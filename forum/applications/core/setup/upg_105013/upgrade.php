@@ -11,39 +11,16 @@
 namespace IPS\core\setup\upg_105013;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\Application;
-use IPS\Content;
-use IPS\Content\Search\Index;
-use IPS\core\Setup\Upgrade as UpgradeClass;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.5.0 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Update group anonymous options
@@ -52,9 +29,9 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		if ( Settings::i()->disable_anonymous )
+		if ( \IPS\Settings::i()->disable_anonymous )
 		{
-			Db::i()->update( 'core_groups', array( "g_hide_online_list" => 2 ), array( "g_hide_online_list!=?", 1 ) );
+			\IPS\Db::i()->update( 'core_groups', array( "g_hide_online_list" => 2 ), array( "g_hide_online_list!=?", 1 ) );
 		}
 		
 		return TRUE;
@@ -77,10 +54,10 @@ class Upgrade
 	 */
 	public function step2()
 	{
-		$existingDefaults = iterator_to_array( Db::i()->select( '*', 'core_notification_defaults' )->setKeyField('notification_key') );
+		$existingDefaults = iterator_to_array( \IPS\Db::i()->select( '*', 'core_notification_defaults' )->setKeyField('notification_key') );
 		$newDefaults = array();
 		
-		$extensions = Application::allExtensions( 'core', 'Notifications' );
+		$extensions = \IPS\Application::allExtensions( 'core', 'Notifications' );
 		foreach ( $extensions as $group => $extension )
 		{
 			try
@@ -146,11 +123,11 @@ class Upgrade
 				}
 
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 		}
 				
-		Db::i()->delete( 'core_notification_defaults' );
-		Db::i()->insert( 'core_notification_defaults', $newDefaults );
+		\IPS\Db::i()->delete( 'core_notification_defaults' );
+		\IPS\Db::i()->insert( 'core_notification_defaults', $newDefaults );
 		
 		return TRUE;
 	}
@@ -174,17 +151,17 @@ class Upgrade
 	{
 		try
 		{
-			if( Db::i()->checkForTable('nexus_referrals' ) )
+			if( \IPS\Db::i()->checkForTable('nexus_referrals' ) )
 			{
-				Db::i()->insert( 'core_referrals', Db::i()->select( 'member_id, referred_by, amount', 'nexus_referrals' ), FALSE, TRUE );
+				\IPS\Db::i()->insert( 'core_referrals', \IPS\Db::i()->select( 'member_id, referred_by, amount', 'nexus_referrals' ), FALSE, TRUE );
 			}
 
-			if( Db::i()->checkForTable('nexus_referral_banners' ) )
+			if( \IPS\Db::i()->checkForTable('nexus_referral_banners' ) )
 			{
-				Db::i()->insert( 'core_referral_banners', Db::i()->select( 'rb_id, rb_url, rb_upload, rb_order', 'nexus_referral_banners' ), FALSE, TRUE );
+				\IPS\Db::i()->insert( 'core_referral_banners', \IPS\Db::i()->select( 'rb_id, rb_url, rb_upload, rb_order', 'nexus_referral_banners' ), FALSE, TRUE );
 			}
 		}
-		catch ( Exception $e ) {}
+		catch ( \Exception $e ) {}
 
 		return TRUE;
 	}
@@ -206,17 +183,17 @@ class Upgrade
 	 */
 	public function step4()
 	{
-		if( CIC )
+		if( \IPS\CIC )
 		{
 			/* Reset notification pruning back to default */
-			Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => NULL ), array( Db::i()->in( 'conf_key', array( 'prune_member_history', 'prune_notifications' ) ) ) );
+			\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => NULL ), array( \IPS\Db::i()->in( 'conf_key', array( 'prune_member_history', 'prune_notifications' ) ) ) );
 
 			/* If we are not using the default member history prune preference, initiate the BG task to reset it */
-			if( !Settings::i()->prune_member_history OR Settings::i()->prune_member_history != 365 )
+			if( !\IPS\Settings::i()->prune_member_history OR \IPS\Settings::i()->prune_member_history != 365 )
 			{
-				Task::queue( 'core', 'PruneLargeTable', array(
+				\IPS\Task::queue( 'core', 'PruneLargeTable', array(
 					'table'			=> 'core_member_history',
-					'where'			=> array( 'log_date < ?', DateTime::create()->sub( new DateInterval( 'P365D' ) )->getTimestamp() ),
+					'where'			=> array( 'log_date < ? and log_app != ?', \IPS\DateTime::create()->sub( new \DateInterval( 'P365D' ) )->getTimestamp(), 'nexus' ),
 					'setting'		=> 'prune_member_history',
 				), 4 );
 			}
@@ -224,76 +201,76 @@ class Upgrade
 		else
 		{
 			/* If this is less than the new minimum, update the setting */
-			if( Settings::i()->prune_notifications > 0 AND Settings::i()->prune_notifications < 7 )
+			if( \IPS\Settings::i()->prune_notifications > 0 AND \IPS\Settings::i()->prune_notifications < 7 )
 			{
-				Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => NULL ), array( 'conf_key=?', 'prune_notifications' ) );
+				\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => NULL ), array( 'conf_key=?', 'prune_notifications' ) );
 			}
 		}
 
 		/* Do the initial prune on the potentially large tables */
-		if ( CIC OR ( isset( $_SESSION['upgrade_options']['core']['105000']['prune'] ) AND $_SESSION['upgrade_options']['core']['105000']['prune'] == 'enable' ) )
+		if ( \IPS\CIC OR ( isset( $_SESSION['upgrade_options']['core']['105000']['prune'] ) AND $_SESSION['upgrade_options']['core']['105000']['prune'] == 'enable' ) )
 		{
-			Task::queue( 'core', 'PruneLargeTable', array(
+			\IPS\Task::queue( 'core', 'PruneLargeTable', array(
 				'table'			=> 'core_members_known_ip_addresses',
-				'where'			=> array( 'last_seen < ?', DateTime::create()->sub( new DateInterval( 'P365D' ) )->getTimestamp() ),
+				'where'			=> array( 'last_seen < ?', \IPS\DateTime::create()->sub( new \DateInterval( 'P365D' ) )->getTimestamp() ),
 				'setting'		=> 'prune_known_ips',
 			), 4 );
 
-			Task::queue( 'core', 'PruneLargeTable', array(
+			\IPS\Task::queue( 'core', 'PruneLargeTable', array(
 				'table'			=> 'core_members_known_devices',
-				'where'			=> array( 'last_seen < ?', DateTime::create()->sub( new DateInterval( 'P365D' ) )->getTimestamp() ),
+				'where'			=> array( 'last_seen < ?', \IPS\DateTime::create()->sub( new \DateInterval( 'P365D' ) )->getTimestamp() ),
 				'setting'		=> 'prune_known_devices',
 			), 4 );
 
-			Task::queue( 'core', 'PruneLargeTable', array(
+			\IPS\Task::queue( 'core', 'PruneLargeTable', array(
 				'table'			=> 'core_item_markers',
-				'where'			=> array( 'item_member_id IN(?)', Db::i()->select( 'member_id', 'core_members', array( 'last_activity < ?', DateTime::create()->sub( new DateInterval( 'P60D' ) )->getTimestamp() ) ) ),
+				'where'			=> array( 'item_member_id IN(?)', \IPS\Db::i()->select( 'member_id', 'core_members', array( 'last_activity < ?', \IPS\DateTime::create()->sub( new \DateInterval( 'P60D' ) )->getTimestamp() ) ) ),
 				'setting'		=> 'prune_item_markers',
 				'deleteJoin'	=> array(
 					'column'		=> 'member_id',
 					'table'			=> 'core_members',
-					'where'			=> array( 'last_activity < ?', DateTime::create()->sub( new DateInterval( 'P60D' ) )->getTimestamp() ),
+					'where'			=> array( 'last_activity < ?', \IPS\DateTime::create()->sub( new \DateInterval( 'P60D' ) )->getTimestamp() ),
 					'outerColumn'	=> 'item_member_id'
 				)
 			), 4 );
 
-			Task::queue( 'core', 'PruneLargeTable', array(
+			\IPS\Task::queue( 'core', 'PruneLargeTable', array(
 				'table'			=> 'core_follow',
-				'where'			=> array( 'follow_app!=? AND follow_area!=? AND follow_member_id IN(?)', 'core', 'member', Db::i()->select( 'member_id', 'core_members', array( 'last_activity < ?', DateTime::create()->sub( new DateInterval( 'P365D' ) )->getTimestamp() ) ) ),
+				'where'			=> array( 'follow_app!=? AND follow_area!=? AND follow_member_id IN(?)', 'core', 'member', \IPS\Db::i()->select( 'member_id', 'core_members', array( 'last_activity < ?', \IPS\DateTime::create()->sub( new \DateInterval( 'P365D' ) )->getTimestamp() ) ) ),
 				'setting'		=> 'prune_follows',
 				'deleteJoin'	=> array(
 					'column'		=> 'member_id',
 					'table'			=> 'core_members',
-					'where'			=> array( 'last_activity < ?', DateTime::create()->sub( new DateInterval( 'P365D' ) )->getTimestamp() ),
+					'where'			=> array( 'last_activity < ?', \IPS\DateTime::create()->sub( new \DateInterval( 'P365D' ) )->getTimestamp() ),
 					'outerColumn'	=> 'follow_member_id'
 				)
 			), 4 );
 		}
-		elseif( !CIC AND isset( $_SESSION['upgrade_options']['core']['105000']['prune'] ) AND $_SESSION['upgrade_options']['core']['105000']['prune'] == 'disable' )
+		elseif( !\IPS\CIC AND isset( $_SESSION['upgrade_options']['core']['105000']['prune'] ) AND $_SESSION['upgrade_options']['core']['105000']['prune'] == 'disable' )
 		{
 			/* We need to insert the settings with values of 0 so they will remain disabled when we import the settings later */
-			Db::i()->replace( 'core_sys_conf_settings', array(
+			\IPS\Db::i()->replace( 'core_sys_conf_settings', array(
 				'conf_key'		=> 'prune_item_markers',
 				'conf_value'	=> '0',
 				'conf_default'	=> '60',
 				'conf_app'		=> 'core'
 			)	);
 
-			Db::i()->replace( 'core_sys_conf_settings', array(
+			\IPS\Db::i()->replace( 'core_sys_conf_settings', array(
 				'conf_key'		=> 'prune_known_ips',
 				'conf_value'	=> '0',
 				'conf_default'	=> '365',
 				'conf_app'		=> 'core'
 			)	);
 
-			Db::i()->replace( 'core_sys_conf_settings', array(
+			\IPS\Db::i()->replace( 'core_sys_conf_settings', array(
 				'conf_key'		=> 'prune_known_devices',
 				'conf_value'	=> '0',
 				'conf_default'	=> '365',
 				'conf_app'		=> 'core'
 			)	);
 
-			Db::i()->replace( 'core_sys_conf_settings', array(
+			\IPS\Db::i()->replace( 'core_sys_conf_settings', array(
 				'conf_key'		=> 'prune_follows',
 				'conf_value'	=> '0',
 				'conf_default'	=> '365',
@@ -302,9 +279,9 @@ class Upgrade
 		}
 
 		/* If this is less than the new minimum, update the setting */
-		if( Settings::i()->prune_log_system > 0 AND Settings::i()->prune_log_system < 7 )
+		if( \IPS\Settings::i()->prune_log_system > 0 AND \IPS\Settings::i()->prune_log_system < 7 )
 		{
-			Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => NULL ), array( 'conf_key=?', 'prune_log_system' ) );
+			\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => NULL ), array( 'conf_key=?', 'prune_log_system' ) );
 		}
 
 		return TRUE;
@@ -329,30 +306,30 @@ class Upgrade
 	{
 		$validClasses = array();
 
-		foreach( Content::routedClasses( FALSE, TRUE, TRUE ) as $class )
+		foreach( \IPS\Content::routedClasses( FALSE, TRUE, TRUE ) as $class )
 		{
-			if( IPS::classUsesTrait( $class, 'IPS\Content\Ratings' ) )
+			if( \in_array( 'IPS\Content\Ratings', class_implements( $class ) ) )
 			{
 				$validClasses[] = $class;
 			}
 		}
 
-		if( !count( $validClasses ) )
+		if( !\count( $validClasses ) )
 		{
 			return TRUE;
 		}
 
-		$toRun = UpgradeClass::runManualQueries( array( array(
+		$toRun = \IPS\core\Setup\Upgrade::runManualQueries( array( array(
 			'table' => 'core_ratings',
-			'query' => "DELETE FROM `" . Db::i()->prefix . "core_ratings` WHERE " . Db::i()->in( 'class', $validClasses, TRUE )
+			'query' => "DELETE FROM `" . \IPS\Db::i()->prefix . "core_ratings` WHERE " . \IPS\Db::i()->in( 'class', $validClasses, TRUE )
 		) ) );
 
-		if ( count( $toRun ) )
+		if ( \count( $toRun ) )
 		{
-			UpgradeClass::adjustMultipleRedirect( array( 1 => 'core', 'extra' => array( '_upgradeStep' => 6 ) ) );
+			\IPS\core\Setup\Upgrade::adjustMultipleRedirect( array( 1 => 'core', 'extra' => array( '_upgradeStep' => 6 ) ) );
 
 			/* Queries to run manually */
-			return array( 'html' => Theme::i()->getTemplate( 'forms' )->queries( $toRun, Url::internal( 'controller=upgrade' )->setQueryString( array( 'key' => $_SESSION['uniqueKey'], 'mr_continue' => 1, 'mr' => Request::i()->mr ) ) ) );
+			return array( 'html' => \IPS\Theme::i()->getTemplate( 'forms' )->queries( $toRun, \IPS\Http\Url::internal( 'controller=upgrade' )->setQueryString( array( 'key' => $_SESSION['uniqueKey'], 'mr_continue' => 1, 'mr' => \IPS\Request::i()->mr ) ) ) );
 		}
 
 		return TRUE;
@@ -377,12 +354,12 @@ class Upgrade
 	{
 		$perCycle	= 250;
 		$did		= 0;
-		$limit		= intval( Request::i()->extra );
+		$limit		= \intval( \IPS\Request::i()->extra );
 
 		/* Try to prevent timeouts to the extent possible */
-		$cutOff			= UpgradeClass::determineCutoff();
+		$cutOff			= \IPS\core\Setup\Upgrade::determineCutoff();
 
-		foreach( Db::i()->select( '*', 'core_content_meta', array( 'meta_type=?', 'core_ContentMessages' ), 'meta_id', array( $limit, $perCycle ) ) as $i )
+		foreach( \IPS\Db::i()->select( '*', 'core_content_meta', array( 'meta_type=?', 'core_ContentMessages' ), 'meta_id', array( $limit, $perCycle ) ) as $i )
 		{
 			if( $cutOff !== null AND time() >= $cutOff )
 			{
@@ -393,7 +370,7 @@ class Upgrade
 
 			$meta = json_decode( $i['meta_data'], TRUE);
 			$meta['is_public'] = TRUE;
-			Db::i()->update('core_content_meta', array('meta_data' => json_encode($meta)), array('meta_id=?', $i['meta_id'] ));
+			\IPS\Db::i()->update('core_content_meta', array('meta_data' => json_encode($meta)), array('meta_id=?', $i['meta_id'] ));
 		}
 
 		if ( $did )
@@ -426,7 +403,7 @@ class Upgrade
 	public function finish()
 	{
 		/* Delete old language strings (yes, these are in core for some reason ) */
-		Db::i()->delete( 'core_sys_lang_words', array( 'word_app=? and ' . Db::i()->in( 'word_key', array(
+		\IPS\Db::i()->delete( 'core_sys_lang_words', array( 'word_app=? and ' . \IPS\Db::i()->in( 'word_key', array(
 			'rss_import_forum_id',
 			'rss_import_mid',
 			'rss_import_mid_desc',
@@ -440,68 +417,87 @@ class Upgrade
 		/* Revert back to MySQL search if their Elasticsearch version is outdated */
 		if ( isset( $_SESSION['upgrade_options']['core']['105000']['es_version'] ) AND $_SESSION['upgrade_options']['core']['105000']['es_version'] )
 		{
-			Settings::i()->changeValues( array( 'search_method' => 'mysql' ) );
+			\IPS\Settings::i()->changeValues( array( 'search_method' => 'mysql' ) );
 
-			Index::i()->rebuild();
+			\IPS\Content\Search\Index::i()->rebuild();
 		}
 
 		/* Update user link preference setting for existing installs */
-		Db::i()->replace( 'core_sys_conf_settings', array(
+		\IPS\Db::i()->replace( 'core_sys_conf_settings', array(
 			'conf_key'		=> 'link_default',
 			'conf_value'	=> 'first',
 			'conf_default'	=> 'unread',
 			'conf_app'		=> 'core'
 		)	);
 
+		/* Enable/disable bbcode appropriately */
+		if ( isset( $_SESSION['upgrade_options']['core']['105000']['enable_bbcode'] ) AND $_SESSION['upgrade_options']['core']['105000']['enable_bbcode'] == 'enable' )
+		{
+			/* The setting won't have been inserted yet */
+			\IPS\Db::i()->replace( 'core_sys_conf_settings', array(
+				'conf_key'		=> 'enable_bbcode',
+				'conf_value'	=> 1,
+				'conf_default'	=> 0,
+				'conf_app'		=> 'core'
+			)	);
+		}
+
 		/* Copy Commerce setting to core. It is removed in Commerce upgrader */
-		Db::i()->replace( 'core_sys_conf_settings', array(
+		\IPS\Db::i()->replace( 'core_sys_conf_settings', array(
 			'conf_key'		=> 'ref_on',
-			'conf_value'	=> Settings::i()->cm_ref_on ?: 0,
+			'conf_value'	=> \IPS\Settings::i()->cm_ref_on ?: 0,
 			'conf_default'	=> 0,
 			'conf_app'		=> 'core'
 		)	);
 		
 		/* Revert admin_reg email templates */
-		Db::i()->delete( 'core_email_templates', array( "template_app=? AND template_name=? AND template_edited=?", 'core', 'admin_reg', 1 ) );
+		\IPS\Db::i()->delete( 'core_email_templates', array( "template_app=? AND template_name=? AND template_edited=?", 'core', 'admin_reg', 1 ) );
 
 		/* Initiate image proxy rebuilds to remove image proxy */
-		unset( Store::i()->currentImageProxyRebuild );
+		unset( \IPS\Data\Store::i()->currentImageProxyRebuild );
 
-		if( Db::i()->checkForTable('core_image_proxy') )
+		if( \IPS\Db::i()->checkForTable('core_image_proxy') )
 		{
-			foreach ( Content::routedClasses( FALSE, TRUE ) as $class )
+			foreach ( \IPS\Content::routedClasses( FALSE, TRUE ) as $class )
 			{
 				if( isset( $class::$databaseColumnMap['content'] ) )
 				{
 					try
 					{
-						Task::queue( 'core', 'RebuildImageProxy', array( 'class' => $class ), 4 );
+						\IPS\Task::queue( 'core', 'RebuildImageProxy', array( 'class' => $class ), 4 );
 					}
-					catch( OutOfRangeException $ex ) { }
+					catch( \OutOfRangeException $ex ) { }
 				}
 			}
 
-			foreach( Application::allExtensions( 'core', 'EditorLocations', FALSE, NULL, NULL, TRUE, TRUE ) as $_key => $extension )
+			foreach( \IPS\Application::allExtensions( 'core', 'EditorLocations', FALSE, NULL, NULL, TRUE, TRUE ) as $_key => $extension )
 			{
 				if( method_exists( $extension, 'rebuildImageProxy' ) )
 				{
-					Task::queue( 'core', 'RebuildImageProxyNonContent', array( 'extension' => $_key ), 4 );
+					\IPS\Task::queue( 'core', 'RebuildImageProxyNonContent', array( 'extension' => $_key ), 4 );
 				}
 			}
 
 			/* Also initiate the task to delete the files. If we are caching indefinitely, files will be retained but the table still should be dropped. */
-			Task::queue( 'core', 'DeleteImageProxyFiles', array(), 5 );
+			\IPS\Task::queue( 'core', 'DeleteImageProxyFiles', array(), 5 );
 		}
 
 		/* Disable third party addons to prevent errors post-upgrade */
-		foreach( Application::enabledApplications() as $app )
+		foreach( \IPS\Application::enabledApplications() as $app )
 		{
-			if( !in_array( $app->directory, IPS::$ipsApps ) )
+			if( !\in_array( $app->directory, \IPS\IPS::$ipsApps ) )
 			{
 				$app->enabled = false;
 				$app->save();
 			}
 		}
+
+		foreach( \IPS\Plugin::enabledPlugins() as $plugin )
+		{
+			$plugin->enabled = FALSE;
+			$plugin->save();
+		}
+
 		return TRUE;
 	}
 	

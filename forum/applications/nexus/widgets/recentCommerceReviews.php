@@ -12,65 +12,55 @@
 namespace IPS\nexus\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Filter;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\nexus\Package\Review;
-use IPS\Output;
-use IPS\Theme;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * recentCommerceReviews Widget
  */
-class recentCommerceReviews extends PermissionCache implements Customizable
+class _recentCommerceReviews extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'recentCommerceReviews';
+	public $key = 'recentCommerceReviews';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'nexus';
-
+	public $app = 'nexus';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
+	
 	/**
 	 * Init widget
 	 *
-	 * @return	void
+	 * @return	null
 	 */
-	public function init(): void
+	public function init()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'nexus', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'nexus', 'front' ) );
 		parent::init();
 	}
 	
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
 		$form = parent::configuration( $form );
 
 		/* Container */
-		$form->add( new Node( 'widget_group', $this->configuration['widget_group'] ?? 0, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Node( 'widget_group', isset( $this->configuration['widget_group'] ) ? $this->configuration['widget_group'] : 0, FALSE, array(
 			'class'           => '\IPS\nexus\Package\Group',
 			'zeroVal'         => 'all',
 			'permissionCheck' => 'view',
@@ -78,7 +68,7 @@ class recentCommerceReviews extends PermissionCache implements Customizable
 			'subnodes'		  => false,
 		) ) );
 
-		$form->add( new Number( 'review_count', $this->configuration['review_count'] ?? 5, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'review_count', isset( $this->configuration['review_count'] ) ? $this->configuration['review_count'] : 5, TRUE ) );
 
 		return $form;
 	}
@@ -89,9 +79,9 @@ class recentCommerceReviews extends PermissionCache implements Customizable
  	 * @param	array	$values	Values from form
  	 * @return	array
  	 */
-	public function preConfig( array $values ): array
+	public function preConfig( $values )
 	{
-		if ( is_array( $values['widget_group'] ) )
+		if ( \is_array( $values['widget_group'] ) )
 		{
 			$values['widget_group'] = array_keys( $values['widget_group'] );
 		}
@@ -104,18 +94,18 @@ class recentCommerceReviews extends PermissionCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		$where = array();
 
 		if ( ! empty( $this->configuration['widget_group'] ) )
 		{
-			$where['item'][] = array( Db::i()->in( 'p_group', $this->configuration['widget_group'] ) );
+			$where['item'][] = array( \IPS\Db::i()->in( 'p_group', $this->configuration['widget_group'] ) );
 		}
 
-		$reviews = Review::getItemsWithPermission( $where, null, ( isset( $this->configuration['review_count'] ) and $this->configuration['review_count'] > 0 ) ? $this->configuration['review_count'] : 5, 'read', Filter::FILTER_PUBLIC_ONLY );
+		$reviews = \IPS\nexus\Package\Review::getItemsWithPermission( $where, NULL, ( isset( $this->configuration['review_count'] ) AND $this->configuration['review_count'] > 0 ) ? $this->configuration['review_count'] : 5, 'read', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY );
 
-		if ( !count( $reviews ) )
+		if ( !\count( $reviews ) )
 		{
 			return "";
 		}

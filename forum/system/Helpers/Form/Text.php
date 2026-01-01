@@ -11,36 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use IPS\core\Profanity;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Front;
-use IPS\Login;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function count;
-use function defined;
-use function get_called_class;
-use function in_array;
-use function is_array;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Text input class for Form Builder
  */
-class Text extends TextArea
+class _Text extends TextArea
 {
 	/**
 	 * @brief	Default Options
@@ -64,9 +44,7 @@ class Text extends TextArea
 	 			'minAjaxLength'		=> 3,				// Minimum length of value before sending AJAX lookup call
 	 			'disallowedCharacters' => array(), 		// An array of disallowed characters (default < > ' ")
 	 			'minimized'			=> TRUE 			// Whether the autocomplete shows a 'choose' link to activate. Existing values or required = true will always override this.
-	 			'alphabetical'		=> FALSE,			// Force values to be sorted alphabetically.,
-				'suggestionsOnly'	=> false,			// Force values to come from the autocomplete suggestion form before submitting,
-                'separator'         => null             // Custom separator when multiple values are submitted in the request. Defaults to newline character.
+	 			'alphabetical'		=> FALSE,			// Force values to be sorted alphabetically.
 	 		),
 	 		'placeholder'		=> 'e.g. ...',	// A placeholder (NB: Will only work on compatible browsers)
 	 		'regex'				=> '/[A-Z]+/i',	// RegEx of acceptable value
@@ -78,7 +56,7 @@ class Text extends TextArea
 	  );
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'minLength'			=> NULL,
 		'maxLength'			=> NULL,
 		'size'				=> NULL,
@@ -96,12 +74,12 @@ class Text extends TextArea
 	/**
 	 * @brief	Child default Options
 	 */
-	protected array $childDefaultOptions = array();
+	protected $childDefaultOptions = array();
 	
 	/**
 	 * @brief	Form type
 	 */
-	public string $formType = 'text';
+	public $formType = 'text';
 	
 	/**
 	 * @brief	Do not bypass profanity filters
@@ -121,16 +99,17 @@ class Text extends TextArea
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		/* Pull in default options from child class */
 		$this->defaultOptions = array_merge( $this->defaultOptions, $this->childDefaultOptions );
@@ -138,8 +117,8 @@ class Text extends TextArea
 		/* Set username regex */
 		if ( isset( $options['accountUsername'] ) and $options['accountUsername'] !== FALSE )
 		{
-			$options['minLength'] = Settings::i()->min_user_name_length;
-			$options['maxLength'] = Settings::i()->max_user_name_length;
+			$options['minLength'] = \IPS\Settings::i()->min_user_name_length;
+			$options['maxLength'] = \IPS\Settings::i()->max_user_name_length;
 		}
 		
 		/* Call parent constructor */
@@ -148,11 +127,11 @@ class Text extends TextArea
 		/* Add JS */
 		if ( isset( $this->options['autocomplete']['prefix'] ) and $this->options['autocomplete']['prefix'] )
 		{
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_core.js', 'core', 'global' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_core.js', 'core', 'global' ) );
 		}
 		
 		/* Set the form type */
-		$this->formType = mb_strtolower( mb_substr( get_called_class(), mb_strrpos( get_called_class(), '\\' ) + 1 ) );
+		$this->formType = mb_strtolower( mb_substr( \get_called_class(), mb_strrpos( \get_called_class(), '\\' ) + 1 ) );
 	}
 	
 	/**
@@ -163,25 +142,19 @@ class Text extends TextArea
 	 *	@li	PCRE and ECMAScript regex are not 100% compatible (though the instances this present a problem are admittedly rare)
 	 *	@li	You cannot specify modifiers with the pattern attribute, which we need to support on the PHP side
 	 */
-	public function html(): string
+	public function html()
 	{
 		/* 10/19/15 - adding htmlspecialchars around value if autocomplete is enabled so that html tag characters can be used (e.g. for members) */
 		/* This value is decoded by the JS widget before use */
-		if( $this->options['autocomplete'] and !empty( $this->value ) and is_array( $this->value ) )
+		if( $this->options['autocomplete'] and !empty( $this->value ) and \is_array( $this->value ) )
 		{
 			foreach( $this->value as $key => $value )
 			{
 				$this->value[ $key ] = htmlspecialchars( $value, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', FALSE );
 			}
 		}
-		elseif( !isset( $this->options['nullLang'] ) )
-		{
-			/* PHP 8.1 - htmlspecialchars() expects parameter 1 to be string, null given */
-			$this->value = $this->value === null ? '' : $this->value;
-		}
 
-
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->text( $this->name, $this->formType, $this->value, $this->required, $this->options['maxLength'], $this->options['size'], $this->options['disabled'], $this->options['autocomplete'], $this->options['placeholder'], NULL, $this->options['nullLang'], $this->htmlId, FALSE, $this->options['htmlAutocomplete'] );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->text( $this->name, $this->formType, $this->value, $this->required, $this->options['maxLength'], $this->options['size'], $this->options['disabled'], $this->options['autocomplete'], $this->options['placeholder'], NULL, $this->options['nullLang'], $this->htmlId, FALSE, $this->options['htmlAutocomplete'] );
 	}
 	
 	/**
@@ -189,13 +162,21 @@ class Text extends TextArea
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
-		$return = parent::getValue();
+		$name = $this->name . '_noscript';
+		if ( isset( \IPS\Request::i()->$name ) )
+		{
+			$return = \IPS\Request::i()->$name;
+		}
+		else
+		{
+			$return = parent::getValue();
+		}
 
 		if ( $this->options['trim'] )
 		{
-			if ( is_array( $return ) )
+			if ( \is_array( $return ) )
 			{
 				$return = array_map( 'trim', $return );
 			}
@@ -204,10 +185,10 @@ class Text extends TextArea
 				$return = trim( $return );
 			}
 		}
-
-		if ( isset( $this->options['autocomplete'] ) and $return !== null )
+		
+		if ( isset( $this->options['autocomplete'] ) )
 		{
-			if ( is_array( $return ) )
+			if ( \is_array( $return ) )
 			{
 				$return = array_map( function( $val ) {
 					return htmlspecialchars_decode( $val, ENT_QUOTES );
@@ -217,23 +198,22 @@ class Text extends TextArea
 			{
 				$return = htmlspecialchars_decode( $return, ENT_QUOTES );
 			}
-
-			if ( !is_array( $return ) and ( !isset( $this->options['autocomplete']['maxItems'] ) or $this->options['autocomplete']['maxItems'] != 1 ) )
+			
+			if ( !\is_array( $return ) and ( !isset( $this->options['autocomplete']['maxItems'] ) or $this->options['autocomplete']['maxItems'] != 1 ) )
 			{
-                $separator = $this->options['autocomplete']['separator'] ?? "\n";
-				$return = array_filter( array_map( 'trim', explode( $separator, $return ) ) );
+				$return = array_filter( array_map( 'trim', explode( "\n", $return ) ) );
 			}
-
-			if ( is_array( $return ) AND isset( $this->options['autocomplete']['alphabetical'] ) AND $this->options['autocomplete']['alphabetical'] )
+			
+			if ( \is_array( $return ) AND isset( $this->options['autocomplete']['alphabetical'] ) AND $this->options['autocomplete']['alphabetical'] )
 			{
 				natcasesort( $return );
 			}
 		}
-
+				
 		/* Remove all invisible characters if this is a username */
 		if( $this->options['accountUsername'] )
 		{
-			if ( !is_array( $return ) )
+			if ( !\is_array( $return ) )
 			{
 				$return = preg_replace( '/\p{C}+/u', '', $return );
 			}
@@ -248,21 +228,31 @@ class Text extends TextArea
 
 		if ( isset( $this->options['autocomplete']['prefix'] ) and $this->options['autocomplete']['prefix'] )
 		{
-			$return = is_array( $return ) ? $return : ( $return ? array( $return ) : array() );
+			$return = \is_array( $return ) ? $return : ( $return ? array( $return ) : array() );
 
 			$firstAsPrefix = $this->name . '_first_as_prefix';
 			$freechoicePrefixCheckbox = $this->name . '_freechoice_prefix';
 			$freechoicePrefix = $this->name . '_prefix';
-			if ( isset( Request::i()->$freechoicePrefixCheckbox ) and Request::i()->$freechoicePrefixCheckbox and isset( Request::i()->$freechoicePrefix ) and Request::i()->$freechoicePrefix )
+			$noscriptPrefix = $this->name . '_noscript_prefix';
+			if ( isset( \IPS\Request::i()->$noscriptPrefix ) and \IPS\Request::i()->$noscriptPrefix )
 			{
-				$currentIndex = array_search( Request::i()->$freechoicePrefix, $return );
+				$currentIndex = array_search( \IPS\Request::i()->$noscriptPrefix, $return );
 				if ( $currentIndex !== FALSE )
 				{
 					unset( $return[ $currentIndex ] );
 				}
-				$return['prefix'] = Request::i()->$freechoicePrefix;
+				$return['prefix'] = \IPS\Request::i()->$noscriptPrefix;
 			}
-			elseif ( isset( Request::i()->$firstAsPrefix ) and Request::i()->$firstAsPrefix and !empty( $return ) )
+			elseif ( isset( \IPS\Request::i()->$freechoicePrefixCheckbox ) and \IPS\Request::i()->$freechoicePrefixCheckbox and isset( \IPS\Request::i()->$freechoicePrefix ) and \IPS\Request::i()->$freechoicePrefix )
+			{
+				$currentIndex = array_search( \IPS\Request::i()->$freechoicePrefix, $return );
+				if ( $currentIndex !== FALSE )
+				{
+					unset( $return[ $currentIndex ] );
+				}
+				$return['prefix'] = \IPS\Request::i()->$freechoicePrefix;
+			}
+			elseif ( isset( \IPS\Request::i()->$firstAsPrefix ) and \IPS\Request::i()->$firstAsPrefix and !empty( $return ) )
 			{
 				$return = array_merge( array( 'prefix' => array_shift( $return ) ), $return );
 			}
@@ -270,18 +260,17 @@ class Text extends TextArea
 
 		return $return;
 	}
-
+	
 	/**
 	 * Format Value
 	 *
 	 * @return	mixed
 	 */
-	public function formatValue(): mixed
-	{
-		if ( $this->options['autocomplete'] !== NULL and ( !isset( $this->options['autocomplete']['maxItems'] ) or $this->options['autocomplete']['maxItems'] != 1 ) and !is_array( $this->value ) and $this->value !== NULL )
+	public function formatValue()
+	{		
+		if ( $this->options['autocomplete'] !== NULL and ( !isset( $this->options['autocomplete']['maxItems'] ) or $this->options['autocomplete']['maxItems'] != 1 ) and !\is_array( $this->value ) and $this->value !== NULL )
 		{
-            $separator = $this->options['autocomplete']['separator'] ?? "\n";
-			return array_filter( array_map( 'trim', explode( $separator, $this->value ) ) );
+			return array_filter( array_map( 'trim', explode( "\n", $this->value ) ) );
 		}
 		
 		return $this->value;
@@ -292,7 +281,7 @@ class Text extends TextArea
 	 *
 	 * @return	mixed
 	 */
-	public function getLabelForAttribute(): mixed
+	public function getLabelForAttribute()
 	{
 		return 'elInput_' . parent::getLabelForAttribute();
 	}
@@ -300,39 +289,33 @@ class Text extends TextArea
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
-	 * @throws	DomainException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\DomainException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		parent::validate();
 
 		/* Check it isn't just invisible characters (we don't strip them, because things like zero-width-joiners when in between other characters have a special meaning */
-		if ( $this->required and is_string( $this->value ) and mb_strlen( preg_replace( '/\p{C}+/u', '', $this->value ) ) === 0 )
+		if ( $this->required and \is_string( $this->value ) and mb_strlen( preg_replace( '/\p{C}+/u', '', $this->value ) ) === 0 )
 		{
-			throw new DomainException('form_required');
+			throw new \DomainException('form_required');
 		}
 
 		/* skip validation if it's an username field and if the name wasn't changed */
-		if ( $this->options['accountUsername'] AND $this->options['accountUsername'] instanceOf Member AND $this->options['accountUsername']->name == $this->value )
+		if ( $this->options['accountUsername'] AND $this->options['accountUsername'] instanceOf \IPS\Member AND $this->options['accountUsername']->name == $this->value )
 		{
 			return TRUE;
 		}
 
-		/* If the value is null, just stop here */
-		if( $this->value === null )
-		{
-			return TRUE;
-		}
-
-		if( Dispatcher::i() instanceof Front and !Member::loggedIn()->group['g_bypass_badwords'] )
+		if( \IPS\Dispatcher::i() instanceof \IPS\Dispatcher\Front and !\IPS\Member::loggedIn()->group['g_bypass_badwords'] )
 		{
 			$looseProfanity = array();
 			$exactProfanity = array();
 			
 			/* Set up profanity filters */
-			foreach( Profanity::getProfanity() AS $profanity )
+			foreach( \IPS\core\Profanity::getProfanity() AS $profanity )
 			{
 				if ( $profanity->action == 'block' )
 				{
@@ -356,7 +339,7 @@ class Text extends TextArea
 
 			/* Construct break points */
 			$exactProfanityBreakpoints = array();
-			if( count( $exactProfanity ) )
+			if( \count( $exactProfanity ) )
 			{
 				$array = array();
 				foreach( array_keys( $exactProfanity ) as $entry )
@@ -371,32 +354,32 @@ class Text extends TextArea
 		/* Regex */
 		if ( $this->options['regex'] !== NULL and $this->value and !preg_match( $this->options['regex'], $this->value ) )
 		{
-			throw new InvalidArgumentException( 'form_bad_value' );
+			throw new \InvalidArgumentException( 'form_bad_value' );
 		}
 
 		/* Username */
 		if ( $this->options['accountUsername'] )
 		{
 			/* Check it is valid */
-			if ( !Login::usernameIsAllowed( $this->value ) )
+			if ( !\IPS\Login::usernameIsAllowed( $this->value ) )
 			{
-				throw new DomainException( 'form_name_banned' );
+				throw new \DomainException( 'form_name_banned' );
 			}
 
 			/* Check if it exists */
-			if ( !( $this->options['accountUsername'] instanceof Member ) or mb_strtolower( $this->options['accountUsername']->name ) !== mb_strtolower( $this->value ) )
+			if ( !( $this->options['accountUsername'] instanceof \IPS\Member ) or mb_strtolower( $this->options['accountUsername']->name ) !== mb_strtolower( $this->value ) )
 			{
-				if ( $error = Login::usernameIsInUse( $this->value, ( $this->options['accountUsername'] instanceof Member ) ? $this->options['accountUsername'] : NULL, Member::loggedIn()->isAdmin() ) )
+				if ( $error = \IPS\Login::usernameIsInUse( $this->value, ( $this->options['accountUsername'] instanceof \IPS\Member ) ? $this->options['accountUsername'] : NULL, \IPS\Member::loggedIn()->isAdmin() ) )
 				{
-					throw new DomainException( $error );
+					throw new \DomainException( $error );
 				}
 				
 				/* Check it's not banned */
-				foreach( Db::i()->select( 'ban_content', 'core_banfilters', array("ban_type=?", 'name') ) as $bannedName )
+				foreach( \IPS\Db::i()->select( 'ban_content', 'core_banfilters', array("ban_type=?", 'name') ) as $bannedName )
 				{
 					if( preg_match( '/^' . str_replace( '\*', '.*', preg_quote( $bannedName, '/' ) ) . '$/i', $this->value ) )
 					{
-						throw new DomainException( 'form_name_banned' );
+						throw new \DomainException( 'form_name_banned' );
 					}
 				}
 			}
@@ -407,20 +390,20 @@ class Text extends TextArea
 		{
 			if( $this->value )
 			{
-				$values = ( is_array( $this->value ) ) ? $this->value : array( $this->value );
+				$values = ( \is_array( $this->value ) ) ? $this->value : array( $this->value );
 			}
 			else
 			{
 				$values = array();
 			}
 
-			if ( isset( $this->options['autocomplete']['maxItems'] ) and count( $values ) > $this->options['autocomplete']['maxItems'] )
+			if ( isset( $this->options['autocomplete']['maxItems'] ) and \count( $values ) > $this->options['autocomplete']['maxItems'] )
 			{
-				throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_tags_max', FALSE, array( 'pluralize' => array( $this->options['autocomplete']['maxItems'] ) ) ) );
+				throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_tags_max', FALSE, array( 'pluralize' => array( $this->options['autocomplete']['maxItems'] ) ) ) );
 			}
-			if ( isset( $this->options['autocomplete']['minItems'] ) and ( $this->required or count( $values ) > 0 ) and count( $values ) < $this->options['autocomplete']['minItems'] )
+			if ( isset( $this->options['autocomplete']['minItems'] ) and ( $this->required or \count( $values ) > 0 ) and \count( $values ) < $this->options['autocomplete']['minItems'] )
 			{
-				throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_tags_min', FALSE, array( 'pluralize' => array( $this->options['autocomplete']['minItems'] ) ) ) );
+				throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_tags_min', FALSE, array( 'pluralize' => array( $this->options['autocomplete']['minItems'] ) ) ) );
 			}
 
 			if ( isset( $this->options['autocomplete']['minLength'] ) )
@@ -429,7 +412,7 @@ class Text extends TextArea
 				{
 					if ( mb_strlen( $v ) < $this->options['autocomplete']['minLength'] )
 					{
-						throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_tags_length_min', FALSE, array( 'pluralize' => array( $this->options['autocomplete']['minLength'] ) ) ) );
+						throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_tags_length_min', FALSE, array( 'pluralize' => array( $this->options['autocomplete']['minLength'] ) ) ) );
 					}
 				}
 			}
@@ -439,11 +422,11 @@ class Text extends TextArea
 				{
 					if ( mb_strlen( $v ) > $this->options['autocomplete']['maxLength'] )
 					{
-						throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_tags_length_max', FALSE, array( 'pluralize' => array( $this->options['autocomplete']['maxLength'] ) ) ) );
+						throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_tags_length_max', FALSE, array( 'pluralize' => array( $this->options['autocomplete']['maxLength'] ) ) ) );
 					}
 				}
 			}
-			if ( isset( $this->options['autocomplete']['filterProfanity'] ) AND is_array( $this->value ) AND count( $this->value ) and Dispatcher::i() instanceof Front and !Member::loggedIn()->group['g_bypass_badwords'] )
+			if ( isset( $this->options['autocomplete']['filterProfanity'] ) AND \is_array( $this->value ) AND \count( $this->value ) and \IPS\Dispatcher::i() instanceof \IPS\Dispatcher\Front and !\IPS\Member::loggedIn()->group['g_bypass_badwords'] )
 			{
 				foreach ( $values as $k => $v )
 				{
@@ -455,7 +438,7 @@ class Text extends TextArea
 						}
 						else
 						{
-							throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_tags_not_allowed', FALSE, array( 'sprintf' => array( $v ) ) ) );
+							throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_tags_not_allowed', FALSE, array( 'sprintf' => array( $v ) ) ) );
 						}
 					}
 					else
@@ -471,7 +454,7 @@ class Text extends TextArea
 							{
 								if ( mb_stristr( $this->value[ $k ], $type ) )
 								{
-									throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_tags_not_allowed', FALSE, array( 'sprintf' => array( $v ) ) ) );
+									throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_tags_not_allowed', FALSE, array( 'sprintf' => array( $v ) ) ) );
 								}
 							}
 						}
@@ -482,7 +465,7 @@ class Text extends TextArea
 				}
 			}
 
-			if ( isset( $this->options['autocomplete']['unique'] ) AND $this->options['autocomplete']['unique'] AND is_array( $this->value ) AND count( $this->value ) )
+			if ( isset( $this->options['autocomplete']['unique'] ) AND $this->options['autocomplete']['unique'] AND \is_array( $this->value ) AND \count( $this->value ) )
 			{
 				foreach ( $this->value as $v )
 				{
@@ -494,7 +477,7 @@ class Text extends TextArea
 				}
 			}
 
-			if ( is_array( $this->value ) AND isset( $this->options['autocomplete']['source'] ) AND is_array( $this->options['autocomplete']['source'] ) AND ( !isset( $this->options['autocomplete']['freeChoice'] ) OR !$this->options['autocomplete']['freeChoice'] ) )
+			if ( \is_array( $this->value ) AND isset( $this->options['autocomplete']['source'] ) AND \is_array( $this->options['autocomplete']['source'] ) AND ( !isset( $this->options['autocomplete']['freeChoice'] ) OR !$this->options['autocomplete']['freeChoice'] ) )
 			{
 				if( isset( $this->options['autocomplete']['forceLower'] ) AND $this->options['autocomplete']['forceLower'] )
 				{
@@ -508,15 +491,15 @@ class Text extends TextArea
 		}
 
 		/* Split on profanity */
-		if( in_array( $this->options['bypassProfanity'], array( static::BYPASS_PROFANITY_NONE, static::BYPASS_PROFANITY_SWAP ) ) and is_string( $this->value ) and Dispatcher::i() instanceof Front and !Member::loggedIn()->group['g_bypass_badwords'] AND !$this->options['accountUsername'] )
+		if( \in_array( $this->options['bypassProfanity'], array( static::BYPASS_PROFANITY_NONE, static::BYPASS_PROFANITY_SWAP ) ) and \is_string( $this->value ) and \IPS\Dispatcher::i() instanceof \IPS\Dispatcher\Front and !\IPS\Member::loggedIn()->group['g_bypass_badwords'] AND !$this->options['accountUsername'] )
 		{
 			$newVal = NULL;
-			if ( count( $exactProfanityBreakpoints ) )
+			if ( \count( $exactProfanityBreakpoints ) )
 			{
 				/* preg_split can return boolean false*/
 				$split = preg_split( '/' . implode( '|', $exactProfanityBreakpoints ) . '/iu', $this->value, null, PREG_SPLIT_DELIM_CAPTURE );
 
-				if( is_array( $split ) )
+				if( \is_array( $split ) )
 				{
 					foreach ( $split as $section )
 					{
@@ -530,7 +513,7 @@ class Text extends TextArea
 							{
 								if ( $this->options['bypassProfanity'] === static::BYPASS_PROFANITY_NONE )
 								{
-									throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_tags_not_allowed', FALSE, array( 'sprintf' => array( $section ) ) ) );
+									throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_tags_not_allowed', FALSE, array( 'sprintf' => array( $section ) ) ) );
 								}
 								else
 								{
@@ -548,7 +531,7 @@ class Text extends TextArea
 			
 			$value = $newVal ?: $this->value;
 			
-			if ( count( $looseProfanity ) )
+			if ( \count( $looseProfanity ) )
 			{
 				$swaps = array();
 				foreach( $looseProfanity AS $type => $row )
@@ -563,7 +546,7 @@ class Text extends TextArea
 						{
 							if ( $this->options['bypassProfanity'] === static::BYPASS_PROFANITY_NONE )
 							{
-								throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_tags_not_allowed', FALSE, array( 'sprintf' => array( $row->type ) ) ) );
+								throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_tags_not_allowed', FALSE, array( 'sprintf' => array( $row->type ) ) ) );
 							}
 						}
 					}

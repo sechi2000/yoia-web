@@ -12,95 +12,48 @@ namespace IPS\core\extensions\core\ModCp;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use ErrorException;
-use IPS\Api\Exception;
-use IPS\Application;
-use IPS\Content\Controller;
-use IPS\core\DeletionLog;
-use IPS\core\Reports\Comment;
 use IPS\core\Reports\Report;
-use IPS\core\Reports\Types;
-use IPS\DateTime;
-use IPS\Db;
 use IPS\Helpers\Form;
 use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Table\Content;
-use IPS\Http\Url;
 use IPS\Member;
-use IPS\Node\Permissions as NodePermissions;
 use IPS\Output;
 use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function in_array;
+use function count;
+use function intval;
+use function iterator_to_array;
+use function rtrim;
+use function str_replace;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Report Center
  */
-class Reports extends Controller
+class _Reports extends \IPS\Content\Controller
 {
 	/**
 	 * [Content\Controller]	Class
 	 */
-	protected static string $contentModel = 'IPS\core\Reports\Report';
+	protected static $contentModel = 'IPS\core\Reports\Report';
 	
 	/**
 	 * Returns the primary tab key for the navigation bar
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function getTab(): ?string
+	public function getTab()
 	{
 		/* Check Permissions */
-		if ( ! Member::loggedIn()->canAccessReportCenter() )
+		if ( ! Member::loggedIn()->modPermission('can_view_reports') )
 		{
 			return null;
 		}
 		
 		return 'reports';
-	}
-
-	/**
-	 * What do I manage?
-	 * Acceptable responses are: content, members, or other
-	 *
-	 * @return	string
-	 */
-	public function manageType() : string
-	{
-		return 'content';
-	}
-
-	/**
-	 * Any counters that will be displayed in the ModCP Header.
-	 * This should return an array of counters, where each item contains
-	 * 		title (a language string)
-	 * 		total
-	 * 		id (optional element ID)
-	 *
-	 * @return array
-	 */
-	public function getCounters() : array
-	{
-		if( $this->getTab() )
-		{
-			return [
-				[ 'id' => 'elModCPReportCount', 'title' => 'active_reports', 'total' => Member::loggedIn()->reportCount( TRUE ) ]
-			];
-		}
-
-		return [];
 	}
 		
 	/**
@@ -108,15 +61,19 @@ class Reports extends Controller
 	 *
 	 * @return	void
 	 */
-	public function execute(): void
+	public function execute()
 	{		
-		if ( !Member::loggedIn()->canAccessReportCenter() )
+		if ( !Member::loggedIn()->modPermission( 'can_view_reports' ) )
 		{
 			Output::i()->error( 'no_module_permission', '2C139/1', 403, '' );
 		}
 		
 		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/modcp.css' ) );
+		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/modcp.css' ) );
+		if ( \IPS\Theme::i()->settings['responsive'] )
+		{
+			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/modcp_responsive.css' ) );
+		}
 		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_modcp.js', 'core' ) );
 		
 		parent::execute();
@@ -125,12 +82,12 @@ class Reports extends Controller
 	/**
 	 * Overview
 	 *
-	 * @return	mixed
+	 * @return	void
 	 */
-	public function manage() : mixed
+	public function manage()
 	{
 		/* Make sure we're only loading reports where we have permission to view the content */
-		$where = [ Report::where() ];
+		$where = [ \IPS\core\Reports\Report::where() ];
 
 		/* Make sure we're loading the correct statuses */
 		if( Request::i()->isAjax() and isset( Request::i()->overview ) )
@@ -139,7 +96,7 @@ class Reports extends Controller
 		}
 
 		/* Create table */
-		$table = new Content( '\IPS\core\Reports\Report', Url::internal( 'app=core&module=modcp&controller=modcp&tab=reports', NULL, 'modcp_reports' ), $where );
+		$table = new \IPS\Helpers\Table\Content( '\IPS\core\Reports\Report', \IPS\Http\Url::internal( 'app=core&module=modcp&controller=modcp&tab=reports', NULL, 'modcp_reports' ), $where );
 		$table->sortBy = $table->sortBy ?: 'first_report_date';
 		$table->sortDirection = 'desc';
 		
@@ -150,8 +107,7 @@ class Reports extends Controller
 			'filter_report_status_1' => array( 'status=1' )
 		];
 
-		$apps = [];
-		foreach ( Application::allExtensions( 'core', 'ContentRouter') as $app => $classes )
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter') as $app => $classes )
 		{
 			$appKey = explode('_', $app)[0];
 			$apps[ $appKey ] = $classes;
@@ -173,8 +129,8 @@ class Reports extends Controller
 				}
 			}
 
-			$table->filters['filter_report_status_1_' . $appKey ] = [ 'status=1 and ' . Db::i()->in( 'class', $classes ) ];
-			Member::loggedIn()->language()->words[ 'filter_report_status_1_' . $appKey ] = Member::loggedIn()->language()->addToStack( 'filter_report_status_1_app', NULL, [ 'sprintf' => [ Application::applications()[ $appKey ]->_title ] ] );
+			$table->filters['filter_report_status_1_' . $appKey ] = [ 'status=1 and ' . \IPS\Db::i()->in( 'class', $classes ) ];
+			Member::loggedIn()->language()->words[ 'filter_report_status_1_' . $appKey ] = Member::loggedIn()->language()->addToStack( 'filter_report_status_1_app', NULL, [ 'sprintf' => [ \IPS\Application::applications()[ $appKey ]->_title ] ] );
 		}
 
 		$table->filters['filter_report_status_2'] = [ 'status=2' ];
@@ -184,16 +140,15 @@ class Reports extends Controller
 
 		if ( Request::i()->isAjax() and isset( Request::i()->overview ) )
 		{
-			$table->tableTemplate = array( Theme::i()->getTemplate( 'modcp', 'core' ), 'reportListOverview' );
+			$table->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'modcp', 'core' ), 'reportListOverview' );
 			Output::i()->json( array( 'data' => (string) $table ) );
 		}
 		else
 		{
 			Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( 'modcp_reports' ) );
 			Output::i()->title = Member::loggedIn()->language()->addToStack( 'modcp_reports' );
-			Output::i()->output = Theme::i()->getTemplate( 'modcp' )->reportList( (string) $table );
+			return  \IPS\Theme::i()->getTemplate( 'modcp' )->reportList( (string) $table );
 		}
-		return null;
 	}
 
 	/**
@@ -201,20 +156,21 @@ class Reports extends Controller
 	 *
 	 * @return	void
 	 */
-	public function view() : void
+	public function view()
 	{
 		/* Load Report */
 		try
 		{
-			$report = Report::loadAndCheckPerms( Request::i()->id );
+			$report = \IPS\core\Reports\Report::loadAndCheckPerms( Request::i()->id );
 			$report->markRead();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			Output::i()->error( 'node_error', '2C139/3', 404, '' );
 		}
 		
 		/* Check permission. We do it this way rather than loadAndCheckPerms() since we need to know if the user *had* permission if the content has been deleted */
+		$allowedPermIds = iterator_to_array( \IPS\Db::i()->select( 'perm_id', 'core_permission_index', \IPS\Db::i()->findInSet( 'perm_view', Member::loggedIn()->permissionArray() ) . " OR perm_view='*'" ) );
 		$workingClass = $report->class;
 		if ( isset( $workingClass::$itemClass ) )
 		{
@@ -224,38 +180,33 @@ class Reports extends Controller
 		{
 			$workingClass = $workingClass::$containerNodeClass;
 		}
-		if( in_array( NodePermissions::class, class_implements( $workingClass ) ) )
+		if ( isset( $workingClass::$permissionMap ) and isset( $workingClass::$permissionMap['read'] ) and $workingClass::$permissionMap['read'] !== 'view' )
 		{
-			$allowedPermIds = iterator_to_array( Db::i()->select( 'perm_id', 'core_permission_index', Db::i()->findInSet( 'perm_view', Member::loggedIn()->permissionArray() ) . " OR perm_view='*'" ) );
+			$allowedPermIds = array_intersect( $allowedPermIds, iterator_to_array( \IPS\Db::i()->select( 'perm_id', 'core_permission_index', \IPS\Db::i()->findInSet( 'perm_' . $workingClass::$permissionMap['read'], Member::loggedIn()->permissionArray() ) . " OR perm_" . $workingClass::$permissionMap['read'] . "='*'" ) ) );
+		}
 
-			if ( isset( $workingClass::$permissionMap ) and isset( $workingClass::$permissionMap['read'] ) and $workingClass::$permissionMap['read'] !== 'view' )
-			{
-				$allowedPermIds = array_intersect( $allowedPermIds, iterator_to_array( Db::i()->select( 'perm_id', 'core_permission_index', Db::i()->findInSet( 'perm_' . $workingClass::$permissionMap['read'], Member::loggedIn()->permissionArray() ) . " OR perm_" . $workingClass::$permissionMap['read'] . "='*'" ) ) );
-			}
-
-			if ( !in_array( $report->perm_id, $allowedPermIds ) )
-			{
-				Output::i()->error( 'node_error_no_perm', '2C139/5', 403, '' );
-			}
+		if ( \in_array( 'IPS\Content\Permissions', class_implements( $workingClass ) ) and !\in_array( $report->perm_id, $allowedPermIds ) )
+		{
+			Output::i()->error( 'node_error_no_perm', '2C139/5', 403, '' );
 		}
 		
 		/* Setting status? */
-		if( isset( Request::i()->setStatus ) and in_array( Request::i()->setStatus, range( 1, 4 ) ) )
+		if( isset( Request::i()->setStatus ) and \in_array( Request::i()->setStatus, range( 1, 4 ) ) )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			$report->changeStatus( (int) Request::i()->setStatus );
 
-			\IPS\Output::i()->redirect( $report->url()->setQueryString( 'changed', '1' ) );
+			Output::i()->redirect( $report->url()->setQueryString( 'changed', '1' ) );
 		}
 
 		/* Deleting? */
 		if( isset( Request::i()->_action ) and Request::i()->_action == 'delete' and $report->canDelete() )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			
 			$report->delete();
 			
-			Output::i()->redirect( Url::internal( 'app=core&module=modcp&controller=modcp&tab=reports', NULL, 'modcp_reports' ) );
+			Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=modcp&controller=modcp&tab=reports', NULL, 'modcp_reports' ) );
 		}
 
 		/* Load */
@@ -295,15 +246,15 @@ class Reports extends Controller
 			{
 				try
 				{
-					$delLog = DeletionLog::loadFromContent( $contentToCheck );
+					$delLog = \IPS\core\DeletionLog::loadFromContent( $contentToCheck );
 				}
-				catch( OutOfRangeException $e ) {}
+				catch( \OutOfRangeException $e ) {}
 			}
 		}
-		catch ( OutOfRangeException $e ) { }
+		catch ( \OutOfRangeException $e ) { }
 		
 		/* Next/Previous Links */
-		$reportSubQuery = Report::where();
+		$permSubQuery = \IPS\Db::i()->select( 'perm_id', 'core_permission_index', \IPS\Db::i()->findInSet( 'perm_view', array_merge( array( Member::loggedIn()->member_group_id ) , array_filter( explode( ',', Member::loggedIn()->mgroup_others ) ) ) ) . " or perm_view='*'" );
 
 		$prevReport	= NULL;
 		$prevItem	= NULL;
@@ -313,12 +264,8 @@ class Reports extends Controller
 		/* Prev */
 		try
 		{
-			$where = array_merge(
-				array( array( 'first_report_date>?', $report->first_report_date ) ),
-				$reportSubQuery
-			);
-			$prevReport = Db::i()->select( 'id, class, content_id', 'core_rc_index', $where, 'first_report_date ASC', 1 )->first();
-
+			$prevReport = \IPS\Db::i()->select( 'id, class, content_id', 'core_rc_index', array( '( perm_id IN (?) OR perm_id IS NULL ) AND first_report_date>?', $permSubQuery, $report->first_report_date ), 'first_report_date ASC', 1 )->first();
+			
 			try
 			{
 				$reportClass = $prevReport['class'];
@@ -329,18 +276,14 @@ class Reports extends Controller
 					$prevItem = $prevItem->item();
 				}
 			}
-			catch (OutOfRangeException $e) {}
+			catch (\OutOfRangeException $e) {}
 		}
-		catch ( UnderflowException $e ) {}
+		catch ( \UnderflowException $e ) {}
 		
 		/* Next */
 		try
 		{
-			$where = array_merge(
-				array( array( 'first_report_date<?', $report->first_report_date ) ),
-				$reportSubQuery
-			);
-			$nextReport = Db::i()->select( 'id, class, content_id', 'core_rc_index', $where, 'first_report_date DESC', 1 )->first();
+			$nextReport = \IPS\Db::i()->select( 'id, class, content_id', 'core_rc_index', array( '( perm_id IN (?) OR perm_id IS NULL ) AND first_report_date<?', $permSubQuery, $report->first_report_date ), 'first_report_date DESC', 1 )->first();
 
 			try
 			{
@@ -352,14 +295,14 @@ class Reports extends Controller
 					$nextItem = $nextItem->item();
 				}
 			}
-			catch (OutOfRangeException $e) {}
+			catch (\OutOfRangeException $e) {}
 		}
-		catch ( UnderflowException $e ) {}
+		catch ( \UnderflowException $e ) {}
 
 		/* Display */
 		if ( Request::i()->isAjax() and !isset( Request::i()->_contentReply ) and !isset( Request::i()->getUploader ) AND !isset( Request::i()->page ) AND !isset( Request::i()->_previewField ) )
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'modcp' )->reportPanel( $report, $comment, $ref );
+			Output::i()->output = \IPS\Theme::i()->getTemplate( 'modcp' )->reportPanel( $report, $comment, $ref );
 		}
 		else
 		{
@@ -371,19 +314,18 @@ class Reports extends Controller
 
 			$sprintf = $item ? htmlspecialchars( $item->mapped('title'), ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE ) : Member::loggedIn()->language()->addToStack('content_deleted');
 			Output::i()->title = Member::loggedIn()->language()->addToStack( 'modcp_reports_view', FALSE, array( 'sprintf' => array( $sprintf ) ) );
-			Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=modcp&controller=modcp&tab=reports', 'front', 'modcp_reports' ), Member::loggedIn()->language()->addToStack( 'modcp_reports' ) );
+			Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=modcp&controller=modcp&tab=reports', 'front', 'modcp_reports' ), Member::loggedIn()->language()->addToStack( 'modcp_reports' ) );
 			Output::i()->breadcrumb[] = array( NULL, $item ? $item->mapped('title') : Member::loggedIn()->language()->addToStack( 'content_deleted' ) );
-			Output::i()->output = Theme::i()->getTemplate( 'modcp' )->report( $report, $comment, $item, $ref, $prevReport, $prevItem, $nextReport, $nextItem, $delLog );
+			return \IPS\Theme::i()->getTemplate( 'modcp' )->report( $report, $comment, $item, $ref, $prevReport, $prevItem, $nextReport, $nextItem, $delLog );
 		}
 	}
-
 
 	/**
 	 * Show the report center modal
 	 *
 	 * @return void
 	 */
-	public function reportCenterConfirmModal(): void
+	public function reportCenterConfirmModal()
 	{
 		$id = intval( Request::i()->id );
 
@@ -397,7 +339,7 @@ class Reports extends Controller
 		}
 
 		$form = new Form( 'form', 'modal_author_notification_form_submit' );
-		$form->class .= 'ipsForm--vertical';
+		$form->class .= 'ipsForm_vertical';
 		$form->addButton( 'cancel', 'link', $report->url() );
 
 		/* Get the optional notifications */
@@ -422,7 +364,7 @@ class Reports extends Controller
 		Member::loggedIn()->language()->words['modal_author_notification'] = Member::loggedIn()->language()->addToStack('modal_author__notification', null, [ 'sprintf' => [ $thing->author()->name ] ] );
 		if ( $values = $form->values() )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			$report->changeStatus( (int) Request::i()->status, $values['modal_author_notification'] );
 
 			Output::i()->redirect( $report->url()->setQueryString( 'changed', '1' ) );
@@ -434,17 +376,16 @@ class Reports extends Controller
 	/**
 	 * Change Report Reason (report_type)
 	 *
-	 * @return    void
-	 * @throws ErrorException
-	 * @throws Exception
+	 * @return	void
 	 */
-	public function changeType(): void
+	public function changeType()
 	{
+
 		/* Load the report and the main object */
 		try
 		{
-			$report = Db::i()->select( '*', 'core_rc_reports', [ 'id=?', Request::i()->id ] )->first();
-			$item = Report::loadAndCheckPerms( $report['rid'] );
+			$report = \IPS\Db::i()->select( '*', 'core_rc_reports', [ 'id=?', Request::i()->id ] )->first();
+			$item = \IPS\core\Reports\Report::loadAndCheckPerms( $report['rid'] );
 		}
 		catch ( \Exception $e )
 		{
@@ -453,8 +394,8 @@ class Reports extends Controller
 
 		/* Build form */
 		$form = new Form;
-		$options = array( Report::TYPE_MESSAGE => Member::loggedIn()->language()->addToStack('report_message_comment') );
-		foreach( Types::roots() as $type )
+		$options = array( \IPS\core\Reports\Report::TYPE_MESSAGE => Member::loggedIn()->language()->addToStack('report_message_comment') );
+		foreach( \IPS\core\Reports\Types::roots() as $type )
 		{
 			$options[ $type->id ] = $type->_title;
 		}
@@ -462,15 +403,15 @@ class Reports extends Controller
 		if ( count( $options ) > 1 )
 		{
 			$form->add( new Select( 'report_type', $report['report_type'], null, [ 'options' => $options ] ) );
-			$form->add( new YesNo( 'report_type_change_log', true, null ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'report_type_change_log', true, null ) );
 		}
-		$form->class .= 'ipsForm--vertical';
+		$form->class .= 'ipsForm_vertical';
 
 		/* Handle submissions */
 		if ( $values = $form->values() )
 		{
 			/* Update the new reason */
-			Db::i()->update( 'core_rc_reports', array( 'report_type' => $values['report_type'] ), [ 'id=?', $report['id'] ] );
+			\IPS\Db::i()->update( 'core_rc_reports', array( 'report_type' => $values['report_type'] ), [ 'id=?', $report['id'] ] );
 
 			if ( ! empty( $values['report_type_change_log'] ) )
 			{
@@ -479,14 +420,14 @@ class Reports extends Controller
 
 				if ( $values['report_type'] )
 				{
-					$new = Types::load( $values['report_type'] )->_title;
+					$new = \IPS\core\Reports\Types::load( $values['report_type'] )->_title;
 				}
 
 				if ( $report['report_type'] )
 				{
 					try
 					{
-						$old = Types::load( $report['report_type'] )->_title;
+						$old = \IPS\core\Reports\Types::load( $report['report_type'] )->_title;
 					}
 					catch ( \OutOfRangeException $e )
 					{
@@ -499,9 +440,9 @@ class Reports extends Controller
 					$url = $item->url()->setQueryString( 'tab', 'reports' )->setFragment( 'report' . $report['id'] );
 					$content = Member::loggedIn()->language()->addToStack('report_type_changed', FALSE, array( 'sprintf' => array( $new, $old, $url, $report['id'] ) ) );
 					Member::loggedIn()->language()->parseOutputForDisplay( $content );
-					$content = str_replace( rtrim( Settings::i()->base_url, '/' ), '<___base_url___>', $content );
+					$content = str_replace( rtrim( \IPS\Settings::i()->base_url, '/' ), '<___base_url___>', $content );
 
-					$comment = Comment::create( $item, $content, TRUE, NULL, NULL, Member::loggedIn(), new DateTime );
+					$comment = \IPS\core\Reports\Comment::create( $item, $content, TRUE, NULL, NULL, Member::loggedIn(), new \IPS\DateTime );
 					$comment->save();
 				}
 			}
@@ -510,24 +451,23 @@ class Reports extends Controller
 		}
 
 		/* Display form */
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 
 	/**
 	 * Redirect to the original content for a report
 	 *
-	 * @return    void
-	 * @throws Exception
+	 * @return	void
 	 */
-	public function find() : void
+	public function find()
 	{		
 		try
 		{
-			$report = Report::loadAndCheckPerms( Request::i()->id );
+			$report = \IPS\core\Reports\Report::loadAndCheckPerms( Request::i()->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C139/2', 404, '' );
+			Output::i()->error( 'node_error', '2C139/4', 404, '' );
 		}
 		
 		$reportClass = $report->class;
@@ -541,32 +481,33 @@ class Reports extends Controller
 	/**
 	 * Return a comment URL
 	 *
-	 * @return void
+	 * @return \IPS\Http\Url
 	 */
-	 public function findComment() : void
+	 public function findComment()
 	 {
 		try
 		{
-			$report = Report::loadAndCheckPerms( Request::i()->id );
-			$comment = Comment::load( Request::i()->comment );
+			$report = \IPS\core\Reports\Report::loadAndCheckPerms( Request::i()->id );
+			$comment = \IPS\core\Reports\Comment::load( Request::i()->comment );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			Output::i()->error( 'node_error', '2C139/4', 404, '' );
 		}
 		
 		$url = $report->url()->setQueryString( 'activeTab', 'comments' );
 		
-		$idColumn = Report::$databaseColumnId;
-		$commentIdColumn = Comment::$databaseColumnId;
-		$position = Db::i()->select( 'COUNT(*)', 'core_rc_comments', array( "rid=? AND id<=?", $report->$idColumn, $comment->$commentIdColumn ) )->first();
+		$idColumn = \IPS\core\Reports\Report::$databaseColumnId;
+		$commentIdColumn = \IPS\core\Reports\Comment::$databaseColumnId;
+		$position = \IPS\Db::i()->select( 'COUNT(*)', 'core_rc_comments', array( "rid=? AND id<=?", $report->$idColumn, $comment->$commentIdColumn ) )->first();
 		
 		$page = ceil( $position / $report::getCommentsPerPage() );
 		if ( $page != 1 )
 		{
 			$url = $url->setPage( 'page', $page );
 		}
-
+		
+		
 		Output::i()->redirect( $url->setFragment( 'comment-' . $comment->$commentIdColumn ) );
 	 }
 }

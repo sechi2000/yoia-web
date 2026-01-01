@@ -10,26 +10,20 @@
 
 namespace IPS\core\api\GraphQL\Queries;
 
-use GraphQL\Type\Definition\ListOfType;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\ClubType;
-use IPS\Db;
-use IPS\Patterns\ActiveRecordIterator;
-use function defined;
-use function in_array;
-use function is_int;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ).' 403 Forbidden' );
+	header( ( isset( $_SERVER[ 'SERVER_PROTOCOL' ] ) ? $_SERVER[ 'SERVER_PROTOCOL' ] : 'HTTP/1.0' ).' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Club query for GraphQL API
  */
-class Clubs
+class _Clubs
 {
 	/*
 	 * @brief 	Query description
@@ -55,7 +49,7 @@ class Clubs
 			'type' => TypeRegistry::eNum( [
 									  'name' => 'clubs_order_by',
 									  'description' => 'Fields on which topics can be sorted',
-									  'values' => ClubType::getOrderByOptions()
+									  'values' => \IPS\core\api\GraphQL\Types\ClubType::getOrderByOptions()
 									  ] ),
 			'defaultValue' => NULL // will use default sort option
 		],
@@ -76,7 +70,7 @@ class Clubs
 	/**
 	 * Return the query return type
 	 */
-	public function type(): ListOfType
+	public function type(): \GraphQL\Type\Definition\ListOfType
 	{
 		return TypeRegistry::listOf( \IPS\core\api\GraphQL\TypeRegistry::club() );
 	}
@@ -84,19 +78,19 @@ class Clubs
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @return    ActiveRecordIterator[\IPS\Member\Club]
+	 * @param mixed    Value passed into this resolver
+	 * @param array    Arguments
+	 * @param array    Context values
+	 * @return    \IPS\Patterns\ActiveRecordIterator[\IPS\Member\Club]
 	 */
-	public function resolve( mixed $val, array $args, array $context ): ActiveRecordIterator
+	public function resolve( mixed $val, array $args, array $context ): \IPS\Patterns\ActiveRecordIterator
 	{
 		$where = [];
-		$sortBy = ( isset( $args['orderBy'] ) and in_array( $args['orderBy'], ClubType::getOrderByOptions() ) ) ? $args['orderBy'] : 'name';
-		$sortDir = ( isset( $args['orderDir'] ) and in_array( mb_strtolower( $args['orderDir'] ), array( 'asc', 'desc' ) ) ) ? $args['orderDir'] : 'desc';
-		$limit =( isset( $args['orderDir'] ) and is_int( $args['limit'] ) ) ? $args['limit'] : 25;
+		$sortBy = ( isset( $args['orderBy'] ) and \in_array( $args['orderBy'], \IPS\core\api\GraphQL\Types\ClubType::getOrderByOptions() ) ) ? $args['orderBy'] : 'name';
+		$sortDir = ( isset( $args['orderDir'] ) and \in_array( mb_strtolower( $args['orderDir'] ), array( 'asc', 'desc' ) ) ) ? $args['orderDir'] : 'desc';
+		$limit =( isset( $args['orderDir'] ) and \is_int( $args['limit'] ) ) ? $args['limit'] : 25;
 
-		$query = Db::i()->select( '*', 'core_clubs', $where, "{$sortBy} {$sortDir}", $limit );
-		return new ActiveRecordIterator( $query, 	'\IPS\Member\Club' );
+		$query = \IPS\Db::i()->select( '*', 'core_clubs', $where, "{$sortBy} {$sortDir}", $limit );
+		return new \IPS\Patterns\ActiveRecordIterator( $query, 	'\IPS\Member\Club' );
 	}
 }

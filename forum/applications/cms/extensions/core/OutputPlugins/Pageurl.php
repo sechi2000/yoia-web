@@ -12,46 +12,38 @@
 namespace IPS\cms\extensions\core\OutputPlugins;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Pages\Page;
-use IPS\Extensions\OutputPluginsAbstract;
-use IPS\Http\Url;
-use OutOfRangeException;
-use function defined;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Content: Block
  */
-class Pageurl extends OutputPluginsAbstract
+class _Pageurl
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = FALSE;
+	public static $canBeUsedInCss = FALSE;
 	
 	/**
 	 * Run the plug-in
 	 *
 	 * @param	string 		$data	  The initial data from the tag
 	 * @param	array		$options    Array of options
-	 * @return	string|array		Code to eval
+	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options ): string|array
+	public static function runPlugin( $data, $options )
 	{
-		if ( is_numeric( $data ) )
+		if ( \is_numeric( $data ) )
 		{
 			try
 			{
-				$url = Page::load( $data )->url();
+				$url = \IPS\cms\Pages\Page::load( $data )->url();
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
 				$url = NULL;
 			}
@@ -59,9 +51,9 @@ class Pageurl extends OutputPluginsAbstract
 		else
 		{
 			$data = ltrim( $data );
-			$url = Url::internal( 'app=cms&module=pages&controller=page&path=' . $data, 'front', 'content_page_path', array( $data ) );
+			$url = \IPS\Http\Url::internal( 'app=cms&module=pages&controller=page&path=' . $data, 'front', 'content_page_path', array( $data ) );
 		}
 		
-		return "'" . $url . "'";
+		return "'" . (string) $url . "'";
 	}
 }

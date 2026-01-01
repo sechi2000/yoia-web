@@ -12,71 +12,38 @@
 namespace IPS\convert\modules\admin\manage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\convert\App;
-use IPS\Convert\Exception;
-use IPS\convert\Library;
-use IPS\convert\Software;
-use IPS\DB;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Password;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Wizard;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_bool;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Create new conversion session
  */
-class create extends Controller
+class _create extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute(): void
+	public function execute()
 	{
-		if ( CIC )
+		if ( \IPS\CIC )
 		{
-			Output::i()->error( 'module_no_permission', '2V391/3', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2V391/3', 403, '' );
 		}
 		
-		Output::i()->responsive = FALSE;
-		Dispatcher::i()->checkAcpPermission( 'create_manage' );
+		\IPS\Output::i()->responsive = FALSE;
+		\IPS\Dispatcher::i()->checkAcpPermission( 'create_manage' );
 
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'convert.css' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'convert.css' ) );
 		parent::execute();
 	}
 
@@ -85,30 +52,30 @@ class create extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* We only use the Wizard helper for starting a conversion, so we need to make sure it is always starting new and not using old session data */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack( 'convert_start' );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack( 'convert_start' );
 		
 		/* Let's call on the wizard to make some magic */
-		Output::i()->output = (string) new Wizard( array(
+		\IPS\Output::i()->output = (string) new \IPS\Helpers\Wizard( array(
 			'convert_start_source_software' => array( $this, '_chooseSoftware' ),
 			'convert_start_application'	=> array( $this, '_chooseApplications' ),
 			'convert_start_database_details' => array( $this, '_setDatabaseDetails' ),
 			'convert_start_conversion_details' => array( $this, '_setConversionDetails' ),
-		), Url::internal( 'app=convert&module=manage&controller=create' ) );
+		), \IPS\Http\Url::internal( 'app=convert&module=manage&controller=create' ) );
 	}
 
 	/**
 	 * Choose what software you want to convert from
 	 *
 	 * @param	array	$data	Wizard data from previous steps
-	 * @return	Form|array
+	 * @return	\IPS\Helpers\Form|array
 	 */
-	public function _chooseSoftware( array $data ) : Form|array
+	public function _chooseSoftware( $data )
 	{
 		$options = array();
-		foreach( Software::software()['core'] AS $key => $classname )
+		foreach( \IPS\convert\Software::software()['core'] AS $key => $classname )
 		{
 			if ( class_exists( $classname ) AND $classname::canConvert() !== NULL )
 			{
@@ -116,8 +83,8 @@ class create extends Controller
 			}
 		}
 		
-		$form = new Form( 'convert_source_software', 'choose_what_to_convert' );
-		$form->add( new Select( 'convert_start_source_software', NULL, TRUE, array( 'options' => $options ) ) );
+		$form = new \IPS\Helpers\Form( 'convert_source_software', 'choose_what_to_convert' );
+		$form->add( new \IPS\Helpers\Form\Select( 'convert_start_source_software', NULL, TRUE, array( 'options' => $options ) ) );
 
 		if ( $values = $form->values() )
 		{
@@ -131,33 +98,33 @@ class create extends Controller
 	 * Choose which applications to convert
 	 *
 	 * @param	array	$data	Wizard data from previous steps
-	 * @return	Form|array
+	 * @return	\IPS\Helpers\Form|array
 	 */
-	public function _chooseApplications( array $data ) : Form|array
+	public function _chooseApplications( $data )
 	{
 		/* Figure out what converter libraries we have for the selected application */
 		$software		= $data['convert_start_source_software'];
-		$applications	= array( 'core' => Member::loggedIn()->language()->addToStack( 'core_node_select' ) );
+		$applications	= array( 'core' => \IPS\Member::loggedIn()->language()->addToStack( 'core_node_select' ) );
 
-		foreach( Library::libraries() AS $key => $class )
+		foreach( \IPS\convert\Library::libraries() AS $key => $class )
 		{
 			/* Check app is installed and enabled */
-			if( !Application::appIsEnabled( $key ) )
+			if( !\IPS\Application::appIsEnabled( $key ) )
 			{
 				continue;
 			}
 
-			foreach( Software::software()[ $key ] AS $softwareKey => $softwareClass )
+			foreach( \IPS\convert\Software::software()[ $key ] AS $softwareKey => $softwareClass )
 			{
 				if( $softwareKey == $software )
 				{
-					$applications[ $key ]	= Member::loggedIn()->language()->addToStack( $key . '_node_select' );
+					$applications[ $key ]	= \IPS\Member::loggedIn()->language()->addToStack( $key . '_node_select' );
 				}
 				elseif( isset( $softwareClass::parents()['core'] ) )
 				{
-					if( in_array( $software, $softwareClass::parents()['core'] ) )
+					if( \in_array( $software, $softwareClass::parents()['core'] ) )
 					{
-						$applications[ $key . '_' . $softwareKey ]	= Member::loggedIn()->language()->get( $key . '_node_select' ) . ' - ' . $softwareClass::softwareName();
+						$applications[ $key . '_' . $softwareKey ]	= \IPS\Member::loggedIn()->language()->get( $key . '_node_select' ) . ' - ' . $softwareClass::softwareName();
 					}
 				}
 			}
@@ -172,13 +139,13 @@ class create extends Controller
 			}
 		});
 
-		$form = new Form( 'convert_application', 'enter_database_details' );
-		$form->add( new CheckboxSet( 'choose_what_to_convert', array_keys( $preSelected ), FALSE, array( 'options' => $applications, 'disabled' => array( 'core' ) ) ) );
+		$form = new \IPS\Helpers\Form( 'convert_application', 'enter_database_details' );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'choose_what_to_convert', array_keys( $preSelected ), FALSE, array( 'options' => $applications, 'disabled' => array( 'core' ) ) ) );
 		
 		if ( $values = $form->values() )
 		{
 			/* Core is required, and it was disabled on the form, so make sure it's in the array just to prevent people breaking stuff intentionally */
-			if( !in_array( 'core', $values['choose_what_to_convert'] ) )
+			if( !\in_array( 'core', $values['choose_what_to_convert'] ) )
 			{
 				$values['choose_what_to_convert'][] = 'core';
 			}
@@ -193,11 +160,11 @@ class create extends Controller
 	 * Allow the admin to supply the needed details
 	 *
 	 * @param	array	$data	Wizard data from previous steps
-	 * @return	Form|array
+	 * @return	\IPS\Helpers\Form|array
 	 */
-	public function _setDatabaseDetails( array $data ) : Form|array
+	public function _setDatabaseDetails( $data )
 	{
-		$form = new Form( 'convert_database_details', 'enter_conversion_details' );
+		$form = new \IPS\Helpers\Form( 'convert_database_details', 'enter_conversion_details' );
 
 		$usePrefix	= NULL;
 
@@ -206,16 +173,16 @@ class create extends Controller
 			if( mb_stristr( $application, '_' ) )
 			{
 				$converter = explode( '_', $application );
-				$classname = Software::software()[ $converter[0] ] [ $converter[1] ];
+				$classname = \IPS\convert\Software::software()[ $converter[0] ] [ $converter[1] ];
 			}
 			else
 			{
-				$classname = Software::software()[ $application ] [ mb_strtolower( $data['convert_start_source_software'] ) ];
+				$classname = \IPS\convert\Software::software()[ $application ] [ mb_strtolower( $data['convert_start_source_software'] ) ];
 			}
 
 			if ( $classname::getPreConversionInformation() !== NULL )
 			{
-				$form->addMessage( Member::loggedIn()->language()->addToStack( $classname::getPreConversionInformation() ), '', FALSE );
+				$form->addMessage( \IPS\Member::loggedIn()->language()->addToStack( $classname::getPreConversionInformation() ), '', FALSE );
 			}
 
 			if( $application == 'core' )
@@ -224,24 +191,24 @@ class create extends Controller
 			}
 		}
 		
-		$form->add( new Text( 'convert_start_database_host', NULL, FALSE ) );
-		$form->add( new Number( 'convert_start_database_port', 3306, FALSE, array( 'max' => 65535, 'min' => 1 ) ) );
-		$form->add( new Text( 'convert_start_database_name', NULL, FALSE ) );
-		$form->add( new Text( 'convert_start_database_user', NULL, FALSE ) );
-		$form->add( new Password( 'convert_start_database_pass', NULL, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'convert_start_database_host', NULL, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'convert_start_database_port', 3306, FALSE, array( 'max' => 65535, 'min' => 1 ) ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'convert_start_database_name', NULL, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'convert_start_database_user', NULL, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Password( 'convert_start_database_pass', NULL, FALSE ) );
 		
 		/* If the source software doesn't use a prefix, then we should not ask for one to avoid confusion. */
 		if ( $usePrefix )
 		{
-			$form->add( new Text( 'convert_start_database_prefix', NULL, FALSE ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'convert_start_database_prefix', NULL, FALSE ) );
 		}
 		
-		$form->add( new Text( 'convert_start_database_charset', NULL, FALSE, array( 'placeholder' => 'utf8mb4' ) ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'convert_start_database_charset', NULL, FALSE, array( 'placeholder' => 'utf8mb4' ) ) );
 
 		if ( $values = $form->values() )
 		{
 			/* Start the (core) app object */
-			$app			= new App;
+			$app			= new \IPS\convert\App;
 			$app->sw		= 'core';
 			$app->app_key	= $data['convert_start_source_software'];
 			$app->parent	= 0;
@@ -268,18 +235,18 @@ class create extends Controller
 					$connectionSettings['sql_utf8mb4'] = TRUE;
 				}
 
-				$db = Db::i( 'convertertest', $connectionSettings );
+				$db = \IPS\Db::i( 'convertertest', $connectionSettings );
 				$db->checkConnection();
 
 				/* Now test the charset */
-				if ( $values['convert_start_database_charset'] AND !in_array( $values['convert_start_database_charset'], array( 'utf8', 'utf8mb4' ) ) )
+				if ( $values['convert_start_database_charset'] AND !\in_array( $values['convert_start_database_charset'], array( 'utf8', 'utf8mb4' ) ) )
 				{
 					/* Get all db charsets and make sure the one we entered is valid */
-					$charsets = Software::getDatabaseCharsets( $db );
+					$charsets = \IPS\convert\Software::getDatabaseCharsets( $db );
 
-					if ( !in_array( mb_strtolower( $values['convert_start_database_charset'] ), $charsets ) )
+					if ( !\in_array( mb_strtolower( $values['convert_start_database_charset'] ), $charsets ) )
 					{
-						throw new InvalidArgumentException( 'invalid_charset' );
+						throw new \InvalidArgumentException( 'invalid_charset' );
 					}
 					
 					$db->set_charset( $values['convert_start_database_charset'] );
@@ -290,7 +257,7 @@ class create extends Controller
 
 				foreach( $data['choose_what_to_convert'] as $application )
 				{
-					$childApp			= new App;
+					$childApp			= new \IPS\convert\App;
 
 					if( mb_stristr( $application, '_' ) )
 					{
@@ -324,12 +291,12 @@ class create extends Controller
 					{
 						$appClass->countRows( $testAgainst['table'] );
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
-						throw new InvalidArgumentException( 'invalid_prefix' );
+						throw new \InvalidArgumentException( 'invalid_prefix' );
 					}
 					/* Can't find the table */
-					catch( Exception $e )
+					catch( \IPS\convert\Exception $e )
 					{
 						if( $appToCheck->sw != 'core' )
 						{
@@ -343,16 +310,16 @@ class create extends Controller
 					}
 				}
 			}
-			catch( InvalidArgumentException $e )
+			catch( \InvalidArgumentException $e )
 			{
 				if( $e->getMessage() == 'invalid_charset' )
 				{
-					$form->error	= Member::loggedIn()->language()->addToStack('convert_cant_connect_db_charset');
+					$form->error	= \IPS\Member::loggedIn()->language()->addToStack('convert_cant_connect_db_charset');
 					return $form;
 				}
 				else if( $e->getMessage() == 'invalid_prefix' )
 				{
-					$form->error	= Member::loggedIn()->language()->addToStack('convert_cant_connect_db_prefix');
+					$form->error	= \IPS\Member::loggedIn()->language()->addToStack('convert_cant_connect_db_prefix');
 					return $form;
 				}
 				else
@@ -362,7 +329,7 @@ class create extends Controller
 			}
 			catch( \Exception $e )
 			{
-				$form->error	= Member::loggedIn()->language()->addToStack('convert_cant_connect_db');
+				$form->error	= \IPS\Member::loggedIn()->language()->addToStack('convert_cant_connect_db');
 				return $form;
 			}
 
@@ -376,12 +343,12 @@ class create extends Controller
 			/* Check for existing apps */
 			try
 			{
-				$existingApp = DB::i()->select( '*', 'convert_apps', array( 'sw=? AND app_key=? AND db_host=? AND db_db=? AND db_user=? AND db_pass=? AND db_prefix=?', $app->sw, $app->app_key, $app->db_host, $app->db_db, $app->db_user, $app->db_pass, $app->db_prefix ) )->first();
+				$existingApp = \IPS\DB::i()->select( '*', 'convert_apps', array( 'sw=? AND app_key=? AND db_host=? AND db_db=? AND db_user=? AND db_pass=? AND db_prefix=?', $app->sw, $app->app_key, $app->db_host, $app->db_db, $app->db_user, $app->db_pass, $app->db_prefix ) )->first();
 
 				/* App already exists */
-				Output::i()->redirect( Url::internal( "app=convert&module=manage&controller=convert&id={$existingApp['app_id']}" ), 'conversion_app_already_exists' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&id={$existingApp['app_id']}" ), 'conversion_app_already_exists' );
 			}
-			catch( UnderflowException $e ) { }
+			catch( \UnderflowException $e ) { }
 
 			if ( !empty( $values['convert_start_database_charset'] ) )
 			{
@@ -402,7 +369,7 @@ class create extends Controller
 					continue;
 				}
 
-				if( in_array( $application, $childAppsToRemove ) )
+				if( \in_array( $application, $childAppsToRemove ) )
 				{
 					continue;
 				}
@@ -436,25 +403,25 @@ class create extends Controller
 	 * Allow the admin to supply the needed details
 	 *
 	 * @param	array	$data	Wizard data from previous steps
-	 * @return	Form
+	 * @return	\IPS\Helpers\Form
 	 */
-	public function _setConversionDetails( array $data ) : Form
+	public function _setConversionDetails( $data )
 	{
 		/* We may be coming here from a previously incomplete conversion setup...detect and set the parent app ID appropriately */
-		if( ( !isset( $data['_app_parent'] ) OR !$data['_app_parent'] ) AND isset( Request::i()->id ) )
+		if( ( !isset( $data['_app_parent'] ) OR !$data['_app_parent'] ) AND isset( \IPS\Request::i()->id ) )
 		{
-			$data['_app_parent'] = Request::i()->id;
+			$data['_app_parent'] = \IPS\Request::i()->id;
 		}
 
-		$form = new Form( 'convert_other_details', 'start_conversion' );
+		$form = new \IPS\Helpers\Form( 'convert_other_details', 'start_conversion' );
 
 		try
 		{
-			$parentApplication = App::load( $data['_app_parent'] );
+			$parentApplication = \IPS\convert\App::load( $data['_app_parent'] );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'conversion_app_not_found', '3V391/1', 404, '' );
+			\IPS\Output::i()->error( 'conversion_app_not_found', '3V391/1', 404, '' );
 		}
 
 		$this->_addConversionApplication( $parentApplication, $form );
@@ -469,14 +436,14 @@ class create extends Controller
 			/* We know the core/parent app is fine, but any child apps that don't have 'more_info' should be deleted as they cannot be converted */
 			foreach( $parentApplication->children() as $childApplication )
 			{
-				if( !count( $childApplication->_session['more_info'] ) )
+				if( !\count( $childApplication->_session['more_info'] ) )
 				{
 					$childApplication->delete();
 				}
 			}
 
 			/* We have already saved our custom configuration, so now we can head off to the races */
-			Output::i()->redirect( Url::internal( "app=convert&module=manage&controller=convert&id={$data['_app_parent']}" ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&id={$data['_app_parent']}" ) );
 		}
 
 		return $form;
@@ -485,26 +452,26 @@ class create extends Controller
 	/**
 	 * Add form elements for the specified application to the form
 	 *
-	 * @param	App	$app	Conversion application
-	 * @param	Form	$form	Form object
+	 * @param	\IPS\convert\App	$app	Conversion application
+	 * @param	\IPS\Helpers\Form	$form	Form object
 	 * @return	void
 	 */
-	protected function _addConversionApplication( App $app, Form $form ) : void
+	protected function _addConversionApplication( $app, &$form )
 	{
 		$softwareClass				= $app->getSource();
 		$libraryClass				= $softwareClass->getLibrary();
 
 		/* Add a nice little header to the form */
-		$form->addHeader( Member::loggedIn()->language()->addToStack( 'converting_x_to_x', FALSE, array( 'sprintf' => array( $softwareClass::softwareName(), Application::load( $app->sw )->_title ) ) ) );
+		$form->addHeader( \IPS\Member::loggedIn()->language()->addToStack( 'converting_x_to_x', FALSE, array( 'sprintf' => array( $softwareClass::softwareName(), \IPS\Application::load( $app->sw )->_title ) ) ) );
 		
 		/* Now fetch the details about this application we are converting so we can build the appropriate form elements */
 		try
 		{
-			$menuRows	= convert::getMenuRows( $softwareClass, TRUE, TRUE );
+			$menuRows	= \IPS\convert\modules\admin\manage\convert::getMenuRows( $softwareClass, TRUE, TRUE );
 		}
-		catch( Exception $e )
+		catch( \IPS\Convert\Exception $e )
 		{
-			$form->addMessage( 'nothing_convertable_found', 'ipsMessage ipsMessage--warning' );
+			$form->addMessage( 'nothing_convertable_found', 'ipsMessage ipsMessage_warning', TRUE );
 			return;
 		}
 
@@ -516,17 +483,17 @@ class create extends Controller
 			foreach( $softwareClass->settingsMapList() as $key => $setting )
 			{
 				$value = $setting['value'];
-				if ( is_bool( ( $setting['value'] ) ) )
+				if ( \is_bool( ( $setting['value'] ) ) )
 				{
 					$value = $setting['value'] === TRUE ? 'On' : 'Off';
 				}
 				
-				$settings[ $setting['our_key'] ] = new Checkbox( $setting['our_key'], TRUE, FALSE, array( 'label' => $value ), NULL, NULL, NULL, $setting['our_key'] );
+				$settings[ $setting['our_key'] ] = new \IPS\Helpers\Form\Checkbox( $setting['our_key'], TRUE, FALSE, array( 'label' => $value ), NULL, NULL, NULL, $setting['our_key'] );
 			}
 
 			/* Add a nice little header to the form */
 			$form->addHeader( 'convert_settings' );
-			$form->add( new YesNo( 'convert_settings', TRUE, TRUE, array( 'togglesOn' => array_keys( $settings ) ) ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'convert_settings', TRUE, TRUE, array( 'togglesOn' => array_keys( $settings ) ) ) );
 
 			foreach( $settings as $settingFormField )
 			{
@@ -536,7 +503,7 @@ class create extends Controller
 			/* Did we just submit? If so save our configuration */
 			if( $values = $form->values() )
 			{
-				$values = array_filter( $values, function( $key ) use ( $settings ) { return $key == 'convert_settings' OR in_array( $key, array_keys( $settings ) ); }, ARRAY_FILTER_USE_KEY );
+				$values = array_filter( $values, function( $key ) use ( $settings ) { return $key == 'convert_settings' OR \in_array( $key, array_keys( $settings ) ); }, ARRAY_FILTER_USE_KEY );
 
 				$app->saveMoreInfo( 'convertSettings', $values );
 			}
@@ -548,28 +515,28 @@ class create extends Controller
 			/* Determine if this step has any extra configuration questions */
 			$formElements = array();
 
-			if ( in_array( $row['step_method'], $softwareClass::checkConf() ) )
+			if ( \in_array( $row['step_method'], $softwareClass::checkConf() ) )
 			{
 				$getMoreInfo	= $softwareClass->getMoreInfo( $row['step_method'] );
-				if ( is_array( $getMoreInfo ) AND count( $getMoreInfo ) )
+				if ( \is_array( $getMoreInfo ) AND \count( $getMoreInfo ) )
 				{
 					/* Show the 'more info' fields */
 					foreach( $getMoreInfo as $key => $input )
 					{
 						$fieldClass = $input['field_class'];
-						$formElements[ $key ] = new $fieldClass( $key, $input['field_default'], $input['field_required'], $input['field_extra'], $input['field_validation'] ?? NULL, NULL, NULL, $key );
+						$formElements[ $key ] = new $fieldClass( $key, $input['field_default'], $input['field_required'], $input['field_extra'], isset( $input['field_validation'] ) ? $input['field_validation'] : NULL, NULL, NULL, $key );
 						if ( $input['field_hint'] !== NULL )
 						{
-							Member::loggedIn()->language()->words[ $key . '_desc' ] = $input['field_hint'];
+							\IPS\Member::loggedIn()->language()->words[ $key . '_desc' ] = $input['field_hint'];
 						}
 					}
 				}
 			}
 
 			$form->addHeader( $row['step_title'] );
-			$form->add( new YesNo( $row['step_title'], TRUE, TRUE, array( 'togglesOn' => array_keys( $formElements ) ) ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( $row['step_title'], TRUE, TRUE, array( 'togglesOn' => array_keys( $formElements ) ) ) );
 
-			if( count( $formElements ) )
+			if( \count( $formElements ) )
 			{
 				foreach( $formElements as $key => $element )
 				{
@@ -580,22 +547,22 @@ class create extends Controller
 			/* Did we just submit? If so save our configuration */
 			if( $values = $form->values() )
 			{
-				$values = array_filter( $values, function( $key ) use ( $formElements, $row ) { return $key == $row['step_title'] OR in_array( $key, array_keys( $formElements ) ); }, ARRAY_FILTER_USE_KEY );
+				$values = array_filter( $values, function( $key ) use ( $formElements, $row ) { return $key == $row['step_title'] OR \in_array( $key, array_keys( $formElements ) ); }, ARRAY_FILTER_USE_KEY );
 
 				$app->saveMoreInfo( $row['step_method'], $values );
 			}
 		}
 
 		/* If there was nothing to convert, show an appropriate message */
-		if( $softwareClass::canConvertSettings() === FALSE AND !count( $menuRows ) )
+		if( $softwareClass::canConvertSettings() === FALSE AND !\count( $menuRows ) )
 		{
-			$form->addMessage( 'nothing_convertable_found', 'ipsMessage ipsMessage--warning' );
+			$form->addMessage( 'nothing_convertable_found', 'ipsMessage ipsMessage_warning', TRUE );
 		}
 
 		/* If there is a message to show, go ahead and show it */
 		if( $postConversionMessage = $libraryClass->getPostConversionInformation() )
 		{
-			$form->addMessage( $postConversionMessage, 'ipsMessage ipsMessage--info', FALSE );
+			$form->addMessage( $postConversionMessage, 'ipsMessage ipsMessage_info', FALSE );
 		}
 	}
 }

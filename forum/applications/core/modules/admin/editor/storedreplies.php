@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Editor Stored Replies aka Stock Actions aka whatever else I rename it during this coding session
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -13,47 +12,35 @@
 namespace IPS\core\modules\admin\editor;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\StoredReplies as StoredRepliesClass;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Stored Replies
  */
-class storedreplies extends Controller
+class _storedreplies extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\core\StoredReplies';
+	protected $nodeClass = 'IPS\core\StoredReplies';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'stored_replies_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'stored_replies_manage' );
 		parent::execute();
 	}
 
@@ -62,12 +49,49 @@ class storedreplies extends Controller
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		/* Have we not dragged the button to the editor bar? */
-		parent::manage();
+		$toolbars = json_decode( \IPS\Settings::i()->ckeditor_toolbars, true );
+		$found = 0;
+		foreach ( array('desktop', 'tablet', 'phone') as $device )
+		{
+			foreach ( $toolbars[$device] as $row )
+			{
+				if ( \is_array( $row ) and isset( $row['items'] ) )
+				{
+					if ( \in_array( 'ipsstockreplies', $row['items'] ) )
+					{
+						$found++;
+					}
+				}
+			}
+		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'forms', 'core' )->blurb( 'editor_stored_replies_blurb' ) . Output::i()->output;
+		/* Do we have any stored replies yet? */
+		if ( \IPS\Db::i()->select('count(*)', 'core_editor_stored_replies' )->first() )
+		{
+			if ( $found > 0 and $found < 3 )
+			{
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->message( 'editor_stored_replies_not_all_editors_have_button', 'info' );
+			}
+			else
+			{
+				if ( $found == 0 )
+				{
+					\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->message( 'editor_stored_replies_no_editor_has_button', 'warning' );
+				}
+			}
+		}
+		else
+		{
+			if ( $found )
+			{
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->message( 'editor_stored_replies_none_created_button', 'info' );
+			}
+		}
+
+		parent::manage();
 	}
 
 	/**
@@ -75,7 +99,7 @@ class storedreplies extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function search() : void
+	protected function search()
 	{
 		$rows = array();
 
@@ -84,13 +108,12 @@ class storedreplies extends Controller
 		$results = [];
 
 		/* Convert to HTML */
-		/* @var StoredRepliesClass $nodeClass */
-		foreach ( $nodeClass::search( 'reply_title', Request::i()->input, 'reply_title' ) as $result )
+		foreach ( $nodeClass::search( 'reply_title', \IPS\Request::i()->input, 'reply_title' ) as $result )
 		{
 			$id = ( $result instanceof $this->nodeClass ? '' : 's.' ) . $result->_id;
 			$rows[ $id ] = $this->_getRow( $result, FALSE, TRUE );
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'trees', 'core' )->rows( $rows, '' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'trees', 'core' )->rows( $rows, '' );
 	}
 }

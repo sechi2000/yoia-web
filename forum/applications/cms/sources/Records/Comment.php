@@ -12,88 +12,58 @@
 namespace IPS\cms\Records;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Databases;
-use IPS\cms\Records;
-use IPS\Content\Anonymous;
-use IPS\Content\Comment as ContentComment;
-use IPS\Content\EditHistory;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Hideable;
-use IPS\Content\Featurable;
-use IPS\Content\Reactable;
-use IPS\Content\Recognizable;
-use IPS\Content\Reportable;
-use IPS\Content\Shareable;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Patterns\ActiveRecord;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Post Model
  */
-class Comment extends ContentComment implements Embeddable,
-	Filter
+class _Comment extends \IPS\Content\Comment implements \IPS\Content\EditHistory, \IPS\Content\Hideable, \IPS\Content\Shareable, \IPS\Content\Searchable, \IPS\Content\Embeddable, \IPS\Content\Anonymous
 {
-	use	Reactable,
-		Reportable,
-		Anonymous,
-		Shareable,
-		EditHistory,
-		Hideable,
-		Featurable,
-		Recognizable;
+	use \IPS\Content\Reactable, \IPS\Content\Reportable;
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[Content\Comment]	Item Class
 	 */
-	public static ?string $itemClass = NULL;
+	public static $itemClass = NULL;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'cms_database_comments';
+	public static $databaseTable = 'cms_database_comments';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'comment_';
+	public static $databasePrefix = 'comment_';
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'cms';
+	public static $application = 'cms';
 
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'content_comment';
+	public static $title = 'content_comment';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'item'				=> 'record_id',
 		'author'			=> 'user',
 		'author_name'		=> 'author',
@@ -113,28 +83,35 @@ class Comment extends ContentComment implements Embeddable,
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'comments';
+	public static $icon = 'comment';
 	
 	/**
 	 * @brief	[Content\Comment]	Comment Template
 	 */
-	public static array $commentTemplate = array( array( 'display', 'cms', 'database' ), 'commentContainer' );
+	public static $commentTemplate = array( array( 'display', 'cms', 'database' ), 'commentContainer' );
 
 	/**
 	 * @brief	Database ID
 	 */
-	public static ?int $customDatabaseId = NULL;
+	public static $customDatabaseId = NULL;
+	
+	/**
+	 * @brief Store generated search index titles for efficiency
+	 */
+	protected static $searchIndexTitles = array();
 
 	/**
 	 * Load Record
 	 *
-	 * @param int|string|null $id ID
-	 * @param string|null $idField The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
-	 * @param mixed $extraWhereClause Additional where clause(s) (see \IPS\Db::build for details) - if used will cause multiton store to be skipped and a query always ran
-	 * @return ActiveRecord|Comment
-	 * @see        Db::build
+	 * @see		\IPS\Db::build
+	 * @param	int|string	$id					ID
+	 * @param	string		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
+	 * @param	mixed		$extraWhereClause	Additional where clause(s) (see \IPS\Db::build for details) - if used will cause multiton store to be skipped and a query always ran
+	 * @return	static
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function load( int|string|null $id, string $idField=NULL, mixed $extraWhereClause=NULL ): ActiveRecord|static
+	public static function load( $id, $idField=NULL, $extraWhereClause=NULL )
 	{
 		if ( static::commentWhere() !== NULL )
 		{
@@ -154,12 +131,10 @@ class Comment extends ContentComment implements Embeddable,
 	/**
 	 * Post count for member
 	 *
-	 * @param Member $member The memner
-	 * @param bool $includeNonPostCountIncreasing
-	 * @param bool $includeHiddenAndPendingApproval
-	 * @return    int
+	 * @param	\IPS\Member	$member	The memner
+	 * @return	int
 	 */
-	public static function memberPostCount( Member $member, bool $includeNonPostCountIncreasing = FALSE, bool $includeHiddenAndPendingApproval = TRUE ): int
+	public static function memberPostCount( \IPS\Member $member, bool $includeNonPostCountIncreasing = FALSE, bool $includeHiddenAndPendingApproval = TRUE )
 	{
 		$where = [];
 		$where[] = [ 'comment_database_id=?', static::$customDatabaseId ];
@@ -170,7 +145,7 @@ class Comment extends ContentComment implements Embeddable,
 			$where[] = [ 'comment_approved=1' ];
 		}
 		
-		return Db::i()->select( 'COUNT(*)', static::$databaseTable, $where )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', static::$databaseTable, $where )->first();
 	}
 	
 	/**
@@ -179,7 +154,7 @@ class Comment extends ContentComment implements Embeddable,
 	 * @param   int     $id     Content item to delete from
 	 * @return array
 	 */
-	public static function deleteWhereSql( int $id ) : array
+	public static function deleteWhereSql( $id )
 	{
 		return array( array( static::$databasePrefix . static::$databaseColumnMap['item'] . '=?', $id ), array( static::$databasePrefix . 'database_id=?', static::$customDatabaseId ) );
 	}
@@ -189,36 +164,73 @@ class Comment extends ContentComment implements Embeddable,
 	 *
 	 * @return string
 	 */
-	public static function findByIPWhere() : string
+	public static function findByIPWhere()
 	{
 		return " AND comment_database_id=" . static::$customDatabaseId;
 	}
-
+	
 	/**
 	 * Get items with permisison check
 	 *
-	 * @param array $where Where clause
-	 * @param string|null $order MySQL ORDER BY clause (NULL to order by date)
-	 * @param int|array|null $limit Limit clause
-	 * @param string|null $permissionKey A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index
-	 * @param mixed $includeHiddenComments
-	 * @param int $queryFlags Select bitwise flags
-	 * @param Member|null $member The member (NULL to use currently logged in member)
-	 * @param bool $joinContainer If true, will join container data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinComments If true, will join comment data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinReviews If true, will join review data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $countOnly If true will return the count
-	 * @param array|null $joins Additional arbitrary joins for the query
-	 * @return    array|NULL|Comment        If $limit is 1, will return \IPS\Content\Comment or NULL for no results. For any other number, will return an array.
+	 * @param	array		$where				Where clause
+	 * @param	string		$order				MySQL ORDER BY clause (NULL to order by date)
+	 * @param	int|array	$limit				Limit clause
+	 * @param	string		$permissionKey		A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index
+	 * @param	mixed		$includeHiddenItems	Include hidden comments? NULL to detect if currently logged in member has permission, -1 to return public content only, TRUE to return unapproved content and FALSE to only return unapproved content the viewing member submitted
+	 * @param	int			$queryFlags			Select bitwise flags
+	 * @param	\IPS\Member	$member				The member (NULL to use currently logged in member)
+	 * @param	bool		$joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinComments		If true, will join comment data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinReviews		If true, will join review data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$countOnly				If true will return the count
+	 * @param	array|null	$joins					Additional arbitrary joins for the query
+	 * @return	array|NULL|\IPS\Content\Comment		If $limit is 1, will return \IPS\Content\Comment or NULL for no results. For any other number, will return an array.
 	 */
-	public static function getItemsWithPermission( array $where=array(), string $order= null, int|array|null $limit=10, string|null $permissionKey='read', mixed $includeHiddenComments= Filter::FILTER_AUTOMATIC, int $queryFlags=0, Member|null $member= null, bool $joinContainer=FALSE, bool $joinComments=FALSE, bool $joinReviews=FALSE, bool $countOnly=FALSE, array|null $joins= null ): mixed
+	public static function getItemsWithPermission( $where=array(), $order=NULL, $limit=10, $permissionKey='read', $includeHiddenItems=\IPS\Content\Hideable::FILTER_AUTOMATIC, $queryFlags=0, \IPS\Member $member=NULL, $joinContainer=FALSE, $joinComments=FALSE, $joinReviews=FALSE, $countOnly=FALSE, $joins=NULL )
 	{
 		$class = '\IPS\cms\Records' . static::$customDatabaseId;
-
-		/* @var	$class	Records */
 		$where = $class::getItemsWithPermissionWhere( $where, $permissionKey, $member, $joinContainer );
 		
-		return parent::getItemsWithPermission( $where, $order, $limit, $permissionKey, $includeHiddenComments, $queryFlags, $member, $joinContainer, $joinComments, $joinReviews, $countOnly, $joins );
+		return parent::getItemsWithPermission( $where, $order, $limit, $permissionKey, $includeHiddenItems, $queryFlags, $member, $joinContainer, $joinComments, $joinReviews, $countOnly, $joins );
+	}
+	
+	/**
+	 * Get HTML for search result display
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$authorData		Basic data about the author. Only includes columns returned by \IPS\Member::columnsForPhoto()
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	array		$reputationData	Array of people who have given reputation and the reputation they gave
+	 * @param	int|NULL	$reviewRating	If this is a review, the rating
+	 * @param	bool		$iPostedIn		If the user has posted in the item
+	 * @param	string		$view			'expanded' or 'condensed'
+	 * @param	bool		$asItem	Displaying results as items?
+	 * @param	bool		$canIgnoreComments	Can ignore comments in the result stream? Activity stream can, but search results cannot.
+	 * @param	array		$template	Optional custom template
+	 * @param	array		$reactions	Reaction Data
+	 * @return	string
+	 */
+	public static function searchResult( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating, $iPostedIn, $view, $asItem, $canIgnoreComments=FALSE, $template=NULL, $reactions=array() )
+	{
+		/* Ensure that the comment title is formatted correctly */
+		try
+		{
+			$databases  = \IPS\cms\Databases::databases();
+			
+			if ( ! isset( static::$searchIndexTitles[ $itemData['primary_id_field'] ] ) )
+			{
+				$fields     = '\IPS\cms\Fields' .  static::$customDatabaseId;
+				$titleField = $databases[ static::$customDatabaseId ]->field_title;
+				
+				static::$searchIndexTitles[ $itemData['primary_id_field'] ] = $fields::load( $databases[ static::$customDatabaseId ]->field_title )->displayValue( $itemData['field_' . $databases[ static::$customDatabaseId ]->field_title ] );
+			}
+
+			$itemData['field_' . $databases[ static::$customDatabaseId ]->field_title ] = static::$searchIndexTitles[ $itemData['primary_id_field'] ];
+		}
+		catch ( \Exception $ex ) { }
+
+		return parent::searchResult( $indexData, $authorData, $itemData, $containerData, $reputationData, $reviewRating, $iPostedIn, $view, $asItem, $canIgnoreComments, $template, $reactions );
 	}
 	
 	/**
@@ -226,14 +238,13 @@ class Comment extends ContentComment implements Embeddable,
 	 *
 	 * @return	void
 	 */
-	public function postCreate(): void
+	public function postCreate()
 	{
 		$this->database_id = static::$customDatabaseId;
 		$this->save();
 		
 		$item = $this->item();
-		/* @var	$item	Records */
-		if ( $item->hidden() OR ( Databases::load( static::$customDatabaseId )->_comment_bump & Databases::BUMP_ON_COMMENT ) )
+		if ( $item->hidden() OR ( \IPS\cms\Databases::load( static::$customDatabaseId )->_comment_bump & \IPS\cms\Databases::BUMP_ON_COMMENT ) )
 		{
 			parent::postCreate();
 		}
@@ -259,7 +270,7 @@ class Comment extends ContentComment implements Embeddable,
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		$template = static::$commentTemplate[1];
 		static::$commentTemplate[0][0] = $this->item()->database()->template_display;
@@ -271,9 +282,9 @@ class Comment extends ContentComment implements Embeddable,
 	 * Get URL for doing stuff
 	 *
 	 * @param	string|NULL		$action		Action
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function url( ?string $action='find' ): Url
+	public function url( $action='find' )
 	{
 		$url = parent::url( $action );
 		
@@ -292,7 +303,7 @@ class Comment extends ContentComment implements Embeddable,
 	 *
 	 * @return	array
 	 */
-	public function attachmentIds(): array
+	public function attachmentIds()
 	{
 		$item = $this->item();
 		$idColumn = $item::$databaseColumnId;
@@ -305,9 +316,19 @@ class Comment extends ContentComment implements Embeddable,
 	 *
 	 * @return	array|NULL
 	 */
-	public static function commentWhere(): ?array
+	public static function commentWhere()
 	{
 		return array( 'comment_database_id=?', static::$customDatabaseId );
+	}
+
+	/**
+	 * WHERE clause for getting items for ACP overview statistics
+	 *
+	 * @return	array
+	 */
+	public static function overviewStatisticsWhere()
+	{
+		return [ static::commentWhere() ];
 	}
 	
 	/**
@@ -315,7 +336,7 @@ class Comment extends ContentComment implements Embeddable,
 	 *
 	 * @return	string
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		$databaseId = static::$customDatabaseId;
 		return "comment_id_{$databaseId}";
@@ -327,9 +348,9 @@ class Comment extends ContentComment implements Embeddable,
 	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'cms', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'cms' )->embedRecordComment( $this, $this->item(), $this->url()->setQueryString( $params ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'cms', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'cms' )->embedRecordComment( $this, $this->item(), $this->url()->setQueryString( $params ) );
 	}
 }

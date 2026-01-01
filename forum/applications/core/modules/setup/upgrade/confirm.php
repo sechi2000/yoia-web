@@ -11,31 +11,23 @@
 namespace IPS\core\modules\setup\upgrade;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Member;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Upgrader: Confirm
  */
-class confirm extends Controller
+class _confirm extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Show Form
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		/* reset a few things */
 		$_SESSION['lastJsonIndex'] = 0;
@@ -43,9 +35,9 @@ class confirm extends Controller
 		$_SESSION['sqlFinished']   = array();
 
 		/* Create our temporary upgrade data storage table */
-		if( !Db::i()->checkForTable( 'upgrade_temp' ) )
+		if( !\IPS\Db::i()->checkForTable( 'upgrade_temp' ) )
 		{
-			Db::i()->createTable( array(
+			\IPS\Db::i()->createTable( array(
 				'name'		=> 'upgrade_temp',
 				'columns'	=> array(
 					'id' => array(
@@ -81,7 +73,7 @@ class confirm extends Controller
 			)	);
 		}
 		
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('confirmpage');
-		Output::i()->output 	= Theme::i()->getTemplate( 'global' )->confirm();
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('confirmpage');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate( 'global' )->confirm();
 	}
 }

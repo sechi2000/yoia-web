@@ -9,66 +9,51 @@
  */
 
 namespace IPS\convert\Software\Forums;
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Vanilla as VanillaCore;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function unserialize;
+use \IPS\convert\Software\Core\Vanilla as VanillaCore;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Vanilla Forums Converter
  */
-class Vanilla extends Software
+class _Vanilla extends \IPS\convert\Software
 {
 	/**
 	 * @brief	Store the result of the check for reaction support
 	 */
-	protected static bool $_supportsReactions = FALSE;
+	protected static $_supportsReactions = FALSE;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 
 		/* Check for reaction support - This is a Vanilla2 addon, so it may not be installed */
 		if ( $needDB )
 		{
 			static::$_supportsReactions = $this->db->checkForTable( 'Action' );
 		}
+
+		return $return;
 	}
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "Vanilla (3.x)";
@@ -77,9 +62,9 @@ class Vanilla extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "vanilla";
@@ -88,9 +73,9 @@ class Vanilla extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -98,9 +83,9 @@ class Vanilla extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'vanilla' ) );
 	}
@@ -108,9 +93,9 @@ class Vanilla extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums' => array(
@@ -132,7 +117,7 @@ class Vanilla extends Software
 			),
 			'convertAttachments'	=> array(
 				'table'		=> 'Media',
-				'where'		=> [ "ForeignTable IN ('discussion', 'comment', 'embed')" ]
+				'where'		=> array( 'ForeignTable=? OR ForeignTable=?', 'discussion', 'comment' )
 			)
 		);
 	}
@@ -140,15 +125,15 @@ class Vanilla extends Software
 	/**
 	 * Allows software to add additional menu row options
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function extraMenuRows(): array
+	public function extraMenuRows()
 	{
 		$rows = array();
 		$rows['convertForumsPosts2'] = array(
 			'step_title'		=> 'convert_forums_posts',
 			'step_method'		=> 'convertForumsPosts2',
-			'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'forums_posts' ),
+			'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'forums_posts' ),
 			'source_rows'		=> array( 'table' => static::canConvert()['convertForumsPosts2']['table'], 'where' => static::canConvert()['convertForumsPosts2']['where'] ),
 			'per_cycle'			=> 200,
 			'dependencies'		=> array( 'convertForumsPosts' ),
@@ -162,13 +147,13 @@ class Vanilla extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
@@ -180,22 +165,24 @@ class Vanilla extends Software
 					$count += $this->db->select( 'COUNT(*)', 'Comment' )->first();
 					return $count;
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 	
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -203,9 +190,9 @@ class Vanilla extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertForumsForums',
@@ -217,10 +204,10 @@ class Vanilla extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 
@@ -230,13 +217,13 @@ class Vanilla extends Software
 				$return['convertForumsForums'] = array();
 
 				/* Find out where the photos live */
-				Member::loggedIn()->language()->words['attach_location_desc'] = Member::loggedIn()->language()->addToStack( 'attach_location' );
+				\IPS\Member::loggedIn()->language()->words['attach_location_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'attach_location' );
 				$return['convertForumsForums']['attach_location'] = array(
 					'field_class'			=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
-					'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_vanilla_photopath'),
+					'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_vanilla_photopath'),
 				);
 				break;
 			case 'convertForumsPosts':
@@ -245,18 +232,18 @@ class Vanilla extends Software
 				{
 					$options		= array();
 					$descriptions	= array();
-					foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
+					foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
 					{
 						$options[ $reaction->id ]		= $reaction->_icon->url;
-						$descriptions[ $reaction->id ]	= Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
+						$descriptions[ $reaction->id ]	= \IPS\Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
 					}
 
 					$return['convertForumsPosts'] = array();
 
 					foreach( $this->db->select( '*', 'Action' ) as $reaction )
 					{
-						Member::loggedIn()->language()->words['reaction_' . $reaction['ActionID'] ] = $reaction['Name'];
-						Member::loggedIn()->language()->words['reaction_' . $reaction['ActionID'] . '_desc' ] = Member::loggedIn()->language()->addToStack('reaction_convert_help');
+						\IPS\Member::loggedIn()->language()->words['reaction_' . $reaction['ActionID'] ] = $reaction['Name'];
+						\IPS\Member::loggedIn()->language()->words['reaction_' . $reaction['ActionID'] . '_desc' ] = \IPS\Member::loggedIn()->language()->addToStack('reaction_convert_help');
 
 						$return['convertForumsPosts']['reaction_' . $reaction['ActionID'] ] = array(
 							'field_class'		=> 'IPS\\Helpers\\Form\\Radio',
@@ -276,8 +263,8 @@ class Vanilla extends Software
 						'field_default'		=> NULL,
 						'field_required'	=> TRUE,
 						'field_extra'		=> array(),
-						'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_vanilla_photopath'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_vanilla_photopath'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					),
 				);
 				break;
@@ -289,89 +276,57 @@ class Vanilla extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts_first', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		/* Rebuild Leaderboard */
-		Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
-		Db::i()->delete('core_reputation_leaderboard_history');
+		\IPS\Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
+		\IPS\Db::i()->delete('core_reputation_leaderboard_history');
 
 		/* Caches */
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
 
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics", "f_topic_tags_recount" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return VanillaCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Vanilla::fixPostData( $post );
 	}
-
-	/**
-	 * @brief   temporarily store post content
-	 */
-	protected array $_postContent = array();
 
 	/**
 	 * Convert attachments
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments(): void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
-		$libraryClass::setKey( 'MediaID' );
-		$this->_postContent = [];
 
-		foreach( $this->fetch( 'Media', 'MediaID', [ $this->db->in( 'ForeignTable', [ 'discussion', 'comment', 'embed' ] ) ] ) AS $row )
+		$libraryClass::setKey( 'MediaID' );
+
+		foreach( $this->fetch( 'Media', 'MediaID', array( 'ForeignTable=? OR ForeignTable=?', 'discussion', 'comment' ) ) AS $row )
 		{
 			if( $row['ForeignTable'] == 'discussion' )
 			{
 				$map = array(
-					'id1'	=> $row['ForeignID'],
+					'id1'	=> 'fp-' . $row['ForeignID'],
 					'id2'	=> $row['ForeignID'],
-					'first_post' => true
 				);
-			}
-			elseif( $row['ForeignTable'] == 'embed' )
-			{
-				$mediaRows = iterator_to_array( 
-					\IPS\Db::i()->select( 
-						'*', 
-						'convert_vanilla_temp', 
-						[ 'media_id=? AND ' . \IPS\Db::i()->in( 'link_type', [ 'forums_posts', 'forums_posts_first'] ), $row['MediaID'] ] 
-				) );
-
-				// Nothing to do, attachment must be in another content type
-				if( !count( $mediaRows ) )
-				{
-					$libraryClass->setLastKeyValue( $row['MediaID'] );
-					continue;
-				}
-
-				$map = [
-					'id1'	=> $mediaRows[0]['content_id'],
-					'id2'	=> $mediaRows[0]['post_id'],
-					'first_post' => ( $mediaRows[0]['link_type'] == 'forums_posts_first' ) ? true : false
-				];
 			}
 			else
 			{
@@ -379,7 +334,7 @@ class Vanilla extends Software
 				{
 					$discussionId = $this->db->select( 'DiscussionID', 'Comment', array( 'CommentID=?', $row['ForeignID'] ) )->first();
 				}
-				catch( UnderflowException $ex )
+				catch( \UnderflowException $ex )
 				{
 					$libraryClass->setLastKeyValue( $row['MediaID'] );
 					continue;
@@ -405,39 +360,10 @@ class Vanilla extends Software
 				'attach_filesize'	=> $row['Size'],
 			);
 
-			$uploadPath = VanillaCore::parseMediaLocation( $row['Path'], $this->app->_session['more_info']['convertAttachments']['attach_location'] );
+			$uploadPath = \IPS\convert\Software\Core\Vanilla::parseMediaLocation( $row['Path'], $this->app->_session['more_info']['convertAttachments']['attach_location'] );
 
-			$attachId = $libraryClass->convertAttachment( $info, $map, $uploadPath );
-
-			/* Do some re-jiggery on the post itself to make sure attachment displays */
-			if ( $attachId !== FALSE and isset( $mediaRows ) )
-			{
-				foreach( $mediaRows as $mediaRow )
-				{
-					try
-					{
-						$pid = $this->app->getLink( $map['id2'], ( isset( $map['first_post'] ) AND $map['first_post'] === TRUE ) ? 'forums_posts_first' : 'forums_posts' );
-
-						if( !isset( $this->_postContent[ $pid ] ) )
-						{
-							$this->_postContent[ $pid ] = Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
-						}
-
-						$this->_postContent[ $pid ] = str_replace( "[ATTACH={$row['MediaID']}]", '[attachment=' . $attachId . ':name]', $this->_postContent[ $pid ] );
-					//	dump($this->_postContent[ $pid ]);
-					}
-					catch( UnderflowException|OutOfRangeException $e ) {}
-				}
-			}
-
-			unset( $mediaRows );
+			$libraryClass->convertAttachment( $info, $map, $uploadPath );
 			$libraryClass->setLastKeyValue( $row['MediaID'] );
-		}
-
-		/* Do the updates */
-		foreach( $this->_postContent as $pid => $content )
-		{
-			Db::i()->update( 'forums_posts', array( 'post' => $content ), array( 'pid=?', $pid ) );
 		}
 	}
 
@@ -446,14 +372,18 @@ class Vanilla extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums(): void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'c.CategoryID' );
 
 		$uploadsPath = $this->app->_session['more_info']['convertForumsForums']['attach_location'];
 
-		$forums = $this->fetch( array( 'Category', 'c' ), 'CategoryID', array( 'c.CategoryID<>?', -1 ) );
+		$forums = $this->fetch( array( 'Category', 'c' ), 'CategoryID', array( 'c.CategoryID<>?', -1 ), 
+			'c.*, lcu.UserID as LastCommentUserID, lcu.Name as LastCommentUserName, ld.Name as LastDiscussionName' 
+		);
+		$forums->join( array( 'User', 'lcu' ), 'c.LastCommentID=lcu.UserID' );
+		$forums->join( array( 'Discussion', 'ld' ), 'c.LastDiscussionID=ld.DiscussionID' );
 
 		foreach( $forums AS $row )
 		{
@@ -464,8 +394,12 @@ class Vanilla extends Software
 				'description'       => $row['Description'],
 				'topics'            => $row['CountDiscussions'],
 				'posts'             => $row['CountComments'],
+				'last_post'         => VanillaCore::mysqlToDateTime( $row['LastDateInserted'] ),
+				'last_poster_id'    => $row['LastCommentID'],
+				'last_poster_name'  => $row['LastCommentUserName'],
 				'parent_id'         => ( (int) $row['ParentCategoryID'] > 0 ) ? $row['ParentCategoryID'] : NULL,
 				'position'          => $row['Sort'],
+				'last_title'        => $row['LastDiscussionName'],
 				'icon'              => $icon,
 				'sub_can_post'		=> $row['AllowDiscussions'] ?: 0
 			];
@@ -480,7 +414,7 @@ class Vanilla extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics(): void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'd.DiscussionID' );
@@ -502,7 +436,7 @@ class Vanilla extends Software
 			{
 				if( substr( $row['Attributes'], 0, 2 ) == 'a:' ) // Probably serialize
 				{
-					$attributes = unserialize( $row['Attributes'] );
+					$attributes = \unserialize( $row['Attributes'] );
 				}
 				else
 				{
@@ -516,12 +450,12 @@ class Vanilla extends Software
 				continue;
 			}
 
-			$row['DateLastComment'] = $row['DateLastComment'] ?? 0;
-			$row['LastCommentUserID'] = $row['LastCommentUserID'] ?? 0;
-			$row['LastCommentUserName'] = $row['LastCommentUserName'] ?? '';
+			$row['DateLastComment'] = 0;
+			$row['LastCommentUserID'] = 0;
+			$row['LastCommentUserName'] = '';
 
 			/* If last post info is empty, fetch it */
-			if( !$row['DateLastComment'] )
+			if( $row['DateLastComment'] === NULL )
 			{
 				try
 				{
@@ -533,7 +467,7 @@ class Vanilla extends Software
 					$row['LastCommentUserID'] = $data['InsertUserId'];
 					$row['LastCommentUserName'] = $data['Name'];
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 
 			$info = array(
@@ -549,7 +483,6 @@ class Vanilla extends Software
 				'starter_name'		=> $row['UserName'],
 				'last_poster_name'	=> $row['LastCommentUserName'],
 				'views'				=> $row['CountViews'],
-				'pinned'			=> (int) $row['Announce'] > 0 ? 1 : 0,
 			);
 
 			$libraryClass->convertForumsTopic( $info );
@@ -559,7 +492,7 @@ class Vanilla extends Software
 			{
 				$tags = explode( ',', $row['Tags'] );
 
-				if ( count( $tags ) )
+				if ( \count( $tags ) )
 				{
 					foreach( $tags AS $tag )
 					{
@@ -590,7 +523,7 @@ class Vanilla extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts(): void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'DiscussionID' );
@@ -606,7 +539,7 @@ class Vanilla extends Software
 			{
 				if( substr( $row['Attributes'], 0, 2 ) == 'a:' ) // Probably serialize
 				{
-					$attributes = unserialize( $row['Attributes'] );
+					$attributes = \unserialize( $row['Attributes'] );
 				}
 				else
 				{
@@ -628,7 +561,7 @@ class Vanilla extends Software
 				{
 					$editName = $this->db->select( 'Name', 'User', array( 'UserID=?', $row['UpdateUserID'] ) )->first();
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 
 			// Add Format Type (for later processing) if Markdown
@@ -636,31 +569,17 @@ class Vanilla extends Software
 			{
 				$row['Body'] = '<!--Markdown-->' . $row['Body'];
 			}
-			elseif( $row['Format'] == 'Rich' )
-			{
-				$row['Body'] = VanillaCore::processQuill( $row['Body'], $this->app, 'forums_posts_first', $row['DiscussionID'], $row['DiscussionID'] );
-			}
-
-			/* Get IP */
-			try
-			{
-				$ipAddress = ( $row['InsertIPAddress'] AND !str_contains( $row['InsertIPAddress'], '.' ) ) ? long2ip( hexdec( bin2hex( $row['InsertIPAddress'] ) ) ) : $row['InsertIPAddress'];
-			}
-			catch( \ErrorException $e )
-			{
-				$ipAddress = '';
-			}
 
 			// First post
 			$info = array(
-				'pid'           => $row['DiscussionID'],
+				'pid'           => 'fp-' . $row['DiscussionID'],
 				'topic_id'      => $row['DiscussionID'],
 				'post'          => $row['Body'],
 				'new_topic'     => 1,
 				'edit_time'     => ( $editName === NULL ) ? NULL : VanillaCore::mysqlToDateTime( $row['DateUpdated'] ),
 				'edit_name'		=> $editName,
 				'author_id'     => $row['InsertUserID'],
-				'ip_address'    => $ipAddress,
+				'ip_address'    => $row['InsertIPAddress'],
 				'post_date'     => VanillaCore::mysqlToDateTime( $row['DateInserted'] ),
 			);
 
@@ -696,7 +615,7 @@ class Vanilla extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts2(): void
+	public function convertForumsPosts2()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'CommentID' );
@@ -711,7 +630,7 @@ class Vanilla extends Software
 			{
 				if( substr( $row['Attributes'], 0, 2 ) == 'a:' ) // Probably serialize
 				{
-					$attributes = unserialize( $row['Attributes'] );
+					$attributes = \unserialize( $row['Attributes'] );
 				}
 				else
 				{
@@ -733,27 +652,13 @@ class Vanilla extends Software
 				{
 					$editName = $this->db->select( 'Name', 'User', array( 'UserID=?', $row['UpdateUserID'] ) )->first();
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 
 			// Add Format Type (for later processing) if Markdown
 			if( $row['Format'] == 'Markdown' )
 			{
 				$row['Body'] = '<!--Markdown-->' . $row['Body'];
-			}
-			elseif( $row['Format'] == 'Rich' )
-			{
-				$row['Body'] = VanillaCore::processQuill( $row['Body'], $this->app, 'forums_posts', $row['DiscussionID'], $row['CommentID'] );
-			}
-
-			/* Get IP */
-			try
-			{
-				$ipAddress = ( $row['InsertIPAddress'] AND !str_contains( $row['InsertIPAddress'], '.' ) ) ? long2ip( hexdec( bin2hex( $row['InsertIPAddress'] ) ) ) : $row['InsertIPAddress'];
-			}
-			catch( \ErrorException $e )
-			{
-				$ipAddress = '';
 			}
 
 			$info = [
@@ -763,7 +668,7 @@ class Vanilla extends Software
 				'edit_time'  => ( $editName === NULL ) ? NULL : VanillaCore::mysqlToDateTime( $row['DateUpdated'] ),
 				'edit_name'	 => $editName,
 				'author_id'  => $row['InsertUserID'],
-				'ip_address' => $ipAddress,
+				'ip_address' => $row['InsertIPAddress'],
 				'post_date'  => VanillaCore::mysqlToDateTime( $row['DateInserted'] ),
 			];
 
@@ -775,20 +680,20 @@ class Vanilla extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 * @note	Forums and profiles don't use an ID in the URL. While we may be able to somehow cross reference this with our SEO slug, it wouldn't be reliable.
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( preg_match( '#/discussion/([0-9]+)/#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/discussion/([0-9]+)/#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			$class	= '\IPS\forums\Topic';
 			$types	= array( 'topics', 'forums_topics' );
 			$oldId	= (int) $matches[1];
 		}
-		elseif( preg_match( '#/discussion/comment/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		elseif( preg_match( '#/discussion/comment/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			$class	= '\IPS\forums\Topic\Post';
 			$types	= array( 'posts', 'forums_posts' );
@@ -803,13 +708,13 @@ class Vanilla extends Software
 				{
 					$data = (string) $this->app->getLink( $oldId, $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( $oldId, $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
@@ -817,7 +722,7 @@ class Vanilla extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

@@ -10,29 +10,25 @@
  */
 
 namespace IPS\gallery\api\GraphQL\Queries;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\gallery\api\GraphQL\Types\ImageType;
-use IPS\gallery\Image as ImageClass;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Image query for GraphQL API
  */
-class Image
+class _Image
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns a gallery image";
+	public static $description = "Returns a gallery image";
 
 	/*
 	 * Query arguments
@@ -47,7 +43,7 @@ class Image
 	/**
 	 * Return the query return type
 	 */
-	public function type() : ImageType
+	public function type() 
 	{
 		return \IPS\gallery\api\GraphQL\TypeRegistry::image();
 	}
@@ -55,26 +51,25 @@ class Image
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val
-	 * @param array $args
-	 * @param array $context
-	 * @param mixed $info
-	 * @return    ImageClass
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\gallery\Image
 	 */
-	public function resolve( mixed $val, array $args, array $context, mixed $info ) : ImageClass
+	public function resolve($val, $args, $context, $info)
 	{
 		try
 		{
-			$image = ImageClass::loadAndCheckPerms( $args['id'] );
+			$image = \IPS\gallery\Image::loadAndCheckPerms( $args['id'] );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'NO_IMAGE', '1F294/2', 400 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_IMAGE', '1F294/2', 400 );
 		}
 
 		if( !$image->can('read') )
 		{
-			throw new SafeException( 'INVALID_ID', '2F294/9', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_ID', '2F294/9', 403 );
 		}
 
 		return $image;

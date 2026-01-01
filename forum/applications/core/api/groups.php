@@ -11,27 +11,16 @@
 namespace IPS\core\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Db;
-use IPS\Member\Group;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member Groups API
  */
-class groups extends Controller
+class _groups extends \IPS\Api\Controller
 {
 	/**
 	 * GET /core/groups
@@ -39,23 +28,22 @@ class groups extends Controller
 	 *
 	 * @apiparam	int		page		Page number
 	 * @apiparam	int		perPage		Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\Member\Group>
-	 * @return PaginatedResponse<Group>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\Member\Group>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = array();
 
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', 'core_groups', $where, "g_id asc" ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			\IPS\Db::i()->select( '*', 'core_groups', $where, "g_id asc" ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			'IPS\Member\Group',
-			Db::i()->select( 'COUNT(*)', 'core_groups', $where )->first(),
+			\IPS\Db::i()->select( 'COUNT(*)', 'core_groups', $where )->first(),
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 
@@ -65,24 +53,23 @@ class groups extends Controller
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		1C358/1	INVALID_ID	The group ID does not exist
-	 * @apireturn		\IPS\Member\Group
-	 * @return Response
+	 * @return		\IPS\Member\Group
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{
-			$group = Group::load( $id );
+			$group = \IPS\Member\Group::load( $id );
 			if ( !$group->g_id )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
-			return new Response( 200, $group->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $group->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1C358/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1C358/1', 404 );
 		}
 	}
 
@@ -94,31 +81,30 @@ class groups extends Controller
 	 * @param		int		$id			ID Number
 	 * @throws		2C358/3	CANNOT_DELETE	The group can't be deleted
 	 * @throws		1C358/2	INVALID_ID	The group ID does not exist
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
 		try
 		{
-			$group = Group::load( $id );
+			$group = \IPS\Member\Group::load( $id );
 			if ( !$group->g_id )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
 			if( !$group->canDelete() )
 			{
-				throw new Exception( 'CANNOT_DELETE', '2C358/3', 403 );
+				throw new \IPS\Api\Exception( 'CANNOT_DELETE', '2C358/3', 403 );
 			}
 
 			$group->delete();
 
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1C358/2', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1C358/2', 404 );
 		}
 	}
 }

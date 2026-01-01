@@ -12,48 +12,43 @@
 namespace IPS\blog\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\blog\Entry;
-use IPS\Content\Filter;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * recentEntries Widget
  */
-class recentEntries extends PermissionCache implements Customizable
+class _recentEntries extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'recentEntries';
+	public $key = 'recentEntries';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'blog';
+	public $app = 'blog';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
  	{
 		$form = parent::configuration( $form );
  		
-		$form->add( new Number( 'number_to_show', $this->configuration['number_to_show'] ?? 5, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'number_to_show', isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 5, TRUE ) );
 		return $form;
  	} 
 
@@ -62,10 +57,10 @@ class recentEntries extends PermissionCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
-		$entries = Entry::getItemsWithPermission( array( array( 'entry_status!=?', 'draft' ) ), NULL, $this->configuration['number_to_show'] ?? 5, 'read', Filter::FILTER_PUBLIC_ONLY );
-		if ( count( $entries ) )
+		$entries = \IPS\blog\Entry::getItemsWithPermission( array( array( 'entry_status!=?', 'draft' ) ), NULL, isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 5, 'read', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY );
+		if ( \count( $entries ) )
 		{
 			return $this->output( $entries );
 		}

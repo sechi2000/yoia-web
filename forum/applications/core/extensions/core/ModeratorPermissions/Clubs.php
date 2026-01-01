@@ -11,26 +11,20 @@
 namespace IPS\core\extensions\core\ModeratorPermissions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\ModeratorPermissionsAbstract;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Moderator Permissions: Clubs
  */
-class Clubs extends ModeratorPermissionsAbstract
+class _Clubs
 {
 	/**
 	 * Get Permissions
 	 *
-	 * @param array $toggles
 	 * @code
 	 	return array(
 	 		'key'	=> 'YesNo',	// Can just return a string with type
@@ -45,16 +39,39 @@ class Clubs extends ModeratorPermissionsAbstract
 	 * @endcode
 	 * @return	array
 	 */
-	public function getPermissions( array $toggles ): array
+	public function getPermissions()
 	{
 		$return = array();
 		
-		if ( Settings::i()->clubs )
+		if ( \IPS\Settings::i()->clubs )
 		{
 			$return['can_access_all_clubs'] = 'YesNo';
 			$return['can_manage_featured_clubs'] = 'YesNo';
 		}
 
 		return $return;
+	}
+	
+	/**
+	 * After change
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @param	array	$changed	Values that were changed
+	 * @return	void
+	 */
+	public function onChange( $moderator, $changed )
+	{
+		
+	}
+	
+	/**
+	 * After delete
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @return	void
+	 */
+	public function onDelete( $moderator )
+	{
+		
 	}
 }

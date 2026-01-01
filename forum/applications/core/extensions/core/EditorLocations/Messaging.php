@@ -11,48 +11,44 @@
 namespace IPS\core\extensions\core\EditorLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Content;
-use IPS\core\Messenger\Conversation;
-use IPS\core\Messenger\Message;
-use IPS\Extensions\EditorLocationsAbstract;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Task;
-use LogicException;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: Messenger
  */
-class Messaging extends EditorLocationsAbstract
+class _Messaging
 {
+	/**
+	 * Can we use HTML in this editor?
+	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
+	 */
+	public function canUseHtml( $member )
+	{
+		return NULL;
+	}
+	
 	/**
 	 * Can we use attachments in this editor?
 	 *
-	 * @param	Member					$member	The member
-	 * @param	Editor	$field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
 	 */
-	public function canAttach( Member $member, Editor $field ): ?bool
+	public function canAttach( $member, $field )
 	{
-		return (bool) Member::loggedIn()->group['g_can_msg_attach'];
+		return (bool) \IPS\Member::loggedIn()->group['g_can_msg_attach'];
 	}
 
 	/**
 	 * Permission check for attachments
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	int|null	$id1		Primary ID
 	 * @param	int|null	$id2		Secondary ID
 	 * @param	string|null	$id3		Arbitrary data
@@ -60,14 +56,14 @@ class Messaging extends EditorLocationsAbstract
 	 * @param	bool		$viewOnly	If true, just check if the user can see the attachment rather than download it
 	 * @return	bool
 	 */
-	public function attachmentPermissionCheck( Member $member, ?int $id1, ?int $id2, ?string $id3, array $attachment, bool $viewOnly=FALSE ): bool
+	public function attachmentPermissionCheck( $member, $id1, $id2, $id3, $attachment, $viewOnly=FALSE )
 	{
 		try
 		{
-			$conversation = Conversation::load( $id1 );
+			$conversation = \IPS\core\Messenger\Conversation::load( $id1 );
 			return $conversation->canView( $member );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}
@@ -79,19 +75,12 @@ class Messaging extends EditorLocationsAbstract
 	 * @param	int|null	$id1	Primary ID
 	 * @param	int|null	$id2	Secondary ID
 	 * @param	string|null	$id3	Arbitrary data
-	 * @return    Content|Member|Model|Url|null
-	 * @throws	LogicException
+	 * @return	\IPS\Http\Url|\IPS\Content|\IPS\Node\Model
+	 * @throws	\LogicException
 	 */
-	public function attachmentLookup( ?int $id1=NULL, ?int $id2=NULL, ?string $id3=NULL ): Model|Content|Url|Member|null
+	public function attachmentLookup( $id1, $id2, $id3 )
 	{
-		try
-		{
-			return Message::load( $id2 );
-		}
-		catch( Exception $e )
-		{
-			throw new LogicException;
-		}
+		return \IPS\core\Messenger\Message::load( $id2 );
 	}
 
 	/**
@@ -102,9 +91,9 @@ class Messaging extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildContent( ?int $offset, ?int $max ): int
+	public function rebuildContent( $offset, $max )
 	{
-		Task::queue( 'core', 'RebuildPosts', array( 'class' => 'IPS\\core\\Messenger\\Message' ), 2 );
+		\IPS\Task::queue( 'core', 'RebuildPosts', array( 'class' => 'IPS\\core\\Messenger\\Message' ), 2 );
 		return 0;
 	}
 }

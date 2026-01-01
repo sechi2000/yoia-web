@@ -11,47 +11,28 @@
 namespace IPS\Login\Handler\OAuth2;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\File;
-use IPS\Helpers\Form\Color;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Login;
-use IPS\Login\Exception;
-use IPS\Login\Handler\OAuth2;
-use IPS\Member;
-use RuntimeException;
-use function count;
-use function defined;
-use function is_array;
-use function is_string;
-use const IPS\OAUTH_REQUIRES_HTTPS;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Wordpress oAuth Login Handler
  */
-class Wordpress extends OAuth2
+class _Wordpress extends \IPS\Login\Handler\OAuth2
 {
 	/**
 	 * @brief	Can we have multiple instances of this handler?
 	 */
-	public static bool $allowMultiple = TRUE;
+	public static $allowMultiple = TRUE;
 
 	/**
 	 * Get title
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return 'login_handler_wordpress';
 	}
@@ -64,7 +45,7 @@ class Wordpress extends OAuth2
 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{
 		$return = array();
 		$return[] = array( 'login_handler_wordpress_settings', 'login_handler_wordpress_oauth_info' );
@@ -77,7 +58,7 @@ class Wordpress extends OAuth2
 			{
 				$active = 'accountManagementSettings';
 			}
-			if ( !is_string( $v ) and !is_array( $v ) )
+			if ( !\is_string( $v ) and !\is_array( $v ) )
 			{
 				${$active}[ $k ] = $v;
 			}
@@ -85,24 +66,24 @@ class Wordpress extends OAuth2
 
 		$endpointValidation = function( $val )
 		{
-			if ( OAUTH_REQUIRES_HTTPS and $val and $val instanceof Url )
+			if ( \IPS\OAUTH_REQUIRES_HTTPS and $val and $val instanceof \IPS\Http\Url )
 			{
-				if ( $val->data[ Url::COMPONENT_SCHEME ] !== 'https' )
+				if ( $val->data[ \IPS\Http\Url::COMPONENT_SCHEME ] !== 'https' )
 				{
-					throw new DomainException('authorization_endpoint_https');
+					throw new \DomainException('authorization_endpoint_https');
 				}
-				if ( $val->data[ Url::COMPONENT_FRAGMENT ] )
+				if ( $val->data[ \IPS\Http\Url::COMPONENT_FRAGMENT ] )
 				{
-					throw new DomainException('authorization_endpoint_fragment');
+					throw new \DomainException('authorization_endpoint_fragment');
 				}
 			}
 		};
-		$return['wordpress_url'] = new \IPS\Helpers\Form\Url( 'wordpress_url', $this->settings['wordpress_url'] ?? NULL, NULL, array( 'placeholder' => 'https://example.com/' ), $endpointValidation, NULL, NULL, 'wordpress_url' );
+		$return['wordpress_url'] = new \IPS\Helpers\Form\Url( 'wordpress_url', isset( $this->settings['wordpress_url'] ) ? $this->settings['wordpress_url'] : NULL, NULL, array( 'placeholder' => 'https://example.com/' ), $endpointValidation, NULL, NULL, 'wordpress_url' );
 
 		$return[] = 'login_handler_oauth_ui';
-		$return['button_color'] = new Color( 'oauth_custom_button_color', $this->settings['button_color'] ?? '#23282d', NULL, array(), NULL, NULL, NULL, 'button_color' );
-		$return['button_text'] = new Translatable( 'oauth_custom_button_text',  NULL, NULL, array( 'placeholder' => Member::loggedIn()->language()->addToStack('oauth_custom_button_text_custom_placeholder'), 'app' => 'core', 'key' => ( $this->id ? "core_custom_oauth_{$this->id}" : NULL ) ), NULL, NULL, NULL, 'button_text' );
-		$return['button_icon'] = new Upload( 'oauth_custom_button_icon',  ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? File::get( 'core_Login', $this->settings['button_icon'] ) : NULL, FALSE, array( 'storageExtension' => 'core_Login' ), NULL, NULL, NULL, 'button_icon' );
+		$return['button_color'] = new \IPS\Helpers\Form\Color( 'oauth_custom_button_color', isset( $this->settings['button_color'] ) ? $this->settings['button_color'] : '#23282d', NULL, array(), NULL, NULL, NULL, 'button_color' );
+		$return['button_text'] = new \IPS\Helpers\Form\Translatable( 'oauth_custom_button_text',  NULL, NULL, array( 'placeholder' => \IPS\Member::loggedIn()->language()->addToStack('oauth_custom_button_text_custom_placeholder'), 'app' => 'core', 'key' => ( $this->id ? "core_custom_oauth_{$this->id}" : NULL ) ), NULL, NULL, NULL, 'button_text' );
+		$return['button_icon'] = new \IPS\Helpers\Form\Upload( 'oauth_custom_button_icon',  ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? \IPS\File::get( 'core_Login', $this->settings['button_icon'] ) : NULL, FALSE, array( 'storageExtension' => 'core_Login' ), NULL, NULL, NULL, 'button_icon' );
 
 		$return[] = 'account_management_settings';
 		foreach ( $accountManagementSettings as $k => $v )
@@ -119,7 +100,7 @@ class Wordpress extends OAuth2
 	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function acpFormSave( array &$values ): array
+	public function acpFormSave( &$values )
 	{
 		$return = parent::acpFormSave( $values );
 		$return['button_icon'] = (string) $return['button_icon'];
@@ -133,7 +114,7 @@ class Wordpress extends OAuth2
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		$parent = parent::formatFormValues( $values );
 
@@ -143,7 +124,7 @@ class Wordpress extends OAuth2
 			{
 				$this->save();
 			}
-			Lang::saveCustom( 'core', "core_custom_oauth_{$this->id}", $values['oauth_custom_button_text'] );
+			\IPS\Lang::saveCustom( 'core', "core_custom_oauth_{$this->id}", $values['oauth_custom_button_text'] );
 			unset( $values['button_text'] );
 		}
 
@@ -155,7 +136,7 @@ class Wordpress extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonColor(): string
+	public function buttonColor()
 	{
 		return $this->settings['button_color'];
 	}
@@ -163,30 +144,30 @@ class Wordpress extends OAuth2
 	/**
 	 * Get the button icon
 	 *
-	 * @return	string|File
+	 * @return	string
 	 */
-	public function buttonIcon(): string|File
+	public function buttonIcon()
 	{
-		return 'wordpress';
+		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? \IPS\File::get( 'core_Login', $this->settings['button_icon'] ) : 'wordpress';
 	}
 
 	/**
 	 * Get logo to display in information about logins with this method
 	 * Returns NULL for methods where it is not necessary to indicate the method, e..g Standard
 	 *
-	 * @return Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForDeviceInformation(): Url|string|null
+	public function logoForDeviceInformation()
 	{
-		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? File::get( 'core_Login', $this->settings['button_icon'] )->url : NULL;
+		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? \IPS\File::get( 'core_Login', $this->settings['button_icon'] )->url : NULL;
 	}
 
 	/**
 	 * Get logo to display in user cp sidebar
 	 *
-	 * @return Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForUcp(): Url|string|null
+	public function logoForUcp()
 	{
 		return $this->logoForDeviceInformation() ?: 'wordpress';
 	}
@@ -196,7 +177,7 @@ class Wordpress extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonText(): string
+	public function buttonText()
 	{
 		return "core_custom_oauth_{$this->id}";
 	}
@@ -206,7 +187,7 @@ class Wordpress extends OAuth2
 	 *
 	 * @return	string
 	 */
-	protected function _authenticationType(): string
+	protected function _authenticationType()
 	{
 		return static::AUTHENTICATE_POST; // Just because it's possible their server isn't configured to accept HTTP Authorization whereas we know this will always work
 	}
@@ -216,7 +197,7 @@ class Wordpress extends OAuth2
 	 *
 	 * @return	string
 	 */
-	protected function grantType(): string
+	protected function grantType()
 	{
 		return 'authorization_code';
 	}
@@ -227,7 +208,7 @@ class Wordpress extends OAuth2
 	 * @param	array|NULL	$additional	Any additional scopes to request
 	 * @return	array
 	 */
-	protected function scopesToRequest( array $additional=NULL ): array
+	protected function scopesToRequest( $additional=NULL )
 	{
 		return array( "profile" );
 	}
@@ -235,31 +216,31 @@ class Wordpress extends OAuth2
 	/**
 	 * Authorization Endpoint
 	 *
-	 * @param	Login	$login	The login object
-	 * @return	Url
+	 * @param	\IPS\Login	$login	The login object
+	 * @return	\IPS\Http\Url
 	 */
-	protected function authorizationEndpoint( Login $login ): Url
+	protected function authorizationEndpoint( \IPS\Login $login )
 	{
-		return Url::external( rtrim( $this->settings['wordpress_url'], "/" ) . "/wp-json/moserver/authorize" );
+		return \IPS\Http\Url::external( rtrim( $this->settings['wordpress_url'], "/" ) . "/wp-json/moserver/authorize" );
 	}
 
 	/**
 	 * Token Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function tokenEndpoint(): Url
+	protected function tokenEndpoint()
 	{
-		return Url::external( rtrim( $this->settings['wordpress_url'], "/" ) . "/wp-json/moserver/token" );
+		return \IPS\Http\Url::external( rtrim( $this->settings['wordpress_url'], "/" ) . "/wp-json/moserver/token" );
 	}
 
 	/**
 	 * Get authenticated user's identifier (may not be a number)
 	 *
-	 * @param string $accessToken Access Token
-	 * @return string|null
+	 * @param	string	$accessToken	Access Token
+	 * @return	string
 	 */
-	protected function authenticatedUserId( string $accessToken ): ?string
+	protected function authenticatedUserId( $accessToken )
 	{
 		if ( isset( $this->_userData( $accessToken )[ 'username' ] ) )
 		{
@@ -275,7 +256,7 @@ class Wordpress extends OAuth2
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedUserName( string $accessToken ): ?string
+	protected function authenticatedUserName( $accessToken )
 	{
 		if ( isset( $this->_userData( $accessToken )[ 'display_name' ] ) )
 		{
@@ -291,7 +272,7 @@ class Wordpress extends OAuth2
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedEmail( string $accessToken ): ?string
+	protected function authenticatedEmail( $accessToken )
 	{
 		if ( isset( $this->_userData( $accessToken )[ 'email' ] ) )
 		{
@@ -304,17 +285,17 @@ class Wordpress extends OAuth2
 	 * Get user's profile photo
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
-	 * @return	Url|NULL
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	\IPS\Member	$member	Member
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfilePhoto( Member $member ): ?Url
+	public function userProfilePhoto( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new Exception( "", Exception::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		if ( isset( $this->_userData( $link['token_access_token'] )[ 'avatar' ] ) )
@@ -323,7 +304,7 @@ class Wordpress extends OAuth2
 
 			try
 			{
-				return Url::external( $url );
+				return \IPS\Http\Url::external( $url );
 			}
 			catch ( \Exception $e ) { }
 		}
@@ -334,17 +315,17 @@ class Wordpress extends OAuth2
 	 * Get user's profile name
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfileName( Member $member ): ?string
+	public function userProfileName( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new Exception( "", Exception::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 
 		return $this->authenticatedUserName( $link['token_access_token'] );
@@ -353,11 +334,11 @@ class Wordpress extends OAuth2
 	/**
 	 * Syncing Options
 	 *
-	 * @param	Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
+	 * @param	\IPS\Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
 	 * @param	bool		$defaultOnly	If TRUE, only returns which options should be enabled by default for a new account
 	 * @return	array
 	 */
-	public function syncOptions( Member $member, bool $defaultOnly=FALSE ): array
+	public function syncOptions( \IPS\Member $member, $defaultOnly = FALSE )
 	{
 		$return = array();
 
@@ -377,20 +358,20 @@ class Wordpress extends OAuth2
 	/**
 	 * @brief	Cached user data
 	 */
-	protected array $_cachedUserData = array();
+	protected $_cachedUserData = array();
 
 	/**
 	 * Get user data
 	 *
 	 * @param	string	$accessToken	Access Token
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	protected function _userData( string $accessToken ): array
+	protected function _userData( $accessToken )
 	{
 		if ( !isset( $this->_cachedUserData[ $accessToken ] ) )
 		{
-			$data = Url::external( rtrim( $this->settings['wordpress_url'], "/" ) . "/wp-json/moserver/resource" )
+			$data = \IPS\Http\Url::external( rtrim( $this->settings['wordpress_url'], "/" ) . "/wp-json/moserver/resource" )
 				->request()
 				->setHeaders( array(
 					'Authorization' => "Bearer {$accessToken}"
@@ -399,9 +380,9 @@ class Wordpress extends OAuth2
 				->decodeJson();
 			
 			/* As with the Custom handler - if we did not get expected data, try using the query string method. */
-			if ( !count( $data ) )
+			if ( !\count( $data ) )
 			{
-				$data = Url::external( rtrim( $this->settings['wordpress_url'], "/" ) . "/wp-json/moserver/resource" )
+				$data = \IPS\Http\Url::external( rtrim( $this->settings['wordpress_url'], "/" ) . "/wp-json/moserver/resource" )
 					->setQueryString( 'access_token', $accessToken )
 					->request()
 					->get()
@@ -416,10 +397,10 @@ class Wordpress extends OAuth2
 	/**
 	 * Forgot Password URL
 	 *
-	 * @return	Url|NULL
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function forgotPasswordUrl(): ?Url
+	public function forgotPasswordUrl()
 	{
-		return Url::external( rtrim( $this->settings['wordpress_url'], "/" ) . "/wp-login.php?action=lostpassword" );
+		return \IPS\Http\Url::external( rtrim( $this->settings['wordpress_url'], "/" ) . "/wp-login.php?action=lostpassword" );
 	}
 }

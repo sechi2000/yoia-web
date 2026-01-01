@@ -11,33 +11,28 @@
 namespace IPS\Application;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Developer class used for IN_DEV management
  */
-class Developer extends Application
+class _Developer extends \IPS\Application
 {
 	/**
 	 * @brief Array of directories that should always be present inside /dev
 	 */
-	protected static array $devDirs = array( 'css', 'email', 'html', 'img', 'js' );
+	protected static $devDirs = array( 'css', 'email', 'html', 'img', 'js' );
 
 	/**
 	 * Returns NULL or a list of missing IN_DEV required directories
 	 * 
 	 * @return NULL|array	Null if all directories are present, or an array of directory names ('dev', 'dev/css', 'dev/email',... )
 	 */
-	public function getMissingDirectories(): ?array
+	public function getMissingDirectories()
 	{
 		$path    = \IPS\ROOT_PATH . '/' . $this->directory . '/dev';
 		$missing = array();
@@ -55,24 +50,24 @@ class Developer extends Application
 			}
 		}
 		
-		return ( count( $missing ) ) ? $missing : null;
+		return ( \count( $missing ) ) ? $missing : null;
 	}
-
+	
 	/**
 	 * Returns NULL or a list of unwritable directories
-	 *
-	 * @return NULL|array	Null if all directories are writeable, or an array of directory names ('dev', 'dev/css', 'dev/email',... )
+	 * 
+	 * @return NULL|Array	Null if all directories are writeable, or an array of directory names ('dev', 'dev/css', 'dev/email',... )
 	 */
-	public function getUnwritableDirectories(): array|null
+	public function getUnwritableDirectories()
 	{
 		$path        = \IPS\ROOT_PATH . '/' . $this->directory . '/dev';
 		$unwriteable = array();
-
+		
 		if ( ! is_writeable( $path ) )
 		{
 			return  array( 'dev' );
 		}
-
+		
 		foreach( static::$devDirs as $dir )
 		{
 			if ( ! is_writeable( $path . '/' . $dir ) )
@@ -80,7 +75,7 @@ class Developer extends Application
 				$unwriteable[] = $dir;
 			}
 		}
-
-		return ( count( $unwriteable ) ) ? $unwriteable : null;
+		
+		return ( \count( $unwriteable ) ) ? $unwriteable : null;
 	}
 }

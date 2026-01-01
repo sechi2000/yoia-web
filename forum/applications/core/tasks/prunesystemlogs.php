@@ -11,23 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Log;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * prunesystemlogs Task
  */
-class prunesystemlogs extends Task
+class _prunesystemlogs extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -38,13 +31,13 @@ class prunesystemlogs extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		if( Settings::i()->prune_log_system )
+		if( \IPS\Settings::i()->prune_log_system )
 		{
-			Log::pruneLogs( Settings::i()->prune_log_system );
+			\IPS\Log::pruneLogs( \IPS\Settings::i()->prune_log_system );
 		}
 
 		return NULL;

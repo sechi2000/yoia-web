@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Custom Field Node
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -12,90 +11,56 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use DomainException;
-use IPS\Extensions\CustomFieldAbstract;
-use IPS\Db\Exception;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Stack;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Text\Encrypt;
-use OutOfRangeException;
-use function defined;
-use function get_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_numeric;
-use function is_object;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Custom Field Node
  */
-abstract class CustomField extends Model
+abstract class _CustomField extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[CustomField] Title/Description lang prefix
 	 */
-	protected static string $langKey;
+	protected static $langKey;
 
 	/**
 	 * @brief	[CustomField] Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'not_null'	=> 'not_null'
 	);
 	
 	/**
 	 * @brief	[CustomField] Additional Field Classes
 	 */
-	public static array $additionalFieldTypes = array();
+	public static $additionalFieldTypes = array();
 	
 	/**
 	 * @brief	[CustomField] Additional Field Toggles
 	 */
-	public static array $additionalFieldToggles = array();
+	public static $additionalFieldToggles = array();
 
 	/**
 	 * @brief   [CustomField] An array of the 'keys' of the Field types toggles that shouldn't be an option. The main use is for excluding polls
 	 */
-	public static array $disabledFieldTypes = array();
+	public static $disabledFieldTypes = array();
 	
 	/**
 	 * @brief	[CustomField] Set to TRUE if uploads fields are capable of holding the submitted content for moderation
 	 */
-	public static bool $uploadsCanBeModerated = FALSE;
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
+	public static $uploadsCanBeModerated = FALSE;
 	
 	/**
 	 * Get
 	 *
-	 * @param mixed $key	Key
+	 * @param	string	$key	Key
 	 * @return	mixed	$value	Value
 	 */
-	public function __get( mixed $key )
+	public function __get( $key )
 	{
 		if ( isset( static::$databaseColumnMap[ $key ] ) )
 		{
@@ -108,53 +73,53 @@ abstract class CustomField extends Model
 	/**
 	 * Set
 	 *
-	 * @param mixed $key	Key
+	 * @param	string	$key	Key
 	 * @param	mixed	$value	Value
 	 * @return	void
 	 */
-	public function __set( mixed $key, mixed $value )
+	public function __set( $key, $value )
 	{
 		if ( isset( static::$databaseColumnMap[ $key ] ) )
 		{
 			$key = static::$databaseColumnMap[ $key ];
 		}
 
-		if( $value instanceof Model )
+		if( $value instanceof \IPS\Node\Model )
 		{
 			$value = $value->_id;
 		}
 		
-		parent::__set( $key, $value );
+		return parent::__set( $key, $value );
 	}
 
 	/**
 	 * @brief	Field ID controlling formatting that we should show/hide depending upon field type selection
 	 */
-	protected string $fieldFormattingId = 'pf_format';
+	protected $fieldFormattingId = 'pf_format';
 	
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{		
 		$form->addHeader( 'pfield_settings' );
 
 		/* Are we being forced to change the field type? */
-		if ( !$this->_new AND isset( $this->type ) AND in_array( $this->type, static::$disabledFieldTypes ) )
+		if ( !$this->_new AND isset( $this->type ) AND \in_array( $this->type, static::$disabledFieldTypes ) )
 		{
 			//\IPS\Member::loggedIn()->language()->words['pf_type_deprecated'] = \IPS\Member::loggedIn()->language()->addToStack('custom_field_type_deprecated');
-			$form->addMessage( 'custom_field_type_deprecated', 'ipsMessage ipsMessage_info i-margin_3' );
+			$form->addMessage( 'custom_field_type_deprecated', 'ipsMessage ipsMessage_info ipsMargin' );
 		}
 
-		$form->add( new Translatable( 'pf_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? static::$langKey . '_' . $this->id : NULL ) ) ) );
-		$form->add( new Translatable( 'pf_desc', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ? static::$langKey . '_' . $this->id . '_desc' : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'pf_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? static::$langKey . '_' . $this->id : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'pf_desc', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ? static::$langKey . '_' . $this->id . '_desc' : NULL ) ) ) );
 		
 		if ( isset( static::$parentNodeClass ) )
 		{
-			$form->add( new Node( 'pf_group_id', $this->group_id, TRUE, array( 'class' => static::$parentNodeClass, 'subnodes' => FALSE  ) ) );
+			$form->add( new \IPS\Helpers\Form\Node( 'pf_group_id', $this->group_id, TRUE, array( 'class' => static::$parentNodeClass, 'subnodes' => FALSE  ) ) );
 		}
 		
 		$options = array_merge( array(
@@ -181,6 +146,7 @@ abstract class CustomField extends Model
 			'YesNo'			=> 'pf_type_YesNo',
 		), static::$additionalFieldTypes );
 
+		
 		$toggles = array(
 			'CheckboxSet'	=> array( 'pf_content', 'pf_not_null', 'pf_search_type_on_off', "{$form->id}_header_pfield_displayoptions" ),
 			'Codemirror'	=> array( 'pf_not_null', 'pf_max_input', "{$form->id}_header_pfield_displayoptions" ),
@@ -203,17 +169,6 @@ abstract class CustomField extends Model
 			'Upload'		=> array( 'pf_not_null', "{$form->id}_header_pfield_displayoptions" ),
 		);
 
-		/* Add field options and toggles from the extensions */
-		foreach( Application::allExtensions( 'core', 'CustomField' ) as $ext )
-		{
-			/* @var CustomFieldAbstract $ext */
-			if( $ext::isEnabled() )
-			{
-				$options[ $ext::fieldType() ] = $ext::fieldTypeTitle();
-				$toggles[ $ext::fieldType() ] = $ext::fieldTypeToggles();
-			}
-		}
-
 
 		foreach( $options as $id => $toggle )
 		{
@@ -222,7 +177,7 @@ abstract class CustomField extends Model
 
 		foreach ( static::$additionalFieldTypes as $k => $v )
 		{
-			$toggles[ $k ] = static::$additionalFieldToggles[$k] ?? array( 'pf_not_null' );
+			$toggles[ $k ] = isset( static::$additionalFieldToggles[ $k ] ) ? static::$additionalFieldToggles[ $k ] : array( 'pf_not_null' );
 		}
 		foreach ( static::$additionalFieldToggles as $k => $v )
 		{
@@ -247,7 +202,7 @@ abstract class CustomField extends Model
 
 		if ( !$this->_new )
 		{
-			Member::loggedIn()->language()->words['pf_type_warning']	= Member::loggedIn()->language()->addToStack('custom_field_change');
+			\IPS\Member::loggedIn()->language()->words['pf_type_warning']	= \IPS\Member::loggedIn()->language()->addToStack('custom_field_change');
 
 			foreach ( $toggles as $k => $_toggles )
 			{
@@ -258,127 +213,114 @@ abstract class CustomField extends Model
 			}
 		}
 
-		$form->add( new Select( 'pf_type', $this->id ? $this->type : 'Text', TRUE, array( 'options' => $options, 'toggles' => $toggles ) ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'pf_type', $this->id ? $this->type : 'Text', TRUE, array( 'options' => $options, 'toggles' => $toggles ) ) );
 
-		$form->add( new YesNo( 'pf_allow_attachments', $this->id ? $this->allow_attachments : 1, FALSE, array( ), NULL, NULL, NULL, 'pf_allow_attachments' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'pf_allow_attachments', $this->id ? $this->allow_attachments : 1, FALSE, array( ), NULL, NULL, NULL, 'pf_allow_attachments' ) );
 
-		$form->add( new Stack( 'pf_content', $this->id ? json_decode( $this->content, TRUE ) : array(), FALSE, array( 'removeEmptyValues' => FALSE ), NULL, NULL, NULL, 'pf_content' ) );
-		$form->add( new YesNo( 'pf_multiple', $this->id ? $this->multiple : FALSE, FALSE, array(), NULL, NULL, NULL, 'pf_multiple' ) );
+		$form->add( new \IPS\Helpers\Form\Stack( 'pf_content', $this->id ? json_decode( $this->content, TRUE ) : array(), FALSE, array( 'removeEmptyValues' => FALSE ), NULL, NULL, NULL, 'pf_content' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'pf_multiple', $this->id ? $this->multiple : FALSE, FALSE, array(), NULL, NULL, NULL, 'pf_multiple' ) );
 
         $requiredColumn = ( isset( static::$databaseColumnMap['not_null'] ) and static::$databaseColumnMap['not_null'] ) ? static::$databaseColumnMap['not_null'] : NULL;
 		
 		if ( isset( static::$databaseColumnMap['not_null'] ) )
 		{
-	        $form->add( new YesNo( 'pf_not_null', $this->id ? $this->$requiredColumn : TRUE, FALSE, array(), NULL, NULL, NULL, 'pf_not_null' ) );
+	        $form->add( new \IPS\Helpers\Form\YesNo( 'pf_not_null', $this->id ? $this->$requiredColumn : TRUE, FALSE, array(), NULL, NULL, NULL, 'pf_not_null' ) );
 	    }
 	    
-		$form->add( new Number( 'pf_max_input', $this->id ? $this->max_input : 0, FALSE, array( 'unlimited' => 0 ), NULL, NULL, NULL, 'pf_max_input' ) );
-		$form->add( new Text( 'pf_input_format', $this->id ? $this->input_format : NULL, FALSE, array( 'placeholder' => '/[A-Z0-9]+/i' ), function( $val )
+		$form->add( new \IPS\Helpers\Form\Number( 'pf_max_input', $this->id ? $this->max_input : 0, FALSE, array( 'unlimited' => 0 ), NULL, NULL, NULL, 'pf_max_input' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'pf_input_format', $this->id ? $this->input_format : NULL, FALSE, array( 'placeholder' => '/[A-Z0-9]+/i' ), function( $val )
 		{
 			if ( $val AND @preg_match( $val, NULL ) === false )
 			{
-				throw new DomainException('form_bad_value');
+				throw new \DomainException('form_bad_value');
 			}
 		}, NULL, NULL, 'pf_input_format' ) );
 		$form->addHeader( 'pfield_displayoptions' );
-		$form->add( new Select( 'pf_search_type', $this->id ? $this->search_type : 'loose', FALSE, array( 'options' => array( 'exact' => 'pf_search_type_exact', 'loose' => 'pf_search_type_loose', '' => 'pf_search_type_none' ) ), NULL, NULL, NULL, 'pf_search_type' ) );
-		$form->add( new Select( 'pf_search_type_on_off', $this->id ? $this->search_type : 'exact', FALSE, array( 'options' => array( 'exact' => 'pf_search_type_exact', '' => 'pf_search_type_none' ) ), NULL, NULL, NULL, 'pf_search_type_on_off' ) );
-
-		/* Add form fields from extensions */
-		foreach( Application::allExtensions( 'core', 'CustomField' ) as $ext )
-		{
-			/* @var CustomFieldAbstract $ext */
-			if( $ext::isEnabled() )
-			{
-				$ext::form( $form, $this );
-			}
-		}
-
-        parent::form( $form );
+		$form->add( new \IPS\Helpers\Form\Select( 'pf_search_type', $this->id ? $this->search_type : 'loose', FALSE, array( 'options' => array( 'exact' => 'pf_search_type_exact', 'loose' => 'pf_search_type_loose', '' => 'pf_search_type_none' ) ), NULL, NULL, NULL, 'pf_search_type' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'pf_search_type_on_off', $this->id ? $this->search_type : 'exact', FALSE, array( 'options' => array( 'exact' => 'pf_search_type_exact', '' => 'pf_search_type_none' ) ), NULL, NULL, NULL, 'pf_search_type_on_off' ) );
 	}
 	
 	/**
 	 * Does the change mean wiping the value?
 	 *
-	 * @param string $newType	The new type
-	 * @return	bool
+	 * @param	string	$newType	The new type
+	 * @return	array
 	 */
-	protected function canKeepValueOnChange( string $newType ): bool
+	protected function canKeepValueOnChange( $newType )
 	{
-		/* Check additional field types */
-		if ( in_array( $newType, array_keys( static::$additionalFieldTypes ) ) )
+		if ( \in_array( $newType, array_keys( static::$additionalFieldTypes ) ) )
 		{
 			return $newType === $this->type;
-		}
-
-		/* Check extensions */
-		if( $extension = $this->extension() )
-		{
-			return $extension::canKeepValueOnChange( $this, $newType );
 		}
 		
 		switch ( $this->type )
 		{
 			case 'Address':
-				return $newType == 'Address';
+				return \in_array( $newType, array( 'Address' ) );
 			
 			case 'Checkbox':
-			case 'YesNo':
-				return in_array( $newType, array( 'Checkbox', 'YesNo' ) );
+				return \in_array( $newType, array( 'Checkbox', 'YesNo' ) );
 				
 			case 'CheckboxSet':
-				return in_array( $newType, array( 'CheckboxSet', 'Select' ) );
+				return \in_array( $newType, array( 'CheckboxSet', 'Select' ) );
 			
 			case 'Code':
 			case 'Codemirror':
-				return in_array( $newType, array( 'Code', 'Codemirror', 'Editor', 'TextArea' ) );
+				return \in_array( $newType, array( 'Code', 'Codemirror', 'Editor', 'TextArea' ) );
 				
 			case 'Color':
-				return in_array( $newType, array( 'Color', 'Text' ) );
+				return \in_array( $newType, array( 'Color', 'Text' ) );
 				
 			case 'Date':
-				return in_array( $newType, array( 'Date', 'Text' ) );
+				return \in_array( $newType, array( 'Date', 'Text' ) );
 				
 			case 'Editor':
-			case 'TextArea':
-				return in_array( $newType, array( 'Code', 'Editor', 'TextArea' ) );
+				return \in_array( $newType, array( 'Code', 'Editor', 'TextArea' ) );
 			
 			case 'Email':
-				return in_array( $newType, array( 'Email', 'Password', 'Text' ) );
+				return \in_array( $newType, array( 'Email', 'Password', 'Text' ) );
 				
 			case 'Item':
-				return in_array( $newType, array( 'Item', 'TextArea' ) );
+				return \in_array( $newType, array( 'Item', 'TextArea' ) );
 			
 			case 'Member':
-				return in_array( $newType, array( 'Member', 'Text', 'TextArea', 'Editor' ) );
+				return \in_array( $newType, array( 'Member', 'Text', 'TextArea', 'Editor' ) );
 				
 			case 'Number':
-			case 'Rating':
-				return in_array( $newType, array( 'Number', 'Password', 'Rating', 'Text', 'Tel' ) );
+				return \in_array( $newType, array( 'Number', 'Password', 'Rating', 'Text', 'Tel' ) );
 				
 			case 'Password':
-				return in_array( $newType, array( 'Number', 'Password', 'Text', 'Tel' ) );
+				return \in_array( $newType, array( 'Number', 'Password', 'Text', 'Tel' ) );
 				
 			case 'Poll':
-				return $newType == 'Poll';
+				return \in_array( $newType, array( 'Poll' ) );
 				
 			case 'Radio':
-				return in_array( $newType, array( 'Radio', 'Select' ) );
+				return \in_array( $newType, array( 'Radio', 'Select' ) );
+				
+			case 'Rating':
+				return \in_array( $newType, array( 'Number', 'Password', 'Rating', 'Text', 'Tel' ) );
 				
 			case 'Select':
-				return in_array( $newType, array( 'Select', 'CheckboxSet' ) );
+				return \in_array( $newType, array( 'Select', 'CheckboxSet' ) );
 				
 			case 'Tel':
-				return in_array( $newType, array( 'Password', 'Rating', 'Text', 'Tel' ) );
+				return \in_array( $newType, array( 'Password', 'Rating', 'Text', 'Tel' ) );
 				
 			case 'Text':
-				return in_array( $newType, array( 'Email', 'Password', 'Text', 'Tel', 'Url', 'Editor', 'TextArea', 'Code', 'Codemirror' ) );
+				return \in_array( $newType, array( 'Email', 'Password', 'Text', 'Tel', 'Url', 'Editor', 'TextArea', 'Code', 'Codemirror' ) );
+
+			case 'TextArea':
+				return \in_array( $newType, array( 'Code', 'Editor', 'TextArea' ) );
 
 			case 'Upload':
-				return $newType == 'Upload';
+				return \in_array( $newType, array( 'Upload' ) );
 
 			case 'Url':
-				return in_array( $newType, array( 'Text', 'Url' ) );
+				return \in_array( $newType, array( 'Text', 'Url' ) );
+			
+			case 'YesNo':
+				return \in_array( $newType, array( 'Checkbox', 'YesNo' ) );
 		}
 		
 		return FALSE;
@@ -391,9 +333,9 @@ abstract class CustomField extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
-		$column = $this->column ?? "field_{$this->id}";
+		$column = isset( $this->column ) ? $this->column : "field_{$this->id}";
 
 		/* Checkbox sets are always multiple */
 		if ( isset( $values['pf_type'] ) AND $values['pf_type'] === 'CheckboxSet' )
@@ -403,7 +345,7 @@ abstract class CustomField extends Model
 
 		if( isset( $values['pf_multiple'] ) )
 		{
-			$values['pf_multiple']	= (bool)$values['pf_multiple'];
+			$values['pf_multiple']	= $values['pf_multiple'] ? TRUE : FALSE;
 		}
 
 		/* Add/Update the content table */
@@ -468,19 +410,6 @@ abstract class CustomField extends Model
 					$columnDefinition['length'] = 1;
 					break;
 			}
-
-			/* Process values for extension */
-			foreach( Application::allExtensions( 'core', 'CustomField' ) as $ext )
-			{
-				/* @var CustomFieldAbstract $ext */
-				if( $ext::isEnabled() and $values['pf_type'] == $ext::fieldType() )
-				{
-					$values = $ext::formatFormValues( $values );
-					$columnDefinition['type'] = $ext::columnDefinition();
-					break;
-				}
-			}
-
 			if ( isset( $values['pf_max_input'] ) and $values['pf_max_input'] )
 			{
 				if( $values['pf_max_input'] > 255 )
@@ -497,19 +426,19 @@ abstract class CustomField extends Model
 			if ( !$this->id )
 			{
 				$this->save();
-				$columnDefinition['name'] = $this->column ?? "field_{$this->id}";
+				$columnDefinition['name'] = isset( $this->column ) ? $this->column : "field_{$this->id}";
 				
-				Db::i()->addColumn( static::$contentDatabaseTable, $columnDefinition );
+				\IPS\Db::i()->addColumn( static::$contentDatabaseTable, $columnDefinition );
 				
 				if ( $values['pf_type'] != 'Upload' )
 				{
-					if ( in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
+					if ( \in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
 					{
-						Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
+						\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
 					}
 					else
 					{
-						Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
+						\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
 					}
 				}
 			}
@@ -517,41 +446,41 @@ abstract class CustomField extends Model
 			{
 				try
 				{
-					Db::i()->dropIndex( static::$contentDatabaseTable, $column );
-					Db::i()->dropColumn( static::$contentDatabaseTable, $column );
+					\IPS\Db::i()->dropIndex( static::$contentDatabaseTable, $column );
+					\IPS\Db::i()->dropColumn( static::$contentDatabaseTable, $column );
 				} 
-				catch ( Exception $e )
+				catch ( \IPS\Db\Exception $e )
 				{
 
 				}
 
-				Db::i()->addColumn( static::$contentDatabaseTable, $columnDefinition );
+				\IPS\Db::i()->addColumn( static::$contentDatabaseTable, $columnDefinition );
 
 				if ( $values['pf_type'] != 'Upload' )
 				{
-					if ( in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
+					if ( \in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
 					{
-						Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => $column, 'columns' => array( $column ) ) );
+						\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => $column, 'columns' => array( $column ) ) );
 					}
 					else
 					{
-						Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => $column, 'columns' => array( $column ) ) );
+						\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => $column, 'columns' => array( $column ) ) );
 					}
 				}
 			}
 			else
 			{
-				Db::i()->dropIndex( static::$contentDatabaseTable, $column );
+				\IPS\Db::i()->dropIndex( static::$contentDatabaseTable, $column );
 
-				Db::i()->changeColumn( static::$contentDatabaseTable, $column, $columnDefinition );
+				\IPS\Db::i()->changeColumn( static::$contentDatabaseTable, $column, $columnDefinition );
 
-				if ( in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
+				if ( \in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
 				{
-					Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => $column, 'columns' => array( $column ) ) );
+					\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => $column, 'columns' => array( $column ) ) );
 				}
 				else
 				{
-					Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => $column, 'columns' => array( $column ) ) );
+					\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => $column, 'columns' => array( $column ) ) );
 				}
 			}
 		}
@@ -563,29 +492,29 @@ abstract class CustomField extends Model
 		/* Save the name and description */
 		if( isset( $values['pf_title'] ) )
 		{
-			Lang::saveCustom( 'core', static::$langKey . '_' . $this->id, $values['pf_title'] );
+			\IPS\Lang::saveCustom( 'core', static::$langKey . '_' . $this->id, $values['pf_title'] );
 			unset( $values['pf_title'] );
 		}
 
 		if( isset( $values['pf_desc'] ) )
 		{
-			Lang::saveCustom( 'core', static::$langKey . '_' . $this->id . '_desc', $values['pf_desc'] );
+			\IPS\Lang::saveCustom( 'core', static::$langKey . '_' . $this->id . '_desc', $values['pf_desc'] );
 			unset( $values['pf_desc'] );
 		}
 		
 		/* And the other fields */
 		if ( isset( static::$parentNodeClass ) AND isset( $values['pf_group_id'] ) )
 		{
-			$values['group_id'] = is_object( $values['pf_group_id'] ) ? $values['pf_group_id']->_id : $values['pf_group_id'];
+			$values['group_id'] = \is_object( $values['pf_group_id'] ) ? $values['pf_group_id']->_id : $values['pf_group_id'];
 		}
 		
 		/* "Required" means nothing for radio and checkbox */
-		if( isset( $values['pf_type'] ) and in_array( $values['pf_type'], array( 'Radio', 'Checkbox' ) ) )
+		if( isset( $values['pf_type'] ) and \in_array( $values['pf_type'], array( 'Radio', 'Checkbox' ) ) )
 		{
 			$values['pf_not_null'] = FALSE;
 		}
 		
-		if ( array_key_exists( 'pf_search_type_on_off', $values ) and isset( $values['pf_type'] ) and ( in_array( $values['pf_type'], array( 'Select', 'Radio', 'CheckboxSet') ) ) )
+		if ( array_key_exists( 'pf_search_type_on_off', $values ) and isset( $values['pf_type'] ) and ( \in_array( $values['pf_type'], array( 'Select', 'Radio', 'CheckboxSet') ) ) )
 		{
 			$values['pf_search_type'] = (string) $values['pf_search_type_on_off'];
 		}
@@ -614,14 +543,14 @@ abstract class CustomField extends Model
 	 *
 	 * @return	string
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		if ( !$this->id )
 		{
 			return '';
 		}
 		
-		return Member::loggedIn()->language()->addToStack( static::$langKey . '_' . $this->id );
+		return \IPS\Member::loggedIn()->language()->addToStack( static::$langKey . '_' . $this->id );
 	}
 
 	/**
@@ -629,7 +558,7 @@ abstract class CustomField extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canAdd(): bool
+	public function canAdd()
 	{
 		return FALSE;
 	}
@@ -639,7 +568,7 @@ abstract class CustomField extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canManagePermissions(): bool
+	public function canManagePermissions()
 	{
 		return false;
 	}
@@ -657,29 +586,28 @@ abstract class CustomField extends Model
 		}
 
 		$oldId		= $this->id;
-		$oldColumn	= $this->column ?? "field_{$oldId}";
+		$oldColumn	= isset( $this->column ) ? $this->column : "field_{$oldId}";
 		parent::__clone();
         $column = "field_{$this->id}";
 		
 		if ( isset( static::$contentDatabaseTable ) )
 		{
-			$definition = Db::i()->getTableDefinition( static::$contentDatabaseTable, TRUE );
+			$definition = \IPS\Db::i()->getTableDefinition( static::$contentDatabaseTable, TRUE );
 
-			/* @var array $fieldDefinition */
 			$fieldDefinition = $definition['columns'][ $oldColumn ];
 			$fieldDefinition['name'] = $column;
 
-			Db::i()->addColumn( static::$contentDatabaseTable, $fieldDefinition );
+			\IPS\Db::i()->addColumn( static::$contentDatabaseTable, $fieldDefinition );
 
 			if ( $this->type != 'Upload' )
 			{
-				if ( in_array( $fieldDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
+				if ( \in_array( $fieldDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
 				{
-					Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => $column, 'columns' => array( $column ) ) );
+					\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => $column, 'columns' => array( $column ) ) );
 				}
 				else
 				{
-					Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => $column, 'columns' => array( $column ) ) );
+					\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => $column, 'columns' => array( $column ) ) );
 				}
 			}
 		}
@@ -689,30 +617,30 @@ abstract class CustomField extends Model
 			$this->column = NULL;
 		}
 
-		Lang::saveCustom( 'core', static::$langKey . '_' . $this->id, iterator_to_array( Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', static::$langKey . '_' . $oldId ) )->setKeyField( 'lang_id' )->setValueField( 'word_custom' ) ) );
-		Lang::saveCustom( 'core', static::$langKey . '_' . $this->id . '_desc', iterator_to_array( Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', static::$langKey . '_' . $oldId . '_desc' ) )->setKeyField( 'lang_id' )->setValueField( 'word_custom' ) ) );
+		\IPS\Lang::saveCustom( 'core', static::$langKey . '_' . $this->id, iterator_to_array( \IPS\Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', static::$langKey . '_' . $oldId ) )->setKeyField( 'lang_id' )->setValueField( 'word_custom' ) ) );
+		\IPS\Lang::saveCustom( 'core', static::$langKey . '_' . $this->id . '_desc', iterator_to_array( \IPS\Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', static::$langKey . '_' . $oldId . '_desc' ) )->setKeyField( 'lang_id' )->setValueField( 'word_custom' ) ) );
 	}
 	
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		$column = $this->column ?? "field_{$this->id}";
+		$column = isset( $this->column ) ? $this->column : "field_{$this->id}";
 
 		parent::delete();
 		
-		Lang::deleteCustom( 'core', static::$langKey . '_' . $this->id );
-		Lang::deleteCustom( 'core', static::$langKey . '_' . $this->id . '_desc' );
+		\IPS\Lang::deleteCustom( 'core', static::$langKey . '_' . $this->id );
+		\IPS\Lang::deleteCustom( 'core', static::$langKey . '_' . $this->id . '_desc' );
 
-		if ( isset( static::$contentDatabaseTable ) and static::$contentDatabaseTable )
+		if ( isset( static::$contentDatabaseTable ) )
 		{
 			if( $this->type == 'Upload' )
 			{
 				/* Delete records */
-				Task::queue( 'core', 'FileCleanup', array(
+				\IPS\Task::queue( 'core', 'FileCleanup', array( 
 					'table'				=> static::$contentDatabaseTable,
 					'column'			=> $column,
 					'storageExtension'	=> static::$uploadStorageExtension,
@@ -725,48 +653,37 @@ abstract class CustomField extends Model
 			{
 				try
 				{
-					Db::i()->dropColumn( static::$contentDatabaseTable, $column );
+					\IPS\Db::i()->dropColumn( static::$contentDatabaseTable, $column );
 				}
-				catch( Exception $e ) { }
+				catch( \IPS\Db\Exception $e ) { }
 			}
 		}
 	}
-
+	
 	/**
 	 * Build Form Helper
 	 *
-	 * @param mixed|null $value The value
-	 * @param callback|null $customValidationCode Custom validation code
-	 * @param Content|NULL $content The associated content, if editing
-	 * @param int $flags
-	 * @return FormAbstract
+	 * @param	mixed					$value					The value
+	 * @param	callback					$customValidationCode	Custom validation code
+	 * @param   \IPS\Content|NULL		$content				The associated content, if editing
+	 * @return \IPS\Helpers\Form\FormAbstract
 	 */
-	public function buildHelper( mixed $value=NULL, callable $customValidationCode=NULL, Content $content = NULL, int $flags=0 ): FormAbstract
+	public function buildHelper( $value=NULL, $customValidationCode=NULL, \IPS\Content $content = NULL )
 	{
 		$class = '\IPS\Helpers\Form\\' . $this->type;
-		$options = array();
-
-		/* Check the extensions first */
-		if( !class_exists( $class ) )
-		{
-			if( $extension = $this->extension() )
-			{
-				$class = $extension::formClass();
-				$options = $extension::formHelperOptions( $this );
-			}
-		}
-
-		/* Fallback option in case the extension is no longer valid. Disabling or uninstalling an extension can
-		then cause an error here, so we default to text. */
+		
+		/* Hooks can add custom field types which are stored in the database. Toggling the hook can then stop the hook from loading the field class giving a class not found error */
 		if ( ! class_exists( $class ) )
 		{
 			$class = '\IPS\Helpers\Form\\Text';
 		}
 		
+		$options = array();
+
 		$maxLength = $this->max_input ?: NULL;
 
 		/* Set the max length to 255 because that's the max the column can store */
-		if( !$maxLength AND !in_array( $this->type, [ 'Editor', 'TextArea', 'Upload', 'Address', 'CodeMirror', 'Select' ] ) )
+		if( !$maxLength AND !\in_array( $this->type, [ 'Editor', 'TextArea', 'Upload', 'Address', 'CodeMirror', 'Select' ] ) )
 		{
 			$maxLength = 255;
 		}
@@ -778,11 +695,11 @@ abstract class CustomField extends Model
 				// that date to display the same to all users regardless of their timezone.
 				// To faciliate this, the timestamp for the inputted date UTC is saved, rather that the inputted date in the submitting user's timezone
 				// displayValue will then not apply the viewing user's timestamp.
-				$options['timezone'] = new DateTimeZone('UTC');
+				$options['timezone'] = new \DateTimeZone('UTC');
 				
-				if ( is_numeric( $value ) )
+				if ( \is_numeric( $value ) )
 				{
-					$value = DateTime::ts( $value );
+					$value = \IPS\DateTime::ts( $value ); 
 				}
 				break;
 			
@@ -832,9 +749,9 @@ abstract class CustomField extends Model
 						$value = array();
 						foreach( $values as $val )
 						{
-							if ( is_numeric( $val ) and intval( $val ) == $val )
+							if ( \is_numeric( $val ) and \intval( $val ) == $val )
 							{
-								$value[] = intval( $val );
+								$value[] = \intval( $val );
 							}
 							else
 							{
@@ -847,9 +764,9 @@ abstract class CustomField extends Model
 				}
 				else
 				{
-					if ( is_numeric( $value ) and intval( $value ) == $value )
+					if ( \is_numeric( $value ) and \intval( $value ) == $value )
 					{
-						$value = intval( $value );
+						$value = \intval( $value );
 					}
 				}
 
@@ -867,9 +784,9 @@ abstract class CustomField extends Model
 				{
 					try
 					{
-						$value = File::get( static::$uploadStorageExtension, $value );
+						$value = \IPS\File::get( static::$uploadStorageExtension, $value );
 					}
-					catch ( OutOfRangeException $e )
+					catch ( \OutOfRangeException $e )
 					{
 						$value = NULL;
 					} 
@@ -881,14 +798,14 @@ abstract class CustomField extends Model
 				
 				if ( !isset( $options['autoSaveKey'] ) )
 				{
-					$options['autoSaveKey'] = md5( get_class( $this ) . '-' . $this->id  . '-' . ( $content ? $content->id : 'new' ) );
+					$options['autoSaveKey'] = md5( \get_class( $this ) . '-' . $this->id  . '-' . ( $content ? $content->id : 'new' ) );
 				}
 				
 				$options['allowAttachments'] = $this->allow_attachments;
 				break;
 			
 			case 'Address':
-				$value = GeoLocation::buildFromJson( $value );
+				$value = \IPS\GeoLocation::buildFromJson( $value );
 				break;
 				
 			case 'Member':
@@ -898,7 +815,7 @@ abstract class CustomField extends Model
 				{
 					$value = array_map( function( $id )
 					{
-						return Member::load( $id );
+						return \IPS\Member::load( $id );
 					}, explode( "\n", $value ) );
 				}
 				break;
@@ -908,9 +825,9 @@ abstract class CustomField extends Model
 				{
 					try
 					{
-						$value = Poll::load( $value );
+						$value = \IPS\Poll::load( $value );
 					}
-					catch ( OutOfRangeException $e )
+					catch ( \OutOfRangeException $e )
 					{
 						$value = NULL;
 					} 
@@ -936,31 +853,31 @@ abstract class CustomField extends Model
 	/**
 	 * Claim attachments for an editor field
 	 *
-	 * @param int|null $id1					ID 1	(ID 2 will be the field ID)
-	 * @param mixed|null $id3					ID 3
-	 * @param Content|null $contentBeingEdited		If you passed $content to buildHelpers(), pass that same object here. ONLY if editing, don't pass a newly created piece of content
+	 * @param	int|NULL				$id1					ID 1	(ID 2 will be the field ID)
+	 * @param	mixed				$id3					ID 3
+	 * @param   \IPS\Content|NULL	$contentBeingEdited		If you passed $content to buildHelpers(), pass that same object here. ONLY if editing, don't pass a newly created piece of content
 	 * @return	void
 	 */
-	public function claimAttachments( int $id1 = NULL, mixed $id3 = NULL, Content $contentBeingEdited = NULL ) : void
+	public function claimAttachments( $id1 = NULL, $id3 = NULL, $contentBeingEdited = NULL )
 	{
 		$options = static::$editorOptions;
 		
 		if ( !isset( $options['autoSaveKey'] ) )
 		{
-			$options['autoSaveKey'] = md5( get_class( $this ) . '-' . $this->id . '-' . ( $contentBeingEdited ? $contentBeingEdited->id : 'new' ) );
+			$options['autoSaveKey'] = md5( \get_class( $this ) . '-' . $this->id . '-' . ( $contentBeingEdited ? $contentBeingEdited->id : 'new' ) );
 		}
 
-		File::claimAttachments( $options['autoSaveKey'], $id1, $this->id, $id3 );
+		\IPS\File::claimAttachments( $options['autoSaveKey'], $id1, $this->id, $id3 );
 	}
 	
 	/**
 	 * Return values in API-suitable format
 	 *
-	 * @param mixed|null $value						The value
-	 * @param bool $showSensitiveInformation	If TRUE, potentially sensitive data (like passwords) will be displayed - otherwise will be blanked out
-	 * @return	int|bool|array|string|null 			Must return a value that can be JSON serialized
+	 * @param	mixed	$value						The value
+	 * @param	bool	$showSensitiveInformation	If TRUE, potentially sensitive data (like passwords) will be displayed - otherwise will be blanked out
+	 * @return	string|int|array|boolean 			Must return a value that can be JSON serialized
 	 */
-	public function apiValue( mixed $value=NULL, bool $showSensitiveInformation = true ): int|bool|array|string|null
+	public function apiValue( $value=NULL, $showSensitiveInformation=FALSE )
 	{
 		switch( $this->type )
 		{
@@ -968,9 +885,9 @@ abstract class CustomField extends Model
 				return json_decode( $value );
 			case 'CheckboxSet':
 			case 'Select':
-				if ( is_array( $this->extra ) AND isset( $this->extra[ $value ] ) )
+				if ( \is_array( $this->extra ) AND isset( $this->extra[ $value ] ) )
 				{
-					$values = $this->extra[ $value ];
+					$value = $this->extra[ $value ];
 				}
 				else
 				{
@@ -982,7 +899,7 @@ abstract class CustomField extends Model
 					if( $this->type == 'Select' )
 					{
 						$requiredColumn = ( isset( $this::$databaseColumnMap['not_null'] ) and $this::$databaseColumnMap['not_null'] ) ? $this::$databaseColumnMap['not_null'] : NULL;
-						if ( !$this->$requiredColumn AND !$this->multiple AND is_array( $options ) )
+						if ( !$this->$requiredColumn AND !$this->multiple AND \is_array( $options ) )
 						{
 							array_unshift( $options, '' );
 						}
@@ -1007,8 +924,8 @@ abstract class CustomField extends Model
 			case 'Member':
 				return array_map( function( $id )
 				{
-					$member = Member::load( $id );
-					$group = Group::load( $member->group['g_id'] );
+					$member = \IPS\Member::load( $id );
+					$group = \IPS\Member\Group::load( $member->group['g_id'] );
 
 					return array(
 						'id' => $member->member_id,
@@ -1029,11 +946,11 @@ abstract class CustomField extends Model
 			case 'Upload':
 				if( $value )
 				{
-					$file = File::get( static::$uploadStorageExtension, $value );
-					$downloadUrl = Url::internal( 'applications/core/interface/file/cfield.php', 'none' )->setqueryString( array(
+					$file = \IPS\File::get( static::$uploadStorageExtension, $value );
+					$downloadUrl = \IPS\Http\Url::internal( 'applications/core/interface/file/cfield.php', 'none' )->setqueryString( array(
 						'storage'	=> $file->storageExtension,
-						'path'		=> $file->originalFilename,
-						'fileKey'   => base64_encode( Encrypt::fromPlaintext( (string) $file )->cipher )
+						'path'		=> (string) $file->originalFilename,
+						'fileKey'   => base64_encode( \IPS\Text\Encrypt::fromPlaintext( (string) $file )->cipher )
 					) );
 					return (string) $downloadUrl;
 				}
@@ -1046,7 +963,7 @@ abstract class CustomField extends Model
 			case 'Color':
 				return ( $value AND $value !== '#' ) ? $value : '';
 			case 'Url':
-				return ( $value ) ? (string) Url::external( $value ) : NULL;
+				return ( $value ) ? (string) \IPS\Http\Url::external( $value ) : NULL;
 			case 'Rating':
 				return array(
 					'value' => $value,
@@ -1067,25 +984,25 @@ abstract class CustomField extends Model
 	/**
 	 * Display Value
 	 *
-	 * @param mixed|null $value The value
-	 * @param bool $showSensitiveInformation If TRUE, potentially sensitive data (like passwords) will be displayed - otherwise will be blanked out
-	 * @param string|null $separator Used to separate items when displaying a field with multiple values.
-	 * @return string|null
+	 * @param	mixed	$value						The value
+	 * @param	bool	$showSensitiveInformation	If TRUE, potentially sensitive data (like passwords) will be displayed - otherwise will be blanked out
+	 * @param	string	$separator					Used to separate items when displaying a field with multiple values.
+	 * @return	string
 	 */
-	public function displayValue( mixed $value=NULL, bool $showSensitiveInformation=FALSE, string $separator=NULL ): ?string
+	public function displayValue( $value=NULL, $showSensitiveInformation=FALSE, $separator=NULL )
 	{
 		switch ( $this->type )
 		{
 			case 'Address':
-				return GeoLocation::buildFromJson( $value )->toString();
+				return \IPS\GeoLocation::buildFromJson( $value )->toString( ', ' );
 			
 			case 'Checkbox':
 			case 'YesNo':
-				return $value ? Member::loggedIn()->language()->addToStack('yes') : Member::loggedIn()->language()->addToStack('no');
+				return $value ? \IPS\Member::loggedIn()->language()->addToStack('yes') : \IPS\Member::loggedIn()->language()->addToStack('no');
 			
 			case 'CheckboxSet':
 			case 'Select':
-				if ( is_array( $this->extra ) AND isset( $this->extra[ $value ] ) )
+				if ( \is_array( $this->extra ) AND isset( $this->extra[ $value ] ) )
 				{
 					$value = $this->extra[ $value ];
 				}
@@ -1099,7 +1016,7 @@ abstract class CustomField extends Model
 					if( $this->type == 'Select' )
 					{
 						$requiredColumn = ( isset( $this::$databaseColumnMap['not_null'] ) and $this::$databaseColumnMap['not_null'] ) ? $this::$databaseColumnMap['not_null'] : NULL;
-						if ( !$this->$requiredColumn AND !$this->multiple AND is_array( $options )  )
+						if ( !$this->$requiredColumn AND !$this->multiple AND \is_array( $options )  )
 						{
 							array_unshift( $options, '' );
 						}
@@ -1124,7 +1041,7 @@ abstract class CustomField extends Model
 				
 				if ( $this->multiple )
 				{
-					return implode( ( $separator ) ?: '<br>', explode( ',', htmlspecialchars( $value, ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE ) ) );
+					return implode( ( $separator ) ? $separator : '<br>', explode( ',', htmlspecialchars( $value, ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE ) ) );
 				}
 				else
 				{
@@ -1132,13 +1049,13 @@ abstract class CustomField extends Model
 				}
 			
 			case 'Codemirror':
-				return Theme::i()->getTemplate( 'global', 'core', 'global' )->prettyprint( $value );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->prettyprint( $value );
 			
 			case 'Color':
-				return ( $value AND $value !== '#' ) ? Theme::i()->getTemplate( 'forms', 'core', 'global' )->colorDisplay( $value ) : '';
+				return ( $value AND $value !== '#' ) ? \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->colorDisplay( $value ) : '';
 			
 			case 'Date':
-				return $value ? DateTime::ts( $value, TRUE )->localeDate() : ''; // See buildHelper for why we ignore the timezone
+				return $value ? \IPS\DateTime::ts( $value, TRUE )->localeDate() : ''; // See buildHelper for why we ignore the timezone
 			
 			case 'Editor':
 				return $value;
@@ -1146,7 +1063,7 @@ abstract class CustomField extends Model
 			case 'Member':
 				return implode( '<br>', array_map( function( $id )
 				{
-					return Member::load( $id )->link();
+					return \IPS\Member::load( $id )->link();
 				}, explode( "\n", $value ) ) );
 				
 			case 'Password':
@@ -1157,27 +1074,27 @@ abstract class CustomField extends Model
 				return '';
 				
 			case 'Poll':
-				return $value ? ( (string) Poll::load( $value ) ) : NULL;
+				return $value ? ( (string) \IPS\Poll::load( $value ) ) : NULL;
 			
 			case 'Rating':
-				return Theme::i()->getTemplate( 'global', 'core', 'front' )->rating( $this->options['max'] ?? null, $value );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->rating( $this->options['max'] ?? null, $value );
 				
 			case 'TextArea':
 				return nl2br( htmlspecialchars( $value, ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE ) );
 				
 			case 'Url':
-				return ( $value ) ? Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $value, TRUE, $value, TRUE, TRUE, TRUE ) : NULL;
+				return ( $value ) ? \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $value, TRUE, $value, TRUE, TRUE, TRUE ) : NULL;
 							
 			case 'Upload':
 				if( $value )
 				{
-					$file = File::get( static::$uploadStorageExtension, $value );
-					$downloadUrl = Url::internal( 'applications/core/interface/file/cfield.php', 'none' )->setqueryString( array(
+					$file = \IPS\File::get( static::$uploadStorageExtension, $value );
+					$downloadUrl = \IPS\Http\Url::internal( 'applications/core/interface/file/cfield.php', 'none' )->setqueryString( array(
 						'storage'	=> $file->storageExtension,
-						'path'		=> $file->originalFilename,
-						'fileKey'   => Encrypt::fromPlaintext( (string) $file )->tag()
+						'path'		=> (string) $file->originalFilename,
+						'fileKey'   => \IPS\Text\Encrypt::fromPlaintext( (string) $file )->tag()
 					) );
-					return Theme::i()->getTemplate( 'forms', 'core', 'global' )->uploadDisplay( $file, $downloadUrl );
+					return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->uploadDisplay( $file, $downloadUrl );
 				}
 				else
 				{
@@ -1185,46 +1102,21 @@ abstract class CustomField extends Model
 				}
 
 			case 'Ftp':
-				$value = is_array( $value ) ? $value : json_decode( Encrypt::fromTag( $value )->decrypt(), TRUE );
+				$value = \is_array( $value ) ? $value : json_decode( \IPS\Text\Encrypt::fromTag( $value )->decrypt(), TRUE );
 				if ( $showSensitiveInformation )
 				{
-					$url = Url::createFromComponents( $value['server'], $value['protocol'] ? ( $value['protocol'] == 'ssl_ftp' ? 'ftps': $value['protocol'] ) : 'ftp', $value['path'] ?: NULL, NULL, $value['port'] ?: 21, $value['un'] ?: NULL, $value['pw'] ?: NULL );
+					$url = \IPS\Http\Url::createFromComponents( $value['server'], $value['protocol'] ? ( $value['protocol'] == 'ssl_ftp' ? 'ftps': $value['protocol'] ) : 'ftp', $value['path'] ?: NULL, NULL, $value['port'] ?: 21, $value['un'] ?: NULL, $value['pw'] ?: NULL );
 				}
 				else
 				{
 					$url = NULL;
 					$value['pw'] = '********';
 				}
-				return Theme::i()->getTemplate( 'forms', 'core', 'global' )->ftpDisplay( $value, $url );
+				return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->ftpDisplay( $value, $url );
+
 
 			default:
-
-				/* Is this an extension? */
-				if( $extension = $this->extension() )
-				{
-					return $extension::displayValue( $this, $value, $showSensitiveInformation, $separator );
-				}
-
 				return htmlspecialchars( $value, ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE );
 		}
-	}
-
-	/**
-	 * Does this field use an extension?
-	 *
-	 * @return CustomFieldAbstract|null
-	 */
-	public function extension() : ?CustomFieldAbstract
-	{
-		foreach( Application::allExtensions( 'core', 'CustomField' ) as $ext )
-		{
-			/* @var CustomFieldAbstract $ext */
-			if( $ext::isEnabled() and $ext::fieldType() == $this->type )
-			{
-				return $ext;
-			}
-		}
-
-		return null;
 	}
 }

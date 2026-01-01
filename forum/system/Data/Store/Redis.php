@@ -11,38 +11,31 @@
 namespace IPS\Data\Store;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Data\Store;
-use IPS\Redis as RedisClass;
-use RedisException;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Redis Storage Class
  */
-class Redis extends Store
+class _Redis extends \IPS\Data\Store
 {
 	/**
 	 * Server supports this method?
 	 *
 	 * @return	bool
 	 */
-	public static function supported(): bool
+	public static function supported()
 	{
-		return class_exists('\\Redis');
+		return class_exists('Redis');
 	}
 	
 	/**
 	 * Redis key
 	 */
-	protected string|false $_redisKey;
+	protected $_redisKey;
 	
 	/**
 	 * Constructor
@@ -50,23 +43,21 @@ class Redis extends Store
 	 * @param	array	$configuration	Configuration to use
 	 * @return	void
 	 */
-	public function __construct( array $configuration )
+	public function __construct( $configuration )
 	{
 		try
 		{
-			$writeConnection = RedisClass::i()->connection('write');
-			$readConnection = RedisClass::i()->connection('read');
+			$writeConnection = \IPS\Redis::i()->connection('write');
+			$readConnection = \IPS\Redis::i()->connection('read');
 
 			if( !$writeConnection OR !$readConnection )
 			{
-				throw new RedisException;
+				throw new \RedisException;
 			}
-
-			$this->_redisKey = false;
 		}
-		catch( RedisException $e )
+		catch( \RedisException $e )
 		{
-			throw new Exception;
+			throw new \IPS\Data\Store\Exception;
 		}
 	}
 		
@@ -75,16 +66,16 @@ class Redis extends Store
 	 *
 	 * @return  string|FALSE    Value from the _datastore; FALSE if key doesn't exist
 	 */
-	protected function _getRedisKey(): string|FALSE
+	protected function _getRedisKey()
 	{
 		if ( !$this->_redisKey )
 		{
 			/* Last access ensures that the data is not stale if we fail back to MySQL and then go back to Redis later */
-			if ( !( $this->_redisKey = RedisClass::i()->get( 'redisKey_store' ) ) OR ! RedisClass::i()->get( 'redisStore_lastAccess' ) )
+			if ( !( $this->_redisKey = \IPS\Redis::i()->get( 'redisKey_store' ) ) OR ! \IPS\Redis::i()->get( 'redisStore_lastAccess' ) )
 			{
 				$this->_redisKey = md5( mt_rand() );
-				RedisClass::i()->setex( 'redisKey_store', 604800, $this->_redisKey );
-				RedisClass::i()->setex( 'redisStore_lastAccess', ( 3 * 3600 ), time() );
+				\IPS\Redis::i()->setex( 'redisKey_store', 604800, $this->_redisKey );
+				\IPS\Redis::i()->setex( 'redisStore_lastAccess', ( 3 * 3600 ), time() );
 			}
 		}
 
@@ -94,12 +85,12 @@ class Redis extends Store
 	/**
 	 * @brief	Cache
 	 */
-	protected static array $cache = array();
+	protected static $cache = array();
 	
 	/**
 	 * @brief	Already updated lastAccess?
 	 */
-	protected static bool $updatedLastAccess = FALSE;
+	protected static $updatedLastAccess = FALSE;
 	
 	/**
 	 * Abstract Method: Get
@@ -107,7 +98,7 @@ class Redis extends Store
 	 * @param   string          $key	Key
 	 * @return  string|FALSE    Value from the _datastore; FALSE if key doesn't exist
 	 */
-	public function get( string $key ): string|FALSE
+	public function get( $key )
 	{
 		if( array_key_exists( $key, static::$cache ) )
 		{
@@ -119,31 +110,31 @@ class Redis extends Store
 			/* Set the last access time */
 			if ( static::$updatedLastAccess === FALSE )
 			{
-				RedisClass::i()->setex( 'redisStore_lastAccess', ( 3 * 3600 ), time() );
+				\IPS\Redis::i()->setex( 'redisStore_lastAccess', ( 3 * 3600 ), time() );
 				static::$updatedLastAccess = TRUE;
 			}
 			
-			$return = RedisClass::i()->get( $this->_getRedisKey() . '_' . $key );
+			$return = \IPS\Redis::i()->get( $this->_getRedisKey() . '_' . $key );
 			
-			if ( $return !== FALSE AND $decoded = RedisClass::i()->decode( $return ) )
+			if ( $return !== FALSE AND $decoded = \IPS\Redis::i()->decode( $return ) )
 			{
 				static::$cache[ $key ] = $decoded;
 				return static::$cache[ $key ];
 			}
 			else
 			{
-				throw new UnderflowException;
+				throw new \UnderflowException;
 			}
 		}
-		catch( RedisException $e )
+		catch( \RedisException $e )
 		{
 			/* Do not reset the connection if the decode failed */
 			if ( $e->getMessage() !== 'DECODE_ERROR' )
 			{
-				RedisClass::i()->resetConnection( $e );
+				\IPS\Redis::i()->resetConnection( $e );
 			}
 
-			throw new UnderflowException;
+			throw new \UnderflowException;
 		}
 	}
 	
@@ -154,15 +145,15 @@ class Redis extends Store
 	 * @param	string			$value	Value
 	 * @return	bool
 	 */
-	public function set( string $key, string $value ): bool
+	public function set( $key, $value )
 	{
 		try
 		{
-			return RedisClass::i()->setex( $this->_getRedisKey() . '_' . $key, 604800, RedisClass::i()->encode( $value ) );
+			return (bool) \IPS\Redis::i()->setex( $this->_getRedisKey() . '_' . $key, 604800, \IPS\Redis::i()->encode( $value ) );
 		}
-		catch( RedisException $e )
+		catch( \RedisException $e )
 		{
-			RedisClass::i()->resetConnection( $e );
+			\IPS\Redis::i()->resetConnection( $e );
 
 			return FALSE;
 		}
@@ -174,19 +165,19 @@ class Redis extends Store
 	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	public function exists( string $key ): bool
+	public function exists( $key )
 	{
 		if( array_key_exists( $key, static::$cache ) )
 		{
-			return !( ( static::$cache[$key] === FALSE ) );
+			return ( static::$cache[ $key ] === FALSE ) ? FALSE : TRUE;
 		}
 
 		/* We do a get instead of an exists() check because it will cause the cache value to be fetched and cached inline, saving another call to the server */
 		try
 		{
-			return !( ( $this->get( $key ) === FALSE ) );
+			return ( $this->get( $key ) === FALSE ) ? FALSE : TRUE;
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return FALSE;
 		}
@@ -198,16 +189,16 @@ class Redis extends Store
 	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	public function delete( string $key ): bool
+	public function delete( $key )
 	{		
 		try
 		{
 			unset( static::$cache[ $key ] );
-			return (bool) RedisClass::i()->del( $this->_getRedisKey() . '_' . $key );
+			return (bool) \IPS\Redis::i()->del( $this->_getRedisKey() . '_' . $key );
 		}
-		catch( RedisException $e )
+		catch( \RedisException $e )
 		{
-			RedisClass::i()->resetConnection( $e );
+			\IPS\Redis::i()->resetConnection( $e );
 			return FALSE;
 		}
 	}
@@ -217,16 +208,17 @@ class Redis extends Store
 	 *
 	 * @return	void
 	 */
-	public function clearAll() : void
+	public function clearAll()
 	{
 		try
 		{
 			$this->_redisKey = md5( mt_rand() );
-			RedisClass::i()->setex( 'redisKey_store', 604800, $this->_redisKey );
+			\IPS\Redis::i()->setex( 'redisKey_store', 604800, $this->_redisKey );
 		}
-		catch( RedisException $e )
+		catch( \RedisException $e )
 		{
-			RedisClass::i()->resetConnection( $e );
+			\IPS\Redis::i()->resetConnection( $e );
+			return FALSE;
 		}
 	}
 	
@@ -236,8 +228,8 @@ class Redis extends Store
 	 *
 	 * @return	bool
 	 */
-	public function test(): bool
+	public function test()
 	{
-		return RedisClass::i()->test();
+		return \IPS\Redis::i()->test();
 	}
 }

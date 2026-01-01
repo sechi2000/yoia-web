@@ -12,27 +12,23 @@
 namespace IPS\core\modules\admin\activitystats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ajax
  */
-class ajax extends Controller
+class _ajax extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		
 		parent::execute();
@@ -43,7 +39,7 @@ class ajax extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		// This is the default method if no 'do' parameter is specified
 	}

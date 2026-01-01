@@ -11,45 +11,31 @@
 namespace IPS\nexus\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Transaction as NexusTransaction;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Theme;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP Notification: Transactions Requiring Attention
  */
-class Transaction extends AdminNotification
+class _Transaction extends \IPS\core\AdminNotification
 {
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'commerce';
+	public static $group = 'commerce';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 4;
+	public static $groupPriority = 4;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 2;
+	public static $itemPriority = 2;
 	
 	/**
 	 * Get queue HTML
@@ -57,13 +43,13 @@ class Transaction extends AdminNotification
 	 * @param	string	$status	Status to show
 	 * @return	string
 	 */
-	public static function queueHtml( string $status ) : string
+	public static function queueHtml( $status )
 	{
-		$select = Db::i()->select( '*', 'nexus_transactions', array( 't_status=?', $status ), 't_date ASC', array( 0, 12 ) );
+		$select = \IPS\Db::i()->select( '*', 'nexus_transactions', array( 't_status=?', $status ), 't_date ASC', array( 0, 12 ) );
 		
-		if ( count( $select ) )
+		if ( \count( $select ) )
 		{ 	
-			return Theme::i()->getTemplate( 'notifications', 'nexus' )->transactions( new ActiveRecordIterator( $select, 'IPS\nexus\Transaction' ) );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'nexus' )->transactions( new \IPS\Patterns\ActiveRecordIterator( $select, 'IPS\nexus\Transaction' ) );
 		}
 		else
 		{
@@ -76,7 +62,7 @@ class Transaction extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle(): string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_Transaction';
 	}
@@ -84,9 +70,9 @@ class Transaction extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional(): bool
+	public static function mayBeOptional()
 	{
 		return TRUE;
 	}
@@ -96,7 +82,7 @@ class Transaction extends AdminNotification
 	 *
 	 * @return	bool
 	 */
-	public static function mayRecur(): bool
+	public static function mayRecur()
 	{
 		return TRUE;
 	}
@@ -104,18 +90,18 @@ class Transaction extends AdminNotification
 	/**
 	 * @brief	Current count
 	 */
-	protected ?int $count = NULL;
+	protected $count = NULL;
 	
 	/**
 	 * Get count
 	 *
-	 * @return	int
+	 * @return	bool
 	 */
-	public function count(): int
+	public function count()
 	{
 		if ( $this->count === NULL )
 		{
-			$this->count = Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( 't_status=?', $this->extra ) )->first();
+			$this->count = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( 't_status=?', $this->extra ) )->first();
 		}
 		return $this->count;
 	}
@@ -123,10 +109,10 @@ class Transaction extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member )
 	{
 		return $member->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' );
 	}
@@ -136,23 +122,23 @@ class Transaction extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{		
-		return Member::loggedIn()->language()->addToStack( 'acpNotification_nexusTransaction_' . $this->extra, FALSE, array( 'pluralize' => array( $this->count() ) ) );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'acpNotification_nexusTransaction_' . $this->extra, FALSE, array( 'pluralize' => array( $this->count() ) ) );
 	}
 	
 	/**
 	 * Notification Subtitle (no HTML)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function subtitle(): ?string
+	public function subtitle()
 	{
 		try
 		{
-			return DateTime::ts( Db::i()->select( 't_date', 'nexus_transactions', array( 't_status=?', $this->extra ), 't_date asc', 1 )->first() )->relative();
+			return \IPS\DateTime::ts( \IPS\Db::i()->select( 't_date', 'nexus_transactions', array( 't_status=?', $this->extra ), 't_date asc', 1 )->first() )->relative();
 		}
-		catch ( UnderflowException )
+		catch ( \UnderflowException $e )
 		{
 			return NULL;
 		}
@@ -161,11 +147,11 @@ class Transaction extends AdminNotification
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js('admin_notifications.js', 'nexus') );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('admin_notifications.js', 'nexus') );
 		
 		return static::queueHtml( $this->extra );
 	}
@@ -175,7 +161,7 @@ class Transaction extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function severity(): string
+	public function severity()
 	{
 		return static::SEVERITY_OPTIONAL;
 	}
@@ -185,7 +171,7 @@ class Transaction extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function dismissible(): string
+	public function dismissible()
 	{	
 		return static::DISMISSIBLE_NO;
 	}
@@ -193,11 +179,11 @@ class Transaction extends AdminNotification
 	/**
 	 * Style
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
-	public function style(): string
+	public function style()
 	{
-		if ( $this->extra === NexusTransaction::STATUS_DISPUTED )
+		if ( $this->extra === \IPS\nexus\Transaction::STATUS_DISPUTED )
 		{
 			return static::STYLE_WARNING;
 		}
@@ -210,11 +196,11 @@ class Transaction extends AdminNotification
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url
+	 * @return	bool
 	 */
-	public function link(): Url
+	public function link()
 	{
-		return Url::internal('app=nexus&module=payments&controller=transactions&attn=1');
+		return \IPS\Http\Url::internal('app=nexus&module=payments&controller=transactions&attn=1');
 	}
 	
 	/**
@@ -223,7 +209,7 @@ class Transaction extends AdminNotification
 	 * @note	This is checked every time the notification shows. Should be lightweight.
 	 * @return	bool
 	 */
-	public function selfDismiss(): bool
+	public function selfDismiss()
 	{
 		return !$this->count();
 	}

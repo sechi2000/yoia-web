@@ -11,50 +11,36 @@
 namespace IPS\core\modules\admin\applications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Application;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use LogicException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancements
  */
-class enhancements extends Controller
+class _enhancements extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * @brief Enhancements plugins
 	 */
-	protected array $enhancements = array();
+	protected $enhancements = array();
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'enhancements_manage' );
-		$this->enhancements = Application::allExtensions( 'core', 'CommunityEnhancements' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'enhancements_manage' );
+		$this->enhancements = \IPS\Application::allExtensions( 'core', 'CommunityEnhancements' );
 		parent::execute();
 	}
 	
@@ -63,7 +49,7 @@ class enhancements extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Collect the enhancements into an array */
 		$rows	= array();
@@ -78,15 +64,15 @@ class enhancements extends Controller
 					'app'			=> mb_substr( $key, 0, mb_strpos( $key, '_' ) ),
 					'icon'			=> $class->icon,
 					'enabled'		=> $class->enabled,
-					'config'		=> (bool) $class->hasOptions
+					'config'		=> $class->hasOptions ? TRUE : FALSE
 				);
 			}
 		}
 		
 		/* Display */
-		Output::i()->cssFiles	= array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/enhancements.css', 'core', 'admin' ) );
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('menu__core_applications_enhancements');
-		Output::i()->output 	= Theme::i()->getTemplate( 'applications' )->enhancements( $rows );
+		\IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/enhancements.css', 'core', 'admin' ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('menu__core_applications_enhancements');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate( 'applications' )->enhancements( $rows );
 	}
 	
 	/**
@@ -95,25 +81,28 @@ class enhancements extends Controller
 	 * @csrfChecked	Extension files use form helper 7 Oct 2019
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
-		if ( isset( $this->enhancements[ Request::i()->id ] ) and ( !method_exists( $this->enhancements[ Request::i()->id ], 'isAvailable' ) or $this->enhancements[ Request::i()->id ]::isAvailable() ) )
+		if ( isset( $this->enhancements[ \IPS\Request::i()->id ] ) and ( !method_exists( $this->enhancements[ \IPS\Request::i()->id ], 'isAvailable' ) or $this->enhancements[ \IPS\Request::i()->id ]::isAvailable() ) )
 		{
-			$langKey = 'enhancements__' . Request::i()->id;
-			Output::i()->title = Member::loggedIn()->language()->addToStack( $langKey );
+			$langKey = 'enhancements__' . \IPS\Request::i()->id;
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( $langKey );
 
 			try
 			{
-				$this->enhancements[ Request::i()->id ]->edit();
+				$this->enhancements[ \IPS\Request::i()->id ]->edit();
 			}
-			catch ( DomainException $e )
+			catch ( \DomainException $e )
 			{
-				Output::i()->error( $e->getMessage(), $e->getCode() );
+				\IPS\Output::i()->error( $e->getMessage(), $e->getCode() );
 			}
+
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
 		}
 		else
 		{
-			Output::i()->error( 'node_error', '2C115/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C115/1', 404, '' );
 		}
 	}
 	
@@ -122,26 +111,29 @@ class enhancements extends Controller
 	 *
 	 * @return	void
 	 */
-	public function enableToggle() : void
+	public function enableToggle()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$this->enhancements[ Request::i()->id ]->toggle( Request::i()->status );
-			Session::i()->log( Request::i()->status ? 'acplog__enhancements_enable' : 'acplog__enhancements_disable', array( 'enhancements__' . Request::i()->id => TRUE ) );
+			$this->enhancements[ \IPS\Request::i()->id ]->toggle( \IPS\Request::i()->status );
+			\IPS\Session::i()->log( \IPS\Request::i()->status ? 'acplog__enhancements_enable' : 'acplog__enhancements_disable', array( 'enhancements__' . \IPS\Request::i()->id => TRUE ) );
 
-			Output::i()->redirect( Url::internal( "app=core&module=applications&controller=enhancements" ), Request::i()->status ? Member::loggedIn()->language()->addToStack('acplog__enhancements_enable', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( 'enhancements__' . Request::i()->id ) ) ) ) : Member::loggedIn()->language()->addToStack('acplog__enhancements_disable', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( 'enhancements__' . Request::i()->id ) ) ) ) );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=enhancements" ), \IPS\Request::i()->status ? \IPS\Member::loggedIn()->language()->addToStack('acplog__enhancements_enable', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( 'enhancements__' . \IPS\Request::i()->id ) ) ) ) : \IPS\Member::loggedIn()->language()->addToStack('acplog__enhancements_disable', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( 'enhancements__' . \IPS\Request::i()->id ) ) ) ) );
 		}
-		catch ( LogicException $e )
+		catch ( \LogicException $e )
 		{
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->error( $e->getMessage(), $e->getCode() );
+				\IPS\Output::i()->error( $e->getMessage(), $e->getCode() );
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( "app=core&module=applications&controller=enhancements&do=edit&id=" . Request::i()->id ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=enhancements&do=edit&id=" . \IPS\Request::i()->id ) );
 			}
 		}
 	}

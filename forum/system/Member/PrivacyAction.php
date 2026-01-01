@@ -11,45 +11,31 @@
 namespace IPS\Member;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\AdminNotification;
-use IPS\Db;
-use IPS\Email;
-use IPS\Login;
-use IPS\Member;
-use IPS\Notification;
-use IPS\Patterns\ActiveRecord;
-use IPS\Session;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PrivacyAction Model
  */
-class PrivacyAction extends ActiveRecord
+class _PrivacyAction extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief    [ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief    [ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_member_privacy_actions';
+	public static $databaseTable = 'core_member_privacy_actions';
 
 	/**
 	 * @brief    [ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap = [];
+	protected static $multitonMap = [];
 
 	/**
 	 * @brief    PII request
@@ -69,30 +55,30 @@ class PrivacyAction extends ActiveRecord
 	/**
 	 * Request the PII Data
 	 * 
-	 * @param Member|null $member
+	 * @param \IPS\Member|NULL $member
 	 * @return void
 	 */
-	public static function requestPiiData( Member $member = NULL ) : void
+	public static function requestPiiData( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		$obj = new static;
 		$obj->member_id = $member->member_id;
 		$obj->request_date = time();
 		$obj->action = static::TYPE_REQUEST_PII;
 		$obj->save();
 
-		AdminNotification::send( 'core', 'PiiDataRequest', NULL, TRUE, $member );
+		\IPS\core\AdminNotification::send( 'core', 'PiiDataRequest', NULL, TRUE, $member );
 	}
 
 	/**
 	 * Can the member request his PII Data?
 	 * 
-	 * @param Member|null $member
+	 * @param \IPS\Member|NULL $member
 	 * @return bool
 	 */
-	public static function canRequestPiiData( Member $member = NULL ): bool
+	public static function canRequestPiiData( \IPS\Member $member = NULL ): bool
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		if ( $member->member_id  AND !static::hasPiiRequest($member) )
 		{
 			return TRUE;
@@ -104,18 +90,18 @@ class PrivacyAction extends ActiveRecord
 	/**
 	 * Can the member download his PII Data?
 	 * 
-	 * @param Member|null $member
+	 * @param \IPS\Member|NULL $member
 	 * @return bool
 	 */
-	public static function canDownloadPiiData( Member $member = NULL ): bool
+	public static function canDownloadPiiData( \IPS\Member $member = NULL ): bool
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		if( !$member->member_id )
 		{
 			return FALSE;
 		}
 		
-		if ( Db::i()->select( 'count(*)', static::$databaseTable, [ 'member_id=? AND action=? AND approved=?', $member->member_id, static::TYPE_REQUEST_PII, 1 ] )->first() > 0 )
+		if ( \IPS\Db::i()->select( 'count(*)', static::$databaseTable, [ 'member_id=? AND action=? AND approved=?', $member->member_id, static::TYPE_REQUEST_PII, 1 ] )->first() > 0 )
 		{
 			return TRUE;
 		}
@@ -126,44 +112,42 @@ class PrivacyAction extends ActiveRecord
 	/**
 	 * Get the deletion request by member and key
 	 * 
-	 * @param Member $member
+	 * @param \IPS\Member $member
 	 * @param string $key
-	 * @throws OutOfRangeException
 	 * @return static
+	 * @throws \OutOfRangeException
 	 */
-	public static function getDeletionRequestByMemberAndKey( Member $member, string $key ): static
+	public static function getDeletionRequestByMemberAndKey( \IPS\Member $member, string $key ): static
 	{
 		try
 		{
 			$where = [];
 			$where[] = ['member_id=?', $member->member_id];
 			$where[] = ['vkey=?', $key];
-			$where[] = [ Db::i()->in( 'action',[static::TYPE_REQUEST_DELETE, static::TYPE_REQUEST_DELETE_VALIDATION ] )];
-			return static::constructFromData( Db::i()->select( '*', static::$databaseTable, $where  )->first() );
+			$where[] = [ \IPS\Db::i()->in( 'action',[static::TYPE_REQUEST_DELETE, static::TYPE_REQUEST_DELETE_VALIDATION ] )];
+			return static::constructFromData(\IPS\Db::i()->select( '*', static::$databaseTable, $where  )->first() );
 		}
-		catch( UnderflowException $e )
-		{
-			throw new OutOfRangeException;
+		catch( \UnderflowException $e ){
+			throw new \OutOfRangeException;
 		}
-
 	}
 
 	/**
 	 * Is a PII Data Request pending for this member?
 	 * 
-	 * @param Member|null $member
+	 * @param \IPS\Member|NULL $member
 	 * @param bool $approved
 	 * @return bool
 	 */
-	public static function hasPiiRequest( Member $member = NULL, bool $approved = FALSE ): bool
+	public static function hasPiiRequest( \IPS\Member $member = NULL, bool $approved = FALSE ): bool
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		try
 		{
-			Db::i()->select( '*', static::$databaseTable, [ 'member_id=? AND action=? AND approved=?', $member->member_id, static::TYPE_REQUEST_PII, (int) $approved ] )->first();
+			\IPS\Db::i()->select( '*', static::$databaseTable, [ 'member_id=? AND action=? AND approved=?', $member->member_id, static::TYPE_REQUEST_PII, (int) $approved ] )->first();
 			return TRUE;
 		}
-		catch( UnderflowException $e ){}
+		catch( \UnderflowException $e ){}
 		return FALSE;
 	}
 
@@ -172,11 +156,11 @@ class PrivacyAction extends ActiveRecord
 	 * 
 	 * @return void
 	 */
-	public function approvePiiRequest() : void
+	public function approvePiiRequest()
 	{
 		$this->approved = TRUE;
 		$this->save();
-		$notification = new Notification( Application::load( 'core' ), 'pii_data', $this, array( $this ) );
+		$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'pii_data', $this, array( $this ) );
 		$notification->recipients->attach( $this->member );
 		$notification->send();
 		static::resetPiiAcpNotifications();
@@ -187,9 +171,9 @@ class PrivacyAction extends ActiveRecord
 	 * 
 	 * @return void
 	 */
-	public function rejectPiiRequest() : void
+	public function rejectPiiRequest()
 	{
-		$notification = new Notification( Application::load( 'core' ), 'pii_data_rejected', $this, array( $this ) );
+		$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'pii_data_rejected', $this, array( $this ) );
 		$notification->recipients->attach( $this->member );
 		$notification->send();
 		$this->delete();
@@ -199,11 +183,11 @@ class PrivacyAction extends ActiveRecord
 	/**
 	 * Get the member object
 	 * 
-	 * @return Member
+	 * @return \IPS\Member
 	 */
-	public function get_member(): Member
+	public function get_member(): \IPS\Member
 	{
-		return Member::load( $this->member_id );
+		return \IPS\Member::load( $this->member_id );
 	}
 
 	/**
@@ -211,11 +195,11 @@ class PrivacyAction extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public static function resetPiiAcpNotifications() : void
+	public static function resetPiiAcpNotifications()
 	{
-		if ( !Db::i()->select( 'COUNT(*)', static::$databaseTable, array( 'action=? AND approved=?', static::TYPE_REQUEST_PII, 0 ) )->first() )
+		if ( !\IPS\Db::i()->select( 'COUNT(*)', static::$databaseTable, array( 'action=? AND approved=?', static::TYPE_REQUEST_PII, 0 ) )->first() )
 		{
-			AdminNotification::remove( 'core', 'PiiDataRequest' );
+			\IPS\core\AdminNotification::remove( 'core', 'PiiDataRequest' );
 		}
 	}
 
@@ -224,45 +208,43 @@ class PrivacyAction extends ActiveRecord
 	 * 
 	 * @return void
 	 */
-	public static function resetDeletionAcpNotifications() : void
+	public static function resetDeletionAcpNotifications()
 	{
-		if ( !Db::i()->select( 'COUNT(*)', static::$databaseTable, array( 'action=?', static::TYPE_REQUEST_DELETE ) )->first() )
+		if ( !\IPS\Db::i()->select( 'COUNT(*)', static::$databaseTable, array( 'action=?', static::TYPE_REQUEST_DELETE ) )->first() )
 		{
-			AdminNotification::remove( 'core', 'AccountDeletion' );
+			\IPS\core\AdminNotification::remove( 'core', 'AccountDeletion' );
 		}
 	}
 
 	/**
 	 * Can the current member request account deletion?
 	 * 
-	 * @param Member|null $member
+	 * @param \IPS\Member|NULL $member
 	 * @return bool
 	 */
-	public static function canDeleteAccount( Member $member = NULL ): bool
+	public static function canDeleteAccount( \IPS\Member $member = NULL ): bool
 	{
-		$member = $member ?: Member::loggedIn();
-		return Db::i()->select( 'count(*)', static::$databaseTable, [
-				[ 'member_id=?', $member->member_id ],
-				[ Db::i()->in( 'action', [ static::TYPE_REQUEST_DELETE, static::TYPE_REQUEST_DELETE_VALIDATION ] ) ]
-			] )->first() == 0;
+		$member = $member ?: \IPS\Member::loggedIn();
+		
+		return \IPS\Db::i()->select( 'count(*)', static::$databaseTable, [ 'member_id=? AND action=?', $member->member_id, static::TYPE_REQUEST_DELETE ] )->first() == 0;
 	}
 
 	/**
 	 * Create and log the account  deletion request
 	 * 
-	 * @param Member|null $member
+	 * @param \IPS\Member|NULL $member
 	 * @return void
 	 */
-	public static function requestAccountDeletion( Member $member = NULL ) : void
+	public static function requestAccountDeletion( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		$obj = new static;
 		$obj->member_id = $member->member_id;
 		$obj->request_date = time();
 		$obj->action = static::TYPE_REQUEST_DELETE_VALIDATION;
-		$vkey = md5( $member->members_pass_hash . Login::generateRandomString() );
+		$vkey = md5( $member->members_pass_hash . \IPS\Login::generateRandomString() );
 		$obj->vkey = $vkey;
-		Email::buildFromTemplate( 'core', 'account_deletion_confirmation', array( $member, $vkey ), Email::TYPE_TRANSACTIONAL )->send( $member );
+		\IPS\Email::buildFromTemplate( 'core', 'account_deletion_confirmation', array( $member, $vkey ), \IPS\Email::TYPE_TRANSACTIONAL )->send( $member );
 
 		$obj->save();
 	}
@@ -272,10 +254,10 @@ class PrivacyAction extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function confirmAccountDeletion() : void
+	public function confirmAccountDeletion()
 	{
 		$this->action = static::TYPE_REQUEST_DELETE;
-		AdminNotification::send( 'core', 'AccountDeletion', NULL, TRUE, $this->member );
+		\IPS\core\AdminNotification::send( 'core', 'AccountDeletion', NULL, TRUE, $this->member );
 		$this->member->logHistory( 'core', 'privacy', array( 'type' => 'account_deletion_requested' ) );
 		$this->save();
 	}
@@ -285,14 +267,14 @@ class PrivacyAction extends ActiveRecord
 	 * 
 	 * @return void
 	 */
-	public function deleteAccount() : void
+	public function deleteAccount()
 	{
-		/** @var Member $member */
+		/** @var \IPS\Member $member */
 		$member = $this->member;
 
 		$member->delete( TRUE, FALSE );
 		static::resetDeletionAcpNotifications();
-		Session::i()->log( 'acplog__members_deleted_id', array( $member->name => FALSE, $member->member_id => FALSE ) );
+		\IPS\Session::i()->log( 'acplog__members_deleted_id', array( $member->name => FALSE, $member->member_id => FALSE ) );
 	}
 
 	/**
@@ -300,12 +282,23 @@ class PrivacyAction extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function rejectDeletionRequest() : void
+	public function rejectDeletionRequest()
 	{
-		$notification = new Notification( Application::load( 'core' ), 'account_del_request_rejected', $this, array( $this ) );
+		$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'account_del_request_rejected', $this, array( $this ) );
 		$notification->recipients->attach( $this->member );
 		$notification->send();
 		$this->delete();
+		static::resetDeletionAcpNotifications();
+	}
+
+	/**
+	 * Reset all ACP notifications and caches if there are any, should be called after a member was deleted or merged
+	 * 
+	 * @return void
+	 */
+	public static function resetAcpNotificationCounts()
+	{
+		static::resetPiiAcpNotifications();
 		static::resetDeletionAcpNotifications();
 	}
 }

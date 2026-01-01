@@ -198,6 +198,20 @@
                 "values": [],
                 "zerofill": false
             },
+            "i_shipaddress": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "i_shipaddress",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
             "i_billaddress": {
                 "allow_null": true,
                 "auto_increment": false,
@@ -788,6 +802,20 @@
                 "allow_null": false,
                 "default": "0",
                 "comment": "Is the primary billing address?",
+                "unsigned": true,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "primary_shipping": {
+                "name": "primary_shipping",
+                "type": "TINYINT",
+                "length": 1,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": "0",
+                "comment": "Is the primary shipping address?",
                 "unsigned": true,
                 "zerofill": false,
                 "auto_increment": false,
@@ -1520,6 +1548,123 @@
         "collation": "utf8mb4_unicode_ci",
         "reporting": "count"
     },
+    "nexus_shipping": {
+        "name": "nexus_shipping",
+        "columns": {
+            "s_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 5,
+                "name": "s_id",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "s_name": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "s_name",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "s_locations": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "s_locations",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "s_type": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 1,
+                "name": "s_type",
+                "type": "CHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "s_rates": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "s_rates",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "s_tax": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 5,
+                "name": "s_tax",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "s_order": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 5,
+                "name": "s_order",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "s_id"
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
     "nexus_fraud_rules": {
         "name": "nexus_fraud_rules",
         "columns": {
@@ -2196,6 +2341,237 @@
         "comment": "",
         "reporting": "count"
     },
+    "nexus_ship_orders": {
+        "name": "nexus_ship_orders",
+        "columns": {
+            "o_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 10,
+                "name": "o_id",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_invoice": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "o_invoice",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_data": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "o_data",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_status": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "",
+                "length": 4,
+                "name": "o_status",
+                "type": "CHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_method": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 5,
+                "name": "o_method",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_items": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "o_items",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_date": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "o_date",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_shipped_date": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "o_shipped_date",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_service": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "o_service",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_tracknumber": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "o_tracknumber",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_api": {
+                "name": "o_api",
+                "type": "VARCHAR",
+                "length": 255,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": "",
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            },
+            "o_api_service": {
+                "name": "o_api_service",
+                "type": "VARCHAR",
+                "length": 255,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": "",
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            },
+            "o_label": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "o_label",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "o_extra": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "o_extra",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "o_id"
+                ]
+            },
+            "o_status": {
+                "type": "key",
+                "name": "o_status",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "o_status"
+                ]
+            },
+            "o_date": {
+                "type": "key",
+                "name": "o_date",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "o_date"
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
     "nexus_payouts": {
         "name": "nexus_payouts",
         "columns": {
@@ -2405,6 +2781,2072 @@
                 "columns": [
                     "po_member",
                     "po_date"
+                ],
+                "length": [
+                    null,
+                    null
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_replies": {
+        "name": "nexus_support_replies",
+        "columns": {
+            "reply_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 10,
+                "name": "reply_id",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_request": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "reply_request",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_member": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 20,
+                "name": "reply_member",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_type": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "",
+                "length": 1,
+                "name": "reply_type",
+                "type": "CHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_post": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "reply_post",
+                "type": "MEDIUMTEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_hidden": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "reply_hidden",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_date": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "reply_date",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_email": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "reply_email",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_cc": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "reply_cc",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_raw": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "reply_raw",
+                "type": "MEDIUMTEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_textformat": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "",
+                "length": 1,
+                "name": "reply_textformat",
+                "type": "CHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_ip_address": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 46,
+                "name": "reply_ip_address",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_bcc": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "reply_bcc",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "reply_is_first": {
+                "name": "reply_is_first",
+                "type": "TINYINT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": "0",
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "reply_id"
+                ]
+            },
+            "reply_request": {
+                "type": "key",
+                "name": "reply_request",
+                "columns": [
+                    "reply_request",
+                    "reply_hidden",
+                    "reply_date"
+                ],
+                "length": [
+                    null,
+                    null,
+                    null
+                ]
+            },
+            "reply_date": {
+                "type": "key",
+                "name": "reply_date",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "reply_date"
+                ]
+            },
+            "reply_email": {
+                "type": "key",
+                "name": "reply_email",
+                "length": [
+                    191
+                ],
+                "columns": [
+                    "reply_email"
+                ]
+            },
+            "reply_ip_address": {
+                "type": "key",
+                "name": "reply_ip_address",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "reply_ip_address"
+                ]
+            },
+            "reply_post": {
+                "type": "fulltext",
+                "name": "reply_post",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "reply_post"
+                ]
+            },
+            "reply_member": {
+                "type": "key",
+                "name": "reply_member",
+                "columns": [
+                    "reply_member"
+                ],
+                "length": [
+                    null
+                ]
+            }
+        },
+        "collation": "utf8mb4_unicode_ci",
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_requests": {
+        "name": "nexus_support_requests",
+        "columns": {
+            "r_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 10,
+                "name": "r_id",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_title": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "r_title",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_member": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 20,
+                "name": "r_member",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "r_department": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "r_department",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_purchase": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "r_purchase",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_status": {
+                "name": "r_status",
+                "type": "INT",
+                "length": 5,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": "0",
+                "comment": "",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "r_severity": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 5,
+                "name": "r_severity",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_severity_lock": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "r_severity_lock",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_started": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "r_started",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_last_reply": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "r_last_reply",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_last_reply_by": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 20,
+                "name": "r_last_reply_by",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "r_last_new_reply": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "r_last_new_reply",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_last_staff_reply": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "r_last_staff_reply",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_staff": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 20,
+                "name": "r_staff",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "r_staff_lock": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "r_staff_lock",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_replies": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 5,
+                "name": "r_replies",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_notify": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "r_notify",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_email": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "r_email",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_email_key": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 3,
+                "name": "r_email_key",
+                "type": "CHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_ar_notify": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "r_ar_notify",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "r_cfields": {
+                "name": "r_cfields",
+                "type": "MEDIUMTEXT",
+                "length": 0,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "r_ppi_invoice": {
+                "name": "r_ppi_invoice",
+                "type": "INT",
+                "length": 10,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": true,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "r_id"
+                ]
+            },
+            "r_member": {
+                "type": "key",
+                "name": "r_member",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "r_member"
+                ]
+            },
+            "r_started": {
+                "type": "key",
+                "name": "r_started",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "r_started"
+                ]
+            },
+            "status_and_department": {
+                "type": "key",
+                "name": "status_and_department",
+                "columns": [
+                    "r_status",
+                    "r_department"
+                ],
+                "length": [
+                    null,
+                    null
+                ]
+            },
+            "r_staff": {
+                "type": "key",
+                "name": "r_staff",
+                "columns": [
+                    "r_staff"
+                ],
+                "length": [
+                    null
+                ]
+            },
+            "r_last_reply_by": {
+                "type": "key",
+                "name": "r_last_reply_by",
+                "columns": [
+                    "r_last_reply_by"
+                ],
+                "length": [
+                    null
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_departments": {
+        "name": "nexus_support_departments",
+        "columns": {
+            "dpt_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 10,
+                "name": "dpt_id",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_name": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "dpt_name",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_open": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "dpt_open",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_require_package": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "dpt_require_package",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_packages": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "dpt_packages",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_position": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 5,
+                "name": "dpt_position",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_email": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "dpt_email",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_notify": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "dpt_notify",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_notify_reply": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "dpt_notify_reply",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_ppi": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "",
+                "length": 0,
+                "name": "dpt_ppi",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_staff": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "dpt_staff",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_ppi_tax": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 5,
+                "name": "dpt_ppi_tax",
+                "type": "INT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "dpt_subscriptions": {
+                "name": "dpt_subscriptions",
+                "type": "TEXT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "dpt_id"
+                ]
+            },
+            "dpt_email": {
+                "type": "key",
+                "name": "dpt_email",
+                "length": [
+                    191
+                ],
+                "columns": [
+                    "dpt_email"
+                ]
+            },
+            "dpt_position": {
+                "type": "key",
+                "name": "dpt_position",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "dpt_position"
+                ]
+            },
+            "dp_staff": {
+                "type": "key",
+                "name": "dp_staff",
+                "length": [
+                    191
+                ],
+                "columns": [
+                    "dpt_staff"
+                ]
+            }
+        },
+        "collation": "utf8mb4_unicode_ci",
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_statuses": {
+        "name": "nexus_support_statuses",
+        "columns": {
+            "status_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 5,
+                "name": "status_id",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_name": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 128,
+                "name": "status_name",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_public_name": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 128,
+                "name": "status_public_name",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_public_set": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "status_public_set",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_default_member": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "status_default_member",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_default_staff": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "status_default_staff",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_is_locked": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "status_is_locked",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_assign": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "status_assign",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_position": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 5,
+                "name": "status_position",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_open": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "status_open",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_color": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "",
+                "length": 6,
+                "name": "status_color",
+                "type": "CHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "status_log": {
+                "name": "status_log",
+                "type": "TINYINT",
+                "length": 1,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": "1",
+                "comment": "Should setting the status be logged?",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "status_id"
+                ]
+            },
+            "status_position": {
+                "type": "key",
+                "name": "status_position",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "status_position"
+                ]
+            },
+            "status_open": {
+                "type": "key",
+                "name": "status_open",
+                "columns": [
+                    "status_open"
+                ],
+                "length": [
+                    null
+                ]
+            },
+            "member_default": {
+                "type": "key",
+                "name": "member_default",
+                "columns": [
+                    "status_default_member"
+                ],
+                "length": [
+                    null
+                ]
+            }
+        },
+        "inserts": [
+            {
+                "status_id": 1,
+                "status_name": null,
+                "status_public_name": null,
+                "status_public_set": null,
+                "status_default_member": 1,
+                "status_default_staff": 0,
+                "status_is_locked": 0,
+                "status_assign": 0,
+                "status_position": 0,
+                "status_open": 1,
+                "status_color": ""
+            },
+            {
+                "status_id": 2,
+                "status_name": null,
+                "status_public_name": null,
+                "status_public_set": null,
+                "status_default_member": 0,
+                "status_default_staff": 0,
+                "status_is_locked": 0,
+                "status_assign": 0,
+                "status_position": 2,
+                "status_open": 1,
+                "status_color": ""
+            },
+            {
+                "status_id": 3,
+                "status_name": null,
+                "status_public_name": null,
+                "status_public_set": null,
+                "status_default_member": 0,
+                "status_default_staff": 1,
+                "status_is_locked": 0,
+                "status_assign": 0,
+                "status_position": 4,
+                "status_open": 0,
+                "status_color": ""
+            },
+            {
+                "status_id": 4,
+                "status_name": null,
+                "status_public_name": null,
+                "status_public_set": null,
+                "status_default_member": 0,
+                "status_default_staff": 0,
+                "status_is_locked": 1,
+                "status_assign": 0,
+                "status_position": 5,
+                "status_open": 0,
+                "status_color": ""
+            },
+            {
+                "status_id": 5,
+                "status_name": null,
+                "status_public_name": null,
+                "status_public_set": null,
+                "status_default_member": 0,
+                "status_default_staff": 0,
+                "status_is_locked": 0,
+                "status_assign": 0,
+                "status_position": 6,
+                "status_open": 0,
+                "status_color": ""
+            },
+            {
+                "status_id": 6,
+                "status_name": null,
+                "status_public_name": null,
+                "status_public_set": null,
+                "status_default_member": 0,
+                "status_default_staff": 0,
+                "status_is_locked": 0,
+                "status_assign": 1,
+                "status_position": 3,
+                "status_open": 1,
+                "status_color": ""
+            }
+        ],
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_severities": {
+        "name": "nexus_support_severities",
+        "columns": {
+            "sev_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 5,
+                "name": "sev_id",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sev_name": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "sev_name",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sev_icon": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "sev_icon",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sev_color": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 6,
+                "name": "sev_color",
+                "type": "CHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sev_default": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 1,
+                "name": "sev_default",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sev_public": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 1,
+                "name": "sev_public",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sev_position": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 5,
+                "name": "sev_position",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sev_action": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "sev_action",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sev_departments": {
+                "name": "sev_departments",
+                "type": "TEXT",
+                "length": null,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "sev_id"
+                ]
+            }
+        },
+        "inserts": [
+            {
+                "sev_id": 1,
+                "sev_name": null,
+                "sev_icon": null,
+                "sev_color": "000",
+                "sev_default": 1,
+                "sev_public": 1,
+                "sev_position": 1,
+                "sev_action": null,
+                "sev_departments": "*"
+            }
+        ],
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_tracker": {
+        "name": "nexus_support_tracker",
+        "columns": {
+            "member_id": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 20,
+                "name": "member_id",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "request_id": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "request_id",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "notify": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 1,
+                "name": "notify",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null,
+                    null
+                ],
+                "columns": [
+                    "member_id",
+                    "request_id"
+                ]
+            },
+            "notifications": {
+                "type": "key",
+                "name": "notifications",
+                "columns": [
+                    "request_id",
+                    "notify"
+                ],
+                "length": [
+                    null,
+                    null
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_views": {
+        "name": "nexus_support_views",
+        "columns": {
+            "view_rid": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "view_rid",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "view_member": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 20,
+                "name": "view_member",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "view_first": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 10,
+                "name": "view_first",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "view_last": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 10,
+                "name": "view_last",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "view_reply": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 10,
+                "name": "view_reply",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null,
+                    null
+                ],
+                "columns": [
+                    "view_rid",
+                    "view_member"
+                ]
+            },
+            "view_last": {
+                "type": "key",
+                "name": "view_last",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "view_last"
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_stock_actions": {
+        "name": "nexus_support_stock_actions",
+        "columns": {
+            "action_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 5,
+                "name": "action_id",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "action_name": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "action_name",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "action_department": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "action_department",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "action_status": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 5,
+                "name": "action_status",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "action_staff": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 20,
+                "name": "action_staff",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "action_message": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "action_message",
+                "type": "MEDIUMTEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "action_position": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 5,
+                "name": "action_position",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "action_show_in": {
+                "name": "action_show_in",
+                "type": "TEXT",
+                "length": null,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "action_id"
+                ]
+            },
+            "action_position": {
+                "type": "key",
+                "name": "action_position",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "action_position"
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_fields": {
+        "name": "nexus_support_fields",
+        "columns": {
+            "sf_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 5,
+                "name": "sf_id",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sf_name": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 128,
+                "name": "sf_name",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sf_desc": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "sf_desc",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sf_type": {
+                "name": "sf_type",
+                "type": "VARCHAR",
+                "length": 32,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "sf_extra": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "sf_extra",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sf_departments": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "sf_departments",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sf_position": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 5,
+                "name": "sf_position",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sf_required": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "sf_required",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sf_multiple": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "sf_multiple",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "sf_max_input": {
+                "name": "sf_max_input",
+                "type": "MEDIUMINT",
+                "length": 6,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": "0",
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            },
+            "sf_input_format": {
+                "name": "sf_input_format",
+                "type": "TEXT",
+                "length": null,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "sf_validate": {
+                "name": "sf_validate",
+                "type": "TINYINT",
+                "length": 1,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": "1",
+                "comment": "",
+                "unsigned": true,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "sf_allow_attachments": {
+                "name": "sf_allow_attachments",
+                "type": "TINYINT",
+                "length": 1,
+                "decimals": null,
+                "values": null,
+                "allow_null": false,
+                "default": "1",
+                "comment": "",
+                "unsigned": true,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "sf_id"
+                ]
+            },
+            "sf_position": {
+                "type": "key",
+                "name": "sf_position",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "sf_position"
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_ratings": {
+        "name": "nexus_support_ratings",
+        "columns": {
+            "rating_reply": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "rating_reply",
+                "type": "INT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "rating_rating": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 1,
+                "name": "rating_rating",
+                "type": "SMALLINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "rating_from": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 20,
+                "name": "rating_from",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "rating_staff": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 20,
+                "name": "rating_staff",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "rating_note": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "rating_note",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "rating_date": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 10,
+                "name": "rating_date",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "rating_reply"
+                ]
+            },
+            "rating_staff": {
+                "type": "key",
+                "name": "rating_staff",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "rating_staff"
+                ]
+            },
+            "rating_date": {
+                "type": "key",
+                "name": "rating_date",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "rating_date"
+                ]
+            },
+            "rating_from": {
+                "type": "key",
+                "name": "rating_from",
+                "columns": [
+                    "rating_from"
+                ],
+                "length": [
+                    null
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_notify": {
+        "name": "nexus_support_notify",
+        "columns": {
+            "staff_id": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "The staff member ID",
+                "decimals": null,
+                "default": "0",
+                "length": 20,
+                "name": "staff_id",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "type": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "The type",
+                "decimals": null,
+                "default": "",
+                "length": 1,
+                "name": "type",
+                "type": "CHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "departments": {
+                "name": "departments",
+                "type": "TEXT",
+                "length": null,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": null,
+                "comment": "The department IDs",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "columns": [
+                    "staff_id",
+                    "type"
                 ],
                 "length": [
                     null,
@@ -2919,6 +5361,48 @@
                 "values": [],
                 "zerofill": false
             },
+            "p_support": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "p_support",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "p_support_department": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "p_support_department",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "p_support_severity": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 5,
+                "name": "p_support_severity",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
             "p_featured": {
                 "allow_null": false,
                 "auto_increment": false,
@@ -3306,18 +5790,6 @@
                 "comment": "",
                 "unsigned": false,
                 "auto_increment": false
-            },
-            "p_locked": {
-                "name": "p_locked",
-                "type": "TINYINT",
-                "length": null,
-                "decimals": null,
-                "values": null,
-                "allow_null": true,
-                "default": "0",
-                "comment": "",
-                "unsigned": false,
-                "auto_increment": false
             }
         },
         "indexes": {
@@ -3393,6 +5865,20 @@
                 "values": [],
                 "zerofill": false
             },
+            "p_physical": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "p_physical",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
             "p_subscription": {
                 "allow_null": false,
                 "auto_increment": false,
@@ -3403,6 +5889,34 @@
                 "length": 1,
                 "name": "p_subscription",
                 "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "p_shipping": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "p_shipping",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "p_weight": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 0,
+                "name": "p_weight",
+                "type": "FLOAT",
                 "unsigned": false,
                 "values": [],
                 "zerofill": false
@@ -3458,6 +5972,48 @@
                 "allow_null": false,
                 "default": "1",
                 "comment": "",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "p_length": {
+                "name": "p_length",
+                "type": "FLOAT",
+                "length": null,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "Length (in metres)",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "p_width": {
+                "name": "p_width",
+                "type": "FLOAT",
+                "length": null,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "Width (in metres)",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "p_height": {
+                "name": "p_height",
+                "type": "FLOAT",
+                "length": null,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "Height (in metres)",
                 "unsigned": false,
                 "zerofill": false,
                 "auto_increment": false,
@@ -4402,6 +6958,7 @@
             "main_id": {
                 "allow_null": false,
                 "auto_increment": false,
+                "binary": false,
                 "comment": "",
                 "decimals": null,
                 "default": "0",
@@ -4409,11 +6966,13 @@
                 "name": "main_id",
                 "type": "BIGINT",
                 "unsigned": true,
-                "values": []
+                "values": [],
+                "zerofill": false
             },
             "alt_id": {
                 "allow_null": false,
                 "auto_increment": false,
+                "binary": false,
                 "comment": "",
                 "decimals": null,
                 "default": "0",
@@ -4421,11 +6980,13 @@
                 "name": "alt_id",
                 "type": "BIGINT",
                 "unsigned": true,
-                "values": []
+                "values": [],
+                "zerofill": false
             },
             "purchases": {
                 "allow_null": true,
                 "auto_increment": false,
+                "binary": false,
                 "comment": "",
                 "decimals": null,
                 "default": null,
@@ -4433,19 +6994,36 @@
                 "name": "purchases",
                 "type": "TEXT",
                 "unsigned": false,
-                "values": []
+                "values": [],
+                "zerofill": false
             },
             "billing": {
                 "allow_null": false,
                 "auto_increment": false,
+                "binary": false,
                 "comment": "",
                 "decimals": null,
                 "default": "0",
-                "length": 4,
+                "length": 1,
                 "name": "billing",
                 "type": "TINYINT",
                 "unsigned": false,
-                "values": []
+                "values": [],
+                "zerofill": false
+            },
+            "support": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "support",
+                "type": "TINYINT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
             }
         },
         "indexes": {
@@ -4464,15 +7042,15 @@
             "alt_id": {
                 "type": "key",
                 "name": "alt_id",
-                "length": [
-                    null
-                ],
                 "columns": [
                     "alt_id"
+                ],
+                "length": [
+                    null
                 ]
             }
         },
-        "collation": "utf8mb4_unicode_ci",
+        "comment": "",
         "reporting": "count"
     },
     "nexus_coupons": {
@@ -5015,42 +7593,6 @@
                 "zerofill": false,
                 "auto_increment": false,
                 "binary": false
-            },
-            "d_suggestions": {
-                "name": "d_suggestions",
-                "type": "TEXT",
-                "length": null,
-                "decimals": null,
-                "values": null,
-                "allow_null": true,
-                "default": null,
-                "comment": "",
-                "unsigned": false,
-                "auto_increment": false
-            },
-            "d_suggestions_open": {
-                "name": "d_suggestions_open",
-                "type": "TINYINT",
-                "length": null,
-                "decimals": null,
-                "values": null,
-                "allow_null": false,
-                "default": "1",
-                "comment": "",
-                "unsigned": true,
-                "auto_increment": false
-            },
-            "d_goal_reached": {
-                "name": "d_goal_reached",
-                "type": "TINYINT",
-                "length": null,
-                "decimals": null,
-                "values": null,
-                "allow_null": false,
-                "default": 0,
-                "comment": "",
-                "unsigned": true,
-                "auto_increment": false
             }
         },
         "indexes": {
@@ -5164,18 +7706,6 @@
                 "unsigned": false,
                 "values": [],
                 "zerofill": false
-            },
-            "dl_anon": {
-                "name": "dl_anon",
-                "type": "TINYINT",
-                "length": null,
-                "decimals": null,
-                "values": null,
-                "allow_null": false,
-                "default": 0,
-                "comment": "",
-                "unsigned": true,
-                "auto_increment": false
             }
         },
         "indexes": {
@@ -5291,30 +7821,6 @@
                 "unsigned": false,
                 "values": [],
                 "zerofill": false
-            },
-            "p_settings": {
-                "name": "p_settings",
-                "type": "TEXT",
-                "length": null,
-                "decimals": null,
-                "values": null,
-                "allow_null": true,
-                "default": null,
-                "comment": "",
-                "unsigned": false,
-                "auto_increment": false
-            },
-            "p_email": {
-                "name": "p_email",
-                "type": "TINYINT",
-                "length": null,
-                "decimals": null,
-                "values": null,
-                "allow_null": true,
-                "default": "0",
-                "comment": "",
-                "unsigned": false,
-                "auto_increment": false
             }
         },
         "indexes": {
@@ -5603,6 +8109,95 @@
         "comment": "",
         "reporting": "count"
     },
+    "nexus_eom": {
+        "name": "nexus_eom",
+        "columns": {
+            "eom_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 10,
+                "name": "eom_id",
+                "type": "INT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "eom_url": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": "",
+                "length": 255,
+                "name": "eom_url",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "eom_type": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 1,
+                "name": "eom_type",
+                "type": "CHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "eom_value": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "eom_value",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "eom_notify": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "eom_notify",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "eom_id"
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
     "nexus_notes": {
         "name": "nexus_notes",
         "columns": {
@@ -5730,6 +8325,133 @@
                 ]
             }
         }
+    },
+    "nexus_support_request_log": {
+        "name": "nexus_support_request_log",
+        "columns": {
+            "rlog_id": {
+                "name": "rlog_id",
+                "type": "BIGINT",
+                "length": 20,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": null,
+                "comment": "ID Number",
+                "unsigned": true,
+                "zerofill": false,
+                "auto_increment": true,
+                "binary": false
+            },
+            "rlog_request": {
+                "name": "rlog_request",
+                "type": "INT",
+                "length": 10,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": null,
+                "comment": "The support request ID number",
+                "unsigned": true,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "rlog_member": {
+                "name": "rlog_member",
+                "type": "BIGINT",
+                "length": 20,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": null,
+                "comment": "The member ID of the staff performing the action",
+                "unsigned": true,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "rlog_action": {
+                "name": "rlog_action",
+                "type": "VARCHAR",
+                "length": 32,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": null,
+                "comment": "The field being changed",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "rlog_old": {
+                "name": "rlog_old",
+                "type": "INT",
+                "length": 10,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "The old value",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "rlog_new": {
+                "name": "rlog_new",
+                "type": "INT",
+                "length": 10,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "The new value",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "rlog_date": {
+                "name": "rlog_date",
+                "type": "INT",
+                "length": 10,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": null,
+                "comment": "Unix timestamp of when change was made",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "columns": [
+                    "rlog_id"
+                ],
+                "length": [
+                    null
+                ]
+            },
+            "rlog_member": {
+                "type": "key",
+                "name": "rlog_member",
+                "columns": [
+                    "rlog_member"
+                ],
+                "length": [
+                    null
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
     },
     "nexus_billing_agreements": {
         "name": "nexus_billing_agreements",
@@ -5958,6 +8680,388 @@
                 ]
             }
         }
+    },
+    "nexus_support_streams": {
+        "name": "nexus_support_streams",
+        "columns": {
+            "stream_id": {
+                "allow_null": false,
+                "auto_increment": true,
+                "binary": false,
+                "comment": "ID Number",
+                "decimals": null,
+                "default": null,
+                "length": 20,
+                "name": "stream_id",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_departments": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "Comma-delimited list of department IDs or NULL for all",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "stream_departments",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_statuses": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "Comma-delimited list of status IDs or NULL for all",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "stream_statuses",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_severities": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "Comma-delimited list of severity IDs or NULL for all",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "stream_severities",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_staff": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "Comma-delimited list of staff IDs or NULL for all",
+                "decimals": null,
+                "default": null,
+                "length": 0,
+                "name": "stream_staff",
+                "type": "TEXT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_from_email": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "From email address, or NULL for any",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "stream_from_email",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_search_term": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "Search term, or NULL for none",
+                "decimals": null,
+                "default": null,
+                "length": 255,
+                "name": "stream_search_term",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_started": {
+                "name": "stream_started",
+                "type": "VARCHAR",
+                "length": 64,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "JSON array of number of hours to restrict started time to and sort direction, or NULL for no restriction",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "stream_last_reply": {
+                "name": "stream_last_reply",
+                "type": "VARCHAR",
+                "length": 64,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "JSON array of number of hours to restrict last reply time to and sort direction, or NULL for no restriction",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "stream_last_staff_reply": {
+                "name": "stream_last_staff_reply",
+                "type": "VARCHAR",
+                "length": 64,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "JSON array of number of hours to restrict last staff reply time to and sort direction, or NULL for no restriction",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "stream_owner": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "The ID number of the staff member who owns the stream",
+                "decimals": null,
+                "default": "0",
+                "length": 20,
+                "name": "stream_owner",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_position": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "Order in staff members streams",
+                "decimals": null,
+                "default": "0",
+                "length": 10,
+                "name": "stream_position",
+                "type": "INT",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_last_new_reply": {
+                "name": "stream_last_new_reply",
+                "type": "VARCHAR",
+                "length": 64,
+                "decimals": null,
+                "values": [],
+                "allow_null": true,
+                "default": null,
+                "comment": "JSON array of number of hours to restrict reopened time to and sort direction, or NULL for no restriction",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "stream_tracked": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "Boolean value indicating if only tracked requests should be included",
+                "decimals": null,
+                "default": "0",
+                "length": 1,
+                "name": "stream_tracked",
+                "type": "TINYINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_title": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "The name of the stream",
+                "decimals": null,
+                "default": "",
+                "length": 255,
+                "name": "stream_title",
+                "type": "VARCHAR",
+                "unsigned": false,
+                "values": [],
+                "zerofill": false
+            },
+            "stream_temporary": {
+                "allow_null": false,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "If this has not yet been saved by its owner",
+                "decimals": null,
+                "default": "1",
+                "length": 1,
+                "name": "stream_temporary",
+                "type": "TINYINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "length": [
+                    null
+                ],
+                "columns": [
+                    "stream_id"
+                ]
+            },
+            "list": {
+                "type": "key",
+                "name": "list",
+                "length": [
+                    null,
+                    null
+                ],
+                "columns": [
+                    "stream_owner",
+                    "stream_position"
+                ]
+            }
+        },
+        "collation": "utf8mb4_unicode_ci",
+        "engine": "InnoDB",
+        "reporting": "count"
+    },
+    "nexus_support_staff_preferences": {
+        "name": "nexus_support_staff_preferences",
+        "columns": {
+            "staff_id": {
+                "name": "staff_id",
+                "type": "BIGINT",
+                "length": 20,
+                "decimals": null,
+                "values": null,
+                "allow_null": false,
+                "default": null,
+                "comment": "ID Number of staff member",
+                "unsigned": true,
+                "zerofill": false,
+                "auto_increment": true,
+                "binary": false
+            },
+            "content": {
+                "name": "content",
+                "type": "TEXT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "Default editor content",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "action": {
+                "name": "action",
+                "type": "VARCHAR",
+                "length": 32,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "Default action when replying to a support request",
+                "unsigned": false,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            }
+        },
+        "indexes": {
+            "PRIMARY": {
+                "type": "primary",
+                "name": "PRIMARY",
+                "columns": [
+                    "staff_id"
+                ],
+                "length": [
+                    null
+                ]
+            }
+        },
+        "comment": "",
+        "reporting": "count"
+    },
+    "nexus_support_staff_dpt_order": {
+        "name": "nexus_support_staff_dpt_order",
+        "columns": {
+            "staff_id": {
+                "allow_null": true,
+                "auto_increment": false,
+                "binary": false,
+                "comment": "The staff's member ID",
+                "decimals": null,
+                "default": "0",
+                "length": 20,
+                "name": "staff_id",
+                "type": "BIGINT",
+                "unsigned": true,
+                "values": [],
+                "zerofill": false
+            },
+            "department_id": {
+                "name": "department_id",
+                "type": "INT",
+                "length": 10,
+                "decimals": null,
+                "values": null,
+                "allow_null": false,
+                "default": null,
+                "comment": "The department ID",
+                "unsigned": true,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            },
+            "dpt_position": {
+                "name": "dpt_position",
+                "type": "INT",
+                "length": 10,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "The department position",
+                "unsigned": true,
+                "zerofill": false,
+                "auto_increment": false,
+                "binary": false
+            }
+        },
+        "indexes": {
+            "staff_and_department": {
+                "type": "unique",
+                "name": "staff_and_department",
+                "columns": [
+                    "staff_id",
+                    "department_id"
+                ],
+                "length": [
+                    null,
+                    null
+                ]
+            }
+        },
+        "collation": "utf8mb4_unicode_ci",
+        "engine": "InnoDB",
+        "comment": "",
+        "reporting": "count"
     },
     "nexus_member_subscription_packages": {
         "name": "nexus_member_subscription_packages",

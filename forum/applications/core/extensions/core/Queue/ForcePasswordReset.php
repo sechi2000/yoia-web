@@ -12,53 +12,42 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use OutOfRangeException;
-use function defined;
-use function is_string;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class ForcePasswordReset extends QueueAbstract
+class _ForcePasswordReset
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		/* Compile where */
 		$where = array();
 		$where[] = array( "core_members.temp_ban=0" );
 		$where[] = array( "core_members.members_pass_hash!=''" );
 		$where[] = array( "core_members.members_pass_hash IS NOT NULL" );
-		$where[] = array( '( ! ' . Db::i()->bitwiseWhere( Member::$bitOptions['members_bitoptions'], 'password_reset_forced' ) . ' )' );
+		$where[] = array( '( ! ' . \IPS\Db::i()->bitwiseWhere( \IPS\Member::$bitOptions['members_bitoptions'], 'password_reset_forced' ) . ' )' );
 
-		foreach ( Application::allExtensions( 'core', 'MemberFilter', FALSE, 'core' ) as $key => $extension )
+		foreach ( \IPS\Application::allExtensions( 'core', 'MemberFilter', FALSE, 'core' ) as $key => $extension )
 		{
-			if( $extension->availableIn( 'passwordreset' ) )
+			if( method_exists( $extension, 'getQueryWhereClause' ) AND $extension->availableIn( 'passwordreset' ) )
 			{
 				/* Grab our fields and add to the form */
 				if( !empty( $data[ $key ] ) )
 				{
 					if( $_where = $extension->getQueryWhereClause( $data[ $key ] ) )
 					{
-						if ( is_string( $_where ) )
+						if ( \is_string( $_where ) )
 						{
 							$_where = array( $_where );
 						}
@@ -69,7 +58,7 @@ class ForcePasswordReset extends QueueAbstract
 			}
 		}
 		
-		$data['count'] = Db::i()->select( 'COUNT(*)', 'core_members', $where )->first();
+		$data['count'] = \IPS\Db::i()->select( 'COUNT(*)', 'core_members', $where )->first();
 		$data['done'] = 0;
 		
 		return $data;
@@ -83,7 +72,7 @@ class ForcePasswordReset extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$lastId = ( isset( $data['lastId'] ) ) ? $data['lastId'] : 0;
 		
@@ -93,18 +82,18 @@ class ForcePasswordReset extends QueueAbstract
 		$where[] = array( "core_members.members_pass_hash!=''" );
 		$where[] = array( "core_members.members_pass_hash IS NOT NULL" );
 		$where[] = array( "member_id>{$lastId}" );
-		$where[] = array( '( ! ' . Db::i()->bitwiseWhere( Member::$bitOptions['members_bitoptions'], 'password_reset_forced' ) . ' )' );
+		$where[] = array( '( ! ' . \IPS\Db::i()->bitwiseWhere( \IPS\Member::$bitOptions['members_bitoptions'], 'password_reset_forced' ) . ' )' );
 
-		foreach ( Application::allExtensions( 'core', 'MemberFilter', FALSE, 'core' ) as $key => $extension )
+		foreach ( \IPS\Application::allExtensions( 'core', 'MemberFilter', FALSE, 'core' ) as $key => $extension )
 		{
-			if( $extension->availableIn( 'passwordreset' ) )
+			if( method_exists( $extension, 'getQueryWhereClause' ) AND $extension->availableIn( 'passwordreset' ) )
 			{
 				/* Grab our fields and add to the form */
 				if( !empty( $data[ $key ] ) )
 				{
 					if( $_where = $extension->getQueryWhereClause( $data[ $key ] ) )
 					{
-						if ( is_string( $_where ) )
+						if ( \is_string( $_where ) )
 						{
 							$_where = array( $_where );
 						}
@@ -117,7 +106,7 @@ class ForcePasswordReset extends QueueAbstract
 		
 		$done = 0;
 		
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_members', $where, 'member_id ASC', REBUILD_SLOW ), 'IPS\Member' ) AS $member )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', $where, 'member_id ASC', \IPS\REBUILD_SLOW ), 'IPS\Member' ) AS $member )
 		{
 			$lastId = $member->member_id;
 			$member->forcePasswordReset();
@@ -140,10 +129,10 @@ class ForcePasswordReset extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' => Member::loggedIn()->language()->addToStack( 'forcing_password_resets' ), 'complete' => $data['done'] ? ( round( 100 / $data['done'] * $data['count'], 2 ) ) : 0 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'forcing_password_resets' ), 'complete' => $data['done'] ? ( round( 100 / $data['done'] * $data['count'], 2 ) ) : 0 );
 	}
 }

@@ -11,37 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\convert\App;
-use IPS\Db;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Login;
-use IPS\nexus\Gateway;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use function defined;
-use function get_class;
-use function in_array;
-use function strpos;
-use function strtolower;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * usagereporting Task
  */
-class usagereporting extends Task
+class _usagereporting extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -52,19 +31,19 @@ class usagereporting extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		/* Check usage reporting is enabled */
-		if ( !Settings::i()->usage_reporting )
+		if ( !\IPS\Settings::i()->usage_reporting )
 		{
-			Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'usagereporting' ) );
+			\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'usagereporting' ) );
 			return NULL;
 		}
 		
 		/* Check this isn't a test install */
-		$licenseData = IPS::licenseKey();
+		$licenseData = \IPS\IPS::licenseKey();
 		if ( \IPS\IN_DEV or !$licenseData or mb_substr( $licenseData['key'], -12 ) === '-TESTINSTALL' )
 		{
 			return NULL;
@@ -73,13 +52,13 @@ class usagereporting extends Task
 		/* Send the report */
 		try
 		{
-			$response = Url::external('https://invisionpowerdiagnostics.com/usage/')->request(2)->post( $this->buildReport() ); // Timeout is deliberately very low because we don't care if it times out (but not 0 because we still need to let the DNS resolve)
+			$response = \IPS\Http\Url::external('https://invisionpowerdiagnostics.com/usage/')->request(2)->post( $this->buildReport() ); // Timeout is deliberately very low because we don't care if it times out (but not 0 because we still need to let the DNS resolve)
 			
 			/* If the server has asked us to stop sending reports, then turn it off */
 			if ( $response->httpResponseCode == 410 )
 			{
-				Settings::i()->changeValues( array( 'usage_reporting' => 0 ) );
-				Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'usagereporting' ) );
+				\IPS\Settings::i()->changeValues( array( 'usage_reporting' => 0 ) );
+				\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'usagereporting' ) );
 			}
 		}
 		catch ( \IPS\Http\Request\Exception $e )
@@ -95,33 +74,33 @@ class usagereporting extends Task
 	 *
 	 * @return	array
 	 */
-	final protected function buildReport() : array
+	final protected function buildReport()
 	{
 		/* Identifier which allows us to keep separate reports from this community
 			from other reports (so we can see how communities change things as they grow) but
 			does NOT allow us to identify which community is sending the report */
-		$report = array( 'anonymized_id' => md5( Settings::i()->base_url . Settings::i()->site_secret_key ) );
+		$report = array( 'anonymized_id' => md5( \IPS\Settings::i()->base_url . \IPS\Settings::i()->site_secret_key ) );
 
 		/* Community data */
-		$licenseData = IPS::licenseKey(); // this is just to know if it is *active* and if it is CiC - we don't actually send the license key
+		$licenseData = \IPS\IPS::licenseKey(); // this is just to know if it is *active* and if it is CiC - we don't actually send the license key
 		$report['community'] = array(
-			'version'		=> Application::load('core')->version,
-			'installed'		=> date( 'Y-m-d', Settings::i()->board_start ),
-			'active_license'=> $licenseData && $licenseData['active'],
-			'cloud'			=> $licenseData && $licenseData['cloud'],
+			'version'		=> \IPS\Application::load('core')->version,
+			'installed'		=> date( 'Y-m-d', \IPS\Settings::i()->board_start ),
+			'active_license'=> $licenseData ? ( (bool) $licenseData['active'] ) : FALSE,
+			'cloud'			=> $licenseData ? ( (bool) $licenseData['cloud'] ) : FALSE,
 		);
 		
 		/* Server Data */
 		$report['server'] = array(
 			'php_version'		=> PHP_VERSION_ID,
 			'php_extensions'	=> get_loaded_extensions(),
-			'mysql_version'		=> Db::i()->server_version,
+			'mysql_version'		=> \IPS\Db::i()->server_version,
 			'os'				=> PHP_OS,
 		);
 		
 		/* Apps */
 		$report['apps'] = array();
-		foreach ( Application::applications() as $app )
+		foreach ( \IPS\Application::applications() as $app )
 		{
 			if ( $app->enabled )
 			{
@@ -129,31 +108,41 @@ class usagereporting extends Task
 			}
 		}
 		
+		/* Plugins */
+		$report['plugins'] = array();
+		foreach ( \IPS\Plugin::plugins() as $plugin )
+		{
+			if ( $plugin->enabled )
+			{
+				$report['plugins'][ $plugin->location ] = $plugin->version_long;
+			}
+		}
+		
 		/* Themes */
 		$report['themes'] = array();
-		foreach ( Theme::themes() as $theme )
+		foreach ( \IPS\Theme::themes() as $theme )
 		{
 			$settings = array();
 			foreach ( $theme->settings as $k => $v )
 			{
-				if ( in_array( $k, array( 'responsive', 'rounded_photos', 'social_links', 'sidebar_position', 'sidebar_responsive', 'enable_fluid_width', 'fluid_width_size', 'js_incclude', 'ajax_pagination', 'cm_store_view', 'body_font', 'headline_font' ) ) )
+				if ( \in_array( $k, array( 'responsive', 'rounded_photos', 'social_links', 'sidebar_position', 'sidebar_responsive', 'enable_fluid_width', 'fluid_width_size', 'js_incclude', 'ajax_pagination', 'cm_store_view', 'body_font', 'headline_font' ) ) )
 				{
 					$settings[ $k ] = $v;
 				}
 			}
 			
 			$report['themes'][] = array(
-				'customised'	=> Db::i()->select( 'COUNT(*)', 'core_theme_templates', array( 'template_set_id=?', $theme->id ) )->first(),
+				'customised'	=> \IPS\Db::i()->select( 'COUNT(*)', 'core_theme_templates', array( 'template_set_id=?', $theme->id ) )->first(),
 				'settings'		=> $settings,
 			);
 		}
 		
 		/* Languages */
 		$report['languages'] = array();
-		foreach ( Lang::languages() as $lang )
+		foreach ( \IPS\Lang::languages() as $lang )
 		{
-			$localeDot = strpos( $lang->short, '.' );
-			$langKey = $localeDot ? substr( $lang->short, 0, $localeDot ) : $lang->short;
+			$localeDot = \strpos( $lang->short, '.' );
+			$langKey = $localeDot ? \substr( $lang->short, 0, $localeDot ) : $lang->short;
 			
 			if ( !isset( $report['languages'][ $langKey ] ) )
 			{
@@ -163,9 +152,9 @@ class usagereporting extends Task
 		}
 		
 		/* Settings */
-		foreach ( Db::i()->select( array( 'conf_key', 'conf_value', 'conf_default', 'conf_app', 'conf_report' ), 'core_sys_conf_settings', 'conf_report IS NOT NULL' ) as $row )
+		foreach ( \IPS\Db::i()->select( array( 'conf_key', 'conf_value', 'conf_default', 'conf_app', 'conf_report' ), 'core_sys_conf_settings', 'conf_report IS NOT NULL' ) as $row )
 		{
-			if ( in_array( $row['conf_app'], IPS::$ipsApps ) and Application::appIsEnabled( $row['conf_app'] ) )
+			if ( \in_array( $row['conf_app'], \IPS\IPS::$ipsApps ) and \IPS\Application::appIsEnabled( $row['conf_app'] ) )
 			{
 				if ( $row['conf_report'] == 'full' )
 				{
@@ -179,15 +168,15 @@ class usagereporting extends Task
 		}
 		
 		/* Database counts */
-		foreach ( IPS::$ipsApps as $app )
+		foreach ( \IPS\IPS::$ipsApps as $app )
 		{
-			if ( Application::appIsEnabled( $app ) and file_exists( \IPS\ROOT_PATH . "/applications/{$app}/data/schema.json" ) )
+			if ( \IPS\Application::appIsEnabled( $app ) and file_exists( \IPS\ROOT_PATH . "/applications/{$app}/data/schema.json" ) )
 			{
 				foreach ( json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$app}/data/schema.json" ), TRUE ) as $table => $data )
 				{
 					if ( isset( $data['reporting'] ) and $data['reporting'] === 'count' )
 					{
-						$report['tables'][ $table ] = Db::i()->select( 'COUNT(*)', $table )->first();
+						$report['tables'][ $table ] = \IPS\Db::i()->select( 'COUNT(*)', $table )->first();
 					}
 				}
 			}
@@ -195,11 +184,11 @@ class usagereporting extends Task
 				
 		/* File storage configurations */
 		$report['files'] = array( 'amazon' => 0, 'database' => 0, 'filesystem' => 0, 'ftp' => 0, 'other' => 0 );
-		foreach ( Application::allExtensions( 'core', 'FileStorage', FALSE ) as $k => $v )
+		foreach ( \IPS\Application::allExtensions( 'core', 'FileStorage', FALSE ) as $k => $v )
 		{
 			try
 			{
-				$class = strtolower( substr( get_class( File::getClass( $k ) ), 9 ) );
+				$class = \strtolower( \substr( \get_class( \IPS\File::getClass( $k ) ), 9 ) );
 				
 				if ( isset( $report['files'][ $class ] ) )
 				{
@@ -210,7 +199,7 @@ class usagereporting extends Task
 					$report['files']['other']++;
 				}
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 		
 		/* Login methods */
@@ -232,9 +221,9 @@ class usagereporting extends Task
 			$report['login'][ $v ] = 0;
 		}
 		$report['login']['other'] = 0;
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{			
-			$class = get_class( $method );
+			$class = \get_class( $method );
 			if ( array_key_exists( $class, $loginMethods ) )
 			{
 				$report['login'][ $loginMethods[ $class ] ]++;
@@ -247,15 +236,19 @@ class usagereporting extends Task
 		
 		/* Payment methods */
 		$report['paymethods'] = array();
-		if ( Application::appIsEnabled('nexus') )
+		if ( \IPS\Application::appIsEnabled('nexus') )
 		{
-			$report['paymethods'] = array( 'manual' => 0, 'paypal_standard' => 0, 'paypal_pro' => 0, 'stripe_card' => 0, 'stripe_native' => 0, 'stripe_alipay' => 0, 'stripe_bancontact' => 0, 'stripe_giropay' => 0, 'stripe_ideal' => 0, 'stripe_sofort' => 0, 'test' => 0, 'other' => 0 );
-			foreach ( Gateway::roots() as $gateway )
+			$report['paymethods'] = array( 'authorizenet_aim' => 0, 'authorizenet_dpm' => 0, 'manual' => 0, 'paypal_standard' => 0, 'paypal_pro' => 0, 'stripe_card' => 0, 'stripe_native' => 0, 'stripe_alipay' => 0, 'stripe_bancontact' => 0, 'stripe_giropay' => 0, 'stripe_ideal' => 0, 'stripe_sofort' => 0, 'test' => 0, 'twocheckout' => 0, 'other' => 0 );
+			foreach ( \IPS\nexus\Gateway::roots() as $gateway )
 			{
-				$class = strtolower( substr( get_class( $gateway ), 18 ) );
+				$class = \strtolower( \substr( \get_class( $gateway ), 18 ) );
 				$settings = json_decode( $gateway->settings, TRUE );
 				
-				if ( $class === 'paypal' )
+				if ( $class === 'authorizenet' )
+				{
+					$class = ( $settings['method'] === 'AIM' ) ? 'authorizenet_aim' : 'authorizenet_dpm';
+				}
+				elseif ( $class === 'paypal' )
 				{
 					$class = ( $settings['type'] === 'paypal' ) ? 'paypal_standard' : 'paypal_pro';
 				}
@@ -278,12 +271,12 @@ class usagereporting extends Task
 
 		/* Converters */
 		$report['converters'] = array();
-		if ( Application::appIsEnabled('convert') )
+		if ( \IPS\Application::appIsEnabled('convert') )
 		{
-			foreach( App::apps() as $app )
+			foreach( \IPS\convert\App::apps() as $app )
 			{
 				/* Some legacy converters may not have the correct sw key */
-				if( !in_array( $app->sw, IPS::$ipsApps ) OR !$app->finished )
+				if( !\in_array( $app->sw, \IPS\IPS::$ipsApps ) OR !$app->finished )
 				{
 					continue;
 				}

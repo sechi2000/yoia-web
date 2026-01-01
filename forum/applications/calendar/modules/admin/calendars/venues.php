@@ -12,51 +12,45 @@
 namespace IPS\calendar\modules\admin\calendars;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Node\Model;
-use IPS\Node\Controller;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * venues
  */
-class venues extends Controller
+class _venues extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = '\IPS\calendar\Venue';
+	protected $nodeClass = '\IPS\calendar\Venue';
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'venues_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'venues_manage' );
 		parent::execute();
 	}
 	
 	/**
 	 * Allow overloading to change how the title is displayed in the tree
 	 *
-	 * @param	$node    Model    Node
+	 * @param	$node	\IPS\Node	Node
 	 * @return string
 	 */
-	protected static function nodeTitle( Model $node ): string
+	protected static function nodeTitle( $node )
 	{
 		return $node->_title;
 	}

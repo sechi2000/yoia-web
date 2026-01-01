@@ -11,24 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use IPS\File;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-use function is_dir;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * chunkcleanup Task
  */
-class chunkcleanup extends Task
+class _chunkcleanup extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -39,26 +31,26 @@ class chunkcleanup extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		$chunksCleanedUp = 0;
 
 		/* Loop over file storage configurations */
-		foreach( File::getStore() as $configuration )
+		foreach( \IPS\File::getStore() as $configuration )
 		{
 			/* If this is a filesystem config... */
 			if( $configuration['method'] == 'FileSystem' )
 			{
 				/* Get the configuration object */
-				$fileStorageObject = File::getClass( $configuration['id'] );
+				$fileStorageObject = \IPS\File::getClass( $configuration['id'] );
 
 				/* If we have a chunks folder */
-				if( is_dir( $fileStorageObject->configuration['dir'] . '/chunks' ) )
+				if( \is_dir( $fileStorageObject->configuration['dir'] . '/chunks' ) )
 				{
 					/* Loop over all the files in the directory */
-					$iterator = new DirectoryIterator( $fileStorageObject->configuration['dir'] . '/chunks' );
+					$iterator = new \DirectoryIterator( $fileStorageObject->configuration['dir'] . '/chunks' );
 
 					foreach( $iterator as $file )
 					{

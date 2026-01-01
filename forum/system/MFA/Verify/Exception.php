@@ -13,21 +13,17 @@
 namespace IPS\MFA\Verify;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Throwable;
-
 if( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
-class Exception extends DomainException
+class _Exception extends \DomainException
 {
 	const EXPIRED_CODE = 20404;
 
-	public function __construct( string $message = "", int $code = 0, ?Throwable $previous = null )
+	public function __construct( string $message = "", int $code = 0, ?\Throwable $previous = null )
 	{
 		switch( $code )
 		{

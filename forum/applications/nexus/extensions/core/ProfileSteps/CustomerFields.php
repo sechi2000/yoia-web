@@ -11,45 +11,27 @@
 namespace IPS\nexus\extensions\core\ProfileSteps;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\ProfileStepsAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\ProfileStep;
-use IPS\nexus\Customer\CustomField;
-use IPS\Output;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Profile fields extension
  */
-class CustomerFields extends ProfileStepsAbstract
+class _CustomerFields
 {
 	/**
 	 * Available parent actions to complete steps
 	 *
 	 * @return	array	array( 'key' => 'lang_string' )
 	 */
-	public static function actions(): array
+	public static function actions()
 	{
 		$return = array();
 		
-		if ( Db::i()->select( 'COUNT(*)', 'nexus_customer_fields' )->first() )
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customer_fields' )->first() )
 		{
 			$return['customer_fields'] = 'complete_profile_app__nexus_CustomerFields';
 		}
@@ -62,13 +44,13 @@ class CustomerFields extends ProfileStepsAbstract
 	 *
 	 * @return	array	array( 'key' => 'lang_string' )
 	 */
-	public static function subActions(): array
+	public static function subActions()
 	{
 		$return = array();
 		
-		foreach( Db::i()->select( '*', 'nexus_customer_fields' ) as $field )
+		foreach( \IPS\Db::i()->select( '*', 'nexus_customer_fields' ) as $field )
 		{
-			$field = CustomField::constructFromData( $field );
+			$field = \IPS\nexus\Customer\CustomField::constructFromData( $field );
 			$return['customer_fields'][ 'nexus_ccfield_' . $field->_id ] = 'nexus_ccfield_' . $field->_id;
 		}
 		
@@ -79,9 +61,9 @@ class CustomerFields extends ProfileStepsAbstract
 	 * Can the actions have multiple choices?
 	 *
 	 * @param	string		$action		Action key (basic_profile, etc)
-	 * @return	bool|null
+	 * @return	boolean
 	 */
-	public static function actionMultipleChoice( string $action ): ?bool
+	public static function actionMultipleChoice( $action )
 	{
 		return TRUE;
 	}
@@ -92,7 +74,7 @@ class CustomerFields extends ProfileStepsAbstract
 	 * @return	array
 	 * @note	This is intended for items which have their own independent settings and dedicated enable pages, such as MFA and Social Login integration
 	 */
-	public static function canBeRequired(): array
+	public static function canBeRequired()
 	{
 		return array( 'customer_fields' );
 	}
@@ -100,13 +82,13 @@ class CustomerFields extends ProfileStepsAbstract
 	/**
 	 * Has a specific step been completed?
 	 *
-	 * @param	ProfileStep	$step	The step to check
-	 * @param	Member|NULL		$member	The member to check, or NULL for currently logged in
+	 * @param	\IPS\Member\ProfileStep	$step	The step to check
+	 * @param	\IPS\Member|NULL		$member	The member to check, or NULL for currently logged in
 	 * @return	bool
 	 */
-	public function completed( ProfileStep $step, Member $member = NULL ): bool
+	public function completed( \IPS\Member\ProfileStep $step, \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		if ( !$member->member_id )
 		{
@@ -114,14 +96,14 @@ class CustomerFields extends ProfileStepsAbstract
 		}
 		try
 		{
-			$profileFields = iterator_to_array( Db::i()->select( '*', 'nexus_customers', array( 'member_id=?', $member->member_id ) ) );
+			$profileFields = iterator_to_array( \IPS\Db::i()->select( '*', 'nexus_customers', array( 'member_id=?', $member->member_id ) ) );
 		}
-		catch( Exception )
+		catch( \Exception $e )
 		{
 			return FALSE;
 		}
 		
-		if ( ! count( $profileFields ) )
+		if ( ! \count( $profileFields ) )
 		{
 			return FALSE;
 		}
@@ -129,13 +111,13 @@ class CustomerFields extends ProfileStepsAbstract
 		$done = 0;
 		foreach( $step->subcompletion_act as $item )
 		{
-			$fieldId = substr( $item, 14 );
+			$fieldId = \substr( $item, 14 );
 			
 			foreach( $profileFields AS $key => $value )
 			{
 				if ( $key == 'field_' . $fieldId )
 				{
-					if ( $value )
+					if ( (bool) $value )
 					{
 						$done++;
 					}
@@ -143,38 +125,38 @@ class CustomerFields extends ProfileStepsAbstract
 			}
 		}
 		
-		return ( $done === count( $step->subcompletion_act ) );
+		return ( $done === \count( $step->subcompletion_act ) );
 	}
 	
 	/**
 	 * Action URL
 	 *
 	 * @param	string				$action	The action
-	 * @param	Member|NULL	$member	The member, or NULL for currently logged in
-	 * @return	Url|null
+	 * @param	\IPS\Member|NULL	$member	The member, or NULL for currently logged in
+	 * @return	\IPS\Http\Url
 	 */
-	public function url( string $action, Member $member = NULL ): ?Url
+	public function url( $action, \IPS\Member $member = NULL )
 	{
-		return Url::internal( "app=core&module=members&controller=profile&do=edit&id={$member->member_id}", 'front', 'edit_profile', $member->members_seo_name );
+		return \IPS\Http\Url::internal( "app=core&module=members&controller=profile&do=edit&id={$member->member_id}", 'front', 'edit_profile', $member->members_seo_name );
 	}
 	
 	/**
 	 * Post ACP Save
 	 *
-	 * @param	ProfileStep		$step	The step
+	 * @param	\IPS\Member\ProfileStep		$step	The step
 	 * @param	array						$values	Form Values
 	 * @return	void
 	 */
-	public function postAcpSave( ProfileStep $step, array $values ) : void
+	public function postAcpSave( \IPS\Member\ProfileStep $step, array $values )
 	{
 		$subActions = static::subActions()['customer_fields'];
 		
 		/* If we are going to add a profile field to a step, or even require it, we need to make sure the actual field is updated */
 		foreach( $subActions AS $key )
 		{
-			if ( in_array( $key, $values['step_subcompletion_act'] ) )
+			if ( \in_array( $key, $values['step_subcompletion_act'] ) )
 			{
-				$fieldId = substr( $key, 14 );
+				$fieldId = \substr( $key, 14 );
 				$update = array();
 				$update['f_reg_show'] = 1;
 				if ( $step->required )
@@ -182,7 +164,7 @@ class CustomerFields extends ProfileStepsAbstract
 					$update['f_reg_require'] = 1;
 				}
 				
-				Db::i()->update( 'nexus_customer_fields', $update, array( "f_id=?", $fieldId ) );
+				\IPS\Db::i()->update( 'nexus_customer_fields', $update, array( "f_id=?", $fieldId ) );
 			}
 		}
 	}
@@ -191,42 +173,44 @@ class CustomerFields extends ProfileStepsAbstract
 	 * Format Form Values
 	 *
 	 * @param	array				$values	The form values
-	 * @param	Member			$member	The member
-	 * @param	Form	$form	The form object
+	 * @param	\IPS\Member			$member	The member
+	 * @param	\IPS\Helpers\Form	$form	The form object
 	 * @return	void
 	 */
-	public static function formatFormValues( array $values, Member $member, Form $form ) : void
+	public static function formatFormValues( $values, &$member, &$form )
 	{
+		$member = $member ?: \IPS\Member::loggedIn();
+		
 		$profileFields = array();
-		foreach ( CustomField::roots() as $field )
+		foreach ( \IPS\nexus\Customer\CustomField::roots() as $field )
 		{
 			if ( isset( $values[ "nexus_ccfield_{$field->_id}"] ) )
 			{
 				if( $field->required and ( $values[ "nexus_ccfield_{$field->_id}" ] === NULL or !isset( $values[ "nexus_ccfield_{$field->_id}" ] ) ) )
 				{
-					Output::i()->error( 'reg_required_fields', '1C223/5', 403, '' );
+					\IPS\Output::i()->error( 'reg_required_fields', '1C223/5', 403, '' );
 				}
 				
 				$helper = $field->buildHelper();
 				$profileFields[ "field_{$field->_id}" ] = $helper::stringValue( $values[ "nexus_ccfield_{$field->_id}" ] );
 				
-				if ( $helper instanceof Editor )
+				if ( $helper instanceof \IPS\Helpers\Form\Editor )
 				{
 					$field->claimAttachments( $member->member_id );
 				}
 			}
 		}
 		
-		if ( count( $profileFields ) )
+		if ( \count( $profileFields ) )
 		{
 			try
 			{
-				Db::i()->select( 'member_id', 'nexus_customers', array( "member_id=?", $member->member_id ) )->first();
-				Db::i()->update( 'nexus_customers', $profileFields, array( "member_id=?", $member->member_id ) );
+				\IPS\Db::i()->select( 'member_id', 'nexus_customers', array( "member_id=?", $member->member_id ) )->first();
+				\IPS\Db::i()->update( 'nexus_customers', $profileFields, array( "member_id=?", $member->member_id ) );
 			}
-			catch( Exception )
+			catch( \Exception $e )
 			{
-				Db::i()->insert( 'nexus_customers', array_merge( array( 'member_id' => $member->member_id ), $profileFields ) );
+				\IPS\Db::i()->insert( 'nexus_customers', array_merge( array( 'member_id' => $member->member_id ), array_merge( array( 'member_id' => $member->member_id ), $profileFields ) ) );
 			}
 		}
 	}
@@ -234,26 +218,26 @@ class CustomerFields extends ProfileStepsAbstract
 	/**
 	 * Wizard Steps
 	 *
-	 * @param	Member|NULL	$member	The member completing the wizard, or NULL for currently logged in member
-	 * @return	array|string
+	 * @param	\IPS\Member|NULL	$member	The member completing the wizard, or NULL for currently logged in member
+	 * @return	array
 	 */
-	public static function wizard( Member $member = NULL ): array|string
+	public static function wizard( \IPS\Member $member = NULL )
 	{
 		$include = array();
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		$wizards = array();
 		
-		foreach( ProfileStep::loadAll() AS $step )
+		foreach( \IPS\Member\ProfileStep::loadAll() AS $step )
 		{
 			if ( $step->completion_act === 'customer_fields' AND ! $step->completed( $member ) )
 			{
 				$wizards[ $step->key ] = function( $data ) use ( $member, $include, $step ) {
-					$form = new Form( 'customer_profile_fields_' . $step->id, 'profile_complete_next' );
+					$form = new \IPS\Helpers\Form( 'customer_profile_fields_' . $step->id, 'profile_complete_next' );
 					
 					foreach( $step->subcompletion_act as $item )
 					{
-						$id		= substr( $item, 14 );
-						$field	= CustomField::load( $id );
+						$id		= \substr( $item, 14 );
+						$field	= \IPS\nexus\Customer\CustomField::load( $id );
 						$form->add( $field->buildHelper() );
 					}
 					
@@ -265,49 +249,47 @@ class CustomerFields extends ProfileStepsAbstract
 						return $values;
 					}
 					
-					return $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'profileCompleteTemplate' ), $step );
+					return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'profileCompleteTemplate' ), $step );
 				};
 			}
 		}
 		
-		if ( count( $wizards ) )
+		if ( \count( $wizards ) )
 		{
 			return $wizards;
 		}
-
-		return [];
 	}
 	
 	/**
 	 * Resyncs when something external happens
 	 *
-	 * @param	ProfileStep		$step The step
+	 * @param	\IPS\Member\ProfileStep		$step The step
 	 * @return void
 	 */
-	public function resync( ProfileStep $step ) : void
+	public function resync( \IPS\Member\ProfileStep $step )
 	{
 		$subActions = array();
 		
 		foreach( $step->subcompletion_act as $item )
 		{
-			$fieldId = substr( $item, 12 );
+			$fieldId = \substr( $item, 12 );
 			try
 			{
-				CustomField::load( $fieldId );
+				\IPS\nexus\Customer\CustomField::load( $fieldId );
 				$subActions[] = $item;
 			}
-			catch( OutOfRangeException )
+			catch( \OutOfRangeException $e )
 			{
 				/* No longer exists.. */
 			}
 		}
 		
-		if ( count( $subActions ) and count( $subActions ) != $step->subcompletion_act )
+		if ( \count( $subActions ) and \count( $subActions ) != $step->subcompletion_act )
 		{
 			$step->subcompletion_act = $subActions;
 			$step->save();
 		}
-		else if ( ! count( $subActions ) )
+		else if ( ! \count( $subActions ) )
 		{
 			/* No fields left, so delete this */
 			$step->delete();

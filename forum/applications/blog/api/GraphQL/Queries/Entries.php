@@ -10,35 +10,25 @@
  */
 
 namespace IPS\blog\api\GraphQL\Queries;
-use Exception;
-use GraphQL\Type\Definition\ListOfType;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\blog\api\GraphQL\Types\EntryType;
-use IPS\blog\Blog;
-use IPS\blog\Entry;
-use IPS\Db;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use function count;
-use function defined;
-use function is_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * Topics query for GraphQL API
  */
-class Entries
+class _Entries
 {
     /*
      * @brief 	Query description
      */
-    public static string $description = "Returns a list of blog entries";
+    public static $description = "Returns a list of blog entries";
 
     /*
      * Query arguments
@@ -59,7 +49,7 @@ class Entries
                 'type' => TypeRegistry::eNum([
                     'name' => 'blog_order_by',
                     'description' => 'Fields on which event can be sorted',
-                    'values' => EntryType::getOrderByOptions()
+                    'values' => \IPS\blog\api\GraphQL\Types\EntryType::getOrderByOptions()
                 ]),
                 'defaultValue' => NULL // will use default sort option
             ],
@@ -81,7 +71,7 @@ class Entries
     /**
      * Return the query return type
      */
-    public function type(): ListOfType
+    public function type()
     {
         return TypeRegistry::listOf( \IPS\blog\api\GraphQL\TypeRegistry::entry() );
     }
@@ -89,30 +79,29 @@ class Entries
     /**
      * Resolves this query
      *
-     * @param 	mixed $val 	Value passed into this resolver
-     * @param 	array $args 	Arguments
-     * @param 	array $context 	Context values
-	 * @param 	mixed $info
-     * @return	ActiveRecordIterator
+     * @param 	mixed 	Value passed into this resolver
+     * @param 	array 	Arguments
+     * @param 	array 	Context values
+     * @return	\IPS\blog\Entry
      */
-    public function resolve( mixed $val, array $args, array $context, mixed $info ): ActiveRecordIterator
+    public function resolve($val, $args, $context, $info)
     {
-        Blog::loadIntoMemory('view', Member::loggedIn() );
+        \IPS\blog\Blog::loadIntoMemory('view', \IPS\Member::loggedIn() );
 
         $blogIds = [];
 
         /* Are we filtering by blogs? */
-        if( isset( $args['blogs'] ) && count( $args['blogs'] ) )
+        if( isset( $args['blogs'] ) && \count( $args['blogs'] ) )
         {
             foreach( $args['blogs'] as $id )
             {
-                $blog = Blog::loadAndCheckPerms( $id );
+                $blog = \IPS\blog\Blog::loadAndCheckPerms( $id );
                 $blogIds[] = $blog->id;
             }
 
-            if( count( $blogIds ) )
+            if( \count( $blogIds ) )
             {
-                $where['container'][] = array( Db::i()->in( 'blog_blogs.blog_id', array_filter( $blogIds ) ) );
+                $where['container'][] = array( \IPS\Db::i()->in( 'blog_blogs.blog_id', array_filter( $blogIds ) ) );
             }
         }
 
@@ -125,30 +114,30 @@ class Entries
             }
             else
             {
-                $orderBy = Entry::$databaseColumnMap[ $args['orderBy'] ];
+                $orderBy = \IPS\blog\Entry::$databaseColumnMap[ $args['orderBy'] ];
             }
 
             if( $args['orderBy'] === 'last_comment' )
             {
-                $orderBy = is_array( $orderBy ) ? array_pop( $orderBy ) : $orderBy;
+                $orderBy = \is_array( $orderBy ) ? array_pop( $orderBy ) : $orderBy;
             }
         }
-        catch (Exception)
+        catch (\Exception $e)
         {
             $orderBy = 'last_post';
         }
 
-        $sortBy = Entry::$databaseTable . '.' . Entry::$databasePrefix . "{$orderBy} {$args['orderDir']}";
+        $sortBy = \IPS\blog\Entry::$databaseTable . '.' . \IPS\blog\Entry::$databasePrefix . "{$orderBy} {$args['orderDir']}";
         $offset = max( $args['offset'], 0 );
         $limit = min( $args['limit'], 50 );
 
         /* Figure out pinned status */
         if ( $args['honorPinned'] )
         {
-            $column = Entry::$databaseTable . '.' . Entry::$databasePrefix . Entry::$databaseColumnMap['pinned'];
+            $column = \IPS\blog\Entry::$databaseTable . '.' . \IPS\blog\Entry::$databasePrefix . \IPS\blog\Entry::$databaseColumnMap['pinned'];
             $sortBy = "{$column} DESC, {$sortBy}";
         }
 
-        return Entry::getItemsWithPermission( $where, $sortBy, array( $offset, $limit ) );
+        return \IPS\blog\Entry::getItemsWithPermission( $where, $sortBy, array( $offset, $limit ), 'read' );
     }
 }

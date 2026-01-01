@@ -1,8 +1,5 @@
 {
     "core": {
-        "LoginHandler": {
-            "Converter": "IPS\\convert\\extensions\\core\\LoginHandler\\Converter"
-        },
         "Queue": {
             "DeleteEmptyTopics": "IPS\\convert\\extensions\\core\\Queue\\DeleteEmptyTopics",
             "InvisionCommunityRebuildContent": "IPS\\convert\\extensions\\core\\Queue\\InvisionCommunityRebuildContent",
@@ -13,7 +10,9 @@
             "RebuildNonContent": "IPS\\convert\\extensions\\core\\Queue\\RebuildNonContent",
             "RebuildProfilePhotos": "IPS\\convert\\extensions\\core\\Queue\\RebuildProfilePhotos",
             "RebuildTagCache": "IPS\\convert\\extensions\\core\\Queue\\RebuildTagCache",
-            "RecountClubMembers": "IPS\\convert\\extensions\\core\\Queue\\RecountClubMembers"
+            "RecountAnswerRatings": "IPS\\convert\\extensions\\core\\Queue\\RecountAnswerRatings",
+            "RecountClubMembers": "IPS\\convert\\extensions\\core\\Queue\\RecountClubMembers",
+            "RecountQuestionRatings": "IPS\\convert\\extensions\\core\\Queue\\RecountQuestionRatings"
         }
     }
 }

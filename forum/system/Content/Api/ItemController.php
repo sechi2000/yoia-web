@@ -12,44 +12,18 @@ namespace IPS\Content\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use BadMethodCallException;
-use DateInterval;
-use IPS\Api\Controller;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Api\Webhook;
-use IPS\Content\Comment;
-use IPS\Content\Filter;
-use IPS\Content\Item;
-use IPS\Content\Search\Index;
-use IPS\Content\Search\SearchContent;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Poll;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Text\Parser;
 use OutOfRangeException;
-use function defined;
-use function get_class;
-use function in_array;
-use function intval;
-use function substr;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base API endpoint for Content Items
  */
-class ItemController extends Controller
+class _ItemController extends \IPS\Api\Controller
 {
 	/**
 	 * List
@@ -57,37 +31,36 @@ class ItemController extends Controller
 	 * @param	array	$where			Extra WHERE clause
 	 * @param	string	$containerParam	The parameter which includes the container values
 	 * @param	bool	$byPassPerms	If permissions should be ignored
-	 * @param	string|null	$customSort		Custom sort by parameter to use
-	 * @return	PaginatedResponse
+	 * @param	string	$customSort		Custom sort by parameter to use
+	 * @return	\IPS\Api\PaginatedResponse
 	 */
-	protected function _list( array $where = array(), string $containerParam = 'categories', bool $byPassPerms = FALSE, string|null $customSort = NULL ): PaginatedResponse
+	protected function _list( $where = array(), $containerParam = 'categories', $byPassPerms = FALSE, $customSort = NULL )
 	{
-		/* @var array $databaseColumnMap */
 		$class = $this->class;
 		
 		/* Containers */
-		if ( $containerParam and isset( Request::i()->$containerParam ) )
+		if ( $containerParam and isset( \IPS\Request::i()->$containerParam ) )
 		{
-			$where[] = array( Db::i()->in( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['container'], array_map( 'intval', array_filter( explode( ',', Request::i()->$containerParam ) ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['container'], array_map( 'intval', array_filter( explode( ',', \IPS\Request::i()->$containerParam ) ) ) ) );
 		}
 
 		/* IDs */
-		if ( isset( Request::i()->ids ) )
+		if ( isset( \IPS\Request::i()->ids ) )
 		{
 			$idField = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId;
-			$where[] = array(Db::i()->in( $idField, array_map( 'intval', explode(',', Request::i()->ids ) ) ) );
+			$where[] = array(\IPS\Db::i()->in( $idField, array_map( 'intval', explode(',', \IPS\Request::i()->ids ) ) ) );
 		}
 		
 		/* Authors */
-		if ( isset( Request::i()->authors ) )
+		if ( isset( \IPS\Request::i()->authors ) )
 		{
-			$where[] = array( Db::i()->in( $class::$databasePrefix . $class::$databaseColumnMap['author'], array_map( 'intval', array_filter( explode( ',', Request::i()->authors ) ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( $class::$databasePrefix . $class::$databaseColumnMap['author'], array_map( 'intval', array_filter( explode( ',', \IPS\Request::i()->authors ) ) ) ) );
 		}
 		
 		/* Pinned? */
-		if ( isset( Request::i()->pinned ) AND IPS::classUsesTrait( $class, 'IPS\Content\Pinnable' ) )
+		if ( isset( \IPS\Request::i()->pinned ) AND \in_array( 'IPS\Content\Pinnable', class_implements( $class ) ) )
 		{
-			if ( Request::i()->pinned )
+			if ( \IPS\Request::i()->pinned )
 			{
 				$where[] = array( $class::$databasePrefix . $class::$databaseColumnMap['pinned'] . "=1" );
 			}
@@ -98,9 +71,9 @@ class ItemController extends Controller
 		}
 		
 		/* Featured? */
-		if ( isset( Request::i()->featured ) AND IPS::classUsesTrait( $class, 'IPS\Content\Featurable' ) )
+		if ( isset( \IPS\Request::i()->featured ) AND \in_array( 'IPS\Content\Featurable', class_implements( $class ) ) )
 		{
-			if ( Request::i()->featured )
+			if ( \IPS\Request::i()->featured )
 			{
 				$where[] = array( $class::$databasePrefix . $class::$databaseColumnMap['featured'] . "=1" );
 			}
@@ -111,22 +84,22 @@ class ItemController extends Controller
 		}
 		
 		/* Locked? */
-		if ( isset( Request::i()->locked ) AND IPS::classUsesTrait( $class, 'IPS\Content\Lockable' ) )
+		if ( isset( \IPS\Request::i()->locked ) AND \in_array( 'IPS\Content\Lockable', class_implements( $class ) ) )
 		{
 			if ( isset( $class::$databaseColumnMap['locked'] ) )
 			{
-				$where[] = array( $class::$databasePrefix . $class::$databaseColumnMap['locked'] . '=?', intval( Request::i()->locked ) );
+				$where[] = array( $class::$databasePrefix . $class::$databaseColumnMap['locked'] . '=?', \intval( \IPS\Request::i()->locked ) );
 			}
 			else
 			{
-				$where[] = array( $class::$databasePrefix . $class::$databaseColumnMap['state'] . '=?', Request::i()->locked ? 'closed' : 'open' );
+				$where[] = array( $class::$databasePrefix . $class::$databaseColumnMap['state'] . '=?', \IPS\Request::i()->locked ? 'closed' : 'open' );
 			}
 		}
 		
 		/* Hidden */
-		if ( isset( Request::i()->hidden ) AND IPS::classUSesTrait( $class, 'IPS\Content\Hideable' ) )
+		if ( isset( \IPS\Request::i()->hidden ) AND \in_array( 'IPS\Content\Hideable', class_implements( $class ) ) )
 		{
-			if ( Request::i()->hidden )
+			if ( \IPS\Request::i()->hidden )
 			{
 				if ( isset( $class::$databaseColumnMap['hidden'] ) )
 				{
@@ -151,9 +124,9 @@ class ItemController extends Controller
 		}
 		
 		/* Has poll? */
-		if ( isset( Request::i()->hasPoll ) AND IPS::classUsesTrait( $class, 'IPS\Content\Polls' ) )
+		if ( isset( \IPS\Request::i()->hasPoll ) AND \in_array( 'IPS\Content\Polls', class_implements( $class ) ) )
 		{
-			if ( Request::i()->hasPoll )
+			if ( \IPS\Request::i()->hasPoll )
 			{
 				$where[] = array( $class::$databasePrefix . $class::$databaseColumnMap['poll'] . ">0" );
 			}
@@ -165,7 +138,7 @@ class ItemController extends Controller
 		
 		/* Sort */
 		$supportedSortBy = array( 'date', 'title' );
-		if( isset($class::$databaseColumnMap['updated'] ) )
+		if( $class::$databaseColumnMap['updated'] )
 		{
 			$supportedSortBy[] = 'updated';
 		}
@@ -174,21 +147,21 @@ class ItemController extends Controller
 		{
 			$sortBy = $customSort;
 		}
-		elseif ( isset( Request::i()->sortBy ) and in_array( Request::i()->sortBy, $supportedSortBy ) )
+		elseif ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, $supportedSortBy ) )
 		{
-			$sortBy = $class::$databasePrefix . $class::$databaseColumnMap[ Request::i()->sortBy ];
+			$sortBy = $class::$databasePrefix . $class::$databaseColumnMap[ \IPS\Request::i()->sortBy ];
 		}
 		else
 		{
 			$sortBy = $class::$databasePrefix . $class::$databaseColumnId;
 		}
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 		
 		/* Get results */
 		if ( $this->member and !$byPassPerms )
 		{
-			$query = $class::getItemsWithPermission( $where, "{$sortBy} {$sortDir}", NULL, 'view', Filter::FILTER_AUTOMATIC, 0, $this->member )->getInnerIterator();
-			$count = $class::getItemsWithPermission( $where, "{$sortBy} {$sortDir}", NULL, 'view', Filter::FILTER_AUTOMATIC, 0, $this->member, FALSE, FALSE, FALSE, TRUE );
+			$query = $class::getItemsWithPermission( $where, "{$sortBy} {$sortDir}", NULL, 'view', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, $this->member )->getInnerIterator();
+			$count = $class::getItemsWithPermission( $where, "{$sortBy} {$sortDir}", NULL, 'view', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, $this->member, FALSE, FALSE, FALSE, TRUE );
 		}
 		else
 		{
@@ -204,19 +177,19 @@ class ItemController extends Controller
 				$where[] = array( "{$col}!=-2 AND {$col}!=-3" );
 			}
 
-			$query = Db::i()->select( '*', $class::$databaseTable, $where, "{$sortBy} {$sortDir}" );
-			$count = Db::i()->select( 'COUNT(*)', $class::$databaseTable, $where )->first();
+			$query = \IPS\Db::i()->select( '*', $class::$databaseTable, $where, "{$sortBy} {$sortDir}" );
+			$count = \IPS\Db::i()->select( 'COUNT(*)', $class::$databaseTable, $where )->first();
 		}
 		
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
 			$query,
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			$class,
 			$count,
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 	
@@ -224,14 +197,13 @@ class ItemController extends Controller
 	 * View
 	 *
 	 * @param	int	$id	ID Number
-	 * @return	Response
+	 * @return	\IPS\Api\Response
 	 */
-	protected function _view( int $id ): Response
+	protected function _view( $id )
 	{
 		$class = $this->class;
 		
 		$item = $class::load( $id );
-
 		if( $this->member )
 		{
 			if ( method_exists($item, 'canView') and !$item->canView( $this->member ) )
@@ -243,42 +215,40 @@ class ItemController extends Controller
 				throw new OutOfRangeException;
 			}
 		}
-
 		
-		return new Response( 200, $item->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $item->apiOutput( $this->member ) );
 	}
 
 	/**
 	 * Create or update item
 	 *
-	 * @param	Item	$item	The item
+	 * @param	\IPS\Content\Item	$item	The item
 	 * @param	string				$type	add or edit
-	 * @return	Item
+	 * @return	\IPS\Content\Item
 	 */
-	protected function _createOrUpdate( Item $item, string $type='add' ): Item
+	protected function _createOrUpdate( \IPS\Content\Item $item, $type='add' )
 	{
-		/* @var array $databaseColumnMap */
 		/* Title */
-		if ( isset( Request::i()->title ) and isset( $item::$databaseColumnMap['title'] ) )
+		if ( isset( \IPS\Request::i()->title ) and isset( $item::$databaseColumnMap['title'] ) )
 		{
 			$titleColumn = $item::$databaseColumnMap['title'];
-			$item->$titleColumn = Request::i()->title;
+			$item->$titleColumn = \IPS\Request::i()->title;
 		}
 		
 		/* Tags */
-		if ( ( isset( Request::i()->prefix ) or isset( Request::i()->tags ) ) and IPS::classUsesTrait( $item, 'IPS\Content\Taggable' ) )
+		if ( ( isset( \IPS\Request::i()->prefix ) or isset( \IPS\Request::i()->tags ) ) and \in_array( 'IPS\Content\Tags', class_implements( \get_class( $item ) ) ) )
 		{
 			if ( !$this->member or $item::canTag( $this->member, $item->containerWrapper() ) )
 			{			
-				$tags = isset( Request::i()->tags ) ? array_filter( explode( ',', Request::i()->tags ) ) : $item->tags();
+				$tags = isset( \IPS\Request::i()->tags ) ? array_filter( explode( ',', \IPS\Request::i()->tags ) ) : $item->tags();
 				
 				if ( !$this->member or $item::canPrefix( $this->member, $item->containerWrapper() ) )
 				{
-					if ( isset( Request::i()->prefix ) )
+					if ( isset( \IPS\Request::i()->prefix ) )
 					{
-						if ( Request::i()->prefix )
+						if ( \IPS\Request::i()->prefix )
 						{
-							$tags['prefix'] = Request::i()->prefix;
+							$tags['prefix'] = \IPS\Request::i()->prefix;
 						}
 					}
 					elseif ( $existingPrefix = $item->prefix() )
@@ -299,30 +269,30 @@ class ItemController extends Controller
 		}
 		
 		/* Open/closed */
-		if ( isset( Request::i()->locked ) and IPS::classUsesTrait( $item, 'IPS\Content\Lockable' ) )
+		if ( isset( \IPS\Request::i()->locked ) and \in_array( 'IPS\Content\Lockable', class_implements( \get_class( $item ) ) ) )
 		{
-			if ( !$this->member or ( Request::i()->locked and $item->canLock( $this->member ) ) or ( !Request::i()->locked and $item->canUnlock( $this->member ) ) )
+			if ( !$this->member or ( \IPS\Request::i()->locked and $item->canLock( $this->member ) ) or ( !\IPS\Request::i()->locked and $item->canUnlock( $this->member ) ) )
 			{
 				if ( isset( $item::$databaseColumnMap['locked'] ) )
 				{
 					$lockedColumn = $item::$databaseColumnMap['locked'];
-					$item->$lockedColumn = intval( Request::i()->locked );
+					$item->$lockedColumn = \intval( \IPS\Request::i()->locked );
 				}
 				else
 				{
 					$stateColumn = $item::$databaseColumnMap['status'];
-					$item->$stateColumn = Request::i()->locked ? 'closed' : 'open';
+					$item->$stateColumn = \IPS\Request::i()->locked ? 'closed' : 'open';
 				}
 			}
 		}
 		
 		/* Hidden */
-		if ( isset( Request::i()->hidden ) and IPS::classUsesTrait( $item, 'IPS\Content\Hideable' ) )
+		if ( isset( \IPS\Request::i()->hidden ) and \in_array( 'IPS\Content\Hideable', class_implements( \get_class( $item ) ) ) )
 		{
-			if ( !$this->member or ( Request::i()->hidden and $item->canHide( $this->member ) ) or ( !Request::i()->hidden and $item->canUnhide( $this->member ) ) )
+			if ( !$this->member or ( \IPS\Request::i()->hidden and $item->canHide( $this->member ) ) or ( !\IPS\Request::i()->hidden and $item->canUnhide( $this->member ) ) )
 			{
 				$idColumn = $item::$databaseColumnId;
-				if ( Request::i()->hidden AND $item->hidden() != -1 )
+				if ( \IPS\Request::i()->hidden AND $item->hidden() != -1 )
 				{
 					if ( $item->$idColumn )
 					{
@@ -333,17 +303,17 @@ class ItemController extends Controller
 						if ( isset( $item::$databaseColumnMap['hidden'] ) )
 						{
 							$hiddenColumn = $item::$databaseColumnMap['hidden'];
-							$item->$hiddenColumn = Request::i()->hidden;
+							$item->$hiddenColumn = \IPS\Request::i()->hidden;
 						}
 						else
 						{
 							$approvedColumn = $item::$databaseColumnMap['approved'];
-							$item->$approvedColumn = ( Request::i()->hidden == -1 ) ? -1 : 0;
+							$item->$approvedColumn = ( \IPS\Request::i()->hidden == -1 ) ? -1 : 0;
 						}
 					}
 				}
 				
-				if ( !Request::i()->hidden AND $item->hidden() == -1 )
+				if ( !\IPS\Request::i()->hidden AND $item->hidden() == -1 )
 				{
 					if ( $item->$idColumn )
 					{
@@ -367,27 +337,27 @@ class ItemController extends Controller
 		}
 		
 		/* Pinned */
-		if ( isset( Request::i()->pinned ) and IPS::classUsesTrait( $item, 'IPS\Content\Pinnable' ) )
+		if ( isset( \IPS\Request::i()->pinned ) and \in_array( 'IPS\Content\Pinnable', class_implements( \get_class( $item ) ) ) )
 		{
-			if ( !$this->member or ( Request::i()->pinned and $item->canPin( $this->member ) ) or ( !Request::i()->pinned and $item->canUnpin( $this->member ) ) )
+			if ( !$this->member or ( \IPS\Request::i()->pinned and $item->canPin( $this->member ) ) or ( !\IPS\Request::i()->pinned and $item->canUnpin( $this->member ) ) )
 			{
 				$pinnedColumn = $item::$databaseColumnMap['pinned'];
-				$item->$pinnedColumn = intval( Request::i()->pinned );
+				$item->$pinnedColumn = \intval( \IPS\Request::i()->pinned );
 			}
 		}
 		
 		/* Featured */
-		if ( isset( Request::i()->featured ) and IPS::classUsesTrait( $item, 'IPS\Content\Featurable' ) )
+		if ( isset( \IPS\Request::i()->featured ) and \in_array( 'IPS\Content\Featurable', class_implements( \get_class( $item ) ) ) )
 		{
-			if ( !$this->member or $item->canFeature( $this->member ) )
+			if ( !$this->member or ( \IPS\Request::i()->featured and $item->canFeature( $this->member ) ) or ( !\IPS\Request::i()->featured and $item->canUnfeature( $this->member ) ) )
 			{
 				$featuredColumn = $item::$databaseColumnMap['featured'];
-				$item->$featuredColumn = intval( Request::i()->featured );
+				$item->$featuredColumn = \intval( \IPS\Request::i()->featured );
 			}
 		}
 
 		/** We intentionally allow anonymous content in nodes where it's possible (but where it's disabled via the settings */
-		if( isset( Request::i()->anonymous ) AND IPS::classUsesTrait( $item, 'IPS\Content\Anonymous' ) )
+		if( isset( \IPS\Request::i()->anonymous ) AND \in_array( 'IPS\Content\Anonymous', class_implements( \get_class( $item ) ) ) )
 		{
 			/* we need to save the item before we set the anonymous data */
 			$idColumn = $item::$databaseColumnId;
@@ -397,41 +367,40 @@ class ItemController extends Controller
 			}
 			try
 			{
-				$item->setAnonymous( (bool) Request::i()->anonymous, $item->author() );
+				$item->setAnonymous( (bool) \IPS\Request::i()->anonymous, $item->author() );
 			}
-			catch ( BadMethodCallException $e ){}
+			catch ( \BadMethodCallException $e ){}
 
 		}
 
 		/* Update first comment if required, and it's not a new item */
-		$field = $item::$databaseColumnMap['first_comment_id'] ?? NULL;
+		$field = isset( $item::$databaseColumnMap['first_comment_id'] ) ? $item::$databaseColumnMap['first_comment_id'] : NULL;
 		$commentClass = $item::$commentClass;
 		$contentField = $commentClass::$databaseColumnMap['content'];
-		if ( $item::$firstCommentRequired AND isset( $item->$field ) AND isset( Request::i()->$contentField ) AND $type == 'edit' )
+		if ( $item::$firstCommentRequired AND isset( $item->$field ) AND isset( \IPS\Request::i()->$contentField ) AND $type == 'edit' )
 		{
-			$content = Request::i()->$contentField;
+			$content = \IPS\Request::i()->$contentField;
 			if ( $this->member )
 			{
-				$content = Parser::parseStatic( $content, NULL, $this->member, $item::$application . '_' . IPS::mb_ucfirst( $item::$module ) );
+				$content = \IPS\Text\Parser::parseStatic( $content, TRUE, NULL, $this->member, $item::$application . '_' . mb_ucfirst( $item::$module ) );
 			}
 
 			try
 			{
-				/* @var Comment $commentClass */
 				$comment = $commentClass::load( $item->$field );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				throw new Exception( 'NO_FIRST_POST', '1S377/1', 400 );
+				throw new \IPS\Api\Exception( 'NO_FIRST_POST', '1S377/1', 400 );
 			}
 
 			$comment->$contentField = $content;
 			$comment->save();
 
 			/* Update Search Index of the first item */
-			if( SearchContent::isSearchable( $item ) )
+			if ( $item instanceof \IPS\Content\Searchable )
 			{
-				Index::i()->index( $comment );
+				\IPS\Content\Search\Index::i()->index( $comment );
 			}
 		}
 		
@@ -439,40 +408,40 @@ class ItemController extends Controller
 		return $item;
 	}
 
-
+	
 	/**
 	 * Create
 	 *
-	 * @param Model|null $container Container
-	 * @param Member $author Author
-	 * @param string $firstPostParam The parameter which contains the body for the first comment
-	 * @return    Item
+	 * @param	\IPS\Node\Model	$container			Container
+	 * @param	\IPS\Member		$author				Author
+	 * @param	string			$firstPostParam		The parameter which contains the body for the first comment
+	 * @return	\IPS\Content\Item
 	 */
-	protected function _create( Model|null $container, Member $author, string $firstPostParam = 'post' ): Item
+	protected function _create( ?\IPS\Node\Model $container, \IPS\Member $author, $firstPostParam = 'post' )
 	{
 		$class = $this->class;
 		
 		/* Work out the date */
-		$date = ( !$this->member and Request::i()->date ) ? new DateTime( Request::i()->date ) : DateTime::create();
+		$date = ( !$this->member and \IPS\Request::i()->date ) ? new \IPS\DateTime( \IPS\Request::i()->date ) : \IPS\DateTime::create();
 		
 		/* Create item */
-		$item = $class::createItem( $author, ( !$this->member and Request::i()->ip_address ) ? Request::i()->ip_address : Request::i()->ipAddress(), $date, $container );
+		$item = $class::createItem( $author, ( !$this->member and \IPS\Request::i()->ip_address ) ? \IPS\Request::i()->ip_address : \IPS\Request::i()->ipAddress(), $date, $container );
 
-		$this->_createOrUpdate( $item );
+		$this->_createOrUpdate( $item, 'add' );
 		$item->save();
 
 		/* Create post */
 		if ( $class::$firstCommentRequired )
 		{			
-			$postContents = Request::i()->$firstPostParam;
+			$postContents = \IPS\Request::i()->$firstPostParam;
 			
 			if ( $this->member )
 			{
-				$postContents = Parser::parseStatic( $postContents, NULL, $this->member, $class::$application . '_' . IPS::mb_ucfirst( $class::$module ) );
+				$postContents = \IPS\Text\Parser::parseStatic( $postContents, TRUE, NULL, $this->member, $class::$application . '_' . mb_ucfirst( $class::$module ) );
 			}
 
 			$commentClass = $item::$commentClass;
-			$post = $commentClass::create( $item, $postContents, TRUE, $author->member_id ? NULL : $author->real_name, NULL, $author, $date, ( !$this->member and Request::i()->ip_address ) ? Request::i()->ip_address : Request::i()->ipAddress(), NULL, ( isset( Request::i()->anonymous ) ? (bool) Request::i()->anonymous : NULL ) );
+			$post = $commentClass::create( $item, $postContents, TRUE, $author->member_id ? NULL : $author->real_name, NULL, $author, $date, ( !$this->member and \IPS\Request::i()->ip_address ) ? \IPS\Request::i()->ip_address : \IPS\Request::i()->ipAddress(), NULL, ( isset( \IPS\Request::i()->anonymous ) ? (bool) \IPS\Request::i()->anonymous : NULL ) );
 			
 			if ( isset( $class::$databaseColumnMap['first_comment_id'] ) )
 			{
@@ -484,15 +453,15 @@ class ItemController extends Controller
 		}
 		
 		/* Index */
-		if( SearchContent::isSearchable( $item ) )
+		if ( $item instanceof \IPS\Content\Searchable )
 		{
-			Index::i()->index( $item );
+			\IPS\Content\Search\Index::i()->index( $item );
 		}
 		
 		/* Send webhooks */
-		if ( in_array( $item->hidden(), array( -1, 0, 1 ) ) ) // i.e. not post before register or pending deletion
+		if ( \in_array( $item->hidden(), array( -1, 0, 1 ) ) ) // i.e. not post before register or pending deletion
 		{
-			Webhook::fire( str_replace( '\\', '', substr( get_class( $item ), 3 ) ) . '_create', $item, $item->webhookFilters() );
+			\IPS\Api\Webhook::fire( str_replace( '\\', '', \substr( \get_class( $item ), 3 ) ) . '_create', $item, $item->webhookFilters() );
 		}
 		
 		/* Send notifications and dish out points */
@@ -501,7 +470,7 @@ class ItemController extends Controller
 			$item->sendNotifications();
 			$author->achievementAction( 'core', 'NewContentItem', $item );
 		}
-		elseif( !in_array( $item->hidden(), array( -1, -3 ) ) )
+		elseif( !\in_array( $item->hidden(), array( -1, -3 ) ) )
 		{
 			$item->sendUnapprovedNotification();
 		}
@@ -513,43 +482,43 @@ class ItemController extends Controller
 	/**
 	 * Create or update poll
 	 * 
-	 * @param	Item	$item	The content item to attach the poll to
+	 * @param	\IPS\Content\Item	$item	The content item to attach the poll to
 	 * @param	string				$type	Whether we are adding or editing
 	 * @return	void
 	 */
-	protected function _createOrUpdatePoll( Item $item, string $type ): void
+	protected function _createOrUpdatePoll( $item, $type )
 	{
 		/* Are we creating or updating a poll? */
-		if( isset( Request::i()->poll_title ) AND isset( Request::i()->poll_options ) AND Request::i()->poll_title AND Request::i()->poll_options AND ( !$this->member OR $item::canCreatePoll( $this->member, $item->container() ) ) )
+		if( isset( \IPS\Request::i()->poll_title ) AND isset( \IPS\Request::i()->poll_options ) AND \IPS\Request::i()->poll_title AND \IPS\Request::i()->poll_options AND ( !$this->member OR $item::canCreatePoll( $this->member, $item->container() ) ) )
 		{
 			$canCreatePoll = TRUE;
 
 			if( $type == 'edit' AND !$item->getPoll() )
 			{
-				$canCreatePoll = ( Settings::i()->startpoll_cutoff == -1 or DateTime::create()->sub( new DateInterval( 'PT' . Settings::i()->startpoll_cutoff . 'H' ) )->getTimestamp() < $item->mapped('date') );
+				$canCreatePoll = (bool) ( \IPS\Settings::i()->startpoll_cutoff == -1 or \IPS\DateTime::create()->sub( new \DateInterval( 'PT' . \IPS\Settings::i()->startpoll_cutoff . 'H' ) )->getTimestamp() < $item->mapped('date') );
 			}
 
 			if( $canCreatePoll === TRUE )
 			{
-				$poll = $item->getPoll() ?: new Poll;
+				$poll = $item->getPoll() ?: new \IPS\Poll;
 
 				if( !$item->getPoll() )
 				{
 					$poll->starter_id		= $item->author()->member_id;
-					$poll->poll_item_class	= get_class( $item );
+					$poll->poll_item_class	= \get_class( $item );
 				}
 
 				$formatted = array(
-					'title'		=> Request::i()->poll_title,
-					'questions'	=> Request::i()->poll_options
+					'title'		=> \IPS\Request::i()->poll_title,
+					'questions'	=> \IPS\Request::i()->poll_options
 				);
 
-				if( isset( Request::i()->poll_only ) AND Request::i()->poll_only )
+				if( isset( \IPS\Request::i()->poll_only ) AND \IPS\Request::i()->poll_only )
 				{
 					$formatted['poll_only'] = 1;
 				}
 
-				if( isset( Request::i()->poll_public ) AND Request::i()->poll_public )
+				if( isset( \IPS\Request::i()->poll_public ) AND \IPS\Request::i()->poll_public )
 				{
 					$formatted['public'] = 1;
 				}
@@ -570,14 +539,11 @@ class ItemController extends Controller
 	 * @param	int		$id				ID Number
 	 * @param	string	$commentClass	The class
 	 * @param	array	$where			Base where clause
-	 * @return	PaginatedResponse
+	 * @return	\IPS\Api\PaginatedResponse
 	 */
-	protected function _comments( int $id, string $commentClass, array $where = array() ): PaginatedResponse
+	protected function _comments( $id, $commentClass, $where = array() )
 	{
 		/* Init */
-		/* @var array $databaseColumnMap
-		 * @var Item $itemClass
-		 * @var Comment $commentClass */
 		$itemClass = $this->class;
 		$item = $itemClass::load( $id );
 		if( $this->member )
@@ -595,10 +561,10 @@ class ItemController extends Controller
 		$where [] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['item'] . '=?', $item->$itemIdColumn );
 
 		/* Hideable? */
-		if ( IPS::classUsesTrait( $commentClass, 'IPS\Content\Hideable' ) )
+		if ( \in_array( 'IPS\Content\Hideable', class_implements( $commentClass ) ) )
 		{
 			/* If request for hidden comments, only show if request is via API key or by a moderator */
-			if ( isset( Request::i()->hidden ) AND Request::i()->hidden
+			if ( isset( \IPS\Request::i()->hidden ) AND \IPS\Request::i()->hidden
 				AND ( $this->member === NULL OR $commentClass::modPermission( 'view_hidden', $this->member ) ) )
 			{
 				if ( isset( $commentClass::$databaseColumnMap['hidden'] ) )
@@ -631,16 +597,16 @@ class ItemController extends Controller
 		
 		/* Sort */
 		$sortBy = $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['date'];
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 		
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', $commentClass::$databaseTable, $where, "{$sortBy} {$sortDir}" ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			\IPS\Db::i()->select( '*', $commentClass::$databaseTable, $where, "{$sortBy} {$sortDir}" ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			$commentClass,
-			Db::i()->select( 'COUNT(*)', $commentClass::$databaseTable, $where )->first(),
+			\IPS\Db::i()->select( 'COUNT(*)', $commentClass::$databaseTable, $where )->first(),
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 }

@@ -11,46 +11,28 @@
 namespace IPS\forums\extensions\core\AchievementAction;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Achievements\Actions\AchievementActionAbstract;
-use IPS\core\Achievements\Rule;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\forums\Forum;
-use IPS\forums\Topic\Post;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Select;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement Action Extension: Answer a member in a Q&A Forum is marked as the best answer
  */
-class AnswerMarkedBest extends AchievementActionAbstract
+class _AnswerMarkedBest extends \IPS\core\Achievements\Actions\AbstractAchievementAction
 {
 	/**
 	 * Get filter form elements
 	 *
 	 * @param	array|NULL		$filters	Current filter values (if editing)
-	 * @param	Url	$url		The URL the form is being shown on
+	 * @param	\IPS\Http\Url	$url		The URL the form is being shown on
 	 * @return	array
 	 */
-	public function filters( ?array $filters, Url $url ): array
+	public function filters( ?array $filters, \IPS\Http\Url $url ): array
 	{
-		$return = parent::filters( $filters, $url );
-		$return['nodes'] = new Node( 'achievement_filter_AnswerMarkedBest_forum', ( $filters and isset( $filters['nodes'] ) and $filters['nodes'] ) ? $filters['nodes'] : NULL, FALSE, [
+		return [
+			'nodes' => new \IPS\Helpers\Form\Node( 'achievement_filter_AnswerMarkedBest_forum', ( $filters and isset( $filters['nodes'] ) and $filters['nodes'] ) ? $filters['nodes'] : NULL, FALSE, [
 				'url'				=> $url,
 				'class'				=> 'IPS\forums\Forum',
 				'showAllNodes'		=> TRUE,
@@ -58,16 +40,9 @@ class AnswerMarkedBest extends AchievementActionAbstract
 				'permissionCheck'	=> function( $forum ) {
 					return $forum->forums_bitoptions['bw_enable_answers'];
 				}
-			], NULL, Member::loggedIn()->language()->addToStack('achievement_filter_AnswerMarkedBest_forum_prefix') );
-		$return['helpful_or_solved'] = new Select( 'achievement_filter_AnswerMarkedBest_helpful_or_solved', ( $filters and isset( $filters['helpful_or_solved'] ) and $filters['helpful_or_solved'] ) ? $filters['helpful_or_solved'] : NULL, NULL, [
-				'options' => [
-					'helpful' => Member::loggedIn()->language()->addToStack('achievement_filter_AnswerMarkedBest_helpful_or_solved_helpful'),
-					'solved'  => Member::loggedIn()->language()->addToStack('achievement_filter_AnswerMarkedBest_helpful_or_solved_solved')
-				]
-			] );
-		$return['milestone'] = new Number( 'achievement_filter_AnswerMarkedBest_nth', ( $filters and isset( $filters['milestone'] ) and $filters['milestone'] ) ? $filters['milestone'] : 0, FALSE, [], NULL, Member::loggedIn()->language()->addToStack('achievement_filter_nth_their'), Member::loggedIn()->language()->addToStack('achievement_filter_AnswerMarkedBest_nth_suffix') );
-
-		return $return;
+			], NULL, \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_AnswerMarkedBest_forum_prefix') ),
+			'milestone' => new \IPS\Helpers\Form\Number( 'achievement_filter_AnswerMarkedBest_nth', ( $filters and isset( $filters['milestone'] ) and $filters['milestone'] ) ? $filters['milestone'] : 0, FALSE, [], NULL, \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_nth_their'), \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_AnswerMarkedBest_nth_suffix') )
+		];
 	}
 	
 	/**
@@ -78,7 +53,7 @@ class AnswerMarkedBest extends AchievementActionAbstract
 	 */
 	public function formatFilterValues( array $values ): array
 	{
-		$return = parent::formatFilterValues( $values );
+		$return = [];
 		if ( isset( $values['achievement_filter_AnswerMarkedBest_forum'] ) )
 		{
 			$return['nodes'] = array_keys( $values['achievement_filter_AnswerMarkedBest_forum'] );
@@ -86,10 +61,6 @@ class AnswerMarkedBest extends AchievementActionAbstract
 		if ( isset( $values['achievement_filter_AnswerMarkedBest_nth'] ) )
 		{
 			$return['milestone'] = $values['achievement_filter_AnswerMarkedBest_nth'];
-		}
-		if ( isset( $values['achievement_filter_AnswerMarkedBest_helpful_or_solved'] ) )
-		{
-			$return['helpful_or_solved'] = $values['achievement_filter_AnswerMarkedBest_helpful_or_solved'];
 		}
 		return $return;
 	}
@@ -101,16 +72,14 @@ class AnswerMarkedBest extends AchievementActionAbstract
 	 * calls that BEFORE making its change in the database (or there is read/write separation), you will need to add
 	 * 1 to the value being considered for milestones
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	array		$filters	The value returned by formatFilterValues()
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	bool
 	 */
-	public function filtersMatch( Member $subject, array $filters, mixed $extra = NULL ): bool
+	public function filtersMatch( \IPS\Member $subject, array $filters, $extra = NULL ): bool
 	{
-		$post = $extra['post'];
-		$type = $extra['type'] == 'helpful'? 'helpful' :'solved';
-		if ( isset( $filters['nodes'] ) and !in_array( $post->container()->_id, $filters['nodes'] ) )
+		if ( isset( $filters['nodes'] ) and !\in_array( $extra->container()->_id, $filters['nodes'] ) )
 		{
 			return FALSE;
 		}
@@ -118,13 +87,13 @@ class AnswerMarkedBest extends AchievementActionAbstract
 		if ( isset( $filters['milestone'] ) )
 		{
 			$where = [
-				[ 'member_id=? AND app=? AND type=? AND hidden=0', $post->author()->member_id, 'forums', $type ],
+				[ 'member_id=? AND app=?', $extra->author()->member_id, 'forums' ],
 			];
 			if ( isset( $filters['nodes'] ) )
 			{
-				$where[] = [ Db::i()->in( 'forum_id', $filters['nodes'] ) ];
+				$where[] = [ \IPS\Db::i()->in( 'forum_id', $filters['nodes'] ) ];
 			}
-			$query = Db::i()->select( 'COUNT(*)', 'core_solved_index', $where );
+			$query = \IPS\Db::i()->select( 'COUNT(*)', 'core_solved_index', $where );
 			if ( isset( $filters['nodes'] ) )
 			{
 				$query->join( 'forums_topics', 'core_solved_index.item_id=forums_topics.tid' );
@@ -160,58 +129,22 @@ class AnswerMarkedBest extends AchievementActionAbstract
 	 * @param	array|NULL	$filters	Current filter values
 	 * @return	array
 	 */
-	public function awardOther( mixed $extra = NULL, ?array $filters = NULL ): array
+	public function awardOther( $extra = NULL, ?array $filters = NULL ): array
 	{
-		return [ $extra['post']->item()->author() ];
-	}
-
-	/**
-	 * Determines if the member has already completed this rule.
-	 * Used for retroactive rule completion.
-	 * So far, this is only used in Quests, but may be used elsewhere at a later point.
-	 *
-	 * @param Member $member
-	 * @param array $filters
-	 * @return bool
-	 */
-	public function isRuleCompleted( Member $member, array $filters ) : bool
-	{
-		$where = [
-			[' member_id=?', $member->member_id ],
-			[ 'app=?', 'forums' ]
-		];
-
-		if( !empty( $filters['nodes'] ) )
-		{
-			$where[] = [ Db::i()->in( 'forum_id', $filters['nodes'] ) ];
-		}
-
-		$total = Db::i()->select( 'count(*)', 'core_solved_index', $where )
-			->join( 'forums_topics', 'item_id=tid' )
-			->first();
-
-		if( !empty( $filters['milestone'] ) )
-		{
-			return $total >= $filters['milestone'];
-		}
-
-		return $total > 0;
+		return [ $extra->item()->author() ];
 	}
 	
 	/**
 	 * Get identifier to prevent the member being awarded points for the same action twice
 	 * Must be unique within within of this domain, must not exceed 32 chars.
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	string
 	 */
-	public function identifier( Member $subject, mixed $extra = NULL ): string
+	public function identifier( \IPS\Member $subject, $extra = NULL ): string
 	{
-		$post = $extra['post'];
-		$type = $extra['type'] == 'helpful'? ':helpful' : ''; // Prevent existing rows from becoming obsolete by changing format to 123:solved
-
-		return $post->pid . $type;
+		return (string) $extra->pid;
 	}
 	
 	/**
@@ -224,57 +157,44 @@ class AnswerMarkedBest extends AchievementActionAbstract
 	public function logRow( string $identifier, array $actor ): string
 	{
 		$sprintf = [];
-		if ( stristr( $identifier, ':') )
-		{
-			[ $identifier, $type ] = explode( ':', $identifier );
-		}
-		else
-		{
-			$type = 'solved';
-		}
-
 		try
 		{
-			$post = Post::load( $identifier );
+			$post = \IPS\forums\Topic\Post::load( $identifier );
 			$sprintf = [ 'htmlsprintf' => [
-				Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $post->url(), TRUE, $post->item()->title, FALSE )
+				\IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $post->url(), TRUE, $post->item()->title, FALSE )
 			] ];
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			$sprintf = [ 'sprintf' => [ Member::loggedIn()->language()->addToStack('AchievementAction__AnswerMarkedBest_log_deleted') ] ];
+			$sprintf = [ 'sprintf' => [ \IPS\Member::loggedIn()->language()->addToStack('AchievementAction__AnswerMarkedBest_log_deleted') ] ];
 		}
 		
-		if ( in_array( 'subject', $actor ) )
+		if ( \in_array( 'subject', $actor ) )
 		{
-			return $type === 'solved'
-				? Member::loggedIn()->language()->addToStack( 'AchievementAction__AnswerMarkedBest_log_subject', FALSE, $sprintf )
-				: Member::loggedIn()->language()->addToStack( 'AchievementAction__AnswerMarkedBest_log_subject_helpful', FALSE, $sprintf );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__AnswerMarkedBest_log_subject', FALSE, $sprintf );
 		}
 		else
 		{
-			return $type === 'solved'
-				? Member::loggedIn()->language()->addToStack( 'AchievementAction__AnswerMarkedBest_log_other', FALSE, $sprintf )
-				: Member::loggedIn()->language()->addToStack( 'AchievementAction__AnswerMarkedBest_log_other_helpful', FALSE, $sprintf );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__AnswerMarkedBest_log_other', FALSE, $sprintf );
 		}
 	}
 	
 	/**
 	 * Get "description" for rule
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|null
 	 */
-	public function ruleDescription( Rule $rule ): ?string
+	public function ruleDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{		
 		$conditions = [];
 		if ( isset( $rule->filters['milestone'] ) )
 		{
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
 				'htmlsprintf' => [
-					Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'milestone', Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
+					\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'milestone', \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
 				],
-				'sprintf' => Member::loggedIn()->language()->addToStack( 'best_answer_post', FALSE, [ 'strtolower' => TRUE ] )
+				'sprintf' => \IPS\Member::loggedIn()->language()->addToStack( 'best_answer_post', FALSE, [ 'strtolower' => TRUE ] )
 			] );
 		}
 		if ( isset( $rule->filters['nodes'] ) )
@@ -284,38 +204,30 @@ class AnswerMarkedBest extends AchievementActionAbstract
 			{
 				try
 				{
-					$forumNames[] = Forum::load( $id )->_title;
+					$forumNames[] = \IPS\forums\Forum::load( $id )->_title;
 				}
-				catch ( OutOfRangeException $e ) {}
+				catch ( \OutOfRangeException $e ) {}
 			}
 			if ( $forumNames )
 			{
-				$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location', FALSE, [
+				$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location', FALSE, [
 					'htmlsprintf' => [
-						Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'location',
-							count( $forumNames ) === 1 ? $forumNames[0] : Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location_val', FALSE, [ 'sprintf' => [
-								count( $forumNames ),
-								Member::loggedIn()->language()->addToStack( Forum::$nodeTitle, FALSE, [ 'strtolower' => TRUE ] )
+						\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'location',
+							\count( $forumNames ) === 1 ? $forumNames[0] : \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location_val', FALSE, [ 'sprintf' => [
+								\count( $forumNames ),
+								\IPS\Member::loggedIn()->language()->addToStack( \IPS\forum\Forum::$nodeTitle, FALSE, [ 'strtolower' => TRUE ] )
 							] ] ),
-							count( $forumNames ) === 1 ? NULL : $forumNames
+							\count( $forumNames ) === 1 ? NULL : $forumNames
 						)
 					],
 				] );
 			}
 		}
-
-		if( $questCondition = $this->_questFilterDescription( $rule ) )
-		{
-			$conditions[] = $questCondition;
-		}
-
-		$title = Member::loggedIn()->language()->addToStack( 'AchievementAction__AnswerMarkedBest_title' );
-		if ( isset( $rule->filters['helpful_or_solved'] ) and $rule->filters['helpful_or_solved'] == 'helpful' )
-		{
-			$title = Member::loggedIn()->language()->addToStack( 'AchievementAction__AnswerMarkedHelpful_title' );
-		}
-
-		return Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescription( $title, $conditions );
+		
+		return \IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescription(
+			\IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__AnswerMarkedBest_title' ),
+			$conditions
+		);
 	}
 
 	/**
@@ -323,13 +235,13 @@ class AnswerMarkedBest extends AchievementActionAbstract
 	 *
 	 * @return	array
 	 */
-	static public function rebuildData(): array
+	static public function rebuildData()
 	{
 		return [ [
 			'table' => 'core_solved_index',
 			'pkey'  => 'id',
 			'date'  => 'solved_date',
-			'where' => [ [ 'app=? AND type=?', 'forums', 'solved' ] ],
+			'where' => [ [ 'app=?', 'forums' ] ],
 		] ];
 	}
 
@@ -340,9 +252,9 @@ class AnswerMarkedBest extends AchievementActionAbstract
 	 * @param array		$data	Data collected when starting rebuild [table, pkey...]
 	 * @return void
 	 */
-	public static function rebuildRow( array $row, array $data ) : void
+	public static function rebuildRow( $row, $data )
 	{
-		$post = Post::load( $row['comment_id'] );
-		$post->author()->achievementAction( 'forums', 'AnswerMarkedBest', [ 'post' => $post, 'type' => $data['type'] ], DateTime::ts( $row[ $data['date'] ] ) );
+		$post = \IPS\forums\Topic\Post::load( $row['comment_id'] );
+		$post->author()->achievementAction( 'forums', 'AnswerMarkedBest', $post, \IPS\DateTime::ts( $row[ $data['date'] ] ) );
 	}
 }

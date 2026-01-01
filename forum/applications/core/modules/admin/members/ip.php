@@ -11,53 +11,41 @@
 namespace IPS\core\modules\admin\members;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Member as FormMember;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Tools
  */
-class ip extends Controller
+class _ip extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * @brief	GeoLocation
 	 */
-	protected ?GeoLocation $geoLocation = NULL;
+	protected $geoLocation = NULL;
+	
+	/**
+	 * @brief	GeoLocation Exception
+	 */
+	protected $getLocationException = NULL;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'membertools_ip' );
-		parent::execute();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'membertools_ip' );
+		return parent::execute();
 	}
 
 	/**
@@ -65,24 +53,24 @@ class ip extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		if ( isset( Request::i()->ip ) )
+		if ( isset( \IPS\Request::i()->ip ) )
 		{
-			$ip = Request::i()->ip;
-			Output::i()->title = $ip;
+			$ip = \IPS\Request::i()->ip;
+			\IPS\Output::i()->title = $ip;
 			
-			$url =  Url::internal( 'app=core&module=members&controller=ip' )->setQueryString( 'ip', $ip );
+			$url =  \IPS\Http\Url::internal( 'app=core&module=members&controller=ip' )->setQueryString( 'ip', $ip );
 			
-			if ( isset( Request::i()->area ) )
+			if ( isset( \IPS\Request::i()->area ) )
 			{
-				Output::i()->breadcrumb[] = array( $url, $ip );
-				Output::i()->breadcrumb[] = array( NULL, 'ipAddresses__' .  Request::i()->area );
+				\IPS\Output::i()->breadcrumb[] = array( $url, $ip );
+				\IPS\Output::i()->breadcrumb[] = array( NULL, 'ipAddresses__' .  \IPS\Request::i()->area );
 
-				$exploded = explode( '_', Request::i()->area );
-				$extensions = Application::load( $exploded[0] )->extensions( 'core', 'IpAddresses' );
-				$class = $extensions[ mb_substr( Request::i()->area, mb_strlen( $exploded[0] ) + 1 ) ];
-				Output::i()->output = $class->findByIp( str_replace( '*', '%', $ip ), $url->setQueryString( 'area', Request::i()->area ) );
+				$exploded = explode( '_', \IPS\Request::i()->area );
+				$extensions = \IPS\Application::load( $exploded[0] )->extensions( 'core', 'IpAddresses' );
+				$class = $extensions[ mb_substr( \IPS\Request::i()->area, mb_strlen( $exploded[0] ) + 1 ) ];
+				\IPS\Output::i()->output = $class->findByIp( str_replace( '*', '%', $ip ), $url->setQueryString( 'area', \IPS\Request::i()->area ) );
 			}
 			else
 			{
@@ -94,21 +82,21 @@ class ip extends Controller
 				{
 					try
 					{
-						$geolocation = GeoLocation::getByIp( $ip );
+						$geolocation = \IPS\GeoLocation::getByIp( $ip );
 						$map = $geolocation->map()->render( 400, 350, 0.6 );
 					}
-					catch ( Exception $e ) {}
+					catch ( \Exception $e ) {}
 
 					$hostName	= @gethostbyaddr( $ip );
 				}
 				
 				$contentCounts = array();
 				$otherCounts = array();
-				foreach ( Application::allExtensions( 'core', 'IpAddresses' ) as $k => $ext )
+				foreach ( \IPS\Application::allExtensions( 'core', 'IpAddresses' ) as $k => $ext )
 				{
 					/* If the method does not exist, we presume it is supported - this is for legacy purposes as the method is new so
 						third parties won't have it present */
-					if( !$ext->supportedInAcp() )
+					if( method_exists( $ext, 'supportedInAcp' ) AND !$ext->supportedInAcp() )
 					{
 						continue;
 					}
@@ -131,35 +119,35 @@ class ip extends Controller
 					}
 				}
 				
-				Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'admin' )->block( '', Theme::i()->getTemplate( 'members', 'core', 'global' )->ipLookup( $url, $geolocation, $map, $hostName, array_merge( $otherCounts, $contentCounts ) ) );
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'admin' )->block( '', \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->ipLookup( $url, $geolocation, $map, $hostName, array_merge( $otherCounts, $contentCounts ) ) );
 			}
 		}
 		else
 		{
-			$form = new Form( 'form', 'continue' );
-			$form->add( new Text( 'ip_address', NULL, TRUE, array(), function( $val )
+			$form = new \IPS\Helpers\Form( 'form', 'continue' );
+			$form->add( new \IPS\Helpers\Form\Text( 'ip_address', NULL, TRUE, array(), function( $val )
 			{
 				if( trim( $val, '*' ) == '' )
 				{
-					throw new DomainException('not_just_asterisk');
+					throw new \DomainException('not_just_asterisk');
 				}
 			} ) );
 			
 			if ( $values = $form->values() )
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=members&controller=ip' )->setQueryString( 'ip', $values['ip_address'] ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=members&controller=ip' )->setQueryString( 'ip', $values['ip_address'] ) );
 			}
 
-			$members = new Form( 'members', 'continue' );
-			$members->add( new FormMember( 'ip_username', NULL, TRUE ) );
+			$members = new \IPS\Helpers\Form( 'members', 'continue' );
+			$members->add( new \IPS\Helpers\Form\Member( 'ip_username', NULL, TRUE ) );
 			
 			if ( $values = $members->values() )
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=members&controller=members&do=ip' )->setQueryString( 'id', $values['ip_username']->member_id ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=members&controller=members&do=ip' )->setQueryString( 'id', $values['ip_username']->member_id ) );
 			}
 			
-			Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_members_ip');
-			Output::i()->output = Theme::i()->getTemplate( 'members' )->ipform( $form, $members );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_members_ip');
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'members' )->ipform( $form, $members );
 		}
 	}
 }

@@ -10,83 +10,26 @@
  
 namespace IPS\core\modules\front\system;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DateInterval;
-use DOMXpath;
-use Exception;
-use IPS\Api\OAuthClient;
-use IPS\Application;
-use IPS\core\DataLayer;
-use IPS\core\ShareLinks\Service;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Email;
-use IPS\Extensions\AccountSettingsAbstract;
-use IPS\Extensions\SSOAbstract;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Email as FormEmail;
-use IPS\Helpers\Form\Password;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Wizard;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Login;
-use IPS\Login\Exception as LoginException;
-use IPS\Login\Handler;
-use IPS\Login\Success;
 use IPS\Member;
-use IPS\Member\Device;
-use IPS\Member\Group;
-use IPS\Member\PrivacyAction;
-use IPS\Member\ProfileStep;
-use IPS\MFA\MFAHandler;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Session\Front;
-use IPS\Session\Store;
-use IPS\Settings as SettingsClass;
 use IPS\Text\Encrypt;
-use IPS\Theme;
-use IPS\Xml\DOMDocument;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_numeric;
-use function is_string;
-use function json_decode;
-use function strlen;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * User CP Controller
  */
-class settings extends Controller
+class _settings extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief These properties are used to specify datalayer context properties.
 	 *
 	 */
-	public static array $dataLayerContext = array(
+	public static $dataLayerContext = array(
 		'community_area' =>  [ 'value' => 'settings', 'odkUpdate' => true]
 	);
 
@@ -95,17 +38,17 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		/* Only logged in members */
-		if ( !Member::loggedIn()->member_id and !in_array( Request::i()->do, array( 'mfarecovery', 'mfarecoveryvalidate', 'invite' ) ) )
+		if ( !\IPS\Member::loggedIn()->member_id and !\in_array( \IPS\Request::i()->do, array( 'mfarecovery', 'mfarecoveryvalidate', 'invite' ) ) )
 		{
-			Output::i()->error( 'no_module_permission_guest', '2C122/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission_guest', '2C122/1', 403, '' );
 		}
 		
-		Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_system.js', 'core' ) );
+		\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_system.js', 'core' ) );
 
-		Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
 		parent::execute();
 	}
 
@@ -114,62 +57,41 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Work out output */
-		$area = Request::i()->area ?: 'overview';
+		$area = \IPS\Request::i()->area ?: 'overview';
 		$methodName = "_{$area}";
 		if ( method_exists( $this, $methodName ) )
 		{
 			$output = $this->$methodName();
 		}
-		else
-		{
-			foreach( Application::allExtensions( 'core', 'AccountSettings', TRUE, 'core' ) as $ext )
-			{
-				/* @var AccountSettingsAbstract $ext */
-				$tabName = $ext->getTab();
-				if( $tabName == $area )
-				{
-					if( isset( Request::i()->action ) AND method_exists( $ext, Request::i()->action ) )
-					{
-						$method = Request::i()->action;
-						$output = $ext->$method();
-					}
-					else
-					{
-						$output = $ext->getContent();
-					}
-				}
-			}
-		}
-
-		/* If we have no output, then we couldn't find the tab */
-		if( !isset( $output ) )
-		{
-			Output::i()->error( 'node_error', '2C122/2', 404 );
-		}
 		
 		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('settings');
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('settings') );
-		if ( !Request::i()->isAjax() )
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('settings');
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack('settings') );
+		if ( !\IPS\Request::i()->isAjax() )
 		{
-			if ( Request::i()->service )
+			if ( \IPS\Request::i()->service )
 			{
-				$area = "{$area}_" . Request::i()->service;
+				$area = "{$area}_" . \IPS\Request::i()->service;
 			}
             
-            Output::i()->cssFiles	= array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/settings.css' ) );
+            \IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/settings.css' ) );
+            
+            if ( \IPS\Theme::i()->settings['responsive'] )
+            {
+                \IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/settings_responsive.css' ) );
+            }
             
             if ( $output )
             {
-				Output::i()->output .= $this->_wrapOutputInTemplate( $area, $output );
+				\IPS\Output::i()->output .= $this->_wrapOutputInTemplate( $area, $output );
 			}
 		}
 		elseif ( $output )
 		{
-			Output::i()->output .= $output;
+			\IPS\Output::i()->output .= $output;
 		}
 	}
 	
@@ -180,148 +102,45 @@ class settings extends Controller
 	 * @param	string	$output	Output
 	 * @return	string
 	 */
-	protected function _wrapOutputInTemplate( string $area, string $output ) : string
+	protected function _wrapOutputInTemplate( $area, $output )
 	{
 		/* What can we do? */
-		$tabs = [
-			'overview' => [
-				'icon' => 'circle-user',
-				'url' => Url::internal( "app=core&module=system&controller=settings", "front", "settings" )
-			]
-		];
-
-		/* Can change email? */
-		if( SettingsClass::i()->allow_email_changes != 'disabled' )
+		$canChangePassword = ( \IPS\Settings::i()->allow_password_changes == 'redirect' );
+		$canConfigureMfa = FALSE;
+		if ( \IPS\Settings::i()->allow_password_changes == 'normal' )
 		{
-			$tabs['email'] = [
-				'icon' => 'envelope',
-				'title' => 'email_address',
-				'url' => Url::internal( "app=core&module=system&controller=settings&area=email", "front", "settings_email" )
-			];
-		}
-
-		/* Can change password? */
-		$canChangePassword = (  SettingsClass::i()->allow_password_changes == 'redirect' );
-		if (  SettingsClass::i()->allow_password_changes == 'normal' )
-		{
-			foreach ( Login::methods() as $method )
+			foreach ( \IPS\Login::methods() as $method )
 			{
-				if ( $method->canChangePassword( Member::loggedIn() ) )
+				if ( $method->canChangePassword( \IPS\Member::loggedIn() ) )
 				{
 					$canChangePassword = TRUE;
 					break;
 				}
 			}
-		}
+		}	
 
-		if( $canChangePassword )
+		foreach ( \IPS\MFA\MFAHandler::handlers() as $handler )
 		{
-			$tabs['password'] = [
-				'icon' => 'key',
-				'url' => Url::internal( "app=core&module=system&controller=settings&area=password", "front", "settings_password" )
-			];
-		}
-
-		/* MFA */
-		$canConfigureMfa = FALSE;
-		foreach ( MFAHandler::handlers() as $handler )
-		{
-			if ( $handler->isEnabled() and $handler->memberCanUseHandler( Member::loggedIn() ) )
+			if ( $handler->isEnabled() and $handler->memberCanUseHandler( \IPS\Member::loggedIn() ) )
 			{
 				$canConfigureMfa = TRUE;
 				break;
 			}
 		}
-
-		if( $canConfigureMfa OR !Member::loggedIn()->group['g_hide_online_list'] OR Member::loggedIn()->canUseAccountDeletion() OR SettingsClass::i()->pii_type != 'off' )
+		
+		/* Any value other than zero means the user is either forced anonymous, or cannot be anonymous at all. */
+		if ( !\IPS\Member::loggedIn()->group['g_hide_online_list'] )
 		{
-			$tabs['mfa'] = [
-				'icon' => 'lock',
-				'title' => 'ucp_mfa',
-				'url' => Url::internal( "app=core&module=system&controller=settings&area=mfa", "front", "settings_mfa" )
-			];
-		}
-
-		/* Devices */
-		if( SettingsClass::i()->device_management )
-		{
-			$tabs['devices'] = [
-				'icon' => 'laptop',
-				'title' => 'ucp_devices',
-				'url' => Url::internal( "app=core&module=system&controller=settings&area=devices", "front", "settings_devices" )
-			];
-		}
-
-		/* Can change username? */
-		if( Member::loggedIn()->group['g_dname_changes'] )
-		{
-			$tabs['username'] = [
-				'icon' => 'user',
-				'url' => Url::internal( "app=core&module=system&controller=settings&area=username", "front", "settings_username" )
-			];
-		}
-
-		/* Content Preferences */
-		$tabs['links'] = [
-			'icon' => 'file-pen',
-			'title' => 'profile_settings_cvb',
-			'url' => Url::internal( "app=core&module=system&controller=settings&area=links", "front", "settings_links" )
-		];
-
-		/* Signature */
-		if( Member::loggedIn()->canEditSignature() )
-		{
-			$tabs['signature'] = [ 'icon' => 'pencil' ];
-		}
-
-		/* Login methods */
-		foreach( Login::methods() as $method )
-		{
-			if( $method->showInUcp( Member::loggedIn() ) )
-			{
-				$tabs['login_' . $method->id] = [
-					'url' => Url::internal( "app=core&module=system&controller=settings&area=login&service=" . $method->id, "front", "settings_login" ),
-					'title' => $method->_title
-				];
-
-				$icon = $method->logoForUcp();
-				if( is_string( $icon ) )
-				{
-					$tabs['login_' . $method->id]['icon'] = 'brands fa-' . $icon;
-				}
-				else
-				{
-					$tabs['login_' . $method->id]['image'] = $icon;
-				}
-			}
-		}
-
-		/* Show our own oauth clients? */
-		$showApps = (bool) Db::i()->select( 'COUNT(*)', 'core_oauth_clients', array( array( 'oauth_enabled=1 AND oauth_ucp=1' ) ) )->first();
-		if( $showApps )
-		{
-			$tabs['apps'] = [
-				'icon' => 'cubes',
-				'title' => 'oauth_apps',
-				'url' => Url::internal( "app=core&module=system&controller=settings&area=apps", "front", "settings_apps" )
-			];
-		}
-
-		/* Extensions */
-		foreach( Application::allExtensions( 'core', 'AccountSettings', TRUE, 'core' ) as $ext )
-		{
-			if( $key = $ext->getTab() )
-			{
-				$tabs[ $key ] = [
-					'icon' => $ext::$icon,
-					'title' => $ext->getTitle(),
-					'warning' => $ext->showWarning()
-				];
-			}
+			$canConfigureMfa = TRUE;
 		}
 				
+		/* Add login handlers */
+		$loginMethods = \IPS\Login::methods();
+		
+		/* Show our own oauth clients? */
+		$showApps = (bool) \IPS\Db::i()->select( 'COUNT(*)', 'core_oauth_clients', array( array( 'oauth_enabled=1 AND oauth_ucp=1' ) ) )->first();
 		/* Return */
-		return Theme::i()->getTemplate( 'system' )->settings( $area, $output, $tabs );
+		return \IPS\Theme::i()->getTemplate( 'system' )->settings( $area, $output, ( \IPS\Settings::i()->allow_email_changes != 'disabled' ), $canChangePassword, \IPS\Member::loggedIn()->group['g_dname_changes'], (bool) \IPS\Settings::i()->signatures_enabled, $loginMethods, $canConfigureMfa, $showApps );
 	}
 	
 	/**
@@ -329,51 +148,51 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _overview() : string
+	protected function _overview()
 	{
 		$loginMethods = array();
 		$canChangePassword = FALSE;
 		
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
-			if ( $method->showInUcp( Member::loggedIn() ) )
+			if ( $method->showInUcp( \IPS\Member::loggedIn() ) )
 			{
-				if ( $method->canProcess( Member::loggedIn() ) )
+				if ( $method->canProcess( \IPS\Member::loggedIn() ) )
 				{
 					try
 					{
-						$name = $method->userProfileName( Member::loggedIn() );
+						$name = $method->userProfileName( \IPS\Member::loggedIn() );
 						
 						$loginMethods[ $method->id ] = array(
 							'title'	=> $method->_title,
-							'blurb'	=> $name ? Member::loggedIn()->language()->addToStack( 'profilesync_headline', FALSE, array( 'sprintf' => array( $name ) ) ) : Member::loggedIn()->language()->addToStack( 'profilesync_signed_in' ),
-							'icon'	=> $method->userProfilePhoto( Member::loggedIn() )
+							'blurb'	=> $name ? \IPS\Member::loggedIn()->language()->addToStack( 'profilesync_headline', FALSE, array( 'sprintf' => array( $name ) ) ) : \IPS\Member::loggedIn()->language()->addToStack( 'profilesync_signed_in' ),
+							'icon'	=> $method->userProfilePhoto( \IPS\Member::loggedIn() )
 						);
 					}
-					catch ( LoginException $e )
+					catch ( \IPS\Login\Exception $e )
 					{
-						$loginMethods[ $method->id ] = array( 'title' => $method->_title, 'blurb' => Member::loggedIn()->language()->addToStack('profilesync_reauth_needed') );
+						$loginMethods[ $method->id ] = array( 'title' => $method->_title, 'blurb' => \IPS\Member::loggedIn()->language()->addToStack('profilesync_reauth_needed') );
 					}
 				}
 				else
 				{
-					$loginMethods[ $method->id ] = array( 'title' => $method->_title, 'blurb' => Member::loggedIn()->language()->addToStack('profilesync_not_synced') );
+					$loginMethods[ $method->id ] = array( 'title' => $method->_title, 'blurb' => \IPS\Member::loggedIn()->language()->addToStack('profilesync_not_synced') );
 				}
 			}
 			
 			
-			if ( $method->canChangePassword( Member::loggedIn() ) )
+			if ( $method->canChangePassword( \IPS\Member::loggedIn() ) )
 			{
 				$canChangePassword = TRUE;
 			}
 		}
 
-		if(  SettingsClass::i()->allow_password_changes == 'disabled' )
+		if( \IPS\Settings::i()->allow_password_changes == 'disabled' )
 		{
 			$canChangePassword = FALSE;
-		}
-
-		return Theme::i()->getTemplate( 'system' )->settingsOverview( $loginMethods, $canChangePassword );
+		}	
+				
+		return \IPS\Theme::i()->getTemplate( 'system' )->settingsOverview( $loginMethods, $canChangePassword );
 	}
 	
 	/**
@@ -381,56 +200,54 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _email() : string
+	protected function _email()
 	{
-		if (  SettingsClass::i()->allow_email_changes == 'redirect' )
+		if ( \IPS\Settings::i()->allow_email_changes == 'redirect' )
 		{
-			Output::i()->redirect( Url::external(  SettingsClass::i()->allow_email_changes_target ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::external( \IPS\Settings::i()->allow_email_changes_target ) );
 		}
 
-		if(  SettingsClass::i()->allow_email_changes != 'normal' )
+		if( \IPS\Settings::i()->allow_email_changes != 'normal' )
 		{
-			Output::i()->error( 'no_module_permission', '2C122/U', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C122/U', 403, '' );
 		}
 		
-		if( Member::loggedIn()->isAdmin() )
+		if( \IPS\Member::loggedIn()->isAdmin() )
 		{
-			return Theme::i()->getTemplate( 'system' )->settingsEmail();
+			return \IPS\Theme::i()->getTemplate( 'system' )->settingsEmail();
 		}
 				
-		$mfaOutput = MFAHandler::accessToArea( 'core', 'EmailChange', Url::internal( 'app=core&module=system&controller=settings&area=email', 'front', 'settings_email' ) );
-
+		$mfaOutput = \IPS\MFA\MFAHandler::accessToArea( 'core', 'EmailChange', \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=email', 'front', 'settings_email' ) );
 		if ( $mfaOutput )
 		{
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=email', 'front', 'settings_email' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=email', 'front', 'settings_email' ) );
 			}
-			Output::i()->output = $mfaOutput;
+			\IPS\Output::i()->output = $mfaOutput;
 		}
 		
 		/* Do we have any pending validation emails? */
 		try
 		{
-			$pending = Db::i()->select( '*', 'core_validating', array( 'member_id=? AND email_chg=1', Member::loggedIn()->member_id ), 'entry_date DESC' )->first();
+			$pending = \IPS\Db::i()->select( '*', 'core_validating', array( 'member_id=? AND email_chg=1', \IPS\Member::loggedIn()->member_id ), 'entry_date DESC' )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			$pending = null;
 		}
 		
 		/* Build the form */
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->class = 'ipsForm_collapseTablet';
-
-		$currentEmail = htmlspecialchars( Member::loggedIn()->email, ENT_DISALLOWED, 'UTF-8', FALSE );
-		$form->add( new FormEmail(
+		$currentEmail = htmlspecialchars( \IPS\Member::loggedIn()->email, ENT_DISALLOWED, 'UTF-8', FALSE );
+		$form->addDummy( 'current_email', $currentEmail );
+		$form->add( new \IPS\Helpers\Form\Email(
 			'new_email',
 			'',
 			TRUE,
-			array( 'accountEmail' => Member::loggedIn() )
+			array( 'accountEmail' => \IPS\Member::loggedIn() )
 		) );
-
 		
 		/* Handle submissions */
 		$values = NULL;
@@ -441,74 +258,94 @@ class settings extends Controller
 		if ( isset( $_SESSION['newEmail'] ) )
 		{
 			/* Reauthenticate */
-			$login = new Login( Url::internal( 'app=core&module=system&controller=settings&area=email', 'front', 'settings_email' ), Login::LOGIN_REAUTHENTICATE );
+			$login = new \IPS\Login( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=email', 'front', 'settings_email' ), \IPS\Login::LOGIN_REAUTHENTICATE );
 			
 			/* After re-authenticating, change the email */
 			$error = NULL;
 			try
 			{
-
-				if ( !count( $login->buttonMethods() ) or $success = $login->authenticate() )
+				if ( $success = $login->authenticate() )
 				{
-					/* Send a validation email if we need to */
-					if (  SettingsClass::i()->reg_auth_type == 'user' or  SettingsClass::i()->reg_auth_type == 'admin_user' )
+					/* Disable syncing */
+					$profileSync = \IPS\Member::loggedIn()->profilesync;
+					if ( isset( $profileSync['email'] ) )
 					{
-						$vid = Login::generateRandomString();
-						$plainSecurityKey = Login::generateRandomString();
+						unset( $profileSync['email'] );
+						\IPS\Member::loggedIn()->profilesync = $profileSync;
+						\IPS\Member::loggedIn()->save();
+					}
+							
+					/* Change the email */
+					$oldEmail = \IPS\Member::loggedIn()->email;
+					\IPS\Member::loggedIn()->email = $_SESSION['newEmail'];
+					\IPS\Member::loggedIn()->save();
+					foreach ( \IPS\Login::methods() as $method )
+					{
+						try
+						{
+							$method->changeEmail( \IPS\Member::loggedIn(), $oldEmail, $_SESSION['newEmail'] );
+						}
+						catch( \BadMethodCallException $e ){}
+					}
+					\IPS\Member::loggedIn()->logHistory( 'core', 'email_change', array( 'old' => $oldEmail, 'new' => \IPS\Member::loggedIn()->email, 'by' => 'manual' ) );
+					
+					/* Invalidate sessions except this one */
+					\IPS\Member::loggedIn()->invalidateSessionsAndLogins( \IPS\Session::i()->id );
+					if( isset( \IPS\Request::i()->cookie['login_key'] ) )
+					{
+						\IPS\Member\Device::loadOrCreate( \IPS\Member::loggedIn() )->updateAfterAuthentication( TRUE );
+					}
+								
+					/* Send a validation email if we need to */
+					if ( \IPS\Settings::i()->reg_auth_type == 'user' or \IPS\Settings::i()->reg_auth_type == 'admin_user' )
+					{
+						unset( $_SESSION['newEmail'] );
 						
-						Db::i()->insert( 'core_validating', array(
+						$vid = \IPS\Login::generateRandomString();
+						$plainSecurityKey = \IPS\Login::generateRandomString();
+						
+						\IPS\Db::i()->insert( 'core_validating', [
 							'vid'			=> $vid,
-							'member_id'		=> Member::loggedIn()->member_id,
+							'member_id'		=> \IPS\Member::loggedIn()->member_id,
 							'entry_date'	=> time(),
 							'email_chg'		=> TRUE,
-							'ip_address'	=> Request::i()->ipAddress(),
-							'new_email'		=> $_SESSION['newEmail'],
+							'ip_address'	=> \IPS\Request::i()->ipAddress(),
+							'prev_email'	=> $oldEmail,
 							'email_sent'	=> time(),
 							'security_key'  => Encrypt::fromPlaintext( $plainSecurityKey )->tag()
-						) );
+						] );
 		
-						Member::loggedIn()->members_bitoptions['validating'] = TRUE;
-						Member::loggedIn()->save();
+						\IPS\Member::loggedIn()->members_bitoptions['validating'] = TRUE;
+						\IPS\Member::loggedIn()->save();
 						
-						Email::buildFromTemplate( 'core', 'email_change', array( Member::loggedIn(), $vid, $plainSecurityKey, $_SESSION['newEmail'] ), Email::TYPE_TRANSACTIONAL )->send( $_SESSION['newEmail'], array(), array(), NULL, NULL, array( 'Reply-To' =>  SettingsClass::i()->email_in ) );
-
-						unset( $_SESSION['newEmail'] );
+						\IPS\Email::buildFromTemplate( 'core', 'email_change', array( \IPS\Member::loggedIn(), $vid, $plainSecurityKey ), \IPS\Email::TYPE_TRANSACTIONAL )->send( \IPS\Member::loggedIn() );
 									
-						Output::i()->redirect( Url::internal( '' ) );
+						\IPS\Output::i()->redirect( \IPS\Http\Url::internal( '' ) );
 					}
 					
-					/* If we don't need validation, just change it */
+					/* Or just redirect */
 					else
 					{
-						$oldEmail = Member::loggedIn()->email;
-						Member::loggedIn()->changeEmail( $_SESSION['newEmail'] );
-
-						/* Invalidate sessions except this one */
-						Member::loggedIn()->invalidateSessionsAndLogins( Session::i()->id );
-						if( isset( Request::i()->cookie['login_key'] ) )
-						{
-							Device::loadOrCreate( Member::loggedIn() )->updateAfterAuthentication( TRUE );
-						}
-
+						\IPS\Member::loggedIn()->memberSync( 'onEmailChange', array( $_SESSION['newEmail'], $oldEmail ) );
 						unset( $_SESSION['newEmail'] );
 
 						/* Send a confirmation email */
-						Email::buildFromTemplate( 'core', 'email_address_changed', array( Member::loggedIn(), $oldEmail ), Email::TYPE_TRANSACTIONAL )->send( $oldEmail, array(), array(), NULL, NULL, array( 'Reply-To' =>  SettingsClass::i()->email_in ) );
+						\IPS\Email::buildFromTemplate( 'core', 'email_address_changed', array( \IPS\Member::loggedIn(), $oldEmail ), \IPS\Email::TYPE_TRANSACTIONAL )->send( $oldEmail, array(), array(), NULL, NULL, array( 'Reply-To' => \IPS\Settings::i()->email_in ) );
 		
-						Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=email', 'front', 'settings' ), 'email_changed' );
+						\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=email', 'front', 'settings' ), 'email_changed' );
 					}
 				}
 			}
-			catch ( LoginException|Exception $e )
+			catch ( \IPS\Login\Exception $e )
 			{
 				$error = $e->getMessage();
 			}
 			
 			/* Otherwise show the reauthenticate form */
-			return Theme::i()->getTemplate( 'system' )->settingsEmail( NULL, $login, $error );
+			return \IPS\Theme::i()->getTemplate( 'system' )->settingsEmail( NULL, $login, $error );
 			
 		}
-		return Theme::i()->getTemplate( 'system' )->settingsEmail( $form );
+		return \IPS\Theme::i()->getTemplate( 'system' )->settingsEmail( $form );
 	}
 	
 	/**
@@ -516,23 +353,23 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _password() : string
+	protected function _password()
 	{
-		if (  SettingsClass::i()->allow_password_changes == 'redirect' )
+		if ( \IPS\Settings::i()->allow_password_changes == 'redirect' )
 		{
-			Output::i()->redirect( Url::external(  SettingsClass::i()->allow_password_changes_target ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::external( \IPS\Settings::i()->allow_password_changes_target ) );
 		}
 
-		if(  SettingsClass::i()->allow_password_changes != 'normal' )
+		if( \IPS\Settings::i()->allow_password_changes != 'normal' )
 		{
-			Output::i()->error( 'no_module_permission', '2C122/T', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C122/T', 403, '' );
 		}
 
 		$canChangePassword = FALSE;
 
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
-			if ( $method->canChangePassword( Member::loggedIn() ) )
+			if ( $method->canChangePassword( \IPS\Member::loggedIn() ) )
 			{
 				$canChangePassword = TRUE;
 				break;
@@ -541,52 +378,52 @@ class settings extends Controller
 
 		if( !$canChangePassword )
 		{
-			Output::i()->error( 'no_module_permission', '3C122/W', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '3C122/W', 403, '' );
 		}
 		
-		if( Member::loggedIn()->isAdmin() )
+		if( \IPS\Member::loggedIn()->isAdmin() )
 		{
-			return Theme::i()->getTemplate( 'system' )->settingsPassword();
+			return \IPS\Theme::i()->getTemplate( 'system' )->settingsPassword();
 		}
 		
-		$mfaOutput = MFAHandler::accessToArea( 'core', 'PasswordChange', Url::internal( 'app=core&module=system&controller=settings&area=password', 'front', 'settings_password' ) );
+		$mfaOutput = \IPS\MFA\MFAHandler::accessToArea( 'core', 'PasswordChange', \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=password', 'front', 'settings_password' ) );
 		if ( $mfaOutput )
 		{
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=password', 'front', 'settings_password' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=password', 'front', 'settings_password' ) );
 			}
-			Output::i()->output = $mfaOutput;
+			\IPS\Output::i()->output = $mfaOutput;
 		}
 				
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->class = 'ipsForm_collapseTablet';
-		if ( !Member::loggedIn()->members_bitoptions['password_reset_forced'] )
+		if ( !\IPS\Member::loggedIn()->members_bitoptions['password_reset_forced'] )
 		{
-			$form->add( new Password( 'current_password', '', TRUE, array( 'protect' => TRUE, 'validateFor' => Member::loggedIn(), 'bypassProfanity' => Text::BYPASS_PROFANITY_ALL, 'htmlAutocomplete' => "current-password" ) ) );
+			$form->add( new \IPS\Helpers\Form\Password( 'current_password', '', TRUE, array( 'protect' => TRUE, 'validateFor' => \IPS\Member::loggedIn(), 'bypassProfanity' => \IPS\Helpers\Form\Text::BYPASS_PROFANITY_ALL, 'htmlAutocomplete' => "current-password" ) ) );
 		}
-		$form->add( new Password( 'new_password', '', TRUE, array( 'protect' => TRUE, 'showMeter' =>  SettingsClass::i()->password_strength_meter, 'checkStrength' => TRUE, 'strengthMember' => Member::loggedIn(), 'bypassProfanity' => Text::BYPASS_PROFANITY_ALL, 'htmlAutocomplete' => "new-password" ) ) );
-		$form->add( new Password( 'confirm_new_password', '', TRUE, array( 'protect' => TRUE, 'confirm' => 'new_password', 'bypassProfanity' => Text::BYPASS_PROFANITY_ALL, 'htmlAutocomplete' => "new-password" ) ) );
+		$form->add( new \IPS\Helpers\Form\Password( 'new_password', '', TRUE, array( 'protect' => TRUE, 'showMeter' => \IPS\Settings::i()->password_strength_meter, 'checkStrength' => TRUE, 'strengthMember' => \IPS\Member::loggedIn(), 'bypassProfanity' => \IPS\Helpers\Form\Text::BYPASS_PROFANITY_ALL, 'htmlAutocomplete' => "new-password" ) ) );
+		$form->add( new \IPS\Helpers\Form\Password( 'confirm_new_password', '', TRUE, array( 'protect' => TRUE, 'confirm' => 'new_password', 'bypassProfanity' => \IPS\Helpers\Form\Text::BYPASS_PROFANITY_ALL, 'htmlAutocomplete' => "new-password" ) ) );
 		
 		if ( !$mfaOutput and $values = $form->values() )
 		{
 			/* Change password */
-			Member::loggedIn()->changePassword( $values['new_password'] );
+			\IPS\Member::loggedIn()->changePassword( $values['new_password'] );
 
 			/* Invalidate sessions except this one */
-			Member::loggedIn()->invalidateSessionsAndLogins( Session::i()->id );
-			if( isset( Request::i()->cookie['login_key'] ) )
+			\IPS\Member::loggedIn()->invalidateSessionsAndLogins( \IPS\Session::i()->id );
+			if( isset( \IPS\Request::i()->cookie['login_key'] ) )
 			{
-				Device::loadOrCreate( Member::loggedIn() )->updateAfterAuthentication( TRUE );
+				\IPS\Member\Device::loadOrCreate( \IPS\Member::loggedIn() )->updateAfterAuthentication( TRUE );
 			}
 			
 			/* Delete any pending validation emails */
-			Db::i()->delete( 'core_validating', array( 'member_id=? AND lost_pass=1', Member::loggedIn()->member_id ) );
+			\IPS\Db::i()->delete( 'core_validating', array( 'member_id=? AND lost_pass=1', \IPS\Member::loggedIn()->member_id ) );
 
-			Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=password&success=1', 'front', 'settings' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=password&success=1', 'front', 'settings' ) );
 		}
 		
-		return Theme::i()->getTemplate( 'system' )->settingsPassword( $form );
+		return \IPS\Theme::i()->getTemplate( 'system' )->settingsPassword( $form );
 	}
 	
 	
@@ -595,26 +432,26 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _devices() : string
+	protected function _devices()
 	{
 		/* Can users manage devices? */
-		if ( ! SettingsClass::i()->device_management )
+		if ( !\IPS\Settings::i()->device_management )
 		{
-			Output::i()->error( 'no_module_permission', '2C122/S' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C122/S' );
 		}
 
-		$mfaOutput = MFAHandler::accessToArea( 'core', 'DeviceManagement', Url::internal( 'app=core&module=system&controller=settings&area=devices', 'front', 'settings_devices' ) );
+		$mfaOutput = \IPS\MFA\MFAHandler::accessToArea( 'core', 'DeviceManagement', \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=devices', 'front', 'settings_devices' ) );
 		if ( $mfaOutput )
 		{
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=devices', 'front', 'settings_devices' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=devices', 'front', 'settings_devices' ) );
 			}
-			Output::i()->output = $mfaOutput;
-			return Theme::i()->getTemplate( 'system' )->settingsDevices( array(), array() );
+			\IPS\Output::i()->output = $mfaOutput;
+			return \IPS\Theme::i()->getTemplate( 'system' )->settingsDevices( array(), array() );
 		}
 		
-		$devices = new ActiveRecordIterator( Db::i()->select( '*', 'core_members_known_devices', array( 'member_id=? AND last_seen>?', Member::loggedIn()->member_id, ( new \DateTime )->sub( new DateInterval( Device::LOGIN_KEY_VALIDITY ) )->getTimestamp() ), 'last_seen DESC' ), 'IPS\Member\Device' );
+		$devices = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members_known_devices', array( 'member_id=? AND last_seen>?', \IPS\Member::loggedIn()->member_id, ( new \DateTime )->sub( new \DateInterval( \IPS\Member\Device::LOGIN_KEY_VALIDITY ) )->getTimestamp() ), 'last_seen DESC' ), 'IPS\Member\Device' );
 
 		$locations = array();
 		$ipAddresses = array();
@@ -622,24 +459,24 @@ class settings extends Controller
 		{
 			try
 			{
-				$log = Db::i()->select( '*', 'core_members_known_ip_addresses', array( 'member_id=? AND device_key=?', Member::loggedIn()->member_id, $device->device_key ), 'last_seen DESC' )->first();
+				$log = \IPS\Db::i()->select( '*', 'core_members_known_ip_addresses', array( 'member_id=? AND device_key=?', \IPS\Member::loggedIn()->member_id, $device->device_key ), 'last_seen DESC' )->first();
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				continue;
 			}
 			
-			if (  SettingsClass::i()->ipsgeoip )
+			if ( \IPS\Settings::i()->ipsgeoip )
 			{
 				if ( !array_key_exists( $log['ip_address'], $locations ) )
 				{
 					try
 					{
-						$locations[ $log['ip_address'] ] = GeoLocation::getByIp( $log['ip_address'] );
+						$locations[ $log['ip_address'] ] = \IPS\GeoLocation::getByIp( $log['ip_address'] );
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
-						$locations[ $log['ip_address'] ] = Member::loggedIn()->language()->addToStack('unknown');
+						$locations[ $log['ip_address'] ] = \IPS\Member::loggedIn()->language()->addToStack('unknown');
 					}
 				}
 				
@@ -656,9 +493,9 @@ class settings extends Controller
 			}
 		}
 		
-		$oauthClients = OAuthClient::roots();
+		$oauthClients = \IPS\Api\OAuthClient::roots();
 		$apps = array();
-		foreach ( Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'member_id=?', Member::loggedIn()->member_id ), 'issued DESC' ) as $accessToken )
+		foreach ( \IPS\Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'member_id=?', \IPS\Member::loggedIn()->member_id ), 'issued DESC' ) as $accessToken )
 		{
 			if ( $accessToken['device_key'] and isset( $oauthClients[ $accessToken['client_id'] ] ) )
 			{				
@@ -668,26 +505,26 @@ class settings extends Controller
 			}
 		}
 		
-		return Theme::i()->getTemplate( 'system' )->settingsDevices( $devices, $ipAddresses, $apps, $oauthClients );
+		return \IPS\Theme::i()->getTemplate( 'system' )->settingsDevices( $devices, $ipAddresses, $apps, $oauthClients );
 	}
 	
 	/**
 	 * Secure Account
 	 *
-	 * @return	void
+	 * @return	string
 	 */
-	protected function secureAccount() : void
+	protected function secureAccount()
 	{
 		/* Only logged in members */
-		if ( !Member::loggedIn()->member_id )
+		if ( !\IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->error( 'no_module_permission_guest', '2C122/Q', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission_guest', '2C122/Q', 403, '' );
 		}
 
 		$canChangePassword = FALSE;
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
-			if ( $method->canChangePassword( Member::loggedIn() ) )
+			if ( $method->canChangePassword( \IPS\Member::loggedIn() ) )
 			{
 				$canChangePassword = TRUE;
 			}
@@ -695,13 +532,13 @@ class settings extends Controller
 		
 		$canConfigureMfa = FALSE;
 		$hasConfiguredMfa = FALSE;
-		foreach ( MFAHandler::handlers() as $handler )
+		foreach ( \IPS\MFA\MFAHandler::handlers() as $handler )
 		{
-			if ( $handler->isEnabled() and $handler->memberCanUseHandler( Member::loggedIn() ) )
+			if ( $handler->isEnabled() and $handler->memberCanUseHandler( \IPS\Member::loggedIn() ) )
 			{
 				$canConfigureMfa = TRUE;
 				
-				if ( $handler->memberHasConfiguredHandler( Member::loggedIn() ) )
+				if ( $handler->memberHasConfiguredHandler( \IPS\Member::loggedIn() ) )
 				{
 					$hasConfiguredMfa = TRUE;
 					break;
@@ -710,38 +547,38 @@ class settings extends Controller
 		}
 				
 		$loginMethods = array();
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
-			if ( $method->showInUcp( Member::loggedIn() ) )
+			if ( $method->showInUcp( \IPS\Member::loggedIn() ) )
 			{
-				if ( $method->canProcess( Member::loggedIn() ) )
+				if ( $method->canProcess( \IPS\Member::loggedIn() ) )
 				{
 					try
 					{
-						$name = $method->userProfileName( Member::loggedIn() );
+						$name = $method->userProfileName( \IPS\Member::loggedIn() );
 						
 						$loginMethods[ $method->id ] = array(
 							'title'	=> $method->_title,
-							'blurb'	=> $name ? Member::loggedIn()->language()->addToStack( 'profilesync_headline', FALSE, array( 'sprintf' => array( $name ) ) ) : Member::loggedIn()->language()->addToStack( 'profilesync_headline' ),
-							'icon'	=> $method->userProfilePhoto( Member::loggedIn() )
+							'blurb'	=> $name ? \IPS\Member::loggedIn()->language()->addToStack( 'profilesync_headline', FALSE, array( 'sprintf' => array( $name ) ) ) : \IPS\Member::loggedIn()->language()->addToStack( 'profilesync_headline' ),
+							'icon'	=> $method->userProfilePhoto( \IPS\Member::loggedIn() )
 						);
 					}
-					catch ( LoginException $e )
+					catch ( \IPS\Login\Exception $e )
 					{
-						$loginMethods[ $method->id ] = array( 'title' => $method->_title, 'blurb' => Member::loggedIn()->language()->addToStack('profilesync_reauth_needed') );
+						$loginMethods[ $method->id ] = array( 'title' => $method->_title, 'blurb' => \IPS\Member::loggedIn()->language()->addToStack('profilesync_reauth_needed') );
 					}
 				}
 			}
 		}	
 		
-		$oauthApps = Db::i()->select( 'COUNT(DISTINCT client_id)', 'core_oauth_server_access_tokens', array( "member_id=? AND oauth_enabled=1 AND oauth_ucp=1 AND status='active'", Member::loggedIn()->member_id ) )
+		$oauthApps = \IPS\Db::i()->select( 'COUNT(DISTINCT client_id)', 'core_oauth_server_access_tokens', array( "member_id=? AND oauth_enabled=1 AND oauth_ucp=1 AND status='active'", \IPS\Member::loggedIn()->member_id ) )
 			->join( 'core_oauth_clients', 'oauth_client_id=client_id' )
 			->first();
 				
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'secure_account' );
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=system&controller=settings', 'front', 'settings' ), Member::loggedIn()->language()->addToStack('settings') );
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('secure_account') );
-		Output::i()->output = Theme::i()->getTemplate( 'system' )->settingsSecureAccount( $canChangePassword, $canConfigureMfa, $hasConfiguredMfa, $loginMethods, $oauthApps );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'secure_account' );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings', 'front', 'settings' ), \IPS\Member::loggedIn()->language()->addToStack('settings') );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack('secure_account') );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->settingsSecureAccount( $canChangePassword, $canConfigureMfa, $hasConfiguredMfa, $loginMethods, $oauthApps );
 	}
 	
 	/**
@@ -749,25 +586,25 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function disableAutomaticLogin() : string
+	protected function disableAutomaticLogin()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$device = Device::loadAndAuthenticate( Request::i()->device, Member::loggedIn() );
+			$device = \IPS\Member\Device::loadAndAuthenticate( \IPS\Request::i()->device, \IPS\Member::loggedIn() );
 			$device->login_key = NULL;
 			$device->save();
 			
-			Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'member_id=? AND device_key=?', $device->member_id, $device->device_key ) );
+			\IPS\Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'member_id=? AND device_key=?', $device->member_id, $device->device_key ) );
 			
-			Member::loggedIn()->logHistory( 'core', 'login', array( 'type' => 'logout', 'device' => $device->device_key ) );
+			\IPS\Member::loggedIn()->logHistory( 'core', 'login', array( 'type' => 'logout', 'device' => $device->device_key ) );
 			
-			Store::i()->deleteByMember( $device->member_id, $device->user_agent, array( Session::i()->id ) );
+			\IPS\Session\Store::i()->deleteByMember( $device->member_id, $device->user_agent, array( \IPS\Session::i()->id ) );
 		}
-		catch ( Exception $e ) { }
+		catch ( \Exception $e ) { } 
 						
-		Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=devices', 'front', 'settings_devices' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=devices', 'front', 'settings_devices' ) );
 	}
 	
 	/**
@@ -775,61 +612,55 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _mfa() : string
+	protected function _mfa()
 	{
-		Output::i()->bypassCsrfKeyCheck = true;
+		\IPS\Output::i()->bypassCsrfKeyCheck = true;
 
 		/* Validate password */
 		if ( !isset( $_SESSION['passwordForMfa'] ) )
 		{
-			$login = new Login( Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ), Login::LOGIN_REAUTHENTICATE );
+			$login = new \IPS\Login( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ), \IPS\Login::LOGIN_REAUTHENTICATE );
 			$usernamePasswordMethods = $login->usernamePasswordMethods();
 			$buttonMethods = $login->buttonMethods();
 
 			/* Only prompt for re-authentication if it is possible */
 			if( $usernamePasswordMethods OR $buttonMethods )
 			{
-				$_SESSION['mfaValidationRequired'] = TRUE;
 				$error = NULL;
 				try
 				{
 					if ( $success = $login->authenticate() )
 					{
 						$_SESSION['passwordForMfa'] = TRUE;
-						Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) );
+						\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) );
 					}
 				}
-				catch ( LoginException $e )
+				catch ( \IPS\Login\Exception $e )
 				{
 					$error = $e->getMessage();
 				}
-				return Theme::i()->getTemplate( 'system' )->settingsMfaPassword( $login, $error );
-			}
-			else
-			{
-				/* If we don't have any methods available, we have only the standard login */
-				$_SESSION['mfaValidationRequired'] = FALSE;
+				return \IPS\Theme::i()->getTemplate( 'system' )->settingsMfaPassword( $login, $error );
 			}
 		}
 
 		/* Get our handlers and the output, even if it's just for a backdrop */
 		$handlers = array();
-		foreach ( MFAHandler::handlers() as $key => $handler )
+		foreach ( \IPS\MFA\MFAHandler::handlers() as $key => $handler )
 		{
-			if ( $handler->isEnabled() and $handler->memberCanUseHandler( Member::loggedIn() ) )
+			if ( $handler->isEnabled() and $handler->memberCanUseHandler( \IPS\Member::loggedIn() ) )
 			{
 				$handlers[ $key ] = $handler;
 			}
 		}
-		$output = Theme::i()->getTemplate( 'system' )->settingsMfa( $handlers );
+		$output = \IPS\Theme::i()->getTemplate( 'system' )->settingsMfa( $handlers );
 		
 		/* Do MFA check */
-		$mfaOutput = MFAHandler::accessToArea( 'core', 'SecurityQuestions', Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) );
+		$mfaOutput = \IPS\MFA\MFAHandler::accessToArea( 'core', 'SecurityQuestions', \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) );
 		if ( $mfaOutput )
 		{
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) );
 			}
 			return $output . $mfaOutput;
 		}
@@ -838,54 +669,54 @@ class settings extends Controller
 		$_SESSION['passwordValidatedForMfa'] = TRUE;
 		
 		/* Do any enabling/disabling */
-		if ( isset( Request::i()->act ) )
+		if ( isset( \IPS\Request::i()->act ) )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 
 			/* Get the handler */
-			$key = Request::i()->type;
-			if ( !isset( $handlers[ $key ] ) or MFAHandler::accessToArea( 'core', 'SecurityQuestions', Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) ) )
+			$key = \IPS\Request::i()->type;
+			if ( !isset( $handlers[ $key ] ) or \IPS\MFA\MFAHandler::accessToArea( 'core', 'SecurityQuestions', \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) ) )
 			{
-				Output::i()->error( 'node_error', '2C122/M', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2C122/M', 404, '' );
 			}
 			
 			/* Do it */
-			if ( Request::i()->act === 'enable' )
+			if ( \IPS\Request::i()->act === 'enable' )
 			{
 				/* Include the CSS we'll need */
-				Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( '2fa.css', 'core', 'global' ) );
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( '2fa.css', 'core', 'global' ) );
 								
 				/* Did we just submit it? */
-				if ( isset( Request::i()->mfa_setup ) and $handlers[ $key ]->configurationScreenSubmit( Member::loggedIn() ) )
+				if ( isset( \IPS\Request::i()->mfa_setup ) and $handlers[ $key ]->configurationScreenSubmit( \IPS\Member::loggedIn() ) )
 				{
 					$_SESSION['MFAAuthenticated'] = time();
 					
-					Member::loggedIn()->members_bitoptions['security_questions_opt_out'] = FALSE;
-					Member::loggedIn()->save();
+					\IPS\Member::loggedIn()->members_bitoptions['security_questions_opt_out'] = FALSE;
+					\IPS\Member::loggedIn()->save();
 
 					/* Invalidate other sessions */
-					Member::loggedIn()->invalidateSessionsAndLogins( Session::i()->id );
+					\IPS\Member::loggedIn()->invalidateSessionsAndLogins( \IPS\Session::i()->id );
 
-					Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) );
 				}
 
 				/* Show the configuration modal */
-				Output::i()->title = Member::loggedIn()->language()->addToStack('settings');
-				return $output . Theme::i()->getTemplate( 'system' )->settingsMfaSetup( $handlers[ $key ]->configurationScreen( Member::loggedIn(), FALSE, Url::internal( 'app=core&module=system&controller=settings&area=mfa&act=enable&type=' . $key, 'front', 'settings_mfa' ) ), Url::internal( 'app=core&module=system&controller=settings&area=mfa&act=enable&type=' . $key, 'front', 'settings_mfa' ) );
+				\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('settings');
+				return $output . \IPS\Theme::i()->getTemplate( 'system' )->settingsMfaSetup( $handlers[ $key ]->configurationScreen( \IPS\Member::loggedIn(), FALSE, \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa&act=enable&type=' . $key, 'front', 'settings_mfa' ) ), \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa&act=enable&type=' . $key, 'front', 'settings_mfa' ) );
 			}
-			elseif ( Request::i()->act === 'disable' )
+			elseif ( \IPS\Request::i()->act === 'disable' )
 			{
 				/* Disable it */
-				$handlers[ $key ]->disableHandlerForMember( Member::loggedIn() );
-				Member::loggedIn()->save();
+				$handlers[ $key ]->disableHandlerForMember( \IPS\Member::loggedIn() );
+				\IPS\Member::loggedIn()->save();
 		
 				/* If we have now disabled everything, save that we have opted out */
-				if (  SettingsClass::i()->mfa_required_groups != '*' and !Member::loggedIn()->inGroup( explode( ',',  SettingsClass::i()->mfa_required_groups ) ) )
+				if ( \IPS\Settings::i()->mfa_required_groups != '*' and !\IPS\Member::loggedIn()->inGroup( explode( ',', \IPS\Settings::i()->mfa_required_groups ) ) )
 				{
 					$enabledHandlers = FALSE;
 					foreach ( $handlers as $handler )
 					{
-						if ( $handler->memberHasConfiguredHandler( Member::loggedIn() ) )
+						if ( $handler->memberHasConfiguredHandler( \IPS\Member::loggedIn() ) )
 						{
 							$enabledHandlers = TRUE;
 							break;
@@ -893,18 +724,19 @@ class settings extends Controller
 					}
 					if ( !$enabledHandlers )
 					{
-						Member::loggedIn()->members_bitoptions['security_questions_opt_out'] = TRUE;
-						Member::loggedIn()->save();
+						\IPS\Member::loggedIn()->members_bitoptions['security_questions_opt_out'] = TRUE;
+						\IPS\Member::loggedIn()->save();
 					}
 				}
 				
 				/* Redirect */
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front', 'settings_mfa' ) );
+				return;
 			}
 		}
 
 
-		$output.= Theme::i()->getTemplate( 'system' )->settingsPrivacy();
+		$output.= \IPS\Theme::i()->getTemplate( 'system' )->settingsPrivacy();
 		
 		/* If we're still here, just show the screen */
 		return $output;
@@ -915,37 +747,37 @@ class settings extends Controller
 	 *
 	 * @return void
 	 */
-	protected function requestPiiData() : void
+	protected function requestPiiData()
 	{
-		if( ( $_SESSION['mfaValidationRequired'] AND !isset( $_SESSION['passwordValidatedForMfa'] ) ) OR !PrivacyAction::canRequestPiiData() OR SettingsClass::i()->pii_type !== 'on' )
+		if( !isset( $_SESSION['passwordValidatedForMfa'] ) OR !\IPS\Member\PrivacyAction::canRequestPiiData() OR \IPS\Settings::i()->pii_type !== 'on' )
 		{
-			Output::i()->error( 'node_error', '1C122/10', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '1C122/10', 403, '' );
 		}
-		PrivacyAction::requestPiiData();
-		Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front')->setFragment('piiDataRequest'), 'pii_requested' );
+		\IPS\Member\PrivacyAction::requestPiiData();
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front')->setFragment('piiDataRequest'), 'pii_requested' );
 	}
 
 	/**
 	 * Download personal identifiable information
 	 *
 	 * @return void
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	protected function downloadPiiData() : void
+	protected function downloadPiiData()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		if( ( $_SESSION['mfaValidationRequired'] AND !isset( $_SESSION['passwordValidatedForMfa'] ) ) OR !PrivacyAction::canDownloadPiiData() OR SettingsClass::i()->pii_type !== 'on' )
+		if( !isset( $_SESSION['passwordValidatedForMfa'] ) OR !\IPS\Member\PrivacyAction::canDownloadPiiData() OR \IPS\Settings::i()->pii_type !== 'on' )
 		{
-			Output::i()->error( 'node_error', '1C122/11', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '1C122/11', 403, '' );
 		}
 
-		$xml = Member::loggedIn()->getPiiData();
+		$xml = \IPS\Member::loggedIn()->getPiiData();
 
-		Db::i()->delete( 'core_member_privacy_actions', array( 'member_id=? AND action=?', Member::loggedIn()->member_id, PrivacyAction::TYPE_REQUEST_PII ) );
-		Db::i()->delete( 'core_notifications', array( 'member=? AND notification_key=?', Member::loggedIn()->member_id, 'pii_data' ) );
-		Member::loggedIn()->logHistory( 'core', 'privacy', array( 'type' => 'pii_download' ) );
-		Output::i()->sendOutput( $xml->asXML(), 200, 'application/xml', [ 'Content-Disposition' => Output::getContentDisposition( 'attachment', Member::loggedIn()->name.'_personal_information.xml' ) ], FALSE, FALSE, FALSE );
+		\IPS\Db::i()->delete( 'core_member_privacy_actions', array( 'member_id=? AND action=?', \IPS\Member::loggedIn()->member_id, \IPS\Member\PrivacyAction::TYPE_REQUEST_PII ) );
+		\IPS\Db::i()->delete( 'core_notifications', array( 'member=? AND notification_key=?', \IPS\Member::loggedIn()->member_id, 'pii_data' ) );
+		\IPS\Member::loggedIn()->logHistory( 'core', 'privacy', array( 'type' => 'pii_download' ) );
+		\IPS\Output::i()->sendOutput( $xml->asXML(), 200, 'application/xml', [ 'Content-Disposition' => \IPS\Output::getContentDisposition( 'attachment', \IPS\Member::loggedIn()->name.'_personal_information.xml' ) ], FALSE, FALSE, FALSE );
 	}
 
 	/**
@@ -953,23 +785,30 @@ class settings extends Controller
 	 *
 	 * @return void
 	 */
-	protected function requestAccountDeletion() : void
+	protected function requestAccountDeletion()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		if( ( $_SESSION['mfaValidationRequired'] AND !isset( $_SESSION['passwordValidatedForMfa'] ) ) OR !Member::loggedIn()->canUseAccountDeletion() OR SettingsClass::i()->right_to_be_forgotten_type !== 'on' )
+		if( !isset( $_SESSION['passwordValidatedForMfa'] ) OR !\IPS\Member::loggedIn()->canUseAccountDeletion() OR \IPS\Settings::i()->right_to_be_forgotten_type !== 'on' )
 		{
-			Output::i()->error( 'node_error', '2C122/13', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C122/13', 403, '' );
 		}
 		
-		if( !PrivacyAction::canDeleteAccount() )
+		if( !\IPS\Member\PrivacyAction::canDeleteAccount() )
 		{
-			Output::i()->error( 'node_error', '1C122/12', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '1C122/12', 403, '' );
+		}
+		if( \IPS\Request::i()->vkey )
+		{
+			\IPS\Member\PrivacyAction::requestAccountDeletion( NULL, FALSE );
+		}
+		else
+		{
+			\IPS\Member\PrivacyAction::requestAccountDeletion(NULL, TRUE );
 		}
 
-		PrivacyAction::requestAccountDeletion();
 
-		Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front')->setFragment('requestAccountDeletion'), 'account_deletion_requested' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front')->setFragment('requestAccountDeletion'), 'account_deletion_requested' );
 	}
 
 	/**
@@ -977,26 +816,22 @@ class settings extends Controller
 	 *
 	 * @return void
 	 */
-	protected function cancelAccountDeletion() : void
+	protected function cancelAccountDeletion()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		try
 		{
 			$where = [];
-			$where[] = ['member_id=?', Member::loggedIn()->member_id];
-			$where[] = [ Db::i()->in( 'action',[PrivacyAction::TYPE_REQUEST_DELETE, PrivacyAction::TYPE_REQUEST_DELETE_VALIDATION ] ) ];
-			$row = Db::i()->select( '*', PrivacyAction::$databaseTable, $where  )->first();
-			PrivacyAction::constructFromData( $row )->delete();
-			Member::loggedIn()->logHistory( 'core', 'privacy', [ 'type' => 'account_deletion_cancelled' ] );
-			if ( DataLayer::enabled() )
-			{
-				DataLayer::i()->addEvent( 'account_deletion_canceled', [] );
-			}
-			Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front'), 'account_deletion_cancelled' );
+			$where[] = ['member_id=?', \IPS\Member::loggedIn()->member_id];
+			$where[] = [ \IPS\Db::i()->in( 'action',[\IPS\Member\PrivacyAction::TYPE_REQUEST_DELETE, \IPS\Member\PrivacyAction::TYPE_REQUEST_DELETE_VALIDATION ] ) ];
+			$row = \IPS\Db::i()->select( '*', \IPS\Member\PrivacyAction::$databaseTable, $where  )->first();
+			\IPS\Member\PrivacyAction::constructFromData( $row )->delete();
+			\IPS\Member::loggedIn()->logHistory( 'core', 'privacy', [ 'type' => 'account_deletion_cancelled' ] );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=mfa', 'front'), 'account_deletion_cancelled' );
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
-			Output::i()->error( 'node_error', '2C122/Y', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C122/Y', 404, '' );
 		}
 	}
 
@@ -1005,25 +840,26 @@ class settings extends Controller
 	 *
 	 * @return void
 	 */
-	protected function confirmAccountDeletion() : void
+	protected function confirmAccountDeletion()
 	{
-		$key = Request::i()->vid;
+		$mfaOutput = \IPS\MFA\MFAHandler::accessToArea( 'core', 'SecurityQuestions', \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=confirmAccountDeletion', 'front' )->setQueryString('vid', \IPS\Request::i()->vid ) );
+		if ( $mfaOutput )
+		{
+			\IPS\Output::i()->output = $mfaOutput;
+			return;
+		}
+		
+		$key = \IPS\Request::i()->vid;
 		try
 		{
-			$request = PrivacyAction::getDeletionRequestByMemberAndKey( Member::loggedIn(), $key );
+			$request = \IPS\Member\PrivacyAction::getDeletionRequestByMemberAndKey( \IPS\Member::loggedIn(), $key );
 		
 			$request->confirmAccountDeletion();
-
-			/* Add data layer event */
-			if ( DataLayer::enabled() )
-			{
-				DataLayer::i()->addEvent( 'account_deletion_requested', [] );
-			}
-			Output::i()->redirect( $this->url->setQueryString( 'area','mfa'), 'account_deletion_confirmed' );
+			\IPS\Output::i()->redirect( $this->url->setQueryString( 'area','mfa'), 'account_deletion_confirmed' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C122/Z', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C122/Z', 404, '' );
 		}
 
 	}
@@ -1031,31 +867,31 @@ class settings extends Controller
 	/**
 	 * Initial MFA Setup
 	 *
-	 * @return	void
+	 * @return	string
 	 */
-	protected function initialMfa() : void
+	protected function initialMfa()
 	{
 		$handlers = array();
-		foreach ( MFAHandler::handlers() as $key => $handler )
+		foreach ( \IPS\MFA\MFAHandler::handlers() as $key => $handler )
 		{
-			if ( $handler->isEnabled() and $handler->memberCanUseHandler( Member::loggedIn() ) )
+			if ( $handler->isEnabled() and $handler->memberCanUseHandler( \IPS\Member::loggedIn() ) )
 			{
 				$handlers[ $key ] = $handler;
 			}
 		}
 		
-		if ( isset( Request::i()->mfa_setup ) )
+		if ( isset( \IPS\Request::i()->mfa_setup ) )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			
 			foreach ( $handlers as $key => $handler )
 			{
-				if ( ( count( $handlers ) == 1 ) or $key == Request::i()->mfa_method )
+				if ( ( \count( $handlers ) == 1 ) or $key == \IPS\Request::i()->mfa_method )
 				{
-					if ( $handler->configurationScreenSubmit( Member::loggedIn() ) )
+					if ( $handler->configurationScreenSubmit( \IPS\Member::loggedIn() ) )
 					{							
 						$_SESSION['MFAAuthenticated'] = time();
-						$this->_performRedirect( Url::internal('') );
+						$this->_performRedirect( \IPS\Http\Url::internal('') );
 					}
 				}
 			}
@@ -1063,25 +899,25 @@ class settings extends Controller
 		
 		foreach ( $handlers as $key => $handler )
 		{
-			if ( $handler->memberHasConfiguredHandler( Member::loggedIn() ) )
+			if ( $handler->memberHasConfiguredHandler( \IPS\Member::loggedIn() ) )
 			{
-				$this->_performRedirect( Url::internal('') );
+				$this->_performRedirect( \IPS\Http\Url::internal('') );
 			}
 		}
 
-		if ( isset( Request::i()->_mfa ) and Request::i()->_mfa == 'optout' )
+		if ( isset( \IPS\Request::i()->_mfa ) and \IPS\Request::i()->_mfa == 'optout' )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			
-			Member::loggedIn()->members_bitoptions['security_questions_opt_out'] = TRUE;
-			Member::loggedIn()->save();
-			Member::loggedIn()->logHistory( 'core', 'mfa', array( 'handler' => 'questions', 'enable' => FALSE, 'optout' => TRUE ) );
-			$this->_performRedirect( Url::internal('') );
+			\IPS\Member::loggedIn()->members_bitoptions['security_questions_opt_out'] = TRUE;
+			\IPS\Member::loggedIn()->save();
+			\IPS\Member::loggedIn()->logHistory( 'core', 'mfa', array( 'handler' => 'questions', 'enable' => FALSE, 'optout' => TRUE ) );
+			$this->_performRedirect( \IPS\Http\Url::internal('') );
 		}
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('reg_complete_2fa_title');
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( '2fa.css', 'core', 'global' ) );
-		Output::i()->output = Theme::i()->getTemplate( 'login', 'core', 'global' )->mfaSetup( $handlers, Member::loggedIn(), Url::internal( 'app=core&module=system&controller=settings&do=initialMfa', 'front', 'settings' )->addRef( $this->_performRedirect( Url::internal(''), '', TRUE ) ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('reg_complete_2fa_title');
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( '2fa.css', 'core', 'global' ) );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->mfaSetup( $handlers, \IPS\Member::loggedIn(), \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&do=initialMfa', 'front', 'settings' )->addRef( $this->_performRedirect( \IPS\Http\Url::internal(''), '', TRUE ) ) );
 	}
 		
 	/**
@@ -1089,86 +925,85 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _securityquestions() : string
+	protected function _securityquestions()
 	{
 		$handler = new \IPS\MFA\SecurityQuestions\Handler();
 		
 		if ( !$handler->isEnabled() )
 		{
-			Output::i()->error( 'requested_route_404', '2C122/J', 404, '' );
+			\IPS\Output::i()->error( 'requested_route_404', '2C122/J', 404, '' );
 		}
 				
-		$url = Url::internal( 'app=core&module=system&controller=settings&area=securityquestions', 'front', 'settings_securityquestions' );
-		if ( isset( Request::i()->initial ) )
+		$url = \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=securityquestions', 'front', 'settings_securityquestions' );
+		if ( isset( \IPS\Request::i()->initial ) )
 		{
-			if ( isset( Request::i()->ref ) )
+			if ( isset( \IPS\Request::i()->ref ) )
 			{
-				$url = $url->setQueryString( 'ref', Request::i()->ref );
+				$url = $url->setQueryString( 'ref', \IPS\Request::i()->ref );
 			}
 						
-			if ( !$handler->memberCanUseHandler( Member::loggedIn() ) or $handler->memberHasConfiguredHandler( Member::loggedIn() ) )
+			if ( !$handler->memberCanUseHandler( \IPS\Member::loggedIn() ) or $handler->memberHasConfiguredHandler( \IPS\Member::loggedIn() ) )
 			{
-				$this->_performRedirect( Url::internal('') );
+				$this->_performRedirect( \IPS\Http\Url::internal('') );
 			}
 			
 			$url = $url->setQueryString( 'initial', 1 );
 		}
-		elseif ( $handler->memberHasConfiguredHandler( Member::loggedIn() ) )
+		elseif ( $handler->memberHasConfiguredHandler( \IPS\Member::loggedIn() ) )
 		{
-			if ( isset( Request::i()->_securityQuestionSetup ) )
+			if ( isset( \IPS\Request::i()->_securityQuestionSetup ) )
 			{
-				return Theme::i()->getTemplate( 'system', 'core' )->securityQuestionsFinished();
+				return \IPS\Theme::i()->getTemplate( 'system', 'core' )->securityQuestionsFinished();
 			}
-			elseif ( $output = MFAHandler::accessToArea( 'core', 'SecurityQuestions', $url ) )
+			elseif ( $output = \IPS\MFA\MFAHandler::accessToArea( 'core', 'SecurityQuestions', $url ) )
 			{
 				return $output;
 			}
 		}
 		
-		$output = $handler->configurationScreen( Member::loggedIn(), !isset( Request::i()->initial ), $url  );
+		$output = $handler->configurationForm( \IPS\Member::loggedIn(), $url, !isset( \IPS\Request::i()->initial ) );
 		
-		if ( isset( Request::i()->initial ) )
+		if ( isset( \IPS\Request::i()->initial ) )
 		{
-			Output::i()->bodyClasses[] = 'ipsLayout_minimal';
-			Output::i()->sidebar['enabled'] = FALSE;
-			Output::i()->output = $output;
+			\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimal';
+			\IPS\Output::i()->sidebar['enabled'] = FALSE;
+			\IPS\Output::i()->output = $output;
+			return;
 		}
 		else
 		{
 			return $output;
 		}
-
-		return '';
 	}
 	
 	/**
 	 * MFA Email Recovery
 	 *
-	 * @return	void
+	 * @return	string
 	 */
-	protected function mfarecovery() : void
+	protected function mfarecovery()
 	{
 		/* Who are we */
 		if ( isset( $_SESSION['processing2FA'] ) )
 		{
-			$member = Member::load( $_SESSION['processing2FA']['memberId'] );
+			$member = \IPS\Member::load( $_SESSION['processing2FA']['memberId'] );
 		}
 		else
 		{
-			$member = Member::loggedIn();
+			$member = \IPS\Member::loggedIn();
 		}
 				
 		/* Can we use this? */
-		if ( !$member->member_id or !( ( $member->failed_mfa_attempts >=  SettingsClass::i()->security_questions_tries and  SettingsClass::i()->mfa_lockout_behaviour == 'email' ) or in_array( 'email', explode( ',',  SettingsClass::i()->mfa_forgot_behaviour ) ) ) )
+		if ( !$member->member_id or !( ( $member->failed_mfa_attempts >= \IPS\Settings::i()->security_questions_tries and \IPS\Settings::i()->mfa_lockout_behaviour == 'email' ) or \in_array( 'email', explode( ',', \IPS\Settings::i()->mfa_forgot_behaviour ) ) ) )
 		{
-			Output::i()->error( 'no_module_permission', '2C122/L', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C122/L', 403, '' );
 		}
 				
 		/* If we have an existing validation record, we can just reuse it */
 		$sendEmail = TRUE;
 		try
 		{
-			$existing = Db::i()->select( array( 'vid', 'email_sent' ), 'core_validating', array( 'member_id=? AND forgot_security=1', $member->member_id ) )->first();
+			$existing = \IPS\Db::i()->select( array( 'vid', 'email_sent' ), 'core_validating', array( 'member_id=? AND forgot_security=1', $member->member_id ) )->first();
 			$vid = $existing['vid'];
 			
 			/* If we sent an email within the last 15 minutes, don't send another one otherwise someone could be a nuisence */
@@ -1178,21 +1013,21 @@ class settings extends Controller
 			}
 			else
 			{
-				$plainSecurityKey = Login::generateRandomString();
-				Db::i()->update( 'core_validating', [ 'email_sent' => time(), 'security_key' => Encrypt::fromPlaintext( $plainSecurityKey )->tag() ], [ 'vid=?', $vid ] );
+				$plainSecurityKey = \IPS\Login::generateRandomString();
+				\IPS\Db::i()->update( 'core_validating', [ 'email_sent' => time(), 'security_key' => Encrypt::fromPlaintext( $plainSecurityKey )->tag() ], [ 'vid=?', $vid ] );
 			}
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			$vid = md5( $member->members_pass_hash . Login::generateRandomString() );
-			$plainSecurityKey = Login::generateRandomString();
+			$vid = md5( $member->members_pass_hash . \IPS\Login::generateRandomString() );
+			$plainSecurityKey = \IPS\Login::generateRandomString();
 
-			Db::i()->insert( 'core_validating', [
+			\IPS\Db::i()->insert( 'core_validating', [
 				'vid'         		=> $vid,
 				'member_id'   		=> $member->member_id,
 				'entry_date'  		=> time(),
 				'forgot_security'   => 1,
-				'ip_address'  		=> Request::i()->ipAddress(),
+				'ip_address'  		=> \IPS\Request::i()->ipAddress(),
 				'email_sent'  		=> time(),
 				'security_key'      => Encrypt::fromPlaintext( $plainSecurityKey )->tag()
 			] );
@@ -1201,7 +1036,7 @@ class settings extends Controller
 		/* Send email */
 		if ( $sendEmail )
 		{
-			Email::buildFromTemplate( 'core', 'mfaRecovery', array( $member, $vid, $plainSecurityKey ), Email::TYPE_TRANSACTIONAL )->send( $member );
+			\IPS\Email::buildFromTemplate( 'core', 'mfaRecovery', array( $member, $vid, $plainSecurityKey ), \IPS\Email::TYPE_TRANSACTIONAL )->send( $member );
 			$message = "mfa_recovery_email_sent";
 		}
 		else
@@ -1210,10 +1045,10 @@ class settings extends Controller
 		}
 		
 		/* Show confirmation page with further instructions */
-		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->bodyClasses[] = 'ipsLayout_minimal';
-		Output::i()->title = Member::loggedIn()->language()->addToStack('mfa_account_recovery');
-		Output::i()->output = Theme::i()->getTemplate( 'system' )->mfaAccountRecovery( $message );
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimal';
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('mfa_account_recovery');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->mfaAccountRecovery( $message );
 	}
 	
 	/**
@@ -1221,27 +1056,27 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function mfarecoveryvalidate() : void
+	protected function mfarecoveryvalidate()
 	{
 		/* Validate */
 		try
 		{
-			$record = Db::i()->select( '*', 'core_validating', array( 'vid=? AND member_id=? AND forgot_security=1', Request::i()->vid, Request::i()->mid ) )->first();
+			$record = \IPS\Db::i()->select( '*', 'core_validating', array( 'vid=? AND member_id=? AND forgot_security=1', \IPS\Request::i()->vid, \IPS\Request::i()->mid ) )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			Output::i()->error( 'mfa_recovery_no_validation_key', '2C122/K', 410, '' );
+			\IPS\Output::i()->error( 'mfa_recovery_no_validation_key', '2C122/K', 410, '' );
 		}
 
-		/* Check security key is valid */
-		if( !Login::compareHashes( Encrypt::fromTag( $record['security_key'] )->decrypt(), Request::i()->security_key ) )
+		/* Check security key */
+		if( !\IPS\Login::compareHashes( Encrypt::fromTag( $record['security_key'] )->decrypt(), \IPS\Request::i()->security_key ) )
 		{
-			Output::i()->error( 'mfavalidate_invalid_security_key', '3C122/16', 403, '' );
+			\IPS\Output::i()->error( 'mfavalidate_invalid_security_key', '3C122/16', 403, '' );
 		}
-
+				
 		/* Remove all MFA */
-		$member = Member::load( $record['member_id'] );
-		foreach ( MFAHandler::handlers() as $key => $handler )
+		$member = \IPS\Member::load( $record['member_id'] );
+		foreach ( \IPS\MFA\MFAHandler::handlers() as $key => $handler )
 		{
 			$handler->disableHandlerForMember( $member );
 		}
@@ -1249,16 +1084,16 @@ class settings extends Controller
 		$member->save();
 		
 		/* Delete validating record  */
-		Db::i()->delete( 'core_validating', array( 'member_id=? AND forgot_security=1', $member->member_id ) );
+		\IPS\Db::i()->delete( 'core_validating', array( 'member_id=? AND forgot_security=1', $member->member_id ) );
 		
 		/* Log in if necessary */
-		if ( !Member::loggedIn()->member_id and isset( $_SESSION['processing2FA'] ) )
+		if ( !\IPS\Member::loggedIn()->member_id and isset( $_SESSION['processing2FA'] ) )
 		{
-			( new Success( $member, Handler::load( $_SESSION['processing2FA']['handler'] ), $_SESSION['processing2FA']['remember'], $_SESSION['processing2FA']['anonymous'] ) )->process();
+			( new \IPS\Login\Success( $member, \IPS\Login\Handler::load( $_SESSION['processing2FA']['handler'] ), $_SESSION['processing2FA']['remember'], $_SESSION['processing2FA']['anonymous'] ) )->process();
 		}
 		
 		/* Redirect */
-		Output::i()->redirect( Url::internal( '' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( '' ) );
 	}
 	
 	/**
@@ -1266,212 +1101,113 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _username() : string
+	protected function _username()
 	{
 		/* Check they have permission to change their username */
-		if( !Member::loggedIn()->group['g_dname_changes'] )
+		if( !\IPS\Member::loggedIn()->group['g_dname_changes'] )
 		{
-			Output::i()->error( 'username_err_nochange', '1C122/4', 403, '' );
-		}
-
-		/* SSO Overrides */
-		foreach( Application::allExtensions( 'core', 'SSO', FALSE ) as $ext )
-		{
-			/* @var SSOAbstract $ext */
-			if( $ext->isEnabled() AND $url = $ext->displayNameChange() )
-			{
-				Output::i()->redirect( $url );
-			}
+			\IPS\Output::i()->error( 'username_err_nochange', '1C122/4', 403, '' );
 		}
 				
-		if ( Member::loggedIn()->group['g_displayname_unit'] )
+		if ( \IPS\Member::loggedIn()->group['g_displayname_unit'] )
 		{
-			if ( Member::loggedIn()->group['gbw_displayname_unit_type'] )
+			if ( \IPS\Member::loggedIn()->group['gbw_displayname_unit_type'] )
 			{
-				if ( Member::loggedIn()->joined->diff( DateTime::create() )->days < Member::loggedIn()->group['g_displayname_unit'] )
+				if ( \IPS\Member::loggedIn()->joined->diff( \IPS\DateTime::create() )->days < \IPS\Member::loggedIn()->group['g_displayname_unit'] )
 				{
-					Output::i()->error(
-						Member::loggedIn()->language()->addToStack( 'username_err_days', FALSE, array( 'sprintf' => array(
-						Member::loggedIn()->joined->add(
-							new DateInterval( 'P' . Member::loggedIn()->group['g_displayname_unit'] . 'D' )
+					\IPS\Output::i()->error(
+						\IPS\Member::loggedIn()->language()->addToStack( 'username_err_days', FALSE, array( 'sprintf' => array(
+						\IPS\Member::loggedIn()->joined->add(
+							new \DateInterval( 'P' . \IPS\Member::loggedIn()->group['g_displayname_unit'] . 'D' )
 						)->localeDate()
-						), 'pluralize' => array( Member::loggedIn()->group['g_displayname_unit'] ) ) ),
+						), 'pluralize' => array( \IPS\Member::loggedIn()->group['g_displayname_unit'] ) ) ),
 					'1C122/5', 403, '' );
 				}
 			}
 			else
 			{
-				if ( Member::loggedIn()->member_posts < Member::loggedIn()->group['g_displayname_unit'] )
+				if ( \IPS\Member::loggedIn()->member_posts < \IPS\Member::loggedIn()->group['g_displayname_unit'] )
 				{
-					Output::i()->error(
-						Member::loggedIn()->language()->addToStack( 'username_err_posts' , FALSE, array( 'sprintf' => array(
-						( Member::loggedIn()->group['g_displayname_unit'] - Member::loggedIn()->member_posts )
-						), 'pluralize' => array( Member::loggedIn()->group['g_displayname_unit'] ) ) ),
+					\IPS\Output::i()->error( 
+						\IPS\Member::loggedIn()->language()->addToStack( 'username_err_posts' , FALSE, array( 'sprintf' => array(
+						( \IPS\Member::loggedIn()->group['g_displayname_unit'] - \IPS\Member::loggedIn()->member_posts )
+						), 'pluralize' => array( \IPS\Member::loggedIn()->group['g_displayname_unit'] ) ) ),
 					'1C122/6', 403, '' );
 				}
 			}
 		}
 		
 		/* How many changes */
-		$nameCount = Db::i()->select( 'COUNT(*) as count, MIN(log_date) as min_date', 'core_member_history', array(
+		$nameCount = \IPS\Db::i()->select( 'COUNT(*) as count, MIN(log_date) as min_date', 'core_member_history', array(
 			'log_member=? AND log_app=? AND log_type=? AND log_date>?',
-			Member::loggedIn()->member_id,
+			\IPS\Member::loggedIn()->member_id,
 			'core',
 			'display_name',
-			DateTime::create()->sub( new DateInterval( 'P' . Member::loggedIn()->group['g_dname_date'] . 'D' ) )->getTimestamp()
+			\IPS\DateTime::create()->sub( new \DateInterval( 'P' . \IPS\Member::loggedIn()->group['g_dname_date'] . 'D' ) )->getTimestamp()
 		) )->first();
 
-		if ( Member::loggedIn()->group['g_dname_changes'] != -1 and $nameCount['count'] >= Member::loggedIn()->group['g_dname_changes'] )
+		if ( \IPS\Member::loggedIn()->group['g_dname_changes'] != -1 and $nameCount['count'] >= \IPS\Member::loggedIn()->group['g_dname_changes'] )
 		{
-			return Theme::i()->getTemplate( 'system' )->settingsUsernameLimitReached( Member::loggedIn()->language()->addToStack('username_err_limit', FALSE, array( 'sprintf' => array( Member::loggedIn()->group['g_dname_date'] ), 'pluralize' => array( Member::loggedIn()->group['g_dname_changes'] ) ) ) );
+			return \IPS\Theme::i()->getTemplate( 'system' )->settingsUsernameLimitReached( \IPS\Member::loggedIn()->language()->addToStack('username_err_limit', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->group['g_dname_date'] ), 'pluralize' => array( \IPS\Member::loggedIn()->group['g_dname_changes'] ) ) ) );
 		}
 		else
 		{
 			/* Build form */
-			$form = new Form;
+			$form = new \IPS\Helpers\Form;
 			$form->class = 'ipsForm_collapseTablet';
-			$form->add( new Text( 'new_username', '', TRUE, array( 'accountUsername' => Member::loggedIn(), 'htmlAutocomplete' => "username" ) ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'new_username', '', TRUE, array( 'accountUsername' => \IPS\Member::loggedIn(), 'htmlAutocomplete' => "username" ) ) );
 						
 			/* Handle submissions */
 			if ( $values = $form->values() )
 			{
 				/* Disable syncing */
-				$profileSync = Member::loggedIn()->profilesync;
+				$profileSync = \IPS\Member::loggedIn()->profilesync;
 				if ( isset( $profileSync['name'] ) )
 				{
 					unset( $profileSync['name'] );
-					Member::loggedIn()->profilesync = $profileSync;
-					Member::loggedIn()->save();
+					\IPS\Member::loggedIn()->profilesync = $profileSync;
+					\IPS\Member::loggedIn()->save();
 				}
 				
 				/* Save */
-				$oldName = Member::loggedIn()->name;
-				Member::loggedIn()->name = $values['new_username'];
-				Member::loggedIn()->save();
-				Member::loggedIn()->logHistory( 'core', 'display_name', array( 'old' => $oldName, 'new' => $values['new_username'], 'by' => 'manual' ) );
+				$oldName = \IPS\Member::loggedIn()->name;
+				\IPS\Member::loggedIn()->name = $values['new_username'];
+				\IPS\Member::loggedIn()->save();
+				\IPS\Member::loggedIn()->logHistory( 'core', 'display_name', array( 'old' => $oldName, 'new' => $values['new_username'], 'by' => 'manual' ) );
 				
 				/* Sync with login handlers */
-				foreach ( Login::methods() as $method )
+				foreach ( \IPS\Login::methods() as $method )
 				{
 					try
 					{
-						$method->changeUsername( Member::loggedIn(), $oldName, $values['new_username'] );
+						$method->changeUsername( \IPS\Member::loggedIn(), $oldName, $values['new_username'] );
 					}
-					catch( BadMethodCallException $e ){}
-				}
-
-				/* Data Layer Event */
-				if ( $oldName !== $values['new_username'] and DataLayer::enabled() )
-				{
-					try
-					{
-						$groupName = Group::load( Member::loggedIn()->member_group_id )->formattedName;
-					}
-					catch ( UnderflowException $e )
-					{
-						$groupName = null;
-					}
-					$properties = array(
-						'profile_group'    => $groupName,
-						'profile_group_id' => Member::loggedIn()->member_group_id ?: null,
-						'profile_id'       => intval( Member::loggedIn()->member_id ) ?: null,
-						'profile_name'     => Member::loggedIn()->name ?: null,
-						'updated_custom_fields'     => false,
-						'updated_profile_name'      => DataLayer::i()->includeSSOForMember() ? [ 'old' => $oldName, 'new' => $values['new_username'] ] : true,
-						'updated_profile_photo'     => false,
-						'updated_profile_coverphoto'   => false,
-					);
-					DataLayer::i()->addEvent( 'social_update', $properties );
+					catch( \BadMethodCallException $e ){}
 				}
 				
 				/* Redirect */
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=username', 'front', 'settings_username' ), 'username_changed' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=username', 'front', 'settings_username' ), 'username_changed' );
 			}
 		}
 
-		return Theme::i()->getTemplate( 'system' )->settingsUsername( $form, $nameCount['count'], Member::loggedIn()->group['g_dname_changes'], $nameCount['min_date'] ? DateTime::ts( $nameCount['min_date'] ) : Member::loggedIn()->joined, Member::loggedIn()->group['g_dname_date'] );
+		return \IPS\Theme::i()->getTemplate( 'system' )->settingsUsername( $form, $nameCount['count'], \IPS\Member::loggedIn()->group['g_dname_changes'], $nameCount['min_date'] ? \IPS\DateTime::ts( $nameCount['min_date'] ) : \IPS\Member::loggedIn()->joined, \IPS\Member::loggedIn()->group['g_dname_date'] );
 	}
 
 	/**
 	 * Link Preference
 	 *
-	 * @return    string
-	 * @throws Exception
+	 * @return	string
 	 */
-	protected function _links() : string
+	protected function _links()
 	{
 		/* Build form */
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->class = 'ipsForm_collapseTablet';
-		$form->add( new Radio( 'link_pref', Member::loggedIn()->linkPref() ?:  SettingsClass::i()->link_default, FALSE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'link_pref', \IPS\Member::loggedIn()->linkPref() ?: \IPS\Settings::i()->link_default, FALSE, array( 'options' => array(
 			'unread'	=> 'profile_settings_cvb_unread',
 			'first'	=> 'profile_settings_cvb_first',
 			'last'	=> 'profile_settings_cvb_last'
 		) ) ) );
-
-		if ( Member::loggedIn()->group['gbw_change_layouts'] )
-		{
-			if ( Member::loggedIn()->isEditingTheme() )
-			{
-				$form->addMessage( 'member_change_theme_layouts_editing_message' );
-			}
-			else
-			{
-				$form->add( new YesNo( 'member_change_theme_layouts', ( Member::loggedIn()->layouts and $memberOptions = json_decode( Member::loggedIn()->layouts, true ) and count( $memberOptions ) ), false, ['togglesOn' => ['forum_view', 'forum_list_view', 'forum_topic_view', 'downloads_categories_view', 'blog_view', 'courses_default_view', 'cm_store_view']] ) );
-
-				if( Application::appIsEnabled( 'forums' ) )
-				{
-					$form->add( new Radio( 'forum_view', Member::loggedIn()->getLayoutValue( 'forums_forum' ), false, ['options' => [
-						'table' => 'forums_default_view_table',
-						'grid' => 'forums_default_view_grid',
-						'fluid' => 'forums_default_view_fluid',
-						'modern' => 'forums_default_view_modern'
-					]], null, null, null, 'forum_view' ) );
-
-					$form->add( new Radio( 'forum_list_view', Member::loggedIn()->getLayoutValue( 'forums_topic' ), false, ['options' => [
-						'list' => 'forums_topic_list_list',
-						'snippet' => 'forums_topic_list_snippet',
-					]], null, null, null, 'forum_list_view' ) );
-
-					$form->add( new Radio( 'forum_topic_view', Member::loggedIn()->getLayoutValue( 'forums_post' ), false, ['options' => [
-						'classic' => 'forums_topic_view_classic',
-						'modern' => 'forums_topic_view_modern',
-					]], null, null, null, 'forum_topic_view' ) );
-				}
-
-				if( Application::appIsEnabled( 'nexus' ) )
-				{
-					$form->add( new Radio( 'cm_store_view', Member::loggedIn()->getLayoutValue( 'store_view' ), FALSE, array( 'options' => array(
-						'grid'		=> 'cm_store_view_grid',
-						'list'		=> 'cm_store_view_list'
-					) ), null, null, null, 'cm_store_view' ) );
-				}
-
-				if( Application::appIsEnabled( 'downloads' ) )
-				{
-					$form->add( new Radio( 'downloads_categories_view', Member::loggedIn()->getLayoutValue( 'downloads_categories' ), false, [ 'options' => [
-						'table' => 'downloads_default_view_table',
-						'grid' => 'downloads_default_view_grid'
-					]], null, null, null, 'downloads_categories_view' ) );
-				}
-
-				if( Application::appIsEnabled( 'blog' ) )
-				{
-					$form->add( new Radio( 'blog_view', Member::loggedIn()->getLayoutValue( 'blog_view' ), false, [ 'options' => [
-						'table' => 'blog_view_mode_table',
-						'grid' => 'blog_view_mode_grid'
-					]], null, null, null, 'blog_view' ) );
-				}
-
-				if( Application::appIsEnabled( 'courses' ) )
-				{
-					$form->add( new Radio( 'courses_default_view', Member::loggedIn()->getLayoutValue( 'courses_view' ), false, [ 'options' => [
-						'list' => 'course_view_list',
-						'grid' => 'course_view_grid'
-					]], null, null, null, 'courses_default_view' ) );
-				}
-			}
-		}
 
 		/* Handle submissions */
 		if ( $values = $form->values() )
@@ -1479,65 +1215,27 @@ class settings extends Controller
 			switch( $values['link_pref'] )
 			{
 				case 'last':
-					Member::loggedIn()->members_bitoptions['link_pref_unread'] = FALSE;
-					Member::loggedIn()->members_bitoptions['link_pref_last'] = TRUE;
-					Member::loggedIn()->members_bitoptions['link_pref_first'] = FALSE;
+					\IPS\Member::loggedIn()->members_bitoptions['link_pref_unread'] = FALSE;
+					\IPS\Member::loggedIn()->members_bitoptions['link_pref_last'] = TRUE;
+					\IPS\Member::loggedIn()->members_bitoptions['link_pref_first'] = FALSE;
 					break;
 				case 'unread':
-					Member::loggedIn()->members_bitoptions['link_pref_unread'] = TRUE;
-					Member::loggedIn()->members_bitoptions['link_pref_last'] = FALSE;
-					Member::loggedIn()->members_bitoptions['link_pref_first'] = FALSE;
+					\IPS\Member::loggedIn()->members_bitoptions['link_pref_unread'] = TRUE;
+					\IPS\Member::loggedIn()->members_bitoptions['link_pref_last'] = FALSE;
+					\IPS\Member::loggedIn()->members_bitoptions['link_pref_first'] = FALSE;
 					break;
 				default:
-					Member::loggedIn()->members_bitoptions['link_pref_unread'] = FALSE;
-					Member::loggedIn()->members_bitoptions['link_pref_last'] = FALSE;
-					Member::loggedIn()->members_bitoptions['link_pref_first'] = TRUE;
+					\IPS\Member::loggedIn()->members_bitoptions['link_pref_unread'] = FALSE;
+					\IPS\Member::loggedIn()->members_bitoptions['link_pref_last'] = FALSE;
+					\IPS\Member::loggedIn()->members_bitoptions['link_pref_first'] = TRUE;
 					break;
 			}
 
-			/* Update the view preferences */
-			if ( ! Member::loggedIn()->isEditingTheme() )
-			{
-				if ( ! empty( $values['member_change_theme_layouts'] ) )
-				{
-					if( Application::appIsEnabled( 'forums' ) )
-					{
-						Member::loggedIn()->setLayoutValue( 'forums_forum', $values['forum_view'] );
-						Member::loggedIn()->setLayoutValue( 'forums_topic', $values['forum_list_view'] );
-						Member::loggedIn()->setLayoutValue( 'forums_post', $values['forum_topic_view'] );
-					}
-
-					if( Application::appIsEnabled( 'downloads' ) )
-					{
-						Member::loggedIn()->setLayoutValue( 'downloads_categories', $values['downloads_categories_view'] );
-					}
-
-					if( Application::appIsEnabled( 'blog' ) )
-					{
-						Member::loggedIn()->setLayoutValue( 'blog_view', $values['blog_view'] );
-					}
-
-					if( Application::appIsEnabled( 'courses' ) )
-					{
-						Member::loggedIn()->setLayoutValue( 'courses_view', $values['courses_default_view' ] );
-					}
-
-					if( Application::appIsEnabled( 'nexus' ) )
-					{
-						Member::loggedIn()->setLayoutValue( 'store_view', $values['cm_store_view'] );
-					}
-				}
-				else
-				{
-					Member::loggedIn()->setLayoutValue( null, null );
-				}
-			}
-
-			Member::loggedIn()->save();
-			Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=links', 'front', 'settings_links' ), 'saved' );
+			\IPS\Member::loggedIn()->save();
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=links', 'front', 'settings_links' ), 'saved' );
 		}
 
-		return Theme::i()->getTemplate( 'system' )->settingsLinks( $form );
+		return \IPS\Theme::i()->getTemplate( 'system' )->settingsLinks( $form );
 	}
 
 	/**
@@ -1545,74 +1243,77 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _signature() : string
+	protected function _signature()
 	{
 		/* Check they have permission to change their signature */
-		$sigLimits = explode( ":", Member::loggedIn()->group['g_signature_limits']);
+		$sigLimits = explode( ":", \IPS\Member::loggedIn()->group['g_signature_limits']);
 		
-		if( !Member::loggedIn()->canEditSignature() )
+		if( (bool) \IPS\Settings::i()->signatures_enabled === FALSE )
 		{
-			Output::i()->error( 'signatures_disabled', '2C122/C', 403, '' );
+			\IPS\Output::i()->error( 'signatures_disabled', '2C122/C', 403, '' );
 		}
 		
 		/* Check limits */
-		if ( Member::loggedIn()->group['g_sig_unit'] )
+		if ( \IPS\Member::loggedIn()->group['g_sig_unit'] )
 		{
 			/* Days */
-			if ( Member::loggedIn()->group['gbw_sig_unit_type'] )
+			if ( \IPS\Member::loggedIn()->group['gbw_sig_unit_type'] )
 			{
-				if ( Member::loggedIn()->joined->diff( DateTime::create() )->days < Member::loggedIn()->group['g_sig_unit'] )
+				if ( \IPS\Member::loggedIn()->joined->diff( \IPS\DateTime::create() )->days < \IPS\Member::loggedIn()->group['g_sig_unit'] )
 				{
-					Output::i()->error( Member::loggedIn()->language()->pluralize(
+					\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->pluralize(
 							sprintf(
-									Member::loggedIn()->language()->get('sig_err_days'),
-									Member::loggedIn()->joined->add(
-											new DateInterval( 'P' . Member::loggedIn()->group['g_sig_unit'] . 'D' )
+									\IPS\Member::loggedIn()->language()->get('sig_err_days'),
+									\IPS\Member::loggedIn()->joined->add(
+											new \DateInterval( 'P' . \IPS\Member::loggedIn()->group['g_sig_unit'] . 'D' )
 									)->localeDate()
-							), array( Member::loggedIn()->group['g_sig_unit'] ) ),
+							), array( \IPS\Member::loggedIn()->group['g_sig_unit'] ) ),
 							'1C122/D', 403, '' );
 				}
 			}
 			/* Posts */
 			else
 			{
-				if ( Member::loggedIn()->member_posts < Member::loggedIn()->group['g_sig_unit'] )
+				if ( \IPS\Member::loggedIn()->member_posts < \IPS\Member::loggedIn()->group['g_sig_unit'] )
 				{
-					Output::i()->error( Member::loggedIn()->language()->pluralize(
+					\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->pluralize(
 							sprintf(
-									Member::loggedIn()->language()->get('sig_err_posts'),
-									( Member::loggedIn()->group['g_sig_unit'] - Member::loggedIn()->member_posts )
-							), array( Member::loggedIn()->group['g_sig_unit'] ) ),
+									\IPS\Member::loggedIn()->language()->get('sig_err_posts'),
+									( \IPS\Member::loggedIn()->group['g_sig_unit'] - \IPS\Member::loggedIn()->member_posts )
+							), array( \IPS\Member::loggedIn()->group['g_sig_unit'] ) ),
 							'1C122/E', 403, '' );
 				}
 			}
 		}
 	
 		/* Build form */
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->class = 'ipsForm_collapseTablet';
-		$form->add( new YesNo( 'view_sigs', Member::loggedIn()->members_bitoptions['view_sigs'], FALSE ) );
-		$form->add( new Editor( 'signature', Member::loggedIn()->signature, FALSE, array( 'app' => 'core', 'key' => 'Signatures', 'autoSaveKey' => "frontsig-" . Member::loggedIn()->member_id, 'attachIds' => array( Member::loggedIn()->member_id ) ) ) );
-		
+		$form->add( new \IPS\Helpers\Form\YesNo( 'view_sigs', \IPS\Member::loggedIn()->members_bitoptions['view_sigs'], FALSE ) );
+		if( Member::loggedIn()->canEditSignature() )
+		{
+			$form->add( new \IPS\Helpers\Form\Editor( 'signature', \IPS\Member::loggedIn()->signature, FALSE, ['app' => 'core', 'key' => 'Signatures', 'autoSaveKey' => 'frontsig-'.\IPS\Member::loggedIn()->member_id, 'attachIds' => [\IPS\Member::loggedIn()->member_id]] ) );
+		}
+
 		/* Handle submissions */
 		if ( $values = $form->values() )
 		{
-			if( $values['signature'] )
+			if( isset( $values['signature'] ) and $values['signature'] )
 			{
 				/* Check Limits */
-				$signature = new DOMDocument( '1.0', 'UTF-8' );
-				$signature->loadHTML( DOMDocument::wrapHtml( $values['signature'] ) );
+				$signature = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
+				$signature->loadHTML( \IPS\Xml\DOMDocument::wrapHtml( $values['signature'] ) );
 				
 				$errors = array();
 				
 				/* Links */
-				if ( is_numeric( $sigLimits[4] ) and ( $signature->getElementsByTagName('a')->length + $signature->getElementsByTagName('iframe')->length ) > $sigLimits[4] )
+				if ( \is_numeric( $sigLimits[4] ) and ( $signature->getElementsByTagName('a')->length + $signature->getElementsByTagName('iframe')->length ) > $sigLimits[4] )
 				{
-					$errors[] = Member::loggedIn()->language()->addToStack('sig_num_links_exceeded');
+					$errors[] = \IPS\Member::loggedIn()->language()->addToStack('sig_num_links_exceeded');
 				}
 
 				/* Number of Images */
-				if ( is_numeric( $sigLimits[1] ) )
+				if ( \is_numeric( $sigLimits[1] ) )
 				{
 					$imageCount = 0;
 					foreach ( $signature->getElementsByTagName('img') as $img )
@@ -1624,7 +1325,7 @@ class settings extends Controller
 					}
 
 					/* Look for background-image URLs too */
-					$xpath = new DOMXpath( $signature );
+					$xpath = new \DOMXpath( $signature );
 
 					foreach ( $xpath->query("//*[contains(@style, 'url') and contains(@style, 'background')]") as $styleUrl )
 					{
@@ -1633,12 +1334,12 @@ class settings extends Controller
 
 					if( $imageCount > $sigLimits[1] )
 					{
-						$errors[] = Member::loggedIn()->language()->addToStack('sig_num_images_exceeded');
+						$errors[] = \IPS\Member::loggedIn()->language()->addToStack('sig_num_images_exceeded');
 					}
 				}
 				
 				/* Size of images */
-				if ( ( is_numeric( $sigLimits[2] ) and $sigLimits[2] ) or ( is_numeric( $sigLimits[3] ) and $sigLimits[3] ) )
+				if ( ( \is_numeric( $sigLimits[2] ) and $sigLimits[2] ) or ( \is_numeric( $sigLimits[3] ) and $sigLimits[3] ) )
 				{
 					foreach ( $signature->getElementsByTagName('img') as $image )
 					{
@@ -1649,18 +1350,18 @@ class settings extends Controller
 						{
 							try
 							{
-								$attachment = Db::i()->select( 'attach_location, attach_thumb_location', 'core_attachments', array( 'attach_id=?', $attachId ) )->first();
-								$imageProperties = File::get( 'core_Attachment', $attachment['attach_thumb_location'] ?: $attachment['attach_location'] )->getImageDimensions();
-								$src = (string) File::get( 'core_Attachment', $attachment['attach_location'] )->url;
+								$attachment = \IPS\Db::i()->select( 'attach_location, attach_thumb_location', 'core_attachments', array( 'attach_id=?', $attachId ) )->first();
+								$imageProperties = \IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] ?: $attachment['attach_location'] )->getImageDimensions();
+								$src = (string) \IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->url;
 							}
-							catch( UnderflowException $e ){}
+							catch( \UnderflowException $e ){}
 						}
 						
-						if( is_array( $imageProperties ) AND count( $imageProperties ) )
+						if( \is_array( $imageProperties ) AND \count( $imageProperties ) )
 						{
 							if( $imageProperties[0] > $sigLimits[2] OR $imageProperties[1] > $sigLimits[3] )
 							{
-								$errors[] = Member::loggedIn()->language()->addToStack( 'sig_imagetoobig', FALSE, array( 'sprintf' => array( $src, $sigLimits[2], $sigLimits[3] ) ) );
+								$errors[] = \IPS\Member::loggedIn()->language()->addToStack( 'sig_imagetoobig', FALSE, array( 'sprintf' => array( $src, $sigLimits[2], $sigLimits[3] ) ) );
 							}
 						}
 					}
@@ -1673,31 +1374,32 @@ class settings extends Controller
 				foreach( $signature->getElementsByTagName('pre') AS $pre )
 				{
 					$content = nl2br( trim( $pre->nodeValue ) );
-					$preBreaks += count( explode( "<br />", $content ) );
+					$preBreaks += \count( explode( "<br />", $content ) );
 				}
 
-				if ( ( is_numeric( $sigLimits[5] ) and ( $signature->getElementsByTagName('p')->length + $signature->getElementsByTagName('br')->length + $preBreaks ) > $sigLimits[5] ) or strlen( $values['signature'] ) > 20000 )
+				/* Line limit with a sensible length restriction to prevent broken html */
+				if ( ( \is_numeric( $sigLimits[5] ) and ( $signature->getElementsByTagName('p')->length + $signature->getElementsByTagName('br')->length + $preBreaks ) > $sigLimits[5] ) or \strlen( $values['signature'] ) > 20000 )
 				{
-					$errors[] = Member::loggedIn()->language()->addToStack('sig_num_lines_exceeded');
+					$errors[] = \IPS\Member::loggedIn()->language()->addToStack('sig_num_lines_exceeded');
 				}
+				\IPS\Member::loggedIn()->signature = $values['signature'];
 			}
 			
 			if( !empty( $errors ) )
 			{
-				$form->error = Member::loggedIn()->language()->addToStack('sig_restrictions_exceeded');
-				$form->elements['']['signature']->error = Member::loggedIn()->language()->formatList( $errors );
+				$form->error = \IPS\Member::loggedIn()->language()->addToStack('sig_restrictions_exceeded');
+				$form->elements['']['signature']->error = \IPS\Member::loggedIn()->language()->formatList( $errors );
 				
-				return Theme::i()->getTemplate( 'system' )->settingsSignature( $form, $sigLimits );
+				return \IPS\Theme::i()->getTemplate( 'system' )->settingsSignature( $form, $sigLimits );
 			}
 			
-			Member::loggedIn()->signature = $values['signature'];
-			Member::loggedIn()->members_bitoptions['view_sigs'] = $values['view_sigs'];
+			\IPS\Member::loggedIn()->members_bitoptions['view_sigs'] = $values['view_sigs'];
 			
-			Member::loggedIn()->save();
-			Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=signature', 'front', 'settings_signature' ), 'signature_changed' );
+			\IPS\Member::loggedIn()->save();
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=signature', 'front', 'settings_signature' ), 'signature_changed' );
 		}
 
-		return Theme::i()->getTemplate( 'system' )->settingsSignature( $form, $sigLimits );
+		return \IPS\Theme::i()->getTemplate( 'system' )->settingsSignature( $form, $sigLimits );
 	}
 	
 	/**
@@ -1705,20 +1407,20 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _login() : string
+	protected function _login()
 	{
 		/* Load method */
 		try
 		{
-			$method = Handler::load( Request::i()->service );
-			if ( !$method->showInUcp( Member::loggedIn() ) )
+			$method = \IPS\Login\Handler::load( \IPS\Request::i()->service );
+			if ( !$method->showInUcp( \IPS\Member::loggedIn() ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'page_doesnt_exist', '2C122/B', 404, '' );
+			\IPS\Output::i()->error( 'page_doesnt_exist', '2C122/B', 404, '' );
 		}
 		
 		/* Are we connected? */
@@ -1727,16 +1429,16 @@ class settings extends Controller
 
 		try
 		{
-			$connected = $method->canProcess( Member::loggedIn() );
+			$connected = $method->canProcess( \IPS\Member::loggedIn() );
 			if ( $connected )
 			{
-				$photoUrl = $method->userProfilePhoto( Member::loggedIn() );
-				$profileName = $method->userProfileName( Member::loggedIn() );
+				$photoUrl = $method->userProfilePhoto( \IPS\Member::loggedIn() );
+				$profileName = $method->userProfileName( \IPS\Member::loggedIn() );
 
 				/* Can we disassociate? */
-				foreach ( Login::methods() as $_method )
+				foreach ( \IPS\Login::methods() as $_method )
 				{
-					if ( $_method->id != $method->id and $_method->canProcess( Member::loggedIn() ) )
+					if ( $_method->id != $method->id and $_method->canProcess( \IPS\Member::loggedIn() ) )
 					{
 						$canDisassociate = TRUE;
 						break;
@@ -1744,30 +1446,30 @@ class settings extends Controller
 				}
 			}
 		}
-		catch ( LoginException $e )
+		catch ( \IPS\Login\Exception $e )
 		{
 			$connected = FALSE;
 			$blurb = 'profilesync_expire_blurb';
 
 			/* If we previously associated an account but that link has expired, we should still allow you to disassociate */
-			if( $method->canProcess( Member::loggedIn() ) )
+			if( $method->canProcess( \IPS\Member::loggedIn() ) )
 			{
 				$canDisassociate = TRUE;
 			}
 		}
 
-		if ( $canDisassociate and isset( Request::i()->disassociate ) )
+		if ( $canDisassociate and isset( \IPS\Request::i()->disassociate ) )
 		{				
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			$method->disassociate();
 			
-			if ( $method->showInUcp( Member::loggedIn() ) )
+			if ( $method->showInUcp( \IPS\Member::loggedIn() ) )
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ) );
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings', 'front', 'settings' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings', 'front', 'settings' ) );
 			}
 		}
 
@@ -1775,13 +1477,13 @@ class settings extends Controller
 		if ( $connected )
 		{			
 			/* Are we forcing syncing of anything? */
-			$syncOptions = $method->syncOptions( Member::loggedIn() );
+			$syncOptions = $method->syncOptions( \IPS\Member::loggedIn() );
 			$forceSync = array();
 			foreach ( $method->forceSync() as $type )
 			{
 				$forceSync[ $type ] = array(
-					'label'	=> Member::loggedIn()->language()->addToStack( "profilesync_{$type}_force", FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( $method->_title ) ) ) ),
-					'error'	=> isset( Member::loggedIn()->profilesync[ $type ]['error'] ) ? Member::loggedIn()->profilesync[ $type ]['error'] : NULL
+					'label'	=> \IPS\Member::loggedIn()->language()->addToStack( "profilesync_{$type}_force", FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $method->_title ) ) ) ),
+					'error'	=> isset( \IPS\Member::loggedIn()->profilesync[ $type ]['error'] ) ? \IPS\Member::loggedIn()->profilesync[ $type ]['error'] : NULL
 				);
 			}
 			
@@ -1789,40 +1491,44 @@ class settings extends Controller
 			$form = NULL;
 			if ( $syncOptions )
 			{
-				$form = new Form( 'sync', 'profilesync_save' );
-				$form->class = 'ipsForm--vertical ipsForm--profile-sync';
+				$form = new \IPS\Helpers\Form( 'sync', 'profilesync_save' );
+				$form->class = 'ipsForm_vertical';
 				foreach ( $syncOptions as $option )
 				{
-					if ( !Handler::handlerHasForceSync( $option, NULL, Member::loggedIn() ) )
+					if ( !\IPS\Login\Handler::handlerHasForceSync( $option, NULL, \IPS\Member::loggedIn() ) )
 					{
-						if ( $option == 'photo' and !Member::loggedIn()->group['g_edit_profile'] )
+						if ( $option == 'photo' and !\IPS\Member::loggedIn()->group['g_edit_profile'] )
 						{
 							continue;
 						}
-						if ( $option == 'cover' and ( !Member::loggedIn()->group['g_edit_profile'] or !Member::loggedIn()->group['gbw_allow_upload_bgimage'] ) )
+						if ( $option == 'cover' and ( !\IPS\Member::loggedIn()->group['g_edit_profile'] or !\IPS\Member::loggedIn()->group['gbw_allow_upload_bgimage'] ) )
 						{
 							continue;
 						}
-
+						if ( $option == 'status' and ( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'status' ) ) or !\IPS\core\Statuses\Status::canCreateFromCreateMenu( \IPS\Member::loggedIn() ) or !\IPS\Settings::i()->profile_comments or \IPS\Member::loggedIn()->group['gbw_no_status_update'] ) )
+						{
+							continue;
+						}
+						
 						if ( $option == 'status' )
 						{
-							$checked = ( isset( Member::loggedIn()->profilesync[ $option ] ) and array_key_exists( $method->id, Member::loggedIn()->profilesync[ $option ]) );
+							$checked = ( isset( \IPS\Member::loggedIn()->profilesync[ $option ] ) and array_key_exists( $method->id, \IPS\Member::loggedIn()->profilesync[ $option ]) );
 						}
 						else
 						{
-							$checked = ( isset( Member::loggedIn()->profilesync[ $option ] ) and  Member::loggedIn()->profilesync[ $option ]['handler'] == $method->id );
+							$checked = ( isset( \IPS\Member::loggedIn()->profilesync[ $option ] ) and  \IPS\Member::loggedIn()->profilesync[ $option ]['handler'] == $method->id );
 						}
-						$field = new Checkbox( "profilesync_{$option}", $checked, FALSE, array( 'labelSprintf' => array( Member::loggedIn()->language()->addToStack( $method->_title ) ) ), NULL, NULL, NULL, "profilesync_{$option}_{$method->id}" );
-						if ( $checked and ( ( $option == 'status' and $error = Member::loggedIn()->profilesync[ $option ][ $method->id ]['error'] ) or ( $option != 'status' and $error = Member::loggedIn()->profilesync[ $option ]['error'] ) ) )
+						$field = new \IPS\Helpers\Form\Checkbox( "profilesync_{$option}", $checked, FALSE, array( 'labelSprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $method->_title ) ) ), NULL, NULL, NULL, "profilesync_{$option}_{$method->id}" );
+						if ( $checked and ( ( $option == 'status' and $error = \IPS\Member::loggedIn()->profilesync[ $option ][ $method->id ]['error'] ) or ( $option != 'status' and $error = \IPS\Member::loggedIn()->profilesync[ $option ]['error'] ) ) )
 						{
-							$field->description = Theme::i()->getTemplate( 'system' )->settingsLoginMethodSynError( $error );
+							$field->description = \IPS\Theme::i()->getTemplate( 'system' )->settingsLoginMethodSynError( $error );
 						}		
 						$form->add( $field );
 					}
 				}
 				if ( $values = $form->values() )
 				{
-					$profileSync = Member::loggedIn()->profilesync;
+					$profileSync = \IPS\Member::loggedIn()->profilesync;
 					$changes = array();
 					
 					foreach ( $values as $k => $v )
@@ -1830,7 +1536,7 @@ class settings extends Controller
 						$option = mb_substr( $k, 12 );
 						if ( $option === 'status' )
 						{
-							if ( isset( Member::loggedIn()->profilesync[ $option ][ $method->id ] ) )
+							if ( isset( \IPS\Member::loggedIn()->profilesync[ $option ][ $method->id ] ) )
 							{
 								if ( !$v )
 								{
@@ -1849,7 +1555,7 @@ class settings extends Controller
 						}
 						else
 						{
-							if ( isset( Member::loggedIn()->profilesync[ $option ] ) and  Member::loggedIn()->profilesync[ $option ]['handler'] == $method->id )
+							if ( isset( \IPS\Member::loggedIn()->profilesync[ $option ] ) and  \IPS\Member::loggedIn()->profilesync[ $option ]['handler'] == $method->id )
 							{
 								if ( !$v )
 								{
@@ -1868,84 +1574,84 @@ class settings extends Controller
 						}
 					}
 					
-					if ( count( $changes ) )
+					if ( \count( $changes ) )
 					{
-						Member::loggedIn()->logHistory( 'core', 'social_account', array( 'changed' => $changes, 'handler' => $method->id, 'service' => $method::getTitle() ) );
+						\IPS\Member::loggedIn()->logHistory( 'core', 'social_account', array( 'changed' => $changes, 'handler' => $method->id, 'service' => $method::getTitle() ) );
 					}
 					
-					Member::loggedIn()->profilesync = $profileSync;
-					Member::loggedIn()->save();
-					Member::loggedIn()->profileSync();
+					\IPS\Member::loggedIn()->profilesync = $profileSync;
+					\IPS\Member::loggedIn()->save();
+					\IPS\Member::loggedIn()->profileSync();
 					
-					Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ) );
 				}
 			}
 			
 			$extraPermissions = NULL;
 			$login = NULL;
-			if ( isset( Request::i()->scopes ) )
+			if ( isset( \IPS\Request::i()->scopes ) )
 			{
-				$method = Handler::findMethod('IPS\Login\Handler\Oauth2\Facebook');
-				$extraPermissions = Request::i()->scopes;
-				$login = new Login( Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id . '&scopes=' . Request::i()->scopes, 'front', 'settings_login' ), Login::LOGIN_UCP );
-				$login->reauthenticateAs = Member::loggedIn();
+				$method = \IPS\Login\Handler::findMethod('IPS\Login\Handler\Oauth2\Facebook');
+				$extraPermissions = \IPS\Request::i()->scopes;
+				$login = new \IPS\Login( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id . '&scopes=' . \IPS\Request::i()->scopes, 'front', 'settings_login' ), \IPS\Login::LOGIN_UCP );
+				$login->reauthenticateAs = \IPS\Member::loggedIn();
 
 				try
 				{
 					if ( $success = $login->authenticate( $method ) )
 					{				
-						if ( $success->member->member_id === Member::loggedIn()->member_id )
+						if ( $success->member->member_id === \IPS\Member::loggedIn()->member_id )
 						{
-							$method->completeLink( Member::loggedIn(), NULL );
-							Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ) );
+							$method->completeLink( \IPS\Member::loggedIn(), NULL );
+							\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ) );
 						}
 					}
 				}
-				catch( Exception $ex ) { }
+				catch( \Exception $ex ) { }
 			}
 					
 			/* Display */
-			return Theme::i()->getTemplate( 'system' )->settingsLoginMethodOn( $method, $form, $canDisassociate, $photoUrl, $profileName, $extraPermissions, $login, $forceSync );
+			return \IPS\Theme::i()->getTemplate( 'system' )->settingsLoginMethodOn( $method, $form, $canDisassociate, $photoUrl, $profileName, $extraPermissions, $login, $forceSync );
 		}
 		
 		/* No - show option to connect */
 		else
 		{			
-			$login = new Login( Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ), Login::LOGIN_UCP );
-			$login->reauthenticateAs = Member::loggedIn();
+			$login = new \IPS\Login( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ), \IPS\Login::LOGIN_UCP );
+			$login->reauthenticateAs = \IPS\Member::loggedIn();
 			$error = NULL;
 			try
 			{
 				if ( $success = $login->authenticate( $method ) )
 				{					
-					if ( $success->member->member_id === Member::loggedIn()->member_id )
+					if ( $success->member->member_id === \IPS\Member::loggedIn()->member_id )
 					{
-						$method->completeLink( Member::loggedIn(), NULL );
-						Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ) );
+						$method->completeLink( \IPS\Member::loggedIn(), NULL );
+						\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ) );
 					}
 					else
 					{
-						$error = Member::loggedIn()->language()->addToStack( 'profilesync_already_associated', FALSE, array( 'sprintf' => array( $method->_title ) ) );
+						$error = \IPS\Member::loggedIn()->language()->addToStack( 'profilesync_already_associated', FALSE, array( 'sprintf' => array( $method->_title ) ) );
 					}
 				}
 			}
-			catch ( LoginException $e )
+			catch ( \IPS\Login\Exception $e )
 			{
-				if ( $e->getCode() === LoginException::MERGE_SOCIAL_ACCOUNT )
+				if ( $e->getCode() === \IPS\Login\Exception::MERGE_SOCIAL_ACCOUNT )
 				{
-					if ( $e->member->member_id === Member::loggedIn()->member_id )
+					if ( $e->member->member_id === \IPS\Member::loggedIn()->member_id )
 					{
-						$method->completeLink( Member::loggedIn(), NULL );
-						Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ) );
+						$method->completeLink( \IPS\Member::loggedIn(), NULL );
+						\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=login&service=' . $method->id, 'front', 'settings_login' ) );
 					}
 					else
 					{
-						$error = Member::loggedIn()->language()->addToStack( 'profilesync_email_exists', FALSE, array( 'sprintf' => array( $method->_title ) ) );
+						$error = \IPS\Member::loggedIn()->language()->addToStack( 'profilesync_email_exists', FALSE, array( 'sprintf' => array( $method->_title ) ) );
 					}
 				}
-				elseif( $e->getCode() === LoginException::LOCAL_ACCOUNT_ALREADY_MERGED )
+				elseif( $e->getCode() === \IPS\Login\Exception::LOCAL_ACCOUNT_ALREADY_MERGED )
 				{
-					$error = Member::loggedIn()->language()->addToStack( 'profilesync_already_merged', FALSE, array( 'sprintf' => array( $method->_title, $method->_title, $method->_title ) ) );
+					$error = \IPS\Member::loggedIn()->language()->addToStack( 'profilesync_already_merged', FALSE, array( 'sprintf' => array( $method->_title, $method->_title, $method->_title ) ) );
 				}
 				else
 				{
@@ -1953,7 +1659,7 @@ class settings extends Controller
 				}
 			}
 			
-			return Theme::i()->getTemplate( 'system' )->settingsLoginMethodOff( $method, $login, $error, $blurb, $canDisassociate );
+			return \IPS\Theme::i()->getTemplate( 'system' )->settingsLoginMethodOff( $method, $login, $error, $blurb, $canDisassociate );
 		}
 	}
 	
@@ -1962,11 +1668,11 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _apps() : string
+	protected function _apps()
 	{
 		$apps = array();
 		
-		foreach ( Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'member_id=?', Member::loggedIn()->member_id ), 'issued DESC' ) as $accessToken )
+		foreach ( \IPS\Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'member_id=?', \IPS\Member::loggedIn()->member_id ), 'issued DESC' ) as $accessToken )
 		{
 			if ( $accessToken['status'] == 'revoked' )
 			{
@@ -1974,10 +1680,10 @@ class settings extends Controller
 			}
 			try
 			{
-				$client = OAuthClient::load( $accessToken['client_id'] );
+				$client = \IPS\Api\OAuthClient::load( $accessToken['client_id'] );
 				if ( !$client->enabled )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 				if ( !$client->ucp )
 				{
@@ -2013,30 +1719,30 @@ class settings extends Controller
 					}
 				}
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 				
-		return Theme::i()->getTemplate( 'system' )->settingsApps( $apps );
+		return \IPS\Theme::i()->getTemplate( 'system' )->settingsApps( $apps );
 	}
 		
 	/**
 	 * Change App Permissions
 	 *
-	 * @return	void
+	 * @return	string
 	 */
-	protected function revokeApp() : void
+	protected function revokeApp()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$client = OAuthClient::load( Request::i()->client_id );
-			Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'client_id=? AND member_id=?', $client->client_id, Member::loggedIn()->member_id ) );
-			Member::loggedIn()->logHistory( 'core', 'oauth', array( 'type' => 'revoked_access_token', 'client' => $client->client_id ) );
+			$client = \IPS\Api\OAuthClient::load( \IPS\Request::i()->client_id );
+			\IPS\Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'client_id=? AND member_id=?', $client->client_id, \IPS\Member::loggedIn()->member_id ) );
+			\IPS\Member::loggedIn()->logHistory( 'core', 'oauth', array( 'type' => 'revoked_access_token', 'client' => $client->client_id ) );
 		}
-		catch ( Exception $e ) { }
+		catch ( \Exception $e ) { } 
 				
-		Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&area=apps', 'front', 'settings_apps' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=apps', 'front', 'settings_apps' ) );
 	}
 	
 	/**
@@ -2044,33 +1750,33 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function toggleSigs() : void
+	protected function toggleSigs()
 	{
-		if ( ! SettingsClass::i()->signatures_enabled )
+		if ( !\IPS\Settings::i()->signatures_enabled )
 		{
-			Output::i()->error( 'signatures_disabled', '2C122/F', 403, '' );
+			\IPS\Output::i()->error( 'signatures_disabled', '2C122/F', 403, '' );
 		}
 			
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 			
-		if ( Member::loggedIn()->members_bitoptions['view_sigs'] )
+		if ( \IPS\Member::loggedIn()->members_bitoptions['view_sigs'] )
 		{
-			Member::loggedIn()->members_bitoptions['view_sigs'] = 0;
+			\IPS\Member::loggedIn()->members_bitoptions['view_sigs'] = 0;
 		}
 		else
 		{
-			Member::loggedIn()->members_bitoptions['view_sigs'] = 1;
+			\IPS\Member::loggedIn()->members_bitoptions['view_sigs'] = 1;
 		}
 		
-		Member::loggedIn()->save();
+		\IPS\Member::loggedIn()->save();
 		
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 		
-		$redirectUrl = Request::i()->referrer() ?: Url::internal( "app=core&module=system&controller=settings", 'front', 'settings' );
-		Output::i()->redirect( $redirectUrl, 'signature_pref_toggled' );
+		$redirectUrl = \IPS\Request::i()->referrer() ?: \IPS\Http\Url::internal( "app=core&module=system&controller=settings", 'front', 'settings' );
+		\IPS\Output::i()->redirect( $redirectUrl, 'signature_pref_toggled' );
 	}
 	
 	/**
@@ -2078,21 +1784,21 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function dismissProfile() : void
+	protected function dismissProfile()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		Member::loggedIn()->members_bitoptions['profile_completion_dismissed'] = TRUE;
-		Member::loggedIn()->save();
+		\IPS\Member::loggedIn()->members_bitoptions['profile_completion_dismissed'] = TRUE;
+		\IPS\Member::loggedIn()->save();
 		
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 		else
 		{
-			$redirectUrl = Request::i()->referrer() ?: Url::internal( "app=core&module=system&controller=settings", 'front', 'settings' );
-			Output::i()->redirect( $redirectUrl );
+			$redirectUrl = \IPS\Request::i()->referrer() ?: \IPS\Http\Url::internal( "app=core&module=system&controller=settings", 'front', 'settings' );
+			\IPS\Output::i()->redirect( $redirectUrl );
 		}
 	}
 	
@@ -2101,24 +1807,24 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function completion() : void
+	protected function completion()
 	{
 		$steps = array();
-		$url = Url::internal( 'app=core&module=system&controller=settings&do=completion', 'front', 'settings' )->setQueryString( 'ref', Request::i()->ref );
+		$url = \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&do=completion', 'front', 'settings' )->setQueryString( 'ref', \IPS\Request::i()->ref );
 
-		foreach( Application::allExtensions( 'core', 'ProfileSteps' ) AS $extension )
+		foreach( \IPS\Application::allExtensions( 'core', 'ProfileSteps' ) AS $extension )
 		{
-			if ( is_array( $extension::wizard() ) AND count( $extension::wizard() ) )
+			if ( method_exists( $extension, 'wizard') AND \is_array( $extension::wizard() ) AND \count( $extension::wizard() ) )
 			{
 				$steps = array_merge( $steps, $extension::wizard() );
 			}
-			if ( method_exists( $extension, 'extraStep') AND count( $extension::extraStep() ) )
+			if ( method_exists( $extension, 'extraStep') AND \count( $extension::extraStep() ) )
 			{
 				$steps = array_merge( $steps, $extension::extraStep() );
 			}
 		}
 
-		$steps = ProfileStep::setOrder( $steps );
+		$steps = \IPS\Member\ProfileStep::setOrder( $steps );
 
 		$steps = array_merge( $steps, array( 'profile_done' => function( $data ) use ( $url ) {
 
@@ -2130,19 +1836,19 @@ class settings extends Controller
 				unset( $_SESSION['profileCompletionData'] );
 			}
 
-			$this->_performRedirect( Url::internal( "app=core&module=system&controller=settings", 'front', 'settings' ), 'saved' );
+			$this->_performRedirect( \IPS\Http\Url::internal( "app=core&module=system&controller=settings", 'front', 'settings' ), 'saved' );
 		} ) );
 
-		$wizard = new Wizard( $steps, $url, FALSE, NULL, TRUE );
-		$wizard->template = array( Theme::i()->getTemplate( 'system', 'core', 'front' ), 'completeWizardTemplate' );
+		$wizard = new \IPS\Helpers\Wizard( $steps, $url, FALSE, NULL, TRUE );
+		$wizard->template = array( \IPS\Theme::i()->getTemplate( 'system', 'core', 'front' ), 'completeWizardTemplate' );
 
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( '2fa.css', 'core', 'global' ) );
-		Output::i()->cssFiles	= array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/settings.css' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( '2fa.css', 'core', 'global' ) );
+		\IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/settings.css' ) );
 		
-		Output::i()->bodyClasses[]			= 'ipsLayout_minimal';
-		Output::i()->sidebar['enabled']	= FALSE;
-		Output::i()->title					= Member::loggedIn()->language()->addToStack( 'complete_your_profile' );
-		Output::i()->output 				= (string) $wizard;
+		\IPS\Output::i()->bodyClasses[]			= 'ipsLayout_minimal';
+		\IPS\Output::i()->sidebar['enabled']	= FALSE;
+		\IPS\Output::i()->title					= \IPS\Member::loggedIn()->language()->addToStack( 'complete_your_profile' );
+		\IPS\Output::i()->output 				= (string) $wizard;
 	}
 
 	/**
@@ -2150,20 +1856,20 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function newsletterSubscribe() : void
+	protected function newsletterSubscribe()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 
-		Member::loggedIn()->allow_admin_mails = TRUE;
-		Member::loggedIn()->save();
+		\IPS\Member::loggedIn()->allow_admin_mails = TRUE;
+		\IPS\Member::loggedIn()->save();
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 
-		$this->_performRedirect( Url::internal( "app=core&module=system&controller=settings", 'front', 'settings' ), 'block_newsletter_subscribed' );
+		$this->_performRedirect( \IPS\Http\Url::internal( "app=core&module=system&controller=settings", 'front', 'settings' ), 'block_newsletter_subscribed' );
 	}
 
 	/**
@@ -2171,48 +1877,42 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function updateAnon() : void
+	protected function updateAnon()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Check validation */
-		if( $_SESSION['mfaValidationRequired'] AND !isset( $_SESSION['passwordValidatedForMfa'] ) )
+		if( !isset( $_SESSION['passwordValidatedForMfa'] ) )
 		{
-			Output::i()->error( 'node_error', '1C122/14', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '1C122/14', 403, '' );
 		}
 
 		/* Check this value can be toggled */
-		if( Member::loggedIn()->group['g_hide_online_list'] >= 1 )
+		if( \IPS\Member::loggedIn()->group['g_hide_online_list'] >= 1 )
 		{
-			Output::i()->error( 'online_status_cannot_change', '2C122/X', 403, '' );
-		}
-
-		if ( $output = MFAHandler::accessToArea( 'core', 'DeviceManagement', $this->url->setQuerystring('do','updateDeviceEmail')->csrf()) )
-		{
-			Output::i()->output = $output;
-			return;
+			\IPS\Output::i()->error( 'online_status_cannot_change', '2C122/X', 403, '' );
 		}
 
 		/* Update the bitwise flag */
-		Member::loggedIn()->members_bitoptions['is_anon'] = (bool) Request::i()->value;
-		Member::loggedIn()->save();
+		\IPS\Member::loggedIn()->members_bitoptions['is_anon'] = (bool) \IPS\Request::i()->value;
+		\IPS\Member::loggedIn()->save();
 
 		/* Update users devices */
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_members_known_devices', array( "member_id=?", Member::loggedIn()->member_id ) ), 'IPS\Member\Device' ) AS $device )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members_known_devices', array( "member_id=?", \IPS\Member::loggedIn()->member_id ) ), 'IPS\Member\Device' ) AS $device )
 		{
-			$device->anonymous = ( Request::i()->value ) ? 1 : 0;
+			$device->anonymous = ( (bool) \IPS\Request::i()->value ) ? 1 : 0;
 			$device->save();
 		}
 
 		/* Update the session */
-		Session::i()->setType( ( Request::i()->value ) ? Front::LOGIN_TYPE_ANONYMOUS : Front::LOGIN_TYPE_MEMBER );
+		\IPS\Session::i()->setType( ( (bool) \IPS\Request::i()->value ) ? \IPS\Session\Front::LOGIN_TYPE_ANONYMOUS : \IPS\Session\Front::LOGIN_TYPE_MEMBER );
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 
-		$this->_performRedirect( Url::internal( "app=core&module=system&controller=settings&area=mfa", 'front', 'settings_mfa' ), 'saved' );
+		$this->_performRedirect( \IPS\Http\Url::internal( "app=core&module=system&controller=settings&area=mfa", 'front', 'settings_mfa' ), 'saved' );
 	}
 
 	/**
@@ -2220,24 +1920,24 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function togglePii() : void
+	protected function togglePii()
 	{
-		if ( !  SettingsClass::i()->core_datalayer_member_pii_choice OR ( $_SESSION['mfaValidationRequired'] AND !isset( $_SESSION['passwordValidatedForMfa'] ) ) OR SettingsClass::i()->pii_type !== 'on' )
+		if ( ! \IPS\Settings::i()->core_datalayer_member_pii_choice or !isset( $_SESSION['passwordValidatedForMfa'] ) OR \IPS\Settings::i()->pii_type !== 'on' )
 		{
-			Output::i()->error( 'page_not_found', '3T251/7', 404 );
+			\IPS\Output::i()->error( 'page_not_found', '3T251/7', 404 );
 		}
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Update the bitwise flag */
-		Member::loggedIn()->members_bitoptions['datalayer_pii_optout'] = ! Member::loggedIn()->members_bitoptions['datalayer_pii_optout'];
-		Member::loggedIn()->save();
+		\IPS\Member::loggedIn()->members_bitoptions['datalayer_pii_optout'] = (bool) ! \IPS\Member::loggedIn()->members_bitoptions['datalayer_pii_optout'];
+		\IPS\Member::loggedIn()->save();
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 
-		$this->_performRedirect( Url::internal( "app=core&module=system&controller=settings&area=mfa", 'front', 'settings_mfa' ), 'saved' );
+		$this->_performRedirect( \IPS\Http\Url::internal( "app=core&module=system&controller=settings&area=mfa", 'front', 'settings_mfa' ), 'saved' );
 	}
 
 	/**
@@ -2245,18 +1945,57 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function invite() : void
+	protected function invite()
 	{
-		$url = Url::internal( "" );
+		$url = \IPS\Http\Url::internal( "" );
 
-		if(  SettingsClass::i()->ref_on and Member::loggedIn()->member_id )
+		if( \IPS\Settings::i()->ref_on and \IPS\Member::loggedIn()->member_id )
 		{
-			$url = $url->setQueryString( array( '_rid' => Member::loggedIn()->member_id  ) );
+			$url = $url->setQueryString( array( '_rid' => \IPS\Member::loggedIn()->member_id  ) );
 		}
 
-		$links = Service::getAllServices( $url,  SettingsClass::i()->board_name );
-		Output::i()->title	= Member::loggedIn()->language()->addToStack( 'block_invite' );
-		Output::i()->output = Theme::i()->getTemplate( 'system' )->invite( $links, $url );
+		$links = \IPS\core\ShareLinks\Service::getAllServices( $url, \IPS\Settings::i()->board_name, NULL );
+		\IPS\Output::i()->title	= \IPS\Member::loggedIn()->language()->addToStack( 'block_invite' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->invite( $links, $url );
+	}
+
+	/**
+	 * Referrals 
+	 *
+	 * @return	string
+	 */
+	protected function _referrals()
+	{
+		if( !\IPS\Settings::i()->ref_on )
+		{
+			\IPS\Output::i()->error( 'referrals_disabled', '2C122/V', 403, '' );
+		}
+
+        \IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/referrals.css' ) );
+        
+        if ( \IPS\Theme::i()->settings['responsive'] )
+        {
+            \IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/referrals_responsive.css' ) );
+        }
+            
+		$table = new \IPS\Helpers\Table\Db( 'core_referrals', \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=referrals', 'front', 'settings_referrals' ), array( array( 'core_referrals.referred_by=?', \IPS\Member::loggedIn()->member_id ) ) );
+		$table->joins = array(
+			array( 'select' => 'm.joined', 'from' => array( 'core_members', 'm' ), 'where' => "m.member_id=core_referrals.member_id" )
+		);
+		
+		$table->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'system', 'core', 'front' ), 'referralTable' );
+		$table->rowsTemplate  = array( \IPS\Theme::i()->getTemplate( 'system', 'core', 'front' ), 'referralsRows' );
+
+		$url = \IPS\Http\Url::internal('')->setQueryString( '_rid', \IPS\Member::loggedIn()->member_id );
+		
+		$rules = NULL;
+		if ( \IPS\Application::appIsEnabled('nexus') )
+		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'clients.css', 'nexus' ) );
+			$rules = new \IPS\nexus\CommissionRule\Iterator( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_referral_rules' ), 'IPS\nexus\CommissionRule' ), \IPS\Member::loggedIn() );
+		}
+			
+		return \IPS\Theme::i()->getTemplate( 'system' )->settingsReferrals( $table, $url, $rules );
 	}
 
 	/**
@@ -2264,41 +2003,41 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function updateDeviceEmail() : void
+	protected function updateDeviceEmail()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		if ( $output = MFAHandler::accessToArea( 'core', 'DeviceManagement', $this->url->setQuerystring('do','updateDeviceEmail')->csrf()) )
+		if ( $output = \IPS\MFA\MFAHandler::accessToArea( 'core', 'DeviceManagement', $this->url->setQuerystring('do','updateDeviceEmail')->csrf()) )
 		{
-			Output::i()->output = $output;
+			\IPS\Output::i()->output = $output;
 			return;
 		}
-
+		
 		/* Update the bitwise flag */
-		Member::loggedIn()->members_bitoptions['new_device_email'] = (bool) Request::i()->value;
-		Member::loggedIn()->save();
+		\IPS\Member::loggedIn()->members_bitoptions['new_device_email'] = (bool) \IPS\Request::i()->value;
+		\IPS\Member::loggedIn()->save();
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 
-		$this->_performRedirect( Url::internal( "app=core&module=system&controller=settings&area=devices", 'front', 'settings_devices' ), 'saved' );
+		$this->_performRedirect( \IPS\Http\Url::internal( "app=core&module=system&controller=settings&area=devices", 'front', 'settings_devices' ), 'saved' );
 	}
 
 	/**
 	 * Redirect the user
 	 * -consolidated to reduce duplicate code
 	 *
-	 * @param	Url	$fallbackUrl		URL to send user to if no referrer was passed
+	 * @param	\IPS\Http\Url	$fallbackUrl		URL to send user to if no referrer was passed
 	 * @param	string			$message			(Optional) message to show during redirect
 	 * @param	bool			$return				Return URL instead of redirecting
-	 * @return    string|null
+	 * @return	void
 	 */
-	protected function _performRedirect( Url $fallbackUrl, string $message='', bool $return=FALSE ) : ?string
+	protected function _performRedirect( $fallbackUrl, $message='', $return=FALSE )
 	{
 		/* Redirect */
-		$ref = Request::i()->referrer();
+		$ref = \IPS\Request::i()->referrer();
 		if ( $ref === NULL )
 		{
 			$ref = $fallbackUrl;
@@ -2309,6 +2048,6 @@ class settings extends Controller
 			return $ref;
 		}
 
-		Output::i()->redirect( $ref, $message );
+		\IPS\Output::i()->redirect( $ref, $message );	
 	}
 }

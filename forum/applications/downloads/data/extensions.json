@@ -9,6 +9,9 @@
         "ContentRouter": {
             "Files": "IPS\\downloads\\extensions\\core\\ContentRouter\\Files"
         },
+        "CreateMenu": {
+            "File": "IPS\\downloads\\extensions\\core\\CreateMenu\\File"
+        },
         "Dashboard": {
             "Overview": "IPS\\downloads\\extensions\\core\\Dashboard\\Overview"
         },
@@ -20,10 +23,8 @@
             "Files": "IPS\\downloads\\extensions\\core\\EditorMedia\\Files"
         },
         "FileStorage": {
-            "Cards": "IPS\\downloads\\extensions\\core\\FileStorage\\Cards",
             "FileField": "IPS\\downloads\\extensions\\core\\FileStorage\\FileField",
             "Files": "IPS\\downloads\\extensions\\core\\FileStorage\\Files",
-            "Icons": "IPS\\downloads\\extensions\\core\\FileStorage\\Icons",
             "Screenshots": "IPS\\downloads\\extensions\\core\\FileStorage\\Screenshots"
         },
         "FrontNavigation": {
@@ -47,6 +48,9 @@
         "MemberRestrictions": {
             "Downloads": "IPS\\downloads\\extensions\\core\\MemberRestrictions\\Downloads"
         },
+        "MemberSync": {
+            "Downloads": "IPS\\downloads\\extensions\\core\\MemberSync\\Downloads"
+        },
         "ModeratorPermissions": {
             "Files": "IPS\\downloads\\extensions\\core\\ModeratorPermissions\\Files"
         },
@@ -62,11 +66,7 @@
         "Queue": {
             "Follow": "IPS\\downloads\\extensions\\core\\Queue\\Follow",
             "Notify": "IPS\\downloads\\extensions\\core\\Queue\\Notify",
-            "RebuildScreenshotWatermarks": "IPS\\downloads\\extensions\\core\\Queue\\RebuildScreenshotWatermarks",
-            "StoreMemberViews": "IPS\\downloads\\extensions\\core\\Queue\\StoreMemberViews"
-        },
-        "SearchContent": {
-            "Files": "IPS\\downloads\\extensions\\core\\SearchContent\\Files"
+            "RebuildScreenshotWatermarks": "IPS\\downloads\\extensions\\core\\Queue\\RebuildScreenshotWatermarks"
         },
         "Statistics": {
             "Downloads": "IPS\\downloads\\extensions\\core\\Statistics\\Downloads"

@@ -11,80 +11,41 @@
 namespace IPS\core\modules\admin\settings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Application;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Extensions\SSOAbstract;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Address;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Stack;
-use IPS\Helpers\Form\Tel;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Url as FormUrl;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Wizard;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Login as LoginClass;
-use IPS\Login\Handler;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Login Methods
  */
-class login extends Controller
+class _login extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\Login\Handler';
+	protected $nodeClass = 'IPS\Login\Handler';
 	
 	/**
 	 * Show the "add" button in the page root rather than the table root
 	 */
-	protected bool $_addButtonInRoot = FALSE;
+	protected $_addButtonInRoot = FALSE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'login_access' );
-		parent::execute();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'login_access' );
+		return parent::execute();
 	}
 	
 	/**
@@ -92,19 +53,13 @@ class login extends Controller
 	 *
 	 * @return	array
 	 */
-	public function _getRootButtons(): array
+	public function _getRootButtons()
 	{
 		$buttons = parent::_getRootButtons();
 		
 		if ( isset( $buttons['add'] ) )
 		{
 			$buttons['add']['link'] = $buttons['add']['link']->setQueryString( '_new', 1 );
-		}
-
-		/* No add button for managed */
-		if( !IPS::canManageResources() )
-		{
-			unset( $buttons['add'] );
 		}
 		
 		return $buttons;
@@ -115,31 +70,31 @@ class login extends Controller
 	 *
 	 * @return void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Work out tabs */
 		$tabs = array();
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'login_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'login_manage' ) )
 		{
 			$tabs['handlers'] = 'login_handlers';
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'login_settings' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'login_settings' ) )
 		{
 			$tabs['settings'] = 'login_settings';
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'registration_settings' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'registration_settings' ) )
 		{
 			$tabs['registration'] = 'registration_settings';
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'login_account_management' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'login_account_management' ) )
 		{
 			$tabs['accountsettings'] = 'account_management_settings';
 		}
 		
 		/* Get active tab */
-		if ( isset( Request::i()->tab ) and isset( $tabs[ Request::i()->tab ] ) )
+		if ( isset( \IPS\Request::i()->tab ) and isset( $tabs[ \IPS\Request::i()->tab ] ) )
 		{
-			$activeTab = Request::i()->tab;
+			$activeTab = \IPS\Request::i()->tab;
 		}
 		else
 		{
@@ -152,9 +107,9 @@ class login extends Controller
 		switch ( $activeTab )
 		{
 			case 'handlers':
-				Dispatcher::i()->checkAcpPermission( 'login_manage' );
+				\IPS\Dispatcher::i()->checkAcpPermission( 'login_manage' );
 				parent::manage();
-				$output = Output::i()->output;
+				$output = \IPS\Output::i()->output;
 				break;
 			case 'settings':
 				$output = $this->_settings();
@@ -168,22 +123,22 @@ class login extends Controller
 		}
 		
 		/* Output */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_settings_login');
-		if ( Request::i()->isAjax() )
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_settings_login');
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $output;
+			\IPS\Output::i()->output = $output;
 		}
 		else
 		{
-			Output::i()->sidebar['actions'] = array(
+			\IPS\Output::i()->sidebar['actions'] = array(
 				'forcelogout'	=> array(
 					'title'		=> 'force_all_logout',
 					'icon'		=> 'lock',
-					'link'		=> Url::internal( 'app=core&module=settings&controller=login&do=forceLogout' )->csrf(),
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=settings&controller=login&do=forceLogout' )->csrf(),
 					'data'		=> array( 'confirm' => '' ),
 				),
 			);
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, $output, Url::internal( "app=core&module=settings&controller=login" ) );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, $output, \IPS\Http\Url::internal( "app=core&module=settings&controller=login" ) );
 		}
 	}
 		
@@ -192,24 +147,23 @@ class login extends Controller
 	 *
 	 * @return void
 	 */
-	protected function form() : void
+	protected function form()
 	{
-		if ( Request::i()->id )
+		if ( \IPS\Request::i()->id )
 		{
-			parent::form();
+			return parent::form();
 		}
 		else
 		{
-			Output::i()->output = (string) new Wizard( array(
+			\IPS\Output::i()->output = (string) new \IPS\Helpers\Wizard( array(
 				'login_handler'	=> function( $data )
 				{
 					$options = array();
-					foreach ( Handler::handlerClasses() as $class )
+					foreach ( \IPS\Login\Handler::handlerClasses() as $class )
 					{
-						/* @var Handler $class */
 						if ( !$class::$allowMultiple )
 						{
-							foreach ( Handler::roots() as $handler )
+							foreach ( \IPS\Login\Handler::roots() as $handler )
 							{
 								if ( $handler instanceof $class )
 								{
@@ -220,8 +174,8 @@ class login extends Controller
 						$options[ $class ] = $class::getTitle();
 					}
 					
-					$form = new Form( 'login_handler_1', 'continue' );
-					$form->add( new Radio( 'login_handler', TRUE, NULL, array( 'options' => $options ), function( $val )
+					$form = new \IPS\Helpers\Form( 'login_handler_1', 'continue' );
+					$form->add( new \IPS\Helpers\Form\Radio( 'login_handler', TRUE, NULL, array( 'options' => $options ), function( $val )
 					{
 						$val::testCompatibility();
 					} ) );
@@ -241,21 +195,21 @@ class login extends Controller
 						try
 						{
 							$node->settings = array();
-							$node->order = Db::i()->select( 'MAX(login_order)', $node::$databaseTable  )->first() + 1;
+							$node->order = \IPS\Db::i()->select( 'MAX(login_order)', $node::$databaseTable  )->first() + 1;
 							$node->saveForm( $node->formatFormValues( $values ) );
 											
-							Session::i()->log( 'acplog__node_created', array( $this->title => TRUE, $node->titleForLog() => FALSE ) );
+							\IPS\Session::i()->log( 'acplog__node_created', array( $this->title => TRUE, $node->titleForLog() => FALSE ) );
 			
-							Output::i()->redirect( Url::internal('app=core&module=settings&controller=login') );
+							\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=settings&controller=login') );
 						}
-						catch ( LogicException $e )
+						catch ( \LogicException $e )
 						{
 							$form->error = $e->getMessage();
 						}
 					}
 					return $form;
 				}
-			), Url::internal('app=core&module=settings&controller=login&do=form') );
+			), \IPS\Http\Url::internal('app=core&module=settings&controller=login&do=form') );
 		}
 	}
 	
@@ -265,13 +219,13 @@ class login extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function enableToggle() : void
+	protected function enableToggle()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		$loginMethod = Handler::load( Request::i()->id );
+		$loginMethod = \IPS\Login\Handler::load( \IPS\Request::i()->id );
 		
-		if ( Request::i()->status )
+		if ( \IPS\Request::i()->status )
 		{
 			try
 			{
@@ -279,7 +233,7 @@ class login extends Controller
 			}
 			catch ( \Exception $e )
 			{
-				Output::i()->redirect( Url::internal( "app=core&module=settings&controller=login&do=form&id={$loginMethod->id}" ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=settings&controller=login&do=form&id={$loginMethod->id}" ) );
 			}
 		}
 		else
@@ -288,11 +242,11 @@ class login extends Controller
 		}
 
 		/* Clear caches */
-		unset( Store::i()->loginMethods, Store::i()->essentialCookieNames );
-		Cache::i()->clearAll();
+		unset( \IPS\Data\Store::i()->loginMethods, \IPS\Data\Store::i()->essentialCookieNames );
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Toggle */
-		parent::enableToggle();
+		return parent::enableToggle();
 	}
 	
 	/**
@@ -300,36 +254,36 @@ class login extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
 		/* Check it's okay */
-		$loginMethod = Handler::load( Request::i()->id );
+		$loginMethod = \IPS\Login\Handler::load( \IPS\Request::i()->id );
 		$this->_disableCheck( $loginMethod );
 		
 		/* Do it */
 		parent::delete();
 		
 		/* Clear caches */
-		unset( Store::i()->loginMethods, Store::i()->essentialCookieNames );
-		Cache::i()->clearAll();
+		unset( \IPS\Data\Store::i()->loginMethods );
+		\IPS\Data\Cache::i()->clearAll();
 	}
 	
 	/**
 	 * If a particular method is disabled/deleted - will we still be able to log in?
 	 *
-	 * @param	Handler	$methodToRemove	Handler to be disabled/deleted
-	 * @return	bool
+	 * @param	\IPS\Login\Handler	$methodToRemove	Handler to be disabled/deleted
+	 * @return	void
 	 */
-	protected function _disableCheck( Handler $methodToRemove ) : bool
+	protected function _disableCheck( \IPS\Login\Handler $methodToRemove )
 	{
-		foreach ( LoginClass::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
-			if ( $method != $methodToRemove and $method->canProcess( Member::loggedIn() ) and $method->acp )
+			if ( $method != $methodToRemove and $method->canProcess( \IPS\Member::loggedIn() ) and $method->acp )
 			{
 				return true;
 			}
 		}
-		Output::i()->error( 'login_handler_cannot_disable', '1C166/5', 403, '' );
+		\IPS\Output::i()->error( 'login_handler_cannot_disable', '1C166/5', 403, '' );
 	}
 	
 	/**
@@ -337,48 +291,50 @@ class login extends Controller
 	 *
 	 * @return string
 	 */
-	protected function _settings() : string
+	protected function _settings()
 	{
-		Dispatcher::i()->checkAcpPermission( 'login_settings' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'login_settings' );
 		
 		/* Build Form */
-		$form = new Form();
+		$form = new \IPS\Helpers\Form();
 		$form->addHeader( 'ipb_bruteforce_attempts_title' );
-		$form->addHtml( Theme::i()->getTemplate( 'forms' )->blurb( 'ipb_bruteforce_attempts_block_desc', true, true ) );
-		$form->add( new Number( 'ipb_bruteforce_attempts', Settings::i()->ipb_bruteforce_attempts, FALSE, array( 'min' => 0, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('after'), Member::loggedIn()->language()->addToStack('failed_logins'), 'ipb_bruteforce_attempts' ) );
-		$form->add( new Interval( 'ipb_bruteforce_period', Settings::i()->ipb_bruteforce_period, FALSE, array( 'valueAs' => Interval::MINUTES, 'min' => 0, 'max' => 10000, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL, 'ipb_bruteforce_period' ) );
-		$form->add( new YesNo( 'ipb_bruteforce_unlock', Settings::i()->ipb_bruteforce_unlock, FALSE, array(), NULL, NULL, NULL, 'ipb_bruteforce_unlock' ) );
+		$form->addMessage( 'ipb_bruteforce_attempts_block_desc', 'ipsMessage ipsMessage_info' );
+		$form->add( new \IPS\Helpers\Form\Number( 'ipb_bruteforce_attempts', \IPS\Settings::i()->ipb_bruteforce_attempts, FALSE, array( 'min' => 0, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), \IPS\Member::loggedIn()->language()->addToStack('failed_logins'), 'ipb_bruteforce_attempts' ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'ipb_bruteforce_period', \IPS\Settings::i()->ipb_bruteforce_period, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::MINUTES, 'min' => 0, 'max' => 10000, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), NULL, 'ipb_bruteforce_period' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_bruteforce_unlock', \IPS\Settings::i()->ipb_bruteforce_unlock, FALSE, array(), NULL, NULL, NULL, 'ipb_bruteforce_unlock' ) );
 		$form->addHeader( 'bruteforce_global_attempts_title' );
-		$form->addHtml( Theme::i()->getTemplate( 'forms' )->blurb( 'bruteforce_global_attempts_block_desc', true, true ) );
-		$form->add( new Number( 'bruteforce_global_attempts', Settings::i()->bruteforce_global_attempts, FALSE, array( 'min' => 5 ), NULL, Member::loggedIn()->language()->addToStack('after'), Member::loggedIn()->language()->addToStack('failed_logins'), 'bruteforce_global_attempts' ) );
-		$form->add( new Interval( 'bruteforce_global_period', Settings::i()->bruteforce_global_period, FALSE, array( 'valueAs' => Interval::MINUTES, 'min' => 0, 'max' => 10000 ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL, 'bruteforce_global_period' ) );
-
+		$form->addMessage( 'bruteforce_global_attempts_block_desc', 'ipsMessage ipsMessage_info' );
+		$form->add( new \IPS\Helpers\Form\Number( 'bruteforce_global_attempts', \IPS\Settings::i()->bruteforce_global_attempts, FALSE, array( 'min' => 5 ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), \IPS\Member::loggedIn()->language()->addToStack('failed_logins'), 'bruteforce_global_attempts' ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'bruteforce_global_period', \IPS\Settings::i()->bruteforce_global_period, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::MINUTES, 'min' => 0, 'max' => 10000 ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), NULL, 'bruteforce_global_period' ) );
 		$form->addHeader( 'login_settings' );
-		$form->add( new YesNo( 'new_device_email', Settings::i()->new_device_email, FALSE ) );
-		$form->add( new YesNo( 'login_after_inactivity_notification', Settings::i()->login_after_inactivity_notification, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'new_device_email', \IPS\Settings::i()->new_device_email, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'login_after_inactivity_notification', \IPS\Settings::i()->login_after_inactivity_notification, FALSE ) );
 		
 		/* Save */
 		if ( $values = $form->values() )
 		{
 			/* unlock all locked members if we have disabled the locking */
-			if ( Settings::i()->ipb_bruteforce_attempts > 0 AND $values['ipb_bruteforce_attempts'] == 0 )
+			if ( \IPS\Settings::i()->ipb_bruteforce_attempts > 0 AND $values['ipb_bruteforce_attempts'] == 0 )
 			{
-				Member::updateAllMembers( array( 'failed_login_count' => 0 ) );
-				Db::i()->delete( 'core_login_failures', [ 'login_member_id IS NOT NULL' ] );
+				\IPS\Member::updateAllMembers( array( 'failed_login_count' => 0 ) );
+				\IPS\Db::i()->delete( 'core_login_failures', [ 'login_member_id IS NOT NULL' ] );
 
 				/* disable task */
-				Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), "`key`='unlockmembers'" );
+				\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), "`key`='unlockmembers'" );
 			}
 			else if ( $values['ipb_bruteforce_attempts'] > 0 )
 			{
 				/* enable task */
-				Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), "`key`='unlockmembers'" );
+				\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), "`key`='unlockmembers'" );
 			}
 
 			$form->saveAsSettings( $values );
 
-			Session::i()->log( 'acplogs__login_settings' );
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=login&tab=settings' ), 'saved' );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			\IPS\Session::i()->log( 'acplogs__login_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=login&tab=settings' ), 'saved' );
 		}
 		
 		/* Display */
@@ -388,18 +344,18 @@ class login extends Controller
 	/**
 	 * HTTPS check
 	 *
-	 * @return void
+	 * @return null
 	 */
-	protected function httpsCheck() : void
+	protected function httpsCheck()
 	{
 		try
 		{
-			$response = Url::external( 'https://' . mb_substr( Settings::i()->base_url, 7 ) )->request()->get();
-			Output::i()->output = $response;
+			$response = \IPS\Http\Url::external( 'https://' . mb_substr( \IPS\Settings::i()->base_url, 7 ) )->request()->get();
+			\IPS\Output::i()->output = $response;
 		}
-		catch ( Exception $e )
+		catch ( \IPS\Http\Request\Exception $e )
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'global' )->message( $e->getMessage() ?: '500_error_title', 'error' );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->message( $e->getMessage() ?: '500_error_title', 'error' );
 		}
 	}
 	
@@ -408,141 +364,91 @@ class login extends Controller
 	 *
 	 * @return string
 	 */
-	protected function _registration() : string
+	protected function _registration()
 	{
-		Dispatcher::i()->checkAcpPermission( 'registration_settings' );
-
-		/* Check SSO Extensions for overloads */
-		$disabledSettings = $appBlocks = [];
-		$ssoSettings = [ 'allow_reg', 'allow_reg_target' ];
-		foreach( Application::allExtensions( 'core', 'SSO', FALSE ) as $app => $ext )
-		{
-			/* @var SSOAbstract $ext */
-			if( $ext->isEnabled() )
-			{
-				foreach( array_keys( $ext->overrideSettings() ) as $settingKey )
-				{
-					if( !in_array( $settingKey, $ssoSettings ) )
-					{
-						continue;
-					}
-					$appBlocks[ $app ] = Member::loggedIn()->language()->addToStack( '__app_' . explode( '_', $app )[0], FALSE );
-					$disabledSettings[ $settingKey ] = $settingKey;
-					Member::loggedIn()->language()->words[ $settingKey . '_desc'] = Member::loggedIn()->language()->addToStack( 'sso_setting_override', FALSE, [ 'pluralize' => [ count( $appBlocks ) ],'htmlsprintf' =>  [ Member::loggedIn()->language()->formatList( $appBlocks ) ] ] );
-				}
-			}
-		}
+		\IPS\Dispatcher::i()->checkAcpPermission( 'registration_settings' );
 
 		/* Build Form */
-		$form = new Form();
+		$form = new \IPS\Helpers\Form();
 		$form->addHeader('registration_standard_settings');
-		$form->addHtml( Theme::i()->getTemplate( 'forms' )->blurb( 'registration_standard_settings_blurb', true, true ) );
-		$form->add( new Radio( 'allow_reg', LoginClass::registrationType(), FALSE, [
-			'options' 	=>  [
+		$form->addMessage('registration_standard_settings_blurb');
+		$form->add( new \IPS\Helpers\Form\Radio( 'allow_reg', \IPS\Login::registrationType(), FALSE, array(
+			'options' 	=>  array(
 				'normal'	=> 'allow_reg_normal',
 				'full'		=> 'allow_reg_full',
 				'redirect'	=> 'allow_reg_redirect',
 				'disabled'	=> 'allow_reg_disabled'
-			],
-			'toggles'	=> [
-				'normal'    => [ 'allow_reg_normal_warning' ],
-				'full'		=> [ 'minimum_age', 'use_coppa' ],
-				'redirect'	=> [ 'allow_reg_target' ]
-			],
-			'disabled'	=> isset( $disabledSettings['allow_reg'] ) ? TRUE : ( Handler::findMethod( 'IPS\Login\Handler\Standard' ) ? [] : [ 'normal', 'full' ] )
-		] ) );
+			),
+			'toggles'	=> array(
+				'normal'    => array( 'allow_reg_normal_warning' ),
+				'full'		=> array( 'minimum_age', 'use_coppa' ),
+				'redirect'	=> array( 'allow_reg_target' )
+			),
+			'disabled'	=> \IPS\Login\Handler::findMethod( 'IPS\Login\Handler\Standard' ) ? array() : array( 'normal', 'full' )
+		) ) );
 	
 		/* Do we have required custom fields? */
-		if ( Db::i()->select( 'COUNT(*)', 'core_pfields_data', array( 'pf_not_null != 0 and pf_show_on_reg=1' ) )->first() )
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_pfields_data', array( 'pf_not_null != 0 and pf_show_on_reg=1' ) )->first() )
 		{
-			Member::loggedIn()->language()->words['allow_reg_normal_warning'] = Member::loggedIn()->language()->addToStack( 'allow_reg_normal_desc_required_warning' );
+			\IPS\Member::loggedIn()->language()->words['allow_reg_normal_warning'] = \IPS\Member::loggedIn()->language()->addToStack( 'allow_reg_normal_desc_required_warning' );
 		}
-
-		$form->add( new FormUrl( 'allow_reg_target', Settings::i()->allow_reg_target, NULL, [ 'disabled' => isset( $disabledSettings['allow_reg_target'] ) ], function( $val )
+		
+		$form->add( new \IPS\Helpers\Form\Url( 'allow_reg_target', \IPS\Settings::i()->allow_reg_target, NULL, array(), function( $val )
 		{
-			if ( !$val and Request::i()->allow_red === 'redirect' )
+			if ( !$val and \IPS\Request::i()->allow_red === 'redirect' )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'allow_reg_target' ) );
-		$form->add( new Number( 'minimum_age', Settings::i()->minimum_age, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'any_age' ), NULL, NULL, NULL, 'minimum_age' ) );
-		$form->add( new YesNo( 'use_coppa', Settings::i()->use_coppa, FALSE, array( 'togglesOn' => array( 'coppa_fax', 'coppa_address' ) ), NULL, NULL, NULL, 'use_coppa' ) );
-		$form->add( new Tel( 'coppa_fax', Settings::i()->coppa_fax, FALSE, array(), NULL, NULL, NULL, 'coppa_fax' ) );
-		$form->add( new Address( 'coppa_address', Settings::i()->coppa_address ? GeoLocation::buildFromJson( Settings::i()->coppa_address ) : null, FALSE, array(), NULL, NULL, NULL, 'coppa_address' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'minimum_age', \IPS\Settings::i()->minimum_age, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'any_age' ), NULL, NULL, NULL, 'minimum_age' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'use_coppa', \IPS\Settings::i()->use_coppa, FALSE, array( 'togglesOn' => array( 'coppa_fax', 'coppa_address' ) ), NULL, NULL, NULL, 'use_coppa' ) );
+		$form->add( new \IPS\Helpers\Form\Tel( 'coppa_fax', \IPS\Settings::i()->coppa_fax, FALSE, array(), NULL, NULL, NULL, 'coppa_fax' ) );
+		$form->add( new \IPS\Helpers\Form\Address( 'coppa_address', \IPS\GeoLocation::buildFromJson( \IPS\Settings::i()->coppa_address ), FALSE, array(), NULL, NULL, NULL, 'coppa_address' ) );
 		$form->addHeader('registration_global_settings');
-		$form->addHtml( Theme::i()->getTemplate( 'forms' )->blurb( 'registration_global_settings_blurb', true, true ) );
-		$form->add( new Radio( 'reg_auth_type', Settings::i()->reg_auth_type, FALSE, array(
+		$form->addMessage('registration_global_settings_blurb');
+		$form->add( new \IPS\Helpers\Form\Radio( 'reg_auth_type', \IPS\Settings::i()->reg_auth_type, FALSE, array(
 			'options'	=> array( 'user' => 'reg_auth_type_user', 'admin' => 'reg_auth_type_admin', 'admin_user' => 'reg_auth_type_admin_user', 'none' => 'reg_auth_type_none' ),
 			'toggles'	=> array( 'user' => array( 'validate_day_prune' ), 'admin_user' => array( 'validate_day_prune' ) )
 		), NULL, NULL, NULL, 'reg_auth_type' ) );
-		$form->add( new Interval( 'validate_day_prune', Settings::i()->validate_day_prune, FALSE, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL, 'validate_day_prune' ) );
-		$form->add( new Stack( 'allowed_reg_email', explode( ',', Settings::i()->allowed_reg_email ), FALSE, array( 'placeholder' => 'mycompany.com' ), function( $value ) {
+		$form->add( new \IPS\Helpers\Form\Interval( 'validate_day_prune', \IPS\Settings::i()->validate_day_prune, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), NULL, 'validate_day_prune' ) );
+		$form->add( new \IPS\Helpers\Form\Stack( 'allowed_reg_email', explode( ',', \IPS\Settings::i()->allowed_reg_email ), FALSE, array( 'placeholder' => 'mycompany.com' ), function( $value ) {
 			if( isset( $value[0] ) AND mb_stripos( $value[0], '@' ) )
 			{
-				throw new DomainException( 'allowed_reg_email_email_detected' );
+				throw new \DomainException( 'allowed_reg_email_email_detected' );
 			}
 		}, NULL, NULL ) );
-		$form->add( new Radio( 'force_reg_terms', Settings::i()->force_reg_terms, FALSE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'force_reg_terms', \IPS\Settings::i()->force_reg_terms, FALSE, array( 'options' => array(
 			'0'	=> 'force_reg_terms_0',
 			'1'	=> 'force_reg_terms_1',
 		) ) ) );
-		$form->add( new YesNo( 'reg_welcome_email', Settings::i()->reg_welcome_email, false, [ 'togglesOn' => [ 'reg_welcome_email_text' ] ] ) );
-
-		$defaultMessage = Member::loggedIn()->language()->addToStack( 'email_reg_complete', false, [ 'sprintf' => [ Settings::i()->board_name ] ] ) . Member::loggedIn()
-		->language()->addToStack( 'email_reg_complete_pass' );
-		$form->add( new Translatable( 'reg_welcome_email_text', Member::loggedIn()->language()->checkKeyExists( 'reg_welcome_email_message' ) ? null : $defaultMessage, null, [
-			'app' => 'core',
-			'key' => 'reg_welcome_email_message',
-			'editor' => [
-				'app' => 'core',
-				'key' => 'Admin',
-				'allowAttachments' => false,
-				'autoSaveKey' => 'core-Admin-reg_welcome_email_message',
-			]
-		], id: 'reg_welcome_email_text' ) );
 
 		/* Save */
 		if ( $values = $form->values() )
 		{
 			/* Save */
-			if ( isset( $values['allowed_reg_email'] ) and is_array( $values['allowed_reg_email'] ) )
+			if ( isset( $values['allowed_reg_email'] ) and \is_array( $values['allowed_reg_email'] ) )
 			{
 				$values['allowed_reg_email'] = implode( ',', $values['allowed_reg_email'] );
 			}
 			
-			if ( isset( $values['coppa_address'] ) AND ( $values['coppa_address'] instanceof GeoLocation ) )
+			if ( isset( $values['coppa_address'] ) AND ( $values['coppa_address'] instanceof \IPS\GeoLocation ) )
 			{
 				$values['coppa_address'] = json_encode( $values['coppa_address'] );
 			}
-
-			if( isset( $values['reg_welcome_email_text'] ) )
-			{
-				/* We only want to save this if it doesn't match the default */
-				Member::loggedIn()->language()->parseOutputForDisplay( $defaultMessage );
-				if( strip_tags( $values['reg_welcome_email_text'][ Member::loggedIn()->language()->id ] ) != trim( strip_tags( $defaultMessage ) ) )
-				{
-					Lang::saveCustom( 'core', 'reg_welcome_email_message', $values['reg_welcome_email_text'] );
-				}
-				else
-				{
-					Lang::deleteCustom( 'core', 'reg_welcome_email_message' );
-				}
-
-				File::claimAttachments( 'core-Admin-reg_welcome_email_message', null, null, 'reg_welcome_email_message', true );
-
-				unset( $values['reg_welcome_email_text'] );
-			}
 			
 			$form->saveAsSettings( $values );
-			Session::i()->log( 'acplogs__registration_settings' );
+			\IPS\Session::i()->log( 'acplogs__registration_settings' );
+
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
 			
 			/* Redirect */
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=login&tab=registration' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=login&tab=registration' ), 'saved' );
 		}
-		$desc = Theme::i()->getTemplate( 'global', 'core' )->message( Member::loggedIn()->language()->addToStack('registration_default_group_info', NULL, [ 'htmlsprintf' => [Group::load( Settings::i()->member_group )->formattedName ] ] ), 'none i-border-radius_0' );
+		$desc = \IPS\Theme::i()->getTemplate( 'global', 'core' )->message( \IPS\Member::loggedIn()->language()->addToStack('registration_default_group_info', NULL, [ 'sprintf' => [\IPS\Member\Group::load( \IPS\Settings::i()->member_group )->formattedName ] ] ), 'info' );
 		
 		/* Display */
-		return $desc . $form;
+		return (string) $desc . $form;
 	}
 	
 	/**
@@ -550,103 +456,74 @@ class login extends Controller
 	 *
 	 * @return string
 	 */
-	protected function _accountsettings() : string
+	protected function _accountsettings()
 	{
-		Dispatcher::i()->checkAcpPermission( 'login_account_management' );
-
-		/* Check SSO Extensions for overloads */
-		$disabledSettings = $appBlocks = [];
-		$ssoSettings = [ 'allow_email_changes', 'allow_email_changes_target', 'allow_password_changes', 'allow_password_changes_target', 'allow_forgot_password', 'allow_forgot_password_target' ];
-
-		foreach( Application::allExtensions( 'core', 'SSO', FALSE ) as $app => $ext )
-		{
-			/* @var SSOAbstract $ext */
-			if( $ext->isEnabled() )
-			{
-				foreach( array_keys( $ext->overrideSettings() ) as $settingKey )
-				{
-					if( !in_array( $settingKey, $ssoSettings ) )
-					{
-						continue;
-					}
-					$appBlocks[ $settingKey ][] = Member::loggedIn()->language()->addToStack( '__app_' . explode( '_', $app )[0], FALSE );
-					$disabledSettings[ $settingKey ] = true;
-				}
-			}
-		}
-
-		foreach( $appBlocks as $sKey => $apps )
-		{
-			Member::loggedIn()->language()->words[ $sKey . '_desc'] = Member::loggedIn()->language()->addToStack( 'sso_setting_override', FALSE, [ 'pluralize' => [ count( $apps ) ],'htmlsprintf' =>  [ Member::loggedIn()->language()->formatList( $apps ) ] ] );
-		}
-
+		\IPS\Dispatcher::i()->checkAcpPermission( 'login_account_management' );
+		
 		/* Build Form */
-		$form = new Form();
+		$form = new \IPS\Helpers\Form();
 		$form->addHeader( 'security_header_accounts' );
-		$form->add( new YesNo( 'password_strength_meter', Settings::i()->password_strength_meter, FALSE, array( 'togglesOn' => array( 'password_strength_meter_enforce' ) ), NULL, NULL, NULL, 'password_strength_meter' ) );
-		$form->add( new YesNo( 'password_strength_meter_enforce', Settings::i()->password_strength_meter_enforce, FALSE, array( 'togglesOn' => array( 'password_strength_option' ) ), NULL, NULL, NULL, 'password_strength_meter_enforce' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'password_strength_meter', \IPS\Settings::i()->password_strength_meter, FALSE, array( 'togglesOn' => array( 'password_strength_meter_enforce' ) ), NULL, NULL, NULL, 'password_strength_meter' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'password_strength_meter_enforce', \IPS\Settings::i()->password_strength_meter_enforce, FALSE, array( 'togglesOn' => array( 'password_strength_option' ) ), NULL, NULL, NULL, 'password_strength_meter_enforce' ) );
 		$strengthOptions = array(
 			'3' => 'strength_3',
 			'4' => 'strength_4',
 			'5' => 'strength_5',
 		);
-		$form->add( new Radio( 'password_strength_option', Settings::i()->password_strength_option, FALSE, array( 'options' => $strengthOptions ), NULL, NULL, NULL, 'password_strength_option' ) );
-		$form->add( new YesNo( 'device_management', Settings::i()->device_management, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'password_strength_option', \IPS\Settings::i()->password_strength_option, FALSE, array( 'options' => $strengthOptions ), NULL, NULL, NULL, 'password_strength_option' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'device_management', \IPS\Settings::i()->device_management, FALSE ) );
 		$form->addHeader('account_management_email_pass');
-		$form->addHtml( Theme::i()->getTemplate( 'forms' )->blurb( 'account_management_email_pass_blurb', true, true ) );
-		$form->add( new Radio( 'allow_email_changes', Settings::i()->allow_email_changes, FALSE, [
-			'options'	 => [
+		$form->addMessage('account_management_email_pass_blurb');
+		$form->add( new \IPS\Helpers\Form\Radio( 'allow_email_changes', \IPS\Settings::i()->allow_email_changes, FALSE, array(
+			'options'	 => array(
 				'normal'	=> 'allow_email_changes_normal',
 				'redirect'	=> 'allow_email_changes_redirect',
 				'disabled'	=> 'allow_email_changes_disabled',
-			],
-			'toggles'	=> [
-				'redirect'	=> [ 'allow_email_changes_target' ]
-			],
-			'disabled'  => isset( $disabledSettings['allow_email_changes'] )
-		] ) );
-		$form->add( new FormUrl( 'allow_email_changes_target', Settings::i()->allow_email_changes_target, NULL, [ 'disabled'  => isset( $disabledSettings['allow_email_changes_target'] ) ], function( $val )
+			),
+			'toggles'	=> array(
+				'redirect'	=> array( 'allow_email_changes_target' )
+			)
+		) ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'allow_email_changes_target', \IPS\Settings::i()->allow_email_changes_target, NULL, array(), function( $val )
 		{
-			if ( !$val and Request::i()->allow_email_changes === 'redirect' )
+			if ( !$val and \IPS\Request::i()->allow_email_changes === 'redirect' )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'allow_email_changes_target' ) );
-		$form->add( new Radio( 'allow_password_changes', Settings::i()->allow_password_changes, FALSE, [
-			'options'	 => [
+		$form->add( new \IPS\Helpers\Form\Radio( 'allow_password_changes', \IPS\Settings::i()->allow_password_changes, FALSE, array(
+			'options'	 => array(
 				'normal'	=> 'allow_password_changes_normal',
 				'redirect'	=> 'allow_password_changes_redirect',
 				'disabled'	=> 'allow_password_changes_disabled',
-			],
-			'toggles'	=> [
-				'redirect'	=> [ 'allow_password_changes_target' ]
-			],
-			'disabled'  => isset( $disabledSettings['allow_password_changes'] )
-		] ) );
-		$form->add( new FormUrl( 'allow_password_changes_target', Settings::i()->allow_password_changes_target, NULL, [ 'disabled'  => isset( $disabledSettings['allow_password_changes_target'] ) ], function( $val )
+			),
+			'toggles'	=> array(
+				'redirect'	=> array( 'allow_password_changes_target' )
+			)
+		) ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'allow_password_changes_target', \IPS\Settings::i()->allow_password_changes_target, NULL, array(), function( $val )
 		{
-			if ( !$val and Request::i()->allow_password_changes === 'redirect' )
+			if ( !$val and \IPS\Request::i()->allow_password_changes === 'redirect' )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'allow_password_changes_target' ) );
-		$form->add( new Radio( 'allow_forgot_password', Settings::i()->allow_forgot_password, FALSE, [
-			'options'	 => [
+		$form->add( new \IPS\Helpers\Form\Radio( 'allow_forgot_password', \IPS\Settings::i()->allow_forgot_password, FALSE, array(
+			'options'	 => array(
 				'normal'	=> 'allow_forgot_password_normal',
 				'handler'	=> 'allow_forgot_password_handler',
 				'redirect'	=> 'allow_forgot_password_redirect',
 				'disabled'	=> 'allow_forgot_password_disabled',
-			],
-			'toggles'	=> [
-				'redirect'	=> [ 'allow_forgot_password_target' ]
-			],
-			'disabled'  => isset( $disabledSettings['allow_forgot_password'] )
-		] ) );
-		$form->add( new FormUrl( 'allow_forgot_password_target', Settings::i()->allow_forgot_password_target, FALSE, [ 'disabled'  => isset( $disabledSettings['allow_forgot_password_target'] ) ], function( $val )
+			),
+			'toggles'	=> array(
+				'redirect'	=> array( 'allow_forgot_password_target' )
+			)
+		) ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'allow_forgot_password_target', \IPS\Settings::i()->allow_forgot_password_target, NULL, array(), function( $val )
 		{
-			if ( !$val and Request::i()->allow_forgot_password === 'redirect' )
+			if ( !$val and \IPS\Request::i()->allow_forgot_password === 'redirect' )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'allow_forgot_password_target' ) );
 
@@ -657,8 +534,8 @@ class login extends Controller
 			
 			$form->saveAsSettings( $values );
 
-			Session::i()->log( 'acplogs__account_management_settings' );
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=login&tab=accountsettings' ), 'saved' );
+			\IPS\Session::i()->log( 'acplogs__account_management_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=login&tab=accountsettings' ), 'saved' );
 		}
 		
 		/* Display */
@@ -670,14 +547,14 @@ class login extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function forceLogout() : void
+	protected function forceLogout()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		Db::i()->update( 'core_members_known_devices', array( 'login_key' => NULL ) );
-		Db::i()->delete( 'core_sessions' );
+		\IPS\Db::i()->update( 'core_members_known_devices', array( 'login_key' => NULL ) );
+		\IPS\Db::i()->delete( 'core_sessions' );
 
-		Session::i()->log( 'acplogs__logout_force' );
-		Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=login' ), 'logged_out_force' );
+		\IPS\Session::i()->log( 'acplogs__logout_force' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=login' ), 'logged_out_force' );
 	}
 }

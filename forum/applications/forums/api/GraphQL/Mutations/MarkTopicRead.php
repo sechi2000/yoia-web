@@ -10,30 +10,25 @@
  */
 
 namespace IPS\forums\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Api\GraphQL\ItemMutator;
-use IPS\forums\api\GraphQL\Types\TopicType;
-use IPS\forums\Topic;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Mark topic read mutation for GraphQL API
  */
-class MarkTopicRead extends ItemMutator
+class _MarkTopicRead extends \IPS\Content\Api\GraphQL\ItemMutator
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Mark a topic as read";
+	public static $description = "Mark a topic as read";
 
 	/*
 	 * Mutation arguments
@@ -47,10 +42,8 @@ class MarkTopicRead extends ItemMutator
 
 	/**
 	 * Return the mutation return type
-	 *
-	 * @reutrn TopicType
 	 */
-	public function type() : TopicType
+	public function type() 
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::topic();
 	}
@@ -58,24 +51,25 @@ class MarkTopicRead extends ItemMutator
 	/**
 	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @return	Topic
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\forums\Forum
 	 */
-	public function resolve( mixed $val, array $args ) : Topic
+	public function resolve($val, $args)
 	{
 		try
 		{
-			$topic = Topic::loadAndCheckPerms( $args['id'] );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( $args['id'] );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'NO_TOPIC', 'GQL/0005/1', 400 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_TOPIC', 'GQL/0005/1', 400 );
 		}
 
 		if( !$topic->can('read') )
 		{
-			throw new SafeException( 'INVALID_ID', 'GQL/0005/2', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_ID', 'GQL/0005/2', 403 );
 		}
 
 		$this->_markRead( $topic );

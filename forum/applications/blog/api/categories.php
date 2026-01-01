@@ -12,37 +12,22 @@
 namespace IPS\blog\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\blog\Category;
-use IPS\Db;
-use IPS\Http\Url\Friendly;
-use IPS\Lang;
-use IPS\Node\Api\NodeController;
-use IPS\Node\Model;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Blog Blogs API
  */
-class categories extends NodeController
+class _categories extends \IPS\Node\Api\NodeController
 {
 
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\blog\Category';
+	protected $class = 'IPS\blog\Category';
 
 	/**
 	 * GET /blog/categories
@@ -53,34 +38,33 @@ class categories extends NodeController
 	 * @apiparam	string	sortDir	Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page	Page number
 	 * @apiparam	int		perPage	Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\blog\Category>
-	 * @return PaginatedResponse<Category>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\blog\Entry>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = $this->_globalWhere();
 
 		/* Sort */
-		if ( isset( Request::i()->sortBy ) and Request::i()->sortBy == 'position' )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'position' ) ) )
 		{
-			$sortBy = 'category_' . Request::i()->sortBy;
+			$sortBy = 'category_' . \IPS\Request::i()->sortBy;
 		}
 		else
 		{
 			$sortBy = 'category_id';
 		}
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', 'blog_categories', $where, "{$sortBy} {$sortDir}" ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			\IPS\Db::i()->select( '*', 'blog_categories', $where, "{$sortBy} {$sortDir}" ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			'IPS\blog\Category',
-			Db::i()->select( 'COUNT(*)', 'blog_categories', $where )->first(),
+			\IPS\Db::i()->select( 'COUNT(*)', 'blog_categories', $where )->first(),
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 
@@ -89,10 +73,9 @@ class categories extends NodeController
 	 * Get information about a specific blog category
 	 *
 	 * @param		int		$id			ID Number
-	 * @apireturn		\IPS\blog\Category
-	 * @return Response
+	 * @return		\IPS\blog\Blog
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		return $this->_view( $id );
 	}
@@ -105,18 +88,17 @@ class categories extends NodeController
 	 * @reqapiparam	string		name				The category name
 	 * @apiparam	int|null	parent				The ID number of the parent the category should be created in. NULL for root.
 	 * @apiparam	int			position			The category position
-	 * @apireturn		\IPS\blog\Category
+	 * @return		\IPS\blog\Category
 	 * @throws		1B408/1		NO_TITLE			A name for the category must be supplied
-	 * @return Response
 	 */
-	public function POSTindex(): Response
+	public function POSTindex()
 	{
-		if ( !Request::i()->name )
+		if ( !\IPS\Request::i()->name )
 		{
-			throw new Exception( 'NO_TITLE', '1B408/1', 400 );
+			throw new \IPS\Api\Exception( 'NO_TITLE', '1B408/1', 400 );
 		}
 
-		return new Response( 201, $this->_create()->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 201, $this->_create()->apiOutput( $this->member ) );
 	}
 
 	/**
@@ -128,16 +110,14 @@ class categories extends NodeController
 	 * @apiparam	int|null	parent				The ID number of the parent the category should be created in. NULL for root.
 	 * @apiparam	int			position			The category position
 	 * @param		int		$id			ID Number
-	 * @apireturn		\IPS\blog\Category
-	 * @return Response
+	 * @return		\IPS\blog\Category
 	 */
-	public function POSTitem( int $id ): Response
+	public function POSTitem( $id )
 	{
-		/* @var Category $class */
 		$class = $this->class;
 		$category = $class::load( $id );
 
-		return new Response( 200, $this->_createOrUpdate( $category )->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $this->_createOrUpdate( $category )->apiOutput( $this->member ) );
 	}
 
 	/**
@@ -146,13 +126,11 @@ class categories extends NodeController
 	 *
 	 * @apiclientonly
 	 * @param		int		$id			ID Number
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 * @throws		2B408/3	INVALID_ID		The blog category ID does not exist or the authorized user does not have permission to delete it
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
-		/* @var Category $class */
 		$class = $this->class;
 
 		try
@@ -160,31 +138,31 @@ class categories extends NodeController
 			$category = $class::load( $id );
 			$category->delete();
 
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2B408/3', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2B408/3', 404 );
 		}
 	}
 
 	/**
 	 * Create or update node
 	 *
-	 * @param	Model	$node				The node
-	 * @return	Model
+	 * @param	\IPS\Node\Model	$category				The node
+	 * @return	\IPS\Node\Model
 	 */
-	protected function _createOrUpdate( Model $node ): Model
+	protected function _createOrUpdate( \IPS\Node\Model $category )
 	{
-		if ( isset( Request::i()->name ) )
+		if ( isset( \IPS\Request::i()->name ) )
 		{
-			Lang::saveCustom( 'blog', "blog_category_{$node->id}", Request::i()->name );
+			\IPS\Lang::saveCustom( 'blog', "blog_category_{$category->id}", \IPS\Request::i()->name );
 
-			$node->seo_name = Friendly::seoTitle( Request::i()->name );
+			$category->seo_name = \IPS\Http\Url\Friendly::seoTitle( \IPS\Request::i()->name );
 		}
 
-		$node->parent = (int) Request::i()->parent?: Category::$databaseColumnParentRootValue;
+		$category->parent = (int) \IPS\Request::i()->parent?: \IPS\blog\Category::$databaseColumnParentRootValue;
 
-		return parent::_createOrUpdate( $node );
+		return parent::_createOrUpdate( $category );
 	}
 }

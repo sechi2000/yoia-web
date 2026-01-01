@@ -11,50 +11,20 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Db\Exception;
-use IPS\Db\Select;
-use mysqli;
-use mysqli_result;
-use mysqli_stmt;
-use OutOfRangeException;
-use function count;
-use function debug_backtrace;
-use function defined;
-use function floatval;
-use function gettype;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_float;
-use function is_int;
-use function is_null;
-use function is_numeric;
-use function is_object;
-use function is_string;
-use function mb_strtolower;
-use function mysqli_report;
-use function str_contains;
-use function strlen;
-use function strtolower;
-use function substr;
-use const DEBUG_BACKTRACE_IGNORE_ARGS;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 // Make sure PHP 8.1 uses MySQL errors as we expect
-mysqli_report( MYSQLI_REPORT_OFF );
+\mysqli_report( MYSQLI_REPORT_OFF );
 
 /**
  * @brief	Database Class
  * @note	All functionality MUST be supported by MySQL 5.1.3 and higher. All references to the MySQL manual are therefore the 5.1 version.
  */
-class Db extends mysqli
+class _Db extends \mysqli
 {
 	/**
 	 * SELECT flags
@@ -68,12 +38,11 @@ class Db extends mysqli
 	 */
 	const LOW_PRIORITY = 1;
 	const IGNORE = 2;
-	const ALLOW_INCDEC_VALUES = 4;
 	
 	/**
 	 * @brief	Datatypes
 	 */
-	public static array $dataTypes = array(
+	public static $dataTypes = array(
 		'database_column_type_numeric'	=> array(
 			'TINYINT'	=> 'TINYINT [±127 ⊻ 255] [1B]',
 			'SMALLINT'	=> 'SMALLINT [±3.3e4 ⊻ 6.6e4] [2B]',
@@ -113,22 +82,22 @@ class Db extends mysqli
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	Our identifier
 	 */
-	public ?string $identifier = null;
+	public $identifier;
 
 	/**
 	 * @brief	Stored connection details so we can connect on-demand
 	 */
-	protected array $connectionDetails = array();
+	protected $connectionDetails = array();
 
 	/**
 	 * @brief	Track if we've connected
 	 */
-	protected array $connections = array( 'read' => FALSE, 'write' => FALSE );
+	protected $connections = array( 'read' => FALSE, 'write' => FALSE );
 
 	/**
 	 * Constructor
@@ -140,12 +109,12 @@ class Db extends mysqli
 	 * @param	string		$database		Database name
 	 * @param	int			$port			Port
 	 * @param	string		$socket			Socket
-	 * @param bool $utf8mb4		Use UTF8MB4?
-	 * @param string $prefix			Table prefix to use
-	 * @param array|null $readDatabase	If using read/write, the connection details for the read database
+	 * @param	bool		$utf8mb4		Use UTF8MB4?
+	 * @param	string		$prefix			Table prefix to use
+	 * @param	NULL|array	$readDatabase	If using read/write, the connection details for the read database
 	 * @return	void
 	 */
-	public function __construct($host = NULL, $username = NULL, $password = NULL, $database = "", $port = NULL, $socket = NULL, bool $utf8mb4 = true, string $prefix = '', array $readDatabase = NULL )
+	public function __construct( $host = NULL, $username = NULL, $password = NULL, $database = "", $port = NULL, $socket = NULL, $utf8mb4 = true, $prefix = '', $readDatabase = NULL )
 	{
 		$this->connectionDetails = array(
 			'host'		=> $host ?? ini_get("mysqli.default_host"),
@@ -162,17 +131,17 @@ class Db extends mysqli
 		$this->prefix = $prefix;
 
 		/* Now initialize the object so we can connect later */
-		parent::__construct();
+		parent::init();
 	}
 
 	/**
 	 * Get instance
 	 *
-	 * @param string|null $identifier			Identifier
-	 * @param array $connectionSettings	Connection settings (use when initiating a new connection)
-	 * @return    Db
+	 * @param	mixed	$identifier			Identifier
+	 * @param	array	$connectionSettings	Connection settings (use when initiating a new connection)
+	 * @return	\IPS\Db
 	 */
-	public static function i( ?string $identifier=NULL, array $connectionSettings=array() ) : Db
+	public static function i( $identifier=NULL, $connectionSettings=array() )
 	{
 		/* Did we pass a null value? */
 		$identifier	= ( $identifier === NULL ) ? '__MAIN' : $identifier;
@@ -183,19 +152,19 @@ class Db extends mysqli
 			/* Load the default settings if necessary */
 			if( $identifier === '__MAIN' )
 			{
-				require( SITE_FILES_PATH . '/conf_global.php' );
-				if (CIC2)
+				require( \IPS\SITE_FILES_PATH . '/conf_global.php' );
+				if ( \IPS\CIC2 )
 				{
 					$INFO['sql_pass']		= $_SERVER['IPS_CLOUD2_DBPASS'];
 					$INFO['sql_read_pass']	= $_SERVER['IPS_CLOUD2_DBPASS'];
 				}
-				$connectionSettings = $INFO ?? array();
+				$connectionSettings = isset( $INFO ) ? $INFO : array();
 			}
 
 			$readDatabase = NULL;
 
 			/* Read/Write Separation? */
-			if ( isset( $connectionSettings['sql_read_host'] ) and READ_WRITE_SEPARATION)
+			if ( isset( $connectionSettings['sql_read_host'] ) and \IPS\READ_WRITE_SEPARATION )
 			{
 				$readDatabase = array(
 					'host'		=> $connectionSettings['sql_read_host'],
@@ -229,10 +198,10 @@ class Db extends mysqli
 	/**
 	 * Apparently, get_charset can be unavailable
 	 *
-	 * @param bool $read	Read only connection?
+	 * @param	bool	$read	Read only connection?
 	 * @return	string
 	 */
-	public function getCharset( bool $read=FALSE ): string
+	public function getCharset( $read=FALSE )
 	{
 		if ( method_exists( $this, 'get_charset' ) )
 		{
@@ -247,10 +216,10 @@ class Db extends mysqli
 	/**
 	 * Establish database connection
 	 *
-	 * @param bool $read	Connect to read database (if specified)?
+	 * @param	bool	$read	Connect to read database (if specified)?
 	 * @return	mysqli
 	 */
-	protected function _establishConnection( bool $read=FALSE ): mysqli
+	protected function _establishConnection( $read = FALSE )
 	{
 		/* Which details to use? */
 		$sqlCredentials = $this->connectionDetails;
@@ -261,7 +230,7 @@ class Db extends mysqli
 			$sqlCredentials = $this->connectionDetails['readDatabase'];
 			$logDatabase	= 'read database';
 
-			$this->reader	= new mysqli(
+			$this->reader	= new \mysqli(
 				$sqlCredentials['host'],
 				$sqlCredentials['username'],
 				$sqlCredentials['password'],
@@ -297,11 +266,11 @@ class Db extends mysqli
 		/* If the connection failed, throw an exception */
 		if( $error )
 		{
-			throw new Exception( $error, $errno );
+			throw new \IPS\Db\Exception( $error, $errno );
 		}
 
 		/* Enable strict mode for IN_DEV */
-		if (IN_DEV)
+		if ( \IPS\IN_DEV )
 		{
 			if( $read AND $this->connectionDetails['readDatabase'] )
 			{
@@ -346,7 +315,7 @@ class Db extends mysqli
 		}
 
 		/* Set charset / collation properties */
-		if ( $this->getCharset($read) === 'utf8mb4' )
+		if ( $this->getCharset( $read ) === 'utf8mb4' )
 		{
 			$this->charset = 'utf8mb4';
 			$this->collation = 'utf8mb4_unicode_ci';
@@ -366,10 +335,10 @@ class Db extends mysqli
 	/**
 	 * Check if we are connected, and connect if not
 	 *
-	 * @param bool $read	Is this a read query (i.e. connect to reader)?
+	 * @param	bool	$read	Is this a read query (i.e. connect to reader)?
 	 * @return	void
 	 */
-	public function checkConnection( bool $read=FALSE ) : void
+	public function checkConnection( $read = FALSE )
 	{
 		/* If we aren't using read/write separation, we only have one connection */
 		if( !$this->connectionDetails['readDatabase'] )
@@ -384,7 +353,7 @@ class Db extends mysqli
 		}
 				
 		/* Connect */
-		$this->_establishConnection($read);
+		$this->_establishConnection( $read );
 
 		/* And then flag that the connection was successful */
 		$this->connections[ $read ? 'read' : 'write' ] = TRUE;
@@ -393,78 +362,57 @@ class Db extends mysqli
 	/**
 	 * @brief	Charset
 	 */
-	public string $charset = 'utf8mb4';
+	public $charset = 'utf8';
 	
 	/**
 	 * @brief	Collation
 	 */
-	public string $collation = 'utf8mb4_unicode_ci';
+	public $collation = 'utf8_unicode_ci';
 	
 	/**
 	 * @brief	Binary Collation
 	 */
-	public string $binaryCollation = 'utf8mb4_bin';
+	public $binaryCollation = 'utf8_bin';
 	
 	/**
 	 * @brief	Table Prefix
 	 */
-	public string $prefix = '';
+	public $prefix = '';
 	
 	/**
 	 * @brief	Query log
 	 */
-	public array $log = array();
+	public $log = array();
 
 	/**
 	 * @brief	Return the query instead of executing it
 	 * @note	Only designed to work with methods that call query() vs prepared statements
 	 */
-	public bool $returnQuery	= FALSE;
+	public $returnQuery	= FALSE;
 		
 	/**
 	 * @brief	MySQLi object for reading, if using read/write separation
 	 */
-	protected ?Mysqli $reader = NULL;
+	protected $reader = NULL;
 	
 	/**
 	 * @brief	Read/Write Separation Enabled
 	 * @todo	This is hacky. Do it properly later
 	 */
-	public bool $readWriteSeparation = TRUE;
-
-	/**
-	 * @var string
-	 */
-	protected string $lastCompiledQuery = '';
-
-	/**
-	 * Compile the query and return it instead of executing
-	 *
-	 * @param string $method
-	 * @param array $params
-	 * @return string
-	 */
-	public function returnQuery( string $method, array $params ) : string
-	{
-		$this->returnQuery = true;
-		$this->$method( ...$params );
-		return $this->lastCompiledQuery;
-	}
-
+	public $readWriteSeparation = TRUE;
+	
 	/**
 	 * Run a query
 	 *
-	 * @param string $query The query
-	 * @param int $result_mode
-	 * @param bool $read If TRUE and read/write separation is in use, will use the "read" connection
-	 * @return    mysqli_result|bool
-	 * @see        <a href="http://uk1.php.net/manual/en/mysqli.query.php">mysqli::query</a>
+	 * @param	string	$query	The query
+	 * @param	bool	$log	Should be logged?
+	 * @param	bool	$read	If TRUE and read/write separation is in use, will use the "read" connection 
+	 * @return	mixed
+	 * @see		<a href="http://uk1.php.net/manual/en/mysqli.query.php">mysqli::query</a>
+	 * @throws	\IPS\Db\Exception
 	 */
-	public function query( string $query, int $result_mode = MYSQLI_STORE_RESULT, bool $read=TRUE ): mysqli_result|bool
+	public function query( $query, $log = TRUE, $read=FALSE )
 	{
-		/* Store the compiled query */
-		$this->lastCompiledQuery = $query;
-
 		/* Should we return the query instead of executing it? */
 		if( $this->returnQuery === TRUE )
 		{
@@ -473,10 +421,10 @@ class Db extends mysqli
 		}
 
 		/* Make sure we're connected */
-		$this->checkConnection($read);
+		$this->checkConnection( $read );
 
 		/* Log */
-		if (QUERY_LOG)
+		if ( \IPS\QUERY_LOG and $log )
 		{
 			$this->log( $query, ( $read and $this->readWriteSeparation ) ? 'read' : 'write' );
 		}
@@ -487,7 +435,7 @@ class Db extends mysqli
 			$return = $this->reader->query( $query );
 			if ( $return === FALSE )
 			{
-				throw new Exception( $this->reader->error, $this->reader->errno );
+				throw new \IPS\Db\Exception( $this->reader->error, $this->reader->errno );
 			}
 		}
 		else
@@ -495,7 +443,7 @@ class Db extends mysqli
 			$return = parent::query( $query );
 			if ( $return === FALSE )
 			{
-				throw new Exception( $this->error, $this->errno );
+				throw new \IPS\Db\Exception( $this->error, $this->errno );
 			}
 		}
 		
@@ -506,19 +454,19 @@ class Db extends mysqli
 	/**
 	 * Force a query to run regardless of $this->returnQuery
 	 *
-	 * @param	string $query	The query
-	 * @param bool $log	Should be logged?
-	 * @param bool $read	If TRUE and read/write separation is in use, will use the "read" connection
-	 * @return    bool|mysqli_result
-	 * @throws	Exception
-	 *@see		<a href="http://uk1.php.net/manual/en/mysqli.query.php">mysqli::query</a>
+	 * @param	string	$query	The query
+	 * @param	bool	$log	Should be logged?
+	 * @param	bool	$read	If TRUE and read/write separation is in use, will use the "read" connection 
+	 * @return	mixed
+	 * @see		<a href="http://uk1.php.net/manual/en/mysqli.query.php">mysqli::query</a>
+	 * @throws	\IPS\Db\Exception
 	 */
-	public function forceQuery( string $query, bool $log=TRUE, bool $read=FALSE ): bool|mysqli_result
+	public function forceQuery( $query, $log = TRUE, $read=FALSE )
 	{
 		$return = $this->returnQuery;
 		$this->returnQuery	= false;
 
-		$result	= $this->query($query, $log, $read);
+		$result	= $this->query( $query, $log, $read );
 
 		$this->returnQuery	= $return;
 
@@ -528,15 +476,15 @@ class Db extends mysqli
 	/**
 	 * Run Prepared SQL Statement
 	 *
-	 * @param string $query	SQL Statement
+	 * @param	string	$query	SQL Statement
 	 * @param	array	$_binds	Variables to bind
-	 * @param bool $read	If TRUE and read/write separation is in use, will use the "read" connection
-	 * @return	mysqli_stmt|string
+	 * @param	bool	$read	If TRUE and read/write separation is in use, will use the "read" connection 
+	 * @return	\mysqli_stmt
 	 */
-	public function preparedQuery( string $query, array $_binds, bool $read=FALSE ): string|mysqli_stmt
+	public function preparedQuery( $query, array $_binds, $read=FALSE )
 	{
 		/* Make sure we're connected */
-		$this->checkConnection(( $read AND $this->readWriteSeparation ));
+		$this->checkConnection( ( $read AND $this->readWriteSeparation ) );
 
 		/* Init Bind object */
 		$bind = new Db\Bind();
@@ -544,16 +492,16 @@ class Db extends mysqli
 		/* Sort out subqueries */
 		$binds = array();
 		$i = 0;
-		for ( $j = 0; $j < strlen( $query ); $j++ )
+		for ( $j = 0; $j < \strlen( $query ); $j++ )
 		{
 			if ( $query[ $j ] == '?' )
 			{
 				if ( array_key_exists( $i, $_binds ) )
 				{
-					if ( $_binds[ $i ] instanceof Select )
+					if ( $_binds[ $i ] instanceof \IPS\Db\Select )
 					{
-						$query = substr( $query, 0, $j ) . $_binds[ $i ]->query . substr( $query, $j + 1);
-						$j += strlen( $_binds[ $i ]->query );
+						$query = \substr( $query, 0, $j ) . $_binds[ $i ]->query . \substr( $query, $j + 1);
+						$j += \strlen( $_binds[ $i ]->query );
 
 						foreach ( $_binds[ $i ]->binds as $_bind )
 						{
@@ -579,13 +527,13 @@ class Db extends mysqli
 		$sendAsLong = array();
 		foreach ( $binds as $bindVal )
 		{
-			if( ( is_object( $bindVal ) OR is_string( $bindVal ) ) AND strlen( (string) $bindVal ) > $longThreshold )
+			if( ( \is_object( $bindVal ) OR \is_string( $bindVal ) ) AND \strlen( (string) $bindVal ) > $longThreshold )
 			{
 				$sendAsLong[ $i ] = (string) $bindVal;
 			}
 
 			$i++;
-			switch ( gettype( $bindVal ) )
+			switch ( \gettype( $bindVal ) )
 			{
 				case 'boolean':
 				case 'integer':
@@ -597,7 +545,7 @@ class Db extends mysqli
 					break;
 												
 				case 'string':
-					if( strlen( $bindVal ) > $longThreshold )
+					if( \strlen( $bindVal ) > $longThreshold )
 					{
 						$bind->add( 'b', NULL );
 					}
@@ -610,7 +558,7 @@ class Db extends mysqli
 				case 'object':
 					if( method_exists( $bindVal, '__toString' ) )
 					{
-						if( strlen( $bindVal ) > $longThreshold )
+						if( \strlen( $bindVal ) > $longThreshold )
 						{
 							$bind->add( 'b', NULL );
 						}
@@ -640,7 +588,7 @@ class Db extends mysqli
 		}
 				
 		/* Log */
-		if (QUERY_LOG)
+		if ( \IPS\QUERY_LOG )
 		{
 			/* Log */
 			$this->log( static::_replaceBinds( $queryForLog, $binds ), ( $read and $this->readWriteSeparation ) ? 'read' : 'write' );	
@@ -663,14 +611,14 @@ class Db extends mysqli
 				$line = $b['line'];
 			}
 			
-			if( isset( $b['class'] ) and !in_array( $b['class'], array( 'IPS\Db', 'IPS\Db\Select', 'IPS\Patterns\ActiveRecord', 'IPS\Patterns\ActiveRecordIterator', 'IteratorIterator' ) ) )
+			if( isset( $b['class'] ) and !\in_array( $b['class'], array( 'IPS\_Db', 'IPS\Db\_Select', 'IPS\Patterns\_ActiveRecord', 'IPS\Patterns\_ActiveRecordIterator', 'IteratorIterator' ) ) )
 			{
 				$comment = "{$b['class']}::{$b['function']}:{$line}";
 				break;
 			}
 		}
 		$_query = $query;
-		$query = "/*" . Settings::i()->sql_database . "::" . Settings::i()->sql_user . "::{$comment}*/ {$query}";
+		$query = "/*" . \IPS\Settings::i()->sql_database . "::" . \IPS\Settings::i()->sql_user . "::{$comment}*/ {$query}";
 
 		/* Prepare */
 		if ( $read and $this->reader and $this->readWriteSeparation )
@@ -678,7 +626,7 @@ class Db extends mysqli
 			$stmt = $this->reader->prepare( $query );
 			if( $stmt === FALSE )
 			{
-				throw new Exception( $this->reader->error, $this->reader->errno, NULL, $queryForLog, $binds );
+				throw new \IPS\Db\Exception( $this->reader->error, $this->reader->errno, NULL, $queryForLog, $binds );
 			}
 		}
 		else
@@ -687,7 +635,7 @@ class Db extends mysqli
 
 			if( $stmt === FALSE )
 			{
-				throw new Exception( $this->error, $this->errno, NULL, $queryForLog, $binds );
+				throw new \IPS\Db\Exception( $this->error, $this->errno, NULL, $queryForLog, $binds );
 			}
 		}
 
@@ -696,7 +644,7 @@ class Db extends mysqli
 		{
 			$stmt->bind_param( ...$bind->get() );
 
-			if( count( $sendAsLong ) )
+			if( \count( $sendAsLong ) )
 			{
 				foreach( $sendAsLong as $index => $data )
 				{
@@ -728,7 +676,7 @@ class Db extends mysqli
 			/* Throw error */
 			else
 			{
-				throw new Exception( $stmt->error, $stmt->errno, NULL, $queryForLog, $binds );
+				throw new \IPS\Db\Exception( $stmt->error, $stmt->errno, NULL, $queryForLog, $binds );
 			}
 		}
 				
@@ -742,56 +690,38 @@ class Db extends mysqli
 	/**
 	 * Log
 	 *
-	 * @param string $logQuery	Query to log
-	 * @param string|null $server		Will be "read" or "write" to indicate which server was (or would be) used in read/write separation
+	 * @param	string	$logQuery	Query to log
+	 * @param	string	$server		Will be "read" or "write" to indicate which server was (or would be) used in read/write separation
 	 * @return	void
 	 */
-	protected function log( string $logQuery, string $server=NULL ) : void
-	{
-		/* Fix the trace a bit */
-		$trace = array();
-		$_debug = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS );
-		foreach( $_debug as $idx => $data )
-		{
-			if ( isset( $data['class'] ) and str_contains( $data['class'], 'IPS\Db' ) )
-			{
-				continue;
-			}
-
-			foreach( array( 'file', 'line', 'function', 'class' ) as $field )
-			{
-				if ( isset( $data[ $field ] ) )
-				{
-					$trace[ $idx ][ $field ] = $data[ $field ];
-				}
-			}
-		}
-
+	protected function log( $logQuery, $server=NULL )
+	{		
 		$this->log[] = array(
 			'query'		=> $logQuery,
 			'server'	=> $server,
-			'backtrace'	=> $trace,
+			'backtrace'	=> var_export( debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ), TRUE ),
 			'extra'		=> NULL,
 		);
 	}
-
+		
 	/**
 	 * Build SELECT statement
 	 *
-	 * @param array|string $columns The columns (as an array) to select or an expression
-	 * @param array|string|Select $table The table to select from. Either (string) table_name or (array) ( name, alias ) or \IPS\Db\Select object
-	 * @param array|string|null $where WHERE clause - see \IPS\Db::compileWhereClause() for details
-	 * @param string|null $order ORDER BY clause
-	 * @param int|array|null $limit Rows to fetch or array( offset, limit )
-	 * @param array|string|null $group Column(s) to GROUP BY
-	 * @param array|string|null $having HAVING clause (same format as WHERE clause)
-	 * @param int $flags Bitwise flags
-	 * @return    Select
-	 * @li    \IPS\Db::SELECT_DISTINCT                Will use SELECT DISTINCT
-	 * @li    \IPS\Db::SELECT_MULTIDIMENSIONAL_JOINS    Will return the result as a multidimensional array, with each joined table separately
-	 * @li    \IPS\Db::SELECT_FROM_WRITE_SERVER        Will send the query to the write server (if read/write separation is enabled)
+	 * @param	array|string		$columns	The columns (as an array) to select or an expression
+	 * @param	array|string		$table		The table to select from. Either (string) table_name or (array) ( name, alias ) or \IPS\Db\Select object
+	 * @param	array|string|NULL	$where		WHERE clause - see \IPS\Db::compileWhereClause() for details
+	 * @param	string|NULL			$order		ORDER BY clause
+	 * @param	array|int			$limit		Rows to fetch or array( offset, limit )
+	 * @param	string|NULL|array	$group		Column(s) to GROUP BY
+	 * @param	array|string|NULL	$having		HAVING clause (same format as WHERE clause)
+	 * @param	int					$flags		Bitwise flags
+	 *	@li	\IPS\Db::SELECT_DISTINCT				Will use SELECT DISTINCT
+	 *	@li	\IPS\Db::SELECT_MULTIDIMENSIONAL_JOINS	Will return the result as a multidimensional array, with each joined table separately
+	 *	@li	\IPS\Db::SELECT_FROM_WRITE_SERVER		Will send the query to the write server (if read/write separation is enabled)
+	 * @return	\IPS\Db\Select
+	 *
 	 */
-	public function select( array|string $columns, array|string|Select $table, array|string $where=NULL, string $order=NULL, int|array $limit=NULL, array|string $group=NULL, array|string $having=NULL, int $flags=0 ): Select
+	public function select( $columns, $table, $where=NULL, $order=NULL, $limit=NULL, $group=NULL, $having=NULL, $flags=0 )
 	{
 		$binds = array();
 		$query = 'SELECT ';
@@ -803,7 +733,7 @@ class Db extends mysqli
 		}
 
 		/* Columns */
-		if ( is_string( $columns ) )
+		if ( \is_string( $columns ) )
 		{
 			$query .= $columns;
 		}
@@ -816,16 +746,16 @@ class Db extends mysqli
 		}
 		
 		/* Tables */
-		if ( $table instanceof Select )
+		if ( $table instanceof \IPS\Db\Select )
 		{
 			$tableQuery = $table->query;
 			$binds = $table->binds;
 			preg_match( '/FROM `(.+?)`( AS `(.+?)`)?/', $tableQuery, $matches );
 			$query .= isset( $matches[3] ) ? " FROM ( {$tableQuery} ) AS `{$matches[3]}`" : ( " FROM ( {$tableQuery} ) AS `" . md5(mt_rand()) . '`' );			
 		}
-		elseif ( is_array( $table ) )
+		elseif ( \is_array( $table ) )
 		{
-			if ( is_array( $table[0] ) and count( $table[0] ) )
+			if ( \is_array( $table[0] ) and \count( $table[0] ) )
 			{
 				$tables = array();
 				foreach( $table as $item )
@@ -837,7 +767,7 @@ class Db extends mysqli
 			}
 			else
 			{
-				$tableName = ( $table[0] instanceof Select ) ? '(' . $table[0] . ')' : '`' . $this->prefix . $table[0] . '`';
+				$tableName = ( $table[0] instanceof \IPS\Db\Select ) ? '(' . $table[0] . ')' : '`' . $this->prefix . $table[0] . '`';
 				$query .= " FROM {$tableName} AS `{$table[1]}`";
 			}
 		}
@@ -857,7 +787,7 @@ class Db extends mysqli
 		/* Group? */
 		if( $group )
 		{
-			if ( is_array( $group ) )
+			if ( \is_array( $group ) )
 			{
 				$query .= " GROUP BY " . implode( ',', array_map( function( $val )
 				{
@@ -919,23 +849,23 @@ class Db extends mysqli
 		}
 		
 		/* Return */
-		return new Select( $query, $binds, $this, $flags & static::SELECT_MULTIDIMENSIONAL_JOINS, $flags & static::SELECT_FROM_WRITE_SERVER );
+		return new \IPS\Db\Select( $query, $binds, $this, $flags & static::SELECT_MULTIDIMENSIONAL_JOINS, $flags & static::SELECT_FROM_WRITE_SERVER );
 	}
-
+	
 	/**
 	 * Build UNION statement
 	 *
-	 * @param array $selects Array of \IPS\Db\Select objects
-	 * @param string|null $order ORDER BY clause
-	 * @param int|array|null $limit Rows to fetch or array( offset, limit )
-	 * @param string|null $group Group by clause
-	 * @param bool $unionAll TRUE to perform a UNION ALL, FALSE (default) to perform a regular UNION
-	 * @param int $flags Bitwise flags
-	 * @param array|string|null $where WHERE clause (see example)
-	 * @param string $querySelect Custom select for the outer query
-	 * @return    Db|Select
+	 * @param	array				$selects		Array of \IPS\Db\Select objects
+	 * @param	string|NULL			$order			ORDER BY clause
+	 * @param	array|int			$limit			Rows to fetch or array( offset, limit )
+	 * @param	string|null			$group			Group by clause
+	 * @param	bool				$unionAll		TRUE to perform a UNION ALL, FALSE (default) to perform a regular UNION
+	 * @param	int					$flags			Bitwise flags
+	 * @param	array|string|NULL	$where			WHERE clause (see example)
+	 * @param	string				$querySelect	Custom select for the outer query
+	 * @return	\IPS\Db|Select
 	 */
-	public function union( array $selects, ?string $order, int|array|null $limit, ?string $group=NULL, ?bool $unionAll=FALSE, int $flags=0, array|string $where=NULL, string $querySelect='*' ): Select|Db
+	public function union( $selects, $order, $limit, $group=NULL, $unionAll=FALSE, $flags=0, $where=NULL, $querySelect='*' )
 	{
 		/* Combine selects */
 		$query = array();
@@ -977,23 +907,24 @@ class Db extends mysqli
 		}
 		
 		/* Return */
-		$return =  new Select( $query, $binds, $this );
+		$return =  new \IPS\Db\Select( $query, $binds, $this );
 		$return->isUnion = TRUE;
 		return $return;
 	}
-
+	
 	/**
 	 * Run INSERT statement and return insert ID
 	 *
-	 * @param string $table Table name
-	 * @param array|Select $set Values to insert or array of values to set for multiple rows (NB, if providing multiple rows, they MUST all contain the same columns) or a statement to do INSERT INTO SELECT FROM
-	 * @param bool $odkUpdate Append an ON DUPLICATE KEY UPDATE clause to the query.  Similar to the replace() method but updates if a record is found, instead of delete and reinsert.
-	 * @param bool $ignoreErrors Ignore errors?
-	 * @return int|string|mysqli_stmt
-	 * @see        <a href='http://dev.mysql.com/doc/refman/5.1/en/insert.html'>INSERT Syntax</a>
-	 * @see        replace
+	 * @see		<a href='http://dev.mysql.com/doc/refman/5.1/en/insert.html'>INSERT Syntax</a>
+	 * @param	string					$table			Table name
+	 * @param	array|\IPS\Db\Select	$set			Values to insert or array of values to set for multiple rows (NB, if providing multiple rows, they MUST all contain the same columns) or a statement to do INSERT INTO SELECT FROM
+	 * @param	bool					$odkUpdate		Append an ON DUPLICATE KEY UPDATE clause to the query.  Similar to the replace() method but updates if a record is found, instead of delete and reinsert.
+	 * @param	bool					$ignoreErrors	Ignore errors?
+	 * @see		replace
+	 * @return	int
+	 * @throws	\IPS\Db\Exception
 	 */
-	public function insert( string $table, Select|array $set, bool $odkUpdate=FALSE, bool $ignoreErrors=FALSE ): int|string|mysqli_stmt
+	public function insert( $table, $set, $odkUpdate=FALSE, $ignoreErrors=FALSE )
 	{
 		/* Build */
 		$query = $this->_buildInsertQuery( ( $ignoreErrors ? 'INSERT IGNORE' : 'INSERT' ), $table, $set );
@@ -1007,7 +938,7 @@ class Db extends mysqli
 		/* Run */
 		$return = $this->returnQuery;
 
-		$stmt = $this->preparedQuery($query[0], $query[1] );
+		$stmt = $this->preparedQuery( $query[0], $query[1] );
 
 		if( $return === TRUE )
 		{
@@ -1020,24 +951,25 @@ class Db extends mysqli
 
 		return $insertId;
 	}
-
+	
 	/**
 	 * Run REPLACE statament and return number of affected rows OR inserted ID
 	 *
-	 * @param string $table Table name
-	 * @param array|Select $set Values to insert
-	 * @param bool $getInsertId If TRUE, returns the insert ID rather than the number of affected rows
-	 * @return int|string|mysqli_stmt
-	 * @see        <a href='http://dev.mysql.com/doc/refman/5.1/en/replace.html'>REPLACE Syntax</a>
+	 * @see		<a href='http://dev.mysql.com/doc/refman/5.1/en/replace.html'>REPLACE Syntax</a>
+	 * @param	string	$table			Table name
+	 * @param	array	$set			Values to insert
+	 * @param	bool	$getInsertId	If TRUE, returns the insert ID rather than the number of affected rows
+	 * @return	int
+	 * @throws	\IPS\Db\Exception
 	 */
-	public function replace( string $table, array|Select $set, bool $getInsertId=FALSE ): int|string|mysqli_stmt
+	public function replace( $table, $set, $getInsertId=false )
 	{
 		/* Build */
 		$query = $this->_buildInsertQuery( 'REPLACE', $table, $set );
 
 		$return = $this->returnQuery;
 
-		$stmt = $this->preparedQuery($query[0], $query[1]);
+		$stmt = $this->preparedQuery( $query[0], $query[1] );
 
 		if( $return === TRUE )
 		{
@@ -1055,51 +987,51 @@ class Db extends mysqli
 	 * Escapes special characters in a string for use in an SQL statement, taking into account the current charset of the connection
 	 *
 	 * @see		https://php.net/manual/en/mysqli.real-escape-string.php
-	 * @param	string	$string	The string to be escaped.
+	 * @param	string	$escapestr	The string to be escaped.
 	 * @return	string	An escaped string.
 	 */
-	public function real_escape_string( string $string ): string
+	public function real_escape_string( $escapestr )
 	{
 		/* Make sure we're connected */
-		$this->checkConnection(TRUE);
+		$this->checkConnection( TRUE );
 
-		return $this->connectionDetails['readDatabase'] ? $this->reader->real_escape_string( $string ) : parent::real_escape_string( $string );
+		return $this->connectionDetails['readDatabase'] ? $this->reader->real_escape_string( $escapestr ) : parent::real_escape_string( $escapestr );
 	}
 
 	/**
 	 * Escapes special characters in a string for use in an SQL statement, taking into account the current charset of the connection
 	 *
 	 * @see		https://php.net/manual/en/mysqli.real-escape-string.php
-	 * @param	string	$string	The string to be escaped.
+	 * @param	string	$escapestr	The string to be escaped.
 	 * @return	string	An escaped string.
 	 */
-	public function escape_string( string $string ): string
+	public function escape_string( $escapestr )
 	{
 		/* Make sure we're connected */
-		$this->checkConnection(TRUE);
+		$this->checkConnection( TRUE );
 
-		return $this->connectionDetails['readDatabase'] ? $this->reader->escape_string( $string ) : parent::escape_string( $string );
+		return $this->connectionDetails['readDatabase'] ? $this->reader->escape_string( $escapestr ) : parent::escape_string( $escapestr );
 	}
 
 	/**
 	 * Build the replace or insert into query
 	 *
-	 * @param string $type	INSERT|REPLACE
-	 * @param string $table	Table name
-	 * @param array|Select $set	Values to insert or array of values to set for multiple rows (NB, if providing multiple rows, they MUST all contain the same columns) or a statement to do INSERT INTO SELECT FROM
+	 * @param	string					$type	INSERT|REPLACE
+	 * @param	string					$table	Table name
+	 * @param	array|\IPS\Db\Select	$set	Values to insert or array of values to set for multiple rows (NB, if providing multiple rows, they MUST all contain the same columns) or a statement to do INSERT INTO SELECT FROM
 	 * @return	array	0 => query, 1 => binds, 2 => columns
 	 */
-	protected function _buildInsertQuery( string $type, string $table, Select|array $set ): array
+	protected function _buildInsertQuery( $type, $table, $set )
 	{
 		$columns	= NULL;
 
 		/* Is a statement? */
-		if ( $set instanceof Select )
+		if ( $set instanceof \IPS\Db\Select )
 		{
 			$query = "{$type} INTO `{$this->prefix}{$table}` " . $set->query;
 			$binds = $set->binds;
 		}
-		elseif ( count( $set ) == 2 and isset( $set[1] ) and $set[1] instanceof Select )
+		elseif ( \is_array( $set ) and \count( $set ) == 2 and isset( $set[1] ) and $set[1] instanceof \IPS\Db\Select )
 		{
 			$query = "{$type} INTO `{$this->prefix}{$table}` (" . $set[0] . ") " . $set[1]->query;
 			$binds = $set[1]->binds;
@@ -1109,7 +1041,7 @@ class Db extends mysqli
 			/* Is this just one row? */
 			foreach ( $set as $k => $v )
 			{
-				if ( !is_array( $v ) )
+				if ( !\is_array( $v ) )
 				{
 					$set = array( $set );
 				}
@@ -1117,9 +1049,10 @@ class Db extends mysqli
 			}
 			
 			/* Compile */
+			$columns = NULL;
 			$values = array();
 			$binds = array();
-			if ( count( $set ) )
+			if ( \count( $set ) )
 			{
 				foreach ( $set as $row )
 				{
@@ -1129,7 +1062,7 @@ class Db extends mysqli
 					}
 					
 					$binds = array_merge( $binds, array_values( $row ) );
-					$values[] = '( ' . implode( ', ', array_fill( 0, count( $columns ), '?' ) ) . ' )';
+					$values[] = '( ' . implode( ', ', array_fill( 0, \count( $columns ), '?' ) ) . ' )';
 				}
 			}
 			else
@@ -1144,35 +1077,36 @@ class Db extends mysqli
 
 		return array( 0 => $query, 1 => $binds, 2 => $columns );
 	}
-
+	
 	/**
 	 * Run UPDATE statement and return number of affected rows
 	 *
-	 * @param array|string $table Table Name, or array( Table Name => Identifier )
-	 * @param array|string $set Values to set (keys should be the table columns) or pre-formatted SET clause or \IPS\Db\Select object
-	 * @param mixed $where WHERE clause (see \IPS\Db::compileWhereClause for details)
-	 * @param array $joins Tables to join
-	 * @param int|array|null $limit LIMIT clause (see \IPS\Db::select for details)
-	 * @param int $flags Bitwise flags
-	 * @return int|string|mysqli_stmt
-	 * @li    \IPS\Db::LOW_PRIORITY            Will use LOW_PRIORITY
-	 * @li    \IPS\Db::IGNORE                    Will use IGNORE
-	 * @see        <a href='http://dev.mysql.com/doc/refman/5.1/en/update.html'>UPDATE Syntax</a>
+	 * @see		<a href='http://dev.mysql.com/doc/refman/5.1/en/update.html'>UPDATE Syntax</a>
+	 * @param	string|array	$table		Table Name, or array( Table Name => Identifier )
+	 * @param	string|array	$set		Values to set (keys should be the table columns) or pre-formatted SET clause or \IPS\Db\Select object
+	 * @param	mixed			$where		WHERE clause (see \IPS\Db::compileWhereClause for details)
+	 * @param	array			$joins		Tables to join
+	 * @param	int|array|null	$limit		LIMIT clause (see \IPS\Db::select for details)
+	 * @param	int				$flags		Bitwise flags
+	 *	@li	\IPS\Db::LOW_PRIORITY			Will use LOW_PRIORITY
+	 *	@li	\IPS\Db::IGNORE					Will use IGNORE
+	 * @return	int
+	 * @throws	\IPS\Db\Exception
 	 */
-	public function update( array|string $table, array|string $set, mixed $where='', array $joins=array(), int|array $limit=NULL, int $flags=0 ): int|string|mysqli_stmt
+	public function update( $table, $set, $where='', $joins=array(), $limit=NULL, $flags=0 )
 	{
 		$binds = array();
 		
 		/* Work out table */
-		$table = is_array( $table ) ? "`{$this->prefix}{$table[0]}` `{$this->prefix}{$table[1]}`" : "`{$this->prefix}{$table}` `{$table}`";
+		$table = \is_array( $table ) ? "`{$this->prefix}{$table[0]}` `{$this->prefix}{$table[1]}`" : "`{$this->prefix}{$table}` `{$table}`";
 
 		/* Work out joins */
 		$_joins	= array();
 		
 		foreach ( $joins as $join )
 		{
-			$type = ( isset( $join['type'] ) and in_array( mb_strtoupper( $join['type'] ), array( 'LEFT', 'INNER', 'RIGHT' ) ) ) ? mb_strtoupper( $join['type'] ) : 'LEFT';
-			$_table = is_array( $join['from'] ) ? "`{$this->prefix}{$join['from'][0]}` {$this->prefix}{$join['from'][1]}" : "`{$this->prefix}{$join['from']}` {$join['from']}";
+			$type = ( isset( $join['type'] ) and \in_array( mb_strtoupper( $join['type'] ), array( 'LEFT', 'INNER', 'RIGHT' ) ) ) ? mb_strtoupper( $join['type'] ) : 'LEFT';
+			$_table = \is_array( $join['from'] ) ? "`{$this->prefix}{$join['from'][0]}` {$this->prefix}{$join['from'][1]}" : "`{$this->prefix}{$join['from']}` {$join['from']}";
 
 			$on = $this->compileWhereClause( $join['where'] );
 			$binds = array_merge( $binds, $on['binds'] );
@@ -1182,24 +1116,17 @@ class Db extends mysqli
 		$joins = empty( $_joins ) ? '' : ( ' ' . implode( "\n", $_joins ) );
 		
 		/* Work out SET clause */
-		if ( is_array( $set ) )
+		if ( \is_array( $set ) )
 		{
 			$_set = array();
 			foreach ( $set as $k => $v )
 			{
-				if ( $flags & static::ALLOW_INCDEC_VALUES and str_contains( $v, '`' ) )
-				{
-					$_set[] = "`{$k}`={$v}";
-				}
-				else
-				{
-					$_set[] = "`{$k}`=" . ( is_object( $v ) ? '(?)' : '?' );
-					$binds[] = $v;
-				}
+				$_set[] = "`{$k}`=" . ( \is_object( $v ) ? '(?)' : '?' );
+				$binds[] = $v;
 			}
 			$set = implode( ',', $_set );
 		}
-
+				
 		/* Compile where clause */
 		if ( $where !== '' )
 		{
@@ -1229,7 +1156,7 @@ class Db extends mysqli
 		/* Run it */
 		$return = $this->returnQuery;
 
-		$stmt = $this->preparedQuery($query, $binds);
+		$stmt = $this->preparedQuery( $query, $binds );
 
 		if( $return === TRUE )
 		{
@@ -1242,24 +1169,25 @@ class Db extends mysqli
 		
 		return $return;
 	}
-
+	
 	/**
 	 * Run DELETE statement and return number of affected rows
 	 *
-	 * @param array|string $table Table Name or array of table names
-	 * @param mixed $where WHERE clause (see \IPS\Db::compileWhereClause for details)
-	 * @param mixed|null $order ORDER BY clause
-	 * @param mixed|null $limit LIMIT clause (see \IPS\Db::select for details)
-	 * @param mixed|null $statementColumn If \IPS\Db\Select is passed, this is either the name of the column that results are being loaded from (and we will use a WHERE clause like WHERE {statementColumn} IN ({select-query})) or an array to map the outer table column to the inner table column (and we will JOIN the inner table and use an ON clause like ON {statementColumn[0]} IN ({statementColumn[1]}))
-	 * @param string $deleteWhat What to delete (used when executing a multitable delete)
-	 * @param bool $statementReverse If \IPS\Db\Select is passed, TRUE will use NOT IN() rather than IN().
-	 * @return Select|string|mysqli_stmt
-	 * @see        <a href='http://dev.mysql.com/doc/refman/5.1/en/delete.html'>DELETE Syntax</a>
+	 * @see		<a href='http://dev.mysql.com/doc/refman/5.1/en/delete.html'>DELETE Syntax</a>
+	 * @param	string|array							$table				Table Name or array of table names
+	 * @param	string|array|\IPS\Db\Select|null		$where				WHERE clause (see \IPS\Db::compileWhereClause for details)
+	 * @param	string|null							$order				ORDER BY clause
+	 * @param	int|array|null						$limit				LIMIT clause (see \IPS\Db::select for details)
+	 * @param	string|array|null						$statementColumn		If \IPS\Db\Select is passed, this is either the name of the column that results are being loaded from (and we will use a WHERE clause like WHERE {statementColumn} IN ({select-query})) or an array to map the outer table column to the inner table column (and we will JOIN the inner table and use an ON clause like ON {statementColumn[0]} IN ({statementColumn[1]}))
+	 * @param	string								$deleteWhat			What to delete (used when executing a multitable delete)
+	 * @param	bool									$statementReverse	If \IPS\Db\Select is passed, TRUE will use NOT IN() rather than IN().
+	 * @return	\IPS\Db\Select
+	 * @throws	\IPS\Db\Exception
 	 */
-	public function delete( array|string $table, mixed $where=NULL, mixed $order=NULL, mixed $limit=NULL, mixed $statementColumn=NULL, string $deleteWhat='', bool $statementReverse=FALSE ): Select|string|mysqli_stmt
+	public function delete( $table, $where=NULL, $order=NULL, $limit=NULL, $statementColumn=NULL, $deleteWhat='', $statementReverse=FALSE )
 	{
 		/* Clear any size cache if it exists */
-		if( is_array( $table ) )
+		if( \is_array( $table ) )
 		{
 			foreach( $table as $_table )
 			{
@@ -1278,11 +1206,11 @@ class Db extends mysqli
 		}
 
 		/* TRUNCATE is faster, so use that if appropriate */
-		if ( $where === NULL and $limit === NULL and is_string( $table ) )
+		if ( $where === NULL and $limit === NULL and \is_string( $table ) )
 		{
 			$return = $this->returnQuery;
 
-			$stmt = $this->preparedQuery("TRUNCATE `{$this->prefix}{$table}`", array());
+			$stmt = $this->preparedQuery( "TRUNCATE `{$this->prefix}{$table}`", array() );
 
 			if( $return === TRUE )
 			{
@@ -1309,7 +1237,7 @@ class Db extends mysqli
 
 		$query .= "FROM ";
 
-		if( is_string( $table ) )
+		if( \is_string( $table ) )
 		{
 			$query .= "`{$this->prefix}{$table}`";
 		}
@@ -1319,7 +1247,7 @@ class Db extends mysqli
 
 			foreach( $table as $alias => $_table )
 			{
-				$alias = is_string( $alias ) ? $alias : $_table;
+				$alias = \is_string( $alias ) ? $alias : $_table;
 
 				$tables[] = "`{$this->prefix}{$_table}` AS `{$alias}`";
 			}
@@ -1328,9 +1256,9 @@ class Db extends mysqli
 		}
 
 		/* Is a statement? */
-		if ( $where instanceof Select )
+		if ( $where instanceof \IPS\Db\Select )
 		{
-			if( is_string( $statementColumn ) )
+			if( \is_string( $statementColumn ) )
 			{
 				$query .= ' WHERE ' . $statementColumn . ' ' . ( $statementReverse ? 'NOT ' : '' ) . 'IN(' . $where->query . ')';
 			}
@@ -1369,7 +1297,7 @@ class Db extends mysqli
 		/* Run it */
 		$return = $this->returnQuery;
 
-		$stmt = $this->preparedQuery($query, $binds);
+		$stmt = $this->preparedQuery( $query, $binds );
 
 		if( $return === TRUE )
 		{
@@ -1387,28 +1315,28 @@ class Db extends mysqli
 	 * Compile WHERE clause
 	 *
 	 * @code
-	 	* // Single clause
-	 	* "foo IS NOT NULL"
-	 	* // Single clause with bound values (always bind values to ensure they are properly escaped)
-	 	* array( 'foo=?', 'fooValue' )
-	 	* array( 'foo=? OR bar=?', 'fooValue', 'barValue' )
-	 	* // Multiple clauses (will be joined with AND) with bound values
-	 	* array( array( 'foo=?, 'fooValue' ), array( 'bar=?', 'barValue' ) )
+	 	// Single clause
+	 	"foo IS NOT NULL"
+	 	// Single clause with bound values (always bind values to ensure they are properly escaped)
+	 	array( 'foo=?', 'fooValue' )
+	 	array( 'foo=? OR bar=?', 'fooValue', 'barValue' )
+	 	// Multiple clauses (will be joined with AND) with bound values
+	 	array( array( 'foo=?, 'fooValue' ), array( 'bar=?', 'barValue' ) )
 	 * @endcode
-	 * @param array|string|null	$data	See examples
+	 * @param	string|array	$data	See examples
 	 * @return	array	Array containing the WHERE clause and the values to be bound - array( 'clause' => '1=1', 'binds' => array() )
 	 */
-	public function compileWhereClause( array|string|null $data ): array
+	public function compileWhereClause( $data )
 	{
 		$return = array( 'clause' => '1=1', 'binds' => array() );
 		
-		if( is_string( $data ) )
+		if( \is_string( $data ) )
 		{
 			$return['clause'] = $data;
 		}
-		elseif ( is_array( $data ) and ! empty( $data ) )
+		elseif ( \is_array( $data ) and ! empty( $data ) )
 		{
-			if ( is_string( $data[0] ) )
+			if ( \is_string( $data[0] ) )
 			{
 				$data = array( $data );
 			}
@@ -1416,7 +1344,7 @@ class Db extends mysqli
 			$clauses = array();
 			foreach ( $data as $bit )
 			{
-				if( !is_array( $bit ) )
+				if( !\is_array( $bit ) )
 				{
 					$clauses[] = $bit;
 				}
@@ -1466,20 +1394,20 @@ class Db extends mysqli
 	/**
 	 * Compile LIMIT clause
 	 *
-	 * @param array|int $data	Rows to fetch or array( offset, limit )
+	 * @param	int|array	$data	Rows to fetch or array( offset, limit )
 	 * @return	string
 	 */
-	public function compileLimitClause( array|int $data ): string
+	public function compileLimitClause( $data )
 	{
 		$limit = NULL;
-		if( is_array( $data ) )
+		if( \is_array( $data ) )
 		{
-			$offset = intval( $data[0] );
-			$limit  = intval( $data[1] );
+			$offset = \intval( $data[0] );
+			$limit  = \intval( $data[1] );
 		}
 		else
 		{
-			$offset = $data;
+			$offset = \intval( $data );
 		}
 
 		if( $limit !== NULL )
@@ -1496,45 +1424,45 @@ class Db extends mysqli
 	 * Compile column definition
 	 *
 	 * @code
-	 	* \IPS\Db::i()->compileColumnDefinition( array(
-	 		* 'name'			=> 'column_name',		// Column name
-	 		* 'type'			=> 'VARCHAR',			// Data type (do not specify length, etc. here)
-	 		* 'length'		=> 255,					// Length. May be required or optional depending on data type.
-	 		* 'decimals'		=> 2,					// Decimals. May be required or optional depending on data type.
-	 		* 'values'		=> array( 0, 1 ),		// Acceptable values. Required for ENUM and SET data types.
-	 		* 'allow_null'	=> FALSE,				// (Optional) Specifies whether or not NULL vavlues are allowed. Defaults to TRUE.
-	 		* 'default'		=> 'Default Value',		// (Optional) Default value
-	 		* 'comment'		=> 'Column Comment',	// (Optional) Column comment
-	 		* 'unsigned'		=> TRUE,				// (Optional) Will specify UNSIGNED for numeric types. Defaults to FALSE.
-	 		* 'auto_increment'=> TRUE,				// (Optional) Will specify auto_increment. Defaults to FALSE.
-	 		* 'primary'		=> TRUE,				// (Optional) Will specify PRIMARY KEY. Defaults to FALSE.
-	 		* 'unqiue'		=> TRUE,				// (Optional) Will specify UNIQUE. Defaults to FALSE.
-	 		* 'key'			=> TRUE,				// (Optional) Will specify KEY. Defaults to FALSE.
-	 	* ) );
+	 	\IPS\Db::i()->compileColumnDefinition( array(
+	 		'name'			=> 'column_name',		// Column name
+	 		'type'			=> 'VARCHAR',			// Data type (do not specify length, etc. here)
+	 		'length'		=> 255,					// Length. May be required or optional depending on data type.
+	 		'decimals'		=> 2,					// Decimals. May be required or optional depending on data type.
+	 		'values'		=> array( 0, 1 ),		// Acceptable values. Required for ENUM and SET data types.
+	 		'allow_null'	=> FALSE,				// (Optional) Specifies whether or not NULL vavlues are allowed. Defaults to TRUE.
+	 		'default'		=> 'Default Value',		// (Optional) Default value
+	 		'comment'		=> 'Column Comment',	// (Optional) Column comment
+	 		'unsigned'		=> TRUE,				// (Optional) Will specify UNSIGNED for numeric types. Defaults to FALSE.
+	 		'auto_increment'=> TRUE,				// (Optional) Will specify auto_increment. Defaults to FALSE.
+	 		'primary'		=> TRUE,				// (Optional) Will specify PRIMARY KEY. Defaults to FALSE.
+	 		'unqiue'		=> TRUE,				// (Optional) Will specify UNIQUE. Defaults to FALSE.
+	 		'key'			=> TRUE,				// (Optional) Will specify KEY. Defaults to FALSE.
+	 	) );
 	 * @endcode
+	 * @see		<a href='http://dev.mysql.com/doc/refman/5.1/en/create-table.html'>MySQL CREATE TABLE syntax</a>
 	 * @param	array	$data	Column Data (see \IPS\Db::createTable for details)
 	 * @return	string
-	 	 * @see        <a href='http://dev.mysql.com/doc/refman/5.1/en/create-table.html'>MySQL CREATE TABLE syntax</a>
 	 */
-	public function compileColumnDefinition( array $data ): string
+	public function compileColumnDefinition( $data )
 	{
 		/* Specify name and type */
 		$definition = "`{$data['name']}` " . mb_strtoupper( $data['type'] ) . ' ';
 		
 		/* Some types specify length */
 		if(
-			in_array( mb_strtoupper( $data['type'] ), array( 'VARCHAR', 'VARBINARY' ) )
+			\in_array( mb_strtoupper( $data['type'] ), array( 'VARCHAR', 'VARBINARY' ) )
 			or
 			(
 				isset( $data['length'] ) and $data['length']
 				and
-				in_array( mb_strtoupper( $data['type'] ), array( 'BIT', 'REAL', 'DOUBLE', 'FLOAT', 'DECIMAL', 'CHAR', 'BINARY' ) )
+				\in_array( mb_strtoupper( $data['type'] ), array( 'BIT', 'REAL', 'DOUBLE', 'FLOAT', 'DECIMAL', 'CHAR', 'BINARY' ) )
 			)
 		) {
 			$definition .= "({$data['length']}";
 			
 			/* And some of those specify decimals (which may or may not be optional) */
-			if( in_array( mb_strtoupper( $data['type'] ), array( 'DECIMAL', 'NUMERIC' ) ) and isset( $data['decimals'] ) )
+			if( \in_array( mb_strtoupper( $data['type'] ), array( 'DECIMAL', 'NUMERIC' ) ) and isset( $data['decimals'] ) )
 			{
 				$definition .= ',' . $data['decimals'];
 			}
@@ -1543,7 +1471,7 @@ class Db extends mysqli
 		}
 		
 		/* Numeric types can be UNSIGNED */
-		if( in_array( mb_strtoupper( $data['type'] ), array( 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'INTEGER', 'BIGINT', 'NUMERIC' ) ) )
+		if( \in_array( mb_strtoupper( $data['type'] ), array( 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'INTEGER', 'BIGINT', 'NUMERIC' ) ) )
 		{
 			if( isset( $data['unsigned'] ) and $data['unsigned'] === TRUE )
 			{
@@ -1552,7 +1480,7 @@ class Db extends mysqli
 		}
 		
 		/* ENUM and SETs have values */
-		if( in_array( mb_strtoupper( $data['type'] ), array( 'ENUM', 'SET' ) ) )
+		if( \in_array( mb_strtoupper( $data['type'] ), array( 'ENUM', 'SET' ) ) )
 		{
 			$values = array();
 			foreach ( $data['values'] as $v )
@@ -1564,7 +1492,7 @@ class Db extends mysqli
 		}
 		
 		/* Text types specify a character set and collation */
-		if( in_array( mb_strtoupper( $data['type'] ), array( 'CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'ENUM', 'SET' ) ) )
+		if( \in_array( mb_strtoupper( $data['type'] ), array( 'CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'ENUM', 'SET' ) ) )
 		{
 			$definition .= "CHARACTER SET {$this->charset} COLLATE {$this->collation} ";
 		}
@@ -1587,7 +1515,7 @@ class Db extends mysqli
 		else
 		{
 			/* Default value */
-			if( isset( $data['default'] ) and !in_array( mb_strtoupper( $data['type'] ), array( 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'BLOB', 'MEDIUMBLOB', 'BIGBLOB', 'LONGBLOB' ) ) )
+			if( isset( $data['default'] ) and !\in_array( mb_strtoupper( $data['type'] ), array( 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'BLOB', 'MEDIUMBLOB', 'BIGBLOB', 'LONGBLOB' ) ) )
 			{
 				if( $data['type'] == 'BIT' )
 				{
@@ -1595,7 +1523,7 @@ class Db extends mysqli
 				}
 				else
 				{
-					$defaultValue = in_array( mb_strtoupper( $data['type'] ), array( 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'INTEGER', 'BIGINT', 'REAL', 'DOUBLE', 'FLOAT', 'DECIMAL', 'NUMERIC' ) ) ? floatval( $data['default'] ) : ( ! in_array( $data['default'], array( 'CURRENT_TIMESTAMP', 'BIT' ) ) ? '\'' . $this->escape_string( $data['default'] ) . '\'' : $data['default'] );
+					$defaultValue = \in_array( mb_strtoupper( $data['type'] ), array( 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'INTEGER', 'BIGINT', 'REAL', 'DOUBLE', 'FLOAT', 'DECIMAL', 'NUMERIC' ) ) ? \floatval( $data['default'] ) : ( ! \in_array( $data['default'], array( 'CURRENT_TIMESTAMP', 'BIT' ) ) ? '\'' . $this->escape_string( $data['default'] ) . '\'' : $data['default'] );
 					$definition .= "DEFAULT {$defaultValue} ";
 				}
 			}
@@ -1629,24 +1557,24 @@ class Db extends mysqli
 	 * Compile index definition
 	 *
 	 * @code
-	 	* \IPS\Db::i()->compileIndexDefinition( array(
-	 		* 'type'		=> 'key',				// "primary", "unique", "fulltext" or "key"
-	 		* 'name'		=> 'index_name',		// Index name. Not required if type is "primary"
-	 		* 'length'	=> 200,					// Index length (used when taking part of a text field, for example)
-	 		* 'columns'	=> array( 'column' )	// Columns to be in the index
-	 	* ) );
+	 	\IPS\Db::i()->compileIndexDefinition( array(
+	 		'type'		=> 'key',				// "primary", "unique", "fulltext" or "key"
+	 		'name'		=> 'index_name',		// Index name. Not required if type is "primary"
+	 		'length'	=> 200,					// Index length (used when taking part of a text field, for example)
+	 		'columns'	=> array( 'column' )	// Columns to be in the index
+	 	) );
 	 * @endcode
+	 * @see		<a href='http://dev.mysql.com/doc/refman/5.1/en/create-index.html'>MySQL CREATE INDEX syntax</a>
+	 * @see		createTable
 	 * @param	array	$data	Index Data (see \IPS\Db::createTable for details)
 	 * @return	string
-	 *@see		<a href='http://dev.mysql.com/doc/refman/5.1/en/create-index.html'>MySQL CREATE INDEX syntax</a>
-	 * @see		createTable
 	 */
-	public function compileIndexDefinition( array $data ): string
+	public function compileIndexDefinition( $data )
 	{
 		$definition = '';
 		
 		/* Specify type */
-		switch ( strtolower( $data['type'] ) )
+		switch ( \strtolower( $data['type'] ) )
 		{
 			case 'primary':
 				$definition .= 'PRIMARY KEY ';
@@ -1669,7 +1597,7 @@ class Db extends mysqli
 		$definition .= '(' . implode( ',', array_map( function ( $val, $len )
 		{
 			return ( ! empty( $len ) ) ? "`{$val}`({$len})" : "`{$val}`";
-		}, $data['columns'], ( ( isset( $data['length'] ) AND is_array( $data['length'] ) ) ? $data['length'] : array_fill( 0, count( $data['columns'] ), null ) ) ) ) . ')';
+		}, $data['columns'], ( ( isset( $data['length'] ) AND \is_array( $data['length'] ) ) ? $data['length'] : array_fill( 0, \count( $data['columns'] ), null ) ) ) ) . ')';
 		
 		/* Return */
 		return $definition;
@@ -1678,102 +1606,102 @@ class Db extends mysqli
 	/**
 	 * Does table exist?
 	 *
-	 * @param string $name	Table Name
+	 * @param	string	$name	Table Name
 	 * @return	bool
 	 */
-	public function checkForTable( string $name ): bool
+	public function checkForTable( $name )
 	{
-		return ( $this->forceQuery("SHOW TABLES LIKE '". $this->escape_string( "{$this->prefix}{$name}" ) . "'")->num_rows > 0 );
+		return ( $this->forceQuery( "SHOW TABLES LIKE '". $this->escape_string( "{$this->prefix}{$name}" ) . "'" )->num_rows > 0 );
 	}
 
 	/**
 	 * Does column exist?
 	 *
-	 * @param string $name	Table Name
-	 * @param string $column	Column Name
+	 * @param	string	$name	Table Name
+	 * @param	string	$column	Column Name
 	 * @return	bool
 	 */
-	public function checkForColumn( string $name, string $column ): bool
+	public function checkForColumn( $name, $column )
 	{
-		return ( $this->forceQuery("SHOW COLUMNS FROM `". $this->escape_string( "{$this->prefix}{$name}" ) . "` LIKE '". $this->escape_string( $column ) . "'")->num_rows > 0 );
+		return ( $this->forceQuery( "SHOW COLUMNS FROM `". $this->escape_string( "{$this->prefix}{$name}" ) . "` LIKE '". $this->escape_string( $column ) . "'" )->num_rows > 0 );
 	}
 
 	/**
 	 * Does index exist?
 	 *
-	 * @param string $name	Table Name
-	 * @param string $index	Index Name
+	 * @param	string	$name	Table Name
+	 * @param	string	$index	Index Name
 	 * @return	bool
 	 */
-	public function checkForIndex( string $name, string $index ): bool
+	public function checkForIndex( $name, $index )
 	{
-		return ( $this->forceQuery("SHOW INDEXES FROM `". $this->escape_string( "{$this->prefix}{$name}" ) . "` WHERE Key_name LIKE '". $this->escape_string( $index ) . "'")->num_rows > 0 );
+		return ( $this->forceQuery( "SHOW INDEXES FROM `". $this->escape_string( "{$this->prefix}{$name}" ) . "` WHERE Key_name LIKE '". $this->escape_string( $index ) . "'" )->num_rows > 0 );
 	}
 	
 	/**
 	 * Create Table
 	 *
 	 * @code
-	 	* \IPS\Db::createTable( array(
-	 		* 'name'			=> 'table_name',	// Table name
-	 		* 'columns'		=> array( ... ),	// Column data - see \IPS\Db::compileColumnDefinition for details
-	 		* 'indexes'		=> array( ... ),	// (Optional) Index data - see \IPS\Db::compileIndexDefinition for details
-	 		* 'comment'		=> '...',			// (Optional) Table comment
-	 		* 'engine'		=> 'MEMORY',		// (Optional) Engine to use - will default to not specifying one, unless a FULLTEXT index is specified, in which case MyISAM is forced
-	 		* 'temporary'		=> TRUE,			// (Optional) Will sepcify CREATE TEMPORARY TABLE - defaults to FALSE
-	 		* 'if_not_exists'	=> TRUE,			// (Optional) Will sepcify CREATE TABLE name IF NOT EXISTS - defaults to FALSE
-	 	* ) );
+	 	\IPS\Db::createTable( array(
+	 		'name'			=> 'table_name',	// Table name
+	 		'columns'		=> array( ... ),	// Column data - see \IPS\Db::compileColumnDefinition for details
+	 		'indexes'		=> array( ... ),	// (Optional) Index data - see \IPS\Db::compileIndexDefinition for details
+	 		'comment'		=> '...',			// (Optional) Table comment
+	 		'engine'		=> 'MEMORY',		// (Optional) Engine to use - will default to not specifying one, unless a FULLTEXT index is specified, in which case MyISAM is forced
+	 		'temporary'		=> TRUE,			// (Optional) Will sepcify CREATE TEMPORARY TABLE - defaults to FALSE
+	 		'if_not_exists'	=> TRUE,			// (Optional) Will sepcify CREATE TABLE name IF NOT EXISTS - defaults to FALSE
+	 	) );
 	 * @endcode
 	 * @param	array	$data	Table Definition (see code sample for details)
-	 * @return    bool|mysqli_result
-	 *@throws	Exception
+	 * @throws	\IPS\Db\Exception
+	 * @return	void|string
 	 */
-	public function createTable( array $data ): mysqli_result|bool
+	public function createTable( $data )
 	{
 		/* Make sure we're connected */
-		$this->checkConnection(TRUE);
+		$this->checkConnection( TRUE );
 
-		return $this->query($this->_createTableQuery( $data ), read: false );
+		return $this->query( $this->_createTableQuery( $data ) );
 	}
 	
 	/**
 	 * Create copy of table structure
 	 *
-	 * @param string $table			The table name
-	 * @param string $newTableName	Name of table to create
-	 * @return	bool|mysqli_result
-	 * @throws    Exception
+	 * @param	string	$table			The table name
+	 * @param	string	$newTableName	Name of table to create
+	 * @throws	\IPS\Db\Exception
+	 * @return	void|string
 	 */
-	public function duplicateTableStructure( string $table, string $newTableName ): mysqli_result|bool
+	public function duplicateTableStructure( $table, $newTableName )
 	{
 		/* Make sure we're connected */
-		$this->checkConnection(TRUE);
+		$this->checkConnection( TRUE );
 
-		return $this->query("CREATE TABLE `{$this->prefix}{$newTableName}` LIKE `{$this->prefix}{$table}`", read: false );
+		return $this->query( "CREATE TABLE `{$this->prefix}{$newTableName}` LIKE `{$this->prefix}{$table}`" );
 	}
 	
 	/**
 	 * Create Table Query
 	 *
-	 * @param	array	$data	Table Definition (see code sample for details)
-	 * @return	string
-	 *@see		compileIndexDefinition
 	 * @see		<a href='http://dev.mysql.com/doc/refman/5.1/en/create-table.html'>MySQL CREATE TABLE syntax</a>
 	 * @see		compileColumnDefinition
+	 * @see		compileIndexDefinition
+	 * @param	array	$data	Table Definition (see code sample for details)
+	 * @return	string
 	 */
-	public function _createTableQuery( array $data ): string
+	public function _createTableQuery( $data )
 	{
 		$data = $this->updateDefinitionIndexLengths( $data );
-		$mysqlVersion = Db::i()->server_info;
+		$mysqlVersion = \IPS\Db::i()->server_info;
 		
 		/* Start with a basic CREATE TABLE */
 		$query = 'CREATE ';
-		if( isset( $data['temporary'] ) and $data['temporary'] )
+		if( isset( $data['temporary'] ) and $data['temporary'] === TRUE )
 		{
 			$query.= 'TEMPORARY ';
 		}
 		$query .= 'TABLE ';
-		if( isset( $data['if_not_exists'] ) and $data['if_not_exists'] )
+		if( isset( $data['if_not_exists'] ) and $data['if_not_exists'] === TRUE )
 		{
 			$query.= 'IF NOT EXISTS ';
 		}
@@ -1781,7 +1709,6 @@ class Db extends mysqli
 		/* Add in our create definition */
 		$query .= "`{$this->prefix}{$data['name']}` (\n\t";
 		$createDefinitons = array();
-		/* @var $data array */
 		foreach ( $data['columns'] as $field )
 		{
 			$createDefinitons[] = $this->compileColumnDefinition( $field );
@@ -1790,14 +1717,27 @@ class Db extends mysqli
 		{
 			foreach ( $data['indexes'] as $index )
 			{
+				if( $index['type'] === 'fulltext' )
+				{
+					/* If this is a fulltext index, set engine to myisam but only if engine is something besides innodb or myisam OR the mysql version is less than 5.6 - in
+						this case we assume the default engine is most likely either myisam or innodb */
+					if( !$this->_innoDbSupportsFulltextIndexes() OR ( isset( $data['engine'] ) AND !\in_array( mb_strtoupper( $data['engine'] ), array( 'INNODB', 'MYISAM' ) ) ) )
+					{
+						$data['engine'] = 'MYISAM';
+					}
+				}
+
 				$createDefinitons[] = $this->compileIndexDefinition( $index );
 			}
 		}
 		$query .= implode( ",\n\t", $createDefinitons );
 		$query .= "\n)\n";
-
-		/* Force to InnoDB */
-		$query .= "ENGINE InnoDB ";
+		
+		/* Specifying a particular engine? */
+		if( isset( $data['engine'] ) and $data['engine'] )
+		{
+			$query .= "ENGINE {$data['engine']} ";
+		}
 		
 		/* Specify UTF8 */
 		$query .= "CHARACTER SET {$this->charset} COLLATE {$this->collation} ";
@@ -1815,15 +1755,15 @@ class Db extends mysqli
 	/**
 	 * Rename table
 	 *
+	 * @see		<a href='http://dev.mysql.com/doc/refman/5.1/en/rename-table.html'>Rename Table</a>
 	 * @param	string	$oldName	The current table name
-	 * @param string $newName	The new name
+	 * @param	string	$newName	The new name
 	 * @return	void
-		  * @see		<a href='http://dev.mysql.com/doc/refman/5.1/en/rename-table.html'>Rename Table</a>
 	 * @see		<a href='http://stackoverflow.com/questions/12856783/best-practice-with-mysql-innodb-to-rename-huge-table-when-table-with-same-name-a'>Renaming huge InnoDB tables</a>
 	 * @see		<a href='http://www.percona.com/blog/2011/02/03/performance-problem-with-innodb-and-drop-table/'>Performance problem dropping huge InnoDB tables</a>
 	 * @note	A race condition can occur sometimes with InnoDB + innodb_file_per_table so we can't drop then rename...see above links
 	 */
-	public function renameTable( string $oldName, string $newName ) : void
+	public function renameTable( $oldName, $newName )
 	{
 		/* Find out if the table we are renaming *to* already exists */
 		$cleanUp	= FALSE;
@@ -1835,12 +1775,14 @@ class Db extends mysqli
 			$cleanUp = TRUE;
 		}
 
-		$result = $this->query("RENAME TABLE " . $query, read: false );
+		$result = $this->query( "RENAME TABLE " . $query );
 
 		if( $cleanUp )
 		{
-			$this->dropTable($newName . '_DROP', TRUE);
+			$this->dropTable( $newName . '_DROP', TRUE );
 		}
+
+		return $result;
 	}
 	
 	/**
@@ -1848,12 +1790,12 @@ class Db extends mysqli
 	 * Can only update the comment and engine
 	 * @note This will not examine key lengths and adjust.
 	 *
-	 * @param string $table		Table name
-	 * @param string|null $comment	Table comment. NULL to not change
-	 * @param string|null $engine		Engine to use. NULL to not change
+	 * @param	string			$table		Table name
+	 * @param	string|null		$comment	Table comment. NULL to not change
+	 * @param	string|null		$engine		Engine to use. NULL to not change
 	 * @return	void
 	 */
-	public function alterTable( string $table, string $comment=NULL, string $engine=NULL ) : void
+	public function alterTable( $table, $comment=NULL, $engine=NULL )
 	{
 		if ( $comment === NULL and $engine === NULL )
 		{
@@ -1865,11 +1807,32 @@ class Db extends mysqli
 		{
 			$query .= "COMMENT='{$this->escape_string( $comment )}' ";
 		}
-
-		/* Force InnoDB as the storage engine */
-		$query .= "ENGINE=InnoDB";
+		if ( $engine !== NULL )
+		{
+			$query .= "ENGINE={$engine}";
+		}
 				
-		$this->query($query, read: false );
+		return $this->query( $query );
+	}
+
+	/**
+	 * Find out the default storage engine
+	 *
+	 * @return	string
+	 */
+	public function defaultEngine()
+	{
+		$result = $this->forceQuery( "SHOW ENGINES" );
+
+		while( $engine = $result->fetch_assoc() )
+		{
+			if( mb_strtoupper( $engine['Support'] ) == 'DEFAULT' )
+			{
+				return $engine['Engine'];
+			}
+		}
+		
+		return $this->_innoDbSupportsFulltextIndexes() ? 'InnoDB' : 'MyISAM';
 	}
 	
 	/**
@@ -1877,7 +1840,7 @@ class Db extends mysqli
 	 *
 	 * @return	bool
 	 */
-	protected function _innoDbSupportsFulltextIndexes(): bool
+	protected function _innoDbSupportsFulltextIndexes()
 	{
 		/* MariaDB supports fulltext for InnoDB on versions higher than 10.0.5 */
 		if ( preg_match( '/^(\d*\.\d*(\.\d*)-)?(\d*\.\d*(\.\d*))-MariaDB/', $this->server_info, $matches ) )
@@ -1896,48 +1859,47 @@ class Db extends mysqli
 	/**
 	 * Drop table
 	 *
-	 * @param	array|string	$table		Table Name(s)
-	 * @param bool $ifExists	Adds an "IF EXISTS" clause to the query
-	 * @param bool $temporary	Table is temporary?
-	 * @return    bool|mysqli_result
-	 *@see		<a href='http://dev.mysql.com/doc/refman/5.1/en/drop-table.html'>DROP TABLE Syntax</a>
+	 * @see		<a href='http://dev.mysql.com/doc/refman/5.1/en/drop-table.html'>DROP TABLE Syntax</a>
+	 * @param	string|array	$table		Table Name(s)
+	 * @param	bool			$ifExists	Adds an "IF EXISTS" clause to the query
+	 * @param	bool			$temporary	Table is temporary?
+	 * @return	mixed
 	 */
-	public function dropTable( array|string $table, bool $ifExists=FALSE, bool $temporary=FALSE ): bool|mysqli_result
+	public function dropTable( $table, $ifExists=FALSE, $temporary=FALSE )
 	{
 		$prefix = $this->prefix;
 		
 		return $this->query(
-			'DROP '
-		  . ( $temporary ? 'TEMPORARY ' : '' )
-		  . 'TABLE '
-		  . ( $ifExists ? 'IF EXISTS ' :'' )
-		  . implode( ', ', array_map(
-			  function( $val ) use ( $prefix )
-			  {
-				  return '`' . $prefix . $val . '`';
-			  },
-			  ( is_array( $table ) ? $table : array( $table ) )
-		  ) ),
-			read: false
+			  'DROP '
+			. ( $temporary ? 'TEMPORARY ' : '' )
+			. 'TABLE '
+			. ( $ifExists ? 'IF EXISTS ' :'' )
+			. implode( ', ', array_map(
+				function( $val ) use ( $prefix )
+				{
+					return '`' . $prefix . $val . '`';
+				},
+				( \is_array( $table ) ? $table : array( $table ) )
+			) )
 		);
 	}
 
 	/**
 	 * Get database tables
 	 *
-	 * @param string|null $prefix		Optional table prefix to filter by
+	 * @param	string|NULL		$prefix		Optional table prefix to filter by
 	 * @return	array
 	 */
-	public function getTables( string $prefix=NULL ): array
+	public function getTables( $prefix=NULL )
 	{
-		$query	= $this->query("SHOW TABLES");
+		$query	= $this->query( "SHOW TABLES" );
 		$tables	= array();
 
 		while ( $row = $query->fetch_assoc() )
 		{
 			$name = array_pop($row);
 
-			if ( $prefix === NULL OR mb_substr( $name, 0, strlen( $prefix ) ) === $prefix )
+			if ( $prefix === NULL OR mb_substr( $name, 0, \strlen( $prefix ) ) === $prefix )
 			{
 				$tables[] = $name;
 			}
@@ -1949,15 +1911,15 @@ class Db extends mysqli
 	/**
 	 * Get the table definition for an existing table
 	 *
+	 * @see		createTable
 	 * @param	string	$table	Table Name
-		  * @param boolean $columnsOnly	Fetch columns only
-	 * @param boolean $getCollation	Get column collations
+	 * @param	boolean	$columnsOnly	Fetch columns only
+	 * @param	boolean	$getCollation	Get column collations
 	 * @return	array	Table definition - see IPS\Db::createTable for details
-	 * @throws	OutOfRangeException
-	 * @throws	Exception
-	 *@see		createTable
+	 * @throws	\OutOfRangeException
+	 * @throws	\IPS\Db\Exception
 	 */
-	public function getTableDefinition( string $table, bool $columnsOnly=FALSE, bool $getCollation=FALSE ): array
+	public function getTableDefinition( $table, $columnsOnly=FALSE, $getCollation=FALSE )
 	{
 		/* Set name */
 		$definition = array(
@@ -1967,18 +1929,19 @@ class Db extends mysqli
 		/* Fetch columns */
 		if( !$this->checkForTable( $table ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
-		$query = $this->forceQuery("SHOW FULL COLUMNS FROM `{$this->prefix}" . $this->escape_string( $table ) . '`');
+		$query = $this->forceQuery( "SHOW FULL COLUMNS FROM `{$this->prefix}" . $this->escape_string( $table ) . '`' );
 		if ( $query->num_rows === 0 )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		while ( $row = $query->fetch_assoc() )
 		{
 			/* Set basic information */
 			$columnDefinition = array(
 				'name' => $row['Field'],
+				'type'		=> '',
 				'length'	=> 0,
 				'decimals'	=> NULL,
 				'values'	=> array()
@@ -2011,10 +1974,10 @@ class Db extends mysqli
 				else
 				{						
 					$lengthInfo = explode( ',', $matches[2] );
-					$columnDefinition['length'] = intval( $lengthInfo[0] );
+					$columnDefinition['length'] = \intval( $lengthInfo[0] );
 					if( isset( $lengthInfo[1] ) )
 					{
-						$columnDefinition['decimals'] = intval( $lengthInfo[1] );
+						$columnDefinition['decimals'] = \intval( $lengthInfo[1] );
 					}
 				}
 			}
@@ -2027,7 +1990,7 @@ class Db extends mysqli
 			}
 			
 			/* unsigned? */
-			$columnDefinition['unsigned'] = in_array( 'unsigned', $typeInfo );
+			$columnDefinition['unsigned'] = \in_array( 'unsigned', $typeInfo );
 
 			/* Allow NULL? */
 			$columnDefinition['allow_null'] = ( $row['Null'] === 'YES' );
@@ -2050,10 +2013,10 @@ class Db extends mysqli
 		{
 			/* Fetch indexes */
 			$indexes = array();
-			$query = $this->forceQuery("SHOW INDEXES FROM `{$this->prefix}{$table}`");
+			$query = $this->forceQuery( "SHOW INDEXES FROM `{$this->prefix}{$table}`" );
 			while ( $row = $query->fetch_assoc() )
 			{
-				$length = ( isset( $row['Sub_part'] ) AND ! empty( $row['Sub_part'] ) ) ? intval( $row['Sub_part'] ) : null;
+				$length = ( isset( $row['Sub_part'] ) AND ! empty( $row['Sub_part'] ) ) ? \intval( $row['Sub_part'] ) : null;
 				
 				if( isset( $indexes[ $row['Key_name'] ] ) )
 				{
@@ -2087,7 +2050,7 @@ class Db extends mysqli
 			$definition['indexes'] = $indexes;
 			
 			/* Finally, get the table comment and engine */
-			$row = $this->forceQuery("SHOW TABLE STATUS LIKE '{$this->prefix}" . $this->escape_string( $table ) . "'")->fetch_assoc();
+			$row = $this->forceQuery( "SHOW TABLE STATUS LIKE '{$this->prefix}" . $this->escape_string( $table ) . "'" )->fetch_assoc();
 
 			if( $row['Comment'] )
 			{
@@ -2109,104 +2072,44 @@ class Db extends mysqli
 		/* Return */
 		return $definition;
 	}
-
-	/**
-	 * Alter a table and add multiple columns and indexes
-	 *
-	 * @param string $table
-	 * @param array $columns
-	 * @param array $indexes
-	 * @return mysqli_result|bool
-	 */
-	public function addColumnsAndIndexes( string $table, array $columns=array(), array $indexes=array() ) : mysqli_result|bool
-	{
-		$query = "ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` ADD( ";
-
-		$columnClauses = [];
-		foreach( $columns as $column )
-		{
-			$columnClauses[] = $this->compileColumnDefinition( $column );
-		}
-		$query .= implode( ", ", $columnClauses );
-
-		/* If we have both columns and indexes, add a comma here */
-		if( count( $columns ) and count( $indexes ) )
-		{
-			$query .= ", ";
-		}
-
-		$indexClauses = [];
-		foreach( $indexes as $index )
-		{
-			$indexClauses[] = $this->compileIndexDefinition( $index );
-		}
-
-		$query .= implode( ", ", $indexClauses );
-		$query .= " );";
-
-		return $this->query( $query, read: false );
-	}
-
-	/**
-	 * Change multiple columns/indexes in one query
-	 *
-	 * @param string $table
-	 * @param array $columns
-	 * @param array $indexes
-	 * @return mysqli_result|bool
-	 */
-	public function changeColumnsAndIndexes( string $table, array $columns=array() ) : mysqli_result|bool
-	{
-		$query = "ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` ";
-
-		$columnClauses = [];
-		foreach( $columns as $columnName => $newColumnDefinition )
-		{
-			$columnClauses[] = "CHANGE COLUMN `{$columnName}` " . $this->compileColumnDefinition( $newColumnDefinition );
-		}
-		$query .= implode( ", ", $columnClauses );
-		$query .= ";";
-
-		return $this->query( $query, read: false );
-	}
 	
 	/**
 	 * Add column to table in database
 	 *
+	 * @see		compileColumnDefinition
 	 * @param	string	$table			Table name
-	 * @param array $definition		Column Definition (see \IPS\Db::compileColumnDefinition for details)
-	 * @return    bool|mysqli_result
-	 *@see		compileColumnDefinition
+	 * @param	array	$definition		Column Definition (see \IPS\Db::compileColumnDefinition for details)
+	 * @return	void
 	 */
-	public function addColumn(string $table, array $definition ): mysqli_result|bool
+	public function addColumn( $table, $definition )
 	{
-		return $this->query("ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` ADD COLUMN {$this->compileColumnDefinition( $definition )}", MYSQLI_STORE_RESULT, false );
+		return $this->query( "ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` ADD COLUMN {$this->compileColumnDefinition( $definition )}" );
 	}
 	
 	/**
 	 * Modify an existing column
 	 *
+	 * @see		compileColumnDefinition
 	 * @param	string	$table			Table name
-	 * @param string $column			Column name
-	 * @param array $definition		New column definition (see \IPS\Db::compileColumnDefinition for details)
-	 * @return    bool|mysqli_result
-	 *@see		compileColumnDefinition
+	 * @param	string	$column			Column name
+	 * @param	array	$definition		New column definition (see \IPS\Db::compileColumnDefinition for details)
+	 * @return	void
 	 */
-	public function changeColumn(string $table, string $column, array $definition ): mysqli_result|bool
+	public function changeColumn( $table, $column, $definition )
 	{
-		return $this->query("ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` CHANGE COLUMN `{$this->escape_string( $column )}` {$this->compileColumnDefinition( $definition )}", MYSQLI_STORE_RESULT, false );
+		return $this->query( "ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` CHANGE COLUMN `{$this->escape_string( $column )}` {$this->compileColumnDefinition( $definition )}" );
 	}
 	
 	/**
 	 * Drop a column
 	 *
-	 * @param string $table			Table name
-	 * @param array|string $column			Column name
-	 * @return    bool|mysqli_result
+	 * @param	string			$table			Table name
+	 * @param	string|array	$column			Column name
+	 * @return	void
 	 */
-	public function dropColumn( string $table, array|string $column ) : bool|mysqli_result
+	public function dropColumn( $table, $column )
 	{
-		if( is_array( $column ) )
+		if( \is_array( $column ) )
 		{
 			$drops	= array();
 
@@ -2222,57 +2125,57 @@ class Db extends mysqli
 			$statement = "DROP COLUMN `{$this->escape_string( $column )}`";
 		}
 
-		return $this->query("ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` {$statement};", MYSQLI_STORE_RESULT, false );
+		return $this->query( "ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` {$statement};" );
 	}
 	
 	/**
 	 * Add index to table in database
 	 *
+	 * @see		compileIndexDefinition
 	 * @param	string	$table				Table name
-	 * @param array $definition			Index Definition (see \IPS\Db::compileIndexDefinition for details)
-	 * @param bool $discardDuplicates	If adding a unique index, should duplicates be discarded? (If FALSE and there are any, an exception will be thrown)
+	 * @param	array	$definition			Index Definition (see \IPS\Db::compileIndexDefinition for details)
+	 * @param	bool	$discardDuplicates	If adding a unique index, should duplicates be discarded? (If FALSE and there are any, an exception will be thrown)
 	 * @return	void
-	 *@see		compileIndexDefinition
 	 */
-	public function addIndex( string $table, array $definition, bool $discardDuplicates=TRUE ) : void
+	public function addIndex( $table, $definition, $discardDuplicates=TRUE )
 	{
 		/* If it's a unique index, make sure there won't be any duplicates */
-		if ( $discardDuplicates and in_array( $definition['type'], array( 'primary', 'unique' ) ) AND $this->returnQuery === FALSE )
+		if ( $discardDuplicates and \in_array( $definition['type'], array( 'primary', 'unique' ) ) AND $this->returnQuery === FALSE )
 		{
 			$this->duplicateTableStructure( $table, "{$table}_temp" );
 			$this->addIndex( "{$table}_temp", $definition, FALSE );
-			$this->insert("{$table}_temp", Db::i()->select('*', $table), FALSE, TRUE);
-			$this->dropTable($table);
+			$this->insert( "{$table}_temp", \IPS\Db::i()->select( '*', $table ), FALSE, TRUE );
+			$this->dropTable( $table );
 			$this->renameTable( "{$table}_temp", $table );
 		}
 		/* Otherwise just do it normally */
 		else
 		{
-			$this->query("ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` {$this->buildIndex( $table, $definition )}", MYSQLI_STORE_RESULT, false );
+			return $this->query( "ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` {$this->buildIndex( $table, $definition )}" );
 		}
 	}
 	
 	/**
 	 * Modify an existing index
 	 *
+	 * @see		compileIndexDefinition
 	 * @param	string	$table			Table name
-	 * @param string $index			Index name
-	 * @param array $definition		New index definition (see \IPS\Db::compileIndexDefinition for details)
-	 * @return    mixed
-	 *@see		compileIndexDefinition
+	 * @param	string	$index			Index name
+	 * @param	array	$definition		New index definition (see \IPS\Db::compileIndexDefinition for details)
+	 * @return	void
 	 */
-	public function changeIndex( string $table, string $index, array $definition ): mixed
+	public function changeIndex( $table, $index, $definition )
 	{
 		$returnQuery = $this->returnQuery;
 		$return = NULL;
 
 		if( $this->checkForIndex( $table, $index ) )
 		{
-			$this->dropIndex( $table, $index );
-
+			$query = $this->dropIndex( $table, $index );
+		
 			if( $returnQuery === TRUE )
 			{
-				$return = $this->lastCompiledQuery;
+				$return = $query;
 			}
 		}
 		
@@ -2281,49 +2184,54 @@ class Db extends mysqli
 			$this->returnQuery = TRUE;
 		}
 		
-		$this->addIndex( $table, $definition );
-
+		$query = $this->addIndex( $table, $definition );
+		
 		if( $returnQuery === TRUE )
 		{
 			$this->returnQuery = FALSE;
-			$this->lastCompiledQuery = $return . $this->lastCompiledQuery; // prepend the drop index first
-			$return .= $this->lastCompiledQuery;
-
+			$return .= $query;
+	
 			return $return;
 		}
 
-		return $return;
+		return $query;
 	}
 
 	/**
 	 * Build an index query for add/change
 	 *
+	 * @see		compileIndexDefinition
 	 * @param	string	$table			Table name
-	 * @param array $definition		New index definition (see \IPS\Db::compileIndexDefinition for details)
-	 * @param array|null $data		Table definition, or null to pull from database
-	 * @return    string
-	 *@see		compileIndexDefinition
+	 * @param	array	$definition		New index definition (see \IPS\Db::compileIndexDefinition for details)
+	 * @param	array|NULL	$data		Table definition, or null to pull from database
+	 * @return	void
 	 */
-	public function buildIndex(string $table, array $definition, array $data=NULL ): string
+	public function buildIndex( $table, $definition, $data=NULL )
 	{
 		$indexName	= $definition['name'];
 		
 		if ( $data === NULL )
 		{
-			$data	= $this->getTableDefinition($table, FALSE, TRUE);
+			$data	= $this->getTableDefinition( $table, FALSE, TRUE );
 		}
+		
+		$engine		= mb_strtolower( $data['engine'] );
 		
 		/* Add the index to the table definition */
 		$data['indexes'][ $indexName ] = $definition;
 		
 		/* Reduce sub_part if required */
 		$data	= $this->updateDefinitionIndexLengths( $data );
+		$return = '';
 
-		/* Force to InnoDB */
-		$return = "ENGINE=InnoDB, ";
+		/* Do we need to adjust the engine because it's a fulltext index? */
+		if( $engine !== mb_strtolower( $data['engine'] ) )
+		{
+			$return = "ENGINE={$data['engine']}, ";
+		}
 
 		/* Extract the key we want to add */
-		$definition = (array) $data['indexes'][ $indexName ];
+		$definition = $data['indexes'][ $indexName ];
 
 		return $return . "ADD {$this->compileIndexDefinition( $definition )}";
 	}
@@ -2331,17 +2239,17 @@ class Db extends mysqli
 	/**
 	 * Drop an index
 	 *
-	 * @param string $table			Table name
-	 * @param array|string $index			Column name
-	 * @return    string|int|bool|mysqli_result
+	 * @param	string			$table			Table name
+	 * @param	string|array	$index			Column name
+	 * @return	mixed
 	 */
-	public function dropIndex( string $table, array|string $index ): string|int|bool|mysqli_result
+	public function dropIndex( $table, $index )
 	{
-		$index = ( is_array( $index ) ) ? $index : array( $index );
+		$index = ( \is_array( $index ) ) ? $index : array( $index );
 
 		$indexes	= array();
 
-		if( Db::i()->returnQuery )
+		if( \IPS\Db::i()->returnQuery )
 		{
 			foreach( $index as $key => $col )
 			{
@@ -2366,17 +2274,17 @@ class Db extends mysqli
 			
 			if ( $_index )
 			{
-				$return = $this->query("ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` {$_index};", MYSQLI_STORE_RESULT, false );
+				$return = $this->query( "ALTER TABLE `{$this->prefix}{$this->escape_string( $table )}` {$_index};" );
 			}
 			else
 			{
 				/* Even if we do not run a query here, we need to reset this */
-				Db::i()->returnQuery = FALSE;
+				\IPS\Db::i()->returnQuery = FALSE;
 			}
 			
 			return $return;
 		}
-		catch( Exception $e )
+		catch( \IPS\Db\Exception $e )
 		{
 			/* No need to stop here if index doesn't exist */
 			if ( $e->getCode() !== 1091 )
@@ -2392,30 +2300,27 @@ class Db extends mysqli
 	 * FIND_IN_SET
 	 * Generates a WHERE clause to determine if any value from a column containing a comma-delimined list matches any value from an array
 	 * 
-	 * @param string $column		Column name (which contains a comma-delimited list)
-	 * @param array $values		Acceptable values
-	 * @param bool $reverse	If true, will match cases where NO values from $column match any from $values
+	 * @param	string	$column		Column name (which contains a comma-delimited list)
+	 * @param	array	$values		Acceptable values
+	 * @param	bool	$reverse	If true, will match cases where NO values from $column match any from $values
 	 * @return 	string	Where clause
 	 * @link	in
-	 	* More efficient equivilant for columns that do not contain comma-delimited lists
+	 	More efficient equivilant for columns that do not contain comma-delimited lists
 	 * @endlink
 	 */
-	public function findInSet( string $column, array $values, bool $reverse=FALSE ): string
+	public function findInSet( $column, $values, $reverse=FALSE )
 	{
 		$where = array();
 
-		if( !empty( $values ) )
+		foreach( $values as $i )
 		{
-			foreach( $values as $i )
+			if ( $i != NULL and \is_numeric( $i ) )
 			{
-				if ( $i !== NULL and is_numeric( $i ) )
-				{
-					$where[] = ( $reverse ? 'NOT ' : '' ) . "FIND_IN_SET(" . $i . "," . $column . ")";
-				}
-				else if ( $i !== NULL and is_string( $i ) )
-				{
-					$where[] = ( $reverse ? 'NOT ' : '' ) . "FIND_IN_SET('" . $this->real_escape_string( $i ) . "'," . $column . ")";
-				}
+				$where[] = ( $reverse ? 'NOT ' : '' ) . "FIND_IN_SET(" . $i . "," . $column . ")";
+			}
+			else if ( $i != NULL and \is_string( $i ) )
+			{
+				$where[] = ( $reverse ? 'NOT ' : '' ) . "FIND_IN_SET('" . $this->real_escape_string( $i ) . "'," . $column . ")";
 			}
 		}
 
@@ -2435,19 +2340,19 @@ class Db extends mysqli
 	 * IN
 	 * Generates a WHERE clause to determine if the value of a column matches any value from an array
 	 *
-	 * @param string $column			Column name
-	 * @param array|Select $values			Acceptable values
-	 * @param bool $reverse		If true, will match cases where $column does NOT match $values
+	 * @param	string	$column			Column name
+	 * @param	array	$values			Acceptable values
+	 * @param	bool	$reverse		If true, will match cases where $column does NOT match $values
 	 * @return 	string	Where clause
 	 * @link	findInSet
-	 	* For columns that contain comma-delimited lists
+	 	For columns that contain comma-delimited lists
 	 * @endlink
 	 */
-	public function in( string $column, array|Select $values, bool $reverse=FALSE ): string
+	public function in( $column, $values, $reverse=FALSE )
 	{
 		$in	= array();
 
-		if( !is_array( $values ) )
+		if( !\is_array( $values ) )
 		{
 			$values = array( $values );
 		}
@@ -2455,15 +2360,15 @@ class Db extends mysqli
 		foreach( $values as $i )
 		{
 			/* We must use the !== comparison so that 0 is not treated the same as NULL */
-			if ( $i !== NULL and is_numeric( $i ) and ( is_int( $i ) or is_float( $i ) ) )
+			if ( $i !== NULL and \is_numeric( $i ) and ( \is_int( $i ) or \is_float( $i ) ) )
 			{
 				$in[] = $i;
 			}
-			else if ( $i != NULL and is_string( $i ) )
+			else if ( $i != NULL and \is_string( $i ) )
 			{
 				$in[] = "'" . $this->real_escape_string( $i ) . "'";
 			}
-			else if( $i instanceof Select )
+			else if( $i instanceof \IPS\Db\Select )
 			{
 				$in[] = (string) $i;
 			}
@@ -2476,7 +2381,7 @@ class Db extends mysqli
 			$return[] = $column . ( $reverse ? ' NOT' : '' ) . ' IN(' . implode( ',', $in ) . ')';
 		}
 		
-		if ( count( $return ) )
+		if ( \count( $return ) )
 		{
 			return '( ' . implode( ' OR ', $return ) . ' )';
 		}
@@ -2489,22 +2394,22 @@ class Db extends mysqli
 	/**
 	 * Generates a WHERE clause to perform a LIKE search
 	 *
-	 * @param array|string $column				The column(s) we are searching (multiple columns are searched as an OR)
-	 * @param string $string				The string we are searching for
-	 * @param bool $escape				Whether or not to escape wildcards in the search string
-	 * @param bool $trailingWildcard	Add a wildcard to the end of the string
-	 * @param bool $leadingWildcard	Add a wildcard to the beginning of the string (note that database indexes cannot be used in this case)
-	 * @param bool $reverse			Perform a NOT LIKE query instead of a LIKE query
+	 * @param	string|array	$column				The column(s) we are searching (multiple columns are searched as an OR)
+	 * @param	string			$string				The string we are searching for
+	 * @param	bool			$escape				Whether or not to escape wildcards in the search string
+	 * @param	bool			$trailingWildcard	Add a wildcard to the end of the string
+	 * @param	bool			$leadingWildcard	Add a wildcard to the beginning of the string (note that database indexes cannot be used in this case)
+	 * @param	bool			$reverse			Perform a NOT LIKE query instead of a LIKE query
 	 * @return	array
 	 */
-	public function like( array|string $column, string $string, bool $escape=TRUE, bool $trailingWildcard=TRUE, bool $leadingWildcard=FALSE, bool $reverse=FALSE ): array
+	public function like( $column, $string, $escape=TRUE, $trailingWildcard=TRUE, $leadingWildcard=FALSE, $reverse=FALSE )
 	{
 		if( $escape === TRUE )
 		{
 			$string = str_replace( array( '%', '_' ), array( '\%', '\_' ), $string );
 		}
 
-		if( !is_array( $column ) )
+		if( !\is_array( $column ) )
 		{
 			$column = array( $column );
 		}
@@ -2541,20 +2446,20 @@ class Db extends mysqli
 			}
 		}
 
-		return array_merge( array( implode( ' OR ', $searchClause ) ), array_fill( 1, count( $searchClause ), $string ) );
+		return array_merge( array( implode( ' OR ', $searchClause ) ), array_fill( 1, \count( $searchClause ), $string ) );
 	}
 	
 	/**
 	 * Bitwise WHERE clause
 	 *
-	 * @param array $definition		Bitwise keys as defined by the class
-	 * @param string $key			The key to check for
-	 * @param bool $value			Value to check for
-	 * @param string|null $prefix			Column prefix (optional)
+	 * @param	array	$definition		Bitwise keys as defined by the class
+	 * @param	string	$key			The key to check for
+	 * @param	bool	$value			Value to check for
+	 * @param	string	$prefix			Column prefix (optional)
 	 * @return	string
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function bitwiseWhere( array $definition, string $key, bool $value=TRUE, string $prefix=NULL ): string
+	public function bitwiseWhere( $definition, $key, $value=TRUE, $prefix=NULL )
 	{
 		$operator = $value ? '& ' : '& ~';
 		foreach ( $definition as $column => $keys )
@@ -2566,19 +2471,19 @@ class Db extends mysqli
 			}
 		}
 		
-		throw new InvalidArgumentException;
+		throw new \InvalidArgumentException;
 	}
 
 	/**
 	 * Strip index lengths in the schema definitions - useful for a better comparison of the definitions
 	 * since different engines and charsets require different storage.  Also, strip engine and collation.
 	 *
-	 * @param array|string $data		Table definition (array) or table name (string)
+	 * @param	array|string	$data		Table definition (array) or table name (string)
 	 * @return	array
 	 */
-	public function normalizeDefinition( array|string $data ): array
+	public function normalizeDefinition( $data )
 	{
-		$definition  = ( is_array( $data ) ) ? $data : $this->getTableDefinition($data, FALSE, TRUE);
+		$definition  = ( \is_array( $data ) ) ? $data : $this->getTableDefinition( $data, FALSE, TRUE );
 
 		if ( isset( $definition['indexes'] ) )
 		{
@@ -2602,7 +2507,7 @@ class Db extends mysqli
 
 		foreach ( $definition['columns'] as $k => $c )
 		{
-			if( !in_array( $c['type'], $decimalTypes ) )
+			if( !\in_array( $c['type'], $decimalTypes ) )
 			{
 				if( array_key_exists( 'decimals', $c ) )
 				{
@@ -2621,7 +2526,7 @@ class Db extends mysqli
 				}
 			}
 
-			if( !in_array( $c['type'], $lengthTypes ) )
+			if( !\in_array( $c['type'], $lengthTypes ) )
 			{
 				if( array_key_exists( 'length', $c ) )
 				{
@@ -2647,7 +2552,7 @@ class Db extends mysqli
 			
 			if ( $c['type'] === 'BIT' )
 			{
-				if( is_null( $c['default'] ) )
+				if( \is_null( $c['default'] ) )
 				{
 					$definition['columns'][ $k ]['default'] = NULL;
 				}
@@ -2677,11 +2582,11 @@ class Db extends mysqli
 		/* Prevent conflicts when schema says DEFAULT '0' but it is DEFAULT 0 and an INT type column as this is always set as a 0 anyway */
 		foreach( $definition['columns'] as $name => $data )
 		{
-			if ( in_array( mb_strtoupper( $data['type'] ), array_keys( static::$dataTypes['database_column_type_numeric'] ) ) and ( ! in_array( mb_strtoupper( $data['type'] ), array( 'DECIMAL', 'FLOAT', 'BIT' ) ) ) )
+			if ( \in_array( mb_strtoupper( $data['type'] ), array_keys( static::$dataTypes['database_column_type_numeric'] ) ) and ( ! \in_array( mb_strtoupper( $data['type'] ), array( 'DECIMAL', 'FLOAT', 'BIT' ) ) ) )
 			{
-				if( is_numeric( $data['default'] ) )
+				if( \is_numeric( $data['default'] ) )
 				{
-					$definition['columns'][ $name ]['default'] = intval( $data['default'] );
+					$definition['columns'][ $name ]['default'] = \intval( $data['default'] );
 				}
 
 				/* Length is no longer supported */
@@ -2702,9 +2607,9 @@ class Db extends mysqli
 				unset( $definition['columns'][ $name ]['binary'] );
 			}
 
-			if ( in_array( mb_strtoupper( $data['type'] ), array_keys( static::$dataTypes['database_column_type_numeric'] ) ) and ( ! in_array( mb_strtoupper( $data['type'] ), array( 'DECIMAL', 'FLOAT', 'BIT' ) ) ) and is_numeric( $data['default'] ) )
+			if ( \in_array( mb_strtoupper( $data['type'] ), array_keys( static::$dataTypes['database_column_type_numeric'] ) ) and ( ! \in_array( mb_strtoupper( $data['type'] ), array( 'DECIMAL', 'FLOAT', 'BIT' ) ) ) and \is_numeric( $data['default'] ) )
 			{
-				$definition['columns'][ $name ]['default'] = intval( $data['default'] );
+				$definition['columns'][ $name ]['default'] = \intval( $data['default'] );
 			}
 		}
 		
@@ -2716,21 +2621,45 @@ class Db extends mysqli
 	 * which is 1000 bytes for MyISAM and 767 for InnoDB taking into consideration the
 	 * multiplier (4 bytes per character for utf8mb4 and 3 bytes per character for UTF8)
 	 *
-	 * @param array|string $data		Table definition (array) or table name (string)
+	 * @param	array|string	$data		Table definition (array) or table name (string)
 	 * @return	array
 	 */
-	public function updateDefinitionIndexLengths( array|string $data ): array
+	public function updateDefinitionIndexLengths( $data )
 	{
-		$definition  = ( is_array( $data ) ) ? $data : $this->getTableDefinition($data, FALSE, TRUE);
+		$definition  = ( \is_array( $data ) ) ? $data : $this->getTableDefinition( $data, FALSE, TRUE );
 		$length      = 0;
 		/* We use 4 for utf8mb4 to prevent issues if the client attempts to switch or forgets to mark conf_global.php that utf8mb4 is used */
 		$multiplier	 = 4;
 		$needsFixing = array();
 		$maxLen      = 1000;
-
-		/* Force the use of InnoDB */
-		$definition['engine'] = 'InnoDB';
-		$maxLen = 767;
+		
+		if ( ( ! isset( $definition['engine'] ) OR mb_strtolower( $definition['engine'] ) == 'innodb' ) and isset( $definition['indexes'] ) )
+		{
+			/* Only set/change the engine if it is not already innodb - don't change innodb to myisam */
+			if( ( ! isset( $definition['engine'] ) OR mb_strtolower( $definition['engine'] ) != 'innodb' ) )
+			{
+				$definition['engine'] = $this->defaultEngine();
+			}
+			
+			/* Any FULLTEXT fields? */
+			foreach( $definition['indexes'] as $key => $data )
+			{
+				if ( $data['type'] === 'fulltext' )
+				{
+					/* If this is a fulltext index, set engine to myisam but only if engine is something besides innodb or myisam OR the mysql version is less than 5.6 - in
+						this case we assume the default engine is most likely either myisam or innodb */
+					if( !$this->_innoDbSupportsFulltextIndexes() OR ( isset( $definition['engine'] ) AND !\in_array( mb_strtoupper( $definition['engine'] ), array( 'INNODB', 'MYISAM' ) ) ) )
+					{
+						$definition['engine'] = 'myisam';
+					}
+				}
+			}
+		}
+		
+		if ( \mb_strtolower( $definition['engine'] ) === 'innodb' )
+		{
+			$maxLen = 767;
+		}
 		
 		if ( isset( $definition['indexes'] ) )
 		{
@@ -2741,11 +2670,6 @@ class Db extends mysqli
 				
 				foreach( $index['columns'] as $i => $column )
 				{
-					if ( ! isset( $definition['columns'][ $column ] ) )
-					{
-						continue;
-					}
-
 					if( isset( $index['length'][ $i ] ) )
 					{
 						$thisLength = $index['length'][ $i ];
@@ -2759,14 +2683,14 @@ class Db extends mysqli
 						$thisLength = 250;
 					}
 					
-					$isText = in_array( mb_strtolower( $definition['columns'][ $column ]['type'] ), array( 'mediumtext', 'text' ) );
+					$isText = \in_array( mb_strtolower( $definition['columns'][ $column ]['type'] ), array( 'mediumtext', 'text' ) );
 					
 					if ( $hasText === false and $isText === true )
 					{
 						$hasText = true;
 					}
 					
-					if ( ! empty( $thisLength ) or $isText )
+					if ( isset( $definition['columns'][ $column ] ) and ( ( ! empty( $thisLength ) or $isText ) ) )
 					{
 						$length += $thisLength;
 					}
@@ -2776,11 +2700,6 @@ class Db extends mysqli
 				{
 					foreach( $index['columns'] as $i => $column )
 					{
-						if ( ! isset( $definition['columns'][ $column ] ) )
-						{
-							continue;
-						}
-
 						if( isset( $index['length'][ $i ] ) )
 						{
 							$thisLength = $index['length'][ $i ];
@@ -2795,12 +2714,12 @@ class Db extends mysqli
 						}
 
 						/* If this is a datetime column, the length will top out at 8 bytes max, so just use 8 as our limitation...indexing datetime columns is fairly rare for us anyways */
-						if ( in_array( mb_strtoupper( $definition['columns'][ $column ]['type'] ), array_keys( static::$dataTypes['database_column_type_datetime'] ) ) )
+						if ( \in_array( mb_strtoupper( $definition['columns'][ $column ]['type'] ), array_keys( static::$dataTypes['database_column_type_datetime'] ) ) )
 						{
 							$thisLength = 8;
 						}
 
-						if ( ! empty( $thisLength ) or in_array( mb_strtolower( $definition['columns'][ $column ]['type'] ), array( 'mediumtext', 'text' ) ) )
+						if ( isset( $definition['columns'][ $column ] ) and ( ( ! empty( $thisLength ) or \in_array( mb_strtolower( $definition['columns'][ $column ]['type'] ), array( 'mediumtext', 'text' ) ) ) ) )
 						{
 							/* Column name, column length, column type  */
 							$needsFixing[ $key ][ $i ] = array( $column, $thisLength, $definition['columns'][ $column ]['type'] );
@@ -2812,7 +2731,7 @@ class Db extends mysqli
 			}
 		}
 		
-		if ( count( $needsFixing ) )
+		if ( \count( $needsFixing ) )
 		{
 			foreach( $needsFixing as $key => $i )
 			{
@@ -2834,7 +2753,7 @@ class Db extends mysqli
 					/* Apply debt if we have any. We do not reduce non-strings. */
 					foreach( $i as $x => $vals )
 					{
-						if ( !in_array( mb_strtoupper( $vals[2] ), array_keys( static::$dataTypes['database_column_type_string'] ) ) )
+						if ( !\in_array( mb_strtoupper( $vals[2] ), array_keys( static::$dataTypes['database_column_type_string'] ) ) )
 						{
 							$debt += $vals[1];
 						}
@@ -2854,7 +2773,7 @@ class Db extends mysqli
 							$vals[1] = 250;
 						}
 
-						if ( !in_array( mb_strtoupper( $vals[2] ), array_keys( static::$dataTypes['database_column_type_string'] ) ) )
+						if ( !\in_array( mb_strtoupper( $vals[2] ), array_keys( static::$dataTypes['database_column_type_string'] ) ) )
 						{
 							/* Preserve col len where possible but if the column length is greater than subpart allowed, NULL the length
 							   otherwise MySQL will complain as you cannot use subpart on non-string column. */
@@ -2871,9 +2790,9 @@ class Db extends mysqli
 
 				foreach( $i as $x => $vals )
 				{
-					if ( !isset( $definition['columns'][ $definition['indexes'][ $key ]['columns'][ $x ] ]['length'] ) OR ( $definition['columns'][ $definition['indexes'][ $key ]['columns'][ $x ] ]['length'] != $vals[1] AND in_array( mb_strtoupper( $vals[2] ), array_keys( static::$dataTypes['database_column_type_string'] ) ) ) )
+					if ( !isset( $definition['columns'][ $definition['indexes'][ $key ]['columns'][ $x ] ]['length'] ) OR ( $definition['columns'][ $definition['indexes'][ $key ]['columns'][ $x ] ]['length'] != $vals[1] AND \in_array( mb_strtoupper( $vals[2] ), array_keys( static::$dataTypes['database_column_type_string'] ) ) ) )
 					{
-						$definition['indexes'][ $key ]['length'][ $x ] = intval( $vals[1] );
+						$definition['indexes'][ $key ]['length'][ $x ] = \intval( $vals[1] );
 					}
 					else
 					{
@@ -2885,31 +2804,31 @@ class Db extends mysqli
 
 		return $definition;
 	}
-
+	
 	/**
 	 * Create database
 	 *
-	 * @param string $name Database Name
-	 * @return mysqli_result|bool
+	 * @param	string	$name	Database Name
+	 * @return	bool
 	 */
-	public function createDatabase( string $name ): mysqli_result|bool
+	public function createDatabase( $name )
 	{
-		return ( $this->query("CREATE DATABASE ". $this->escape_string( "{$name}" ), MYSQLI_STORE_RESULT, false ) );
+		return ( $this->query( "CREATE DATABASE ". $this->escape_string( "{$name}" ) ) );
 	}
 
 	/**
 	 * @brief	Cached table data
 	 */
-	public array $cachedTableData	= array();
+	public $cachedTableData	= array();
 
 	/**
 	 * Is it recommended to run a query manually?
 	 *
-	 * @param string $tableName	Database table to work with
+	 * @param	string	$tableName	Database table to work with
 	 * @return	bool
 	 * @note	Constants \IPSUPGRADE_MANUAL_THRESHOLD and \IPS\UPGRADE_LARGE_TABLE_SIZE can be defined in constants.php
 	 */
-	public function recommendManualQuery( string $tableName ): bool
+	public function recommendManualQuery( $tableName )
 	{
 		/* Does the table even exist? */
 		if( !$this->checkForTable( $tableName ) )
@@ -2917,16 +2836,28 @@ class Db extends mysqli
 			return FALSE;
 		}
 
-		/* Make sure we have the table information */
-		$this->getTableData( $tableName );
+		/* Have we gathered the table data yet? */
+		if( !isset( $this->cachedTableData[ $tableName ] ) )
+		{
+			$this->cachedTableData[ $tableName ] = array( 'rows' => 0, 'size' => 0 );
+
+			$this->cachedTableData[ $tableName ]['rows'] = $this->select( 'count(*)', $tableName )->first();
+
+			$result = $this->forceQuery( "SHOW TABLE STATUS WHERE name LIKE '" . $this->prefix . $tableName . "'" );
+
+			while( $data = $result->fetch_assoc() )
+			{
+				$this->cachedTableData[ $tableName ]['size'] = $data['Data_length'];
+			}
+		}
 
 		/* Now determine if we're over our limits and return appropriately */
-		if( $this->cachedTableData[ $tableName ]['rows'] > UPGRADE_MANUAL_THRESHOLD)
+		if( $this->cachedTableData[ $tableName ]['rows'] > \IPS\UPGRADE_MANUAL_THRESHOLD )
 		{
 			return TRUE;
 		}
 
-		if( $this->cachedTableData[ $tableName ]['size'] > UPGRADE_LARGE_TABLE_SIZE)
+		if( $this->cachedTableData[ $tableName ]['size'] > \IPS\UPGRADE_LARGE_TABLE_SIZE )
 		{
 			return TRUE;
 		}
@@ -2935,49 +2866,12 @@ class Db extends mysqli
 	}
 
 	/**
-	 * Return the rows and size for the specified table.
-	 * Used to get an approximate count for large tables.
-	 *
-	 * @param string $tableName
-	 * @return array
-	 */
-	public function getTableData( string $tableName ) : array
-	{
-		/* Have we gathered the table data yet? */
-		if( !isset( $this->cachedTableData[ $tableName ] ) )
-		{
-			$this->cachedTableData[ $tableName ] = array( 'rows' => 0, 'size' => 0 );
-
-			if ( !CIC )
-			{
-				/* Outside of Cloud we don't know if it's InnoDB, etc */
-				$this->cachedTableData[ $tableName ]['rows'] = $this->select( 'count(*)', $tableName )->first();
-			}
-
-			$result = $this->forceQuery("SHOW TABLE STATUS WHERE name LIKE '" . $this->prefix . $tableName . "'");
-
-			while( $data = $result->fetch_assoc() )
-			{
-				$this->cachedTableData[ $tableName ]['size'] = $data['Data_length'];
-
-				if ( CIC )
-				{
-					/* Less accurate but much faster */
-					$this->cachedTableData[ $tableName ]['rows'] = $data['Rows'];
-				}
-			}
-		}
-
-		return $this->cachedTableData[ $tableName ];
-	}
-
-	/**
 	 * Strip comments from a .sql file
 	 *
-	 * @param string $contents	Contents from SQL file
+	 * @param	string	$contents	Contents from SQL file
 	 * @return	string
 	 */
-	public static function stripComments( string $contents ): string
+	public static function stripComments( $contents )
 	{
 		$contents = preg_replace( '/\/\*.+?\*\//', '', $contents );
 		$contents = preg_replace( '/#.*/', '', $contents );
@@ -2990,18 +2884,18 @@ class Db extends mysqli
 	/**
 	 * Replace binds in a prepared query to get the "full" query
 	 *
-	 * @param string|null $query	Query
-	 * @param array $binds	Any binds in the query
-	 * @return	string|null
+	 * @param	string	$query	Query
+	 * @param	array 	$binds	Any binds in the query
+	 * @return	string
 	 */
-	public static function _replaceBinds( ?string $query, array $binds ): ?string
+	public static function _replaceBinds( $query, $binds )
 	{
 		/* Replace ?s with the actual values */
-		if( count( $binds ) )
+		if( \is_array( $binds ) AND \count( $binds ) )
 		{
 			foreach ( $binds as $b )
 			{
-				$b = ( $b instanceof Select ) ? (string) $b : $b;
+				$b = ( $b instanceof \IPS\Db\Select ) ? (string) $b : $b;
 				$query = preg_replace( '/\?/', var_export( $b, TRUE ), $query, 1 );
 			}
 		}

@@ -12,33 +12,25 @@
 namespace IPS\nexus\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: Gateways
  */
-class Gateways extends FileStorageAbstract
+class _Gateways
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
-		return Db::i()->select( 'COUNT(*)', 'nexus_paymethods', array( 'm_validationfile<>?', '' ) )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'nexus_paymethods', array( 'm_validationfile<>?', '' ) )->first();
 	}
 	
 	/**
@@ -47,23 +39,23 @@ class Gateways extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	UnderflowException					When file record doesn't exist. Indicating there are no more files to move
-	 * @return	void
+	 * @throws	\UnderflowException					When file record doesn't exist. Indicating there are no more files to move
+	 * @return	void|int							An offset integer to use on the next cycle, or nothing
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-		$record = Db::i()->select( '*', 'nexus_paymethods', array( 'm_validationfile<>?', '' ), 'm_id', array( $offset, 1 ) )->first();
+		$record = \IPS\Db::i()->select( '*', 'nexus_paymethods', array( 'm_validationfile<>?', '' ), 'm_id', array( $offset, 1 ) )->first();
 
 		try
 		{
-			$file = File::get( $oldConfiguration ?: 'nexus_Gateways', $record['m_id'] )->move( $storageConfiguration );
+			$file = \IPS\File::get( $oldConfiguration ?: 'nexus_Gateways', $record['m_id'] )->move( $storageConfiguration );
 
 			if ( (string) $file != $record['m_validationfile'] )
 			{
-				Db::i()->update( 'nexus_paymethods', array( 'm_validationfile' => (string) $file ), array( 'm_id=?', $record['m_id'] ) );
+				\IPS\Db::i()->update( 'nexus_paymethods', array( 'm_validationfile' => (string) $file ), array( 'm_id=?', $record['m_id'] ) );
 			}
 		}
-		catch( Exception )
+		catch( \Exception $e )
 		{
 			/* Any issues are logged */
 		}
@@ -72,17 +64,17 @@ class Gateways extends FileStorageAbstract
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
 		try
 		{
-			Db::i()->select( '*', 'nexus_paymethods', array( 'm_validationfile=?', $file ) )->first();
+			\IPS\Db::i()->select( '*', 'nexus_paymethods', array( 'm_validationfile=?', (string) $file ) )->first();
 			return TRUE;
 		}
-		catch ( UnderflowException )
+		catch ( \UnderflowException $e )
 		{
 			return FALSE;
 		}
@@ -93,15 +85,15 @@ class Gateways extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		foreach( Db::i()->select( '*', 'nexus_paymethods', array( 'm_validationfile<>?', '' ) ) as $product )
+		foreach( \IPS\Db::i()->select( '*', 'nexus_paymethods', array( 'm_validationfile<>?', '' ) ) as $product )
 		{
 			try
 			{
-				File::get( 'nexus_Gateways', $product['m_validationfile'] )->delete();
+				\IPS\File::get( 'nexus_Gateways', $product['m_validationfile'] )->delete();
 			}
-			catch( Exception ){}
+			catch( \Exception $e ){}
 		}
 	}
 }

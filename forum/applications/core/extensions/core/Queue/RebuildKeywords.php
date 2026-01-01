@@ -12,37 +12,21 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\Application;
-use IPS\DateTime;
-use IPS\Extensions\QueueAbstract;
-use IPS\Log;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use OutOfRangeException;
-use Throwable;
-use function defined;
-use function is_array;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class RebuildKeywords extends QueueAbstract
+class _RebuildKeywords
 {
 	/**
 	 * @brief Number of content items to rebuild per cycle
 	 */
-	public int $rebuild	= REBUILD_SLOW;
+	public $rebuild	= \IPS\REBUILD_SLOW;
 	
 	/**
 	 * Parse data before queuing
@@ -50,25 +34,24 @@ class RebuildKeywords extends QueueAbstract
 	 * @param	array	$data
 	 * @return	array|NULL
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data ): ?array
 	{
 		$classname = $data['class'];
 
 		try
 		{
 			$where = ( is_subclass_of( $classname, 'IPS\Content\Comment' ) ) ? array( $classname::commentWhere() ) : array();
-			if ( Settings::i()->stats_keywords_prune )
+			if ( \IPS\Settings::i()->stats_keywords_prune )
 			{
-				/* @var array $databaseColumnMap */
-				$where[] = array( $classname::$databasePrefix . $classname::$databaseColumnMap['date'] . ">?", DateTime::create()->sub( new DateInterval( 'P' . Settings::i()->stats_keywords_prune . 'D' ) )->getTimestamp() );
+				$where[] = array( $classname::$databasePrefix . $classname::$databaseColumnMap['date'] . ">?", \IPS\DateTime::create()->sub( new \DateInterval( 'P' . \IPS\Settings::i()->stats_keywords_prune . 'D' ) )->getTimestamp() );
 			}
 			$data['count']		= $classname::db()->select( 'MAX(' . $classname::$databasePrefix . $classname::$databaseColumnId . ')', $classname::$databaseTable, $where )->first();
 			$data['realCount']	= $classname::db()->select( 'COUNT(*)', $classname::$databaseTable, $where )->first();
 		    $data['runPid']		= $data['count'] + 1;
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		if( $data['count'] == 0 )
@@ -84,29 +67,28 @@ class RebuildKeywords extends QueueAbstract
 	/**
 	 * Run Background Task
 	 *
-	 * @param	array						$data	Data as it was passed to \IPS\Task::queue()
+	 * @param	mixed						$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int							$offset	Offset
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ) : int
+	public function run( &$data, $offset )
 	{
 		$classname = $data['class'];
         $exploded = explode( '\\', $classname );
-        if ( !class_exists( $classname ) or !Application::appIsEnabled( $exploded[1] ) )
+        if ( !class_exists( $classname ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
-		$where	 	= ( is_subclass_of( $classname, 'IPS\Content\Comment' ) ) ? ( is_array( $classname::commentWhere() ) ? $classname::commentWhere() : array() ) : array();
+		$where	 	= ( is_subclass_of( $classname, 'IPS\Content\Comment' ) ) ? ( \is_array( $classname::commentWhere() ) ? $classname::commentWhere() : array() ) : array();
 		$where[]	= array( $classname::$databasePrefix . $classname::$databaseColumnId . ' < ?',  $data['runPid'] );
-		if ( Settings::i()->stats_keywords_prune )
+		if ( \IPS\Settings::i()->stats_keywords_prune )
 		{
-			/* @var array $databaseColumnMap */
-			$where[] = array( $classname::$databasePrefix . $classname::$databaseColumnMap['date'] . ">?", DateTime::create()->sub( new DateInterval( 'P' . Settings::i()->stats_keywords_prune . 'D' ) )->getTimestamp() );
+			$where[] = array( $classname::$databasePrefix . $classname::$databaseColumnMap['date'] . ">?", \IPS\DateTime::create()->sub( new \DateInterval( 'P' . \IPS\Settings::i()->stats_keywords_prune . 'D' ) )->getTimestamp() );
 		}
 		$select   = $classname::db()->select( '*', $classname::$databaseTable, $where, $classname::$databasePrefix . $classname::$databaseColumnId . ' DESC', array( 0, $this->rebuild ) );
-		$iterator = new ActiveRecordIterator( $select, $classname );
+		$iterator = new \IPS\Patterns\ActiveRecordIterator( $select, $classname );
 		$last     = NULL;
 
 		foreach( $iterator as $item )
@@ -130,9 +112,9 @@ class RebuildKeywords extends QueueAbstract
 			{
 				$item->checkKeywords( $item->content(), $title, ( isset( $classname::$databaseColumnMap['date'] ) ) ? $item->mapped('date') : NULL );
 			}
-			catch( Throwable $e )
+			catch( \Throwable $e )
 			{
-				Log::log( $e, 'keyword_rebuild' );
+				\IPS\Log::log( $e, 'keyword_rebuild' );
 			}
 			
 			$last = $item->$idColumn;
@@ -156,17 +138,17 @@ class RebuildKeywords extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( array $data, int $offset ) : array
+	public function getProgress( $data, $offset )
 	{
 		$class = $data['class'];
         $exploded = explode( '\\', $class );
-        if ( !class_exists( $class ) or !Application::appIsEnabled( $exploded[1] ) )
+        if ( !class_exists( $class ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
-		return array( 'text' => Member::loggedIn()->language()->addToStack('rebuilding_keywords', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( $class::$title . '_pl_lc' ) ) ) ), 'complete' => $data['realCount'] ? ( round( 100 / $data['realCount'] * $data['indexed'], 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('rebuilding_keywords', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl_lc' ) ) ) ), 'complete' => $data['realCount'] ? ( round( 100 / $data['realCount'] * $data['indexed'], 2 ) ) : 100 );
 	}
 }

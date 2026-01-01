@@ -11,30 +11,26 @@
 namespace IPS\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception as PHPException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * API Exception
  */
-class Exception extends PHPException
+class _Exception extends \Exception
 {
 	/**
 	 * @brief	Exception code
 	 */
-	public string $exceptionCode = '';
+	public $exceptionCode;
 	
 	/**
 	 * @brief	OAUth Error
 	 */
-	public string $oauthError = '';
+	public $oauthError;
 	
 	/**
 	 * Constructor
@@ -45,10 +41,10 @@ class Exception extends PHPException
 	 * @param	string	$oauthError	Error Message for OAuth
 	 * @return	void
 	 */
-	public function __construct( string $message, string $code, int $httpCode, string $oauthError = 'invalid_request' )
+	public function __construct( $message, $code, $httpCode, $oauthError = 'invalid_request' )
 	{
 		$this->exceptionCode = $code;
 		$this->oauthError = $oauthError;
-		parent::__construct( $message, $httpCode );
+		return parent::__construct( $message, $httpCode );
 	}
 }

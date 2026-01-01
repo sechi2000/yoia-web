@@ -12,37 +12,13 @@ namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use Exception;
-use IPS\Application;
-use	IPS\DateTime as IPSDateTime; // DateTime aliased to avoid conflicts with base DateTime class to ensure \IPS\DateTime is actually being used.
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\IPS;
-use IPS\Patterns\ActiveRecordIterator;
-use LogicException;
-use OutOfRangeException;
-use UnderflowException;
-use UnexpectedValueException;
-use BadMethodCallException;
-use function array_push;
-use function array_slice;
-use function defined;
-use function explode;
-use function get_class;
-use function in_array;
-use function is_callable;
-use function iterator_to_array;
-use function json_decode;
-use function json_encode;
-use function md5;
-use function stristr;
-use function time;
+use http\Exception\BadMethodCallException;
 use function array_merge;
 use function implode;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -51,98 +27,20 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  */
 trait Statistics
 {
-
-	/**
-	 * Get stats for many items at once. Trying caches first to minimise queries
-	 *
-	 * @param string $type
-	 * @param array $items
-	 * @return array
-	 */
-	public static function getMany( string $type, array $items ): array
-	{
-		$itemIds = [];
-		$class = null;
-		$return = [];
-
-		if ( ! count( $items ) )
-		{
-			return [];
-		}
-
-		foreach( $items as $item )
-		{
-			/* This is genuis and you can't tell me otherwise */
-			if ( $class === null )
-			{
-				$class = get_class( $item );
-			}
-
-			/* @var Item $class */
-			$idColumn = $class::$databaseColumnId;
-			$itemIds[ $item->$idColumn ] = $item;
-		}
-
-		foreach( Db::i()->select( '*', 'core_item_statistics_cache', [ [ 'cache_class=?', $class ], [ Db::i()->in( 'cache_item_id', array_keys( $itemIds ) ) ] ] ) as $cache )
-		{
-			if ( $cache['cache_added'] > time() - 86400 )
-			{
-				$json = json_decode( $cache['cache_contents'], TRUE );
-
-				if ( isset( $json[ $type ] ) )
-				{
-					$return[ $cache['cache_item_id'] ] = $json[ $type ];
-				}
-				else
-				{
-					/* We may have multiple types such as topPosters_4 or topPosters_10, so we make a guess here if the type sent is just 'topPosters' */
-					foreach( $json as $key => $data )
-					{
-						if ( strpos( $key, $type ) === 0 )
-						{
-							$return[ $cache['cache_item_id'] ] = $data;
-							break;
-						}
-					}
-				}
-			}
-		}
-
-		$diff = array_diff( array_keys( $itemIds ), array_keys( $return ) );
-
-		if ( count( $diff ) )
-		{
-			foreach( $diff as $id )
-			{
-				/* Make sure the method is 'topPosters' and not 'topPosters_10' */
-				$method = preg_replace( '#([a-zA-Z0-9]*)(_*|$)#', '$1', $type );
-				if ( method_exists( $class, $method ) )
-				{
-					$return[ $id ] = $itemIds[ $id ]->$type();
-				}
-				else
-				{
-					$return[ $id ] = [];
-				}
-			}
-		}
-
-		return $return;
-	}
-
 	/**
 	 * Most downloaded attachments
 	 *
 	 * @param int $count The number of results to return
 	 * @return    array
 	 * @throw BadMethodCallException
-	 * @throws Exception
 	 */
-	public function topAttachments( int $count = 5 ): array
+	public function topAttachments( $count = 5 ): array
 	{
-		$attachments = $this->_getAllAttachments( array(), $count, 'attach_hits DESC', 'topAttachments' );
+		$attachments = $this->_getAllAttachments( array(), $count, 'attach_hits DESC' );
 
-		return array_slice( $attachments, 0, $count );
+		$attachments = \array_slice( $attachments, 0, $count );
+
+		return $attachments;
 	}
 
 	/**
@@ -151,12 +49,13 @@ trait Statistics
 	 * @param int $count The number of results to return
 	 * @return    array
 	 * @throw BadMethodCallException
-	 * @throws Exception
 	 */
-	public function imageAttachments( int $count = 10 ): array
+	public function imageAttachments( $count = 10 ): array
 	{
-		$attachments = $this->_getAllAttachments( array( 'attach_is_image=1' ), $count, 'attachment_id DESC', 'imageAttachments' );
-		return array_slice( $attachments, 0, $count );
+		$attachments = $this->_getAllAttachments( array( 'attach_is_image=1' ), $count, 'attachment_id DESC' );
+		$attachments = \array_slice( $attachments, 0, $count );
+
+		return $attachments;
 	}
 
 	/**
@@ -164,16 +63,16 @@ trait Statistics
 	 *
 	 * @param int $count The number of results to return
 	 * @return    array
-	 * @throws Exception
+	 * @throws \Exception
 	 * @throw BadMethodCallException
 	 */
-	public function topPosters( int $count = 10 ): array
+	public function topPosters( $count = 10 ): array
 	{
 		$commentClass = static::$commentClass;
 
 		if ( !isset( $commentClass::$databaseColumnMap['author'] ) )
 		{
-			throw new BadMethodCallException();
+			throw new \BadMethodCallException();
 		}
 
 		$authorColumn = $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'];
@@ -183,12 +82,12 @@ trait Statistics
 		{
 			$members = $this->_getCached( $cacheKey );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			$where = $this->_getVisibleWhere();
 			$where[] = [ $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'] . '!=?', 0];
 
-			$members = iterator_to_array( Db::i()->select( "count(*) as sum, {$authorColumn}", $commentClass::$databaseTable, $where, 'sum DESC', array( 0, $count ), array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'] ) ) );
+			$members = iterator_to_array( \IPS\Db::i()->select( "count(*) as sum, {$authorColumn}", $commentClass::$databaseTable, $where, 'sum DESC', array( 0, $count ), array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'] ) ) );
 
 			$this->_storeCached( $cacheKey, $members );
 		}
@@ -207,7 +106,7 @@ trait Statistics
 		}
 
 		$return = array();
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_members', array( Db::i()->in( 'member_id', $contributors ) ) ), 'IPS\Member' ) as $member )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', array( \IPS\Db::i()->in( 'member_id', $contributors ) ) ), 'IPS\Member' ) as $member )
 		{
 			$return[] = array( 'member' => $member, 'count' => $counts[ $member->member_id ] );
 		}
@@ -226,15 +125,15 @@ trait Statistics
 	 * @param	string|NULL		$name		If we are looking for a specific user.
 	 * @param	int				$limit		The amount of results to return.
 	 * @param	bool			$incBanned	Include banned members? (Used to exclude from recent mentions)
-	 * @return	ActiveRecordIterator
+	 * @return	\IPS\Patterns\ActiveRecordIterator
 	 */
-	public function mostRecent( string|null $name = NULL, int $limit = 10, bool $incBanned = true ): ActiveRecordIterator
+	public function mostRecent( ?string $name = NULL, int $limit = 10, bool $incBanned = TRUE )
 	{
 		$commentClass = static::$commentClass;
 		
 		if ( !isset( $commentClass::$databaseColumnMap['author'] ) )
 		{
-			throw new BadMethodCallException;
+			throw new \BadMethodCallException;
 		}
 		
 		if ( $name )
@@ -250,23 +149,23 @@ trait Statistics
 		{
 			$members = $this->_getCached( $cacheKey );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			/* Get the ten most recent posters in this content that match input. */
 			$where = $this->_getVisibleWhere();
 			if ( $name )
 			{
 				$subWhere = array();
-				$subWhere[] = Db::i()->like( 'core_members.name', $name );
+				$subWhere[] = \IPS\Db::i()->like( 'core_members.name', $name );
 				if ( !$incBanned )
 				{
 					$subWhere[] = array( "core_members.temp_ban=?", 0 );
 				}
-				$subQuery = Db::i()->select( 'core_members.member_id', 'core_members', $subWhere );
+				$subQuery = \IPS\Db::i()->select( 'core_members.member_id', 'core_members', $subWhere );
 				$where[] = [ $commentClass::$databaseTable . '.' . $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'] . ' IN(?)', $subQuery ];
 			}
 
-			$members = iterator_to_array( Db::i()->select(
+			$members = iterator_to_array( \IPS\Db::i()->select(
 				$commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'],
 				$commentClass::$databaseTable,
 				$where,
@@ -276,54 +175,7 @@ trait Statistics
 			$this->_storeCached( $cacheKey, $members );
 		}
 		
-		return new ActiveRecordIterator( Db::i()->select( '*', 'core_members', array( Db::i()->in( 'member_id', $members ) ) ), 'IPS\Member' );
-	}
-
-	/**
-	 * Get reactions and the count of the times used
-	 *
-	 * @return  array
-	 * @throws Exception
-	 */
-	protected function allReactions(): array
-	{
-		$idField = static::$databaseColumnId;
-		$cacheKey = 'allReactions';
-		$return = [];
-		$enabledReactions = Reaction::enabledReactions();
-
-		if ( ! $enabledReactions )
-		{
-			return [];
-		}
-
-		try
-		{
-			$return = $this->_getCached( $cacheKey );
-		}
-		catch( OutOfRangeException $e )
-		{
-			/* Get reactions from all comments. Using distinct or group by is instant death by a thousand seconds (of execution time). Max of 100k to prevent memory exhaustion */
-			$reactions = iterator_to_array( Db::i()->select( 'reaction', 'core_reputation_index', [ [ 'rep_class=? and type_id IN(?)', static::$commentClass, $this->_subQueryVisibleComments( $this->$idField ) ] ], null, 100000 ) );
-
-			/* Get link to comments */
-			foreach( $reactions as $reaction )
-			{
-				if( isset( $enabledReactions[ $reaction ] ) )
-				{
-					if ( !isset( $return[ $reaction ] ) )
-					{
-						$return[ $reaction ] = 0;
-					}
-
-					$return[ $reaction ]++;
-				}
-			}
-
-			$this->_storeCached( $cacheKey, $return );
-		}
-
-		return $return;
+		return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', array( \IPS\Db::i()->in( 'member_id', $members ) ) ), 'IPS\Member' );
 	}
 
 	/**
@@ -332,22 +184,22 @@ trait Statistics
 	 * @param int $count The number of results to return, max 100
 	 * @return    array
 	 * @throw BadMethodCallException
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	public function topReactedPosts( int $count = 5 ): array
+	public function topReactedPosts( $count = 5 ): array
 	{
 		$commentClass = static::$commentClass;
 		$commentIdField = $commentClass::$databasePrefix . $commentClass::$databaseColumnId;
 		$idField = static::$databaseColumnId;
 
-		if ( !IPS::classUsesTrait( $commentClass, 'IPS\Content\Reactable' ) )
+		if ( !\IPS\IPS::classUsesTrait( $commentClass, 'IPS\Content\Reactable' ) )
 		{
-			throw new BadMethodCallException();
+			throw new \BadMethodCallException();
 		}
 		
 		if ( $count > 100 )
 		{
-			throw new BadMethodCallException();
+			throw new \BadMethodCallException();
 		}
 
 		$cacheKey = 'topReactedPosts_' . $count;
@@ -356,21 +208,10 @@ trait Statistics
 		{
 			$posts = $this->_getCached( $cacheKey );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$where = [
-				[ 'app=?', $commentClass::$application ],
-				[ 'type=?', $commentClass::reactionType() ],
-				[ 'item_id=?', $this->$idField ]
-			];
-
-			/* Exclude the first post */
-			if( $firstComment = $this->mapped( 'first_comment_id' ) )
-			{
-				$where[] = [ 'type_id <> ?', $firstComment ];
-			}
-
-			$posts = Db::i()->select( "count(*) as sum, type_id", 'core_reputation_index', $where, NULL, NULL, array( 'type_id' ) );
+			$where = array( 'app=? and type=? and item_id=?', $commentClass::$application, $commentClass::reactionType(), $this->$idField );
+			$posts = \IPS\Db::i()->select( "count(*) as sum, type_id", 'core_reputation_index', $where, NULL, NULL, array( 'type_id' ) );
 			
 			$posts = iterator_to_array( $posts );
 			
@@ -380,7 +221,7 @@ trait Statistics
 			} );
 			
 			/* Just store the top 100 posts, they are already sorted by highest to lowest */
-			$posts = array_slice( $posts, 0, 100 );
+			$posts = \array_slice( $posts, 0, 100 );
 			$this->_storeCached( $cacheKey, $posts );
 		}
 
@@ -397,111 +238,26 @@ trait Statistics
 			return array();
 		}
 
-		return $this->getComments( $commentClass, $commentIdField, $idField, $postIds, $count, $counts );
-	}
-
-	/**
-	 * Most helpful posts
-	 *
-	 * @param int $count The number of results to return, max 100
-	 * @return    array
-	 * @throw BadMethodCallException
-	 * @throws Exception
-	 */
-	public function helpfulPosts( int $count = 5 ): array
-	{
-		$commentClass = static::$commentClass;
-		$commentIdField = $commentClass::$databasePrefix . $commentClass::$databaseColumnId;
-		$idField = static::$databaseColumnId;
-
-		if ( !IPS::classUsesTrait( $commentClass, 'IPS\Content\Helpful' ) )
+		$return = array();
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', $commentClass::$databaseTable, array( \IPS\Db::i()->in( $commentIdField, $postIds ) ), "FIND_IN_SET( {$commentIdField}, '" . implode( ",", $postIds ) . "' )", array( 0, $count ) ), $commentClass ) as $comment )
 		{
-			throw new BadMethodCallException();
-		}
-
-		if ( $count > 100 )
-		{
-			throw new BadMethodCallException();
-		}
-
-		$cacheKey = 'helpfulPosts_' . $count;
-
-		try
-		{
-			$posts = $this->_getCached( $cacheKey );
-		}
-		catch( OutOfRangeException $e )
-		{
-			$where = array( 'app=? and type=? and item_id=? and hidden=0', $commentClass::$application, 'helpful', $this->$idField );
-			$posts = Db::i()->select( "count(*) as sum, comment_id", 'core_solved_index', $where, NULL, NULL, array( 'comment_id' ) );
-
-			$posts = iterator_to_array( $posts );
-
-			usort( $posts, function( $item1, $item2 )
+			if ( $comment->canView() and $comment->mapped('item') == $this->$idField and isset( $counts[ $comment->$commentIdField ] ) )
 			{
-				return $item2['sum'] <=> $item1['sum'];
-			} );
-
-			/* Just store the top 100 posts, they are already sorted by highest to lowest */
-			$posts = array_slice( $posts, 0, 100 );
-			$this->_storeCached( $cacheKey, $posts );
-		}
-
-		$postIds = array();
-		$counts = array();
-		foreach ( $posts as $post )
-		{
-			$postIds[] = $post['comment_id'];
-			$counts[$post['comment_id']] = $post['sum'];
-		}
-
-		if ( empty( $postIds ) )
-		{
-			return array();
-		}
-
-		return $this->getComments( $commentClass, $commentIdField, $idField, $postIds, $count, $counts );
-	}
-
-	protected $commentCache = array();
-
-	/**
-	 * Get the comments, storing them for later use in the same request
-	 *
-	 * @param string $commentClass
-	 * @param string $commentIdField
-	 * @param string $idField
-	 * @param array $postIds
-	 * @param int $count
-	 * @param array $counts
-	 * @return array
-	 */
-	protected function getComments( string $commentClass, string $commentIdField, string $idField, array $postIds, int $count, array $counts ): array
-	{
-		$key = md5( $commentClass . $commentIdField . $idField . implode( ',', $postIds ) . $count . json_encode( $counts ) );
-
-		if ( ! isset( $this->commentCache[ $key ] ) )
-		{
-			$this->commentCache[ $key ] = [];
-			foreach ( new ActiveRecordIterator( Db::i()->select( '*', $commentClass::$databaseTable, [Db::i()->in( $commentIdField, $postIds )], "FIND_IN_SET( {$commentIdField}, '" . implode( ",", $postIds ) . "' )", [0, $count] ), $commentClass ) as $comment )
-			{
-				if ( $comment->canView() and $comment->mapped( 'item' ) == $this->$idField and isset( $counts[$comment->$commentIdField] ) )
-				{
-					$this->commentCache[ $key ][] = ['comment' => $comment, 'count' => $counts[$comment->$commentIdField]];
-				}
+				$return[] = array( 'comment' => $comment, 'count' => $counts[ $comment->$commentIdField ] );
 			}
 		}
 
-		return $this->commentCache[ $key ];
+		return $return;
 	}
+
 	/**
 	 * Fetch the top 10 popular days for posts
 	 *
 	 * @param int $count	Number of days to return
 	 * @return array
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	public function popularDays( int $count=10 ): array
+	public function popularDays( $count=10 )
 	{
 		$return = array();
 		$commentClass = static::$commentClass;
@@ -515,20 +271,19 @@ trait Statistics
 		{
 			$posts = $this->_getCached( $cacheKey );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			/* @var $databaseColumnMap array */
-			$dateColumn = $commentClass::$databasePrefix . ( $commentClass::$databaseColumnMap['updated'] ?? $commentClass::$databaseColumnMap['date'] );
+			$dateColumn = $commentClass::$databasePrefix . ( isset( $commentClass::$databaseColumnMap['updated'] ) ? $commentClass::$databaseColumnMap['updated'] : $commentClass::$databaseColumnMap['date'] );
 			$where = $this->_getVisibleWhere();
 
-			$posts = iterator_to_array( Db::i()->select( "COUNT(*) AS count, MIN({$commentIdField}) as commentId, (DATE_FORMAT( FROM_UNIXTIME( IFNULL( {$dateColumn}, 0 ) ), '%Y-%c-%e' ) ) as time", $commentClass::$databaseTable, $where, 'count desc', array( 0, $count ), array( 'time' ) ) );
+			$posts = iterator_to_array( \IPS\Db::i()->select( "COUNT(*) AS count, MIN({$commentIdField}) as commentId, (DATE_FORMAT( FROM_UNIXTIME( IFNULL( {$dateColumn}, 0 ) ), '%Y-%c-%e' ) ) as time", $commentClass::$databaseTable, $where, 'count desc', array( 0, $count ), array( 'time' ) ) );
 
 			$this->_storeCached( $cacheKey, $posts );
 		}
 
-		foreach ( $posts as $row )
+		foreach ( $posts  as $row )
 		{
-			if ( ! in_array( $row['time'], $rows ) )
+			if ( ! \in_array( $row['time'], $rows ) )
 			{
 				$rows[ $row['time'] ] = 0;
 			}
@@ -539,7 +294,7 @@ trait Statistics
 
 		foreach ( $rows as $time => $val )
 		{
-			$datetime = new IPSDateTime;
+			$datetime = new \IPS\DateTime;
 			$datetime->setTime( 12, 0, 0 );
 			$exploded = explode( '-', $time );
 			$datetime->setDate( $exploded[0], $exploded[1], $exploded[2] );
@@ -553,21 +308,21 @@ trait Statistics
 	/**
 	 * Clear any cached stats
 	 *
-	 * @param bool $force Force immediate cache delete
+	 * @param  bool $force      Force immediate cache delete
 	 * @return void
-	 * @throws Exception
+	 * @throws \Exception
 	 */
 	public function clearCachedStatistics( bool $force=FALSE )
 	{
 		$idField = static::$databaseColumnId;
 		if( $force )
 		{
-			Db::i()->delete( 'core_item_statistics_cache', [ 'cache_class=? and cache_item_id=?', \get_class( $this ), $this->$idField ] );
+			\IPS\Db::i()->delete( 'core_item_statistics_cache', [ 'cache_class=? and cache_item_id=?', \get_class( $this ), $this->$idField ] );
 		}
 		else
 		{
 			/* Set cache to time out in 10 minutes. */
-			Db::i()->update( 'core_item_statistics_cache', [ 'cache_added' => ( time() - 172200 ) ], [ 'cache_class=? and cache_item_id=?', \get_class( $this ), $this->$idField ] );
+			\IPS\Db::i()->update( 'core_item_statistics_cache', [ 'cache_added' => ( time() - 172200 ) ], [ 'cache_class=? and cache_item_id=?', \get_class( $this ), $this->$idField ] );
 		}
 	}
 
@@ -579,32 +334,31 @@ trait Statistics
 	/**
 	 * Get all attachments for this item
 	 *
-	 * @param array|null $extraWhere Additional where clause
-	 * @param int $limit Number to return/limit to
-	 * @param string|NULL $orderBy Order by clause (optional)
-	 * @param string $cacheName
+	 * @param	array		$extraWhere	Additional where clause
+	 * @param	int			$limit		Number to return/limit to
+	 * @param	string|NULL	$orderBy	Order by clause (optional)
 	 * @return  array
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	protected function _getAllAttachments( array|null $extraWhere=NULL, int $limit=10, string|null $orderBy=NULL, $cacheName='allAttachments' ): array
+	protected function _getAllAttachments( $extraWhere=NULL, $limit=10, $orderBy=NULL )
 	{
 		$idField = static::$databaseColumnId;
-		$cacheKey = $cacheName . '_' . md5( json_encode( $extraWhere ) . $limit . $orderBy );
+		$cacheKey = 'allAttachments' . md5( json_encode( $extraWhere ) . $limit . (string) $orderBy );
 		$return = array();
 
 		try
 		{
 			$return = $this->_getCached( $cacheKey );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			/* This is more efficient and avoids a very slow table join */
-			if ( stristr( $orderBy, 'attach_date' ) )
+			if ( \stristr( $orderBy, 'attach_date' ) )
 			{
 				$orderBy = str_replace( 'attach_date', 'attachment_id', $orderBy );
 			}
 
-			$where = array( array( 'location_key=? and id1=?', static::$application . '_' . IPS::mb_ucfirst( static::$module ), $this->$idField ) );
+			$where = array( array( 'location_key=? and id1=?', static::$application . '_' . mb_ucfirst( static::$module ), $this->$idField ) );
 
 			if ( $extraWhere !== NULL )
 			{
@@ -626,7 +380,7 @@ trait Statistics
 			}
 
 			$return = iterator_to_array(
-				Db::i()->select( '*', 'core_attachments_map', $where, $orderBy, $limit )
+				\IPS\Db::i()->select( '*', 'core_attachments_map', $where, $orderBy, $limit )
 					->join( 'core_attachments', array( 'attach_id=attachment_id' ) )
 					->join( $commentClass::$databaseTable, array( implode( ' AND ', $commentTableJoin ) ), 'INNER' )
 			);
@@ -640,13 +394,14 @@ trait Statistics
 					$exploded = explode( '_', $map['location_key'] );
 					try
 					{
-						$extensions = Application::load( $exploded[0] )->extensions( 'core', 'EditorLocations' );
+						$extensions = \IPS\Application::load( $exploded[0] )->extensions( 'core', 'EditorLocations' );
 						if ( isset( $extensions[ $exploded[1] ] ) )
 						{
 							static::$loadedExtensions[ $map['location_key'] ] = $extensions[ $exploded[1] ];
 						}
 					}
-					catch ( OutOfRangeException | UnexpectedValueException $e ) { }
+					catch ( \OutOfRangeException $e ) { }
+					catch ( \UnexpectedValueException $e ) { }
 				}
 				
 				if ( isset( static::$loadedExtensions[ $map['location_key'] ] ) )
@@ -657,7 +412,8 @@ trait Statistics
 
 						$return[ $k ]['commentUrl'] = (string) $url->url();
 					}
-					catch ( LogicException | OutOfRangeException $e ) { }
+					catch ( \LogicException $e ) { }
+					catch ( \BadMethodCallException $e ){ }
 				}
 			}
 
@@ -671,13 +427,12 @@ trait Statistics
 	 * Return a sub query to fetch only visible posts
 	 *
 	 * @param	int		$id		Content item ID
-	 * @return Select
+	 * @return \IPS\Db\Select
 	 */
-	protected function _subQueryVisibleComments( int $id ): Select
+	protected function _subQueryVisibleComments( $id )
 	{
 		$commentClass = static::$commentClass;
-		/* @var $databaseColumnMap array */
-		return Db::i()->select( $commentClass::$databasePrefix . $commentClass::$databaseColumnId, $commentClass::$databaseTable, array_merge( $this->_getVisibleWhere(), array( array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['item'] . '=' . $id ) ) ) );
+		return \IPS\Db::i()->select( $commentClass::$databasePrefix . $commentClass::$databaseColumnId, $commentClass::$databaseTable, array_merge( $this->_getVisibleWhere(), array( array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['item'] . '=' . $id ) ) ) );
 	}
 
 	/**
@@ -685,9 +440,8 @@ trait Statistics
 	 *
 	 * @return array
 	 */
-	protected function _getVisibleWhere(): array
+	protected function _getVisibleWhere()
 	{
-		/* @var $databaseColumnMap array */
 		$commentClass = static::$commentClass;
 
 		$lookFor = 'IPS\cms\Records\CommentTopicSync';
@@ -715,13 +469,6 @@ trait Statistics
 			$where[] = array( "{$hiddenColumn} = 0" );
 		}
 
-		/* Exclude first posts */
-		if ( isset( $commentClass::$databaseColumnMap['first'] ) )
-		{
-			$firstCommentColumn = $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['first'];
-			$where[] = array( "{$firstCommentColumn} = 0" );
-		}
-
 		if ( $commentClass::commentWhere() !== NULL )
 		{
 			$where[] = $commentClass::commentWhere();
@@ -735,7 +482,7 @@ trait Statistics
 	/**
 	 * @brief Cached data
 	 */
-	public static array|null $cachedActivity = NULL;
+	static $cachedActivity = NULL;
 
 	/**
 	 * @var bool|null Process has rebuild lock
@@ -746,10 +493,10 @@ trait Statistics
 	 * Get the cached data
 	 *
 	 * @param	string	$key	Key to get
-	 * @throws Exception
+	 * @throws \Exception
 	 * @return mixed|NULL
 	 */
-	protected function _getCached( string $key ): mixed
+	protected function _getCached( $key )
 	{
 		$idField = static::$databaseColumnId;
 		if( $this->hasRebuildLock === FALSE )
@@ -757,13 +504,13 @@ trait Statistics
 			return [];
 		}
 
-		$class = get_class( $this );
+		$class = \get_class( $this );
 		$arrayKey = $class . '.' . $this->$idField;
 		if ( !isset( static::$cachedActivity[ $arrayKey ] ) )
 		{
 			try
 			{
-				$cache = Db::i()->select( '*', 'core_item_statistics_cache', [ 'cache_class=? and cache_item_id=?', $class, $this->$idField ] )->first();
+				$cache = \IPS\Db::i()->select( '*', 'core_item_statistics_cache', [ 'cache_class=? and cache_item_id=?', $class, $this->$idField ] )->first();
 				if ( $cache['cache_added'] > ( time() - 172800 ) )
 				{
 					static::$cachedActivity[ $arrayKey ] = json_decode( $cache['cache_contents'], TRUE );
@@ -771,7 +518,7 @@ trait Statistics
 				else
 				{
 					$this->hasRebuildLock = TRUE;
-					$affectedRows = Db::i()->delete( 'core_item_statistics_cache', [ 'cache_class=? and cache_item_id=?', \get_class( $this ), $this->$idField ] );
+					$affectedRows = \IPS\Db::i()->delete( 'core_item_statistics_cache', [ 'cache_class=? and cache_item_id=?', \get_class( $this ), $this->$idField ] );
 					if( $affectedRows == 0 )
 					{
 						/* We did not delete the row, allow another process to rebuild the cache */
@@ -785,7 +532,7 @@ trait Statistics
 				/* Try to get the lock for new cache generation */
 				try
 				{
-					Db::i()->insert( 'core_item_statistics_cache', [
+					\IPS\Db::i()->insert( 'core_item_statistics_cache', [
 						'cache_class'       => \get_class( $this ),
 						'cache_item_id'     => $this->$idField,
 						'cache_contents'    => '[]',
@@ -793,7 +540,7 @@ trait Statistics
 					] );
 					$this->hasRebuildLock = TRUE;
 				}
-					/* We didn't get the lock, return empty array and allow other process to build cache */
+				/* We didn't get the lock, return empty array and allow other process to build cache */
 				catch( \IPS\Db\Exception $e )
 				{
 					$this->hasRebuildLock = FALSE;
@@ -814,34 +561,32 @@ trait Statistics
 			}
 
 			static::$cachedActivity[ $arrayKey ][ $key ] = [];
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 	}
 
 	/**
 	 * @brief	Should we store the data in the cache?
 	 */
-	protected array|null $storeCache = NULL;
+	protected $storeCache = NULL;
 
 	/**
 	 * Set cached data
 	 *
 	 * @param string $key Key to store
 	 * @param mixed $value Value to store
-	 *
-	 * @return	void
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	protected function _storeCached( string $key, mixed $value ): void
+	protected function _storeCached( $key, $value )
 	{
 		try
 		{
 			$this->_getCached( $key );
 		}
-		catch( Exception $e ) { }
+		catch( \Exception $e ) { }
 
 		$idField = static::$databaseColumnId;
-		$class = get_class( $this );
+		$class = \get_class( $this );
 		$arrayKey = $class.'.'.$this->$idField;
 
 		static::$cachedActivity[ $arrayKey ][ $key ] = $value;
@@ -858,18 +603,24 @@ trait Statistics
 	{
 		if( $this->storeCache )
 		{
+			$insert = [];
 			foreach( $this->storeCache as $key => $data )
 			{
-				Db::i()->insert( 'core_item_statistics_cache', array(
-					'cache_class'    => get_class( $this ),
+				$insert[] = array(
+					'cache_class'    => \get_class( $this ),
 					'cache_item_id'  => str_replace( \get_class( $this ) . '.', '', $key ),
 					'cache_contents' => json_encode( static::$cachedActivity[ $key ] ) ?? '[]',
 					'cache_added'	 => time()
-				), TRUE );
+				);
+			}
+
+			if( \count( $insert ) )
+			{
+				\IPS\Db::i()->insert( 'core_item_statistics_cache', $insert, TRUE );
 			}
 		}
 
-		if( is_callable( 'parent::__destruct' ) )
+		if( \is_callable( 'parent::__destruct' ) )
 		{
 			parent::__destruct();
 		}

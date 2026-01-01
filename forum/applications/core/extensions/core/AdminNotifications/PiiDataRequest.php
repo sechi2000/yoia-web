@@ -11,41 +11,31 @@
 namespace IPS\core\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\PrivacyAction;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP  Notification Extension
  */
-class PiiDataRequest extends AdminNotification
+class _PiiDataRequest extends \IPS\core\AdminNotification
 {	
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'members';
+	public static $group = 'members';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 2;
+	public static $groupPriority = 2;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 1;
+	public static $itemPriority = 1;
 	
 	/**
 	 * Title for settings
@@ -60,10 +50,10 @@ class PiiDataRequest extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member ): bool
 	{
 		return $member->hasAcpRestriction( 'core', 'members' );
 	}
@@ -71,9 +61,9 @@ class PiiDataRequest extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional() : bool
+	public static function mayBeOptional()
 	{
 		return FALSE;
 	}
@@ -93,15 +83,15 @@ class PiiDataRequest extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function title() : string
+	public function title()
 	{
-		$others = Db::i()->select( 'COUNT(*)', 'core_member_privacy_actions', [ 'action=?', PrivacyAction::TYPE_REQUEST_PII ] )->first();
+		$others = \IPS\Db::i()->select( 'COUNT(*)', 'core_member_privacy_actions', [ 'action=?', \IPS\Member\PrivacyAction::TYPE_REQUEST_PII ] )->first();
 		$names = [];
 		foreach (
-			Db::i()->select(
+			\IPS\Db::i()->select(
 				   "*",
 				   'core_member_privacy_actions',
-			where: [ 'action=?', PrivacyAction::TYPE_REQUEST_PII ],
+			where: [ 'action=?', \IPS\Member\PrivacyAction::TYPE_REQUEST_PII ],
 			order: 'request_date asc',
 			limit: [ 0, 2 ]
 			)->join(
@@ -115,27 +105,27 @@ class PiiDataRequest extends AdminNotification
 		}
 		if ( $others )
 		{
-			$names[] = Member::loggedIn()->language()->addToStack( 'and_x_others', FALSE, array( 'pluralize' => array( $others ) ) );
+			$names[] = \IPS\Member::loggedIn()->language()->addToStack( 'and_x_others', FALSE, array( 'pluralize' => array( $others ) ) );
 		}
 
-		return Member::loggedIn()->language()->addToStack( 'pii_data_request_adminnotification', FALSE, array( 'pluralize' => array( count( $names ) ), 'sprintf' => array( Member::loggedIn()->language()->formatList( $names ) ) ) );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'pii_data_request_adminnotification', FALSE, array( 'pluralize' => array( \count( $names ) ), 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $names ) ) ) );
 	}
 
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body(): string
 	{
 		$users = [];
 
 		$names = [];
 		foreach(
-		Db::i()->select(
+		\IPS\Db::i()->select(
 			'*',
 			'core_member_privacy_actions',
-			where: ['action=?', PrivacyAction::TYPE_REQUEST_PII],
+			where: ['action=?', \IPS\Member\PrivacyAction::TYPE_REQUEST_PII],
 			order: 'request_date asc',
 			limit: [0, 2]
 		)->join(
@@ -144,13 +134,13 @@ class PiiDataRequest extends AdminNotification
 		) as $user
 		)
 		{
-			$users[ $user[ 'member_id' ] ] = Member::constructFromData( $user );
+			$users[ $user[ 'member_id' ] ] = \IPS\Member::constructFromData( $user );
 			$users[ $user[ 'member_id' ] ]->_privacy_id = $user['id'];
 		}
 		
-		if( count( $users ) )
+		if( \count( $users ) )
 		{
-			return Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->piiRequest( $users );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->piiRequest( $users );
 		}
 		else
 		{
@@ -181,7 +171,7 @@ class PiiDataRequest extends AdminNotification
 	/**
 	 * Style
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
 	public function style(): string
 	{
@@ -191,10 +181,10 @@ class PiiDataRequest extends AdminNotification
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url
+	public function link(): \IPS\Http\Url
 	{
-		return Url::internal( 'app=core&module=members&controller=privacy&filter=pii_data' );
+		return \IPS\Http\Url::internal( 'app=core&module=members&controller=privacy&filter=pii_data' );
 	}
 }

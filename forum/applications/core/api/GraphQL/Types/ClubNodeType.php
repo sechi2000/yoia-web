@@ -11,25 +11,25 @@
 
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
+use GraphQL\Type\Definition\UnionType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Http\Url\Friendly;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ClubNodeType for GraphQL API
  */
-class ClubNodeType extends ObjectType
+class _ClubNodeType extends ObjectType
 {
     /**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -41,28 +41,28 @@ class ClubNodeType extends ObjectType
 					'id' => [
 						'type' => TypeRegistry::id(),
 						'description' => "Node ID",
-						'resolve' => function ($node) {
+						'resolve' => function ($node, $args, $context, $info) {
 							return $node['node_id'];
 						}
 					],
 					'name' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Node name",
-						'resolve' => function ($node) {
+						'resolve' => function ($node, $args, $context, $info) {
 							return $node['name'];
 						}
 					],
 					'seoTitle' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Node's SEO title",
-						'resolve' => function ($node) {
-							return Friendly::seoTitle( $node['name'] );
+						'resolve' => function ($node, $args, $context, $info) {
+							return \IPS\Http\Url\Friendly::seoTitle( $node['name'] );
 						}
 					],
 					'type' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Node type (from classname)",
-						'resolve' => function ($node) {
+						'resolve' => function ($node, $args, $context, $info) {
 							return str_replace('\\', '_', str_replace('IPS\\', '', $node['node_class'] ) );
 						}
 					]

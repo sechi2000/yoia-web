@@ -13,97 +13,50 @@ namespace IPS\downloads;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use DateInterval;
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Content\ClubContainer;
 use IPS\Content\Comment;
-use IPS\Content\Filter;
-use IPS\Content\Item;
-use IPS\Content\Search\Index;
-use IPS\Content\ViewUpdates;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\downloads\File;
-use IPS\File as SystemFile;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\WidthHeight;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Group;
-use IPS\Node\Icon;
-use IPS\Node\Model;
-use IPS\Node\Permissions;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Widget;
-use OutOfBoundsException;
-use OutOfRangeException;
-use UnderFlowException;
-use function defined;
-use function get_called_class;
-use function intval;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Category Node
  */
-class Category extends Model implements Permissions
+class _Category extends \IPS\Node\Model implements \IPS\Node\Permissions
 {
-	use ClubContainer, ViewUpdates, Icon;
+	use \IPS\Content\ClubContainer, \IPS\Content\ViewUpdates;
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'downloads_categories';
+	public static $databaseTable = 'downloads_categories';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'c';
+	public static $databasePrefix = 'c';
 		
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 	
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnParent = 'parent';
+	public static $databaseColumnParent = 'parent';
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'categories';
+	public static $nodeTitle = 'categories';
 			
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -121,7 +74,7 @@ class Category extends Model implements Permissions
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'downloads',
 		'module'	=> 'downloads',
 		'prefix' => 'categories_'
@@ -130,17 +83,17 @@ class Category extends Model implements Permissions
 	/**
 	 * @brief	[Node] App for permission index
 	 */
-	public static ?string $permApp = 'downloads';
+	public static $permApp = 'downloads';
 	
 	/**
 	 * @brief	[Node] Type for permission index
 	 */
-	public static ?string $permType = 'category';
+	public static $permType = 'category';
 	
 	/**
 	 * @brief	The map of permission columns
 	 */
-	public static array $permissionMap = array(
+	public static $permissionMap = array(
 		'view' 				=> 'view',
 		'read'				=> 2,
 		'add'				=> 3,
@@ -152,7 +105,7 @@ class Category extends Model implements Permissions
 	/**
 	 * @brief	Bitwise values for members_bitoptions field
 	 */
-	public static array $bitOptions = array(
+	public static $bitOptions = array(
 		'bitoptions' => array(
 			'bitoptions' => array(
 				'allowss'				=> 1,	// Allow screenshots?
@@ -173,95 +126,62 @@ class Category extends Model implements Permissions
 	);
 
 	/**
-	 * Mapping of node columns to specific actions (e.g. comment, review)
-	 * Note: Mappings can also reference bitoptions keys.
-	 *
-	 * @var array
-	 */
-	public static array $actionColumnMap = array(
-		'comments' 			=> 'comments',
-		'reviews'			=> 'reviews',
-		'moderate_comments'	=> 'comment_moderation',
-		'moderate_items'	=> 'moderation',
-		'moderate_reviews'  => 'reviews_mod',
-		'tags'				=> 'tags_disabled',
-		'prefix'			=> 'tags_noprefixes'
-	);
-
-	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'downloads_category_';
+	public static $titleLangPrefix = 'downloads_category_';
 	
 	/**
 	 * @brief	[Node] Description suffix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}_{$descriptionLangSuffix}" as the key
 	 */
-	public static ?string $descriptionLangSuffix = '_desc';
+	public static $descriptionLangSuffix = '_desc';
 	
 	/**
 	 * @brief	[Node] Moderator Permission
 	 */
-	public static string $modPerm = 'download_categories';
+	public static $modPerm = 'download_categories';
 	
 	/**
 	 * @brief	Content Item Class
 	 */
-	public static ?string $contentItemClass = 'IPS\downloads\File';
+	public static $contentItemClass = 'IPS\downloads\File';
 	
 	/**
 	 * @brief	[Node] Prefix string that is automatically prepended to permission matrix language strings
 	 */
-	public static string $permissionLangPrefix = 'perm_file_';
+	public static $permissionLangPrefix = 'perm_file_';
 	
 	/**
 	 * @brief	[Node] Enabled/Disabled Column
 	 */
-	public static ?string $databaseColumnEnabledDisabled = 'open';
+	public static $databaseColumnEnabledDisabled = 'open';
 
 	/**
 	 * @brief   The class of the ACP \IPS\Node\Controller that manages this node type
 	 */
-	protected static ?string $acpController = "IPS\\downloads\\modules\\admin\\downloads\\categories";
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
-
-	/**
-	 * @brief	FileStorage extension
-	 */
-	public static string $iconStorageExtension = 'downloads_Icons';
-
-	/**
-	 * @var string
-	 */
-	public static string $iconFormPrefix = 'c';
+	protected static $acpController = "IPS\\downloads\\modules\\admin\\downloads\\categories";
 
 	/**
 	 * Get SEO name
 	 *
 	 * @return	string
 	 */
-	public function get_name_furl(): string
+	public function get_name_furl()
 	{
 		if( !$this->_data['name_furl'] )
 		{
-			$this->name_furl	= Friendly::seoTitle( Lang::load( Lang::defaultLanguage() )->get( 'downloads_category_' . $this->id ) );
+			$this->name_furl	= \IPS\Http\Url\Friendly::seoTitle( \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( 'downloads_category_' . $this->id ) );
 			$this->save();
 		}
 
-		return $this->_data['name_furl'] ?: Friendly::seoTitle( Lang::load( Lang::defaultLanguage() )->get( 'downloads_category_' . $this->id ) );
+		return $this->_data['name_furl'] ?: \IPS\Http\Url\Friendly::seoTitle( \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( 'downloads_category_' . $this->id ) );
 	}
-
+	
 	/**
 	 * Get sort order
 	 *
-	 * @return string|null
+	 * @return	string
 	 */
-	public function get__sortBy(): ?string
+	public function get__sortBy()
 	{
 		return $this->sortorder;
 	}
@@ -271,58 +191,39 @@ class Category extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	public function get__sortOrder(): string
+	public function get__sortOrder()
 	{
 		return $this->sortorder == 'file_name' ? 'ASC' : parent::get__sortOrder();
 	}
-
+	
 	/**
 	 * [Node] Set whether or not this node is enabled
 	 *
 	 * @param	bool|int	$enabled	Whether to set it enabled or disabled
 	 * @return	void
 	 */
-	public function set__enabled( bool|int $enabled ) : void
+	public function set__enabled( $enabled )
 	{
 		parent::set__enabled( $enabled );
 		
 		static::updateSearchIndexOnEnableDisable( $this, (bool) $enabled );
 		
 		/* Trash widgets so files in this category are not viewable in widgets */
-		Widget::deleteCaches( NULL, 'downloads' );
-	}
-
-	/**
-	 * Check the action column map if the action is enabled in this node
-	 *
-	 * @param string $action
-	 * @return bool
-	 */
-	public function checkAction( string $action ) : bool
-	{
-		$return = parent::checkAction( $action );
-
-		/* Some actions here are reversed, we mark them as disabled instead of enabled */
-		if( in_array( $action, array( 'tags', 'prefix' ) ) )
-		{
-			return !$return;
-		}
-
-		return $return;
+		\IPS\Widget::deleteCaches( NULL, 'downloads' );
 	}
 	
 	/**
 	 * Update the search index on enable / disable of a category
 	 *
-	 * @param Category $node		The Category
-	 * @param bool $enabled	Enabled / Disable
+	 * @param	\IPS\downloads\Category		$node		The Category
+	 * @param	bool						$enabled	Enabled / Disable
 	 * @return	void
 	 */
-	protected static function updateSearchIndexOnEnableDisable( Category $node, bool $enabled ) : void
+	protected static function updateSearchIndexOnEnableDisable( \IPS\downloads\Category $node, $enabled )
 	{
-		Index::i()->massUpdate( static::$contentItemClass, $node->_id, NULL, ( $enabled ) ? $node->searchIndexPermissions() : '' );
+		\IPS\Content\Search\Index::i()->massUpdate( static::$contentItemClass, $node->_id, NULL, ( $enabled ) ? $node->searchIndexPermissions() : '' );
 		
-		Db::i()->update( 'core_tags_perms', array( 'tag_perm_text' => ( $enabled ) ? $node->searchIndexPermissions() : '' ), array( 'tag_perm_aap_lookup=?', md5( static::$permApp . ';' . static::$permType . ';' . $node->_id ) ) );
+		\IPS\Db::i()->update( 'core_tags_perms', array( 'tag_perm_text' => ( $enabled ) ? $node->searchIndexPermissions() : '' ), array( 'tag_perm_aap_lookup=?', md5( static::$permApp . ';' . static::$permType . ';' . $node->_id ) ) );
 
 		if ( $node->hasChildren( NULL ) )
 		{
@@ -336,21 +237,21 @@ class Category extends Model implements Permissions
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$customFields = array();
-		foreach ( Db::i()->select( 'cf_id', 'downloads_cfields', NULL, 'cf_position' ) as $fieldId )
+		foreach ( \IPS\Db::i()->select( 'cf_id', 'downloads_cfields', NULL, 'cf_position' ) as $fieldId )
 		{
-			$customFields[ $fieldId ] = Member::loggedIn()->language()->addToStack( "downloads_field_{$fieldId}" );
+			$customFields[ $fieldId ] = \IPS\Member::loggedIn()->language()->addToStack( "downloads_field_{$fieldId}" );
 		}
 		
 		$form->addTab( 'category_settings' );
 		$form->addHeader( 'category_settings' );
-		$form->add( new Translatable( 'cname', NULL, TRUE, array( 'app' => 'downloads', 'key' => ( $this->id ? "downloads_category_{$this->id}" : NULL ) ) ) );
-		$form->add( new Translatable( 'cdesc', NULL, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Translatable( 'cname', NULL, TRUE, array( 'app' => 'downloads', 'key' => ( $this->id ? "downloads_category_{$this->id}" : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'cdesc', NULL, FALSE, array(
 			'app'		=> 'downloads',
 			'key'		=> ( $this->id ? "downloads_category_{$this->id}_desc" : NULL ),
 			'editor'	=> array(
@@ -361,9 +262,9 @@ class Category extends Model implements Permissions
 			)
 		) ) );
 
-		$class = get_called_class();
+		$class = \get_called_class();
 
-		$form->add( new Node( 'cparent', $this->parent ?: 0, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Node( 'cparent', $this->parent ?: 0, FALSE, array(
 			'class'		      => '\IPS\downloads\Category',
 			'disabled'	      => false,
 			'zeroVal'         => 'node_no_parentd',
@@ -374,97 +275,96 @@ class Category extends Model implements Permissions
 					return FALSE;
 				}
 
-				return !isset( Request::i()->id ) or ( $node->id != Request::i()->id and !$node->isChildOf( $node::load( Request::i()->id ) ) );
+				return !isset( \IPS\Request::i()->id ) or ( $node->id != \IPS\Request::i()->id and !$node->isChildOf( $node::load( \IPS\Request::i()->id ) ) );
 			}
 		) ) );
 		if ( !empty( $customFields ) )
 		{
-			$form->add( new CheckboxSet( 'ccfields', ( $this->id AND $this->_data['cfields'] ) ? explode( ',', $this->_data['cfields'] ) : array(), FALSE, array( 'options' => $customFields, 'multiple' => TRUE ), NULL, NULL, NULL, 'ccfields' ) );
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'ccfields', $this->id ? explode( ',', $this->_data['cfields'] ) : array(), FALSE, array( 'options' => $customFields, 'multiple' => TRUE ), NULL, NULL, NULL, 'ccfields' ) );
 		}
-		$form->add( new YesNo( 'allow_anonymous', $this->id ? $this->allow_anonymous : FALSE, FALSE, array() ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'allow_anonymous', $this->id ? $this->allow_anonymous : FALSE, FALSE, array() ) );
 		
 		$form->addHeader( 'category_comments_and_reviews' );
-		$form->add( new YesNo( 'cbitoptions_comments', $this->id ? $this->bitoptions['comments'] : TRUE, FALSE, array( 'togglesOn' => array( 'cbitoptions_comment_moderation' ) ), NULL, NULL, NULL, 'cbitoptions_comments' ) );
-		$form->add( new YesNo( 'cbitoptions_comment_moderation', $this->bitoptions['comment_moderation'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_comment_moderation' ) );
-		$form->add( new YesNo( 'cbitoptions_reviews', $this->id ? $this->bitoptions['reviews'] : TRUE, FALSE, array( 'togglesOn' => array( 'cbitoptions_reviews_mod', 'cbitoptions_reviews_download' ) ) ) );
-		$form->add( new YesNo( 'cbitoptions_reviews_download', $this->bitoptions['reviews_download'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_reviews_download' ) );
-		$form->add( new YesNo( 'cbitoptions_reviews_mod', $this->bitoptions['reviews_mod'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_reviews_mod' ) );
-
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_comments', $this->id ? $this->bitoptions['comments'] : TRUE, FALSE, array( 'togglesOn' => array( 'cbitoptions_comment_moderation' ) ), NULL, NULL, NULL, 'cbitoptions_comments' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_comment_moderation', $this->bitoptions['comment_moderation'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_comment_moderation' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_reviews', $this->id ? $this->bitoptions['reviews'] : TRUE, FALSE, array( 'togglesOn' => array( 'cbitoptions_reviews_mod', 'cbitoptions_reviews_download' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_reviews_download', $this->bitoptions['reviews_download'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_reviews_download' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_reviews_mod', $this->bitoptions['reviews_mod'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_reviews_mod' ) );
 		$form->addHeader( 'category_display' );
-		$form->add( new Select( 'csortorder', $this->sortorder ?: 'updated', FALSE, array( 'options' => array( 'updated' => 'sort_updated', 'last_comment' => 'last_reply', 'title' => 'file_title', 'rating' => 'sort_rating', 'date' => 'sort_date', 'num_comments' => 'sort_num_comments', 'num_reviews' => 'sort_num_reviews', 'views' => 'sort_num_views' ) ), NULL, NULL, NULL, 'csortorder' ) );
-		$form->add( new Translatable( 'cdisclaimer', NULL, FALSE, array( 'app' => 'downloads', 'key' => ( $this->id ? "downloads_category_{$this->id}_disclaimer" : NULL ), 'editor' => array( 'app' => 'downloads', 'key' => 'Categories', 'autoSaveKey' => ( $this->id ? "downloads-cat-{$this->id}-disc" : "downloads-new-cat-disc" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'disclaimer' ) : NULL, 'minimize' => 'cdisclaimer_placeholder' ) ), NULL, NULL, NULL, 'cdisclaimer-editor' ) );
-		$form->add( new Radio( 'cdisclaimer_location', $this->id ? $this->disclaimer_location : 'download', FALSE, array( 'options' => array( 'purchase' => 'cdisclaimer_purchase', 'download' => 'cdisclaimer_download', 'both' => 'cdisclaimer_both' ) ) ) );
-
-		/* Insert logic for icons */
-		$this->iconFormFields( $form );
-
-		$form->add( new Upload( 'ccard_image', $this->card_image ? SystemFile::get( 'downloads_Cards', $this->card_image ) : NULL, FALSE, array( 'image' => array( 'maxWidth' => 800, 'maxHeight' => 800 ), 'storageExtension' => 'downloads_Cards', 'allowStockPhotos' => TRUE ), NULL, NULL, NULL, 'ccard_image' ) );
-
+		$form->add( new \IPS\Helpers\Form\Select( 'csortorder', $this->sortorder ?: 'updated', FALSE, array( 'options' => array( 'updated' => 'sort_updated', 'last_comment' => 'last_reply', 'title' => 'file_title', 'rating' => 'sort_rating', 'date' => 'sort_date', 'num_comments' => 'sort_num_comments', 'num_reviews' => 'sort_num_reviews', 'views' => 'sort_num_views' ) ), NULL, NULL, NULL, 'csortorder' ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'cdisclaimer', NULL, FALSE, array( 'app' => 'downloads', 'key' => ( $this->id ? "downloads_category_{$this->id}_disclaimer" : NULL ), 'editor' => array( 'app' => 'downloads', 'key' => 'Categories', 'autoSaveKey' => ( $this->id ? "downloads-cat-{$this->id}-disc" : "downloads-new-cat-disc" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'disclaimer' ) : NULL, 'minimize' => 'cdisclaimer_placeholder' ) ), NULL, NULL, NULL, 'cdisclaimer-editor' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'cdisclaimer_location', $this->id ? $this->disclaimer_location : 'download', FALSE, array( 'options' => array( 'purchase' => 'cdisclaimer_purchase', 'download' => 'cdisclaimer_download', 'both' => 'cdisclaimer_both' ) ) ) );
 		$form->addHeader( 'category_logs' );
-		$form->add( new YesNo( 'clog_on', $this->log !== 0, FALSE, array( 'disableCopy' => TRUE, 'togglesOn' => array( 'clog', 'submitter_log' ) ) ) );
-		$form->add( new Interval( 'clog', $this->log === NULL ? -1 : $this->log, FALSE, array(
-			'valueAs' => Interval::DAYS, 'unlimited' => -1,
-			'endSuffix'	=> ( $this->id and Member::loggedIn()->hasAcpRestriction( 'downloads', 'downloads', 'categories_recount_downloads' ) ) ? '<a data-confirm data-confirmSubMessage="' . Member::loggedIn()->language()->addToStack('clog_recount_desc') . '" href="' . Url::internal( "app=downloads&module=downloads&controller=categories&do=recountDownloads&id={$this->id}")->csrf() . '">' . Member::loggedIn()->language()->addToStack('clog_recount') . '</a>' : ''
+		$form->add( new \IPS\Helpers\Form\YesNo( 'clog_on', $this->log !== 0, FALSE, array( 'disableCopy' => TRUE, 'togglesOn' => array( 'clog', 'submitter_log' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'clog', $this->log === NULL ? -1 : $this->log, FALSE, array(
+			'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => -1,
+			'endSuffix'	=> ( $this->id and \IPS\Member::loggedIn()->hasAcpRestriction( 'downloads', 'downloads', 'categories_recount_downloads' ) ) ? '<a data-confirm data-confirmSubMessage="' . \IPS\Member::loggedIn()->language()->addToStack('clog_recount_desc') . '" href="' . \IPS\Http\Url::internal( "app=downloads&module=downloads&controller=categories&do=recountDownloads&id={$this->id}")->csrf() . '">' . \IPS\Member::loggedIn()->language()->addToStack('clog_recount') . '</a>' : ''
 		), NULL, NULL, NULL, 'clog' ) );
-		$form->add( new YesNo( 'cbitoptions_submitter_log', $this->bitoptions['submitter_log'], FALSE, array(), NULL, NULL, NULL, 'submitter_log' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_submitter_log', $this->bitoptions['submitter_log'], FALSE, array(), NULL, NULL, NULL, 'submitter_log' ) );
 		
 		$form->addTab( 'category_submissions' );
 		$form->addHeader( 'category_allowed_files' );
-		$form->add( new Text( 'ctypes', $this->id ? $this->_data['types'] : NULL, FALSE, array( 'autocomplete' => array( 'unique' => 'true' ), 'nullLang' => 'any_extensions' ), NULL, NULL, NULL, 'ctypes' ) );
-		$form->add( new Number( 'cmaxfile', $this->maxfile ?: -1, FALSE, array( 'unlimited' => -1 ), function( $value ) {
+		$form->add( new \IPS\Helpers\Form\Text( 'ctypes', $this->id ? $this->_data['types'] : NULL, FALSE, array( 'autocomplete' => array( 'unique' => 'true' ), 'nullLang' => 'any_extensions' ), NULL, NULL, NULL, 'ctypes' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'cmaxfile', $this->maxfile ?: -1, FALSE, array( 'unlimited' => -1 ), function( $value ) {
 			if( !$value )
 			{
-				throw new InvalidArgumentException('form_required');
+				throw new \InvalidArgumentException('form_required');
 			}
-		}, NULL, Member::loggedIn()->language()->addToStack('filesize_raw_k'), 'cmaxfile' ) );
-		$form->add( new YesNo( 'cmultiple_files', $this->id ? $this->multiple_files : TRUE ) );
-		$form->add( new Translatable( 'csubmissionterms', $this->submissionterms, FALSE, array( 'app' => 'downloads', 'key' => ( $this->id ? "downloads_category_{$this->id}_subterms" : NULL ), 'editor' => array( 'app' => 'downloads', 'key' => 'Categories', 'autoSaveKey' => ( $this->id ? "downloads-cat-{$this->id}-subt" : "downloads-new-cat-subt" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'subt' ) : NULL, 'minimize' => 'csubmissionterms_placeholder' ) ) ) );
+		}, NULL, \IPS\Member::loggedIn()->language()->addToStack('filesize_raw_k'), 'cmaxfile' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cmultiple_files', $this->id ? $this->multiple_files : TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'csubmissionterms', $this->submissionterms, FALSE, array( 'app' => 'downloads', 'key' => ( $this->id ? "downloads_category_{$this->id}_subterms" : NULL ), 'editor' => array( 'app' => 'downloads', 'key' => 'Categories', 'autoSaveKey' => ( $this->id ? "downloads-cat-{$this->id}-subt" : "downloads-new-cat-subt" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'subt' ) : NULL, 'minimize' => 'csubmissionterms_placeholder' ) ) ) );
 		$form->addHeader( 'category_versioning' );
-		$form->add( new Radio( 'cversion_numbers', $this->id ? $this->version_numbers : 1, TRUE, array( 'options' => array( 0 => 'version_numbers_disabled', 1 => 'version_numbers_enabled', 2 => 'version_numbers_required' ) ) ) );
-		$form->add( new YesNo( 'cversioning_on', $this->versioning !== 0, FALSE, array( 'togglesOn' => array( 'cversioning', 'crequire_changelog' ) ) ) );
-		$form->add( new Number( 'cversioning', $this->versioning === NULL ? -1 : $this->versioning, FALSE, array( 'unlimited' => -1 ), NULL, NULL, NULL, 'cversioning' ) );
-        $form->add( new YesNo( 'crequire_changelog', $this->require_changelog ?: 0, FALSE, array( ), NULL, NULL, NULL, 'crequire_changelog' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'cversion_numbers', $this->id ? $this->version_numbers : 1, TRUE, array( 'options' => array( 0 => 'version_numbers_disabled', 1 => 'version_numbers_enabled', 2 => 'version_numbers_required' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cversioning_on', $this->versioning !== 0, FALSE, array( 'togglesOn' => array( 'cversioning', 'crequire_changelog' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'cversioning', $this->versioning === NULL ? -1 : $this->versioning, FALSE, array( 'unlimited' => -1 ), NULL, NULL, NULL, 'cversioning' ) );
+        $form->add( new \IPS\Helpers\Form\YesNo( 'crequire_changelog', $this->require_changelog ?: 0, FALSE, array( ), NULL, NULL, NULL, 'crequire_changelog' ) );
         $form->addHeader( 'category_moderation' );
-		$form->add( new YesNo( 'cbitoptions_moderation', $this->bitoptions['moderation'], FALSE, array( 'togglesOn' => array( 'cbitoptions_moderation_edits' ) ) ) );
-		$form->add( new YesNo( 'cbitoptions_moderation_edits', $this->bitoptions['moderation_edits'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_moderation_edits' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_moderation', $this->bitoptions['moderation'], FALSE, array( 'togglesOn' => array( 'cbitoptions_moderation_edits' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_moderation_edits', $this->bitoptions['moderation_edits'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_moderation_edits' ) );
 		$form->addHeader( 'category_screenshots' );
-		$form->add( new YesNo( 'cbitoptions_allowss', $this->id ? $this->bitoptions['allowss'] : TRUE, FALSE, array( 'togglesOn' => array( 'cbitoptions_reqss', 'cmaxss', 'cmaxdims' ) ), NULL, NULL, NULL, 'cbitoptions_allowss' ) );
-		$form->add( new YesNo( 'cbitoptions_reqss', $this->bitoptions['reqss'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_reqss' ) );
-		$form->add( new Number( 'cmaxss', $this->maxss, FALSE, array( 'unlimited' => 0 ), NULL, NULL, Member::loggedIn()->language()->addToStack('filesize_raw_k'), 'cmaxss' ) );
-		$form->add( new WidthHeight( 'cmaxdims', $this->maxdims ? explode( 'x', $this->maxdims ) : array( 0, 0 ), FALSE, array( 'unlimited' => array( 0, 0 ) ), NULL, NULL, NULL, 'cmaxdims' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_allowss', $this->id ? $this->bitoptions['allowss'] : TRUE, FALSE, array( 'togglesOn' => array( 'cbitoptions_reqss', 'cmaxss', 'cmaxdims' ) ), NULL, NULL, NULL, 'cbitoptions_allowss' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_reqss', $this->bitoptions['reqss'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_reqss' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'cmaxss', $this->maxss, FALSE, array( 'unlimited' => 0 ), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('filesize_raw_k'), 'cmaxss' ) );
+		$form->add( new \IPS\Helpers\Form\WidthHeight( 'cmaxdims', $this->maxdims ? explode( 'x', $this->maxdims ) : array( 0, 0 ), FALSE, array( 'unlimited' => array( 0, 0 ) ), NULL, NULL, NULL, 'cmaxdims' ) );
+		
+		if ( \IPS\Settings::i()->tags_enabled )
+		{
+			$form->addHeader( 'category_tags' );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'ctags_disabled', !$this->tags_disabled, FALSE, array( 'togglesOn' => array( 'ctags_noprefixes', 'ctags_predefined' ) ), NULL, NULL, NULL, 'ctags_disabled' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'ctags_noprefixes', !$this->tags_noprefixes, FALSE, array(), NULL, NULL, NULL, 'ctags_noprefixes' ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'ctags_predefined', $this->tags_predefined, FALSE, array( 'autocomplete' => array( 'unique' => 'true', 'alphabetical' => \IPS\Settings::i()->tags_alphabetical ), 'nullLang' => 'ctags_predefined_unlimited' ), NULL, NULL, NULL, 'ctags_predefined' ) );
+		}
 		
 		$form->addTab( 'category_errors', NULL, 'category_errors_blurb' );
-		$form->add( new Translatable( 'noperm_view', NULL, FALSE, array( 'app' => 'downloads', 'key' => ( $this->id ? "downloads_category_{$this->id}_npv" : NULL ), 'editor' => array( 'app' => 'downloads', 'key' => 'Categories', 'autoSaveKey' => ( $this->id ? "downloads-cat-{$this->id}-npv" : "downloads-new-cat-npv" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'npv' ) : NULL, 'minimize' => 'noperm_view_placeholder' ), NULL, NULL, NULL, 'noperm_view' ) ) );
-		$form->add( new Translatable( 'noperm_dl', NULL, FALSE, array( 'app' => 'downloads', 'key' => ( $this->id ? "downloads_category_{$this->id}_npd" : NULL ), 'editor' => array( 'app' => 'downloads', 'key' => 'Categories', 'autoSaveKey' => ( $this->id ? "downloads-cat-{$this->id}-npd" : "downloads-new-cat-npd" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'npv' ) : NULL, 'minimize' => 'noperm_dl_placeholder' ), NULL, NULL, NULL, 'noperm_dl' ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'noperm_view', NULL, FALSE, array( 'app' => 'downloads', 'key' => ( $this->id ? "downloads_category_{$this->id}_npv" : NULL ), 'editor' => array( 'app' => 'downloads', 'key' => 'Categories', 'autoSaveKey' => ( $this->id ? "downloads-cat-{$this->id}-npv" : "downloads-new-cat-npv" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'npv' ) : NULL, 'minimize' => 'noperm_view_placeholder' ), NULL, NULL, NULL, 'noperm_view' ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'noperm_dl', NULL, FALSE, array( 'app' => 'downloads', 'key' => ( $this->id ? "downloads_category_{$this->id}_npd" : NULL ), 'editor' => array( 'app' => 'downloads', 'key' => 'Categories', 'autoSaveKey' => ( $this->id ? "downloads-cat-{$this->id}-npd" : "downloads-new-cat-npd" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'npv' ) : NULL, 'minimize' => 'noperm_dl_placeholder' ), NULL, NULL, NULL, 'noperm_dl' ) ) );
 		
-		if ( Application::appIsEnabled( 'forums' ) )
+		if ( \IPS\Application::appIsEnabled( 'forums' ) )
 		{
 			if ( $this->id )
 			{
-				$rebuildUrl = Url::internal( 'app=downloads&module=downloads&controller=categories&id=' . $this->id . '&do=rebuildTopicContent' )->csrf();
+				$rebuildUrl = \IPS\Http\Url::internal( 'app=downloads&module=downloads&controller=categories&id=' . $this->id . '&do=rebuildTopicContent' )->csrf();
 			}
 
 			$form->addTab( 'category_forums_integration' );
-			$form->add( new YesNo( 'cforum_on', $this->forum_id, FALSE, array( 'disableCopy' => TRUE, 'togglesOn' => array(
+			$form->add( new \IPS\Helpers\Form\YesNo( 'cforum_on', $this->forum_id, FALSE, array( 'disableCopy' => TRUE, 'togglesOn' => array(
 				'cforum_id',
 				'ctopic_prefix',
 				'ctopic_suffix',
 				'cbitoptions_topic_delete',
 				'cbitoptions_topic_screenshot'
-			) ), NULL, NULL, $this->id ? Member::loggedIn()->language()->addToStack( 'downloadcategory_topic_rebuild', FALSE, array( 'sprintf' => array( $rebuildUrl ) ) ) : NULL ) );
-			$form->add( new Node( 'cforum_id', $this->forum_id ? $this->forum_id  : NULL, FALSE, array( 'class' => 'IPS\forums\Forum', 'permissionCheck' => function ( $forum ) { return $forum->sub_can_post and !$forum->redirect_url; } ), function( $val ) {
-				if( Request::i()->cforum_on_checkbox AND !$val )
+			) ), NULL, NULL, $this->id ? \IPS\Member::loggedIn()->language()->addToStack( 'downloadcategory_topic_rebuild', FALSE, array( 'sprintf' => array( $rebuildUrl ) ) ) : NULL ) );
+			$form->add( new \IPS\Helpers\Form\Node( 'cforum_id', $this->forum_id ? $this->forum_id  : NULL, FALSE, array( 'class' => 'IPS\forums\Forum', 'permissionCheck' => function ( $forum ) { return $forum->sub_can_post and !$forum->redirect_url; } ), function( $val ) {
+				if( \IPS\Request::i()->cforum_on_checkbox AND !$val )
 				{
-					throw new DomainException( 'form_required' );
+					throw new \DomainException( 'form_required' );
 				}
 			}, NULL, NULL, 'cforum_id' ) );
-			$form->add( new Text( 'ctopic_prefix', $this->topic_prefix, FALSE, array( 'trim' => FALSE ), NULL, NULL, NULL, 'ctopic_prefix' ) );
-			$form->add( new Text( 'ctopic_suffix', $this->topic_suffix, FALSE, array( 'trim' => FALSE ), NULL, NULL, NULL, 'ctopic_suffix' ) );
-			$form->add( new YesNo( 'cbitoptions_topic_delete', $this->id ? $this->bitoptions['topic_delete'] : NULL, FALSE, array(), NULL, NULL, NULL, 'cbitoptions_topic_delete' ) );
-			$form->add( new YesNo( 'cbitoptions_topic_screenshot', $this->id ? $this->bitoptions['topic_screenshot'] : NULL, FALSE, array(), NULL, NULL, NULL, 'cbitoptions_topic_screenshot' ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'ctopic_prefix', $this->topic_prefix, FALSE, array( 'trim' => FALSE ), NULL, NULL, NULL, 'ctopic_prefix' ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'ctopic_suffix', $this->topic_suffix, FALSE, array( 'trim' => FALSE ), NULL, NULL, NULL, 'ctopic_suffix' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_topic_delete', $this->id ? $this->bitoptions['topic_delete'] : NULL, FALSE, array(), NULL, NULL, NULL, 'cbitoptions_topic_delete' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_topic_screenshot', $this->id ? $this->bitoptions['topic_screenshot'] : NULL, FALSE, array(), NULL, NULL, NULL, 'cbitoptions_topic_screenshot' ) );
 		}
-
-        parent::form( $form );
 	}
 	
 	/**
@@ -473,27 +373,27 @@ class Category extends Model implements Permissions
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( !$this->id )
 		{
 			$this->save();
-			SystemFile::claimAttachments( 'downloads-new-cat', $this->id, NULL, 'description', TRUE );
-			SystemFile::claimAttachments( 'downloads-new-cat-disc', $this->id, NULL, 'disclaimer', TRUE );
-			SystemFile::claimAttachments( 'downloads-new-cat-subt', $this->id, NULL, 'subt', TRUE );
-			SystemFile::claimAttachments( 'downloads-new-cat-npv', $this->id, NULL, 'npv', TRUE );
-			SystemFile::claimAttachments( 'downloads-new-cat-npd', $this->id, NULL, 'npd', TRUE );
+			\IPS\File::claimAttachments( 'downloads-new-cat', $this->id, NULL, 'description', TRUE );
+			\IPS\File::claimAttachments( 'downloads-new-cat-disc', $this->id, NULL, 'disclaimer', TRUE );
+			\IPS\File::claimAttachments( 'downloads-new-cat-subt', $this->id, NULL, 'subt', TRUE );
+			\IPS\File::claimAttachments( 'downloads-new-cat-npv', $this->id, NULL, 'npv', TRUE );
+			\IPS\File::claimAttachments( 'downloads-new-cat-npd', $this->id, NULL, 'npd', TRUE );
 		}
 				
 		foreach ( array( 'cname' => "downloads_category_{$this->id}", 'cdesc' => "downloads_category_{$this->id}_desc", 'cdisclaimer' => "downloads_category_{$this->id}_disclaimer", 'csubmissionterms' => "downloads_category_{$this->id}_subterms", 'noperm_view' => "downloads_category_{$this->id}_npv", 'noperm_dl' => "downloads_category_{$this->id}_npd" ) as $fieldKey => $langKey )
 		{
 			if ( array_key_exists( $fieldKey, $values ) )
 			{
-				Lang::saveCustom( 'downloads', $langKey, $values[ $fieldKey ] );
+				\IPS\Lang::saveCustom( 'downloads', $langKey, $values[ $fieldKey ] );
 				
 				if ( $fieldKey === 'cname' )
 				{
-					$this->name_furl = Friendly::seoTitle( $values[ $fieldKey ][ Lang::defaultLanguage() ] );
+					$this->name_furl = \IPS\Http\Url\Friendly::seoTitle( $values[ $fieldKey ][ \IPS\Lang::defaultLanguage() ] );
 				}
 				
 				unset( $values[ $fieldKey ] );
@@ -551,14 +451,20 @@ class Category extends Model implements Permissions
 			$values['cmaxdims'] = $values['cmaxdims'] ? implode( 'x', $values['cmaxdims'] ) : NULL;
 		}
 
+		/* Inverted for legacy reasons */
+		foreach ( array( 'ctags_disabled', 'ctags_noprefixes' ) as $k )
+		{
+			if ( isset( $values[ $k ] ) )
+			{
+				$values[ $k ] = !$values[ $k ];
+			}
+		}
+		
 		if ( isset( $values['cparent'] ) )
 		{
 			/* Avoid "cparent cannot be null" error if no parent selected. */
-			$values['cparent'] = $values['cparent'] ? intval( $values['cparent']->id ) : 0;
+			$values['cparent'] = $values['cparent'] ? \intval( $values['cparent']->id ) : 0;
 		}
-
-		/* Handle Icons */
-		$values = $this->formatIconFieldValues( $values );
 		
 		if ( isset( $values['cforum_on'] ) and !$values['cforum_on'] )
 		{
@@ -567,7 +473,7 @@ class Category extends Model implements Permissions
 		
 		if( isset( $values['cforum_id'] ) AND $values['cforum_id'] )
 		{
-			$values['cforum_id'] = ( $values['cforum_id'] instanceof Model ) ? intval( $values['cforum_id']->id ) : intval( $values['cforum_id'] );
+			$values['cforum_id'] = ( $values['cforum_id'] instanceof \IPS\Node\Model ) ? \intval( $values['cforum_id']->id ) : \intval( $values['cforum_id'] );
 		}
 
 		if( array_key_exists( 'cforum_on', $values ) )
@@ -593,49 +499,49 @@ class Category extends Model implements Permissions
 	 *
 	 * @return	array|NULL
 	 */
-	public function get_types(): ?array
+	public function get_types()
 	{
 		return $this->_data['types'] ? explode( ',', $this->_data['types'] ) : NULL;
 	}
-
+	
 	/**
 	 * Get number of items
 	 *
-	 * @return int|null
+	 * @return	int
 	 */
-	protected function get__items(): ?int
+	protected function get__items()
 	{
-		return $this->files;
+		return (int) $this->files;
 	}
 	/**
 	 * Set number of items
 	 *
 	 * @param	int	$val	Items
-	 * @return	void
+	 * @return	int
 	 */
-	protected function set__items( int $val ) : void
+	protected function set__items( $val )
 	{
-		$this->files = $val;
+		$this->files = (int) $val;
 	}
 	
 	/**
 	 * @brief	Custom Field Cache
 	 */
-	protected ?array $_customFields = NULL;
+	protected $_customFields = NULL;
 	
 	/**
 	 * Get custom fields
 	 *
 	 * @return	array
 	 */
-	protected function get_cfields(): array
+	protected function get_cfields()
 	{
 		if ( $this->_customFields === NULL )
 		{
 			$this->_customFields = array();
 			if ( $this->_data['cfields'] )
 			{
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'downloads_cfields', array( Db::i()->in( 'cf_id', explode( ',', $this->_data['cfields'] ) ) ), 'cf_position ASC' ), 'IPS\downloads\Field' ) AS $field )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'downloads_cfields', array( \IPS\Db::i()->in( 'cf_id', explode( ',', $this->_data['cfields'] ) ) ), 'cf_position ASC' ), 'IPS\downloads\Field' ) AS $field )
 				{
 					$this->_customFields[ $field->id ] = $field;
 				}
@@ -650,7 +556,7 @@ class Category extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	public function get__topic_prefix(): string
+	public function get__topic_prefix()
 	{
 		return str_replace( '{catname}', $this->_title, $this->_data['topic_prefix'] );
 	}
@@ -660,7 +566,7 @@ class Category extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	public function get__topic_suffix(): string
+	public function get__topic_suffix()
 	{
 		return str_replace( '{catname}', $this->_title, $this->_data['topic_suffix'] );
 	}
@@ -668,34 +574,34 @@ class Category extends Model implements Permissions
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlBase = 'app=downloads&module=downloads&controller=browse&id=';
+	public static $urlBase = 'app=downloads&module=downloads&controller=browse&id=';
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlTemplate = 'downloads_cat';
+	public static $urlTemplate = 'downloads_cat';
 	
 	/**
 	 * @brief	SEO Title Column
 	 */
-	public static string $seoTitleColumn = 'name_furl';
+	public static $seoTitleColumn = 'name_furl';
 
 	/**
 	 * Get message
 	 *
-	 * @param string $type	'npv', 'npd', 'disclaimer'
+	 * @param	string	$type	'npv', 'npd', 'disclaimer'
 	 * @return	string|null
 	 */
-	public function message( string $type ): ?string
+	public function message( $type )
 	{
-		if ( Member::loggedIn()->language()->checkKeyExists( "downloads_category_{$this->_id}_{$type}" ) )
+		if ( \IPS\Member::loggedIn()->language()->checkKeyExists( "downloads_category_{$this->_id}_{$type}" ) )
 		{
-			$message = Member::loggedIn()->language()->get( "downloads_category_{$this->_id}_{$type}" );
+			$message = \IPS\Member::loggedIn()->language()->get( "downloads_category_{$this->_id}_{$type}" );
 			if ( $message and $message != '<p></p>' )
 			{
 				return trim( $message );
@@ -713,16 +619,15 @@ class Category extends Model implements Permissions
 	 * if there should be a "Submit" button
 	 *
 	 * @param	mixed								$permission						A key which has a value in static::$permissionMap['view'] matching a column ID in core_permission_index
-	 * @param	Member|Group|NULL	$member							The member or group to check (NULL for currently logged in member)
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$member							The member or group to check (NULL for currently logged in member)
 	 * @param	array								$where							Additional WHERE clause
 	 * @param	bool								$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
 	 * @return	bool
-	 * @throws	OutOfBoundsException	If $permission does not exist in static::$permissionMap
+	 * @throws	\OutOfBoundsException	If $permission does not exist in static::$permissionMap
 	 */
-	public static function canOnAny( mixed $permission, Group|Member $member=NULL, array $where = array(), bool $considerPostBeforeRegistering = TRUE ): bool
-
+	public static function canOnAny( $permission, $member=NULL, $where = array(), $considerPostBeforeRegistering = TRUE )
 	{
-		$member	= ( $member === NULL ) ? Member::loggedIn() : $member;
+		$member	= ( $member === NULL ) ? \IPS\Member::loggedIn() : $member;
 
 		if ( $member->idm_block_submissions )
 		{
@@ -735,9 +640,9 @@ class Category extends Model implements Permissions
 	/**
 	 * Get latest file information
 	 *
-	 * @return    File|NULL
+	 * @return	\IPS\downloads\File|NULL
 	 */
-	public function lastFile(): ?File
+	public function lastFile()
 	{
 		$latestFileData	= $this->getLatestFileId();
 		$latestFile		= NULL;
@@ -746,9 +651,9 @@ class Category extends Model implements Permissions
 		{
 			try
 			{
-				$latestFile	= File::load( $latestFileData['id'] );
+				$latestFile	= \IPS\downloads\File::load( $latestFileData['id'] );
 			}
-			catch( OutOfRangeException $e ){}
+			catch( \OutOfRangeException $e ){}
 		}
 
 		return $latestFile;
@@ -759,7 +664,7 @@ class Category extends Model implements Permissions
 	 *
 	 * @return	array|NULL
 	 */
-	protected function getLatestFileId(): ?array
+	protected function getLatestFileId()
 	{
 		$latestFile	= NULL;
 
@@ -784,71 +689,57 @@ class Category extends Model implements Permissions
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		SystemFile::unclaimAttachments( 'downloads_Categories', $this->id );
+		\IPS\File::unclaimAttachments( 'downloads_Categories', $this->id );
 		parent::delete();
 		
 		foreach ( array( 'cdisclaimer' => "downloads_category_{$this->id}_disclaimer", 'csubmissionterms' => "downloads_category_{$this->id}_subterms", 'noperm_view' => "downloads_category_{$this->id}_npv", 'noperm_dl' => "downloads_category_{$this->id}_npd" ) as $fieldKey => $langKey )
 		{
-			Lang::deleteCustom( 'downloads', $langKey );
-		}
-
-		/* Unclaim Attachments */
-		foreach( [ 'description', 'disclaimer', 'subt', 'npv' ] as $id3 )
-		{
-			SystemFile::unclaimAttachments( 'downloads_Categories', $this->_id, null, $id3 );
-		}
-
-		if( $this->card_image )
-		{
-			try
-			{
-				SystemFile::get( 'downloads_Cards', $this->card_image )->delete();
-			}
-			catch( Exception $e ){}
+			\IPS\Lang::deleteCustom( 'downloads', $langKey );
 		}
 	}
 
 	/**
 	 * Get template for node tables
 	 *
-	 * @return	callable|array
+	 * @return	callable
 	 */
-	public static function nodeTableTemplate(): callable|array
+	public static function nodeTableTemplate()
 	{
-		return array( Theme::i()->getTemplate( 'browse', 'downloads' ), 'categoryRow' );
+		return array( \IPS\Theme::i()->getTemplate( 'browse', 'downloads' ), 'categoryRow' );
 	}
 
 	/**
 	 * Get last comment time
 	 *
 	 * @note	This should return the last comment time for this node only, not for children nodes
-	 * @param   Member|null    $member         MemberObject
-	 * @return	DateTime|NULL
+	 * @param   \IPS\Member|NULL    $member         MemberObject
+	 * @return	\IPS\DateTime|NULL
 	 */
-	public function getLastCommentTime( Member $member = NULL ): ?DateTime
+	public function getLastCommentTime( \IPS\Member $member = NULL )
 	{
-		return $this->last_file_date ? DateTime::ts( $this->last_file_date ) : NULL;
+		return $this->last_file_date ? \IPS\DateTime::ts( $this->last_file_date ) : NULL;
 	}
 	
 	/**
 	 * Set last file data
 	 *
-	 * @param File|NULL	$file	The latest file or NULL to work it out
+	 * @param	\IPS\downloads\File|NULL	$file	The latest file or NULL to work it out
 	 * @return	void
 	 */
-	public function setLastFile( ?File $file=NULL ) : void
+	public function setLastFile( \IPS\downloads\File $file=NULL )
 	{
 		if( $file === NULL )
 		{
 			try
 			{
-				$file	= File::constructFromData( Db::i()->select( '*', 'downloads_files', array( 'file_cat=? AND file_open=1', $this->id ), 'file_submitted DESC', 1, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first() );
+				/* @note SELECT_FROM_WRITE_SERVER added in c96a0b88e7386e01a6eed39427f2312bc746874f */
+				$file	= \IPS\downloads\File::constructFromData( \IPS\Db::i()->select( '*', 'downloads_files', array( 'file_cat=? AND file_open=1', $this->id ), 'file_submitted DESC', 1, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first() );
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				$this->last_file_id		= 0;
 				$this->last_file_date	= 0;
@@ -867,7 +758,7 @@ class Category extends Model implements Permissions
 	 * @param Item|null $updatedItem We sometimes run setLastComment() when an item has been edited, if so, that item will be here
 	 * @return    void
 	 */
-	protected function _setLastComment( ?Comment $comment=NULL, Item $updatedItem=NULL ) : void
+	public function _setLastComment( \IPS\Content\Comment $comment=NULL, \IPS\Content\Item $updatedItem=NULL )
 	{
 		$this->setLastFile( $updatedItem );
 	}
@@ -885,47 +776,13 @@ class Category extends Model implements Permissions
 		}
 
 		$oldId = $this->id;
-		$oldGridImage = $this->card_image;
 
 		parent::__clone();
 
 		foreach ( array( 'cdisclaimer' => "downloads_category_{$this->id}_disclaimer", 'csubmissionterms' => "downloads_category_{$this->id}_subterms", 'noperm_view' => "downloads_category_{$this->id}_npv", 'noperm_dl' => "downloads_category_{$this->id}_npd" ) as $fieldKey => $langKey )
 		{
 			$oldLangKey = str_replace( $this->id, $oldId, $langKey );
-			Lang::saveCustom( 'downloads', $langKey, iterator_to_array( Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', $oldLangKey ) )->setKeyField( 'lang_id' )->setValueField('word_custom') ) );
-		}
-
-		/* If the description had attachments, link them */
-		$attachmentMappings = [];
-		foreach( Db::i()->select( '*', 'core_attachments_map', [
-			[ 'location_key=?', 'downloads_Categories' ],
-			[ 'id1=?', $oldId ],
-			[ 'id2 is null' ],
-			[ Db::i()->in( 'id3', [ 'description', 'disclaimer', 'subt', 'npv' ] ) ]
-		] ) as $attachment )
-		{
-			$attachment['id1'] = $this->_id;
-			$attachmentMappings[] = $attachment;
-		}
-		if( count( $attachmentMappings ) )
-		{
-			Db::i()->insert( 'core_attachments_map', $attachmentMappings );
-		}
-
-		if ( $oldGridImage )
-		{
-			try
-			{
-				$gridImg = SystemFile::get( 'downloads_Cards', $oldGridImage );
-				$newImage = SystemFile::create( 'downloads_Cards', $gridImg->originalFilename, $gridImg->contents() );
-				$this->card_image = (string) $newImage;
-			}
-			catch ( Exception $e )
-			{
-				$this->card_image = NULL;
-			}
-
-			$this->save();
+			\IPS\Lang::saveCustom( 'downloads', $langKey, iterator_to_array( \IPS\Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', $oldLangKey ) )->setKeyField( 'lang_id' )->setValueField('word_custom') ) );
 		}
 	}
 	
@@ -934,9 +791,9 @@ class Category extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	public static function fullyQualifiedType(): string
+	public static function fullyQualifiedType()
 	{
-		return Member::loggedIn()->language()->addToStack('__app_downloads') . ' ' . Member::loggedIn()->language()->addToStack( static::$nodeTitle . '_sg' );
+		return \IPS\Member::loggedIn()->language()->addToStack('__app_downloads') . ' ' . \IPS\Member::loggedIn()->language()->addToStack( static::$nodeTitle . '_sg' );
 	}
 	
 	/* !Clubs */
@@ -946,44 +803,42 @@ class Category extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	public static function clubAcpTitle(): string
+	public static function clubAcpTitle()
 	{
 		return 'downloads_categories';
 	}
-
+	
 	/**
 	 * Set form for creating a node of this type in a club
 	 *
-	 * @param Form $form Form object
-	 * @param Club $club
-	 * @return    void
+	 * @param	\IPS\Helpers\Form	$form	Form object
+	 * @return	void
 	 */
-	public function _clubForm( Form $form, Club $club ) : void
+	public function clubForm( \IPS\Helpers\Form $form, \IPS\Member\Club $club )
 	{
-		/* @var File $itemClass */
 		$itemClass = static::$contentItemClass;
-		$form->add( new Text( 'club_node_name', $this->_id ? $this->_title : Member::loggedIn()->language()->addToStack( $itemClass::$title . '_pl' ), TRUE, array( 'maxLength' => 255 ) ) );
-		$form->add( new Editor( 'club_node_description', $this->_id ? Member::loggedIn()->language()->get( static::$titleLangPrefix . $this->_id . '_desc' ) : NULL, FALSE, array( 'app' => 'downloads', 'key' => 'Categories', 'autoSaveKey' => ( $this->id ? "downloads-cat-{$this->id}" : "downloads-new-cat" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'cdesc_placeholder' ) ) );
-		$form->add( new YesNo( 'cbitoptions_comments', $this->id ? $this->bitoptions['comments'] : TRUE, FALSE, array(), NULL, NULL, NULL, 'cbitoptions_comments' ) );
-		$form->add( new YesNo( 'cbitoptions_reviews', $this->id ? $this->bitoptions['reviews'] : TRUE, FALSE, array( 'togglesOn' => array( 'cbitoptions_reviews_download' ) ) ) );
-		$form->add( new YesNo( 'cbitoptions_allowss', $this->id ? $this->bitoptions['allowss'] : TRUE, FALSE, array( 'togglesOn' => array( 'cbitoptions_reqss', 'cmaxss', 'cmaxdims' ) ), NULL, NULL, NULL, 'cbitoptions_allowss' ) );
-		$form->add( new YesNo( 'cbitoptions_reqss', $this->bitoptions['reqss'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_reqss' ) );
-		$form->add( new Text( 'ctypes', $this->id ? $this->_data['types'] : NULL, FALSE, array( 'autocomplete' => array( 'unique' => 'true', 'lang' => 'files_optional' ), 'nullLang' => 'any_extensions' ), NULL, NULL, NULL, 'ctypes' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'club_node_name', $this->_id ? $this->_title : \IPS\Member::loggedIn()->language()->addToStack( $itemClass::$title . '_pl' ), TRUE, array( 'maxLength' => 255 ) ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'club_node_description', $this->_id ? \IPS\Member::loggedIn()->language()->get( static::$titleLangPrefix . $this->_id . '_desc' ) : NULL, FALSE, array( 'app' => 'downloads', 'key' => 'Categories', 'autoSaveKey' => ( $this->id ? "downloads-cat-{$this->id}" : "downloads-new-cat" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'cdesc_placeholder' ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_comments', $this->id ? $this->bitoptions['comments'] : TRUE, FALSE, array(), NULL, NULL, NULL, 'cbitoptions_comments' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_reviews', $this->id ? $this->bitoptions['reviews'] : TRUE, FALSE, array( 'togglesOn' => array( 'cbitoptions_reviews_download' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_allowss', $this->id ? $this->bitoptions['allowss'] : TRUE, FALSE, array( 'togglesOn' => array( 'cbitoptions_reqss', 'cmaxss', 'cmaxdims' ) ), NULL, NULL, NULL, 'cbitoptions_allowss' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cbitoptions_reqss', $this->bitoptions['reqss'], FALSE, array(), NULL, NULL, NULL, 'cbitoptions_reqss' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'ctypes', $this->id ? $this->_data['types'] : NULL, FALSE, array( 'autocomplete' => array( 'unique' => 'true', 'lang' => 'files_optional' ), 'nullLang' => 'any_extensions' ), NULL, NULL, NULL, 'ctypes' ) );
 		
 		if( $club->type == 'closed' )
 		{
-			$form->add( new Radio( 'club_node_public', $this->id ? $this->isPublic() : 0, TRUE, array( 'options' => array( '0' => 'club_node_public_no', '1' => 'club_node_public_view', '2' => 'club_node_public_participate' ) ) ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'club_node_public', $this->id ? $this->isPublic() : 0, TRUE, array( 'options' => array( '0' => 'club_node_public_no', '1' => 'club_node_public_view', '2' => 'club_node_public_participate' ) ) ) );
 		}
 	}
 	
 	/**
 	 * Class-specific routine when saving club form
 	 *
-	 * @param	Club	$club	The club
+	 * @param	\IPS\Member\Club	$club	The club
 	 * @param	array				$values	Values
 	 * @return	void
 	 */
-	public function _saveClubForm( Club $club, array $values ) : void
+	public function _saveClubForm( \IPS\Member\Club $club, $values )
 	{
 		foreach ( array( 'allowss', 'reqss', 'comments', 'reviews' ) as $k )
 		{
@@ -997,13 +852,13 @@ class Category extends Model implements Permissions
 		
 		if ( $values['club_node_name'] )
 		{
-			$this->name_furl = Friendly::seoTitle( $values['club_node_name'] );
+			$this->name_furl = \IPS\Http\Url\Friendly::seoTitle( $values['club_node_name'] );
 		}
 		
 		if ( !$this->_id )
 		{
 			$this->save();
-			SystemFile::claimAttachments( 'downloads-new-cat', $this->id, NULL, 'description' );
+			\IPS\File::claimAttachments( 'downloads-new-cat', $this->id, NULL, 'description' );
 		}
 	}
 	
@@ -1012,9 +867,9 @@ class Category extends Model implements Permissions
 	 *
 	 * @return	int
 	 */
-	public static function filesInClubNodes(): int
+	public static function filesInClubNodes()
 	{
-		return File::getItemsWithPermission( array( array( static::$databasePrefix . static::clubIdColumn() . ' IS NOT NULL' ) ), NULL, 1, 'read', Filter::FILTER_AUTOMATIC, 0, NULL, TRUE, FALSE, FALSE, TRUE );
+		return \IPS\downloads\File::getItemsWithPermission( array( array( static::$databasePrefix . static::clubIdColumn() . ' IS NOT NULL' ) ), NULL, 1, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, TRUE, FALSE, FALSE, TRUE );
 	}
 	
 	/**
@@ -1022,13 +877,13 @@ class Category extends Model implements Permissions
 	 * Allow node classes that can determine if content should be held for approval in individual nodes
 	 *
 	 * @param	string				$content	The type of content we are checking (item, comment, review).
-	 * @param	Member|NULL	$member		Member to check or NULL for currently logged in member.
+	 * @param	\IPS\Member|NULL	$member		Member to check or NULL for currently logged in member.
 	 * @return	bool
 	 */
-	public function contentHeldForApprovalByNode( string $content, ?Member $member = NULL ): bool
+	public function contentHeldForApprovalByNode( string $content, ?\IPS\Member $member = NULL ): bool
 	{
 		/* If members group bypasses, then no. */
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		if ( $member->group['g_avoid_q'] )
 		{
 			return FALSE;
@@ -1038,30 +893,52 @@ class Category extends Model implements Permissions
 		{
 			case 'item':
 				return (bool) $this->bitoptions['moderation'];
+				break;
 			
 			case 'comment':
 				return (bool) $this->bitoptions['comment_moderation'];
+				break;
 			
 			case 'review':
 				return (bool) $this->bitoptions['reviews_mod'];
+				break;
 		}
-
-		return false;
 	}
 
 	/**
-	 * Allow for individual classes to override and
-	 * specify a primary image. Used for grid views, etc.
+	 * Get the member's view method
 	 *
-	 * @return SystemFile|null
+	 * @return string
 	 */
-	public function primaryImage() : ?SystemFile
+	public static function getMemberView()
 	{
-		if( $this->card_image )
-		{
-			return SystemFile::get( 'downloads_Cards', $this->card_image );
-		}
+		$method = ( isset( \IPS\Request::i()->cookie['idm_category_view'] ) ) ? \IPS\Request::i()->cookie['idm_category_view'] : NULL;
+		$chooseable = \IPS\Settings::i()->idm_default_view_choose;
 
-		return parent::primaryImage();
+		if ( ! $chooseable or !\IPS\Member::loggedIn()->member_id )
+		{
+			return \IPS\Settings::i()->idm_default_view;
+		}
+	
+		if ( ! $method )
+		{
+			try
+			{
+				$method = \IPS\Db::i()->select( 'method', 'downloads_view_method', array( 'member_id=?', \IPS\Member::loggedIn()->member_id ) )->first();
+			}
+			catch( \UnderFlowException $e )
+			{
+				$method = \IPS\Settings::i()->idm_default_view;
+			}
+			/* Attempt to set the cookie again */
+			\IPS\Request::i()->setCookie( 'idm_category_view', $method, ( new \IPS\DateTime )->add( new \DateInterval( 'P1Y' ) ) );
+		}
+	
+		if ( ! $method or !$chooseable )
+		{
+			$method = \IPS\Settings::i()->idm_default_view;
+		}
+		
+		return $method;
 	}
 }

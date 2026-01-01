@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Topic Feed Widget
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -13,62 +12,55 @@
 namespace IPS\forums\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\WidgetComment;
-use IPS\forums\Forum;
-use IPS\forums\Topic;
-use IPS\forums\Topic\Post;
-use IPS\Helpers\Form\Node;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * postFeed Widget
  */
-class postFeed extends WidgetComment
+class _postFeed extends \IPS\Content\WidgetComment
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'postFeed';
+	public $key = 'postFeed';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'forums';
-	
+	public $app = 'forums';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
+
 	/**
 	 * Class
 	 */
-	protected static string $class = 'IPS\forums\Topic\Post';
+	protected static $class = 'IPS\forums\Topic\Post';
 
 	/**
 	 * @brief	Moderator permission to generate caches on [optional]
 	 */
-	protected array $moderatorPermissions	= array( 'can_view_hidden_content', 'can_view_hidden_post' );
+	protected $moderatorPermissions	= array( 'can_view_hidden_content', 'can_view_hidden_post' );
 
  	/**
  	 * Return the form elements to use
  	 *
  	 * @return array
  	 */
- 	protected function formElements(): array
+ 	protected function formElements()
  	{
  		$elements = parent::formElements();
 
-		 /* @var Post $class */
 		$class		= static::$class;
-
-		/* @var Topic $itemClass */
 		$itemClass	= $class::$itemClass;
 
- 		$elements['container'] = new Node( 'widget_feed_container_' . $itemClass::$title, $this->configuration['widget_feed_container'] ?? 0, FALSE, array(
+ 		$elements['container'] = new \IPS\Helpers\Form\Node( 'widget_feed_container_' . $itemClass::$title, isset( $this->configuration['widget_feed_container'] ) ? $this->configuration['widget_feed_container'] : 0, FALSE, array(
 				'class'           => $itemClass::$containerNodeClass,
 				'zeroVal'         => 'all_public',
 				'permissionCheck' => function ( $forum )
@@ -88,22 +80,17 @@ class postFeed extends WidgetComment
 	 *
 	 * @return	array
 	 */
-	protected function buildWhere(): array
+	protected function buildWhere()
 	{
 		$class		= static::$class;
-
-		/* @var Post $class */
 		$itemClass	= $class::$itemClass;
-
-		/* @var Topic $itemClass */
-		/* @var Forum $containerClass */
 		$containerClass = $itemClass::$containerNodeClass;
 		$where = parent::buildWhere();
 		if ( !isset( $this->configuration['widget_feed_use_perms'] ) or $this->configuration['widget_feed_use_perms'] )
 		{
 			if ( $customNodes = $containerClass::customPermissionNodes() )
 			{
-				if ( count( $customNodes['password'] ) )
+				if ( \count( $customNodes['password'] ) )
 				{
 					$where['container'][] = array('forums_forums.password IS NULL AND forums_forums.can_view_others=1');
 				}

@@ -12,22 +12,16 @@
 namespace IPS\cms\setup\upg_107620;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\cms\Databases;
-use IPS\Db;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.7.7 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * ...
@@ -36,9 +30,9 @@ class Upgrade
 	 */
 	public function step1()
 	{
-        foreach( Db::i()->select( 'database_id', 'cms_databases' ) as $database )
+        foreach( \IPS\Db::i()->select( 'database_id', 'cms_databases' ) as $database )
         {
-            Db::i()->update( 'cms_custom_database_' . $database, 'record_saved=record_publish_date', array( 'record_publish_date is not null and record_publish_date > ?', 0 ) );
+            \IPS\Db::i()->update( 'cms_custom_database_' . $database, 'record_saved=record_publish_date', array( 'record_publish_date is not null and record_publish_date > ?', 0 ) );
         }
 
 		return TRUE;
@@ -51,13 +45,13 @@ class Upgrade
 	 */
 	public function step2()
 	{
-		foreach( Databases::databases() as $id => $db )
+		foreach( \IPS\cms\Databases::databases() as $id => $db )
 		{
 			try
 			{
-				Databases::checkandFixDatabaseSchema( $id );
+				\IPS\cms\Databases::checkandFixDatabaseSchema( $id );
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 
 		return TRUE;

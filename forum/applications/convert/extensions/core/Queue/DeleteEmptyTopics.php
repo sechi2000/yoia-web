@@ -13,44 +13,30 @@
 namespace IPS\convert\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\convert\App;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\forums\Topic\ArchivedPost;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task\Queue\OutOfRangeException;
-use UnderflowException;
-use function defined;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class DeleteEmptyTopics extends QueueAbstract
+class _DeleteEmptyTopics
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data	Data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		try
 		{
-			$data['count'] = Db::i()->select( 'count(tid)', 'forums_topics', array( 'forums_posts.pid IS NULL' ) )->join( 'forums_posts', 'forums_posts.topic_id=forums_topics.tid' )->first();
+			$data['count'] = \IPS\Db::i()->select( 'count(tid)', 'forums_topics', array( 'forums_posts.pid IS NULL' ) )->join( 'forums_posts', 'forums_posts.topic_id=forums_topics.tid' )->first();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			throw new \OutOfRangeException;
 		}
@@ -70,29 +56,29 @@ class DeleteEmptyTopics extends QueueAbstract
 	 *
 	 * @param	mixed			$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int				$offset	Offset
-	 * @return	int		New offset or NULL if complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @return	int|null		New offset or NULL if complete
+	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
-		if ( !class_exists( 'IPS\forums\Topic' ) OR !Application::appisEnabled( 'forums' ) )
+		if ( !class_exists( 'IPS\forums\Topic' ) OR !\IPS\Application::appisEnabled( 'forums' ) )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		/* If app was removed, then cancel this */
 		try
 		{
-			$app = App::load( $data['app'] );
+			$app = \IPS\convert\App::load( $data['app'] );
 		}
 		catch( \OutOfRangeException $e )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		$last = NULL;
 
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'forums_topics', array( "tid>? AND forums_posts.pid IS NULL", $offset ), "tid ASC", array( 0, REBUILD_SLOW ) )->join( 'forums_posts', 'forums_posts.topic_id=forums_topics.tid' ), 'IPS\forums\Topic' ) AS $topic )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'forums_topics', array( "tid>? AND forums_posts.pid IS NULL", $offset ), "tid ASC", array( 0, \IPS\REBUILD_SLOW ) )->join( 'forums_posts', 'forums_posts.topic_id=forums_topics.tid' ), 'IPS\forums\Topic' ) AS $topic )
 		{
 			$tid = $topic->tid;
 
@@ -110,7 +96,7 @@ class DeleteEmptyTopics extends QueueAbstract
 			}
 
 			/* If the topic isn't archived, we can delete it */
-			if ( !$topic->isArchived() )
+			if ( $topic->isArchived() == FALSE )
 			{
 				$topic->delete();
 			}
@@ -120,10 +106,10 @@ class DeleteEmptyTopics extends QueueAbstract
 				try
 				{
 					/* Do we have any posts? This is more efficient than running a COUNT(*) query, funny enough */
-					ArchivedPost::db()->select( 'archive_id', 'forums_archive_posts', array( "archive_topic_id=?", $topic->tid ), NULL, 1 )->first();
+					\IPS\forums\Topic\ArchivedPost::db()->select( 'archive_id', 'forums_archive_posts', array( "archive_topic_id=?", $topic->tid ), NULL, 1 )->first();
 				}
 				/* This topic is empty */
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					$topic->delete();
 				}
@@ -135,7 +121,7 @@ class DeleteEmptyTopics extends QueueAbstract
 
 		if( $last === NULL )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		return $last;
@@ -148,8 +134,8 @@ class DeleteEmptyTopics extends QueueAbstract
 	 * @param	int						$offset	Offset
 	 * @return	array	Text explaning task and percentage complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
     {
-        return array( 'text' => Member::loggedIn()->language()->addToStack( 'queue_deleting_empty_topics' ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
+        return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'queue_deleting_empty_topics' ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
     }
 }

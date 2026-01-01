@@ -12,26 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Member;
-use function array_slice;
-use function defined;
-use function in_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PollQuestionType for GraphQL API
  */
-class PollQuestionType extends ObjectType
+class _PollQuestionType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -95,7 +92,7 @@ class PollQuestionType extends ObjectType
 									'type' => TypeRegistry::boolean(),
 									'description' => "Whether the logged-in member voted for this choice",
 									'resolve' => function ($choice) {
-										return in_array( Member::loggedIn()->member_id, $choice['voters'] );
+										return \in_array( \IPS\Member::loggedIn()->member_id, $choice['voters'] );
 									}
 								],
 								'voters' => [
@@ -114,11 +111,11 @@ class PollQuestionType extends ObjectType
 										$members = array();
 										$offset = max( $args['offset'], 0 );
 										$limit = min( $args['limit'], 50 );
-										$membersToLoad = array_slice( $choice['voters'], $offset, $limit );
+										$membersToLoad = \array_slice( $choice['voters'], $offset, $limit );
 
 										foreach( $membersToLoad as $memberID )
 										{
-											$members[] = Member::load( $memberID );
+											$members[] = \IPS\Member::load( $memberID );
 										}
 
 										return $members;
@@ -137,7 +134,7 @@ class PollQuestionType extends ObjectType
 									'poll' => $question['poll'],
 									'title' => $choice,
 									'votes' => isset( $question['data']['votes'] ) ? $question['data']['votes'][ $idx ] : 0,
-									'voters' => $question['voters'][$idx] ?? array()
+									'voters' => isset( $question['voters'][ $idx ] ) ? $question['voters'][ $idx ] : array()
 								);
 							}
 

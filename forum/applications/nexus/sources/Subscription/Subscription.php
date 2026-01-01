@@ -11,53 +11,43 @@
 namespace IPS\nexus;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Member;
-use IPS\nexus\Subscription\Package;
-use IPS\Patterns\ActiveRecord;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * User subscription model
  */
-class Subscription extends ActiveRecord
+class _Subscription extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_member_subscriptions';
+	public static $databaseTable = 'nexus_member_subscriptions';
 
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'sub_';
+	public static $databasePrefix = 'sub_';
 
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'sub_purchase_id' );
+	protected static $databaseIdFields = array( 'sub_purchase_id' );
 
 	/**
 	 * Get the DateTime object for when this little subscription doth run out
 	 *
-	 * @return	DateTime|NULL
+	 * @return	\IPS\DateTime|NULL
 	 */
-	public function get__expire() : DateTime|null
+	public function get__expire()
 	{
 		if ( $this->expire )
 		{
@@ -66,17 +56,17 @@ class Subscription extends ActiveRecord
 				/* This has been invoiced, so there is a purchase row - fetch the expiration from that */
 				try
 				{
-					$purchase = Purchase::load( $this->purchase_id );
+					$purchase = \IPS\nexus\Purchase::load( $this->purchase_id );
 					
 					if ( $purchase->expire )
 					{
 						return $purchase->expire;
 					} 
 				}
-				catch( OutOfRangeException ) { }
+				catch( \OutOfRangeException $e ) { }
 			}
 			
-			return DateTime::ts( $this->expire );
+			return \IPS\DateTime::ts( $this->expire );
 		}
 		
 		return NULL;
@@ -85,15 +75,15 @@ class Subscription extends ActiveRecord
 	/**
 	 * Get the package (ooh, very mysterious, sounds like something from Narcos)
 	 *
-	 * @return	Package|null
+	 * @return	\IPS\nexus\Subscription\Package or NULL, I don't really care at this point.
 	 */
-	public function get_package() : Package|null
+	public function get_package()
 	{
 		try
 		{
-			return Package::load( $this->package_id );
+			return \IPS\nexus\Subscription\Package::load( $this->package_id );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $ex )
 		{
 			return NULL;
 		}
@@ -102,15 +92,15 @@ class Subscription extends ActiveRecord
 	/**
 	 * Get the purchase
 	 *
-	 * @return	Purchase|null
+	 * @return	\IPS\nexus\Subscription\Package or NULL, I don't really care at this point.
 	 */
-	public function get_purchase() : Purchase|null
+	public function get_purchase()
 	{
 		try
 		{
-			return Purchase::load( $this->purchase_id );
+			return \IPS\nexus\Purchase::load( $this->purchase_id );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $ex )
 		{
 			return NULL;
 		}
@@ -119,11 +109,11 @@ class Subscription extends ActiveRecord
 	/**
 	 * Change the subscription package
 	 *
-	 * @param	Package		$package		The new package innit
-	 * @param	DateTime|NULL					$expires		The new expiration date
+	 * @param	\IPS\nexus\Subscription\Package		$package		The new package innit
+	 * @param	\IPS\DateTime|NULL					$expires		The new expiration date
 	 * @return void
 	 */
-	public function changePackage( Package $package, ?DateTime $expires=NULL ) : void
+	public function changePackage( \IPS\nexus\Subscription\Package $package, $expires=NULL )
 	{
 		$this->package_id = $package->id;
 		$this->expire     = ( $expires === NULL ) ? 0 : $expires->getTimeStamp();
@@ -136,36 +126,36 @@ class Subscription extends ActiveRecord
 	 *
 	 * @return string
 	 */
-	public function currentBlurb() : string
+	public function currentBlurb()
 	{
 		if ( !$this->active AND !$this->purchase->cancelled )
 		{
-			return Member::loggedIn()->language()->addToStack( 'nexus_subs_subscribed_expired' );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'nexus_subs_subscribed_expired' );
 		}
 		elseif( $this->purchase->cancelled AND $this->purchase->can_reactivate )
 		{
-			return Member::loggedIn()->language()->addToStack( 'nexus_subs_subscribed_cancelled' );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'nexus_subs_subscribed_cancelled' );
 		}
 		elseif( $this->purchase->cancelled )
 		{
-			return Member::loggedIn()->language()->addToStack( 'nexus_subs_subscribed_cancelled_no_reactivate' );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'nexus_subs_subscribed_cancelled_no_reactivate' );
 		}
 		if ( $this->expire and $this->renews and !$this->manually_added )
 		{
-			return Member::loggedIn()->language()->addToStack( 'nexus_subs_subscribed_with_expire' . ( ( $this->purchase and $this->purchase->renewals ) ? '' : '_no_renewal' ), NULL, array( 'sprintf' => array( $this->_expire->dayAndMonth() . ' ' . $this->_expire->format('Y') ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'nexus_subs_subscribed_with_expire' . ( ( $this->purchase and $this->purchase->renewals ) ? '' : '_no_renewal' ), NULL, array( 'sprintf' => array( $this->_expire->dayAndMonth() . ' ' . $this->_expire->format('Y') ) ) );
 		}
 		
-		return Member::loggedIn()->language()->addToStack( 'nexus_subs_subscribed' );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'nexus_subs_subscribed' );
 	}
 	
 	/**
 	 * Find and return the package this person is currently subscribed to, or NULL
 	 *
-	 * @param	Member					$member			The member
+	 * @param	\IPS\Member					$member			The member
 	 * @param	bool						$activeOnly		If TRUE, returns only active subscription
-	 * @return	static|ActiveRecord|null
+	 * @return	?\IPS\nexus\Subscription
 	 */
-	public static function loadByMember( Member $member, bool $activeOnly ) : static|ActiveRecord|null
+	public static function loadByMember( \IPS\Member $member, bool $activeOnly )
 	{		
 		try
 		{
@@ -176,9 +166,9 @@ class Subscription extends ActiveRecord
 				$where[] = [ 'sub_active=1' ];
 			}
 			
-			return static::constructFromData( Db::i()->select( '*', 'nexus_member_subscriptions', $where, 'sub_active DESC, sub_start DESC' )->first() );
+			return static::constructFromData( \IPS\Db::i()->select( '*', 'nexus_member_subscriptions', $where, 'sub_active DESC, sub_start DESC' )->first() );
 		}
-		catch( Exception )
+		catch( \Exception $e )
 		{
 			return NULL;
 		}
@@ -187,25 +177,25 @@ class Subscription extends ActiveRecord
 	/**
 	 * Find and return the package this person is currently subscribed to, or NULL
 	 *
-	 * @param		Member|NULL	$member		Pass a member in if you like, no pressure really up to you
-	 * @return        static|null
+	 * @param		\IPS\Member|NULL	$member		Pass a member in if you like, no pressure really up to you
+	 * @return		\IPS\nexus\Subscription or NULL
 	 * @deprecated	Use loadByMember() instead
 	 */
-	public static function loadActiveByMember( ?Member $member=NULL ) : static|null
+	public static function loadActiveByMember( $member=NULL )
 	{
-		return static::loadByMember( $member ?: Member::loggedIn(), TRUE );
+		return static::loadByMember( $member ? $member : \IPS\Member::loggedIn(), TRUE );
 	}
 
 	/**
 	 * Load a subscription by member and package
 	 *
-	 * @param	Member							$member		Take a guess
-	 * @param	Package		$package	I mean it's really writing itself
+	 * @param	\IPS\Member							$member		Take a guess
+	 * @param	\IPS\nexus\Subscription\Package		$package	I mean it's really writing itself
 	 * @param	boolean								$activeOnly		Only get active packages
-	 * @return    static|ActiveRecord
-	 * @throws OutOfRangeException
+	 * @return	\IPS\nexus\Subscription
+	 * @throws \OutOfRangeException
 	 */
-	public static function loadByMemberAndPackage( Member $member, Package $package, bool $activeOnly = TRUE ) : static|ActiveRecord
+	public static function loadByMemberAndPackage( \IPS\Member $member, \IPS\nexus\Subscription\Package $package, $activeOnly = TRUE )
 	{
 		try
 		{
@@ -216,22 +206,22 @@ class Subscription extends ActiveRecord
 				$where[] = array( 'sub_active=1' );
 			}
 
-			return static::constructFromData( Db::i()->select( '*', 'nexus_member_subscriptions', $where )->first() );
+			return static::constructFromData( \IPS\Db::i()->select( '*', 'nexus_member_subscriptions', $where )->first() );
 		}
-		catch( Exception )
+		catch( \Exception $ex )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 	}
 	
 	/**
 	 * Mark all subscriptions by this member as inactive
 	 *
-	 * @param	Member		$member		I dunno, take a guess
+	 * @param	\IPS\Member		$member		I dunno, take a guess
 	 * @return	void
 	 */
-	public static function markInactiveByUser( Member $member ) : void
+	public static function markInactiveByUser( \IPS\Member $member )
 	{
-		Db::i()->update( 'nexus_member_subscriptions', array( 'sub_active' => 0 ), array( 'sub_member_id=?', $member->member_id ) );
+		\IPS\Db::i()->update( 'nexus_member_subscriptions', array( 'sub_active' => 0 ), array( 'sub_member_id=?', $member->member_id ) );
 	}
 }

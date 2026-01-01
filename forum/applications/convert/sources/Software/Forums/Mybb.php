@@ -12,42 +12,23 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Mybb as MybbCore;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function preg_match;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * MyBB Forums Converter
  */
-class Mybb extends Software
+class _Mybb extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "MyBB 1.8.x";
@@ -56,9 +37,9 @@ class Mybb extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "mybb";
@@ -67,9 +48,9 @@ class Mybb extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums'		=> array(
@@ -94,9 +75,9 @@ class Mybb extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -104,9 +85,9 @@ class Mybb extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'mybb' ) );
 	}
@@ -114,9 +95,9 @@ class Mybb extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertAttachments',
@@ -127,10 +108,10 @@ class Mybb extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		
@@ -140,10 +121,10 @@ class Mybb extends Software
 				/* Get our reactions to let the admin map them */
 				$options		= array();
 				$descriptions	= array();
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
 				{
-					$options[ $reaction->id ]		= $reaction->_icon->url;
-					$descriptions[ $reaction->id ]	= Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
+					$options[ $reaction->id ]		= $reaction->_icon->url;;
+					$descriptions[ $reaction->id ]	= \IPS\Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
 				}
 
 				$return['convertForumsPosts'] = array(
@@ -173,8 +154,8 @@ class Mybb extends Software
 						'field_default'		=> NULL,
 						'field_required'	=> TRUE,
 						'field_extra'		=> array(),
-						'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_mybb_attach_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_mybb_attach_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					),
 				);
 				break;
@@ -186,39 +167,36 @@ class Mybb extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		/* Rebuild Leaderboard */
-		Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
-		Db::i()->delete('core_reputation_leaderboard_history');
+		\IPS\Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
+		\IPS\Db::i()->delete('core_reputation_leaderboard_history');
 
 		/* Caches */
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
 
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics", "f_topic_tags_recount" );
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix Post Data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string	$post	Post
+	 * @return	string	Fixed Post
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return MybbCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Mybb::fixPostData( $post );
 	}
 
 	/**
@@ -226,9 +204,10 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums(): void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
+		
 		$libraryClass::setKey( 'fid' );
 		
 		foreach( $this->fetch( 'forums', 'fid' ) AS $row )
@@ -239,9 +218,13 @@ class Mybb extends Software
 				'description'			=> $row['description'],
 				'topics'				=> $row['threads'],
 				'posts'					=> $row['posts'],
+				'last_post'				=> $row['lastpost'],
+				'last_poster_id'		=> $row['lastposteruid'],
+				'last_poster_name'		=> $row['lastposter'],
 				'parent_id'				=> $row['pid'] ?: -1,
 				'position'				=> $row['disporder'],
 				'password'				=> $row['password'] ?: NULL,
+				'last_title'			=> $row['lastpostsubject'],
 				'inc_postcount'			=> $row['usepostcounts'],
 				'redirect_url'			=> $row['linkto'],
 				'sub_can_post'			=> ( $row['type'] == 'c' ) ? 0 : 1,
@@ -280,7 +263,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics(): void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -362,7 +345,7 @@ class Mybb extends Software
 						);
 					}
 				}
-				catch( UnderflowException $e ) {} # if the poll is missing, don't bother
+				catch( \UnderflowException $e ) {} # if the poll is missing, don't bother
 			}
 			
 			/* Moved ?*/
@@ -377,7 +360,10 @@ class Mybb extends Software
 						$this->db->select( 'fid', 'threads', array( "tid=?", $moved[1] ) )->first()
 					);
 				}
-				catch( UnderflowException $e ){}
+				catch( \UnderflowException $e )
+				{
+					$moved_to = NULL;
+				}
 			}
 			
 			$info = array(
@@ -422,7 +408,7 @@ class Mybb extends Software
 						'tag_prefix'			=> 1,
 					) );
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 			
 			/* Follows */
@@ -467,7 +453,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts(): void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -506,7 +492,7 @@ class Mybb extends Software
 				'author_name'		=> $row['username'],
 				'ip_address'		=> $row['ipaddress'],
 				'post_date'			=> $row['dateline'],
-				'queued'			=> $queued ?? 0,
+				'queued'			=> $queued,
 				'post_edit_reason'	=> $row['editreason'],
 			);
 
@@ -568,7 +554,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments(): void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -580,7 +566,7 @@ class Mybb extends Software
 			{
 				$topic_id = $this->db->select( 'tid', 'posts', array( "pid=?", $row['pid'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				/* Post is orphaned */
 				$libraryClass->setLastKeyValue( $row['aid'] );
@@ -614,17 +600,18 @@ class Mybb extends Software
 				{
 					$pid = $this->app->getLink( $row['pid'], 'forums_posts' );
 
-					$post = Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
+					$post = \IPS\Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
 
-					if( preg_match( '#\[attachment=' . $row['aid'] . ']#i', $post ) )
+					if( \preg_match( '#\[attachment=' . $row['aid'] . ']#i', $post ) )
 					{
 						$post = str_ireplace( '[attachment=' . $row['aid'] . ']', '[attachment=' . $attachId . ':name]', $post );
-						Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
+						\IPS\Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
 					}
 				}
 			}
-			catch( UnderflowException|OutOfRangeException $e ) {}
-
+			catch( \UnderflowException $e ) {}
+			catch( \OutOfRangeException $e ) {}
+			
 			$libraryClass->setLastKeyValue( $row['aid'] );
 		}
 	}
@@ -632,23 +619,23 @@ class Mybb extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'showthread.php' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'showthread.php' ) !== FALSE )
 		{
 			$class	= '\IPS\forums\Topic';
 			$types	= array( 'topics', 'forums_topics' );
-			$oldId	= Request::i()->tid;
+			$oldId	= \IPS\Request::i()->tid;
 		}
-		elseif( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'forumdisplay.php' ) !== FALSE )
+		elseif( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'forumdisplay.php' ) !== FALSE )
 		{
 			$class	= '\IPS\forums\Forum';
 			$types	= array( 'forums', 'forums_forums' );
-			$oldId	= Request::i()->fid;
+			$oldId	= \IPS\Request::i()->fid;
 		}
 
 		if( isset( $class ) )
@@ -659,20 +646,20 @@ class Mybb extends Software
 				{
 					$data = (string) $this->app->getLink( $oldId, $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( $oldId, $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				elseif( $item instanceof Model )
+				elseif( $item instanceof \IPS\Node\Model )
 				{
 					if( $item->can( 'view' ) )
 					{
@@ -680,7 +667,7 @@ class Mybb extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

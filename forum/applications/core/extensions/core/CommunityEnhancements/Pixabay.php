@@ -11,53 +11,36 @@
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Output;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancement
  */
-class Pixabay extends CommunityEnhancementsAbstract
+class _Pixabay
 {
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= FALSE;
+	public $ips	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= TRUE;
+	public $hasOptions	= TRUE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "pixabay.png";
+	public $icon	= "pixabay.png";
 
 	/**
 	 * Constructor
@@ -66,7 +49,7 @@ class Pixabay extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		$this->enabled = ( Settings::i()->pixabay_enabled );
+		$this->enabled = ( \IPS\Settings::i()->pixabay_enabled );
 	}
 
 	/**
@@ -74,48 +57,48 @@ class Pixabay extends CommunityEnhancementsAbstract
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 
-		$form->add( new Text( 'pixabay_apikey', Settings::i()->pixabay_apikey ? Settings::i()->pixabay_apikey : '', FALSE, array(), function( $val ) {
+		$form->add( new \IPS\Helpers\Form\Text( 'pixabay_apikey', \IPS\Settings::i()->pixabay_apikey ? \IPS\Settings::i()->pixabay_apikey : '', FALSE, array(), function( $val ) {
 			if ( $val )
 			{
 				/* Check API */
 				try
 				{
-					$response = Url::external( "https://pixabay.com/api/" )->setQueryString( array(
+					$response = \IPS\Http\Url::external( "https://pixabay.com/api/" )->setQueryString( array(
 						'key'		=> $val,
 						'q'			=> "winning"
 					) )->request()->get();
 
 					if ( $response->httpResponseCode == 400 )
 					{
-						throw new DomainException('pixabay_api_key_invalid');
+						throw new \DomainException('pixabay_api_key_invalid');
 					}
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
-					throw new DomainException('pixabay_api_key_invalid');
+					throw new \DomainException('pixabay_api_key_invalid');
 				}
 			}
 		}, NULL, NULL, 'pixabay_apikey' ) );
 
 		$groups = array();
-		foreach ( Group::groups() as $group )
+		foreach ( \IPS\Member\Group::groups() as $group )
 		{
 			$groups[ $group->g_id ] = $group->name;
 		}
 		
-		$form->add( new YesNo( 'pixabay_safesearch', Settings::i()->pixabay_safesearch, FALSE, array(), NULL, NULL, NULL, 'pixabay_safesearch' ) );
-		$form->add( new CheckboxSet( 'pixabay_editor_permissions', Settings::i()->pixabay_editor_permissions == '*' ? '*' : explode( ',', Settings::i()->pixabay_editor_permissions ), NULL, array( 'multiple' => TRUE, 'options' => $groups, 'unlimited' => '*', 'unlimitedLang' => 'everyone', 'impliedUnlimited' => TRUE ), NULL, NULL, NULL, 'pixabay_editor_permissions_access' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'pixabay_safesearch', \IPS\Settings::i()->pixabay_safesearch, FALSE, array(), NULL, NULL, NULL, 'pixabay_safesearch' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'pixabay_editor_permissions', \IPS\Settings::i()->pixabay_editor_permissions == '*' ? '*' : explode( ',', \IPS\Settings::i()->pixabay_editor_permissions ), NULL, array( 'multiple' => TRUE, 'options' => $groups, 'unlimited' => '*', 'unlimitedLang' => 'everyone', 'impliedUnlimited' => TRUE ), NULL, NULL, NULL, 'pixabay_editor_permissions_access' ) );
 
 		if ( $values = $form->values() )
 		{
 			try
 			{
 				/* Enable giphy automatically on the first submit of the form and add it automatically to all toolbars */
-				if ( ! Settings::i()->pixabay_apikey )
+				if ( ! \IPS\Settings::i()->pixabay_apikey )
 				{
 					$values['pixabay_enabled'] = 1;
 				}
@@ -124,24 +107,24 @@ class Pixabay extends CommunityEnhancementsAbstract
 
 				$form->saveAsSettings( $values );
 
-				Output::i()->inlineMessage	= Member::loggedIn()->language()->addToStack('saved');
+				\IPS\Output::i()->inlineMessage	= \IPS\Member::loggedIn()->language()->addToStack('saved');
 			}
-			catch ( LogicException $e )
+			catch ( \LogicException $e )
 			{
 				$form->error = $e->getMessage();
 			}
 		}
 
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'help'	=> array(
 				'title'		=> 'help',
 				'icon'		=> 'question-circle',
-				'link'		=> Url::ips( 'docs/pixabay' ),
+				'link'		=> \IPS\Http\Url::ips( 'docs/pixabay' ),
 				'target'	=> '_blank'
 			),
 		);
 
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_Pixabay', $form );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_Pixabay', $form );
 	}
 
 	/**
@@ -149,24 +132,24 @@ class Pixabay extends CommunityEnhancementsAbstract
 	 *
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		if ( $enabled )
 		{
-			if ( Settings::i()->pixabay_apikey )
+			if ( \IPS\Settings::i()->pixabay_apikey )
 			{
-				Settings::i()->changeValues( array( 'pixabay_enabled' => 1 ) );
+				\IPS\Settings::i()->changeValues( array( 'pixabay_enabled' => 1 ) );
 			}
 			else
 			{
-				throw new DomainException;
+				throw new \DomainException;
 			}
 		}
 		else
 		{
-			Settings::i()->changeValues( array( 'pixabay_enabled' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'pixabay_enabled' => 0 ) );
 		}
 	}
 }

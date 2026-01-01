@@ -11,40 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Node\Grouping;
-use IPS\Node\Model;
-use IPS\Node\NodeGroup;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_callable;
-use function is_object;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Text input class for Form Builder
  */
-class Node extends FormAbstract
+class _Node extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -67,14 +43,13 @@ class Node extends FormAbstract
 	 		'where'				=> array(),						// where clause to control which results to display
 	 		'disabledIds'		=> array(),					    // Array of disabled IDs
 	 		'noParentNodes'		=> 'Custom'						// If a value is provided, subnodes of this class which have no parent node will be added into a pseudo-group with the title provided. e.g. custom packages in Nexus do not belong to any package group
-	 		'autoPopulate'		=> FALSE						// Whether to autopopulate children of root nodes (defaults to TRUE which means the children are loaded, use FALSE to only show the parent nodes by default until they are clicked on)
+	 		'autoPopulate'		=> FALSE						// Whether or not to autopopulate children of root nodes (defaults to TRUE which means the children are loaded, use FALSE to only show the parent nodes by default until they are clicked on)
 	 		'clubs'				=> TRUE,						// If TRUE, will also show nodes inside clubs that the user can access. Defaults to FALSE.
-	 		'nodeGroups'		=> FALSE,						// If TRUE, will show node groups for easier selection. Defaults to FALSE.
 	 		'maxResults'		=> 200,							// Maximum number of nodes to load. NULL to load all nodes or FALSE to respect node class definition. Defaults to FALSE.
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'url'				=> NULL,
 		'class'				=> NULL,
 		'permissionCheck'	=> NULL,
@@ -94,52 +69,35 @@ class Node extends FormAbstract
 		'noParentNodes'		=> NULL,
 		'autoPopulate'		=> TRUE,
 		'clubs'				=> FALSE,
-		'nodeGroups'		=> FALSE,
 		'maxResults'		=> FALSE,
 	);
-
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		parent::__construct( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
 		
 		if ( !$this->options['url'] )
 		{
-			$this->options['url'] = Request::i()->url();
+			$this->options['url'] = \IPS\Request::i()->url();
 		}
 		$this->options['url'] = $this->options['url']->setQueryString( '_nodeSelectName', $this->name );
 		
-		if ( $this->options['clubs'] )
+		if ( $this->options['clubs'] and ( !\IPS\Settings::i()->clubs or !\IPS\IPS::classUsesTrait( $this->options['class'], 'IPS\Content\ClubContainer' ) ) )
 		{
-			if( ( !Settings::i()->clubs or !IPS::classUsesTrait( $this->options['class'], 'IPS\Content\ClubContainer' ) ) )
-			{
-				$this->options['clubs'] = FALSE;
-			}
-			else
-			{
-				/* Make sure we have clubs to show */
-				$totalClubNodes = (int) Db::i()->select( 'count(*)', 'core_clubs_node_map', [ 'node_class=?', $this->options['class'] ] )->first();
-				if( !$totalClubNodes )
-				{
-					$this->options['clubs'] = false;
-				}
-			}
-		}
-
-		if( $this->options['nodeGroups'] and ! ( IPS::classUsesTrait( $this->options['class'], Grouping::class ) and Member::loggedIn()->isModerator() ) )
-		{
-			$this->options['nodeGroups'] = false;
+			$this->options['clubs'] = FALSE;
 		}
 
 		/* Do we need to respect the node class's defined max results (which is the default)? */
@@ -155,42 +113,42 @@ class Node extends FormAbstract
 	 *
 	 * @return	string
 	 * @note	$selectable controls whether the node is selectable, not whether it is provided as an option or not. 
-	 * @note	$showable controls whether the node should be displayed at all. On the front end this is based on view permissions, and on the backend we display all nodes regardless of view permissions.
+	 * @note	$showable controls whether or not the node should be displayed at all. On the front end this is based on view permissions, and on the backend we display all nodes regardless of view permissions.
 	 */
-	public function html(): string
+	public function html()
 	{
 		$nodeClass = $this->options['class'];
-		$selectable = is_string( $this->options['permissionCheck'] ) ? $this->options['permissionCheck'] : NULL;
+		$selectable = \is_string( $this->options['permissionCheck'] ) ? $this->options['permissionCheck'] : NULL;
 		$showable = $this->_getShowable();
-		$disabledCallback = is_callable( $this->options['permissionCheck'] ) ? $this->options['permissionCheck'] : NULL;
+		$disabledCallback = \is_callable( $this->options['permissionCheck'] ) ? $this->options['permissionCheck'] : NULL;
 		
-		if ( !$selectable and $showable and Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' )
+		if ( !$selectable and $showable and \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'front' )
 		{
 			$selectable = 'view';
 		}
 
 		/* Determine if we need a limit clause */
 		$limit = $this->options['maxResults'] ?
-			( ( isset( Request::i()->_nodeSelectOffset ) ) ? array( (int) Request::i()->_nodeSelectOffset, $this->options['maxResults'] ) : array( 0, $this->options['maxResults'] ) ) :
+			( ( isset( \IPS\Request::i()->_nodeSelectOffset ) ) ? array( (int) \IPS\Request::i()->_nodeSelectOffset, $this->options['maxResults'] ) : array( 0, $this->options['maxResults'] ) ) :
 			NULL;
 
 		/* Are we getting some AJAX stuff? */
-		if ( isset( Request::i()->_nodeSelectName ) and  Request::i()->_nodeSelectName === $this->name )
+		if ( isset( \IPS\Request::i()->_nodeSelectName ) and  \IPS\Request::i()->_nodeSelectName === $this->name )
 		{
 			$disabled = null;
 			
-			if ( isset( Request::i()->_disabled ) )
+			if ( isset( \IPS\Request::i()->_disabled ) )
 			{
-				$disabled = json_decode( Request::i()->_disabled, true );
+				$disabled = json_decode( \IPS\Request::i()->_disabled, true );
 				$disabled = ( $disabled === FALSE ) ? array() : $disabled;
 			}
 			
-			switch ( Request::i()->_nodeSelect )
+			switch ( \IPS\Request::i()->_nodeSelect )
 			{
 				case 'children':
 					try
 					{
-						$node = $showable ? $nodeClass::loadAndCheckPerms( Request::i()->_nodeId, $showable ) : $nodeClass::load( Request::i()->_nodeId );
+						$node = $showable ? $nodeClass::loadAndCheckPerms( \IPS\Request::i()->_nodeId, $showable ) : $nodeClass::load( \IPS\Request::i()->_nodeId );
 						
 						/* Note - we must check 'view' permissions here, so that the list can properly populate even if we do not have the original permission
 						 * - subsequent children may eventually have those permissions, so if the actual permCheck fails, add the node to the disabled list
@@ -209,17 +167,18 @@ class Node extends FormAbstract
 							}
 						}
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
-						Output::i()->json( NULL, 404 );
+						\IPS\Output::i()->json( NULL, 404 );
 					}
 
-					Output::i()->json( array( 'viewing' => $node->_id, 'title' => $node->_title, 'output' => Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $children, FALSE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabledIds'], NULL, array(), NULL, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ) ) );
+					\IPS\Output::i()->json( array( 'viewing' => $node->_id, 'title' => $node->_title, 'output' => \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $children, FALSE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabledIds'], NULL, array(), NULL, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ) ) );
+					break;
 					
 				case 'parent':					
 					try
 					{
-						$node = $showable ? $nodeClass::loadAndCheckPerms( Request::i()->_nodeId, $showable ) : $nodeClass::load( Request::i()->_nodeId );
+						$node = $showable ? $nodeClass::loadAndCheckPerms( \IPS\Request::i()->_nodeId, $showable ) : $nodeClass::load( \IPS\Request::i()->_nodeId );
 						$parent = $node->parent();
 						
 						$children = $parent ? $parent->children( $showable, NULL, $this->options['subnodes'], $disabled, $this->options['where'] ) : $nodeClass::roots( $showable, NULL, $this->options['where'] );
@@ -235,44 +194,39 @@ class Node extends FormAbstract
 							}
 						}
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
-						Output::i()->json( $e->getMessage(), 404 );
+						\IPS\Output::i()->json( $e->getMessage(), 404 );
 					}
 					
-					Output::i()->json( array( 'viewing' => $parent ? $parent->_id : 0, 'title' => $parent ? $parent->_title : Member::loggedIn()->language()->addToStack( $nodeClass::$nodeTitle ), 'output' => Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $children, FALSE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabledIds'], NULL, array(), NULL, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ) ) );
+					\IPS\Output::i()->json( array( 'viewing' => $parent ? $parent->_id : 0, 'title' => $parent ? $parent->_title : \IPS\Member::loggedIn()->language()->addToStack( $nodeClass::$nodeTitle ), 'output' => \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $children, FALSE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabledIds'], NULL, array(), NULL, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ) ) );
+					break;
 					
 				case 'search':
 					$results = array();
 					
-					$_results = $nodeClass::search( '_title', Request::i()->q, '_title' );
+					$_results = $nodeClass::search( '_title', \IPS\Request::i()->q, '_title' );
 					foreach ( $_results as $node )
 					{
-						if ( ( !$showable or $node->can( $showable ) ) AND ! in_array( $node->_id, $disabled ) )
+						if ( ( !$showable or $node->can( $showable ) ) AND ! \in_array( $node->_id, $disabled ) )
 						{						
 							$id = ( $node instanceof $nodeClass ? $node->_id : "s.{$node->_id}" );
 							$results[ $id ] = $node;
 						}
 					}
 					
-					Output::i()->sendOutput( Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $results, TRUE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabled'], NULL, array(), NULL, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ) );
+					\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $results, TRUE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabled'], NULL, array(), NULL, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ) );
+					break;
 			}
-		}
-
-		/* Node Groups */
-		$nodeGroups = null;
-		if( $this->options['nodeGroups'] )
-		{
-			$nodeGroups = $nodeClass::availableNodeGroups();
 		}
 		
 		/* Get initial nodes */
 		$nodes		= array();
 		$children	= array();
 		$noParentNodes = array();
-		if( !empty( $nodeClass::$ownerTypes ) and $this->options['forceOwner'] !== FALSE )
+		if( isset( $nodeClass::$ownerTypes ) and $nodeClass::$ownerTypes !== NULL and $this->options['forceOwner'] !== FALSE )
 		{
-			$nodes = $nodeClass::loadByOwner( $this->options['forceOwner'] ?: Member::loggedIn(), $this->options['where'] );
+			$nodes = $nodeClass::loadByOwner( $this->options['forceOwner'] ?: \IPS\Member::loggedIn(), $this->options['where'] );
 			if ( $this->options['clubs'] )
 			{
 				$nodes = array_merge( $nodes, $nodeClass::clubNodes( $showable, NULL, $this->options['where'] ) );
@@ -294,30 +248,30 @@ class Node extends FormAbstract
 				make the control harder to use, it will have a bad performance impact. So we'll go 3 levels deep or until 300 nodes are
 				showing, whichever happens first  */ 
 			$totalLimit = 300;
-			$currentCount = count( $nodes );
+			$currentCount = \count( $nodes );
 			if ( $currentCount < $totalLimit )
 			{
 				foreach( $nodes AS $node )
 				{
-					$this->_populate($nodes, $disabled, 0, $node, $children, 3, NULL, $totalLimit, $currentCount);
+					$this->_populate( $nodes, $disabled, 0, $node, $children, 3, NULL, FALSE, $totalLimit, $currentCount );
 				}
 			}
 			if ( $this->options['noParentNodes'] )
 			{
 				$subnodeClass = $nodeClass::$subnodeClass;
-				$noParentNodes = iterator_to_array( new ActiveRecordIterator( Db::i()->select( '*', $subnodeClass::$databaseTable, $subnodeClass::$databasePrefix . $subnodeClass::$parentNodeColumnId . '=0' )->setKeyField( $subnodeClass::$databasePrefix . $subnodeClass::$databaseColumnId ), $subnodeClass ) );
+				$noParentNodes = iterator_to_array( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', $subnodeClass::$databaseTable, $subnodeClass::$databasePrefix . $subnodeClass::$parentNodeColumnId . '=0' )->setKeyField( $subnodeClass::$databasePrefix . $subnodeClass::$databaseColumnId ), $subnodeClass ) );
 			}
 		}
 
 		/* Do we need to show a "load more" link? */
 		$loadMoreLink = FALSE;
 
-		if( $this->options['maxResults'] AND count( $nodes ) == $this->options['maxResults'] )
+		if( $this->options['maxResults'] AND \count( $nodes ) == $this->options['maxResults'] )
 		{
-			$loadMoreLink = (int) Request::i()->_nodeSelectOffset + $this->options['maxResults'];
+			$loadMoreLink = (int) \IPS\Request::i()->_nodeSelectOffset + $this->options['maxResults'];
 		}
 
-		if ( isset( $this->options['disabled'] ) and is_array( $this->options['disabled'] ) )
+		if ( isset( $this->options['disabled'] ) and \is_array( $this->options['disabled'] ) )
 		{
 			$this->options['url'] = $this->options['url']->setQueryString( '_disabled', json_encode( $this->options['disabled'] ) );
 			
@@ -331,131 +285,157 @@ class Node extends FormAbstract
 		}
 		
 		/* What is selected? */
-		if ( $this->options['zeroVal'] !== NULL and !( $this->value instanceof Model ) and !is_array( $this->value ) and $this->value == 0 )
+		if ( $this->options['zeroVal'] !== NULL and $this->value === 0 )
 		{
 			$selected = 0;
 		}
 		else
 		{
 			$selected = array();
-			$mergeNodes = array();
 
-			if ( is_array( $this->value ) )
+			if ( \is_array( $this->value ) )
 			{
-				/* Check to make sure we don't have a node group selected and do not have permission to select node groups */
-				foreach( $this->value as $index => $node )
-				{
-					if ( $node instanceof NodeGroup )
-					{
-						if ( ! $this->options['nodeGroups'] )
-						{
-							/* We don't, so all we can do is get the current node IDs and present them */
-							foreach( $node->nodes() as $groupedNode )
-							{
-								if ( $groupedNode instanceof $nodeClass )
-								{
-									$mergeNodes[ $groupedNode->_id ] = $groupedNode;
-								}
-							}
-							unset( $this->value[ $index ] );
-						}
-					}
-				}
-
-				if ( count( $mergeNodes ) )
-				{
-					$this->value = array_merge( $this->value, $mergeNodes );
-				}
-
 				foreach ( $this->value as $node )
 				{
-					$title = str_replace( "&#039;", "&apos;", htmlspecialchars( $node->_title, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', false ) );
+					$title = isset( $node::$titleLangPrefix ) ? \IPS\Member::loggedIn()->language()->addToStack( $node::$titleLangPrefix . $node->_id, FALSE, array( 'json' => TRUE, 'escape' => TRUE, 'striptags'=> TRUE ) ) : str_replace( "&#039;", "&apos;", htmlspecialchars( $node->_title, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', false ) );
 
-					$suffix = "";
-					if( !( $node instanceof $nodeClass ) )
-					{
-						$suffix = ( $node instanceof NodeGroup ) ? ".g" : ".s";
-					}
-
-					$selected[ "{$node->_id}{$suffix}" ] = array( 'title' => $title, 'parents' => array_values( array_map( function( $val ){
-						return str_replace( "&#039;", "&apos;", htmlspecialchars( $val->_title, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', false ) );
+					$selected[ !( $node instanceof $nodeClass ) ? "{$node->_id}.s" : $node->_id ] = array( 'title' => $title, 'parents' => array_values( array_map( function( $val ){
+							if( isset( $val::$titleLangPrefix ) )
+							{
+								return \IPS\Member::loggedIn()->language()->addToStack( $val::$titleLangPrefix . $val->_id, FALSE, array( 'json' => TRUE, 'escape' => TRUE, 'striptags'=> TRUE ) );
+							}
+							else
+							{
+								return str_replace( "&#039;", "&apos;", htmlspecialchars( $val->_title, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', false ) ); 
+							}
 					}, iterator_to_array( $node->parents() ) ) ) );
 				}
 			}
-			elseif ( $this->value instanceof Model )
+			elseif ( $this->value instanceof \IPS\Node\Model )
 			{
-				$suffix = "";
-				if( !( $this->value instanceof $nodeClass ) )
-				{
-					$suffix = ( $this->value instanceof NodeGroup ) ? ".g" : ".s";
-				}
-
-				$class = get_class( $this->value );
-				$title = str_replace( "&#039;", "&apos;", htmlspecialchars( $this->value->_title, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', false ) );
-				$selected[ "{$this->value->_id}{$suffix}" ] = array( 'title' => $title, 'parents' => array_values( array_map( function( $val ){
-					return str_replace( "&#039;", "&apos;", htmlspecialchars( $val->_title, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', false ) );
+				$class = \get_class( $this->value );
+				$title = isset( $nodeClass::$titleLangPrefix ) ? \IPS\Member::loggedIn()->language()->addToStack( $class::$titleLangPrefix . $this->value->_id, FALSE, array( 'json' => TRUE, 'escape' => TRUE, 'striptags'=> TRUE ) ) : str_replace( "&#039;", "&apos;", htmlspecialchars( $this->value->_title, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', false ) );
+				$selected[ !( $this->value instanceof $nodeClass ) ? "{$this->value->_id}.s" : $this->value->_id ] = array( 'title' => $title, 'parents' => array_values( array_map( function( $val ){ 
+						if( isset( $val::$titleLangPrefix ) )
+						{
+							return \IPS\Member::loggedIn()->language()->addToStack( $val::$titleLangPrefix . $val->_id, FALSE, array( 'json' => TRUE, 'escape' => TRUE, 'striptags'=> TRUE ) );
+						}
+						else
+						{
+							return str_replace( "&#039;", "&apos;", htmlspecialchars( $val->_title, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', false ) ); 
+						}
 				}, iterator_to_array( $this->value->parents() ) ) ) );
 			}
 			
 			$selected = json_encode( $selected );
 		}
 
+		/* Do we need the no-JS fallback? We only do this if we know JS is disabled as it's intensive and may cause memory exhaustion if there are lots of nodes - it's a last resort */
+		$noJS = NULL;
+		if ( isset( \IPS\Request::i()->_noJs ) )
+		{
+			$options = array();
+			$_children = array();
+			$disabled = ( isset( $this->options['disabled'] ) and \is_array( $this->options['disabled'] ) ) ? $this->options['disabled'] : array();
+			$currentCount = NULL;
+			foreach ( $nodeClass::roots( $showable, NULL, $this->options['where'] ) as $root )
+			{
+				$this->_populate( $options, $disabled, 0, $root, $_children, NULL, NULL, TRUE, NULL, $currentCount );
+			}
+			
+			$value = NULL;
+			if ( $this->value !== 0 )
+			{
+				if ( $this->options['multiple'] )
+				{
+					$value = array();
+					if ( \is_array( $this->value ) )
+					{
+						$value = array_keys( $this->value );
+					}
+					elseif ( \is_object( $this->value ) )
+					{
+						$value = array( $this->value->_id );
+					}
+				}
+				else
+				{
+					if ( \is_numeric( $this->value ) )
+					{
+						$value = $this->value;
+					}
+					elseif ( \is_object( $this->value ) )
+					{
+						$value = array( $this->value->_id );
+					}
+				}
+			}
+																
+			$noJS = \IPS\Theme::i()->getTemplate( 'forms', 'core' )->select( $this->name . ( $this->options['multiple'] ? '[]' : '' ), $value, $this->required, $options, $this->options['multiple'], '', $disabled );
+		}
+
 		/* Were we just loading more? */
-		if( isset( Request::i()->_nodeSelectName ) and Request::i()->_nodeSelectName === $this->name AND isset( Request::i()->_nodeSelect ) AND Request::i()->_nodeSelect == 'loadMore' )
+		if( isset( \IPS\Request::i()->_nodeSelectName ) and \IPS\Request::i()->_nodeSelectName === $this->name AND isset( \IPS\Request::i()->_nodeSelect ) AND \IPS\Request::i()->_nodeSelect == 'loadMore' )
 		{
 			if ( $this->options['clubs'] )
 			{
-				Output::i()->json( array( 'loadMore' => $loadMoreLink, 'globalOutput' => Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $nodes, FALSE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabledIds'], NULL, array(), FALSE, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ), 'clubsOutput' => Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $nodes, FALSE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabledIds'], NULL, array(), TRUE, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ) ) );
+				\IPS\Output::i()->json( array( 'loadMore' => $loadMoreLink, 'globalOutput' => \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $nodes, FALSE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabledIds'], NULL, array(), FALSE, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ), 'clubsOutput' => \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $nodes, FALSE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabledIds'], NULL, array(), TRUE, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ) ) );
 			}
 			else
 			{
-				Output::i()->json( array( 'loadMore' => $loadMoreLink, 'output' => Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $nodes, FALSE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabledIds'], NULL, array(), NULL, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ) ) );
+				\IPS\Output::i()->json( array( 'loadMore' => $loadMoreLink, 'output' => \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->nodeCascade( $nodes, FALSE, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, FALSE, NULL, $this->options['class'], $this->options['where'], $this->options['disabledIds'], NULL, array(), NULL, $this->options['togglePermPBR'], $this->options['toggleIdsOff'] ) ) );
 			}
 		}
 
 		/* Display */
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->node( $this->name, $selected, $this->options['multiple'], $this->options['url'], $nodeClass::$nodeTitle, $nodes, $this->options['zeroVal'], $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, $this->options['zeroValTogglesOn'], $this->options['zeroValTogglesOff'], $this->options['autoPopulate'], $children, $this->options['class'], $this->options['where'], is_array( $this->options['disabledIds'] ) ? $this->options['disabledIds'] : array(), $this->options['noParentNodes'], $noParentNodes, $this->options['clubs'], $this->options['togglePermPBR'], $this->options['toggleIdsOff'], $loadMoreLink, $nodeGroups );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->node( $this->name, $selected, $this->options['multiple'], $this->options['url'], $nodeClass::$nodeTitle, $nodes, $this->options['zeroVal'], $noJS, $selectable, $this->options['subnodes'], $this->options['togglePerm'], $this->options['toggleIds'], $disabledCallback, $this->options['zeroValTogglesOn'], $this->options['zeroValTogglesOff'], $this->options['autoPopulate'], $children, $this->options['class'], $this->options['where'], \is_array( $this->options['disabledIds'] ) ? $this->options['disabledIds'] : array(), $this->options['noParentNodes'], $noParentNodes, $this->options['clubs'], $this->options['togglePermPBR'], $this->options['toggleIdsOff'], $loadMoreLink );
 	}
-
+	
 	/**
 	 * Populate array options
 	 *
-	 * @param array $nodes The list of nodes
-	 * @param boolean|array $disabled Disabled options
-	 * @param int $depth The current depth
-	 * @param Model|null $node The node
-	 * @param array $children Children of the node
-	 * @param int|null $depthLimit How deep the recursion should go
-	 * @param Model|null $parent If we are recursing on a child, this should be the parent node. Otherwise NULL if in the root.
-	 * @param int|null $totalLimit
-	 * @param int $currentCount
-	 * @return    void
+	 * @param	array					$nodes		The list of nodes
+	 * @param	array|boolean			$disabled	Disabled options
+	 * @param	int						$depth		The current depth
+	 * @param	\IPS\Node\Model			$node		The node
+	 * @param	array					$children	Children of the node
+	 * @param	int|NULL				$depthLimit	How deep the recursion should go
+	 * @param	\IPS\Node\Model|NULL	$parent		If we are recursing on a child, this should be the parent node. Otherwise NULL if in the root.
+	 * @param	bool					$noJS		No-javascript fallback
+	 * @return	void
 	 */
-	protected function _populate(array &$nodes, bool|array|null &$disabled = NULL, int $depth = 0, ?Model $node = null, array &$children = array(), int $depthLimit = NULL, Model $parent = NULL, int $totalLimit = NULL, int &$currentCount = 0 ) : void
+	protected function _populate( &$nodes, &$disabled, $depth, $node, &$children, $depthLimit = NULL, $parent = NULL, $noJS = FALSE, $totalLimit = NULL, &$currentCount = 0 )
 	{
 		$showable = $this->_getShowable();
 
-		if ( ( !$showable OR $node->can( $showable ) ) and ( empty( $this->options['disabled'] ) or !in_array( $node->_id, $this->options['disabled'] ) ) and !$node->deleteOrMoveQueued() )
+		if ( ( !$showable OR $node->can( $showable ) ) and ( empty( $this->options['disabled'] ) or !\in_array( $node->_id, $this->options['disabled'] ) ) and !$node->deleteOrMoveQueued() )
 		{
-			if ( $parent === NULL )
+			if ( $noJS )
 			{
-				$nodes[ $node->_id ] = $node;
+				$nodes[ $node->_id . ( !( $node instanceof $this->options['class'] ) ? '.s' : '' ) ] = str_repeat( '- ', $depth ) . $node->_title;
 			}
 			else
 			{
-				$children[ $parent->_id ][ $node->_id ] = $node;
+				if ( $parent === NULL )
+				{
+					$nodes[ $node->_id ] = $node;
+				}
+				else
+				{
+					$children[ $parent->_id ][ $node->_id ] = $node;
+				}
 			}
 			
 			if ( $this->options['permissionCheck'] )
 			{
-				if ( is_string( $this->options['permissionCheck'] ) )
+				if ( \is_string( $this->options['permissionCheck'] ) )
 				{
 					if ( !$node->can( $this->options['permissionCheck'] ) )
 					{
 						$disabled[] = $node->_id;
 					}
 				}
-				elseif ( is_callable( $this->options['permissionCheck'] ) )
+				elseif ( \is_callable( $this->options['permissionCheck'] ) )
 				{
 					$permissionCheck = $this->options['permissionCheck'];
 					if ( !$permissionCheck( $node ) )
@@ -464,14 +444,14 @@ class Node extends FormAbstract
 					}
 				}
 			}
-
-			if ( $depthLimit === NULL OR $depth < $depthLimit )
+			
+			if ( $depthLimit === NULL OR $depth < (int) $depthLimit )
 			{
 				if ( !$totalLimit or ( ( $currentCount += $node->childrenCount( $showable, NULL, $this->options['subnodes'], $this->options['where'] ) ) < $totalLimit ) )
 				{
 					foreach( $node->children( $showable, NULL, $this->options['subnodes'], NULL, $this->options['where'] ) AS $child )
 					{
-						$this->_populate($nodes, $disabled, $depth + 1, $child, $children, $depthLimit, $node, $totalLimit, $currentCount);
+						$this->_populate( $nodes, $disabled, $depth + 1, $child, $children, $depthLimit, $node, $noJS, $totalLimit, $currentCount );
 					}
 				}
 			}
@@ -483,7 +463,7 @@ class Node extends FormAbstract
 	 *
 	 * @return	string|NULL
 	 */
-	protected function _getShowable(): ?string
+	protected function _getShowable()
 	{
 		if( $this->options['showAllNodes'] === TRUE )
 		{
@@ -495,19 +475,19 @@ class Node extends FormAbstract
 		}
 		else
 		{
-			return ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' ) ? 'view' : NULL;
+			return ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'front' ) ? 'view' : NULL;
 		}
 	}
-
+		
 	/**
 	 * Get Value
 	 *
-	 * @return mixed
+	 * @return	string|int
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$zeroValName = "{$this->name}-zeroVal";
-		if ( $this->options['zeroVal'] !== NULL and isset( Request::i()->$zeroValName ) )
+		if ( $this->options['zeroVal'] !== NULL and isset( \IPS\Request::i()->$zeroValName ) )
 		{
 			return 0;
 		}
@@ -520,64 +500,37 @@ class Node extends FormAbstract
 	/**
 	 * Format Value
 	 *
-	 * @return	mixed
+	 * @return	\IPS\Node\Model|array|NULL
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{		
 		$nodeClass	= $this->options['class'];
 		$selectable	= $this->options['permissionCheck'];
 		$showable	= $this->_getShowable();
 				
-		if ( $this->value and !( $this->value instanceof Model ) )
-		{
+		if ( $this->value and !( $this->value instanceof \IPS\Node\Model ) )
+		{			
 			$return = array();
-			foreach ( is_array( $this->value ) ? $this->value : explode( ',', $this->value ) as $v )
+			foreach ( \is_array( $this->value ) ? $this->value : explode( ',', $this->value ) as $v )
 			{
-				if ( $v instanceof Model )
+				if ( $v instanceof \IPS\Node\Model )
 				{
-					$prefix = '';
-					if( !( $v instanceof $nodeClass ) )
-					{
-						$prefix = ( $v instanceof NodeGroup ) ? 'g' : 's';
-					}
-					$return [ $prefix . $v->_id ] = $v;
+					$return[ !( $v instanceof $nodeClass ) ? "s{$v->_id}" : $v->_id ] = $v;
 				}	
 				elseif( $v )
 				{
 					try
 					{
-						if( ( mb_substr( $v, 0, 1 ) === 'g' or mb_substr( $v, 0, 1 ) === 's' ) and is_numeric( mb_substr( $v, 1 ) ) )
-						{
-							$exploded = [
-								mb_substr( $v, 1 ),
-								mb_substr( $v, 0, 1 )
-							];
-						}
-						else
-						{
-							$exploded = explode( '.', $v );
-						}
-
-						if( isset( $exploded[1] ) )
-						{
-							$classToUse = ( $exploded[1] === 'g' ) ? NodeGroup::class : $nodeClass::$subnodeClass;
-						}
-						else
-						{
-							$classToUse = $nodeClass;
-						}
-
+						$exploded = explode( '.', $v );
+						$classToUse = ( isset( $exploded[1] ) and $exploded[1] === 's' ) ? $nodeClass::$subnodeClass : $nodeClass;
 						$node = $classToUse::load( $exploded[0] );
-						if( $classToUse == NodeGroup::class )
+												
+						if ( ( !$showable or $node->can( $showable ) ) and !$selectable or ( \is_string( $selectable ) and $node->can( $selectable ) ) or ( \is_callable( $selectable ) and $selectable( $node ) ) )
 						{
-							$return[ 'g' . $node->_id ] = $node;
-						}
-						elseif ( ( !$showable or $node->can( $showable ) ) and !$selectable or ( is_string( $selectable ) and $node->can( $selectable ) ) or ( is_callable( $selectable ) and $selectable( $node ) ) )
-						{
-							$return[ ( $exploded[1] ?? '' ) . $node->_id ] = $node;
+							$return[ isset( $exploded[1] ) ? "s{$node->_id}" : $node->_id ] = $node;
 						}
 					}
-					catch ( Exception $e ) {}
+					catch ( \Exception $e ) {}
 				}
 			}
 			
@@ -597,15 +550,15 @@ class Node extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		/* We return a NULL value instead of an empty string, so we need to check that if field is required */
-		if( ( $this->value === NULL OR ( is_array( $this->value ) AND empty( $this->value ) ) ) and $this->required )
+		if( ( $this->value === NULL OR ( \is_array( $this->value ) AND empty( $this->value ) ) ) and $this->required )
 		{
-			throw new InvalidArgumentException('form_required');
+			throw new \InvalidArgumentException('form_required');
 		}
 
 		return parent::validate();
@@ -615,15 +568,15 @@ class Node extends FormAbstract
 	 * String Value
 	 *
 	 * @param	mixed	$value	The value
-	 * @return    string|int|null
+	 * @return	string
 	 */
-	public static function stringValue( mixed $value ): string|int|null
+	public static function stringValue( $value )
 	{
-		if ( is_array( $value ) )
+		if ( \is_array( $value ) )
 		{
 			return implode( ',', array_keys( $value ) );
 		}
-		elseif ( is_object( $value ) )
+		elseif ( \is_object( $value ) )
 		{
 			return $value->_id;
 		}

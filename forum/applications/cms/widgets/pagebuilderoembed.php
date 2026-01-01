@@ -11,56 +11,46 @@
 namespace IPS\cms\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use IPS\Text\Parser;
-use IPS\Widget\Builder;
-use IPS\Widget\StaticCache;
-use UnexpectedValueException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * oembed Widget
  */
-class pagebuilderoembed extends StaticCache implements Builder
+class _pagebuilderoembed extends \IPS\Widget\StaticCache implements \IPS\Widget\Builder
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'pagebuilderoembed';
+	public $key = 'pagebuilderoembed';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'cms';
-
+	public $app = 'cms';
+		
 	/**
-	 * @var bool
+	 * @brief	Plugin
 	 */
-	public bool $allowNoBox = true;
+	public $plugin = '';
 	
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
  		$form = parent::configuration( $form );
 
- 		$form->add( new Form\Url( 'video_url', ( isset( $this->configuration['video_url'] )  )? $this->configuration['video_url'] : NULL, TRUE, array(), function( $url ) {
-	 		if ( Parser::embeddableMedia( Url::external( $url ) ) === NULL )
+ 		$form->add( new \IPS\Helpers\Form\Url( 'video_url', ( isset( $this->configuration['video_url'] )  )? $this->configuration['video_url'] : NULL, TRUE, array(), function( $url ) {
+	 		if ( \IPS\Text\Parser::embeddableMedia( \IPS\Http\Url::external( $url ) ) === NULL )
 	 		{
-		 		throw new DomainException('video_cannot_embed');
+		 		throw new \DomainException('video_cannot_embed');
 	 		}
  		} ) );
  		return $form;
@@ -72,7 +62,7 @@ class pagebuilderoembed extends StaticCache implements Builder
  	 * @param	array	$values	Values from form
  	 * @return	array
  	 */
- 	public function preConfig( array $values ): array
+ 	public function preConfig( $values )
  	{
 	 	$values['video_url'] = (string) $values['video_url'];
  		return $values;
@@ -83,16 +73,16 @@ class pagebuilderoembed extends StaticCache implements Builder
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		try
 		{
-			if ( isset( $this->configuration['video_url'] ) AND $embed = Parser::embeddableMedia( Url::external( $this->configuration['video_url'] ) ) )
+			if ( isset( $this->configuration['video_url'] ) AND $embed = \IPS\Text\Parser::embeddableMedia( \IPS\Http\Url::external( $this->configuration['video_url'] ) ) )
 			{
 				return $this->output( $embed );
 			}
 		}
-		catch( UnexpectedValueException $e ){}
+		catch( \UnexpectedValueException $e ){}
 		
 		return '';
 	}

@@ -11,35 +11,29 @@
 namespace IPS\core\MemberACPProfile;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use IPS\Output;
-use function defined;
-use function get_called_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Block
  */
-abstract class Block
+abstract class _Block
 {
 	/**
 	 * @brief	Member
 	 */
-	protected ?Member $member = null;
+	protected $member;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function __construct( Member $member )
+	public function __construct( \IPS\Member $member )
 	{
 		$this->member = $member;
 	}
@@ -49,11 +43,11 @@ abstract class Block
 	 *
 	 * @return	string
 	 */
-	public static function title() : string
+	public static function title()
 	{
-		$class = get_called_class();
+		$class = \get_called_class();
 		$exploded = explode( '\\', $class );
-		return Member::loggedIn()->language()->addToStack( 'memberACPProfileTitle_' . $exploded[1] . '_' . $exploded[5] );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'memberACPProfileTitle_' . $exploded[1] . '_' . $exploded[5] );
 	}
 	
 	/**
@@ -61,15 +55,15 @@ abstract class Block
 	 *
 	 * @return	string
 	 */
-	abstract public function output() : string;
+	abstract public function output();
 	
 	/**
 	 * Edit Window
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function edit()  : ?string
+	public function edit()
 	{
-		Output::i()->error( 'node_error', '2C114/T', 404, '' );
+		\IPS\Output::i()->error( 'node_error', '2C114/T', 404, '' );
 	}
 }

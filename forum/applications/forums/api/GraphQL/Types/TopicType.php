@@ -10,53 +10,48 @@
  */
 
 namespace IPS\forums\api\GraphQL\Types;
-use Exception;
 use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\_TypeRegistry;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Api\GraphQL\ItemType;
-use IPS\forums\Topic\Post;
-use IPS\Member;
-use function defined;
-use function in_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * TopicType for GraphQL API
  */
-class TopicType extends ItemType
+class _TopicType extends \IPS\Content\Api\GraphQL\ItemType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $itemClass	= '\IPS\forums\Topic';
+	protected static $itemClass	= '\IPS\forums\Topic';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'forums_Topic';
+	protected static $typeName = 'forums_Topic';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'A topic';
+	protected static $typeDescription = 'A topic';
 
 	/*
 	 * @brief 	Follow data passed in to FollowType resolver
 	 */
-	protected static array $followData = array('app' => 'forums', 'area' => 'topic');
+	protected static $followData = array('app' => 'forums', 'area' => 'topic');
 
 	/**
 	 * Return the fields available in this type
 	 *
 	 * @return	array
 	 */
-	public function fields(): array
+	public function fields()
 	{
 		// Extend our fields with topic-specific stuff
 		$defaultFields = parent::fields();
@@ -78,7 +73,7 @@ class TopicType extends ItemType
 				'resolve' => function ($topic) {
 					foreach( $topic->stats(FALSE) as $k => $v )
 					{
-						if( in_array( $k, $topic->hotStats ) )
+						if( \in_array( $k, $topic->hotStats ) )
 						{
 							return TRUE;
 						}
@@ -101,7 +96,6 @@ class TopicType extends ItemType
 					if( $topic->isSolved() ){
 						return $topic->mapped('solved_comment_id');
 					}
-					return 0;
 				}
 			],
 			'canMarkSolved' => [
@@ -120,12 +114,67 @@ class TopicType extends ItemType
 					
 					try 
 					{
-						return Post::load( $topic->mapped('solved_comment_id') );
+						$solved = \IPS\forums\Topic\Post::load( $topic->mapped('solved_comment_id') );
+						return $solved;
 					}
-					catch (Exception $err)
+					catch (\Exception $err) 
 					{
 						return NULL;
 					}
+				}
+			],
+
+			/* Q&A STUFF */
+			'isQuestion' => [
+				'type' => TypeRegistry::boolean(),
+				'resolve' => function ($topic) {
+					return $topic->isQuestion();
+				}
+			],
+			'questionVotes' => [
+				'type' => TypeRegistry::int(),
+				'resolve' => function ($topic) {
+					if( !$topic->isQuestion() )
+					{
+						return NULL;
+					}
+
+					return \intval( $topic->question_rating );
+				}
+			],
+			'canVoteUp' => [
+				'type' => TypeRegistry::boolean(),
+				'resolve' => function ($topic) {
+					if( !$topic->isQuestion() )
+					{
+						return NULL;
+					}
+
+					return $topic->canVote(1);
+				}
+			],
+			'canVoteDown' => [
+				'type' => TypeRegistry::boolean(),
+				'resolve' => function ($topic) {
+					if( !$topic->isQuestion() )
+					{
+						return NULL;
+					}
+
+					return $topic->canVote(-1) && \IPS\Settings::i()->forums_questions_downvote;
+				}
+			],
+			'vote' => [
+				'type' => \IPS\forums\api\GraphQL\TypeRegistry::vote(),
+				'resolve' => function ($topic) {
+					$topicVotes	= $topic->votes();
+
+					if( !$topic->isQuestion() || !isset( $topicVotes[ \IPS\Member::loggedIn()->member_id ] ) )
+					{
+						return NULL;
+					}
+
+					return $topicVotes[ \IPS\Member::loggedIn()->member_id ] === -1 ? 'DOWN' : 'UP';
 				}
 			],
 			'hasBestAnswer' => [
@@ -137,6 +186,11 @@ class TopicType extends ItemType
 			'bestAnswerID' => [
 				'type' => TypeRegistry::id(),
 				'resolve' => function ($topic) {
+					if( !$topic->isQuestion() )
+					{
+						return NULL;
+					}
+
 					return $topic->topic_answered_pid;
 				}
 			],
@@ -154,7 +208,7 @@ class TopicType extends ItemType
 		$topicFields['postCount']['resolve'] = function ($topic, $args) {
 			if( $args['includeHidden'] )
 			{
-				return $topic->commentCount();
+				return $topic->commentCount() + ( $topic->isQuestion() ? 1 : 0 );
 			}
 
 			return $topic->mapped('num_comments');
@@ -176,7 +230,7 @@ class TopicType extends ItemType
 		return array_merge( $defaultFields, $topicFields );
 	}
 
-	public static function args(): array
+	public static function args()
 	{
 		return array_merge( parent::args(), array(
 			'password' => [
@@ -190,15 +244,15 @@ class TopicType extends ItemType
 	 * Here we adjust the resolver for the commentInformation field to check whether this is
 	 * a poll-only topic.
 	 *
-	 * @return	array
+	 * @return	string|null
 	 */
-	public static function getItemPermissionFields(): array
+	public static function getItemPermissionFields()
 	{
 		$defaultFields = parent::getItemPermissionFields();
 		$existingResolver = $defaultFields['commentInformation']['resolve'];
 
 		$defaultFields['commentInformation']['resolve'] = function ($topic, $args, $context) use ( $existingResolver ) {
-			if( $topic->canComment( Member::loggedIn(), FALSE ) && ( $topic->getPoll() and $topic->getPoll()->poll_only ) )
+			if( $topic->canComment( \IPS\Member::loggedIn(), FALSE ) && ( $topic->getPoll() and $topic->getPoll()->poll_only ) )
 			{
 				return 'topic_poll_can_comment';
 			}
@@ -216,7 +270,7 @@ class TopicType extends ItemType
 	 *
 	 * @return	array
 	 */
-	public static function getOrderByOptions(): array
+	public static function getOrderByOptions()
 	{
 		$defaultArgs = parent::getOrderByOptions();
 		return array_merge( $defaultArgs, array('last_comment', 'num_comments', 'views', 'author_name', 'last_comment_name', 'date', 'votes') );
@@ -227,8 +281,39 @@ class TopicType extends ItemType
 	 *
 	 * @return	ObjectType
 	 */
-	protected static function getCommentType(): ObjectType
+	protected static function getCommentType()
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::post();
+	}
+
+	/**
+	 * Resolve the comments field - overridden from ItemType
+	 * If this is a question and order isn't date, then force order by votes
+	 *
+	 * @param 	\IPS\forums\Topic
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	array
+	 */
+	protected static function comments($topic, $args)
+	{
+		if( $topic->isQuestion() && $args['orderBy'] !== 'date' )
+		{
+			if( $topic->isArchived() )
+			{
+				$args['orderBy'] = "archive_is_first desc, archive_bwoptions";
+				$args['orderDir'] = "DESC";
+			}
+			else
+			{
+				$args['orderBy'] = "new_topic DESC, post_bwoptions DESC, post_field_int DESC, post_date";
+				$args['orderDir'] = "ASC";
+			}
+		}
+		elseif( !$topic->isQuestion() && $args['orderBy'] === 'votes' )
+		{
+			$args['orderBy'] = 'date'; // Only Q&A can order by votes
+		}
+
+		return parent::comments($topic, $args);
 	}
 }

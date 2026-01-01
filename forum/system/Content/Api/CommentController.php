@@ -11,44 +11,16 @@
 namespace IPS\Content\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use IPS\Api\Controller;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Content\Comment;
-use IPS\Content\Filter;
-use IPS\Content\Item;
-use IPS\Content\Reaction;
-use IPS\Content\Search\Index;
-use IPS\Content\Search\SearchContent;
-use IPS\core\Reports\Report;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Text\Parser;
-use OutOfRangeException;
-use UnexpectedValueException;
-use function defined;
-use function get_class;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base API endpoint for Content Comments
  */
-class CommentController extends Controller
+class _CommentController extends \IPS\Api\Controller
 {
 	/**
 	 * List
@@ -56,30 +28,29 @@ class CommentController extends Controller
 	 * @param	array	$where			Extra WHERE clause
 	 * @param	string	$containerParam	The parameter which includes the container values
 	 * @param	bool	$byPassPerms	If permissions should be ignored
-	 * @return	PaginatedResponse
+	 * @return	\IPS\Api\PaginatedResponse
 	 */
-	protected function _list( array $where = array(), string $containerParam = 'categories', bool $byPassPerms=FALSE ): PaginatedResponse
+	protected function _list( $where = array(), $containerParam = 'categories', $byPassPerms=FALSE )
 	{
-		/* @var array $databaseColumnMap */
 		$class = $this->class;
 		$itemClass = $class::$itemClass;
 		
 		/* Containers */
-		if ( isset( Request::i()->$containerParam ) )
+		if ( isset( \IPS\Request::i()->$containerParam ) )
 		{
-			$where[] = array( Db::i()->in( $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['container'], array_map( 'intval', array_filter( explode( ',', Request::i()->$containerParam ) ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['container'], array_map( 'intval', array_filter( explode( ',', \IPS\Request::i()->$containerParam ) ) ) ) );
 		}
 		
 		/* Authors */
-		if ( isset( Request::i()->authors ) )
+		if ( isset( \IPS\Request::i()->authors ) )
 		{
-			$where[] = array( Db::i()->in( $class::$databasePrefix . $class::$databaseColumnMap['author'], array_map( 'intval', array_filter( explode( ',', Request::i()->authors ) ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( $class::$databasePrefix . $class::$databaseColumnMap['author'], array_map( 'intval', array_filter( explode( ',', \IPS\Request::i()->authors ) ) ) ) );
 		}
 		
 		/* Pinned? */
-		if ( isset( Request::i()->pinned ) AND IPS::classUsesTrait( $itemClass, 'IPS\Content\Pinnable' ) )
+		if ( isset( \IPS\Request::i()->pinned ) AND \in_array( 'IPS\Content\Pinnable', class_implements( $itemClass ) ) )
 		{
-			if ( Request::i()->pinned )
+			if ( \IPS\Request::i()->pinned )
 			{
 				$where[] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['pinned'] . "=1" );
 			}
@@ -90,9 +61,9 @@ class CommentController extends Controller
 		}
 		
 		/* Featured? */
-		if ( isset( Request::i()->featured ) AND IPS::classUsesTrait( $itemClass, 'IPS\Content\Featurable' ) )
+		if ( isset( \IPS\Request::i()->featured ) AND \in_array( 'IPS\Content\Featurable', class_implements( $itemClass ) ) )
 		{
-			if ( Request::i()->featured )
+			if ( \IPS\Request::i()->featured )
 			{
 				$where[] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['featured'] . "=1" );
 			}
@@ -103,22 +74,22 @@ class CommentController extends Controller
 		}
 		
 		/* Locked? */
-		if ( isset( Request::i()->locked ) AND IPS::classUsesTrait( $itemClass, 'IPS\Content\Lockable' ) )
+		if ( isset( \IPS\Request::i()->locked ) AND \in_array( 'IPS\Content\Lockable', class_implements( $itemClass ) ) )
 		{
-			if ( isset( $itemClass::$databaseColumnMap['locked'] ) )
+			if ( isset( static::$databaseColumnMap['locked'] ) )
 			{
-				$where[] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['locked'] . '=?', intval( Request::i()->locked ) );
+				$where[] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['locked'] . '=?', \intval( \IPS\Request::i()->locked ) );
 			}
 			else
 			{
-				$where[] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['state'] . '=?', Request::i()->locked ? 'closed' : 'open' );
+				$where[] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['state'] . '=?', \IPS\Request::i()->locked ? 'closed' : 'open' );
 			}
 		}
 		
 		/* Hidden */
-		if ( isset( Request::i()->hidden ) AND IPS::classUsesTrait( $class, 'IPS\Content\Hideable' ) )
+		if ( isset( \IPS\Request::i()->hidden ) AND \in_array( 'IPS\Content\Hideable', class_implements( $class ) ) )
 		{
-			if ( Request::i()->hidden )
+			if ( \IPS\Request::i()->hidden )
 			{
 				if ( isset( $class::$databaseColumnMap['hidden'] ) )
 				{
@@ -143,9 +114,9 @@ class CommentController extends Controller
 		}
 		
 		/* Has poll? */
-		if ( isset( Request::i()->hasPoll ) AND IPS::classUsesTrait( $itemClass, 'IPS\Content\Polls' ) )
+		if ( isset( \IPS\Request::i()->hasPoll ) AND \in_array( 'IPS\Content\Polls', class_implements( $itemClass ) ) )
 		{
-			if ( Request::i()->hasPoll )
+			if ( \IPS\Request::i()->hasPoll )
 			{
 				$where[] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['poll'] . ">0" );
 			}
@@ -156,25 +127,25 @@ class CommentController extends Controller
 		}
 		
 		/* Sort */
-		if ( isset( Request::i()->sortBy ) and Request::i()->sortBy == 'date' )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'date' ) ) )
 		{
-			$sortBy = $class::$databasePrefix . $class::$databaseColumnMap[ Request::i()->sortBy ];
+			$sortBy = $class::$databasePrefix . $class::$databaseColumnMap[ \IPS\Request::i()->sortBy ];
 		}
-		if ( isset( Request::i()->sortBy ) and Request::i()->sortBy == 'title' )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'title' ) ) )
 		{
-			$sortBy = $itemClass::$databasePrefix . $itemClass::$databaseColumnMap[ Request::i()->sortBy ];
+			$sortBy = $itemClass::$databasePrefix . $itemClass::$databaseColumnMap[ \IPS\Request::i()->sortBy ];
 		}
 		else
 		{
 			$sortBy = $class::$databasePrefix . $class::$databaseColumnId;
 		}
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 		
 		/* Get results */
 		if ( $this->member and !$byPassPerms )
 		{
-			$query = $class::getItemsWithPermission( $where, "{$sortBy} {$sortDir}", NULL, 'read', Filter::FILTER_AUTOMATIC, 0, $this->member )->getInnerIterator();
-			$count = $class::getItemsWithPermission( $where, "{$sortBy} {$sortDir}", NULL, 'read', Filter::FILTER_AUTOMATIC, 0, $this->member, FALSE, FALSE, FALSE, TRUE );
+			$query = $class::getItemsWithPermission( $where, "{$sortBy} {$sortDir}", NULL, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, $this->member )->getInnerIterator();
+			$count = $class::getItemsWithPermission( $where, "{$sortBy} {$sortDir}", NULL, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, $this->member, FALSE, FALSE, FALSE, TRUE );
 		}
 		else
 		{
@@ -193,7 +164,7 @@ class CommentController extends Controller
 			}
 
 			/* We also need to check the item for soft delete and post before register */
-			if( IPS::classUsesTrait( $itemClass, 'IPS\Content\Hideable' ) )
+			if( \in_array( 'IPS\Content\Hideable', class_implements( $itemClass ) ) )
 			{
 				/* No matter if we can or cannot view hidden items, we do not want these to show: -2 is queued for deletion and -3 is posted before register */
 				if ( isset( $itemClass::$databaseColumnMap['hidden'] ) )
@@ -208,96 +179,95 @@ class CommentController extends Controller
 				}
 			}
 
-			$query = Db::i()->select( '*', $class::$databaseTable, $where, "{$sortBy} {$sortDir}" )->join( $itemClass::$databaseTable, array_merge( array( array( $class::$databaseTable . "." . $class::$databasePrefix . $class::$databaseColumnMap['item'] . "=" . $itemClass::$databaseTable . "." . $itemClass::$databasePrefix . $itemClass::$databaseColumnId ) ), $itemWhere ), 'STRAIGHT_JOIN' );
-			$count = Db::i()->select( 'COUNT(*)', $class::$databaseTable, $where )->join( $itemClass::$databaseTable, array_merge( array( array( $class::$databaseTable . "." . $class::$databasePrefix . $class::$databaseColumnMap['item'] . "=" . $itemClass::$databaseTable . "." . $itemClass::$databasePrefix . $itemClass::$databaseColumnId ) ), $itemWhere ), 'STRAIGHT_JOIN' )->first();
+			$query = \IPS\Db::i()->select( '*', $class::$databaseTable, $where, "{$sortBy} {$sortDir}" )->join( $itemClass::$databaseTable, array_merge( array( array( $class::$databaseTable . "." . $class::$databasePrefix . $class::$databaseColumnMap['item'] . "=" . $itemClass::$databaseTable . "." . $itemClass::$databasePrefix . $itemClass::$databaseColumnId ) ), $itemWhere ), 'STRAIGHT_JOIN' );
+			$count = \IPS\Db::i()->select( 'COUNT(*)', $class::$databaseTable, $where )->join( $itemClass::$databaseTable, array_merge( array( array( $class::$databaseTable . "." . $class::$databasePrefix . $class::$databaseColumnMap['item'] . "=" . $itemClass::$databaseTable . "." . $itemClass::$databasePrefix . $itemClass::$databaseColumnId ) ), $itemWhere ), 'STRAIGHT_JOIN' )->first();
 		}
 		
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
 			$query,
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			$class,
 			$count,
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 	
 	/**
 	 * Create
 	 *
-	 * @param	Item	$item			Content Item
-	 * @param	Member			$author			Author
+	 * @param	\IPS\Content\Item	$item			Content Item
+	 * @param	\IPS\Member			$author			Author
 	 * @param	string				$contentParam	The parameter that contains the content body
-	 * @return	Response
+	 * @return	\IPS\Api\Response
 	 */
-	protected function _create( Item $item, Member $author, string $contentParam='content' ): Response
+	protected function _create( \IPS\Content\Item $item, \IPS\Member $author, $contentParam='content' )
 	{
-		return new Response( 201, $this->_createComment( $item, $author, $contentParam )->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 201, $this->_createComment( $item, $author, $contentParam )->apiOutput( $this->member ) );
 	}
 	
 	/**
 	 * Create
 	 *
-	 * @param	Item	$item			Content Item
-	 * @param	Member			$author			Author
+	 * @param	\IPS\Content\Item	$item			Content Item
+	 * @param	\IPS\Member			$author			Author
 	 * @param	string				$contentParam	The parameter that contains the content body
-	 * @return	Comment
+	 * @return	\IPS\Api\Response
 	 */
-	protected function _createComment( Item $item, Member $author, string $contentParam='content' ): Comment
+	protected function _createComment( \IPS\Content\Item $item, \IPS\Member $author, $contentParam='content' )
 	{
 		/* Work out the date */
-		$date = ( !$this->member and Request::i()->date ) ? new DateTime( Request::i()->date ) : DateTime::create();
+		$date = ( !$this->member and \IPS\Request::i()->date ) ? new \IPS\DateTime( \IPS\Request::i()->date ) : \IPS\DateTime::create();
 		
 		/* Is it hidden? */
 		$hidden = NULL;
-		if ( isset( Request::i()->hidden ) and !$this->member )
+		if ( isset( \IPS\Request::i()->hidden ) and !$this->member )
 		{
-			$hidden = Request::i()->hidden;
+			$hidden = \IPS\Request::i()->hidden;
 		}
 		
 		/* Parse */
-		$content = Request::i()->$contentParam;
+		$content = \IPS\Request::i()->$contentParam;
 		if ( $this->member )
 		{
-			$content = Parser::parseStatic( $content, NULL, $this->member, $item::$application . '_' . IPS::mb_ucfirst( $item::$module ) );
+			$content = \IPS\Text\Parser::parseStatic( $content, TRUE, NULL, $this->member, $item::$application . '_' . mb_ucfirst( $item::$module ) );
 		}
 		
 		/* Create post */
-		/* @var Comment $class */
 		$class = $this->class;
-		if ( in_array( 'IPS\Content\Review', class_parents( $class ) ) )
+		if ( \in_array( 'IPS\Content\Review', class_parents( $class ) ) )
 		{
-			$comment = $class::create( $item, $content, FALSE, intval( Request::i()->rating ), $author->member_id ? NULL : $author->real_name, $author, $date, ( !$this->member and Request::i()->ip_address ) ? Request::i()->ip_address : Request::i()->ipAddress(), $hidden, ( isset( Request::i()->anonymous ) ? (bool) Request::i()->anonymous : NULL ) );
+			$comment = $class::create( $item, $content, FALSE, \intval( \IPS\Request::i()->rating ), $author->member_id ? NULL : $author->real_name, $author, $date, ( !$this->member and \IPS\Request::i()->ip_address ) ? \IPS\Request::i()->ip_address : \IPS\Request::i()->ipAddress(), $hidden, ( isset( \IPS\Request::i()->anonymous ) ? (bool) \IPS\Request::i()->anonymous : NULL ) );
 		}
 		else
 		{
-			$comment = $class::create( $item, $content, FALSE, $author->member_id ? NULL : $author->real_name, NULL, $author, $date, ( !$this->member and Request::i()->ip_address ) ? Request::i()->ip_address : Request::i()->ipAddress(), $hidden, ( isset( Request::i()->anonymous ) ? (bool) Request::i()->anonymous : NULL ) );
+			$comment = $class::create( $item, $content, FALSE, $author->member_id ? NULL : $author->real_name, NULL, $author, $date, ( !$this->member and \IPS\Request::i()->ip_address ) ? \IPS\Request::i()->ip_address : \IPS\Request::i()->ipAddress(), $hidden, ( isset( \IPS\Request::i()->anonymous ) ? (bool) \IPS\Request::i()->anonymous : NULL ) );
 		}
 
 		/* Index */
-		if( SearchContent::isSearchable( $item ) )
+		if ( $item instanceof \IPS\Content\Searchable )
 		{
 			if ( $item::$firstCommentRequired and !$comment->isFirst() )
 			{
-				if( SearchContent::isSearchable( $class ) )
+				if ( \in_array( 'IPS\Content\Searchable', class_implements( $class ) ) )
 				{					
-					Index::i()->index( $item->firstComment() );
+					\IPS\Content\Search\Index::i()->index( $item->firstComment() );
 				}
 			}
 			else
 			{
-				Index::i()->index( $item );
+				\IPS\Content\Search\Index::i()->index( $item );
 			}
 		}
-		if( SearchContent::isSearchable( $comment ) )
+		if ( $comment instanceof \IPS\Content\Searchable )
 		{
-			Index::i()->index( $comment );
+			\IPS\Content\Search\Index::i()->index( $comment );
 		}
 		
 		/* Hide */
-		if ( isset( Request::i()->hidden ) and $this->member and Request::i()->hidden and $comment->canHide( $this->member ) )
+		if ( isset( \IPS\Request::i()->hidden ) and $this->member and \IPS\Request::i()->hidden and $comment->canHide( $this->member ) )
 		{
 			$comment->hide( $this->member );
 		}
@@ -309,18 +279,17 @@ class CommentController extends Controller
 	/**
 	 * Edit
 	 *
-	 * @param	Comment		$comment		The comment
+	 * @param	\IPS\Content\Comment		$comment		The comment
 	 * @param	string						$contentParam	The parameter that contains the content body
 	 * @throws	InvalidArgumentException	Invalid author
-	 * @return	Response
+	 * @return	\IPS\Api\Response
 	 */
-	protected function _edit( Comment $comment, string $contentParam='content' ): Response
+	protected function _edit( $comment, $contentParam='content' )
 	{
-		/* @var array $databaseColumnMap */
 		/* Hidden */
-		if ( !$this->member and isset( Request::i()->hidden ) )
+		if ( !$this->member and isset( \IPS\Request::i()->hidden ) )
 		{			
-			if ( Request::i()->hidden )
+			if ( \IPS\Request::i()->hidden )
 			{
 				$comment->hide( FALSE );
 			}
@@ -331,15 +300,15 @@ class CommentController extends Controller
 		}
 		
 		/* Change author */
-		if ( !$this->member and isset( Request::i()->author ) )
+		if ( !$this->member and isset( \IPS\Request::i()->author ) )
 		{
 			$authorIdColumn = $comment::$databaseColumnMap['author'];
 			$authorNameColumn = $comment::$databaseColumnMap['author_name'];
 			
 			/* Just renaming the guest */
-			if ( !$comment->$authorIdColumn and ( !isset( Request::i()->author ) or !Request::i()->author ) and isset( Request::i()->author_name ) )
+			if ( !$comment->$authorIdColumn and ( !isset( \IPS\Request::i()->author ) or !\IPS\Request::i()->author ) and isset( \IPS\Request::i()->author_name ) )
 			{
-				$comment->$authorNameColumn = Request::i()->author_name;
+				$comment->$authorNameColumn = \IPS\Request::i()->author_name;
 			}
 			
 			/* Actually changing the author */
@@ -347,42 +316,42 @@ class CommentController extends Controller
 			{
 				try
 				{
-					$member = Member::load( Request::i()->author );
+					$member = \IPS\Member::load( \IPS\Request::i()->author );
 					if ( !$member->member_id )
 					{
-						throw new InvalidArgumentException;
+						throw new \InvalidArgumentException;
 					}
 					
 					$comment->changeAuthor( $member );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					throw new InvalidArgumentException;
+					throw new \InvalidArgumentException;
 				}
 			}
 		}
 		
 		/* Post value */
-		if ( isset( Request::i()->$contentParam ) )
+		if ( isset( \IPS\Request::i()->$contentParam ) )
 		{
 			$contentColumn = $comment::$databaseColumnMap['content'];
 			
-			$content = Request::i()->$contentParam;
+			$content = \IPS\Request::i()->$contentParam;
 			if ( $this->member )
 			{
 				$item = $comment->item();
-				$content = Parser::parseStatic( $content, NULL, $this->member, $item::$application . '_' . IPS::mb_ucfirst( $item::$module ) );
+				$content = \IPS\Text\Parser::parseStatic( $content, TRUE, NULL, $this->member, $item::$application . '_' . mb_ucfirst( $item::$module ) );
 			}
 			$comment->$contentColumn =$content;
 		}
 		
 		/* Rating */
 		$ratingChanged = FALSE;
-		if ( isset( Request::i()->rating ) )
+		if ( isset( \IPS\Request::i()->rating ) )
 		{
 			$ratingChanged = TRUE;
 			$ratingColumn = $comment::$databaseColumnMap['rating'];
-			$comment->$ratingColumn = intval( Request::i()->rating );
+			$comment->$ratingColumn = \intval( \IPS\Request::i()->rating );
 		}
 		
 		/* Save and return */
@@ -399,25 +368,25 @@ class CommentController extends Controller
 		}
 		
 		/* Return */
-		return new Response( 200, $comment->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $comment->apiOutput( $this->member ) );
 	}
 
 	/**
 	 * Delete a reaction to a comment
 	 *
-	 * @param int $id
-	 * @return Response
-	 * @throws Exception
+	 * @param $id
+	 * @return \IPS\Api\Response
+	 * @throws \IPS\Api\Exception
 	 */
-	public function _reactRemove( int $id ): Response
+	public function _reactRemove( $id ): \IPS\Api\Response
 	{
 		try
 		{
-			$member = Member::load( Request::i()->author );
+			$member = \IPS\Member::load( \IPS\Request::i()->author );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_AUTHOR', '1S425/6', 404 );
+			throw new \IPS\Api\Exception( 'NO_AUTHOR', '1S425/6', 404 );
 		}
 
 		try
@@ -434,43 +403,43 @@ class CommentController extends Controller
 
 			$object->removeReaction( $member );
 
-			return new Response( 200, $object->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $object->apiOutput( $this->member ) );
 		}
-		catch ( DomainException $e )
+		catch ( \DomainException $e )
 		{
-			throw new Exception( $e->getMessage(), '1S425/7', 403 );
+			throw new \IPS\Api\Exception( $e->getMessage(), '1S425/7', 403 );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1S425/8', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1S425/8', 404 );
 		}
 	}
 
 	/**
 	 * React to a comment
 	 *
-	 * @param int $id
-	 * @return Response
-	 * @throws Exception
+	 * @param $id
+	 * @return \IPS\Api\Response
+	 * @throws \IPS\Api\Exception
 	 */
-	public function _reactAdd( int $id ): Response
+	public function _reactAdd( $id ): \IPS\Api\Response
 	{
 		try
 		{
-			$reaction = Reaction::load( Request::i()->id );
+			$reaction = \IPS\Content\Reaction::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_REACTION', '1S425/2', 404 );
+			throw new \IPS\Api\Exception( 'NO_REACTION', '1S425/2', 404 );
 		}
 
 		try
 		{
-			$member = Member::load( Request::i()->author );
+			$member = \IPS\Member::load( \IPS\Request::i()->author );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_AUTHOR', '1S425/3', 404 );
+			throw new \IPS\Api\Exception( 'NO_AUTHOR', '1S425/3', 404 );
 		}
 
 		try
@@ -487,15 +456,15 @@ class CommentController extends Controller
 
 			$object->react( $reaction, $member );
 
-			return new Response( 200, $object->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $object->apiOutput( $this->member ) );
 		}
-		catch ( DomainException $e )
+		catch ( \DomainException $e )
 		{
-			throw new Exception( 'REACT_ERROR_' . $e->getMessage(), '1S425/4', 403 );
+			throw new \IPS\Api\Exception( 'REACT_ERROR_' . $e->getMessage(), '1S425/4', 403 );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1S425/5', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1S425/5', 404 );
 		}
 	}
 
@@ -503,19 +472,19 @@ class CommentController extends Controller
 	/**
 	 * Report a comment
 	 *
-	 * @param int $id
-	 * @return Response
-	 * @throws Exception
+	 * @param $id
+	 * @return \IPS\Api\Response
+	 * @throws \IPS\Api\Exception
 	 */
-	public function _report( int $id ): Response
+	public function _report( $id ): \IPS\Api\Response
 	{
 		try
 		{
-			$member = Member::load( Request::i()->author );
+			$member = \IPS\Member::load( \IPS\Request::i()->author );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_AUTHOR', '1S425/B', 404 );
+			throw new \IPS\Api\Exception( 'NO_AUTHOR', '1S425/B', 404 );
 		}
 
 		$class = $this->class;
@@ -532,11 +501,11 @@ class CommentController extends Controller
 		/* Has this member already reported this in the past 24 hours */
 		try
 		{
-			$index = Report::loadByClassAndId( get_class( $object ), $object->$idColumn );
-			$report = Db::i()->select( '*', 'core_rc_reports', ['rid=? and report_by=? and date_reported > ?', $index->id, $member->member_id, time() - ( Settings::i()->automoderation_report_again_mins * 60 )] )->first();
+			$index = \IPS\core\Reports\Report::loadByClassAndId( \get_class( $object ), $object->$idColumn );
+			$report = \IPS\Db::i()->select( '*', 'core_rc_reports', array( 'rid=? and report_by=? and date_reported > ?', $index->id, $member, time() - ( \IPS\Settings::i()->automoderation_report_again_mins * 60 ) ) )->first();
 
-			/* They have already reported, so do nothing */
-			throw new Exception( 'REPORTED_ALREADY', '1S425/C', 404 );
+			/* They have aleady reported, so do nothing */
+			throw new \IPS\Api\Exception( 'REPORTED_ALREADY', '1S425/C', 404 );
 		}
 		catch( \Exception $e )
 		{
@@ -545,13 +514,13 @@ class CommentController extends Controller
 
 		try
 		{
-			$object->report( ( isset( Request::i()->message ) ? Request::i()->message : '' ), ( isset(Request::i()->report_type) ? Request::i()->report_type : 0 ), $member );
+			$object->report( ( isset( \IPS\Request::i()->message ) ? \IPS\Request::i()->message : '' ), ( isset(\IPS\Request::i()->report_type) ? \IPS\Request::i()->report_type : 0 ), $member );
 		}
-		catch( UnexpectedValueException $e )
+		catch( \UnexpectedValueException $e )
 		{
-			throw new Exception( 'REPORT_ERROR_' . $e->getMessage(), '1S425/B', 403 );
+			throw new \IPS\Api\Exception( 'REPORT_ERROR_' . $e->getMessage(), '1S425/B', 403 );
 		}
 
-		return new Response( 200, $object->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $object->apiOutput( $this->member ) );
 	}
 }

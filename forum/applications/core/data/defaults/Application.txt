@@ -11,12 +11,10 @@
  
 namespace IPS\{app};
 
-use IPS\Application as SystemApplication;
-
 /**
  * {subpackage} Application Class
  */
-class Application extends SystemApplication
+class _Application extends \IPS\Application
 {
 	
 }

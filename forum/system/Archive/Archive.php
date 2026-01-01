@@ -11,85 +11,74 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Archive\Exception;
-use OutOfRangeException;
-use function defined;
-use function dirname;
-use function fclose;
-use function file_put_contents;
-use function fopen;
-use function function_exists;
-use function fwrite;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Archive Class
  */
-abstract class Archive
+abstract class _Archive
 {	
 	/**
 	 * Create object from local file
 	 *
 	 * @param	string	$path			Path to archive file
 	 * @param	string	$containerName	The root folder name which should be ignored (with trailing slash)
-	 * @return    Archive
+	 * @return	\IPS\Archive
 	 */
-	public static function fromLocalFile( string $path, string $containerName = '' ) : static
+	public static function fromLocalFile( $path, $containerName = '' )
 	{
 		return new static;
 	}
-
+	
 	/**
 	 * Number of files
 	 *
 	 * @return	int
 	 */
-	abstract public function numberOfFiles(): int;
+	abstract public function numberOfFiles();
 	
 	/**
 	 * Get file name
 	 *
 	 * @param	int	$i	File number
 	 * @return	string
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	abstract public function getFileName( int $i ): string;
+	abstract public function getFileName( $i );
 	
 	/**
 	 * Get file contents
 	 *
 	 * @param	int	$i	File number
 	 * @return	string
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	abstract public function getFileContents( int $i ): string;
+	abstract public function getFileContents( $i );
 	
 	/**
 	 * @brief	The root folder name which should be ignored (with trailing slash)
 	 */
-	protected string $containerName = '';
+	protected $containerName = '';
 	
 	/**
 	 * @brief	Ignore hidden files?
 	 */
-	public bool $ignoreHiddenFiles = TRUE;
+	public $ignoreHiddenFiles = TRUE;
 	
 	/**
 	 * Extract
 	 *
-	 * @param string $destination	Destination directory
-	 * @param int|null $limit			Number of files to extract
-	 * @param int $offset			Offset
-	 * @param Ftp|NULL	$ftp			If provided, the files will be extracted using FTP, otherwise will attempt to write manually
+	 * @param	string			$destination	Destination directory
+	 * @param	int|NULL		$limit			Number of files to extract
+	 * @param	int				$offset			Offset
+	 * @param	\IPS\Ftp|NULL	$ftp			If provided, the files will be extracted using FTP, otherwise will attempt to write manually
 	 * @return	bool			If true, all files were extracted, if false, there is more to extract
 	 */
-	public function extract( string $destination, int $limit=NULL, int $offset=0, Ftp $ftp = NULL ): bool
+	public function extract( $destination, $limit=NULL, $offset=0, \IPS\Ftp $ftp = NULL )
 	{
 		$done = 0;
 		while ( $limit === NULL or $limit > $done ) // OutOfRangeException will break if $limit is NULL
@@ -100,11 +89,11 @@ abstract class Archive
 				if ( $path and mb_substr( $path, -1 ) !== '/' and ( !$this->ignoreHiddenFiles or ( mb_substr( $path, 0, 1 ) !== '.' and mb_substr( $path, 0, 9 ) !== '__MACOSX/' ) ) )
 				{
 					/* Create a directory if needed */
-					$dir = dirname( $path );
+					$dir = \dirname( $path );
 					$directories = array( $dir );
 					while ( $dir != '.' )
 					{
-						$dir = dirname( $dir );
+						$dir = \dirname( $dir );
 						if ( $dir != '.' )
 						{
 							$directories[] = $dir;
@@ -120,7 +109,7 @@ abstract class Archive
 							}
 							else
 							{
-								@mkdir( $destination . '/' . $dir, FOLDER_PERMISSION_NO_WRITE);
+								@mkdir( $destination . '/' . $dir, \IPS\FOLDER_PERMISSION_NO_WRITE );
 							}
 						}
 					}
@@ -129,8 +118,8 @@ abstract class Archive
 					$contents = $this->getFileContents( $offset + $done );
 					if ( $ftp )
 					{
-						$tmpFile = tempnam( TEMP_DIRECTORY, 'IPS' );
-						file_put_contents( $tmpFile, $contents );
+						$tmpFile = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
+						\file_put_contents( $tmpFile, $contents );
 						
 						$ftp->upload( $path, $tmpFile );
 
@@ -141,21 +130,21 @@ abstract class Archive
 						/* Determine if the file exists (we'll want to know this later) */
 						$fileExists	= file_exists( $destination . '/' . $path );
 
-						$fh = @fopen( $destination . '/' . $path, 'w+' );
+						$fh = @\fopen( $destination . '/' . $path, 'w+' );
 						if ( $fh === FALSE )
 						{
-							throw new Exception( 'Error: ' . ( IPS::$lastError?->getMessage() ) . ', Path:' . $destination . '/' . $path, Exception::COULD_NOT_WRITE );
+							throw new \IPS\Archive\Exception( 'Error: ' . ( \IPS\IPS::$lastError ? \IPS\IPS::$lastError->getMessage() : NULL ) . ', Path:' . $destination . '/' . $path, \IPS\Archive\Exception::COULD_NOT_WRITE );
 						}
-						if ( @fwrite( $fh, $contents ) === FALSE )
+						if ( @\fwrite( $fh, $contents ) === FALSE )
 						{
-							throw new Exception( 'Error: ' . ( IPS::$lastError?->getMessage() ) . ', Path:' . $destination . '/' . $path, Exception::COULD_NOT_WRITE );
+							throw new \IPS\Archive\Exception( 'Error: ' . ( \IPS\IPS::$lastError ? \IPS\IPS::$lastError->getMessage() : NULL ) . ', Path:' . $destination . '/' . $path, \IPS\Archive\Exception::COULD_NOT_WRITE );
 						}
 						else
 						{
 							/* If the file existed before we started, we should clear it from opcache if opcache is enabled */
 							if( $fileExists )
 							{
-								if ( function_exists( 'opcache_invalidate' ) )
+								if ( \function_exists( 'opcache_invalidate' ) )
 								{
 									@opcache_invalidate( $destination . '/' . $path );
 								}
@@ -163,16 +152,16 @@ abstract class Archive
 							/* Otherwise, we should set file permissions on the file if it's brand new in case server defaults to something odd */
 							else
 							{
-								@chmod( $destination . '/' . $path, FILE_PERMISSION_NO_WRITE);
+								@chmod( $destination . '/' . $path, \IPS\FILE_PERMISSION_NO_WRITE );
 							}
 						}
-						@fclose( $fh );
+						@\fclose( $fh );
 					}
 				}
 				
 				$done++;
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				return TRUE;
 			}

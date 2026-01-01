@@ -12,27 +12,16 @@
 namespace IPS\gallery\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Lang;
-use IPS\Task;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Clear temporary uploads task
  */
-class clearUploads extends Task
+class _clearUploads extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -43,33 +32,33 @@ class clearUploads extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		$cutoff		= DateTime::create()->sub( new DateInterval( 'P1D' ) )->getTimestamp();
+		$cutoff		= \IPS\DateTime::create()->sub( new \DateInterval( 'P1D' ) )->getTimestamp();
 		$sessions	= array();
 		$messages   = array();
-		$errorLang  = Lang::load( Lang::defaultLanguage() )->get( 'gallery_clear_uploads_error' );
+		$errorLang  = \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( 'gallery_clear_uploads_error' );
 
-		foreach( Db::i()->select( '*', 'gallery_images_uploads', array( 'upload_date < ?', $cutoff ) ) as $upload )
+		foreach( \IPS\Db::i()->select( '*', 'gallery_images_uploads', array( 'upload_date < ?', $cutoff ) ) as $upload )
 		{
 			try
 			{
-				$file = File::get( 'gallery_Images', $upload['upload_location'] );
+				$file = \IPS\File::get( 'gallery_Images', $upload['upload_location'] );
 				$file->delete();
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				$messages[] = sprintf( $errorLang, $file ?? '', $e->getMessage() );
+				$messages[] = sprintf( $errorLang, (string) $file, $e->getMessage() );
 			}
 
 			$sessions[ $upload['upload_session'] ]	= $upload['upload_session'];
 		}
 
-		if( count( $sessions ) )
+		if( \count( $sessions ) )
 		{
-			Db::i()->delete( 'gallery_images_uploads', array( array( "upload_session IN('" . implode( "','", $sessions ) . "')" ) ) );
+			\IPS\Db::i()->delete( 'gallery_images_uploads', array( array( "upload_session IN('" . implode( "','", $sessions ) . "')" ) ) );
 		}
 
 		return !empty( $messages ) ? implode( '; ', $messages ) : NULL;
@@ -84,7 +73,7 @@ class clearUploads extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 		
 	}

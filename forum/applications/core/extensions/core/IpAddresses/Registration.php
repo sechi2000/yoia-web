@@ -11,58 +11,67 @@
 namespace IPS\core\extensions\core\IpAddresses;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Dispatcher;
-use IPS\Extensions\IpAddressesAbstract;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Lookup: Registration
  */
-class Registration extends IpAddressesAbstract
+class _Registration
 {
 	/**
 	 * Removes the logged IP address
 	 *
-	 * @param int $time
+	 * @param int $timestamp
 	 * @return void
 	 */
-	public function pruneIpAddresses( int $time ) : void
+	public function pruneIpAddresses(int $time)
 	{
-		Db::i()->update('core_members', [ 'ip_address' => '' ] , [ "ip_address != '' and joined <?", $time ] );
+		\IPS\Db::i()->update('core_members', [ 'ip_address' => '' ] , [ "ip_address != '' and joined <?", $time ] );
+	}
+
+	/**
+	 * Supported in the ACP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInAcp()
+	{
+		return TRUE;
+	}
+
+	/**
+	 * Supported in the ModCP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInModCp(): bool
+	{
+		return TRUE;
 	}
 
 	/** 
 	 * Find Records by IP
 	 *
 	 * @param	string			$ip			The IP Address
-	 * @param	Url|null	$baseUrl	URL table will be displayed on or NULL to return a count
-	 * @return	string|int|null
+	 * @param	\IPS\Http\Url	$baseUrl	URL table will be displayed on or NULL to return a count
+	 * @return	\IPS\Helpers\Table|int|null
 	 */
-	public function findByIp( string $ip, ?Url $baseUrl = NULL ): string|int|null
+	public function findByIp( $ip, \IPS\Http\Url $baseUrl = NULL )
 	{
 		/* Return count */
 		if ( $baseUrl === NULL )
 		{
-			return Db::i()->select( 'COUNT(*)', 'core_members', array( "ip_address LIKE ?", $ip ) )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'core_members', array( "ip_address LIKE ?", $ip ) )->first();
 		}
 		
 		/* Init Table */
-		$table = new TableDb( 'core_members', $baseUrl, array( "ip_address LIKE ?", $ip ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_members', $baseUrl, array( "ip_address LIKE ?", $ip ) );
 		$table->langPrefix = 'members_';
 				
 		/* Columns we need */
@@ -70,10 +79,10 @@ class Registration extends IpAddressesAbstract
 		$table->mainColumn = 'name';
 		$table->noSort	= array( 'photo' );
 		
-		if( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' )
+		if( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'front' )
 		{
 			$table->include = array_merge( array( 'member_id' ), $table->include );
-			$table->rowsTemplate = array( Theme::i()->getTemplate( 'modcp', 'core', 'front' ), 'memberManagementRow' );
+			$table->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'modcp', 'core', 'front' ), 'memberManagementRow' );
 		}
 				
 		/* Default sort options */
@@ -84,32 +93,32 @@ class Registration extends IpAddressesAbstract
 		$table->parsers = array(
 			'photo'				=> function( $val, $row )
 			{
-				return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( Member::constructFromData( $row ), 'mini' );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( \IPS\Member::constructFromData( $row ), 'mini' );
 			},
 			'joined'			=> function( $val, $row )
 			{
-				return DateTime::ts( $val )->localeDate();
+				return \IPS\DateTime::ts( $val )->localeDate();
 			},
 			'member_group_id'	=> function( $val, $row )
 			{
-				return Group::load( $val )->formattedName;
+				return \IPS\Member\Group::load( $val )->formattedName;
 			},
 			'name'	=> function( $val, $row )
 			{
-				$link = ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' ) ? Member::constructFromData( $row )->url() : Member::constructFromData( $row )->acpUrl();
-				return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $link, TRUE, $val );
+				$link = ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'front' ) ? \IPS\Member::constructFromData( $row )->url() : \IPS\Member::constructFromData( $row )->acpUrl();
+				return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $link, TRUE, $val );
 			},
 		);
 		
 		/* Buttons */
 		$table->rowButtons = function( $row )
 		{
-            $member = Member::load( $row['member_id'] );
+            $member = \IPS\Member::load( $row['member_id'] );
 			return array(
 				'edit'	=> array(
 					'icon'		=> 'pencil',
 					'title'		=> 'edit',
-					'link'		=> ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' ) ? $member->url()->setQueryString( array( 'do' => 'edit' ) ) : $member->acpUrl(),
+					'link'		=> ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'front' ) ? $member->url()->setQueryString( array( 'do' => 'edit' ) ) : $member->acpUrl(),
 				),
 			);
 		};
@@ -132,11 +141,11 @@ class Registration extends IpAddressesAbstract
 		 	...
 	 	);
 	 * @endcode
-	 * @param	Member	$member	The member
-	 * @return	array|Select
+	 * @param	\IPS\Member	$member	The member
+	 * @return	array
 	 */
-	public function findByMember( Member $member ) : array|Select
+	public function findByMember( $member )
 	{
-		return Db::i()->select( 'ip_address AS ip, 1 AS count, joined AS first, joined AS last', 'core_members', array( 'member_id=?', $member->member_id ) )->setKeyField( 'ip' );
+		return \IPS\Db::i()->select( 'ip_address AS ip, 1 AS count, joined AS first, joined AS last', 'core_members', array( 'member_id=?', $member->member_id ) )->setKeyField( 'ip' );
 	}	
 }

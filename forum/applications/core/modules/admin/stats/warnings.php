@@ -12,42 +12,31 @@
 namespace IPS\core\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * warnings
  */
-class warnings extends Controller
+class _warnings extends \IPS\Dispatcher\Controller
 {
 	
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'warnings_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'warnings_manage' );
 		parent::execute();
 	}
 
@@ -56,34 +45,34 @@ class warnings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$tabs = array(
+		$tabs		= array(
 			'reason'			=> 'stats_warnings_reason',
 			'suspended'		=> 'stats_warnings_suspended',
 		);
-
+		
 		/* Make sure tab is set, otherwise saved charts may not show up when loading the page. */
-		Request::i()->tab ??= 'reason';
-		$activeTab	= ( array_key_exists( Request::i()->tab, $tabs ) ) ? Request::i()->tab : 'reason';
+		\IPS\Request::i()->tab ??= 'reason';
+		$activeTab	= ( array_key_exists( \IPS\Request::i()->tab, $tabs ) ) ? \IPS\Request::i()->tab : 'reason';
 
 		if ( $activeTab === 'reason' )
 		{
-			$chart = Chart::loadFromExtension( 'core', 'WarningReasons' )->getChart( Url::internal( 'app=core&module=stats&controller=warnings&tab=reason' ) );
+			$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'WarningReasons' )->getChart( \IPS\Http\Url::internal( 'app=core&module=stats&controller=warnings&tab=reason' ) );
 		}
 		else if ( $activeTab === 'suspended' )
 		{
-			$chart = Chart::loadFromExtension( 'core', 'WarningSuspended' )->getChart( Url::internal( 'app=core&module=stats&controller=warnings&tab=suspended' ) );
+			$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'WarningSuspended' )->getChart( \IPS\Http\Url::internal( 'app=core&module=stats&controller=warnings&tab=suspended' ) );
 		}
 		
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = (string) $chart;
+			\IPS\Output::i()->output = (string) $chart;
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_stats_warnings');
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string) $chart, Url::internal( "app=core&module=stats&controller=warnings" ), 'tab', '', '' );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_stats_warnings');
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string) $chart, \IPS\Http\Url::internal( "app=core&module=stats&controller=warnings" ), 'tab', '', 'ipsPad' );
 		}
 	}
 	

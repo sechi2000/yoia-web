@@ -1,5 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" data-server-ip="<?php echo $_SERVER['SERVER_ADDR'] ?? ( $_SERVER['LOCAL_ADDR'] ?? 'unavailable' ); ?>">
+<html lang="en">
+<?php if ( isset( $_SERVER['IPS_CIC'] ) and $_SERVER['IPS_CIC'] ): ?>
+    <!-- ServerIP: <?php echo $_SERVER['SERVER_ADDR'] ?? ( $_SERVER['LOCAL_ADDR'] ?? 'unavailable' ); ?>-->
+<?php endif; ?>
+
 	<head>
 		<title>Error</title>
 		<style type='text/css'>
@@ -61,6 +65,5 @@
 				<button onclick="window.location.reload();" id='reload_button'>Try again</button>
 			</div>
 		</div>
-		<!-- Nulled by NullForums.net -->
 	</body>
 </html>

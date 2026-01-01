@@ -12,35 +12,23 @@ namespace IPS\core\extensions\core\IpAddresses;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use IPS\Application;
-use IPS\Content as ContentClass;
-use IPS\Content\ExtensionGenerator;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
 use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function in_array;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Lookup: Content Classes
  */
-class Content extends ExtensionGenerator
+class _Content extends \IPS\Content\ExtensionGenerator
 {
 	/**
 	 * @brief	If TRUE, will include archive classes
 	 */
-	protected static bool $includeArchive = TRUE;
+	protected static $includeArchive = TRUE;
 
 	/**
 	 * Supported in the ACP IP address lookup tool?
@@ -48,7 +36,7 @@ class Content extends ExtensionGenerator
 	 * @return	bool
 	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
 	 */
-	public function supportedInAcp(): bool
+	public function supportedInAcp()
 	{
 		return TRUE;
 	}
@@ -68,20 +56,19 @@ class Content extends ExtensionGenerator
 	 * Find Records by IP
 	 *
 	 * @param	string			$ip			The IP Address
-	 * @param	Url|null	$baseUrl	URL table will be displayed on or NULL to return a count
-	 * @return	string|int|null
+	 * @param	\IPS\Http\Url	$baseUrl	URL table will be displayed on or NULL to return a count
+	 * @return	\IPS\Helpers\Table|null
 	 */
-	public function findByIp( string $ip, ?Url $baseUrl = NULL ): string|int|null
+	public function findByIp( $ip, \IPS\Http\Url $baseUrl = NULL )
 	{
-		/* @var ContentClass $class */
 		$class = $this->class;
-
+		
 		if( !isset( $class::$databaseColumnMap['ip_address'] ) OR !$class::$databaseColumnMap['ip_address'] )
 		{
 			return NULL;
 		}
 
-		if ( ! Application::appIsEnabled( $class::$application ) )
+		if ( ! \IPS\Application::appIsEnabled( $class::$application ) )
 		{
 			return NULL;
 		}
@@ -108,17 +95,17 @@ class Content extends ExtensionGenerator
 		/* Return count */
 		if ( $baseUrl === NULL )
 		{
-			return Db::i()->select( 'COUNT(*)', $class::$databaseTable, $where )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', $class::$databaseTable, $where )->first();
 		}
 		
 		/* Init Table */
-		$table = new TableDb( $class::$databaseTable, $baseUrl, $where );
+		$table = new \IPS\Helpers\Table\Db( $class::$databaseTable, $baseUrl, $where );
 		
-		$table->tableTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
-		$table->rowsTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
+		$table->tableTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
+		$table->rowsTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
 		
 		/* Columns we need */
-		if ( in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
+		if ( \in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
 		{
 			$table->include = array( $class::$databasePrefix . $class::$databaseColumnMap['item'], $class::$databasePrefix . $class::$databaseColumnMap['author'], $class::$databasePrefix . $class::$databaseColumnMap['date'], $class::$databasePrefix . $class::$databaseColumnMap['ip_address'] );
 			$table->mainColumn = $class::$databasePrefix . $class::$databaseColumnMap['item'];
@@ -131,19 +118,19 @@ class Content extends ExtensionGenerator
 						$comment = $class::load( $data[ $class::$databasePrefix . $class::$databaseColumnId ] );
 						if( $comment->canView() )
 						{
-							return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $comment->url(), TRUE, $comment->item()->mapped('title') );
+							return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $comment->url(), TRUE, $comment->item()->mapped('title') );
 						}
 					}
-					catch ( OutOfRangeException $e ){}
+					catch ( \OutOfRangeException $e ){}
 					return Member::loggedIn()->language()->addToStack( 'ipaddress_no_permission' );
 				}
 			);
 			
 			$contentClass = $class::$itemClass;
-			Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['item'] ] = Member::loggedIn()->language()->addToStack( $contentClass::$title, FALSE );
-			Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['author'] ] = Member::loggedIn()->language()->addToStack( 'author', FALSE );
-			Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['content'] ] = Member::loggedIn()->language()->addToStack( 'content', FALSE );
-			Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['date'] ] = Member::loggedIn()->language()->addToStack( 'date', FALSE );
+			\IPS\Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['item'] ] = \IPS\Member::loggedIn()->language()->addToStack( $contentClass::$title, FALSE );
+			\IPS\Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['author'] ] = \IPS\Member::loggedIn()->language()->addToStack( 'author', FALSE );
+			\IPS\Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['content'] ] = \IPS\Member::loggedIn()->language()->addToStack( 'content', FALSE );
+			\IPS\Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['date'] ] = \IPS\Member::loggedIn()->language()->addToStack( 'date', FALSE );
 		}
 		else
 		{
@@ -160,15 +147,14 @@ class Content extends ExtensionGenerator
 			$table->parsers = array(
 				$class::$databasePrefix . $class::$databaseColumnMap['title']	=> function( $val, $data ) use ( $class )
 				{
-					/* In rare occasions there is no title and we just return the content */
-					/* @var array $databaseColumnMap */
+					/* In rare occasions, like status updates, there is no title and we just return the content */
 					if( $class::$databaseColumnMap['title'] == $class::$databaseColumnMap['content'] )
 					{
 						$val	= trim( strip_tags( $val ) );
 
 						if( !$val )
 						{
-							$val	= Member::loggedIn()->language()->get('no_content_to_show');
+							$val	= \IPS\Member::loggedIn()->language()->get('no_content_to_show');
 						}
 					}
 
@@ -177,10 +163,10 @@ class Content extends ExtensionGenerator
 						$item = $class::load( $data[ $class::$databasePrefix . $class::$databaseColumnId ] );
 						if( $item->canView() )
 						{
-							return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $item->url(), TRUE, $val );
+							return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $item->url(), TRUE, $val );
 						}
 					}
-					catch( OutOfRangeException ){}
+					catch( \OutOfRangeException ){}
 					return Member::loggedIn()->language()->addToStack( 'ipaddress_no_permission' );
 				},
 			);
@@ -192,15 +178,15 @@ class Content extends ExtensionGenerator
 					$node = $nodeClass::load( $val );
 					if( $node->canView() )
 					{
-						return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $node->url(), TRUE, $node->_title );
+						return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $node->url(), TRUE, $node->_title );
 					}
 					return Member::loggedIn()->language()->addToStack( 'ipaddress_no_permission' );
 				};
 			}
 			
-			Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['title'] ] = Member::loggedIn()->language()->addToStack( $class::$title, FALSE );
-			Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['author'] ] = Member::loggedIn()->language()->addToStack( 'author', FALSE );
-			Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['date'] ] = Member::loggedIn()->language()->addToStack( 'date', FALSE );
+			\IPS\Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['title'] ] = \IPS\Member::loggedIn()->language()->addToStack( $class::$title, FALSE );
+			\IPS\Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['author'] ] = \IPS\Member::loggedIn()->language()->addToStack( 'author', FALSE );
+			\IPS\Member::loggedIn()->language()->words[ $class::$databasePrefix . $class::$databaseColumnMap['date'] ] = \IPS\Member::loggedIn()->language()->addToStack( 'date', FALSE );
 		}
 				
 		/* Default sort options */
@@ -211,12 +197,12 @@ class Content extends ExtensionGenerator
 		$table->parsers = array_merge( $table->parsers, array(
 			$class::$databasePrefix . $class::$databaseColumnMap['author']	=> function( $val )
 			{
-				$member = Member::load( $val );
-				return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
+				$member = \IPS\Member::load( $val );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
 			},
 			$class::$databasePrefix . $class::$databaseColumnMap['date']	=> function( $val )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			}
 		) );
 				
@@ -238,55 +224,23 @@ class Content extends ExtensionGenerator
 		 	...
 	 	);
 	 * @endcode
-	 * @param	Member	$member	The member
-	 * @return	array|Select
+	 * @param	\IPS\Member	$member	The member
+	 * @return	array|NULL
 	 */
-	public function findByMember( Member $member ): array|Select
+	public function findByMember( $member )
 	{
-		/* @var ContentClass $class */
 		$class = $this->class;
 		
-		if ( ! Application::appIsEnabled( $class::$application ) )
+		if ( ! \IPS\Application::appIsEnabled( $class::$application ) )
 		{
-			return array();
+			return NULL;
 		}
 		
 		if( !isset( $class::$databaseColumnMap['ip_address'] ) OR !$class::$databaseColumnMap['ip_address'] )
 		{
-			return array();
+			return NULL;
 		}
 		
-		return Db::i()->select( "{$class::$databasePrefix}{$class::$databaseColumnMap['ip_address']} AS ip, count(*) AS count, MIN({$class::$databasePrefix}{$class::$databaseColumnMap['date']}) AS first, MAX({$class::$databasePrefix}{$class::$databaseColumnMap['date']}) AS last", $class::$databaseTable, array( "{$class::$databasePrefix}{$class::$databaseColumnMap['author']}=?", $member->member_id ), NULL, NULL, "{$class::$databasePrefix}{$class::$databaseColumnMap['ip_address']}" )->setKeyField( 'ip' );
-	}
-
-	/**
-	 * Removes the logged IP address
-	 *
-	 * @param int $time
-	 * @return void
-	 */
-	public function pruneIpAddresses( int $time ) : void
-	{
-		/* @var ContentClass $class */
-		$class = $this->class;
-		$classes = [ $class ];
-		if( isset( $class::$commentClass ) )
-		{
-			$classes[] = $class::$commentClass;
-		}
-		if( isset( $class::$reviewClass ) )
-		{
-			$classes[] = $class::$reviewClass;
-		}
-
-		foreach( $classes as $class )
-		{
-			if( isset( $class::$databaseColumnMap['ip_address'] ) and isset( $class::$databaseColumnMap['date'] ) )
-			{
-				Db::i()->update( $class::$databaseTable, [ $class::$databasePrefix . $class::$databaseColumnMap['ip_address'] => '' ], [
-					$class::$databasePrefix . $class::$databaseColumnMap['ip_address'] . ' != ? and ' . $class::$databasePrefix . $class::$databaseColumnMap['date'] . ' < ?', '', $time
-				] );
-			}
-		}
-	}
+		return \IPS\Db::i()->select( "{$class::$databasePrefix}{$class::$databaseColumnMap['ip_address']} AS ip, count(*) AS count, MIN({$class::$databasePrefix}{$class::$databaseColumnMap['date']}) AS first, MAX({$class::$databasePrefix}{$class::$databaseColumnMap['date']}) AS last", $class::$databaseTable, array( "{$class::$databasePrefix}{$class::$databaseColumnMap['author']}=?", $member->member_id ), NULL, NULL, "{$class::$databasePrefix}{$class::$databaseColumnMap['ip_address']}" )->setKeyField( 'ip' );
+	}	
 }

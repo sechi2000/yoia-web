@@ -11,72 +11,62 @@
 namespace IPS\core\modules\admin\activitystats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\core\modules\admin\stats\overview as StatsOverview;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function array_merge;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Content overview statistics
  */
-class overview extends StatsOverview
+class _overview extends \IPS\core\modules\admin\stats\overview
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief Template group to use to output
 	 */
-	protected string $templateGroup = 'activitystats';
+	protected $templateGroup = 'activitystats';
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 
 	/**
 	 * Create the general page layout, but we will load the individual cells via AJAX to ensure there are no performance concerns loading the page
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$formHtml = $this->form->customTemplate( array( Theme::i()->getTemplate( 'stats' ), 'filtersOverviewForm' ) );
-		$blocks = Application::allExtensions( 'core', 'OverviewStatistics', TRUE, 'core', 'Registrations' );
+		$formHtml = $this->form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'stats' ), 'filtersOverviewForm' ) );
+		$blocks = \IPS\Application::allExtensions( 'core', 'OverviewStatistics', TRUE, 'core', 'Registrations' );
 
 		$excludedApps = array();
 
-		if( isset( Request::i()->cookie['overviewExcludedApps'] ) )
+		if( isset( \IPS\Request::i()->cookie['overviewExcludedApps'] ) )
 		{
 			try
 			{
-				$excludedApps = json_decode( Request::i()->cookie['overviewExcludedApps'] );
+				$excludedApps = json_decode( \IPS\Request::i()->cookie['overviewExcludedApps'] );
 
-				if( !is_array( $excludedApps ) )
+				if( !\is_array( $excludedApps ) )
 				{
 					$excludedApps = array();
 				}
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 		}
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_keystats_activityoverview');
-		Output::i()->output = Theme::i()->getTemplate( $this->templateGroup )->overview( $formHtml, $blocks, $excludedApps );
+		\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_stats.js', 'core' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/statistics.css', 'core', 'admin' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_stats_overview');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( $this->templateGroup )->overview( $formHtml, $blocks, $excludedApps );
 	}
 
 	/**
@@ -84,15 +74,15 @@ class overview extends StatsOverview
 	 *
 	 * @return	void
 	 */
-	protected function loadBlockForm() : void
+	protected function loadBlockForm()
 	{
-		$blocks = Application::allExtensions( 'core', 'OverviewStatistics', TRUE, 'core', 'Registrations' );
+		$blocks = \IPS\Application::allExtensions( 'core', 'OverviewStatistics', TRUE, 'core', 'Registrations' );
 
-		if( !isset( $blocks[ Request::i()->blockKey ] ) )
+		if( !isset( $blocks[ \IPS\Request::i()->blockKey ] ) )
 		{
-			Output::i()->error( 'stats_overview_block_not_found', '2C416/1', 404, '' );
+			\IPS\Output::i()->error( 'stats_overview_block_not_found', '2C416/1', 404, '' );
 		}
 
-		Output::i()->output = $blocks[ Request::i()->blockKey ]->getBlockForm( Request::i()->subBlockKey );
+		\IPS\Output::i()->output = $blocks[ \IPS\Request::i()->blockKey ]->getBlockForm( \IPS\Request::i()->subBlockKey );
 	}
 }

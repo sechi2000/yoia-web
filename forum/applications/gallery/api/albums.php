@@ -12,29 +12,16 @@
 namespace IPS\gallery\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Db;
-use IPS\gallery\Album;
-use IPS\gallery\Album\Item;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Gallery Albums API
  */
-class albums extends Controller
+class _albums extends \IPS\Api\Controller
 {	
 	/**
 	 * GET /gallery/albums
@@ -47,76 +34,75 @@ class albums extends Controller
 	 * @apiparam	string	sortDir			Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page			Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\gallery\Album>
-	 * @return PaginatedResponse<Album>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\gallery\Album>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = array();
 		
 		/* Categories */
-		if ( isset( Request::i()->categories ) )
+		if ( isset( \IPS\Request::i()->categories ) )
 		{
-			$where[] = array( Db::i()->in( 'album_category_id', array_filter( explode( ',', Request::i()->categories ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( 'album_category_id', array_filter( explode( ',', \IPS\Request::i()->categories ) ) ) );
 		}
 		
 		/* Owners */
-		if ( isset( Request::i()->owners ) )
+		if ( isset( \IPS\Request::i()->owners ) )
 		{
-			$where[] = array( Db::i()->in( 'album_owner_id', array_filter( explode( ',', Request::i()->owners ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( 'album_owner_id', array_filter( explode( ',', \IPS\Request::i()->owners ) ) ) );
 		}
 		
 		/* Privacy */
-		if ( isset( Request::i()->privacy ) )
+		if ( isset( \IPS\Request::i()->privacy ) )
 		{
 			$privacy = array();
-			foreach ( array_filter( explode( ',', Request::i()->privacy ) ) as $type )
+			foreach ( array_filter( explode( ',', \IPS\Request::i()->privacy ) ) as $type )
 			{
 				switch ( $type )
 				{
 					case 'public':
-						$privacy[] = Album::AUTH_TYPE_PUBLIC;
+						$privacy[] = \IPS\gallery\Album::AUTH_TYPE_PUBLIC;
 						break;
 					case 'private':
-						$privacy[] = Album::AUTH_TYPE_PRIVATE;
+						$privacy[] = \IPS\gallery\Album::AUTH_TYPE_PRIVATE;
 						break;
 					case 'restricted':
-						$privacy[] = Album::AUTH_TYPE_RESTRICTED;
+						$privacy[] = \IPS\gallery\Album::AUTH_TYPE_RESTRICTED;
 						break;
 				}
 			}
 			
-			$where[] = array( Db::i()->in( 'album_type', $privacy ) );
+			$where[] = array( \IPS\Db::i()->in( 'album_type', $privacy ) );
 		}
 			
 		/* Sort */
-		if ( isset( Request::i()->sortBy ) and in_array( Request::i()->sortBy, array( 'name', 'count_images' ) ) )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'name', 'count_images' ) ) )
 		{
-			$sortBy = 'album_' . Request::i()->sortBy;
+			$sortBy = 'album_' . \IPS\Request::i()->sortBy;
 		}
 		else
 		{
 			$sortBy = 'album_id';
 		}
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 		
 		/* Get results */
 		if ( $this->member )
 		{
 			$joins = array();
-			$where[] = Item::getItemsWithPermissionWhere( $where, $this->member, $joins );
+			$where[] = \IPS\gallery\Album\Item::getItemsWithPermissionWhere( $where, $this->member, $joins );
 		}
 		
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', 'gallery_albums', $where, "{$sortBy} {$sortDir}" ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			\IPS\Db::i()->select( '*', 'gallery_albums', $where, "{$sortBy} {$sortDir}" ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			'IPS\gallery\Album',
-			Db::i()->select( 'COUNT(*)', 'gallery_albums', $where )->first(),
+			\IPS\Db::i()->select( 'COUNT(*)', 'gallery_albums', $where )->first(),
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 	
@@ -126,19 +112,18 @@ class albums extends Controller
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		2G315/1	INVALID_ID	The album ID does not exist or the authorized user does not have permisison to view it
-	 * @apireturn		\IPS\gallery\Album
-	 * @return Response
+	 * @return		\IPS\gallery\Album
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{
-			$album = $this->member ? Album::loadAndCheckPerms( $id, 'view', $this->member ) : Album::load( $id );
-			return new Response( 200, $album->apiOutput( $this->member ) );
+			$album = $this->member ? \IPS\gallery\Album::loadAndCheckPerms( $id, 'view', $this->member ) : \IPS\gallery\Album::load( $id );
+			return new \IPS\Api\Response( 200, $album->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2G315/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2G315/1', 404 );
 		}
 	}
 }

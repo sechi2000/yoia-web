@@ -12,62 +12,37 @@
 namespace IPS\convert;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ArrayIterator;
-use BadMethodCallException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Db\Exception as DbException;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use OutOfRangeException;
-use UnderflowException;
-use function array_column;
-use function array_diff;
-use function array_keys;
-use function array_map;
-use function array_merge;
-use function array_unique;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Converter Application Class
  */
-class App extends ActiveRecord
+class _App extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'convert_apps' );
+	protected $caches = array( 'convert_apps' );
 
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId		= 'app_id';
+	public static $databaseColumnId		= 'app_id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database table
 	 */
-	public static ?string $databaseTable		= 'convert_apps';
+	public static $databaseTable		= 'convert_apps';
 	
 	/**
 	 * @brief	Array Storage of loaded ID links.
 	 */
-	protected array $linkCache				= array();
+	protected $linkCache				= array();
 	
 	/**
 	 * @brief	Flag to indicate the log is simply a notice, and that it is informational only. Useful for when data is missing, but can be covered via default values.
@@ -87,11 +62,11 @@ class App extends ActiveRecord
 	/**
 	 * Get converted apps
 	 *
-	 * @return	ActiveRecordIterator
+	 * @return	\IPS\Patterns\ActiveRecordIterator
 	 */
-	public static function apps() : ActiveRecordIterator
+	public static function apps()
 	{
-		return new ActiveRecordIterator( new ArrayIterator( static::getStore() ), 'IPS\convert\App' );
+		return new \IPS\Patterns\ActiveRecordIterator( new \ArrayIterator( static::getStore() ), 'IPS\convert\App' );
 	}
 
 	/**
@@ -99,19 +74,19 @@ class App extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->convert_apps ) )
+		if ( !isset( \IPS\Data\Store::i()->convert_apps ) )
 		{
 			try
 			{
-				$rows = iterator_to_array( Db::i()->select( '*', 'convert_apps', array(), 'app_id ASC' ) );
+				$rows = iterator_to_array( \IPS\Db::i()->select( '*', 'convert_apps', array(), 'app_id ASC' ) );
 			}
-			catch ( DbException $e )
+			catch ( \IPS\Db\Exception $e )
 			{
 				if ( $e->getCode() === 1146 )
 				{
-					$rows = iterator_to_array( Db::i()->select( '*', 'conv_apps', array(), 'app_id ASC' ) );
+					$rows = iterator_to_array( \IPS\Db::i()->select( '*', 'conv_apps', array(), 'app_id ASC' ) );
 				}
 				else
 				{
@@ -119,33 +94,33 @@ class App extends ActiveRecord
 				}
 			}
 			
-			Store::i()->convert_apps = $rows;
+			\IPS\Data\Store::i()->convert_apps = $rows;
 		}
 
-		return Store::i()->convert_apps;
+		return \IPS\Data\Store::i()->convert_apps;
 	}
 	
 	/**
 	 * [ActiveRecord]	Save Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		if ( !$this->app_id )
 		{
 			$this->start_date = time();
 			parent::save();
 			
-			Application::checkConvParent( $this->getSource()->getLibrary()->getAppKey() );
+			\IPS\convert\Application::checkConvParent( $this->getSource()->getLibrary()->app );
 			
-			Db::i()->insert( 'convert_app_sessions', array(
+			\IPS\Db::i()->insert( 'convert_app_sessions', array(
 				'session_app_id'	=> $this->app_id,
 				'session_app_data'	=> json_encode( array( 'completed' => array(), 'working' => array(), 'more_info' => array() ) ),
 			) );
 		}
 		
-		$classname			= get_class( $this->getSource( TRUE, FALSE ) );
+		$classname			= \get_class( $this->getSource( TRUE, FALSE ) );
 		$this->login		= ( $classname::loginEnabled() === TRUE ) ? 1 : 0;
 		$this->db_driver	= 'mysql';  /* I was going to drop this, but it has the potential for expansion in the future, as all we do is select from the source */
 		$this->app_merge	= 1;
@@ -155,17 +130,17 @@ class App extends ActiveRecord
 	/**
 	 * [ActiveRecord]	Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		foreach( array( 'convert_link', 'convert_link_pms', 'convert_link_topics', 'convert_link_posts' ) AS $table )
 		{
-			Db::i()->delete( $table, array( 'app=?', $this->app_id ) );
+			\IPS\Db::i()->delete( $table, array( 'app=?', $this->app_id ) );
 		}
 		
-		Db::i()->delete( 'convert_app_sessions', array( 'session_app_id=?', $this->app_id ) );
-		Db::i()->delete( 'convert_logs', array( 'log_app=?', $this->app_id ) );
+		\IPS\Db::i()->delete( 'convert_app_sessions', array( 'session_app_id=?', $this->app_id ) );
+		\IPS\Db::i()->delete( 'convert_logs', array( 'log_app=?', $this->app_id ) );
 		
 		parent::delete();
 	}
@@ -173,17 +148,17 @@ class App extends ActiveRecord
 	/**
 	 * @brief	Session data store
 	 */
-	protected ?array $_sessionData = null;
+	protected $_sessionData = null;
 	
 	/**
 	 * Save Session Data for this application
 	 *
-	 * @param	array|null	$value	Session Data
+	 * @param	array	$value	Session Data
 	 * @return	void
 	 */
-	public function set__session( ?array $value ) : void
+	public function set__session( $value )
 	{
-		Db::i()->update( 'convert_app_sessions', array( 'session_app_data' => json_encode( $value ) ), array( 'session_app_id=?', $this->app_id ) );
+		\IPS\Db::i()->update( 'convert_app_sessions', array( 'session_app_data' => json_encode( $value ) ), array( 'session_app_id=?', $this->app_id ) );
 
 		$this->_sessionData = $value;
 	}
@@ -193,7 +168,7 @@ class App extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function get__session() : array
+	public function get__session()
 	{
 		/* Use ready-cached session data */
 		if( $this->_sessionData !== null )
@@ -203,13 +178,13 @@ class App extends ActiveRecord
 
 		try
 		{
-			$this->_sessionData = json_decode( Db::i()->select( 'session_app_data', 'convert_app_sessions', array( 'session_app_id=?', $this->app_id ) )->first(), TRUE );
+			$this->_sessionData = json_decode( \IPS\Db::i()->select( 'session_app_data', 'convert_app_sessions', array( 'session_app_id=?', $this->app_id ) )->first(), TRUE );
 			return $this->_sessionData;
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			/* If it doesn't exist, create it in the database and return an empty array. */
-			Db::i()->insert( 'convert_app_sessions', array(
+			\IPS\Db::i()->insert( 'convert_app_sessions', array(
 				'session_app_id'	=> $this->app_id,
 				'session_app_data'	=> json_encode( array( 'completed' => array(), 'working' => array(), 'more_info' => array() ) )
 			) );
@@ -222,28 +197,31 @@ class App extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	public function get_sw() : string
+	public function get_sw()
 	{
 		switch( $this->_data['sw'] )
 		{
 			case 'board':
 				return 'forums';
+			break;
 			
 			case 'ccs':
 				return 'cms';
+			break;
 			
 			default:
 				return $this->_data['sw'];
+			break;
 		}
 	}
 	
 	/**
 	 * [Legacy] Automatically fix any legacy application keys that have changed.
 	 *
-	 * @param	string|null	$value	App value
+	 * @param	string	$value	App value
 	 * @return	void
 	 */
-	public function set_sw( ?string $value ) : void
+	public function set_sw( $value )
 	{
 		switch( $value )
 		{
@@ -264,30 +242,34 @@ class App extends ActiveRecord
 	/**
 	 * @brief	Parent Store
 	 */
-	protected ?App $parentStore = NULL;
+	protected $parentStore = NULL;
 	
 	/**
 	 * Get parent application
 	 *
-	 * @return    App
-	 * @throws	BadMethodCallException
+	 * @return	\IPS\convert\App
+	 * @throws	\BadMethodCallException
 	 */
-	public function get__parent() : App
+	public function get__parent()
 	{
-		if ( is_null( $this->parentStore ) )
+		if ( \is_null( $this->parentStore ) )
 		{
 			if ( ! $this->parent )
 			{
-				throw new BadMethodCallException;
+				throw new \BadMethodCallException;
 			}
 			
 			try
 			{
-				$this->parentStore = static::constructFromData( Db::i()->select( '*', 'convert_apps', array( "app_id=?", $this->parent ) )->first() );
+				$this->parentStore = static::constructFromData( \IPS\Db::i()->select( '*', 'convert_apps', array( "app_id=?", $this->parent ) )->first() );
 			}
-			catch( UnderflowException|OutOfRangeException $e )
+			catch( \UnderflowException $e )
 			{
-				throw new BadMethodCallException;
+				throw new \BadMethodCallException;
+			}
+			catch( \OutOfRangeException $e )
+			{
+				throw new \BadMethodCallException;
 			}
 		}
 		
@@ -297,9 +279,9 @@ class App extends ActiveRecord
 	/**
 	 * Return this application's children applications
 	 *
-	 * @return	array|ActiveRecordIterator
+	 * @return	array|\IPS\Patterns\ActiveRecordIterator
 	 */
-	public function children() : array|ActiveRecordIterator
+	public function children()
 	{
 		/* If we have a parent, we are already a child and will not have children */
 		if( $this->parent )
@@ -307,7 +289,7 @@ class App extends ActiveRecord
 			return array();
 		}
 
-		return new ActiveRecordIterator( Db::i()->select( '*', 'convert_apps', array( 'parent=?', $this->app_id ) ), 'IPS\convert\App' );
+		return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'convert_apps', array( 'parent=?', $this->app_id ) ), 'IPS\convert\App' );
 	}
 	
 	/**
@@ -315,26 +297,26 @@ class App extends ActiveRecord
 	 *
 	 * @param	mixed			$foreign_id		The Foreign ID
 	 * @param	string|array	$type			The type of item, or an array of types to check.
-	 * @param	bool			$parent			If set to TRUE, then retrieves from the parent application if one is available.
-	 * @param	bool			$mainTable		If set to TRUE, and the type is of either 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', or 'forums_posts', then the ID is retrieved from convert_link, rather than the other link tables.
+	 * @param	boolean			$parent			If set to TRUE, then retrieves from the parent application if one is available.
+	 * @param	boolean			$mainTable		If set to TRUE, and the type is of either 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', or 'forums_posts', then the ID is retrieved from convert_link, rather than the other link tables.
 	 *
-	 * @return	int	The Invision Community ID.
-	 * @throws	OutOfRangeException
+	 * @return	integer	The Invision Community ID.
+	 * @throws	\OutOfRangeException
 	 */
-	public function getLink( mixed $foreign_id, string|array $type, bool $parent=FALSE, bool $mainTable=FALSE ) : int
+	public function getLink( $foreign_id, $type, $parent=FALSE, $mainTable=FALSE )
 	{
-		if ( !is_array( $type ) )
+		if ( !\is_array( $type ) )
 		{
 			$type = array( $type );
 		}
 		
-		$key = count( $type ) > 1 ? md5( implode('', $type ) ) : $type[0];
+		$key = \count( $type ) > 1 ? md5( implode('', $type ) ) : $type[0];
 		
 		if ( isset( $this->linkCache[ $key ][ $foreign_id ] ) )
 		{
 			if( $this->linkCache[ $key ][ $foreign_id ] === FALSE )
 			{
-				throw new OutOfRangeException( 'link_invalid' );
+				throw new \OutOfRangeException( 'link_invalid' );
 			}
 
 			return $this->linkCache[ $key ][ $foreign_id ];
@@ -347,23 +329,23 @@ class App extends ActiveRecord
 
 		try
 		{
-			$link = Db::i()->select( 'ipb_id', $table, array( Db::i()->in( 'type', $type ) . ' AND foreign_id=? AND app=?', (string) $foreign_id, ( $parent === TRUE and $this->parent ) ? $this->parent : $this->app_id ), 'link_id DESC' )->first();
+			$link = \IPS\Db::i()->select( 'ipb_id', $table, array( \IPS\Db::i()->in( 'type', $type ) . ' AND foreign_id=? AND app=?', (string) $foreign_id, ( $parent === TRUE and $this->parent ) ? $this->parent : $this->app_id ), 'link_id DESC' )->first();
 			$this->linkCache[ $key ][ $foreign_id ] = $link;
 			return $this->linkCache[ $key ][ $foreign_id ];
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			/* If lookup failed, and we have a parent, try it anyway */
 			try
 			{
-				$link = Db::i()->select( 'ipb_id', $table, array( Db::i()->in( 'type', $type ) . ' AND foreign_id=? AND app=?', (string) $foreign_id, $this->parent ), 'link_id DESC' )->first();
+				$link = \IPS\Db::i()->select( 'ipb_id', $table, array( \IPS\Db::i()->in( 'type', $type ) . ' AND foreign_id=? AND app=?', (string) $foreign_id, $this->parent ), 'link_id DESC' )->first();
 				$this->linkCache[ $key ][ $foreign_id ] = $link;
 				return $this->linkCache[ $key ][ $foreign_id ];
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			/* Still here? Throw the exception */
-			throw new OutOfRangeException( 'link_invalid' );
+			throw new \OutOfRangeException( 'link_invalid' );
 		}
 	}
 
@@ -378,7 +360,7 @@ class App extends ActiveRecord
 		{
 			return $this->_parent->app_id;
 		}
-		catch( BadMethodCallException $e )
+		catch( \BadMethodCallException $e )
 		{
 			return $this->app_id;
 		}
@@ -387,7 +369,7 @@ class App extends ActiveRecord
 	/**
 	 * @brief	Sibling Link Cache
 	 */
-	protected array $siblingLinkCache = array();
+	protected $siblingLinkCache = array();
 	
 	/**
 	 * Retrieves an Invision Community iD from a Foriegn ID in a Sibling Application
@@ -395,12 +377,12 @@ class App extends ActiveRecord
 	 * @param	mixed		$foreign_id		The Foreign ID.
 	 * @param	string		$type			The type of item.
 	 * @param	string		$sibling		The sibling software library.
-	 * @param	bool		$mainTable		If set to TRUE, and the type is of either 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', or 'forums_posts', then the ID is retrieved from convert_link, rather than the other link tables.
+	 * @param	boolean		$mainTable		If set to TRUE, and the type is of either 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', or 'forums_posts', then the ID is retrieved from convert_link, rather than the other link tables.
 	 *
-	 * @return	int	The Invision Community ID.
-	 * @throws	OutOfRangeException
+	 * @return	inteer	The Invision Community ID.
+	 * @throws	\OutOfRangeException
 	 */
-	public function getSiblingLink( mixed $foreign_id, string $type, string $sibling, bool $mainTable=FALSE ) : int
+	public function getSiblingLink( $foreign_id, $type, $sibling, $mainTable=FALSE )
 	{
 		if ( isset( $this->siblingLinkCache[$type][$sibling][$foreign_id] ) )
 		{
@@ -409,11 +391,11 @@ class App extends ActiveRecord
 		
 		try
 		{
-			$sibling = static::constructFromData( Db::i()->select( '*', 'convert_apps', array( "sw=? AND parent=?", $sibling, $this->parent ) )->first() );
+			$sibling = static::constructFromData( \IPS\Db::i()->select( '*', 'convert_apps', array( "sw=? AND parent=?", $sibling, $this->parent ) )->first() );
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
-			throw new OutOfRangeException( 'sibling_invalid' );
+			throw new \OutOfRangeException( 'sibling_invalid' );
 		}
 		
 		return $sibling->getLink( $foreign_id, $type, FALSE, $mainTable );
@@ -422,31 +404,31 @@ class App extends ActiveRecord
 	/**
 	 * Saves a foreign ID to Invision Community ID reference to the convert_link tables.
 	 *
-	 * @param	int		$ips_id			The Invision Community ID
+	 * @param	integer		$ips_id			The Invision Community ID
 	 * @param	mixed		$foreign_id		The Foreign ID
 	 * @param	string		$type			The type of item
-	 * @param	bool		$duplicate		If TRUE, then this item is a duplicate and was merged into existing $ips_id
-	 * @param	bool		$mainTable		If TRUE, then link will be stored in the main convert_link table even if $type is 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', or 'forums_posts'
+	 * @param	boolean		$duplicate		If TRUE, then this item is a duplicate and was merged into existing $ips_id
+	 * @param	boolean		$mainTable		If TRUE, then link will be stored in the main convert_link table even if $type is 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', or 'forums_posts'
 	 * @return	void
 	 */
-	public function addLink( int $ips_id, mixed $foreign_id, string $type, bool $duplicate=FALSE, bool $mainTable=FALSE ) : void
+	public function addLink( $ips_id, $foreign_id, $type, $duplicate=FALSE, $mainTable=FALSE )
 	{
 		$table = 'convert_link';
 		
-		if ( in_array( $type, [ 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', 'forums_posts', 'forums_posts_first', 'forums_topics_old', 'forums_posts_old' ] ) AND $mainTable === FALSE )
+		if ( \in_array( $type, [ 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', 'forums_posts', 'forums_topics_old', 'forums_posts_old' ] ) AND $mainTable === FALSE )
 		{
-			if ( in_array( $type, array( 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map' ) ) )
+			if ( \in_array( $type, array( 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map' ) ) )
 			{
 				$table = 'convert_link_pms';
 			}
 			else
 			{
-				$tableType = str_replace( [ 'forums_', '_first', '_old' ], '', $type );
+				$tableType = str_replace( [ 'forums_', '_old' ], '', $type );
 				$table = "convert_link_{$tableType}";
 			}
 		}
 		
-		Db::i()->insert( $table, array(
+		\IPS\Db::i()->insert( $table, array(
 			'ipb_id'		=> $ips_id,
 			'foreign_id'	=> $foreign_id,
 			'type'			=> $type,
@@ -462,15 +444,14 @@ class App extends ActiveRecord
 	 *
 	 * @param array $data
 	 * @param array $map
-	 * @return void
 	 */
-	public function preCacheLinks( array $data, array $map ) : void
+	public function preCacheLinks( array $data, array $map )
 	{
 		$cachesToLookup = [];
 		$tables = [];
 
 		/* Check for data */
-		if( !count( $data ) )
+		if( !\count( $data ) )
 		{
 			return;
 		}
@@ -478,24 +459,24 @@ class App extends ActiveRecord
 		foreach( $map as $type => $columns )
 		{
 			$cachesToLookup[ $type ] = array();
-			if ( is_array( $columns ) )
+			if ( \is_array( $columns ) )
 			{
 				foreach ( $columns as $column )
 				{
-					$cachesToLookup[ $type ] = array_merge( $cachesToLookup[ $type ], array_column( $data, $column ) );
+					$cachesToLookup[ $type ] = \array_merge( $cachesToLookup[ $type ], \array_column( $data, $column ) );
 				}
-				$cachesToLookup[ $type ] = array_map( 'strval', array_unique( $cachesToLookup[ $type ] ) );
+				$cachesToLookup[ $type ] = \array_map( 'strval', \array_unique( $cachesToLookup[ $type ] ) );
 			}
 			else
 			{
-				$cachesToLookup[ $type ] = array_map( 'strval', array_unique( array_column( $data, $columns ) ) );
+				$cachesToLookup[ $type ] = \array_map( 'strval', \array_unique( \array_column( $data, $columns ) ) );
 			}
 
 			/* Check whether there are values we don't have cached */
 			if( isset( $this->linkCache[ $type ] ) )
 			{
-				$cachesToLookup[ $type ] = array_diff( $cachesToLookup[ $type ], array_keys( $this->linkCache[ $type ] ) );
-				if ( !count( $cachesToLookup[ $type ] ) )
+				$cachesToLookup[ $type ] = \array_diff( $cachesToLookup[ $type ], \array_keys( $this->linkCache[ $type ] ) );
+				if ( !\count( $cachesToLookup[ $type ] ) )
 				{
 					/* nope, so skip the query */
 					continue;
@@ -512,8 +493,8 @@ class App extends ActiveRecord
 				$this->linkCache[ $link ] = array();
 			}
 
-			$where = [ '`type`=? AND ' . Db::i()->in('foreign_id', $cachesToLookup[ $link ] ) . ' AND (app=? OR app=?)', $link, $this->parent, $this->app_id ];
-			foreach( Db::i()->select( 'ipb_id, foreign_id', $table, $where ) as $result )
+			$where = [ '`type`=? AND ' . \IPS\Db::i()->in('foreign_id', $cachesToLookup[ $link ] ) . ' AND (app=? OR app=?)', $link, $this->parent, $this->app_id ];
+			foreach( \IPS\Db::i()->select( 'ipb_id, foreign_id', $table, $where ) as $result )
 			{
 				$this->linkCache[ $link ][ (string) $result['foreign_id'] ] = $result['ipb_id'];
 			}
@@ -531,23 +512,23 @@ class App extends ActiveRecord
 	/**
 	 * Checks to see if a link exists for an Invision Community ID
 	 *
-	 * @param	int	$ips_id		The Invision Community ID.
+	 * @param	integer	$ips_id		The Invision Community ID.
 	 * @param	string	$type		The type of item
 	 * @param	bool	$mainTable	If TRUE, then link will be check against the main convert_link table even if $type is 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', or 'forums_posts'
 	 * @return	void
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	public function checkLink( int $ips_id, string $type, bool $mainTable=FALSE ) : void
+	public function checkLink( $ips_id, $type, $mainTable=FALSE )
 	{
 		$table = $this->_getLinkTableName( $type, $mainTable );
 		
 		try
 		{
-			$link = Db::i()->select( '*', $table, array( "app=? AND ipb_id=? AND type=?", $this->app_id, $ips_id, $type ) )->first();
+			$link = \IPS\Db::i()->select( '*', $table, array( "app=? AND ipb_id=? AND type=?", $this->app_id, $ips_id, $type ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 	}
 	
@@ -556,17 +537,17 @@ class App extends ActiveRecord
 	 *
 	 * @param	string	$software	The application key to look for
 	 * @return	void
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	public function checkForSibling( string $software ) : void
+	public function checkForSibling( $software )
 	{
 		try
 		{
-			Db::i()->select( '*', 'convert_apps', array( "sw=? AND parent=?", $software, $this->parent ) )->first();
+			\IPS\Db::i()->select( '*', 'convert_apps', array( "sw=? AND parent=?", $software, $this->parent ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 	}
 
@@ -577,11 +558,11 @@ class App extends ActiveRecord
 	 * @param	string		$type				The type of item
 	 * @return	void
 	 */
-	public function deleteLink( mixed $foreignId, string $type ) : void
+	public function deleteLink( $foreignId, string $type )
 	{
 		$table = $this->_getLinkTableName( $type );
 
-		Db::i()->delete( $table, array( 'foreign_id=? AND type=? AND app=?', $foreignId, $type, $this->app_id ) );
+		\IPS\Db::i()->delete( $table, array( 'foreign_id=? AND type=? AND app=?', $foreignId, $type, $this->app_id ) );
 
 		/* Remove this from the link cache */
 		if( isset( $this->linkCache[ $type ][ $foreignId ] ) )
@@ -593,26 +574,26 @@ class App extends ActiveRecord
 	/**
 	 * @brief	Sibling Cache
 	 */
-	protected array $siblingCache = array();
+	protected $siblingCache = array();
 	
 	/**
 	 * Construct an \IPS\convert\App object for a sibling application.
 	 *
 	 * @param	string	$software	The application key to look for
-	 * @return    App
-	 * @throws	OutOfRangeException
+	 * @return	\IPS\convert\App
+	 * @throws	\OutOfRangeException
 	 */
-	public function getSibling( string $software ) : App
+	public function getSibling( $software )
 	{
 		if ( !isset( $this->siblingCache[$software] ) )
 		{
 			try
 			{
-				$this->siblingCache[$software] = static::constructFromData( Db::i()->select( '*', 'convert_apps', array( "sw=? AND parent=?", $software, $this->parent ) )->first() );
+				$this->siblingCache[$software] = static::constructFromData( \IPS\Db::i()->select( '*', 'convert_apps', array( "sw=? AND parent=?", $software, $this->parent ) )->first() );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
 		
@@ -624,16 +605,17 @@ class App extends ActiveRecord
 	 *
 	 * @param	bool	$construct	Construct the object
 	 * @param	bool	$needDB		Establish a database connection ($construct must be TRUE)
-	 * @return    Software|string
-	 * @throws	InvalidArgumentException
+	 * @return	\IPS\convert\Software|string
+	 * @throws	\InvalidArgumentException
 	 */
-	public function getSource( bool $construct=TRUE, bool $needDB=TRUE ) : Software|string
+	public function getSource( $construct=TRUE, $needDB=TRUE )
 	{
 		/* Update software keys for communities converted to 3.x */
 		switch( $this->_data['sw'] )
 		{
 			case 'board':
 			case 'ccs':
+				$this->sw = $this->sw;
 				$this->save();
 			break;
 		}
@@ -689,11 +671,11 @@ class App extends ActiveRecord
 			break;
 		}
 		
-		$classname = Software::software()[ $this->_data['sw'] ][ $this->_data['app_key'] ];
+		$classname = \IPS\convert\Software::software()[ $this->_data['sw'] ][ $this->_data['app_key'] ];
 
 		if ( ! class_exists( $classname ) )
 		{
-			throw new InvalidArgumentException( 'invalid_source' );
+			throw new \InvalidArgumentException( 'invalid_source' );
 		}
 		
 		if ( $construct )
@@ -711,19 +693,19 @@ class App extends ActiveRecord
 	 *
 	 * @param	string		$message	The message to log.
 	 * @param	string		$method		The current conversion method (convert_posts, convert_topics, etc.)
-	 * @param	int		$severity	The severity level of the log. Default to LOG_NOTICE
+	 * @param	integer		$severity	The severity level of the log. Default to LOG_NOTICE
 	 * @param	int|NULL	$id			The item ID
 	 * @return	void
-	 * @throws InvalidArgumentException
+	 * @throws \InvalidArgumentException
 	 */
-	public function log( string $message, string $method, int $severity=1, int $id=NULL ) : void
+	public function log( $message, $method, $severity=1, $id=NULL )
 	{
-		if ( ! in_array( $severity, array( static::LOG_NOTICE, static::LOG_WARNING, static::LOG_ERROR ) ) )
+		if ( ! \in_array( $severity, array( static::LOG_NOTICE, static::LOG_WARNING, static::LOG_ERROR ) ) )
 		{
-			throw new InvalidArgumentException( 'invalid_severity' );
+			throw new \InvalidArgumentException( 'invalid_severity' );
 		}
 		
-		Db::i()->insert( 'convert_logs', array(
+		\IPS\Db::i()->insert( 'convert_logs', array(
 			'log_message'	=> $message,
 			'log_app'		=> $this->app_id,
 			'log_severity'	=> $severity,
@@ -737,11 +719,11 @@ class App extends ActiveRecord
 	 * Callback function to return all dependencies not yet converted.
 	 *
 	 * @param	string	$value	Value from depency array
-	 * @return	bool
+	 * @return	boolean
 	 */
-	public function dependencies( string $value ) : bool
+	public function dependencies( $value )
 	{
-		if ( !in_array( $value, $this->_session['completed'] ) )
+		if ( !\in_array( $value, $this->_session['completed'] ) )
 		{
 			return TRUE;
 		}
@@ -756,7 +738,7 @@ class App extends ActiveRecord
 	 * @param	array	$values		Values from the form.
 	 * @return	void
 	 */
-	public function saveMoreInfo( string $method, array $values=array() ) : void
+	public function saveMoreInfo( $method, $values=array() )
 	{
 		$sessionData = $this->_session;
 		
@@ -771,7 +753,7 @@ class App extends ActiveRecord
 	 * @param	mixed $key key
 	 * @return	bool
 	 */
-	public function __isset( mixed $key ) : bool
+	public function __isset( $key )
 	{
 		if ( method_exists( $this, 'get_' . $key ) )
 		{
@@ -793,9 +775,9 @@ class App extends ActiveRecord
 	 * @param 	bool		$status		Flag status
 	 * @return	void
 	 */
-	public function setRunningFlag( string $method, bool $status ) : void
+	public function setRunningFlag( $method, $status )
 	{
-		$running = $this->_session['running'] ?? array();
+		$running = isset( $this->_session['running'] ) ? $this->_session['running'] : array();
 
 		/* If setting running flag, set to a timestamp */
 		if( $status === TRUE )
@@ -814,7 +796,7 @@ class App extends ActiveRecord
 	 * @param	string		$method		Method name
 	 * @return	bool|int				False or a timestamp
 	 */
-	public function getRunningFlag( string $method ) : bool|int
+	public function getRunningFlag( $method )
 	{
 		if( isset( $this->_session['running'][ $method ] ) )
 		{
@@ -837,15 +819,15 @@ class App extends ActiveRecord
 
 		if ( $mainTable === FALSE )
 		{
-			if ( in_array( $type, array( 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', 'forums_posts', 'forums_posts_first', 'forums_topics_old', 'forums_posts_old' ) ) )
+			if ( \in_array( $type, array( 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map', 'forums_topics', 'forums_posts', 'forums_topics_old', 'forums_posts_old' ) ) )
 			{
-				if ( in_array( $type, array( 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map' ) ) )
+				if ( \in_array( $type, array( 'core_message_topics', 'core_message_posts', 'core_message_topic_user_map' ) ) )
 				{
 					$table = 'convert_link_pms';
 				}
 				else
 				{
-					$tableType = str_replace(  [ 'forums_', '_first', '_old' ], '', $type );
+					$tableType = str_replace(  [ 'forums_', '_old' ], '', $type );
 					$table = "convert_link_{$tableType}";
 				}
 			}

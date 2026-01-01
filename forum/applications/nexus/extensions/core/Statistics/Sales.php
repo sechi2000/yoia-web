@@ -11,41 +11,31 @@
 namespace IPS\nexus\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Sales extends \IPS\core\Statistics\Chart
+class _Sales extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'nexus_reports_purchases';
+	public $controller = 'nexus_reports_purchases';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$chart = new Database(
+		$chart = new \IPS\Helpers\Chart\Database(
 			$url,
 			'nexus_purchases',
 			'ps_start',
@@ -64,20 +54,20 @@ class Sales extends \IPS\core\Statistics\Chart
 		$chart->tableInclude	= array( 'ps_id', 'ps_member', 'ps_name', 'ps_start', 'ps_expire' );
 		$chart->tableParsers	= array( 
 			'ps_member' => function( $val ) {
-				return Theme::i()->getTemplate('global', 'nexus')->userLink( Member::load( $val ) );
+				return \IPS\Theme::i()->getTemplate('global', 'nexus')->userLink( \IPS\Member::load( $val ) );
 			},
 			'ps_start'	=> function( $val ) {
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
 			'ps_expire'	=> function( $val ) {
-				return $val ? DateTime::ts( $val ) : '';
+				return $val ? \IPS\DateTime::ts( $val ) : '';
 			}
 		);
 		
 		$packages = array();
-		foreach ( Db::i()->select( 'p_id', 'nexus_packages' ) as $packageId )
+		foreach ( \IPS\Db::i()->select( 'p_id', 'nexus_packages' ) as $packageId )
 		{
-			$packages[ $packageId ] = Member::loggedIn()->language()->get( 'nexus_package_' . $packageId );
+			$packages[ $packageId ] = \IPS\Member::loggedIn()->language()->get( 'nexus_package_' . $packageId );
 		}
 		
 		asort( $packages );

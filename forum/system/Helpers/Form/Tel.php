@@ -11,29 +11,26 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Telephone input class for Form Builder
  */
-class Tel extends Text
+class _Tel extends Text
 {
 	/**
 	 * @brief	Child default Options
 	 */
-	protected array $childDefaultOptions = array( 'htmlAutocomplete' => "tel" );
+	protected $childDefaultOptions = array( 'htmlAutocomplete' => "tel" );
 
 	/**
 	 * @brief	Dialling Codes
 	 */
-	public static array $diallingCodes = array (
+	public static $diallingCodes = array (
 	  'AD' => 
 	  array (
 	    0 => '376',

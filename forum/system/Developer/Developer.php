@@ -11,47 +11,38 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use Whoops\Handler\PrettyPageHandler;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Developer class used for IN_DEV management
  */
-class Developer
+class _Developer
 {
 	
 	/**
 	 * @brief Array of directories that should always be present inside /dev
 	 */
-	protected static array $devDirs = array( 'css', 'email', 'html', 'img', 'js' );
+	protected static $devDirs = array( 'css', 'email', 'html', 'img', 'js' );
 	
 	/**
 	 * @brief Array of multitons
 	 */
-	protected static array $multitons = array();
+	protected static $multitons = array();
 	
 	/**
 	 * Synchronises development data between installations
 	 *
 	 * @return void
 	 */
-	public static function sync() : void
+	public static function sync()
 	{
 		$updated	= FALSE;
 
-		foreach (Application::applications() as $app )
+		foreach ( \IPS\Application::applications() as $app )
 		{
 			$thisAppUpdated = static::load( $app->directory )->synchronize();
 			$updated		= $updated ?: $thisAppUpdated;
@@ -59,22 +50,24 @@ class Developer
 
 		if( $updated )
 		{
+			\IPS\Plugin\Hook::writeDataFile();
+
 			/* Update JS cache bust */
-			Settings::i()->changeValues( array( 'javascript_updated' => time() ) );
+			\IPS\Settings::i()->changeValues( array( 'javascript_updated' => time() ) );
 		}
 	}
 
 	/**
 	 * Stores objects
 	 *
-	 * @param string $app Application key
-	 * @return Developer \IPS\Developer
+	 * @param	string	$app	Application key
+	 * @return object \IPS\Developer
 	 */
-	public static function load( string $app ): Developer
+	public static function load( $app )
 	{
 		if ( ! isset( static::$multitons[ $app ] ) )
 		{
-			static::$multitons[ $app ] = new Developer( Application::load( $app ) );
+			static::$multitons[ $app ] = new \IPS\Developer( \IPS\Application::load( $app ) );
 		}
 		
 		return static::$multitons[ $app ];
@@ -83,15 +76,15 @@ class Developer
 	/**
 	 * @brief	Application
 	 */
-	protected ?Application $app;
+	protected $app;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param Application $app	The application the notification belongs to
+	 * @param	\IPS\Application		$app	The application the notification belongs to
 	 * @return	void
 	 */
-	public function __construct( Application $app )
+	public function __construct( \IPS\Application $app )
 	{
 		$this->app = $app;
 	}
@@ -99,7 +92,7 @@ class Developer
 	/**
 	 * @brief	Last updates
 	 */
-	protected static ?array $lastUpdates = NULL;
+	protected static $lastUpdates = NULL;
 	
 	/**
 	 * Sync development data for an application
@@ -110,11 +103,11 @@ class Developer
 	{
 		if ( static::$lastUpdates === NULL )
 		{
-			static::$lastUpdates = iterator_to_array( Db::i()->select( '*', 'core_dev' )->setKeyField('app_key') );
+			static::$lastUpdates = iterator_to_array( \IPS\Db::i()->select( '*', 'core_dev' )->setKeyField('app_key') );
 		}
 		
 		/* Get versions */
-		$versions      = array_keys( json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->app->directory}/data/versions.json" ), TRUE ) );
+		$versions      = array_keys( json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/versions.json" ), TRUE ) );
 		$latestVersion = array_pop( $versions );
 		
 		$updated = FALSE;
@@ -127,12 +120,12 @@ class Developer
 			{
 				$content = NULL;
 
-				if( file_exists( ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" ) )
+				if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" ) )
 				{
-					$content = file_get_contents( ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" );
+					$content = file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" );
 				}
 
-				Db::i()->insert( 'core_dev', array(
+				\IPS\Db::i()->insert( 'core_dev', array(
 						'app_key'			=> $this->app->directory,
 						'working_version'	=> $latestVersion,
 						'last_sync'			=> time(),
@@ -143,19 +136,19 @@ class Developer
 			else
 			{
 				/* Database schema */
-				if( file_exists( ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" ) )
+				if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" ) )
 				{
-					if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" ) )
+					if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" ) )
 					{
 						/* Get schema file */
-						$schema = json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->app->directory}/data/schema.json" ), TRUE );
+						$schema = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/schema.json" ), TRUE );
 							
 						/* Run queries for previous versions */
 						if ( static::$lastUpdates[ $this->app->directory ]['working_version'] != $latestVersion )
 						{
 							/* Get all versions past the working version */
 							$dirMatches = [];
-							foreach (new DirectoryIterator( ROOT_PATH . "/applications/{$this->app->directory}/setup/" ) as $dir )
+							foreach ( new \DirectoryIterator( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/" ) as $dir )
 							{
 								if ( $dir->isDir() and !$dir->isDot() and preg_match( '/^upg_(\d+)$/', $dir, $matches ) )
 								{
@@ -172,38 +165,38 @@ class Developer
 							{
 								if ( $match == static::$lastUpdates[ $this->app->directory ]['working_version'] )
 								{
-									if( file_exists( ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$match}/queries.json" ) )
+									if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$match}/queries.json" ) )
 									{
-										$queries = json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$match}/queries.json" ), TRUE );
+										$queries = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$match}/queries.json" ), TRUE );
 										$localQueries = json_decode( static::$lastUpdates[ $this->app->directory ]['ran'], TRUE );
 										foreach ( $queries as $q )
 										{
-											if ( is_array( $localQueries ) AND !in_array( $q, $localQueries ) )
+											if ( \is_array( $localQueries ) AND !\in_array( $q, $localQueries ) )
 											{
 												$method = $q['method'];
 												$params = $q['params'];
-												Db::i()->$method( ...$params );
+												\IPS\Db::i()->$method( ...$params );
 											}
 										}
 									}
 								}
 								else
 								{
-									if( file_exists( ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$match}/queries.json" ) )
+									if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$match}/queries.json" ) )
 									{
-										$queries = json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$match}/queries.json" ), TRUE );
+										$queries = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$match}/queries.json" ), TRUE );
 										foreach ( $queries as $q )
 										{
 											try
 											{
 												$method = $q['method'];
 												$params = $q['params'];
-												Db::i()->$method( ...$params );
+												\IPS\Db::i()->$method( ...$params );
 											}
-											catch(Db\Exception $e )
+											catch( \IPS\Db\Exception $e )
 											{
 												/* If the issue is with a create table other than exists, we should just throw it */
-												if ( $q['method'] == 'createTable' and ! in_array( $e->getCode(), array( 1007, 1050 ) ) )
+												if ( $q['method'] == 'createTable' and ! \in_array( $e->getCode(), array( 1007, 1050 ) ) )
 												{
 													throw $e;
 												}
@@ -213,19 +206,19 @@ class Developer
 												{
 													if ( $q['method'] == 'changeColumn' )
 													{
-														if ( Db::i()->checkForTable( $q['params'][0] ) )
+														if ( \IPS\Db::i()->checkForTable( $q['params'][0] ) )
 														{
 															/* Does the column exist already? */
-															if ( Db::i()->checkForColumn( $q['params'][0], $q['params'][2]['name'] ) )
+															if ( \IPS\Db::i()->checkForColumn( $q['params'][0], $q['params'][2]['name'] ) )
 															{
 																/* Just make sure it's up to date */
-																Db::i()->changeColumn( $q['params'][0], $q['params'][2]['name'], $q['params'][2] );
+																\IPS\Db::i()->changeColumn( $q['params'][0], $q['params'][2]['name'], $q['params'][2] );
 																continue;
 															}
 															else
 															{
 																/* The table exists, so lets just add the column */
-																Db::i()->addColumn( $q['params'][0], $q['params'][2] );
+																\IPS\Db::i()->addColumn( $q['params'][0], $q['params'][2] );
 
 																continue;
 															}
@@ -239,7 +232,7 @@ class Developer
 												{
 													if ( $q['method'] == 'renameTable' )
 													{
-														if ( Db::i()->checkForTable( $q['params'][1] ) )
+														if ( \IPS\Db::i()->checkForTable( $q['params'][1] ) )
 														{
 															/* The table we are renaming to *does* exist */
 															continue;
@@ -249,7 +242,7 @@ class Developer
 													throw $e;
 												}
 												/* If the error isn't important we should ignore it */
-												else if( !in_array( $e->getCode(), array( 1007, 1008, 1050, 1051, 1060, 1061, 1062, 1091, 1146 ) ) )
+												else if( !\in_array( $e->getCode(), array( 1007, 1008, 1050, 1051, 1060, 1061, 1062, 1091 ) ) )
 												{
 													throw $e;
 												}
@@ -263,25 +256,25 @@ class Developer
 						}
 							
 						/* Run queries for this version */
-						$queries = json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" ), TRUE );
+						$queries = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" ), TRUE );
 						$localQueries = json_decode( static::$lastUpdates[ $this->app->directory ]['ran'], TRUE );
 			
-						if( is_array($queries) )
+						if( \is_array($queries) )
 						{
 							foreach ( $queries as $q )
 							{
-								if ( !is_array($localQueries) OR !in_array( $q, $localQueries ) )
+								if ( !\is_array($localQueries) OR !\in_array( $q, $localQueries ) )
 								{
 									/* Check if the table exists, as it may be an import */
-									if ( $q['method'] === 'renameTable' and Db::i()->checkForTable( $q['params'][0] ) === FALSE )
+									if ( $q['method'] === 'renameTable' and \IPS\Db::i()->checkForTable( $q['params'][0] ) === FALSE )
 									{
 										if ( isset( $schema[ $q['params'][1] ] ) )
 										{
 											try
 											{
-												Db::i()->createTable( $schema[ $q['params'][1] ] );
+												\IPS\Db::i()->createTable( $schema[ $q['params'][1] ] );
 											}
-											catch (Db\Exception $e ) { }
+											catch ( \IPS\Db\Exception $e ) { }
 										}
 									}
 									/* Run */
@@ -291,9 +284,9 @@ class Developer
 										{
 											$method = $q['method'];
 											$params = $q['params'];
-											Db::i()->$method( ...$params );
+											\IPS\Db::i()->$method( ...$params );
 										}
-										catch (Db\Exception $e ) { }
+										catch ( \IPS\Db\Exception $e ) { }
 									}
 								}
 							}
@@ -303,12 +296,12 @@ class Developer
 					}
 					else
 					{
-						$queries = json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" ), TRUE );
+						$queries = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/setup/upg_{$latestVersion}/queries.json" ), TRUE );
 					}
 				}
 		
 				/* Check for missing tables or columns */
-				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( ROOT_PATH . "/applications/{$this->app->directory}/data/schema.json" ) )
+				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/schema.json" ) )
 				{
 					$this->app->installDatabaseSchema( TRUE );
 						
@@ -316,7 +309,7 @@ class Developer
 				}
 		
 				/* Settings */
-				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( ROOT_PATH . "/applications/{$this->app->directory}/data/settings.json" ) )
+				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/settings.json" ) )
 				{
 					$this->app->installSettings();
 						
@@ -324,7 +317,7 @@ class Developer
 				}
 		
 				/* Modules */
-				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( ROOT_PATH . "/applications/{$this->app->directory}/data/modules.json" ) )
+				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/modules.json" ) )
 				{
 					$this->app->installModules();
 						
@@ -332,7 +325,7 @@ class Developer
 				}
 		
 				/* Tasks */				
-				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( ROOT_PATH . "/applications/{$this->app->directory}/data/tasks.json" ) )
+				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/tasks.json" ) )
 				{
 					$this->app->installTasks();
 		
@@ -340,32 +333,134 @@ class Developer
 				}
 				
 				/* Widgets */
-				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( ROOT_PATH . "/applications/{$this->app->directory}/data/widgets.json" ) )
+				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/widgets.json" ) )
 				{
 					$this->app->installWidgets();
 				
 					$updated = TRUE;
 				}
+		
+				/* Skin Settings */
+				if ( static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/themesettings.json" ) )
+				{					
+					if ( $this->app->directory == 'core' )
+					{
+						/* Make sure we've got a skin set ID 1 (constant DEFAULT_THEME_ID) */
+						try
+						{
+							$skinSetOne = \IPS\Db::i()->select( '*', 'core_themes', array( 'set_id=?', \IPS\DEFAULT_THEME_ID ) )->first();
+						}
+						catch( \Exception $e )
+						{
+							$skinSetOne = array();
+						}
+		
+						if ( ! isset( $skinSetOne['set_id'] ) )
+						{
+							\IPS\Db::i()->insert( 'core_themes', array(
+									'set_id'	    			=> \IPS\DEFAULT_THEME_ID,
+									'set_name'      			=> 'Default',
+									'set_key'      				=> 'master',
+									'set_parent_id' 			=> 0,
+									'set_parent_array' 			=> '[]',
+									'set_child_array'  			=> '[]',
+									'set_permissions'  			=> '*',
+									'set_author_name'  			=> "Invision Power Services, Inc",
+									'set_author_url'   			=> 'https://www.invisioncommunity.com',
+									'set_added'		   			=> time(),
+									'set_updated'	  			=> time(),
+									'set_template_settings'     => '[]',
+									'set_version'				=> \IPS\Application::load( $this->app->directory )->version,
+									'set_long_version'			=> \IPS\Application::load( $this->app->directory )->long_version,
+							) );
+								
+							\IPS\Lang::saveCustom( 'core', "core_theme_set_title_" . \IPS\DEFAULT_THEME_ID, "Default" );
+						}
+						else if ( $skinSetOne['set_name'] != 'Default' )
+						{
+							\IPS\Db::i()->update( 'core_themes', array( 'set_name' => 'Default' ), array( 'set_id=?', \IPS\DEFAULT_THEME_ID ) );
+							\IPS\Lang::saveCustom( 'core', "core_theme_set_title_" . \IPS\DEFAULT_THEME_ID, "Default" );
+						}
 
-				/* Theme Editor Settings */
-				if( file_exists( ROOT_PATH . "/applications/{$this->app->directory}/data/themeeditor.json" ) and static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( ROOT_PATH . "/applications/{$this->app->directory}/data/themeeditor.json" ) )
-				{
-					$this->app->installThemeEditorSettings();
-
+						unset( \IPS\Data\Store::i()->themes );
+					}
+						
+					$currentSettings =  iterator_to_array( \IPS\Db::i()->select( '*', 'core_theme_settings_fields', array( 'sc_set_id=? AND sc_app=?', \IPS\DEFAULT_THEME_ID, $this->app->directory ) )->setKeyField('sc_key') );
+						
+					$json		= ( file_exists( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/themesettings.json" ) ) ?
+						json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/themesettings.json" ), TRUE ) :
+						array();
+					$jsonKeys	= array();
+						
+					/* Add */
+					foreach( $json as $key => $data)
+					{
+						$jsonKeys[] = $data['sc_key'];
+		
+						if ( ! isset( $currentSettings[ $data['sc_key'] ] ) )
+						{
+							$currentId = \IPS\Db::i()->insert( 'core_theme_settings_fields', array(
+								'sc_set_id'		 => \IPS\DEFAULT_THEME_ID,
+								'sc_key'		 => $data['sc_key'],
+								'sc_tab_key'	 => $data['sc_tab_key'],
+								'sc_type'		 => $data['sc_type'],
+								'sc_multiple'	 => $data['sc_multiple'],
+								'sc_default'	 => $data['sc_default'],
+								'sc_content'	 => $data['sc_content'],
+								'sc_show_in_vse' => ( isset( $data['sc_show_in_vse'] ) ) ? $data['sc_show_in_vse'] : 0,
+								'sc_updated'	 => time(),
+								'sc_app'		 => $this->app->directory,
+								'sc_title'		 => $data['sc_title'],
+								'sc_order'		 => $data['sc_order'],
+								'sc_condition'	 => $data['sc_condition'],
+							) );
+						}
+						else
+						{
+							/* Update */
+							\IPS\Db::i()->update( 'core_theme_settings_fields', array(
+								'sc_tab_key'	 => $data['sc_tab_key'],
+								'sc_type'		 => $data['sc_type'],
+								'sc_multiple'	 => $data['sc_multiple'],
+								'sc_default'	 => $data['sc_default'],
+								'sc_show_in_vse' => ( isset( $data['sc_show_in_vse'] ) ) ? $data['sc_show_in_vse'] : 0,
+								'sc_content'	 => $data['sc_content'],
+								'sc_title'		 => $data['sc_title'],
+								'sc_order'		 => $data['sc_order'],
+								'sc_condition'	 => $data['sc_condition'],
+							), array( 'sc_set_id=? AND sc_key=? AND sc_app=?', \IPS\DEFAULT_THEME_ID, $data['sc_key'], $this->app->directory ) );
+							
+							$currentId = $currentSettings[ $data['sc_key'] ]['sc_id'];
+						}
+						
+						\IPS\Db::i()->delete('core_theme_settings_values', array('sv_id=?', $currentId ) );
+						\IPS\Db::i()->insert('core_theme_settings_values', array( 'sv_id' => $currentId, 'sv_value' => (string) $data['sc_default'] ) );
+					}
+		
+					/* Remove items not in the JSON file */
+					foreach( $currentSettings as $key => $data )
+					{
+						if ( ! \in_array( $data['sc_key'], $jsonKeys ) )
+						{
+							\IPS\Db::i()->delete( 'core_theme_settings_fields', array( 'sc_set_id=? AND sc_key=? AND sc_app=?', \IPS\DEFAULT_THEME_ID, $data['sc_key'], $this->app->directory ) );
+						}
+					}
+		
 					$updated = TRUE;
-				}
-
-				/* Custom Templates */
-				if( file_exists( ROOT_PATH . "/applications/{$this->app->directory}/data/customtemplates.json" ) and static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( ROOT_PATH . "/applications/{$this->app->directory}/data/customtemplates.json" ) )
-				{
-					$this->app->installCustomTemplates();
-					$updated = true;
 				}
 				
 				/* ACP Search Keywords */
-				if ( file_exists( ROOT_PATH . "/applications/{$this->app->directory}/data/acpsearch.json" ) AND static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( ROOT_PATH . "/applications/{$this->app->directory}/data/acpsearch.json" ) )
+				if ( file_exists( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/acpsearch.json" ) AND static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/acpsearch.json" ) )
 				{
 					$this->app->installSearchKeywords();
+						
+					$updated = TRUE;
+				}
+				
+				/* Hooks */
+				if ( file_exists( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/hooks.json" ) AND static::$lastUpdates[ $this->app->directory ]['last_sync'] < filemtime( \IPS\ROOT_PATH . "/applications/{$this->app->directory}/data/hooks.json" ) )
+				{
+					$this->app->installHooks();
 						
 					$updated = TRUE;
 				}
@@ -379,67 +474,20 @@ class Developer
 				/* Update record */
 				if ( $updated === TRUE )
 				{					
-					Theme::load(DEFAULT_THEME_ID)->saveSet();
+					\IPS\Theme::load( \IPS\DEFAULT_THEME_ID )->saveSet();
 						
-					Db::i()->update( 'core_dev', array(
+					\IPS\Db::i()->update( 'core_dev', array(
 						'working_version'	=> $latestVersion,
 						'last_sync'			=> time(),
 						'ran'				=> isset( $queries ) ? json_encode( $queries ) : array(),
 					), array( 'app_key=?', $this->app->directory ) );
 
-					Store::i()->clearAll();
-					Cache::i()->clearAll();
+					\IPS\Data\Store::i()->clearAll();
+					\IPS\Data\Cache::i()->clearAll();
 				}
 			}
 		}
 
 		return $updated;
-	}
-
-	/**
-	 * Returns a link which will open the file in the IDE
-	 * 
-	 * @param string $filePath
-	 * @param int $line
-	 * @return string|bool|null
-	 */
-	public static function getIdeHref( string $filePath, int $line = 0): string|bool|null
-	{
-		return static::getWhoopsHandler()?->getEditorHref( $filePath, $line );
-	}
-
-	/**
-	 * Returns the Whoops handler
-	 *
-	 * @return PrettyPageHandler|null
-	 */
-	protected static function getWhoopsHandler(): PrettyPageHandler|null
-	{
-		static $handler = NULL;
-		if( !$handler and DEV_WHOOPS_EDITOR )
-		{
-			$handler = new PrettyPageHandler();
-			$handler->setEditor(DEV_WHOOPS_EDITOR);
-		}
-		return $handler;
-	}
-
-	/**
-	 * Retrieves the file path for an application's language file.
-	 * Can optionally add the IDE Handler link so that the link can be opened in an IDE
-	 *
-	 * @param Application $application The application instance.
-	 * @param bool $ideHandlerSupport Indicates whether the IDE handler support is enabled.
-	 * @return string|bool The language file path as a string if it exists, or FALSE if the file does not exist.
-	 */
-	public static function getApplicationsLanguageFilePath( Application $application, bool $ideHandlerSupport = TRUE ): string|bool
-	{
-		$path = \IPS\ROOT_PATH.'/applications/'. $application->directory . '/dev/lang.php';
-
-		if ( file_exists( $path ) and $ideHandlerSupport and $path = static::getIdeHref( $path ) )
-		{
-			return  $path;
-		}
-		return FALSE;
 	}
 }

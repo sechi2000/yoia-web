@@ -12,52 +12,31 @@ namespace IPS\core\extensions\core\Notifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use IPS\Application\Module;
-use IPS\Content;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Content\ReadMarkers;
-use IPS\core\Reports\Report;
-use IPS\core\Reports\Types;
-use IPS\core\Warnings\Warning;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\NotificationsAbstract;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Notification\Inline;
-use IPS\Settings;
-use OutOfRangeException;
-use function defined;
-use function get_class;
-use function is_array;
+use function md5;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Notification Options
  */
-class Moderation extends NotificationsAbstract
+class _Moderation
 {	
 	/**
 	 * Get fields for configuration
 	 *
-	 * @param	Member|null	$member		The member (to take out any notification types a given member will never see) or NULL if this is for the ACP
+	 * @param	\IPS\Member|null	$member		The member (to take out any notification types a given member will never see) or NULL if this is for the ACP
 	 * @return	array
 	 */
-	public static function configurationOptions( ?Member $member = NULL ): array
+	public static function configurationOptions( \IPS\Member $member = NULL ): array
 	{
 		$return = array();
 		
 		/* Reports */
-		if ( $member === NULL or $member->canAccessReportCenter() )
+		if ( $member === NULL or $member->modPermission( 'can_view_reports' ) )
 		{
 			$return['report_center'] = array(
 				'type'				=> 'standard',
@@ -71,14 +50,14 @@ class Moderation extends NotificationsAbstract
 					'report_count'		=> array(
 						'title'				=> 'report_count',
 						'description'		=> 'report_count_desc',
-						'icon'				=> 'list-check',
+						'icon'				=> 'circle-o',
 						'value'				=> $member ? ( !$member->members_bitoptions['no_report_count'] ) : NULL,
 						'adminCanSetDefault'=> FALSE,
 					)
 				)
 			);
 			
-			if ( Db::i()->select( 'COUNT(*)', 'core_automatic_moderation_rules', array( 'rule_enabled=1' ) )->first() )
+			if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_automatic_moderation_rules', array( 'rule_enabled=1' ) )->first() )
 			{
 				$return['automatic_moderation'] = array(
 					'type'				=> 'standard',
@@ -96,9 +75,9 @@ class Moderation extends NotificationsAbstract
 		$canSeePendingContent = ( !$member or $member->modPermission( 'can_view_hidden_content' ) );
 		if ( !$canSeePendingContent )
 		{
-			foreach ( Content::routedClasses( TRUE, TRUE ) as $class )
+			foreach ( \IPS\Content::routedClasses( TRUE, TRUE ) as $class )
 			{
-				if ( IPS::classUsesTrait( $class, 'IPS\Content\Hideable' ) )
+				if ( \in_array( 'IPS\Content\Hideable', class_implements( $class ) ) )
 				{
 					if ( $member->modPermission( 'can_view_hidden_' . $class::$title ) )
 					{
@@ -109,7 +88,7 @@ class Moderation extends NotificationsAbstract
 			}
 		}
 		$canApproveClubs = FALSE;
-		if ( Settings::i()->clubs and Settings::i()->clubs_require_approval and $module = Module::get( 'core', 'clubs', 'front' ) and $module->_enabled )
+		if ( \IPS\Settings::i()->clubs and \IPS\Settings::i()->clubs_require_approval and $module = \IPS\Application\Module::get( 'core', 'clubs', 'front' ) and $module->_enabled )
 		{
 			$canApproveClubs = ( !$member or $member->modPermission( 'can_access_all_clubs' ) );
 		}
@@ -141,7 +120,7 @@ class Moderation extends NotificationsAbstract
 		}
 
 		/* Do we have any report types, and can we report things? ? */
-		if ( Db::i()->select( 'COUNT(*)', 'core_automatic_moderation_types' )->first() and ( ! $member or $member->group['g_can_report'] ) )
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_automatic_moderation_types' )->first() and ( ! $member or $member->group['g_can_report'] ) )
 		{
 			$return['reports'] = [
 				'type' => 'standard',
@@ -160,12 +139,12 @@ class Moderation extends NotificationsAbstract
 	/**
 	 * Save "extra" value
 	 *
-	 * @param	Member|null	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string		$key	The key
-	 * @param	mixed		$value	The value
+	 * @param	bool		$value	The value
 	 * @return	void
 	 */
-	public static function saveExtra( ?Member $member, string $key, mixed $value ) : void
+	public static function saveExtra( ?\IPS\Member $member, $key, $value )
 	{
 		switch ( $key )
 		{
@@ -176,22 +155,34 @@ class Moderation extends NotificationsAbstract
 	}
 	
 	/**
+	 * Disable all "extra" values for a particular type
+	 *
+	 * @param	\IPS\Member|NULL	$member	The member or NULL if this is the admin setting defaults
+	 * @param	string				$method	The method type
+	 * @return	void
+	 */
+	public static function disableExtra( ?\IPS\Member $member, $method )
+	{
+		// Do nothing
+	}
+	
+	/**
 	 * Reset "extra" value to the default for all accounts
 	 *
 	 * @return	void
 	 */
-	public static function resetExtra() : void
+	public static function resetExtra()
 	{
-		Db::i()->update( 'core_members', 'members_bitoptions2 = members_bitoptions2 &~' . Member::$bitOptions['members_bitoptions']['members_bitoptions2']['no_report_count'] );
+		\IPS\Db::i()->update( 'core_members', 'members_bitoptions2 = members_bitoptions2 &~' . \IPS\Member::$bitOptions['members_bitoptions']['members_bitoptions2']['no_report_count'] );
 	}
 	
 	/**
 	 * Get configuration
 	 *
-	 * @param	Member|null	$member	The member
+	 * @param	\IPS\Member|null	$member	The member
 	 * @return	array
 	 */
-	public function getConfiguration( ?Member $member ) : array
+	public function getConfiguration( $member )
 	{
 		$return = array();
 										
@@ -201,9 +192,9 @@ class Moderation extends NotificationsAbstract
 		}
 		else
 		{
-			foreach ( Content::routedClasses( TRUE, TRUE ) as $class )
+			foreach ( \IPS\Content::routedClasses( TRUE, TRUE ) as $class )
 			{
-				if ( IPS::classUSesTrait( $class, 'IPS\Content\Hideable' ) )
+				if ( \in_array( 'IPS\Content\Hideable', class_implements( $class ) ) )
 				{
 					if ( $member->modPermission( 'can_view_hidden_' . $class::$title ) )
 					{
@@ -241,11 +232,11 @@ class Moderation extends NotificationsAbstract
 			throw new \OutOfRangeException;
 		}
 		$reported = $notification->item_sub;
-		$item = ( $reported instanceof Item ) ? $reported : $reported->item();
+		$item = ( $reported instanceof \IPS\Content\Item ) ? $reported : $reported->item();
 
 		try
 		{
-			$reportType = Types::load( $notification->extra['reportType'] );
+			$reportType = \IPS\core\Reports\Types::load( $notification->extra['reportType'] );
 			$class = $item->class;
 			$url = $class::load( $item->content_id )->url();
 		}
@@ -255,18 +246,18 @@ class Moderation extends NotificationsAbstract
 		}
 
 		return array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'notification__report_outcome', FALSE, array(
-					( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( $item->mapped('title'), $reportType->_title, Member::loggedIn()->language()->addToStack( 'report_status_' . $item->status ) ) )
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'notification__report_outcome', FALSE, array(
+					( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( $item->mapped('title'), $reportType->_title, \IPS\Member::loggedIn()->language()->addToStack( 'report_status_' . $item->status ) ) )
 			),
 			'url'		=> $url,
-			'author'	=> Member::loggedIn(),
+			'author'	=> \IPS\Member::loggedIn(),
 		);
 	}
-
+		
 	/**
 	 * Parse notification: unapproved_content_bulk
 	 *
-	 * @param	Inline	$notification	The notification
+	 * @param	\IPS\Notification\Inline	$notification	The notification
 	 * @param	bool						$htmlEscape		TRUE to escape HTML in title
 	 * @return	array
 	 * @code
@@ -280,13 +271,13 @@ class Moderation extends NotificationsAbstract
 	 );
 	 * @endcode
 	 */
-	public function parse_unapproved_content_bulk( Inline $notification, bool $htmlEscape=TRUE ) : array
+	public function parse_unapproved_content_bulk( $notification, $htmlEscape=TRUE )
 	{
 		$node = $notification->item;
 		
 		if ( !$node )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		if ( $notification->extra )
@@ -295,26 +286,26 @@ class Moderation extends NotificationsAbstract
 				so we need to grab just the one array entry (the member ID we stored) */
 			$memberId = $notification->extra;
 
-			if( is_array( $memberId ) )
+			if( \is_array( $memberId ) )
 			{
 				$memberId = array_pop( $memberId );
 			}
 
-			$author = Member::load( $memberId );
+			$author = \IPS\Member::load( $memberId );
 		}
 		else
 		{
-			$author = new Member;
+			$author = new \IPS\Member;
 		}
 		
 		$contentClass = $node::$contentItemClass;
 		
 		return array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'notification__unapproved_content_bulk', FALSE, array(
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'notification__unapproved_content_bulk', FALSE, array(
 				( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array(
 					$author->name,
-					Member::loggedIn()->language()->get( $contentClass::$title . '_pl_lc' ),
-					$node->getTitleForLanguage( Member::loggedIn()->language(), $htmlEscape ? array( 'escape' => TRUE ) : array() )
+					\IPS\Member::loggedIn()->language()->get( $contentClass::$title . '_pl_lc' ),
+					$node->getTitleForLanguage( \IPS\Member::loggedIn()->language(), $htmlEscape ? array( 'escape' => TRUE ) : array() )
 				)
 			) ),
 			'url'		=> $node->url(),
@@ -325,7 +316,7 @@ class Moderation extends NotificationsAbstract
 	/**
 	 * Parse notification: warning_mods
 	 *
-	 * @param	Inline	$notification	The notification
+	 * @param	\IPS\Notification\Inline	$notification	The notification
 	 * @param	bool						$htmlEscape		TRUE to escape HTML in title
 	 * @return	array
 	 * @code
@@ -339,44 +330,44 @@ class Moderation extends NotificationsAbstract
 	 	);
 	 * @endcode
 	 */
-	public function parse_warning_mods( Inline $notification, bool $htmlEscape=TRUE ) : array
+	public function parse_warning_mods( $notification, $htmlEscape=TRUE )
 	{
 		if ( !$notification->item )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		return array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'notification__warning_mods', FALSE, array(
-				( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( Member::load( $notification->item->member )->name, Member::load( $notification->item->moderator )->name ) )
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'notification__warning_mods', FALSE, array(
+				( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( \IPS\Member::load( $notification->item->member )->name, \IPS\Member::load( $notification->item->moderator )->name ) )
 			),
 			'url'		=> $notification->item->url(),
 			'content'	=> $notification->item->note_mods,
-			'author'	=> Member::load( $notification->item->moderator ),
+			'author'	=> \IPS\Member::load( $notification->item->moderator ),
 		);
 	}
 	
 	/**
 	 * Parse notification for mobile: warning_mods
 	 *
-	 * @param	Lang					$language	The language that the notification should be in
-	 * @param	Warning	$warning		The warning
+	 * @param	\IPS\Lang					$language	The language that the notification should be in
+	 * @param	\IPS\core\Warnings\Warning	$warning		The warning
 	 * @return	array
 	 */
-	public static function parse_mobile_warning_mods( Lang $language, Warning $warning ) : array
+	public static function parse_mobile_warning_mods( \IPS\Lang $language, \IPS\core\Warnings\Warning $warning )
 	{
 		return array(
 			'title'		=> $language->addToStack( 'notification__warning_mods_title', FALSE, array( 'pluralize' => array(1) ) ),
 			'body'		=> $language->addToStack( 'notification__warning_mods', FALSE, array( 'htmlsprintf' => array(
-				Member::load( $warning->member )->name,
-				Member::load( $warning->moderator )->name
+				\IPS\Member::load( $warning->member )->name,
+				\IPS\Member::load( $warning->moderator )->name
 			) ) ),
 			'data'		=> array(
 				'url'		=> (string) $warning->url(),
 				'author'	=> $warning->moderator,
 				'grouped'	=> $language->addToStack( 'notification__warning_mods_grouped'), // Pluralized on the client
 				'groupedTitle' => $language->addToStack( 'notification__warning_mods_title' ), // Pluralized on the client
-				'groupedUrl' => Url::internal( 'app=core&module=modcp&controller=modcp&tab=recent_warnings', 'front', 'modcp_recent_warnings' )
+				'groupedUrl' => \IPS\Http\Url::internal( 'app=core&module=modcp&controller=modcp&tab=recent_warnings', 'front', 'modcp_recent_warnings' )
 			),
 			'tag' => md5('recent-warnings'), // Group warning notifications
 			'channelId'	=> 'moderation',
@@ -386,15 +377,14 @@ class Moderation extends NotificationsAbstract
 	/**
 	 * Parse notification for mobile: unapproved_content_bulk
 	 *
-	 * @param	Lang			$language		The language that the notification should be in
-	 * @param	Model		$node			The node with the new content
-	 * @param	Member			$author			The author
+	 * @param	\IPS\Lang			$language		The language that the notification should be in
+	 * @param	\IPS\Node\Model		$node			The node with the new content
+	 * @param	\IPS\Member			$author			The author
 	 * @param	string				$contentClass	The content class
 	 * @return	array
 	 */
-	public static function parse_mobile_unapproved_content_bulk( Lang $language, Model $node, Member $author, string $contentClass ) : array
+	public static function parse_mobile_unapproved_content_bulk( \IPS\Lang $language, \IPS\Node\Model $node, \IPS\Member $author, $contentClass )
 	{
-		/* @var Content $contentClass */
 		return array(
 			'title'		=> $language->addToStack( 'notification__unapproved_content_bulk_title', FALSE, array( 'htmlsprintf' => array(
 				$language->get( $contentClass::$title . '_pl_lc' ),
@@ -415,7 +405,7 @@ class Moderation extends NotificationsAbstract
 	/**
 	 * Parse notification: report_center
 	 *
-	 * @param	Inline	$notification	The notification
+	 * @param	\IPS\Notification\Inline	$notification	The notification
 	 * @param	bool						$htmlEscape		TRUE to escape HTML in title
 	 * @return	array
 	 * @code
@@ -429,18 +419,18 @@ class Moderation extends NotificationsAbstract
 	 	);
 	 * @endcode
 	 */
-	public function parse_report_center( Inline $notification, bool $htmlEscape=TRUE ) : array
+	public function parse_report_center( $notification, $htmlEscape=TRUE )
 	{
 		if ( !$notification->item_sub )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		$reported = $notification->item_sub;
-		$item = ( $reported instanceof Item ) ? $reported : $reported->item();
+		$item = ( $reported instanceof \IPS\Content\Item ) ? $reported : $reported->item();
 
 		return array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'notification__report_center', FALSE, array(
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'notification__report_center', FALSE, array(
 				( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( $notification->item->author()->name, mb_strtolower( $reported->indefiniteArticle() ), $item->mapped('title' ) ) )
 			),
 			'url'		=> $notification->item->url(),
@@ -452,18 +442,18 @@ class Moderation extends NotificationsAbstract
 	/**
 	 * Parse notification for mobile: report_center
 	 *
-	 * @param	Lang					$language		The language that the notification should be in
-	 * @param	Report	$report			The report
+	 * @param	\IPS\Lang					$language		The language that the notification should be in
+	 * @param	\IPS\core\Reports\Report	$report			The report
 	 * @param	array						$latestReport	Information about this specific report
-	 * @param	Content				$reportedContent	The content that was reported
+	 * @param	\IPS\Content				$reportedContent	The content that was reported
 	 * @return	array
 	 */
-	public static function parse_mobile_report_center( Lang $language, Report $report, array $latestReport, Content $reportedContent ) :array
+	public static function parse_mobile_report_center( \IPS\Lang $language, \IPS\core\Reports\Report $report, array $latestReport, \IPS\Content $reportedContent )
 	{
 		return array(
 			'title'		=> $language->addToStack( 'notification__report_center_title' ),
 			'body'		=> $language->addToStack( 'notification__report_center', FALSE, array( 'htmlsprintf' => array(
-				Member::load( $latestReport['report_by'] )->name,
+				\IPS\Member::load( $latestReport['report_by'] )->name,
 				mb_strtolower( $reportedContent->indefiniteArticle( $language ) ),
 				$report->mapped('title')
 			) ) ),
@@ -472,7 +462,7 @@ class Moderation extends NotificationsAbstract
 				'author'	=> $report->author(),
 				'grouped'	=> $language->addToStack( 'notification__report_center_grouped'), // Pluralized on the client
 				'groupedTitle' => $language->addToStack( 'notification__report_center_title' ), // Pluralized on the client
-				'groupedUrl' => Url::internal( 'app=core&module=modcp&controller=modcp&tab=reports', NULL, 'modcp_reports' )
+				'groupedUrl' => \IPS\Http\Url::internal( 'app=core&module=modcp&controller=modcp&tab=reports', NULL, 'modcp_reports' )
 			),
 			'tag' => md5('report-center'),
 			'channelId'	=> 'moderation',
@@ -482,7 +472,7 @@ class Moderation extends NotificationsAbstract
 	/**
 	 * Parse notification: automatic_moderation
 	 *
-	 * @param	Inline	$notification	The notification
+	 * @param	\IPS\Notification\Inline	$notification	The notification
 	 * @param	bool						$htmlEscape		TRUE to escape HTML in title
 	 * @return	array
 	 * @code
@@ -496,18 +486,18 @@ class Moderation extends NotificationsAbstract
 	 	);
 	 * @endcode
 	 */
-	public function parse_automatic_moderation( Inline $notification, bool $htmlEscape=TRUE ) : array
+	public function parse_automatic_moderation( $notification, $htmlEscape=TRUE )
 	{
 		if ( !$notification->item_sub )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		$reported = $notification->item_sub;
-		$item = ( $reported instanceof Item ) ? $reported : $reported->item();
+		$item = ( $reported instanceof \IPS\Content\Item ) ? $reported : $reported->item();
 
 		return array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'notification__automatic_moderation', FALSE, array(
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'notification__automatic_moderation', FALSE, array(
 				( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( mb_strtolower( $reported->indefiniteArticle() ), $item->mapped('title' ) ) )
 			),
 			'url'		=> $notification->item->url(),
@@ -519,13 +509,13 @@ class Moderation extends NotificationsAbstract
 	/**
 	 * Parse notification for mobile: automatic_moderation
 	 *
-	 * @param	Lang					$language		The language that the notification should be in
-	 * @param	Report		$report			The report
+	 * @param	\IPS\Lang					$language		The language that the notification should be in
+	 * @param	\IPS\core\Reports\Report		$report			The report
 	 * @param	array						$latestReport	Information about this specific report
-	 * @param	Content					$reportedContent	The content that was reported
+	 * @param	\IPS\Content					$reportedContent	The content that was reported
 	 * @return	array
 	 */
-	public static function parse_mobile_automatic_moderation( Lang $language, Report $report, array $latestReport, Content $reportedContent ) : array
+	public static function parse_mobile_automatic_moderation( \IPS\Lang $language, \IPS\core\Reports\Report $report, array $latestReport, \IPS\Content $reportedContent )
 	{
 		return array(
 			'title'		=> $language->addToStack( 'notification__automatic_moderation_title' ),
@@ -544,7 +534,7 @@ class Moderation extends NotificationsAbstract
 	/**
 	 * Parse notification: unapproved_content
 	 *
-	 * @param	Inline	$notification	The notification
+	 * @param	\IPS\Notification\Inline	$notification	The notification
 	 * @param	bool						$htmlEscape		TRUE to escape HTML in title
 	 * @return	array
 	 * @code
@@ -558,37 +548,36 @@ class Moderation extends NotificationsAbstract
 	 	);
 	 * @endcode
 	 */
-	public function parse_unapproved_content( Inline $notification, bool $htmlEscape=TRUE ) : array
+	public function parse_unapproved_content( $notification, $htmlEscape=TRUE )
 	{
 		if ( !$notification->item )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		$item = $notification->item;
-		$unread = false;
-		$title = ( $item instanceof Comment ) ? $item->item()->mapped( 'title' ) : $item->mapped( 'title' );
-
-		if( IPS::classUsesTrait( $item, ReadMarkers::class ) )
+		
+		if ( $item instanceof \IPS\Content\Comment OR $item instanceof \IPS\Content\Review )
 		{
-			if ( $item instanceof Comment )
+			$title = $item->item()->mapped('title');
+
+			/* Unread? */
+			$unread = false;
+			if ( $item->item()->timeLastRead() instanceof \IPS\DateTime )
 			{
-				/* Unread? */
-				if ( $item->item()->timeLastRead() instanceof DateTime )
-				{
-					$unread =( $item->item()->timeLastRead()->getTimestamp() < $notification->updated_time->getTimestamp() );
-				}
-			}
-			else
-			{
-				$unread = (bool) ( $item->unread() );
+				$unread = (bool) ( $item->item()->timeLastRead()->getTimestamp() < $notification->updated_time->getTimestamp() );
 			}
 		}
+		else
+		{
+			$title = $item->mapped('title');
+			$unread = (bool) ( $item->unread() );
+		}
 		
-		$name = ( IPS::classUsesTrait( $item, 'IPS\Content\Anonymous' ) AND $item->isAnonymous() ) ? Member::loggedIn()->language()->addToStack( 'post_anonymously_placename' ) : $item->author()->name;
+		$name = ( $item->isAnonymous() ) ? \IPS\Member::loggedIn()->language()->addToStack( 'post_anonymously_placename' ) : $item->author()->name;
 		
 		return array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'notification__unapproved_content', FALSE, array( ( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( $name, mb_strtolower( $item->indefiniteArticle() ), $title ) ) ),
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'notification__unapproved_content', FALSE, array( ( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( $name, mb_strtolower( $item->indefiniteArticle() ), $title ) ) ),
 			'url'		=> $item->url(),
 			'content'	=> $item->content(),
 			'author'	=> $item->author(),
@@ -599,19 +588,19 @@ class Moderation extends NotificationsAbstract
 	/**
 	 * Parse notification for mobile: unapproved_content
 	 *
-	 * @param	Lang		$language		The language that the notification should be in
-	 * @param	Content		$content			The content
+	 * @param	\IPS\Lang		$language		The language that the notification should be in
+	 * @param	\IPS\Content		$content			The content
 	 * @return	array
 	 */
-	public static function parse_mobile_unapproved_content( Lang $language, Content $content ) : array
+	public static function parse_mobile_unapproved_content( \IPS\Lang $language, \IPS\Content $content )
 	{
-		$item = ( $content instanceof Item ) ? $content : $content->item();
+		$item = ( $content instanceof \IPS\Content\Item ) ? $content : $content->item();
 		$container = $item->containerWrapper();
 		$containerId = $container ? $container->_id : "-"; // This is used to generate the tag. Use ID if we have one, otherwise just a dash
 
 		return array(
 			'title'		=> $language->addToStack( 'notification__unapproved_content_title', FALSE, array( 'htmlsprintf' => array(
-				( $content instanceof Item ) ? $content->definiteArticle( $language ) : $language->get( $content::$title . '_lc' ),
+				( $content instanceof \IPS\Content ) ? $content->definiteArticle( $language ) : $language->get( $content::$title . '_lc' ),
 			) ) ),
 			'body'		=> $language->addToStack( 'notification__unapproved_content', FALSE, array( 'htmlsprintf' => array(
 				$content->author()->name,
@@ -632,7 +621,7 @@ class Moderation extends NotificationsAbstract
 				)) ), // Pluralized on the client
 				'groupedUrl' => $container ? $container->url() : NULL
 			),
-			'tag' => md5('unapproved' . get_class( $item ) . $containerId ),
+			'tag' => md5('unapproved' . \get_class( $item ) . $containerId ),
 			'channelId'	=> 'moderation',
 		);
 	}

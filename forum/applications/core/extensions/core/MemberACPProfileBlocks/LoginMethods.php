@@ -11,38 +11,28 @@
 namespace IPS\core\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\LazyLoadingBlock;
-use IPS\Http\Request\Exception;
-use IPS\Log;
-use IPS\Login;
-use IPS\Login\Handler\Standard;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Login Methods Block
  */
-class LoginMethods extends LazyLoadingBlock
+class _LoginMethods extends \IPS\core\MemberACPProfile\LazyLoadingBlock
 {
 	/**
 	 * Get output
 	 *
 	 * @return	string
 	 */
-	public function lazyOutput(): string
+	public function lazyOutput()
 	{
 		$loginMethods = array();
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
-			if ( $method->canProcess( $this->member ) and !( $method instanceof Standard ) )
+			if ( $method->canProcess( $this->member ) and !( $method instanceof \IPS\Login\Handler\Standard ) )
 			{
 				$link = NULL;
 				try
@@ -54,7 +44,7 @@ class LoginMethods extends LazyLoadingBlock
 					{
 						if ( isset( $this->member->profilesync[ $type ]['error'] ) )
 						{
-							$forceSyncErrors[ $type ] = Member::loggedIn()->language()->addToStack( $this->member->profilesync[ $type ]['error'] );
+							$forceSyncErrors[ $type ] = \IPS\Member::loggedIn()->language()->addToStack( $this->member->profilesync[ $type ]['error'] );
 						}
 					}
 					
@@ -69,13 +59,17 @@ class LoginMethods extends LazyLoadingBlock
 						{
 							continue;
 						}
+						if ( $option == 'status' and ( !$this->member->canAccessModule( \IPS\Application\Module::get( 'core', 'status', 'front' ) ) or !\IPS\core\Statuses\Status::canCreateFromCreateMenu( $this->member ) or !\IPS\Settings::i()->profile_comments or $this->member->group['gbw_no_status_update'] ) )
+						{
+							continue;
+						}
 						
 						$syncOptions = TRUE;
 						break;
 					}
 					
 					$canDisassociate = FALSE;
-					foreach ( Login::methods() as $_method )
+					foreach ( \IPS\Login::methods() as $_method )
 					{
 						if ( $_method->id != $method->id and $_method->canProcess( $this->member ) )
 						{
@@ -85,11 +79,11 @@ class LoginMethods extends LazyLoadingBlock
 					}
 
 					/* Login handlers may return NULL if they do not support display name syncing */
-					$memberName = $method->userProfileName( $this->member ) ?? Member::loggedIn()->language()->get( 'profilesync_unknown_name' );
+					$memberName = $method->userProfileName( $this->member ) ?? \IPS\Member::loggedIn()->language()->get( 'profilesync_unknown_name' );
 					
 					$loginMethods[ $method->id ] = array(
 						'title'				=> $method->_title,
-						'blurb'				=> Member::loggedIn()->language()->addToStack( 'profilesync_headline', FALSE, array( 'sprintf' => array( $memberName ) ) ),
+						'blurb'				=> \IPS\Member::loggedIn()->language()->addToStack( 'profilesync_headline', FALSE, array( 'sprintf' => array( $memberName ) ) ),
 						'forceSyncErrors'	=> $forceSyncErrors,
 						'icon'				=> $method->userProfilePhoto( $this->member ),
 						'logo'				=> $method->logoForUcp(),
@@ -98,17 +92,17 @@ class LoginMethods extends LazyLoadingBlock
 						'delete'			=> $canDisassociate
 					);
 				}
-				catch ( Login\Exception $e )
+				catch ( \IPS\Login\Exception $e )
 				{
-					$loginMethods[ $method->id ] = array( 'title' => $method->_title, 'blurb' => Member::loggedIn()->language()->addToStack('profilesync_reauth_needed'), 'logo' => $method->logoForUcp(), 'link' => $link );
+					$loginMethods[ $method->id ] = array( 'title' => $method->_title, 'blurb' => \IPS\Member::loggedIn()->language()->addToStack('profilesync_reauth_needed'), 'logo' => $method->logoForUcp(), 'link' => $link );
 				}
-				catch( Exception $e )
+				catch( \IPS\Http\Request\Exception $e )
 				{
-					Log::log( $e, 'login_method_connect' );
+					\IPS\Log::log( $e, 'login_method_connect' );
 				}
 			}
 		}
 		
-		return (string) Theme::i()->getTemplate('memberprofile')->loginMethods( $this->member, $loginMethods );
+		return \IPS\Theme::i()->getTemplate('memberprofile')->loginMethods( $this->member, $loginMethods );
 	}
 }

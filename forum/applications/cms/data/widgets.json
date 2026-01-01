@@ -11,18 +11,11 @@
     },
     "Wysiwyg": {
         "class": "\\IPS\\Widget\\StaticCache",
-        "restrict": [
-            "sidebar",
-            "cms"
-        ],
+        "restrict": [],
         "default_area": "",
         "allow_reuse": true,
         "menu_style": "modal",
-        "layouts": "",
-        "embeddable": false,
-        "padding": false,
-        "default_layout": null,
-        "searchterms": "rich text,editor,content"
+        "embeddable": false
     },
     "DatabaseFilters": {
         "class": "\\IPS\\Widget",
@@ -59,10 +52,9 @@
             "cms"
         ],
         "default_area": "",
-        "allow_reuse": true,
+        "allow_reuse": false,
         "menu_style": "menu",
-        "embeddable": true,
-        "padding": false
+        "embeddable": true
     },
     "Rss": {
         "class": "\\IPS\\Widget\\StaticCache",
@@ -83,11 +75,7 @@
         "default_area": "",
         "allow_reuse": true,
         "menu_style": "modal",
-        "layouts": "",
-        "embeddable": true,
-        "padding": false,
-        "default_layout": null,
-        "searchterms": "plaintext,plain"
+        "embeddable": true
     },
     "pagebuilderoembed": {
         "class": "\\IPS\\Widget\\StaticCache",
@@ -109,49 +97,6 @@
         "default_area": "",
         "allow_reuse": true,
         "menu_style": "modal",
-        "layouts": "wallpaper",
-        "embeddable": true,
-        "padding": false,
-        "default_layout": "wallpaper",
-        "searchterms": "carousel,slideshow,autoplay"
-    },
-    "Codemirror": {
-        "class": "\\IPS\\Widget",
-        "restrict": [
-            "sidebar",
-            "cms"
-        ],
-        "default_area": "",
-        "allow_reuse": true,
-        "menu_style": "modal",
-        "layouts": "",
-        "embeddable": true,
-        "padding": false,
-        "default_layout": null,
-        "searchterms": "code,rich,plain,editor"
-    },
-    "DatabaseNavigation": {
-        "class": "\\IPS\\Widget",
-        "restrict": [
-            "sidebar",
-            "cms"
-        ],
-        "default_area": "",
-        "allow_reuse": false,
-        "menu_style": "menu",
-        "layouts": "wrap,grid,start,center,end,columnLeft,columnRight,stack",
-        "embeddable": true
-    },
-    "FolderNavigation": {
-        "class": "\\IPS\\Widget",
-        "restrict": [
-            "sidebar",
-            "cms"
-        ],
-        "default_area": "",
-        "allow_reuse": true,
-        "menu_style": "menu",
-        "layouts": "wrap,grid,start,center,end,columnLeft,columnRight,stack",
         "embeddable": true
     }
 }

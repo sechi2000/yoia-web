@@ -10,34 +10,37 @@
 
 namespace IPS\{app}\extensions\core\Statistics;
 
-use IPS\core\Statistics\Chart;
-use IPS\Helpers\Chart as ChartClass;
+use IPS\core\Statistics\Chart as ParentClass;
+use IPS\Helpers\Chart;
 use IPS\Http\Url;
-use function defined;
 
+use function defined;
+use function header;
+
+/* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class {class} extends Chart
+class _{class} extends ParentClass
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = NULL;
+	public $controller = NULL;
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param   Url	$url	URL the chart is being shown on.
-	 * @return ChartClass
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): ChartClass
+	public function getChart( Url $url ): Chart
 	{
 		
 	}

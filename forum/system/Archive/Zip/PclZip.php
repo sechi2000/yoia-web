@@ -11,17 +11,9 @@
 namespace IPS\Archive\Zip;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Archive;
-use IPS\Archive\Zip;
-use OutOfRangeException;
-use RuntimeException;
-use function defined;
-use const PCLZIP_OPT_EXTRACT_AS_STRING;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -30,25 +22,25 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * @brief	PclZip Zip Class
  */
-class PclZip extends Zip
+class _PclZip extends \IPS\Archive\Zip
 {
 	/**
 	 * @brief	PclZip Object
 	 */
-	protected ?\PclZip $zipArchive;
+	protected $zipArchive;
 	
 	/**
 	 * @brief	Files
 	 */
-	protected array|int|null $files = null;
+	protected $files;
 	
 	/**
 	 * Create object from local file
 	 *
-	 * @param string $path			Path to archive file
-	 * @return	Archive
+	 * @param	string	$path			Path to archive file
+	 * @return	\IPS\Archive
 	 */
-	public static function _fromLocalFile( string $path ): Archive
+	public static function _fromLocalFile( $path )
 	{
 		$object = new static;
 		$object->zipArchive = new \PclZip( $path );
@@ -60,7 +52,7 @@ class PclZip extends Zip
 	 *
 	 * @return	int
 	 */
-	public function numberOfFiles(): int
+	public function numberOfFiles()
 	{
 		$properties = $this->zipArchive->properties();
 		return $properties['nb'];
@@ -69,12 +61,12 @@ class PclZip extends Zip
 	/**
 	 * Get file name
 	 *
-	 * @param int $i	File number
+	 * @param	int	$i	File number
 	 * @return	string
-	 * @throws	RuntimeException
-	 * @throws	OutOfRangeException
+	 * @throws	\RuntimeException
+	 * @throws	\OutOfRangeException
 	 */
-	public function getFileName( int $i ): string
+	public function getFileName( $i )
 	{
 		if ( $this->files === NULL )
 		{
@@ -84,7 +76,7 @@ class PclZip extends Zip
 		/* pclZip returns 0 on an unrecoverable failure */
 		if ( $this->files === 0 )
 		{
-			throw new RuntimeException;
+			throw new \RuntimeException;
 		}
 		
 		if ( isset( $this->files[ $i ] ) )
@@ -93,20 +85,20 @@ class PclZip extends Zip
 		}
 		else
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 	}
 	
 	/**
 	 * Get file contents
 	 *
-	 * @param int $i	File number
+	 * @param	int	$i	File number
 	 * @return	string
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	public function getFileContents( int $i ): string
+	public function getFileContents( $i )
 	{
-		$content = $this->zipArchive->extractByIndex( $i, PCLZIP_OPT_EXTRACT_AS_STRING );
+		$content = $this->zipArchive->extractByIndex( $i, \PCLZIP_OPT_EXTRACT_AS_STRING );
 		return $content[0]['content'];
 	}
 }

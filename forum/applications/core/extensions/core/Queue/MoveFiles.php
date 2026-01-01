@@ -11,36 +11,22 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Log;
-use IPS\Member;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function is_numeric;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Move Files from one storage method to another
  */
-class MoveFiles extends QueueAbstract
+class _MoveFiles
 {
 	
 	/**
 	 * @brief Number of files to move per cycle
 	 */
-	public int $batch = REBUILD_SLOW;
+	public $batch = \IPS\REBUILD_SLOW;
 	
 	/**
 	 * Run Background Task
@@ -50,52 +36,44 @@ class MoveFiles extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ): int
+	public function run( $data, $offset )
 	{
-		$exploded	= explode( '_', $data['storageExtension'] );
-		try
-		{
-			$classname = Application::getExtensionClass( $exploded[2], 'FileStorage', $exploded[3] );
-		}
-		catch( OutOfRangeException )
+		$exploded	= explode( '_', $data['storageExtension'] );		
+		$classname	= "IPS\\{$exploded[2]}\\extensions\\core\\FileStorage\\{$exploded[3]}";
+		$offset		= $offset ?: 0;
+       
+        if ( !class_exists( $classname ) or !\IPS\Application::appIsEnabled( $exploded[2] ) )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
-
-		$offset		= $offset ?: 0;
+		
 		$extension = new $classname;
 
 		for ( $i = 0; $i < $this->batch; $i++ )
 		{
 			try
 			{
-				/* If we have nothing to move, don't bother with this */
-				if( $data['count'] === 0 )
-				{
-					throw new UnderflowException;
-				}
-
 				$return = $extension->move( $offset, (int) $data['newConfiguration'], (int) $data['oldConfiguration'] );
 				
 				$offset++;
 				
 				/* Did we return a new offset? */
-				if ( is_numeric( $return ) )
+				if ( \is_numeric( $return ) )
 				{
 					$offset = $return;
 				}
 			} 
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				/* Move is done so remove second config ID to remove lock */
-				$row = Db::i()->select( '*', 'core_sys_conf_settings', array( 'conf_key=?', 'upload_settings' ) )->first();
+				$row = \IPS\Db::i()->select( '*', 'core_sys_conf_settings', array( 'conf_key=?', 'upload_settings' ) )->first();
 				$settings = json_decode( $row['conf_value'], TRUE );
 
 				if ( isset( $settings[ $data['storageExtension'] ] ) )
 				{
 					$settings[ $data['storageExtension'] ] = $data['newConfiguration'];
 
-					Settings::i()->changeValues( array( 'upload_settings' => json_encode( $settings ) ) );
+					\IPS\Settings::i()->changeValues( array( 'upload_settings' => json_encode( $settings ) ) );
 				}
 				
 				/* Run the settingsUpdated method to clear out anything that needs rebuilding or whatever and so on */
@@ -106,9 +84,9 @@ class MoveFiles extends QueueAbstract
 				
 				throw new \IPS\Task\Queue\OutOfRangeException;
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				Log::log( $e, 'move_files_bgtask' );
+				\IPS\Log::log( $e, 'move_files_bgtask' );
 				$offset++;
 				continue;
 			}
@@ -123,21 +101,10 @@ class MoveFiles extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' => Member::loggedIn()->language()->addToStack('moving_files', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( $data['storageExtension'] ) ) ) ), 'complete' => $data['count'] ? round( ( 100 / $data['count'] * $offset ), 2 ) : 100 );
-	}
-
-	/**
-	 * Parse data before queuing
-	 *
-	 * @param array $data
-	 * @return    array|null
-	 */
-	public function preQueueData( array $data ): ?array
-	{
-		return $data;
-	}
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('moving_files', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $data['storageExtension'] ) ) ) ), 'complete' => $data['count'] ? round( ( 100 / $data['count'] * $offset ), 2 ) : 100 );
+	}	
 }

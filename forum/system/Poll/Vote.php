@@ -11,66 +11,57 @@
 namespace IPS\Poll;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Member;
-use IPS\Patterns\ActiveRecord;
-use IPS\Poll;
-use IPS\Request;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Poll Vote Model
  */
-class Vote extends ActiveRecord
+class _Vote extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_voters';
+	public static $databaseTable = 'core_voters';
 	
 	/**
 	 * @brief	Database ID Column
 	 */
-	public static string $databaseColumnId = 'vid';
+	public static $databaseColumnId = 'vid';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'member_id' );
+	protected static $databaseIdFields = array( 'member_id' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * Create from form
 	 *
 	 * @param	array|NULL	$values	Form values
-	 * @return    Vote
+	 * @return	\IPS\Poll\Vote
 	 */
-	public static function fromForm( array|null $values ): Vote
+	public static function fromForm( $values )
 	{
 		$vote = new static;
-		$vote->member_id = Member::loggedIn()->member_id;
+		$vote->member_id = \IPS\Member::loggedIn()->member_id;
 		if ( $values )
 		{
 			$vote->member_choices = $values;
 		}
-		$vote->ip_address = Request::i()->ipAddress();
+		$vote->ip_address = \IPS\Request::i()->ipAddress();
 		return $vote;
 	}
 	
@@ -79,18 +70,18 @@ class Vote extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
-		$this->vote_date = new DateTime;
+		$this->vote_date = new \IPS\DateTime;
 	}
 	
 	/**
 	 * Set vote date
 	 *
-	 * @param	DateTime	$value	Value
+	 * @param	\IPS\DateTime	$value	Value
 	 * @return	void
 	 */
-	public function set_vote_date( DateTime $value ) : void
+	public function set_vote_date( \IPS\DateTime $value )
 	{
 		$this->_data['vote_date'] = $value->getTimestamp();
 	}
@@ -98,11 +89,11 @@ class Vote extends ActiveRecord
 	/**
 	 * Get vote date
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_vote_date(): DateTime
+	public function get_vote_date()
 	{
-		return DateTime::ts( $this->_data['vote_date'] );
+		return \IPS\DateTime::ts( $this->_data['vote_date'] );
 	}
 	
 	/**
@@ -111,7 +102,7 @@ class Vote extends ActiveRecord
 	 * @param	array	$value	Value
 	 * @return	void
 	 */
-	public function set_member_choices( array $value ) : void
+	public function set_member_choices( array $value )
 	{
 		$this->_data['member_choices'] = json_encode( $value );
 	}
@@ -119,9 +110,9 @@ class Vote extends ActiveRecord
 	/**
 	 * Get choices
 	 *
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function get_member_choices(): ?array
+	public function get_member_choices()
 	{
 		return isset( $this->_data['member_choices'] ) ? json_decode( $this->_data['member_choices'], TRUE ) : NULL;
 	}
@@ -129,10 +120,10 @@ class Vote extends ActiveRecord
 	/**
 	 * Set poll
 	 *
-	 * @param	Poll	$value	Value
+	 * @param	\IPS\Poll	$value	Value
 	 * @return	void
 	 */
-	public function set_poll( Poll $value ) : void
+	public function set_poll( \IPS\Poll $value )
 	{
 		$this->_data['poll'] = $value->pid;
 	}
@@ -140,19 +131,19 @@ class Vote extends ActiveRecord
 	/**
 	 * Get poll
 	 *
-	 * @return	Poll
+	 * @return	array
 	 */
-	public function get_poll(): Poll
+	public function get_poll()
 	{
-		return Poll::load( $this->_data['poll'] );
+		return \IPS\Poll::load( $this->_data['poll'] );
 	}
 	
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		if ( $this->member_choices !== NULL )
 		{
@@ -161,7 +152,7 @@ class Vote extends ActiveRecord
 			{
 				if ( isset( $choices[ $k ] ) ) // If the question has been deleted since this vote was cast, this won't be set
 				{
-					if ( is_array( $v ) )
+					if ( \is_array( $v ) )
 					{
 						foreach ( $v as $key => $memberValues )
 						{

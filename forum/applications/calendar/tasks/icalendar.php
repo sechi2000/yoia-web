@@ -12,24 +12,16 @@
 namespace IPS\calendar\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\calendar\Icalendar as iCalendarClass;
-use IPS\Db;
-use IPS\Task;
-use IPS\Task\Exception;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * icalendar Task
  */
-class icalendar extends Task
+class _icalendar extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -40,34 +32,34 @@ class icalendar extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		try
 		{
-			$next	= Db::i()->select( '*', 'calendar_import_feeds', NULL, 'feed_last_run ASC', 1 )->first();
+			$next	= \IPS\Db::i()->select( '*', 'calendar_import_feeds', NULL, 'feed_last_run ASC', 1 )->first();
 
 			if( $next['feed_id'] )
 			{
 				/* Refresh the feed */
 				try
 				{
-					$count	= iCalendarClass::load( $next['feed_id'] )->refresh();
+					$count	= \IPS\calendar\Icalendar::load( $next['feed_id'] )->refresh();
 				}
 				catch( \Exception $e )
 				{
-					throw new Exception( $this, array( 'task_' . $e->getMessage(), $next['feed_title'] ) );
+					throw new \IPS\Task\Exception( $this, array( 'task_' . $e->getMessage(), $next['feed_title'] ) );
 				}
+
+				/* Task log */
+				return NULL;
 			}
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			return NULL;
 		}
-
-		/* Task log */
-		return NULL;
 	}
 	
 	/**

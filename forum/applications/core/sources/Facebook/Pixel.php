@@ -11,45 +11,38 @@
 namespace IPS\core\Facebook;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Patterns\Singleton;
-use IPS\Settings;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Facebook Pixel class
  */
-class Pixel extends Singleton
+class _Pixel extends \IPS\Patterns\Singleton
 {
 	/**
 	 * @brief	Singleton Instances
 	 */
-	protected static ?Singleton $instance = NULL;
+	protected static $instance = NULL;
 	
 	/**
 	 * @brief	Data Store
 	 */
-	protected ?array $data = NULL;
+	protected $data = NULL;
 	
 	/**
 	 * @brief	Events
 	 */
-	protected static ?array $events = NULL;
+	protected static $events = NULL;
 	
 	/**
 	 * Output for JS inclusion
 	 *
 	 * @return string|null
 	 */
-	public function output() : ?string
+	public function output()
 	{
 		if ( $this->data === NULL )
 		{
@@ -67,7 +60,7 @@ class Pixel extends Singleton
 		{
 			$inlineParams = '';
 		
-			if ( is_array( $params ) and count( $params ) )
+			if ( \is_array( $params ) and \count( $params ) )
 			{
 				$inlineParams = json_encode( $params );
 			}
@@ -82,7 +75,7 @@ class Pixel extends Singleton
 			}
 		}
 		
-		return count( $return ) ? implode( "\n", $return ) : null;
+		return \count( $return ) ? implode( "\n", $return ) : null;
 	}
 	
 	/**
@@ -90,11 +83,11 @@ class Pixel extends Singleton
 	 *
 	 * @return string|null
 	 */
-	public function noscript() : ?string
+	public function noscript()
 	{
 		if ( $this->data === NULL )
 		{
-			return '<img alt="" height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=' . Settings::i()->fb_pixel_id . '&ev=PageView&noscript=1"/>';
+			return '<img alt="" height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=' . \IPS\Settings::i()->fb_pixel_id . '&ev=PageView&noscript=1"/>';
 		}
 		
 		$return = array();
@@ -106,9 +99,9 @@ class Pixel extends Singleton
 		
 		foreach( $this->data as $name => $params )
 		{
-			$url = 'https://www.facebook.com/tr?id=' . Settings::i()->fb_pixel_id . '&ev=' . $name;
+			$url = 'https://www.facebook.com/tr?id=' . \IPS\Settings::i()->fb_pixel_id . '&ev=' . $name;
 			
-			if ( is_array( $params ) and count( $params ) )
+			if ( \is_array( $params ) and \count( $params ) )
 			{
 				$url .= '&' . http_build_query( array( 'cd' => $params ), '', '&' );
 			}
@@ -117,6 +110,6 @@ class Pixel extends Singleton
 			
 		}
 			
-		return count( $return ) ? implode( "\n", $return ) : null;
+		return \count( $return ) ? implode( "\n", $return ) : null;
 	}
 }

@@ -12,75 +12,47 @@
 namespace IPS\core\modules\admin\applications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Dispatcher;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Interval;
-use IPS\Member;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * webhooks
  */
-class webhooks extends Controller
+class _webhooks extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\Api\Webhook';
+	protected $nodeClass = 'IPS\Api\Webhook';
 
 	/**
 	 * Show the "add" button in the page root rather than the table root
 	 */
-	protected bool $_addButtonInRoot = FALSE;
+	protected $_addButtonInRoot = FALSE;
 
 	/**
 	 * Description can contain HTML?
 	 */
-	public bool $_descriptionHtml = TRUE;
+	public $_descriptionHtml = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'webhooks_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'webhooks_manage' );
 
 		parent::execute();
-	}
-
-	/**
-	 * Manage
-	 *
-	 * @return void
-	 */
-	public function manage() : void
-	{
-		if ( ( new Bridge )->coreAdminWebhooks() )
-		{
-			parent::manage();
-		}
 	}
 
 	/**
@@ -88,17 +60,17 @@ class webhooks extends Controller
 	 *
 	 * @return void
 	 */
-	protected function form() : void
+	protected function form()
 	{
 		parent::form();
 
-		if ( Request::i()->id )
+		if ( \IPS\Request::i()->id )
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('edit_webhook', FALSE, array( 'sprintf' => array( Output::i()->title ) ) );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('edit_webhook', FALSE, array( 'sprintf' => array( \IPS\Output::i()->title ) ) );
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('add_webhook');
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('add_webhook');
 		}
 	}
 
@@ -107,20 +79,20 @@ class webhooks extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function settings() : void
+	protected function settings()
 	{
-		$form = new Form;
-		$form->add( new Interval( 'webhook_logs_success', Settings::i()->webhook_logs_success, FALSE, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'always' ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL, 'webhook_logs_success' ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Interval( 'webhook_logs_success', \IPS\Settings::i()->webhook_logs_success, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'always' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), NULL, 'webhook_logs_success' ) );
 
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings( $values );
-			Session::i()->log( 'acplog__webhook_settings' );
-			Output::i()->redirect( $this->url, 'saved' );
+			\IPS\Session::i()->log( 'acplog__webhook_settings' );
+			\IPS\Output::i()->redirect( $this->url, 'saved' );
 		}
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('settings');
-		Output::i()->output 	= Theme::i()->getTemplate('global')->block( 'settings', $form, FALSE );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('settings');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate('global')->block( 'settings', $form, FALSE );
 	}
 
 	/**
@@ -128,7 +100,7 @@ class webhooks extends Controller
 	 *
 	 * @return	array
 	 */
-	public function _getRootButtons(): array
+	public function _getRootButtons()
 	{
 		$response = parent::_getRootButtons();
 
@@ -136,39 +108,9 @@ class webhooks extends Controller
 				'title'		=> 'settings',
 				'icon'		=> 'cog',
 				'link'		=> $this->url->setQueryString('do', 'settings'),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('settings') ),
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('settings') )
 			];
-
-		$logButton =  [
-		'icon'	=> 'list',
-		'title'	=> 'webhook_response_log',
-		'link'	=> $this->url->setQueryString( ['do' => 'webhooklog'] ),
-		];
-			return array_merge( $response, [ 'settings' =>$settingsButton, 'log' =>$logButton ] );
-	}
-
-	/**
-	 * Get all the logged Webhook Responses
-	 * 
-	 * @return void
-	 */
-	public function webhooklog() : void
-	{
-		$table = new \IPS\Helpers\Table\Db( 'core_api_webhook_fires', $this->url->setQueryString( ['do' => 'webhooklog'] ) );
-		$table->include = ['event', 'time', 'data'];
-		$table->rowClasses	= ['data' => ['ipsTable_wrap']];
-
-		$table->sortBy = $table->sortBy ?: 'time';
-		$table->sortDirection = $table->sortDirection ?: 'desc';
-		
-		$table->parsers = [
-		'time' => 		 function( $val )
-		{
-			return DateTime::ts( $val );
-		},
-		];
-		Output::i()->title = Member::loggedIn()->language()->addToStack('webhook_response_log');
-		Output::i()->output = $table;
+			return array_merge( $response, [ 'settings' =>$settingsButton] );
 	}
 
 }

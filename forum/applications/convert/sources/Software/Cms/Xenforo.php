@@ -12,28 +12,23 @@
 namespace IPS\convert\Software\Cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\convert\Software;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Xenforo Pages Converter
  */
-class Xenforo extends Software
+class _Xenforo extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "XenForo Page Nodes (1.5.x/2.0.x/2.1.x/2.2.x)";
@@ -42,9 +37,9 @@ class Xenforo extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "xenforo";
@@ -53,9 +48,9 @@ class Xenforo extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertCmsPages' => array(
@@ -68,9 +63,9 @@ class Xenforo extends Software
 	/**
 	 * Uses Prefix
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function usesPrefix(): bool
+	public static function usesPrefix()
 	{
 		return FALSE;
 	}
@@ -78,9 +73,9 @@ class Xenforo extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -88,9 +83,9 @@ class Xenforo extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'xenforo' ) );
 	}
@@ -100,7 +95,7 @@ class Xenforo extends Software
 	 *
 	 * @return void
 	 */
-	public function convertCmsPages() : void
+	public function convertCmsPages()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -112,7 +107,7 @@ class Xenforo extends Software
 			{
 				$template = $this->db->select( 'template', 'xf_template', array( "title=?", "_page_node.{$row['node_id']}" ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$template = '';
 			}

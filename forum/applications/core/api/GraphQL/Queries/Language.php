@@ -10,29 +10,26 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\LanguageType;
-use IPS\Lang;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Me query for GraphQL API
  */
-class Language
+class _Language
 {
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Return language data";
+	public static $description = "Return language data";
 
 	/*
 	 * Query arguments
@@ -47,7 +44,7 @@ class Language
 	/**
 	 * Return the query return type
 	 */
-	public function type() : LanguageType
+	public function type()
 	{
 		return \IPS\core\api\GraphQL\TypeRegistry::language();
 	}
@@ -55,16 +52,17 @@ class Language
 	/**
 	 * Resolves this query
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @return	Lang
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\Member|null
 	 */
-	public function resolve( mixed $val, array $args ) : Lang
+	public function resolve($val, $args)
 	{
 		if( isset( $args['id'] ) ){
-			return Lang::load( $args['id'] );
+			return \IPS\Lang::load( $args['id'] );
 		}
 
-		return Member::loggedIn()->language();
+		return \IPS\Member::loggedIn()->language();
 	}
 }

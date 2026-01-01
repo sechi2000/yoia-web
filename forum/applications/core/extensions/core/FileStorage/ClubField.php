@@ -12,38 +12,28 @@
 namespace IPS\core\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use OutOfRangeException;
-use Throwable;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: ClubField
  */
-class ClubField extends FileStorageAbstract
+class _ClubField
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
 		$count = 0;
-		foreach( Db::i()->select( '*', 'core_clubs_fields', array( "f_type=?", 'Upload' ) ) AS $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_clubs_fields', array( "f_type=?", 'Upload' ) ) AS $row )
 		{
-			$count += Db::i()->select( 'COUNT(*)', 'core_clubs_fieldvalues', array( "field_{$row['f_id']}<>? AND field_{$row['f_id']} IS NOT NULL", '' ) )->first();
+			$count += \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs_fieldvalues', array( "field_{$row['f_id']}<>? AND field_{$row['f_id']} IS NOT NULL", '' ) )->first();
 		}
 		return $count;
 	}
@@ -54,38 +44,66 @@ class ClubField extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	UnderflowException					When file record doesn't exist. Indicating there are no more files to move
-	 * @return	void							An offset integer to use on the next cycle, or nothing
+	 * @throws	\UnderflowException					When file record doesn't exist. Indicating there are no more files to move
+	 * @return	void|int							An offset integer to use on the next cycle, or nothing
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-		foreach( Db::i()->select( '*', 'core_clubs_fields', array( "f_type=?", 'Upload' ) ) AS $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_clubs_fields', array( "f_type=?", 'Upload' ) ) AS $row )
 		{
-			foreach( Db::i()->select( '*', 'core_clubs_fieldvalues', array( "field_{$row['f_id']}<>? AND field_{$row['f_id']} IS NOT NULL", '' ) ) AS $field )
+			foreach( \IPS\Db::i()->select( '*', 'core_clubs_fieldvalues', array( "field_{$row['f_id']}<>? AND field_{$row['f_id']} IS NOT NULL", '' ) ) AS $field )
 			{
 				try
 				{
-					$moved = File::get( $oldConfiguration ?: 'core_ClubField', $field[ "field_{$row['f_id']}" ] )->move( $storageConfiguration );
-					Db::i()->update( 'core_clubs_fieldvalues', array( "field_{$row['f_id']}" => (string) $moved ), array( "club_id=?", $field['club_id'] ) );
+					$moved = \IPS\File::get( $oldConfiguration ?: 'core_ClubField', $field[ "field_{$row['f_id']}" ] )->move( $storageConfiguration );
+					\IPS\Db::i()->update( 'core_clubs_fieldvalues', array( "field_{$row['f_id']}" => (string) $moved ), array( "club_id=?", $field['club_id'] ) );
 				}
-				catch( Exception |Throwable $e ){}
+				catch( \Exception $e )
+				{
+					// Any issues are logged
+				}
+				catch( \Throwable $e )
+				{
+					// Any issues are logged
+				}
 			}
 		}
 		
-		throw new UnderflowException;
+		throw new \UnderflowException;
 	}
 	
 	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		foreach( \IPS\Db::i()->select( '*', 'core_clubs_fields', array( "f_type=?", 'Upload' ) ) AS $row )
+		{
+			foreach( \IPS\Db::i()->select( '*', 'core_clubs_fieldvalues', array( "field_{$row['f_id']}<>? AND field_{$row['f_id']} IS NOT NULL" ) ) AS $field )
+			{
+				$new = \IPS\File::repairUrl( $field[ "field_{$row['f_id']}" ] );
+				
+				\IPS\Db::i()->update( 'core_clubs_fieldvalues', array( "field_{$row['f_id']}" => $new ), array( "club_id=?", $field['club_id'] ) );
+			}
+		}
+		
+		throw new \UnderflowException;
+	}
+
+	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
-		foreach( Db::i()->select( '*', 'core_clubs_fields', array( "f_type=?", 'Upload' ) ) AS $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_clubs_fields', array( "f_type=?", 'Upload' ) ) AS $row )
 		{
-			if ( Db::i()->select( 'COUNT(*)', 'core_clubs_fieldvalues', array( "field_{$row['f_id']}=?", (string) $file ) )->first() )
+			if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs_fieldvalues', array( "field_{$row['f_id']}=?", (string) $file ) )->first() )
 			{
 				return TRUE;
 			}
@@ -98,19 +116,19 @@ class ClubField extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		foreach( Db::i()->select( '*', 'core_clubs_fields', array( "f_type=?", 'Upload' ) ) AS $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_clubs_fields', array( "f_type=?", 'Upload' ) ) AS $row )
 		{
-			foreach( Db::i()->select( '*', 'core_clubs_fieldvalues', array( "field_{$row['f_id']}<>? AND field_{$row['f_id']} IS NOT NULL" ) ) AS $field )
+			foreach( \IPS\Db::i()->select( '*', 'core_clubs_fieldvalues', array( "field_{$row['f_id']}<>? AND field_{$row['f_id']} IS NOT NULL" ) ) AS $field )
 			{
 				try
 				{
-					File::get( 'core_ClubField', $field[ "field_{$row['f_id']}" ] )->delete();
+					\IPS\File::get( 'core_ClubField', $field[ "field_{$row['f_id']}" ] )->delete();
 				}
-				catch( OutOfRangeException $e ) {}
+				catch( \OutOfRangeException $e ) {}
 				
-				Db::i()->update( 'core_clubs_fieldvalues', array( "field_{$row['f_id']}" => NULL ), array( "club_id=?", $field['club_id'] ) );
+				\IPS\Db::i()->update( 'core_clubs_fieldvalues', array( "field_{$row['f_id']}" => NULL ), array( "club_id=?", $field['club_id'] ) );
 			}
 		}
 	}

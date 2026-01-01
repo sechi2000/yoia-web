@@ -12,50 +12,30 @@
 namespace IPS\nexus\modules\admin\store;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Stack;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\nexus\Form\Money;
-use IPS\Output;
-use IPS\Session;
-use IPS\Settings as SettingsClass;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Store Settings
  */
-class settings extends Controller
+class _settings extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'settings_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'settings_manage' );
 		parent::execute();
 	}
 
@@ -64,10 +44,10 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$giftVouchers = array();
-		foreach ( SettingsClass::i()->nexus_gift_vouchers ? ( json_decode( SettingsClass::i()->nexus_gift_vouchers, TRUE ) ?: array() ) : array() as $voucher )
+		foreach ( \IPS\Settings::i()->nexus_gift_vouchers ? ( json_decode( \IPS\Settings::i()->nexus_gift_vouchers, TRUE ) ?: array() ) : array() as $voucher )
 		{
 			$amounts = array();
 			foreach ( $voucher as $currency => $amount )
@@ -78,44 +58,43 @@ class settings extends Controller
 		}
 		
 		$groups = array();
-		foreach ( Group::groups( FALSE, FALSE ) as $group )
+		foreach ( \IPS\Member\Group::groups( FALSE, FALSE ) as $group )
 		{
 			$groups[ $group->g_id ] = $group->name;
 		}
 						
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->addTab('nexus_store_display');
 		$form->addHeader('nexus_store_prices');
-		$form->add( new YesNo( 'nexus_show_tax', SettingsClass::i()->nexus_show_tax ) );
-		$form->add( new Translatable( 'nexus_tax_explain', NULL, FALSE, array( 'app' => 'nexus', 'key' => 'nexus_tax_explain_val', 'placeholder' => Member::loggedIn()->language()->addToStack('nexus_tax_explain_placeholder') ) ) );
-		$form->add( new Radio( 'nexus_show_renew_option_savings', SettingsClass::i()->nexus_show_renew_option_savings, FALSE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\YesNo( 'nexus_show_tax', \IPS\Settings::i()->nexus_show_tax ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'nexus_tax_explain', NULL, FALSE, array( 'app' => 'nexus', 'key' => 'nexus_tax_explain_val', 'placeholder' => \IPS\Member::loggedIn()->language()->addToStack('nexus_tax_explain_placeholder') ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'nexus_show_renew_option_savings', \IPS\Settings::i()->nexus_show_renew_option_savings, FALSE, array( 'options' => array(
 			'none'		=> 'nexus_show_renew_option_savings_none',
 			'amount'	=> 'nexus_show_renew_option_savings_amount',
 			'percent'	=> 'nexus_show_renew_option_savings_percent',
 		) ) ) );
 		$form->addHeader( 'nexus_store_index' );
-		$form->add( new Custom( 'nexus_store_new', explode( ',', SettingsClass::i()->nexus_store_new ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Custom( 'nexus_store_new', explode( ',', \IPS\Settings::i()->nexus_store_new ), FALSE, array(
 			'getHtml'	=> function( $field )
 			{
-				return Theme::i()->getTemplate( 'store' )->storeIndexProductsSetting( 'nexus_store_new_field', $field->name, $field->value );
+				return \IPS\Theme::i()->getTemplate( 'store' )->storeIndexProductsSetting( 'nexus_store_new_field', $field->name, $field->value );
 			}
 		) ) );
-		$form->add( new Custom( 'nexus_store_popular', explode( ',', SettingsClass::i()->nexus_store_popular ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Custom( 'nexus_store_popular', explode( ',', \IPS\Settings::i()->nexus_store_popular ), FALSE, array(
 			'getHtml'	=> function( $field )
 			{
-				return Theme::i()->getTemplate( 'store' )->storeIndexProductsSetting( 'nexus_store_popular_field', $field->name, $field->value );
+				return \IPS\Theme::i()->getTemplate( 'store' )->storeIndexProductsSetting( 'nexus_store_popular_field', $field->name, $field->value );
 			}
 		) ) );
-
 		$form->addHeader( 'nexus_stock' );
-		$form->add( new YesNo( 'nexus_show_stock', SettingsClass::i()->nexus_show_stock ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'nexus_show_stock', \IPS\Settings::i()->nexus_show_stock ) );
 		$form->addTab( 'nexus_purchase_settings' );
-		$form->add( new YesNo( 'nexus_reg_force', SettingsClass::i()->nexus_reg_force, FALSE ) );
-		$form->add( new Money( 'nexus_minimum_order', json_decode( SettingsClass::i()->nexus_minimum_order, TRUE ) ) );
-		$form->add( new CheckboxSet( 'cm_protected', explode( ',', SettingsClass::i()->cm_protected ), FALSE, array( 'options' => $groups, 'multiple' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'nexus_reg_force', \IPS\Settings::i()->nexus_reg_force, FALSE ) );
+		$form->add( new \IPS\nexus\Form\Money( 'nexus_minimum_order', json_decode( \IPS\Settings::i()->nexus_minimum_order, TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'cm_protected', explode( ',', \IPS\Settings::i()->cm_protected ), FALSE, array( 'options' => $groups, 'multiple' => TRUE ) ) );
 		$form->addTab('nexus_gift_vouchers');
-		$form->add( new Stack( 'nexus_gift_vouchers', $giftVouchers, FALSE, array( 'stackFieldType' => 'IPS\nexus\Form\Money' ) ) );
-		$form->add( new YesNo( 'nexus_gift_vouchers_free', SettingsClass::i()->nexus_gift_vouchers_free ) );
+		$form->add( new \IPS\Helpers\Form\Stack( 'nexus_gift_vouchers', $giftVouchers, FALSE, array( 'stackFieldType' => 'IPS\nexus\Form\Money' ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'nexus_gift_vouchers_free', \IPS\Settings::i()->nexus_gift_vouchers_free ) );
 		
 		if ( $values = $form->values() )
 		{
@@ -131,7 +110,7 @@ class settings extends Controller
 			}
 			$values['nexus_gift_vouchers'] = json_encode( $giftVouchers );
 			
-			Lang::saveCustom( 'nexus', "nexus_tax_explain_val", $values['nexus_tax_explain'] );
+			\IPS\Lang::saveCustom( 'nexus', "nexus_tax_explain_val", $values['nexus_tax_explain'] );
 			unset( $values['nexus_tax_explain'] );
 			
 			$values['cm_protected'] = implode( ',', $values['cm_protected'] );
@@ -142,9 +121,12 @@ class settings extends Controller
 
 			$form->saveAsSettings( $values );
 			
-			Session::i()->log( 'acplogs__nexus_store_settings' );
+			\IPS\Session::i()->log( 'acplogs__nexus_store_settings' );
+
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
 		}
-		Output::i()->title = Member::loggedIn()->language()->addToStack('store_settings');
-		Output::i()->output = $form;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('store_settings');
+		\IPS\Output::i()->output = $form;
 	}
 }

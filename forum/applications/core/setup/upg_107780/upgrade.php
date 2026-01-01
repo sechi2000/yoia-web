@@ -21,7 +21,7 @@ if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * 4.7.19 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Remove deprecated settings

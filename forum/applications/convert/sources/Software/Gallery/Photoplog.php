@@ -12,35 +12,23 @@
 namespace IPS\convert\Software\Gallery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\convert\Software;
-use IPS\Db;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task;
-use function defined;
-use function intval;
-use function is_array;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Photoplog Gallery Converter
  */
-class Photoplog extends Software
+class _Photoplog extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "PhotoPlog (vBulletin 3.x/4.x)";
@@ -49,9 +37,9 @@ class Photoplog extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "photoplog";
@@ -60,9 +48,9 @@ class Photoplog extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertGalleryCategories' => array(
@@ -87,9 +75,9 @@ class Photoplog extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -97,9 +85,9 @@ class Photoplog extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|NULL
+	 * @return	NULL|array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'vbulletin' ) );
 	}
@@ -107,9 +95,9 @@ class Photoplog extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertGalleryAlbums',
@@ -120,16 +108,16 @@ class Photoplog extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
 
 		return array( "f_gallery_images_rebuild", "f_gallery_cat_recount", "f_gallery_album_recount", "f_gallery_image_recount" );
 	}
@@ -137,17 +125,17 @@ class Photoplog extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Method name
-	 * @return    array|null
+	 * @param	string	$method	Method name
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
 		{
 			case 'convertGalleryAlbums':
 				$options = array();
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'gallery_categories' ), 'IPS\gallery\Category' ) AS $category )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'gallery_categories' ), 'IPS\gallery\Category' ) AS $category )
 				{
 					$options[ $category->_id ] = $category->_title;
 				}
@@ -168,8 +156,8 @@ class Photoplog extends Software
 					'field_default'		=> NULL,
 					'field_required'	=> TRUE,
 					'field_extra'		=> array(),
-					'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_photoplog_hint'),
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_photoplog_hint'),
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				break;
 		}
@@ -182,7 +170,7 @@ class Photoplog extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryAlbums() : void
+	public function convertGalleryAlbums()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -215,7 +203,7 @@ class Photoplog extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryCategories() : void
+	public function convertGalleryCategories()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -240,17 +228,17 @@ class Photoplog extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryImages() : void
+	public function convertGalleryImages()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'fileid' );
 
 		foreach( $this->fetch( 'fileuploads', 'fileid' ) AS $row )
 		{
-			$album = unserialize( $row['albumids'] );
+			$album = \unserialize( $row['albumids'] );
 			$albumId = NULL;
 
-			if( is_array( $album ) )
+			if( \is_array( $album ) )
 			{
 				$albumId = $album[0];
 			}
@@ -265,9 +253,9 @@ class Photoplog extends Software
 				'image_comments'		=> $row['num_comments0'] + $row['num_comments1'],
 				'image_ratings_total'	=> $row['sum_ratings1'],
 				'image_ratings_count'	=> $row['num_ratings1'],
-				'image_rating'			=> $row['num_ratings1'] > 0 ? intval( $row['sum_ratings1'] / $row['num_ratings1'] ) : 0,
+				'image_rating'			=> $row['num_ratings1'] > 0 ? \intval( $row['sum_ratings1'] / $row['num_ratings1'] ) : 0,
 				'image_date'			=> $row['dateline'],
-				'image_metadata'		=> json_encode( unserialize( $row['exifinfo'] ) ),
+				'image_metadata'		=> json_encode( \unserialize( $row['exifinfo'] ) ),
 				'image_file_name'		=> $row['filename'],
 				'image_description'		=> $row['description'],
 				'image_approved'		=> $row['moderate'] == 1 ? 0 : 1,
@@ -297,7 +285,7 @@ class Photoplog extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryComments() : void
+	public function convertGalleryComments()
 	{
 		$libraryClass = $this->getLibrary();
 

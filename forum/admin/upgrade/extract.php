@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <title>Invision Community Update Extractor</title>
-<style type='text/css'>body{font-family:BlinkMacSystemFont, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}@keyframes progress-bar-stripes{from{background-position:40px 0}to{background-position:0 0}}.ipsProgressBar{width:50%;margin:auto;height:26px;overflow:hidden;background:#c0cbde;background-image:linear-gradient(to bottom,rgba(23, 126, 201,0.1),rgba(23, 126, 201,0.1));border-radius:8px;box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);}.ipsProgressBar_animated .ipsProgressBar_progress{background-color:#135bec;background-image:linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);background-size:40px 40px;animation:progress-bar-stripes 2s linear infinite}.ipsProgressBar_progress{display:flex;align-items:center;width:0;height:100%;font-size:12px;color:#ffffff;text-align:right;background:#135bec;position:relative;white-space:nowrap;line-height:26px;text-indent:6px;padding-right:2px;}.ipsProgressBar>span:first-child{padding-left:7px;}.ipsProgressBar_progress[data-progress]:after{top:0;color:#fff;content:attr(data-progress);display:block;right:5px;}@media (prefers-color-scheme: dark) { body{ background-color: rgb(45, 49, 57); } }</style>
+<style type='text/css'>body{font-family:BlinkMacSystemFont, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;}@keyframes progress-bar-stripes{from{background-position:40px 0}to{background-position:0 0}}.ipsProgressBar{width:50%;margin:auto;height:26px;overflow:hidden;background:rgb(237, 242, 247);background-image:linear-gradient(to bottom,rgba(23, 126, 201,0.1),rgba(23, 126, 201,0.1));border-radius:4px;}.ipsProgressBar_animated .ipsProgressBar_progress{background-color:rgb(23, 126, 201);background-image:linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent);background-size:40px 40px;animation:progress-bar-stripes 2s linear infinite}.ipsProgressBar_progress{display:flex;align-items:center;width:0;height:100%;font-size:12px;color:#ffffff;text-align:right;background:rgb(23, 126, 201);position:relative;white-space:nowrap;line-height:26px;text-indent:6px;padding-right:2px;}.ipsProgressBar>span:first-child{padding-left:7px;}.ipsProgressBar_progress[data-progress]:after{top:0;color:#fff;content:attr(data-progress);display:block;right:5px;}@media (prefers-color-scheme: dark) { body{ background-color: rgb(45, 49, 57); } }</style>
 </head>
 <body style="margin:0">
 <?php
@@ -28,9 +28,9 @@ if ( file_exists( "../../constants.php" ) )
 }
 foreach ( [ 'FOLDER_PERMISSION_NO_WRITE' => 0755, 'FILE_PERMISSION_NO_WRITE' => 0644, 'IPS_FILE_PERMISSION' => 0666, 'TEMP_DIRECTORY' => sys_get_temp_dir(), 'TEXT_ENCRYPTION_KEY' => NULL ] as $k => $v )
 {
-	if ( !defined( $k ) )
+	if ( !\defined( $k ) )
 	{
-		define( $k, $v );
+		\define( $k, $v );
 	}
 }
 
@@ -266,11 +266,11 @@ class Extractor
 		}
 		
 		/* Create a directory if needed */
-		$dir = dirname( $path );
+		$dir = \dirname( $path );
 		$directories = array( $dir );
 		while ( $dir != '.' )
 		{
-			$dir = dirname( $dir );
+			$dir = \dirname( $dir );
 			if ( $dir != '.' )
 			{
 				$directories[] = $dir;
@@ -296,25 +296,25 @@ class Extractor
 		}
 				
 		/* Write contents */
-		$contents = @$this->zip->extractByIndex( $index, PCLZIP_OPT_EXTRACT_AS_STRING);
+		$contents = @$this->zip->extractByIndex( $index, \PCLZIP_OPT_EXTRACT_AS_STRING );
 		$contents = $contents[0]['content'];
 		if ( $this->sftp or $this->ftp )
 		{
 			$tmpFile = tempnam( TEMP_DIRECTORY, 'IPS' );
-			file_put_contents( $tmpFile, $contents );
+			\file_put_contents( $tmpFile, $contents );
 			
 			if ( $this->sftp )
 			{
 				if ( @ssh2_scp_send( $this->ssh, $tmpFile, $this->sftpDir . $path, FILE_PERMISSION_NO_WRITE ) === FALSE )
 				{
-					throw new Exception( "Could not transfer file to server via SFTP" );
+					throw new \Exception( "Could not transfer file to server via SFTP" );
 				}
 			}
 			else
 			{
 				if ( @ftp_put( $this->ftp, $path, $tmpFile, FTP_BINARY ) === FALSE )
 				{
-					throw new Exception( "Could not transfer file to server via FTP" );
+					throw new \Exception( "Could not transfer file to server via FTP" );
 				}
 			}
 			
@@ -325,13 +325,13 @@ class Extractor
 			/* Determine if the file exists (we'll want to know this later) */
 			$fileExists	= file_exists( "../../{$path}" );
 
-			$fh = @fopen( "../../{$path}", 'w+' );
+			$fh = @\fopen( "../../{$path}", 'w+' );
 			if ( $fh === FALSE )
 			{
 				$lastError = error_get_last();
 				throw new Exception( $lastError['message'] );
 			}
-			if ( @fwrite( $fh, $contents ) === FALSE )
+			if ( @\fwrite( $fh, $contents ) === FALSE )
 			{
 				$lastError = error_get_last();
 				throw new Exception( $lastError['message'] );
@@ -341,7 +341,7 @@ class Extractor
 				/* If the file existed before we started, we should clear it from opcache if opcache is enabled */
 				if( $fileExists )
 				{
-					if ( function_exists( 'opcache_invalidate' ) )
+					if ( \function_exists( 'opcache_invalidate' ) )
 					{
 						@opcache_invalidate( "../../{$path}" );
 					}
@@ -352,7 +352,7 @@ class Extractor
 					@chmod( "../../{$path}", FILE_PERMISSION_NO_WRITE );
 				}
 			}
-			@fclose( $fh );
+			@\fclose( $fh );
 		}
 	}
 
@@ -368,13 +368,13 @@ class Extractor
 	 */
 	private function _compareHashes( $expected, $provided )
 	{
-		if ( !is_string( $expected ) || !is_string( $provided ) || $expected === '*0' || $expected === '*1' || $provided === '*0' || $provided === '*1' ) // *0 and *1 are failures from crypt() - if we have ended up with an invalid hash anywhere, we will reject it to prevent a possible vulnerability from deliberately generating invalid hashes
+		if ( !\is_string( $expected ) || !\is_string( $provided ) || $expected === '*0' || $expected === '*1' || $provided === '*0' || $provided === '*1' ) // *0 and *1 are failures from crypt() - if we have ended up with an invalid hash anywhere, we will reject it to prevent a possible vulnerability from deliberately generating invalid hashes
 		{
 			return FALSE;
 		}
 
-		$len = strlen( $expected );
-		if ( $len !== strlen( $provided ) )
+		$len = \strlen( $expected );
+		if ( $len !== \strlen( $provided ) )
 		{
 			return FALSE;
 		}
@@ -382,7 +382,7 @@ class Extractor
 		$status = 0;
 		for ( $i = 0; $i < $len; $i++ )
 		{
-			$status |= ord( $expected[ $i ] ) ^ ord( $provided[ $i ] );
+			$status |= \ord( $expected[ $i ] ) ^ \ord( $provided[ $i ] );
 		}
 
 		return $status === 0;
@@ -402,7 +402,7 @@ class Encrypt
 	public static function key()
 	{
 		require "../../conf_global.php";
-		return TEXT_ENCRYPTION_KEY ?: md5( $INFO['sql_pass'] . $INFO['sql_database'] );
+		return \TEXT_ENCRYPTION_KEY ?: md5( $INFO['sql_pass'] . $INFO['sql_database'] );
 	}
 
 	/**
@@ -436,10 +436,10 @@ class Encrypt
 		$obj = new static;
 
 		/* Try to use OpenSSL if it's available... */
-		if ( function_exists( 'openssl_get_cipher_methods' ) )
+		if ( \function_exists( 'openssl_get_cipher_methods' ) )
 		{
 			/* If GCM is available (PHP 7.1+), use that as if provides authenticated encryption natively */
-			if ( in_array( 'aes-128-gcm', openssl_get_cipher_methods() ) )
+			if ( \in_array( 'aes-128-gcm', openssl_get_cipher_methods() ) )
 			{
 				$obj->iv = openssl_random_pseudo_bytes( openssl_cipher_iv_length( 'aes-128-gcm' ) );
 				$obj->cipher = openssl_encrypt( $plaintext, 'aes-128-gcm', static::key(), 0, $obj->iv, $obj->tag );
@@ -447,7 +447,7 @@ class Encrypt
 			}
 
 			/* Otherwise, use CBC and store the hash so we can do our own authentication when decrypting */
-            elseif ( in_array( 'aes-128-cbc', openssl_get_cipher_methods() ) )
+            elseif ( \in_array( 'aes-128-cbc', openssl_get_cipher_methods() ) )
 			{
 				$obj->iv = openssl_random_pseudo_bytes( openssl_cipher_iv_length( 'aes-128-cbc' ) );
 				$obj->cipher = openssl_encrypt( $plaintext, 'aes-128-cbc', static::key(), OPENSSL_RAW_DATA, $obj->iv );
@@ -458,7 +458,7 @@ class Encrypt
 
 		/* If we're still here, fallback to the PHP library */
 		require_once '../../system/3rd_party/AES/AES.php';
-		$obj->cipher = AesCtr::encrypt( $plaintext, static::key(), 256 );
+		$obj->cipher = \AesCtr::encrypt( $plaintext, static::key(), 256 );
 		return $obj;
 	}
 
@@ -498,7 +498,7 @@ class Encrypt
 			$cipher = base64_decode( $matches[1] );
 			$ivLength = openssl_cipher_iv_length('aes-128-cbc');
 
-			return static::fromCipher( substr( $cipher, $ivLength + 32 ), substr( $cipher, 0, $ivLength ), NULL, substr( $cipher, $ivLength, 32 ) );
+			return static::fromCipher( \substr( $cipher, $ivLength + 32 ), \substr( $cipher, 0, $ivLength ), NULL, \substr( $cipher, $ivLength, 32 ) );
 		}
         elseif ( preg_match( '/^\[\!AES\[(.+?)\]\]/', $tag, $matches ) )
 		{
@@ -554,7 +554,7 @@ class Encrypt
 		else
 		{
 			require_once '../../system/3rd_party/AES/AES.php';
-			return AesCtr::decrypt( $this->cipher, static::key(), 256 );
+			return \AesCtr::decrypt( $this->cipher, static::key(), 256 );
 		}
 	}
 }
@@ -569,17 +569,17 @@ function writeLogFile( $message )
 {
 	/* What are we writing? */
 	$date = date('r');
-	if ( $message instanceof Exception)
+	if ( $message instanceof \Exception )
 	{
-		$messageToLog = $date . "\n" . get_class( $message ) . '::' . $message->getCode() . "\n" . $message->getMessage() . "\n" . $message->getTraceAsString();
+		$messageToLog = $date . "\n" . \get_class( $message ) . '::' . $message->getCode() . "\n" . $message->getMessage() . "\n" . $message->getTraceAsString();
 	}
 	else
 	{
-		if ( is_array( $message ) )
+		if ( \is_array( $message ) )
 		{
 			$message = var_export( $message, TRUE );
 		}
-		$messageToLog = $date . "\n" . $message . "\n" . ( new Exception)->getTraceAsString();
+		$messageToLog = $date . "\n" . $message . "\n" . ( new \Exception )->getTraceAsString();
 	}
 	
 	/* Where are we writing it? */
@@ -590,11 +590,11 @@ function writeLogFile( $message )
 	$file = $dir . '/' . date( 'Y' ) . '_' . date( 'm' ) . '_' . date('d') . '_' . ( 'extractfailure' ) . '.php';
 	if ( file_exists( $file ) )
 	{
-		@file_put_contents( $file, "\n\n-------------\n\n" . $messageToLog, FILE_APPEND );
+		@\file_put_contents( $file, "\n\n-------------\n\n" . $messageToLog, FILE_APPEND );
 	}
 	else
 	{
-		@file_put_contents( $file, $header . $messageToLog );
+		@\file_put_contents( $file, $header . $messageToLog );
 	}
 	@chmod( $file, IPS_FILE_PERMISSION );
 }
@@ -617,16 +617,16 @@ try
 		$query = $extractor->db->query( "SELECT conf_value FROM " . $extractor->dbPrefix . "core_sys_conf_settings WHERE conf_key='upgrade_ftp_details'" );
 		if( !$query )
 		{
-			throw new RuntimeException('Cannot find (S)FTP credentials');
+			throw new \RuntimeException('Cannot find (S)FTP credentials');
 		}
 
 		$ftpCredentials = $query->fetch_assoc()['conf_value'];
 		if( empty( $ftpCredentials ) )
 		{
-			throw new RuntimeException('Cannot load (S)FTP credentials');
+			throw new \RuntimeException('Cannot load (S)FTP credentials');
 		}
 
-		if ( substr( $ftpCredentials, 0, 5 ) === '[!AES' )
+		if ( \substr( $ftpCredentials, 0, 5 ) === '[!AES' )
 		{
 			$decodedFtpDetails = Encrypt::fromTag( $ftpCredentials )->decrypt();
 		}
@@ -647,7 +647,7 @@ try
 	{
 		@unlink( $_GET['file'] );
 		
-		if ( function_exists( 'opcache_reset' ) )
+		if ( \function_exists( 'opcache_reset' ) )
 		{
 			@opcache_reset();
 		}

@@ -11,90 +11,64 @@
 namespace IPS\core\modules\admin\support;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Content\Search\Index;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Helpers\Wizard;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function mb_strtolower;
-use function strtoupper;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * utf8mb4 Converter
  */
-class utf8mb4 extends Controller
+class _utf8mb4 extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Bootstrap
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{	
-		Output::i()->title = Member::loggedIn()->language()->addToStack('utf8mb4_converter');
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('utf8mb4_converter');
 
 		/* Check it isn't utf8mb4 already */
-		if ( Settings::i()->getFromConfGlobal('sql_utf8mb4') === TRUE)
+		if ( \IPS\Settings::i()->getFromConfGlobal('sql_utf8mb4') === TRUE)
 		{
-			Output::i()->output = Theme::i()->getTemplate('global', 'core')->message( 'utf8mb4_converter_finished', 'success' );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('global', 'core')->message( 'utf8mb4_converter_finished', 'success' );
 			return;
 		}
 		
 		/* Requires MySQL 5.5.3 */
-		if ( !CIC AND version_compare( Db::i()->server_info, '5.5.3', '<' ) )
+		if ( !\IPS\CIC AND version_compare( \IPS\Db::i()->server_info, '5.5.3', '<' ) )
 		{
-			Output::i()->error( 'utf8mb4_converter_requires_553', '1C325/1', 403, '' );
+			\IPS\Output::i()->error( 'utf8mb4_converter_requires_553', '1C325/1', 403, '' );
 		}
 		
 		/* Display Wizard */
 		$supportController = new support;
-		Output::i()->output = (string) new Wizard( array(
+		\IPS\Output::i()->output = (string) new \IPS\Helpers\Wizard( array(
 			'utf8mb4_converter_intro'	=> array( $this, '_introduction' ),
 			'utf8mb4_converter_convert'	=> array( $this, '_convert' ),
 			'utf8mb4_converter_finish'	=> array( $this, '_finish' ),
-		), Url::internal( 'app=core&module=support&controller=utf8mb4' )->csrf() );
+		), \IPS\Http\Url::internal( 'app=core&module=support&controller=utf8mb4' )->csrf() );
 	}
 	
 	/**
 	 * Introduction
 	 *
-	 * @param	array	$data	Wizard Data
-	 * @return	array|string
+	 * @param	mixed	$data	Wizard Data
+	 * @return	mixed
 	 */
-	public function _introduction( array $data ) : array|string
+	public function _introduction( $data )
 	{
-		$form = new Form( 'utf8mb4_converter_intro', 'continue' );
+		$form = new \IPS\Helpers\Form( 'utf8mb4_converter_intro', 'continue' );
 		$form->hiddenValues['continue'] = 1;
-		$form->addMessage( CIC ? 'utf8mb4_converter_cic_explain' : 'utf8mb4_converter_explain' );
+		$form->addMessage( \IPS\CIC ? 'utf8mb4_converter_cic_explain' : 'utf8mb4_converter_explain' );
 		
 		if ( $form->values() )
 		{
@@ -107,50 +81,50 @@ class utf8mb4 extends Controller
 	/**
 	 * Convert
 	 *
-	 * @param	array	$wizardData	Wizard Data
-	 * @return	array|string
+	 * @param	mixed	$wizardData	Wizard Data
+	 * @return	mixed
 	 */
-	public function _convert( array $wizardData ) : array|string
+	public function _convert( $wizardData )
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		if ( isset( Request::i()->finished ) )
+		if ( isset( \IPS\Request::i()->finished ) )
 		{
 			return $wizardData;
 		}
 		
-		$baseUrl = Url::internal( 'app=core&module=support&controller=utf8mb4' )->csrf();
+		$baseUrl = \IPS\Http\Url::internal( 'app=core&module=support&controller=utf8mb4' )->csrf();
 		
-		return new MultipleRedirect( $baseUrl,
+		return new \IPS\Helpers\MultipleRedirect( $baseUrl,
 			function( $mrData )
 			{
 				try
 				{
 					/* If this is the first run, do the database itself... */
-					if ( !is_array( $mrData ) )
+					if ( !\is_array( $mrData ) )
 					{
-						$databaseName = Settings::i()->sql_database;
-						Db::i()->query("ALTER DATABASE `{$databaseName}` CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;");
+						$databaseName = \IPS\Settings::i()->sql_database;
+						\IPS\Db::i()->query("ALTER DATABASE `{$databaseName}` CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;");
 											
-						return array( array( 'done' => array() ), Member::loggedIn()->language()->addToStack('utf8mb4_converter_converting'), 0 );
+						return array( array( 'done' => array() ), \IPS\Member::loggedIn()->language()->addToStack('utf8mb4_converter_converting'), 0 );
 					}
 					
 					/* Set properties */
-					Db::i()->charset = 'utf8mb4';
-					Db::i()->collation = 'utf8mb4_unicode_ci';
-					Db::i()->binaryCollation = 'utf8mb4_bin';
+					\IPS\Db::i()->charset = 'utf8mb4';
+					\IPS\Db::i()->collation = 'utf8mb4_unicode_ci';
+					\IPS\Db::i()->binaryCollation = 'utf8mb4_bin';
 					
 					/* Do each table */
-					$select = Settings::i()->sql_tbl_prefix ? ( new Select( "SHOW TABLES LIKE '" . Db::i()->escape_string( Settings::i()->sql_tbl_prefix ) . "%'", array(), Db::i() ) ) : ( new Select( "SHOW TABLES", array(), Db::i() ) );
-					$totalCount = count( $select );
+					$select = \IPS\Settings::i()->sql_tbl_prefix ? ( new \IPS\Db\Select( "SHOW TABLES LIKE '" . \IPS\Db::i()->escape_string( \IPS\Settings::i()->sql_tbl_prefix ) . "%'", array(), \IPS\Db::i() ) ) : ( new \IPS\Db\Select( "SHOW TABLES", array(), \IPS\Db::i() ) );
+					$totalCount = \count( $select );
 					$i = 0;
 					foreach ( $select as $table )
 					{						
 						$i++;
-						$table = mb_substr( $table, mb_strlen( Settings::i()->sql_tbl_prefix ) );
+						$table = mb_substr( $table, mb_strlen( \IPS\Settings::i()->sql_tbl_prefix ) );
 												
 						/* If we've already done it, skip to next */
-						if ( in_array( $table, $mrData['done'] ) )
+						if ( \in_array( $table, $mrData['done'] ) )
 						{
 							continue;
 						}
@@ -159,8 +133,8 @@ class utf8mb4 extends Controller
 						$appName = mb_substr( $table, 0, mb_strpos( $table, '_' ) );
 						try
 						{
-							$app = Application::load( $appName );
-							$schemaRoot = in_array( $app->directory, \IPS\IPS::$ipsApps ) ? \IPS\ROOT_PATH : \IPS\SITE_FILES_PATH;
+							$app = \IPS\Application::load( $appName );
+							$schemaRoot = \in_array( $app->directory, \IPS\IPS::$ipsApps ) ? \IPS\ROOT_PATH : \IPS\SITE_FILES_PATH;
 							$schema	= json_decode( file_get_contents( $schemaRoot . "/applications/{$app->directory}/data/schema.json" ), TRUE );
 							if ( !array_key_exists( $table, $schema ) )
 							{
@@ -171,7 +145,7 @@ class utf8mb4 extends Controller
 								}
 							}
 						}
-						catch ( Exception $e )
+						catch ( \Exception $e )
 						{
 							continue;
 						}
@@ -180,15 +154,15 @@ class utf8mb4 extends Controller
 							table because it is large and it has a primary key and a unique index, so the table work is too intensive. */
 						if( $table == 'core_search_index' )
 						{
-							Db::i()->delete( 'core_search_index' );
+							\IPS\Db::i()->delete( 'core_search_index' );
 						}
 						
 						/* Get table definition */
-						$tableDefinition = Db::i()->getTableDefinition( $table, FALSE, TRUE );
+						$tableDefinition = \IPS\Db::i()->getTableDefinition( $table, FALSE, TRUE );
 						
 						/* Drop any potentially problematic indexes */
 						$indexesToRecreate = array();
-						$maxLen = mb_strtolower( $tableDefinition['engine'] ) === 'innodb' ? 767 : 1000;
+						$maxLen = \mb_strtolower( $tableDefinition['engine'] ) === 'innodb' ? 767 : 1000;
 						foreach ( $tableDefinition['indexes'] as $indexName => $indexData )
 						{
 							/* If this is a fulltext index, we don't need to drop it and recreate it */
@@ -204,13 +178,13 @@ class utf8mb4 extends Controller
 							$hasText = false;
 							foreach( $indexData['columns'] as $column )
 							{
-								if ( in_array( mb_strtolower( $tableDefinition['columns'][ $column ]['type'] ), array( 'mediumtext', 'text' ) ) )
+								if ( \in_array( mb_strtolower( $tableDefinition['columns'][ $column ]['type'] ), array( 'mediumtext', 'text' ) ) )
 								{
 									$hasText = true;
 								}
 								if ( isset( $tableDefinition['columns'][ $column ]['length'] ) )
 								{
-									$length += (int) ( $tableDefinition['columns'][ $column ]['length'] );
+									$length += $tableDefinition['columns'][ $column ]['length'];
 								}
 
 								if( isset( $tableDefinition['columns'][ $column ]['collation'] ) AND $tableDefinition['columns'][ $column ]['collation'] !== 'utf8mb4_unicode_ci' )
@@ -222,7 +196,7 @@ class utf8mb4 extends Controller
 							if ( $needToRecreate AND ( ( $length * 4 > $maxLen ) or $hasText ) )
 							{
 								$indexesToRecreate[ $indexName ] = $indexData;
-								Db::i()->dropIndex( $table, $indexName );
+								\IPS\Db::i()->dropIndex( $table, $indexName );
 							}
 						}
 												
@@ -231,8 +205,8 @@ class utf8mb4 extends Controller
 
 						if( $tableDefinition['collation'] !== 'utf8mb4_unicode_ci' )
 						{
-							Db::i()->query("ALTER TABLE `" . Settings::i()->sql_tbl_prefix . "{$table}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-							Db::i()->query("ALTER TABLE `" . Settings::i()->sql_tbl_prefix . "{$table}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+							\IPS\Db::i()->query("ALTER TABLE `" . \IPS\Settings::i()->sql_tbl_prefix . "{$table}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+							\IPS\Db::i()->query("ALTER TABLE `" . \IPS\Settings::i()->sql_tbl_prefix . "{$table}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 							$repair	= true;
 						}
 
@@ -242,11 +216,11 @@ class utf8mb4 extends Controller
 						/* Do each column */
 						foreach ( $tableDefinition['columns'] as $columnName => $columnData )
 						{
-							if( in_array( strtoupper( $columnData['type'] ), array( 'CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'ENUM', 'SET' ) ) )
+							if( \in_array( \strtoupper( $columnData['type'] ), array( 'CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'ENUM', 'SET' ) ) )
 							{
 								if( $tableDefinition['columns'][ $columnName ]['collation'] !== 'utf8mb4_unicode_ci' )
 								{
-									$aggregatedChanges[] = "CHANGE COLUMN `" . Db::i()->escape_string( $columnName ) . "` " . Db::i()->compileColumnDefinition( $columnData );
+									$aggregatedChanges[] = "CHANGE COLUMN `" . \IPS\Db::i()->escape_string( $columnName ) . "` " . \IPS\Db::i()->compileColumnDefinition( $columnData );
 									$repair = true;
 								}
 							}
@@ -255,47 +229,47 @@ class utf8mb4 extends Controller
 						/* Recreate any indexes */
 						foreach ( $indexesToRecreate as $indexName => $indexData )
 						{
-							$aggregatedChanges[] = Db::i()->buildIndex( $table, $indexData );
+							$aggregatedChanges[] = \IPS\Db::i()->buildIndex( $table, $indexData );
 							$repair	= true;
 						}
 
 						/* Now if we have any changes to make....make them */
-						if( count( $aggregatedChanges ) )
+						if( \count( $aggregatedChanges ) )
 						{
-							Db::i()->query( "ALTER TABLE " . Db::i()->prefix . Db::i()->escape_string( $table ) . " " . implode( ', ', $aggregatedChanges ) );
+							\IPS\Db::i()->query( "ALTER TABLE " . \IPS\Db::i()->prefix . \IPS\Db::i()->escape_string( $table ) . " " . implode( ', ', $aggregatedChanges ) );
 						}
 												
 						/* Repair and optimize */
 						if( $repair === true )
 						{
-							Db::i()->query("REPAIR TABLE `" . Settings::i()->sql_tbl_prefix . "{$table}`");
+							\IPS\Db::i()->query("REPAIR TABLE `" . \IPS\Settings::i()->sql_tbl_prefix . "{$table}`");
 							//\IPS\Db::i()->query("OPTIMIZE TABLE `" . \IPS\Settings::i()->sql_tbl_prefix . "{$table}`");
 						}
 
 						/* If this is the search index table, initiate rebuild now. */
-						if( $table == 'core_search_index' and Settings::i()->search_method == 'mysql' )
+						if( $table == 'core_search_index' and \IPS\Settings::i()->search_method == 'mysql' )
 						{
-							Index::i()->rebuild();
+							\IPS\Content\Search\Index::i()->rebuild();
 						}
 						
 						/* Continue */
 						$mrData['done'][] = $table;
-						return array( $mrData, Member::loggedIn()->language()->addToStack('utf8mb4_converter_converting'), floor( 100 / $totalCount * $i ) );
+						return array( $mrData, \IPS\Member::loggedIn()->language()->addToStack('utf8mb4_converter_converting'), floor( 100 / $totalCount * $i ) );
 					}
 					
 					/* If we get to this point, we're finished */
 					return NULL;
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
-					Log::log( $e, 'utf8mb4' );
-					Output::i()->error( Member::loggedIn()->language()->addToStack( 'utf8mb4_converter_error', FALSE, array( 'sprintf' => array( $e->getMessage() ) ) ), '4C171/4', 403, '' );
+					\IPS\Log::log( $e, 'utf8mb4' );
+					\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack( 'utf8mb4_converter_error', FALSE, array( 'sprintf' => array( $e->getMessage() ) ) ), '4C171/4', 403, '' );
 				}	
 				
 			},
 			function() use ( $baseUrl )
 			{
-				Output::i()->redirect( $baseUrl->setQueryString( 'finished', 1 ) );
+				\IPS\Output::i()->redirect( $baseUrl->setQueryString( 'finished', 1 ) );
 			}
 		);
 	}
@@ -303,13 +277,13 @@ class utf8mb4 extends Controller
 	/**
 	 * Finish
 	 *
-	 * @param	array	$data	Wizard Data
-	 * @return	array|string
+	 * @param	mixed	$data	Wizard Data
+	 * @return	mixed
 	 */
-	public function _finish( array $data ) : array|string
+	public function _finish( $data )
 	{
-		Session::i()->log( 'acplog__ran_utf8mb4_converter' );
+		\IPS\Session::i()->log( 'acplog__ran_utf8mb4_converter' );
 
-		return Theme::i()->getTemplate('support')->finishUtf8Mb4Conversion();
+		return \IPS\Theme::i()->getTemplate('support')->finishUtf8Mb4Conversion();
 	}
 }

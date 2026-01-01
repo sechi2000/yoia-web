@@ -11,27 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Task\Exception;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * deletecontent Task
  */
-class deletecontent extends Task
+class _deletecontent extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -42,16 +31,16 @@ class deletecontent extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		$this->runUntilTimeout( function()
 		{
-			$timeago	= DateTime::create()->sub( new DateInterval( 'P' . Settings::i()->dellog_retention_period . 'D' ) );
+			$timeago	= \IPS\DateTime::create()->sub( new \DateInterval( 'P' . \IPS\Settings::i()->dellog_retention_period . 'D' ) );
 			$count		= 0;
 
-			foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_deletion_log', array( "dellog_deleted_date<?", $timeago->getTimestamp() ), 'dellog_deleted_date ASC', array( 0, 20 ) ), 'IPS\core\DeletionLog' ) AS $log )
+			foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_deletion_log', array( "dellog_deleted_date<?", $timeago->getTimestamp() ), 'dellog_deleted_date ASC', array( 0, 20 ) ), 'IPS\core\DeletionLog' ) AS $log )
 			{
 				try
 				{
@@ -63,20 +52,20 @@ class deletecontent extends Task
 						/* Make sure that the content is flagged for deletion */
 						if( $content->hidden() !== -2 )
 						{
-							throw new OutOfRangeException;
+							throw new \OutOfRangeException;
 						}
 
 						$content->delete();
 					}
 				}
 				/* If the content is gone already, don't let an uncaught exception bubble up...just remove the deletion log orphaned entry */
-				catch( OutOfRangeException $e ){}
+				catch( \OutOfRangeException $e ){}
 				
 				$log->delete();
 				$count++;
 			}
 			
-			return (bool) $count;
+			return $count ? TRUE : FALSE;
 		} );
 		
 		return NULL;

@@ -10,34 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Api\GraphQL\Types\FollowType;
-use IPS\Application;
-use IPS\Db;
-use IPS\IPS;
-use IPS\Member;
-use OutOfRangeException;
-use function defined;
-use function get_class;
-use function in_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Follow something mutation for GraphQL API
  */
-class Unfollow
+class _Unfollow
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Unfollow a node, item or member";
+	public static $description = "Unfollow a node, item or member";
 
 	/*
 	 * Mutation arguments
@@ -55,7 +46,7 @@ class Unfollow
 	/**
 	 * Return the mutation return type
 	 */
-	public function type() : FollowType
+	public function type() 
 	{
 		return TypeRegistry::follow();
 	}
@@ -65,27 +56,25 @@ class Unfollow
 	 * @todo this is basically copied and pasted from notifications.php which isn't ideal, so we 
 	 * might want to consider refactoring to abstract this functionality.
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
 	 * @return	array
 	 */
-	public function resolve( mixed $val, array $args ) : array
+	public function resolve($val, $args)
 	{
-		if( !Member::loggedIn()->member_id )
+		if( !\IPS\Member::loggedIn()->member_id )
 		{
-			throw new SafeException( 'NOT_LOGGED_IN', 'GQL/0002/6', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NOT_LOGGED_IN', 'GQL/0002/6', 403 );
 		}
 
 		try
 		{
-			$follow = Db::i()->select( '*', 'core_follow', array( 'follow_id=? AND follow_member_id=?', $args['followID'], Member::loggedIn()->member_id ) )->first();
+			$follow = \IPS\Db::i()->select( '*', 'core_follow', array( 'follow_id=? AND follow_member_id=?', $args['followID'], \IPS\Member::loggedIn()->member_id ) )->first();
 		}
-		catch ( OutOfRangeException $e )
-		{
-			throw new SafeException( 'NOT_FOUND', 'GQL/0002/7', 404 );
-		}
+		catch ( \OutOfRangeException $e ) {}
 		
-		Db::i()->delete( 'core_follow', array( 'follow_id=? AND follow_member_id=?', $args['followID'], Member::loggedIn()->member_id ) );
+		\IPS\Db::i()->delete( 'core_follow', array( 'follow_id=? AND follow_member_id=?', $args['followID'], \IPS\Member::loggedIn()->member_id ) );
 
 		/* Get class */		
 		if( $args['app'] == 'core' and $args['area'] == 'member' )
@@ -99,16 +88,16 @@ class Unfollow
 		else
 		{
 			$class = NULL;
-			foreach ( Application::load( $args['app'] )->extensions( 'core', 'ContentRouter' ) as $ext )
+			foreach ( \IPS\Application::load( $args['app'] )->extensions( 'core', 'ContentRouter' ) as $ext )
 			{
 				foreach ( $ext->classes as $classname )
 				{
-					if ( $classname == 'IPS\\' . $args['app'] . '\\' . IPS::mb_ucfirst( $args['area'] ) )
+					if ( $classname == 'IPS\\' . $args['app'] . '\\' . mb_ucfirst( $args['area'] ) )
 					{
 						$class = $classname;
 						break;
 					}
-					if ( isset( $classname::$containerNodeClass ) and $classname::$containerNodeClass == 'IPS\\' . $args['app'] . '\\' . IPS::mb_ucfirst( $args['area'] ) )
+					if ( isset( $classname::$containerNodeClass ) and $classname::$containerNodeClass == 'IPS\\' . $args['app'] . '\\' . mb_ucfirst( $args['area'] ) )
 					{
 						$class = $classname::$containerNodeClass;
 						break;
@@ -117,7 +106,7 @@ class Unfollow
 					{
 						foreach( $classname::$containerFollowClasses as $followClass )
 						{
-							if( $followClass == 'IPS\\' . $args['app'] . '\\' . IPS::mb_ucfirst( $args['area'] ) )
+							if( $followClass == 'IPS\\' . $args['app'] . '\\' . mb_ucfirst( $args['area'] ) )
 							{
 								$class = $followClass;
 								break;
@@ -128,9 +117,9 @@ class Unfollow
 			}
 		}
 		
-		if ( !$class or !array_key_exists( $args['app'], Application::applications() ) )
+		if ( !$class or !array_key_exists( $args['app'], \IPS\Application::applications() ) )
 		{
-			throw new SafeException( 'NOT_FOUND', 'GQL/0001/7', 404 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NOT_FOUND', 'GQL/0001/7', 404 );
 		}
 
 		/* Get our return info ready */
@@ -163,15 +152,15 @@ class Unfollow
 					$followApp = $itemClass::$application;
 					$followArea = mb_strtolower( mb_substr( $node['node_class'], mb_strrpos( $node['node_class'], '\\' ) + 1 ) );
 					
-					Db::i()->delete( 'core_follow', array( 'follow_id=? AND follow_member_id=?', md5( $followApp . ';' . $followArea . ';' . $node['node_id'] . ';' .  Member::loggedIn()->member_id ), Member::loggedIn()->member_id ) );
+					\IPS\Db::i()->delete( 'core_follow', array( 'follow_id=? AND follow_member_id=?', md5( $followApp . ';' . $followArea . ';' . $node['node_id'] . ';' .  \IPS\Member::loggedIn()->member_id ), \IPS\Member::loggedIn()->member_id ) );
 				}
 			}
 
-			if ( in_array( 'IPS\Node\Model', class_parents( $class ) ) )
+			if ( \in_array( 'IPS\Node\Model', class_parents( $class ) ) )
 			{
 				$return = array_merge($return, array(
 					'node' => $thing,
-					'nodeClass' => get_class( $thing )
+					'nodeClass' => \get_class( $thing )
 				));
 			}
 			else if( $class == 'IPS\Member' )
@@ -188,11 +177,11 @@ class Unfollow
 			{
 				$return = array_merge($return, array(
 					'item' => $thing,
-					'itemClass' => get_class( $thing )
+					'itemClass' => \get_class( $thing )
 				));
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 		}
 

@@ -12,21 +12,16 @@
 namespace IPS\{app}\extensions\core\BulkMail;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\BulkMailAbstract;
-use IPS\Member as MemberClass;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Bulk Mail Extension
  */
-class {class} extends BulkMailAbstract
+class _{class}
 {
 	/** 
 	 * Get tags that can be used in bulk mail
@@ -45,10 +40,10 @@ class {class} extends BulkMailAbstract
 	 *
 	 * @param	string				$content	Bulk Mail Content (passed in case a particular tag is computationally expensive so that the extension may "sniff" for it and elect not to perform the computation if it is not used)
 	 * @param	int					$type		0=All, 1=Global, 2=Member-specific
-	 * @param	NULL|MemberClass	$member		Member object if $type is 0 or 2
+	 * @param	NULL|\IPS\Member	$member		Member object if $type is 0 or 2
 	 * @return	array
 	 */
-	public function returnTagValues( string $content, int $type, ?MemberClass $member ): array
+	public function returnTagValues( string $content, int $type, ?\IPS\Member $member ): array
 	{
 		return array(
 			'{some_tag}'	=> 'Value',

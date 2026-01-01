@@ -10,47 +10,13 @@
  */
 
 namespace IPS\core\api\GraphQL;
-use IPS\core\api\GraphQL\Types\ActiveUsersType;
-use IPS\core\api\GraphQL\Types\ActiveUserType;
-use IPS\core\api\GraphQL\Types\AttachmentPermissionsType;
-use IPS\core\api\GraphQL\Types\AttachmentType;
-use IPS\core\api\GraphQL\Types\ClubNodeType;
-use IPS\core\api\GraphQL\Types\ClubType;
-use IPS\core\api\GraphQL\Types\ContentReactionType;
-use IPS\core\api\GraphQL\Types\ContentSearchResultType;
-use IPS\core\api\GraphQL\Types\GroupType;
-use IPS\core\api\GraphQL\Types\IgnoreOptionType;
-use IPS\core\api\GraphQL\Types\LanguageType;
-use IPS\core\api\GraphQL\Types\LoginType;
-use IPS\core\api\GraphQL\Types\MemberType;
-use IPS\core\api\GraphQL\Types\MessengerConversationType;
-use IPS\core\api\GraphQL\Types\MessengerFolderType;
-use IPS\core\api\GraphQL\Types\MessengerParticipantType;
-use IPS\core\api\GraphQL\Types\MessengerReplyType;
-use IPS\core\api\GraphQL\Types\NotificationMethodType;
-use IPS\core\api\GraphQL\Types\NotificationType;
-use IPS\core\api\GraphQL\Types\NotificationTypeType;
-use IPS\core\api\GraphQL\Types\PollQuestionType;
-use IPS\core\api\GraphQL\Types\PollType;
-use IPS\core\api\GraphQL\Types\PopularContributorType;
-use IPS\core\api\GraphQL\Types\ProfileFieldGroupType;
-use IPS\core\api\GraphQL\Types\ProfileFieldType;
-use IPS\core\api\GraphQL\Types\PromotedItemType;
-use IPS\core\api\GraphQL\Types\ReportReasonType;
-use IPS\core\api\GraphQL\Types\ReportType;
-use IPS\core\api\GraphQL\Types\SearchResultType;
-use IPS\core\api\GraphQL\Types\SearchType;
-use IPS\core\api\GraphQL\Types\SettingsType;
-use IPS\core\api\GraphQL\Types\StatsType;
-use IPS\core\api\GraphQL\Types\StreamType;
-use IPS\core\api\GraphQL\Types\TagType;
-use IPS\core\api\GraphQL\Types\UploadProgressType;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -59,43 +25,43 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * so we'll generate singletons here.
  * @todo automate this somehow?
  */
-class TypeRegistry
+class _TypeRegistry
 {
-	protected static ?ActiveUsersType $activeUsers = null;
-	protected static ?ActiveUserType $activeUser = null;
-	protected static ?AttachmentType $attachment = null;
-	protected static ?AttachmentPermissionsType $attachmentPermissions = null;
-	protected static ?ClubNodeType $clubNode = null;
-	protected static ?ClubType $club = null;
-	protected static ?ContentReactionType $contentReaction = null;
-	protected static ?ContentSearchResultType $contentSearchResult = null;
-	protected static ?GroupType $group = null;
-	protected static ?IgnoreOptionType $ignoreOption = null;
-	protected static ?MemberType $member = null;
-	protected static ?LanguageType $language = null;
-	protected static ?LoginType $login = null;
-	protected static ?MessengerConversationType $messengerConversation = null;
-	protected static ?MessengerFolderType $messengerFolder = null;
-	protected static ?MessengerParticipantType $messengerParticipant = null;
-	protected static ?MessengerReplyType $messengerReply = null;
-	protected static ?NotificationType $notification = null;
-	protected static ?NotificationMethodType $notificationMethod = null;
-	protected static ?NotificationTypeType $notificationType = null;
-	protected static ?PollType $poll = null;
-	protected static ?PollQuestionType $pollQuestion = null;
-	protected static ?PopularContributorType $popularContributor = null;
-	protected static ?ProfileFieldGroupType $profileFieldGroup = null;
-	protected static ?ProfileFieldType $profileField = null;
-	protected static ?PromotedItemType $promotedItem = null;
-	protected static ?ReportType $report = null;
-	protected static ?ReportReasonType $reportReason = null;
-	protected static ?SearchType $search = null;
-	protected static ?SearchResultType $searchResult = null;
-	protected static ?StatsType $stats = null;
-	protected static ?StreamType $stream = null;
-	protected static ?TagType $tag = null;
-	protected static ?SettingsType $settings = null;
-	protected static ?UploadProgressType $uploadProgress = null;
+	protected static $activeUsers;
+	protected static $activeUser;
+	protected static $attachment;
+	protected static $attachmentPermissions;
+	protected static $clubNode;
+	protected static $club;
+	protected static $contentReaction;
+	protected static $contentSearchResult;
+	protected static $group;
+	protected static $ignoreOption;
+	protected static $member;
+	protected static $language;
+	protected static $login;
+	protected static $messengerConversation;
+	protected static $messengerFolder;
+	protected static $messengerParticipant;
+	protected static $messengerReply;
+	protected static $notification;
+	protected static $notificationMethod;
+	protected static $notificationType;
+	protected static $poll;
+	protected static $pollQuestion;
+	protected static $popularContributor;
+	protected static $profileFieldGroup;
+	protected static $profileField;
+	protected static $promotedItem;
+	protected static $report;
+	protected static $reportReason;
+	protected static $search;
+	protected static $searchResult;
+	protected static $stats;
+	protected static $stream;
+	protected static $tag;
+	protected static $settings;
+	protected static $uploadProgress;
 
 	/**
 	 * Constructor
@@ -106,282 +72,282 @@ class TypeRegistry
 	}
 
 	/**
-	 * @return ActiveUsersType
+	 * @return \IPS\core\api\GraphQL\Types\ActiveUsersType
 	 */
-	public static function activeUsers() : ActiveUsersType
+	public static function activeUsers()
 	{
-		return self::$activeUsers ?: (self::$activeUsers = new ActiveUsersType());
+		return self::$activeUsers ?: (self::$activeUsers = new \IPS\core\api\GraphQL\Types\ActiveUsersType());
 	}
 
 	/**
-	 * @return ActiveUserType
+	 * @return \IPS\core\api\GraphQL\Types\ActiveUserType
 	 */
-	public static function activeUser() : ActiveUserType
+	public static function activeUser()
 	{
-		return self::$activeUser ?: (self::$activeUser = new ActiveUserType());
-	}
-	
-	/**
-	 * @return AttachmentType
-	 */
-	public static function attachment() : AttachmentType
-	{
-		return self::$attachment ?: (self::$attachment = new AttachmentType());
+		return self::$activeUser ?: (self::$activeUser = new \IPS\core\api\GraphQL\Types\ActiveUserType());
 	}
 	
 	/**
-	 * @return AttachmentPermissionsType
+	 * @return \IPS\core\api\GraphQL\Types\AttachmentType
 	 */
-	public static function attachmentPermissions() : AttachmentPermissionsType
+	public static function attachment()
 	{
-		return self::$attachmentPermissions ?: (self::$attachmentPermissions = new AttachmentPermissionsType());
+		return self::$attachment ?: (self::$attachment = new \IPS\core\api\GraphQL\Types\AttachmentType());
+	}
+	
+	/**
+	 * @return \IPS\core\api\GraphQL\Types\AttachmentPermissionsType
+	 */
+	public static function attachmentPermissions()
+	{
+		return self::$attachmentPermissions ?: (self::$attachmentPermissions = new \IPS\core\api\GraphQL\Types\AttachmentPermissionsType());
 	}
 
 	/**
-	 * @return ClubNodeType
+	 * @return \IPS\core\api\GraphQL\Types\ClubNodeType
 	 */
-	public static function clubNode() : ClubNodeType
+	public static function clubNode()
 	{
-		return self::$clubNode ?: (self::$clubNode = new ClubNodeType());
+		return self::$clubNode ?: (self::$clubNode = new \IPS\core\api\GraphQL\Types\ClubNodeType());
 	}
 
 	/**
-	 * @return ClubType
+	 * @return \IPS\core\api\GraphQL\Types\ClubType
 	 */
-	public static function club() : ClubType
+	public static function club()
 	{
-		return self::$club ?: (self::$club = new ClubType());
+		return self::$club ?: (self::$club = new \IPS\core\api\GraphQL\Types\ClubType());
 	}
 
 	/**
-	 * @return ContentReactionType
+	 * @return \IPS\core\api\GraphQL\Types\ContentReactionType
 	 */
-	public static function contentReaction() : ContentReactionType
+	public static function contentReaction()
 	{
-		return self::$contentReaction ?: (self::$contentReaction = new ContentReactionType());
+		return self::$contentReaction ?: (self::$contentReaction = new \IPS\core\api\GraphQL\Types\ContentReactionType());
 	}
 
 	/**
-	 * @return GroupType
+	 * @return \IPS\core\api\GraphQL\Types\GroupType
 	 */
-	public static function group() : GroupType
+	public static function group()
 	{
-		return self::$group ?: (self::$group = new GroupType());
+		return self::$group ?: (self::$group = new \IPS\core\api\GraphQL\Types\GroupType());
 	}
 
 	/**
-	 * @return IgnoreOptionType
+	 * @return \IPS\core\api\GraphQL\Types\IgnoreOptionType
 	 */
-	public static function ignoreOption() : IgnoreOptionType
+	public static function ignoreOption()
 	{
-		return self::$ignoreOption ?: (self::$ignoreOption = new IgnoreOptionType());
+		return self::$ignoreOption ?: (self::$ignoreOption = new \IPS\core\api\GraphQL\Types\IgnoreOptionType());
 	}
 
 	/**
-	 * @return MemberType
+	 * @return \IPS\core\api\GraphQL\Types\MemberType
 	 */
-	public static function member() : MemberType
+	public static function member()
 	{
-		return self::$member ?: (self::$member = new MemberType());
+		return self::$member ?: (self::$member = new \IPS\core\api\GraphQL\Types\MemberType());
 	}
 
 	/**
-	 * @return LanguageType
+	 * @return \IPS\core\api\GraphQL\Types\LanguageType
 	 */
-	public static function language() : LanguageType
+	public static function language()
 	{
-		return self::$language ?: (self::$language = new LanguageType());
+		return self::$language ?: (self::$language = new \IPS\core\api\GraphQL\Types\LanguageType());
 	}
 
 	/**
-	 * @return LoginType
+	 * @return \IPS\core\api\GraphQL\Types\LoginType
 	 */
-	public static function login() : LoginType
+	public static function login()
 	{
-		return self::$login ?: (self::$login = new LoginType());
+		return self::$login ?: (self::$login = new \IPS\core\api\GraphQL\Types\LoginType());
 	}
 
 	/**
-	 * @return MessengerConversationType
+	 * @return \IPS\core\api\GraphQL\Types\MessengerConversationType
 	 */
-	public static function messengerConversation() : MessengerConversationType
+	public static function messengerConversation()
 	{
-		return self::$messengerConversation ?: (self::$messengerConversation = new MessengerConversationType());
+		return self::$messengerConversation ?: (self::$messengerConversation = new \IPS\core\api\GraphQL\Types\MessengerConversationType());
 	}
 
 	/**
-	 * @return MessengerFolderType
+	 * @return \IPS\core\api\GraphQL\Types\MessengerFolderType
 	 */
-	public static function messengerFolder() : MessengerFolderType
+	public static function messengerFolder()
 	{
-		return self::$messengerFolder ?: (self::$messengerFolder = new MessengerFolderType());
+		return self::$messengerFolder ?: (self::$messengerFolder = new \IPS\core\api\GraphQL\Types\MessengerFolderType());
 	}
 
 	/**
-	 * @return MessengerParticipantType
+	 * @return \IPS\core\api\GraphQL\Types\MessengerParticipantType
 	 */
-	public static function messengerParticipant() : MessengerParticipantType
+	public static function messengerParticipant()
 	{
-		return self::$messengerParticipant ?: (self::$messengerParticipant = new MessengerParticipantType());
+		return self::$messengerParticipant ?: (self::$messengerParticipant = new \IPS\core\api\GraphQL\Types\MessengerParticipantType());
 	}
 
 	/**
-	 * @return MessengerReplyType
+	 * @return \IPS\core\api\GraphQL\Types\MessengerReplyType
 	 */
-	public static function messengerReply() : MessengerReplyType
+	public static function messengerReply()
 	{
-		return self::$messengerReply ?: (self::$messengerReply = new MessengerReplyType());
+		return self::$messengerReply ?: (self::$messengerReply = new \IPS\core\api\GraphQL\Types\MessengerReplyType());
 	}
 
 	/**
-	 * @return NotificationType
+	 * @return \IPS\core\api\GraphQL\Types\NotificationType
 	 */
-	public static function notification() : NotificationType
+	public static function notification()
 	{
-		return self::$notification ?: (self::$notification = new NotificationType());
+		return self::$notification ?: (self::$notification = new \IPS\core\api\GraphQL\Types\NotificationType());
 	}
 
 	/**
-	 * @return NotificationMethodType
+	 * @return \IPS\core\api\GraphQL\Types\NotificationMethodType
 	 */
-	public static function notificationMethod() : NotificationMethodType
+	public static function notificationMethod()
 	{
-		return self::$notificationMethod ?: (self::$notificationMethod = new NotificationMethodType());
+		return self::$notificationMethod ?: (self::$notificationMethod = new \IPS\core\api\GraphQL\Types\NotificationMethodType());
 	}
 
 	/**
-	 * @return NotificationTypeType
+	 * @return \IPS\core\api\GraphQL\Types\NotificationTypeType
 	 */
-	public static function notificationType() : NotificationTypeType
+	public static function notificationType()
 	{
-		return self::$notificationType ?: (self::$notificationType = new NotificationTypeType());
+		return self::$notificationType ?: (self::$notificationType = new \IPS\core\api\GraphQL\Types\NotificationTypeType());
 	}
 
 	/**
-	 * @return PollType
+	 * @return \IPS\core\api\GraphQL\Types\PollType
 	 */
-	public static function poll() : PollType
+	public static function poll()
 	{
-		return self::$poll ?: (self::$poll = new PollType());
+		return self::$poll ?: (self::$poll = new \IPS\core\api\GraphQL\Types\PollType());
 	}
 
 	/**
-	 * @return PollQuestionType
+	 * @return \IPS\core\api\GraphQL\Types\PollQuestionType
 	 */
-	public static function pollQuestion(): PollQuestionType
+	public static function pollQuestion(): \IPS\core\api\GraphQL\Types\PollQuestionType
 	{
-		return self::$pollQuestion ?: (self::$pollQuestion = new PollQuestionType());
+		return self::$pollQuestion ?: (self::$pollQuestion = new \IPS\core\api\GraphQL\Types\PollQuestionType());
 	}
 
 	/**
-	 * @return PopularContributorType
+	 * @return \IPS\core\api\GraphQL\Types\PopularContributorType
 	 */
-	public static function popularContributor(): PopularContributorType
+	public static function popularContributor(): \IPS\core\api\GraphQL\Types\PopularContributorType
 	{
-		return self::$popularContributor ?: (self::$popularContributor = new PopularContributorType());
+		return self::$popularContributor ?: (self::$popularContributor = new \IPS\core\api\GraphQL\Types\PopularContributorType());
 	}
 
 	/**
-	 * @return ProfileFieldGroupType
+	 * @return \IPS\core\api\GraphQL\Types\ProfileFieldGroupType
 	 */
-	public static function profileFieldGroup(): ProfileFieldGroupType
+	public static function profileFieldGroup(): \IPS\core\api\GraphQL\Types\ProfileFieldGroupType
     {
-        return self::$profileFieldGroup ?: (self::$profileFieldGroup = new ProfileFieldGroupType());
+        return self::$profileFieldGroup ?: (self::$profileFieldGroup = new \IPS\core\api\GraphQL\Types\ProfileFieldGroupType());
     }
 
 	/**
-	 * @return ProfileFieldType
+	 * @return \IPS\core\api\GraphQL\Types\ProfileFieldType
 	 */
-	public static function profileField(): ProfileFieldType
+	public static function profileField(): \IPS\core\api\GraphQL\Types\ProfileFieldType
 	{
-		return self::$profileField ?: (self::$profileField = new ProfileFieldType());
+		return self::$profileField ?: (self::$profileField = new \IPS\core\api\GraphQL\Types\ProfileFieldType());
 	}
 
 	/**
-	 * @return PromotedItemType
+	 * @return \IPS\core\api\GraphQL\Types\PromotedItemType
 	 */
-	public static function promotedItem(): PromotedItemType
+	public static function promotedItem(): \IPS\core\api\GraphQL\Types\PromotedItemType
 	{
-		return self::$promotedItem ?: (self::$promotedItem = new PromotedItemType());
+		return self::$promotedItem ?: (self::$promotedItem = new \IPS\core\api\GraphQL\Types\PromotedItemType());
 	}
 
 	/**
-	 * @return ContentSearchResultType
+	 * @return \IPS\core\api\GraphQL\Types\ContentSearchResultType
 	 */
-	public static function contentSearchResult(): ContentSearchResultType
+	public static function contentSearchResult(): \IPS\core\api\GraphQL\Types\ContentSearchResultType
 	{
-		return self::$contentSearchResult ?: (self::$contentSearchResult = new ContentSearchResultType());
+		return self::$contentSearchResult ?: (self::$contentSearchResult = new \IPS\core\api\GraphQL\Types\ContentSearchResultType());
 	}
 
 	/**
-	 * @return ReportType
+	 * @return \IPS\core\api\GraphQL\Types\ReportType
 	 */
-	public static function report(): ReportType
+	public static function report(): \IPS\core\api\GraphQL\Types\ReportType
     {
-        return self::$report ?: (self::$report = new ReportType());
+        return self::$report ?: (self::$report = new \IPS\core\api\GraphQL\Types\ReportType());
     }
 
 	/**
-	 * @return ReportReasonType
+	 * @return \IPS\core\api\GraphQL\Types\ReportReasonType
 	 */
-	public static function reportReason(): ReportReasonType
+	public static function reportReason(): \IPS\core\api\GraphQL\Types\ReportReasonType
     {
-        return self::$reportReason ?: (self::$reportReason = new ReportReasonType());
+        return self::$reportReason ?: (self::$reportReason = new \IPS\core\api\GraphQL\Types\ReportReasonType());
     }
 
 	/**
-	 * @return SearchResultType
+	 * @return \IPS\core\api\GraphQL\Types\SearchResultType
 	 */
-	public static function searchResult(): SearchResultType
+	public static function searchResult(): \IPS\core\api\GraphQL\Types\SearchResultType
 	{
-		return self::$searchResult ?: (self::$searchResult = new SearchResultType());
+		return self::$searchResult ?: (self::$searchResult = new \IPS\core\api\GraphQL\Types\SearchResultType());
 	}
 
 	/**
-	 * @return SearchType
+	 * @return \IPS\core\api\GraphQL\Types\SearchType
 	 */
-	public static function search(): SearchType
+	public static function search(): \IPS\core\api\GraphQL\Types\SearchType
 	{
-		return self::$search ?: (self::$search = new SearchType());
+		return self::$search ?: (self::$search = new \IPS\core\api\GraphQL\Types\SearchType());
 	}
 
 	/**
-	 * @return StatsType
+	 * @return \IPS\core\api\GraphQL\Types\StatsType
 	 */
-	public static function stats(): StatsType
+	public static function stats(): \IPS\core\api\GraphQL\Types\StatsType
 	{
-		return self::$stats ?: (self::$stats = new StatsType());
+		return self::$stats ?: (self::$stats = new \IPS\core\api\GraphQL\Types\StatsType());
 	}
 
 	/**
-	 * @return StreamType
+	 * @return \IPS\core\api\GraphQL\Types\StreamType
 	 */
-	public static function stream(): StreamType
+	public static function stream(): \IPS\core\api\GraphQL\Types\StreamType
 	{
-		return self::$stream ?: (self::$stream = new StreamType());
+		return self::$stream ?: (self::$stream = new \IPS\core\api\GraphQL\Types\StreamType());
 	}
 
 	/**
-	 * @return TagType
+	 * @return \IPS\core\api\GraphQL\Types\TagType
 	 */
-	public static function tag(): TagType
+	public static function tag(): \IPS\core\api\GraphQL\Types\TagType
 	{
-		return self::$tag ?: (self::$tag = new TagType());
+		return self::$tag ?: (self::$tag = new \IPS\core\api\GraphQL\Types\TagType());
 	}
 
 	/**
-	 * @return SettingsType
+	 * @return \IPS\core\api\GraphQL\Types\SettingsType
 	 */
-	public static function settings(): SettingsType
+	public static function settings(): \IPS\core\api\GraphQL\Types\SettingsType
 	{
-		return self::$settings ?: (self::$settings = new SettingsType());
+		return self::$settings ?: (self::$settings = new \IPS\core\api\GraphQL\Types\SettingsType());
 	}
 
 	/**
-	 * @return UploadProgressType
+	 * @return \IPS\core\api\GraphQL\Types\UploadProgressType
 	 */
-	public static function uploadProgress(): UploadProgressType
+	public static function uploadProgress(): \IPS\core\api\GraphQL\Types\UploadProgressType
 	{
-		return self::$uploadProgress ?: (self::$uploadProgress = new UploadProgressType());
+		return self::$uploadProgress ?: (self::$uploadProgress = new \IPS\core\api\GraphQL\Types\UploadProgressType());
 	}
 }

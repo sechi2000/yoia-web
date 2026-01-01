@@ -11,39 +11,29 @@
 namespace IPS\GeoLocation\Maps;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\GeoLocation;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Google Maps
  */
-class Google
+class _Google
 {	
 	/**
 	 * @brief	GeoLocation
 	 */
-	public ?GeoLocation $geolocation = NULL;
+	public $geoLocation;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	GeoLocation	$geoLocation	Location
+	 * @param	\IPS\GeoLocation	$geoLocation	Location
 	 * @return	void
 	 */
-	public function __construct( GeoLocation $geoLocation )
+	public function __construct( \IPS\GeoLocation $geoLocation )
 	{
 		$this->geolocation	= $geoLocation;
 	}
@@ -51,61 +41,50 @@ class Google
 	/**
 	 * Render
 	 *
-	 * @param int $width	Width
-	 * @param int $height	Height
-	 * @param float|null $zoom	The zoom amount (a value between 0 being totally zoomed out view of the world, and 1 being as fully zoomed in as possible) or NULL to zoom automatically based on how much data is available
-	 * @param int $scale	Google maps scale to use (https://developers.google.com/maps/documentation/static-maps/intro#scale_values)
-	 * @param string $maptype	Type of map to use. Valid values are roadmap (default), satellite, terrain, and hybrid (https://developers.google.com/maps/documentation/static-maps/intro#MapTypes)
+	 * @param	int			$width	Width
+	 * @param	int			$height	Height
+	 * @param	float|NULL	$zoom	The zoom amount (a value between 0 being totally zoomed out view of the world, and 1 being as fully zoomed in as possible) or NULL to zoom automatically based on how much data is available
+	 * @param	int			$scale	Google maps scale to use (https://developers.google.com/maps/documentation/static-maps/intro#scale_values)
+	 * @param	string		$maptype	Type of map to use. Valid values are roadmap (default), satellite, terrain, and hybrid (https://developers.google.com/maps/documentation/static-maps/intro#MapTypes)
 	 * @return	string
 	 */
-	public function render( int $width, int $height, float $zoom=NULL, int $scale=1, string $maptype='roadmap' ): string
+	public function render( $width, $height, $zoom=NULL, $scale=1, $maptype='roadmap' )
 	{
-		/* Check permissions */
-		if( Settings::i()->google_maps_groups != '*' and !Member::loggedIn()->inGroup( explode( ",", Settings::i()->google_maps_groups ) ) )
-		{
-			return '';
-		}
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_core.js', 'core', 'global' ) );
 
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_core.js', 'core', 'global' ) );
-
-		if( empty( $zoom ) )
-		{
-			$zoom = Settings::i()->google_maps_zoom ?: null;
-		}
-
-		return Settings::i()->google_maps_static_use_embed ?
-			Theme::i()->getTemplate( 'global', 'core', 'global' )->googleMap( array(
+		return \IPS\Settings::i()->google_maps_static_use_embed ?
+			\IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->googleMap( array(
 				'lat' => $this->geolocation->lat,
 				'long' => $this->geolocation->long,
-				'key' => Settings::i()->google_maps_api_key,
+				'key' => \IPS\Settings::i()->google_maps_api_key,
 				'zoom' => $zoom,
 				'scale' => $scale,
 				'maptype' => $maptype,
 				'width' => $width,
 				'height' => $height )) :
-			Theme::i()->getTemplate( 'global', 'core', 'global' )->staticMap( Url::external( 'https://maps.google.com/' )->setQueryString( 'q', $this->_getLocation() ), $this->mapUrl( $width, $height, $zoom, $scale, $maptype ), $this->geolocation->lat, $this->geolocation->long, $width, $height );
+			\IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->staticMap( \IPS\Http\Url::external( 'https://maps.google.com/' )->setQueryString( 'q', $this->_getLocation() ), $this->mapUrl( $width, $height, $zoom, $scale, $maptype ), $this->geolocation->lat, $this->geolocation->long, $width, $height );
 	}
 
 	/**
 	 * Return the map image URL
 	 *
-	 * @param int $width	Width
-	 * @param int $height	Height
-	 * @param float|null $zoom	The zoom amount (a value between 0 being totally zoomed out view of the world, and 1 being as fully zoomed in as possible) or NULL to zoom automatically based on how much data is available
-	 * @param int $scale	Google maps scale to use (https://developers.google.com/maps/documentation/static-maps/intro#scale_values)
-	 * @param string $maptype	Type of map to use. Valid values are roadmap (default), satellite, terrain, and hybrid (https://developers.google.com/maps/documentation/static-maps/intro#MapTypes)
-	 * @return	Url|NULL
+	 * @param	int			$width	Width
+	 * @param	int			$height	Height
+	 * @param	float|NULL	$zoom	The zoom amount (a value between 0 being totally zoomed out view of the world, and 1 being as fully zoomed in as possible) or NULL to zoom automatically based on how much data is available
+	 * @param	int			$scale	Google maps scale to use (https://developers.google.com/maps/documentation/static-maps/intro#scale_values)
+	 * @param	string		$maptype	Type of map to use. Valid values are roadmap (default), satellite, terrain, and hybrid (https://developers.google.com/maps/documentation/static-maps/intro#MapTypes)
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function mapUrl( int $width, int $height, float $zoom=NULL, int $scale=1, string $maptype='roadmap' ): ?Url
+	public function mapUrl( $width, $height, $zoom=NULL, $scale=1, $maptype='roadmap' )
 	{
 		$location = $this->_getLocation();
 		
-		return Url::external( 'https://maps.googleapis.com/maps/api/staticmap' )->setQueryString( array(
+		return \IPS\Http\Url::external( 'https://maps.googleapis.com/maps/api/staticmap' )->setQueryString( array(
 			'center'	=> $location,
 			'zoom'		=> $zoom === NULL ? NULL : ceil( $zoom * 8 ),
 			'size'		=> "{$width}x{$height}",
 			'markers'	=> $location,
-			'key'		=> Settings::i()->google_maps_api_key,
+			'key'		=> \IPS\Settings::i()->google_maps_api_key,
 			'scale'		=> $scale,
 			'maptype'	=> $maptype
 		) );
@@ -116,7 +95,7 @@ class Google
 	 *
 	 * @return	string
 	 */
-	protected function _getLocation(): string
+	protected function _getLocation()
 	{
 		if ( $this->geolocation->lat and $this->geolocation->long )
 		{
@@ -129,7 +108,7 @@ class Google
 			{
 				if ( $this->geolocation->$k )
 				{
-					if ( is_array( $this->geolocation->$k ) )
+					if ( \is_array( $this->geolocation->$k ) )
 					{
 						foreach ( array_reverse( $this->geolocation->$k ) as $v )
 						{

@@ -12,48 +12,25 @@
 namespace IPS\convert;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\convert\Login\HashCryptPrivate;
-use IPS\convert\Software\Core\Joomla;
-use IPS\convert\Software\Core\Phpbb;
-use IPS\convert\Software\Core\Vbulletin;
-use IPS\convert\Software\Core\Vbulletin5;
-use IPS\convert\Software\Core\Wordpress;
-use IPS\Db;
-use IPS\Db\Exception as DbException;
-use IPS\Events\Event;
-use IPS\Login as LoginClass;
-use IPS\Login\Exception;
-use IPS\Login\Handler;
-use IPS\Login\Handler\UsernamePasswordHandler;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use SoapClient;
-use function count;
-use function defined;
-use function strlen;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Standard Internal Database Login Handler
  */
-class Login extends Handler
+class _Login extends \IPS\Login\Handler
 {
-	use UsernamePasswordHandler;
+	use \IPS\Login\Handler\UsernamePasswordHandler;
 
 	/**
 	 * Get title
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return 'login_handler_Convert';
 	}
@@ -61,42 +38,83 @@ class Login extends Handler
 	/**
 	 * Authenticate
 	 *
-	 * @param	LoginClass	$login				The login object
-	 * @param string $usernameOrEmail		The username or email address provided by the user
-	 * @param object $password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
-	 * @return	Member
-	 * @throws	Exception
+	 * @param	\IPS\Login	$login				The login object
+	 * @param	string		$usernameOrEmail		The username or email address provided by the user
+	 * @param	object		$password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @return	\IPS\Member
+	 * @throws	\IPS\Login\Exception
 	 */
-	public function authenticateUsernamePassword( LoginClass $login, string $usernameOrEmail, object $password ): Member
+	public function authenticateUsernamePassword( \IPS\Login $login, $usernameOrEmail, $password )
 	{
+		$type = 'username_or_email';
+		switch ( $this->authType() )
+		{
+			case \IPS\Login::AUTH_TYPE_USERNAME + \IPS\Login::AUTH_TYPE_EMAIL:
+				$type = 'username_or_email';
+				break;
+
+			case \IPS\Login::AUTH_TYPE_USERNAME:
+				$type = 'username';
+				break;
+
+			case \IPS\Login::AUTH_TYPE_EMAIL:
+				$type = 'email_address';
+				break;
+		}
+
 		/* Make sure we have the username or email */
 		if( !$usernameOrEmail )
 		{
-			throw new Exception( Member::loggedIn()->language()->addToStack( 'login_err_no_account', FALSE ), Exception::NO_ACCOUNT );
+			$member = NULL;
+
+			if ( $this->authType() & \IPS\Login::AUTH_TYPE_EMAIL )
+			{
+				$member = new \IPS\Member;
+				$member->email = $usernameOrEmail;
+			}
+
+			throw new \IPS\Login\Exception( \IPS\Member::loggedIn()->language()->addToStack( 'login_err_no_account', FALSE, array( 'pluralize' => array( $this->authType() ) ) ), \IPS\Login\Exception::NO_ACCOUNT, NULL, $member );
 		}
 
 		/* Get member(s) */
 		$where = array();
 		$params = array();
+		if ( $this->authType() & \IPS\Login::AUTH_TYPE_USERNAME )
+		{
+			$where[] = 'name=?';
+			$params[] = $usernameOrEmail;
 
-		$where[] = 'email=?';
-		$params[] = $usernameOrEmail;
-
-		if ( $usernameOrEmail !== Request::legacyEscape( $usernameOrEmail ) )
+			if ( $usernameOrEmail !== \IPS\Request::legacyEscape( $usernameOrEmail ) )
+			{
+				$where[] = 'name=?';
+				$params[] = \IPS\Request::legacyEscape( $usernameOrEmail );
+			}
+		}
+		if ( $this->authType() & \IPS\Login::AUTH_TYPE_EMAIL )
 		{
 			$where[] = 'email=?';
-			$params[] = Request::legacyEscape( $usernameOrEmail );
-		}
+			$params[] = $usernameOrEmail;
 
-		$members = new ActiveRecordIterator( Db::i()->select( '*', 'core_members', array_merge( array( implode( ' OR ', $where ) ), $params ) ), 'IPS\Member' );
+			if ( $usernameOrEmail !== \IPS\Request::legacyEscape( $usernameOrEmail ) )
+			{
+				$where[] = 'email=?';
+				$params[] = \IPS\Request::legacyEscape( $usernameOrEmail );
+			}
+		}
+		$members = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', array_merge( array( implode( ' OR ', $where ) ), $params ) ), 'IPS\Member' );
 
 		/* If we didn't match any, throw an exception */
-		if ( !count( $members ) )
+		if ( !\count( $members ) )
 		{
-			$member = new Member;
-			$member->email = $usernameOrEmail;
+			$member = NULL;
 
-			throw new Exception( Member::loggedIn()->language()->addToStack( 'login_err_no_account', FALSE ), Exception::NO_ACCOUNT, NULL, $member );
+			if ( $this->authType() & \IPS\Login::AUTH_TYPE_EMAIL )
+			{
+				$member = new \IPS\Member;
+				$member->email = $usernameOrEmail;
+			}
+
+			throw new \IPS\Login\Exception( \IPS\Member::loggedIn()->language()->addToStack( 'login_err_no_account', FALSE, array( 'pluralize' => array( $this->authType() ) ) ), \IPS\Login\Exception::NO_ACCOUNT, NULL, $member );
 		}
 
 		/* Table switcher for new converters */
@@ -110,36 +128,36 @@ class Login extends Handler
 				}
 			}
 		}
-		catch( DbException $e )
+		catch( \IPS\Db\Exception $e )
 		{
 			/* Converter tables no longer exist */
 			if( $e->getCode() == 1146 )
 			{
-				throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+				throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 		}
 
 		/* Still here? Throw a password incorrect exception */
-		throw new Exception( Member::loggedIn()->language()->addToStack( 'login_err_bad_password', FALSE ), Exception::BAD_PASSWORD, NULL, $member ?? NULL );
+		throw new \IPS\Login\Exception( \IPS\Member::loggedIn()->language()->addToStack( 'login_err_bad_password', FALSE, array( 'pluralize' => array( $this->authType() ) ) ), \IPS\Login\Exception::BAD_PASSWORD, NULL, isset( $member ) ? $member : NULL );
 	}
 
 	/**
 	 *	@brief		Convert app cache
 	 */
-	protected static ?ActiveRecordIterator $_apps = null;
+	protected static $_apps;
 
 	/**
 	 * Authenticate
 	 *
-	 * @param	Member	$member				The member
-	 * @param object $password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	\IPS\Member	$member				The member
+	 * @param	object		$password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	bool
 	 */
-	public function authenticatePasswordForMember( Member $member, object $password ): bool
+	public function authenticatePasswordForMember( \IPS\Member $member, $password )
 	{
 		if( static::$_apps === NULL )
 		{
-			static::$_apps = new ActiveRecordIterator( Db::i()->select( '*', 'convert_apps', array( 'login=?', 1 ) ), 'IPS\convert\App' );
+			static::$_apps = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'convert_apps', array( 'login=?', 1 ) ), 'IPS\convert\App' );
 		}
 
 		foreach( static::$_apps as $app )
@@ -153,7 +171,7 @@ class Login extends Handler
 				$application = $app->getSource( FALSE, FALSE );
 			}
 			/* Converter application class no longer exists, but we want to continue since we may have a login method here */
-			catch( InvalidArgumentException $e )
+			catch( \InvalidArgumentException $e )
 			{
 				$application = NULL;
 			}
@@ -188,9 +206,9 @@ class Login extends Handler
 				$member->conv_password_extra	= NULL;
 				$member->setLocalPassword( $password );
 				$member->save();
-				Event::fire( 'onPassChange', $member, array( $password ) );
+				$member->memberSync( 'onPassChange', array( $password ) );
 
-				return true;
+				return $member;
 			}
 		}
 
@@ -200,10 +218,10 @@ class Login extends Handler
 	/**
 	 * Can this handler process a login for a member?
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	bool
 	 */
-	public function canProcess( Member $member ): bool
+	public function canProcess( \IPS\Member $member )
 	{
 		return (bool) $member->conv_password;
 	}
@@ -211,10 +229,10 @@ class Login extends Handler
 	/**
 	 * Can this handler process a password change for a member?
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	bool
 	 */
-	public function canChangePassword( Member $member ): bool
+	public function canChangePassword( \IPS\Member $member )
 	{
 		return FALSE;
 	}
@@ -222,11 +240,11 @@ class Login extends Handler
 	/**
 	 * Change Password
 	 *
-	 * @param	Member	$member			The member
+	 * @param	\IPS\Member	$member			The member
 	 * @param	object		$newPassword		New Password wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	void
 	 */
-	public function changePassword( Member $member, object $newPassword ) : void
+	public function changePassword( \IPS\Member $member, $newPassword )
 	{
 		$member->setLocalPassword( $newPassword );
 		$member->save();
@@ -235,10 +253,10 @@ class Login extends Handler
 	/**
 	 * Show in Account Settings?
 	 *
-	 * @param	Member|NULL	$member	The member, or NULL for if it should show generally
+	 * @param	\IPS\Member|NULL	$member	The member, or NULL for if it should show generally
 	 * @return	bool
 	 */
-	public function showInUcp( Member $member = NULL ): bool
+	public function showInUcp( \IPS\Member $member = NULL )
 	{
 		return FALSE;
 	}
@@ -246,13 +264,13 @@ class Login extends Handler
 	/**
 	 * AEF
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function aef( Member $member, string $password ) : bool
+	protected function aef( $member, $password )
 	{
-		if ( LoginClass::compareHashes( $member->conv_password, md5( $member->misc . $password ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, md5( $member->misc . $password ) ) )
 		{
 			return TRUE;
 		}
@@ -265,11 +283,11 @@ class Login extends Handler
 	/**
 	 * BBPress Standalone
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function bbpressstandalone( Member $member, string $password ) : bool
+	protected function bbpressstandalone( $member, $password )
 	{
 		return $this->bbpress( $member, $password );
 	}
@@ -277,25 +295,25 @@ class Login extends Handler
 	/**
 	 * BBPress
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function bbpress( Member $member, string $password ) : bool
+	protected function bbpress( $member, $password )
 	{
 		$success = false;
 		$password = html_entity_decode( $password );
 		$hash = $member->conv_password;
 
-		if ( strlen( $hash ) == 32 )
+		if ( \strlen( $hash ) == 32 )
 		{
-			$success = ( LoginClass::compareHashes( $member->conv_password, md5( $password ) ) );
+			$success = ( bool ) ( \IPS\Login::compareHashes( $member->conv_password, md5( $password ) ) );
 		}
 
 		// Nope, not md5.
 		if ( ! $success )
 		{
-			$hashLibrary = new HashCryptPrivate;
+			$hashLibrary = new \IPS\convert\Login\HashCryptPrivate;
 			$itoa64 = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 			$crypt = $hashLibrary->hashCryptPrivate( $password, $hash, $itoa64, 'P' );
 			if ( $crypt[ 0 ] == '*' )
@@ -314,7 +332,7 @@ class Login extends Handler
 		{
 			// No - check against WordPress.
 			// Note to self - perhaps push this to main bbpress method.
-			$success = Wordpress::login( $member, $password );
+			$success = \IPS\convert\Software\Core\Wordpress::login( $member, $password );
 		}
 
 		return $success;
@@ -323,11 +341,11 @@ class Login extends Handler
 	/**
 	 * BBPress 2.3
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function bbpress23( Member $member, string $password ) : bool
+	protected function bbpress23( $member, $password )
 	{
 		return $this->bbpress( $member, $password );
 	}
@@ -335,15 +353,15 @@ class Login extends Handler
 	/**
 	 * Community Server
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function cs( Member $member, string $password ) : bool
+	protected function cs( $member, $password )
 	{
 		$encodedHashPass = base64_encode( pack( "H*", sha1( base64_decode( $member->misc ) . $password ) ) );
 
-		if ( LoginClass::compareHashes( $member->conv_password, $encodedHashPass ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, $encodedHashPass ) )
 		{
 			return TRUE;
 		}
@@ -356,11 +374,11 @@ class Login extends Handler
 	/**
 	 * CSAuth
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function csauth( Member $member, string $password ) : bool
+	protected function csauth( $member, $password )
 	{
 		$wsdl = 'https://internal.auth.com/Service.asmx?wsdl';
 		$dest = 'https://interal.auth.com/Service.asmx';
@@ -378,7 +396,8 @@ class Login extends Handler
 				case 'SUCCESS' :
 					return TRUE;
 				case 'WRONG_AUTH' :
-				default:
+					return FALSE;
+				default :
 					return FALSE;
 			}
 		}
@@ -391,13 +410,13 @@ class Login extends Handler
 	/**
 	 * Discuz
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function discuz( Member $member, string $password ) : bool
+	protected function discuz( $member, $password )
 	{
-		if ( LoginClass::compareHashes( $member->conv_password, md5( md5( $password ) . $member->misc ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, md5( md5( $password ) . $member->misc ) ) )
 		{
 			return TRUE;
 		}
@@ -407,23 +426,23 @@ class Login extends Handler
 	/**
 	 * FudForum
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function fudforum( Member $member, string $password ) : bool
+	protected function fudforum( $member, $password )
 	{
 		$success = false;
 		$single_md5_pass = md5( $password );
 		$hash = $member->conv_password;
 
-		if ( strlen( $hash ) == 40 )
+		if ( \strlen( $hash ) == 40 )
 		{
-			$success = LoginClass::compareHashes( $member->conv_password, sha1( $member->misc . sha1( $password ) ) );
+			$success = ( \IPS\Login::compareHashes( $member->conv_password, sha1( $member->misc . sha1( $password ) ) ) ) ? TRUE : FALSE;
 		}
 		else
 		{
-			$success = LoginClass::compareHashes( $member->conv_password, $single_md5_pass );
+			$success = ( \IPS\Login::compareHashes( $member->conv_password, $single_md5_pass ) ) ? TRUE : FALSE;
 		}
 
 		return $success;
@@ -432,28 +451,28 @@ class Login extends Handler
 	/**
 	 * FusionBB
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function fusionbb( Member $member, string $password ) : bool
+	protected function fusionbb( $member, $password )
 	{
 		/* FusionBB Has multiple methods that can be used to check a hash, so we need to cycle through them */
 
 		/* md5( md5( salt ) . md5( pass ) ) */
-		if ( LoginClass::compareHashes( $member->conv_password, md5( md5( $member->misc ) . md5( $password ) ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, md5( md5( $member->misc ) . md5( $password ) ) ) )
 		{
 			return TRUE;
 		}
 
 		/* md5( md5( salt ) . pass ) */
-		if ( LoginClass::compareHashes( $member->conv_password, md5( md5( $member->misc ) . $password ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, md5( md5( $member->misc ) . $password ) ) )
 		{
 			return TRUE;
 		}
 
 		/* md5( pass ) */
-		if ( LoginClass::compareHashes( $member->conv_password, md5( $password ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, md5( $password ) ) )
 		{
 			return TRUE;
 		}
@@ -464,17 +483,17 @@ class Login extends Handler
 	/**
 	 * Ikonboard
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function ikonboard( Member $member, string $password ) : bool
+	protected function ikonboard( $member, $password )
 	{
-		if ( LoginClass::compareHashes( $member->conv_password, crypt( $password, $member->misc ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, crypt( $password, $member->misc ) ) )
 		{
 			return TRUE;
 		}
-		else if ( LoginClass::compareHashes( $member->conv_password, md5( $password . mb_strtolower( $member->conv_password_extra ) ) ) )
+		else if ( \IPS\Login::compareHashes( $member->conv_password, md5( $password . mb_strtolower( $member->conv_password_extra ) ) ) )
 		{
 			return TRUE;
 		}
@@ -487,88 +506,88 @@ class Login extends Handler
 	/**
 	 * Kunena
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function kunena( Member $member, string $password ) : bool
+	protected function kunena( $member, $password )
 	{
 		// Kunena authenticates using internal Joomla functions.
 		// This is required, however, if the member only converts from
 		// Kunena and not Joomla + Kunena.
-		return Joomla::login( $member, $password );
+		return \IPS\convert\Software\Core\Joomla::login( $member, $password );
 	}
 
 	/**
 	 * PHP Legacy (2.x)
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function phpbblegacy( Member $member, string $password ) : bool
+	protected function phpbblegacy( $member, $password )
 	{
-		return Phpbb::login( $member, $password );
+		return \IPS\convert\Software\Core\Phpbb::login( $member, $password );
 	}
 
 	/**
 	 * Vbulletin 5.1
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function vb51connect( Member $member, string $password ) : bool
+	protected function vb51connect( $member, $password )
 	{
-		return Vbulletin5::login( $member, $password );
+		return \IPS\convert\Software\Core\Vbulletin5::login( $member, $password );
 	}
 
 	/**
 	 * Vbulletin 5
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function vb5connect( Member $member, string $password ) : bool
+	protected function vb5connect( $member, $password )
 	{
-		return Vbulletin5::login( $member, $password );
+		return \IPS\convert\Software\Core\Vbulletin5::login( $member, $password );
 	}
 
 	/**
 	 * Vbulletin 3.8
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function vbulletinlegacy( Member $member, string $password ) : bool
+	protected function vbulletinlegacy( $member, $password )
 	{
-		return Vbulletin::login( $member, $password );
+		return \IPS\convert\Software\Core\Vbulletin::login( $member, $password );
 	}
 
 	/**
 	 * Vbulletin 3.6
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function vbulletinlegacy36( Member $member, string $password ) : bool
+	protected function vbulletinlegacy36( $member, $password )
 	{
-		return Vbulletin::login( $member, $password );
+		return \IPS\convert\Software\Core\Vbulletin::login( $member, $password );
 	}
 
 	/**
 	 * SMF Legacy
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function smflegacy( Member $member, string $password ) : bool
+	protected function smflegacy( $member, $password )
 	{
-		if ( LoginClass::compareHashes( $member->conv_password, sha1( mb_strtolower( $member->name ) . $password ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, sha1( mb_strtolower( $member->name ) . $password ) ) )
 		{
 			return TRUE;
 		}
@@ -581,11 +600,11 @@ class Login extends Handler
 	/**
 	 * Telligent
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function telligentcs( Member $member, string $password ) : bool
+	protected function telligentcs( $member, $password )
 	{
 		return $this->cs( $member, $password );
 	}
@@ -593,11 +612,11 @@ class Login extends Handler
 	/**
 	 * WoltLab 4.x
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function woltlab( Member $member, string $password ) : bool
+	protected function woltlab( $member, $password )
 	{
 		$testHash = FALSE;
 
@@ -608,7 +627,7 @@ class Login extends Handler
 			$testHash = crypt( crypt( $password, $salt ), $salt );
 		}
 
-		if (	$testHash AND LoginClass::compareHashes( $member->conv_password, $testHash ) )
+		if (	$testHash AND \IPS\Login::compareHashes( $member->conv_password, $testHash ) )
 		{
 			return TRUE;
 		}
@@ -623,13 +642,13 @@ class Login extends Handler
 	/**
 	 * WoltLab 3.x
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function woltlablegacy( Member $member, string $password ) : bool
+	protected function woltlablegacy( $member, $password )
 	{
-		if ( LoginClass::compareHashes( $member->conv_password, sha1( $member->misc . sha1( $member->misc . sha1( $password ) ) ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, sha1( $member->misc . sha1( $member->misc . sha1( $password ) ) ) ) )
 		{
 			return TRUE;
 		}
@@ -642,41 +661,41 @@ class Login extends Handler
 	/**
 	 * PHP Fusion
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function phpfusion( Member $member, string $password ) : bool
+	protected function phpfusion( $member, $password )
 	{
-		return LoginClass::compareHashes( $member->conv_password, md5( md5( $password ) ) );
+		return ( bool ) \IPS\Login::compareHashes( $member->conv_password, md5( md5( $password ) ) );
 	}
 
 	/**
 	 * fluxBB
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function fluxbb( Member $member, string $password ) : bool
+	protected function fluxbb( $member, $password )
 	{
 		$success = false;
 		$hash = $member->conv_password;
 
-		if ( strlen( $hash ) == 40 )
+		if ( \strlen( $hash ) == 40 )
 		{
-			if ( LoginClass::compareHashes( $hash, sha1( $member->misc . sha1( $password ) ) ) )
+			if ( \IPS\Login::compareHashes( $hash, sha1( $member->misc . sha1( $password ) ) ) )
 			{
 				$success = TRUE;
 			}
-			elseif ( LoginClass::compareHashes( $hash, sha1( $password ) ) )
+			elseif ( \IPS\Login::compareHashes( $hash, sha1( $password ) ) )
 			{
 				$success = TRUE;
 			}
 		}
 		else
 		{
-			$success = LoginClass::compareHashes( $hash, md5( $password ) );
+			$success = ( \IPS\Login::compareHashes( $hash, md5( $password ) ) ) ? TRUE : FALSE;
 		}
 
 		return $success;
@@ -685,12 +704,12 @@ class Login extends Handler
 	/**
 	 * Simplepress Forum
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string	$password	Password from form
 	 * @return	bool
 	 */
-	protected function simplepress( Member $member, string $password ) : bool
+	protected function simplepress( $member, $password )
 	{
-		return Wordpress::login( $member, $password );
+		return \IPS\convert\Software\Core\Wordpress::login( $member, $password );
 	}
 }

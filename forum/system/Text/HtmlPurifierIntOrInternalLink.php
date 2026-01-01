@@ -20,7 +20,7 @@ if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * A HTMLPurifier Attribute Definition used for attributes which must be internal URLs or Integers (such as data-fileid for attachments)
  */
-class HtmlPurifierIntOrInternalLink extends HtmlPurifierInternalLinkDef
+class _HtmlPurifierIntOrInternalLink extends HtmlPurifierInternalLinkDef
 {
 	/**
 	 * Validate
@@ -30,7 +30,7 @@ class HtmlPurifierIntOrInternalLink extends HtmlPurifierInternalLinkDef
 	 * @param	\HTMLPurifier_Context	$context
 	 * @return	bool|string
 	 */
-	public function validate( $value, $config, $context ): bool|string
+	public function validate( $value, $config, $context )
 	{
 		$parentCheck = parent::validate( $value, $config, $context );
 

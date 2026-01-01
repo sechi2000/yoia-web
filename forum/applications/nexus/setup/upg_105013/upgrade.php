@@ -12,29 +12,25 @@
 namespace IPS\nexus\setup\upg_105013;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.5.0 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
  	 * Update time based settings
  	 *
- 	 * @return	bool|array	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
+ 	 * @return	array	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
  	 */
- 	public function step1() : bool|array
+ 	public function step1()
  	{
- 		Settings::i()->changeValues( array( 'cm_invoice_generate' => Settings::i()->cm_invoice_generate * 24, 'cm_invoice_warning' => Settings::i()->cm_invoice_warning * 24 ) );
+ 		\IPS\Settings::i()->changeValues( array( 'cm_invoice_generate' => \IPS\Settings::i()->cm_invoice_generate * 24, 'cm_invoice_warning' => \IPS\Settings::i()->cm_invoice_warning * 24 ) );
  		return TRUE;
  	}
 
@@ -43,7 +39,7 @@ class Upgrade
  	 *
  	 * @return string
  	 */
- 	public function step1CustomTitle() : string
+ 	public function step1CustomTitle()
  	{
  		return "Updating Settings";
  	}

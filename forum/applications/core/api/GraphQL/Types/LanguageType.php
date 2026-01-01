@@ -10,29 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Types;
-use Exception;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use function defined;
-use function strtolower;
-use function strtoupper;
-use function substr;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * LanguageType for GraphQL API
  */
-class LanguageType extends ObjectType
+class _LanguageType extends ObjectType
 {
     /**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -61,7 +57,7 @@ class LanguageType extends ObjectType
 						'resolve' => function ($lang) {
 							if ( preg_match( '/^\w{2}[-_]\w{2}($|\.)/i', $lang->short ) )
 							{
-								return strtolower( substr( $lang->short, 0, 2 ) ) . '-' . strtoupper( substr( $lang->short, 3, 2 ) );
+								return \strtolower( \substr( $lang->short, 0, 2 ) ) . '-' . \strtoupper( \substr( $lang->short, 3, 2 ) );
 							}
 
 							return '';
@@ -95,12 +91,12 @@ class LanguageType extends ObjectType
 								'type' => TypeRegistry::nonNull( TypeRegistry::string() )
 							]
 						],
-						'resolve' => function ($lang, $args) {
+						'resolve' => function ($lang, $args, $context, $info) {
 							try 
 							{
 								return $lang->addToStack( $args['key'] );
 							} 
-							catch (Exception $err)
+							catch (\Exception $err)
 							{
 								return $args['key'];
 							}

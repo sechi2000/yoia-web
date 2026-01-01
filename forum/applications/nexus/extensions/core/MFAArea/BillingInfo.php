@@ -12,27 +12,23 @@
 namespace IPS\nexus\extensions\core\MFAArea;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\MFAAreaAbstract;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Multi-Factor Authentication Area
  */
-class BillingInfo extends MFAAreaAbstract
+class _BillingInfo
 {
 	/**
 	 * Is this area available and should show in the ACP configuration?
 	 *
 	 * @return	bool
 	 */
-	public function isEnabled(): bool
+	public function isEnabled()
 	{
 		return TRUE;
 	}

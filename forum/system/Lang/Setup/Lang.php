@@ -11,35 +11,29 @@
 namespace IPS\Lang\Setup;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Setup Language Class
  */
-class Lang extends \IPS\Lang
+class _Lang extends \IPS\_Lang
 {
 	/**
 	 * Add to output stack
 	 *
-	 * @param string $key	Language key
-	 * @param bool|null $vle	Add VLE tags?
-	 * @param array $options Options
+	 * @param	string	$key	Language key
+	 * @param	bool	$vle	Add VLE tags?
+	 * @param	array	$options Options
 	 * @return	string	Unique id
 	 */
-	public function addToStack( string $key, ?bool $vle=TRUE, array $options=array() ): string
+	public function addToStack( $key, $vle=TRUE, $options=array() )
 	{
 		/* if we don't have any options, there's no need to add it to the stack */
-		if( count($options) == 0 )
+		if( \count($options) == 0 )
 		{
 			return ( isset( $this->words[ $key ] ) ) ? $this->words[ $key ] : $key;
 		}
@@ -56,13 +50,14 @@ class Lang extends \IPS\Lang
 	/**
 	 * Parse output and replace language keys
 	 *
-	 * @param string $output	Unparsed
+	 * @param	string	$output	Unparsed
 	 * @return	void
 	 */
-	public function parseOutputForDisplay( mixed &$output ) : void
+	public function parseOutputForDisplay( &$output )
 	{
+
 		/* Do we actually have any? */
-		if( !count( $this->outputStack ) )
+		if( !\count( $this->outputStack ) )
 		{
 			return;
 		}

@@ -12,35 +12,21 @@
 namespace IPS\forums\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Content\Api\CommentController;
-use IPS\Db;
-use IPS\forums\Topic;
-use IPS\forums\Topic\Post;
-use IPS\Member;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Posts API
  */
-class posts extends CommentController
+class _posts extends \IPS\Content\Api\CommentController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\forums\Topic\Post';
+	protected $class = 'IPS\forums\Topic\Post';
 	
 	/**
 	 * GET /forums/posts
@@ -60,18 +46,17 @@ class posts extends CommentController
 	 * @apiparam	string	sortDir			Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page			Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\forums\Topic\Post>
-	 * @return PaginatedResponse<Post>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\forums\Topic\Post>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Init */
 		$where = array();
 		
 		/* Has best answer */
-		if ( isset( Request::i()->hasBestAnswer ) )
+		if ( isset( \IPS\Request::i()->hasBestAnswer ) )
 		{
-			if ( Request::i()->hasBestAnswer )
+			if ( \IPS\Request::i()->hasBestAnswer )
 			{
 				$where[] = array( "topic_answered_pid>0" );
 			}
@@ -82,15 +67,15 @@ class posts extends CommentController
 		}
 		
 		/* Archived */
-		if ( isset( Request::i()->archived ) )
+		if ( isset( \IPS\Request::i()->archived ) )
 		{
-			if ( Request::i()->archived )
+			if ( \IPS\Request::i()->archived )
 			{
-				$where[] = array( Db::i()->in( 'topic_archive_status', array( Topic::ARCHIVE_DONE, Topic::ARCHIVE_WORKING, Topic::ARCHIVE_RESTORE ) ) );
+				$where[] = array( \IPS\Db::i()->in( 'topic_archive_status', array( \IPS\forums\Topic::ARCHIVE_DONE, \IPS\forums\Topic::ARCHIVE_WORKING, \IPS\forums\Topic::ARCHIVE_RESTORE ) ) );
 			}
 			else
 			{
-				$where[] = array( Db::i()->in( 'topic_archive_status', array( Topic::ARCHIVE_NOT, Topic::ARCHIVE_EXCLUDE ) ) );
+				$where[] = array( \IPS\Db::i()->in( 'topic_archive_status', array( \IPS\forums\Topic::ARCHIVE_NOT, \IPS\forums\Topic::ARCHIVE_EXCLUDE ) ) );
 			}
 		}
 		
@@ -104,14 +89,12 @@ class posts extends CommentController
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		1F295/4	INVALID_ID	The post ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\forums\Topic\Post
-	 * @return Response
+	 * @return		\IPS\forums\Topic\Post
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{
-			/* @var Post $class */
 			$class = $this->class;
 			if ( $this->member )
 			{
@@ -122,11 +105,11 @@ class posts extends CommentController
 				$object = $class::load( $id );
 			}
 			
-			return new Response( 200, $object->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $object->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1F295/4', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1F295/4', 404 );
 		}
 	}
 
@@ -137,15 +120,14 @@ class posts extends CommentController
 	 * @param		int		$id			ID Number
 	 * @apiparam	int		id			ID of the reaction to add
 	 * @apiparam	int     author      ID of the member reacting
-	 * @apireturn		\IPS\forums\Topic\Post
+	 * @return		\IPS\forums\Topic\Post
 	 * @throws		1S425/2		NO_REACTION	The reaction ID does not exist
 	 * @throws		1S425/3		NO_AUTHOR	The author ID does not exist
 	 * @throws		1S425/4		REACT_ERROR	Error adding the reaction
 	 * @throws		1S425/5		INVALID_ID	Object ID does not exist
 	 * @note		If the author has already reacted to this content, any existing reaction will be removed first
-	 * @return Response
 	 */
-	public function POSTitem_react( int $id ): Response
+	public function POSTitem_react( $id )
 	{
 		return $this->_reactAdd( $id );
 	}
@@ -156,14 +138,13 @@ class posts extends CommentController
 	 *
 	 * @param		int		$id			ID Number
 	 * @apiparam	int     author      ID of the member who reacted
-	 * @apireturn		\IPS\forums\Topic\Post
+	 * @return		\IPS\forums\Topic\Post
 	 * @throws		1S425/6		NO_AUTHOR	The author ID does not exist
 	 * @throws		1S425/7		REACT_ERROR	Error adding the reaction
 	 * @throws		1S425/8		INVALID_ID	Object ID does not exist
 	 * @note		If the author has already reacted to this content, any existing reaction will be removed first
-	 * @return Response
 	 */
-	public function DELETEitem_react( int $id ): Response
+	public function DELETEitem_react( $id )
 	{
 		return $this->_reactRemove( $id );
 	}
@@ -186,19 +167,18 @@ class posts extends CommentController
 	 * @throws		1F295/3		NO_POST		No post was supplied
 	 * @throws		2F294/A		NO_PERMISSION	The authorized user does not have permission to reply to that topic
 	 * @throws		3F295/C		NO_ANON_PERMISSION	The topic is set for anonymous posting, but the author does not have permission to post anonymously
-	 * @apireturn		\IPS\forums\Topic\Post
-	 * @return Response
+	 * @return		\IPS\forums\Topic\Post
 	 */
-	public function POSTindex(): Response
+	public function POSTindex()
 	{
 		/* Get topic */
 		try
 		{
-			$topic = Topic::load( Request::i()->topic );
+			$topic = \IPS\forums\Topic::load( \IPS\Request::i()->topic );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_TOPIC', '1F295/1', 403 );
+			throw new \IPS\Api\Exception( 'NO_TOPIC', '1F295/1', 403 );
 		}
 		
 		/* Get author */
@@ -206,47 +186,47 @@ class posts extends CommentController
 		{
 			if ( !$topic->canComment( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2F294/A', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2F294/A', 403 );
 			}
 			$author = $this->member;
 		}
 		else
 		{
-			if ( Request::i()->author )
+			if ( \IPS\Request::i()->author )
 			{
-				$author = Member::load( Request::i()->author );
+				$author = \IPS\Member::load( \IPS\Request::i()->author );
 				if ( !$author->member_id )
 				{
-					throw new Exception( 'NO_AUTHOR', '1F295/2', 403 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1F295/2', 403 );
 				}
 			}
 			else
 			{
-				if ( (int) Request::i()->author === 0 )
+				if ( \IPS\Request::i()->author === 0 ) 
 				{
-					$author = new Member;
-					$author->name = Request::i()->author_name;
+					$author = new \IPS\Member;
+					$author->name = \IPS\Request::i()->author_name;
 				}
 				else 
 				{
-					throw new Exception( 'NO_AUTHOR', '1F295/2', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1F295/2', 400 );
 				}
 			}
 		}
 
 		/* Check anonymous posting */
-		if ( isset( Request::i()->anonymous ) and $author->member_id )
+		if ( isset( \IPS\Request::i()->anonymous ) and $author->member_id )
 		{
 			if ( ! $topic->container()->canPostAnonymously( 0, $author ) )
 			{
-				throw new Exception( 'NO_ANON_PERMISSION', '3F295/C', 403 );
+				throw new \IPS\Api\Exception( 'NO_ANON_PERMISSION', '3F295/C', 403 );
 			}
 		}
 		
 		/* Check we have a post */
-		if ( !Request::i()->post )
+		if ( !\IPS\Request::i()->post )
 		{
-			throw new Exception( 'NO_POST', '1F295/3', 403 );
+			throw new \IPS\Api\Exception( 'NO_POST', '1F295/3', 403 );
 		}
 		
 		/* Do it */
@@ -269,34 +249,33 @@ class posts extends CommentController
 	 * @throws		1F295/8		CANNOT_HIDE_FIRST_POST		You cannot hide or unhide the first post in a topic. Hide/unhide the topic itself instead.
 	 * @throws		1F295/9		CANNOT_AUTHOR_FIRST_POST	You cannot change the author for the first post in a topic. Change the author on the topic itself instead.
 	 * @throws		2F295/A		NO_PERMISSION				The authorized user does not have permission to edit the post
-	 * @apireturn		\IPS\forums\Topic\Post
-	 * @return Response
+	 * @return		\IPS\forums\Topic\Post
 	 */
-	public function POSTitem( int $id ): Response
+	public function POSTitem( $id )
 	{
 		try
 		{
 			/* Load */
-			$post = Post::load( $id );
+			$post = \IPS\forums\Topic\Post::load( $id );
 			if ( $this->member and !$post->canView( $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			if ( $this->member and !$post->canEdit( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2F295/A', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2F295/A', 403 );
 			}
 			
 			/* Check */
 			if ( $post->isFirst() )
 			{
-				if ( isset( Request::i()->hidden ) )
+				if ( isset( \IPS\Request::i()->hidden ) )
 				{
-					throw new Exception( 'CANNOT_HIDE_FIRST_POST', '1F295/8', 403 );
+					throw new \IPS\Api\Exception( 'CANNOT_HIDE_FIRST_POST', '1F295/8', 403 );
 				}
-				if ( isset( Request::i()->author ) )
+				if ( isset( \IPS\Request::i()->author ) )
 				{
-					throw new Exception( 'CANNOT_AUTHOR_FIRST_POST', '1F295/9', 403 );
+					throw new \IPS\Api\Exception( 'CANNOT_AUTHOR_FIRST_POST', '1F295/9', 403 );
 				}
 			}
 			
@@ -305,14 +284,14 @@ class posts extends CommentController
 			{
 				return $this->_edit( $post, 'post' );
 			}
-			catch ( InvalidArgumentException $e )
+			catch ( \InvalidArgumentException $e )
 			{
-				throw new Exception( 'NO_AUTHOR', '2F295/7', 400 );
+				throw new \IPS\Api\Exception( 'NO_AUTHOR', '2F295/7', 400 );
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2F295/6', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2F295/6', 404 );
 		}
 	}
 		
@@ -324,31 +303,29 @@ class posts extends CommentController
 	 * @throws		1F295/5		INVALID_ID					The post ID does not exist
 	 * @throws		1F295/B		CANNOT_DELETE_FIRST_POST	You cannot delete the first post in a topic. Delete the topic itself instead.
 	 * @throws		2F295/B		NO_PERMISSION				The authorized user does not have permission to delete the post
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
 		try
 		{
-			/* @var Post $class */
 			$class = $this->class;
 			$object = $class::load( $id );
 			if ( $object->isFirst() )
 			{
-				throw new Exception( 'CANNOT_DELETE_FIRST_POST', '1F295/B', 403 );
+				throw new \IPS\Api\Exception( 'CANNOT_DELETE_FIRST_POST', '1F295/B', 403 );
 			}
 			if ( $this->member and !$object->canDelete( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2F295/B', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2F295/B', 403 );
 			}
 			$object->delete();
 			
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1F295/5', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1F295/5', 404 );
 		}
 	}
 
@@ -362,10 +339,9 @@ class posts extends CommentController
 	 * @apiparam	string		message			Optional message
 	 * @throws		1S425/B		NO_AUTHOR			The author ID does not exist
 	 * @throws		1S425/C		REPORTED_ALREADY	The member has reported this item in the past 24 hours
-	 * @apireturn		\IPS\forums\Topic\Post
-	 * @return Response
+	 * @return		\IPS\forums\Topic\Post
 	 */
-	public function POSTitem_report( int $id ): Response
+	public function POSTitem_report( $id )
 	{
 		return $this->_report( $id );
 	}

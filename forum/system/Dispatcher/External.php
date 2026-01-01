@@ -11,36 +11,28 @@
 namespace IPS\Dispatcher;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Dispatcher that doesn't really dispatch but sets things up for external scripts like Pages external blocks
  */
-class External extends Standard
+class _External extends \IPS\Dispatcher\Standard
 {
 	/**
 	 * Controller Location
 	 */
-	public string $controllerLocation = 'front';
+	public $controllerLocation = 'front';
 	
 	/**
 	 * Init
 	 *
 	 * @return	void
 	 */
-	public function init() : void
+	public function init()
 	{
 		/* Base CSS */
 		static::baseCss();
@@ -54,11 +46,11 @@ class External extends Standard
 			parent::init();
 			
 			/* Don't update sessions for this hit as it will wipe location data */
-			Session::i()->noUpdate();
+			\IPS\Session::i()->noUpdate();
 		}
-		catch ( DomainException $e )
+		catch ( \DomainException $e )
 		{	
-			Output::i()->error( $e->getMessage(), '2S100/' . $e->getCode(), $e->getCode() === 4 ? 403 : 404, '' );
+			\IPS\Output::i()->error( $e->getMessage(), '2S100/' . $e->getCode(), $e->getCode() === 4 ? 403 : 404, '' );
 		}
 	}
 
@@ -67,15 +59,15 @@ class External extends Standard
 	 *
 	 * @return void
 	 */
-	protected static function baseJs() : void
+	protected static function baseJs()
 	{
 		parent::baseJs();
 
 		/* Stuff for output */
-		if ( !Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
-			Output::i()->globalControllers[] = 'core.front.core.app';
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front.js' ) );
+			\IPS\Output::i()->globalControllers[] = 'core.front.core.app';
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front.js' ) );
 		}
 	}
 
@@ -84,14 +76,18 @@ class External extends Standard
 	 *
 	 * @return	void
 	 */
-	public static function baseCss() : void
+	public static function baseCss()
 	{
 		parent::baseCss();
 
 		/* Stuff for output */
-		if ( !Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'core.css', 'core', 'front' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'core.css', 'core', 'front' ) );
+			if ( \IPS\Theme::i()->settings['responsive'] )
+			{
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'core_responsive.css', 'core', 'front' ) );
+			}
 		}
 	}
 }

@@ -11,109 +11,84 @@
 namespace IPS\Patterns;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\File;
-use IPS\Helpers\CoverPhoto;
-use IPS\Http\Url;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_called_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function ord;
-use function strlen;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Active Record Pattern
  */
-abstract class ActiveRecord
+abstract class _ActiveRecord
 {
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = '';
+	public static $databasePrefix = '';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 
 	/**
 	 * @brief	[ActiveRecord] Database table
 	 * @note	This MUST be over-ridden
 	 */
-	public static ?string $databaseTable	= '';
+	public static $databaseTable	= '';
 		
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 * @note	If using this, declare a static $multitonMap = array(); in the child class to prevent duplicate loading queries
 	 */
-	protected static array $databaseIdFields = array();
+	protected static $databaseIdFields = array();
 	
 	/**
 	 * @brief	Bitwise keys
 	 */
-	protected static array $bitOptions = array();
+	protected static $bitOptions = array();
 
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 * @note	This needs to be declared in any child classes as well, only declaring here for editor code-complete/error-check functionality
 	 */
-	protected static array $multitons	= array();
+	protected static $multitons	= array();
 
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array();
+	protected $caches = array();
 
 	/**
 	 * @brief	[ActiveRecord] Attempt to load from cache
 	 * @note	If this is set to TRUE you should define a getStore() method to return the objects from cache
 	 */
-	protected static bool $loadFromCache = FALSE;
+	protected static $loadFromCache = FALSE;
 		
 	/**
 	 * @brief	[ActiveRecord] Database Connection
-	 * @return	Db
+	 * @return	\IPS\Db
 	 */
-	public static function db(): Db
+	public static function db()
 	{
-		return Db::i();
+		return \IPS\Db::i();
 	}
 	
 	/**
 	 * Load Record
 	 *
-	 * @param	int|string|null	$id					ID
-	 * @param string|null $idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
-	 * @param mixed $extraWhereClause	Additional where clause(s) (see \IPS\Db::build for details) - if used will cause multiton store to be skipped and a query always ran
+	 * @see		\IPS\Db::build
+	 * @param	int|string	$id					ID
+	 * @param	string		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
+	 * @param	mixed		$extraWhereClause	Additional where clause(s) (see \IPS\Db::build for details) - if used will cause multiton store to be skipped and a query always ran
 	 * @return	static
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
-	 *@see        Db::build
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function load( int|string|null $id, string $idField=NULL, mixed $extraWhereClause=NULL ): ActiveRecord|static
+	public static function load( $id, $idField=NULL, $extraWhereClause=NULL )
 	{
-		if( !$id )
-		{
-			throw new OutOfRangeException;
-		}
-
 		/* If we didn't specify an ID field, assume the default */
 		if( $idField === NULL )
 		{
@@ -121,9 +96,9 @@ abstract class ActiveRecord
 		}
 		
 		/* If we did, check it's valid */
-		elseif( !in_array( $idField, static::$databaseIdFields ) )
+		elseif( !\in_array( $idField, static::$databaseIdFields ) )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 
 		/* Some classes can load directly from a cache, so check that first */
@@ -137,7 +112,7 @@ abstract class ActiveRecord
 			}
 			else
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
 				
@@ -162,9 +137,9 @@ abstract class ActiveRecord
 		{
 			$row = static::constructLoadQuery( $id, $idField, $extraWhereClause )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		/* If it doesn't exist in the multiton store, set it */
@@ -190,12 +165,12 @@ abstract class ActiveRecord
 	/**
 	 * Load record based on a URL
 	 *
-	 * @param	Url	$url	URL to load from
-	 * @return	mixed
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
+	 * @param	\IPS\Http\Url	$url	URL to load from
+	 * @return	static
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadFromUrl( Url $url ): mixed
+	public static function loadFromUrl( \IPS\Http\Url $url )
 	{		
 		if ( isset( $url->queryString['id'] ) )
 		{
@@ -206,23 +181,23 @@ abstract class ActiveRecord
 			return static::load( $url->hiddenQueryString['id'] );
 		}
 		
-		throw new InvalidArgumentException;
+		throw new \InvalidArgumentException;
 	}
 
 	/**
 	 * Construct Load Query
 	 *
-	 * @param int|string $id					ID
-	 * @param string $idField			The database column that the $id parameter pertains to
+	 * @param	int|string	$id					ID
+	 * @param	string		$idField			The database column that the $id parameter pertains to
 	 * @param	mixed		$extraWhereClause	Additional where clause(s)
-	 * @return	Select
+	 * @return	\IPS\Db\Select
 	 */
-	protected static function constructLoadQuery( int|string $id, string $idField, mixed $extraWhereClause ): Select
+	protected static function constructLoadQuery( $id, $idField, $extraWhereClause )
 	{
 		$where = array( array( '`' . $idField . '`=?', $id ) );
 		if( $extraWhereClause !== NULL )
 		{
-			if ( !is_array( $extraWhereClause ) or !is_array( $extraWhereClause[0] ) )
+			if ( !\is_array( $extraWhereClause ) or !\is_array( $extraWhereClause[0] ) )
 			{
 				$extraWhereClause = array( $extraWhereClause );
 			}
@@ -235,11 +210,11 @@ abstract class ActiveRecord
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    ActiveRecord
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): ActiveRecord|static
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
 		/* Does that exist in the multiton store? */
 		$obj = NULL;
@@ -261,19 +236,19 @@ abstract class ActiveRecord
 		/* Initiate an object */
 		if ( !$obj )
 		{
-			$classname = get_called_class();
+			$classname = \get_called_class();
 			$obj = new $classname;
 			$obj->_new  = FALSE;
 			$obj->_data = array();
 		}
 		
 		/* Import data */
-		$databasePrefixLength = strlen( static::$databasePrefix );
+		$databasePrefixLength = \strlen( static::$databasePrefix );
 		foreach ( $data as $k => $v )
 		{
 			if( static::$databasePrefix AND mb_strpos( $k, static::$databasePrefix ) === 0 )
 			{
-				$k = substr( $k, $databasePrefixLength );
+				$k = \substr( $k, $databasePrefixLength );
 			}
 
 			$obj->_data[ $k ] = $v;
@@ -302,9 +277,9 @@ abstract class ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public static function multitonIds(): array
+	public static function multitonIds()
 	{
-		if ( is_array( static::$multitons ) )
+		if ( \is_array( static::$multitons ) )
 		{
 			return array_keys( static::$multitons );
 		}
@@ -314,17 +289,17 @@ abstract class ActiveRecord
 	/**
 	 * @brief	Data Store
 	 */
-	protected array $_data = array();
+	protected $_data = array();
 	
 	/**
 	 * @brief	Is new record?
 	 */
-	protected bool $_new = TRUE;
+	protected $_new = TRUE;
 		
 	/**
 	 * @brief	Changed Columns
 	 */
-	public array $changed = array();
+	public $changed = array();
 	
 	/**
 	 * Constructor - Create a blank object with default values
@@ -352,7 +327,7 @@ abstract class ActiveRecord
 	 * @param	mixed	$key	Key
 	 * @return	mixed	Value from the datastore
 	 */
-	public function __get( mixed $key )
+	public function __get( $key )
 	{
 		if( method_exists( $this, 'get_'.$key ) )
 		{
@@ -368,7 +343,7 @@ abstract class ActiveRecord
 					$values = array();
 					foreach ( static::$bitOptions[ $key ] as $k => $map )
 					{
-						$values[ $k ] = $this->_data[$k] ?? 0;
+						$values[ $k ] = isset( $this->_data[ $k ] ) ? $this->_data[ $k ] : 0;
 					}
 					$this->_data[ $key ] = new Bitwise( $values, static::$bitOptions[ $key ], method_exists( $this, "setBitwise_{$key}" ) ? array( $this, "setBitwise_{$key}" ) : NULL );
 				}
@@ -382,12 +357,12 @@ abstract class ActiveRecord
 	/**
 	 * Set value in data store
 	 *
-	 * @see		ActiveRecord::save
+	 * @see		\IPS\Patterns\ActiveRecord::save
 	 * @param	mixed	$key	Key
 	 * @param	mixed	$value	Value
 	 * @return	void
 	 */
-	public function __set( mixed $key, mixed $value )
+	public function __set( $key, $value )
 	{
 		if( method_exists( $this, 'set_'.$key ) )
 		{
@@ -398,7 +373,7 @@ abstract class ActiveRecord
 						
 			foreach( $this->_data as $k => $v )
 			{				
-				if( !array_key_exists( $k, $oldValues ) or ( $v instanceof Bitwise and !( $oldValues[ $k ] instanceof Bitwise) ) or $oldValues[ $k ] !== $v )
+				if( !array_key_exists( $k, $oldValues ) or ( $v instanceof \IPS\Patterns\Bitwise and !( $oldValues[ $k ] instanceof \IPS\Patterns\Bitwise ) ) or $oldValues[ $k ] !== $v )
 				{
 					$this->changed[ $k ]	= $v;
 				}
@@ -423,7 +398,7 @@ abstract class ActiveRecord
 	 * @param	mixed	$key	Key
 	 * @return	bool
 	 */
-	public function __isset( mixed $key )
+	public function __isset( $key )
 	{
 		if ( method_exists( $this, 'get_' . $key ) )
 		{
@@ -442,7 +417,7 @@ abstract class ActiveRecord
 	/**
 	 * @brief	By default cloning will create a new ActiveRecord record, but if you truly want an object copy you can set this to TRUE first and a direct copy will be returned
 	 */
-	public bool $skipCloneDuplication = FALSE;
+	public $skipCloneDuplication	= FALSE;
 
 	/**
 	 * [ActiveRecord] Duplicate
@@ -466,9 +441,9 @@ abstract class ActiveRecord
 	/**
 	 * Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		if ( $this->_new )
 		{
@@ -485,9 +460,9 @@ abstract class ActiveRecord
 			{
 				foreach( $this->$k->values as $field => $value )
 				{ 
-					if ( isset( $data[ $field ] ) or $this->$k->originalValues[ $field ] != intval( $value ) )
+					if ( isset( $data[ $field ] ) or $this->$k->originalValues[ $field ] != \intval( $value ) )
 					{
-						$data[ $field ] = intval( $value );
+						$data[ $field ] = \intval( $value );
 					}
 				}
 			}
@@ -502,6 +477,7 @@ abstract class ActiveRecord
 			}
 			else
 			{
+				$insert = array();
 				foreach ( $data as $k => $v )
 				{
 					$insert[ static::$databasePrefix . $k ] = $v;
@@ -553,9 +529,9 @@ abstract class ActiveRecord
 	/**
 	 * Get the WHERE clause for save()
 	 *
-	 * @return	array
+	 * @return	void
 	 */
-	protected function _whereClauseForSave() : array
+	protected function _whereClauseForSave()
 	{
 		$idColumn = static::$databaseColumnId;
 		return array( static::$databasePrefix . $idColumn . '=?', $this->$idColumn );
@@ -564,39 +540,241 @@ abstract class ActiveRecord
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		$idColumn = static::$databaseColumnId;
 		static::db()->delete( static::$databaseTable, array( static::$databasePrefix . $idColumn . '=?', $this->$idColumn ) );
 
-		$this->clearCaches(TRUE);
+		$this->clearCaches( TRUE );
+	}
+
+	/**
+	 * @brief	Cache followers count query to prevent running it multiple times
+	 */
+	protected static $followerCountCache = array();
+	
+	/**
+	 * Get follow data
+	 *
+	 * @param	string					$area			Area
+	 * @param	int|array				$id				ID or array of IDs
+	 * @param	int						$privacy		static::FOLLOW_PUBLIC + static::FOLLOW_ANONYMOUS
+	 * @param	array					$frequencyTypes	array( 'none', 'immediate', 'daily', 'weekly' )
+	 * @param	\IPS\DateTime|int|NULL	$date			Only users who started following before this date will be returned. NULL for no restriction
+	 * @param	int|array				$limit			LIMIT clause
+	 * @param	string					$order			Column to order by
+	 * @param	bool					$countOnly		Return only the count
+	 * @return	\Iterator|int
+	 * @throws	\BadMethodCallException
+	 */
+	protected static function _followers( $area, $id, $privacy, $frequencyTypes, $date=NULL, $limit=NULL, $order=NULL, $countOnly=FALSE )
+	{
+		/* Normalize the input */
+		sort( $frequencyTypes );
+
+		/* Can we use the cache table? */
+		$canCache = FALSE;
+		$cached = array();
+		if ( \count( $frequencyTypes ) == 4 and $countOnly and ( $privacy == static::FOLLOW_PUBLIC + static::FOLLOW_ANONYMOUS ) )
+		{
+			$canCache = TRUE;
+
+			if ( \is_array( $id ) )
+			{
+				foreach( \IPS\Db::i()->select( 'id, count', 'core_follow_count_cache', array( 'class=? and ' . \IPS\Db::i()->in( 'id', $id ), 'IPS\\' . static::$application . '\\' . ucfirst( $area ) ) ) as $row )
+				{
+					$cached[ $row['id'] ] = array( 'count' => $row['count'], 'follow_rel_id' => $row['id'] );
+				}
+
+				/* Got everything? */
+				if ( \count( $id ) == \count( $cached ) )
+				{
+					$obj = new \ArrayObject( $cached );
+					return $obj->getIterator();
+				}
+			}
+			else
+			{
+				$_key = md5( static::$application . $area . $id );
+
+				if( isset( static::$followerCountCache[ $_key ] ) )
+				{
+					return static::$followerCountCache[ $_key ];
+				}
+
+				try
+				{
+					static::$followerCountCache[ $_key ] = (int) \IPS\Db::i()->select( 'count', 'core_follow_count_cache', array('class=? and id=?', 'IPS\\' . static::$application . '\\' . ucfirst( $area ), $id ) )->first();
+
+					return static::$followerCountCache[ $_key ];
+				}
+				catch ( \UnderflowException $e )
+				{
+				}
+			}
+		}
+
+		/* We need to use a group by if $id is an array, but otherwise not */
+		$groupBy = NULL;
+
+		/* Initial where clause */
+		if( \is_array( $id ) )
+		{
+			$where[]	= array( 'follow_app=? AND follow_area=? AND follow_rel_id IN(' . implode( ',', $id ) . ')', static::$application, $area );
+			$groupBy	= 'follow_rel_id';
+		}
+		else
+		{
+			$where[] = array( 'follow_app=? AND follow_area=? AND follow_rel_id=?', static::$application, $area, $id );
+		}
+	
+		/* Public / Anonymous */
+		if ( !( $privacy & static::FOLLOW_PUBLIC ) )
+		{
+			$where[] = array( 'follow_is_anon=1' );
+		}
+		elseif ( !( $privacy & static::FOLLOW_ANONYMOUS ) )
+		{
+			$where[] = array( 'follow_is_anon=0' );
+		}
+	
+		/* Specific type */
+		if ( \count( array_diff( array( 'immediate', 'daily', 'weekly', 'none' ), $frequencyTypes ) ) )
+		{
+			$where[] = array( \IPS\Db::i()->in( 'follow_notify_freq', $frequencyTypes ) );
+		}
+		
+		/* Since */
+		if( $date !== NULL )
+		{
+			$where[] = array( 'follow_added<?', ( $date instanceof \IPS\DateTime ) ? $date->getTimestamp() : \intval( $date ) );
+		}
+
+		/* We don't need order or limit if we're doing a count only, which makes the query more efficient */
+		if( $countOnly === TRUE )
+		{
+			$limit = NULL;
+			$order = NULL;
+		}
+
+		/* Cache the results as this may be called multiple times in one page load */
+		static $cache	= array();
+		$_hash			= md5( json_encode( \func_get_args() ) );
+
+		if( isset( $cache[ $_hash ] ) )
+		{
+			return $cache[ $_hash ];
+		}
+
+		/* Get */
+		if ( $order === 'name' )
+		{
+			$cache[ $_hash ]	= \IPS\Db::i()->select( 'core_follow.*, core_members.name', 'core_follow', $where, 'name ASC', $limit )->join( 'core_members', array( 'core_members.member_id=core_follow.follow_member_id' ) );
+		}
+		else
+		{
+			$cache[ $_hash ]	= \IPS\Db::i()->select( $countOnly ? ( \is_array( $id ) ? 'COUNT(*) as count, follow_rel_id' : 'COUNT(*)' ) : 'core_follow.*', 'core_follow', $where, $order, $limit, $groupBy );
+		}
+
+		/* If we only want the count, fetch it and store it now */
+		if( $countOnly )
+		{
+			if( \is_array( $id ) )
+			{
+				$args = \func_get_args();
+
+				foreach( $cache[ $_hash ] as $result )
+				{
+					$args[1] = $result['follow_rel_id'];
+					$cache[ md5( json_encode( $args ) ) ] = $result;
+
+					if ( $canCache and ! isset( $cached[ $result['follow_rel_id'] ] ) )
+					{
+						\IPS\Db::i()->replace( 'core_follow_count_cache', array(
+							'id'	 => $result['follow_rel_id'],
+							'class'  => 'IPS\\' . static::$application . '\\' . ucfirst( $area ),
+							'count'  => $result['count'],
+							'added'  => time()
+						) );
+					}
+
+					$cached[ $result['follow_rel_id'] ] = $result;
+				}
+
+				/* And then any that do not exist were not found in the query, so they're 0 */
+				foreach( $id as $_id )
+				{
+					$args[1] = $_id;
+					$cache[ md5( json_encode( $args ) ) ] = array( 'follow_rel_id' => $id, 'count' => 0 );
+
+					if ( $canCache and ! isset( $cached[ $_id ] ) )
+					{
+						\IPS\Db::i()->replace( 'core_follow_count_cache', array(
+							'id'	 => $_id,
+							'class'  => 'IPS\\' . static::$application . '\\' . ucfirst( $area ),
+							'count'  => 0,
+							'added'  => time()
+						) );
+					}
+				}
+			}
+			else
+			{
+				$cache[ $_hash ] = $cache[ $_hash ]->first();
+
+				if ( $canCache )
+				{
+					\IPS\Db::i()->replace( 'core_follow_count_cache', array(
+						'id'	 => $id,
+						'class'  => 'IPS\\' . static::$application . '\\' . ucfirst( $area ),
+						'count'  => $cache[ $_hash ],
+						'added'  => time()
+					) );
+				}
+			}
+		}
+
+		if ( isset( $cached ) AND \is_array( $id ) )
+		{
+			$obj = new \ArrayObject( $cached );
+			return $obj->getIterator();
+		}
+
+		return $cache[ $_hash ];
+	}
+
+	/**
+	 * Get follower count
+	 *
+	 * @param	string					$area			Area
+	 * @param	int|array				$id				ID or array of IDs
+	 * @param	int						$privacy		static::FOLLOW_PUBLIC + static::FOLLOW_ANONYMOUS
+	 * @param	array					$frequencyTypes	array( 'immediate', 'daily', 'weekly' )
+	 * @param	\IPS\DateTime|int|NULL	$date			Only users who started following before this date will be returned. NULL for no restriction
+	 * @return	int
+	 * @throws	|\BadMethodCallException
+	 */
+	protected static function _followersCount( $area, $id, $privacy=3, $frequencyTypes=array( 'immediate', 'daily', 'weekly', 'none' ), $date=NULL )
+	{
+		return static::_followers( $area, $id, $privacy, $frequencyTypes, $date, NULL, NULL, TRUE );
 	}
 	
 	/**
 	 * Cover Photo
 	 *
-	 * @return	mixed
+	 * @return	\IPS\Helpers\CoverPhoto
 	 */
-	public function coverPhoto(): mixed
+	public function coverPhoto()
 	{
-        $photo = new CoverPhoto;
+        $photo = new \IPS\Helpers\CoverPhoto;
         if( $file = $this->coverPhotoFile() )
         {
+            $photoOffset = static::$databaseColumnMap[ 'cover_photo_offset' ];
             $photo->file = $file;
-
-			if( isset( static::$databaseColumnMap[ 'cover_photo_offset' ] ) )
-			{
-				$photoOffset = static::$databaseColumnMap[ 'cover_photo_offset' ];
-				$photo->offset = $this->$photoOffset ?: 0;
-			}
-			else
-			{
-				$photo->offset = 0;
-			}
+            $photo->offset = $this->$photoOffset;
         }
-
         $photo->editable = $this->canEdit();
         $photo->object = $this;
         return $photo;
@@ -605,17 +783,15 @@ abstract class ActiveRecord
     /**
      * Returns the CoverPhoto File Instance or NULL if there's none
      *
-     * @return null|File
+     * @return null|\IPS\File
      */
-    public function coverPhotoFile(): ?File
+    public function coverPhotoFile() : ?\IPS\File
     {
-        if ( isset( static::$databaseColumnMap['cover_photo'] ) )
+        $photoCol = static::$databaseColumnMap[ 'cover_photo' ];
+
+        if ( isset( static::$databaseColumnMap['cover_photo'] ) and $this->$photoCol )
         {
-			$photoCol = static::$databaseColumnMap[ 'cover_photo' ];
-			if( $this->$photoCol )
-			{
-				return File::get( static::$coverPhotoStorageExtension, $this->$photoCol );
-			}
+            return \IPS\File::get( static::$coverPhotoStorageExtension, $this->$photoCol );
         }
         return NULL;
     }
@@ -625,7 +801,7 @@ abstract class ActiveRecord
 	 *
 	 * @return string
 	 */
-	public function coverPhotoBackgroundColor(): string
+	public function coverPhotoBackgroundColor()
 	{
 		return '#' . dechex( mt_rand( 0x000000, 0xFFFFFF ) );
 	}
@@ -633,16 +809,16 @@ abstract class ActiveRecord
 	/**
 	 * Return cover photo background color based on a string
 	 *
-	 * @param string $string	Some string to base background color on
+	 * @param	string	$string	Some string to base background color on
 	 * @return	string
 	 */
-	protected function staticCoverPhotoBackgroundColor(string $string ): string
+	protected function staticCoverPhotoBackgroundColor( $string )
 	{
 		$integer	= 0;
 
-		for($i=0, $j= strlen($string); $i<$j; $i++ )
+		for( $i=0, $j=\strlen($string); $i<$j; $i++ )
 		{
-			$integer = ord( substr( $string, $i, 1 ) ) + ( ( $integer << 5 ) - $integer );
+			$integer = \ord( \substr( $string, $i, 1 ) ) + ( ( $integer << 5 ) - $integer );
 			$integer = $integer & $integer;
 		}
 
@@ -650,29 +826,18 @@ abstract class ActiveRecord
 	}
 
 	/**
-	 * Allow for individual classes to override and
-	 * specify a primary image. Used for grid views, etc.
-	 *
-	 * @return File|null
-	 */
-	public function primaryImage() : ?File
-	{
-		return $this->coverPhotoFile();
-	}
-
-	/**
 	 * Clear any defined caches
 	 *
-	 * @param bool $removeMultiton		Should the multiton record also be removed?
+	 * @param	bool	$removeMultiton		Should the multiton record also be removed?
 	 * @return void
 	 */
-	public function clearCaches( bool $removeMultiton=FALSE ) : void
+	public function clearCaches( $removeMultiton=FALSE )
 	{
-		if( count( $this->caches ) )
+		if( \count( $this->caches ) )
 		{
 			foreach( $this->caches as $cacheKey )
 			{
-				unset( Store::i()->$cacheKey );
+				unset( \IPS\Data\Store::i()->$cacheKey );
 			}
 		}
 
@@ -707,12 +872,11 @@ abstract class ActiveRecord
 	/**
 	 * Attempt to load cached data
 	 *
-	 * @note	This should be overridden in your class if you enable $loadFromCache
-	 * @see		ActiveRecord::$loadFromCache
-	 * @return    array
+	 * @note	This should be overridden in your class if you define $cacheToLoadFrom
+	 * @return	mixed
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		return iterator_to_array( Db::i()->select( '*', static::$databaseTable, NULL, static::$databasePrefix . static::$databaseColumnId )->setKeyField( static::$databasePrefix . static::$databaseColumnId ) );
+		return iterator_to_array( \IPS\Db::i()->select( '*', static::$databaseTable, NULL, static::$databasePrefix . static::$databaseColumnId )->setKeyField( static::$databasePrefix . static::$databaseColumnId ) );
 	}
 }

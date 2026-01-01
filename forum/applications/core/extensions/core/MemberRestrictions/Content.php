@@ -11,38 +11,27 @@
 namespace IPS\core\extensions\core\MemberRestrictions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\core\MemberACPProfile\Restriction;
-use IPS\DateTime;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Date;
-use IPS\Member;
-use function defined;
-use function is_numeric;
-use function is_object;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member Restrictions: Content
  */
-class Content extends Restriction
+class _Content extends \IPS\core\MemberACPProfile\Restriction
 {
 	/**
 	 * Modify Edit Restrictions form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form $form ) : void
+	public function form( \IPS\Helpers\Form $form )
 	{
-		$form->add( new Date( 'restrict_post', $this->member->restrict_post, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'indefinitely' ), NULL, Member::loggedIn()->language()->addToStack('until') ) );
-		$form->add( new Date( 'mod_posts', $this->member->mod_posts, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'indefinitely' ), NULL, Member::loggedIn()->language()->addToStack('until') ) );
+		$form->add( new \IPS\Helpers\Form\Date( 'restrict_post', $this->member->restrict_post, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'indefinitely' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('until') ) );
+		$form->add( new \IPS\Helpers\Form\Date( 'mod_posts', $this->member->mod_posts, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'indefinitely' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('until') ) );
 	}
 	
 	/**
@@ -51,18 +40,18 @@ class Content extends Restriction
 	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function save( array $values ): array
+	public function save( $values )
 	{
 		$return = array();
 		
-		$modPosts = is_object( $values['mod_posts'] ) ? $values['mod_posts']->getTimestamp() : ( $values['mod_posts'] ?: 0 );
+		$modPosts = \is_object( $values['mod_posts'] ) ? $values['mod_posts']->getTimestamp() : ( $values['mod_posts'] ?: 0 );
 		if ( $modPosts != $this->member->mod_posts )
 		{
 			$return['mod_posts'] = array( 'old' => $this->member->mod_posts, 'new' => $modPosts );
 			$this->member->mod_posts = $modPosts;
 		}
 		
-		$restrictPost = is_object( $values['restrict_post'] ) ? $values['restrict_post']->getTimestamp() : ( $values['restrict_post'] ?: 0 );
+		$restrictPost = \is_object( $values['restrict_post'] ) ? $values['restrict_post']->getTimestamp() : ( $values['restrict_post'] ?: 0 );
 		if ( $restrictPost != $this->member->restrict_post )
 		{
 			$return['restrict_post'] = array( 'old' => $this->member->restrict_post, 'new' => $restrictPost );
@@ -77,7 +66,7 @@ class Content extends Restriction
 	 *
 	 * @return	array
 	 */
-	public function activeRestrictions(): array
+	public function activeRestrictions()
 	{
 		$return = array();
 		
@@ -110,16 +99,16 @@ class Content extends Restriction
 			{
 				if ( $changes[ $v ]['new'] )
 				{
-					$c = Member::loggedIn()->language()->addToStack( 'moderation_' . $k );
+					$c = \IPS\Member::loggedIn()->language()->addToStack( 'moderation_' . $k );
 					if ( $changes[ $v ]['new'] != -1 )
 					{
-						$interval = DateTime::formatInterval( ( is_numeric( $changes[ $v ]['new'] ) ) ? DateTime::ts( $row['log_date'] )->diff( DateTime::ts( $changes[ $v ]['new'] ) ) : new DateInterval( $changes[ $v ]['new'] ), 2 );
-						$c = Member::loggedIn()->language()->addToStack( 'history_received_warning_penalty_time', FALSE, array( 'sprintf' => array( $c, $interval ) ) );
+						$interval = \IPS\DateTime::formatInterval( ( \is_numeric( $changes[ $v ]['new'] ) ) ? \IPS\DateTime::ts( $row['log_date'] )->diff( \IPS\DateTime::ts( $changes[ $v ]['new'] ) ) : new \DateInterval( $changes[ $v ]['new'] ), 2 );
+						$c = \IPS\Member::loggedIn()->language()->addToStack( 'history_received_warning_penalty_time', FALSE, array( 'sprintf' => array( $c, $interval ) ) );
 					}
 				}
 				else
 				{
-					$c = Member::loggedIn()->language()->addToStack( 'history_warning_revoke_' . $v );
+					$c = \IPS\Member::loggedIn()->language()->addToStack( 'history_warning_revoke_' . $v );
 				}
 				$return[] = $c;
 			}

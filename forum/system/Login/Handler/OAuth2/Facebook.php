@@ -11,54 +11,26 @@
 namespace IPS\Login\Handler\OAuth2;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-use DomainException;
-use IPS\File;
-use IPS\Helpers\Form\Radio;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Login\Exception as LoginException;
-use IPS\Login\Handler\OAuth2;
-use IPS\Member;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use RuntimeException;
-use function defined;
-use function in_array;
-use function is_numeric;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Facebook Login Handler
  */
-class Facebook extends OAuth2
+class _Facebook extends \IPS\Login\Handler\OAuth2
 {
 	/**
 	 * Get title
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return 'login_handler_Facebook';
 	}
-
-    /**
-     * Can this handler sync profile photos?
-     *
-     * @return bool
-     */
-    public function canSyncProfilePhoto() : bool
-    {
-        return true;
-    }
 	
 	/**
 	 * ACP Settings Form
@@ -68,15 +40,15 @@ class Facebook extends OAuth2
 	 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{
-		Member::loggedIn()->language()->words['login_acp_desc'] = Member::loggedIn()->language()->addToStack('login_acp_will_reauth');
-		Member::loggedIn()->language()->words['oauth_client_id'] = Member::loggedIn()->language()->addToStack('login_facebook_app');
-		Member::loggedIn()->language()->words['oauth_client_client_secret'] = Member::loggedIn()->language()->addToStack('login_facebook_secret');
+		\IPS\Member::loggedIn()->language()->words['login_acp_desc'] = \IPS\Member::loggedIn()->language()->addToStack('login_acp_will_reauth');
+		\IPS\Member::loggedIn()->language()->words['oauth_client_id'] = \IPS\Member::loggedIn()->language()->addToStack('login_facebook_app');
+		\IPS\Member::loggedIn()->language()->words['oauth_client_client_secret'] = \IPS\Member::loggedIn()->language()->addToStack('login_facebook_secret');
 
 		return array_merge(
 			array(
-				'real_name'	=> new Radio( 'login_real_name', $this->settings['real_name'] ?? 1, FALSE, array(
+				'real_name'	=> new \IPS\Helpers\Form\Radio( 'login_real_name', isset( $this->settings['real_name'] ) ? $this->settings['real_name'] : 1, FALSE, array(
 					'options' => array(
 						1			=> 'login_real_name_facebook',
 						0			=> 'login_real_name_disabled',
@@ -85,32 +57,27 @@ class Facebook extends OAuth2
 						1			=> array( 'login_update_name_changes_inc_optional' ),
 					)
 				), NULL, NULL, NULL, 'login_real_name' ),
-                'real_photo' => new Radio( 'login_real_photo', $this->settings['real_photo'] ?? 1, false, array(
-                    'options' => array(
-                        1 => 'login_real_photo_facebook',
-                        0 => 'login_real_photo_disabled'
-                    ),
-                    'toggles' => array(
-                        1 => array( 'login_update_photo_changes_inc_optional' )
-                    )
-                ) )
 			),
 			parent::acpForm(),
-			array()
+			array(
+				'allow_status_import' => new \IPS\Helpers\Form\YesNo( 'login_facebook_allow_status_import', ( isset( $this->settings['allow_status_import'] ) ) ? $this->settings['allow_status_import'] : FALSE, FALSE )
+			)
 		);
+				
+		return $return;
 	}
 	
 	/**
 	 * Test Compatibility
 	 *
 	 * @return	bool
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public static function testCompatibility(): bool
+	public static function testCompatibility()
 	{
-		if ( mb_substr( Settings::i()->base_url, 0, 8 ) !== 'https://' )
+		if ( mb_substr( \IPS\Settings::i()->base_url, 0, 8 ) !== 'https://' )
 		{
-			throw new LogicException( Member::loggedIn()->language()->addToStack( CIC ? 'login_facebook_https_cic' : 'login_facebook_https' ) );
+			throw new \LogicException( \IPS\Member::loggedIn()->language()->addToStack( \IPS\CIC ? 'login_facebook_https_cic' : 'login_facebook_https' ) );
 		}
 		
 		return TRUE;
@@ -121,7 +88,7 @@ class Facebook extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonColor(): string
+	public function buttonColor()
 	{
 		return '#3a579a';
 	}
@@ -129,11 +96,11 @@ class Facebook extends OAuth2
 	/**
 	 * Get the button icon
 	 *
-	 * @return	string|File
+	 * @return	string
 	 */
-	public function buttonIcon(): string|File
+	public function buttonIcon()
 	{
-		return 'facebook-f';
+		return 'facebook-official';
 	}
 	
 	/**
@@ -141,7 +108,7 @@ class Facebook extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonText(): string
+	public function buttonText()
 	{
 		return 'login_facebook';
 	}
@@ -151,20 +118,20 @@ class Facebook extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonClass(): string
+	public function buttonClass()
 	{
-		return 'ipsSocial--facebook';
+		return 'ipsSocial_facebook';
 	}
 	
 	/**
 	 * Get logo to display in information about logins with this method
 	 * Returns NULL for methods where it is not necessary to indicate the method, e..g Standard
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForDeviceInformation(): Url|string|null
+	public function logoForDeviceInformation()
 	{
-		return Theme::i()->resource( 'logos/login/Facebook.png', 'core', 'interface' );
+		return \IPS\Theme::i()->resource( 'logos/login/Facebook.png', 'core', 'interface' );
 	}
 	
 	/**
@@ -172,7 +139,7 @@ class Facebook extends OAuth2
 	 *
 	 * @return	string
 	 */
-	protected function grantType(): string
+	protected function grantType()
 	{
 		return 'authorization_code';
 	}
@@ -183,16 +150,21 @@ class Facebook extends OAuth2
 	 * @param	array|NULL	$additional	Any additional scopes to request
 	 * @return	array
 	 */
-	protected function scopesToRequest( array $additional=NULL ): array
+	protected function scopesToRequest( $additional=NULL )
 	{
 		$return = array('email');
+		
+		if ( \IPS\Settings::i()->profile_comments and isset( $this->settings['allow_status_import'] ) and $this->settings['allow_status_import'] )
+		{
+			$return[] = 'user_posts';
+		}
 		
 		$additionalPermitted = array( 'manage_pages', 'publish_pages' );
 		if ( $additional !== NULL )
 		{
 			foreach( $additional as $scope )
 			{
-				if ( in_array( $scope, $additionalPermitted ) )
+				if ( \in_array( $scope, $additionalPermitted ) )
 				{
 					$return[] = $scope;
 				}
@@ -208,7 +180,7 @@ class Facebook extends OAuth2
 	 * @param	string		$accessToken	Access Token
 	 * @return	array|NULL
 	 */
-	public function scopesIssued( string $accessToken ): ?array
+	public function scopesIssued( $accessToken )
 	{
 		try
 		{
@@ -239,14 +211,14 @@ class Facebook extends OAuth2
 	/**
 	 * Authorization Endpoint
 	 *
-	 * @param	Login	$login	The login object
-	 * @return	Url
+	 * @param	\IPS\Login	$login	The login object
+	 * @return	\IPS\Http\Url
 	 */
-	protected function authorizationEndpoint( Login $login ): Url
+	protected function authorizationEndpoint( \IPS\Login $login )
 	{
-		$return = Url::external('https://www.facebook.com/dialog/oauth');
+		$return = \IPS\Http\Url::external('https://www.facebook.com/dialog/oauth');
 		
-		if ( $login->type === Login::LOGIN_ACP or $login->type === Login::LOGIN_REAUTHENTICATE )
+		if ( $login->type === \IPS\Login::LOGIN_ACP or $login->type === \IPS\Login::LOGIN_REAUTHENTICATE )
 		{
 			$return = $return->setQueryString( 'auth_type', 'reauthenticate' );
 		}
@@ -257,23 +229,23 @@ class Facebook extends OAuth2
 	/**
 	 * Token Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function tokenEndpoint(): Url
+	protected function tokenEndpoint()
 	{
-		return Url::external('https://graph.facebook.com/v2.9/oauth/access_token');
+		return \IPS\Http\Url::external('https://graph.facebook.com/v2.9/oauth/access_token');
 	}
 	
 	/**
 	 * Redirection Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function redirectionEndpoint(): Url
+	protected function redirectionEndpoint()
 	{
 		if ( isset( $this->settings['legacy_redirect'] ) and $this->settings['legacy_redirect'] )
 		{
-			return Url::internal( 'applications/core/interface/facebook/auth.php', 'none' );
+			return \IPS\Http\Url::internal( 'applications/core/interface/facebook/auth.php', 'none' );
 		}
 		return parent::redirectionEndpoint();
 	}
@@ -282,9 +254,9 @@ class Facebook extends OAuth2
 	 * Get authenticated user's identifier (may not be a number)
 	 *
 	 * @param	string	$accessToken	Access Token
-	 * @return	string|null
+	 * @return	string
 	 */
-	protected function authenticatedUserId( string $accessToken ): ?string
+	protected function authenticatedUserId( $accessToken )
 	{
 		return $this->_userData( $accessToken )['id'];
 	}
@@ -296,7 +268,7 @@ class Facebook extends OAuth2
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedUserName( string $accessToken ): ?string
+	protected function authenticatedUserName( $accessToken )
 	{
 		if ( isset( $this->settings['real_name'] ) and $this->settings['real_name'] )
 		{
@@ -312,7 +284,7 @@ class Facebook extends OAuth2
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedEmail( string $accessToken ): ?string
+	protected function authenticatedEmail( $accessToken )
 	{
 		return $this->_userData( $accessToken )['email'];
 	}
@@ -321,29 +293,25 @@ class Facebook extends OAuth2
 	 * Get user's profile photo
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
-	 * @return	Url|NULL
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	\IPS\Member	$member	Member
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfilePhoto( Member $member ): ?Url
+	public function userProfilePhoto( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new LoginException( "", LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( $error['message'], \IPS\Login\Exception::INTERNAL_ERROR );
 		}
-
-        if ( isset( $this->settings['real_photo'] ) and $this->settings['real_photo'] )
-        {
-            $photoVars = explode( ':', $member->group['g_photo_max_vars'] );
-            $response = $this->_authorizedRequest( "{$link['token_identifier']}/picture?width={$photoVars[1]}&redirect=false", $link['token_access_token'], NULL, 'get' );
-            if ( !$response['data']['is_silhouette'] and isset( $response['data']['url'] ) and $response['data']['url'] )
-            {
-                return Url::external( $response['data']['url'] );
-            }
-        }
-
+		
+		$photoVars = explode( ':', $member->group['g_photo_max_vars'] );		
+		$response = $this->_authorizedRequest( "{$link['token_identifier']}/picture?width={$photoVars[1]}&redirect=false", $link['token_access_token'], NULL, 'get' );
+		if ( !$response['data']['is_silhouette'] )
+		{
+			return \IPS\Http\Url::external( $response['data']['url'] );
+		}
 		return NULL;
 	}
 	
@@ -351,35 +319,79 @@ class Facebook extends OAuth2
 	 * Get user's profile name
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfileName( Member $member ): ?string
+	public function userProfileName( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new LoginException( "", LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		return $this->_userData( $link['token_access_token'] )['name'];
 	}
 	
 	/**
+	 * Get user's statuses since a particular date
+	 *
+	 * @param	\IPS\Member			$member	Member
+	 * @param	\IPS\DateTime|NULL	$since	Date/Time to get statuses since then, or NULL to get the latest one
+	 * @return	array
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
+	 */
+	public function userStatuses( \IPS\Member $member, \IPS\DateTime $since = NULL )
+	{
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
+		{
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
+		}
+		
+		$data = array();
+		if ( $since )
+		{
+			$data['since'] = $since->getTimestamp();
+		}
+		
+		$return = array();
+		$response = $this->_authorizedRequest( 'me/posts', $link['token_access_token'], $data, 'get' );
+		foreach ( $response['data'] as $statusData )
+		{
+			if( isset( $statusData['message'] ) and !isset( $statusData['story'] ) )
+			{
+				$status = \IPS\core\Statuses\Status::createItem( $member, $member->ip_address, new \IPS\DateTime( $statusData['created_time'] ) );
+				$status->content = $this->_parseStatusText( $member, nl2br( $statusData['message'], FALSE ) );
+					
+				$return[] = $status;
+				
+				if ( !$since )
+				{
+					return $return;
+				}
+			}
+		}
+		
+		return $return;
+	}
+	
+	/**
 	 * Syncing Options
 	 *
-	 * @param	Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
+	 * @param	\IPS\Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
 	 * @param	bool		$defaultOnly	If TRUE, only returns which options should be enabled by default for a new account
 	 * @return	array
 	 */
-	public function syncOptions( Member $member, bool $defaultOnly=FALSE ): array
+	public function syncOptions( \IPS\Member $member, $defaultOnly = FALSE )
 	{
 		$return = array();
 		$scopes = $this->authorizedScopes( $member );
 
-		if ( ( !isset( $this->settings['update_email_changes'] ) or $this->settings['update_email_changes'] === 'optional' ) and ( $scopes and in_array( 'email', $scopes ) ) )
+		if ( ( !isset( $this->settings['update_email_changes'] ) or $this->settings['update_email_changes'] === 'optional' ) and ( $scopes and \in_array( 'email', $scopes ) ) )
 		{
 			$return[] = 'email';
 		}
@@ -388,11 +400,13 @@ class Facebook extends OAuth2
 		{
 			$return[] = 'name';
 		}
-
-        if( isset( $this->settings['update_photo_changes'] ) and $this->settings['update_photo_changes'] == 'optional' and isset( $this->settings['real_photo'] ) and $this->settings['real_photo'] )
-        {
-            $return[] = 'photo';
-        }
+		
+		$return[] = 'photo';
+		
+		if ( \IPS\Settings::i()->profile_comments and isset( $this->settings['allow_status_import'] ) and $this->settings['allow_status_import'] and ( $scopes and \in_array( 'user_posts', $this->authorizedScopes( $member ) ) ) )
+		{
+			$return[] = 'status';
+		}
 		
 		return $return;
 	}
@@ -400,17 +414,17 @@ class Facebook extends OAuth2
 	/**
 	 * @brief	Cached user data
 	 */
-	protected array $_cachedUserData = array();
+	protected $_cachedUserData = array();
 	
 	/**
 	 * Get user data
 	 *
-	 * @param string $accessToken	Access Token
+	 * @param	string	$accessToken	Access Token
 	 * @return	array
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	protected function _userData( string $accessToken ): array
+	protected function _userData( $accessToken )
 	{
 		if ( !isset( $this->_cachedUserData[ $accessToken ] ) )
 		{
@@ -421,28 +435,28 @@ class Facebook extends OAuth2
 				
 			if ( isset( $response['error'] ) )
 			{
-				throw new LoginException( $response['error']['message'], LoginException::INTERNAL_ERROR );
+				throw new \IPS\Login\Exception( $response['error']['message'], \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 				
 			$this->_cachedUserData[ $accessToken ] = $response;
 		}
 		return $this->_cachedUserData[ $accessToken ];
 	}
-
-
+	
+	
 	/**
 	 * Make authorized request
 	 *
-	 * @param string $endpoint		Endpoint
-	 * @param string $accessToken	Access Token
-	 * @param array|null $data		Data to post or query string]
-	 * @param string|null $method			'get' or 'post'
+	 * @param	string			$endpoint		Endpoint
+	 * @param	string			$accessToken	Access Token
+	 * @param	array|NULL		$postData		Data to post or query string]
+	 * @param	string|NULL		$method			'get' or 'post'
 	 * @return	array
-	 * @throws	Exception
+	 * @throws	\IPS\Http\Request\Exception
 	 */
-	protected function _authorizedRequest(string $endpoint, string $accessToken, array $data = NULL, string $method = NULL ): array
+	protected function _authorizedRequest( $endpoint, $accessToken, $data = NULL, $method = NULL )
 	{
-		$url = Url::external( "https://graph.facebook.com/{$endpoint}" );
+		$url = \IPS\Http\Url::external( "https://graph.facebook.com/{$endpoint}" );
 		if ( $method === 'get' and $data )
 		{
 			$url = $url->setQueryString( $data );
@@ -460,16 +474,143 @@ class Facebook extends OAuth2
 		
 		return $response->decodeJson();
 	}
+	
+	/**
+	 * Post something to Facebook
+	 *
+	 * @param	\IPS\Member			$member		Member posting
+	 * @param	string				$content	Content to post
+	 * @param	\IPS\Http\Url|NULL	$url		Optional link
+	 * @return	void
+	 */
+	public function postToFacebook( \IPS\Member $member, $content, \IPS\Http\Url $url = NULL )
+	{
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
+		{
+			return FALSE;
+		}
+		
+		$data = array( 'message' => $content );
+		if ( $url !== NULL )
+		{
+			$data['link'] = (string) $url;
+		}
+		
+		$response = $this->_authorizedRequest( 'me/feed', $link['token_access_token'], $data );
+		
+		return isset( $response['id'] );
+	}
+	
+	/* ! Social Promotion */
+	
+	/**
+	 * Exchange a short lived member token for a longer lived token
+	 *
+	 * @param	string	$shortLivedToken	The short lived token to exchange for a long lived token
+	 * @return array
+	 */
+	public function exchangeMemberToken( $code )
+	{
+		$accessToken = $this->_exchangeAuthorizationCodeForAccessToken( $code );
+		
+		/* Get user ID */
+		$accessToken['identifier'] = $this->authenticatedUserId( $accessToken['access_token'] );
+		
+		return $accessToken;
+	}
+	
+	/**
+	 * Exchange a short lived token for a longer lived token
+	 *
+	 * @param	string	$shortLivedToken	The short lived token to exchange for a long lived token
+	 * @return string
+	 */
+	public function exchangeToken( $shortLivedToken )
+	{
+		try
+		{
+			$response =  $this->_authenticatedRequest( $this->tokenEndpoint(), array(
+				'grant_type'		=> 'fb_exchange_token',
+				'fb_exchange_token'	=> $shortLivedToken
+			) )->decodeJson();
+			
+			return isset( $response['access_token'] ) ? $response['access_token'] : NULL;			
+		}
+		catch( \RuntimeException $e )
+		{
+			\IPS\Log::log( $e, 'facebook' );
+		}
+		
+		return NULL;
+	}
+	
+	/**
+	 * Get pages this user manages
+	 *
+	 * @param	\IPS\Member			$member		Member requesting pages
+	 * @return	array
+	 */
+	public function getPages( $member )
+	{
+		$pages = array();
+		if ( !( $link = $this->_promoteLink( $member ) ) )
+		{
+			return $pages;
+		}
+		
+		$response = $this->_authorizedRequest( $link['token_identifier'] . '/accounts?limit=100', $link['token_access_token'], array(
+			'appsecret_proof' 	=> hash_hmac( 'sha256', $link['token_access_token'], $this->settings['client_secret'] )
+		), 'get' );
 
+		if ( !empty( $response['data'] ) )
+		{			
+			foreach( $response['data'] as $page )
+			{
+				$pages[ $page['id'] ] = array( $page['name'], $page['access_token'] );
+			}
+		}
+				
+		return $pages;
+	}
+	
+	/**
+	 * Get groups this user manages
+	 *
+	 * @param	\IPS\Member			$member		Member requesting pages
+	 * @return	array
+	 */
+	public function getGroups( $member )
+	{
+		$groups = array();
+		if ( !( $link = $this->_promoteLink( $member ) ) )
+		{
+			return $groups;
+		}
+
+		$response = $this->_authorizedRequest( $link['token_identifier'] . '/groups', $link['token_access_token'], array(
+			'appsecret_proof' 	=> hash_hmac( 'sha256', $link['token_access_token'], $this->settings['client_secret'] )
+		), 'get' );
+
+		if ( !empty( $response['data'] ) )
+		{			
+			foreach( $response['data'] as $group )
+			{
+				$groups[ $group['id'] ] = array( $group['name'], ( isset( $group['privacy'] ) ? $group['privacy'] : NULL ) );
+			}
+		}
+				
+		return $groups;
+	}
+	
 	/**
 	 * Get user link
 	 *
-	 * @param Member $member		Member requesting pages
+	 * @param	\IPS\Member			$member		Member requesting pages
 	 * @return	array
 	 */
-	protected function _promoteLink( Member $member ): array
+	protected function _promoteLink( $member )
 	{
-		if ( is_numeric( Settings::i()->promote_facebook_auth ) )
+		if ( \is_numeric( \IPS\Settings::i()->promote_facebook_auth ) )
 		{
 			/* standard handler */
 			if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
@@ -477,7 +618,16 @@ class Facebook extends OAuth2
 				return array();
 			}
 		}
+		else
+		{
+			$account = \IPS\core\Promote::getPromoter('Facebook')->setMember( $member );
+			$this->settings = json_decode( \IPS\Settings::i()->promote_facebook_auth, TRUE );
+			$link = array(
+				'token_identifier' => $account->settings['member_token']['identifier'],
+				'token_access_token' => $account->settings['member_token']['access_token']
+			);
+		}
 		
-		return $link ?? [];
+		return $link;
 	}
 }

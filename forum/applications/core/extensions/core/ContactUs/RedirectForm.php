@@ -12,38 +12,30 @@
 namespace IPS\core\extensions\core\ContactUs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\ContactUsAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Url;
-use IPS\Output;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Contact Us extension
  */
-class RedirectForm extends ContactUsAbstract
+class _RedirectForm
 {
 	/**
 	 * Process Form
 	 *
-	 * @param	Form		$form	    The form
+	 * @param	\IPS\Helpers\Form		$form	    The form
 	 * @param	array                   $formFields Additional Configuration Formfields
 	 * @param	array                   $options    Type Radio Form Options
 	 * @param	array                   $toggles    Type Radio Form Toggles
 	 * @param	array                   $disabled   Type Radio Form Disabled Options
 	 * @return	void
 	 */
-	public function process( Form &$form, array &$formFields, array &$options, array &$toggles, array &$disabled  ) : void
+	public function process( &$form, &$formFields, &$options, &$toggles, &$disabled  )
 	{
-		$formFields[] = new Url( 'contact_redirect', Settings::i()->contact_redirect, FALSE, array( ),NULL ,NULL ,NULL, 'contact_redirect' );
+		$formFields[] = new \IPS\Helpers\Form\Url( 'contact_redirect', \IPS\Settings::i()->contact_redirect, FALSE, array( ),NULL ,NULL ,NULL, 'contact_redirect' );
 		$options['contact_redirect'] = 'contact_redirect';
 		$toggles['contact_redirect'] = array( 'contact_redirect' );
 	}
@@ -51,14 +43,14 @@ class RedirectForm extends ContactUsAbstract
 	/**
 	 * Allows extensions to do something before the form is shown... e.g. add your own custom fields, or redirect the page
 	 *
-	 * @param	Form		$form	    The form
+	 * @param	\IPS\Helpers\Form		$form	    The form
 	 * @return	void
 	 */
-	public function runBeforeFormOutput( Form $form ) : void
+	public function runBeforeFormOutput( \IPS\Helpers\Form &$form )
 	{
-		if ( Settings::i()->contact_type == 'contact_redirect' AND Settings::i()->contact_redirect != '' )
+		if ( \IPS\Settings::i()->contact_type == 'contact_redirect' AND \IPS\Settings::i()->contact_redirect != '' )
 		{
-			Output::i()->redirect( Settings::i()->contact_redirect );
+			\IPS\Output::i()->redirect( \IPS\Settings::i()->contact_redirect );
 		}
 	}
 
@@ -68,7 +60,7 @@ class RedirectForm extends ContactUsAbstract
 	 * @param	array                   $values     Values from form
 	 * @return	bool
 	 */
-	public function handleForm( array $values ): bool
+	public function handleForm( $values )
 	{
 		return FALSE;
 	}

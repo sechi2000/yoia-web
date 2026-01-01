@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Profile Fields and Settings
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -12,47 +11,40 @@
 namespace IPS\core\modules\admin\membersettings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\ProfileFields\Field;
-use IPS\Dispatcher;
-use IPS\Member;
-use IPS\Node\Controller;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Profile Fields and Settings
  */
-class profilefields extends Controller
+class _profilefields extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = '\IPS\core\ProfileFields\Group';
+	protected $nodeClass = '\IPS\core\ProfileFields\Group';
 
 	/**
 	 * Show the "add" button in the page root rather than the table root
 	 */
-	protected bool $_addButtonInRoot = FALSE;
+	protected $_addButtonInRoot = FALSE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'profilefields_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'profilefields_manage' );
 		parent::execute();
 	}
 
@@ -61,9 +53,8 @@ class profilefields extends Controller
 	 *
 	 * @return	array
 	 */
-	public function _getRootButtons(): array
+	public function _getRootButtons()
 	{
-		/* @var Field $nodeClass */
 		$nodeClass = $this->nodeClass;
 		
 		if ( $nodeClass::canAddRoot() )
@@ -72,7 +63,7 @@ class profilefields extends Controller
 				'icon'	=> 'plus',
 				'title'	=> 'add',
 				'link'	=> $this->url->setQueryString( 'do', 'form' ),
-				'data'	=> ( $nodeClass::$modalForms ? array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('add') ) : array() )
+				'data'	=> ( $nodeClass::$modalForms ? array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('add') ) : array() )
 			);
 
 			return array( 'add' => $add );

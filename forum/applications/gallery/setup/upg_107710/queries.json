@@ -1,14 +1,15 @@
 {
     "1": {
-        "method": "addColumn",
+        "method": "changeColumn",
         "params": [
-            "gallery_albums",
+            "gallery_images",
+            "image_file_size",
             {
-                "name": "album_views",
+                "name": "image_file_size",
                 "type": "BIGINT",
-                "length": null,
+                "length": 20,
                 "decimals": null,
-                "values": null,
+                "values": [],
                 "allow_null": false,
                 "default": 0,
                 "comment": "",

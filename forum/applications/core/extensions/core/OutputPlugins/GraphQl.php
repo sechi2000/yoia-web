@@ -12,48 +12,41 @@
 namespace IPS\core\extensions\core\OutputPlugins;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\GraphQL as GraphQLApi;
-use IPS\Extensions\OutputPluginsAbstract;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin
  */
-class GraphQl extends OutputPluginsAbstract
+class _GraphQl
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = FALSE;
+	public static $canBeUsedInCss = FALSE;
 	
 	/**
 	 * Run the plug-in
 	 *
 	 * @param	string 		$data	  The initial data from the tag
 	 * @param	array		$options    Array of options
-	 * @return	string|array		Code to eval
+	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options ): string|array
+	public static function runPlugin( $data, $options )
 	{
 		if( !isset( $options['variables']))
 		{
 			$options['variables'] = [];
 		}
 
-		$response = GraphQLApi::execute($data, $options['variables']);
+		$response = \IPS\Api\GraphQL::execute($data, $options['variables']);
 
 		if( isset( $response['data']))
 		{
 			return "'"  . json_encode($response['data'], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS ) . "'";
 		}
-
-		return '';
 	}
 }

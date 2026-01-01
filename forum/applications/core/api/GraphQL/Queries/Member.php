@@ -10,28 +10,26 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\MemberType;
-use IPS\Member as MemberClass;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member query for GraphQL API
  */
-class Member
+class _Member
 {
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Return a member";
+	public static $description = "Return a member";
 
 	/*
 	 * Query arguments
@@ -47,7 +45,7 @@ class Member
 	/**
 	 * Return the query return type
 	 */
-	public function type() : MemberType
+	public function type() 
 	{
 		return \IPS\core\api\GraphQL\TypeRegistry::member();
 	}
@@ -55,19 +53,17 @@ class Member
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @return	MemberClass|null
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\Member|null
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : ?MemberClass
+	public function resolve($val, $args, $context)
 	{
 		if( isset( $args['loggedIn'] ) ){
-			return MemberClass::loggedIn();
+			return \IPS\Member::loggedIn();
 		} elseif ( isset( $args['id'] ) ){
-			return MemberClass::load( $args['id'] );
+			return \IPS\Member::load( $args['id'] );
 		}
-
-		return null;
 	}
 }

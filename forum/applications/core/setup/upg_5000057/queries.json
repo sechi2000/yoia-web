@@ -1,9 +1,0 @@
-{
-    "1": {
-        "method": "dropTable",
-        "params": [
-            "core_theme_conflict",
-            true
-        ]
-    }
-}

@@ -12,68 +12,45 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Xenforo as XenforoCore;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_array;
-use function is_null;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Xenforo Forums Converter
  */
-class Xenforo extends Software
+class _Xenforo extends \IPS\convert\Software
 {
 	use \IPS\convert\Tools\Xenforo;
 
 	/**
 	 * @brief	The similarities between XF1 and XF2 are close enough that we can use the same converter
 	 */
-	public static ?bool $isLegacy = NULL;
+	public static $isLegacy = NULL;
 
 	/**
 	 * @brief	Flag to indicate the post data has been fixed during conversion, and we only need to use Legacy Parser
 	 */
-	public static bool $contentFixed = TRUE;
+	public static $contentFixed = TRUE;
 
 	/**
 	 * @brief XF2.1 changed serialized data to json decoded
 	 */
-	public static bool $useJson = FALSE;
+	public static $useJson = FALSE;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 
 		if ( $needDB )
 		{
@@ -82,7 +59,7 @@ class Xenforo extends Software
 				/* Is this XF1 or XF2 */
 				if ( static::$isLegacy === NULL )
 				{
-					$version = $this->db->select( 'MAX(version_id)', 'xf_template', array( Db::i()->in( 'addon_id', array( 'XF', 'XenForo' ) ) ) )->first();
+					$version = $this->db->select( 'MAX(version_id)', 'xf_template', array( \IPS\Db::i()->in( 'addon_id', array( 'XF', 'XenForo' ) ) ) )->first();
 
 					if ( $version < 2000010 )
 					{
@@ -102,16 +79,18 @@ class Xenforo extends Software
 					}
 				}
 			}
-			catch( Exception $e ) {} # If we can't query, we won't be able to do anything anyway
+			catch( \Exception $e ) {} # If we can't query, we won't be able to do anything anyway
 		}
+
+		return $return;
 	}
 
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "XenForo (1.5.x/2.0.x/2.1.x/2.2.x)";
@@ -120,9 +99,9 @@ class Xenforo extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "xenforo";
@@ -131,14 +110,14 @@ class Xenforo extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums' => array(
 				'table'					=> 'xf_node',
-				'where'					=> array( Db::i()->in( 'node_type_id', array( 'Category', 'Forum', 'LinkForum' ) ) )
+				'where'					=> array( \IPS\Db::i()->in( 'node_type_id', array( 'Category', 'Forum', 'LinkForum' ) ) )
 			),
 			'convertForumsTopics'	=> array(
 				'table'					=> 'xf_thread',
@@ -158,9 +137,9 @@ class Xenforo extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -168,9 +147,9 @@ class Xenforo extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'xenforo' ) );
 	}
@@ -178,9 +157,9 @@ class Xenforo extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		$return = array(
 			'convertAttachments'
@@ -197,10 +176,10 @@ class Xenforo extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -213,10 +192,10 @@ class Xenforo extends Software
 					$options		= array();
 					$descriptions	= array();
 
-					foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
+					foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
 					{
 						$options[ $reaction->id ]		= $reaction->_icon->url;
-						$descriptions[ $reaction->id ]	= Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id );
+						$descriptions[ $reaction->id ]	= \IPS\Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id );
 					}
 
 					$return['convertForumsPosts'] = array(
@@ -240,8 +219,8 @@ class Xenforo extends Software
 						'field_default'			=> NULL,
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(),
-						'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_xf_attach_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_xf_attach_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;
@@ -253,35 +232,32 @@ class Xenforo extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		/* Caches */
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
 		
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics", "f_topic_tags_recount" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return XenforoCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Xenforo::fixPostData( $post );
 	}
 
 	/**
@@ -291,14 +267,14 @@ class Xenforo extends Software
 	 * @param	string			$xfTwoTitle		XF2 Phrase Title
 	 * @return	string|null
 	 */
-	protected function getPhrase( string $xfOneTitle, string $xfTwoTitle ) : ?string
+	protected function getPhrase( $xfOneTitle, $xfTwoTitle )
 	{
 		try
 		{
-			$title = ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) ? $xfTwoTitle : $xfOneTitle;
+			$title = ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) ? $xfTwoTitle : $xfOneTitle;
 			return $this->db->select( 'phrase_text', 'xf_phrase', array( "title=?", $title ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			return NULL;
 		}
@@ -309,7 +285,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums() : void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -331,7 +307,7 @@ class Xenforo extends Software
 						break;
 				}
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			$info = array(
 				'id'				=> $row['node_id'],
@@ -339,8 +315,12 @@ class Xenforo extends Software
 				'description'		=> $row['description'],
 				'topics'			=> ( isset( $data['discussion_count'] ) ) ? $data['discussion_count'] : 0,
 				'posts'				=> ( isset( $data['message_count'] ) ) ? $data['message_count'] : 0,
+				'last_post'			=> ( isset( $data['last_post_date'] ) ) ? $data['last_post_date'] : 0,
+				'last_poster_id'	=> ( isset( $data['last_post_user_id'] ) ) ? $data['last_post_user_id'] : 0,
+				'last_poster_name'	=> ( isset( $data['last_poster_name'] ) ) ? $data['last_post_username'] : '',
 				'parent_id'			=> ( $row['parent_node_id'] == 0 ) ? -1 : $row['parent_node_id'],
 				'position'			=> $row['display_order'],
+				'last_title'		=> ( isset( $data['last_thread_title'] ) ) ? $data['last_thread_title'] : '',
 				'allow_poll'		=> ( isset( $data['allow_poll'] ) ) ? $data['allow_poll'] : 0,
 				'inc_postcount'		=> ( isset( $data['count_messages'] ) ) ? $data['count_messages'] : 0,
 				'redirect_url'		=> ( isset( $data['link_url'] ) ) ? $data['link_url'] : NULL,
@@ -379,7 +359,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics() : void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'thread_id' );
@@ -443,7 +423,7 @@ class Xenforo extends Software
 						);
 					}
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 			
 			/* Approval */
@@ -472,7 +452,7 @@ class Xenforo extends Software
 					$key		= explode( '-', $redirect['redirect_key'] );
 					$moved_to	= array( $key[1], $key[2] );
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 			
 			$info = array(
@@ -489,7 +469,7 @@ class Xenforo extends Software
 				'last_poster_name'	=> $row['last_post_username'],
 				'poll_state'		=> $poll,
 				'views'				=> $row['view_count'],
-				'approved'			=> $approved ?? 0,
+				'approved'			=> $approved,
 				'pinned'			=> $row['sticky'],
 				'moved_to'			=> $moved_to,
 			);
@@ -520,7 +500,7 @@ class Xenforo extends Software
 			{
 				$prefix = $this->getPhrase( "thread_prefix_{$row['prefix_id']}", "thread_prefix.{$row['prefix_id']}" );
 				
-				if ( !is_null( $prefix ) )
+				if ( !\is_null( $prefix ) )
 				{
 					$libraryClass->convertTag( array(
 						'tag_meta_app'			=> 'forums',
@@ -539,7 +519,7 @@ class Xenforo extends Software
 			if ( $row['tags'] )
 			{
 				$tags = static::unpack( $row['tags'] );
-				if ( count( $tags ) )
+				if ( \count( $tags ) )
 				{
 					foreach( $tags AS $key => $tag )
 					{
@@ -566,7 +546,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts() : void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -610,7 +590,7 @@ class Xenforo extends Software
 					$editName = $this->db->select( 'username', 'xf_user', array( 'user_id=?', $row['last_edit_user_id'] ) )->first();
 				}
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			$info = array(
 				'pid'			=> $row['post_id'],
@@ -623,7 +603,7 @@ class Xenforo extends Software
 				'author_name'	=> $row['username'],
 				'ip_address'	=> $row['ip'] ?? '127.0.0.1',
 				'post_date'		=> $row['post_date'],
-				'queued'		=> $queued ?? 0,
+				'queued'		=> $queued,
 			);
 			
 			$libraryClass->convertForumsPost( $info );
@@ -631,8 +611,8 @@ class Xenforo extends Software
 			/* Reputation */
 			if ( !static::$useJson )
 			{
-				$likes = unserialize( $row['like_users'] );
-				if ( is_array( $likes ) AND count( $likes ) )
+				$likes = \unserialize( $row['like_users'] );
+				if ( \is_array( $likes ) AND \count( $likes ) )
 				{
 					foreach( $likes AS $like )
 					{
@@ -721,7 +701,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'xf_attachment.attachment_id' );
@@ -734,9 +714,9 @@ class Xenforo extends Software
 			{
 				$topic = $this->db->select( 'thread_id', 'xf_post', array( "post_id=?", $row['content_id'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
-				$this->app->log( 'xf_attach_missing_topic_link', __METHOD__, App::LOG_WARNING, $row['attachment_id'] );
+				$this->app->log( 'xf_attach_missing_topic_link', __METHOD__, \IPS\convert\App::LOG_WARNING, $row['attachment_id'] );
 				$libraryClass->setLastKeyValue( $row['attachment_id'] );
 				continue;
 			}
@@ -772,17 +752,18 @@ class Xenforo extends Software
 				{
 					$pid = $this->app->getLink( $row['content_id'], 'forums_posts' );
 
-					$post = Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
+					$post = \IPS\Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
 
 					if ( preg_match( "/\[ATTACH([^\]]+?)?\]" . $row['attachment_id'] . "(\._xfImport)?\[\/ATTACH\]/i", $post ) )
 					{
 						$post = preg_replace( "/\[ATTACH([^\]]+?)?\]" . $row['attachment_id'] . "(\._xfImport)?\[\/ATTACH\]/i", '[attachment=' . $attachId . ':name]', $post );
-						Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
+						\IPS\Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
 					}
 				}
 			}
-			catch( UnderflowException|OutOfRangeException $e ) {}
-
+			catch( \UnderflowException $e ) {}
+			catch( \OutOfRangeException $e ) {}
+			
 			$libraryClass->setLastKeyValue( $row['attachment_id'] );
 		}
 	}
@@ -790,13 +771,13 @@ class Xenforo extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( preg_match( '#/(forums|threads)/(.+?)\.([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/(forums|threads)/(.+?)\.([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			$oldId	= (int) $matches[3];
 
@@ -813,7 +794,7 @@ class Xenforo extends Software
 				break;
 			}
 		}
-		elseif( preg_match( '#/posts/([0-9]+)/#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		elseif( preg_match( '#/posts/([0-9]+)/#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			$class	= '\IPS\forums\Topic\Post';
 			$types	= array( 'posts', 'forums_posts' );
@@ -828,20 +809,20 @@ class Xenforo extends Software
 				{
 					$data = (string) $this->app->getLink( $oldId, $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( $oldId, $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				elseif( $item instanceof Model )
+				elseif( $item instanceof \IPS\Node\Model )
 				{
 					if( $item->can( 'view' ) )
 					{
@@ -849,7 +830,7 @@ class Xenforo extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

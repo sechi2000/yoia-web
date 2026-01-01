@@ -11,62 +11,38 @@
 namespace IPS\Dispatcher;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use const IPS\COOKIE_BYPASS_SSLONLY;
-use const IPS\COOKIE_DOMAIN;
-use const IPS\COOKIE_PATH;
-use const IPS\COOKIE_PREFIX;
-use const IPS\SITE_FILES_PATH;
-use const IPS\STORE_CONFIG;
-use const IPS\STORE_METHOD;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Installer/Upgrader Dispatcher
  */
-class Setup extends Dispatcher
+class _Setup extends \IPS\Dispatcher
 {
 	/**
 	 * @brief Controller Location
 	 */
-	public string $controllerLocation = 'setup';
+	public $controllerLocation = 'setup';
 
 	/**
 	 * @brief Install or upgrade
 	 */
-	public string $setupLocation = 'install';
+	public $setupLocation = 'install';
 
 	/**
 	 * @brief Step
 	 */
-	public int $step = 1;
+	public $step = 1;
 	
 	/**
 	 * Initiator
 	 *
 	 * @return	void
 	 */
-	public function init() : void
+	public function init()
 	{
 	}
 
@@ -75,7 +51,7 @@ class Setup extends Dispatcher
 	 *
 	 * @return	array
 	 */
-	protected function returnSteps(): array
+	protected function returnSteps()
 	{
 		if( $this->setupLocation == 'upgrade' )
 		{
@@ -107,31 +83,14 @@ class Setup extends Dispatcher
 	/**
 	 * Set location (install or upgrade)
 	 *
-	 * @param string $location	'install' or 'upgrade'
-	 * @return    Setup
+	 * @param	string	$location	'install' or 'upgrade'
+	 * @return	\IPS\Dispatcher\Setup
 	 */
-	public function setLocation(string $location ): Setup
+	public function setLocation( $location )
 	{
 		$this->setupLocation	= $location;
 		$steps					= $this->returnSteps();
-		$currentStep			= ( isset( Request::i()->controller ) ? Request::i()->controller : $steps[1] );
-		$this->classname		= 'IPS\core\modules\setup\\' . $location . '\\' . $currentStep;
-
-		/* If we are upgrading and just starting, check the current version.
-		If we are upgrading from a version prior to v5, disable all non-1st party apps. */
-		if( $location == 'upgrade' and $currentStep == 'login' )
-		{
-			$currentBaseVersion = Db::i()->select( 'app_long_version', 'core_applications', [ 'app_directory=?', 'core' ] )->first();
-
-			/* If we are upgrading from a version earlier than v5, disable and lock anything that isn't 1st party */
-			if( $currentBaseVersion < 5000016 )
-			{
-				Db::i()->update( 'core_applications', [ 'app_enabled' => 0, 'app_requires_manual_intervention' => 1 ], Db::i()->in( 'app_directory', IPS::$ipsApps, true ) );
-				Cache::i()->clearAll();
-				Store::i()->clearAll();
-			}
-		}
-
+		$this->classname		= 'IPS\core\modules\setup\\' . $location . '\\' . ( isset( \IPS\Request::i()->controller ) ? \IPS\Request::i()->controller : $steps[1] );
 		return $this;
 	}
 	
@@ -140,7 +99,7 @@ class Setup extends Dispatcher
 	 *
 	 * @return	void
 	 */
-	public function run() : void
+	public function run()
 	{
 		/* Installer checks */
 		if( $this->setupLocation == 'install' )
@@ -151,7 +110,7 @@ class Setup extends Dispatcher
 				{
 					rename( \IPS\ROOT_PATH . '/conf_global.dist.php', \IPS\ROOT_PATH . '/conf_global.php' );
 				}
-				catch ( Exception $e ) { }
+				catch ( \Exception $e ) { }
 				
 				if ( !file_exists( \IPS\ROOT_PATH . '/conf_global.php' ) )
 				{
@@ -159,115 +118,115 @@ class Setup extends Dispatcher
 					{
 						file_put_contents( \IPS\ROOT_PATH. '/conf_global.php', '' );
 					}
-					catch ( Exception $e ) { }
+					catch ( \Exception $e ) { }
 				}
 								
 				if ( !file_exists( \IPS\ROOT_PATH . '/conf_global.php' ) )
 				{
-					Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( Member::loggedIn()->language()->addToStack( 'installation_error' ), '', true, \IPS\ROOT_PATH ), 500, 'text/html', array(), FALSE, FALSE, FALSE );
+					\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( \IPS\Member::loggedIn()->language()->addToStack( 'installation_error' ), '', true, \IPS\ROOT_PATH ), 500, 'text/html', array(), FALSE, FALSE, FALSE );
 				}
 			}
 			
 			require \IPS\ROOT_PATH . '/conf_global.php';
 			if ( isset( $INFO ) and isset( $INFO['installed'] ) )
 			{
-				$upgradeUrl = new Url( Settings::i()->base_url . 'admin/upgrade/' );
-				Output::i()->redirect( $upgradeUrl );
+				$upgradeUrl = new \IPS\Http\Url( \IPS\Settings::i()->base_url . \IPS\CP_DIRECTORY . '/upgrade/' );
+				\IPS\Output::i()->redirect( $upgradeUrl );
 			}
 		}
 		/* Upgrader Checks */
 		else
 		{
-			if ( !file_exists( SITE_FILES_PATH . '/conf_global.php' ) )
+			if ( !file_exists( \IPS\SITE_FILES_PATH . '/conf_global.php' ) )
 			{
-				Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( Member::loggedIn()->language()->addToStack('upgrade_error'), '', Member::loggedIn()->language()->addToStack('no_conf_global'), \IPS\ROOT_PATH ), 200, 'text/html', array(), FALSE );
+				\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( \IPS\Member::loggedIn()->language()->addToStack('upgrade_error'), '', \IPS\Member::loggedIn()->language()->addToStack('no_conf_global'), \IPS\ROOT_PATH ), 200, 'text/html', array(), FALSE );
 			}
 			
-			if ( STORE_METHOD === 'FileSystem' )
+			if ( \IPS\STORE_METHOD === 'FileSystem' )
 			{
-				$config = json_decode( STORE_CONFIG, TRUE );
+				$config = json_decode( \IPS\STORE_CONFIG, TRUE );
 				$path = str_replace( '{root}', \IPS\ROOT_PATH, $config['path'] );
 				if ( !is_dir( $path ) or !is_writable( $path ) )
 				{
-					Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( Member::loggedIn()->language()->addToStack('upgrade_error'), '', Member::loggedIn()->language()->addToStack( 'create_conf_global', FALSE, array( 'sprintf' => array( $path ) ) ), \IPS\ROOT_PATH ), 200, 'text/html', array(), FALSE );
+					\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( \IPS\Member::loggedIn()->language()->addToStack('upgrade_error'), '', \IPS\Member::loggedIn()->language()->addToStack( 'create_conf_global', FALSE, array( 'sprintf' => array( $path ) ) ), \IPS\ROOT_PATH ), 200, 'text/html', array(), FALSE );
 				}
 			}
 
-			require SITE_FILES_PATH . '/conf_global.php';
+			require \IPS\SITE_FILES_PATH . '/conf_global.php';
 			if ( !isset( $INFO ) )
 			{
-				Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( Member::loggedIn()->language()->addToStack('upgrade_error'), '', Member::loggedIn()->language()->addToStack('bad_conf_global'), \IPS\ROOT_PATH ), 200, 'text/html', array(), FALSE );
+				\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( \IPS\Member::loggedIn()->language()->addToStack('upgrade_error'), '', \IPS\Member::loggedIn()->language()->addToStack('bad_conf_global'), \IPS\ROOT_PATH ), 200, 'text/html', array(), FALSE );
 			}
 			
 			/* Fix languages if necessary */
-			if( Db::i()->checkForTable( 'core_sys_lang' ) AND !Db::i()->checkForColumn( 'core_sys_lang', 'lang_order' ) )
+			if( \IPS\Db::i()->checkForTable( 'core_sys_lang' ) AND !\IPS\Db::i()->checkForColumn( 'core_sys_lang', 'lang_order' ) )
 			{
-				Lang::languages( Db::i()->select( '*', 'core_sys_lang' ) );
+				\IPS\Lang::languages( \IPS\Db::i()->select( '*', 'core_sys_lang' ) );
 			}
 	
 			/* Fix members if necessary */
-			if( !Db::i()->checkForTable( 'core_members' ) )
+			if( !\IPS\Db::i()->checkForTable( 'core_members' ) )
 			{
-				Member::$databaseTable	= 'members';
+				\IPS\Member::$databaseTable	= 'members';
 				
-				if ( !Db::i()->checkForTable( 'core_groups' ) )
+				if ( !\IPS\Db::i()->checkForTable( 'core_groups' ) )
 				{
-					Group::$databaseTable = 'groups';
+					\IPS\Member\Group::$databaseTable = 'groups';
 				}
 				
 				/* re-arrange 3.x mapping to 4.x code */
-				$bits    = Member::$bitOptions;
+				$bits    = \IPS\Member::$bitOptions;
 				unset( $bits['members_bitoptions']['members_bitoptions2'] );
-				Member::$bitOptions = $bits;
+				\IPS\Member::$bitOptions = $bits;				
 			}
 		}
 		
-		Settings::i()->base_url = ( Request::i()->isSecure()  ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . mb_substr( $_SERVER['SCRIPT_NAME'], 0, -mb_strlen(  'admin/' . $this->setupLocation . '/index.php' ) );
+		\IPS\Settings::i()->base_url = ( \IPS\Request::i()->isSecure()  ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . mb_substr( $_SERVER['SCRIPT_NAME'], 0, -mb_strlen( \IPS\CP_DIRECTORY . '/' . $this->setupLocation . '/index.php' ) );
 
-		$this->step	= array_search( Request::i()->controller, $this->returnSteps() );
+		$this->step	= array_search( \IPS\Request::i()->controller, $this->returnSteps() );
 
-		session_name( ( COOKIE_PREFIX !== NULL ) ? COOKIE_PREFIX . 'IPSSessionSetup' : 'IPSSessionSetup' );
+		session_name( ( \IPS\COOKIE_PREFIX !== NULL ) ? \IPS\COOKIE_PREFIX . 'IPSSessionSetup' : 'IPSSessionSetup' );
 		$currentCookieParams = session_get_cookie_params();
 		session_set_cookie_params( 
 			86400 * 14, 
-			( COOKIE_PATH !== NULL ) ? COOKIE_PATH : $currentCookieParams['path'],
-			( COOKIE_DOMAIN !== NULL ) ? COOKIE_DOMAIN : $currentCookieParams['domain'],
-			( !COOKIE_BYPASS_SSLONLY ) ? ( mb_substr( Settings::i()->base_url, 0, 5 ) == 'https' ) : $currentCookieParams['secure'],
+			( \IPS\COOKIE_PATH !== NULL ) ? \IPS\COOKIE_PATH : $currentCookieParams['path'],
+			( \IPS\COOKIE_DOMAIN !== NULL ) ? \IPS\COOKIE_DOMAIN : $currentCookieParams['domain'],
+			( \IPS\COOKIE_BYPASS_SSLONLY !== TRUE ) ? ( mb_substr( \IPS\Settings::i()->base_url, 0, 5 ) == 'https' ) : $currentCookieParams['secure'],
 			TRUE
 		);
 
 		if( !@session_start() )
 		{
-			Output::i()->error( Member::loggedIn()->language()->addToStack( 'session_no_good', FALSE, array( 'sprintf' => array( IPS::$lastError?->getMessage() ) ) ), '4S109/5', 500, '' );
+			\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack( 'session_no_good', FALSE, array( 'sprintf' => array( \IPS\IPS::$lastError ? \IPS\IPS::$lastError->getMessage() : NULL ) ) ), '4S109/5', 500, '' );
 		}
 		
-		if( $this->classname != 'IPS\core\modules\setup\upgrade\done' and $this->setupLocation != 'install' and $this->step > 1 AND ( !isset( $_SESSION['uniqueKey'] ) OR $_SESSION['uniqueKey'] != Request::i()->key ) )
+		if( $this->classname != 'IPS\core\modules\setup\upgrade\done' and $this->setupLocation != 'install' and $this->step > 1 AND ( !isset( $_SESSION['uniqueKey'] ) OR $_SESSION['uniqueKey'] != \IPS\Request::i()->key ) )
 		{
-			Output::i()->error( 'upgrade_session_error', '3S109/4', 403, '' );
+			\IPS\Output::i()->error( 'upgrade_session_error', '3S109/4', 403, '' );
 		}
 
 		/* Init class */
 		if( !class_exists( $this->classname ) )
 		{
-			Output::i()->error( 'page_doesnt_exist', '2S100/1', 404 );
+			\IPS\Output::i()->error( 'page_doesnt_exist', '2S100/1', 404 );
 		}
 		$controller = new $this->classname; 
-		if( !( $controller instanceof Controller) )
+		if( !( $controller instanceof \IPS\Dispatcher\Controller ) )
 		{
-			Output::i()->error( 'page_not_found', '5S100/3', 500, '' );
+			\IPS\Output::i()->error( 'page_not_found', '5S100/3', 500, '' );
 		}
 		
 		/* Execute */
 		$controller->execute();
 		
 		/* If we're still here - output */
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( Output::i()->output ), 200, 'text/html', array(), FALSE, FALSE, TRUE, FALSE );
+			\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( \IPS\Output::i()->output ), 200, 'text/html', array(), FALSE, FALSE, TRUE, FALSE );
 		}
 		else
 		{
-			Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( Output::i()->title, Output::i()->output ), 200, 'text/html', array(), FALSE, FALSE, TRUE, FALSE );
+			\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( \IPS\Output::i()->title, \IPS\Output::i()->output ), 200, 'text/html', array(), FALSE, FALSE, TRUE, FALSE );
 		}
 	}
 

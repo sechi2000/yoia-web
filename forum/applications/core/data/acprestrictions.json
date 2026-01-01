@@ -9,6 +9,12 @@
         "enhancements": {
             "enhancements_manage": "enhancements_manage"
         },
+        "plugins": {
+            "plugins_view": "plugins_view",
+            "plugins_install": "plugins_install",
+            "plugins_edit": "plugins_edit",
+            "plugins_uninstall": "plugins_uninstall"
+        },
         "menu": {
             "menu_manage": "menu_manage"
         },
@@ -52,6 +58,10 @@
             "advertisements_add": "advertisements_add",
             "advertisements_edit": "advertisements_edit",
             "advertisements_delete": "advertisements_delete"
+        },
+        "promote": {
+            "promote_manage": "promote_manage",
+            "promote_logs": "promote_logs"
         }
     },
     "settings": {
@@ -85,9 +95,9 @@
             "posting_manage_profanity": "posting_manage_profanity",
             "posting_manage_url": "posting_manage_url",
             "posting_manage_acronym": "posting_manage_acronym",
+            "posting_manage_tags": "posting_manage_tags",
             "posting_manage_attachments": "posting_manage_attachments",
-            "posting_manage_polls": "posting_manage_polls",
-            "posting_manage_simplified_mode": "posting_manage_simplified_mode"
+            "posting_manage_polls": "posting_manage_polls"
         },
         "advanced": {
             "advanced_manage": "advanced_manage",
@@ -120,9 +130,6 @@
         },
         "rss_exports": {
             "rss_export_manage": "rss_export_manage"
-        },
-        "tags": {
-            "tags_manage": "tags_manage"
         }
     },
     "members": {
@@ -251,11 +258,17 @@
         }
     },
     "editor": {
+        "toolbar": {
+            "toolbar_manage": "toolbar_manage"
+        },
         "emoticons": {
             "emoticons_manage": "emoticons_manage",
             "emoticons_add": "emoticons_add",
             "emoticons_edit": "emoticons_edit",
             "emoticons_delete": "emoticons_delete"
+        },
+        "settings": {
+            "settings_manage": "settings_manage"
         },
         "editor_stored_replies": {
             "stored_replies_manage": "stored_replies_manage"
@@ -270,7 +283,9 @@
             "theme_settings_add": "theme_settings_add",
             "theme_settings_remove": "theme_settings_remove",
             "theme_download_upload": "theme_download_upload",
-            "theme_templates_manage": "theme_templates_manage"
+            "theme_templates_manage": "theme_templates_manage",
+            "theme_easy_editor": "theme_easy_editor",
+            "theme_designers_mode": "theme_designers_mode"
         }
     },
     "bulkmail": {
@@ -377,9 +392,6 @@
         },
         "rankprogression": {
             "rankprogression_manage": "rankprogression_manage"
-        },
-        "helpful": {
-            "helpful_manage": "helpful_manage"
         }
     },
     "system": [],
@@ -442,10 +454,7 @@
         },
         "deletedcontent": {
             "deletedcontent_manage": "deletedcontent_manage"
-        },
-        "adverts": {
-            "adverts_manage": "adverts_manage"
         }
     },
-    "developer": []
+    "marketplace": []
 }

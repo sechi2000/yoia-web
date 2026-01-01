@@ -353,30 +353,6 @@
                 "comment": "",
                 "unsigned": false,
                 "auto_increment": false
-            },
-            "cicon": {
-                "name": "cicon",
-                "type": "TEXT",
-                "length": null,
-                "decimals": null,
-                "values": null,
-                "allow_null": true,
-                "default": null,
-                "comment": "",
-                "unsigned": false,
-                "auto_increment": false
-            },
-            "ccard_image": {
-                "name": "ccard_image",
-                "type": "VARCHAR",
-                "length": 255,
-                "decimals": null,
-                "values": null,
-                "allow_null": true,
-                "default": null,
-                "comment": "Card image file name",
-                "unsigned": false,
-                "auto_increment": false
             }
         },
         "indexes": {
@@ -3057,6 +3033,47 @@
                 "name": "file_id",
                 "columns": [
                     "pending_file_id"
+                ],
+                "length": [
+                    null
+                ]
+            }
+        }
+    },
+    "downloads_view_method": {
+        "name": "downloads_view_method",
+        "columns": {
+            "member_id": {
+                "name": "member_id",
+                "type": "BIGINT",
+                "length": "20",
+                "decimals": null,
+                "values": null,
+                "allow_null": false,
+                "default": 0,
+                "comment": "ID Number",
+                "unsigned": true,
+                "auto_increment": false
+            },
+            "method": {
+                "name": "method",
+                "type": "VARCHAR",
+                "length": 16,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": "table",
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        },
+        "indexes": {
+            "uniquemember": {
+                "type": "unique",
+                "name": "uniquemember",
+                "columns": [
+                    "member_id"
                 ],
                 "length": [
                     null

@@ -11,39 +11,23 @@
 namespace IPS\Data\Store;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use DomainException;
-use ErrorException;
-use IPS\Data\Store;
-use IPS\Helpers\Form\Text;
-use IPS\Request;
-use ParseError;
-use UnderflowException;
-use function defined;
-use function file_put_contents;
-use function function_exists;
-use const IPS\IPS_FILE_PERMISSION;
-use const IPS\IPS_FOLDER_PERMISSION;
-use const IPS\SUITE_UNIQUE_KEY;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File System Storage Class
  */
-class FileSystem extends Store
+class _FileSystem extends \IPS\Data\Store
 {
 	/**
 	 * Server supports this method?
 	 *
 	 * @return	bool
 	 */
-	public static function supported(): bool
+	public static function supported()
 	{
 		return TRUE;
 	}
@@ -54,23 +38,23 @@ class FileSystem extends Store
 	 * @param	array	$configuration	Existing settings
 	 * @return	array	\IPS\Helpers\Form\FormAbstract elements
 	 */
-	public static function configuration( array $configuration ): array
+	public static function configuration( $configuration )
 	{
 		return array(
-			'path'	=> new Text( 'datastore_filesystem_path', ( isset( $configuration['path'] ) ) ? rtrim( str_replace( '{root}', \IPS\ROOT_PATH, $configuration['path'] ), '/' ) : \IPS\ROOT_PATH . '/datastore', FALSE, array(), function( $val )
+			'path'	=> new \IPS\Helpers\Form\Text( 'datastore_filesystem_path', ( isset( $configuration['path'] ) ) ? rtrim( str_replace( '{root}', \IPS\ROOT_PATH, $configuration['path'] ), '/' ) : \IPS\ROOT_PATH . '/datastore', FALSE, array(), function( $val )
 			{
-				if ( Request::i()->datastore_method === 'FileSystem' )
+				if ( \IPS\Request::i()->datastore_method === 'FileSystem' )
 				{
 					if ( !is_dir( $val ) and is_writable( $val ) )
 					{
 						mkdir( $val );
-						chmod( $val, IPS_FOLDER_PERMISSION );
-						file_put_contents( $val . '/index.html', '' );
+						chmod( $val, \IPS\IPS_FOLDER_PERMISSION );
+						\file_put_contents( $val . '/index.html', '' );
 					}
 					
 					if ( !is_dir( $val ) or !is_writable( $val ) )
 					{
-						throw new DomainException( 'datastore_filesystem_path_err' );
+						throw new \DomainException( 'datastore_filesystem_path_err' );
 					}
 				}
 			} )
@@ -80,7 +64,7 @@ class FileSystem extends Store
 	/**
 	 * @brief	Storage Path
 	 */
-	public string $_path;
+	public $_path;
 	
 	/**
 	 * Constructor
@@ -88,7 +72,7 @@ class FileSystem extends Store
 	 * @param	array	$configuration	Configuration
 	 * @return	void
 	 */
-	public function __construct( array $configuration )
+	public function __construct( $configuration )
 	{
 		$this->_path = rtrim( str_replace( '{root}', \IPS\ROOT_PATH, $configuration['path'] ), '/' );
 
@@ -102,7 +86,7 @@ class FileSystem extends Store
 	/**
 	 * @brief	Cache
 	 */
-	protected static array $cache = array();
+	protected static $cache = array();
 
 	/**
 	 * Abstract Method: Get
@@ -110,24 +94,24 @@ class FileSystem extends Store
 	 * @param	string	$key	Key
 	 * @return	string	Value from the _datastore
 	 */
-	public function get( string $key ): string
+	public function get( $key )
 	{
 		if ( !isset( static::$cache[ $key ] ) )
 		{	
-			if ( @filesize( $this->_path . '/' . $key . '.' . SUITE_UNIQUE_KEY . '.php' ) )
+			if ( @filesize( $this->_path . '/' . $key . '.' . \IPS\SUITE_UNIQUE_KEY . '.php' ) )
 			{
 				try
 				{
-					static::$cache[ $key ] = require( $this->_path . '/' . $key . '.' . SUITE_UNIQUE_KEY . '.php' );
+					static::$cache[ $key ] = require( $this->_path . '/' . $key . '.' . \IPS\SUITE_UNIQUE_KEY . '.php' );
 				}
-				catch ( ParseError|ErrorException $e )
+				catch ( \ParseError $e )
 				{
-					throw new UnderflowException;
+					throw new \UnderflowException;
 				}
 			}
 			else
 			{
-				throw new UnderflowException;
+				throw new \UnderflowException;
 			}
 		}
 
@@ -137,11 +121,11 @@ class FileSystem extends Store
 	/**
 	 * Abstract Method: Set
 	 *
-	 * @param string $key	Key
-	 * @param string $value	Value
+	 * @param	string	$key	Key
+	 * @param	string	$value	Value
 	 * @return	bool
 	 */
-	public function set( string $key, string $value ): bool
+	public function set( $key, $value )
 	{
 		$contents = <<<CONTENTS
 <?php
@@ -152,24 +136,24 @@ VALUE;
 
 CONTENTS;
 		
-		$result = (bool) @file_put_contents( $this->_path . '/' . $key . '.' . SUITE_UNIQUE_KEY . '.php', $contents, LOCK_EX );
+		$result = (bool) @\file_put_contents( $this->_path . '/' . $key . '.' . \IPS\SUITE_UNIQUE_KEY . '.php', $contents, LOCK_EX );
 
 		/* Sometimes LOCK_EX is unavailable and throws file_put_contents(): Exclusive locks are not supported for this stream.
 			While we would prefer an exclusive lock, it would be better to write the file if possible. */
 		if( !$result )
 		{
-			@unlink( $this->_path . '/' . $key . '.' . SUITE_UNIQUE_KEY . '.php' );
-			$result = (bool) @file_put_contents( $this->_path . '/' . $key . '.' . SUITE_UNIQUE_KEY . '.php', $contents );
+			@unlink( $this->_path . '/' . $key . '.' . \IPS\SUITE_UNIQUE_KEY . '.php' );
+			$result = (bool) @\file_put_contents( $this->_path . '/' . $key . '.' . \IPS\SUITE_UNIQUE_KEY . '.php', $contents );
 		}
 
-		@chmod( $this->_path . '/' . $key . '.' . SUITE_UNIQUE_KEY . '.php', IPS_FILE_PERMISSION );
+		@chmod( $this->_path . '/' . $key . '.' . \IPS\SUITE_UNIQUE_KEY . '.php', \IPS\IPS_FILE_PERMISSION );
 
 		static::$cache[ $key ] = $value;
 
 		/* Clear zend opcache if enabled */
-		if ( function_exists( 'opcache_invalidate' ) )
+		if ( \function_exists( 'opcache_invalidate' ) )
 		{
-			@opcache_invalidate( $this->_path . '/' . $key . '.' . SUITE_UNIQUE_KEY . '.php' );
+			@opcache_invalidate( $this->_path . '/' . $key . '.' . \IPS\SUITE_UNIQUE_KEY . '.php' );
 		}
 
 		return $result;
@@ -181,7 +165,7 @@ CONTENTS;
 	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	public function exists( string $key ): bool
+	public function exists( $key )
 	{
 		if( isset( static::$cache[ $key ] ) )
 		{
@@ -194,7 +178,7 @@ CONTENTS;
 				$this->get( $key );
 				return TRUE;
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				return FALSE;
 			}
@@ -207,12 +191,12 @@ CONTENTS;
 	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	public function delete( string $key ): bool
+	public function delete( $key )
 	{
 		$return = false;
-		if ( file_exists( $this->_path . '/' . $key . '.' . SUITE_UNIQUE_KEY . '.php' ) )
+		if ( file_exists( $this->_path . '/' . $key . '.' . \IPS\SUITE_UNIQUE_KEY . '.php' ) )
 		{
-			$return = @unlink( $this->_path . '/' . $key . '.' . SUITE_UNIQUE_KEY . '.php' );
+			$return = @unlink( $this->_path . '/' . $key . '.' . \IPS\SUITE_UNIQUE_KEY . '.php' );
 		}
 
 		if( array_key_exists( $key, static::$cache ) )
@@ -221,9 +205,9 @@ CONTENTS;
 		}
 
 		/* Clear zend opcache if enabled */
-		if ( function_exists( 'opcache_invalidate' ) )
+		if ( \function_exists( 'opcache_invalidate' ) )
 		{
-			@opcache_invalidate( $this->_path . '/' . $key . '.' . SUITE_UNIQUE_KEY . '.php' );
+			@opcache_invalidate( $this->_path . '/' . $key . '.' . \IPS\SUITE_UNIQUE_KEY . '.php' );
 		}
 		
 		return $return;
@@ -235,9 +219,9 @@ CONTENTS;
 	 * @param	NULL|string	$exclude	Key to exclude (keep)
 	 * @return	void
 	 */
-	public function clearAll( string $exclude=NULL ) : void
+	public function clearAll( $exclude=NULL )
 	{
-		foreach ( new DirectoryIterator( $this->_path ) as $file )
+		foreach ( new \DirectoryIterator( $this->_path ) as $file )
 		{			
 			if ( !$file->isDot() and ( mb_substr( $file, -9 ) === '.ipsstore' or ( mb_substr( $file, -4 ) === '.php' and $file != $exclude . '.php' ) ) )
 			{
@@ -256,7 +240,7 @@ CONTENTS;
 		/* Clear zend opcache if enabled - we call reset here since we're wiping multiple files
 			and since this gets called as part of a general 'rebuild everything', a reset is 
 			probably a good idea anyway */
-		if ( function_exists( 'opcache_reset' ) )
+		if ( \function_exists( 'opcache_reset' ) )
 		{
 			@opcache_reset();
 		}

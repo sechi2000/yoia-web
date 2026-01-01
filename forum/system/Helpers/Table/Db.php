@@ -11,99 +11,83 @@
 namespace IPS\Helpers\Table;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use Exception;
-use IPS\DateTime;
-use IPS\Db as IPSDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_callable;
-use function is_object;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * List Table Builder using a database table datasource
  */
-class Db extends Table
+class _Db extends Table
 {
 	/**
 	 * @brief	Database Table
 	 */
-	protected ?string $table = NULL;
+	protected $table;
 	
 	/**
 	 * @brief	Selects
 	 */
-	public array $selects = array();
+	public $selects = array();
 	
 	/**
 	 * @brief	Initial WHERE clause
 	 */
-	public mixed $where = NULL;
+	public $where;
 
 	/**
 	 * @brief	Force index clause
 	 */
-	protected mixed $index = NULL;
+	protected $index;
 
 	/**
 	 * @brief	Primary sort column
 	 */
-	public ?string $primarySortBy = NULL;
+	public $primarySortBy;
 
 	/**
 	 * @brief	Direction of primary sort
 	 */
-	public ?string $primarySortDirection = NULL;
+	public $primarySortDirection;
 	
 	/**
 	 * @brief	Joins
 	 */
-	public array $joins = array();
+	public $joins = array();
 	
 	/**
 	 * @brief	Key field
 	 */
-	public mixed $keyField = NULL;
+	public $keyField = NULL;
 
 	/**
 	 * @brief	Group by key
 	 */
-	public string|array|null $groupBy = NULL;
+	public $groupBy = NULL;
 
 	/**
 	 * @brief	The database we will query against
 	 */
-	public ?IPSDb $db = NULL;
+	public $db;
 
 	/**
 	 * Constructor
 	 *
-	 * @param string $table Database table
-	 * @param Url $baseUrl Base URL
-	 * @param array|string|null $where WHERE clause
-	 * @param array|null $forceIndex Index to force
-	 * @param IPSDb|null $database An instance of \IPS\Db to run the queries against (defaults to current connection)
+	 * @param	string	$table						Database table
+	 * @param	\IPS\Http\Url	$baseUrl			Base URL
+	 * @param	array|null		$where				WHERE clause
+	 * @param	array|null		$forceIndex			Index to force
+	 * @param	\IPS\Db|null	$database			An instance of \IPS\Db to run the queries against (defaults to current connection)
+	 * @return	void
 	 */
-	public function __construct( string $table, Url $baseUrl, array|string $where=null, mixed $forceIndex=null, IPSDb $database=null )
+	public function __construct( $table, \IPS\Http\Url $baseUrl, $where=NULL, $forceIndex=NULL, $database=NULL )
 	{
 		$this->table = $table;
 		$this->where = $where;
 		$this->index = $forceIndex;
-		$this->db	 = $database ?? IPSDb::i();
+		$this->db	 = $database ?? \IPS\Db::i();
 		
 		return parent::__construct( $baseUrl );
 	}
@@ -112,32 +96,31 @@ class Db extends Table
 	 * Get rows
 	 * @note This method is called twice, so if there'some expensive operation happening, or if you're calculating something, make sure to cache it.
 	 *
-	 * @param array|null $advancedSearchValues Values from the advanced search form
-	 * @return    array
-	 * @throws Exception
+	 * @param	array	$advancedSearchValues	Values from the advanced search form
+	 * @return	array
 	 */
-	public function getRows( array $advancedSearchValues = null ): array
+	public function getRows( $advancedSearchValues )
 	{
 		/* Specify filter in where clause */
-		$where = $this->where ? is_array( $this->where ) ? $this->where : array( $this->where ) : array();
+		$where = $this->where ? \is_array( $this->where ) ? $this->where : array( $this->where ) : array();
 
 		if ( $this->filter and isset( $this->filters[ $this->filter ] ) )
 		{
-			$where[] = is_array( $this->filters[ $this->filter ] ) ? $this->filters[ $this->filter ] : array( $this->filters[ $this->filter ] );
+			$where[] = \is_array( $this->filters[ $this->filter ] ) ? $this->filters[ $this->filter ] : array( $this->filters[ $this->filter ] );
 		}
-		
+
 		/* Add quick search term to where clause if necessary */
-		if ( $this->quickSearch !== NULL and Request::i()->quicksearch )
+		if ( $this->quickSearch !== NULL and \IPS\Request::i()->quicksearch )
 		{
-			if ( is_callable( $this->quickSearch ) )
+			if ( \is_callable( $this->quickSearch ) )
 			{
 				$quickSearchFunc = $this->quickSearch;
-				$where[] = $quickSearchFunc( trim( Request::i()->quicksearch ) );
+				$where[] = $quickSearchFunc( trim( \IPS\Request::i()->quicksearch ) );
 			}
 			else
 			{
-				$columns = is_array( $this->quickSearch ) ? $this->quickSearch[0] : $this->quickSearch;
-				$columns = is_array( $columns ) ? $columns : array( $columns );
+				$columns = \is_array( $this->quickSearch ) ? $this->quickSearch[0] : $this->quickSearch;
+				$columns = \is_array( $columns ) ? $columns : array( $columns );
 				
 				$_where = array();
 				foreach ( $columns as $c )
@@ -145,7 +128,7 @@ class Db extends Table
 					$_where[] = "LOWER(`{$c}`) LIKE CONCAT( '%', ?, '%' )";
 				}
 				
-				$where[] = array_merge( array( '(' . implode( ' OR ', $_where ) . ')' ), array_fill( 0, count( $_where ), mb_strtolower( trim( Request::i()->quicksearch ) ) ) );
+				$where[] = array_merge( array( '(' . implode( ' OR ', $_where ) . ')' ), array_fill( 0, \count( $_where ), mb_strtolower( trim( \IPS\Request::i()->quicksearch ) ) ) );
 			}
 		}
 
@@ -154,11 +137,11 @@ class Db extends Table
 		{
 			foreach ( $advancedSearchValues as $k => $v )
 			{
-				if ( isset( $this->advancedSearch[ $k ] ) AND $v !== '' AND ( !is_array( $v ) OR !empty( $v ) ) )
+				if ( isset( $this->advancedSearch[ $k ] ) AND $v !== '' AND ( !\is_array( $v ) OR !empty( $v ) ) )
 				{
 					$type = $this->advancedSearch[ $k ];
 
-					if ( is_array( $type ) )
+					if ( \is_array( $type ) )
 					{
 						if ( isset( $type[2] ) )
 						{
@@ -208,9 +191,9 @@ class Db extends Table
 							{
 								unset( $advancedSearchValues[ $k ] );
 							}
-							break;
+							break;	
 						case SEARCH_DATE_RANGE:
-							$timezone = ( Member::loggedIn()->timezone ? new DateTimeZone( Member::loggedIn()->timezone ) : NULL );
+							$timezone = ( \IPS\Member::loggedIn()->timezone ? new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) : NULL );
 
 							if( !$v['start'] AND !$v['end'] )
 							{
@@ -219,18 +202,18 @@ class Db extends Table
 
 							if ( $v['start'] )
 							{
-								if( !( $v['start'] instanceof DateTime ) )
+								if( !( $v['start'] instanceof \IPS\DateTime ) )
 								{
-									$v['start'] = new DateTime( $v['start'], $timezone );
+									$v['start'] = new \IPS\DateTime( $v['start'], $timezone );
 								}
 
 								$where[] = array( "{$k}>?", $v['start']->getTimestamp() );
 							}
 							if ( $v['end'] )
 							{
-								if( !( $v['end'] instanceof DateTime ) )
+								if( !( $v['end'] instanceof \IPS\DateTime ) )
 								{
-									$v['end'] = new DateTime( $v['end'], $timezone );
+									$v['end'] = new \IPS\DateTime( $v['end'], $timezone );
 								}
 
 								$where[] = array( "{$k}<?", $v['end']->getTimestamp() );
@@ -252,7 +235,7 @@ class Db extends Table
 						case SEARCH_MEMBER:
 							if ( $v )
 							{
-								$where[] = array( "{$k}=?", ( $v instanceof Member ) ? $v->member_id : $v );
+								$where[] = array( "{$k}=?", ( $v instanceof \IPS\Member ) ? $v->member_id : $v );
 							}
 							else
 							{
@@ -261,44 +244,37 @@ class Db extends Table
 							break;
 							
 						case SEARCH_NODE:
-
-							if( $v )
+							$nodeClass = $options['class'];
+							$prop = isset( $options['searchProp'] ) ? $options['searchProp'] : '_id';
+							if ( !\is_array( $v ) )
 							{
-								$nodeClass = $options[ 'class' ];
-								$prop = $options[ 'searchProp' ]??'_id';
-								if( !is_array( $v ) )
-								{
-									$v = [$v];
-								}
-								$values = [];
-								foreach( $v as $_v )
-								{
-									if( !is_object( $_v ) )
-									{
-										if( mb_substr( $_v, 0, 2 ) === 's.' )
-										{
-											$nodeClass = $nodeClass::$subnodeClass;
-											$_v = mb_substr( $_v, 2 );
-										}
-										try
-										{
-											$_v = $nodeClass::load( $_v );
-										}
-										catch( OutOfRangeException $e )
-										{
-											continue;
-										}
-									}
-									$values[] = $_v->$prop;
-								}
-								$where[] = [$this->db->in( $k, $values )];
+								$v = array( $v );
 							}
-						else
-						{
-							unset( $advancedSearchValues[ $k ] );
-						}
+							
+							$values = array();
+							foreach ( $v as $_v )
+							{
+								if ( !\is_object( $_v ) )
+								{
+									if ( mb_substr( $_v, 0, 2 ) === 's.' )
+									{
+										$nodeClass = $nodeClass::$subnodeClass;
+										$_v = mb_substr( $_v, 2 );
+									}
+									try
+									{
+										$_v = $nodeClass::load( $_v );
+									}
+									catch ( \OutOfRangeException $e )
+									{
+										continue;
+									}
+								}
+								$values[] = $_v->$prop;
+							}
+							$where[] = array( $this->db->in( $k, $values ) );
 							break;
-
+						
 						case SEARCH_NUMERIC:
 						case SEARCH_NUMERIC_TEXT:
 							switch ( $v[0] )
@@ -330,7 +306,7 @@ class Db extends Table
 		$selects = $this->selects;
 		$isOtherJoin = false;
 
-		if ( count( $this->joins ) )
+		if ( \count( $this->joins ) )
 		{
 			foreach( $this->joins as $join )
 			{
@@ -339,7 +315,7 @@ class Db extends Table
 					$selects[] = $join['select'];
 				}
 
-				if ( isset( $join['type'] ) and mb_strtolower( $join['type'] ) != 'left' )
+				if ( isset( $join['type'] ) and \mb_strtolower( $join['type'] ) != 'left' )
 				{
 					/* Inner join or straight join which will affect the query results */
 					$isOtherJoin = true;
@@ -349,15 +325,13 @@ class Db extends Table
 		
 		/* Count results (for pagination) */
 		$count = $this->db->select( 'count(*)', $this->table, $where, NULL, NULL, $this->groupBy  );
-		if ( count( $this->joins ) )
+
+		/* Add the joins if we have a where statement and all joins are left for the count */
+		if ( ( $isOtherJoin or \count( $where ) ) and \count( $this->joins ) )
 		{
-			/* Add the joins if we have a where statement and all joins are left for the count */
-			if ( ( $isOtherJoin or count( $where ) ) and count( $this->joins ) )
+			foreach( $this->joins as $join )
 			{
-				foreach ( $this->joins as $join )
-				{
-					$count->join( $join['from'], ( $join['where'] ?? null ), ( isset( $join['type'] ) ) ? $join['type'] : 'LEFT' );
-				}
+				$count->join( $join['from'], ( isset( $join['where'] ) ? $join['where'] : null ), ( isset( $join['type'] ) ) ? $join['type'] : 'LEFT' );
 			}
 		}
 
@@ -366,13 +340,13 @@ class Db extends Table
 		$selectPrefix = ( $this->groupBy ) ? '' : $this->table . '.*, ';
 
 		/* Now get column headers */
-		$query = $this->db->select( ( count( $selects ) ) ? $selectPrefix . implode( ', ', $selects ) : '*', $this->table, NULL, NULL, array( 0, 1 ), $this->groupBy );
+		$query = $this->db->select( ( \count( $selects ) ) ? $selectPrefix . implode( ', ', $selects ) : '*', $this->table, NULL, NULL, array( 0, 1 ), $this->groupBy );
 
-		if ( count( $this->joins ) )
+		if ( \count( $this->joins ) )
 		{
 			foreach( $this->joins as $join )
 			{
-				$query->join( $join['from'], ( $join['where'] ?? null ), ( isset( $join['type'] ) ) ? $join['type'] : 'LEFT' );
+				$query->join( $join['from'], ( isset( $join['where'] ) ? $join['where'] : null ), ( isset( $join['type'] ) ) ? $join['type'] : 'LEFT' );
 			}
 		}
 
@@ -380,7 +354,7 @@ class Db extends Table
 		{
 			$results	= $query->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			$results	= array();
 		}
@@ -419,12 +393,12 @@ class Db extends Table
 		}
 
 		/* Are we downloading? Bypass Table Limit */
-		$limit = Request::i()->download ? $count : $this->limit;
+		$limit = \IPS\Request::i()->download ? $count : $this->limit;
 
 		/* Run query */
 		$rows = array();
 		$select = $this->db->select(
-			( count( $selects ) ) ? $selectPrefix . implode( ', ', $selects ) : '*',
+			( \count( $selects ) ) ? $selectPrefix . implode( ', ', $selects ) : '*',
 			$this->table,
 			$where,
 			$orderBy,
@@ -437,7 +411,7 @@ class Db extends Table
 			$select->forceIndex( $this->index );
 		}
 
-		if ( count( $this->joins ) )
+		if ( \count( $this->joins ) )
 		{
 			foreach( $this->joins as $join )
 			{
@@ -458,14 +432,14 @@ class Db extends Table
 				$row = array();
 				foreach ( $this->include as $k )
 				{
-					$row[ $k ] = $_row[$k] ?? NULL;
+					$row[ $k ] = isset( $_row[ $k ] ) ? $_row[ $k ] : NULL;
 				}
 				
-				if( !empty( $advancedSearchValues ) AND !isset( Request::i()->noColumn ) )
+				if( !empty( $advancedSearchValues ) AND !isset( \IPS\Request::i()->noColumn ) )
 				{
 					foreach ( $advancedSearchValues as $k => $v )
 					{
-						$row[ $k ] = $_row[$k] ?? NULL;
+						$row[ $k ] = isset( $_row[ $k ] ) ? $_row[ $k ] : NULL;
 					}
 				}
 			}
@@ -485,7 +459,7 @@ class Db extends Table
 				}
 
 				/* Are we including this one? */
-				if( ( ( $this->include !== NULL and !in_array( $k, $this->include ) ) or ( $this->exclude !== NULL and in_array( $k, $this->exclude ) ) ) and !array_key_exists( $k, $advancedSearchValues ) )
+				if( ( ( $this->include !== NULL and !\in_array( $k, $this->include ) ) or ( $this->exclude !== NULL and \in_array( $k, $this->exclude ) ) ) and !array_key_exists( $k, $advancedSearchValues ) )
 				{
 					unset( $row[ $k ] );
 					continue;
@@ -544,17 +518,17 @@ class Db extends Table
 	
 	/**
 	 * User set sortBy is suitable for an SQL sort operation
-	 * @param array $count	Result of count(*) query with field names included
+	 * @param	array	$count	Result of count(*) query with field names included
 	 * @return	boolean
 	 */
-	protected function _isSqlSort( array $count ): bool
+	protected function _isSqlSort( $count )
 	{
 		if ( !$this->sortBy )
 		{
 			return false;
 		}
 
-		if( !is_array( $count ) )
+		if( !\is_array( $count ) )
 		{
 			$count = array( $count );
 		}
@@ -598,7 +572,7 @@ class Db extends Table
 	 *
 	 * @return	array
 	 */
-	public function customActions(): array
+	public function customActions()
 	{
 		return array();
 	}

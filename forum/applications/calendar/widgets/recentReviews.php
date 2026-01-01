@@ -12,58 +12,51 @@
 namespace IPS\calendar\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\calendar\Event\Review;
-use IPS\Content\Filter;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Recent event reviews Widget
  */
-class recentReviews extends PermissionCache implements Customizable
+class _recentReviews extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'recentReviews';
+	public $key = 'recentReviews';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'calendar';
+	public $app = 'calendar';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
  	{
 		$form = parent::configuration( $form );
  		
  		/* Container */
-		$form->add( new Node( 'widget_calendar', $this->configuration['widget_calendar'] ?? 0, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Node( 'widget_calendar', isset( $this->configuration['widget_calendar'] ) ? $this->configuration['widget_calendar'] : 0, FALSE, array(
 			'class'           => '\IPS\calendar\Calendar',
 			'zeroVal'         => 'all',
 			'permissionCheck' => 'view',
 			'multiple'        => true
 		) ) );
  		
-		$form->add( new Number( 'review_count', $this->configuration['review_count'] ?? 5, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'review_count', isset( $this->configuration['review_count'] ) ? $this->configuration['review_count'] : 5, TRUE ) );
 
 		return $form;
  	} 
@@ -74,9 +67,9 @@ class recentReviews extends PermissionCache implements Customizable
  	 * @param	array	$values	Values from form
  	 * @return	array
  	 */
- 	public function preConfig( array $values ): array
+ 	public function preConfig( $values )
  	{
- 		if ( is_array( $values['widget_calendar'] ) )
+ 		if ( \is_array( $values['widget_calendar'] ) )
  		{
 	 		$values['widget_calendar'] = array_keys( $values['widget_calendar'] );
  		}
@@ -89,16 +82,16 @@ class recentReviews extends PermissionCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		$where = array();
 		
 		if ( ! empty( $this->configuration['widget_calendar'] ) )
 		{
-			$where['item'][] = array( Db::i()->in( 'event_calendar_id', $this->configuration['widget_calendar'] ) );
+			$where['item'][] = array( \IPS\Db::i()->in( 'event_calendar_id', $this->configuration['widget_calendar'] ) );
 		}
 		
-		$reviews = Review::getItemsWithPermission( $where, null, ( isset( $this->configuration['review_count'] ) and $this->configuration['review_count'] > 0 ) ? $this->configuration['review_count'] : 5, 'read', Filter::FILTER_PUBLIC_ONLY );
+		$reviews = \IPS\calendar\Event\Review::getItemsWithPermission( $where, NULL, ( isset( $this->configuration['review_count'] ) AND $this->configuration['review_count'] > 0 ) ? $this->configuration['review_count'] : 5, 'read', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY );
 
 		return $this->output( $reviews );
 	}

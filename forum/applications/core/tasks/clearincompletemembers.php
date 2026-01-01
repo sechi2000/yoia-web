@@ -11,26 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * clearincompletemembers Task
  */
-class clearincompletemembers extends Task
+class _clearincompletemembers extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -41,14 +31,14 @@ class clearincompletemembers extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		/* Delete cancelled registration members */
-		foreach( Db::i()->select( 'member_id', 'core_validating', array( 'do_not_delete=0 and reg_cancelled > 0 and reg_cancelled < ?', DateTime::create()->sub( new DateInterval( 'PT1H' ) )->getTimestamp() ) ) as $id )
+		foreach( \IPS\Db::i()->select( 'member_id', 'core_validating', array( 'do_not_delete=0 and reg_cancelled > 0 and reg_cancelled < ?', \IPS\DateTime::create()->sub( new \DateInterval( 'PT1H' ) )->getTimestamp() ) ) as $id )
 		{
-			$member = Member::load( $id );
+			$member = \IPS\Member::load( $id );
 
 			if( $member->member_id )
 			{
@@ -56,12 +46,12 @@ class clearincompletemembers extends Task
 			}
 			else
 			{
-				Db::i()->delete( 'core_validating', array( 'member_id=?', $id ) );
+				\IPS\Db::i()->delete( 'core_validating', array( 'member_id=?', $id ) );
 			}
 		}
 		
 		/* Delete any incompleted accounts (for example, someone has clicked "Sign in with Twitter" and never provided a username or email */
-		foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'core_members', array( array( '(name=? OR email=?)', '', '' ), array( '! (members_bitoptions2 & 16384 ) AND joined<? AND (last_visit=0 OR last_visit IS NULL)', DateTime::create()->sub( new DateInterval( 'PT1H' ) )->getTimestamp() ) ) ), 'IPS\Member' ) as $incompleteMember )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', array( array( '(name=? OR email=?)', '', '' ), array( '! (members_bitoptions2 & 16384 ) AND joined<? AND (last_visit=0 OR last_visit IS NULL)', \IPS\DateTime::create()->sub( new \DateInterval( 'PT1H' ) )->getTimestamp() ) ) ), 'IPS\Member' ) as $incompleteMember )
 		{
 			$incompleteMember->delete();
 		}

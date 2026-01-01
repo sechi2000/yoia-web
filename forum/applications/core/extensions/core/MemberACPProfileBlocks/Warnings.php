@@ -11,42 +11,26 @@
 namespace IPS\core\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\core\MemberACPProfile\Block;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Warnings Block
  */
-class Warnings extends Block
+class _Warnings extends \IPS\core\MemberACPProfile\Block
 {
 	/**
 	 * Get output
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
 		$restrictions = array();
-		foreach ( Application::allExtensions( 'core', 'MemberRestrictions', TRUE, 'core', 'Content', FALSE ) as $class )
+		foreach ( \IPS\Application::allExtensions( 'core', 'MemberRestrictions', TRUE, 'core', 'Content', FALSE ) as $class )
 		{
 			try
 			{
@@ -59,37 +43,37 @@ class Warnings extends Block
 					}
 				}
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 		
 		$flagActions = array();
-		$spamOption = explode( ',', Settings::i()->spm_option );
-		if ( in_array( 'delete', $spamOption ) )
+		$spamOption = explode( ',', \IPS\Settings::i()->spm_option );
+		if ( \in_array( 'delete', $spamOption ) )
 		{
-			$flagActions[] = Member::loggedIn()->language()->addToStack('spam_flag_confirm_delete');
+			$flagActions[] = \IPS\Member::loggedIn()->language()->addToStack('spam_flag_confirm_delete');
 		}
-		elseif ( in_array( 'unapprove', $spamOption ) )
+		elseif ( \in_array( 'unapprove', $spamOption ) )
 		{
-			$flagActions[] = Member::loggedIn()->language()->addToStack('spam_flag_confirm_unapprove');
+			$flagActions[] = \IPS\Member::loggedIn()->language()->addToStack('spam_flag_confirm_unapprove');
 		}
-		if ( in_array( 'ban', $spamOption ) )
+		if ( \in_array( 'ban', $spamOption ) )
 		{
-			$flagActions[] = Member::loggedIn()->language()->addToStack('spam_flag_confirm_ban');
+			$flagActions[] = \IPS\Member::loggedIn()->language()->addToStack('spam_flag_confirm_ban');
 		}
-		elseif ( in_array( 'disable', $spamOption ) )
+		elseif ( \in_array( 'disable', $spamOption ) )
 		{
-			$flagActions[] = Member::loggedIn()->language()->addToStack('spam_flag_confirm_disable');
+			$flagActions[] = \IPS\Member::loggedIn()->language()->addToStack('spam_flag_confirm_disable');
 		}
-		if ( Settings::i()->spam_service_enabled and Settings::i()->spam_service_send_to_ips )
+		if ( \IPS\Settings::i()->spam_service_enabled and \IPS\Settings::i()->spam_service_send_to_ips )
 		{
-			$flagActions[] = Member::loggedIn()->language()->addToStack('spam_flag_confirm_report');
+			$flagActions[] = \IPS\Member::loggedIn()->language()->addToStack('spam_flag_confirm_report');
 		}
-		if ( count( $flagActions ) )
+		if ( \count( $flagActions ) )
 		{
-			$flagMessage = sprintf( Member::loggedIn()->language()->get('spam_flag_confirm'), Member::loggedIn()->language()->formatList( $flagActions ) );
+			$flagMessage = sprintf( \IPS\Member::loggedIn()->language()->get('spam_flag_confirm'), \IPS\Member::loggedIn()->language()->formatList( $flagActions ) );
 		}
 		
-		return (string) Theme::i()->getTemplate('memberprofile')->warnings( $this->member, $restrictions, $flagMessage ?? '' );
+		return \IPS\Theme::i()->getTemplate('memberprofile')->warnings( $this->member, $restrictions, $flagMessage );
 	}
 	
 	/**
@@ -97,11 +81,11 @@ class Warnings extends Block
 	 *
 	 * @return	string
 	 */
-	public function edit(): string
+	public function edit()
 	{
 		/* Get extensions */
 		$extensions = array();
-		foreach ( Application::allExtensions( 'core', 'MemberRestrictions', TRUE, 'core', 'Content', FALSE ) as $class )
+		foreach ( \IPS\Application::allExtensions( 'core', 'MemberRestrictions', TRUE, 'core', 'Content', FALSE ) as $class )
 		{
 			try
 			{
@@ -112,15 +96,15 @@ class Warnings extends Block
 					$extensions[ $exploded[1] . '_' . $exploded[5] ] = $ext;
 				}
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 		
 		/* Build Form */
-		$form = new Form;
-		if ( Settings::i()->warn_on )
+		$form = new \IPS\Helpers\Form;
+		if ( \IPS\Settings::i()->warn_on )
 		{
 			$form->addHeader( 'warnings' );
-			$form->add( new Number( 'member_warnings', $this->member->warn_level, FALSE ) );
+			$form->add( new \IPS\Helpers\Form\Number( 'member_warnings', $this->member->warn_level, FALSE ) );	
 		}
 		foreach ( $extensions as $key => $ext )
 		{
@@ -133,7 +117,7 @@ class Warnings extends Block
 		{
 			$changes = array();
 			
-			if ( Settings::i()->warn_on )
+			if ( \IPS\Settings::i()->warn_on )
 			{
 				if ( $this->member->warn_level != $values['member_warnings'] )
 				{
@@ -149,14 +133,14 @@ class Warnings extends Block
 				}
 			}
 			
-			if ( count( $changes ) )
+			if ( \count( $changes ) )
 			{
 				$this->member->logHistory( 'core', 'warning', array( 'restrictions' => $changes ) );
 			} 
 			
 			$this->member->save();
-			Session::i()->log( 'acplog__members_edited_restrictions', array( $this->member->name => FALSE ) );
-			Output::i()->redirect( Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member->member_id}" ), 'saved' );
+			\IPS\Session::i()->log( 'acplog__members_edited_restrictions', array( $this->member->name => FALSE ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member->member_id}" ), 'saved' );
 		}
 				
 		/* Display */

@@ -11,38 +11,25 @@
 namespace IPS\Application;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use RecursiveFilterIterator;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Custom filter iterator for application building
  */
-class BuilderFilter extends RecursiveFilterIterator
+class _BuilderFilter extends \RecursiveFilterIterator
 {
 	/**
 	 * Accept the member
 	 *
 	 * @return bool
 	 */
-	public function accept(): bool
+	public function accept()
 	{
-		foreach( Application::allExtensions( 'core', 'Build' ) as $builder )
-		{
-			if( !$builder->accept( $this ) )
-			{
-				return false;
-			}
-		}
-		return !( $this->isDir() && in_array( $this->getFilename(), $this->getDirectoriesToIgnore() ) );
+		return !( $this->isDir() && \in_array( $this->getFilename(), $this->getDirectoriesToIgnore() ) );
 	}
 
 	/**
@@ -50,7 +37,7 @@ class BuilderFilter extends RecursiveFilterIterator
 	 *
 	 * @return array
 	 */
-	protected function getDirectoriesToIgnore(): array
+	protected function getDirectoriesToIgnore()
 	{
 		return array(
 			'.git',

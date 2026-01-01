@@ -11,21 +11,17 @@
 
 namespace IPS\{namespace};
 
-use IPS\Task;
-use IPS\Task\Exception as TaskException;
-use function defined;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * {key} Task
  */
-class {key} extends Task
+class _{key} extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -36,9 +32,9 @@ class {key} extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	TaskException
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		return NULL;
 	}
@@ -52,7 +48,7 @@ class {key} extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 		
 	}

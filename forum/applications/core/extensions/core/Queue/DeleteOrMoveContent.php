@@ -11,32 +11,24 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Delete or move content
  */
-class DeleteOrMoveContent extends QueueAbstract
+class _DeleteOrMoveContent
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		$classname = $data['class'];
 		$node = $classname::load( $data['id'] );
@@ -62,11 +54,11 @@ class DeleteOrMoveContent extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ): int
+	public function run( $data, $offset )
 	{
 		$classname = $data['class'];
         $exploded = explode( '\\', $classname );
-        if ( !class_exists( $classname ) or !Application::appIsEnabled( $exploded[1] ) )
+        if ( !class_exists( $classname ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
@@ -75,7 +67,7 @@ class DeleteOrMoveContent extends QueueAbstract
 		{
 			$node = $classname::load( $data['id'] );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			/* Item no longer exists, so we're done here. */
 			throw new \IPS\Task\Queue\OutOfRangeException;
@@ -89,7 +81,10 @@ class DeleteOrMoveContent extends QueueAbstract
 			{
 				$moveTo = $moveToClass::load( $data['moveTo'] );
 			}
-			catch( OutOfRangeException $e ){}
+			catch( \OutOfRangeException $e )
+			{
+				$moveTo = NULL;
+			}
 		}
 		
 		$return = $node->massMoveorDelete( $moveTo, $data );
@@ -113,29 +108,29 @@ class DeleteOrMoveContent extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		$classname = $data['class'];
 		$exploded = explode( '\\', $classname );
-		if ( !class_exists( $classname ) or !Application::appIsEnabled( $exploded[1] ) )
+		if ( !class_exists( $classname ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		$node = $classname::load( $data['id'] );
 		if ( isset( $data['moveTo'] ) )
 		{
 			$moveTo = $classname::load( $data['moveTo'] );
-			$link1 = Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $node->url(), TRUE, $node->_title, FALSE );
-			$link2 = Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $moveTo->url(), TRUE, $moveTo->_title, FALSE );
-			$text = Member::loggedIn()->language()->addToStack('backgroundQueue_move_content', FALSE, array( 'htmlsprintf' => array( $link1, $link2 ) ) );
+			$link1 = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $node->url(), TRUE, $node->_title, FALSE );
+			$link2 = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $moveTo->url(), TRUE, $moveTo->_title, FALSE );
+			$text = \IPS\Member::loggedIn()->language()->addToStack('backgroundQueue_move_content', FALSE, array( 'htmlsprintf' => array( $link1, $link2 ) ) );
 		}
 		else
 		{
-			$link = Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $node->url(), TRUE, $node->_title, FALSE );
-			$text = Member::loggedIn()->language()->addToStack('backgroundQueue_deleting', FALSE, array( 'htmlsprintf' => array( $link ) ) );
+			$link = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $node->url(), TRUE, $node->_title, FALSE );
+			$text = \IPS\Member::loggedIn()->language()->addToStack('backgroundQueue_deleting', FALSE, array( 'htmlsprintf' => array( $link ) ) );
 		}
 		
 		return array( 'text' => $text, 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $offset, 2 ) ) : 100 );

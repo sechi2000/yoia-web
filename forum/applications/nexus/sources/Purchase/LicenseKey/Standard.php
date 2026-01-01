@@ -12,59 +12,53 @@
 namespace IPS\nexus\Purchase\LicenseKey;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\nexus\Purchase\LicenseKey;
-use function chr;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * License Key Model - Standard
  */
-class Standard extends LicenseKey
+class _Standard extends \IPS\nexus\Purchase\LicenseKey
 {	
 	/**
 	 * @brief	Number of blocks
 	 */
-	protected static int $blocks = 5;
+	protected static $blocks = 5;
 	
 	/**
 	 * @brief	Number of characters in a block
 	 */
-	protected static int $characters = 4;
+	protected static $characters = 4;
 	
 	/**
 	 * @brief	Lowest allowed ASCII number
 	 */
-	protected static int $low = 48; // 0
+	protected static $low = 48; // 0
 	
 	/**
 	 * @brief	Highest allowed ASCII number
 	 */
-	protected static int $high = 90; // Z
+	protected static $high = 90; // Z
 	
 	/**
 	 * @brief	Disallowed ASCII numbers
 	 */
-	protected static array $disallowed = array( 58, 59, 60, 61, 62, 63, 64 ); // Various non A-Z / 0-9 characters
+	protected static $disallowed = array( 58, 59, 60, 61, 62, 63, 64 ); // Various non A-Z / 0-9 characters
 	
 	/**
 	 * @brief	Seperator between blocks
 	 */
-	protected static string $seperator	= '-';
+	protected static $seperator	= '-';
 
 	/**
 	 * Generates a License Key
 	 *
 	 * @return	string
 	 */
-	public function generateKey() : string
+	public function generate()
 	{
 		$key = array();
 		foreach ( range( 1, static::$blocks ) as $i )
@@ -76,8 +70,8 @@ class Standard extends LicenseKey
 				{
 					$chr = rand( static::$low, static::$high );
 				}
-				while ( in_array( $chr, static::$disallowed ) );
-				$_k .= chr( $chr );
+				while ( \in_array( $chr, static::$disallowed ) );
+				$_k .= \chr( $chr );
 			}
 			$key[] = $_k;
 		}

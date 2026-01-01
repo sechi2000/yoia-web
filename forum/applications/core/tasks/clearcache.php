@@ -11,23 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-use const IPS\STORE_METHOD;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * clearcache Task
  */
-class clearcache extends Task
+class _clearcache extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -38,17 +31,18 @@ class clearcache extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		/* Note: We previously disabled the task if the caching method was disabled however this lead to people re-enabling through a constants edit which would not re-enabled the task */
-		Db::i()->delete( 'core_cache', array( 'cache_expire<?', time() ) );
+		\IPS\Db::i()->delete( 'core_cache', array( 'cache_expire<?', time() ) );
+		\IPS\Output\Cache::i()->deleteExpired();
 
 		/* If we are using Redis, ensure that core_store is empty. We may have switched over to Redis from MySQL and if we switch back, we do not want stale data being used */
-		if ( STORE_METHOD !== 'Database' AND Db::i()->select( 'count(*)', 'core_store' )->first() )
+		if ( \IPS\STORE_METHOD !== 'Database' AND \IPS\Db::i()->select( 'count(*)', 'core_store' )->first() )
 		{
-			Db::i()->delete( 'core_store' );
+			\IPS\Db::i()->delete( 'core_store' );
 		}
 
 		return NULL;

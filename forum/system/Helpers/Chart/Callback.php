@@ -11,22 +11,9 @@
 namespace IPS\Helpers\Chart;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DateTimeZone;
-use Exception;
-use IPS\DateTime;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use function count;
-use function defined;
-use function in_array;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -35,36 +22,36 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * This is similar to \IPS\Helpers\Chart\Database but with results supplied manually in user-land code. 
  * Useful when you need to merge results from multiple sources.
  */
-class Callback extends Dynamic
+class _Callback extends \IPS\Helpers\Chart\Dynamic
 {
 	/**
 	 * @brief	Callback to retrieve results
 	 */
-	public mixed $callback = NULL;
+	public $callback;
 
 	/**
 	 * @brief	Custom form
 	 */
-	public bool|array $customFiltersForm = FALSE;
+	public $customFiltersForm = FALSE;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Url	$url			The URL the chart will be displayed on
-	 * @param	callable|null $callback		Callback to fetch results
-	 * @param string $title			Title
-	 * @param array $options		Options
-	 * @param string $defaultType	The default chart type
-	 * @param string $defaultTimescale	The default timescale to use
-	 * @param array $defaultTimes	The default start/end times to use
-	 * @param string $identifier		If there will be more than one chart per page, provide a unique identifier
-	 * @param DateTime|null $minimumDate	The earliest available date for this chart
+	 * @param	\IPS\Http\Url	$url			The URL the chart will be displayed on
+	 * @param	callable		$callback		Callback to fetch results
+	 * @param	string			$title			Title
+	 * @param	array			$options		Options
+	 * @param	string			$defaultType	The default chart type
+	 * @param	string			$defaultTimescale	The default timescale to use
+	 * @param	array			$defaultTimes	The default start/end times to use
+	 * @param	string			$identifier		If there will be more than one chart per page, provide a unique identifier
+	 * @param	\IPS\DateTime|NULL	$minimumDate	The earliest available date for this chart
+	 * @see		<a href='https://google-developers.appspot.com/chart/interactive/docs/gallery'>Charts Gallery - Google Charts - Google Developers</a>
 	 * @return	void
-	 *@see		<a href='https://google-developers.appspot.com/chart/interactive/docs/gallery'>Charts Gallery - Google Charts - Google Developers</a>
 	 */
-	public function __construct( Url $url, callable $callback=NULL, string $title='', array $options=array(), string $defaultType='AreaChart', string $defaultTimescale='monthly', array $defaultTimes=array( 'start' => 0, 'end' => 0 ), string $identifier='', DateTime $minimumDate=NULL )
+	public function __construct( \IPS\Http\Url $url, $callback=NULL, $title='', $options=array(), $defaultType='AreaChart', $defaultTimescale='monthly', $defaultTimes=array( 'start' => 0, 'end' => 0 ), $identifier='', $minimumDate=NULL )
 	{
-		$this->identifier	= substr( md5( (string) $url ), 0, 6 ) . $identifier . ( Request::i()->chartId ?: '_default' );
+		$this->identifier	= \substr( md5( (string) $url ), 0, 6 ) . $identifier . ( \IPS\Request::i()->chartId ?: '_default' );
 		$this->callback		= $callback;
 
 		parent::__construct( $url, $title, $options, $defaultType, $defaultTimescale, $defaultTimes, $identifier, $minimumDate );
@@ -73,23 +60,23 @@ class Callback extends Dynamic
 	/**
 	 * Add Series
 	 *
-	 * @param string $name		Name
-	 * @param string $type		Type of value
+	 * @param	string	$name		Name
+	 * @param	string	$type		Type of value
 	 *	@li	string
 	 *	@li	number
 	 *	@li	boolean
 	 *	@li	date
 	 *	@li	datetime
 	 *	@li	timeofday
-	 * @param bool $filterable	If TRUE, will show as a filter option to be toggled on/off
+	 * @param	bool	$filterable	If TRUE, will show as a filter option to be toggled on/off
 	 * @return	void
 	 */
-	public function addSeries( string $name, string $type, bool $filterable=TRUE ) : void
+	public function addSeries( $name, $type, $filterable=TRUE )
 	{
-		Member::loggedIn()->language()->parseOutputForDisplay( $name );
+		\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $name );
 		$filterKey = $name;
 		
-		if ( !$filterable or !isset( Request::i()->filters[ $this->identifier ] ) or in_array( $filterKey, Request::i()->filters[ $this->identifier ] ) )
+		if ( !$filterable or !isset( \IPS\Request::i()->filters[ $this->identifier ] ) or \in_array( $filterKey, \IPS\Request::i()->filters[ $this->identifier ] ) )
 		{
 			if ( $this->type !== 'PieChart' and $this->type !== 'GeoChart' )
 			{
@@ -102,7 +89,7 @@ class Callback extends Dynamic
 			{
 				$this->currentFilters[] = $filterKey;
 				
-				if ( isset( Request::i()->filters[ $this->identifier ] ) )
+				if ( isset( \IPS\Request::i()->filters[ $this->identifier ] ) )
 				{
 					$this->url = $this->url->setQueryString( 'filters', array( $this->identifier => $this->currentFilters ) );
 				}
@@ -114,13 +101,14 @@ class Callback extends Dynamic
 			$this->availableFilters[ $filterKey ] = $name;
 		}
 	}
-
+	
 	/**
 	 * Compile Data for Output
 	 *
-	 * @return    void
+	 * @param	array	$data	The data
+	 * @return	void
 	 */
-	public function compileForOutput() : void
+	public function compileForOutput()
 	{
 		/* Init data */
 		$data = $this->initData();
@@ -134,7 +122,7 @@ class Callback extends Dynamic
 		{					
 			foreach ( $rows as $k => $v )
 			{
-				if( count( $this->availableFilters ) and !in_array( $k, $this->currentFilters ) )
+				if( \count( $this->availableFilters ) and !\in_array( $k, $this->currentFilters ) )
 				{
 					continue;
 				}
@@ -154,36 +142,8 @@ class Callback extends Dynamic
 				{
 					$result[ $column ]	= $row[ $column ];
 				}
-
-
-				$time = $row['time'];
-
-				// UNIX timestamps are sometimes passed in. In this case, we try to make sure the timestamp format matches the defaults added via $this->initData()
-				if ( is_int( $time ) )
-				{
-					$date = DateTime::ts( $time );
-					switch ( $this->timescale )
-					{
-						case 'hourly':
-							$time = $date->format( 'Y-n-j-h-i-s' );
-							break;
-
-						case 'daily':
-							$time = $date->format( 'Y-n-j' );
-							break;
-
-						case 'weekly':
-							/* o is the ISO year number, which we need when years roll over.
-								@see http://php.net/manual/en/function.date.php#106974 */
-							$time = $date->format( 'o-W' );
-							break;
-
-						case 'monthly':
-							$time = $date->format( 'Y-n' );
-							break;
-					}
-				}
-				$data[ $time ] = $result;
+	
+				$data[ $row['time'] ] = $result;
 			}
 
 			ksort( $data, SORT_NATURAL );
@@ -193,18 +153,18 @@ class Callback extends Dynamic
 			$max = NULL;
 			foreach ( $data as $time => $d )
 			{
-				$datetime = new DateTime;
+				$datetime = new \IPS\DateTime;
 
-				if ( Member::loggedIn()->timezone )
+				if ( \IPS\Member::loggedIn()->timezone )
 				{
 					try
 					{
-						$datetime->setTimezone( new DateTimeZone( Member::loggedIn()->timezone ) );
+						$datetime->setTimezone( new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) );
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
-						Member::loggedIn()->timezone	= null;
-						Member::loggedIn()->save();
+						\IPS\Member::loggedIn()->timezone	= null;
+						\IPS\Member::loggedIn()->save();
 					}
 				}
 
@@ -221,7 +181,7 @@ class Callback extends Dynamic
 					switch ( $this->timescale )
 					{
 						case 'none':
-							$datetime = DateTime::ts( $time );
+							$datetime = \IPS\DateTime::ts( $time );
 							break;
 
 						case 'daily':
@@ -249,14 +209,14 @@ class Callback extends Dynamic
 					}
 					else
 					{
-						$this->addRow( array_merge( array( $datetime ), array_fill( 0, count( $this->series ), 0 ) ) );
+						$this->addRow( array_merge( array( $datetime ), array_fill( 0, \count( $this->series ), 0 ) ) );
 					}
 				}
 				else
 				{
-					if( count($d) < count($this->series) )
+					if( \count($d) < \count($this->series) )
 					{
-						$this->addRow( array_merge( array( $datetime ), $d, array_fill( 0, count($this->series) - count($d), 0 ) ) );
+						$this->addRow( array_merge( array( $datetime ), $d, array_fill( 0, \count($this->series) - \count($d), 0 ) ) );
 					}
 					else
 					{
@@ -265,7 +225,7 @@ class Callback extends Dynamic
 				}
 			}
 			
-			if ( count( $data ) === 1 )
+			if ( \count( $data ) === 1 )
 			{
 				$this->options['domainAxis']['type'] = 'category';
 			}
@@ -277,13 +237,12 @@ class Callback extends Dynamic
 	 *
 	 * @return	string
 	 */
-	public function getOutput(): string
+	public function getOutput()
 	{
 		$this->compileForOutput();
-		if ( isset( Request::i()->download ) )
+		if ( isset( \IPS\Request::i()->download ) )
 		{
-			$this->download();
-			return '';
+			return $this->download();
 		}
 		else
 		{

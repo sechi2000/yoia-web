@@ -12,35 +12,9 @@
 namespace IPS\convert\Library;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\convert\App;
-use IPS\convert\Library;
-use IPS\convert\Software;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Http\url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\nexus\Gateway;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Transaction;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_null;
-use function strtoupper;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -48,12 +22,12 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * Invision Commerce (Nexus) Converter
  * @note	We must extend the Core Library here so we can access methods like convertAttachment, convertFollow, etc
  */
-class Nexus extends Library
+class _Nexus extends \IPS\convert\Library
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $app = 'nexus';
+	public $app = 'nexus';
 
 	/**
 	 * Returns an array of items that we can convert, including the amount of rows stored in the Community Suite as well as the recommend value of rows to convert per cycle
@@ -61,7 +35,7 @@ class Nexus extends Library
 	 * @param	bool	$rowCounts		enable row counts
 	 * @return	array
 	 */
-	public function menuRows( bool $rowCounts=FALSE ) : array
+	public function menuRows( $rowCounts=FALSE )
 	{
 		$return		= array();
 		$extraRows 	= $this->software->extraMenuRows();
@@ -74,7 +48,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_customer_fields',
 						'step_method'	=> 'convertNexusCustomerFields',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_customer_fields' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customer_fields' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array(),
@@ -84,7 +58,7 @@ class Nexus extends Library
 				
 				case 'convertNexusCustomers':
 					$dependencies = array();
-					if ( in_array( 'convertNexusCustomerFields', $this->getConvertableItems() ) )
+					if ( \in_array( 'convertNexusCustomerFields', $this->getConvertableItems() ) )
 					{
 						$dependencies[] = 'convertNexusCustomerFields';
 					}
@@ -92,7 +66,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_customers',
 						'step_method'	=> 'convertNexusCustomers',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_customers' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customers' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> $dependencies,
@@ -104,7 +78,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_customer_addresses',
 						'step_method'	=> 'convertNexusCustomerAddresses',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_customer_addresses' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customer_addresses' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertNexusCustomers' ),
@@ -116,7 +90,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_customer_history',
 						'step_method'	=> 'convertNexusCustomerHistory',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'core_member_history', array( 'log_app=?', 'nexus' ) ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'core_member_history', array( 'log_app=?', 'nexus' ) ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertNexusCustomers' ),
@@ -128,7 +102,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_alternate_contacts',
 						'step_method'	=> 'convertNexusAlternateContacts',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_alternate_contacts' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_alternate_contacts' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertNexusCustomers' ),
@@ -140,7 +114,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_notes',
 						'step_method'	=> 'convertNexusNotes',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_notes' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_notes' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertNexusCustomers' ),
@@ -152,7 +126,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_payment_methods',
 						'step_method'	=> 'convertNexusPaymentMethods',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_paymethods' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_paymethods' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array(),
@@ -164,7 +138,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_package_groups',
 						'step_method'	=> 'convertNexusPackageGroups',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_package_groups' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_package_groups' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array(),
@@ -176,7 +150,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_package_fields',
 						'step_method'	=> 'convertNexusPackageFields',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_package_fields' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_package_fields' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array(),
@@ -198,7 +172,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_nexus_packages',
 						'step_method'		=> 'convertNexusPackages',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'nexus_packages' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_packages' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 100,
 						'dependencies'		=> $dependencies,
@@ -211,7 +185,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_nexus_reviews',
 						'step_method'		=> 'convertNexusReviews',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'nexus_reviews' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_reviews' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertNexusPackages' ),
@@ -224,7 +198,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_coupons',
 						'step_method'	=> 'convertNexusCoupons',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_coupons' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_coupons' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertNexusPackages' ),
@@ -236,7 +210,7 @@ class Nexus extends Library
 					$return[ $k ] = [
 						'step_title'	=> 'convert_nexus_subscription_packages',
 						'step_method'	=> 'convertNexusSubscriptionPackages',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_member_subscription_packages' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_member_subscription_packages' ),
 						'source_rows'	=> [ 'table' => $v['table'], 'where' => $v['where'] ],
 						'per_cycle'		=> 200,
 						'dependencies'	=> [],
@@ -258,7 +232,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_invoices',
 						'step_method'	=> 'convertNexusInvoices',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_invoices' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_invoices' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> $dependencies,
@@ -281,7 +255,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_transactions',
 						'step_method'	=> 'convertNexusTransactions',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_transactions' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_transactions' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> $dependencies,
@@ -303,7 +277,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_purchases',
 						'step_method'	=> 'convertNexusPurchases',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_purchases' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> $dependencies,
@@ -315,7 +289,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_fraud_rules',
 						'step_method'	=> 'convertNexusFraudRules',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_fraud_rules' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_fraud_rules' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array(),
@@ -327,7 +301,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_support_departments',
 						'step_method'	=> 'convertNexusSupportDepartments',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_support_departments' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_support_departments' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertNexusPackages' ),
@@ -338,7 +312,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_support_fields',
 						'step_method'	=> 'convertNexusSupportFields',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_support_fields' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_support_fields' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertNexusSupportDepartments' ),
@@ -350,7 +324,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_support_statuses',
 						'step_method'	=> 'convertNexusSupportStatuses',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_support_statuses' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_support_statuses' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array(),
@@ -362,7 +336,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_support_severities',
 						'step_method'	=> 'convertNexusSupportSeverities',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_support_severities' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_support_severities' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertNexusSupportDepartments' ),
@@ -374,7 +348,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_nexus_support_stock_actions',
 						'step_method'	=> 'convertNexusSupportStockActions',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'nexus_support_stock_actions' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_support_stock_actions' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertNexusSupportDepartments' ),
@@ -386,7 +360,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_nexus_support_requests',
 						'step_method'		=> 'convertNexusSupportRequests',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'nexus_support_requests' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_support_requests' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertNexusCustomers', 'convertNexusSupportDepartments', 'convertNexusSupportFields' ),
@@ -399,7 +373,7 @@ class Nexus extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_nexus_support_replies',
 						'step_method'		=> 'convertNexusSupportReplies',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'nexus_support_replies' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_support_replies' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertNexusSupportRequests' ),
@@ -434,12 +408,11 @@ class Nexus extends Library
 	 * @param	string	$method	Method to truncate
 	 * @return	array
 	 */
-	protected function truncate( string $method ) : array
+	protected function truncate( $method )
 	{
 		$return		= array();
-		$classname	= get_class( $this->software );
+		$classname	= \get_class( $this->software );
 
-		/* @var Software $classname */
 		if( $classname::canConvert() === NULL )
 		{
 			return array();
@@ -454,7 +427,7 @@ class Nexus extends Library
 					break;
 				
 				case 'convertNexusCustomers':
-					$return['convertNexusCustomers'] = array( 'nexus_customers' => array( "member_id<>?", Member::loggedIn()->member_id ) );
+					$return['convertNexusCustomers'] = array( 'nexus_customers' => array( "member_id<>?", \IPS\Member::loggedIn()->member_id ) );
 					break;
 				
 				case 'convertNexusCustomerAddresses':
@@ -578,11 +551,11 @@ class Nexus extends Library
 	 * @param	array		$fields	Custom Field Data
 	 * @return	int|bool	The ID of the inserted customer, or FALSE on failure
 	 */
-	public function convertNexusCustomer( array $info, array $fields=array() ) : bool|int
+	public function convertNexusCustomer( $info, $fields=array() )
 	{
 		if ( !isset( $info['member_id'] ) )
 		{
-			$this->software->app->log( 'nexus_customer_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_customer_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		else
@@ -593,9 +566,9 @@ class Nexus extends Library
 			{
 				$info['member_id'] = $this->software->app->getLink( $info['member_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'nexus_customer_missing_member', __METHOD__, App::LOG_WARNING, $info['member_id'] );
+				$this->software->app->log( 'nexus_customer_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['member_id'] );
 				return FALSE;
 			}
 		}
@@ -617,7 +590,7 @@ class Nexus extends Library
 		
 		if ( isset( $info['cm_profiles'] ) )
 		{
-			if ( is_array( $info['cm_profiles'] ) )
+			if ( \is_array( $info['cm_profiles'] ) )
 			{
 				$info['cm_profiles'] = json_encode( $info['cm_profiles'] );
 			}
@@ -629,7 +602,7 @@ class Nexus extends Library
 		
 		$info = array_merge( $info, $this->_formatCustomerFields( $fields ) );
 
-		Db::i()->replace( 'nexus_customers', $info );
+		\IPS\Db::i()->replace( 'nexus_customers', $info );
 		$this->software->app->addLink( $info['member_id'], $sourceId, 'nexus_customers' );
 		
 		return $info['member_id'];
@@ -641,12 +614,12 @@ class Nexus extends Library
 	 * @param	array		$fields	The fields
 	 * @return	array		Formatted Fields
 	 */
-	protected function _formatCustomerFields( array $fields ) : array
+	protected function _formatCustomerFields( $fields )
 	{
 		$return = array();
 		foreach( $fields as $key => $value )
 		{
-			if ( is_array( $value ) )
+			if ( \is_array( $value ) )
 			{
 				$value = json_encode( $value );
 			}
@@ -657,7 +630,7 @@ class Nexus extends Library
 				
 				$return['field_' . $id] = $value;
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				continue;
 			}
@@ -669,7 +642,7 @@ class Nexus extends Library
 	/**
 	 * @brief	Allowed currencies
 	 */
-	protected array $_allowedCurrencies = array( 'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD',
+	protected $_allowedCurrencies = array( 'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD',
 		'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BRL', 'BSD', 'BTN', 'BWP', 'BYN', 'BYR', 'BZD', 'CAD', 'CDF', 'CHF',
 		'CLF', 'CLP', 'CNY', 'COP', 'CRC', 'CUC', 'CUP', 'CVE', 'CZK', 'DJF', 'DKK', 'DOP', 'DZD', 'EGP', 'ERN', 'ETB', 'EUR',
 		'FJD', 'FKP', 'GBP', 'GEL', 'GGP', 'GHS', 'GIP', 'GMD', 'GNF', 'GTQ', 'GYD', 'HKD', 'HNL', 'HRK', 'HTG', 'HUF', 'IDR',
@@ -684,27 +657,27 @@ class Nexus extends Library
 	/**
 	 * Convert a currency
 	 *
-	 * @param	array $info		Info
+	 * @param	array		Info
 	 * @return	int|bool	The newly inserted currency, or FALSE on failure
 	 */
-	public function convertNexusCurrency( array $info ) : bool|int
+	public function convertNexusCurrency( $info )
 	{
 		if ( !isset( $info['code'] ) )
 		{
-			$this->software->app->log( 'nexus_currency_missing_code', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_currency_missing_code', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		/* Normalise the currency code */
-		$info['code'] = strtoupper( $info['code'] );
+		$info['code'] = \strtoupper( $info['code'] );
 
-		if ( !in_array( $info['code'], $this->_allowedCurrencies ) )
+		if ( !\in_array( $info['code'], $this->_allowedCurrencies ) )
 		{
-			$this->software->app->log( 'nexus_currency_not_allowed', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_currency_not_allowed', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
-		$currencies = json_decode( Settings::i()->nexus_currency, TRUE );
+		$currencies = json_decode( \IPS\Settings::i()->nexus_currency, TRUE );
 
 		/* Currencies are a little odd in that they don't really have a link */
 		if( isset( $currencies[ $info['code'] ] ) )
@@ -716,7 +689,7 @@ class Nexus extends Library
 		$currencies[ $info['code'] ] = array();
 
 		/* save */
-		Settings::i()->changeValues( array( 'nexus_currency' => json_encode( $currencies ) ) );
+		\IPS\Settings::i()->changeValues( array( 'nexus_currency' => json_encode( $currencies ) ) );
 
 		return $info['code'];
 	}
@@ -727,7 +700,7 @@ class Nexus extends Library
 	 * @param	array		$info	Info
 	 * @return	int|bool	The newly inserted note ID, or FALSE on failure
 	 */
-	public function convertNexusNote( array $info ) : bool|int
+	public function convertNexusNote( $info )
 	{
 		$hasId = TRUE;
 		if ( !isset( $info['note_id'] ) )
@@ -741,21 +714,21 @@ class Nexus extends Library
 			{
 				$info['note_member'] = $this->software->app->getLink( $info['note_member'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( "nexus_note_missing_member", __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['note_id'] : NULL );
+				$this->software->app->log( "nexus_note_missing_member", __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['note_id'] : NULL );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'nexus_note_missing_member', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['note_id'] : NULL );
+			$this->software->app->log( 'nexus_note_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['note_id'] : NULL );
 			return FALSE;
 		}
 		
 		if ( empty( $info['note_text'] ) )
 		{
-			$this->software->app->log( 'nexus_note_missing_content', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['note_id'] : NULL );
+			$this->software->app->log( 'nexus_note_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['note_id'] : NULL );
 			return FALSE;
 		}
 		
@@ -765,7 +738,7 @@ class Nexus extends Library
 			{
 				$info['note_author'] = $this->software->app->getLink( $info['note_author'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['note_author'] = 0;
 			}
@@ -777,7 +750,7 @@ class Nexus extends Library
 		
 		if ( isset( $info['note_date'] ) )
 		{
-			if ( $info['note_date'] instanceof DateTime )
+			if ( $info['note_date'] instanceof \IPS\DateTime )
 			{
 				$info['note_date'] = $info['note_date']->getTimestamp();
 			}
@@ -793,7 +766,7 @@ class Nexus extends Library
 			unset( $info['note_id'] );
 		}
 		
-		$inserted_id = Db::i()->insert( 'nexus_notes', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'nexus_notes', $info );
 		
 		if ( $hasId )
 		{
@@ -811,11 +784,11 @@ class Nexus extends Library
 	 * @param	string|NULL	$filedata	Raw filedata for the groups cover photo, or NULL
 	 * @return	int|bool	THe ID of the newly inserted package group, or FALSE on failure
 	 */
-	public function convertNexusPackageGroup( array $info, ?string $filepath=NULL, ?string $filedata=NULL ) : bool|int
+	public function convertNexusPackageGroup( $info, $filepath=NULL, $filedata=NULL )
 	{
 		if ( !isset( $info['pg_id'] ) )
 		{
-			$this->software->app->log( 'nexus_package_group_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_package_group_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -831,12 +804,12 @@ class Nexus extends Library
 		
 		if ( !isset( $info['pg_seo_name'] ) )
 		{
-			$info['pg_seo_name'] = Url::seoTitle( $name );
+			$info['pg_seo_name'] = \IPS\Http\Url::seoTitle( $name );
 		}
 		
 		if ( !isset( $info['pg_position'] ) )
 		{
-			$position = Db::i()->select( 'MAX(pg_position)', 'nexus_package_groups' )->first();
+			$position = \IPS\Db::i()->select( 'MAX(pg_position)', 'nexus_package_groups' )->first();
 			
 			$info['pg_position'] = $position + 1;
 		}
@@ -850,9 +823,9 @@ class Nexus extends Library
 			$info['pg_parent'] = 0;
 		}
 		
-		if ( isset( $info['pg_image'] ) AND ( !is_null( $filepath ) OR !is_null( $filedata ) ) )
+		if ( isset( $info['pg_image'] ) AND ( !\is_null( $filepath ) OR !\is_null( $filedata ) ) )
 		{
-			if ( is_null( $filedata ) AND !is_null( $filepath ) )
+			if ( \is_null( $filedata ) AND !\is_null( $filepath ) )
 			{
 				$filedata = @file_get_contents( rtrim( $filepath, '/' ) . '/' . $info['pg_image'] );
 				unset( $filepath );
@@ -862,10 +835,10 @@ class Nexus extends Library
 			{
 				try
 				{
-					$file = File::create( 'nexus_PackageGroups', $info['pg_image'], $filedata );
+					$file = \IPS\File::create( 'nexus_PackageGroups', $info['pg_image'], $filedata );
 					$info['pg_image'] = (string) $file;
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					$info['pg_image'] = '';
 				}
@@ -883,13 +856,13 @@ class Nexus extends Library
 		$id = $info['pg_id'];
 		unset( $info['pg_id'] );
 		
-		$insertedId = Db::i()->insert( 'nexus_package_groups', $info );
+		$insertedId = \IPS\Db::i()->insert( 'nexus_package_groups', $info );
 		$this->software->app->addLink( $insertedId, $id, 'nexus_package_groups' );
 
 		/* Custom Lang */
-		Lang::saveCustom( 'nexus', "nexus_pgroup_{$insertedId}", $name );
+		\IPS\Lang::saveCustom( 'nexus', "nexus_pgroup_{$insertedId}", $name );
 		
-		Db::i()->update( 'nexus_package_groups', array( 'pg_parent' => $insertedId ), array( "pg_conv_parent=?", $id ) );
+		\IPS\Db::i()->update( 'nexus_package_groups', array( 'pg_parent' => $insertedId ), array( "pg_conv_parent=?", $id ) );
 		
 		return $insertedId;
 	}
@@ -900,19 +873,19 @@ class Nexus extends Library
 	 * @param	array		$info		Info
 	 * @return	int|bool	The ID of the newly inserted payment gateway, or FALSE on failure
 	 */
-	public function convertNexusPaymentMethod( array $info ) : bool|int
+	public function convertNexusPaymentMethod( $info )
 	{
 		/* !Required: ID */
 		if ( !isset( $info['m_id'] ) )
 		{
-			$this->software->app->log( 'nexus_payment_method_missing_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_payment_method_missing_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		/* !Required: Method */
 		if ( !isset( $info['m_gateway'] ) )
 		{
-			$this->software->app->log( 'nexus_payment_method_missing_gateway', __METHOD__, App::LOG_WARNING, $info['m_id'] );
+			$this->software->app->log( 'nexus_payment_method_missing_gateway', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['m_id'] );
 			return FALSE;
 		}
 
@@ -920,7 +893,7 @@ class Nexus extends Library
 
 		if( $info['m_gateway'] === FALSE )
 		{
-			$this->software->app->log( 'nexus_payment_method_not_supported', __METHOD__, App::LOG_WARNING, $info['m_id'] );
+			$this->software->app->log( 'nexus_payment_method_not_supported', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['m_id'] );
 			return FALSE;
 		}
 
@@ -946,10 +919,10 @@ class Nexus extends Library
 		unset( $info['m_id'], $info['m_name'] );
 
 		/* Save Product Data */
-		$insertedId = Db::i()->insert( 'nexus_paymethods', $this->_getValues( $gateway, $info ) );
+		$insertedId = \IPS\Db::i()->insert( 'nexus_paymethods', $this->_getValues( $gateway, $info ) );
 
 		/* Custom lang strings */
-		Lang::saveCustom( 'nexus', "nexus_paymethod_{$insertedId}", $name );
+		\IPS\Lang::saveCustom( 'nexus', "nexus_paymethod_{$insertedId}", $name );
 
 		/* Add Link */
 		$this->software->app->addLink( $insertedId, $originalId, 'nexus_payment_methods' );
@@ -964,12 +937,12 @@ class Nexus extends Library
 	 * @param	string|NULL		$filePath	Path to images
 	 * @return	int|bool	The ID of the newly inserted package, or FALSE on failure
 	 */
-	public function convertNexusPackage( array $info, ?string $filePath=NULL ) : bool|int
+	public function convertNexusPackage( $info, $filePath=NULL )
 	{
 		/* !Required: ID */
 		if ( !isset( $info['p_id'] ) )
 		{
-			$this->software->app->log( 'nexus_package_missing_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_package_missing_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -996,14 +969,14 @@ class Nexus extends Library
 		/* !Required: Price */
 		if( !isset( $info['p_base_price'] ) )
 		{
-			$this->software->app->log( 'nexus_package_missing_price', __METHOD__, App::LOG_WARNING, $info['p_id'] );
+			$this->software->app->log( 'nexus_package_missing_price', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['p_id'] );
 			return FALSE;
 		}
 
 		/* !Required: Package Group */
 		if( !isset( $info['p_group'] ) )
 		{
-			$this->software->app->log( 'nexus_package_missing_group', __METHOD__, App::LOG_WARNING, $info['p_id'] );
+			$this->software->app->log( 'nexus_package_missing_group', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['p_id'] );
 			return FALSE;
 		}
 		$info['p_group'] = $this->software->app->getLink( $info['p_group'], 'nexus_package_groups' );
@@ -1025,8 +998,10 @@ class Nexus extends Library
 				{
 					$newGroups[] = $this->software->app->getLink( $group, 'core_groups', TRUE );
 				}
-				catch( OutOfRangeException $ex ) { }
+				catch( \OutOfRangeException $ex ) { }
 			}, $newGroups );
+
+			$info['p_member_group'] = $info['p_member_group'];
 		}
 
 		/* Primary User Group */
@@ -1047,7 +1022,7 @@ class Nexus extends Library
 				{
 					$newSecondaryGroups[] = $this->software->app->getLink( $group, 'core_groups', TRUE );
 				}
-				catch( OutOfRangeException $ex ) { }
+				catch( \OutOfRangeException $ex ) { }
 			}, $newSecondaryGroups );
 		}
 
@@ -1058,7 +1033,7 @@ class Nexus extends Library
 			{
 				$info['p_associable'] = $this->software->app->getLink( $info['p_associable'], 'nexus_packages' );
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
 				$info['conv_p_associable'] = $info['p_associable'];
 				unset( $info['p_associable'] );
@@ -1069,16 +1044,16 @@ class Nexus extends Library
 		{
 			try
 			{
-				$position = Db::i()->select( 'MAX(p_position)', 'nexus_packages' )->first();
+				$position = \IPS\Db::i()->select( 'MAX(p_position)', 'nexus_packages' )->first();
 				$info['p_position'] = $position + 1;
 			}
-			catch( UnderflowException $e ) { }
+			catch( \UnderflowException $e ) { }
 		}
 
 		/* Base Price */
 		array_walk( $info['p_base_price'], function( &$value, $currency )
 		{
-			$price = new Money( $value, $currency );
+			$price = new \IPS\nexus\Money( $value, $currency );
 			$value = [ 'amount' => $price->amount, 'currency' => $currency ];
 		});
 		$basePrice = $info['p_base_price'];
@@ -1086,20 +1061,20 @@ class Nexus extends Library
 
 		/* Renewal costs & terms */
 		$renewals = array();
-		if( isset( $info['p_renew_options'] ) AND count( $info['p_renew_options'] ) )
+		if( isset( $info['p_renew_options'] ) AND \count( $info['p_renew_options'] ) )
 		{
-			foreach ( $info['p_renew_options'] as $k => $options )
+			foreach ( $info['p_renew_options'] as $currency => $options )
 			{
 				$newOptions = array(
 					'cost' => [],
 					'term' => $options['term'],
 					'unit' => $options['unit'],
-					'add' => $options['add'] ?? false
+					'add' => isset( $options['add'] ) ? $options['add'] : false
 				);
 
 				foreach ( $options['cost'] as $currency => $cost )
 				{
-					$price = new Money( $cost, $currency );
+					$price = new \IPS\nexus\Money( $cost, $currency );
 					$newOptions['cost'][ $currency ] = [ 'amount' => $price->amount, 'currency' => $currency ];
 				}
 
@@ -1112,12 +1087,12 @@ class Nexus extends Library
 		/* Discounts */
 		//@TODO
 
-		$productImages = $info['p_images'] ?? NULL;
+		$productImages = isset( $info['p_images'] ) ? $info['p_images'] : NULL;
 		unset( $info['p_images'] );
 
 		$package = array(
 			'p_name' => $name,
-			'p_seo_name' => url::seoTitle( $name ),
+			'p_seo_name' => \IPS\Http\Url::seoTitle( $name ),
 			'p_group' => 0,
 			'p_stock' => -1,
 			'p_reg' => 0,
@@ -1166,7 +1141,7 @@ class Nexus extends Library
 		);
 
 		/* Save Package Data */
-		$insertedId = Db::i()->insert( 'nexus_packages', $this->_getValues( $package, $info ) );
+		$insertedId = \IPS\Db::i()->insert( 'nexus_packages', $this->_getValues( $package, $info ) );
 		$originalId = $info['p_id'];
 		unset( $info['p_id'] );
 
@@ -1178,7 +1153,7 @@ class Nexus extends Library
 			$default = 0;
 			foreach( $productImages as $image )
 			{
-				if ( ( isset( $image['data'] ) AND empty( $image['data'] ) ) AND !is_null( $filePath ) )
+				if ( ( isset( $image['data'] ) AND \is_null( $image['data'] ) ) AND !\is_null( $filePath ) )
 				{
 					$filedata = @file_get_contents( rtrim( $filePath, '/' ) . '/' . $image['filename'] );
 					unset( $filepath );
@@ -1188,18 +1163,18 @@ class Nexus extends Library
 				{
 					try
 					{
-						$file = File::create( 'nexus_Products', $image['filename'], $filedata );
+						$file = \IPS\File::create( 'nexus_Products', $image['filename'], $filedata );
 						$images[] = [ 'image_product' => $insertedId, 'image_location' => (string) $file, 'image_primary' => ( $default ? 0 : 1 ) ];
 						$default++;
 					}
-					catch( Exception $e ) {}
+					catch( \Exception $e ) {}
 				}
 			}
 
 			/* Insert Images */
-			if( is_array( $images ) AND count( $images ) )
+			if( \is_array( $images ) AND \count( $images ) )
 			{
-				Db::i()->insert( 'nexus_package_images', $images );
+				\IPS\Db::i()->insert( 'nexus_package_images', $images );
 			}
 		}
 
@@ -1222,7 +1197,7 @@ class Nexus extends Library
 					);
 
 			/* Save Product Data */
-			Db::i()->insert( 'nexus_packages_products', $this->_getValues( $product, $info ) );
+			\IPS\Db::i()->insert( 'nexus_packages_products', $this->_getValues( $product, $info ) );
 
 			/* Add Link */
 			$this->software->app->addLink( $insertedId, $originalId, 'nexus_packages_products' );
@@ -1236,26 +1211,26 @@ class Nexus extends Library
 			$this->convertNexusCurrency( [ 'code' => $currency ] );
 
 			/* Check the table */
-			if ( !Db::i()->checkForColumn( 'nexus_package_base_prices', $currency ) )
+			if ( !\IPS\Db::i()->checkForColumn( 'nexus_package_base_prices', $currency ) )
 			{
-				Db::i()->addColumn( 'nexus_package_base_prices', array(
+				\IPS\Db::i()->addColumn( 'nexus_package_base_prices', array(
 					'name' => $currency,
 					'type' => 'FLOAT'
 				) );
 			}
 			$insert[ $currency ] = (string) $amount['amount'];
 		}
-		Db::i()->insert( 'nexus_package_base_prices', $insert );
+		\IPS\Db::i()->insert( 'nexus_package_base_prices', $insert );
 
 		/* Custom lang strings */
-		Lang::saveCustom( 'nexus', "nexus_package_{$insertedId}", $name );
-		Lang::saveCustom( 'nexus', "nexus_package_{$insertedId}_desc", $description );
+		\IPS\Lang::saveCustom( 'nexus', "nexus_package_{$insertedId}", $name );
+		\IPS\Lang::saveCustom( 'nexus', "nexus_package_{$insertedId}_desc", $description );
 
 		/* Add Link */
 		$this->software->app->addLink( $insertedId, $originalId, 'nexus_packages' );
 
 		/* Update associations */
-		Db::i()->update( 'nexus_packages', array( 'p_associable' => $insertedId ), array( 'p_conv_associable=?', $originalId ) );
+		\IPS\Db::i()->update( 'nexus_packages', array( 'p_associable' => $insertedId ), array( 'p_conv_associable=?', $originalId ) );
 
 		return $insertedId;
 	}
@@ -1267,12 +1242,12 @@ class Nexus extends Library
 	 * @param	string|NULL		$filePath	Path to images
 	 * @return	int|bool	The ID of the newly inserted package, or FALSE on failure
 	 */
-	public function convertNexusSubscriptionPackage( array $info, ?string $filePath=NULL ) : bool|int
+	public function convertNexusSubscriptionPackage( $info, $filePath=NULL )
 	{
 		/* !Required: ID */
 		if ( !isset( $info['sp_id'] ) )
 		{
-			$this->software->app->log( 'nexus_package_missing_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_package_missing_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -1299,7 +1274,7 @@ class Nexus extends Library
 		/* !Required: Price */
 		if( !isset( $info['sp_price'] ) )
 		{
-			$this->software->app->log( 'nexus_subscription_missing_price', __METHOD__, App::LOG_WARNING, $info['sp_id'] );
+			$this->software->app->log( 'nexus_subscription_missing_price', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['sp_id'] );
 			return FALSE;
 		}
 
@@ -1321,7 +1296,7 @@ class Nexus extends Library
 				{
 					$newSecondaryGroups[] = $this->software->app->getLink( $group, 'core_groups', TRUE );
 				}
-				catch( OutOfRangeException $ex ) { }
+				catch( \OutOfRangeException $ex ) { }
 			}, $newSecondaryGroups );
 		}
 
@@ -1329,25 +1304,25 @@ class Nexus extends Library
 		{
 			try
 			{
-				$position = Db::i()->select( 'MAX(p_position)', 'nexus_subscription_packages' )->first();
+				$position = \IPS\Db::i()->select( 'MAX(p_position)', 'nexus_subscription_packages' )->first();
 				$info['sp_position'] = $position + 1;
 			}
-			catch( UnderflowException $e ) { }
+			catch( \UnderflowException $e ) { }
 		}
 
 		/* Base Price */
-		if( is_array( $info['sp_price'] ) AND count( $info['sp_price'] ) )
+		if( isset( $info['sp_price'] ) AND \count( $info['sp_price'] ) )
 		{
 			$newOptions = array(
 				'cost' => [],
 				'term' => $info['sp_price']['term'],
 				'unit' => $info['sp_price']['unit'],
-				'add' => $info['sp_price']['add'] ?? false
+				'add' => isset( $info['sp_price']['add'] ) ? $info['sp_price']['add'] : false
 			);
 
 			foreach ( $info['sp_price']['cost'] as $currency => $cost )
 			{
-				$price = new Money( $cost, $currency );
+				$price = new \IPS\nexus\Money( $cost, $currency );
 				$newOptions['cost'][ $currency ] = [ 'amount' => $price->amount, 'currency' => $currency ];
 			}
 		}
@@ -1356,25 +1331,25 @@ class Nexus extends Library
 		unset( $info['sp_price'] );
 
 		/* Renewal costs & terms */
-		if( isset( $info['sp_renew_options'] ) AND count( $info['sp_renew_options'] ) )
+		if( isset( $info['sp_renew_options'] ) AND \count( $info['sp_renew_options'] ) )
 		{
 			$newOptions = array(
 				'cost' => [],
 				'term' => $info['sp_renew_options']['term'],
 				'unit' => $info['sp_renew_options']['unit'],
-				'add' => $info['sp_renew_options']['add'] ?? false
+				'add' => isset( $info['sp_renew_options']['add'] ) ? $info['sp_renew_options']['add'] : false
 			);
 
 			foreach ( $info['sp_renew_options']['cost'] as $currency => $cost )
 			{
-				$price = new Money( $cost, $currency );
+				$price = new \IPS\nexus\Money( $cost, $currency );
 				$newOptions['cost'][ $currency ] = [ 'amount' => $price->amount, 'currency' => $currency ];
 			}
 
 			$info['sp_renew_options'] = json_encode( $newOptions );
 		}
 
-		$image = $info['sp_image'] ?? NULL;
+		$image = isset( $info['sp_image'] ) ? $info['sp_image'] : NULL;
 		unset( $info['sp_image'] );
 
 		$package = array(
@@ -1396,7 +1371,7 @@ class Nexus extends Library
 		/* Images */
 		if( $image )
 		{
-			if ( ( isset( $image['data'] ) AND empty( $image['data'] ) ) AND !is_null( $filePath ) )
+			if ( ( isset( $image['data'] ) AND \is_null( $image['data'] ) ) AND !\is_null( $filePath ) )
 			{
 				$filedata = @file_get_contents( rtrim( $filePath, '/' ) . '/' . $image['filename'] );
 				unset( $filepath );
@@ -1406,20 +1381,20 @@ class Nexus extends Library
 			{
 				try
 				{
-					$info['sp_image'] = (string) File::create( 'nexus_Products', $image['filename'], $filedata );
+					$info['sp_image'] = (string) \IPS\File::create( 'nexus_Products', $image['filename'], $filedata );
 				}
-				catch( Exception $e ) {}
+				catch( \Exception $e ) {}
 			}
 		}
 
 		/* Save Package Data */
-		$insertedId = Db::i()->insert( 'nexus_member_subscription_packages', $this->_getValues( $package, $info ) );
+		$insertedId = \IPS\Db::i()->insert( 'nexus_member_subscription_packages', $this->_getValues( $package, $info ) );
 		$originalId = $info['sp_id'];
 		unset( $info['sp_id'] );
 
 		/* Custom lang strings */
-		Lang::saveCustom( 'nexus', "nexus_subs_{$insertedId}", $name );
-		Lang::saveCustom( 'nexus', "nexus_subs_{$insertedId}_desc", $description );
+		\IPS\Lang::saveCustom( 'nexus', "nexus_subs_{$insertedId}", $name );
+		\IPS\Lang::saveCustom( 'nexus', "nexus_subs_{$insertedId}_desc", $description );
 
 		/* Add Link */
 		$this->software->app->addLink( $insertedId, $originalId, 'nexus_members_subs_pkg' );
@@ -1434,31 +1409,31 @@ class Nexus extends Library
 	 * @param	string		$currency	Invoice Currency
 	 * @return	int|bool	The ID of the newly inserted invoice, or FALSE on failure
 	 */
-	public function convertNexusInvoice( array $info, string $currency ) : bool|int
+	public function convertNexusInvoice( $info, $currency )
 	{
 		/* !Required: ID */
 		if ( !isset( $info['i_id'] ) )
 		{
-			$this->software->app->log( 'nexus_invoices_missing_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_invoices_missing_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		/* !Required: Currency */
 		if ( !isset( $currency ) OR !$currency = $this->convertNexusCurrency( [ 'code' => $currency ] ) )
 		{
-			$this->software->app->log( 'nexus_invoice_currency_invalid', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_invoice_currency_invalid', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		/* !Required: Items */
-		if ( !isset( $info['i_items'] ) OR !is_array( $info['i_items'] ) )
+		if ( !isset( $info['i_items'] ) OR !\is_array( $info['i_items'] ) )
 		{
-			$this->software->app->log( 'nexus_invoices_missing_items', __METHOD__, App::LOG_WARNING, $info['i_id'] );
+			$this->software->app->log( 'nexus_invoices_missing_items', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['i_id'] );
 			return FALSE;
 		}
 
 		/* Default Currency */
-		$price = new Money( $info['i_total'], $currency );
+		$price = new \IPS\nexus\Money( $info['i_total'], $currency );
 		$info['i_total'] = $price->amount;
 
 		/* ITEMS */
@@ -1471,12 +1446,12 @@ class Nexus extends Library
 				unset( $item['item_type'] );
 				$newItems[] = $item;
 			}
-			catch( OutOfRangeException $e ) {}
+			catch( \OutOfRangeException $e ) {}
 		}
 
-		if( !count( $newItems ) )
+		if( !\count( $newItems ) )
 		{
-			$this->software->app->log( 'nexus_invoices_missing_mapped_items', __METHOD__, App::LOG_WARNING, $info['i_id'] );
+			$this->software->app->log( 'nexus_invoices_missing_mapped_items', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['i_id'] );
 			return FALSE;
 		}
 
@@ -1487,7 +1462,7 @@ class Nexus extends Library
 		{
 			$info['i_member'] = $this->software->app->getLink( $info['i_member'], 'core_members', TRUE );
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			unset( $info['i_member'] );
 		}
@@ -1499,7 +1474,7 @@ class Nexus extends Library
 
 		/* Invoice */
 		$invoice = array(
-			'i_status' => Invoice::STATUS_PENDING,
+			'i_status' => \IPS\nexus\Invoice::STATUS_PENDING,
 			'i_title' => 'Converted Invoice '. $info['i_id'],
 			'i_member' => 0,
 			'i_items' => '[]',
@@ -1520,7 +1495,7 @@ class Nexus extends Library
  		);
 
 		/* Save Invoice Data */
-		$insertedId = Db::i()->insert( 'nexus_invoices', $this->_getValues( $invoice, $info ) );
+		$insertedId = \IPS\Db::i()->insert( 'nexus_invoices', $this->_getValues( $invoice, $info ) );
 
 		/* Add Link */
 		$this->software->app->addLink( $insertedId, $info['i_id'], 'nexus_invoices' );
@@ -1535,40 +1510,40 @@ class Nexus extends Library
 	 * @param	string		$currency	Transaction Currency
 	 * @return	int|bool	The ID of the newly inserted transaction, or FALSE on failure
 	 */
-	public function convertNexusTransaction( array $info, string $currency ) : bool|int
+	public function convertNexusTransaction( $info, $currency )
 	{
 		/* !Required: ID */
 		if ( !isset( $info['t_id'] ) )
 		{
-			$this->software->app->log( 'nexus_transactions_missing_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_transactions_missing_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		/* !Required: MemberID */
 		if ( !isset( $info['t_member'] ) )
 		{
-			$this->software->app->log( 'nexus_transactions_missing_member_id', __METHOD__, App::LOG_WARNING, $info['t_id'] );
+			$this->software->app->log( 'nexus_transactions_missing_member_id', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['t_id'] );
 			return FALSE;
 		}
 
 		/* !Required: InvoiceID */
 		if ( !isset( $info['t_invoice'] ) )
 		{
-			$this->software->app->log( 'nexus_transactions_missing_invoice_id', __METHOD__, App::LOG_WARNING, $info['t_id'] );
+			$this->software->app->log( 'nexus_transactions_missing_invoice_id', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['t_id'] );
 			return FALSE;
 		}
 
 		/* !Required: Amount */
 		if ( !isset( $info['t_amount'] ) )
 		{
-			$this->software->app->log( 'nexus_transactions_missing_amount', __METHOD__, App::LOG_WARNING, $info['t_id'] );
+			$this->software->app->log( 'nexus_transactions_missing_amount', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['t_id'] );
 			return FALSE;
 		}
 
 		/* !Required: Currency */
 		if ( !isset( $currency ) OR !$currency = $this->convertNexusCurrency( [ 'code' => $currency ] ) )
 		{
-			$this->software->app->log( 'nexus_transaction_currency_invalid', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_transaction_currency_invalid', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -1577,9 +1552,9 @@ class Nexus extends Library
 		{
 			$info['t_invoice'] = $this->software->app->getLink( $info['t_invoice'], 'nexus_invoices' );
 		}
-		catch( OutOfRangeException $ex )
+		catch( \OutOfRangeException $ex )
 		{
-			$this->software->app->log( 'nexus_transactions_missing_invoice', __METHOD__, App::LOG_WARNING, $info['t_invoice'] );
+			$this->software->app->log( 'nexus_transactions_missing_invoice', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['t_invoice'] );
 			return FALSE;
 		}
 
@@ -1587,9 +1562,9 @@ class Nexus extends Library
 		{
 			$info['t_member'] = $this->software->app->getLink( $info['t_member'], 'core_members', TRUE );
 		}
-		catch( OutOfRangeException $ex)
+		catch( \OutOfRangeException $ex)
 		{
-			$this->software->app->log( 'nexus_transactions_missing_member', __METHOD__, App::LOG_WARNING, $info['t_id'] );
+			$this->software->app->log( 'nexus_transactions_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['t_id'] );
 			return FALSE;
 		}
 
@@ -1600,21 +1575,21 @@ class Nexus extends Library
 			{
 				$info['t_method'] = $this->software->app->getLink( $info['t_method'], 'nexus_payment_methods' );
 			}
-			catch ( OutOfRangeException $ex )
+			catch ( \OutOfRangeException $ex )
 			{
 				$info['t_method'] = 0;
 			}
 		}
 
 		/* Default Currency */
-		$price = new Money( $info['t_amount'], $currency );
+		$price = new \IPS\nexus\Money( $info['t_amount'], $currency );
 		$info['t_amount'] = $price->amount;
 
 		$transaction = array(
 			't_member' => 0,
 			't_invoice' => 0,
 			't_method' => 0,
-			't_status' => Transaction::STATUS_PENDING,
+			't_status' => \IPS\nexus\Transaction::STATUS_PENDING,
 			't_amount' => 0,
 			't_date' => time(),
 			't_extra' => '[]',
@@ -1630,7 +1605,7 @@ class Nexus extends Library
 		);
 
 		/* Save Transaction Data */
-		$insertedId = Db::i()->insert( 'nexus_transactions', $this->_getValues( $transaction, $info ) );
+		$insertedId = \IPS\Db::i()->insert( 'nexus_transactions', $this->_getValues( $transaction, $info ) );
 
 		/* Add Link */
 		$this->software->app->addLink( $insertedId, $info['t_id'], 'nexus_transactions' );
@@ -1645,33 +1620,33 @@ class Nexus extends Library
 	 * @param	string		$currency	Transaction Currency
 	 * @return	int|bool	The ID of the newly inserted purchase, or FALSE on failure
 	 */
-	public function convertNexusPurchase( array $info, string $currency ) : bool|int
+	public function convertNexusPurchase( $info, $currency )
 	{
 		/* !Required: ID */
 		if ( !isset( $info['ps_id'] ) )
 		{
-			$this->software->app->log( 'nexus_purchases_missing_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_purchases_missing_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		/* !Required: MemberID */
 		if ( !isset( $info['ps_member'] ) )
 		{
-			$this->software->app->log( 'nexus_purchases_missing_member_id', __METHOD__, App::LOG_WARNING, $info['ps_id'] );
+			$this->software->app->log( 'nexus_purchases_missing_member_id', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['ps_id'] );
 			return FALSE;
 		}
 
 		/* !Required: InvoiceID */
 		if ( !isset( $info['ps_original_invoice'] ) )
 		{
-			$this->software->app->log( 'nexus_purchases_missing_invoice_id', __METHOD__, App::LOG_WARNING, $info['ps_id'] );
+			$this->software->app->log( 'nexus_purchases_missing_invoice_id', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['ps_id'] );
 			return FALSE;
 		}
 
 		/* !Required: Currency */
 		if ( !isset( $currency ) OR !$currency = $this->convertNexusCurrency( [ 'code' => $currency ] ) )
 		{
-			$this->software->app->log( 'nexus_purchase_currency_invalid', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'nexus_purchase_currency_invalid', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -1680,9 +1655,9 @@ class Nexus extends Library
 		{
 			$info['ps_original_invoice'] = $this->software->app->getLink( $info['ps_original_invoice'], 'nexus_invoices' );
 		}
-		catch( OutOfRangeException $ex)
+		catch( \OutOfRangeException $ex)
 		{
-			$this->software->app->log( 'nexus_purchases_missing_invoice', __METHOD__, App::LOG_WARNING, $info['ps_id'] );
+			$this->software->app->log( 'nexus_purchases_missing_invoice', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['ps_id'] );
 			return FALSE;
 		}
 
@@ -1692,9 +1667,9 @@ class Nexus extends Library
 		{
 			$info['ps_member'] = $this->software->app->getLink( $info['ps_member'], 'core_members', TRUE );
 		}
-		catch( OutOfRangeException $ex)
+		catch( \OutOfRangeException $ex)
 		{
-			$this->software->app->log( 'nexus_purchases_missing_member', __METHOD__, App::LOG_WARNING, $info['ps_id'] );
+			$this->software->app->log( 'nexus_purchases_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['ps_id'] );
 			return FALSE;
 		}
 
@@ -1711,7 +1686,7 @@ class Nexus extends Library
 			{
 				$info['ps_parent'] = $this->software->app->getLink( $info['ps_parent'], 'nexus_purchases' );
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
 				$info['ps_conv_parent'] = $info['ps_parent'];
 				unset( $info['ps_parent'] );
@@ -1730,7 +1705,7 @@ class Nexus extends Library
 		}
 
 		/* Old Secondary User Groups */
-		if( isset( $info['ps_extra']['nexus']['old_secondary_groups'] ) AND is_array( $info['ps_extra']['nexus']['old_secondary_groups'] ) )
+		if( isset( $info['ps_extra']['nexus']['old_secondary_groups'] ) AND \is_array( $info['ps_extra']['nexus']['old_secondary_groups'] ) )
 		{
 			$newSecondaryGroups = [];
 
@@ -1740,7 +1715,7 @@ class Nexus extends Library
 				{
 					$newSecondaryGroups[] = $this->software->app->getLink( $group, 'core_groups', TRUE );
 				}
-				catch( OutOfRangeException $ex ) { }
+				catch( \OutOfRangeException $ex ) { }
 			}, $newSecondaryGroups );
 
 			$info['ps_extra']['nexus']['old_secondary_groups'] = $newSecondaryGroups;
@@ -1751,7 +1726,7 @@ class Nexus extends Library
 		/* Default Currency */
 		if( isset( $info['ps_renewal_price'] ) )
 		{
-			$price = new Money( $info['ps_renewal_price'], $currency );
+			$price = new \IPS\nexus\Money( $info['ps_renewal_price'], $currency );
 			$info['ps_renewal_price'] = $price->amount;
 		}
 
@@ -1789,13 +1764,13 @@ class Nexus extends Library
 		);
 
 		/* Save Purchase Data */
-		$insertedId = Db::i()->insert( 'nexus_purchases', $this->_getValues( $purchase, $info ) );
+		$insertedId = \IPS\Db::i()->insert( 'nexus_purchases', $this->_getValues( $purchase, $info ) );
 
 		/* Add Link */
 		$this->software->app->addLink( $insertedId, $info['ps_id'], 'nexus_purchases' );
 
 		/* Update associations */
-		Db::i()->update( 'nexus_purchases', array( 'ps_parent' => $insertedId ), array( 'ps_conv_parent=?', $info['ps_id'] ) );
+		\IPS\Db::i()->update( 'nexus_purchases', array( 'ps_parent' => $insertedId ), array( 'ps_conv_parent=?', $info['ps_id'] ) );
 
 		return $insertedId;
 	}
@@ -1807,7 +1782,7 @@ class Nexus extends Library
 	 * @param	array		$source		User-supplied array
 	 * @return	array
 	 */
-	protected function _getValues( array $defaults, array $source ) : array
+	protected function _getValues( array $defaults, array $source )
 	{
 		array_walk( $defaults, function( &$value, $key, $source )
 		{
@@ -1823,12 +1798,12 @@ class Nexus extends Library
 	/**
 	 * Check whether a given payment method is supported by Commerce
 	 *
-	 * @param string $method
+	 * @param $method
 	 * @return bool
 	 */
-	protected function _isPaymentMethodSupported( string $method ) : bool
+	protected function _isPaymentMethodSupported( $method )
 	{
-		$availableGateways = Gateway::gateways();
+		$availableGateways = \IPS\nexus\Gateway::gateways();
 		$methodKey = array_search( $method, array_keys( array_change_key_case( $availableGateways, CASE_LOWER ) ) );
 
 		if( $methodKey !== FALSE )

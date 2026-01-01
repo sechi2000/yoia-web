@@ -11,53 +11,35 @@
 namespace IPS\core\modules\admin\settings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\AdminNotification;
-use IPS\Data\Store;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * licensekey
  */
-class licensekey extends Controller
+class _licensekey extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * @brief Data about the license key from the store
 	 */
-	protected array $licenseData = array();
+	protected $licenseData = array();
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'licensekey_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'licensekey_manage' );
 		parent::execute();
 	}
 
@@ -66,45 +48,42 @@ class licensekey extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Get license info.  If license info is empty, refresh it. */
-		$licenseData = IPS::licenseKey();
+		$licenseData = \IPS\IPS::licenseKey();
 		
 		/* If no license key has been supplied yet just show the form */
-		if( !Settings::i()->ipb_reg_number )
+		if( !\IPS\Settings::i()->ipb_reg_number )
 		{
-			$this->settings();
-			return;
+			return $this->settings();
 		}
 		
 		/* Init */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('license_settings');
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('license_settings');
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'refresh'	=> array(
 				'icon'	=> 'refresh',
-				'link'	=> Url::internal( 'app=core&module=settings&controller=licensekey&do=refresh' )->csrf(),
+				'link'	=> \IPS\Http\Url::internal( 'app=core&module=settings&controller=licensekey&do=refresh' )->csrf(),
 				'title'	=> 'license_refresh',
-				'class' => 'ipsButton--disabled',
 			),
 			'remove'	=> array(
 				'icon'	=> 'pencil',
-				'link'	=> Url::internal( 'app=core&module=settings&controller=licensekey&do=settings' ),
+				'link'	=> \IPS\Http\Url::internal( 'app=core&module=settings&controller=licensekey&do=settings' ),
 				'title'	=> 'license_change',
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('license_change') ),
-				'class' => 'ipsButton--disabled',
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('license_change') )
 			),
 		);
 		
 		/* If we have a license key, but the server doesn't recognise it, show an error */
 		if ( !$licenseData )
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->message( 'license_not_recognised', 'error' );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->message( 'license_not_recognised', 'error' );
 		}
 		/* Otherwise show the normal info */
 		else
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'licensekey', 'core' )->overview( $licenseData );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'licensekey', 'core' )->overview( $licenseData );
 		}
 	}
 
@@ -113,22 +92,22 @@ class licensekey extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function refresh() : void
+	protected function refresh()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Fetch the license key data and update our local storage */
-		IPS::licenseKey( TRUE );
+		\IPS\IPS::licenseKey( TRUE );
 
 		/* Return the overview screen afterwards */
-		if ( isset( Request::i()->return ) and Request::i()->return === 'cloud' and Application::appIsEnabled('cloud') )
+		if ( isset( \IPS\Request::i()->return ) and \IPS\Request::i()->return === 'cloud' and \IPS\Application::appIsEnabled('cloud') )
 		{
 			\IPS\cloud\Application::toggleDisabledApps();
-			Output::i()->redirect( Url::internal( 'app=cloud&module=smartcommunity&controller=smartcommunity' ), 'cloud_license_refreshed' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cloud&module=smartcommunity&controller=smartcommunity' ), 'cloud_license_refreshed' );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=licensekey' ), 'license_key_refreshed' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=licensekey' ), 'license_key_refreshed' );
 		}
 	}
 
@@ -137,12 +116,32 @@ class licensekey extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function settings() : void
+	protected function settings()
 	{
-		$form = new Form;
-		$form->add( new Text( 'ipb_reg_number', NULL, TRUE, array(), function( $val ){
-			IPS::checkLicenseKey( $val, Settings::i()->base_url );
-		} ) );
+		$form = new \IPS\Helpers\Form;
+		$form->addHeader('ipb_license_edit_main');
+		$form->add( new \IPS\Helpers\Form\Text( 'ipb_reg_number', \IPS\Settings::i()->ipb_reg_number, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_license_active', \IPS\Settings::i()->ipb_license_active ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'ipb_license_expires', \IPS\Settings::i()->ipb_license_expires ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_license_cloud', \IPS\Settings::i()->ipb_license_cloud ) );
+
+		$form->addHeader('ipb_license_urls');
+		$form->add( new \IPS\Helpers\Form\Text( 'ipb_license_url', \IPS\Settings::i()->ipb_license_url ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'ipb_license_test_url', \IPS\Settings::i()->ipb_license_test_url ) );
+
+		$form->addHeader('ipb_license_components');
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_license_product_forums', \IPS\Settings::i()->ipb_license_product_forums ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_license_product_calendar', \IPS\Settings::i()->ipb_license_product_calendar ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_license_product_blog', \IPS\Settings::i()->ipb_license_product_blog ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_license_product_gallery', \IPS\Settings::i()->ipb_license_product_gallery ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_license_product_downloads', \IPS\Settings::i()->ipb_license_product_downloads ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_license_product_cms', \IPS\Settings::i()->ipb_license_product_cms ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_license_product_nexus', \IPS\Settings::i()->ipb_license_product_nexus ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipb_license_product_copyright', \IPS\Settings::i()->ipb_license_product_copyright ) );
+
+		$form->addHeader('ipb_license_services');
+		$form->add( new \IPS\Helpers\Form\Text( 'ipb_license_chat_limit', \IPS\Settings::i()->ipb_license_chat_limit ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'ipb_license_support', \IPS\Settings::i()->ipb_license_support ) );
 
 		if ( $values = $form->values() )
 		{
@@ -154,17 +153,17 @@ class licensekey extends Controller
 			}
 			
 			$form->saveAsSettings( $values );
-			Session::i()->log( 'acplogs__license_settings' );
+			\IPS\Session::i()->log( 'acplogs__license_settings' );
 
 			/* Refresh the locally stored license info */
-			unset( Store::i()->license_data );
+			unset( \IPS\Data\Store::i()->license_data );
 			
-			AdminNotification::remove( 'core', 'License', 'missing' );
+			\IPS\core\AdminNotification::remove( 'core', 'License', 'missing' );
 
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=licensekey' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=licensekey' ), 'saved' );
 		}
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('license_settings');
-		Output::i()->output	= Theme::i()->getTemplate( 'global' )->block( 'menu__core_settings_licensekey', $form );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('license_settings');
+		\IPS\Output::i()->output	= \IPS\Theme::i()->getTemplate( 'global' )->block( 'menu__core_settings_licensekey', $form );
 	}
 }

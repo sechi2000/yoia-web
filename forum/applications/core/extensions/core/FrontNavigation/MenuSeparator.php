@@ -12,26 +12,23 @@
 namespace IPS\core\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Menu Separator
  */
-class MenuSeparator
+class _MenuSeparator
 {
 	/**
 	 * Can access?
 	 *
 	 * @return	bool
 	 */
-	public function canView(): bool
+	public function canView()
 	{
 		return TRUE;
 	}
@@ -40,21 +37,10 @@ class MenuSeparator
 	 * Children
 	 *
 	 * @param	bool	$noStore	If true, will skip datastore and get from DB (used for ACP preview)
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function children( bool $noStore=FALSE ): ?array
+	public function children( $noStore=FALSE )
 	{
 		return NULL;
-	}
-
-	/**
-	 * Is this item available for the specified type?
-	 *
-	 * @param string $type
-	 * @return bool
-	 */
-	public function isAvailableFor( string $type ): bool
-	{
-		return true;
 	}
 }

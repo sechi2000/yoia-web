@@ -11,73 +11,61 @@
 namespace IPS\core\StaffDirectory;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Translatable;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Staff Directory Group Node
  */
-class Group extends Model
+class _Group extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_leaders_groups';
+	public static $databaseTable = 'core_leaders_groups';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'group_';
+	public static $databasePrefix = 'group_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'staff_directory';
+	public static $nodeTitle = 'staff_directory';
 	
 	/**
 	 * @brief	[Node] Subnode class
 	 */
-	public static ?string $subnodeClass = 'IPS\core\StaffDirectory\User';
+	public static $subnodeClass = 'IPS\core\StaffDirectory\User';
 	
 	/**
 	 * @brief	[Node] Show forms modally?
 	 */
-	public static bool $modalForms = TRUE;
+	public static $modalForms = TRUE;
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'staff',
 		'prefix'	=> 'leaders_',
@@ -86,30 +74,30 @@ class Group extends Model
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'core_staffgroups_';
+	public static $titleLangPrefix = 'core_staffgroups_';
 	
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		/* Title field */
-		$form->add( new Translatable( 'staff_group_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? "core_staffgroups_{$this->id}" : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'staff_group_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? "core_staffgroups_{$this->id}" : NULL ) ) ) );
 		
 		/* Build the layout selection radios */
 		$templates = array();
-
-		foreach ( [ 'layout_blocks','layout_full','layout_half' ] as $template )
+		foreach ( \IPS\Theme::load( \IPS\Theme::defaultTheme() )->getRawTemplates( 'core', 'front', 'staffdirectory', \IPS\Theme::RETURN_ARRAY_BIT_NAMES | \IPS\Theme::RETURN_NATIVE ) as $template )
 		{
+			if ( mb_strpos( $template, 'layout_' ) === 0 && mb_strpos( $template, '_preview' ) === FALSE )
+			{
 				$realTemplate = $template . '_preview';
-				$templates[ $template ] = Theme::i()->getTemplate( 'staffdirectory', 'core', 'front' )->$realTemplate( );
-
+				$templates[ $template ] = \IPS\Theme::i()->getTemplate( 'staffdirectory', 'core', 'front' )->$realTemplate( );
+			}
 		}
-	
-		$form->add( new Radio( 'staff_group_template', $this->id ? $this->template : NULL, TRUE, array( 'options' => $templates, 'parse' => 'none' ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'staff_group_template', $this->id ? $this->template : NULL, TRUE, array( 'options' => $templates, 'parse' => 'none' ) ) );
 	}
 
 	/**
@@ -118,7 +106,7 @@ class Group extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( !$this->id )
 		{
@@ -127,7 +115,7 @@ class Group extends Model
 
 		if( isset( $values['staff_group_title'] ) )
 		{
-			Lang::saveCustom( 'core', "core_staffgroups_{$this->id}", $values['staff_group_title'] );
+			\IPS\Lang::saveCustom( 'core', "core_staffgroups_{$this->id}", $values['staff_group_title'] );
 			unset( $values['staff_group_title'] );
 		}
 
@@ -145,21 +133,21 @@ class Group extends Model
 	 * Example code explains return value
 	 *
 	 * @code
-	 	* array(
-	 		* array(
-	 			* 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
-	 			* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	 			* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	 			* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	 		* ),
-	 		* ...							// Additional buttons
-	 	* );
+	 	array(
+	 		array(
+	 			'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
+	 			'title'	=> 'foo',		// Language key to use for button's title parameter
+	 			'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	 			'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	 		),
+	 		...							// Additional buttons
+	 	);
 	 * @endcode
-	 * @param Url $url		Base URL
+	 * @param	string	$url		Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = parent::getButtons( $url, $subnode );
 		
@@ -176,7 +164,7 @@ class Group extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canManagePermissions(): bool
+	public function canManagePermissions()
 	{
 		return false;
 	}
@@ -186,7 +174,7 @@ class Group extends Model
 	 *
 	 * @return	array
 	 */
-	public function members() : array
+	public function members()
 	{
 		$members = array();
 		foreach ( $this->children() as $child )
@@ -198,17 +186,17 @@ class Group extends Model
 			else
 			{
 				$memberIds = array();
-				foreach ( Db::i()->select( 'member_id', 'core_members', array( 'member_group_id=? OR FIND_IN_SET( ?, mgroup_others )', $child->type_id, $child->type_id ), 'name' ) as $memberId )
+				foreach ( \IPS\Db::i()->select( 'member_id', 'core_members', array( 'member_group_id=? OR FIND_IN_SET( ?, mgroup_others )', $child->type_id, $child->type_id ), 'name' ) as $memberId )
 				{
 					$memberIds[] = $memberId;
 				}
 				
-				foreach ( Db::i()->select( '*', 'core_members', array( Db::i()->in( 'member_id', $memberIds ) ) ) as $m )
+				foreach ( \IPS\Db::i()->select( '*', 'core_members', array( \IPS\Db::i()->in( 'member_id', $memberIds ) ) ) as $m )
 				{
 					if ( !isset( $members[ $m['member_id'] ] ) )
 					{
 						$member = new User;
-						$memberObj = Member::constructFromData( $m );
+						$memberObj = \IPS\Member::constructFromData( $m );
 						$member->member = $memberObj;
 						$members[ $memberObj->member_id ] = $member;
 					}

@@ -80,20 +80,21 @@ $lang = array(
 	'requirements_php_version_success'	=> "PHP version %s.",
 	'requirements_php_version_fail'		=> "You are running PHP version %s. You need PHP %s or above (%s or above recommended). You should contact your hosting provider or system administrator to ask for an upgrade.",
 	'requirements_php_version_fail_no_recommended'	=> "You are running PHP version %s. You need PHP %s or above. You should contact your hosting provider or system administrator to ask for an upgrade.",
-	'requirements_php_version_advice'	=> "You are running PHP version %s. While this version is compatible, we recommend version %s or above.",
+	'requirements_php_version_advice'	=> "You are running PHP version %s. While this version is compatible, we recommend version %s.",
+	'requirements_php_version_advice_max'	=> "You are running PHP version %s. While this version may work, you may experience errors or other issues. We recommend version %s.",
 	'requirements_curl_success'			=> "cURL extension loaded.",
+	'requirements_curl_fopen'			=> "fsockopen function available",
 	'requirements_file_uploads'			=> "File uploads are currently disabled in your PHP configuration, which will prevent many features from working correctly. You should contact your host to have the option `file_uploads` enabled.",
 	'requirements_curl_advice'			=> "You do not have the cURL PHP extension loaded or it is running a version less than 7.36. While this is not required, it is recommended.",
-	'requirements_curl_fail'			=> "You do not have the cURL PHP extension loaded (or it is running a version less than 7.36). You should contact your hosting provider or system administrator to ask for cURL version 7.36 or greater to be installed.",
+	'requirements_curl_fail'			=> "You do not have the cURL PHP extension loaded (or it is running a version less than 7.36) and the fsockopen function is disabled. You should contact your hosting provider or system administrator to ask either for cURL version 7.36 or greater to be installed, or the fsockopen function to be enabled. cURL is recommended.",
 	'requirements_mb_success'			=> "Multibyte String extension loaded",
 	'requirements_mb_regex'				=> "The Multibyte String extension has been configured with the --disable-mbregex option. You should contact your hosting provider or system administrator to ask for it to be reconfigured without that option.",
 	'requirements_mb_overload'			=> "The PHP configuration has mbstring.func_overload set with a value higher than 0. You should contact your hosting provider or system administrator to disable Multibyte function overloading.",
 	'requirements_mb_fail'				=> "You do not have the Multibyte String PHP extension loaded which is required. You should contact your hosting provider or system administrator to ask for it to be enabled. It must be configured <em>without</em> the --disable-mbregex option.",
-	'requirements_dns_success'			=> "The dns_get_record function is available",
-	'requirements_dns_fail'				=> "The dns_get_record function is not available",
 	'requirements_extension_success'	=> "%s extension loaded",
 	'requirements_extension_fail'		=> "You do not have the %s PHP extension loaded which is required. You should contact your hosting provider or system administrator to ask for it to be enabled.",
 	'requirements_extension_advice'		=> "You do not have the %s PHP extension loaded. While this is not required, it is recommended.",
+	'hook_file_not_writable' => "You must make the file %s writeable (usually by setting the CHMOD for the file or the plugins folder to 0777) before you can continue.",
 	'requirements_extension_dom'		=> "DOM",
 	'requirements_extension_gd'			=> "GD",
 	'requirements_extension_exif'		=> "Exif",
@@ -115,9 +116,7 @@ $lang = array(
 	'requirements_mysql_version_fail'	=> "You are running MySQL version %s. You need MySQL %s or above (%s or above recommended). You should contact your hosting provider or system administrator to ask for an upgrade.",
 	'requirements_mysql_version_advice'	=> "You are running MySQL version %s. While this version is compatible, we recommend version %s or above.",
 	'requirements_mysql_utf8_success'	=> "All database tables UTF8.",
-	'requirements_mysql_utf8_fail'		=> "Some or all of the tables or columns in your database are not using a UTF-8 collation (%s). You must convert your database to UTF-8 in order to continue. Please contact support for assistance.",
-	'requirements_mysql_charset_fail'   => "Your database character set is not using a 4-Byte UTF-8. You must convert your database to utf8mb4 in order to continue.",
-	'requirements_mysql_charset_success' => "Using utf8mb4",
+	'requirements_mysql_utf8_fail'		=> "Some or all of the tables or columns in your database are not using a UTF-8 collation (%s). You must <a href='../convertutf8'>convert your database to UTF-8</a> in order to continue.",
 	'requirements_mysql_utf8_info'		=> "%s is %s",	
 	'requirements_file_system'			=> "File System",
 	'requirements_file_writable'		=> "%s is writable",
@@ -537,14 +536,15 @@ $lang = array(
 	'40000_cms_htmlconversion'			=> "Pages HTML",
 	'40000_cms_htmlconversion_desc'		=> "HTML in pages, blocks and templates in Pages cannot be converted during the upgrade. While those pages and blocks will continue to work, you may wish to adjust the HTML following the upgrade to integrate the styling used by the Community Suite 4.0.",
 
-	'third_party_stuff_disabled'		=> "You have some third party applications installed which can potentially cause problems during or after upgrading and have been disabled.",
+	'third_party_stuff_disabled'		=> "You have some third party applications or plugins installed which can potentially cause problems during or after upgrading and have been disabled.",
 	'third_party_stuff_disabled_apps'	=> "The following third party applications were disabled:",
-	'third_party_stuff_disabled_end'	=> "After upgrading you can visit the AdminCP to individually enable the applications one at a time and verify they work correctly.",
-	'101000_disable_3rdparty'			=> "Disabled Applications",
+	'third_party_stuff_disabled_plugins'=> "The following third party plugins were disabled:",
+	'third_party_stuff_disabled_end'	=> "After upgrading you can visit the AdminCP to individually enable the applications and plugins one at a time and verify they work correctly.",
+	'101000_disable_3rdparty'			=> "Disabled Applications & Plugins",
 
 	/* ! Core 101079 Diagnostic reporting option */
 	'101079_diagnostics_reporting'			=> "Send diagnostics data to IPS?",
-	'101079_diagnostics_reporting_desc'		=> "This distribution is nulled and this setting does not work. Help Invision Community improve by automatically sending diagnostic information. The data sent does not contain any private information about your users or your community.",
+	'101079_diagnostics_reporting_desc'		=> "Help Invision Community improve by automatically sending diagnostic information. The data sent does not contain any private information about your users or your community.",
 
 	'104000_es_version'						=> "Elasticsearch version in use is no longer supported",
 	'104000_paypal_warning'					=> "PayPal Functionality",
@@ -557,7 +557,6 @@ $lang = array(
 	'ipsconnect'				=> "IPS Connect",
 
 	'no_apps_upgrade'			=> 'There are no applications available to upgrade',
-	'ips_too_old'				=> "Your version of Invision Community is not supported by the upgrader. The minimum version for upgrades is 4.5.",
 	'exit_upgrader'				=> "Exit upgrader",
 	'retry'						=> "Retry?",
 	'convert_charset'			=> "Convert character set",
@@ -566,17 +565,21 @@ $lang = array(
 	'continue_upgrade'			=> "Continue Upgrade",
 	'continue_not_set'			=> "Not set",
 	'unfinished_upgrade_info'	=> "You have an unfinished upgrade from %s",
+	'hc_designers_mode'			=> "Designers' Mode On",
+	'hc_designers_enabled'		=> "Designers' Mode is currently enabled.",
+	'hc_disable_designers'		=> "Disable Designers' Mode now",
+	'hc_designers_dis_info'		=> "Disabling Designers' Mode now will <strong>not</strong> synchronize your templates.<br>If you need to save your edited files, please synchronize them via the ACP &gt; Customization &gt; Themes before disabling Designer's Mode.",
 	'hc_requirements'			=> "%s Requirements",
 	'hc_recommendations'		=> "Recommendations",
 	'hc_recommendations_info'	=> "None of these items are required in order to continue with the upgrade right now. However, they may affect how your community works or be required in future upgrades. You should make a note of them and contact your hosting provider or system administrator after the upgrade to address them. You can re-run these checks later from the <em>Support</em> section of the Administrator Control Panel.",
 	'hc_no_continue'			=> "You must correct any issues listed above before you can proceed",
-	'upgrader_banner'			=> "Upgrade Invision Community",
+	'upgrader_banner'			=> "Upgrade Invision Community 4",
 	'upgradeoptions'			=> 'Upgrade Options',
-	'done_banner'				=> "Your Invision Community is ready",
+	'done_banner'				=> "Your Invision Community 4 is ready",
 	'go_to_suite'				=> "Go to the suite",
 	'go_to_acp'					=> "Go to the AdminCP",
 	'suite_docs'				=> "Suite Documentation",
-	'start_banner'				=> "Welcome to Invision Community 5",
+	'start_banner'				=> "Welcome to Invision Community 4",
 	'start_info'				=> "This process will install your software for you. Be sure you have your license key and MySQL database details to hand.",
 	'install_docs'				=> "Install Guide",
 	'js_confirm_mrerror'		=> 'The server encountered multiple instances where it has stopped responding.\nPress \'OK\' to reload this page and re-run this installation step.',
@@ -614,6 +617,12 @@ $lang = array(
 
 	/* ! Core - 4.5 - Elastic search version */
 	'105000_es_version'						=> "Elasticsearch version in use is no longer supported",
+
+	/* ! Core - 4.5 - BBCode enable/disable */
+	'105000_enable_bbcode'					=> "BBCode Processing",
+	'105000_enable_bbcode_desc'				=> "BBCode is a lightweight markup language that was originally designed to allow users to submit rich content prior to the advancement of WYSIWYG editors by using special tags within square brackets (for instance, to bold content you would manually type out [b]bolded text[/b]). This version of Invision Community deprecates BBCode support. This functionality will continue if enabled, but may be completely removed in a future version. What does this mean for you? If your community does not rely on legacy BBCode support, we recommend you opt to disable it now for greater posting performance and reliability. If you do rely on BBCode, you may choose to keep it enabled at this time, however we encourage you to explore ways to transition to the preferred, native editor.",
+	'105000_bbcode_disable'					=> "Disable BBCode support",
+	'105000_bbcode_enable'					=> "Enable BBCode support",
 
 	/* ! Core - 4.5 - New pruning enable/disable */
 	'105000_prune'							=> "Pruning Defaults",
@@ -672,18 +681,9 @@ $lang = array(
 	'106000_deprecated' => "Removed Caching Methods",
 	'106000_deprecation' => "The following Cache and Datastore methods have been removed in Invision Community 4.6: APC, Wincache, Memcached and XCache.<br>You do not need to do anything as the caching method will be reverted to 'None' after this upgrade.",
 
-	/* 5.0 Tags */
-	'200000_open_tags' => "Tagging",
-	'200000_open_tags_desc' => "Open Tagging is no longer supported. You can convert existing tags to our new system.",
-	'200000_open_tags_all' => "Convert All Tags",
-	'200000_open_tags_convert' => "Convert Top 25 Used Tags",
-	'200000_open_tags_delete' => "Delete all Tags",
-	'200000_node_tags' => "Application-Specific Tags",
-	'200000_node_tags_desc' => "Application-Specific Tags are no longer supported. You can convert these to our new system, or choose to remove them.",
-	'200000_node_tags_convert' => "Convert",
-	'200000_node_tags_delete' => "Delete",
 
 	/* PHP 8 Compatibility Issues */
+	'method_check_fail'       => 'PHP8 Incompatible Customizations',
 	'method_check_fix'        => 'Outdated Overloaded 3rd Party Methods',
 	'methodscanner_no_issues' => 'No PHP8 Issues found',
 	'invalid_php8_customization' => 'Contains outdated code. Please contact the Author for an updated version.',
@@ -696,15 +696,15 @@ $lang = array(
 	'method_issue_packed'         => 'Packed status differs',
 	'method_issue_final'          => 'Overloaded final method',
 	'method_issue_parameters'     => 'Mismatching parameter list',
-	'method_issue_security_desc'          => 'Overloading method in the app changes the security (public, private, or protected) level from the base class from which it inherits',
+	'method_issue_security_desc'          => 'Overloading method in the app/plugin changes the security (public, private, or protected) level from the base class from which it inherits',
 	'method_issue_static_desc'            => 'Base method is static and overloading method is not or vice versa',
 	'method_issue_return_type_desc'       => 'Base method has a different return type hint than the subclass\'s method',
 	'method_issue_parameter_type_desc'    => "Overloading method changes a parameter's type",
 	'method_issue_nullable_desc'          => 'Base method defined a parameter as nullable but the overloaded did not or vice versa',
 	'method_issue_reference_desc'         => 'The parameter is passed by reference to the base method but not to the overloading method or vice versa',
 	'method_issue_packed_desc'            => 'The parameter is "packed" in the base method but not in the overloading method or vice versa',
-	'method_issue_final_desc'             => 'A class in the app overloaded a method that was declared final, meaning it cannot be overloaded',
-	'method_issue_parameters_desc'        => 'A subclass method in the app defines a different set of parameters than the base class from which it inherits',
+	'method_issue_final_desc'             => 'A class in the app/plugin overloaded a method that was declared final, meaning it cannot be overloaded',
+	'method_issue_parameters_desc'        => 'A subclass method in the app/plugin defines a different set of parameters than the base class from which it inherits',
 	'method_type'    => 'Type',
 	'method_app'     => 'App',
 	'method_reason'  => 'Issue',
@@ -714,5 +714,13 @@ $lang = array(
 	'method_parameter'   => 'Bad Parameter',
 	'method_na'          => 'N/A',
 	'method_priority'    => 'Priority',
+	'acp_notification_ManualInterventionMessage' => 'PHP8 Incompatible Customizations',
+	'advise_removal_of_php8_incompatible_code' => <<<TEXT
+<div style="text-align: left">We are currently in the process of migrating our platform from PHP7 to PHP8 in order to provide you with the greatest level of performance and security. We've identified and disabled one or more Applications or Plugins currently installed on your site which contain PHP8 incompatible code. Refer to the AdminCP &gt; Support &gt; Get Support page for more information.<br><br>You can re-enable these Applications and Plugins via the AdminCP &gt; Applications page. Please make a note of the following Applications and Plugins so you are clear which have been automatically disabled via the upgrader.</div>
+TEXT,
+
+
+
 	'107783_pbr_captcha' => "Post Before Register Changes"
+
 );

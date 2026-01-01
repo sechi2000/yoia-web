@@ -11,47 +11,36 @@
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\YesNo;
-use IPS\Member;
-use IPS\Output;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancement
  */
-class GeoIP extends CommunityEnhancementsAbstract
+class _GeoIP
 {
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= TRUE;
+	public $ips	= TRUE;
 
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= FALSE;
+	public $hasOptions	= FALSE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "ips.png"; 
+	public $icon	= "ips.png"; 
 	
 	/**
 	 * Constructor
@@ -60,7 +49,7 @@ class GeoIP extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		$this->enabled = Settings::i()->ipsgeoip;
+		$this->enabled = \IPS\Settings::i()->ipsgeoip;
 	}
 	
 	/**
@@ -68,18 +57,18 @@ class GeoIP extends CommunityEnhancementsAbstract
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
-		$form = new Form;
-		$form->add( new YesNo( 'ipsgeoip', Settings::i()->ipsgeoip ) );
+		$form = new \IPS\Helpers\Form;		
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ipsgeoip', \IPS\Settings::i()->ipsgeoip ) );
 		if ( $form->values() )
 		{
 			$form->saveAsSettings();
-			Session::i()->log( 'acplog__enhancements_edited', array( 'enhancements__core_GeoIP' => TRUE ) );
-			Output::i()->inlineMessage	= Member::loggedIn()->language()->addToStack('saved');
+			\IPS\Session::i()->log( 'acplog__enhancements_edited', array( 'enhancements__core_GeoIP' => TRUE ) );
+			\IPS\Output::i()->inlineMessage	= \IPS\Member::loggedIn()->language()->addToStack('saved');
 		}
 		
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_GeoIP', $form );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_GeoIP', $form );
 	}
 	
 	/**
@@ -88,8 +77,8 @@ class GeoIP extends CommunityEnhancementsAbstract
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
-		Settings::i()->changeValues( array( 'ipsgeoip' => 0 ) );
+		\IPS\Settings::i()->changeValues( array( 'ipsgeoip' => 0 ) );
 	}
 }

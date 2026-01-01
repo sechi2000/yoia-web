@@ -12,32 +12,22 @@
 namespace IPS\gallery\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Db;
-use IPS\gallery\Category;
-use IPS\Node\Api\NodeController;
-use IPS\Request;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Gallery Categories API
  */
-class categories extends NodeController
+class _categories extends \IPS\Node\Api\NodeController
 {
 
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\gallery\Category';
+	protected $class = 'IPS\gallery\Category';
 
 	/**
 	 * GET /gallery/categories
@@ -47,34 +37,33 @@ class categories extends NodeController
 	 * @apiparam	string	sortDir	Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page	Page number
 	 * @apiparam	int		perPage	Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\gallery\Category>
-	 * @return PaginatedResponse<Category>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\blog\Entry>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = array();
 
 		/* Sort */
-		if ( isset( Request::i()->sortBy ) and in_array( Request::i()->sortBy, array( 'count_imgs', 'last_img_date' ) ) )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'count_imgs', 'last_img_date' ) ) )
 		{
-			$sortBy = 'category_' . Request::i()->sortBy;
+			$sortBy = 'category_' . \IPS\Request::i()->sortBy;
 		}
 		else
 		{
 			$sortBy = 'category_id';
 		}
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', 'gallery_categories', $where, "{$sortBy} {$sortDir}" ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			\IPS\Db::i()->select( '*', 'gallery_categories', $where, "{$sortBy} {$sortDir}" ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			'IPS\gallery\Category',
-			Db::i()->select( 'COUNT(*)', 'gallery_categories', $where )->first(),
+			\IPS\Db::i()->select( 'COUNT(*)', 'gallery_categories', $where )->first(),
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 
@@ -83,10 +72,9 @@ class categories extends NodeController
 	 * Get information about a specific gallery category
 	 *
 	 * @param		int		$id			ID Number
-	 * @apireturn		\IPS\gallery\Category
-	 * @return Response
+	 * @return		\IPS\blog\Blog
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		return $this->_view( $id );
 	}

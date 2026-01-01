@@ -12,37 +12,32 @@
 namespace IPS\forums\extensions\core\Permissions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\PermissionsAbstract;
-use IPS\forums\Forum;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Permissions
  */
-class Permissions extends PermissionsAbstract
+class _Permissions
 {
 	/**
 	 * Get node classes
 	 *
 	 * @return	array
 	 */
-	public function getNodeClasses(): array
+	public function getNodeClasses()
 	{		
 		return array(
 			'IPS\forums\Forum' => function( $current, $group )
 			{
 				$rows = array();
 				
-				foreach( Forum::roots( NULL ) AS $root )
+				foreach( \IPS\forums\Forum::roots( NULL ) AS $root )
 				{
-					Forum::populatePermissionMatrix( $rows, $root, $group, $current );
+					\IPS\forums\Forum::populatePermissionMatrix( $rows, $root, $group, $current );
 				}
 				
 				return $rows;

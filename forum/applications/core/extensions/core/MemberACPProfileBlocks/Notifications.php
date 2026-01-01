@@ -11,41 +11,28 @@
 namespace IPS\core\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\MemberACPProfile\Block;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Notification;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Profile Data Block
  */
-class Notifications extends Block
-{
-	protected ?array $extensions = array();
-
+class _Notifications extends \IPS\core\MemberACPProfile\Block
+{	
 	/**
 	 * Constructor
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function __construct( Member $member )
+	public function __construct( \IPS\Member $member )
 	{
 		parent::__construct( $member );
 		
-		$this->extensions = Application::allExtensions( 'core', 'Notifications' );
+		$this->extensions = \IPS\Application::allExtensions( 'core', 'Notifications' );
 	}
 		
 	/**
@@ -53,9 +40,9 @@ class Notifications extends Block
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
-		return (string) Theme::i()->getTemplate('memberprofile')->notificationTypes( $this->member, Notification::membersOptionCategories( $this->member, $this->extensions ) );
+		return \IPS\Theme::i()->getTemplate('memberprofile')->notificationTypes( $this->member, \IPS\Notification::membersOptionCategories( $this->member, $this->extensions ) );
 	}
 	
 	/**
@@ -63,21 +50,31 @@ class Notifications extends Block
 	 *
 	 * @return	string
 	 */
-	public function edit(): string
+	public function edit()
 	{
-		if ( isset( Request::i()->type ) and array_key_exists( Request::i()->type, $this->extensions ) )
+		if ( isset( \IPS\Request::i()->type ) and array_key_exists( \IPS\Request::i()->type, $this->extensions ) )
 		{
-			$form = Notification::membersTypeForm( $this->member, $this->extensions[ Request::i()->type ] );
+			$form = \IPS\Notification::membersTypeForm( $this->member, $this->extensions[ \IPS\Request::i()->type ] );
 			if ( $form === TRUE )
 			{
-				Output::i()->redirect( Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member->member_id}" ), 'saved' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member->member_id}" ), 'saved' );
+			}
+			
+			return $form;
+		}
+		elseif ( isset( \IPS\Request::i()->method ) and \in_array( \IPS\Request::i()->method, array( 'inline', 'email' ) ) )
+		{
+			$form = \IPS\Notification::membersMethodForm( $this->member, \IPS\Request::i()->method, $this->extensions );
+			if ( $form === TRUE )
+			{
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member->member_id}" ), 'saved' );
 			}
 			
 			return $form;
 		}
 		else
 		{
-			Output::i()->error( 'node_error', '2C403/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C403/1', 404, '' );
 		}
 	}
 }

@@ -11,52 +11,36 @@
  
 namespace IPS\blog;
 
-use IPS\Application as SystemApplication;
-use IPS\Content\Filter;
-use IPS\DateTime;
-use IPS\Dispatcher;
-use IPS\Lang;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Xml\Rss;
-use OutOfRangeException;
-use function array_merge;
-
 /**
  * Blog Application Class
  */
-class Application extends SystemApplication
+class _Application extends \IPS\Application
 {
 	/**
 	 * Init
 	 *
 	 * @return	void
 	 */
-	public function init() : void
+	public function init()
 	{
 		/* Handle RSS requests */
-		if ( Request::i()->module == 'blogs' and Request::i()->controller == 'view' and Request::i()->do == 'rss' )
+		if ( \IPS\Request::i()->module == 'blogs' and \IPS\Request::i()->controller == 'view' and \IPS\Request::i()->do == 'rss' )
 		{
 			$member = NULL;
-			if( Request::i()->member AND Request::i()->key )
+			if( \IPS\Request::i()->member AND \IPS\Request::i()->key )
 			{
-				$member = Member::load( Request::i()->member );
-				if( !Login::compareHashes( $member->getUniqueMemberHash(), (string) Request::i()->key ) )
+				$member = \IPS\Member::load( \IPS\Request::i()->member );
+				if( !\IPS\Login::compareHashes( $member->getUniqueMemberHash(), (string) \IPS\Request::i()->key ) )
 				{
 					$member = NULL;
 				}
 			}
 
-			$this->sendBlogRss( $member ?? new Member );
+			$this->sendBlogRss( $member ?? new \IPS\Member );
 
-			if( !Member::loggedIn()->group['g_view_board'] )
+			if( !\IPS\Member::loggedIn()->group['g_view_board'] )
 			{
-				Output::i()->error( 'node_error', '2B221/1', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2B221/1', 404, '' );
 			}
 		}
 	}
@@ -64,48 +48,45 @@ class Application extends SystemApplication
 	/**
 	 * Send the blog's RSS feed for the indicated member
 	 *
-	 * @param	Member		$member		Member
+	 * @param	\IPS\Member		$member		Member
 	 * @return	void
 	 */
-	protected function sendBlogRss( Member $member ) : void
+	protected function sendBlogRss( $member )
 	{
 		try
 		{
-			$blog = Blog::load( Request::i()->id );
+			$blog = \IPS\blog\Blog::load( \IPS\Request::i()->id );
 
 			if( !$blog->can( 'view', $member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			/* We'll let the regular controller handle the error */
 			return;
 		}
 
-		if( !Settings::i()->blog_allow_rss or !$blog->settings['allowrss'] )
+		if( !\IPS\Settings::i()->blog_allow_rss or !$blog->settings['allowrss'] )
 		{
-			Output::i()->error( 'blog_rss_offline', '2B201/5', 403, 'blog_rss_offline_admin' );
+			\IPS\Output::i()->error( 'blog_rss_offline', '2B201/5', 403, 'blog_rss_offline_admin' );
 		}
 
 		/* We have to use get() to ensure CDATA tags wrap the blog title properly */
+		$title	= $blog->member_id ? $blog->name : $member->language()->get( "blogs_blog_{$blog->id}" );
 
-		$title	= $member->language()->get( "blogs_blog_{$blog->id}" );
-
-		$document = Rss::newDocument( $blog->url(), $title, $blog->description ?? '' );
+		$document = \IPS\Xml\Rss::newDocument( $blog->url(), $title, $blog->description );
 	
-		foreach (Entry::getItemsWithPermission( array( array( 'entry_blog_id=?', $blog->id ), array( 'entry_status!=?', 'draft' ) ), 'entry_date DESC', 25, 'read', Filter::FILTER_PUBLIC_ONLY, 0, $member, FALSE, FALSE, FALSE, FALSE, NULL, $blog ) as $entry )
+		foreach ( \IPS\blog\Entry::getItemsWithPermission( array( array( 'entry_blog_id=?', $blog->id ), array( 'entry_status!=?', 'draft' ) ), 'entry_date DESC', 25, 'read', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY, 0, $member, FALSE, FALSE, FALSE, FALSE, NULL, $blog ) as $entry )
 		{
-			/* @var Entry $entry */
 			$content = $entry->content;
-			Output::i()->parseFileObjectUrls( $content );
-
-			$document->addItem( $entry->name, $entry->url(), $entry->content, DateTime::ts( $entry->date ), $entry->id );
+			\IPS\Output::i()->parseFileObjectUrls( $content );
+			$document->addItem( $entry->name, $entry->url(), $content, \IPS\DateTime::ts( $entry->date ), $entry->id );
 		}
 	
 		/* @note application/rss+xml is not a registered IANA mime-type so we need to stick with text/xml for RSS */
-		Output::i()->sendOutput( $document->asXML(), 200, 'text/xml', array(), TRUE, parseFileObjects: true );
+		\IPS\Output::i()->sendOutput( $document->asXML(), 200, 'text/xml', array(), TRUE, parseFileObjects: FALSE );
 	}
 
 	/**
@@ -113,10 +94,10 @@ class Application extends SystemApplication
 	 *
 	 * @return void
 	 */
-	public function installOther() : void
+	public function installOther()
 	{
 		/* Allow non guests to create and comment on Blogs */
-		foreach( Group::groups( TRUE, FALSE ) as $group )
+		foreach( \IPS\Member\Group::groups( TRUE, FALSE ) as $group )
 		{
 			$group->g_blog_allowlocal = TRUE;
 			$group->g_blog_allowcomment = TRUE;
@@ -124,20 +105,20 @@ class Application extends SystemApplication
 		}
 
 		/* Create new default category */
-		$category = new Category;
+		$category = new \IPS\blog\Category;
 		$category->seo_name = 'general';
 		$category->save();
 
-		Lang::saveCustom( 'blog', "blog_category_{$category->id}", "General" );
+		\IPS\Lang::saveCustom( 'blog', "blog_category_{$category->id}", "General" );
 	}
 
 	/**
 	 * [Node] Get Icon for tree
 	 *
 	 * @note	Return the class for the icon (e.g. 'globe')
-	 * @return    string
+	 * @return	string|null
 	 */
-	protected function get__icon(): string
+	protected function get__icon()
 	{
 		return 'file-text';
 	}
@@ -165,7 +146,7 @@ class Application extends SystemApplication
 	 * @endcode
 	 * @return array
 	 */
-	public function defaultFrontNavigation(): array
+	public function defaultFrontNavigation()
 	{
 		return array(
 			'rootTabs'		=> array(),
@@ -183,20 +164,7 @@ class Application extends SystemApplication
 	public function getWebhooks() : array
 	{
 		return array_merge(  [
-			'blogBlog_create' => Blog::class
+			'blogBlog_create' => \IPS\blog\Blog::class
 		], parent::getWebhooks());
-	}
-
-	/**
-	 * Output CSS files
-	 *
-	 * @return void
-	 */
-	public static function outputCss() : void
-	{
-		if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' )
-		{
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'blog.css', 'blog', 'front' ) );
-		}
 	}
 }

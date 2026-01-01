@@ -11,54 +11,26 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Base64Url\Base64Url;
-use DateInterval;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Http\Url\Internal;
-use IPS\Member\Device;
-use IPS\Node\Model;
-use IPS\Notification\Inline;
-use IPS\Notification\Recipients;
-use IPS\Patterns\ActiveRecord;
-use IPS\Platform\Bridge;
-use Minishlink\WebPush\Encryption;
-use Minishlink\WebPush\Utils;
-use Minishlink\WebPush\VAPID;
-use OutOfRangeException;
-use UnderflowException;
-use function array_keys;
-use function count;
-use function defined;
-use function function_exists;
-use function get_class;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Notification Class
  */
-class Notification
+class _Notification
 {
 	/**
 	 * @brief	Default Configuration
 	 */
-	protected static ?array $defaultConfiguration = NULL;
+	protected static $defaultConfiguration = NULL;
 
 	/**
 	 * @brief	Cache of vapid headers to save processing time
 	 */
-	protected static array $vapidHeaderCache = array();
+	protected static $vapidHeaderCache = array();
 
 	/**
 	 * @brief	Pre-defined web push TTL values
@@ -79,7 +51,7 @@ class Notification
 	/**
 	 * @brief	Allow notifications to be programatically silenced
 	 */
-	protected static bool $silenced = FALSE;
+	protected static $silenced = FALSE;
 
 	/**
 	 * Silence notifications programatically
@@ -87,7 +59,7 @@ class Notification
 	 *
 	 * @return void
 	 */
-	public static function silence() : void
+	public static function silence()
 	{
 		static::$silenced = TRUE;
 	}
@@ -97,7 +69,7 @@ class Notification
 	 *
 	 * @return void
 	 */
-	public static function unsilence() : void
+	public static function unsilence()
 	{
 		static::$silenced = FALSE;
 	}
@@ -109,13 +81,12 @@ class Notification
 	 */
 	public static function canUseWebPush(): bool
 	{
-		if ( Application::appIsEnabled('cloud') or IN_DEV )
+		if ( \IPS\IN_DEV )
 		{
-            /* Cloud is clearly the superior premium platform, so it already has GMP */
 			return TRUE;
 		}
 
-		return function_exists('gmp_init');
+		return \function_exists('gmp_init');
 	}
 
 	/**
@@ -125,23 +96,23 @@ class Notification
 	 */
 	public static function webPushEnabled(): bool
 	{
-		return static::canUseWebPush() and ( ( isset( Settings::i()->vapid_public_key ) && !empty( Settings::i()->vapid_public_key ) &&
-			isset( Settings::i()->vapid_private_key ) && !empty( Settings::i()->vapid_private_key ) ) );
+		return static::canUseWebPush() and ( ( isset( \IPS\Settings::i()->vapid_public_key ) && !empty( \IPS\Settings::i()->vapid_public_key ) &&
+			isset( \IPS\Settings::i()->vapid_private_key ) && !empty( \IPS\Settings::i()->vapid_private_key ) ) );
 	}
 
 	/**
 	 * Get default configuration
 	 *
-	 * @return array|null
+	 * @return	array
 	 */
-	public static function defaultConfiguration(): ?array
+	public static function defaultConfiguration()
 	{
 		if ( static::$defaultConfiguration === NULL )
 		{
 			/* Get data from the actual extensions */
 			$extensionDefaults = array();
 			$notificationGroups = [];
-			foreach(Application::allExtensions( 'core', 'Notifications' ) as $group => $class )
+			foreach( \IPS\Application::allExtensions( 'core', 'Notifications' ) as $group => $class )
 			{
 				if ( method_exists( $class, 'configurationOptions' ) )
 				{
@@ -179,7 +150,7 @@ class Notification
 			}
 			
 			/* Combine that with what the admin has set */
-			static::$defaultConfiguration = iterator_to_array( Db::i()->select( '*', 'core_notification_defaults' )->setKeyField('notification_key') );
+			static::$defaultConfiguration = iterator_to_array( \IPS\Db::i()->select( '*', 'core_notification_defaults' )->setKeyField('notification_key') );
 			foreach ( $extensionDefaults as $key => $data )
 			{
 				if ( !isset( static::$defaultConfiguration[ $key ] ) )
@@ -187,7 +158,7 @@ class Notification
 					/* If parent group already has defaults stored, use those */
 					if( isset( $notificationGroups[ $key ] ) AND isset( static::$defaultConfiguration[ $notificationGroups[ $key ] ] ) )
 					{
-						Db::i()->insert( 'core_notification_defaults', array(
+						\IPS\Db::i()->insert( 'core_notification_defaults', array(
 							'notification_key' => $key,
 							'default'		   => implode( ',', static::$defaultConfiguration[ $notificationGroups[ $key ] ]['default'] ),
 							'disabled'		   => implode( ',', static::$defaultConfiguration[ $notificationGroups[ $key ] ]['disabled'] )
@@ -198,7 +169,7 @@ class Notification
 					else
 					{
 						/* Row isn't in DB, add it */
-						Db::i()->insert( 'core_notification_defaults', array(
+						\IPS\Db::i()->insert( 'core_notification_defaults', array(
 							'notification_key' => $key,
 							'default' => implode( ',', $data['default'] ),
 							'disabled' => implode( ',', $data['disabled'] )
@@ -210,7 +181,7 @@ class Notification
 				else
 				{					
 					static::$defaultConfiguration[ $key ]['default'] = array_filter( explode( ',', static::$defaultConfiguration[ $key ]['default'] ) );
-					static::$defaultConfiguration[ $key ]['disabled'] = array_filter( array_merge( $data['disabled'], explode( ',', static::$defaultConfiguration[ $key ]['disabled'] ) ) );
+					static::$defaultConfiguration[ $key ]['disabled'] = array_filter( array_merge( $extensionDefaults[ $key ]['disabled'], explode( ',', static::$defaultConfiguration[ $key ]['disabled'] ) ) );
 				}
 			}
 		}
@@ -221,18 +192,38 @@ class Notification
 	/**
 	 * Get available options for an extension
 	 *
-	 * @param Member|null $member		The member or NULL to get all
-	 * @param object $extension	The notifications extension
-	 * @return	array
+	 * @param	\IPS\Member|NULL	$member		The member or NULL to get all
+	 * @param	object				$extension	The noticiations extension
+	 * @return	void
 	 */
-	public static function availableOptions( ?Member $member, object $extension ) : array
+	public static function availableOptions( $member, $extension )
 	{
-		$settings = $extension::configurationOptions( $member );
+		/* First of all, get the settings from the extension, maintaining backwards compatibility with older extensions */
+		if ( method_exists( $extension, 'configurationOptions' ) )
+		{
+			$settings = $extension::configurationOptions( $member );
+		}
+		else
+		{
+			$configuration = $extension->getConfiguration( $member );
+			
+			$settings = array();
+			foreach ( $configuration as $key => $details )
+			{
+				$settings[ $key ] = array(
+					'type'				=> 'standard',
+					'notificationTypes'	=> array( $key ),
+					'title'				=> "notifications__{$key}",
+					'showTitle'			=> TRUE,
+					'description'		=> NULL,
+				);
+			}
+		}
 		
 		/* Now loop through each of those and get the value for each */
 		if ( $member )
 		{
-			$defaultConfiguration = Notification::defaultConfiguration();
+			$defaultConfiguration = \IPS\Notification::defaultConfiguration();
 			$memberConfiguration = $member->notificationsConfiguration();
 			$finalSettings = array();
 			foreach ( $settings as $key => $details )
@@ -241,14 +232,14 @@ class Notification
 				{
 					$options = array();
 					$availableTypes = array('inline');
-					if ( static::webPushEnabled() && count( $member->getPwaAuths() ) )
+					if ( static::webPushEnabled() && \count( $member->getPwaAuths() ) )
 					{
 						$availableTypes[] = 'push';
 					}
 					$availableTypes[] = 'email';
 					foreach ( $availableTypes as $type )
 					{
-						if ( !in_array( $type, $defaultConfiguration[ $key ]['disabled'] ) )//if ( !\in_array( $type, $defaultConfiguration[ $key ]['disabled'] ) and ( $type !== 'push' or !\in_array( 'inline', $defaultConfiguration[ $key ]['disabled'] ) ) )
+						if ( !\in_array( $type, $defaultConfiguration[ $key ]['disabled'] ) )//if ( !\in_array( $type, $defaultConfiguration[ $key ]['disabled'] ) and ( $type !== 'push' or !\in_array( 'inline', $defaultConfiguration[ $key ]['disabled'] ) ) )
 						{
 							$enabled = array();
 							$haveMemberPreferences = FALSE;
@@ -270,13 +261,13 @@ class Notification
 							
 							$options[ $type ] = array(
 								'title'		=> "member_notifications_{$type}",
-								'value'		=> in_array( $type, $enabled ),
+								'value'		=> \in_array( $type, $enabled ),
 								'editable'	=> $defaultConfiguration[ $key ]['editable']
 							);
 						}
 					} 
 					
-					if ( count( $options ) or ( isset( $details['extra'] ) and count( $details['extra'] ) ) )
+					if ( \count( $options ) or ( isset( $details['extra'] ) and \count( $details['extra'] ) ) )
 					{
 						$details['options'] = $options;
 						$finalSettings[ $key ] = $details;
@@ -300,11 +291,11 @@ class Notification
 	/**
 	 * Get the notification categories to show to a member
 	 *
-	 * @param Member $member		The member
-	 * @param array $extensions	The notification extensions (passed so we don't have to load it more than once)
+	 * @param	\IPS\Member	$member		The member
+	 * @param	array		$extensions	The notification extensions (passed so we don't have to load it more than once)
 	 * @return	array
 	 */	
-	public static function membersOptionCategories( Member $member, array $extensions ): array
+	public static function membersOptionCategories( \IPS\Member $member, $extensions )
 	{
 		$categories = array();
 		foreach( $extensions as $group => $extension )
@@ -325,7 +316,7 @@ class Notification
 						{
 							if ( $extraDetails['value'] )
 							{
-								$categories[ $group ][ $extraKey ] = array( 'title' => Member::loggedIn()->language()->get( $extraDetails['title'] ), 'icon' => $extraDetails['icon'], 'description' => $extraDetails['description'] ?? NULL );
+								$categories[ $group ][ $extraKey ] = array( 'title' => \IPS\Member::loggedIn()->language()->get( $extraDetails['title'] ), 'icon' => $extraDetails['icon'], 'description' => isset( $extraDetails['description'] ) ? $extraDetails['description'] : NULL );
 							}
 						}
 					}
@@ -342,17 +333,17 @@ class Notification
 										{
 											continue 2;
 										}
-										$icon = 'bell';
+										$icon = 'bell-o';
 										break;
 									case 'push':
 										$icon = 'mobile';
 										break;
 									case 'email':
-										$icon = 'envelope';
+										$icon = 'envelope-o';
 										break;
 								}
 								
-								$categories[ $group ][ $type ] = array( 'title' => Member::loggedIn()->language()->get( 'member_notifications_' . $type ), 'icon' => $icon );
+								$categories[ $group ][ $type ] = array( 'title' => \IPS\Member::loggedIn()->language()->get( 'member_notifications_' . $type ), 'icon' => $icon );
 							}
 						}
 					}
@@ -366,21 +357,21 @@ class Notification
 	/**
 	 * Get the form for editing a member's notification preferences for a given notification extension
 	 *
-	 * @param Member $member		The member
-	 * @param object $extension	The notification extension to edit preferences for
-	 * @return	Form|NULL|TRUE
+	 * @param	\IPS\Member	$member		The member
+	 * @param	object		$extension	The notification extension to edit preferences for
+	 * @return	\IPS\Helpers\Form|NULL|TRUE
 	 */
-	public static function membersTypeForm( Member $member, object $extension ): Form|bool|null
+	public static function membersTypeForm( \IPS\Member $member, $extension )
 	{
 		$form = NULL;
 		$formIsEditable = FALSE;
 		
-		if ( $options = Notification::availableOptions( $member, $extension ) )
+		if ( $options = \IPS\Notification::availableOptions( $member, $extension ) )
 		{
-			$form = new Form;
+			$form = new \IPS\Helpers\Form;
 			foreach ( $options as $key => $details )
 			{
-				if ( $details['type'] === 'separator' and Dispatcher::i()->controllerLocation === 'front' )
+				if ( $details['type'] === 'separator' and \IPS\Dispatcher::i()->controllerLocation === 'front' )
 				{
 					$form->addSeparator();
 				}
@@ -397,7 +388,7 @@ class Notification
 				{
 					if ( !$formIsEditable )
 					{
-						if ( isset( $details['extra'] ) and count( $details['extra'] ) )
+						if ( isset( $details['extra'] ) and \count( $details['extra'] ) )
 						{
 							$formIsEditable = TRUE;
 						}
@@ -414,9 +405,9 @@ class Notification
 						}
 					}
 										
-					$form->add( new Custom( "notifications_{$key}", NULL, TRUE, array(
+					$form->add( new \IPS\Helpers\Form\Custom( "notifications_{$key}", NULL, TRUE, array(
 						'rowHtml'	=> function( $field ) use ( $details, $options ) {
-							return Theme::i()->getTemplate( 'members', 'core', 'global' )->notificationsSettingsRow( $field, $details );
+							return \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->notificationsSettingsRow( $field, $details );
 						}
 					) ) );
 				}
@@ -438,7 +429,7 @@ class Notification
 									$value['inline'] = 'inline';
 									$value['push'] = 'push';
 								}
-								elseif ( in_array( $k, array( 'inline', 'push', 'email' ) ) and $v )
+								elseif ( \in_array( $k, array( 'inline', 'push', 'email' ) ) and $v )
 								{
 									$value[ $k ] = $k;
 								}
@@ -447,7 +438,7 @@ class Notification
 						
 						foreach ( $details['notificationTypes'] as $notificationKey )
 						{
-							Db::i()->insert( 'core_notification_preferences', array(
+							\IPS\Db::i()->insert( 'core_notification_preferences', array(
 								'member_id'			=> $member->member_id,
 								'notification_key'	=> $notificationKey,
 								'preference'		=> implode( ',', $value )
@@ -486,23 +477,23 @@ class Notification
 	/**
 	 * @brief	Application
 	 */
-	protected Application $app;
+	protected $app;
 	
 	/**
 	 * @brief	Notification key
 	 */
-	protected ?string $key = NULL;
+	protected $key;
 	
 	/**
 	 * @brief	Email template key
 	 * @note	Typically this is "notification__{key}"
 	 */
-	protected ?string $emailKey = NULL;
+	protected $emailKey;
 
 	/**
 	 * @brief	Item
 	 */
-	protected ?object $item;
+	protected $item;
 		
 	/**
 	 * @brief	An \IPS\Notification\Recipients object which contains \IPS\Member objects and replacements to use for that member in the notification content.
@@ -511,48 +502,48 @@ class Notification
 	 	$notification->recipients->attach( $member2, array( 'foo' => 'baz' ) );
 	 * @endcode
 	 */
-	public Recipients $recipients;
+	public $recipients;
 	
 	/**
 	 * @brief	Data for notification emails
 	 */
-	protected array $emailParams = array();
+	protected $emailParams = array();
 	
 	/**
 	 * @brief	Extra data to save with inline notifications
 	 */
-	protected array $inlineExtra = array();
+	protected $inlineExtra = array();
 	
 	/**
 	 * @brief	Unsubscribe Type
 	 */
-	public string $unsubscribeType = 'notification';
+	public $unsubscribeType = 'notification';
 
 	/**
 	 * @brief	Allow merging of notifications
 	 */
-	protected bool $allowMerging = TRUE;
+	protected $allowMerging = TRUE;
 
 	/**
 	 * Constructor
 	 *
-	 * @param Application $app			The application the notification belongs to
-	 * @param string $key			Notification key
-	 * @param object|null $item			The thing the notification is about
-	 * @param array $emailParams	Data for notification emails
-	 * @param array|null $inlineExtra	Extra data to save with inline notifications. Use sparingly: only in cases where it is not possible to obtain the same data later. Will be merged for duplicate notifications.
-	 * @param bool $allowMerging	Allow two identical notification types to be merged
-	 * @param string|null $emailKey		Custom email template to use, or NULL to use default
+	 * @param	\IPS\Application	$app			The application the notification belongs to
+	 * @param	string				$key			Notification key
+	 * @param	object|NULL			$item			The thing the notification is about
+	 * @param	array				$emailParams	Data for notification emails
+	 * @param	array				$inlineExtra	Extra data to save with inline notifications. Use sparingly: only in cases where it is not possible to obtain the same data later. Will be merged for duplicate notifications.
+	 * @param	bool				$allowMerging	Allow two identical notification types to be merged
+	 * @param	string|NULL			$emailKey		Custom email template to use, or NULL to use default
 	 * @return	void
 	 */
-	public function __construct( Application $app, string $key, object $item=NULL, array $emailParams=array(), ?array $inlineExtra=array(), bool $allowMerging=TRUE, string $emailKey=NULL )
+	public function __construct( \IPS\Application $app, $key, $item=NULL, $emailParams=array(), $inlineExtra=array(), $allowMerging=TRUE, $emailKey=NULL )
 	{
 		$this->app			= $app;
 		$this->key			= $key;
 		$this->item			= $item;
-		$this->recipients	= new Recipients;
+		$this->recipients	= new \IPS\Notification\Recipients;
 		$this->emailParams	= $emailParams;
-		$this->inlineExtra	= $inlineExtra ?: array();
+		$this->inlineExtra	= $inlineExtra;
 		$this->allowMerging = $allowMerging;
 		$this->emailKey		= ( $emailKey === NULL ) ? 'notification_' . $this->key : $emailKey;
 	}
@@ -560,10 +551,10 @@ class Notification
 	/**
 	 * Send Notification
 	 *
-	 * @param array $sentTo		Members who have already received a notification and how (same format as the return value) to prevent duplicates
+	 * @param	array	$sentTo		Members who have already received a notification and how (same format as the return value) to prevent duplicates
 	 * @return	array	The members that were notified and how they were notified
 	 */
-	public function send( array $sentTo = array() ) : array
+	public function send( $sentTo = array() )
 	{
 		if ( static::$silenced === TRUE )
 		{
@@ -588,7 +579,7 @@ class Notification
 
 			$membersForNotifications[ $member->member_id ] = $member;
 		}
-		if( count( $membersForNotifications ) )
+		if( \count( $membersForNotifications ) )
 		{			
 			/* Fill in any that may not have customized their preferences */
 			foreach( $membersForNotifications as $member )
@@ -603,7 +594,7 @@ class Notification
 			$preferenceSet = array();
 
 			foreach (
-				Db::i()->select(
+				\IPS\Db::i()->select(
 					'd.*, p.preference, p.member_id',
 					array( 'core_notification_defaults', 'd' )
 				)->join(
@@ -612,7 +603,7 @@ class Notification
 				)
 				as $row
 			) {
-				if( !in_array( $row['notification_key'], $preferenceSet ) )
+				if( !\in_array( $row['notification_key'], $preferenceSet ) )
 				{
 					foreach( $membersForNotifications as $member )
 					{
@@ -643,9 +634,9 @@ class Notification
 			{
 				/* Permission check */
 				$item = $this->item;
-				if ( $item instanceof Item )
+				if ( $item instanceof \IPS\Content\Item )
 				{
-					$application = Application::load( $item::$application );
+					$application = \IPS\Application::load( $item::$application );
 					if ( !$application->canAccess( $member ) )
 					{
 						continue;
@@ -662,7 +653,7 @@ class Notification
 				/* Not ignoring the comment this is about */
 				foreach( $this->emailParams AS $param )
 				{
-					if ( $param instanceof Comment )
+					if ( $param instanceof \IPS\Content\Comment OR $param instanceof \IPS\Content\Review )
 					{
 						if ( $member->isIgnoring( $param->author(), 'topics' ) )
 						{
@@ -670,7 +661,7 @@ class Notification
 						}
 					}
 					
-					if ( $param instanceof Member)
+					if ( $param instanceof \IPS\Member )
 					{
 						if ( $member->isIgnoring( $param, 'topics' ) )
 						{
@@ -701,13 +692,13 @@ class Notification
 			}
 									
 			/* They want to receive an email (we don't send until the end once we've collated all the emails to send) */
-			if ( isset( $notificationPreferences[ $keyToCheck ] ) AND in_array( 'email', $notificationPreferences[ $keyToCheck ] ) and ( !isset( $sentTo[ $member->member_id ] ) or !in_array( 'email', $sentTo[ $member->member_id ] ) ) )
+			if ( isset( $notificationPreferences[ $keyToCheck ] ) AND \in_array( 'email', $notificationPreferences[ $keyToCheck ] ) and ( !isset( $sentTo[ $member->member_id ] ) or !\in_array( 'email', $sentTo[ $member->member_id ] ) ) )
 			{
 				$language = $member->language()->id;
 
 				if ( !isset( $emails[ $language ] ) )
 				{
-					$email = Email::buildFromTemplate( $this->app->directory, $this->emailKey, $this->emailParams, Email::TYPE_LIST );
+					$email = \IPS\Email::buildFromTemplate( $this->app->directory, $this->emailKey, $this->emailParams, \IPS\Email::TYPE_LIST );
 					
 					if ( $info )
 					{
@@ -732,12 +723,11 @@ class Notification
 					{
 						if ( $info['follow_app'] === 'core' and $info['follow_area'] === 'member' )
 						{
-							$thingsBeingFollowed[ $info['follow_app'] ][ $info['follow_area'] ][ $info['follow_rel_id'] ] = Member::load( $info['follow_rel_id'] );
+							$thingsBeingFollowed[ $info['follow_app'] ][ $info['follow_area'] ][ $info['follow_rel_id'] ] = \IPS\Member::load( $info['follow_rel_id'] );
 						}
 						else
 						{
-							/* @var ActiveRecord $classname */
-							$classname = 'IPS\\' . $info['follow_app'] . '\\' . IPS::mb_ucfirst( $info['follow_area'] );
+							$classname = 'IPS\\' . $info['follow_app'] . '\\' . mb_ucfirst( $info['follow_area'] );
 							$thingsBeingFollowed[ $info['follow_app'] ][ $info['follow_area'] ][ $info['follow_rel_id'] ] = $classname::load( $info['follow_rel_id'] );
 
 							/* Set some parameters so the best advertisement possible can be loaded later */
@@ -746,11 +736,11 @@ class Notification
 					}
 				
 					$thingBeingFollowed = $thingsBeingFollowed[ $info['follow_app'] ][ $info['follow_area'] ][ $info['follow_rel_id'] ];
-					if ( $thingBeingFollowed instanceof Member)
+					if ( $thingBeingFollowed instanceof \IPS\Member )
 					{
 						$unsubscribeBlurb = $member->language()->addToStack( 'unsubscribe_blurb_follow_member', FALSE, array( 'htmlsprintf' => array( $thingBeingFollowed->name ) ) );
 					}
-					elseif ( $thingBeingFollowed instanceof Model )
+					elseif ( $thingBeingFollowed instanceof \IPS\Node\Model )
 					{
 						$unsubscribeBlurb	= $member->language()->addToStack( 'unsubscribe_blurb_follow', FALSE, array( 'htmlsprintf' => array( $member->language()->addToStack( $thingBeingFollowed::$nodeTitle . '_sg' ), $thingBeingFollowed->getTitleForLanguage( $member->language() ) ) ) );
 					}
@@ -760,11 +750,11 @@ class Notification
 					}
 					
 					$guestKey = md5( $info['follow_app'] . ';' . $info['follow_area'] . ';' . $info['follow_rel_id'] . ';' . $info['follow_member_id'] . ';' . $info['follow_added'] ) . '-' . md5( $member->email . ';' . $member->ip_address . ';' . $member->joined->getTimestamp() );
-					$unfollowLink = Url::internal( "app=core&module=system&controller=notifications&do=unfollowFromEmail&follow_app={$info['follow_app']}&follow_area={$info['follow_area']}&follow_id={$info['follow_rel_id']}&gkey={$guestKey}", 'front' );
+					$unfollowLink = \IPS\Http\Url::internal( "app=core&module=system&controller=notifications&do=unfollowFromEmail&follow_app={$info['follow_app']}&follow_area={$info['follow_area']}&follow_id={$info['follow_rel_id']}&gkey={$guestKey}", 'front' );
 					$listUnsubscribeLink = $unfollowLink->setQueryString( 'listunsubscribe', 1 );
 
 					/* If we are tracking email views/clicks, add the tracking info to this URL as the email handler won't be able to */
-					if( Settings::i()->prune_log_emailstats != 0 )
+					if( \IPS\Settings::i()->prune_log_emailstats != 0 )
 					{
 						$unfollowLink = $unfollowLink->setQueryString( array( 'email' => 1, 'type' => $this->emailKey ) );
 					}
@@ -780,9 +770,9 @@ class Notification
 				if ( $okToEmail )
 				{
 					$emailRecipients[ $language ][ $member->email ] = array(
-						'member_name'		    => $member->name,
-						'unsubscribe_blurb'	    => $unsubscribeBlurb,
-						'unfollow_link'		    => $unfollowLink,
+						'member_name'		=> $member->name,
+						'unsubscribe_blurb'	=> $unsubscribeBlurb,
+						'unfollow_link'		=> $unfollowLink,
 						'list_unsubscribe_link' => $listUnsubscribeLink
 					);
 				}
@@ -793,85 +783,77 @@ class Notification
 			/* They want to receive an inline notification... (ignore for report center which is treated special and the 'inline' notification
 				preference actually instead controls whether the bubble should be shown on the report center icon at the top or not) */
 			$notification = NULL;
-			if ( $this->key != 'report_center' and isset( $notificationPreferences[ $keyToCheck ] ) and in_array( 'inline', $notificationPreferences[ $keyToCheck ] ) and ( !isset( $sentTo[ $member->member_id ] ) or !in_array( 'inline', $sentTo[ $member->member_id ] ) ) )
+			if ( $this->key != 'report_center' and isset( $notificationPreferences[ $keyToCheck ] ) and \in_array( 'inline', $notificationPreferences[ $keyToCheck ] ) and ( !isset( $sentTo[ $member->member_id ] ) or !\in_array( 'inline', $sentTo[ $member->member_id ] ) ) )
 			{
-				$hasMerged = false;
-				if ( $this->item and $this->allowMerging )
+				if ( $this->item AND $this->allowMerging )
 				{
 					try
 					{
 						$item = $this->item;
 						$idColumn = $item::$databaseColumnId;
-						$notification = Inline::constructFromData( Db::i()->select( '*', 'core_notifications', ['notification_key=? AND item_class=? AND item_id=? AND `member`=? AND read_time IS NULL', $this->key, get_class( $this->item ), $item->$idColumn, $member->member_id] )->first() );
-
+						$notification = \IPS\Notification\Inline::constructFromData( \IPS\Db::i()->select( '*', 'core_notifications', array( 'notification_key=? AND item_class=? AND item_id=? AND `member`=? AND read_time IS NULL', $this->key, \get_class( $this->item ), $item->$idColumn, $member->member_id ) )->first() );
+						
 						$notification->member = $member;
 						$notification->updated_time = time();
 						$notification->extra = array_merge( $notification->extra, $this->inlineExtra );
 						$notification->save();
-
-						$hasMerged = true;
+						
+						continue;
 					}
-					catch ( UnderflowException )
-					{
-					}
+					catch ( \UnderflowException $e ) { }
 				}
 
-				if ( ! $hasMerged )
+				$notification = new \IPS\Notification\Inline;
+				$notification->member = $member;
+				$notification->notification_app = $this->app;
+				$notification->notification_key = $this->key;
+				if ( $this->item )
 				{
-					$notification = new Inline;
-					$notification->member = $member;
-					$notification->notification_app = $this->app;
-					$notification->notification_key = $this->key;
-					if ( $this->item )
+					$notification->item = $this->item;
+				}
+				$notification->member_data = $info;
+				
+				foreach( $this->emailParams AS $param )
+				{
+					if ( $param instanceof \IPS\Content )
 					{
-						$notification->item = $this->item;
-					}
-					$notification->member_data = $info;
+						$subIdColumn = $param::$databaseColumnId;
+						$notification->item_sub_class	= \get_class( $param );
+						$notification->item_sub_id		= $param->$subIdColumn;
 
-					foreach ( $this->emailParams as $param )
-					{
-						if ( $param instanceof Content )
+						/*
+						 * If this is a grouped comment or review, set the sent time to the same time as the comment just in case there is a slight delay
+						 */
+						if ( ( $param instanceof \IPS\Content\Comment OR $param instanceof \IPS\Content\Review ) && \in_array( $this->key, array( 'new_comment', 'new_review', 'quote', 'new_likes' ) ) )
 						{
-							$subIdColumn = $param::$databaseColumnId;
-							$notification->item_sub_class = get_class( $param );
-							$notification->item_sub_id = $param->$subIdColumn;
-
-							/*
-							 * If this is a grouped comment or review, set the sent time to the same time as the comment just in case there is a slight delay
-							 */
-							if ( ( $param instanceof Comment ) && in_array( $this->key, ['new_comment', 'new_review', 'quote', 'new_likes'] ) )
+							if ( $this->key === 'new_likes' and $this->emailParams[1] instanceof \IPS\Member )
 							{
-								if ( $this->key === 'new_likes' and $this->emailParams[1] instanceof Member )
+								/* Reset the time to the time of the rep to prevent a slight delay from missing this notification */
+								try
 								{
-									/* Reset the time to the time of the rep to prevent a slight delay from missing this notification */
-									try
-									{
-										$where = $param->getReactionWhereClause();
-										$where[] = ['member_id = ?', $this->emailParams[1]->member_id];
-
-										$notification->sent_time = Db::i()->select( 'rep_date', 'core_reputation_index', $where )->join( 'core_reactions', 'reaction=reaction_id' )->first();
-									}
-									catch ( \Exception $ex )
-									{
-									}
+									$where = $param->getReactionWhereClause();
+									$where[] = array( 'member_id = ?', $this->emailParams[1]->member_id );
+									
+									$notification->sent_time = \IPS\Db::i()->select( 'rep_date', 'core_reputation_index', $where )->join( 'core_reactions', 'reaction=reaction_id' )->first();
 								}
-								else
-								{
-									$notification->sent_time = $param->mapped( 'date' );
-								}
+								catch( \Exception $ex ) { }
+							}
+							else
+							{
+								$notification->sent_time = $param->mapped('date');
 							}
 						}
 					}
-
-					$notification->extra = $this->inlineExtra;
-					$notification->save();
 				}
 
-				$sentTo[$member->member_id][] = 'inline';
+				$notification->extra = $this->inlineExtra;				
+				$notification->save();
+				
+				$sentTo[ $member->member_id ][] = 'inline';
 			}
-
+			
 			/* They want to receive a push notification (we don't send until the end once we've collated all the notifications to send) */
-			if ( ( static::webPushEnabled() && count( $member->getPwaAuths() ) ) and isset( $notificationPreferences[ $keyToCheck ] ) AND in_array( 'push', $notificationPreferences[ $keyToCheck ] ) and ( !isset( $sentTo[ $member->member_id ] ) or !in_array( 'push', $sentTo[ $member->member_id ] ) ) )
+			if ( ( static::webPushEnabled() && \count( $member->getPwaAuths() ) ) and isset( $notificationPreferences[ $keyToCheck ] ) AND \in_array( 'push', $notificationPreferences[ $keyToCheck ] ) and ( !isset( $sentTo[ $member->member_id ] ) or !\in_array( 'push', $sentTo[ $member->member_id ] ) ) )
 			{				
 				$language = $member->language();
 				if ( !isset( $pushNotifications[ $language->id ] ) )
@@ -892,8 +874,8 @@ class Notification
 							
 							if ( isset( $data['data']['url'] ) )
 							{
-								$url = Url::createFromString( $data['data']['url'] );
-								if ( $url instanceof Internal )
+								$url = \IPS\Http\Url::createFromString( $data['data']['url'] );
+								if ( $url instanceof \IPS\Http\Url\Internal )
 								{
 									foreach ( array( 'app', 'module', 'controller', 'id', 'comment', 'review' ) as $k )
 									{
@@ -924,43 +906,20 @@ class Notification
 				{
 					$pushRecipients[ $member->member_id ] = $pushNotifications[ $language->id ];
 					$pushRecipients[ $member->member_id ]['member'] = $member->member_id;
-
-					/* Count Unread PMs */
-					$unreadMessagesCount = Db::i()->select( 'COUNT(*)', 'core_message_topic_user_map', [ 'map_has_unread=1 and map_user_id=?', $member->member_id ] )->first();
-					$pushRecipients[ $member->member_id ]['unreadCount'] = $member->notification_cnt + $unreadMessagesCount;
-					$pushRecipients[ $member->member_id ]['notificationId'] = $notification?->id;
+					$pushRecipients[ $member->member_id ]['unreadCount'] = $member->notification_cnt;
+					$pushRecipients[ $member->member_id ]['notificationId'] = $notification ? $notification->id : NULL;
 				}
 								
 				$sentTo[ $member->member_id ][] = 'push';
 			}
 		}
 
-
-		/* On cloud, push this to the browser */
-		if ( Bridge::i()->featureIsEnabled( 'realtime' ) )
-		{
-			$memberIds = [];
-			foreach ( $sentTo as $memberId => $data )
-			{
-				if ( in_array( 'push', $data ) OR in_array( 'inline', $data ) )
-				{
-					$memberIds[] = $memberId;
-				}
-			}
-
-			if ( count( $memberIds ) )
-			{
-				Bridge::i()->publishRealtimeEvent( 'notifications_available', location: array_map( 'intval', $memberIds ), locationAsMember: true );
-			}
-		}
-
-
 		/* Send any emails and push notifications */
-		if ( count( $pushNotifications ) )
+		if ( \count( $pushNotifications ) )
 		{
 			$this->sendPushNotifications( $pushRecipients );
 		}
-		if ( count( $emails ) )
+		if ( \count( $emails ) )
 		{
 			$this->sendEmails( $emails, $emailRecipients );
 		}
@@ -972,11 +931,11 @@ class Notification
 	/**
 	 * Send emails
 	 *
-	 * @param array $emails				Emails to send
-	 * @param array $emailRecipients	Email recipients
+	 * @param	array 	$emails				Emails to send
+	 * @param	array 	$emailRecipients	Email recipients
 	 * @return	void
 	 */
-	protected function sendEmails( array $emails, array $emailRecipients ) : void
+	protected function sendEmails( $emails, $emailRecipients )
 	{
 		foreach ( $emails as $languageId => $email )
 		{
@@ -985,7 +944,7 @@ class Notification
 				$email->mergeAndSend( $emailRecipients[ $languageId ], NULL, NULL, array(
 					'List-Unsubscribe' 		=> '<*|list_unsubscribe_link|*>',
 					'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click'
-				), Lang::load( $languageId ) );
+				), \IPS\Lang::load( $languageId ) );
 			}
 		}
 	}
@@ -993,10 +952,10 @@ class Notification
 	/**
 	 * Send push notifications
 	 *
-	 * @param array $pushNotifications	Push notifications to send
+	 * @param	array 	$pushNotifications	Push notifications to send
 	 * @return	void
 	 */
-	protected function sendPushNotifications( array $pushNotifications ) : void
+	protected function sendPushNotifications( $pushNotifications )
 	{
 		/* Send PWA notifications */
 		$pwaPushNotifications = [];
@@ -1005,9 +964,9 @@ class Notification
 		{
 			$data = json_encode( array(
 				'member'	=> $memberId,
-				'title'		=> static::textForPushNotification( $data['title'] ?? Settings::i()->board_name ),
+				'title'		=> static::textForPushNotification( $data['title'] ?? \IPS\Settings::i()->board_name ),
 				'body'		=> static::textForPushNotification( $data['body'] ),
-				'url'		=> isset( $data['data']['url'] ) ? (string) $data['data']['url'] : NULL,
+				'url'		=> (string) $data['data']['url'],
 				'icon'		=> $data['icon'] ?? NULL,
 				'image'		=> $data['image'] ?? NULL,
 				'tag'		=> $data['tag'] ?? NULL,
@@ -1016,7 +975,7 @@ class Notification
 				'groupedUrl' => isset( $data['data']['groupedUrl'] ) ? (string) $data['data']['groupedUrl'] : NULL
 			) );
 
-			$notificationId = Db::i()->insert( 'core_notifications_pwa_queue', array( 'notification_data' => $data, 'expiration' => DateTime::ts( time() )->add( new DateInterval('P1D') )->getTimestamp() ) );
+			$notificationId = \IPS\Db::i()->insert( 'core_notifications_pwa_queue', array( 'notification_data' => $data, 'expiration' => \IPS\DateTime::ts( time() )->add( new \DateInterval('P1D') )->getTimestamp() ) );
 
 			$pwaPushNotifications[ $memberId ] = [
 				'member'	=> $memberId,
@@ -1028,18 +987,18 @@ class Notification
 			];
 		}
 
-		$memberIds = array_keys( $pwaPushNotifications );
-		$count = Db::i()->select( 'COUNT(*)', 'core_notifications_pwa_keys', Db::i()->in( '`member`', $memberIds ) )->first();
+		$memberIds = \array_keys( $pwaPushNotifications );
+		$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_notifications_pwa_keys', \IPS\Db::i()->in( '`member`', $memberIds ) )->first();
 
 		if ( $count )
 		{
-			if ( \IPS\IN_DEV or $count == 1 )
+			if ( $count == 1 )
 			{
 				static::sendPWANotifications( $pwaPushNotifications );
 			}
 			else
 			{
-				Task::queue( 'core', 'PWANotifications', $pwaPushNotifications, 2 );
+				\IPS\Task::queue( 'core', 'PWANotifications', $pwaPushNotifications, 2 );
 			}
 		}
 	}
@@ -1051,65 +1010,64 @@ class Notification
 	 */
 	public static function generateVapidKeys(): array
 	{
-		IPS::$PSR0Namespaces['Jose'] = ROOT_PATH . '/system/3rd_party/JwtFramework/src';
-		IPS::$PSR0Namespaces['Minishlink'] = ROOT_PATH . '/system/3rd_party/Minishlink';
-		IPS::$PSR0Namespaces['Base64Url'] = ROOT_PATH .'/system/3rd_party/Base64Url';
-		IPS::$PSR0Namespaces['Brick'] = ROOT_PATH . '/system/3rd_party/Brick';
+		\IPS\IPS::$PSR0Namespaces['Jose'] = \IPS\ROOT_PATH . '/system/3rd_party/JwtFramework/src';
+		\IPS\IPS::$PSR0Namespaces['Minishlink'] = \IPS\ROOT_PATH . '/system/3rd_party/Minishlink';
+		\IPS\IPS::$PSR0Namespaces['Base64Url'] = \IPS\ROOT_PATH .'/system/3rd_party/Base64Url';
+		\IPS\IPS::$PSR0Namespaces['Brick'] = \IPS\ROOT_PATH . '/system/3rd_party/Brick';
 
-		return VAPID::createVapidKeys();
+		return \Minishlink\WebPush\VAPID::createVapidKeys();
 	}
 	
 	/**
 	 * Send PWA notifications
 	 *
-	 * @param array $data	PWA notifications to send
+	 * @param	array 	$data	PWA notifications to send
 	 * @return	void
 	 */
-	public static function sendPWANotifications( array $data ) : void
+	public static function sendPWANotifications( $data )
 	{
-		IPS::$PSR0Namespaces['Jose'] = ROOT_PATH . '/system/3rd_party/JwtFramework/src';
-		IPS::$PSR0Namespaces['Minishlink'] = ROOT_PATH . '/system/3rd_party/Minishlink';
-		IPS::$PSR0Namespaces['Base64Url'] = ROOT_PATH .'/system/3rd_party/Base64Url';
-		IPS::$PSR0Namespaces['Brick'] = ROOT_PATH . '/system/3rd_party/Brick';
+		\IPS\IPS::$PSR0Namespaces['Jose'] = \IPS\ROOT_PATH . '/system/3rd_party/JwtFramework/src';
+		\IPS\IPS::$PSR0Namespaces['Minishlink'] = \IPS\ROOT_PATH . '/system/3rd_party/Minishlink';
+		\IPS\IPS::$PSR0Namespaces['Base64Url'] = \IPS\ROOT_PATH .'/system/3rd_party/Base64Url';
+		\IPS\IPS::$PSR0Namespaces['Brick'] = \IPS\ROOT_PATH . '/system/3rd_party/Brick';
 		
 		// Step 1: Validate VAPID details
-		$vapid = VAPID::validate( array(
-			'subject'		=> "mailto:" . Settings::i()->email_in,
-			'publicKey'		=> Settings::i()->vapid_public_key,
-			'privateKey'	=> Settings::i()->vapid_private_key
+		$vapid = \Minishlink\WebPush\VAPID::validate( array(
+			'subject'		=> "mailto:" . \IPS\Settings::i()->email_in,
+			'publicKey'		=> \IPS\Settings::i()->vapid_public_key, 
+			'privateKey'	=> \IPS\Settings::i()->vapid_private_key
 		) );
 
-		foreach (Db::i()->select( '*', 'core_notifications_pwa_keys', Db::i()->in( '`member`', array_keys( $data ) ) ) as $auth )
+		foreach ( \IPS\Db::i()->select( '*', 'core_notifications_pwa_keys', \IPS\Db::i()->in( '`member`', array_keys( $data ) ) ) as $auth )
 		{
 			/* Check device is logged in */
 			try
 			{
-				$device = Device::load( $auth['device'], NULL, [ 'member_id=?', $auth['member'] ] );
-
+				$device = \IPS\Member\Device::load( $auth['device'], NULL, [ 'member_id=?', $auth['member'] ] );
 				if ( !$device->login_key )
 				{
 					/* Is not, continue */
 					continue;
 				}
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				/* Device does not exist so delete & skip */
-				Db::i()->delete( 'core_notifications_pwa_keys', array( 'device=?', $auth['device'] ) );
+				\IPS\Db::i()->delete( 'core_notifications_pwa_keys', array( 'device=?', $auth['device'] ) );
 				continue;
 			}
 			
-			$endpoint = Url::external( $auth['endpoint'] );
+			$endpoint = \IPS\Http\Url::external( $auth['endpoint'] );
 
 			// Step 2: Content encoding (provided by browser)
 			$contentEncoding = $auth['encoding'];
 	
 			// Step 3: Get and pad the payload
 			$payload = json_encode( $data[ $auth['member'] ]['data'] );
-			$payload = Encryption::padPayload( $payload, Encryption::MAX_COMPATIBILITY_PAYLOAD_LENGTH, $contentEncoding );
+			$payload = \Minishlink\WebPush\Encryption::padPayload( $payload, \Minishlink\WebPush\Encryption::MAX_COMPATIBILITY_PAYLOAD_LENGTH, $contentEncoding );
 
 			// Step 4: Build Vapid headers
-			$audience = $endpoint->data[ Url::COMPONENT_SCHEME ] . "://" . $endpoint->data[ Url::COMPONENT_HOST ];
+			$audience = $endpoint->data[ \IPS\Http\Url::COMPONENT_SCHEME ] . "://" . $endpoint->data[ \IPS\Http\Url::COMPONENT_HOST ];
 			$cacheKey = implode( '#', array( $audience, $contentEncoding, md5(json_encode($vapid)) ) );
 
 			if( isset( static::$vapidHeaderCache[ $cacheKey ] ) )
@@ -1118,18 +1076,18 @@ class Notification
 			} 
 			else 
 			{
-				$vapidHeaders = VAPID::getVapidHeaders( $audience, $vapid['subject'], $vapid['publicKey'], $vapid['privateKey'], $contentEncoding );
+				$vapidHeaders = \Minishlink\WebPush\VAPID::getVapidHeaders( $audience, $vapid['subject'], $vapid['publicKey'], $vapid['privateKey'], $contentEncoding );
 				static::$vapidHeaderCache[ $cacheKey ] = $vapidHeaders;
 			}
 
 			// Step 5: Encrypt the payload with user's keys
-			$encryptedPayload = Encryption::encrypt( $payload, $auth['p256dh'], $auth['auth'], $contentEncoding );
+			$encryptedPayload = \Minishlink\WebPush\Encryption::encrypt( $payload, $auth['p256dh'], $auth['auth'], $contentEncoding );
 			$salt = $encryptedPayload['salt'];
 			$localPublicKey = $encryptedPayload['localPublicKey'];
 			$cipherText = $encryptedPayload['cipherText'];
 			
 			// Step 6: Get the content coding header and prepend it to the content
-			$encryptionContentCodingHeader = Encryption::getContentCodingHeader($salt, $localPublicKey, $contentEncoding);
+			$encryptionContentCodingHeader = \Minishlink\WebPush\Encryption::getContentCodingHeader($salt, $localPublicKey, $contentEncoding);
 			$content = $encryptionContentCodingHeader.$cipherText;
 			
 			// Step 7: Set headers
@@ -1145,11 +1103,11 @@ class Notification
 
 			if ( $contentEncoding === "aesgcm" ) 
 			{
-				$headers['Encryption'] = 'salt=' . Base64Url::encode($salt);
-				$headers['Crypto-Key'] = 'dh=' . Base64Url::encode($localPublicKey) . ';' . $vapidHeaders['Crypto-Key'];
+				$headers['Encryption'] = 'salt=' . \Base64Url\Base64Url::encode($salt);
+				$headers['Crypto-Key'] = 'dh=' . \Base64Url\Base64Url::encode($localPublicKey) . ';' . $vapidHeaders['Crypto-Key'];
 			}
 
-			$headers['Content-Length'] = Utils::safeStrlen($content);
+			$headers['Content-Length'] = \Minishlink\WebPush\Utils::safeStrlen($content);
 			$headers['Authorization'] = $vapidHeaders['Authorization'];
 			
 			try
@@ -1157,17 +1115,17 @@ class Notification
 				// Step 8: Send the damn thing
 				$response = $endpoint->request()->setHeaders( $headers )->post( $content );
 			}
-			catch( Exception $e )
+			catch( \IPS\Http\Request\Exception $e )
 			{
 				/* If the request failed (DNS issues, etc.). Log it and move on. */
-				Log::log( $e, 'pwa_notification' );
+				\IPS\Log::log( $e, 'pwa_notification' );
 				continue;
 			}
 
 			// Step 9: Check the response - 404/410 indicates a permanent problem, so delete that key
-			if( in_array( $response->httpResponseCode, array( 404, 410 ) ) )
+			if( \in_array( $response->httpResponseCode, array( 404, 410 ) ) )
 			{
-				Db::i()->delete( 'core_notifications_pwa_keys', array('id = ?', $auth['id'] ) );
+				\IPS\Db::i()->delete( 'core_notifications_pwa_keys', array('id = ?', $auth['id'] ) );
 			}
 		}
 	}
@@ -1175,11 +1133,11 @@ class Notification
 	/**
 	 * Convert HTML to plaintext for use in notifications
 	 *
-	 * @param string $html	HTML Text
+	 * @param	string	$html	HTML Text
 	 * @return	string
 	 * @todo Almost certainly will need to make this more thorough
 	 */
-	public static function textForPushNotification( string $html ): string
+	public static function textForPushNotification( $html )
 	{
 		return preg_replace( "/\n\s+/", "\n", trim( html_entity_decode( strip_tags( $html ) ) ) );
 	}

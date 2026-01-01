@@ -10,82 +10,62 @@
 
 namespace IPS\core\modules\admin\system;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\extensions\core\AdminNotifications\ConfigurationError;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
 use IPS\Http\Url;
-use IPS\Login as LoginClass;
-use IPS\Login\Exception;
-use IPS\Member;
-use IPS\MFA\MFAHandler;
 use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use function is_null;
-use function substr;
-use const IPS\CIC;
-use const IPS\IN_DEV;
-use const IPS\RECOVERY_MODE;
-use const IPS\ROOT_PATH;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Admin CP Login
  */
-class login extends Controller
+class _login extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Log In
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Do we have an unfinished upgrade? */
-		if ( !IN_DEV and ( !RECOVERY_MODE OR !isset( Request::i()->noWarning ) ) and Settings::i()->setup_in_progress )
+		if ( !\IPS\IN_DEV and ( \IPS\RECOVERY_MODE !== TRUE OR !isset( \IPS\Request::i()->noWarning ) ) and \IPS\Settings::i()->setup_in_progress )
 		{
 			/* Don't allow the upgrade in progress page to be cached, it will only be displayed for a very short period of time */
-			foreach( Output::getNoCacheHeaders() as $headerKey => $headerValue )
+			foreach( \IPS\Output::getNoCacheHeaders() as $headerKey => $headerValue )
 			{
 				header( "{$headerKey}: {$headerValue}" );
 			}
-			include( ROOT_PATH . '/admin/upgrade/upgradeStarted.php' );
+			include( \IPS\ROOT_PATH . '/' . \IPS\CP_DIRECTORY . '/upgrade/upgradeStarted.php' );
 			session_abort();
 			exit;
 		}
 
 		/* Do we have an upgrade available to install? */
-		if ( !IN_DEV and !isset( Request::i()->noWarning ) )
+		if ( !\IPS\IN_DEV and !isset( \IPS\Request::i()->noWarning ) )
 		{
-			if( Application::load('core')->long_version < Application::getAvailableVersion('core') and Application::load('core')->version != Application::getAvailableVersion( 'core', TRUE ) )
+			if( \IPS\Application::load('core')->long_version < \IPS\Application::getAvailableVersion('core') and \IPS\Application::load('core')->version != \IPS\Application::getAvailableVersion( 'core', TRUE ) )
 			{
 				/* Force no caching */
 				@header( "Cache-control: no-cache, no-store, must-revalidate, max-age=0, s-maxage=0" );
 				@header( "Expires: 0" );
 
-				if ( CIC )
+				if ( \IPS\CIC )
 				{
-					include( ROOT_PATH . '/admin/upgrade/upgradeAvailableCic.php' );
+					include( \IPS\ROOT_PATH . '/' . \IPS\CP_DIRECTORY . '/upgrade/upgradeAvailableCic.php' );
 				}
 				else
 				{
-					include( ROOT_PATH . '/admin/upgrade/upgradeAvailable.php' );
+					include( \IPS\ROOT_PATH . '/' . \IPS\CP_DIRECTORY . '/upgrade/upgradeAvailable.php' );
 				}
 				session_abort();
 				exit;
@@ -93,16 +73,16 @@ class login extends Controller
 		}
 
 		/* Init login class */
-		$url = Url::internal( "app=core&module=system&controller=login", 'admin' );
-		if ( isset( Request::i()->noWarning ) )
+		$url = \IPS\Http\Url::internal( "app=core&module=system&controller=login", 'admin' );
+		if ( isset( \IPS\Request::i()->noWarning ) )
 		{
 			$url = $url->setQueryString( 'noWarning', 1 );
 		}
-		if ( isset( Request::i()->ref ) )
+		if ( isset( \IPS\Request::i()->ref ) )
 		{
-			$url = $url->setQueryString( 'ref', Request::i()->ref );
+			$url = $url->setQueryString( 'ref', \IPS\Request::i()->ref );
 		}
-		$login = new LoginClass( $url, LoginClass::LOGIN_ACP );
+		$login = new \IPS\Login( $url, \IPS\Login::LOGIN_ACP );
 		
 		/* Authenticate */
 		$error = NULL;
@@ -119,16 +99,16 @@ class login extends Controller
 					{
 						$_SESSION['processing2FA'] = array( 'memberId' => $success->member->member_id );
 						
-						$url = Url::internal( 'app=core&module=system&controller=login&do=mfa', 'admin', 'login' );
-						if ( isset( Request::i()->ref ) )
+						$url = \IPS\Http\Url::internal( 'app=core&module=system&controller=login&do=mfa', 'admin', 'login' );
+						if ( isset( \IPS\Request::i()->ref ) )
 						{
-							$url = $url->setQueryString( 'ref', Request::i()->ref );
+							$url = $url->setQueryString( 'ref', \IPS\Request::i()->ref );
 						}
-						if ( isset( Request::i()->auth ) )
+						if ( isset( \IPS\Request::i()->auth ) )
 						{
-							$url = $url->setQueryString( 'auth', Request::i()->auth );
+							$url = $url->setQueryString( 'auth', \IPS\Request::i()->auth );
 						}
-						Output::i()->redirect( $url );
+						\IPS\Output::i()->redirect( $url );
 					}
 
 					$success->device->updateAfterAuthentication( FALSE, $success->handler, FALSE, FALSE );
@@ -143,137 +123,136 @@ class login extends Controller
 				}
 			}
 		}
-		catch ( Exception $e )
+		catch ( \IPS\Login\Exception $e )
 		{
 			$error = $e->getMessage();
 			$this->_log( 'fail' );
 		}
 		
 		/* Have we been sent here because of an IP address mismatch? */
-		if ( is_null( $error ) AND isset( Request::i()->error ) )
+		if ( \is_null( $error ) AND isset( \IPS\Request::i()->error ) )
 		{
-			switch( Request::i()->error )
+			switch( \IPS\Request::i()->error )
 			{
 				case 'BAD_IP':
-					$error = Member::loggedIn()->language()->addToStack( 'cp_bad_ip' );
+					$error = \IPS\Member::loggedIn()->language()->addToStack( 'cp_bad_ip' );
 				break;
 				
 				case 'NO_ACPACCESS':
-					$error = Member::loggedIn()->language()->addToStack( 'no_access_cp' );
+					$error = \IPS\Member::loggedIn()->language()->addToStack( 'no_access_cp' );
 				break;
 			}
 		}
 
 		/* Display Login Form */
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_system.js', 'core', 'admin' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/login.css', 'core', 'admin' ) );
-		Output::i()->sendOutput( Theme::i()->getTemplate( 'system' )->login( $login, $error, FALSE ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_system.js', 'core', 'admin' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/login.css', 'core', 'admin' ) );
+		\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'system' )->login( $login, $error, FALSE ) );
 	}
 	
 	/**
 	 * MFA
 	 *
-	 * @param	string|null	$mfaOutput	If coming from _doLogin, the existing MFA output
+	 * @param	string	$mfaOutput	If coming from _doLogin, the existing MFA output
 	 * @return	void
 	 */
-	protected function mfa( ?string $mfaOutput=NULL ) : void
+	protected function mfa( $mfaOutput=NULL )
 	{
 		/* Have we logged in? */
 		$member = NULL;
 		if ( isset( $_SESSION['processing2FA']  ) )
 		{
-			$member = Member::load( $_SESSION['processing2FA']['memberId'] );
+			$member = \IPS\Member::load( $_SESSION['processing2FA']['memberId'] );
 		}
 		if ( !$member AND !$member->member_id )
 		{
-			Output::i()->redirect( Url::internal( '', 'admin' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( '', 'admin' ) );
 		}
 		
 		/* Set the referer in the URL */
-		$url = Url::internal( 'app=core&module=system&controller=login&do=mfa', 'admin', 'login' );
-		if ( isset( Request::i()->ref ) )
+		$url = \IPS\Http\Url::internal( 'app=core&module=system&controller=login&do=mfa', 'admin', 'login' );
+		if ( isset( \IPS\Request::i()->ref ) )
 		{
-			$url = $url->setQueryString( 'ref', Request::i()->ref );
+			$url = $url->setQueryString( 'ref', \IPS\Request::i()->ref );
 		}
-		if ( isset( Request::i()->auth ) )
+		if ( isset( \IPS\Request::i()->auth ) )
 		{
-			$url = $url->setQueryString( 'auth', Request::i()->auth );
+			$url = $url->setQueryString( 'auth', \IPS\Request::i()->auth );
 		}
 		
 		/* Have we already done 2FA? */
-		$output = $mfaOutput ?: MFAHandler::accessToArea( 'core', 'AuthenticateAdmin', $url, $member );
+		$output = $mfaOutput ?: \IPS\MFA\MFAHandler::accessToArea( 'core', 'AuthenticateAdmin', $url, $member );
 		if ( !$output )
 		{			
 			$this->_doLogin( $member, TRUE );
 		}
 		
 		/* Nope, displau the 2FA form over the login page */
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/login.css', 'core', 'admin' ) );
-		Output::i()->sendOutput( Theme::i()->getTemplate( 'system' )->mfaLogin( $output ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/login.css', 'core', 'admin' ) );
+		\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'system' )->mfaLogin( $output ) );
 	}
 	
 	/**
 	 * Process log in
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	bool			$bypass2FA		If true, will not perform 2FA check
 	 * @return	void
 	 */
-	protected function _doLogin( Member $member, bool $bypass2FA = FALSE ) : void
+	protected function _doLogin( $member, $bypass2FA = FALSE )
 	{
 		/* Check if we need to send any ACP notifications */
-		ConfigurationError::runChecksAndSendNotifications();
+		\IPS\core\extensions\core\AdminNotifications\ConfigurationError::runChecksAndSendNotifications();
 		
 		/* Set the referer in the URL */
-		$url = Url::internal( 'app=core&module=system&controller=login&do=mfa', 'admin', 'login' );
-		if ( isset( Request::i()->ref ) )
+		$url = \IPS\Http\Url::internal( 'app=core&module=system&controller=login&do=mfa', 'admin', 'login' );
+		if ( isset( \IPS\Request::i()->ref ) )
 		{
-			$url = $url->setQueryString( 'ref', Request::i()->ref );
+			$url = $url->setQueryString( 'ref', \IPS\Request::i()->ref );
 		}
-		if ( isset( Request::i()->auth ) )
+		if ( isset( \IPS\Request::i()->auth ) )
 		{
-			$url = $url->setQueryString( 'auth', Request::i()->auth );
+			$url = $url->setQueryString( 'auth', \IPS\Request::i()->auth );
 		}
 
 		/* Do we need to do 2FA? */
-		if ( !$bypass2FA and $output = MFAHandler::accessToArea( 'core', 'AuthenticateAdmin', $url, $member ) )
+		if ( !$bypass2FA and $output = \IPS\MFA\MFAHandler::accessToArea( 'core', 'AuthenticateAdmin', $url, $member ) )
 		{
 			$_SESSION['processing2FA'] = array( 'memberId' => $member->member_id );
 
-			$this->mfa( $output );
-			return;
+			return $this->mfa( $output );
 		}
 		
 		/* Set the member */
-		Session::i()->setMember( $member );
+		\IPS\Session::i()->setMember( $member );
 		
 		/* Log */
 		$this->_log( 'ok' );
 
 		/* Clean out any existing session ID in the URL */
 		$queryString = array();
-		if( isset( Request::i()->ref ) )
+		if( isset( \IPS\Request::i()->ref ) )
 		{
-			parse_str( base64_decode( Request::i()->ref ), $queryString );
+			parse_str( base64_decode( \IPS\Request::i()->ref ), $queryString );
 		}
 
 		/* Do we need to show the installation onboard screen? */
-		if( isset( Settings::i()->onboard_complete ) AND ( Settings::i()->onboard_complete == 0 OR ( Settings::i()->onboard_complete != 1 AND Settings::i()->onboard_complete < time() ) ) )
+		if( isset( \IPS\Settings::i()->onboard_complete ) AND ( \IPS\Settings::i()->onboard_complete == 0 OR ( \IPS\Settings::i()->onboard_complete != 1 AND \IPS\Settings::i()->onboard_complete < time() ) ) )
 		{
 			/* We flag that onboarding is complete now so that if the admin clicks away from the page they're not immediately taken back. This is supposed to be helpful, not a hindrance. */
-			Settings::i()->changeValues( array( 'onboard_complete' => 1 ) );
+			\IPS\Settings::i()->changeValues( array( 'onboard_complete' => 1 ) );
 
-			Output::i()->redirect( Url::internal( "app=core&module=overview&controller=onboard&do=initial", 'admin' )->csrf() );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=overview&controller=onboard&do=initial", 'admin' )->csrf() );
 		}
 				
 		/* Boink - if we're in recovery mode, go there */
-		if ( RECOVERY_MODE )
+		if ( \IPS\RECOVERY_MODE === TRUE )
 		{
-			Output::i()->redirect( Url::internal( "app=core&module=support&controller=recovery" )->csrf(), '', 303 );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=support&controller=recovery" )->csrf(), '', 303 );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( http_build_query( $queryString, '', '&' ) ), '', 303 );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( http_build_query( $queryString, '', '&' ) ), '', 303 );
 		}
 	}
 		
@@ -282,12 +261,12 @@ class login extends Controller
 	 *
 	 * @return void
 	 */
-	protected function logout() : void
+	protected function logout()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		session_destroy();
-		Output::i()->redirect( Url::internal( "app=core&module=system&controller=login&_fromLogout=1" ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=system&controller=login&_fromLogout=1" ) );
 	}
 	
 	/**
@@ -296,10 +275,10 @@ class login extends Controller
 	 * @param	string	$status	Status ['fail','ok']
 	 * @return void
 	 */
-	protected function _log( string $status ) : void
+	protected function _log( $status )
 	{
 		/* Generate request details */
-		foreach( Request::i() as $k => $v )
+		foreach( \IPS\Request::i() as $k => $v )
 		{
 			if ( $k == 'password' AND mb_strlen( $v ) > 1 )
 			{
@@ -309,29 +288,29 @@ class login extends Controller
 		}
 		
 		$save = array(
-			'admin_ip_address'		=> Request::i()->ipAddress(),
-			'admin_username'		=> Request::i()->auth ? substr( Request::i()->auth, 0, 255 ) : '',
+			'admin_ip_address'		=> \IPS\Request::i()->ipAddress(),
+			'admin_username'		=> \IPS\Request::i()->auth ? \substr( \IPS\Request::i()->auth, 0, 255 ) : '',
 			'admin_time'			=> time(),
 			'admin_success'			=> ( $status == 'ok' ) ? 1 : 0,
 			'admin_request'	=> json_encode( $request ),
 		);
 		
-		Db::i()->insert( 'core_admin_login_logs', $save );
+		\IPS\Db::i()->insert( 'core_admin_login_logs', $save );
 	}
 
 	/**
 	 * Return current CSRF token
 	 *
-	 * @return void
+	 * @return string|null
 	 */
-	public function getCsrfKey() : void
+	public function getCsrfKey()
 	{
 		/* Don't cache the CSRF key */
-		Output::setCacheTime( false );
+		\IPS\Output::setCacheTime( false );
 
-		/* Nor CORS request (e.g. the whole point of CSRF) */
-		Output::i()->httpHeaders['Access-Control-Allow-Origin'] = Url::internal('')->data[ Url::COMPONENT_SCHEME ] . '://' . Url::internal('')->data[ Url::COMPONENT_HOST ];
+		/* Restrict endpoint to our origin JS */
+		Output::i()->httpHeaders['Access-Control-Allow-Origin'] = Url::baseUrl()->data[ Url::COMPONENT_SCHEME ] . '://' . Url::baseUrl()->data[ Url::COMPONENT_HOST ];
 
-		Output::i()->json( [ 'key' => Session::i()->csrfKey ] );
+		\IPS\Output::i()->json( [ 'key' => \IPS\Session::i()->csrfKey ] );
 	}
 }

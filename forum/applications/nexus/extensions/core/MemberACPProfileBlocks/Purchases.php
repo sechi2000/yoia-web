@@ -11,55 +11,44 @@
 namespace IPS\nexus\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\TabbedBlock;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Tree\Tree;
-use IPS\nexus\Purchase;
-use IPS\Request;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Purchases
  */
-class Purchases extends TabbedBlock
+class _Purchases extends \IPS\core\MemberACPProfile\TabbedBlock
 {
 	/**
 	 * Purchase tree
 	 */
-	protected ?Tree $_purchases = NULL;
+	protected $_purchases = NULL;
 
 	/**
 	 * Get Tab Names
 	 *
-	 * @return	array
+	 * @return	string
 	 */
-	public function tabs(): array
+	public function tabs()
 	{
 		$tabs = array();
 
-		$activeCount = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_member=? AND ps_show=1 AND ps_active=1 AND ps_parent = 0', $this->member->member_id ) )->first();
+		$activeCount = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_member=? AND ps_show=1 AND ps_active=1 AND ps_parent = 0', $this->member->member_id ) )->first();
 		$tabs['active'] = array(
 				'icon'		=> 'credit-card',
 				'count'		=> $activeCount,
 		);
 
-		$expiredCount = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_member=? AND ps_active = 0 AND ps_cancelled = 0 AND ps_parent = 0 AND ps_expire <?', $this->member->member_id, DateTime::create()->getTimestamp() ) )->first();
+		$expiredCount = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_member=? AND ps_active = 0 AND ps_cancelled = 0 AND ps_parent = 0 AND ps_expire <?', $this->member->member_id, \IPS\DateTime::create()->getTimestamp() ) )->first();
 		$tabs['expired'] = array(
 				'icon'		=> 'credit-card',
 				'count'		=> $expiredCount,
 		);
 
-		$canceledCount = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_member=? AND ps_cancelled=1 AND ps_parent = 0', $this->member->member_id ) )->first();
+		$canceledCount = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_member=? AND ps_cancelled=1 AND ps_parent = 0', $this->member->member_id ) )->first();
 		$tabs['canceled'] = array(
 			'icon'		=> 'credit-card',
 			'count'		=> $canceledCount,
@@ -73,33 +62,32 @@ class Purchases extends TabbedBlock
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
 		$tabs = $this->tabs();
-		if ( !count( $tabs ) )
+		if ( !\count( $tabs ) )
 		{
 			return '';
 		}
 		$tabKeys = array_keys( $tabs );
-		$activeTabKey = ( isset( Request::i()->block['nexus_Purchase'] ) and array_key_exists( Request::i()->block['nexus_Purchases'], $tabs ) ) ? Request::i()->block['nexus_Purchases'] : array_shift( $tabKeys );
+		$activeTabKey = ( isset( \IPS\Request::i()->block['nexus_Purchase'] ) and array_key_exists( \IPS\Request::i()->block['nexus_Purchases'], $tabs ) ) ? \IPS\Request::i()->block['nexus_Purchases'] : array_shift( $tabKeys );
 
-		return (string) Theme::i()->getTemplate( 'customers', 'nexus' )->purchases( $this->member, $tabs, $activeTabKey, $this->tabOutput( $activeTabKey ) );
+		return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->purchases( $this->member, $tabs, $activeTabKey, $this->tabOutput( $activeTabKey ) );
 	}
 
 	/**
 	 * Get output
 	 *
-	 * @param string $tab
-	 * @return    mixed
+	 * @return	string
 	 */
-	public function tabOutput(string $tab ): mixed
+	public function tabOutput( $activeTabKey )
 	{
 		if ( $this->_purchases === NULL )
 		{
 			$where = array();
 			$where[] = array( 'ps_member=?', $this->member->member_id );
 
-			switch ( $tab )
+			switch ( $activeTabKey )
 			{
 				case 'active':
 					$where[] = array( 'ps_active=1' );
@@ -108,11 +96,11 @@ class Purchases extends TabbedBlock
 					$where[] = array( 'ps_cancelled=1' );
 					break;
 				case 'expired':
-					$where[] = array( 'ps_active = 0 and ps_cancelled = 0 and ps_expire <?', DateTime::create()->getTimestamp() );
+					$where[] = array( 'ps_active = 0 and ps_cancelled = 0 and ps_expire <?', \IPS\DateTime::create()->getTimestamp() );
 					break;
 			}
 
-			$this->_purchases = Purchase::tree( $this->member->acpUrl()->setQueryString( 'blockKey', 'nexus_Purchases' ), $where );
+			$this->_purchases = \IPS\nexus\Purchase::tree( $this->member->acpUrl()->setQueryString( 'blockKey', 'nexus_Purchases' ), $where );
 			$this->_purchases->getTotalRoots = function()
 			{
 				return NULL;

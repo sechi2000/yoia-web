@@ -11,26 +11,20 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Theme;
-use LengthException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Key/Value input class for Form Builder
  */
-class KeyValue extends FormAbstract
+class _KeyValue extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
-	 * @see        Date
+	 * @see		\IPS\Helpers\Form\Date::$defaultOptions
 	 * @code
 	 	$defaultOptions = array(
 	 		'start'			=> array( ... ),
@@ -38,7 +32,7 @@ class KeyValue extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'key'		=> array(
 			'minLength'			=> NULL,
 			'maxLength'			=> NULL,
@@ -68,31 +62,32 @@ class KeyValue extends FormAbstract
 	/**
 	 * @brief	Key Object
 	 */
-	public mixed $keyField = NULL;
+	public $keyField = NULL;
 	
 	/**
 	 * @brief	Value Object
 	 */
-	public mixed $valueField = NULL;
-
+	public $valueField = NULL;
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		$options = array_merge( $this->defaultOptions, $options );
 		
-		$this->keyField = new Text( "{$name}[key]", $defaultValue['key'] ?? NULL, FALSE, $options['key'] ?? array() );
-		$this->valueField = new Text( "{$name}[value]", $defaultValue['value'] ?? NULL, FALSE, $options['value'] ?? array() );
+		$this->keyField = new \IPS\Helpers\Form\Text( "{$name}[key]", isset( $defaultValue['key'] ) ? $defaultValue['key'] : NULL, FALSE, isset( $options['key'] ) ? $options['key'] : array() );
+		$this->valueField = new \IPS\Helpers\Form\Text( "{$name}[value]", isset( $defaultValue['value'] ) ? $defaultValue['value'] : NULL, FALSE, isset( $options['value'] ) ? $options['value'] : array() );
 		
 		parent::__construct( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
 	}
@@ -102,7 +97,7 @@ class KeyValue extends FormAbstract
 	 *
 	 * @return	array
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
 		return array(
 			'key'	=> $this->keyField->formatValue(),
@@ -115,19 +110,19 @@ class KeyValue extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->keyValue( $this->keyField->html(), $this->valueField->html() );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->keyValue( $this->keyField->html(), $this->valueField->html() );
 	}
 	
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
-	 * @throws	LengthException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\LengthException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		$this->keyField->validate();
 		$this->valueField->validate();
@@ -137,7 +132,5 @@ class KeyValue extends FormAbstract
 			$validationFunction = $this->customValidationCode;
 			$validationFunction( $this->value );
 		}
-
-		return TRUE;
 	}
 }

@@ -10,28 +10,25 @@
  */
 
 namespace IPS\forums\api\GraphQL\Queries;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\forums\api\GraphQL\Types\ForumType;
-use IPS\forums\Forum as ForumClass;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Forum query for GraphQL API
  */
-class Forum
+class _Forum
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns a forum";
+	public static $description = "Returns a forum";
 
 	/*
 	 * Query arguments
@@ -46,10 +43,8 @@ class Forum
 
 	/**
 	 * Return the query return type
-	 *
-	 * @return ForumType
 	 */
-	public function type() : ForumType
+	public function type() 
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::forum();
 	}
@@ -57,19 +52,18 @@ class Forum
 	/**
 	 * Resolves this query
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @param 	array $context 	Context values
-	 * @param	mixed $info
-	 * @return	ForumClass
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\forums\Forum
 	 */
-	public function resolve( mixed $val, array $args, array $context, mixed $info ) : ForumClass
+	public function resolve($val, $args, $context, $info)
 	{
-		$forum = ForumClass::load( $args['id'] );
+		$forum = \IPS\forums\Forum::load( $args['id'] );
 
 		if( !$forum->can( 'view', $context['member'] ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		return $forum;
 	}

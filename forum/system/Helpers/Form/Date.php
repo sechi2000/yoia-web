@@ -11,31 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use Exception;
-use InvalidArgumentException;
-use IPS\DateTime;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use LengthException;
-use function defined;
-use function is_array;
-use function is_int;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Date input class for Form Builder
  */
-class Date extends FormAbstract
+class _Date extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -53,7 +38,7 @@ class Date extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'min'				=> NULL,
 		'max'				=> NULL,
 		'disabled'			=> FALSE,
@@ -68,26 +53,27 @@ class Date extends FormAbstract
 	/**
 	 * Input name for time field
 	 */
-	protected string|array|null $timeName = NULL;
+	protected $timeName = NULL;
 	
 	/**
 	 * Input name for unlimited checkbox
 	 */
-	protected string|array|null $unlimitedName = NULL;
-
+	protected $unlimitedName = NULL;
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		/* Work out the key for the time input and unlimited checkboxes */
 		if ( mb_strpos( $name, '[' ) !== FALSE )
@@ -107,11 +93,11 @@ class Date extends FormAbstract
 		/* Set min/max - hardcoded to 32bit values rather than using PHP_INT_MAX because the MySQL server may be 32-bit even if the web server is 64 */
 		if ( !isset( $this->options['min'] ) or $this->options['min']->getTimestamp() < -2147483648 )
 		{
-			$this->options['min'] = DateTime::ts( -2147483648 );
+			$this->options['min'] = \IPS\DateTime::ts( -2147483648 );
 		}
 		if ( !isset( $this->options['max'] ) or $this->options['max']->getTimestamp() > 2147483647 )
 		{
-			$this->options['max'] = DateTime::ts( 2147483647 );
+			$this->options['max'] = \IPS\DateTime::ts( 2147483647 );
 		}
 	}
 
@@ -120,11 +106,11 @@ class Date extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'jquery/jquery-ui.js', 'core', 'interface' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'jquery/jquery-touchpunch.js', 'core', 'interface' ) );
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->date(
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'jquery/jquery-ui.js', 'core', 'interface' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'jquery/jquery-touchpunch.js', 'core', 'interface' ) );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->date(
 			$this->name,
 			$this->value,
 			$this->required,
@@ -145,7 +131,7 @@ class Date extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		/* Unlimited? */
 		if ( $this->options['unlimited'] !== NULL )
@@ -153,12 +139,12 @@ class Date extends FormAbstract
 			$unlimitedName = $this->unlimitedName;
 			if ( mb_strpos( $unlimitedName, '[' ) === FALSE )
 			{
-				if ( isset( Request::i()->$unlimitedName ) )
+				if ( isset( \IPS\Request::i()->$unlimitedName ) )
 				{
 					return $this->options['unlimited'];
 				}
 			}
-			elseif ( Request::i()->valueFromArray( $unlimitedName ) !== NULL )
+			elseif ( \IPS\Request::i()->valueFromArray( $unlimitedName ) !== NULL )
 			{
 				return $this->options['unlimited'];
 			}			
@@ -167,20 +153,20 @@ class Date extends FormAbstract
 		/* Get value */
 		return parent::getValue();
 	}
-
+	
 	/**
 	 * Format Value
 	 *
-	 * @return mixed
+	 * @return	\IPS\DateTime|null
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
 		$v = $this->value;
 		try
 		{
-			$timezone = $this->options['timezone'] ?: ( Member::loggedIn()->timezone ? new DateTimeZone( Member::loggedIn()->timezone ) : NULL );
+			$timezone = $this->options['timezone'] ?: ( \IPS\Member::loggedIn()->timezone ? new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) : NULL );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
 			$timezone = NULL;
 		}
@@ -191,21 +177,21 @@ class Date extends FormAbstract
 		}
 		elseif ( $v )
 		{
-			if ( is_int( $v ) or ( is_string( $v ) and preg_match( '/^[0-9]+$/', $v ) ) )
+			if ( \is_int( $v ) or ( $v and \is_string( $v ) and preg_match( '/^[0-9]+$/', $v ) ) )
 			{
-				return DateTime::ts( $v );
+				return \IPS\DateTime::ts( $v );
 			}
-			else if( is_array( $v ) )
+			else if( \is_array( $v ) )
 			{
 				/* When using pagination and date range, data may come as an array of the datetime object, e.g. field['start']['date']=(date)&field['start']['timezone']=(timezone) */
 				try
 				{
 					$timeKey = $this->timeName;
-					$time = $this->options['time'] ? ( mb_strpos( $timeKey, '[' ) === FALSE ? Request::i()->$timeKey : Request::i()->valueFromArray( $timeKey ) ) : '';
+					$time = $this->options['time'] ? ( mb_strpos( $timeKey, '[' ) === FALSE ? \IPS\Request::i()->$timeKey : \IPS\Request::i()->valueFromArray( $timeKey ) ) : '';
 					
-					return new DateTime( static::_convertDateFormat( $v['date'] ) . ' ' . $time, new DateTimeZone( $v['timezone'] ) );
+					return new \IPS\DateTime( static::_convertDateFormat( $v['date'] ) . ' ' . $time, new \DateTimeZone( $v['timezone'] ) );
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
 					return $v;
 				}
@@ -215,13 +201,13 @@ class Date extends FormAbstract
 				try
 				{
 					$timeKey = $this->timeName;
-					$time = $this->options['time'] ? ( mb_strpos( $timeKey, '[' ) === FALSE ? Request::i()->$timeKey : Request::i()->valueFromArray( $timeKey ) ) : '';
+					$time = $this->options['time'] ? ( mb_strpos( $timeKey, '[' ) === FALSE ? \IPS\Request::i()->$timeKey : \IPS\Request::i()->valueFromArray( $timeKey ) ) : '';
 					
 					if( $time )
 					{
-						return new DateTime( static::_convertDateFormat( $v ) . ' ' . $time, $timezone );
+						return new \IPS\DateTime( static::_convertDateFormat( $v ) . ' ' . $time, $timezone );
 					}
-					else if( $v instanceof DateTime )
+					else if( $v instanceof \IPS\DateTime )
 					{
 						if ( $timezone )
 						{
@@ -231,10 +217,10 @@ class Date extends FormAbstract
 					}
 					else
 					{
-						return new DateTime( static::_convertDateFormat( $v ), $timezone );
+						return new \IPS\DateTime( static::_convertDateFormat( $v ), $timezone );
 					}
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
 					return $v;
 				}
@@ -247,12 +233,12 @@ class Date extends FormAbstract
 	 * Convert date to expected format
 	 *
 	 * @param	string				$date	User supplied date
-	 * @param	Member|NULL	$member	The user that supplied it (NULL For currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The user that supplied it (NULL For currently logged in member)
 	 * @return	string
 	 */
-	public static function _convertDateFormat( string $date, Member $member = NULL ): string
+	public static function _convertDateFormat( $date, \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		$format = $member->language()->preferredDateFormat();
 		
 		$count = 0;
@@ -278,21 +264,21 @@ class Date extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
-	 * @throws	LengthException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\LengthException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		if( $this->value === NULL and $this->required )
 		{
-			throw new InvalidArgumentException('form_required');
+			throw new \InvalidArgumentException('form_required');
 		}
 
 		/* Check it's valid */
-		if ( !( $this->value instanceof DateTime ) and $this->value !== NULL AND ( $this->options['unlimited'] === NULL OR $this->value !== $this->options['unlimited'] ) )
+		if ( !( $this->value instanceof \IPS\DateTime ) and $this->value !== NULL AND ( $this->options['unlimited'] === NULL OR $this->value !== $this->options['unlimited'] ) )
 		{
-			throw new InvalidArgumentException( 'form_date_bad' );
+			throw new \InvalidArgumentException( 'form_date_bad' );
 		}
 		
 		parent::validate();
@@ -307,32 +293,32 @@ class Date extends FormAbstract
 
 		try
 		{
-			$timezone = $this->options['timezone'] ?: ( Member::loggedIn()->timezone ? new DateTimeZone( Member::loggedIn()->timezone ) : NULL );
+			$timezone = $this->options['timezone'] ?: ( \IPS\Member::loggedIn()->timezone ? new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) : NULL );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
 			$timezone = NULL;
 		}
 		
 		if ( $this->value and $this->options['min'] !== NULL and $this->options['min'] > $this->value )
 		{
-			$string = $this->options['min']->setTimeZone( $timezone )->localeDate( Member::loggedIn() );
+			$string = $this->options['min']->setTimeZone( $timezone )->localeDate( \IPS\Member::loggedIn() );
 			if( $this->options['time'] )
 			{
-				$string .=' ' . $this->options['min']->setTimeZone( $timezone )->localeTime();
+				$string .=' ' . $this->options['min']->setTimeZone( $timezone )->localeTime( \IPS\Member::loggedIn() );
 			}
-			throw new LengthException( Member::loggedIn()->language()->addToStack('form_date_min', FALSE, array( 'sprintf' => array( $string ) ) ) );
+			throw new \LengthException( \IPS\Member::loggedIn()->language()->addToStack('form_date_min', FALSE, array( 'sprintf' => array( $string ) ) ) );
 		}
 		
 		/* Check maximum */
 		if ( $this->value and $this->options['max'] !== NULL and $this->options['max'] < $this->value )
 		{
-			$string = $this->options['max']->setTimeZone( $timezone )->localeDate( Member::loggedIn() );
+			$string = $this->options['max']->setTimeZone( $timezone )->localeDate( \IPS\Member::loggedIn() );
 			if( $this->options['time'] )
 			{
-				$string .=' ' . $this->options['max']->setTimeZone( $timezone )->localeTime();
+				$string .=' ' . $this->options['max']->setTimeZone( $timezone )->localeTime( \IPS\Member::loggedIn() );
 			}
-			throw new LengthException( Member::loggedIn()->language()->addToStack('form_date_max', FALSE, array( 'sprintf' => array( $string ) ) ) );
+			throw new \LengthException( \IPS\Member::loggedIn()->language()->addToStack('form_date_max', FALSE, array( 'sprintf' => array( $string ) ) ) );
 		}
 		
 		return TRUE;
@@ -342,10 +328,10 @@ class Date extends FormAbstract
 	 * String Value
 	 *
 	 * @param	mixed	$value	The value
-	 * @return    string|int|null
+	 * @return	string
 	 */
-	public static function stringValue( mixed $value ): string|int|null
+	public static function stringValue( $value )
 	{
-		return $value instanceof DateTime ? $value->getTimestamp() : $value;
+		return $value instanceof \IPS\DateTime ? $value->getTimestamp() : $value;
 	}
 }

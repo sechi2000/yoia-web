@@ -12,44 +12,21 @@
 namespace IPS\convert\Library;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ErrorException;
-use Exception;
-use IPS\Application;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\downloads\Category;
-use IPS\downloads\Field;
-use IPS\File;
-use IPS\Http\url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Club;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invision Downloads Converter
  */
-class Downloads extends Core
+class _Downloads extends Core
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $app = 'downloads';
+	public $app = 'downloads';
 
 	/**
 	 * Returns an array of items that we can convert, including the amount of rows stored in the Community Suite as well as the recommend value of rows to convert per cycle
@@ -57,7 +34,7 @@ class Downloads extends Core
 	 * @param	bool	$rowCounts		enable row counts
 	 * @return	array
 	 */
-	public function menuRows( bool $rowCounts=FALSE ) : array
+	public function menuRows( $rowCounts=FALSE )
 	{
 		$return		= array();
 		$extraRows 	= $this->software->extraMenuRows();
@@ -70,7 +47,7 @@ class Downloads extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertDownloadsCfields',
 						'step_title'		=> 'convert_downloads_cfields',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'downloads_cfields' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'downloads_cfields' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -89,7 +66,7 @@ class Downloads extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertDownloadsCategories',
 						'step_title'		=> 'convert_downloads_categories',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'downloads_categories' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'downloads_categories' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> $dependencies,
@@ -112,7 +89,7 @@ class Downloads extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertDownloadsFiles',
 						'step_title'		=> 'convert_downloads_files',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'downloads_files' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'downloads_files' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 10,
 						'dependencies'		=> $dependencies,
@@ -125,7 +102,7 @@ class Downloads extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertDownloadsComments',
 						'step_title'		=> 'convert_downloads_comments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'downloads_comments' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'downloads_comments' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertDownloadsFiles' ),
@@ -138,7 +115,7 @@ class Downloads extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertDownloadsReviews',
 						'step_title'		=> 'convert_downloads_reviews',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'downloads_reviews' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'downloads_reviews' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertDownloadsFiles' ),
@@ -151,7 +128,7 @@ class Downloads extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_downloads_categories',
 						'step_method'		=> 'convertClubDownloadsCategories',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'downloads_categories', array( "cclub_id IS NOT NULL" ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'downloads_categories', array( "cclub_id IS NOT NULL" ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubs' ),
@@ -163,7 +140,7 @@ class Downloads extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_downloads_files',
 						'step_method'		=> 'convertClubDownloadsFiles',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'downloads_files', array( Db::i()->in( 'file_cat', Db::i()->select( 'cid', 'downloads_categories', array( "cclub_id IS NOT NULL" ) ) ) ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'downloads_files', array( \IPS\Db::i()->in( 'file_cat', \IPS\Db::i()->select( 'cid', 'downloads_categories', array( "cclub_id IS NOT NULL" ) ) ) ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 10,
 						'dependencies'		=> array( 'convertClubDownloadsCategories' ),
@@ -175,7 +152,7 @@ class Downloads extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_downloads_comments',
 						'step_method'		=> 'convertClubDownloadsComments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'downloads_comments', array( Db::i()->in( 'comment_file_id', Db::i()->select( 'file_id', 'downloads_files', array( Db::i()->in( 'file_cat', Db::i()->select( 'cid', 'downloads_categories', array( "cclub_id IS NOT NULL" ) ) ) ) ) ) ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'downloads_comments', array( \IPS\Db::i()->in( 'comment_file_id', \IPS\Db::i()->select( 'file_id', 'downloads_files', array( \IPS\Db::i()->in( 'file_cat', \IPS\Db::i()->select( 'cid', 'downloads_categories', array( "cclub_id IS NOT NULL" ) ) ) ) ) ) ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubDownloadsFiles' ),
@@ -187,7 +164,7 @@ class Downloads extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_downloads_reviews',
 						'step_method'		=> 'convertClubDownloadsReviews',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'downloads_files_reviews', array( Db::i()->in( 'review_file_id', Db::i()->select( 'file_id', 'downloads_files', array( Db::i()->in( 'file_cat', Db::i()->select( 'cid', 'downloads_categories', array( "cclub_id IS NOT NULL" ) ) ) ) ) ) ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'downloads_files_reviews', array( \IPS\Db::i()->in( 'review_file_id', \IPS\Db::i()->select( 'file_id', 'downloads_files', array( \IPS\Db::i()->in( 'file_cat', \IPS\Db::i()->select( 'cid', 'downloads_categories', array( "cclub_id IS NOT NULL" ) ) ) ) ) ) ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubDownloadsFiles' ),
@@ -211,7 +188,7 @@ class Downloads extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertAttachments',
 						'step_title'		=> 'convert_attachments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( "location_key=?", 'downloads_Downloads' ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( "location_key=?", 'downloads_Downloads' ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 10,
 						'dependencies'		=> $dependencies,
@@ -245,12 +222,11 @@ class Downloads extends Core
 	 * @param	string	$method	Method to truncate
 	 * @return	array
 	 */
-	protected function truncate( string $method ) : array
+	protected function truncate( $method )
 	{
 		$return		= array();
-		$classname	= get_class( $this->software );
+		$classname	= \get_class( $this->software );
 
-		/* @var Software $classname */
 		if( $classname::canConvert() === NULL )
 		{
 			return array();
@@ -267,9 +243,9 @@ class Downloads extends Core
 				case 'convertDownloadsCfields':
 					if ( $method == $k )
 					{
-						foreach( Db::i()->select( '*', 'downloads_cfields' ) AS $field )
+						foreach( \IPS\Db::i()->select( '*', 'downloads_cfields' ) AS $field )
 						{
-							Db::i()->dropColumn( 'downloads_ccontent', "field_{$field['cf_id']}" );
+							\IPS\Db::i()->dropColumn( 'downloads_ccontent', "field_{$field['cf_id']}" );
 						}
 					}
 					$return['convertDownloadsCfields'] = array( 'downloads_cfields' => NULL );
@@ -293,7 +269,7 @@ class Downloads extends Core
 					break;
 				
 				case 'convertAttachments':
-					$return['convertAttachments'] = array( 'core_attachments' => Db::i()->select( 'attachment_id', 'core_attachments_map', array( "location_key=?", 'downloads_Downloads' ) ), 'core_attachments_map' => array( "location_key=?", 'downloads_Downloads' ) );
+					$return['convertAttachments'] = array( 'core_attachments' => \IPS\Db::i()->select( 'attachment_id', 'core_attachments_map', array( "location_key=?", 'downloads_Downloads' ) ), 'core_attachments_map' => array( "location_key=?", 'downloads_Downloads' ) );
 					break;
 
 				case 'convertClubDownloadsCategories':
@@ -301,15 +277,15 @@ class Downloads extends Core
 					break;
 
 				case 'convertClubDownloadsFiles':
-					$return['convertClubDownloadsFiles'] = array( 'downloads_files' => array( 'file_id IN ( ' . Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_downloads_files' AND app={$this->software->app->app_id}" ) ) . ')' ) );
+					$return['convertClubDownloadsFiles'] = array( 'downloads_files' => array( 'file_id IN ( ' . (string) \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_downloads_files' AND app={$this->software->app->app_id}" ) ) . ')' ) );
 					break;
 
 				case 'convertClubDownloadsComments':
-					$return['convertClubDownloadsComments'] = array( 'downloads_comments' => array( 'comment_id IN ( ' . Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_downloads_comments' AND app={$this->software->app->app_id}" ) ) . ')' ) );
+					$return['convertClubDownloadsComments'] = array( 'downloads_comments' => array( 'comment_id IN ( ' . (string) \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_downloads_comments' AND app={$this->software->app->app_id}" ) ) . ')' ) );
 					break;
 
 				case 'convertClubDownloadsReviews':
-					$return['convertClubDownloadsFiles'] = array( 'downloads_reviews' => array( 'review_id IN ( ' . Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_downloads_reviews' AND app={$this->software->app->app_id}" ) ) . ')' ) );
+					$return['convertClubDownloadsFiles'] = array( 'downloads_reviews' => array( 'review_id IN ( ' . (string) \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_downloads_reviews' AND app={$this->software->app->app_id}" ) ) . ')' ) );
 					break;
 			}
 		}
@@ -325,9 +301,9 @@ class Downloads extends Core
 	
 	/**
 	 * A note on logging -
-	 * If the data is missing, and it is unlikely that any source software would be able to provide this, we do not need to log anything and can use default data (for example, group_layout in convertLeaderGroups).
-	 * If the data is missing, and it is likely that a majority of the source software can provide this, we should log a NOTICE and use default data (for example, a_casesensitive in convertAcronyms).
-	 * If the data is missing, and it is required to convert the item, we should log a WARNING and return FALSE.
+	 * If the data is missing and it is unlikely that any source software would be able to provide this, we do not need to log anything and can use default data (for example, group_layout in convertLeaderGroups).
+	 * If the data is missing and it is likely that a majority of the source software can provide this, we should log a NOTICE and use default data (for example, a_casesensitive in convertAcronyms).
+	 * If the data is missing and it is required to convert the item, we should log a WARNING and return FALSE.
 	 * If the conversion absolutely cannot proceed at all (filestorage locations not writable, for example), then we should log an ERROR and throw an \IPS\convert\Exception to completely halt the process and redirect to an error screen showing the last logged error.
 	 */
 	
@@ -335,27 +311,27 @@ class Downloads extends Core
 	 * Convert a Custom Field
 	 *
 	 * @param	array			$info	Data to insert
-	 * @return	int|bool	The ID of the newly inserted field, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted field, or FALSE on failure.
 	 */
-	public function convertDownloadsCfield( array $info=array() ) : bool|int
+	public function convertDownloadsCfield( $info=array() )
 	{
-		$validFields = array_merge( static::$fieldTypes, Field::$additionalFieldTypes );
+		$validFields = array_merge( static::$fieldTypes, \IPS\downloads\Field::$additionalFieldTypes );
 		
 		if ( !isset( $info['cf_id'] ) )
 		{
-			$this->software->app->log( 'downloads_cfield_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'downloads_cfield_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( !isset( $info['cf_type'] ) OR !in_array( $info['cf_type'], $validFields ) )
+		if ( !isset( $info['cf_type'] ) OR !\in_array( $info['cf_type'], $validFields ) )
 		{
-			$this->software->app->log( 'downloads_cfield_invalid_type', __METHOD__, App::LOG_WARNING, $info['cf_id'] );
+			$this->software->app->log( 'downloads_cfield_invalid_type', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['cf_id'] );
 			return FALSE;
 		}
 		
 		if ( isset( $info['cf_content'] ) )
 		{
-			if ( is_array( $info['cf_content'] ) )
+			if ( \is_array( $info['cf_content'] ) )
 			{
 				$info['cf_content'] = json_encode( $info['cf_content'] );
 			}
@@ -382,7 +358,7 @@ class Downloads extends Core
 		
 		if ( !isset( $info['cf_position'] ) )
 		{
-			$position = Db::i()->select( 'MAX(cf_position)', 'downloads_cfields' )->first();
+			$position = \IPS\Db::i()->select( 'MAX(cf_position)', 'downloads_cfields' )->first();
 			
 			$info['cf_position'] = $position + 1;
 		}
@@ -408,16 +384,16 @@ class Downloads extends Core
 		}
 		
 		$id = $info['cf_id'];
-		$fieldName = $info['cf_name'] ?? NULL;
-		$fieldDescription = $info['cf_desc'] ?? NULL;
+		$fieldName = isset( $info['cf_name'] ) ? $info['cf_name'] : NULL;
+		$fieldDescription = isset( $info['cf_desc'] ) ? $info['cf_desc'] : NULL;
 		unset( $info['cf_id'], $info['cf_name'], $info['cf_desc'] );
 		
-		$inserted_id = Db::i()->insert( 'downloads_cfields', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'downloads_cfields', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'downloads_cfields' );
 
 		/* Field Name */
-		Lang::saveCustom( 'downloads', "downloads_field_{$inserted_id}", $fieldName ?: "Converted Field {$inserted_id}" );
-		Lang::saveCustom( 'downloads', "downloads_field_{$inserted_id}_desc", $fieldDescription ?: '' );
+		\IPS\Lang::saveCustom( 'downloads', "downloads_field_{$inserted_id}", $fieldName ?: "Converted Field {$inserted_id}" );
+		\IPS\Lang::saveCustom( 'downloads', "downloads_field_{$inserted_id}_desc", $fieldDescription ?: '' );
 
 		/* Now... create our column */
 		$columnDefinition = array( 'name' => "field_{$inserted_id}" );
@@ -489,17 +465,17 @@ class Downloads extends Core
 			}
 		}
 		
-		Db::i()->addColumn( 'downloads_ccontent', $columnDefinition );
+		\IPS\Db::i()->addColumn( 'downloads_ccontent', $columnDefinition );
 		
 		if ( $info['cf_type'] != 'Upload' )
 		{
-			if ( in_array( $columnDefinition['type'], [ 'TEXT', 'MEDIUMTEXT' ] ) )
+			if ( \in_array( $columnDefinition['type'], [ 'TEXT', 'MEDIUMTEXT' ] ) )
 			{
-				Db::i()->addIndex( 'downloads_ccontent', array( 'type' => 'fulltext', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
+				\IPS\Db::i()->addIndex( 'downloads_ccontent', array( 'type' => 'fulltext', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
 			}
 			else
 			{
-				Db::i()->addIndex( 'downloads_ccontent', array( 'type' => 'key', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
+				\IPS\Db::i()->addIndex( 'downloads_ccontent', array( 'type' => 'key', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
 			}
 		}
 		
@@ -513,11 +489,11 @@ class Downloads extends Core
 	 * @param	array	$fieldInfo		The Custom Field Information to format. This SHOULD be in $foreign_id => $content format, however field_$foreign_id => $content is also accepted.
 	 * @return	array					An array of data formatted for downloads_ccontent
 	 */
-	protected function _formatCustomFieldContent( int $file_id, array $fieldInfo ) : array
+	protected function _formatCustomFieldContent( $file_id, $fieldInfo )
 	{
 		$return = array( 'file_id' => $file_id );
 		
-		if ( count( $fieldInfo ) )
+		if ( \count( $fieldInfo ) )
 		{
 			foreach( $fieldInfo as $key => $value )
 			{
@@ -534,7 +510,7 @@ class Downloads extends Core
 				{
 					$link = $this->software->app->getLink( $id, 'downloads_cfields' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* Does not exist - skip */
 					continue;
@@ -551,13 +527,13 @@ class Downloads extends Core
 	 * Convert a category
 	 *
 	 * @param	array			$info	Data to insert
-	 * @return	int|bool	The ID of the newly inserted category, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted category, or FALSE on failure.
 	 */
-	public function convertDownloadsCategory( array $info=array() ) : bool|int
+	public function convertDownloadsCategory( $info=array() )
 	{
 		if ( !isset( $info['cid'] ) )
 		{
-			$this->software->app->log( 'downloads_category_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'downloads_category_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -567,7 +543,7 @@ class Downloads extends Core
 			{
 				$info['cparent'] = $this->software->app->getLink( $info['cparent'], 'downloads_categories' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['cconv_parent'] = $info['cparent'];
 			}
@@ -605,20 +581,20 @@ class Downloads extends Core
 		
 		if ( !isset( $info['cposition'] ) )
 		{
-			$position = Db::i()->select( 'MAX(cposition)', 'downloads_categories' )->first();
+			$position = \IPS\Db::i()->select( 'MAX(cposition)', 'downloads_categories' )->first();
 			
 			$info['cposition'] = $position + 1;
 		}
 		
 		if ( isset( $info['ccfields'] ) )
 		{
-			if ( !is_array( $info['ccfields'] ) )
+			if ( !\is_array( $info['ccfields'] ) )
 			{
 				$info['ccfields'] = explode( ',', $info['ccfields'] );
 			}
 			
 			$newCfields = array();
-			if ( count( $info['ccfields'] ) )
+			if ( \count( $info['ccfields'] ) )
 			{
 				foreach( $info['ccfields'] AS $field )
 				{
@@ -626,14 +602,14 @@ class Downloads extends Core
 					{
 						$newCfields[] = $this->software->app->getLink( $field, 'downloads_cfields' );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						continue;
 					}
 				}
 			}
 
-			if ( count( $newCfields ) )
+			if ( \count( $newCfields ) )
 			{
 				$info['ccfields'] = implode( ',', $newCfields );
 			}
@@ -647,7 +623,7 @@ class Downloads extends Core
 			$info['ccfields'] = NULL;
 		}
 		
-		$info['cname_furl'] = Url::seoTitle( $name );
+		$info['cname_furl'] = \IPS\Http\Url::seoTitle( $name );
 		
 		if ( !isset( $info['ctags_disabled'] ) )
 		{
@@ -663,7 +639,7 @@ class Downloads extends Core
 		$info['ctags_predefined'] = NULL;
 		
 		$bitoptions = 0;
-		foreach( Category::$bitOptions['bitoptions']['bitoptions'] AS $key => $value )
+		foreach( \IPS\downloads\Category::$bitOptions['bitoptions']['bitoptions'] AS $key => $value )
 		{
 			if ( isset( $info['cbitoptions'][$key] ) AND $info['cbitoptions'][$key] )
 			{
@@ -674,7 +650,7 @@ class Downloads extends Core
 		
 		if ( isset( $info['ctypes'] ) )
 		{
-			if ( is_array( $info['ctypes'] ) )
+			if ( \is_array( $info['ctypes'] ) )
 			{
 				$info['ctypes'] = implode( ',', $info['ctypes'] );
 			}
@@ -684,7 +660,7 @@ class Downloads extends Core
 			$info['ctypes'] = NULL;
 		}
 		
-		if ( !isset( $info['csortorder'] ) OR !in_array( $info['csortorder'], array( 'updated', 'last_comment', 'title', 'rating', 'date', 'num_comments', 'num_reviews', 'views' ) ) )
+		if ( !isset( $info['csortorder'] ) OR !\in_array( $info['csortorder'], array( 'updated', 'last_comment', 'title', 'rating', 'date', 'num_comments', 'num_reviews', 'views' ) ) )
 		{
 			$info['csortorder'] = 'updated';
 		}
@@ -701,7 +677,7 @@ class Downloads extends Core
 		
 		if ( isset( $info['cmaxdims'] ) )
 		{
-			if ( is_array( $info['cmaxdims'] ) )
+			if ( \is_array( $info['cmaxdims'] ) )
 			{
 				$info['cmaxdims'] = implode( 'x', $info['cmaxdims'] );
 			}
@@ -727,7 +703,7 @@ class Downloads extends Core
 			{
 				$info['cforum_id'] = $this->software->app->getSiblingLink( $info['cforum_id'], 'forums_forums', 'forums' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['cforum_id'] = 0;
 			}
@@ -754,7 +730,7 @@ class Downloads extends Core
 			{
 				$info['cclub_id'] = $this->software->app->getLink( $info['cclub_id'], 'core_clubs', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['cclub_id'] = NULL;
 			}
@@ -771,25 +747,25 @@ class Downloads extends Core
 		$id = $info['cid'];
 		unset( $info['cid'] );
 		
-		$inserted_id = Db::i()->insert( 'downloads_categories', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'downloads_categories', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'downloads_categories' );
 
-		Lang::saveCustom( 'downloads', "downloads_category_{$inserted_id}", $name );
-		Lang::saveCustom( 'downloads', "downloads_category_{$inserted_id}_desc", $desc );
+		\IPS\Lang::saveCustom( 'downloads', "downloads_category_{$inserted_id}", $name );
+		\IPS\Lang::saveCustom( 'downloads', "downloads_category_{$inserted_id}_desc", $desc );
 		
-		Db::i()->update( 'downloads_categories', array( "cparent" => $inserted_id ), array( "cconv_parent=?", $id ) );
-		Db::i()->insert( 'core_permission_index', array( 'app' => 'downloads', 'perm_type' => 'category', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
+		\IPS\Db::i()->update( 'downloads_categories', array( "cparent" => $inserted_id ), array( "cconv_parent=?", $id ) );
+		\IPS\Db::i()->insert( 'core_permission_index', array( 'app' => 'downloads', 'perm_type' => 'category', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
 		
 		if ( $info['cclub_id'] )
 		{
-			Db::i()->insert( 'core_clubs_node_map', array(
+			\IPS\Db::i()->insert( 'core_clubs_node_map', array(
 				'node_id'		=> $inserted_id,
 				'node_class'	=> "IPS\\downloads\\Category",
 				'club_id'		=> $info['cclub_id'],
 				'name'			=> $name
 			) );
 			
-			Category::load( $inserted_id )->setPermissionsToClub( Club::load( $info['cclub_id'] ) );
+			\IPS\downloads\Category::load( $inserted_id )->setPermissionsToClub( \IPS\Member\Club::load( $info['cclub_id'] ) );
 		}
 		
 		return $inserted_id;
@@ -801,32 +777,32 @@ class Downloads extends Core
 	 * @param	array			$info			Data to insert
 	 * @param	array			$records		Record Data to insert
 	 * @param	array			$customFields	Custom Field Data to insert
-	 * @return	int|bool	The ID of the newly inserted file, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted file, or FALSE on failure.
 	 */
-	public function convertDownloadsFile( array $info=array(), array $records=array(), array $customFields=array() ) : bool|int
+	public function convertDownloadsFile( $info=array(), $records=array(), $customFields=array() )
 	{
 		if ( !isset( $info['file_id'] ) )
 		{
-			$this->software->app->log( 'downloads_file_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'downloads_file_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( !count( $records ) )
+		if ( !\count( $records ) )
 		{
-			$this->software->app->log( 'downloads_file_no_records', __METHOD__, App::LOG_WARNING, $info['file_id'] );
+			$this->software->app->log( 'downloads_file_no_records', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['file_id'] );
 			return FALSE;
 		}
 		
 		if ( empty( $info['file_desc'] ) )
 		{
-			$this->software->app->log( 'downloads_file_missing_content', __METHOD__, App::LOG_WARNING, $info['file_id'] );
+			$this->software->app->log( 'downloads_file_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['file_id'] );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['file_name'] ) )
 		{
 			$info['file_name'] = "Untitled File {$info['file_id']}";
-			$this->software->app->log( 'downloads_file_no_title', __METHOD__, App::LOG_NOTICE, $info['file_id'] );
+			$this->software->app->log( 'downloads_file_no_title', __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['file_id'] );
 		}
 		
 		if ( isset( $info['file_cat'] ) )
@@ -835,7 +811,7 @@ class Downloads extends Core
 			{
 				$info['file_cat'] = $this->software->app->getLink( $info['file_cat'], 'downloads_categories' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['file_cat'] = $this->_orphanedFilesCategory();
 			}
@@ -875,7 +851,7 @@ class Downloads extends Core
 		
 		if ( isset( $info['file_submitted'] ) )
 		{
-			if ( $info['file_submitted'] instanceof DateTime )
+			if ( $info['file_submitted'] instanceof \IPS\DateTime )
 			{
 				$info['file_submitted'] = $info['file_submitted']->getTimestamp();
 			}
@@ -887,7 +863,7 @@ class Downloads extends Core
 		
 		if ( isset( $info['file_updated'] ) )
 		{
-			if ( $info['file_updated'] instanceof DateTime )
+			if ( $info['file_updated'] instanceof \IPS\DateTime )
 			{
 				$info['file_updated'] = $info['file_updated']->getTimestamp();
 			}
@@ -906,7 +882,7 @@ class Downloads extends Core
 			{
 				$info['file_submitter'] = $this->software->app->getLink( $info['file_submitter'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['file_submitter'] = 0;
 			}
@@ -922,7 +898,7 @@ class Downloads extends Core
 			{
 				$info['file_approver'] = $this->software->app->getLink( $info['file_approver'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['file_approver'] = 0;
 			}
@@ -934,7 +910,7 @@ class Downloads extends Core
 		
 		if ( isset( $info['file_approvedon'] ) )
 		{
-			if ( $info['file_approvedon'] instanceof DateTime )
+			if ( $info['file_approvedon'] instanceof \IPS\DateTime )
 			{
 				$info['file_approvedon'] = $info['file_approvedon']->getTimestamp();
 			}
@@ -950,7 +926,7 @@ class Downloads extends Core
 			{
 				$info['file_topicid'] = $this->software->app->getSiblingLink( $info['file_topicid'], 'forums_topics', 'forums' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['file_topicid'] = 0;
 			}
@@ -965,9 +941,9 @@ class Downloads extends Core
 			$info['file_ipaddress'] = '127.0.0.1';
 		}
 		
-		$info['file_name_furl'] = url::seoTitle( $info['file_name'] );
+		$info['file_name_furl'] = \IPS\Http\Url::seoTitle( $info['file_name'] );
 		
-		if ( Application::appIsEnabled( 'nexus' ) )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) )
 		{
 			// @todo I need the Commerce Libraries for this
 		}
@@ -1010,7 +986,7 @@ class Downloads extends Core
 		
 		if ( isset( $info['file_last_comment'] ) )
 		{
-			if ( $info['file_last_comment'] instanceof DateTime )
+			if ( $info['file_last_comment'] instanceof \IPS\DateTime )
 			{
 				$info['file_last_comment'] = $info['file_last_comment']->getTimestamp();
 			}
@@ -1022,7 +998,7 @@ class Downloads extends Core
 		
 		if ( isset( $info['file_last_review'] ) )
 		{
-			if ( $info['file_last_review'] instanceof DateTime )
+			if ( $info['file_last_review'] instanceof \IPS\DateTime )
 			{
 				$info['file_last_review'] = $info['file_last_review']->getTimestamp();
 			}
@@ -1034,7 +1010,7 @@ class Downloads extends Core
 
 		if ( isset( $info['file_edit_time'] ) )
 		{
-			if ( $info['file_edit_time'] instanceof DateTime )
+			if ( $info['file_edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['file_edit_time'] = $info['file_edit_time']->getTimestamp();
 			}
@@ -1062,7 +1038,7 @@ class Downloads extends Core
 		$id = $info['file_id'];
 		unset( $info['file_id'] );
 		
-		$inserted_id = Db::i()->insert( 'downloads_files', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'downloads_files', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'downloads_files' );
 		
 		/* Now our records */
@@ -1083,7 +1059,7 @@ class Downloads extends Core
 			$record['record_link_type']		= NULL;
 			$record['record_no_watermark']	= NULL;
 			
-			if ( !isset( $record['record_type'] ) OR !in_array( $record['record_type'], array( 'upload', 'ssupload', 'link' ) ) )
+			if ( !isset( $record['record_type'] ) OR !\in_array( $record['record_type'], array( 'upload', 'ssupload', 'link' ) ) )
 			{
 				$record['record_type'] = 'upload';
 			}
@@ -1100,7 +1076,7 @@ class Downloads extends Core
 			
 			if ( !isset( $record['record_realname'] ) )
 			{
-				if ( isset( $record['file_path'] ) AND !empty( $record['file_path'] ) )
+				if ( isset( $record['file_path'] ) AND !\is_null( $record['file_path'] ) )
 				{
 					$fileName = explode( '/', $record['file_path'] );
 					$fileName = array_pop( $fileName );
@@ -1110,7 +1086,7 @@ class Downloads extends Core
 
 			if ( isset( $record['record_time'] ) )
 			{
-				if ( $record['record_time'] instanceof DateTime )
+				if ( $record['record_time'] instanceof \IPS\DateTime )
 				{
 					$record['record_time'] = $record['record_time']->getTimestamp();
 				}
@@ -1131,7 +1107,7 @@ class Downloads extends Core
 				$container = 'monthly_' . date( 'Y', $record['record_time'] ) . '_' . date( 'm', $record['record_time'] );
 
 				/* We need the file storage to copy the file rather than move it */
-				File::$copyFiles = TRUE;
+				\IPS\File::$copyFiles = TRUE;
 				
 				if ( $record['record_type'] == 'link' )
 				{
@@ -1140,7 +1116,7 @@ class Downloads extends Core
 				}
 				else if ( $record['record_type'] == 'upload' )
 				{
-					$file = File::create( 'downloads_Files', $record['record_realname'], $record['file_data'], $container, TRUE, $record['file_path'] );
+					$file = \IPS\File::create( 'downloads_Files', $record['record_realname'], $record['file_data'], $container, TRUE, $record['file_path'] );
 					$record['record_location']	= (string) $file;
 					$record['record_size']		= $file->filesize();
 					
@@ -1151,21 +1127,21 @@ class Downloads extends Core
 				}
 				else
 				{
-					$file = File::create( 'downloads_Screenshots', $record['record_realname'], $record['file_data'], $container, TRUE, $record['file_path'] );
+					$file = \IPS\File::create( 'downloads_Screenshots', $record['record_realname'], $record['file_data'], $container, TRUE, $record['file_path'] );
 					$file->thumbnailContainer = $container;
 					$record['record_location']	= (string) $file;
 					$record['record_thumb']		= (string) $file->thumbnail( 'downloads_Screenshots' );
 					$record['record_size']		= $file->filesize();
 				}
 			}
-			catch( Exception | ErrorException $e )
+			catch( \Exception | \ErrorException $e )
 			{
-				$this->software->app->log( $e->getMessage(), __METHOD__, App::LOG_WARNING, ( $hasId ) ? $record['record_id'] : NULL );
+				$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $record['record_id'] : NULL );
 				continue;
 			}
 
 			/* Revert file system to default functionality */
-			File::$copyFiles = FALSE;
+			\IPS\File::$copyFiles = FALSE;
 			unset( $record['file_data'], $file, $record['file_path'] );
 			
 			if ( $hasId )
@@ -1174,7 +1150,7 @@ class Downloads extends Core
 				unset( $record['record_id'] );
 			}
 			
-			$recordInsertedId = Db::i()->insert( 'downloads_files_records', $record );
+			$recordInsertedId = \IPS\Db::i()->insert( 'downloads_files_records', $record );
 			
 			if ( $hasId )
 			{
@@ -1187,8 +1163,8 @@ class Downloads extends Core
 			}
 		}
 		
-		Db::i()->update( 'downloads_files', array( 'file_primary_screenshot' => $primaryScreenshot ), array( "file_id=?", $inserted_id ) );
-		Db::i()->replace( 'downloads_ccontent', $this->_formatCustomFieldContent( $inserted_id, $customFields ), TRUE );
+		\IPS\Db::i()->update( 'downloads_files', array( 'file_primary_screenshot' => $primaryScreenshot ), array( "file_id=?", $inserted_id ) );
+		\IPS\Db::i()->replace( 'downloads_ccontent', $this->_formatCustomFieldContent( $inserted_id, $customFields ), TRUE );
 		
 		return $inserted_id;
 	}
@@ -1196,15 +1172,15 @@ class Downloads extends Core
 	/**
 	 * Get Orphaned Files Category
 	 *
-	 * @return	int	The Category ID.
+	 * @return	integer	The Category ID.
 	 */
-	protected function _orphanedFilesCategory() : int
+	protected function _orphanedFilesCategory()
 	{
 		try
 		{
 			return $this->software->app->getLink( '__orphaned__', 'downloads_categories' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			return $this->convertDownloadsCategory( array(
 				'cid'		=> '__orphaned__',
@@ -1217,13 +1193,13 @@ class Downloads extends Core
 	 * Convert a comment
 	 *
 	 * @param	array			$info	Data to insert
-	 * @return	int|bool	The ID of the newly inserted comment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted comment, or FALSE on failure.
 	 */
-	public function convertDownloadsComment( array $info=array() ) : bool|int
+	public function convertDownloadsComment( $info=array() )
 	{
 		if ( !isset( $info['comment_id'] ) )
 		{
-			$this->software->app->log( 'downloads_comment_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'downloads_comment_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -1233,21 +1209,21 @@ class Downloads extends Core
 			{
 				$info['comment_fid'] = $this->software->app->getLink( $info['comment_fid'], 'downloads_files' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'downloads_comment_missing_file', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+				$this->software->app->log( 'downloads_comment_missing_file', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'downloads_comment_missing_file', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'downloads_comment_missing_file', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 		
 		if ( empty( $info['comment_text'] ) )
 		{
-			$this->software->app->log( 'downloads_comment_missing_content', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'downloads_comment_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 		
@@ -1257,7 +1233,7 @@ class Downloads extends Core
 			{
 				$info['comment_mid'] = $this->software->app->getLink( $info['comment_mid'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['comment_mid'] = 0;
 			}
@@ -1269,7 +1245,7 @@ class Downloads extends Core
 		
 		if ( isset( $info['comment_date'] ) )
 		{
-			if ( $info['comment_date'] instanceof DateTime )
+			if ( $info['comment_date'] instanceof \IPS\DateTime )
 			{
 				$info['comment_date'] = $info['comment_date']->getTimestamp();
 			}
@@ -1291,7 +1267,7 @@ class Downloads extends Core
 		
 		if ( isset( $info['comment_edit_time'] ) )
 		{
-			if ( $info['comment_edit_time'] instanceof DateTime )
+			if ( $info['comment_edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['comment_edit_time'] = $info['comment_edit_time']->getTimestamp();
 			}
@@ -1308,7 +1284,7 @@ class Downloads extends Core
 		
 		if ( !isset( $info['comment_author'] ) )
 		{
-			$author = Member::load( $info['comment_mid'] );
+			$author = \IPS\Member::load( $info['comment_mid'] );
 			
 			if ( $author->member_id )
 			{
@@ -1323,7 +1299,7 @@ class Downloads extends Core
 		$id = $info['comment_id'];
 		unset( $info['comment_id'] );
 		
-		$inserted_id = Db::i()->insert( 'downloads_comments', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'downloads_comments', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'downloads_comments' );
 		
 		return $inserted_id;
@@ -1333,13 +1309,13 @@ class Downloads extends Core
 	 * Convert a review
 	 *
 	 * @param	array			$info	Data to insert
-	 * @return	int|bool	The ID of the newly inserted review, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted review, or FALSE on failure.
 	 */
-	public function convertDownloadsReview( array $info=array() ) : bool|int
+	public function convertDownloadsReview( $info=array() )
 	{
 		if ( !isset( $info['review_id'] ) )
 		{
-			$this->software->app->log( 'download_review_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'download_review_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -1351,7 +1327,7 @@ class Downloads extends Core
 		
 		if ( !isset( $info['review_rating'] ) OR $info['review_rating'] < 1 )
 		{
-			$this->software->app->log( 'download_review_missing_rating', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'download_review_missing_rating', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 		
@@ -1361,15 +1337,15 @@ class Downloads extends Core
 			{
 				$info['review_mid'] = $this->software->app->getLink( $info['review_mid'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'download_review_missing_author', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+				$this->software->app->log( 'download_review_missing_author', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'download_review_missing_author', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'download_review_missing_author', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 		
@@ -1379,22 +1355,22 @@ class Downloads extends Core
 			{
 				$info['review_fid'] = $this->software->app->getLink( $info['review_fid'], 'downloads_files' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'download_review_missing_file', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+				$this->software->app->log( 'download_review_missing_file', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 				return FALSE;
 			}
 		}
 		
 		if ( !isset( $info['review_author_name'] ) )
 		{
-			$author = Member::load( $info['review_mid'] );
+			$author = \IPS\Member::load( $info['review_mid'] );
 			$info['review_author_name'] = $author->name;
 		}
 		
 		if ( isset( $info['review_date'] ) )
 		{
-			if ( $info['review_date'] instanceof DateTime )
+			if ( $info['review_date'] instanceof \IPS\DateTime )
 			{
 				$info['review_date'] = $info['review_date']->getTimestamp();
 			}
@@ -1411,7 +1387,7 @@ class Downloads extends Core
 		
 		if ( isset( $info['review_edit_time'] ) )
 		{
-			if ( $info['review_edit_time'] instanceof DateTime )
+			if ( $info['review_edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['review_edit_time'] = $info['review_edit_time']->getTimestamp();
 			}
@@ -1433,13 +1409,13 @@ class Downloads extends Core
 		
 		if ( isset( $info['review_votes_data'] ) )
 		{
-			if ( !is_array( $info['review_votes_data'] ) )
+			if ( !\is_array( $info['review_votes_data'] ) )
 			{
 				$info['review_votes_data'] = json_decode( $info['review_votes_data'], TRUE );
 			}
 			
 			$newVoters = array();
-			if ( !is_null( $info['review_votes_data'] ) AND count( $info['review_votes_data'] ) )
+			if ( !\is_null( $info['review_votes_data'] ) AND \count( $info['review_votes_data'] ) )
 			{
 				foreach( $info['review_votes_data'] as $member => $vote )
 				{
@@ -1447,7 +1423,7 @@ class Downloads extends Core
 					{
 						$memberId = $this->software->app->getLink( $member, 'core_members', TRUE );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						continue;
 					}
@@ -1456,7 +1432,7 @@ class Downloads extends Core
 				}
 			}
 			
-			if ( count( $newVoters ) )
+			if ( \count( $newVoters ) )
 			{
 				$info['review_votes_data'] = json_encode( $newVoters );
 			}
@@ -1472,19 +1448,19 @@ class Downloads extends Core
 		
 		if ( !isset( $info['review_votes'] ) )
 		{
-			if ( is_null( $info['review_votes_data'] ) )
+			if ( \is_null( $info['review_votes_data'] ) )
 			{
 				$info['review_votes'] = 0;
 			}
 			else
 			{
-				$info['review_votes'] = count( json_decode( $info['review_votes_data'], TRUE ) );
+				$info['review_votes'] = \count( json_decode( $info['review_votes_data'], TRUE ) );
 			}
 		}
 		
 		if ( !isset( $info['review_votes_helpful'] ) )
 		{
-			if ( is_null( $info['review_votes_data'] ) )
+			if ( \is_null( $info['review_votes_data'] ) )
 			{
 				$info['review_votes_helpful'] = 0;
 			}
@@ -1516,7 +1492,7 @@ class Downloads extends Core
 		$id = $info['review_id'];
 		unset( $info['review_id'] );
 		
-		$inserted_id = Db::i()->insert( 'downloads_reviews', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'downloads_reviews', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'downloads_reviews' );
 		
 		return $inserted_id;
@@ -1530,9 +1506,9 @@ class Downloads extends Core
 	 * @param	string|NULL		$filepath	Path to the file, or NULL.
 	 * @param	string|NULL		$filedata	Binary data for the file, or NULL.
 	 * @param	string|NULL		$thumbnailpath	Path to thumbnail, or NULL.
-	 * @return	int|bool	The ID of the newly inserted attachment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted attachment, or FALSE on failure.
 	 */
-	public function convertAttachment( array $info=array(), array $map=array(), ?string $filepath=NULL, ?string $filedata=NULL, ?string $thumbnailpath = NULL ) : bool|int
+	public function convertAttachment( $info=array(), $map=array(), $filepath=NULL, $filedata=NULL, $thumbnailpath = NULL )
 	{
 		$map['location_key']	= 'downloads_Downloads';
 		$map['id1_type']		= 'downloads_files';
@@ -1544,7 +1520,7 @@ class Downloads extends Core
 			$map['id3'] = NULL;
 		}
 		
-		if ( is_null( $map['id3'] ) OR $map['id3'] != 'review' )
+		if ( \is_null( $map['id3'] ) OR $map['id3'] != 'review' )
 		{
 			$map['id2_type'] = 'downloads_comments';
 		}
@@ -1560,9 +1536,9 @@ class Downloads extends Core
 	 * Convert a Club Downloads Category
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted category, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted category, or FALSE on failure.
 	 */
-	public function convertClubDownloadsCategory( array $info=array() ) : bool|int
+	public function convertClubDownloadsCategory( $info=array() )
 	{
 		$insertedId = $this->convertDownloadsCategory( $info );
 		if ( $insertedId )
@@ -1577,9 +1553,9 @@ class Downloads extends Core
 	 *
 	 * @param	array			$info		Data to insert
 	 * @param	array			$records	File Records
-	 * @return	int|bool	The ID of the newly inserted file, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted file, or FALSE on failure.
 	 */
-	public function convertClubDownloadsFile( array $info=array(), array $records=array() ) : bool|int
+	public function convertClubDownloadsFile( $info=array(), $records=array() )
 	{
 		$insertedId = $this->convertDownloadsFile( $info, $records );
 		if ( $insertedId )
@@ -1593,9 +1569,9 @@ class Downloads extends Core
 	 * Convert a Club Downloads Comment
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted comment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted comment, or FALSE on failure.
 	 */
-	public function convertClubDownloadsComment( array $info=array() ) : bool|int
+	public function convertClubDownloadsComment( $info=array() )
 	{
 		$insertedId = $this->convertDownloadsComment( $info );
 		if ( $insertedId )
@@ -1609,9 +1585,9 @@ class Downloads extends Core
 	 * Convert a Club Downloads Review
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted comment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted comment, or FALSE on failure.
 	 */
-	public function convertClubDownloadsReview( array $info=array() ) : bool|int
+	public function convertClubDownloadsReview( $info=array() )
 	{
 		$insertedId = $this->convertDownloadsReview( $info );
 		if ( $insertedId )

@@ -11,33 +11,10 @@
  
 namespace IPS\forums;
 
-use DateInterval;
-use Exception;
-use IPS\Application as SystemApplication;
-use IPS\Content\Filter;
-use IPS\Content\Search\Index;
-use IPS\DateTime;
-use IPS\Dispatcher;
-use IPS\forums\Topic\Post;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Log;
-use IPS\Login;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Xml\Rss;
-use OutOfRangeException;
-use function array_merge;
-use function IPS\Cicloud\getForumArchiveWhere;
-use function is_numeric;
-
 /**
  * Forums Application Class
  */
-class Application extends SystemApplication
+class _Application extends \IPS\Application
 {
 
 	/**
@@ -45,26 +22,26 @@ class Application extends SystemApplication
 	 *
 	 * @return	void
 	 */
-	public function init() : void
+	public function init()
 	{
 		/* Handle RSS requests */
-		if ( Request::i()->module == 'forums' and Request::i()->controller == 'forums' and isset( Request::i()->rss ) )
+		if ( \IPS\Request::i()->module == 'forums' and \IPS\Request::i()->controller == 'forums' and isset( \IPS\Request::i()->rss ) )
 		{
 			$member = NULL;
-			if( Request::i()->member AND Request::i()->key )
+			if( \IPS\Request::i()->member AND \IPS\Request::i()->key )
 			{
-				$member = Member::load( Request::i()->member );
-				if( !Login::compareHashes( $member->getUniqueMemberHash(), (string) Request::i()->key ) )
+				$member = \IPS\Member::load( \IPS\Request::i()->member );
+				if( !\IPS\Login::compareHashes( $member->getUniqueMemberHash(), (string) \IPS\Request::i()->key ) )
 				{
 					$member = NULL;
 				}
 			}
 
-			$this->sendForumRss( $member ?? new Member );
+			$this->sendForumRss( $member ?? new \IPS\Member );
 
-			if( !Member::loggedIn()->group['g_view_board'] )
+			if( !\IPS\Member::loggedIn()->group['g_view_board'] )
 			{
-				Output::i()->error( 'node_error', '2F219/1', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2F219/1', 404, '' );
 			}
 		}
 	}
@@ -72,28 +49,28 @@ class Application extends SystemApplication
 	/**
 	 * Send the forum's RSS feed for the indicated member
 	 *
-	 * @param Member $member		Member
+	 * @param	\IPS\Member		$member		Member
 	 * @return	void
 	 */
-	protected function sendForumRss( Member $member ) : void
+	protected function sendForumRss( $member )
 	{
 		try
 		{
-			$forum = Forum::load( Request::i()->id );
+			$forum = \IPS\forums\Forum::load( \IPS\Request::i()->id );
 
 			if( !$forum->can( 'view', $member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			/* We'll let the regular controller handle the error */
 			return;
 		}
 
 		/* RSS feeds are not available if the setting is off, or there is nothing to include */
-		if ( !Settings::i()->forums_rss OR !$forum->topics )
+		if ( !\IPS\Settings::i()->forums_rss OR !$forum->topics )
 		{
 			return;
 		}
@@ -106,16 +83,23 @@ class Application extends SystemApplication
         }
 
 		/* Init table (it won't show anything until after the password check, but it sets navigation and titles) */
-		$iterator = Topic::getItemsWithPermission( $where, 'forums_topics.last_post DESC', Settings::i()->forums_topics_per_page, 'view', Filter::FILTER_PUBLIC_ONLY, 0, $member, FALSE, FALSE, FALSE, FALSE, NULL, $forum, TRUE, TRUE, TRUE, FALSE );
+		$iterator = \IPS\forums\Topic::getItemsWithPermission( $where, 'forums_topics.last_post DESC', \IPS\Settings::i()->forums_topics_per_page, 'view', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY, 0, $member, FALSE, FALSE, FALSE, FALSE, NULL, $forum, TRUE, TRUE, TRUE, FALSE );
 
-		/* Set the title */
-		$rssTitle = sprintf( $member->language()->get( 'forum_rss_title_topics'), $member->language()->get( "forums_forum_{$forum->id}" ) );
+		/* Set the title, either topics or questions */
+		if ( $forum->forums_bitoptions['bw_enable_answers'] )
+		{
+			$rssTitle = sprintf( $member->language()->get( 'forum_rss_title_questions'), $member->language()->get( "forums_forum_{$forum->id}" ) );
+		}
+		else
+		{
+			$rssTitle = sprintf( $member->language()->get( 'forum_rss_title_topics'), $member->language()->get( "forums_forum_{$forum->id}" ) );
+		}
 
 		/* Can we view the content (permission_showtopic may allow us to view the list, but not the content)? */
 		$canViewContent = $forum->can('read', $member );
 
 		/* Build the document */
-		$document = Rss::newDocument( $forum->url(), $rssTitle, $rssTitle );
+		$document = \IPS\Xml\Rss::newDocument( $forum->url(), $rssTitle, $rssTitle );
 		foreach ( $iterator as $topic )
 		{
 			try
@@ -123,33 +107,31 @@ class Application extends SystemApplication
 				$content = NULL;
 				if ( $canViewContent )
 				{
-					/* @var $topic Topic */
 					$content = $topic->content();
-					Output::i()->parseFileObjectUrls( $content );
+					\IPS\Output::i()->parseFileObjectUrls( $content );
 				}
-
-				$document->addItem( $topic->title, $topic->url(), $canViewContent ? $topic->content() : NULL, DateTime::ts( $topic->start_date ), $topic->tid );
+				$document->addItem( $topic->title, $topic->url(), $content, \IPS\DateTime::ts( $topic->start_date ), $topic->tid );
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 		
 		/* Display - note application/rss+xml is not a registered IANA mime-type so we need to stick with text/xml for RSS */
-		Output::i()->sendOutput( $document->asXML(), 200, 'text/xml', array(), TRUE, parseFileObjects: true );
+		\IPS\Output::i()->sendOutput( $document->asXML(), 200, 'text/xml', array(), TRUE );
 	}
 	
 	/**
 	 * Archive Query
 	 *
-	 * @param array $rules	Rules
+	 * @param	array	$rules	Rules
 	 * @return	array
 	 */
-	public static function archiveWhere( array $rules ): array
+	public static function archiveWhere( $rules )
 	{
 		$where = array();
 		
-		if ( Application::appIsEnabled('cloud') )
+		if ( \IPS\CIC )
 		{
-			return getForumArchiveWhere();
+			return \IPS\Cicloud\getForumArchiveWhere();
 		}
 
 		foreach ( $rules as $rule )
@@ -162,12 +144,12 @@ class Application extends SystemApplication
 					/* If the data is bad, log and don't throw an error, but don't allow anything to be archived. */
 					if( !$rule['archive_text'] OR !$rule['archive_unit'] )
 					{
-						Log::log( 'Forum archiving missing time period or archive unit', 'forum_archive' );
+						\IPS\Log::log( 'Forum archiving missing time period or archive unit', 'forum_archive' );
 						$clause = array( '0=?', '1' );
 					}
 					else
 					{
-						$clause = array( '(last_post > 0 AND last_post ' . $rule['archive_value'] . ' ?)', DateTime::create()->sub( new DateInterval( 'P' . trim( $rule['archive_text'] ) . mb_strtoupper( $rule['archive_unit'] ) ) )->getTimestamp() );
+						$clause = array( '(last_post > 0 AND last_post ' . $rule['archive_value'] . ' ?)', \IPS\DateTime::create()->sub( new \DateInterval( 'P' . trim( $rule['archive_text'] ) . mb_strtoupper( $rule['archive_unit'] ) ) )->getTimestamp() );
 					}
 					break;
 				
@@ -201,6 +183,10 @@ class Application extends SystemApplication
 					$clause = array( $rule['archive_field'] . 's' . $rule['archive_value'] . '?', $rule['archive_text'] );
 					break;
 				
+				case 'rating':
+					$clause = array( 'ROUND(topic_rating_total/topic_rating_hits)' . $rule['archive_value'] . '?', $rule['archive_text'] );
+					break;
+				
 				case 'member':
 					$clause = array( 'starter_id ' . ( $rule['archive_value'] == '+' ? 'IN' : 'NOT IN' ) . '(' . $rule['archive_text'] . ')' );
 					break;
@@ -212,8 +198,12 @@ class Application extends SystemApplication
 				if ( $rule['archive_skip'] )
 				{
 					$clause[0] = ( '!(' . $clause[0] . ')' );
+					$where[] = $clause;
 				}
-				$where[] = $clause;
+				else
+				{
+					$where[] = $clause;
+				}
 			}
 		}
 		
@@ -224,9 +214,9 @@ class Application extends SystemApplication
 	 * [Node] Get Icon for tree
 	 *
 	 * @note	Return the class for the icon (e.g. 'globe')
-	 * @return    string
+	 * @return	string|null
 	 */
-	protected function get__icon(): string
+	protected function get__icon()
 	{
 		return 'comments';
 	}
@@ -236,10 +226,10 @@ class Application extends SystemApplication
 	 *
 	 * @return void
 	 */
-	public function installOther() : void
+	public function installOther()
 	{
-		Index::i()->index( Topic::load( 1 ) );
-		Index::i()->index( Post::load( 1 ) );
+		\IPS\Content\Search\Index::i()->index( \IPS\forums\Topic::load( 1 ) );
+		\IPS\Content\Search\Index::i()->index( \IPS\forums\Topic\Post::load( 1 ) );
 	}
 	
 	/**
@@ -265,7 +255,7 @@ class Application extends SystemApplication
 	 * @endcode
 	 * @return array
 	 */
-	public function defaultFrontNavigation(): array
+	public function defaultFrontNavigation()
 	{
 		return array(
 			'rootTabs'		=> array(),
@@ -280,10 +270,10 @@ class Application extends SystemApplication
 	 *
 	 * @return	void
 	 */
-	public function convertLegacyParameters() : void
+	public function convertLegacyParameters()
 	{
 		/* Convert &showtopic= (link) */
-		if ( isset( Request::i()->showtopic ) and is_numeric( Request::i()->showtopic ) )
+		if ( isset( \IPS\Request::i()->showtopic ) and \is_numeric( \IPS\Request::i()->showtopic ) )
 		{
 			$base        = NULL;
 			$seoTemplate = NULL;
@@ -291,7 +281,7 @@ class Application extends SystemApplication
 
 			try
 			{
-				$topic = Topic::load( Request::i()->showtopic );
+				$topic = \IPS\forums\Topic::load( \IPS\Request::i()->showtopic );
 
 				if ( $topic->canView() )
 				{
@@ -299,23 +289,23 @@ class Application extends SystemApplication
 					$seoTemplate = 'forums_topic';
 					$seoTitles   = array( $topic->title_seo );
 				}
-			} catch( Exception $e ) {}
+			} catch( \Exception $e ) {}
 
-			$url = Url::internal( 'app=forums&module=forums&controller=topic&id=' . Request::i()->showtopic, $base, $seoTemplate, $seoTitles );
+			$url = \IPS\Http\Url::internal( 'app=forums&module=forums&controller=topic&id=' . \IPS\Request::i()->showtopic, $base, $seoTemplate, $seoTitles );
 
-			if ( isset( Request::i()->p ) or isset( Request::i()->findpost ) or isset( Request::i()->comment ) )
+			if ( isset( \IPS\Request::i()->p ) or isset( \IPS\Request::i()->findpost ) or isset( \IPS\Request::i()->comment ) )
 			{
-				$url = $url->setQueryString( array( 'do' => 'findComment', 'comment' => Request::i()->p ?: ( Request::i()->findpost ?: Request::i()->comment ) ) );
+				$url = $url->setQueryString( array( 'do' => 'findComment', 'comment' => \IPS\Request::i()->p ?: ( \IPS\Request::i()->findpost ?: \IPS\Request::i()->comment ) ) );
 			}
-			elseif ( isset( Request::i()->page ) and is_numeric( Request::i()->page ) )
+			elseif ( isset( \IPS\Request::i()->page ) )
 			{
-				$url = $url->setPage( 'page', Request::i()->page );
+				$url = $url->setPage( 'page', \IPS\Request::i()->page );
 			}
-			Output::i()->redirect( $url );
+			\IPS\Output::i()->redirect( $url );
 		}
 
 		/* Convert &showforum= */
-		if ( isset( Request::i()->showforum ) and is_numeric( Request::i()->showforum ) )
+		if ( isset( \IPS\Request::i()->showforum ) and \is_numeric( \IPS\Request::i()->showforum ) )
 		{
 			$base        = NULL;
 			$seoTemplate = NULL;
@@ -323,7 +313,7 @@ class Application extends SystemApplication
 
 			try
 			{
-				$forum = Forum::load( Request::i()->showforum );
+				$forum = \IPS\forums\Forum::load( \IPS\Request::i()->showforum );
 
 				if ( $forum->can( 'view' ) )
 				{
@@ -331,22 +321,22 @@ class Application extends SystemApplication
 					$seoTemplate = 'forums_forum';
 					$seoTitles   = array( $forum->name_seo );
 				}
-			} catch ( Exception $e ) {}
+			} catch ( \Exception $e ) {}
 
-			$url = Url::internal( 'app=forums&module=forums&controller=forums&id=' . Request::i()->showforum, $base, $seoTemplate, $seoTitles );
-			Output::i()->redirect( $url );
+			$url = \IPS\Http\Url::internal( 'app=forums&module=forums&controller=forums&id=' . \IPS\Request::i()->showforum, $base, $seoTemplate, $seoTitles );
+			\IPS\Output::i()->redirect( $url );
 		}
 		
 		/* Convert /topic/123-example/&p= */
-		if ( isset( Request::i()->p ) AND is_numeric( Request::i()->p ) AND ( Request::i()->url() instanceof Friendly ) AND Request::i()->url()->seoTemplate == 'forums_topic' )
+		if ( isset( \IPS\Request::i()->p ) AND \is_numeric( \IPS\Request::i()->p ) AND ( \IPS\Request::i()->url() instanceof \IPS\Http\Url\Friendly ) AND \IPS\Request::i()->url()->seoTemplate == 'forums_topic' )
 		{
 			/* We do this a little differently as the topic seo title is already known at this point */
 			try
 			{
-				$post = Post::loadAndCheckPerms( Request::i()->p );
-				Output::i()->redirect( $post->url() );
+				$post = \IPS\forums\Topic\Post::loadAndCheckPerms( \IPS\Request::i()->p );
+				\IPS\Output::i()->redirect( $post->url() );
 			}
-			catch( Exception $e ) {}
+			catch( \Exception $e ) {}
 		}
 	}
 
@@ -359,44 +349,5 @@ class Application extends SystemApplication
 	public function _getEssentialCookieNames(): array
 	{
 		return [ 'forumpass_*' ];
-	}
-
-	/**
-	 * Get all possible layout values for this page and app
-	 *
-	 * @return array
-	 */
-	public function getThemeLayoutOptionsForThisPage(): array
-	{
-		$return = [];
-
-		if ( Dispatcher::i()->application->directory === 'forums' and Dispatcher::i()->module->key === 'forums' and Dispatcher::i()->controller === 'index' )
-		{
-			$return[] = 'forums_forum';
-		}
-		else if ( Dispatcher::i()->application->directory === 'forums' and Dispatcher::i()->module->key === 'forums' and Dispatcher::i()->controller === 'forums' )
-		{
-			$return[] = 'forums_topic';
-		}
-		else if ( Dispatcher::i()->application->directory === 'forums' and Dispatcher::i()->module->key === 'forums' and Dispatcher::i()->controller === 'topic' )
-		{
-			$return[] = 'forums_post';
-			$return[] = 'forum_topic_view_firstpost';
-		}
-
-		return $return;
-	}
-
-	/**
-	 * Output CSS files
-	 *
-	 * @return void
-	 */
-	public static function outputCss() : void
-	{
-		if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' )
-		{
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'forums.css', 'forums', 'front' ) );
-		}
 	}
 }

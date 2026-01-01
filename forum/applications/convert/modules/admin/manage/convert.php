@@ -12,67 +12,36 @@
 namespace IPS\convert\modules\admin\manage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\convert\App;
-use IPS\convert\Application as ConverterApplication;
-use IPS\convert\Exception;
-use IPS\convert\Library;
-use IPS\convert\Software;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Helpers\Table\Custom;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_bool;
-use const IPS\CIC;
-use const IPS\CONVERTERS_DEV_UI;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Run conversion
  */
-class convert extends Controller
+class _convert extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute(): void
+	public function execute()
 	{
-		if ( CIC )
+		if ( \IPS\CIC )
 		{
-			Output::i()->error( 'module_no_permission', '2V368/2', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2V368/2', 403, '' );
 		}
 		
-		Output::i()->responsive = FALSE;
-		Dispatcher::i()->checkAcpPermission( 'convert_manage' );
+		\IPS\Output::i()->responsive = FALSE;
+		\IPS\Dispatcher::i()->checkAcpPermission( 'convert_manage' );
 		parent::execute();
 	}
 
@@ -81,40 +50,40 @@ class convert extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Do we have an id? */
-		if ( ! isset( Request::i()->id ) )
+		if ( ! isset( \IPS\Request::i()->id ) )
 		{
-			Output::i()->error( 'no_conversion_app', '2V101/1' );
+			\IPS\Output::i()->error( 'no_conversion_app', '2V101/1' );
 		}
 		
 		/* Load the app */
 		try
 		{
-			$app = App::load( Request::i()->id );
+			$app = \IPS\convert\App::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'conversion_app_not_found', '2V101/2', 404 );
+			\IPS\Output::i()->error( 'conversion_app_not_found', '2V101/2', 404 );
 		}
 		
 		/* Do a quick parent storage check */
-		ConverterApplication::checkConvParent( $app->getSource()->getLibrary()->getAppKey() );
+		\IPS\convert\Application::checkConvParent( $app->getSource()->getLibrary()->app );
 
 		/* Check child apps also have temporary columns */
 		foreach( $app->children() as $child )
 		{
-			ConverterApplication::checkConvParent( $child->getSource()->getLibrary()->getAppKey() );
+			\IPS\convert\Application::checkConvParent( $child->getSource()->getLibrary()->app );
 		}
 
 		/* Are we using the legacy UI? If not, then start converting as we already have everything we need. */
-		if( !CONVERTERS_DEV_UI )
+		if( !\IPS\CONVERTERS_DEV_UI )
 		{
 			$configurationNeeded = FALSE;
 
 			/* If we have not yet configured the app, go there first */
-			if( !count( $app->_session['more_info'] ) )
+			if( !\count( $app->_session['more_info'] ) )
 			{
 				$configurationNeeded = TRUE;
 			}
@@ -122,7 +91,7 @@ class convert extends Controller
 			/* Check child apps also have more_info */
 			foreach( $app->children() as $childApp )
 			{
-				if( !count( $childApp->_session['more_info'] ) )
+				if( !\count( $childApp->_session['more_info'] ) )
 				{
 					$configurationNeeded = TRUE;
 					break;
@@ -132,32 +101,32 @@ class convert extends Controller
 			/* Do we need to configure? */
 			if( $configurationNeeded )
 			{
-				$url = Url::internal( "app=convert&module=manage&controller=create&_moveToStep=convert_start_conversion_details&id=" . ( $app->parent ?: $app->app_id ) );
+				$url = \IPS\Http\Url::internal( "app=convert&module=manage&controller=create&_moveToStep=convert_start_conversion_details&id=" . ( $app->parent ?: $app->app_id ) );
 			}
 			/* Otherwise start converting! */
 			else
 			{
-				$url = Url::internal( "app=convert&module=manage&controller=convert&do=runStep&id=" . $app->app_id )->csrf();
+				$url = \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&do=runStep&id=" . $app->app_id )->csrf();
 
-				if( isset( Request::i()->continue ) )
+				if( isset( \IPS\Request::i()->continue ) )
 				{
-					$url = $url->setQueryString( 'continue', Request::i()->continue );
+					$url = $url->setQueryString( 'continue', \IPS\Request::i()->continue );
 				}
 			}
 
-			Output::i()->redirect( $url );
+			\IPS\Output::i()->redirect( $url );
 		}
 		
 		/* Get our details */
 		$softwareClass				= $app->getSource();
 		$libraryClass				= $softwareClass->getLibrary();
-		Output::i()->title		= Member::loggedIn()->language()->addToStack( 'converting_x_to_x', FALSE, array( 'sprintf' => array( $softwareClass::softwareName(), Application::load( $app->sw )->_title ), 'striptags' => true ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack( 'converting_x_to_x', FALSE, array( 'sprintf' => array( $softwareClass::softwareName(), \IPS\Application::load( $app->sw )->_title ), 'striptags' => true ) );
 		
 		/* Build our table. If I can do this using only the Table helper, I'll be impressed */
 		$menuRows	= static::getMenuRows( $softwareClass );
 		
-		$table						= new Custom( $menuRows, Url::internal( "app=convert&module=manage&controller=convert" ) );
-		$table->rowsTemplate		= array( Theme::i()->getTemplate( 'table' ), 'convertMenuRow' );
+		$table						= new \IPS\Helpers\Table\Custom( $menuRows, \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert" ) );
+		$table->rowsTemplate		= array( \IPS\Theme::i()->getTemplate( 'table' ), 'convertMenuRow' );
 		$table->extra				= array( 'sessionData' => $app->_session, 'appClass' => $app, 'softwareClass' => $softwareClass, 'libraryClass' => $libraryClass, 'menuRows' => $menuRows );
 		$table->mainColumn			= 'step_title';
 		$table->showAdvancedSearch	= FALSE;
@@ -166,35 +135,35 @@ class convert extends Controller
 		$table->parsers				= array(
 			'step_title' => function( $row )
 			{
-				return Member::loggedIn()->language()->addToStack( $row );
+				return \IPS\Member::loggedIn()->language()->addToStack( $row );
 			},
 		);
 		
-		Output::i()->output = '';
+		\IPS\Output::i()->output = '';
 		
 		if ( $softwareClass::canConvertSettings() !== FALSE )
 		{
-			Output::i()->output	.= Theme::i()->getTemplate( 'table' )->settingsMessage( $app );
+			\IPS\Output::i()->output	.= \IPS\Theme::i()->getTemplate( 'table' )->settingsMessage( $app );
 		}
 		
-		Output::i()->output	.= $table;
+		\IPS\Output::i()->output	.= $table;
 		
 		if ( $libraryClass->getPostConversionInformation() != NULL )
 		{
-			Output::i()->output	.= Theme::i()->getTemplate( 'table' )->postConversionInformation( $libraryClass->getPostConversionInformation() );
+			\IPS\Output::i()->output	.= \IPS\Theme::i()->getTemplate( 'table' )->postConversionInformation( $libraryClass->getPostConversionInformation() );
 		}
 	}
 
 	/**
 	 * Get the appropriate menu rows for the library
 	 *
-	 * @param	Software	$softwareClass	Library class
+	 * @param	\IPS\convert\Software	$softwareClass	Library class
 	 * @param	bool					$filter			Filter out extra steps
 	 * @param	bool					$return			Let exception bubble instead of outputting it
 	 * @param	bool					$count			Count database rows
 	 * @return	array
 	 */
-	public static function getMenuRows( Software $softwareClass, bool $filter=TRUE, bool $return=FALSE, bool $count=TRUE ) : array
+	public static function getMenuRows( $softwareClass, $filter=TRUE, $return=FALSE, $count=TRUE )
 	{
 		$libraryClass	= $softwareClass->getLibrary();
 
@@ -216,7 +185,7 @@ class convert extends Controller
 			if( $filter === TRUE )
 			{
 				$menuRows = array_filter( $menuRows, function( $row ) use ( $extraSteps ) {
-					if( in_array( $row['step_method'], $extraSteps ) )
+					if( \in_array( $row['step_method'], $extraSteps ) )
 					{
 						return FALSE;
 					}
@@ -225,14 +194,14 @@ class convert extends Controller
 				});
 			}
 		}
-		catch( Exception $e )
+		catch( \IPS\convert\Exception $e )
 		{
 			if( $return )
 			{
 				throw $e;
 			}
 
-			Output::i()->error( $e->getMessage(), '1V101/3' );
+			\IPS\Output::i()->error( $e->getMessage(), '1V101/3', 500 );
 		}
 
 		return $menuRows;
@@ -241,10 +210,10 @@ class convert extends Controller
 	/**
 	 * Figure out the next steps for converting
 	 *
-	 * @param	App	$app	Application we are converting
+	 * @param	\IPS\convert\App	$app	Application we are converting
 	 * @return	array
 	 */
-	protected function _getNextStep( App $app ) : array
+	protected function _getNextStep( $app )
 	{
 		/* Set our variables */
 		$appId	= $app->app_id;
@@ -277,7 +246,7 @@ class convert extends Controller
 		}
 
 		/* Loop over all applications */
-		if( count( $applicationsToCheck ) )
+		if( \count( $applicationsToCheck ) )
 		{
 			foreach( $applicationsToCheck as $appToCheck )
 			{
@@ -290,7 +259,7 @@ class convert extends Controller
 					$_SESSION['convertCountRows'][ $masterAppId ][ $appToCheck->app_id ] = array();
 				}
 
-				if( !$appToCheck->parent AND $softwareClass::canConvertSettings() AND isset( $appToCheck->_session['more_info']['convertSettings'] ) AND $appToCheck->_session['more_info']['convertSettings']['convert_settings'] AND !count( $appToCheck->_session['completed'] ) )
+				if( !$appToCheck->parent AND $softwareClass::canConvertSettings() AND isset( $appToCheck->_session['more_info']['convertSettings'] ) AND $appToCheck->_session['more_info']['convertSettings']['convert_settings'] AND !\count( $appToCheck->_session['completed'] ) )
 				{
 					$method = 'convertSettings';
 					$_SESSION['convertCountRows'][ $masterAppId ][ $appToCheck->app_id ][ $method ] = 1;
@@ -325,9 +294,9 @@ class convert extends Controller
 					}
 
 					/* We chose to convert a specific step and it's not complete */
-					if( isset( Request::i()->method ) AND $row['step_method'] == Request::i()->method )
+					if( isset( \IPS\Request::i()->method ) AND $row['step_method'] == \IPS\Request::i()->method )
 					{
-						if( !in_array( $row['step_method'], $appToCheck->_session['completed'] ) )
+						if( !\in_array( $row['step_method'], $appToCheck->_session['completed'] ) )
 						{
 							$method = $row['step_method'];
 						}
@@ -346,19 +315,19 @@ class convert extends Controller
 					}
 
 					/* If this step has any dependencies not yet converted, skip for now */
-					if( count( array_filter( $row['dependencies'], array( $appToCheck, 'dependencies' ) ) ) )
+					if( \count( array_filter( $row['dependencies'], array( $appToCheck, 'dependencies' ) ) ) )
 					{
 						continue;
 					}
 
 					/* If this step is already completed, also skip */
-					if( in_array( $row['step_method'], $appToCheck->_session['completed'] ) )
+					if( \in_array( $row['step_method'], $appToCheck->_session['completed'] ) )
 					{
 						continue;
 					}
 
 					/* If we don't want this converted, also skip */
-					if( empty( $appToCheck->_session['more_info'][ $row['step_method'] ][ $row['step_title'] ] ) AND !in_array( $row['step_method'], array_keys( $softwareClass->extraMenuRows() ) ) )
+					if( empty( $appToCheck->_session['more_info'][ $row['step_method'] ][ $row['step_title'] ] ) AND !\in_array( $row['step_method'], array_keys( $softwareClass->extraMenuRows() ) ) )
 					{
 						continue;
 					}
@@ -377,40 +346,40 @@ class convert extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function emptyData() : void
+	protected function emptyData()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		if ( ! isset( Request::i()->id ) )
+		if ( ! isset( \IPS\Request::i()->id ) )
 		{
-			Output::i()->error( 'no_conversion_app', '2V101/4' );
+			\IPS\Output::i()->error( 'no_conversion_app', '2V101/4' );
 		}
 		
 		try
 		{
-			$app = App::load( Request::i()->id );
+			$app = \IPS\convert\App::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'conversion_app_not_found', '2V101/5' );
+			\IPS\Output::i()->error( 'conversion_app_not_found', '2V101/5' );
 		}
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'removing_data' );
-		Output::i()->output = new MultipleRedirect( Url::internal( "app=convert&module=manage&controller=convert&do=emptyData&id={$app->app_id}&method=" . Request::i()->method ),
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'removing_data' );
+		\IPS\Output::i()->output = new \IPS\Helpers\MultipleRedirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&do=emptyData&id={$app->app_id}&method=" . \IPS\Request::i()->method ),
 		function( $data ) use ( $app )
 		{
 			try
 			{
-				return $app->getSource()->getLibrary()->emptyData( $data, Request::i()->method );
+				return $app->getSource()->getLibrary()->emptyData( $data, \IPS\Request::i()->method );
 			}
-			catch( Exception $e )
+			catch( \IPS\convert\Exception $e )
 			{
-				Output::i()->redirect( Url::internal( "app=convert&module=manage&controller=convert&do=error&id={$app->app_id}" ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&do=error&id={$app->app_id}" ) );
 			}
 		},
 		function() use ( $app )
 		{
-			Output::i()->redirect( Url::internal( "app=convert&module=manage&controller=convert&id={$app->app_id}" ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&id={$app->app_id}" ) );
 		} );
 	}
 	
@@ -419,37 +388,37 @@ class convert extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function runStep() : void
+	protected function runStep()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Make sure we have our app id */
-		if ( ! isset( Request::i()->id ) )
+		if ( ! isset( \IPS\Request::i()->id ) )
 		{
-			Output::i()->error( 'no_conversion_app', '2V101/6' );
+			\IPS\Output::i()->error( 'no_conversion_app', '2V101/6' );
 		}
 		
 		/* Load our app */
 		try
 		{
-			$app = App::load( Request::i()->id );
+			$app = \IPS\convert\App::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'conversion_app_not_found', '2V101/7', 404 );
+			\IPS\Output::i()->error( 'conversion_app_not_found', '2V101/7', 404 );
 		}
 
 		/* If we decided to truncate, we need to do so before getMoreInfo() is generated */
-		if ( CONVERTERS_DEV_UI AND isset( Request::i()->empty_local_data ) AND Request::i()->empty_local_data == 1 )
+		if ( \IPS\CONVERTERS_DEV_UI AND isset( \IPS\Request::i()->empty_local_data ) AND \IPS\Request::i()->empty_local_data == 1 )
 		{
-			$app->getSource()->getLibrary()->emptyLocalData( Request::i()->method );
+			$app->getSource()->getLibrary()->emptyLocalData( \IPS\Request::i()->method );
 
 			/* If this step has extra steps, we need to unset the completed flag. */
 			$canConvert = $app->getSource()->getLibrary()->getConvertableItems();
 			$session = $app->_session;
-			if ( isset( $canConvert[ Request::i()->method ]['extra_steps'] ) )
+			if ( isset( $canConvert[ \IPS\Request::i()->method ]['extra_steps'] ) )
 			{
-				foreach( $canConvert[ Request::i()->method ]['extra_steps'] as $next )
+				foreach( $canConvert[ \IPS\Request::i()->method ]['extra_steps'] as $next )
 				{
 					if( $key = array_search( $next, $session['completed'] ) )
 					{
@@ -460,7 +429,7 @@ class convert extends Controller
 
 			/* Since we're emptying everything, remove the main step from the completed list
 				so that 'continue' functionality can be used on the next run. */
-			if( $key = array_search( Request::i()->method, $session['completed'] ) )
+			if( $key = array_search( \IPS\Request::i()->method, $session['completed'] ) )
 			{
 				unset( $session['completed'][ $key ] );
 			}
@@ -481,7 +450,7 @@ class convert extends Controller
 		}
 		
 		/* Do we need more information? */
-		if ( CONVERTERS_DEV_UI AND ! isset( $app->_session['more_info'][ Request::i()->method ] ) OR ( isset( Request::i()->reconfigure ) AND Request::i()->reconfigure == 1 ) )
+		if ( \IPS\CONVERTERS_DEV_UI AND ! isset( $app->_session['more_info'][ \IPS\Request::i()->method ] ) OR ( isset( \IPS\Request::i()->reconfigure ) AND \IPS\Request::i()->reconfigure == 1 ) )
 		{
 			if( $this->_checkMethodConfiguration( $app ) )
 			{
@@ -490,7 +459,7 @@ class convert extends Controller
 		}
 		
 		/* Are we continuing? We need to tell the library that, but we need to use sessions to do it so it only does it on the first cycle. */
-		if ( isset( Request::i()->continue ) )
+		if ( isset( \IPS\Request::i()->continue ) )
 		{
 			/* Is it set? If not, just go ahead. */
 			if ( !isset( $_SESSION['convertContinue'] ) )
@@ -500,22 +469,22 @@ class convert extends Controller
 		}
 		
 		/* Generate our multiredirect URL */
-		$redirectUrl = Url::internal( "app=convert&module=manage&controller=convert&do=runStep&id={$app->app_id}" )->csrf();
+		$redirectUrl = \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&do=runStep&id={$app->app_id}" )->csrf();
 
 		/* Legacy URL parameters we won't need now, but will if using the developer UI */
-		if( isset( Request::i()->per_cycle ) )
+		if( isset( \IPS\Request::i()->per_cycle ) )
 		{
-			$redirectUrl	= $redirectUrl->setQueryString( 'per_cycle', Request::i()->per_cycle );
+			$redirectUrl	= $redirectUrl->setQueryString( 'per_cycle', \IPS\Request::i()->per_cycle );
 		}
 
-		if( isset( Request::i()->method ) )
+		if( isset( \IPS\Request::i()->method ) )
 		{
-			$redirectUrl	= $redirectUrl->setQueryString( 'method', Request::i()->method );
+			$redirectUrl	= $redirectUrl->setQueryString( 'method', \IPS\Request::i()->method );
 		}
 
 		/* Output multiredirector */
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'converting' );
-		Output::i()->output = new MultipleRedirect(
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'converting' );
+		\IPS\Output::i()->output = new \IPS\Helpers\MultipleRedirect( 
 			/* The multiredirect URL */
 			$redirectUrl,
 
@@ -525,10 +494,10 @@ class convert extends Controller
 				/* Are we reconverting using the dev ui and this is the first iteration? */
 				if( $data === NULL )
 				{
-					if( isset( Request::i()->method ) )
+					if( isset( \IPS\Request::i()->method ) )
 					{
 						$session = $app->_session;
-						if( $key = array_search( Request::i()->method, $session['completed'] ) )
+						if( $key = array_search( \IPS\Request::i()->method, $session['completed'] ) )
 						{
 							unset( $session['completed'][ $key ] );
 							$app->_session = $session;
@@ -548,19 +517,19 @@ class convert extends Controller
 				/* If we are moving on to a different app, load it now */
 				if( $convertData['id'] != $app->app_id )
 				{
-					$app	= App::load( $convertData['id'] );
+					$app	= \IPS\convert\App::load( $convertData['id'] );
 				}
 
 				/* Convert settings if that's what we're doing */
 				if( $convertData['method'] == 'convertSettings' )
 				{
 					$app->getSource()->convertSettings( $app->_session['more_info']['convertSettings'] );
-					Settings::i()->clearCache();
+					\IPS\Settings::i()->clearCache();
 
 					/* A Software Exception indicates we are done */
 					$completed	= $app->_session['completed'];
 					$more_info	= $app->_session['more_info'];
-					if ( !in_array( $convertData['method'], $completed ) )
+					if ( !\in_array( $convertData['method'], $completed ) )
 					{
 						$completed[] = $convertData['method'];
 					}
@@ -571,12 +540,12 @@ class convert extends Controller
 
 					$app->_session = array( 'working' => array(), 'more_info' => $more_info, 'completed' => $completed, 'running' => $running );
 
-					$percentage	= 100 / Library::getTotalCachedRows( $app->getMasterConversionId() );
+					$percentage	= 100 / \IPS\convert\Library::getTotalCachedRows( $app->getMasterConversionId() );
 					if ( $percentage > 100 )
 					{
 						$percentage = 100;
 					}
-					return array( 0, sprintf( Member::loggedIn()->language()->get( 'converted_x_of_x' ), 1, 1, Member::loggedIn()->language()->addToStack( '_convert_settings' ) ), $percentage );
+					return array( 0, sprintf( \IPS\Member::loggedIn()->language()->get( 'converted_x_of_x' ), 1, 1, \IPS\Member::loggedIn()->language()->addToStack( '_convert_settings' ) ), $percentage );
 				}
 
 				try
@@ -589,22 +558,22 @@ class convert extends Controller
 
 					return $app->getSource()->getLibrary()->process( $data, $convertData['method'], $app->getSource()->getLibrary()->getMethodFromMenuRows( $convertData['method'] )['per_cycle'] );
 				}
-				catch( Exception $e )
+				catch( \IPS\convert\Exception $e )
 				{
-					Output::i()->redirect( Url::internal( "app=convert&module=manage&controller=convert&do=error&id={$app->app_id}" ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&do=error&id={$app->app_id}" ) );
 				}
 			},
 
 			/* The final function to run */
 			function() use ( $app )
 			{
-				if( CONVERTERS_DEV_UI AND isset( Request::i()->method ) )
+				if( \IPS\CONVERTERS_DEV_UI AND isset( \IPS\Request::i()->method ) )
 				{
-					Output::i()->redirect( Url::internal( "app=convert&module=manage&controller=convert&do=manage&id=" . ( $app->parent ?: $app->app_id ) ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&do=manage&id=" . ( $app->parent ?: $app->app_id ) ) );
 				}
 				else
 				{
-					Output::i()->redirect( Url::internal( "app=convert&module=manage&controller=convert&do=finish&wasConfirmed=1&id=" . ( $app->parent ?: $app->app_id ) )->csrf() );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&do=finish&wasConfirmed=1&id=" . ( $app->parent ?: $app->app_id ) )->csrf() );
 				}
 			}
 		 );
@@ -613,22 +582,22 @@ class convert extends Controller
 	/**
 	 * Check if we need to configure this conversion step
 	 *
-	 * @param	App	$app	App we are converting
+	 * @param	\IPS\convert\App	$app	App we are converting
 	 * @return	bool
 	 */
-	protected function _checkMethodConfiguration( App $app ) : bool
+	protected function _checkMethodConfiguration( $app )
 	{
 		$softwareClass	= $app->getSource();
 
-		if ( in_array( Request::i()->method, $softwareClass::checkConf() ) )
+		if ( \in_array( \IPS\Request::i()->method, $softwareClass::checkConf() ) )
 		{
-			$getMoreInfo	= $softwareClass->getMoreInfo( Request::i()->method );
-			if ( is_array( $getMoreInfo ) AND count( $getMoreInfo ) )
+			$getMoreInfo	= $softwareClass->getMoreInfo( \IPS\Request::i()->method );
+			if ( \is_array( $getMoreInfo ) AND \count( $getMoreInfo ) )
 			{
-				$form = new Form( Request::i()->method . '_more_info', 'continue' );
-				$form->hiddenValues['per_cycle'] = Request::i()->per_cycle;
+				$form = new \IPS\Helpers\Form( \IPS\Request::i()->method . '_more_info', 'continue' );
+				$form->hiddenValues['per_cycle'] = \IPS\Request::i()->per_cycle;
 				
-				if ( isset( Request::i()->reconfigure ) )
+				if ( isset( \IPS\Request::i()->reconfigure ) )
 				{
 					$form->hiddenValues['reconfigure'] = 1;
 				}
@@ -637,10 +606,10 @@ class convert extends Controller
 				foreach( $getMoreInfo as $key => $input )
 				{
 					$fieldClass = $input['field_class'];
-					$form->add( new $fieldClass( $key, $input['field_default'], $input['field_required'], $input['field_extra'], $input['field_validation'] ?? NULL ) );
+					$form->add( new $fieldClass( $key, $input['field_default'], $input['field_required'], $input['field_extra'], isset( $input['field_validation'] ) ? $input['field_validation'] : NULL ) );
 					if ( $input['field_hint'] !== NULL )
 					{
-						$form->addMessage( $input['field_hint'], 'ipsMessage ipsMessage--info' );
+						$form->addMessage( $input['field_hint'], 'ipsMessage ipsMessage_info' );
 					}
 				}
 				
@@ -649,13 +618,13 @@ class convert extends Controller
 					$per_cycle = $values['per_cycle'];
 					unset( $values['per_cycle'] );
 					
-					$app->saveMoreInfo( Request::i()->method, $values );
+					$app->saveMoreInfo( \IPS\Request::i()->method, $values );
 
-					Output::i()->redirect( Url::internal( "app=convert&module=manage&controller=convert&do=runStep&id={$app->app_id}&per_cycle={$per_cycle}&method=" . Request::i()->method )->csrf() );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&do=runStep&id={$app->app_id}&per_cycle={$per_cycle}&method=" . \IPS\Request::i()->method )->csrf() );
 				}
 				
-				Output::i()->title	= Member::loggedIn()->language()->addToStack( 'more_info_needed' );
-				Output::i()->output = $form;
+				\IPS\Output::i()->title	= \IPS\Member::loggedIn()->language()->addToStack( 'more_info_needed' );
+				\IPS\Output::i()->output = $form;
 				return TRUE;
 			}
 		}
@@ -668,27 +637,27 @@ class convert extends Controller
 	 *
 	 * @return	void
 	 */
-	public function error() : void
+	public function error()
 	{
-		if ( !isset( Request::i()->id ) )
+		if ( !isset( \IPS\Request::i()->id ) )
 		{
-			Output::i()->error( 'no_conversion_app', '2V101/8' );
+			\IPS\Output::i()->error( 'no_conversion_app', '2V101/8' );
 		}
 		
 		try
 		{
-			$app = App::load( Request::i()->id );
+			$app = \IPS\convert\App::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'conversion_app_not_found', '2V101/9', 404 );
+			\IPS\Output::i()->error( 'conversion_app_not_found', '2V101/9', 404 );
 		}
 		
 		/* Load the last actual error logged */
-		$error = Db::i()->select( '*', 'convert_logs', array( 'log_app=?', $app->app_id ), 'log_id DESC', 1 )->first();
+		$error = \IPS\Db::i()->select( '*', 'convert_logs', array( 'log_app=?', $app->app_id ), 'log_id DESC', 1 )->first();
 		
 		/* Just use generic error wrapper */
-		Output::i()->error( $error['log_method'] . ': ' . $error['log_message'], '2V101/A' );
+		\IPS\Output::i()->error( $error['log_method'] . ': ' . $error['log_message'], '2V101/A' );
 	}
 	
 	/**
@@ -696,51 +665,51 @@ class convert extends Controller
 	 *
 	 * @return	void
 	 */
-	public function settings() : void
+	public function settings()
 	{
-		if ( !isset( Request::i()->id ) )
+		if ( !isset( \IPS\Request::i()->id ) )
 		{
-			Output::i()->error( 'no_conversion_app', '2V101/B' );
+			\IPS\Output::i()->error( 'no_conversion_app', '2V101/B' );
 		}
 		
 		try
 		{
-			$app = App::load( Request::i()->id );
+			$app = \IPS\convert\App::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'conversion_app_not_found', '2V101/C', 404 );
+			\IPS\Output::i()->error( 'conversion_app_not_found', '2V101/C', 404 );
 		}
 		
 		$softwareClass = $app->getSource();
 		
 		if ( $softwareClass::canConvertSettings() === FALSE )
 		{
-			Output::i()->error( 'settings_conversion_not_supported', '2V101/D' );
+			\IPS\Output::i()->error( 'settings_conversion_not_supported', '2V101/D' );
 		}
 		
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		foreach( $softwareClass->settingsMapList() as $key => $setting )
 		{
 			$value = $setting['value'];
-			if ( is_bool( ( $setting['value'] ) ) )
+			if ( \is_bool( ( $setting['value'] ) ) )
 			{
 				$value = $setting['value'] === TRUE ? 'On' : 'Off';
 			}
 			
-			$form->add( new Checkbox( $setting['our_key'], TRUE, FALSE, array( 'label' => $value ) ) );
+			$form->add( new \IPS\Helpers\Form\Checkbox( $setting['our_key'], TRUE, FALSE, array( 'label' => $value ) ) );
 		}
 		
 		if ( $values = $form->values() )
 		{
 			$softwareClass->convertSettings( $values );
-			Settings::i()->clearCache();
+			\IPS\Settings::i()->clearCache();
 			
-			Output::i()->redirect( Url::internal( "app=convert&module=manage&controller=convert&id={$app->app_id}" ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=convert&id={$app->app_id}" ), 'saved' );
 		}
 		
-		Output::i()->title		= Member::loggedIn()->language()->addToStack( 'converting_settings' );
-		Output::i()->output	= $form;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack( 'converting_settings' );
+		\IPS\Output::i()->output	= $form;
 	}
 	
 	/**
@@ -748,24 +717,24 @@ class convert extends Controller
 	 *
 	 * @return	void
 	 */
-	public function finish() : void
+	public function finish()
 	{
-		if ( !isset( Request::i()->id ) )
+		if ( !isset( \IPS\Request::i()->id ) )
 		{
-			Output::i()->error( 'no_conversion_app', '2V101/E' );
+			\IPS\Output::i()->error( 'no_conversion_app', '2V101/E' );
 		}
 
 		try
 		{
-			$app = App::load( Request::i()->id );
+			$app = \IPS\convert\App::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			output::i()->error( 'conversion_app_not_found', '2V101/F', 404 );
+			\IPS\output::i()->error( 'conversion_app_not_found', '2V101/F', 404 );
 		}
 
 		/* Make sure the user confirmed they want to finish */
-		Request::i()->confirmedDelete( 'convert_finish_confirm_title', 'convert_finish_confirm', 'finish' );
+		\IPS\Request::i()->confirmedDelete( 'convert_finish_confirm_title', 'convert_finish_confirm', 'finish' );
 
 		$softwareClass = $app->getSource();
 
@@ -776,53 +745,53 @@ class convert extends Controller
 		{
 			if ( $app->parent )
 			{
-				$parent = App::load( $app->parent );
+				$parent = \IPS\convert\App::load( $app->parent );
 
 				if ( method_exists( $parent->getSource(), 'finish' ) AND !$parent->finished )
 				{
 					$return = $parent->getSource()->finish();
-					$parent->log( 'app_finished', __METHOD__, App::LOG_NOTICE );
+					$parent->log( 'app_finished', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 					$parent->finished = TRUE;
 					$parent->save();
 
-					if ( is_array( $return ) )
+					if ( \is_array( $return ) )
 					{
 						$messages = array_merge( $messages, $return );
 					}
 				}
 				elseif( $parent->finished )
 				{
-					$parent->log( 'app_finished_skipped', __METHOD__, App::LOG_NOTICE );
+					$parent->log( 'app_finished_skipped', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 				}
 
 				/* Run siblings if need be */
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'convert_apps', array( "parent=? AND app_id!=?", $parent->app_id, $app->app_id ) ), 'IPS\convert\App' ) AS $sibling )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'convert_apps', array( "parent=? AND app_id!=?", $parent->app_id, $app->app_id ) ), 'IPS\convert\App' ) AS $sibling )
 				{
 					if ( method_exists( $sibling->getSource(), 'finish' ) AND !$sibling->finished )
 					{
 						$return = $sibling->getSource()->finish();
-						$sibling->log( 'app_finished', __METHOD__, App::LOG_NOTICE );
+						$sibling->log( 'app_finished', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 						$sibling->finished = TRUE;
 						$sibling->save();
 
-						if ( is_array( $return ) )
+						if ( \is_array( $return ) )
 						{
 							$messages = array_merge( $messages, $return );
 						}
 					}
 					elseif( $sibling->finished )
 					{
-						$sibling->log( 'app_finished_skipped', __METHOD__, App::LOG_NOTICE );
+						$sibling->log( 'app_finished_skipped', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 					}
 				}
 			}
 			else
 			{
 				/* No parent - bubble up to the exception */
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			/* This is a parent - run it's children */
 			foreach( $app->children() AS $child )
@@ -832,18 +801,18 @@ class convert extends Controller
 				if ( method_exists( $childSoftwareClass, 'finish' ) AND !$child->finished )
 				{
 					$return = $childSoftwareClass->finish();
-					$child->log( 'app_finished', __METHOD__, App::LOG_NOTICE );
+					$child->log( 'app_finished', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 					$child->finished = TRUE;
 					$child->save();
 
-					if ( is_array( $return ) )
+					if ( \is_array( $return ) )
 					{
 						$messages = array_merge( $messages, $return );
 					}
 				}
 				elseif( $child->finished )
 				{
-					$child->log( 'app_finished_skipped', __METHOD__, App::LOG_NOTICE );
+					$child->log( 'app_finished_skipped', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 				}
 			}
 		}
@@ -852,30 +821,30 @@ class convert extends Controller
 		if ( method_exists( $softwareClass, 'finish' ) AND !$app->finished )
 		{
 			$return = $softwareClass->finish();
-			$app->log( 'app_finished', __METHOD__, App::LOG_NOTICE );
+			$app->log( 'app_finished', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 			$app->finished = TRUE;
 			$app->save();
 
-			if ( is_array( $return ) )
+			if ( \is_array( $return ) )
 			{
 				$messages = array_merge( $messages, $return );
 			}
 		}
 		elseif( $app->finished )
 		{
-			$app->log( 'app_finished_skipped', __METHOD__, App::LOG_NOTICE );
+			$app->log( 'app_finished_skipped', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 		}
 
 		/* Any Messages? */
-		if( !count( $messages ) )
+		if( !\count( $messages ) )
 		{
 			$messages = array( 'nothing_to_finish' );
 		}
 
 		$messages = array_map( function( $key ) {
-			return Member::loggedIn()->language()->addToStack( $key );
+			return \IPS\Member::loggedIn()->language()->addToStack( $key );
 		}, $messages );
 
-		Output::i()->redirect( Url::internal( "app=convert&module=manage&controller=manage" ), Member::loggedIn()->language()->formatList( $messages ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=convert&module=manage&controller=manage" ), \IPS\Member::loggedIn()->language()->formatList( $messages ) );
 	}
 }

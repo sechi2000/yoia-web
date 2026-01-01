@@ -12,50 +12,45 @@
 namespace IPS\gallery\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Api\GraphQL\ItemType;
-use IPS\File;
-use IPS\gallery\Album;
-use IPS\GeoLocation;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ImageType for GraphQL API
  */
-class ImageType extends ItemType
+class _ImageType extends \IPS\Content\Api\GraphQL\ItemType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $itemClass	= '\IPS\gallery\Image';
+	protected static $itemClass	= '\IPS\gallery\Image';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'gallery_Image';
+	protected static $typeName = 'gallery_Image';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'An image';
+	protected static $typeDescription = 'An image';
 
 	/*
 	 * @brief 	Follow data passed in to FollowType resolver
 	 */
-	protected static array $followData = array('app' => 'gallery', 'area' => 'image');
+	protected static $followData = array('app' => 'gallery', 'area' => 'image');
 
 	/**
 	 * Return the fields available in this type
 	 *
 	 * @return	array
 	 */
-	public function fields(): array
+	public function fields()
 	{
 		// Extend our fields with image-specific stuff
 		$defaultFields = parent::fields();
@@ -77,7 +72,7 @@ class ImageType extends ItemType
 				'resolve' => function ($image) {
 					if( $image->album_id )
 					{
-						return Album::load( $image->album_id );
+						return \IPS\gallery\Album::load( $image->album_id );
 					}
 
 					return NULL;
@@ -116,19 +111,19 @@ class ImageType extends ItemType
 			'maskedFileName' => [
 				'type' => TypeRegistry::string(),
 				'resolve' => function ($image) {
-					return (string) File::get( 'gallery_Images', $image->masked_file_name )->url;
+					return (string) \IPS\File::get( 'gallery_Images', $image->masked_file_name )->url;
 				}
 			],
 			'originalFileName' => [
 				'type' => TypeRegistry::string(),
 				'resolve' => function ($image) {
-					return (string) File::get( 'gallery_Images', $image->original_file_name )->url;
+					return (string) \IPS\File::get( 'gallery_Images', $image->original_file_name )->url;
 				}
 			],
 			'smallFileName' => [
 				'type' => TypeRegistry::string(),
 				'resolve' => function ($image) {
-					return (string) File::get( 'gallery_Images', $image->small_file_name )->url;
+					return (string) \IPS\File::get( 'gallery_Images', $image->small_file_name )->url;
 				}
 			],
 			'fileSize' => [
@@ -138,11 +133,11 @@ class ImageType extends ItemType
 				}
 			],
 			'location' => [
-				'type' => GeoLocation\Api\GraphQL\TypeRegistry::geolocation(),
+				'type' => \IPS\GeoLocation\Api\GraphQL\TypeRegistry::geolocation(),
 				'resolve' => function ($image) {
 					if( $image->gps_raw )
 					{
-						return GeoLocation::buildFromJson( $image->gps_raw );
+						return \IPS\GeoLocation::buildFromJson( $image->gps_raw );
 					}
 
 					return NULL;
@@ -202,7 +197,7 @@ class ImageType extends ItemType
 	 *
 	 * @return	ObjectType
 	 */
-	protected static function getCommentType(): ObjectType
+	protected static function getCommentType()
 	{
 		return \IPS\gallery\api\GraphQL\TypeRegistry::imageComment();
 	}

@@ -10,23 +10,20 @@
  */
 
 namespace IPS\blog\api\GraphQL;
-use IPS\blog\api\GraphQL\Queries\Blog;
-use IPS\blog\api\GraphQL\Queries\Blogs;
-use IPS\blog\api\GraphQL\Queries\Entries;
-use IPS\blog\api\GraphQL\Queries\Entry;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * Blog queries for GraphQL API
  */
-abstract class Query
+abstract class _Query
 {
     /**
      * Get the supported query types in this app
@@ -36,10 +33,10 @@ abstract class Query
     public static function queries(): array
     {
         return [
-            'blogs' => new Blogs(),
-            'blog' => new Blog(),
-            'entries' => new Entries(),
-           'entry' => new Entry(),
+            'blogs' => new \IPS\blog\api\GraphQL\Queries\Blogs(),
+            'blog' => new \IPS\blog\api\GraphQL\Queries\Blog(),
+            'entries' => new \IPS\blog\api\GraphQL\Queries\Entries(),
+           'entry' => new \IPS\blog\api\GraphQL\Queries\Entry(),
         ];
     }
 }

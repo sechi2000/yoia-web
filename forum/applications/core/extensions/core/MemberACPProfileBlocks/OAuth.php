@@ -11,43 +11,34 @@
 namespace IPS\core\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Api\OAuthClient;
-use IPS\core\MemberACPProfile\Block;
-use IPS\Db;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Groups Block
  */
-class OAuth extends Block
+class _OAuth extends \IPS\core\MemberACPProfile\Block
 {
 	/**
 	 * Get output
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'oauth_tokens' ) and $count = Db::i()->select( 'COUNT(*)', 'core_oauth_clients', array( Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) )->first() )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'oauth_tokens' ) and $count = \IPS\Db::i()->select( 'COUNT(*)', 'core_oauth_clients', array( \IPS\Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) )->first() )
 		{
 
 			$tokens = array();
-			foreach ( Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'member_id=?', $this->member->member_id ), 'issued DESC' ) as $token )
+			foreach ( \IPS\Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'member_id=?', $this->member->member_id ), 'issued DESC' ) as $token )
 			{
 
 				try
 				{
-					$client = OAuthClient::load( $token['client_id'] );
+					$client = \IPS\Api\OAuthClient::load( $token['client_id'] );
 					
 					$title = $client->_title;
 					
@@ -57,18 +48,16 @@ class OAuth extends Block
 						'data'					=> $token
 					);
 				}
-				catch ( Exception $e ) {}
+				catch ( \Exception $e ) {}
 			}
 			
 			$onlyApp = NULL;
 			if ( $count === 1 )
 			{
-				$onlyApp = OAuthClient::constructFromData( Db::i()->select( '*', 'core_oauth_clients', array( Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) )->first() );
+				$onlyApp = \IPS\Api\OAuthClient::constructFromData( \IPS\Db::i()->select( '*', 'core_oauth_clients', array( \IPS\Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) )->first() );
 			}
 			
-			return (string) Theme::i()->getTemplate('memberprofile')->oauth( $this->member, $tokens, $onlyApp );
+			return \IPS\Theme::i()->getTemplate('memberprofile')->oauth( $this->member, $tokens, $onlyApp );
 		}
-
-		return '';
 	}
 }

@@ -11,45 +11,36 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Settings;
-use OutOfRangeException;
-use function defined;
-use const IPS\REBUILD_NORMAL;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Rebuild non-content item editor content
  */
-class RebuildImageProxyNonContent extends QueueAbstract
+class _RebuildImageProxyNonContent
 {
 	/**
 	 * @brief Number of content items to rebuild per cycle
 	 */
-	public int $rebuild	= REBUILD_NORMAL;
+	public $rebuild	= \IPS\REBUILD_NORMAL;
 
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		$data['count']			= 0;
-		$data['cachePeriod']	= Settings::i()->image_proxy_cache_period;
+		$data['cachePeriod']	= \IPS\Settings::i()->image_proxy_cache_period;
 
 		$_extensionData = explode( '_', $data['extension'] );
 
-		foreach( Application::load( $_extensionData[0] )->extensions( 'core', 'EditorLocations' ) as $_key => $extension )
+		foreach( \IPS\Application::load( $_extensionData[0] )->extensions( 'core', 'EditorLocations' ) as $_key => $extension )
 		{
 			if( $_key != $_extensionData[1] )
 			{
@@ -83,10 +74,9 @@ class RebuildImageProxyNonContent extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ): int
+	public function run( $data, $offset )
 	{
-		$did = 0;
-		foreach( Application::allExtensions( 'core', 'EditorLocations', FALSE, NULL, NULL, TRUE ) as $_key => $extension )
+		foreach( \IPS\Application::allExtensions( 'core', 'EditorLocations', FALSE, NULL, NULL, TRUE ) as $_key => $extension )
 		{
 			if( $_key != $data['extension'] )
 			{
@@ -117,10 +107,10 @@ class RebuildImageProxyNonContent extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
     {
-        return array( 'text' => Member::loggedIn()->language()->addToStack( 'rebuilding_imageproxy_stuff', FALSE, array( 'sprintf' => Member::loggedIn()->language()->addToStack( 'editor__' . $data['extension'] ) ) ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $offset, 2 ) ) : 100 );
+        return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'rebuilding_imageproxy_stuff', FALSE, array( 'sprintf' => \IPS\Member::loggedIn()->language()->addToStack( 'editor__' . $data['extension'] ) ) ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $offset, 2 ) ) : 100 );
     }
 }

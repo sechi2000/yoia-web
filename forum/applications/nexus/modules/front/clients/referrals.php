@@ -12,31 +12,25 @@
 namespace IPS\nexus\modules\front\clients;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Output;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Legacy Referrals Controller
  */
-class referrals extends Controller
+class _referrals extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Manage
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Referrals have moved to the core. */
-		Output::i()->redirect( Url::internal( "app=core&module=system&controller=settings&area=referrals", 'front', 'settings_referrals' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=system&controller=settings&area=referrals", 'front', 'settings_referrals' ) );
 	}
 }

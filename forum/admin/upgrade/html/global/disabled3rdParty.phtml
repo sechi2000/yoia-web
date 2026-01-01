@@ -1,17 +1,25 @@
-<ips:template parameters="$disabledApps, $showMessage=true" />
-<div class="i-padding_3 i-text-align_start ipsPos_center">
+<ips:template parameters="$disabledApps, $disabledPlugins, $showMessage=true" />
+<div class="ipsPad ipsType_left ipsPos_center">
     {{if $showMessage}}
-	    <p>{lang="third_party_stuff_disabled"}</p>
+	    <p class="ipsType_normal">{lang="third_party_stuff_disabled"}</p>
     {{endif}}
 	{{if \count( $disabledApps )}}
-		<p>{lang="third_party_stuff_disabled_apps"}</p>
-		<ul class='ipsList_bullets i-text-align_start'>
+		<p class="ipsType_normal">{lang="third_party_stuff_disabled_apps"}</p>
+		<ul class='ipsList_bullets ipsType_left'>
 			{{foreach $disabledApps as $app}}
 				<li>{$app}</li>
 			{{endforeach}}
 		</ul>
 	{{endif}}
+	{{if \count( $disabledPlugins )}}
+		<p class="ipsType_normal">{lang="third_party_stuff_disabled_plugins"}</p>
+		<ul class='ipsList_bullets ipsType_left'>
+			{{foreach $disabledPlugins as $plugin}}
+				<li>{$plugin}</li>
+			{{endforeach}}
+		</ul>
+	{{endif}}
     {{if $showMessage}}
-	    <p>{lang="third_party_stuff_disabled_end"}</p>
+	    <p class="ipsType_normal">{lang="third_party_stuff_disabled_end"}</p>
     {{endif}}
 </div>

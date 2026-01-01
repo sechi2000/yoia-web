@@ -11,62 +11,55 @@
 namespace IPS\Helpers;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\File;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Cover Photo Helper
  */
-class CoverPhoto
+class _CoverPhoto
 {
 	/**
 	 * File
 	 */
-	public ?File $file = NULL;
+	public $file;
 	
 	/**
 	 * Offset
 	 */
-	public int $offset = 0;
+	public $offset = 0;
 	
 	/**
 	 * Editable
 	 */
-	public bool $editable = FALSE;
+	public $editable = FALSE;
 
 	/**
 	 * Maximum file size
 	 */
-	public ?int $maxSize = NULL;
+	public $maxSize = NULL;
 	
 	/**
 	 * Overlay
 	 */
-	public ?string $overlay = null;
+	public $overlay;
 	
 	/**
 	 * Object
 	 */
-	public ?object $object;
+	public $object;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	File|NULL	$file		The file
-	 * @param int $offset		The offset
-	 * @param bool $editable	User can edit?
+	 * @param	\IPS\File|NULL	$file		The file
+	 * @param	int				$offset		The offset
+	 * @param	bool			$editable	User can edit?
 	 */
-	public function __construct( File $file = NULL, int $offset = 0, bool $editable=FALSE )
+	public function __construct( \IPS\File $file = NULL, $offset = 0, $editable = FALSE )
 	{
 		$this->file = $file;
 		$this->offset = $offset;
@@ -79,12 +72,12 @@ class CoverPhoto
 	 */
 	public function __toString()
 	{
-		if( !Request::i()->isAjax() )
+		if( !\IPS\Request::i()->isAjax() )
 		{
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_core.js', 'core' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_core.js', 'core' ) );
 		}
 
-		return Theme::i()->getTemplate( 'global', 'core' )->coverPhoto( $this->object->url(), $this );
+		return \IPS\Theme::i()->getTemplate( 'global', 'core' )->coverPhoto( $this->object->url(), $this );
 	}
 	
 	/**
@@ -92,7 +85,7 @@ class CoverPhoto
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
 		if ( $this->file )
 		{

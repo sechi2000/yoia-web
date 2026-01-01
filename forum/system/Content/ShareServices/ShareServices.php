@@ -11,33 +11,25 @@
 namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\core\ShareLinks\Service;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Share Services Abstract Class
  */
-abstract class ShareServices
+abstract class _ShareServices
 {
 	/**
 	 * Get services
 	 *
 	 * @return	array
 	 */
-	public static function services(): array
+	public static function services()
 	{
-		$return = [
+		return array(
 			'Bluesky'	=>	'IPS\Content\ShareServices\Bluesky',
 			'Facebook'	=>	'IPS\Content\ShareServices\Facebook',
 			'Linkedin'	=>	'IPS\Content\ShareServices\Linkedin',
@@ -45,31 +37,22 @@ abstract class ShareServices
 			'Reddit'	=>	'IPS\Content\ShareServices\Reddit',
 			'Email'	=>	'IPS\Content\ShareServices\Email',
 			'X'		=> 'IPS\Content\ShareServices\X',
-		];
-
-		/* Load any extensions */
-		foreach ( Application::allExtensions( 'core', 'ShareServices', FALSE, 'core' ) as $key => $extension )
-		{
-			$bits = explode( "_", $key );
-			$return[ $bits[1] ] = $extension::class;
-		}
-
-		return $return;
+		);
 	}
 
 	/**
 	 * @brief	Cached services
 	 */
-	static array|null $services = NULL;
+	static $services = NULL;
 
 	/**
 	 * Helper method to get the class based on the key
 	 *
 	 * @param	string	$key	Service to load
 	 * @return	mixed
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public static function getClassByKey( string $key ): mixed
+	public static function getClassByKey( $key )
 	{
 		if ( static::$services == NULL )
 		{
@@ -78,7 +61,7 @@ abstract class ShareServices
 
 		if ( !isset( static::$services[ ucwords($key) ] ) )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 		return static::$services[ ucwords($key) ];
 	}
@@ -88,7 +71,7 @@ abstract class ShareServices
 	 *
 	 * @return	boolean
 	 */
-	public static function canAutoshare(): bool
+	public static function canAutoshare()
 	{
 		return FALSE;
 	}
@@ -96,11 +79,11 @@ abstract class ShareServices
 	/**
 	 * Add any additional form elements to the configuration form. These must be setting keys that the service configuration form can save as a setting.
 	 *
-	 * @param	Form				$form		Configuration form for this service
-	 * @param	Service	$service	The service
+	 * @param	\IPS\Helpers\Form				$form		Configuration form for this service
+	 * @param	\IPS\core\ShareLinks\Service	$service	The service
 	 * @return	void
 	 */
-	public static function modifyForm( Form &$form, Service $service ): void
+	public static function modifyForm( \IPS\Helpers\Form &$form, $service )
 	{
 		// Do nothing by default
 	}
@@ -108,21 +91,21 @@ abstract class ShareServices
 	/**
 	 * @brief	URL to the content item
 	 */
-	protected Url|null $url = NULL;
+	protected $url = NULL;
 	
 	/**
 	 * @brief	Title of the content item
 	 */
-	protected string|null $title = NULL;
+	protected $title = NULL;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Url|null	$url	URL to the content [optional - if omitted, some services will figure out on their own]
-	 * @param	string|null			$title	Default text for the content, usually the title [optional - if omitted, some services will figure out on their own]
+	 * @param	\IPS\Http\Url	$url	URL to the content [optional - if omitted, some services will figure out on their own]
+	 * @param	string			$title	Default text for the content, usually the title [optional - if omitted, some services will figure out on their own]
 	 * @return	void
 	 */
-	public function __construct( Url|null $url=NULL, string|null $title=NULL )
+	public function __construct( \IPS\Http\Url $url=NULL, $title=NULL )
 	{
 		$this->url		= $url;
 		$this->title	= $title;
@@ -133,5 +116,5 @@ abstract class ShareServices
 	 *
 	 * @return	string
 	 */
-	abstract public function __toString(): string;
+	abstract public function __toString();
 }

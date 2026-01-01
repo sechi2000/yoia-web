@@ -12,66 +12,45 @@
 namespace IPS\convert\Software\Downloads;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Tools\Xenforo as XenforoTrait;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function in_array;
-use function is_null;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Xenforo Downloads Converter
  */
-class Xenforo extends Software
+class _Xenforo extends \IPS\convert\Software
 {
-	use XenforoTrait;
+	use \IPS\convert\Tools\Xenforo;
 
 	/**
 	 * @brief	The similarities between XF1 and XF2 are close enough that we can use the same converter 
 	 */
-	public static ?bool $isLegacy = NULL;
+	public static $isLegacy = NULL;
 
 	/**
 	 * @brief	XF2 Has prefixes on RM tables
 	 */
-	public static string $tablePrefix = '';
+	public static $tablePrefix = '';
 
 	/**
 	 * @brief XF2.1 changed serialized data to json decoded
 	 */
-	public static bool $useJson = FALSE;
+	public static $useJson = FALSE;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 
 		if ( $needDB )
 		{
@@ -80,7 +59,7 @@ class Xenforo extends Software
 				/* Is this XF1 or XF2 */
 				if ( static::$isLegacy === NULL )
 				{
-					$version = $this->db->select( 'MAX(version_id)', 'xf_template', array( Db::i()->in( 'addon_id', array( 'XF', 'XenForo' ) ) ) )->first();
+					$version = $this->db->select( 'MAX(version_id)', 'xf_template', array( \IPS\Db::i()->in( 'addon_id', array( 'XF', 'XenForo' ) ) ) )->first();
 
 					if ( $version < 2000010 )
 					{
@@ -99,16 +78,18 @@ class Xenforo extends Software
 					}
 				}
 			}
-			catch( Exception $e ) {} # If we can't query, we won't be able to do anything anyway
+			catch( \Exception $e ) {} # If we can't query, we won't be able to do anything anyway
 		}
+
+		return $return;
 	}
 
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "XenForo Resource Manager (1.5.x/2.0.x/2.1.x/2.2.x)";
@@ -117,9 +98,9 @@ class Xenforo extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "xenforo";
@@ -128,9 +109,9 @@ class Xenforo extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertDownloadsCfields' 		=> array(
@@ -155,13 +136,13 @@ class Xenforo extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
@@ -175,21 +156,21 @@ class Xenforo extends Software
 				{
 					return $this->db->select( 'COUNT(*)', 'xf_rm_resource_field' )->first();
 				}
+
 				break;
 			
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
-
-		return 0;
 	}
 
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -197,9 +178,9 @@ class Xenforo extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'xenforo' ) );
 	}
@@ -207,9 +188,9 @@ class Xenforo extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertDownloadsFiles',
@@ -220,14 +201,14 @@ class Xenforo extends Software
 	/**
 	 * Finish
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\downloads\File', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\downloads\Category', 'count' => 0 ), 5, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'class' => 'IPS\downloads\File', 'link' => 'downloads_files' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'class' => 'IPS\downloads\File\Review', 'link' => 'downloads_reviews'  ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\downloads\File', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\downloads\Category', 'count' => 0 ), 5, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'class' => 'IPS\downloads\File', 'link' => 'downloads_files' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'class' => 'IPS\downloads\File\Review', 'link' => 'downloads_reviews'  ), 2, array( 'app', 'link', 'class' ) );
 
 		return array( );
 	}
@@ -235,10 +216,10 @@ class Xenforo extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -249,8 +230,8 @@ class Xenforo extends Software
 					'field_default'		=> NULL,
 					'field_required'	=> TRUE,
 					'field_extra'		=> array(),
-					'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_xf_attach_path'),
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_xf_attach_path'),
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				break;
 			
@@ -274,14 +255,14 @@ class Xenforo extends Software
 	 * @param	string			$xfTwoTitle		XF2 Phrase Title
 	 * @return	string|null
 	 */
-	protected function getPhrase( string $xfOneTitle, string $xfTwoTitle ) : ?string
+	protected function getPhrase( $xfOneTitle, $xfTwoTitle )
 	{
 		try
 		{
-			$title = ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) ? $xfTwoTitle : $xfOneTitle;
+			$title = ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) ? $xfTwoTitle : $xfOneTitle;
 			return $this->db->select( 'phrase_text', 'xf_phrase', array( "title=?", $title ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			return NULL;
 		}
@@ -292,7 +273,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertDownloadsCfields() : void
+	public function convertDownloadsCfields()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -301,7 +282,7 @@ class Xenforo extends Software
 			$inputFormat = '';
 			if( $row['match_type'] == 'regex' AND static::$isLegacy === FALSE )
 			{
-				$inputFormat = '/' . $row['match_regex'] .'/i';
+				$inputFormat = ( $row['match_type'] == 'regex' ) ? '/' . $row['match_regex'] .'/i' : '';
 			}
 			elseif( $row['match_type'] == 'regex' )
 			{
@@ -317,7 +298,7 @@ class Xenforo extends Software
 				'cf_max_input'		=> $row['max_length'],
 				'cf_input_format'	=> $inputFormat,
 				'cf_position'		=> $row['display_order'],
-				'cf_multiple'		=> ( in_array( $row['field_type'], array( 'checkbox', 'multiselect' ) ) ) ? 1 : 0
+				'cf_multiple'		=> ( \in_array( $row['field_type'], array( 'checkbox', 'multiselect' ) ) ) ? 1 : 0
 			);
 			
 			$libraryClass->convertDownloadsCfield( $info );
@@ -329,9 +310,9 @@ class Xenforo extends Software
 	 *
 	 * @param	string	$type	Custom field type
 	 * @param	string	$match	Match type
-	 * @return	string
+	 * @return	void
 	 */
-	protected function _mapFieldType( string $type, string $match ) : string
+	protected function _mapFieldType( $type, $match )
 	{
 		switch( $type )
 		{
@@ -341,32 +322,39 @@ class Xenforo extends Software
 				{
 					case 'email':
 						return 'Email';
+						break;
 					
 					case 'url':
 						return 'Url';
+						break;
 					
 					case 'number':
 						return 'Number';
+						break;
 					
 					default:
 						return 'Text';
+						break;
 				}
+				break;
 			
 			case 'textarea':
 				return 'TextArea';
+				break;
 			
 			case 'bbcode':
 				return 'Editor';
+				break;
 			
 			case 'multiselect':
 			case 'select':
 				return 'Select';
+				break;
 			
 			case 'checkbox':
 				return 'CheckboxSet';
+				break;
 		}
-
-		return '';
 	}
 	
 	/**
@@ -374,7 +362,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertDownloadsCategories() : void
+	public function convertDownloadsCategories()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -395,7 +383,7 @@ class Xenforo extends Software
 			{
 				$prefix = $this->getPhrase( "thread_prefix_{$row['thread_prefix_id']}", "thread_prefix.{$row['thread_prefix_id']}" );
 				
-				if ( is_null( $prefix ) )
+				if ( \is_null( $prefix ) )
 				{
 					$prefix = '';
 				}
@@ -404,8 +392,8 @@ class Xenforo extends Software
 			$info = array(
 				'cid'			=> $row['resource_category_id'],
 				'cparent'		=> $row['parent_category_id'],
-				'cname'			=> $row['category_title'] ?? $row['title'],
-				'cdesc'			=> $row['category_description'] ?? $row['description'],
+				'cname'			=> isset( $row['category_title'] ) ? $row['category_title'] : $row['title'],
+				'cdesc'			=> isset( $row['category_description'] ) ? $row['category_description'] : $row['description'],
 				'copen'			=> ( $row['allow_local'] OR $row['allow_external'] ) ? 1 : 0,
 				'cposition'		=> $row['display_order'],
 				'ccfields'		=> $ccfields,
@@ -443,7 +431,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertDownloadsFiles() : void
+	public function convertDownloadsFiles()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -467,7 +455,7 @@ class Xenforo extends Software
 				
 				$featured = 1;
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			$info = array(
 				'file_id'			=> $row['resource_id'],
@@ -505,9 +493,9 @@ class Xenforo extends Software
 					{
 						$file_data = $this->db->select( '*', 'xf_attachment', array( "xf_attachment.content_type=? AND xf_attachment.content_id=?", 'resource_version', $record['resource_version_id'] ) )->join( 'xf_attachment_data', "xf_attachment.data_id = xf_attachment_data.data_id" )->first();
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
-						$this->app->log( 'xenforo_resource_missing_record', __METHOD__, App::LOG_WARNING, $record['resource_update_id'] );
+						$this->app->log( 'xenforo_resource_missing_record', __METHOD__, \IPS\convert\App::LOG_WARNING, $record['resource_update_id'] );
 						continue;
 					}
 
@@ -537,9 +525,9 @@ class Xenforo extends Software
 						);
 					}
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
-					$this->app->log( 'xenforo_resource_missing_screenshot', __METHOD__, App::LOG_WARNING, $record['resource_update_id'] );
+					$this->app->log( 'xenforo_resource_missing_screenshot', __METHOD__, \IPS\convert\App::LOG_WARNING, $record['resource_update_id'] );
 				}
 			}
 
@@ -548,9 +536,9 @@ class Xenforo extends Software
 			{
 				$field_type = $this->db->select( 'field_type', 'xf_' . static::$tablePrefix . 'resource_field', array( "field_id=?", $key ) )->first();
 				
-				if ( in_array( $field_type, array( 'checkbox', 'multiselect' ) ) )
+				if ( \in_array( $field_type, array( 'checkbox', 'multiselect' ) ) )
 				{
-					$cfields[$key] = static::$isLegacy ? json_encode( unserialize( $value ) ) : $value;
+					$cfields[$key] = static::$isLegacy ? json_encode( \unserialize( $value ) ) : $value;
 				}
 				else
 				{
@@ -605,7 +593,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertDownloadsReviews() : void
+	public function convertDownloadsReviews()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -664,13 +652,13 @@ class Xenforo extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( preg_match( '#/(resources/categories|resources)/(.+?)\.([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/(resources/categories|resources)/(.+?)\.([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			$oldId	= (int) $matches[3];
 
@@ -696,20 +684,20 @@ class Xenforo extends Software
 				{
 					$data = (string) $this->app->getLink( $oldId, $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( $oldId, $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				elseif( $item instanceof Model )
+				elseif( $item instanceof \IPS\Node\Model )
 				{
 					if( $item->can( 'view' ) )
 					{
@@ -717,7 +705,7 @@ class Xenforo extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

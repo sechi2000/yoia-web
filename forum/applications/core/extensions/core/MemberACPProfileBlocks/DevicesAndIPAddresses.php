@@ -11,34 +11,27 @@
 namespace IPS\core\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\Block;
-use IPS\Db;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Devices & IP Addresses Block
  */
-class DevicesAndIPAddresses extends Block
+class _DevicesAndIPAddresses extends \IPS\core\MemberACPProfile\Block
 {
 	/**
 	 * Get output
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
-		$lastUsedIp = $this->member->lastUsedIp();
-		$devices = new ActiveRecordIterator( Db::i()->select( '*', 'core_members_known_devices', array( 'member_id=?', $this->member->member_id ), 'last_seen DESC', 5 ), 'IPS\Member\Device' );
+		$lastUsedIp = $this->member->lastUsedIp() ?? '';
+		$devices = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members_known_devices', array( 'member_id=?', $this->member->member_id ), 'last_seen DESC', 5 ), 'IPS\Member\Device' );
 		
-		return (string) Theme::i()->getTemplate('memberprofile')->devicesAndIPAddresses( $this->member, $lastUsedIp, $devices );
+		return \IPS\Theme::i()->getTemplate('memberprofile')->devicesAndIPAddresses( $this->member, $lastUsedIp, $devices );
 	}
 }

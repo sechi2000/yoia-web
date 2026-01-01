@@ -11,22 +11,9 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Db;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function count;
-use function defined;
-use function is_array;
-use function is_numeric;
-use function is_object;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -35,7 +22,7 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * Content Item selector
  */
-class Item extends FormAbstract
+class _Item extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -52,7 +39,7 @@ class Item extends FormAbstract
 	 * );
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'class'				=> NULL,
 		'permissionCheck'   => 'read',
 		'maxItems'      	=> NULL,
@@ -68,15 +55,15 @@ class Item extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		/* Display */
-		$url = Request::i()->url()->setQueryString( '_itemSelectName', $this->name );
+		$url = \IPS\Request::i()->url()->setQueryString( '_itemSelectName', $this->name );
 
 		$template = NULL;
 		if ( $this->options['itemTemplate'] === NULL )
 		{
-			$template = array( Theme::i()->getTemplate( 'forms', 'core', 'global' ), 'itemResult' );
+			$template = array( \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' ), 'itemResult' );
 		}
 		else
 		{
@@ -84,20 +71,19 @@ class Item extends FormAbstract
 		}
 
 		/* Are we getting some AJAX stuff? */
-		if ( isset( Request::i()->_itemSelectName ) and Request::i()->_itemSelectName === $this->name )
+		if ( isset( \IPS\Request::i()->_itemSelectName ) and \IPS\Request::i()->_itemSelectName === $this->name )
 		{
-			/* @var array $databaseColumnMap */
 			$results = array();
 			$class   = $this->options['class'];
 			$field   = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['title'];
-			$where   = array( array( $field . " LIKE CONCAT('%', ?, '%')", Request::i()->q ) );
+			$where   = array( array( $field . " LIKE CONCAT('%', ?, '%')", \IPS\Request::i()->q ) );
 			$idField = $class::$databaseColumnId;
-			if ( isset( $class::$databaseColumnMap['container'] ) and is_array( $this->options['containerIds'] ) and count( $this->options['containerIds'] ) )
+			if ( isset( $class::$databaseColumnMap['container'] ) and \is_array( $this->options['containerIds'] ) and \count( $this->options['containerIds'] ) )
 			{
-				$where[] = array( Db::i()->in( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['container'], $this->options['containerIds'] ) );
+				$where[] = array( \IPS\Db::i()->in( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['container'], $this->options['containerIds'] ) );
 			}
 
-			if ( isset( $this->options['where'] ) and count( $this->options['where'] ) )
+			if ( isset( $this->options['where'] ) and \count( $this->options['where'] ) )
 			{
 				$where = array_merge( $where, $this->options['where'] );
 			}
@@ -110,10 +96,10 @@ class Item extends FormAbstract
 				);
 			}
 
-			Output::i()->json( $results );
+			\IPS\Output::i()->json( $results );
 		}
 
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->item( $this->name, $this->value, $this->options['maxItems'], $this->options['minAjaxLength'], $url, $template );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->item( $this->name, $this->value, $this->options['maxItems'], $this->options['minAjaxLength'], $url, $template );
 	}
 
 	/**
@@ -121,12 +107,12 @@ class Item extends FormAbstract
 	 *
 	 * @return	array
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$name = $this->name . '_values';
-		if ( isset( Request::i()->$name ) )
+		if ( isset( \IPS\Request::i()->$name ) )
 		{
-			return explode( ',', Request::i()->$name );
+			return explode( ',', \IPS\Request::i()->$name );
 		}
 		else
 		{
@@ -139,7 +125,7 @@ class Item extends FormAbstract
 	 *
 	 * @return	array|NULL
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
 		$itemClass = $this->options['class'];
 		$order     = NULL;
@@ -152,19 +138,19 @@ class Item extends FormAbstract
 		else
 		{
 			/* $this->value may be a single, numeric, ID, so look for that to avoid a Countable error */
-			if ( is_numeric( $this->value ) )
+			if ( \is_numeric( $this->value ) )
 			{
 				$this->value = array( $this->value );
 			}
 			else
 			{
-				$this->value = ( is_string( $this->value ) ) ? explode( ',', $this->value ) : $this->value;
+				$this->value = ( \is_string( $this->value ) ) ? explode( ',', $this->value ) : $this->value;
 			}
 		}
 
-		if ( count( $this->value ) )
+		if ( \count( $this->value ) )
 		{
-			if ( is_array( $this->options['orderResults'] ) )
+			if ( \is_array( $this->options['orderResults'] ) )
 			{
 				if ( isset( $itemClass::$databaseColumnMap[ $this->options['orderResults'][0] ] ) )
 				{
@@ -172,7 +158,7 @@ class Item extends FormAbstract
 				}
 			}
 
-			$where = array( Db::i()->in( $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemClass::$databaseColumnId, $this->value ) );
+			$where = array( \IPS\Db::i()->in( $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemClass::$databaseColumnId, $this->value ) );
 			foreach( $itemClass::getItemsWithPermission( array( $where ), $order, NULL, $this->options['permissionCheck'] ) as $item )
 			{
 				$items[ $item->$idField ] = $item;
@@ -201,15 +187,15 @@ class Item extends FormAbstract
 	 * String Value
 	 *
 	 * @param	mixed	$value	The value
-	 * @return    string|int|null
+	 * @return	string
 	 */
-	public static function stringValue( mixed $value ): string|int|null
+	public static function stringValue( $value )
 	{
-		if ( is_array( $value ) )
+		if ( \is_array( $value ) )
 		{
 			return implode( ',', array_keys( $value ) );
 		}
-		elseif ( is_object( $value ) )
+		elseif ( \is_object( $value ) )
 		{
 			return $value->_id;
 		}
@@ -218,16 +204,16 @@ class Item extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		if( empty( $this->value ) and $this->required )
 		{
-			throw new InvalidArgumentException('form_required');
+			throw new \InvalidArgumentException('form_required');
 		}
 		
-		return parent::validate();
+		parent::validate();
 	}
 }

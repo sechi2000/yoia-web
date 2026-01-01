@@ -11,57 +11,43 @@
 namespace IPS\core\modules\admin\promotion;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\ShareServices;
-use IPS\core\ShareLinks\Service;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Node\Controller;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Share Link Services
  */
-class sharelinks extends Controller
+class _sharelinks extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = '\IPS\core\ShareLinks\Service';
+	protected $nodeClass = '\IPS\core\ShareLinks\Service';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'sharelinks_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'sharelinks_manage' );
 
 		$reloadRoots	= FALSE;
 
 		/* First, see if any are missing */
 		$nodeClass = $this->nodeClass;
 
-		$shareServices = ShareServices::services();
+		$shareServices = \IPS\Content\ShareServices::services();
 
-		/* @var Model $nodeClass */
 		foreach( $nodeClass::roots() as $node )
 		{
 			if( !isset( $shareServices[ ucwords( $node->key ) ] ) )
@@ -72,16 +58,16 @@ class sharelinks extends Controller
 		}
 
 		/* Now see if there are any new classes */
-		foreach( ShareServices::services() as $id => $className )
+		foreach( \IPS\Content\ShareServices::services() as $id => $className )
 		{
 			try
 			{
 				$nodeClass::load( mb_strtolower( $id ), 'share_key' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				/* Class does not exist - let's add it */
-				$newService	= new Service;
+				$newService	= new \IPS\core\ShareLinks\Service;
 				$newService->key		= mb_strtolower( $id );
 				$newService->groups		= '*';
 				$newService->title		= $id;
@@ -97,7 +83,7 @@ class sharelinks extends Controller
 			$nodeClass::resetRootResult();
 		}
 
-		parent::execute();
+		return parent::execute();
 	}
 
 	/**
@@ -105,7 +91,7 @@ class sharelinks extends Controller
 	 *
 	 * @return	array
 	 */
-	public function _getRootButtons(): array
+	public function _getRootButtons()
 	{
 		return array();
 	}
@@ -115,13 +101,16 @@ class sharelinks extends Controller
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
-		Db::i()->delete( 'core_share_links', array( 'share_id=?', (int) Request::i()->id ) );
+		\IPS\Db::i()->delete( 'core_share_links', array( 'share_id=?', (int) \IPS\Request::i()->id ) );
 
-		Output::i()->redirect( Url::internal( 'app=core&module=promotion&controller=sharelinks' ), 'saved' );
+		/* Clear guest page caches */
+		\IPS\Data\Cache::i()->clearAll();
+
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=promotion&controller=sharelinks' ), 'saved' );
 	}
 }

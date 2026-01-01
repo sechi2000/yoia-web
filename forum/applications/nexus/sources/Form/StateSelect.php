@@ -12,25 +12,16 @@
 namespace IPS\nexus\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\GeoLocation;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Country/State input class for Form Builder
  */
-class StateSelect extends FormAbstract
+class _StateSelect extends \IPS\Helpers\Form\FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -40,7 +31,7 @@ class StateSelect extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'unlimitedLang' => NULL
 	);
 	
@@ -49,9 +40,9 @@ class StateSelect extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		return Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->stateSelect( $this->name, $this->value, $this->options['unlimitedLang'] );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->stateSelect( $this->name, $this->value, $this->options['unlimitedLang'] );
 	}
 	
 	/**
@@ -59,12 +50,12 @@ class StateSelect extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{		
 		if ( $this->options['unlimitedLang'] )
 		{
 			$unlimitedName = "{$this->name}_unlimited";
-			if ( isset( Request::i()->$unlimitedName ) )
+			if ( isset( \IPS\Request::i()->$unlimitedName ) )
 			{
 				return '*';
 			}
@@ -78,14 +69,14 @@ class StateSelect extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
-		if ( is_array( $this->value ) )
+		if ( \is_array( $this->value ) )
 		{
 			$value = array();
 			foreach ( $this->value as $k => $v )
 			{
-				if ( in_array( (string) $k, GeoLocation::$countries ) )
+				if ( \in_array( (string) $k, \IPS\GeoLocation::$countries ) )
 				{
 					$value[ $k ] = $v;
 				}

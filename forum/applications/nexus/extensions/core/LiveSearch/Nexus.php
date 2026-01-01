@@ -12,46 +12,30 @@
 namespace IPS\nexus\extensions\core\LiveSearch;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\extensions\core\LiveSearch\Members;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Extensions\LiveSearchAbstract;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Invoice;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\LicenseKey;
-use IPS\nexus\Transaction;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Live Search Extension
  */
-class Nexus extends LiveSearchAbstract
+class _Nexus
 {	
 	/**
 	 * Check we have access
 	 *
 	 * @return	bool
 	 */
-	public function hasAccess(): bool
+	public function hasAccess()
 	{
-		return	Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_manage' )
-		or 		Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' )
-		or		Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_view' )
-		or		Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view' )
-		or		Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'lkeys_view' );
+		return	\IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_manage' )
+		or 		\IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' )
+		or		\IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_view' )
+		or		\IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'support', 'requests_manage' )
+		or		\IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view' )
+		or		\IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'lkeys_view' );
 	}
 	
 	/**
@@ -60,55 +44,69 @@ class Nexus extends LiveSearchAbstract
 	 * @param	string	$searchTerm	Search Term
 	 * @return	array 	Array of results
 	 */
-	public function getResults( string $searchTerm ): array
+	public function getResults( $searchTerm )
 	{
 		$results = array();
 		
 		/* Numeric */
-		if ( is_numeric( $searchTerm ) )
+		if ( \is_numeric( $searchTerm ) )
 		{
 			/* Invoice */
-			if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_manage' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_manage' ) )
 			{
 				try
 				{
-					$results[] = Theme::i()->getTemplate('livesearch', 'nexus')->invoice( Invoice::load( $searchTerm ) );
+					$results[] = \IPS\Theme::i()->getTemplate('livesearch', 'nexus')->invoice( \IPS\nexus\Invoice::load( $searchTerm ) );
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 			
 			/* Transaction */
-			if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' ) )
 			{
 				try
 				{
-					$results[] = Theme::i()->getTemplate('livesearch', 'nexus')->transaction( Transaction::load( $searchTerm ) );
+					$results[] = \IPS\Theme::i()->getTemplate('livesearch', 'nexus')->transaction( \IPS\nexus\Transaction::load( $searchTerm ) );
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 			
 			/* Purchase */
-			if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_view' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_view' ) )
 			{
 				try
 				{
-					$results[] = Theme::i()->getTemplate('livesearch', 'nexus')->purchase( Purchase::load( $searchTerm ) );
+					$results[] = \IPS\Theme::i()->getTemplate('livesearch', 'nexus')->purchase( \IPS\nexus\Purchase::load( $searchTerm ) );
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
+			}
+						
+			/* Support */
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'support', 'requests_manage' ) )
+			{
+				try
+				{
+					$supportRequest = \IPS\nexus\Support\Request::load( $searchTerm );
+					if ( $supportRequest->canView() )
+					{
+						$results[] = \IPS\Theme::i()->getTemplate('livesearch', 'nexus')->support( $supportRequest );
+					}
+				}
+				catch ( \OutOfRangeException $e ) { }
 			}
 			
 			/* Customer */
-			if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view' ) )
 			{
 				try
 				{
-					$customer = Customer::load( $searchTerm );
+					$customer = \IPS\nexus\Customer::load( $searchTerm );
 					if ( $customer->member_id )
 					{
-						$results[] = Theme::i()->getTemplate('livesearch', 'nexus')->customer( $customer );
+						$results[] = \IPS\Theme::i()->getTemplate('livesearch', 'nexus')->customer( $customer );
 					}
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 		}
 		
@@ -116,38 +114,38 @@ class Nexus extends LiveSearchAbstract
 		else
 		{
 			/* License Key */
-			if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'lkeys_view' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'lkeys_view' ) )
 			{
 				try
 				{
-					$results[] = Theme::i()->getTemplate('livesearch', 'nexus')->licensekey( LicenseKey::load( $searchTerm ) );
+					$results[] = \IPS\Theme::i()->getTemplate('livesearch', 'nexus')->licensekey( \IPS\nexus\Purchase\LicenseKey::load( $searchTerm ) );
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 			
 			/* Customers */
-			if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view' ) )
 			{
-				if( Members::canPerformInlineSearch() )
+				if( \IPS\core\extensions\core\LiveSearch\Members::canPerformInlineSearch() )
 				{
-					$query = Db::i()->select( '*', 'nexus_customers', array( Db::i()->like( array( 'core_members.name', 'core_members.email', "CONCAT( LOWER( nexus_customers.cm_first_name ), ' ', LOWER( nexus_customers.cm_last_name ) )" ), $searchTerm, TRUE, TRUE, TRUE ) ), NULL, 50 )->join( 'core_members', 'core_members.member_id=nexus_customers.member_id' );
+					$query = \IPS\Db::i()->select( '*', 'nexus_customers', array( \IPS\Db::i()->like( array( 'core_members.name', 'core_members.email', "CONCAT( LOWER( nexus_customers.cm_first_name ), ' ', LOWER( nexus_customers.cm_last_name ) )" ), $searchTerm, TRUE, TRUE, TRUE ) ), NULL, 50 )->join( 'core_members', 'core_members.member_id=nexus_customers.member_id' );
 				}
 				else
 				{
-					$query = Db::i()->select( '*', 'nexus_customers', array( Db::i()->like( array( 'core_members.name', 'core_members.email', 'nexus_customers.cm_first_name', 'nexus_customers.cm_last_name', "CONCAT( LOWER( nexus_customers.cm_first_name ), ' ', LOWER( nexus_customers.cm_last_name ) )" ), $searchTerm ) ), NULL, 50 )->join( 'core_members', 'core_members.member_id=nexus_customers.member_id' );
+					$query = \IPS\Db::i()->select( '*', 'nexus_customers', array( \IPS\Db::i()->like( array( 'core_members.name', 'core_members.email', 'nexus_customers.cm_first_name', 'nexus_customers.cm_last_name', "CONCAT( LOWER( nexus_customers.cm_first_name ), ' ', LOWER( nexus_customers.cm_last_name ) )" ), $searchTerm, TRUE, TRUE, FALSE ) ), NULL, 50 )->join( 'core_members', 'core_members.member_id=nexus_customers.member_id' );
 				}
 
-				foreach ( new ActiveRecordIterator( $query, 'IPS\nexus\Customer' ) as $customer )
+				foreach ( new \IPS\Patterns\ActiveRecordIterator( $query, 'IPS\nexus\Customer' ) as $customer )
 				{
-					$results[] = Theme::i()->getTemplate('livesearch', 'nexus')->customer( $customer );
+					$results[] = \IPS\Theme::i()->getTemplate('livesearch', 'nexus')->customer( $customer );
 				}
 			}
 		}
 		
 		/* For either, search for transaction gateway IDs */
-		foreach ( Db::i()->select( '*', 'nexus_transactions', array( 't_gw_id=?', $searchTerm ) ) as $transactionData )
+		foreach ( \IPS\Db::i()->select( '*', 'nexus_transactions', array( 't_gw_id=?', $searchTerm ) ) as $transactionData )
 		{
-			$results[] = Theme::i()->getTemplate( 'livesearch', 'nexus' )->transaction( Transaction::constructFromData( $transactionData ) );
+			$results[] = \IPS\Theme::i()->getTemplate( 'livesearch', 'nexus' )->transaction( \IPS\nexus\Transaction::constructFromData( $transactionData ) );
 		}
 		
 		/* Return */		
@@ -159,8 +157,8 @@ class Nexus extends LiveSearchAbstract
 	 *
 	 * @return	bool
 	 */
-	public function isDefault(): bool
+	public function isDefault()
 	{
-		return Dispatcher::i()->application->directory == 'nexus';
+		return \IPS\Dispatcher::i()->application->directory == 'nexus';
 	}
 }

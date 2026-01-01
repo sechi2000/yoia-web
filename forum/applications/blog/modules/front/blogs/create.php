@@ -12,35 +12,23 @@
 namespace IPS\blog\modules\front\blogs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\blog\Blog;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Create Blog
  */
-class create extends Controller
+class _create extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		parent::execute();
 	}
@@ -50,18 +38,18 @@ class create extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		if ( !Blog::canCreate() )
+		if ( !\IPS\blog\Blog::canCreate() )
 		{
-			Output::i()->error( 'no_module_permission', '2B227/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2B227/1', 403, '' );
 		}
 		
-		$form = new Form( 'select_blog', 'continue' );
-		$form->class = 'ipsForm--vertical ipsForm--create-blog';
+		$form = new \IPS\Helpers\Form( 'select_blog', 'continue' );
+		$form->class = 'ipsForm_vertical';
 		
-		$blog	= new Blog;
-		$blog->member_id = Member::loggedIn()->member_id;
+		$blog	= new \IPS\blog\Blog;
+		$blog->member_id = \IPS\Member::loggedIn()->member_id;
 		$blog->form( $form, TRUE );
 
 		if ( $values = $form->values() )
@@ -69,21 +57,21 @@ class create extends Controller
 			$blog->saveForm( $blog->formatFormValues( $values ) );
 		
 			/* Redirect */
-			Output::i()->redirect( $blog->url() );
+			\IPS\Output::i()->redirect( $blog->url() );
 		}
 		
-		Session::i()->setLocation( Url::internal( 'app=blog', 'front', 'blogs' ), array(), 'loc_blog_creating' );
+		\IPS\Session::i()->setLocation( \IPS\Http\Url::internal( 'app=blog', 'front', 'blogs' ), array(), 'loc_blog_creating' );
 		
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_view.js', 'blog', 'front' ) );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('create_blog');
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_view.js', 'blog', 'front' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('create_blog');
 
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+			\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 		}
 		else
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'submit' )->createBlog( $form );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'submit' )->createBlog( $form );
 		}
 	}
 }

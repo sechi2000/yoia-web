@@ -12,43 +12,35 @@
 namespace IPS\calendar\modules\admin\calendars;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Member;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Request;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Calendars
  */
-class calendars extends Controller
+class _calendars extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\calendar\Calendar';
+	protected $nodeClass = 'IPS\calendar\Calendar';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'calendars_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'calendars_manage' );
 		parent::execute();
 	}
 
@@ -57,17 +49,17 @@ class calendars extends Controller
 	 *
 	 * @return void
 	 */
-	protected function form() : void
+	protected function form()
 	{
 		parent::form();
 
-		if ( Request::i()->id )
+		if ( \IPS\Request::i()->id )
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('edit_calendar') . ': ' . Output::i()->title;
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('edit_calendar') . ': ' . \IPS\Output::i()->title;
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('add_calendar');
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('add_calendar');
 		}
 	}
 }

@@ -12,43 +12,16 @@
 namespace IPS\nexus\Customer;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Gateway;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item\Renewal;
-use IPS\nexus\Transaction;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function strlen;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Billing Agreement Model
- *
- * @method status() : string
- * @method nextPaymentDate() : DateTime
- * @method doSuspend()
- * @method doReactivate()
- * @method doCancel()
- * @method latestUnclaimedTransaction() : Transaction
- * @method term() : RenewalTerm
  */
-class BillingAgreement extends ActiveRecord
+class _BillingAgreement extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	Billing Agreement is active and will charge automatically
@@ -68,28 +41,28 @@ class BillingAgreement extends ActiveRecord
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_billing_agreements';
+	public static $databaseTable = 'nexus_billing_agreements';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'ba_';
+	public static $databasePrefix = 'ba_';
 	
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    static
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): static
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
-		$gateway = Gateway::load( $data['ba_method'] );
+		$gateway = \IPS\nexus\Gateway::load( $data['ba_method'] );
 		$classname = 'IPS\nexus\Gateway\\' . $gateway->gateway . '\\BillingAgreement';
 		
 		/* Initiate an object */
@@ -101,7 +74,7 @@ class BillingAgreement extends ActiveRecord
 		{
 			if( static::$databasePrefix AND mb_strpos( $k, static::$databasePrefix ) === 0 )
 			{
-				$k = substr( $k, strlen( static::$databasePrefix ) );
+				$k = \substr( $k, \strlen( static::$databasePrefix ) );
 			}
 
 			$obj->_data[ $k ] = $v;
@@ -121,17 +94,17 @@ class BillingAgreement extends ActiveRecord
 	/**
 	 * Load and check permissions
 	 *
-	 * @param	int	$id	ID to load
-	 * @return	static
-	 * @throws	OutOfRangeException
+	 * @param	mixed	$id	ID to load
+	 * @return	\IPS\Content\Item
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadAndCheckPerms( int $id ) : static
+	public static function loadAndCheckPerms( $id )
 	{
 		$obj = static::load( $id );
 		
 		if ( !$obj->canView() )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		return $obj;
@@ -140,12 +113,12 @@ class BillingAgreement extends ActiveRecord
 	/**
 	 * Member can view?
 	 *
-	 * @param	Member|NULL	$member	The member to check for, or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member	The member to check for, or NULL for currently logged in member
 	 * @return	bool
 	 */
-	public function canView( Member $member = null ) : bool
+	public function canView( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		return $this->member->member_id === $member->member_id or array_key_exists( $member->member_id, iterator_to_array( $this->member->alternativeContacts( array( 'billing=1' ) ) ) );
 	}
@@ -153,20 +126,20 @@ class BillingAgreement extends ActiveRecord
 	/**
 	 * Get member
 	 *
-	 * @return	Customer
+	 * @return	\IPS\Member
 	 */
-	public function get_member() : Customer
+	public function get_member()
 	{
-		return Customer::load( $this->_data['member'] );
+		return \IPS\nexus\Customer::load( $this->_data['member'] );
 	}
 	
 	/**
 	 * Set member
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function set_member( Member $member ) : void
+	public function set_member( \IPS\Member $member )
 	{
 		$this->_data['member'] = $member->member_id;
 	}
@@ -174,20 +147,20 @@ class BillingAgreement extends ActiveRecord
 	/**
 	 * Get payment gateway
 	 *
-	 * @return	Gateway
+	 * @return	\IPS\nexus\Gateway
 	 */
-	public function get_method() : Gateway
+	public function get_method()
 	{
-		return Gateway::load( $this->_data['method'] );
+		return \IPS\nexus\Gateway::load( $this->_data['method'] );
 	}
 	
 	/**
 	 * Set payment gateway
 	 *
-	 * @param	Gateway	$gateway	Payment gateway
+	 * @param	\IPS\nexus\Gateway	$gateway	Payment gateway
 	 * @return	void
 	 */
-	public function set_method( Gateway $gateway ) : void
+	public function set_method( \IPS\nexus\Gateway $gateway )
 	{
 		$this->_data['method'] = $gateway->id;
 	}
@@ -195,41 +168,41 @@ class BillingAgreement extends ActiveRecord
 	/**
 	 * Get start date
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_started() : DateTime
+	public function get_started()
 	{
-		return DateTime::ts( $this->_data['started'] );
+		return \IPS\DateTime::ts( $this->_data['started'] );
 	}
 	
 	/**
 	 * Set next payment date
 	 *
-	 * @param	DateTime|null	$date	The invoice date
+	 * @param	\IPS\DateTime	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_next_cycle( ?DateTime $date = NULL ) : void
+	public function set_next_cycle( \IPS\DateTime $date = NULL )
 	{
-		$this->_data['next_cycle'] = $date?->getTimestamp();
+		$this->_data['next_cycle'] = $date ? $date->getTimestamp() : NULL;
 	}
 	
 	/**
 	 * Get next payment date
 	 *
-	 * @return	DateTime|null
+	 * @return	\IPS\DateTime
 	 */
-	public function get_next_cycle() : DateTime|null
+	public function get_next_cycle()
 	{
-		return $this->_data['next_cycle'] ? DateTime::ts( $this->_data['next_cycle'] ) : NULL;
+		return $this->_data['next_cycle'] ? \IPS\DateTime::ts( $this->_data['next_cycle'] ) : NULL;
 	}
 	
 	/**
 	 * Set start date
 	 *
-	 * @param	DateTime	$date	The invoice date
+	 * @param	\IPS\DateTime	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_started( DateTime $date ) : void
+	public function set_started( \IPS\DateTime $date )
 	{
 		$this->_data['started'] = $date->getTimestamp();
 	}
@@ -238,9 +211,9 @@ class BillingAgreement extends ActiveRecord
 	 * Suspend
 	 *
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function refresh() : void
+	public function refresh()
 	{
 		try
 		{
@@ -249,7 +222,7 @@ class BillingAgreement extends ActiveRecord
 				$this->checkForLatestTransaction();
 			}
 		}
-		catch( OutOfRangeException | UnderflowException )
+		catch( \OutOfRangeException | \UnderflowException $e )
 		{
 			return;
 		}
@@ -259,9 +232,9 @@ class BillingAgreement extends ActiveRecord
 	 * Suspend
 	 *
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function suspend() : void
+	public function suspend()
 	{
 		$this->doSuspend();
 		
@@ -274,9 +247,9 @@ class BillingAgreement extends ActiveRecord
 	 * Reactivate
 	 *
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function reactivate() : void
+	public function reactivate()
 	{
 		$this->doReactivate();
 		
@@ -289,9 +262,9 @@ class BillingAgreement extends ActiveRecord
 	 * Cancel
 	 *
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function cancel() : void
+	public function cancel()
 	{
 		$this->doCancel();
 		
@@ -304,21 +277,21 @@ class BillingAgreement extends ActiveRecord
 	/**
 	 * Front-End URL
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	function url(): Url
+	public function url()
 	{
-		return Url::internal( "app=nexus&module=clients&controller=billingagreements&do=view&id={$this->id}", 'front', 'clientsbillingagreement' );
+		return \IPS\Http\Url::internal( "app=nexus&module=clients&controller=billingagreements&do=view&id={$this->id}", 'front', 'clientsbillingagreement' );
 	}
 	
 	/**
 	 * ACP URL
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function acpUrl() : Url
+	public function acpUrl()
 	{
-		return Url::internal( "app=nexus&module=payments&controller=billingagreements&id={$this->id}", 'admin' );
+		return \IPS\Http\Url::internal( "app=nexus&module=payments&controller=billingagreements&id={$this->id}", 'admin' );
 	}
 
 	/**
@@ -326,7 +299,7 @@ class BillingAgreement extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function checkForLatestTransaction() : void
+	public function checkForLatestTransaction()
 	{
 		/* Fetch the latest unclaimed transaction */
 		try
@@ -334,11 +307,11 @@ class BillingAgreement extends ActiveRecord
 			$transaction = $this->latestUnclaimedTransaction();
 		}
 		/* If there isn't one yet, it might just be that PayPal hasn't taken it yet. Let it try for up to 11 days before giving up, which is how long PayPal will try for if there's an issue. */
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			if ( $this->next_cycle->getTimestamp() > ( time() - ( 86400 * 11 ) ) )
 			{
-				throw new UnderflowException;
+				throw new \UnderflowException;
 			}
 			else
 			{
@@ -350,7 +323,7 @@ class BillingAgreement extends ActiveRecord
 					$this->next_cycle = $nextPaymentDate;
 					$this->save();
 
-					throw new UnderflowException;
+					throw new \UnderflowException;
 				}
 
 				throw $e;
@@ -358,17 +331,17 @@ class BillingAgreement extends ActiveRecord
 		}
 
 		/* Get purchases */
-		$purchases = new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', array( 'ps_billing_agreement=?', $this->id ) ), 'IPS\nexus\Purchase' );
+		$purchases = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', array( 'ps_billing_agreement=?', $this->id ) ), 'IPS\nexus\Purchase' );
 
 		/* Generate an invoice */
-		$invoice = new Invoice;
+		$invoice = new \IPS\nexus\Invoice;
 		$invoice->system = TRUE;
 		$invoice->currency = $transaction->amount->currency;
 		$invoice->member = $this->member;
 		$invoice->billaddress = $this->member->primaryBillingAddress();
 		foreach ( $purchases as $purchase )
 		{
-			$invoice->addItem( Renewal::create( $purchase ) );
+			$invoice->addItem( \IPS\nexus\Invoice\Item\Renewal::create( $purchase ) );
 		}
 		$invoice->save();
 
@@ -381,7 +354,7 @@ class BillingAgreement extends ActiveRecord
 		/* Log */
 		$invoice->member->log( 'transaction', array(
 			'type' => 'paid',
-			'status' => Transaction::STATUS_PAID,
+			'status' => \IPS\nexus\Transaction::STATUS_PAID,
 			'id' => $transaction->id,
 			'invoice_id' => $invoice->id,
 			'invoice_title' => $invoice->title,

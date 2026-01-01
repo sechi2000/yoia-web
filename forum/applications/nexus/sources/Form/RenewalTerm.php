@@ -12,30 +12,16 @@
 namespace IPS\nexus\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\nexus\Money;
-use IPS\nexus\Purchase\RenewalTerm as RenewalTermClass;
-use IPS\Theme;
-use LengthException;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Renewal Term input class for Form Builder
  */
-class RenewalTerm extends FormAbstract
+class _RenewalTerm extends \IPS\Helpers\Form\FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -55,7 +41,7 @@ class RenewalTerm extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'customer'				=> NULL,
 		'currency'				=> NULL,
 		'allCurrencies'			=> FALSE,
@@ -74,9 +60,9 @@ class RenewalTerm extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		return Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->renewalTerm( $this->name, $this->value, $this->options );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->renewalTerm( $this->name, $this->value, $this->options );
 	}
 	
 	/**
@@ -84,9 +70,9 @@ class RenewalTerm extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
-		if ( is_array( $this->value ) )
+		if ( \is_array( $this->value ) )
 		{
 			if ( isset( $this->value['null'] ) /* or !isset( $this->value['term'] ) or !$this->value['term'] or !isset( $this->value['unit'] ) or !$this->value['unit'] */ )
 			{
@@ -98,11 +84,11 @@ class RenewalTerm extends FormAbstract
 				if ( $this->options['allCurrencies'] )
 				{
 					$costs = array();
-					foreach ( Money::currencies() as $currency )
+					foreach ( \IPS\nexus\Money::currencies() as $currency )
 					{
 						if ( isset( $this->value[ 'amount_' . $currency ] ) )
 						{
-							$costs[ $currency ] = new Money( $this->value[ 'amount_' . $currency ], $currency );
+							$costs[ $currency ] = new \IPS\nexus\Money( $this->value[ 'amount_' . $currency ], $currency );
 						}
 						else
 						{
@@ -118,23 +104,10 @@ class RenewalTerm extends FormAbstract
 					}
 					else
 					{
-						$currencies = Money::currencies();
+						$currencies = \IPS\nexus\Money::currencies();
 						$currency = array_shift( $currencies );
 					}
-					$costs = isset( $this->value['amount'] ) ? new Money( $this->value['amount'], $currency ) : NULL;
-				}
-
-				/* If we have no price specified, stop here */
-				if( $costs === NULL OR ( is_array( $costs ) AND !count( $costs ) ) )
-				{
-					if( $this->options['lockPrice'] )
-					{
-						$costs = new Money( new Number( "0" ), $currency );
-					}
-					else
-					{
-						return null;
-					}
+					$costs = isset( $this->value['amount'] ) ? new \IPS\nexus\Money( $this->value['amount'], $currency ) : NULL;
 				}
 				
 				/* Work out term */
@@ -151,20 +124,20 @@ class RenewalTerm extends FormAbstract
 					
 					if ( $this->value['term'] < 1 )
 					{
-						$this->value = new RenewalTermClass( $costs, new DateInterval( 'P' . 1 . mb_strtoupper( $this->value['unit'] ) ), NULL, $this->options['addToBase'] ? isset( $this->value['add'] ) : FALSE );
-						throw new LengthException( Member::loggedIn()->language()->addToStack('form_number_min', FALSE, array( 'sprintf' => array( 0 ) ) ) );
+						$this->value = new \IPS\nexus\Purchase\RenewalTerm( $costs, new \DateInterval( 'P' . 1 . mb_strtoupper( $this->value['unit'] ) ), NULL, $this->options['addToBase'] ? isset( $this->value['add'] ) : FALSE );
+						throw new \LengthException( \IPS\Member::loggedIn()->language()->addToStack('form_number_min', FALSE, array( 'sprintf' => array( 0 ) ) ) );
 					}
-					if ( !in_array( $this->value['unit'], array( 'd', 'm', 'y' ) ) )
+					if ( !\in_array( $this->value['unit'], array( 'd', 'm', 'y' ) ) )
 					{
-						$this->value = new RenewalTermClass( $costs, new DateInterval( 'P' . $this->value['term'] . 'D' ), NULL, $this->options['addToBase'] ? isset( $this->value['add'] ) : FALSE );
-						throw new OutOfRangeException( 'form_bad_value' );
+						$this->value = new \IPS\nexus\Purchase\RenewalTerm( $costs, new \DateInterval( 'P' . $this->value['term'] . 'D' ), NULL, $this->options['addToBase'] ? isset( $this->value['add'] ) : FALSE );
+						throw new \OutOfRangeException( 'form_bad_value' );
 					}
 					
-					$term = new DateInterval( 'P' . $this->value['term'] . mb_strtoupper( $this->value['unit'] ) );
+					$term = new \DateInterval( 'P' . $this->value['term'] . mb_strtoupper( $this->value['unit'] ) );
 				}
 				
 				/* Return */
-				return new RenewalTermClass( $costs, $term, NULL, $this->options['addToBase'] ? isset( $this->value['add'] ) : FALSE );
+				return new \IPS\nexus\Purchase\RenewalTerm( $costs, $term, NULL, $this->options['addToBase'] ? isset( $this->value['add'] ) : FALSE );
 			}
 		}
 

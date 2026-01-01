@@ -11,34 +11,23 @@
 namespace IPS\Data\Store;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Data\Cache;
-use IPS\Data\Cache\None;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Db\Exception;
-use IPS\Session\Front;
-use UnderflowException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Database Storage Class
  */
-class Database extends Store
+class _Database extends \IPS\Data\Store
 {
 	/**
 	 * Server supports this method?
 	 *
 	 * @return	bool
 	 */
-	public static function supported(): bool
+	public static function supported()
 	{
 		return TRUE;
 	}
@@ -46,17 +35,17 @@ class Database extends Store
 	/**
 	 * @brief	Always needed Store keys
 	 */
-	public array $initLoad = array( 'cacheKeys', 'settings', 'storageConfigurations', 'themes', 'languages', 'groups', 'applications', 'modules', 'widgets', 'furl', 'javascript_map', 'metaTags', 'bannedIpAddresses', 'license_data', 'furl_configuration', 'rssFeeds', 'frontNavigation', 'globalStreamIds', 'profileSteps' );
+	public $initLoad = array( 'cacheKeys', 'settings', 'storageConfigurations', 'themes', 'languages', 'groups', 'applications', 'modules', 'widgets', 'furl', 'javascript_map', 'metaTags', 'bannedIpAddresses', 'license_data', 'furl_configuration', 'rssFeeds', 'frontNavigation', 'globalStreamIds', 'profileSteps' );
 		
 	/**
 	 * @brief	Have we done the intitial load?
 	 */
-	protected bool $doneInitLoad = FALSE;
+	protected $doneInitLoad = FALSE;
 		
 	/**
 	 * @brief	Cache
 	 */
-	protected static array $cache = array();
+	protected static $cache = array();
 	
 	/**
 	 * Constructor
@@ -67,7 +56,7 @@ class Database extends Store
 	public function __construct()
 	{
 		/* When caching is enabled, we only need cacheKeys, the rest will come from the cache */
-		if ( !Cache::i() instanceof None )
+		if ( !\IPS\Data\Cache::i() instanceof \IPS\Data\Cache\None )
 		{
 			$this->initLoad = array( 'cacheKeys' );
 		}
@@ -81,16 +70,13 @@ class Database extends Store
 			$this->initLoad[] = 'acpNotifications';
 			$this->initLoad[] = 'emoticons';
 
-			$this->initLoad[] = 'administrators';
-			$this->initLoad[] = 'moderators';
-			$this->initLoad[] = 'group_promotions';
-			$this->initLoad[] = 'promoters';
-
-			/* things from other apps */
-			$this->initLoad[] = 'nexusPackagesWithReviews';
-			$this->initLoad[] = 'cms_menu';
-			$this->initLoad[] = 'cms_databases';
-			$this->initLoad[] = 'pages_page_urls';
+			if ( \IPS\Session\Front::loggedIn() )
+			{
+				$this->initLoad[] = 'administrators';
+				$this->initLoad[] = 'moderators';
+				$this->initLoad[] = 'group_promotions';
+				$this->initLoad[] = 'promoters';
+			}
 		}
 	}
 	
@@ -101,9 +87,9 @@ class Database extends Store
 	 * @param	array	$keys	Keys
 	 * @return	void
 	 */
-	public function loadIntoMemory( array $keys ) : void
+	public function loadIntoMemory( array $keys )
 	{
-		foreach ( Db::i()->select( '*', 'core_store', Db::i()->in( 'store_key', $keys ) ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'core_store', \IPS\Db::i()->in( 'store_key', $keys ) ) as $row )
 		{
 			static::$cache[ $row['store_key'] ] = $row['store_value'];
 		}
@@ -112,12 +98,12 @@ class Database extends Store
 	/**
 	 * Abstract Method: Get
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	string	Value from the datastore
 	 */
-	public function get( string $key ) : string
+	public function get( $key )
 	{
-		if ( !$this->doneInitLoad and in_array( $key, $this->initLoad ) )
+		if ( !$this->doneInitLoad and \in_array( $key, $this->initLoad ) )
 		{
 			$this->loadIntoMemory( $this->initLoad );
 			$this->doneInitLoad = TRUE;
@@ -127,11 +113,11 @@ class Database extends Store
 		{
 			try
 			{
-				static::$cache[ $key ] = Db::i()->select( 'store_value', 'core_store', array( 'store_key=?', $key ) )->first();
+				static::$cache[ $key ] = \IPS\Db::i()->select( 'store_value', 'core_store', array( 'store_key=?', $key ) )->first();
 			}
-			catch ( Exception $e )
+			catch ( \IPS\Db\Exception $e )
 			{
-				throw new UnderflowException;
+				throw new \UnderflowException;
 			}
 		}
 		
@@ -141,13 +127,13 @@ class Database extends Store
 	/**
 	 * Abstract Method: Set
 	 *
-	 * @param string $key	Key
-	 * @param string $value	Value
+	 * @param	string	$key	Key
+	 * @param	string	$value	Value
 	 * @return	bool
 	 */
-	public function set( string $key, string $value ): bool
+	public function set( $key, $value )
 	{
-		Db::i()->replace( 'core_store', array(
+		\IPS\Db::i()->replace( 'core_store', array(
 			'store_key'		=> $key,
 			'store_value'	=> $value
 		) );
@@ -160,10 +146,10 @@ class Database extends Store
 	/**
 	 * Abstract Method: Exists?
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	public function exists( string $key ): bool
+	public function exists( $key )
 	{
 		if ( isset( static::$cache[ $key ] ) )
 		{
@@ -176,7 +162,7 @@ class Database extends Store
 				$this->get( $key );
 				return TRUE;
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				return FALSE;
 			}
@@ -189,31 +175,31 @@ class Database extends Store
 	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	public function delete( string $key ): bool
+	public function delete( $key )
 	{
 		if( isset( static::$cache[ $key ] ) )
 		{
 			unset( static::$cache[ $key ] );
 		}
 
-		Db::i()->delete( 'core_store', array( 'store_key=?', $key ) );
+		\IPS\Db::i()->delete( 'core_store', array( 'store_key=?', $key ) );
 		return TRUE;
 	}
 	
 	/**
 	 * Abstract Method: Clear All Caches
 	 *
-	 * @param string|null $exclude	Key to exclude (keep)
+	 * @param	NULL|string	$exclude	Key to exclude (keep)
 	 * @return	void
 	 */
-	public function clearAll( string $exclude=NULL ) : void
+	public function clearAll( $exclude=NULL )
 	{
 		$where = array();
 		if( $exclude !== NULL )
 		{
 			$where[] = array( 'store_key != ?', $exclude );
 		}
-		Db::i()->delete( 'core_store', $where );
+		\IPS\Db::i()->delete( 'core_store', $where );
 
 		foreach( static::$cache as $key => $value )
 		{

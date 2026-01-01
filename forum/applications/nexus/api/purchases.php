@@ -12,30 +12,16 @@
 namespace IPS\nexus\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Application;
-use IPS\Db;
-use IPS\nexus\Purchase;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Purchases API
  */
-class purchases extends Controller
+class _purchases extends \IPS\Api\Controller
 {
 	/**
 	 * GET /nexus/purchases
@@ -54,83 +40,82 @@ class purchases extends Controller
 	 * @apiparam	string	sortDir				Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page				Page number
 	 * @apiparam	int		perPage				Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\nexus\Purchase>
-	 * @return PaginatedResponse<Purchase>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\nexus\Purchase>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = array();
 
 		/* Get only the purchases from active applications */
-		$where[] = array( "ps_app IN('" . implode( "','", array_keys( Application::enabledApplications() ) ) . "')" );
+		$where[] = array( "ps_app IN('" . implode( "','", array_keys( \IPS\Application::enabledApplications() ) ) . "')" );
 
 		/* Customers */
 		if ( $this->member )
 		{
 			$where[] = array( 'ps_member=?', $this->member->member_id );
 		}
-		elseif ( isset( Request::i()->customers ) )
+		elseif ( isset( \IPS\Request::i()->customers ) )
 		{
-			$where[] = array( Db::i()->in( 'ps_member', array_map( 'intval', array_filter( explode( ',', Request::i()->customers ) ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( 'ps_member', array_map( 'intval', array_filter( explode( ',', \IPS\Request::i()->customers ) ) ) ) );
 		}
 
 		/* Status */
-		if ( isset( Request::i()->active ) )
+		if ( isset( \IPS\Request::i()->active ) )
 		{
-			$where[] = array( 'ps_active=?', intval( Request::i()->active ) );
+			$where[] = array( 'ps_active=?', \intval( \IPS\Request::i()->active ) );
 		}
-		if ( isset( Request::i()->canceled ) )
+		if ( isset( \IPS\Request::i()->canceled ) )
 		{
-			$where[] = array( 'ps_cancelled=?', intval( Request::i()->canceled ) );
+			$where[] = array( 'ps_cancelled=?', \intval( \IPS\Request::i()->canceled ) );
 		}
 		
 		/* Item */
-		if ( isset( Request::i()->itemApp ) )
+		if ( isset( \IPS\Request::i()->itemApp ) )
 		{
-			$where[] = array( 'ps_app=?', Request::i()->itemApp );
+			$where[] = array( 'ps_app=?', \IPS\Request::i()->itemApp );
 		}
-		if ( isset( Request::i()->itemType ) )
+		if ( isset( \IPS\Request::i()->itemType ) )
 		{
-			$where[] = array( 'ps_type=?', Request::i()->itemType );
+			$where[] = array( 'ps_type=?', \IPS\Request::i()->itemType );
 		}
-		if ( isset( Request::i()->itemId ) )
+		if ( isset( \IPS\Request::i()->itemId ) )
 		{
-			$where[] = array( 'ps_item_id=?', Request::i()->itemId );
+			$where[] = array( 'ps_item_id=?', \IPS\Request::i()->itemId );
 		}
 		
 		/* Parent */
-		if ( isset( Request::i()->parent ) )
+		if ( isset( \IPS\Request::i()->parent ) )
 		{
-			$where[] = array( 'ps_parent=?', intval( Request::i()->parent ) );
+			$where[] = array( 'ps_parent=?', \intval( \IPS\Request::i()->parent ) );
 		}
 		
 		/* Show */
-		if ( isset( Request::i()->show ) )
+		if ( isset( \IPS\Request::i()->show ) )
 		{
-			$where[] = array( 'ps_show=?', intval( Request::i()->show ) );
+			$where[] = array( 'ps_show=?', \intval( \IPS\Request::i()->show ) );
 		}
 						
 		/* Sort */
-		if ( isset( Request::i()->sortBy ) and in_array( Request::i()->sortBy, array( 'start', 'expire' ) ) )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'start', 'expire' ) ) )
 		{
-			$sortBy = 'ps_' . Request::i()->sortBy;
+			$sortBy = 'ps_' . \IPS\Request::i()->sortBy;
 		}
 		else
 		{
 			$sortBy = 'ps_id';
 		}
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 		
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', 'nexus_purchases', $where, "{$sortBy} {$sortDir}" ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			\IPS\Db::i()->select( '*', 'nexus_purchases', $where, "{$sortBy} {$sortDir}" ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			'IPS\nexus\Purchase',
-			Db::i()->select( 'COUNT(*)', 'nexus_purchases', $where )->first(),
+			\IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', $where )->first(),
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 	
@@ -140,24 +125,23 @@ class purchases extends Controller
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		2X310/1	INVALID_ID	The purchase ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\nexus\Purchase
-	 * @return Response
+	 * @return		\IPS\nexus\Purchase
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{			
-			$object = Purchase::load( $id );
+			$object = \IPS\nexus\Purchase::load( $id );
 			if ( $this->member and !$object->canView( $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
-			return new Response( 200, $object->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $object->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2X309/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2X309/1', 404 );
 		}
 	}
 	
@@ -169,24 +153,23 @@ class purchases extends Controller
 	 * @apiparam	object	customFields	Values for custom fields
 	 * @param		int		$id			ID Number
 	 * @throws		2X309/1	INVALID_ID	The purchase ID does not exist
-	 * @apireturn		\IPS\nexus\Purchase
-	 * @return Response
+	 * @return		\IPS\nexus\Purchase
 	 */
-	public function POSTitem( int $id ): Response
+	public function POSTitem( $id )
 	{
 		try
 		{			
-			$purchase =  Purchase::load( $id );
+			$purchase =  \IPS\nexus\Purchase::load( $id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2X309/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2X309/1', 404 );
 		}
 		
-		if ( isset( Request::i()->customFields ) )
+		if ( isset( \IPS\Request::i()->customFields ) )
 		{
 			$customFields = $purchase->custom_fields;
-			foreach ( Request::i()->customFields as $k => $v )
+			foreach ( \IPS\Request::i()->customFields as $k => $v )
 			{
 				$customFields[ $k ] = $v;
 			}
@@ -195,6 +178,6 @@ class purchases extends Controller
 		
 		$purchase->save();
 		
-		return new Response( 200, $purchase->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $purchase->apiOutput( $this->member ) );
 	}
 }

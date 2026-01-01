@@ -11,101 +11,57 @@
 namespace IPS\core\modules\admin\languages;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\Url as FormUrl;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Output\Javascript;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Xml\XMLReader;
-use OutOfRangeException;
-use UnderflowException;
-use UnexpectedValueException;
-use XMLWriter;
-use function constant;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function substr;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
-use const IPS\Helpers\Table\SEARCH_NODE;
-use const IPS\IN_DEV;
-use const IPS\TEMP_DIRECTORY;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * languages
  */
-class languages extends Controller
+class _languages extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\Lang';
+	protected $nodeClass = 'IPS\Lang';
 	
 	/**
 	 * Title can contain HTML?
 	 */
-	public bool $_titleHtml = TRUE;
+	public $_titleHtml = TRUE;
 	
 	/**
 	 * Description can contain HTML?
 	 */
-	public bool $_descriptionHtml = TRUE;
+	public $_descriptionHtml = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'lang_words' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'lang_words' );
 		parent::execute();
 	}
 	
 	/**
 	 * Allow overloading to change how the title is displayed in the tree
 	 *
-	 * @param	$node    Model    Node
+	 * @param	$node	\IPS\Node	Node
 	 * @return string
 	 */
-	protected static function nodeTitle( Model $node ): string
+	protected static function nodeTitle( $node )
 	{
-		return Theme::i()->getTemplate('customization')->langRowTitle( $node );
+		return \IPS\Theme::i()->getTemplate('customization')->langRowTitle( $node );
 	}
 
 	/**
@@ -114,10 +70,10 @@ class languages extends Controller
 	 * @param	object	$node	Node returned from $nodeClass::load()
 	 * @return	NULL|string
 	 */
-	public function _getRowHtml( object $node ): ?string
+	public function _getRowHtml( $node )
 	{
-		$hasBeenCustomized = Db::i()->select( 'COUNT(*)', 'core_sys_lang_words', array( 'lang_id=? AND word_export=1 AND word_custom IS NOT NULL', $node->id ) )->first();
-		return Theme::i()->getTemplate('customization' )->langRowAdditional( $node, $hasBeenCustomized );
+		$hasBeenCustomized = \IPS\Db::i()->select( 'COUNT(*)', 'core_sys_lang_words', array( 'lang_id=? AND word_export=1 AND word_custom IS NOT NULL', $node->id ) )->first();
+		return \IPS\Theme::i()->getTemplate('customization' )->langRowAdditional( $node, $hasBeenCustomized );
 	}
 	
 	/**
@@ -125,34 +81,34 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'flags.css', 'core', 'global' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'flags.css', 'core', 'global' ) );
 		
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'languages', 'lang_words' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'languages', 'lang_words' ) )
 		{
-			Output::i()->sidebar['actions'][] = array(
+			\IPS\Output::i()->sidebar['actions'][] = array(
 				'icon'	=> 'globe',
 				'title'	=> 'lang_vle',
-				'link'	=> Url::internal( 'app=core&module=languages&controller=languages&do=vle' ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('lang_vle') )
+				'link'	=> \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages&do=vle' ),
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('lang_vle') )
 			);
 			
-			Output::i()->sidebar['actions'][] = array(
+			\IPS\Output::i()->sidebar['actions'][] = array(
 				'icon'	=> 'plus',
 				'title'	=> 'add_word',
-				'link'	=> Url::internal( "app=core&module=languages&controller=languages&do=addWord" ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'add_word' ) )
+				'link'	=> \IPS\Http\Url::internal( "app=core&module=languages&controller=languages&do=addWord" ),
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack( 'add_word' ) )
 			);
 			
 			/* @note If any more settings are added, then this condition needs to be moved. */
-			if ( count( Lang::languages() ) > 1 )
+			if ( \count( \IPS\Lang::languages() ) > 1 )
 			{
-				Output::i()->sidebar['actions'][] = array(
+				\IPS\Output::i()->sidebar['actions'][] = array(
 					'icon'	=> 'cogs',
 					'title'	=> 'settings',
-					'link'	=> Url::internal( 'app=core&module=languages&controller=languages&do=settings' ),
-					'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('settings') )
+					'link'	=> \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages&do=settings' ),
+					'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('settings') )
 				);
 			}
 		}
@@ -165,30 +121,30 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function addWord() : void
+	protected function addWord()
 	{
-		$form = new Form( 'wordForm', 'save', NULL, array( 'data-role' => 'wordForm' ) );
-		Lang::wordForm( $form );
+		$form = new \IPS\Helpers\Form( 'wordForm', 'save', NULL, array( 'data-role' => 'wordForm' ) );
+		\IPS\Lang::wordForm( $form );
 		
 		if ( $values = $form->values() )
 		{
 			/* Save */
-			Lang::saveCustom( 'core', $values['word_key'], $values['word_custom'] ?? NULL, FALSE, $values['word_default'] );
+			\IPS\Lang::saveCustom( 'core', $values['word_key'], $values['word_custom'] ?? NULL, FALSE, $values['word_default'] );
 			
-			Session::i()->log( 'acplog__custom_word_added', array( $values['word_key'] => FALSE ) );
+			\IPS\Session::i()->log( 'acplog__custom_word_added', array( $values['word_key'] => FALSE ) );
 			
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->json( 'OK' );
+				\IPS\Output::i()->json( 'OK' );
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( "app=core&module=languages&controller=languages" ), 'saved' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=languages&controller=languages" ), 'saved' );
 			}
 		}
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'add_word' );
-		Output::i()->output = (string) $form;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'add_word' );
+		\IPS\Output::i()->output = (string) $form;
 	}
 	
 	/**
@@ -196,30 +152,30 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function deleteWord() : void
+	protected function deleteWord()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Make sure this is actually a custom phrase */
 		try
 		{
-			$word = Db::i()->select( '*', 'core_sys_lang_words', array( "word_key=? AND lang_id=?", Request::i()->key, Request::i()->langId ) )->first();
+			$word = \IPS\Db::i()->select( '*', 'core_sys_lang_words', array( "word_key=? AND lang_id=?", \IPS\Request::i()->key, \IPS\Request::i()->langId ) )->first();
 			
 			if ( !$word['word_is_custom'] ) 
 			{
-				Output::i()->error( 'node_error', '1C126/9', 403, '' );
+				\IPS\Output::i()->error( 'node_error', '1C126/9', 403, '' );
 			}
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
-			Output::i()->error( 'node_error', '1C126/A', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '1C126/A', 403, '' );
 		}
 		
-		Db::i()->delete( 'core_sys_lang_words', array( "word_key=?", Request::i()->key ) );
+		\IPS\Db::i()->delete( 'core_sys_lang_words', array( "word_key=?", \IPS\Request::i()->key ) );
 		
-		Session::i()->log( 'acplog__custom_word_deleted', array( Request::i()->key => FALSE ) );
+		\IPS\Session::i()->log( 'acplog__custom_word_deleted', array( \IPS\Request::i()->key => FALSE ) );
 		
-		Output::i()->redirect( Url::internal( "app=core&module=languages&controller=languages&do=translate&id=" . Request::i()->langId ), 'deleted' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=languages&controller=languages&do=translate&id=" . \IPS\Request::i()->langId ), 'deleted' );
 	}
 	
 	/**
@@ -227,13 +183,12 @@ class languages extends Controller
 	 *
 	 * @return void
 	 */
-	protected function upload() : void
+	protected function upload()
 	{
 		/* Build form */
-		$form = new Form;
-		$form->addMessage('languages_manual_install_warning');
-		$form->add( new Upload( 'lang_upload', NULL, TRUE, array( 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ) ) );
-		Lang::localeField( $form );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Upload( 'lang_upload', NULL, TRUE, array( 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ) ) );
+		\IPS\Lang::localeField( $form );
 		
 		$activeTabContents = $form;
 		
@@ -241,7 +196,7 @@ class languages extends Controller
 		if ( $values = $form->values() )
 		{
 			/* Move it to a temporary location */
-			$tempFile = tempnam( TEMP_DIRECTORY, 'IPS' );
+			$tempFile = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
 			move_uploaded_file( $values['lang_upload'], $tempFile );
 			
 			/* Work out locale */
@@ -258,11 +213,11 @@ class languages extends Controller
 			}
 								
 			/* Initate a redirector */
-			Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages&do=import' )->setQueryString( array( 'file' => $tempFile, 'key' => md5_file( $tempFile ), 'locale' => $locale ) )->csrf() );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages&do=import' )->setQueryString( array( 'file' => $tempFile, 'key' => md5_file( $tempFile ), 'locale' => $locale ) )->csrf() );
 		}
 		
 		/* Display */
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -270,19 +225,18 @@ class languages extends Controller
 	 *
 	 * @return void
 	 */
-	protected function form() : void
+	protected function form()
 	{
 		/* If we have no ID number, this is the add form, which is handled differently to the edit */
-		if ( !Request::i()->id )
+		if ( !\IPS\Request::i()->id )
 		{			
 			/* CREATE NEW */
-			$max = Db::i()->select( 'MAX(lang_order)', 'core_sys_lang' )->first();
+			$max = \IPS\Db::i()->select( 'MAX(lang_order)', 'core_sys_lang' )->first();
 
 			/* Build form */
-			$form = new Form;
+			$form = new \IPS\Helpers\Form;
 			$form->addMessage('languages_create_blurb');
-			$lang = new Lang;
-			$lang->short = 'en_US';
+			$lang = new \IPS\Lang( array( 'lang_short' => 'en_US' ) );
 			$lang->form( $form );
 			
 			/* Handle submissions */
@@ -298,7 +252,7 @@ class languages extends Controller
 				/* reset default language if we want this to be default */
 				if( isset( $values['lang_default'] ) and $values['lang_default'] )
 				{
-					Db::i()->update( 'core_sys_lang', array( 'lang_default' => 0 ) );
+					\IPS\Db::i()->update( 'core_sys_lang', array( 'lang_default' => 0 ) );
 				}
 
 				/* Add "UTF8" if we can */
@@ -317,40 +271,43 @@ class languages extends Controller
 				foreach( explode( ";", $currentLocale ) as $locale )
 				{
 					$parts = explode( "=", $locale );
-					if( in_array( $parts[0], array( 'LC_ALL', 'LC_COLLATE', 'LC_CTYPE', 'LC_MONETARY', 'LC_NUMERIC', 'LC_TIME' ) ) )
+					if( \in_array( $parts[0], array( 'LC_ALL', 'LC_COLLATE', 'LC_CTYPE', 'LC_MONETARY', 'LC_NUMERIC', 'LC_TIME' ) ) )
 					{
-						setlocale( constant( $parts[0] ), $parts[1] );
+						setlocale( \constant( $parts[0] ), $parts[1] );
 					}
 				}
 				
 				/* Insert the actual language */
 				$values['lang_order'] = ++$max;
-				$insertId = Db::i()->insert( 'core_sys_lang', $values );
+				$insertId = \IPS\Db::i()->insert( 'core_sys_lang', $values );
 				
 				/* Copy over language strings */
-				$default = Lang::defaultLanguage();
-				$prefix = Db::i()->prefix;
-				$defaultStmt = Db::i()->prepare( "INSERT INTO `{$prefix}core_sys_lang_words` ( `lang_id`, `word_app`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export` ) SELECT {$insertId} AS `lang_id`, `word_app`, `word_key`, `word_default`, NULL AS `word_custom`, `word_default_version`, NULL AS `word_custom_version`, `word_js`, `word_export` FROM `{$prefix}core_sys_lang_words` WHERE `lang_id`={$default} AND `word_export`=1" );
+				$default = \IPS\Lang::defaultLanguage();
+				$prefix = \IPS\Db::i()->prefix;
+				$defaultStmt = \IPS\Db::i()->prepare( "INSERT INTO `{$prefix}core_sys_lang_words` ( `lang_id`, `word_app`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export` ) SELECT {$insertId} AS `lang_id`, `word_app`, `word_key`, `word_default`, NULL AS `word_custom`, `word_default_version`, NULL AS `word_custom_version`, `word_js`, `word_export` FROM `{$prefix}core_sys_lang_words` WHERE `lang_id`={$default} AND `word_export`=1" );
 				$defaultStmt->execute();
-				$customStmt = Db::i()->prepare( "INSERT INTO `{$prefix}core_sys_lang_words` ( `lang_id`, `word_app`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export`, `word_is_custom` ) SELECT {$insertId} AS `lang_id`, `word_app`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export`, `word_is_custom` FROM `{$prefix}core_sys_lang_words` WHERE `lang_id`={$default} AND `word_export`=0" );
+				$customStmt = \IPS\Db::i()->prepare( "INSERT INTO `{$prefix}core_sys_lang_words` ( `lang_id`, `word_app`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export`, `word_is_custom` ) SELECT {$insertId} AS `lang_id`, `word_app`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export`, `word_is_custom` FROM `{$prefix}core_sys_lang_words` WHERE `lang_id`={$default} AND `word_export`=0" );
 				$customStmt->execute();
 
-				unset( Store::i()->languages );
+				unset( \IPS\Data\Store::i()->languages );
+
+				/* Clear guest page caches */
+				\IPS\Data\Cache::i()->clearAll();
 
 				/* Log */
-				Session::i()->log( 'acplogs__lang_created', array( $values['lang_title'] => FALSE ) );
+				\IPS\Session::i()->log( 'acplogs__lang_created', array( $values['lang_title'] => FALSE ) );
 				
 				/* Redirect */
-				Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages' ), 'saved' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages' ), 'saved' );
 			}
 			
 			/* Display */
-			Output::i()->output = $form;
+			\IPS\Output::i()->output = $form;
 		}
 		/* If it's an edit, we can just let the node controller handle it */
 		else
 		{
-			parent::form();
+			return parent::form();
 		}
 	}
 	
@@ -359,39 +316,39 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function enableToggle() : void
+	protected function enableToggle()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Load Language */
 		try
 		{
-			$language = Lang::load( Request::i()->id );
+			$language = \IPS\Lang::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '3C126/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '3C126/1', 404, '' );
 		}
 		/* Check we're not locked */
 		if( $language->_locked or !$language->canEdit() )
 		{
-			Output::i()->error( 'node_noperm_enable', '2C126/2', 403, '' );
+			\IPS\Output::i()->error( 'node_noperm_enable', '2C126/2', 403, '' );
 		}
 		
 		/* Check if any members are using this */
-		if ( !Request::i()->status )
+		if ( !\IPS\Request::i()->status )
 		{
-			$count = Db::i()->select( 'count(*)', 'core_members', array( 'language=?', $language->_id ) )->first();
+			$count = \IPS\Db::i()->select( 'count(*)', 'core_members', array( 'language=?', $language->_id ) )->first();
 			if ( $count )
 			{
-				if ( Request::i()->isAjax() )
+				if ( \IPS\Request::i()->isAjax() )
 				{
-					Output::i()->json( false, 500 );
+					\IPS\Output::i()->json( false, 500 );
 				}
 				else
 				{
 					$options = array();
-					foreach ( Lang::languages() as $lang )
+					foreach ( \IPS\Lang::languages() as $lang )
 					{
 						if ( $lang->id != $language->_id )
 						{
@@ -399,16 +356,16 @@ class languages extends Controller
 						}
 					}
 					
-					$form = new Form;
-					$form->add( new Select( 'lang_change_to', Lang::defaultLanguage(), TRUE, array( 'options' => $options ) ) );
+					$form = new \IPS\Helpers\Form;
+					$form->add( new \IPS\Helpers\Form\Select( 'lang_change_to', \IPS\Lang::defaultLanguage(), TRUE, array( 'options' => $options ) ) );
 					
 					if ( $values = $form->values() )
 					{
-						Db::i()->update( 'core_members', array( 'language' => $values['lang_change_to'] ), array( 'language=?', $language->_id ) );
+						\IPS\Db::i()->update( 'core_members', array( 'language' => $values['lang_change_to'] ), array( 'language=?', $language->_id ) );
 					}
 					else
 					{
-						Output::i()->output = $form;
+						\IPS\Output::i()->output = $form;
 						return;
 					}
 				}
@@ -416,30 +373,33 @@ class languages extends Controller
 		}
 		
 		/* Do it */
-		Db::i()->update( 'core_sys_lang', array( 'lang_enabled' => (bool) Request::i()->status ), array( 'lang_id=?', $language->_id ) );
-		unset( Store::i()->languages );
+		\IPS\Db::i()->update( 'core_sys_lang', array( 'lang_enabled' => (bool) \IPS\Request::i()->status ), array( 'lang_id=?', $language->_id ) );
+		unset( \IPS\Data\Store::i()->languages );
+
+		/* Clear guest page caches */
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Update the essential cookie name list */
-		unset( Store::i()->essentialCookieNames );
+		unset( \IPS\Data\Store::i()->essentialCookieNames );
 
 		/* Log */
-		if ( Request::i()->status )
+		if ( \IPS\Request::i()->status )
 		{
-			Session::i()->log( 'acplog__node_enabled', array( 'menu__core_languages_languages' => TRUE, $language->title => FALSE ) );
+			\IPS\Session::i()->log( 'acplog__node_enabled', array( 'menu__core_languages_languages' => TRUE, $language->title => FALSE ) );
 		}
 		else
 		{
-			Session::i()->log( 'acplog__node_disabled', array( 'menu__core_languages_languages' => TRUE, $language->title => FALSE ) );
+			\IPS\Session::i()->log( 'acplog__node_disabled', array( 'menu__core_languages_languages' => TRUE, $language->title => FALSE ) );
 		}
 		
 		/* Redirect */
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( (bool) Request::i()->status );
+			\IPS\Output::i()->json( (bool) \IPS\Request::i()->status );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages' ), 'saved' );
 		}
 	}
 	
@@ -448,16 +408,16 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function vle() : void
+	protected function vle()
 	{
-		if( IN_DEV )
+		if( \IPS\IN_DEV )
 		{
-			Member::loggedIn()->language()->words['lang_vle_editor_warning']	= Member::loggedIn()->language()->addToStack( 'dev_lang_vle_editor_warn', FALSE );
+			\IPS\Member::loggedIn()->language()->words['lang_vle_editor_warning']	= \IPS\Member::loggedIn()->language()->addToStack( 'dev_lang_vle_editor_warn', FALSE );
 		}
 
-		$form = new Form();
-		$form->add( new YesNo( 'lang_vle_editor', ( isset( Request::i()->cookie['vle_editor'] ) and Request::i()->cookie['vle_editor'] ) and !IN_DEV, FALSE, array( 'disabled' => IN_DEV ) ) );
-		$form->add( new YesNo( 'lang_vle_keys', isset( Request::i()->cookie['vle_keys'] ) and Request::i()->cookie['vle_keys'] ) );
+		$form = new \IPS\Helpers\Form();
+		$form->add( new \IPS\Helpers\Form\YesNo( 'lang_vle_editor', ( isset( \IPS\Request::i()->cookie['vle_editor'] ) and \IPS\Request::i()->cookie['vle_editor'] ) and !\IPS\IN_DEV, FALSE, array( 'disabled' => \IPS\IN_DEV ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'lang_vle_keys', isset( \IPS\Request::i()->cookie['vle_keys'] ) and \IPS\Request::i()->cookie['vle_keys'] ) );
 		
 		if ( $values = $form->values() )
 		{
@@ -465,18 +425,18 @@ class languages extends Controller
 			{
 				if ( $values[ 'lang_' . $k ] )
 				{
-					Request::i()->setCookie( $k, 1 );
+					\IPS\Request::i()->setCookie( $k, 1 );
 				}
-				elseif ( isset( Request::i()->cookie[ $k ] ) )
+				elseif ( isset( \IPS\Request::i()->cookie[ $k ] ) )
 				{
-					Request::i()->setCookie( $k, 0 );
+					\IPS\Request::i()->setCookie( $k, 0 );
 				}
 			}
 			
-			Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages' ) );
 		}
 		
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -484,19 +444,19 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function settings() : void
+	protected function settings()
 	{
-		$form = new Form;
-		$form->add( new YesNo( 'lang_auto_detect', Settings::i()->lang_auto_detect, TRUE ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\YesNo( 'lang_auto_detect', \IPS\Settings::i()->lang_auto_detect, TRUE ) );
 		
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings( $values );
-			Session::i()->log( 'acplog__language_settings_edited' );
-			Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages' ) );
+			\IPS\Session::i()->log( 'acplog__language_settings_edited' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages' ) );
 		}
 		
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -504,63 +464,82 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function translate() : void
+	protected function translate()
 	{
-		if ( Lang::vleActive() )
+		if ( \IPS\Lang::vleActive() )
 		{
-			Output::i()->error( 'no_translate_with_vle', '1C126/8', 403, '' );
+			\IPS\Output::i()->error( 'no_translate_with_vle', '1C126/8', 403, '' );
 		}
 
 		try
 		{
-			$lang = Lang::load( Request::i()->id );
+			$lang = \IPS\Lang::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C126/3', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C126/3', 404, '' );
 		}
 		
 		$where = array(
-			array( 'lang_id=? AND (word_export=1 OR word_is_custom=1)', Request::i()->id ),
+			array( 'lang_id=? AND (word_export=1 OR word_is_custom=1)', \IPS\Request::i()->id ),
 		);
 		
-		$table = new \IPS\Helpers\Table\Db( 'core_sys_lang_words', Url::internal( 'app=core&module=languages&controller=languages&do=translate&id=' . Request::i()->id ), $where );
+		$table = new \IPS\Helpers\Table\Db( 'core_sys_lang_words', \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages&do=translate&id=' . \IPS\Request::i()->id ), $where );
 		$table->langPrefix = 'lang_';
 		$table->classes = array( 'cTranslateTable' );
 		$table->rowClasses = array( 'word_default' => array( 'ipsTable_wrap' ) );
 
-		$table->include = array( 'word_app', 'word_theme', 'word_key', 'word_default', 'word_custom' );
+		$table->include = array( 'word_app', 'word_plugin', 'word_theme', 'word_key', 'word_default', 'word_custom' );
 
 		$table->parsers = array(
 			'word_app' => function( $val, $row )
 			{
 				try
 				{
-					return Application::load( $row['word_app'] )->_title;
+					return \IPS\Application::load( $row['word_app'] )->_title;
 				}
-				catch ( OutOfRangeException | InvalidArgumentException | UnexpectedValueException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					return Theme::i()->getTemplate( 'global' )->shortMessage( Member::loggedIn()->language()->addToStack('translate_na'), array( 'ipsBadge', 'ipsBadge--neutral' ) );
+					return \IPS\Theme::i()->getTemplate( 'global' )->shortMessage( \IPS\Member::loggedIn()->language()->addToStack('translate_na'), array( 'ipsBadge', 'ipsBadge_neutral' ) );
+				}
+				catch ( \InvalidArgumentException $e )
+				{
+					return \IPS\Theme::i()->getTemplate( 'global' )->shortMessage( \IPS\Member::loggedIn()->language()->addToStack('translate_na'), array( 'ipsBadge', 'ipsBadge_neutral' ) );
+				}
+				catch ( \UnexpectedValueException $e )
+				{
+					return \IPS\Theme::i()->getTemplate( 'global' )->shortMessage( \IPS\Member::loggedIn()->language()->addToStack('translate_na'), array( 'ipsBadge', 'ipsBadge_neutral' ) );
+				}
+			},
+			'word_plugin' => function( $val, $row )
+			{
+				try
+				{
+					return \IPS\Plugin::load( $row['word_plugin'] )->name;
+				}
+				catch ( \OutOfRangeException $e )
+				{
+					return \IPS\Theme::i()->getTemplate( 'global' )->shortMessage( \IPS\Member::loggedIn()->language()->addToStack('translate_na'), array( 'ipsBadge', 'ipsBadge_neutral' ) );
 				}
 			},
 			'word_theme' => function( $val, $row )
 			{
 				try
 				{
-					return Theme::load( $row['word_theme'] )->_title;
+					return \IPS\Theme::load( $row['word_theme'] )->_title;
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					return Theme::i()->getTemplate( 'global' )->shortMessage( Member::loggedIn()->language()->addToStack('translate_na'), array( 'ipsBadge', 'ipsBadge--neutral' ) );
+					return \IPS\Theme::i()->getTemplate( 'global' )->shortMessage( \IPS\Member::loggedIn()->language()->addToStack('translate_na'), array( 'ipsBadge', 'ipsBadge_neutral' ) );
 				}
 			},
 			'word_default'	=> function( $val, $row )
 			{
-				return htmlspecialchars( $val, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8' );
+				return htmlspecialchars( $val, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', TRUE );
 			},
 			'word_custom'	=> function( $val, $row )
 			{
-				return Theme::i()->getTemplate( 'customization' )->langString( $val, $row['word_key'], $row['lang_id'], $row['word_js'] );
+				return \IPS\Theme::i()->getTemplate( 'customization' )->langString( $val, $row['word_key'], $row['lang_id'], $row['word_js'] );
 			},
 		);
 		
@@ -569,10 +548,11 @@ class languages extends Controller
 
 		$table->quickSearch = array( array( 'word_default', 'word_key' ), 'word_default' );
 		$table->advancedSearch = array(
-			'word_key'		=> SEARCH_CONTAINS_TEXT,
-			'word_default'	=> SEARCH_CONTAINS_TEXT,
-			'word_custom'	=> SEARCH_CONTAINS_TEXT,
-			'word_app'		=> array( SEARCH_NODE, array( 'class' => 'IPS\Application', 'subnodes' => FALSE ) ),
+			'word_key'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'word_default'	=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'word_custom'	=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'word_app'		=> array( \IPS\Helpers\Table\SEARCH_NODE, array( 'class' => 'IPS\Application', 'subnodes' => FALSE ) ),
+			'word_plugin'	=> array( \IPS\Helpers\Table\SEARCH_NODE, array( 'class' => 'IPS\Plugin', 'subnodes' => FALSE ) )
 		);
 		
 		$table->filters = array(
@@ -590,8 +570,8 @@ class languages extends Controller
 					'delete' => array(
 						'icon'		=> 'times',
 						'title'		=> 'delete',
-						'link'		=> Url::internal( "app=core&module=languages&controller=languages&do=deleteWord&key={$row['word_key']}&langId=" . Request::i()->id )->csrf(),
-						'data'		=> array( 'confirm' => '', 'confirmMessage' => Member::loggedIn()->language()->addToStack('delete_word_all_languages') )
+						'link'		=> \IPS\Http\Url::internal( "app=core&module=languages&controller=languages&do=deleteWord&key={$row['word_key']}&langId=" . \IPS\Request::i()->id )->csrf(),
+						'data'		=> array( 'confirm' => '', 'confirmMessage' => \IPS\Member::loggedIn()->language()->addToStack('delete_word_all_languages') )
 					)
 				);
 			}
@@ -601,12 +581,12 @@ class languages extends Controller
 			}
 		};
 		
-		Member::loggedIn()->language()->words['lang_word_custom'] = $lang->title;
+		\IPS\Member::loggedIn()->language()->words['lang_word_custom'] = $lang->title;
 		
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'customization/languages.css', 'core', 'admin' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_core.js' ) );
-		Output::i()->title = $lang->title;
-		Output::i()->output = (string) $table;
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'customization/languages.css', 'core', 'admin' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_core.js' ) );
+		\IPS\Output::i()->title = $lang->title;
+		\IPS\Output::i()->output = (string) $table;
 	}
 	
 	/**
@@ -614,22 +594,22 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function translateWord() : void
+	protected function translateWord()
 	{
 		try
 		{
-			$lang = Lang::load( Request::i()->lang );
+			$lang = \IPS\Lang::load( \IPS\Request::i()->lang );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C126/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C126/4', 404, '' );
 		}
 		
-		$word = Db::i()->select( '*', 'core_sys_lang_words', array( 'lang_id=? AND word_key=? AND word_js=?', Request::i()->lang, Request::i()->key, (int) Request::i()->js ) )->first();
+		$word = \IPS\Db::i()->select( '*', 'core_sys_lang_words', array( 'lang_id=? AND word_key=? AND word_js=?', \IPS\Request::i()->lang, \IPS\Request::i()->key, (int) \IPS\Request::i()->js ) )->first();
 		
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->addDummy( 'lang_word_default', htmlspecialchars( $word['word_default'],ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', FALSE ) );
-		$form->add( new Text( 'lang_word_custom', $word['word_custom'] ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'lang_word_custom', $word['word_custom'] ) );
 		
 		if ( $values = $form->values() )
 		{
@@ -638,45 +618,52 @@ class languages extends Controller
 			{
 				if ( $word['word_app'] )
 				{
-					$version = Application::load( $word['word_app'] )->long_version;
+					$version = \IPS\Application::load( $word['word_app'] )->long_version;
+				}
+				elseif ( $word['word_plugin'] )
+				{
+					$version = \IPS\Plugin::load( $word['word_plugin'] )->version_long;
 				}
 				elseif ( $word['word_theme'] )
 				{
-					$version = Theme::load( $word['word_theme'] )->long_version;
+					$version = \IPS\Theme::load( $word['word_theme'] )->long_version;
 				}
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 			
-			Db::i()->update( 'core_sys_lang_words', array( 'word_custom' => ( $values['lang_word_custom'] ? urldecode( $values['lang_word_custom'] ) : NULL ), 'word_custom_version' => ( $values['lang_word_custom'] ? $version : NULL ) ), array( 'word_id=?', $word['word_id'] ) );
-			Session::i()->log( 'acplogs__lang_translate', array( $word['word_key'] => FALSE, $lang->title => FALSE ) );
+			\IPS\Db::i()->update( 'core_sys_lang_words', array( 'word_custom' => ( $values['lang_word_custom'] ? urldecode( $values['lang_word_custom'] ) : NULL ), 'word_custom_version' => ( $values['lang_word_custom'] ? $version : NULL ) ), array( 'word_id=?', $word['word_id'] ) );
+			\IPS\Session::i()->log( 'acplogs__lang_translate', array( $word['word_key'] => FALSE, $lang->title => FALSE ) );
 			
 			if ( $word['word_js'] )
 			{
-				Javascript::clearLanguage( $lang );
+				\IPS\Output::clearJsFiles( 'global', 'root', 'js_lang_' . $word['lang_id'] . '.js' );
 			}
 
 			if ( $word['word_key'] === '_list_format_' )
 			{
-				unset( Store::i()->listFormats );
+				unset( \IPS\Data\Store::i()->listFormats );
 			}
 			
-			if ( substr( $word['word_key'], 0, 10 ) === 'num_short_' )
+			if ( \substr( $word['word_key'], 0, 10 ) === 'num_short_' )
 			{
-				unset( Store::i()->shortFormats );
+				unset( \IPS\Data\Store::i()->shortFormats );
 			}
 
-			if ( Request::i()->isAjax() )
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->json( array() );
+				\IPS\Output::i()->json( array() );
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages&do=translate&id=' . $word['lang_id'] ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages&do=translate&id=' . $word['lang_id'] ) );
 			}
 		}
 		
-		Member::loggedIn()->language()->words['lang_word_custom'] = $lang->title;
-		Output::i()->output = $form;
+		\IPS\Member::loggedIn()->language()->words['lang_word_custom'] = $lang->title;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -684,34 +671,34 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function copy() : void
+	protected function copy()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		Output::i()->output = new MultipleRedirect(
-			Url::internal( "app=core&module=languages&controller=languages&do=copy&id=" . intval( Request::i()->id ) )->csrf(),
+		\IPS\Output::i()->output = new \IPS\Helpers\MultipleRedirect(
+			\IPS\Http\Url::internal( "app=core&module=languages&controller=languages&do=copy&id=" . \intval( \IPS\Request::i()->id ) )->csrf(),
 			function( $data )
 			{
-				if ( !is_array( $data ) )
+				if ( !\is_array( $data ) )
 				{
-					$lang = Db::i()->select( '*', 'core_sys_lang',  array( 'lang_id=?', Request::i()->id ) )->first();
+					$lang = \IPS\Db::i()->select( '*', 'core_sys_lang',  array( 'lang_id=?', \IPS\Request::i()->id ) )->first();
 					unset( $lang['lang_id'] );
 
-					$lang['lang_title'] = $lang['lang_title'] . ' ' . Member::loggedIn()->language()->get('copy_noun');
+					$lang['lang_title'] = $lang['lang_title'] . ' ' . \IPS\Member::loggedIn()->language()->get('copy_noun');
 					$lang['lang_default'] = FALSE;
 
-					$insertId = Db::i()->insert( 'core_sys_lang', $lang );
+					$insertId = \IPS\Db::i()->insert( 'core_sys_lang', $lang );
 					
-					Session::i()->log( 'acplog__node_copied', array( 'menu__core_languages_languages' => TRUE, $lang['lang_title'] => FALSE ) );
+					\IPS\Session::i()->log( 'acplog__node_copied', array( 'menu__core_languages_languages' => TRUE, $lang['lang_title'] => FALSE ) );
 					
-					$words = Db::i()->select( 'count(*)', 'core_sys_lang_words', array( 'lang_id=?', Request::i()->id ) )->first();
+					$words = \IPS\Db::i()->select( 'count(*)', 'core_sys_lang_words', array( 'lang_id=?', \IPS\Request::i()->id ) )->first();
 					
-					return array( array( 'id' => $insertId, 'done' => 0, 'total' => $words ), Member::loggedIn()->language()->addToStack('copying'), 1 );
+					return array( array( 'id' => $insertId, 'done' => 0, 'total' => $words ), \IPS\Member::loggedIn()->language()->addToStack('copying'), 1 );
 				}
 				else
 				{
-					$words = Db::i()->select(  '*', 'core_sys_lang_words', array( 'lang_id=?', Request::i()->id ), 'word_id', array( $data['done'], 100 ) );
-					if ( !count( $words  ) )
+					$words = \IPS\Db::i()->select(  '*', 'core_sys_lang_words', array( 'lang_id=?', \IPS\Request::i()->id ), 'word_id', array( $data['done'], 100 ) );
+					if ( !\count( $words  ) )
 					{
 						return NULL;
 					}
@@ -721,24 +708,27 @@ class languages extends Controller
 						{
 							unset( $row['word_id'] );
 							$row['lang_id'] = $data['id'];
-							Db::i()->replace( 'core_sys_lang_words', $row );
+							\IPS\Db::i()->replace( 'core_sys_lang_words', $row );
 						}
 					}
 					
 					
 					$data['done'] += 100;
-					return array( $data, Member::loggedIn()->language()->addToStack('copying'), ( 100 / $data['total'] * $data['done'] ) );
+					return array( $data, \IPS\Member::loggedIn()->language()->addToStack('copying'), ( 100 / $data['total'] * $data['done'] ) );
 				}
 			},
 			function()
 			{
-				unset( Store::i()->languages );
-				unset( Store::i()->listFormats );
+				unset( \IPS\Data\Store::i()->languages );
+				unset( \IPS\Data\Store::i()->listFormats );
 
 				/* Update the essential cookie name list */
-				unset( Store::i()->essentialCookieNames );
+				unset( \IPS\Data\Store::i()->essentialCookieNames );
 
-				Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages' ) );
+				/* Clear guest page caches */
+				\IPS\Data\Cache::i()->clearAll();
+
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages' ) );
 			}
 		);
 	}
@@ -748,27 +738,25 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function download() : void
+	protected function download()
 	{
 		/* Load language */
 		try
 		{
-			$lang = Lang::load( Request::i()->id );
+			$lang = \IPS\Lang::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C126/5', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C126/5', 404, '' );
 		}
 
-		$form = new Form( 'form', 'langauge_export_button' );
-		// This appears inside a dialog. The following instructs the dialog to handle the download via JS rather than using a native form download. This allows the dialog to close when done.
-		$form->attributes['data-form-is-download'] = '';
+		$form = new \IPS\Helpers\Form( 'form', 'langauge_export_button' );
 
-		$form->add( new Text( 'language_export_author_name', $lang->author_name, false ) );
-		$form->add( new FormUrl( 'language_export_author_url', $lang->author_url, false ) );
-		$form->add( new FormUrl( 'language_export_update_check', $lang->update_url, false ) );
-		$form->add( new Text( 'language_export_version', $lang->version, true, array( 'placeholder' => '1.0.0' ) ) );
-		$form->add( new Number( 'language_export_long_version', $lang->version_long ?: 10000, true ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'language_export_author_name', $lang->author_name, false ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'language_export_author_url', $lang->author_url, false ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'language_export_update_check', $lang->update_url, false ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'language_export_version', $lang->version, true, array( 'placeholder' => '1.0.0' ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'language_export_long_version', $lang->version_long ?: 10000, true ) );
 
 		if ( $values = $form->values() )
 		{
@@ -780,25 +768,19 @@ class languages extends Controller
 			$lang->save();
 
 			$count = 0;
-			$where = [
-				[ 'lang_id=?', $lang->id ],
-				[ '(word_export=? or word_is_custom=?)', 1, 1 ],
-				[ 'word_custom is not null' ]
-			];
-
 			try
 			{
-				$count = Db::i()->select( 'COUNT(word_id)', 'core_sys_lang_words', $where, 'word_id', NULL, 'word_id' )->first();
+				$count = \IPS\Db::i()->select( 'COUNT(word_id)', 'core_sys_lang_words', array( 'lang_id=? AND word_export=1 AND word_custom IS NOT NULL', $lang->id ), 'word_id', NULL, 'word_id' )->first();
 			}
-			catch ( UnderflowException $e ) {}
+			catch ( \UnderflowException $e ) {}
 
 			if ( $count < 1 )
 			{
-				Output::i()->error( 'core_lang_download_empty', '1C126/7', 404, '' );
+				\IPS\Output::i()->error( 'core_lang_download_empty', '1C126/7', 404, '' );
 			}
 
 			/* Init */
-			$xml = new XMLWriter;
+			$xml = new \XMLWriter;
 			$xml->openMemory();
 			$xml->setIndent( TRUE );
 			$xml->startDocument( '1.0', 'UTF-8' );
@@ -831,7 +813,7 @@ class languages extends Controller
 			$xml->endAttribute();
 
 			/* Loop applications */
-			foreach ( Application::applications() as $app )
+			foreach ( \IPS\Application::applications() as $app )
 			{
 				/* Initiate the <app> tag */
 				$xml->startElement( 'app' );
@@ -847,9 +829,7 @@ class languages extends Controller
 				$xml->endAttribute();
 
 				/* Add words */
-				$appWhere = $where;
-				$appWhere[] = [ 'word_app=?', $app->directory ];
-				foreach ( Db::i()->select( '*', 'core_sys_lang_words', $appWhere, 'word_id' ) as $row )
+				foreach ( \IPS\Db::i()->select( '*', 'core_sys_lang_words', array( 'lang_id=? AND word_app=? AND word_export=1 AND word_custom IS NOT NULL', $lang->id, $app->directory ), 'word_id' ) as $row )
 				{
 					/* Start */
 					$xml->startElement( 'word' );
@@ -884,21 +864,11 @@ class languages extends Controller
 
 			/* Finish */
 			$xml->endDocument();
-			$filename = $lang->title . " {$lang->version}.xml";
-			Output::i()->sendOutput(
-				$xml->outputMemory(),
-				200,
-				'application/xml',
-				array(
-					'Content-Disposition' => Output::getContentDisposition( 'attachment', $filename ) ),
-				FALSE,
-				FALSE,
-				FALSE
-			);
+			\IPS\Output::i()->sendOutput( $xml->outputMemory(), 200, 'application/xml', array( 'Content-Disposition' => \IPS\Output::getContentDisposition( 'attachment', $lang->title . " {$lang->version}.xml" ) ), FALSE, FALSE, FALSE );
 		}
 
 		/* Display */
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( Member::loggedIn()->language()->addToStack('language_export_title', FALSE, array( 'sprintf' => array( $lang->title ) ) ), $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( \IPS\Member::loggedIn()->language()->addToStack('language_export_title', FALSE, array( 'sprintf' => array( $lang->title ) ) ), $form, FALSE );
 	}
 	
 	/**
@@ -906,27 +876,27 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	public function uploadNewVersion() : void
+	public function uploadNewVersion()
 	{
-		Dispatcher::i()->checkAcpPermission( 'lang_words' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'lang_words' );
 
-		$language = Lang::load( Request::i()->id );
+		$language = \IPS\Lang::load( \IPS\Request::i()->id );
 		
-		$form = new Form;
-		$form->add( new Upload( 'lang_upload', NULL, TRUE, array( 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ) ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Upload( 'lang_upload', NULL, TRUE, array( 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ) ) );
 		
 		/* Handle submissions */
 		if ( $values = $form->values() )
 		{
 			/* Move it to a temporary location */
-			$tempFile = tempnam( TEMP_DIRECTORY, 'IPS' );
+			$tempFile = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
 			move_uploaded_file( $values['lang_upload'], $tempFile );
 								
 			/* Initate a redirector */
-			Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages&do=import' )->setQueryString( array( 'file' => $tempFile, 'key' => md5_file( $tempFile ), 'into' => Request::i()->id ) )->csrf() );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages&do=import' )->setQueryString( array( 'file' => $tempFile, 'key' => md5_file( $tempFile ), 'into' => \IPS\Request::i()->id ) )->csrf() );
 		}
 		
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -934,38 +904,38 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	public function import() : void
+	public function import()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		if ( !file_exists( Request::i()->file ) or md5_file( Request::i()->file ) !== Request::i()->key )
+		if ( !file_exists( \IPS\Request::i()->file ) or md5_file( \IPS\Request::i()->file ) !== \IPS\Request::i()->key )
 		{
-			Output::i()->error( 'generic_error', '3C126/6', 500, '' );
+			\IPS\Output::i()->error( 'generic_error', '3C126/6', 500, '' );
 		}
 		
-		$url = Url::internal( 'app=core&module=languages&controller=languages&do=import' )->setQueryString( array( 'file' => Request::i()->file, 'key' => Request::i()->key, 'locale' => Request::i()->locale ) )->csrf();
-		if ( isset( Request::i()->into ) )
+		$url = \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages&do=import' )->setQueryString( array( 'file' => \IPS\Request::i()->file, 'key' => \IPS\Request::i()->key, 'locale' => \IPS\Request::i()->locale ) )->csrf();
+		if ( isset( \IPS\Request::i()->into ) )
 		{
-			$url = $url->setQueryString( 'into', Request::i()->into );
+			$url = $url->setQueryString( 'into', \IPS\Request::i()->into );
 		}
 		
-		Output::i()->output = new MultipleRedirect(
+		\IPS\Output::i()->output = new \IPS\Helpers\MultipleRedirect(
 			$url,
 			function( $data )
 			{
 				/* Open XML file */
-				$xml = XMLReader::safeOpen( Request::i()->file );
+				$xml = \IPS\Xml\XMLReader::safeOpen( \IPS\Request::i()->file );
 				$xml->read();
 				
 				/* If this is the first batch, create the language record */
-				if ( !is_array( $data ) )
+				if ( !\is_array( $data ) )
 				{
 					/* Create the record */
-					if ( isset( Request::i()->into ) )
+					if ( isset( \IPS\Request::i()->into ) )
 					{
-						$insertId = Request::i()->into;
+						$insertId = \IPS\Request::i()->into;
 
-						Db::i()->update( 'core_sys_lang', array(
+						\IPS\Db::i()->update( 'core_sys_lang', array(
 							'lang_title'		=> $xml->getAttribute('name'),
 							'lang_isrtl'		=> $xml->getAttribute('rtl'),
 							'lang_version'		=> $xml->getAttribute('version'),
@@ -981,12 +951,12 @@ class languages extends Controller
 						/* Add "UTF8" if we can */
 						$currentLocale = setlocale( LC_ALL, '0' );
 
-						foreach ( array( Request::i()->locale . ".UTF-8", Request::i()->locale . ".UTF8" ) as $l )
+						foreach ( array( \IPS\Request::i()->locale . ".UTF-8", \IPS\Request::i()->locale . ".UTF8" ) as $l )
 						{
 							$test = setlocale( LC_ALL, $l );
 							if ( $test !== FALSE )
 							{
-								Request::i()->locale = $l;
+								\IPS\Request::i()->locale = $l;
 								break;
 							}
 						}
@@ -994,16 +964,16 @@ class languages extends Controller
 						foreach( explode( ";", $currentLocale ) as $locale )
 						{
 							$parts = explode( "=", $locale );
-							if( in_array( $parts[0], array( 'LC_ALL', 'LC_COLLATE', 'LC_CTYPE', 'LC_MONETARY', 'LC_NUMERIC', 'LC_TIME' ) ) )
+							if( \in_array( $parts[0], array( 'LC_ALL', 'LC_COLLATE', 'LC_CTYPE', 'LC_MONETARY', 'LC_NUMERIC', 'LC_TIME' ) ) )
 							{
-								setlocale( constant( $parts[0] ), $parts[1] );
+								setlocale( \constant( $parts[0] ), $parts[1] );
 							}
 						}
 
 						/* Insert the language pack record */
-						$max = Db::i()->select( 'MAX(lang_order)', 'core_sys_lang' )->first();
-						$insertId = Db::i()->insert( 'core_sys_lang', array(
-							'lang_short'		=> Request::i()->locale,
+						$max = \IPS\Db::i()->select( 'MAX(lang_order)', 'core_sys_lang' )->first();
+						$insertId = \IPS\Db::i()->insert( 'core_sys_lang', array(
+							'lang_short'		=> \IPS\Request::i()->locale,
 							'lang_title'		=> $xml->getAttribute('name'),
 							'lang_isrtl'		=> $xml->getAttribute('rtl'),
 							'lang_order'		=> $max + 1,
@@ -1011,29 +981,29 @@ class languages extends Controller
 							'lang_version_long'	=> $xml->getAttribute('long_version'),
 							'lang_author_name'	=> $xml->getAttribute('author_name'),
 							'lang_author_url'	=> $xml->getAttribute('author_url'),
-							'lang_update_url'	=> $xml->getAttribute('update_check'),
+							'lang_update_url'	=> $xml->getAttribute('update_check')
 						) );
 					
 						/* Copy over default language strings */
-						$default = Lang::defaultLanguage();
-						$prefix = Db::i()->prefix;
-						$defaultStmt = Db::i()->prepare( "INSERT INTO `{$prefix}core_sys_lang_words` ( `lang_id`, `word_app`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export` ) SELECT {$insertId} AS `lang_id`, `word_app`, `word_key`, `word_default`, NULL AS `word_custom`, `word_default_version`, NULL AS `word_custom_version`, `word_js`, `word_export` FROM `{$prefix}core_sys_lang_words` WHERE `lang_id`={$default} AND `word_export`=1" );
+						$default = \IPS\Lang::defaultLanguage();
+						$prefix = \IPS\Db::i()->prefix;
+						$defaultStmt = \IPS\Db::i()->prepare( "INSERT INTO `{$prefix}core_sys_lang_words` ( `lang_id`, `word_app`, `word_plugin`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export` ) SELECT {$insertId} AS `lang_id`, `word_app`, `word_plugin`, `word_key`, `word_default`, NULL AS `word_custom`, `word_default_version`, NULL AS `word_custom_version`, `word_js`, `word_export` FROM `{$prefix}core_sys_lang_words` WHERE `lang_id`={$default} AND `word_export`=1" );
 						$defaultStmt->execute();
-						$customStmt = Db::i()->prepare( "INSERT INTO `{$prefix}core_sys_lang_words` ( `lang_id`, `word_app`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export` ) SELECT {$insertId} AS `lang_id`, `word_app`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export` FROM `{$prefix}core_sys_lang_words` WHERE `lang_id`={$default} AND `word_export`=0" );
+						$customStmt = \IPS\Db::i()->prepare( "INSERT INTO `{$prefix}core_sys_lang_words` ( `lang_id`, `word_app`, `word_plugin`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export` ) SELECT {$insertId} AS `lang_id`, `word_app`, `word_plugin`, `word_key`, `word_default`, `word_custom`, `word_default_version`, `word_custom_version`, `word_js`, `word_export` FROM `{$prefix}core_sys_lang_words` WHERE `lang_id`={$default} AND `word_export`=0" );
 						$customStmt->execute();
 					}
 					
 					/* Log */
-					Session::i()->log( 'acplogs__lang_created', array( $xml->getAttribute('name') => FALSE ) );
+					\IPS\Session::i()->log( 'acplogs__lang_created', array( $xml->getAttribute('name') => FALSE ) );
 					
 					/* Start importing */
 					$data = array( 'apps' => array(), 'id' => $insertId );
-					return array( $data, Member::loggedIn()->language()->get('processing') );
+					return array( $data, \IPS\Member::loggedIn()->language()->get('processing') );
 				}
 
 				/* Only import language strings from applications we have installed */
 				$applications = array();
-				foreach( Application::applications() as $app )
+				foreach( \IPS\Application::applications() as $app )
 				{
 					$applications[$app->directory] = $app->long_version;
 				}
@@ -1054,7 +1024,7 @@ class languages extends Controller
 						$xml->read();
 						while ( $xml->read() and $xml->name == 'word' )
 						{
-							Db::i()->insert( 'core_sys_lang_words', array(
+							\IPS\Db::i()->insert( 'core_sys_lang_words', array(
 								'word_app'				=> $appKey,
 								'word_key'				=> $xml->getAttribute('key'),
 								'lang_id'				=> $data['id'],
@@ -1068,7 +1038,7 @@ class languages extends Controller
 						
 						/* Done */
 						$data['apps'][ $appKey ] = TRUE;
-						return array( $data, Member::loggedIn()->language()->get('processing') );
+						return array( $data, \IPS\Member::loggedIn()->language()->get('processing') );
 					}
 					else
 					{
@@ -1082,14 +1052,22 @@ class languages extends Controller
 			function()
 			{
 				/* Clear language caches, including update counter */
-				unset( Store::i()->languages, Store::i()->listFormats, Store::i()->updatecount_languages );
+				unset( \IPS\Data\Store::i()->languages, \IPS\Data\Store::i()->listFormats, \IPS\Data\Store::i()->updatecount_languages );
+
+				/* Clear guest page caches */
+				\IPS\Data\Cache::i()->clearAll();
 
 				/* Update the essential cookie name list */
-				unset( Store::i()->essentialCookieNames );
+				unset( \IPS\Data\Store::i()->essentialCookieNames );
 
-				@unlink( Request::i()->file );
-				
-				Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages' ) );
+				@unlink( \IPS\Request::i()->file );
+
+				if ( isset( \IPS\Request::i()->into ) )
+				{
+					\IPS\Lang::load( (int) \IPS\Request::i()->into )->save();
+				}
+
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages' ) );
 			}
 		);
 	}
@@ -1099,31 +1077,32 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function devimport() : void
+	protected function devimport()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		Output::i()->output = new MultipleRedirect(
-			Url::internal( "app=core&module=languages&controller=languages&do=devimport&id=" . intval( Request::i()->id ) )->csrf(),
+		\IPS\Output::i()->output = new \IPS\Helpers\MultipleRedirect(
+			\IPS\Http\Url::internal( "app=core&module=languages&controller=languages&do=devimport&id=" . \intval( \IPS\Request::i()->id ) )->csrf(),
 			function ( $data )
 			{
-				if ( !is_array( $data ) )
+				if ( !\is_array( $data ) )
 				{
-					Db::i()->delete( 'core_sys_lang_words', array( 'lang_id=? AND word_export=1', Request::i()->id ) );
-					return array( array(), Member::loggedIn()->language()->addToStack('lang_dev_importing'), 1 );
+					\IPS\Db::i()->delete( 'core_sys_lang_words', array( 'lang_id=? AND word_export=1', \IPS\Request::i()->id ) );
+					return array( array(), \IPS\Member::loggedIn()->language()->addToStack('lang_dev_importing'), 1 );
 				}
 								
 				$done = FALSE;
-				foreach ( Application::applications() as $appKey => $app )
+				foreach ( \IPS\Application::applications() as $appKey => $app )
 				{
 					if ( !array_key_exists( $appKey, $data ) )
 					{
 						$words = array();
-						$lang = Lang::readLangFiles( $app->directory );
+						$lang = array();
+						require \IPS\ROOT_PATH . "/applications/{$app->directory}/dev/lang.php";
 						foreach ( $lang as $k => $v )
 						{
-							Db::i()->replace( 'core_sys_lang_words', array(
-								'lang_id'				=> Request::i()->id,
+							\IPS\Db::i()->replace( 'core_sys_lang_words', array(
+								'lang_id'				=> \IPS\Request::i()->id,
 								'word_app'				=> $app->directory,
 								'word_key'				=> $k,
 								'word_default'			=> $v,
@@ -1142,11 +1121,12 @@ class languages extends Controller
 					elseif ( $data[ $appKey ] === 0 )
 					{
 						$words = array();
-						$lang = Lang::readLangFiles( $app->directory, true );
+						$lang = array();
+						require \IPS\ROOT_PATH . "/applications/{$app->directory}/dev/jslang.php";
 						foreach ( $lang as $k => $v )
 						{
-							Db::i()->replace( 'core_sys_lang_words', array(
-								'lang_id'				=> Request::i()->id,
+							\IPS\Db::i()->replace( 'core_sys_lang_words', array(
+								'lang_id'				=> \IPS\Request::i()->id,
 								'word_app'				=> $app->directory,
 								'word_key'				=> $k,
 								'word_default'			=> $v,
@@ -1169,12 +1149,12 @@ class languages extends Controller
 					return NULL;
 				}
 				
-				return array( $data, Member::loggedIn()->language()->addToStack('lang_dev_importing'), ( 100 / ( count( Application::applications() ) * 2 ) * count( $data ) ) );
+				return array( $data, \IPS\Member::loggedIn()->language()->addToStack('lang_dev_importing'), ( 100 / ( \count( \IPS\Application::applications() ) * 2 ) * \count( $data ) ) );
 			},
 			function ()
 			{
-				unset( Store::i()->languages );
-				Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages' ), 'saved' );
+				unset( \IPS\Data\Store::i()->languages );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages' ), 'saved' );
 			}
 		);
 	}
@@ -1184,11 +1164,11 @@ class languages extends Controller
 	 *
 	 * @return	void
 	 */
-	public function setMembers() : void
+	public function setMembers()
 	{
-		$form = new Form;
-		$form->hiddenValues['id'] = Request::i()->id;
-		$form->add( new CheckboxSet( 'member_reset_where', '*', TRUE, array( 'options' => Group::groups( TRUE, FALSE ), 'multiple' => TRUE, 'parse' => 'normal', 'unlimited' => '*', 'unlimitedLang' => 'all', 'impliedUnlimited' => TRUE ) ) );
+		$form = new \IPS\Helpers\Form;
+		$form->hiddenvalues['id'] = \IPS\Request::i()->id;
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'member_reset_where', '*', TRUE, array( 'options' => \IPS\Member\Group::groups( TRUE, FALSE ), 'multiple' => TRUE, 'parse' => 'normal', 'unlimited' => '*', 'unlimitedLang' => 'all', 'impliedUnlimited' => TRUE ) ) );
 		
 		if ( $values = $form->values() )
 		{
@@ -1198,22 +1178,22 @@ class languages extends Controller
 			}
 			else
 			{
-				$where = Db::i()->in( 'member_group_id', $values['member_reset_where'] );
+				$where = \IPS\Db::i()->in( 'member_group_id', $values['member_reset_where'] );
 			}
 			
 			if ( $where )
 			{
-				Db::i()->update( 'core_members', array( 'language' => Request::i()->id ), $where );
+				\IPS\Db::i()->update( 'core_members', array( 'language' => \IPS\Request::i()->id ), $where );
 			}
 			else
 			{
-				Member::updateAllMembers( array( 'language' => Request::i()->id ) );
+				\IPS\Member::updateAllMembers( array( 'language' => \IPS\Request::i()->id ) );
 			}
 			
-			Session::i()->log( 'acplogs__members_language_reset', array( Lang::load( Request::i()->id ?: Lang::defaultLanguage()  )->title  => FALSE ) );
-			Output::i()->redirect( Url::internal( 'app=core&module=languages&controller=languages' ), 'reset' );
+			\IPS\Session::i()->log( 'acplogs__members_language_reset', array( \IPS\Lang::load( \IPS\Request::i()->id ?: \IPS\Lang::defaultLanguage()  )->title  => FALSE ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=languages&controller=languages' ), 'reset' );
 		}
 
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 }

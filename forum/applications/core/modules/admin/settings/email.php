@@ -14,7 +14,7 @@ use IPS\core\AdminNotification;
 use IPS\DateTime;
 use IPS\Db;
 use IPS\Dispatcher;
-use IPS\Email as EmailClass;
+use IPS\Email;
 use IPS\File;
 use IPS\Helpers\Form;
 use IPS\Helpers\Form\Color;
@@ -25,7 +25,6 @@ use IPS\Helpers\Form\Text;
 use IPS\Helpers\Form\TextArea;
 use IPS\Helpers\Form\Upload;
 use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Table\Db as TableDb;
 use IPS\Http\Url;
 use IPS\Member;
 use IPS\Output;
@@ -34,7 +33,6 @@ use IPS\Session;
 use IPS\Settings;
 use IPS\Theme;
 use const IPS\DEMO_MODE;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
@@ -46,19 +44,19 @@ if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * email
  */
-class email extends \IPS\Dispatcher\Controller
+class _email extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		Dispatcher::i()->checkAcpPermission( 'email_manage' );
 		parent::execute();
@@ -69,7 +67,7 @@ class email extends \IPS\Dispatcher\Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Build the settings form */
 		$messageHtml = '';
@@ -81,18 +79,22 @@ class email extends \IPS\Dispatcher\Controller
 		$settingsForm->add( new Color( 'email_color', Settings::i()->email_color, TRUE ) );
 		$settingsForm->add( new Upload( 'email_logo', Settings::i()->email_logo ? File::get( 'core_Theme', Settings::i()->email_logo ) : NULL, FALSE, [ 'image' => TRUE, 'storageExtension' => 'core_Theme' ] ) );
 		$settingsForm->add( new YesNo( 'social_links_in_email', Settings::i()->social_links_in_email, FALSE, [], NULL, NULL, NULL, 'social_links_in_email' ) );
-		$settingsForm->add( new YesNo( 'our_picks_in_email', Settings::i()->our_picks_in_email, FALSE, array(), NULL, NULL, NULL, 'our_picks_in_email' ) );
+
+		if ( Settings::i()->promote_community_enabled )
+		{
+			$settingsForm->add( new YesNo( 'our_picks_in_email', Settings::i()->our_picks_in_email, FALSE, [], NULL, NULL, NULL, 'our_picks_in_email' ) );
+		}
 		
-		$settingsForm->add( new YesNo( 'email_truncate', ( Settings::i()->email_truncate ), FALSE, array(), NULL, NULL, NULL, 'email_truncate' ) );
-		$settingsForm->add( new YesNo( 'email_log_do', ( Settings::i()->prune_log_emailstats != 0 ), FALSE, array( 'togglesOn' => array( 'prune_log_emailstats' ) ), NULL, NULL, NULL, 'email_log_do' ) );
-		$settingsForm->add( new Interval( 'prune_log_emailstats', Settings::i()->prune_log_emailstats ?: 60, FALSE, array( 'valueAs' => 'd', 'unlimited' => '-1', 'unlimitedLang' => 'never' ), NULL, NULL, NULL, 'prune_log_emailstats' ) );
+		$settingsForm->add( new YesNo( 'email_truncate', ( Settings::i()->email_truncate ), FALSE, [], NULL, NULL, NULL, 'email_truncate' ) );
+		$settingsForm->add( new YesNo( 'email_log_do', ( Settings::i()->prune_log_emailstats != 0 ), FALSE, [ 'togglesOn' => [ 'prune_log_emailstats' ] ], NULL, NULL, NULL, 'email_log_do' ) );
+		$settingsForm->add( new Interval( 'prune_log_emailstats', Settings::i()->prune_log_emailstats ?: 60, FALSE, [ 'valueAs' => 'd', 'unlimited' => '-1', 'unlimitedLang' => 'never' ], NULL, NULL, NULL, 'prune_log_emailstats' ) );
 		if ( !DEMO_MODE )
 		{
 			$settingsForm->addHeader( 'advanced_settings' );
-
+					
 			$method = Settings::i()->mail_method;
 			$disabled = [];
-
+	
 			if ( Settings::i()->sendgrid_api_key AND Settings::i()->sendgrid_use_for > 0  )
 			{
 				if ( Settings::i()->sendgrid_use_for == 2 )
@@ -104,7 +106,7 @@ class email extends \IPS\Dispatcher\Controller
 			{
 				$disabled[] = 'sendgrid';
 			}
-
+	
 			/* We previously renamed this to 'php' */
 			if( $method == 'mail' )
 			{
@@ -112,16 +114,16 @@ class email extends \IPS\Dispatcher\Controller
 			}
 
 			$debug = FALSE;
-			if( EmailClass::classToUse( EmailClass::TYPE_TRANSACTIONAL ) == 'IPS\\Email\\Outgoing\\Debug' )
+			if( Email::classToUse( Email::TYPE_TRANSACTIONAL ) == 'IPS\\Email\\Outgoing\\Debug' )
 			{
 				$debug = true;
 				$method = 'debug';
 			}
 
 			$mailOptions = $toggles = $fields = [];
-			foreach( EmailClass::outgoingHandlers() as $key => $handler )
+			foreach( Email::outgoingHandlers() as $key => $handler )
 			{
-				if( ! $handler::isUsable( EmailClass::TYPE_TRANSACTIONAL ) )
+				if( ! $handler::isUsable( Email::TYPE_TRANSACTIONAL ) )
 				{
 					continue;
 				}
@@ -176,7 +178,7 @@ class email extends \IPS\Dispatcher\Controller
 			unset( $values['email_log_do'] );
 
 			/* Allow individual handlers to save settings */
-			foreach( EmailClass::outgoingHandlers() as $key => $handler )
+			foreach( Email::outgoingHandlers() as $key => $handler )
 			{
 				$values = $handler::processSettings( $values );
 			}
@@ -191,8 +193,8 @@ class email extends \IPS\Dispatcher\Controller
 
 			if( $sendTestEmail )
 			{
-				$email = EmailClass::buildFromContent( Member::loggedIn()->language()->get('email_test_subject'), Member::loggedIn()->language()->addToStack('email_test_message'), Member::loggedIn()->language()->addToStack('email_test_message'), EmailClass::TYPE_BULK );
-
+				$email = Email::buildFromContent( Member::loggedIn()->language()->get('email_test_subject'), Member::loggedIn()->language()->addToStack('email_test_message'), Member::loggedIn()->language()->addToStack('email_test_message'), Email::TYPE_BULK );
+				
 				try
 				{
 					$email->_send( Member::loggedIn(), fromEmail: Settings::i()->email_out );
@@ -219,7 +221,7 @@ class email extends \IPS\Dispatcher\Controller
 				'link'		=> Url::internal( '#testForm' ),
 				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('email_test'), 'ipsDialog-content' => '#testForm' )
 			);
-
+			
 			$testForm = new Form( 'test_form' );
 			$testForm->add( new FormEmail( 'from', Settings::i()->email_out, TRUE ) );
 			$testForm->add( new FormEmail( 'to', Member::loggedIn()->email, TRUE ) );
@@ -229,9 +231,9 @@ class email extends \IPS\Dispatcher\Controller
 			{
 				try
 				{
-					$email = EmailClass::buildFromContent( $values['subject'], $values['message'], $values['message'], EmailClass::TYPE_BULK );
+					$email = Email::buildFromContent( $values['subject'], $values['message'], $values['message'], Email::TYPE_BULK );
 					$email->_send( $values['to'], fromEmail: $values['from'] );
-
+					
 					/* Sent successfully, remove notification */
 					AdminNotification::remove( 'core', 'ConfigurationError', 'failedMail' );
 					Db::i()->update( 'core_mail_error_logs', array( 'mlog_notification_sent' => TRUE ) );
@@ -251,7 +253,7 @@ class email extends \IPS\Dispatcher\Controller
 
 			$testFormHtml = Theme::i()->getTemplate( 'global' )->block( 'email_test', $testForm, FALSE, 'ipsJS_hide', 'testForm' );
 		}
-
+		
 		/* Add a button for logs */
 		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'email_errorlog' ) )
 		{
@@ -261,23 +263,23 @@ class email extends \IPS\Dispatcher\Controller
 				'link'		=> Url::internal( 'app=core&module=settings&controller=email&do=errorLog' ),
 			);
 		}
-
+		
 		/* Display */
 		Output::i()->title	= Member::loggedIn()->language()->addToStack('email_settings');
 		Output::i()->output	= $messageHtml;
 		Output::i()->output	.= Theme::i()->getTemplate( 'global' )->block( 'email_settings', $settingsForm );
 		Output::i()->output	.= $testFormHtml;
 	}
-
+	
 	/**
 	 * Error Log
 	 *
 	 * @return	void
 	 */
-	protected function errorLog() : void
+	protected function errorLog()
 	{
 		Dispatcher::i()->checkAcpPermission( 'email_errorlog' );
-
+		
 		/* Add a button for settings */
 		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'email_errorlog_prune' ) )
 		{
@@ -295,20 +297,20 @@ class email extends \IPS\Dispatcher\Controller
 		Output::i()->title		= Member::loggedIn()->language()->addToStack('emailerrorlogs');
 		Output::i()->output	= (string) static::emailErrorLogTable( Url::internal( 'app=core&module=settings&controller=email&do=errorLog' ) );
 	}
-
+	
 	/**
 	 * Get email error log table
 	 *
 	 * @param	Url	$url	Base URL for table
 	 * @param 	array			$where	Where Array
-	 * @return    TableDb
+	 * @return	\IPS\Helpers\Table\Db
 	 */
-	public static function emailErrorLogTable( Url $url, array $where=array() ): TableDb
+	public static function emailErrorLogTable( Url $url, array $where=array() ): \IPS\Helpers\Table\Db
 	{
 		/* Create the table */
-		$table = new TableDb( 'core_mail_error_logs', $url, $where );
+		$table = new \IPS\Helpers\Table\Db( 'core_mail_error_logs', $url, $where );
 		$table->langPrefix = 'emailerrorlogs_';
-
+		
 		/* Columns we need */
 		$table->include	= array( 'mlog_to', 'mlog_subject', 'mlog_date', 'mlog_msg' );
 		$table->rowClasses = array( 'mlog_subject' => array( 'ipsTable_wrap' ), 'mlog_msg' => array( 'ipsTable_wrap' ) );
@@ -316,17 +318,17 @@ class email extends \IPS\Dispatcher\Controller
 		$table->sortBy	= $table->sortBy ?: 'mlog_date';
 		$table->sortDirection	= $table->sortDirection ?: 'DESC';
 		$table->noSort	= array( 'mlog_msg' );
-
+		
 		/* Search */
 		$table->quickSearch = 'mlog_to';
 		$table->advancedSearch = array(
-			'mlog_to'			=> SEARCH_CONTAINS_TEXT,
-			'mlog_from'			=> SEARCH_CONTAINS_TEXT,
-			'mlog_subject'		=> SEARCH_CONTAINS_TEXT,
-			'mlog_msg'			=> SEARCH_CONTAINS_TEXT,
-			'mlog_content'		=> SEARCH_CONTAINS_TEXT,
+				'mlog_to'			=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+				'mlog_from'			=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+				'mlog_subject'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+				'mlog_msg'			=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+				'mlog_content'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
 		);
-
+		
 		/* Custom parsers */
 		$table->parsers = array(
 			'mlog_date'				=> function( $val, $row )
@@ -346,7 +348,7 @@ class email extends \IPS\Dispatcher\Controller
 						/* We may not have a 'message' key if this is an older SendGrid log entry */
 						if( isset( $data['message'] ) )
 						{
-							$val = \is_string( $data['message'] ) ?
+							$val = \is_string( $data['message'] ) ? 
 								( ( isset( $data['details'] ) AND $data['details'] ) ? Member::loggedIn()->language()->addToStack( $data['message'], FALSE, array( 'sprintf' => $data['details'] ) ) : Member::loggedIn()->language()->addToStack( $data['message'] ) ) :
 								$val;
 						}
@@ -382,7 +384,7 @@ class email extends \IPS\Dispatcher\Controller
 
 			return $return;
 		};
-
+		
 		/* Return */
 		return $table;
 	}
@@ -392,15 +394,15 @@ class email extends \IPS\Dispatcher\Controller
 	 *
 	 * @return void
 	 */
-	public function errorLogResend() : void
+	public function errorLogResend()
 	{
 		Dispatcher::i()->checkAcpPermission( 'email_errorlog' );
 		Session::i()->csrfCheck();
-
+		
 		$id			= (int) Request::i()->id;
 		$log		= Db::i()->select( '*', 'core_mail_error_logs', array( 'mlog_id=?', $id ) )->first();
 		$emailData	= json_decode( $log['mlog_resend_data'], true );
-
+		
 		try
 		{
 			$fromName = NULL;
@@ -413,8 +415,8 @@ class email extends \IPS\Dispatcher\Controller
 			unset( $emailData['headers']['MIME-Version'] );
 			unset( $emailData['headers']['Content-Type'] );
 			unset( $emailData['headers']['Content-Transfer-Encoding'] );
-
-			$email = EmailClass::buildFromContent( $log['mlog_subject'], $emailData['body']['html'], $emailData['body']['plain'], isset( $emailData['type'] ) ? $emailData['type'] : EmailClass::TYPE_TRANSACTIONAL );
+			
+			$email = Email::buildFromContent( $log['mlog_subject'], $emailData['body']['html'], $emailData['body']['plain'], isset( $emailData['type'] ) ? $emailData['type'] : Email::TYPE_TRANSACTIONAL );
 			$email->_send(
 				array_map( 'trim', explode( ',', $log['mlog_to'] ) ),
 				isset( $emailData['headers']['Cc'] ) ? array_map( 'trim', explode( ',', $emailData['headers']['Cc'] ) ) : array(),
@@ -432,7 +434,7 @@ class email extends \IPS\Dispatcher\Controller
 		Db::i()->delete( 'core_mail_error_logs', array( 'mlog_id=?', $id ) );
 
 		/* Remove notification since this was re-sent with success and it is below the recent threshold */
-		if( EmailClass::countFailedMail( DateTime::create()->sub( new \DateInterval( 'P3D' ) ), FALSE, TRUE ) <= 3 )
+		if( Email::countFailedMail( DateTime::create()->sub( new \DateInterval( 'P3D' ) ), FALSE, TRUE ) <= 3 )
 		{
 			AdminNotification::remove( 'core', 'ConfigurationError', 'failedMail' );
 			Db::i()->update( 'core_mail_error_logs', array( 'mlog_notification_sent' => TRUE ), array( 'mlog_id=?', $id ) );
@@ -446,10 +448,10 @@ class email extends \IPS\Dispatcher\Controller
 	 *
 	 * @return void
 	 */
-	public function errorLogView() : void
+	public function errorLogView()
 	{
 		Dispatcher::i()->checkAcpPermission( 'email_errorlog' );
-
+		
 		$id		= (int) Request::i()->id;
 		$log	= Db::i()->select( '*', 'core_mail_error_logs', array( 'mlog_id=?', $id ) )->first();
 
@@ -461,20 +463,20 @@ class email extends \IPS\Dispatcher\Controller
 	 *
 	 * @return	void
 	 */
-	protected function errorLogSettings() : void
+	protected function errorLogSettings()
 	{
 		Dispatcher::i()->checkAcpPermission( 'email_errorlog_prune' );
-
+		
 		$form = new Form;
 		$form->add( new Interval( 'prune_log_email_error', Settings::i()->prune_log_email_error, FALSE, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL, 'prune_log_email_error' ) );
-
+		
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings();
 			Session::i()->log( 'acplog__emailerrorlog_settings' );
 			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=email&do=errorLog' ), 'saved' );
 		}
-
+		
 		Output::i()->title		= Member::loggedIn()->language()->addToStack('emailerrorlogssettings');
 		Output::i()->output 	= Theme::i()->getTemplate('global')->block( 'emailerrorlogssettings', $form, FALSE );
 	}

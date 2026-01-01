@@ -10,29 +10,26 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use GraphQL\Type\Definition\ListOfType;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\LoginType;
-use IPS\Login;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Login handler query for GraphQL API
  */
-class LoginHandlers
+class _LoginHandlers
 {
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Return login handler data";
+	public static $description = "Return login handler data";
 
 	/*
 	 * Query arguments
@@ -46,10 +43,8 @@ class LoginHandlers
 
 	/**
 	 * Return the query return type
-	 *
-	 * @return ListOfType<LoginType>
 	 */
-	public function type() : ListOfType
+	public function type()
 	{
 		return TypeRegistry::listOf( \IPS\core\api\GraphQL\TypeRegistry::login() );
 	}
@@ -57,13 +52,14 @@ class LoginHandlers
 	/**
 	 * Resolves this query
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @return	array
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\Member|null
 	 */
-	public function resolve( mixed $val, array $args ) : array
+	public function resolve($val, $args)
 	{
-		$login = new Login;
+		$login = new \IPS\Login;
 		return $login->buttonMethods();
 	}
 }

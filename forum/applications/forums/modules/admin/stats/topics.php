@@ -11,9 +11,6 @@
 
 namespace IPS\forums\modules\admin\stats;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
 use IPS\Dispatcher;
 use IPS\Dispatcher\Controller;
 use IPS\Db;
@@ -35,47 +32,48 @@ use const IPS\Helpers\Table\SEARCH_NODE;
 use const IPS\Helpers\Table\SEARCH_MEMBER;
 use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
 
+/* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * topics
  */
-class topics extends Controller
+class _topics extends Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * Manage
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		Dispatcher::i()->checkAcpPermission( 'topics_manage' );
 
 		$tabs = array( 'total' => 'stats_topics_tab_total' );
 
-		if( Db::i()->select( 'COUNT(*)', 'forums_forums', array( 'topics>?', 0 ) )->first() )
-		{
-			$tabs['byforum'] = 'stats_topics_tab_byforum';
-		}
-
-		if ( Db::i()->select( 'COUNT(*)', 'forums_topics', static::_noPostsWhere() )->first() )
-		{
-			$tabs['noposts'] = 'stats_topics_tab_noposts';
-		}
+        if( Db::i()->select( 'COUNT(*)', 'forums_forums', array( 'topics>?', 0 ) )->first() )
+        {
+            $tabs['byforum'] = 'stats_topics_tab_byforum';
+        }
+        
+        if ( Db::i()->select( 'COUNT(*)', 'forums_topics', static::_noPostsWhere() )->first() )
+        {
+	        $tabs['noposts'] = 'stats_topics_tab_noposts';
+        }
 
 		Request::i()->tab ??= 'total';
 		$activeTab	= ( array_key_exists( Request::i()->tab, $tabs ) ) ? Request::i()->tab : 'total';
@@ -91,26 +89,26 @@ class topics extends Controller
 			Output::i()->output = (string) $output;
 		}
 		else
-		{
+		{	
 			Output::i()->title = Member::loggedIn()->language()->addToStack('menu__forums_stats_topics');
 			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string) $output, Url::internal( "app=forums&module=stats&controller=topics" ) );
 		}
 	}
-
+	
 	/**
 	 * Topics with No Posts Table
 	 *
-	 * @return	TableDb
+	 * @return	\IPS\Helpers\Table\Db
 	 */
 	protected function _noPostsTable(): TableDb
 	{
 		/* Load Forums into Memory */
 		Forum::loadIntoMemory( NULL );
-
+		
 		$table							= new TableDb( 'forums_topics', Url::internal( "app=forums&module=stats&controller=topics&tab=noposts" ), static::_noPostsWhere() );
 		$table->langPrefix				= 'topics_noposts_';
 		$table->include					= array( 'tid', 'title', 'state', 'start_date', 'starter_id', 'views', 'forum_id', 'approved' );
-
+		
 		$table->parsers = array(
 			'title'			=> function( $val, $row )
 			{
@@ -127,7 +125,7 @@ class topics extends Controller
 			},
 			'start_date'	=> function( $val )
 			{
-				return (string) DateTime::ts( $val );
+				return (string) \IPS\DateTime::ts( $val );
 			},
 			'starter_id'	=> function( $val, $row )
 			{
@@ -149,7 +147,7 @@ class topics extends Controller
 						{
 							$guest->name = $row['starter_name'];
 						}
-
+						
 						return $guest->name;
 					}
 				}
@@ -169,7 +167,7 @@ class topics extends Controller
 				{
 					$title = $forum->_title;
 				}
-
+				
 				return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $forum->url(), TRUE, $title );
 			},
 			'approved'		=> function( $val )
@@ -184,21 +182,21 @@ class topics extends Controller
 				}
 			}
 		);
-
+		
 		$table->filters = array(
 			'open'			=> "state='open'",
 			'locked'		=> "state='closed'",
 			'approved'		=> "approved=1",
 			'unapproved'	=> "approved=0"
 		);
-
+		
 		$table->advancedSearch['forum_id']		= array( SEARCH_NODE, array( 'class' => 'IPS\\forums\\Forum', 'clubs' => TRUE ) );
 		$table->advancedSearch['starter_id']	= SEARCH_MEMBER;
 		$table->advancedSearch['start_date']	= SEARCH_DATE_RANGE;
-
+		
 		return $table;
 	}
-
+	
 	/**
 	 * Get No Posts Where Clause
 	 *
@@ -213,7 +211,7 @@ class topics extends Controller
 		$where[] = array( Db::i()->in( 'approved', array( 0, 1 ) ) );
 		$where[] = array( Db::i()->in( 'forum_id', Db::i()->select( 'id', 'forums_forums' ) ) );
 		$where[] = array( Db::i()->in( 'state', array( 'link', 'merged' ), TRUE ) );
-
+		
 		return $where;
 	}
 }

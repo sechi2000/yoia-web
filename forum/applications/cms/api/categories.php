@@ -12,34 +12,21 @@
 namespace IPS\cms\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\cms\Categories as CategoriesClass;
-use IPS\cms\Databases;
-use IPS\Node\Api\NodeController;
-use OutOfRangeException;
-use RuntimeException;
-use function count;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Pages Databases API
  */
-class categories extends NodeController
+class _categories extends \IPS\Node\Api\NodeController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = '';
+	protected $class;
 	
 	/**
 	 * Get endpoint data
@@ -47,25 +34,25 @@ class categories extends NodeController
 	 * @param	array	$pathBits	The parts to the path called
 	 * @param	string	$method		HTTP method verb
 	 * @return	array
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	protected function _getEndpoint( array $pathBits, string $method = 'GET' ): array
+	protected function _getEndpoint( $pathBits, $method = 'GET' )
 	{
-		if ( !count( $pathBits ) )
+		if ( !\count( $pathBits ) )
 		{
-			throw new RuntimeException;
+			throw new \RuntimeException;
 		}
 		
 		$database = array_shift( $pathBits );
-		if ( !count( $pathBits ) )
+		if ( !\count( $pathBits ) )
 		{
 			return array( 'endpoint' => 'index', 'params' => array( $database ) );
 		}
 		
 		$nextBit = array_shift( $pathBits );
-		if ( intval( $nextBit ) != 0 )
+		if ( \intval( $nextBit ) != 0 )
 		{
-			if ( count( $pathBits ) )
+			if ( \count( $pathBits ) )
 			{
 				return array( 'endpoint' => 'item_' . array_shift( $pathBits ), 'params' => array( $database, $nextBit ) );
 			}
@@ -75,7 +62,7 @@ class categories extends NodeController
 			}
 		}
 				
-		throw new RuntimeException;
+		throw new \RuntimeException;
 	}
 
 	/**
@@ -83,30 +70,29 @@ class categories extends NodeController
 	 * Get list of database categories
 	 *
 	 * @param		int		$database			Database ID
-	 * @apireturn		PaginatedResponse<IPS\cms\Categories>
-	 * @return PaginatedResponse<CategoriesClass>
-	 *@throws		2T306/2	DATABASE_DOES_NOT_USE_CATEGORIES		The database does not use categories
+	 * @return		\IPS\Api\PaginatedResponse<IPS\cms\Categories>
 	 * @throws		2T306/1	INVALID_DATABASE							The database ID does not exist or the authorized user does not have permission to view it
+	 * @throws		2T306/2	DATABASE_DOES_NOT_USE_CATEGORIES		The database does not use categories
 	 */
-	public function GETindex( int $database ): PaginatedResponse
+	public function GETindex( $database )
 	{
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			if ( $this->member and !$database->can( 'view', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}	
 			$this->class = 'IPS\cms\Categories' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '2T415/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '2T415/1', 404 );
 		}	
 		if ( !$database->use_categories )
 		{
-			throw new Exception( 'DATABASE_DOES_NOT_USE_CATEGORIES', '2T415/2', 404 );
+			throw new \IPS\Api\Exception( 'DATABASE_DOES_NOT_USE_CATEGORIES', '2T415/2', 404 );
 		}
 		
 		/* Where clause */
@@ -120,28 +106,26 @@ class categories extends NodeController
 	 * GET /cms/databases/{database_id}/{category_id}
 	 * Get specific database
 	 *
-	 * @param int $database
 	 * @param		int		$id			ID Number
-	 * @apireturn		\IPS\cms\Categories
+	 * @return		\IPS\cms\Categories
 	 * @throws		2T306/3	INVALID_DATABASE		The database ID does not exist or the authorized user does not have permission to view it
 	 * @throws		2T306/4	INVALID_ID			The category ID does not exist or the authorized user does not have permission to view it
-	 * @return Response
 	 */
-	public function GETitem( int $database, int $id ): Response
+	public function GETitem( $database, $id )
 	{
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			if ( $this->member and !$database->can( 'view', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}	
 			$this->class = 'IPS\cms\Categories' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '2T415/3', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '2T415/3', 404 );
 		}	
 		
 		/* Return */
@@ -149,9 +133,9 @@ class categories extends NodeController
 		{
 			return $this->_view( $id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2T415/4', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2T415/4', 404 );
 		}
 	}
 }

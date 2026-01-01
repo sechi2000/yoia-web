@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Front Session Handler
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -12,58 +11,23 @@
 namespace IPS\Session;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\Api\OAuthClient;
-use IPS\Application;
-use IPS\Application\Module;
-use IPS\Data\Store;
-use IPS\Extensions\SSOAbstract;
-use IPS\Platform\Bridge;
-use IPS\core\ShareLinks\Service;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Http\Useragent;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Device;
-use IPS\Request;
-use IPS\Session;
-use IPS\Session\Store as SessionStore;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_string;
-use const IPS\CACHE_PAGE_TIMEOUT;
-use const IPS\OAUTH_REQUIRES_HTTPS;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Session Handler
  */
-class Front extends Session
+class _Front extends \IPS\Session
 {
 	const LOGIN_TYPE_MEMBER = 0;
 	const LOGIN_TYPE_ANONYMOUS = 1;
 	const LOGIN_TYPE_GUEST = 2;
 	const LOGIN_TYPE_SPIDER = 3;
 	const LOGIN_TYPE_INCOMPLETE = 4;
-
-	protected string $sessionId;
-	protected bool|null|array $sessionData;
-
+	
 	/**
 	 * Guess if the user is logged in
 	 *
@@ -75,21 +39,16 @@ class Front extends Session
 	 *
 	 * @return	bool
 	 */
-	public static function loggedIn(): bool
+	public static function loggedIn()
 	{
 		/* If we have a "member_id" cookie, we're probably logged in... */
-		if ( isset( Request::i()->cookie['member_id'] ) and Request::i()->cookie['member_id'] )
+		if ( isset( \IPS\Request::i()->cookie['member_id'] ) and \IPS\Request::i()->cookie['member_id'] )
 		{
 			return TRUE;
 		}
 		
 		/* If the request sent an access token which has GraphQL acceess we'll need to check that */
-		if ( isset( $_SERVER['HTTP_X_IPS_ACCESSTOKENMEMBER'] ) or isset( Request::i()->access_token_member ) )
-		{
-			return TRUE;
-		}
-
-		if ( ( $member = Bridge::i()->liveTopicDevPreviewMember() ) AND $member instanceof Member AND $member->member_id )
+		if ( isset( $_SERVER['HTTP_X_IPS_ACCESSTOKENMEMBER'] ) or isset( \IPS\Request::i()->access_token_member ) )
 		{
 			return TRUE;
 		}
@@ -101,21 +60,21 @@ class Front extends Session
 	/**
 	 * @brief	Session Data
 	 */
-	protected array $data	= array();
+	protected $data	= array();
 	
 	/**
 	 * @brief	Needs saving?
 	 */
-	protected bool $save	= TRUE;
+	protected $save	= TRUE;
 	
 	/**
 	 * Open Session
 	 *
-	 * @param string $savePath	Save path
-	 * @param string $sessionName Session Name
-	 * @return	bool
+	 * @param	string	$savePath	Save path
+	 * @param	string	$sessionName Session Name
+	 * @return	void
 	 */
-	public function open( string $savePath, string $sessionName ) : bool
+	public function open( $savePath, $sessionName )
 	{
 		return TRUE;
 	}
@@ -123,31 +82,31 @@ class Front extends Session
 	/**
 	 * Read Session
 	 *
-	 * @param string $sessionId	Session ID
+	 * @param	string	$sessionId	Session ID
 	 * @return	string
 	 */
-	public function read( string $sessionId ): string
+	public function read( $sessionId )
 	{
 		$this->sessionId = $sessionId;
 		
 		/* Get user agent info */
-		$this->userAgent = Useragent::parse();
+		$this->userAgent = \IPS\Http\Useragent::parse();
 
-		$session = method_exists( SessionStore::i(), 'loadSession' ) ? SessionStore::i()->loadSession( $this->sessionId ) : NULL;
-
+		$session = \IPS\Session\Store::i()->loadSession( $this->sessionId );
+		
 		/* Only use sessions with matching IP address */
-		if( $session and Settings::i()->match_ipaddress and $session['ip_address'] != Request::i()->ipAddress() )
+		if( $session and \IPS\Settings::i()->match_ipaddress and $session['ip_address'] != \IPS\Request::i()->ipAddress() )
 		{
 			$session = NULL;
 		}
 
 		/* Validate member_id cookie against member_id the session belongs to */
-		if( $session and isset( Request::i()->cookie['member_id'] ) AND Request::i()->cookie['member_id'] != $session['member_id'] )
+		if( $session and isset( \IPS\Request::i()->cookie['member_id'] ) AND \IPS\Request::i()->cookie['member_id'] != $session['member_id'] )
 		{
 			$session = FALSE;
 		}
 		/* If the session is for a member but the member_id cookie is not present, wipe the session */
-		elseif( $session AND $session['member_id'] > 0 AND empty( Request::i()->cookie['member_id'] ) )
+		elseif( $session AND $session['member_id'] > 0 AND empty( \IPS\Request::i()->cookie['member_id'] ) )
 		{
 			$session = FALSE;
 		}
@@ -165,7 +124,7 @@ class Front extends Session
 		if ( $session )
 		{
 			/* If this is a guest and the "running time" on this is less than the guest page cache, or if a member and less than 15 seconds ago, we don't need a database write */
-			if ( ( !$session['member_id'] and $session['running_time'] < ( time() - CACHE_PAGE_TIMEOUT ) ) or ( $session['member_id'] and $session['running_time'] < ( time() - 15 ) ) )
+			if ( ( !$session['member_id'] and $session['running_time'] < ( time() - \IPS\CACHE_PAGE_TIMEOUT ) ) or ( $session['member_id'] and $session['running_time'] < ( time() - 15 ) ) )
 			{
 				$this->save = TRUE;
 			}
@@ -177,31 +136,31 @@ class Front extends Session
 			/* Set member */
 			try
 			{
-				$this->member = Member::load( (int) $session['member_id'] );
+				$this->member = \IPS\Member::load( (int) $session['member_id'] );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				$this->member = new Member;
+				$this->member = new \IPS\Member;
 			}
 		}
 		/* We might be able to get the member from a cookie */
 		else
 		{
-			$this->member = new Member;
+			$this->member = new \IPS\Member;
 		}
 		
 		/* If we don't have a member, but the request *did* send an access token which has GraphQL acceess (i.e. unfettered access to act as the user), then use that */
-		if ( !$this->member->member_id and ( isset( $_SERVER['HTTP_X_IPS_ACCESSTOKENMEMBER'] ) or isset( Request::i()->access_token_member ) ) and $authorizationHeader = Request::i()->authorizationHeader() and mb_substr( $authorizationHeader, 0, 7 ) === 'Bearer ' and ( !OAUTH_REQUIRES_HTTPS or Request::i()->isSecure() ) )
+		if ( !$this->member->member_id and ( isset( $_SERVER['HTTP_X_IPS_ACCESSTOKENMEMBER'] ) or isset( \IPS\Request::i()->access_token_member ) ) and $authorizationHeader = \IPS\Request::i()->authorizationHeader() and mb_substr( $authorizationHeader, 0, 7 ) === 'Bearer ' and ( !\IPS\OAUTH_REQUIRES_HTTPS or \IPS\Request::i()->isSecure() ) )
 		{
-			$expectedMember = Member::load( $_SERVER['HTTP_X_IPS_ACCESSTOKENMEMBER'] ?? Request::i()->access_token_member );
+			$expectedMember = \IPS\Member::load( isset( $_SERVER['HTTP_X_IPS_ACCESSTOKENMEMBER'] ) ? $_SERVER['HTTP_X_IPS_ACCESSTOKENMEMBER'] : \IPS\Request::i()->access_token_member );
 			if ( $expectedMember->member_id )
 			{
 				/* Start by checking the access token is valid and for this member */
 				try
 				{					
-					$accessToken = OAuthClient::accessTokenDetails( mb_substr( $authorizationHeader, 7 ) );
-					$client = OAuthClient::load( $accessToken['client_id'] );
-					if ( in_array($client->api_access, [ 'graphql', 'both'] ) AND $accessToken['member_id'] === $expectedMember->member_id )
+					$accessToken = \IPS\Api\OAuthClient::accessTokenDetails( mb_substr( $authorizationHeader, 7 ) );
+					$client = \IPS\Api\OAuthClient::load( $accessToken['client_id'] );
+					if ( \in_array($client->api_access, [ 'graphql', 'both'] ) AND $accessToken['member_id'] === $expectedMember->member_id )
 					{
 						$success = TRUE;
 					}
@@ -210,7 +169,7 @@ class Front extends Session
 						$success = FALSE;
 					}
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
 					$success = FALSE;
 				}
@@ -218,7 +177,7 @@ class Front extends Session
 				/* Because this is effectively a log in attempt, we need to make sure the account is not locked */
 				try
 				{
-					Login::checkIfAccountIsLocked( $expectedMember, $success );
+					\IPS\Login::checkIfAccountIsLocked( $expectedMember, $success );
 					
 					/* If it isn't, we can either set that we are that member... */
 					if ( $success )
@@ -232,7 +191,7 @@ class Front extends Session
 						$expectedMember->failedLogin();
 					}
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
 					// Account is locked. Do nothing.
 				}
@@ -241,23 +200,23 @@ class Front extends Session
 
 		/* If we still don't have a member, check the cookies */
 		$device = NULL;
-		if ( !$this->member->member_id and isset( Request::i()->cookie['device_key'] ) and isset( Request::i()->cookie['member_id'] ) and isset( Request::i()->cookie['login_key'] ) )
+		if ( !$this->member->member_id and isset( \IPS\Request::i()->cookie['device_key'] ) and isset( \IPS\Request::i()->cookie['member_id'] ) and isset( \IPS\Request::i()->cookie['login_key'] ) )
 		{
 			/* Get the member we're trying to authenticate against - do not process cookie-based login if the account is locked */
-			$member = Member::load( (int) Request::i()->cookie['member_id'] );
+			$member = \IPS\Member::load( (int) \IPS\Request::i()->cookie['member_id'] );
 			if ( $member->member_id and $member->unlockTime() === FALSE )
 			{
 				/* Load and authenticate device device data */
 				try
 				{
 					/* Authenticate */
-					$device = Device::loadAndAuthenticate( Request::i()->cookie['device_key'], $member, Request::i()->cookie['login_key'] );
+					$device = \IPS\Member\Device::loadAndAuthenticate( \IPS\Request::i()->cookie['device_key'], $member, \IPS\Request::i()->cookie['login_key'] );
 
 					/* Set member in session */
 					$this->member = $member;
-
+					
 					/* Refresh the device key cookie */
-					Request::i()->setCookie( 'device_key', Request::i()->cookie['device_key'], ( new DateTime )->add( new DateInterval( 'P1Y' ) ) );
+					\IPS\Request::i()->setCookie( 'device_key', \IPS\Request::i()->cookie['device_key'], ( new \IPS\DateTime )->add( new \DateInterval( 'P1Y' ) ) );
 
 					$member->recordLogin();
 					$member->achievementAction( 'core', 'SessionStartDaily' );
@@ -266,24 +225,21 @@ class Front extends Session
 					$device->updateAfterAuthentication( TRUE, NULL, FALSE );
 				}
 				/* If the device_key/login_key combination wasn't valid, this may be someone trying to bruteforce... */
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					/* ... so log it as a failed login */
-					if( isset( $expectedMember ) and $expectedMember instanceof Member )
-					{
-						$expectedMember->failedLogin();
-					}
+					$member->failedLogin();
 					
 					/* Then set us as a guest and clear out those cookies */
-					$this->member = new Member;
-					Request::i()->clearLoginCookies();
+					$this->member = new \IPS\Member;
+					\IPS\Request::i()->clearLoginCookies();
 				}
 			}
 			// If the member no longer exists, or the account is locked, set us as a guest and clear out those cookies
 			else
 			{
-				$this->member = new Member;
-				Request::i()->clearLoginCookies();
+				$this->member = new \IPS\Member;
+				\IPS\Request::i()->clearLoginCookies();
 			}
 		}
 
@@ -314,21 +270,21 @@ class Front extends Session
 			'member_name'				=> $this->member->member_id ? $this->member->name : '',
 			'seo_name'					=> $this->member->member_id ? ( $this->member->members_seo_name ?: '' ) : '',
 			'member_id'					=> $this->member->member_id ?: 0,
-			'ip_address'				=> Request::i()->ipAddress(),
-			'browser'					=> $_SERVER['HTTP_USER_AGENT'] ?? '',
+			'ip_address'				=> \IPS\Request::i()->ipAddress(),
+			'browser'					=> isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '',
 			/* We do not want ajax calls to update running time as this affects appearance of being online. If no session exists, we do not want ajax polling to trigger an online list hit so we set running time for time - 31 minutes as
 			   online lists look for running times less than 30 minutes. */
-			'running_time'				=> ( Request::i()->isAjax() ) ? ( $session ? $session['running_time'] : time() - 1860 ) : time(),
+			'running_time'				=> ( \IPS\Request::i()->isAjax() ) ? ( $session ? $session['running_time'] : time() - 1860 ) : time(), 
 			'login_type'				=> $type,
-			'member_group'				=> ( $this->member->member_id ) ? $this->member->member_group_id : Settings::i()->guest_group,
-			'current_appcomponent'		=> ( Request::i()->isAjax() ) ? ( $session ? $session['current_appcomponent'] : '' ) : '',
-			'current_module'			=> ( Request::i()->isAjax() ) ? ( $session ? $session['current_module'] : '' ) : '',
-			'current_controller'		=> ( Request::i()->isAjax() ) ? ( $session ? $session['current_controller'] : NULL ) : NULL,
-			'current_id'				=> ( Request::i()->isAjax() ) ? ( $session ? $session['current_id'] : NULL ) : intval( Request::i()->id ),
+			'member_group'				=> ( $this->member->member_id ) ? $this->member->member_group_id : \IPS\Settings::i()->guest_group,
+			'current_appcomponent'		=> ( \IPS\Request::i()->isAjax() ) ? ( $session ? $session['current_appcomponent'] : '' ) : '',
+			'current_module'			=> ( \IPS\Request::i()->isAjax() ) ? ( $session ? $session['current_module'] : '' ) : '',
+			'current_controller'		=> ( \IPS\Request::i()->isAjax() ) ? ( $session ? $session['current_controller'] : NULL ) : NULL,
+			'current_id'				=> ( \IPS\Request::i()->isAjax() ) ? ( $session ? $session['current_id'] : NULL ) : \intval( \IPS\Request::i()->id ),
 			'uagent_key'				=> $this->userAgent->browser ?: '',
 			'uagent_version'			=> $this->userAgent->browserVersion ?: '',
 			'uagent_type'				=> $this->userAgent->bot ? 'search' : 'browser',
-			'search_thread_id'			=> $session ? intval( $session['search_thread_id'] ) : 0,
+			'search_thread_id'			=> $session ? \intval( $session['search_thread_id'] ) : 0,
 			'search_thread_time'		=> $session ? $session['search_thread_time'] : 0,
 			'data'						=> $session ? $session['data'] : '',
 			'location_url'				=> $session ? $session['location_url'] : NULL,
@@ -336,7 +292,7 @@ class Front extends Session
 			'location_data'				=> $session ? $session['location_data'] : NULL,
 			'location_permissions'		=> $session ? $session['location_permissions'] : NULL,
 			'theme_id'					=> $session ? $session['theme_id'] : 0,
-			'in_editor'					=> ( Request::i()->isAjax() ) ? ( $session ? $session['in_editor'] : 0 ) : 0,
+			'in_editor'					=> ( \IPS\Request::i()->isAjax() ) ? ( $session ? $session['in_editor'] : 0 ) : 0,
 			
 		);
 
@@ -346,38 +302,27 @@ class Front extends Session
 			/* Is this Facebook? Do we need to treat them as a user of a different group? */
 			if( $this->userAgent->bot == 'facebook' )
 			{
-				if( Service::load( 'facebook', 'share_key' )->enabled )
+				if( \IPS\core\ShareLinks\Service::load( 'facebook', 'share_key' )->enabled )
 				{
-					if( $this->userAgent->facebookIpVerified( Request::i()->ipAddress() ) AND Settings::i()->fbc_bot_group != Settings::i()->guest_group )
+					if( $this->userAgent->facebookIpVerified( \IPS\Request::i()->ipAddress() ) AND \IPS\Settings::i()->fbc_bot_group != \IPS\Settings::i()->guest_group )
 					{
-						$this->member->member_group_id	= Settings::i()->fbc_bot_group;
+						$this->member->member_group_id	= \IPS\Settings::i()->fbc_bot_group;
 					}
 				}
 			}
 		}
 
 		/* Session read() method MUST return a string, or this can result in PHP errors */
-		$result = (string) $this->data['data'];
-
-		foreach( Application::allExtensions( 'core', 'SSO', FALSE ) as $ext )
-		{
-			/* @var SSOAbstract $ext */
-			if( $ext->isEnabled() )
-			{
-				return $ext->onSessionRead( $this, $result );
-			}
-		}
-
-		return $result;
+		return (string) $this->data['data'];
 	}
 
 	/**
 	 * Set Session Member
 	 *
-	 * @param Member $member	Member object
+	 * @param	\IPS\Member	$member	Member object
 	 * @return	void
 	 */
-	public function setMember( Member $member ) : void
+	public function setMember( $member )
 	{
 		parent::setMember( $member );
 
@@ -391,11 +336,11 @@ class Front extends Session
 	/**
 	 * Write Session
 	 *
-	 * @param string $sessionId	Session ID
-	 * @param string $data		Session Data
+	 * @param	string	$sessionId	Session ID
+	 * @param	string	$data		Session Data
 	 * @return	bool
 	 */
-	public function write( string $sessionId, string $data ): bool
+	public function write( $sessionId, $data )
 	{
 		if ( !isset( $this->data['data'] ) or $data !== $this->data['data'] or $this->data['member_id'] != $this->member->member_id )
 		{
@@ -403,34 +348,31 @@ class Front extends Session
 		}
 
 		/* Don't update if instant notifications are checking to reduce overhead on the session table */
-		if ( Request::i()->isAjax() and isset( Request::i()->app ) and Request::i()->app === 'core' and isset( Request::i()->controller ) and Request::i()->controller === 'ajax' and isset( Request::i()->do ) and Request::i()->do === 'instantNotifications' )
+		if ( \IPS\Request::i()->isAjax() and isset( \IPS\Request::i()->app ) and \IPS\Request::i()->app === 'core' and isset( \IPS\Request::i()->controller ) and \IPS\Request::i()->controller === 'ajax' and isset( \IPS\Request::i()->do ) and \IPS\Request::i()->do === 'instantNotifications' )
 		{
 			$this->save = FALSE;
 		}
 
 		/* Don't update if there is a hit on the manifest. Why do we use the url()? When page caching grabs and returns, the \IPS\Request::i()->do/controller variables are no populated */
-		if ( isset( Request::i()->url()->hiddenQueryString['controller'] ) and Request::i()->url()->hiddenQueryString['controller'] === 'metatags' and isset( Request::i()->url()->hiddenQueryString['do'] ) and Request::i()->url()->hiddenQueryString['do'] === 'manifest' )
+		if ( isset( \IPS\Request::i()->url()->hiddenQueryString['controller'] ) and \IPS\Request::i()->url()->hiddenQueryString['controller'] === 'metatags' and isset( \IPS\Request::i()->url()->hiddenQueryString['do'] ) and \IPS\Request::i()->url()->hiddenQueryString['do'] === 'manifest' )
 		{
 			$this->save = FALSE;
 		}
 
 		/* Don't update if there is a hit on the serviceworker */
-		if ( isset( Request::i()->app ) and Request::i()->app === 'core' and isset( Request::i()->controller ) and Request::i()->controller === 'serviceworker' )
+		if ( isset( \IPS\Request::i()->app ) and \IPS\Request::i()->app === 'core' and isset( \IPS\Request::i()->controller ) and \IPS\Request::i()->controller === 'serviceworker' )
 		{
 			$this->save = FALSE;
 		}
-
+		
 		$this->data['member_name']	= $this->member->member_id ? $this->member->name : '';
 		$this->data['member_id']	= $this->member->member_id ?: NULL;
 		$this->data['data']			= $data;
 		$this->setLocationData();
 
-		if ( $this->save === TRUE and ( !empty( Request::i()->cookie ) or $this->userAgent->bot or $this->member->member_id ) ) // If a guest and cookies are disabled we do not write to database to prevent duplicate sessions unless it's a search engine, which we deal with separately
+		if ( $this->save === TRUE and ( !empty( \IPS\Request::i()->cookie ) or $this->userAgent->bot or $this->member->member_id ) ) // If a guest and cookies are disabled we do not write to database to prevent duplicate sessions unless it's a search engine, which we deal with separately
 		{
-			if( method_exists( '\IPS\Session\Store', 'updateSession' ) )
-			{
-				SessionStore::i()->updateSession( $this->data );
-			}
+			\IPS\Session\Store::i()->updateSession( $this->data );
 		}
 		
 		return TRUE;
@@ -441,7 +383,7 @@ class Front extends Session
 	 *
 	 * @return void
 	 */
-	public function noUpdate() : void
+	public function noUpdate()
 	{
 		$this->save = FALSE;
 	}
@@ -449,18 +391,18 @@ class Front extends Session
 	/**
 	 * @brief	Stored engine
 	 */
-	protected static mixed $engine = NULL;
+	protected static $engine = NULL;
 		
 	/**
 	 * Clear sessions - abstracted so it can be called externally without initiating a session
 	 *
-	 * @param int $timeout	Sessions older than the number of seconds provided will be deleted
+	 * @param	int		$timeout	Sessions older than the number of seconds provided will be deleted
 	 * @return void
 	 */
-	public static function clearSessions( int $timeout ) : void
+	public static function clearSessions( $timeout )
 	{
 		/* Cannot change this from a static method as it is called on garbage collection */
-		SessionStore::i()->clearSessions( $timeout );
+		\IPS\Session\Store::i()->clearSessions( $timeout );
 	}
 	
 	/**
@@ -468,9 +410,9 @@ class Front extends Session
 	 *
 	 * @return	void
 	 */
-	public function startSearch() : void
+	public function startSearch()
 	{
-		$this->data['search_thread_id']		= Db::i()->thread_id;
+		$this->data['search_thread_id']		= \IPS\Db::i()->thread_id;
 		$this->data['search_thread_time']	= time();
 	}
 
@@ -479,7 +421,7 @@ class Front extends Session
 	 *
 	 * @return	void
 	 */
-	public function endSearch() : void
+	public function endSearch()
 	{
 		$this->data['search_thread_id']		= 0;
 		$this->data['search_thread_time']	= 0;
@@ -488,12 +430,12 @@ class Front extends Session
 	/**
 	 * Set a theme ID
 	 *
-	 * @param int $themeId		The theme id, of course
+	 * @param	int		$themeId		The theme id, of course
 	 * @return	void
 	 */
-	public function setTheme( int $themeId ) : void
+	public function setTheme( $themeId )
 	{
-		if( !Dispatcher::hasInstance() OR Request::i()->isAjax() )
+		if( !\IPS\Dispatcher::hasInstance() OR \IPS\Request::i()->isAjax() )
 		{
 			return;
 		}
@@ -502,13 +444,13 @@ class Front extends Session
 		
 		$this->save = TRUE;
 	}
-
+	
 	/**
 	 * Get the theme ID
 	 *
-	 * @return int|null
+	 * @return	int
 	 */
-	public function getTheme(): ?int
+	public function getTheme()
 	{
 		if ( isset( $this->data['theme_id'] ) and $this->data['theme_id'] )
 		{
@@ -523,17 +465,17 @@ class Front extends Session
 	 *
 	 * @return	void
 	 */
-	public function setLocationData() : void
+	public function setLocationData()
 	{
-		if( !Dispatcher::hasInstance() OR Request::i()->isAjax() )
+		if( !\IPS\Dispatcher::hasInstance() OR \IPS\Request::i()->isAjax() )
 		{
 			return;
 		}
 
-		$this->data['current_appcomponent']	= Dispatcher::i()->application ? Dispatcher::i()->application->directory : '';
-		$this->data['current_module']		= Dispatcher::i()->module ? Dispatcher::i()->module->key : '';
-		$this->data['current_controller']	= Dispatcher::i()->controller;
-		$this->data['current_id']			= intval( Request::i()->id );
+		$this->data['current_appcomponent']	= \IPS\Dispatcher::i()->application ? \IPS\Dispatcher::i()->application->directory : '';
+		$this->data['current_module']		= \IPS\Dispatcher::i()->module ? \IPS\Dispatcher::i()->module->key : '';
+		$this->data['current_controller']	= \IPS\Dispatcher::i()->controller;
+		$this->data['current_id']			= \intval( \IPS\Request::i()->id );
 	}
 	
 	/**
@@ -541,7 +483,7 @@ class Front extends Session
 	 *
 	 * @return	void
 	 */
-	public function setUsingEditor() : void
+	public function setUsingEditor()
 	{
 		$this->data['in_editor'] = time();
 	}
@@ -549,15 +491,15 @@ class Front extends Session
 	/**
 	 * Set the session location
 	 *
-	 * @param	Url	$url		URL
-	 * @param mixed $groupIds	Permission data
-	 * @param string $lang		Language string
-	 * @param array $data		Language data. Keys are the words, value is a boolean indicating if it's a language key (TRUE) or should be displayed as-is (FALSE)
+	 * @param	\IPS\Http\Url	$url		URL
+	 * @param	array			$groupIds	Permission data
+	 * @param	string			$lang		Language string
+	 * @param	array			$data		Language data. Keys are the words, value is a boolean indicating if it's a language key (TRUE) or should be displayed as-is (FALSE)
 	 * @return	void
 	 */
-	public function setLocation( Url $url, mixed $groupIds, string $lang, array $data=array() ) : void
+	public function setLocation( \IPS\Http\Url $url, $groupIds, $lang, $data=array() )
 	{
-		if( !Dispatcher::hasInstance() OR Request::i()->isAjax() )
+		if( !\IPS\Dispatcher::hasInstance() OR \IPS\Request::i()->isAjax() )
 		{
 			return;
 		}
@@ -565,7 +507,7 @@ class Front extends Session
 		$this->data['location_url'] = (string) $url;
 		$this->data['location_lang'] = $lang;
 		$this->data['location_data'] = json_encode( $data );
-        $this->data['current_id'] = intval( Request::i()->id );
+        $this->data['current_id'] = \intval( \IPS\Request::i()->id );
 		
 		if ( !$this->data['current_appcomponent'] )
 		{
@@ -578,21 +520,21 @@ class Front extends Session
 			$groupIds = (string) $groupIds;
 		}		
 	
-		$groupIds = is_string( $groupIds ) ? explode( ',', $groupIds ) : ( $groupIds ?: NULL );
+		$groupIds = \is_string( $groupIds ) ? explode( ',', $groupIds ) : ( $groupIds ?: NULL );
 				
-		$app = Application::load( $this->data['current_appcomponent'] );
+		$app = \IPS\Application::load( $this->data['current_appcomponent'] );
 		if ( !$app->enabled )
 		{			
 			$groupIds = $groupIds ? array_intersect( $groupIds, explode( ',', $app->disabled_groups ) ) : explode( ',', $app->disabled_groups );
 		}
 		
-		$modulePermissions = Module::get( $this->data['current_appcomponent'], $this->data['current_module'], 'front' )->permissions();
+		$modulePermissions = \IPS\Application\Module::get( $this->data['current_appcomponent'], $this->data['current_module'], 'front' )->permissions();
 		if ( $modulePermissions['perm_view'] !== '*' )
 		{
 			$groupIds = $groupIds ? array_intersect( $groupIds, explode( ',', $modulePermissions['perm_view'] ) ) : explode( ',', $modulePermissions['perm_view'] );
 		}
 
-		$this->data['location_permissions'] = ( $groupIds !== NULL ) ? ( is_string( $groupIds ) ? $groupIds : implode( ',', $groupIds ) ) : NULL;
+		$this->data['location_permissions'] = ( $groupIds !== NULL ) ? ( \is_string( $groupIds ) ? $groupIds : implode( ',', $groupIds ) ) : NULL;
 
 		$this->save = TRUE;
 	}
@@ -600,10 +542,10 @@ class Front extends Session
 	/**
 	 * Get the session location
 	 * 
-	 * @param array $row		Row from sessions
+	 * @param	array			$row		Row from sessions
 	 * @return	string|null
 	 */
-	public static function getLocation( array $row ): ?string
+	public static function getLocation( $row )
 	{
 		$location = NULL;
 
@@ -614,7 +556,7 @@ class Front extends Session
 
 		try
 		{
-			if ( $row['location_permissions'] === NULL or $row['location_permissions'] === '*' or Member::loggedIn()->inGroup( explode( ',', $row['location_permissions'] ), TRUE ) )
+			if ( $row['location_permissions'] === NULL or $row['location_permissions'] === '*' or \IPS\Member::loggedIn()->inGroup( explode( ',', $row['location_permissions'] ), TRUE ) )
 			{
 				$sprintf = array();
 				$data = json_decode( $row['location_data'], TRUE );
@@ -623,17 +565,17 @@ class Front extends Session
 				{
 					foreach ( $data as $key => $parse )
 					{
-						$value		= htmlspecialchars( $parse ? Member::loggedIn()->language()->get( $key ) : $key, ENT_DISALLOWED, 'UTF-8', FALSE );
+						$value		= htmlspecialchars( $parse ? \IPS\Member::loggedIn()->language()->get( $key ) : $key, ENT_DISALLOWED, 'UTF-8', FALSE );
 						$sprintf[]	= $value;
 					}
 				}
 
-				$location = Member::loggedIn()->language()->addToStack( htmlspecialchars( $row['location_lang'], ENT_DISALLOWED, 'UTF-8', FALSE ), FALSE, array( 'htmlsprintf' => $sprintf ) );
+				$location = \IPS\Member::loggedIn()->language()->addToStack( htmlspecialchars( $row['location_lang'], ENT_DISALLOWED, 'UTF-8', FALSE ), FALSE, array( 'htmlsprintf' => $sprintf ) );
 
 				$location	= "<a href='" . htmlspecialchars( $row['location_url'], ENT_DISALLOWED, 'UTF-8', FALSE ) . "'>" . $location . "</a>";
 			}
 		}
-		catch ( UnderflowException $e ){ }
+		catch ( \UnderflowException $e ){ }
 		
 		return $location;
 	}
@@ -641,10 +583,10 @@ class Front extends Session
 	/**
 	 * Set the session "login_type"
 	 *
-	 * @param int $type	Type as defined by the class constants
+	 * @param	int		$type	Type as defined by the class constants
 	 * @return	void
 	 */
-	public function setType( int $type ) : void
+	public function setType( $type )
 	{
 		if ( $this->data['login_type'] !== $type )
 		{
@@ -661,8 +603,8 @@ class Front extends Session
 				$this->data['login_type'] = $type;
 			break;
 			default:
-				throw new OutOfRangeException();
-
+				throw new \OutOfRangeException();
+			break;
 		}
 	}
 	
@@ -671,7 +613,7 @@ class Front extends Session
 	 *
 	 * @return	void
 	 */
-	public function setAnon() : void
+	public function setAnon()
 	{
 		$this->setType( static::LOGIN_TYPE_ANONYMOUS );
 	}
@@ -679,9 +621,9 @@ class Front extends Session
 	/**
 	 * Set the session as anonymous
 	 *
-	 * @return	bool
+	 * @return	void
 	 */
-	public function getAnon() : bool
+	public function getAnon()
 	{
 		return (bool) $this->data['login_type'] == static::LOGIN_TYPE_ANONYMOUS;
 	}
@@ -691,7 +633,7 @@ class Front extends Session
 	 *
 	 * @return	bool
 	 */
-	public function close() : bool
+	public function close()
 	{
 		return TRUE;
 	}
@@ -699,57 +641,30 @@ class Front extends Session
 	/**
 	 * Destroy Session
 	 *
-	 * @param string $sessionId	Session ID
+	 * @param	string	$sessionId	Session ID
 	 * @return	bool
 	 */
-	public function destroy( string $sessionId ): bool
+	public function destroy( $sessionId )
 	{
 		if ( isset( $_SESSION['wizardKey'] ) )
 		{
 			$dataKey = $_SESSION['wizardKey'];
-			unset( Store::i()->$dataKey );
+			unset( \IPS\Data\Store::i()->$dataKey );
 		}
-
-		if( method_exists( '\IPS\Session\Store', 'deleteSession' ) )
-		{
-			SessionStore::i()->deleteSession( $sessionId );
-		}
-
+		
+		\IPS\Session\Store::i()->deleteSession( $sessionId );
 		return TRUE;
 	}
 	
 	/**
 	 * Garbage Collection
 	 *
-	 * @param int $lifetime	Number of seconds to consider sessions expired beyond
+	 * @param	int		$lifetime	Number of seconds to consider sessions expired beyond
 	 * @return	bool
 	 */
-	public function gc( int $lifetime ): bool
+	public function gc( $lifetime )
 	{
 		static::clearSessions( $lifetime );
 		return TRUE;
-	}
-
-	/**
-	 * @inheritDoc
-	 * @return void
-	 */
-	public function init(): void
-	{
-		if ( ( $member = Bridge::i()->liveTopicDevPreviewMember() ) AND $member instanceof Member AND $member->member_id )
-		{
-			$this->setMember( $member );
-		}
-
-		parent::init();
-
-		foreach( Application::allExtensions( 'core', 'SSO', FALSE ) as $ext )
-		{
-			/* @var SSOAbstract $ext */
-			if( $ext->isEnabled() )
-			{
-				$ext->onSessionInit( $this );
-			}
-		}
 	}
 }

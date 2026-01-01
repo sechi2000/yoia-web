@@ -10,33 +10,13 @@
  */
 
 namespace IPS\core\api\GraphQL;
-use IPS\core\api\GraphQL\Queries\ActiveUsers;
-use IPS\core\api\GraphQL\Queries\Club;
-use IPS\core\api\GraphQL\Queries\Clubs;
-use IPS\core\api\GraphQL\Queries\Content;
-use IPS\core\api\GraphQL\Queries\Group;
-use IPS\core\api\GraphQL\Queries\Language;
-use IPS\core\api\GraphQL\Queries\LoginHandlers;
-use IPS\core\api\GraphQL\Queries\Me;
-use IPS\core\api\GraphQL\Queries\Member;
-use IPS\core\api\GraphQL\Queries\Members;
-use IPS\core\api\GraphQL\Queries\MessengerConversation;
-use IPS\core\api\GraphQL\Queries\MessengerConversations;
-use IPS\core\api\GraphQL\Queries\MessengerFolders;
-use IPS\core\api\GraphQL\Queries\NotificationTypes;
-use IPS\core\api\GraphQL\Queries\OurPicks;
-use IPS\core\api\GraphQL\Queries\PopularContributors;
-use IPS\core\api\GraphQL\Queries\Search;
-use IPS\core\api\GraphQL\Queries\Settings;
-use IPS\core\api\GraphQL\Queries\Stats;
-use IPS\core\api\GraphQL\Queries\Stream;
-use IPS\core\api\GraphQL\Queries\Streams;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -44,7 +24,7 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * Core controller for GraphQL API
  * @todo maybe this shouldn't be a class since it only has a static method?
  */
-abstract class Query
+abstract class _Query
 {
 
 	/**
@@ -55,27 +35,27 @@ abstract class Query
 	public static function queries(): array
 	{
 		return [
-			'activeUsers' => new ActiveUsers(),
-			'club' => new Club(),
-			'clubs' => new Clubs(),
-			'content' => new Content(),
-			'group' => new Group(),
-			'language' => new Language(),
-			'loginHandlers' => new LoginHandlers(),
-			'me' => new Me(),
-			'member' => new Member(),
-			'members' => new Members(),
-			'messengerConversation' => new MessengerConversation(),
-			'messengerConversations' => new MessengerConversations(),
-			'messengerFolders' => new MessengerFolders(),
-			'notificationTypes' => new NotificationTypes(),
-			'ourPicks' => new OurPicks(),
-			'popularContributors' => new PopularContributors(),
-			'search' => new Search(),
-			'settings' => new Settings(),
-			'stats' => new Stats(),
-			'stream' => new Stream(),
-			'streams' => new Streams(),
+			'activeUsers' => new \IPS\core\api\GraphQL\Queries\ActiveUsers(),
+			'club' => new \IPS\core\api\GraphQL\Queries\Club(),
+			'clubs' => new \IPS\core\api\GraphQL\Queries\Clubs(),
+			'content' => new \IPS\core\api\GraphQL\Queries\Content(),
+			'group' => new \IPS\core\api\GraphQL\Queries\Group(),
+			'language' => new \IPS\core\api\GraphQL\Queries\Language(),
+			'loginHandlers' => new \IPS\core\api\GraphQL\Queries\LoginHandlers(),
+			'me' => new \IPS\core\api\GraphQL\Queries\Me(),
+			'member' => new \IPS\core\api\GraphQL\Queries\Member(),
+			'members' => new \IPS\core\api\GraphQL\Queries\Members(),
+			'messengerConversation' => new \IPS\core\api\GraphQL\Queries\MessengerConversation(),
+			'messengerConversations' => new \IPS\core\api\GraphQL\Queries\MessengerConversations(),
+			'messengerFolders' => new \IPS\core\api\GraphQL\Queries\MessengerFolders(),
+			'notificationTypes' => new \IPS\core\api\GraphQL\Queries\NotificationTypes(),
+			'ourPicks' => new \IPS\core\api\GraphQL\Queries\OurPicks(),
+			'popularContributors' => new \IPS\core\api\GraphQL\Queries\PopularContributors(),
+			'search' => new \IPS\core\api\GraphQL\Queries\Search(),
+			'settings' => new \IPS\core\api\GraphQL\Queries\Settings(),
+			'stats' => new \IPS\core\api\GraphQL\Queries\Stats(),
+			'stream' => new \IPS\core\api\GraphQL\Queries\Stream(),
+			'streams' => new \IPS\core\api\GraphQL\Queries\Streams(),
 		];
 	}
 }

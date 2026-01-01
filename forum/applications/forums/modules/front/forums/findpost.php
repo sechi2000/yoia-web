@@ -12,39 +12,31 @@
 namespace IPS\forums\modules\front\forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\forums\Topic\Post;
-use IPS\Output;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Legacy 3.x findpost
  */
-class findpost extends Controller
+class _findpost extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Route
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{		
 		try
 		{
-			Output::i()->redirect( Post::loadAndCheckPerms( Request::i()->pid )->url(), NULL );
+			\IPS\Output::i()->redirect( \IPS\forums\Topic\Post::loadAndCheckPerms( \IPS\Request::i()->pid )->url(), NULL, 301 );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2F284/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2F284/1', 404, '' );
 		}
 	}
 }

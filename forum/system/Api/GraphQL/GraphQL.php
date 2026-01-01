@@ -11,26 +11,16 @@
 namespace IPS\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use GraphQL\Error\DebugFlag;
-use GraphQL\GraphQL as _GraphQL;
-use GraphQL\Type\Schema;
-use IPS\Api\GraphQL\TypeRegistry;
-use IPS\IPS;
-use IPS\Member;
-use function defined;
-use const IPS\DEBUG_GRAPHQL;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Base API Controller
  */
-class GraphQL
+class _GraphQL
 {
 
 	public function __construct()
@@ -43,20 +33,20 @@ class GraphQL
 	 *
 	 * @param	string				$query		The query to execute
 	 * @param	array				$variables	Variables to include in query
-	 * @param Member|null $member Member to check or NULL for currently logged in member.
+	 * @param \IPS\Member|NULL $member Member to check or NULL for currently logged in member.
 	 * @return 	array 				GraphQL response
 	 */
-	public static function execute( string $query, array $variables = [], ?Member $member = NULL ) : array
+	public static function execute( string $query, array $variables = [], ?\IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		/* Register our GraphQL library */
-		IPS::$PSR0Namespaces['GraphQL'] = \IPS\ROOT_PATH . "/system/3rd_party/graphql-php";
+		\IPS\IPS::$PSR0Namespaces['GraphQL'] = \IPS\ROOT_PATH . "/system/3rd_party/graphql-php";
 
 		/* Execute! */
-		$result = _GraphQL::executeQuery(
-			new Schema([
-				'query' => TypeRegistry::query(),
-				'mutation' => TypeRegistry::mutation()
+		$result = \GraphQL\GraphQL::executeQuery(
+			new \GraphQL\Type\Schema([
+				'query' => \IPS\Api\GraphQL\TypeRegistry::query(),
+				'mutation' => \IPS\Api\GraphQL\TypeRegistry::mutation()
 			]),
 			$query,
 			NULL, // $rootValue
@@ -67,6 +57,7 @@ class GraphQL
 		);
 
 		/* Convert result into JSON and send */
-		return $result->toArray( ( \IPS\IN_DEV OR DEBUG_GRAPHQL ) ? DebugFlag::INCLUDE_DEBUG_MESSAGE | DebugFlag::INCLUDE_TRACE : false );
+		$output = $result->toArray( ( \IPS\IN_DEV OR \IPS\DEBUG_GRAPHQL ) ? \GraphQL\Error\DebugFlag::INCLUDE_DEBUG_MESSAGE | \GraphQL\Error\DebugFlag::INCLUDE_TRACE : false );
+		return $output;
 	}
 }

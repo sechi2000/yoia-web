@@ -12,42 +12,35 @@
 namespace IPS\calendar\extensions\core\Announcements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Announcements\Announcement;
-use IPS\Extensions\AnnouncementsAbstract;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Helpers\Form\Node;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Announcements Extension
  */
-class Calendars extends AnnouncementsAbstract
+class _Calendars
 {
 	/**
 	 * @brief	ID Field
 	 */
-	public static string $idField = "id";
+	public static $idField = "id";
 	
 	/**
 	 * @brief	Controller classes
 	 */
-	public static array $controllers = array( "IPS\\calendar\\modules\\front\\calendar\\view" );
+	public static $controllers = array( "IPS\\calendar\\modules\\front\\calendar\\view" );
 	
 	/**
 	 * Get Setting Field
 	 *
-	 * @param Announcement|null $announcement
-	 * @return    FormAbstract Form element
+	 * @param	\IPS\core\Announcements\Announcement	$announcement
+	 * @return	Form element
 	 */
-	public function getSettingField( ?Announcement $announcement ): FormAbstract
+	public function getSettingField( $announcement )
 	{
-		return new Node( 'announce_calendars', ( $announcement AND $announcement->ids ) ? explode( ",", $announcement->ids ) : 0, FALSE, array( 'class' => 'IPS\calendar\Calendar', 'zeroVal' => 'any', 'multiple' => TRUE ), NULL, NULL, NULL, 'announce_calendars' );
+		return new \IPS\Helpers\Form\Node( 'announce_calendars', ( $announcement AND $announcement->ids ) ? explode( ",", $announcement->ids ) : 0, FALSE, array( 'class' => 'IPS\calendar\Calendar', 'zeroVal' => 'any', 'multiple' => TRUE ), NULL, NULL, NULL, 'announce_calendars' );
 	}
 }

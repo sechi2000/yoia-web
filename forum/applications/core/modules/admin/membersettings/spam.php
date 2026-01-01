@@ -12,16 +12,9 @@
 namespace IPS\core\modules\admin\membersettings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Output;
-use IPS\Request;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -29,21 +22,21 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * spam
  * @deprecated
  */
-class spam extends Controller
+class _spam extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Output::i()->redirect(Url::internal( 'app=core&module=moderation&controller=spam&tab=' . Request::i()->tab ) );
+		\IPS\Output::i()->redirect(\IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&tab=' . \IPS\Request::i()->tab ) );
 	}
 
 	

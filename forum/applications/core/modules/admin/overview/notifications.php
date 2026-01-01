@@ -11,66 +11,46 @@
 namespace IPS\core\modules\admin\overview;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\AdminNotification;
-use IPS\core\extensions\core\AdminNotifications\ConfigurationError;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form\Matrix;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Task;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP Notification Center
  */
-class notifications extends Controller
+class _notifications extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Show notifications
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$notifications = AdminNotification::notifications();
+		$notifications = \IPS\core\AdminNotification::notifications();
 		
-		if ( Request::i()->isAjax() and !isset( Request::i()->_table ) )
+		if ( \IPS\Request::i()->isAjax() and !isset( \IPS\Request::i()->_table ) )
 		{
-			Output::i()->json( array( 'data' => Theme::i()->getTemplate('notifications')->popupList( $notifications ), 'count' => count( $notifications ) ) );
+			\IPS\Output::i()->json( array( 'data' => \IPS\Theme::i()->getTemplate('notifications')->popupList( $notifications ), 'count' => \count( $notifications ) ) );
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('acp_notifications');
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/notifications.css', 'core', 'admin' ) );
-			Output::i()->output = Theme::i()->getTemplate('notifications')->index( $notifications );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('acp_notifications');
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/notifications.css', 'core', 'admin' ) );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('notifications')->index( $notifications );
 			
-			Output::i()->sidebar['actions'] = array(
+			\IPS\Output::i()->sidebar['actions'] = array(
 				'settings'	=> array(
 					'title'		=> 'notification_options',
 					'icon'		=> 'cog',
-					'link'		=> Url::internal( 'app=core&module=overview&controller=notifications&do=settings' ),
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=overview&controller=notifications&do=settings' ),
 				),
 			);
 		}
@@ -81,19 +61,19 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function dismiss() : void
+	protected function dismiss()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		AdminNotification::dismissNotification( Request::i()->id );
+		\IPS\core\AdminNotification::dismissNotification( \IPS\Request::i()->id );
 		
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array( 'status' => 'OK' ) );
+			\IPS\Output::i()->json( array( 'status' => 'OK' ) );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=overview&controller=notifications' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=overview&controller=notifications' ) );
 		}
 	}
 	
@@ -102,11 +82,11 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function settings() : void
+	protected function settings()
 	{
-		$preferences = iterator_to_array( Db::i()->select( '*', 'core_acp_notifications_preferences', array( '`member`=?', Member::loggedIn()->member_id ) )->setKeyField('type') );
+		$preferences = iterator_to_array( \IPS\Db::i()->select( '*', 'core_acp_notifications_preferences', array( '`member`=?', \IPS\Member::loggedIn()->member_id ) )->setKeyField('type') );
 		
-		$matrix = new Matrix;
+		$matrix = new \IPS\Helpers\Form\Matrix;
 		$matrix->langPrefix = 'acp_notifications_';
 		$matrix->manageable = FALSE;
 		$matrix->columns = array(
@@ -116,7 +96,7 @@ class notifications extends Controller
 			},
 			'view'	=> function( $key, $value, $data )
 			{
-				return new YesNo( $key, $data['maybeOptional'] ? $value : TRUE, FALSE, array( 'disabled' => !$data['maybeOptional'] ) );
+				return new \IPS\Helpers\Form\YesNo( $key, $data['maybeOptional'] ? $value : TRUE, FALSE, array( 'disabled' => !$data['maybeOptional'] ) );
 			},
 			'email'	=> function( $key, $value, $data )
 			{
@@ -135,15 +115,15 @@ class notifications extends Controller
 						'once'		=> 'acp_notifications_email_yes',
 					);
 					
-					return new Select( $key, $value, FALSE, array( 'options' => $options, 'class' => 'ipsField_medium' ) );
+					return new \IPS\Helpers\Form\Select( $key, $value, FALSE, array( 'options' => $options, 'class' => 'ipsField_medium' ) );
 				}
 			},
 		);
 		
 		$rows = array();
-		foreach ( Application::allExtensions( 'core', 'AdminNotifications', TRUE, NULL, NULL, FALSE ) as $ext )
+		foreach ( \IPS\Application::allExtensions( 'core', 'AdminNotifications', TRUE, NULL, NULL, FALSE ) as $ext )
 		{
-			if ( $ext::permissionCheck( Member::loggedIn() ) )
+			if ( $ext::permissionCheck( \IPS\Member::loggedIn() ) )
 			{
 				$exploded = explode( '\\', $ext );
 				$key = "{$exploded[1]}_{$exploded[5]}";
@@ -151,11 +131,11 @@ class notifications extends Controller
 				$rows[ $ext::$group ]['priority'] = $ext::$groupPriority;
 				$rows[ $ext::$group ]['rows'][ $ext ] = array(
 					'name'			=> $ext::settingsTitle(),
-					'view'			=> $preferences[$key]['view'] ?? $ext::defaultValue(),
-					'email'			=> $preferences[$key]['email'] ?? 'never',
+					'view'			=> isset( $preferences[ $key ]['view'] ) ? $preferences[ $key ]['view'] : $ext::defaultValue(),
+					'email'			=> isset( $preferences[ $key ]['email'] ) ? $preferences[ $key ]['email'] : 'never',
 					'maybeOptional' => $ext::mayBeOptional(),
 					'mayRecur' 		=> $ext::mayRecur(),
-					'customEmail' 	=> $ext::customEmailConfigurationSetting( "{$ext}[email]", $preferences[$key]['email'] ?? NULL ),
+					'customEmail' 	=> $ext::customEmailConfigurationSetting( "{$ext}[email]", isset( $preferences[ $key ]['email'] ) ? $preferences[ $key ]['email'] : NULL ),
 					'priority' 		=> $ext::$itemPriority,
 				);
 			}
@@ -167,7 +147,7 @@ class notifications extends Controller
 		
 		foreach ( $rows as $group => $data )
 		{
-			$matrix->rows[] = Member::loggedIn()->language()->addToStack("acp_notification_group_{$group}");
+			$matrix->rows[] = \IPS\Member::loggedIn()->language()->addToStack("acp_notification_group_{$group}");
 			
 			uasort( $data['rows'], function( $a, $b ) {
 				return $a['priority'] - $b['priority'];
@@ -186,29 +166,28 @@ class notifications extends Controller
 				$exploded = explode( '\\', $ext );
 				$key = "{$exploded[1]}_{$exploded[5]}";
 				
-				$v = Request::i()->$ext;
-
-				/* @var AdminNotification $ext */
-				Db::i()->insert( 'core_acp_notifications_preferences', array(
-					'member'	=> Member::loggedIn()->member_id,
+				$v = \IPS\Request::i()->$ext;
+								
+				\IPS\Db::i()->insert( 'core_acp_notifications_preferences', array(
+					'member'	=> \IPS\Member::loggedIn()->member_id,
 					'type'		=> $key,
 					'view'		=> $ext::mayBeOptional() ? $_values['view'] : TRUE,
-					'email'		=> $v['email'] ?? 'never',
+					'email'		=> isset( $v['email'] ) ? $v['email'] : 'never',
 				), TRUE );
 			}
 			
-			if( isset( Store::i()->acpNotificationIds ) )
+			if( isset( \IPS\Data\Store::i()->acpNotificationIds ) )
 			{
-				$notificationCache = Store::i()->acpNotificationIds;
-				unset( $notificationCache[ Member::loggedIn()->member_id ] );
-				Store::i()->acpNotificationIds = $notificationCache;
+				$notificationCache = \IPS\Data\Store::i()->acpNotificationIds;
+				unset( $notificationCache[ \IPS\Member::loggedIn()->member_id ] );
+				\IPS\Data\Store::i()->acpNotificationIds = $notificationCache;
 			}
 			
-			Output::i()->redirect( Url::internal( 'app=core&module=overview&controller=notifications' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=overview&controller=notifications' ) );
 		}
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('notification_options');
-		Output::i()->output = Theme::i()->getTemplate('forms')->blurb( 'acp_notifications_settings_blurb' ) . $matrix;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('notification_options');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('forms')->blurb( 'acp_notifications_settings_blurb' ) . $matrix;
 	}
 	
 	/**
@@ -216,11 +195,11 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function configurationErrorChecks() : void
+	protected function configurationErrorChecks()
 	{
-		Session::i()->csrfCheck();
-		ConfigurationError::runChecksAndSendNotifications();
-		Output::i()->redirect( Url::internal( 'app=core&module=overview&controller=notifications' ) );
+		\IPS\Session::i()->csrfCheck();
+		\IPS\core\extensions\core\AdminNotifications\ConfigurationError::runChecksAndSendNotifications();
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=overview&controller=notifications' ) );
 	}
 	
 	/**
@@ -228,15 +207,15 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function removeOrigTables() : void
+	protected function removeOrigTables()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		$tables = Db::i()->getTables( 'orig_' . Db::i()->prefix );
-		Task::queue( 'core', 'CleanupOrigTables', array( 'originalCount' => count( $tables ) ), 5 );
+		$tables = \IPS\Db::i()->getTables( 'orig_' . \IPS\Db::i()->prefix );
+		\IPS\Task::queue( 'core', 'CleanupOrigTables', array( 'originalCount' => \count( $tables ) ), 5 );
 		
-		AdminNotification::remove( 'core', 'ConfigurationError', 'origTables' );
+		\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'origTables' );
 		
-		Output::i()->redirect( Url::internal( 'app=core&module=overview&controller=notifications' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=overview&controller=notifications' ) );
 	}
 }

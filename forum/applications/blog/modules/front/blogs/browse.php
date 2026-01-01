@@ -12,61 +12,54 @@
 namespace IPS\blog\modules\front\blogs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\blog\Blog;
-use IPS\blog\Blog\Table;
-use IPS\blog\Category;
-use IPS\blog\Entry;
-use IPS\Content\Filter;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * browse
  */
-class browse extends Controller
+class _browse extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Manage
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Category */
 		try
 		{
-			$category = Category::loadAndCheckPerms( Request::i()->id );
+			$category = \IPS\blog\Category::loadAndCheckPerms( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			$category = NULL;
 		}
 
 		/* Featured stuff */
-		$featured = iterator_to_array( Entry::featured( 5, '_rand' ) );
-		$blogs = Blog::loadByOwner( Member::loggedIn(), array( array( 'blog_disabled=?', 0 ) ) );
+		$featured = iterator_to_array( \IPS\blog\Entry::featured( 5, '_rand' ) );
+		$blogs = \IPS\blog\Blog::loadByOwner( \IPS\Member::loggedIn(), array( array( 'blog_disabled=?', 0 ) ) );
+		
+		if ( ! \IPS\Settings::i()->blog_allow_grid )
+		{
+			$viewMode = 'list';
+		}
+		else
+		{
+			$viewMode = ( isset( \IPS\Request::i()->view ) ) ? \IPS\Request::i()->view : ( isset( \IPS\Request::i()->cookie['blog_view'] ) ? \IPS\Request::i()->cookie['blog_view'] : \IPS\Settings::i()->blog_view_mode );
+		}
+		
+		if ( isset( \IPS\Request::i()->view ) )
+		{
+			\IPS\Session::i()->csrfCheck();
+			\IPS\Request::i()->setCookie( 'blog_view', \IPS\Request::i()->view, ( new \IPS\DateTime )->add( new \DateInterval( 'P1Y' ) ) );
 
-		$viewMode = Member::loggedIn()->getLayoutValue( 'blog_view' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=blog', 'front', 'blogs' ) );
+		}
 		
 		/* Grid view */
 		if ( $viewMode == 'grid' )
@@ -74,9 +67,9 @@ class browse extends Controller
 			$perpage = 23;
 			$page    = 1;
 			
-			if ( Request::i()->page )
+			if ( \IPS\Request::i()->page )
 			{
-				$page = intval( Request::i()->page );
+				$page = \intval( \IPS\Request::i()->page );
 				if ( !$page OR $page < 1 )
 				{
 					$page = 1;
@@ -87,7 +80,7 @@ class browse extends Controller
 
 			$where		= array();
 			$where[]		= array( "blog_entries.entry_status!=?", 'draft' );
-			if ( !Settings::i()->club_nodes_in_apps )
+			if ( !\IPS\Settings::i()->club_nodes_in_apps )
 			{
 				$where[] = array( "blog_blogs.blog_club_id IS NULL" );
 			}
@@ -95,8 +88,8 @@ class browse extends Controller
 			{
 				$where[] = array( 'blog_blogs.blog_category_id=?', $category->_id );
 			}
-			$count   = Entry::getItemsWithPermission( $where, 'entry_date desc', NULL, 'read', Filter::FILTER_AUTOMATIC, 0, NULL, TRUE, FALSE, FALSE, TRUE );
-			$entries = Entry::getItemsWithPermission( $where, 'entry_date desc', array( ( $perpage * ( $page - 1 ) ), $perpage ), 'read', Filter::FILTER_AUTOMATIC, 0, NULL, TRUE );
+			$count   = \IPS\blog\Entry::getItemsWithPermission( $where, 'entry_date desc', NULL, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, TRUE, FALSE, FALSE, TRUE );
+			$entries = \IPS\blog\Entry::getItemsWithPermission( $where, 'entry_date desc', array( ( $perpage * ( $page - 1 ) ), $perpage ), 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, TRUE );
 
 			/* Validate Pagination */
 			$totalPages = 	 ceil( $count / $perpage );
@@ -109,69 +102,67 @@ class browse extends Controller
 				}
 			}
 
-			$queryString = 'app=blog&module=blogs&controller=browse';
+            $queryString = 'app=blog&module=blogs&controller=browse';
             if( $category )
             {
                 $queryString .= '&id=' . $category->_id;
             }
-            $paginationUrl = Url::internal( $queryString, 'front', ( $category ) ? 'blog_category' : 'blogs' );
-
+            $paginationUrl = \IPS\Http\Url::internal( $queryString, 'front', ( $category ) ? 'blog_category' : 'blogs' );
 			if( $redirect )
 			{
-				Output::i()->redirect( $paginationUrl->setPage('page', 1 ), NULL, 303 );
+				\IPS\Output::i()->redirect( $paginationUrl->setPage('page', 1 ), NULL, 303 );
 			}
-
 			$pagination = array(
 				'page'    => $page,
 				'pages'   => $totalPages,
 				'perpage' => $perpage,
 				'url'     => $paginationUrl
 			);
-
-			Output::i()->output = Theme::i()->getTemplate( 'browse' )->indexGrid( $entries, $featured, $blogs, $pagination, $viewMode, $category );
+			
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'grid.css', 'blog', 'front' ) );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'browse' )->indexGrid( $entries, $featured, $blogs, $pagination, $viewMode, $category );
 		}
 		else
 		{	
 			/* Blogs table */
-			$table = new Table( Url::internal( 'app=blog&module=blogs&controller=browse', 'front', 'blogs' ) );
+			$table = new \IPS\blog\Blog\Table( \IPS\Http\Url::internal( 'app=blog&module=blogs&controller=browse', 'front', 'blogs' ) );
 			if( $category )
 			{
 				$table->where[] = array( 'blog_category_id=?', $category->_id );
 			}
 			$table->title = 'our_community_blogs';
-			$table->classes = array( 'cBlogList', 'ipsBlogData' );
+			$table->classes = array( 'cBlogList', 'ipsAreaBackground', 'ipsDataList_large' );
 	
 			/* Filters */
 			$table->filters = array(
-				'my_blogs'				=> array( '(' . Db::i()->findInSet( 'blog_groupblog_ids', Member::loggedIn()->groups ) . ' OR ' . 'blog_member_id=? )', Member::loggedIn()->member_id ),
+				'my_blogs'				=> array( '(' . \IPS\Db::i()->findInSet( 'blog_groupblog_ids', \IPS\Member::loggedIn()->groups ) . ' OR ' . 'blog_member_id=? )', \IPS\Member::loggedIn()->member_id ),
 				'blogs_with_content'	=> array( 'blog_count_entries>0' )
 			);
 			
-			Output::i()->output = Theme::i()->getTemplate( 'browse' )->index( $table, $featured, $blogs, $viewMode, $category );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'browse' )->index( $table, $featured, $blogs, $viewMode, $category );
 		}
 		
-		Session::i()->setLocation( Url::internal( 'app=blog', 'front', 'blogs' ), array(), 'loc_blog_viewing_index' );
+		\IPS\Session::i()->setLocation( \IPS\Http\Url::internal( 'app=blog', 'front', 'blogs' ), array(), 'loc_blog_viewing_index' );
 				
 		/* Display */
-		if( count( Category::roots() ) > 1 )
+		if( \count( \IPS\blog\Category::roots() ) > 1 )
 		{
-			Output::i()->sidebar['contextual'] = Theme::i()->getTemplate( 'browse' )->categories( $category );
+			\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate( 'browse' )->categories( $category );
 		}
 
 		if( $category )
 		{
 			foreach( $category->parents() as $parent )
 			{
-				Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 			}
-			Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
 
 			/* Set default search option */
-			Output::i()->defaultSearchOption = array( 'blog_entry', 'blog_entry_pl' );
+			\IPS\Output::i()->defaultSearchOption = array( 'blog_entry', 'blog_entry_pl' );
 		}
-
-		Output::i()->bodyAttributes['contentClass'] = Category::class;
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_browse.js', 'blog', 'front' ) );
-		Output::i()->title		= $category ? $category->_title : Member::loggedIn()->language()->addToStack( 'blogs' );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_browse.js', 'blog', 'front' ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('blogs');
+		
 	}
 }

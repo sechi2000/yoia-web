@@ -12,42 +12,30 @@
 namespace IPS\nexus\modules\admin\payments;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Stack;
-use IPS\Http\Url;
-use IPS\Output;
-use IPS\Session;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Notification Copy Settings
  */
-class emails extends Controller
+class _emails extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'email_copies_settings' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'email_copies_settings' );
 		parent::execute();
 	}
 
@@ -56,10 +44,10 @@ class emails extends Controller
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
-		$form = new Form;
-		$form->add( new CheckboxSet( 'nexus_notify_copy_types', explode( ',', Settings::i()->nexus_notify_copy_types ), FALSE, array( 'options' => array(
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'nexus_notify_copy_types', explode( ',', \IPS\Settings::i()->nexus_notify_copy_types ), FALSE, array( 'options' => array(
 			'invoice_warn'		=> 'nexus_notify_copy_invoice_warn',
 			'new_invoice'		=> 'nexus_notify_copy_new_invoice',
 			'payment_received'	=> 'nexus_notify_copy_payment_received',
@@ -69,16 +57,16 @@ class emails extends Controller
 			'payment_refunded'	=> 'nexus_notify_copy_payment_refunded',
 			'commission_earned'	=> 'nexus_notify_copy_commission_earned',
 		) ) ) );
-		$form->add( new Stack( 'nexus_notify_copy_email', explode( ',', Settings::i()->nexus_notify_copy_email ) ) );
+		$form->add( new \IPS\Helpers\Form\Stack( 'nexus_notify_copy_email', explode( ',', \IPS\Settings::i()->nexus_notify_copy_email ) ) );
 
 		if ( $form->values() )
 		{
 			$form->saveAsSettings();
 			
-			Session::i()->log( 'acplogs__email_copies_setting' );
-			Output::i()->redirect( Url::internal( 'app=nexus&module=payments&controller=paymentsettings&tab=emails' ), 'saved' );
+			\IPS\Session::i()->log( 'acplogs__email_copies_setting' );	
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=payments&controller=paymentsettings&tab=emails' ), 'saved' );
 		}
 		
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 }

@@ -12,40 +12,31 @@
 namespace IPS\nexus\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\DashboardAbstract;
-use IPS\Member;
-use IPS\nexus\Payout;
-use IPS\nexus\Transaction;
-use IPS\Output;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Dashboard extension: PendingActions
  */
-class PendingActions extends DashboardAbstract
+class _PendingActions
 {
 	/**
 	* Can the current user view this dashboard item?
 	*
 	* @return	bool
 	*/
-	public function canView(): bool
+	public function canView()
 	{
-		return  ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' )
+		return  ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' )
 		or
-		Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'advertisements_manage' )
+		\IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'shiporders_manage' )
 		or
-		Settings::i()->nexus_payout and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_manage' ) );
+		\IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'advertisements_manage' )
+		or
+		\IPS\Settings::i()->nexus_payout and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_manage' ) );
 	}
 
 	/** 
@@ -53,25 +44,36 @@ class PendingActions extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
 		/* Pending transactions *might* happen some weird way, so always get the count... but only show the count if we have fraud rules set up */
 		$pendingTransactions = NULL;
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' ) )
 		{
-			$pendingTransactions = Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( Db::i()->in( 't_status', array( Transaction::STATUS_HELD, Transaction::STATUS_WAITING, Transaction::STATUS_REVIEW, Transaction::STATUS_DISPUTED ) ) ) )->first();
-			if ( !$pendingTransactions and !Db::i()->select( 'COUNT(*)', 'nexus_fraud_rules' )->first() )
+			$pendingTransactions = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( \IPS\Db::i()->in( 't_status', array( \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_WAITING, \IPS\nexus\Transaction::STATUS_REVIEW, \IPS\nexus\Transaction::STATUS_DISPUTED ) ) ) )->first();
+			if ( !$pendingTransactions and !\IPS\Db::i()->select( 'COUNT(*)', 'nexus_fraud_rules' )->first() )
 			{
 				$pendingTransactions = NULL;
 			}
 		}
-
+		
+		/* Same with shipments */
+		$pendingShipments = NULL;
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'shiporders_manage' ) )
+		{
+			$pendingShipments = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_ship_orders', array( 'o_status=?', \IPS\nexus\Shipping\Order::STATUS_PENDING ) )->first();
+			if ( !$pendingShipments and !\IPS\Db::i()->select( 'COUNT(*)', 'nexus_packages_products', 'p_physical=1' )->first() )
+			{
+				$pendingShipments = NULL;
+			}
+		}
+		
 		/* And advertisements */
 		$pendingAdvertisements = NULL;
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'advertisements_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'advertisements_manage' ) )
 		{
-			$pendingAdvertisements = Db::i()->select( 'COUNT(*)', 'core_advertisements', array( 'ad_active=-1' ) )->first();
-			if ( !$pendingAdvertisements and !Db::i()->select( 'COUNT(*)', 'nexus_packages_ads' )->first() )
+			$pendingAdvertisements = \IPS\Db::i()->select( 'COUNT(*)', 'core_advertisements', array( 'ad_active=-1' ) )->first();
+			if ( !$pendingAdvertisements and !\IPS\Db::i()->select( 'COUNT(*)', 'nexus_packages_ads' )->first() )
 			{
 				$pendingAdvertisements = NULL;
 			}
@@ -79,13 +81,41 @@ class PendingActions extends DashboardAbstract
 		
 		/* Withdrawals will only be if enabled */
 		$pendingWithdrawals = NULL;
-		if ( Settings::i()->nexus_payout and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_manage' ) )
+		if ( \IPS\Settings::i()->nexus_payout and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_manage' ) )
 		{
-			$pendingWithdrawals = Db::i()->select( 'COUNT(*)', 'nexus_payouts', array( 'po_status=?', Payout::STATUS_PENDING ) )->first();
+			$pendingWithdrawals = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_payouts', array( 'po_status=?', \IPS\nexus\Payout::STATUS_PENDING ) )->first();
 		}
 		
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'nexus', 'front' ) );
+		/* Show support if there are departments we can see */
+		$openSupportRequests = NULL;
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'support', 'requests_manage' ) and \IPS\Db::i()->select( '*', 'nexus_support_departments', array( "( dpt_staff='*' OR " . \IPS\Db::i()->findInSet( 'dpt_staff', \IPS\nexus\Support\Department::staffDepartmentPerms() ) . ')' ) ) )
+		{
+			$myStream = \IPS\nexus\Support\Stream::myStream();
+			$openSupportRequests = $myStream->count( \IPS\Member::loggedIn() );
+		}
 		
-		return Theme::i()->getTemplate( 'dashboard', 'nexus' )->pendingActions( $pendingTransactions, $pendingWithdrawals, $pendingAdvertisements );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'nexus', 'front' ) );
+		
+		return \IPS\Theme::i()->getTemplate( 'dashboard', 'nexus' )->pendingActions( $pendingTransactions, $pendingShipments, $pendingWithdrawals, $openSupportRequests, $pendingAdvertisements );
+	}
+
+	/** 
+	 * Return the block information
+	 *
+	 * @return	array	array( 'name' => 'Block title', 'key' => 'unique_key', 'size' => [1,2,3], 'by' => 'Author name' )
+	 */
+	public function getInfo()
+	{
+		return array();
+	}
+
+	/**
+	 * Save the block data submitted.  This method is only necessary if your block accepts some sort of submitted data to save (such as the 'admin notes' block).
+	 *
+	 * @return	void
+	 * @throws	\LogicException
+	 */
+	public function saveBlock()
+	{
 	}
 }

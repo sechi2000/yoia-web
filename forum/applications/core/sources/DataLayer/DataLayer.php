@@ -11,70 +11,38 @@
 namespace IPS\core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\core\modules\admin\settings\dataLayer as DataLayerController;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Output;
-use IPS\Patterns\Singleton;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function class_exists;
-use function defined;
-use function in_array;
-use function intval;
-use function is_null;
-use function is_numeric;
-use function is_string;
-use function mb_substr;
-use function strtolower;
-use function uasort;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Datalayer Class
  */
-class DataLayer extends Singleton
+class _DataLayer extends \IPS\Patterns\Singleton
 {
 	/**
 	 * @brief	Singleton Instance
 	 */
-	protected static ?Singleton $instance = NULL;
+	protected static $instance = NULL;
 
 	/**
 	 * @brief events as an associative array
 	 */
-	protected array $events = array();
+	protected $events = array();
 
 	/**
 	 * @brief   Key store for the context
 	 */
-	protected array $context = array();
+	protected $context = array();
 
 	/**
 	 *
 	 * @brief These are the available events. The setting changes the 'enabled' and 'formatted_name' properties before processing the event on the front end
 	 */
-	protected array $_eventConfiguration;
-	protected static array $defaultEventConfiguration = array(
+	protected $_eventConfiguration;
+	protected static $defaultEventConfiguration = array(
 		'content_create'    => [
 			'enabled'           => false,
 			'description'       => 'a Content Item is created. This could be a Forum Topic, Blog Post, Gallery Image etc.',
@@ -128,8 +96,8 @@ class DataLayer extends Singleton
 	/**
 	 * @brief These are the available properties. The setting changes the 'enabled' and 'formatted_name' properties before processing the event on the front end
 	 */
-	protected array $_propertiesConfiguration;
-	protected static array $defaultPropertiesConfiguration = array(
+	protected $_propertiesConfiguration;
+	protected static $defaultPropertiesConfiguration = array(
 		'content_id'    => [
 			'event_keys'        => ['content_*', 'file_download'],
 			'pii'               => false,
@@ -183,7 +151,7 @@ class DataLayer extends Singleton
 			'event_keys'        => ['content_view', 'query', 'filter', 'sort'],
 			'pii'               => false,
 			'formatted_name'    => 'page_number',
-			'description'       => 'For Paginated areas such as Topic Listings, Comment Feeds, Search Results, and Activity Streams, this is the <span class="i-font-family_monospace">page_number</span> that the event occurred on. Starts counting at 1. If there is only one page, will be 1.',
+			'description'       => 'For Paginated areas such as Topic Listings, Comment Feeds, Search Results, and Activity Streams, this is the <span class="ipsType_monospace">page_number</span> that the event occurred on. Starts counting at 1. If there is only one page, will be 1.',
 			'short'             => 'Currently viewed page',
 			'enabled'           => true,
 			'type'              => 'number',
@@ -193,7 +161,7 @@ class DataLayer extends Singleton
 			'event_keys'        => ['content_comment', 'content_react', 'content_quote'],
 			'pii'               => false,
 			'formatted_name'    => 'comment_id',
-			'description'       => 'The internal ID of a Comment, Reply, or Review. Note this is type specific, so two Comments with different <span class="i-font-family_monospace">comment_type</span>s can possibly have the same ID.',
+			'description'       => 'The internal ID of a Comment, Reply, or Review. Note this is type specific, so two Comments with different <span class="ipsType_monospace">comment_type</span>s can possibly have the same ID.',
 			'short'             => 'ID of a Comment, Reply or Review',
 			'enabled'           => true,
 			'type'              => 'number',
@@ -203,7 +171,7 @@ class DataLayer extends Singleton
 			'event_keys'        => ['content_comment', 'content_react', 'content_quote'],
 			'pii'               => false,
 			'formatted_name'    => 'comment_url',
-			'description'       => 'The URL of a Comment, Reply, or Review. Note this can change under certain circumstances, so use the <span class="i-font-family_monospace">comment_id</span> and <span class="i-font-family_monospace">comment_type</span> if you need to identify the Comment/Review/Reply.',
+			'description'       => 'The URL of a Comment, Reply, or Review. Note this can change under certain circumstances, so use the <span class="ipsType_monospace">comment_id</span> and <span class="ipsType_monospace">comment_type</span> if you need to identify the Comment/Review/Reply.',
 			'short'             => 'URL of a Comment, Reply, or Review',
 			'enabled'           => true,
 			'type'              => 'string',
@@ -233,7 +201,7 @@ class DataLayer extends Singleton
 			'event_keys'        => ['content_*', 'filter_*', 'sort', 'file_download'],
 			'pii'               => false,
 			'formatted_name'    => 'content_area',
-			'description'       => 'The site Area (app) in which the Content being interacted with is located. Different from <span class="i-font-family_monospace">community_area</span> which is the Area that the Member is viewing. For example, if a member hovers over a Topic located in search results to see the Hovercard, the Topic\'s <span class="i-font-family_monospace">content_area</span> is Forums, while the page itself is Search.',
+			'description'       => 'The site Area (app) in which the Content being interacted with is located. Different from <span class="ipsType_monospace">community_area</span> which is the Area that the Member is viewing. For example, if a member hovers over a Topic located in search results to see the Hovercard, the Topic\'s <span class="ipsType_monospace">content_area</span> is Forums, while the page itself is Search.',
 			'short'             => 'Area of the content',
 			'enabled'           => true,
 			'type'              => 'string',
@@ -243,7 +211,7 @@ class DataLayer extends Singleton
 			'event_keys'        => ['filter_*', 'sort'],
 			'pii'               => false,
 			'formatted_name'    => 'community_area',
-			'description'       => 'The Area (app) the user is viewing. Different from <span class="i-font-family_monospace">content_area</span> which is the area that the content is in. For example, if a member hovers over a Topic located in search results to see the Hovercard, the Topic\'s <span class="i-font-family_monospace">content_area</span> is Forums, while the <span>community_area</span> of the page itself is Search.',
+			'description'       => 'The Area (app) the user is viewing. Different from <span class="ipsType_monospace">content_area</span> which is the area that the content is in. For example, if a member hovers over a Topic located in search results to see the Hovercard, the Topic\'s <span class="ipsType_monospace">content_area</span> is Forums, while the <span>community_area</span> of the page itself is Search.',
 			'short'             => 'Area of the page being viewed',
 			'enabled'           => true,
 			'type'              => 'string',
@@ -286,16 +254,6 @@ HTML,
 			'type'              => 'string',
 			'page_level'        => true,
 		],
-		'content_is_followed' => [
-			'event_keys'        => ['content_*', 'filter_*', 'sort', 'file_download'],
-			'pii'               => false,
-			'formatted_name'    => 'content_is_followed',
-			'description'       => 'Whether the user if following the content item.',
-			'short'             => 'Content item followed',
-			'enabled'           => true,
-			'type'              => 'boolean',
-			'page_level'        => true,
-		],
 		'comment_type'    => [
 			'event_keys'        => ['content_comment', 'content_react', 'content_quote'],
 			'pii'               => false,
@@ -305,17 +263,6 @@ HTML,
 			'enabled'           => true,
 			'type'              => 'string',
 			'page_level'        => false,
-		],
-		'content_anonymous' => [
-			'event_keys' => ['content_*', 'filter_*', 'sort', 'file_download'],
-			'pii'               => false,
-			'formatted_name'    => 'content_anonymous',
-			'description'       => 'Whether the relevant content (item/comment/review) was created anonymously. This attribute is only possible for certain content types, and when true the author ID and Name will be obfuscated',
-			'short'             => 'Content is anonymous',
-			'enabled'           => true,
-			'type'              => 'boolean',
-			'page_level'        => true,
-			'default'           => false,
 		],
 		'content_container_id'    => [
 			'event_keys'        => ['content_*', 'filter_*', 'sort', 'file_download'],
@@ -341,7 +288,7 @@ HTML,
 			'event_keys'        => ['content_*', 'filter_*', 'sort', 'file_download'],
 			'pii'               => false,
 			'formatted_name'    => 'content_container_type',
-			'description'       => 'The actual type of the Content Container, lowercase without spaces (snake case), such as <span class="i-font-family_monospace">forum</span>, <span class="i-font-family_monospace">blog_category</span>, etc.',
+			'description'       => 'The actual type of the Content Container, lowercase without spaces (snake case), such as <span class="ipsType_monospace">forum</span>, <span class="ipsType_monospace">blog_category</span>, etc.',
 			'short'             => 'Type of the Content\'s Container',
 			'enabled'           => true,
 			'type'              => 'string',
@@ -355,17 +302,6 @@ HTML,
 			'short'             => 'URL of the Content\'s Container',
 			'enabled'           => true,
 			'type'              => 'string',
-			'page_level'        => true,
-		],
-		'message_recipient_count' => [
-			'event_keys'        => ['content_*', 'filter_*', 'sort', 'file_download'],
-			'pii'               => false,
-			'formatted_name'    => 'message_recipient_count',
-			'description'       => 'The number of recipients a message was sent to. If the content event or page context is not relevant to a message, this will be <code>null</code>',
-			'short'             => 'PM Recipient Count',
-			'enabled'           => true,
-			'type'              => 'number | null',
-			'default'           => null,
 			'page_level'        => true,
 		],
 		'ips_key'    => [
@@ -392,7 +328,7 @@ HTML,
 			'event_keys'        => [],
 			'pii'               => false,
 			'formatted_name'    => 'logged_in',
-			'description'       => 'Either <span class="i-font-family_monospace">0</span> or <span class="i-font-family_monospace">1</span>, denoting whether or the user viewing the page is Guest or a logged in Member.',
+			'description'       => 'Either <span class="ipsType_monospace">0</span> or <span class="ipsType_monospace">1</span>, denoting whether or the user viewing the page is Guest or a logged in Member.',
 			'short'             => 'Whether the visitor is logged in',
 			'enabled'           => true,
 			'type'              => 'number',
@@ -402,7 +338,7 @@ HTML,
 			'event_keys'        => [],
 			'pii'               => false,
 			'formatted_name'    => 'logged_in_time',
-			'description'       => 'Number of minutes since the currently logged in Member\'s session started. This is <span class="i-font-family_monospace">undefined</span> if the member is not logged in.',
+			'description'       => 'Number of minutes since the currently logged in Member\'s session started. This is <span class="ipsType_monospace">undefined</span> if the member is not logged in.',
 			'short'             => 'Minutes since the visitor logged in',
 			'enabled'           => true,
 			'type'              => 'number',
@@ -432,7 +368,7 @@ HTML,
 			'event_keys'        => [],
 			'pii'               => true,
 			'formatted_name'    => 'member_id',
-			'description'       => 'The ID of the Member viewing the page or executing an event. If the user is logged out, this will have the value of <span class="i-font-family_monospace">undefined</span>.',
+			'description'       => 'The ID of the Member viewing the page or executing an event. If the user is logged out, this will have the value of <span class="ipsType_monospace">undefined</span>.',
 			'short'             => 'Logged in Member\'s ID',
 			'enabled'           => true,
 			'type'              => 'number | string',
@@ -515,7 +451,7 @@ HTML,
 			'event_keys'        => ['*sort'],
 			'pii'               => false,
 			'formatted_name'    => 'sort_by',
-			'description'       => 'The field or property a listing is being sorted by. Could be <span class="i-font-family_monospace">start_date</span>, <span class="i-font-family_monospace">name</span>, <span class="i-font-family_monospace">views</span>, etc.',
+			'description'       => 'The field or property a listing is being sorted by. Could be <span class="ipsType_monospace">start_date</span>, <span class="ipsType_monospace">name</span>, <span class="ipsType_monospace">views</span>, etc.',
 			'short'             => 'Property being sorted by',
 			'enabled'           => true,
 			'type'              => 'string',
@@ -525,7 +461,7 @@ HTML,
 			'event_keys'        => ['*sort'],
 			'pii'               => false,
 			'formatted_name'    => 'sort_direction',
-			'description'       => 'The direction in which a listing was sorted, ascending or descending denoted as <span class="i-font-family_monospace">asc</span> or <span class="i-font-family_monospace">desc</span>.',
+			'description'       => 'The direction in which a listing was sorted, ascending or descending denoted as <span class="ipsType_monospace">asc</span> or <span class="ipsType_monospace">desc</span>.',
 			'short'             => 'Direction being sorted in',
 			'enabled'           => true,
 			'type'              => 'string',
@@ -556,7 +492,7 @@ HTML,
 	/**
 	 * @breif These groups of properties each pertain to the same member and should all be removed if that member has elected to not have their pii collected
 	 */
-	protected static array $_relatedPiiProperties = array(
+	protected static $_relatedPiiProperties = array(
 		array(
 			'author_id',
 			'author_name',
@@ -577,7 +513,7 @@ HTML,
 	 * @param	mixed	$key	Key
 	 * @return	mixed	Value from the datastore
 	 */
-	public function __get( mixed $key ): mixed
+	public function __get( $key )
 	{
 		$property = parent::__get( $key );
 
@@ -594,9 +530,9 @@ HTML,
 	/**
 	 * Cache these in the session if we're not a guest
 	 */
-	public function cache() : void
+	public function cache()
 	{
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
 			$_SESSION['ipsDataLayerEvents'] = $this->events;
 		}
@@ -607,7 +543,7 @@ HTML,
 	 *
 	 * @return void
 	 */
-	public function clearCache() : void
+	public function clearCache()
 	{
 		$_SESSION['ipsDataLayerEvents'] = array();
 	}
@@ -617,11 +553,11 @@ HTML,
 	 *
 	 * @return \IPS\cloud\DataLayer | static
 	 */
-	public static function i(): static
+	public static function i()
 	{
-		if ( !static::hasInstance() )
+		if ( empty( static::$instance ) )
 		{
-			if ( ( \IPS\IN_DEV OR CIC ) AND class_exists( '\IPS\cloud\DataLayer' ) )
+			if ( ( \IPS\IN_DEV OR \IPS\CIC ) AND \class_exists( '\IPS\cloud\DataLayer' ) )
 			{
 				static::$instance = new \IPS\cloud\DataLayer;
 			}
@@ -632,7 +568,7 @@ HTML,
 
 			static::$instance->init();
 
-			if ( Member::loggedIn()->member_id )
+			if ( \IPS\Member::loggedIn()->member_id )
 			{
 				static::$instance->events = $_SESSION['ipsDataLayerEvents'] ?? array();
 			}
@@ -642,21 +578,11 @@ HTML,
 	}
 
 	/**
-	 * Check if there is an instance currently
-	 *
-	 * @return bool
-	 */
-	public static function hasInstance() : bool
-	{
-		return !empty( static::$instance );
-	}
-
-	/**
 	 * Initialize this instance
 	 *
 	 * @return void
 	 */
-	protected function init() : void
+	protected function init()
 	{
 		$this->_eventConfiguration = static::$defaultEventConfiguration;
 		$this->_propertiesConfiguration = static::$defaultPropertiesConfiguration;
@@ -670,17 +596,12 @@ HTML,
 	 * @param   string  $key                The event's key, will be added to $values.
 	 * @param   array   $values             Array of values. On output, $key is added as a property, so $values['event'] will be overridden
 	 * @param   bool    $odkUpdate          Update if the key is already declared for this output? (only one event per key per request)
+	 * @param   bool    $validateProperties Only retain a property in $values if it is recognized.
 	 *
 	 * @return  void
 	 */
-	public function addEvent( string $key, array $values, bool $odkUpdate=true ) : void
+	public function addEvent( string $key, array $values, $odkUpdate=true )
 	{
-		/* Do we care about the datalayer on this request? */
-		if ( Output::i()->bypassDataLayer )
-		{
-			return;
-		}
-
 		/* Is it set */
 		if ( !$odkUpdate AND isset( $this->events[$key] ) )
 		{
@@ -714,7 +635,7 @@ HTML,
 			}
 
 			/* It this property contains PII, make sure PII is allowed */
-			if ( ( $properties[$propertyKey]['pii'] ?? 0 ) AND ! Settings::i()->core_datalayer_include_pii )
+			if ( ( $properties[$propertyKey]['pii'] ?? 0 ) AND ! \IPS\Settings::i()->core_datalayer_include_pii )
 			{
 				continue;
 			}
@@ -724,9 +645,9 @@ HTML,
 			{
 				/* If we know this member doesn't want their PII exposed, don't expose it */
 				if (
-					Settings::i()->core_datalayer_member_pii_choice AND
+					\IPS\Settings::i()->core_datalayer_member_pii_choice AND
 					$value AND
-					( $member = Member::load( $value ) ) AND
+					( $member = \IPS\Member::load( $value ) ) AND
 					$member->member_id AND
 					$member->members_bitoptions['datalayer_pii_optout']
 				)
@@ -734,7 +655,7 @@ HTML,
 					$piiProperties = array_merge( $piiProperties, $this->relatedPiiProperties( $propertyKey ) );
 					continue;
 				}
-				$value = $value ? $this->getSsoId( $value ) : $value;
+				$value = $this->getSsoId( $value );
 			}
 
 			$_values[$propertyKey] = $value;
@@ -758,32 +679,35 @@ HTML,
 	 *
 	 * @return  array
 	 */
-	public function filterProperties( array $properties ) : array
+	public function filterProperties( array $properties )
 	{
 		$output         = array();
 		$piiExcludes    = array();
+		$pii            = \IPS\Settings::i()->core_datalayer_include_pii;
 		foreach ( $this->propertiesConfiguration as $key => $property )
 		{
-			if ( $key === 'content_anonymous' and @$properties[$key] )
-			{
-				$piiExcludes = array_merge( $piiExcludes, $this->relatedPiiProperties( 'author_id' ) );
-			}
-
 			if ( !$property['enabled'] OR !isset( $properties[$key] ) )
 			{
 				continue;
 			}
 
-			if ( !Settings::i()->core_datalayer_include_pii AND ( $property['pii'] ?? 0 ) )
+			if ( !$pii AND ( $property['pii'] ?? 0 ) )
 			{
 				continue;
 			}
 
 			/* Check the member's pii preference. If we can verify the member's PII should NOT be exposed, don't allow it to be added */
-			if ( @$property['replace_with_sso'] and ( $originalID = array_search( $properties[$key], $this->ssoIds ) ) and !$this->includeSSOForMember( $originalID ) )
+			if ( \IPS\Settings::i()->core_datalayer_member_pii_choice AND
+			     @$property['replace_with_sso'] AND
+			     ( $originalID = array_search( $properties[$key], $this->ssoIds ) )
+			)
 			{
-				$piiExcludes = array_merge( $piiExcludes, $this->relatedPiiProperties( $key ) );
-				continue;
+				$member = \IPS\Member::load( $originalID );
+				if ( $member->member_id AND $member->members_bitoptions['datalayer_pii_optout'] )
+				{
+					$piiExcludes = array_merge( $piiExcludes, $this->relatedPiiProperties( $key ) );
+					continue;
+				}
 			}
 
 			$output[$key] = $properties[$key];
@@ -805,13 +729,13 @@ HTML,
 	 *
 	 * @return  array
 	 */
-	public function relatedPiiProperties( string $property ) : array
+	public function relatedPiiProperties( string $property )
 	{
 		$return = array();
 
 		foreach ( static::$_relatedPiiProperties as $group )
 		{
-			if ( in_array( $property, $group ) )
+			if ( \in_array( $property, $group ) )
 			{
 				$return = array_merge( $return, $group );
 			}
@@ -827,7 +751,7 @@ HTML,
 	 *
 	 * @return  void
 	 */
-	public function unsetEvent( string $key ) : void
+	public function unsetEvent( string $key )
 	{
 		unset( $this->events[$key] );
 	}
@@ -841,13 +765,8 @@ HTML,
 	 *
 	 * @return void
 	 */
-	public function addContextProperty( string $key, mixed $value, bool $odkUpdate=true ) : void
+	public function addContextProperty( string $key, $value, bool $odkUpdate=true )
 	{
-		if ( Output::i()->bypassDataLayer )
-		{
-			return;
-		}
-
 		/* Did we set it already? */
 		if ( !$odkUpdate AND isset( $this->context[$key] ) )
 		{
@@ -863,17 +782,17 @@ HTML,
 		}
 
 		/* If this has PII, is PII allowed? */
-		if ( @$properties[$key]['pii'] AND !Settings::i()->core_datalayer_include_pii )
+		if ( ( $properties[$key]['pii'] ?? 0 ) AND ! \IPS\Settings::i()->core_datalayer_include_pii )
 		{
 			return;
 		}
 
 		/* Replace with sso id if needed */
-		if ( @$properties[$key]['replace_with_sso'] )
+		if ( $properties[$key]['replace_with_sso'] ?? 0 )
 		{
 			$value = $this->getSsoId( $value );
 		}
-		elseif ( is_null( $value ) AND isset( $properties[$key]['default'] ) )
+		elseif ( \is_null( $value ) AND isset( $properties[$key]['default'] ) )
 		{
 			$value = $properties[$key]['default'];
 		}
@@ -885,7 +804,7 @@ HTML,
 	/**
 	 * @brief   field cache for the sso ids
 	 */
-	protected array $ssoIds = array();
+	protected $ssoIds = array();
 
 
 	/**
@@ -899,9 +818,9 @@ HTML,
 	 *
 	 * @return  int|string|null
 	 */
-	public function getSsoId( ?int $member_id=null ) : int|string|null
+	public function getSsoId( ?int $member_id=null )
 	{
-		$member_id = $member_id ?? Member::loggedIn()->member_id;
+		$member_id = $member_id ?? \IPS\Member::loggedIn()->member_id;
 
 		/* We want NULL for lack of ID */
 		if ( !$member_id )
@@ -911,13 +830,13 @@ HTML,
 
 		if ( !isset( $this->ssoIds[$member_id] ) )
 		{
-			if ( $sso = Settings::i()->core_datalayer_replace_with_sso )
+			if ( $sso = \IPS\Settings::i()->core_datalayer_replace_with_sso )
 			{
 				try
 				{
-					$this->ssoIds[$member_id] = Db::i()->select( 'token_identifier', 'core_login_links', ['token_member=? AND token_login_method=?', $member_id, $sso], null, 1 )->first();
+					$this->ssoIds[$member_id] = \IPS\Db::i()->select( 'token_identifier', 'core_login_links', ['token_member=? AND token_login_method=?', $member_id, $sso], null, 1 )->first();
 				}
-				catch ( UnderflowException $e )
+				catch ( \UnderflowException $e )
 				{
 					$this->ssoIds[$member_id] = null;
 				}
@@ -936,7 +855,7 @@ HTML,
 	 *
 	 * @return string
 	 */
-	protected function get_jsContext() : string
+	protected function get_jsContext()
 	{
 		/* What has been added during this request? */
 		$_context = $this->context;
@@ -945,35 +864,35 @@ HTML,
 		/* Generate system level values */
 		if ( $properties['logged_in']['enabled'] )
 		{
-			$_context['logged_in'] = (int)( (bool)Member::loggedIn()->member_id );
+			$_context['logged_in'] = (int)( (bool)\IPS\Member::loggedIn()->member_id );
 		}
 
 		if ( $properties['logged_in_time']['enabled'] )
 		{
 			$duration = null;
 
-			if ( Member::loggedIn()->member_id AND $sessionFrontCookie = Request::i()->cookie['IPSSessionFront'] ?? null )
+			if ( \IPS\Member::loggedIn()->member_id AND $sessionFrontCookie = \IPS\Request::i()->cookie['IPSSessionFront'] ?? null )
 			{
-				$_dataLayerLogin = json_decode( base64_decode( @Request::i()->cookie['dataLayerLogin'] ?: '' ), true ) ?: array();
+				$_dataLayerLogin = json_decode( base64_decode( @\IPS\Request::i()->cookie['dataLayerLogin'] ?: '' ), true ) ?: array();
 				$dataLayerLogin = array(
 					'session' => (int) $sessionFrontCookie,
 					'time'    => time(),
 				);
 
-				if ( !isset( $_dataLayerLogin['time'] ) or !is_numeric( $_dataLayerLogin['time'] ) or @$_dataLayerLogin['session'] !== $dataLayerLogin['session'] )
+				if ( !isset( $_dataLayerLogin['time'] ) or !\is_numeric( $_dataLayerLogin['time'] ) or @$_dataLayerLogin['session'] !== $dataLayerLogin['session'] )
 				{
-					Request::i()->setCookie( 'dataLayerLogin', base64_encode( json_encode( $dataLayerLogin ) ) );
+					\IPS\Request::i()->setCookie( 'dataLayerLogin', base64_encode( json_encode( $dataLayerLogin ) ) );
 					$_dataLayerLogin = $dataLayerLogin;
 				}
 
-				$duration = intval( ( time() - intval( $_dataLayerLogin['time'] ) ) / 60 );
+				$duration = \intval( ( time() - \intval( $_dataLayerLogin['time'] ) ) / 60 );
 			}
 
 			$_context['logged_in_time'] = $duration;
 		}
 
 		/* Logged In Member PII */
-		if ( $this->includeSSOForMember() )
+		if ( \IPS\Settings::i()->core_datalayer_include_pii AND ( !\IPS\Settings::i()->core_datalayer_member_pii_choice OR !\IPS\Member::loggedIn()->members_bitoptions['datalayer_pii_optout'] ) )
 		{
 			if ( $properties['member_id']['enabled'] )
 			{
@@ -982,29 +901,29 @@ HTML,
 
 			if ( $properties['member_name']['enabled'] )
 			{
-				$_context['member_name'] = Member::loggedIn()->real_name ?: null;
+				$_context['member_name'] = \IPS\Member::loggedIn()->real_name ?: null;
 			}
 		}
 
 		/* Logged In Member non-PII */
 		if ( $properties['member_group']['enabled'] )
 		{
-			$gid = Member::loggedIn()->group['g_id'] ?: Settings::i()->guest_group;
-			$_context['member_group'] = Lang::load( Lang::defaultLanguage() )->addToStack( "core_group_{$gid}" );
+			$gid = \IPS\Member::loggedIn()->group['g_id'] ?: \IPS\Settings::i()->guest_group;
+			$_context['member_group'] = \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->addToStack( "core_group_{$gid}" );
 		}
 
 		if ( $properties['member_group_id']['enabled'] )
 		{
-			$_context['member_group_id'] = intval( $gid ?? Member::loggedIn()->group['g_id'] ?: Settings::i()->guest_group );
+			$_context['member_group_id'] = \intval( $gid ?? \IPS\Member::loggedIn()->group['g_id'] ?: \IPS\Settings::i()->guest_group );
 		}
 
 		/* The Community/Content Area */
 		if ( $properties['community_area']['enabled'] and !isset( $_context['community_area'] ) )
 		{
-			if ( Dispatcher::i()->application )
+			if ( \IPS\Dispatcher::i()->application )
 			{
-				$directory = Dispatcher::i()->application->directory;
-				$app = strtolower( Lang::load( Lang::defaultLanguage() )->addToStack( "__app_{$directory}" ) );
+				$directory = \IPS\Dispatcher::i()->application->directory;
+				$app = \strtolower( \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->addToStack( "__app_{$directory}" ) );
 			}
 			else
 			{
@@ -1023,21 +942,16 @@ HTML,
 		}
 
 		/* Pagination */
-		if ( isset( $_context['page_number'] ) and is_string( $_context['page_number'] ) )
+		if ( isset( $_context['page_number'] ) and \is_string( $_context['page_number'] ) )
 		{
 			$key = $_context['page_number'] ?? "";
-			$_context['page_number'] = intval( Request::i()->$key ) ?: 1;
+			$_context['page_number'] = \intval( \IPS\Request::i()->$key ) ?: 1;
 		}
 
 		$context = array();
 		$piiExcludes = array();
 		foreach ( $properties as $key => $property )
 		{
-			if ( $key === 'content_anonymous' and @$_context[$key] )
-			{
-				$piiExcludes = array_merge( $piiExcludes, $this->relatedPiiProperties( 'author_id' ) );
-			}
-
 			/* Make sure all are page level, enabled, and valid */
 			if ( !$property['enabled'] or !$property['page_level'] )
 			{
@@ -1046,11 +960,20 @@ HTML,
 			$fkey = $property['formatted_name'];
 
 			/* If we can determine a member based on this property's PII, only include the related PII if we know that member hasn't opted out? */
-			if ( @$property['replace_with_sso'] AND isset( $_context[ $key ] ) AND ( $originalId = array_search( $_context[ $key ], $this->ssoIds ) AND !( $this->includeSSOForMember( $originalId ) ) )
+			if (
+				( $property['replace_with_sso'] ?? 0 ) AND
+				\IPS\Settings::i()->core_datalayer_include_pii AND
+				\IPS\Settings::i()->core_datalayer_member_pii_choice AND
+				isset( $_context[ $key ] ) AND
+				( $originalId = array_search( $_context[ $key ], $this->ssoIds ) )
 			)
 			{
-				$piiExcludes = array_merge( $piiExcludes, $this->relatedPiiProperties( $key ) );
-				continue;
+				$member = \IPS\Member::load( $originalId );
+				if ( !( $member->member_id AND !$member->members_bitoptions['datalayer_pii_optout'] ) )
+				{
+					$piiExcludes = array_merge( $piiExcludes, $this->relatedPiiProperties( $key ) );
+					continue;
+				}
 			}
 
 			/* Add context properties set by the system */
@@ -1086,81 +1009,35 @@ HTML,
 			$out = "const IpsDataLayerContext = " . json_encode( $context ) . ';';
 		}
 
-		Lang::load( Lang::defaultLanguage() )->parseOutputForDisplay( $out );
+		\IPS\Lang::load( \IPS\Lang::defaultLanguage() )->parseOutputForDisplay( $out );
 		return str_replace( ["\u{2028}", "\u{2029}"], ['', ''], $out );
 	}
 
-	/**
-	 * @param Member|int|null $member
-	 * @return bool
-	 */
-	public function includeSSOForMember( Member|int|null $member=null ) :bool
-	{
-		/* Can we determine using settings? */
-		if ( !Settings::i()->core_datalayer_include_pii )
-		{
-			return false;
-		}
 
-		if ( Settings::i()->core_datalayer_include_pii and !Settings::i()->core_datalayer_member_pii_choice )
-		{
-			return true;
-		}
-
-		if ( is_null( $member ) )
-		{
-			$member = Member::loggedIn();
-		}
-
-		static $res = [];
-		$memberId = ( is_int( $member ) ? $member : $member->member_id ) ?: 0;
-		if ( array_key_exists( 'member_' . $memberId, $res ) )
-		{
-			return $res['member_'.$memberId];
-		}
-
-		if ( is_int( $member ) )
-		{
-			try
-			{
-				$member = Member::load( $memberId );
-			}
-			catch ( OutOfRangeException )
-			{
-				$res['member_'.$memberId] = false;
-				return false; // edge case, but if the member doesn't exist, let's not expose PII on the grounds that there technically shouldn't really be PII to expose
-			}
-		}
-
-		$res['member_' . $memberId] = !$member->members_bitoptions['datalayer_pii_optout'];
-		return $res['member_' . $memberId];
-	}
-
-
-	public static string $configCacheKey = 'dataLayerConfig';
+	public static $configCacheKey = 'dataLayerConfig';
 
 	/**
 	 * Event and Property configuration as a valid JavaScript const assignment
 	 *
 	 * @return  string
 	 */
-	public function get_jsConfig() : string
+	public function get_jsConfig()
 	{
 		$key = static::$configCacheKey . '_jsConfig';
 		try
 		{
-			$cached = Store::i()->$key;
+			$cached = \IPS\Data\Store::i()->$key;
 			if ( $cached )
 			{
 				return $cached;
 			}
 		}
-		catch ( OutOfRangeException $e ) {}
+		catch ( \OutOfRangeException $e ) {}
 
 		$config = array(
 			'_events'       => $this->eventConfiguration,
 			'_properties'   => $this->propertiesConfiguration,
-			'_pii'          => (bool) Settings::i()->core_datalayer_include_pii,
+			'_pii'          => (bool) \IPS\Settings::i()->core_datalayer_include_pii,
 			'_pii_groups'   => static::$_relatedPiiProperties,
 		);
 
@@ -1183,10 +1060,10 @@ HTML,
 			$out = "const IpsDataLayerConfig = " . json_encode( $config ) . ';';
 		}
 
-		Lang::load( Lang::defaultLanguage() )->parseOutputForDisplay( $out );
+		\IPS\Lang::load( \IPS\Lang::defaultLanguage() )->parseOutputForDisplay( $out );
 		$out = str_replace( ["\u{2028}", "\u{2029}"], ['', ''], $out );
 
-		Store::i()->$key = $out;
+		\IPS\Data\Store::i()->$key = $out;
 		return $out;
 	}
 
@@ -1197,12 +1074,12 @@ HTML,
 	 *
 	 * @return void
 	 */
-	public function clearCachedConfiguration( array $suffixes=array('_jsConfig','_events','_eventProperties','_properties','_propertyEvents') ) : void
+	public function clearCachedConfiguration( array $suffixes=array('_jsConfig','_events','_eventProperties','_properties','_propertyEvents') )
 	{
 		foreach( $suffixes as $suffix )
 		{
 			$key = static::$configCacheKey . $suffix;
-			unset( Store::i()->$key );
+			unset( \IPS\Data\Store::i()->$key );
 
 			if ( $suffix === '_events' )
 			{
@@ -1220,7 +1097,7 @@ HTML,
 	 *
 	 * @return  string
 	 */
-	public function get_jsEvents() : string
+	public function get_jsEvents()
 	{
 		$out = "const IpsDataLayerEvents = {$this->jsonEvents};";
 		return str_replace( ["\u{2028}", "\u{2029}"], ['', ''], $out );
@@ -1231,16 +1108,16 @@ HTML,
 	 *
 	 * @return  string
 	 */
-	public function get_jsonEvents() : string
+	public function get_jsonEvents()
 	{
 		/* We add the register event here */
-		$member = Member::loggedIn();
+		$member = \IPS\Member::loggedIn();
 		if (
 			$member->member_id AND
 			!$member->members_bitoptions['datalayer_event_fired'] AND
 			$this->eventConfiguration['account_register']['enabled'] AND
-			!Request::i()->isAjax() AND
-			Request::i()->do !== 'logout' )
+			!\IPS\Request::i()->isAjax() AND
+			\IPS\Request::i()->do !== 'logout' )
 		{
 			$this->addEvent( 'account_register', array() );
 			$member->members_bitoptions['datalayer_event_fired'] = 1;
@@ -1257,14 +1134,14 @@ HTML,
 		}
 
 		$out = \IPS\IN_DEV ? str_replace( "\n", "\n\t", json_encode( $events, JSON_PRETTY_PRINT ) ) : json_encode( $events );
-		Lang::load( Lang::defaultLanguage() )->parseOutputForDisplay( $out );
+		\IPS\Lang::load( \IPS\Lang::defaultLanguage() )->parseOutputForDisplay( $out );
 		return $out;
 	}
 
 	/**
 	 * @return bool
 	 */
-	public final function get_customPropertiesSupported() : bool
+	public final function get_customPropertiesSupported()
 	{
 		return method_exists( $this, 'saveCustomProperty' );
 	}
@@ -1277,24 +1154,24 @@ HTML,
 	 *
 	 * @return array
 	 */
-	public function getEventProperties( string $key, bool $onlyActive=false ) : array
+	public function getEventProperties( string $key, bool $onlyActive=false )
 	{
 		/* Is it cached? */
 		$cacheKey = static::$configCacheKey . '_eventProperties';
 		$configuration = array();
 		try
 		{
-			$configuration = json_decode( Store::i()->$cacheKey, true ) ?: array();
+			$configuration = json_decode( \IPS\Data\Store::i()->$cacheKey, true ) ?: array();
 			if ( !empty( $configuration[$key][(int) $onlyActive] ) )
 			{
 				return $configuration[$key][(int) $onlyActive];
 			}
 		}
-		catch ( OutOfRangeException $e ) {}
+		catch ( \OutOfRangeException $e ) {}
 
 		$return = array();
 		$properties = $this->propertiesConfiguration;
-		$pii = Settings::i()->core_datalayer_include_pii;
+		$pii = \IPS\Settings::i()->core_datalayer_include_pii;
 		foreach ( $properties as $propertyKey => $property )
 		{
 			if ( !$onlyActive OR ( $property['enabled'] AND !( !$pii AND $property['pii'] ) ) )
@@ -1313,7 +1190,7 @@ HTML,
 
 		/* Cache for next time */
 		$configuration[$key][(int) $onlyActive] = $return;
-		Store::i()->$cacheKey = json_encode( $configuration );
+		\IPS\Data\Store::i()->$cacheKey = json_encode( $configuration );
 		return $return;
 	}
 
@@ -1325,21 +1202,21 @@ HTML,
 	 *
 	 * @return array
 	 */
-	public function getPropertyEvents( string $key, bool $onlyActive=false ) : array
+	public function getPropertyEvents( string $key, bool $onlyActive=false )
 	{
 		/* Is it cached */
 		$cacheKey = static::$configCacheKey . '_propertyEvents';
 		$configuration = array();
 		try
 		{
-			$configuration = json_decode( Store::i()->$cacheKey, true ) ?: array();
+			$configuration = json_decode( \IPS\Data\Store::i()->$cacheKey, true ) ?: array();
 			if ( !empty( $configuration[$key][(int) $onlyActive] ) )
 			{
 				return $configuration[$key][(int) $onlyActive];
 			}
 			$configuration = array();
 		}
-		catch ( OutOfRangeException $e ) {}
+		catch ( \OutOfRangeException $e ) {}
 
 		$return = array();
 		$events = $this->eventConfiguration;
@@ -1367,7 +1244,7 @@ HTML,
 		}
 
 		$configuration[$key][(int) $onlyActive] = $return;
-		Store::i()->$cacheKey = json_encode( $configuration );
+		\IPS\Data\Store::i()->$cacheKey = json_encode( $configuration );
 		return $return;
 	}
 
@@ -1378,22 +1255,22 @@ HTML,
 	 *
 	 * @return array
 	 */
-	public function get_eventConfiguration() : array
+	public function get_eventConfiguration()
 	{
 		/* Is it cached */
 		$key = static::$configCacheKey . '_events';
 		try
 		{
-			$configuration = json_decode( Store::i()->$key, true );
+			$configuration = json_decode( \IPS\Data\Store::i()->$key, true );
 			if ( !empty( $configuration ) )
 			{
 				return $configuration;
 			}
 		}
-		catch ( OutOfRangeException $e ) {}
+		catch ( \OutOfRangeException $e ) {}
 
 		/* Merge in our settings */
-		$setting    = json_decode( Settings::i()->core_datalayer_events, true ) ?? array();
+		$setting    = json_decode( \IPS\Settings::i()->core_datalayer_events, true ) ?? array();
 		$events     = $this->_eventConfiguration;
 		$setting    = array_filter( $setting, function( $_key ) use ( $events ) { return isset( $events[$_key] ); }, ARRAY_FILTER_USE_KEY );
 		$this->_eventConfiguration  = array_replace_recursive( $this->_eventConfiguration, $setting );
@@ -1401,13 +1278,13 @@ HTML,
 		/* Make sure there's a "short" property */
 		foreach ( array_keys( $this->_eventConfiguration ) as $event )
 		{
-			$this->_eventConfiguration[$event]['short'] = $this->_eventConfiguration[$event]['short'] ?? mb_substr( $this->_eventConfiguration[$event]['description'] ?? '', 0, 70 );
+			$this->_eventConfiguration[$event]['short'] = $this->_eventConfiguration[$event]['short'] ?? \mb_substr( $this->_eventConfiguration[$event]['description'] ?? '', 0, 70 );
 		}
 
-		uasort( $this->_eventConfiguration, function( $a, $b ) { return intval( $a['formatted_name'] > $b['formatted_name'] ); } );
+		\uasort( $this->_eventConfiguration, function( $a, $b ) { return \intval( $a['formatted_name'] > $b['formatted_name'] ); } );
 
 		$this->clearCachedConfiguration([ '_jsConfig', '_eventProperties', '_propertyEvents' ]);
-		Store::i()->$key = json_encode( $this->_eventConfiguration );
+		\IPS\Data\Store::i()->$key = json_encode( $this->_eventConfiguration );
 
 		return $this->_eventConfiguration;
 	}
@@ -1419,22 +1296,22 @@ HTML,
 	 *
 	 * @return array
 	 */
-	public function get_propertiesConfiguration() : array
+	public function get_propertiesConfiguration()
 	{
 		/* Is it cached */
 		$key = static::$configCacheKey . '_properties';
 		try
 		{
-			$configuration = json_decode( Store::i()->$key, true );
+			$configuration = json_decode( \IPS\Data\Store::i()->$key, true );
 			if ( !empty( $configuration ) )
 			{
 				return $configuration;
 			}
 		}
-		catch ( OutOfRangeException $e ) {}
+		catch ( \OutOfRangeException $e ) {}
 
 		/* Merge in our settings and custom Properties */
-		$setting    = json_decode( Settings::i()->core_datalayer_properties, true ) ?? array();
+		$setting    = json_decode( \IPS\Settings::i()->core_datalayer_properties, true ) ?? array();
 		$properties = $this->_propertiesConfiguration;
 		$setting    = array_filter( $setting, function( $value, $_key ) use ( $properties ) { return isset( $properties[$_key] ) OR $value['custom'] ?? 0; }, ARRAY_FILTER_USE_BOTH );
 		$this->_propertiesConfiguration = array_replace_recursive( $this->_propertiesConfiguration, $setting );
@@ -1448,15 +1325,15 @@ HTML,
 			}
 			elseif ( !isset( $this->_propertiesConfiguration[$property]['short'] ) )
 			{
-				$this->_propertiesConfiguration[$property]['short'] = mb_substr( $this->_propertiesConfiguration[$property]['description'] ?? '', 0, 70 );
+				$this->_propertiesConfiguration[$property]['short'] = \mb_substr( $this->_propertiesConfiguration[$property]['description'] ?? '', 0, 70 );
 			}
 
 		}
 
-		uasort( $this->_propertiesConfiguration, function( $a, $b ) { return intval( $a['formatted_name'] > $b['formatted_name'] ); } );
+		\uasort( $this->_propertiesConfiguration, function( $a, $b ) { return \intval( $a['formatted_name'] > $b['formatted_name'] ); } );
 
 		$this->clearCachedConfiguration([ '_jsConfig', '_eventProperties', '_propertyEvents' ]);
-		Store::i()->$key = json_encode( $this->_propertiesConfiguration );
+		\IPS\Data\Store::i()->$key = json_encode( $this->_propertiesConfiguration );
 
 		return $this->_propertiesConfiguration;
 	}
@@ -1469,16 +1346,16 @@ HTML,
 	 * @param   bool    $add        Whether to add this property if it doesn't exist and is custom
 	 *
 	 * @return void
-	 * @throws InvalidArgumentException If $changes['formatted_name'] or $key contains something other than letters and underscores or if the new formatted_name is already taken
+	 * @throws \InvalidArgumentException If $changes['formatted_name'] or $key contains something other than letters and underscores or if the new formatted_name is already taken
 	 */
-	public function savePropertyConfiguration( string $key, array $changes, bool $add=false ) : void
+	public function savePropertyConfiguration( string $key, array $changes, bool $add=false )
 	{
 		$properties = $this->propertiesConfiguration;
 
 		/* Make sure the key is valid */
-		if ( preg_match( "/[^a-zA-Z_]/", $key ) )
+		if ( preg_match( "/[^a-z,A-Z,\_]/", $key ) )
 		{
-			throw new InvalidArgumentException( "The property key '$key' is invalid, property keys can only contain letters and underscores." );
+			throw new \InvalidArgumentException( "The property key '$key' is invalid, property keys can only contain letters and underscores." );
 		}
 
 		/* If this is an unknown property, make sure that we specify it's custom and set default fields */
@@ -1505,6 +1382,14 @@ HTML,
 				$changes
 			);
 			$changes['custom'] = true;
+			if ( !isset( $properties[$key] ) )
+			{
+				$properties[ $key ] = $changes;
+			}
+			else
+			{
+				array_replace_recursive( $properties[ $key ], $changes );
+			}
 		}
 		else
 		{
@@ -1514,25 +1399,25 @@ HTML,
 		/* Check the formatted_name */
 		if ( isset( $changes['formatted_name'] ) )
 		{
-			if ( preg_match( "/[^a-zA-Z_]/", $changes['formatted_name'] ) )
+			if ( preg_match( "/[^a-z,A-Z,\_]/", $changes['formatted_name'] ) )
 			{
-				throw new InvalidArgumentException( "The formatted name '{$changes['formatted_name']}' is invalid, formatted names can only contain letters and underscores." );
+				throw new \InvalidArgumentException( "The formatted name '{$changes['formatted_name']}' is invalid, formatted names can only contain letters and underscores." );
 			}
 
 			foreach ( $properties as $property => $data )
 			{
 				if ( $property !== $key AND $data['formatted_name'] === $changes['formatted_name'] )
 				{
-					throw new InvalidArgumentException( "The formatted name '{$changes['formatted_name']}' is already in use for the property '$property'" );
+					throw new \InvalidArgumentException( "The formatted name '{$changes['formatted_name']}' is already in use for the property '$property'" );
 				}
 			}
 		}
 
 		/* These should never be set in the setting since other code assumes these properties are what's specified in the arrays */
 		$properties[$key] = $properties[$key] ?? array();
-		unset( $changes['pii'] );
 		if ( !( $properties[$key]['custom'] ?? 0 ) )
 		{
+			unset( $changes['pii'] );
 			unset( $changes['event_keys'] );
 			unset( $changes['description'] );
 			unset( $changes['short'] );
@@ -1540,9 +1425,9 @@ HTML,
 			unset( $changes['page_level'] );
 		}
 
-		$setting        = json_decode( Settings::i()->core_datalayer_properties, true );
+		$setting        = json_decode( \IPS\Settings::i()->core_datalayer_properties, true );
 		$setting[$key]  = array_replace( $setting[$key] ?? array(), $changes );
-		Settings::i()->changeValues([ 'core_datalayer_properties' => json_encode( $setting ) ]);
+		\IPS\Settings::i()->changeValues([ 'core_datalayer_properties' => json_encode( $setting ) ]);
 		$this->clearCachedConfiguration([ ' _jsConfig', '_eventProperties', '_properties', '_propertyEvents' ]);
 	}
 
@@ -1553,37 +1438,37 @@ HTML,
 	 * @param   array   $changes    The event's changed fields and their values
 	 *
 	 * @return  void
-	 * @throws  InvalidArgumentException If $changes['formatted_name'] or $key contains something other than letters and underscores or if the new formatted_name is already taken
+	 * @throws  \InvalidArgumentException If $changes['formatted_name'] or $key contains something other than letters and underscores or if the new formatted_name is already taken
 	 */
-	public function saveEventConfiguration( string $key, array $changes ) : void
+	public function saveEventConfiguration( string $key, array $changes )
 	{
 		$events = $this->eventConfiguration;
 
 		/* Make sure the key is valid */
-		if ( preg_match( "/[^a-zA-Z_]/", $key ) )
+		if ( preg_match( "/[^a-z,A-Z,\_]/", $key ) )
 		{
-			throw new InvalidArgumentException( "The event key '$key' is invalid, event keys can only contain letters and underscores." );
+			throw new \InvalidArgumentException( "The event key '$key' is invalid, event keys can only contain letters and underscores." );
 		}
 
 		/* No custom events, throw an exception if we don't know this one */
 		if ( !isset( $events[$key] ) )
 		{
-			throw new InvalidArgumentException( "The event '$key' is not recognized." );
+			throw new \InvalidArgumentException( "The event '$key' is not recognized." );
 		}
 
 		/* Check the formatted_name */
 		if ( isset( $changes['formatted_name'] ) )
 		{
-			if ( preg_match( "/[^a-zA-Z_]/", $changes['formatted_name'] ) )
+			if ( preg_match( "/[^a-z,A-Z,\_]/", $changes['formatted_name'] ) )
 			{
-				throw new InvalidArgumentException( "The formatted name '{$changes['formatted_name']}' is invalid, formatted names can only contain letters and underscores." );
+				throw new \InvalidArgumentException( "The formatted name '{$changes['formatted_name']}' is invalid, formatted names can only contain letters and underscores." );
 			}
 
 			foreach ( $events as $event => $data )
 			{
 				if ( $event !== $key AND $data['formatted_name'] === $changes['formatted_name'] )
 				{
-					throw new InvalidArgumentException( "The formatted name '{$changes['formatted_name']}' is already in use for the event '$event'." );
+					throw new \InvalidArgumentException( "The formatted name '{$changes['formatted_name']}' is already in use for the event '$event'." );
 				}
 			}
 		}
@@ -1592,10 +1477,10 @@ HTML,
 		unset( $changes['description'] );
 		unset( $changes['short'] );
 
-		$setting        = json_decode( Settings::i()->core_datalayer_events, true );
+		$setting        = json_decode( \IPS\Settings::i()->core_datalayer_events, true );
 		$setting[$key]  = array_replace( $setting[$key] ?? array(), $changes );
 		unset( $setting[$key][$key] );
-		Settings::i()->changeValues([ 'core_datalayer_events' => json_encode( $setting ) ]);
+		\IPS\Settings::i()->changeValues([ 'core_datalayer_events' => json_encode( $setting ) ]);
 		$this->clearCachedConfiguration();
 	}
 
@@ -1604,28 +1489,28 @@ HTML,
 	 *
 	 * @return string
 	 */
-	public function handlers() : string
+	public function handlers()
 	{
-		Dispatcher::i()->checkAcpPermission( 'dataLayer_handlers_view' );
-		$class = DataLayerController::$handlerClass;
+		\IPS\Dispatcher::i()->checkAcpPermission( 'dataLayer_handlers_view' );
+		$class = \IPS\core\modules\admin\settings\dataLayer::$handlerClass;
 		if ( !( class_exists( $class ) AND method_exists( $class, 'handlerForm' ) AND method_exists( $class, 'loadWhere' ) ) )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=dataLayer&tab=main' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=main' ) );
 		}
 
 		if ( isset( $_SESSION['handler_saved'] ) )
 		{
 			unset( $_SESSION['handler_saved'] );
-			Output::i()->inlineMessage = 'Saved';
+			\IPS\Output::i()->inlineMessage = 'Saved';
 		}
 		elseif ( isset( $_SESSION['handler_added'] ) )
 		{
 			unset( $_SESSION['handler_added'] );
-			Output::i()->inlineMessage = 'Created';
+			\IPS\Output::i()->inlineMessage = 'Created';
 		}
 
 		$handlers = $class::loadWhere();
-		return Theme::i()->getTemplate( 'settings', 'core', 'admin' )->handlers( $handlers );
+		return \IPS\Theme::i()->getTemplate( 'settings', 'core', 'admin' )->handlers( $handlers );
 	}
 
 
@@ -1633,127 +1518,127 @@ HTML,
 	/**
 	 * Add a new handler
 	 *
-	 * @return void
+	 * @return string
 	 */
-	public function addHandler() : void
+	public function addHandler()
 	{
-		Dispatcher::i()->checkAcpPermission( 'dataLayer_handlers_edit' );
-		$class = DataLayerController::$handlerClass;
+		\IPS\Dispatcher::i()->checkAcpPermission( 'dataLayer_handlers_edit' );
+		$class = \IPS\core\modules\admin\settings\dataLayer::$handlerClass;
 		if ( !( class_exists( $class ) AND method_exists( $class, 'handlerForm' ) AND method_exists( $class, 'loadWhere' ) ) )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=dataLayer&tab=main' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=main' ) );
 		}
 
 		$handler    = new $class;
 		$form       = $handler->handlerForm();
-		$handlersUrl = (string) Url::internal( 'app=core&module=settings&controller=dataLayer&tab=handlers' );
+		$handlersUrl = (string) \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=handlers' );
 
-		Output::i()->title         = Member::loggedIn()->language()->get( 'datalayer_handler_form' );
-		Output::i()->breadcrumb    = array(
-			[ Url::internal( 'app=core&module=settings&controller=dataLayer' ), Member::loggedIn()->language()->get( 'menu__core_settings_dataLayer' ) ],
-			[ $handlersUrl, Member::loggedIn()->language()->get( 'datalayer_handlers' ) ],
-			[ '#', 'Edit ' . Output::i()->title ]
+		\IPS\Output::i()->title         = \IPS\Member::loggedIn()->language()->get( 'datalayer_handler_form' );
+		\IPS\Output::i()->breadcrumb    = array(
+			[ \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer' ), \IPS\Member::loggedIn()->language()->get( 'menu__core_settings_dataLayer' ) ],
+			[ $handlersUrl, \IPS\Member::loggedIn()->language()->get( 'datalayer_handlers' ) ],
+			[ '#', 'Edit ' . \IPS\Output::i()->title ]
 		);
 
 		if ( $values = $form->values() )
 		{
 			$_SESSION['handler_added'] = 1;
-			Output::i()->redirect( $handlersUrl );
+			\IPS\Output::i()->redirect( $handlersUrl );
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'settings', 'core', 'admin' )->formWrapper( $form );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'settings', 'core', 'admin' )->formWrapper( $form );
 	}
 
 	/**
 	 * Modify an existing handler
 	 *
-	 * @return void
+	 * @return string
 	 */
-	public function saveHandler() : void
+	public function saveHandler()
 	{
-		Dispatcher::i()->checkAcpPermission( 'dataLayer_handlers_view' );
-		$class = DataLayerController::$handlerClass;
+		\IPS\Dispatcher::i()->checkAcpPermission( 'dataLayer_handlers_view' );
+		$class = \IPS\core\modules\admin\settings\dataLayer::$handlerClass;
 		if ( !( class_exists( $class ) AND method_exists( $class, 'handlerForm' ) AND method_exists( $class, 'loadWhere' ) ) )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=dataLayer&tab=main' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=main' ) );
 		}
 
-		$handlersUrl = (string) Url::internal( 'app=core&module=settings&controller=dataLayer&tab=handlers' );
+		$handlersUrl = (string) \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=handlers' );
 		try
 		{
-			if( !( $id = intval( Request::i()->id ) ) )
+			if( !( $id = \intval( \IPS\Request::i()->id ) ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
 			$handler        = $class::load( $id );
 			$form           = $handler->handlerForm();
 
-			Output::i()->title         = "Edit {$handler->name}";
-			Output::i()->breadcrumb    = array(
-				[ Url::internal( 'app=core&module=settings&controller=dataLayer' ), Member::loggedIn()->language()->get( 'menu__core_settings_dataLayer' ) ],
-				[ $handlersUrl, Member::loggedIn()->language()->get( 'datalayer_handlers' ) ],
+			\IPS\Output::i()->title         = "Edit {$handler->name}";
+			\IPS\Output::i()->breadcrumb    = array(
+				[ \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer' ), \IPS\Member::loggedIn()->language()->get( 'menu__core_settings_dataLayer' ) ],
+				[ $handlersUrl, \IPS\Member::loggedIn()->language()->get( 'datalayer_handlers' ) ],
 				[ '#', $handler->name ]
 			);
 
-			if ( ! Member::loggedIn()->hasAcpRestriction( 'dataLayer_handlers_edit' ) )
+			if ( ! \IPS\Member::loggedIn()->hasAcpRestriction( 'dataLayer_handlers_edit' ) )
 			{
-				Output::i()->title = "Viewing {$handler->name}";
+				\IPS\Output::i()->title = "Viewing {$handler->name}";
 			}
 
 			if ( $form->values() )
 			{
 				$_SESSION['handler_saved'] = 1;
-				Output::i()->redirect( $handlersUrl );
+				\IPS\Output::i()->redirect( $handlersUrl );
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->redirect( $handlersUrl );
+			\IPS\Output::i()->redirect( $handlersUrl );
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'settings', 'core', 'admin' )->formWrapper( $form );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'settings', 'core', 'admin' )->formWrapper( $form );
 	}
 
 	/**
 	 * Delete handler
 	 *
-	 * @return void
+	 * @return string
 	 */
-	public function deleteHandler() : void
+	public function deleteHandler()
 	{
-		Dispatcher::i()->checkAcpPermission( 'dataLayer_handlers_edit' );
-		if ( Request::i()->isAjax() OR Request::i()->confirm )
+		\IPS\Dispatcher::i()->checkAcpPermission( 'dataLayer_handlers_edit' );
+		if ( \IPS\Request::i()->isAjax() OR \IPS\Request::i()->confirm )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 		}
 
-		$class = DataLayerController::$handlerClass;
+		$class = \IPS\core\modules\admin\settings\dataLayer::$handlerClass;
 		if ( !( class_exists( $class ) AND method_exists( $class, 'handlerForm' ) AND method_exists( $class, 'loadWhere' ) ) )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=dataLayer&tab=main' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=main' ) );
 		}
 
-		$handlersUrl    = Url::internal( 'app=core&module=settings&controller=dataLayer&tab=handlers' );
-		if ( Request::i()->isAjax() )
+		$handlersUrl    = \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=handlers' );
+		if ( \IPS\Request::i()->isAjax() )
 		{
 			$handlersUrl = $handlersUrl->setQueryString(['ct' => time()]);
 		}
 		try
 		{
-			if( !( $id = intval( Request::i()->id ) ) )
+			if( !( $id = \intval( \IPS\Request::i()->id ) ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
 			/* Make sure the user confirmed the deletion */
-			Request::i()->confirmedDelete();
+			\IPS\Request::i()->confirmedDelete();
 
 			$handler = $class::load( $id );
 			$handler->delete();
 		}
-		catch ( OutOfRangeException $e ) {}
-		Output::i()->redirect( $handlersUrl );
+		catch ( \OutOfRangeException $e ) {}
+		\IPS\Output::i()->redirect( $handlersUrl );
 	}
 
 	/**
@@ -1761,102 +1646,48 @@ HTML,
 	 *
 	 * @return void
 	 */
-	public function enableToggle() : void
+	public function enableToggle()
 	{
-		Session::i()->csrfCheck();
-		Dispatcher::i()->checkAcpPermission( 'datalayer_handlers_edit' );
+		\IPS\Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'datalayer_handlers_edit' );
 
-		if ( isset( Request::i()->id ) AND isset( Request::i()->status ) )
+		if ( isset( \IPS\Request::i()->id ) AND isset( \IPS\Request::i()->status ) )
 		{
-			$class = DataLayerController::$handlerClass;
+			$class = \IPS\core\modules\admin\settings\dataLayer::$handlerClass;
 			if ( ( class_exists( $class ) AND method_exists( $class, 'handlerForm' ) AND method_exists( $class, 'loadWhere' ) ) )
 			{
 				try
 				{
-					$handler = $class::load( Request::i()->id );
-					$handler->enabled = (bool) Request::i()->status;
+					$handler = $class::load( \IPS\Request::i()->id );
+					$handler->enabled = (bool) \IPS\Request::i()->status;
 					$handler->save();
 					return;
 				}
-				catch ( UnderflowException $e ) {}
+				catch ( \UnderflowException $e ) {}
 			}
 
 		}
-		Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=dataLayer&tab=handlers' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=handlers' ) );
 	}
 
 	/**
 	 * Get the data layer properties used when viewing a member's profile
 	 *
-	 * @param 	Member 		$member					The member
+	 * @param 	\IPS\Member 		$member					The member
 	 * @param 	array 				$additionalProperties	Optional: Any additional properties to set (e.g. view location)
 	 * @return array
 	 */
-	public function getMemberProfileEventProperties( Member $member, array $additionalProperties=array() ) : array
+	public function getMemberProfileEventProperties( \IPS\Member $member, array $additionalProperties=array() ) : array
 	{
-		$profileId = $member->members_bitoptions['datalayer_pii_optout'] ? '' : DataLayer::i()->getSsoId($member->member_id);
+		$profileId = $member->members_bitoptions['datalayer_pii_optout'] ? '' : \IPS\core\DataLayer::i()->getSsoId($member->member_id);
 		$properties = array(
-			'profile_group' 	=> Group::load( $member->member_group_id )->formattedName,
+			'profile_group' 	=> \IPS\Member\Group::load( $member->member_group_id )->formattedName,
 			'profile_group_id' 	=> $member->member_group_id ?: null,
 			'profile_name'	 	=> $profileId ? $member->real_name : null,
 			'profile_id'		=> $profileId ?: null,
 		);
 
-		return array_merge( $properties, $additionalProperties );
-	}
-
-	/**
-	 * Method to determine whether
-	 *
-	 * @param string[]|string $features     Features that must be available for this site's package for the data layer to be enabled.
-	 *
-	 * @return bool
-	 */
-	public static function enabled( array|string $features=[] ) : bool
-	{
-		if ( !Settings::i()->core_datalayer_enabled or Output::i()->bypassDataLayer )
-		{
-			return false;
-		}
-		else if ( empty( $features ) )
-		{
-			return true;
-		}
-
-		/* Now let's determine if the data layer is enabled for the provided features. We'll cache the result */
-		static $results = [];
-		if ( is_string( $features ) )
-		{
-			$cacheKey = $features;
-			$features = [ $features];
-		}
-		else
-		{
-			$cacheKey = implode( ',', sort( $features ) );
-		}
-
-		if ( !array_key_exists( $cacheKey, $results ) )
-		{
-			/* assume it's enabled till we find one that's not */
-			$results[$cacheKey] = true;
-			foreach ( $features as $feature )
-			{
-				try
-				{
-					if ( !Bridge::i()->featureIsEnabled( $feature ) )
-					{
-						$results[$cacheKey] = false;
-						break;
-					}
-				}
-				catch ( Exception )
-				{
-					$results[$cacheKey] = false;
-					break;
-				}
-			}
-		}
-
-		return $results[$cacheKey];
+		array_replace( $properties, $additionalProperties );
+		return $properties;
 	}
 }

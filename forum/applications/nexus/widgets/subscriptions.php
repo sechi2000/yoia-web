@@ -12,41 +12,40 @@
 namespace IPS\nexus\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use IPS\nexus\Subscription;
-use IPS\Widget;
-use IPS\Widget\Customizable;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * subscriptions Widget
  */
-class subscriptions extends Widget implements Customizable
+class _subscriptions extends \IPS\Widget
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'subscriptions';
+	public $key = 'subscriptions';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'nexus';
+	public $app = 'nexus';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 	
 	/**
 	 * Initialise this widget
 	 *
 	 * @return void
 	 */ 
-	public function init(): void
+	public function init()
 	{
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'subscriptions.css', 'nexus' ) );
 		parent::init();
 	}
 	
@@ -55,10 +54,10 @@ class subscriptions extends Widget implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		/* If we already have one, don't show it */
-		if ( Subscription::loadByMember( Member::loggedIn(), true ) )
+		if ( \IPS\nexus\Subscription::loadActiveByMember( \IPS\Member::loggedIn() ) )
 		{
 			return '';
 		}

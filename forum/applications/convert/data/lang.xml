@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <language>
- <app key="convert" version="5001403">
+ <app key="convert" version="107827">
   <word key="__app_convert" js="0">Converter</word>
   <word key="menu__convert_manage" js="0">Conversions</word>
   <word key="menu__convert_manage_manage_start" js="0">Start New Conversion</word>
@@ -50,8 +50,12 @@
   <word key="db_charset" js="0">Database Character Set</word>
   <word key="could_not_count_rows" js="0">Failed to count rows in table '%s' - is your table prefix set correctly?</word>
   <word key="file_location" js="0">Location of files</word>
+  <word key="new_software" js="0">Create New Converter</word>
   <word key="new_library" js="0">Create New Library</word>
+  <word key="classname" js="0">Class Name</word>
+  <word key="classname_desc" js="0">The path for the generated file must exist. Format must be in the form of IPS\myapp\Namespace\Classname.</word>
   <word key="library" js="0">Library</word>
+  <word key="new_software_not_in_dev" js="0">You can only create new converters while IN_DEV.</word>
   <word key="new_library_not_in_dev" js="0">You can only create new libraries while IN_DEV.</word>
   <word key="source_path" js="0">Path to %s installation.</word>
   <word key="path_invalid" js="0">The path entered appears to be invalid.</word>
@@ -217,6 +221,14 @@
   <word key="username_hint" js="0">You can only convert one name, do you want to keep usernames or display names?</word>
   <word key="convert_member_history" js="0">Convert Member History</word>
   <word key="_convert_member_history" js="0">Member History</word>
+  <word key="convert_statuses" js="0">Convert Status Updates / Profile Comments</word>
+  <word key="convert_status_replies" js="0">Convert Status Comments</word>
+  <word key="_convert_statuses" js="0">Status Updates / Profile Comments</word>
+  <word key="_convert_status_replies" js="0">Status Comments</word>
+  <word key="status_update_missing_ids" js="0">Status Update Missing ID</word>
+  <word key="status_update_no_member" js="0">No Member ID provided.</word>
+  <word key="status_update_no_author" js="0">No Author ID provided</word>
+  <word key="status_update_no_content" js="0">No comment text</word>
   <word key="convert_ignored_users" js="0">Convert Ignored Users</word>
   <word key="_convert_ignored_users" js="0">Ignored Users</word>
   <word key="ignored_user_missing_ids" js="0">Missing Ignore ID</word>
@@ -275,6 +287,10 @@
   <word key="convert_forum_password_desc" js="0"><![CDATA[This forum has a password set, however we are unable to decrypt the password for conversion into Invision Community. Please enter the password you wish to use for this forum. <strong>Note:</strong> Not entering a password here will result in no password being set for the forum.]]></word>
   <word key="convert_forums_topics_multimods" js="0">Convert Multi-moderation Settings</word>
   <word key="_convert_forums_topics_multimods" js="0">Multi-moderation Settings</word>
+  <word key="convert_forums_question_ratings" js="0">Convert Question Ratings</word>
+  <word key="convert_forums_answer_ratings" js="0">Convert Answer Ratings</word>
+  <word key="_convert_forums_question_ratings" js="0">Question Ratings</word>
+  <word key="_convert_forums_answer_ratings" js="0">Answer Ratings</word>
   <word key="convert_forums_topics" js="0">Convert Topics</word>
   <word key="convert_forums_topics_followers" js="0">Convert Topic Followers</word>
   <word key="_convert_forums_topics" js="0">Topics</word>
@@ -412,6 +428,8 @@
   <word key="queue_rebuilding_profile_photos" js="0">Rebuilding Profile Photo Thumbnails</word>
   <word key="queue_rebuilding_conversation_first_id" js="0">Rebuilding Personal Conversation first post ids</word>
   <word key="queue_rebuilding_tag_cache" js="0">Rebuilding %s tags</word>
+  <word key="queue_recounting_question_ratings" js="0">Rebuilding Question Ratings</word>
+  <word key="queue_recounting_answer_ratings" js="0">Rebuilding Answer Ratings</word>
   <word key="queue_recounting_club_members" js="0">Recounting Club Members</word>
   <word key="continue_conversion" js="0">Continue Conversion</word>
   <word key="convert_nexus_customers" js="0">Convert Customers</word>
@@ -458,7 +476,5 @@
   <word key="r__convert_manage" js="0">Can run conversions</word>
   <word key="r__create" js="0">Create Conversions</word>
   <word key="r__create_manage" js="0">Can create conversions</word>
-  <word key="ext__Software" js="0">Create a new Converter to convert data from another platform.</word>
-  <word key="ext__Library" js="0">Create a new Library to convert data for a non-default app.</word>
  </app>
 </language>

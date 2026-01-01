@@ -11,145 +11,69 @@
 namespace IPS\Theme\Dev;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Log;
-use IPS\Login;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme as SystemTheme;
-use IPS\Theme\Template;
-use RuntimeException;
-use function count;
-use function defined;
-use function file_put_contents;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_dir;
-use function is_string;
-use function preg_match;
-use function str_replace;
-use function str_starts_with;
-use function stristr;
-use function strstr;
-use const IPS\DEFAULT_THEME_ID;
-use const IPS\DEV_DEBUG_CSS;
-use const IPS\IPS_FOLDER_PERMISSION;
-use const IPS\ROOT_PATH;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IN_DEV Skin set
  */
-class Theme extends SystemTheme
+class _Theme extends \IPS\Theme
 {
 	/**
 	 * @brief	Template Classes
 	 */
-	protected array $templates = array();
+	protected $templates;
 	
 	/**
 	 * @brief	Stored plugins
 	 */
-	protected static array $plugins = array();
-
-	/**
-	 * Get all available hook points in the templates
-	 *
-	 * @param array|string|null $app
-	 * @return array
-	 */
-	public function getHookPoints( array|string $app=null ): array
-	{
-		$hookPoints = [];
-		foreach( Application::applications() as $appDir => $application )
-		{
-			if ( $app === NULL or ( in_array( $appDir, $app ) ) )
-			{
-				foreach( ['front', 'global' ] as $location )
-				{
-					if ( is_dir( static::_getHtmlPath( $appDir, $location ) ) )
-					{
-						foreach( new DirectoryIterator( static::_getHtmlPath( $appDir, $location ) ) as $file )
-						{
-							if ( $file->isDir() and mb_substr( $file->getFilename(), 0, 1 ) !== '.' )
-							{
-								foreach ( new DirectoryIterator( static::_getHtmlPath( $appDir, $location, $file->getFilename() ) ) as $template )
-								{
-									if ( !$template->isDir() and mb_substr( $template->getFilename(), -6 ) === '.phtml' )
-									{
-										$contents = file_get_contents( $template->getPathname() );
-										if ( stristr( $contents, 'data-ips-hook' ) )
-										{
-											$path = $application->directory . '/' . $location . '/' . $file . '/' . str_replace( ".phtml", "", $template->getFilename() );
-											$hookPoints[$path] = static::extractHookNames( $contents );
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		return $hookPoints;
-	}
+	protected static $plugins = array();
 
 	/**
 	 * Get raw templates. Raw means HTML logic and variables are still in {{format}}
 	 *
-	 * @param array|string $app				Template app (e.g. core, forum)
-	 * @param array|string $location			Template location (e.g. admin,global,front)
-	 * @param array|string $group				Template group (e.g. login, share)
-	 * @param int|null $returnType			Determines the content returned
+	 * @param string|array	$app				Template app (e.g. core, forum)
+	 * @param string|array	$location			Template location (e.g. admin,global,front)
+	 * @param string|array	$group				Template group (e.g. login, share)
+	 * @param int|constant	$returnType			Determines the content returned
+	 * @param boolean		$returnThisSetOnly  Returns rows unique to this set only
 	 * @return array
 	 */
-	public function getAllTemplates( array|string $app=array(), array|string $location=array(), array|string $group=array(), int $returnType=null ): array
+	public function getRawTemplates( $app=array(), $location=array(), $group=array(), $returnType=null, $returnThisSetOnly=false )
 	{
 		$returnType = ( $returnType === null )  ? self::RETURN_ALL   : $returnType;
-		$app        = ( is_string( $app )      AND $app != ''      ) ? array( $app )      : $app;
-		$location   = ( is_string( $location ) AND $location != '' ) ? array( $location ) : $location;
-		$group      = ( is_string( $group )    AND $group != ''    ) ? array( $group )    : $group;
+		$app        = ( \is_string( $app )      AND $app != ''      ) ? array( $app )      : $app;
+		$location   = ( \is_string( $location ) AND $location != '' ) ? array( $location ) : $location;
+		$group      = ( \is_string( $group )    AND $group != ''    ) ? array( $group )    : $group;
 		$where      = array();
 		$templates  = array();
 		
 		if ( ! ( $returnType & static::RETURN_NATIVE ) )
 		{
-			return parent::getAllTemplates( $app, $location, $group, $returnType );
+			return parent::getRawTemplates( $app, $location, $group, $returnType, $returnThisSetOnly );
 		}
 		
 		$fixedLocations = array( 'admin', 'front', 'global' );
 		$results	    = array();
 		
-		foreach( Application::applications() as $appDir => $application )
+		foreach( \IPS\Application::applications() as $appDir => $application )
 		{
-			if ( $app === NULL or ( in_array( $appDir, $app ) ) )
+			if ( $app === NULL or ( \in_array( $appDir, $app ) ) )
 			{
 				foreach( $fixedLocations as $_location )
 				{
-					if ( $location === NULL or ( in_array( $_location, $location ) ) ) # location?
+					if ( $location === NULL or ( \in_array( $_location, $location ) ) ) # location?
 					{
-						foreach( new DirectoryIterator( static::_getHtmlPath( $appDir, $_location ) ) as $file )
+						foreach( new \DirectoryIterator( static::_getHtmlPath( $appDir, $_location ) ) as $file )
 						{
 							if ( $file->isDir() AND mb_substr( $file->getFilename(), 0, 1 ) !== '.' )
 							{
-								if ( $group === NULL or ( in_array( $file->getFilename(), $group ) ) )
+								if ( $group === NULL or ( \in_array( $file->getFilename(), $group ) ) )
 								{
-									foreach( new DirectoryIterator( static::_getHtmlPath( $appDir, $_location, $file->getFilename() ) ) as $template )
+									foreach( new \DirectoryIterator( static::_getHtmlPath( $appDir, $_location, $file->getFilename() ) ) as $template )
 									{
 										if ( ! $template->isDir() AND mb_substr( $template->getFilename(), -6 ) === '.phtml' )
 										{
@@ -170,37 +94,58 @@ class Theme extends SystemTheme
 	/**
 	 * Get a template
 	 *
-	 * @param string $group				Template Group
-	 * @param string|null $app				Application key (NULL for current application)
-	 * @param string|null $location		    Template Location (NULL for current template location)
-	 * @return    Template
+	 * @param	string	$group				Template Group
+	 * @param	string	$app				Application key (NULL for current application)
+	 * @param	string	$location		    Template Location (NULL for current template location)
+	 * @return	\IPS\Theme\Template
 	 */
-	public function getTemplate( string $group, string $app=NULL, string $location=NULL ): Template
+	public function getTemplate( $group, $app=NULL, $location=NULL )
 	{
 		/* Do we have an application? */
 		if( $app === NULL )
 		{
-			if ( !Dispatcher::hasInstance() )
+			if ( !\IPS\Dispatcher::hasInstance() )
 			{
-				throw new RuntimeException('NO_APP');
+				throw new \RuntimeException('NO_APP');
 			}
-			$app = Dispatcher::i()->application->directory;
+			$app = \IPS\Dispatcher::i()->application->directory;
 		}
 		
 		/* How about a template location? */
 		if( $location === NULL )
 		{
-			if ( !Dispatcher::hasInstance() )
+			if ( !\IPS\Dispatcher::hasInstance() )
 			{
-				throw new RuntimeException('NO_LOCATION');
+				throw new \RuntimeException('NO_LOCATION');
 			}
-			$location = Dispatcher::i()->controllerLocation;
+			$location = \IPS\Dispatcher::i()->controllerLocation;
 		}
 		
 		/* Get template */
 		if ( !isset( $this->templates[ $app ][ $location ][ $group ] ) )
 		{
 			$class = 'Template';
+			if ( isset( \IPS\IPS::$hooks[ "\IPS\Theme\class_{$app}_{$location}_{$group}" ] ) AND \IPS\RECOVERY_MODE === FALSE )
+			{
+				foreach ( \IPS\IPS::$hooks[ "\IPS\Theme\class_{$app}_{$location}_{$group}" ] as $id => $data )
+				{
+					if( file_exists( \IPS\ROOT_PATH . '/' . $data['file'] ) )
+					{
+						$contents = "namespace " . rtrim( static::_getTemplateNamespace(), '\\' ) . ";\n\n" . str_replace( '_HOOK_CLASS_', $class, file_get_contents( \IPS\ROOT_PATH . '/' . $data['file'] ) );
+						
+						if ( \IPS\DEBUG_TEMPLATES )
+						{
+							static::runDebugTemplate( str_replace( '/', '_', $data['file'] ), $contents );
+						}
+						else
+						{
+							eval( $contents );
+						}
+						
+						$class = $data['class'];
+					}
+				}
+			}
 			$class = static::_getTemplateNamespace() . $class;
 			
 			$this->templates[ $app ][ $location ][ $group ] = new $class( $app, $location, $group );
@@ -211,34 +156,26 @@ class Theme extends SystemTheme
 	/**
 	 * Get CSS
 	 *
-	 * @param string $file		Filename
-	 * @param string|null $app		Application
-	 * @param string|null $location	Location (e.g. 'admin', 'front')
+	 * @param	string		$file		Filename
+	 * @param	string|null	$app		Application
+	 * @param	string|null	$location	Location (e.g. 'admin', 'front')
 	 * @return	array		URLs to CSS files
 	 */
-	public function css( string $file, string $app=NULL, string $location=NULL ): array
+	public function css( $file, $app=NULL, $location=NULL )
 	{
-		$app      = $app      ?: Dispatcher::i()->application->directory;
-		$location = $location ?: Dispatcher::i()->controllerLocation;
+		$app      = $app      ?: \IPS\Request::i()->app;
+		$location = $location ?: \IPS\Dispatcher::i()->controllerLocation;
 
 		if ( $location === 'interface' )
 		{
-			/* Legacy code support. The following directories were moved to /static */
-			if ( ( $app === "core" or $app === null) and preg_match( "/^(?:codemirror|fontawesome)/", $file ) )
-			{
-				$file = "static/" . $file;
-			}
-
-			$path = ROOT_PATH . "/applications/{$app}/interface/{$file}";
+			$path = \IPS\ROOT_PATH . "/applications/{$app}/interface/{$file}";
 		}
 		else
 		{
 			$path = static::_getCssPath($app, $location, $file);
 		}
 
-		$isStaticInterface = (bool) ( $location === "interface" and ( $app === "core" or $app === null) and str_starts_with( $file, "static/" ) );
-
-		if ( isset( self::$buildGrouping['css'][ $app ][ $location ] ) AND is_array( self::$buildGrouping['css'][ $app ][ $location ] ) )
+		if ( isset( self::$buildGrouping['css'][ $app ][ $location ] ) AND \is_array( self::$buildGrouping['css'][ $app ][ $location ] ) )
 		{
 			foreach( self::$buildGrouping['css'][ $app ][ $location ] as $buildPath )
 			{
@@ -255,44 +192,57 @@ class Theme extends SystemTheme
 		if ( is_dir( $path ) )
 		{
 			$bits     = explode( '/', $path );
-			$group = array_pop( $bits );
-			$fileName = $group . '.css';
+			$fileName = array_pop( $bits ) . '.css';
 
 			/* Load css/location/folderName/folderName.css first */
 			if ( is_file( $path . '/' . $fileName ) )
 			{
-				$return[] = str_replace( array( 'http://', 'https://' ), '//', Settings::i()->base_url ) . ( $isStaticInterface ? "" : "applications/core/interface/css/css.php?css=" ) . ( str_replace( ROOT_PATH . '/', '', static::_getCssPath( $app, $location, $file ) ) ) . $fileName;
+				$return[] = str_replace( array( 'http://', 'https://' ), '//', \IPS\Settings::i()->base_url ) . "applications/core/interface/css/css.php?css=" . ( str_replace( \IPS\ROOT_PATH . '/', '', static::_getCssPath( $app, $location, $file ) ) ) . $fileName;
 			}
 
 			$csses = array();
-			foreach ( new DirectoryIterator( $path ) as $f )
+			foreach ( new \DirectoryIterator( $path ) as $f )
 			{
 				if ( !$f->isDot() and mb_substr( $f, -4 ) === '.css' and $f->getFileName() != $fileName )
 				{
-					$csses[] = ( str_replace( ROOT_PATH . '/', '', static::_getCssPath( $app, $location, $group . '/' . $f->getFilename() ) ) );
+					$csses[] = ( str_replace( \IPS\ROOT_PATH . '/', '', static::_getCssPath( $app, $location, $file ) ) ) . $f;
 				}
 			}
 
 			sort( $csses );
 
-			if ( count( $csses ) )
+			if ( \count( $csses ) )
 			{
-				if( DEV_DEBUG_CSS or $isStaticInterface )
+				if( \IPS\DEV_DEBUG_CSS )
 				{
 					foreach( $csses as $cssFile )
 					{
-						$return[] = str_replace( array( 'http://', 'https://' ), '//', Settings::i()->base_url ) . ( $isStaticInterface ? "" : "applications/core/interface/css/css.php?css=" ) . $cssFile;
+						$return[] = str_replace( array( 'http://', 'https://' ), '//', \IPS\Settings::i()->base_url ) . "applications/core/interface/css/css.php?css=" . $cssFile;
 					}
 				}
 				else
 				{
-					$return[] = str_replace( array( 'http://', 'https://' ), '//', Settings::i()->base_url ) . "applications/core/interface/css/css.php?css=" . implode( ',', $csses );
+					$return[] = str_replace( array( 'http://', 'https://' ), '//', \IPS\Settings::i()->base_url ) . "applications/core/interface/css/css.php?css=" . implode( ',', $csses );
+				}
+			}
+
+			if ( $file === 'custom' and $app === 'core' )
+			{
+				foreach ( \IPS\Plugin::enabledPlugins() as $plugin )
+				{
+					foreach ( new \GlobIterator( \IPS\ROOT_PATH . '/plugins/' . $plugin->location . '/dev/css/*' ) as $file )
+					{
+						if ( $file->getFilename() != 'index.html' )
+						{
+							$return[] = str_replace( array( 'http://', 'https://' ), '//', \IPS\Settings::i()->base_url ) . "applications/core/interface/css/css.php?css=" . 'plugins/' . $plugin->location . '/dev/css/' . $file->getFilename();
+						}
+					}
 				}
 			}
 		}
 		elseif ( file_exists( $path ) )
 		{
-			$return[] = str_replace( ROOT_PATH . '/', '', str_replace( array( 'http://', 'https://' ), '//', Settings::i()->base_url ) . ( $isStaticInterface ? "" : "applications/core/interface/css/css.php?css=" ) . $path );
+			$return[] = str_replace( \IPS\ROOT_PATH . '/', '', str_replace( array( 'http://', 'https://' ), '//', \IPS\Settings::i()->base_url ) . "applications/core/interface/css/css.php?css=" . $path );
 		}
 
 		return $return;
@@ -302,24 +252,43 @@ class Theme extends SystemTheme
 	/**
 	 * Get JS
 	 *
-	 * @param string $file		Filename
-	 * @param string|null $app		Application
-	 * @param string|null $location	Location (e.g. 'admin', 'front')
+	 * @param	string		$file		Filename
+	 * @param	string|null	$app		Application
+	 * @param	string|null	$location	Location (e.g. 'admin', 'front')
 	 * @return	array		URL to JS files
 	 */
-	public function js( string $file, string $app=NULL, string $location=NULL ): array
+	public function js( $file, $app=NULL, $location=NULL )
 	{
-		$app      = $app      ?: Request::i()->app;
-		$location = $location ?: Dispatcher::i()->controllerLocation;
+		$app      = $app      ?: \IPS\Request::i()->app;
+		$location = $location ?: \IPS\Dispatcher::i()->controllerLocation;
 		
 		$return = array();
+		if ( $app === 'core' and $location === 'global' and $file === 'plugins' )
+		{
+			foreach ( new \GlobIterator( \IPS\ROOT_PATH . '/plugins/*/dev/js/*' ) as $file )
+			{
+				try
+				{
+					$plugin = \IPS\Plugin::getPluginFromPath( $file );
+
+					if( $plugin->enabled )
+					{
+						$url = str_replace( \IPS\ROOT_PATH, rtrim( \IPS\Settings::i()->base_url, '/' ), $file );
+						$return[] = str_replace( '\\', '/', $url );
+					}
+				}
+				catch( \OutOfRangeException $e ){}
+			}
+		}
+		else
+		{
 			if ( $location === 'interface' )
 			{
-				$path = ROOT_PATH . "/applications/{$app}/interface/{$file}";
+				$path = \IPS\ROOT_PATH . "/applications/{$app}/interface/{$file}";
 			}
 			else
 			{
-				$path = ROOT_PATH . "/applications/{$app}/dev/js/{$location}/{$file}";
+				$path = \IPS\ROOT_PATH . "/applications/{$app}/dev/js/{$location}/{$file}";
 			}
 					
 			if ( is_dir( $path ) )
@@ -329,21 +298,22 @@ class Theme extends SystemTheme
 				
 				if ( is_file( $path .'/' . $fileName ) )
 				{
-					$return[] = Settings::i()->base_url . "/applications/{$app}/dev/js/{$location}/{$file}/{$fileName}";
+					$return[] = \IPS\Settings::i()->base_url . "/applications/{$app}/dev/js/{$location}/{$file}/{$fileName}";
 				}
 
-				foreach ( new DirectoryIterator( $path ) as $f )
+				foreach ( new \DirectoryIterator( $path ) as $f )
 				{
 					if ( !$f->isDot() and mb_substr( $f, -3 ) === '.js' and $f->getFileName() != $fileName )
 					{
-						$return[] = Settings::i()->base_url . "/applications/{$app}/dev/js/{$location}/{$file}/{$f}";
+						$return[] = \IPS\Settings::i()->base_url . "/applications/{$app}/dev/js/{$location}/{$file}/{$f}";
 					}
 				}
 			}
 			else
 			{			
-				$return[] = str_replace( ROOT_PATH, Settings::i()->base_url, $path );
+				$return[] = str_replace( \IPS\ROOT_PATH, \IPS\Settings::i()->base_url, $path );
 			}
+		}
 		
 		return $return;
 	}
@@ -351,31 +321,25 @@ class Theme extends SystemTheme
 	/**
 	 * Get Theme Resource (resource, font, theme-specific JS, etc)
 	 *
-	 * @param string $path		Path to resource
-	 * @param string|null $app		Application key
-	 * @param string|null $location	Location
+	 * @param	string		$path		Path to resource
+	 * @param	string|null	$app		Application key
+	 * @param	string|null	$location	Location
 	 * @param	bool		$noProtocol	Return URL without a protocol (protocol-relative)
-	 * @return	Url|NULL		URL to resource
+	 * @return	\IPS\Http\Url|NULL		URL to resource
 	 */
-	public function resource( string $path, string $app=NULL, string $location=NULL, $noProtocol=FALSE ): ?Url
+	public function resource( $path, $app=NULL, $location=NULL, $noProtocol=FALSE )
 	{
-		$baseUrl = Settings::i()->base_url;
-		$app = $app ?: Dispatcher::i()->application->directory;
-		$location = $location ?: Dispatcher::i()->controllerLocation;
+		$baseUrl = \IPS\Settings::i()->base_url;
+		$app = $app ?: \IPS\Dispatcher::i()->application->directory;
+		$location = $location ?: \IPS\Dispatcher::i()->controllerLocation;
 		
 		if ( $location === 'interface' )
 		{
-			return Url::internal( "applications/{$app}/interface/{$path}", 'interface', NULL, array(), Url::PROTOCOL_RELATIVE );
+			return \IPS\Http\Url::internal( "applications/{$app}/interface/{$path}", 'interface', NULL, array(), \IPS\Http\Url::PROTOCOL_RELATIVE );
 		}
 
-		/* This is a custom resource uploaded via the ACP */
-		if( in_array( $app, IPS::$ipsApps ) and mb_substr( $path, 0, 7 ) === 'custom/' )
-		{
-			return parent::resource( $path, $app, $location, $noProtocol );
-		}
-
-		$url = Url::createFromString( $baseUrl . str_replace( '\\', '/', str_replace( ROOT_PATH . '/', '', static::_getResourcePath( $app, $location, $path ) ) ), false );
-		if( $noProtocol )
+		$url = \IPS\Http\Url::createFromString( $baseUrl . str_replace( '\\', '/', str_replace( \IPS\ROOT_PATH . '/', '', static::_getResourcePath( $app, $location, $path ) ) ), false );
+		if( $noProtocol and $url instanceof \IPS\Http\Url )
 		{
 			$url = $url->setScheme(NULL);
 		}
@@ -385,29 +349,29 @@ class Theme extends SystemTheme
 	/**
 	 * (re)import HTML templates into the template DB
 	 * 
-	 * @param string $app	        Application Key
-	 * @param int $id	        Theme Set Id (0 if IN_DEV and not in advanced theming mode)
+	 * @param	string       $app	        Application Key
+	 * @param	int	         $id	        Theme Set Id (0 if IN_DEV and not in advanced theming mode)
 	 * 
 	 * @return	void
 	 */
-	public static function importDevHtml( string $app, int $id ): void
+	public static function importDevHtml( $app, $id )
 	{
 		/* Clear out existing template bits */
-		Db::i()->delete( 'core_theme_templates', array( 'template_app=? AND ( template_set_id=? OR ( template_set_id=0 ) )', $app, $id ) );
+		\IPS\Db::i()->delete( 'core_theme_templates', array( 'template_app=? AND ( template_set_id=? OR ( template_set_id=0 AND template_added_to=? ) )', $app, $id, $id ) );
 
-		$themeLocations = Application::load( $app )->themeLocations;
+		$themeLocations = \IPS\Application::load( $app )->themeLocations;
 
 		/* Get existing template bits to see if we need to import */
 		if ( $id > 0 )
 		{
-			$currentTemplates = Theme::load( $id )->getAllTemplates( $app );
+			$currentTemplates = \IPS\Theme::load( $id )->getRawTemplates( $app );
 		}
 		
 		$path = static::_getHtmlPath( $app );
 
 		if ( is_dir( $path ) )
 		{
-			foreach( new DirectoryIterator( $path ) as $location )
+			foreach( new \DirectoryIterator( $path ) as $location )
 			{
 				if ( $location->isDot() || mb_substr( $location->getFilename(), 0, 1 ) === '.' )
 				{
@@ -416,12 +380,12 @@ class Theme extends SystemTheme
 				
 				if ( $location->isDir() )
 				{
-					if ( ! in_array( $location->getFilename(), $themeLocations ) )
+					if ( ! \in_array( $location->getFilename(), $themeLocations ) )
 					{
 						continue;
 					}
 
-					foreach( new DirectoryIterator( $path . $location->getFilename() ) as $group )
+					foreach( new \DirectoryIterator( $path . $location->getFilename() ) as $group )
 					{
 						if ( $group->isDot() || mb_substr( $group->getFilename(), 0, 1 ) === '.' )
 						{
@@ -430,7 +394,7 @@ class Theme extends SystemTheme
 						
 						if ( $group->isDir() )
 						{
-							foreach( new DirectoryIterator( $path . $location->getFilename() . '/' . $group->getFilename() ) as $file )
+							foreach( new \DirectoryIterator( $path . $location->getFilename() . '/' . $group->getFilename() ) as $file )
 							{
 								if ( $file->isDot() || mb_substr( $file->getFilename(), -6 ) !== '.phtml')
 								{
@@ -453,7 +417,7 @@ class Theme extends SystemTheme
 									$html = str_replace( "\r\n", "\n", $html );
 								}
 								
-								$version = Application::load( $app )->long_version;
+								$version = \IPS\Application::load( $app )->long_version;
 								$save = array(
 									'set_id'	  => $id,
 									'added_to'    => 0,
@@ -474,7 +438,7 @@ class Theme extends SystemTheme
 								{
 									if ( isset( $currentTemplates[ $app ][ $location->getFilename() ][ $group->getFilename() ][ $name ] ) )
 									{
-										if( Login::compareHashes( md5( trim( $html ) ), md5( trim( $currentTemplates[ $app ][ $location->getFilename() ][ $group->getFilename() ][ $name ]['template_content'] ) ) ) )
+										if( \IPS\Login::compareHashes( md5( trim( $html ) ), md5( trim( $currentTemplates[ $app ][ $location->getFilename() ][ $group->getFilename() ][ $name ]['template_content'] ) ) ) )
 										{
 											/* No change  */
 											continue;
@@ -494,15 +458,19 @@ class Theme extends SystemTheme
 									}
 								}
 								
-								Db::i()->replace( 'core_theme_templates', array( 'template_set_id'      => $save['set_id'],
+								\IPS\Db::i()->replace( 'core_theme_templates', array( 'template_set_id'      => $save['set_id'],
 																					 'template_app'		    => $app,
+																					 'template_added_to'    => $save['added_to'],
 																					 'template_location'    => $location->getFilename(),
 																					 'template_group'       => $group->getFilename(),
 																					 'template_name'	    => $name,
 																					 'template_data'	    => ( isset( $params[1] ) ) ? $params[1] : '',
 																					 'template_content'     => $html,
 																					 'template_updated'     => time(),
-																					 'template_version'	    => NULL ) );
+																					 'template_user_added'  => $save['user_added'],
+																					 'template_user_edited' => $save['user_edited'],
+																					 'template_version'	    => ( isset( $master ) AND isset( $master[ $key ] ) ) ? $master[ $key ]['template_version'] : NULL,
+																					 'template_removable'   => $id ) );
 							}
 						}
 					}
@@ -514,30 +482,30 @@ class Theme extends SystemTheme
 	/**
 	 * (re)import CSS into the CSS DB
 	 *
-	 * @param string $app	Application Key
-	 * @param int $id	Theme Set Id (0 if IN_DEV and not in advanced theming mode)
+	 * @param	string $app	Application Key
+	 * @param	int	   $id	Theme Set Id (0 if IN_DEV and not in advanced theming mode)
 	 * @return	void
 	 */
-	public static function importDevCss( string $app, int $id ): void
+	public static function importDevCss( $app, $id )
 	{
 		/* Clear out existing template bits */
-		Db::i()->delete( 'core_theme_css', array( 'css_app=? AND ( css_set_id=? ) ', $app, $id ) );
+		\IPS\Db::i()->delete( 'core_theme_css', array( 'css_app=? AND ( css_set_id=? OR ( css_added_to=0 AND css_set_id=? ) ) ', $app, $id, $id ) );
 		
 		$master = array();
 		
 		/* Get existing template bits to see if we need to import */
-		$currentCss = [];
+		$currentCss = NULL;
 		
 		if ( $id > 0 )
 		{
-			$currentCss = Theme::load( $id )->getAllCss( $app );
+			$currentCss = \IPS\Theme::load( $id )->getRawCss( $app );
 		}
 		
 		$path = static::_getCssPath($app);
 	
 		if ( is_dir( $path ) )
 		{
-			foreach( new DirectoryIterator( $path ) as $location )
+			foreach( new \DirectoryIterator( $path ) as $location )
 			{
 				if ( $location->isDot() OR mb_substr( $location->getFilename(), 0, 1 ) === '.' )
 				{
@@ -555,18 +523,18 @@ class Theme extends SystemTheme
 	/**
 	 * (re)import CSS into the CSS DB (Iterable)
 	 *
-	 * @param string $app		Application Key
-	 * @param int $id			Theme set ID
-	 * @param array $currentCss	Master CSS bits
-	 * @param string $location	Location Folder Name
-	 * @param string $path		Path
+	 * @param	string	$app		Application Key
+	 * @param	int		$id			Theme set ID
+	 * @param	array	$currentCss	Master CSS bits
+	 * @param	string	$location	Location Folder Name
+	 * @param	string	$path		Path
 	 * @return	void
 	 */
-	protected static function _importDevCss( string $app, int $id, array $currentCss, string $location, string $path='/' ): void
+	protected static function _importDevCss( $app, $id, $currentCss, $location, $path='/' )
 	{
 		$root = static::_getCssPath( $app, $location );
 		
-		foreach( new DirectoryIterator( $root . $path ) as $file )
+		foreach( new \DirectoryIterator( $root . $path ) as $file )
 		{
 			if ( $file->isDot() OR mb_substr( $file->getFilename(), 0, 1 ) === '.' OR $file == 'index.html' )
 			{
@@ -591,7 +559,7 @@ class Theme extends SystemTheme
 				preg_match( '#^/\*<ips:css([^>]+?)>\*/\n#', $css, $params );
 
 				/* Strip it */
-				if ( count( $params ) AND ! empty( $params[0] ) )
+				if ( \count( $params ) AND ! empty( $params[0] ) )
 				{
 					$css = str_replace( $params[0], '', $css );
 				}
@@ -602,7 +570,7 @@ class Theme extends SystemTheme
 				$cssHidden = 0;
 				
 				/* Tidy params */
-				if ( count( $params ) AND ! empty( $params[1] ) )
+				if ( \count( $params ) AND ! empty( $params[1] ) )
 				{
 					preg_match_all( '#([\d\w]+?)=\"([^"]+?)"#i', $params[1], $items, PREG_SET_ORDER );
 						
@@ -617,10 +585,10 @@ class Theme extends SystemTheme
 								$cssApp = trim( $attr[2] );
 								break;
 							case 'position':
-								$cssPos = intval( $attr[2] );
+								$cssPos = \intval( $attr[2] );
 								break;
 							case 'hidden':
-								$cssHidden = intval( $attr[2] );
+								$cssHidden = \intval( $attr[2] );
 								break;
 						}
 					}
@@ -628,7 +596,7 @@ class Theme extends SystemTheme
 			
 				$trimmedPath = trim( $path, '/' );
 				$finalPath   = ( ( ! empty( $trimmedPath ) ) ? $trimmedPath : '.' );
-				$version     = Application::load( $app )->long_version;
+				$version     = \IPS\Application::load( $app )->long_version;
 				$save        = array(
 					'set_id'	  => $id,
 					'added_to'    => 0,
@@ -647,7 +615,7 @@ class Theme extends SystemTheme
 					$css = str_replace( '/* No Content */', '', $css );
 					if ( isset( $currentCss[ $app ][ $location ][ $finalPath ][ $file->getFilename() ] ) )
 					{
-						if( Login::compareHashes( md5( trim( $css ) ), md5( trim( $currentCss[ $app ][ $location ][ $finalPath ][ $file->getFilename() ]['css_content'] ) ) ) )
+						if( \IPS\Login::compareHashes( md5( trim( $css ) ), md5( trim( $currentCss[ $app ][ $location ][ $finalPath ][ $file->getFilename() ]['css_content'] ) ) ) )
 						{
 							/* No change  */
 							continue;
@@ -668,8 +636,9 @@ class Theme extends SystemTheme
 					}
 				}
 								
-				Db::i()->insert( 'core_theme_css', array( 'css_set_id'    	 => $save['set_id'],
+				\IPS\Db::i()->insert( 'core_theme_css', array( 'css_set_id'    	 => $save['set_id'],
 															   'css_app'		 => $app,
+															   'css_added_to'	 => $save['added_to'],
 															   'css_location'  	 => $location,
 															   'css_path'		 => $finalPath,
 															   'css_name'	     => $file->getFilename(),
@@ -677,6 +646,7 @@ class Theme extends SystemTheme
 															   'css_content'	 => $css,
 															   'css_modules'	 => $cssModule,
 															   'css_position'	 => $cssPos,
+															   'css_user_edited' => $save['user_edited'],
 															   'css_updated'   	 => time(),
 															   'css_hidden'		 => $cssHidden ) );
 			}
@@ -686,13 +656,13 @@ class Theme extends SystemTheme
 	/**
 	 * Build Resourcess ready for non IN_DEV use
 	 * 
-	 * @param string $app	App (e.g. core, forum)
-	 * @param int $id	Theme Set Id (0 if IN_DEV and not in advanced theming mode)
+	 * @param	string|array	$app	App (e.g. core, forum)
+	 * @param	int	   			$id	Theme Set Id (0 if IN_DEV and not in advanced theming mode)
 	 * @return	void
 	 */
-	public static function importDevResources( string $app, int $id ): void
+	public static function importDevResources( $app, $id )
 	{
-		foreach( new DirectoryIterator( ROOT_PATH . '/applications/' ) as $dir )
+		foreach( new \DirectoryIterator( \IPS\ROOT_PATH . '/applications/' ) as $dir )
 		{
 			if ( $dir->isDot() || mb_substr( $dir->getFilename(), 0, 1 ) === '.' || $dir == 'index.html')
 			{
@@ -704,16 +674,24 @@ class Theme extends SystemTheme
 				/* When we are building, removeResources() has already taken care of this */
 				if( $id !== 0 )
 				{
-					Theme::deleteCompiledResources( $dir->getFilename(), null, null, null, $id );
+					\IPS\Theme::deleteCompiledResources( $dir->getFilename(), null, null, null, $id );
+				}
+				
+				if ( $id )
+				{
+					foreach( \IPS\Db::i()->select( '*', 'core_theme_resources', array( 'resource_set_id=? and resource_plugin IS NOT NULL', $id ) ) as $resource )
+					{
+						static::$plugins[ $resource['resource_name'] ] = $resource['resource_plugin'];
+					}
 				}
 						
-				Db::i()->delete( 'core_theme_resources', array( 'resource_app=? AND resource_set_id=?', $dir->getFilename(), $id ) );
+				\IPS\Db::i()->delete( 'core_theme_resources', array( 'resource_app=? AND resource_set_id=?', $dir->getFilename(), $id ) );
 				
 				$path = static::_getResourcePath( $dir->getFilename() );
 					
 				if ( is_dir( $path ) )
 				{
-					foreach( new DirectoryIterator( $path ) as $location )
+					foreach( new \DirectoryIterator( $path ) as $location )
 					{
 						if ( $location->isDot() || mb_substr( $location->getFilename(), 0, 1 ) === '.' )
 						{
@@ -734,13 +712,13 @@ class Theme extends SystemTheme
 	 * Build Resources ready for non IN_DEV use (Iterable)
 	 * Theme resources should be raw binary data everywhere (filesystem and DB) except in the theme XML download where they are base64 encoded.
 	 *
-	 * @param string $app		Application Key
-	 * @param int $id			Theme Set Id
-	 * @param string $location	Location Folder Name
-	 * @param string $path		Path
+	 * @param	string	$app		Application Key
+	 * @param	int		$id			Theme Set Id
+	 * @param	string	$location	Location Folder Name
+	 * @param	string	$path		Path
 	 * @return	void
 	 */
-	public static function _importDevResources( string $app, int $id, string $location, string $path='/' ): void
+	public static function _importDevResources( $app, $id, $location, $path='/' )
 	{
 		$root   = static::_getResourcePath($app, $location);
 		$master = array();
@@ -748,13 +726,13 @@ class Theme extends SystemTheme
 
 		if ( $id )
 		{
-			foreach( Db::i()->select( '*', 'core_theme_resources', array( 'resource_set_id=0 and resource_app=? and resource_location=? and resource_path=?', $app, $location, $path ) ) as $resource )
+			foreach( \IPS\Db::i()->select( '*', 'core_theme_resources', array( 'resource_set_id=0 and resource_app=? and resource_location=? and resource_path=?', $app, $location, $path ) ) as $resource )
 			{
 				$master[ $resource['resource_name'] ] = md5( $resource['resource_data'] );
 			}
 		}
 
-		foreach( new DirectoryIterator( $root . $path ) as $file )
+		foreach( new \DirectoryIterator( $root . $path ) as $file )
 		{
 			if ( $file->isDot() || mb_substr( $file->getFilename(), 0, 1 ) === '.' || $file == 'index.html' )
 			{
@@ -770,7 +748,7 @@ class Theme extends SystemTheme
 				/* files larger than 1.5mb don't base64_encode() as they may not get stored in the resources_data column */
 				if ( filesize( $root . $path . $file->getFilename() ) > ( 1.5 * 1024 * 1024 ) )
 				{
-					Log::log( $root . $path . $file->getFilename() . " too large to import", 'designers_mode_import' );
+					\IPS\Log::log( $root . $path . $file->getFilename() . " too large to import", 'designers_mode_import' );
 					continue;
 				}
 				
@@ -778,21 +756,21 @@ class Theme extends SystemTheme
 				
 				if ( ! base64_encode( $content ) )
 				{
-					Log::log( $root . $path . $file->getFilename() . " could not be saved correctly", 'designers_mode_import' );
+					\IPS\Log::log( $root . $path . $file->getFilename() . " could not be saved correctly", 'designers_mode_import' );
 					continue;
 				}
 				
 				$custom   = 0;
 				$name     = self::makeBuiltTemplateLookupHash($app, $location, $path) . '_' . $file->getFilename();
-				$fileName = (string) File::create( 'core_Theme', $name, $content, 'set_resources_' . ( $id == 0 ? DEFAULT_THEME_ID : $id ), TRUE );
+				$fileName = (string) \IPS\File::create( 'core_Theme', $name, $content, 'set_resources_' . ( $id == 0 ? \IPS\DEFAULT_THEME_ID : $id ), TRUE );
 				
-				if ( $id !== 0 AND ( !isset( $master[ $file->getFilename() ] ) or !Login::compareHashes( md5( $content ), $master[ $file->getFilename() ] ) ) )
+				if ( $id !== 0 AND ( !isset( $master[ $file->getFilename() ] ) or !\IPS\Login::compareHashes( md5( $content ), $master[ $file->getFilename() ] ) ) )
 				{
 					$custom = 1;
 				}
 
-				Db::i()->insert( 'core_theme_resources', array(
-						'resource_set_id'      => ( $id == 0 ? DEFAULT_THEME_ID : $id ),
+				\IPS\Db::i()->insert( 'core_theme_resources', array(
+						'resource_set_id'      => ( $id == 0 ? \IPS\DEFAULT_THEME_ID : $id ),
 						'resource_app'         => $app,
 						'resource_location'    => $location,
 						'resource_path'        => $path,
@@ -800,13 +778,14 @@ class Theme extends SystemTheme
 						'resource_added'	   => time(),
 						'resource_data'        => $content,
 						'resource_filename'    => $fileName,
+						'resource_plugin'	   => ( ( $app == 'core' and $location == 'global' and $path == '/plugins/' ) and isset( static::$plugins[ $file->getFilename() ] ) ) ? static::$plugins[ $file->getFilename() ] : NULL,
 						'resource_user_edited' => $custom
 				) );
 
 				/* Store in master table */
 				if ( $id == 0 )
 				{
-					Db::i()->insert( 'core_theme_resources', array(
+					\IPS\Db::i()->insert( 'core_theme_resources', array(
 	                     'resource_set_id'   => 0,
 	                     'resource_app'      => $app,
 	                     'resource_location' => $location,
@@ -825,35 +804,35 @@ class Theme extends SystemTheme
 	/**
 	 * Writes the /application/{app}/dev/{container}/ directory
 	 *
-	 * @param string $app		 Application Directory
-	 * @param string $container	 Container directory (e.g. html/css/resources)
+	 * @param  string	$app		 Application Directory
+	 * @param  string   $container	 Container directory (e.g. html/css/resources)
 	 * @return string	Path created
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	protected static function _writeThemeContainerDirectory( string $app, string $container ): string
+	protected static function _writeThemeContainerDirectory( $app, $container )
 	{
-		$dirToWrite = ROOT_PATH . "/applications/" . $app . '/dev/' . $container;
+		$dirToWrite = \IPS\ROOT_PATH . "/applications/" . $app . '/dev/' . $container;
 	
 		if ( ! is_dir( $dirToWrite ) )
 		{
 			if ( ! @mkdir( $dirToWrite ) )
 			{
-				throw new RuntimeException('core_theme_dev_cannot_make_dir,' . $dirToWrite);
+				throw new \RuntimeException('core_theme_dev_cannot_make_dir,' . $dirToWrite);
 			}
 			else
 			{
-				@chmod( $dirToWrite, IPS_FOLDER_PERMISSION );
+				@chmod( $dirToWrite, \IPS\IPS_FOLDER_PERMISSION );
 			}
 		}
 	
 		/* Check its writeable */
 		if ( ! is_writeable( $dirToWrite ) )
 		{
-			throw new RuntimeException('core_theme_dev_not_writeable,' . $dirToWrite);
+			throw new \RuntimeException('core_theme_dev_not_writeable,' . $dirToWrite);
 		}
 		
 		/* Make sure root directory is CHMOD correctly */
-		@chmod( ROOT_PATH . "/applications/" . $app . '/dev', 0777 );
+		@chmod( \IPS\ROOT_PATH . "/applications/" . $app . '/dev', 0777 );
 	
 		return $dirToWrite;
 	}
@@ -861,32 +840,32 @@ class Theme extends SystemTheme
 	/**
 	 * Writes the /application/{app}/dev/{container}/{path} directory
 	 *
-	 * @param string $app		Application Directory
-	 * @param string $container	Location of path to create (e.g. admin, front)
-	 * @param string $path		Path to create
+	 * @param	string	$app		Application Directory
+	 * @param	string	$container	Location of path to create (e.g. admin, front)
+	 * @param	string	$path		Path to create
 	 * @return	string	Path created
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	protected static function _writeThemePathDirectory( string $app, string $container, string $path ): string
+	protected static function _writeThemePathDirectory( $app, $container, $path )
 	{
-		$dirToWrite = ROOT_PATH . "/applications/" . $app . '/dev/' . $container . '/' . $path;
+		$dirToWrite = \IPS\ROOT_PATH . "/applications/" . $app . '/dev/' . $container . '/' . $path;
 	
 		if ( ! is_dir( $dirToWrite ) )
 		{
 			if ( ! @mkdir( $dirToWrite ) )
 			{
-				throw new RuntimeException('core_theme_dev_cannot_make_dir,' . $dirToWrite);
+				throw new \RuntimeException('core_theme_dev_cannot_make_dir,' . $dirToWrite);
 			}
 			else
 			{
-				@chmod( $dirToWrite, IPS_FOLDER_PERMISSION );
+				@chmod( $dirToWrite, \IPS\IPS_FOLDER_PERMISSION );
 			}
 		}
 	
 		/* Check its writeable */
 		if ( ! is_writeable( $dirToWrite ) )
 		{
-			throw new RuntimeException('core_theme_dev_not_writeable,' . $dirToWrite);
+			throw new \RuntimeException('core_theme_dev_not_writeable,' . $dirToWrite);
 		}
 	
 		return $dirToWrite;
@@ -896,30 +875,30 @@ class Theme extends SystemTheme
 	 * Write skin resources
 	 * Theme resources should be raw binary data everywhere (filesystem and DB) except in the theme XML download where they are base64 encoded.
 	 *
-	 * @param string $app		 Application Directory
+	 * @param	string	$app		 Application Directory
 	 * @return	void
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public static function exportResources( string $app ): void
+	public static function exportResources( $app )
 	{
 		try
 		{
 			self::_writeThemeContainerDirectory( $app, 'img' );
 		}
-		catch( RuntimeException $e )
+		catch( \RuntimeException $e )
 		{
-			throw new RuntimeException( $e->getMessage() );
+			throw new \RuntimeException( $e->getMessage() );
 		}
 		
-		foreach( Db::i()->select( '*', 'core_theme_resources', array( 'resource_app=? AND resource_set_id=?', $app, DEFAULT_THEME_ID ) )->setKeyField('resource_id') as $resourceId => $resource )
+		foreach( \IPS\Db::i()->select( '*', 'core_theme_resources', array( 'resource_app=? AND resource_set_id=?', $app, \IPS\DEFAULT_THEME_ID ) )->setKeyField('resource_id') as $resourceId => $resource )
 		{
 			try
 			{
 				$pathToWrite = self::_writeThemePathDirectory( $app, 'img', $resource['resource_location'] );
 			}
-			catch( RuntimeException $e )
+			catch( \RuntimeException $e )
 			{
-				throw new RuntimeException( $e->getMessage() );
+				throw new \RuntimeException( $e->getMessage() );
 			}
 				
 			if ( $resource['resource_path'] != '/' )
@@ -934,25 +913,25 @@ class Theme extends SystemTheme
 					{
 						$pathToWrite = self::_writeThemePathDirectory( $app, 'img', $resource['resource_location'] . $_path );
 					}
-					catch( RuntimeException $e )
+					catch( \RuntimeException $e )
 					{
-						throw new RuntimeException( $e->getMessage() );
+						throw new \RuntimeException( $e->getMessage() );
 					}
 				}
 			}
 
 			try
 			{
-				if ( ! @file_put_contents( $pathToWrite . '/' . $resource['resource_name'], $resource['resource_data'] ) )
+				if ( ! @\file_put_contents( $pathToWrite . '/' . $resource['resource_name'], $resource['resource_data'] ) )
 				{
-					throw new RuntimeException('core_theme_dev_cannot_write_resource,' . $pathToWrite . '/' . $resource['resource_name']);
+					throw new \RuntimeException('core_theme_dev_cannot_write_resource,' . $pathToWrite . '/' . $resource['resource_name']);
 				}
 				else
 				{
 					@chmod( $pathToWrite . '/' . $resource['resource_name'], 0777 );
 				}
 			}
-			catch( InvalidArgumentException $e )
+			catch( \InvalidArgumentException $e )
 			{
 				
 			}
@@ -962,43 +941,43 @@ class Theme extends SystemTheme
 	/**
 	 * Write CSS into the appropriate theme directory as plain text CSS ({resource="foo.png"} intact)
 	 *
-	 * @param string $app		 Application Directory
+	 * @param	string	$app		 Application Directory
 	 * @return	void
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public static function exportCss( string $app ): void
+	public static function exportCss( $app )
 	{
 		try
 		{
 			self::_writeThemeContainerDirectory( $app, 'css' );
 		}
-		catch( RuntimeException $e )
+		catch( \RuntimeException $e )
 		{
-			throw new RuntimeException( $e->getMessage() );
+			throw new \RuntimeException( $e->getMessage() );
 		}
 		
-		$css = static::master()->getAllCss();
+		$css = static::master()->getRawCss();
 	
-		foreach( $css as $appDir => $appData )
+		foreach( $css as $appDir => $data )
 		{
-			foreach( $css[ $appDir ] as $location => $locationData )
+			foreach( $css[ $appDir ] as $location => $data )
 			{
 				try
 				{
 					$pathToWrite = self::_writeThemePathDirectory( $app, 'css', $location );
 				}
-				catch( RuntimeException $e )
+				catch( \RuntimeException $e )
 				{
-					throw new RuntimeException( $e->getMessage() );
+					throw new \RuntimeException( $e->getMessage() );
 				}
 					
-				foreach( $css[ $appDir ][ $location ] as $path => $pathData )
+				foreach( $css[ $appDir ][ $location ] as $path => $data )
 				{
 					if ( $path != '.' )
 					{
 						$_path = $path;
 	
-						if ( strstr( $path, '/' ) )
+						if ( \strstr( $path, '/' ) )
 						{
 							$_path = '';
 								
@@ -1010,9 +989,9 @@ class Theme extends SystemTheme
 								{
 									$pathToWrite = self::_writeThemePathDirectory( $app, 'css', $location . $_path );
 								}
-								catch( RuntimeException $e )
+								catch( \RuntimeException $e )
 								{
-									throw new RuntimeException( $e->getMessage() );
+									throw new \RuntimeException( $e->getMessage() );
 								}
 							}
 						}
@@ -1022,9 +1001,9 @@ class Theme extends SystemTheme
 							{
 								$pathToWrite = self::_writeThemePathDirectory( $app, 'css', $location . '/' . $path );
 							}
-							catch( RuntimeException $e )
+							catch( \RuntimeException $e )
 							{
-								throw new RuntimeException( $e->getMessage() );
+								throw new \RuntimeException( $e->getMessage() );
 							}
 						}
 					}
@@ -1039,16 +1018,16 @@ class Theme extends SystemTheme
 							$params[] = 'hidden="1"';
 						}
 	
-						if ( count( $params ) )
+						if ( \count( $params ) )
 						{
 							$write  .= '/*<ips:css ' . implode( ' ', $params ) . ' />*/' . "\n";
 						}
 	
 						$write .= ( empty( $data['css_content'] ) ) ? '/* No Content */' : $data['css_content'];
 							
-						if ( ! @file_put_contents( $pathToWrite . '/' . $data['css_name'], $write ) )
+						if ( ! @\file_put_contents( $pathToWrite . '/' . $data['css_name'], $write ) )
 						{
-							throw new RuntimeException('core_theme_dev_cannot_write_css,' . $pathToWrite . '/' . $data['css_name']);
+							throw new \RuntimeException('core_theme_dev_cannot_write_css,' . $pathToWrite . '/' . $data['css_name']);
 						}
 						else
 						{
@@ -1063,45 +1042,45 @@ class Theme extends SystemTheme
 	/**
 	 * Write templates into the appropriate theme directory as plain text templates ({{logic}} intact)
 	 *
-	 * @param string $app		 Application Directory
+	 * @param	string	$app		 Application Directory
 	 * @return	void
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public static function exportTemplates( string $app ): void
+	public static function exportTemplates( $app )
 	{
 		try
 		{
 			self::_writeThemeContainerDirectory( $app, 'html' );
 		}
-		catch( RuntimeException $e )
+		catch( \RuntimeException $e )
 		{
-			throw new RuntimeException( $e->getMessage() );
+			throw new \RuntimeException( $e->getMessage() );
 		}
 		
-		$templates = static::master()->getAllTemplates();
+		$templates = static::master()->getRawTemplates();
 	
-		foreach( $templates as $appDir => $appData )
+		foreach( $templates as $appDir => $data )
 		{
-			foreach( $templates[ $app ] as $location => $locationData )
+			foreach( $templates[ $app ] as $location => $data )
 			{
 				try
 				{
 					self::_writeThemePathDirectory( $app, 'html', $location );
 				}
-				catch( RuntimeException $e )
+				catch( \RuntimeException $e )
 				{
-					throw new RuntimeException( $e->getMessage() );
+					throw new \RuntimeException( $e->getMessage() );
 				}
 					
-				foreach( $templates[ $app ][ $location ] as $group => $groupData )
+				foreach( $templates[ $app ][ $location ] as $group => $data )
 				{
 					try
 					{
 						$pathToWrite = self::_writeThemePathDirectory( $app, 'html', $location . '/' . $group );
 					}
-					catch( RuntimeException $e )
+					catch( \RuntimeException $e )
 					{
-						throw new RuntimeException( $e->getMessage() );
+						throw new \RuntimeException( $e->getMessage() );
 					}
 					
 					foreach( $templates[ $app ][ $location ][ $group ] as $name => $data )
@@ -1109,9 +1088,9 @@ class Theme extends SystemTheme
 						$write  = '<ips:template parameters="' . $data['template_data'] . '" />' . "\n";
 						$write .= $data['template_content'];
 	
-						if ( ! @file_put_contents( $pathToWrite . '/' . $data['template_name'] . '.phtml', $write ) )
+						if ( ! @\file_put_contents( $pathToWrite . '/' . $data['template_name'] . '.phtml', $write ) )
 						{
-							throw new RuntimeException('core_theme_dev_cannot_write_template,' . $pathToWrite . '/' . $data['css_name']);
+							throw new \RuntimeException('core_theme_dev_cannot_write_template,' . $pathToWrite . '/' . $data['css_name']);
 						}
 						else
 						{
@@ -1124,16 +1103,53 @@ class Theme extends SystemTheme
 	}
 	
 	/**
+	 * Write JSON file so dev installs are synced
+	 *
+	 * @return void
+	 */
+	public static function writeThemeSettingsToDisk()
+	{
+		$data = array();
+	
+		foreach (
+				\IPS\Db::i()->select(
+						'sv.*, core_theme_settings_fields.*',
+						'core_theme_settings_fields',
+						array( 'sc_set_id=?', \IPS\DEFAULT_THEME_ID )
+				)->join(
+						array('core_theme_settings_values', 'sv'),
+						'sv.sv_id=core_theme_settings_fields.sc_id'
+				)->setKeyField('sc_key') as $row
+		)
+		{
+			$row['sc_default'] = ( $row['sv_value'] ) ? $row['sv_value'] : $row['sc_default'];
+			
+			unset( $row['sc_id'], $row['sc_set_id'], $row['sc_updated'], $row['sv_id'], $row['sv_value'] );
+
+			$data[ $row['sc_app'] ][] = $row;
+		}
+		foreach( $data as $app => $json )
+		{
+			$file = \IPS\ROOT_PATH . "/applications/{$app}/data/themesettings.json";
+				
+			if( @\file_put_contents( $file, json_encode( $json, JSON_PRETTY_PRINT ) ) === FALSE )
+			{
+				\IPS\Output::i()->error( 'dev_could_not_write_data', '1C103/4', 403, '' );
+			}
+		}
+	}
+	
+	/**
 	 * Remove an entire theme directory
 	 *
-	 * @param string $dir		Path
+	 * @param	string		$dir		Path
 	 * @return  void
 	 */
-	public static function removeThemeDirectory( string $dir ): void
+	public static function removeThemeDirectory( $dir )
 	{
 		if ( is_dir( $dir ) )
 		{
-			foreach ( new DirectoryIterator( $dir ) as $f )
+			foreach ( new \DirectoryIterator( $dir ) as $f )
 			{
 				if ( !$f->isDot() )
 				{
@@ -1159,7 +1175,7 @@ class Theme extends SystemTheme
 	 *
 	 * @return string
 	 */
-	protected static function _getTemplateNamespace(): string
+	protected static function _getTemplateNamespace()
 	{
 		return 'IPS\\Theme\\Dev\\';
 	}
@@ -1167,49 +1183,60 @@ class Theme extends SystemTheme
 	/**
 	 * Returns the path for the IN_DEV .phtml files
 	 *
-	 * @param string $app			Application Key
-	 * @param string|null $location		Location
-	 * @param string|null $path			Path or Filename
+	 * @param string 	 	  $app			Application Key
+	 * @param string|null	  $location		Location
+	 * @param string|null 	  $path			Path or Filename
 	 * @return string
 	 */
-	protected static function _getHtmlPath( string $app, string $location=null, string $path=null ): string
+	protected static function _getHtmlPath( $app, $location=null, $path=null )
 	{
-		return rtrim( ROOT_PATH . "/applications/{$app}/dev/html/{$location}/{$path}", '/' ) . '/';
+		return rtrim( \IPS\ROOT_PATH . "/applications/{$app}/dev/html/{$location}/{$path}", '/' ) . '/';
 	}
 	
 	/**
 	 * Returns the path for the IN_DEV CSS file
 	 *
-	 * @param string $app			Application Key
-	 * @param string|null $location		Location
-	 * @param string|null $path			Path or Filename
+	 * @param string 	 	  $app			Application Key
+	 * @param string|null	  $location		Location
+	 * @param string|null 	  $path			Path or Filename
 	 * @return string
 	 */
-	protected static function _getCssPath( string $app, string $location=null, string $path=null ): string
+	protected static function _getCssPath( $app, $location=null, $path=null )
 	{
-		/* This is the default, look for an actual CSS file */
-		$path = rtrim( ROOT_PATH . "/applications/{$app}/dev/css/{$location}/{$path}", '/' ) . ( stristr( $path, '.css' ) ? '' : '/' );
-		if( !file_exists( $path ) )
-		{
-			/* If the file doesn't exist, move one level up and return the directory */
-			$bits = explode( "/", $path );
-			array_pop( $bits );
-			$path = implode( "/", $bits );
-		}
-
-		return $path;
+		return rtrim( \IPS\ROOT_PATH . "/applications/{$app}/dev/css/{$location}/{$path}", '/' ) . ( \stristr( $path, '.css' ) ? '' : '/' );
 	}
 	
 	/**
 	 * Returns the path for the IN_DEV resource files
 	 *
-	 * @param string $app			Application Key
-	 * @param string|null $location		Location
-	 * @param string|null $path			Path or Filename
+	 * @param string 	 	  $app			Application Key
+	 * @param string|null	  $location		Location
+	 * @param string|null 	  $path			Path or Filename
 	 * @return string
 	 */
-	protected static function _getResourcePath( string $app, string $location=null, string $path=null ): string
+	protected static function _getResourcePath( $app, $location=null, $path=null )
 	{
-		return rtrim( ROOT_PATH . "/applications/{$app}/dev/resources/{$location}/{$path}", '/' ) . ( ( stristr( $path, '.' ) || stristr( $path, '{' ) ) ? '' : '/' );
+		if ( $app == 'core' and $location == 'global' and mb_substr( $path, 0, mb_strpos( $path, '/' ) ) === 'plugins' )
+		{
+			foreach ( new \GlobIterator( \IPS\ROOT_PATH . '/plugins/*/dev/resources/' . mb_substr( $path, mb_strpos( $path, '/' ) + 1 ) ) as $file )
+			{
+				return $file->getPathName();
+			}
+		}
+		
+		return rtrim( \IPS\ROOT_PATH . "/applications/{$app}/dev/resources/{$location}/{$path}", '/' ) . ( ( \stristr( $path, '.' ) || \stristr( $path, '{' ) ) ? '' : '/' );
+	}
+
+	/**
+	 * Basic debugging output functionality
+	 *
+	 * @param	\Exception $e	Exception that we are outputting
+	 * @return	void
+	 */
+	public static function varDumpException( $e )
+	{
+		echo '<pre>';
+		var_dump( $e );
+		exit;
 	}
 }

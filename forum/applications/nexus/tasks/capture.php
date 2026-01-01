@@ -12,27 +12,16 @@
 namespace IPS\nexus\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\nexus\Transaction;
-use IPS\Task;
-use IPS\Task\Exception;
-use UnderflowException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Task to capture payments approaching their authorization deadlines
  */
-class capture extends Task
+class _capture extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -42,19 +31,19 @@ class capture extends Task
 	 * If an error occurs which means the task could not finish running, throw an \IPS\Task\Exception - do not log an error as a normal log.
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
-	 * @return	string|null	Message to log or NULL
-	 * @throws	Exception
+	 * @return	mixed	Message to log or NULL
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : string|null
+	public function execute()
 	{
-		$taskFrequency = new DateInterval( $this->frequency );
-		$time = DateTime::create()->add( $taskFrequency )->add( $taskFrequency );
+		$taskFrequency = new \DateInterval( $this->frequency );
+		$time = \IPS\DateTime::create()->add( $taskFrequency )->add( $taskFrequency );
 		
 		$this->runUntilTimeout( function() use ( $time )
 		{
 			try
 			{
-				$transaction = Transaction::constructFromData( Db::i()->select( '*', 'nexus_transactions', array( 't_auth<?', $time->getTimestamp() ), 't_auth ASC', 1 )->first() );
+				$transaction = \IPS\nexus\Transaction::constructFromData( \IPS\Db::i()->select( '*', 'nexus_transactions', array( 't_auth<?', $time->getTimestamp() ), 't_auth ASC', 1 )->first() );
 				
 				if ( $transaction->method )
 				{
@@ -64,11 +53,11 @@ class capture extends Task
 					}
 					catch ( \Exception $e )
 					{
-						if ( in_array( $transaction->status, array( $transaction::STATUS_PENDING, $transaction::STATUS_WAITING, $transaction::STATUS_GATEWAY_PENDING ) ) )
+						if ( \in_array( $transaction->status, array( $transaction::STATUS_PENDING, $transaction::STATUS_WAITING, $transaction::STATUS_GATEWAY_PENDING ) ) )
 						{
-							$transaction->status = Transaction::STATUS_REFUSED;
+							$transaction->status = \IPS\nexus\Transaction::STATUS_REFUSED;
 							$extra = $transaction->extra;
-							$extra['history'][] = array( 's' => Transaction::STATUS_REFUSED, 'noteRaw' => $e->getMessage() );
+							$extra['history'][] = array( 's' => \IPS\nexus\Transaction::STATUS_REFUSED, 'noteRaw' => $e->getMessage() );
 							$transaction->extra = $extra;
 						}
 						
@@ -81,23 +70,19 @@ class capture extends Task
 					/* the gateway doesn't exist anymore, so reset the auth time */
 					$transaction->auth = NULL;
 					$extra = $transaction->extra;
-					$extra['history'][] = array( 's' => Transaction::STATUS_REFUSED, 'on' => time(), 'noteRaw' => 'invalid_gateway' );
+					$extra['history'][] = array( 's' => \IPS\nexus\Transaction::STATUS_REFUSED, 'on' => time(), 'noteRaw' => 'invalid_gateway' );
 					$transaction->extra = $extra;
-					$transaction->status = Transaction::STATUS_REFUSED;
+					$transaction->status = \IPS\nexus\Transaction::STATUS_REFUSED;
 					$transaction->save();
 	
-					throw new Exception( $this, array( 'invalid_gateway', $transaction->id ) );
+					throw new \IPS\Task\Exception( $this, array( 'invalid_gateway', $transaction->id ) );
 				}
 			}
-			catch ( UnderflowException )
+			catch ( \UnderflowException $e )
 			{
 				return FALSE;
 			}
-
-			return NULL;
 		});
-
-		return null;
 	}
 	
 	/**
@@ -109,7 +94,7 @@ class capture extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 		
 	}

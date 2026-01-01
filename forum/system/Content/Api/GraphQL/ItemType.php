@@ -9,52 +9,35 @@
  */
 
 namespace IPS\Content\Api\GraphQL;
-use BadMethodCallException;
-use DateTimeZone;
-use Exception;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\IPS;
-use IPS\Http\Url\Friendly;
-use IPS\Member;
-use IPS\Settings;
-use OutOfRangeException;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base mutator class for Content Items
  */
-class ItemType extends ObjectType
+class _ItemType extends ObjectType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $itemClass	= '\IPS\Content\Item';
+	protected static $itemClass	= '\IPS\Content\Item';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'core_Item';
+	protected static $typeName = 'core_Item';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'A generic content item';
+	protected static $typeDescription = 'A generic content item';
 
 
 	public function __construct()
@@ -75,7 +58,7 @@ class ItemType extends ObjectType
 	 *
 	 * @return	array
 	 */
-	public function fields(): array
+	public function fields()
 	{
 		return array(
 			'id' => [
@@ -100,13 +83,13 @@ class ItemType extends ObjectType
 			'seoTitle' => [
 				'type' => TypeRegistry::string(),
 				'resolve' => function ($item) {
-					return Friendly::seoTitle( $item->mapped('title') );
+					return \IPS\Http\Url\Friendly::seoTitle( $item->mapped('title') );
 				}
 			],
 			'views' => [
 				'type' => TypeRegistry::int(),
 				'resolve' => function ($item) {
-					if ( in_array( 'IPS\Content\ViewUpdates', class_uses( $item ) ) )
+					if ( \in_array( 'IPS\Content\Views', class_implements( $item ) ) )
 					{
 						return $item->mapped('views');
 					}
@@ -134,7 +117,7 @@ class ItemType extends ObjectType
 			'isLocked' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($item) {
-					if ( IPS::classUsesTrait( $item, 'IPS\Content\Lockable' ) )
+					if ( \in_array( 'IPS\Content\Lockable', class_implements( $item ) ) )
 					{
 						return (bool) $item->locked();
 					}
@@ -145,7 +128,7 @@ class ItemType extends ObjectType
 			'isPinned' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($item) {
-					if ( IPS::classUsesTrait( $item, 'IPS\Content\Pinnable' ) )
+					if ( \in_array( 'IPS\Content\Pinnable', class_implements( $item ) ) )
 					{
 						return (bool) $item->mapped('pinned');
 					}
@@ -156,7 +139,7 @@ class ItemType extends ObjectType
 			'isFeatured' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($item) {
-					if ( IPS::classUsesTrait( $item, 'IPS\Content\Featurable' ) )
+					if ( \in_array( 'IPS\Content\Featurable', class_implements( $item ) ) )
 					{
 						return (bool) $item->mapped('featured');
 					}
@@ -170,7 +153,7 @@ class ItemType extends ObjectType
 					'values' => ['HIDDEN', 'PENDING', 'DELETED']
 				]),
 				'resolve' => function ($item) {
-					if ( !IPS::classUsesTrait( $item, 'IPS\Content\Hideable' ) )
+					if ( !\in_array( 'IPS\Content\Hideable', class_implements( $item ) ) )
 					{
 						switch( $item->hidden() ){
 							case -2:
@@ -183,7 +166,6 @@ class ItemType extends ObjectType
 								return NULL;
 						}
 					}
-					return null;
 				}
 			],
 			'updated' => [
@@ -201,7 +183,7 @@ class ItemType extends ObjectType
 			'isUnread' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($item) {
-					if ( IPS::classUsesTrait( $item, 'IPS\Content\ReadMarkers' ) )
+					if ( \in_array( 'IPS\Content\ReadMarkers', class_implements( $item ) ) )
 					{
 						return $item->unread();
 					}
@@ -219,7 +201,7 @@ class ItemType extends ObjectType
 				'type' => TypeRegistry::int(),
 				'description' => 'Returns the position of the comment that is the first unread in this topic',
 				'resolve' => function ($item) {
-					if ( IPS::classUsesTrait( $item, 'IPS\Content\ReadMarkers' ) )
+					if ( \in_array( 'IPS\Content\ReadMarkers', class_implements( $item ) ) )
 					{
 						return static::getUnreadPosition($item);
 					}
@@ -240,8 +222,7 @@ class ItemType extends ObjectType
 			'follow' => [
 				'type' => TypeRegistry::follow(),
 				'resolve' => function ($item) {
-					if( IPS::classUsesTrait( $item, 'IPS\Content\Followable' ) && isset( static::$followData ) && is_array( static::$followData ) )
-					{
+					if( \in_array( 'IPS\Content\Followable', class_implements( $item ) ) && isset( static::$followData ) && \is_array( static::$followData ) ){
 						$idColumn = static::getIdColumn($item);
 						return array_merge( static::$followData, array(
 							'id' => $item->$idColumn,
@@ -256,7 +237,7 @@ class ItemType extends ObjectType
 			'tags' => [
 				'type' => TypeRegistry::listOf( \IPS\core\api\GraphQL\TypeRegistry::tag() ),
 				'resolve' => function ($item) {
-					if ( IPS::classUsesTrait( $item, 'IPS\Content\Taggable' ) )
+					if ( \in_array( 'IPS\Content\Tags', class_implements( $item ) ) )
 					{
 						return static::tags($item);
 					}
@@ -292,13 +273,13 @@ class ItemType extends ObjectType
 			'hasPoll' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($item) {
-					return IPS::classUsesTrait( $item, 'IPS\Content\Polls' ) AND $item->poll_state;
+					return $item instanceof \IPS\Content\Polls && $item->poll_state;
 				}
 			],
 			'poll' => [
 				'type' => \IPS\core\api\GraphQL\TypeRegistry::poll(),
 				'resolve' => function ($item) {
-					if( IPS::classUsesTrait( $item, 'IPS\Content\Polls' ) AND $item->poll_state )
+					if( $item instanceof \IPS\Content\Polls && $item->poll_state )
 					{
 						return $item->getPoll();
 					}
@@ -309,9 +290,7 @@ class ItemType extends ObjectType
 			'firstCommentRequired' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($item) {
-					/* @var Item $className */
-					$className = get_class( $item );
-					return $className::$firstCommentRequired;
+					return static::$itemClass::$firstCommentRequired;
 				}
 			],
 			'articleLang' => [
@@ -330,19 +309,17 @@ class ItemType extends ObjectType
 						]
 					],
 					'resolveField' => function ($item, $args, $context, $info) {
-						/* @var Item $className */
-						$className = get_class( $item );
+						$className = \get_class( $item );
 
 						switch( $info->fieldName )
 						{
 							case 'indefinite':
-								return $className::_indefiniteArticle();
-
+								return $className::_indefiniteArticle( NULL );
+							break;
 							case 'definite':
 								return $className::_definiteArticle( NULL, NULL, $args['uppercase'] ? array( 'ucfirst' => TRUE ) : array() );	
-
+							break;
 						}
-						return '';
 					}
 				]),
 				'resolve' => function ($item) {
@@ -399,12 +376,11 @@ class ItemType extends ObjectType
 	/**
 	 * Return the ID column for the provided item
 	 *
-	 * @param Item $item
-	 * @return    string
+	 * @return	array
 	 */
-	protected function getIdColumn(Item $item): string
+	protected function getIdColumn($item)
 	{
-		$className = get_class( $item );
+		$className = \get_class( $item );
 		return $className::$databaseColumnId;
 	}
 
@@ -413,7 +389,7 @@ class ItemType extends ObjectType
 	 *
 	 * @return	array
 	 */
-	public static function args(): array
+	public static function args() 
 	{
 		return array(
 			'offset' => [
@@ -452,7 +428,7 @@ class ItemType extends ObjectType
 	 *
 	 * @return	array
 	 */
-	public static function getOrderByOptions(): array
+	public static function getOrderByOptions()
 	{
 		return array('title', 'author_name', 'last_comment_name');
 	}
@@ -462,42 +438,42 @@ class ItemType extends ObjectType
 	 *
 	 * @return	array
 	 */
-	public static function getItemPermissionFields(): array
+	public static function getItemPermissionFields()
 	{
 		return array(
 			'canComment' => [
 				'type' => TypeRegistry::boolean(),
 				'description' => 'Can the logged in user comment on this item?',
 				'resolve' => function ($item, $args, $context) {
-					return $item->canComment( Member::loggedIn(), FALSE );
+					return $item->canComment( \IPS\Member::loggedIn(), FALSE );
 				}
 			],
 			'commentInformation' => [
 				'type' => TypeRegistry::string(),
 				'description' => 'A message providing some information about the comment form availability',
 				'resolve' => function ($item, $args, $context) {
-					if( $item->canComment( Member::loggedIn(), FALSE ) )
+					if( $item->canComment( \IPS\Member::loggedIn(), FALSE ) )
 					{
-						if( IPS::classUsesTrait( $item, 'IPS\Content\Lockable' ) AND $item->locked() )
+						if( $item instanceof \IPS\Content\Lockable && $item->locked() )
 						{
 							return 'locked_can_comment';
 						}
 					}
 					else
 					{
-						if( IPS::classUsesTrait( $item, 'IPS\Content\Lockable' ) AND $item->locked() )
+						if( $item instanceof \IPS\Content\Lockable && $item->locked() )
 						{
 							return 'locked_cannot_comment';
 						}
-						elseif( Member::loggedIn()->restrict_post )
+						elseif( \IPS\Member::loggedIn()->restrict_post )
 						{
 							return 'restricted_cannot_comment';
 						} 
-						elseif( Member::loggedIn()->members_bitoptions['unacknowledged_warnings'] )
+						elseif( \IPS\Member::loggedIn()->members_bitoptions['unacknowledged_warnings'] )
 						{
 							return 'unacknowledged_warning_cannot_post';
 						}
-						elseif( !Member::loggedIn()->checkPostsPerDay() )
+						elseif( !\IPS\Member::loggedIn()->checkPostsPerDay() )
 						{
 							return 'member_exceeded_posts_per_day';
 						}
@@ -509,11 +485,11 @@ class ItemType extends ObjectType
 			'canCommentIfSignedIn' => [
 				'type' => TypeRegistry::boolean(),
 				'description' => 'Returns boolean indicating whether a guest who signs in would be able to comment on this item. Returns NULL if already signed in.',
-				'resolve' => function ($item) {
-					if ( !Member::loggedIn()->member_id )
+				'resolve' => function ($item, $args, $context) {
+					if ( !\IPS\Member::loggedIn()->member_id )
 					{
-						$testUser = new Member;
-						$testUser->member_group_id = Settings::i()->member_group;
+						$testUser = new \IPS\Member;
+						$testUser->member_group_id = \IPS\Settings::i()->member_group;
 						
 						return $item->canComment( $testUser, FALSE );
 					}
@@ -525,21 +501,21 @@ class ItemType extends ObjectType
 				'type' => TypeRegistry::boolean(),
 				'description' => 'Boolean indicating whether this item supports read markers, and if so, if the user can mark as read',
 				'resolve' => function ($item) {
-					return IPS::classUsesTrait( $item, 'IPS\Content\ReadMarkers' ) && Member::loggedIn()->member_id;
+					return $item instanceof \IPS\Content\ReadMarkers && \IPS\Member::loggedIn()->member_id;
 				}
 			],
 			'canReport' => [
 				'type' => TypeRegistry::boolean(),
 				'description' => 'Can the user report this item?',
 				'resolve' => function ($item) {
-					return $item->canReport( Member::loggedIn() ) === TRUE;
+					return $item->canReport( \IPS\Member::loggedIn() ) === TRUE;
 				}
 			],
 			'canReportOrRevoke' => [
 				'type' => TypeRegistry::boolean(),
 				'description' => 'Can the user report (or revoke a report) on this item?',
 				'resolve' => function ($item) {
-					return $item->canReportOrRevoke( Member::loggedIn() ) === TRUE;
+					return $item->canReportOrRevoke( \IPS\Member::loggedIn() ) === TRUE;
 				}
 			],
 			'canShare' => [
@@ -557,7 +533,7 @@ class ItemType extends ObjectType
 	 *
 	 * @return	ObjectType
 	 */
-	protected static function getCommentType(): ObjectType
+	protected static function getCommentType()
 	{
 		return \IPS\Content\Api\GraphQL\TypeRegistry::comment();
 	}
@@ -565,27 +541,25 @@ class ItemType extends ObjectType
 	/**
 	 * Return content images for the provided item
 	 *
-	 * @param Item $item
-	 * @return    array|null
+	 * @return	array|null
 	 */
-	protected static function contentImages(Item $item): array|NULL
+	protected static function contentImages($item)
 	{
 		try
 		{
 			if ( $images = $item->contentImages( 20 ) )
 			{
-				$toReturn = [];
 				foreach( $images as $image )
 				{
 					foreach( $image as $extension => $file )
 					{
-						$toReturn[] = (string) File::get( $extension, $file )->url;
+						$toReturn[] = (string) \IPS\File::get( $extension, $file )->url;
 					}
 				}
 				return $toReturn;
 			}
 		}
-		catch( BadMethodCallException $e ) { }
+		catch( \BadMethodCallException $e ) { }
 
 		return NULL;
 	}
@@ -593,25 +567,20 @@ class ItemType extends ObjectType
 	/**
 	 * Resolve the findCommentPosition field
 	 *
-	 * @param Item $item
-	 * @param array $args    Arguments passed to this resolver
-	 * @return int|NULL
+	 * @param 	\IPS\forums\Topic
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	array
 	 */
-	protected static function findCommentPosition(Item $item, array $args): int|NULL
+	protected static function findCommentPosition($item, $args)
 	{
 		if( $args['findComment'] === NULL )
 		{
 			return NULL;
 		}
 
-		/* @var Item $itemClass */
-		$itemClass = get_class( $item );
-
 		try 
 		{
-			/* @var Comment $commentClass */
-			$commentClass = $itemClass::$commentClass;
-			$comment = $commentClass::load( $args['findComment'] );
+			$comment = static::$itemClass::$commentClass::load( $args['findComment'] );
 
 			// Check this comment belongs to this topic
 			if( $comment->item() !== $item )
@@ -619,7 +588,7 @@ class ItemType extends ObjectType
 				return NULL;
 			}
 		}
-		catch (Exception $e)
+		catch (\Exception $e)
 		{
 			return NULL;
 		}
@@ -630,15 +599,12 @@ class ItemType extends ObjectType
 	/**
 	 * Resolve the comments field
 	 *
-	 * @param Item $item
-	 * @param array $args    Arguments passed to this resolver
-	 * @return    array
+	 * @param 	\IPS\forums\Topic
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	array
 	 */
-	protected static function comments(Item $item, array $args): array
+	protected static function comments($item, $args)
 	{
-		/* @var Item $itemClass */
-		$itemClass = get_class( $item );
-
 		$offset = 0;
 		$limit = 25;
 
@@ -655,7 +621,7 @@ class ItemType extends ObjectType
 			case 'ID':
 				if( !isset( $args['findComment'] ) )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 
 				$offset = static::getCommentPosition($item, $args['findComment']) + $args['offsetAdjust'];
@@ -671,10 +637,7 @@ class ItemType extends ObjectType
 
 		if( $args['orderBy'] == 'DATE' )
 		{
-			/* @var Comment $commentClass */
-			/* @var array $databaseColumnMap */
-			$commentClass = $itemClass::$commentClass;
-			$args['orderBy'] = $commentClass::$databaseColumnMap['date'];
+			$args['orderBy'] = static::$itemClass::$commentClass::$databaseColumnMap['date'];
 		}
 
 		
@@ -690,35 +653,27 @@ class ItemType extends ObjectType
 	/**
 	 * Get the position of a specific comment
 	 *
-	 * @param 	Item $item
-	 * @param 	int $commentID
-	 * @return	int|null
+	 * @param 	\IPS\Content\Item
+	 * @return	int
 	 */
-	protected static function getCommentPosition(Item $item, int $commentID): ?int
+	protected static function getCommentPosition($item, $commentID)
 	{
-		$itemClass = get_class( $item );
-
-		/* @var Comment $commentClass */
-		$commentClass = $itemClass::$commentClass;
-
 		try 
 		{
-			$comment = $commentClass::load($commentID);
+			$comment = static::$itemClass::$commentClass::load($commentID);
 			return static::findComment($comment, $item);
 		}
-		catch(Exception $error)
+		catch(\Exception $error)
 		{}
-
-		return null;
 	}
 
 	/**
 	 * Get the position of the last comment
 	 *
-	 * @param 	Item $item
+	 * @param 	\IPS\Content\Item
 	 * @return	int
 	 */
-	protected static function getEndPosition(Item $item): int
+	protected static function getEndPosition($item)
 	{
 		$comment = $item->comments( 1, NULL, 'date', 'desc' );
 		return static::findComment($comment, $item);
@@ -727,21 +682,20 @@ class ItemType extends ObjectType
 	/**
 	 * Get the position of the first unread comment
 	 *
-	 * @param 	Item $item
+	 * @param 	\IPS\Content\Item
 	 * @return	int
 	 */
-	protected static function getUnreadPosition(Item $item): int
+	protected static function getUnreadPosition($item)
 	{
 		try
-		{
-			/* @var Item $class */
+		{	
 			$class = static::$itemClass;
 			$timeLastRead = $item->timeLastRead();
 
-			if ( $timeLastRead instanceof DateTime )
+			if ( $timeLastRead instanceof \IPS\DateTime )
 			{
 				$comment = NULL;
-				if( DateTime::ts( $item->mapped('date') ) < $timeLastRead )
+				if( \IPS\DateTime::ts( $item->mapped('date') ) < $timeLastRead )
 				{
 					$comment = $item->comments( 1, NULL, 'date', 'asc', NULL, NULL, $timeLastRead );
 				}
@@ -770,11 +724,11 @@ class ItemType extends ObjectType
 				if ( $item->unread() )
 				{
 					/* If we do not have a time last read set for this content, fallback to the reset time */
-					$resetTimes = Member::loggedIn()->markersResetTimes( $class::$application );
+					$resetTimes = \IPS\Member::loggedIn()->markersResetTimes( $class::$application );
 
 					if ( array_key_exists( $item->container()->_id, $resetTimes ) and $item->mapped('date') < $resetTimes[ $item->container()->_id ] )
 					{
-						$comment = $item->comments( 1, NULL, 'date', 'asc', NULL, NULL, DateTime::ts( $resetTimes[ $item->container()->_id ] ) );
+						$comment = $item->comments( 1, NULL, 'date', 'asc', NULL, NULL, \IPS\DateTime::ts( $resetTimes[ $item->container()->_id ] ) );
 						
 						if ( !$comment || $class::$firstCommentRequired and $comment->isFirst() )
 						{
@@ -794,7 +748,7 @@ class ItemType extends ObjectType
 
 			return static::findComment($comment, $item);
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return 0;
 		}
@@ -803,21 +757,20 @@ class ItemType extends ObjectType
 	/**
 	 * Find the position of a comment
 	 *
-	 * @param 	Comment $comment
-	 * @param 	Item $item
+	 * @param 	\IPS\Content\Comment
+	 * @param 	\IPS\Content\Item
 	 * @return	int
 	 */
-	protected static function findComment(Comment $comment, Item $item): int
+	protected static function findComment($comment, $item)
 	{
 		try 
 		{
-			/* @var array $databaseColumnMap */
-			$commentClass = get_class( $comment );
+			$commentClass = \get_class( $comment );
 			$idColumn = $commentClass::$databaseColumnId;
 			$itemColumn = $commentClass::$databaseColumnMap['item'];
 
 			/* Work out where the comment is in the item */	
-			$directional = ( in_array( 'IPS\Content\Review', class_parents( $commentClass ) ) ) ? '>=?' : '<=?';
+			$directional = ( \in_array( 'IPS\Content\Review', class_parents( $commentClass ) ) ) ? '>=?' : '<=?';
 			$where = array(
 				array( $commentClass::$databasePrefix . $itemColumn . '=?', $comment->$itemColumn ),
 				array( $commentClass::$databasePrefix . $idColumn . $directional, $comment->$idColumn )
@@ -851,17 +804,15 @@ class ItemType extends ObjectType
 					}
 				}
 			}
-			$commentPosition = Db::i()->select( 'COUNT(*) AS position', $commentClass::$databaseTable, $where )->first();
+			$commentPosition = \IPS\Db::i()->select( 'COUNT(*) AS position', $commentClass::$databaseTable, $where )->first();
 
-			/* @var Item $itemClass */
-			$itemClass = get_class( $item );
-			if( $itemClass::$firstCommentRequired ){
+			if( static::$itemClass::$firstCommentRequired ){
 				$commentPosition = $commentPosition - 1;
 			}
 
 			return $commentPosition;
 		} 
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return 0;
 		}
@@ -870,15 +821,15 @@ class ItemType extends ObjectType
 	/**
 	 * Resolve the tags field
 	 *
-	 * @param 	Item $item
-	 * @return	int|null
+	 * @param 	\IPS\Content\Item
+	 * @return	int
 	 */
-	protected static function timeLastRead(Item $item): ?int
+	protected static function timeLastRead($item)
 	{
 		$time = $item->timeLastRead();
-		if( $time instanceof DateTime )
+		if( $time instanceof \IPS\DateTime )
 		{
-			return (int) $time->setTimezone( new DateTimeZone( "UTC" ) )->format('U');
+			return (int) $time->setTimezone( new \DateTimeZone( "UTC" ) )->format('U');
 		}
 		return NULL;
 	}
@@ -886,22 +837,23 @@ class ItemType extends ObjectType
 	/**
 	 * Resolve the tags field
 	 *
-	 * @param 	Item $item
+	 * @param 	\IPS\Content\Item
 	 * @return	array
 	 */
-	protected static function tags(Item $item): array
+	protected static function tags($item)
 	{
-		return $item->tags();
+		$tags = $item->tags();
+		return \is_array( $tags ) ? $tags : array();
 	}
 
 	/**
 	 * Resolve the author field
 	 *
-	 * @param 	Item $item
-	 * @param 	array $args 	Arguments passed to this resolver
-	 * @return	Member
+	 * @param 	null
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	\IPS\forums\Forum
 	 */
-	protected static function author(Item $item, array $args): Member
+	protected static function author($item, $args)
 	{
 		return $item->author();
 	}
@@ -909,11 +861,11 @@ class ItemType extends ObjectType
 	/**
 	 * Resolve the last comment author field
 	 *
-	 * @param 	Item $item
-	 * @param 	array $args 	Arguments passed to this resolver
-	 * @return	Member
+	 * @param 	\IPS\forums\Topic
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	\IPS\Member
 	 */
-	protected static function lastCommentAuthor(Item $item, array $args): Member
+	protected static function lastCommentAuthor($item, $args)
 	{
 		if( $item->mapped('num_comments') )
 		{
@@ -926,11 +878,11 @@ class ItemType extends ObjectType
 	 /**
 	 * Resolve the last comment date field
 	 *
-	 * @param 	Item $item
-	 * @param 	array $args 	Arguments passed to this resolver
+	 * @param 	\IPS\forums\Topic
+	 * @param 	array 	Arguments passed to this resolver
 	 * @return	string
 	 */
-	protected static function lastCommentDate(Item $item, array $args): string
+	protected static function lastCommentDate($item, $args)
 	{
 		if( $item->mapped('last_comment') )
 		{

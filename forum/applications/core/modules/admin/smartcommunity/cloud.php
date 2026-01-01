@@ -12,33 +12,26 @@
 namespace IPS\core\modules\admin\smartcommunity;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Member;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * cloud
  */
-class cloud extends Controller
+class _cloud extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Cloud
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Output::i()->cssFiles	= array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/enhancements.css', 'core', 'admin' ) );
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'menu__core_smartcommunity' );
-		Output::i()->output = Theme::i()->getTemplate( 'smartcommunity' )->cloud();
+		\IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/enhancements.css', 'core', 'admin' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'menu__core_smartcommunity' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'smartcommunity' )->cloud();
 	}
 }

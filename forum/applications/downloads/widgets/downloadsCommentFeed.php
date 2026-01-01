@@ -12,53 +12,50 @@
 namespace IPS\downloads\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\WidgetComment;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * downloadsCommentFeed Widget
  */
-class downloadsCommentFeed extends WidgetComment
+class _downloadsCommentFeed extends \IPS\Content\WidgetComment
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'downloadsCommentFeed';
+	public $key = 'downloadsCommentFeed';
 
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'downloads';
+	public $app = 'downloads';
 
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Class
 	 */
-	protected static string $class = 'IPS\downloads\File\Comment';
+	protected static $class = 'IPS\downloads\File\Comment';
 
 	/**
 	 * @brief	Moderator permission to generate caches on [optional]
 	 */
-	protected array $moderatorPermissions	= array( 'can_view_hidden_content', 'can_view_hidden_downloads_file_comment' );
+	protected $moderatorPermissions	= array( 'can_view_hidden_content', 'can_view_hidden_downloads_file_comment' );
 	
 	/**
 	* Init the widget
 	*
 	* @return	void
 	*/
-	public function init(): void
+	public function init()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'downloads', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'downloads', 'front' ) );
 
 		parent::init();
 	}

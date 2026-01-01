@@ -11,24 +11,9 @@
 namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Api\Webhook;
-use IPS\Application;
-use IPS\Content\Search\Index;
-use IPS\Db;
-use IPS\Member;
-use IPS\Notification;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0') . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -40,36 +25,43 @@ trait Solvable
 	/**
 	 * Container has solvable enabled
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	abstract public function containerAllowsSolvable(): bool;
+	public function containerAllowsSolvable()
+	{
+		throw new \BadMethodCallException;
+	}
 	
 	/**
 	 * Container has solvable enabled
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	abstract public function containerAllowsMemberSolvable(): bool;
+	public function containerAllowsMemberSolvable()
+	{
+		throw new \BadMethodCallException;
+	}
 	
 	/**
 	 * Any container has solvable enabled?
 	 *
 	 * @return	boolean
 	 */
-	abstract public static function anyContainerAllowsSolvable(): bool;
+	public static function anyContainerAllowsSolvable()
+	{
+		return FALSE;
+	}
 	
 	/**
 	 * Toggle the solve value of a comment
 	 *
 	 * @param 	int		$commentId	The comment ID
 	 * @param 	boolean	$value		TRUE/FALSE value
-	 * @param	Member|null	$member	The member (null for currently logged in member)
-	 *
-	 * @return	void
+	 * @param	\IPS\Member	$member	The member (null for currently logged in member)
 	 */
-	public function toggleSolveComment( int $commentId, bool $value, ?Member $member = NULL ): void
+	public function toggleSolveComment( $commentId, $value, \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		$commentClass = static::$commentClass;
 		$commentIdField = $commentClass::$databaseColumnId;
@@ -90,29 +82,27 @@ trait Solvable
 					$oldComment->setSolved( FALSE );
 					$oldComment->save();
 					
-					Db::i()->delete( 'core_solved_index', array( 'comment_class=? AND comment_id=? AND type=?', $commentClass, $oldComment->$commentIdField, 'solved' ) );
+					\IPS\Db::i()->delete( 'core_solved_index', array( 'comment_class=? AND comment_id=?', $commentClass, $oldComment->$commentIdField ) );
 				}
-				catch( Exception ) { }
+				catch( \Exception $e ) { }
 			}
 			
 			$this->$solvedField = $comment->$commentIdField;
 			$this->save();
 		
-			Db::i()->insert( 'core_solved_index', array(
+			\IPS\Db::i()->insert( 'core_solved_index', array(
 				'member_id' => (int) $comment->author()->member_id,
 				'app'	=> $commentClass::$application,
 				'comment_class' => $commentClass,
 				'comment_id' => $comment->$commentIdField,
 				'item_id'	 => $this->$idField,
-				'solved_date' => time(),
-				'type' => 'solved',
-				'node_id' => $comment->item()->container()->_id
+				'solved_date' => time()
 			) );
 
 			/* Send the "solution to your topic" notification but only if we didn't post the solution, we're not marking the solution, we can view the content, and the user isn't ignored */
-			if ( $this->author()->member_id AND $comment->author() != $this->author() AND $this->author() !== $member AND $this->canView( $this->author() ) AND !$this->author()->isIgnoring( $comment->author(), 'posts' ) )
+			if ( $this->author()->member_id AND $comment->author() != $this->author() AND $this->author() != $member AND $this->canView( $this->author() ) AND !$this->author()->isIgnoring( $comment->author(), 'posts' ) )
 			{
-				$notification = new Notification( Application::load('core'), 'mine_solved', $this, array( $this, $comment, $member ), array(), TRUE, NULL );
+				$notification = new \IPS\Notification( \IPS\Application::load('core'), 'mine_solved', $this, array( $this, $comment, $member ), array(), TRUE, NULL );
 				$notification->recipients->attach( $this->author() );
 				$notification->send();
 			}
@@ -120,7 +110,7 @@ trait Solvable
 			/* Send the "you solved the topic" notification but only if we didn't mark the solution */
 			if ( $comment->author()->member_id AND $comment->author() != $member )
 			{
-				$notification = new Notification( Application::load('core'), 'my_solution', $this, array( $this, $comment, $member ), array(), TRUE, NULL );
+				$notification = new \IPS\Notification( \IPS\Application::load('core'), 'my_solution', $this, array( $this, $comment, $member ), array(), TRUE, NULL );
 				$notification->recipients->attach( $comment->author() );
 				$notification->send();
 			}
@@ -130,32 +120,32 @@ trait Solvable
 				'comment' => $comment,
 				'markedBy' => $member
 			];
-			Webhook::fire( 'content_marked_solved', $payload );
+			\IPS\Api\Webhook::fire( 'content_marked_solved', $payload );
 		}
 		else
 		{
 			$this->$solvedField = 0;
 			$this->save();
 		
-			Db::i()->delete( 'core_solved_index', array( 'comment_class=? and comment_id=? AND type=?', $commentClass, $comment->$commentIdField, 'solved' ) );
+			\IPS\Db::i()->delete( 'core_solved_index', array( 'comment_class=? and comment_id=?', $commentClass, $comment->$commentIdField ) );
 
 			$memberIds	= array();
 
-			foreach( Db::i()->select( '`member`', 'core_notifications', array( Db::i()->in( 'notification_key', array( 'mine_solved', 'my_solution' ) ) . ' AND item_class=? AND item_id=?', get_class( $this ), (int) $this->$idField ) ) as $memberToRecount )
+			foreach( \IPS\Db::i()->select( '`member`', 'core_notifications', array( \IPS\Db::i()->in( 'notification_key', array( 'mine_solved', 'my_solution' ) ) . ' AND item_class=? AND item_id=?', (string) \get_class( $this ), (int) $this->$idField ) ) as $memberToRecount )
 			{
 				$memberIds[ $memberToRecount ]	= $memberToRecount;
 			}
 
-			Db::i()->delete( 'core_notifications', array( Db::i()->in( 'notification_key', array( 'mine_solved', 'my_solution' ) ) . ' AND item_class=? AND item_id=?', get_class( $this ), (int) $this->$idField ) );
+			\IPS\Db::i()->delete( 'core_notifications', array( \IPS\Db::i()->in( 'notification_key', array( 'mine_solved', 'my_solution' ) ) . ' AND item_class=? AND item_id=?', (string) \get_class( $this ), (int) $this->$idField ) );
 
 			foreach( $memberIds as $memberToRecount )
 			{
-				Member::load( $memberToRecount )->recountNotifications();
+				\IPS\Member::load( $memberToRecount )->recountNotifications();
 			}
 		}
 
 		/* Update search index */
-		Index::i()->index( $comment );
+		\IPS\Content\Search\Index::i()->index( $comment );
 	}
 	
 	/**
@@ -164,7 +154,7 @@ trait Solvable
 	 * @param	array	$items	Item data (will be an array containing values from basicDataColumns())
 	 * @return	array
 	 */
-	public static function searchResultExtraData( array $items ): array
+	public static function searchResultExtraData( $items )
 	{
 		$itemIds = array();
 		$idField = static::$databaseColumnId;
@@ -177,7 +167,7 @@ trait Solvable
 			}
 		}
 
-		if ( count( $itemIds ) )
+		if ( \count( $itemIds ) )
 		{
 			foreach ( static::getItemsWithPermission( array(array( $idField . ' IN(' . implode( ',', $itemIds ) . ')') ), NULL, NULL ) as $row )
 			{
@@ -195,7 +185,7 @@ trait Solvable
 	 *
 	 * @return	bool
 	 */
-	public function isSolved(): bool
+	public function isSolved()
 	{
 		return ( ( $this->containerAllowsMemberSolvable() OR $this->containerAllowsSolvable() ) and $this->mapped('solved_comment_id') );
 	}
@@ -203,14 +193,14 @@ trait Solvable
 	/**
 	 * Is this a non-admin/mod but can solve this item?
 	 *
-	 * @param Member|null $member The member (null for currently logged in member)
+	 * @param \IPS\Member|null $member The member (null for currently logged in member)
 	 * @return boolean
 	 */
-	public function isNotModeratorButCanSolve( ?Member $member = NULL ): bool
+	public function isNotModeratorButCanSolve( \IPS\Member $member = NULL ): bool
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
-		if ( $this->canSolve( $member ) and $member->member_id === $this->author()->member_id and $this->containerAllowsMemberSolvable() and ! $member->modPermissions() )
+		if ( $this->canSolve( $member ) and $member === $this->author() and $this->containerAllowsMemberSolvable() and ! $member->modPermissions() )
 		{
 			return TRUE;
 		}
@@ -221,33 +211,16 @@ trait Solvable
 	/**
 	 * Can user solve this item?
 	 *
-	 * @param Member|null $member The member (null for currently logged in member)
+	 * @param \IPS\Member|null $member The member (null for currently logged in member)
 	 * @return    bool
 	 */
-	public function canSolve( ?Member $member = NULL ): bool
+	public function canSolve( \IPS\Member $member = NULL )
 	{
-		/* Extensions go first */
-		if( $permCheck = Permissions::can( 'solve', $this, $member ) )
-		{
-			return ( $permCheck === Permissions::PERM_ALLOW );
-		}
-
-		if( !$this->actionEnabled( 'solve', $member ) )
-		{
-			return false;
-		}
-
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		if( isset( static::$archiveClass ) AND method_exists( $this, 'isArchived' ) AND $this->isArchived() )
 		{
 			return FALSE;
-		}
-
-		/* Guests cannot do this */
-		if( !$member->member_id )
-		{
-			return false;
 		}
 
 		/* If we have no replies, it's not solvable yet */
@@ -258,7 +231,7 @@ trait Solvable
 		
 		if ( $this->containerAllowsSolvable() )
 		{
-			if ( $member->member_id === $this->author()->member_id and $this->containerAllowsMemberSolvable() )
+			if ( $member === $this->author() and $this->containerAllowsMemberSolvable() )
 			{
 				return TRUE;
 			}
@@ -280,9 +253,9 @@ trait Solvable
 					( $member->modPermission( $container::$modPerm ) === TRUE or $member->modPermission( $container::$modPerm ) === -1 )
 					or
 					(
-						is_array( $member->modPermission( $container::$modPerm ) )
+						\is_array( $member->modPermission( $container::$modPerm ) )
 						and
-						in_array( $this->container()->_id, $member->modPermission( $container::$modPerm ) )
+						\in_array( $this->container()->_id, $member->modPermission( $container::$modPerm ) )
 					)
 				)
 			)
@@ -298,16 +271,17 @@ trait Solvable
 	/**
 	 * Get the solution
 	 *
-	 * @return Comment|NULL
+	 * @return \IPS\Content\Comment|NULL
 	 */
-	public function getSolution(): Comment|NULL
+	public function getSolution()
 	{
 		try
 		{
 			$commentClass = static::$commentClass;
+
 			return $commentClass::load( $this->mapped('solved_comment_id') );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
 			return NULL;
 		}

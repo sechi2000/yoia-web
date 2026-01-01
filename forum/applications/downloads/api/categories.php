@@ -12,33 +12,21 @@
 namespace IPS\downloads\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\downloads\Category;
-use IPS\Http\Url\Friendly;
-use IPS\Lang;
-use IPS\Node\Api\NodeController;
-use IPS\Node\Model;
-use IPS\Request;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Downloads Category API
  */
-class categories extends NodeController
+class _categories extends \IPS\Node\Api\NodeController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\downloads\Category';
+	protected $class = 'IPS\downloads\Category';
 
 	/**
 	 * GET /downloads/categories
@@ -48,10 +36,9 @@ class categories extends NodeController
 	 * @apiparam	int		page			Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
 	 * @note		For requests using an OAuth Access Token for a particular member, only categories the authorized user can view will be included
-	 * @apireturn		PaginatedResponse<IPS\downloads\Category>
-	 * @return PaginatedResponse<Category>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\downloads\Category>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Return */
 		return $this->_list();
@@ -62,10 +49,9 @@ class categories extends NodeController
 	 * Get specific category
 	 *
 	 * @param		int		$id			ID Number
-	 * @apireturn		IPS\downloads\Category
-	 * @return Response
+	 * @return		\IPS\Api\PaginatedResponse<IPS\downloads\Category>
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		/* Return */
 		return $this->_view( $id );
@@ -86,18 +72,17 @@ class categories extends NodeController
 	 * @apiparam	int			reviews_mod				Reviews must be approved?
 	 * @apiparam	int			reviews_download		Files must be downloaded before a review can be left?
 	 * @apiparam	object		permissions			An object with the keys as permission options (view, read, add, download, reply, review) and values as permissions to use (which may be * to grant access to all groups, or an array of group IDs to permit access to)
-	 * @apireturn		\IPS\downloads\Category
+	 * @return		\IPS\downloads\Category
 	 * @throws		1D365/2	NO_TITLE	A title for the category must be supplied
-	 * @return Response
 	 */
-	public function POSTindex(): Response
+	public function POSTindex()
 	{
-		if ( !Request::i()->title )
+		if ( !\IPS\Request::i()->title )
 		{
-			throw new Exception( 'NO_TITLE', '1D365/2', 400 );
+			throw new \IPS\Api\Exception( 'NO_TITLE', '1D365/2', 400 );
 		}
 
-		return new Response( 201, $this->_create()->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 201, $this->_create()->apiOutput( $this->member ) );
 	}
 
 	/**
@@ -116,16 +101,14 @@ class categories extends NodeController
 	 * @apiparam	int			reviews_download		Files must be downloaded before a review can be left?
 	 * @apiparam	object		permissions			An object with the keys as permission options (view, read, add, download, reply, review) and values as permissions to use (which may be * to grant access to all groups, or an array of group IDs to permit access to)
 	 * @param		int		$id			ID Number
-	 * @apireturn		\IPS\downloads\Category
-	 * @return Response
+	 * @return		\IPS\downloads\Category
 	 */
-	public function POSTitem( int $id ): Response
+	public function POSTitem( $id )
 	{
-		/* @var Category $class */
 		$class = $this->class;
 		$category = $class::load( $id );
 		
-		return new Response( 200, $this->_createOrUpdate( $category )->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $this->_createOrUpdate( $category )->apiOutput( $this->member ) );
 	}
 
 	/**
@@ -134,45 +117,44 @@ class categories extends NodeController
 	 *
 	 * @param		int			$id							ID Number
 	 * @apiparam	int			deleteChildrenOrMove		The ID number of the new parent or -1 to delete all child nodes.
-	 * @apireturn		void
+	 * @return		void
 	 * @throws	1S359/1	INVALID_ID		The node ID does not exist
 	 * @throws	1S359/2	INVALID_TARGET	The target node cannot be deleted because the new parent node does not exist
 	 * @throws	1S359/3	HAS_CHILDREN	The target node cannot be deleted because it has children (pass deleteChildrenOrMove in the request to specify how to handle the children)
-	 * @return Response
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
-		return $this->_delete( $id, Request::i()->deleteChildrenOrMove ?? NULL );
+		return $this->_delete( $id, \IPS\Request::i()->deleteChildrenOrMove ?? NULL );
 	}
 
 	/**
 	 * Create or update node
 	 *
-	 * @param	Model	$category				The node
-	 * @return	Model
+	 * @param	\IPS\node\Model	$category				The node
+	 * @return	\IPS\node\Model
 	 */
-	protected function _createOrUpdate( Model $category ): Model
+	protected function _createOrUpdate( \IPS\Node\Model $category )
 	{
 		foreach ( array( 'title' => "downloads_category_{$category->id}", 'description' => "downloads_category_{$category->id}_desc" ) as $fieldKey => $langKey )
 		{
-			if ( isset( Request::i()->$fieldKey ) )
+			if ( isset( \IPS\Request::i()->$fieldKey ) )
 			{
-				Lang::saveCustom( 'downloads', $langKey, Request::i()->$fieldKey );
+				\IPS\Lang::saveCustom( 'downloads', $langKey, \IPS\Request::i()->$fieldKey );
 
 				if ( $fieldKey === 'title' )
 				{
-					$category->name_furl = Friendly::seoTitle( Request::i()->$fieldKey );
+					$category->name_furl = \IPS\Http\Url\Friendly::seoTitle( \IPS\Request::i()->$fieldKey );
 				}
 			}
 		}
 
-		$category->parent = (int) Request::i()->parent?: 0;
+		$category->parent = (int) \IPS\Request::i()->parent?: 0;
 
 		foreach ( array( 'moderation', 'moderation_edits', 'allowss', 'reqss', 'comments', 'comment_moderation', 'reviews', 'reviews_mod', 'reviews_download' ) as $k )
 		{
-			if ( isset( Request::i()->$k ) )
+			if ( isset( \IPS\Request::i()->$k ) )
 			{
-				$category->bitoptions[ $k ] = Request::i()->$k;
+				$category->bitoptions[ $k ] = \IPS\Request::i()->$k;
 			}
 		}
 

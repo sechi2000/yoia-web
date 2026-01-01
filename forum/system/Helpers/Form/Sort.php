@@ -11,29 +11,21 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Sort items input class for Form Builder
  */
-class Sort extends FormAbstract
+class _Sort extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
         'checkboxes'	=> NULL
 	);
 	
@@ -42,29 +34,29 @@ class Sort extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'jquery/jquery-ui.js', 'core', 'interface' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'jquery/jquery-touchpunch.js', 'core', 'interface' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'jquery/jquery.menuaim.js', 'core', 'interface' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'jquery/jquery-ui.js', 'core', 'interface' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'jquery/jquery-touchpunch.js', 'core', 'interface' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'jquery/jquery.menuaim.js', 'core', 'interface' ) );
 
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->sort( $this->name, $this->value, $this->options );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->sort( $this->name, $this->value, $this->options );
 	}
 		
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		if ( array_diff( array_keys( $this->value ), array_keys( $this->defaultValue ) ) or array_diff( array_keys( $this->defaultValue ), array_keys( $this->value ) ) )
 		{
-			throw new DomainException('form_bad_value');
+			throw new \DomainException('form_bad_value');
 		}
 
-		return parent::validate();
+		parent::validate();
 	}
 	
 	/**
@@ -72,18 +64,21 @@ class Sort extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$value = parent::getValue();
 		$checkboxName = preg_replace( '/^(.+?\[?.+?)(\])?$/', '$1_checkboxes$2', $this->name );
-		if ( $this->options['checkboxes'] and Request::i()->$checkboxName )
+		if ( $this->options['checkboxes'] and \IPS\Request::i()->$checkboxName )
 		{
 			foreach ( $value as $k => $v )
 			{
-				$value[ $k ] = isset( Request::i()->$checkboxName[ $k ] );
+				$value[ $k ] = isset( \IPS\Request::i()->$checkboxName[ $k ] );
 			}
+			return $value;
 		}
-
-		return $value;
+		else
+		{
+			return $value;
+		}
 	}
 }

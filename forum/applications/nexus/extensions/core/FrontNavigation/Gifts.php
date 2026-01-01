@@ -12,34 +12,25 @@
 namespace IPS\nexus\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\FrontNavigation\FrontNavigationAbstract;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Settings;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Gift Cards
  */
-class Gifts extends FrontNavigationAbstract
+class _Gifts extends \IPS\core\FrontNavigation\FrontNavigationAbstract
 {	
 	/**
 	 * Get Type Title which will display in the AdminCP Menu Manager
 	 *
 	 * @return	string
 	 */
-	public static function typeTitle(): string
+	public static function typeTitle()
 	{
-		return Member::loggedIn()->language()->addToStack('gift_vouchers');
+		return \IPS\Member::loggedIn()->language()->addToStack('gift_vouchers');
 	}
 	
 	/**
@@ -47,40 +38,40 @@ class Gifts extends FrontNavigationAbstract
 	 * For example, if this will link to a particular feature which has been diabled, it should
 	 * not be available, even if the user has permission
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function isEnabled(): bool
+	public static function isEnabled()
 	{
-		return ( ( $giftVouchers = json_decode( Settings::i()->nexus_gift_vouchers, TRUE ) and count( $giftVouchers ) ) or Settings::i()->nexus_gift_vouchers_free );
+		return ( ( $giftVouchers = json_decode( \IPS\Settings::i()->nexus_gift_vouchers, TRUE ) and \count( $giftVouchers ) ) or \IPS\Settings::i()->nexus_gift_vouchers_free );
 	}
 			
 	/**
 	 * Get Title
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack('gift_vouchers');
+		return \IPS\Member::loggedIn()->language()->addToStack('gift_vouchers');
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|string|null
+	public function link()
 	{
-		return Url::internal( "app=nexus&module=store&controller=gifts", 'front', 'store_giftvouchers' );
+		return \IPS\Http\Url::internal( "app=nexus&module=store&controller=gifts", 'front', 'store_giftvouchers' );
 	}
 	
 	/**
 	 * Is Active?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function active(): bool
+	public function active()
 	{
-		return Dispatcher::i()->application->directory === 'nexus' and Dispatcher::i()->module and Dispatcher::i()->module->key === 'store' and Dispatcher::i()->controller == 'gifts';
+		return \IPS\Dispatcher::i()->application->directory === 'nexus' and \IPS\Dispatcher::i()->module and \IPS\Dispatcher::i()->module->key === 'store' and \IPS\Dispatcher::i()->controller == 'gifts';
 	}
 }

@@ -11,32 +11,28 @@
 namespace IPS\Member;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Lang;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Dummy Member Model used by installer
  */
-class Setup
+class _Setup
 {
 	/**
 	 * @brief	Instance
 	 */
-	protected static ?self $instance = NULL;
+	protected static $instance = NULL;
 	
 	/**
 	 * Get instance
 	 *
-	 * @return    Setup
+	 * @return	\IPS\Member\Setup
 	 */
-	public static function i() : static
+	public static function i()
 	{
 		if ( static::$instance === NULL )
 		{
@@ -48,14 +44,14 @@ class Setup
 	/**
 	 * @brief	Language data
 	 */
-	protected ?Lang $language = NULL;
+	protected $language = NULL;
 	
 	/**
 	 * Is user an admin
 	 *
 	 * @return	boolean
 	 */
-	public function isAdmin(): bool
+	public function isAdmin()
 	{
 		return FALSE;
 	}
@@ -63,9 +59,9 @@ class Setup
 	/**
 	 * Is the user logged in?
 	 *
-	 * @return static
+	 * @return boolean
 	 */
-	public function loggedIn(): static
+	public function loggedIn()
 	{
 		return $this;
 	}
@@ -75,14 +71,14 @@ class Setup
 	/**
 	 * Get language
 	 *
-	 * @return	Lang|null
+	 * @return	\IPS\Lang
 	 */
-	public function language(): ?Lang
+	public function language()
 	{
 		if ( $this->language === NULL )
 		{
-			$this->language = Lang::constructFromData( array() );
-			require( \IPS\ROOT_PATH . '/admin/install/lang.php' );
+			$this->language = \IPS\Lang::constructFromData( array() );
+			require( \IPS\ROOT_PATH . '/' . \IPS\CP_DIRECTORY . '/install/lang.php' );
 			$this->language->words = $lang;
 		}
 		return $this->language;

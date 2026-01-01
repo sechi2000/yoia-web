@@ -12,37 +12,59 @@
 namespace IPS\cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Widget as SystemWidget;
-use IPS\Widget\Area;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function json_decode;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * CMS Widgets
  */
-class Widget extends SystemWidget
+class _Widget extends \IPS\Widget
 {
+	/**
+	 * Fetch the configuration for this unqiue ID. Looks in active tables and trash. When a widget is moved, saveOrder is called twice,
+	 * once to remove the widget from column A and again to add it to column B. We store the widget removed from column A into the trash
+	 * table.
+	 *
+	 * @param   string  $uniqueId   Widget's unique ID
+	 * @return  array
+	 */
+	public static function getConfiguration( $uniqueId )
+	{
+		foreach( \IPS\Db::i()->select( '*', 'cms_page_widget_areas' ) as $item )
+		{
+			$widgets = json_decode( $item['area_widgets'], TRUE );
+
+			if( \is_array( $widgets ) )
+			{
+				foreach( $widgets as $widget )
+				{
+					if ( $widget['unique'] == $uniqueId )
+					{
+						if ( isset( $widget['configuration'] ) )
+						{
+							return $widget['configuration'];
+						}
+					}
+				}
+			}
+		}
+
+		/* Still here? rummage in the trash */
+		return parent::getConfiguration( $uniqueId );
+	}
+
 	/**
 	 * Delete caches. We need a different name from the parent class otherwise the Pages app hook will get stuck in infinite recursion
 	 *
-	 * @param String|null $key				Widget key
-	 * @param String|null $app				Parent application
-	 * @param String|null $plugin				Parent plugin
+	 * @param	String	$key				Widget key
+	 * @param	String	$app				Parent application
+	 * @param	String	$plugin				Parent plugin
 	 * @return	void
 	 */
-	static public function deleteCachesForBlocks( string $key=NULL, string $app=NULL, string $plugin=NULL ) : void
+	static public function deleteCachesForBlocks( $key=NULL, $app=NULL, $plugin=NULL )
 	{
 		/* Delete any custom block caches relevant to this plug in */
 		if ( $key OR $app )
@@ -60,36 +82,23 @@ class Widget extends SystemWidget
 			}
 
 			$blocks = array();
-			foreach( Db::i()->select( '*', 'cms_blocks', $where ) as $row )
+			foreach( \IPS\Db::i()->select( '*', 'cms_blocks', $where ) as $row )
 			{
 				$blocks[ $row['block_key'] ] = $row;
 			}
 
-			if ( count( $blocks ) )
+			if ( \count( $blocks ) )
 			{
 				$uniqueIds = array();
-				foreach( Db::i()->select( '*', 'cms_page_widget_areas' ) as $item )
+				foreach( \IPS\Db::i()->select( '*', 'cms_page_widget_areas' ) as $item )
 				{
-                    if( !empty( $item['area_tree'] ) )
-                    {
-                        $area = new Area( json_decode( $item['area_tree'], true ), $item['area_area'] );
-                        $widgets = $area->getAllWidgets();
-                    }
-					elseif( $item['area_widgets'] )
-					{
-						$widgets = json_decode( $item['area_widgets'], TRUE );
-					}
-
-					if( !is_array( $widgets ) or !count( $widgets ) )
-					{
-						continue;
-					}
+					$widgets = json_decode( $item['area_widgets'], TRUE );
 
 					foreach( $widgets as $widget )
 					{
 						if ( ( isset( $widget['app'] ) and $widget['app'] === 'cms' ) and $widget['key'] === 'Blocks' and isset( $widget['unique'] ) and isset( $widget['configuration'] ) and isset( $widget['configuration']['cms_widget_custom_block'] ) )
 						{
-							if ( in_array( $widget['configuration']['cms_widget_custom_block'], array_keys( $blocks ) ) )
+							if ( \in_array( $widget['configuration']['cms_widget_custom_block'], array_keys( $blocks ) ) )
 							{
 								$uniqueIds[] = $widget['unique'];
 							}
@@ -97,28 +106,15 @@ class Widget extends SystemWidget
 					}
 				}
 
-				foreach( Db::i()->select( '*', 'core_widget_areas' ) as $item )
+				foreach( \IPS\Db::i()->select( '*', 'core_widget_areas' ) as $item )
 				{
-                    if( !empty( $item['tree'] ) )
-                    {
-                        $area = new Area( json_decode( $item['tree'], true ), $item['area'] );
-                        $widgets = $area->getAllWidgets();
-                    }
-					elseif( $item['widgets'] )
-					{
-						$widgets = json_decode( $item['widgets'], TRUE );
-					}
-
-					if( !is_array( $widgets ) or !count( $widgets ) )
-					{
-						continue;
-					}
+					$widgets = json_decode( $item['widgets'], TRUE );
 
 					foreach( $widgets as $widget )
 					{
 						if ( ( isset( $widget['app'] ) and $widget['app'] === 'cms' ) and $widget['key'] === 'Blocks' and isset( $widget['unique'] ) and isset( $widget['configuration'] ) and isset( $widget['configuration']['cms_widget_custom_block'] ) )
 						{
-							if ( in_array( $widget['configuration']['cms_widget_custom_block'], array_keys( $blocks ) ) )
+							if ( \in_array( $widget['configuration']['cms_widget_custom_block'], array_keys( $blocks ) ) )
 							{
 								$uniqueIds[] = $widget['unique'];
 							}
@@ -126,15 +122,15 @@ class Widget extends SystemWidget
 					}
 				}
 
-				if ( count( $uniqueIds ) )
+				if ( \count( $uniqueIds ) )
 				{
-					$widgetRow = Db::i()->select( '*', 'core_widgets', array( '`key`=? and app=?', 'Blocks', 'cms' ) )->first();
+					$widgetRow = \IPS\Db::i()->select( '*', 'core_widgets', array( '`key`=? and app=?', 'Blocks', 'cms' ) )->first();
 
 					if ( ! empty( $widgetRow['caches'] ) )
 					{
 						$caches = json_decode( $widgetRow['caches'], TRUE );
 
-						if ( is_array( $caches ) )
+						if ( \is_array( $caches ) )
 						{
 							$save  = $caches;
 							foreach( $caches as $key => $time )
@@ -143,9 +139,9 @@ class Widget extends SystemWidget
 								{
 									if ( mb_stristr( $key, 'widget_Blocks_' . $id ) )
 									{
-										if ( isset( Store::i()->$key ) )
+										if ( isset( \IPS\Data\Store::i()->$key ) )
 										{
-											unset( Store::i()->$key );
+											unset( \IPS\Data\Store::i()->$key );
 										}
 
 										unset( $save[ $key ] );
@@ -153,10 +149,10 @@ class Widget extends SystemWidget
 								}
 							}
 
-							if ( count( $save ) !== count( $caches ) )
+							if ( \count( $save ) !== \count( $caches ) )
 							{
-								Db::i()->update( 'core_widgets', array( 'caches' => ( count( $save ) ? json_encode( $save ) : NULL ) ), array( 'id=?', $widgetRow['id'] ) );
-								unset( Store::i()->widgets );
+								\IPS\Db::i()->update( 'core_widgets', array( 'caches' => ( \count( $save ) ? json_encode( $save ) : NULL ) ), array( 'id=?', $widgetRow['id'] ) );
+								unset( \IPS\Data\Store::i()->widgets );
 							}
 						}
 					}
@@ -170,40 +166,25 @@ class Widget extends SystemWidget
 	 *
 	 * @return array
 	 */
-	public static function getUniqueIds(): array
+	public static function getUniqueIds()
 	{
 		$uniqueIds = parent::getUniqueIds();
-		foreach ( Db::i()->select( '*', 'cms_page_widget_areas' ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'cms_page_widget_areas' ) as $row )
 		{
-			if( $row['area_widgets'] )
+			$data = json_decode( $row['area_widgets'], TRUE );
+			
+			if ( is_countable( $data ) AND  \count( $data ) )
 			{
-				$data = json_decode( $row['area_widgets'], TRUE );
-
-				if ( is_countable( $data ) AND  count( $data ) )
+				foreach( $data as $widget )
 				{
-					foreach( $data as $widget )
-					{
-						if ( isset( $widget['unique'] ) )
-						{
-							$uniqueIds[] = $widget['unique'];
-						}
-					}
-				}
-			}
-
-			if( $row['area_tree'] )
-			{
-				$area = new Area( json_decode( $row['area_tree'], true ), $row['area_area'] );
-				foreach( $area->getAllWidgets() as $widget )
-				{
-					if( isset( $widget['unique'] ) )
-					{
+					if ( isset( $widget['unique'] ) )
+					{ 
 						$uniqueIds[] = $widget['unique'];
 					}
 				}
 			}
 		}
 		
-		return array_unique( $uniqueIds );
+		return $uniqueIds;
 	}
 }

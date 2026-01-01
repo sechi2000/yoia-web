@@ -1,4 +1,12 @@
 {
+    "app=core&module=applications&controller=enhancements&do=edit&id=nexus_EasyPost&searchResult=form_easypost_enable": {
+        "lang_key": "easypost_enable",
+        "restriction": "enhancements_manage",
+        "keywords": [
+            "easy post",
+            "easypost"
+        ]
+    },
     "app=core&module=applications&controller=enhancements&do=edit&id=nexus_MaxMind&searchResult=form_maxmind_enable": {
         "lang_key": "maxmind_enable",
         "restriction": "enhancements_manage",
@@ -8,7 +16,7 @@
         ]
     },
     "app=nexus&module=customers&controller=fields": {
-        "lang_key": "acpsearch__nexus_customers_fields",
+        "lang_key": "menu__nexus_customers_fields",
         "restriction": null,
         "keywords": [
             "custom customer fields",
@@ -205,6 +213,9 @@
         "lang_key": "payment_methods",
         "restriction": "gateways_manage",
         "keywords": [
+            "2checkout",
+            "auth.net",
+            "authorize.net",
             "bank",
             "cards",
             "checks",
@@ -226,6 +237,13 @@
             "hold for review",
             "transaction flag",
             "transaction review"
+        ]
+    },
+    "app=nexus&module=payments&controller=paymentsettings&tab=review&searchResult=form_nexus_revw_sa_on": {
+        "lang_key": "nexus_revw_sa_on",
+        "restriction": "paymentsettings_overview",
+        "keywords": [
+            "transaction review support ticket"
         ]
     },
     "app=nexus&module=payments&controller=paymentsettings&tab=tax": {
@@ -250,7 +268,7 @@
         ]
     },
     "app=nexus&module=payments&controller=payouts&do=settings": {
-        "lang_key": "account_credit_settings",
+        "lang_key": "menu__nexus_payments_payouts",
         "restriction": "payouts_manage",
         "keywords": [
             "account credit",
@@ -334,6 +352,36 @@
             "minimum withdrawal"
         ]
     },
+    "app=nexus&module=payments&controller=shipping": {
+        "lang_key": "menu__nexus_payments_shipping",
+        "restriction": "shiporders_manage",
+        "keywords": [
+            "handling",
+            "orders",
+            "postage",
+            "ship",
+            "shipments",
+            "shipping"
+        ]
+    },
+    "app=nexus&module=payments&controller=shippingrates": {
+        "lang_key": "shipping_rates",
+        "restriction": "shipmethods_manage",
+        "keywords": [
+            "air mail",
+            "airmail",
+            "fedex",
+            "mail",
+            "orders",
+            "post",
+            "royal mail",
+            "shipments",
+            "shipping",
+            "tracking",
+            "ups",
+            "usps"
+        ]
+    },
     "app=nexus&module=payments&controller=transactions": {
         "lang_key": "menu__nexus_payments_transactions",
         "restriction": "transactions_manage",
@@ -411,7 +459,7 @@
         ]
     },
     "app=nexus&module=store&controller=fields": {
-        "lang_key": "acpsearch__nexus_store_fields",
+        "lang_key": "menu__nexus_store_fields",
         "restriction": "package_fields_manage",
         "keywords": [
             "custom package fields",
@@ -548,40 +596,194 @@
             "require subscription"
         ]
     },
-    "app=nexus&module=payments&controller=paymentsettings": {
-        "lang_key": "acpsearch__nexus_payments_paymentsettings",
-        "restriction": "paymentsettings_overview",
+    "app=nexus&module=support&controller=reports": {
+        "lang_key": "menu__nexus_support_reports",
+        "restriction": "reports_manage",
         "keywords": [
-            "payment",
-            "gateway",
-            "paypal",
-            "stripe"
+            "customer feedback",
+            "customer satisfaction",
+            "staff performance",
+            "support performance",
+            "support ratings",
+            "support replies",
+            "support reports",
+            "support reviews",
+            "support staff"
         ]
     },
-    "app=nexus&module=store&controller=filters": {
-        "lang_key": "menu__nexus_store_filters",
-        "restriction": "packages_manage",
+    "app=nexus&module=support&controller=reports&tab=feedback_ratings": {
+        "lang_key": "feedback_ratings",
+        "restriction": "reports_manage",
         "keywords": [
-            "product",
-            "filters",
-            "store",
-            "package"
+            "support feedback"
         ]
     },
-    "app=nexus&module=store&controller=settings": {
-        "lang_key": "acpsearch__nexus_store_settings",
+    "app=nexus&module=support&controller=reports&tab=latest_feedback": {
+        "lang_key": "latest_feedback",
+        "restriction": "reports_manage",
+        "keywords": [
+            "latest support feedback"
+        ]
+    },
+    "app=nexus&module=support&controller=reports&tab=overview": {
+        "lang_key": "overview",
+        "restriction": "reports_manage",
+        "keywords": [
+            "support overview"
+        ]
+    },
+    "app=nexus&module=support&controller=reports&tab=replies": {
+        "lang_key": "replies",
+        "restriction": "reports_manage",
+        "keywords": [
+            "support replies"
+        ]
+    },
+    "app=nexus&module=support&controller=requests": {
+        "lang_key": "menu__nexus_support_requests",
+        "restriction": "requests_manage",
+        "keywords": [
+            "support",
+            "support requests",
+            "support tickets",
+            "tickets"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=autoresolve": {
+        "lang_key": "autoresolve",
+        "restriction": "autoresolve_manage",
+        "keywords": [
+            "auto resolve",
+            "auto-resolve",
+            "automatic resolve",
+            "automatically resolve",
+            "autoresolve",
+            "resolve"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=customerfeedback": {
+        "lang_key": "customer_feedback",
+        "restriction": "customerfeedback_manage",
+        "keywords": [
+            "feedback",
+            "performance",
+            "ratings",
+            "satisfaction"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=departments": {
+        "lang_key": "departments",
+        "restriction": "departments_manage",
+        "keywords": [
+            "categories",
+            "departments",
+            "email"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=fields": {
+        "lang_key": "custom_support_fields",
+        "restriction": "scfields_manage",
+        "keywords": [
+            "custom support fields",
+            "custom ticket fields",
+            "support custom fields",
+            "support fields",
+            "support form",
+            "support information",
+            "ticket custom fields",
+            "ticket fields",
+            "ticket information"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=incomingemail": {
+        "lang_key": "incoming_emails",
+        "restriction": "incomingemail_manage",
+        "keywords": [
+            "email filters",
+            "email piping",
+            "incoming emails",
+            "pop3",
+            "spam filters",
+            "support emails",
+            "ticket emails"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=outgoingemail": {
+        "lang_key": "outgoing_emails",
+        "restriction": "outgoingemail_manage",
+        "keywords": [
+            "support emails",
+            "ticket emails"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=outgoingemail&searchResult=form_nexus_sout_autoreply": {
+        "lang_key": "nexus_sout_autoreply",
         "restriction": "settings_manage",
         "keywords": [
-            "store",
-            "store setting"
+            "support confirmation",
+            "ticket confirmation"
         ]
     },
-    "app=nexus&module=reports&controller=donations": {
-        "lang_key": "acpsearch__nexus_reports_donations",
-        "restriction": "donations_stats_manage",
+    "app=nexus&module=support&controller=settings&tab=outgoingemail&searchResult=form_nexus_sout_chrome": {
+        "lang_key": "nexus_sout_chrome",
+        "restriction": "settings_manage",
         "keywords": [
-            "donation",
-            "goal"
+            "email format",
+            "email template"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=outgoingemail&searchResult=form_nexus_sout_from": {
+        "lang_key": "nexus_sout_from",
+        "restriction": "settings_manage",
+        "keywords": [
+            "email from"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=severities": {
+        "lang_key": "severities",
+        "restriction": "severities_manage",
+        "keywords": [
+            "critical",
+            "emergency",
+            "severities",
+            "severity",
+            "urgency",
+            "urgent"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=statuses": {
+        "lang_key": "statuses",
+        "restriction": "settings_manage",
+        "keywords": [
+            "closed",
+            "open",
+            "resolved",
+            "statuses",
+            "tags"
+        ]
+    },
+    "app=nexus&module=support&controller=settings&tab=stockactions": {
+        "lang_key": "stock_actions",
+        "restriction": "stockactions_manage",
+        "keywords": [
+            "defined",
+            "pre defined",
+            "pre set",
+            "predefined",
+            "preset",
+            "stock",
+            "stock actions",
+            "stock messages",
+            "stock replies"
+        ]
+    },
+    "app=nexus&module=support&controller=volume": {
+        "lang_key": "menu__nexus_support_volume",
+        "restriction": "volume_manage",
+        "keywords": [
+            "new ticket stats",
+            "support statistics",
+            "support stats"
         ]
     }
 }

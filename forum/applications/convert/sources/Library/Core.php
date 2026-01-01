@@ -12,71 +12,21 @@
 namespace IPS\convert\Library;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use DomainException;
-use ErrorException;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Library;
-use IPS\convert\Software;
-use IPS\core\Acronym;
-use IPS\core\Announcements\Announcement;
-use IPS\core\Ignore;
-use IPS\core\ProfileFields\Field;
-use IPS\core\StaffDirectory\User;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Exception;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Text\ConverterParser;
-use IPS\Text\LegacyParser;
-use LogicException;
-use OutOfRangeException;
-use UnderflowException;
-use UnexpectedValueException;
-use function chr;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_null;
-use function is_numeric;
-use function mb_strtolower;
-use function strlen;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Core Converter Library
  */
-class Core extends Library
+class _Core extends \IPS\convert\Library
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $app = 'core';
+	public $app = 'core';
 
 	/**
 	 * Returns an array of items that we can convert, including the amount of rows stored in the Community Suite as well as the recommend value of rows to convert per cycle
@@ -84,7 +34,7 @@ class Core extends Library
 	 * @param	bool	$rowCounts		enable row counts
 	 * @return	array
 	 */
-	public function menuRows( bool $rowCounts=FALSE ): array
+	public function menuRows( $rowCounts=FALSE )
 	{
 		$return		= array();
 		$extraRows 	= $this->software->extraMenuRows();
@@ -97,7 +47,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_achievement_badges',
 						'step_method'		=> 'convertAchievementBadges',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_badges' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_badges' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 100,
 						'dependencies'		=> array(),
@@ -109,7 +59,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_achievement_ranks',
 						'step_method'		=> 'convertAchievementRanks',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_member_ranks' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_member_ranks' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -121,7 +71,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_acronyms',
 						'step_method'		=> 'convertAcronyms',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_acronyms' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_acronyms' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -142,7 +92,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_administrators',
 						'step_method'		=> 'convertAdministrators',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_admin_permission_rows' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_admin_permission_rows' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> $dependencies,
@@ -154,7 +104,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_announcements',
 						'step_method'		=> 'convertAnnouncements',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_announcements' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_announcements' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertMembers' ),
@@ -175,7 +125,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_attachments',
 						'step_method'		=> 'convertAttachments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_attachments' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_attachments' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 10,
 						'dependencies'		=> $dependencies,
@@ -187,7 +137,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_banfilters',
 						'step_method'		=> 'convertBanfilters',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_banfilters' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_banfilters' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -199,7 +149,7 @@ class Core extends Library
 					$return[$k] = array(
 						'step_title'		=> 'convert_custom_bbcode',
 						'step_method'		=> 'convertCustomBbcode',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'convert_custom_bbcode' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'custom_bbcode' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -211,7 +161,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_dname_changes',
 						'step_method'		=> 'convertDnameChanges',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_member_history', array( 'log_app=? AND log_type=?', 'core', 'display_name' ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_member_history', array( 'log_app=? AND log_type=?', 'core', 'display_name' ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertMembers' ),
@@ -223,7 +173,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_edit_history',
 						'step_method'		=> 'convertEditHistory',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_edit_history' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_edit_history' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertMembers' ),
@@ -235,7 +185,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_emoticons',
 						'step_method'		=> 'convertEmoticons',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_emoticons' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_emoticons' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 10,
 						'dependencies'		=> array(),
@@ -247,7 +197,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_groups',
 						'step_method'		=> 'convertGroups',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_groups' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_groups' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 100,
 						'dependencies'		=> array(),
@@ -259,7 +209,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_ignored_users',
 						'step_method'		=> 'convertIgnoredUsers',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_ignored_users' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_ignored_users' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertMembers' ),
@@ -271,7 +221,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_leader_groups',
 						'step_method'		=> 'convertLeaderGroups',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_leaders_groups' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_leaders_groups' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -298,7 +248,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_leaders',
 						'step_method'		=> 'convertLeaders',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_leaders' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_leaders' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> $dependencies,
@@ -310,7 +260,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_ranks',
 						'step_method'		=> 'convertRanks',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_member_ranks' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_member_ranks' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -322,7 +272,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_reactions',
 						'step_method'		=> 'convertReactions',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_reactions' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_reactions' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 10,
 						'dependencies'		=> array(),
@@ -330,6 +280,31 @@ class Core extends Library
 					);
 					break;
 				
+				case 'convertStatuses':
+					$return[ $k ] = array(
+						'step_title'		=> 'convert_statuses',
+						'step_method'		=> 'convertStatuses',
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_member_status_updates' ),
+						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
+						'per_cycle'			=> 200,
+						'dependencies'		=> array( 'convertMembers' ),
+						'link_type'			=> 'core_member_status_updates',
+					);
+					break;
+				
+				case 'convertStatusReplies':
+					$return[ $k ] = array(
+						'step_title'		=> 'convert_status_replies',
+						'step_method'		=> 'convertStatusReplies',
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_member_status_replies' ),
+						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
+						'per_cycle'			=> 200,
+						'dependencies'		=> array( 'convertMembers', 'convertStatuses' ),
+						'link_type'			=> 'core_member_status_replies',
+						'requires_rebuild'	=> TRUE
+					);
+					break;
+					
 				case 'convertMembers':
 					$dependencies = array();
 					
@@ -346,7 +321,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_members',
 						'step_method'		=> 'convertMembers',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_members' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_members' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 100,
 						'dependencies'		=> $dependencies,
@@ -358,7 +333,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_member_history',
 						'step_method'		=> 'convertMemberHistory',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_member_history' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_member_history' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertMembers' ),
@@ -370,7 +345,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_warn_actions',
 						'step_method'		=> 'convertWarnActions',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_members_warn_actions' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_members_warn_actions' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -382,7 +357,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_warn_reasons',
 						'step_method'		=> 'convertWarnReasons',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_members_warn_reasons' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_members_warn_reasons' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -394,7 +369,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_private_messages',
 						'step_method'		=> 'convertPrivateMessages',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_message_topics' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_message_topics' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertMembers' ),
@@ -406,7 +381,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_private_message_replies',
 						'step_method'		=> 'convertPrivateMessageReplies',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_message_posts' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_message_posts' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertPrivateMessages' ),
@@ -419,7 +394,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_moderators',
 						'step_method'		=> 'convertModerators',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_moderators' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_moderators' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertMembers' ),
@@ -431,7 +406,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_profile_field_groups',
 						'step_method'		=> 'convertProfileFieldGroups',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_pfields_groups' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_pfields_groups' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -450,7 +425,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_profile_fields',
 						'step_method'		=> 'convertProfileFields',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_pfields_data' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_pfields_data' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 100,
 						'dependencies'		=> $dependencies,
@@ -462,7 +437,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_profanity_filters',
 						'step_method'		=> 'convertProfanityFilters',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_profanity_filters' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_profanity_filters' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -474,7 +449,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_question_and_answers',
 						'step_method'		=> 'convertQuestionAndAnswers',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_question_and_answer' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_question_and_answer' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -486,7 +461,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_report_comments',
 						'step_method'		=> 'convertReportComments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_rc_comments' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_rc_comments' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -498,7 +473,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_reputation_levels',
 						'step_method'		=> 'convertReputationLevels',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_reputation_levels' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_reputation_levels' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -510,7 +485,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_clubs',
 						'step_method'		=> 'convertClubs',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_clubs' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertMembers' ),
@@ -522,7 +497,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_members',
 						'step_method'		=> 'convertClubMembers',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_clubs_memberships' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs_memberships' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubs' ),
@@ -534,7 +509,7 @@ class Core extends Library
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_pages',
 						'step_method'		=> 'convertClubPages',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_club_pages' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_club_pages' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubs' ),
@@ -568,12 +543,11 @@ class Core extends Library
 	 * @param	string	$method	Method to truncate
 	 * @return	array
 	 */
-	protected function truncate( string $method ) : array
+	protected function truncate( $method )
 	{
 		$return		= array();
-		$classname	= get_class( $this->software );
+		$classname	= \get_class( $this->software );
 
-		/* @var Software $classname */
 		if( $classname::canConvert() === NULL )
 		{
 			return array();
@@ -597,7 +571,7 @@ class Core extends Library
 					break;
 				
 				case 'convertAdministrators':
-					$return['convertAdministrators'] = array( 'core_admin_permission_rows', array( "( row_id!=? AND row_id_type!=? ) OR ( row_id!=? AND row_id_type!=?", Member::loggedIn()->member_id, 'member', Member::loggedIn()->member_group_id, 'group' ) );
+					$return['convertAdministrators'] = array( 'core_admin_permission_rows', array( "( row_id!=? AND row_id_type!=? ) OR ( row_id!=? AND row_id_type!=?", \IPS\Member::loggedIn()->member_id, 'member', \IPS\Member::loggedIn()->member_group_id, 'group' ) );
 					break;
 				
 				case 'convertAnnouncements':
@@ -630,11 +604,11 @@ class Core extends Library
 				
 				case 'convertGroups':
 					$return['convertGroups'] = array(
-														'core_admin_permission_rows' => array( 'row_id_type=? AND ' . Db::i()->in( 'row_id', array( Settings::i()->member_group, Settings::i()->guest_group, Settings::i()->admin_group ), TRUE ), 'group' ),
-														'core_groups' => array( Db::i()->in( 'g_id', array( Settings::i()->member_group, Settings::i()->guest_group, Settings::i()->admin_group ), TRUE ) ),
+														'core_admin_permission_rows' => array( 'row_id_type=? AND ' . \IPS\Db::i()->in( 'row_id', array( \IPS\Settings::i()->member_group, \IPS\Settings::i()->guest_group, \IPS\Settings::i()->admin_group ), TRUE ), 'group' ),
+														'core_groups' => array( \IPS\Db::i()->in( 'g_id', array( \IPS\Settings::i()->member_group, \IPS\Settings::i()->guest_group, \IPS\Settings::i()->admin_group ), TRUE ) ),
 														'core_group_promotions' => NULL,
-														'core_leaders' => array( 'leader_type=? AND ' . Db::i()->in( 'leader_type_id', array( Settings::i()->member_group, Settings::i()->guest_group, Settings::i()->admin_group ), TRUE ), 'g' ),
-														'core_moderators' => array( 'type=? AND ' . Db::i()->in( 'id', array( Settings::i()->member_group, Settings::i()->guest_group, Settings::i()->admin_group ), TRUE ), 'g' )
+														'core_leaders' => array( 'leader_type=? AND ' . \IPS\Db::i()->in( 'leader_type_id', array( \IPS\Settings::i()->member_group, \IPS\Settings::i()->guest_group, \IPS\Settings::i()->admin_group ), TRUE ), 'g' ),
+														'core_moderators' => array( 'type=? AND ' . \IPS\Db::i()->in( 'id', array( \IPS\Settings::i()->member_group, \IPS\Settings::i()->guest_group, \IPS\Settings::i()->admin_group ), TRUE ), 'g' )
 						);
 					break;
 				
@@ -657,16 +631,30 @@ class Core extends Library
 					$return['convertRanks'] = array( 'core_member_ranks' => NULL );
 					break;
 				
+				case 'convertStatusReplies':
+					$return['convertStatusReplies'] = array(
+														'core_member_status_replies' => NULL,
+														'core_reputation_index' => array( 'app=? AND type=?', 'core', 'status_reply_id' ),
+					);
+					break;
+				
+				case 'convertStatuses':
+					$return['convertStatuses'] = array(
+														'core_member_status_updates' => NULL,
+														'core_reputation_index' => array( 'app=? AND type=?', 'core', 'status_id' ),
+					);
+					break;
+					
 				case 'convertMembers':
 					$return['convertMembers'] = array(
-														'core_admin_permission_rows' => array( 'row_id_type=? AND row_id<>?', 'member', Member::loggedIn()->member_id ),
-														'core_leaders' => array( 'leader_type=? AND leader_type_id<>?', 'm', Member::loggedIn()->member_id ),
-														'core_login_links' => array( "token_member<>?", Member::loggedIn()->member_id ),
+														'core_admin_permission_rows' => array( 'row_id_type=? AND row_id<>?', 'member', \IPS\Member::loggedIn()->member_id ),
+														'core_leaders' => array( 'leader_type=? AND leader_type_id<>?', 'm', \IPS\Member::loggedIn()->member_id ),
+														'core_login_links' => array( "token_member<>?", \IPS\Member::loggedIn()->member_id ),
 														'core_member_history' => NULL,
-														'core_members' => array( "member_id<>?", Member::loggedIn()->member_id ),
+														'core_members' => array( "member_id<>?", \IPS\Member::loggedIn()->member_id ),
 														'core_members_warn_actions' => NULL,
-														'core_moderators' => array( 'type=? AND id<>?', 'm', Member::loggedIn()->member_id ),
-														'core_pfields_content' => array( "member_id<>?", Member::loggedIn()->member_id )
+														'core_moderators' => array( 'type=? AND id<>?', 'm', \IPS\Member::loggedIn()->member_id ),
+														'core_pfields_content' => array( "member_id<>?", \IPS\Member::loggedIn()->member_id )
 							);
 					break;
 
@@ -702,20 +690,20 @@ class Core extends Library
 					if ( $method == $k )
 					{
 						$columns = array();
-						foreach( Db::i()->select( 'pf_id', 'core_pfields_data' ) AS $field )
+						foreach( \IPS\Db::i()->select( 'pf_id', 'core_pfields_data' ) AS $field )
 						{
 							$field = 'field_' . $field;
 							/* Check the column exists before listing it for removal */
-							if( Db::i()->checkForColumn( 'core_pfields_content', $field ) )
+							if( \IPS\Db::i()->checkForColumn( 'core_pfields_content', $field ) )
 							{
 								$columns[] = $field;
 							}
 						}
 
-						if( count( $columns ) )
+						if( \count( $columns ) )
 						{
 							/* Drop all columns at once */
-							Db::i()->dropColumn( 'core_pfields_content', $columns );
+							\IPS\Db::i()->dropColumn( 'core_pfields_content', $columns );
 						}
 					}
 					
@@ -756,7 +744,7 @@ class Core extends Library
 			}
 		}
 
-		return $return[$method] ?? array();
+		return isset( $return[ $method ] ) ? $return[ $method ] : array();
 	}
 	
 	/**
@@ -767,9 +755,9 @@ class Core extends Library
 	
 	/**
 	 * A note on logging -
-	 * If the data is missing, and it is unlikely that any source software would be able to provide this, we do not need to log anything and can use default data (for example, group_layout in convertLeaderGroups).
-	 * If the data is missing, and it is likely that a majority of the source software can provide this, we should log a NOTICE and use default data (for example, a_casesensitive in convertAcronyms).
-	 * If the data is missing, and it is required to convert the item, we should log a WARNING and return FALSE.
+	 * If the data is missing and it is unlikely that any source software would be able to provide this, we do not need to log anything and can use default data (for example, group_layout in convertLeaderGroups).
+	 * If the data is missing and it is likely that a majority of the source software can provide this, we should log a NOTICE and use default data (for example, a_casesensitive in convertAcronyms).
+	 * If the data is missing and it is required to convert the item, we should log a WARNING and return FALSE.
 	 * If the conversion absolutely cannot proceed at all (filestorage locations not writable, for example), then we should log an ERROR and throw an \IPS\convert\Exception to completely halt the process and redirect to an error screen showing the last logged error.
 	 */
 
@@ -781,17 +769,17 @@ class Core extends Library
 	 * @param	string|NULL		$imageData	Binary image data, or NULL.
 	 * @return	bool|int	    The ID of the newly inserted badge, or FALSE on failure
 	 */
-	public function convertAchievementBadge( array $info=[], ?string $imagePath=NULL, ?string $imageData=NULL ) : bool|int
+	public function convertAchievementBadge( array $info=[], string $imagePath=NULL, string $imageData=NULL )
 	{
 		if ( !isset( $info['id'] ) )
 		{
-			$this->software->app->log( 'badge_missing_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'badge_missing_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['title'] ) )
 		{
-			$this->software->app->log( 'badge_missing_title', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'badge_missing_title', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		else
@@ -805,18 +793,18 @@ class Core extends Library
 			$info['manually_awarded'] = 0;
 		}
 
-		if ( isset( $info['image'] ) AND ( !is_null( $imagePath ) OR !is_null( $imageData ) ) )
+		if ( isset( $info['image'] ) AND ( !\is_null( $imagePath ) OR !\is_null( $imageData ) ) )
 		{
 			try
 			{
-				if ( is_null( $imageData ) AND !is_null( $imagePath ) )
+				if ( \is_null( $imageData ) AND !\is_null( $imagePath ) )
 				{
 					$imageData = file_get_contents( $imagePath );
 				}
-				$file = File::create( 'core_Badges', $info['image'], $imageData, NULL, FALSE, NULL, FALSE );
+				$file = \IPS\File::create( 'core_Badges', $info['image'], $imageData, NULL, FALSE, NULL, FALSE );
 				$info['image'] = (string) $file;
 			}
-			catch( ErrorException | \Exception $e )
+			catch( \ErrorException | \Exception $e )
 			{
 				$info['image'] = NULL;
 			}
@@ -828,9 +816,9 @@ class Core extends Library
 
 		$oldId = $info['id'];
 		unset( $info['id'] );
-		$insertedId = Db::i()->insert( 'core_badges', $info );
+		$insertedId = \IPS\Db::i()->insert( 'core_badges', $info );
 		$this->software->app->addLink( $insertedId, $oldId, 'core_achievement_badges' );
-		Lang::saveCustom( 'core', "core_badges_{$insertedId}", $name );
+		\IPS\Lang::saveCustom( 'core', "core_badges_{$insertedId}", $name );
 
 		return $insertedId;
 	}
@@ -843,35 +831,35 @@ class Core extends Library
 	 * @param	string|NULL		$imageData	Binary image data, or NULL.
 	 * @return	bool|int	    The ID of the newly inserted badge, or FALSE on failure
 	 */
-	public function convertAchievementRank( array $info=[], ?string $imagePath=NULL, ?string $imageData=NULL ) : bool|int
+	public function convertAchievementRank( array $info=[], string $imagePath=NULL, string $imageData=NULL )
 	{
 		/* We don't really need an ID for these, so if one isn't specified, then that's okay. */
 		$hasId = TRUE;
 		if ( !isset( $info['id'] ) )
 		{
 			$hasId = FALSE;
-			$this->software->app->log( 'rank_missing_ids', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'rank_missing_ids', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 		}
 
 		/* We do need this, though. */
 		if ( !isset( $info['title'] ) )
 		{
-			$this->software->app->log( 'rank_missing_title', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'rank_missing_title', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 			return FALSE;
 		}
 
-		if ( isset( $info['icon'] ) AND ( !is_null( $imagePath ) OR !is_null( $imageData ) ) )
+		if ( isset( $info['icon'] ) AND ( !\is_null( $imagePath ) OR !\is_null( $imageData ) ) )
 		{
 			try
 			{
-				if ( is_null( $imageData ) AND !is_null( $imagePath ) )
+				if ( \is_null( $imageData ) AND !\is_null( $imagePath ) )
 				{
 					$imageData = file_get_contents( $imagePath );
 				}
-				$file = File::create( 'core_Ranks', $info['icon'], $imageData, NULL, FALSE, NULL, FALSE );
+				$file = \IPS\File::create( 'core_Ranks', $info['icon'], $imageData, NULL, FALSE, NULL, FALSE );
 				$info['icon'] = (string) $file;
 			}
-			catch( ErrorException | \Exception $e )
+			catch( \ErrorException | \Exception $e )
 			{
 				$info['icon'] = NULL;
 			}
@@ -887,12 +875,12 @@ class Core extends Library
 			unset( $info['id'] );
 		}
 
-		$insertedId = Db::i()->insert( 'core_member_ranks', $info );
+		$insertedId = \IPS\Db::i()->insert( 'core_member_ranks', $info );
 		if( $hasId )
 		{
 			$this->software->app->addLink( $insertedId, $oldId, 'core_achievement_ranks' );
 		}
-		Lang::saveCustom( 'core', "core_member_rank_{$insertedId}", $info['title'] );
+		\IPS\Lang::saveCustom( 'core', "core_member_rank_{$insertedId}", $info['title'] );
 
 		return $insertedId;
 	}
@@ -901,9 +889,9 @@ class Core extends Library
 	 * Convert an Acronym
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted acronym, or FALSE on failure
+	 * @return	boolean|integer	The ID of the newly inserted acronym, or FALSE on failure
 	 */
-	public function convertAcronym( array $info=array() ) : bool|int
+	public function convertAcronym( $info=array() )
 	{
 		/**
 		 * The below are examples of when we should use an error or a notice, depending on the situation.
@@ -913,29 +901,29 @@ class Core extends Library
 		 */
 		if ( !isset( $info['a_id'] ) )
 		{
-			$this->software->app->log( 'acronym_missing_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'acronym_missing_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['a_short'] ) )
 		{
-			$this->software->app->log( 'acronym_missing_short', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'acronym_missing_short', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['a_long'] ) )
 		{
-			$this->software->app->log( 'acronym_missing_long', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'acronym_missing_long', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['a_casesensitive'] ) )
 		{
-			$this->software->app->log( 'acronym_missing_casesensitive', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'acronym_missing_casesensitive', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 			$info['a_casesensitive'] = 0;
 		}
 		
-		$obj					= new Acronym;
+		$obj					= new \IPS\core\Acronym;
 		$obj->a_short			= $info['a_short'];
 		$obj->a_long			= $info['a_long'];
 		$obj->a_casesensitive	= $info['a_casesensitive'];
@@ -949,38 +937,38 @@ class Core extends Library
 	 * Convert an Administrator
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool	TRUE on success, FALSE on failure
+	 * @return	boolean	TRUE on success, FALSE on failure
 	 */
-	public function convertAdministrator( array $info=array() ) : bool
+	public function convertAdministrator( $info=array() )
 	{
 		if ( !isset( $info['row_id'] ) )
 		{
-			$this->software->app->log( 'administrator_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'administrator_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( !isset( $info['row_id_type'] ) OR !in_array( $info['row_id_type'], array( 'member', 'group' ) ) )
+		if ( !isset( $info['row_id_type'] ) OR !\in_array( $info['row_id_type'], array( 'member', 'group' ) ) )
 		{
-			$this->software->app->log( 'administrator_invalid_type', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'administrator_invalid_type', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( isset( $info['row_perm_cache'] ) )
 		{
-			if ( is_array( $info['row_perm_cache'] ) )
+			if ( \is_array( $info['row_perm_cache'] ) )
 			{
 				$info['row_perm_cache'] = json_encode( $info['row_perm_cache'] );
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'administrator_perms_missing', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'administrator_perms_missing', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( isset( $info['row_updated'] ) )
 		{
-			if ( $info['row_updated'] instanceof DateTime )
+			if ( $info['row_updated'] instanceof \IPS\DateTime )
 			{
 				$info['row_updated'] = $info['row_updated']->getTimestamp();
 			}
@@ -997,9 +985,9 @@ class Core extends Library
 				{
 					$info['row_id'] = $this->software->app->getLink( $info['row_id'], 'core_members' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
-					$this->software->app->log( 'administrator_missing_member', __METHOD__, App::LOG_WARNING );
+					$this->software->app->log( 'administrator_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING );
 					return FALSE;
 				}
 				break;
@@ -1009,41 +997,40 @@ class Core extends Library
 				{
 					$info['row_id'] = $this->software->app->getLink( $info['row_id'], 'core_groups' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
-					$this->software->app->log( 'administrator_missing_group', __METHOD__, App::LOG_WARNING );
+					$this->software->app->log( 'administrator_missing_group', __METHOD__, \IPS\convert\App::LOG_WARNING );
 					return FALSE;
 				}
 				break;
 		}
 		
-		Db::i()->insert( 'core_admin_permission_rows', $info );
-		return true;
+		\IPS\Db::i()->insert( 'core_admin_permission_rows', $info );
 	}
 	
 	/**
 	 * Convert an Announcement
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted announcement, or FALSE on failure
+	 * @return	boolean|integer	The ID of the newly inserted announcement, or FALSE on failure
 	 */
-	public function convertAnnouncement( array $info=array() ) : bool|int
+	public function convertAnnouncement( $info=array() )
 	{
 		if ( !isset( $info['announce_id'] ) )
 		{
-			$this->software->app->log( 'announcement_missing_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'announcement_missing_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['announce_title'] ) )
 		{
-			$this->software->app->log( 'announcement_missing_title', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'announcement_missing_title', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['announce_content'] ) )
 		{
-			$this->software->app->log( 'announcement_missing_content', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'announcement_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		else
@@ -1054,7 +1041,7 @@ class Core extends Library
 
 		if ( !isset( $info['announce_member_id'] ) )
 		{
-			$this->software->app->log( 'announcement_missing_member_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'announcement_missing_member_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -1062,9 +1049,9 @@ class Core extends Library
 		{
 			$info['announce_member_id'] = $this->software->app->getLink( $info['announce_member_id'], 'core_members' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'announcement_missing_member', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'announcement_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -1090,7 +1077,7 @@ class Core extends Library
 
 		if ( !isset( $info['announce_seo_title'] ) )
 		{
-			$info['announce_seo_title'] = Url::seoTitle( $info['announce_title'] );
+			$info['announce_seo_title'] = \IPS\Http\Url::seoTitle( $info['announce_title'] );
 		}
 
 		if ( !isset( $info['announce_ids'] ) )
@@ -1122,12 +1109,12 @@ class Core extends Library
 		{
 			$info['announce_page_location'] = array( 'sidebar' );
 		}
-		elseif( !is_array( $info['announce_page_location'] ) )
+		elseif( !\is_array( $info['announce_page_location'] ) )
 		{
 			$info['announce_page_location'] = array( $info['announce_page_location'] );
 		}
 
-		$obj = new Announcement;
+		$obj = new \IPS\core\Announcements\Announcement;
 		foreach ( $info AS $field => $value)
 		{
 			if ( $field !== 'announce_id' )
@@ -1152,38 +1139,38 @@ class Core extends Library
 	 * @param	NULL|string		$filepath		The path to the attachment files or NULL if loading from the database.
 	 * @param	NULL|string		$filedata		If loading from the database, the content of the Binary column.
 	 * @param	NULL|string		$thumbnailpath	Path to thumbnail image
-	 * @return	bool|int	The ID of the newly inserted attachment, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted attachment, or FALSE on failure.
 	 */
-	public function convertAttachment( array $info=array(), array $map=array(), ?string $filepath=NULL, ?string $filedata=NULL, ?string $thumbnailpath=NULL ) : bool|int
+	public function convertAttachment( $info=array(), $map=array(), $filepath=NULL, $filedata=NULL, $thumbnailpath=NULL )
 	{
 		if ( !isset( $info['attach_id'] ) )
 		{
-			$this->software->app->log( 'attachment_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'attachment_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( is_null( $filepath ) AND is_null( $filedata ) )
+		if ( \is_null( $filepath ) AND \is_null( $filedata ) )
 		{
-			$this->software->app->log( 'attachment_missing_data', __METHOD__, App::LOG_WARNING, $info['attach_id'] );
+			$this->software->app->log( 'attachment_missing_data', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['attach_id'] );
 			return FALSE;
 		}
 
-		if ( is_null( $filedata ) AND !file_exists( $filepath ) )
+		if ( \is_null( $filedata ) AND !file_exists( $filepath ) )
 		{
-			$this->software->app->log( 'attachment_file_missing - ' . $filepath, __METHOD__, App::LOG_WARNING, $info['attach_id'] );
+			$this->software->app->log( 'attachment_file_missing - ' . $filepath, __METHOD__, \IPS\convert\App::LOG_WARNING, $info['attach_id'] );
 			return FALSE;
 		}
 		
 		/* All attachments must have at least a location key and id1 OR id3 */
 		if ( !isset( $map['location_key'] ) AND ( !isset( $map['id1'] ) OR !isset( $map['id3'] ) ) )
 		{
-			$this->software->app->log( 'attachment_missing_map_data', __METHOD__, App::LOG_WARNING, $info['attach_id'] );
+			$this->software->app->log( 'attachment_missing_map_data', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['attach_id'] );
 			return FALSE;
 		}
 		
 		/* Make sure our location key is valid */
 		$haveExtension = FALSE;
-		foreach( array_keys( Application::allExtensions( 'core', 'EditorLocations', FALSE, NULL, NULL, FALSE ) ) AS $extension )
+		foreach( array_keys( \IPS\Application::allExtensions( 'core', 'EditorLocations', FALSE, NULL, NULL, FALSE ) ) AS $extension )
 		{
 			if ( $map['location_key'] == $extension )
 			{
@@ -1194,7 +1181,7 @@ class Core extends Library
 		
 		if ( $haveExtension === FALSE )
 		{
-			$this->software->app->log( 'attachment_invalid_location', __METHOD__, App::LOG_WARNING, $info['attach_id'] );
+			$this->software->app->log( 'attachment_invalid_location', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['attach_id'] );
 			return FALSE;
 		}
 		
@@ -1215,7 +1202,7 @@ class Core extends Library
 
 		if ( isset( $info['attach_date'] ) )
 		{
-			if ( $info['attach_date'] instanceof DateTime )
+			if ( $info['attach_date'] instanceof \IPS\DateTime )
 			{
 				$info['attach_date'] = $info['attach_date']->getTimestamp();
 			}
@@ -1235,7 +1222,7 @@ class Core extends Library
 			{
 				$info['attach_member_id'] = $this->software->app->getLink( $info['attach_member_id'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['attach_member_id'] = 0;
 			}
@@ -1263,32 +1250,32 @@ class Core extends Library
 		try
 		{
 			/* We need the file storage to copy the file rather than move it */
-			File::$copyFiles = TRUE;
+			\IPS\File::$copyFiles = TRUE;
 
 			/* Create the file */
-			$file = File::create( 'core_Attachment', $info['attach_file'], $filedata, $container, TRUE, $filepath, static::$obscureFilenames );
+			$file = \IPS\File::create( 'core_Attachment', $info['attach_file'], $filedata, $container, TRUE, $filepath, static::$obscureFilenames );
 
 			/* Revert file system to default functionality */
-			File::$copyFiles = FALSE;
+			\IPS\File::$copyFiles = FALSE;
 			unset( $filedata );
 			
 			$info['attach_location'] = (string) $file;
 		}
-		catch( ErrorException $e )
+		catch( \ErrorException $e )
 		{
-			$this->software->app->log( $e->getMessage(), __METHOD__, App::LOG_WARNING, $info['attach_id'] );
+			$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_WARNING, $info['attach_id'] );
 			return FALSE;
 		}
 		catch( \Exception $e )
 		{
-			Log::log( array( 'exception' => $e, 'file' => $info ), 'converter_attachment_fail' );
-			$this->software->app->log( 'attachment_creation_fail_exception', __METHOD__, App::LOG_WARNING, $info['attach_id'] );
+			\IPS\Log::log( array( 'exception' => $e, 'file' => $info ), 'converter_attachment_fail' );
+			$this->software->app->log( 'attachment_creation_fail_exception', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['attach_id'] );
 			return FALSE;
 		}
 
 		if( $file === NULL )
 		{
-			$this->software->app->log( 'attachment_creation_fail', __METHOD__, App::LOG_WARNING, $info['attach_id'] );
+			$this->software->app->log( 'attachment_creation_fail', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['attach_id'] );
 			return FALSE;
 		}
 
@@ -1308,23 +1295,23 @@ class Core extends Library
 			try
 			{
 				/* We need the file storage to copy the file rather than move it */
-				File::$copyFiles = TRUE;
+				\IPS\File::$copyFiles = TRUE;
 
 				/* Create the file */
-				$thumbnail = File::create( 'core_Attachment', $thumbFilename, NULL, $thumbnailContainer, TRUE, $thumbnailpath, static::$obscureFilenames );
+				$thumbnail = \IPS\File::create( 'core_Attachment', $thumbFilename, NULL, $thumbnailContainer, TRUE, $thumbnailpath, static::$obscureFilenames );
 
 				/* Revert file system to default functionality */
-				File::$copyFiles = FALSE;
+				\IPS\File::$copyFiles = FALSE;
 
 				$info['attach_thumb_location'] = (string) $thumbnail;
 			}
-			catch( ErrorException $e )
+			catch( \ErrorException $e )
 			{
-				$this->software->app->log( $e->getMessage(), __METHOD__, App::LOG_WARNING, $info['attach_id'] );
+				$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_WARNING, $info['attach_id'] );
 			}
 			catch( \Exception $e )
 			{
-				$this->software->app->log( 'attachment_thumb_creation_fail', __METHOD__, App::LOG_WARNING, $info['attach_id'] );
+				$this->software->app->log( 'attachment_thumb_creation_fail', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['attach_id'] );
 			}
 		}
 		else
@@ -1363,7 +1350,7 @@ class Core extends Library
 						$info['attach_img_height'] = $dimensions[1];
 					}
 				}
-				catch( InvalidArgumentException $e )
+				catch( \InvalidArgumentException $e )
 				{
 					/* File isn't actually an image. */
 					$info['attach_is_image']		= 0;
@@ -1387,12 +1374,12 @@ class Core extends Library
 		
 		try
 		{
-			$inserted_id = Db::i()->insert( 'core_attachments', $info );
+			$inserted_id = \IPS\Db::i()->insert( 'core_attachments', $info );
 			$this->software->app->addLink( $inserted_id, $id, 'core_attachments' );
 		}
-		catch( Exception $e )
+		catch( \IPS\Db\Exception $e )
 		{
-			$this->software->app->log( 'attachment_invalid_data', __METHOD__, App::LOG_WARNING, $id );
+			$this->software->app->log( 'attachment_invalid_data', __METHOD__, \IPS\convert\App::LOG_WARNING, $id );
 			return FALSE;
 		}
 		
@@ -1400,7 +1387,7 @@ class Core extends Library
 		if ( !isset( $map['id1'] ) AND isset( $map['id3'] ) )
 		{
 			/* This is just a key - we can directly insert it. The converter will need to determine how to translate */
-			Db::i()->insert( 'core_attachments_map', array(
+			\IPS\Db::i()->insert( 'core_attachments_map', array(
 				'attachment_id'	=> $inserted_id,
 				'location_key'	=> $map['location_key'],
 				'id1'			=> NULL,
@@ -1417,10 +1404,10 @@ class Core extends Library
 		{
 			$id1 = $this->software->app->getLink( $map['id1'], $map['id1_type'], $map['id1_from_parent'] );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Db::i()->delete( 'core_attachments', array( "attach_id=?", $inserted_id ) );
-			$this->software->app->log( 'attachment_missing_parent', __METHOD__, App::LOG_WARNING, $id );
+			\IPS\Db::i()->delete( 'core_attachments', array( "attach_id=?", $inserted_id ) );
+			$this->software->app->log( 'attachment_missing_parent', __METHOD__, \IPS\convert\App::LOG_WARNING, $id );
 			return FALSE;
 		}
 		
@@ -1430,7 +1417,7 @@ class Core extends Library
 			{
 				$id2 = $this->software->app->getLink( $map['id2'], $map['id2_type'], $map['id2_from_parent'] );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$id2 = NULL;
 			}
@@ -1446,7 +1433,7 @@ class Core extends Library
 			{
 				$id3 = $this->software->app->getLink( $map['id3'], $map['id3_type'], $map['id3_from_parent'] );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$id3 = NULL;
 			}
@@ -1460,7 +1447,7 @@ class Core extends Library
 			$id3 = NULL;
 		}
 
-		Db::i()->insert( 'core_attachments_map', array(
+		\IPS\Db::i()->insert( 'core_attachments_map', array(
 			'attachment_id'	=> $inserted_id,
 			'location_key'	=> $map['location_key'],
 			'id1'			=> $id1,
@@ -1476,31 +1463,31 @@ class Core extends Library
 	 * Convert a Ban Filter
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted ban filter, or FALSE on failure
+	 * @return	boolean|integer	The ID of the newly inserted ban filter, or FALSE on failure
 	 */
-	public function convertBanfilter( array $info=array() ) : bool|int
+	public function convertBanfilter( $info=array() )
 	{
 		if ( !isset( $info['ban_id'] ) )
 		{
-			$this->software->app->log( 'banfilter_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'banfilter_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( !isset( $info['ban_type'] ) OR !in_array( $info['ban_type'], array( 'ip', 'email', 'name' ) ) )
+		if ( !isset( $info['ban_type'] ) OR !\in_array( $info['ban_type'], array( 'ip', 'email', 'name' ) ) )
 		{
-			$this->software->app->log( 'banfilter_missing_type', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'banfilter_missing_type', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['ban_content'] ) )
 		{
-			$this->software->app->log( 'banfilter_missing_content', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'banfilter_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['ban_date'] ) )
 		{
-			$this->software->app->log( 'banfilter_missing_date', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'banfilter_missing_date', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 			$info['ban_date'] = time();
 		}
 		
@@ -1511,7 +1498,7 @@ class Core extends Library
 		
 		$old_id = $info['ban_id'];
 		unset( $info['ban_id'] );
-		$inserted_id = Db::i()->insert( 'core_banfilters', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_banfilters', $info );
 		$this->software->app->addLink( $inserted_id, $old_id, 'core_banfilters' );
 		return $inserted_id;
 	}
@@ -1520,31 +1507,31 @@ class Core extends Library
 	 * Convert Custom BBCode for the LegacyParser to use
 	 *
 	 * @param	array				$info	Data to insert
-	 * @return	bool|int				The ID of the newly inserted BBCode, or FALSE on failure.
+	 * @return	boolean|integer				The ID of the newly inserted BBCode, or FALSE on failure.
 	 */
-	public function convertCustomBbcode( array $info=array() ) : bool|int
+	public function convertCustomBbcode( $info=array() )
 	{
 		if ( !isset( $info['bbcode_id'] ) )
 		{
-			$this->software->app->log( 'bbcode_missing_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'bbcode_missing_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['bbcode_tag'] ) )
 		{
-			$this->software->app->log( 'bbcode_missing_tag', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'bbcode_missing_tag', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['bbcode_replacement'] ) )
 		{
-			$this->software->app->log( 'bbcode_missing_replacement', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'bbcode_missing_replacement', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['bbcode_title'] ) )
 		{
-			$this->software->app->log( 'bbcode_missing_title', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'bbcode_missing_title', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -1563,7 +1550,7 @@ class Core extends Library
 			$info['bbcode_useoption'] = 0;
 		}
 
-		$insertedId = Db::i()->insert( 'convert_custom_bbcode',
+		$insertedId = \IPS\Db::i()->insert( 'convert_custom_bbcode',
 											array(
 												'bbcode_title'	=> $info['bbcode_title'],
 												'bbcode_desc' => $info['bbcode_description'],
@@ -1586,19 +1573,19 @@ class Core extends Library
 	 * Convert Display Name History
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted Display Name History, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted Display Name History, or FALSE on failure.
 	 */
-	public function convertDnameChange( array $info=array() ) : bool|int
+	public function convertDnameChange( $info=array() )
 	{
 		// not sure if we really need this?
 		if ( !isset( $info['old_id'] ) )
 		{
-			$this->software->app->log( 'dname_change_missing_old_id', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'dname_change_missing_old_id', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 		}
 
 		if ( !isset( $info['member_id'] ) )
 		{
-			$this->software->app->log( 'dname_change_missing_member_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'dname_change_missing_member_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -1606,38 +1593,38 @@ class Core extends Library
 		{
 			$newMemberId = $this->software->app->getLink( $info['member_id'], 'core_member' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'dname_change_not_existing_member', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'dname_change_not_existing_member', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 
 		if ( !isset( $info['dname_previous'] ) )
 		{
-			$this->software->app->log( 'dname_change_missing_dname_previous', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'dname_change_missing_dname_previous', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['dname_current'] ) )
 		{
-			$this->software->app->log( 'dname_change_missing_dname_current', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'dname_change_missing_dname_current', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['dname_date'] ) )
 		{
-			$this->software->app->log( 'dname_change_missing_dname_current', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'dname_change_missing_dname_current', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 			$info['dname_date'] = time();
 		}
 
 		if ( !isset( $info['dname_ip_address'] ) )
 		{
-			$this->software->app->log( 'dname_change_missing_dname_ip_address', __METHOD__, App::LOG_NOTICE );
-			$info['dname_ip_address'] = Request::i()->ipAddress();
+			$this->software->app->log( 'dname_change_missing_dname_ip_address', __METHOD__, \IPS\convert\App::LOG_NOTICE );
+			$info['dname_ip_address'] =\IPS\Request::i()->ipAddress();
 		}
 
-		$inserted_id = Db::i()->insert( 'core_member_history', array(
+		$inserted_id = \IPS\Db::i()->insert( 'core_member_history', array(
 					'log_app'			=> 'core',
 					'log_member'		=> $newMemberId,
 					'log_by'			=> NULL,
@@ -1658,25 +1645,25 @@ class Core extends Library
 	 * Convert an Edit History Log
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted Edit History, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted Edit History, or FALSE on failure.
 	 */
-	public function convertEditHistory( array $info=array() ) : bool|int
+	public function convertEditHistory( $info=array() )
 	{
 		if ( !isset( $info['id'] ) )
 		{
-			$this->software->app->log( 'edit_history_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'edit_history_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( !isset( $info['class'] ) OR !in_array( $info['class'], Content::routedClasses() ) )
+		if ( !isset( $info['class'] ) OR !\in_array( $info['class'], \IPS\Content::routedClasses() ) )
 		{
-			$this->software->app->log( 'edit_history_missing_class', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'edit_history_missing_class', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
-
-		if( IPS::classUsesTrait( $info['class'], 'IPS\Content\EditHistory' ) )
+		
+		if ( !\in_array( 'IPS\Content\EditHistory', class_implements( $info['class'] ) ) )
 		{
-			$this->software->app->log( 'edit_history_not_supported', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'edit_history_not_supported', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
 		
@@ -1688,15 +1675,15 @@ class Core extends Library
 			{
 				$info['comment_id'] = $this->software->app->getLink( $info['comment_id'], $classname::$databaseTable );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'edit_history_missing_comment', __METHOD__, App::LOG_WARNING, $info['id'] );
+				$this->software->app->log( 'edit_history_missing_comment', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'edit_history_missing_comment', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'edit_history_missing_comment', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
 		
@@ -1706,7 +1693,7 @@ class Core extends Library
 			{
 				$info['member'] = $this->software->app->getLink( $info['member'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['member'] = 0;
 			}
@@ -1718,7 +1705,7 @@ class Core extends Library
 		
 		if ( isset( $info['time'] ) )
 		{
-			if ( $info['time'] instanceof DateTime )
+			if ( $info['time'] instanceof \IPS\DateTime )
 			{
 				$info['time'] = $info['time']->getTimestamp();
 			}
@@ -1730,7 +1717,7 @@ class Core extends Library
 		
 		if ( !isset( $info['old'] ) )
 		{
-			$this->software->app->log( 'edit_history_missing_old', __METHOD__, App::LOG_NOTICE, $info['id'] );
+			$this->software->app->log( 'edit_history_missing_old', __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['id'] );
 			$info['old'] = '';
 		}
 		else
@@ -1741,7 +1728,7 @@ class Core extends Library
 		
 		if ( !isset( $info['new'] ) )
 		{
-			$this->software->app->log( 'edit_history_missing_new', __METHOD__, App::LOG_NOTICE, $info['id'] );
+			$this->software->app->log( 'edit_history_missing_new', __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['id'] );
 			$info['new'] = '';
 		}
 		else
@@ -1752,7 +1739,7 @@ class Core extends Library
 		
 		if ( isset( $info['public'] ) )
 		{
-			$info['public'] = (bool) $info['public'];
+			$info['public'] = (boolean) $info['public'];
 		}
 		else
 		{
@@ -1767,7 +1754,7 @@ class Core extends Library
 		$id = $info['id'];
 		unset( $info['id'] );
 		
-		$inserted_id = Db::i()->insert( 'core_edit_history', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_edit_history', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_edit_history' );
 		return $inserted_id;
 	}
@@ -1777,28 +1764,28 @@ class Core extends Library
 	 *
 	 * @param	array			$info		Data to insert
 	 * @param	NULL|array		$set		Set to store this emoticon in.
-	 * @param	bool			$keepExisting	If TRUE, then if an emoticon code already exists in our database, we'll keep that one. FALSE means overwrite it.
+	 * @param	boolean			$keepExisting	If TRUE, then if an emoticon code already exists in our database, we'll keep that one. FALSE means overwrite it.
 	 * @param	NULL|string		$filepath	Path to files, or NULL if loading from the database.
 	 * @param	NULL|string		$filedata	If loading from the database, the content of the Binary column.
 	 * @param	NULL|string		$filepathx2	Path to the x2 size emoticon, or NULL if it doesn't exist.
 	 * @param	NULL|string		$filedatax2 File Data for the x2 size emoticon, or NULL if it doesn't exist.
-	 * @return	bool|int	The ID of the newly inserted emoticon, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted emoticon, or FALSE on failure.
 	 * @todo	Handle emoticons without a defined set.
 	 */
-	public function convertEmoticon( array $info=array(), ?array $set=NULL, bool $keepExisting=TRUE, ?string $filepath=NULL, ?string $filedata=NULL, ?string $filepathx2=NULL, ?string $filedatax2=NULL ) : bool|int
+	public function convertEmoticon( $info=array(), $set=NULL, $keepExisting=TRUE, $filepath=NULL, $filedata=NULL, $filepathx2=NULL, $filedatax2=NULL )
 	{
 		/* We don't really need an ID for these */
 		$haveID = TRUE;
 		if ( !isset( $info['id'] ) )
 		{
-			$this->software->app->log( 'emoticon_missing_ids', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'emoticon_missing_ids', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 			$haveID = FALSE;
 		}
 		
 		/* We do need these, though */
 		if ( !isset( $info['typed'] ) )
 		{
-			$this->software->app->log( 'emoticon_missing_code', __METHOD__, App::LOG_WARNING, ( $haveID ) ? $info['id'] : NULL );
+			$this->software->app->log( 'emoticon_missing_code', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $haveID ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
@@ -1807,7 +1794,7 @@ class Core extends Library
 			/* Do we already have an emoticon for this code? */
 			try
 			{
-				$existing = Db::i()->select( '*', 'core_emoticons', array( "typed=?", $info['typed'] ) )->first();
+				$existing = \IPS\Db::i()->select( '*', 'core_emoticons', array( "typed=?", $info['typed'] ) )->first();
 				
 				if ( $haveID )
 				{
@@ -1816,21 +1803,21 @@ class Core extends Library
 				
 				return $existing['id'];
 			}
-			catch( UnderflowException $e ) {} # lookup failed, don't do anything as it means we need to insert normally
+			catch( \UnderflowException $e ) {} # lookup failed, don't do anything as it means we need to insert normally
 		}
 		else
 		{
 			/* We are using the source - we need to remove any for this typed code */
-			Db::i()->delete( 'core_emoticons', array( "typed=?", $info['typed'] ) );
+			\IPS\Db::i()->delete( 'core_emoticons', array( "typed=?", $info['typed'] ) );
 		}
 		
-		if ( is_null( $filepath ) AND is_null( $filedata ) )
+		if ( \is_null( $filepath ) AND \is_null( $filedata ) )
 		{
-			$this->software->app->log( 'emoticon_no_file', __METHOD__, App::LOG_WARNING, ( $haveID ) ? $info['id'] : NULL );
+			$this->software->app->log( 'emoticon_no_file', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $haveID ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
-		if ( is_null( $filedata ) AND !is_null( $filepath ) )
+		if ( \is_null( $filedata ) AND !\is_null( $filepath ) )
 		{
 			if ( file_exists( rtrim( $filepath, '/' ) . '/' . $info['filename'] ) )
 			{
@@ -1839,14 +1826,14 @@ class Core extends Library
 			}
 			else
 			{
-				$this->software->app->log( 'emoticon_no_file', __METHOD__, App::LOG_WARNING, ( $haveID ) ? $info['id'] : NULL );
+				$this->software->app->log( 'emoticon_no_file', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $haveID ) ? $info['id'] : NULL );
 				return FALSE;
 			}
 		}
 		
 		if ( !isset( $info['filename'] ) )
 		{
-			$this->software->app->log( 'emoticon_no_filename', __METHOD__, App::LOG_WARNING, ( $haveID ) ? $info['id'] : NULL );
+			$this->software->app->log( 'emoticon_no_filename', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $haveID ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
@@ -1858,27 +1845,27 @@ class Core extends Library
 		$info['emo_set']			= $set['set'];
 		$info['emo_set_position']	= $set['position'];
 		
-		if ( !Member::loggedIn()->language()->checkKeyExists( "core_emoticon_group_{$info['emo_set']}" ) )
+		if ( \IPS\Member::loggedIn()->language()->checkKeyExists( "core_emoticon_group_{$info['emo_set']}" ) == FALSE )
 		{
-			Lang::saveCustom( 'core', "core_emoticon_group_{$info['emo_set']}", $set['title'] );
+			\IPS\Lang::saveCustom( 'core', "core_emoticon_group_{$info['emo_set']}", $set['title'] );
 		}
 		
 		if ( !isset( $info['emo_position'] ) )
 		{
-			$newPosition = (int) Db::i()->select( 'MAX(emo_position) + 1', 'core_emoticons', array( 'emo_set=?', $set['set'] ) )->first();
+			$newPosition = (int) \IPS\Db::i()->select( 'MAX(emo_position) + 1', 'core_emoticons', array( 'emo_set=?', $set['set'] ) )->first();
 			$info['emo_position'] = $newPosition;
 		}
 
 		try
 		{
-			$file = File::create( 'core_Emoticons', $info['filename'], $filedata, 'emoticons', FALSE, NULL, static::$obscureFilenames );
+			$file = \IPS\File::create( 'core_Emoticons', $info['filename'], $filedata, 'emoticons', FALSE, NULL, static::$obscureFilenames );
 			unset( $info['filename'] );
 			$info['image'] = (string) $file;
 			$dims = $file->getImageDimensions();
 		}
 		catch( \Exception $e )
 		{
-			$this->software->app->log( 'emoticon_file_corrupt', __METHOD__, App::LOG_WARNING, ( $haveID ) ? $info['id'] : NULL );
+			$this->software->app->log( 'emoticon_file_corrupt', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $haveID ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
@@ -1892,19 +1879,23 @@ class Core extends Library
 			$info['height'] = $dims[1];
 		}
 		
-		if ( isset( $info['filenamex2'] ) OR ( !is_null( $filedatax2 ) OR !is_null( $filepathx2 ) ) )
+		if ( isset( $info['filenamex2'] ) OR ( !\is_null( $filedatax2 ) OR !\is_null( $filepathx2 ) ) )
 		{
 			try
 			{
-				if ( is_null( $filedatax2 ) AND !is_null( $filepathx2 ) )
+				if ( \is_null( $filedatax2 ) AND !\is_null( $filepathx2 ) )
 				{
 					$filedatax2 = file_get_contents( rtrim( $filepathx2, '/' ) . '/' . $info['filenamex2'] );
 					$filepathx2 = NULL;
 				}
-				$filex2 = File::create( 'core_Emoticons', $info['filenamex2'], $filedatax2, 'emoticons', FALSE, NULL, static::$obscureFilenames );
+				$filex2 = \IPS\File::create( 'core_Emoticons', $info['filenamex2'], $filedatax2, 'emoticons', FALSE, NULL, static::$obscureFilenames );
 				$info['image_2x'] = (string) $filex2;
 			}
-			catch( \Exception|ErrorException $e )
+			catch( \Exception $e )
+			{
+				$info['image_2x'] = NULL;
+			}
+			catch( \ErrorException $e )
 			{
 				$info['image_2x'] = NULL;
 			}
@@ -1917,7 +1908,7 @@ class Core extends Library
 			unset( $info['id'] );
 		}
 		
-		$inserted_id = Db::i()->insert( 'core_emoticons', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_emoticons', $info );
 		
 		if ( $haveID )
 		{
@@ -1931,33 +1922,33 @@ class Core extends Library
 	 * Convert Follow Data
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool			Unlike other methods, we do not need to return an ID for the converted follow - so simply return TRUE on success, or FALSE on failure.
+	 * @return	boolean			Unlike other methods, we do not need to return an ID for the converted follow - so simply return TRUE on success, or FALSE on failure.
 	 * @note This method should not have an individual step, but rather be called during others (ex. when converting topics, insert any follows at that point)
 	 */
-	public function convertFollow( array $info=array() ) : bool
+	public function convertFollow( $info=array() )
 	{
 		if ( !isset( $info['follow_app'] ) )
 		{
-			$this->software->app->log( 'follow_missing_app', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'follow_missing_app', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( !Application::appIsEnabled( $info['follow_app'] ) )
+		if ( !\IPS\Application::appIsEnabled( $info['follow_app'] ) )
 		{
-			$this->software->app->log( 'follow_app_disabed', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'follow_app_disabed', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['follow_area'] ) )
 		{
-			$this->software->app->log( 'follow_missing_area', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'follow_missing_area', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		/* Like attachments, we need a bit more information at runtime about where we need to lookup our link reference */
 		if ( !isset( $info['follow_rel_id'] ) OR !isset( $info['follow_rel_id_type'] ) )
 		{
-			$this->software->app->log( 'follow_missing_rel_info', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'follow_missing_rel_info', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -1966,9 +1957,9 @@ class Core extends Library
 			$info['follow_rel_id'] = $this->software->app->getLink( $info['follow_rel_id'], $info['follow_rel_id_type'] );
 			unset( $info['follow_rel_id_type'] );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'follow_missing_rel_info_orphaned', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'follow_missing_rel_info_orphaned', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -1978,29 +1969,29 @@ class Core extends Library
 			{
 				$info['follow_member_id'] = $this->software->app->getLink( $info['follow_member_id'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'follow_missing_member', __METHOD__, App::LOG_WARNING );
+				$this->software->app->log( 'follow_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'follow_missing_member', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'follow_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		/* Generic Stuff */
 		$info['follow_is_anon']		= ( isset( $info['follow_is_anon'] ) ) ? $info['follow_is_anon'] : 0;
 		$info['follow_notify_do']	= ( isset( $info['follow_notify_do'] ) ) ? $info['follow_notify_do'] : 0;
-		$info['follow_notify_meta']	= ( isset( $info['follow_notify_meta'] ) ) ? ( is_array( $info['follow_notify_meta'] ) ? json_encode( $info['follow_notify_meta'] ) : $info['follow_notify_meta'] ) : '';
-		$info['follow_notify_freq']	= ( isset( $info['follow_notify_freq'] ) AND in_array( $info['follow_notify_freq'], array( 'none', 'immediate', 'daily', 'weekly' ) ) ) ? $info['follow_notify_freq'] : 'none';
+		$info['follow_notify_meta']	= ( isset( $info['follow_notify_meta'] ) ) ? ( \is_array( $info['follow_notify_meta'] ) ? json_encode( $info['follow_notify_meta'] ) : $info['follow_notify_meta'] ) : '';
+		$info['follow_notify_freq']	= ( isset( $info['follow_notify_freq'] ) AND \in_array( $info['follow_notify_freq'], array( 'none', 'immediate', 'daily', 'weekly' ) ) ) ? $info['follow_notify_freq'] : 'none';
 		$info['follow_visible']		= ( isset( $info['follow_visible'] ) ) ? $info['follow_visible'] : 1;
 		
 		/* DateTime Stuff */
 		if ( isset( $info['follow_added'] ) )
 		{
-			if ( $info['follow_added'] instanceof DateTime )
+			if ( $info['follow_added'] instanceof \IPS\DateTime )
 			{
 				$info['follow_added'] = $info['follow_added']->getTimestamp();
 			}
@@ -2012,7 +2003,7 @@ class Core extends Library
 		
 		if ( isset( $info['follow_notify_sent'] ) )
 		{
-			if ( $info['follow_notify_sent'] instanceof DateTime )
+			if ( $info['follow_notify_sent'] instanceof \IPS\DateTime )
 			{
 				$info['follow_notify_sent'] = $info['follow_notify_sent']->getTimestamp();
 			}
@@ -2029,23 +2020,23 @@ class Core extends Library
 		/* Duplicate? */
 		try
 		{
-			$dupe = Db::i()->select( '*', 'core_follow', array( "follow_id=?", $info['follow_id'] ) )->first();
+			$dupe = \IPS\Db::i()->select( '*', 'core_follow', array( "follow_id=?", $info['follow_id'] ) )->first();
 			
 			if ( $dupe['follow_id'] )
 			{
 				return TRUE;
 			}
 		}
-		catch( UnderflowException $e ) {}
+		catch( \UnderflowException $e ) {}
 		
 		try
 		{
-			Db::i()->insert( 'core_follow', $info );
+			\IPS\Db::i()->insert( 'core_follow', $info );
 			return TRUE;
 		}
-		catch( Exception $e )
+		catch( \IPS\Db\Exception $e )
 		{
-			$this->software->app->log( sprintf( Member::loggedIn()->language()->get( 'follow_failed_insert' ), $e->getMessage() ), __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( sprintf( \IPS\Member::loggedIn()->language()->get( 'follow_failed_insert' ), $e->getMessage() ), __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 	}
@@ -2053,13 +2044,13 @@ class Core extends Library
 	/**
 	 * @brief	Bitwise are protected in \IPS\Member\Group, so copying here.
 	 */
-	protected static array $groupBitOptions =	array(
+	protected static $groupBitOptions =	array(
 		'gbw_mod_post_unit_type'	=> 1, 			// Lift moderation after x. 1 is days, 0 is posts. Corresponds to g_mod_post_unit
 		'gbw_ppd_unit_type'			=> 2, 			// Lift post-per-day limit after x. 1 is days, 0 is posts. Corresponds to g_ppd_unit
 		'gbw_displayname_unit_type'	=> 4, 			// Username change restrictions. 1 is days, 0 is posts. Corresponds to g_displayname_unit
 		'gbw_sig_unit_type'			=> 8, 			// Signature edit restrictions. 1 is days, 0 is posts. Corresponds to g_sig_unit
 		'gbw_promote_unit_type'		=> 16, 			// Deprecated. 1 is days since joining, 0 is content count. Corresponds to g_promotion
-		// 32 is deprecated (previously gbw_no_status_update)
+		'gbw_no_status_update'		=> 32, 			// Can NOT post status updates
 		// 64 is deprecated (previously gbw_soft_delete)
 		// 128 is deprecated (previously gbw_soft_delete_own)
 		// 256 is deprecated (previously gbw_soft_delete_own_topic)
@@ -2074,7 +2065,7 @@ class Core extends Library
 		// 131072 is deprecated (previously gbw_allow_url_bgimage)
 		'gbw_allow_upload_bgimage'	=> 262144, 		// Can upload a cover photo?
 		'gbw_view_reps'				=> 524288, 		// Can view who gave reputation?
-		// 1048576 is deprecated (previously gbw_no_status_import)
+		'gbw_no_status_import'		=> 1048576, 	// Can NOT import status updates from Facebook/Twitter
 		'gbw_disable_tagging'		=> 2097152, 	// Can NOT use tags
 		'gbw_disable_prefixes'		=> 4194304, 	// Can NOT use prefixes
 		// 8388608 is deprecated (previously gbw_view_last_info)
@@ -2091,22 +2082,22 @@ class Core extends Library
 	 * Convert a Member Group
 	 *
 	 * @param	array			$info		Data to insert
-	 * @param	int|NULL	$mergeWith	THe ID of the group to merge this one into, or NULL to create new.
+	 * @param	integer|NULL	$mergeWith	THe ID of the group to merge this one into, or NULL to create new.
 	 * @param	string|NULL		$iconpath	Path to Icon file for the group, or NULL.
 	 * @param	string|NULL		$icondata	Binary Icon Data, or NULL.
-	 * @return	bool|int	The ID of the newly inserted group, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted group, or FALSE on failure.
 	 * @note	Other libraries will handle their own settings
 	 */
-	public function convertGroup( array $info=array(), ?int $mergeWith=NULL, ?string $iconpath=NULL, ?string $icondata=NULL ) : bool|int
+	public function convertGroup( $info=array(), $mergeWith=NULL, $iconpath=NULL, $icondata=NULL )
 	{
 		if ( !isset( $info['g_id'] ) )
 		{
-			$this->software->app->log( 'group_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'group_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		/* Are we merging this group with an existing one? Saves a lot of headache later */
-		if ( !is_null( $mergeWith ) )
+		if ( !\is_null( $mergeWith ) )
 		{
 			$this->software->app->addLink( $mergeWith, $info['g_id'], 'core_groups', TRUE );
 			return $mergeWith;
@@ -2116,7 +2107,7 @@ class Core extends Library
 		if ( !isset( $info['g_name'] ) )
 		{
 			$name = "Untitled Group {$info['g_id']}";
-			$this->software->app->log( 'group_missing_name', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'group_missing_name', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 		}
 		else
 		{
@@ -2124,19 +2115,23 @@ class Core extends Library
 			unset( $info['g_name'] );
 		}
 		
-		if ( isset( $info['g_icon'] ) AND ( !is_null( $iconpath ) OR !is_null( $icondata ) ) )
+		if ( isset( $info['g_icon'] ) AND ( !\is_null( $iconpath ) OR !\is_null( $icondata ) ) )
 		{
 			try
 			{
-				if ( is_null( $icondata ) AND !is_null( $iconpath ) )
+				if ( \is_null( $icondata ) AND !\is_null( $iconpath ) )
 				{
 					$icondata = file_get_contents( $iconpath );
 					$iconpath = NULL;
 				}
-				$file = File::create( 'core_Theme', $info['g_icon'], $icondata );
+				$file = \IPS\File::create( 'core_Theme', $info['g_icon'], $icondata );
 				$info['g_icon'] = (string) $file;
 			}
-			catch( \Exception|ErrorException $e )
+			catch( \Exception $e )
+			{
+				$info['g_icon'] = NULL;
+			}
+			catch( \ErrorException $e )
 			{
 				$info['g_icon'] = NULL;
 			}
@@ -2150,7 +2145,7 @@ class Core extends Library
 
 		if ( array_key_exists( 'g_promotion', $info ) )
 		{
-			if ( is_array( $info['g_promotion'] ) )
+			if ( \is_array( $info['g_promotion'] ) )
 			{
 				$groupPromotion = array( 'oldgroup' => $info['g_id'], 'newgroup' => $info['g_promotion'][0], 'value' => $info['g_promotion'][1], 'type' => 'posts' );
 			}
@@ -2165,7 +2160,7 @@ class Core extends Library
 		
 		if ( isset( $info['g_photo_max_vars'] ) )
 		{
-			if ( is_array( $info['g_photo_max_vars'] ) )
+			if ( \is_array( $info['g_photo_max_vars'] ) )
 			{
 				$info['g_photo_max_vars'] = implode( ':', $info['g_photo_max_vars'] );
 			}
@@ -2177,7 +2172,7 @@ class Core extends Library
 		
 		if ( isset( $info['g_signature_limits'] ) )
 		{
-			if ( is_array( $info['g_signature_limits'] ) )
+			if ( \is_array( $info['g_signature_limits'] ) )
 			{
 				$info['g_signature_limits'] = implode( ':', $info['g_signature_limits'] );
 			}
@@ -2188,7 +2183,7 @@ class Core extends Library
 		}
 		
 		$bitoptions = 0;
-		if ( isset( $info['g_bitoptions'] ) AND is_array( $info['g_bitoptions'] ) )
+		if ( isset( $info['g_bitoptions'] ) AND \is_array( $info['g_bitoptions'] ) )
 		{
 			foreach( static::$groupBitOptions AS $key => $value )
 			{
@@ -2201,7 +2196,7 @@ class Core extends Library
 					continue;
 				}
 
-				if ( isset( $info['g_bitoptions'][$key] ) AND $info['g_bitoptions'][$key] )
+				if ( isset( $info['g_bitoptions'][$key] ) AND $info['g_bitoptions'][$key] == TRUE )
 				{
 					$bitoptions += $value;
 				}
@@ -2219,7 +2214,7 @@ class Core extends Library
 		}
 		
 		/* Now let's do 0 defaults */
-		foreach( array( 'g_delete_own_posts', 'g_is_supmod', 'g_access_cp', 'g_append_edit', 'g_access_offline', 'g_avoid_q', 'g_avoid_flood', 'g_max_messages', 'g_bypass_badwords', 'g_attach_per_post', 'g_dname_changes', 'g_mod_preview', 'g_hide_online_list', 'g_mod_post_unit', 'g_ppd_limit', 'g_ppd_unit', 'g_displayname_unit', 'g_sig_unit' ) AS $zeroIsDefault )
+		foreach( array( 'g_delete_own_posts', 'g_is_supmod', 'g_access_cp', 'g_append_edit', 'g_access_offline', 'g_avoid_q', 'g_avoid_flood', 'g_max_messages', 'g_dohtml', 'g_bypass_badwords', 'g_attach_per_post', 'g_dname_changes', 'g_mod_preview', 'g_hide_online_list', 'g_mod_post_unit', 'g_ppd_limit', 'g_ppd_unit', 'g_displayname_unit', 'g_sig_unit', 'g_topic_rate_setting' ) AS $zeroIsDefault )
 		{
 			if ( !isset( $info[$zeroIsDefault] ) )
 			{
@@ -2248,6 +2243,10 @@ class Core extends Library
 						$info[$otherDefault] = '';
 					break;
 					
+					case 'g_max_mass_pm':
+						$info[$otherDefault] = 10;
+					break;
+					
 					case 'g_search_flood':
 						$info[$otherDefault] = 3;
 					break;
@@ -2258,7 +2257,6 @@ class Core extends Library
 					
 					case 'g_rep_max_positive':
 					case 'g_rep_max_negative':
-					case 'g_max_mass_pm':
 						$info[$otherDefault] = 10;
 					break;
 				}
@@ -2299,9 +2297,9 @@ class Core extends Library
 		$id = $info['g_id'];
 		unset( $info['g_id'] );
 		
-		$inserted_id = Db::i()->insert( 'core_groups', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_groups', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_groups' );
-		Lang::saveCustom( 'core', "core_group_{$inserted_id}", $name );
+		\IPS\Lang::saveCustom( 'core', "core_group_{$inserted_id}", $name );
 
 		if( $createAdmin )
 		{
@@ -2319,7 +2317,7 @@ class Core extends Library
 		}
 
 		/* Unset cache */
-		unset( Store::i()->groups );
+		unset( \IPS\Data\Store::i()->groups );
 
 		return $inserted_id;
 	}
@@ -2327,19 +2325,19 @@ class Core extends Library
 	/**
 	 * @brief Store group promotion values temporarily to convert after groups are done
 	 */
-	public array $groupPromotions	= array();
+	public $groupPromotions	= array();
 
 	/**
 	 * Convert a group promotion rule
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted promotion rule, or FALSE on error.
+	 * @return	boolean|integer	The ID of the newly inserted promotion rule, or FALSE on error.
 	 */
-	public function convertGroupPromotion( array $info=array() ) : bool|int
+	public function convertGroupPromotion( $info=array() )
 	{
 		if ( !isset( $info['newgroup'] ) OR !isset( $info['oldgroup'] ) )
 		{
-			$this->software->app->log( 'promotion_rule_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'promotion_rule_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -2349,9 +2347,9 @@ class Core extends Library
 
 			unset( $info['newgroup'] );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'promotion_rule_missing_newgroup', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'promotion_rule_missing_newgroup', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -2362,15 +2360,15 @@ class Core extends Library
 			$oldGroupId = $info['oldgroup'];
 			unset( $info['oldgroup'] );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'promotion_rule_missing_oldgroup', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'promotion_rule_missing_oldgroup', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if( !isset( $info['promote_position'] ) )
 		{
-			$position = Db::i()->select( 'MAX(promote_position)', 'core_group_promotions' )->first();
+			$position = \IPS\Db::i()->select( 'MAX(promote_position)', 'core_group_promotions' )->first();
 			$info['promote_position'] = $position + 1;
 		}
 
@@ -2394,7 +2392,7 @@ class Core extends Library
 
 		unset( $info['type'], $info['value'] );
 
-		$inserted_id = Db::i()->insert( 'core_group_promotions', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_group_promotions', $info );
 
 		$this->software->app->addLink( $inserted_id, $oldGroupId, 'core_group_promotions' );
 		return $inserted_id;
@@ -2404,13 +2402,13 @@ class Core extends Library
 	 * Convert an Ignored User
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted Ignore, or FALSE on error.
+	 * @return	boolean|integer	The ID of the newly inserted Ignore, or FALSE on error.
 	 */
-	public function convertIgnoredUser( array $info=array() ) : bool|int
+	public function convertIgnoredUser( $info=array() )
 	{
 		if ( !isset( $info['ignore_id'] ) )
 		{
-			$this->software->app->log( 'ignored_user_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'ignored_user_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -2420,15 +2418,15 @@ class Core extends Library
 			{
 				$owner = $this->software->app->getLink( $info['ignore_owner_id'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'ignored_user_missing_owner', __METHOD__, App::LOG_WARNING );
+				$this->software->app->log( 'ignored_user_missing_owner', __METHOD__, \IPS\convert\App::LOG_WARNING );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'ignored_user_missing_owner', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'ignored_user_missing_owner', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -2438,23 +2436,23 @@ class Core extends Library
 			{
 				$ignore = $this->software->app->getLink( $info['ignore_ignore_id'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'ignored_user_missing_ignore', __METHOD__, App::LOG_WARNING );
+				$this->software->app->log( 'ignored_user_missing_ignore', __METHOD__, \IPS\convert\App::LOG_WARNING );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'ignored_user_missing_ignore', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'ignored_user_missing_ignore', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		$obj = new Ignore;
+		$obj = new \IPS\core\Ignore;
 		$obj->owner_id = $owner;
 		$obj->ignore_id = $ignore;
 		
-		foreach( Ignore::types() AS $type )
+		foreach( \IPS\core\Ignore::types() AS $type )
 		{
 			/* If the type is set and evaluates to true, then set to 1, otherwise 0. */
 			$obj->$type = ( isset( $info['ignore_' . $type] ) AND $info['ignore_' . $type] ) ? 1 : 0;
@@ -2469,25 +2467,25 @@ class Core extends Library
 	 * Convert a Staff Directory Entry
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted Leader, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted Leader, or FALSE on failure.
 	 */
-	public function convertLeader( array $info=array() ) : bool|int
+	public function convertLeader( $info=array() )
 	{
 		if ( !isset( $info['leader_id'] ) )
 		{
-			$this->software->app->log( 'leader_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'leader_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['leader_type'] ) )
 		{
-			$this->software->app->log( 'leader_missing_type', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'leader_missing_type', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['leader_type_id'] ) )
 		{
-			$this->software->app->log( 'leader_missing_type_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'leader_missing_type_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -2499,9 +2497,9 @@ class Core extends Library
 				{
 					$group = $this->software->app->getLink( $info['leader_type_id'], 'core_groups' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
-					$this->software->app->log( 'leader_missing_group_ids', __METHOD__, App::LOG_WARNING );
+					$this->software->app->log( 'leader_missing_group_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 					return FALSE;
 				}
 				
@@ -2515,9 +2513,9 @@ class Core extends Library
 				{
 					$member = $this->software->app->getLink( $info['leader_type_id'], 'core_members' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
-					$this->software->app->log( 'leader_missing_member_ids', __METHOD__, App::LOG_WARNING );
+					$this->software->app->log( 'leader_missing_member_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 					return FALSE;
 				}
 				
@@ -2532,19 +2530,19 @@ class Core extends Library
 			if ( !isset( $info['leader_group_id'] ) )
 			{
 				/* If it's not set throw an exception to try and trigger orphan parent detection */
-				throw new DomainException;
+				throw new \DomainException;
 			}
 			
 			$info['leader_group_id'] = $this->software->app->getLink( $info['leader_group_id'], 'core_leader_groups' );
 		}
-		catch( LogicException $e ) /* LogicException here to accommodate for catching both OutOfRangeException and DomainException - we don't care which was thrown */
+		catch( \LogicException $e ) /* LogicException here so as to accommodate for catching both OutOfRangeException and DomainException - we don't care which was thrown */
 		{
 			try
 			{
 				/* Have we already created an orphaned row storage container? */
 				$info['leader_group_id'] = $this->software->app->getLink( '__orphan__', 'core_leader_groups' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				/* If we are creating, we should do it in the sense that we are converting so we can use it later on */
 				$info['leader_group_id'] = $this->convertLeaderGroup( array(
@@ -2559,7 +2557,7 @@ class Core extends Library
 			$info['leader_position'] = 1;
 		}
 		
-		$obj			= new User;
+		$obj			= new \IPS\core\StaffDirectory\User;
 		$obj->type		= $info['leader_type'];
 		$obj->type_id	= $info['leader_type_id'];
 		$obj->group_id	= $info['leader_group_id'];
@@ -2574,19 +2572,19 @@ class Core extends Library
 	 * Convert a Staff Directory Group
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted Staff Directory Group, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted Staff Directory Group, or FALSE on failure.
 	 */
-	public function convertLeaderGroup( array $info=array() ) : bool|int
+	public function convertLeaderGroup( $info=array() )
 	{
 		if ( !isset( $info['group_id'] ) )
 		{
-			$this->software->app->log( 'leader_group_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'leader_group_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['group_name'] ) )
 		{
-			$this->software->app->log( 'leader_group_missing_name', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'leader_group_missing_name', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 			$info['group_name'] = 'Untitled Group';
 		}
 		
@@ -2619,18 +2617,221 @@ class Core extends Library
 	 * @param	array			$info		Data to insert
 	 * @param	string|NULL		$iconpath	Icon File Path, or NULL
 	 * @param	string|NULL		$icondata	Icon File Data, or NULL
-	 * @return	bool|int	The ID of the newly inserted Rank, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted Rank, or FALSE on failure.
 	 */
-	public function convertRank( array $info=array(), ?string $iconpath=NULL, ?string $icondata=NULL ) : bool|int
+	public function convertRank( $info=array(), $iconpath=NULL, $icondata=NULL )
 	{
-		$this->software->app->log( 'method_deprecated', __METHOD__, App::LOG_WARNING );
+		$this->software->app->log( 'method_deprecated', __METHOD__, \IPS\convert\App::LOG_WARNING );
 		return FALSE;
+	}
+	
+	/**
+	 * Convert a Status Reply
+	 *
+	 * @param	array	$info	Data to insert
+	 * @return	boolean|integer	The ID of the newly inserted Status Reply, or FALSE on failure.
+	 */
+	public function convertStatusReply( $info=array() )
+	{
+		if ( !isset( $info['reply_id'] ) )
+		{
+			$this->software->app->log( 'status_reply_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
+			return FALSE;
+		}
+		
+		if ( isset( $info['reply_status_id'] ) )
+		{
+			try
+			{
+				$info['reply_status_id'] = $this->software->app->getLink( $info['reply_status_id'], 'core_member_status_updates' );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'status_reply_orphaned', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['reply_id'] );
+				return FALSE;
+			}
+		}
+		else
+		{
+			$this->software->app->log( 'status_reply_orphaned', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['reply_id'] );
+			return FALSE;
+		}
+		
+		if ( isset( $info['reply_member_id'] ) )
+		{
+			try
+			{
+				$info['reply_member_id'] = $this->software->app->getLink( $info['reply_member_id'], 'core_members' );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'status_reply_no_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['reply_id'] );
+				return FALSE;
+			}
+		}
+		else
+		{
+			$this->software->app->log( 'status_reply_no_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['reply_id'] );
+			return FALSE;
+		}
+		
+		if ( isset( $info['reply_date'] ) )
+		{
+			if ( $info['reply_date'] instanceof \IPS\DateTime )
+			{
+				$info['reply_date'] = $info['reply_date']->getTimestamp();
+			}
+		}
+		else
+		{
+			$info['reply_date'] = time();
+		}
+		
+		if ( empty( $info['reply_content'] ) )
+		{
+			$this->software->app->log( 'status_reply_no_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['reply_id'] );
+			return FALSe;
+		}
+		else
+		{
+			$softwareClass = $this->software;
+			$info['reply_content'] = $softwareClass::fixPostData( $info['reply_content'] );
+		}
+		
+		if ( !isset( $info['reply_approved'] ) )
+		{
+			$info['reply_approved'] = 1;
+		}
+		
+		if ( !isset( $info['reply_ip_address'] ) OR filter_var( $info['reply_ip_address'], FILTER_VALIDATE_IP ) === FALSE )
+		{
+			$info['reply_ip_address'] = '127.0.0.1';
+		}
+		
+		$id = $info['reply_id'];
+		unset( $info['reply_id'] );
+		
+		$inserted_id = \IPS\Db::i()->insert( 'core_member_status_replies', $info );
+		$this->software->app->addLink( $inserted_id, $id, 'core_member_status_replies' );
+		return $inserted_id;
+	}
+	
+	/**
+	 * Convert a Status Update
+	 *
+	 * @param	array	$info	Data to insert
+	 * @return	boolean|integer	The ID of the newly inserted Status Update, or FALSE on failure.
+	 */
+	public function convertStatus( $info=array() )
+	{
+		if ( !isset( $info['status_id'] ) )
+		{
+			$this->software->app->log( 'status_update_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
+			return FALSE;
+		}
+		
+		if ( isset( $info['status_member_id'] ) )
+		{
+			try
+			{
+				$info['status_member_id'] = $this->software->app->getLink( $info['status_member_id'], 'core_members' );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'status_update_no_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['status_id'] );
+				return FALSE;
+			}
+		}
+		else
+		{
+			$this->software->app->log( 'status_update_no_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['status_id'] );
+			return FALSE;
+		}
+		
+		if ( isset( $info['status_date'] ) )
+		{
+			if ( $info['status_date'] instanceof \IPS\DateTime )
+			{
+				$info['status_date'] = $info['status_date']->getTimestamp();
+			}
+		}
+		else
+		{
+			$info['status_date'] = time();
+		}
+		
+		if ( empty( $info['status_content'] ) )
+		{
+			$this->software->app->log( 'status_update_no_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['status_id'] );
+			return FALSE;
+		}
+		else
+		{
+			$softwareClass = $this->software;
+			$info['status_content'] = $softwareClass::fixPostData( $info['status_content'] );
+		}
+		
+		if ( !isset( $info['status_replies'] ) )
+		{
+			/* Converter will indicate that these need recounted */
+			$info['status_replies'] = 0;
+		}
+		
+		/* No longer used */
+		$info['status_last_ids']	= NULL;
+		$info['status_is_latest']	= 0;
+		$info['status_hash']		= '';
+		
+		if ( !isset( $info['status_is_locked'] ) )
+		{
+			$info['status_is_locked'] = 0;
+		}
+		
+		if ( !isset( $info['status_imported'] ) )
+		{
+			$info['status_imported'] = 0;
+		}
+		
+		if ( isset( $info['status_author_id'] ) )
+		{
+			try
+			{
+				$info['status_author_id'] = $this->software->app->getLink( $info['status_author_id'], 'core_members' );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'status_update_no_author', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['status_id'] );
+				return FALSE;
+			}
+		}
+		else
+		{
+			$this->software->app->log( 'status_update_no_author', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['status_id'] );
+			return FALSE;
+		}
+		
+		if ( !isset( $info['status_author_ip'] ) OR filter_var( $info['status_author_ip'], FILTER_VALIDATE_IP ) === FALSE )
+		{
+			$info['status_author_ip'] = '127.0.0.1';
+		}
+		
+		if ( !isset( $info['status_approved'] ) )
+		{
+			$info['status_approved'] = 1;
+		}
+		
+		$id = $info['status_id'];
+		unset( $info['status_id'] );
+		
+		$inserted_id = \IPS\Db::i()->insert( 'core_member_status_updates', $info );
+		$this->software->app->addLink( $inserted_id, $id, 'core_member_status_updates' );
+		return $inserted_id;
 	}
 
 	/**
 	 * @brief	Cache login handlers
 	 */
-	protected static ?array $_loginMethods = NULL;
+	protected static $_loginMethods = NULL;
 	
 	/**
 	 * Convert a Member
@@ -2643,14 +2844,14 @@ class Core extends Library
 	 * @param	NULL|string		$coverPhotoName		Filename for the users Cover Photo or NULL if none set.
 	 * @param	NULL|string		$coverPhotoPath		Path to Cover Photos, or NULL to load from the database.
 	 * @param	NULL|string		$coverFileData		If loading from the database, the filedatafor the cover photo from the Binary column.
-	 * @return	bool|int	The ID of the newly inserted member, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted member, or FALSE on failure.
 	 * @todo	Work out if we can convert Social Login Stuff.
 	 */
-	public function convertMember( array $info=array(), array $profileFields=array(), ?string $profilePhotoName=NULL, ?string $profilePhotoPath=NULL, ?string $profileFileData=NULL, ?string $coverPhotoName=NULL, ?string $coverPhotoPath=NULL, ?string $coverFileData=NULL ) : bool|int
+	public function convertMember( $info=array(), $profileFields=array(), $profilePhotoName=NULL, $profilePhotoPath=NULL, $profileFileData=NULL, $coverPhotoName=NULL, $coverPhotoPath=NULL, $coverFileData=NULL )
 	{
 		if ( !isset( $info['member_id'] ) )
 		{
-			$this->software->app->log( 'member_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'member_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -2658,17 +2859,17 @@ class Core extends Library
 		{
 			/* No email, or it is invalid */
 			$newEmail = microtime( TRUE ) . '@example.com';
-			$this->software->app->log( sprintf( Member::loggedIn()->language()->get( 'member_email_invalid' ), $info['email'], $newEmail ), __METHOD__, App::LOG_NOTICE, $info['member_id'] );
+			$this->software->app->log( sprintf( \IPS\Member::loggedIn()->language()->get( 'member_email_invalid' ), $info['email'], $newEmail ), __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['member_id'] );
 			$info['email'] = $newEmail;
 		}
 		else
 		{
 			/* If this email is already in use, we need to merge the two members. Queue Tasks later will handle synchronize stuffs */
-			$memberToTest = Member::load( $info['email'], 'email' );
+			$memberToTest = \IPS\Member::load( $info['email'], 'email' );
 			
 			if ( $memberToTest->member_id )
 			{
-				$this->software->app->log( sprintf( Member::loggedIn()->language()->get( 'member_exists' ), $info['name'], $memberToTest->name ), __METHOD__, App::LOG_NOTICE, $info['member_id'] );
+				$this->software->app->log( sprintf( \IPS\Member::loggedIn()->language()->get( 'member_exists' ), $info['name'], $memberToTest->name ), __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['member_id'] );
 				$this->software->app->addLink( $memberToTest->member_id, $info['member_id'], 'core_members', TRUE );
 				return $memberToTest->member_id;
 			}
@@ -2678,36 +2879,36 @@ class Core extends Library
 		if ( !isset( $info['name'] ) OR !$info['name'] )
 		{
 			$info['name'] = "User_{$info['member_id']}";
-			$this->software->app->log( sprintf( Member::loggedIn()->language()->get( 'member_missing_name' ), $info['name'] ), __METHOD__, App::LOG_NOTICE, $info['member_id'] );
+			$this->software->app->log( sprintf( \IPS\Member::loggedIn()->language()->get( 'member_missing_name' ), $info['name'] ), __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['member_id'] );
 		}
 		else
 		{
 			/* If the username is longer than our defined length, then cut it down to fit rather than not converting */
-			if ( mb_strlen( $info['name'] ) > Settings::i()->max_user_name_length )
+			if ( mb_strlen( $info['name'] ) > \IPS\Settings::i()->max_user_name_length )
 			{
-				$newName = mb_substr( $info['name'], 0, Settings::i()->max_user_name_length );
-				$this->software->app->log( sprintf( Member::loggedIn()->language()->get( 'member_name_too_long' ), $info['name'], $newName ), __METHOD__, App::LOG_NOTICE, $info['member_id'] );
+				$newName = mb_substr( $info['name'], 0, \IPS\Settings::i()->max_user_name_length );
+				$this->software->app->log( sprintf( \IPS\Member::loggedIn()->language()->get( 'member_name_too_long' ), $info['name'], $newName ), __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['member_id'] );
 				$info['name'] = $newName;
 			}
 			
 			/* Is it using any blocked characters? */
-			if ( !Login::usernameIsAllowed( $info['name'] ) )
+			if ( !\IPS\Login::usernameIsAllowed( $info['name'] ) )
 			{
 				$newName = preg_replace( '/\s[\s]+/', ' ', $info['name'] );
 				$newName = preg_replace( '/[^\p{L}\p{M}\p{N}_\.\-, ]/u', '', $newName );
 
-				$this->software->app->log( sprintf( Member::loggedIn()->language()->get( 'member_name_invalid_chars' ), $info['name'], $newName ), __METHOD__, App::LOG_NOTICE, $info['member_id'] );
+				$this->software->app->log( sprintf( \IPS\Member::loggedIn()->language()->get( 'member_name_invalid_chars' ), $info['name'], $newName ), __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['member_id'] );
 				$info['name'] = $newName;
 			}
 			
 			/* Finally, check it's not in use */
-			$memberToTest = Member::load( $info['name'], 'name' );
+			$memberToTest = \IPS\Member::load( $info['name'], 'name' );
 			
 			if ( $memberToTest->member_id )
 			{
 				/* It is... add a tiemstamp on the end */
 				$newName = $info['name'] . time();
-				$this->software->app->log( sprintf( Member::loggedIn()->language()->get( 'member_name_in_use' ), $info['name'], $newName ), __METHOD__, App::LOG_NOTICE, $info['member_id'] );
+				$this->software->app->log( sprintf( \IPS\Member::loggedIn()->language()->get( 'member_name_in_use' ), $info['name'], $newName ), __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['member_id'] );
 				$info['name'] = $newName;
 			}
 			
@@ -2741,7 +2942,7 @@ class Core extends Library
 					$num = 93;
 				}
 
-				$salt .= chr( $num );
+				$salt .= \chr( $num );
 			}
 			$info['members_pass_hash'] = md5( md5( $salt ) . $info['md5_password'] );
 			$info['members_pass_salt'] = $salt;
@@ -2757,9 +2958,9 @@ class Core extends Library
 				{
 					$chr = rand( 48, 122 );
 				}
-				while ( in_array( $chr, range( 58,  64 ) ) or in_array( $chr, range( 91,  96 ) ) );
+				while ( \in_array( $chr, range( 58,  64 ) ) or \in_array( $chr, range( 91,  96 ) ) );
 				
-				$salt .= chr( $chr );
+				$salt .= \chr( $chr );
 			}
 			$info['members_pass_hash'] = crypt( $info['plain_password'], '$2a$13$' . $salt );
 			$info['members_pass_salt'] = $salt;
@@ -2775,16 +2976,16 @@ class Core extends Library
 			}
 		}
 		
-		$group = Settings::i()->member_group;
+		$group = \IPS\Settings::i()->member_group;
 
 		if ( array_key_exists( 'ips_group_id', $info ) )
 		{
 			/* Make sure that the user group is actually valid */
 			try
 			{
-				$group = Group::load( $info['ips_group_id'] )->g_id;
+				$group = \IPS\Member\Group::load( $info['ips_group_id'] )->g_id;
 			}
-			catch( OutOfRangeException $ex ) {}
+			catch( \OutOfRangeException $ex ) {}
 
 			unset( $info['ips_group_id'] );
 		}
@@ -2795,15 +2996,15 @@ class Core extends Library
 				$groupLink = $this->software->app->getLink( $info['member_group_id'], 'core_groups' );
 
 				/* Don't put any users in the guest group, regardless of configuration */
-				if( $groupLink == Settings::i()->guest_group )
+				if( $groupLink == \IPS\Settings::i()->guest_group )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 
 				/* Make sure that the user group is actually valid */
-				$group = Group::load( $groupLink )->g_id;
+				$group = \IPS\Member\Group::load( $groupLink )->g_id;
 			}
-			catch( OutOfRangeException $e ) {}
+			catch( \OutOfRangeException $e ) {}
 		}
 
 		$info['member_group_id'] = $group;
@@ -2811,7 +3012,7 @@ class Core extends Library
 		/* If no join date specified, just use current time */
 		if ( isset( $info['joined'] ) )
 		{
-			if ( $info['joined'] instanceof DateTime )
+			if ( $info['joined'] instanceof \IPS\DateTime )
 			{
 				$info['joined'] = $info['joined']->getTimestamp();
 			}
@@ -2837,7 +3038,7 @@ class Core extends Library
 		
 		if ( isset( $info['warn_lastwarn'] ) )
 		{
-			if ( $info['warn_lastwarn'] instanceof DateTime )
+			if ( $info['warn_lastwarn'] instanceof \IPS\DateTime )
 			{
 				$info['warn_lastwarn'] = $info['warn_lastwarn']->getTimestamp();
 			}
@@ -2848,11 +3049,11 @@ class Core extends Library
 		}
 		
 		/* Cannot convert languages - set to default */
-		$info['language'] = Lang::defaultLanguage();
+		$info['language'] = \IPS\Lang::defaultLanguage();
 		
 		if ( isset( $info['restrict_post'] ) )
 		{
-			if ( $info['restrict_post'] instanceof DateTime )
+			if ( $info['restrict_post'] instanceof \IPS\DateTime )
 			{
 				$info['restrict_post'] = $info['restrict_post']->getTimestamp();
 			}
@@ -2899,7 +3100,7 @@ class Core extends Library
 		
 		if ( isset( $info['last_visit'] ) )
 		{
-			if ( $info['last_visit'] instanceof DateTime )
+			if ( $info['last_visit'] instanceof \IPS\DateTime )
 			{
 				$info['last_visit'] = $info['last_visit']->getTimestamp();
 			}
@@ -2911,7 +3112,7 @@ class Core extends Library
 		
 		if ( isset( $info['last_activity'] ) )
 		{
-			if ( $info['last_activity'] instanceof DateTime )
+			if ( $info['last_activity'] instanceof \IPS\DateTime )
 			{
 				$info['last_activity'] = $info['last_activity']->getTimestamp();
 			}
@@ -2923,7 +3124,7 @@ class Core extends Library
 		
 		if ( isset( $info['mod_posts'] ) )
 		{
-			if ( $info['mod_posts'] instanceof DateTime )
+			if ( $info['mod_posts'] instanceof \IPS\DateTime )
 			{
 				$info['mod_posts'] = $info['mod_posts']->getTimestamp();
 			}
@@ -2938,25 +3139,25 @@ class Core extends Library
 			$autoTrack = array( 'content' => 0, 'comments' => 0, 'method' => 'none' );
 			
 			/* Is it JSON or an array? */
-			if ( !is_array( $info['auto_track'] ) AND $autoTrackJson = @json_decode( $info['auto_track'], TRUE ) )
+			if ( !\is_array( $info['auto_track'] ) AND $autoTrackJson = @json_decode( $info['auto_track'], TRUE ) )
 			{
 				$info['auto_track'] = $autoTrackJson;
 			}
 			
-			if ( is_array( $info['auto_track'] ) )
+			if ( \is_array( $info['auto_track'] ) )
 			{
 				/* Make sure everything is valid */
 				if ( isset( $info['auto_track']['content'] ) )
 				{
-					$autoTrack['content'] = intval( $info['auto_track']['content'] );
+					$autoTrack['content'] = \intval( $info['auto_track']['content'] );
 				}
 				
 				if ( isset( $info['auto_track']['comments'] ) )
 				{
-					$autoTrack['comments'] = intval( $info['auto_track']['comments'] );
+					$autoTrack['comments'] = \intval( $info['auto_track']['comments'] );
 				}
 				
-				if ( isset( $info['auto_track']['method'] ) AND in_array( $info['auto_track']['method'], array( 'immediate', 'daily', 'weekly' ) ) )
+				if ( isset( $info['auto_track']['method'] ) AND \in_array( $info['auto_track']['method'], array( 'immediate', 'daily', 'weekly' ) ) )
 				{
 					$autoTrack['method'] = $info['auto_track']['method'];
 				}
@@ -2973,7 +3174,7 @@ class Core extends Library
 		
 		if ( isset( $info['temp_ban'] ) )
 		{
-			if ( $info['temp_ban'] instanceof DateTime )
+			if ( $info['temp_ban'] instanceof \IPS\DateTime )
 			{
 				$info['temp_ban'] = $info['temp_ban']->getTimestamp();
 			}
@@ -2987,18 +3188,18 @@ class Core extends Library
 		{
 			$newGroups = array();
 			/* Just one? */
-			if ( is_numeric( $info['mgroup_others'] ) )
+			if ( \is_numeric( $info['mgroup_others'] ) )
 			{
 				try
 				{
 					$newGroups[] = $this->software->app->getLink( $info['mgroup_others'], 'core_groups' );
 				}
-				catch( OutOfRangeException $e ) {}
+				catch( \OutOfRangeException $e ) {}
 			}
 			/* An array? */
-			else if ( is_array( $info['mgroup_others'] ) )
+			else if ( \is_array( $info['mgroup_others'] ) )
 			{
-				if ( count( $info['mgroup_others'] ) )
+				if ( \count( $info['mgroup_others'] ) )
 				{
 					foreach( $info['mgroup_others'] AS $group )
 					{
@@ -3006,7 +3207,7 @@ class Core extends Library
 						{
 							$newGroups[] = $this->software->app->getLink( $group, 'core_groups' );
 						}
-						catch( OutOfRangeException $e ) {}
+						catch( \OutOfRangeException $e ) {}
 					}
 				}
 			}
@@ -3014,7 +3215,7 @@ class Core extends Library
 			else if ( mb_strstr( $info['mgroup_others'], ',' ) )
 			{
 				$groups = explode( ',', $info['mgroup_others'] );
-				if ( count( $groups ) )
+				if ( \count( $groups ) )
 				{
 					foreach( $groups AS $group )
 					{
@@ -3022,12 +3223,12 @@ class Core extends Library
 						{
 							$newGroups[] = $this->software->app->getLink( $group, 'core_groups' );
 						}
-						catch( OutOfRangeException $e ) {}
+						catch( \OutOfRangeException $e ) {}
 					}
 				}
 			}
 			
-			if ( count( $newGroups ) )
+			if ( \count( $newGroups ) )
 			{
 				$info['mgroup_others'] = implode( ',', $newGroups );
 			}
@@ -3042,7 +3243,7 @@ class Core extends Library
 		}
 		
 		/* Some generic stuff for uniformity */
-		$info['members_seo_name']			= Url::seoTitle( $info['name'] );
+		$info['members_seo_name']			= \IPS\Http\Url::seoTitle( $info['name'] );
 		$info['members_cache']				= NULL;
 		unset( $info['failed_logins'] ); // no longer used
 		$info['failed_login_count']			= 0;
@@ -3063,11 +3264,11 @@ class Core extends Library
 		}
 
 		$bitoptions = 0;
-		if ( isset( $info['members_bitoptions'] ) AND is_array( $info['members_bitoptions'] ) )
+		if ( isset( $info['members_bitoptions'] ) AND \is_array( $info['members_bitoptions'] ) )
 		{
-			foreach( Member::$bitOptions['members_bitoptions']['members_bitoptions'] AS $key => $value )
+			foreach( \IPS\Member::$bitOptions['members_bitoptions']['members_bitoptions'] AS $key => $value )
 			{
-				if ( isset( $info['members_bitoptions'][$key] ) AND $info['members_bitoptions'][$key] )
+				if ( isset( $info['members_bitoptions'][$key] ) AND $info['members_bitoptions'][$key] == TRUE )
 				{
 					$bitoptions += $value;
 				}
@@ -3081,11 +3282,11 @@ class Core extends Library
 		}
 
 		$bitoptions2 = 0;
-		if ( isset( $info['members_bitoptions2'] ) AND is_array( $info['members_bitoptions2'] ) )
+		if ( isset( $info['members_bitoptions2'] ) AND \is_array( $info['members_bitoptions2'] ) )
 		{
-			foreach( Member::$bitOptions['members_bitoptions']['members_bitoptions2'] AS $key => $value )
+			foreach( \IPS\Member::$bitOptions['members_bitoptions']['members_bitoptions2'] AS $key => $value )
 			{
-				if ( isset( $info['members_bitoptions2'][$key] ) AND $info['members_bitoptions2'] )
+				if ( isset( $info['members_bitoptions2'][$key] ) AND $info['members_bitoptions2'] == TRUE )
 				{
 					$bitoptions2 += $value;
 				}
@@ -3104,12 +3305,12 @@ class Core extends Library
 		
 		if ( isset( $info['pp_last_visitors'] ) )
 		{
-			if ( !is_array( $info['pp_last_visitors'] ) )
+			if ( !\is_array( $info['pp_last_visitors'] ) )
 			{
 				$info['pp_last_visitors'] = @json_decode( $info['pp_last_visitors'], TRUE );
 			}
 			
-			if ( count( $info['pp_last_visitors'] ) )
+			if ( \count( $info['pp_last_visitors'] ) )
 			{
 				$newVisitors = array();
 				$count = 0;
@@ -3119,11 +3320,11 @@ class Core extends Library
 					{
 						if ( $count > 5 )
 						{
-							throw new OutOfRangeException;
+							throw new \OutOfRangeException;
 						}
 						$newVisitorId = $this->software->app->getLink( $memberId, 'core_members' );
 						
-						if ( $date instanceof DateTime )
+						if ( $date instanceof \IPS\DateTime )
 						{
 							$date = $date->getTimestamp();
 						}
@@ -3132,13 +3333,13 @@ class Core extends Library
 						
 						$count++;
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						continue;
 					}
 				}
 				
-				if ( count( $newVisitors ) )
+				if ( \count( $newVisitors ) )
 				{
 					$info['pp_last_visitors'] = json_encode( $newVisitors );
 				}
@@ -3157,27 +3358,27 @@ class Core extends Library
 		unset( $info['pp_photo_type'], $info['pp_main_photo'], $info['pp_thumb_photo'], $info['pp_cover_photo'] );
 		
 		/* Profile Photos! */
-		if ( !is_null( $profilePhotoName ) AND ( !is_null( $profilePhotoPath ) OR !is_null( $profileFileData ) ) )
+		if ( !\is_null( $profilePhotoName ) AND ( !\is_null( $profilePhotoPath ) OR !\is_null( $profileFileData ) ) )
 		{
 			try
 			{
 				$container = 'monthly_' . date( 'Y', $info['joined'] ) . '_' . date( 'm', $info['joined'] );
-				if ( is_null( $profileFileData ) AND !is_null( $profilePhotoPath ) )
+				if ( \is_null( $profileFileData ) AND !\is_null( $profilePhotoPath ) )
 				{
-					File::$copyFiles = TRUE;
-					$photo = File::create( 'core_Profile', $profilePhotoName, NULL, $container, FALSE, rtrim( $profilePhotoPath, '/' ) . '/' . $profilePhotoName );
-					File::$copyFiles = FALSE;
+					\IPS\File::$copyFiles = TRUE;
+					$photo = \IPS\File::create( 'core_Profile', $profilePhotoName, NULL, $container, FALSE, rtrim( $profilePhotoPath, '/' ) . '/' . $profilePhotoName );
+					\IPS\File::$copyFiles = FALSE;
 				}
 				else
 				{
-					$photo = File::create( 'core_Profile', $profilePhotoName, $profileFileData, $container );
+					$photo = \IPS\File::create( 'core_Profile', $profilePhotoName, $profileFileData, $container );
 				}
 
 				$info['pp_photo_type']		= 'custom';
 				$info['pp_main_photo']		= (string) $photo;
 				$info['pp_thumb_photo']		= NULL;
 			}
-			catch( ErrorException | \Exception $e )
+			catch( \ErrorException | \Exception $e )
 			{
 				$info['pp_photo_type']	= '';
 				$info['pp_main_photo']	= NULL;
@@ -3192,20 +3393,20 @@ class Core extends Library
 		}
 		
 		/* Cover Photos! */
-		if ( !is_null( $coverPhotoName ) AND ( !is_null( $coverPhotoPath ) OR !is_null( $coverFileData ) ) )
+		if ( !\is_null( $coverPhotoName ) AND ( !\is_null( $coverPhotoPath ) OR !\is_null( $coverFileData ) ) )
 		{
 			try
 			{
-				if ( is_null( $coverFileData ) AND !is_null( $coverPhotoPath ) )
+				if ( \is_null( $coverFileData ) AND !\is_null( $coverPhotoPath ) )
 				{
 					$coverFileData = file_get_contents( rtrim( $coverPhotoPath, '/' ) .'/' . $coverPhotoName );
 				}
-				$cover						= File::create( 'core_Profile', $coverPhotoName, $coverFileData );
+				$cover						= \IPS\File::create( 'core_Profile', $coverPhotoName, $coverFileData );
 				$info['pp_cover_photo']		= (string) $cover;
 				/* Designs are different so this will never likely be correct, we'll try it if one is supplied though */
-				$info['pp_cover_offset']	= $info['pp_cover_offset'] ?? 0;
+				$info['pp_cover_offset']	= isset( $info['pp_cover_offset'] ) ? $info['pp_cover_offset'] : 0;
 			}
-			catch( ErrorException | \Exception $e )
+			catch( \ErrorException | \Exception $e )
 			{
 				$info['pp_cover_photo']		= '';
 				$info['pp_cover_offset']	= 0;
@@ -3235,7 +3436,7 @@ class Core extends Library
 		if ( isset( $info['pconversation_filters'] ) )
 		{
 			/* We don't really need to do much here - just if it's an array, encode it */
-			if ( is_array( $info['pconversation_filters'] ) )
+			if ( \is_array( $info['pconversation_filters'] ) )
 			{
 				$info['pconversation_filters'] = json_encode( $info['pconversation_filters'] );
 			}
@@ -3248,7 +3449,7 @@ class Core extends Library
 		/* No Longer Used */
 		$info['pp_customization'] = NULL;
 
-		if ( isset( $info['timezone'] ) AND $info['timezone'] instanceof DateTimeZone )
+		if ( isset( $info['timezone'] ) AND $info['timezone'] instanceof \DateTimeZone )
 		{
 			$info['timezone'] = $info['timezone']->getName();
 		}
@@ -3259,7 +3460,7 @@ class Core extends Library
 		
 		if ( isset( $info['allow_admin_mails'] ) )
 		{
-			$info['allow_admin_mails'] = (bool) $info['allow_admin_mails'];
+			$info['allow_admin_mails'] = (boolean) $info['allow_admin_mails'];
 		}
 		else
 		{
@@ -3272,7 +3473,7 @@ class Core extends Library
 		}
 		
 		$info['marked_site_read']	= time();
-		$info['acp_language']		= Lang::defaultLanguage();
+		$info['acp_language']		= \IPS\Lang::defaultLanguage();
 		
 		if ( !isset( $info['member_posts'] ) )
 		{
@@ -3286,7 +3487,7 @@ class Core extends Library
 		
 		if ( isset( $info['member_last_post'] ) )
 		{
-			if ( $info['member_last_post'] instanceof DateTime )
+			if ( $info['member_last_post'] instanceof \IPS\DateTime )
 			{
 				$info['member_last_post'] = $info['member_last_post']->getTimestamp();
 			}
@@ -3303,7 +3504,7 @@ class Core extends Library
 			/* Load, since there's an ID, cache. */
 			if( static::$_loginMethods === NULL )
 			{
-				static::$_loginMethods = iterator_to_array( Db::i()->select( '*', 'core_login_methods' )->setKeyField('login_classname') );
+				static::$_loginMethods = iterator_to_array( \IPS\Db::i()->select( '*', 'core_login_methods' )->setKeyField('login_classname') );
 			}
 		}
 
@@ -3315,19 +3516,19 @@ class Core extends Library
 
 		$info['completed']		= TRUE;
 		$info['member_streams'] = NULL;
-
+		$info['create_menu']	= NULL;
 		$id						= $info['member_id'];
 		unset( $info['member_id'] );
 		
 		/* Whew, finally */
-		$inserted_id = Db::i()->insert( 'core_members', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_members', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_members' );
-		Db::i()->replace( 'core_pfields_content', $this->_formatMemberProfileFieldContent( $inserted_id, $profileFields ), TRUE );
+		\IPS\Db::i()->replace( 'core_pfields_content', $this->_formatMemberProfileFieldContent( $inserted_id, $profileFields ), TRUE );
 
 		/* Social Logins */
 		if ( isset( $fbUid ) and isset( $fbToken ) and $fbUid and isset( static::$_loginMethods['IPS\\Login\\Handler\\OAuth2\\Facebook'] ) )
 		{
-			Db::i()->insert( 'core_login_links', array(
+			\IPS\Db::i()->insert( 'core_login_links', array(
 				'token_login_method'	=> static::$_loginMethods['IPS\\Login\\Handler\\OAuth2\\Facebook']['login_id'],
 				'token_member'			=> $inserted_id,
 				'token_identifier'		=> $fbUid,
@@ -3343,24 +3544,24 @@ class Core extends Library
 	 * Convert member history
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted member history record, or FALSE on failure
+	 * @return	boolean|integer	The ID of the newly inserted member history record, or FALSE on failure
 	 */
-	public function convertMemberHistory( array $info=array() ) : bool|int
+	public function convertMemberHistory( $info=array() )
 	{
 		if ( !isset( $info['log_id'] ) )
 		{
-			$this->software->app->log( 'member_history_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'member_history_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		/* We don't validate this right now, because we expect the valid types to grow over time */
 		if ( !isset( $info['log_type'] ) )
 		{
-			$this->software->app->log( 'member_history_missing_type', __METHOD__, App::LOG_WARNING, $info['log_id'] );
+			$this->software->app->log( 'member_history_missing_type', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['log_id'] );
 			return FALSE;
 		}
 
-		if ( !is_array( $info['log_data'] ) )
+		if ( !\is_array( $info['log_data'] ) )
 		{
 			$info['log_data'] = json_decode( $info['log_data'], TRUE );
 		}
@@ -3384,7 +3585,7 @@ class Core extends Library
 					break;
 				case 'secondary':
 					$groups = array();
-					$groupData = is_array( $info['log_data']['old'] ) ? $info['log_data']['old'] : explode( ',', $info['log_data']['old'] );
+					$groupData = \is_array( $info['log_data']['old'] ) ? $info['log_data']['old'] : explode( ',', $info['log_data']['old'] );
 					foreach ( $groupData as $groupId )
 					{
 						try
@@ -3396,7 +3597,7 @@ class Core extends Library
 
 					$info['log_data']['old'] = implode( ',', array_unique( $groups ) );
 					$groups = array();
-					$newGroupData = is_array( $info['log_data']['new'] ) ? $info['log_data']['new'] : explode( ',', $info['log_data']['new'] );
+					$newGroupData = \is_array( $info['log_data']['new'] ) ? $info['log_data']['new'] : explode( ',', $info['log_data']['new'] );
 					foreach ( $newGroupData as $groupId )
 					{
 						try
@@ -3416,7 +3617,7 @@ class Core extends Library
 		
 		if ( !isset( $info['log_member'] ) )
 		{
-			$this->software->app->log( 'member_history_missing_member', __METHOD__, App::LOG_WARNING, $info['log_id'] );
+			$this->software->app->log( 'member_history_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['log_id'] );
 			return FALSE;
 		}
 		else
@@ -3425,9 +3626,9 @@ class Core extends Library
 			{
 				$info['log_member'] = $this->software->app->getLink( $info['log_member'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'member_history_missing_member', __METHOD__, App::LOG_WARNING, $info['log_id'] );
+				$this->software->app->log( 'member_history_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['log_id'] );
 				return FALSE;
 			}
 		}
@@ -3438,7 +3639,7 @@ class Core extends Library
 			{
 				$info['log_by'] = $this->software->app->getLink( $info['log_by'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['log_by'] = null;
 			}
@@ -3455,7 +3656,7 @@ class Core extends Library
 		
 		if ( isset( $info['log_date'] ) )
 		{
-			if ( $info['log_date'] instanceof DateTime )
+			if ( $info['log_date'] instanceof \IPS\DateTime )
 			{
 				$info['log_date'] = $info['log_date']->getTimestamp();
 			}
@@ -3472,7 +3673,7 @@ class Core extends Library
 		
 		$old_id = $info['log_id'];
 		unset( $info['log_id'] );
-		$inserted_id = Db::i()->insert( 'core_member_history', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_member_history', $info );
 		$this->software->app->addLink( $inserted_id, $old_id, 'core_member_history' );
 		return $inserted_id;
 	}
@@ -3481,15 +3682,15 @@ class Core extends Library
 	 * Convert a Warning Action
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted warning action, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted warning action, or FALSE on failure.
 	 */
-	public function convertWarnAction( array $info=array() ) : bool|int
+	public function convertWarnAction( $info=array() )
 	{
 		/* We do not really need an ID here */
 		$hasId = TRUE;
 		if ( !isset( $info['wa_id'] ) )
 		{
-			$this->software->app->log( 'wa_missing_ids', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'wa_missing_ids', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 			$hasId = FALSE;
 		}
 		
@@ -3503,7 +3704,7 @@ class Core extends Library
 			$info['wa_mq'] = 0;
 		}
 		
-		if ( !isset( $info['wa_mq_unit'] ) OR !in_array( $info['wa_mq_unit'], array( 'd', 'h' ) ) )
+		if ( !isset( $info['wa_mq_unit'] ) OR !\in_array( $info['wa_mq_unit'], array( 'd', 'h' ) ) )
 		{
 			$info['wa_mq_unit'] = 'h';
 		}
@@ -3513,7 +3714,7 @@ class Core extends Library
 			$info['wa_rpa'] = 0;
 		}
 		
-		if ( !isset( $info['wa_rpa_unit'] ) OR !in_array( $info['wa_rpa_unit'], array( 'd', 'h' ) ) )
+		if ( !isset( $info['wa_rpa_unit'] ) OR !\in_array( $info['wa_rpa_unit'], array( 'd', 'h' ) ) )
 		{
 			$info['wa_rpa_unit'] = 'h';
 		}
@@ -3523,7 +3724,7 @@ class Core extends Library
 			$info['wa_suspend'] = 0;
 		}
 		
-		if ( !isset( $info['wa_suspend_unit'] ) OR !in_array( $info['wa_rpa_unit'], array( 'd', 'h' ) ) )
+		if ( !isset( $info['wa_suspend_unit'] ) OR !\in_array( $info['wa_rpa_unit'], array( 'd', 'h' ) ) )
 		{
 			$info['wa_suspend_unit'] = 'h';
 		}
@@ -3539,7 +3740,7 @@ class Core extends Library
 			unset( $info['wa_id'] );
 		}
 		
-		$inserted_id = Db::i()->insert( 'core_members_warn_actions', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_members_warn_actions', $info );
 		
 		if ( $hasId )
 		{
@@ -3553,14 +3754,14 @@ class Core extends Library
 	 * Convert a Warning Log
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted warning log, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted warning log, or FALSE on failure.
 	 * @note Like Follows, this should be done when the actual content it's attached too is being converted.
 	 */
-	public function convertWarnLog( array $info=array() ) : bool|int
+	public function convertWarnLog( $info=array() )
 	{
 		if ( !isset( $info['wl_id'] ) )
 		{
-			$this->software->app->log( 'wl_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'wl_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -3570,15 +3771,15 @@ class Core extends Library
 			{
 				$info['wl_member'] = $this->software->app->getLink( $info['wl_member'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'wl_member_missing', __METHOD__, App::LOG_WARNING, $info['wl_id'] );
+				$this->software->app->log( 'wl_member_missing', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['wl_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'wl_member_missing', __METHOD__, App::LOG_WARNING, $info['wl_id'] );
+			$this->software->app->log( 'wl_member_missing', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['wl_id'] );
 			return FALSE;
 		}
 		
@@ -3588,7 +3789,7 @@ class Core extends Library
 			{
 				$info['wl_moderator'] = $this->software->app->getLink( $info['wl_moderator'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['wl_moderator'] = 0;
 			}
@@ -3600,7 +3801,7 @@ class Core extends Library
 		
 		if ( isset( $info['wl_date'] ) )
 		{
-			if ( $info['wl_date'] instanceof DateTime )
+			if ( $info['wl_date'] instanceof \IPS\DateTime )
 			{
 				$info['wl_date'] = $info['wl_date']->getTimestamp();
 			}
@@ -3616,7 +3817,7 @@ class Core extends Library
 			{
 				$info['wl_reason'] = $this->software->app->getLink( $info['wl_reason'], 'core_members_warn_reasons' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['wl_reason'] = 0;
 			}
@@ -3645,10 +3846,10 @@ class Core extends Library
 		{
 			if ( isset( $info[$restriction] ) )
 			{
-				if ( $info[$restriction] instanceof DateTime )
+				if ( $info[$restriction] instanceof \IPS\DateTime )
 				{
 					/* Naughty copy/paste */
-					$difference = DateTime::create()->diff( $info[$restriction] );
+					$difference = \IPS\DateTime::create()->diff( $info[$restriction] );
 					$period = 'P';
 					foreach ( array( 'y' => 'Y', 'm' => 'M', 'd' => 'D' ) as $k => $v )
 					{
@@ -3708,7 +3909,7 @@ class Core extends Library
 		
 		if ( isset( $info['wl_expire_date'] ) )
 		{
-			if ( $info['wl_expire_date'] instanceof DateTime )
+			if ( $info['wl_expire_date'] instanceof \IPS\DateTime )
 			{
 				$info['wl_expire_date'] = $info['wl_expire_date']->getTimestamp();
 			}
@@ -3725,7 +3926,7 @@ class Core extends Library
 		$id = $info['wl_id'];
 		unset( $info['wl_id'] );
 		
-		$inserted_id = Db::i()->insert( 'core_members_warn_logs', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_members_warn_logs', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_members_warn_logs' );
 		return $inserted_id;
 	}
@@ -3734,20 +3935,20 @@ class Core extends Library
 	 * Convert a Warning Reason
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted warning reason, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted warning reason, or FALSE on failure.
 	 */
-	public function convertWarnReason( array $info=array() ) : bool|int
+	public function convertWarnReason( $info=array() )
 	{
 		if ( !isset( $info['wr_id'] ) )
 		{
-			$this->software->app->log( 'wr_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'wr_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['wr_name'] ) )
 		{
 			$info['wr_name'] = "Untitled Reason {$info['wr_id']}";
-			$this->software->app->log( 'wr_missing_name', __METHOD__, App::LOG_NOTICE, $info['wr_id'] );
+			$this->software->app->log( 'wr_missing_name', __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['wr_id'] );
 		}
 		
 		if ( !isset( $info['wr_points'] ) )
@@ -3765,7 +3966,7 @@ class Core extends Library
 			$info['wr_remove'] = 0;
 		}
 		
-		if ( !isset( $info['wr_remove_unit'] ) OR !in_array( $info['wr_remove_unit'], array( 'h', 'd' ) ) )
+		if ( !isset( $info['wr_remove_unit'] ) OR !\in_array( $info['wr_remove_unit'], array( 'h', 'd' ) ) )
 		{
 			$info['wr_remove_unit'] = 'h';
 		}
@@ -3777,7 +3978,7 @@ class Core extends Library
 		
 		if ( !isset( $info['wr_order'] ) )
 		{
-			$highest = Db::i()->select( 'MAX(wr_order)', 'core_members_warn_reasons' )->first();
+			$highest = \IPS\Db::i()->select( 'MAX(wr_order)', 'core_members_warn_reasons' )->first();
 			$info['wr_order'] = $highest + 1;
 		}
 		
@@ -3787,10 +3988,10 @@ class Core extends Library
 		$name = $info['wr_name'];
 		unset( $info['wr_name'] );
 		
-		$inserted_id = Db::i()->insert( 'core_members_warn_reasons', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_members_warn_reasons', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_members_warn_reasons' );
 		
-		Lang::saveCustom( 'core', "core_warn_reason_{$inserted_id}", $name );
+		\IPS\Lang::saveCustom( 'core', "core_warn_reason_{$inserted_id}", $name );
 		
 		return $inserted_id;
 	}
@@ -3800,19 +4001,19 @@ class Core extends Library
 	 *
 	 * @param	array	$topic	The Message Topic Data to insert
 	 * @param	array	$maps	The User Map Data to insert. Example: array( memberId => array( data ) )
-	 * @return	bool|int	The ID of the newly inserted Message Topic, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted Message Topic, or FALSE on failure.
 	 */
-	public function convertPrivateMessage( array $topic=array(), array $maps=array() ) : bool|int
+	public function convertPrivateMessage( $topic=array(), $maps=array() )
 	{
 		if ( !isset( $topic['mt_id'] ) )
 		{
-			$this->software->app->log( 'private_message_topic_ids_missing', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'private_message_topic_ids_missing', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( count( $maps ) == 0 )
+		if ( \count( $maps ) == 0 )
 		{
-			$this->software->app->log( 'private_message_topic_no_users', __METHOD__, App::LOG_WARNING, $topic['mt_id'] );
+			$this->software->app->log( 'private_message_topic_no_users', __METHOD__, \IPS\convert\App::LOG_WARNING, $topic['mt_id'] );
 			return FALSE;
 		}
 
@@ -3822,21 +4023,21 @@ class Core extends Library
 			{
 				$topic['mt_starter_id'] = $this->software->app->getLink( $topic['mt_starter_id'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'private_message_topic_starter_missing', __METHOD__, App::LOG_WARNING, $topic['mt_id'] );
+				$this->software->app->log( 'private_message_topic_starter_missing', __METHOD__, \IPS\convert\App::LOG_WARNING, $topic['mt_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'private_message_topic_starter_missing', __METHOD__, App::LOG_WARNING, $topic['mt_id'] );
+			$this->software->app->log( 'private_message_topic_starter_missing', __METHOD__, \IPS\convert\App::LOG_WARNING, $topic['mt_id'] );
 			return FALSE;
 		}
 		
 		if ( isset( $topic['mt_date'] ) )
 		{
-			if ( $topic['mt_date'] instanceof DateTime )
+			if ( $topic['mt_date'] instanceof \IPS\DateTime )
 			{
 				$topic['mt_date'] = $topic['mt_date']->getTimestamp();
 			}
@@ -3850,21 +4051,23 @@ class Core extends Library
 		if ( !isset( $topic['mt_title'] ) )
 		{
 			$topic['mt_title'] = "Untitled Conversation {$topic['mt_id']}";
-			$this->software->app->log( 'private_message_topic_title_missing', __METHOD__, App::LOG_NOTICE, $topic['mt_id'] );
+			$this->software->app->log( 'private_message_topic_title_missing', __METHOD__, \IPS\convert\App::LOG_NOTICE, $topic['mt_id'] );
 		}
 		elseif( mb_strlen( $topic['mt_title'] ) > 255 )
 		{
 			$topic['mt_title'] = mb_substr( $topic['mt_title'], 0, 255 );
-			$this->software->app->log( 'private_message_topic_title_truncated', __METHOD__, App::LOG_NOTICE, $topic['mt_id'] );
+			$this->software->app->log( 'private_message_topic_title_truncated', __METHOD__, \IPS\convert\App::LOG_NOTICE, $topic['mt_id'] );
 		}
 		
 		/* No Longer Used */
+		$topic['mt_hasattach']		= 0;
 		$topic['mt_to_member_id']	= 0;
+		$topic['mt_is_draft']		= 0;
 		$topic['mt_is_system']		= 0;
 		
 		if ( isset( $topic['mt_start_time'] ) )
 		{
-			if ( $topic['mt_start_time'] instanceof DateTime )
+			if ( $topic['mt_start_time'] instanceof \IPS\DateTime )
 			{
 				$topic['mt_start_time'] = $topic['mt_start_time']->getTimestamp();
 			}
@@ -3877,7 +4080,7 @@ class Core extends Library
 		
 		if ( isset( $topic['mt_last_post_time'] ) )
 		{
-			if ( $topic['mt_last_post_time'] instanceof DateTime )
+			if ( $topic['mt_last_post_time'] instanceof \IPS\DateTime )
 			{
 				$topic['mt_last_post_time'] = $topic['mt_last_post_time']->getTimestamp();
 			}
@@ -3889,7 +4092,7 @@ class Core extends Library
 		
 		if ( !isset( $topic['mt_to_count'] ) )
 		{
-			$topic['mt_to_count'] = count( $maps );
+			$topic['mt_to_count'] = \count( $maps );
 		}
 		
 		if ( !isset( $topic['mt_replies'] ) )
@@ -3900,7 +4103,7 @@ class Core extends Library
 		$topicId = $topic['mt_id'];
 		unset( $topic['mt_id'] );
 		
-		$topicInsertedId = Db::i()->insert( 'core_message_topics', $topic );
+		$topicInsertedId = \IPS\Db::i()->insert( 'core_message_topics', $topic );
 		$this->software->app->addLink( $topicInsertedId, $topicId, 'core_message_topics' );
 				
 		/* Whew... let's do our maps now */
@@ -3921,29 +4124,29 @@ class Core extends Library
 				{
 					$map['map_user_id'] = $this->software->app->getLink( $map['map_user_id'], 'core_members' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
-					$this->software->app->log( 'private_message_map_missing_user', __METHOD__, App::LOG_WARNING, $topicId );
+					$this->software->app->log( 'private_message_map_missing_user', __METHOD__, \IPS\convert\App::LOG_WARNING, $topicId );
 					continue;
 				}
 			}
 			else
 			{
-				$this->software->app->log( 'private_message_map_missing_user', __METHOD__, App::LOG_WARNING, $topicId );
+				$this->software->app->log( 'private_message_map_missing_user', __METHOD__, \IPS\convert\App::LOG_WARNING, $topicId );
 				continue;
 			}
 			
 			/* We already know this */
 			$map['map_topic_id'] = $topicInsertedId;
 			
-			if ( !isset( $map['map_folder_id'] ) OR empty( $map['map_folder_id'] ) )
+			if ( !isset( $map['map_folder_id'] ) OR ( isset( $map['map_folder_id'] ) AND empty( $map['map_folder_id'] ) ) )
 			{
 				$map['map_folder_id'] = 'myconvo';
 			}
 			
 			if ( isset( $map['map_read_time'] ) )
 			{
-				if ( $map['map_read_time'] instanceof DateTime )
+				if ( $map['map_read_time'] instanceof \IPS\DateTime )
 				{
 					$map['map_read_time'] = $map['map_read_time']->getTimestamp();
 				}
@@ -3993,7 +4196,7 @@ class Core extends Library
 			
 			if ( isset( $map['map_left_time'] ) )
 			{
-				if ( $map['map_left_time'] instanceof DateTime )
+				if ( $map['map_left_time'] instanceof \IPS\DateTime )
 				{
 					$map['map_left_time'] = $map['map_left_time']->getTimestamp();
 				}
@@ -4010,7 +4213,7 @@ class Core extends Library
 			
 			if ( isset( $map['map_last_topic_reply'] ) )
 			{
-				if ( $map['map_last_topic_reply'] instanceof DateTime )
+				if ( $map['map_last_topic_reply'] instanceof \IPS\DateTime )
 				{
 					$map['map_last_topic_reply'] = $map['map_last_topic_reply']->getTimestamp();
 				}
@@ -4029,13 +4232,13 @@ class Core extends Library
 			try
 			{
 				/* Does a map for this user already exist? */
-				$existing		= Db::i()->select( '*', 'core_message_topic_user_map', array( "map_topic_id=? AND map_user_id=?", $map['map_topic_id'], $map['map_user_id'] ) )->first();
+				$existing		= \IPS\Db::i()->select( '*', 'core_message_topic_user_map', array( "map_topic_id=? AND map_user_id=?", $map['map_topic_id'], $map['map_user_id'] ) )->first();
 				$mapInsertedId	= $existing['map_id'];
 				$mapsInserted[]	= $existing['map_id'];
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
-				$mapInsertedId	= Db::i()->insert( 'core_message_topic_user_map', $map );
+				$mapInsertedId	= \IPS\Db::i()->insert( 'core_message_topic_user_map', $map );
 				$mapsInserted[]	= $mapInsertedId;
 			}
 			
@@ -4046,13 +4249,13 @@ class Core extends Library
 		}
 		
 		/* Did we actually add any maps? */
-		if ( count( $mapsInserted ) == 0 )
+		if ( \count( $mapsInserted ) == 0 )
 		{
 			/* Nope... clean up, log, and return */
-			Db::i()->delete( 'core_message_topics', array( "mt_id=?", $topicInsertedId ) );
-			Db::i()->delete( 'core_message_posts', array( "msg_topic_id=?", $topicInsertedId ) );
-			Db::i()->delete( 'convert_link_pms', array( "ipb_id=? AND type=? AND app=?", $topicInsertedId, 'core_message_topics', $this->software->app->app_id ) );
-			$this->software->app->log( 'private_message_topic_missing_maps', __METHOD__, App::LOG_WARNING, $topicId );
+			\IPS\Db::i()->delete( 'core_message_topics', array( "mt_id=?", $topicInsertedId ) );
+			\IPS\Db::i()->delete( 'core_message_posts', array( "msg_topic_id=?", $topicInsertedId ) );
+			\IPS\Db::i()->delete( 'convert_link_pms', array( "ipb_id=? AND type=? AND app=?", $topicInsertedId, 'core_message_topics', $this->software->app->app_id ) );
+			$this->software->app->log( 'private_message_topic_missing_maps', __METHOD__, \IPS\convert\App::LOG_WARNING, $topicId );
 			return FALSE;
 		}
 		
@@ -4066,23 +4269,23 @@ class Core extends Library
 	 * @param	array	$info	Data to insert
 	 * @return	bool|int		The ID of the newly inserted reply, or FALSE on failure.
 	 */
-	public function convertPrivateMessageReply( array $info=array() ) : bool|int
+	public function convertPrivateMessageReply( $info=array() )
 	{
 		if ( !isset( $info['msg_id'] ) )
 		{
-			$this->software->app->log( 'private_message_reply_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'private_message_reply_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['msg_topic_id'] ) )
 		{
-			$this->software->app->log( 'private_message_reply_missing_topic', __METHOD__, App::LOG_WARNING, $info['msg_id'] );
+			$this->software->app->log( 'private_message_reply_missing_topic', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['msg_id'] );
 			return FALSE;
 		}
 		
 		if ( empty( $info['msg_post'] ) )
 		{
-			$this->software->app->log( 'private_message_reply_no_content', __METHOD__, App::LOG_WARNING, $info['msg_id'] );
+			$this->software->app->log( 'private_message_reply_no_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['msg_id'] );
 			return FALSE;
 		}
 		
@@ -4090,9 +4293,9 @@ class Core extends Library
 		{
 			$info['msg_topic_id'] = $this->software->app->getLink( $info['msg_topic_id'], 'core_message_topics' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'private_message_reply_orphaned', __METHOD__, App::LOG_WARNING, $info['msg_id'] );
+			$this->software->app->log( 'private_message_reply_orphaned', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['msg_id'] );
 			return FALSE;
 		}
 		
@@ -4100,14 +4303,14 @@ class Core extends Library
 		{
 			$info['msg_author_id'] = $this->software->app->getLink( $info['msg_author_id'], 'core_members' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			$info['msg_author_id'] = 0;
 		}
 		
 		if ( isset( $info['msg_date'] ) )
 		{
-			if ( $info['msg_date'] instanceof DateTime )
+			if ( $info['msg_date'] instanceof \IPS\DateTime )
 			{
 				$info['msg_date'] = $info['msg_date']->getTimestamp();
 			}
@@ -4132,7 +4335,7 @@ class Core extends Library
 		$id = $info['msg_id'];
 		unset( $info['msg_id'] );
 		
-		$inserted_id = Db::i()->insert( 'core_message_posts', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_message_posts', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_message_posts' );
 		
 		return $inserted_id;
@@ -4142,19 +4345,19 @@ class Core extends Library
 	 * Convert a Moderator
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool			TRUE on success, or FALSE on failure.
+	 * @return	boolean			TRUE on success, or FALSE on failure.
 	 */
-	public function convertModerator( array $info=array() ) : bool
+	public function convertModerator( $info=array() )
 	{
-		if ( !isset( $info['type'] ) OR !in_array( $info['type'], array( 'g', 'm' ) ) )
+		if ( !isset( $info['type'] ) OR !\in_array( $info['type'], array( 'g', 'm' ) ) )
 		{
-			$this->software->app->log( 'moderator_type_invalid', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'moderator_type_invalid', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['id'] ) )
 		{
-			$this->software->app->log( 'moderator_type_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'moderator_type_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -4162,7 +4365,7 @@ class Core extends Library
 		{
 			$info['perms'] = '*';
 		}
-		else if ( $info['perms'] !== '*' AND is_array( $info['perms'] ) )
+		else if ( $info['perms'] !== '*' AND \is_array( $info['perms'] ) )
 		{
 			$info['perms'] = json_encode( $info['perms'] );
 		}
@@ -4180,22 +4383,22 @@ class Core extends Library
 					break;
 			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'moderator_missing', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'moderator_missing', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
 
 		try
 		{
-			Db::i()->insert( 'core_moderators', $info );
+			\IPS\Db::i()->insert( 'core_moderators', $info );
 		}
-		catch( Exception $e )
+		catch( \IPS\Db\Exception $e )
 		{
 			/* duplicate entry */
 			if( $e->getCode() == 1062 )
 			{
-				$this->software->app->log( 'moderator_data_duplicate', __METHOD__, App::LOG_WARNING );
+				$this->software->app->log( 'moderator_data_duplicate', __METHOD__, \IPS\convert\App::LOG_WARNING );
 				return FALSE;
 			}
 			else
@@ -4211,36 +4414,36 @@ class Core extends Library
 	 * Convert Permissions
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted permission row, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted permission row, or FALSE on failure.
 	 * @note	These should be converted when the relevant node is converted.
 	 */
-	public function convertPermission( array $info=array() ) : bool|int
+	public function convertPermission( $info=array() )
 	{
 		/* Valid app? */
 		if ( !isset( $info['app'] ) )
 		{
-			$this->software->app->log( 'permission_index_app_missing', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'permission_index_app_missing', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		try
 		{
-			$application = Application::load( $info['app'] );
+			$application = \IPS\Application::load( $info['app'] );
 			
-			if ( Application::appIsEnabled( $info['app'] ) === FALSE )
+			if ( \IPS\Application::appIsEanbled( $info['app'] ) === FALSE )
 			{
-				throw new UnexpectedValueException;
+				throw new \UnexpectedValueException;
 			}
 		}
-		catch( UnexpectedValueException $e )
+		catch( \UnexpectedValueException $e )
 		{
-			$this->software->application->log( 'permission_index_app_invalid', __METHOD__, App::LOG_WARNING );
+			$this->software->application->log( 'permission_index_app_invalid', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['perm_type'] ) )
 		{
-			$this->software->app->log( 'permission_index_missing_type', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'permission_index_missing_type', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -4257,9 +4460,9 @@ class Core extends Library
 			}
 		}
 		
-		if ( is_null( $nodeClass ) )
+		if ( \is_null( $nodeClass ) )
 		{
-			$this->software->app->log( 'permission_index_invalid_type', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'permission_index_invalid_type', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -4269,24 +4472,24 @@ class Core extends Library
 			{
 				$info['perm_type_id'] = $this->software->app->getLink( $info['perm_type_id'], $nodeClass::$databaseTable );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'permission_index_missing_type_id', __METHOD__, App::LOG_WARNING );
+				$this->software->app->log( 'permission_index_missing_type_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'permission_index_missing_type_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'permission_index_missing_type_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		/* Does this permission index already exist? */
 		try
 		{
-			$perm = Db::i()->select( '*', 'core_permission_index', array( "app=? AND perm_type=? AND perm_type_id=?", $info['app'], $info['perm_type'], $info['perm_type_id'] ) )->first();
+			$perm = \IPS\Db::i()->select( '*', 'core_permission_index', array( "app=? AND perm_type=? AND perm_type_id=?", $info['app'], $info['perm_type'], $info['perm_type_id'] ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			/* No, create a new one. This will almost always be the case. */
 			$perm = array(
@@ -4304,7 +4507,7 @@ class Core extends Library
 				'friend_only'	=> NULL,
 			);
 			
-			$permId = Db::i()->replace( 'core_permission_index', $perm );
+			$permId = \IPS\Db::i()->replace( 'core_permission_index', $perm );
 			$perm['perm_id'] = $permId;
 		}
 		
@@ -4318,21 +4521,21 @@ class Core extends Library
 			}
 			
 			/* If our current permission is NULL, but we are explicitly granting all, do that. */
-			if ( is_null( $perm["perm_{$permission}"] ) AND $info["perm_{$key}"] == '*' )
+			if ( \is_null( $perm["perm_{$permission}"] ) AND $info["perm_{$key}"] == '*' )
 			{
 				$perm["perm_{$permission}"] = '*';
 				break;
 			}
 			
 			/* If our current permission is NULL, but we are assigning groups, do that. */
-			if ( is_null( $perm["perm_{$permission}"] ) AND ( is_array( $info["perm_{$key}"] ) OR mb_strstr( $info["perm_{$key}"], ',' ) OR is_numeric( $info["perm_{$key}"] ) ) )
+			if ( \is_null( $perm["perm_{$permission}"] ) AND ( \is_array( $info["perm_{$key}"] ) OR mb_strstr( $info["perm_{$key}"], ',' ) OR \is_numeric( $info["perm_{$key}"] ) ) )
 			{
-				if ( !is_array( $info["perm_{$key}"] ) )
+				if ( !\is_array( $info["perm_{$key}"] ) )
 				{
 					$info["perm_{$key}"] = explode( ',', $info["perm_{$key}"] );
 				}
 				
-				if ( count( $info["perm_{$key}"] ) )
+				if ( \count( $info["perm_{$key}"] ) )
 				{
 					$groupsToAdd = array();
 					foreach( $info["perm_{$key}"] AS $group )
@@ -4341,7 +4544,7 @@ class Core extends Library
 						{
 							$group = $this->software->app->getLink( $group, 'core_groups' );
 						}
-						catch( OutOfRangeException $e )
+						catch( \OutOfRangeException $e )
 						{
 							continue;
 						}
@@ -4355,18 +4558,18 @@ class Core extends Library
 			}
 			
 			/* If our current permission has specific groups, and we are passing more groups, merge them */
-			if ( mb_strstr( $perm["perm_{$permission}"], ',' ) OR is_numeric( $perm["perm_{$permission}"] ) )
+			if ( mb_strstr( $perm["perm_{$permission}"], ',' ) OR \is_numeric( $perm["perm_{$permission}"] ) )
 			{
 				$currentGroups = explode( ',', $perm["perm_{$permission}"] );
-				if ( count( $currentGroups ) )
+				if ( \count( $currentGroups ) )
 				{
 					$groupsToAdd = array();
-					if ( !is_array( $info["perm_{$key}"] ) )
+					if ( !\is_array( $info["perm_{$key}"] ) )
 					{
 						$info["perm_{$key}"] = explode( ',', $info["perm_{$key}"] );
 					}
 					
-					if ( count( $info["perm_{$key}"] ) )
+					if ( \count( $info["perm_{$key}"] ) )
 					{
 						foreach( $info["perm_{$key}"] AS $group )
 						{
@@ -4374,12 +4577,12 @@ class Core extends Library
 							{
 								$group = $this->software->app->getLink( $group, 'core_groups' );
 							}
-							catch( OutOfRangeException $e )
+							catch( \OutOfRangeException $e )
 							{
 								continue;
 							}
 							
-							if ( !in_array( $group, $currentGroups ) )
+							if ( !\in_array( $currentGroups ) )
 							{
 								$groupsToAdd[] = $group;
 							}
@@ -4393,11 +4596,11 @@ class Core extends Library
 			
 			/* Still here? Something went wrong... log a notice and assign NULL */
 			$perm["perm_{$permission}"] = NULL;
-			$this->software->app->log( 'permission_index_null', __METHOD__, App::LOG_NOTICE, $info['perm_type_id'] );
+			$this->software->app->log( 'permission_index_null', __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['perm_type_id'] );
 		}
 		
 		/* Update the database */
-		Db::i()->update( 'core_permission_index', $perm, array( "perm_id=?", $perm['perm_id'] ) );
+		\IPS\Db::i()->update( 'core_permission_index', $perm, array( "perm_id=?", $perm['perm_id'] ) );
 		return $perm['perm_id'];
 	}
 	
@@ -4405,18 +4608,18 @@ class Core extends Library
 	 * Convert a Profile Field Group
 	 *
 	 * @param	array			$info		Data to insert
-	 * @param	int|NULL	$mergeWith	The group we are merging with, or NULL to not merge.
-	 * @return	bool|int	The ID of the newly inserted profile field group, or FALSE on failure
+	 * @param	integer|NULL	$mergeWith	The group we are merging with, or NULL to not merge.
+	 * @return	boolean|integer	The ID of the newly inserted profile field group, or FALSE on failure
 	 */
-	public function convertProfileFieldGroup( array $info=array(), ?int $mergeWith=NULL ) : bool|int
+	public function convertProfileFieldGroup( $info=array(), $mergeWith=NULL )
 	{
 		if ( !isset( $info['pf_group_id'] ) )
 		{
-			$this->software->app->log( 'profile_field_group_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'profile_field_group_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( !is_null( $mergeWith ) )
+		if ( !\is_null( $mergeWith ) )
 		{
 			$this->software->app->addLink( $mergeWith, $info['pf_group_id'], 'core_pfieldgroups', TRUE );
 			return $mergeWith;
@@ -4425,7 +4628,7 @@ class Core extends Library
 		if ( !isset( $info['pf_group_name'] ) )
 		{
 			$name = "Converted {$info['pf_group_id']}";
-			$this->software->app->log( 'profile_field_group_missing_name', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'profile_field_group_missing_name', __METHOD__, \IPS\convert\App::LOG_WARNING );
 		}
 		else
 		{
@@ -4435,17 +4638,17 @@ class Core extends Library
 		
 		if ( !isset( $info['pf_group_order'] ) )
 		{
-			$position = Db::i()->select( 'MAX(pf_group_order)', 'core_pfields_groups' )->first();
+			$position = \IPS\Db::i()->select( 'MAX(pf_group_order)', 'core_pfields_groups' )->first();
 			$info['pf_group_order'] = $position + 1;
 		}
 		
 		$id = $info['pf_group_id'];
 		unset( $info['pf_group_id'] );
 		
-		$inserted_id = Db::i()->insert( 'core_pfields_groups', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_pfields_groups', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_pfields_groups' );
 		
-		Lang::saveCustom( 'core', "core_pfieldgroups_{$inserted_id}", $name );
+		\IPS\Lang::saveCustom( 'core', "core_pfieldgroups_{$inserted_id}", $name );
 		
 		return $inserted_id;
 	}
@@ -4454,30 +4657,30 @@ class Core extends Library
 	 * Convert a Profile Field
 	 *
 	 * @param	array			$info		Data to insert
-	 * @param	int|NULL	$mergeWith	THe ID of an existing profile field to merge this one with, or NULL to create new.
-	 * @return	bool|int	The ID of the newly inserted profile field, or FALSE on failure.
+	 * @param	integer|NULL	$mergeWith	THe ID of an existing profile field to merge this one with, or NULL to create new.
+	 * @return	boolean|integer	The ID of the newly inserted profile field, or FALSE on failure.
 	 * @note Profile Field Content for individual members needs to be done during the members step, not here.
 	 */
-	public function convertProfileField( array $info=array(), ?int $mergeWith=NULL ) : bool|int
+	public function convertProfileField( $info=array(), $mergeWith=NULL )
 	{
 		/* Get valid fields while taking hooks into account */
-		$validFields = array_merge( static::$fieldTypes, Field::$additionalFieldTypes );
+		$validFields = array_merge( static::$fieldTypes, \IPS\core\ProfileFields\Field::$additionalFieldTypes );
 		
 		if ( !isset( $info['pf_id'] ) )
 		{
-			$this->software->app->log( 'profile_field_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'profile_field_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( !is_null( $mergeWith ) )
+		if ( !\is_null( $mergeWith ) )
 		{
 			$this->software->app->addLink( $mergeWith, $info['pf_id'], 'core_pfields_data', TRUE );
 			return $mergeWith;
 		}
 		
-		if ( !isset( $info['pf_type'] ) OR !in_array( $info['pf_type'], $validFields ) )
+		if ( !isset( $info['pf_type'] ) OR !\in_array( $info['pf_type'], $validFields ) )
 		{
-			$this->software->app->log( 'profile_field_invalid_type', __METHOD__, App::LOG_WARNING, $info['pf_id'] );
+			$this->software->app->log( 'profile_field_invalid_type', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['pf_id'] );
 			return FALSE;
 		}
 		
@@ -4503,7 +4706,7 @@ class Core extends Library
 		
 		if ( isset( $info['pf_content'] ) )
 		{
-			if ( is_array( $info['pf_content'] ) )
+			if ( \is_array( $info['pf_content'] ) )
 			{
 				$info['pf_content'] = json_encode( $info['pf_content'] );
 			}
@@ -4540,7 +4743,7 @@ class Core extends Library
 		
 		if ( !isset( $info['pf_position'] ) )
 		{
-			$position = Db::i()->select( 'MAX(pf_position)', 'core_pfields_data' )->first();
+			$position = \IPS\Db::i()->select( 'MAX(pf_position)', 'core_pfields_data' )->first();
 			$info['pf_position'] = $position + 1;
 		}
 		
@@ -4579,16 +4782,16 @@ class Core extends Library
 			/* Make sure it exists */
 			try
 			{
-				Db::i()->select( 'pf_group_id', 'core_pfields_groups', array( 'pf_group_id=?', $info['pf_group_id'] ) )->first();
+				\IPS\Db::i()->select( 'pf_group_id', 'core_pfields_groups', array( 'pf_group_id=?', $info['pf_group_id'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				/* Delete the relation if it no longer exists */
 				$this->software->app->deleteLink( '__orphaned__', 'core_pfields_groups' );
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			/* Create an orphan group */
 			$info['pf_group_id'] = $this->convertProfileFieldGroup( array(
@@ -4615,26 +4818,26 @@ class Core extends Library
 		$id = $info['pf_id'];
 		unset( $info['pf_id'] );
 		
-		$inserted_id = Db::i()->insert( 'core_pfields_data', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_pfields_data', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_pfields_data' );
 		
-		Lang::saveCustom( 'core', "core_pfield_{$inserted_id}", $name );
-		Lang::saveCustom( 'core', "core_pfield_{$inserted_id}_desc", $desc );
+		\IPS\Lang::saveCustom( 'core', "core_pfield_{$inserted_id}", $name );
+		\IPS\Lang::saveCustom( 'core', "core_pfield_{$inserted_id}_desc", $desc );
 		
 		/* Now... create our column */
 		$columnDefinition = array( 'name' => "field_{$inserted_id}", 'type' => 'TEXT' );
 
-		Db::i()->addColumn( 'core_pfields_content', $columnDefinition );
+		\IPS\Db::i()->addColumn( 'core_pfields_content', $columnDefinition );
 		
 		if ( $info['pf_type'] != 'Upload' )
 		{
-			if ( in_array( $columnDefinition['type'], [ 'TEXT', 'MEDIUMTEXT' ] ) )
+			if ( \in_array( $columnDefinition['type'], [ 'TEXT', 'MEDIUMTEXT' ] ) )
 			{
-				Db::i()->addIndex( 'core_pfields_content', array( 'type' => 'fulltext', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
+				\IPS\Db::i()->addIndex( 'core_pfields_content', array( 'type' => 'fulltext', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
 			}
 			else
 			{
-				Db::i()->addIndex( 'core_pfields_content', array( 'type' => 'key', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
+				\IPS\Db::i()->addIndex( 'core_pfields_content', array( 'type' => 'key', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
 			}
 		}
 		
@@ -4644,25 +4847,27 @@ class Core extends Library
 	/**
 	 * @brief	All local custom fields
 	 */
-	protected ?array $cachedFields	= NULL;
+	protected $cachedFields	= NULL;
 
 	/**
 	 * Get profile fields using cache
 	 *
 	 * @param	int	$fieldId	Custom field id (local)
 	 * @return	array
-	 * @throws	UnderflowException
+	 * @throws	\UnderflowException
 	 */
-	protected function _getField( int $fieldId ) : array
+	protected function _getField( $fieldId )
 	{
 		if( $this->cachedFields === NULL )
 		{
-			$this->cachedFields = iterator_to_array( Db::i()->select( '*', 'core_pfields_data' )->setKeyField('pf_id') );
+			$fields = iterator_to_array( \IPS\Db::i()->select( '*', 'core_pfields_data' )->setKeyField('pf_id') );
+
+			$this->cachedFields = ( \is_array( $fields ) ) ? $fields : array();
 		}
 
 		if( !isset( $this->cachedFields[ $fieldId ] ) )
 		{
-			throw new UnderflowException;
+			throw new \UnderflowException;
 		}
 
 		return $this->cachedFields[ $fieldId ];
@@ -4671,7 +4876,7 @@ class Core extends Library
 	/**
 	 * @brief   Store of field IDs to skip formatting
 	 */
-	protected array $_skipFields = [];
+	protected $_skipFields = [];
 
 	/**
 	 * Format Member Profile Field Content
@@ -4680,11 +4885,11 @@ class Core extends Library
 	 * @param	array	$fieldInfo		The Profile Field Information to format. This SHOULD be in $foreign_id => $content format, however field_$foreign_id => $content is also accepted.
 	 * @return	array					An array of data formatted for core_pfields_content
 	 */
-	protected function _formatMemberProfileFieldContent( int $member_id, array $fieldInfo ) : array
+	protected function _formatMemberProfileFieldContent( $member_id, $fieldInfo )
 	{
 		$return = array( 'member_id' => $member_id );
 		
-		if ( count( $fieldInfo ) )
+		if ( \count( $fieldInfo ) )
 		{
 			foreach( $fieldInfo AS $key => $value )
 			{
@@ -4697,7 +4902,7 @@ class Core extends Library
 					$id = $key;
 				}
 
-				if( in_array( $id, $this->_skipFields ) )
+				if( \in_array( $id, $this->_skipFields ) )
 				{
 					continue;
 				}
@@ -4709,7 +4914,7 @@ class Core extends Library
 					/* Make sure the field itself was not removed. */
 					$field = $this->_getField( $link );
 				}
-				catch( OutOfRangeException | UnderflowException $e )
+				catch( \OutOfRangeException | \UnderflowException $e )
 				{
 					/* Link does not exist so we cannot map */
 					$this->_skipFields[] = $id;
@@ -4726,22 +4931,22 @@ class Core extends Library
 				}
 
 				/* Make sure it's not too long for the MySQL TEXT column */
-				if( strlen( $value ) > 65535 )
+				if( \strlen( $value ) > 65535 )
 				{
-					$value = substr( $value, 0, 65535 );
-					$this->software->app->log( "member_{$member_id}_field_truncated", __METHOD__, App::LOG_NOTICE, $id );
+					$value = \substr( $value, 0, 65535 );
+					$this->software->app->log( "member_{$member_id}_field_truncated", __METHOD__, \IPS\convert\App::LOG_NOTICE, $id );
 				}
 				
 				/* If this is a number field, we need to \intval() */
-				if ( in_array( $field['pf_type'], array( 'CheckboxSet', 'Member', 'Date', 'Poll', 'YesNo', 'Checkbox', 'Rating', 'Number' ) ) )
+				if ( \in_array( $field['pf_type'], array( 'CheckboxSet', 'Member', 'Date', 'Poll', 'YesNo', 'Checkbox', 'Rating', 'Number' ) ) )
 				{
-					if ( in_array( $field['pf_type'], array( 'CheckboxSet', 'Member' ) ) AND $field['pf_multiple'] )
+					if ( \in_array( $field['pf_type'], array( 'CheckboxSet', 'Member' ) ) AND $field['pf_multiple'] )
 					{
 						$return[ 'field_' . $link ] = $value;
 					}
 					else
 					{
-						$return[ 'field_' . $link ] = intval( $value );
+						$return[ 'field_' . $link ] = \intval( $value );
 					}
 				}
 				else
@@ -4759,10 +4964,10 @@ class Core extends Library
 	 *
 	 * @param	array	$info	Data to insert
 	 * @param	array	$votes	Vote Data
-	 * @return	bool|int	The ID of the newly inserted Poll, or false on failure.
+	 * @return	boolean|integer	The ID of the newly inserted Poll, or false on failure.
 	 * @note Like Follows, this should be done when the actual content it's attached too is being converted.
 	 */
-	public function convertPoll( array $info=array(), array $votes=array() ) : bool|int
+	public function convertPoll( $info=array(), $votes=array() )
 	{
 		/* Another instance where we really don't need this, but will store if we have it */
 		$hasId = TRUE;
@@ -4771,9 +4976,9 @@ class Core extends Library
 			$hasId = FALSE;
 		}
 		
-		if ( !isset( $info['choices'] ) OR !is_array( $info['choices'] ) OR count( $info['choices'] ) == 0 )
+		if ( !isset( $info['choices'] ) OR !\is_array( $info['choices'] ) OR \count( $info['choices'] ) == 0 )
 		{
-			$this->software->app->log( 'poll_no_choices', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['pid'] : NULL );
+			$this->software->app->log( 'poll_no_choices', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['pid'] : NULL );
 			return FALSE;
 		}
 		
@@ -4783,12 +4988,12 @@ class Core extends Library
 		if ( !isset( $info['poll_question'] ) )
 		{
 			$info['poll_question'] = 'Untitled Poll';
-			$this->software->app->log( 'poll_missing_title', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['pid'] : NULL );
+			$this->software->app->log( 'poll_missing_title', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['pid'] : NULL );
 		}
 		
 		if ( isset( $info['start_date'] ) )
 		{
-			if ( $info['start_date'] instanceof DateTime )
+			if ( $info['start_date'] instanceof \IPS\DateTime )
 			{
 				$info['start_date'] = $info['start_date']->getTimestamp();
 			}
@@ -4804,7 +5009,7 @@ class Core extends Library
 			{
 				$info['starter_id'] = $this->software->app->getLink( $info['starter_id'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['starter_id'] = 0;
 			}
@@ -4816,7 +5021,7 @@ class Core extends Library
 
 		if ( isset( $info['poll_close_date'] ) )
 		{
-			if ( $info['poll_close_date'] instanceof DateTime )
+			if ( $info['poll_close_date'] instanceof \IPS\DateTime )
 			{
 				$info['poll_close_date'] = $info['poll_close_date']->getTimestamp();
 			}
@@ -4831,13 +5036,13 @@ class Core extends Library
 			$voteCount = 0;
 			foreach( $votes AS $vote )
 			{
-				if ( isset( $vote['member_choices'] ) AND is_array( $vote['member_choices'] ) )
+				if ( isset( $vote['member_choices'] ) AND \is_array( $vote['member_choices'] ) )
 				{
 					foreach( $vote['member_choices'] AS $question_id => $choices )
 					{
-						if ( is_array( $vote ) )
+						if ( \is_array( $vote ) )
 						{
-							$voteCount += count( $vote );
+							$voteCount += \count( $vote );
 						}
 						else
 						{
@@ -4859,10 +5064,10 @@ class Core extends Library
 		{
 			foreach( $choice['choice'] as $k => $c )
 			{
-				$tempParsed = LegacyParser::parseStatic( $c, NULL, TRUE );
-				$info['choices'][ $key ]['choice'][ $k ] = strip_tags( ConverterParser::parseStatic( $tempParsed, null, null, true, true, function( $config ) {
+				$tempParsed = \IPS\Text\LegacyParser::parseStatic( $c, NULL, TRUE );
+				$info['choices'][ $key ]['choice'][ $k ] = strip_tags( \IPS\Text\Parser::parseStatic( $tempParsed, true, null, null, true, true, true, function( $config ) {
 						$config->set( 'HTML.AllowedElements', 'a,img' );
-				}, true ), '<a><img>' );
+				} ), '<a><img>' );
 			}
 		}
 
@@ -4874,7 +5079,7 @@ class Core extends Library
 			unset( $info['pid'] );
 		}
 		
-		$inserted_id = Db::i()->insert( 'core_polls', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_polls', $info );
 		
 		if ( $hasId )
 		{
@@ -4882,7 +5087,7 @@ class Core extends Library
 		}
 		
 		/* Now do Votes */
-		if ( count( $votes ) )
+		if ( \count( $votes ) )
 		{
 			foreach( $votes AS $member_id => $vote )
 			{
@@ -4898,7 +5103,7 @@ class Core extends Library
 				
 				if ( isset( $vote['vote_date'] ) )
 				{
-					if ( $vote['vote_date'] instanceof DateTime )
+					if ( $vote['vote_date'] instanceof \IPS\DateTime )
 					{
 						$vote['vote_date'] = $vote['vote_date']->getTimestamp();
 					}
@@ -4912,10 +5117,10 @@ class Core extends Library
 				{
 					$vote['member_id'] = $this->software->app->getLink( $vote['member_id'], 'core_members' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* Votes need a member account */
-					$this->software->app->log( 'voter_missing_member', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $id : NULL );
+					$this->software->app->log( 'voter_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $id : NULL );
 					continue;
 				}
 				
@@ -4924,7 +5129,7 @@ class Core extends Library
 					$vote['ip_address'] = '127.0.0.1';
 				}
 				
-				if ( isset( $vote['member_choices'] ) AND is_array( $vote['member_choices'] ) AND count( $vote['member_choices'] ) )
+				if ( isset( $vote['member_choices'] ) AND \is_array( $vote['member_choices'] ) AND \count( $vote['member_choices'] ) )
 				{
 					$vote['member_choices'] = json_encode( $vote['member_choices'] );
 				}
@@ -4942,7 +5147,7 @@ class Core extends Library
 					unset( $vote['vid'] );
 				}
 				
-				$voteInsertedId = Db::i()->insert( 'core_voters', $vote );
+				$voteInsertedId = \IPS\Db::i()->insert( 'core_voters', $vote );
 				
 				if ( $voteHasId )
 				{
@@ -4958,19 +5163,19 @@ class Core extends Library
 	 * Convert a Profanity Filter
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted profanity filter, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted profanity filter, or FALSE on failure.
 	 */
-	public function convertProfanityFilter( array $info=array() ) : bool|int
+	public function convertProfanityFilter( $info=array() )
 	{
 		if ( !isset( $info['wid'] ) )
 		{
-			$this->software->app->log( 'profanity_filter_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'profanity_filter_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['type'] ) )
 		{
-			$this->software->app->log( 'profanity_filter_no_type', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'profanity_filter_no_type', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -4981,7 +5186,7 @@ class Core extends Library
 		
 		if ( $info['action'] == 'swap' AND !isset( $info['swop'] ) )
 		{
-			$this->software->app->log( 'profanity_filter_no_swop', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'profanity_filter_no_swop', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -4993,7 +5198,7 @@ class Core extends Library
 		$id = $info['wid'];
 		unset( $info['wid'] );
 		
-		$inserted_id = Db::i()->insert( 'core_profanity_filters', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_profanity_filters', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_profanity_filters' );
 		return $inserted_id;
 	}
@@ -5001,28 +5206,28 @@ class Core extends Library
 	/**
 	 * Convert Question and Answer Spam Prevention
 	 *
-	 * @param	array	$info		Data to insert
+	 * @param	string	$info		Data to insert
 	 * @param	array	$answers	The answers
-	 * @return	bool|int	The ID of the newly insert Q&A, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly insert Q&A, or FALSE on failure.
 	 */
-	public function convertQuestionAndAnswer( array $info, array $answers=array() ) : bool|int
+	public function convertQuestionAndAnswer( $info, $answers=array() )
 	{
 		$haveId = TRUE;
 		if ( !isset( $info['qa_id'] ) )
 		{
 			$haveId = FALSE;
-			$this->software->app->log( 'convert_question_and_answer_missing_ids', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'convert_question_and_answer_missing_ids', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 		}
 		
-		if ( !count( $answers ) )
+		if ( !\count( $answers ) )
 		{
-			$this->software->app->log( 'convert_question_and_answer_no_answers', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'convert_question_and_answer_no_answers', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['qa_question'] ) )
 		{
-			$this->software->app->log( 'convert_question_and_answer_no_question', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'convert_question_and_answer_no_question', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -5037,8 +5242,8 @@ class Core extends Library
 		
 		$info['qa_answers'] = json_encode( $answers );
 		
-		$inserted_id = Db::i()->insert( 'core_question_and_answer', $info );
-		Lang::saveCustom( 'core', "core_question_and_answer_{$inserted_id}", $question );
+		$inserted_id = \IPS\Db::i()->insert( 'core_question_and_answer', $info );
+		\IPS\Lang::saveCustom( 'core', "core_question_and_answer_{$inserted_id}", $question );
 		
 		if ( $haveId )
 		{
@@ -5052,39 +5257,39 @@ class Core extends Library
 	 * Convert a Rating
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted rating, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted rating, or FALSE on failure.
 	 * @note Like Follows, this should be done when the actual content it's attached too is being converted.
 	 */
-	public function convertRating( array $info=array() ) : bool|int
+	public function convertRating( $info=array() )
 	{
 		$haveId = TRUE;
 		if ( !isset( $info['id'] ) )
 		{
 			$haveId = FALSE;
-			$this->software->app->log( 'rating_missing_ids', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'rating_missing_ids', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 		}
 		
 		if ( !isset( $info['class'] ) )
 		{
-			$this->software->app->log( 'rating_missing_class', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'rating_missing_class', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['item_link'] ) )
 		{
-			$this->software->app->log( 'rating_missing_item_link', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'rating_missing_item_link', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['item_id'] ) )
 		{
-			$this->software->app->log( 'rating_missing_item_id', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'rating_missing_item_id', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['rating'] ) )
 		{
-			$this->software->app->log( 'rating_missing_rating', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'rating_missing_rating', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -5102,9 +5307,9 @@ class Core extends Library
 		{
 			$info['member']		= $this->software->app->getLink( $info['member'], 'core_members' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'rating_no_member', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'rating_no_member', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -5112,9 +5317,9 @@ class Core extends Library
 		{
 			$info['item_id']	= $this->software->app->getLink( $info['item_id'], $info['item_link'] );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'rating_no_item', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'rating_no_item', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -5122,13 +5327,13 @@ class Core extends Library
 		
 		try
 		{
-			$inserted_id = Db::i()->select( 'id', 'core_ratings', array( "class=? AND item_id=? AND `member`=?", $info['class'], $info['item_id'], $info['member'] ) )->first();
+			$inserted_id = \IPS\Db::i()->select( 'id', 'core_ratings', array( "class=? AND item_id=? AND `member`=?", $info['class'], $info['item_id'], $info['member'] ) )->first();
 			
-			$this->software->app->log( 'core_rating_duplicate', __METHOD__, App::LOG_NOTICE, ( $haveId ) ? $id : NULL );
+			$this->software->app->log( 'core_rating_duplicate', __METHOD__, \IPS\convert\App::LOG_NOTICE, ( $haveId ) ? $id : NULL );
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
-			$inserted_id = Db::i()->insert( 'core_ratings', $info );
+			$inserted_id = \IPS\Db::i()->insert( 'core_ratings', $info );
 		}
 		
 		if ( $haveId )
@@ -5143,39 +5348,39 @@ class Core extends Library
 	 * Convert a Report Index
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted report index, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted report index, or FALSE on failure.
 	 * @note Like Follows, this should be done when the actual content it's attached too is being converted.
 	 */
-	public function convertReportIndex( array $info=array() ) : bool|int
+	public function convertReportIndex( $info=array() )
 	{
 		if ( !isset( $info['id'] ) )
 		{
-			$this->software->app->log( 'report_index_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'report_index_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		$contentClasses = Content::routedClasses();
-		if ( !isset( $info['class'] ) OR !in_array( $info['class'], $contentClasses ) )
+		$contentClasses = \IPS\Content::routedClasses();
+		if ( !isset( $info['class'] ) OR !\in_array( $info['class'], $contentClasses ) )
 		{
-			$this->software->app->log( 'report_index_invalid_class', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'report_index_invalid_class', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
 		
 		/* The converter will need to pass in the converted content ID */
 		if ( !isset( $info['content_id'] ) )
 		{
-			$this->software->app->log( 'report_index_missing_content', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'report_index_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
 		
 		/* Same with this - we need to figure it out in the converter */
 		if ( !isset( $info['perm_id'] ) )
 		{
-			$this->software->app->log( 'report_index_missing_perm', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'report_index_missing_perm', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
 		
-		if ( !isset( $info['status'] ) OR !in_array( $info['status'], array( 1, 2, 3 ) ) )
+		if ( !isset( $info['status'] ) OR !\in_array( $info['status'], array( 1, 2, 3 ) ) )
 		{
 			$info['status'] = 1;
 		}
@@ -5196,7 +5401,7 @@ class Core extends Library
 			{
 				$info['first_report_by'] = $this->software->app->getLink( $info['first_report_by'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['first_report_by'] = 0;
 			}
@@ -5208,7 +5413,7 @@ class Core extends Library
 		
 		if ( isset( $info['first_report_date'] ) )
 		{
-			if ( $info['first_report_date'] instanceof DateTime )
+			if ( $info['first_report_date'] instanceof \IPS\DateTime )
 			{
 				$info['first_report_date'] = $info['first_report_date']->getTimestamp();
 			}
@@ -5220,7 +5425,7 @@ class Core extends Library
 		
 		if ( isset( $info['last_updated'] ) )
 		{
-			if ( $info['last_updated'] instanceof DateTime )
+			if ( $info['last_updated'] instanceof \IPS\DateTime )
 			{
 				$info['last_updated'] = $info['last_updated']->getTimestamp();
 			}
@@ -5236,7 +5441,7 @@ class Core extends Library
 			{
 				$info['author'] = $this->software->app->getLink( $info['author'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['author'] = 0;
 			}
@@ -5249,7 +5454,7 @@ class Core extends Library
 		$id = $info['id'];
 		unset( $info['id'] );
 		
-		$inserted_id = Db::i()->insert( 'core_rc_index', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_rc_index', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_rc_index' );
 		
 		return $inserted_id;
@@ -5261,19 +5466,19 @@ class Core extends Library
 	 * @param	array			$info		Data to insert
 	 * @param	NULL|string		$filePath	Path to files, or NULL if loading from the database.
 	 * @param	NULL|string		$fileData	If loading from the database, the content of the Binary column.
-	 * @param	int|NULL	$mergeWith	The ID of the group to merge this one into, or NULL to create new.
+	 * @param	integer|NULL	$mergeWith	The ID of the group to merge this one into, or NULL to create new.
 	 * @return	bool|int					ID of new record on success, FALSE on failure
 	 */
-	public function convertReaction( array $info=array(), ?string $filePath=NULL, ?string $fileData=NULL, ?int $mergeWith=NULL ) : bool|int
+	public function convertReaction( $info=array(), $filePath=NULL, $fileData=NULL, int $mergeWith=NULL )
 	{
 		if ( !isset( $info['reaction_id'] ) )
 		{
-			$this->software->app->log( 'reaction_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'reaction_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		/* Are we merging this group with an existing one? Saves a lot of headache later */
-		if ( !is_null( $mergeWith ) )
+		if ( !\is_null( $mergeWith ) )
 		{
 			$this->software->app->addLink( $mergeWith, $info['reaction_id'], 'core_reactions', TRUE );
 			return $mergeWith;
@@ -5281,23 +5486,23 @@ class Core extends Library
 
 		if ( !isset( $info['reaction_value'] ) )
 		{
-			$this->software->app->log( 'reaction_missing_value', __METHOD__, App::LOG_WARNING, $info['reaction_id'] );
+			$this->software->app->log( 'reaction_missing_value', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['reaction_id'] );
 			return FALSE;
 		}
 
 		if ( !isset( $info['filename'] ) )
 		{
-			$this->software->app->log( 'reaction_no_filename', __METHOD__, App::LOG_WARNING, $info['reaction_id'] );
+			$this->software->app->log( 'reaction_no_filename', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['reaction_id'] );
 			return FALSE;
 		}
 
-		if ( is_null( $filePath ) AND is_null( $fileData ) )
+		if ( \is_null( $filePath ) AND \is_null( $fileData ) )
 		{
-			$this->software->app->log( 'reaction_no_file', __METHOD__, App::LOG_WARNING, $info['reaction_id'] );
+			$this->software->app->log( 'reaction_no_file', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['reaction_id'] );
 			return FALSE;
 		}
 
-		if ( is_null( $fileData ) AND !is_null( $filePath ) )
+		if ( \is_null( $fileData ) AND !\is_null( $filePath ) )
 		{
 			if ( file_exists( rtrim( $filePath, '/' ) . '/' . $info['filename'] ) )
 			{
@@ -5306,7 +5511,7 @@ class Core extends Library
 			}
 			else
 			{
-				$this->software->app->log( 'reaction_no_file', __METHOD__, App::LOG_WARNING, $info['reaction_id'] );
+				$this->software->app->log( 'reaction_no_file', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['reaction_id'] );
 				return FALSE;
 			}
 		}
@@ -5314,7 +5519,7 @@ class Core extends Library
 		if ( !isset( $info['reaction_title'] ) )
 		{
 			$name = "Unnamed Reaction";
-			$this->software->app->log( 'reaction_missing_title', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'reaction_missing_title', __METHOD__, \IPS\convert\App::LOG_WARNING );
 		}
 		else
 		{
@@ -5324,20 +5529,20 @@ class Core extends Library
 
 		if( !isset( $info['reaction_position'] ) )
 		{
-			$newPosition = (int) Db::i()->select( 'MAX(reaction_position) + 1', 'core_reactions' )->first();
+			$newPosition = (int) \IPS\Db::i()->select( 'MAX(reaction_position) + 1', 'core_reactions' )->first();
 			$info['reaction_position'] = $newPosition;
 		}
 
 		try
 		{
-			$file = File::create( 'core_Reaction', $info['filename'], $fileData, 'reactions' );
+			$file = \IPS\File::create( 'core_Reaction', $info['filename'], $fileData, 'reactions', FALSE, NULL );
 			unset( $info['filename'] );
 			$info['reaction_icon'] = (string) $file;
 			$file->getImageDimensions();
 		}
 		catch( \Exception $e )
 		{
-			$this->software->app->log( 'reaction_file_corrupt', __METHOD__, App::LOG_WARNING, $info['reaction_id'] );
+			$this->software->app->log( 'reaction_file_corrupt', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['reaction_id'] );
 			return FALSE;
 		}
 
@@ -5350,13 +5555,13 @@ class Core extends Library
 
 		unset( $info['reaction_id'] );
 
-		$insertedId = Db::i()->insert( 'core_reactions', $info );
+		$insertedId = \IPS\Db::i()->insert( 'core_reactions', $info );
 		$this->software->app->addLink( $insertedId, $id, 'core_reactions' );
 
-		Lang::saveCustom( 'core', "reaction_title_{$insertedId}", $name );
+		\IPS\Lang::saveCustom( 'core', "reaction_title_{$insertedId}", $name );
 
 		/* Wipe cache */
-		unset( Store::i()->reactions );
+		unset( \IPS\Data\Store::i()->reactions );
 
 		return $insertedId;
 	}
@@ -5365,14 +5570,14 @@ class Core extends Library
 	 * Convert a Report
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted report, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted report, or FALSE on failure.
 	 * @note Like Follows, this should be done when the actual content it's attached too is being converted.
 	 */
-	public function convertReport( array $info=array() ) : bool|int
+	public function convertReport( $info=array() )
 	{
 		if ( !isset( $info['id'] ) )
 		{
-			$this->software->app->log( 'report_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'report_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -5382,21 +5587,21 @@ class Core extends Library
 			{
 				$info['rid'] = $this->software->app->getLink( $info['rid'], 'core_rc_index' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'report_missing_index', __METHOD__, App::LOG_WARNING, $info['id'] );
+				$this->software->app->log( 'report_missing_index', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'report_missing_index', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'report_missing_index', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
 		
 		if ( empty( $info['report'] ) )
 		{
-			$this->software->app->log( 'report_missing_content', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'report_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
 		
@@ -5406,7 +5611,7 @@ class Core extends Library
 			{
 				$info['report_by'] = $this->software->app->getLink( $info['report_by'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['report_by'] = 0;
 			}
@@ -5418,7 +5623,7 @@ class Core extends Library
 		
 		if ( isset( $info['date_reported'] ) )
 		{
-			if ( $info['date_reported'] instanceof DateTime )
+			if ( $info['date_reported'] instanceof \IPS\DateTime )
 			{
 				$info['date_reported'] = $info['date_reported']->getTimestamp();
 			}
@@ -5436,7 +5641,7 @@ class Core extends Library
 		$id = $info['id'];
 		unset( $info['id'] );
 		
-		$inserted_id = Db::i()->insert( 'core_rc_reports', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_rc_reports', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_rc_reports' );
 		
 		return $inserted_id;
@@ -5446,14 +5651,14 @@ class Core extends Library
 	 * Convert a Report Comment
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted comment, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted comment, or FALSE on failure.
 	 * @note UNLIKE report indexes, this can be done separately.
 	 */
-	public function convertReportComment( array $info=array() ) : bool|int
+	public function convertReportComment( $info=array() )
 	{
 		if ( !isset( $info['id'] ) )
 		{
-			$this->software->app->log( 'report_comment_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'report_comment_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -5463,21 +5668,21 @@ class Core extends Library
 			{
 				$info['rid'] = $this->software->app->getLink( $info['rid'], 'core_rc_index' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'report_comment_missing_index', __METHOD__, App::LOG_WARNING, $info['id'] );
+				$this->software->app->log( 'report_comment_missing_index', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'report_comment_missing_index', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'report_comment_missing_index', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
 		
 		if ( empty( $info['comment'] ) )
 		{
-			$this->software->app->log( 'report_comment_missing_content', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'report_comment_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 			return FALSE;
 		}
 		
@@ -5487,7 +5692,7 @@ class Core extends Library
 			{
 				$info['comment_by'] = $this->software->app->getLink( $info['comment_by'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['comment_by'] = 0;
 			}
@@ -5499,7 +5704,7 @@ class Core extends Library
 		
 		if ( isset( $info['comment_date'] ) )
 		{
-			if( $info['comment_date'] instanceof DateTime )
+			if( $info['comment_date'] instanceof \IPS\DateTime )
 			{
 				$info['comment_date'] = $info['comment_date']->getTimestamp();
 			}
@@ -5516,7 +5721,7 @@ class Core extends Library
 		
 		if ( isset( $info['edit_date'] ) )
 		{
-			if ( $info['edit_date'] instanceof DateTime )
+			if ( $info['edit_date'] instanceof \IPS\DateTime )
 			{
 				$info['edit_date'] = $info['edit_date']->getTimestamp();
 			}
@@ -5534,7 +5739,7 @@ class Core extends Library
 		$id = $info['id'];
 		unset( $info['id'] );
 		
-		$inserted_id = Db::i()->insert( 'core_rc_comments', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_rc_comments', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_rc_comments' );
 		
 		return $inserted_id;
@@ -5544,10 +5749,10 @@ class Core extends Library
 	 * Convert Reputation
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	bool|int	The ID of the newly inserted reputation, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted reputation, or FALSE on failure.
 	 * @note	Like Follows, this should be done when the actual content it's attached to is being converted.
 	 */
-	public function convertReputation( array $info=array() ) : bool|int
+	public function convertReputation( $info=array() )
 	{
 		/* Another instance where we really don't need this, but will store if we have it */
 		$hasId = TRUE;
@@ -5558,77 +5763,77 @@ class Core extends Library
 		
 		if ( !isset( $info['app'] ) )
 		{
-			$this->software->app->log( 'reputation_no_app', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_no_app', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['type'] ) )
 		{
-			$this->software->app->log( 'reputation_missing_type', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_missing_type', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['type_id'] ) )
 		{
-			$this->software->app->log( 'reputation_missing_type_id', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_missing_type_id', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['member_id'] ) )
 		{
-			$this->software->app->log( 'reputation_missing_member', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['member_received'] ) )
 		{
-			$this->software->app->log( 'reputation_missing_member_received', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_missing_member_received', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 
 		if ( !isset( $info['reaction'] ) )
 		{
-			$this->software->app->log( 'reputation_missing_reaction', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_missing_reaction', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		else
 		{
 			try
 			{
-				/* Try to lookup reaction ID link */
+				/* Try to lookup a reaction ID link */
 				try
 				{
 					$info['reaction'] = $this->software->app->getLink( $info['reaction'], 'core_reactions' );
 				}
-				catch( OutOfRangeException $e ) {}
+				catch( \OutOfRangeException $e ) {}
 
-				$reaction = Content\Reaction::load( $info['reaction'] );
+				$reaction = \IPS\Content\Reaction::load( $info['reaction'] );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'reputation_invalid_reaction', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+				$this->software->app->log( 'reputation_invalid_reaction', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 				return FALSE;
 			}
 		}
 		
 		try
 		{
-			$application = Application::load( $info['app'] );
+			$application = \IPS\Application::load( $info['app'] );
 			
-			if ( Application::appIsEnabled( $info['app'] ) === FALSE )
+			if ( \IPS\Application::appIsEnabled( $info['app'] ) === FALSE )
 			{
-				throw new UnexpectedValueException;
+				throw new \UnexpectedValueException;
 			}
 		}
-		catch( UnexpectedValueException $e )
+		catch( \UnexpectedValueException $e )
 		{
-			$this->software->app->log( 'reputation_app_invalid', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_app_invalid', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
 		if ( isset( $info['rep_date'] ) )
 		{
-			if ( $info['rep_date'] instanceof DateTime )
+			if ( $info['rep_date'] instanceof \IPS\DateTime )
 			{
 				$info['rep_date'] = $info['rep_date']->getTimestamp();
 			}
@@ -5662,7 +5867,7 @@ class Core extends Library
 		{
 			foreach( $extension->classes AS $contentClass )
 			{
-				if ( IPS::classUsesTrait( $contentClass, 'IPS\Content\Reactable' ) )
+				if ( \IPS\IPS::classUsesTrait( $contentClass, 'IPS\Content\Reactable' ) )
 				{
 					if ( $contentClass::reactionType() == $info['type'] )
 					{
@@ -5674,7 +5879,7 @@ class Core extends Library
 				{
 					$commentClass = $contentClass::$commentClass;
 					
-					if ( IPS::classUsesTrait( $commentClass, 'IPS\Content\Reactable' ) )
+					if ( \IPS\IPS::classUsesTrait( $commentClass, 'IPS\Content\Reactable' ) )
 					{
 						if ( $commentClass::reactionType() == $info['type'] )
 						{
@@ -5688,7 +5893,7 @@ class Core extends Library
 				{
 					$reviewClass = $contentClass::$reviewClass;
 					
-					if ( IPS::classUsesTrait( $reviewClass, 'IPS\Content\Reactable' ) )
+					if ( \IPS\IPS::classUsesTrait( $reviewClass, 'IPS\Content\Reactable' ) )
 					{
 						if ( $reviewClass::reactionType() == $info['type'] )
 						{
@@ -5700,9 +5905,9 @@ class Core extends Library
 			}
 		}
 		
-		if ( is_null( $contentClass ) )
+		if ( \is_null( $contentClass ) )
 		{
-			$this->software->app->log( 'reputation_type_invalid', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_type_invalid', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
@@ -5712,9 +5917,9 @@ class Core extends Library
 		{
 			$info['member_id'] = $this->software->app->getLink( $info['member_id'], 'core_members' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'reputation_member_orphaned', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_member_orphaned', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
@@ -5722,9 +5927,9 @@ class Core extends Library
 		{
 			$info['type_id'] = $this->software->app->getLink( $info['type_id'], $contentClass::$databaseTable );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'reputation_type_orphaned', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_type_orphaned', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
@@ -5734,9 +5939,9 @@ class Core extends Library
 		{
 			$info['member_received'] = $this->software->app->getLink( $info['member_received'], 'core_members' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'reputation_member_received_orphaned', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			$this->software->app->log( 'reputation_member_received_orphaned', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
 			return FALSE;
 		}
 		
@@ -5746,7 +5951,7 @@ class Core extends Library
 			unset( $info['id'] );
 		}
 		
-		$inserted_id = Db::i()->insert( 'core_reputation_index', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_reputation_index', $info );
 		
 		if ( $hasId )
 		{
@@ -5762,9 +5967,9 @@ class Core extends Library
 	 * @param	array			$info			Data to insert
 	 * @param	string|NULL		$badgepath		Path to Reputation Badge file.
 	 * @param	string|NULL		$badgedata		Binary data for Reputation Badge file.
-	 * @return	bool|int			The ID of the newly inserted reputation level, or FALSE on failure.
+	 * @return	boolean|integer			The ID of the newly inserted reputation level, or FALSE on failure.
 	 */
-	public function convertReputationLevel( array $info=array(), ?string $badgepath=NULL, ?string $badgedata=NULL ) : bool|int
+	public function convertReputationLevel( $info=array(), $badgepath=NULL, $badgedata=NULL )
 	{
 		/* Another instance where we really don't need this, but will store if we have it */
 		$hasId = TRUE;
@@ -5781,7 +5986,7 @@ class Core extends Library
 		if ( !isset( $info['level_title'] ) )
 		{
 			$name = "Reputation {$info['level_points']}";
-			$this->software->app->log( 'reputation_level_missing_title', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'reputation_level_missing_title', __METHOD__, \IPS\convert\App::LOG_WARNING );
 		}
 		else
 		{
@@ -5789,18 +5994,22 @@ class Core extends Library
 			unset( $info['level_title'] );
 		}
 		
-		if ( isset( $info['level_image'] ) AND ( !is_null( $badgepath ) OR !is_null( $badgedata ) ) )
+		if ( isset( $info['level_image'] ) AND ( !\is_null( $badgepath ) OR !\is_null( $badgedata ) ) )
 		{
 			try
 			{
-				if ( is_null( $badgedata ) AND !is_null( $badgepath ) )
+				if ( \is_null( $badgedata ) AND !\is_null( $badgepath ) )
 				{
 					$badgedata = file_get_contents( $badgepath );
 				}
-				$file = File::create( 'core_Theme', $info['level_image'], $badgedata );
+				$file = \IPS\File::create( 'core_Theme', $info['level_image'], $badgedata );
 				$info['level_image'] = (string) $file;
 			}
-			catch( \Exception|ErrorException $e )
+			catch( \Exception $e )
+			{
+				$info['level_image'] = '';
+			}
+			catch( \ErrorException $e )
 			{
 				$info['level_image'] = '';
 			}
@@ -5816,14 +6025,14 @@ class Core extends Library
 			unset( $info['level_id'] );
 		}
 		
-		$inserted_id = Db::i()->insert( 'core_reputation_levels', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_reputation_levels', $info );
 		
 		if ( $hasId )
 		{
 			$this->software->app->addLink( $inserted_id, $id, 'core_reputation_levels' );
 		}
 		
-		Lang::saveCustom( 'core', "core_reputation_level_{$inserted_id}", $name );
+		\IPS\Lang::saveCustom( 'core', "core_reputation_level_{$inserted_id}", $name );
 		
 		return $inserted_id;
 	}
@@ -5832,22 +6041,22 @@ class Core extends Library
 	 * Convert an RSS Import Feed
 	 *
 	 * @param	array			$info			Data to insert
-	 * @param 	string			$containerType	Container Link Type
+	 * @param 	array			$containerType	Container Link Type
 	 * @param	string			$newLinkType	Link type to use
-	 * @return	int|bool	The ID of the newly inserted import feed, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted import feed, or FALSE on failure.
 	 */
-	public function convertRssImport( array $info, string $containerType='forums_forums', string $newLinkType='core_rss_import' ) : bool|int
+	public function convertRssImport( $info, $containerType='forums_forums', $newLinkType='core_rss_import' )
 	{
 		if ( !isset( $info['rss_import_id'] ) )
 		{
-			$this->software->app->log( 'rss_import_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'rss_import_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		/* Required Stuff */
 		if ( !isset( $info['rss_import_url'] ) OR filter_var( $info['rss_import_url'], FILTER_VALIDATE_URL ) === FALSE )
 		{
-			$this->software->app->log( 'rss_import_invalid_url', __METHOD__, App::LOG_WARNING, $info['rss_import_id'] );
+			$this->software->app->log( 'rss_import_invalid_url', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['rss_import_id'] );
 			return FALSE;
 		}
 
@@ -5857,15 +6066,15 @@ class Core extends Library
 			{
 				$info['rss_import_member'] = $this->software->app->getLink( $info['rss_import_member'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'rss_import_missing_member', __METHOD__, App::LOG_WARNING, $info['rss_import_id'] );
+				$this->software->app->log( 'rss_import_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['rss_import_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'rss_import_missing_member', __METHOD__, App::LOG_WARNING, $info['rss_import_id'] );
+			$this->software->app->log( 'rss_import_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['rss_import_id'] );
 			return FALSE;
 		}
 
@@ -5875,15 +6084,15 @@ class Core extends Library
 			{
 				$info['rss_import_node_id'] = $this->software->app->getLink( $info['rss_import_node_id'], $containerType );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'rss_import_missing_node', __METHOD__, App::LOG_WARNING, $info['rss_import_id'] );
+				$this->software->app->log( 'rss_import_missing_node', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['rss_import_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'rss_import_missing_node', __METHOD__, App::LOG_WARNING, $info['rss_import_id'] );
+			$this->software->app->log( 'rss_import_missing_node', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['rss_import_id'] );
 			return FALSE;
 		}
 
@@ -5905,7 +6114,7 @@ class Core extends Library
 
 		if ( isset( $info['rss_import_last_import'] ) )
 		{
-			if ( $info['rss_import_last_import'] instanceof DateTime )
+			if ( $info['rss_import_last_import'] instanceof \IPS\DateTime )
 			{
 				$info['rss_import_last_import'] = $info['rss_import_last_import']->getTimestamp();
 			}
@@ -5932,7 +6141,7 @@ class Core extends Library
 				$info['rss_import_settings'] = array();
 			}
 
-			if ( is_array( $info['rss_tags'] ) )
+			if ( \is_array( $info['rss_tags'] ) )
 			{
 				$info['rss_import_settings']['tags'] = $info['rss_tags'];
 			}
@@ -5940,12 +6149,12 @@ class Core extends Library
 			unset( $info['rss_tags'] );
 		}
 
-		$info['rss_import_settings'] = count( $info['rss_import_settings'] ) ? json_encode( $info['rss_import_settings'] ) : '[]';
+		$info['rss_import_settings'] = \count( $info['rss_import_settings'] ) ? json_encode( $info['rss_import_settings'] ) : '[]';
 
 		$id = $info['rss_import_id'];
 		unset( $info['rss_import_id'] );
 
-		$insertedId = Db::i()->insert( 'core_rss_import', $info );
+		$insertedId = \IPS\Db::i()->insert( 'core_rss_import', $info );
 		$this->software->app->addLink( $insertedId, $id, $newLinkType );
 
 		return $insertedId;
@@ -5956,10 +6165,10 @@ class Core extends Library
 	 *
 	 * @param	array		$info			Data to insert
 	 * @param 	string		$type			Link type for RSS Feed
-	 * @param 	string		$contentType	Content Link Type
-	 * @return	bool		TRUE on success, or FALSE on failure.
+	 * @param 	mixed		$contentType	Content Link Type
+	 * @return	boolean		TRUE on success, or FALSE on failure.
 	 */
-	public function convertRssImported( array $info=array(), string $type='core_rss_import', string $contentType='' ) : bool
+	public function convertRssImported( $info=array(), $type='core_rss_import', $contentType='' )
 	{
 		/* Godspeed */
 		if ( isset( $info['rss_imported_import_id'] ) )
@@ -5968,15 +6177,15 @@ class Core extends Library
 			{
 				$info['rss_imported_import_id'] = $this->software->app->getLink( $info['rss_imported_import_id'], $type );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'rss_imported_missing_feed', __METHOD__, App::LOG_WARNING );
+				$this->software->app->log( 'rss_imported_missing_feed', __METHOD__, \IPS\convert\App::LOG_WARNING );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'rss_imported_missing_feed', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'rss_imported_missing_feed', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -5986,25 +6195,25 @@ class Core extends Library
 			{
 				$info['rss_imported_content_id'] = $this->software->app->getLink( $info['rss_imported_content_id'], $contentType );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'rss_imported_missing_content', __METHOD__, App::LOG_WARNING );
+				$this->software->app->log( 'rss_imported_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'rss_imported_missing_content', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'rss_imported_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['rss_imported_guid'] ) )
 		{
-			$this->software->app->log( 'rss_imported_missing_guid', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'rss_imported_missing_guid', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
-		Db::i()->insert( 'core_rss_imported', $info );
+		\IPS\Db::i()->insert( 'core_rss_imported', $info );
 		return TRUE;
 	}
 	
@@ -6012,22 +6221,22 @@ class Core extends Library
 	 * Convert a Setting
 	 *
 	 * @param	array	$settings	Settings to convert
-	 * @return	bool|array		An array of settings changed, or FALSE on failure.
+	 * @return	boolean|array		An array of settings changed, or FALSE on failure.
 	 */
-	public function convertSettings( array $settings=array() ) : bool|array
+	public function convertSettings( $settings=array() )
 	{
-		if ( !count( $settings ) )
+		if ( !\count( $settings ) )
 		{
-			$this->software->app->log( 'no_settings_to_convert', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'no_settings_to_convert', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		foreach( $settings AS $setting )
 		{
-			Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $setting['value'] ), array( "conf_key=?", $setting['key'] ) );
+			\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $setting['value'] ), array( "conf_key=?", $setting['key'] ) );
 		}
 		
-		Settings::i()->clearCache();
+		\IPS\Settings::i()->clearCache();
 		
 		return $settings;
 	}
@@ -6035,17 +6244,17 @@ class Core extends Library
 	/**
 	 * @brief	Store valid content class set by child converters, if contentrouter verification cannot be relied upon.
 	 */
-	protected ?string $_ipsTagContentClass = NULL;
+	protected $_ipsTagContentClass = NULL;
 	
 	/**
 	 * Convert a Tag
 	 *
 	 * @param	array		$info	Data to insert
-	 * @return	bool|int		The ID of the newly inserted tag, or FALSE on failure.
+	 * @return	boolean|integer		The ID of the newly inserted tag, or FALSE on failure.
 	 * @note Like Follows, this should be done when the actual content it's attached too is being converted.
 	 * @note core_tags_cache and core_tags_perms need to be populated by the converter.
 	 */
-	public function convertTag( array $info=array() ) : bool|int
+	public function convertTag( $info=array() )
 	{
 		/* Another instance where we really don't need this, but will store if we have it */
 		$hasId = TRUE;
@@ -6059,7 +6268,7 @@ class Core extends Library
 		{
 			if ( !isset( $info[$column] ) OR empty( $info[$column] ) )
 			{
-				$this->software->app->log( "tag_missing_{$column}", __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['tag_id'] : NULL );
+				$this->software->app->log( "tag_missing_{$column}", __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['tag_id'] : NULL );
 				return FALSE; # return here - all of these are required so don't bother proceeding
 			}
 		}
@@ -6067,16 +6276,16 @@ class Core extends Library
 		/* let's do some set up */
 		try
 		{
-			$application = Application::load( $info['tag_meta_app'] );
+			$application = \IPS\Application::load( $info['tag_meta_app'] );
 			
-			if ( Application::appIsEnabled( $info['tag_meta_app'] ) === FALSE )
+			if ( \IPS\Application::appIsEnabled( $info['tag_meta_app'] ) === FALSE )
 			{
-				throw new UnexpectedValueException;
+				throw new \UnexpectedValueException;
 			}
 		}
-		catch( UnexpectedValueException $e )
+		catch( \UnexpectedValueException $e )
 		{
-			$this->software->app->log( 'tag_app_invalid', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['tag_id'] : NULL );
+			$this->software->app->log( 'tag_app_invalid', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['tag_id'] : NULL );
 			return FALSE;
 		}
 		
@@ -6084,7 +6293,7 @@ class Core extends Library
 		{
 			$info['tag_member_id'] = $this->software->app->getLink( $info['tag_member_id'], 'core_members' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			/* Tags can be added by guests */
 			$info['tag_member_id'] = 0;
@@ -6092,7 +6301,7 @@ class Core extends Library
 		
 		if ( !empty( $info['tag_added'] ) )
 		{
-			if ( $info['tag_added'] instanceof DateTime )
+			if ( $info['tag_added'] instanceof \IPS\DateTime )
 			{
 				$info['tag_added'] = $info['tag_added']->getTimestamp();
 			}
@@ -6136,15 +6345,15 @@ class Core extends Library
 				}
 			}
 
-			if ( is_null( $contentClass ) )
+			if ( \is_null( $contentClass ) )
 			{
-				$this->software->app->log( 'tag_area_invalid', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['tag_id'] : NULL );
+				$this->software->app->log( 'tag_area_invalid', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['tag_id'] : NULL );
 				return FALSE;
 			}
 		}
 
 		/* Tag text should be lower case and not start or end with a space */
-		$info['tag_text'] = mb_strtolower( trim( $info['tag_text'] ) );
+		$info['tag_text'] = \mb_strtolower( trim( $info['tag_text'] ) );
 		
 		$nodeClass = $contentClass::$containerNodeClass;
 		
@@ -6159,9 +6368,9 @@ class Core extends Library
 			
 			$info['tag_meta_id'] = $this->software->app->getLink( $info['tag_meta_id'], $table );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'tag_orphaned', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['tag_id'] : NULL );
+			$this->software->app->log( 'tag_orphaned', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['tag_id'] : NULL );
 			return FALSE;
 		}
 		
@@ -6176,9 +6385,9 @@ class Core extends Library
 			}
 			$info['tag_meta_parent_id'] = $this->software->app->getLink( $info['tag_meta_parent_id'], $parentTable );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'tag_parent_orphaned', __METHOD__, App::LOG_WARNING, ( $hasId ) ? $info['tag_id'] : NULL );
+			$this->software->app->log( 'tag_parent_orphaned', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['tag_id'] : NULL );
 			return FALSE;
 		}
 		
@@ -6192,7 +6401,7 @@ class Core extends Library
 			unset( $info['tag_id'] );
 		}
 		
-		$inserted_id = Db::i()->insert( 'core_tags', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_tags', $info );
 
 		if ( $hasId )
 		{
@@ -6210,31 +6419,31 @@ class Core extends Library
 	 * @param	string|NULL	$icondata	Binary data for the icon file
 	 * @param	string|NULL	$coverfile	Path to the club cover photo file
 	 * @param	string|NULL	$coverdata	Binary data for the icon file
-	 * @return	bool|int			The ID of the newly inserted club, or FALSE on failure.
+	 * @return	boolean|integer			The ID of the newly inserted club, or FALSE on failure.
 	 */
-	public function convertClub( array $info=array(), ?string $iconfile=NULL, ?string $icondata=NULL, ?string $coverfile=NULL, ?string $coverdata=NULL ) : bool|int
+	public function convertClub( $info=array(), $iconfile=NULL, $icondata=NULL, $coverfile=NULL, $coverdata=NULL )
 	{
 		if ( !isset( $info['club_id'] ) )
 		{
-			$this->software->app->log( 'club_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'club_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['name'] ) )
 		{
 			$info['name'] = "Club #{$info['club_id']}";
-			$this->software->app->log( 'club_missing_name', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'club_missing_name', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 		}
 		
-		if ( !isset( $info['type'] ) OR !in_array( $info['type'], array( 'public', 'open', 'closed', 'private' ) ) )
+		if ( !isset( $info['type'] ) OR !\in_array( $info['type'], array( 'public', 'open', 'closed', 'private' ) ) )
 		{
 			$info['type'] = 'private'; # Assume private so nothing is revealed.
-			$this->software->app->log( 'club_type_invalid', __METHOD__, App::LOG_NOTICE );
+			$this->software->app->log( 'club_type_invalid', __METHOD__, \IPS\convert\App::LOG_NOTICE );
 		}
 		
 		if ( isset( $info['created'] ) )
 		{
-			if ( $info['created'] instanceof DateTime )
+			if ( $info['created'] instanceof \IPS\DateTime )
 			{
 				$info['created'] = $info['created']->getTimestamp();
 			}
@@ -6255,7 +6464,7 @@ class Core extends Library
 			{
 				$info['owner'] = $this->software->app->getLink( $info['owner'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['owner'] = 0;
 			}
@@ -6274,7 +6483,7 @@ class Core extends Library
 			
 			try
 			{
-				$file = File::create( 'core_Clubs', $info['profile_photo'], $icondata );
+				$file = \IPS\File::create( 'core_Clubs', $info['profile_photo'], $icondata );
 				$info['profile_photo'] = (string) $file;
 			}
 			catch( \Exception $e )
@@ -6292,7 +6501,7 @@ class Core extends Library
 			
 			try
 			{
-				$file = File::create( 'core_Clubs', $info['cover_photo'], $coverdata );
+				$file = \IPS\File::create( 'core_Clubs', $info['cover_photo'], $coverdata );
 				$info['cover_photo'] = (string) $file;
 			}
 			catch( \Exception $e )
@@ -6311,7 +6520,7 @@ class Core extends Library
 			$info['featured'] = 0;
 		}
 		
-		if ( isset( $info['location'] ) AND $info['location'] instanceof GeoLocation )
+		if ( isset( $info['location'] ) AND $info['location'] instanceof \IPS\GeoLocation )
 		{
 			$info['location_json']	= json_encode( $info['location'] );
 			$info['location_lat']	= $info['location']->lat;
@@ -6333,7 +6542,7 @@ class Core extends Library
 		
 		if ( isset( $info['last_activity'] ) )
 		{
-			if ( $info['last_activity'] instanceof DateTime )
+			if ( $info['last_activity'] instanceof \IPS\Date\Time )
 			{
 				$info['last_activity'] = $info['last_activity']->getTimestamp();
 			}
@@ -6355,7 +6564,7 @@ class Core extends Library
 		$id = $info['club_id'];
 		unset( $info['club_id'] );
 		
-		$inserted_id = Db::i()->insert( 'core_clubs', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'core_clubs', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'core_clubs' );
 		return $inserted_id;
 	}
@@ -6364,13 +6573,13 @@ class Core extends Library
 	 * Convert a Club Member
 	 *
 	 * @param	array		$info		The data to insert
-	 * @return	bool|int			The unique ID of the newly inserted club member, or FALSE on failure.
+	 * @return	boolean|string			The unique ID of the newly inserted club member, or FALSE on failure.
 	 */
-	public function convertClubMember( array $info=array() ) : bool|int
+	public function convertClubMember( $info=array() )
 	{
 		if ( !isset( $info['club_id'] ) OR !isset( $info['member_id'] ) )
 		{
-			$this->software->app->log( 'club_member_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'club_member_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -6379,15 +6588,15 @@ class Core extends Library
 			$info['club_id']	= $this->software->app->getLink( $info['club_id'], 'core_clubs' );
 			$info['member_id']	= $this->software->app->getLink( $info['member_id'], 'core_members' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'core_member_orphaned_data', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'core_member_orphaned_data', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( isset( $info['joined'] ) )
 		{
-			if ( $info['joined'] instanceof DateTime )
+			if ( $info['joined'] instanceof \IPS\DateTime )
 			{
 				$info['joined'] = $info['joined']->getTimestamp();
 			}
@@ -6397,7 +6606,7 @@ class Core extends Library
 			$info['joined'] = time();
 		}
 		
-		if ( !isset( $info['status'] ) OR !in_array( $info['status'], array( 'member', 'requested', 'invited', 'leader', 'declined', 'banned', 'moderator' ) ) )
+		if ( !isset( $info['status'] ) OR !\in_array( $info['status'], array( 'member', 'requested', 'invited', 'leader', 'declined', 'banned', 'moderator' ) ) )
 		{
 			$info['status'] = 'member';
 		}
@@ -6408,7 +6617,7 @@ class Core extends Library
 			{
 				$info['added_by'] = $this->software->app->getLink( $info['added_by'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['added_by'] = NULL;
 			}
@@ -6424,7 +6633,7 @@ class Core extends Library
 			{
 				$info['invited_by'] = $this->software->app->getLink( $info['invited_by'], 'core_members' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['invited_by'] = NULL;
 			}
@@ -6436,9 +6645,9 @@ class Core extends Library
 
 		try
 		{
-			Db::i()->insert( 'core_clubs_memberships', $info );
+			\IPS\Db::i()->insert( 'core_clubs_memberships', $info );
 		}
-		catch( Exception $e )
+		catch( \IPS\Db\Exception $e )
 		{
 			/* Duplicate row */
 			if( $e->getCode() == 1062 )
@@ -6456,13 +6665,13 @@ class Core extends Library
 	 * Convert a Club Member
 	 *
 	 * @param	array		$info		The data to insert
-	 * @return	bool|int			The unique ID of the newly inserted club member, or FALSE on failure.
+	 * @return	boolean|string			The unique ID of the newly inserted club member, or FALSE on failure.
 	 */
-	public function convertClubPage( array $info=array() ) : bool|int
+	public function convertClubPage( array $info=array() )
 	{
 		if ( !isset( $info['page_id'] ) OR !isset( $info['page_club'] ) )
 		{
-			$this->software->app->log( 'club_page_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'club_page_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
@@ -6470,30 +6679,30 @@ class Core extends Library
 		{
 			$info['page_club']	= $this->software->app->getLink( $info['page_club'], 'core_clubs' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			$this->software->app->log( 'club_page_missing_club_id', __METHOD__, App::LOG_WARNING, $info['page_id'] );
+			$this->software->app->log( 'club_page_missing_club_id', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['page_id'] );
 			return FALSE;
 		}
 
 		if ( empty( $info['page_content'] ) )
 		{
-			$this->software->app->log( 'club_page_missing_content', __METHOD__, App::LOG_WARNING, $info['pid'] );
+			$this->software->app->log( 'club_page_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['pid'] );
 			return FALSE;
 		}
 
 		if ( !isset( $info['page_title'] ) )
 		{
 			$info['page_title'] = "Page {$info['page_id']}";
-			$this->software->app->log( 'club_page_missing_name', __METHOD__, App::LOG_NOTICE, $info['page_id'] );
+			$this->software->app->log( 'club_page_missing_name', __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['page_id'] );
 		}
 
 		if ( isset( $info['page_can_view'] ) )
 		{
-			if( is_array( $info['page_can_view'] ) )
+			if( \is_array( $info['page_can_view'] ) )
 			{
 				$info['page_can_view'] = implode( ',', array_filter( $info['page_can_view'], function( $value ) {
-					return in_array( $value, array( 'nonmember', 'member', 'moderator' ) );
+					return (bool) \in_array( $value, array( 'nonmember', 'member', 'moderator' ) );
 				} ) );
 			}
 		}
@@ -6502,12 +6711,12 @@ class Core extends Library
 			$info['page_can_view'] = NULL;
 		}
 
-		$info['page_seo_title'] = Friendly::seoTitle( $info['page_title'] );
+		$info['page_seo_title'] = \IPS\Http\Url\Friendly::seoTitle( $info['page_title'] );
 
 		$id = $info['page_id'];
 		unset( $info['page_id'] );
 
-		$insertedId = Db::i()->insert( 'core_club_pages', $info );
+		$insertedId = \IPS\Db::i()->insert( 'core_club_pages', $info );
 		$this->software->app->addLink( $insertedId, $id, 'core_club_page' );
 		return $insertedId;
 	}

@@ -13,21 +13,21 @@ namespace IPS\Notification;
 /* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * API Notification Model
  */
-class Api extends Inline
+class _Api extends \IPS\Notification\Inline
 {
 	/**
 	 * Get sent time
 	 *
 	 * @return	int
 	 */
-	public function get_sent(): int
+	public function get_sent()
 	{
 		return $this->_data['sent_time'];
 	}
@@ -37,7 +37,7 @@ class Api extends Inline
 	 *
 	 * @return	int
 	 */
-	public function get_updated(): int
+	public function get_updated()
 	{
 		return $this->_data['updated_time'];
 	}
@@ -47,7 +47,7 @@ class Api extends Inline
 	 *
 	 * @return	string
 	 */
-	public function get_app(): string
+	public function get_app()
 	{
 		return $this->_data['notification_app'];
 	}

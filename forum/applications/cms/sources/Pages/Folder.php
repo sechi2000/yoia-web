@@ -12,47 +12,26 @@
 namespace IPS\cms\Pages;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Session;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function func_get_args;
-use function get_called_class;
-use function get_class;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Folder Model
  */
-class Folder extends Model
+class _Folder extends \IPS\Node\Model
 {
 	/**
 	 * Munge different record types
 	 *
 	 * @return  array
 	 */
-	public static function munge() : array
+	public static function munge()
 	{
 		$rows = array();
-		$args = func_get_args();
+		$args = \func_get_args();
 	
 		foreach( $args as $arg )
 		{
@@ -70,73 +49,73 @@ class Folder extends Model
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'cms_folders';
+	public static $databaseTable = 'cms_folders';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'folder_';
+	public static $databasePrefix = 'folder_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array('folder_name', 'folder_path');
+	protected static $databaseIdFields = array('folder_name', 'folder_path');
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnParent = 'parent_id';
+	public static $databaseColumnParent = 'parent_id';
 	
 	/**
 	 * @brief	[Node] Parent ID Root Value
 	 * @note	This normally doesn't need changing though some legacy areas use -1 to indicate a root node
 	 */
-	public static int $databaseColumnParentRootValue = 0;
+	public static $databaseColumnParentRootValue = 0;
 	
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'path';
+	public static $databaseColumnOrder = 'path';
 
 	/**
 	 * @brief	[Node] Automatically set position for new nodes
 	 */
-	public static bool $automaticPositionDetermination = FALSE;
+	public static $automaticPositionDetermination = FALSE;
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'folder';
+	public static $nodeTitle = 'folder';
 	
 	/**
 	 * @brief	[Node] Subnode class
 	 */
-	public static ?string $subnodeClass = 'IPS\cms\Pages\Page';
+	public static $subnodeClass = 'IPS\cms\Pages\Page';
 	
 	/**
 	 * @brief	[Node] Show forms modally?
 	 */
-	public static bool $modalForms = TRUE;
+	public static $modalForms = TRUE;
 	
 	/**
 	 * @brief	[Node] Restrictions
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
  		'app'		=> 'cms',
  		'module'	=> 'pages',
  		'all'		=> 'page_manage',
@@ -146,9 +125,9 @@ class Folder extends Model
 	/**
 	 * [Node] Get Title
 	 *
-	 * @return	string
+	 * @return	string|null
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		return $this->name;
 	}
@@ -158,7 +137,7 @@ class Folder extends Model
 	 *
 	 * @return	string
 	 */
-	public function getSortableName() : string
+	public function getSortableName()
 	{
 		return $this->name;
 	}
@@ -166,11 +145,11 @@ class Folder extends Model
 	/**
 	 * [Node] Get buttons to display in tree
 	 *
-	 * @param Url $url		Base URL
-	 * @param bool $subnode	Is this a subnode?
-	 * @return    array
+	 * @param	string	$url		Base URL
+	 * @param	bool	$subnode	Is this a subnode?
+	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ): array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = parent::getButtons( $url, $subnode );
 		$return  = array();
@@ -184,14 +163,14 @@ class Folder extends Model
 		{
 			$buttons['add']['icon']	 = 'folder-open';
 			$buttons['add']['title'] = 'content_add_folder';
-			$buttons['add']['data']  = array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('content_add_folder') );
+			$buttons['add']['data']  = array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('content_add_folder') );
 			$buttons['add']['link']	 = $url->setQueryString( array( 'subnode' => 0, 'do' => 'form', 'parent' => $this->_id ) );
 			
 			$buttons['add_page'] = array(
 					'icon'	=> 'plus-circle',
 					'title'	=> 'content_add_page',
 					'link'	=> $url->setQueryString( array( 'subnode' => 1, 'do' => 'add', 'parent' => $this->_id ) ),
-					'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('content_add_page') )
+					'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('content_add_page') )
 			);
 		}
 		
@@ -216,10 +195,10 @@ class Folder extends Model
 			if ( $this->getItemCount() )
 			{
 				$return['delete'] = array(
-					'icon'	=> 'trash',
+					'icon'	=> 'trash-o',
 					'title'	=> 'empty',
 					'link'	=> $url->setQueryString( array( 'do' => 'delete', 'id' => $this->_id ) ),
-					'data' 	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('empty') ),
+					'data' 	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('empty') ),
 					'hotkey'=> 'd'
 				);
 			}
@@ -235,52 +214,52 @@ class Folder extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		/* Build form */
-		$form->add( new Text( 'folder_name', $this->id ? $this->name : '', TRUE, array( 'maxLength' => 64 ), function( $val )
+		$form->add( new \IPS\Helpers\Form\Text( 'folder_name', $this->id ? $this->name : '', TRUE, array( 'maxLength' => 64 ), function( $val )
 		{
 			try
 			{
-				$testPage = Page::load( $val, 'page_seo_name' );
+				$testPage = \IPS\cms\Pages\Page::load( $val, 'page_seo_name' );
 				
 				/* Ok, we have a folder, but is it on the same tree as us ?*/
-				if ( intval( Request::i()->folder_parent_id ) == $testPage->folder_id )
+				if ( \intval( \IPS\Request::i()->folder_parent_id ) == $testPage->folder_id )
 				{
 					/* Yep, this will break designers' mode and may confuse the FURL engine so we cannot allow this */
-					throw new InvalidArgumentException('content_folder_name_furl_collision_folder');
+					throw new \InvalidArgumentException('content_folder_name_furl_collision_folder');
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				/* Nothing with the same name, so that's proper good that is */
 			}
 			
 			try
 			{
-				$test = Folder::load( ( $val === '.well-known' ) ? $val : Friendly::seoTitle( $val ), 'folder_name' );
+				$test = \IPS\cms\Pages\Folder::load( ( $val === '.well-known' ) ? $val : \IPS\Http\Url\Friendly::seoTitle( $val ), 'folder_name' );
 
-				if ( empty( Request::i()->id ) or $test->id != Request::i()->id )
+				if ( empty( \IPS\Request::i()->id ) or $test->id != \IPS\Request::i()->id )
 				{
-					throw new InvalidArgumentException('content_folder_name_in_use');
+					throw new \InvalidArgumentException('content_folder_name_in_use');
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				/* If we hit here, we don't have an existing folder by that name so check for a collision */
-				if ( Request::i()->folder_parent_id == 0 AND Page::isFurlCollision( ( $val === '.well-known' ) ? $val : Friendly::seoTitle( $val ) ) )
+				if ( \IPS\Request::i()->folder_parent_id == 0 AND \IPS\cms\Pages\Page::isFurlCollision( ( $val === '.well-known' ) ? $val : \IPS\Http\Url\Friendly::seoTitle( $val ) ) )
 				{
-					throw new InvalidArgumentException('content_folder_name_furl_collision');
+					throw new \InvalidArgumentException('content_folder_name_furl_collision');
 				}
 			}
 		} ) );
 
-		$class = get_called_class();
+		$class = \get_called_class();
 
-		$form->add( new Node( 'folder_parent_id', $this->parent_id ? $this->parent_id : 0, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Node( 'folder_parent_id', $this->parent_id ? $this->parent_id : 0, FALSE, array(
 				'class'         => '\IPS\cms\Pages\Folder',
 				'zeroVal'         => 'node_no_parent',
 				'permissionCheck' => function( $node ) use ( $class )
@@ -290,7 +269,7 @@ class Folder extends Model
 						return FALSE;
 					}
 
-					return !isset( Request::i()->id ) or ( $node->id != Request::i()->id and !$node->isChildOf( $node::load( Request::i()->id ) ) );
+					return !isset( \IPS\Request::i()->id ) or ( $node->id != \IPS\Request::i()->id and !$node->isChildOf( $node::load( \IPS\Request::i()->id ) ) );
 				}
 		) ) );
 	}
@@ -301,7 +280,7 @@ class Folder extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		$isNew = $this->_new;
 
@@ -328,7 +307,7 @@ class Folder extends Model
 			}
 			else
 			{
-				$values['name'] = Friendly::seoTitle( $values['folder_name'] );
+				$values['name'] = \IPS\Http\Url\Friendly::seoTitle( $values['folder_name'] );
 			}
 			unset( $values['folder_name'] );
 		}
@@ -344,12 +323,12 @@ class Folder extends Model
 	/**
 	 * @brief	Original parent ID
 	 */
-	protected ?int $origParentId = null;
+	protected $origParentId;
 
 	/**
 	 * @brief	Original Name
 	 */
-	protected ?string $origName = null;
+	protected $origName;
 
 	/**
 	 * [Node] Perform actions after saving the form
@@ -357,7 +336,7 @@ class Folder extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
 		if ( $this->origParentId !== $values['parent_id'] OR $this->origName !== $values['name'] )
 		{
@@ -370,9 +349,9 @@ class Folder extends Model
 	 *
 	 * @return void
 	 */
-	public function storeUrl() : void
+	public function storeUrl()
 	{
-		Db::i()->insert( 'cms_url_store', array(
+		\IPS\Db::i()->insert( 'cms_url_store', array(
 			'store_path'       => $this->path,
 			'store_current_id' => $this->_id,
 			'store_type'       => 'folder'
@@ -384,7 +363,7 @@ class Folder extends Model
 	 * 
 	 * @return void
 	 */
-	public function save(): void
+	public function save()
 	{
 		$this->last_modified = time();
 		
@@ -394,12 +373,12 @@ class Folder extends Model
 	/**
 	 * Retrieve item \count(if applicable) for a node.
 	 *
-	 * @return	int
+	 * @return	int|bool
 	 */
-	public function getItemCount() : int
+	public function getItemCount()
 	{
-		$pages = (int) Db::i()->select( 'COUNT(*)', 'cms_pages', array( 'page_folder_id=?', $this->id ) )->first();
-		$subFolders = (int) Db::i()->select( 'COUNT(*)', 'cms_folders', array( 'folder_parent_id=?', $this->id ) )->first();
+		$pages = (int) \IPS\Db::i()->select( 'COUNT(*)', 'cms_pages', array( 'page_folder_id=?', $this->id ) )->first();
+		$subFolders = (int) \IPS\Db::i()->select( 'COUNT(*)', 'cms_folders', array( 'folder_parent_id=?', $this->id ) )->first();
 
 		return $pages + $subFolders;
 	}
@@ -408,19 +387,19 @@ class Folder extends Model
 	 * Form to delete or move content
 	 *
 	 * @param	bool	$showMoveToChildren	If TRUE, will show "move to children" even if there are no children
-	 * @return	Form
+	 * @return	\IPS\Helpers\Form
 	 */
-	public function deleteOrMoveForm( bool $showMoveToChildren=FALSE ): Form
+	public function deleteOrMoveForm( $showMoveToChildren=FALSE )
 	{
 		$hasContent = $this->getItemCount();
 			
-		$form = new Form( 'form', 'delete' );
+		$form = new \IPS\Helpers\Form( 'form', 'delete' );
 		
 		if ( $hasContent )
 		{
-			$form->add( new Node( 'cms_move_pages', 0, TRUE, array( 'class' => get_class( $this ), 'disabled' => array( $this->_id ), 'disabledLang' => 'node_move_delete', 'zeroVal' => 'cms_move_to_root', 'subnodes' => FALSE, 'permissionCheck' => function( $node )
+			$form->add( new \IPS\Helpers\Form\Node( 'cms_move_pages', 0, TRUE, array( 'class' => \get_class( $this ), 'disabled' => array( $this->_id ), 'disabledLang' => 'node_move_delete', 'zeroVal' => 'cms_move_to_root', 'subnodes' => FALSE, 'permissionCheck' => function( $node )
 			{
-				return Request::i()->id != $node->id;
+				return \IPS\Request::i()->id != $node->id;
 			} ) ) );
 		}
 		
@@ -433,7 +412,7 @@ class Folder extends Model
 	 * @param	array	$values			Values from form
 	 * @return	void
 	 */
-	public function deleteOrMoveFormSubmit( array $values ) : void
+	public function deleteOrMoveFormSubmit( $values )
 	{
 		if ( $values['cms_move_pages'] )
 		{
@@ -444,17 +423,17 @@ class Folder extends Model
 			$folderId = 0;
 		}
 		
-		Db::i()->update( 'cms_pages', array( 'page_folder_id' => $folderId ), array( 'page_folder_id=?', $this->_id ) );
-		Db::i()->update( 'cms_folders', array( 'folder_parent_id' => $folderId ), array( 'folder_id=?', $this->_id ) );
-		Db::i()->update( 'cms_folders', array( 'folder_parent_id' => $folderId ), array( 'folder_parent_id=?', $this->_id ) );
+		\IPS\Db::i()->update( 'cms_pages', array( 'page_folder_id' => $folderId ), array( 'page_folder_id=?', $this->_id ) );
+		\IPS\Db::i()->update( 'cms_folders', array( 'folder_parent_id' => $folderId ), array( 'folder_id=?', $this->_id ) );
+		\IPS\Db::i()->update( 'cms_folders', array( 'folder_parent_id' => $folderId ), array( 'folder_parent_id=?', $this->_id ) );
 		
-		unset( Store::i()->pages_page_urls );
+		unset( \IPS\Data\Store::i()->pages_page_urls );
 		
 		/* Update pages */
-		Page::resetPath( $folderId );
+		\IPS\cms\Pages\Page::resetPath( $folderId );
 		
 		/* Delete it */
-		Session::i()->log( 'acplog__node_deleted', array( $this->title => TRUE, $this->titleForLog() => FALSE ) );
+		\IPS\Session::i()->log( 'acplog__node_deleted', array( $this->title => TRUE, $this->titleForLog() => FALSE ) );
 		$this->delete();
 	}
 	
@@ -464,7 +443,7 @@ class Folder extends Model
 	 * @param	boolean	$recursivelyCheck	Recursively reset up and down the tree
 	 * @return void
 	 */
-	public function resetPath( bool $recursivelyCheck=true ) : void
+	public function resetPath( $recursivelyCheck=true )
 	{
 		$path = array();
 		
@@ -473,13 +452,13 @@ class Folder extends Model
 			$path[] = $obj->name;
 		}
 		
-		$this->path = ( count( $path ) ) ? implode( '/', $path ) . '/' . $this->name : $this->name;
+		$this->path = ( \count( $path ) ) ? implode( '/', $path ) . '/' . $this->name : $this->name;
 		
 		/* Save path update */
 		parent::save();
 		
 		/* Update pages */
-		Page::resetPath( $this->id );
+		\IPS\cms\Pages\Page::resetPath( $this->id );
 		
 		if ( $recursivelyCheck === true )
 		{
@@ -503,7 +482,7 @@ class Folder extends Model
 	 * 
 	 * @return void
 	 */
-	protected function _recursivelyResetChildPaths() : void
+	protected function _recursivelyResetChildPaths()
 	{
 		foreach( $this->children( NULL, NULL, FALSE ) as $child )
 		{

@@ -11,38 +11,27 @@
 namespace IPS\Data;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Data\Cache\None;
-use IPS\Data\Store\Exception as StoreException;
-use OutOfRangeException;
-use function defined;
-use function is_array;
-use const IPS\CACHE_METHOD;
-use const IPS\STORE_CONFIG;
-use const IPS\STORE_METHOD;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Abstract Storage Class
  */
-abstract class Store extends AbstractData
+abstract class _Store extends AbstractData
 {
 	/**
 	 * @brief	Instance
 	 */
-	protected static ?Store $instance = NULL;
+	protected static $instance;
 
 	/**
 	 * Available Data Store Methods
 	 * - MUST always return 'Database' and 'FileSystem' options
 	 *
-	 * @return array<string, class-string<\IPS\Data\Store>>
+	 * @return  array
 	 */
 	public static function availableMethods(): array
 	{
@@ -56,32 +45,32 @@ abstract class Store extends AbstractData
 	/**
 	 * Get instance
 	 *
-	 * @return    Store
+	 * @return	\IPS\Data\Store
 	 */
-	public static function i(): Store
+	public static function i()
 	{
 		if( static::$instance === NULL )
 		{
 			try
 			{
-				if( !isset( static::availableMethods()[ STORE_METHOD ] ) )
+				if( !isset( static::availableMethods()[ \IPS\STORE_METHOD ] ) )
 				{
-					throw new StoreException;
+					throw new \IPS\Data\Store\Exception;
 				}
 
-				$classname = static::availableMethods()[ STORE_METHOD ];
+				$classname = static::availableMethods()[ \IPS\STORE_METHOD ];
 
 				if( !$classname::supported() )
 				{
-					throw new StoreException;
+					throw new \IPS\Data\Store\Exception;
 				}
 
-				static::$instance = new $classname( json_decode( STORE_CONFIG, TRUE ) );
+				static::$instance = new $classname( json_decode( \IPS\STORE_CONFIG, TRUE ) );
 			}
-			catch( StoreException $e )
+			catch( \IPS\Data\Store\Exception $e )
 			{
 				/* Fall back to MySQL (if not using it currently, and then FileSystem if we are) */
-				if ( STORE_METHOD !== 'Database' )
+				if ( \IPS\STORE_METHOD !== 'Database' )
 				{
 					$classname = static::availableMethods()['Database'];
 				}
@@ -90,7 +79,7 @@ abstract class Store extends AbstractData
 					$classname = static::availableMethods()['FileSystem'];
 				}
 				
-				static::$instance = new $classname( json_decode( STORE_CONFIG, TRUE ) );
+				static::$instance = new $classname( json_decode( \IPS\STORE_CONFIG, TRUE ) );
 			}
 		}
 		
@@ -100,33 +89,33 @@ abstract class Store extends AbstractData
 	/**
 	 * @brief	Always needed Store keys
 	 */
-	public array $initLoad = array();
+	public $initLoad = array();
 	
 	/**
 	 * @brief	Template store keys
 	 */
-	public array $templateLoad = array();
+	public $templateLoad = array();
 	
 	/**
 	 * @brief	Log
 	 */
-	public array $log	= array();
+	public $log	= array();
 	
 	/**
 	 * Test to see if this store works
 	 *
 	 * @return	boolean
 	 */
-	public static function testStore(): bool
+	public static function testStore()
 	{
 		try
 		{
-			$classname = 'IPS\Data\Store\\' . STORE_METHOD;
-			$store = new $classname( json_decode( STORE_CONFIG, TRUE ) );
+			$classname = 'IPS\Data\Store\\' . \IPS\STORE_METHOD;
+			$store = new $classname( json_decode( \IPS\STORE_CONFIG, TRUE ) );
 			
 			return $store->test();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return FALSE;
 		}
@@ -149,7 +138,7 @@ abstract class Store extends AbstractData
 	 *
 	 * @return	bool
 	 */
-	public function test(): bool
+	public function test()
 	{
 		/* Set a test key */
 		$key	= 'test_' . md5( mt_rand() );
@@ -165,7 +154,7 @@ abstract class Store extends AbstractData
 
 			unset( $this->$key );
 
-			return $value == 1;
+			return ( $value == 1 ) ? TRUE : FALSE;
 		}
 
 		return FALSE;
@@ -174,10 +163,10 @@ abstract class Store extends AbstractData
 	/**
 	 * Magic Method: Get
 	 *
-	 * @param string $key	Key
-	 * @return	mixed	Value from the _datastore
+	 * @param	string	$key	Key
+	 * @return	string	Value from the _datastore
 	 */
-	public function __get( string $key ): mixed
+	public function __get( $key )
 	{
 		/* Try to get it from the cache store... */
 		try
@@ -185,25 +174,25 @@ abstract class Store extends AbstractData
 			/* If caching is enabled, and this isn't the special map of hashes... */ 
 			if ( $this->useCache( $key ) )
 			{
-				if ( Cache::i()->checkKeys() === false )
+				if ( \IPS\Data\Cache::i()->checkKeys() === false )
 				{
-					if ( isset( Cache::i()->$key ) and Cache::i()->$key !== NULL )
+					if ( isset( \IPS\Data\Cache::i()->$key ) and \IPS\Data\Cache::i()->$key !== NULL )
 					{
 						/* Cache engine always returns current content, so return it */
-						return Cache::i()->$key;
+						return \IPS\Data\Cache::i()->$key;
 					}
 					 
 					/* Still here? throw an exception so we get it from the data storage engine */
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 				else
 				{
 					/* It exists in the caching engine, and we know the hash of the correct value... */
-					$cacheKeys = ( isset( $this->cacheKeys ) and is_array( $this->cacheKeys ) ) ? $this->cacheKeys : array();
-					if ( array_key_exists( $key, $cacheKeys ) and isset( Cache::i()->$key ) )
+					$cacheKeys = ( isset( $this->cacheKeys ) and \is_array( $this->cacheKeys ) ) ? $this->cacheKeys : array();
+					if ( array_key_exists( $key, $cacheKeys ) and isset( \IPS\Data\Cache::i()->$key ) )
 					{				
 						/* Get it... */
-						$value = Cache::i()->$key;
+						$value = \IPS\Data\Cache::i()->$key;
 						
 						/* But only use it if the hash matches */
 						if( $cacheKeys[ $key ] == md5( json_encode( $value ) ) )
@@ -215,11 +204,11 @@ abstract class Store extends AbstractData
 			}
 			
 			/* Still here? throw an exception so we get it from the data storage engine */
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		/* If we couldn't get it from the cache engine, get it from the data storage engine */
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			/* Actually get it... */
 			$value = parent::__get( $key );
@@ -228,12 +217,12 @@ abstract class Store extends AbstractData
 			if ( $this->useCache( $key ) )
 			{
 				/* Set it in the caching engine... */
-				Cache::i()->$key = $value;
+				\IPS\Data\Cache::i()->$key = $value;
 				
-				if ( Cache::i()->checkKeys() === true )
+				if ( \IPS\Data\Cache::i()->checkKeys() === true )
 				{
 					/* And set the hash in the cacheKeys hash map */
-					$cacheKeys = ( isset( $this->cacheKeys ) and is_array( $this->cacheKeys ) ) ? $this->cacheKeys : array();
+					$cacheKeys = ( isset( $this->cacheKeys ) and \is_array( $this->cacheKeys ) ) ? $this->cacheKeys : array();
 					$cacheKeys[ $key ] = md5( json_encode( $value ) );
 					$this->cacheKeys = $cacheKeys;
 				}
@@ -246,11 +235,11 @@ abstract class Store extends AbstractData
 	/**
 	 * Magic Method: Set
 	 *
-	 * @param string $key	Key
-	 * @param mixed $value	Value
+	 * @param	string	$key	Key
+	 * @param	string	$value	Value
 	 * @return	void
 	 */
-	public function __set( string $key, mixed $value )
+	public function __set( $key, $value )
 	{
 		/* Actually set it in the data storage engine */
 		parent::__set( $key, $value );
@@ -259,14 +248,14 @@ abstract class Store extends AbstractData
 		if ( $this->useCache( $key ) )
 		{
 			/* Then also set it in the cache... */
-			Cache::i()->$key = $value;
+			\IPS\Data\Cache::i()->$key = $value;
 		
 			/* And set the hash in the cacheKeys hash map */
-			if ( Cache::i()->checkKeys() === true )
+			if ( \IPS\Data\Cache::i()->checkKeys() === true )
 			{
-				if ( ( isset( $this->cacheKeys ) and is_array( $this->cacheKeys ) ) )
+				if ( ( isset( $this->cacheKeys ) and \is_array( $this->cacheKeys ) ) )
 				{
-					$cacheKeys = $this->cacheKeys;
+					$cacheKeys = \is_array( $this->cacheKeys ) ? $this->cacheKeys : array();
 					$cacheKeys[ $key ] = md5( json_encode( $value ) );
 					$this->cacheKeys = $cacheKeys;
 				}
@@ -281,28 +270,28 @@ abstract class Store extends AbstractData
 	/**
 	 * Magic Method: Isset
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	public function __isset( string $key ): bool
+	public function __isset( $key )
 	{
 		/* If caching is enabled, and this isn't the special map of hashes, try to get it from the cache store... */
 		if ( $this->useCache( $key ) )
 		{
 			/* Does it exist in the caching engine? */
-			if ( isset( Cache::i()->$key ) )
+			if ( isset( \IPS\Data\Cache::i()->$key ) )
 			{
 				/* Get it... */
-				$value = Cache::i()->$key;
+				$value = \IPS\Data\Cache::i()->$key;
 				
-				if ( Cache::i()->checkKeys() === false )
+				if ( \IPS\Data\Cache::i()->checkKeys() === false )
 				{
 					/* Cache engine always returns current content, so return it */
 					return TRUE;
 				}				
 				
 				/* Only use it if the hash matches */
-				$cacheKeys = ( isset( $this->cacheKeys ) and is_array( $this->cacheKeys ) ) ? $this->cacheKeys : array();
+				$cacheKeys = ( isset( $this->cacheKeys ) and \is_array( $this->cacheKeys ) ) ? $this->cacheKeys : array();
 				if ( isset( $cacheKeys[ $key ] ) and $cacheKeys[ $key ] == md5( json_encode( $value ) ) )
 				{
 					return TRUE;
@@ -317,10 +306,10 @@ abstract class Store extends AbstractData
 	/**
 	 * Magic Method: Unset
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	void
 	 */
-	public function __unset( string $key )
+	public function __unset( $key )
 	{
 		/* Unset it in the data storage engine */
 		parent::__unset( $key );
@@ -329,17 +318,17 @@ abstract class Store extends AbstractData
 		if ( $this->useCache( $key ) )
 		{
 			/* Remove it from the cache store... */
-			unset( Cache::i()->$key );
+			unset( \IPS\Data\Cache::i()->$key );
 			
-			if ( Cache::i()->checkKeys() === true )
+			if ( \IPS\Data\Cache::i()->checkKeys() === true )
 			{
 				/* And from the special map of hashes */
 				try
 				{
-					$cacheKeys = is_array( $this->cacheKeys ) ? $this->cacheKeys : array();
+					$cacheKeys = \is_array( $this->cacheKeys ) ? $this->cacheKeys : array();
 				}
 				/* If the cache doesn't exist we shouldn't error out with an uncaught OutOfRangeException */
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$cacheKeys = array();
 				}
@@ -357,11 +346,11 @@ abstract class Store extends AbstractData
 	/**
 	 * Check the cache for this key?
 	 *
-	 * @param string $key	The store key
+	 * @param	string	$key	The store key
 	 * @return boolean
 	 */
-	protected function useCache( string $key ): bool
+	protected function useCache( $key )
 	{
-		return ( CACHE_METHOD != STORE_METHOD and ( ! Cache::i() instanceof None ) and $key !== 'cacheKeys' );
+		return ( \IPS\CACHE_METHOD != \IPS\STORE_METHOD and ( ! \IPS\Data\Cache::i() instanceof \IPS\Data\Cache\None ) and $key !== 'cacheKeys' );
 	}
 }

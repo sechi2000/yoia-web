@@ -12,28 +12,16 @@
 namespace IPS\nexus\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Db;
-use IPS\nexus\Transaction;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Transactions API
  */
-class transactions extends Controller
+class _transactions extends \IPS\Api\Controller
 {
 	/**
 	 * GET /nexus/transactions
@@ -47,10 +35,9 @@ class transactions extends Controller
 	 * @apiparam	string	sortDir				Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page				Page number
 	 * @apiparam	int		perPage				Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\nexus\Transaction>
-	 * @return PaginatedResponse<Transaction>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\nexus\Transaction>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = array();
@@ -60,43 +47,43 @@ class transactions extends Controller
 		{
 			$where[] = array( 't_member=?', $this->member->member_id );
 		}
-		elseif ( isset( Request::i()->customers ) )
+		elseif ( isset( \IPS\Request::i()->customers ) )
 		{
-			$where[] = array( Db::i()->in( 't_member', array_map( 'intval', array_filter( explode( ',', Request::i()->customers ) ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( 't_member', array_map( 'intval', array_filter( explode( ',', \IPS\Request::i()->customers ) ) ) ) );
 		}
 		
 		/* Statuses */
-		if ( isset( Request::i()->statuses ) )
+		if ( isset( \IPS\Request::i()->statuses ) )
 		{
-			$where[] = array( Db::i()->in( 't_status', array_filter( explode( ',', Request::i()->statuses ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( 't_status', array_filter( explode( ',', \IPS\Request::i()->statuses ) ) ) );
 		}
 
 		/* Methods */
-		if ( isset( Request::i()->gateways ) )
+		if ( isset( \IPS\Request::i()->gateways ) )
 		{
-			$where[] = array( Db::i()->in( 't_method', array_filter( explode( ',', Request::i()->gateways ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( 't_method', array_filter( explode( ',', \IPS\Request::i()->gateways ) ) ) );
 		}
 				
 		/* Sort */
-		if ( isset( Request::i()->sortBy ) and in_array( Request::i()->sortBy, array( 'date', 'amount' ) ) )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'date', 'amount' ) ) )
 		{
-			$sortBy = 't_' . Request::i()->sortBy;
+			$sortBy = 't_' . \IPS\Request::i()->sortBy;
 		}
 		else
 		{
 			$sortBy = 't_id';
 		}
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 		
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', 'nexus_transactions', $where, "{$sortBy} {$sortDir}" ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			\IPS\Db::i()->select( '*', 'nexus_transactions', $where, "{$sortBy} {$sortDir}" ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			'IPS\nexus\Transaction',
-			Db::i()->select( 'COUNT(*)', 'nexus_transactions', $where )->first(),
+			\IPS\Db::i()->select( 'COUNT(*)', 'nexus_transactions', $where )->first(),
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 	
@@ -106,19 +93,18 @@ class transactions extends Controller
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		2X307/1	INVALID_ID	The transaction ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\nexus\Transaction
-	 * @return Response
+	 * @return		\IPS\nexus\Transaction
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{			
-			$object = $this->member ? Transaction::loadAndCheckPerms( $id ) : Transaction::load( $id );
-			return new Response( 200, $object->apiOutput( $this->member ) );
+			$object = $this->member ? \IPS\nexus\Transaction::loadAndCheckPerms( $id ) : \IPS\nexus\Transaction::load( $id );
+			return new \IPS\Api\Response( 200, $object->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2X307/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2X307/1', 404 );
 		}
 	}
 }

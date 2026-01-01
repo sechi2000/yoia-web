@@ -12,25 +12,16 @@
 namespace IPS\downloads\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Task;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * tempFileCleanup Task
  */
-class tempFileCleanup extends Task
+class _tempFileCleanup extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -41,40 +32,40 @@ class tempFileCleanup extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		foreach ( Db::i()->select( '*', 'downloads_files_records', array( 'record_file_id=0 AND record_time<?', DateTime::create()->sub( new DateInterval( 'P1D' ) )->getTimestamp() ) ) as $file )
+		foreach ( \IPS\Db::i()->select( '*', 'downloads_files_records', array( 'record_file_id=0 AND record_time<?', \IPS\DateTime::create()->sub( new \DateInterval( 'P1D' ) )->getTimestamp() ) ) as $file )
 		{
 			try
 			{
-				File::get( $file['record_type'] === 'upload' ? 'downloads_Files' : 'downloads_Screenshots', $file['record_location'] )->delete();
+				\IPS\File::get( $file['record_type'] === 'upload' ? 'downloads_Files' : 'downloads_Screenshots', $file['record_location'] )->delete();
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 
 			if( $file['record_thumb'] )
 			{
 				try
 				{
-					File::get( 'downloads_Screenshots', $file['record_thumb'] )->delete();
+					\IPS\File::get( 'downloads_Screenshots', $file['record_thumb'] )->delete();
 				}
-				catch ( Exception $e ) { }
+				catch ( \Exception $e ) { }
 			}
 
 			if( $file['record_no_watermark'] )
 			{
 				try
 				{
-					File::get( 'downloads_Screenshots', $file['record_no_watermark'] )->delete();
+					\IPS\File::get( 'downloads_Screenshots', $file['record_no_watermark'] )->delete();
 				}
-				catch ( Exception $e ) { }
+				catch ( \Exception $e ) { }
 			}
 		}
 		
-		Db::i()->delete( 'downloads_files_records', array( 'record_file_id=0 AND record_time<?', DateTime::create()->sub( new DateInterval( 'P1D' ) )->getTimestamp() ) );
+		\IPS\Db::i()->delete( 'downloads_files_records', array( 'record_file_id=0 AND record_time<?', \IPS\DateTime::create()->sub( new \DateInterval( 'P1D' ) )->getTimestamp() ) );
 		
-		Db::i()->delete( 'downloads_sessions', array( 'dsess_start<?', DateTime::create()->sub( new DateInterval( 'PT6H' ) )->getTimestamp() ) );
+		\IPS\Db::i()->delete( 'downloads_sessions', array( 'dsess_start<?', \IPS\DateTime::create()->sub( new \DateInterval( 'PT6H' ) )->getTimestamp() ) );
 		
 		return NULL;
 	}

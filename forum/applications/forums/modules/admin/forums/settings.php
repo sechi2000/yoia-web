@@ -12,108 +12,65 @@
 namespace IPS\forums\modules\admin\forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application;
-use IPS\Content\Tag;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\forums\Forum;
-use IPS\forums\Topic;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Member as FormMember;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings as SettingsClass;
-use IPS\Theme;
-use function count;
-use function defined;
-use function in_array;
-use function IPS\Cicloud\getForumArchiveForm;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * settings
  */
-class settings extends Controller
+class _settings extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Manage Settings
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Dispatcher::i()->checkAcpPermission( 'settings_access' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'settings_access' );
 		
 		$tabs = array();
-		if ( Member::loggedIn()->hasAcpRestriction( 'forums', 'forums', 'forum_settings' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'forums', 'forums', 'forum_settings' ) )
 		{
 			$tabs['settings'] = 'forum_settings';
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'forums', 'forums', 'archive_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'forums', 'forums', 'archive_manage' ) )
 		{
 			$tabs['archiving'] = 'archiving';
 		}
-		if( Member::loggedIn()->hasAcpRestriction( 'forums', 'forums', 'autolock_settings' ) )
-		{
-			$tabs['autolock'] = 'autolock';
-		}
 		
-		$activeTab = Request::i()->tab ?: 'settings';
-		$methodFunction = 'manage' . IPS::mb_ucfirst( $activeTab );
+		$activeTab = \IPS\Request::i()->tab ?: 'settings';
+		$methodFunction = 'manage' . mb_ucfirst( $activeTab );
 		$activeTabContents = $this->$methodFunction();
 		
-		if( Request::i()->isAjax() and !isset( Request::i()->ajaxValidate ) )
+		if( \IPS\Request::i()->isAjax() and !isset( \IPS\Request::i()->ajaxValidate ) )
 		{
-			Output::i()->output = $activeTabContents;
+			\IPS\Output::i()->output = $activeTabContents;
 		}
 		else
 		{		
-			Output::i()->title = Member::loggedIn()->language()->addToStack('menu__forums_forums_settings');
-			Output::i()->output 	= Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, $activeTabContents, Url::internal( "app=forums&module=forums&controller=settings" ) );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__forums_forums_settings');
+			\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, $activeTabContents, \IPS\Http\Url::internal( "app=forums&module=forums&controller=settings" ) );
 		}
 	}
-
+	
 	/**
 	 * Archive settings
 	 *
 	 * @return	string
 	 */
-	protected function manageArchiving(): string
+	protected function manageArchiving()
 	{
-		Dispatcher::i()->checkAcpPermission( 'archive_manage' );
-
-		if ( Application::appIsEnabled('cloud') )
-		{
-			return getForumArchiveForm();
-		}
-
+		\IPS\Dispatcher::i()->checkAcpPermission( 'archive_manage' );
+		
 		return $this->manageArchivingForm();
 	}
 	
@@ -122,14 +79,14 @@ class settings extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function manageArchivingForm(): string
+	protected function manageArchivingForm()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_settings.js', 'forums', 'admin' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_settings.js', 'forums', 'admin' ) );
 		
 		/* Init */
-		$maxTopics = Db::i()->select( 'COUNT(*)', 'forums_topics' )->first();
-		$existingRules = iterator_to_array( Db::i()->select( '*', 'forums_archive_rules' ) );
-		$existingCount = SettingsClass::i()->archive_on ? Db::i()->select( 'COUNT(*)', 'forums_topics', array_merge( array( array( 'topic_archive_status!=?', Topic::ARCHIVE_EXCLUDE ) ), Application::load('forums')->archiveWhere( $existingRules ) ) )->first() : 0;
+		$maxTopics = \IPS\Db::i()->select( 'COUNT(*)', 'forums_topics' )->first();
+		$existingRules = iterator_to_array( \IPS\Db::i()->select( '*', 'forums_archive_rules' ) );
+		$existingCount = \IPS\Settings::i()->archive_on ? \IPS\Db::i()->select( 'COUNT(*)', 'forums_topics', array_merge( array( array( 'topic_archive_status!=?', \IPS\forums\Topic::ARCHIVE_EXCLUDE ) ), \IPS\Application::load('forums')->archiveWhere( $existingRules ) ) )->first() : 0;
 				
 		/* Work out existing values */
 		$existingValues = array();
@@ -169,6 +126,7 @@ class settings extends Controller
 					
 				case 'post':
 				case 'view':
+				case 'rating':
 					if ( $rule['archive_skip'] )
 					{
 						$existingValues[ "archive_not_topic_{$rule['archive_field']}" ] = array( $rule['archive_value'], $rule['archive_text'], FALSE );
@@ -180,17 +138,24 @@ class settings extends Controller
 					break;
 				
 				case 'member':
-					$members = array();
-					foreach( explode( ',', $rule['archive_text'] ) AS $v )
-					{
-						$members[] = Member::load( $v );
-					}
 					if ( $rule['archive_value'] == '+' )
 					{
+						$members = array();
+						foreach( explode( ',', $rule['archive_text'] ) AS $v )
+						{
+							$members[] = \IPS\Member::load( $v );
+						}
+						
 						$existingValues['archive_topic_starter'] = $members;
 					}
 					else
 					{
+						$members = array();
+						foreach( explode( ',', $rule['archive_text'] ) AS $v )
+						{
+							$members[] = \IPS\Member::load( $v );
+						}
+						
 						$existingValues['archive_topic_starter_not'] = $members;
 					}
 					break;
@@ -198,10 +163,10 @@ class settings extends Controller
 		}
 		
 		/* Build Form */
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->attributes['id'] = 'elArchiveForm';
 		$form->addHeader( 'archive_settings' );
-		$form->add( new YesNo( 'archive_on', SettingsClass::i()->archive_on, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\YesNo( 'archive_on', \IPS\Settings::i()->archive_on, FALSE, array(
 			'togglesOn'	=> array(
 				'archive_storage_location',
 				'archive_last_post',
@@ -213,10 +178,12 @@ class settings extends Controller
 				'archive_topic_poll',
 				'archive_topic_post',
 				'archive_topic_view',
+				'archive_topic_rating',
 				'archive_topic_starter',
 				'archive_topic_not_forums',
 				'archive_not_topic_post',
 				'archive_not_topic_view',
+				'archive_not_topic_rating',
 				'archive_not_last_post',
 				'archive_topic_starter_not',
 				'form_header_archive_topics_where',
@@ -224,43 +191,45 @@ class settings extends Controller
 			)
 		) ) );
 		
-		$form->add( new Radio( 'archive_storage_location', SettingsClass::i()->archive_remote_sql_host ? 'remote' : 'local', FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'archive_storage_location', \IPS\Settings::i()->archive_remote_sql_host ? 'remote' : 'local', FALSE, array(
 			'options'	=> array( 'local' => 'archive_storage_location_local', 'remote' => 'archive_storage_location_remote' ),
 			'toggles'	=> array( 'remote' => array( 'archive_sql_host', 'archive_sql_user', 'archive_sql_pass', 'archive_sql_database', 'archive_sql_port', 'archive_sql_socket', 'archive_sql_tbl_prefix' ) )
 		), NULL, NULL, NULL, 'archive_storage_location' ) );
 
-		$form->add( new Text( 'archive_remote_sql_host', SettingsClass::i()->archive_remote_sql_host ?: ini_get('mysqli.default_host') ?: 'localhost', FALSE, array(), NULL, NULL, NULL, 'archive_sql_host' ) );
-		$form->add( new Text( 'archive_remote_sql_user', SettingsClass::i()->archive_remote_sql_user ?: ini_get('mysqli.default_user'), FALSE, array(), NULL, NULL, NULL, 'archive_sql_user' ) );
-		$form->add( new Text( 'archive_remote_sql_pass', SettingsClass::i()->archive_remote_sql_pass ?: ini_get('mysqli.default_pw'), FALSE, array(), NULL, NULL, NULL, 'archive_sql_pass' ) );
-		$form->add( new Text( 'archive_remote_sql_database', SettingsClass::i()->archive_remote_sql_database ?: NULL, FALSE, array(), NULL, NULL, NULL, 'archive_sql_database' ) );
-		$form->add( new Number( 'archive_sql_port', SettingsClass::i()->archive_sql_port ?: ini_get('mysqli.default_port'), FALSE, array(), NULL, NULL, NULL, 'archive_sql_port' ) );
-		$form->add( new Text( 'archive_sql_socket', SettingsClass::i()->archive_sql_socket ?: ini_get('mysqli.default_socket'), FALSE, array(), NULL, NULL, NULL, 'archive_sql_socket' ) );
-		$form->add( new Text( 'archive_sql_tbl_prefix', SettingsClass::i()->archive_sql_tbl_prefix ?: NULL, FALSE, array(), NULL, NULL, NULL, 'archive_sql_tbl_prefix' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'archive_remote_sql_host', \IPS\Settings::i()->archive_remote_sql_host ?: ini_get('mysqli.default_host') ?: 'localhost', FALSE, array(), NULL, NULL, NULL, 'archive_sql_host' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'archive_remote_sql_user', \IPS\Settings::i()->archive_remote_sql_user ?: ini_get('mysqli.default_user'), FALSE, array(), NULL, NULL, NULL, 'archive_sql_user' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'archive_remote_sql_pass', \IPS\Settings::i()->archive_remote_sql_pass ?: ini_get('mysqli.default_pw'), FALSE, array(), NULL, NULL, NULL, 'archive_sql_pass' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'archive_remote_sql_database', \IPS\Settings::i()->archive_remote_sql_database ?: NULL, FALSE, array(), NULL, NULL, NULL, 'archive_sql_database' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'archive_sql_port', \IPS\Settings::i()->archive_sql_port ?: ini_get('mysqli.default_port'), FALSE, array(), NULL, NULL, NULL, 'archive_sql_port' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'archive_sql_socket', \IPS\Settings::i()->archive_sql_socket ?: ini_get('mysqli.default_socket'), FALSE, array(), NULL, NULL, NULL, 'archive_sql_socket' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'archive_sql_tbl_prefix', \IPS\Settings::i()->archive_sql_tbl_prefix ?: NULL, FALSE, array(), NULL, NULL, NULL, 'archive_sql_tbl_prefix' ) );
 	
 		
 		$form->addHeader( 'archive_topics_where' );
-		$form->add( new Custom( 'archive_last_post', $existingValues['archive_last_post'] ?? array( '>', 0, 'm', TRUE ), FALSE, array( 'getHtml' => array( $this, '_beforeAfterTimeAgo' ), 'validate' => array( $this, '_validateBeforeAfterTimeAgo' ) ), NULL, NULL, NULL, 'archive_last_post' ) );
-		$form->add( new Node( 'archive_topic_forums', $existingValues['archive_topic_forums'] ?? 0, FALSE, array( 'class' => 'IPS\forums\Forum', 'zeroVal' => 'any', 'multiple' => TRUE, 'permissionCheck' => function ( $forum )
+		$form->add( new \IPS\Helpers\Form\Custom( 'archive_last_post', isset( $existingValues['archive_last_post'] ) ? $existingValues['archive_last_post'] : array( '>', 0, 'm', TRUE ), FALSE, array( 'getHtml' => array( $this, '_beforeAfterTimeAgo' ), 'validate' => array( $this, '_validateBeforeAfterTimeAgo' ) ), NULL, NULL, NULL, 'archive_last_post' ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'archive_topic_forums', isset( $existingValues['archive_topic_forums'] ) ? $existingValues['archive_topic_forums'] : 0, FALSE, array( 'class' => 'IPS\forums\Forum', 'zeroVal' => 'any', 'multiple' => TRUE, 'permissionCheck' => function ( $forum )
 		{
 			return $forum->sub_can_post and !$forum->redirect_url;
 		} ), NULL, NULL, NULL, 'archive_topic_forums' ) );
-		$form->add( new CheckboxSet( 'archive_topic_pinned', $existingValues['archive_topic_pinned'] ?? array( 1, 0 ), FALSE, array( 'options' => array( 1 => 'pinned', 0 => 'mod_confirm_unpin' ) ), NULL, NULL, NULL, 'archive_topic_pinned' ) );
-		$form->add( new CheckboxSet( 'archive_topic_featured', $existingValues['archive_topic_featured'] ?? array( 1, 0 ), FALSE, array( 'options' => array( 1 => 'featured', 0 => 'mod_confirm_unfeature' ) ), NULL, NULL, NULL, 'archive_topic_featured' ) );
-		$form->add( new CheckboxSet( 'archive_topic_state', $existingValues['archive_topic_state'] ?? array( 'closed', 'open' ), FALSE, array( 'options' => array( 'closed' => 'locked', 'open' => 'unlocked' ) ), NULL, NULL, NULL, 'archive_topic_state' ) );
-		$form->add( new CheckboxSet( 'archive_topic_approved', $existingValues['archive_topic_approved'] ?? array( -1, 1 ), FALSE, array( 'options' => array( -1 => 'hidden', 1 => 'unhidden' ) ), NULL, NULL, NULL, 'archive_topic_approved' ) );
-		$form->add( new CheckboxSet( 'archive_topic_poll', $existingValues['archive_topic_poll'] ?? array( 1, 0 ), FALSE, array( 'options' => array( 1 => 'topic_has_poll', 0 => 'topic_does_not_have_poll' ) ), NULL, NULL, NULL, 'archive_topic_poll' ) );
-		$form->add( new Custom( 'archive_topic_post', $existingValues['archive_topic_post'] ?? array( NULL, NULL, TRUE ), FALSE, array( 'getHtml' => array( $this, '_greaterThanLessThanField' ) ), NULL, NULL, NULL, 'archive_topic_post' ) );
-		$form->add( new Custom( 'archive_topic_view', $existingValues['archive_topic_view'] ?? array( NULL, NULL, TRUE ), FALSE, array( 'getHtml' => array( $this, '_greaterThanLessThanField' ) ), NULL, NULL, NULL, 'archive_topic_view' ) );
-		$form->add( new FormMember( 'archive_topic_starter', $existingValues['archive_topic_starter'] ?? array(), FALSE, array( 'multiple' => 999999 ), NULL, NULL, NULL, 'archive_topic_starter' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'archive_topic_pinned', isset( $existingValues['archive_topic_pinned'] ) ? $existingValues['archive_topic_pinned'] : array( 1, 0 ), FALSE, array( 'options' => array( 1 => 'pinned', 0 => 'mod_confirm_unpin' ) ), NULL, NULL, NULL, 'archive_topic_pinned' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'archive_topic_featured', isset( $existingValues['archive_topic_featured'] ) ? $existingValues['archive_topic_featured'] : array( 1, 0 ), FALSE, array( 'options' => array( 1 => 'featured', 0 => 'mod_confirm_unfeature' ) ), NULL, NULL, NULL, 'archive_topic_featured' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'archive_topic_state', isset( $existingValues['archive_topic_state'] ) ? $existingValues['archive_topic_state'] : array( 'closed', 'open' ), FALSE, array( 'options' => array( 'closed' => 'locked', 'open' => 'unlocked' ) ), NULL, NULL, NULL, 'archive_topic_state' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'archive_topic_approved', isset( $existingValues['archive_topic_approved'] ) ? $existingValues['archive_topic_approved'] : array( -1, 1 ), FALSE, array( 'options' => array( -1 => 'hidden', 1 => 'unhidden' ) ), NULL, NULL, NULL, 'archive_topic_approved' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'archive_topic_poll', isset( $existingValues['archive_topic_poll'] ) ? $existingValues['archive_topic_poll'] : array( 1, 0 ), FALSE, array( 'options' => array( 1 => 'topic_has_poll', 0 => 'topic_does_not_have_poll' ) ), NULL, NULL, NULL, 'archive_topic_poll' ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'archive_topic_post', isset( $existingValues['archive_topic_post'] ) ? $existingValues['archive_topic_post'] : array( NULL, NULL, TRUE ), FALSE, array( 'getHtml' => array( $this, '_greaterThanLessThanField' ) ), NULL, NULL, NULL, 'archive_topic_post' ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'archive_topic_view', isset( $existingValues['archive_topic_view'] ) ? $existingValues['archive_topic_view'] : array( NULL, NULL, TRUE ), FALSE, array( 'getHtml' => array( $this, '_greaterThanLessThanField' ) ), NULL, NULL, NULL, 'archive_topic_view' ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'archive_topic_rating', isset( $existingValues['archive_topic_rating'] ) ? $existingValues['archive_topic_rating'] : array( NULL, NULL, TRUE ), FALSE, array( 'getHtml' => array( $this, '_greaterThanLessThanField' ) ), NULL, NULL, NULL, 'archive_topic_rating' ) );
+		$form->add( new \IPS\Helpers\Form\Member( 'archive_topic_starter', isset( $existingValues['archive_topic_starter'] ) ? $existingValues['archive_topic_starter'] : array(), FALSE, array( 'multiple' => 999999 ), NULL, NULL, NULL, 'archive_topic_starter' ) );
 		$form->addHeader( 'archive_topics_not_where' );
-		$form->add( new Node( 'archive_topic_not_forums', $existingValues['archive_topic_not_forums'] ?? array(), FALSE, array( 'class' => 'IPS\forums\Forum', 'multiple' => TRUE, 'permissionCheck' => function ( $forum )
+		$form->add( new \IPS\Helpers\Form\Node( 'archive_topic_not_forums', isset( $existingValues['archive_topic_not_forums'] ) ? $existingValues['archive_topic_not_forums'] : array(), FALSE, array( 'class' => 'IPS\forums\Forum', 'multiple' => TRUE, 'permissionCheck' => function ( $forum )
 		{
 			return $forum->sub_can_post and !$forum->redirect_url;
 		} ), NULL, NULL, NULL, 'archive_topic_not_forums' ) );
-		$form->add( new Custom( 'archive_not_topic_post', $existingValues['archive_not_topic_post'] ?? array( NULL, NULL, TRUE ), FALSE, array( 'getHtml' => array( $this, '_greaterThanLessThanField' ) ), NULL, NULL, NULL, 'archive_not_topic_post' ) );
-		$form->add( new Custom( 'archive_not_topic_view', $existingValues['archive_not_topic_view'] ?? array( NULL, NULL, TRUE ), FALSE, array( 'getHtml' => array( $this, '_greaterThanLessThanField' ) ), NULL, NULL, NULL, 'archive_not_topic_view' ) );
-		$form->add( new Custom( 'archive_not_last_post', $existingValues['archive_not_last_post'] ?? array( '>', 0, 'm', TRUE ), FALSE, array( 'getHtml' => array( $this, '_beforeAfterTimeAgo' ), 'validate' => array( $this, '_validateBeforeAfterTimeAgo' ) ), NULL, NULL, NULL, 'archive_not_last_post' ) );
-		$form->add( new FormMember( 'archive_topic_starter_not', $existingValues['archive_topic_starter_not'] ?? array(), FALSE, array( 'multiple' => 999999 ), NULL, NULL, NULL, 'archive_topic_starter_not' ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'archive_not_topic_post', isset( $existingValues['archive_not_topic_post'] ) ? $existingValues['archive_not_topic_post'] : array( NULL, NULL, TRUE ), FALSE, array( 'getHtml' => array( $this, '_greaterThanLessThanField' ) ), NULL, NULL, NULL, 'archive_not_topic_post' ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'archive_not_topic_view', isset( $existingValues['archive_not_topic_view'] ) ? $existingValues['archive_not_topic_view'] : array( NULL, NULL, TRUE ), FALSE, array( 'getHtml' => array( $this, '_greaterThanLessThanField' ) ), NULL, NULL, NULL, 'archive_not_topic_view' ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'archive_not_topic_rating', isset( $existingValues['archive_not_topic_rating'] ) ? $existingValues['archive_not_topic_rating'] : array( NULL, NULL, TRUE ), FALSE, array( 'getHtml' => array( $this, '_greaterThanLessThanField' ) ), NULL, NULL, NULL, 'archive_not_topic_rating' ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'archive_not_last_post', isset( $existingValues['archive_not_last_post'] ) ? $existingValues['archive_not_last_post'] : array( '>', 0, 'm', TRUE ), FALSE, array( 'getHtml' => array( $this, '_beforeAfterTimeAgo' ), 'validate' => array( $this, '_validateBeforeAfterTimeAgo' ) ), NULL, NULL, NULL, 'archive_not_last_post' ) );
+		$form->add( new \IPS\Helpers\Form\Member( 'archive_topic_starter_not', isset( $existingValues['archive_topic_starter_not'] ) ? $existingValues['archive_topic_starter_not'] : array(), FALSE, array( 'multiple' => 999999 ), NULL, NULL, NULL, 'archive_topic_starter_not' ) );
 		
 		/* Handle submissions */
 		if ( $values = $form->values() )
@@ -269,7 +238,7 @@ class settings extends Controller
 			$rules = array();
 			foreach ( $values as $k => $v )
 			{
-				if ( in_array( $k, array( 'archive_last_post' ) ) )
+				if ( \in_array( $k, array( 'archive_last_post' ) ) )
 				{
 					if ( ( !isset( $v[3] ) or !$v[3] ) and $v[1] )
 					{
@@ -284,7 +253,7 @@ class settings extends Controller
 						);
 					}
 				}
-				elseif ( in_array( $k, array( 'archive_not_last_post' ) ) )
+				elseif ( \in_array( $k, array( 'archive_not_last_post' ) ) )
 				{
 					if ( ( !isset( $v[3] ) or !$v[3] ) and $v[1] )
 					{
@@ -299,7 +268,7 @@ class settings extends Controller
 						);
 					}
 				}
-				elseif( in_array( $k, array( 'archive_topic_forums' ) ) )
+				elseif( \in_array( $k, array( 'archive_topic_forums' ) ) )
 				{
 					if ( !empty( $v ) )
 					{
@@ -314,7 +283,7 @@ class settings extends Controller
 						);
 					}
 				}
-				elseif( in_array( $k, array( 'archive_topic_not_forums' ) ) )
+				elseif( \in_array( $k, array( 'archive_topic_not_forums' ) ) )
 				{
 					if ( !empty( $v ) )
 					{
@@ -329,9 +298,9 @@ class settings extends Controller
 						);
 					}
 				}
-				elseif ( in_array( $k, array( 'archive_topic_pinned', 'archive_topic_featured', 'archive_topic_state', 'archive_topic_approved', 'archive_topic_poll' ) ) )
+				elseif ( \in_array( $k, array( 'archive_topic_pinned', 'archive_topic_featured', 'archive_topic_state', 'archive_topic_approved', 'archive_topic_poll' ) ) )
 				{
-					if ( !empty( $v ) and count( $v ) == 1 )
+					if ( !empty( $v ) and \count( $v ) == 1 )
 					{
 						$rules[] = array(
 							'archive_key'	=> md5( "forums_{$k}" ),
@@ -344,7 +313,7 @@ class settings extends Controller
 						);
 					}
 				}
-				elseif( in_array( $k, array( 'archive_topic_post', 'archive_topic_view' ) ) )
+				elseif( \in_array( $k, array( 'archive_topic_post', 'archive_topic_view', 'archive_topic_rating' ) ) )
 				{
 					if ( !isset( $v[2] ) and $v[1] and $v[0] )
 					{
@@ -359,7 +328,7 @@ class settings extends Controller
 						);
 					}
 				}
-				elseif( in_array( $k, array( 'archive_not_topic_post', 'archive_not_topic_view' ) ) )
+				elseif( \in_array( $k, array( 'archive_not_topic_post', 'archive_not_topic_view', 'archive_not_topic_rating' ) ) )
 				{
 					if ( !isset( $v[2] ) and $v[1] and $v[0] )
 					{
@@ -374,9 +343,9 @@ class settings extends Controller
 						);
 					}
 				}
-				elseif( in_array( $k, array( 'archive_topic_starter' ) ) )
+				elseif( \in_array( $k, array( 'archive_topic_starter' ) ) )
 				{
-					if ( is_array( $v ) and count( $v ) )
+					if ( \is_array( $v ) and \count( $v ) )
 					{
 						$ids = array();
 						foreach( $v AS $member )
@@ -395,9 +364,9 @@ class settings extends Controller
 						);
 					}
 				}
-				elseif( in_array( $k, array( 'archive_topic_starter_not' ) ) )
+				elseif( \in_array( $k, array( 'archive_topic_starter_not' ) ) )
 				{
-					if ( is_array( $v ) AND count( $v ) )
+					if ( \is_array( $v ) AND \count( $v ) )
 					{
 						$ids = array();
 						foreach( $v AS $member )
@@ -419,7 +388,7 @@ class settings extends Controller
 			}
 			
 			/* Did we just want a new count? */
-			if ( isset( Request::i()->getCount ) )
+			if ( isset( \IPS\Request::i()->getCount ) )
 			{
 				if ( !$values['archive_on'] )
 				{
@@ -427,9 +396,9 @@ class settings extends Controller
 				}
 				else
 				{				
-					$count = Db::i()->select( 'COUNT(*)', 'forums_topics', array_merge( array( array( 'topic_archive_status!=?', Topic::ARCHIVE_EXCLUDE ) ), Application::load('forums')->archiveWhere( $rules ) ) )->first();
+					$count = \IPS\Db::i()->select( 'COUNT(*)', 'forums_topics', array_merge( array( array( 'topic_archive_status!=?', \IPS\forums\Topic::ARCHIVE_EXCLUDE ) ), \IPS\Application::load('forums')->archiveWhere( $rules ) ) )->first();
 				}
-				Output::i()->json( array( 'count' => $count, 'percentage' => ( $maxTopics * $count > 0 ) ? round( 100 / $maxTopics * $count ) : 0 ) );
+				\IPS\Output::i()->json( array( 'count' => $count, 'percentage' => ( $maxTopics * $count > 0 ) ? round( 100 / $maxTopics * $count ) : 0 ) );
 			}
 			
 			/* No, we're actually saving */
@@ -440,7 +409,7 @@ class settings extends Controller
 				{
 					try
 					{
-						$remoteDatabase = Db::i( 'archive', array(
+						$remoteDatabase = \IPS\Db::i( 'archive', array(
 							'sql_host'		=> $values['archive_remote_sql_host'],
 							'sql_user'		=> $values['archive_remote_sql_user'],
 							'sql_pass'		=> $values['archive_remote_sql_pass'],
@@ -448,17 +417,17 @@ class settings extends Controller
 							'sql_port'		=> $values['archive_sql_port'],
 							'sql_socket'	=> $values['archive_sql_socket'],
 							'sql_tbl_prefix'=> $values['archive_sql_tbl_prefix'],
-							'sql_utf8mb4'	=> isset( SettingsClass::i()->sql_utf8mb4 ) ? SettingsClass::i()->sql_utf8mb4 : FALSE
+							'sql_utf8mb4'	=> isset( \IPS\Settings::i()->sql_utf8mb4 ) ? \IPS\Settings::i()->sql_utf8mb4 : FALSE
 						) );
 						
 						if ( !$remoteDatabase->checkForTable('forums_archive_posts') )
 						{
-							$remoteDatabase->createTable( Db::i()->getTableDefinition('forums_archive_posts') );
+							$remoteDatabase->createTable( \IPS\Db::i()->getTableDefinition('forums_archive_posts') );
 						}
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
-						$form->error = Member::loggedIn()->language()->addToStack( 'archive_remote_db_error', FALSE, array( 'sprintf' => array( "{$e->getMessage()} ({$e->getCode()})" ) ) );
+						$form->error = \IPS\Member::loggedIn()->language()->addToStack( 'archive_remote_db_error', FALSE, array( 'sprintf' => array( "{$e->getMessage()} ({$e->getCode()})" ) ) );
 						goto showForm; // Dinosaur attack!!!!
 					}
 				}
@@ -478,18 +447,18 @@ class settings extends Controller
 				}
 				$form->saveAsSettings( $settingValues );
 				
-				Db::i()->delete( 'forums_archive_rules' );
-				if ( count( $rules ) )
+				\IPS\Db::i()->delete( 'forums_archive_rules' );
+				if ( \count( $rules ) )
 				{
-					Db::i()->insert( 'forums_archive_rules', $rules );
+					\IPS\Db::i()->insert( 'forums_archive_rules', $rules );
 				}
 				
 				/* Do we need to unarchive some? */
 				if( $values['archive_on'] )
 				{
-					$whereClause = Db::i()->compileWhereClause( Application::load('forums')->archiveWhere( $rules ) );
+					$whereClause = \IPS\Db::i()->compileWhereClause( \IPS\Application::load('forums')->archiveWhere( $rules ) );
 					$_whereClause = array( 'topic_archive_status=? AND !( ' . $whereClause['clause'] . ')' );
-					$_whereClause[] = Topic::ARCHIVE_DONE;
+					$_whereClause[] = \IPS\forums\Topic::ARCHIVE_DONE;
 					foreach ( $whereClause['binds'] as $bind )
 					{
 						$_whereClause[] = $bind;
@@ -497,74 +466,74 @@ class settings extends Controller
 				}
 				else
 				{
-					$_whereClause = array( 'topic_archive_status NOT IN(' . Topic::ARCHIVE_NOT . ',' . Topic::ARCHIVE_EXCLUDE . ')' );
+					$_whereClause = array( 'topic_archive_status NOT IN(' . \IPS\forums\Topic::ARCHIVE_NOT . ',' . \IPS\forums\Topic::ARCHIVE_EXCLUDE . ')' );
 				}
 
 				/* Make sure the unarchive task is enabled - it will disable itself if there is no work to do */
-				Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'unarchive' ) );
+				\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'unarchive' ) );
 
 				/* And disable the archive task if archiving is disabled */
 				if( !$values['archive_on'] )
 				{
-					Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'archive' ) );
+					\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'archive' ) );
 				}
 				/* Or enable it if archiving is enabled */
 				else
 				{
-					Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'archive' ) );
+					\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'archive' ) );
 				}
 				
 				/* Log and redirect */
-				Session::i()->log( 'acplogs__archive_settings' );
-				if ( Db::i()->select( 'COUNT(*)', 'forums_topics', $_whereClause )->first() )
+				\IPS\Session::i()->log( 'acplogs__archive_settings' );
+				if ( \IPS\Db::i()->select( 'COUNT(*)', 'forums_topics', $_whereClause )->first() )
 				{
-					Output::i()->redirect( Url::internal( 'app=forums&module=forums&controller=settings&do=unarchive' ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=forums&module=forums&controller=settings&do=unarchive' ) );
 				}
 				else
 				{				
-					Output::i()->redirect( Url::internal( 'app=forums&module=forums&controller=settings&tab=archiving' ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=forums&module=forums&controller=settings&tab=archiving' ) );
 				}
 			}
 		}
 		
 		/* Display */
 		showForm:
-		return Theme::i()->getTemplate( 'settings' )->archiveRules( $form, $maxTopics, $existingCount, ( $maxTopics * $existingCount > 0 ) ? round( 100 / $maxTopics * $existingCount ) : 0 );
+		return \IPS\Theme::i()->getTemplate( 'settings' )->archiveRules( $form, $maxTopics, $existingCount, ( $maxTopics * $existingCount > 0 ) ? round( 100 / $maxTopics * $existingCount ) : 0 );
 	}
 		
 	/**
 	 * Greater/Less Than X or Any
 	 *
-	 * @param Custom $field	The field
+	 * @param	\IPS\Helpers\Form\Custom	$field	The field
 	 * @return	string
 	 */
-	public function _greaterThanLessThanField( Custom $field ): string
+	public function _greaterThanLessThanField( $field )
 	{
-		return Theme::i()->getTemplate( 'settings' )->archiveRuleGtLt( $field->name, $field->value );
+		return \IPS\Theme::i()->getTemplate( 'settings' )->archiveRuleGtLt( $field->name, $field->value );
 	}
 	
 	/**
 	 * Before/After X days/months/years ago
 	 *
-	 * @param Custom $field	The field
+	 * @param	\IPS\Helpers\Form\Custom	$field	The field
 	 * @return	string
 	 */
-	public function _beforeAfterTimeAgo( Custom $field ): string
+	public function _beforeAfterTimeAgo( $field )
 	{
-		return Theme::i()->getTemplate( 'settings' )->archiveRuleTime( $field->name, $field->value );
+		return \IPS\Theme::i()->getTemplate( 'settings' )->archiveRuleTime( $field->name, $field->value );
 	}
 	
 	/**
 	 * Before/After X days/months/years ago
 	 *
-	 * @param Custom $field	The field
-	 * @return	void
+	 * @param	\IPS\Helpers\Form\Custom	$field	The field
+	 * @return	string
 	 */
-	public function _validateBeforeAfterTimeAgo( Custom $field ) : void
+	public function _validateBeforeAfterTimeAgo( $field )
 	{
 		if ( isset( $field->value[1] ) and $field->value[1] < 0 )
 		{
-			throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_number_min', FALSE, array( 'sprintf' => array( 0 ) ) ) );
+			throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_number_min', FALSE, array( 'sprintf' => array( 0 ) ) ) );
 		}
 	}
 	
@@ -573,62 +542,128 @@ class settings extends Controller
 	 *
 	 * @return	void
 	 */
-	public function unarchive() : void
+	public function unarchive()
 	{
-		Dispatcher::i()->checkAcpPermission( 'archive_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'archive_manage' );
 		
-		if ( isset( Request::i()->confirm ) )
+		if ( isset( \IPS\Request::i()->confirm ) )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			
-			if ( SettingsClass::i()->archive_on )
+			if ( \IPS\Settings::i()->archive_on )
 			{
-				$whereClause = Db::i()->compileWhereClause( Application::load('forums')->archiveWhere( iterator_to_array( Db::i()->select( '*', 'forums_archive_rules' ) ) ) );
+				$whereClause = \IPS\Db::i()->compileWhereClause( \IPS\Application::load('forums')->archiveWhere( \IPS\Db::i()->select( '*', 'forums_archive_rules' ) ) );
 				$_whereClause = array( 'topic_archive_status=? AND !( ' . $whereClause['clause'] . ')' );
-				$_whereClause[] = Topic::ARCHIVE_DONE;
+				$_whereClause[] = \IPS\forums\Topic::ARCHIVE_DONE;
 				foreach ( $whereClause['binds'] as $bind )
 				{
 					$_whereClause[] = $bind;
 				}
-				Db::i()->update( 'forums_topics', array( 'topic_archive_status' => Topic::ARCHIVE_RESTORE ), $_whereClause );
+				\IPS\Db::i()->update( 'forums_topics', array( 'topic_archive_status' => \IPS\forums\Topic::ARCHIVE_RESTORE ), $_whereClause );
 			}
 			else
 			{
-				Db::i()->update( 'forums_topics', array( 'topic_archive_status' => Topic::ARCHIVE_RESTORE ), array( 'topic_archive_status=?', Topic::ARCHIVE_DONE ) );
+				\IPS\Db::i()->update( 'forums_topics', array( 'topic_archive_status' => \IPS\forums\Topic::ARCHIVE_RESTORE ), array( 'topic_archive_status=?', \IPS\forums\Topic::ARCHIVE_DONE ) );
 			}
 			
-			Output::i()->redirect( Url::internal( 'app=forums&module=forums&controller=settings&tab=archiving' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=forums&module=forums&controller=settings&tab=archiving' ) );
 		}
 		else
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'uanrchive_settings_change', array(
-				'restore_unmatched_settings'	=> Url::internal( 'app=forums&module=forums&controller=settings&do=unarchive&confirm=1' )->csrf(),
-				'leave_archived_topics'			=> Url::internal( 'app=forums&module=forums&controller=settings&tab=archiving' ),
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'uanrchive_settings_change', array(
+				'restore_unmatched_settings'	=> \IPS\Http\Url::internal( 'app=forums&module=forums&controller=settings&do=unarchive&confirm=1' )->csrf(),
+				'leave_archived_topics'			=> \IPS\Http\Url::internal( 'app=forums&module=forums&controller=settings&tab=archiving' ),
 			) );
 		}
 	}
-
+	
 	/**
 	 * Settings
 	 *
-	 * @return Form|string
+	 * @return	string
 	 */
-	protected function manageSettings(): Form|string
+	protected function manageSettings()
 	{
-		Dispatcher::i()->checkAcpPermission( 'forum_settings' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'forum_settings' );
 		
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->addHeader('forum_settings');
-		$form->add( new YesNo( 'forums_rss', SettingsClass::i()->forums_rss ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forums_rss', \IPS\Settings::i()->forums_rss ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'forums_default_view', \IPS\Settings::i()->forums_default_view, FALSE, array(
+			'options' => array(
+				'table' => 'forums_default_view_table',
+				'grid' => 'forums_default_view_grid',
+				'fluid' => 'forums_default_view_fluid'
+			),
+		) ) );
 
-		$form->add( new YesNo( 'forums_fluid_pinned', SettingsClass::i()->forums_fluid_pinned, FALSE, array(), NULL, NULL, NULL, 'forums_fluid_pinned' ) );
-		$form->add( new Number( 'forums_topics_per_page', SettingsClass::i()->forums_topics_per_page , TRUE, array( 'min' => 5, 'max' => 100 ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forums_fluid_pinned', \IPS\Settings::i()->forums_fluid_pinned, FALSE, array(), NULL, NULL, NULL, 'forums_fluid_pinned' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'forums_default_view_choose', \IPS\Settings::i()->forums_default_view_choose ? json_decode( \IPS\Settings::i()->forums_default_view_choose, TRUE ) : NULL, FALSE, array(
+			'unlimited' => '*',
+			'unlimitedLang' => 'forums_default_view_choose_none',
+			'multiple' => true,
+			'noDefault' => TRUE,
+			'options' => array(
+				'table' => 'forums_default_view_table',
+				'grid' => 'forums_default_view_grid',
+				'fluid' => 'forums_default_view_fluid'
+			)
+		), function( $value ) {
+			if( $value !== '*' AND \count( $value ) !== 0 AND \count( $value ) < 2 )
+			{
+				throw new \DomainException( 'forums_default_view_choose_error' );
+			}
+		} ) );
+
+		$form->add( new \IPS\Helpers\Form\Number( 'forums_topics_per_page', \IPS\Settings::i()->forums_topics_per_page , TRUE, array( 'min' => 5, 'max' => 100 ) ) );
+		
+		$form->add( new \IPS\Helpers\Form\Radio( 'forums_view_list_method', \IPS\Settings::i()->forums_view_list_method, FALSE, array(
+			'options' => array(
+				'list' => 'forums_topic_list_list',
+				'snippet' => 'forums_topic_list_snippet'
+			),
+		) ) );
+		
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forums_view_list_choose', \IPS\Settings::i()->forums_view_list_choose, FALSE, array(), NULL, NULL, NULL, 'forums_view_list_choose' ) );
+		
+		$form->addHeader('question_settings');
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forums_questions_downvote', \IPS\Settings::i()->forums_questions_downvote ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forums_answers_downvote', \IPS\Settings::i()->forums_answers_downvote ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'forums_new_questions', \IPS\Settings::i()->forums_new_questions, FALSE, array( 'options' => array( '0' => 'forums_new_questions_best', '1' => 'forums_new_questions_any' ) ) ) );
 
 		$form->addHeader('topic_settings');
+		
 
-		$form->add( new Number( 'forums_posts_per_page', SettingsClass::i()->forums_posts_per_page , TRUE, array( 'min' => 2, 'max' => 250 ) ) );
+		/* We no longer use popular time for cloud */
+		$popularNowMaximum = 14400000;
+		if( !\IPS\CIC )
+		{
+			$form->add( new \IPS\Helpers\Form\Custom( 'forums_popular_now', json_decode( \IPS\Settings::i()->forums_popular_now, TRUE ), FALSE, array(
+				'getHtml'		=> function( $obj ) use ( $popularNowMaximum )
+				{
+					return \IPS\Theme::i()->getTemplate('settings')->popularNow( $obj->name, $obj->value, $popularNowMaximum );
+				},
+				/* If popular now time is greater than 10,000 days */
+				'validate'		=> function( $obj ) use ( $popularNowMaximum )
+				{
 
-		$form->add( new CheckboxSet( 'forums_topics_show_meta', SettingsClass::i()->forums_topics_show_meta ? json_decode( SettingsClass::i()->forums_topics_show_meta, TRUE ) : array(), FALSE, array(
+					if( isset( $obj->value['minutes'] ) AND $obj->value['minutes'] > $popularNowMaximum )
+					{
+						throw new \LengthException( \IPS\Member::loggedIn()->language()->addToStack('form_number_max', FALSE, array( 'sprintf' => array( $popularNowMaximum ) ) ) );
+					}
+				}
+			) ) );
+		}
+		else
+		{
+			$popularSettings = json_decode( \IPS\Settings::i()->forums_popular_now, TRUE );
+			\IPS\Member::loggedIn()->language()->words['forums_popular_now_desc'] = \IPS\Member::loggedIn()->language()->addToStack('forums_popular_now_cloud_desc');
+			$form->add( new \IPS\Helpers\Form\Interval( 'forums_popular_now', $popularSettings['minutes'] ?? 0, FALSE, [ 'min' => 1, 'max' => $popularNowMaximum, 'valueAs' => \IPS\Helpers\Form\Interval::MINUTES, 'unlimitedLang' => 'never', 'unlimited' => 0 ], NULL, \IPS\Member::loggedIn()->language()->addToStack('forums_popular_now_cloud_prefix'), NULL ) );
+		}
+
+		$form->add( new \IPS\Helpers\Form\Number( 'forums_posts_per_page', \IPS\Settings::i()->forums_posts_per_page , TRUE, array( 'min' => 2, 'max' => 250 ) ) );
+
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'forums_topics_show_meta', \IPS\Settings::i()->forums_topics_show_meta ? json_decode( \IPS\Settings::i()->forums_topics_show_meta, TRUE ) : array(), FALSE, array(
 			'options' => array(
 				'time'           => 'forums_topic_show_meta_time',
 				'moderation'     => 'forums_topic_show_meta_moderation'
@@ -637,27 +672,23 @@ class settings extends Controller
 				'moderation'	 => array( 'forums_mod_actions_anon' )
 			) ) ) );
 
-		$form->add( new YesNo( 'forums_mod_actions_anon', !SettingsClass::i()->forums_mod_actions_anon, FALSE, array(), NULL, NULL, NULL, 'forums_mod_actions_anon' ) );
-		$form->add( new Number( 'forums_solved_topic_reengage', SettingsClass::i()->forums_solved_topic_reengage , FALSE, array( 'min' => 1, 'max' => 365, 'unlimited' => 0, 'unlimitedLang' => 'forums_solved_topic_reengage_never' ), NULL, Member::loggedIn()->language()->addToStack('forums_solved_nudge_experts_prefix'), Member::loggedIn()->language()->addToStack('forums_solved_nudge_experts_suffix') ) );
-		$form->add( new Number( 'forums_helpful_highlight', SettingsClass::i()->forums_helpful_highlight , FALSE, array( 'min' => 1, 'unlimited' => 0, 'unlimitedLang' => 'forums_helpful_highlight_never' ), NULL, Member::loggedIn()->language()->addToStack('forums_helpful_highlight_prefix'), Member::loggedIn()->language()->addToStack('forums_helpful_highlight_suffix') ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forums_mod_actions_anon', !\IPS\Settings::i()->forums_mod_actions_anon, FALSE, array(), NULL, NULL, NULL, 'forums_mod_actions_anon' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'forums_solved_topic_reengage', \IPS\Settings::i()->forums_solved_topic_reengage , FALSE, array( 'min' => 1, 'max' => 365, 'unlimited' => 0, 'unlimitedLang' => 'forums_solved_topic_reengage_never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('forums_solved_topic_reengage_prefix'), \IPS\Member::loggedIn()->language()->addToStack('forums_solved_topic_reengage_suffix') ) );
 
-		$form->add( new YesNo( "forum_post_use_minimal_editor", (bool) SettingsClass::i()->forum_post_use_minimal_editor, false ) );
+		$form->addHeader('topic_summary_settings');
 
-		$form->addHeader('topic_overview_settings');
-
-		$form->add( new CheckboxSet( 'forums_topic_activity', SettingsClass::i()->forums_topic_activity ? json_decode( SettingsClass::i()->forums_topic_activity, TRUE ) : NULL, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'forums_topic_activity', \IPS\Settings::i()->forums_topic_activity ? json_decode( \IPS\Settings::i()->forums_topic_activity, TRUE ) : NULL, FALSE, array(
 			'options' => array( 'desktop' => 'forums_topic_activity_desktop_on', 'mobile' => 'forums_topic_activity_mobile_on' ),
 			'toggles' => array( 'desktop' => array( 'forums_topic_activity_desktop' ) )
 		) ) );
-		$form->add( new Radio( 'forums_topic_activity_desktop', SettingsClass::i()->forums_topic_activity_desktop, FALSE, array( 'options' => array( 'sidebar' => 'forums_topic_activity_desktop_sidebar', 'post' => 'forums_topic_activity_desktop_post' ) ), NULL, NULL, NULL, 'forums_topic_activity_desktop' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'forums_topic_activity_desktop', \IPS\Settings::i()->forums_topic_activity_desktop, FALSE, array( 'options' => array( 'sidebar' => 'forums_topic_activity_desktop_sidebar', 'post' => 'forums_topic_activity_desktop_post' ) ), NULL, NULL, NULL, 'forums_topic_activity_desktop' ) );
 
-		$form->add( new Number( 'forums_topics_activity_pages_show', SettingsClass::i()->forums_topics_activity_pages_show , TRUE, array( 'unlimited' => 0, 'unlimitedLang'=> 'forums_topics_activity_pages_show_unlimited', 'min' => 0, 'max' => 100 ), NULL, Member::loggedIn()->language()->addToStack('forums_topics_activity_pages_show_prefix') ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'forums_topics_activity_pages_show', \IPS\Settings::i()->forums_topics_activity_pages_show , TRUE, array( 'unlimited' => 0, 'unlimitedLang'=> 'forums_topics_activity_pages_show_unlimited', 'min' => 0, 'max' => 100 ), NULL, \IPS\Member::loggedIn()->language()->addToStack('forums_topics_activity_pages_show_prefix') ) );
 
-		$form->add( new CheckboxSet( 'forums_topic_activity_features', SettingsClass::i()->forums_topic_activity_features ? json_decode( SettingsClass::i()->forums_topic_activity_features, TRUE ) : array(), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'forums_topic_activity_features', \IPS\Settings::i()->forums_topic_activity_features ? json_decode( \IPS\Settings::i()->forums_topic_activity_features, TRUE ) : array(), FALSE, array(
 			'options' => array(
 				'popularDays' => 'forums_topic_activity_features_popularDays',
 				'topPost'     => 'forums_topic_activity_features_topPost',
-				'helpful'	  => 'forums_topic_activity_features_helpful',
 				'uploads'     => 'forums_topic_activity_features_uploads'
 		) ) ) );
 
@@ -665,10 +696,29 @@ class settings extends Controller
 		{
 			/* This setting needs to be reversed */
 			$values['forums_mod_actions_anon'] = !$values['forums_mod_actions_anon'];
-
+			if( array_key_exists( 'forums_popular_now', $values ) )
+			{
+				/* This is handled slightly different for Cloud */
+				if( \IPS\CIC )
+				{
+					$values['forums_popular_now'] = json_encode( array( 'posts' => 0, 'minutes' => (int) $values['forums_popular_now'] ) );
+				}
+				else
+				{
+					if ( isset( $values['forums_popular_now']['never'] ) )
+					{
+						$values['forums_popular_now'] = json_encode( array( 'posts' => 0, 'minutes' => 0 ) );
+					}
+					else
+					{
+						$values['forums_popular_now'] = json_encode( $values['forums_popular_now'] );
+					}
+				}
+			}
+			
 			if ( isset( $values['forums_default_view_choose'] ) )
 			{
-				$values['forums_default_view_choose'] = ( is_array( $values['forums_default_view_choose'] ) AND !count( $values['forums_default_view_choose'] ) ) ? NULL : json_encode( $values['forums_default_view_choose'] );
+				$values['forums_default_view_choose'] = ( \is_array( $values['forums_default_view_choose'] ) AND !\count( $values['forums_default_view_choose'] ) ) ? NULL : json_encode( $values['forums_default_view_choose'] );
 			}
 
 			if ( isset( $values['forums_topic_activity'] ) )
@@ -688,99 +738,13 @@ class settings extends Controller
 						
 			$form->saveAsSettings( $values );
 
-			Session::i()->log( 'acplogs__forums_settings' );
-			Output::i()->redirect( Url::internal( 'app=forums&module=forums&controller=settings&tab=settings' ), 'saved' );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			\IPS\Session::i()->log( 'acplogs__forums_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=forums&module=forums&controller=settings&tab=settings' ), 'saved' );
 		}
 		
-		return $form;
-	}
-
-	/**
-	 * Auto-Lock topics settings
-	 *
-	 * @return Form|string
-	 */
-	protected function manageAutolock() : Form|string
-	{
-		$settings = SettingsClass::i()->autolock_topic_settings ? json_decode( SettingsClass::i()->autolock_topic_settings, true ) : [];
-
-		$form = new Form;
-		$form->add( new YesNo( 'autolock_enabled', $settings['enabled'] ?? null, false, [
-			'togglesOn' => [ 'autolock_days', 'autolock_pinned', 'autolock_featured', 'autolock_forums', 'autolock_members', 'autolock_tags' ]
-		] ) );
-		$form->add( new Number( 'autolock_days', $settings['days'] ?? 7, null, suffix: Member::loggedIn()->language()->addToStack( 'autolock_days_suffix' ), id: 'autolock_days' ) );
-		$form->add( new YesNo( 'autolock_pinned', $settings['pinned'] ?? false, false, id: 'autolock_pinned' ) );
-		$form->add( new YesNo( 'autolock_featured', $settings['featured'] ?? false, id: 'autolock_featured' ) );
-
-		$form->add( new Node( 'autolock_forums', $settings['forums'] ?? null, false, [
-			'class' => Forum::class,
-			'multiple' => true
-		], id: 'autolock_forums' ) );
-
-		$excludedMembers = [];
-		if( !empty( $settings['members'] ) )
-		{
-			$excludedMembers = iterator_to_array(
-				new ActiveRecordIterator(
-					Db::i()->select( '*', 'core_members', Db::i()->in( 'member_id', $settings['members'] ) ),
-					Member::class
-				)
-			);
-		}
-		$form->add( new FormMember( 'autolock_members', count( $excludedMembers ) ? $excludedMembers : null, false, [ 'multiple' => null ], id: 'autolock_members' ) );
-
-		$form->add( new Text( 'autolock_tags', $settings['tags'] ?? null, false, [
-			'autocomplete' => array(
-				'unique' => TRUE,
-				'source' => Tag::allTags(),
-				'resultItemTemplate' => 'core.autocomplete.tagsResultItem',
-				'freeChoice' => false,
-				'minimized' => false,
-				'alphabetical' => true,
-				'addTokenText' => Member::loggedIn()->language()->get( 'tags_optional' ),
-			)
-		], id: 'autolock_tags' ) );
-
-		if( $values = $form->values() )
-		{
-			if( $values['autolock_enabled'] )
-			{
-				$members = FormMember::stringValue( $values['autolock_members'] );
-				$settings = [
-					'enabled' => true,
-					'days' => $values['autolock_days'],
-					'pinned' => $values['autolock_pinned'],
-					'featured' => $values['autolock_featured'],
-					'members' => ( $members ? explode( "\n", $members ) : null ),
-					'forums' => ( !empty( $values['autolock_forums'] ) ? array_keys( $values['autolock_forums'] ) : null ),
-					'tags' => $values['autolock_tags']
-				];
-			}
-			else
-			{
-				$settings = [ 'enabled' => false ];
-			}
-
-			$form->saveAsSettings([
-				'autolock_topic_settings' => json_encode( $settings )
-			]);
-
-			Session::i()->log( 'acplogs__forums_autolock' );
-
-			/* And disable task if this feaure is disabled */
-			if( !$values['autolock_enabled'] )
-			{
-				Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'autolock' ) );
-			}
-			/* Or enable it if necessary */
-			else
-			{
-				Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'autolock' ) );
-			}
-
-			Output::i()->redirect( Url::internal( 'app=forums&module=forums&controller=settings&tab=autolock' ), 'saved' );
-		}
-
 		return $form;
 	}
 }

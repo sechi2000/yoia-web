@@ -7,6 +7,13 @@
             "image categories"
         ]
     },
+    "app=gallery&module=gallery&controller=categories&do=form": {
+        "lang_key": "menu__gallery_gallery_categories",
+        "restriction": "categories_manage",
+        "keywords": [
+            "add category"
+        ]
+    },
     "app=gallery&module=gallery&controller=categories&searchResult=category_allow_comments": {
         "lang_key": "category_allow_comments",
         "restriction": "categories_manage",
@@ -20,18 +27,71 @@
         "restriction": "categories_manage",
         "keywords": [
             "comments approved",
-            "must approved",
-            "comments must"
+            "must approved"
         ]
     },
-    "app=gallery&module=gallery&controller=categories&searchResult=form_new_category_description": {
+    "app=gallery&module=gallery&controller=categories&searchResult=category_can_tag": {
+        "lang_key": "category_can_tag",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow tags",
+            "tags"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=category_sort_options": {
+        "lang_key": "category_sort_options",
+        "restriction": "categories_manage",
+        "keywords": [
+            "default sort",
+            "sort order"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=category_tag_prefixes": {
+        "lang_key": "category_tag_prefixes",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow prefixes",
+            "prefixes"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_1_category_allow_albums": {
+        "lang_key": "category_allow_albums",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow albums"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_1_category_allow_reviews": {
+        "lang_key": "category_allow_reviews",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow reviews",
+            "reviews"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_1_category_approve_img": {
+        "lang_key": "category_approve_img",
+        "restriction": "categories_manage",
+        "keywords": [
+            "images must",
+            "must approved"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_1_category_description": {
         "lang_key": "category_description",
         "restriction": "categories_manage",
         "keywords": [
             "category description"
         ]
     },
-    "app=gallery&module=gallery&controller=categories&searchResult=form_new_category_show_rules": {
+    "app=gallery&module=gallery&controller=categories&searchResult=form_1_category_name": {
+        "lang_key": "category_name",
+        "restriction": "categories_manage",
+        "keywords": [
+            "category name"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_1_category_show_rules": {
         "lang_key": "category_show_rules",
         "restriction": "categories_manage",
         "keywords": [
@@ -40,12 +100,19 @@
             "show rules"
         ]
     },
-    "app=gallery&module=gallery&controller=categories&searchResult=form_new_gcategory_allow_rating": {
+    "app=gallery&module=gallery&controller=categories&searchResult=form_1_gcategory_allow_rating": {
         "lang_key": "gcategory_allow_rating",
         "restriction": "categories_manage",
         "keywords": [
             "allow ratings",
             "ratings"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_1_gcategory_parent_id": {
+        "lang_key": "gcategory_parent_id",
+        "restriction": "categories_manage",
+        "keywords": [
+            "parent category"
         ]
     },
     "app=gallery&module=gallery&controller=categories&searchResult=form_new_category_allow_albums": {
@@ -64,6 +131,44 @@
             "reviews"
         ]
     },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_new_category_approve_img": {
+        "lang_key": "category_approve_img",
+        "restriction": "categories_manage",
+        "keywords": [
+            "items approved",
+            "must approved"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_new_category_description": {
+        "lang_key": "category_description",
+        "restriction": "categories_manage",
+        "keywords": [
+            "category description"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_new_category_name": {
+        "lang_key": "category_name",
+        "restriction": "categories_manage",
+        "keywords": [
+            "category name"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_new_category_show_rules": {
+        "lang_key": "category_show_rules",
+        "restriction": "categories_manage",
+        "keywords": [
+            "rules",
+            "show rules"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&searchResult=form_new_gcategory_allow_rating": {
+        "lang_key": "gcategory_allow_rating",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow ratings",
+            "ratings"
+        ]
+    },
     "app=gallery&module=gallery&controller=categories&searchResult=form_new_gcategory_parent_id": {
         "lang_key": "gcategory_parent_id",
         "restriction": "categories_manage",
@@ -80,7 +185,31 @@
             "permission denied"
         ]
     },
-    "app=gallery&module=gallery&controller=categories&searchResult=category_sort_options": {
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=category_allow_comments": {
+        "lang_key": "category_allow_comments",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow comments",
+            "comments"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=category_approve_com": {
+        "lang_key": "category_approve_com",
+        "restriction": "categories_manage",
+        "keywords": [
+            "comments must",
+            "must approved"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=category_can_tag": {
+        "lang_key": "category_can_tag",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow tags",
+            "tags"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=category_sort_options": {
         "lang_key": "category_sort_options",
         "restriction": "categories_manage",
         "keywords": [
@@ -88,7 +217,30 @@
             "sort order"
         ]
     },
-    "app=gallery&module=gallery&controller=categories&searchResult=form_new_category_approve_img": {
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=category_tag_prefixes": {
+        "lang_key": "category_tag_prefixes",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow prefixes",
+            "prefixes"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=form_new_category_allow_albums": {
+        "lang_key": "category_allow_albums",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow albums"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=form_new_category_allow_reviews": {
+        "lang_key": "category_allow_reviews",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow reviews",
+            "reviews"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=form_new_category_approve_img": {
         "lang_key": "category_approve_img",
         "restriction": "categories_manage",
         "keywords": [
@@ -97,11 +249,50 @@
             "must approved"
         ]
     },
-    "app=gallery&module=gallery&controller=categories&searchResult=form_new_category_name": {
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=form_new_category_description": {
+        "lang_key": "category_description",
+        "restriction": "categories_manage",
+        "keywords": [
+            "category description"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=form_new_category_name": {
         "lang_key": "category_name",
         "restriction": "categories_manage",
         "keywords": [
             "category name"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=form_new_category_show_rules": {
+        "lang_key": "category_show_rules",
+        "restriction": "categories_manage",
+        "keywords": [
+            "rules",
+            "show rules"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=form_new_gcategory_allow_rating": {
+        "lang_key": "gcategory_allow_rating",
+        "restriction": "categories_manage",
+        "keywords": [
+            "allow ratings",
+            "ratings"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=form_new_gcategory_parent_id": {
+        "lang_key": "gcategory_parent_id",
+        "restriction": "categories_manage",
+        "keywords": [
+            "parent",
+            "parent category"
+        ]
+    },
+    "app=gallery&module=gallery&controller=categories&subnode=0&parent=1&searchResult=gallery_permission_custom_error": {
+        "lang_key": "category_permission_custom_error",
+        "restriction": "categories_manage",
+        "keywords": [
+            "custom error",
+            "custom permission denied"
         ]
     },
     "app=gallery&module=gallery&controller=settings": {
@@ -232,6 +423,15 @@
             "upload movies"
         ]
     },
+    "app=core&module=members&controller=members&searchResult=remove_gallery_upload": {
+        "lang_key": "remove_gallery_upload",
+        "restriction": null,
+        "keywords": [
+            "Can Upload",
+            "Gallery Upload",
+            "Images"
+        ]
+    },
     "app=core&module=members&controller=groups&searchResult=4_g_create_albums": {
         "lang_key": "g_create_albums",
         "restriction": "groups_manage",
@@ -240,16 +440,6 @@
             "albums permission",
             "create albums",
             "create albums permission"
-        ]
-    },
-    "app=gallery&module=gallery&controller=settings&searchResult=form_gallery_metadata": {
-        "lang_key": "gallery_metadata",
-        "restriction": "settings_manage",
-        "keywords": [
-            "exif",
-            "metadata",
-            "location",
-            "image data"
         ]
     }
 }

@@ -12,24 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Db;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * AttachmentPermissionsType for GraphQL API
  */
-class AttachmentPermissionsType extends ObjectType
+class _AttachmentPermissionsType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -44,7 +43,7 @@ class AttachmentPermissionsType extends ObjectType
 						'resolve' => function( $data ) {	
 							$currentPostUsage = 0;
 							// @todo Currently this only considers postKey because the GraphQL doesn't support editing. When edit support is added we'll need to modify this query to do "OR ( location_key=? AND id=? AND id2=?... )"
-							foreach ( Db::i()->select( '*', 'core_attachments', array( 'attach_post_key=?', $data['postKey'] ) ) as $attachment )
+							foreach ( \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_post_key=?', $data['postKey'] ) ) as $attachment )
 							{
 								$currentPostUsage += $attachment['attach_filesize'];
 							}

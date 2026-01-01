@@ -11,32 +11,24 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Redirect
  */
-class designermode extends Controller
+class _designermode extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Something is wrong
 	 *
 	 * @return	void
 	 */
-	protected function missing() : void
+	protected function missing()
 	{
-		Output::i()->error( Member::loggedIn()->language()->addToStack( 'theme_designers_mode_error_missing', FALSE, array( 'sprintf' => array( intval( Request::i()->id ) ) ) ), "4C370/1" );
+		\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack( 'theme_designers_mode_error_missing', FALSE, array( 'sprintf' => array( \intval( \IPS\Request::i()->id ) ) ) ), "4C370/1", 500 );
 	}
 }

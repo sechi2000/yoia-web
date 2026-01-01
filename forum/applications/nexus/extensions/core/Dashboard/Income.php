@@ -12,36 +12,25 @@
 namespace IPS\nexus\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\DashboardAbstract;
-use IPS\Helpers\Chart;
-use IPS\Member;
-use IPS\nexus\Money;
-use IPS\nexus\Transaction;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Dashboard extension: Income
  */
-class Income extends DashboardAbstract
+class _Income
 {
 	/**
 	* Can the current user view this dashboard item?
 	*
 	* @return	bool
 	*/
-	public function canView(): bool
+	public function canView()
 	{
-		return Member::loggedIn()->hasAcpRestriction( 'nexus' , 'transactions', 'transactions_manage' );
+		return \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus' , 'transactions', 'transactions_manage' );
 	}
 
 	/** 
@@ -49,20 +38,20 @@ class Income extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
-		$chart = new Chart;
+		$chart = new \IPS\Helpers\Chart;
 		
 		$chart->addHeader( "Day", 'date' );
-		foreach ( Money::currencies() as $currency )
+		foreach ( \IPS\nexus\Money::currencies() as $currency )
 		{
 			$chart->addHeader( $currency, 'number' );
 		}
 		
-		$thirtyDaysAgo = DateTime::create()->sub( new DateInterval('P30D') );
+		$thirtyDaysAgo = \IPS\DateTime::create()->sub( new \DateInterval('P30D') );
 				
 		$results = array();
-		foreach( Db::i()->select( "t_currency, DATE_FORMAT( FROM_UNIXTIME( t_date ), '%e %c %Y' ) AS date, SUM(t_amount)-SUM(t_partial_refund) AS amount", 'nexus_transactions', array( 't_date>? AND (t_status=? OR t_status=?) AND t_method>0', $thirtyDaysAgo->getTimestamp(), Transaction::STATUS_PAID, Transaction::STATUS_PART_REFUNDED ), NULL, NULL, array( 't_currency', 'date' ) ) as $result )
+		foreach( \IPS\Db::i()->select( "t_currency, DATE_FORMAT( FROM_UNIXTIME( t_date ), '%e %c %Y' ) AS date, SUM(t_amount)-SUM(t_partial_refund) AS amount", 'nexus_transactions', array( 't_date>? AND (t_status=? OR t_status=?) AND t_method>0', $thirtyDaysAgo->getTimestamp(), \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_PART_REFUNDED ), NULL, NULL, array( 't_currency', 'date' ) ) as $result )
 		{
 			$results[ $result['date'] ][ $result['t_currency'] ] = $result['amount'];
 		}
@@ -70,16 +59,16 @@ class Income extends DashboardAbstract
 		$monthAndYear = date( 'n' ) . ' ' . date( 'Y' );
 		foreach ( range( 30, 0 ) as $daysAgo )
 		{
-			$datetime = new DateTime;
-			$datetime->setTime( 0, 0 );
-			$datetime->sub( new DateInterval( 'P' . $daysAgo . 'D' ) );
+			$datetime = new \IPS\DateTime;
+			$datetime->setTime( 0, 0, 0 );
+			$datetime->sub( new \DateInterval( 'P' . $daysAgo . 'D' ) );
 			$resultString = $datetime->format('j n Y');
 			
 			if ( isset( $results[ $resultString ] ) )
 			{
 				$row = array( $datetime );
 				
-				foreach ( Money::currencies() as $currency )
+				foreach ( \IPS\nexus\Money::currencies() as $currency )
 				{
 					if ( !isset( $results[ $resultString ][ $currency ] ) )
 					{
@@ -96,7 +85,7 @@ class Income extends DashboardAbstract
 			else
 			{
 				$row = array( $datetime );
-				foreach ( Money::currencies() as $currency )
+				foreach ( \IPS\nexus\Money::currencies() as $currency )
 				{
 					$row[] = 0;
 				}
@@ -111,5 +100,25 @@ class Income extends DashboardAbstract
 			'lineWidth'			=> 1,
 			'areaOpacity'		=> 0.4,
 		) );
+	}
+
+	/** 
+	 * Return the block information
+	 *
+	 * @return	array	array( 'name' => 'Block title', 'key' => 'unique_key', 'size' => [1,2,3], 'by' => 'Author name' )
+	 */
+	public function getInfo()
+	{
+		return array();
+	}
+
+	/**
+	 * Save the block data submitted.  This method is only necessary if your block accepts some sort of submitted data to save (such as the 'admin notes' block).
+	 *
+	 * @return	void
+	 * @throws	\LogicException
+	 */
+	public function saveBlock()
+	{
 	}
 }

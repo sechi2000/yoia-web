@@ -12,135 +12,56 @@ namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use BadMethodCallException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Api\Webhook;
-use IPS\Content\Anonymous;
-use IPS\Content\Assignable;
-use IPS\Content\Comment;
-use IPS\Content\Followable;
-use IPS\Content\Hideable;
-use IPS\Content\Item;
-use IPS\Content\Review;
-use IPS\Content\Solvable;
-use IPS\core\Approval;
-use IPS\core\DataLayer;
-use IPS\core\Reports\Report;
-use IPS\core\Reports\Types;
-use IPS\Db\Select;
-use IPS\Events\Event;
-use IPS\Http\Url;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Output\UI\UiExtension;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Platform\Bridge;
-use IPS\Session\Store;
-use IPS\Text\Parser;
-use IPS\Xml\DOMDocument;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use UnexpectedValueException;
-use function class_implements;
-use function count;
-use function defined;
-use function func_get_args;
-use function get_called_class;
-use function get_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_int;
-use function substr;
-use function ucfirst;
+use IPS\Content\Searchable;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Abstract Content Model
- * We need PHPStorm to understand that trait methods are available so code completion and analyzing works correctly. PHPStorm can not
- * figure it out because we have these application classes which extend Content and use the traits, so it'll understand from the perspective
- * of \IPS\forums\Topic as it has the trait 'use'd but cannot understand from the perspective of \IPS\Content\Item because those traits are not
- * 'use'd directly. If this really bothers you, toggle the V next to the start of the doc block. :)
- *
- * If you need to update it, just run dev/generateContentTraitMethodTags.php
- *
- * @mixin \IPS\Content\Anonymous
- * @mixin \IPS\Content\Assignable
- * @mixin \IPS\Content\EditHistory
- * @mixin \IPS\Content\Followable
- * @mixin \IPS\Content\FuturePublishing
- * @mixin \IPS\Content\Helpful
- * @mixin \IPS\Content\Hideable
- * @mixin \IPS\Content\ItemTopic
- * @mixin \IPS\Content\Lockable
- * @mixin \IPS\Content\MetaData
- * @mixin \IPS\Content\Featurable
- * @mixin \IPS\Content\Pinnable
- * @mixin \IPS\Content\Polls
- * @mixin \IPS\Content\Ratings
- * @mixin \IPS\Content\Reactable
- * @mixin \IPS\Content\ReadMarkers
- * @mixin \IPS\Content\Recognizable
- * @mixin \IPS\Content\Reportable
- * @mixin \IPS\Content\Shareable
- * @mixin \IPS\Content\Solvable
- * @mixin \IPS\Content\Statistics
- * @mixin \IPS\Content\Taggable
  */
-abstract class Content extends ActiveRecord
+abstract class _Content extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	[Content\Comment]	Database Column Map
 	 */
-	public static array $databaseColumnMap = array();
+	protected static $databaseColumnMap = array();
 	
 	/**
 	 * @brief	[Content]	Key for hide reasons
 	 */
-	public static string|null $hideLogKey = NULL;
+	public static $hideLogKey = NULL;
 	
 	/**
 	 * @brief	[Content\Comment]	Language prefix for forms
 	 */
-	public static string $formLangPrefix = '';
+	public static $formLangPrefix = '';
 
 	/**
 	 * @brief	Include In Sitemap
 	 */
-	public static bool $includeInSitemap = TRUE;
+	public static $includeInSitemap = TRUE;
 	
 	/**
 	 * @brief	Reputation Store
 	 */
-	protected array|null $reputation = null;
+	protected $reputation;
 	
 	/**
 	 * @brief	Can this content be moderated normally from the front-end (will be FALSE for things like Pages and Commerce Products)
 	 */
-	public static bool $canBeModeratedFromFrontend = TRUE;
-
-	/**
-	 * An array containing data layer event keys to bypass. Optionally, this can be set to 'true' to bypass all events.
-	 * @var bool|string[]
-	 */
-	protected static array|bool $_bypassDataLayerEvents = [];
-
+	public static $canBeModeratedFromFrontend = TRUE;
+	
 	/**
 	 * Should posting this increment the poster's post count?
 	 *
-	 * @param	Model|NULL	$container	Container
-	 * @return	bool
+	 * @param	\IPS\Node\Model|NULL	$container	Container
+	 * @return	void
 	 */
-	public static function incrementPostCount( Model $container = NULL ): bool
+	public static function incrementPostCount( \IPS\Node\Model $container = NULL )
 	{
 		return TRUE;
 	}
@@ -148,12 +69,12 @@ abstract class Content extends ActiveRecord
 	/**
 	 * Post count for member
 	 *
-	 * @param Member $member								The member
+	 * @param	\IPS\Member	$member								The member
 	 * @param	bool		$includeNonPostCountIncreasing		If FALSE, will skip any posts which would not cause the user's post count to increase
 	 * @param	bool		$includeHiddenAndPendingApproval	If FALSE, will skip any hidden posts, or posts pending approval
 	 * @return	int
 	 */
-	public static function memberPostCount( Member $member, bool $includeNonPostCountIncreasing = FALSE, bool $includeHiddenAndPendingApproval = TRUE ): int
+	public static function memberPostCount( \IPS\Member $member, bool $includeNonPostCountIncreasing = FALSE, bool $includeHiddenAndPendingApproval = TRUE )
 	{
 		if ( !isset( static::$databaseColumnMap['author'] ) )
 		{
@@ -180,18 +101,18 @@ abstract class Content extends ActiveRecord
 			}
 		}
 		
-		return Db::i()->select( 'COUNT(*)', static::$databaseTable, $where )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', static::$databaseTable, $where )->first();
 	}
 
 	/**
 	 * Post count for member
 	 *
-	 * @param	Member	$member	The member
-	 * @return	int
-	 *@deprecated	Use options provided to memberPostCount()
+	 * @deprecated	Use options provided to memberPostCount()
 	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	int
 	 */
-	public static function rawMemberPostCount( Member $member ): int
+	public static function rawMemberPostCount( \IPS\Member $member )
 	{
 		return static::memberPostCount( $member, TRUE );
 	}
@@ -202,7 +123,7 @@ abstract class Content extends ActiveRecord
 	 * @param	int	$count	The number of results to return
 	 * @return	array
 	 */
-	public static function mostContributions( int $count = 5 ): array
+	public static function mostContributions( $count = 5 )
 	{
 		if( !isset( static::$databaseColumnMap['author'] ) )
 		{
@@ -222,7 +143,7 @@ abstract class Content extends ActiveRecord
 		}
 
 		$authorColumn = static::$databasePrefix . static::$databaseColumnMap['author'];
-		$members = Db::i()->select( "count(*) as sum, {$authorColumn}", static::$databaseTable, $where, 'sum DESC', array( 0, $count ), array( static::$databasePrefix . static::$databaseColumnMap['author'] ) );
+		$members = \IPS\Db::i()->select( "count(*) as sum, {$authorColumn}", static::$databaseTable, $where, 'sum DESC', array( 0, $count ), array( static::$databasePrefix . static::$databaseColumnMap['author'] ) );
 
 		$contributors = array();
 		$counts = array();
@@ -237,25 +158,25 @@ abstract class Content extends ActiveRecord
 			return array( 'counts' => NULL, 'members' => NULL );
 		}
 
-		return array( 'counts' => $counts, 'members' => new ActiveRecordIterator( Db::i()->select( '*', 'core_members', array( Db::i()->in( 'member_id', $contributors ) ), "FIND_IN_SET( member_id, '" . implode( ",", $contributors) . "' )" ), 'IPS\Member' ) );
+		return array( 'counts' => $counts, 'members' => new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', array( \IPS\Db::i()->in( 'member_id', $contributors ) ), "FIND_IN_SET( member_id, '" . implode( ",", $contributors) . "' )" ), 'IPS\Member' ) );
 	}
 		
 	/**
 	 * Load and check permissions
 	 *
 	 * @param	mixed				$id		ID
-	 * @param	Member|NULL	$member	Member, or NULL for logged in member
+	 * @param	\IPS\Member|NULL	$member	Member, or NULL for logged in member
 	 * @return	static
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadAndCheckPerms( mixed $id, Member|null $member = NULL ): static
+	public static function loadAndCheckPerms( $id, \IPS\Member $member = NULL )
 	{
 		$obj = static::load( $id );
 		
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		if ( !$obj->canView( $member ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		return $obj;
@@ -264,23 +185,22 @@ abstract class Content extends ActiveRecord
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    static
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): static
-	{
-	    if ( isset( $data[ static::$databaseTable ] ) and is_array( $data[ static::$databaseTable ] ) )
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
+    {
+	    if ( isset( $data[ static::$databaseTable ] ) and \is_array( $data[ static::$databaseTable ] ) )
 	    {
 	        /* Add author data to multiton store to prevent ->author() running another query later */
-	        if ( isset( $data['author'] ) and is_array( $data['author'] ) )
+	        if ( isset( $data['author'] ) and \is_array( $data['author'] ) )
 	        {
-	           	$author = Member::constructFromData( $data['author'], FALSE );
+	           	$author = \IPS\Member::constructFromData( $data['author'], FALSE );
 
 	            if ( isset( $data['author_pfields'] ) )
 	            {
 		            unset( $data['author_pfields']['member_id'] );
-					/* @var Member $author */
 					$author->contentProfileFields( $data['author_pfields'] );
 	            }
 	        }
@@ -289,50 +209,50 @@ abstract class Content extends ActiveRecord
 	        $obj = parent::constructFromData( $data[ static::$databaseTable ], $updateMultitonStoreIfExists );
 
 			/* Add reputation if it was passed*/
-			if ( isset( $data['core_reputation_index'] ) and is_array( $data['core_reputation_index'] ) )
+			if ( isset( $data['core_reputation_index'] ) and \is_array( $data['core_reputation_index'] ) )
 			{
 				$obj->_data = array_merge( $obj->_data, $data['core_reputation_index'] );
 			}
+
+			/* Return */
+			return $obj;
 		}
 		else
 		{
-			$obj = parent::constructFromData( $data, $updateMultitonStoreIfExists );
+			return parent::constructFromData( $data, $updateMultitonStoreIfExists );
 		}
-
-        /* Return */
-        return $obj;
     }
 
     /**
      * @brief	Cached social groups
      */
-    protected static array $_cachedSocialGroups = array();
-
-	/**
+    protected static $_cachedSocialGroups = array();
+    
+    /**
 	 * Get WHERE clause for Social Group considerations for getItemsWithPermission
 	 *
-	 * @param string $socialGroupColumn The column which contains the social group ID
-	 * @param Member|null $member The member (NULL to use currently logged in member)
-	 * @return    string
+	 * @param	string		$socialGroupColumn	The column which contains the social group ID
+	 * @param	\IPS\Member	$member				The member (NULL to use currently logged in member)
+	 * @return	string
 	 */
-	public static function socialGroupGetItemsWithPermissionWhere( string $socialGroupColumn, Member|null $member = NULL ): string
+	public static function socialGroupGetItemsWithPermissionWhere( $socialGroupColumn, $member )
 	{			
 		$socialGroups = array();
 		
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		if ( $member->member_id )
 		{
 			if( !array_key_exists( $member->member_id, static::$_cachedSocialGroups ) )
 			{
-				static::$_cachedSocialGroups[ $member->member_id ] = iterator_to_array( Db::i()->select( 'group_id', 'core_sys_social_group_members', array( 'member_id=?', $member->member_id ) ) );
+				static::$_cachedSocialGroups[ $member->member_id ] = iterator_to_array( \IPS\Db::i()->select( 'group_id', 'core_sys_social_group_members', array( 'member_id=?', $member->member_id ) ) );
 			}
 
 			$socialGroups = static::$_cachedSocialGroups[ $member->member_id ];
 		}
 
-		if ( count( $socialGroups ) )
+		if ( \count( $socialGroups ) )
 		{
-			return $socialGroupColumn . '=0 OR ( ' . Db::i()->in( $socialGroupColumn, $socialGroups ) . ' )';
+			return $socialGroupColumn . '=0 OR ( ' . \IPS\Db::i()->in( $socialGroupColumn, $socialGroups ) . ' )';
 		}
 		else
 		{
@@ -343,33 +263,35 @@ abstract class Content extends ActiveRecord
 	/**
 	 * Check the request for legacy parameters we may need to redirect to
 	 *
-	 * @return	NULL|Url
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkForLegacyParameters(): Url|NULL
+	public function checkForLegacyParameters()
 	{
 		$paramsToSet	= array();
 		$paramsToUnset	= array();
 
 		/* st=20 needs to go to page=2 (or whatever the comments per page setting is set to) */
-		if( isset( Request::i()->st ) )
+		if( isset( \IPS\Request::i()->st ) )
 		{
 			$commentsPerPage = static::getCommentsPerPage();
 
-			$paramsToSet['page']	= floor( intval( Request::i()->st ) / $commentsPerPage ) + 1;
+			$paramsToSet['page']	= floor( \intval( \IPS\Request::i()->st ) / $commentsPerPage ) + 1;
 			$paramsToUnset[]		= 'st';
 		}
 
 		/* Did we have any? */
-		if( count( $paramsToSet ) )
+		if( \count( $paramsToSet ) )
 		{
 			$url = $this->url();
 
-			if( count( $paramsToUnset ) )
+			if( \count( $paramsToUnset ) )
 			{
 				$url = $url->stripQueryString( $paramsToUnset );
 			}
 
-			return $url->setQueryString( $paramsToSet );
+			$url = $url->setQueryString( $paramsToSet );
+
+			return $url;
 		}
 
 		return NULL;
@@ -378,16 +300,16 @@ abstract class Content extends ActiveRecord
 	/**
 	 * Get mapped value
 	 *
-	 * @param string $key	date,content,ip_address,first
+	 * @param	string	$key	date,content,ip_address,first
 	 * @return	mixed
 	 */
-	public function mapped( string $key ): mixed
+	public function mapped( $key )
 	{
 		if ( isset( static::$databaseColumnMap[ $key ] ) )
 		{
 			$field = static::$databaseColumnMap[ $key ];
 			
-			if ( is_array( $field ) )
+			if ( \is_array( $field ) )
 			{
 				$field = array_pop( $field );
 			}
@@ -400,34 +322,34 @@ abstract class Content extends ActiveRecord
 	/**
 	 * Get author
 	 *
-	 * @return	Member
+	 * @return	\IPS\Member
 	 */
-	public function author(): Member
+	public function author()
 	{
-		if( IPS::classUsesTrait( $this, 'IPS\Content\Anonymous' ) AND $this->isAnonymous() )
+		if( $this->isAnonymous() )
 		{
-			$guest = new Member;
-			$guest->name = Member::loggedIn()->language()->get( "post_anonymously_placename" );
+			$guest = new \IPS\Member;
+			$guest->name = \IPS\Member::loggedIn()->language()->get( "post_anonymously_placename" );
 			return $guest;
 		}
 		elseif ( $this->mapped('author') or !isset( static::$databaseColumnMap['author_name'] ) or !$this->mapped('author_name') )
 		{
-			return Member::load( $this->mapped('author') );
+			return \IPS\Member::load( $this->mapped('author') );
 		} 
 		else
 		{
-			$guest = new Member;
+			$guest = new \IPS\Member;
 			$guest->name = $this->mapped('author_name');
 			return $guest;
 		}
 	}
-
+	
 	/**
 	 * Returns the content
 	 *
-	 * @return string|null
+	 * @return	string
 	 */
-	public function content(): ?string
+	public function content()
 	{
 		return $this->mapped('content');
 	}
@@ -441,63 +363,56 @@ abstract class Content extends ActiveRecord
 	 * @return	string
 	 * @note	For now we are removing all HTML. If we decide to change this to remove specific tags in future, we can use \IPS\Text\Parser::removeElements( $this->content() )
 	 */
-	public function truncated( bool $oneLine=FALSE, int|null $length=500 ): string
+	public function truncated( $oneLine=FALSE, $length=500 )
 	{
-		$content = $this->content();
-		if( $content === null )
-		{
-			return '';
-		}
-
-		return Parser::truncate( $content, $oneLine, $length );
+		return \IPS\Text\Parser::truncate( $this->content(), $oneLine, $length );
 	}
 	
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		$idColumn = static::$databaseColumnId;
 		
-		if ( IPS::classUsesTrait( $this, 'IPS\Content\Reactable' ) )
+		if ( \IPS\IPS::classUsesTrait( $this, 'IPS\Content\Reactable' ) )
 		{
-			Db::i()->delete( 'core_reputation_index', array( 'app=? AND type=? AND type_id=?', static::$application, $this->reactionType(), $this->$idColumn ) );
+			\IPS\Db::i()->delete( 'core_reputation_index', array( 'app=? AND type=? AND type_id=?', static::$application, $this->reactionType(), $this->$idColumn ) );
 		}
 
-		if ( IPS::classUsesTrait( $this, 'IPS\Content\Recognizable' ) )
+		if ( \IPS\IPS::classUsesTrait( $this, 'IPS\Content\Recognizable' ) )
 		{
-			Db::i()->delete( 'core_member_recognize', array( 'r_content_class=? AND r_content_id=?', get_class( $this ), $this->$idColumn ) );
+			\IPS\Db::i()->delete( 'core_member_recognize', array( 'r_content_class=? AND r_content_id=?', \get_class( $this ), $this->$idColumn ) );
 		}
 
-		if( IPS::classUsesTrait( $this, 'IPS\Content\Anonymous' ) )
+		if( $this instanceof \IPS\Content\Anonymous )
 		{
-			Db::i()->delete( 'core_anonymous_posts', array( 'anonymous_object_class=? AND anonymous_object_id=?', get_class( $this ), $this->$idColumn ) );
+			\IPS\Db::i()->delete( 'core_anonymous_posts', array( 'anonymous_object_class=? AND anonymous_object_id=?', \get_class( $this ), $this->$idColumn ) );
 		}
 
 		/* Remove any entries in the promotions table */
-		if( IPS::classUsesTrait( $this, 'IPS\Content\Featurable' ) )
-		{
-			Db::i()->delete( 'core_content_promote', array( 'promote_class=? AND promote_class_id=?', get_class( $this ), $this->$idColumn ) );
-		}
+		\IPS\Db::i()->delete( 'core_social_promote', array( 'promote_class=? AND promote_class_id=?', \get_class( $this ), $this->$idColumn ) );
 		
-		Db::i()->delete( 'core_deletion_log', array( "dellog_content_class=? AND dellog_content_id=?", get_class( $this ), $this->$idColumn ) );
-		Db::i()->delete( 'core_solved_index', array( 'comment_class=? and comment_id=?', get_class( $this ), $this->$idColumn ) );
+		\IPS\Db::i()->delete( 'core_deletion_log', array( "dellog_content_class=? AND dellog_content_id=?", \get_class( $this ), $this->$idColumn ) );
+		\IPS\Db::i()->delete( 'core_solved_index', array( 'comment_class=? and comment_id=?', \get_class( $this ), $this->$idColumn ) );
 
 		if ( static::$hideLogKey )
 		{
 			$idColumn = static::$databaseColumnId;
-			Db::i()->delete('core_soft_delete_log', array('sdl_obj_id=? AND sdl_obj_key=?', $this->$idColumn, static::$hideLogKey));
+			\IPS\Db::i()->delete('core_soft_delete_log', array('sdl_obj_id=? AND sdl_obj_key=?', $this->$idColumn, static::$hideLogKey));
 		}
 
-		Webhook::fire( str_replace( '\\', '', substr( get_called_class(), 3 ) ) . '_delete', $this, $this->webhookFilters() );
+		\IPS\Db::i()->delete( 'core_content_featured', [ 'feature_content_id=? and feature_content_class=?', $this->$idColumn, \get_class( $this ) ] );
+
+		\IPS\Api\Webhook::fire( str_replace( '\\', '', \substr( \get_called_class(), 3 ) ) . '_delete', $this, $this->webhookFilters() );
 		
 		try
 		{
-			Approval::loadFromContent( get_called_class(), $this->$idColumn )->delete();
+			\IPS\core\Approval::loadFromContent( \get_called_class(), $this->$idColumn )->delete();
 		}
-		catch( OutOfRangeException $e ) { }
+		catch( \OutOfRangeException $e ) { }
 
 		parent::delete();
 
@@ -506,18 +421,451 @@ abstract class Content extends ActiveRecord
 	}
 
 	/**
-	 * Wrapper for the "hidden" method because we have
-	 * way too many places that reference it
+	 * Is this a future entry?
 	 *
-	 * @return int
+	 * @return bool
 	 */
-	public function hidden() : int
+	public function isFutureDate()
 	{
-		if( IPS::classUsesTrait( $this, Hideable::class ) )
+		if ( $this instanceof \IPS\Content\FuturePublishing )
 		{
-			return $this->hiddenStatus();
+			if ( isset( static::$databaseColumnMap['is_future_entry'] ) and isset( static::$databaseColumnMap['future_date'] ) )
+			{
+				$column = static::$databaseColumnMap['future_date'];
+				if ( $this->$column > time() )
+				{
+					return TRUE;
+				}
+			}
 		}
 
+		return FALSE;
+	}
+
+	/**
+	 * Return the tooltip blurb for future entries
+	 *
+	 * @return string
+	 */
+	public function futureDateBlurb()
+	{
+		$column = static::$databaseColumnMap['future_date'];
+		$time   = \IPS\DateTime::ts( $this->$column );
+		return  \IPS\Member::loggedIn()->language()->addToStack("content_future_date_blurb", FALSE, array( 'sprintf' => array( $time->localeDate(), $time->localeTime() ) ) );
+	}
+	
+	/**
+	 * Check comment against profanity filters but do not act on it
+	 *
+	 * @param	bool				$first				Is this the first comment?
+	 * @param	bool				$edit				Are we editing or merging (true) or is this a new comment (false)?
+	 * @param	string|NULL			$content			The content to check - useful for if the content needs to be checked first, before it gets saved to the database.
+	 * @param	string|NULL|bool		$title				The title of the content to check, or NULL to check the current title, or FALSE to not check at all.
+	 * @param	string				$autoSaveLocation	The autosave location key of any editors to check, or NULL to use the default.
+	 * @param	string|NULL			$autoSaveKeys		The autosave keys (for new content) or attach lookup ids (for an edit) of any editors to check, or NULL to use the default.
+	 * @param	array				$imageUploads		Images that have been uploaded that may require moderation
+	 * @param	array|NULL			$filtersMatched	What matched, passed by reference
+	 * @return	bool									Whether to send unapproved notifications (i.e. true if the content was hidden)
+	 */
+	public function shouldTriggerProfanityFilters( $first=FALSE, $edit=TRUE, $content=NULL, $title=NULL, $autoSaveLocation=NULL, $autoSaveKeys=NULL, $imageUploads=[], &$hiddenByFilter = FALSE, &$itemHiddenByFilter = FALSE, array &$filtersMatched = array() )
+	{		
+		/* Set our content */
+		$content = $content ?: $this->content();
+				
+		/* We need our item */
+		$item = $this;
+		if ( $this instanceof \IPS\Content\Comment )
+		{
+			$item = $this->item();
+			
+			if ( $item::$firstCommentRequired AND $first AND $title !== FALSE )
+			{
+				$title = $title ?: $item->mapped('title');
+			}
+		}
+		else
+		{
+			if ( $title !== FALSE )
+			{
+				$title = $title ?: $this->mapped('title');
+			}
+		}
+		
+		/* If this content is "post before register", skip this check (we'll do it after registration is complete) */
+		if ( $this->hidden() === -3 or ( $item::$firstCommentRequired and $first and $item->hidden() === -3 ) )
+		{
+			return FALSE;
+		}
+
+		/* Check the author cannot bypass */
+		$member = $this->author();
+		if ( $member->group['g_bypass_badwords'] )
+		{
+			return FALSE;
+		}
+				
+		/* First, check the image scanner */
+		$idColumn = static::$databaseColumnId;
+		$itemIdColumn = $item::$databaseColumnId;
+		if ( \IPS\Settings::i()->ips_imagescanner_enable )
+		{
+			if ( $edit )
+			{
+				$autoSaveLocation = $autoSaveLocation ?: ( $item::$application . '_' . mb_ucfirst( $item::$module ) );
+				
+				if ( !$autoSaveKeys )
+				{			
+					if ( $this instanceof \IPS\Content\Comment and ( !( $this instanceof \IPS\Content\Review ) or !$first or !$item::$firstCommentRequired ) )
+					{
+						$autoSaveKeys = [ $this->attachmentIds() ];
+					}
+					else
+					{
+						$autoSaveKeys = [ [ $item->$itemIdColumn ] ];
+					}
+				}
+				
+				$clauses = [];
+				$binds = [];
+				foreach ( $autoSaveKeys as $_autoSaveKeys )
+				{				
+					$idLookups = [];
+					foreach ( range( 1, \count( $_autoSaveKeys ) ) as $i )
+					{
+						$idLookups[]= "id{$i}=?";
+					}
+					$clauses[] = '( ' . implode( ' AND ', $idLookups ) . ' )';
+					$binds = array_merge( $binds, $_autoSaveKeys );
+				}
+
+				if ( $this instanceof \IPS\Content\Item OR ( $first AND $item::$firstCommentRequired ) )
+				{
+					$itemHiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $content, $member, $filtersMatched );
+					
+					if ( $title AND !$itemHiddenByFilter )
+					{
+						$itemHiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $title, $member, $filtersMatched );
+					}
+				}
+				else
+				{
+					$hiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $content, $member, $filtersMatched );
+					
+					if ( $title AND !$hiddenByFilter )
+					{
+						$hiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $title, $member, $filtersMatched );
+					}
+				}
+				
+				$attachmentsMapWhere = array_merge( array( 'location_key=? AND ( ' . implode( ' OR ', $clauses ) . ' )', $autoSaveLocation ), $binds );
+			}
+			else
+			{
+				if ( $autoSaveKeys === NULL )
+				{
+					if ( $this instanceof \IPS\Content\Item or ( $first and $item::$firstCommentRequired ) )
+					{
+						$container = $item->containerWrapper();
+						$autoSaveKeys[] = 'newContentItem-' . $item::$application . '/' . $item::$module  . '-' . ( $container ? $container->_id : 0 );
+					}
+					else
+					{
+						if ( $this instanceof \IPS\Content\Review )
+						{
+							$autoSaveKeys[] = 'review-' . $item::$application . '/' . $item::$module  . '-' . $item->$itemIdColumn;
+						}
+						else
+						{
+							$autoSaveKeys[] = 'reply-' . $item::$application . '/' . $item::$module  . '-' . $item->$itemIdColumn;
+						}
+					}
+				}
+
+				if ( $this instanceof \IPS\Content\Item OR ( $first AND $item::$firstCommentRequired ) )
+				{
+					$itemHiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $content, $member, $filtersMatched );
+					
+					if ( $title AND !$itemHiddenByFilter )
+					{
+						$itemHiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $title, $member, $filtersMatched );
+					}
+				}
+				else
+				{
+					$hiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $content, $member, $filtersMatched );
+					
+					if ( $title AND !$hiddenByFilter )
+					{
+						$hiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $title, $member, $filtersMatched );
+					}
+				}
+				
+				$attachmentsMapWhere = \IPS\Db::i()->in( 'temp', array_map( 'md5', $autoSaveKeys ) );
+			}
+			
+			foreach ( \IPS\Db::i()->select( 'attach_moderation_status', 'core_attachments', [ 'attach_id IN (?)', \IPS\Db::i()->select( 'attachment_id', 'core_attachments_map', $attachmentsMapWhere ) ] ) as $attachModerationStatus )
+			{
+				if ( $attachModerationStatus === 'pending' )
+				{
+					if ( $this instanceof \IPS\Content\Item or ( $first and $item::$firstCommentRequired ) )
+					{
+						$itemHiddenByFilter = TRUE;
+					}
+					else
+					{
+						$hiddenByFilter = TRUE;
+					}
+					break;
+				}
+			}
+			
+			if ( !$hiddenByFilter and !$itemHiddenByFilter )
+			{
+				foreach ( $imageUploads as $file )
+				{
+					if ( $file->requiresModeration )
+					{
+						if ( $this instanceof \IPS\Content\Item or ( $first and $item::$firstCommentRequired ) )
+						{
+							$itemHiddenByFilter = TRUE;
+						}
+						else
+						{
+							$hiddenByFilter = TRUE;
+						}
+						break;
+					}
+				}
+				
+				if ( $hiddenByFilter OR $itemHiddenByFilter )
+				{
+					$log = new \IPS\core\Approval;
+					$log->content_class	= \get_called_class();
+					$log->content_id	= $this->$idColumn;
+					$log->held_reason	= 'image';
+					$log->save(); 
+				}
+			}
+		}
+				
+		/* Then pass this through our profanity and link filters */
+		try
+		{
+			if ( $this instanceof \IPS\Content\Item or ( $first and $item::$firstCommentRequired ) )
+			{
+				if ( !$itemHiddenByFilter )
+				{
+					$itemHiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $content, $member, $filtersMatched );
+				}
+				if ( !$itemHiddenByFilter and $title )
+				{
+					$itemHiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $title, $member, $filtersMatched );
+				}
+			}
+			else
+			{
+				if ( !$hiddenByFilter )
+				{
+					$hiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $content, $member, $filtersMatched );
+				}
+				if ( !$hiddenByFilter and $title )
+				{
+					$hiddenByFilter = \IPS\core\Profanity::hiddenByFilters( $title, $member, $filtersMatched );
+				}
+			}
+		}
+		catch( \BadMethodCallException $e ) { }
+		
+		/* Return */
+		return ( $hiddenByFilter or $itemHiddenByFilter );
+	}
+	
+	/**
+	 * Check comment against profanity filters AND act on it
+	 *
+	 * @param	bool				$first				Is this the first comment?
+	 * @param	bool				$edit				Are we editing or merging (true) or is this a new comment (false)?
+	 * @param	string|NULL			$content			The content to check - useful for if the content needs to be checked first, before it gets saved to the database.
+	 * @param	string|NULL|bool		$title				The title of the content to check, or NULL to check the current title, or FALSE to not check at all.
+	 * @param	string				$autoSaveLocation	The autosave location key of any editors to check, or NULL to use the default.
+	 * @param	string|NULL			$autoSaveKeys		The autosave keys (for new content) or attach lookup ids (for an edit) of any editors to check, or NULL to use the default.
+	 * @param	array				$imageUploads		Images that have been uploaded that may require moderation
+	 * @return	bool									Whether to send unapproved notifications (i.e. true if the content was hidden)
+	 */
+	public function checkProfanityFilters( $first=FALSE, $edit=TRUE, $content=NULL, $title=NULL, $autoSaveLocation=NULL, $autoSaveKeys=NULL, $imageUploads=[] )
+	{
+		/* Check this content type is hideable */
+		if ( !( $this instanceof \IPS\Content\Hideable ) )
+		{
+			return FALSE;
+		}
+
+		/* Check it */
+		$hiddenByFilter = FALSE;
+		$itemHiddenByFilter = FALSE;
+		$sendNotifications = FALSE;
+		$filtersMatched = array();
+		$item = ( $this instanceof \IPS\Content\Item ) ? $this : $this->item();
+		$this->shouldTriggerProfanityFilters( $first, $edit, $content, $title, $autoSaveLocation, $autoSaveKeys, $imageUploads, $hiddenByFilter, $itemHiddenByFilter, $filtersMatched );
+
+		/* If we need to hide the item, then do that */
+		if ( $itemHiddenByFilter )
+		{
+			$sendNotifications = $edit;
+			
+			/* 'approved' is easy, clear and concise */
+			if ( isset( $item::$databaseColumnMap['approved'] ) )
+			{
+				$column = $item::$databaseColumnMap['approved'];
+				$item->$column = 0;
+				$item->save();
+			}
+			/* 'hidden' is backwards */
+			elseif ( isset( $item::$databaseColumnMap['hidden'] ) )
+			{
+				$column = $item::$databaseColumnMap['hidden'];
+				$item->$column = 1;
+				$item->save();
+			}
+		}
+		
+		/* If we need to hide this, then do that */
+		if ( $hiddenByFilter === TRUE or $itemHiddenByFilter === TRUE )
+		{
+			$sendNotifications = TRUE;
+			
+			/* 'approved' is easy, clear and concise */
+			if ( isset( static::$databaseColumnMap['approved'] ) )
+			{
+				$column = static::$databaseColumnMap['approved'];
+				$this->$column = 0;
+				$this->save();
+			}
+			/* 'hidden' is backwards */
+			else if ( isset( static::$databaseColumnMap['hidden'] ) )
+			{
+				$column = static::$databaseColumnMap['hidden'];
+				$this->$column = ( $itemHiddenByFilter and $this instanceof \IPS\Content\Comment ) ? 2 : 1; # We use the special 2 flag to note it is only hidden because the parent is
+				$this->save();
+			}
+			
+			$idColumn = static::$databaseColumnId;
+			$itemColumnId = $item::$databaseColumnId;
+			
+			try
+			{
+				if ( $this instanceof \IPS\Content\Comment AND $item::$firstCommentRequired AND $this->isFirst() )
+				{
+					\IPS\core\Approval::loadFromContent( \get_class( $item ), $item->$itemColumnId );
+				}
+				else
+				{
+					\IPS\core\Approval::loadFromContent( \get_called_class(), $this->$idColumn );
+				}
+			}
+			catch( \OutOfRangeException $e )
+			{
+				if ( isset( $filtersMatched['type'] ) AND isset( $filtersMatched['match'] ) )
+				{
+					$log = new \IPS\core\Approval;
+					if ( $this instanceof \IPS\Content\Comment AND $item::$firstCommentRequired AND $this->isFirst() )
+					{
+						$log->content_class	= \get_class( $item );
+						$log->content_id	= $item->$itemColumnId;
+					}
+					else
+					{
+						$log->content_class	= \get_called_class();
+						$log->content_id	= $this->$idColumn;
+					}
+					$log->held_reason	= $filtersMatched['type'];
+					switch( $filtersMatched['type'] )
+					{
+						case 'profanity':
+							$log->held_data = array( 'word' => $filtersMatched['match'] );
+							break;
+						
+						case 'url':
+							$log->held_data = array( 'url' => $filtersMatched['match'] );
+							break;
+						
+						case 'email':
+							$log->held_data = array( 'email' => $filtersMatched['match'] );
+							break;
+					}
+					$log->save();
+				}
+			}
+		}
+		
+		/* If we did either, then recount number of comments */
+		if ( $itemHiddenByFilter or $hiddenByFilter )
+		{
+			$item->resyncCommentCounts();
+			$item->resyncLastComment();
+			$item->save();
+
+			if ( $first AND $container = $item->containerWrapper() )
+			{
+				$container->resetCommentCounts();
+				$container->save();
+			}
+		}
+
+		/* Return */
+		return $sendNotifications;
+	}
+	
+	/**
+	 * Content is hidden?
+	 *
+	 * @return	int
+	 *	@li -3 is a post made by a guest using the "post before register" feature
+	 *	@li -2 is pending deletion
+	 * 	@li	-1 is hidden having been hidden by a moderator
+	 * 	@li	0 is unhidden
+	 *	@li	1 is hidden needing approval
+	 * @note	The actual column may also contain 2 which means the item is hidden because the parent is hidden, but it is not hidden in itself. This method will return -1 in that case.
+	 *
+	 * @note    A piece of content (item and comment) can have an alias for hidden OR approved.
+	 *          With hidden: 0=not hidden, 1=hidden (needs moderator approval), -1=hidden by moderator, 2=parent item is hidden, -2=pending deletion, -3=guest post before register
+	 *          With approved: 1=not hidden, 0=hidden (needs moderator approval), -1=hidden by moderator, -2=pending deletion, -3=guest post before register
+	 *
+	 *          User posting has moderator approval set: When adding an unapproved ITEM (approved=0, hidden=1) you should *not* increment container()->_comments but you should update container()->_unapprovedItems
+	 *          User posting has moderator approval set: When adding an unapproved COMMENT (approved=0, hidden=1) you should *not* increment item()->num_comments in item or container()->_comments but you should update item()->unapproved_comments and container()->_unapprovedComments
+	 *
+	 *          User post is hidden by moderator (approved=-1, hidden=0) you should decrement item()->num_comments and decrement container()->_comments but *not* increment item()->unapproved_comments or container()->_unapprovedComments
+	 *          User item is hidden by a moderator (approved=-1, hidden=0) you should decrement container()->comments and subtract comment count from container()->_comments, but *not* increment container()->_unapprovedComments
+	 *
+	 *          Moderator hides item (approved=-1, hidden=-1) you should substract num_comments from container()->_comments. Comments inside item are flagged as approved=-1, hidden=2 but item()->num_comments should not be substracted from
+	 *
+	 *          Comments with a hidden value of 2 should increase item()->num_comments but not container()->_comments
+	 * @throws	\RuntimeException
+	 */
+	public function hidden()
+	{
+		if ( $this instanceof \IPS\Content\Hideable )
+		{
+			if ( isset( static::$databaseColumnMap['hidden'] ) )
+			{
+				$column = static::$databaseColumnMap['hidden'];
+				return ( $this->$column == 2 ) ? -1 : \intval( $this->$column );
+			}
+			elseif ( isset( static::$databaseColumnMap['approved'] ) )
+			{
+				$column = static::$databaseColumnMap['approved'];
+				if ( $this->$column == -2 or $this->$column == -3 )
+				{
+					return \intval( $this->$column );
+				}
+				return $this->$column == -1 ? \intval( $this->$column ) : \intval( !$this->$column );
+			}
+			else
+			{
+				throw new \RuntimeException;
+			}
+		}
+		
 		return 0;
 	}
 	
@@ -525,11 +873,11 @@ abstract class Content extends ActiveRecord
 	 * Can see moderation tools
 	 *
 	 * @note	This is used generally to control if the user has permission to see multi-mod tools. Individual content items may have specific permissions
-	 * @param	Member|NULL	$member	The member to check for or NULL for the currently logged in member
-	 * @param	Model|NULL		$container	The container
+	 * @param	\IPS\Member|NULL	$member	The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Node\Model|NULL		$container	The container
 	 * @return	bool
 	 */
-	public static function canSeeMultiModTools( Member|null $member = NULL, Model|null $container = NULL ): bool
+	public static function canSeeMultiModTools( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
 		return static::modPermission( 'pin', $member, $container ) or static::modPermission( 'unpin', $member, $container ) or static::modPermission( 'feature', $member, $container ) or static::modPermission( 'unfeature', $member, $container ) or static::modPermission( 'edit', $member, $container ) or static::modPermission( 'hide', $member, $container ) or static::modPermission( 'unhide', $member, $container ) or static::modPermission( 'delete', $member, $container ) or static::modPermission( 'move', $member, $container );
 	}
@@ -539,12 +887,12 @@ abstract class Content extends ActiveRecord
 	 *
 	 * @return 	NULL|array
 	 */
-	public function cannotViewGroups(): array|NULL
+	public function cannotViewGroups()
 	{
 		$groups = array();
-		foreach( Group::groups() as $group )
+		foreach( \IPS\Member\Group::groups() as $group )
 		{
-			if ( $this instanceof Comment )
+			if ( $this instanceof \IPS\Content\Comment )
 			{
 				if ( ! $this->item()->can( 'view', $group ) )
 				{
@@ -560,45 +908,45 @@ abstract class Content extends ActiveRecord
 			}
 		}
 
-		return count( $groups ) ? $groups : NULL;
+		return \count( $groups ) ? $groups : NULL;
 	}
 	
 	/**
 	 * Check Moderator Permission
 	 *
 	 * @param	string						$type		'edit', 'hide', 'unhide', 'delete', etc.
-	 * @param	Member|NULL			$member		The member to check for or NULL for the currently logged in member
-	 * @param	Model|NULL		$container	The container
+	 * @param	\IPS\Member|NULL			$member		The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Node\Model|NULL		$container	The container
 	 * @return	bool
 	 */
-	public static function modPermission( string $type, ?Member $member = NULL, ?Model $container = NULL ): bool
+	public static function modPermission( $type, \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
 		/* Compatibility checks */
-		if ( ( $type == 'hide' or $type == 'unhide' ) and !IPS::classUsesTrait( get_called_class(), 'IPS\Content\Hideable' ) )
+		if ( ( $type == 'hide' or $type == 'unhide' ) and !\in_array( 'IPS\Content\Hideable', class_implements( \get_called_class() ) ) )
 		{
 			return FALSE;
 		}
-		if ( ( $type == 'pin' or $type == 'unpin' ) and !IPS::classUsesTrait( get_called_class(), 'IPS\Content\Pinnable' ) )
+		if ( ( $type == 'pin' or $type == 'unpin' ) and !\in_array( 'IPS\Content\Pinnable', class_implements( \get_called_class() ) ) )
 		{
 			return FALSE;
 		}
-		if ( ( $type == 'future_publish' ) and !IPS::classUsesTrait( get_called_class(), 'IPS\Content\FuturePublishing' ) )
+		if ( ( $type == 'feature' or $type == 'unfeature' ) and !\in_array( 'IPS\Content\Featurable', class_implements( \get_called_class() ) ) )
 		{
 			return FALSE;
 		}
-		if( ( $type == 'assign' ) and ( !IPS::classUsesTrait( get_called_class(), Assignable::class ) or !Bridge::i()->featureIsEnabled( 'assignments' ) ) )
+		if ( ( $type == 'future_publish' ) and !\in_array( 'IPS\Content\FuturePublishing', class_implements( \get_called_class() ) ) )
 		{
-			return false;
+			return FALSE;
 		}
 
 		/* If this is called from a gateway script, i.e. email piping, just return false as we are a "guest" */
-		if( $member === NULL AND !Dispatcher::hasInstance() )
+		if( $member === NULL AND !\IPS\Dispatcher::hasInstance() )
 		{
 			return FALSE;
 		}
 		
 		/* Load Member */
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Global permission */
 		if ( $member->modPermission( "can_{$type}_content" ) )
@@ -608,7 +956,7 @@ abstract class Content extends ActiveRecord
 		/* Per-container permission */
 		elseif ( $container )
 		{
-			return $container->modPermission( $type, $member, static::getContainerModPermissionClass() ?: get_called_class() );
+			return $container->modPermission( $type, $member, static::getContainerModPermissionClass() ?: \get_called_class() );
 		}
 		
 		/* Still here? return false */
@@ -622,7 +970,7 @@ abstract class Content extends ActiveRecord
 	 * @note	By default we will return NULL and the container check will execute against Node::$contentItemClass, however
 	 *	in some situations we may need to override this (i.e. for Gallery Albums)
 	 */
-	protected static function getContainerModPermissionClass(): ?string
+	protected static function getContainerModPermissionClass()
 	{
 		return NULL;
 	}
@@ -630,32 +978,19 @@ abstract class Content extends ActiveRecord
 	/**
 	 * @brief	Flag to skip rebuilding container data (because it will be rebuilt in one batch later)
 	 */
-	public bool $skipContainerRebuild = FALSE;
-
-	/**
-	 * Check if a specific action is available for this Content.
-	 * Default to TRUE, but used for overrides in individual Item/Comment classes.
-	 *
-	 * @param string $action
-	 * @param Member|null $member
-	 * @return bool
-	 */
-	public function actionEnabled( string $action, ?Member $member=null ) : bool
-	{
-		return TRUE;
-	}
+	public $skipContainerRebuild = FALSE;
 		
 	/**
 	 * Do Moderator Action
 	 *
-	 * @param string $action	The action
-	 * @param Member|NULL	$member	The member doing the action (NULL for currently logged in member)
-	 * @param string|null $reason	Reason (for hides)
-	 * @param bool $immediately Delete Immediately
+	 * @param	string				$action	The action
+	 * @param	\IPS\Member|NULL	$member	The member doing the action (NULL for currently logged in member)
+	 * @param	string|NULL			$reason	Reason (for hides)
+	 * @param	bool				$immediately Delete Immediately
 	 * @return	void
-	 * @throws	OutOfRangeException|InvalidArgumentException|RuntimeException
+	 * @throws	\OutOfRangeException|\InvalidArgumentException|\RuntimeException
 	 */
-	public function modAction( string $action, ?Member $member = NULL, mixed $reason = NULL, bool $immediately=FALSE ): void
+	public function modAction( $action, \IPS\Member $member = NULL, $reason = NULL, $immediately = FALSE )
 	{
 		if( $action === 'approve' )
 		{
@@ -663,9 +998,9 @@ abstract class Content extends ActiveRecord
 		}
 
 		/* Check it's a valid action */
-		if ( !in_array( $action, array( 'pin', 'unpin', 'feature', 'unfeature', 'hide', 'unhide', 'move', 'lock', 'unlock', 'delete', 'publish', 'restore', 'restoreAsHidden' ) ) )
+		if ( !\in_array( $action, array( 'pin', 'unpin', 'feature', 'unfeature', 'hide', 'unhide', 'move', 'lock', 'unlock', 'delete', 'publish', 'restore', 'restoreAsHidden' ) ) )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 		
 		/* And that we can do it */
@@ -675,22 +1010,19 @@ abstract class Content extends ActiveRecord
 			$toCheck = 'restore';
 		}
 		
-		$methodName = 'can' . ucfirst( $toCheck );
+		$methodName = 'can' . mb_ucfirst( $toCheck );
 		if ( !$this->$methodName( $member ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		/* Log */
-		Session::i()->modLog( 'modlog__action_' . $action, array( static::$title => TRUE, $this->url()->__toString() => FALSE, $this->mapped('title') ?: ( method_exists( $this, 'item' ) ? $this->item()->mapped('title') : NULL ) => FALSE ), ( $this instanceof Item ) ? $this : $this->item() );
+		\IPS\Session::i()->modLog( 'modlog__action_' . $action, array( static::$title => TRUE, $this->url()->__toString() => FALSE, $this->mapped('title') ?: ( method_exists( $this, 'item' ) ? $this->item()->mapped('title') : NULL ) => FALSE ), ( $this instanceof \IPS\Content\Item ) ? $this : $this->item() );
 
 		$idColumn = static::$databaseColumnId;
 
-		Webhook::fire( str_replace( '\\', '', substr( get_called_class(), 3 ) ) . '_modaction', ['action' => $action, 'item' => $this->apiOutput()], $this->webhookFilters() );
-
 		/* These ones just need a property setting */
-		$dataLayerEvent = null;
-		if ( in_array( $action, array( 'pin', 'unpin', 'feature', 'unfeature', 'lock', 'unlock' ) ) )
+		if ( \in_array( $action, array( 'pin', 'unpin', 'feature', 'unfeature', 'lock', 'unlock' ) ) )
 		{
 			$val = TRUE;
 			switch ( $action )
@@ -703,6 +1035,7 @@ abstract class Content extends ActiveRecord
 				
 				case 'unfeature':
 					$val = FALSE;
+					\IPS\Db::i()->delete( 'core_content_featured', [ 'feature_content_id=? and feature_content_class=?', $this->$idColumn, \get_class( $this ) ] );
 				case 'feature':
 					$column = static::$databaseColumnMap['featured'];
 					break;
@@ -724,106 +1057,663 @@ abstract class Content extends ActiveRecord
 			$this->$column = $val;
 			$this->save();
 
-			if ( $action === 'pin' or $action === 'unpin' )
+			if ( $action == 'feature' and $this->author()->member_id )
 			{
-				$dataLayerEvent = $action === 'pin' ? 'pin' : 'unpin';
+				\IPS\Db::i()->insert( 'core_content_featured', [
+					'feature_content_id' => $this->$idColumn,
+					'feature_content_class' => \get_class( $this ),
+					'feature_content_author' => $this->author()->member_id,
+					'feature_date' => time()
+				] );
+
+				/* Points */
+				$this->author()->achievementAction( 'core', 'ContentPromotion', [
+					'content' => $this,
+					'promotype' => 'feature'
+				] );
 			}
 
-            /* Fire events for these here, the others will be fired at a later point */
-            Event::fire( 'onStatusChange', $this, array( $action ) );
+			return;
 		}
 		
 		/* Hide is a tiny bit more complicated */
 		elseif ( $action === 'hide' )
 		{
-			$dataLayerEvent = 'hide';
 			$this->hide( $member, $reason );
+			return;
 		}
 		elseif ( $action === 'unhide' )
 		{
-			$dataLayerEvent = 'unhide';
 			$this->unhide( $member );
+			return;
 		}
 		
 		/* Delete is just a method */
 		elseif ( $action === 'delete' )
 		{
 			/* If we are retaining content for a period of time, we need to just hide it instead for deleting later - this only works, though, with items that implement \IPS\Content\Hideable */
-			if ( Settings::i()->dellog_retention_period AND IPS::classUsesTrait( $this, 'IPS\Content\Hideable' ) AND $immediately === FALSE )
+			if ( \IPS\Settings::i()->dellog_retention_period AND ( $this instanceof \IPS\Content\Hideable ) AND $immediately === FALSE )
 			{
 				$this->logDelete( $member );
 				return;
 			}
-
-			$dataLayerEvent = 'delete';
+			
+			$idColumn = static::$databaseColumnId;
 			$this->delete();
+			return;
 		}
 		
 		/* Restore is just a method */
 		elseif ( $action === 'restore' )
 		{
 			$this->restore();
+			return;
 		}
 		
 		/* Restore As Hidden is just a method */
 		elseif ( $action === 'restoreAsHidden' )
 		{
 			$this->restore( TRUE );
+			return;
 		}
 
 		/* Publish is just a method */
 		elseif ( $action === 'publish' )
 		{
 			$this->publish();
+			return;
 		}
 
 		/* Move is just a method */
 		elseif ( $action === 'move' )
 		{
-			$args	= func_get_args();
-			if ( $args[2] )
+			$args	= \func_get_args();
+			$this->move( $args[2][0], $args[2][1] );
+			return;
+		}
+	}
+	
+	/**
+	 * Log for deletion later
+	 *
+	 * @param	\IPS\Member|NULL 	$member	The member, NULL for currently logged in, or FALSE for no member
+	 * @return	void
+	 */
+	public function logDelete( $member = NULL )
+	{
+		if( $member === NULL )
+		{
+			$member = \IPS\Member::loggedIn();
+		}
+
+		$originalState = $this->hidden();
+		
+		/* Log it! */
+		$log = new \IPS\core\DeletionLog;
+		$log->setContentAndMember( $this, $member );
+		$log->save();
+		
+		if ( isset( static::$databaseColumnMap['hidden'] ) )
+		{
+			$column = static::$databaseColumnMap['hidden'];
+		}
+		else if ( isset( static::$databaseColumnMap['approved'] ) )
+		{
+			$column = static::$databaseColumnMap['approved'];
+		}
+		
+		$this->$column = -2;
+		$this->save();
+		
+		if ( $this instanceof \IPS\Content\Comment )
+		{
+			$item = $this->item();
+			
+			/* Update last comment stuff */
+			$item->resyncLastComment();
+
+			/* Update last review stuff */
+			$item->resyncLastReview();
+
+			/* Update number of comments */
+			$item->resyncCommentCounts();
+
+			/* Update number of reviews */
+			$item->resyncReviewCounts();
+
+			/* Save*/
+			$item->save();
+
+			/* Now the container */
+			try
 			{
-				$this->move( $args[2][0], $args[2][1] );
+				$containerColumn = ( $originalState === 1 ) ? '_unapprovedComments' : '_comments';
+				if ( \in_array( 'IPS\Content\Review', class_parents( \get_called_class() ) ) )
+				{
+					$containerColumn = ( $originalState === 1 ) ? '_unapprovedReviews' : '_reviews';
+				}
+
+				if( $item->container()->$containerColumn !== null )
+				{
+					$item->container()->$containerColumn = ( $item->container()->$containerColumn > 0 ) ? ( $item->container()->$containerColumn - 1 ) : 0;
+					$item->container()->save();
+				}
+			}
+			catch( \BadMethodCallException ){}
+		}
+		
+		if ( $this instanceof \IPS\Content\Tags )
+		{
+			\IPS\Db::i()->update( 'core_tags_perms', array( 'tag_perm_visible' => 0 ), array( 'tag_perm_aai_lookup=?', $this->tagAAIKey() ) );
+		}
+		
+		try
+		{
+			$idColumn = static::$databaseColumnId;
+			
+			if ( $this->container() AND !$this->skipContainerRebuild )
+			{
+				$this->container()->resetCommentCounts();
+				$this->container()->setLastComment();
+				$this->container()->setLastReview();
+				$this->container()->save();
+			}
+
+			/* Update mappings */
+			if ( $this->container() and \IPS\IPS::classUsesTrait( $this->container(), 'IPS\Node\Statistics' ) )
+			{
+				if ( $this instanceof \IPS\Content\Comment )
+				{
+					$this->container()->rebuildPostedIn( array( $this->mapped('item') ) );
+				}
+				else
+				{
+					$this->container()->rebuildPostedIn( array($this->$idColumn) );
+				}
+			}
+			
+			\IPS\core\Approval::loadFromContent( \get_called_class(), $this->$idColumn )->delete();			
+		}
+		catch( \BadMethodCallException $e ) {}
+		catch( \OutOfRangeException $e ) {}
+	}
+	
+	/**
+	 * Restore Content
+	 *
+	 * @param	bool	$hidden	Restore as hidden?
+	 * @return	void
+	 */
+	public function restore( $hidden = FALSE )
+	{
+		try
+		{
+			$idColumn = static::$databaseColumnId;
+			$log = \IPS\core\DeletionLog::constructFromData( \IPS\Db::i()->select( '*', 'core_deletion_log', array( "dellog_content_class=? AND dellog_content_id=?", \get_class( $this ), $this->$idColumn ) )->first() );
+		}
+		catch( \UnderflowException $e )
+		{
+			/* There's no deletion log record, but this shouldn't stop us from restoring */
+		}
+		
+		/* Restoring as hidden? */
+		if ( $hidden )
+		{
+			if ( isset( static::$databaseColumnMap['hidden'] ) )
+			{
+				$column = static::$databaseColumnMap['hidden'];
+			}
+			else if ( isset( static::$databaseColumnMap['approved'] ) )
+			{
+				$column = static::$databaseColumnMap['approved'];
+			}
+			
+			$this->$column = -1;
+		}
+		else
+		{
+			if ( isset( static::$databaseColumnMap['hidden'] ) )
+			{
+				$column = static::$databaseColumnMap['hidden'];
+				$this->$column = 0;
+			}
+			else if ( isset( static::$databaseColumnMap['approved'] ) )
+			{
+				$column = static::$databaseColumnMap['approved'];
+				$this->$column = 1;
+			}
+		}
+		
+		if ( $this instanceof \IPS\Content\Tags AND !$hidden )
+		{
+			\IPS\Db::i()->update( 'core_tags_perms', array( 'tag_perm_visible' => 1 ), array( 'tag_perm_aai_lookup=?', $this->tagAAIKey() ) );
+		}
+
+		/* Save the changes */
+		$this->save();
+
+		if( $this instanceof Searchable )
+		{ /* Reindex the now hidden content - if this is a content item with comments or reviews, then make sure to do those too. */
+			if( $this instanceof \IPS\Content\Item and ( isset( static::$commentClass ) or isset( static::$reviewClass ) ) )
+			{
+				\IPS\Content\Search\Index::i()->index( ( static::$firstCommentRequired ) ? $this->firstComment() : $this );
+				\IPS\Content\Search\Index::i()->indexSingleItem( $this );
+			}else
+			{
+				/* Either this is a comment / review, or the item doesn't support comments or reviews, so we can just reindex it now. */
+				\IPS\Content\Search\Index::i()->index( $this );
 			}
 		}
 
-		if ( $dataLayerEvent and DataLayer::enabled( 'analytics_full' ) and static::dataLayerEventActive( 'content_' . $dataLayerEvent ) )
+		/* Delete the log */
+		if ( isset( $log ) )
 		{
-			DataLayer::i()->addEvent( 'content_' . $dataLayerEvent, $this->getDataLayerProperties() );
+			$log->delete();
 		}
+
+		/* Recount the container counters */
+		if( $this->container() AND !$this->skipContainerRebuild )
+		{
+			$this->container()->resetCommentCounts();
+			$this->container()->setLastComment();
+			$this->container()->setLastReview();
+			$this->container()->save();
+		}
+	}
+	
+	/**
+	 * Can restore?*
+	 *
+	 * @param	\IPS\Member|NULL	$member	The member, or currently logged in member
+	 * @return	bool
+	 */
+	public function canRestore( $member=NULL )
+	{
+		$member = $member ?: \IPS\Member::loggedIn();
+		return $member->modPermission('can_manage_deleted_content');
+	}
+	
+	/**
+	 * Give class a chance to inspect and manipulate search engine filters for streams
+	 *
+	 * @param	array 						$filters	Filters to be used for activity stream
+	 * @param	\IPS\Content\Search\Query	$query		Search query object
+	 * @return	void
+	 */
+	public static function searchEngineFiltering( &$filters, &$query )
+	{
+		/* Intentionally left blank but child classes can override */
+	}
+	
+	/**
+	 * Hide
+	 *
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @param	string					$reason	Reason
+	 * @return	void
+	 */
+	public function hide( $member, $reason = NULL )
+	{
+		if ( isset( static::$databaseColumnMap['hidden'] ) )
+		{
+			$column = static::$databaseColumnMap['hidden'];
+		}
+		elseif ( isset( static::$databaseColumnMap['approved'] ) )
+		{
+			$column = static::$databaseColumnMap['approved'];
+		}
+		else
+		{
+			throw new \RuntimeException;
+		}
+
+		/* Already hidden? */
+		if( $this->$column == -1 )
+		{
+			return;
+		}
+
+		$this->$column = -1;
+		$this->save();
+		$this->onHide( $member );
+		
+		$idColumn = static::$databaseColumnId;
+		if ( static::$hideLogKey )
+		{
+			\IPS\Db::i()->delete( 'core_soft_delete_log', array( 'sdl_obj_id=? AND sdl_obj_key=?', $this->$idColumn, static::$hideLogKey ) );
+			\IPS\Db::i()->insert( 'core_soft_delete_log', array(
+				'sdl_obj_id'		=> $this->$idColumn,
+				'sdl_obj_key'		=> static::$hideLogKey,
+				'sdl_obj_member_id'	=> $member === FALSE ? 0 : \intval( $member ? $member->member_id : \IPS\Member::loggedIn()->member_id ),
+				'sdl_obj_date'		=> time(),
+				'sdl_obj_reason'	=> $reason,
+				
+			) );
+		}
+		
+		if ( $this instanceof \IPS\Content\Tags )
+		{
+			\IPS\Db::i()->update( 'core_tags_perms', array( 'tag_perm_visible' => 0 ), array( 'tag_perm_aai_lookup=?', $this->tagAAIKey() ) );
+		}
+
+        /* Update search index */
+        if ( $this instanceof \IPS\Content\Searchable )
+        {
+            \IPS\Content\Search\Index::i()->index( $this );
+        }
+
+		$this->expireWidgetCaches();
+		$this->adjustSessions();
+		
+		try
+		{
+			\IPS\core\Approval::loadFromContent( \get_called_class(), $this->$idColumn )->delete();
+		}
+		catch( \OutOfRangeException $e ) { }
+	}
+	
+	/**
+	 * Unhide
+	 *
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @return	void
+	 */
+	public function unhide( $member )
+	{
+		/* If we're approving, we have to do extra stuff */
+		$approving	= FALSE;
+		$pbr		= FALSE;
+		if ( $this->hidden() === 1 )
+		{
+			$approving = TRUE;
+			if ( isset( static::$databaseColumnMap['approved_by'] ) and $member !== FALSE )
+			{
+				$column = static::$databaseColumnMap['approved_by'];
+				$this->$column = $member ? $member->member_id : \IPS\Member::loggedIn()->member_id;
+			}
+			if ( isset( static::$databaseColumnMap['approved_date'] ) )
+			{
+				$column = static::$databaseColumnMap['approved_date'];
+				$this->$column = time();
+			}
+		}
+		elseif( $this->hidden() === -3 )
+		{
+			$pbr = TRUE;
+		}
+
+		/* Now do the actual stuff */
+		if ( isset( static::$databaseColumnMap['hidden'] ) )
+		{
+			$column = static::$databaseColumnMap['hidden'];
+
+			/* Already approved? */
+			if( $this->$column == 0 )
+			{
+				return;
+			}
+
+			$this->$column = 0;
+		}
+		elseif ( isset( static::$databaseColumnMap['approved'] ) )
+		{
+			$column = static::$databaseColumnMap['approved'];
+
+			/* Already approved? */
+			if( $this->$column == 1 )
+			{
+				return;
+			}
+
+			$this->$column = 1;
+		}
+		else
+		{
+			throw new \RuntimeException;
+		}
+		$this->save();
+		$this->onUnhide( ( $approving OR ( $pbr AND $this->hidden() === 0 ) ), $member );
+		
+		$idColumn = static::$databaseColumnId;
+		if ( static::$hideLogKey )
+		{
+			\IPS\Db::i()->delete('core_soft_delete_log', array('sdl_obj_id=? AND sdl_obj_key=?', $this->$idColumn, static::$hideLogKey));
+		}
+
+		/* And update the tags perm cache */
+		if ( $this instanceof \IPS\Content\Tags )
+		{
+			\IPS\Db::i()->update( 'core_tags_perms', array( 'tag_perm_visible' => 1 ), array( 'tag_perm_aai_lookup=?', $this->tagAAIKey() ) );
+		}
+		
+		/* Update search index */
+		if ( $this instanceof \IPS\Content\Searchable )
+		{
+			\IPS\Content\Search\Index::i()->index( $this );
+		}
+		
+		/* Update report center stuff */
+		if ( \IPS\IPS::classUsesTrait( $this, 'IPS\Content\Reportable' ) )
+		{
+			$this->moderated( 'unhide' );
+		}
+		
+		/* Send notifications if necessary */
+		if ( ( $approving OR ( $pbr AND $this->hidden() === 0 ) ) )
+		{
+			$this->sendApprovedNotification();
+		}
+
+		/* Award points */
+		$itemClass = \in_array( 'IPS\Content\Comment', class_parents( \get_called_class() ) ) ? static::$itemClass : \get_called_class();
+		if ( $this instanceof \IPS\Content\Item )
+		{
+			$this->author()->achievementAction( 'core', 'NewContentItem', $this );
+		}
+		elseif ( $this instanceof \IPS\Content\Review )
+		{
+			$this->author()->achievementAction( 'core', 'Review', $this );
+		}
+		elseif ( $this instanceof \IPS\Content\Comment and ( ( $itemClass::$firstCommentRequired AND ! $this->isFirst() ) OR ( ! $itemClass::$firstCommentRequired ) ) )
+		{
+			$this->author()->achievementAction( 'core', 'Comment', $this );
+		}
+		
+		/* Send webhook if necessary */
+		if ( $approving )
+		{
+			\IPS\Api\Webhook::fire( str_replace( '\\', '', \substr( \get_called_class(), 3 ) ) . '_create', $this, $this->webhookFilters() );
+
+			if ( $this instanceof \IPS\Content\Item and $itemClass::$firstCommentRequired === TRUE and $firstComment = $this->firstComment() )
+			{
+				\IPS\Api\Webhook::fire( str_replace( '\\', '', \substr( \get_class( $firstComment ), 3 ) ) . '_create', $firstComment, $firstComment->webhookFilters() );
+			}
+		}
+
+		$this->expireWidgetCaches();
+		$this->adjustSessions();
+		
+		try
+		{
+			\IPS\core\Approval::loadFromContent( \get_called_class(), $this->$idColumn )->delete();
+		}
+		catch( \OutOfRangeException $e ) { }
+	}
+
+	/**
+	 * @brief	Hidden blurb cache
+	 */
+	protected $hiddenBlurb	= NULL;
+
+	/**
+	 * Blurb for when/why/by whom this content was hidden
+	 *
+	 * @return	string
+	 */
+	public function hiddenBlurb()
+	{
+		if ( !( $this instanceof \IPS\Content\Hideable ) or !static::$hideLogKey )
+		{
+			throw new \BadMethodCallException;
+		}
+		
+		if( $this->hiddenBlurb === NULL )
+		{
+			try
+			{
+				$idColumn = static::$databaseColumnId;
+				$log = \IPS\Db::i()->select( '*', 'core_soft_delete_log', array( 'sdl_obj_id=? AND sdl_obj_key=?', $this->$idColumn, static::$hideLogKey ) )->first();
+				
+				if ( $log['sdl_obj_member_id'] )
+				{
+					$this->hiddenBlurb = \IPS\Member::loggedIn()->language()->addToStack('hidden_blurb', FALSE, array( 'sprintf' => array( \IPS\Member::load( $log['sdl_obj_member_id'] )->name, \IPS\DateTime::ts( $log['sdl_obj_date'] )->relative(),  $log['sdl_obj_reason'] ?: \IPS\Member::loggedIn()->language()->addToStack('hidden_no_reason') ) ) );
+				}
+				else
+				{
+					$this->hiddenBlurb = \IPS\Member::loggedIn()->language()->addToStack('hidden_blurb_no_member', FALSE, array( 'sprintf' => array( \IPS\DateTime::ts( $log['sdl_obj_date'] )->relative(), $log['sdl_obj_reason'] ?: \IPS\Member::loggedIn()->language()->addToStack('hidden_no_reason') ) ) );
+				}
+			
+			}
+			catch ( \UnderflowException $e )
+			{
+				/* If this is requiring approval and has a logged reason */
+				$hidden = $this->hidden();
+				$item = NULL;
+				if ( ( $this instanceof \IPS\Content\Comment ) )
+				{
+					$item = $this->item();
+					/* If this is the first comment, and it's required, then we need to check the items hidden status instead */
+					if ( $item::$firstCommentRequired AND $this->isFirst() AND $hidden !== 1 )
+					{
+						$hidden = $this->item()->hidden();
+					}
+				}
+
+				if ( $hidden === 1 )
+				{
+					/* If moderator, show the reason */
+					$reason = NULL;
+					if( $this->modPermission( 'unhide' ) )
+					{
+						$reason = ( $item and $item::$firstCommentRequired AND $this->isFirst() ) ? $item->approvalQueueReason() : $this->approvalQueueReason();
+					}
+					
+					if ( $reason )
+					{
+						$this->hiddenBlurb = \IPS\Member::loggedIn()->language()->addToStack( 'hidden_with_reason', FALSE, array( 'sprintf' => array( $reason ) ) );
+					}
+					else
+					{
+						/* Otherwise show a message that the content requires approval before it can be edited. */
+						$this->hiddenBlurb = \IPS\Member::loggedIn()->language()->addToStack( 'hidden_awaiting_approval' );
+					}
+				}
+				else
+				{
+					$this->hiddenBlurb = \IPS\Member::loggedIn()->language()->addToStack('hidden');
+				}
+			}
+		}
+
+		return $this->hiddenBlurb;
+	}
+	
+	/**
+	 * Blurb for when/why/by whom this content was deleted
+	 *
+	 * @return	string
+	 * @throws \BadMethodCallException
+	 */
+	public function deletedBlurb()
+	{
+		if ( !( $this instanceof \IPS\Content\Hideable ) )
+		{
+			throw new \BadMethodCallException;
+		}
+		
+		try
+		{
+			$idColumn = static::$databaseColumnId;
+			$log = \IPS\core\DeletionLog::constructFromData( \IPS\Db::i()->select( '*', 'core_deletion_log', array( "dellog_content_class=? AND dellog_content_id=?", \get_class( $this ), $this->$idColumn ) )->first() );
+			if( $log->_deleted_by )
+			{
+				return \IPS\Member::loggedIn()->language()->addToStack( 'deletion_blurb', FALSE, array( 'sprintf' => array( $log->_deleted_by->name, $log->deleted_date->fullYearLocaleDate(), $log->deletion_date->fullYearLocaleDate() ) ) );
+			}
+			else
+			{
+				return \IPS\Member::loggedIn()->language()->addToStack( 'deletion_blurb_no_member', FALSE, array( 'sprintf' => array( $log->deletion_date->fullYearLocaleDate() ) ) );
+			}
+		}
+		catch( \UnderflowException $e )
+		{
+			return \IPS\Member::loggedIn()->language()->addToStack('deleted');
+		}
+	}
+	
+	/**
+	 * @brief	Reason for requiring approval
+	 */
+	protected $_approvalQueueReason = NULL;
+	
+	/**
+	 * Approval Queue Reason
+	 *
+	 * @return	bool|string
+	 */
+	public function approvalQueueReason()
+	{
+		if ( $this->_approvalQueueReason === NULL )
+		{
+			try
+			{
+				$idColumn = static::$databaseColumnId;
+				$this->_approvalQueueReason = \IPS\core\Approval::loadFromContent( \get_class( $this ), $this->$idColumn )->reason();
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->_approvalQueueReason = NULL;
+			}
+		}
+		return $this->_approvalQueueReason;
+	}
+	
+	/**
+	 * Can promote this comment/item?
+	 *
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @return	boolean
+	 */
+	public function canPromoteToSocialMedia( $member=NULL )
+	{
+		return \IPS\core\Promote::canPromote( $member );
 	}
 
 	/**
 	 * @brief	Have we already reported?
 	 */
-	protected bool|null $alreadyReported = NULL;
+	protected $alreadyReported = NULL;
 	
 	/**
 	 * Can report?
 	 *
-	 * @param	Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	TRUE|string			TRUE or a language string for why not
 	 * @note	This requires a few queries, so don't run a check in every template
 	 */
-	public function canReport( Member|null $member=NULL ): bool|string
+	public function canReport( $member=NULL )
 	{
-		if( !$this->actionEnabled( 'report', $member ) )
-		{
-			return false;
-		}
-
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		/* Is this type of comment reportabe? */
-		if ( !( IPS::classUsesTrait( $this, 'IPS\Content\Reportable' ) ) )
+		if ( !( \IPS\IPS::classUsesTrait( $this, 'IPS\Content\Reportable' ) ) )
 		{
 			return 'generic_error';
 		}
 		
 		/* Can the member report content? */
-		$classToCheck = ( $this instanceof Comment ) ? get_class( $this->item() ) : get_class( $this );
+		$classToCheck = ( $this instanceof \IPS\Content\Comment or $this instanceof \IPS\Content\Review ) ? \get_class( $this->item() ) : \get_class( $this );
 
-		if ( $member->group['g_can_report'] != '1' AND !in_array( $classToCheck, explode( ',', $member->group['g_can_report'] ) ) )
+		if ( $member->group['g_can_report'] != '1' AND !\in_array( $classToCheck, explode( ',', $member->group['g_can_report'] ) ) )
 		{
 			return 'no_module_permission';
 		}
@@ -847,18 +1737,18 @@ abstract class Content extends ActiveRecord
 				try
 				{
 					$idColumn = static::$databaseColumnId;
-					$report = Db::i()->select( 'id', 'core_rc_index', array( 'class=? AND content_id=?', get_called_class(), $this->$idColumn ) )->first();
-					$this->reportData = Db::i()->select( '*', 'core_rc_reports', array( 'rid=? AND report_by=?', $report, $member->member_id ) )->first();
+					$report = \IPS\Db::i()->select( 'id', 'core_rc_index', array( 'class=? AND content_id=?', \get_called_class(), $this->$idColumn ) )->first();
+					$this->reportData = \IPS\Db::i()->select( '*', 'core_rc_reports', array( 'rid=? AND report_by=?', $report, $member->member_id ) )->first();
 				}
-				catch( UnderflowException $e ){}
+				catch( \UnderflowException $e ){}
 			}
 			
 			/* Check again */
-			if ( isset( $this->reportData['date_reported'] ) )
+			if ( isset( $this->reportData ) AND \is_array( $this->reportData ) )
 			{
-				if ( Settings::i()->automoderation_report_again_mins )
-				{
-					if ( ( ( time() - $this->reportData['date_reported'] ) / 60 ) > Settings::i()->automoderation_report_again_mins )
+				if ( \IPS\Settings::i()->automoderation_report_again_mins )
+				{ 
+					if ( ( ( time() - $this->reportData['date_reported'] ) / 60 ) > \IPS\Settings::i()->automoderation_report_again_mins )
 					{
 						return TRUE;
 					}
@@ -878,11 +1768,11 @@ abstract class Content extends ActiveRecord
 	 * Can report or revoke report?
 	 * This method will return TRUE if the link to report content should be shown (which can occur even if you have already reported if you have permission to revoke your report)
 	 *
-	 * @param	Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	bool
 	 * @note	This requires a few queries, so don't run a check in every template
 	 */
-	public function canReportOrRevoke( Member|null $member=NULL ): bool
+	public function canReportOrRevoke( $member=NULL )
 	{
 		/* If we are allowed to report, then we can return TRUE. */
 		if( $this->canReport( $member ) === TRUE )
@@ -890,7 +1780,7 @@ abstract class Content extends ActiveRecord
 			return TRUE;
 		}
 		/* If we have already reported but automatic moderation is enabled, show the link so the user can revoke their report. */
-		elseif( $this->alreadyReported === TRUE AND Settings::i()->automoderation_enabled )
+		elseif( $this->alreadyReported === TRUE AND \IPS\Settings::i()->automoderation_enabled )
 		{
 			return TRUE;
 		}
@@ -903,38 +1793,36 @@ abstract class Content extends ActiveRecord
 	 *
 	 * @param	string					$reportContent	Report content message from member
 	 * @param	int						$reportType		Report type (see constants in \IPS\core\Reports\Report)
-	 * @param	Member|null				$member			Member making the report (or NULL for loggedIn())
-	 * @param array $guestDetails Details for a guest report
-	 * @return	Report
-	 * @throws	UnexpectedValueException	If there is a permission error - you should only call this method after checking canReport
+	 * @param	\IPS\Member|NULL		$member			Member making the report (or NULL for loggedIn())
+	 * @param 	array					$guestDetails	Details for a guest report
+	 * @return	\IPS\core\Reports\Report
+	 * @throws	\UnexpectedValueException	If there is a permission error - you should only call this method after checking canReport
 	 */
-	public function report( string $reportContent, int $reportType=1, Member|null $member=null, array $guestDetails=array() ): Report
+	public function report( $reportContent, $reportType=1, $member=NULL, $guestDetails=array() )
 	{
-		$member = ( $member ) ?: Member::loggedIn();
+		$member = ( $member ) ? $member : \IPS\Member::loggedIn();
 
 		/* Permission check */
 		$permCheck = $this->canReport( $member );
 		if ( $permCheck !== TRUE )
 		{
-			throw new UnexpectedValueException( $permCheck );
+			throw new \UnexpectedValueException( $permCheck );
 		}
 
 		/* Find or create an index */
 		$idColumn = static::$databaseColumnId;
-		$item = ( $this instanceof Comment ) ? $this->item() : $this;
+		$item = ( $this instanceof \IPS\Content\Comment ) ? $this->item() : $this;
 		$itemIdColumn = $item::$databaseColumnId;
 
-		$new = false;
 		try
 		{
-			$index = Report::load( $this->$idColumn, 'content_id', array( 'class=?', get_called_class() ) );
+			$index = \IPS\core\Reports\Report::load( $this->$idColumn, 'content_id', array( 'class=?', \get_called_class() ) );
 			$index->num_reports = $index->num_reports + 1;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			$new = true;
-			$index = new Report;
-			$index->class = get_called_class();
+			$index = new \IPS\core\Reports\Report;
+			$index->class = \get_called_class();
 			$index->content_id = $this->$idColumn;
 			$index->perm_id = $this->permId();
 			$index->first_report_by = (int) $member->member_id;
@@ -962,8 +1850,8 @@ abstract class Content extends ActiveRecord
 			'report'		=> $reportContent,
 			'report_by'		=> (int) $member->member_id,
 			'date_reported'	=> time(),
-			'ip_address'	=> Request::i()->ipAddress(),
-			'report_type'	=> ( ! $member->member_id and Settings::i()->automoderation_enabled ) ? 0 : $reportType
+			'ip_address'	=> \IPS\Request::i()->ipAddress(),
+			'report_type'	=> ( ! $member->member_id and \IPS\Settings::i()->automoderation_enabled ) ? 0 : $reportType
 		);
 
 		if ( count( $guestDetails ) and isset( $guestDetails['email'] ) )
@@ -972,8 +1860,8 @@ abstract class Content extends ActiveRecord
 			$reportInsert['guest_name'] = isset( $guestDetails['name'] ) ? $guestDetails['name'] : '';
 			$reportInsert['guest_email'] = $guestDetails['email'];
 		}
-
-		$insertID = Db::i()->insert( 'core_rc_reports', $reportInsert );
+		
+		$insertID = \IPS\Db::i()->insert( 'core_rc_reports', $reportInsert );
 		$reportInsert['id'] = $insertID;
 		
 		/* Run automatic moderation */
@@ -981,7 +1869,7 @@ abstract class Content extends ActiveRecord
 
 		/* Send notification to mods */
 		$moderators = array( 'm' => array(), 'g' => array() );
-		foreach (Db::i()->select( '*', 'core_moderators' ) as $mod )
+		foreach ( \IPS\Db::i()->select( '*', 'core_moderators' ) as $mod )
 		{
 			$canView = FALSE;
 			if ( $mod['perms'] == '*' )
@@ -1015,13 +1903,12 @@ abstract class Content extends ActiveRecord
 			}
 		}
 
-		$notification = new Notification( Application::load('core'), 'report_center', $index, array( $index, $reportInsert, $this, $member ) );
-		foreach (Db::i()->select( '*', 'core_members', ( count( $moderators['m'] ) ? Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $mem )
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'report_center', $index, array( $index, $reportInsert, $this ) );
+		foreach ( \IPS\Db::i()->select( '*', 'core_members', ( \count( $moderators['m'] ) ? \IPS\Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . \IPS\Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . \IPS\Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $mem )
 		{
-			$memberObj = Member::constructFromData( $mem );
+			$memberObj = \IPS\Member::constructFromData( $mem );
 			
 			/* Members may have individual member level mod permissions, but are also in a group that has moderator permissions. In this case, the member level restrictions always win so we need to recheck those now that we have a member object. See \IPS\Member::modPermissions(). */
-			/* @var Member $memberObj */
 			$perms = $memberObj->modPermissions();
 			$canView = $this->canView( $memberObj );
 			if ( $canView === TRUE and $container = $item->containerWrapper() and isset( $container::$modPerm ) )
@@ -1046,49 +1933,22 @@ abstract class Content extends ActiveRecord
 		$this->alreadyReported = TRUE;
 		$this->reportData = $reportInsert;
 
-		/* If this is new, we need to add a data layer event */
-		if ( $index->status === 1 and DataLayer::enabled( 'analytics_full' ) and static::dataLayerEventActive( 'content_report' ) )
-		{
-			$properties = $this->getDataLayerProperties();
-			try
-			{
-				$reportNode =  ( ( $member->member_id or !Settings::i()->automoderation_enabled ) and $reportType > 0 ) ? Types::load( $reportType ) : null;
-			}
-			catch ( Exception )
-			{
-				$reportNode = null;
-			}
-
-			$properties['report_type_name'] = Lang::load( Lang::defaultLanguage() )->addToStack( $reportNode?->_titleLanguageKey ?: ( $this instanceof Content\Comment ? 'report_message_comment' : 'report_message_item' ) );
-			$properties['report_type_id'] = $reportNode ? $reportType : 0;
-
-			Lang::load( Lang::defaultLanguage() )->parseOutputForDisplay( $properties['report_type_name'] );
-			DataLayer::i()->addEvent( 'content_report', DataLayer::i()->filterProperties( $properties ) );
-		}
-
-		if( $new )
-		{
-			Webhook::fire( 'content_reported', $index);
-
-            Event::fire( 'onReport', $this, [ $index ] );
-		}
-
 		/* Return */
 		return $index;
 	}
 
 	/**
 	 * Change IP Address
-	 * @param string $ip		The new IP address
+	 * @param	string		$ip		The new IP address
 	 *
 	 * @return void
 	 */
-	public function changeIpAddress( string $ip ): void
+	public function changeIpAddress( $ip )
 	{
 		if ( isset( static::$databaseColumnMap['ip_address'] ) )
 		{
 			$col = static::$databaseColumnMap['ip_address'];
-			$this->$col = $ip;
+			$this->$col = (string) $ip;
 			$this->save();
 		}
 	}
@@ -1096,11 +1956,11 @@ abstract class Content extends ActiveRecord
 	/**
 	 * Change Author
 	 *
-	 * @param	Member $newAuthor	The new author
-	 * @param bool $log		If TRUE, action will be logged to moderator log
+	 * @param	\IPS\Member	$newAuthor	The new author
+	 * @param	bool		$log		If TRUE, action will be logged to moderator log
 	 * @return	void
 	 */
-	public function changeAuthor( Member $newAuthor, bool $log=TRUE ): void
+	public function changeAuthor( \IPS\Member $newAuthor, $log=TRUE )
 	{
 		$oldAuthor = $this->author();
 
@@ -1147,22 +2007,261 @@ abstract class Content extends ActiveRecord
 
 		$this->save();
 
-		if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'front' and $log )
+		if ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation == 'front' and $log )
 		{
-			Session::i()->modLog( 'modlog__action_changeauthor', array( static::$title => TRUE, $this->url()->__toString() => FALSE, $this->mapped('title') ?: ( method_exists( $this, 'item' ) ? $this->item()->mapped('title') : NULL ) => FALSE ), ( $this instanceof Item ) ? $this : $this->item() );
+			\IPS\Session::i()->modLog( 'modlog__action_changeauthor', array( static::$title => TRUE, $this->url()->__toString() => FALSE, $this->mapped('title') ?: ( method_exists( $this, 'item' ) ? $this->item()->mapped('title') : NULL ) => FALSE ), ( $this instanceof \IPS\Content\Item ) ? $this : $this->item() );
 		}
 	}
+	
+	/**
+	 * Get language articles for the given container
+	 * 
+	 * @param 	string 		$itemClass 		The classname of this content
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 */
+	public static function articlesFromIndexData( $itemClass, ?array $containerData ): array
+	{
+		/* Object URL */
+		$indefiniteArticle = static::_indefiniteArticle( $containerData );
+		$definiteArticle = static::_definiteArticle( $containerData );
+		$definiteArticleUc = static::_definiteArticle( $containerData, NULL, array( 'ucfirst' => TRUE ) );
+		
+		if ( \in_array( 'IPS\Content\Comment', class_parents( \get_called_class() ) ) )
+		{			
+			$indefiniteArticle = $itemClass::_indefiniteArticle( $containerData );
+			$definiteArticle = $itemClass::_definiteArticle( $containerData );
+			$definiteArticleUc = $itemClass::_definiteArticle( $containerData, NULL, array( 'ucfirst' => TRUE ) );
+		}
+		
+		return array( 'indefinite' => $indefiniteArticle, 'definite' => $definiteArticle, 'definite_uc' => $definiteArticleUc );
+	}
+
+	/**
+	 * Get HTML for search result display
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$authorData		Basic data about the author. Only includes columns returned by \IPS\Member::columnsForPhoto()
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	array		$reputationData	Array of people who have given reputation and the reputation they gave
+	 * @param	int|NULL	$reviewRating	If this is a review, the rating
+	 * @param	bool		$iPostedIn		If the user has posted in the item
+	 * @param	string		$view			'expanded' or 'condensed'
+	 * @param	bool		$asItem	Displaying results as items?
+	 * @param	bool		$canIgnoreComments	Can ignore comments in the result stream? Activity stream can, but search results cannot.
+	 * @param	array		$template	Optional custom template
+	 * @param	array		$reactions	Reaction Data
+	 * @return	string
+	 */
+	public static function searchResult( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating, $iPostedIn, $view, $asItem, $canIgnoreComments=FALSE, $template=NULL, $reactions=array() )
+	{
+		/* Item details */
+		$itemClass = $indexData['index_class'];
+		if ( \in_array( 'IPS\Content\Comment', class_parents( \get_called_class() ) ) )
+		{
+			$itemClass = static::$itemClass;
+			$unread = $itemClass::unreadFromData( NULL, $indexData['index_date_updated'], $indexData['index_date_created'], $indexData['index_item_id'], $indexData['index_container_id'], FALSE );
+		}
+		else
+		{
+			$unread = static::unreadFromData( NULL, $indexData['index_date_updated'], $indexData['index_date_created'], $indexData['index_item_id'], $indexData['index_container_id'], FALSE );
+		}
+		$itemUrl = $itemClass::urlFromIndexData( $indexData, $itemData, 'getPrefComment' );
+		
+		/* Object URL */
+		if ( \in_array( 'IPS\Content\Comment', class_parents( \get_called_class() ) ) )
+		{
+			if ( \in_array( 'IPS\Content\Review', class_parents( \get_called_class() ) ) )
+			{
+				$objectUrl = $itemUrl->setQueryString( array( 'do' => 'findReview', 'review' => $indexData['index_object_id'] ) );
+				$showRepUrl = $itemUrl->setQueryString( array( 'do' => 'showReactionsReview', 'review' => $indexData['index_object_id'] ) );
+			}
+			else
+			{
+				$objectUrl = $itemUrl->setQueryString( array( 'do' => 'findComment', 'comment' => $indexData['index_object_id'] ) );
+				$showRepUrl = $itemUrl->setQueryString( array( 'do' => 'showReactionsComment', 'comment' => $indexData['index_object_id'] ) );
+			}
+		}
+		else
+		{
+			$objectUrl = $itemUrl;
+			$showRepUrl = $itemUrl->setQueryString( 'do', 'showReactions' );
+		}
+		
+		/* Articles language */
+		$articles = static::articlesFromIndexData( $itemClass, $containerData );
+		
+		/* Container details */
+		$containerUrl = NULL;
+		$containerTitle = NULL;
+		if ( isset( $itemClass::$containerNodeClass ) )
+		{
+			$containerClass	= $itemClass::$containerNodeClass;
+			$containerTitle	= $containerClass::titleFromIndexData( $indexData, $itemData, $containerData );
+			$containerUrl	= $containerClass::urlFromIndexData( $indexData, $itemData, $containerData );
+		}
+				
+		/* Reputation - if we are showing the total value, then we need to load them up and total up all of the values */
+		if ( \IPS\Settings::i()->reaction_count_display == 'count' )
+		{
+			$repCount = 0;
+			foreach( $reputationData AS $memberId => $reactionId )
+			{
+				try
+				{
+					$repCount += \IPS\Content\Reaction::load( $reactionId )->value;
+				}
+				catch( \OutOfRangeException $e ) {}
+			}
+		}
+		else
+		{
+			$repCount = \count( $reputationData );
+		}
+		
+		/* Snippet */
+		$snippet = static::searchResultSnippet( $indexData, $authorData, $itemData, $containerData, $reputationData, $reviewRating, $view );
+		
+		if ( $template === NULL )
+		{
+			$template = array( \IPS\Theme::i()->getTemplate( 'system', 'core', 'front' ), 'searchResult' );
+		}
+		
+		/* Return */
+		return $template( $indexData, $articles, $authorData, $itemData, $unread, $asItem ? $itemUrl : $objectUrl, $itemUrl, $containerUrl, $containerTitle, $repCount, $showRepUrl, $snippet, $iPostedIn, $view, $canIgnoreComments, $reactions );
+	}
+	
+	public static function searchResultBlock(): array
+	{
+		return array( \IPS\Theme::i()->getTemplate( 'widgets', 'core', 'front' ), 'streamItem' );
+	}
+	
+	/**
+	 * Get snippet HTML for search result display
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$authorData		Basic data about the author. Only includes columns returned by \IPS\Member::columnsForPhoto()
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	array		$reputationData	Array of people who have given reputation and the reputation they gave
+	 * @param	int|NULL	$reviewRating	If this is a review, the rating
+	 * @param	string		$view			'expanded' or 'condensed'
+	 * @return	callable
+	 */
+	public static function searchResultSnippet( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating, $view )
+	{		
+		return $view == 'expanded' ? \IPS\Theme::i()->getTemplate( 'system', 'core', 'front' )->searchResultSnippet( $indexData, $itemData ) : '';
+	}
+
+	/**
+	 * Return the language string key to use in search results
+	 *
+	 * @note Normally we show "(user) posted a (thing) in (area)" but sometimes this may not be accurate, so this is abstracted to allow
+	 *	content classes the ability to override
+	 * @param	array 		$authorData		Author data
+	 * @param	array 		$articles		Articles language strings
+	 * @param	array 		$indexData		Search index data
+	 * @param	array 		$itemData		Data about the item
+	 * @param   bool        $includeLinks   Include links to member profile
+	 * @return	string
+	 */
+	public static function searchResultSummaryLanguage( $authorData, $articles, $indexData, $itemData, $includeLinks = TRUE )
+	{
+		if( $includeLinks )
+		{
+			$authorTemplate = \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->userLinkFromData( $authorData['member_id'], $authorData['name'], $authorData['members_seo_name'], $authorData['member_group_id'] ?? \IPS\Settings::i()->guest_group, NULL, $indexData['index_is_anon'] );
+		}
+		else
+		{
+			$authorTemplate = \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->userNameFromData( $authorData['name'], $authorData['member_group_id'] ?? \IPS\Settings::i()->guest_group, NULL, $indexData['index_is_anon'] );
+		}
+
+		if( \in_array( 'IPS\Content\Comment', class_parents( $indexData['index_class'] ) ) )
+		{
+			if( isset( $itemData['author'] ) )
+			{
+				if( $includeLinks )
+				{
+					$itemAuthorTemplate = \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->userLinkFromData( $itemData['author']['member_id'], $itemData['author']['name'], $itemData['author']['members_seo_name'], $itemData['author']['member_group_id'] ?? \IPS\Settings::i()->guest_group );
+				}
+				else
+				{
+					$itemAuthorTemplate = \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->userNameFromData( $itemData['author']['name'], $itemData['author']['member_group_id'] ?? \IPS\Settings::i()->guest_group );
+				}
+			}
+
+			if( \in_array( 'IPS\Content\Review', class_parents( $indexData['index_class'] ) ) )
+			{
+				if( isset( $itemData['author'] ) )
+				{
+					return \IPS\Member::loggedIn()->language()->addToStack( "user_other_activity_review", FALSE, array( 'sprintf' => array( $articles['definite'] ), 'htmlsprintf' => array( $authorTemplate, $itemAuthorTemplate ) ) );
+				}
+				else
+				{
+					return \IPS\Member::loggedIn()->language()->addToStack( "user_own_activity_review", FALSE, array( 'sprintf' => array( $articles['indefinite'] ), 'htmlsprintf' => array( $authorTemplate ) ) );
+				}
+			}
+			else
+			{
+				if( static::$firstCommentRequired )
+				{
+					if( $indexData['index_title'] )
+					{
+						return \IPS\Member::loggedIn()->language()->addToStack( "user_own_activity_item", FALSE, array( 'sprintf' => array( $articles['indefinite'] ), 'htmlsprintf' => array( $authorTemplate ) ) );
+					}
+					else
+					{
+						if( isset( $itemData['author'] ) )
+						{
+							return \IPS\Member::loggedIn()->language()->addToStack( "user_other_activity_reply", FALSE, array( 'sprintf' => array( $articles['definite'] ), 'htmlsprintf' => array( $authorTemplate, $itemAuthorTemplate ) ) );
+						}
+						else
+						{
+							return \IPS\Member::loggedIn()->language()->addToStack( "user_own_activity_reply", FALSE, array( 'sprintf' => array( $articles['indefinite'] ), 'htmlsprintf' => array( $authorTemplate ) ) );
+						}
+					}
+				}
+				else
+				{
+					if( isset( $itemData['author'] ) )
+					{
+						return \IPS\Member::loggedIn()->language()->addToStack( "user_other_activity_comment", FALSE, array( 'sprintf' => array( $articles['definite'] ), 'htmlsprintf' => array( $authorTemplate, $itemAuthorTemplate ) ) );
+					}
+					else
+					{
+						return \IPS\Member::loggedIn()->language()->addToStack( "user_own_activity_comment", FALSE, array( 'sprintf' => array( $articles['indefinite'] ), 'htmlsprintf' => array( $authorTemplate ) ) );
+					}
+				}
+			}
+		}
+		else
+		{
+			if ( isset( static::$databaseColumnMap['author'] ) )
+			{
+				return \IPS\Member::loggedIn()->language()->addToStack( "user_own_activity_item", FALSE, array( 'sprintf' => array( $articles['indefinite'] ), 'htmlsprintf' => array( $authorTemplate ) ) );
+			}
+			else
+			{
+				return \IPS\Member::loggedIn()->language()->addToStack( "generic_activity_item", FALSE, array( 'sprintf' => array( $articles['definite_uc'] ) ) );
+			}
+		}
+	}
+
+	/**
+	 * @brief	Return a classname applied to the search result block
+	 */
+	public static $searchResultClassName = '';
 
 	/**
 	 * Return the filters that are available for selecting table rows
 	 *
 	 * @return	array
 	 */
-	public static function getTableFilters(): array
+	public static function getTableFilters()
 	{
 		$return = array();
 		
-		if ( IPS::classUsesTrait( get_called_class(), 'IPS\Content\Hideable' ) )
+		if ( \in_array( 'IPS\Content\Hideable', class_implements( \get_called_class() ) ) )
 		{
 			$return[] = 'hidden';
 			$return[] = 'unhidden';
@@ -1177,11 +2276,11 @@ abstract class Content extends ActiveRecord
 	 *
 	 * @return string
 	 */
-	public function tableStates(): string
+	public function tableStates()
 	{
 		$return	= array();
 
-		if ( IPS::classUsesTrait( $this, 'IPS\Content\Hideable' ) )
+		if ( $this instanceof \IPS\Content\Hideable )
 		{
 			switch ( $this->hidden() )
 			{
@@ -1207,27 +2306,123 @@ abstract class Content extends ActiveRecord
 	 * @param	int		$days 		Remove from content posted older than DAYS ago
 	 * @return	void
 	 */
-	public static function pruneIpAddresses( int $days=0 ): void
+	public static function pruneIpAddresses( $days=0 )
 	{
 		if ( $days and isset( static::$databaseColumnMap['ip_address'] ) and isset( static::$databaseColumnMap['date'] ) )
 		{
 			$time = time() - ( 86400 * $days );
-			Db::i()->update( static::$databaseTable, array( static::$databasePrefix . static::$databaseColumnMap['ip_address'] => '' ), array( static::$databasePrefix . static::$databaseColumnMap['ip_address'] . "!='' AND " . static::$databasePrefix . static::$databaseColumnMap['date'] . ' <= ' . $time ) );
+			\IPS\Db::i()->update( static::$databaseTable, array( static::$databasePrefix . static::$databaseColumnMap['ip_address'] => '' ), array( static::$databasePrefix . static::$databaseColumnMap['ip_address'] . "!='' AND " . static::$databasePrefix . static::$databaseColumnMap['date'] . ' <= ' . $time ) );
 		}
+	}
+	
+	/**
+	 * Log a row in core_post_before_registering
+	 *
+	 * @param	string	$guestEmail	Guest email address
+	 * @param	string	$key		User's existing post_before_register cookie value
+	 * @return	string	The new key, if one wasn't provided
+	 */
+	public function _logPostBeforeRegistering( $guestEmail, $key = NULL )
+	{
+		$key = $key ?: \IPS\Login::generateRandomString();
+		
+		$idColumn = static::$databaseColumnId;
+		\IPS\Db::i()->insert( 'core_post_before_registering', array(
+			'email'		=> $guestEmail,
+			'class'		=> \get_class( $this ),
+			'id'		=> $this->$idColumn,
+			'timestamp'	=> time(),
+			'secret'	=> $key,
+			'language'	=> \IPS\Member::loggedIn()->language()->id
+		) );
+		
+		/* enable followup task */
+		\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), "`key`='postBeforeRegisterFollowup'" );
+		
+		return $key;
 	}
 	
 	/**
 	 * Get content for an email
 	 *
-	 * @param Email $email			The email
+	 * @param	\IPS\Email	$email			The email
 	 * @param	string		$type			'html' or 'plaintext'
 	 * @param	bool		$includeLinks	Whether or not to include links
 	 * @param	bool		$includeAuthor	Whether or not to include the author
 	 * @return	string
 	 */
-	public function emailContent( Email $email, string $type, bool $includeLinks=TRUE, bool $includeAuthor=TRUE ): string
+	public function emailContent( \IPS\Email $email, $type, $includeLinks=TRUE, $includeAuthor=TRUE )
 	{
-		return Email::template( 'core', '_genericContent', $type, array( $this, $includeLinks, $includeAuthor, $email ) );
+		return \IPS\Email::template( 'core', '_genericContent', $type, array( $this, $includeLinks, $includeAuthor, $email ) );
+	}
+
+	/**
+	 * Returns "Foo posted {{indefart}} in {{container}}, {{date}}
+	 *
+	 * @param	\IPS\Lang|NULL	$plaintextLanguage	If specified, will return plaintext (not linking the user or the container in the language specified). If NULL, returns with links based on logged in user's theme and language
+	 * @note	This function was extracted from IPS\Promote
+	 * @return	string
+	 */
+	public function objectMetaDescription( $plaintextLanguage=NULL )
+	{
+		$object = $this;
+		$author = $this->author();
+
+		if ( $object instanceof \IPS\Content\Item )
+		{
+			$container = $object->containerWrapper();
+
+			if ( $container )
+			{
+				if ( !$plaintextLanguage )
+				{
+					return \IPS\Member::loggedIn()->language()->addToStack( 'promote_metadescription_container', FALSE, array(
+						'htmlsprintf'	=> array( $author->link(), \IPS\DateTime::ts( $this->mapped('date')  )->html( FALSE ) ),
+						'sprintf'		=> array( $object->indefiniteArticle(), $container->url(), $container->_title ),
+					) );
+				}
+				else
+				{
+					return $plaintextLanguage->addToStack( 'promote_metadescription_container_nolink', FALSE, array(
+						'sprintf'		=> array( $object->indefiniteArticle( $plaintextLanguage ), $container->getTitleForLanguage( $plaintextLanguage ), $author->name, \IPS\DateTime::ts( $this->mapped('date') ) ),
+					) );
+				}
+			}
+			else
+			{
+				if ( !$plaintextLanguage )
+				{
+					return \IPS\Member::loggedIn()->language()->addToStack( 'promote_metadescription_nocontainer', FALSE, array(
+						'htmlsprintf'	=> array( $author->link(), \IPS\DateTime::ts( $this->mapped('date')  )->html( FALSE ) ),
+						'sprintf'		=> array( $object->indefiniteArticle() )
+					) );
+				}
+				else
+				{
+					return $plaintextLanguage->addToStack( 'promote_metadescription_nocontainer', FALSE, array(
+						'sprintf'		=> array( $object->indefiniteArticle( $plaintextLanguage ), $author->name, \IPS\DateTime::ts( $this->mapped('date') ) )
+					) );
+				}
+			}
+		}
+		else if ( $object instanceof \IPS\Content\Comment )
+		{
+			if ( !$plaintextLanguage )
+			{
+				return \IPS\Member::loggedIn()->language()->addToStack( 'promote_metadescription_nocontainer', FALSE, array(
+					'htmlsprintf'	=> array( $author->link(), \IPS\DateTime::ts( $this->mapped('date') )->html( FALSE ) ),
+					'sprintf'		=> array( $object->indefiniteArticle() )
+				) );
+			}
+			else
+			{
+				return $plaintextLanguage->addToStack( 'promote_metadescription_nocontainer', FALSE, array(
+					'sprintf'		=> array( $object->indefiniteArticle( $plaintextLanguage ), $author->name, \IPS\DateTime::ts( $this->mapped('date') ) )
+				) );
+			}
+		}
+
+		throw new \OutofRangeException('object_not_valid');
 	}
 	
 	/**
@@ -1241,14 +2436,14 @@ abstract class Content extends ActiveRecord
 		$key = 'tbl_cnt_' . ( $approximate ? 'approx_' : 'accurate_' ) . static::$databaseTable;
 		$fetchAgain = FALSE;
 		
-		if ( ! isset( Data\Store::i()->$key ) )
+		if ( ! isset( \IPS\Data\Store::i()->$key ) )
 		{
 			$fetchAgain = TRUE;
 		}
 		else
 		{
 			/* Just check daily */
-			$data = Data\Store::i()->$key;
+			$data = \IPS\Data\Store::i()->$key;
 			
 			if ( $data['time'] < time() - 86400 )
 			{
@@ -1262,19 +2457,19 @@ abstract class Content extends ActiveRecord
 			/* Accept approximate result? */
 			if ( $approximate )
 			{
-				$approxRows = Db::i()->query( "SHOW TABLE STATUS LIKE '" . Db::i()->prefix . static::$databaseTable . "';" )->fetch_assoc();
+				$approxRows = \IPS\Db::i()->query( "SHOW TABLE STATUS LIKE '" . \IPS\Db::i()->prefix . static::$databaseTable . "';" )->fetch_assoc();
 				$count = (int) $approxRows['Rows'];
 			}
 
 			/* If the table is a reasonable size, we'll get the real value instead */
 			if ( $count < 1000000 )
 			{
-				$count = Db::i()->select( 'COUNT(*)', static::$databaseTable )->first();
+				$count = \IPS\Db::i()->select( 'COUNT(*)', static::$databaseTable )->first();
 			}
-			Data\Store::i()->$key = array( 'time' => time(), 'count' => $count );
+			\IPS\Data\Store::i()->$key = array( 'time' => time(), 'count' => $count );
 		}
 
-		$data = Data\Store::i()->$key;
+		$data = \IPS\Data\Store::i()->$key;
 		return $data['count'];
 	}
 	
@@ -1293,52 +2488,33 @@ abstract class Content extends ActiveRecord
 	/**
 	 * @brief	Number of notifications to process per batch
 	 */
-	const NOTIFICATIONS_PER_BATCH = NOTIFICATIONS_PER_BATCH;
+	const NOTIFICATIONS_PER_BATCH = \IPS\NOTIFICATIONS_PER_BATCH;
 	
 	/**
 	 * Send notifications
 	 *
 	 * @return	void
 	 */
-	public function sendNotifications(): void
-	{
-		/* Check the bridge */
-		if ( ! Bridge::i()->sendNotifications( $this ) )
-		{
-			return;
-		}
-
+	public function sendNotifications()
+	{		
 		/* Send quote and mention notifications */
 		$sentTo = $this->sendQuoteAndMentionNotifications();
-
-		/* Stop here if the content does not use the "followable" trait */
-		if( ( $this instanceof Item and !IPS::classUsesTrait( $this, Followable::class ) ) or ( $this instanceof Comment and !IPS::classUsesTrait( $this->item(), Followable::class ) ) )
-		{
-			return;
-		}
-
+		
 		/* How many followers? */
 		try
 		{
-			if( $this instanceof Comment )
-			{
-				$count = $this->item()->notificationRecipientsForComments( null, true, $this );
-			}
-			else
-			{
-				$count = $this->notificationRecipients( NULL, TRUE );
-			}
+			$count = $this->notificationRecipients( NULL, NULL, TRUE );
 		}
-		catch ( BadMethodCallException $e )
+		catch ( \BadMethodCallException $e )
 		{
 			return;
 		}
 		
 		/* Queue if there's lots, or just send them */
-		if ( $count > NOTIFICATION_BACKGROUND_THRESHOLD)
+		if ( $count > \IPS\NOTIFICATION_BACKGROUND_THRESHOLD )
 		{
 			$idColumn = $this::$databaseColumnId;
-			Task::queue( 'core', 'Follow', array( 'class' => get_class( $this ), 'item' => $this->$idColumn, 'sentTo' => $sentTo, 'followerCount' => $count ), 2 );
+			\IPS\Task::queue( 'core', 'Follow', array( 'class' => \get_class( $this ), 'item' => $this->$idColumn, 'sentTo' => $sentTo, 'followerCount' => $count ), 2 );
 		}
 		else
 		{
@@ -1354,14 +2530,8 @@ abstract class Content extends ActiveRecord
 	 * @param	string|NULL		$extra		Additional data
 	 * @return	int|null		New offset or NULL if complete
 	 */
-	public function sendNotificationsBatch( int $offset=0, array &$sentTo=array(), string|null $extra=NULL ): int|NULL
+	public function sendNotificationsBatch( $offset=0, &$sentTo=array(), $extra=NULL )
 	{
-		/* Stop here if the content does not use the "followable" trait */
-		if( ( $this instanceof Item and !IPS::classUsesTrait( $this, Followable::class ) ) or ( $this instanceof Comment and !IPS::classUsesTrait( $this->item(), Followable::class ) ) )
-		{
-			return null;
-		}
-
 		/* Check authors spam status */
 		if( $this->author()->members_bitoptions['bw_is_spammer'] )
 		{
@@ -1370,9 +2540,7 @@ abstract class Content extends ActiveRecord
 		}
 
 		$followIds = array();
-		$followers = ( $this instanceof Comment ) ?
-			$this->item()->notificationRecipientsForComments( array( $offset, static::NOTIFICATIONS_PER_BATCH ), false, $this ) :
-			$this->notificationRecipients( array( $offset, static::NOTIFICATIONS_PER_BATCH ) );
+		$followers = $this->notificationRecipients( array( $offset, static::NOTIFICATIONS_PER_BATCH ), $extra );
 		
 		/* If $followers is NULL (which can be the case if the follows are just people following the author), just return as there is nothing to do */
 		if ( $followers === NULL )
@@ -1383,18 +2551,18 @@ abstract class Content extends ActiveRecord
 		/* If we're still here, our iterator may not necessarily be one that implements Countable so we need to convert it to an array. */
 		$followers = iterator_to_array( $followers );
 		
-		if( !count( $followers ) )
+		if( !\count( $followers ) )
 		{
 			return NULL;
 		}
 
 		/* Send notification */
-		$notification = ( $this instanceof Comment ) ? $this->item()->createNotification( $extra, $this ) : $this->createNotification( $extra );
+		$notification = $this->createNotification( $extra );
 		$notification->unsubscribeType = 'follow';
 		foreach ( $followers as $follower )
 		{
-			$member = Member::load( $follower['follow_member_id'] );
-			if ( $member !== $this->author() and $this->canView( $member ) )
+			$member = \IPS\Member::load( $follower['follow_member_id'] );
+			if ( $member != $this->author() and $this->canView( $member ) )
 			{
 				$followIds[] = $follower['follow_id'];
 				$notification->recipients->attach( $member, $follower );
@@ -1402,9 +2570,9 @@ abstract class Content extends ActiveRecord
 		}
 
 		/* Log that we sent it */
-		if( count( $followIds ) )
+		if( \count( $followIds ) )
 		{
-			Db::i()->update( 'core_follow', array( 'follow_notify_sent' => time() ), Db::i()->in( 'follow_id', $followIds ) );
+			\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_sent' => time() ), \IPS\Db::i()->in( 'follow_id', $followIds ) );
 		}
 
 		$sentTo = $notification->send( $sentTo );
@@ -1414,12 +2582,116 @@ abstract class Content extends ActiveRecord
 	}
 	
 	/**
+	 * Send Approved Notification
+	 *
+	 * @return	void
+	 */
+	public function sendApprovedNotification()
+	{
+		$this->sendNotifications();
+		$this->sendAuthorApprovalNotification();
+	}
+
+	/**
+	 * Send Author Approval Notification
+	 *
+	 * @return  void
+	 */
+	public function sendAuthorApprovalNotification()
+	{
+		/* Tell the author their content has been approved */
+		$member = \IPS\Member::load( $this->mapped('author') );
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'approved_content', $this, array( $this ), array(), FALSE );
+		$notification->recipients->attach( $member );
+		$notification->send();
+	}
+	
+	/**
+	 * Send Unapproved Notification
+	 *
+	 * @return	void
+	 */
+	public function sendUnapprovedNotification()
+	{
+		$moderators = array( 'g' => array(), 'm' => array() );
+		foreach( \IPS\Db::i()->select( '*', 'core_moderators' ) AS $mod )
+		{
+			$canView = FALSE;
+			$canApprove = FALSE;
+			if ( $mod['perms'] == '*' )
+			{
+				$canView = TRUE;
+				$canApprove = TRUE;
+			}
+			else
+			{
+				$perms = json_decode( $mod['perms'], TRUE );
+								
+				foreach ( array( 'canView' => 'can_view_hidden_', 'canApprove' => 'can_unhide_' ) as $varKey => $modPermKey )
+				{
+					if ( isset( $perms[ $modPermKey . 'content' ] ) AND $perms[ $modPermKey . 'content' ] )
+					{
+						$$varKey = TRUE;
+					}
+					else
+					{						
+						try
+						{
+							$container = ( $this instanceof \IPS\Content\Comment ) ? $this->item()->container() : $this->container();
+							$containerClass = \get_class( $container );
+							$title = static::$title;
+							if
+							(
+								isset( $containerClass::$modPerm )
+								and
+								(
+									$perms[ $containerClass::$modPerm ] === -1
+									or
+									(
+										\is_array( $perms[ $containerClass::$modPerm ] )
+										and
+										\in_array( $container->_id, $perms[ $containerClass::$modPerm ] )
+									)
+								)
+								and
+								isset( $perms["{$modPermKey}{$title}"] )
+								and
+								$perms["{$modPermKey}{$title}"]
+							)
+							{
+								$$varKey = TRUE;
+							}
+						}
+						catch ( \BadMethodCallException $e ) { }
+					}
+				}
+			}
+			if ( $canView === TRUE and $canApprove === TRUE )
+			{
+				$moderators[ $mod['type'] ][] = $mod['id'];
+			}
+		}
+						
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'unapproved_content', $this, array( $this, $this->author() ) );
+		foreach ( \IPS\Db::i()->select( '*', 'core_members', ( \count( $moderators['m'] ) ? \IPS\Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . \IPS\Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . \IPS\Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $member )
+		{
+			$member = \IPS\Member::constructFromData( $member );
+			/* We don't need to notify the author of the content or when member cannot view this content*/
+			if( $this->author()->member_id != $member->member_id AND $this->canView( $member ) )
+            {
+                $notification->recipients->attach( $member );
+            }
+		}
+		$notification->send();
+	}
+	
+	/**
 	 * Send the notifications after the content has been edited (for any new quotes or mentiones)
 	 *
 	 * @param	string	$oldContent	The content before the edit
 	 * @return	void
 	 */
-	public function sendAfterEditNotifications( string $oldContent ): void
+	public function sendAfterEditNotifications( $oldContent )
 	{				
 		$existingData = static::_getQuoteAndMentionIdsFromContent( $oldContent );
 		$this->sendQuoteAndMentionNotifications( array_unique( array_merge( $existingData['quotes'], $existingData['mentions'], $existingData['embeds'] ) ) );
@@ -1431,7 +2703,7 @@ abstract class Content extends ActiveRecord
 	 * @param	array	$exclude		An array of member IDs *not* to send notifications to
 	 * @return	array	The members that were notified and how they were notified
 	 */
-	protected function sendQuoteAndMentionNotifications( array $exclude=array() ): array
+	protected function sendQuoteAndMentionNotifications( $exclude=array() )
 	{
 		return $this->_sendQuoteAndMentionNotifications( static::_getQuoteAndMentionIdsFromContent( $this->content() ), $exclude );
 	}
@@ -1443,7 +2715,7 @@ abstract class Content extends ActiveRecord
 	 * @param	array	$exclude	An array of member IDs *not* to send notifications to
 	 * @return	array	The members that were notified and how they were notified
 	 */
-	protected function _sendQuoteAndMentionNotifications( array $data, array $exclude=array() ): array
+	protected function _sendQuoteAndMentionNotifications( $data, $exclude=array() )
 	{
 		/* Init */
 		$sentTo = array();
@@ -1451,15 +2723,15 @@ abstract class Content extends ActiveRecord
 		/* Quotes */
 		$data['quotes'] = array_filter( $data['quotes'], function( $v ) use ( $exclude )
 		{
-			return !in_array( $v, $exclude );
+			return !\in_array( $v, $exclude );
 		} );
 		if ( !empty( $data['quotes'] ) )
 		{
-			$notification = new Notification( Application::load( 'core' ), 'quote', $this, array( $this ), array( $this->author()->member_id ) );
+			$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'quote', $this, array( $this ), array( $this->author()->member_id ) );
 			foreach ( $data['quotes'] as $quote )
 			{
-				$member = Member::load( $quote );
-				if ( $member->member_id and $member !== $this->author() and $this->canView( $member ) and !$member->isIgnoring( $this->author(), 'posts' ) )
+				$member = \IPS\Member::load( $quote );
+				if ( $member->member_id and $member != $this->author() and $this->canView( $member ) and !$member->isIgnoring( $this->author(), 'posts' ) )
 				{
 					$notification->recipients->attach( $member );
 				}
@@ -1470,15 +2742,15 @@ abstract class Content extends ActiveRecord
 		/* Mentions */
 		$data['mentions'] = array_filter( $data['mentions'], function( $v ) use ( $exclude )
 		{
-			return !in_array( $v, $exclude );
+			return !\in_array( $v, $exclude );
 		} );
 		if ( !empty( $data['mentions'] ) )
 		{
-			$notification = new Notification( Application::load( 'core' ), 'mention', $this, array( $this ), array( $this->author()->member_id ) );
+			$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'mention', $this, array( $this ), array( $this->author()->member_id ) );
 			foreach ( $data['mentions'] as $mention )
 			{
-				$member = Member::load( $mention );
-				if ( $member->member_id AND $member !== $this->author() and $this->canView( $member ) and !$member->isIgnoring( $this->author(), 'mentions' ) )
+				$member = \IPS\Member::load( $mention );
+				if ( $member->member_id AND $member != $this->author() and $this->canView( $member ) and !$member->isIgnoring( $this->author(), 'mentions' ) )
 				{
 					$notification->recipients->attach( $member );
 				}
@@ -1489,15 +2761,15 @@ abstract class Content extends ActiveRecord
 		/* Embeds */
 		$data['embeds'] = array_filter( $data['embeds'], function( $v ) use ( $exclude )
 		{
-			return !in_array( $v, $exclude );
+			return !\in_array( $v, $exclude );
 		} );
 		if ( !empty( $data['embeds'] ) )
 		{
-			$notification = new Notification( Application::load( 'core' ), 'embed', $this, array( $this ), array( $this->author()->member_id ) );
+			$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'embed', $this, array( $this ), array( $this->author()->member_id ) );
 			foreach ( $data['embeds'] as $embed )
 			{
-				$member = Member::load( $embed );
-				if ( $member->member_id AND $member !== $this->author() and $this->canView( $member ) and !$member->isIgnoring( $this->author(), 'posts' ) )
+				$member = \IPS\Member::load( $embed );
+				if ( $member->member_id AND $member != $this->author() and $this->canView( $member ) and !$member->isIgnoring( $this->author(), 'posts' ) )
 				{
 					$notification->recipients->attach( $member );
 				}
@@ -1512,21 +2784,15 @@ abstract class Content extends ActiveRecord
 	/**
 	 * Get quote and mention notifications
 	 *
-	 * @param	string|null	$content	The content
+	 * @param	string	$content	The content
 	 * @return	array	array( 'quotes' => array( ... member IDs ... ), 'mentions' => array( ... member IDs ... ), 'embeds' => array( ... member IDs ... )  )
 	 */
-	protected static function _getQuoteAndMentionIdsFromContent( ?string $content ): array
+	protected static function _getQuoteAndMentionIdsFromContent( $content )
 	{
 		$return = array( 'quotes' => array(), 'mentions' => array(), 'embeds' => array() );
-
-		/* If we have no content, don't bother with this */
-		if( empty( $content ) )
-		{
-			return $return;
-		}
 		
-		$document = new DOMDocument( '1.0', 'UTF-8' );
-		if ( @$document->loadHTML( DOMDocument::wrapHtml( '<div>' . $content . '</div>' ) ) !== FALSE )
+		$document = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
+		if ( @$document->loadHTML( \IPS\Xml\DOMDocument::wrapHtml( '<div>' . $content . '</div>' ) ) !== FALSE )
 		{
 			/* Quotes */
 			foreach( $document->getElementsByTagName('blockquote') as $quote )
@@ -1542,7 +2808,7 @@ abstract class Content extends ActiveRecord
 			{
 				if ( $link->getAttribute('data-mentionid') )
 				{					
-					if ( !preg_match( '/\/blockquote(\[\d*])?\//', $link->getNodePath() ) )
+					if ( !preg_match( '/\/blockquote(\[\d*\])?\//', $link->getNodePath() ) )
 					{
 						$return['mentions'][] = $link->getAttribute('data-mentionid');
 					}
@@ -1554,7 +2820,7 @@ abstract class Content extends ActiveRecord
 			{
 				if ( $embed->getAttribute('data-embedauthorid') )
 				{
-					if ( $embed->getAttribute('data-embedauthorid') and (int) $embed->getAttribute('data-embedauthorid') > 0 and !preg_match( '/\/blockquote(\[\d*])?\//', $embed->getNodePath() ) )
+					if ( $embed->getAttribute('data-embedauthorid') and (int) $embed->getAttribute('data-embedauthorid') > 0 and !preg_match( '/\/blockquote(\[\d*\])?\//', $embed->getNodePath() ) )
 					{
 						$return['embeds'][] = $embed->getAttribute('data-embedauthorid');
 					}
@@ -1570,9 +2836,9 @@ abstract class Content extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function expireWidgetCaches(): void
+	public function expireWidgetCaches()
 	{
-		Widget::deleteCaches( NULL, static::$application );
+		\IPS\Widget::deleteCaches( NULL, static::$application );
 	}
 
 	/**
@@ -1580,15 +2846,15 @@ abstract class Content extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function adjustSessions(): void
+	public function adjustSessions()
 	{
-		if( $this instanceof Comment )
+		if( $this instanceof \IPS\Content\Comment )
 		{
 			try
 			{
 				$item = $this->item();
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				return;
 			}
@@ -1602,7 +2868,7 @@ abstract class Content extends ActiveRecord
 		try
 		{
 			/* We have to send a limit even though we want all records because otherwise the Database store does not return all columns */
-			foreach( Store::i()->getOnlineUsers( 0, 'desc', array( 0, 5000 ), NULL, TRUE ) as $session )
+			foreach( \IPS\Session\Store::i()->getOnlineUsers( 0, 'desc', array( 0, 5000 ), NULL, TRUE ) as $session )
 			{
 				if( mb_strpos( $session['location_url'], (string) $item->url() ) === 0 )
 				{
@@ -1613,11 +2879,11 @@ abstract class Content extends ActiveRecord
 					$sessionData['current_id']				= 0;
 					$sessionData['location_permissions']	= 0;
 
-					Store::i()->updateSession( $sessionData );
+					\IPS\Session\Store::i()->updateSession( $sessionData );
 				}
 			}
 		}
-		catch( LogicException $e ){}
+		catch( \LogicException $e ){}
 
 
 	}
@@ -1625,16 +2891,16 @@ abstract class Content extends ActiveRecord
 	/**
 	 * Fetch classes from content router
 	 *
-	 * @param	bool|Member $member		Check member access
+	 * @param	bool|\IPS\Member	$member		Check member access
 	 * @param	bool				$archived	Include any supported archive classes
 	 * @param	bool				$onlyItems	Only include item classes
 	 * @return	array
 	 */
-	public static function routedClasses( bool|Member $member=FALSE, bool $archived=FALSE, bool $onlyItems=FALSE ): array
+	public static function routedClasses( $member=FALSE, $archived=FALSE, $onlyItems=FALSE )
 	{
 		$classes	= array();
 
-		foreach (Application::allExtensions( 'core', 'ContentRouter', $member, NULL, NULL, TRUE ) as $router )
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', $member, NULL, NULL, TRUE ) as $router )
 		{
 			foreach ( $router->classes as $class )
 			{
@@ -1645,9 +2911,9 @@ abstract class Content extends ActiveRecord
 					continue;
 				}
 				
-				if ( !( $member instanceof Member) )
+				if ( !( $member instanceof \IPS\Member ) )
 				{
-					$member = $member ? Member::loggedIn() : NULL;
+					$member = $member ? \IPS\Member::loggedIn() : NULL;
 				}
 				
 				if ( isset( $class::$commentClass ) and $class::supportsComments( $member ) )
@@ -1677,7 +2943,7 @@ abstract class Content extends ActiveRecord
 	 * @see		\IPS\forums\Topic\Post
 	 * @return	bool
 	 */
-	public function htmlParsingEnforced(): bool
+	public function htmlParsingEnforced()
 	{
 		return FALSE;
 	}
@@ -1687,7 +2953,7 @@ abstract class Content extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function customMultimodActions(): array
+	public function customMultimodActions()
 	{
 		return array();
 	}
@@ -1701,68 +2967,79 @@ abstract class Content extends ActiveRecord
 	 * @note	For an example, look at \IPS\core\Announcements\Announcement
 	 * @return	array
 	 */
-	public static function availableCustomMultimodActions(): array
+	public static function availableCustomMultimodActions()
 	{
 		return array();
 	}
 
 	/**
-	 * Indefinite Article
+	 * Get HTML for search result display
 	 *
-	 * @param Lang|null $lang The language to use, or NULL for the language of the currently logged in member
-	 * @param array $options
-	 * @return    string
+	 * @param	NULL|string		$ref		Referrer
+	 * @param	\IPS\Node\Model	$container	Container
+	 * @param	string			$title		Title
+	 * @return	callable
 	 */
-	public function indefiniteArticle( ?Lang $lang = NULL, array $options=array() ): string
+	public function approvalQueueHtml( $ref, $container, $title )
 	{
-		$container = ( $this instanceof Comment ) ? $this->item()->containerWrapper() : $this->containerWrapper();
-		return static::_indefiniteArticle( $container ? $container->_data : array(), $lang, $options );
+		return \IPS\Theme::i()->getTemplate( 'modcp', 'core', 'front' )->approvalQueueItem( $this, $ref, $container, $title );
 	}
 
 	/**
 	 * Indefinite Article
 	 *
-	 * @param array|null $containerData Container data
-	 * @param Lang|null $lang The language to use, or NULL for the language of the currently logged in member
-	 * @param array $options
-	 * @return    string
+	 * @param	\IPS\Lang|NULL	$lang	The language to use, or NULL for the language of the currently logged in member
+	 * @return	string
 	 */
-	public static function _indefiniteArticle( ?array $containerData = NULL, ?Lang $lang = NULL, array $options=array() ): string
+	public function indefiniteArticle( \IPS\Lang $lang = NULL )
 	{
-		$lang = $lang ?: Member::loggedIn()->language();
-		return $lang->addToStack( '__indefart_' . static::$title, FALSE, $options );
+		$container = ( $this instanceof \IPS\Content\Comment ) ? $this->item()->containerWrapper() : $this->containerWrapper();
+		return static::_indefiniteArticle( $container ? $container->_data : array(), $lang );
 	}
-
+	
+	/**
+	 * Indefinite Article
+	 *
+	 * @param	array			$containerData	Container data
+	 * @param	\IPS\Lang|NULL	$lang			The language to use, or NULL for the language of the currently logged in member
+	 * @return	string
+	 */
+	public static function _indefiniteArticle( array $containerData = NULL, \IPS\Lang $lang = NULL )
+	{
+		$lang = $lang ?: \IPS\Member::loggedIn()->language();
+		return $lang->addToStack( '__indefart_' . static::$title, FALSE );
+	}
+	
 	/**
 	 * Definite Article
 	 *
-	 * @param Lang|null $lang The language to use, or NULL for the language of the currently logged in member
-	 * @param integer|boolean $count Number of items. If not FALSE, pluralized version of phrase will be used
-	 * @return    string
+	 * @param	\IPS\Lang|NULL		$lang	The language to use, or NULL for the language of the currently logged in member
+	 * @param	integer|boolean		$count	Number of items. If not FALSE, pluralized version of phrase will be used
+	 * @return	string
 	 */
-	public function definiteArticle( ?Lang $lang = NULL, int|bool $count = FALSE ): string
+	public function definiteArticle( \IPS\Lang $lang = NULL, $count = FALSE )
 	{
-		$container = ( $this instanceof Comment ) ? $this->item()->containerWrapper() : $this->containerWrapper();
+		$container = ( $this instanceof \IPS\Content\Comment ) ? $this->item()->containerWrapper() : $this->containerWrapper();
 		return static::_definiteArticle( $container ? $container->_data : array(), $lang, array(), $count );
 	}
-
+	
 	/**
 	 * Definite Article
 	 *
-	 * @param array|null $containerData Basic data about the container. Only includes columns returned by container::basicDataColumns()
-	 * @param Lang|null $lang The language to use, or NULL for the language of the currently logged in member
-	 * @param array $options Options to pass to \IPS\Lang::addToStack
-	 * @param integer|boolean $count Number of items. If not false, pluralized version of phrase will be used.
-	 * @return    string
+	 * @param	array			$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	\IPS\Lang|NULL	$lang			The language to use, or NULL for the language of the currently logged in member
+	 * @param	array			$options		Options to pass to \IPS\Lang::addToStack
+	 * @param	integer|boolean	$count			Number of items. If not false, pluralized version of phrase will be used.
+	 * @return	string
 	 */
-	public static function _definiteArticle( ?array $containerData = NULL, ?Lang $lang = NULL, array $options = array(), int|bool $count = FALSE ): string
+	public static function _definiteArticle( array $containerData = NULL, \IPS\Lang $lang = NULL, $options = array(), $count = FALSE )
 	{
-		$lang = $lang ?: Member::loggedIn()->language();
+		$lang = $lang ?: \IPS\Member::loggedIn()->language();
 		
-		if( ( is_int( $count ) || $count === TRUE ) && $lang->checkKeyExists('__defart_' . static::$title . '_plural') )
+		if( ( \is_int( $count ) || $count === TRUE ) && $lang->checkKeyExists('__defart_' . static::$title . '_plural') )
 		{
 			/* If $count is TRUE, use the pluralized form but don't pluralize here - useful if we're passing to JS for example */
-			if( is_int( $count ) )
+			if( \is_int( $count ) )
 			{
 				$options['pluralize'] = array( $count );
 			}
@@ -1778,19 +3055,18 @@ abstract class Content extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	public function shareImage(): string
+	public function shareImage()
 	{
 		/* While we now allow multiple share logos now, this deprecated method can only return one */
-		$shareLogos = Settings::i()->icons_sharer_logo ? json_decode( Settings::i()->icons_sharer_logo, true ) : array();
+		$shareLogos = \IPS\Settings::i()->icons_sharer_logo ? json_decode( \IPS\Settings::i()->icons_sharer_logo, true ) : array();
 
-		if( count( $shareLogos ) )
+		if( \count( $shareLogos ) )
 		{
 			try
 			{
-				$url = Url::createFromString( File::get( 'core_Icons', array_shift( $shareLogos ) ) );
-				return (string) ( $url->setScheme( ( Request::i()->isSecure() ) ? 'https' : 'http' ) );
+				return (string) \IPS\File::get( 'core_Icons', array_shift($shareLogos) )->url->setScheme( ( \IPS\Request::i()->isSecure() ) ? 'https' : 'http' );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return '';
 			}
@@ -1802,15 +3078,15 @@ abstract class Content extends ActiveRecord
 	/**
 	 * Log keyword usage, if any
 	 *
-	 * @param	string		$content	Content/text of submission
-	 * @param	string|NULL	$title		Title of submission
+	 * @param	string				$content	Content/text of submission
+	 * @param	string|NULL			$title		Title of submission
 	 * @param	int|NULL			$date		Date of submission
 	 * @return	void
 	 */
-	public function checkKeywords( string $content, string|null $title=null, ?int $date = null ): void
+	public function checkKeywords( $content, $title=NULL, ?int $date = NULL )
 	{
 		/* Do we have any keywords to track? */
-		if( !Settings::i()->stats_keywords )
+		if( !\IPS\Settings::i()->stats_keywords )
 		{
 			return;
 		}
@@ -1819,7 +3095,7 @@ abstract class Content extends ActiveRecord
 		$idColumn	= static::$databaseColumnId;
 
 		/* If this is a content item and first comment is required, skip checking the comment */
-		if ( $this instanceof Comment )
+		if ( $this instanceof \IPS\Content\Comment )
 		{
 			$itemClass = static::$itemClass;
 
@@ -1843,18 +3119,46 @@ abstract class Content extends ActiveRecord
 
 		$words = array_unique( $words );
 
-		$keywords = json_decode( Settings::i()->stats_keywords, true );
+		$keywords = json_decode( \IPS\Settings::i()->stats_keywords, true );
 
-		$extraData	= json_encode( array( 'class' => get_class( $this ), 'id' => $this->$idColumn ) );
+		$extraData	= json_encode( array( 'class' => \get_class( $this ), 'id' => $this->$idColumn ) );
 
+		$insert = [];
 		foreach( $keywords as $keyword )
 		{
-			if( in_array( $keyword, $words ) )
+			if( \in_array( $keyword, $words ) )
 			{
-				$date = $date ?: DateTime::create()->getTimestamp();
-				Db::i()->insert( 'core_statistics', array( 'time' => $date, 'type' => 'keyword', 'value_4' => $keyword, 'extra_data' => $extraData ) );
+				$date = $date ?: \IPS\DateTime::create()->getTimestamp();
+				$insert[] = array( 'time' => $date, 'type' => 'keyword', 'value_4' => $keyword, 'extra_data' => $extraData );
 			}
 		}
+
+		if( \count( $insert ) )
+		{
+			\IPS\Db::i()->insert( 'core_statistics', $insert );
+		}
+	}
+	
+	/* !Search */
+	
+	/**
+	 * Title for search index
+	 *
+	 * @return	string
+	 */
+	public function searchIndexTitle()
+	{
+		return $this->mapped('title');
+	}
+	
+	/**
+	 * Content for search index
+	 *
+	 * @return	string
+	 */
+	public function searchIndexContent()
+	{
+		return $this->mapped('content');
 	}
 
 	/**
@@ -1863,7 +3167,7 @@ abstract class Content extends ActiveRecord
 	 * @note Most content types do not support this, and those that do will need to override this method to return the appropriate info
 	 * @return array
 	 */
-	public function getAttachmentInfo(): array
+	public function getAttachmentInfo()
 	{
 		return array();
 	}
@@ -1873,9 +3177,9 @@ abstract class Content extends ActiveRecord
 	 *
 	 * @note	The intention is to formulate a query that will fetch the members with the most contributions
 	 * @param	int		$limit	The number of members to return
-	 * @return	Select
+	 * @return	\IPS\Db\Select
 	 */
-	public static function topMembersQuery( int $limit ): Select
+	public static function topMembersQuery( $limit )
 	{
 		$contentWhere = array( array( static::$databasePrefix . static::$databaseColumnMap['author'] . '<>?', 0 ) );
 		if ( isset( static::$databaseColumnMap['hidden'] ) )
@@ -1889,7 +3193,47 @@ abstract class Content extends ActiveRecord
 		
 		$authorField = static::$databasePrefix . static::$databaseColumnMap['author'];
 
-		return Db::i()->select( 'COUNT(*) as count, ' . static::$databaseTable . '.' . $authorField, static::$databaseTable, $contentWhere, 'count DESC', $limit, $authorField );
+		return \IPS\Db::i()->select( 'COUNT(*) as count, ' . static::$databaseTable . '.' . $authorField, static::$databaseTable, $contentWhere, 'count DESC', $limit, $authorField );
+	}
+
+	/**
+	 * Get edit line
+	 *
+	 * @return	string|NULL
+	 */
+	public function editLine()
+	{
+		if ( $this instanceof \IPS\Content\EditHistory and $this->mapped('edit_time') and ( $this->mapped('edit_show') or \IPS\Member::loggedIn()->modPermission('can_view_editlog') ) and \IPS\Settings::i()->edit_log )
+		{
+			/* If anonymous and we can't see, it's a no. */
+			if ( $this->isAnonymous() AND !\IPS\Member::loggedIn()->modPermission('can_view_anonymous_posters') )
+			{
+				return NULL;
+			}
+			
+			$template = static::$editLineTemplate[1];
+			return \IPS\Theme::i()->getTemplate( static::$editLineTemplate[0][0], static::$editLineTemplate[0][1], ( isset( static::$editLineTemplate[0][2] ) ) ? static::$editLineTemplate[0][2] : NULL )->$template( $this, ( isset( static::$databaseColumnMap['edit_reason'] ) and $this->mapped('edit_reason') ) );
+		}
+		return NULL;
+	}
+
+	/**
+	 * Get edit history
+	 *
+	 * @param	bool		$staff		Set true for moderators who have permission to view the full log which will show edits not made by the author and private edits
+	 * @param	int|NULL 	$limit
+	 * @return	\IPS\Db\Select
+	 */
+	public function editHistory( $staff=FALSE, $limit=NULL )
+	{
+		$idColumn = static::$databaseColumnId;
+		$where = array( array( 'class=? AND comment_id=?', \get_called_class(), $this->$idColumn ) );
+		if ( !$staff )
+		{
+			$where[] = array( '`member`=? AND public=1', $this->author()->member_id );
+		}
+
+		return \IPS\Db::i()->select( '*', 'core_edit_history', $where, 'time DESC', $limit );
 	}
 	
 	/**
@@ -1897,174 +3241,113 @@ abstract class Content extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function webhookFilters(): array
+	public function webhookFilters()
 	{
 		$filters = array();
 		$filters['author'] = $this->author()->member_id;
 
 		/* All our Zapier Triggers for content have a hidden setting, so we're using this one global for items and comments */
-		$filters['hidden'] = IPS::classUsesTrait( $this, 'IPS\Content\Hideable' ) && $this->hidden();
+		$filters['hidden'] = (bool) $this->hidden();
 
 		return $filters;
 	}
 
 	/**
-	 * Get content for embed
+	 * Set anonymous state
 	 *
-	 * @param	array	$params	Additional parameters to add to URL
-	 * @return	string
-	 * @throws BadMethodCallException
+	 * @param	bool				$state		The state, TRUE for anonymous FALSE for not
+	 * @param	\IPS\Member|NULL 	$member		The member posting anonymously or NULL for logged in member
+	 * @return	void
 	 */
-	public function embedContent( array $params ): string
+	public function setAnonymous( bool $state = TRUE, \IPS\Member $member = NULL)
 	{
-		if( !in_array( 'IPS\Content\Embeddable', class_implements( $this ) ) )
+		if( !$this instanceof \IPS\Content\Anonymous  )
 		{
-			return "";
+			throw new \BadMethodCallException();
 		}
 
-		if ( $this instanceof Comment )
+		if( $state == $this->isAnonymous() )
 		{
-			$item = $this->item();
-			$itemCommentClass = $item::$commentClass;
-			$idField = static::$databaseColumnId;
+			return;
+		}
 
-			if ( $this instanceof $itemCommentClass and $item::$firstCommentRequired and ( in_array( 'IPS\Content\Embeddable', class_implements( $item ) ) ) and $item->firstComment()->$idField == $this->$idField )
+		$class = \get_class( $this );
+		$idColumn = static::$databaseColumnId;
+		$anonColumn = static::$databaseColumnMap['is_anon'];
+
+		if( !$state )
+		{
+			try
 			{
-				if ( @$params['do'] === 'findComment' or @$params['embedDo'] === 'findComment' )
-				{
-					unset( $params['do'] );
-					unset( $params['embedDo'] );
-				}
-				unset( $params['comment'] );
-				unset( $params['embedComment'] );
+				$originalAuthor = \IPS\DB::i()->select( 'anonymous_member_id', 'core_anonymous_posts', array( 'anonymous_object_class=? and anonymous_object_id=?', $class, $this->$idColumn ) )->first();
 
-				return $item->embedContent( $params ); // recurse up to the parent
+				$member = \IPS\Member::load( $originalAuthor );
+			}
+			catch (\UnderflowException $e )
+			{
+				$member = NULL;
 			}
 		}
 
-		$template = Theme::i()->getTemplate( 'global', 'core' );
-		return match( true ) {
-			$this instanceof Review		=> $template->embedReview( $this->item(), $this, $this->url()->setQueryString( $params ), $this->embedImage() ),
-			$this instanceof Comment	=> $template->embedComment( $this->item(), $this, $this->url()->setQueryString( $params ), $this->embedImage() ),
-			$this instanceof Item		=> $template->embedItem( $this, $this->url()->setQueryString( $params ), $this->embedImage() ),
-			default						=> throw new BadMethodCallException( 'Using class must define embedContent method for non-content classes.' )
-		};
-	}
+		$member = $member ?: \IPS\Member::loggedIn();
 
-	/**
-	 * Get image for embed
-	 *
-	 * @return	File|NULL
-	 */
-	public function embedImage(): ?File
-	{
-		if( !in_array( 'IPS\Content\Embeddable', class_implements( $this ) ) )
+		if( $state and !$this->container()->canPostAnonymously( 0, $member ) )
 		{
-			return NULL;
+			throw new \BadMethodCallException();
 		}
 
-		/* Comments/Reviews should use whatever we have in the item */
-		if ( $this instanceof Comment )
+		if( $state )
 		{
-			return $this->item()->embedImage();
+			/* Insert the anonymous map */
+			$save = array(
+				'anonymous_member_id'				=> ( $this->author()->member_id ) ? $this->author()->member_id : $member->member_id,
+				'anonymous_object_class'			=> $class,
+				'anonymous_object_id'				=> $this->$idColumn
+			);
+
+			\IPS\Db::i()->replace( 'core_anonymous_posts', $save );
+
+			$member = new \IPS\Member;
+			$this->$anonColumn = 1;
+		}
+		else
+		{
+			\IPS\Db::i()->delete( 'core_anonymous_posts', array( 'anonymous_object_class=? and anonymous_object_id=?', $class, $this->$idColumn ) );
+
+			$this->$anonColumn = 0;
 		}
 
-		/* If we have a cover photo, use it */
-		return $this->coverPhotoFile();
-	}
+		/* @todo only run the rest of the code here if the $anonColumn state is different from original. Waste of processing otherwise */
+		$this->save();
+		$this->changeAuthor( $member, FALSE );
 
-	/**
-	 * Run a UI extension method
-	 * This is identical to UiExtension::run, but used to simplify templates
-	 *
-	 * @param string $method
-	 * @param array|null $payload
-     * @param bool  $returnAsArray
-     * @param string $separator
-	 * @return array|string
-	 */
-	public function ui( string $method, ?array $payload=array(), bool $returnAsArray=false, string $separator = " " ) : array|string
-	{
-		$response = UiExtension::i()->run( $this, $method, $payload );
-        if( !$returnAsArray )
-        {
-            return implode( $separator, $response );
-        }
-        return $response;
-	}
-
-	/**
-	 * Spam methods (not currently used)
-	 */
-	public function spamProtectionPayload( bool $isEdit, string $contentType, Content $content ): array
-	{
-		return Bridge::i()->spamProtectionPayload( $isEdit, $contentType, $content );
-	}
-
-	public function spamCheck( bool $isEdit, Content $content ): int
-	{
-		return Bridge::i()->spamCheck( $isEdit, $content );
-	}
-
-	public function canMarkAsSpam( $member, Content $content ): bool
-	{
-		return Bridge::i()->canMarkAsSpam( $member, $content );
-	}
-
-	public function canUnmarkAsSpam( $member, Content $content ): bool
-	{
-		return Bridge::i()->canUnmarkAsSpam( $member, $content );
-	}
-
-	/**
-	 * Get a url from which to load the mini-profile bar.
-	 *
-	 * @return string
-	 */
-	public function get_authorMiniProfileUrl() : string
-	{
-		$params = [
-			'app' => 'core',
-			'module' => 'system',
-			'controller' => 'ajax',
-			'do'			=> 'miniProfile',
-			'authorId'		=> $this->author()?->member_id ?? null,
-		];
-
-		if ( !IPS::classUsesTrait( $this, Anonymous::class ) or $this->isAnonymous() )
+		if ( \in_array( 'IPS\Content\Comment', class_parents( $this ) ) )
 		{
-			$params['anonymous'] = '1';
+			$this->item()->rebuildFirstAndLastCommentData();
 		}
 
-		$item = $this instanceof Comment ? $this->item() : $this;
-		if ( IPS::classUsesTrait( $item, Solvable::class ) )
-		{
-			if ( isset( $this->author_solved_count ) and is_int( $this->author_solved_count ) )
-			{
-				$params['solvedCount'] = $this->author_solved_count;
-			}
-			else
-			{
-				$params['solvedCount'] = 'load';
-			}
-		}
-
-		$url = Url::internal( '', 'front' )->setQueryString( $params );
-
-		return (string) $url;
+		$this->expireWidgetCaches();
 	}
 
 	/**
-	 * Check whether an event is active for this content type based on the event key. For example, reports don't fire any content_* or comment_* events. This uses the $_bypassDataLayerEvents static property
-	 *
-	 * @see Content::$_bypassDataLayerEvents
-	 *
-	 * @param string $eventKey      The data layer event key.
+	 * Is this an anonymous entry?
 	 *
 	 * @return bool
 	 */
-	public static function dataLayerEventActive( string $eventKey ) : bool
+	public function isAnonymous()
 	{
-		return empty( static::$_bypassDataLayerEvents ) or ( is_array( static::$_bypassDataLayerEvents ) and !in_array( $eventKey, static::$_bypassDataLayerEvents ) );
+		return $this->mapped('is_anon');
 	}
+
+	/**
+	 * Returns the content images
+	 *
+	 * @return	array|NULL
+	 * @throws	\BadMethodCallException
+	 */
+	public function imageLabelsForSearch()
+	{
+		return [];
+	}
+
 }

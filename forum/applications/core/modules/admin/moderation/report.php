@@ -18,14 +18,10 @@ use IPS\Dispatcher;
 use IPS\Dispatcher\Controller;
 use IPS\Helpers\Form;
 use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
 use IPS\Helpers\Form\YesNo;
 use IPS\Http\Url;
-use IPS\IPS;
 use IPS\Member;
 use IPS\Output;
-use IPS\Request;
 use IPS\Session;
 use IPS\Settings;
 use IPS\Theme;
@@ -40,31 +36,31 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * report
  */
-class report extends Controller
+class _report extends Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute(): void
+	public function execute()
 	{
 		/* Add a button for settings */
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'automatic'	=> array(
 				'title'		=> 'manage_automatic_rules',
 				'icon'		=> 'bolt',
-				'link'		=> Url::internal( 'app=core&module=moderation&controller=reportedContent' )
+				'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=reportedContent' )
 			),
 			'settings'	=> array(
 				'title'		=> 'reportedContent_types',
 				'icon'		=> 'cog',
-				'link'		=> Url::internal( 'app=core&module=moderation&controller=reportedContentTypes' )
+				'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=reportedContentTypes' )
 			)
 		);
 
@@ -82,22 +78,22 @@ class report extends Controller
 		Dispatcher::i()->checkAcpPermission( 'reportedContent_manage' );
 
 		/* Work out output */
-		Request::i()->tab = isset( Request::i()->tab ) ? Request::i()->tab : 'settings';
-		if ( $pos = mb_strpos( Request::i()->tab, '-' ) )
+		\IPS\Request::i()->tab = isset( \IPS\Request::i()->tab ) ? \IPS\Request::i()->tab : 'settings';
+		if ( $pos = mb_strpos( \IPS\Request::i()->tab, '-' ) )
 		{
-			$tabMethod			= '_manage' . IPS::mb_ucfirst( mb_substr( Request::i()->tab, 0, $pos ) );
-			$activeTabContents	= $this->$tabMethod( mb_substr( Request::i()->tab, $pos + 1 ) );
+			$tabMethod			= '_manage' . mb_ucfirst( mb_substr( \IPS\Request::i()->tab, 0, $pos ) );
+			$activeTabContents	= $this->$tabMethod( mb_substr( \IPS\Request::i()->tab, $pos + 1 ) );
 		}
 		else
 		{
-			$tabMethod			= '_manage' . IPS::mb_ucfirst( Request::i()->tab );
+			$tabMethod			= '_manage' . mb_ucfirst( \IPS\Request::i()->tab );
 			$activeTabContents	= $this->$tabMethod();
 		}
 
 		/* If this is an AJAX request, just return it */
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $activeTabContents;
+			\IPS\Output::i()->output = $activeTabContents;
 			return;
 		}
 
@@ -108,8 +104,8 @@ class report extends Controller
 		];
 
 		/* Display */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('menu__core_moderation_report');
-		Output::i()->output 	= Theme::i()->getTemplate( 'global' )->tabs( $tabs, Request::i()->tab, $activeTabContents, Url::internal( "app=core&module=moderation&controller=report" ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('menu__core_moderation_report');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate( 'global' )->tabs( $tabs, \IPS\Request::i()->tab, $activeTabContents, \IPS\Http\Url::internal( "app=core&module=moderation&controller=report" ) );
 	}
 
 	/**
@@ -122,14 +118,14 @@ class report extends Controller
 		$form = new Form;
 
 		/* Can guests report */
-		$guest = new Member;
+		$guest = new \IPS\Member;
 		$guestDisabled = false;
 		$guestSetting = Settings::i()->report_capture_guest_details;
 		if ( ! $guest->group['g_can_report'] )
 		{
 			$guestDisabled = true;
 			$guestSetting = false;
-			Member::loggedIn()->language()->words['report_capture_guest_details_warning'] = Member::loggedIn()->language()->addToStack( 'report_capture_guest_details__warning' );
+			\IPS\Member::loggedIn()->language()->words['report_capture_guest_details_warning'] =  \IPS\Member::loggedIn()->language()->addToStack( 'report_capture_guest_details__warning' );
 		}
 
 		$form->add( new YesNo( 'report_capture_guest_details', $guestSetting, FALSE, array( 'disabled' => $guestDisabled, 'togglesOn' => [ 'report_guest_details_name_mandatory', 'report_guest_details_store_days'] ), NULL, NULL, NULL, 'report_capture_guest_details' ) );
@@ -160,7 +156,7 @@ class report extends Controller
 	protected function _manageNotifications(): string
 	{
 		/* Init */
-		$table = new \IPS\Helpers\Table\Db( 'core_rc_author_notification_text', Url::internal( 'app=core&module=moderation&controller=report&tab=notifications' ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_rc_author_notification_text', \IPS\Http\Url::internal( 'app=core&module=moderation&controller=report&tab=notifications' ) );
 		$table->include = array( 'title' );
 		$table->sortBy        = $table->sortBy        ?: 'title';
 		$table->sortDirection = $table->sortDirection ?: 'asc';
@@ -172,14 +168,14 @@ class report extends Controller
 
 			$return['edit'] = array(
 				'icon'	=> 'pencil',
-				'link'	=> Url::internal( 'app=core&module=moderation&controller=report&tab=notifications&do=notificationForm&id=' ) . $row['id'],
+				'link'	=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=report&tab=notifications&do=notificationForm&id=' ) . $row['id'],
 				'title'	=> 'edit',
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit') )
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit') )
 			);
 
 			$return['delete'] = array(
 				'icon'	=> 'times-circle',
-				'link'	=> Url::internal( 'app=core&module=moderation&controller=report&tab=notifications&do=notificationDelete&id=' ) . $row['id'],
+				'link'	=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=report&tab=notifications&do=notificationDelete&id=' ) . $row['id'],
 				'title'	=> 'delete',
 				'data'	=> array( 'delete' => '' )
 			);
@@ -209,14 +205,14 @@ class report extends Controller
 	protected function notificationForm()
 	{
 		$current = NULL;
-		if ( Request::i()->id )
+		if ( \IPS\Request::i()->id )
 		{
-			$current = Db::i()->select( '*', 'core_rc_author_notification_text', array( 'id=?', Request::i()->id ) )->first();
+			$current = \IPS\Db::i()->select( '*', 'core_rc_author_notification_text', array( 'id=?', \IPS\Request::i()->id ) )->first();
 		}
 
-		$form = new Form;
-		$form->add( new Text( 'report_notifications_title', ( $current ? $current['title'] : '' ), true ) );
-		$form->add( new TextArea( 'report_notifications_text', ( $current ? $current['text'] : '' ), true, [ 'rows' => 20 ] ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Text( 'report_notifications_title', ( $current ? $current['title'] : '' ), true ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'report_notifications_text', ( $current ? $current['text'] : '' ), true, [ 'rows' => 20 ] ) );
 
 		if ( $values = $form->values() )
 		{
@@ -227,19 +223,19 @@ class report extends Controller
 
 			if ( $current )
 			{
-				Db::i()->update( 'core_rc_author_notification_text', $save, array( 'id=?', $current['id'] ) );
-				Session::i()->log( 'acplog__report_author_notification_edited', array( $current['title'] => true ) );
+				\IPS\Db::i()->update( 'core_rc_author_notification_text', $save, array( 'id=?', $current['id'] ) );
+				\IPS\Session::i()->log( 'acplog__report_author_notification_edited', array( $current['title'] => true ) );
 			}
 			else
 			{
-				Db::i()->insert( 'core_rc_author_notification_text', $save );
-				Session::i()->log( 'acplog__report_author_notification_created', array( $save['title'] => true ) );
+				\IPS\Db::i()->insert( 'core_rc_author_notification_text', $save );
+				\IPS\Session::i()->log( 'acplog__report_author_notification_created', array( $save['title'] => true ) );
 			}
 
-			Output::i()->redirect( Url::internal( 'app=core&module=moderation&controller=report&tab=notifications' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=moderation&controller=report&tab=notifications' ), 'saved' );
 		}
 
-		Output::i()->output .= Theme::i()->getTemplate( 'global' )->block( 'report_author_notification_title', $form, FALSE );
+		\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global' )->block( 'report_author_notification_title', $form, FALSE );
 	}
 
 	/**
@@ -250,17 +246,17 @@ class report extends Controller
 	protected function notificationDelete()
 	{
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
 		try
 		{
-			$current = Db::i()->select( '*', 'core_rc_author_notification_text', array( 'id=?', Request::i()->id ) )->first();
+			$current = \IPS\Db::i()->select( '*', 'core_rc_author_notification_text', array( 'id=?', \IPS\Request::i()->id ) )->first();
 
-			Session::i()->log( 'acplog__report_author_notification_deleted', array( $current['title'] => true ) );
-			Db::i()->delete( 'core_rc_author_notification_text', array( 'id=?', Request::i()->id ) );
+			\IPS\Session::i()->log( 'acplog__report_author_notification_deleted', array( $current['title'] => true ) );
+			\IPS\Db::i()->delete( 'core_rc_author_notification_text', array( 'id=?', \IPS\Request::i()->id ) );
 		}
 		catch ( \UnderflowException $e ) { }
 
-		Output::i()->redirect( Url::internal( 'app=core&module=moderation&controller=report&tab=notifications' ), 'deleted' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=moderation&controller=report&tab=notifications' ), 'deleted' );
 	}
 }

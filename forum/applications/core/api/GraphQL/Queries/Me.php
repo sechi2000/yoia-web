@@ -10,28 +10,26 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use IPS\core\api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\MemberType;
-use IPS\Member;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Me query for GraphQL API
  */
-class Me
+class _Me
 {
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Return the logged-in member";
+	public static $description = "Return the logged-in member";
 
 	/*
 	 * Query arguments
@@ -44,21 +42,21 @@ class Me
 	/**
 	 * Return the query return type
 	 */
-	public function type() : MemberType
+	public function type()
 	{
-		return TypeRegistry::member();
+		return \IPS\core\api\GraphQL\TypeRegistry::member();
 	}
 
 	/**
 	 * Resolves this query
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @param 	array $context 	Context values
-	 * @return	Member
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\Member|null
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : Member
+	public function resolve($val, $args, $context)
 	{
-		return Member::loggedIn();
+		return \IPS\Member::loggedIn();
 	}
 }

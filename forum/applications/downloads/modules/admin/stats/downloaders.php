@@ -12,43 +12,26 @@
 namespace IPS\downloads\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\DateRange;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use UnderflowException;
-use function count;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Top Downloaders
  */
-class downloaders extends Controller
+class _downloaders extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * @brief	Number of results per page
@@ -60,9 +43,9 @@ class downloaders extends Controller
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'downloaders_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'downloaders_manage' );
 		parent::execute();
 	}
 
@@ -71,32 +54,32 @@ class downloaders extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$where = array( array( 'dmid>0' ) );
 		
-		if ( isset( Request::i()->form ) )
+		if ( isset( \IPS\Request::i()->form ) )
 		{
-			$form = new Form( 'form', 'go' );
+			$form = new \IPS\Helpers\Form( 'form', 'go' );
 
 			$default = array(
-				'start' => Request::i()->start ? DateTime::ts( (int) Request::i()->start ) : NULL,
-				'end' => Request::i()->end ? DateTime::ts( (int) Request::i()->end ) : NULL
+				'start' => \IPS\Request::i()->start ? \IPS\DateTime::ts( \IPS\Request::i()->start ) : NULL,
+				'end' => \IPS\Request::i()->end ? \IPS\DateTime::ts( \IPS\Request::i()->end ) : NULL
 			);
 
-			$form->add( new DateRange( 'stats_date_range', $default, FALSE, array( 'start' => array( 'max' => DateTime::ts( time() )->setTime( 0, 0, 0 ), 'time' => FALSE ), 'end' => array( 'max' => DateTime::ts( time() )->setTime( 23, 59, 59 ), 'time' => FALSE ) ) ) );
+			$form->add( new \IPS\Helpers\Form\DateRange( 'stats_date_range', $default, FALSE, array( 'start' => array( 'max' => \IPS\DateTime::ts( time() )->setTime( 0, 0, 0 ), 'time' => FALSE ), 'end' => array( 'max' => \IPS\DateTime::ts( time() )->setTime( 23, 59, 59 ), 'time' => FALSE ) ) ) );
 
 			if ( !$values = $form->values() )
 			{
-				Output::i()->output = $form;
+				\IPS\Output::i()->output = $form;
 				return;
 			}
 		}
 
 		/* Figure out start and end parameters for links */
 		$params = array(
-			'start' => !empty( $values['stats_date_range']['start'] ) ? $values['stats_date_range']['start']->getTimestamp() : Request::i()->start,
-			'end' => !empty( $values['stats_date_range']['end'] ) ? $values['stats_date_range']['end']->getTimestamp() : Request::i()->end
+			'start' => !empty( $values['stats_date_range']['start'] ) ? $values['stats_date_range']['start']->getTimestamp() : \IPS\Request::i()->start,
+			'end' => !empty( $values['stats_date_range']['end'] ) ? $values['stats_date_range']['end']->getTimestamp() : \IPS\Request::i()->end
 		);
 
 		if( $params['start'] )
@@ -109,7 +92,7 @@ class downloaders extends Controller
 			$where[] = array( 'dtime<?', $params['end'] );
 		}
 		
-		$page = isset( Request::i()->page ) ? intval( Request::i()->page ) : 1;
+		$page = isset( \IPS\Request::i()->page ) ? \intval( \IPS\Request::i()->page ) : 1;
 
 		if( $page < 1 )
 		{
@@ -118,26 +101,26 @@ class downloaders extends Controller
 
 		try
 		{
-			$total = Db::i()->select( 'COUNT(DISTINCT(dmid))', 'downloads_downloads', $where )->first();
+			$total = \IPS\Db::i()->select( 'COUNT(DISTINCT(dmid))', 'downloads_downloads', $where )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			$total = 0;
 		}
 
 		/* Add the date range button */
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'settings'	=> array(
 				'title'		=> 'stats_date_range',
 				'icon'		=> 'calendar',
-				'link'		=> Url::internal( 'app=downloads&module=stats&controller=downloaders&form=1' )->setQueryString( $params ),
-				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('stats_date_range') )
+				'link'		=> \IPS\Http\Url::internal( 'app=downloads&module=stats&controller=downloaders&form=1' )->setQueryString( $params ),
+				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('stats_date_range') )
 			)
 		);
 		
 		if( $total > 0 )
 		{
-			$select	= Db::i()->select( 'dmid, count(*) as downloads', 'downloads_downloads', $where, 'downloads DESC', array( ( $page - 1 ) * static::PER_PAGE, static::PER_PAGE ), 'dmid' );
+			$select	= \IPS\Db::i()->select( 'dmid, count(*) as downloads', 'downloads_downloads', $where, 'downloads DESC', array( ( $page - 1 ) * static::PER_PAGE, static::PER_PAGE ), 'dmid' );
 			$mids = array();
 
 			foreach( $select as $row )
@@ -147,26 +130,26 @@ class downloaders extends Controller
 
 			$members = array();
 
-			if ( count( $mids ) )
+			if ( \count( $mids ) )
 			{
-				$members = iterator_to_array( Db::i()->select( '*', 'core_members', array( Db::i()->in( 'member_id', $mids ) ) )->setKeyField('member_id') );
+				$members = iterator_to_array( \IPS\Db::i()->select( '*', 'core_members', array( \IPS\Db::i()->in( 'member_id', $mids ) ) )->setKeyField('member_id') );
 			}
 
-			$pagination = Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination(
-				Url::internal( 'app=downloads&module=stats&controller=downloaders' )->setQueryString( $params ),
+			$pagination = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination(
+				\IPS\Http\Url::internal( 'app=downloads&module=stats&controller=downloaders' )->setQueryString( $params ),
 				ceil( $total / static::PER_PAGE ),
 				$page,
 				static::PER_PAGE,
 				FALSE
 			);
 
-			Output::i()->output = Theme::i()->getTemplate('stats')->downloadsTable( $select, $pagination, $members, $total );
-			Output::i()->title = Member::loggedIn()->language()->addToStack('menu__downloads_stats_downloaders');
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('stats')->downloadsTable( $select, $pagination, $members, $total );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__downloads_stats_downloaders');
 		}
 		else
 		{
 			/* Return the no results message */
-			Output::i()->output .= Theme::i()->getTemplate( 'global', 'core' )->block( Member::loggedIn()->language()->addToStack('menu__downloads_stats_downloaders'), Member::loggedIn()->language()->addToStack('no_results'), FALSE , 'i-padding_3', NULL, TRUE );
+			\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core' )->block( \IPS\Member::loggedIn()->language()->addToStack('menu__downloads_stats_downloaders'), \IPS\Member::loggedIn()->language()->addToStack('no_results'), FALSE , 'ipsPad', NULL, TRUE );
 		}
 	}
 }

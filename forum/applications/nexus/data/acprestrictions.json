@@ -15,6 +15,12 @@
             "invoices_delete": "invoices_delete",
             "invoices_settings": "invoices_settings"
         },
+        "shipping": {
+            "shiporders_manage": "shiporders_manage",
+            "shiporders_edit": "shiporders_edit",
+            "shiporders_delete": "shiporders_delete",
+            "shipmethods_manage": "shipmethods_manage"
+        },
         "paymentsettings": {
             "paymentsettings_overview": "paymentsettings_overview",
             "gateways_manage": "gateways_manage",
@@ -73,6 +79,37 @@
             "customer_notes_delete": "customer_notes_delete"
         }
     },
+    "support": {
+        "requests": {
+            "requests_ratings": "requests_ratings",
+            "requests_ratings_feedback": "requests_ratings_feedback",
+            "requests_split": "requests_split",
+            "requests_block_sev": "requests_block_sev",
+            "requests_reply_delete": "requests_reply_delete",
+            "requests_create": "requests_create",
+            "requests_merge": "requests_merge",
+            "requests_delete": "requests_delete",
+            "requests_manage": "requests_manage"
+        },
+        "support_reports": {
+            "reports_manage": "reports_manage"
+        },
+        "settings": {
+            "settings_manage": "settings_manage",
+            "departments_manage": "departments_manage",
+            "stockactions_manage": "stockactions_manage",
+            "scfields_manage": "scfields_manage",
+            "severities_manage": "severities_manage",
+            "statuses_manage": "statuses_manage",
+            "autoresolve_manage": "autoresolve_manage",
+            "customerfeedback_manage": "customerfeedback_manage",
+            "outgoingemail_manage": "outgoingemail_manage",
+            "incomingemail_manage": "incomingemail_manage"
+        },
+        "stats": {
+            "volume_manage": "volume_manage"
+        }
+    },
     "store": {
         "packages": {
             "packages_manage": "packages_manage",
@@ -105,9 +142,6 @@
         },
         "markets": {
             "markets_manage": "markets_manage"
-        },
-        "donations": {
-            "donations_stats_manage": "donations_stats_manage"
         }
     },
     "subscriptions": {

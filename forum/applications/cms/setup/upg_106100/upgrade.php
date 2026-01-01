@@ -12,20 +12,16 @@
 namespace IPS\cms\setup\upg_106100;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Task;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.6.0 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Step 1
@@ -35,7 +31,7 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		Task::queue( 'core', 'RebuildSearchIndex', array( 'class' => 'IPS\cms\Pages\PageItem' ), 5 );
+		\IPS\Task::queue( 'core', 'RebuildSearchIndex', array( 'class' => 'IPS\cms\Pages\PageItem' ), 5 );
 
 		return TRUE;
 	}

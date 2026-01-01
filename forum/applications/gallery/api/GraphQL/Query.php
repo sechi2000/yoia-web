@@ -10,30 +10,30 @@
  */
 
 namespace IPS\gallery\api\GraphQL;
-use IPS\gallery\api\GraphQL\Queries\Image;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Forums queries for GraphQL API
  */
-abstract class Query
+abstract class _Query
 {
 	/**
 	 * Get the supported query types in this app
 	 *
 	 * @return	array
 	 */
-	public static function queries() : array
+	public static function queries()
 	{
 		return [
-			'image' => new Image(),
+			'image' => new \IPS\gallery\api\GraphQL\Queries\Image(),
 		];
 	}
 }

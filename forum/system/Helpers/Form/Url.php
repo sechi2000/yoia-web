@@ -11,33 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Data\Cache;
-use IPS\DateTime;
-use IPS\File;
-use IPS\Http\Url as HttpUrl;
-use IPS\Image;
-use IPS\Member;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function strlen;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * URL input class for Form Builder
  */
-class Url extends Text
+class _Url extends Text
 {
 	/**
 	 * @brief	Default Options
@@ -54,7 +37,7 @@ class Url extends Text
 	 * @endcode
 	 * @note You should NOT use file/image/allowedMimes options for public-facing forms. These options will result in the file being imported, and exposing such a form to end users opens up the community to potential SSRF concerns.
 	 */
-	public array $childDefaultOptions = array(
+	public $childDefaultOptions = array(
 		'allowedProtocols'	=> array( 'http', 'https' ),
 		'allowedMimes'		=> NULL,
 		'image'				=> FALSE,
@@ -67,12 +50,12 @@ class Url extends Text
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
-	 * @throws	DomainException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\DomainException
 	 * @return	TRUE
 	 * @note	Custom validation is performed AFTER all standard validations to ensure consistent error messages in places like importing profile photos (if an attacker was attempting to supply a local address). This means that if the form helper's 'file' childoption is set, the value supplied to the custom helper will be an instance of \IPS\File instead of \IPS\Http\Url. Also, a second param $response is made available if you need to check the value of the URL's response and file, allowedMimes, or image was set (preventing a second unnecessary HTTP request).
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		/* If we have a custom validation function, store it now and we'll run it manually afterwards */
 		$validationFunction = NULL;
@@ -89,32 +72,32 @@ class Url extends Text
 		if ( $this->value )
 		{
 			$value = $this->formatValue();
-
+			
 			/* Check the URL is valid */
-			if ( !( $value instanceof HttpUrl ) )
+			if ( !( $value instanceof \IPS\Http\Url ) )
 			{
-				throw new InvalidArgumentException('form_url_bad');
+				throw new \InvalidArgumentException('form_url_bad');
 			}
 			
 			/* And that it's an allowed protocol */
-			if ( $this->options['allowedProtocols'] and !in_array( mb_strtolower( $value->data['scheme'] ), $this->options['allowedProtocols'] ) )
+			if ( $this->options['allowedProtocols'] and !\in_array( mb_strtolower( $value->data['scheme'] ), $this->options['allowedProtocols'] ) )
 			{
-				throw new DomainException('form_url_bad_protocol');
+				throw new \DomainException('form_url_bad_protocol');
 			}
 			
 			/* Try to fetch it, if necessary */
 			if ( $this->options['file'] or $this->options['allowedMimes'] or $this->options['image'] )
 			{
 				/* Is rate limiting enabled (the default)? */
-				if( $this->options['rateLimit'] !== NULL AND intval( $this->options['rateLimit'] ) > 0 )
+				if( $this->options['rateLimit'] !== NULL AND \intval( $this->options['rateLimit'] ) > 0 )
 				{
 					if( $rateLimit = $this->getRateLimitValue() )
 					{
 						/* Was it less than 20 seconds ago? If so, make the user wait */
-						$timeLeft =  $rateLimit - ( time() - intval( $this->options['rateLimit'] ) );
+						$timeLeft =  $rateLimit - ( time() - \intval( $this->options['rateLimit'] ) );
 						if( $timeLeft > 0 )
 						{
-							throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_url_too_soon', FALSE, array( 'sprintf' => array( $this->options['rateLimit'], $timeLeft ) ) ) );
+							throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_url_too_soon', FALSE, array( 'sprintf' => array( $this->options['rateLimit'], $timeLeft ) ) ) );
 						}
 					}
 
@@ -130,21 +113,21 @@ class Url extends Text
 				{
 					if( $e->getMessage() === 'localhost_url_not_followed' )
 					{
-						throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_url_localhost', FALSE, array( 'sprintf' => array( HttpUrl::internal('')->data['host'] ) ) ) );
+						throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_url_localhost', FALSE, array( 'sprintf' => array( \IPS\Http\Url::internal('')->data['host'] ) ) ) );
 					}
 
 					if( $e->getMessage() === 'protocol_not_followed' )
 					{
-						throw new DomainException('form_url_bad_protocol');
+						throw new \DomainException('form_url_bad_protocol');
 					}
 					
-					throw new DomainException( 'form_url_error' );
+					throw new \DomainException( 'form_url_error' );
 				}
 
 				/* Check MIME */
 				if ( $this->options['allowedMimes'] or $this->options['image'] )
 				{
-					$allowedMimes = $this->options['allowedMimes'] ? ( is_array( $this->options['allowedMimes'] ) ? $this->options['allowedMimes'] : array( $this->options['allowedMimes'] ) ): Image::$imageMimes;
+					$allowedMimes = $this->options['allowedMimes'] ? ( \is_array( $this->options['allowedMimes'] ) ? $this->options['allowedMimes'] : array( $this->options['allowedMimes'] ) ): \IPS\Image::$imageMimes;
 					
 					$match = FALSE;
                     $contentType = ( isset( $response->httpHeaders['Content-Type'] ) ) ? $response->httpHeaders['Content-Type'] : ( ( isset( $response->httpHeaders['content-type'] ) ) ? $response->httpHeaders['content-type'] : NULL );
@@ -162,7 +145,7 @@ class Url extends Text
 					
 					if ( !$match )
 					{
-						throw new DomainException( 'form_url_bad_mime' );
+						throw new \DomainException( 'form_url_bad_mime' );
 					}
 				}
 				
@@ -171,10 +154,10 @@ class Url extends Text
 				{
 					$maxFileSize	= $this->options['maxFileSize'] * 1048576;
 
-					if( strlen( $response ) > $maxFileSize )
+					if( \strlen( $response ) > $maxFileSize )
 					{
 						unset( $response );
-						throw new DomainException( Member::loggedIn()->language()->addToStack( 'upload_too_big', TRUE, array( 'sprintf' => $this->options['maxFileSize'] ) ), 2 );
+						throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'upload_too_big', TRUE, array( 'sprintf' => $this->options['maxFileSize'] ) ), 2 );
 					}
 				}
 								
@@ -183,7 +166,7 @@ class Url extends Text
 				{
 					try
 					{
-						$image = Image::create( $response );
+						$image = \IPS\Image::create( $response );
 
 						if ( $this->options['maxDimensions'] !== NULL )
 						{
@@ -191,11 +174,11 @@ class Url extends Text
 							$response = (string) $image;
 						}
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
 						if ( $this->options['image'] )
 						{
-							throw new DomainException( 'form_url_bad_mime' );
+							throw new \DomainException( 'form_url_bad_mime' );
 						}
 					}
 				}
@@ -207,11 +190,11 @@ class Url extends Text
 
 					try
 					{
-						$this->value = File::create( $this->options['file'], $filename, $response );
+						$this->value = \IPS\File::create( $this->options['file'], $filename, $response );
 					}
-					catch( InvalidArgumentException $e )
+					catch( \InvalidArgumentException $e )
 					{
-						throw new DomainException( 'form_url_error' );
+						throw new \DomainException( 'form_url_error' );
 					}
 				}
 			}
@@ -231,22 +214,22 @@ class Url extends Text
 	 * Get the stored rate limit for this field and member
 	 * We use sessions if we're a member to avoid adding data to cache_store
 	 *
-	 * @return int|null
+	 * @return int
 	 */
-	protected function getRateLimitValue(): ?int
+	protected function getRateLimitValue()
 	{
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
-			return ( $_SESSION['url_fetch_' . $this->htmlId] ?? NULL );
+			return ( isset( $_SESSION[ 'url_fetch_' . $this->htmlId ] ) ? $_SESSION[ 'url_fetch_' . $this->htmlId ] : NULL );
 		}
 		else
 		{
 			$cached = NULL;
 			try
 			{
-				$cached = Cache::i()->getWithExpire( 'url_fetch_' . $this->htmlId . '-' . Member::loggedIn()->ip_address, TRUE );
+				$cached = \IPS\Data\Cache::i()->getWithExpire( 'url_fetch_' . $this->htmlId . '-' . \IPS\Member::loggedIn()->ip_address, TRUE );
 			}
-			catch( Exception $ex ) { }
+			catch( \Exception $ex ) { }
 			
 			return $cached;
 		}
@@ -260,15 +243,15 @@ class Url extends Text
 	 *
 	 * @return void
 	 */
-	protected function setRateLimitValue( mixed $value ) : void
+	protected function setRateLimitValue( $value )
 	{
-		if ( !Member::loggedIn()->member_id )
+		if ( !\IPS\Member::loggedIn()->member_id )
 		{
 			$_SESSION[ 'url_fetch_' . $this->htmlId ] = $value;
 		}
 		else
 		{
-			Cache::i()->storeWithExpire( 'url_fetch_' . $this->htmlId . '-' . Member::loggedIn()->ip_address, $value, DateTime::create()->add( new DateInterval( 'PT60M' ) ), TRUE );
+			\IPS\Data\Cache::i()->storeWithExpire( 'url_fetch_' . $this->htmlId . '-' . \IPS\Member::loggedIn()->ip_address, $value, \IPS\DateTime::create()->add( new \DateInterval( 'PT60M' ) ), TRUE );
 		}
 	}
 	
@@ -277,7 +260,7 @@ class Url extends Text
 	 *
 	 * @return	string
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$val = str_replace( 'feed://', 'http://', parent::getValue() );
 		if ( $val and !mb_strpos( $val, '://' ) )
@@ -291,17 +274,17 @@ class Url extends Text
 	/**
 	 * Format Value
 	 *
-	 * @return	Url|string
+	 * @return	\IPS\Http\Url|string
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
-		if ( $this->value and !( $this->value instanceof Url ) )
+		if ( $this->value and !( $this->value instanceof \IPS\Http\Url ) )
 		{
 			try
 			{
-				return HttpUrl::createFromString( $this->value, TRUE, TRUE );
+				return \IPS\Http\Url::createFromString( $this->value, TRUE, TRUE );
 			}
-			catch ( InvalidArgumentException $e )
+			catch ( \InvalidArgumentException $e )
 			{
 				return $this->value;
 			}

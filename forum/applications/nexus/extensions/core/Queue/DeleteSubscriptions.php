@@ -12,41 +12,30 @@
 namespace IPS\nexus\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use OutOfRangeException;
-use function count;
-use function defined;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class DeleteSubscriptions extends QueueAbstract
+class _DeleteSubscriptions
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		try
 		{
-			$data['count'] = Db::i()->select( 'COUNT(*)', 'nexus_member_subscriptions', [ 'sub_package_id=?', $data['id'] ] )->first();
+			$data['count'] = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_member_subscriptions', [ 'sub_package_id=?', $data['id'] ] )->first();
 		}
-		catch( Exception )
+		catch( \Exception $ex )
 		{
 			return NULL;
 		}
@@ -64,15 +53,15 @@ class DeleteSubscriptions extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ): int
+	public function run( $data, $offset )
 	{
-		$query = Db::i()->select( '*', 'nexus_member_subscriptions', [ 'sub_id>? AND sub_package_id=?', $data['lastId'], $data['id'] ], 'sub_id ASC', REBUILD_SLOW );
-		if ( !count( $query ) )
+		$query = \IPS\Db::i()->select( '*', 'nexus_member_subscriptions', [ 'sub_id>? AND sub_package_id=?', $data['lastId'], $data['id'] ], 'sub_id ASC', \IPS\REBUILD_SLOW );
+		if ( !\count( $query ) )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
-		foreach ( new ActiveRecordIterator( $query, 'IPS\nexus\Subscription' ) as $sub )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( $query, 'IPS\nexus\Subscription' ) as $sub )
 		{
 			$data['completed']++;
 			$data['lastId'] = $sub->id;
@@ -88,11 +77,11 @@ class DeleteSubscriptions extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' =>  Member::loggedIn()->language()->addToStack('removing_subscriptions'), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
+		return array( 'text' =>  \IPS\Member::loggedIn()->language()->addToStack('removing_subscriptions'), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
 	}
 
 	/**
@@ -102,7 +91,7 @@ class DeleteSubscriptions extends QueueAbstract
 	 * @param	bool	$processed	Was anything processed or not? If preQueueData returns NULL, this will be FALSE.
 	 * @return	void
 	 */
-	public function postComplete( array $data, bool $processed = TRUE ) : void
+	public function postComplete( $data, $processed = TRUE )
 	{
 
 	}

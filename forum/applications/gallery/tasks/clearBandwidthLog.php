@@ -12,25 +12,16 @@
 namespace IPS\gallery\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Clear bandwidth log Task
  */
-class clearBandwidthLog extends Task
+class _clearBandwidthLog extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -41,18 +32,18 @@ class clearBandwidthLog extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		if( Settings::i()->gallery_bandwidth_period < 1 )
+		if( \IPS\Settings::i()->gallery_bandwidth_period < 1 )
 		{
 			return NULL;
 		}
 
-		$cutoff		= DateTime::create()->sub( DateInterval::createFromDateString( Settings::i()->gallery_bandwidth_period . ' hours' ) )->getTimestamp();
+		$cutoff		= \IPS\DateTime::create()->sub( \DateInterval::createFromDateString( \IPS\Settings::i()->gallery_bandwidth_period . ' hours' ) )->getTimestamp();
 
-		Db::i()->delete( 'gallery_bandwidth', array( 'bdate < ?', $cutoff ) );
+		\IPS\Db::i()->delete( 'gallery_bandwidth', array( 'bdate < ?', $cutoff ) );
 
 		return NULL;
 	}

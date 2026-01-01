@@ -12,26 +12,16 @@
 namespace IPS\core\setup\upg_106156;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Key;
-use IPS\Api\OAuthClient;
-use IPS\core\extensions\core\CommunityEnhancements\Zapier;
-use IPS\Db;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.6.11 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * remove mobile app client
@@ -42,30 +32,30 @@ class Upgrade
 	{
 		try
 		{
-			$client = OAuthClient::constructFromData( Db::i()->select( '*', 'core_oauth_clients', array( 'oauth_type=?', 'mobile' ) )->first() );
+			$client = \IPS\Api\OAuthClient::constructFromData( \IPS\Db::i()->select( '*', 'core_oauth_clients', array( 'oauth_type=?', 'mobile' ) )->first() );
 			$client->delete();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 		}
 
 
 
 		/* Rebuild Zapier REST API Key Permissions */
-		if( Settings::i()->zapier_api_key )
+		if( \IPS\Settings::i()->zapier_api_key )
 		{
 			try
 			{
-				$apiKey = Key::load( Settings::i()->zapier_api_key );
+				$apiKey = \IPS\Api\Key::load( \IPS\Settings::i()->zapier_api_key );
 
-				$correctPermissions = json_encode( Zapier::apiKeyPermissions() );
+				$correctPermissions = json_encode( \IPS\core\extensions\core\CommunityEnhancements\Zapier::apiKeyPermissions() );
 				if ( $apiKey->permissions != $correctPermissions )
 				{
 					$apiKey->permissions = $correctPermissions;
 					$apiKey->save();
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 
 			}

@@ -12,30 +12,23 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\convert\Software;
-use IPS\Task;
-use UnderflowException;
-use function defined;
-use function strtotime;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * BBPress Forums Converter
  */
-class Bbpress extends Software
+class _Bbpress extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "bbPress (for WordPress)";
@@ -44,9 +37,9 @@ class Bbpress extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "bbpress";
@@ -55,9 +48,9 @@ class Bbpress extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums'		=> array(
@@ -78,9 +71,9 @@ class Bbpress extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -88,9 +81,9 @@ class Bbpress extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'wordpress' ) );
 	}
@@ -98,16 +91,16 @@ class Bbpress extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics" );
 	}
@@ -117,7 +110,7 @@ class Bbpress extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums() : void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -141,14 +134,14 @@ class Bbpress extends Software
 	/**
 	 * @brief	User cache to minimise repeated DB lookups
 	 */
-	protected static array $userCache = array();
+	protected static $userCache = array();
 
 	/**
 	 * Convert topics
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics() : void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'ID' );
@@ -164,7 +157,7 @@ class Bbpress extends Software
 				{
 					static::$userCache[ $row['post_author'] ] = $this->db->select( $userName, 'users', array( 'ID=?', $row['post_author'] ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					static::$userCache[ $row['post_author'] ] = 'Guest';
 				}
@@ -176,7 +169,7 @@ class Bbpress extends Software
 				'forum_id'			=> $row['post_parent'],
 				'state'				=> ( $row['post_status'] == 'publish' ) ? 'open' : 'closed',
 				'starter_id'		=> $row['post_author'],
-				'start_date'		=> strtotime( $row['post_date'] ),
+				'start_date'		=> \strtotime( $row['post_date'] ),
 				'starter_name'		=> static::$userCache[ $row['post_author'] ],
 			);
 
@@ -190,7 +183,7 @@ class Bbpress extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts() : void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'ID' );
@@ -206,7 +199,7 @@ class Bbpress extends Software
 				{
 					static::$userCache[ $row['post_author'] ] = $this->db->select( $userName, 'users', array( 'ID=?', $row['post_author'] ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					static::$userCache[ $row['post_author'] ] = 'Guest';
 				}
@@ -218,7 +211,7 @@ class Bbpress extends Software
 				'post'			=> $row['post_content'],
 				'author_id'		=> $row['post_author'],
 				'author_name'	=> static::$userCache[ $row['post_author'] ],
-				'post_date'		=> strtotime( $row['post_date'] )
+				'post_date'		=> \strtotime( $row['post_date'] )
 			);
 
 			$libraryClass->convertForumsPost( $info );

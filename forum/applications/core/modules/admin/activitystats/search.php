@@ -11,52 +11,35 @@
 namespace IPS\core\modules\admin\activitystats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\DateTime;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Search Statistics
  */
-class search extends Controller
+class _search extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'search_stats_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'search_stats_manage' );
 		parent::execute();
 	}
 
@@ -65,34 +48,34 @@ class search extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Show button to adjust settings */
-		Output::i()->sidebar['actions']['settings'] = array(
+		\IPS\Output::i()->sidebar['actions']['settings'] = array(
 			'icon'		=> 'cog',
 			'primary'	=> TRUE,
 			'title'		=> 'manage_searchstats',
-			'link'		=> Url::internal( 'app=core&module=activitystats&controller=search&do=settings' ),
-			'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('settings') )
+			'link'		=> \IPS\Http\Url::internal( 'app=core&module=activitystats&controller=search&do=settings' ),
+			'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('settings') )
 		);
 
-		Output::i()->sidebar['actions']['log'] = array(
+		\IPS\Output::i()->sidebar['actions']['log'] = array(
 			'icon'		=> 'search',
 			'title'		=> 'searchstats_log',
-			'link'		=> Url::internal( 'app=core&module=activitystats&controller=search&do=log' ),
+			'link'		=> \IPS\Http\Url::internal( 'app=core&module=activitystats&controller=search&do=log' ),
 		);
+		
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'Search' )->getChart( \IPS\Http\Url::internal( "app=core&module=activitystats&controller=search" ) );
 
-		$chart = Chart::loadFromExtension( 'core', 'Search' )->getChart( Url::internal( "app=core&module=activitystats&controller=search" ) );
+		\IPS\Output::i()->output	= (string) $chart;
 
-		Output::i()->output	= (string) $chart;
-
-		if( Request::i()->noheader AND Request::i()->isAjax() )
+		if( \IPS\Request::i()->noheader AND \IPS\Request::i()->isAjax() )
 		{
 			return;
 		}
 
 		/* Display */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('menu__core_activitystats_search');
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('menu__core_activitystats_search');
 	}
 
 	/**
@@ -100,20 +83,20 @@ class search extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function settings() : void
+	protected function settings()
 	{
-		$form = new Form;
-		$form->add( new Interval( 'stats_search_prune', Settings::i()->stats_search_prune, FALSE, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Interval( 'stats_search_prune', \IPS\Settings::i()->stats_search_prune, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), NULL ) );
 
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings( $values );
-			Session::i()->log( 'acplog__statssearch_settings' );
-			Output::i()->redirect( Url::internal( 'app=core&module=activitystats&controller=search' ), 'saved' );
+			\IPS\Session::i()->log( 'acplog__statssearch_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=activitystats&controller=search' ), 'saved' );
 		}
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('settings');
-		Output::i()->output 	= Theme::i()->getTemplate('global')->block( 'settings', $form, FALSE );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('settings');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate('global')->block( 'settings', $form, FALSE );
 	}
 
 	/**
@@ -121,10 +104,10 @@ class search extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function log() : void
+	protected function log()
 	{
 		/* Create the table */
-		$table = new Db( 'core_statistics', Url::internal( 'app=core&module=activitystats&controller=search&do=log' ), array( array( 'type=?', 'search' ) ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_statistics', \IPS\Http\Url::internal( 'app=core&module=activitystats&controller=search&do=log' ), array( array( 'type=?', 'search' ) ) );
 		$table->langPrefix = 'searchstats_';
 		$table->quickSearch = 'value_4';
 
@@ -139,14 +122,14 @@ class search extends Controller
 		$table->parsers = array(
 			'time'			=> function( $val, $row )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			}
 		);
 
 		/* The table filters won't without this */
-		Output::i()->bypassCsrfKeyCheck = true;
+		\IPS\Output::i()->bypassCsrfKeyCheck = true;
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('searchstats_log');
-		Output::i()->output 	= (string) $table;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('searchstats_log');
+		\IPS\Output::i()->output 	= (string) $table;
 	}
 }

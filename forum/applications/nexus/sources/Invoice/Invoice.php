@@ -13,54 +13,17 @@ namespace IPS\nexus;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Email;
-use IPS\Events\Event;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Http\Url;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\nexus\Customer\Address;
-use IPS\nexus\extensions\nexus\Item\CouponDiscount;
-use IPS\nexus\extensions\nexus\Item\Package;
-use IPS\nexus\Invoice\Item;
-use IPS\nexus\Invoice\Item\Purchase;
-use IPS\nexus\Invoice\Item\Renewal;
-use IPS\nexus\Invoice\Item\TaxItem;
-use IPS\nexus\Invoice\ItemsIterator;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Theme;
-use LengthException;
-use OutOfRangeException;
-use ReflectionClass;
-use RuntimeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_called_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_int;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invoice Model
- *
- * @property Customer $member
- * @property ItemsIterator $items
  */
-class Invoice extends ActiveRecord
+class _Invoice extends \IPS\Patterns\ActiveRecord
 {
 	const STATUS_PAID		= 'paid';
 	const STATUS_PENDING	= 'pend';
@@ -70,32 +33,31 @@ class Invoice extends ActiveRecord
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_invoices';
+	public static $databaseTable = 'nexus_invoices';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'i_';
-
+	public static $databasePrefix = 'i_';
+	
 	/**
 	 * Load and check permissions
 	 *
-	 * @param int $id
-	 * @return    static
-	 * @throws OutOfRangeException
+	 * @return	\IPS\Content\Item
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadAndCheckPerms( int $id ) : static
+	public static function loadAndCheckPerms( $id )
 	{
 		$obj = static::load( $id );
-
+		
 		if ( !$obj->canView() )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		return $obj;
@@ -106,10 +68,10 @@ class Invoice extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public static function statuses() : array
+	public static function statuses()
 	{
 		$options = array();
-		$reflection = new ReflectionClass( get_called_class() );
+		$reflection = new \ReflectionClass( \get_called_class() );
 		foreach ( $reflection->getConstants() as $k => $v )
 		{
 			if ( mb_substr( $k, 0, 7 ) === 'STATUS_' )
@@ -123,12 +85,11 @@ class Invoice extends ActiveRecord
 	/**
 	 * Get invoices table
 	 *
-	 * @param	array|null	$where	Where clause
-	 * @param Url	$url
+	 * @param	array	$where	Where clause
 	 * @param	string	$ref	Referer
 	 * @return	\IPS\Helpers\Table\Db
 	 */
-	public static function table( ?array $where, Url $url, string $ref = 't' ) : \IPS\Helpers\Table\Db
+	public static function table( ?array $where, \IPS\Http\Url $url, $ref = 't' )
 	{
 		/* Create the table */
 		$table = new \IPS\Helpers\Table\Db( 'nexus_invoices', $url, $where );
@@ -139,31 +100,31 @@ class Invoice extends ActiveRecord
 		$table->parsers = array(
 			'i_status'	=> function( $val )
 			{
-				return Theme::i()->getTemplate( 'invoices', 'nexus' )->status( $val );
+				return \IPS\Theme::i()->getTemplate( 'invoices', 'nexus' )->status( $val );
 			},
 			'i_member'	=> function ( $val, $row )
 			{
 				if ( $val )
 				{
-					return Theme::i()->getTemplate( 'global', 'nexus' )->userLink( Member::load( $val ) );
+					return \IPS\Theme::i()->getTemplate( 'global', 'nexus' )->userLink( \IPS\Member::load( $val ) );
 				}
 				elseif ( $row['i_guest_data'] )
 				{
 					$data  = json_decode( $row['i_guest_data'], TRUE );
-					return htmlspecialchars( Customer::constructFromData( $data['member'] )->cm_name, ENT_DISALLOWED, 'UTF-8', FALSE );
+					return htmlspecialchars( \IPS\nexus\Customer::constructFromData( $data['member'] )->cm_name, ENT_DISALLOWED, 'UTF-8', FALSE );
 				}
 				else
 				{
-					return Theme::i()->getTemplate( 'global', 'nexus' )->userLink( Member::load( 0 ) );
+					return \IPS\Theme::i()->getTemplate( 'global', 'nexus' )->userLink( \IPS\Member::load( 0 ) );
 				}
 			},
 			'i_total'	=> function( $val, $row )
 			{
-				return (string) new Money( $val, $row['i_currency'] );
+				return (string) new \IPS\nexus\Money( $val, $row['i_currency'] );
 			},
 			'i_date'	=> function( $val )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			}
 		);
 				
@@ -174,9 +135,9 @@ class Invoice extends ActiveRecord
 				'view'	=> array(
 					'icon'	=> 'search',
 					'title'	=> 'invoice_view',
-					'link'	=> Url::internal( "app=nexus&module=payments&controller=invoices&do=view&id={$row['i_id']}" )
+					'link'	=> \IPS\Http\Url::internal( "app=nexus&module=payments&controller=invoices&do=view&id={$row['i_id']}" )
 				),
-			), Invoice::constructFromData( $row )->buttons( $ref ) );
+			), \IPS\nexus\Invoice::constructFromData( $row )->buttons( $ref ) );
 		};
 		
 		return $table;
@@ -185,18 +146,18 @@ class Invoice extends ActiveRecord
 	/**
 	 * @brief	Being generated by system?
 	 */
-	public bool $system = FALSE;
+	public $system = FALSE;
 	
 	/**
 	 * Set Default Values
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->status = static::STATUS_PENDING;
 		$this->items = json_encode( array() );
-		$this->date = new DateTime;
+		$this->date = new \IPS\DateTime;
 		$this->renewal_ids = array();
 		$this->guest_data = array();
 		$this->_data['total'] = 0;
@@ -207,12 +168,12 @@ class Invoice extends ActiveRecord
 	/**
 	 * Member can view?
 	 *
-	 * @param	Member|NULL	$member	The member to check for, or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member	The member to check for, or NULL for currently logged in member
 	 * @return	bool
 	 */
-	public function canView( Member $member = null ) : bool
+	public function canView( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		return $this->member->member_id === $member->member_id or array_key_exists( $member->member_id, iterator_to_array( $this->member->alternativeContacts( array( 'billing=1' ) ) ) );
 	}
@@ -220,51 +181,51 @@ class Invoice extends ActiveRecord
 	/**
 	 * Set title
 	 *
-	 * @param	string $title
+	 * @param	string
 	 * @return	void
-	 * @throws	LengthException
+	 * @throws	\LengthException
 	 */
-	public function set_title( string $title ) : void
+	public function set_title( $title )
 	{
 		if ( mb_strlen( $title ) > 128 )
 		{
-			throw new LengthException;
+			throw new \LengthException;
 		}
 		
 		$this->_data['title'] = $title;
 	}
 	
 	/**
-	 * @brief	Customer|null
+	 * @brief	Member
 	 */
-	protected ?Customer $_member = null;
+	protected $_member;
 	
 	/**
 	 * Get member
 	 *
-	 * @return    Customer
+	 * @return	\IPS\nexus\Customer
 	 */
-	public function get_member() : Customer
+	public function get_member()
 	{
 		if ( $this->_member === NULL )
 		{
 			try
 			{
-				$this->_member = Customer::load( $this->_data['member'] );
+				$this->_member = \IPS\nexus\Customer::load( $this->_data['member'] );
 				
 				/* \IPS\nexus\Customer does not necessarily throw an OutOfRangeException if passed a value of 0 (a guest instance is valid) - throw one here so we can bubble up to get the correct information for guests. */
 				if ( !$this->_member->member_id )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException $e )
 			{
-				$this->_member = new Customer;
+				$this->_member = new \IPS\nexus\Customer;
 				
 				if ( $this->_data['member'] )
 				{
-					$this->_member->_data['cm_first_name'] = Member::loggedIn()->language()->addToStack('deleted_member');
+					$this->_member->_data['cm_first_name'] = \IPS\Member::loggedIn()->language()->addToStack('deleted_member');
 				}
 				elseif ( $this->guest_data )
 				{
@@ -283,15 +244,15 @@ class Invoice extends ActiveRecord
 	/**
 	 * Set member
 	 *
-	 * @param	Customer $member
+	 * @param	\IPS\Member
 	 * @return	void
 	 */
-	public function set_member( Customer $member ) : void
+	public function set_member( \IPS\Member $member )
 	{
 		$this->_data['member'] = (int) $member->member_id;
 		$this->_member = NULL;
 		
-		if ( !$this->currency and $member instanceof Customer)
+		if ( !$this->currency and $member instanceof \IPS\nexus\Customer )
 		{
 			$this->currency = $member->defaultCurrency();
 		}
@@ -300,19 +261,19 @@ class Invoice extends ActiveRecord
 	/**
 	 * @brief	Items iterator
 	 */
-	protected ?ItemsIterator $_itemsIterator = null;
+	protected $_itemsIterator;
 	
 	/**
 	 * @brief	Tracked
 	 */
-	protected array $_tracked = array();
+	protected $_tracked = array();
 	
 	/**
 	 * Get items
 	 *
-	 * @return	ItemsIterator
+	 * @return	array
 	 */
-	public function get_items() : ItemsIterator
+	public function get_items()
 	{
 		if ( $this->_itemsIterator === NULL )
 		{
@@ -323,7 +284,7 @@ class Invoice extends ActiveRecord
 				just create a dummy if so */
 			$itemsJson = array_filter( $itemsJson, function( $val )
 			{
-				return is_array( $val ) and isset( $val['act'] );
+				return \is_array( $val ) and isset( $val['act'] );
 			} );
 			if ( !$itemsJson and $this->total->amount->isGreaterThanZero() )
 			{
@@ -336,6 +297,7 @@ class Invoice extends ActiveRecord
 					'quantity'		=> 1,
 					'itemName'		=> $this->title,
 					'itemID'		=> NULL,
+					'physical'		=> FALSE,
 					'methods'		=> '*',
 					'cfields'		=> array(),
 					'extra'			=> NULL,
@@ -343,7 +305,7 @@ class Invoice extends ActiveRecord
 			}
 						
 			/* Return it */
-			$this->_itemsIterator = new ItemsIterator( $itemsJson );
+			$this->_itemsIterator = new \IPS\nexus\Invoice\ItemsIterator( $itemsJson );
 			$this->_itemsIterator->currency = $this->currency;
 		}
 
@@ -353,20 +315,20 @@ class Invoice extends ActiveRecord
 	/**
 	 * Get total
 	 *
-	 * @return    Money
+	 * @return	\IPS\nexus\Money
 	 */
-	public function get_total() : Money
+	public function get_total()
 	{
-		return new Money( $this->_data['total'], $this->currency );
+		return new \IPS\nexus\Money( $this->_data['total'], $this->currency );
 	}
 	
 	/**
 	 * Set total
 	 *
-	 * @param Money $total	The total
+	 * @param	\IPS\nexus\Money	$total	The total
 	 * @return	void
 	 */
-	public function set_total(Money $total ) : void
+	public function set_total( \IPS\nexus\Money $total )
 	{
 		$this->_data['total'] = $total->amount;
 	}
@@ -374,41 +336,41 @@ class Invoice extends ActiveRecord
 	/**
 	 * Get date
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_date() : DateTime
+	public function get_date()
 	{
-		return DateTime::ts( $this->_data['date'] );
+		return \IPS\DateTime::ts( $this->_data['date'] );
 	}
 	
 	/**
 	 * Set date
 	 *
-	 * @param	DateTime	$date	The invoice date
+	 * @param	\IPS\DateTime	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_date( DateTime $date ) : void
+	public function set_date( \IPS\DateTime $date )
 	{
 		$this->_data['date'] = $date->getTimestamp();
 	}
 	
 	/**
-	 * Get paid date
+	 * Get paid date date
 	 *
-	 * @return	DateTime|NULL
+	 * @return	\IPS\DateTime|NULL
 	 */
-	public function get_paid() : DateTime|null
+	public function get_paid()
 	{
-		return ( isset( $this->_data['paid'] ) and $this->_data['paid'] ) ? DateTime::ts( $this->_data['paid'] ) : NULL;
+		return ( isset( $this->_data['paid'] ) and $this->_data['paid'] ) ? \IPS\DateTime::ts( $this->_data['paid'] ) : NULL;
 	}
 	
 	/**
 	 * Set paid date
 	 *
-	 * @param	DateTime	$date	The invoice date
+	 * @param	\IPS\DateTime	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_paid( DateTime $date ) : void
+	public function set_paid( \IPS\DateTime $date )
 	{
 		$this->_data['paid'] = $date->getTimestamp();
 	}
@@ -416,19 +378,19 @@ class Invoice extends ActiveRecord
 	/**
 	 * Get return URI
 	 *
-	 * @return	Url|NULL
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function get_return_uri() : Url|null
+	public function get_return_uri()
 	{
-		return $this->_data['return_uri'] ? Url::internal( $this->_data['return_uri'] ) : NULL;
+		return $this->_data['return_uri'] ? \IPS\Http\Url::internal( $this->_data['return_uri'] ) : NULL;
 	}
 	
 	/**
 	 * Get status information
 	 *
-	 * @return	array
+	 * @return	mixed
 	 */
-	public function get_status_extra() : array
+	public function get_status_extra()
 	{
 		return json_decode( $this->_data['status_extra'], TRUE );
 	}
@@ -436,10 +398,10 @@ class Invoice extends ActiveRecord
 	/**
 	 * Set status information
 	 *
-	 * @param	array|null	$extra	The data
+	 * @param	mixed	$extra	The data
 	 * @return	void
 	 */
-	public function set_status_extra( ?array $extra ) : void
+	public function set_status_extra( $extra )
 	{
 		$this->_data['status_extra'] = json_encode( $extra );
 	}
@@ -449,7 +411,7 @@ class Invoice extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function get_renewal_ids() : array
+	public function get_renewal_ids()
 	{
 		return explode( ',', $this->_data['renewal_ids'] );
 	}
@@ -460,23 +422,63 @@ class Invoice extends ActiveRecord
 	 * @param	array	$ids	The IDs
 	 * @return	void
 	 */
-	public function set_renewal_ids( array $ids ) : void
+	public function set_renewal_ids( $ids )
 	{
-		$ids = array_unique( $ids );
+		array_unique( $ids );
 		$ids = array_filter( $ids );
 		$this->_data['renewal_ids'] = implode( ',', $ids );
 	}
-
+	
+	/**
+	 * Get shipping address
+	 *
+	 * @return	\IPS\GeoLocation|NULL
+	 */
+	public function get_shipaddress()
+	{
+		if ( !$this->hasPhysicalItems() )
+		{
+			return NULL;
+		}
+		
+		if ( isset( $this->_data['shipaddress'] ) and $this->_data['shipaddress'] )
+		{
+			return \IPS\GeoLocation::buildFromJson( $this->_data['shipaddress'] );
+		}
+		else
+		{
+			try
+			{
+				return \IPS\GeoLocation::buildFromJson( \IPS\Db::i()->select( 'address', 'nexus_customer_addresses', array( '`member`=? AND primary_shipping=1', $this->member->member_id ) )->first() );
+			}
+			catch ( \UnderflowException $e )
+			{
+				return NULL;
+			}
+		}		
+	}
+	
+	/**
+	 * Set shipping address
+	 *
+	 * @param	\IPS\GeoLocation	$shippingAddress	The shipping address
+	 * @return	void
+	 */
+	public function set_shipaddress( \IPS\GeoLocation $shippingAddress )
+	{
+		$this->_data['shipaddress'] = json_encode( $shippingAddress );
+	}
+	
 	/**
 	 * Get billing address
 	 *
-	 * @return	GeoLocation|NULL
+	 * @return	\IPS\GeoLocation|NULL
 	 */
-	public function get_billaddress() : GeoLocation|null
+	public function get_billaddress()
 	{
 		if ( isset( $this->_data['billaddress'] ) and $this->_data['billaddress'] )
 		{
-			return GeoLocation::buildFromJson( $this->_data['billaddress'] );
+			return \IPS\GeoLocation::buildFromJson( $this->_data['billaddress'] );
 		}
 		else
 		{
@@ -487,10 +489,10 @@ class Invoice extends ActiveRecord
 	/**
 	 * Set billing address
 	 *
-	 * @param	GeoLocation|null	$billingAddress	The billing address
+	 * @param	\IPS\GeoLocation	$billingAddress	The billing address
 	 * @return	void
 	 */
-	public function set_billaddress( ?GeoLocation $billingAddress = NULL ) : void
+	public function set_billaddress( \IPS\GeoLocation $billingAddress = NULL )
 	{
 		if ( $billingAddress )
 		{
@@ -507,9 +509,9 @@ class Invoice extends ActiveRecord
 	/**
 	 * Get guest data
 	 *
-	 * @return	array|null
+	 * @return	mixed
 	 */
-	public function get_guest_data() : array|null
+	public function get_guest_data()
 	{
 		return $this->_data['guest_data'] ? json_decode( $this->_data['guest_data'], TRUE ) : NULL;
 	}
@@ -517,13 +519,13 @@ class Invoice extends ActiveRecord
 	/**
 	 * Set guest data
 	 *
-	 * @param	array|null	$data	The data
+	 * @param	mixed	$data	The data
 	 * @return	void
 	 */
-	public function set_guest_data( ?array $data ) : void
+	public function set_guest_data( $data )
 	{
 		$this->_data['guest_data'] = $data ? json_encode( $data ) : NULL;
-        $this->_member = null;
+		$this->_member = null;
 	}
 	
 	/**
@@ -531,7 +533,7 @@ class Invoice extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function setDefaultTitle() : void
+	public function setDefaultTitle()
 	{
 		$titles = array();
 		foreach ( $this->items as $item )
@@ -551,9 +553,9 @@ class Invoice extends ActiveRecord
 	/**
 	 * Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{		
 		if ( !$this->title )
 		{
@@ -567,33 +569,24 @@ class Invoice extends ActiveRecord
 		}
 		else
 		{
-			/* Has the invoice status changed? */
-			$statusChanged = isset( $this->changed['status'] );
-
 			parent::save();
-
-			/* If the invoice status was changed, fire an event */
-			if( $statusChanged )
-			{
-				Event::fire( 'onStatusChange', $this, array( $this->status ) );
-			}
 		}						
 	}
 	
 	/**
 	 * Delete
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		File::unclaimAttachments( 'nexus_Purchases', NULL, NULL, "invoice-{$this->id}" );
+		\IPS\File::unclaimAttachments( 'nexus_Purchases', NULL, NULL, "invoice-{$this->id}" );
 		
 		parent::delete();
 		
-		foreach ($this->transactions( array( Transaction::STATUS_PENDING, Transaction::STATUS_WAITING, Transaction::STATUS_HELD, Transaction::STATUS_REVIEW, Transaction::STATUS_GATEWAY_PENDING ) ) as $transaction )
+		foreach ( $this->transactions( array( \IPS\nexus\Transaction::STATUS_PENDING, \IPS\nexus\Transaction::STATUS_WAITING, \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_REVIEW, \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING ) ) as $transaction )
 		{
-			if ( $transaction->status === Transaction::STATUS_PENDING )
+			if ( $transaction->status === \IPS\nexus\Transaction::STATUS_PENDING )
 			{
 				$transaction->delete();
 			}
@@ -603,12 +596,12 @@ class Invoice extends ActiveRecord
 				{
 					$transaction->method->void( $transaction );
 				}
-				catch ( Exception ){}
+				catch ( \Exception $e ){}
 				
 				$extra = $transaction->extra;
-				$extra['history'][] = array( 's' => Transaction::STATUS_REFUSED, 'on' => time(), 'note' => 'invoiceDeleted' );
+				$extra['history'][] = array( 's' => \IPS\nexus\Transaction::STATUS_REFUSED, 'on' => time(), 'note' => 'invoiceDeleted' );
 				$transaction->extra = $extra;
-				$transaction->status = Transaction::STATUS_REFUSED;
+				$transaction->status = \IPS\nexus\Transaction::STATUS_REFUSED;
 				$transaction->save();
 			}
 		}
@@ -619,31 +612,32 @@ class Invoice extends ActiveRecord
 	/**
 	 * Add item
 	 *
-	 * @param	Item	$item		The item
-	 * @param	int|NULL $cartKey	Our cart key for this item, or NULL. Used to make sure items are properly associated with their parents if not bought yet.
+	 * @param	\IPS\nexus\Invoice\Item	$item		The item
+	 * @array	int|NULL				$cartKey	Our cart key for this item, or NULL. Used to make sure items are properly associated with their parents if not bought yet.
 	 * @return	int
 	 */
-	public function addItem( Item $item, ?int $cartKey = NULL ) : int
+	public function addItem( \IPS\nexus\Invoice\Item $item, $cartKey = NULL )
 	{
 		/* Set basic data */
 		$data = array(
 			'act'			=> $item::$act,
-			'app'			=> $item::$application ?? $item->application,
-			'type'			=> $item::$type ?? $item->type,
+			'app'			=> isset( $item::$application ) ? $item::$application : $item->application,
+			'type'			=> isset( $item::$type ) ? $item::$type : $item->type,
 			'cost'			=> $item->price->amountAsString(),
-			'tax'			=> $item->tax?->id,
+			'tax'			=> $item->tax ? $item->tax->id : NULL,
 			'quantity'		=> $item->quantity,
 			'itemName'		=> $item->name,
-			'itemID'		=> $item->id ?? 0,
+			'itemID'		=> $item->id,
+			'physical'		=> FALSE,
 			'methods'		=> $item->paymentMethodIds ?: '*',
 			'cfields'		=> $item->details,
 			'extra'			=> $item->extra,
 		);
 		
 		/* Parent? */
-		if ( isset( $item->parent ) )
+		if ( isset( $item->parent ) and $item->parent !== NULL )
 		{			
-			if ( is_int( $item->parent ) )
+			if ( \is_int( $item->parent ) )
 			{
 				$data['assoc'] = $item->parent;
 				$data['assocBought'] = FALSE;
@@ -665,7 +659,7 @@ class Invoice extends ActiveRecord
 			$data['renew_cost'] = $item->renewalTerm->cost->amountAsString();
 			if ( $item->renewalTerm->gracePeriod )
 			{
-				$data['grace_period'] = DateTime::create()->add( $item->renewalTerm->gracePeriod )->getTimestamp() - time();
+				$data['grace_period'] = \IPS\DateTime::create()->add( $item->renewalTerm->gracePeriod )->getTimestamp() - time();
 			}
 		}
 		if ( isset( $item->initialInterval ) )
@@ -692,7 +686,18 @@ class Invoice extends ActiveRecord
 		{
 			$data['expires'] = $item->expireDate->getTimestamp();
 		}
-
+		
+		/* Physical? */
+		if ( $item->physical )
+		{
+			$data['physical'] = TRUE;
+			$data['shipping'] = $item->shippingMethodIds ?: '*';
+			$data['weight'] = $item->weight->kilograms;
+			$data['length'] = $item->length->metres;
+			$data['width'] = $item->width->metres;
+			$data['height'] = $item->height->metres;
+		}
+		
 		/* Pay to someone else? */
 		if ( $item->payTo )
 		{
@@ -727,7 +732,7 @@ class Invoice extends ActiveRecord
 		$this->_itemsIterator = NULL;
 		
 		/* Is it a renewal */
-		if ( $item instanceof Renewal )
+		if ( $item instanceof \IPS\nexus\Invoice\Item\Renewal )
 		{
 			$renewalIds = $this->renewal_ids;
 			$renewalIds[] = $item->id;
@@ -736,9 +741,6 @@ class Invoice extends ActiveRecord
 
 		/* Increase the total */
 		$this->recalculateTotal();
-
-		/* Fire an event */
-		Event::fire( 'onAddToInvoice', $item, [ $this ] );
 		
 		/* Return the ID */
 		return $id;
@@ -751,7 +753,7 @@ class Invoice extends ActiveRecord
 	 * @param	array	$data	Data to set
 	 * @return	void
 	 */
-	public function changeItem( int $index, array $data ) : void
+	public function changeItem( $index, $data )
 	{
 		$items = json_decode( $this->_data['items'], TRUE );
 		foreach ( $data as $k => $v )
@@ -768,7 +770,7 @@ class Invoice extends ActiveRecord
 	 * @param	int		$index	The index
 	 * @return	void
 	 */
-	public function removeItem( int $index ) : void
+	public function removeItem( $index )
 	{
 		$items = json_decode( $this->_data['items'], TRUE );
 		unset( $items[ $index ] );
@@ -782,7 +784,7 @@ class Invoice extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function recalculateTotal() : void
+	public function recalculateTotal()
 	{		
 		$summary = $this->summary();		
 		$this->total = $summary['total'];
@@ -793,50 +795,50 @@ class Invoice extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function summary() : array
+	public function summary()
 	{
 		$return = array();
 		$return['items'] = array();
-		$subtotal = new Number('0');
+		$shippingItems = array();
+		$subtotal = new \IPS\Math\Number('0');
 		$taxableAmounts = array();
-		$taxClasses = Tax::roots();
+		$taxClasses = \IPS\nexus\Tax::roots();
 				
 		/* Reduce taxable amount from coupons */
 		$couponTaxReductions = array();
-		$itemsAsArray = iterator_to_array( $this->items );
 		foreach ( $this->items as $itemId => $item )
 		{
-			if ( $item instanceof CouponDiscount )
+			if ( $item instanceof \IPS\nexus\extensions\nexus\Item\CouponDiscount )
 			{				
 				if ( isset( $item->extra['type'] ) )
 				{
 					if ( isset( $item->extra['items'] ) )
 					{
-						$itemCount = count( $item->extra['items'] );
+						$itemCount = \count( $item->extra['items'] );
 					}
 					else
 					{
 						$itemCount = 0;
-						foreach ( $itemsAsArray as $k => $_item ) // We have to clone because $items is an iterator, and we're already looping them, but we need a separate loop
+						foreach ( clone $this->items as $k => $_item ) // We have to clone because $items is an iterator, and we're already looping them, but we need a separate loop
 						{
-							if ( $_item != $item and !( $_item instanceof CouponDiscount ) )
+							if ( $_item != $item and !( $_item instanceof \IPS\nexus\extensions\nexus\Item\ShippingCharge ) and !( $_item instanceof \IPS\nexus\extensions\nexus\Item\CouponDiscount ) )
 							{
 								$itemCount++;
 							}
 						}
 					}
 					
-					foreach ( $itemsAsArray as $k => $_item ) // We have to clone because $items is an iterator, and we're already looping them, but we need a separate loop
+					foreach ( clone $this->items as $k => $_item ) // We have to clone because $items is an iterator, and we're already looping them, but we need a separate loop
 					{
-						if ( $_item != $item and !( $_item instanceof CouponDiscount ) and ( !isset( $item->extra['items'] ) or in_array( $k, $item->extra['items'] ) ) )
+						if ( $_item != $item and !( $_item instanceof \IPS\nexus\extensions\nexus\Item\CouponDiscount ) and !( $_item instanceof \IPS\nexus\extensions\nexus\Item\ShippingCharge ) and ( !isset( $item->extra['items'] ) or \in_array( $k, $item->extra['items'] ) ) )
 						{
 							if ( $item->extra['type'] == 'p' )
 							{
-								$reductionAmount = $_item->linePrice()->amount->multiply( new Number("{$item->extra['value']}") )->divide( new Number('100') );
+								$reductionAmount = $_item->linePrice()->amount->multiply( new \IPS\Math\Number("{$item->extra['value']}") )->divide( new \IPS\Math\Number('100') );
 							}
 							else
 							{
-								$reductionAmount = ( new Number( "{$item->extra['value']}" ) )->divide( new Number( "{$itemCount}" ) )->multiply( new Number( '-1' ) );
+								$reductionAmount = ( new \IPS\Math\Number( "{$item->extra['value']}" ) )->divide( new \IPS\Math\Number( "{$itemCount}" ) )->multiply( new \IPS\Math\Number( '-1' ) );
 							}
 							
 							if ( isset( $couponTaxReductions[ $k ] ) )
@@ -856,58 +858,89 @@ class Invoice extends ActiveRecord
 		/* Work out the line totals */
 		foreach ( $this->items as $k => $item )
 		{
-			$subtotal = $subtotal->add( $item->linePrice()->amount );
-
+			if ( $item instanceof \IPS\nexus\extensions\nexus\Item\ShippingCharge )
+			{
+				$shippingItems[ $k ] = $item;
+			}
+			else
+			{
+				$subtotal = $subtotal->add( $item->linePrice()->amount );
+								
+				if ( isset( $item->tax ) )
+				{
+					$taxAmount = $item->linePrice()->amount;
+										
+					if ( isset( $couponTaxReductions[ $k ] ) )
+					{
+						$taxAmount = $taxAmount->subtract( $couponTaxReductions[ $k ] );
+					}
+					
+					if ( isset( $taxableAmounts[ $item->tax->id ] ) )
+					{
+						$taxableAmounts[ $item->tax->id ] = $taxableAmounts[ $item->tax->id ]->add( $taxAmount );
+					}
+					else
+					{
+						$taxableAmounts[ $item->tax->id ] = $taxAmount;
+					}
+				}		
+				
+				$return['items'][ $k ] = $item;
+			}
+		}
+		
+		/* Subtotal (subtotal is caulculated BEFORE shipping is added) */
+		$return['subtotal'] = new \IPS\nexus\Money( $subtotal, $this->currency );
+		
+		/* Add shipping */
+		$return['shipping'] = array();
+		$shipping = new \IPS\Math\Number('0');
+		foreach ( $shippingItems as $k => $item )
+		{
+			$linePrice = $item->linePrice()->amount;
+			$shipping = $shipping->add( $linePrice );
+			
 			if ( isset( $item->tax ) )
 			{
-				$taxAmount = $item->linePrice()->amount;
-
-				if ( isset( $couponTaxReductions[ $k ] ) )
-				{
-					$taxAmount = $taxAmount->subtract( $couponTaxReductions[ $k ] );
-				}
-
 				if ( isset( $taxableAmounts[ $item->tax->id ] ) )
 				{
-					$taxableAmounts[ $item->tax->id ] = $taxableAmounts[ $item->tax->id ]->add( $taxAmount );
+					$taxableAmounts[ $item->tax->id ] = $taxableAmounts[ $item->tax->id ]->add( $linePrice );
 				}
 				else
 				{
-					$taxableAmounts[ $item->tax->id ] = $taxAmount;
+					$taxableAmounts[ $item->tax->id ] = $linePrice;
 				}
 			}
-
-			$return['items'][ $k ] = $item;
+			
+			$return['shipping'][ $k ] = $item;
 		}
-		
-		/* Subtotal (subtotal is caulculated BEFORE tax is added) */
-		$return['subtotal'] = new Money( $subtotal, $this->currency );
+		$return['shippingTotal'] = new \IPS\nexus\Money( $shipping, $this->currency );
 
 		/* Now work out the tax */
 		$return['tax'] = array();
-		$tax = new Number('0');
+		$tax = new \IPS\Math\Number('0');
 		foreach ( $taxableAmounts as $taxId => $amount )
 		{
 			$rate = $taxClasses[ $taxId ]->rate( $this->billaddress );
-			$amount = $amount->multiply( new Number( $rate ) );
+			$amount = $amount->multiply( new \IPS\Math\Number( $rate ) );
 			
-			$amount = new Money( $amount, $this->currency );
+			$amount = new \IPS\nexus\Money( $amount, $this->currency );
 			
 			$return['tax'][ $taxId ] = array( 'name' => '', 'rate' => $rate, 'amount' => $amount, 'type' => $taxClasses[ $taxId ]->type ); // "name" is no longer used. It is definef here only to not break custom themes. Get the title from the ID instead.
 			$tax = $tax->add( $amount->amount );
 		}
-		$return['taxTotal'] = new Money( $tax, $this->currency );
+		$return['taxTotal'] = new \IPS\nexus\Money( $tax, $this->currency );
 
 		/* Discounts applied */
-		$discount = new Number( '0' );
+		$discount = new \IPS\Math\Number( '0' );
 		foreach( $couponTaxReductions as $itemId => $amount )
 		{
 			$discount = $discount->add( $amount );
 		}
-		$return['discount'] = new Money( $discount, $this->currency );
+		$return['discount'] = new \IPS\nexus\Money( $discount, $this->currency );
 		
 		/* Add it all together */		
-		$return['total'] = new Money( $subtotal->add( $tax ), $this->currency );
+		$return['total'] = new \IPS\nexus\Money( $subtotal->add( $shipping )->add( $tax ), $this->currency );
 		
 		return $return;			
 	}
@@ -919,7 +952,7 @@ class Invoice extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public function hasItemsRequiringBillingAddress() : bool
+	public function hasItemsRequiringBillingAddress()
 	{
 		foreach ( $this->items as $item )
 		{
@@ -933,11 +966,29 @@ class Invoice extends ActiveRecord
 	}
 	
 	/**
+	 * Does the invoice contain physical items that need shipping?
+	 *
+	 * @return	bool
+	 */
+	public function hasPhysicalItems()
+	{
+		foreach ( $this->items as $item )
+		{
+			if ( $item->physical )
+			{
+				return TRUE;
+			}
+		}
+		
+		return FALSE;
+	}
+	
+	/**
 	 * Requires login?
 	 *
 	 * @return	bool
 	 */
-	public function requiresLogin() : bool
+	public function requiresLogin()
 	{
 		foreach ( $this->items as $item )
 		{
@@ -955,7 +1006,7 @@ class Invoice extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function payToRecipients() : array
+	public function payToRecipients()
 	{
 		$recipients = array();
 		
@@ -965,7 +1016,7 @@ class Invoice extends ActiveRecord
 			{
 				if ( !isset( $recipients[ $item->payTo->member_id ] ) )
 				{
-					$recipients[ $item->payTo->member_id ] = new Number('0');
+					$recipients[ $item->payTo->member_id ] = new \IPS\Math\Number('0');
 				}
 				$itemRecipientAmounts = $item->recipientAmounts();
 				$recipients[ $item->payTo->member_id ] = $recipients[ $item->payTo->member_id ]->add( $itemRecipientAmounts['recipient_final']->amount );
@@ -978,43 +1029,42 @@ class Invoice extends ActiveRecord
 	/**
 	 * Get the commission information
 	 *
-	 * @param	Number	$amountReceived	The amount the invoice is for, minus amounts being given to other recipients
+	 * @param	\IPS\Math\Number	$amountReceived	The amount the invoice is for, minus amounts being given to other recipients
 	 * @return	array( 'rule' => \IPS\nexus\CommissionRule, 'referrer' => \IPS\nexus\Customer, 'amount' => \IPS\nexus\Money )
 	 */
-	public function commission( Number $amountReceived ) : array
+	public function commission( \IPS\Math\Number $amountReceived )
 	{
 		if ( !isset( $this->status_extra['commissionrule'] ) )
 		{		
 			try
 			{
 				/* Get the referrer */
-				/* @var Member $referrer */
-				$referrer = Member::load( Db::i()->select( 'referred_by', 'core_referrals', array( 'member_id=?', $this->member->member_id ) )->first() );
-				if ( !$referrer->member_id or $referrer->inGroup( explode( ',', Settings::i()->nexus_no_commission ) ) )
+				$referrer = \IPS\Member::load( \IPS\Db::i()->select( 'referred_by', 'core_referrals', array( 'member_id=?', $this->member->member_id ) )->first() );
+				if ( !$referrer->member_id or $referrer->inGroup( explode( ',', \IPS\Settings::i()->nexus_no_commission ) ) )
 				{
-					throw new UnderflowException;
+					throw new \UnderflowException;
 				}
 				
 				/* Get pertinent values */
-				$byNumber  = Db::i()->select( 'COUNT( i_id )', 'nexus_invoices', array( "i_member=? AND i_status=?", $referrer->member_id, static::STATUS_PAID ) )->first();
-				$byAmounts  = iterator_to_array( Db::i()->select( 'i_currency, SUM( i_total ) as value', 'nexus_invoices', array( "i_member=? AND i_status=?", $referrer->member_id, static::STATUS_PAID ), NULL, NULL, 'i_currency' )->setKeyField( 'i_currency' )->setValueField( 'value' ) );
-				$forNumber  = Db::i()->select( 'COUNT( i_id )', 'nexus_invoices', array( "i_member=? AND i_status=?", $this->member->member_id, static::STATUS_PAID ) )->first();
-				$forAmounts  = iterator_to_array( Db::i()->select( 'i_currency, SUM( i_total ) as value', 'nexus_invoices', array( "i_member=? AND i_status=?", $this->member->member_id, static::STATUS_PAID ), NULL, NULL, 'i_currency' )->setKeyField( 'i_currency' )->setValueField( 'value' ) );
+				$byNumber  = \IPS\Db::i()->select( 'COUNT( i_id )', 'nexus_invoices', array( "i_member=? AND i_status=?", $referrer->member_id, static::STATUS_PAID ) )->first();
+				$byAmounts  = iterator_to_array( \IPS\Db::i()->select( 'i_currency, SUM( i_total ) as value', 'nexus_invoices', array( "i_member=? AND i_status=?", $referrer->member_id, static::STATUS_PAID ), NULL, NULL, 'i_currency' )->setKeyField( 'i_currency' )->setValueField( 'value' ) );
+				$forNumber  = \IPS\Db::i()->select( 'COUNT( i_id )', 'nexus_invoices', array( "i_member=? AND i_status=?", $this->member->member_id, static::STATUS_PAID ) )->first();
+				$forAmounts  = iterator_to_array( \IPS\Db::i()->select( 'i_currency, SUM( i_total ) as value', 'nexus_invoices', array( "i_member=? AND i_status=?", $this->member->member_id, static::STATUS_PAID ), NULL, NULL, 'i_currency' )->setKeyField( 'i_currency' )->setValueField( 'value' ) );
 	
 				/* Loop the rules to find out the best one */
-				$maxAmount = new Number('0');
+				$maxAmount = new \IPS\Math\Number('0');
 				$actingRule = NULL;
-				foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_referral_rules', array( array( "rrule_by_group='*' OR " . Db::i()->findInSet( 'rrule_by_group', $referrer->groups ) ), array( "rrule_for_group='*' OR " . Db::i()->findInSet( 'rrule_for_group', $this->member->groups ) ) ) ), 'IPS\nexus\CommissionRule' ) as $commissionRule )
+				foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_referral_rules', array( array( "rrule_by_group='*' OR " . \IPS\Db::i()->findInSet( 'rrule_by_group', $referrer->groups ) ), array( "rrule_for_group='*' OR " . \IPS\Db::i()->findInSet( 'rrule_for_group', $this->member->groups ) ) ) ), 'IPS\nexus\CommissionRule' ) as $commissionRule )
 				{
 					/* Before we go nuts, don't bother if it's not going to give us more commission */
 					if ( $amountReceived->percentage( $commissionRule->commission )->compare( $maxAmount ) === -1 )
 					{
 						continue;
 					}
-					if ( $commissionRule->commission_limit and $commissionRule->commission_limit != '*' )
+					if ( $commissionRule->commission_limit )
 					{
 						$commisionLimit = json_decode( $commissionRule->commission_limit, TRUE );
-						if ( isset( $commisionLimit[ $this->currency ] ) and ( new Number( number_format( $commisionLimit[ $this->currency ]['amount'], Money::numberOfDecimalsForCurrency( $this->currency ), '.', '' ) ) )->compare( $maxAmount ) === -1 )
+						if ( isset( $commisionLimit[ $this->currency ] ) and ( new \IPS\Math\Number( number_format( $commisionLimit[ $this->currency ]['amount'], \IPS\nexus\Money::numberOfDecimalsForCurrency( $this->currency ), '.', '' ) ) )->compare( $maxAmount ) === -1 )
 						{
 							continue;
 						}
@@ -1069,46 +1119,40 @@ class Invoice extends ActiveRecord
 					{
 						if ( $commissionRule->purchase_package_limit )
 						{
-							$amountToApplyCommissionOn = new Number('0');
+							$amountToApplyCommissionOn = new \IPS\Math\Number('0');
 						}
 												
 						$itemsToCount = array();
 						foreach ( $this->items as $k => $item )
 						{
-							$itemType = null;
-							$packageId = null;
-
 							/* What's the package ID? */
-							if( $item->isValid( $commissionRule->purchase_packages, $this, $this->member ) )
+							if ( $item instanceof \IPS\nexus\extensions\nexus\Item\Package )
 							{
-								$itemType = $item::$title;
 								$packageId = $item->id;
 							}
-							elseif ( $commissionRule->purchase_renewal and $item instanceof Renewal and $item->isValid( $commissionRule->purchase_packages, $this, $this->member ) )
+							elseif ( $commissionRule->purchase_renewal and $item instanceof \IPS\nexus\Invoice\Item\Renewal and $item->appKey == 'nexus' and $item->typeKey == 'package' )
 							{
 								try
 								{
-									$packageId = $item->getPurchase()->item_id;
-									$itemType = $item->getPurchaseExtension()::$title;
+									$packageId = \IPS\nexus\Purchase::load( $item->id )->item_id;
 								}
-								catch ( OutOfRangeException ) { }
+								catch ( \OutOfRangeException $e ) { }
 							}
-
-							if ( !$packageId )
+													
+							/* Is it in our list? */
+							if ( !$packageId or !\in_array( $packageId, explode( ',', $commissionRule->purchase_packages ) ) )
 							{
 								continue;
 							}
 							
 							/* Add it to the list */
-							if( !isset( $itemsToCount[ $itemType ] ) )
+							if ( $packageId )
 							{
-								$itemsToCount[ $itemType ] = [];
+								$itemsToCount[ $k ] = $packageId;
 							}
-							$itemsToCount[ $itemType ][ $k ] = $packageId;
-
 							if ( $commissionRule->purchase_package_limit )
 							{
-								$amountToApplyCommissionOn = $amountToApplyCommissionOn->add( $item->price->amount->multiply( new Number( "{$item->quantity}" ) ) );
+								$amountToApplyCommissionOn = $amountToApplyCommissionOn->add( $item->price->amount->multiply( new \IPS\Math\Number( "{$item->quantity}" ) ) );
 							}
 						}
 						
@@ -1122,10 +1166,9 @@ class Invoice extends ActiveRecord
 						}
 						else
 						{
-							foreach( $commissionRule->purchase_packages as $itemType => $items )
+							foreach ( explode( ',', $commissionRule->purchase_packages ) as $pid )
 							{
-								$missing = array_diff( $items, ( $itemsToCount[ $itemType ] ?? [] ) );
-								if( count( $missing ) )
+								if ( !\in_array( $pid, $itemsToCount ) )
 								{
 									continue 2;
 								}
@@ -1138,9 +1181,9 @@ class Invoice extends ActiveRecord
 					if ( $commissionRule->commission_limit and $commissionRule->commission_limit != '*' )
 					{
 						$limit = json_decode( $commissionRule->commission_limit, TRUE );
-						if ( isset( $limit[ $this->currency ] ) and $amountToGive->compare( new Number( number_format( $limit[ $this->currency ]['amount'], Money::numberOfDecimalsForCurrency( $this->currency ), '.', '' ) ) ) === 1 )
+						if ( isset( $limit[ $this->currency ] ) and $amountToGive->compare( new \IPS\Math\Number( number_format( $limit[ $this->currency ]['amount'], \IPS\nexus\Money::numberOfDecimalsForCurrency( $this->currency ), '.', '' ) ) ) === 1 )
 						{
-							$amountToGive = new Number( number_format( $limit[ $this->currency ]['amount'], Money::numberOfDecimalsForCurrency( $this->currency ), '.', '' ) );
+							$amountToGive = new \IPS\Math\Number( number_format( $limit[ $this->currency ]['amount'], \IPS\nexus\Money::numberOfDecimalsForCurrency( $this->currency ), '.', '' ) );
 						}
 					}
 					
@@ -1159,7 +1202,7 @@ class Invoice extends ActiveRecord
 				$extra['commissionamount'] = $maxAmount;
 				$this->status_extra = $extra;
 			}
-			catch ( UnderflowException )
+			catch ( \UnderflowException $e )
 			{
 				$extra = $this->status_extra;
 				$extra['commissionrule'] = 0;
@@ -1174,12 +1217,12 @@ class Invoice extends ActiveRecord
 		try
 		{
 			return array(
-				'rule'		=> $this->status_extra['commissionrule'] ? CommissionRule::load( $this->status_extra['commissionrule'] ) : NULL,
-				'referrer'	=> $this->status_extra['commissionref'] ? Customer::load( $this->status_extra['commissionref'] ) : NULL,
-				'amount'	=> $this->status_extra['commissionamount'] ? new Money( $this->status_extra['commissionamount'], $this->currency ) : NULL
+				'rule'		=> $this->status_extra['commissionrule'] ? \IPS\nexus\CommissionRule::load( $this->status_extra['commissionrule'] ) : NULL,
+				'referrer'	=> $this->status_extra['commissionref'] ? \IPS\nexus\Customer::load( $this->status_extra['commissionref'] ) : NULL,
+				'amount'	=> $this->status_extra['commissionamount'] ? new \IPS\nexus\Money( $this->status_extra['commissionamount'], $this->currency ) : NULL
 			);
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
 			/* If either the commission rule, or the commission ref, are no longer valid, then let's try again and see if it matches up with a different one. */
 			$extra = $this->status_extra;
@@ -1195,26 +1238,26 @@ class Invoice extends ActiveRecord
 	/**
 	 * Check condition
 	 *
-	 * @param	int|Number	$a			First parameter
+	 * @param	float	$a			First parameter
 	 * @param	string	$operator	Operator (g = greater than, e = equal to, l = less than)
-	 * @param	int|Number	$b			Second parameter
+	 * @param	float	$b			Second parameter
 	 * @return	bool
 	 */
-	protected function _checkCondition( int|Number $a, string $operator, int|Number $b ) : bool
+	protected function _checkCondition( $a, $operator, $b )
 	{
-		if ( $a instanceof Number and !( $b instanceof Number ) )
+		if ( $a instanceof \IPS\Math\Number and !( $b instanceof \IPS\Math\Number ) )
 		{
-			$b = new Number( "{$b}" );
+			$b = new \IPS\Math\Number( "{$b}" );
 		}
-		if ( !( $a instanceof Number ) and $b instanceof Number )
+		if ( !( $a instanceof \IPS\Math\Number ) and $b instanceof \IPS\Math\Number )
 		{
-			$a = new Number( "{$a}" );
+			$a = new \IPS\Math\Number( "{$a}" );
 		}
 		
 		switch ( $operator )
 		{
 			case 'g':
-				if ( $a instanceof Number )
+				if ( $a instanceof \IPS\Math\Number )
 				{
 					return $a->compare( $b ) === 1;
 				}
@@ -1223,7 +1266,7 @@ class Invoice extends ActiveRecord
 					return $a > $b;
 				}
 			case 'e':
-				if ( $a instanceof Number )
+				if ( $a instanceof \IPS\Math\Number )
 				{
 					return $a->compare( $b ) === 0;
 				}
@@ -1232,7 +1275,7 @@ class Invoice extends ActiveRecord
 					return $a == $b;
 				}
 			case 'l':
-				if ( $a instanceof Number )
+				if ( $a instanceof \IPS\Math\Number )
 				{
 					return $a->compare( $b ) === 11;
 				}
@@ -1247,19 +1290,18 @@ class Invoice extends ActiveRecord
 	/**
 	 * Get amount left to pay
 	 *
-	 * @param bool $deductHeldTransactions
-	 * @return    Money
+	 * @return	\IPS\nexus\Money
 	 */
-	public function amountToPay( bool $deductHeldTransactions=FALSE ) : Money
+	public function amountToPay( $deductHeldTransactions=FALSE )
 	{
 		$amountToPay = $this->total;
 		
-		$statuses = array( Transaction::STATUS_PAID, Transaction::STATUS_PART_REFUNDED );
+		$statuses = array( \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_PART_REFUNDED );
 		if ( $deductHeldTransactions )
 		{
-			$statuses[] = Transaction::STATUS_HELD;
-			$statuses[] = Transaction::STATUS_REVIEW;
-			$statuses[] = Transaction::STATUS_GATEWAY_PENDING;
+			$statuses[] = \IPS\nexus\Transaction::STATUS_HELD;
+			$statuses[] = \IPS\nexus\Transaction::STATUS_REVIEW;
+			$statuses[] = \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING;
 		}
 		
 		foreach ( $this->transactions( $statuses ) as $transaction )
@@ -1267,7 +1309,7 @@ class Invoice extends ActiveRecord
 			if ( $transaction->currency === $this->currency )
 			{
 				$amountToSubtract = $transaction->amount->amount;
-				if ( $transaction->status === Transaction::STATUS_PART_REFUNDED )
+				if ( $transaction->status === \IPS\nexus\Transaction::STATUS_PART_REFUNDED )
 				{
 					$amountToSubtract = $amountToSubtract->subtract( $transaction->partial_refund->amount );
 					$amountToSubtract = $amountToSubtract->subtract( $transaction->credit->amount );
@@ -1286,12 +1328,12 @@ class Invoice extends ActiveRecord
 	 * @param	string	$ref	Referer
 	 * @return	array
 	 */
-	public function buttons( string $ref='v' ) : array
+	public function buttons( $ref='v' )
 	{
 		$url = $this->acpUrl()->setQueryString( 'r', $ref );
 		$return = array();
 		
-		if ( $this->status !== static::STATUS_PAID and ( $this->member->member_id or $this->guest_data ) and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_add' ) )
+		if ( $this->status !== \IPS\nexus\Invoice::STATUS_PAID and ( $this->member->member_id or $this->guest_data ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_add' ) )
 		{
 			$return['edit'] = array(
 				'title'		=> 'edit',
@@ -1300,18 +1342,18 @@ class Invoice extends ActiveRecord
 			);
 		}
 		
-		if ( $this->status === static::STATUS_PENDING and ( $this->member->member_id or $this->guest_data ) )
+		if ( $this->status === \IPS\nexus\Invoice::STATUS_PENDING and ( $this->member->member_id or $this->guest_data ) )
 		{
-			if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_edit' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_edit' ) )
 			{
 				$return['paid'] = array(
 					'title'		=> 'invoice_mark_paid',
 					'icon'		=> 'check',
 					'link'		=> $url->setQueryString( 'do', 'paid' )->csrf(),
-					'data'		=> count( $this->transactions( array( Transaction::STATUS_PENDING, Transaction::STATUS_WAITING, Transaction::STATUS_HELD, Transaction::STATUS_REVIEW, Transaction::STATUS_GATEWAY_PENDING ) ) ) ? array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('invoice_mark_paid') ) : array( 'confirm' => '' )
+					'data'		=> \count( $this->transactions( array( \IPS\nexus\Transaction::STATUS_PENDING, \IPS\nexus\Transaction::STATUS_WAITING, \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_REVIEW, \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING ) ) ) ? array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('invoice_mark_paid') ) : array( 'confirm' => '' )
 				);
 			}
-			if ( count( Gateway::manualChargeGateways( $this->member ) ) and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'chargetocard' ) )
+			if ( \count( \IPS\nexus\Gateway::manualChargeGateways( $this->member ) ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'chargetocard' ) )
 			{
 				$return['card'] = array(
 					'title'		=> 'invoice_charge_to_card',
@@ -1319,17 +1361,17 @@ class Invoice extends ActiveRecord
 					'link'		=> $url->setQueryString( array( 'do' => 'card', '_new' => 1 ) ),
 				);
 			}
-			if ( isset( $this->member->cm_credits[ $this->currency ] ) and $this->member->cm_credits[ $this->currency ]->amount->isGreaterThanZero() and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_edit' ) )
+			if ( isset( $this->member->cm_credits[ $this->currency ] ) and $this->member->cm_credits[ $this->currency ]->amount->isGreaterThanZero() and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_edit' ) )
 			{
 				$return['credit'] = array(
 					'title'		=> 'invoice_charge_to_credit',
 					'icon'		=> 'money',
 					'link'		=> $url->setQueryString( 'do', 'credit' ),
-					'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('invoice_charge_to_credit') )
+					'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('invoice_charge_to_credit') )
 				);
 			}
 		}
-		if ( $this->status !== static::STATUS_PAID and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_resend' ) )
+		if ( $this->status !== \IPS\nexus\Invoice::STATUS_PAID and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_resend' ) )
 		{
 			$return['resend'] = array(
 				'title'		=> 'invoice_reissue',
@@ -1337,13 +1379,13 @@ class Invoice extends ActiveRecord
 				'link'		=> $url->setQueryString( 'do', 'resend' )->csrf(),
 				'data'		=> array(
 					'confirm'			=> '',
-					'confirmSubMessage'	=> Member::loggedIn()->language()->addToStack('invoice_reissue_confirm'),
+					'confirmSubMessage'	=> \IPS\Member::loggedIn()->language()->addToStack('invoice_reissue_confirm'),
 					'confirmType'		=> 'verify',
 					'confirmIcon'		=> 'question',
 					'confirmButtons'	=> json_encode( array(
-						'yes'				=>	Member::loggedIn()->language()->addToStack('invoice_reissue_yes'),
-						'no'				=>	Member::loggedIn()->language()->addToStack('invoice_reissue_no'),
-						'cancel'			=>	Member::loggedIn()->language()->addToStack('cancel'),
+						'yes'				=>	\IPS\Member::loggedIn()->language()->addToStack('invoice_reissue_yes'),
+						'no'				=>	\IPS\Member::loggedIn()->language()->addToStack('invoice_reissue_no'),
+						'cancel'			=>	\IPS\Member::loggedIn()->language()->addToStack('cancel'),
 					) )
 				)
 			);
@@ -1363,22 +1405,22 @@ class Invoice extends ActiveRecord
 			'data'		=> array( 'confirm' => '' )
 		);
 		
-		if ( $this->status !== static::STATUS_CANCELED and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_edit' ) )
+		if ( $this->status !== \IPS\nexus\Invoice::STATUS_CANCELED and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_edit' ) )
 		{
 			$return['unpaid'] = array(
-				'title'		=> $this->status === static::STATUS_PAID ? 'invoice_mark_unpaid' : 'cancel',
+				'title'		=> $this->status === \IPS\nexus\Invoice::STATUS_PAID ? 'invoice_mark_unpaid' : 'cancel',
 				'icon'		=> 'times',
 				'link'		=> $url->setQueryString( 'do', 'unpaid' ),
-				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('cancel') )
+				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('cancel') )
 			);
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_delete' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_delete' ) )
 		{
 			$return['delete'] = array(
 				'title'		=> 'delete',
 				'icon'		=> 'times-circle',
 				'link'		=> $url->setQueryString( 'do', 'delete' )->csrf()->getSafeUrlFromFilters(),
-				'data'		=> array( 'confirm' => '', 'confirmSubMessage' => Member::loggedIn()->language()->addToStack('invoice_delete_warning') )
+				'data'		=> array( 'confirm' => '', 'confirmSubMessage' => \IPS\Member::loggedIn()->language()->addToStack('invoice_delete_warning') )
 			);
 		}
 		
@@ -1388,18 +1430,18 @@ class Invoice extends ActiveRecord
 	/**
 	 * Can payment be split? Returns the minnimum split amount
 	 *
-	 * @return	mixed
+	 * @return	FALSE|float
 	 */
-	public function canSplitPayment() : mixed
+	public function canSplitPayment()
 	{
-		if ( Settings::i()->nexus_split_payments == -1 )
+		if ( \IPS\Settings::i()->nexus_split_payments == -1 )
 		{
 			return FALSE;
 		}
 				
-		if ( Settings::i()->nexus_split_payments )
+		if ( \IPS\Settings::i()->nexus_split_payments )
 		{
-			$decoded = json_decode( Settings::i()->nexus_split_payments, TRUE );
+			$decoded = json_decode( \IPS\Settings::i()->nexus_split_payments, TRUE );
 			if ( isset( $decoded[ $this->currency ] ) )
 			{
 				if ( $decoded[ $this->currency ]['amount'] <= $this->amountToPay()->amount )
@@ -1418,7 +1460,7 @@ class Invoice extends ActiveRecord
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	int									id				ID number
 	 * @apiresponse	string								title			Title
@@ -1427,27 +1469,31 @@ class Invoice extends ActiveRecord
 	 * @apiresponse	datetime							paidDate		The date the invoice was paid	
 	 * @apiresponse	\IPS\nexus\Customer					customer		Customer
 	 * @apiresponse	[\IPS\nexus\Invoice\Item]			items			Items
-	 * @apiresponse	\IPS\nexus\Money					subTotal		Subtotal of item costs
+	 * @apiresponse	\IPS\nexus\Money					subTotal		Subtotal of item costs		
+	 * @apiresponse	[\IPS\nexus\Invoice\Item]			shippingCharges	Shipping charges
+	 * @apiresponse	\IPS\nexus\Money					shippingTotal	Total cost of shipping charges
 	 * @apiresponse	[\IPS\nexus\Invoice\Item\TaxItem]	tax				Tax charges
 	 * @apiresponse	\IPS\nexus\Money					taxTotal		Total cost of tax charges
 	 * @apiresponse	\IPS\nexus\Money					total			Total
 	 * @apiresponse	\IPS\nexus\Money					outstanding		The outstanding amount to be paid
 	 * @apiresponse	\IPS\GeoLocation					billingAddress	Billing address
+	 * @apiresponse	\IPS\GeoLocation					shippingAddress	Shipping Address
 	 * @apiresponse	string								poNumber		PO Number (set by customer)
 	 * @apiresponse	string								notes			Notes (set by customer)
 	 * @apiresponse	[\IPS\nexus\Transaction]			transactions	Transactions against this invoice
+	 * @apiresponse	[\IPS\nexus\Shipping\Order]			shipments		Shipments generated from this invoice (if paid)
 	 * @apiresponse	[\IPS\nexus\Purchase]				purchases		Purchases generated from this invoice (if paid)
 	 * @apiresponse	string								viewUrl			The URL to where the customer can view this invoice
 	 * @apiresponse	string								checkoutUrl		The URL to where the customer can pay this invoice
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		$summary = $this->summary();
 		
 		$tax = array();
 		foreach ( $summary['tax'] as $classId => $data )
 		{
-			$tax[] = ( new TaxItem( $classId, $data ) )->apiOutput( $authorizedMember );
+			$tax[] = ( new \IPS\nexus\Invoice\Item\TaxItem( $classId, $data ) )->apiOutput( $authorizedMember );
 		}
 		
 		return array(
@@ -1455,22 +1501,30 @@ class Invoice extends ActiveRecord
 			'title'				=> $this->title,
 			'status'			=> $this->status,
 			'issueDate'			=> $this->date->rfc3339(),
-			'paidDate'			=> $this->paid?->rfc3339(),
+			'paidDate'			=> $this->paid ? $this->paid->rfc3339() : null,
 			'customer'			=> $this->member->apiOutput( $authorizedMember ),
 			'items'				=> array_map( function( $item ) use ( $authorizedMember ) {
 				return $item->apiOutput( $authorizedMember );
 			}, $summary['items'] ),
 			'subTotal'			=> $summary['subtotal']->apiOutput( $authorizedMember ),
+			'shippingCharges'	=> array_map( function( $item ) use ( $authorizedMember ) {
+				return $item->apiOutput( $authorizedMember );
+			}, $summary['shipping'] ),
+			'shippingTotal'		=> $summary['shippingTotal']->apiOutput( $authorizedMember ),
 			'tax'				=> $tax,
 			'taxTotal'			=> $summary['taxTotal']->apiOutput( $authorizedMember ),
 			'total'				=> $summary['total']->apiOutput( $authorizedMember ),
 			'outstanding'		=> $this->amountToPay()->apiOutput( $authorizedMember ),
-			'billingAddress'	=> $this->billaddress?->apiOutput($authorizedMember),
+			'billingAddress'	=> $this->billaddress ? $this->billaddress->apiOutput( $authorizedMember ) : null,
+			'shippingAddress'	=> $this->shipaddress ? $this->shipaddress->apiOutput( $authorizedMember ) : null,
 			'poNumber'			=> $this->po,
 			'notes'				=> $this->notes,
 			'transactions'		=> array_map( function( $transaction ) use ( $authorizedMember ) {
 				return $transaction->apiOutput( $authorizedMember );
 			}, iterator_to_array( $this->transactions() ) ),
+			'shipments'			=> array_map( function( $shipment ) use ( $authorizedMember ) {
+				return $shipment->apiOutput( $authorizedMember );
+			}, iterator_to_array( $this->shipments() ) ),
 			'purchases'			=> array_map( function( $purchase ) use ( $authorizedMember ) {
 				return $purchase->apiOutput( $authorizedMember );
 			}, iterator_to_array( $this->purchasesCreated() ) ),
@@ -1486,27 +1540,45 @@ class Invoice extends ActiveRecord
 	 *
 	 * @param	array|null	$statuses	Statuses to get, or NULL for all
 	 * @param	array		$where		Initial where clause
-	 * @return	ActiveRecordIterator
+	 * @return	\IPS\Patterns\ActiveRecordIteator
 	 */
-	public function transactions( ?array $statuses=NULL, array $where = array() ) : ActiveRecordIterator
+	public function transactions( $statuses=NULL, $where = array() )
 	{
 		$where[] = array( 't_invoice=?', $this->id );
 		if ( $statuses )
 		{
-			$where[] = array( Db::i()->in( 't_status', $statuses ) );
+			$where[] = array( \IPS\Db::i()->in( 't_status', $statuses ) );
 		}
 		
-		return new ActiveRecordIterator( Db::i()->select( '*', 'nexus_transactions', $where ), 'IPS\nexus\Transaction' );
+		return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_transactions', $where ), 'IPS\nexus\Transaction' );
 	}
-
+	
+	/**
+	 * Get shipments
+	 *
+	 * @param	array|null	$statuses	Statuses to get, or NULL for all
+	 * @return	\IPS\Patterns\ActiveRecordIteator
+	 */
+	public function shipments( $statuses=NULL )
+	{
+		$where = array();
+		$where[] = array( 'o_invoice=?', $this->id );
+		if ( $statuses )
+		{
+			$where[] = \IPS\Db::i()->in( 'o_status', $statuses );
+		}
+		
+		return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_ship_orders', $where ), 'IPS\nexus\Shipping\Order' );
+	}
+	
 	/**
 	 * Get purchases created by this invoice
 	 *
-	 * @return	ActiveRecordIterator
+	 * @return	\IPS\Patterns\ActiveRecordIteator
 	 */
-	public function purchasesCreated() : ActiveRecordIterator
+	public function purchasesCreated()
 	{
-		return new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', array( 'ps_original_invoice=? AND ps_show=1', $this->id ) ), 'IPS\nexus\Purchase' );
+		return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', array( 'ps_original_invoice=? AND ps_show=1', $this->id ) ), 'IPS\nexus\Purchase' );
 	}
 	
 	/* !Actions */
@@ -1514,24 +1586,23 @@ class Invoice extends ActiveRecord
 	/**
 	 * Create account from guest checkout
 	 *
-	 * @return    Customer
+	 * @return	\IPS\nexus\Customer
 	 */
-	public function createAccountForGuest() : Customer
-	{
-		$guestData = $this->guest_data;
+	public function createAccountForGuest()
+	{		
 		$profileFields = $this->guest_data['profileFields'];
-		$securityAnswers = $this->guest_data['securityAnswers'] ?? array();
+		$securityAnswers = isset( $this->guest_data['securityAnswers'] ) ? $this->guest_data['securityAnswers'] : array();
 		$spamData = $this->guest_data['spamData'];
-		$cards = $this->guest_data['cards'] ?? array();
+		$cards = isset( $this->guest_data['cards'] ) ? $this->guest_data['cards'] : array();
 		
 		/* If the member has already been created (the user made two separate purchases with the same data), use that, otherwise create one */
 		try
 		{
-			$memberToSave = Customer::load( $this->guest_data['member']['email'], 'email' );
+			$memberToSave = \IPS\nexus\Customer::load( $this->guest_data['member']['email'], 'email' );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			$memberToSave = new Customer;
+			$memberToSave = new \IPS\nexus\Customer;
 			foreach ( $this->guest_data['member'] as $k => $v )
 			{
 				$memberToSave->$k = $v;
@@ -1552,12 +1623,12 @@ class Invoice extends ActiveRecord
 		{
 			try
 			{
-				$postBeforeRegister = Db::i()->select( '*', 'core_post_before_registering', array( 'secret=?', $this->guest_data['pbr'] ) )->first();
+				$postBeforeRegister = \IPS\Db::i()->select( '*', 'core_post_before_registering', array( 'secret=?', $this->guest_data['pbr'] ) )->first();
 			}
-			catch ( UnderflowException ){}
+			catch ( \UnderflowException $e ){}
 		}
 
-		$referredBy = $this->guest_data['referred_by'] ?? NULL;
+		$referredBy = isset( $this->guest_data['referred_by'] ) ? $this->guest_data['referred_by'] : NULL;
 
 		$this->guest_data = isset( $this->guest_data['guestTransactionKey'] ) ? array( 'guestTransactionKey' => $this->guest_data['guestTransactionKey'] ) : NULL;
 		$this->save();
@@ -1567,19 +1638,19 @@ class Invoice extends ActiveRecord
 		{
 			try
 			{
-				Member::load( $referredBy )->addReferral( $this->member );
+				\IPS\Member::load( $referredBy )->addReferral( $this->member );
 			}
-			catch ( OutOfRangeException ) {}
+			catch ( \OutOfRangeException $e ) {}
 		}
 
 		/* If we provided answers to security questions in check out, save those */
-		if ( Settings::i()->security_questions_enabled and in_array( Settings::i()->security_questions_prompt, array( 'register', 'optional' ) ) )
+		if ( \IPS\Settings::i()->security_questions_enabled and \in_array( \IPS\Settings::i()->security_questions_prompt, array( 'register', 'optional' ) ) )
 		{
 			if ( $securityAnswers )
 			{
 				foreach ( $securityAnswers as $k => $v )
 				{
-					Db::i()->insert( 'core_security_answers', array(
+					\IPS\Db::i()->insert( 'core_security_answers', array(
 						'answer_question_id'	=> $k,
 						'answer_member_id'		=> $this->member->member_id,
 						'answer_answer'			=> $v
@@ -1603,25 +1674,34 @@ class Invoice extends ActiveRecord
 		/* If we've entered an address during checkout, save it */
 		if ( $this->billaddress !== NULL )
 		{
-			$billing					= new Address;
+			$billing					= new \IPS\nexus\Customer\Address;
 			$billing->member			= $this->member;
 			$billing->address			= $this->billaddress;
 			$billing->primary_billing	= 1;
 			$billing->save();
 		}
-
+		
+		if ( $this->shipaddress !== NULL )
+		{
+			$shipping					= new \IPS\nexus\Customer\Address;
+			$shipping->member			= $this->member;
+			$shipping->address			= $this->shipaddress;
+			$shipping->primary_shipping	= 1;
+			$shipping->save();
+		}
+		
 		$profileFields['member_id'] = $memberToSave->member_id;				
-		Db::i()->replace( 'core_pfields_content', $profileFields );
+		\IPS\Db::i()->replace( 'core_pfields_content', $profileFields );
 		
 		/* If we opted to save a card at checkout, save it */
 		foreach ( $cards as $card )
 		{
 			$card['card_member'] = $memberToSave->member_id;
-			Db::i()->insert( 'nexus_customer_cards', $card );
+			\IPS\Db::i()->insert( 'nexus_customer_cards', $card );
 		}
 						
 		/* Validation */
-		if ( Settings::i()->nexus_checkreg_validate or !$this->total->amount->isGreaterThanZero() )
+		if ( \IPS\Settings::i()->nexus_checkreg_validate or !$this->total->amount->isGreaterThanZero() )
 		{
 			$this->member->postRegistration( FALSE, TRUE, $postBeforeRegister );
 		}
@@ -1631,15 +1711,15 @@ class Invoice extends ActiveRecord
 		}
 		
 		/* Update associated transactions */				
-		Db::i()->update( 'nexus_billing_agreements', array( 'ba_member' => $this->member->member_id ), array( 'ba_id IN(?)', Db::i()->select( 't_billing_agreement', 'nexus_transactions', array( 't_billing_agreement>0 AND t_invoice=? AND t_member=0', $this->id ) ) ) );
-		Db::i()->update( 'nexus_transactions', array( 't_member' => $this->member->member_id ), array( 't_invoice=? AND t_member=0', $this->id ) );
+		\IPS\Db::i()->update( 'nexus_billing_agreements', array( 'ba_member' => $this->member->member_id ), array( 'ba_id IN(?)', \IPS\Db::i()->select( 't_billing_agreement', 'nexus_transactions', array( 't_billing_agreement>0 AND t_invoice=? AND t_member=0', $this->id ) ) ) );
+		\IPS\Db::i()->update( 'nexus_transactions', array( 't_member' => $this->member->member_id ), array( 't_invoice=? AND t_member=0', $this->id ) );
 		
 		/* Did we use any coupons? */
 		foreach ( $this->items as $item )
 		{
-			if ( $item instanceof CouponDiscount )
+			if ( $item instanceof \IPS\nexus\extensions\nexus\Item\CouponDiscount )
 			{
-				$coupon = Coupon::load( $item->id );
+				$coupon = \IPS\nexus\Coupon::load( $item->id );
 				$uses = $coupon->used_by ? json_decode( $coupon->used_by, TRUE ) : array();
 				if ( isset( $uses[ $this->member->email ] ) )
 				{
@@ -1654,8 +1734,6 @@ class Invoice extends ActiveRecord
 				$coupon->save();
 			}
 		}
-
-		Event::fire( 'onCreateAccountForGuest', $this, [ $memberToSave, $guestData ] );
 		
 		return $memberToSave;
 	}
@@ -1663,12 +1741,11 @@ class Invoice extends ActiveRecord
 	/**
 	 * Mark as paid
 	 *
-	 * @param	Member|NULL	$member	The member changing the status. Only set if the status is being manually changed by an admin.
-	 * @return	Member|NULL	If the invoice belonged to a guest, a member will be created by approving and returned here
+	 * @param	\IPS\Member|NULL	$member	The member changing the status. Only set if the status is being manually changed by an admin.
+	 * @return	\IPS\Member|NULL	If the invoice belonged to a guest, a member will be created by approving and returned here
 	 * @note	It is the responsibility of the code calling this to log the action on the customer's account *before* calling this method
-	 * @throws RuntimeException
 	 */
-	public function markPaid( Member $member = NULL ) : Member|null
+	public function markPaid( \IPS\Member $member = NULL )
 	{
 		$return = NULL;
 		$memberCreated = FALSE;
@@ -1685,20 +1762,21 @@ class Invoice extends ActiveRecord
 				}
 				else
 				{
-					throw new RuntimeException('NO_MEMBER_DATA');
+					throw new \RuntimeException('NO_MEMBER_DATA');
 				}
 			}
 			
 			/* Init */
 			$extra = $this->status_extra;
-
+			$shipOrders = array();			
+			
 			/* Find any billing agreements */
 			$billingAgreement = NULL;
 
 			/* Turn off read/write separation so that we make sure to retrieve the latest records */
 			$currentValue = \IPS\Db::i()->readWriteSeparation;
 			\IPS\Db::i()->readWriteSeparation = false;
-			foreach ($this->transactions( array( Transaction::STATUS_PAID, Transaction::STATUS_PART_REFUNDED ), array( array( 't_billing_agreement IS NOT NULL' ) ) ) as $transaction )
+			foreach ( $this->transactions( array( \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_PART_REFUNDED ), array( array( 't_billing_agreement IS NOT NULL' ) ) ) as $transaction )
 			{
 				$billingAgreement = $transaction->billing_agreement;
 			}
@@ -1711,16 +1789,12 @@ class Invoice extends ActiveRecord
 			$amountReceived = $this->total->amount;
 			foreach ( $this->items as $k => $item )
 			{
-				/* @var Invoice\Item $item */
 				/* onPaid */
 				$item->onPaid( $this );
-
-				/* Fire the event here; it doesn't get fired with the other Commerce events */
-				Event::fire( 'onPaid', $item, array( $this ) );
 				
 				/* Create a purchase record */
 				$purchase = NULL;
-				if( $item instanceof Purchase )
+				if( $item instanceof \IPS\nexus\Invoice\Item\Purchase )
 				{
 					$showPurchaseRecord = $item->showPurchaseRecord();
 					
@@ -1733,10 +1807,10 @@ class Invoice extends ActiveRecord
 						if ( $item->renewalTerm )
 						{
 							$purchase->renewals = $item->renewalTerm;
-							$purchase->expire = DateTime::create()->add( $item->initialInterval ?: $item->renewalTerm->interval );
+							$purchase->expire = \IPS\DateTime::create()->add( $item->initialInterval ?: $item->renewalTerm->interval );
 							if ( $item->renewalTerm->gracePeriod )
 							{
-								$purchase->grace_period = DateTime::create()->add( $item->renewalTerm->gracePeriod )->getTimestamp() - time();
+								$purchase->grace_period = \IPS\DateTime::create()->add( $item->renewalTerm->gracePeriod )->getTimestamp() - time();
 							}
 							if ( $billingAgreement )
 							{
@@ -1749,7 +1823,7 @@ class Invoice extends ActiveRecord
 						}
 						$purchase->app = $item::$application;
 						$purchase->type = $item::$type;
-						$purchase->item_id = intval( $item->id );
+						$purchase->item_id = \intval( $item->id );
 						$purchase->custom_fields = $item->purchaseDetails;
 						$purchase->original_invoice = $this;
 						$purchase->tax = $item->tax ? $item->tax->id : 0;
@@ -1790,11 +1864,11 @@ class Invoice extends ActiveRecord
 						$purchases[ $k ][] = $purchase;
 						
 						/* Claim attachments */
-						foreach ( Db::i()->select( '*', 'core_attachments_map', array( 'location_key=? AND id1=? AND id3=?', 'nexus_Purchases', $k, "invoice-{$this->id}" ) ) as $attachMap )
+						foreach ( \IPS\Db::i()->select( '*', 'core_attachments_map', array( 'location_key=? AND id1=? AND id3=?', 'nexus_Purchases', $k, "invoice-{$this->id}" ) ) as $attachMap )
 						{
 							$attachMap['id1'] = $purchase->id;
 							$attachMap['id3'] = 'purchase';
-							Db::i()->insert( 'core_attachments_map', $attachMap );
+							\IPS\Db::i()->insert( 'core_attachments_map', $attachMap );
 						}
 						
 						/* Log */
@@ -1810,14 +1884,24 @@ class Invoice extends ActiveRecord
 						}
 					}
 				}
-
+				
+				/* Does it need shipping? */
+				if ( $item->physical )
+				{
+					if ( !isset( $shipOrders[ $item->chosenShippingMethodId ] ) )
+					{
+						$shipOrders[ $item->chosenShippingMethodId ] = array();
+					}
+					$shipOrders[ $item->chosenShippingMethodId ][ $k ] = $item;
+				}
+				
 				/* Is the money going to another member? */
-				if ( $item->payTo and !$item->payTo->inGroup( explode( ',', Settings::i()->nexus_no_commission ) ) )
+				if ( $item->payTo and !$item->payTo->inGroup( explode( ',', \IPS\Settings::i()->nexus_no_commission ) ) )
 				{
 					$recipientAmounts = $item->recipientAmounts();
 
 					/* We explicitly re-load $item->payTo in order to ensure the account credit amounts have not changed since the time this invoice request began and now. If an admin began a payout that processed after this page load began, the account credit amount may have been reduced. */
-					$item->payTo = Customer::constructFromData( Db::i()->select( '*, core_members.member_id AS _member_id', 'core_members', array( 'core_members.member_id=?', $item->payTo->member_id) )->join( 'nexus_customers', 'nexus_customers.member_id=core_members.member_id' )->first() );
+					$item->payTo = \IPS\nexus\Customer::constructFromData( \IPS\Db::i()->select( '*, core_members.member_id AS _member_id', 'core_members', array( 'core_members.member_id=?', $item->payTo->member_id) )->join( 'nexus_customers', 'nexus_customers.member_id=core_members.member_id' )->first() );
 					$credits = $item->payTo->cm_credits;
 					$credits[ $this->currency ]->amount = $credits[ $this->currency ]->amount->add( $recipientAmounts['recipient_final']->amount );
 					$item->payTo->cm_credits = $credits;
@@ -1826,11 +1910,11 @@ class Invoice extends ActiveRecord
 					
 					if ( !isset( $extra['commission'][ $item->payTo->member_id ] ) )
 					{
-						$extra['commission'][ $item->payTo->member_id ] = array( 'amount' => new Number('0') );
+						$extra['commission'][ $item->payTo->member_id ] = array( 'amount' => new \IPS\Math\Number('0') );
 					}
-					elseif ( !( $extra['commission'][ $item->payTo->member_id ]['amount'] instanceof Number ) )
+					elseif ( !( $extra['commission'][ $item->payTo->member_id ]['amount'] instanceof \IPS\Math\Number ) )
 					{
-						$extra['commission'][ $item->payTo->member_id ]['amount'] = new Number( "{$extra['commission'][ $item->payTo->member_id ]['amount']}" );
+						$extra['commission'][ $item->payTo->member_id ]['amount'] = new \IPS\Math\Number( "{$extra['commission'][ $item->payTo->member_id ]['amount']}" );
 					}
 					$extra['commission'][ $item->payTo->member_id ]['amount'] = $extra['commission'][ $item->payTo->member_id ]['amount']->add( $recipientAmounts['recipient_final']->amount );	
 					
@@ -1844,7 +1928,7 @@ class Invoice extends ActiveRecord
 						'name'			=> $item->name
 					), FALSE );
 					
-					Email::buildFromTemplate( 'nexus', 'commissionEarned', array( $this, $item, $recipientAmounts['recipient_final'] ), Email::TYPE_TRANSACTIONAL )
+					\IPS\Email::buildFromTemplate( 'nexus', 'commissionEarned', array( $this, $item, $recipientAmounts['recipient_final'] ), \IPS\Email::TYPE_TRANSACTIONAL )
 						->send(
 							$item->payTo,
 							array_map(
@@ -1854,14 +1938,14 @@ class Invoice extends ActiveRecord
 								},
 								iterator_to_array( $item->payTo->alternativeContacts( array( 'billing=1' ) ) )
 							),
-							( ( in_array( 'commission_earned', explode( ',', Settings::i()->nexus_notify_copy_types ) ) AND Settings::i()->nexus_notify_copy_email ) ? explode( ',', Settings::i()->nexus_notify_copy_email ) : array() )
+							( ( \in_array( 'commission_earned', explode( ',', \IPS\Settings::i()->nexus_notify_copy_types ) ) AND \IPS\Settings::i()->nexus_notify_copy_email ) ? explode( ',', \IPS\Settings::i()->nexus_notify_copy_email ) : array() )
 						);
 				}
 			}
 			
 			/* Referral Commission */
 			$this->status_extra = $extra;
-			if ( Settings::i()->ref_on and $commission = $this->commission( $amountReceived ) and $commission['amount'] )
+			if ( \IPS\Settings::i()->ref_on and $commission = $this->commission( $amountReceived ) and $commission['amount'] )
 			{
 				$extra = $this->status_extra; // Reload, the commission method may have changed this.
 				$credits = $commission['referrer']->cm_credits;
@@ -1871,11 +1955,11 @@ class Invoice extends ActiveRecord
 				
 				if ( !isset( $extra['commission'][ $commission['referrer']->member_id ] ) )
 				{
-					$extra['commission'][ $commission['referrer']->member_id ] = array( 'amount' => new Number('0') );
+					$extra['commission'][ $commission['referrer']->member_id ] = array( 'amount' => new \IPS\Math\Number('0') );
 				}
-				elseif ( !( $extra['commission'][ $commission['referrer']->member_id ]['amount'] instanceof Number ) )
+				elseif ( !( $extra['commission'][ $commission['referrer']->member_id ]['amount'] instanceof \IPS\Math\Number ) )
 				{
-					$extra['commission'][ $commission['referrer']->member_id ]['amount'] = new Number( "{$extra['commission'][ $commission['referrer']->member_id ]['amount']}" );
+					$extra['commission'][ $commission['referrer']->member_id ]['amount'] = new \IPS\Math\Number( "{$extra['commission'][ $commission['referrer']->member_id ]['amount']}" );
 				}
 				$extra['commission'][ $commission['referrer']->member_id ]['amount'] = $extra['commission'][ $commission['referrer']->member_id ]['amount']->add( $commission['amount']->amount );	
 				
@@ -1889,20 +1973,20 @@ class Invoice extends ActiveRecord
 					'invoice_title'	=> $this->title
 				), FALSE );
 				
-				$record = Db::i()->select( '*', 'core_referrals', array( 'member_id=? AND referred_by=?', $this->member->member_id, $commission['referrer']->member_id ) )->first();
+				$record = \IPS\Db::i()->select( '*', 'core_referrals', array( 'member_id=? AND referred_by=?', $this->member->member_id, $commission['referrer']->member_id ) )->first();
 				$amounts = $record['amount'] ? json_decode( $record['amount'], TRUE ) : array();
 				if ( !isset( $amounts[ $this->currency ] ) )
 				{
-					$amounts[ $this->currency ] = new Number('0');
+					$amounts[ $this->currency ] = new \IPS\Math\Number('0');
 				}
-				elseif ( !( $amounts[ $this->currency ] instanceof Number ) )
+				elseif ( !( $amounts[ $this->currency ] instanceof \IPS\Math\Number ) )
 				{
-					$amounts[ $this->currency ] = new Number( number_format( $amounts[ $this->currency ], Money::numberOfDecimalsForCurrency( $this->currency ), '.', '' ) );
+					$amounts[ $this->currency ] = new \IPS\Math\Number( number_format( $amounts[ $this->currency ], \IPS\nexus\Money::numberOfDecimalsForCurrency( $this->currency ), '.', '' ) );
 				}
 				$amounts[ $this->currency ] = $amounts[ $this->currency ]->add( $commission['amount']->amount );
-				Db::i()->update( 'core_referrals', array( 'amount' => json_encode( $amounts ) ), array( 'member_id=? AND referred_by=?', $this->member->member_id, $commission['referrer']->member_id ) );
+				\IPS\Db::i()->update( 'core_referrals', array( 'amount' => json_encode( $amounts ) ), array( 'member_id=? AND referred_by=?', $this->member->member_id, $commission['referrer']->member_id ) );
 				
-				Email::buildFromTemplate( 'nexus', 'commissionEarned', array( $this, NULL, $commission['amount'] ), Email::TYPE_TRANSACTIONAL )
+				\IPS\Email::buildFromTemplate( 'nexus', 'commissionEarned', array( $this, NULL, $commission['amount'] ), \IPS\Email::TYPE_TRANSACTIONAL )
 					->send(
 						$commission['referrer'],
 						array_map(
@@ -1912,7 +1996,7 @@ class Invoice extends ActiveRecord
 							},
 							iterator_to_array( $commission['referrer']->alternativeContacts( array( 'billing=1' ) ) )
 						),
-						( ( in_array( 'commission_earned', explode( ',', Settings::i()->nexus_notify_copy_types ) ) AND Settings::i()->nexus_notify_copy_email ) ? explode( ',', Settings::i()->nexus_notify_copy_email ) : array() )
+						( ( \in_array( 'commission_earned', explode( ',', \IPS\Settings::i()->nexus_notify_copy_types ) ) AND \IPS\Settings::i()->nexus_notify_copy_email ) ? explode( ',', \IPS\Settings::i()->nexus_notify_copy_email ) : array() )
 					);
 			}
 			
@@ -1921,7 +2005,7 @@ class Invoice extends ActiveRecord
 			{
 				foreach ( $extra['commission'] as $memberId => $data )
 				{
-					if ( $data['amount'] and $data['amount'] instanceof Number )
+					if ( $data['amount'] and $data['amount'] instanceof \IPS\Math\Number )
 					{
 						$extra['commission'][ $memberId ]['amount'] = (string) $data['amount'];
 					}
@@ -1933,7 +2017,7 @@ class Invoice extends ActiveRecord
 			{
 				foreach ( $purchases[ $k ] as $k2 => $_purchase )
 				{					
-					$_purchase->parent = $purchases[$v][$k2] ?? $purchases[$v][0];
+					$_purchase->parent = isset( $purchases[ $v ][ $k2 ] ) ? $purchases[ $v ][ $k2 ] : $purchases[ $v ][0];					
 					$_purchase->save();
 					
 					if( isset( $groupParentIds[ $k ] ) )
@@ -1951,11 +2035,41 @@ class Invoice extends ActiveRecord
 					$purchase->onPurchaseGenerated( $this );
 				}
 			}
-
-			/* Refuse any pending transactions */
-			foreach ($this->transactions( array( Transaction::STATUS_PENDING, Transaction::STATUS_WAITING, Transaction::STATUS_HELD, Transaction::STATUS_REVIEW, Transaction::STATUS_GATEWAY_PENDING ) ) as $transaction )
+			
+			/* Create shipping orders */
+			foreach ( $shipOrders as $method => $items )
 			{
-				if ( $transaction->status === Transaction::STATUS_PENDING )
+				$shipOrder = new \IPS\nexus\Shipping\Order;
+				$shipOrder->invoice = $this;
+				$shipOrder->data = array( 'cm_first_name' => $this->member->cm_first_name, 'cm_last_name' => $this->member->cm_last_name, 'address' => $this->shipaddress, 'cm_phone' => $this->member->cm_phone );
+				if ( $method )
+				{
+					try
+					{
+						$shipOrder->method = \IPS\nexus\Shipping\FlatRate::load( $method );
+					}
+					catch ( \OutOfRangeException $e )
+					{
+						$shipOrder->api_service = $method;
+					}
+				}
+				$shipOrder->items = $items;
+				$shipOrder->save();
+				
+				$this->member->log( 'shipping', array(
+					'type'			=> 'new',
+					'id'			=> $shipOrder->id,
+					'invoice_id'	=> $this->id,
+					'invoice_title' => $this->title
+				), FALSE );
+				
+				\IPS\core\AdminNotification::send( 'nexus', 'Shipment', NULL, TRUE, $shipOrder );
+			}
+			
+			/* Refuse any pending transactions */
+			foreach ( $this->transactions( array( \IPS\nexus\Transaction::STATUS_PENDING, \IPS\nexus\Transaction::STATUS_WAITING, \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_REVIEW, \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING ) ) as $transaction )
+			{
+				if ( $transaction->status === \IPS\nexus\Transaction::STATUS_PENDING )
 				{
 					$transaction->delete();
 				}
@@ -1965,19 +2079,19 @@ class Invoice extends ActiveRecord
 					{
 						$transaction->method->void( $transaction );
 					}
-					catch ( Exception ){}
+					catch ( \Exception $e ){}
 					
 					$textra = $transaction->extra;
-					$textra['history'][] = array( 's' => Transaction::STATUS_REFUSED, 'on' => time(), 'note' => 'invoicePaid' );
+					$textra['history'][] = array( 's' => \IPS\nexus\Transaction::STATUS_REFUSED, 'on' => time(), 'note' => 'invoicePaid' );
 					$transaction->extra = $textra;
-					$transaction->status = Transaction::STATUS_REFUSED;
+					$transaction->status = \IPS\nexus\Transaction::STATUS_REFUSED;
 					$transaction->save();
 				}
 			}
 			
 			/* Update invoice */
 			$this->status = static::STATUS_PAID;
-			$this->paid = new DateTime;
+			$this->paid = new \IPS\DateTime;
 
 			/* Set our billing address automatically if it's not already set */
 			if( !$this->billaddress )
@@ -1986,10 +2100,10 @@ class Invoice extends ActiveRecord
 			}
 			
 			/* Send tracked notifications */
-			foreach ( Db::i()->select( 'member_id', 'nexus_invoice_tracker', array( 'invoice_id=?', $this->id ) ) as $trackingMember )
+			foreach ( \IPS\Db::i()->select( 'member_id', 'nexus_invoice_tracker', array( 'invoice_id=?', $this->id ) ) as $trackingMember )
 			{
-				$trackingMember = Member::load( $trackingMember );
-				Email::buildFromTemplate( 'nexus', 'invoiceNotify', array( $this, $this->summary() ), Email::TYPE_LIST )
+				$trackingMember = \IPS\Member::load( $trackingMember );
+				\IPS\Email::buildFromTemplate( 'nexus', 'invoiceNotify', array( $this, $this->summary( $trackingMember->language() ) ), \IPS\Email::TYPE_LIST )
 							->send( $trackingMember );
 			}
 			
@@ -2020,10 +2134,10 @@ class Invoice extends ActiveRecord
 	 * Mark as unpaid
 	 *
 	 * @param	string|NULL			$status	The status to set to
-	 * @param	Member|NULL	$member	The member changing the status. Only set if the status is being manually changed by an admin.
+	 * @param	\IPS\Member|NULL	$member	The member changing the status. Only set if the status is being manually changed by an admin.
 	 * @return	void
 	 */
-	public function markUnpaid( ?string $status, Member $member = NULL ) : void
+	public function markUnpaid( $status, \IPS\Member $member = NULL )
 	{		
 		/* Do stuff */
 		$extra = $this->status_extra;
@@ -2032,14 +2146,10 @@ class Invoice extends ActiveRecord
 			/* Loop items */
 			foreach ( $this->items as $k => $item )
 			{
-				/* @var Invoice\Item $item */
 				$item->onUnpaid( $this, $this->status );
-
-				/* Fire the event */
-				Event::fire( 'onUnpaid', $item, array( $this, $this->status ) );
 				
 				/* Is the money going to another member? */
-				if ( $item->payTo and !$item->payTo->inGroup( explode( ',', Settings::i()->nexus_no_commission ) ) )
+				if ( $item->payTo and !$item->payTo->inGroup( explode( ',', \IPS\Settings::i()->nexus_no_commission ) ) )
 				{
 					$recipientAmounts = $item->recipientAmounts();
 					$this->revokeCommission( $item->payTo, $recipientAmounts['recipient_final'], $item );
@@ -2049,7 +2159,7 @@ class Invoice extends ActiveRecord
 			/* Revoke commissions based on the referral rules */
 			if( !empty( $extra['commissionref'] ) AND !empty( $extra['commissionamount'] ) )
 			{
-				$this->revokeCommission( Customer::load( $extra['commissionref'] ), new Money( $extra['commissionamount'], $this->currency ) );
+				$this->revokeCommission( \IPS\nexus\Customer::load( $extra['commissionref'] ), new \IPS\nexus\Money( $extra['commissionamount'], $this->currency ) );
 			}
 			
 			/* Delete purchases */
@@ -2057,15 +2167,18 @@ class Invoice extends ActiveRecord
 			{
 				$purchase->delete( FALSE );
 			}
+			
+			/* Delete shipping orders */
+			foreach ( $this->shipments() as $shipment )
+			{
+				$shipment->delete();
+			}
 		}
 		else
 		{
 			foreach ( $this->items as $k => $item )
 			{
-				/* @var Invoice\Item $item */
 				$item->onInvoiceCancel( $this );
-
-				Event::fire( 'onInvoiceCancel', $item, array( $this ) );
 			}
 		}
 		
@@ -2089,12 +2202,11 @@ class Invoice extends ActiveRecord
 	/**
 	 * Revoke Commission
 	 *
-	 * @param   Member                     $paidTo     Revoke the commission from this member
-	 * @param Money $commission Amount of commission to revoke
-	 * @param   Item|null    $item       Item commission was for (if applicable)
-	 * @return void
+	 * @param   \IPS\Member                     $paidTo     Revoke the commission from this member
+	 * @param   \IPS\nexus\Money                $commission Amount of commission to revoke
+	 * @param   \IPS\nexus\Invoice\Item|null    $item       Item commission was for (if applicable)
 	 */
-	protected function revokeCommission( Member $paidTo, Money $commission, Item $item=NULL ) : void
+	protected function revokeCommission( \IPS\Member $paidTo, \IPS\nexus\Money $commission, \IPS\nexus\Invoice\Item $item=NULL )
 	{
 		$credits = $paidTo->cm_credits;
 		$credits[ $this->currency ]->amount = $credits[ $this->currency ]->amount->subtract( $commission->amount );
@@ -2111,7 +2223,7 @@ class Invoice extends ActiveRecord
 			'invoice_title'	=> $this->title
 		), FALSE );
 
-		Email::buildFromTemplate( 'nexus', 'commissionRevoked', array( $this, $item, $commission ), Email::TYPE_TRANSACTIONAL )
+		\IPS\Email::buildFromTemplate( 'nexus', 'commissionRevoked', array( $this, $item, $commission ), \IPS\Email::TYPE_TRANSACTIONAL )
 			->send(
 				$paidTo,
 				array_map(
@@ -2121,7 +2233,7 @@ class Invoice extends ActiveRecord
 					},
 					iterator_to_array( $paidTo->alternativeContacts( array( 'billing=1' ) ) )
 				),
-				( ( in_array( 'commission_earned', explode( ',', Settings::i()->nexus_notify_copy_types ) ) AND Settings::i()->nexus_notify_copy_email ) ? explode( ',', Settings::i()->nexus_notify_copy_email ) : array() )
+				( ( \in_array( 'commission_earned', explode( ',', \IPS\Settings::i()->nexus_notify_copy_types ) ) AND \IPS\Settings::i()->nexus_notify_copy_email ) ? explode( ',', \IPS\Settings::i()->nexus_notify_copy_email ) : array() )
 			);
 	}
 	
@@ -2130,38 +2242,56 @@ class Invoice extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function unpaidConsequences() : array
+	public function unpaidConsequences()
 	{
 		$return = array();
 		
 		$purchases = $this->purchasesCreated();
-		if ( count( $purchases ) )
+		if ( \count( $purchases ) )
 		{
 			$return['purchases'] = array();
 			foreach ( $purchases as $purchase )
 			{
-				/* @var \IPS\nexus\Purchase $purchase */
-				$return['purchases'][ $purchase->id ] = Theme::i()->getTemplate( 'purchases', 'nexus' )->link( $purchase );
+				$return['purchases'][ $purchase->id ] = \IPS\Theme::i()->getTemplate( 'purchases', 'nexus' )->link( $purchase );
 				
 				foreach ( $purchase->children( NULL ) as $child )
 				{
-					$return['unassociate'][ $purchase->id ][ $child->id ] = Theme::i()->getTemplate( 'purchases', 'nexus' )->link( $child );
+					$return['unassociate'][ $purchase->id ][ $child->id ] = \IPS\Theme::i()->getTemplate( 'purchases', 'nexus' )->link( $child );
 				}
 			}
 		}
-
+		
+		$shipments = $this->shipments();
+		if ( \count( $shipments ) )
+		{
+			$return['shipments'] = array();
+			foreach ( $shipments as $shipment )
+			{
+				if ( $shipment->status === \IPS\nexus\Shipping\Order::STATUS_SHIPPED )
+				{
+					$return['shipments'][] = \IPS\Theme::i()->getTemplate( 'shiporders', 'nexus' )->link( $shipment );
+				}
+				else
+				{
+					$return['shipments'][] = array(
+						'message' => \IPS\Theme::i()->getTemplate( 'shiporders', 'nexus' )->link( $shipment ),
+						'warning' => \IPS\Member::loggedIn()->language()->addToStack('invoice_unpaid_shipments_shipped'),
+					);
+				}
+			}
+		}
+		
 		foreach ( $this->items as $item )
 		{
-			/* @var Invoice\Item $item */
 			if ( $item->payTo )
 			{
 				$amount = $item->amountForRecipient();
-				$message = Member::loggedIn()->language()->addToStack('account_credit_remove', FALSE, array( 'sprintf' => array( $amount, $item->payTo->cm_name ) ) );
+				$message = \IPS\Member::loggedIn()->language()->addToStack('account_credit_remove', FALSE, array( 'sprintf' => array( $amount, $item->payTo->cm_name ) ) );
 				
 				$credits = $item->payTo->cm_credits;
 				if ( !$credits[ $amount->currency ]->amount->subtract( $amount->amount )->isPositive() )
 				{
-					$return[] = array( 'message' => $message, 'warning' => Member::loggedIn()->language()->addToStack('account_credit_remove_neg') );
+					$return[] = array( 'message' => $message, 'warning' => \IPS\Member::loggedIn()->language()->addToStack('account_credit_remove_neg') );
 				}
 				else
 				{
@@ -2169,7 +2299,7 @@ class Invoice extends ActiveRecord
 				}
 			}
 
-            if( count( $item->onUnpaidDescription( $this ) ) )
+            if( \count( $item->onUnpaidDescription( $this ) ) )
             {
                 foreach( $item->onUnpaidDescription( $this ) as $desc )
                 {
@@ -2182,14 +2312,14 @@ class Invoice extends ActiveRecord
 		$extra = $this->status_extra;
 		if( !empty( $extra['commissionref'] ) AND !empty( $extra['commissionamount'] ) )
 		{
-			$customer = Customer::load( $extra['commissionref'] );
-			$amount = new Money( $extra['commissionamount'], $this->currency );
-			$message = Member::loggedIn()->language()->addToStack( 'account_credit_remove_commission', FALSE, array( 'sprintf' => array( $amount, $customer->cm_name ) ) );
+			$customer = \IPS\nexus\Customer::load( $extra['commissionref'] );
+			$amount = new \IPS\nexus\Money( $extra['commissionamount'], $this->currency );
+			$message = \IPS\Member::loggedIn()->language()->addToStack( 'account_credit_remove_commission', FALSE, array( 'sprintf' => array( $amount, $customer->cm_name ) ) );
 
 			$credits = $customer->cm_credits;
 			if ( !$credits[ $amount->currency ]->amount->subtract( $amount->amount )->isPositive() )
 			{
-				$return[] = array( 'message' => $message, 'warning' => Member::loggedIn()->language()->addToStack( 'account_credit_remove_neg' ) );
+				$return[] = array( 'message' => $message, 'warning' => \IPS\Member::loggedIn()->language()->addToStack( 'account_credit_remove_neg' ) );
 			}
 			else
 			{
@@ -2205,9 +2335,9 @@ class Invoice extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function sendNotification() : void
+	public function sendNotification()
 	{		
-		Email::buildFromTemplate( 'nexus', 'newInvoice', array( $this, $this->summary() , ( $this->paid ) ? $this->member->language()->get('invoice_mailsub_paid') : $this->member->language()->get('invoice_mailsub_pend') ), Email::TYPE_TRANSACTIONAL )
+		\IPS\Email::buildFromTemplate( 'nexus', 'newInvoice', array( $this, $this->summary( $this->member->language() ) , ( $this->paid ) ? $this->member->language()->get('invoice_mailsub_paid') : $this->member->language()->get('invoice_mailsub_pend') ), \IPS\Email::TYPE_TRANSACTIONAL )
 			->send(
 				$this->member,
 				array_map(
@@ -2217,7 +2347,7 @@ class Invoice extends ActiveRecord
 					},
 					iterator_to_array( $this->member->alternativeContacts( array( 'billing=1' ) ) )
 				),
-				( ( in_array( 'new_invoice', explode( ',', Settings::i()->nexus_notify_copy_types ) ) AND Settings::i()->nexus_notify_copy_email ) ? explode( ',', Settings::i()->nexus_notify_copy_email ) : array() )
+				( ( \in_array( 'new_invoice', explode( ',', \IPS\Settings::i()->nexus_notify_copy_types ) ) AND \IPS\Settings::i()->nexus_notify_copy_email ) ? explode( ',', \IPS\Settings::i()->nexus_notify_copy_email ) : array() )
 			);
 	}
 	
@@ -2226,33 +2356,33 @@ class Invoice extends ActiveRecord
 	/**
 	 * Get checkout URL
 	 *
-	 * @return	Url
+	 * @return	void
 	 */
-	public function checkoutUrl() : Url
+	public function checkoutUrl()
 	{
 		if ( !$this->id )
 		{
 			$this->save();
 		}
 		
-		return Url::internal( 'app=nexus&module=checkout&controller=checkout&id=' . $this->id, 'front', 'nexus_checkout' );
+		return \IPS\Http\Url::internal( 'app=nexus&module=checkout&controller=checkout&id=' . $this->id, 'front', 'nexus_checkout' );
 	}
 
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 
 	/**
 	 * Get URL
 	 *
-	 * @return	Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	function url(): Url|null
+	public function url()
 	{
 		if( $this->_url === NULL )
 		{
-			$this->_url = Url::internal( "app=nexus&module=clients&controller=invoices&do=view&id={$this->id}", 'front', 'clientsinvoice' );
+			$this->_url = \IPS\Http\Url::internal( "app=nexus&module=clients&controller=invoices&do=view&id={$this->id}", 'front', 'clientsinvoice' );
 		}
 
 		return $this->_url;
@@ -2261,32 +2391,32 @@ class Invoice extends ActiveRecord
 	/**
 	 * ACP "View Invoice" URL
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function acpUrl() : Url
+	public function acpUrl()
 	{
-		return Url::internal( "app=nexus&module=payments&controller=invoices&do=view&id={$this->id}", 'admin' );
+		return \IPS\Http\Url::internal( "app=nexus&module=payments&controller=invoices&do=view&id={$this->id}", 'admin' );
 	}
 	
 	/**
 	 * Is the member tracking this invoice?
 	 *
-	 * @param	Member|NULL	$member	The member to check for, or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member	The member to check for, or NULL for currently logged in member
 	 * @return	bool
 	 */
-	public function tracked( Member $member = NULL ) : bool
+	public function tracked( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		if( !isset( $this->_tracked[ $member->member_id ] ) )
 		{
 			try
 			{
-				Db::i()->select( array( 'invoice_id' ), 'nexus_invoice_tracker', array( 'member_id=? and invoice_id=?', $member->member_id, $this->id ) )->first();
+				$tracked = \IPS\Db::i()->select( array( 'invoice_id' ), 'nexus_invoice_tracker', array( 'member_id=? and invoice_id=?', $member->member_id, $this->id ) )->first();
 
 				$this->_tracked[ $member->member_id ] = TRUE;
 			} 
-			catch ( UnderflowException )
+			catch ( \UnderflowException $e )
 			{
 				$this->_tracked[ $member->member_id ] = FALSE;
 			}

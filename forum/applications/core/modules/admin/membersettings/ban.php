@@ -11,52 +11,30 @@
 namespace IPS\core\modules\admin\membersettings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Webhook;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use UnderflowException;
-use function defined;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ban
  */
-class ban extends Controller
+class _ban extends \IPS\Dispatcher\Controller
 {	
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'ban_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'ban_manage' );
 		parent::execute();
 	}
 	
@@ -65,9 +43,9 @@ class ban extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{		
-		$table = new TableDb( 'core_banfilters', Url::internal( 'app=core&module=membersettings&controller=ban' ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_banfilters', \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=ban' ) );
 		
 		$table->filters = array(
 				'ban_filter_ip'		=> 'ban_type=\'ip\'',
@@ -83,30 +61,30 @@ class ban extends Controller
 		$table->sortDirection = $table->sortDirection ?: 'asc';
 		$table->quickSearch   = 'ban_content';
 		$table->advancedSearch = array(
-			'ban_reason'	=> SEARCH_CONTAINS_TEXT,
-			'ban_date'		=> SEARCH_DATE_RANGE
+			'ban_reason'	=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'ban_date'		=> \IPS\Helpers\Table\SEARCH_DATE_RANGE
 		);
 		
 		/* Custom parsers */
 		$table->parsers = array(
-				'ban_date'			=> function( $val )
+				'ban_date'			=> function( $val, $row )
 				{
-					return DateTime::ts( $val )->localeDate();
+					return \IPS\DateTime::ts( $val )->localeDate();
 				},
-				'ban_type'			=> function( $val )
+				'ban_type'			=> function( $val, $row )
 				{
 					switch( $val )
 					{
 						default:
 						case 'ip':
-							return Member::loggedIn()->language()->addToStack('ban_filter_ip_select');
-
+							return \IPS\Member::loggedIn()->language()->addToStack('ban_filter_ip_select');
+						break;
 						case 'email':
-							return Member::loggedIn()->language()->addToStack('ban_filter_email_select');
-
+							return \IPS\Member::loggedIn()->language()->addToStack('ban_filter_email_select');
+						break;
 						case 'name':
-							return Member::loggedIn()->language()->addToStack('ban_filter_name_select');
-
+							return \IPS\Member::loggedIn()->language()->addToStack('ban_filter_name_select');
+						break;
 					}
 				}
 		);
@@ -119,8 +97,8 @@ class ban extends Controller
 			$return['edit'] = array(
 						'icon'		=> 'pencil',
 						'title'		=> 'edit',
-						'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit') ),
-						'link'		=> Url::internal( 'app=core&module=membersettings&controller=ban&do=form&id=' ) . $row['ban_id'],
+						'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit') ),
+						'link'		=> \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=ban&do=form&id=' ) . $row['ban_id'],
 			);
 			
 		
@@ -128,7 +106,7 @@ class ban extends Controller
 			$return['delete'] = array(
 						'icon'		=> 'times-circle',
 						'title'		=> 'delete',
-						'link'		=> Url::internal( 'app=core&module=membersettings&controller=ban&do=delete&id=' ) . $row['ban_id'],
+						'link'		=> \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=ban&do=delete&id=' ) . $row['ban_id'],
 						'data'		=> array( 'delete' => '' ),
 			);
 		
@@ -136,41 +114,41 @@ class ban extends Controller
 		};
 		
 		/* Specify the buttons */
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'add'	=> array(
 				'primary'	=> TRUE,
 				'icon'		=> 'plus',
 				'title'		=> 'ban_filter_add',
-				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('ban_filter_add') ),
-				'link'		=> Url::internal( 'app=core&module=membersettings&controller=ban&do=form' )
+				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('ban_filter_add') ),
+				'link'		=> \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=ban&do=form' )
 			)
 		);
 		
         /* Display */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('menu__core_membersettings_ban');
-		Output::i()->output	= (string) $table;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('menu__core_membersettings_ban');
+		\IPS\Output::i()->output	= (string) $table;
 	}
 	
 	/**
 	 * Add/Edit Rank
 	 */
-	public function form() : void
+	public function form()
 	{
 		$current = NULL;
-		if ( Request::i()->id )
+		if ( \IPS\Request::i()->id )
 		{
-			$current = Db::i()->select( '*', 'core_banfilters', array( 'ban_id=?', Request::i()->id ) )->first();
+			$current = \IPS\Db::i()->select( '*', 'core_banfilters', array( 'ban_id=?', \IPS\Request::i()->id ) )->first();
 		}
 	
 		/* Build form */
-		$form = new Form();
-		$form->add( new Select( 'ban_type', $current ? $current['ban_type'] : NULL , TRUE, array( 'options' => array(
+		$form = new \IPS\Helpers\Form();
+		$form->add( new \IPS\Helpers\Form\Select( 'ban_type', $current ? $current['ban_type'] : NULL , TRUE, array( 'options' => array(
 			'ip'    => 'ban_filter_ip_select',
 			'email' => 'ban_filter_email_select',
 			'name'  => 'ban_filter_name_select'
 		) ) ) );
-		$form->add( new Text( 'ban_content', $current ? $current['ban_content'] : "", TRUE ) );
-		$form->add( new Text( 'ban_reason', $current ? $current['ban_reason'] : "" ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'ban_content', $current ? $current['ban_content'] : "", TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'ban_reason', $current ? $current['ban_reason'] : "" ) );
 		
 		/* Handle submissions */
 		if ( $values = $form->values() )
@@ -181,28 +159,26 @@ class ban extends Controller
 				'ban_reason'  => $values['ban_reason'],
 				'ban_date'	  => time()  
 			);
-			
-			Webhook::fire( 'ban_filter_added', $save);
 				
 			if ( $current )
 			{
 				unset( $save['ban_date'] );
-				Db::i()->update( 'core_banfilters', $save, array( 'ban_id=?', $current['ban_id'] ) );
-				Session::i()->log( 'acplog__ban_edited', array( 'ban_filter_' . $save['ban_type'] . '_select' => TRUE, $save['ban_content'] => FALSE ) );
+				\IPS\Db::i()->update( 'core_banfilters', $save, array( 'ban_id=?', $current['ban_id'] ) );
+				\IPS\Session::i()->log( 'acplog__ban_edited', array( 'ban_filter_' . $save['ban_type'] . '_select' => TRUE, $save['ban_content'] => FALSE ) );
 			}
 			else
 			{
-				Db::i()->insert( 'core_banfilters', $save );
-				Session::i()->log( 'acplog__ban_created', array( 'ban_filter_' . $save['ban_type'] . '_select' => TRUE, $save['ban_content'] => FALSE ) );
+				\IPS\Db::i()->insert( 'core_banfilters', $save );
+				\IPS\Session::i()->log( 'acplog__ban_created', array( 'ban_filter_' . $save['ban_type'] . '_select' => TRUE, $save['ban_content'] => FALSE ) );
 			}
 			
-			unset( Store::i()->bannedIpAddresses );
+			unset( \IPS\Data\Store::i()->bannedIpAddresses );
 	
-			Output::i()->redirect( Url::internal( 'app=core&module=membersettings&controller=ban' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=ban' ), 'saved' );
 		}
 	
 		/* Display */
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( $current ? $current['ban_content'] : 'add', $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( $current ? $current['ban_content'] : 'add', $form, FALSE );
 	}
 	
 	/**
@@ -210,21 +186,20 @@ class ban extends Controller
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 		
 		try
 		{
-			$current = Db::i()->select( '*', 'core_banfilters', array( 'ban_id=?', Request::i()->id ) )->first();
-			Session::i()->log( 'acplog__ban_deleted', array( 'ban_filter_' . $current['ban_type'] . '_select' => TRUE, $current['ban_content'] => FALSE ) );
-			Db::i()->delete( 'core_banfilters', array( 'ban_id=?', Request::i()->id ) );
-			Webhook::fire( 'ban_filter_removed', $current);
-			unset( Store::i()->bannedIpAddresses );
+			$current = \IPS\Db::i()->select( '*', 'core_banfilters', array( 'ban_id=?', \IPS\Request::i()->id ) )->first();
+			\IPS\Session::i()->log( 'acplog__ban_deleted', array( 'ban_filter_' . $current['ban_type'] . '_select' => TRUE, $current['ban_content'] => FALSE ) );
+			\IPS\Db::i()->delete( 'core_banfilters', array( 'ban_id=?', \IPS\Request::i()->id ) );
+			unset( \IPS\Data\Store::i()->bannedIpAddresses );
 		}
-		catch ( UnderflowException $e ) { }
+		catch ( \UnderflowException $e ) { } 
 	
-		Output::i()->redirect( Url::internal( 'app=core&module=membersettings&controller=ban' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=ban' ) );
 	}
 }

@@ -11,62 +11,31 @@
 namespace IPS\core\modules\admin\editor;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Data\Cache;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_array;
-use function mb_stristr;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Emoticons
  */
-class emoticons extends Controller
+class _emoticons extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'emoticons_manage' );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'customization/emoticons.css', 'core', 'admin' ) );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'emoticons_manage' );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'customization/emoticons.css', 'core', 'admin' ) );
 		parent::execute();
 	}
 
@@ -75,13 +44,59 @@ class emoticons extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$activeTabContents = Theme::i()->getTemplate( 'customization' )->emoticons( $this->_getEmoticons() );
-
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('custom_emoji');
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js('admin_customization.js', 'core', 'admin') );
-		Output::i()->output = $activeTabContents; // @todo Mayyyyyyybe we should make one tab per set, but I really think custom emoticons are too dumb for all that
+		$tabs = array(
+			'standard'	=> 'standard_emoji',
+			'custom'	=> 'custom_emoji',
+		);
+		$activeTab = ( isset( \IPS\Request::i()->tab ) and array_key_exists( \IPS\Request::i()->tab, $tabs ) ) ? \IPS\Request::i()->tab : 'standard';
+		
+		if ( $activeTab == 'standard' )
+		{
+			if ( \IPS\Settings::i()->getFromConfGlobal('sql_utf8mb4') === TRUE )
+			{
+				$form = new \IPS\Helpers\Form;
+				$form->add( new \IPS\Helpers\Form\Radio( 'emoji_style', \IPS\Settings::i()->emoji_style, FALSE, array(
+					'options' => array(
+						'native'	=> 'emoji_style_native',
+						'twemoji'	=> 'emoji_style_twemoji',
+						'disabled'	=> 'emoji_style_disabled',
+					),
+				) ) );
+				\IPS\Member::loggedIn()->language()->get( 'emoji_style_native' ); // We need to preload the word before we can add more text to it.
+				\IPS\Member::loggedIn()->language()->words['emoji_style_native'] .= "<br><div class='ipsType_large ipsSpacer_top ipsSpacer_half'><span class='ipsEmoji'>😀</span><span class='ipsEmoji'>😉</span><span class='ipsEmoji'>😂</span><span class='ipsEmoji'>😍</span><span class='ipsEmoji'>🤘</span><span class='ipsEmoji'>🤦‍♀️</span><span class='ipsEmoji'>🤷‍♂️</span><span class='ipsEmoji'>🍿</span><span class='ipsEmoji'>🚀</span><span class='ipsEmoji'>🎉</span><span class='ipsEmoji'>🏳️‍🌈</span></div>"; // Have to do this here because if we try to put it in the actual language string, that will cause an error if not utf8mb4
+				$form->add( new \IPS\Helpers\Form\YesNo( 'emoji_shortcodes', \IPS\Settings::i()->emoji_shortcodes, FALSE, array(), NULL, NULL, NULL, 'emoji_shortcodes' ) );
+				$form->add( new \IPS\Helpers\Form\YesNo( 'emoji_ascii', \IPS\Settings::i()->emoji_ascii, FALSE, array(), NULL, NULL, NULL, 'emoji_ascii' ) );
+				if ( $values = $form->values() )
+				{
+					$values['emoji_cache'] = time();
+					$form->saveAsSettings( $values );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=editor&controller=emoticons&tab=standard' ), 'saved' );
+				}
+				
+				$activeTabContents = $form;
+			}
+			else
+			{
+				$activeTabContents = \IPS\Theme::i()->getTemplate( 'global' )->message( \IPS\CIC ? 'emoji_utf8mb4_required_cic' : 'emoji_utf8mb4_required', 'error', NULL, TRUE, TRUE );
+			}
+		}
+		else
+		{
+			$activeTabContents = \IPS\Theme::i()->getTemplate( 'customization' )->emoticons( $this->_getEmoticons() );
+		}
+		
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('menu__core_editor_emoticons');
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('admin_customization.js', 'core', 'admin') );
+		if( \IPS\Request::i()->isAjax() )
+		{
+			\IPS\Output::i()->output = $activeTabContents;
+		}
+		else
+		{
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->tabs( $tabs, $activeTab, $activeTabContents, \IPS\Http\Url::internal( "app=core&module=editor&controller=emoticons" ) );
+		}
 	}
 	
 	/**
@@ -89,30 +104,30 @@ class emoticons extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function add() : void
+	protected function add()
 	{
-		Dispatcher::i()->checkAcpPermission( 'emoticons_add' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'emoticons_add' );
 	
-		$groups = iterator_to_array( Db::i()->select( "emo_set, CONCAT( 'core_emoticon_group_', emo_set ) as emo_set_name", 'core_emoticons', null, null, null, 'emo_set' )->setKeyField('emo_set')->setValueField('emo_set_name') );
+		$groups = iterator_to_array( \IPS\Db::i()->select( "emo_set, CONCAT( 'core_emoticon_group_', emo_set ) as emo_set_name", 'core_emoticons', null, null, null, 'emo_set' )->setKeyField('emo_set')->setValueField('emo_set_name') );
 
-		$form = new Form;
-		$form->add( new Upload( 'emoticons_upload', NULL, TRUE, array( 'multiple' => TRUE, 'image' => TRUE, 'storageExtension' => 'core_Emoticons', 'storageContainer' => 'emoticons', 'obscure' => FALSE ) ) );
-		$form->add( new Radio( 'emoticons_add_group', 'create', TRUE, array(
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Upload( 'emoticons_upload', NULL, TRUE, array( 'multiple' => TRUE, 'image' => TRUE, 'storageExtension' => 'core_Emoticons', 'storageContainer' => 'emoticons', 'obscure' => FALSE ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'emoticons_add_group', 'create', TRUE, array(
 			'options'	=> array( 'create' => 'emoticons_add_create', 'existing' => 'emoticons_add_existing' ),
 			'toggles'	=> array( 'create' => array( 'emoticons_add_newgroup' ), 'existing' => array( 'emoticons_add_choosegroup' ) ),
 			'disabled'	=> empty($groups)
 		) ) );
-		$form->add( new Translatable( 'emoticons_add_newgroup', NULL, FALSE, array(), function( $value )
+		$form->add( new \IPS\Helpers\Form\Translatable( 'emoticons_add_newgroup', NULL, FALSE, array(), function( $value )
 		{
-			if ( Request::i()->emoticons_add_group === 'create' )
+			if ( \IPS\Request::i()->emoticons_add_group === 'create' )
 			{
-				foreach ( Lang::languages() as $lang )
+				foreach ( \IPS\Lang::languages() as $lang )
 				{
 					if ( $lang->default )
 					{
 						if( ! $value[ $lang->id ] )
 						{		
-							throw new InvalidArgumentException('form_required');
+							throw new \InvalidArgumentException('form_required');
 						}
 					}
 				}
@@ -121,7 +136,7 @@ class emoticons extends Controller
 		
 		if ( !empty( $groups ) )
 		{
-			$form->add( new Select( 'emoticons_add_choosegroup', NULL, FALSE, array( 'options' => $groups ), NULL, NULL, NULL, 'emoticons_add_choosegroup' ) );
+			$form->add( new \IPS\Helpers\Form\Select( 'emoticons_add_choosegroup', NULL, FALSE, array( 'options' => $groups ), NULL, NULL, NULL, 'emoticons_add_choosegroup' ) );
 		}
 		
 		if ( $values = $form->values() )
@@ -130,16 +145,16 @@ class emoticons extends Controller
 			{
 				$position = 0;
 				$setId = mt_rand();
-				Lang::saveCustom( 'core', "core_emoticon_group_{$setId}", $values['emoticons_add_newgroup'] );
-                Session::i()->log( 'acplog__emoticon_group_created', array( "core_emoticon_group_{$setId}" => TRUE ) );
+				\IPS\Lang::saveCustom( 'core', "core_emoticon_group_{$setId}", $values['emoticons_add_newgroup'] );
+                \IPS\Session::i()->log( 'acplog__emoticon_group_created', array( "core_emoticon_group_{$setId}" => TRUE ) );
 			}
 			else
 			{
 				$setId = $values['emoticons_add_choosegroup'];
-				$position = Db::i()->select( 'MAX(emo_position)', 'core_emoticons', array( 'emo_set=?', $setId ) )->first( );
+				$position = \IPS\Db::i()->select( 'MAX(emo_position)', 'core_emoticons', array( 'emo_set=?', $setId ) )->first( );
 			}
 					
-			if ( !is_array( $values['emoticons_upload'] ) )
+			if ( !\is_array( $values['emoticons_upload'] ) )
 			{
 				$values['emoticons_upload'] = array( $values['emoticons_upload'] );
 			}
@@ -149,7 +164,7 @@ class emoticons extends Controller
 			foreach ( $values['emoticons_upload'] as $file )
 			{
 				/* Is it "retina" */
-				if( mb_stristr( $file->filename, '@2x' ) )
+				if( \mb_stristr( $file->filename, '@2x' ) )
 				{
 					$filename_2x = preg_replace( "/^(.+?)\.[0-9a-f]{32}(?:\..+?)$/i", "$1", str_replace( '@2x', '', $file->filename ) );
 
@@ -168,17 +183,17 @@ class emoticons extends Controller
 				);
 			}
 
-			if( count( $inserts ) )
+			if( \count( $inserts ) )
 			{
-				Db::i()->insert( 'core_emoticons', $inserts );
+				\IPS\Db::i()->insert( 'core_emoticons', $inserts );
 			}
 
 			/* Add 2x */
-			if( count( $images2x ) )
+			if( \count( $images2x ) )
 			{
-				foreach( Db::i()->select( '*', 'core_emoticons', array( 'emo_set=?', $setId ) ) as $emo )
+				foreach( \IPS\Db::i()->select( '*', 'core_emoticons', array( 'emo_set=?', $setId ) ) as $emo )
 				{
-					$file = File::get( 'core_Emoticons', $emo['image'] );
+					$file = \IPS\File::get( 'core_Emoticons', $emo['image'] );
 					$filename = $this->_getRawFilename( $file->filename );
 
 					/* There isn't an original for the 2x emo */
@@ -190,7 +205,7 @@ class emoticons extends Controller
 					/* Get the dimensions of the smaller emoticon */
 					$imageDimensions = $file->getImageDimensions();
 
-					Db::i()->update( 'core_emoticons', array(
+					\IPS\Db::i()->update( 'core_emoticons', array(
 						'image_2x' => $images2x[ $filename ],
 						'width' => $imageDimensions[0],
 						'height' => $imageDimensions[1]
@@ -202,19 +217,21 @@ class emoticons extends Controller
 				/* Delete any unused 2x files */
 				foreach( $images2x as $img )
 				{
-					File::get( 'core_Emoticons', $img )->delete();
+					\IPS\File::get( 'core_Emoticons', $img )->delete();
 				}
 			}
 
-			unset( Cache::i()->core_editor_emoji_sets );
-			Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
+			\IPS\Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
 
-            Session::i()->log( 'acplog__emoticons_added', array( "core_emoticon_group_{$setId}" => TRUE ) );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+            \IPS\Session::i()->log( 'acplog__emoticons_added', array( "core_emoticon_group_{$setId}" => TRUE ) );
 			
-			Output::i()->redirect( Url::internal( 'app=core&module=editor&controller=emoticons&tab=custom' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=editor&controller=emoticons&tab=custom' ), 'saved' );
 		}
 		
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'emoticons_add', $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'emoticons_add', $form, FALSE );
 	}
 	
 	/**
@@ -222,39 +239,39 @@ class emoticons extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function edit() : void
+	protected function edit()
 	{
-		Dispatcher::i()->checkAcpPermission( 'emoticons_edit' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'emoticons_edit' );
+		\IPS\Session::i()->csrfCheck();
 
 		$position = 0;
 		$set = NULL;
 		
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
 			$i = 1;
-			if ( isset( Request::i()->setOrder ) )
+			if ( isset( \IPS\Request::i()->setOrder ) )
 			{
-				foreach ( Request::i()->setOrder as $set )
+				foreach ( \IPS\Request::i()->setOrder as $set )
 				{
 					$set = preg_replace( '/^core_emoticon_group_/', '', $set );
 					
-					Db::i()->update( 'core_emoticons', array( 'emo_set_position' => $i ), array( 'emo_set=?', $set ) );
+					\IPS\Db::i()->update( 'core_emoticons', array( 'emo_set_position' => $i ), array( 'emo_set=?', $set ) );
 					$i++;
 				}
 			}
 			else
 			{			
-				$emoticons	= $this->_getEmoticons();
+				$emoticons	= $this->_getEmoticons( TRUE );
 				$setPos		= 1;
 				
 				foreach ( $emoticons as $group => $emos )
 				{
-					if( isset( Request::i()->$group ) AND is_array( Request::i()->$group ) )
+					if( isset( \IPS\Request::i()->$group ) AND \is_array( \IPS\Request::i()->$group ) )
 					{
-						foreach( Request::i()->$group as $id )
+						foreach( \IPS\Request::i()->$group as $id )
 						{
-							Db::i()->update( 'core_emoticons', array( 'emo_position' => $i, 'emo_set_position' => $setPos, 'emo_set' => str_replace( 'core_emoticon_group_', '', $group ) ), array( 'id=?', $id ) );
+							\IPS\Db::i()->update( 'core_emoticons', array( 'emo_position' => $i, 'emo_set_position' => $setPos, 'emo_set' => str_replace( 'core_emoticon_group_', '', $group ) ), array( 'id=?', $id ) );
 							$i++;
 						}
 					}
@@ -262,36 +279,36 @@ class emoticons extends Controller
 					$setPos++;
 				}
 			}
-
-			unset( Cache::i()->core_editor_emoji_sets );// clear the cache
-			Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
 			
-			Session::i()->log( 'acplog__emoticons_edited' );
+			\IPS\Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
 			
-			Output::i()->json( 'OK' );
+			\IPS\Session::i()->log( 'acplog__emoticons_edited' );
+			
+			\IPS\Output::i()->json( 'OK' );
+			return;
 		}
 
 		// Do we need to unsquash any values?
 		// Squashed values are json_encoded by javascript to prevent us exceeding max_post_vars		
 		// If 'squashedField' isn't in the request it might indicate the user didn't have JS enabled
-		if ( isset( Request::i()->emoticons_squashed ) )
+		if ( isset( \IPS\Request::i()->emoticons_squashed ) )
 		{
-			if ( isset( Request::i()->emoticons_squashed ) )
+			if ( isset( \IPS\Request::i()->emoticons_squashed ) )
 			{
-				$unsquashed = json_decode( Request::i()->emoticons_squashed, TRUE );
+				$unsquashed = json_decode( \IPS\Request::i()->emoticons_squashed, TRUE );
 				
 				foreach( $unsquashed as $key => $value )
 				{
-					Request::i()->$key = $value;
+					\IPS\Request::i()->$key = $value;
 				}
 
-				unset( Request::i()->emoticons_squashed );
+				unset( \IPS\Request::i()->emoticons_squashed );
 			}
 		}
 
 		$emoticons = $this->_getEmoticons( FALSE );
 
-		foreach ( Request::i()->emo as $id => $data )
+		foreach ( \IPS\Request::i()->emo as $id => $data )
 		{
 			if ( isset( $emoticons[ $id ] ) )
 			{
@@ -309,16 +326,19 @@ class emoticons extends Controller
 						$save['emo_set'] = str_replace( 'core_emoticon_group_', '', $data['set'] );
 					}
 
-					Db::i()->update( 'core_emoticons', $save, array( 'id=?', $id ) );
+					\IPS\Db::i()->update( 'core_emoticons', $save, array( 'id=?', $id ) );
 				}
 			}
 		}
 
-		Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
+		\IPS\Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
 
-        Session::i()->log( 'acplog__emoticons_edited' );
+		/* Clear guest page caches */
+		\IPS\Data\Cache::i()->clearAll();
+
+        \IPS\Session::i()->log( 'acplog__emoticons_edited' );
 		
-		Output::i()->redirect( Url::internal( 'app=core&module=editor&controller=emoticons&tab=custom' ), 'saved' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=editor&controller=emoticons&tab=custom' ), 'saved' );
 	}
 	
 	/**
@@ -326,49 +346,42 @@ class emoticons extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
-		Dispatcher::i()->checkAcpPermission( 'emoticons_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'emoticons_delete' );
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
 		try
 		{
-			$emoticon = Db::i()->select( '*', 'core_emoticons', array( 'id=?', Request::i()->id ) )->first();
+			$emoticon = \IPS\Db::i()->select( '*', 'core_emoticons', array( 'id=?', \IPS\Request::i()->id ) )->first();
 			if ( $emoticon['id'] )
 			{
-				foreach ( ['image', 'image_2x'] as $field )
-				{
-					if ( is_string( $emoticon[$field] ) )
-					{
-						try
-						{
-							File::get( 'core_Emoticons', $emoticon[$field] )->delete();
-						}
-						catch ( OutOfRangeException ) {} // if the file doesn't exist anyway, we don't care
-					}
-				}
+				\IPS\File::get( 'core_Emoticons', $emoticon['image'] )->delete();
+				\IPS\File::get( 'core_Emoticons', $emoticon['image_2x'] )->delete();
 			}
 
-			Db::i()->delete( 'core_emoticons', array( 'id=?', (int) Request::i()->id ) );
+			\IPS\Db::i()->delete( 'core_emoticons', array( 'id=?', (int) \IPS\Request::i()->id ) );
 
 			/* delete the group name, if there are no other emoticons in this group */
-			$emoticons = Db::i()->select( 'COUNT(*) as count', 'core_emoticons', array( 'emo_set =?', $emoticon['emo_set'] ) )->first();
+			$emoticons = \IPS\Db::i()->select( 'COUNT(*) as count', 'core_emoticons', array( 'emo_set =?', $emoticon['emo_set'] ) )->first();
 
 			if ( $emoticons == 0 )
 			{
-				Lang::deleteCustom( 'core', 'core_emoticon_group_'. $emoticon['emo_set'] );
+				\IPS\Lang::deleteCustom( 'core', 'core_emoticon_group_'. $emoticon['emo_set'] );
 			}
 
-	        Session::i()->log( 'acplog__emoticon_deleted' );
+	        \IPS\Session::i()->log( 'acplog__emoticon_deleted' );
 
-			Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
-			unset( Cache::i()->core_editor_emoji_sets ); // clear the cache
+			\IPS\Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
+
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
 		}
-		catch ( UnderflowException $e ) { }
+		catch ( \UnderflowException $e ) { }
 
-		Output::i()->redirect( Url::internal( 'app=core&module=editor&controller=emoticons&tab=custom' ), 'saved' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=editor&controller=emoticons&tab=custom' ), 'saved' );
 	}
 	
 	/**
@@ -376,40 +389,36 @@ class emoticons extends Controller
 	 *
 	 * @return	void
 	 */
-	public function deleteSet() : void
+	public function deleteSet()
 	{
-		Dispatcher::i()->checkAcpPermission( 'emoticons_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'emoticons_delete' );
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 		
-		$set = preg_replace( '/^core_emoticon_group_/', '', Request::i()->key );
+		$set = preg_replace( '/^core_emoticon_group_/', '', \IPS\Request::i()->key );
 		
-		foreach ( Db::i()->select( '*', 'core_emoticons', array( 'emo_set=?', $set ) ) as $emoticon )
+		foreach ( \IPS\Db::i()->select( '*', 'core_emoticons', array( 'emo_set=?', $set ) ) as $emoticon )
 		{
 			try
 			{
-				if( $emoticon['image'] )
-				{
-					File::get( 'core_Emoticons', $emoticon['image'] )->delete();
-				}
-				if( $emoticon['image_2x'] )
-				{
-					File::get( 'core_Emoticons', $emoticon['image_2x'] )->delete();
-				}
+				\IPS\File::get( 'core_Emoticons', $emoticon['image'] )->delete();
+				\IPS\File::get( 'core_Emoticons', $emoticon['image_2x'] )->delete();
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \UnderflowException $e ) { }
 		}
 		
-		Db::i()->delete( 'core_emoticons', array( 'emo_set=?', $set ) );
-		Lang::deleteCustom( 'core', 'core_emoticon_group_'. $set );
+		\IPS\Db::i()->delete( 'core_emoticons', array( 'emo_set=?', $set ) );
+		\IPS\Lang::deleteCustom( 'core', 'core_emoticon_group_'. $set );
 
-		Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
-		unset( Cache::i()->core_editor_emoji_sets ); // clear the cache
+		\IPS\Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
+
+		/* Clear guest page caches */
+		\IPS\Data\Cache::i()->clearAll();
 		
-		Session::i()->log( 'acplog__emoticon_set_deleted' );
+		\IPS\Session::i()->log( 'acplog__emoticon_set_deleted' );
 
-		Output::i()->redirect( Url::internal( 'app=core&module=editor&controller=emoticons&tab=custom' ), 'saved' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=editor&controller=emoticons&tab=custom' ), 'saved' );
 	}
 
 	/**
@@ -417,28 +426,28 @@ class emoticons extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function editTitle() : void
+	protected function editTitle()
 	{
-		Dispatcher::i()->checkAcpPermission( 'emoticons_edit' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'emoticons_edit' );
 
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--edit-emoticon-group ipsForm--fullWidth';
-		$form->add( new Translatable( 'emoticons_add_newgroup', NULL, FALSE, array( 'app' => 'core', 'key' => Request::i()->key ), NULL, NULL, NULL, 'emoticons_add_newgroup' ) );
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical ipsForm_fullWidth';
+		$form->add( new \IPS\Helpers\Form\Translatable( 'emoticons_add_newgroup', NULL, FALSE, array( 'app' => 'core', 'key' => \IPS\Request::i()->key ), NULL, NULL, NULL, 'emoticons_add_newgroup' ) );
 		
 		if ( $values = $form->values() )
 		{
-			Lang::saveCustom( 'core', Request::i()->key, $values['emoticons_add_newgroup'] );
+			\IPS\Lang::saveCustom( 'core', \IPS\Request::i()->key, $values['emoticons_add_newgroup'] );
 			
-			Output::i()->redirect( Url::internal( 'app=core&module=editor&controller=emoticons&tab=custom' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=editor&controller=emoticons&tab=custom' ), 'saved' );
 		}
 		
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $form;
+			\IPS\Output::i()->output = $form;
 			return;
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'emoticons_edit_groupname', $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'emoticons_edit_groupname', $form, FALSE );
 	}
 
 	/**
@@ -447,10 +456,10 @@ class emoticons extends Controller
 	 * @param	bool	$group	Group by their group?
 	 * @return	array
 	 */
-	protected function _getEmoticons( bool $group=TRUE ) : array
+	protected function _getEmoticons( $group=TRUE )
 	{
 		$emoticons = array();
-		foreach ( Db::i()->select( '*', 'core_emoticons', NULL, 'emo_set_position,emo_position' ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'core_emoticons', NULL, 'emo_set_position,emo_position' ) as $row )
 		{			
 			if ( $group )
 			{
@@ -471,10 +480,12 @@ class emoticons extends Controller
 	 * @param	string		$path		Emoticon path
 	 * @return	string
 	 */
-	protected function _getRawFilename( string $path ) : string
+	protected function _getRawFilename( $path )
 	{
 		$parts = explode( '/', $path );
 		$filenamePart = array_pop( $parts );
-		return mb_substr( $filenamePart, 0, mb_strrpos( $filenamePart, '.' ) );
+		$filename = mb_substr( $filenamePart, 0, mb_strrpos( $filenamePart, '.' ) );
+
+		return $filename;
 	}
 }

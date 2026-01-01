@@ -12,28 +12,16 @@
 namespace IPS\nexus\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Db;
-use IPS\Log;
-use IPS\nexus\Customer\BillingAgreement;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task;
-use Throwable;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * billingAgreements Task
  */
-class billingAgreements extends Task
+class _billingAgreements extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -43,14 +31,13 @@ class billingAgreements extends Task
 	 * If an error occurs which means the task could not finish running, throw an \IPS\Task\Exception - do not log an error as a normal log.
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
-	 * @return	string|null	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @return	mixed	Message to log or NULL
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : string|null
+	public function execute()
 	{
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_billing_agreements', array( 'ba_next_cycle<?', time() ), 'ba_next_cycle ASC', 50 ), 'IPS\nexus\Customer\BillingAgreement' ) as $billingAgreement )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_billing_agreements', array( 'ba_next_cycle<?', time() ), 'ba_next_cycle ASC', 50 ), 'IPS\nexus\Customer\BillingAgreement' ) as $billingAgreement )
 		{
-			/* @var BillingAgreement $billingAgreement */
 			try
 			{
 				/* Get the status? */
@@ -60,7 +47,7 @@ class billingAgreements extends Task
 					{
 						$billingAgreement->canceled = TRUE;
 					}
-					throw new DomainException("{$billingAgreement->id} - {$billingAgreement->status()}");
+					throw new \DomainException("{$billingAgreement->id} - {$billingAgreement->status()}");
 				}
 
 				/* Get the term */
@@ -69,22 +56,27 @@ class billingAgreements extends Task
 				/* Check for a recent transaction */
 				$billingAgreement->checkForLatestTransaction();
 			}
-			catch( UnderflowException ){}	// We intentionally ignore this because it's normal
+			catch( \UnderflowException $e ){}	// We intentionally ignore this because it's normal
 			catch ( \IPS\Http\Url\Exception $e )
 			{
 				/* Just log the issue, but don't do anything here,.. this was probably a temporary issue so let the next call run this again */
-				Log::log( $e, 'ba_sync_fail' );
+				\IPS\Log::log( $e, 'ba_sync_fail' );
 			}
-			catch ( Exception|Throwable $e )
+			catch ( \Exception $e )
 			{
-				Log::log( $e, 'ba_sync_fail' );
+				\IPS\Log::log( $e, 'ba_sync_fail' );
+
+				$billingAgreement->next_cycle = NULL;
+				$billingAgreement->save();
+			}
+			catch ( \Throwable $e )
+			{
+				\IPS\Log::log( $e, 'ba_sync_fail' );
 
 				$billingAgreement->next_cycle = NULL;
 				$billingAgreement->save();
 			}
 		}
-
-		return null;
 	}
 
 	/**
@@ -96,7 +88,7 @@ class billingAgreements extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 
 	}

@@ -12,50 +12,43 @@
 namespace IPS\cms\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Editor;
-use IPS\Output;
-use IPS\Widget\StaticCache;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * WYSIWYG Widget
  */
-class Wysiwyg extends StaticCache
+class _Wysiwyg extends \IPS\Widget\StaticCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'Wysiwyg';
+	public $key = 'Wysiwyg';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'cms';
+	public $app = 'cms';
 		
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	Form|NULL	$form	Form helper
-	 * @return	Form
+	 * @param	\IPS\Helpers\Form|NULL	$form	Form helper
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
  	{
 		$form = parent::configuration( $form );
  		
-		$form->add( new Editor( 'content', ( $this->configuration['content'] ?? NULL ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Editor( 'content', ( isset( $this->configuration['content'] ) ? $this->configuration['content'] : NULL ), FALSE, array(
 			'app'			=> $this->app,
 			'key'			=> 'Widgets',
 			'autoSaveKey' 	=> 'widget-' . $this->uniqueKey,
@@ -70,25 +63,25 @@ class Wysiwyg extends StaticCache
 	 *
 	 * @return void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		foreach( Db::i()->select( '*', 'core_attachments_map', array( array( 'location_key=? and id3=?', 'cms_Widgets', $this->uniqueKey ) ) ) as $map )
+		foreach( \IPS\Db::i()->select( '*', 'core_attachments_map', array( array( 'location_key=? and id3=?', 'cms_Widgets', $this->uniqueKey ) ) ) as $map )
 		{
 			try
 			{				
-				$attachment = Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', $map['attachment_id'] ) )->first();
+				$attachment = \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', $map['attachment_id'] ) )->first();
 				
-				Db::i()->delete( 'core_attachments_map', array( array( 'attachment_id=?', $attachment['attach_id'] ) ) );
-				Db::i()->delete( 'core_attachments', array( 'attach_id=?', $attachment['attach_id'] ) );
+				\IPS\Db::i()->delete( 'core_attachments_map', array( array( 'attachment_id=?', $attachment['attach_id'] ) ) );
+				\IPS\Db::i()->delete( 'core_attachments', array( 'attach_id=?', $attachment['attach_id'] ) );
 				
 				
-				File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
+				\IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
 				if ( $attachment['attach_thumb_location'] )
 				{
-					File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
+					\IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
 				}
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 	}
 	
@@ -96,11 +89,11 @@ class Wysiwyg extends StaticCache
  	 * Pre-save config method
  	 *
  	 * @param	array	$values		Form values
- 	 * @return array
+ 	 * @return void
  	 */
- 	public function preConfig( array $values=array() ) : array
+ 	public function preConfig( $values=array() )
  	{
-	 	File::claimAttachments( 'widget-' . $this->uniqueKey, 0, 0, $this->uniqueKey );
+	 	\IPS\File::claimAttachments( 'widget-' . $this->uniqueKey, 0, 0, $this->uniqueKey );
 	 	
 	 	return $values;
  	}
@@ -110,9 +103,9 @@ class Wysiwyg extends StaticCache
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_core.js', 'core' ) );
-		return $this->output( $this->configuration['content'] ?? '' );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_core.js', 'core' ) );
+		return $this->output( isset( $this->configuration['content'] ) ? $this->configuration['content'] : '' );
 	}
 }

@@ -11,34 +11,26 @@
 namespace IPS\nexus\extensions\core\MemberACPProfileTabs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\MainTab;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Customer Tab
  */
-class Main extends MainTab
+class _Main extends \IPS\core\MemberACPProfile\MainTab
 {
 	/**
 	 * Constructor
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function __construct( Member $member )
+	public function __construct( \IPS\Member $member )
 	{
-		$this->member = Customer::load( $member->member_id );
+		$this->member = \IPS\nexus\Customer::load( $member->member_id );
 	}
 	
 	/**
@@ -46,9 +38,9 @@ class Main extends MainTab
 	 *
 	 * @return	bool
 	 */
-	public function canView(): bool
+	public function canView()
 	{
-		return (bool) Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view' );
+		return (bool) \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view' );
 	}
 	
 	/**
@@ -56,7 +48,7 @@ class Main extends MainTab
 	 *
 	 * @return	array
 	 */
-	public function leftColumnBlocks(): array
+	public function leftColumnBlocks()
 	{
 		return array(
 			'IPS\nexus\extensions\core\MemberACPProfileBlocks\AccountInformation',
@@ -68,30 +60,35 @@ class Main extends MainTab
 	 *
 	 * @return	array
 	 */
-	public function mainColumnBlocks(): array
+	public function mainColumnBlocks()
 	{
 		$return = array();
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view_statistics' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view_statistics' ) )
 		{
 			$return[] = 'IPS\nexus\extensions\core\MemberACPProfileBlocks\Statistics';
 		}
 
 		$return[] = 'IPS\nexus\extensions\core\MemberACPProfileBlocks\ParentAccounts';
 		
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customer_notes_view' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customer_notes_view' ) )
 		{
 			$return[] = 'IPS\nexus\extensions\core\MemberACPProfileBlocks\Notes';
 		}
 		
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_view' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_view' ) )
 		{
 			$return[] = 'IPS\nexus\extensions\core\MemberACPProfileBlocks\Purchases';
 		}
 		
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_manage' ) )
 		{
 			$return[] = 'IPS\nexus\extensions\core\MemberACPProfileBlocks\Invoices';
+		}
+		
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'support', 'requests_manage' ) )
+		{
+			$return[] = 'IPS\nexus\extensions\core\MemberACPProfileBlocks\Support';
 		}
 		
 		return $return;
@@ -102,10 +99,17 @@ class Main extends MainTab
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'customer.css', 'nexus', 'admin' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_customer.js', 'nexus', 'admin' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'customer.css', 'nexus', 'admin' ) );
+
+		if ( \IPS\Theme::i()->settings['responsive'] )
+		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'customer_responsive.css', 'nexus', 'admin' ) );
+		}
+
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'support.css', 'nexus', 'admin' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_customer.js', 'nexus', 'admin' ) );
 		
 		return parent::output();
 	}

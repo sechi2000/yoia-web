@@ -12,39 +12,16 @@
 namespace IPS\nexus\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Math\Number;
-use IPS\nexus\Customer;
-use IPS\nexus\Gateway;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item\Renewal;
-use IPS\nexus\Money;
-use IPS\nexus\Tax;
-use IPS\nexus\Transaction;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Task;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Generate Renewal Invoices Task
  */
-class generateRenewalInvoices extends Task
+class _generateRenewalInvoices extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -54,25 +31,25 @@ class generateRenewalInvoices extends Task
 	 * If an error occurs which means the task could not finish running, throw an \IPS\Task\Exception - do not log an error as a normal log.
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
-	 * @return	string|null	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @return	mixed	Message to log or NULL
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : string|null
+	public function execute()
 	{
         /* Get purchases grouped by member and currency */
         $select = $this->_getSelectQuery();
-        $log = Db::_replaceBinds( $select->query, $select->binds ) . "\n" . count( $select ) . " matches\n\n";
-		$availableTaxes = Tax::roots();
+        $log = \IPS\Db::_replaceBinds( $select->query, $select->binds ) . "\n" . \count( $select ) . " matches\n\n";
+		$availableTaxes = \IPS\nexus\Tax::roots();
 
 		$groupedPurchases = array();
-		foreach ( new ActiveRecordIterator( $select, 'IPS\nexus\Purchase' ) as $purchase )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( $select, 'IPS\nexus\Purchase' ) as $purchase )
 		{
 			/* If the member does not exist, we should not lock the task */
 			try
 			{
 				$groupedPurchases[ $purchase->member->member_id ][ $purchase->renewal_currency ][ $purchase->id ] = $purchase;
 			}
-			catch( OutOfRangeException )
+			catch( \OutOfRangeException $e )
 			{
 				/* Set the purchase inactive so we don't try again. */
 				$purchase->active = 0;
@@ -83,13 +60,13 @@ class generateRenewalInvoices extends Task
 		/* Loop */
 		foreach ( $groupedPurchases as $memberId => $currencies )
 		{
-			$member = Customer::load( $memberId );
+			$member = \IPS\nexus\Customer::load( $memberId );
 			foreach ( $currencies as $currency => $purchases )
 			{		
-				$log .= "Member {$memberId}, {$currency}: " . count( $purchases ) . " purchase(s) to be renewed: " . implode( ', ', array_keys( $purchases ) ) . ". ";
+				$log .= "Member {$memberId}, {$currency}: " . \count( $purchases ) . " purchase(s) to be renewed: " . implode( ', ', array_keys( $purchases ) ) . ". ";
 						
 				/* Create Invoice */
-				$invoice = new Invoice;
+				$invoice = new \IPS\nexus\Invoice;
 				$invoice->system = TRUE;
 				$invoice->currency = $currency;
 				$invoice->member = $member;
@@ -114,7 +91,7 @@ class generateRenewalInvoices extends Task
 				}
 
 				/* Continue to next invoice if no items left */
-				if( !count( $items ) )
+				if( !\count( $items ) )
 				{
 					continue;
 				}
@@ -122,14 +99,14 @@ class generateRenewalInvoices extends Task
 				/* Add items to invoice */
 				foreach( $items as $item )
 				{
-					$invoice->addItem( Renewal::create( $item ) );
+					$invoice->addItem( \IPS\nexus\Invoice\Item\Renewal::create( $item ) );
 				}
 				$invoice->save();
 				$log .= "Invoice {$invoice->id} generated... ";
 				
 				/* Try to take payment automatically, but *only* if we have a billing address (i.e. the customer has a primary billing address set)
 					otherwise we don't know how we're taxing this and the customer will need to manually come and pay it - we can skip this if tax has not been configured */
-				if ( $invoice->billaddress OR count( $availableTaxes ) === 0 )
+				if ( $invoice->billaddress OR \count( $availableTaxes ) === 0 )
 				{
 					/* Nothing to pay? */
 					if ( $invoice->amountToPay()->amount->isZero() )
@@ -153,14 +130,14 @@ class generateRenewalInvoices extends Task
 							{
 								$take = NULL;
 								/* If credit is equal or larger than invoice value */
-								if ( in_array( $credit->compare( $invoice->total->amount ), [ 0, 1 ] ) )
+								if ( \in_array( $credit->compare( $invoice->total->amount ), [ 0, 1 ] ) )
 								{
 									$take = $invoice->total->amount;
 								}
 								else
 								{
 									/* Only use credit if amount remaining is greater than card gateway min amount */
-									if( $invoice->total->amount->subtract( $credit ) > new Number( '0.50' ) )
+									if( $invoice->total->amount->subtract( $credit ) > new \IPS\Math\Number( '0.50' ) )
 									{
 										$take = $credit;
 									}
@@ -170,10 +147,10 @@ class generateRenewalInvoices extends Task
 								{
 									$log .= "{$credit} account credit available... ";
 
-									$transaction = new Transaction;
+									$transaction = new \IPS\nexus\Transaction;
 									$transaction->member = $member;
 									$transaction->invoice = $invoice;
-									$transaction->amount = new Money( $take, $currency );
+									$transaction->amount = new \IPS\nexus\Money( $take, $currency );
 									$transaction->extra = array('automatic' => TRUE);
 									$transaction->save();
 									$transaction->approve();
@@ -182,7 +159,7 @@ class generateRenewalInvoices extends Task
 
 									$member->log( 'transaction', array(
 										'type' => 'paid',
-										'status' => Transaction::STATUS_PAID,
+										'status' => \IPS\nexus\Transaction::STATUS_PAID,
 										'id' => $transaction->id,
 										'invoice_id' => $invoice->id,
 										'invoice_title' => $invoice->title,
@@ -206,45 +183,85 @@ class generateRenewalInvoices extends Task
                         $allowedPaymentMethods = array();
                         foreach( $invoice->items as $item )
                         {
-                            if( is_array( $item->paymentMethodIds ) and !in_array( '*', $item->paymentMethodIds ) )
+                            if( \is_array( $item->paymentMethodIds ) and !\in_array( '*', $item->paymentMethodIds ) )
                             {
                                 $allowedPaymentMethods = array_merge( $allowedPaymentMethods, $item->paymentMethodIds );
                             }
                         }
 
-						/* Check all available gateways */
-						if( empty( $allowedPaymentMethods ) )
-						{
-							foreach( Gateway::roots() as $gateway )
-							{
-								$allowedPaymentMethods[] = $gateway->_id;
-							}
-						}
+                        $cardWhere = array(
+                            array( 'card_member=?', $member->member_id )
+                        );
+                        if( \count( $allowedPaymentMethods ) )
+                        {
+                            $cardWhere[] = array( \IPS\Db::i()->in( 'card_method', $allowedPaymentMethods ) );
+                        }
 
-						/* Loop through each payment method and try to take payment */
-						foreach( $allowedPaymentMethods as $paymentMethodId )
+						foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_customer_cards', $cardWhere ), 'IPS\nexus\Customer\CreditCard' ) as $card )
 						{
+							$log .= "Attempting card {$card->id}... ";
+							
 							try
 							{
-								$gateway = Gateway::load( $paymentMethodId );
-								if( $gateway::SUPPORTS_AUTOPAY and $gateway->checkValidity( $invoice->amountToPay() ) )
+								$cardDetails = $card->card; // We're just checking this doesn't throw an exception
+								
+								$amountToPay = $invoice->amountToPay();
+								$gateway = $card->method;
+		
+								$transaction = new \IPS\nexus\Transaction;
+								$transaction->member = $member;
+								$transaction->invoice = $invoice;
+								$transaction->method = $gateway;
+								$transaction->amount = $amountToPay;
+								$transaction->currency = $currency;
+								$transaction->extra = array( 'automatic' => TRUE );
+		
+								try
 								{
-									foreach( $gateway->autopay( $invoice ) as $transaction )
-									{
-										if( $transaction->status == Transaction::STATUS_REFUSED )
-										{
-											$log .= "Transaction {$transaction->id} failed. ";
-										}
-										else
-										{
-											$log .= "Transaction {$transaction->id} approved! ";
-										}
-
-										$invoice->status = $transaction->invoice->status;
-									}
+									$transaction->auth = $gateway->auth( $transaction, array(
+										( $gateway->id . '_card' ) => $card
+									), NULL, array(), 'renewal' );
+									$transaction->capture();
+		
+									$transaction->member->log( 'transaction', array(
+										'type'			=> 'paid',
+										'status'		=> \IPS\nexus\Transaction::STATUS_PAID,
+										'id'			=> $transaction->id,
+										'invoice_id'	=> $invoice->id,
+										'invoice_title'	=> $invoice->title,
+										'automatic'		=> TRUE,
+									), FALSE );
+		
+									$transaction->approve();
+									
+									$log .= "Transaction {$transaction->id} approved! ";
+									
+									break;
 								}
+								catch ( \Exception $e )
+								{
+									$transaction->status = \IPS\nexus\Transaction::STATUS_REFUSED;
+									$extra = $transaction->extra;
+									$extra['history'][] = array( 's' => \IPS\nexus\Transaction::STATUS_REFUSED, 'noteRaw' => $e->getMessage() );
+									$transaction->extra = $extra;
+									$transaction->save();
+									
+									$log .= "Transaction {$transaction->id} failed. ";
+									
+									$transaction->member->log( 'transaction', array(
+										'type'			=> 'paid',
+										'status'		=> \IPS\nexus\Transaction::STATUS_REFUSED,
+										'id'			=> $transaction->id,
+										'invoice_id'	=> $invoice->id,
+										'invoice_title'	=> $invoice->title,
+										'automatic'		=> TRUE,
+									), FALSE );
+								}
+		
+								$invoice->status = $transaction->invoice->status;
 							}
-							catch( OutOfRangeException ){}
+							// error with card, move on
+							catch ( \Exception $e ){}
 						}
 					}
 				}
@@ -277,7 +294,7 @@ class generateRenewalInvoices extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 		
 	}
@@ -285,19 +302,19 @@ class generateRenewalInvoices extends Task
 	/**
 	 * Get Purchases Query
 	 *
-	 * @return Select
-	 * @throws Exception
+	 * @return \IPS\Db\Select
+	 * @throws \Exception
 	 */
-	protected function _getSelectQuery(): Select
+	protected function _getSelectQuery(): \IPS\Db\Select
 	{
 		/* What's out cutoff? */
-		$renewalDate = DateTime::create();
-		if( Settings::i()->cm_invoice_generate )
+		$renewalDate = \IPS\DateTime::create();
+		if( \IPS\Settings::i()->cm_invoice_generate )
 		{
-			$renewalDate->add( new DateInterval( 'PT' . Settings::i()->cm_invoice_generate . 'H' )  );
+			$renewalDate->add( new \DateInterval( 'PT' . \IPS\Settings::i()->cm_invoice_generate . 'H' )  );
 		}
 
-		return Db::i()->select( 'ps.*', [ 'nexus_purchases', 'ps' ],
+		return \IPS\Db::i()->select( 'ps.*', [ 'nexus_purchases', 'ps' ],
 			[
 				"ps_cancelled=0 AND ps_renewals>0 AND ps_invoice_pending=0 AND ps_active=1 AND ps_expire>0 AND ps_expire<? AND (ps_billing_agreement IS NULL OR ba.ba_canceled=1) AND ( ps_grouped_renewals='' OR ps_grouped_renewals IS NULL )",
 				$renewalDate->getTimestamp()

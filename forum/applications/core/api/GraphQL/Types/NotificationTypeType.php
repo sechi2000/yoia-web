@@ -12,25 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Member;
-use function count;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * NotificationTypeType for GraphQL API
  */
-class NotificationTypeType extends ObjectType
+class _NotificationTypeType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -57,7 +55,7 @@ class NotificationTypeType extends ObjectType
 						'type' => TypeRegistry::string(),
 						'description' => "Title of the notification group",
 						'resolve' => function ($type) {
-							return Member::loggedIn()->language()->addToStack( 'notifications__' . $type['extension'] );
+							return \IPS\Member::loggedIn()->language()->addToStack( 'notifications__' . $type['extension'] );
 						}
 					],
 					'type' => [
@@ -78,14 +76,14 @@ class NotificationTypeType extends ObjectType
 						'type' => TypeRegistry::string(),
 						'description' => "Type description",
 						'resolve' => function ($type) {
-							return Member::loggedIn()->language()->addToStack( $type['description'] );
+							return \IPS\Member::loggedIn()->language()->addToStack( $type['description'] );
 						}
 					],
 					'lang' => [
 						'type' => TypeRegistry::string(),
 						'description' => "The translated label",
 						'resolve' => function ($type) {
-							return Member::loggedIn()->language()->addToStack( $type['name'] );
+							return \IPS\Member::loggedIn()->language()->addToStack( $type['name'] );
 						}
 					],
 					'inline' => [
@@ -106,7 +104,7 @@ class NotificationTypeType extends ObjectType
 						'type' => \IPS\core\api\GraphQL\TypeRegistry::notificationMethod(),
 						'description' => "Push notification method",
 						'resolve' => function ($type) {
-							if ( !isset( $type['push'] ) || !count( $type['push'] ) || !Member::loggedIn()->members_bitoptions['mobile_notifications'] )
+							if ( !isset( $type['push'] ) || !\count( $type['push'] ) || !\IPS\Member::loggedIn()->members_bitoptions['mobile_notifications'] )
 							{
 								return NULL;
 							}

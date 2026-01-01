@@ -12,71 +12,51 @@
 namespace IPS\convert;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use ErrorException;
-use Exception;
-use IPS\Application;
-use IPS\convert\Software\Exception as SoftwareException;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\forums\Topic\ArchivedPost;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Converter Library Class
  */
-abstract class Library
+abstract class _Library
 {
 	/**
 	 * @brief	Flag to indicate that we are using a specific key, and should do WHERE static::$currentKeyName > static::$currentKeyValue rather than LIMIT 0,1000
 	 */
-	public static bool $usingKeys			= FALSE;
+	public static $usingKeys			= FALSE;
 	
 	/**
 	 * @brief	The name of the current key in the database for this step
 	 */
-	public static ?string $currentKeyName	= NULL;
+	public static $currentKeyName	= NULL;
 	
 	/**
 	 * @brief	The current value of the key
 	 */
-	public static ?int $currentKeyValue	= 0;
+	public static $currentKeyValue	= 0;
 	
 	/**
 	 * @brief	Amount of data being processed per cycle.
 	 */
-	public static int $perCycle				= 2000;
+	public static $perCycle				= 2000;
 	
 	/**
 	 * @brief	If not using keys, the current start value for LIMIT clause.
 	 */
-	public static int $startValue		= 0;
+	public static $startValue		= 0;
 	
 	/**
 	 * @brief	The current conversion step
 	 */
-	public static ?string $action			= NULL;
+	public static $action			= NULL;
 	
 	/**
 	 * @brief	\IPS\convert\Software instance for the software we are converting from
 	 */
-	public ?Software $software					= NULL;
+	public $software					= NULL;
 
 	/**
 	 * @brief	Obscure filenames?
@@ -84,38 +64,22 @@ abstract class Library
 	 * This is only referenced in certain content types that may be referenced in already parsed data such as attachments and emoticons
 	 * - Designed for use with the Invision Community converter.
 	 */
-	public static bool $obscureFilenames		= TRUE;
+	public static $obscureFilenames		= TRUE;
 	
 	/**
 	 * @brief	Array of field types
 	 */
-	protected static array $fieldTypes = array( 'Address', 'Checkbox', 'CheckboxSet', 'Codemirror', 'Color', 'Date', 'Editor', 'Email', 'Item', 'Member', 'Number', 'Password', 'Poll', 'Radio', 'Rating', 'Select', 'Tel', 'Text', 'TextArea', 'Upload', 'Url', 'YesNo' );
+	protected static $fieldTypes = array( 'Address', 'Checkbox', 'CheckboxSet', 'Codemirror', 'Color', 'Date', 'Editor', 'Email', 'Item', 'Member', 'Number', 'Password', 'Poll', 'Radio', 'Rating', 'Select', 'Tel', 'Text', 'TextArea', 'Upload', 'Url', 'YesNo' );
 	
 	/**
 	 * Constructor
 	 *
-	 * @param Software $software	Software Instance we are converting from
+	 * @param	\IPS\convert\Software	$software	Software Instance we are converting from
 	 * @return	void
 	 */
-	public function __construct(Software $software )
+	public function __construct( \IPS\convert\Software $software )
 	{
 		$this->software = $software;
-	}
-
-	/**
-	 * Get Application Key
-	 *
-	 * @return string
-	 * @throws BadMethodCallException
-	 */
-	public function getAppKey(): string
-	{
-		if( !isset( static::$app ) )
-		{
-			throw new BadMethodCallException;
-		}
-
-		return static::$app;
 	}
 	
 	/**
@@ -123,9 +87,9 @@ abstract class Library
 	 *
 	 * @return	array
 	 */
-	public static function libraries() : array
+	public static function libraries()
 	{
-		$libraries = [
+		return array(
 			'core'			=> 'IPS\convert\Library\Core',
 			'blog'			=> 'IPS\convert\Library\Blog',
 			'calendar'		=> 'IPS\convert\Library\Calendar',
@@ -134,22 +98,7 @@ abstract class Library
 			'forums'		=> 'IPS\convert\Library\Forums',
 			'gallery'		=> 'IPS\convert\Library\Gallery',
 			'nexus'			=> 'IPS\convert\Library\Nexus',
-		];
-
-		/* Library Extensions */
-		foreach ( Application::allExtensions( 'convert', 'Library', FALSE, construct: false ) as $extension )
-		{
-			try
-			{
-				if( !empty( $extension::$app ) AND !isset( $libraries[ $extension::$app ] ) )
-				{
-					$libraries[ $extension::$app ] = $extension;
-				}
-			}
-			catch( BadMethodCallException ) {}
-		}
-
-		return $libraries;
+		);
 	}
 	
 	/**
@@ -158,7 +107,7 @@ abstract class Library
 	 * @param	string	$key	The key to use
 	 * @return	void
 	 */
-	public static function setKey( string $key ) : void
+	public static function setKey( $key )
 	{
 		static::$usingKeys		= TRUE;
 		static::$currentKeyName	= $key;
@@ -170,7 +119,7 @@ abstract class Library
 	 * @param	mixed	$value	The current value
 	 * @return	void
 	 */
-	public function setLastKeyValue( mixed $value ) : void
+	public function setLastKeyValue( $value )
 	{
 		$_SESSION['currentKeyValue'] = $value;
 		static::$currentKeyValue = $value;
@@ -184,15 +133,15 @@ abstract class Library
 	 * @param	int|NULL			$perCycle	The number of results to process per cycle
 	 * @return	array|NULL	Data for the MultipleRedirect
 	 */
-	public function process( ?int $data, string $method, ?int $perCycle=NULL ) : ?array
+	public function process( $data, $method, $perCycle=NULL )
 	{
-		if ( !is_null( $perCycle ) )
+		if ( !\is_null( $perCycle ) )
 		{
 			static::$perCycle = $perCycle;
 		}
 		
 		/* temp */
-		$classname			= get_class( $this->software );
+		$classname			= \get_class( $this->software );
 		$canConvert			= $classname::canConvert();
 
 		/* If we hit something that can't be converted, there's a problem */
@@ -202,7 +151,7 @@ abstract class Library
 		}
 
 		static::$action		= $canConvert[ $method ]['table'];
-		static::$startValue	= (int) $data;
+		static::$startValue	= $data;
 		$masterAppId = $this->software->app->getMasterConversionId();
 		
 		if ( !isset( $_SESSION['convertCountRows'] ) )
@@ -231,7 +180,7 @@ abstract class Library
 		{
 			$completed	= $this->software->app->_session['completed'];
 			$more_info	= $this->software->app->_session['more_info'];
-			if ( !in_array( $method, $completed ) )
+			if ( !\in_array( $method, $completed ) )
 			{
 				$completed[] = $method;
 			}
@@ -245,7 +194,7 @@ abstract class Library
 			unset( $_SESSION['convertContinue'] );
 
 			$percentage	= ( 100 / static::getTotalCachedRows( $this->software->app->getMasterConversionId() ) ) * $this->_getConvertedCount();
-			return array( 0, sprintf( Member::loggedIn()->language()->get( 'converted_x_of_x' ), $total, $total, Member::loggedIn()->language()->addToStack( '_' . $this->getMethodFromMenuRows( $method )['step_title'] ) ), $percentage );
+			return array( 0, sprintf( \IPS\Member::loggedIn()->language()->get( 'converted_x_of_x' ), $total, $total, \IPS\Member::loggedIn()->language()->addToStack( '_' . $this->getMethodFromMenuRows( $method )['step_title'] ) ), $percentage );
 		}
 		else
 		{
@@ -273,23 +222,23 @@ abstract class Library
 				/* Select our max foreign ID */
 				$type = $this->getMethodFromMenuRows( $method )['link_type'];
 
-				if( is_array( $type ) )
+				if( \is_array( $type ) )
 				{
 					$type = $type[0];
 				}
 
 				try
 				{
-					$lastId = Db::i()->select( 'foreign_id', $table, array( "app=? AND type=?", $this->software->app->app_id, $type ), 'link_id DESC', 1 )->first();
+					$lastId = \IPS\Db::i()->select( 'foreign_id', $table, array( "app=? AND type=?", $this->software->app->app_id, $type ), 'link_id DESC', 1 )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
-					// Nothing has been run yet
+					// Nothing has been ran yet
 					$lastId = 0;
 				}
 
 				/* Set the data count for MR */
-				$data = Db::i()->select( 'COUNT(*)', $table, array( "app=? AND type=?", $this->software->app->app_id, $type ) )->first();
+				$data = \IPS\Db::i()->select( 'COUNT(*)', $table, array( "app=? AND type=?", $this->software->app->app_id, $type ) )->first();
 
 				/* Set as last key value */
 				$this->setLastKeyValue( $lastId );
@@ -310,13 +259,13 @@ abstract class Library
 			if( $this->software->app->getRunningFlag( $method ) )
 			{
 				/* Count how many times we've seen this */
-				$_SESSION['convertSkipped'] = ( $_SESSION['convertSkipped'] ?? 0 ) + 1;
+				$_SESSION['convertSkipped'] = ( isset( $_SESSION['convertSkipped'] ) ? $_SESSION['convertSkipped'] : 0 ) + 1;
 
 				/* If we've shown this 5 times,  and the flag was set more than 60 seconds ago, there's a good chance something is wrong */
 				if( $_SESSION['convertSkipped'] > 5 AND $this->software->app->getRunningFlag( $method ) < ( time() - 60 ))
 				{
 					unset( $_SESSION['convertSkipped'] );
-					Output::i()->error( 'converter_could_not_continue', '2V387/1', 403, '' );
+					\IPS\Output::i()->error( 'converter_could_not_continue', '2V387/1', 403, '' );
 				}
 
 				/* Generate dots for UI to show that processing is still occurring */
@@ -324,7 +273,7 @@ abstract class Library
 
 				/* Sleep to allow the other process to complete without hammering the server */
 				sleep(5);
-				return array( $data, Member::loggedIn()->language()->get( 'waiting_previous_process' ) . $dots, ( 100 / static::getTotalCachedRows( $this->software->app->getMasterConversionId() ) ) * $this->_getConvertedCount( $total ) );
+				return array( $data, \IPS\Member::loggedIn()->language()->get( 'waiting_previous_process' ) . $dots, ( 100 / static::getTotalCachedRows( $this->software->app->getMasterConversionId() ) ) * $this->_getConvertedCount( $total ) );
 			}
 
 			/* Set conversion as running */
@@ -335,12 +284,12 @@ abstract class Library
 			{
 				$this->software->$method();
 			}
-			catch( SoftwareException $e )
+			catch( \IPS\convert\Software\Exception $e )
 			{
 				/* A Software Exception indicates we are done */
 				$completed	= $this->software->app->_session['completed'];
 				$more_info	= $this->software->app->_session['more_info'];
-				if ( !in_array( $method, $completed ) )
+				if ( !\in_array( $method, $completed ) )
 				{
 					$completed[] = $method;
 				}
@@ -354,16 +303,27 @@ abstract class Library
 				unset( $_SESSION['convertContinue'] );
 
 				$percentage	= ( 100 / static::getTotalCachedRows( $this->software->app->getMasterConversionId() ) ) * $this->_getConvertedCount();
-				return array( 0, sprintf( Member::loggedIn()->language()->get( 'converted_x_of_x' ), $total, $total, Member::loggedIn()->language()->addToStack( '_' . $this->getMethodFromMenuRows( $method )['step_title'] ) ), $percentage );
+				return array( 0, sprintf( \IPS\Member::loggedIn()->language()->get( 'converted_x_of_x' ), $total, $total, \IPS\Member::loggedIn()->language()->addToStack( '_' . $this->getMethodFromMenuRows( $method )['step_title'] ) ), $percentage );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
-				Log::log( $e, 'converters' );
+				\IPS\Log::log( $e, 'converters' );
 
 				/* Clear the running flag */
 				$this->software->app->setRunningFlag( $method, FALSE );
-				$this->software->app->log( $e->getMessage(), __METHOD__, App::LOG_WARNING );
-				throw new Exception;
+
+				$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_WARNING );
+				throw new \IPS\convert\Exception;
+			}
+			catch( \ErrorException $e )
+			{
+				\IPS\Log::log( $e, 'converters' );
+
+				/* Clear the running flag */
+				$this->software->app->setRunningFlag( $method, FALSE );
+
+				$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_WARNING );
+				throw new \IPS\convert\Exception;
 			}
 
 			/* Manually set running flag to save write queries */
@@ -373,7 +333,7 @@ abstract class Library
 			$this->software->app->_session = array_merge( $this->software->app->_session, array( 'working' => array( $method => $data + static::$perCycle ), 'running' => $running ) );
 
 			$percentage	= ( 100 / static::getTotalCachedRows( $this->software->app->getMasterConversionId() ) ) * $this->_getConvertedCount( ( $data + static::$perCycle > $total ) ? $total : $data + static::$perCycle );
-			return array( $data + static::$perCycle, sprintf( Member::loggedIn()->language()->get( 'converted_x_of_x' ), ( $data + static::$perCycle ) < $total ? $data + static::$perCycle : $total, $total, Member::loggedIn()->language()->addToStack( '_' . $this->getMethodFromMenuRows( $method )['step_title'] ) ), $percentage );
+			return array( $data + static::$perCycle, sprintf( \IPS\Member::loggedIn()->language()->get( 'converted_x_of_x' ), ( $data + static::$perCycle ) < $total ? $data + static::$perCycle : $total, $total, \IPS\Member::loggedIn()->language()->addToStack( '_' . $this->getMethodFromMenuRows( $method )['step_title'] ) ), $percentage );
 		}
 	}
 
@@ -383,7 +343,7 @@ abstract class Library
 	 * @param	int	$add	Amount to add to completed count
 	 * @return	int
 	 */
-	protected function _getConvertedCount( int $add = 0 ) : int
+	protected function _getConvertedCount( $add = 0 )
 	{
 		if( $this->software->app->parent )
 		{
@@ -410,7 +370,7 @@ abstract class Library
 
 			$totalSoFar += array_sum(
 				array_filter( $_SESSION['convertCountRows'][ $masterAppId ][ $app->app_id ], function( $key ) use( $app ) {
-					return ( in_array( $key, $app->_session['completed'] ) );
+					return ( \in_array( $key, $app->_session['completed'] ) );
 				}, ARRAY_FILTER_USE_KEY )
 			);
 		}
@@ -426,16 +386,16 @@ abstract class Library
 	/**
 	 * Empty Conversion Data
 	 *
-	 * @param	int				$data	Data from the previous step.
-	 * @param string $method	The conversion method to empty results for
+	 * @param	integer				$data	Data from the previous step.
+	 * @param	\IPS\convert\App	$method	The conversion method to empty results for
 	 * @return	array|NULL	Data for the MultipleRedirect
 	 */
-	public function emptyData( int $data, string $method ) : ?array
+	public function emptyData( $data, $method )
 	{
 		$perCycle = 500;
 		
 		/* temp */
-		$classname			= get_class( $this->software );
+		$classname			= \get_class( $this->software );
 		$canConvert			= $this->menuRows();
 		
 		if ( !isset( $canConvert[ $method ]['link_type'] ) )
@@ -449,11 +409,11 @@ abstract class Library
 		{
 			$count = 0;
 			/* Just one type? */
-			if ( !is_array( $type ) )
+			if ( !\is_array( $type ) )
 			{
 				foreach( array( 'convert_link', 'convert_link_pms', 'convert_link_posts', 'convert_link_topics' ) as $table )
 				{
-					$count += Db::i()->select( 'COUNT(*)', $table, array( "type=? AND app=?", $type, $this->software->app->app_id ) )->first();
+					$count += \IPS\Db::i()->select( 'COUNT(*)', $table, array( "type=? AND app=?", $type, $this->software->app->app_id ) )->first();
 				}
 			}
 			else
@@ -462,7 +422,7 @@ abstract class Library
 				{
 					foreach( array( 'convert_link', 'convert_link_pms', 'convert_link_posts', 'convert_link_topics' ) as $table )
 					{
-						$count += Db::i()->select( 'COUNT(*)', $table, array( "type=? AND app=?", $t, $this->software->app->app_id ) )->first();
+						$count += \IPS\Db::i()->select( 'COUNT(*)', $table, array( "type=? AND app=?", $t, $this->software->app->app_id ) )->first();
 					}
 				}
 			}
@@ -481,7 +441,7 @@ abstract class Library
 			try
 			{
 				/* If we're dealing with more than one type, then we can just delete from any one at random until we're done */
-				if ( is_array( $type ) )
+				if ( \is_array( $type ) )
 				{
 					$type = array_rand( $type );
 				}
@@ -507,33 +467,34 @@ abstract class Library
 						break;
 				}
 				
-				$total	= (int) Db::i()->select( 'COUNT(*)', $table, array( "type=? AND app=?", $type, $this->software->app->app_id ) )->first();
-				$rows	= iterator_to_array( Db::i()->select( 'link_id, ipb_id', $table, array( "type=? AND app=?", $type, $this->software->app->app_id ), "link_id ASC", array( 0, $perCycle ) )->setKeyField( 'link_id' )->setValueField( 'ipb_id' ) );
-				$def	= Db::i()->getTableDefinition( $type );
+				$total	= (int) \IPS\Db::i()->select( 'COUNT(*)', $table, array( "type=? AND app=?", $type, $this->software->app->app_id ) )->first();
+				$rows	= iterator_to_array( \IPS\Db::i()->select( 'link_id, ipb_id', $table, array( "type=? AND app=?", $type, $this->software->app->app_id ), "link_id ASC", array( 0, $perCycle ) )->setKeyField( 'link_id' )->setValueField( 'ipb_id' ) );
+				$def	= \IPS\Db::i()->getTableDefinition( $type );
 				
 				if ( isset( $def['indexes']['PRIMARY']['columns'] ) )
 				{
 					$id = array_pop( $def['indexes']['PRIMARY']['columns'] );
-					Db::i()->delete( $type, array( Db::i()->in( $id, array_values( $rows ) ) ) );
 				}
-
-				Db::i()->delete( $table, array( Db::i()->in( 'link_id', array_keys( $rows ) ) ) );
+				
+				\IPS\Db::i()->delete( $type, array( \IPS\Db::i()->in( $id, array_values( $rows ) ) ) );
+				\IPS\Db::i()->delete( $table, array( \IPS\Db::i()->in( 'link_id', array_keys( $rows ) ) ) );
 			}
-			catch( ErrorException $e )
+			catch( \Exception $e )
 			{
-				Log::log( $e, 'converters' );
+				\IPS\Log::log( $e, 'converters' );
 
-				$this->software->app->log( $e->getMessage(), __METHOD__, App::LOG_ERROR );
-				throw new Exception;
+				$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_WARNING );
+				throw new \IPS\convert\Exception;
 			}
-			catch( Exception $e )
+			catch( \ErrorException $e )
 			{
-				Log::log( $e, 'converters' );
-				$this->software->app->log( $e->getMessage(), __METHOD__, App::LOG_WARNING );
-				throw new Exception;
+				\IPS\Log::log( $e, 'converters' );
+
+				$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_ERROR );
+				throw new \IPS\convert\Exception;
 			}
 			
-			return array( $data + $perCycle, sprintf( Member::loggedIn()->language()->get( 'removed_x_of_x' ), ( $data + $perCycle > $total ) ? $_SESSION['emptyConvertedDataCount'] : $data + $perCycle, Member::loggedIn()->language()->addToStack( $method ), $_SESSION['emptyConvertedDataCount'] ), 100 / $_SESSION['emptyConvertedDataCount'] * ( $data + $perCycle ) );
+			return array( $data + $perCycle, sprintf( \IPS\Member::loggedIn()->language()->get( 'removed_x_of_x' ), ( $data + $perCycle > $total ) ? $_SESSION['emptyConvertedDataCount'] : $data + $perCycle, \IPS\Member::loggedIn()->language()->addToStack( $method ), $_SESSION['emptyConvertedDataCount'] ), 100 / $_SESSION['emptyConvertedDataCount'] * ( $data + $perCycle ) );
 		}
 	}
 	
@@ -543,7 +504,7 @@ abstract class Library
 	 * @param	string	$method	Convert method to run truncate call for
 	 * @return	void
 	 */
-	public function emptyLocalData( string $method ) : void
+	public function emptyLocalData( $method )
 	{
 		$truncate = $this->truncate( $method );
 
@@ -558,11 +519,11 @@ abstract class Library
 			/* Kind of a hacky way to make sure we truncate the right forums archive table */
 			if ( $table === 'forums_archive_posts' )
 			{
-				ArchivedPost::db()->delete( $table, $where );
+				\IPS\forums\Topic\ArchivedPost::db()->delete( $table, $where );
 			}
 			else
 			{
-				Db::i()->delete( $table, $where );
+				\IPS\Db::i()->delete( $table, $where );
 			}
 
 			/* Do we have a specific link type? */
@@ -576,7 +537,7 @@ abstract class Library
 			{
 				default:
 					$key = $linkType ?: $table;
-					if( is_array( $key ) )
+					if( \is_array( $key ) )
 					{
 						foreach( $key as $link )
 						{
@@ -604,28 +565,28 @@ abstract class Library
 
 		foreach( $toDelete AS $table => $links )
 		{
-			if( !count( $links ) )
+			if( !\count( $links ) )
 			{
 				continue;
 			}
 
 			/* If posts or topics we may be able to truncate */
-			if( in_array( $table, array( 'convert_link_topics', 'convert_link_posts' ) ) )
+			if( \in_array( $table, array( 'convert_link_topics', 'convert_link_posts' ) ) )
 			{
 				try
 				{
 					/* Check for other app data in this table */
-					Db::i()->select( 'link_id', $table, array('app<>?', $this->software->app->app_id ), NULL, 1 )->first();
+					\IPS\Db::i()->select( 'link_id', $table, array('app<>?', $this->software->app->app_id ), NULL, 1 )->first();
 				}
-				catch ( UnderflowException $e )
+				catch ( \UnderflowException $e )
 				{
 					/* There isn't any other app data in this table, truncate */
-					Db::i()->delete( $table );
+					\IPS\Db::i()->delete( $table );
 					continue;
 				}
 			}
 
-			Db::i()->delete( $table, array( Db::i()->in( 'type', $links ) . " AND app=?", $this->software->app->app_id ) );
+			\IPS\Db::i()->delete( $table, array( \IPS\Db::i()->in( 'type', $links ) . " AND app=?", $this->software->app->app_id ) );
 		}
 
 		/* Clear the running flag */
@@ -635,21 +596,21 @@ abstract class Library
 	/**
 	 * @brief	Cached convertable items
 	 */
-	protected ?array $convertable	= NULL;
+	protected $convertable	= NULL;
 
 	/**
 	 * Return the items we can convert. Removes things that are empty.
 	 *
 	 * @return	array
 	 */
-	public function getConvertableItems() : array
+	public function getConvertableItems()
 	{
 		if( $this->convertable !== NULL )
 		{
 			return $this->convertable;
 		}
 
-		$classname			= get_class( $this->software );
+		$classname			= \get_class( $this->software );
 		$this->convertable	= $classname::canConvert();
 
 		if( $this->convertable === NULL )
@@ -675,7 +636,7 @@ abstract class Library
 	 * @param	mixed	$arguments		Arguments to pass to the method
 	 * @return 	mixed
 	 */
-	public function __call( string $name, mixed $arguments )
+	public function __call( $name, $arguments )
 	{
 		if ( method_exists( $this, 'convert' . $name ) )
 		{
@@ -688,7 +649,7 @@ abstract class Library
 		}
 		else
 		{
-			Log::log( "Call to undefined method in " . get_class( $this ) . "::{$name}", 'converters' );
+			\IPS\Log::log( "Call to undefined method in " . \get_class( $this ) . "::{$name}", 'converters' );
 			return NULL;
 		}
 	}
@@ -698,7 +659,7 @@ abstract class Library
 	 *
 	 * @return	string
 	 */
-	public function getPostConversionInformation() : string
+	public function getPostConversionInformation()
 	{
 		return '';
 	}
@@ -727,7 +688,7 @@ abstract class Library
 	 * @param	bool	$rowCounts		enable row counts
 	 * @return	array
 	 */
-	abstract public function menuRows( bool $rowCounts=FALSE ) : array;
+	abstract public function menuRows( $rowCounts=FALSE );
 
 	/**
 	 * Utility method to run queries for menuRows() data
@@ -736,14 +697,14 @@ abstract class Library
 	 * @param	bool	$ips		Count IPS rows
 	 * @param	bool	$source		Count source rows
 	 * @return	array
-	 * @throws	UnderflowException
-	 * @throws    Exception
+	 * @throws	\UnderflowException
+	 * @throws	\IPS\convert\Exception
 	 */
-	public function getDatabaseRowCounts( array $return, bool $ips=TRUE, bool $source=TRUE ) : array
+	public function getDatabaseRowCounts( array $return, $ips=TRUE, $source=TRUE )
 	{
 		foreach( $return as $key => $value )
 		{
-			if( $ips AND isset( $value['ips_rows'] ) AND $value['ips_rows'] instanceof Select )
+			if( $ips AND isset( $value['ips_rows'] ) AND $value['ips_rows'] instanceof \IPS\Db\Select )
 			{
 				$return[ $key ]['ips_rows'] = (int) $value['ips_rows']->first();
 			}
@@ -760,7 +721,7 @@ abstract class Library
 	/**
 	 * @brief	Cache menu row data
 	 */
-	protected array $_menuRowCache = array( 'rows' => array(), 'noRows' => array() );
+	protected $_menuRowCache = array( 'rows' => array(), 'noRows' => array() );
 
 	/**
 	 * Get method from menu rows - abstracted to allow 'fake' entries not in menuRows()
@@ -769,7 +730,7 @@ abstract class Library
 	 * @param	bool	$rowCount		Count local rows
 	 * @return	array
 	 */
-	public function getMethodFromMenuRows( string $method, bool $rowCount=FALSE ) : array
+	public function getMethodFromMenuRows( $method, $rowCount=FALSE )
 	{
 		$key = $rowCount ? 'rows' : 'noRows';
 		if( isset( $this->_menuRowCache[ $key ][ $method ] ) )
@@ -777,7 +738,7 @@ abstract class Library
 			return $this->_menuRowCache[ $key ][ $method ];
 		}
 
-		/* Set to the cache */
+		/* Set to to the cache */
 		$this->_menuRowCache[ $key ] = $this->menuRows( $rowCount );
 
 		/* Cache an empty array for the response */
@@ -795,5 +756,5 @@ abstract class Library
 	 * @param	string	$method	The method to truncate
 	 * @return	array
 	 */
-	abstract protected function truncate( string $method ) : array;
+	abstract protected function truncate( $method );
 }

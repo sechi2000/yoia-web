@@ -11,64 +11,57 @@
 namespace IPS\{app}\extensions\core\AchievementAction;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Achievements\Actions\AchievementActionAbstract;
-use IPS\core\Achievements\Rule;
-use IPS\Http\Url;
-use IPS\Member as MemberClass;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement Action Extension
  */
-class {class} extends AchievementActionAbstract // NOTE: Other classes exist to provided bases for common situations, like where node-based filters will be required
+class _{class} extends \IPS\core\Achievements\Actions\AbstractAchievementAction // NOTE: Other classes exist to provided bases for common situations, like where node-based filters will be required
 {	
 	/**
 	 * Get filter form elements
 	 *
 	 * @param	array|NULL		$filters	Current filter values (if editing)
-	 * @param	Url	$url		The URL the form is being shown on
+	 * @param	\IPS\Http\Url	$url		The URL the form is being shown on
 	 * @return	array
 	 */
-	//public function filters( ?array $filters, Url $url ): array
-	//{
-	//	return parent::filters( $filters, $url );
-	//}
-
+	public function filters( ?array $filters, \IPS\Http\Url $url ): array
+	{
+		return [];
+	}
+	
 	/**
 	 * Format filter form values
 	 *
 	 * @param	array	$values	The values from the form
 	 * @return	array
 	 */
-	//public function formatFilterValues( array $values ): array
-	//{
-	//	return parent::formatFilterValues( $values );
-	//}
-
+	public function formatFilterValues( array $values ): array
+	{
+		return [];
+	}
+	
 	/**
 	 * Work out if the filters applies for a given action
 	 *
-	 * Important note for milestones: consider the context. This method is called by \IPS\Member::achievementAction(). If your code
+	 * Important note for milestones: consider the context. This method is called by \IPS\Member::achievementAction(). If your code 
 	 * calls that BEFORE making its change in the database (or there is read/write separation), you will need to add
 	 * 1 to the value being considered for milestones
 	 *
-	 * @param	MemberClass	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	array		$filters	The value returned by formatFilterValues()
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	bool
 	 */
-	//public function filtersMatch( MemberClass $subject, array $filters, mixed $extra = NULL ): bool
-	//{
-	//	return TRUE;
-	//}
-
+	public function filtersMatch( \IPS\Member $subject, array $filters, $extra = NULL ): bool
+	{
+		return TRUE;
+	}
+	
 	/**
     	 * Get the labels for the people this action might give awards to
     	 *
@@ -87,24 +80,24 @@ class {class} extends AchievementActionAbstract // NOTE: Other classes exist to 
 	/**
      * Get the "other" people we need to award =stuff to
      *
-	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @param	array|NULL	$filters	Current filter values
+	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
      * @return	array
      */
-    // public function awardOther( mixed $extra = NULL, ?array $filters = NULL ): array
+    // public function awardOther(?array $filters, $extra = NULL ): array
 	// {
-	// 	return [ MemberClass::loggedIn() ];
+	// 	return [ \IPS\Member::loggedIn() ];
 	// }
 	
 	/**
 	 * Get identifier to prevent the member being awarded points for the same action twice
 	 * Must be unique within within of this domain, must not exceed 32 chars.
 	 *
-	 * @param	MemberClass	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	string
 	 */
-	public function identifier( MemberClass $subject, mixed $extra = NULL ): string
+	public function identifier( \IPS\Member $subject, $extra = NULL ): string
 	{
 		return (string) $extra->id;
 	}
@@ -124,10 +117,10 @@ class {class} extends AchievementActionAbstract // NOTE: Other classes exist to 
 	/**
 	 * Get "description" for rule
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	public function ruleDescription( Rule $rule ): ?string
+	public function ruleDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		return "{class}";
 	}
@@ -137,7 +130,7 @@ class {class} extends AchievementActionAbstract // NOTE: Other classes exist to 
 	 *
 	 * @return	array
 	 */
-	static public function rebuildData(): array
+	static public function rebuildData()
 	{
 		// This method returns an array of tables that this extension uses to award achievements, so for example
 		// the follow extension uses 'core_follow'.
@@ -146,12 +139,12 @@ class {class} extends AchievementActionAbstract // NOTE: Other classes exist to 
 		// Where shouldn't attempt to limit based on filters or milestones, but just remove data that you don't need to 
 		// look at, such as banned members, archived items and so on. You can return an empty array if you do not need
 		// a where statement.
-		return [ [
+		//return [ [
 		//	'table' => 'table_name',
 		//	'pkey'  => 'field_id',
 		//	'date'  => 'field_date',
 		//	'where' => [ [ 'banned != 1' ] ],
-		] ];
+		//] ];
 	}
 
 	/**
@@ -161,11 +154,11 @@ class {class} extends AchievementActionAbstract // NOTE: Other classes exist to 
 	 * @param array		$data	Data collected when starting rebuild [table, pkey...]
 	 * @return void
 	 */
-	public static function rebuildRow( array $row, array $data ) : void
+	public static function rebuildRow( $row, $data )
 	{
 		// This method runs the achievementAction on the table row from the table (or tables) you specified in rebuildData()
 		// You are welcome to load any classes, etc you need here.
-		//MemberClass::loggedIn()->achievementAction( '{app}', '{class}', $row['field_id'] ), \IPS\DateTime::ts( $row['field_date'] ) );
+		//IPS\Member::loggedIn()->achievementAction( '{app}', '{class}', $row['field_id'] ), \IPS\DateTime::ts( $row['field_date'] ) );
 	}
 
 }

@@ -12,62 +12,50 @@
 namespace IPS\nexus\Package;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Matrix;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Package Filter
  */
-class Filter extends Model
+class _Filter extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_package_filters';
+	public static $databaseTable = 'nexus_package_filters';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'pfilter_';
+	public static $databasePrefix = 'pfilter_';
 		/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'order';
+	public static $databaseColumnOrder = 'order';
 		
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'menu__nexus_store_filters';
+	public static $nodeTitle = 'menu__nexus_store_filters';
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'nexus_product_filter_';
+	public static $titleLangPrefix = 'nexus_product_filter_';
 
 	/**
 	 * @brief	[Node] Description suffix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}_{$descriptionLangSuffix}" as the key
 	 */
-	public static ?string $descriptionLangSuffix = '_public';
+	public static $descriptionLangSuffix = '_public';
 
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -85,7 +73,7 @@ class Filter extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'nexus',
 		'module'	=> 'store',
 		'all'		=> 'packages_manage',
@@ -94,31 +82,31 @@ class Filter extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$form->addHeader( 'pfilter_basic_settings' );
-		$form->add( new Translatable( 'pfilter_admin_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_product_filter_{$this->id}" : NULL ) ) );
-		$form->add( new Translatable( 'pfilter_public_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_product_filter_{$this->id}_public" : NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'pfilter_admin_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_product_filter_{$this->id}" : NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'pfilter_public_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_product_filter_{$this->id}_public" : NULL ) ) );
 		
-		$matrix = new Matrix;
+		$matrix = new \IPS\Helpers\Form\Matrix;
 		$matrix->sortable = TRUE;
-		foreach ( Lang::languages() as $lang )
+		foreach ( \IPS\Lang::languages() as $lang )
 		{
 			if ( $lang->enabled )
 			{
-				Member::loggedIn()->language()->words["lang_{$lang->id}"] = $lang->title;
+				\IPS\Member::loggedIn()->language()->words["lang_{$lang->id}"] = $lang->title;
 				$matrix->columns["lang_{$lang->id}"] = function( $key, $value, $data )
 				{
-					return new Text( $key, $value );
+					return new \IPS\Helpers\Form\Text( $key, $value );
 				};
 			}
 		}
 		if ( $this->id )
 		{
-			foreach ( Db::i()->select( '*', 'nexus_package_filters_values', array( 'pfv_filter=?', $this->id ), 'pfv_order' ) as $filterValue )
+			foreach ( \IPS\Db::i()->select( '*', 'nexus_package_filters_values', array( 'pfv_filter=?', $this->id ), 'pfv_order' ) as $filterValue )
 			{
 				$matrix->rows[ $filterValue['pfv_value'] ][ 'lang_' . $filterValue['pfv_lang'] ] = $filterValue['pfv_text'];
 			}
@@ -134,7 +122,7 @@ class Filter extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( !$this->id )
 		{
@@ -143,32 +131,32 @@ class Filter extends Model
 			
 		if( isset( $values['pfilter_admin_name'] ) )
 		{
-			Lang::saveCustom( 'nexus', "nexus_product_filter_{$this->id}", $values['pfilter_admin_name'] );
+			\IPS\Lang::saveCustom( 'nexus', "nexus_product_filter_{$this->id}", $values['pfilter_admin_name'] );
 			unset( $values['pfilter_admin_name'] );
 		}
 
 		if( isset( $values['pfilter_public_name'] ) )
 		{
-			Lang::saveCustom( 'nexus', "nexus_product_filter_{$this->id}_public", $values['pfilter_public_name'] );
+			\IPS\Lang::saveCustom( 'nexus', "nexus_product_filter_{$this->id}_public", $values['pfilter_public_name'] );
 			unset( $values['pfilter_public_name'] );
 		}
 				
 		$order = 1;
-		$deletedIds = $this->id ? iterator_to_array( Db::i()->select( 'pfv_value', 'nexus_package_filters_values', array( 'pfv_filter=?', $this->id ) )->setKeyField('pfv_value') ) : array();
+		$deletedIds = $this->id ? iterator_to_array( \IPS\Db::i()->select( 'pfv_value', 'nexus_package_filters_values', array( 'pfv_filter=?', $this->id ) )->setKeyField('pfv_value') ) : array();
 		foreach ( $values['pfilter_options'] as $k => $_values )
 		{
 			unset( $deletedIds[ $k ] );
 			
 			if ( mb_substr( $k, 0, 5 ) === '_new_' )
 			{
-				$id = Db::i()->select( 'MAX(pfv_value)', 'nexus_package_filters_values', array( 'pfv_filter=?', $this->id ) )->first() + 1;
+				$id = \IPS\Db::i()->select( 'MAX(pfv_value)', 'nexus_package_filters_values', array( 'pfv_filter=?', $this->id ) )->first() + 1;
 				
 				foreach ( $_values as $langId => $text )
 				{
-					Db::i()->insert( 'nexus_package_filters_values', array(
+					\IPS\Db::i()->insert( 'nexus_package_filters_values', array(
 						'pfv_filter'	=> $this->id,
 						'pfv_value'		=> $id,
-						'pfv_lang'		=> intval( mb_substr( $langId, 5 ) ),
+						'pfv_lang'		=> \intval( mb_substr( $langId, 5 ) ),
 						'pfv_text'		=> $text,
 						'pfv_order'		=> $order
 					) );
@@ -178,10 +166,10 @@ class Filter extends Model
 			{
 				foreach ( $_values as $langId => $text )
 				{
-					Db::i()->update( 'nexus_package_filters_values', array(
+					\IPS\Db::i()->update( 'nexus_package_filters_values', array(
 						'pfv_text'		=> $text,
 						'pfv_order'		=> $order
-					), array( 'pfv_filter=? AND pfv_value=? AND pfv_lang=?', $this->id, $k, intval( mb_substr( $langId, 5 ) ) ) );
+					), array( 'pfv_filter=? AND pfv_value=? AND pfv_lang=?', $this->id, $k, \intval( mb_substr( $langId, 5 ) ) ) );
 				}
 			}
 			
@@ -189,7 +177,7 @@ class Filter extends Model
 		}
 		if ( $deletedIds )
 		{
-			Db::i()->delete( 'nexus_package_filters_values', Db::i()->in( 'pfv_value', $deletedIds ) );
+			\IPS\Db::i()->delete( 'nexus_package_filters_values', \IPS\Db::i()->in( 'pfv_value', $deletedIds ) );
 		}
 		unset( $values['pfilter_options'] ); 
 		
@@ -199,13 +187,13 @@ class Filter extends Model
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		Db::i()->delete( 'nexus_package_filters_values', array( 'pfv_filter=?', $this->id ) );
-		Lang::deleteCustom( 'nexus', static::$titleLangPrefix . $this->_id );
-		Lang::deleteCustom( 'nexus', static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix );
+		\IPS\Db::i()->delete( 'nexus_package_filters_values', array( 'pfv_filter=?', $this->id ) );
+		\IPS\Lang::deleteCustom( 'nexus', static::$titleLangPrefix . $this->_id );
+		\IPS\Lang::deleteCustom( 'nexus', static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix );
 		parent::delete();
 	}
 	
@@ -216,9 +204,9 @@ class Filter extends Model
 	 * @param	int			$filterId		ID of the filter
 	 * @param	int|null	$valueToAdd		Value to add to the filter array
 	 * @param	int|null	$valueToRemove	Value to remove from the filter array
-	 * @return	array
+	 * @return	void
 	 */
-	public static function queryString( array $queryString, int $filterId, ?int $valueToAdd=NULL, ?int $valueToRemove = NULL ) : array
+	public static function queryString( $queryString, $filterId, $valueToAdd=NULL, $valueToRemove = NULL )
 	{
 		$queryString = $queryString ?: array();
 		

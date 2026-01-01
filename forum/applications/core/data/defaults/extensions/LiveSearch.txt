@@ -12,29 +12,34 @@
 namespace IPS\{app}\extensions\core\LiveSearch;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Extensions\LiveSearchAbstract;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Live Search Extension
  */
-class {class} extends LiveSearchAbstract
+class _{class}
 {	
+	/**
+	 * Constructor
+	 *
+	 * @return	void
+	 */
+	public function __construct()
+	{
+		/* Check Permissions */
+	}
+	
 	/**
 	 * Get the search results
 	 *
 	 * @param	string	$searchTerm	Search Term
 	 * @return	array 	Array of results
 	 */
-	public function getResults( string $searchTerm ): array
+	public function getResults( $searchTerm ): array
 	{
 		return array();
 	}
@@ -57,6 +62,6 @@ class {class} extends LiveSearchAbstract
 	 */
 	public function isDefault(): bool
 	{
-		return Dispatcher::i()->application->directory == '{app}';
+		return \IPS\Dispatcher::i()->application->directory == 'myapp';
 	}
 }

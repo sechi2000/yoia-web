@@ -11,58 +11,44 @@
 namespace IPS\core\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Settings;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Search extends \IPS\core\Statistics\Chart
+class _Search extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_activitystats_search';
+	public $controller = 'core_activitystats_search';
 	
 	/**
 	 * @brief	Default limit to number of graphed results
 	 */
-	protected int $defaultLimit = 25;
-
+	protected $defaultLimit = 25;
+	
 	/**
 	 * Render Chart
 	 *
-	 * @param Url $url URL the chart is being shown on.
-	 * @return Chart
-	 * @throws Exception
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
 		/* Determine minimum date */
 		$minimumDate = NULL;
 
-		if( Settings::i()->stats_search_prune )
+		if( \IPS\Settings::i()->stats_search_prune )
 		{
-			$minimumDate = DateTime::create()->sub( new DateInterval( 'P' . Settings::i()->stats_search_prune . 'D' ) );
+			$minimumDate = \IPS\DateTime::create()->sub( new \DateInterval( 'P' . \IPS\Settings::i()->stats_search_prune . 'D' ) );
 		}
 
-		$chart = new Database(
+		$chart = new \IPS\Helpers\Chart\Database(
 			$url,
 			'core_statistics',
 			'time',
@@ -78,7 +64,7 @@ class Search extends \IPS\core\Statistics\Chart
 			),
 			'LineChart',
 			'daily',
-			array( 'start' => DateTime::create()->sub( new DateInterval( 'P90D' ) ), 'end' => DateTime::ts( time() ) ),
+			array( 'start' => \IPS\DateTime::create()->sub( new \DateInterval( 'P90D' ) ), 'end' => \IPS\DateTime::ts( time() ) ),
 			array(),
 			'',
 			$minimumDate
@@ -94,12 +80,12 @@ class Search extends \IPS\core\Statistics\Chart
 			$chart->addSeries( $v, 'number', 'COUNT(*)', FALSE );
 		}
 
-		if ( count( $terms ) )
+		if ( \count( $terms ) )
 		{
-			$chart->where[] = [ Db::i()->in( 'value_4', $terms ) ];
+			$chart->where[] = [ \IPS\Db::i()->in( 'value_4', $terms ) ];
 		}
 
-		$chart->title = Member::loggedIn()->language()->addToStack('search_stats_chart');
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('search_stats_chart');
 		$chart->availableTypes = array( 'AreaChart', 'ColumnChart', 'BarChart' );
 		
 		return $chart;
@@ -108,7 +94,7 @@ class Search extends \IPS\core\Statistics\Chart
 	/**
 	 * @brief	Cached top search terms
 	 */
-	protected array $_topSearchTerms = array();
+	protected $_topSearchTerms = array();
 
 	/**
 	 * Get the top search terms
@@ -116,7 +102,7 @@ class Search extends \IPS\core\Statistics\Chart
 	 * @param	string|null		$term	Term we searched for
 	 * @return	array
 	 */
-	public function getTerms( ?string $term=NULL ): array
+	public function getTerms( $term=NULL )
 	{
 		if( !isset( $this->_topSearchTerms[ $term ] ) )
 		{
@@ -126,10 +112,10 @@ class Search extends \IPS\core\Statistics\Chart
 
 			if( $term !== NULL )
 			{
-				$where[] = Db::i()->like( 'value_4', $term, TRUE, TRUE, TRUE );
+				$where[] = \IPS\Db::i()->like( 'value_4', $term, TRUE, TRUE, TRUE );
 			}
 
-			foreach( Db::i()->select( 'SQL_BIG_RESULT value_4, COUNT(*) as total', 'core_statistics', $where, 'total DESC', $this->defaultLimit, 'value_4' ) as $searchedValue )
+			foreach( \IPS\Db::i()->select( 'SQL_BIG_RESULT value_4, COUNT(*) as total', 'core_statistics', $where, 'total DESC', $this->defaultLimit, 'value_4' ) as $searchedValue )
 			{
 				$this->_topSearchTerms[ $term ][] = $searchedValue['value_4'];
 			}

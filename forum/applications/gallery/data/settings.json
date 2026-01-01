@@ -20,11 +20,6 @@
         "report": "full"
     },
     {
-        "key": "gallery_metadata",
-        "default": "1",
-        "report": "none"
-    },
-    {
         "key": "gallery_new_images_count",
         "default": "16",
         "report": "none"

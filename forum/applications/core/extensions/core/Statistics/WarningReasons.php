@@ -10,43 +10,44 @@
 
 namespace IPS\core\extensions\core\Statistics;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
 use IPS\core\Statistics\Chart as ParentClass;
-use IPS\core\Warnings\Reason;
-use IPS\DateTime;
+use IPS\Http\Url;
 use IPS\Helpers\Chart;
 use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
+use IPS\core\Warnings\Reason;
 use IPS\Member;
+use IPS\DateTime as IPSDateTime;
 use IPS\Theme;
-use function defined;
 
+use function defined;
+use function header;
+
+/* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class WarningReasons extends ParentClass
+class _WarningReasons extends ParentClass
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_stats_warnings_reason';
+	public $controller = 'core_stats_warnings_reason';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
 	public function getChart( Url $url ): Chart
 	{
-		$chart	= new Database( $url, 'core_members_warn_logs', 'wl_date', '', array(
+		$chart	= new Database( $url, 'core_members_warn_logs', 'wl_date', '', array( 
 			'isStacked' => TRUE,
 			'backgroundColor' 	=> '#ffffff',
 			'hAxis'				=> array( 'gridlines' => array( 'color' => '#f5f5f5' ) ),
@@ -59,7 +60,7 @@ class WarningReasons extends ParentClass
 
 		foreach( Reason::roots() as $reason )
 		{
-			$chart->addSeries(  Member::loggedIn()->language()->addToStack('core_warn_reason_' . $reason->id ), 'number', 'COUNT(*)', TRUE, $reason->id );
+			$chart->addSeries(  Member::loggedIn()->language()->addToStack('core_warn_reason_' . $reason->id ), 'number', 'COUNT(*)', TRUE, $reason->id );		
 		}
 
 		$chart->title = Member::loggedIn()->language()->addToStack('stats_warnings_title');
@@ -79,7 +80,7 @@ class WarningReasons extends ParentClass
 			},
 			'wl_date'	=> function( $val )
 			{
-				return (string) DateTime::ts( $val );
+				return (string) IPSDateTime::ts( $val );
 			}
 		);
 		

@@ -12,44 +12,35 @@
 namespace IPS\blog\extensions\core\LiveSearch;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\blog\Blog;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Extensions\LiveSearchAbstract;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Live Search Extension
  */
-class Blogs extends LiveSearchAbstract
+class _Blogs
 {	
 	/**
 	 * Check we have access
 	 *
 	 * @return	bool
 	 */
-	public function hasAccess(): bool
+	public function hasAccess()
 	{
 		/* Check Permissions */
-		return Member::loggedIn()->hasAcpRestriction( 'blog', 'blog', 'blogs_manage' );
+		return \IPS\Member::loggedIn()->hasAcpRestriction( 'blog', 'blog', 'blogs_manage' );
 	}
 
 	/**
 	 * Get the search results
 	 *
-	 * @param string $searchTerm	Search Term
+	 * @param	string	$searchTerm	Search Term
 	 * @return	array 	Array of results
 	 */
-	public function getResults( string $searchTerm ): array
+	public function getResults( $searchTerm )
 	{
 		/* Init */
 		$results = array();
@@ -59,10 +50,10 @@ class Blogs extends LiveSearchAbstract
 		if( $this->hasAccess() )
 		{
 			/* Perform the search */
-			$blogs = Db::i()->select(
+			$blogs = \IPS\Db::i()->select(
 							"*",
 							'blog_blogs',
-							array( "blog_club_id IS NULL AND ( word_custom LIKE CONCAT( '%', ?, '%' ) AND lang_id=? )", $searchTerm, Member::loggedIn()->language()->id ),
+							array( "blog_club_id IS NULL AND ( word_custom LIKE CONCAT( '%', ?, '%' ) AND lang_id=? )", $searchTerm, \IPS\Member::loggedIn()->language()->id ),
 							NULL,
 							array( 0, 500 )
 					)->join(
@@ -73,9 +64,9 @@ class Blogs extends LiveSearchAbstract
 			/* Format results */
 			foreach ( $blogs as $blog )
 			{
-				$blog = Blog::constructFromData( $blog );
+				$blog = \IPS\blog\Blog::constructFromData( $blog );
 				
-				$results[] = Theme::i()->getTemplate( 'livesearch', 'blog', 'admin' )->blog( $blog );
+				$results[] = \IPS\Theme::i()->getTemplate( 'livesearch', 'blog', 'admin' )->blog( $blog );
 			}
 		}
 		
@@ -87,8 +78,8 @@ class Blogs extends LiveSearchAbstract
 	 *
 	 * @return	bool
 	 */
-	public function isDefault(): bool
+	public function isDefault()
 	{
-		return Dispatcher::i()->application->directory == 'blog';
+		return \IPS\Dispatcher::i()->application->directory == 'blog';
 	}
 }

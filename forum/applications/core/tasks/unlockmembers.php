@@ -11,27 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Unlock Members Task
  */
-class unlockmembers extends Task
+class _unlockmembers extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -41,30 +30,22 @@ class unlockmembers extends Task
 	 * If an error occurs which means the task could not finish running, throw an \IPS\Task\Exception - do not log an error as a normal log.
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
-	 * @return    mixed    Message to log or NULL
-	 * @throws    Exception|\Exception
+	 * @return	mixed	Message to log or NULL
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		if(  !Settings::i()->ipb_bruteforce_unlock or !Settings::i()->ipb_bruteforce_period or !Settings::i()->ipb_bruteforce_attempts )
+		if(  !\IPS\Settings::i()->ipb_bruteforce_unlock or !\IPS\Settings::i()->ipb_bruteforce_period or !\IPS\Settings::i()->ipb_bruteforce_attempts )
 		{
 			return NULL;
 		}
 
 		/* Clear out old data */
-		Db::i()->delete( 'core_login_failures', [ 'login_date<? AND login_ip_address IS NOT NULL AND login_member_id IS NOT NULL', ( new DateTime() )->sub( new DateInterval( 'PT' . Settings::i()->ipb_bruteforce_period . 'M' ) )->getTimestamp() ] );
+		\IPS\Db::i()->delete( 'core_login_failures', [ 'login_date<? AND login_ip_address IS NOT NULL AND login_member_id IS NOT NULL', ( new \IPS\DateTime() )->sub( new \DateInterval( 'PT' . \IPS\Settings::i()->ipb_bruteforce_period . 'M' ) )->getTimestamp() ] );
 
-		foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'core_members', array( 'failed_login_count >= ?', Settings::i()->ipb_bruteforce_attempts ) ), 'IPS\Member') AS $member )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', array( 'failed_login_count >= ?', \IPS\Settings::i()->ipb_bruteforce_attempts ) ), 'IPS\Member') AS $member )
 		{
-			$where = [
-				'login_date>=? AND login_ip_address IS NOT NULL AND login_member_id=?',
-				( new DateTime )->sub( new DateInterval( 'PT' . Settings::i()->ipb_bruteforce_period . 'M' ) )->getTimestamp(),
-				$this->member_id
-			];
-
-			$failedLogins = iterator_to_array( Db::i()->select( 'count(login_ip_address)', 'core_login_failures', $where, NULL, NULL, 'login_ip_address' ) );
-			$member->failed_login_count = count( $failedLogins ) ? max( $failedLogins ) : 0;
-			$member->save();
+			$member->recountFailedLogins();
 		}
 
 		return NULL;

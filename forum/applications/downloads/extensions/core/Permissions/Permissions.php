@@ -12,42 +12,36 @@
 namespace IPS\downloads\extensions\core\Permissions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use IPS\downloads\Category;
-use IPS\Extensions\PermissionsAbstract;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Permissions
  */
-class Permissions extends PermissionsAbstract
+class _Permissions
 {
 	/**
 	 * Get node classes
 	 *
 	 * @return	array
 	 */
-	public function getNodeClasses(): array
+	public function getNodeClasses()
 	{		
 		return array(
 			'IPS\downloads\Category' => function( $current, $group )
 			{
 				$rows = array();
 				
-				foreach( Category::roots( NULL ) AS $root )
+				foreach( \IPS\downloads\Category::roots( NULL ) AS $root )
 				{
 					try
 					{
-						Category::populatePermissionMatrix( $rows, $root, $group, $current );
+						\IPS\downloads\Category::populatePermissionMatrix( $rows, $root, $group, $current );
 					}
-					catch( BadMethodCallException $e ) {}
+					catch( \BadMethodCallException $e ) {}
 				}
 				
 				return $rows;

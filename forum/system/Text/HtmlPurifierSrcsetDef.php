@@ -11,34 +11,27 @@
 namespace IPS\Text;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use HTMLPurifier_AttrDef_URI;
-use HTMLPurifier_Config;
-use HTMLPurifier_Context;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * A HTMLPurifier Attribute Definition used for attributes which must be internal URLs
  */
-class HtmlPurifierSrcsetDef extends HTMLPurifier_AttrDef_URI
+class _HtmlPurifierSrcsetDef extends \HTMLPurifier_AttrDef_URI
 {
 	/**
 	 * Validate
 	 * 
      * @param	string					$srcset
-     * @param	HTMLPurifier_Config	$config
-     * @param	HTMLPurifier_Context	$context
+     * @param	\HTMLPurifier_Config	$config
+     * @param	\HTMLPurifier_Context	$context
      * @return	bool|string
      */
-    public function validate($srcset, $config, $context): bool|string
-	{
+    public function validate($srcset, $config, $context)
+    {
 	    $return = array();
 	    	    
 	    foreach ( explode( ',', $srcset ) as $src )
@@ -54,7 +47,7 @@ class HtmlPurifierSrcsetDef extends HTMLPurifier_AttrDef_URI
 		    }
 	    }
 	    	    
-	    if ( count( $return ) )
+	    if ( \count( $return ) )
 	    {
 		    return implode( ', ', $return );
 	    }

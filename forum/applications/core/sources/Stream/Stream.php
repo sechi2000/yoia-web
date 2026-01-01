@@ -11,80 +11,41 @@
 namespace IPS\core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use Exception;
-use IPS\Content\Item;
-use IPS\Content\Search\ContentFilter;
-use IPS\Content\Search\Query;
-use IPS\Content\Search\SearchContent;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\DateRange;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use UnhandledMatchError;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Content Discovery Stream
  */
-class Stream extends Model
+class _Stream extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_streams';
+	public static $databaseTable = 'core_streams';
 			
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 		
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'streams';
+	public static $nodeTitle = 'streams';
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'stream_title_';
+	public static $titleLangPrefix = 'stream_title_';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -102,7 +63,7 @@ class Stream extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'discovery',
 		'all'	 	=> 'streams_manage',
@@ -111,28 +72,28 @@ class Stream extends Model
 	/**
 	 * @brief The base URL of this stream
 	 */
-	public ?Url $baseUrl = NULL;
+	public $baseUrl = NULL;
 	
 	/**
 	 * @brief	The default stream either set by member or admin
 	 */
-	protected static ?Stream $defaultStream = NULL;
+	protected static $defaultStream = NULL;
 	
 	/**
 	 * @brief	The config of the stream when it is first loaded
 	 */
-	protected ?array $defaultConfig = NULL;
+	protected $defaultConfig = NULL;
 	
 	/**
 	 * Fetch All Root Nodes
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	mixed				$where				Additional WHERE clause
 	 * @param	array|NULL			$limit				Limit/offset to use, or NULL for no limit (default)
 	 * @return	array
 	 */
-	public static function roots( ?string $permissionCheck='view', Member $member=NULL, mixed $where=array(), array $limit=NULL ): array
+	public static function roots( $permissionCheck='view', $member=NULL, $where=array(), $limit=NULL )
 	{
 		$where[] = array( '`member` IS NULL' );
 		return parent::roots( $permissionCheck, $member, $where, $limit );
@@ -141,9 +102,9 @@ class Stream extends Model
 	/**
 	 * Fetch the default stream, or NULL
 	 *
-	 * @return Stream|null
+	 * @return \IPS\core\Stream|null
 	 */
-	public static function defaultStream() : Stream|null
+	public static function defaultStream()
 	{
 		/* If we've already loaded it, return it */
 		if( static::$defaultStream !== NULL )
@@ -152,9 +113,9 @@ class Stream extends Model
 		}
 
 		/* Check the member first */
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
-			$default = Member::loggedIn()->defaultStream;
+			$default = \IPS\Member::loggedIn()->defaultStream;
 
 			if ( $default !== NULL )
 			{
@@ -169,7 +130,7 @@ class Stream extends Model
 						static::$defaultStream = static::allActivityStream();
 					}
 				}
-				catch( Exception )
+				catch( \Exception $e )
 				{
 					return NULL;
 				}
@@ -181,28 +142,28 @@ class Stream extends Model
 		/* Still here? Check menu */
 		try
 		{
-			if ( !isset( Store::i()->defaultStreamData ) )
+			if ( !isset( \IPS\Data\Store::i()->defaultStreamData ) )
 			{
 				try
 				{
-					Store::i()->defaultStreamData = Db::i()->select( '*', 'core_streams', array( array( '`default`=?', 1 ) ) )->first();
+					\IPS\Data\Store::i()->defaultStreamData = \IPS\Db::i()->select( '*', 'core_streams', array( array( '`default`=?', 1 ) ) )->first();
 				}
-				catch ( UnderflowException )
+				catch ( \UnderflowException $e )
 				{
-					Store::i()->defaultStreamData = 0;
+					\IPS\Data\Store::i()->defaultStreamData = 0;
 				}
 			}
 			
-			if ( Store::i()->defaultStreamData == 0 )
+			if ( \IPS\Data\Store::i()->defaultStreamData == 0 )
 			{
 				static::$defaultStream = static::allActivityStream();
 				return static::$defaultStream;
 			}
 			
-			$stream = static::constructFromData( Store::i()->defaultStreamData );
+			$stream = static::constructFromData( \IPS\Data\Store::i()->defaultStreamData );
 			
 			/* Suitable for guests? */
-			if ( ! Member::loggedIn()->member_id )
+			if ( ! \IPS\Member::loggedIn()->member_id )
 			{
 				if ( ! ( ( $stream->ownership == 'all' and $stream->read == 'all' and $stream->follow == 'all' and $stream->date_type != 'last_visit' ) ) )
 				{
@@ -215,7 +176,7 @@ class Stream extends Model
 			
 			return $stream;
 		}
-		catch( Exception )
+		catch( \Exception $e )
 		{
 			return NULL;
 		}
@@ -224,9 +185,9 @@ class Stream extends Model
 	/**
 	 * "All Activity" Stream
 	 *
-	 * @return    Stream
+	 * @return	\IPS\core\Stream
 	 */
-	public static function allActivityStream() : Stream
+	public static function allActivityStream()
 	{
 		$stream = new static;
 		$stream->id = 0;
@@ -234,7 +195,7 @@ class Stream extends Model
 		$stream->date_relative_days = 365;
 		$stream->date_type = 'relative';
 		$stream->default_view = 'expanded';
-		$stream->baseUrl = Url::internal( "app=core&module=discover&controller=streams", 'front', 'discover_all' );
+		$stream->baseUrl = \IPS\Http\Url::internal( "app=core&module=discover&controller=streams", 'front', 'discover_all' );
 		$stream->read = "all";
 		return $stream;
 	}
@@ -242,11 +203,11 @@ class Stream extends Model
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    ActiveRecord|static
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): ActiveRecord|static
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
 		$obj = parent::constructFromData( $data, $updateMultitonStoreIfExists );
 		$obj->initBaseUrl();
@@ -261,22 +222,22 @@ class Stream extends Model
 	 * Javascript returns containers[class] = 1,2,3
 	 * The PHP code expects json_encode( containers[class] = array(1,2,3) )
 	 *
-	 * @param	string|array|null	$containers		Containers to convert
+	 * @param	string|array	$containers		Containers to convert
 	 * @return	array
 	 */
-	static public function containersToUrl( string|array|null $containers ) : array
+	static public function containersToUrl( $containers )
 	{
 		if ( $containers === NULL )
 		{
 			return array();
 		}
 		
-		if ( ! is_array( $containers ) )
+		if ( ! \is_array( $containers ) )
 		{ 
 			$containers = json_decode( $containers, true );
 		}
 		
-		if ( count( $containers ) )
+		if ( \count( $containers ) )
 		{
 			foreach( $containers as $class => $ids )
 			{
@@ -293,12 +254,12 @@ class Stream extends Model
 	 * Javascript returns containers[class] = 1,2,3
 	 * The PHP code expects json_encode( containers[class] = array(1,2,3) )
 	 *
-	 * @param	array|null	$containers		Containers to convert
+	 * @param	array	$containers		Containers to convert
 	 * @return	string
 	 */
-	static public function containersFromUrl( ?array $containers ) : string
+	static public function containersFromUrl( $containers )
 	{
-		if ( is_array( $containers) and count( $containers ) )
+		if ( \is_array( $containers) and \count( $containers ) )
 		{
 			foreach( $containers as $class => $ids )
 			{
@@ -314,7 +275,7 @@ class Stream extends Model
 	 *
 	 * @return void
 	 */
-	protected function initBaseUrl() : void
+	protected function initBaseUrl()
 	{
 		$this->baseUrl = $this->getBaseUrl();
 	}
@@ -322,9 +283,9 @@ class Stream extends Model
 	/**
 	 * Fetch the base url
 	 *
-	 * @return Url
+	 * @return void
 	 */
-	public function getBaseUrl() : Url
+	public function getBaseUrl()
 	{
 		if ( $this->id )
 		{
@@ -349,20 +310,20 @@ class Stream extends Model
 					$furlKey = 'discover_stream';
 					break;
 			}
-			return Url::internal( "app=core&module=discover&controller=streams&id={$this->id}", 'front', $furlKey );
+			return \IPS\Http\Url::internal( "app=core&module=discover&controller=streams&id={$this->id}", 'front', $furlKey );
 		}
 		else
 		{
-			return Url::internal( "app=core&module=discover&controller=streams", 'front', 'discover_all' );
+			return \IPS\Http\Url::internal( "app=core&module=discover&controller=streams", 'front', 'discover_all' );
 		}
 	}
 	
 	/**
 	 * [Node] Get Title
 	 *
-	 * @return	string
+	 * @return	string|null
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		if ( $this->id )
 		{
@@ -370,26 +331,20 @@ class Stream extends Model
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack('all_activity');
+			return \IPS\Member::loggedIn()->language()->addToStack('all_activity');
 		}
 	}
 	
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form			The form
+	 * @param	\IPS\Helpers\Form	$form			The form
 	 * @param	string				$titleType		'Text' or 'Translatable
 	 * @param	bool				$titleRequired	Is the title field required?
 	 * @return	void
 	 */
-	public function form( Form &$form, string $titleType='Translatable', bool $titleRequired=TRUE ) : void
+	public function form( &$form, $titleType='Translatable', $titleRequired=TRUE )
 	{
-		/* JS Controller */
-		if( Dispatcher::i()->controllerLocation == 'admin' )
-		{
-			$form->attributes['data-controller'] = 'core.admin.streams.form';
-		}
-
 		/* Title */
 		if ( $titleType )
 		{
@@ -398,13 +353,13 @@ class Stream extends Model
 		}
 		
 		/* All content or specific content? */
-		$form->add( new Radio( 'stream_include_comments', $this->include_comments, TRUE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'stream_include_comments', $this->include_comments, TRUE, array( 'options' => array(
 			1	=> 'stream_include_comments_1',
 			0	=> 'stream_include_comments_0'
 		) ) ) );
 		
 		/* All content or specific content? */
-		$form->add( new Radio( 'stream_classes_type', $this->classes ? 1 : 0, TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'stream_classes_type', $this->classes ? 1 : 0, TRUE, array(
 			'options'	=> array( 0 => 'stream_classes_type_all', 1 => 'stream_classes_type_custom' ),
 			'toggles'	=> array( 0 => array( 'stream_club_select' ), 1 => array( 'stream_classes' ) )
 		) ) );
@@ -413,10 +368,9 @@ class Stream extends Model
 		$classes = array();
 		$classToggles = array();
 
-		$memberToCheck = ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'admin' ) ? false : Member::loggedIn();
-		foreach( SearchContent::searchableClasses( $memberToCheck ) as $class )
+		foreach ( \IPS\Content::routedClasses( TRUE, FALSE, TRUE ) as $class )
 		{
-			if( in_array( 'IPS\Content\Item', class_parents( $class ) ) AND isset( $class::$databaseColumnMap['date'] ) )
+			if ( is_subclass_of( $class, 'IPS\Content\Searchable' ) AND isset( $class::$databaseColumnMap['date'] ) )
 			{
 				$classes[ $class ] = $class::$title . '_pl';
 				if ( isset( $class::$containerNodeClass ) )
@@ -426,12 +380,12 @@ class Stream extends Model
 			}
 		}
 
-		$containers = $this->containers ? json_decode( $this->containers ) : NULL;
+		$containers = json_decode( $this->containers );
 
 		/* Add the fields for them */
-		$form->add( new CheckboxSet( 'stream_classes', $this->classes ? explode( ',', $this->classes ) : array(), NULL, array( 'options' => $classes, 'toggles' => $classToggles ), NULL, NULL, NULL, 'stream_classes' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'stream_classes', $this->classes ? explode( ',', $this->classes ) : array(), NULL, array( 'options' => $classes, 'toggles' => $classToggles ), NULL, NULL, NULL, 'stream_classes' ) );
 
-		if ( Dispatcher::i()->controllerLocation === 'admin' )
+		if ( \IPS\Dispatcher::i()->controllerLocation === 'admin' )
 		{
 			/* Nodes */
 			foreach ( $classToggles as $class => $id )
@@ -439,30 +393,21 @@ class Stream extends Model
 				if ( isset( $class::$containerNodeClass ) )
 				{
 					$nodeClass = $class::$containerNodeClass;
-					$value = $containers->$class ?? 0;
+					$value = isset( $containers->$class ) ? $containers->$class : 0;
 
-					/* @var Item $class */
-					$field = new Node( 'stream_containers_' . $class::$title, $value, FALSE, array(
-						'class' => $nodeClass,
-						'clubs' => TRUE,
-						'multiple' => TRUE,
-						'zeroVal' => 'all',
-						'forceOwner' => FALSE,
-						'subnodes' => FALSE,
-						'nodeGroups' => TRUE,
-					), NULL, NULL, NULL, 'stream_containers_' . $class::$title );
-					$field->label = Member::loggedIn()->language()->addToStack( $nodeClass::$nodeTitle );
+					$field = new \IPS\Helpers\Form\Node( 'stream_containers_' . $class::$title, $value, FALSE, array( 'class' => $nodeClass, 'clubs' => TRUE, 'multiple' => TRUE, 'zeroVal' => 'all', 'forceOwner' => FALSE, 'subnodes' => FALSE ), NULL, NULL, NULL, 'stream_containers_' . $class::$title );
+					$field->label = \IPS\Member::loggedIn()->language()->addToStack( $nodeClass::$nodeTitle );
 					$form->add( $field );
 				}
 			}
 		}
 		
 		/* Clubs */
-		if( Settings::i()->clubs )
+		if( \IPS\Settings::i()->clubs )
 		{
 			$clubs = $this->_getOurClubs();
 
-			if ( count( $clubs ) )
+			if ( \is_array( $clubs ) AND \count( $clubs ) )
 			{
 				$clubOptions = array();
 				foreach ( $clubs as $club )
@@ -483,7 +428,7 @@ class Stream extends Model
 						break;
 				}
 							
-				$form->add( new Radio( 'stream_club_select', $clubSelect, TRUE, array(
+				$form->add( new \IPS\Helpers\Form\Radio( 'stream_club_select', $clubSelect, TRUE, array(
 					'options'		=> array(
 						'all'		=> 'stream_club_select_all',
 						'none'		=> 'stream_club_select_none',
@@ -493,14 +438,14 @@ class Stream extends Model
 						'select'	=> array( 'stream_club_filter' )
 					)
 				), NULL, NULL, NULL, 'stream_club_select' ) );
-				$form->add( new Select( 'stream_club_filter', $this->clubs ? explode( ',', $this->clubs ) : array(), FALSE, array( 'options' => $clubOptions, 'parse' => 'normal', 'multiple' => TRUE, 'noDefault' => TRUE ), NULL, NULL, NULL, 'stream_club_filter' ) );
+				$form->add( new \IPS\Helpers\Form\Select( 'stream_club_filter', explode( ',', $this->clubs ), FALSE, array( 'options' => $clubOptions, 'parse' => 'normal', 'multiple' => TRUE, 'noDefault' => TRUE ), NULL, NULL, NULL, 'stream_club_filter' ) );
 			}
 		}
 
 		/* Tags */
-		if ( Settings::i()->tags_enabled )
+		if ( \IPS\Settings::i()->tags_enabled )
 		{
-			$form->add( new Radio( 'stream_tags_type', $this->tags ? 'custom' : 'all', TRUE, array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'stream_tags_type', $this->tags ? 'custom' : 'all', TRUE, array(
 				'options' 	=> array(
 					'all'		=> 'stream_tags_all',
 					'custom'	=> 'stream_tags_custom'
@@ -509,11 +454,11 @@ class Stream extends Model
 					'custom'	=> array( 'stream_tags' )
 				)
 			) ) );
-			$form->add( new Text( 'stream_tags', $this->tags ? explode( ',', $this->tags ) : NULL, NULL, array( 'autocomplete' => array( 'minimized' => FALSE ) ), NULL, NULL, NULL, 'stream_tags' ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'stream_tags', $this->tags ? explode( ',', $this->tags ) : NULL, NULL, array( 'autocomplete' => array( 'minimized' => FALSE ) ), NULL, NULL, NULL, 'stream_tags' ) );
 		}
 		
 		/* Ownership */
-		$form->add( new Radio( 'stream_ownership', $this->ownership, TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'stream_ownership', $this->ownership, TRUE, array(
 			'options' => array(
 				'all'				=> 'stream_ownership_all',
 				'started'			=> 'stream_ownership_started',
@@ -524,23 +469,23 @@ class Stream extends Model
 				'custom'			=> array( 'stream_custom_members' )
 			)
 		) ) );
-		$form->add( new Form\Member( 'stream_custom_members', $this->custom_members ? array_map( array( 'IPS\Member', 'load' ), explode( ',', $this->custom_members ) ) : NULL, NULL, array( 'multiple' => NULL ), NULL, NULL, NULL, 'stream_custom_members' ) );
+		$form->add( new \IPS\Helpers\Form\Member( 'stream_custom_members', $this->custom_members ? array_map( array( 'IPS\Member', 'load' ), explode( ',', $this->custom_members ) ) : NULL, NULL, array( 'multiple' => NULL ), NULL, NULL, NULL, 'stream_custom_members' ) );
 		
 		/* Read */
-		$form->add( new Radio( 'stream_read', $this->read, TRUE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'stream_read', $this->read, TRUE, array( 'options' => array(
 			'all'				=> 'stream_read_all',
 			'unread'			=> 'stream_read_unread',
 		) ) ) );
 
 		/* Solved */
-		$form->add( new Radio( 'stream_solved', $this->solved, TRUE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'stream_solved', $this->solved, TRUE, array( 'options' => array(
 			'all'				=> 'stream_solved_all',
 			'solved'			=> 'stream_solved_solved',
 			'unsolved'			=> 'stream_solved_unsolved',
 		) ) ) );
 		
 		/* Follow */
-		$form->add( new Radio( 'stream_follow', $this->follow, TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'stream_follow', $this->follow, TRUE, array(
 			'options' 	=> array(
 				'all'		=> 'stream_follow_all',
 				'followed'	=> 'stream_follow_followed',
@@ -549,7 +494,7 @@ class Stream extends Model
 				'followed'	=> array( 'stream_followed_types' )
 			)
 		) ) );
-		$form->add( new CheckboxSet( 'stream_followed_types', $this->followed_types ? explode( ',', $this->followed_types ) : array( 'items' ), NULL, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'stream_followed_types', $this->followed_types ? explode( ',', $this->followed_types ) : array( 'items' ), NULL, array( 'options' => array(
 			'containers'	=> 'stream_followed_types_areas',
 			'items'			=> 'stream_followed_types_items',
 			'members'		=> 'stream_followed_types_members',
@@ -557,75 +502,76 @@ class Stream extends Model
 		
 		/* Date */
 		$streamDateOptions = [];
-		if ( Settings::i()->search_method === 'elastic' )
+		if ( \IPS\Settings::i()->search_method === 'elastic' )
 		{
 			$streamDateOptions['all'] = 'stream_date_type_all';
 		}
 		$streamDateOptions['last_visit'] = 'stream_date_type_last_visit';
 		$streamDateOptions['relative'] = 'stream_date_type_relative';
 		$streamDateOptions['custom'] = 'stream_date_type_custom';
-		$form->add( new Radio( 'stream_date_type', $this->id ? $this->date_type : ( Settings::i()->search_method === 'elastic' ? 'all' : 'relative' ), TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'stream_date_type', $this->id ? $this->date_type : ( \IPS\Settings::i()->search_method === 'elastic' ? 'all' : 'relative' ), TRUE, array(
 			'options' => $streamDateOptions,
 			'toggles' => array(
 				'relative'			=> array( 'stream_date_relative_days' ),
 				'custom'			=> array( 'stream_date_range' )
 			)
 		) ) );
-		$form->add( new Interval( 'stream_date_relative_days', $this->date_relative_days ?: 365, NULL, array( 'valueAs' => Interval::DAYS ), function( $val )
+		$form->add( new \IPS\Helpers\Form\Interval( 'stream_date_relative_days', $this->date_relative_days ?: 365, NULL, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS ), function( $val )
 		{
-			if ( Request::i()->stream_date_type == 'relative' and !$val )
+			if ( \IPS\Request::i()->stream_date_type == 'relative' and !$val )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
-		}, Member::loggedIn()->language()->addToStack('stream_date_relative_days_prefix'), NULL, 'stream_date_relative_days' ) );
-		$form->add( new DateRange( 'stream_date_range', array( 'start' => $this->date_start, 'end' => $this->date_end ), NULL, array(), function( $val )
+		}, \IPS\Member::loggedIn()->language()->addToStack('stream_date_relative_days_prefix'), NULL, 'stream_date_relative_days' ) );
+		$form->add( new \IPS\Helpers\Form\DateRange( 'stream_date_range', array( 'start' => $this->date_start, 'end' => $this->date_end ), NULL, array(), function( $val )
 		{
-			if ( Request::i()->stream_date_type == 'custom' and !$val['start'] and !$val['end'] )
+			if ( \IPS\Request::i()->stream_date_type == 'custom' and !$val['start'] and !$val['end'] )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'stream_date_range' ) );
 
 		/* Default View */
-		$form->add( new Radio( 'stream_default_view', $this->default_view ?: 'expanded', TRUE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'stream_default_view', $this->default_view ?: 'expanded', TRUE, array( 'options' => array(
 			'condensed'			=> 'stream_default_view_condensed',
 			'expanded'			=> 'stream_default_view_expanded',
 		) ) ) );
 		
 		/* Sort */
-		$form->add( new Radio( 'stream_sort', $this->sort, TRUE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'stream_sort', $this->sort, TRUE, array( 'options' => array(
 			'newest'	=> 'stream_sort_newest',
 			'oldest'	=> 'stream_sort_oldest',
 		) ) ) );
 		
-		if ( Dispatcher::i()->controllerLocation === 'admin' )
+		if ( \IPS\Dispatcher::i()->controllerLocation === 'admin' )
 		{
-			$form->add( new YesNo( 'stream_default', $this->default, FALSE ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'stream_default', $this->default, FALSE ) );
 		}
 	}
 
 	/**
 	 * @brief Cached clubs
 	 */
-	protected static ?array $ourClubs = NULL;
+	protected static $ourClubs = NULL;
 
 	/**
 	 * Fetch our clubs and cache
 	 *
 	 * @return array
 	 */
-	protected function _getOurClubs() : array
+	protected function _getOurClubs()
 	{
 		/* If we're in the ACP, just return all clubs */
-		if( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'admin' )
+		if( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'admin' )
 		{
-			return iterator_to_array( Club::clubs( NULL, NULL, 'name' ) );
+			return iterator_to_array( \IPS\Member\Club::clubs( NULL, NULL, 'name' ) );
 		}
 		
 		if( static::$ourClubs === NULL )
 		{
-			$clubs = Club::clubs( Member::loggedIn(), NULL, 'name', TRUE, array(), Settings::i()->clubs_require_approval ? array( 'approved=1' ) : NULL );
-			static::$ourClubs = ( $clubs instanceof ActiveRecordIterator) ? iterator_to_array( $clubs ) : $clubs;
+			static::$ourClubs = \IPS\Member\Club::clubs( \IPS\Member::loggedIn(), NULL, 'name', TRUE, array(), \IPS\Settings::i()->clubs_require_approval ? array( 'approved=1' ) : NULL );
+
+			static::$ourClubs = static::$ourClubs ? iterator_to_array( static::$ourClubs ) : array();
 		}
 
 		return static::$ourClubs;
@@ -637,16 +583,16 @@ class Stream extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		/* Title */
 		if ( ! $this->id and $this->id !== 0 )
 		{
 			$this->save();
 		}
-		if ( isset( $values['stream_title'] ) and is_array( $values['stream_title'] ) )
+		if ( isset( $values['stream_title'] ) and \is_array( $values['stream_title'] ) )
 		{
-			Lang::saveCustom( 'core', "stream_title_{$this->id}", $values['stream_title'] );
+			\IPS\Lang::saveCustom( 'core', "stream_title_{$this->id}", $values['stream_title'] );
 			$values['stream_title'] = NULL;
 		}
 		unset( $values['__custom_stream'] );
@@ -658,7 +604,7 @@ class Stream extends Model
 			$values['stream_classes'] = NULL;
 			$values['stream_containers'] = NULL;
 		} 
-		elseif ( ( isset( $values['stream_classes'] ) && is_array( $values['stream_classes'] ) ) )
+		elseif ( ( isset( $values['stream_classes'] ) && \is_array( $values['stream_classes'] ) ) )
 		{
 			$classes = array();
 			$containers = NULL;
@@ -682,7 +628,7 @@ class Stream extends Model
 		unset( $values['stream_classes_type'] );
 		
 		/* Clubs */
-		if ( isset( $values['stream_club_select'] ) )
+		if ( isset( $values['stream_club_select'] ) and ( !isset( $values['stream_classes_type'] ) or $values['stream_classes_type'] == 0 ) )
 		{
 			switch ( $values['stream_club_select'] )
 			{
@@ -697,7 +643,7 @@ class Stream extends Model
 				case 'select':
 					if ( $values['stream_club_filter'] )
 					{
-						$values['stream_clubs'] = is_array( $values['stream_club_filter'] ) ? implode( ',', $values['stream_club_filter'] ) : $values['stream_club_filter'];
+						$values['stream_clubs'] = \is_array( $values['stream_club_filter'] ) ? implode( ',', $values['stream_club_filter'] ) : $values['stream_club_filter'];
 					}
 					else
 					{
@@ -723,7 +669,7 @@ class Stream extends Model
 			}
 			else
 			{
-				$values['stream_tags'] = ( is_array( $values['stream_tags'] ) ) ? implode( ',', $values['stream_tags'] ) : $values['stream_tags'];
+				$values['stream_tags'] = ( \is_array( $values['stream_tags'] ) ) ? implode( ',', $values['stream_tags'] ) : $values['stream_tags'];
 			}
 		}
 		
@@ -782,7 +728,7 @@ class Stream extends Model
 					]
 				};
 			}
-			catch( UnhandledMatchError ) { }
+			catch( \UnhandledMatchError ) { }
 		}
 		
 		/* If we're using custom dates, these need to be handled specially. */
@@ -790,12 +736,12 @@ class Stream extends Model
 		{
 			if ( ! isset( $values['stream_date_start'] ) )
 			{
-				$values['stream_date_start'] = isset( $values['stream_date_range'] ) && $values['stream_date_range']['start'] ? ( $values['stream_date_range']['start'] instanceof DateTime ? $values['stream_date_range']['start']->getTimestamp() : $values['stream_date_range']['start'] ) : NULL;
+				$values['stream_date_start'] = isset( $values['stream_date_range'] ) && $values['stream_date_range']['start'] ? ( $values['stream_date_range']['start'] instanceof \IPS\DateTime ? $values['stream_date_range']['start']->getTimestamp() : $values['stream_date_range']['start'] ) : NULL;
 			}
 			
 			if ( ! isset( $values['stream_date_end'] ) )
 			{
-				$values['stream_date_end'] = isset( $values['stream_date_range'] ) && $values['stream_date_range']['end'] ? ( $values['stream_date_range']['end'] instanceof DateTime ? $values['stream_date_range']['end']->getTimestamp() : $values['stream_date_range']['end'] ) : NULL;
+				$values['stream_date_end'] = isset( $values['stream_date_range'] ) && $values['stream_date_range']['end'] ? ( $values['stream_date_range']['end'] instanceof \IPS\DateTime ? $values['stream_date_range']['end']->getTimestamp() : $values['stream_date_range']['end'] ) : NULL;
 			}
 			
 			$values['stream_date_relative_days'] = NULL;
@@ -803,10 +749,10 @@ class Stream extends Model
 		
 		unset( $values['stream_date_range'] );
 		
-		if ( Dispatcher::i()->controllerLocation === 'admin' and ! empty( $values['stream_default'] ) )
+		if ( \IPS\Dispatcher::i()->controllerLocation === 'admin' and ! empty( $values['stream_default'] ) )
 		{
 			$where = ( $this->id ) ? array( 'id !=?', $this->id ) : NULL;
-			Db::i()->update( 'core_streams', array( 'default' => 0 ), $where );
+			\IPS\Db::i()->update( 'core_streams', array( 'default' => 0 ), $where );
 		}
 		
 		/* Remove stream_ prefix */
@@ -837,7 +783,7 @@ class Stream extends Model
 	 *
 	 * @return	string
 	 */
-	public function blurb() : string
+	public function blurb()
 	{
 		if ( $this->classes )
 		{
@@ -846,15 +792,15 @@ class Stream extends Model
 			{
 				if ( class_exists( $class ) )
 				{
-					if ( in_array( 'IPS\Content\Review', class_parents( $class ) ) )
+					if ( \in_array( 'IPS\Content\Review', class_parents( $class ) ) )
 					{
 						$classes[ $class::$itemClass ]['reviews'] = $class;
 					}
-					elseif ( in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
+					elseif ( \in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
 					{
 						$classes[ $class::$itemClass ]['comments'] = $class;
 					}
-					elseif ( in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+					elseif ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
 					{
 						$classes[ $class ]['items'] = $class;
 					}
@@ -868,9 +814,9 @@ class Stream extends Model
 				$_types = array();
 				foreach ( $subClasses as $class )
 				{
-					$_types[] = Member::loggedIn()->language()->addToStack( $class::$title . '_pl_lc' );
+					$_types[] = \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl_lc' );
 				}
-				$_types = Member::loggedIn()->language()->formatList( $_types );
+				$_types = \IPS\Member::loggedIn()->language()->formatList( $_types );
 												
 				if ( isset( $allowedContainers[ $itemClass ] ) and isset( $itemClass::$containerNodeClass ) )
 				{
@@ -882,11 +828,11 @@ class Stream extends Model
 						{
 							$containers[] = $containerClass::loadAndCheckPerms( $id )->_title;
 						}
-						catch ( OutOfRangeException ) { }
+						catch ( \OutOfRangeException $e ) { }
 					}
-					$containers = Member::loggedIn()->language()->formatList( $containers );
+					$containers = \IPS\Member::loggedIn()->language()->formatList( $containers );
 					
-					$types[] = Member::loggedIn()->language()->addToStack( 'stream_blurb_in_containers', FALSE, array( 'sprintf' => array( $_types, $containers ) ) );
+					$types[] = \IPS\Member::loggedIn()->language()->addToStack( 'stream_blurb_in_containers', FALSE, array( 'sprintf' => array( $_types, $containers ) ) );
 				}
 				else
 				{
@@ -894,18 +840,18 @@ class Stream extends Model
 				}
 			}
 						
-			$type = Member::loggedIn()->language()->formatList( $types );
+			$type = \IPS\Member::loggedIn()->language()->formatList( $types );
 		}
 		else
 		{
-			$type = Member::loggedIn()->language()->addToStack('stream_blurb_all');
+			$type = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_all');
 		}
 				
 		$terms = array();
 		
 		if ( $this->clubs === '0' )
 		{
-			$terms[] = Member::loggedIn()->language()->addToStack('stream_blurb_no_clubs');
+			$terms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_no_clubs');
 		}
 		elseif ( $this->clubs )
 		{
@@ -914,49 +860,49 @@ class Stream extends Model
 			{
 				try
 				{
-					$club = Club::load( ltrim( $clubId, 'c' ) );
-					if ( $club->canRead( Member::loggedIn() ) )
+					$club = \IPS\Member\Club::load( ltrim( $clubId, 'c' ) );
+					if ( $club->canRead( \IPS\Member::loggedIn() ) )
 					{
 						$clubs[] = $club->name;
 					}
 				}
-				catch ( Exception ) { }
+				catch ( \Exception $e ) { }
 			}
-			if ( count( $clubs ) )
+			if ( \count( $clubs ) )
 			{
-				$terms[] = Member::loggedIn()->language()->addToStack( 'stream_blurb_in_clubs', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( $clubs ) ) ) );
+				$terms[] = \IPS\Member::loggedIn()->language()->addToStack( 'stream_blurb_in_clubs', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $clubs ) ) ) );
 			}
 			else
 			{
-				$terms[] = Member::loggedIn()->language()->addToStack('stream_blurb_no_clubs');
+				$terms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_no_clubs');
 			}
 		}
-
-		if ( $this->tags and Settings::i()->tags_enabled )
+		
+		if ( $this->tags and \IPS\Settings::i()->tags_enabled )
 		{
-			$terms[] = Member::loggedIn()->language()->addToStack( 'stream_includes_tags', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( array_map( function( $val ){
+			$terms[] = \IPS\Member::loggedIn()->language()->addToStack( 'stream_includes_tags', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( array_map( function( $val ){
 				return '\'' . $val . '\'';
-			}, explode( ',', $this->tags ) ) ), Member::loggedIn()->language()->get('or_list_format') ) ) );
+			}, explode( ',', $this->tags ) ) ), \IPS\Member::loggedIn()->language()->get('or_list_format') ) ) );
 		}
 		
 		switch ( $this->ownership )
 		{
 			case 'started':
-				$terms[] = Member::loggedIn()->language()->addToStack('stream_blurb_i_started');
+				$terms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_i_started');
 				break;
 			
 			case 'postedin':
-				$terms[] = Member::loggedIn()->language()->addToStack('stream_blurb_i_posted_in');
+				$terms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_i_posted_in');
 				break;
 							
 			case 'custom':
 				$memberNames = array();
-				$members = ( ! is_array( $this->custom_members ) ? explode( ',', $this->custom_members ) : $this->custom_members );
+				$members = ( ! \is_array( $this->custom_members ) ? explode( ',', $this->custom_members ) : $this->custom_members );
 				foreach ( $members as $member )
 				{
-					if ( ! ( $member instanceof Member ) )
+					if ( ! ( $member instanceof \IPS\Member ) )
 					{
-						$_member = Member::load( $member );
+						$_member = \IPS\Member::load( $member );
 						if ( $_member->member_id )
 						{
 							$memberNames[] = $_member->name;
@@ -967,15 +913,15 @@ class Stream extends Model
 						$memberNames[] = $member->name;
 					}
 				}
-				if ( count( $memberNames ) )
+				if ( \count( $memberNames ) )
 				{
-					$terms[] = Member::loggedIn()->language()->addToStack( 'stream_blurb_by_members', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( $memberNames, Member::loggedIn()->language()->get('or_list_format') ) ) ) );
+					$terms[] = \IPS\Member::loggedIn()->language()->addToStack( 'stream_blurb_by_members', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $memberNames, \IPS\Member::loggedIn()->language()->get('or_list_format') ) ) ) );
 				}
 				break;
 		}
 		if ( $this->read == 'unread' )
 		{
-			$terms[] = Member::loggedIn()->language()->addToStack('stream_blurb_unread');
+			$terms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_unread');
 		}
 		if ( $this->follow == 'followed' )
 		{
@@ -985,68 +931,68 @@ class Stream extends Model
 				switch ( $followType )
 				{
 					case 'containers':
-						$followTerms[] = Member::loggedIn()->language()->addToStack('stream_blurb_following_containers');
+						$followTerms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_following_containers');
 						break;
 					case 'items':
-						$followTerms[] = Member::loggedIn()->language()->addToStack('stream_blurb_following_items');
+						$followTerms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_following_items');
 						break;
 					case 'members':
-						$followTerms[] = Member::loggedIn()->language()->addToStack('stream_blurb_following_members');
+						$followTerms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_following_members');
 						break;
 				}
 			}
 			
-			$terms[] = Member::loggedIn()->language()->formatList( $followTerms, Member::loggedIn()->language()->get('or_list_format') );
+			$terms[] = \IPS\Member::loggedIn()->language()->formatList( $followTerms, \IPS\Member::loggedIn()->language()->get('or_list_format') );
 		}
 		switch ( $this->date_type )
 		{
 			case 'last_visit':
-				$terms[] = Member::loggedIn()->language()->addToStack('stream_blurb_since_last_visit');
+				$terms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_since_last_visit');
 				break;
 			case 'relative':
-				if( Request::i()->stream_date_relative_days )
+				if( \IPS\Request::i()->stream_date_relative_days )
 				{
-					$period = ( Request::i()->stream_date_relative_days['unit'] == 'd' ) ? Member::loggedIn()->language()->addToStack( 'f_days', FALSE, array( 'pluralize' => array( Request::i()->stream_date_relative_days['val'] ) ) ) : Member::loggedIn()->language()->addToStack( 'f_weeks', FALSE, array( 'pluralize' => array( Request::i()->stream_date_relative_days['val'] ) ) );
+					$period = ( \IPS\Request::i()->stream_date_relative_days['unit'] == 'd' ) ? \IPS\Member::loggedIn()->language()->addToStack( 'f_days', FALSE, array( 'pluralize' => array( \IPS\Request::i()->stream_date_relative_days['val'] ) ) ) : \IPS\Member::loggedIn()->language()->addToStack( 'f_weeks', FALSE, array( 'pluralize' => array( \IPS\Request::i()->stream_date_relative_days['val'] ) ) );
 				}
 				else
 				{
-					$period = Member::loggedIn()->language()->addToStack( 'f_days', FALSE, array( 'pluralize' => array( $this->date_relative_days ) ) );
+					$period = \IPS\Member::loggedIn()->language()->addToStack( 'f_days', FALSE, array( 'pluralize' => array( $this->date_relative_days ) ) );
 				}
 
-				$terms[] = Member::loggedIn()->language()->addToStack( 'stream_blurb_relative', FALSE, array( 'sprintf' => array( $period ) ) );
+				$terms[] = \IPS\Member::loggedIn()->language()->addToStack( 'stream_blurb_relative', FALSE, array( 'sprintf' => array( $period ) ) );
 				break;
 			case 'custom':
 				if ( $this->date_start and $this->date_end )
 				{
-					$terms[] = Member::loggedIn()->language()->addToStack( 'stream_blurb_date_between', FALSE, array( 'sprintf' => array( DateTime::ts( $this->date_start ), DateTime::ts( $this->date_end ) ) ) );
+					$terms[] = \IPS\Member::loggedIn()->language()->addToStack( 'stream_blurb_date_between', FALSE, array( 'sprintf' => array( \IPS\DateTime::ts( $this->date_start ), \IPS\DateTime::ts( $this->date_end ) ) ) );
 				}
 				elseif ( $this->date_start )
 				{
-					$terms[] = Member::loggedIn()->language()->addToStack( 'stream_blurb_date_after', FALSE, array( 'sprintf' => array( DateTime::ts( $this->date_start ) ) ) );
+					$terms[] = \IPS\Member::loggedIn()->language()->addToStack( 'stream_blurb_date_after', FALSE, array( 'sprintf' => array( \IPS\DateTime::ts( $this->date_start ) ) ) );
 				}
 				elseif ( $this->date_end )
 				{
-					$terms[] = Member::loggedIn()->language()->addToStack( 'stream_blurb_date_before', FALSE, array( 'sprintf' => array( DateTime::ts( $this->date_end ) ) ) );
+					$terms[] = \IPS\Member::loggedIn()->language()->addToStack( 'stream_blurb_date_before', FALSE, array( 'sprintf' => array( \IPS\DateTime::ts( $this->date_end ) ) ) );
 				}
 				break;
 		}
 
 		if ( $this->solved == 'unsolved' )
 		{
-			$terms[] = Member::loggedIn()->language()->addToStack('stream_blurb_unsolved');
+			$terms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_unsolved');
 		}
 		else if ( $this->solved =='solved')
 		{
-			$terms[] = Member::loggedIn()->language()->addToStack('stream_blurb_solved');
+			$terms[] = \IPS\Member::loggedIn()->language()->addToStack('stream_blurb_solved');
 		}
 		
-		if ( count( $terms ) )
+		if ( \count( $terms ) )
 		{
-			return Member::loggedIn()->language()->addToStack( 'steam_blurb_with_terms', FALSE, array( 'sprintf' => array( $type, Member::loggedIn()->language()->formatList( $terms ) ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'steam_blurb_with_terms', FALSE, array( 'sprintf' => array( $type, \IPS\Member::loggedIn()->language()->formatList( $terms ) ) ) );
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack( 'steam_blurb_no_terms', FALSE, array( 'sprintf' => array( $type ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'steam_blurb_no_terms', FALSE, array( 'sprintf' => array( $type ) ) );
 		}
 	}
 		
@@ -1055,7 +1001,7 @@ class Stream extends Model
 	 *
 	 * @return	array
 	 */
-	public function config() : array
+	public function config()
 	{
 		/* The simple values */
 		$config = array(
@@ -1092,7 +1038,7 @@ class Stream extends Model
 		}
 		
 		/* Follows */
-		$followedTypes = $this->followed_types ? explode( ',', $this->followed_types ) : array();
+		$followedTypes = explode( ',', $this->followed_types );
 		$config['stream_followed_types'] = array();
 		
 		foreach( $followedTypes as $type )
@@ -1111,15 +1057,15 @@ class Stream extends Model
 			{
 				if ( class_exists( $class ) )
 				{
-					if ( in_array( 'IPS\Content\Review', class_parents( $class ) ) )
+					if ( \in_array( 'IPS\Content\Review', class_parents( $class ) ) )
 					{
 						$classes[ $class::$itemClass ]['reviews'] = $class;
 					}
-					elseif ( in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
+					elseif ( \in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
 					{
 						$classes[ $class::$itemClass ]['comments'] = $class;
 					}
-					elseif ( in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+					elseif ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
 					{
 						$classes[ $class ]['items'] = $class;
 					}
@@ -1131,7 +1077,7 @@ class Stream extends Model
 			{
 				foreach ( $subClasses as $class )
 				{
-					$types[ $class ] = Member::loggedIn()->language()->addToStack( $class::$title . '_pl', FALSE );
+					$types[ $class ] = \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl', FALSE );
 				}
 			}
 			
@@ -1144,22 +1090,22 @@ class Stream extends Model
 		if( $this->ownership == 'custom' and $this->custom_members )
 		{
 			/* Values are store as int in the db, but the json needs names so it matches the form data */
-			if( mb_strpos( $this->custom_members, ',' ) === FALSE AND $this->custom_members == Member::loggedIn()->member_id )
+			if( mb_strpos( $this->custom_members, ',' ) === FALSE AND $this->custom_members == \IPS\Member::loggedIn()->member_id )
 			{
-				$config['stream_custom_members'] = Member::loggedIn()->name;
+				$config['stream_custom_members'] = \IPS\Member::loggedIn()->name;
 			}
 			else
 			{
 				try
 				{
-					$config['stream_custom_members'] = iterator_to_array( Db::i()->select( 'name', 'core_members', array( Db::i()->in( 'member_id', explode( ',', $this->custom_members ) ) ) )->setValueField('name') );
+					$config['stream_custom_members'] = iterator_to_array( \IPS\Db::i()->select( 'name', 'core_members', array( \IPS\Db::i()->in( 'member_id', explode( ',', $this->custom_members ) ) ) )->setValueField('name') );
 				}
-				catch( Exception ) { }
+				catch( \Exception $e ) { }
 			}
 		}
 		
 		/* Tags */
-		if( $this->tags and Settings::i()->tags_enabled )
+		if( $this->tags and \IPS\Settings::i()->tags_enabled )
 		{
 			$config['stream_tags'] = $this->tags;
 		}
@@ -1172,8 +1118,8 @@ class Stream extends Model
 		elseif( $this->date_type == 'custom' )
 		{
 			$config['stream_date_range'] = array(
-				'start' => intval( $this->date_start ),
-				'end' => intval( $this->date_end )
+				'start' => \intval( $this->date_start ),
+				'end' => \intval( $this->date_end )
 			);
 		}
 		
@@ -1198,16 +1144,16 @@ class Stream extends Model
 	/**
 	 * Get results
 	 *
-	 * @param	Member|null	$member	The member to get the results as
-	 * @return	Query
+	 * @param	\IPS\Member|null	$member	The member to get the results as
+	 * @return	\IPS\Content\Search\Query
 	 */
-	public function query( ?Member $member = NULL ) : Query
+	public function query( $member = NULL )
 	{
 		/* Init */
-		$query = Query::init( $member );
+		$query = \IPS\Content\Search\Query::init( $member );
 
 		/* Get Member */
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		/* Content Filters */
 		$filters			= array();
@@ -1238,16 +1184,15 @@ class Stream extends Model
 			foreach ( $classes as $class => $options )
 			{
 				/* Init */
-				/* @var Item $class */
-				if ( ! $this->include_comments or ( isset( $options['items'] ) and !isset( $options['comments'] ) and in_array( 'IPS\Content\Item', class_parents( $class ) ) and $class::$firstCommentRequired ) )
+				if ( ! $this->include_comments or ( isset( $options['items'] ) and !isset( $options['comments'] ) and \in_array( 'IPS\Content\Item', class_parents( $class ) ) and $class::$firstCommentRequired ) )
 				{
 					/* As we do not want comments to appear separately, we want to only show the content item if no comments
 							   or the last comment of the content item */
-					$filter= ContentFilter::init( $class )->onlyLastComment();
+					$filter= \IPS\Content\Search\ContentFilter::init( $class, TRUE, TRUE, TRUE )->onlyLastComment();
 				}
 				else
 				{
-					$filter = ContentFilter::init( $class, isset( $options['items'] ), isset( $options['comments'] ), isset( $options['reviews'] ) );
+					$filter = \IPS\Content\Search\ContentFilter::init( $class, isset( $options['items'] ), isset( $options['comments'] ), isset( $options['reviews'] ) );
 				}
 				
 				/* Are we restricted to certain containers? */
@@ -1263,18 +1208,21 @@ class Stream extends Model
 		}
 		else
 		{
-			foreach( SearchContent::searchableClasses( $member ?? false ) as $class )
+			foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
 			{
-				if ( in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+				foreach ( $object->classes as $class )
 				{
-					if( !$this->include_comments )
+					if ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
 					{
-						/* As we do not want comments to appear separately, we want to only show the content item if no comments
-						   or the last comment of the content item */
-						$filters[] = ContentFilter::init( $class )->onlyLastComment();
-					}
+						if( !$this->include_comments )
+						{
+							/* As we do not want comments to appear separately, we want to only show the content item if no comments
+							   or the last comment of the content item */
+							$filters[] = \IPS\Content\Search\ContentFilter::init( $class, TRUE, TRUE, TRUE )->onlyLastComment();
+						}
 
-					$classesChecked[]	= $class;
+						$classesChecked[]	= $class;
+					}
 				}
 			}
 		}
@@ -1282,13 +1230,10 @@ class Stream extends Model
 		/* Give content item classes a chance to inspect and manipulate filters */
 		foreach( $classesChecked as $itemClass )
 		{
-			if( $extension = SearchContent::extension( $itemClass ) )
-			{
-				$extension::searchEngineFiltering( $filters, $query );
-			}
+			$itemClass::searchEngineFiltering( $filters, $query );
 		}
 
-		if ( count( $filters ) )
+		if ( \count( $filters ) )
 		{
 			$query->filterByContent( $filters );
 		}
@@ -1329,7 +1274,7 @@ class Stream extends Model
 		if ( $this->follow == 'followed' )
 		{
 			$followTypes = explode( ',', $this->followed_types );
-			$query->filterByFollowed( in_array( 'containers', $followTypes ), in_array( 'items', $followTypes ), in_array( 'members', $followTypes ) );
+			$query->filterByFollowed( \in_array( 'containers', $followTypes ), \in_array( 'items', $followTypes ), \in_array( 'members', $followTypes ) );
 		}
 		
 		/* If we are showing all items (not grouping on last comment, then we need to filter by creation date */
@@ -1339,20 +1284,19 @@ class Stream extends Model
 		switch ( $this->date_type )
 		{
 			case 'last_visit':
-				$query->$filterDateMethod( DateTime::ts( (int) $member->last_visit ) );
+				$query->$filterDateMethod( \IPS\DateTime::ts( $member->last_visit ) );
 				break;
 			case 'relative':
-				if ( is_array( $this->date_relative_days ) )
+				if ( \is_array( $this->date_relative_days ) )
 				{
-					$query->$filterDateMethod( DateTime::create()->sub( new DateInterval( 'P' . intval( $this->date_relative_days['val'] ) . mb_strtoupper( $this->date_relative_days['unit'] ) ) ) );
+					$query->$filterDateMethod( \IPS\DateTime::create()->sub( new \DateInterval( 'P' . \intval( $this->date_relative_days['val'] ) . mb_strtoupper( $this->date_relative_days['unit'] ) ) ) );
 				}
 				else
 				{
-					$query->$filterDateMethod( DateTime::create()->sub( new DateInterval( 'P' . intval( $this->date_relative_days ) . 'D' ) ) );
+					$query->$filterDateMethod( \IPS\DateTime::create()->sub( new \DateInterval( 'P' . \intval( $this->date_relative_days ) . 'D' ) ) );
 				}
-				break;
 			case 'custom':
-				$query->$filterDateMethod( $this->date_start ? DateTime::ts( $this->date_start ) : NULL, $this->date_end ? DateTime::ts( $this->date_end ) : NULL );
+				$query->$filterDateMethod( $this->date_start ? \IPS\DateTime::ts( $this->date_start ) : NULL, $this->date_end ? \IPS\DateTime::ts( $this->date_end ) : NULL );
 				break;
 		}
 
@@ -1371,22 +1315,22 @@ class Stream extends Model
 		{
 			if ( $this->sort === 'oldest' )
 			{
-				$query->setOrder( Query::ORDER_OLDEST_CREATED );
+				$query->setOrder( \IPS\Content\Search\Query::ORDER_OLDEST_CREATED );
 			}
 			else
 			{
-				$query->setOrder( Query::ORDER_NEWEST_CREATED );
+				$query->setOrder( \IPS\Content\Search\Query::ORDER_NEWEST_CREATED );
 			}
 		}
 		else
 		{
 			if ( $this->sort === 'oldest' )
 			{
-				$query->setOrder( Query::ORDER_OLDEST_CREATED );
+				$query->setOrder( \IPS\Content\Search\Query::ORDER_OLDEST_CREATED );
 			}
 			else
 			{
-				$query->setOrder( Query::ORDER_NEWEST_COMMENTED );
+				$query->setOrder( \IPS\Content\Search\Query::ORDER_NEWEST_COMMENTED );
 			}
 		}
 				
@@ -1397,9 +1341,9 @@ class Stream extends Model
 	/**
 	 * URL to this stream
 	 *
-	 * @return	Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function url(): Url|null
+	public function url()
 	{
 		return $this->baseUrl;
 	}
@@ -1407,9 +1351,9 @@ class Stream extends Model
 	/**
 	 * Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		parent::save();
 		
@@ -1417,24 +1361,24 @@ class Stream extends Model
 		
 		if ( !$this->member )
 		{
-			unset( Store::i()->globalStreamIds );
+			unset( \IPS\Data\Store::i()->globalStreamIds );
 		}
 		
 		if ( $this->default )
 		{
-			unset( Store::i()->defaultStreamData );
+			unset( \IPS\Data\Store::i()->defaultStreamData );
 		}
 	}
 	
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		/* Delete Subscriptions */
-		Db::i()->delete( 'core_stream_subscriptions', ['stream_id=?', $this->id ] );
+		\IPS\Db::i()->delete( 'core_stream_subscriptions', ['stream_id=?', $this->id ] );
 
 		if ( $this->member )
 		{
@@ -1443,26 +1387,26 @@ class Stream extends Model
 		else
 		{
 			/* If it's in the menu, remove it */
-			foreach( Db::i()->select( '*', 'core_menu', array( "extension=?", 'YourActivityStreamsItem' ) ) AS $row )
+			foreach( \IPS\Db::i()->select( '*', 'core_menu', array( "extension=?", 'YourActivityStreamsItem' ) ) AS $row )
 			{
 				$config = json_decode( $row['config'], true );
 				if ( isset( $config['menu_stream_id'] ) )
 				{
 					if ( $config['menu_stream_id'] == $this->_id )
 					{
-						Db::i()->delete( 'core_menu', array( 'id=?', $row['id'] ) );
-						Lang::deleteCustom( 'core', "menu_item_{$row['id']}" );
+						\IPS\Db::i()->delete( 'core_menu', array( 'id=?', $row['id'] ) );
+						\IPS\Lang::deleteCustom( 'core', "menu_item_{$row['id']}" );
 					}
 				}
 			}
-			unset( Store::i()->frontNavigation );
+			unset( \IPS\Data\Store::i()->frontNavigation );
 			
 			parent::delete();
-			unset( Store::i()->globalStreamIds );
+			unset( \IPS\Data\Store::i()->globalStreamIds );
 			
 			if ( $this->default )
 			{
-				unset( Store::i()->defaultStreamData );
+				unset( \IPS\Data\Store::i()->defaultStreamData );
 			}
 		}
 	}
@@ -1470,12 +1414,12 @@ class Stream extends Model
 	/**
 	 * Can the member subscribe to this stream?
 	 *
-	 * @param Member|null $member
+	 * @param \IPS\Member|null $member
 	 * @return bool
 	 */
-	public function canSubscribe( Member $member = NULL ) : bool
+	public function canSubscribe( \IPS\Member $member = NULL ) : bool
 	{
-		if( !Settings::i()->activity_stream_subscriptions )
+		if( !\IPS\Settings::i()->activity_stream_subscriptions )
 		{
 			return FALSE;
 		}
@@ -1485,14 +1429,14 @@ class Stream extends Model
 			return FALSE;
 		}
 
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		if( !$member->member_id )
 		{
 			return FALSE;
 		}
 
-		if ( Db::i()->select( 'COUNT(*)', 'core_stream_subscriptions', array( 'member_id=?', $member->member_id ) )->first() >= Settings::i()->activity_stream_subscriptions_max )
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_stream_subscriptions', array( 'member_id=?', $member->member_id ) )->first() >= \IPS\Settings::i()->activity_stream_subscriptions_max )
 		{
 			return FALSE;
 		}
@@ -1503,25 +1447,25 @@ class Stream extends Model
 	/**
 	 * Can the member unsubscribe from this stream?
 	 *
-	 * @param Member|null $member
+	 * @param \IPS\Member|null $member
 	 * @return bool
 	 */
-	public function canUnsubscribe( Member $member = NULL ) : bool
+	public function canUnsubscribe( \IPS\Member $member = NULL ) : bool
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		return $this->isSubscribed($member);
 	}
 
 	/**
 	 * Are we already subscribed to this stream?
 	 *
-	 * @param Member|null $member
+	 * @param \IPS\Member|null $member
 	 * @return bool
 	 */
-	public function isSubscribed( Member $member = NULL ) : bool
+	public function isSubscribed( \IPS\Member $member = NULL ) : bool
 	{
-		$member = $member ?: Member::loggedIn();
-		return (bool) Db::i()->select( 'COUNT(*)', 'core_stream_subscriptions', array( 'stream_id=? AND member_id=?', $this->id, $member->member_id ) )->first();
+		$member = $member ?: \IPS\Member::loggedIn();
+		return (bool) \IPS\Db::i()->select( 'COUNT(*)', 'core_stream_subscriptions', array( 'stream_id=? AND member_id=?', $this->id, $member->member_id ) )->first();
 	}
 	
 	/**
@@ -1529,13 +1473,13 @@ class Stream extends Model
 	 *
 	 * @return	NULL|array		Null for no badge, or an array of badge data (0 => CSS class type, 1 => language string, 2 => optional raw HTML to show instead of language string)
 	 */
-	protected function get__badge(): ?array
+	protected function get__badge()
 	{
 		$badge = NULL;
 		if ( $this->default )
 		{
 			$badge	= array(
-				0	=> 'positive',
+				0	=> 'positive ipsPos_right',
 				1	=> 'default_no_parenthesis'
 			);
 		}

@@ -11,89 +11,60 @@
 namespace IPS\Content\Search\Elastic;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Content;
-use IPS\Content\Item;
-use IPS\Content\Search\Query as SearchQuery;
-use IPS\Content\Search\Results;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Log;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Node\Grouping;
-use IPS\Settings;
-use StdClass;
-use function array_pop;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Elasticsearch Search Query
  */
-class Query extends SearchQuery
+class _Query extends \IPS\Content\Search\Query
 {
 	/**
 	 * @brief	The server URL
 	 */
-	protected Url $url;
+	protected $url;
 	
 	/**
 	 * @brief	Filters
 	 */
-	protected array $filters = array();
+	protected $filters = array();
 	
 	/**
 	 * @brief	"Must Not" filter
 	 */
-	protected array $mustNot = array();
+	protected $mustNot = array();
 	
 	 /**
      * @brief	The sort clause
      */
-    protected array|string|null $sort = NULL;
+    protected $sort = NULL;
     
     /**
      * @brief       The offset
      */
-    protected int $offset = 0;
+    protected $offset = 0;
 	
 	/**
 	 * @brief	index_hidden statuses
 	 */
-	protected int|array|null $hiddenStatuses = NULL;
+	protected $hiddenStatuses = NULL;
 	
 	/**
      * @brief       Item classes included
      */
-    protected array|null $itemClasses = NULL;
-
-	/**
-	 * @brief	If true, just fetch the title record, or the first comment if a post, etc
-	 */
-	protected bool $getTitleRecordOnly = false;
+    protected $itemClasses = NULL;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	Member	$member	The member performing the search
-	 * @param	Url	$url	The server URL
+	 * @param	\IPS\Member	$member	The member performing the search
+	 * @param	\IPS\Http\Url	$url	The server URL
 	 * @return	void
 	 */
-	public function __construct( Member $member, Url $url )
+	public function __construct( \IPS\Member $member, \IPS\Http\Url $url )
 	{
 		parent::__construct( $member );
 		$this->url = $url;
@@ -102,16 +73,16 @@ class Query extends SearchQuery
 	/**
 	 * @var bool Stores whether or not any content type needs to be limited by the latest comment
 	 */
-	protected bool $lastCommentMustBeTrue = false;
+	protected $lastCommentMustBeTrue = false;
 
 	/**
 	 * Filter by multiple content types
 	 *
 	 * @param	array	$contentFilters	Array of \IPS\Content\Search\ContentFilter objects
 	 * @param	bool	$type			TRUE means only include results matching the filters, FALSE means exclude all results matching the filters
-	 * @return	Query	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByContent( array $contentFilters, bool $type = TRUE ): static
+	public function filterByContent( array $contentFilters, $type = TRUE )
 	{
 		$contentFilterConditions = array();
 		if ( $type )
@@ -123,7 +94,7 @@ class Query extends SearchQuery
 		foreach ( $contentFilters as $filter )
 		{
 			$conditions = array();
-			if ( $type and !empty( $filter->itemClass ) )
+			if ( $type )
 			{
 				$this->itemClasses[] = $filter->itemClass;
 			}
@@ -140,19 +111,6 @@ class Query extends SearchQuery
 			{
 				if ( $filter->containerIdFilter )
 				{
-					if ( $filter->containerIds )
-					{
-						if ( $filter->itemClass )
-						{
-							$itemClass = $filter->itemClass;
-							if ( isset( $itemClass::$containerNodeClass ) )
-							{
-								$containerClass = $itemClass::$containerNodeClass;
-								$filter->containerIds = $containerClass::normalizeIds( $filter->containerIds );
-							}
-						}
-					}
-
 					$conditions[] = array(
 						'terms' => array(
 							'index_container_id' => $filter->containerIds
@@ -237,7 +195,9 @@ class Query extends SearchQuery
 			/* Only first comment? */
 			if ( $filter->onlyFirstComment )
 			{
-				$this->getTitleRecordOnly = true;
+				$conditions[] = array(
+					'exists' => array( 'field' => 'index_title' )
+				);
 			}
 			
 			/* Only last comment? */
@@ -252,14 +212,14 @@ class Query extends SearchQuery
 			}
 
 			/* Put it together */
-			if( count( $conditions ) )
+			if( \count( $conditions ) )
 			{
 				$contentFilterConditions[] = Index::convertConditionsToQuery( $conditions );
 			}
 		}
 
 		/* Put them together */
-		if ( count( $contentFilterConditions ) > 1 )
+		if ( \count( $contentFilterConditions ) > 1 )
 		{		
 			$this->filters[] = array(
 				'bool'	=> array(
@@ -269,14 +229,14 @@ class Query extends SearchQuery
 		}
 		elseif ( $type )
 		{
-			if( count( $contentFilterConditions ) )
+			if( \count( $contentFilterConditions ) )
 			{
 				$this->filters[] = $contentFilterConditions[0];
 			}
 		}
 		else
 		{
-			if( count( $contentFilterConditions ) )
+			if( \count( $contentFilterConditions ) )
 			{
 				$this->mustNot[] = $contentFilterConditions[0];
 			}
@@ -288,18 +248,18 @@ class Query extends SearchQuery
 	/**
 	 * Filter by author
 	 *
-	 * @param	Member|int|array	$author						The author, or an array of author IDs
-	 * @return	Query	(for daisy chaining)
+	 * @param	\IPS\Member|int|array	$author						The author, or an array of author IDs
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByAuthor( Member|int|array $author ): static
+	public function filterByAuthor( $author )
 	{
-		if ( is_array( $author ) )
+		if ( \is_array( $author ) )
 		{
 			$this->filters[] = array( 'terms' => array( 'index_author' => $author ) );
 		}
 		else
 		{
-			$this->filters[] = array( 'term' => array( 'index_author' => $author instanceof Member ? $author->member_id : $author ) );
+			$this->filters[] = array( 'term' => array( 'index_author' => $author instanceof \IPS\Member ? $author->member_id : $author ) );
 		}
 		
 		return $this;
@@ -308,10 +268,10 @@ class Query extends SearchQuery
 	/**
 	 * Filter by club
 	 *
-	 * @param	Club|int|array|null	$club	The club, or array of club IDs or NULL to exlude content from clubs
-	 * @return	Query	(for daisy chaining)
+	 * @param	\IPS\Member\Club|int|array	$club	The club, or array of club IDs
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByClub( Club|int|array|null $club ): static
+	public function filterByClub( $club )
 	{
 		if ( $club === NULL )
 		{
@@ -319,7 +279,7 @@ class Query extends SearchQuery
 				'exists' => array( 'field' => 'index_club_id' )
 			);
 		}
-		elseif ( is_array( $club ) )
+		elseif ( \is_array( $club ) )
 		{
 			$this->filters[] = array(
 				'terms' => array( 'index_club_id' => $club )
@@ -328,12 +288,28 @@ class Query extends SearchQuery
 		else
 		{
 			$this->filters[] = array(
-				'term' => array( 'index_club_id' => $club instanceof Club ? $club->id : $club )
+				'term' => array( 'index_club_id' => $club instanceof \IPS\Member\Club ? $club->id : $club )
 			);
 		}
 
+		/* Get the list of valid classes */
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
+		{
+			foreach ( $object->classes as $class )
+			{
+				if ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+				{
+					$classesChecked[]	= $class;
+				}
+			}
+		}
+
 		/* Give content item classes a chance to inspect and manipulate filters */
-		$this->customFiltering( TRUE );
+		$filters = array();
+		foreach( $classesChecked as $itemClass )
+		{
+			$itemClass::searchEngineFiltering( $filters, $this );
+		}
 		
 		return $this;
 	}
@@ -341,10 +317,10 @@ class Query extends SearchQuery
 	/**
 	 * Filter for profile
 	 *
-	 * @param	Member	$member	The member whose profile is being viewed
-	 * @return	Query	(for daisy chaining)
+	 * @param	\IPS\Member	$member	The member whose profile is being viewed
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterForProfile( Member $member ): static
+	public function filterForProfile( \IPS\Member $member )
 	{
 		/* Filter by content they've posted or posts on their wall */
 		$this->filters[] = array(
@@ -352,40 +328,71 @@ class Query extends SearchQuery
 				'should' => array(
 					array(
 						'term' => array( 'index_author' => $member->member_id )
+					),
+					array(
+						'bool' => array(
+							'filter' => array(
+								array(
+									'term' => array(
+										'index_class' => 'IPS\core\Statuses\Status'
+									)
+								),
+								array(
+									'term' => array(
+										'index_container_id' => $member->member_id
+									)
+								)
+							)
+						)
 					)
 				)
 			)
 		);
+		
+		/* Get the list of valid classes */
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
+		{
+			foreach ( $object->classes as $class )
+			{
+				if ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+				{
+					$classesChecked[]	= $class;
+				}
+			}
+		}
 
 		/* Give content item classes a chance to inspect and manipulate filters */
-		$this->customFiltering( TRUE );
+		$filters = array();
+		foreach( $classesChecked as $itemClass )
+		{
+			$itemClass::searchEngineFiltering( $filters, $this );
+		}
 		
-		/* Return for daisy-chaining */
+		/* Return for daisy chaining */
 		return $this;
 	}
 
 	/**
 	 * Stores the "more like this" Content object for search()
-	 * @param string|null	$moreLikeThis
+	 * @param null
 	 */
-	protected string|null $moreLikeThis = NULL;
+	protected $moreLikeThis = NULL;
 
 	/**
 	 * Filter by more like this
-	 * @param Content $object
-	 * @return Query
+	 * @param \IPS\Content\Searchable $object
 	 */
-	public function filterByMoreLikeThis( Content $object ): static
+	public function filterByMoreLikeThis( \IPS\Content\Searchable $object )
 	{
-		$index = new Index( $this->url );
-		$this->moreLikeThis = $index->getIndexId( ( $object instanceof Item and $object::$firstCommentRequired ) ? $object->firstComment() : $object );
+		$index = new \IPS\Content\Search\Elastic\Index( $this->url );
+		$this->moreLikeThis = $index->getIndexId( ( $object instanceof \IPS\Content\Item and $object::$firstCommentRequired ) ? $object->firstComment() : $object );
 
 		/* Some container types cannot be cached */
 		$classes = [];
 		$conditions = [];
 		$noSimilarContentClasses = [];
 
-		foreach ( Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
 		{
 			$classes = array_merge( $object->classes, $classes );
 
@@ -421,7 +428,7 @@ class Query extends SearchQuery
 					}
 				}
 
-				if ( count( $blockIds ) )
+				if ( \count( $blockIds ) )
 				{
 					$conditions[] = array(
 						'bool' => array(
@@ -437,7 +444,7 @@ class Query extends SearchQuery
 					);
 				}
 
-				if ( count( $conditions ) )
+				if ( \count( $conditions ) )
 				{
 					foreach( $conditions as $condition )
 					{
@@ -448,7 +455,7 @@ class Query extends SearchQuery
 		}
 
 		/* Prevent some things from being in similar content widget */
-		if ( count( $noSimilarContentClasses ) )
+		if ( \count( $noSimilarContentClasses ) )
 		{
 			$this->mustNot[] = array(
 				'bool' => array(
@@ -463,8 +470,6 @@ class Query extends SearchQuery
 
 		/* Only show non-hidden and approved items */
 		$this->setHiddenFilter( static::HIDDEN_VISIBLE );
-
-		return $this;
 	}
 
 	/**
@@ -473,9 +478,9 @@ class Query extends SearchQuery
 	 * @param	array	$classes	Container classes to exclude from results.
 	 * @param	array	$exclude	Content classes to exclude from the filter. For cases where multiple content classes may have the same container class
 	 * 								such as Gallery images, comments and reviews.
-	 * @return	Query	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByContainerClasses( array $classes=array(), array $exclude=array() ): static
+	public function filterByContainerClasses( $classes=array(), $exclude=array() )
 	{
 		if( empty( $exclude ) )
 		{
@@ -514,10 +519,10 @@ class Query extends SearchQuery
 	/**
 	 * Filter by item author
 	 *
-	 * @param	Member	$author		The author
-	 * @return	Query	(for daisy chaining)
+	 * @param	\IPS\Member	$author		The author
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByItemAuthor( Member $author ): static
+	public function filterByItemAuthor( \IPS\Member $author )
 	{
 		$this->filters[] = array(
 			'term' => array( 'index_item_author' => $author->member_id )
@@ -531,9 +536,9 @@ class Query extends SearchQuery
 	 * @param	bool	$includeContainers	Include content in containers the user follows?
 	 * @param	bool	$includeItems		Include items and comments/reviews on items the user follows?
 	 * @param	bool	$includeMembers		Include content posted by members the user follows?
-	 * @return	Query	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByFollowed( bool $includeContainers, bool $includeItems, bool $includeMembers ): static
+	public function filterByFollowed( $includeContainers, $includeItems, $includeMembers )
 	{
 		$conditions = array();
 		$followApps = $followAreas = $case = $containerCase = array();
@@ -551,7 +556,7 @@ class Query extends SearchQuery
 			else
 			{
 				$classes = array();
-				foreach ( Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
+				foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
 				{
 					$classes = array_merge( $object->classes, $classes );
 				}
@@ -560,7 +565,7 @@ class Query extends SearchQuery
 			/* Loop them */
 			foreach ( $classes as $class )
 			{
-				if( IPS::classUsesTrait( $class, 'IPS\Content\Followable' ) )
+				if( is_subclass_of( $class, 'IPS\Content\Followable' ) )
 				{
 					$followApps[ $class::$application ] = $class::$application;
 					$followArea = mb_strtolower( mb_substr( $class, mb_strrpos( $class, '\\' ) + 1 ) );
@@ -602,13 +607,13 @@ class Query extends SearchQuery
 			}
 
 			/* Get the stuff we follow */
-			foreach( Db::i()->select( '*', 'core_follow', array( 'follow_member_id=? AND ' . Db::i()->in( 'follow_app', $followApps ) . ' AND ' . Db::i()->in( 'follow_area', $followAreas ), $this->member->member_id ) ) as $follow )
+			foreach( \IPS\Db::i()->select( '*', 'core_follow', array( 'follow_member_id=? AND ' . \IPS\Db::i()->in( 'follow_app', $followApps ) . ' AND ' . \IPS\Db::i()->in( 'follow_area', $followAreas ), $this->member->member_id ) ) as $follow )
 			{
 				if( array_key_exists( $follow['follow_area'], $case ) )
 				{
 					$followedItems[ $follow['follow_area'] ][]	= $follow['follow_rel_id'];
 				}
-				else if( in_array( $follow['follow_area'], $containerCase ) )
+				else if( \in_array( $follow['follow_area'], $containerCase ) )
 				{
 					$followedContainers[ $follow['follow_area'] ][]	= $follow['follow_rel_id'];
 				}
@@ -658,7 +663,7 @@ class Query extends SearchQuery
 		}
 		
 		/* Are we including content posted by followed members? */
-		if ( $includeMembers and $followed = iterator_to_array( Db::i()->select( 'follow_rel_id', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_member_id=?', 'core', 'member', $this->member->member_id ), 'follow_rel_id asc' ) ) )
+		if ( $includeMembers and $followed = iterator_to_array( \IPS\Db::i()->select( 'follow_rel_id', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_member_id=?', 'core', 'member', $this->member->member_id ), 'follow_rel_id asc' ) ) )
 		{
 			$conditions[] = array(
 				'terms'	=> array( 'index_author' =>  $followed )
@@ -666,13 +671,13 @@ class Query extends SearchQuery
 		}
 		
 		/* Put it all together */
-		if ( count( $conditions ) )
+		if ( \count( $conditions ) )	
 		{
 			$this->filters[] = array( 'bool' => array( 'should' => $conditions ) );
 		}
 		else
 		{
-			$this->filters[] = array( 'match_none' => new StdClass );
+			$this->filters[] = array( 'match_none' => new \StdClass );
 		}
 
 		/* And return */
@@ -682,9 +687,9 @@ class Query extends SearchQuery
 	/**
 	 * Filter by content the user has posted in
 	 *
-	 * @return	Query	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByItemsIPostedIn(): static
+	public function filterByItemsIPostedIn()
 	{
 		$this->filters[] = array(
 			'term'			=> array(
@@ -698,9 +703,9 @@ class Query extends SearchQuery
 	 * Filter by content the user has not read
 	 *
 	 * @note	If applicable, it is more efficient to call filterByContent() before calling this method
-	 * @return	Query	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByUnread(): static
+	public function filterByUnread()
 	{
 		/* Work out what classes we need to examine */
 		if ( $this->itemClasses !== NULL )
@@ -710,7 +715,7 @@ class Query extends SearchQuery
 		else
 		{
 			$classes = array();
-			foreach ( Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
+			foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
 			{
 				$classes = array_merge( $object->classes, $classes );
 			}
@@ -721,9 +726,9 @@ class Query extends SearchQuery
 		$resetTimes = $this->member->markersResetTimes( NULL );
 		foreach ( $classes as $class )
 		{
-			if( IPS::classUsesTrait( $class, 'IPS\Content\ReadMarkers' ) )
+			if( is_subclass_of( $class, 'IPS\Content\ReadMarkers' ) )
 			{
-				$containerClass = $class::$containerNodeClass ?? NULL;
+				$containerClass = ( $class::$containerNodeClass ) ? $class::$containerNodeClass : NULL;
 				$classConditions = array();
 				
 				/* Work out what classes this applies to - need to specify comment and review classes */
@@ -774,21 +779,21 @@ class Query extends SearchQuery
 						);
 						
 						/* And get the times each individual item was read for later */
-						$items = $this->member->markersItems( $application, $class::makeMarkerKey( $containerId ) );
-						if ( count( $items ) )
+						$items = $this->member->markersItems( $application, \IPS\Content\Item::makeMarkerKey( $containerId ) );
+						if ( \count( $items ) )
 						{
 							foreach( $items as $mid => $mtime )
 							{
 								if ( $mtime > $timestamp )
 								{
 									/* If an item has been moved from one container to another, the user may have a marker
-										in its old location, with the previously 'read' time. In this circumstance, we need
+										in it's old location, with the previously 'read' time. In this circumstance, we need
 										to only use more recent read time, otherwise the topic may be incorrectly included
 										in the results */
-									if ( in_array( $mid, $markers ) )
+									if ( \in_array( $mid, $markers ) )
 									{
 										$_key = array_search( $mid, $markers );
-										$_mtime = intval( mb_substr( $_key, 0, mb_strpos( $_key, '.' ) ) );
+										$_mtime = \intval( mb_substr( $_key, 0, mb_strpos( $_key, '.' ) ) );
 										if ( $_mtime < $mtime )
 										{
 											unset( $markers[ $_key ] );
@@ -833,7 +838,7 @@ class Query extends SearchQuery
 				}
 				
 				$notIn  = array();
-				if ( count( $markers ) )
+				if ( \count( $markers ) )
 				{
 					$useIds = array_flip( $markers );
 					
@@ -842,7 +847,7 @@ class Query extends SearchQuery
 					{
 						if ( isset( $class::$databaseColumnMap[ $k ] ) )
 						{
-							if ( is_array( $class::$databaseColumnMap[ $k ] ) )
+							if ( \is_array( $class::$databaseColumnMap[ $k ] ) )
 							{
 								foreach ( $class::$databaseColumnMap[ $k ] as $v )
 								{
@@ -855,16 +860,16 @@ class Query extends SearchQuery
 							}
 						}
 					}
-					$dateColumnExpression = count( $dateColumns ) > 1 ? ( 'GREATEST(' . implode( ',', $dateColumns ) . ')' ) : array_pop( $dateColumns );
+					$dateColumnExpression = \count( $dateColumns ) > 1 ? ( 'GREATEST(' . implode( ',', $dateColumns ) . ')' ) : array_pop( $dateColumns );
 					
-					foreach( Db::i()->select( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId. ' as _id, ' . $dateColumnExpression . ' as _date', $class::$databaseTable, Db::i()->in( $class::$databasePrefix . $class::$databaseColumnId, array_keys( $useIds ) ) ) as $row )
+					foreach( \IPS\Db::i()->select( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId. ' as _id, ' . $dateColumnExpression . ' as _date', $class::$databaseTable, \IPS\Db::i()->in( $class::$databasePrefix . $class::$databaseColumnId, array_keys( $useIds ) ) ) as $row )
 					{
 						if ( isset( $useIds[ $row['_id'] ] ) )
 						{
 							if ( $useIds[ $row['_id'] ] >= $row['_date'] )
 							{
 								/* Still read */
-								$notIn[] = intval( $row['_id'] );
+								$notIn[] = \intval( $row['_id'] );
 							}
 						}
 					}
@@ -876,7 +881,7 @@ class Query extends SearchQuery
 						'filter' => $classConditions
 					)
 				);
-				if ( count( $notIn ) )
+				if ( \count( $notIn ) )
 				{
 					$_condition['bool']['must_not'] = array(
 						'terms' => array(
@@ -889,7 +894,7 @@ class Query extends SearchQuery
 		}		
 		
 		/* Put it all together */
-		if ( count( $conditions ) )
+		if ( \count( $conditions ) )
 		{
 			$this->filters[] = array(
 				'bool' => array(
@@ -904,9 +909,9 @@ class Query extends SearchQuery
 	/**
 	 * Filter by solved
 	 *
-	 * @return	Query	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterBySolved(): static
+	public function filterBySolved()
 	{
 		$this->filters[] = array(
 			'term' => array( 'index_item_solved' => 1 )
@@ -918,9 +923,9 @@ class Query extends SearchQuery
 	/**
 	 * Filter by Unsolved
 	 *
-	 * @return	Query	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByUnsolved(): static
+	public function filterByUnsolved()
 	{
 		$this->filters[] = array(
 			'term' => array( 'index_item_solved' => 0 )
@@ -932,23 +937,21 @@ class Query extends SearchQuery
 	/**
 	 * Filter by start date
 	 *
-	 * @param	DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
-	 * @param	DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
-	 * @return	Query	(for daisy chaining)
+	 * @param	\IPS\DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
+	 * @param	\IPS\DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByCreateDate( DateTime|null $start = null, DateTime|null $end = null ): static
+	public function filterByCreateDate( \IPS\DateTime $start = NULL, \IPS\DateTime $end = NULL )
 	{
 		$range = array();
 		
 		if ( $start )
 		{
-			/* Numeric values are treated as milliseconds since epoch, not seconds https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html */
-			$range['gt'] = (string) $start->getTimestamp();
+			$range['gt'] = $start->getTimestamp();
 		}
 		if ( $end )
 		{
-			/* Numeric values are treated as milliseconds since epoch, not seconds https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html */
-			$range['lt'] = (string) $end->getTimestamp();
+			$range['lt'] = $end->getTimestamp();
 		}
 		
 		if ( $range )
@@ -964,23 +967,21 @@ class Query extends SearchQuery
 	/**
 	 * Filter by last updated date
 	 *
-	 * @param	DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
-	 * @param	DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
-	 * @return	Query	(for daisy chaining)
+	 * @param	\IPS\DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
+	 * @param	\IPS\DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByLastUpdatedDate( DateTime|null $start = null, DateTime|null $end = null ): static
+	public function filterByLastUpdatedDate( \IPS\DateTime $start = NULL, \IPS\DateTime $end = NULL )
 	{
 		$range = array();
 		
 		if ( $start )
 		{
-			/* Numeric values are treated as milliseconds since epoch, not seconds https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html */
-			$range['gt'] = (string) $start->getTimestamp();
+			$range['gt'] = $start->getTimestamp();
 		}
 		if ( $end )
 		{
-			/* Numeric values are treated as milliseconds since epoch, not seconds https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html */
-			$range['lt'] = (string) $end->getTimestamp();
+			$range['lt'] = $end->getTimestamp();
 		}
 		
 		if ( $range )
@@ -997,9 +998,9 @@ class Query extends SearchQuery
 	 * Set hidden status
 	 *
 	 * @param	int|array|NULL	$statuses	The statuses (see HIDDEN_ constants) or NULL for any
-	 * @return	Query	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function setHiddenFilter( int|array|null $statuses ): static
+	public function setHiddenFilter( $statuses )
 	{
 		$this->hiddenStatuses = $statuses;
 		return $this;
@@ -1009,9 +1010,9 @@ class Query extends SearchQuery
 	 * Set page
 	 *
 	 * @param	int		$page	The page number
-	 * @return	Query	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function setPage( int $page ): static
+	public function setPage( $page )
 	{
 		$this->offset = ( $page - 1 ) * $this->resultsToGet;
 		
@@ -1022,9 +1023,9 @@ class Query extends SearchQuery
 	 * Set order
 	 *
 	 * @param	int		$order	Order (see ORDER_ constants)
-	 * @return	Query	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function setOrder( int $order ): static
+	public function setOrder( $order )
 	{
 		switch ( $order )
 		{
@@ -1061,16 +1062,16 @@ class Query extends SearchQuery
 	/**
 	 * Debug by itemId, used for debugging purposes only
 	 * @note No permission checks run, do not use in production
-	 * @param int $itemId
-	 * @return array
+	 * @param $itemId
+	 * @return void
 	 */
-	public function debugByItemId( int $itemId ): array
+	public function debugByItemId( $itemId )
 	{
 		$array = array(
 			'query'	=> [
 				'term'	=> [
 					'index_item_id' => [
-						'value'	=> $itemId
+						'value'	=> \intval( $itemId )
 					]
 				]
 			],
@@ -1081,7 +1082,7 @@ class Query extends SearchQuery
 
 		$json = json_encode( $array, JSON_PARTIAL_OUTPUT_ON_ERROR );
 
-		return Index::request( $this->url->setPath( $this->url->data[ Url::COMPONENT_PATH ] . '/_search' ) )->setHeaders( array( 'Content-Type' => 'application/json' ) )->get( $json )->decodeJson();
+		return \IPS\Content\Search\Elastic\Index::request( $this->url->setPath( $this->url->data[ \IPS\Http\Url::COMPONENT_PATH ] . '/_search' ) )->setHeaders( array( 'Content-Type' => 'application/json' ) )->get( $json )->decodeJson();
 	}
 
 	/**
@@ -1091,25 +1092,25 @@ class Query extends SearchQuery
 	 * @param	array|null	$tags		The tags to search for
 	 * @param	int			$method 	See \IPS\Content\Search\Query::TERM_* contants
 	 * @param	string|null	$operator	If $term contains more than one word, determines if searching for both ("and") or any ("or") of those terms. NULL will go to admin-defined setting
-	 * @return	Results
+	 * @return	\IPS\Content\Search\Results
 	 */
-	public function search( string|null $term = null, array|null $tags = null, int $method = 1, string|null $operator = null ): Results
+	public function search( $term = NULL, $tags = NULL, $method = 1, $operator = NULL )
 	{
-		/* If we're looking for more results than we can fetch, we don't need to ask ElasticSearch */
-		if( ( $this->offset + $this->resultsToGet ) > Settings::i()->search_index_maxresults )
+		/* If we're looking for more results than we can fetch, we don't need to ask Elastic Search */
+		if( ( $this->offset + $this->resultsToGet ) > \IPS\Settings::i()->search_index_maxresults )
 		{
-			return new Results( array(), 0 );
+			return new \IPS\Content\Search\Results( array(), 0 );
 		}
 
-		$operator = $operator ?: Settings::i()->search_default_operator;
+		$operator = $operator ?: \IPS\Settings::i()->search_default_operator;
 		$must = array();
 		$filters = $this->filters;
 		
 		/* Set our conditions for this search */
-		if ( $term !== NULL or ( Settings::i()->tags_enabled AND $tags !== NULL ) )
+		if ( $term !== NULL or ( \IPS\Settings::i()->tags_enabled AND $tags !== NULL ) )
 		{
 			$searchConditions = array();
-			$titleField = Settings::i()->search_title_boost ? ( 'index_title^' . intval( Settings::i()->search_title_boost ) ) : 'index_title';
+			$titleField = \IPS\Settings::i()->search_title_boost ? ( 'index_title^' . \intval( \IPS\Settings::i()->search_title_boost ) ) : 'index_title';
 			
 			/* Build the condition for the search term */
 			if ( $term !== NULL )
@@ -1121,9 +1122,6 @@ class Query extends SearchQuery
 					if ( $method & static::TERM_TITLES_ONLY )
 					{
 						$searchConditions[] = array( 'match_phrase' => array( 'index_title' => array( 'query' => $term ) ) );
-
-						/* Just get the title record only, or the first post if it's a topic as we don't want to show each comment as each comment will have the topic title in the index */
-						$this->getTitleRecordOnly = true;
 					}
 					else
 					{
@@ -1136,9 +1134,6 @@ class Query extends SearchQuery
 					if ( $method & static::TERM_TITLES_ONLY )
 					{
 						$searchConditions[] = array( 'wildcard' => array( 'index_title' => array( 'value' => $term ) ) );
-
-						/* Just get the title record only, or the first post if it's a topic as we don't want to show each comment as each comment will have the topic title in the index */
-						$this->getTitleRecordOnly = true;
 					}
 					else
 					{
@@ -1146,7 +1141,7 @@ class Query extends SearchQuery
 							'bool' => array(
 								'should' => array(
 									array(
-										'wildcard' => array( 'index_title' => ( Settings::i()->search_title_boost ? array( 'value' => $term, 'boost' => intval( Settings::i()->search_title_boost ) ) : array( 'value' => $term ) ) )
+										'wildcard' => array( 'index_title' => ( \IPS\Settings::i()->search_title_boost ? array( 'value' => $term, 'boost' => \intval( \IPS\Settings::i()->search_title_boost ) ) : array( 'value' => $term ) ) )
 									),
 									array(
 										'wildcard'	=> array( 'index_content' => array( 'value' => $term ) )
@@ -1162,9 +1157,6 @@ class Query extends SearchQuery
 					if ( $method & static::TERM_TITLES_ONLY )
 					{
 						$searchConditions[] = array( 'match' => array( 'index_title' => array( 'query' => $term, 'operator' => $operator ) ) );
-
-						/* Just get the title record only, or the first post if it's a topic as we don't want to show each comment as each comment will have the topic title in the index */
-						$this->getTitleRecordOnly = true;
 					}
 					else
 					{
@@ -1173,7 +1165,7 @@ class Query extends SearchQuery
 				}
 			}
 			/* Build the condition for the tags */
-			if ( Settings::i()->tags_enabled and $tags !== NULL )
+			if ( \IPS\Settings::i()->tags_enabled and $tags !== NULL )
 			{
 				$searchConditions[] = array(
 					'bool' => array(
@@ -1191,7 +1183,7 @@ class Query extends SearchQuery
 				/* If we're not searching with a term, then just show the title record, not comments */
 				if ( $term === NULL and ! $this->lastCommentMustBeTrue )
 				{
-					$this->getTitleRecordOnly = true;
+					$must[] = ['exists' => ['field' => 'index_title']];
 				}
 			}
 			
@@ -1217,7 +1209,7 @@ class Query extends SearchQuery
 		$filters[] = array( 'terms' => array( 'index_permissions' => array_merge( $this->permissionArray(), array( '*' ) ) ) );
 		if ( $this->hiddenStatuses !== NULL )
 		{
-			if ( is_array( $this->hiddenStatuses ) )
+			if ( \is_array( $this->hiddenStatuses ) )
 			{
 				$filters[] = array( 'terms' => array( 'index_hidden' => $this->hiddenStatuses ) );
 			}
@@ -1227,14 +1219,14 @@ class Query extends SearchQuery
 			}
 		}
 
-		$searchUrl = $this->url->setPath( $this->url->data[ Url::COMPONENT_PATH ] . '/_search' );
+		$searchUrl = $this->url->setPath( $this->url->data[ \IPS\Http\Url::COMPONENT_PATH ] . '/_search' );
 
 		if ( $this->moreLikeThis )
 		{
 			$must[] = [
 				'more_like_this' => [
 					'fields' => [ 'index_title' ],
-					'like' => [ '_index' => Settings::i()->search_elastic_index, '_id' => $this->moreLikeThis ],
+					'like' => [ '_index' => \IPS\Settings::i()->search_elastic_index, '_id' => $this->moreLikeThis ],
 					'min_term_freq' => 1,
 					'max_query_terms' => 12,
 					'min_word_length' => 3,
@@ -1248,19 +1240,6 @@ class Query extends SearchQuery
 		/* Peform the search */
 		try
 		{
-			/* We only want the main record (of first comment) not the comments themselves, so we check to make sure _id (aka index_id) is the same as index_item_index_id */
-			if ( $this->getTitleRecordOnly )
-			{
-				$filters[] = [
-					'script' => [
-						'script' => [
-							'lang'   => 'painless',
-							'source' => "doc['index_item_index_id'] == doc['index_id']"
-						]
-					]
-				];
-			}
-
 			/* Initial query */
 			$query = array(
 				'bool'	=> array(
@@ -1271,15 +1250,15 @@ class Query extends SearchQuery
 			);
 
 			/* Add the time decay */
-			if ( Settings::i()->search_decay_factor and !$this->sort )
+			if ( \IPS\Settings::i()->search_decay_factor and !$this->sort and ! $this->sort )
 			{
 				$query = array(
 					'function_score' => array(
 						'query'			=> $query,
 						'linear'			=> array(
 							'index_date_updated' => array(
-								'scale'				=> intval( Settings::i()->search_decay_days ) . 'd',
-								'decay'				=> number_format( Settings::i()->search_decay_factor, 1, '.', '' ),
+								'scale'				=> \intval( \IPS\Settings::i()->search_decay_days ) . 'd',
+								'decay'				=> number_format( \IPS\Settings::i()->search_decay_factor, 1, '.', '' ),
 								'origin'			=> time(),
 							)
 						)
@@ -1288,7 +1267,7 @@ class Query extends SearchQuery
 			}
 			
 			/* Add the self boost */
-			if ( Settings::i()->search_elastic_self_boost and $this->member->member_id and !$this->sort and ! $this->moreLikeThis )
+			if ( \IPS\Settings::i()->search_elastic_self_boost and $this->member->member_id and !$this->sort and ! $this->moreLikeThis )
 			{
 				$query = array(
 					'function_score' => array(
@@ -1298,8 +1277,8 @@ class Query extends SearchQuery
 								'source'			=> "doc['index_author'].value == params.param_memberId ? ( _score * Float.parseFloat( params.param_booster ) ) : _score",
 								'lang'				=> 'painless',
 								'params'			=> array(
-									'param_memberId'	=> intval( $this->member->member_id ),
-									'param_booster'		=> number_format( Settings::i()->search_elastic_self_boost, 1, '.', '' )
+									'param_memberId'	=> \intval( $this->member->member_id ),
+									'param_booster'		=> number_format( \IPS\Settings::i()->search_elastic_self_boost, 1, '.', '' )
 								)
 							)
 						)
@@ -1320,30 +1299,30 @@ class Query extends SearchQuery
 			$json = json_encode( $array, JSON_PARTIAL_OUTPUT_ON_ERROR );
 			if ( $json === FALSE )
 			{				
-				return new Results( array(), 0 );
+				return new \IPS\Content\Search\Results( array(), 0 );
 			}
 
 			/* Make the call! */
-			$return = Index::request( $searchUrl )->setHeaders( array( 'Content-Type' => 'application/json' ) )->get( $json )->decodeJson();
+			$return = \IPS\Content\Search\Elastic\Index::request( $searchUrl )->setHeaders( array( 'Content-Type' => 'application/json' ) )->get( $json )->decodeJson();
 			if ( isset( $return['error'] ) )
 			{
-				Log::log( print_r( array_merge( $array, ['error' => $return['error'] ] ), TRUE ), 'elasticsearch' );
-				return new Results( array(), 0 );
+				\IPS\Log::log( print_r( array_merge( $array, ['error' => $return['error'] ] ), TRUE ), 'elasticsearch' );
+				return new \IPS\Content\Search\Results( array(), 0 );
 			}
 
 			/* Set results */
 			$total = $return['hits']['total']['value'] ?? $return['hits']['total'];
-			return new Results( array_map( function( $hit ) {
+			return new \IPS\Content\Search\Results( array_map( function( $hit ) {
 				$indexData = $hit['_source'];
 				$indexData['index_permissions'] = implode( ',', $indexData['index_permissions'] );
 				$indexData['index_tags'] = $indexData['index_tags'] ? implode( ',', $indexData['index_tags'] ) : NULL;
 				return $indexData;
-			}, $return['hits']['hits'] ), $total <= Settings::i()->search_index_maxresults ? $total : (int) Settings::i()->search_index_maxresults );
+			}, $return['hits']['hits'] ), $total <= \IPS\Settings::i()->search_index_maxresults ? $total : (int) \IPS\Settings::i()->search_index_maxresults );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Log::log( $e, 'elasticsearch' );
-			return new Results( array(), 0 );
+			\IPS\Log::log( $e, 'elasticsearch' );
+			return new \IPS\Content\Search\Results( array(), 0 );
 		}
 	}
 }

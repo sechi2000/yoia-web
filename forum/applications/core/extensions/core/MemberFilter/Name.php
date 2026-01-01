@@ -11,47 +11,40 @@
 namespace IPS\core\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\Radio;
-use LogicException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member filter: Name
  */
-class Name extends MemberFilterAbstract
+class _Name
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param	string	$area	Area to check (bulkmail, group_promotions, automatic_moderation, passwordreset)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'bulkmail' ) );
+		return \in_array( $area, array( 'bulkmail' ) );
 	}
 
 	/**
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		$options = array( 'any' => 'mf_name_whatever', 'yes' => 'mf_name_yes', 'no' => 'mf_name_no' );
 
 		return array(
-			new Radio( 'mf_name', $criteria['mf_name'] ?? 'yes', FALSE, array( 'options' => $options ) ),
+			new \IPS\Helpers\Form\Radio( 'mf_name', isset( $criteria['mf_name'] ) ? $criteria['mf_name'] : 'yes', FALSE, array( 'options' => $options ) ),
 		);
 	}
 
@@ -59,21 +52,21 @@ class Name extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return    array|bool            False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array|bool
+	public function save( $post )
 	{
-		return ( isset( $post['mf_name'] ) and in_array( $post['mf_name'], array( 'any', 'yes', 'no' ) ) ) ? array( 'mf_name' => $post['mf_name'] ) : FALSE;
+		return ( isset( $post['mf_name'] ) and \in_array( $post['mf_name'], array( 'any', 'yes', 'no' ) ) ) ? array( 'mf_name' => $post['mf_name'] ) : FALSE;
 	}
 
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		if ( isset( $data['mf_name'] ) )
 		{
@@ -81,10 +74,10 @@ class Name extends MemberFilterAbstract
 			{
 				case 'yes':
 					return array( "core_members.name <> ''" );
-
+					break;
 				case 'no':
 					return array( "core_members.name = ''" );
-
+					break;
 			}
 		}
 

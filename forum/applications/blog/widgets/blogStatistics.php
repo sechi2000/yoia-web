@@ -12,43 +12,43 @@
 namespace IPS\blog\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Widget\StaticCache;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * blogStatistics Widget
  */
-class blogStatistics extends StaticCache
+class _blogStatistics extends \IPS\Widget\StaticCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'blogStatistics';
+	public $key = 'blogStatistics';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'blog';
+	public $app = 'blog';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Render a widget
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		$stats = array();
 		
-		$stats['total_blogs']	= Db::i()->select( "COUNT(*)", 'blog_blogs' )->first();
-		$stats['total_entries']	= Db::i()->select( "COUNT(*)", 'blog_entries', array( 'entry_status=? AND entry_hidden=?', 'published', 1 ) )->first();
+		$stats['total_blogs']	= \IPS\Db::i()->select( "COUNT(*)", 'blog_blogs' )->first();
+		$stats['total_entries']	= \IPS\Db::i()->select( "COUNT(*)", 'blog_entries', array( 'entry_status=? AND entry_hidden=?', 'published', 1 ) )->first();
 		
 		return $this->output( $stats );
 	}

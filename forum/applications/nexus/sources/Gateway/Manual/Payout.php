@@ -12,63 +12,42 @@
 namespace IPS\nexus\Gateway\Manual;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\nexus\Payout as NexusPayout;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Manual Pay Out Gateway
  */
-class Payout extends NexusPayout
+class _Payout extends \IPS\nexus\Payout
 {
 	/**
 	 * @brief	Requires manual approval?
 	 */
-	public static bool $requiresApproval = TRUE;
-
-	/**
-	 * Extra HTML to display when the admin view the Payout in the ACP
-	 *
-	 * @return string
-	 */
-	public function acpHtml() : string
-	{
-		return Theme::i()->getTemplate( 'payouts', 'nexus' )->Manual( $this );
-	}
+	public static $requiresApproval = TRUE;
 	
 	/**
 	 * ACP Settings
 	 *
 	 * @return	array
 	 */
-	public static function settings() : array
+	public static function settings()
 	{
-		$settings = json_decode( Settings::i()->nexus_payout, TRUE );
+		$settings = json_decode( \IPS\Settings::i()->nexus_payout, TRUE );
 
 		$return = array();
-		$return[] = new Text( 'manual_name', isset( $settings['Manual'] ) ? $settings['Manual']['name'] : '' , NULL, array(), function( $val ) {
-			if ( !$val AND isset( Request::i()->nexus_payout['Manual'] ) AND  Request::i()->nexus_payout['Manual']  == 1 )
+		$return[] = new \IPS\Helpers\Form\Text( 'manual_name', isset( $settings['Manual'] ) ? $settings['Manual']['name'] : '' , NULL, array(), function( $val ) {
+			if ( !$val AND isset( \IPS\Request::i()->nexus_payout['Manual'] ) AND  \IPS\Request::i()->nexus_payout['Manual']  == 1 )
 			{
-				throw new DomainException( 'form_required' );
+				throw new \DomainException( 'form_required' );
 			}
 		});
-		$return[] = new Text( 'manual_title', isset( $settings['Manual'] ) ? $settings['Manual']['title'] : '', NULL, array(), function( $val ) {
-			if ( !$val AND isset( Request::i()->nexus_payout['Manual'] ) AND  Request::i()->nexus_payout['Manual']  == 1 )
+		$return[] = new \IPS\Helpers\Form\Text( 'manual_title', isset( $settings['Manual'] ) ? $settings['Manual']['title'] : '', NULL, array(), function( $val ) {
+			if ( !$val AND isset( \IPS\Request::i()->nexus_payout['Manual'] ) AND  \IPS\Request::i()->nexus_payout['Manual']  == 1 )
 			{
-				throw new DomainException( 'form_required' );
+				throw new \DomainException( 'form_required' );
 			}
 		});
 
@@ -80,11 +59,11 @@ class Payout extends NexusPayout
 	 *
 	 * @return	array
 	 */
-	public static function form() : array
+	public static function form()
 	{		
-		$settings = json_decode( Settings::i()->nexus_payout, TRUE );
+		$settings = json_decode( \IPS\Settings::i()->nexus_payout, TRUE );
 		
-		$field = new TextArea( 'manual_details', NULL, TRUE, array() );
+		$field = new \IPS\Helpers\Form\TextArea( 'manual_details', NULL, TRUE, array() );
 		$field->label = $settings['Manual']['title'];
 		return array( $field );
 	}
@@ -94,22 +73,23 @@ class Payout extends NexusPayout
 	 *
 	 * @param	array	$values	Values from form
 	 * @return	mixed
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function getData( array $values ) : mixed
+	public function getData( array $values )
 	{
 		return $values['manual_details'];
 	}
-
-	/**
-	 * Process the payout
-	 * Return the new status for this payout record
+	
+	/** 
+	 * Process
 	 *
-	 * @return	string
-	 * @throws	Exception
+	 * @return	void
+	 * @throws	\Exception
 	 */
-	public function process() : string
+	public function process()
 	{
-		return static::STATUS_COMPLETE;
+		$this->status = static::STATUS_COMPLETE;
+		$this->completed = new \IPS\DateTime;
+		$this->save();
 	}
 }

@@ -12,34 +12,25 @@
 namespace IPS\calendar\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * rsvp
  */
-class rsvp extends Controller
+class _rsvp extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'rsvp_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'rsvp_manage' );
 		parent::execute();
 	}
 
@@ -48,12 +39,11 @@ class rsvp extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$chart = Chart::loadFromExtension( 'calendar', 'Rsvp' )->getChart( Url::internal( "app=calendar&module=stats&controller=rsvp" ) );
-
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__calendar_stats_rsvp');
-		Output::i()->output = (string) $chart;
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'calendar', 'Rsvp' )->getChart( \IPS\Http\Url::internal( "app=calendar&module=stats&controller=rsvp" ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__calendar_stats_rsvp');
+		\IPS\Output::i()->output = (string) $chart;
 	}
 	
 	// Create new methods with the same name as the 'do' parameter which should execute it

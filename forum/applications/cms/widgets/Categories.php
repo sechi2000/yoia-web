@@ -12,72 +12,69 @@
 namespace IPS\cms\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\cms\Databases\Dispatcher;
-use IPS\cms\Pages\Page;
-use IPS\Http\Url;
-use IPS\Widget\PermissionCache;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Categories Widget
  */
-class Categories extends PermissionCache
+class _Categories extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'Categories';
+	public $key = 'Categories';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'cms';
+	public $app = 'cms';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Render a widget
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		/* If we're not on a Pages page, return nothing */
-		if( !Page::$currentPage )
+		if( !\IPS\cms\Pages\Page::$currentPage )
 		{
 			return '';
 		}
 
 		/* Scope makes it possible for this block to fire before the main block which sets up the dispatcher */
 		$db = NULL;
-		if ( ! Dispatcher::i()->databaseId )
+		if ( ! \IPS\cms\Databases\Dispatcher::i()->databaseId )
 		{
 			try
 			{
-				$db = Page::$currentPage->getDatabase()->id;
+				$db = \IPS\cms\Pages\Page::$currentPage->getDatabase()->id;
 			}
-			catch( Exception $ex )
+			catch( \Exception $ex )
 			{
 
 			}
 		}
 		else
 		{
-			$db = Dispatcher::i()->databaseId;
+			$db = \IPS\cms\Databases\Dispatcher::i()->databaseId;
 		}
 
-		if ( ! Page::$currentPage->full_path or ! $db )
+		if ( ! \IPS\cms\Pages\Page::$currentPage->full_path or ! $db )
 		{
 			return '';
 		}
 
-		$url = Url::internal( "app=cms&module=pages&controller=page&path=" . Page::$currentPage->full_path, 'front', 'content_page_path', Page::$currentPage->full_path );
+		$url = \IPS\Http\Url::internal( "app=cms&module=pages&controller=page&path=" . \IPS\cms\Pages\Page::$currentPage->full_path, 'front', 'content_page_path', \IPS\cms\Pages\Page::$currentPage->full_path );
 
 		return $this->output($url);
 	}

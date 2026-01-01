@@ -13,37 +13,23 @@
 namespace IPS\convert\Software\Gallery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\convert\Software;
-use IPS\Db;
-use IPS\gallery\Category;
-use IPS\gallery\Image;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Photopost Gallery Converter
  */
-class Photopost extends Software
+class _Photopost extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "Photopost (8.x)";
@@ -52,9 +38,9 @@ class Photopost extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "photopost";
@@ -63,9 +49,9 @@ class Photopost extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -73,9 +59,9 @@ class Photopost extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'photopost' ) );
 	}
@@ -83,9 +69,9 @@ class Photopost extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertGalleryCategories'	=> array(
@@ -110,9 +96,9 @@ class Photopost extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertGalleryAlbums',
@@ -123,17 +109,17 @@ class Photopost extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
 		{
 			case 'convertGalleryAlbums':
 				$options = array();
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'gallery_categories' ), 'IPS\gallery\Category' ) AS $category )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'gallery_categories' ), 'IPS\gallery\Category' ) AS $category )
 				{
 					$options[$category->_id] = $category->_title;
 				}
@@ -154,8 +140,8 @@ class Photopost extends Software
 					'field_default'		=> NULL,
 					'field_required'	=> TRUE,
 					'field_extra'		=> array(),
-					'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_photopost_image_path'),
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_photopost_image_path'),
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 
 				break;
@@ -167,16 +153,16 @@ class Photopost extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
 
 		return array( "f_gallery_images_rebuild", "f_gallery_cat_recount", "f_gallery_album_recount", "f_gallery_image_recount" );
 	}
@@ -186,7 +172,7 @@ class Photopost extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryCategories() : void
+	public function convertGalleryCategories()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -212,7 +198,7 @@ class Photopost extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryAlbums() : void
+	public function convertGalleryAlbums()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -246,13 +232,13 @@ class Photopost extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryImages() : void
+	public function convertGalleryImages()
 	{
 		$libraryClass = $this->getLibrary();
 
 		$libraryClass::setKey( 'id' );
 
-		foreach( $this->fetch( 'photos' ) AS $row )
+		foreach( $this->fetch( 'photos', 'id' ) AS $row )
 		{
 			$info = array(
 				'image_id'				=> $row['id'],
@@ -286,13 +272,13 @@ class Photopost extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryComments() : void
+	public function convertGalleryComments()
 	{
 		$libraryClass = $this->getLibrary();
 
 		$libraryClass::setKey( 'id' );
 
-		foreach( $this->fetch( 'comments' ) AS $row )
+		foreach( $this->fetch( 'comments', 'id' ) AS $row )
 		{
 			$libraryClass->convertGalleryComment( array(
 				'comment_id'			=> $row['id'],
@@ -312,55 +298,55 @@ class Photopost extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'showgallery.php' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'showgallery.php' ) !== FALSE )
 		{
-			if( !$id = Request::i()->cat )
+			if( !$id = \IPS\Request::i()->cat )
 			{
-				preg_match( '#cat/([0-9]+)#', $url->data[ Url::COMPONENT_PATH ], $matches );
-				$id = $matches[1] ?? NULL;
+				preg_match( '#cat/([0-9]+)#', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches );
+				$id = isset( $matches[1] ) ? $matches[1] : NULL;
 			}
 
 			try
 			{
 				$data = (string) $this->app->getLink( $id, 'gallery_categories' );
-				$item = Category::load( $data );
+				$item = \IPS\gallery\Category::load( $data );
 
 				if( $item->can('view') )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
 		}
-		elseif( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'showphoto.php' ) !== FALSE OR
-			mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'showfull.php' ) !== FALSE)
+		elseif( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'showphoto.php' ) !== FALSE OR
+			mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'showfull.php' ) !== FALSE)
 		{
-			if( !$id = Request::i()->photo )
+			if( !$id = \IPS\Request::i()->photo )
 			{
-				preg_match( '#photo/([0-9]+)#', $url->data[ Url::COMPONENT_PATH ], $matches );
-				$id = $matches[1] ?? NULL;
+				preg_match( '#photo/([0-9]+)#', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches );
+				$id = isset( $matches[1] ) ? $matches[1] : NULL;
 			}
 
 			try
 			{
 				$data = (string) $this->app->getLink( $id, 'gallery_images' );
-				$item = Image::load( $data );
+				$item = \IPS\gallery\Image::load( $data );
 
 				if( $item->canView() )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

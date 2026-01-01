@@ -12,47 +12,35 @@
 namespace IPS\nexus\modules\admin\store;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Node\Controller;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * fields
  */
-class fields extends Controller
+class _fields extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\nexus\Package\CustomField';
+	protected $nodeClass = 'IPS\nexus\Package\CustomField';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'package_fields_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'package_fields_manage' );
 		parent::execute();
 	}
 	
@@ -61,10 +49,10 @@ class fields extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Output::i()->output = Theme::i()->getTemplate( 'forms', 'core' )->blurb( 'custom_package_fields_blurb' );
-		parent::manage();
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'forms', 'core' )->blurb( 'custom_package_fields_blurb' );
+		return parent::manage();
 	}
 	
 	/**
@@ -72,11 +60,11 @@ class fields extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function warning() : void
+	protected function warning()
 	{
-		Output::i()->output = Theme::i()->getTemplate( 'store' )->productOptionsChanged(
-			new ActiveRecordIterator(
-				Db::i()->select( '*', 'nexus_packages', Db::i()->in( 'p_id', explode( ',', Request::i()->ids ) ) ),
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'store' )->productOptionsChanged(
+			new \IPS\Patterns\ActiveRecordIterator(
+				\IPS\Db::i()->select( '*', 'nexus_packages', \IPS\Db::i()->in( 'p_id', explode( ',', \IPS\Request::i()->ids ) ) ),
 				'IPS\nexus\Package'
 			)
 		);
@@ -84,19 +72,19 @@ class fields extends Controller
 	/**
 	 * Redirect after save
 	 *
-	 * @param	Model|null	$old			A clone of the node as it was before or NULL if this is a creation
-	 * @param	Model	$new			The node now
+	 * @param	\IPS\Node\Model	$old			A clone of the node as it was before or NULL if this is a creation
+	 * @param	\IPS\Node\Model	$new			The node now
 	 * @param	string			$lastUsedTab	The tab last used in the form
 	 * @return	void
 	 */
-	protected function _afterSave( ?Model $old, Model $new, mixed $lastUsedTab = FALSE ): void
+	protected function _afterSave( ?\IPS\Node\Model $old, \IPS\Node\Model $new, $lastUsedTab = FALSE )
 	{
 		if ( $old AND $old->extra != $new->extra )
 		{
-			$products = Db::i()->select( 'DISTINCT(opt_package)', 'nexus_product_options', "opt_values LIKE '%\"{$new->_id}\":%'" );
-			if ( count( $products ) )
+			$products = \IPS\Db::i()->select( 'DISTINCT(opt_package)', 'nexus_product_options', "opt_values LIKE '%\"{$new->_id}\":%'" );
+			if ( \count( $products ) )
 			{
-				Output::i()->redirect( $this->url->setQueryString( array( 'do' => 'warning', 'ids' => implode( ',', iterator_to_array( $products ) ) ) ) );
+				\IPS\Output::i()->redirect( $this->url->setQueryString( array( 'do' => 'warning', 'ids' => implode( ',', iterator_to_array( $products ) ) ) ) );
 			}
 		}
 		

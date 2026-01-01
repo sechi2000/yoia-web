@@ -12,76 +12,71 @@
 namespace IPS\cms\Selector;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Node\Model;
-use IPS\Node\Permissions;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Databases Model
  */
-class Databases extends Model implements Permissions
+class _Databases extends \IPS\Node\Model implements \IPS\Node\Permissions
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons = array();
+	protected static $multitons = array();
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'database_';
+	public static $databasePrefix = 'database_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Table
 	 */
-	public static ?string $databaseTable = 'cms_databases';
+	public static $databaseTable = 'cms_databases';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'database_key', 'database_page_id' );
+	protected static $databaseIdFields = array( 'database_key', 'database_page_id' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'id';
+	public static $databaseColumnOrder = 'id';
 	
 	/**
 	 * @brief	[Node] Sortable?
 	 */
-	public static bool $nodeSortable = FALSE;
+	public static $nodeSortable = FALSE;
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = '';
+	public static $nodeTitle = '';
 	
 	/**
 	 * @brief	[Node] Subnode class
 	 */
-	public static ?string $subnodeClass = 'IPS\cms\Selector\Categories';
+	public static $subnodeClass = 'IPS\cms\Selector\Categories';
 	
 	/**
 	 * @brief	The map of permission columns
 	 */
-	public static array $permissionMap = array(
+	public static $permissionMap = array(
 			'view' 				=> 'view',
 			'read'				=> 2,
 			'add'				=> 3,
@@ -94,25 +89,25 @@ class Databases extends Model implements Permissions
 	/**
 	 * @brief	[Node] App for permission index
 	 */
-	public static ?string $permApp = 'cms';
+	public static $permApp = 'cms';
 	
 	/**
 	 * @brief	[Node] Type for permission index
 	 */
-	public static ?string $permType = 'databases';
+	public static $permType = 'databases';
 	
 	/**
 	 * @brief	[Node] Prefix string that is automatically prepended to permission matrix language strings
 	 */
-	public static string $permissionLangPrefix = 'perm_content_';
+	public static $permissionLangPrefix = 'perm_content_';
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}" as the key
 	 */
-	public static ?string $titleLangPrefix = 'content_db_';
+	public static $titleLangPrefix = 'content_db_';
 	
 	/**
 	 * @brief	[Node] Description suffix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}_{$descriptionLangSuffix}" as the key
 	 */
-	public static ?string $descriptionLangSuffix = 'desc';
+	public static $descriptionLangSuffix = 'desc';
 }

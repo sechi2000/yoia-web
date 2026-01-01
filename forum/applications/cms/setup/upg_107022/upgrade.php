@@ -12,20 +12,16 @@
 namespace IPS\cms\setup\upg_107022;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.7.1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Set record published date to fix issue in 4.7.1. Only fix records created after the beta was released.
@@ -34,9 +30,9 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		foreach( Db::i()->select( '*', 'cms_databases' ) as $database )
+		foreach( \IPS\Db::i()->select( '*', 'cms_databases' ) as $database )
 		{
-			Db::i()->query('UPDATE `' . Db::i()->prefix .'cms_custom_database_' . $database['database_id'] . '` SET record_publish_date = record_saved, record_future_date = 1 WHERE record_publish_date = 0 AND record_saved > 1659372642 ' );
+			\IPS\Db::i()->query('UPDATE `' . \IPS\Db::i()->prefix .'cms_custom_database_' . $database['database_id'] . '` SET record_publish_date = record_saved, record_future_date = 1 WHERE record_publish_date = 0 AND record_saved > 1659372642 ' );
 		}
 
 		return TRUE;

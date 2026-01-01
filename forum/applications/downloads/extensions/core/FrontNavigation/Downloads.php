@@ -12,78 +12,64 @@
 namespace IPS\downloads\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application\Module;
-use IPS\core\FrontNavigation;
-use IPS\core\FrontNavigation\FrontNavigationAbstract;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Downloads
  */
-class Downloads extends FrontNavigationAbstract
+class _Downloads extends \IPS\core\FrontNavigation\FrontNavigationAbstract
 {
-	/**
-	 * @var string Default icon
-	 */
-	public string $defaultIcon = '\f019';
-
 	/**
 	 * Get Type Title which will display in the AdminCP Menu Manager
 	 *
 	 * @return	string
 	 */
-	public static function typeTitle(): string
+	public static function typeTitle()
 	{
-		return Member::loggedIn()->language()->addToStack('frontnavigation_downloads');
+		return \IPS\Member::loggedIn()->language()->addToStack('frontnavigation_downloads');
 	}
 		
 	/**
 	 * Can the currently logged in user access the content this item links to?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canAccessContent(): bool
+	public function canAccessContent()
 	{
-		return Member::loggedIn()->canAccessModule( Module::get( 'downloads', 'downloads' ) );
+		return \IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'downloads', 'downloads' ) );
 	}
 	
 	/**
 	 * Get Title
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack('frontnavigation_downloads');
+		return \IPS\Member::loggedIn()->language()->addToStack('frontnavigation_downloads');
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|string|null
+	public function link()
 	{
-		return Url::internal( "app=downloads&module=downloads&controller=browse", 'front', 'downloads' );
+		return \IPS\Http\Url::internal( "app=downloads&module=downloads&controller=browse", 'front', 'downloads' );
 	}
 	
 	/**
 	 * Is Active?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function active(): bool
+	public function active()
 	{
-		return !FrontNavigation::$clubTabActive and !FrontNavigation::nodeExtensionIsActive( 'downloads' ) and Dispatcher::i()->application->directory === 'downloads';
+		return !\IPS\core\FrontNavigation::$clubTabActive and \IPS\Dispatcher::i()->application->directory === 'downloads';
 	}
 }

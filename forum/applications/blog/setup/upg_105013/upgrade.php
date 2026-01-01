@@ -12,37 +12,29 @@
 namespace IPS\blog\setup\upg_105013;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\blog\Blog;
-use IPS\blog\Category;
-use IPS\Db;
-use IPS\Lang;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.5.0 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Set up categories
 	 *
-	 * @return	bool|array	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
+	 * @return	array	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
 	 */
-	public function step1() : bool|array
+	public function step1()
 	{
-		$category = new Category;
+		$category = new \IPS\blog\Category;
 		$category->seo_name = 'general';
 		$category->save();
 
-		Lang::saveCustom( 'blog', "blog_category_{$category->id}", "General" );
+		\IPS\Lang::saveCustom( 'blog', "blog_category_{$category->id}", "General" );
 
 		return TRUE;
 	}
@@ -50,29 +42,29 @@ class Upgrade
 	/**
 	 * Convert RSS imports over
 	 *
-	 * @return	bool|array	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
+	 * @return	array	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
 	 */
-	public function step2() : bool|array
+	public function step2()
 	{
 		/* Make sure we have the table first */
-		if( !Db::i()->checkForTable('blog_rss_import') )
+		if( !\IPS\Db::i()->checkForTable('blog_rss_import') )
 		{
 			return TRUE;
 		}
 
 		/* Move over blog_rss_import to core_rss_import */
-		foreach( Db::i()->select( '*', 'blog_rss_import' ) as $rss )
+		foreach( \IPS\Db::i()->select( '*', 'blog_rss_import' ) as $rss )
 		{
 			try
 			{
-				$blog = Blog::load( $rss['rss_blog_id'] );
+				$blog = \IPS\blog\Blog::load( $rss['rss_blog_id'] );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				continue;
 			}
 			
-			$newImportId = Db::i()->insert( 'core_rss_import', array(
+			$newImportId = \IPS\Db::i()->insert( 'core_rss_import', array(
 				'rss_import_enabled' => 1,
 				'rss_import_title' => $blog->titleForLog(),
 				'rss_import_url' => $rss['rss_url'],
@@ -94,13 +86,13 @@ class Upgrade
 			/* Prevent multiple runs from breaking */
 			try 
 			{
-				Db::i()->delete( 'core_rss_imported', array( 'rss_imported_import_id=?', $newImportId ) );
+				\IPS\Db::i()->delete( 'core_rss_imported', array( 'rss_imported_import_id=?', $newImportId ) );
 				
-				Db::i()->query( "INSERT INTO " . Db::i()->prefix . "core_rss_imported
+				\IPS\Db::i()->query( "INSERT INTO " . \IPS\Db::i()->prefix . "core_rss_imported
 					(rss_imported_guid, rss_imported_content_id, rss_imported_import_id )
-					( SELECT a.rss_imported_guid, a.rss_imported_entry_id, {$newImportId} FROM " . Db::i()->prefix . "blog_rss_imported a)" );
+					( SELECT a.rss_imported_guid, a.rss_imported_entry_id, {$newImportId} FROM " . \IPS\Db::i()->prefix . "blog_rss_imported a)" );
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 
 		return TRUE;
@@ -109,17 +101,17 @@ class Upgrade
 	/**
 	 * Finish
 	 *
-	 * @return	bool|array	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
+	 * @return	array	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
 	 */
-	public function finish() : bool|array
+	public function finish()
 	{
 		/* Delete old language strings */
-		Db::i()->delete( 'core_tasks', array( '`key`=?', 'blogrssimport' ) );
+		\IPS\Db::i()->delete( 'core_tasks', array( '`key`=?', 'blogrssimport' ) );
 
 		/* Delete old RSS Table */
-		if( Db::i()->checkForTable('blog_rss_import') )
+		if( \IPS\Db::i()->checkForTable('blog_rss_import') )
 		{
-			Db::i()->dropTable( array( 'blog_rss_import', 'blog_rss_imported' ) );
+			\IPS\Db::i()->dropTable( array( 'blog_rss_import', 'blog_rss_imported' ) );
 		}
 
 		return TRUE;

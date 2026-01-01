@@ -11,38 +11,33 @@
 namespace IPS\Xml;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Class for reading an RSS 1.0 document
  */
-class Rss1 extends Rss
+class _Rss1 extends Rss
 {	
 	/**
 	 * Fetch the date
 	 *
-	 * @param object $item	RSS item
-	 * @return	NULL|DateTime
+	 * @param	object	$item	RSS item
+	 * @return	NULL|\IPS\DateTime
 	 */
-	protected function getDate( object $item ): ?DateTime
+	protected function getDate( $item )
 	{
 		$pubDate = NULL;
 
 		/* If we use the Dublin Core (dc) namespace, we will probably have dc:date */
 		$namespaces = $this->getNamespaces( TRUE );
 
-		if( in_array( 'https://purl.org/dc/elements/1.1/', $namespaces ) AND $item->children( $namespaces['dc'] )->date )
+		if( \in_array( 'http://purl.org/dc/elements/1.1/', $namespaces ) AND $item->children( $namespaces['dc'] )->date )
 		{
-			$pubDate	= DateTime::ts( strtotime( $item->children( $namespaces['dc'] )->date ) );
+			$pubDate	= \IPS\DateTime::ts( strtotime( $item->children( $namespaces['dc'] )->date ) );
 		}
 
 		return $pubDate ?: parent::getDate( $item );
@@ -51,9 +46,9 @@ class Rss1 extends Rss
 	/**
 	 * Fetch the items
 	 *
-	 * @return	Rss
+	 * @return	array
 	 */
-	protected function getItems(): Rss
+	protected function getItems()
 	{
 		return $this->item;
 	}

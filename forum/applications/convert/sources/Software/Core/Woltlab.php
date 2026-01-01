@@ -12,49 +12,28 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Exception;
-use IPS\convert\Software;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Login;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use const ENT_HTML5;
-use const ENT_QUOTES;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Woltlab Suite Core Converter
  */
-class Woltlab extends Software
+class _Woltlab extends \IPS\convert\Software
 {
 	/**
 	 * @brief	The WCF table prefix can change depending on the number of installs
 	 */
-	 public static int $installId = 1;
+	 public static $installId = 1;
 
 	 /**
 	 * Software Name
 	 *
 	 * @return    string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "WoltLab Suite (3.1)";
@@ -65,7 +44,7 @@ class Woltlab extends Software
 	 *
 	 * @return    string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "woltlab";
@@ -74,9 +53,9 @@ class Woltlab extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertProfileFieldGroups'		=> array(
@@ -117,13 +96,13 @@ class Woltlab extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
-	 * @throws	Exception
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
+	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
@@ -135,20 +114,22 @@ class Woltlab extends Software
 				}
 				catch( \Exception $e )
 				{
-					throw new Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -156,9 +137,9 @@ class Woltlab extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertProfileFieldGroups',
@@ -172,10 +153,10 @@ class Woltlab extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -183,16 +164,16 @@ class Woltlab extends Software
 			case 'convertProfileFieldGroups':
 				$return['convertProfileFieldGroups'] = array();
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_pfields_groups' ), 'IPS\core\ProfileFields\Group' ) AS $group )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_pfields_groups' ), 'IPS\core\ProfileFields\Group' ) AS $group )
 				{
 					$options[ $group->_id ] = $group->_title;
 				}
 
 				foreach( $this->db->select( '*', 'wcf' . static::$installId . '_user_option_category', array( 'parentCategoryName=?', 'profile' ) ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_pfgroup_{$group['categoryID']}"]	= $this->getLanguage( $group['categoryName'], 'wcf.user.option.category' );
-					Member::loggedIn()->language()->words["map_pfgroup_{$group['categoryID']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_pfgroup_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_pfgroup_{$group['categoryID']}"]	= $this->getLanguage( $group['categoryName'], 'wcf.user.option.category' );
+					\IPS\Member::loggedIn()->language()->words["map_pfgroup_{$group['categoryID']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_pfgroup_desc' );
 
 					$return['convertProfileFieldGroups']["map_pfgroup_{$group['categoryID']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -208,8 +189,8 @@ class Woltlab extends Software
 				$return['convertProfileFields'] = array();
 
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
 				{
 					$options[ $field->_id ] = $field->_title;
 				}
@@ -217,8 +198,8 @@ class Woltlab extends Software
 				$where = array( "categoryName LIKE 'profile.%' OR " . $this->db->in( 'categoryName', iterator_to_array( $this->db->select( 'categoryName', static::canConvert()['convertProfileFieldGroups']['table'], static::canConvert()['convertProfileFieldGroups']['where'] ) ) ) );
 				foreach( $this->db->select( '*', 'wcf' . static::$installId . '_user_option', $where ) AS $field )
 				{
-					Member::loggedIn()->language()->words["map_pfield_{$field['optionID']}"]	= $this->getLanguage( $field['optionName'], 'wcf.user.option' );
-					Member::loggedIn()->language()->words["map_pfield_{$field['optionID']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['optionID']}"]	= $this->getLanguage( $field['optionName'], 'wcf.user.option' );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['optionID']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
 
 					$return['convertProfileFields']["map_pfield_{$field['optionID']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -231,7 +212,7 @@ class Woltlab extends Software
 				break;
 
 			case 'convertEmoticons':
-				Member::loggedIn()->language()->words['emoticon_path'] = Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'Woltlab' ) ) );
+				\IPS\Member::loggedIn()->language()->words['emoticon_path'] = \IPS\Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'Woltlab' ) ) );
 				$return['convertEmoticons'] = array(
 					'emoticon_path'				=> array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Text',
@@ -239,7 +220,7 @@ class Woltlab extends Software
 						'field_required'	=> TRUE,
 						'field_extra'		=> array(),
 						'field_hint'		=> NULL,
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					),
 					'keep_existing_emoticons'	=> array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Checkbox',
@@ -255,16 +236,16 @@ class Woltlab extends Software
 				$return['convertGroups'] = array();
 
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[ $group->g_id ] = $group->name;
 				}
 
 				foreach( $this->db->select( '*', 'wcf' . static::$installId . '_user_group' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['groupID']}"]			= $this->getLanguage( $group['groupName'] );
-					Member::loggedIn()->language()->words["map_group_{$group['groupID']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['groupID']}"]			= $this->getLanguage( $group['groupName'] );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['groupID']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 
 					$return['convertGroups']["map_group_{$group['groupID']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -280,39 +261,39 @@ class Woltlab extends Software
 				$return['convertMembers'] = array();
 
 				/* Find out where the photos live */
-				Member::loggedIn()->language()->words['photo_location']		= Member::loggedIn()->language()->addToStack( 'convert_woltlab_avatar' );
-				Member::loggedIn()->language()->words['photo_location_desc']	= Member::loggedIn()->language()->addToStack( 'convert_woltlab_avatar_desc' );
+				\IPS\Member::loggedIn()->language()->words['photo_location']		= \IPS\Member::loggedIn()->language()->addToStack( 'convert_woltlab_avatar' );
+				\IPS\Member::loggedIn()->language()->words['photo_location_desc']	= \IPS\Member::loggedIn()->language()->addToStack( 'convert_woltlab_avatar_desc' );
 				$return['convertMembers']['photo_location'] = array(
 					'field_class'			=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
 					'field_hint'			=> NULL,
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
-				Member::loggedIn()->language()->words['coverphoto_location']		= Member::loggedIn()->language()->addToStack( 'convert_woltlab_cover' );
-				Member::loggedIn()->language()->words['coverphoto_location_desc']	= Member::loggedIn()->language()->addToStack( 'convert_woltlab_cover_desc' );
+				\IPS\Member::loggedIn()->language()->words['coverphoto_location']		= \IPS\Member::loggedIn()->language()->addToStack( 'convert_woltlab_cover' );
+				\IPS\Member::loggedIn()->language()->words['coverphoto_location_desc']	= \IPS\Member::loggedIn()->language()->addToStack( 'convert_woltlab_cover_desc' );
 				$return['convertMembers']['coverphoto_location'] = array(
 					'field_class'			=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
 					'field_hint'			=> NULL,
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 
 				foreach( [ 'usertitle' ] AS $field )
 				{
-					Member::loggedIn()->language()->words["field_{$field}"]		= Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, [ 'sprintf' => $field ] );
-					Member::loggedIn()->language()->words["field_{$field}_desc"]	= Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}"]		= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, [ 'sprintf' => $field ] );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
 					$return['convertMembers']["field_{$field}"] = [
 						'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 						'field_default'			=> 'no_convert',
 						'field_required'		=> TRUE,
 						'field_extra'			=> [
 							'options'				=> [
-								'no_convert'			=> Member::loggedIn()->language()->addToStack( 'no_convert' ),
-								'create_field'			=> Member::loggedIn()->language()->addToStack( 'create_field' ),
+								'no_convert'			=> \IPS\Member::loggedIn()->language()->addToStack( 'no_convert' ),
+								'create_field'			=> \IPS\Member::loggedIn()->language()->addToStack( 'create_field' ),
 							],
 							'userSuppliedInput'		=> 'create_field'
 						],
@@ -328,46 +309,43 @@ class Woltlab extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Non-Content Rebuilds */
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_announcements', 'extension' => 'core_Announcement' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_announcements', 'extension' => 'core_Announcement' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
 
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\core\Messenger\Message' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\core\Messenger\Message' ), 3, array( 'class' ) );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
 
 		return array( "f_search_index_rebuild", "f_clear_caches", "f_rebuild_pms", "f_signatures_rebuild" );
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix Post Data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string	$post	Post
+	 * @return	string	Fixed Post
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		return $post;
 	}
@@ -377,7 +355,7 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfileFieldGroups() : void
+	public function convertProfileFieldGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'categoryID' );
@@ -403,7 +381,7 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfileFields() : void
+	public function convertProfileFields()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'optionID' );
@@ -412,7 +390,7 @@ class Woltlab extends Software
 		foreach ( $this->fetch( 'wcf' . static::$installId . '_user_option', 'optionID', $where ) AS $field )
 		{
 			/* Birthday is special */
-			if( in_array( $field['optionName'], ['birthday', 'birthdayShowYear'] ) )
+			if( \in_array( $field['optionName'], ['birthday', 'birthdayShowYear'] ) )
 			{
 				$libraryClass->setLastKeyValue( $field['optionID'] );
 				continue;
@@ -476,7 +454,7 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertEmoticons() : void
+	public function convertEmoticons()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'smileyID' );
@@ -515,7 +493,7 @@ class Woltlab extends Software
 				'emo_position'	=> $row['showOrder'],
 			);
 
-			$libraryClass->convertEmoticon( $info, $set, $this->app->_session['more_info']['convertEmoticons']['keep_existing_emoticons'], $filepath, NULL, $filepathx2 );
+			$libraryClass->convertEmoticon( $info, $set, $this->app->_session['more_info']['convertEmoticons']['keep_existing_emoticons'], $filepath, NULL, $filepathx2, NULL );
 			$libraryClass->setLastKeyValue( $row['smileyID'] );
 		}
 	}
@@ -525,7 +503,7 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'groupID' );
@@ -534,8 +512,8 @@ class Woltlab extends Software
 		{
 			/* Username Styles */
 			$style = explode( '%s', $row['userOnlineMarking'] );
-			$prefix = $style[0] ?? '';
-			$suffix = $style[1] ?? '';
+			$prefix = isset( $style[0] ) ? $style[0] : '';
+			$suffix = isset( $style[1] ) ? $style[1] : '';
 
 			$info = array(
 				'g_id'					=> $row['groupID'],
@@ -551,7 +529,7 @@ class Woltlab extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -565,7 +543,7 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'userID' );
@@ -605,7 +583,7 @@ class Woltlab extends Software
 
 			$info = array(
 				'member_id'				=> $row['userID'],
-				'name'					=> html_entity_decode( $row['username'], ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
+				'name'					=> html_entity_decode( $row['username'], \ENT_QUOTES | \ENT_HTML5, 'UTF-8' ),
 				'email'					=> $row['email'],
 				'password'				=> $row['password'],
 				'member_group_id'		=> $row['userOnlineGroupID'],
@@ -634,7 +612,7 @@ class Woltlab extends Software
 					$filename = $row['avatarID'] . '-' . $avatar['fileHash'] . '.' . $avatar['avatarExtension'];
 					$filepath = rtrim( $this->app->_session['more_info']['convertMembers']['photo_location'], '/' ) . '/' . mb_substr( $avatar['fileHash'], 0, 2 );
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 
 			/* Cover Photo */
@@ -667,7 +645,7 @@ class Woltlab extends Software
 					/* We don't actually need this, but we need to make sure the field was created */
 					$fieldId = $this->app->getLink( $pseudo, 'core_pfields_data' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$libraryClass->convertProfileField( [
 						'pf_id'				=> $pseudo,
@@ -685,7 +663,7 @@ class Woltlab extends Software
 
 				if( $pseudo == 'usertitle' )
 				{
-					$profileFields[ $pseudo ] = in_array( $row['userTitle'], $userTitles ) OR empty( $row['userTitle'] ) ? NULL : $row['userTitle'];
+					$profileFields[ $pseudo ] = \in_array( $row['userTitle'], $userTitles ) OR empty( $row['userTitle'] ) ? NULL : $row['userTitle'];
 				}
 				else
 				{
@@ -717,7 +695,7 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertIgnoredUsers() : void
+	public function convertIgnoredUsers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'ignoreID' );
@@ -742,7 +720,7 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'conversationID' );
@@ -789,7 +767,7 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'messageID' );
@@ -812,15 +790,15 @@ class Woltlab extends Software
 	/**
 	 * @brief		Cache default language
 	 */
-	static ?int $_defaultLanguage = NULL;
+	static $_defaultLanguage = NULL;
 
 	/**
 	 * Helper to fetch a WCF lang string
 	 *
 	 * @param	string			$itemName		WCF Language Name
-	 * @param 	string|null			$itemPrefix		WCF Prefix for end-user input
+	 * @param 	string			$itemPrefix		WCF Prefix for end-user input
 	 * @return	string							Translated string, or original if no customisation exists
-	 * @throws	UnderflowException
+	 * @throws	\UnderflowException
 	 */
 	protected function getLanguage( string $itemName, string $itemPrefix=NULL ): string
 	{
@@ -833,13 +811,13 @@ class Woltlab extends Software
 		{
 			return $this->db->select( 'languageItemValue', 'wcf' . static::$installId . '_language_item', array( "languageID=? AND languageItem=?", static::$_defaultLanguage, $itemName ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			try
 			{
 				return $this->db->select( 'languageItemValue', 'wcf' . static::$installId . '_language_item', array( "languageID=? AND languageItem=?", static::$_defaultLanguage, $itemPrefix . '.' . $itemName ) )->first();
 			}
-			catch( UnderflowException $e ) { }
+			catch( \UnderflowException $e ) { }
 
 			return $itemName;
 		}
@@ -848,11 +826,11 @@ class Woltlab extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
 		/* If it's not blowfish, then we don't have a salt for it. fail. */
 		if( preg_match( '/^\$2[ay]\$(0[4-9]|[1-2][0-9]|3[0-1])\$[a-zA-Z0-9.\/]{53}/', $member->conv_password ) )
@@ -860,7 +838,7 @@ class Woltlab extends Software
 			$salt = mb_substr( $member->conv_password, 0, 29 );
 			$test = crypt( crypt( $password, $salt ), $salt );
 
-			return Login::compareHashes( $member->conv_password, $test );
+			return \IPS\Login::compareHashes( $member->conv_password, $test );
 		}
 
 		return FALSE;

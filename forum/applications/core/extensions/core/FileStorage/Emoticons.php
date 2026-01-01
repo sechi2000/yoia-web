@@ -11,34 +11,25 @@
 namespace IPS\core\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use IPS\Settings;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: Emoticons
  */
-class Emoticons extends FileStorageAbstract
+class _Emoticons
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
-		return Db::i()->select( 'COUNT(*)', 'core_emoticons' )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'core_emoticons' )->first();
 	}
 	
 	/**
@@ -47,51 +38,82 @@ class Emoticons extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	UnderflowException					When file record doesn't exist. Indicating there are no more files to move
-	 * @return	void							An offset integer to use on the next cycle, or nothing
+	 * @throws	\UnderflowException					When file record doesn't exist. Indicating there are no more files to move
+	 * @return	void|int							An offset integer to use on the next cycle, or nothing
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-		$emoticon = Db::i()->select( '*', 'core_emoticons', array(), 'id', array( $offset, 1 ) )->first();
+		$emoticon = \IPS\Db::i()->select( '*', 'core_emoticons', array(), 'id', array( $offset, 1 ) )->first();
 		
 		try
 		{
-			$file = File::get( $oldConfiguration ?: 'core_Emoticons', $emoticon['image'] )->move( $storageConfiguration );
+			$file = \IPS\File::get( $oldConfiguration ?: 'core_Emoticons', $emoticon['image'] )->move( $storageConfiguration );
 
 			$image_2x = NULL;
 			if ( $emoticon['image_2x'] )
 			{
-				$image_2x = File::get( $oldConfiguration ?: 'core_Emoticons', $emoticon['image_2x'] )->move( $storageConfiguration );
+				$image_2x = \IPS\File::get( $oldConfiguration ?: 'core_Emoticons', $emoticon['image_2x'] )->move( $storageConfiguration );
 			}
 
 			if ( (string) $file != $emoticon['image'] or (string) $image_2x != $emoticon['image_2x'] )
 			{
-				Db::i()->update( 'core_emoticons', array( 'image' => (string) $file, 'image_2x' => (string) $image_2x ), array( 'id=?', $emoticon['id'] ) );
+				\IPS\Db::i()->update( 'core_emoticons', array( 'image' => (string) $file, 'image_2x' => (string) $image_2x ), array( 'id=?', $emoticon['id'] ) );
 			}
 			
-			Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
+			\IPS\Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			/* Any issues are logged */
 		}
 	}
 	
 	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		$emoticon = \IPS\Db::i()->select( '*', 'core_emoticons', array(), 'id', array( $offset, 1 ) )->first();
+
+		try
+		{
+			$fixed = array();
+			foreach( array( 'image', 'image_2x' ) as $location )
+			{
+				if ( $new = \IPS\File::repairUrl( $emoticon[ $location ] ) )
+				{
+					$fixed[ $location ] = $new;
+				}
+			}
+
+			if ( \count( $fixed ) )
+			{
+				\IPS\Db::i()->update( 'core_emoticons', $fixed, array( 'id=?', $emoticon['id'] ) );
+
+				\IPS\Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
+			}
+		}
+		catch( \Exception $e ) { }
+	}
+	
+	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
 		try
 		{
-			$emoticon	= Db::i()->select( '*', 'core_emoticons', array( 'image=? or image_2x=?', (string) $file, (string) $file ) )->first();
+			$emoticon	= \IPS\Db::i()->select( '*', 'core_emoticons', array( 'image=? or image_2x=?', (string) $file, (string) $file ) )->first();
 
 			return TRUE;
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return FALSE;
 		}
@@ -102,16 +124,16 @@ class Emoticons extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		foreach( Db::i()->select( '*', 'core_emoticons', 'image IS NOT NULL' ) as $emoticon )
+		foreach( \IPS\Db::i()->select( '*', 'core_emoticons', 'image IS NOT NULL' ) as $emoticon )
 		{
 			try
 			{
-				File::get( 'core_Emoticons', $emoticon['image'] )->delete();
-				File::get( 'core_Emoticons', $emoticon['image_2x'] )->delete();
+				\IPS\File::get( 'core_Emoticons', $emoticon['image'] )->delete();
+				\IPS\File::get( 'core_Emoticons', $emoticon['image_2x'] )->delete();
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 		}
 	}
 }

@@ -11,46 +11,71 @@
 namespace IPS\{app}\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\Http\Url;
-use IPS\Member as MemberClass;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP  Notification Extension
  */
-class {class} extends AdminNotification
+class _{class} extends \IPS\core\AdminNotification
 {	
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = '{group}';
+	public static $group = 'other';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 3;
+	public static $groupPriority = 3;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = {priority};
+	public static $itemPriority = 1;
 	
 	/**
 	 * Title for settings
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle(): string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_{class}';
+	}
+	
+	/**
+	 * Can a member access this type of notification?
+	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool
+	 */
+	public static function permissionCheck( \IPS\Member $member ): bool
+	{
+		return true;// $member->hasAcpRestriction( ... );
+	}
+	
+	/**
+	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
+	 *
+	 * @return	string
+	 */
+	public static function mayBeOptional()
+	{
+		return FALSE;
+	}
+	
+	/**
+	 * Is this type of notification might recur (controls what options will be available for the email setting)
+	 *
+	 * @return	bool
+	 */
+	public static function mayRecur(): bool
+	{
+		return FALSE;
 	}
 			
 	/**
@@ -66,9 +91,9 @@ class {class} extends AdminNotification
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body(): string
 	{
 		return "Body";
 	}
@@ -80,7 +105,7 @@ class {class} extends AdminNotification
 	 */
 	public function severity(): string
 	{
-		return {severity};
+		return static::SEVERITY_NORMAL;
 	}
 	
 	/**
@@ -91,5 +116,25 @@ class {class} extends AdminNotification
 	public function dismissible(): string
 	{
 		return static::DISMISSIBLE_TEMPORARY;
+	}
+	
+	/**
+	 * Style
+	 *
+	 * @return	bool
+	 */
+	public function style(): string
+	{
+		return static::STYLE_INFORMATION;
+	}
+	
+	/**
+	 * Quick link from popup menu
+	 *
+	 * @return	\IPS\Http\Url
+	 */
+	public function link(): \IPS\Http\Url
+	{
+		return parent::link(); // \IPS\Http\Url::internal( '...' );
 	}
 }

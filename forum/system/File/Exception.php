@@ -11,21 +11,16 @@
 namespace IPS\File;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ReflectionClass;
-use RuntimeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Exception Class
  */
-class Exception extends RuntimeException
+class _Exception extends \RuntimeException
 {
 	/**
 	 * @brief	Cannot open the file
@@ -65,22 +60,22 @@ class Exception extends RuntimeException
 	/**
 	 * @brief	File path
 	 */
-	public ?string $filepath = NULL;
+	public $filepath = NULL;
 
 	/**
 	 * @brief	Original filename (used for friendlier errors)
 	 */
-	public ?string $originalFilename = NULL;
+	public $originalFilename = NULL;
 
 	/**
 	 * @brief	Additional error information
 	 */
-	public ?string $errorMessage = NULL;
+	public $errorMessage = NULL;
 
 	/**
 	 * @brief	Additional log information
 	 */
-	public ?string $extraLog = NULL;
+	public $extraLog = NULL;
 
 	/**
 	 * Constructor
@@ -92,7 +87,7 @@ class Exception extends RuntimeException
 	 * @param	string|null	$extraLog		Error information to log
 	 * @return	void
 	 */
-	public function __construct( string $file, int $error, ?string $originalFilename = NULL, ?string $errorMessage = NULL, ?string $extraLog = NULL )
+	public function __construct( $file, $error, $originalFilename = NULL, $errorMessage = NULL, $extraLog = NULL )
 	{
 		/* Store the file */
 		$this->filepath = $file;
@@ -102,7 +97,7 @@ class Exception extends RuntimeException
 		$this->errorMessage	= $errorMessage;
 		$this->extraLog		= $extraLog;
 
-		$message = array_flip( ( new ReflectionClass( __CLASS__ ) )->getConstants() )[ $error ];
+		$message = array_flip( ( new \ReflectionClass( __CLASS__ ) )->getConstants() )[ $error ];
 
 		parent::__construct( $message, $error );
 	}
@@ -112,7 +107,7 @@ class Exception extends RuntimeException
 	 *
 	 * @return	string
 	 */
-	public function extraErrorMessage() : string
+	public function extraErrorMessage()
 	{
 		return (string) $this->errorMessage;
 	}
@@ -122,7 +117,7 @@ class Exception extends RuntimeException
 	 *
 	 * @return	string
 	 */
-	public function extraLogData() : string
+	public function extraLogData()
 	{
 		return (string) $this->extraLog;
 	}

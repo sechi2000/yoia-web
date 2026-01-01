@@ -10,29 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\MessengerConversationType;
-use IPS\core\Messenger\Conversation;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Messenger conversation query for GraphQL API
  */
-class MessengerConversation
+class _MessengerConversation
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns a messenger conversation";
+	public static $description = "Returns a messenger conversation";
 
 	/*
 	 * Query arguments
@@ -47,7 +43,7 @@ class MessengerConversation
 	/**
 	 * Return the query return type
 	 */
-	public function type() : MessengerConversationType
+	public function type() 
 	{
 		return \IPS\core\api\GraphQL\TypeRegistry::messengerConversation();
 	}
@@ -55,21 +51,20 @@ class MessengerConversation
 	/**
 	 * Resolves this query
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @param 	array $context 	Context values
-	 * @param	mixed $info
-	 * @return	Conversation
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\core\Messenger\Conversation
 	 */
-	public function resolve( mixed $val, array $args, array $context, mixed $info ) : Conversation
+	public function resolve($val, $args, $context, $info)
 	{
 		try
 		{
-			$conversation = Conversation::loadAndCheckPerms( $args['id'] );
+			$conversation = \IPS\core\Messenger\Conversation::loadAndCheckPerms( $args['id'] );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'NO_MESSAGE', '1F294/2', 400 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_MESSAGE', '1F294/2', 400 );
 		}
 
 		return $conversation;

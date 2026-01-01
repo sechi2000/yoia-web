@@ -12,43 +12,33 @@
 namespace IPS\convert\Software\Cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Exception;
-use IPS\Db;
-use IPS\Task;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Xenforo (resource manager) Pages Converter
  */
-class Xenfororm extends Software
+class _Xenfororm extends \IPS\convert\Software
 {
 	/**
 	 * @brief	The similarities between XF1 and XF2 are close enough that we can use the same converter
 	 */
-	public static ?bool $isLegacy = NULL;
+	public static $isLegacy = NULL;
 
 	/**
 	 * @brief	XF2 Has prefixes on RM tables
 	 */
-	public static string $tablePrefix = '';
+	public static $tablePrefix = '';
 
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "XenForo Resource Manager Articles (1.5.x/2.0.x/2.1.x/2.2.x)";
@@ -57,14 +47,14 @@ class Xenfororm extends Software
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 
 		if ( $needDB )
 		{
@@ -73,7 +63,7 @@ class Xenfororm extends Software
 				/* Is this XF1 or XF2 */
 				if ( static::$isLegacy === NULL )
 				{
-					$version = $this->db->select( 'MAX(version_id)', 'xf_template', array( Db::i()->in( 'addon_id', array( 'XF', 'XenForo' ) ) ) )->first();
+					$version = $this->db->select( 'MAX(version_id)', 'xf_template', array( \IPS\Db::i()->in( 'addon_id', array( 'XF', 'XenForo' ) ) ) )->first();
 
 					if ( $version < 2000010 )
 					{
@@ -88,14 +78,16 @@ class Xenfororm extends Software
 			}
 			catch( \Exception $e ) {} # If we can't query, we won't be able to do anything anyway
 		}
+
+		return $return;
 	}
 	
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "xenfororm";
@@ -104,9 +96,9 @@ class Xenfororm extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertCmsDatabases'			=> array(
@@ -127,30 +119,32 @@ class Xenfororm extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
 			case 'cms_databases':
 				return 1;
+				break;
 				
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 	
 	/**
 	 * Uses Prefix
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function usesPrefix(): bool
+	public static function usesPrefix()
 	{
 		return FALSE;
 	}
@@ -158,9 +152,9 @@ class Xenfororm extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -168,9 +162,9 @@ class Xenfororm extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'xenforo' ) );
 	}
@@ -180,7 +174,7 @@ class Xenfororm extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsDatabases() : void
+	public function convertCmsDatabases()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -223,7 +217,7 @@ class Xenfororm extends Software
 		) );
 		
 		/* Throw an exception here to tell the library that we're done with this step */
-		throw new Exception;
+		throw new \IPS\convert\Software\Exception;
 	}
 
 	/**
@@ -231,7 +225,7 @@ class Xenfororm extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsDatabaseCategories() : void
+	public function convertCmsDatabaseCategories()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -250,7 +244,7 @@ class Xenfororm extends Software
 			$info = array(
 				'category_id'			=> $row['resource_category_id'],
 				'category_database_id'	=> 1,
-				'category_name'			=> $row['category_title'] ?? $row['title'],
+				'category_name'			=> isset( $row['category_title'] ) ? $row['category_title'] : $row['title'],
 				'category_parent_id'	=> $row['parent_category_id'],
 				'category_position'		=> $row['display_order'],
 				'category_fields'		=> array( 'resource_title', 'resource_tagline', 'resource_content' ),
@@ -267,7 +261,7 @@ class Xenfororm extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsDatabaseRecords() : void
+	public function convertCmsDatabaseRecords()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -315,19 +309,19 @@ class Xenfororm extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		try
 		{
 			$database = $this->app->getLink( 1, 'cms_databases' );
-			Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\cms\Categories' . $database, 'count' => 0 ), 5, array( 'class' ) );
-			Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'cms_custom_database_' . $database, 'class' => 'IPS\cms\Records' . $database ), 2, array( 'app', 'link', 'class' ) );
+			\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\cms\Categories' . $database, 'count' => 0 ), 5, array( 'class' ) );
+			\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'cms_custom_database_' . $database, 'class' => 'IPS\cms\Records' . $database ), 2, array( 'app', 'link', 'class' ) );
 
 			return array( "f_recount_cms_categories", "f_rebuild_cms_tags" );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			return array();
 		}

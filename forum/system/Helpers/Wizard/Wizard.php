@@ -11,22 +11,9 @@
 namespace IPS\Helpers;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use Throwable;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -57,70 +44,70 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 	);
  * @endcode
  */
-class Wizard
+class _Wizard
 {
 	/**
 	 * @brief	Steps
 	 */
-	protected array $steps = array();
+	protected $steps = array();
 	
 	/**
 	 * @brief	Base URL
 	 */
-	protected Url $baseUrl;
+	protected $baseUrl;
 	
 	/**
 	 * @brief	Show steps?
 	 */
-	protected bool $showSteps = TRUE;
+	protected $showSteps = TRUE;
 	
 	/**
 	 * @brief	Key used for \IPS\Data\Store
 	 */
-	protected bool $dataKey = TRUE;
+	protected $dataKey = TRUE;
 	
 	/**
 	 * @brief	Flag to reset session data when wizard completes
 	 */
-	public bool $resetWhenDone = FALSE;
+	public $resetWhenDone = FALSE;
 	
 	/**
 	 * @brief	Template
 	 */
-	public ?array $template = NULL;
+	public $template = NULL;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param array $steps			An array of callback functions. Each function should return either a string to output or (if the step is done) an array (which can be blank) of arbitrary data to retain between steps (which will be passed to each callback function). The keys should be langauge keys for the title of the step.
-	 * @param Url $baseUrl		The base URL (used when moving between steps)
-	 * @param bool $showSteps		Whether or not to show the step bar
-	 * @param array|null $initialData	The initial data, if any
-	 * @param bool $resetWhenDone	Whether or not to reset the session data when the wizard completes
-	 * @param array|string|null $ignoreQueryParams	String or array of URL params to ignore. For example, the base URL may be /submit/ but your userland code adds params /submit/?foo=bar, this changes the baseUrl and creates a new wizard session
+	 * @param	array			$steps			An array of callback functions. Each function should return either a string to output or (if the step is done) an array (which can be blank) of arbitrary data to retain between steps (which will be passed to each callback function). The keys should be langauge keys for the title of the step.
+	 * @param	\IPS\Http\Url	$baseUrl		The base URL (used when moving between steps)
+	 * @param	bool			$showSteps		Whether or not to show the step bar
+	 * @param	array|NULL		$initialData	The initial data, if any
+	 * @param	bool			$resetWhenDone	Whether or not to reset the session data when the wizard completes
+	 * @param	string|array|null $ignoreQueryParams	String or array of URL params to ignore. For example, the base URL may be /submit/ but your userland code adds params /submit/?foo=bar, this changes the baseUrl and creates a new wizard session
 	 * @return	void
 	 */
-	public function __construct(array $steps, Url $baseUrl, bool $showSteps=TRUE, array $initialData=NULL, bool $resetWhenDone=FALSE, array|string $ignoreQueryParams=NULL )
+	public function __construct( $steps, $baseUrl, $showSteps=TRUE, $initialData=NULL, $resetWhenDone=FALSE, $ignoreQueryParams=NULL )
 	{
 		$this->steps = $steps;
 		$this->baseUrl = ( $ignoreQueryParams != NULL ) ? $baseUrl->stripQueryString( $ignoreQueryParams ) : $baseUrl;
 		$this->showSteps = $showSteps;
 		$this->resetWhenDone = $resetWhenDone;
-		$this->template = array( Theme::i()->getTemplate( 'global', 'core', 'global' ), 'wizard' );
+		$this->template = array( \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' ), 'wizard' );
 		
-		if ( isset( Request::i()->_new ) )
+		if ( isset( \IPS\Request::i()->_new ) )
 		{
 			unset( $_SESSION[ 'wizard-' . md5( $this->baseUrl ) . '-step' ] );
             unset( $_SESSION[ 'wizard-' . md5( $this->baseUrl ) . '-data' ] );
             
-            if ( !is_null( $initialData ) )
+            if ( !\is_null( $initialData ) )
             {
 	            $_SESSION[ 'wizard-' . md5( $this->baseUrl ) . '-data' ] = $initialData;
             }
 			
-			if ( !Request::i()->isAjax() )
+			if ( !\IPS\Request::i()->isAjax() )
 			{
-				Output::i()->redirect( $baseUrl );
+				\IPS\Output::i()->redirect( $baseUrl );
 			}
 		}
 	}
@@ -133,7 +120,7 @@ class Wizard
 	public function __toString()
 	{
 		/* Don't cache for a short while to ensure sessions work */
-		Output::setCacheTime( false );
+		\IPS\Output::setCacheTime( false );
 		
 		try
 		{
@@ -152,7 +139,7 @@ class Wizard
 			{
 				$activeStep = $_SESSION[ 'wizard-' . md5( $this->baseUrl ) . '-step' ];
 
-				if ( isset( Request::i()->_step ) and in_array( Request::i()->_step, $stepKeys ) )
+				if ( isset( \IPS\Request::i()->_step ) and \in_array( \IPS\Request::i()->_step, $stepKeys ) )
 				{
 					foreach ( $stepKeys as $key )
 					{
@@ -160,7 +147,7 @@ class Wizard
 						{
 							break;
 						}
-						elseif ( $key == Request::i()->_step )
+						elseif ( $key == \IPS\Request::i()->_step )
 						{
 							$activeStep = $key;
 							break;
@@ -177,11 +164,11 @@ class Wizard
 				}
 			}
 
-			if ( isset( Request::i()->_moveToStep ) and in_array( Request::i()->_moveToStep, $stepKeys ) )
+			if ( isset( \IPS\Request::i()->_moveToStep ) and \in_array( \IPS\Request::i()->_moveToStep, $stepKeys ) )
 			{
 				foreach ( $stepKeys as $key )
 				{
-					if ( $key == Request::i()->_moveToStep )
+					if ( $key == \IPS\Request::i()->_moveToStep )
 					{
 						$activeStep = $key;
 						break;
@@ -192,7 +179,7 @@ class Wizard
 			/* Get it's output */
 			$activeStepFunction = $this->steps[ $activeStep ];
 			$output = $activeStepFunction( $data );
-			while ( is_array( $output ) )
+			while ( \is_array( $output ) )
 			{
 				$data = array_merge( $data, $output );
 
@@ -235,10 +222,13 @@ class Wizard
 			$htmlTemplate = $this->template;
 			return $htmlTemplate( $stepKeys, $activeStep, $output, $this->baseUrl, $this->showSteps );
 		}
-		catch ( Exception | Throwable $e )
+		catch ( \Exception $e )
 		{
-			IPS::exceptionHandler( $e );
+			\IPS\IPS::exceptionHandler( $e );
 		}
-		return '';
+		catch ( \Throwable $e )
+		{
+			\IPS\IPS::exceptionHandler( $e );
+		}
 	}
 }

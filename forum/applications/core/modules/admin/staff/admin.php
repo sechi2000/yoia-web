@@ -11,66 +11,33 @@
 namespace IPS\core\modules\admin\staff;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Member as FormMember;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use const IPS\CIC;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Admin CP Restrictions
  */
-class admin extends Controller
+class _admin extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'restrictions_manage' );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'members/restrictions.css', 'core', 'admin' ) );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_manage' );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'members/restrictions.css', 'core', 'admin' ) );
 
-		parent::execute();
+		return parent::execute();
 	}
 	
 	/**
@@ -78,41 +45,41 @@ class admin extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Create the table */
-		$table = new TableDb( 'core_admin_permission_rows', Url::internal( 'app=core&module=staff&controller=admin' ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_admin_permission_rows', \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin' ) );
 		
 		/* Columns */
 		$table->selects		= array( 'row_perm_cache', 'row_updated', 'row_id', 'row_id_type' );
 		$table->langPrefix = 'acprestrictions_';
 		$table->joins = array(
 			array( 'select' => "IF(core_admin_permission_rows.row_id_type= 'group', w.word_custom, m.name) as name", 'from' => array( 'core_members', 'm' ), 'where' => "m.member_id=core_admin_permission_rows.row_id AND core_admin_permission_rows.row_id_type='member'" ),
-			array( 'from' => array( 'core_sys_lang_words', 'w' ), 'where' => "w.word_key=CONCAT( 'core_group_', core_admin_permission_rows.row_id ) AND core_admin_permission_rows.row_id_type='group' AND w.lang_id=" . Member::loggedIn()->language()->id )
+			array( 'from' => array( 'core_sys_lang_words', 'w' ), 'where' => "w.word_key=CONCAT( 'core_group_', core_admin_permission_rows.row_id ) AND core_admin_permission_rows.row_id_type='group' AND w.lang_id=" . \IPS\Member::loggedIn()->language()->id )
 		);
 		$table->include = array( 'name', 'row_updated', 'row_perm_cache' );
 		$table->parsers = array(
 			'name'		=> function( $val, $row )
 			{
-				$return	= Theme::i()->getTemplate( 'global' )->shortMessage( $row['row_id_type'], array( 'ipsBadge', 'ipsBadge--neutral', 'ipsBadge--label' ) );
+				$return	= \IPS\Theme::i()->getTemplate( 'global' )->shortMessage( $row['row_id_type'], array( 'ipsBadge', 'ipsBadge_neutral', 'ipsBadge_label' ) );
 				try
 				{
-					$name = empty( $row['name'] ) ? Member::loggedIn()->language()->addToStack('deleted_member') : htmlentities( $row['name'], ENT_DISALLOWED, 'UTF-8', FALSE );
-					$return	.= ( $row['row_id_type'] === 'group' ) ? Group::load( $row['row_id'] )->formattedName : $name;
+					$name = empty( $row['name'] ) ? \IPS\Member::loggedIn()->language()->addToStack('deleted_member') : htmlentities( $row['name'], ENT_DISALLOWED, 'UTF-8', FALSE );
+					$return	.= ( $row['row_id_type'] === 'group' ) ? \IPS\Member\Group::load( $row['row_id'] )->formattedName : $name;
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
-					$return .= Member::loggedIn()->language()->addToStack('deleted_group');
+					$return .= \IPS\Member::loggedIn()->language()->addToStack('deleted_group');
 				}
 				return $return;
 			},
 			'row_updated'	=> function( $val )
 			{
-				return ( $val ) ? DateTime::ts( $val )->localeDate() : Member::loggedIn()->language()->addToStack('never');
+				return ( $val ) ? \IPS\DateTime::ts( $val )->localeDate() : \IPS\Member::loggedIn()->language()->addToStack('never');
 			},
 			'row_perm_cache' => function( $val )
 			{
-				return Theme::i()->getTemplate( 'members' )->restrictionsLabel( $val );
+				return \IPS\Theme::i()->getTemplate( 'members' )->restrictionsLabel( $val );
 			}
 		);
 		$table->mainColumn = 'name';
@@ -124,15 +91,15 @@ class admin extends Controller
 		$table->sortDirection = $table->sortDirection ?: 'desc';
 
 		/* Buttons */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_member' ) or Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_group' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_member' ) or \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_group' ) )
 		{
-			Output::i()->sidebar['actions'] = array(
+			\IPS\Output::i()->sidebar['actions'] = array(
 				'add'	=> array(
 					'primary' => TRUE,
 					'icon'	=> 'plus',
-					'link'	=> Url::internal( 'app=core&module=staff&controller=admin&do=add' ),
+					'link'	=> \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin&do=add' ),
 					'title'	=> 'acprestrictions_add',
-					'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('acprestrictions_add') )
+					'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('acprestrictions_add') )
 				),
 			);
 		}
@@ -143,13 +110,13 @@ class admin extends Controller
 			$buttons = array(
 				'edit'	=> array(
 					'icon'	=> 'pencil',
-					'link'	=> Url::internal( "app=core&module=staff&controller=admin&do=edit&id={$row['row_id']}&type={$row['row_id_type']}" ),
+					'link'	=> \IPS\Http\Url::internal( "app=core&module=staff&controller=admin&do=edit&id={$row['row_id']}&type={$row['row_id_type']}" ),
 					'title'	=> 'edit',
 					'class'	=> '',
 				),
 				'delete'	=> array(
 					'icon'	=> 'times-circle',
-					'link'	=> Url::internal( "app=core&module=staff&controller=admin&do=delete&id={$row['row_id']}&type={$row['row_id_type']}" ),
+					'link'	=> \IPS\Http\Url::internal( "app=core&module=staff&controller=admin&do=delete&id={$row['row_id']}&type={$row['row_id_type']}" ),
 					'title'	=> 'delete',
 					'data'	=> array( 'delete' => '' ),
 				)
@@ -157,17 +124,17 @@ class admin extends Controller
 			
 			if ( $row['row_id_type'] === 'member' )
 			{
-				if ( $row['row_id'] == Member::loggedIn()->member_id )
+				if ( $row['row_id'] == \IPS\Member::loggedIn()->member_id )
 				{
 					return array();
 				}
 				else
 				{
-					if ( !Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_edit_member' ) )
+					if ( !\IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_edit_member' ) )
 					{
 						unset( $buttons['edit'] );
 					}
-					if ( !Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_delete_member' ) )
+					if ( !\IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_delete_member' ) )
 					{
 						unset( $buttons['delete'] );
 					}
@@ -175,17 +142,17 @@ class admin extends Controller
 			}
 			else
 			{
-				if ( Member::loggedIn()->inGroup( $row['row_id'] ) )
+				if ( \IPS\Member::loggedIn()->inGroup( $row['row_id'] ) )
 				{
 					return array();
 				}
 				else
 				{
-					if ( !Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_edit_group' ) )
+					if ( !\IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_edit_group' ) )
 					{
 						unset( $buttons['edit'] );
 					}
-					if ( !Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_delete_group' ) )
+					if ( !\IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_delete_group' ) )
 					{
 						unset( $buttons['delete'] );
 					}
@@ -196,36 +163,36 @@ class admin extends Controller
 		};
 		
 		/* Buttons for logs */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_adminlogs' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_adminlogs' ) )
 		{
-			Output::i()->sidebar['actions']['actionLogs'] = array(
+			\IPS\Output::i()->sidebar['actions']['actionLogs'] = array(
 				'title'		=> 'acplogs',
 				'icon'		=> 'search',
-				'link'		=> Url::internal( 'app=core&module=staff&controller=admin&do=actionLogs' ),
+				'link'		=> \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin&do=actionLogs' ),
 			);
 		}
 		
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_acploginlogs' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_acploginlogs' ) )
 		{
-			Output::i()->sidebar['actions']['loginLogs'] = array(
+			\IPS\Output::i()->sidebar['actions']['loginLogs'] = array(
 				'title'		=> 'adminloginlogs',
 				'icon'		=> 'search',
-				'link'		=> Url::internal( 'app=core&module=staff&controller=admin&do=loginLogs' ),
+				'link'		=> \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin&do=loginLogs' ),
 			);
 		}
 		
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'members' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'members' ) )
 		{
-			Output::i()->sidebar['actions']['list_admins']	= array(
+			\IPS\Output::i()->sidebar['actions']['list_admins']	= array(
 				'icon'	=> 'search',
-				'link'	=> Url::internal( 'app=core&module=members&controller=members&filter=members_filter_administrators' ),
+				'link'	=> \IPS\Http\Url::internal( 'app=core&module=members&controller=members&filter=members_filter_administrators' ),
 				'title'	=> 'security_list_admins',
 			);
 		}
 		
 		/* Display */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('acprestrictions');
-		Output::i()->output	= (string) $table;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('acprestrictions');
+		\IPS\Output::i()->output	= (string) $table;
 	}
 	
 	/**
@@ -233,33 +200,33 @@ class admin extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function add() : void
+	protected function add()
 	{
-		$form = new Form();
+		$form = new \IPS\Helpers\Form();
 				
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_member' ) and Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_group' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_member' ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_group' ) )
 		{
-			$form->add( new Radio( 'acprestrictions_type', NULL, TRUE, array( 'options' => array( 'group' => 'group', 'member' => 'member' ), 'toggles' => array( 'group' => array( 'acprestrictions_group' ), 'member' => array( 'acprestrictions_member' ) ) ) ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'acprestrictions_type', NULL, TRUE, array( 'options' => array( 'group' => 'group', 'member' => 'member' ), 'toggles' => array( 'group' => array( 'acprestrictions_group' ), 'member' => array( 'acprestrictions_member' ) ) ) ) );
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_member' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_member' ) )
 		{
-			$form->add( new Select( 'acprestrictions_group', NULL, FALSE, array( 'options' => Group::groups( TRUE, FALSE ), 'parse' => 'normal' ), NULL, NULL, NULL, 'acprestrictions_group' ) );
+			$form->add( new \IPS\Helpers\Form\Select( 'acprestrictions_group', NULL, FALSE, array( 'options' => \IPS\Member\Group::groups( TRUE, FALSE ), 'parse' => 'normal' ), NULL, NULL, NULL, 'acprestrictions_group' ) );
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_group' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_group' ) )
 		{
-			$form->add( new FormMember( 'acprestrictions_member', NULL, ( Request::i()->acprestrictions_type === 'member' ), array( 'multiple' => 1 ), NULL, NULL, NULL, 'acprestrictions_member' ) );
+			$form->add( new \IPS\Helpers\Form\Member( 'acprestrictions_member', NULL, ( \IPS\Request::i()->acprestrictions_type === 'member' ), array( 'multiple' => 1 ), NULL, NULL, NULL, 'acprestrictions_member' ) );
 		}
 		
 		if ( $values = $form->values() )
 		{
 			$rowId = NULL;
 
-			if ( $values['acprestrictions_type'] === 'group' or !Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_member' ) )
+			if ( $values['acprestrictions_type'] === 'group' or !\IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_add_member' ) )
 			{
-				Dispatcher::i()->checkAcpPermission( 'restrictions_add_group' );
-				if ( Member::loggedIn()->inGroup( $values['acprestrictions_group'] ) )
+				\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_add_group' );
+				if ( \IPS\Member::loggedIn()->inGroup( $values['acprestrictions_group'] ) )
 				{
-					$form->error = Member::loggedIn()->language()->addToStack('acprestrictions_noself');
+					$form->error = \IPS\Member::loggedIn()->language()->addToStack('acprestrictions_noself');
 				}
 				else
 				{
@@ -268,10 +235,10 @@ class admin extends Controller
 			}
 			elseif ( $values['acprestrictions_member'] )
 			{
-				Dispatcher::i()->checkAcpPermission( 'restrictions_add_member' );
-				if ( $values['acprestrictions_member']->member_id === Member::loggedIn()->member_id )
+				\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_add_member' );
+				if ( $values['acprestrictions_member']->member_id === \IPS\Member::loggedIn()->member_id )
 				{
-					$form->error = Member::loggedIn()->language()->addToStack('acprestrictions_noself');
+					$form->error = \IPS\Member::loggedIn()->language()->addToStack('acprestrictions_noself');
 				}
 				else
 				{
@@ -281,9 +248,9 @@ class admin extends Controller
 
 			if ( $rowId !== NULL )
 			{
-				$current = Db::i()->select( '*', 'core_admin_permission_rows', array( "row_id=? AND row_id_type=?", $rowId, $values['acprestrictions_type'] ) );
+				$current = \IPS\Db::i()->select( '*', 'core_admin_permission_rows', array( "row_id=? AND row_id_type=?", $rowId, $values['acprestrictions_type'] ) );
 
-				if ( !count( $current ) )
+				if ( !\count( $current ) )
 				{
 					$current = array(
 						'row_id'			=> $rowId,
@@ -291,7 +258,7 @@ class admin extends Controller
 						'row_perm_cache'	=> '*',
 						'row_updated'		=> time()
 					);
-					Db::i()->insert( 'core_admin_permission_rows', $current );
+					\IPS\Db::i()->insert( 'core_admin_permission_rows', $current );
 
 					if( $values['acprestrictions_type'] == 'group' )
 					{
@@ -302,21 +269,21 @@ class admin extends Controller
 						$logValue = array( $values['acprestrictions_member']->name => FALSE );
 					}
 
-					Session::i()->log( 'acplog__acpr_created', $logValue );
+					\IPS\Session::i()->log( 'acplog__acpr_created', $logValue );
 				}
 				else
 				{
 					$current	= $current->first();
 				}
 
-				unset( Store::i()->administrators );
+				unset( \IPS\Data\Store::i()->administrators );
 
-				Output::i()->redirect( Url::internal( "app=core&module=staff&controller=admin" ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=staff&controller=admin" ) );
 			}
 		}
 		
-		Output::i()->title	 = Member::loggedIn()->language()->addToStack('acprestrictions_add');
-		Output::i()->output = Theme::i()->getTemplate('global')->block( 'acprestrictions_add', $form, FALSE );
+		\IPS\Output::i()->title	 = \IPS\Member::loggedIn()->language()->addToStack('acprestrictions_add');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('global')->block( 'acprestrictions_add', $form, FALSE );
 	}
 	
 	/**
@@ -325,41 +292,41 @@ class admin extends Controller
 	 * @csrfChecked	Uses form helper 7 Oct 2019
 	 * @return	void
 	 */
-	protected function edit() : void
+	protected function edit()
 	{
 		try
 		{
 			/* Get record */
-			$current = Db::i()->select( '*', 'core_admin_permission_rows', array( "row_id=? AND row_id_type=?", intval( Request::i()->id ), Request::i()->type ) )->first();
+			$current = \IPS\Db::i()->select( '*', 'core_admin_permission_rows', array( "row_id=? AND row_id_type=?", \intval( \IPS\Request::i()->id ), \IPS\Request::i()->type ) )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			Output::i()->error( 'node_error', '2C113/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C113/1', 404, '' );
 		}
 		
 		/* Check permissions */
 		if ( $current['row_id_type'] === 'member' )
 		{
-			Dispatcher::i()->checkAcpPermission( 'restrictions_edit_member' );
-			if ( $current['row_id'] == Member::loggedIn()->member_id )
+			\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_edit_member' );
+			if ( $current['row_id'] == \IPS\Member::loggedIn()->member_id )
 			{
-				Output::i()->error( 'acprestrictions_noself', '1C113/3', 403, '' );
+				\IPS\Output::i()->error( 'acprestrictions_noself', '1C113/3', 403, '' );
 			}
 		}
 		else
 		{
-			Dispatcher::i()->checkAcpPermission( 'restrictions_edit_group' );
-			if ( $current['row_id_type'] === 'group' and Member::loggedIn()->inGroup( $current['row_id'] ) )
+			\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_edit_group' );
+			if ( $current['row_id_type'] === 'group' and \IPS\Member::loggedIn()->inGroup( $current['row_id'] ) )
 			{
-				Output::i()->error( 'acprestrictions_noself', '1C113/4', 403, '' );
+				\IPS\Output::i()->error( 'acprestrictions_noself', '1C113/4', 403, '' );
 			}
 		}
 		
 		/* Get available restrictions */
 		$restrictions = array();
-		foreach ( Application::enabledApplications() as $app )
+		foreach ( \IPS\Application::applications() as $app )
 		{
-			if ( !CIC or !in_array( "{$app->directory}", Member::$cicBlockedAcpRestrictions ) )
+			if ( !\IPS\CIC or !\in_array( "{$app->directory}", \IPS\Member::$cicBlockedAcpRestrictions ) )
 			{			
 				$restrictions['applications'][ $app->directory ] = $app->id;
 				
@@ -373,7 +340,7 @@ class admin extends Controller
 				
 				foreach ( $app->modules( 'admin' ) as $module )
 				{
-					if ( !$module->protected and ( !CIC or !in_array( "{$app->directory}.{$module->key}", Member::$cicBlockedAcpRestrictions ) ) )
+					if ( !$module->protected and ( !\IPS\CIC or !\in_array( "{$app->directory}.{$module->key}", \IPS\Member::$cicBlockedAcpRestrictions ) ) )
 					{
 						$restrictions['modules'][ $app->id ][ $module->key ] = $module->id;
 						
@@ -383,7 +350,7 @@ class admin extends Controller
 							{
 								foreach ( $items as $restrictionKey => $langKey )
 								{
-									if ( !CIC or !in_array( "{$app->directory}.{$module->key}.{$restrictionKey}", Member::$cicBlockedAcpRestrictions ) )
+									if ( !\IPS\CIC or !\in_array( "{$app->directory}.{$module->key}.{$restrictionKey}", \IPS\Member::$cicBlockedAcpRestrictions ) )
 									{
 										$restrictions['items'][ $module->id ][ $group ][ $restrictionKey ] = $langKey;
 									}
@@ -396,9 +363,9 @@ class admin extends Controller
 		}
 
 		/* Display */
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_members.js', 'core', 'admin' ) );
-		Output::i()->title	 = $current['row_id_type'] === 'group' ? Group::load( $current['row_id'] )->name : Member::load( $current['row_id'] )->name;
-		Output::i()->output .= Theme::i()->getTemplate( 'global' )->block( 'acprestrictions', Theme::i()->getTemplate( 'members' )->acpRestrictions( $current['row_perm_cache'] === '*' ? '*' : json_decode( $current['row_perm_cache'], TRUE ), $restrictions, $current ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_members.js', 'core', 'admin' ) );
+		\IPS\Output::i()->title	 = $current['row_id_type'] === 'group' ? \IPS\Member\Group::load( $current['row_id'] )->name : \IPS\Member::load( $current['row_id'] )->name;
+		\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global' )->block( 'acprestrictions', \IPS\Theme::i()->getTemplate( 'members' )->acpRestrictions( $current['row_perm_cache'] === '*' ? '*' : json_decode( $current['row_perm_cache'], TRUE ), $restrictions, $current ) );
 	}
 	
 	/**
@@ -406,23 +373,23 @@ class admin extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function save() : void
+	protected function save()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Get record */
-		$current = Db::i()->select( '*', 'core_admin_permission_rows', array( "row_id=? AND row_id_type=?", intval( Request::i()->id ), Request::i()->type ) )->first();
+		$current = \IPS\Db::i()->select( '*', 'core_admin_permission_rows', array( "row_id=? AND row_id_type=?", \intval( \IPS\Request::i()->id ), \IPS\Request::i()->type ) )->first();
 		if ( !$current )
 		{
-			Output::i()->error( 'node_error', '2C113/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C113/2', 404, '' );
 		}
 		
-		$permissions = ( Request::i()->admin_use_restrictions == 'no' ) ? '*' : json_encode( ( is_array( Request::i()->r ) ) ? Request::i()->r : array() );
+		$permissions = ( \IPS\Request::i()->admin_use_restrictions == 'no' ) ? '*' : json_encode( ( \is_array( \IPS\Request::i()->r ) ) ? \IPS\Request::i()->r : array() );
 
 		/* Save */
-		Db::i()->update( 'core_admin_permission_rows', array( 'row_perm_cache' => $permissions, 'row_updated' => time() ), array( "row_id=? AND row_id_type=?", intval( Request::i()->id ), Request::i()->type ) );
+		\IPS\Db::i()->update( 'core_admin_permission_rows', array( 'row_perm_cache' => $permissions, 'row_updated' => time() ), array( "row_id=? AND row_id_type=?", \intval( \IPS\Request::i()->id ), \IPS\Request::i()->type ) );
 
-		unset( Store::i()->administrators );
+		unset( \IPS\Data\Store::i()->administrators );
 		
 		/* Log */
 		if( $current['row_id_type'] == 'group' )
@@ -431,13 +398,13 @@ class admin extends Controller
 		}
 		else
 		{
-			$logValue = array( Member::load( $current['row_id'] )->name => FALSE );
+			$logValue = array( \IPS\Member::load( $current['row_id'] )->name => FALSE );
 		}
 
-		Session::i()->log( 'acplog__acpr_edited', $logValue );
+		\IPS\Session::i()->log( 'acplog__acpr_edited', $logValue );
 		
 		/* Boink */
-		Output::i()->redirect( Url::internal( 'app=core&module=staff&controller=admin' ), 'saved' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin' ), 'saved' );
 	}
 
 	/**
@@ -445,21 +412,21 @@ class admin extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
-		$current = Db::i()->select( '*', 'core_admin_permission_rows', array( "row_id=? AND row_id_type=?", intval( Request::i()->id ), Request::i()->type ) )->first();
+		$current = \IPS\Db::i()->select( '*', 'core_admin_permission_rows', array( "row_id=? AND row_id_type=?", \intval( \IPS\Request::i()->id ), \IPS\Request::i()->type ) )->first();
 
 		if ( $current['row_id_type'] === 'member' )
 		{
-			Dispatcher::i()->checkAcpPermission( 'restrictions_delete_member' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_delete_member' );
 		}
 		else
 		{
-			Dispatcher::i()->checkAcpPermission( 'restrictions_delete_group' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_delete_group' );
 		}
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
 		if( $current['row_id_type'] == 'group' )
 		{
@@ -467,7 +434,7 @@ class admin extends Controller
 			{
 				$name = 'core_group_' . $current['row_id'];
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$name = 'deleted_group';
 			}
@@ -476,7 +443,7 @@ class admin extends Controller
 		}
 		else
 		{
-			$member = Member::load( $current['row_id'] );
+			$member = \IPS\Member::load( $current['row_id'] );
 
 			if( $member->member_id )
 			{
@@ -488,12 +455,12 @@ class admin extends Controller
 			}
 		}
 
-		Session::i()->log( 'acplog__acpr_deleted', $logValue );
+		\IPS\Session::i()->log( 'acplog__acpr_deleted', $logValue );
 
-		Db::i()->delete( 'core_admin_permission_rows', array( 'row_id=? AND row_id_type=?', intval( Request::i()->id ), Request::i()->type ) );
-		unset ( Store::i()->administrators );
+		\IPS\Db::i()->delete( 'core_admin_permission_rows', array( 'row_id=? AND row_id_type=?', \intval( \IPS\Request::i()->id ), \IPS\Request::i()->type ) );
+		unset ( \IPS\Data\Store::i()->administrators );
 		
-		Output::i()->redirect( Url::internal( 'app=core&module=staff&controller=admin' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin' ) );
 	}
 	
 	/**
@@ -501,22 +468,22 @@ class admin extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function actionLogs() : void
+	protected function actionLogs()
 	{
-		Dispatcher::i()->checkAcpPermission( 'restrictions_adminlogs' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_adminlogs' );
 		
 		/* Create the table */
-		$table = new TableDb( 'core_admin_logs', Url::internal( 'app=core&module=staff&controller=admin&do=actionLogs' ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_admin_logs', \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin&do=actionLogs' ) );
 		$table->langPrefix = 'acplogs_';
 		$table->include = array( 'member_id', 'action', 'ip_address', 'ctime' );
 		$table->mainColumn = 'action';
 		$table->parsers = array(
 			'member_id'	=> function( $val, $row )
 			{
-				$member = Member::load( $val );
+				$member = \IPS\Member::load( $val );
 				if ( $member->member_id )
 				{
-					return htmlentities( Member::load( $val )->name, ENT_DISALLOWED, 'UTF-8', FALSE );
+					return htmlentities( \IPS\Member::load( $val )->name, ENT_DISALLOWED, 'UTF-8', FALSE );
 				}
 				else if ( $row['member_name'] != '' )
 				{
@@ -538,10 +505,10 @@ class admin extends Controller
 					$params = array();
 					foreach ( json_decode( $row['note'], TRUE ) as $k => $v )
 					{
-						$params[] = ( $v ? Member::loggedIn()->language()->addToStack( $k ) : $k );
+						$params[] = ( $v ? \IPS\Member::loggedIn()->language()->addToStack( $k ) : $k );
 					}
 					
-					return Member::loggedIn()->language()->addToStack( $langKey, FALSE, array( 'sprintf' => $params ) );
+					return \IPS\Member::loggedIn()->language()->addToStack( $langKey, FALSE, array( 'sprintf' => $params ) );
 				}
 				else
 				{
@@ -550,15 +517,15 @@ class admin extends Controller
 			},
 			'ip_address'=> function( $val )
 			{
-				if ( Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'membertools_ip' ) )
+				if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'membertools_ip' ) )
 				{
-					return "<a href='" . Url::internal( "app=core&module=members&controller=ip&ip={$val}" ) . "'>{$val}</a>";
+					return "<a href='" . \IPS\Http\Url::internal( "app=core&module=members&controller=ip&ip={$val}" ) . "'>{$val}</a>";
 				}
 				return $val;
 			},
 			'ctime'		=> function( $val )
 			{
-				return (string) DateTime::ts( $val );
+				return (string) \IPS\DateTime::ts( $val );
 			}
 		);
 		$table->sortBy = $table->sortBy ?: 'ctime';
@@ -566,16 +533,16 @@ class admin extends Controller
 		
 		/* Search */
 		$table->advancedSearch	= array(
-			'member_id'			=> SEARCH_MEMBER,
-			'ip_address'		=> SEARCH_CONTAINS_TEXT,
-			'ctime'				=> SEARCH_DATE_RANGE,
+			'member_id'			=> \IPS\Helpers\Table\SEARCH_MEMBER,
+			'ip_address'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'ctime'				=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
 			);
 
 		/* Custom quick search function to search unicode entities in JSON encoded data */
 		$table->quickSearch = function( $val )
 		{
-			$searchTerm = mb_strtolower( trim( Request::i()->quicksearch ) );
-			$jsonSearchTerm = str_replace( '\\', '\\\\\\', trim( json_encode( trim( Request::i()->quicksearch ) ), '"' ) );
+			$searchTerm = mb_strtolower( trim( \IPS\Request::i()->quicksearch ) );
+			$jsonSearchTerm = str_replace( '\\', '\\\\\\', trim( json_encode( trim( \IPS\Request::i()->quicksearch ) ), '"' ) );
 
 			return array(
 				"(`note` LIKE CONCAT( '%', ?, '%' ) OR LOWER(`word_custom`) LIKE CONCAT( '%', ?, '%' ) OR LOWER(`word_default`) LIKE CONCAT( '%', ?, '%' ))",
@@ -586,26 +553,26 @@ class admin extends Controller
 		};
 
 		$table->joins = array(
-			array( 'from' => array( 'core_sys_lang_words', 'w' ), 'where' => "w.word_key=lang_key AND w.lang_id=" . Member::loggedIn()->language()->id )
+			array( 'from' => array( 'core_sys_lang_words', 'w' ), 'where' => "w.word_key=lang_key AND w.lang_id=" . \IPS\Member::loggedIn()->language()->id )
 		);
 
 		/* Add a button for settings */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_adminlogs_prune' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_adminlogs_prune' ) )
 		{
-			Output::i()->sidebar['actions'] = array(
+			\IPS\Output::i()->sidebar['actions'] = array(
 				'settings'	=> array(
 					'title'		=> 'prunesettings',
 					'icon'		=> 'cog',
-					'link'		=> Url::internal( 'app=core&module=staff&controller=admin&do=actionLogSettings' ),
-					'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('prunesettings') )
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin&do=actionLogSettings' ),
+					'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('prunesettings') )
 				),
 			);
 		}
 		
 		/* Display */
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=staff&controller=admin&do=actionLogs' ), Member::loggedIn()->language()->addToStack( 'acplogs' ) );
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('acplogs');
-		Output::i()->output	= (string) $table;
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin&do=actionLogs' ), \IPS\Member::loggedIn()->language()->addToStack( 'acplogs' ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('acplogs');
+		\IPS\Output::i()->output	= (string) $table;
 	}
 	
 	/**
@@ -613,22 +580,22 @@ class admin extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function actionLogSettings() : void
+	protected function actionLogSettings()
 	{
-		Dispatcher::i()->checkAcpPermission( 'restrictions_adminlogs_prune' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_adminlogs_prune' );
 		
-		$form = new Form;
-		$form->add( new Interval( 'prune_log_admin', Settings::i()->prune_log_admin, FALSE, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL, 'prune_log_admin' ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Interval( 'prune_log_admin', \IPS\Settings::i()->prune_log_admin, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), NULL, 'prune_log_admin' ) );
 		
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings();
-			Session::i()->log( 'acplog__adminlog_settings' );
-			Output::i()->redirect( Url::internal( 'app=core&module=staff&controller=admin&do=actionLogs' ), 'saved' );
+			\IPS\Session::i()->log( 'acplog__adminlog_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin&do=actionLogs' ), 'saved' );
 		}
 	
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('adminlogssettings');
-		Output::i()->output 	= Theme::i()->getTemplate('global')->block( 'adminlogssettings', $form, FALSE );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('adminlogssettings');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate('global')->block( 'adminlogssettings', $form, FALSE );
 	}
 	
 	/**
@@ -636,12 +603,12 @@ class admin extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function loginLogs() : void
+	protected function loginLogs()
 	{
-		Dispatcher::i()->checkAcpPermission( 'restrictions_acploginlogs' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_acploginlogs' );
 		
 		/* Create the table */
-		$table = new TableDb( 'core_admin_login_logs', Url::internal( 'app=core&module=staff&controller=admin&do=loginLogs' ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_admin_login_logs', \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin&do=loginLogs' ) );
 		$table->joins[] = array( 'from' => 'core_members', 'where' => 'core_admin_login_logs.admin_username=core_members.email' );
 		$table->langPrefix = 'adminloginlogs_';
 		$table->sortBy	= $table->sortBy ?: 'admin_time';
@@ -652,18 +619,17 @@ class admin extends Controller
 		$table->quickSearch		= 'admin_username';
 		$table->advancedSearch	= array(
 			'admin_username'	=> array(
-				SEARCH_CONTAINS_TEXT,
+				\IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
 				array(),
 				function( $val ){
 					if( !empty( $val ) )
 					{
 						return array( "(core_members.name LIKE CONCAT(?, '%') OR admin_username LIKE CONCAT(?,'%'))", $val, $val );
 					}
-					return null;
 				}
 			),
-			'admin_ip_address'	=> SEARCH_CONTAINS_TEXT,
-			'admin_time' => SEARCH_DATE_RANGE
+			'admin_ip_address'	=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'admin_time' => \IPS\Helpers\Table\SEARCH_DATE_RANGE
 		);
 		
 		/* Filters */
@@ -676,40 +642,40 @@ class admin extends Controller
 		$table->parsers = array(
 			'admin_username' => function( $val, $row )
 			{
-				$member = Member::constructFromData( $row );
+				$member = \IPS\Member::constructFromData( $row );
 				if( $member->member_id )
 				{
 					return "<a href='{$member->acpUrl()}'>" . htmlentities( $member->name, ENT_DISALLOWED, 'UTF-8', FALSE ) . "</a>";
 				}
 				return $val;
 			},
-			'admin_time'	=> function( $val )
+			'admin_time'	=> function( $val, $row )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
-			'admin_success'	=> function( $val )
+			'admin_success'	=> function( $val, $row )
 			{
-				return ( $val ) ? "<i class='fa-solid fa-check'></i>" : "<i class='fa-solid fa-xmark'></i>";
+				return ( $val ) ? "<i class='fa fa-check'></i>" : "<i class='fa fa-times'></i>";
 			},
 		);
 				
 		/* Add a button for settings */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_acploginlogs_prune' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'staff', 'restrictions_acploginlogs_prune' ) )
 		{
-			Output::i()->sidebar['actions'] = array(
+			\IPS\Output::i()->sidebar['actions'] = array(
 				'settings'	=> array(
 					'title'		=> 'prunesettings',
 					'icon'		=> 'cog',
-					'link'		=> Url::internal( 'app=core&module=staff&controller=admin&do=loginLogsSettings' ),
-					'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('prunesettings') )
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin&do=loginLogsSettings' ),
+					'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('prunesettings') )
 				),
 			);
 		}
 		
 		/* Display */
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=staff&controller=admin&do=loginLogs' ), Member::loggedIn()->language()->addToStack( 'adminloginlogs' ) );
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('adminloginlogs');
-		Output::i()->output	= (string) $table;
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin&do=loginLogs' ), \IPS\Member::loggedIn()->language()->addToStack( 'adminloginlogs' ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('adminloginlogs');
+		\IPS\Output::i()->output	= (string) $table;
 	}
 	
 	/**
@@ -717,21 +683,21 @@ class admin extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function loginLogsSettings() : void
+	protected function loginLogsSettings()
 	{
-		Dispatcher::i()->checkAcpPermission( 'restrictions_acploginlogs_prune' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'restrictions_acploginlogs_prune' );
 		
-		$form = new Form;
-		$form->add( new Interval( 'prune_log_adminlogin', Settings::i()->prune_log_adminlogin, FALSE, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL, 'prune_log_adminlogin' ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Interval( 'prune_log_adminlogin', \IPS\Settings::i()->prune_log_adminlogin, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), NULL, 'prune_log_adminlogin' ) );
 	
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings();
-			Session::i()->log( 'acplog__adminloginlog_settings' );
-			Output::i()->redirect( Url::internal( 'app=core&module=staff&controller=admin' ), 'saved' );
+			\IPS\Session::i()->log( 'acplog__adminloginlog_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=staff&controller=admin' ), 'saved' );
 		}
 	
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('adminloginlogssettings');
-		Output::i()->output 	= Theme::i()->getTemplate('global')->block( 'adminloginlogssettings', $form, FALSE );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('adminloginlogssettings');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate('global')->block( 'adminloginlogssettings', $form, FALSE );
 	}
 }

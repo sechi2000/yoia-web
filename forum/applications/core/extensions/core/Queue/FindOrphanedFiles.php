@@ -11,29 +11,16 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\File;
-use IPS\Member;
-use IPS\Task;
-use IPS\Task\Queue\OutOfRangeException as QueueException;
-use OutOfRangeException;
-use RuntimeException;
-use function defined;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Find orphaned files
  */
-class FindOrphanedFiles extends QueueAbstract
+class _FindOrphanedFiles
 {
 	/**
 	 * Run Background Task
@@ -41,28 +28,28 @@ class FindOrphanedFiles extends QueueAbstract
 	 * @param	mixed						$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int							$offset	Offset
 	 * @return	int							New offset
-	 * @throws    QueueException    Indicates offset doesn't exist and thus task is complete
+	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		if ( ! $data['configurationId'] )
 		{
-			throw new QueueException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		/* Check the configuration location and loop through x files looking for any that aren't mapped in any storage locations */
 		try
 		{
-			$results = File::orphanedFiles( $data['configurationId'], ( ! empty( $data['fileIndex'] ) ? $data['fileIndex'] : $offset ) );
+			$results = \IPS\File::orphanedFiles( $data['configurationId'], ( ! empty( $data['fileIndex'] ) ? $data['fileIndex'] : $offset ) );
 		
 			if ( $results['_done'] === TRUE )
 			{
-				Task::queue( 'core', 'DeleteOrphanedFiles', array( 'configurationId' => $data['configurationId'], 'count' => $results['fileIndex'] ), 5, array( 'configurationId' ) );
-				throw new QueueException;
+				\IPS\Task::queue( 'core', 'DeleteOrphanedFiles', array( 'configurationId' => $data['configurationId'], 'count' => $results['fileIndex'] ), 5, array( 'configurationId' ) );
+				throw new \IPS\Task\Queue\OutOfRangeException;
 			}
 			
 			/* Amazon returns a key, not an integer */
-			if ( is_numeric( $results['fileIndex'] ) )
+			if ( \is_numeric( $results['fileIndex'] ) )
 			{
 				return $results['fileIndex'];
 			}
@@ -73,9 +60,9 @@ class FindOrphanedFiles extends QueueAbstract
 				return 0;
 			}
 		}
-		catch( RuntimeException $ex )
+		catch( \RuntimeException $ex )
 		{
-			throw new QueueException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 	}
 	
@@ -85,28 +72,17 @@ class FindOrphanedFiles extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		$extensionName = '';
 		try
 		{
-			$extensionName = Db::i()->select( 'method', 'core_file_storage', array( 'id=?', $data['configurationId'] ) )->first();
+			$extensionName = \IPS\Db::i()->select( 'method', 'core_file_storage', array( 'id=?', $data['configurationId'] ) )->first();
 		}
-		catch( Exception $e ) { }
+		catch( \Exception $e ) { }
 
-		return array( 'text' => Member::loggedIn()->language()->addToStack('finding_orphaned_files', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( $extensionName ) ) ) ), 'complete' => NULL );
-	}
-
-	/**
-	 * Parse data before queuing
-	 *
-	 * @param array $data
-	 * @return    array|null
-	 */
-	public function preQueueData( array $data ): ?array
-	{
-		return $data;
-	}
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('finding_orphaned_files', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $extensionName ) ) ) ), 'complete' => NULL );
+	}	
 }

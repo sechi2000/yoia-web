@@ -11,50 +11,17 @@
 namespace IPS\core\Reports;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Content;
-use IPS\Content\Comment;
-use IPS\Content\Hideable;
-use IPS\Content\Item;
-use IPS\Content\ReadMarkers;
-use IPS\core\Reports\Comment as ReportComment;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Email;
-use IPS\Events\Event;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Log;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Notification;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Report Model
  */
-class Report extends Item
+class _Report extends \IPS\Content\Item implements \IPS\Content\ReadMarkers
 {
-	use ReadMarkers;
-	
 	/**
 	 * @brief	Const	No type selected
 	 */
@@ -73,49 +40,49 @@ class Report extends Item
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_rc_index';
+	public static $databaseTable = 'core_rc_index';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = '';
+	public static $databasePrefix = '';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'content_id' );
+	protected static $databaseIdFields = array( 'content_id' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/* !\IPS\Content\Item */
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'core';
+	public static $application = 'core';
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $module = 'modcp';
+	public static $module = 'modcp';
 
 	/**
 	 * @brief	Allow the title to be editable via AJAX
 	 */
-	public bool $editableTitle	= FALSE;
+	public $editableTitle	= FALSE;
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'date'			=> 'first_report_date',
 		'author'		=> 'first_report_by',
 		'author_count'	=> 'num_reports',
@@ -127,22 +94,22 @@ class Report extends Item
 	/**
 	 * @brief	Language prefix for forms
 	 */
-	public static string $formLangPrefix = 'report_';
+	public static $formLangPrefix = 'report_';
 	
 	/**
 	 * @brief	Comment Class
 	 */
-	public static ?string $commentClass = 'IPS\core\Reports\Comment';
+	public static $commentClass = 'IPS\core\Reports\Comment';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'report';
+	public static $title = 'report';
 
 	/**
 	 * @brief	[Content\Item]	Include these items in trending content
 	 */
-	public static bool $includeInTrending = FALSE;
+	public static $includeInTrending = FALSE;
 
 	/**
 	 * Should IndexNow be skipped for this item? Can be used to prevent that Private Messages,
@@ -150,9 +117,37 @@ class Report extends Item
 	 * @var bool
 	 */
 	public static bool $skipIndexNow = TRUE;
-
-	protected static array|bool $_bypassDataLayerEvents = true;
-
+	
+	/**
+	 * Should posting this increment the poster's post count?
+	 *
+	 * @param	\IPS\Node\Model|NULL	$container	Container
+	 * @return	void
+	 */
+	public static function incrementPostCount( \IPS\Node\Model $container = NULL )
+	{
+		return FALSE;
+	}
+	
+	/**
+	 * Load by class and content_id
+	 *
+	 * @param	string	$class	Class to load
+	 * @param	int		$id		ID to load
+	 * @return	static
+	 * @throws	\OutofRangeException
+	 */
+	public static function loadByClassAndId( $class, $id )
+	{
+		try
+		{
+			return static::constructFromData( \IPS\Db::i()->select( '*', 'core_rc_index', array( 'class=? and content_id=?', $class, $id ) )->first() );
+		}
+		catch ( \UnderflowException $e )
+		{
+			throw new \OutofRangeException;
+		}
+	}
 
 	/**
 	 * Get all the report types for this report index
@@ -163,12 +158,12 @@ class Report extends Item
 	{
 		$reportedTypes = [];
 		$reportTypes = [];
-		foreach ( Types::roots() as $type )
+		foreach ( \IPS\core\Reports\Types::roots() as $type )
 		{
 			$reportTypes[ $type->id ] = $type->_title;
 		}
 
-		foreach ( Db::i()->select( '*', 'core_rc_reports', ['rid=? and report_type > 0', $this->id] ) as $report )
+		foreach ( \IPS\Db::i()->select( '*', 'core_rc_reports', ['rid=? and report_type > 0', $this->id] ) as $report )
 		{
 			if ( isset( $reportTypes[ $report['report_type'] ] ) )
 			{
@@ -183,18 +178,14 @@ class Report extends Item
 	 * Set the status of the report
 	 *
 	 * @param int $status
-	 * @param int $authorNotification
-	 * @param null $member
+	 * @param $member
 	 * @return void
 	 */
-	public function changeStatus( int $status, int $authorNotification=0, $member=null ): void
+	public function changeStatus( int $status, int $authorNotification=0, $member=null )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		$this->status = $status;
 		$this->save();
-
-        /* Fire an event */
-        Event::fire( 'onCreateOrEdit', $this, [ array(), false ] );
 
 		/* We only need to notify if there is an outcome */
 		if ( $status == static::STATUS_CLOSED or static::STATUS_REJECTED )
@@ -203,7 +194,7 @@ class Report extends Item
 			$forEmails = [];
 
 			/* Now go through all the individual reports and see if we need to notify anyone */
-			foreach ( Db::i()->select( '*', 'core_rc_reports', ['rid=?', $this->id] ) as $report )
+			foreach ( \IPS\Db::i()->select( '*', 'core_rc_reports', ['rid=?', $this->id] ) as $report )
 			{
 				if ( !$report['report_type'] )
 				{
@@ -214,8 +205,8 @@ class Report extends Item
 				/* Get the report type object */
 				try
 				{
-					$reportType = Types::load( $report['report_type'] );
-					$reportMember = Member::load( $report['report_by'] );
+					$reportType = \IPS\core\Reports\Types::load( $report['report_type'] );
+					$reportMember = \IPS\Member::load( $report['report_by'] );
 				}
 				catch ( \Exception $e )
 				{
@@ -248,10 +239,10 @@ class Report extends Item
 
 					if ( $this->getReportOutcomeBlurb( $userReport['id'] ) )
 					{
-						$notification = new Notification( Application::load( 'core' ), 'report_outcome', $this, [$this, $reportType, $userReport], ['reportType' => $reportType->id, 'userReport' => $userReport] );
+						$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'report_outcome', $this, [$this, $reportType, $userReport], ['reportType' => $reportType->id, 'userReport' => $userReport] );
 						$notification->recipients->attach( $reportMember );
 						$notification->send();
-						Log::debug( "Sent notification to {$reportMember->name}", 'reports_notification' );
+						\IPS\Log::debug( "Sent notification to {$reportMember->name}", 'reports_notification' );
 					}
 				}
 			}
@@ -267,7 +258,7 @@ class Report extends Item
 
 					if ( $guestEmail and $this->getReportOutcomeBlurb( $userReport['id'] ) )
 					{
-						Email::buildFromTemplate( 'core', 'notification_report_outcome', [$this, $reportType, $userReport], Email::TYPE_LIST )->send( $guestEmail );
+						\IPS\Email::buildFromTemplate( 'core', 'notification_report_outcome', [$this, $reportType, $userReport], \IPS\Email::TYPE_LIST )->send( $guestEmail );
 					}
 				}
 			}
@@ -279,7 +270,7 @@ class Report extends Item
 				{
 					$class = $this->_data['class'];
 					$thing = $class::load( $this->_data['content_id'] );
-					$content = ( $thing instanceof Comment ) ? $thing->truncated() : $thing->mapped( 'title' );
+					$content = ( $thing instanceof \IPS\Content\Comment ) ? $thing->truncated() : $thing->mapped( 'title' );
 
 					if ( $thing->author() and $thing->author()->email )
 					{
@@ -302,7 +293,7 @@ class Report extends Item
 								$notificationContent = str_replace( '{' . $key . '}', $value, $notificationContent );
 							}
 
-							Email::buildFromTemplate( 'core', 'notification_report_content_author', [$this, $thing, $notificationContent], Email::TYPE_LIST )->send( $thing->author()->email );
+							\IPS\Email::buildFromTemplate( 'core', 'notification_report_content_author', [$this, $thing, $notificationContent], \IPS\Email::TYPE_LIST )->send( $thing->author()->email );
 						}
 					}
 				}
@@ -315,14 +306,11 @@ class Report extends Item
 		$content = $member->language()->addToStack( 'update_report_status_content', FALSE, array( 'sprintf' => array( $member->language()->addToStack( 'report_status_' . $this->status ) ) ) );
 		$member->language()->parseOutputForDisplay( $content );
 
-		$comment = ReportComment::create( $this, $content, TRUE, NULL, NULL, $member, new DateTime );
+		$comment = \IPS\core\Reports\Comment::create( $this, $content, TRUE, NULL, NULL, $member, new \IPS\DateTime );
 		$comment->save();
 
-        /* And fire an event for the comment */
-        Event::fire( 'onCreateOrEdit', $comment, [ array(), true ] );
-
 		/* And add to the moderator log */
-		Session::i()->modLog( 'modlog__action_update_report_status', array( $this->url()->__toString() => FALSE ) );
+		\IPS\Session::i()->modLog( 'modlog__action_update_report_status', array( $this->url()->__toString() => FALSE ) );
 	}
 
 	/**
@@ -352,9 +340,9 @@ class Report extends Item
 	{
 		try
 		{
-			$userReport = Db::i()->select( '*', 'core_rc_reports', array( 'id=?', $userReportId ) )->first();
-			$reportType = Types::load( $userReport['report_type'] );
-			return $this->status === static::STATUS_REJECTED ? $reportType->getRejectedNotificationText( Member::load( $userReport['report_by'] ) ) : $reportType->getCompletedNotificationText( Member::load( $userReport['report_by'] ) );
+			$userReport = \IPS\Db::i()->select( '*', 'core_rc_reports', array( 'id=?', $userReportId ) )->first();
+			$reportType = \IPS\core\Reports\Types::load( $userReport['report_type'] );
+			return $this->status === static::STATUS_REJECTED ? $reportType->getRejectedNotificationText( \IPS\Member::load( $userReport['report_by'] ) ) : $reportType->getCompletedNotificationText( \IPS\Member::load( $userReport['report_by'] ) );
 		}
 		catch( \Exception $e )
 		{
@@ -363,43 +351,12 @@ class Report extends Item
 	}
 
 	/**
-	 * Should posting this increment the poster's post count?
-	 *
-	 * @param	Model|NULL	$container	Container
-	 * @return	bool
-	 */
-	public static function incrementPostCount( Model $container = NULL ): bool
-	{
-		return FALSE;
-	}
-	
-	/**
-	 * Load by class and content_id
-	 *
-	 * @param	string	$class	Class to load
-	 * @param	int		$id		ID to load
-	 * @return	static
-	 * @throws	OutofRangeException
-	 */
-	public static function loadByClassAndId( string $class, int $id ) : static
-	{
-		try
-		{
-			return static::constructFromData( Db::i()->select( '*', 'core_rc_index', array( 'class=? and content_id=?', $class, $id ) )->first() );
-		}
-		catch ( UnderflowException $e )
-		{
-			throw new OutofRangeException;
-		}
-	}
-	
-	/**
 	 * Get mapped value
 	 *
-	 * @param string $key	date,content,ip_address,first
+	 * @param	string	$key	date,content,ip_address,first
 	 * @return	mixed
 	 */
-	public function mapped( string $key ): mixed
+	public function mapped( $key )
 	{
 		/* Get the reported content items title */
 		if ( $key === 'title' )
@@ -408,22 +365,22 @@ class Report extends Item
 			{
 				$class = $this->_data['class'];
 				$thing = $class::load( $this->_data['content_id'] );
-				$item = ( $thing instanceof Comment ) ? $thing->item() : $thing;
+				$item = ( $thing instanceof \IPS\Content\Comment ) ? $thing->item() : $thing;
 
 				if( isset( $item::$databaseColumnMap['content'] ) AND $item::$databaseColumnMap['content'] == $item::$databaseColumnMap['title'] )
 				{
 					$title = trim( mb_substr( strip_tags( $item->mapped( 'title' ) ), 0, 85 ) );
+					return $title ?: \IPS\Member::loggedIn()->language()->addToStack('report_no_title_available'); 
 				}
 				else
 				{
 					$title = trim( strip_tags( $item->mapped( 'title' ) ) );
+					return $title ?: \IPS\Member::loggedIn()->language()->addToStack('report_no_title_available');
 				}
-
-				return $title ?: Member::loggedIn()->language()->addToStack('report_no_title_available');
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				return Member::loggedIn()->language()->addToStack( 'unknown' );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'unknown' );
 			}
 		}
 
@@ -433,21 +390,21 @@ class Report extends Item
 	/**
 	 * @brief	Cached URLs
 	 */
-	protected mixed $_url = array();
+	protected $_url	= array();
 
 	/**
 	 * Get URL
 	 *
 	 * @param	string|NULL		$action		Action
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function url( string|null $action=NULL ): Url
+	public function url( $action=NULL )
 	{
-		$_key	= $action ? md5( $action ) : NULL;
+		$_key	= md5( $action );
 
 		if( !isset( $this->_url[ $_key ] ) )
 		{
-			$this->_url[ $_key ] = Url::internal( "app=core&module=modcp&tab=reports&action=view&id={$this->id}", 'front', 'modcp_report' );
+			$this->_url[ $_key ] = \IPS\Http\Url::internal( "app=core&module=modcp&tab=reports&action=view&id={$this->id}", 'front', 'modcp_report' );
 		
 			if ( $action )
 			{
@@ -467,7 +424,7 @@ class Report extends Item
 	 * @param	array	$rows	Array of objects of this class
 	 * @return	void
 	 */
-	public static function tableGetRows( array $rows ) : void
+	public static function tableGetRows( $rows )
 	{
 		$types = array();
 		
@@ -478,20 +435,17 @@ class Report extends Item
 
 		foreach ( $types as $class => $objects )
 		{
-			if ( in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
+			if ( \in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
 			{
-				/* @var Comment $class */
 				$itemClass = $class::$itemClass;
 				$databaseTable = $class::$databaseTable;
 				$itemDatabaseTable = $itemClass::$databaseTable;
-
-				/* @var array $databaseColumnMap */
 				$itemTitleField = $itemClass::$databaseColumnMap['title']; # Strange PHP issue can cause this to be lost when added to the query below.
 				
-				foreach( Db::i()->select(
+				foreach( \IPS\Db::i()->select(
 					"{$databaseTable}.{$class::$databasePrefix}{$class::$databaseColumnId} as commentId, {$databaseTable}.{$class::$databasePrefix}{$class::$databaseColumnMap['item']} AS itemId, {$itemClass::$databaseTable}.{$itemClass::$databasePrefix}{$itemTitleField} AS title",
 					$databaseTable,
-					Db::i()->in( $databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId, array_keys( $objects ) )
+					\IPS\Db::i()->in( $databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId, array_keys( $objects ) )
 				)->join(
 					$itemDatabaseTable,
 					"{$itemDatabaseTable}.{$itemClass::$databasePrefix}{$itemClass::$databaseColumnId}={$databaseTable}.{$class::$databasePrefix}{$class::$databaseColumnMap['item']}"
@@ -501,14 +455,12 @@ class Report extends Item
 					$objects[ $k ]->_data = array_merge( $objects[ $k ]->_data, $data );
 				}
 			}
-			elseif ( in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+			elseif ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
 			{
-				/* @var Item $class */
-				/* @var array $databaseColumnMap */
-				foreach( Db::i()->select(
+				foreach( \IPS\Db::i()->select(
 					"{$class::$databasePrefix}{$class::$databaseColumnId} as itemId, {$class::$databasePrefix}{$class::$databaseColumnMap['title']} AS title",
 					$class::$databaseTable,
-					Db::i()->in( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId, array_keys( $objects ) )
+					\IPS\Db::i()->in( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId, array_keys( $objects ) )
 				)->setKeyField( 'itemId' ) as $k => $data
 				)
 				{
@@ -523,14 +475,14 @@ class Report extends Item
 	 *
 	 * @return	string
 	 */
-	public function tableDescription() : string
+	public function tableDescription()
 	{
 		$className = $this->class;
 		try
 		{
 			$reportedContent = $className::load( $this->content_id );
 
-			if( $reportedContent instanceof Comment )
+			if( $reportedContent instanceof \IPS\Content\Comment )
 			{
 				$container = ( $reportedContent->item()->containerWrapper() !== NULL ) ? $reportedContent->item()->container() : NULL;
 			}
@@ -539,12 +491,12 @@ class Report extends Item
 				$container = ( $reportedContent->containerWrapper() !== NULL ) ? $reportedContent->container() : NULL;
 			}
 		}
-		catch ( OutOfRangeException $ex )
+		catch ( \OutOfRangeException $ex )
 		{
 			$container = NULL;
 		}
 
-		return Theme::i()->getTemplate( 'modcp', 'core', 'front' )->reportTableDescription( $className, $this, $container );
+		return \IPS\Theme::i()->getTemplate( 'modcp', 'core', 'front' )->reportTableDescription( $className, $this, $container );
 	}
 
 	/**
@@ -552,7 +504,7 @@ class Report extends Item
 	 *
 	 * @return string
 	 */
-	public function tableStates(): string
+	public function tableStates()
 	{
 		$states = explode( ' ', parent::tableStates() );
 		$states[] = "report_status_" . $this->status;
@@ -563,10 +515,10 @@ class Report extends Item
 	/**
 	 * Stats for table view
 	 *
-	 * @param bool $includeFirstCommentInCommentCount	Whether or not to include the first comment in the comment count
+	 * @param	bool	$includeFirstCommentInCommentCount	Whether or not to include the first comment in the comment count
 	 * @return	array
 	 */
-	public function stats( bool $includeFirstCommentInCommentCount=TRUE ): array
+	public function stats( $includeFirstCommentInCommentCount=TRUE )
 	{
 		return array_merge( parent::stats( $includeFirstCommentInCommentCount ), array( 'num_reports' => $this->num_reports ) );
 	}
@@ -576,9 +528,9 @@ class Report extends Item
 	 *
 	 * @return	array
 	 */
-	public function tableIcon() : array
+	public function tableIcon()
 	{
-		return Theme::i()->getTemplate( 'modcp', 'core', 'front' )->reportToggle( $this );
+		return \IPS\Theme::i()->getTemplate( 'modcp', 'core', 'front' )->reportToggle( $this );
 	}
 
 	/**
@@ -586,14 +538,16 @@ class Report extends Item
 	 *
 	 * @return	string
 	 */
-	public function tableClass() : string
+	public function tableClass()
 	{
 		switch ( $this->status )
 		{
 			case 2:
 				return 'warning';
+			break;
 			case 1:
 				return 'new';
+			break;
 		}
 
 		return '';
@@ -602,14 +556,14 @@ class Report extends Item
 	/**
 	 * Do Moderator Action
 	 *
-	 * @param string $action	The action
-	 * @param	Member|NULL	$member	The member doing the action (NULL for currently logged in member)
-	 * @param string|null $reason	Reason (for hides)
-	 * @param bool $immediately	Delete immediately
+	 * @param	string				$action	The action
+	 * @param	\IPS\Member|NULL	$member	The member doing the action (NULL for currently logged in member)
+	 * @param	string|NULL			$reason	Reason (for hides)
+	 * @param	bool				$immediately	Delete immediately
 	 * @return	void
-	 * @throws	OutOfRangeException|InvalidArgumentException|RuntimeException
+	 * @throws	\OutOfRangeException|\InvalidArgumentException|\RuntimeException
 	 */
-	public function modAction(string $action, Member $member = NULL, mixed $reason = NULL, bool $immediately=FALSE ): void
+	public function modAction( $action, \IPS\Member $member = NULL, $reason = NULL, $immediately = FALSE )
 	{
 		if ( mb_substr( $action, 0, -1 ) === 'report_status_' )
 		{
@@ -617,7 +571,7 @@ class Report extends Item
 		}
 		else
 		{
-			parent::modAction( $action, $member, $reason, $immediately );
+			return parent::modAction( $action, $member, $reason, $immediately );
 		}
 	}
 	
@@ -626,7 +580,7 @@ class Report extends Item
 	 *
 	 * @return	array
 	 */
-	public function customMultimodActions(): array
+	public function customMultimodActions()
 	{
 		return array_diff( array( 'report_status_1', 'report_status_2', 'report_status_3', 'report_status_4'), array( 'report_status_' . $this->status ) );
 	}
@@ -637,7 +591,7 @@ class Report extends Item
 	 * @note	Return in format of array( array( 'action' => ..., 'icon' => ..., 'language' => ... ) )
 	 * @return	array
 	 */
-	public static function availableCustomMultimodActions(): array
+	public static function availableCustomMultimodActions()
 	{
 		return array(
 			array(
@@ -675,10 +629,10 @@ class Report extends Item
 	/**
 	 * Get reports
 	 *
-	 * @param string|null $filterByType	Report type to filter by, or NULL to not filter by type
+	 * @param	string|NULL	$filterByType	Report type to filter by, or NULL to not filter by type
 	 * @return	array
 	 */
-	public function reports( string $filterByType=NULL ): array
+	public function reports( $filterByType=NULL)
 	{
 		$where = array( array( 'rid=?', $this->id ) );
 		
@@ -687,7 +641,7 @@ class Report extends Item
 			$where[] = array( 'report_type=?', $filterByType );
 		}
 		
-		return iterator_to_array( Db::i()->select( '*', 'core_rc_reports', $where, 'date_reported' ) );
+		return iterator_to_array( \IPS\Db::i()->select( '*', 'core_rc_reports', $where, 'date_reported' ) );
 	}
 	
 	/**
@@ -695,16 +649,16 @@ class Report extends Item
 	 *
 	 * @return	void
 	 */
-	public function rebuild() : void
+	public function rebuild()
 	{
-		$numReports = Db::i()->select( 'COUNT(*)', 'core_rc_reports', array( 'rid=?', $this->id ) )->first();
+		$numReports = \IPS\Db::i()->select( 'COUNT(*)', 'core_rc_reports', array( 'rid=?', $this->id ) )->first();
 		if ( !$numReports )
 		{
 			$this->delete();
 		}
 		$this->num_reports = $numReports;
 		
-		$numComments = Db::i()->select( 'COUNT(*)', 'core_rc_comments', array( 'rid=?', $this->id ) )->first();
+		$numComments = \IPS\Db::i()->select( 'COUNT(*)', 'core_rc_comments', array( 'rid=?', $this->id ) )->first();
 		$this->num_comments = $numComments;
 		
 		$this->save();
@@ -713,14 +667,14 @@ class Report extends Item
 	/**
 	 * Delete Report
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		parent::delete();
 	
-		Db::i()->delete( 'core_rc_reports', array( 'rid=?', $this->id ) );
-		Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_object_class=? and pending_object_id=?', $this->class, $this->content_id ) );
+		\IPS\Db::i()->delete( 'core_rc_reports', array( 'rid=?', $this->id ) );
+		\IPS\Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_object_class=? and pending_object_id=?', $this->class, $this->content_id ) );
 	}
 	
 	/**
@@ -728,7 +682,7 @@ class Report extends Item
 	 *
 	 * @return void
 	 */
-	public function lockAutoModeration() : void
+	public function lockAutoModeration()
 	{
 		$this->auto_moderation_exempt = 1;
 		$this->save();
@@ -739,19 +693,19 @@ class Report extends Item
 	 *
 	 * @return bool
 	 */
-	public function isAutoModerationLocked() : bool
+	public function isAutoModerationLocked()
 	{
-		return (bool) $this->auto_moderation_exempt;
+		return (boolean) $this->auto_moderation_exempt;
 	}
 	
 	/**
 	 * Run any automatic moderation
 	 *
-	 * @return bool
+	 * @return bool|void
 	 */
-	public function runAutomaticModeration() : bool
+	public function runAutomaticModeration()
 	{
-		if ( ! Settings::i()->automoderation_enabled )
+		if ( ! \IPS\Settings::i()->automoderation_enabled )
 		{
 			return FALSE;
 		}
@@ -767,14 +721,14 @@ class Report extends Item
 		{
 			$reportedContent = $className::load( $this->content_id );
 		}
-		catch ( OutOfRangeException $ex )
+		catch ( \OutOfRangeException $ex )
 		{
 			/* No content, no moderation, no cry */
 			return FALSE;
 		}
 
 		/* Is automatic moderation supported for this content type? */
-		if ( !IPS::classUsesTrait( $reportedContent, Hideable::class ) )
+		if ( !( $reportedContent instanceof \IPS\Content\Hideable ) )
 		{
 			return FALSE;
 		}
@@ -784,7 +738,7 @@ class Report extends Item
 		$ruleToUse  = NULL;
 		
 		/* Loop over all group promotion rules and get the last one that matches us */
-		foreach(Rules::roots() as $rule )
+		foreach( \IPS\core\Reports\Rules::roots() as $rule )
 		{
 			if( $rule->enabled and $rule->matches( $reportedContent->author(), $typeCounts ) )
 			{
@@ -796,12 +750,12 @@ class Report extends Item
 		if( $ruleToUse === NULL )
 		{
 			/* It is possible a few reports have been removed so the threshold is no longer met, delete any pending rows if this is the case */
-			Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_object_class=? and pending_object_id=?', $className, $this->content_id ) );
+			\IPS\Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_object_class=? and pending_object_id=?', $className, $this->content_id ) );
 		}
 		else
 		{
 			/* Log the bad boy for actioning later. A small delay allows users to retract their warning */
-			Db::i()->replace( 'core_automatic_moderation_pending', array(
+			\IPS\Db::i()->replace( 'core_automatic_moderation_pending', array(
 				'pending_object_class' => $className,
 				'pending_object_id'    => $this->content_id,
 				'pending_report_id'	   => $this->id,
@@ -809,22 +763,21 @@ class Report extends Item
 				'pending_rule_id'	   => $ruleToUse
 			) );
 		}
-
-		return true;
 	}
 	
 	/**
 	 * Fetch the report type counts
 	 *
 	 * @param	boolean	$totalOnly		Return either an int of the total counts, or an array with the breakdown
-	 * @return int|array		( 1 => 10, 2 => 3 )
+	 * @return array( 1 => 10, 2 => 3 )|INT
 	 */
-	public function getReportTypeCounts( bool $totalOnly=false ) : array|int
+	public function getReportTypeCounts( $totalOnly=false )
 	{
 		$typeCounts = array();
 		$total = 0;
 		$seen = array();
-		foreach( Db::i()->select( '*', 'core_rc_reports', array( 'rid=? and report_type > 0', $this->id ), NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER ) as $row )
+		/* @note SELECT_FROM_WRITE_SERVER added in 7fd46ad949b0a9b03a5c67c70afee26184c2930c pull #316 (The problem was, that the R/W separation.The new report was added and in the same step we fetched(counted) the existing reports, where the recent one wasn't taken into account.) */
+		foreach( \IPS\Db::i()->select( '*', 'core_rc_reports', array( 'rid=? and report_type > 0', $this->id ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER ) as $row )
 		{
 			if ( isset( $seen[ $row['report_by'] ] ) )
 			{
@@ -837,12 +790,12 @@ class Report extends Item
 		}
 		
 		$return = array();
-		foreach(array_keys( Types::roots() ) as $type )
+		foreach( array_keys( \IPS\core\Reports\Types::roots() ) as $type )
 		{
 			if ( isset( $typeCounts[ $type ] ) )
 			{
-				$return[ $type ] = count( $typeCounts[ $type ] );
-				$total += count( $typeCounts[ $type ] );
+				$return[ $type ] = \count( $typeCounts[ $type ] );
+				$total += \count( $typeCounts[ $type ] );
 			}
 			else
 			{
@@ -858,7 +811,7 @@ class Report extends Item
 	 *
 	 * @return	array
 	 */
-	public static function getTableFilters(): array
+	public static function getTableFilters()
 	{
 		return array(
 			'read', 'unread', 'report_status_1', 'report_status_2', 'report_status_3'
@@ -868,23 +821,23 @@ class Report extends Item
 	/**
 	 * Build the where clause for finding reports
 	 *
-	 * @param Member|null $member	Member to base permissions on
+	 * @param \IPS\Member|null $member	Member to base permissions on
 	 * @return array
 	 */
-	public static function where( Member $member=NULL ): array
+	public static function where( \IPS\Member $member=NULL ): array
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		$classWhere = [];
 		$extensionWhere = [];
 		$viewPermIds = [];
 		$perms = $member->modPermissions();
 
-		foreach( Db::i()->select( 'app, perm_id', 'core_permission_index', Db::i()->findInSet( 'perm_view', $member->permissionArray() ) . " OR perm_view='*'" ) as $perm )
+		foreach( \IPS\Db::i()->select( 'app, perm_id', 'core_permission_index', \IPS\Db::i()->findInSet( 'perm_view', $member->permissionArray() ) . " OR perm_view='*'" ) as $perm )
 		{
 			$viewPermIds[ $perm['app'] ][] = $perm['perm_id'];
 		}
 
-		foreach ( array_merge( ['IPS\core\Messenger\Conversation', 'IPS\core\Messenger\Message'], array_values( Content::routedClasses( FALSE, TRUE ) ) ) as $class )
+		foreach ( array_merge( ['IPS\core\Messenger\Conversation', 'IPS\core\Messenger\Message'], array_values( \IPS\Content::routedClasses( FALSE, TRUE ) ) ) as $class )
 		{
 			/* Got nodes? */
 			$item = NULL;
@@ -913,28 +866,7 @@ class Report extends Item
 				{
 					if ( isset( $perms[$container::$modPerm] ) and $perms[$container::$modPerm] != '*' and $perms[$container::$modPerm] != '-1')
 					{
-						$extensionWhereClause = ' AND ' . Db::i()->in( 'node_id', is_array( $perms[$container::$modPerm] ) ? $perms[$container::$modPerm] : [ $perms[$container::$modPerm] ] );
-					}
-				}
-			}
-
-			/* Skip this if we have global permissions */
-			if( is_array( $perms ) and !$perms['can_view_reports'] )
-			{
-				/* Skip anything where we have reports disabled */
-				$permissionKey = 'can_view_reports_' . $item::$title;
-				if( !isset( $perms[$permissionKey] ) or !$perms[$permissionKey] )
-				{
-					continue;
-				}
-
-				/* Container-level permissions */
-				if ( isset( $item::$containerNodeClass ) )
-				{
-					$container = $item::$containerNodeClass;
-					if ( isset( $container::$modPerm ) and isset( $perms[$container::$modPerm] ) and $perms[$container::$modPerm] != '*' and $perms[$container::$modPerm] != '-1' and isset( $perms[$permissionKey] ) and $perms[$permissionKey] )
-					{
-						$extensionWhereClause = ' AND ' . Db::i()->in( 'node_id', is_array( $perms[$container::$modPerm] ) ? $perms[$container::$modPerm] : [ $perms[$container::$modPerm] ] );
+						$extensionWhereClause = ' AND ' . \IPS\Db::i()->in( 'node_id', $perms[$container::$modPerm] );
 					}
 				}
 			}
@@ -952,7 +884,7 @@ class Report extends Item
 			{
 				if ( !isset( $permIds[ $class::$application ][ $workingClass::$permissionMap['read'] ] ) )
 				{
-					$permIds[ $class::$application ][ $workingClass::$permissionMap['read'] ] = iterator_to_array( Db::i()->select( 'perm_id', 'core_permission_index', "(" . Db::i()->findInSet( 'perm_' . $workingClass::$permissionMap['read'], Member::loggedIn()->permissionArray() ) . " OR perm_" . $workingClass::$permissionMap['read'] . "='*' ) AND app='{$class::$application}'" ) );
+					$permIds[ $class::$application ][ $workingClass::$permissionMap['read'] ] = iterator_to_array( \IPS\Db::i()->select( 'perm_id', 'core_permission_index', "(" . \IPS\Db::i()->findInSet( 'perm_' . $workingClass::$permissionMap['read'], \IPS\Member::loggedIn()->permissionArray() ) . " OR perm_" . $workingClass::$permissionMap['read'] . "='*' ) AND app='{$class::$application}'" ) );
 				}
 
 				if( isset( $viewPermIds[ $class::$application ] ) AND !empty( $permIds[ $class::$application ][ $workingClass::$permissionMap['read'] ] ) )
@@ -977,75 +909,21 @@ class Report extends Item
 	}
 
 	/**
-	 * Can view?
+	 * Can view this entry
 	 *
-	 * @param	Member|NULL	$member	The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member		The member or NULL for currently logged in member.
 	 * @return	bool
 	 */
-	public function canView( ?Member $member=NULL ): bool
+	public function canView( $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
-		$return = parent::canView( $member );
+		$return = parent::canView($member);
 
 		if ( $return AND $member->modPermission('can_view_reports') )
 		{
 			return TRUE;
 		}
-
-		$class = $this->_data['class'];
-		try
-		{
-			$thing = $class::load( $this->_data['content_id'] );
-			if( $thing instanceof Comment )
-			{
-				$itemClass = $thing::$itemClass;
-				return $itemClass::modPermission( 'view_reports', $member, $thing->item()->containerWrapper() );
-			}
-
-			return $class::modPermission( 'view_reports', $member, $thing->containerWrapper() );
-		}
-		catch( OutOfRangeException $e ){}
-
 		return FALSE;
 	}
-
-	/**
-	 * Get output for API
-	 *
-	 * @param Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @param bool	$includeItem	Should the assigned item be attached to the response?
-	 * @return	array
-	 * @apiresponse	int			id			ID
-	 * @apiresponse	int			date		Date of report
-	 * @apiresponse	\IPS\Member			reported_by			Member who reported the item
-	 * @apiresponse	string					item_class						Content Class
-	 * @apiresponse	int						item_id								Content ID
-	 * @apiresponse	[\IPS\Content\Item|\IPS\Content\Comment]			content								Content Object
-	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
-	{
-		$className = $this->class;
-		try
-		{
-			$reportedContent = $className::load( $this->content_id );
-		}
-		catch ( OutOfRangeException $ex )
-		{
-			/* No content, no moderation, no cry */
-			$reportedContent = FALSE;
-		}
-
-		$response = [];
-		$response['id'] = $this->id;
-		$response['date'] = $this->mapped('date');
-		$response['reported_by'] = $this->author()->apiOutput($authorizedMember);
-		$response['item_class'] = $this->class;
-		$response['item_id'] = $this->content_id;
-		$response['content'] = $reportedContent ? $reportedContent->apiOutput($authorizedMember) : NULL;
-
-		return $response;
-	}
-
-
 }

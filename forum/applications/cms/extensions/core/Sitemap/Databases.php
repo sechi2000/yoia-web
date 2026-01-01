@@ -1,6 +1,4 @@
 <?php
-
-
 /**
  * @brief		Support Pages Databases in sitemaps
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -14,41 +12,21 @@
 namespace IPS\cms\extensions\core\Sitemap;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Databases as DatabasesClass;
-use IPS\cms\Pages\Page;
-use IPS\cms\Records;
-use IPS\Content\Filter;
-use IPS\Db;
-use IPS\Extensions\SitemapAbstract;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\YesNo;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Sitemap;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function intval;
-use const IPS\SITEMAP_MAX_PER_FILE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Support Pages Databases in sitemaps
  */
-class Databases extends SitemapAbstract
+class _Databases
 {
 	/**
 	 * @brief	Recommended Settings
 	 */
-	public array $recommendedSettings = array(
+	public $recommendedSettings = array(
 		'sitemap_databases_include'		=> true,
 		'sitemap_databases_count'		=> -1,
 		'sitemap_databases_priority'	=> 1
@@ -59,12 +37,12 @@ class Databases extends SitemapAbstract
 	 *
 	 * @return	array
 	 */
-	public function settings(): array
+	public function settings()
 	{
 		return array(
-			'sitemap_databases_include'	=> new YesNo( "sitemap_databases_include", Settings::i()->sitemap_databases_count != 0, FALSE, array( 'togglesOn' => array( "sitemap_databases_count", "sitemap_databases_priority" ) ), NULL, NULL, NULL, "sitemap_databases_include" ),
-			'sitemap_databases_count'	 => new Number( 'sitemap_databases_count', Settings::i()->sitemap_databases_count, FALSE, array( 'min' => '-1', 'unlimited' => '-1' ), NULL, NULL, NULL, 'sitemap_databases_count' ),
-			'sitemap_databases_priority' => new Select( 'sitemap_databases_priority', Settings::i()->sitemap_databases_priority, FALSE, array( 'options' => Sitemap::$priorities, 'unlimited' => '-1', 'unlimitedLang' => 'sitemap_dont_include' ), NULL, NULL, NULL, 'sitemap_databases_priority' )
+			'sitemap_databases_include'	=> new \IPS\Helpers\Form\YesNo( "sitemap_databases_include", \IPS\Settings::i()->sitemap_databases_count != 0, FALSE, array( 'togglesOn' => array( "sitemap_databases_count", "sitemap_databases_priority" ) ), NULL, NULL, NULL, "sitemap_databases_include" ),
+			'sitemap_databases_count'	 => new \IPS\Helpers\Form\Number( 'sitemap_databases_count', \IPS\Settings::i()->sitemap_databases_count, FALSE, array( 'min' => '-1', 'unlimited' => '-1' ), NULL, NULL, NULL, 'sitemap_databases_count' ),
+			'sitemap_databases_priority' => new \IPS\Helpers\Form\Select( 'sitemap_databases_priority', \IPS\Settings::i()->sitemap_databases_priority, FALSE, array( 'options' => \IPS\Sitemap::$priorities, 'unlimited' => '-1', 'unlimitedLang' => 'sitemap_dont_include' ), NULL, NULL, NULL, 'sitemap_databases_priority' )
 		);
 	}
 
@@ -74,15 +52,15 @@ class Databases extends SitemapAbstract
 	 * @param	array	$values	Values
 	 * @return	void
 	 */
-	public function saveSettings( array $values ) : void
+	public function saveSettings( $values )
 	{
 		if ( $values['sitemap_configuration_info'] )
 		{
-			Settings::i()->changeValues( array( 'sitemap_databases_count' => $this->recommendedSettings['sitemap_databases_count'], 'sitemap_databases_priority' => $this->recommendedSettings['sitemap_databases_priority'] ) );
+			\IPS\Settings::i()->changeValues( array( 'sitemap_databases_count' => $this->recommendedSettings['sitemap_databases_count'], 'sitemap_databases_priority' => $this->recommendedSettings['sitemap_databases_priority'] ) );
 		}
 		else
 		{
-			Settings::i()->changeValues( array( 'sitemap_databases_count' => $values['sitemap_databases_include'] ? $values['sitemap_databases_count'] : 0, 'sitemap_databases_priority' => $values['sitemap_databases_priority'] ) );
+			\IPS\Settings::i()->changeValues( array( 'sitemap_databases_count' => $values['sitemap_databases_include'] ? $values['sitemap_databases_count'] : 0, 'sitemap_databases_priority' => $values['sitemap_databases_priority'] ) );
 		}
 	}
 	
@@ -91,10 +69,10 @@ class Databases extends SitemapAbstract
 	 *
 	 * @return	array
 	 */
-	public function getFilenames(): array
+	public function getFilenames()
 	{
 		/* Are we including? */
-		if ( ! Settings::i()->sitemap_databases_count )
+		if ( ! \IPS\Settings::i()->sitemap_databases_count )
 		{
 			return array();
 		}
@@ -102,37 +80,36 @@ class Databases extends SitemapAbstract
 		$files = array();
 		
 		/* Check that guests can access the content at all */
-		foreach( DatabasesClass::databases() as $database )
+		foreach( \IPS\cms\Databases::databases() as $database )
 		{
 			if ( $database->page_id > 0 )
 			{
 				try
 				{
-					if ( !$database->can( 'view', new Member ) )
+					if ( !$database->can( 'view', new \IPS\Member ) )
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					continue;
 				}
 
 				try
 				{
-					$page = Page::load( $database->page_id );
+					$page = \IPS\cms\Pages\Page::load( $database->page_id );
 
-					if( !$page->can( 'view', new Member ) )
+					if( !$page->can( 'view', new \IPS\Member ) )
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					continue;
 				}
-
-				/* @var Records $class */
+				
 				$class = '\IPS\cms\Records' . $database->id;
 				
 				if ( isset( $class::$containerNodeClass ) )
@@ -145,7 +122,7 @@ class Databases extends SitemapAbstract
 				}
 				
 				/* And however many for the content items */
-				$count = ceil( max( (int) $class::getItemsWithPermission( $class::sitemapWhere(), NULL, 10, 'read', Filter::FILTER_PUBLIC_ONLY, 0, new Member, FALSE, FALSE, FALSE, TRUE ), Settings::i()->sitemap_databases_count ) / SITEMAP_MAX_PER_FILE );
+				$count = ceil( max( (int) $class::getItemsWithPermission( $class::sitemapWhere(), NULL, 10, 'read', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY, 0, new \IPS\Member, FALSE, FALSE, FALSE, TRUE ), \IPS\Settings::i()->sitemap_databases_count ) / \IPS\SITEMAP_MAX_PER_FILE );
 				for( $i=1; $i <= $count; $i++ )
 				{
 					$files[] = $database->id . '_sitemap_database_records_' . $i;
@@ -160,19 +137,19 @@ class Databases extends SitemapAbstract
 	 * Generate the sitemap
 	 *
 	 * @param	string			$filename	The sitemap file to build (should be one returned from getFilenames())
-	 * @param	Sitemap	$sitemap	Sitemap object reference
-	 * @return	int|null
+	 * @param	\IPS\Sitemap	$sitemap	Sitemap object reference
+	 * @return	void
 	 */
-	public function generateSitemap( string $filename, Sitemap $sitemap ) : ?int
+	public function generateSitemap( $filename, $sitemap )
 	{
 		/* We have elected to not add databases to the sitemap */
-		if ( ! Settings::i()->sitemap_databases_count )
+		if ( ! \IPS\Settings::i()->sitemap_databases_count )
 		{
-			return null;
+			return NULL;
 		}
 		
 		$tmp = explode( '_', $filename );
-		$databaseId = intval( array_shift( $tmp ) );
+		$databaseId = \intval( array_shift( $tmp ) );
 		try
 		{
 			$class = '\IPS\cms\Records' . $databaseId;
@@ -185,30 +162,29 @@ class Databases extends SitemapAbstract
 			if ( isset( $nodeClass ) and $filename == $databaseId . '_sitemap_database_categories' )
 			{
 				$select = array();
-				if ( in_array( 'IPS\Node\Permissions', class_implements( $nodeClass ) ) )
+				if ( \in_array( 'IPS\Content\Permissions', class_implements( $nodeClass ) ) or \in_array( 'IPS\Node\Permissions', class_implements( $nodeClass ) ) )
 				{
-					$select = new ActiveRecordIterator( Db::i()->select( '*', $nodeClass::$databaseTable, array( 'category_database_id=? AND (' . Db::i()->findInSet( 'perm_view', array( Settings::i()->guest_group ) ) . ' OR ' . 'perm_view=? )', $databaseId, '*' ) )->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id={$nodeClass::$databaseTable}.{$nodeClass::$databasePrefix}{$nodeClass::$databaseColumnId}", $nodeClass::$permApp, $nodeClass::$permType ) ), $nodeClass );
+					$select = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', $nodeClass::$databaseTable, array( 'category_database_id=? AND (' . \IPS\Db::i()->findInSet( 'perm_view', array( \IPS\Settings::i()->guest_group ) ) . ' OR ' . 'perm_view=? )', $databaseId, '*' ) )->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id={$nodeClass::$databaseTable}.{$nodeClass::$databasePrefix}{$nodeClass::$databaseColumnId}", $nodeClass::$permApp, $nodeClass::$permType ) ), $nodeClass );
 				}
 				else if ( $nodeClass::$ownerTypes !== NULL and is_subclass_of( $nodeClass, 'IPS\Node\Model' ) )
 				{
-					$select = $nodeClass::loadByOwner( new Member );
+					$select = $nodeClass::loadByOwner( new \IPS\Member );
 				}
 
 				foreach ( $select as $node )
 				{
 					/* We only want nodes we can see, and that have actual content inside */
-					if( $node->url() !== NULL and $node->can( 'view', new Member ) and ( $node->hasChildren() OR ( $node->show_records and $node->getContentItemCount() ) ) )
+					if( $node->url() !== NULL and $node->can( 'view', new \IPS\Member ) and ( $node->hasChildren() OR ( $node->show_records and $node->getContentItemCount() ) ) )
 					{
-						$data = array( 'url' => $node->url(), 'lastmod' => $node->getLastCommentTime( new Member ) );
+						$data = array( 'url' => $node->url(), 'lastmod' => $node->getLastCommentTime( new \IPS\Member ) );
 
-						$priority = intval( Settings::i()->sitemap_databases_priority );
+						$priority = \intval( \IPS\Settings::i()->sitemap_databases_priority );
 						if ( $priority !== -1 )
 						{
 							$data['priority'] = $priority;
 						}
 
 						$entries[] = $data;
-						$lastId = $node->_id;
 					}
 				}
 			}
@@ -217,10 +193,10 @@ class Databases extends SitemapAbstract
 				$exploded = explode( '_', $filename );
 				$block = (int) array_pop( $exploded );
 
-				$offset = ( $block - 1 ) * SITEMAP_MAX_PER_FILE;
-				$limit = SITEMAP_MAX_PER_FILE;
+				$offset = ( $block - 1 ) * \IPS\SITEMAP_MAX_PER_FILE;
+				$limit = \IPS\SITEMAP_MAX_PER_FILE;
 
-				$totalLimit = Settings::i()->sitemap_databases_count;
+				$totalLimit = \IPS\Settings::i()->sitemap_databases_count;
 				if ( $totalLimit > -1 and ( $offset + $limit ) > $totalLimit )
 				{
 					if ( $totalLimit < $limit )
@@ -233,8 +209,7 @@ class Databases extends SitemapAbstract
 					}
 				}
 
-				/* @var Records $class */
-				foreach ( $class::getItemsWithPermission( $class::sitemapWhere(), NULL, array( $offset, $limit ), 'read', Filter::FILTER_PUBLIC_ONLY, 0, new Member, TRUE ) as $item )
+				foreach ( $class::getItemsWithPermission( $class::sitemapWhere(), NULL, array( $offset, $limit ), 'read', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY, 0, new \IPS\Member, TRUE ) as $item )
 				{
 					$data = array( 'url' => $item->url() );
 
@@ -245,23 +220,21 @@ class Databases extends SitemapAbstract
 						$data['lastmod'] = $lastMod;
 					}
 
-					$priority = ( $item->sitemapPriority() ?: ( intval( Settings::i()->sitemap_databases_priority ) ) );
+					$priority = ( $item->sitemapPriority() ?: ( \intval( \IPS\Settings::i()->sitemap_databases_priority ) ) );
 					if ( $priority !== -1 )
 					{
 						$data['priority'] = $priority;
 					}
 
 					$entries[] = $data;
-					$lastId = $item->primary_id_field;
 				}
 			}
 
 			$sitemap->buildSitemapFile( $filename, $entries );
-			return $lastId ?? 0;
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			return null;
+
 		}
 	}
 }

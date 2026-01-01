@@ -12,66 +12,41 @@
 namespace IPS\cms\modules\admin\pages;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\cms\Media as MediaClass;
-use IPS\cms\Media\Folder;
-use IPS\cms\Pages\Page;
-use IPS\cms\Templates;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Tree\Tree;
-use IPS\Http\Url;
-use IPS\Image;
-use IPS\Member;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Output\Plugin\Filesize;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * media
  */
-class media extends Controller
+class _media extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = '\IPS\cms\Media\Folder';
+	protected $nodeClass = '\IPS\cms\Media\Folder';
 
 	/**
 	 * @var string[] 	Additional allowed FileTypes for the media field.
 	 */
-	public static array $additionalAllowedMediaFileTypes = array( 'pdf', 'svg', 'woff', 'woff2', 'ttf', 'eot' );
+	public static $additionalAllowedMediaFileTypes = array( 'pdf', 'svg' );
+
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'media_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'media_manage' );
 		parent::execute();
 	}
 
@@ -80,24 +55,24 @@ class media extends Controller
 	*
 	* @return	array
 	*/
-	public function _getRootButtons(): array
+	public function _getRootButtons()
 	{
 		$buttons   = array();
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'cms', 'pages', 'page_add' )  )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'cms', 'pages', 'page_add' )  )
 		{
 			$buttons['add_folder'] = array(
 				'icon'	=> 'folder-open',
 				'title'	=> 'cms_add_media_folder',
-				'link'	=> Url::internal( 'app=cms&module=pages&controller=media&do=form' ),
-				'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('cms_add_media_folder') )
+				'link'	=> \IPS\Http\Url::internal( 'app=cms&module=pages&controller=media&do=form' ),
+				'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('cms_add_media_folder') )
 			);
 
 			$buttons['add_page'] = array(
 				'icon'	=> 'plus-circle',
 				'title'	=> 'cms_add_media',
-				'link'	=>  Url::internal( 'app=cms&module=pages&controller=media&subnode=1&do=form' ),
-				'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('cms_add_media') )
+				'link'	=>  \IPS\Http\Url::internal( 'app=cms&module=pages&controller=media&subnode=1&do=form' ),
+				'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('cms_add_media') )
 			);
 		}
 
@@ -109,19 +84,19 @@ class media extends Controller
 	 *
 	 * @return void
 	 */
-	public function deleteByFileIds() : void
+	public function deleteByFileIds()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		if ( isset( Request::i()->fileIds ) )
+		if ( isset( \IPS\Request::i()->fileIds ) )
 		{
-			$ids = Request::i()->fileIds;
+			$ids = \IPS\Request::i()->fileIds;
 			
-			if ( ! is_array( $ids ) )
+			if ( ! \is_array( $ids ) )
 			{
 				$try = json_decode( $ids, TRUE );
 				
-				if ( ! is_array( $try ) )
+				if ( ! \is_array( $try ) )
 				{
 					$ids = array( $ids );
 				}
@@ -131,11 +106,11 @@ class media extends Controller
 				}
 			}
 			
-			if ( count( $ids ) )
+			if ( \count( $ids ) )
 			{
-				MediaClass::deleteByFileIds( $ids );
+				\IPS\cms\Media::deleteByFileIds( $ids );
 
-				Session::i()->log( 'acplogs__cms_deleted_media', array( count( $ids ) => FALSE ) );
+				\IPS\Session::i()->log( 'acplogs__cms_deleted_media', array( \count( $ids ) => FALSE ) );
 			}
 		}
 	}
@@ -143,97 +118,104 @@ class media extends Controller
 	/**
 	 * Show the pages tree
 	 *
-	 * @return	void
+	 * @return	string
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$url = Url::internal( "app=cms&module=pages&controller=media" );
-
-		/* Display the table */
-		Output::i()->title  = Member::loggedIn()->language()->addToStack('menu__cms_pages_media');
-		$output = new Tree( $url, 'menu__cms_pages_media',
-			/* Get Roots */
-			function () use ( $url )
-			{
-				$data = media::getRowsForTree( 0 );
-				$rows = array();
-
-				foreach ( $data as $id => $row )
-				{
-					if( ( Request::i()->isAjax() && $row instanceof MediaClass ) || !Request::i()->isAjax() )
-					{
-						$rows[ $id ] = ( $row instanceof MediaClass) ? media::getItemRow( $row, $url ) : media::getFolderRow( $row, $url );
-					}
-				}
-
-				if( Request::i()->isAjax() )
-				{
-					Output::i()->sendOutput( json_encode( $rows ), 200, 'application/json' );
-				}
-
-				return $data;
-			},
-			/* Get Row */
-			function ( $id, $root ) use ( $url )
-			{
-				if ( $root )
-				{
-					return media::getFolderRow( Folder::load( $id ), $url );
-				}
-				else
-				{
-					return media::getItemRow( MediaClass::load( $id ), $url );
-				}
-			},
-			/* Get Row Parent ID*/
-			function ()
-			{
-				return NULL;
-			},
-			/* Get Children */
-			function ( $id ) use ( $url )
-			{
-				$rows = array();
-				$data = media::getRowsForTree( $id );
-
-				if ( ! isset( Request::i()->subnode ) )
-				{
-					foreach ( $data as $id => $row )
-					{
-						if( Request::i()->get == 'folders' && !( $row instanceof MediaClass ) )
-						{
-							$rows[ $id ] = media::getFolderRow( $row, $url );
-						}
-						elseif ( Request::i()->get == 'files' && $row instanceof MediaClass )
-						{
-							$rows[ $id ] = media::getItemRow( $row, $url );
-						}
-
-					}
-				}
-
-				if( Request::i()->isAjax() ){
-					Output::i()->sendOutput( json_encode( $rows ), 200, 'application/json' );
-				}
-
-				return $rows;
-			},
-		   array( $this, '_getRootButtons' ),
-		   TRUE,
-		   FALSE,
-		   FALSE
-		);
-
-		Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_media.js', 'cms' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'media/media.css', 'cms', 'admin' ) );
-
-		if( Request::i()->isAjax() )
+		if ( \IPS\Theme::designersModeEnabled() )
 		{
-			Output::i()->sendOutput( $output );
+			$link = \IPS\Http\Url::internal( 'app=core&module=customization&controller=themes&do=designersmode' );
+			\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->message( \IPS\Member::loggedIn()->language()->addToStack( 'cms_media_designer_mode_warning', FALSE, array( 'sprintf' => array( $link ) ) ), 'information', NULL, FALSE );
 		}
 		else
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'media', 'cms', 'admin' )->media( $output );
+			$url = \IPS\Http\Url::internal( "app=cms&module=pages&controller=media" );
+	
+			/* Display the table */
+			\IPS\Output::i()->title  = \IPS\Member::loggedIn()->language()->addToStack('menu__cms_pages_media');
+			$output = new \IPS\Helpers\Tree\Tree( $url, 'menu__cms_pages_media',
+				/* Get Roots */
+				function () use ( $url )
+				{
+					$data = \IPS\cms\modules\admin\pages\media::getRowsForTree( 0 );
+					$rows = array();
+	
+					foreach ( $data as $id => $row )
+					{
+						if( ( \IPS\Request::i()->isAjax() && $row instanceof \IPS\cms\Media ) || !\IPS\Request::i()->isAjax() )
+						{
+							$rows[ $id ] = ( $row instanceof \IPS\cms\Media) ? \IPS\cms\modules\admin\pages\media::getItemRow( $row, $url ) : \IPS\cms\modules\admin\pages\media::getFolderRow( $row, $url );	
+						}					
+					}
+	
+					if( \IPS\Request::i()->isAjax() ){
+						\IPS\Output::i()->sendOutput( json_encode( $rows ), 200, 'application/json' );
+					}
+	
+					return $data;
+				},
+				/* Get Row */
+				function ( $id, $root ) use ( $url )
+				{
+					if ( $root )
+					{
+						return \IPS\cms\modules\admin\pages\media::getFolderRow( \IPS\cms\Media\Folder::load( $id ), $url );
+					}
+					else
+					{
+						return \IPS\cms\modules\admin\pages\media::getItemRow( \IPS\cms\Media::load( $id ), $url );
+					}
+				},
+				/* Get Row Parent ID*/
+				function ()
+				{
+					return NULL;
+				},
+				/* Get Children */
+				function ( $id ) use ( $url )
+				{
+					$rows = array();
+					$data = \IPS\cms\modules\admin\pages\media::getRowsForTree( $id );
+	
+					if ( ! isset( \IPS\Request::i()->subnode ) )
+					{
+						foreach ( $data as $id => $row )
+						{
+							if( \IPS\Request::i()->get == 'folders' && !( $row instanceof \IPS\cms\Media ) )
+							{
+								$rows[ $id ] = \IPS\cms\modules\admin\pages\media::getFolderRow( $row, $url );
+							}
+							elseif ( \IPS\Request::i()->get == 'files' && $row instanceof \IPS\cms\Media )
+							{
+								$rows[ $id ] = \IPS\cms\modules\admin\pages\media::getItemRow( $row, $url );
+							}
+							
+						}
+					}
+	
+					if( \IPS\Request::i()->isAjax() ){
+						\IPS\Output::i()->sendOutput( json_encode( $rows ), 200, 'application/json' );
+					}
+	
+					return $rows;
+				},
+	           array( $this, '_getRootButtons' ),
+	           TRUE,
+	           FALSE,
+	           FALSE
+			);
+			
+			\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_media.js', 'cms' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'media/media.css', 'cms', 'admin' ) );
+			
+			if( \IPS\Request::i()->isAjax() )
+			{
+				\IPS\Output::i()->sendOutput( $output, 200, 'text/html' );
+			}
+			else
+			{
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'media', 'cms', 'admin' )->media( $output );	
+			}
 		}
 	}
 
@@ -242,26 +224,26 @@ class media extends Controller
 	 *
 	 * @return void
 	 */
-	public function replace() : void
+	public function replace()
 	{
-		if( !isset( Request::i()->id ) OR !Request::i()->id )
+		if( !isset( \IPS\Request::i()->id ) OR !\IPS\Request::i()->id )
 		{
-			Output::i()->error( 'missing_media_file', '3T334/2', 404, '' );
+			\IPS\Output::i()->error( 'missing_media_file', '3T334/2', 404, '' );
 		}
 
 		try
 		{
-			$media = MediaClass::load( Request::i()->id );
+			$media = \IPS\cms\Media::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'missing_media_file', '3T334/3', 404, '' );
+			\IPS\Output::i()->error( 'missing_media_file', '3T334/3', 404, '' );
 		}
 
-		$form = new Form( 'form', 'upload' );
-		$form->class = 'ipsForm--vertical ipsForm--replace-file ipsForm_noLabels';
+		$form = new \IPS\Helpers\Form( 'form', 'upload' );
+		$form->class = 'ipsForm_vertical ipsForm_noLabels';
 			
-		$form->add( new Upload( 'media_filename', NULL, FALSE, array( 'allowedFileTypes' => array_merge( File::$safeFileExtensions, static::$additionalAllowedMediaFileTypes ), 'obscure' => FALSE, 'storageExtension' => 'cms_Media', 'storageContainer' => 'pages_media', 'multiple' => FALSE, 'minimize' => FALSE ), NULL, NULL, NULL, 'media_filename' ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'media_filename', NULL, FALSE, array( 'allowedFileTypes' => array_merge( \IPS\File::$safeFileExtensions, static::$additionalAllowedMediaFileTypes ), 'obscure' => FALSE, 'storageExtension' => 'cms_Media', 'storageContainer' => 'pages_media', 'multiple' => FALSE, 'minimize' => FALSE ), NULL, NULL, NULL, 'media_filename' ) );
 
 		if ( $values = $form->values() )
 		{
@@ -271,7 +253,7 @@ class media extends Controller
 			/* If we have the same extension, we will just retain the same filename */
 			if( $existingFileExtension == $newFileExtension )
 			{
-				$media->file_object		= (string) File::create( 'cms_Media', $media->filename_stored, $values['media_filename']->contents(), 'pages_media', TRUE, NULL, FALSE );
+				$media->file_object		= (string) \IPS\File::create( 'cms_Media', $media->filename_stored, $values['media_filename']->contents(), 'pages_media', TRUE, NULL, FALSE );
 			}
 			/* Otherwise we need to update the rest of the file info too */
 			else
@@ -279,10 +261,10 @@ class media extends Controller
 				$media->is_image		= $values['media_filename']->isImage();
 				$media->filename		= $values['media_filename']->originalFilename;
 				$media->filename_stored	= $media->parent . '_' . $media->filename;
-				$media->file_object		= (string) File::create( 'cms_Media', $media->filename_stored, $values['media_filename']->contents(), 'pages_media', TRUE, NULL, FALSE );
+				$media->file_object		= (string) \IPS\File::create( 'cms_Media', $media->filename_stored, $values['media_filename']->contents(), 'pages_media', TRUE, NULL, FALSE );
 			}
 
-			$media->setFullPath( ( $media->parent ? Folder::load( $media->parent )->path : '' ) );
+			$media->setFullPath( ( $media->parent ? \IPS\cms\Media\Folder::load( $media->parent )->path : '' ) );
 			$media->save();
 			
 			/* Remove the original as we created a copy with a slightly altered filename */
@@ -290,37 +272,37 @@ class media extends Controller
 			{
 				$values['media_filename']->delete();
 			}
-			catch( Exception $ex ) { }
+			catch( \Exception $ex ) { }
 			
 			/* Wipe out included JS just in case we're using this media thing */
-			Templates::deleteCompiledFiles();
-			Page::deleteCachedIncludes();
+			\IPS\cms\Templates::deleteCompiledFiles();
+			\IPS\cms\Pages\Page::deleteCachedIncludes();
 
-			Session::i()->log( 'acplogs__cms_replaced_media', array( $values['media_filename']->originalFilename => FALSE ) );
+			\IPS\Session::i()->log( 'acplogs__cms_replaced_media', array( $values['media_filename']->originalFilename => FALSE ) );
 			
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				$url = Url::internal( "app=cms&module=pages&controller=media" );
-				$data = media::getRowsForTree( $media->parent );
+				$url = \IPS\Http\Url::internal( "app=cms&module=pages&controller=media" );
+				$data = \IPS\cms\modules\admin\pages\media::getRowsForTree( $media->parent );
 				$rows = array();
 
 				foreach ( $data as $id => $row )
 				{
-					if ( $row instanceof MediaClass )
+					if ( $row instanceof \IPS\cms\Media )
 					{
-						$rows[ $id ] = media::getItemRow( $row, $url );
+						$rows[ $id ] = \IPS\cms\modules\admin\pages\media::getItemRow( $row, $url );
 					}
 				}
 
-				Output::i()->sendOutput( json_encode( array( 'fileID' => $media->id, 'folderID' => $media->parent, 'rows' => $rows ) ), 200, 'application/json' );
+				\IPS\Output::i()->sendOutput( json_encode( array( 'fileID' => $media->id, 'folderID' => $media->parent, 'rows' => $rows ) ), 200, 'application/json' );
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=media' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=media' ) );
 			}
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'admin' )->block( 'upload', $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'admin' )->block( 'upload', $form, FALSE );
 	}
 
 
@@ -329,25 +311,23 @@ class media extends Controller
 	 *
 	 * @return void
 	 */
-	public function upload() : void
+	public function upload()
 	{
-		$form = new Form( 'form', 'upload' );
-		$form->class = 'ipsForm--vertical ipsForm--upload-items ipsForm_noLabels';
-
-		$extensions = array_merge( File::$safeFileExtensions, static::$additionalAllowedMediaFileTypes, Image::supportedExtensions() );
-		sort( $extensions );
-		$form->add( new Upload( 'media_filename', NULL, FALSE, array( 'allowedFileTypes' => array_values( array_unique( $extensions ) ), 'obscure' => FALSE, 'storageExtension' => 'cms_Media', 'storageContainer' => 'pages_media', 'multiple' => true, 'minimize' => FALSE ), NULL, NULL, NULL, 'media_filename' ) );
+		$form = new \IPS\Helpers\Form( 'form', 'upload' );
+		$form->class = 'ipsForm_vertical ipsForm_noLabels';
 			
-		if ( ! isset( Request::i()->media_parent ) and ! Request::i()->media_parent )
+		$form->add( new \IPS\Helpers\Form\Upload( 'media_filename', NULL, FALSE, array( 'allowedFileTypes' => array_merge( \IPS\File::$safeFileExtensions, static::$additionalAllowedMediaFileTypes ), 'obscure' => FALSE, 'storageExtension' => 'cms_Media', 'storageContainer' => 'pages_media', 'multiple' => true, 'minimize' => FALSE ), NULL, NULL, NULL, 'media_filename' ) );
+			
+		if ( ! isset( \IPS\Request::i()->media_parent ) and ! \IPS\Request::i()->media_parent )
 		{
-			$form->add( new Node( 'media_parent', 0, FALSE, array(
+			$form->add( new \IPS\Helpers\Form\Node( 'media_parent', 0, FALSE, array(
 				'class'    => '\IPS\cms\Media\Folder',
 				'zeroVal'  => 'node_no_parent'
 			) ) );
 		}
 		else
 		{
-			$form->hiddenValues['media_parent_inline'] = Request::i()->media_parent;
+			$form->hiddenValues['media_parent_inline'] = \IPS\Request::i()->media_parent;
 		}
 		
 		if ( $values = $form->values() )
@@ -378,7 +358,7 @@ class media extends Controller
 					$filename = mb_substr( $filename, mb_strlen( $prefix ) );
 				}
 
-				$new = new MediaClass;
+				$new = new \IPS\cms\Media;
 				$new->filename        = $filename;
 				$new->filename_stored = $parent . '_' . $filename;
 				$new->is_image        = $media->isImage();
@@ -387,41 +367,41 @@ class media extends Controller
 				$new->file_object     = (string) $media;
 				$new->save();
 				
-				$new->setFullPath( ( $parent ? Folder::load( $parent )->path : '' ) );
+				$new->setFullPath( ( $parent ? \IPS\cms\Media\Folder::load( $parent )->path : '' ) );
 				$new->save();
 				
 				$count++;
 			}
 			
 			/* Wipe out included JS just in case we're using this media thing */
-			Templates::deleteCompiledFiles();
-			Page::deleteCachedIncludes();
+			\IPS\cms\Templates::deleteCompiledFiles();
+			\IPS\cms\Pages\Page::deleteCachedIncludes();
 
-			Session::i()->log( 'acplogs__cms_uploaded_media', array( $count => FALSE ) );
+			\IPS\Session::i()->log( 'acplogs__cms_uploaded_media', array( $count => FALSE ) );
 			
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				$url = Url::internal( "app=cms&module=pages&controller=media" );
-				$data = media::getRowsForTree( $parent );
+				$url = \IPS\Http\Url::internal( "app=cms&module=pages&controller=media" );
+				$data = \IPS\cms\modules\admin\pages\media::getRowsForTree( $parent );
 				$rows = array();
 
 				foreach ( $data as $id => $row )
 				{
-					if ( $row instanceof MediaClass )
+					if ( $row instanceof \IPS\cms\Media )
 					{
-						$rows[ $id ] = media::getItemRow( $row, $url );
+						$rows[ $id ] = \IPS\cms\modules\admin\pages\media::getItemRow( $row, $url );
 					}
 				}
 
-				Output::i()->sendOutput( json_encode( array( 'count' => $count, 'folderID' => $parent, 'rows' => $rows ) ), 200, 'application/json' );
+				\IPS\Output::i()->sendOutput( json_encode( array( 'count' => $count, 'folderID' => $parent, 'rows' => $rows ) ), 200, 'application/json' );
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=media' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=media' ) );
 			}
 		}
 		
-		Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'admin' )->block( 'upload', $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'admin' )->block( 'upload', $form, FALSE );
 	}
 	
 	/**
@@ -429,13 +409,13 @@ class media extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function search() : void
+	protected function search()
 	{
 		$rows = array();
-		$url  = Url::internal( "app=cms&module=pages&controller=media" );
+		$url  = \IPS\Http\Url::internal( "app=cms&module=pages&controller=media" );
 
 		/* Get results */
-		$items   = MediaClass::search( 'media_filename', Request::i()->input, 'media_filename' );
+		$items   = \IPS\cms\Media::search( 'media_filename', \IPS\Request::i()->input, 'media_filename' );
 
 		/* Convert to HTML */
 		foreach ( $items as $id => $result )
@@ -443,13 +423,13 @@ class media extends Controller
 			$rows[ $id ] = $this->getItemRow( $result, $url );
 		}
 
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->sendOutput( json_encode( $rows ), 200, 'application/json' );
+			\IPS\Output::i()->sendOutput( json_encode( $rows ), 200, 'application/json' );
 		}
 		else
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'trees', 'core' )->rows( $rows, '' );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'trees', 'core' )->rows( $rows, '' );	
 		}		
 	}
 
@@ -458,21 +438,21 @@ class media extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function getFileInfo() : void
+	protected function getFileInfo()
 	{
 		try
 		{
-			$row = MediaClass::load( Request::i()->id );
-			$fileObject = File::get( 'cms_Media', $row->file_object );
+			$row = \IPS\cms\Media::load( \IPS\Request::i()->id );
+			$fileObject = \IPS\File::get( 'cms_Media', $row->file_object );
 		}
-		catch( OutOfRangeException $ex )
+		catch( \OutOfRangeException $ex )
 		{
 			return;
 		}
 		
 		/* Make a human-readable size */
-		$filesize = Filesize::humanReadableFilesize( $fileObject->filesize() );
-		Member::loggedIn()->language()->parseOutputForDisplay( $filesize );
+		$filesize = \IPS\Output\Plugin\Filesize::humanReadableFilesize( $fileObject->filesize() );
+		\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $filesize );
 
 		$output = array( 
 			'fileSize' => $filesize,
@@ -486,61 +466,60 @@ class media extends Controller
 			$output['dimensions'] = $dimensions[0] . ' x ' . $dimensions[1];
 		}
 
-		Output::i()->sendOutput( json_encode( $output ), 200, 'application/json' );
+		\IPS\Output::i()->sendOutput( json_encode( $output ), 200, 'application/json' );
 	}
 
 	/**
 	 * Return HTML for a page row
 	 *
-	 * @param MediaClass $item	Row data
-	 * @param object $url	\IPS\Http\Url object
+	 * @param   array   $item	Row data
+	 * @param	object	$url	\IPS\Http\Url object
 	 * @return	string	HTML
 	 */
-	public static function getItemRow( MediaClass $item, object $url ): string
+	public static function getItemRow( $item, $url )
 	{
-		return Theme::i()->getTemplate( 'media', 'cms', 'admin' )->fileListing( $url, $item );
+		return \IPS\Theme::i()->getTemplate( 'media', 'cms', 'admin' )->fileListing( $url, $item );
 	}
 
 	/**
 	 * Return HTML for a folder row
 	 *
-	 * @param MediaClass|Folder $folder	Row data
-	 * @param Url $url	\IPS\Http\Url object
+	 * @param   array   $folder	Row data
+	 * @param	object	$url	\IPS\Http\Url object
 	 * @return	string	HTML
 	 */
-	public static function getFolderRow( MediaClass|Folder $folder, Url $url ): string
+	public static function getFolderRow( $folder, $url )
 	{
-		return Theme::i()->getTemplate( 'media', 'cms', 'admin' )->folderRow( $url, $folder );
+		return \IPS\Theme::i()->getTemplate( 'media', 'cms', 'admin' )->folderRow( $url, $folder );
 	}
 
 
 	/**
 	 * Fetch rows of folders/pages
 	 *
-	 * @param int $folderId		Parent ID to fetch from
-	 * @return array
+	 * @param	int	$folderId		Parent ID to fetch from
 	 */
-	public static function getRowsForTree( int $folderId=0 ) : array
+	public static function getRowsForTree( $folderId=0 )
 	{
 		try
 		{
 			if ( $folderId === 0 )
 			{
-				$folders = Folder::roots();
+				$folders = \IPS\cms\Media\Folder::roots();
 			}
 			else
 			{
-				$folders = Folder::load( $folderId )->children( NULL, NULL, FALSE );
+				$folders = \IPS\cms\Media\Folder::load( $folderId )->children( NULL, NULL, FALSE );
 			}
 		}
-		catch( OutOfRangeException $ex )
+		catch( \OutOfRangeException $ex )
 		{
 			$folders = array();
 		}
 
-		$media = MediaClass::getChildren( $folderId );
+		$media = \IPS\cms\Media::getChildren( $folderId );
 
-		return Folder::munge( $folders, $media );
+		return \IPS\cms\Media\Folder::munge( $folders, $media );
 	}
 
 }

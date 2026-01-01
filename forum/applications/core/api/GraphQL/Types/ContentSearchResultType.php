@@ -10,37 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Types;
-use Exception;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Content\Reaction;
-use IPS\Content\Search\Result;
-use IPS\Content\Search\SearchContent;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Club;
-use function count;
-use function defined;
-use function in_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ContentSearchResultType for GraphQL API
  */
-class ContentSearchResultType extends ObjectType
+class _ContentSearchResultType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -103,7 +91,9 @@ class ContentSearchResultType extends ObjectType
 						'description' => "Class of the item type, if this result is a comment/review",
 						'resolve' => function ($result) {
 							$asArray = $result->asArray();
-							return static::getItemClass( $asArray );
+							$itemClass = static::getItemClass( $asArray );
+
+							return $itemClass;
 						}
 					],
 					// @todo this should really be in a more generic ClassType that returns 
@@ -113,8 +103,6 @@ class ContentSearchResultType extends ObjectType
 						'description' => "Does the result class require a first comment (e.g. topics)?",
 						'resolve' => function ($result) {
 							$asArray = $result->asArray();
-
-							/* @var Item $itemClass */
 							$itemClass = static::getItemClass( $asArray );
 
 							return $itemClass::$firstCommentRequired;
@@ -160,23 +148,20 @@ class ContentSearchResultType extends ObjectType
 							],
 							'resolveField' => function ($result, $args, $context, $info) {
 								$asArray = $result->asArray();
-
-								/* @var Item $classToUse */
 								$classToUse = static::getItemClass( $asArray );
 
 								switch( $info->fieldName )
 								{
 									case 'indefinite':
 										return $classToUse::_indefiniteArticle( $asArray['containerData'] );
-
+									break;
 									case 'definite':
 										return $classToUse::_definiteArticle( $asArray['containerData'] );
-
+									break;
 									case 'definiteUC':
 										return $classToUse::_definiteArticle( $asArray['containerData'], NULL, array( 'ucfirst' => TRUE ) );
-
+									break;
 								}
-								return '';
 							}
 						]),
 						'resolve' => function ($result) {
@@ -232,14 +217,14 @@ class ContentSearchResultType extends ObjectType
 						'type' => TypeRegistry::boolean(),
 						'description' => "Is this result a comment?",
 						'resolve' => function ($result) {
-							return in_array( 'IPS\Content\Comment', class_parents( self::getFieldValue('index_class', $result) ) ) && !self::getFieldValue('index_title', $result);
+							return \in_array( 'IPS\Content\Comment', class_parents( self::getFieldValue('index_class', $result) ) ) && !self::getFieldValue('index_title', $result);
 						}
 					],
 					'isReview' => [
 						'type' => TypeRegistry::boolean(),
 						'description' => "Is this result a review?",
 						'resolve' => function ($result) {
-							return in_array( 'IPS\Content\Review', class_parents( self::getFieldValue('index_class', $result) ) );
+							return \in_array( 'IPS\Content\Review', class_parents( self::getFieldValue('index_class', $result) ) );
 						}
 					],
 					'replies' => [
@@ -260,14 +245,14 @@ class ContentSearchResultType extends ObjectType
 						'type' => \IPS\core\api\GraphQL\TypeRegistry::member(),
 						'description' => "Author of this result",
 						'resolve' => function ($result) {
-							return Member::load( self::getFieldValue('index_author', $result) );
+							return \IPS\Member::load( self::getFieldValue('index_author', $result) );
 						}
 					],
 					'itemAuthor' => [
 						'type' => \IPS\core\api\GraphQL\TypeRegistry::member(),
 						'description' => "Author of the original content item",
 						'resolve' => function ($result) {
-							return Member::load( self::getFieldValue('index_item_author', $result) );
+							return \IPS\Member::load( self::getFieldValue('index_item_author', $result) );	
 						}
 					],
 					'club' => [
@@ -284,13 +269,13 @@ class ContentSearchResultType extends ObjectType
 							try {
 								$reactions = array();
 
-								if( count( $result->reactions ) )
+								if( \count( $result->reactions ) )
 								{
 									foreach( $result->reactions as $reactID => $count )
 									{
 										$reactions[] = array(
 											'id' => $reactID,
-											'reaction' => Reaction::load( $reactID ),
+											'reaction' => \IPS\Content\Reaction::load( $reactID ),
 											'count' => $count
 										);
 									}
@@ -298,7 +283,7 @@ class ContentSearchResultType extends ObjectType
 
 								return $reactions;
 							}
-							catch (Exception $e)
+							catch (\Exception $e)
 							{}
 								
 							return array();
@@ -320,17 +305,15 @@ class ContentSearchResultType extends ObjectType
 	/**
 	 * Return the number of replies
 	 *
-	 * @param 	Result $result	Search result
-	 * @return	int|null
+	 * @param 	\IPS\Content\Search\Result 	Search result
+	 * @return	string
 	 */
-	protected static function replies( Result $result) : ?int
-	{
+	protected static function replies($result) {
 		$asArray = $result->asArray();
 		$itemData = $asArray['itemData'];
 
-		if ( in_array( 'IPS\Content\Comment', class_parents( $asArray['indexData']['index_class'] ) ) )
+		if ( \in_array( 'IPS\Content\Comment', class_parents( $asArray['indexData']['index_class'] ) ) )
 		{
-			/* @var Item $itemClass */
 			$itemClass = static::getItemClass( $asArray );
 
 			if( isset( $itemClass::$databaseColumnMap['num_comments'] ) and isset( $itemData[ $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['num_comments'] ] ) )
@@ -361,6 +344,8 @@ class ContentSearchResultType extends ObjectType
 				{
 					return $itemData[ $indexClass::$databasePrefix . $indexClass::$databaseColumnMap['num_comments'] ];
 				}
+
+				return 0;
 			}
 		}
 
@@ -370,16 +355,12 @@ class ContentSearchResultType extends ObjectType
 	/**
 	 * Return the content item title
 	 *
-	 * @param 	Result $result	Search result
-	 * @return	string|null
+	 * @param 	\IPS\Content\Search\Result 	Search result
+	 * @return	string
 	 */
-	protected static function title( Result $result ) : ?string
+	protected static function title( $result )
 	{
 		$asArray = $result->asArray();
-
-		/* @var Item $itemClass
-		 * @var array $databaseColumnMap
-		  */
 		$itemClass = static::getItemClass( $asArray );
 
 		// If the content is used as the title (e.g. status updates), don't return anything
@@ -394,22 +375,19 @@ class ContentSearchResultType extends ObjectType
 	/**
 	 * Return the item URL
 	 *
-	 * @param 	Result $result 	Search result
-	 * @return	Url
+	 * @param 	\IPS\Content\Search\Result 	Search result
+	 * @return	string
 	 */
-	protected static function url( Result $result ) : Url
+	protected static function url( $result )
 	{
 		$asArray = $result->asArray();
-
-		/* @var Item $itemClass */
 		$itemClass = static::getItemClass( $asArray );
-		$extension = SearchContent::extension( $itemClass );
-		$itemUrl = $extension::urlFromIndexData( $asArray['indexData'], $asArray['itemData'] );
+		$itemUrl = $itemClass::urlFromIndexData( $asArray['indexData'], $asArray['itemData'] );
 
 		/* Object URL */
-		if ( in_array( 'IPS\Content\Comment', class_parents( $asArray['indexData']['index_class'] ) ) )
+		if ( \in_array( 'IPS\Content\Comment', class_parents( $asArray['indexData']['index_class'] ) ) )
 		{
-			if ( in_array( 'IPS\Content\Review', class_parents( $asArray['indexData']['index_class'] ) ) )
+			if ( \in_array( 'IPS\Content\Review', class_parents( $asArray['indexData']['index_class'] ) ) )
 			{
 				$itemUrl = $itemUrl->setQueryString( array( 'do' => 'findReview', 'review' => $asArray['indexData']['index_object_id'] ) );
 			}
@@ -425,23 +403,21 @@ class ContentSearchResultType extends ObjectType
 	/**
 	 * Return the unread status of this content
 	 *
-	 * @param 	Result $result 	Search result
+	 * @param 	\IPS\Content\Search\Result 	Search result
 	 * @return	boolean
 	 */
-	protected static function isUnread( Result $result ) : bool
+	protected static function isUnread( $result )
 	{
 		$asArray = $result->asArray();
 		$itemClass = static::getItemClass( $asArray );
 
-		if ( in_array( 'IPS\Content\Comment', class_parents( $itemClass ) ) )
+		if ( \in_array( 'IPS\Content\Comment', class_parents( $itemClass ) ) )
 		{
-			/* @var Comment $itemClass */
-			$contentClass = $itemClass::$itemClass;
+			$contentClass = $itemClass::$contentItemClass;
 			$unread = $contentClass::unreadFromData( NULL, $asArray['indexData']['index_date_updated'], $asArray['indexData']['index_date_created'], $asArray['indexData']['index_item_id'], $asArray['indexData']['index_container_id'], FALSE );
 		}
 		else
 		{
-			/* @var Item $itemClass */
 			$unread = $itemClass::unreadFromData( NULL, $asArray['indexData']['index_date_updated'], $asArray['indexData']['index_date_created'], $asArray['indexData']['index_item_id'], $asArray['indexData']['index_container_id'], FALSE );
 		}
 
@@ -451,13 +427,13 @@ class ContentSearchResultType extends ObjectType
 	/**
 	 * Resolve contentImage
 	 *
-	 * @param 	Result $result 	Array representation of \IPS\Content\Search\Result
-	 * @return	array|null
+	 * @param 	array 	Array representation of \IPS\Content\Search\Result
+	 * @param 	array 	Arguments passed from resolver
+	 * @return	string
 	 */
-	protected static function contentImages( Result $result ) : ?array
+	protected static function contentImages( $result )
 	{
 		try {
-			/* @var Item $itemClass */
 			$itemClass = static::getItemClass( $result->asArray() );
 			$item = $itemClass::load( self::getFieldValue('index_item_id', $result) );
 			$toReturn = array();
@@ -468,28 +444,29 @@ class ContentSearchResultType extends ObjectType
 				{
 					foreach( $image as $extension => $file )
 					{
-						$toReturn[] = (string) File::get( $extension, $file )->url;
+						$toReturn[] = (string) \IPS\File::get( $extension, $file )->url;
 					}
 				}
 			}
 
 			return $toReturn;
-		} catch (Exception $e) {
+		} catch (\Exception $e) {
 			return NULL;
 		}
+
+		return NULL;
 	}
 
 	/**
 	 * Resolve containerTitle
 	 *
-	 * @param 	Result $result 	Array representation of \IPS\Content\Search\Result
+	 * @param 	array 	Array representation of \IPS\Content\Search\Result
+	 * @param 	array 	Arguments passed from resolver
 	 * @return	string
 	 */
-	protected static function containerTitle( Result $result ) : string
+	protected static function containerTitle( $result )
 	{
 		$result = $result->asArray();
-
-		/* @var Item $itemClass */
 		$itemClass = static::getItemClass( $result );
 		$containerTitle = NULL;
 
@@ -505,14 +482,15 @@ class ContentSearchResultType extends ObjectType
 	/**
 	 * Resolve club
 	 *
-	 * @param 	Result $result 	Array representation of \IPS\Content\Search\Result
-	 * @return	Club|null
+	 * @param 	array 	Array representation of \IPS\Content\Search\Result
+	 * @param 	array 	Arguments passed from resolver
+	 * @return	\IPS\Member\Club
 	 */
-	protected static function club( Result $result ) : ?Club
+	protected static function club( $result )
 	{
 		if( self::getFieldValue('index_club_id', $result) )
 		{
-			return Club::load( self::getFieldValue('index_club_id', $result) );
+			return \IPS\Member\Club::load( self::getFieldValue('index_club_id', $result) );
 		}
 
 		return NULL;
@@ -521,12 +499,14 @@ class ContentSearchResultType extends ObjectType
 	/**
 	 * Get the item class for the result
 	 *
-	 * @param 	array $result 	Array representation of \IPS\Content\Search\Result
+	 * @param 	array 	Array representation of \IPS\Content\Search\Result
 	 * @return	string
 	 */
-	protected static function getItemClass( array $result ) : string
+	protected static function getItemClass( $result )
 	{
 		$indexClass = $result['indexData']['index_class'];
-		return ( in_array( 'IPS\Content\Comment', class_parents( $indexClass ) ) ) ? $indexClass::$itemClass : $indexClass;
+		$itemClass = ( \in_array( 'IPS\Content\Comment', class_parents( $indexClass ) ) ) ? $indexClass::$itemClass : $indexClass;
+
+		return $itemClass;
 	}
 }

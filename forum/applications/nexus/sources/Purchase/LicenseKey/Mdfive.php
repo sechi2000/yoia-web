@@ -12,27 +12,23 @@
 namespace IPS\nexus\Purchase\LicenseKey;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\nexus\Purchase\LicenseKey;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * License Key Model - MD5
  */
-class Mdfive extends LicenseKey
+class _Mdfive extends \IPS\nexus\Purchase\LicenseKey
 {	
 	/**
 	 * Generates a License Key
 	 *
 	 * @return	string
 	 */
-	public function generateKey() : string
+	public function generate()
 	{
 		return md5( mt_rand() );
 	}

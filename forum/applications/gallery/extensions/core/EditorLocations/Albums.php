@@ -12,41 +12,36 @@
 namespace IPS\gallery\extensions\core\EditorLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\Content;
-use IPS\Db;
-use IPS\Extensions\EditorLocationsAbstract;
-use IPS\gallery\Album;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Text\LegacyParser;
-use LogicException;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: Albums
  */
-class Albums extends EditorLocationsAbstract
+class _Albums
 {
+	/**
+	 * Can we use HTML in this editor?
+	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
+	 */
+	public function canUseHtml( $member )
+	{
+		return NULL;
+	}
+	
 	/**
 	 * Can we use attachments in this editor?
 	 *
-	 * @param	Member					$member	The member
-	 * @param	Editor	$field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
 	 */
-	public function canAttach( Member $member, Editor $field ): ?bool
+	public function canAttach( $member, $field )
 	{
 		return FALSE;
 	}
@@ -54,7 +49,7 @@ class Albums extends EditorLocationsAbstract
 	/**
 	 * Permission check for attachments
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	int|null	$id1		Primary ID
 	 * @param	int|null	$id2		Secondary ID
 	 * @param	string|null	$id3		Arbitrary data
@@ -62,14 +57,14 @@ class Albums extends EditorLocationsAbstract
 	 * @param	bool		$viewOnly	If true, just check if the user can see the attachment rather than download it
 	 * @return	bool
 	 */
-	public function attachmentPermissionCheck( Member $member, ?int $id1, ?int $id2, ?string $id3, array $attachment, bool $viewOnly=FALSE ): bool
+	public function attachmentPermissionCheck( $member, $id1, $id2, $id3, $attachment, $viewOnly=FALSE )
 	{
 		try
 		{
-			$album = Album::load( $id1 );
+			$album = \IPS\gallery\Album::load( $id1 );
 			return $album->can( 'view', $member );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}
@@ -81,19 +76,12 @@ class Albums extends EditorLocationsAbstract
 	 * @param	int|null	$id1	Primary ID
 	 * @param	int|null	$id2	Secondary ID
 	 * @param	string|null	$id3	Arbitrary data
-	 * @return	Url|Content|Model|Member|null
-	 * @throws	LogicException
+	 * @return	\IPS\Http\Url|\IPS\Content|\IPS\Node\Model
+	 * @throws	\LogicException
 	 */
-	public function attachmentLookup( int $id1=NULL, int $id2=NULL, string $id3=NULL ): Model|Content|Url|Member|null
+	public function attachmentLookup( $id1, $id2, $id3 )
 	{
-		try
-		{
-			return Album::load( $id1 );
-		}
-		catch( Exception $e )
-		{
-			throw new LogicException;
-		}
+		return \IPS\gallery\Album::load( $id1 );
 	}
 
 	/**
@@ -104,19 +92,19 @@ class Albums extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildContent( ?int $offset, ?int $max ): int
+	public function rebuildContent( $offset, $max )
 	{
 		$did	= 0;
 
-		foreach( Db::i()->select( '*', 'gallery_albums', NULL, 'album_id ASC', array( $offset, $max ) ) as $album )
+		foreach( \IPS\Db::i()->select( '*', 'gallery_albums', NULL, 'album_id ASC', array( $offset, $max ) ) as $album )
 		{
 			$did++;
 			
 			try
 			{
-				$rebuilt = LegacyParser::parseStatic( $album['album_description'] );
+				$rebuilt = \IPS\Text\LegacyParser::parseStatic( $album['album_description'] );
 			}
-			catch( InvalidArgumentException $e )
+			catch( \InvalidArgumentException $e )
 			{
 				if( $e->getcode() == 103014 )
 				{
@@ -130,7 +118,7 @@ class Albums extends EditorLocationsAbstract
 
 			if( $rebuilt !== FALSE )
 			{
-				Db::i()->update( 'gallery_albums', array( 'album_description' => $rebuilt ), 'album_id=' . $album['album_id'] );
+				\IPS\Db::i()->update( 'gallery_albums', array( 'album_description' => $rebuilt ), 'album_id=' . $album['album_id'] );
 			}
 		}
 
@@ -142,8 +130,8 @@ class Albums extends EditorLocationsAbstract
 	 *
 	 * @return	int			Total Count
 	 */
-	public function contentCount(): int
+	public function contentCount()
 	{
-		return Db::i()->select( 'COUNT(*)', 'gallery_albums' )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'gallery_albums' )->first();
 	}
 }

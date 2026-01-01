@@ -12,53 +12,41 @@
 namespace IPS\cms\Records;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Records;
-use IPS\cms\Theme;
-use IPS\Content\Item;
-use IPS\core\Reports\Report;
-use IPS\forums\Topic\Post;
-use IPS\Member;
-use IPS\Request;
-use OutOfRangeException;
-use UnexpectedValueException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief Records Model
  */
-class CommentTopicSync extends Comment
+class _CommentTopicSync extends \IPS\cms\Records\Comment
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 		
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'pid';
+	public static $databaseColumnId = 'pid';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'forums_posts';
+	public static $databaseTable = 'forums_posts';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = '';
+	public static $databasePrefix = '';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'item'				=> 'topic_id',
 		'author'			=> 'author_id',
 		'author_name'		=> 'author_name',
@@ -76,27 +64,27 @@ class CommentTopicSync extends Comment
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'forums';
+	public static $application = 'forums';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'comment';
+	public static $icon = 'comment';
 	
 	/**
 	 * @brief	[Content]	Key for hide reasons
 	 */
-	public static ?string $hideLogKey = 'post';
+	public static $hideLogKey = 'post';
 	
 	/**
 	 * @brief	[Content\Comment]	Comment Template
 	 */
-	public static array $commentTemplate = array( array( 'display', 'cms', 'database' ), 'commentContainer' );
+	public static $commentTemplate = array( array( 'display', 'cms', 'database' ), 'commentContainer' );
 	
 	/**
 	 * @brief	Bitwise values for post_bwoptions field
 	 */
-	public static array $bitOptions = array(
+	public static $bitOptions = array(
 		'post_bwoptions' => array(
 			'post_bwoptions' => array(
 				'best_answer'	=> 1
@@ -107,12 +95,11 @@ class CommentTopicSync extends Comment
 	/**
 	 * Get containing item
 	 *
-	 * @return Item
+	 * @return	\IPS\cms\Record
 	 */
-	public function item(): Item
+	public function item()
 	{
 		$itemClass = static::$itemClass;
-		/* @var $itemClass Records */
 		$lookFor = 'IPS\cms\Records\RecordsTopicSync';
 
 		if ( mb_substr( $itemClass, 0, mb_strlen( $lookFor ) ) === $lookFor )
@@ -121,7 +108,7 @@ class CommentTopicSync extends Comment
 		}
 		else
 		{
-			$id = Request::i()->id;
+			$id = \IPS\Request::i()->id;
 		}
 		
 		return $itemClass::load( $id );
@@ -130,24 +117,24 @@ class CommentTopicSync extends Comment
 	/**
 	 * Delete Comment
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		/* We need the classname to be \IPS\forums\Topic\Post so topic/forum sync occur and to ensure post is removed from search index */
-		$comment = Post::load( $this->pid );
+		$comment = \IPS\forums\Topic\Post::load( $this->pid );
 		$comment->delete();
 	}
 	
 	/**
 	 * Edit Comment Contents - Note: does not add edit log
 	 *
-	 * @param string $newContent	New content
-	 * @return    void
+	 * @param	string	$newContent	New content
+	 * @return	string|NULL
 	 */
-	public function editContents( string $newContent ): void
+	public function editContents( $newContent )
 	{
-		$comment = Post::load( $this->pid );
+		$comment = \IPS\forums\Topic\Post::load( $this->pid );
 		$comment->editContents( $newContent );
 	}
 	
@@ -156,19 +143,19 @@ class CommentTopicSync extends Comment
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		if ( ! empty( $this->pid ) )
 		{
 			try
 			{
-				$comment = Post::load( $this->pid );
+				$comment = \IPS\forums\Topic\Post::load( $this->pid );
 				$template = static::$commentTemplate[1];
 				static::$commentTemplate[0][0] = $this->item()->database()->template_display;
 
-				return Theme::i()->getTemplate( static::$commentTemplate[0][0], static::$commentTemplate[0][1], static::$commentTemplate[0][2] )->$template( $comment->item(), $comment );
+				return \IPS\cms\Theme::i()->getTemplate( static::$commentTemplate[0][0], static::$commentTemplate[0][1], static::$commentTemplate[0][2] )->$template( $comment->item(), $comment );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				return parent::html();
 			}
@@ -178,20 +165,20 @@ class CommentTopicSync extends Comment
 			return parent::html();
 		}
 	}
-	
+
 	/**
 	 * Report
 	 *
-	 * @param string $reportContent Report content message from member
-	 * @param int $reportType Report type (see constants in \IPS\core\Reports\Report)
-	 * @param \IPS\Member|NULL $member Member making the report (or NULL for loggedIn())
-	 * @param array $guestDetails Details for a guest report
-	 * @return    \IPS\core\Reports\Report
-	 * @throws    UnexpectedValueException	If there is a permission error - you should only call this method after checking canReport
+	 * @param	string					$reportContent	Report content message from member
+	 * @param	int						$reportType		Report type (see constants in \IPS\core\Reports\Report)
+	 * @param	\IPS\Member|NULL		$member			Member making the report (or NULL for loggedIn())
+	 * @param 	array					$guestDetails	Details for a guest report
+	 * @return	\IPS\core\Reports\Report
+	 * @throws	\UnexpectedValueException	If there is a permission error - you should only call this method after checking canReport
 	 */
-	public function report( string $reportContent, int $reportType=1, Member|null $member=null, array $guestDetails=array()  ): Report
+	public function report( $reportContent, $reportType=1, $member=NULL, $guestDetails=array() )
 	{
-		$comment = Post::load( $this->pid );
+		$comment = \IPS\forums\Topic\Post::load( $this->pid );
 		return $comment->report( $reportContent, $reportType, $member );
 	}
 	
@@ -200,7 +187,7 @@ class CommentTopicSync extends Comment
 	 *
 	 * @return	array|NULL
 	 */
-	public static function commentWhere(): ?array
+	public static function commentWhere()
 	{
 		return NULL;
 	}
@@ -211,7 +198,7 @@ class CommentTopicSync extends Comment
 	 * @param   int     $id     Content item to delete from
 	 * @return array
 	 */
-	public static function deleteWhereSql( int $id ): array
+	public static function deleteWhereSql( $id )
 	{
 		return array( array( static::$databasePrefix . static::$databaseColumnMap['item'] . '=?', $id ) );
 	}
@@ -219,12 +206,12 @@ class CommentTopicSync extends Comment
 	/**
 	 * Post count for member
 	 *
-	 * @param	Member	$member								The member
+	 * @param	\IPS\Member	$member								The member
 	 * @param	bool		$includeNonPostCountIncreasing		If FALSE, will skip any posts which would not cause the user's post count to increase
 	 * @param	bool		$includeHiddenAndPendingApproval	If FALSE, will skip any hidden posts, or posts pending approval
 	 * @return	int
 	 */
-	public static function memberPostCount( Member $member, bool $includeNonPostCountIncreasing = FALSE, bool $includeHiddenAndPendingApproval = TRUE ): int
+	public static function memberPostCount( \IPS\Member $member, bool $includeNonPostCountIncreasing = FALSE, bool $includeHiddenAndPendingApproval = TRUE )
 	{
 		return 0; // We explicitely return 0 because any posts will be counted via the forums application inherently already
 	}
@@ -234,7 +221,7 @@ class CommentTopicSync extends Comment
 	 *
 	 * @return	string
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		return 'pid';
 	}
@@ -244,7 +231,7 @@ class CommentTopicSync extends Comment
 	 *
 	 * @return	string
 	 */
-	public static function reactionClass() : string
+	public static function reactionClass()
 	{
 		return 'IPS\forums\Topic\Post';
 	}

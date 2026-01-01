@@ -12,71 +12,30 @@
 namespace IPS\gallery\modules\front\gallery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Api\Webhook;
-use IPS\core\FrontNavigation;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\File;
-use IPS\gallery\Album;
-use IPS\gallery\Application;
-use IPS\gallery\Category;
-use IPS\gallery\Image as ImageClass;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Email;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Http\Url;
-use IPS\Image;
-use IPS\Member;
-use IPS\Output;
-use IPS\Output\Plugin\Filesize;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Gallery Submission
  */
-class submit extends Controller
+class _submit extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Manage addition of gallery images
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Init */
-		$url = Url::internal( 'app=gallery&module=gallery&controller=submit', 'front', 'gallery_submit' );
+		$url = \IPS\Http\Url::internal( 'app=gallery&module=gallery&controller=submit', 'front', 'gallery_submit' );
 
-		if( isset( Request::i()->_pi ) )
+		if( isset( \IPS\Request::i()->_pi ) )
 		{
-			$url = $url->setQueryString( '_pi', Request::i()->_pi );
+			$url = $url->setQueryString( '_pi', \IPS\Request::i()->_pi );
 		}
 
 		/* Init our form variables and check container */
@@ -85,7 +44,7 @@ class submit extends Controller
 		$errors		= array();
 
 		/* If we've submitted that and have our values we need, it's time to show the upload form */
-		if( is_array( $container ) )
+		if( \is_array( $container ) )
 		{
 			$url = $url->setQueryString( 'category', $container['category']->_id );
 
@@ -116,49 +75,53 @@ class submit extends Controller
 		/* Are we in da club? */
 		$club = NULL;
 
-		if ( is_array( $container ) AND isset( $container['category'] ) AND $container['category'] )
+		if ( \is_array( $container ) AND isset( $container['category'] ) AND $container['category'] )
 		{
 			try
 			{
 				if ( $club = $container['category']->club() )
 				{
-					FrontNavigation::$clubTabActive = TRUE;
-					Output::i()->breadcrumb = array();
-					Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), Member::loggedIn()->language()->addToStack('module__core_clubs') );
-					Output::i()->breadcrumb[] = array( $club->url(), $club->name );
-					Output::i()->breadcrumb[] = array( $container['category']->url(), $container['category']->_title );
+					\IPS\core\FrontNavigation::$clubTabActive = TRUE;
+					\IPS\Output::i()->breadcrumb = array();
+					\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), \IPS\Member::loggedIn()->language()->addToStack('module__core_clubs') );
+					\IPS\Output::i()->breadcrumb[] = array( $club->url(), $club->name );
+					\IPS\Output::i()->breadcrumb[] = array( $container['category']->url(), $container['category']->_title );
 					
-					if ( Settings::i()->clubs_header == 'sidebar' )
+					if ( \IPS\Settings::i()->clubs_header == 'sidebar' )
 					{
-						Output::i()->sidebar['contextual'] = Theme::i()->getTemplate( 'clubs', 'core' )->header( $club, $container['category'], 'sidebar' );
+						\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->header( $club, $container['category'], 'sidebar' );
 					}
 				}
 			}
-			catch ( OutOfRangeException ) {}
+			catch ( \OutOfRangeException $e ) {}
 		}
 
 		/* Set online user location */
-		Session::i()->setLocation( Url::internal( 'app=gallery&module=gallery&controller=submit', 'front', 'gallery_submit' ), array(), 'loc_gallery_adding_image' );
+		\IPS\Session::i()->setLocation( \IPS\Http\Url::internal( 'app=gallery&module=gallery&controller=submit', 'front', 'gallery_submit' ), array(), 'loc_gallery_adding_image' );
 
 		/* Output */
-		Application::outputCss();
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'submit.css' ) );
+		\IPS\gallery\Application::outputCss();
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'submit.css' ) );
+		if ( \IPS\Theme::i()->settings['responsive'] )
+		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'submit_responsive.css', 'gallery', 'front' ) );
+		}
 
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'jquery/jquery-ui.js', 'core', 'interface' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_submit.js', 'gallery' ) );
-		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->title = Member::loggedIn()->language()->addToStack('add_gallery_image');
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( ( Member::loggedIn()->group['g_movies'] ) ? 'add_gallery_image_movies' : 'add_gallery_image' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'jquery/jquery-ui.js', 'core', 'interface' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_submit.js', 'gallery' ) );	
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('add_gallery_image');
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( ( \IPS\Member::loggedIn()->group['g_movies'] ) ? 'add_gallery_image_movies' : 'add_gallery_image' ) );
 
-		if( Request::i()->isAjax() && isset( Request::i()->noWrapper ) )
+		if( \IPS\Request::i()->isAjax() && isset( \IPS\Request::i()->noWrapper ) )
 		{
 			$tagsField		= NULL;
 			$imageTagsField = $tagsField;
 
 			/* Tags */
-			if ( is_array( $container ) AND isset( $container['category'] ) AND $container['category'] AND ImageClass::canTag( NULL, $container['category'] ) )
+			if ( \is_array( $container ) AND isset( $container['category'] ) AND $container['category'] AND \IPS\gallery\Image::canTag( NULL, $container['category'] ) )
 			{
-				$tagsField		= ImageClass::tagsFormField( null, $container['category'] );
+				$tagsField		= \IPS\gallery\Image::tagsFormField( NULL, $container['category'] );
 				$imageTagsField	= $tagsField;
 
 				if( $tagsField )
@@ -169,14 +132,14 @@ class submit extends Controller
 					$imageTagsField			= $imageTagsField->html();
 				}
 
-				Member::loggedIn()->language()->parseOutputForDisplay( $tagsField );
+				\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $tagsField );
 			}
 
-			Output::i()->json( array(
-				'container'		=> is_string( $container ) ? $container : NULL,
-				'containerInfo'	=> is_string( $container ) ? '' : Theme::i()->getTemplate( 'submit' )->container( $container ),
+			\IPS\Output::i()->json( array( 
+				'container'		=> \is_string( $container ) ? $container : NULL, 
+				'containerInfo'	=> \is_string( $container ) ? '' : \IPS\Theme::i()->getTemplate( 'submit' )->container( $container ), 
 				'images'		=> $images,
-				'imageTags'		=> ( $imageTagsField ) ? preg_replace( '/data-ipsAutocomplete(?!\-)/', '', $imageTagsField ) : $imageTagsField,
+				'imageTags'		=> preg_replace( '/data-ipsAutocomplete(?!\-)/', '', $imageTagsField ),
 				'tagsField'		=> $tagsField,
 				'imageErrors'	=> $errors,
 			) );
@@ -184,36 +147,36 @@ class submit extends Controller
 		else
 		{
 			/* We create a dummy generic form so that we can output its elements and then clone them using fancy javascript */
-			$allImagesForm = new Form( 'all_images_form', 'submit' );
-			$allImagesForm->add( new TextArea( 'image_credit_info', NULL, FALSE ) );
-			$allImagesForm->add( new Text( 'image_copyright', NULL, FALSE, array( 'maxLength' => 255 ) ) );
+			$allImagesForm = new \IPS\Helpers\Form( 'all_images_form', 'submit' );
+			$allImagesForm->add( new \IPS\Helpers\Form\TextArea( 'image_credit_info', NULL, FALSE ) );
+			$allImagesForm->add( new \IPS\Helpers\Form\Text( 'image_copyright', NULL, FALSE, array( 'maxLength' => 255 ) ) );
 
-			if( Member::loggedIn()->member_id )
+			if( \IPS\Member::loggedIn()->member_id )
 			{
-				$allImagesForm->add( new YesNo( 'image_auto_follow', (bool) Member::loggedIn()->auto_follow['content'], FALSE, array(), NULL, NULL, Member::loggedIn()->language()->addToStack( 'image_auto_follow_suffix' ) ) );
+				$allImagesForm->add( new \IPS\Helpers\Form\YesNo( 'image_auto_follow', (bool) \IPS\Member::loggedIn()->auto_follow['content'], FALSE, array(), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack( 'image_auto_follow_suffix' ) ) );
 			}
 
-			if( Settings::i()->gallery_nsfw )
+			if( \IPS\Settings::i()->gallery_nsfw )
 			{
-				$allImagesForm->add( new YesNo( 'image_nsfw', FALSE, FALSE, array(), NULL, NULL, Member::loggedIn()->language()->addToStack( 'image_nsfw_suffix' ) ) );
+				$allImagesForm->add( new \IPS\Helpers\Form\YesNo( 'image_nsfw', FALSE, FALSE, array(), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack( 'image_nsfw_suffix' ) ) );
 			}
 
 			/* Tags */
-			if ( is_array( $container ) AND isset( $container['category'] ) AND $container['category'] AND ImageClass::canTag( NULL, $container['category'] ) )
+			if ( \is_array( $container ) AND isset( $container['category'] ) AND $container['category'] AND \IPS\gallery\Image::canTag( NULL, $container['category'] ) )
 			{
-				if( $tagsField = ImageClass::tagsFormField( null, $container['category'] ) )
+				if( $tagsField = \IPS\gallery\Image::tagsFormField( NULL, $container['category'] ) )
 				{
 					$allImagesForm->add( $tagsField );
 				}
 			}
 
-			$formElements = ImageClass::formElements( NULL, ( isset( $container['category'] ) ) ? $container['category'] : NULL );
+			$formElements = \IPS\gallery\Image::formElements( NULL, ( isset( $container['category'] ) ) ? $container['category'] : NULL );
 
 			foreach( $formElements as $element )
 			{
 				if( $element->name == 'image_tags' )
 				{
-					if ( !is_array( $container ) OR !isset( $container['category'] ) OR !$container['category'] OR !ImageClass::canTag( NULL, $container['category'] ) )
+					if ( !\is_array( $container ) OR !isset( $container['category'] ) OR !$container['category'] OR !\IPS\gallery\Image::canTag( NULL, $container['category'] ) )
 					{
 						continue;
 					}
@@ -223,94 +186,94 @@ class submit extends Controller
 				$allImagesForm->add( $element );
 			}
 
-			$allImagesForm->add( new TextArea( 'image_textarea_DEFAULT', NULL, FALSE ) );
+			$allImagesForm->add( new \IPS\Helpers\Form\TextArea( 'image_textarea_DEFAULT', NULL, FALSE ) );
 
 			/* These fields are conditional and will not always show for each image */
-			$allImagesForm->add( new YesNo( "image_gps_show_DEFAULT", Settings::i()->gallery_maps_default, FALSE ) );
-			$allImagesForm->add( new Upload( "image_thumbnail_DEFAULT", NULL, FALSE, array(
+			$allImagesForm->add( new \IPS\Helpers\Form\YesNo( "image_gps_show_DEFAULT", \IPS\Settings::i()->gallery_maps_default, FALSE ) );
+			$allImagesForm->add( new \IPS\Helpers\Form\Upload( "image_thumbnail_DEFAULT", NULL, FALSE, array( 
 				'storageExtension'	=> 'gallery_Images', 
 				'image'				=> TRUE,
-				'maxFileSize'		=> Member::loggedIn()->group['g_max_upload'] ? ( Member::loggedIn()->group['g_max_upload'] / 1024 ) : NULL,
+				'maxFileSize'		=> \IPS\Member::loggedIn()->group['g_max_upload'] ? ( \IPS\Member::loggedIn()->group['g_max_upload'] / 1024 ) : NULL,
 				'canBeModerated'	=> TRUE
 			) ) );
 
 			/* And output */
-			$category = ( is_array( $container ) AND isset( $container['category'] ) AND $container['category'] ) ? $container['category'] : NULL;
-			Output::i()->output = Theme::i()->getTemplate( 'submit' )->wrapper( $container, $images, $club, $allImagesForm );
+			$category = ( \is_array( $container ) AND isset( $container['category'] ) AND $container['category'] ) ? $container['category'] : NULL;
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'submit' )->wrapper( $container, $images, $club, $allImagesForm );
 		}
 	}
 	
 	/**
 	 * Step 1: Choose the container
 	 *
-	 * @param Url $url	The URL
+	 * @param	\IPS\Http\Url	$url	The URL
 	 * @return	string|array
 	 */
-	public function chooseContainerForm( Url $url ): array|string
+	public function chooseContainerForm( $url )
 	{
 		/* Have we chosen a category? */
 		$category = NULL;
 
-		if ( isset( Request::i()->category ) )
+		if ( isset( \IPS\Request::i()->category ) )
 		{
 			try
 			{
-				$category = Category::loadAndCheckPerms( Request::i()->category, 'add' );
+				$category = \IPS\gallery\Category::loadAndCheckPerms( \IPS\Request::i()->category, 'add' );
 			}
-			catch ( OutOfRangeException ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 
 		/* What about an album? */
 		$album = NULL;
 
-		if ( isset( Request::i()->album ) )
+		if ( isset( \IPS\Request::i()->album ) )
 		{
 			try
 			{
-				$album = Album::loadAndCheckPerms( Request::i()->album, 'add' );
+				$album = \IPS\gallery\Album::loadAndCheckPerms( \IPS\Request::i()->album, 'add' );
 
 				/* If it's an album, make sure we grab the current category */
 				try
 				{
-					$category = Category::loadAndCheckPerms( $album->category_id, 'add' );
+					$category = \IPS\gallery\Category::loadAndCheckPerms( $album->category_id, 'add' );
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
-			catch ( OutOfRangeException ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 		
 		/* If we have chosen an album we can return now */
 		if( $category AND $album )
 		{
-			return array( 'category' => $category, 'album' => $album, 'guest_email' => isset( Request::i()->guest_email ) ? Request::i()->guest_email : NULL );
+			return array( 'category' => $category, 'album' => $album, 'guest_email' => isset( \IPS\Request::i()->guest_email ) ? \IPS\Request::i()->guest_email : NULL );
 		}
 
 		/* If we have chosen no album specifically, we can just return now */
-		if ( isset( Request::i()->noAlbum ) AND Request::i()->noAlbum AND $category AND $category->allow_albums != 2 )
+		if ( isset( \IPS\Request::i()->noAlbum ) AND \IPS\Request::i()->noAlbum AND $category AND $category->allow_albums != 2 )
 		{
-			return array( 'category' => $category, 'album' => NULL, 'guest_email' => isset( Request::i()->guest_email ) ? Request::i()->guest_email : NULL );
+			return array( 'category' => $category, 'album' => NULL, 'guest_email' => isset( \IPS\Request::i()->guest_email ) ? \IPS\Request::i()->guest_email : NULL );
 		}
 
 		/* If we haven't selected a category yet... */
 		if ( !$category )
 		{
 			/* If there's only one category automatically select it, otherwise show the form */
-			$category = Category::theOnlyNode();
+			$category = \IPS\gallery\Category::theOnlyNode();
 
 			if( !$category )
 			{
-				$chooseCategoryForm = new Form( 'choose_category', 'continue' );
-				$chooseCategoryForm->add( new Node( 'image_category', NULL, TRUE, array(
+				$chooseCategoryForm = new \IPS\Helpers\Form( 'choose_category', 'continue' );
+				$chooseCategoryForm->add( new \IPS\Helpers\Form\Node( 'image_category', $category ?: NULL, TRUE, array(
 					'url'					=> $url,
 					'class'					=> 'IPS\gallery\Category',
 					'permissionCheck'		=> function( $node ){
-						if( $node->can('add') and ( $node->allow_albums != 2 or Member::loggedIn()->group['g_create_albums'] or Album::loadForSubmit( $node ) ) )
+						if( $node->can('add') and ( $node->allow_albums != 2 or \IPS\Member::loggedIn()->group['g_create_albums'] or \IPS\gallery\Album::loadForSubmit( $node ) ) )
 						{
 							return TRUE;
 						}
 						return FALSE;
 					},
-					'clubs'					=> Settings::i()->club_nodes_in_apps
+					'clubs'					=> \IPS\Settings::i()->club_nodes_in_apps
 				) ) );
 
 				if ( $chooseCategoryFormValues = $chooseCategoryForm->values() )
@@ -319,16 +282,16 @@ class submit extends Controller
 				}
 				else
 				{
-					return $chooseCategoryForm->customTemplate( array( Theme::i()->getTemplate('submit'), 'chooseCategory' ) );
+					return (string) $chooseCategoryForm->customTemplate( array( \IPS\Theme::i()->getTemplate('submit'), 'chooseCategory' ) );
 				}
 			}
 		}
 		
 		/* Do we have any posting information to show? */
 		$guestEmailError = NULL;
-		if ( isset( Request::i()->guest_email_submit ) )
+		if ( isset( \IPS\Request::i()->guest_email_submit ) )
 		{
-			if ( !Request::i()->guest_email )
+			if ( !\IPS\Request::i()->guest_email )
 			{
 				$guestEmailError = 'form_required';
 			}
@@ -336,41 +299,41 @@ class submit extends Controller
 			{
 				try
 				{
-					Email::validateEmail( Request::i()->guest_email, TRUE );
-					Request::i()->_pi = TRUE;
+					\IPS\Helpers\Form\Email::validateEmail( \IPS\Request::i()->guest_email, TRUE );
+					\IPS\Request::i()->_pi = TRUE;
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
 					$guestEmailError = $e->getMessage();
 				}
 			}
 		}
-		if ( !isset( Request::i()->_pi ) )
+		if ( !isset( \IPS\Request::i()->_pi ) )
 		{			
-			$guestPostBeforeRegister = ( !Member::loggedIn()->member_id ) ? ( $category and !$category->can( 'add', Member::loggedIn(), FALSE ) ) : FALSE;
-			$modQueued = ImageClass::moderateNewItems( Member::loggedIn(), $category, $guestPostBeforeRegister );
+			$guestPostBeforeRegister = ( !\IPS\Member::loggedIn()->member_id ) ? ( $category and !$category->can( 'add', \IPS\Member::loggedIn(), FALSE ) ) : NULL;
+			$modQueued = \IPS\gallery\Image::moderateNewItems( \IPS\Member::loggedIn(), $category, $guestPostBeforeRegister );
 			if ( $guestPostBeforeRegister or $modQueued )
 			{
-				return Theme::i()->getTemplate('submit')->postingInformation( $guestPostBeforeRegister, $modQueued, $url->setQueryString( array( 'category' => $category->_id ) ), $guestEmailError );
+				return \IPS\Theme::i()->getTemplate('submit')->postingInformation( $guestPostBeforeRegister, $modQueued, $url->setQueryString( array( 'category' => $category->_id ) ), $guestEmailError );
 			}
 		}
 					
 		/* Can we create an album in this category? */
-		$canCreateAlbum		= ( $category->allow_albums and Member::loggedIn()->group['g_create_albums'] );
-		$maximumAlbums		= Member::loggedIn()->group['g_album_limit'];
-		$currentAlbumCount	= Db::i()->select( 'COUNT(*)', 'gallery_albums', array( 'album_owner_id=?', Member::loggedIn()->member_id ) )->first();
+		$canCreateAlbum		= ( $category->allow_albums and \IPS\Member::loggedIn()->group['g_create_albums'] );
+		$maximumAlbums		= \IPS\Member::loggedIn()->group['g_album_limit'];
+		$currentAlbumCount	= \IPS\Db::i()->select( 'COUNT(*)', 'gallery_albums', array( 'album_owner_id=?', \IPS\Member::loggedIn()->member_id ) )->first();
 
 		/* If we can, build a form */
 		$createAlbumForm	= NULL;
 		if ( $canCreateAlbum and ( !$maximumAlbums or $maximumAlbums > $currentAlbumCount ) )
 		{
 			/* Build the create form... */
-			$createAlbumForm = new Form( 'new_album', 'create_new_album' );
-			$createAlbumForm->class .= 'ipsForm--vertical ipsForm--new-album';
+			$createAlbumForm = new \IPS\Helpers\Form( 'new_album', 'create_new_album' );
+			$createAlbumForm->class .= 'ipsForm_vertical';
 			$createAlbumForm->hiddenValues['category'] = $category->_id;
-			$createAlbumForm->hiddenValues['_pi'] = Request::i()->_pi;
+			$createAlbumForm->hiddenValues['_pi'] = \IPS\Request::i()->_pi;
 
-			$album	= new Album;
+			$album	= new \IPS\gallery\Album;
 			$album->form( $createAlbumForm );
 			unset( $createAlbumForm->elements['']['album_category'] );
 			
@@ -381,43 +344,43 @@ class submit extends Controller
 				$createAlbumFormValues['album_category'] = $category;
 				$album->saveForm( $album->formatFormValues( $createAlbumFormValues ) );
 				
-				Webhook::fire( 'galleryAlbum_create', $album, $album->webhookFilters() );
+				\IPS\Api\Webhook::fire( 'galleryAlbum_create', $album, $album->webhookFilters() );
 
-				Member::loggedIn()->achievementAction( 'core', 'NewContentItem', $album->asItem() );
+				\IPS\Member::loggedIn()->achievementAction( 'core', 'NewContentItem', $album->asItem() );
 
-				return array( 'category' => $category, 'album' => $album, 'guest_email' => isset( Request::i()->guest_email ) ? Request::i()->guest_email : NULL );
+				return array( 'category' => $category, 'album' => $album, 'guest_email' => isset( \IPS\Request::i()->guest_email ) ? \IPS\Request::i()->guest_email : NULL );
 			}
 			
 			/* Otherwise, display it*/
-			$createAlbumForm = $createAlbumForm->customTemplate( array( Theme::i()->getTemplate( 'submit', 'gallery' ), 'createAlbum' ) );
+			$createAlbumForm = $createAlbumForm->customTemplate( array( \IPS\Theme::i()->getTemplate( 'submit', 'gallery' ), 'createAlbum' ) );
 		}
 		
 		/* Can we choose an existing album? */
 		$existingAlbumForm	= NULL;
-		$albumsInCategory	= Member::loggedIn()->member_id ? Album::loadForSubmit( $category ) : array();
+		$albumsInCategory	= \IPS\Member::loggedIn()->member_id ? \IPS\gallery\Album::loadForSubmit( $category ) : array();
 
-		if ( count( $albumsInCategory ) )
+		if ( \count( $albumsInCategory ) )
 		{
 			/* Build the existing album form... */
-			$existingAlbumForm = new Form( 'choose_album', 'choose_selected_album' );
-			$existingAlbumForm->class .= 'cGalleryChooseAlbum';
+			$existingAlbumForm = new \IPS\Helpers\Form( 'choose_album', 'choose_selected_album' );
+			$existingAlbumForm->class .= 'ipsForm_vertical';
 			$existingAlbumForm->hiddenValues['category'] = $category->_id;
-			$existingAlbumForm->hiddenValues['_pi'] = Request::i()->_pi;
+			$existingAlbumForm->hiddenValues['_pi'] = \IPS\Request::i()->_pi;
 			$albums = array();
 			foreach( $albumsInCategory as $id => $album )
 			{
 				$albums[ $id ] = $album->_title;
 			}
-			$existingAlbumForm->add( new Radio( 'existing_album', NULL, FALSE, array( 'options' => $albums, 'noDefault' => TRUE ), NULL, NULL, NULL, 'set_album_owner' ) );
+			$existingAlbumForm->add( new \IPS\Helpers\Form\Radio( 'existing_album', NULL, FALSE, array( 'options' => $albums, 'noDefault' => TRUE ), NULL, NULL, NULL, 'set_album_owner' ) );
 			
 			/* When we submit it, we can continue... */
 			if ( $existingAlbumFormValues = $existingAlbumForm->values() )
 			{
-				return array( 'category' => $category, 'album' => Album::loadAndCheckPerms( $existingAlbumFormValues['existing_album'], 'add' ), 'guest_email' => isset( Request::i()->guest_email ) ? Request::i()->guest_email : NULL );
+				return array( 'category' => $category, 'album' => \IPS\gallery\Album::loadAndCheckPerms( $existingAlbumFormValues['existing_album'], 'add' ), 'guest_email' => isset( \IPS\Request::i()->guest_email ) ? \IPS\Request::i()->guest_email : NULL );
 			}
 			
 			/* Otherwise, display it */
-			$existingAlbumForm = $existingAlbumForm->customTemplate( array( Theme::i()->getTemplate( 'submit', 'gallery' ), 'existingAlbumForm' ), $category );
+			$existingAlbumForm = $existingAlbumForm->customTemplate( array( \IPS\Theme::i()->getTemplate( 'submit', 'gallery' ), 'existingAlbumForm' ), $category );
 		}
 		
 		/* If there's nothing we can do, we can just continue */
@@ -425,34 +388,34 @@ class submit extends Controller
 		{
 			if ( $category->allow_albums == 2 )
 			{
-				Output::i()->error( 'node_error_no_perm', '2G376/2', 403, '' );
+				\IPS\Output::i()->error( 'node_error_no_perm', '2G376/2', 403, '' );
 			}
-			return array( 'category' => $category, 'album' => NULL, 'guest_email' => isset( Request::i()->guest_email ) ? Request::i()->guest_email : NULL );
+			return array( 'category' => $category, 'album' => NULL, 'guest_email' => isset( \IPS\Request::i()->guest_email ) ? \IPS\Request::i()->guest_email : NULL );
 		}
 		/* Otherwise, ask the user what they want to do */
 		else
 		{
-			return Theme::i()->getTemplate('submit')->chooseAlbum( $category, $createAlbumForm, $canCreateAlbum, $maximumAlbums, $existingAlbumForm );
+			return \IPS\Theme::i()->getTemplate('submit')->chooseAlbum( $category, $createAlbumForm, $canCreateAlbum, $maximumAlbums, $existingAlbumForm );
 		}
 	}
 	
 	/**
 	 * Step 2: Upload images and configure details
 	 *
-	 * @param Url $url	The URL
-	 * @param array $data	The current data
+	 * @param	string	$url	The URL
+	 * @param	array	$data	The current data
 	 * @return	string|array
 	 */
-	public function chooseImagesForm( Url $url, array $data ): array|string
+	public function chooseImagesForm( $url, $data )
 	{				
 		$album		= $data['album'];
 		$category	= $data['category'];
 
 		/* How many images are allowed? */
 		$maxNumberOfImages = NULL;
-		if ( $album and Member::loggedIn()->group['g_img_album_limit'] )
+		if ( $album and \IPS\Member::loggedIn()->group['g_img_album_limit'] )
 		{
-			$maxNumberOfImages = Member::loggedIn()->group['g_img_album_limit'] - ( $album->count_imgs + $album->count_imgs_hidden );
+			$maxNumberOfImages = \IPS\Member::loggedIn()->group['g_img_album_limit'] - ( $album->count_imgs + $album->count_imgs_hidden );
 		}
 
 		/* Limit uploads to what we know we can process on this server */
@@ -462,25 +425,25 @@ class submit extends Controller
 		}
 
 		/* Init form */
-		$form = new Form( 'upload_images', 'continue', $url );
-		$form->class = 'ipsForm--vertical ipsForm--choose-images-from';
+		$form = new \IPS\Helpers\Form( 'upload_images', 'continue', $url );
+		$form->class = 'ipsForm_vertical';
 
 		/* These form fields are not displayed to the user, however the fancy uploader process populates them via javascript */
-		$form->add( new TextArea( 'credit_all', NULL, FALSE ) );
-		$form->add( new TextArea( 'copyright_all', NULL, FALSE ) );
-		$form->add( new TextArea( 'tags_all', NULL, FALSE ) );
-		$form->add( new TextArea( 'prefix_all', NULL, FALSE ) );
-		$form->add( new TextArea( 'images_order', NULL, FALSE ) );
-		$form->add( new TextArea( 'images_info', NULL, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'credit_all', NULL, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'copyright_all', NULL, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'tags_all', NULL, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'prefix_all', NULL, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'images_order', NULL, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'images_info', NULL, FALSE ) );
 
-		if( Settings::i()->gallery_nsfw )
+		if( \IPS\Settings::i()->gallery_nsfw )
 		{
-			$form->add( new Number( 'nsfw_all', NULL, FALSE ) );
+			$form->add( new \IPS\Helpers\Form\Number( 'nsfw_all', NULL, FALSE ) );
 		}
 
-		if( Member::loggedIn()->member_id )
+		if( \IPS\Member::loggedIn()->member_id )
 		{
-			$form->add( new Number( 'images_autofollow_all', 1, FALSE ) );
+			$form->add( new \IPS\Helpers\Form\Number( 'images_autofollow_all', 1, FALSE ) );
 		}
 
 		/* Add upload field */
@@ -502,18 +465,18 @@ class submit extends Controller
 
 		$unlimitedMaxSize = TRUE;
 
-		if ( Member::loggedIn()->group['g_max_upload'] )
+		if ( \IPS\Member::loggedIn()->group['g_max_upload'] )
 		{
-			$maxFileSizes['image'] = Member::loggedIn()->group['g_max_upload'] / 1024;
+			$maxFileSizes['image'] = \IPS\Member::loggedIn()->group['g_max_upload'] / 1024;
 			$unlimitedMaxSize = FALSE;
 		}
-		if ( Member::loggedIn()->group['g_movies'] )
+		if ( \IPS\Member::loggedIn()->group['g_movies'] )
 		{
 			$options['image'] = NULL;
-			$options['allowedFileTypes'] = array_merge( Image::supportedExtensions(), array( 'flv', 'f4v', 'wmv', 'mpg', 'mpeg', 'mp4', 'mkv', 'm4a', 'm4v', '3gp', 'mov', 'avi', 'webm', 'ogg', 'ogv' ) );
-			if ( Member::loggedIn()->group['g_movie_size'] )
+			$options['allowedFileTypes'] = array_merge( \IPS\Image::supportedExtensions(), array( 'flv', 'f4v', 'wmv', 'mpg', 'mpeg', 'mp4', 'mkv', 'm4a', 'm4v', '3gp', 'mov', 'avi', 'webm', 'ogg', 'ogv' ) );
+			if ( \IPS\Member::loggedIn()->group['g_movie_size'] )
 			{
-				$maxFileSizes['movie'] = Member::loggedIn()->group['g_movie_size'] / 1024;
+				$maxFileSizes['movie'] = \IPS\Member::loggedIn()->group['g_movie_size'] / 1024;
 				$unlimitedMaxSize = FALSE;
 			}
 			else
@@ -521,54 +484,54 @@ class submit extends Controller
 				$unlimitedMaxSize = TRUE;
 			}
 		}
-		if ( count( $maxFileSizes ) AND !$unlimitedMaxSize )
+		if ( \count( $maxFileSizes ) AND !$unlimitedMaxSize )
 		{
 			$options['maxFileSize'] = max( $maxFileSizes );
 		}
 
-		$uploader = new Upload( 'images', array(), TRUE, $options, function( $val ) use ( $maxNumberOfImages, $maxFileSizes ) {
-			if ( $maxNumberOfImages !== NULL and count( $val ) > $maxNumberOfImages )
+		$uploader = new \IPS\Helpers\Form\Upload( 'images', array(), TRUE, $options, function( $val ) use ( $maxNumberOfImages, $maxFileSizes ) {
+			if ( $maxNumberOfImages !== NULL and \count( $val ) > $maxNumberOfImages )
 			{
 				if ( $maxNumberOfImages < 1 )
 				{
-					throw new DomainException( Member::loggedIn()->language()->addToStack( 'gallery_images_no_more' ) );
+					throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'gallery_images_no_more' ) );
 				}
 				else
 				{
-					throw new DomainException( Member::loggedIn()->language()->addToStack( 'gallery_images_too_many', FALSE, array( 'pluralize' => array( $maxNumberOfImages ) ) ) );
+					throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'gallery_images_too_many', FALSE, array( 'pluralize' => array( $maxNumberOfImages ) ) ) );
 				}
 			}
 
 			foreach ( $val as $file )
 			{
 				$ext = mb_substr( $file->filename, ( mb_strrpos( $file->filename, '.' ) + 1 ) );
-				if ( in_array( mb_strtolower( $ext ), Image::supportedExtensions() ) )
+				if ( \in_array( mb_strtolower( $ext ), \IPS\Image::supportedExtensions() ) )
 				{
 					/* The size was saved as kb, then divided by 1024 above to figure out how many MB to allow. So now we have '2' for 2MB for instance, so we need
 						to multiply that by 1024*1024 in order to get the byte size again */
 					if ( isset( $maxFileSizes['image'] ) and $file->filesize() > ( $maxFileSizes['image'] * 1048576 ) )
 					{
-						throw new DomainException( Member::loggedIn()->language()->addToStack( 'upload_image_too_big', FALSE, array( 'sprintf' => array( Filesize::humanReadableFilesize( $maxFileSizes['image'] * 1048576 ) ) ) ) );
+						throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'upload_image_too_big', FALSE, array( 'sprintf' => array( \IPS\Output\Plugin\Filesize::humanReadableFilesize( $maxFileSizes['image'] * 1048576 ) ) ) ) );
 					}
 				}
 				elseif ( isset( $maxFileSizes['movie'] ) and $file->filesize() > ( $maxFileSizes['movie'] * 1048576 ) )
 				{
-					throw new DomainException( Member::loggedIn()->language()->addToStack( 'upload_movie_too_big', FALSE, array( 'sprintf' => array( Filesize::humanReadableFilesize( $maxFileSizes['movie'] * 1048576 ) ) ) ) );
+					throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'upload_movie_too_big', FALSE, array( 'sprintf' => array( \IPS\Output\Plugin\Filesize::humanReadableFilesize( $maxFileSizes['movie'] * 1048576 ) ) ) ) );
 				}
 			}
 		} );
 
-		$uploader->template = array( Theme::i()->getTemplate( 'forms', 'gallery', 'front' ), 'imageUpload' );
+		$uploader->template = array( \IPS\Theme::i()->getTemplate( 'forms', 'gallery', 'front' ), 'imageUpload' );
 		$form->add( $uploader );
 
 		/* Add tag fields so we can validate it */
-		if( isset( Request::i()->images_info ) AND ImageClass::canTag( NULL, $category ) )
+		if( isset( \IPS\Request::i()->images_info ) AND \IPS\gallery\Image::canTag( NULL, $category ) )
 		{
-			$imagesData		= json_decode( Request::i()->images_info, true );
+			$imagesData		= json_decode( \IPS\Request::i()->images_info, true );
 
-			foreach( Request::i()->images_existing as $imageId )
+			foreach( \IPS\Request::i()->images_existing as $imageId )
 			{
-				if( $tagsField = ImageClass::tagsFormField( null, $category ) )
+				if( $tagsField = \IPS\gallery\Image::tagsFormField( NULL, $category ) )
 				{
 					$tagsFieldName		= $tagsField->name . '_' . $imageId;
 					$tagsField->name	= $tagsFieldName;
@@ -590,16 +553,16 @@ class submit extends Controller
 
 					if( !$tagsValue )
 					{
-						$tagsValue	= Request::i()->tags_all;
-						$tagsPrefix	= Request::i()->prefix_all;
+						$tagsValue	= \IPS\Request::i()->tags_all;
+						$tagsPrefix	= \IPS\Request::i()->prefix_all;
 					}
 
 					$checkboxInput	= $tagsFieldName . '_freechoice_prefix';
 					$prefixinput	= $tagsFieldName . '_prefix';
 
-					Request::i()->$tagsFieldName	= ( is_array( $tagsValue ) ) ? implode( "\n", $tagsValue ) : $tagsValue;
-					Request::i()->$checkboxInput	= 1;
-					Request::i()->$prefixinput		= $tagsPrefix;
+					\IPS\Request::i()->$tagsFieldName	= ( \is_array( $tagsValue ) ) ? implode( "\n", $tagsValue ) : $tagsValue;
+					\IPS\Request::i()->$checkboxInput	= 1;
+					\IPS\Request::i()->$prefixinput		= $tagsPrefix;
 
 					$form->add( $tagsField );
 				}
@@ -613,7 +576,7 @@ class submit extends Controller
 		{
 			return array( 'html' => $this->processUploads( $values, $url, $data ) );
 		}
-		elseif( isset( Output::i()->httpHeaders['X-IPS-FormError'] ) AND Output::i()->httpHeaders['X-IPS-FormError'] == 'true' )
+		elseif( isset( \IPS\Output::i()->httpHeaders['X-IPS-FormError'] ) AND \IPS\Output::i()->httpHeaders['X-IPS-FormError'] == 'true' )
 		{
 			foreach ( $form->elements as $elements )
 			{
@@ -642,11 +605,11 @@ class submit extends Controller
 
 						if( isset( $imagesWithIssues[ $fieldId ] ) )
 						{
-							$imagesWithIssues[ $fieldId ][ $fieldName ] = Member::loggedIn()->language()->addToStack( $fieldError );
+							$imagesWithIssues[ $fieldId ][ $fieldName ] = \IPS\Member::loggedIn()->language()->addToStack( $fieldError );
 						}
 						else
 						{
-							$imagesWithIssues[ $fieldId ] = array( $fieldName => Member::loggedIn()->language()->addToStack( $fieldError ) );
+							$imagesWithIssues[ $fieldId ] = array( $fieldName => \IPS\Member::loggedIn()->language()->addToStack( $fieldError ) );
 						}
 					}
 				}
@@ -654,22 +617,22 @@ class submit extends Controller
 		}
 		
 		/* Display */
-		return array( 'html' => Theme::i()->getTemplate( 'submit' )->uploadImages( $form, $category ), 'errors' => $imagesWithIssues );
+		return array( 'html' => \IPS\Theme::i()->getTemplate( 'submit' )->uploadImages( $form, $category ), 'errors' => $imagesWithIssues );
 	}
 	
 	/**
 	 * Process the uploaded files
 	 *
-	 * @param array $values		Values from the form submission
-	 * @param Url $url	The URL
-	 * @param array $data	The current data
+	 * @param	array 	$values		Values from the form submission
+	 * @param	string	$url	The URL
+	 * @param	array	$data	The current data
 	 * @return	string
 	 * @note	This returns a multiredirector instance which processes all of the images
 	 */
-	public function processUploads( array $values, Url $url, array $data ): string
+	public function processUploads( $values, $url, $data )
 	{
 		/* Get any records we had before in case we need to delete them */
-		$existing = iterator_to_array( Db::i()->select( '*', 'gallery_images_uploads', array( 'upload_session=?', session_id() ) )->setKeyField( 'upload_location' ) );
+		$existing = iterator_to_array( \IPS\Db::i()->select( '*', 'gallery_images_uploads', array( 'upload_session=?', session_id() ) )->setKeyField( 'upload_location' ) );
 
 		/* Get our image order first, as that's the order we want to loop through in */
 		$imageOrder = json_decode( $values['images_order'], true );
@@ -677,10 +640,8 @@ class submit extends Controller
 		/* Get the image info (caption, etc.) - note this data has NOT been sanitized at this point */
 		$imagesData = json_decode( $values['images_info'], true );
 
-		/* Build a list of image tags */
-		$imageTags = [];
-
 		/* Loop through the values we have */
+		$images		= array();
 		$inserts	= array();
 		$i			= 0;
 
@@ -690,7 +651,7 @@ class submit extends Controller
 
 			$imageData = array();
 
-			if( is_array( $imagesData ) )
+			if( \is_array( $imagesData ) )
 			{
 				foreach( $imagesData as $dataEntry )
 				{
@@ -718,12 +679,12 @@ class submit extends Controller
 				$imageData['image_tags_prefix']	= $values['prefix_all'];
 			}
 
-			if( Member::loggedIn()->member_id )
+			if( \IPS\Member::loggedIn()->member_id )
 			{
 				$imageData['image_auto_follow'] = $values['images_autofollow_all'];
 			}
 
-			if( Settings::i()->gallery_nsfw and !isset( $imageData['image_nsfw'] ) )
+			if( \IPS\Settings::i()->gallery_nsfw and !isset( $imageData['image_nsfw'] ) )
 			{
 				$imageData['image_nsfw'] = $values['nsfw_all'];
 			}
@@ -737,21 +698,15 @@ class submit extends Controller
 			/* Image scanner labels */
 			$imageData['labels'] = $image->labels;
 
-			if( isset( $imageData['image_tags'] ) and $imageData['image_tags'] )
-			{
-				$tags = is_array( $imageData['image_tags'] ) ? $imageData['image_tags'] : explode( "\n", $imageData['image_tags'] );
-				$imageTags = array_merge( $imageTags, $tags );
-			}
-
 			if ( !isset( $existing[ (string) $image ] ) )
 			{
 				$inserts[] = array(
 					'upload_session'	=> session_id(),
-					'upload_member_id'	=> (int) Member::loggedIn()->member_id,
+					'upload_member_id'	=> (int) \IPS\Member::loggedIn()->member_id,
 					'upload_location'	=> (string) $image,
 					'upload_file_name'	=> $image->originalFilename,
 					'upload_date'		=> time(),
-					'upload_order'		=> ( is_array( $imageOrder ) ) ? array_search( $image->tempId, $imageOrder ) : $i,
+					'upload_order'		=> ( \is_array( $imageOrder ) ) ? array_search( $image->tempId, $imageOrder ) : $i,
 					'upload_data'		=> json_encode( $imageData ),
 					'upload_exif'		=> $image->exifData ? json_encode( $image->exifData ) : NULL
 				);
@@ -761,9 +716,9 @@ class submit extends Controller
 		}
 
 		/* Insert them into the database */
-		if( count( $inserts ) )
+		if( \count( $inserts ) )
 		{
-			Db::i()->insert( 'gallery_images_uploads', $inserts );
+			\IPS\Db::i()->insert( 'gallery_images_uploads', $inserts );
 		}
 
 		/* Delete any that we don't have any more */
@@ -771,19 +726,18 @@ class submit extends Controller
 		{
 			try
 			{
-				File::get( 'gallery_Images', $location )->delete();
+				\IPS\File::get( 'gallery_Images', $location )->delete();
 			}
-			catch ( Exception ) { }
+			catch ( \Exception $e ) { }
 			
-			Db::i()->delete( 'gallery_images_uploads', array( 'upload_session=? and upload_location=?', $file['upload_session'], $file['upload_location'] ) );
+			\IPS\Db::i()->delete( 'gallery_images_uploads', array( 'upload_session=? and upload_location=?', $file['upload_session'], $file['upload_location'] ) );
 		}
 
 		/* Get the total number of images now as it will decrease each cycle moving forward */
-		$totalImages = Db::i()->select( 'count(*)', 'gallery_images_uploads', array( 'upload_session=?', session_id() ), NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first();
+		/* @note SELECT_FROM_WRITE_SERVER added in pull #5011 */
+		$totalImages = \IPS\Db::i()->select( 'count(*)', 'gallery_images_uploads', array( 'upload_session=?', session_id() ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 
-		$url = $url->setQueryString( [
-			'totalImages' => $totalImages,
-			'tags' => $imageTags ] );
+		$url = $url->setQueryString( 'totalImages', $totalImages );
 		if ( isset( $data['guest_email'] ) )
 		{
 			$url = $url->setQueryString( 'guest_email', $data['guest_email'] );
@@ -796,22 +750,23 @@ class submit extends Controller
 	/**
 	 * Wizard step: Process the saved data to create an album and save images
 	 *
-	 * @param Url|null $url The URL
-	 * @return string|null
+	 * @param	string|NULL	$url	The URL
+	 * @return	string
 	 */
-	public function saveImages( Url $url=NULL ): ?string
+	public function saveImages( $url=NULL )
 	{
 		/* Process */
-		$url = $url ? $url->setQueryString( 'do', 'saveImages' ) : Request::i()->url()->stripQueryString( array( 'mr' ) );
+		$url = $url ? $url->setQueryString( 'do', 'saveImages' ) : \IPS\Request::i()->url()->stripQueryString( array( 'mr' ) );
 		
 		/* Return the multiredirector */
-		$multiRedirect = (string) new MultipleRedirect( $url,
+		$multiRedirect = (string) new \IPS\Helpers\MultipleRedirect( $url,
 			/* Function to process each image */
 			function( $offset ) use ( $url )
 			{
-				$offset = intval( $offset );
-				
-				$existing = Db::i()->select( '*', 'gallery_images_uploads', array( 'upload_session=?', session_id() ), 'upload_order ASC', array( 0, 1 ), NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->setKeyField( 'upload_location' );
+				$offset = \intval( $offset );
+
+				/* @note SELECT_FROM_WRITE_SERVER added in pull #5011 */
+				$existing = \IPS\Db::i()->select( '*', 'gallery_images_uploads', array( 'upload_session=?', session_id() ), 'upload_order ASC', array( 0, 1 ), NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->setKeyField( 'upload_location' );
 
 				/* Get category and album data */
 				$data = $this->chooseContainerForm( $url );
@@ -824,7 +779,7 @@ class submit extends Controller
 						'category'		=> $data['category']->_id,
 						'imageLocation'	=> $location,
 						'album'			=> $data['album'] ? $data['album']->_id : NULL,
-						'guest_email'	=> $data['guest_email'] ?? NULL
+						'guest_email'	=> isset( $data['guest_email'] ) ? $data['guest_email'] : NULL
 					);
 					
 					/* Get the data from the row and set */
@@ -835,7 +790,7 @@ class submit extends Controller
 						unset( $fileData['requires_moderation'] );
 					}
 
-					if( count( $fileData ) )
+					if( \count( $fileData ) )
 					{
 						foreach( $fileData as $k => $v )
 						{
@@ -843,7 +798,7 @@ class submit extends Controller
 						}	
 					}
 
-					if( isset( $values['image_tags'] ) AND $values['image_tags'] AND !is_array( $values['image_tags'] ) )
+					if( isset( $values['image_tags'] ) AND $values['image_tags'] AND !\is_array( $values['image_tags'] ) )
 					{
 						$values['image_tags']	= explode( "\n", $values['image_tags'] );
 					}
@@ -865,15 +820,15 @@ class submit extends Controller
 							{
 								try
 								{
-									$thumb = Db::i()->select( '*', 'core_files_temp', array( 'id=?', $value ) )->first();
+									$thumb = \IPS\Db::i()->select( '*', 'core_files_temp', array( 'id=?', $value ) )->first();
 
 									$values['image_thumbnail'] = $thumb['contents'];
 									$values['image_thumbnail_requires_moderation'] = $thumb['requires_moderation'];
 									$thumbnailReset = TRUE;
-									Db::i()->delete( 'core_files_temp', array( 'id=?', $value ) );
+									\IPS\Db::i()->delete( 'core_files_temp', array( 'id=?', $value ) );
 									break;
 								}
-								catch( UnderflowException ){}
+								catch( \UnderflowException $e ){}
 							}
 						}
 
@@ -884,22 +839,22 @@ class submit extends Controller
 					}
 
 					/* If GPS is supported but the admin did not specify whether to show the map or not, then default to showing it */
-					$image = File::get( 'gallery_Images', $location );
+					$image = \IPS\File::get( 'gallery_Images', $location );
 
 					$exif = $file['upload_exif'] ? json_decode( $file['upload_exif'], true ) : NULL;
 					$values['_exif'] = $exif;
 
-					if( GeoLocation::enabled() and $exif )
+					if( \IPS\GeoLocation::enabled() and $exif )
 					{
 						if( isset( $exif['GPS.GPSLatitudeRef'] ) && isset( $exif['GPS.GPSLatitude'] ) && isset( $exif['GPS.GPSLongitudeRef'] ) && isset( $exif['GPS.GPSLongitude'] ) )
 						{
-							$values['image_gps_show'] = ( isset( $values['image_gps_show'] ) ) ? (int) ( isset( $values['image_gps_show_checkbox'] ) ) : Settings::i()->gallery_maps_default;
+							$values['image_gps_show'] = ( isset( $values['image_gps_show'] ) ) ? (int) ( isset( $values['image_gps_show_checkbox'] ) ) : \IPS\Settings::i()->gallery_maps_default;
 						}
 					}
 
 					/* We will create a dummy form to sanitize the elements */
-					$formElements	= ImageClass::formElements();
-					$testValuesForm	= new Form;
+					$formElements	= \IPS\gallery\Image::formElements();
+					$testValuesForm	= new \IPS\Helpers\Form;
 
 					foreach( $formElements as $key => $element )
 					{
@@ -917,11 +872,11 @@ class submit extends Controller
 						{
 							if( $name == 'image_description' )
 							{
-								Request::i()->filedata__image_description = $values[ $name ];
+								\IPS\Request::i()->filedata__image_description = $values[ $name ];
 							}
 							else
 							{
-								Request::i()->$name	= ( is_array( $values[ $name ] ) ) ? implode( "\n", $values[ $name ] ) : $values[ $name ];
+								\IPS\Request::i()->$name	= ( \is_array( $values[ $name ] ) ) ? implode( "\n", $values[ $name ] ) : $values[ $name ];
 							}
 
 							if( $name == 'image_tags' )
@@ -929,23 +884,23 @@ class submit extends Controller
 								$checkboxInput	= $name . '_freechoice_prefix';
 								$prefixinput	= $name . '_prefix';
 
-								Request::i()->$checkboxInput	= 1;
-								Request::i()->$prefixinput		= ( isset( $values[ $name . '_prefix' ] ) ) ? $values[ $name . '_prefix' ] : '';
+								\IPS\Request::i()->$checkboxInput	= 1;
+								\IPS\Request::i()->$prefixinput		= ( isset( $values[ $name . '_prefix' ] ) ) ? $values[ $name . '_prefix' ] : '';
 
 								unset( $values[ $name . '_prefix' ] );
 							}
-							elseif( $name == 'image_auto_follow' AND Member::loggedIn()->member_id )
+							elseif( $name == 'image_auto_follow' AND \IPS\Member::loggedIn()->member_id )
 							{
 								$checkboxInput	= $name . '_checkbox';
 
-								Request::i()->$checkboxInput	= $values[ $name ];
+								\IPS\Request::i()->$checkboxInput	= $values[ $name ];
 							}
 							elseif( $name == 'image_nsfw' )
 							{
 								$checkboxInput	= $name . '_checkbox';
 
-								Request::i()->$checkboxInput	= $values[$checkboxInput] ?? $values[$name];
-								Request::i()->$name			= $values[$checkboxInput] ?? $values[$name];
+								\IPS\Request::i()->$checkboxInput	= $values[$checkboxInput] ?? $values[$name];
+								\IPS\Request::i()->$name			= $values[$checkboxInput] ?? $values[$name];
 							}
 
 							unset( $values[ $name ] );
@@ -954,8 +909,8 @@ class submit extends Controller
 
 					$submitted = "{$testValuesForm->id}_submitted";
 
-					Request::i()->$submitted	= true;
-					Request::i()->csrfKey		= Session::i()->csrfKey;
+					\IPS\Request::i()->$submitted	= true;
+					\IPS\Request::i()->csrfKey		= \IPS\Session::i()->csrfKey;
 
 					if( $cleaned = $testValuesForm->values() )
 					{
@@ -966,14 +921,14 @@ class submit extends Controller
 					}
 
 					/* And now create the images */
-					$image	= ImageClass::createFromForm( $values, $data['category'], FALSE );
+					$image	= \IPS\gallery\Image::createFromForm( $values, $data['category'], FALSE );
 					$image->markRead();
 					
 					/* Delete that file */
-					Db::i()->delete( 'gallery_images_uploads', array( 'upload_unique_id=?', $file['upload_unique_id'] ) );
+					\IPS\Db::i()->delete( 'gallery_images_uploads', array( 'upload_unique_id=?', $file['upload_unique_id'] ) );
 
 					/* Go to next */
-					return array( ++$offset, Member::loggedIn()->language()->addToStack('processing'), number_format( 100 / ( Request::i()->totalImages ?: $offset ) * $offset, 2 ) );
+					return array( ++$offset, \IPS\Member::loggedIn()->language()->addToStack('processing'), number_format( 100 / ( \IPS\Request::i()->totalImages ?: $offset ) * $offset, 2 ) );
 				}
 
 				/* Update last image info */
@@ -993,47 +948,47 @@ class submit extends Controller
 			/* Function to call when done */
 			function() use( $url )
 			{
-				if ( isset( Request::i()->guest_email ) )
+				if ( isset( \IPS\Request::i()->guest_email ) )
 				{
-					Output::i()->redirect( Url::internal( 'app=core&module=system&controller=register', 'front', 'register' ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=register', 'front', 'register' ) );
 				}
-				elseif ( Request::i()->totalImages === 1 )
+				elseif ( \IPS\Request::i()->totalImages === 1 )
 				{
 					/* If we are only sending one image, send a normal notification and award points */
-					$image = ImageClass::constructFromData( Db::i()->select( '*', 'gallery_images', NULL, 'image_id DESC', 1 )->first() );
+					$image = \IPS\gallery\Image::constructFromData( \IPS\Db::i()->select( '*', 'gallery_images', NULL, 'image_id DESC', 1 )->first() );
 					if ( !$image->hidden() )
 					{
 						$image->sendNotifications();
 					}
-					else if( !in_array( $image->hidden(), array( -1, -3 ) ) )
+					else if( !\in_array( $image->hidden(), array( -1, -3 ) ) )
 					{
 						$image->sendUnapprovedNotification();
 					}
 										
 					/* Then redirect */
-					Output::i()->redirect( $image->url() );
+					\IPS\Output::i()->redirect( $image->url() );
 				}
 				else
 				{
 					/* Get category and album data */
 					$data = $this->chooseContainerForm( $url );
 
-					if ( Member::loggedIn()->moderateNewContent() OR ImageClass::moderateNewItems( Member::loggedIn(), $data['category'] ) )
+					if ( \IPS\Member::loggedIn()->moderateNewContent() OR \IPS\gallery\Image::moderateNewItems( \IPS\Member::loggedIn(), $data['category'] ) )
 					{
-						ImageClass::_sendUnapprovedNotifications( $data['category'], $data['album'] );
+						\IPS\gallery\Image::_sendUnapprovedNotifications( $data['category'], $data['album'] );
 					}
 					else
 					{
-						ImageClass::_sendNotifications( $data['category'], $data['album'], null, Request::i()->tags ?? [] );
+						\IPS\gallery\Image::_sendNotifications( $data['category'], $data['album'] );
 					}
 					
-					Output::i()->redirect( $data['album'] ? $data['album']->url() : $data['category']->url() );
+					\IPS\Output::i()->redirect( $data['album'] ? $data['album']->url() : $data['category']->url() );
 				}
 			}
 		);
 		
 		/* Display redirect */
-		return Theme::i()->getTemplate( 'submit' )->processing( $multiRedirect );
+		return \IPS\Theme::i()->getTemplate( 'submit' )->processing( $multiRedirect );	
 	}
 
 	/**
@@ -1041,36 +996,36 @@ class submit extends Controller
 	 *
 	 * @return void
 	 */
-	protected function checkGps() : void
+	protected function checkGps()
 	{
 		/* If the service is not enabled just return now */
-		if( !GeoLocation::enabled() )
+		if( !\IPS\GeoLocation::enabled() )
 		{
-			Output::i()->json( array( 'hasGeo' => 0 ) );
+			\IPS\Output::i()->json( array( 'hasGeo' => 0 ) );
 		}
 
 		try
 		{
-			$temporaryImage = Db::i()->select( '*', 'core_files_temp', array( 'storage_extension=? AND id=?', 'gallery_Images', Request::i()->imageId ) )->first();
+			$temporaryImage = \IPS\Db::i()->select( '*', 'core_files_temp', array( 'storage_extension=? AND id=?', 'gallery_Images', \IPS\Request::i()->imageId ) )->first();
 		}
-		catch( UnderflowException )
+		catch( \UnderflowException $e )
 		{
-			Output::i()->error( 'node_error', '2G376/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2G376/1', 404, '' );
 		}
 
-		if( Image::exifSupported() and mb_strpos( $temporaryImage['mime'], 'image' ) === 0 )
+		if( \IPS\Image::exifSupported() and mb_strpos( $temporaryImage['mime'], 'image' ) === 0 )
 		{
-			$exif	= Image::create( File::get( $temporaryImage['storage_extension'], $temporaryImage['contents'] )->contents() )->parseExif();
+			$exif	= \IPS\Image::create( \IPS\File::get( $temporaryImage['storage_extension'], $temporaryImage['contents'] )->contents() )->parseExif();
 
-			if( count( $exif ) )
+			if( \count( $exif ) )
 			{
 				if( isset( $exif['GPS.GPSLatitudeRef'] ) && isset( $exif['GPS.GPSLatitude'] ) && isset( $exif['GPS.GPSLongitudeRef'] ) && isset( $exif['GPS.GPSLongitude'] ) )
 				{
-					Output::i()->json( array( 'hasGeo' => 1 ) );
+					\IPS\Output::i()->json( array( 'hasGeo' => 1 ) );
 				}
 			}
 		}
 
-		Output::i()->json( array( 'hasGeo' => 0 ) );
+		\IPS\Output::i()->json( array( 'hasGeo' => 0 ) );
 	}
 }

@@ -10,36 +10,30 @@
  */
 
 namespace IPS\forums\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Api\GraphQL\CommentMutator;
-use IPS\Content\Comment;
-use IPS\forums\api\GraphQL\Types\PostType;
-use IPS\forums\Topic\Post;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Report post mutation for GraphQL API
  */
-class ReportPost extends CommentMutator
+class _ReportPost extends \IPS\Content\Api\GraphQL\CommentMutator
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\forums\Topic\Post';
+	protected $class = 'IPS\forums\Topic\Post';
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Report a post";
+	public static $description = "Report a post";
 
 	/*
 	 * Mutation arguments
@@ -58,33 +52,30 @@ class ReportPost extends CommentMutator
 
 	/**
 	 * Return the mutation return type
-	 *
-	 * @return PostType
 	 */
-	public function type() : PostType
+	public function type() 
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::post();
 	}
 
 	/**
-	 * Resolves this query
+	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @param 	array $context 	Context values
-	 * @param	mixed $info
-	 * @return	Post
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\forums\Topic\Post
 	 */
-	public function resolve( mixed $val, array $args, array $context, mixed $info ) : Comment
+	public function resolve($val, $args, $context, $info)
 	{
 		/* Get post */
 		try
 		{
-			$post = Post::loadAndCheckPerms( $args['id'] );
+			$post = \IPS\forums\Topic\Post::loadAndCheckPerms( $args['id'] );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'NO_POST', '1F295/1_graphl', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_POST', '1F295/1_graphl', 403 );
 		}
 		
 		/* Do it */

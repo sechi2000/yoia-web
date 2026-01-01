@@ -12,6 +12,12 @@
             "do": "",
             "restriction": "invoices_manage"
         },
+        "shipping": {
+            "tab": "nexus",
+            "controller": "shipping",
+            "do": "",
+            "restriction": "shiporders_manage"
+        },
         "donations": {
             "tab": "nexus",
             "controller": "donations",
@@ -22,7 +28,8 @@
             "tab": "nexus",
             "controller": "payouts",
             "do": "",
-            "restriction": "payouts_manage"
+            "restriction": null,
+            "callback": "return ( ( \\IPS\\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_manage' ) and \\IPS\\Settings::i()->nexus_payout ) or \\IPS\\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_settings' ) );"
         },
         "paymentsettings": {
             "tab": "nexus",
@@ -109,13 +116,6 @@
             "controller": "markets",
             "do": "",
             "restriction": "markets_manage"
-        },
-        "donations": {
-            "tab": "stats",
-            "controller": "donations",
-            "do": "",
-            "restriction": "donations_stats_manage",
-            "subcontrollers": ""
         }
     }
 }

@@ -12,24 +12,16 @@
 namespace IPS\downloads\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Log Cleanup Task
  */
-class logCleanup extends Task
+class _logCleanup extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -40,13 +32,13 @@ class logCleanup extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{	
-		foreach ( Db::i()->select( '*', 'downloads_categories', 'clog>0' ) as $cat )
+		foreach ( \IPS\Db::i()->select( '*', 'downloads_categories', 'clog>0' ) as $cat )
 		{
-			Db::i()->delete( 'downloads_downloads', array( 'dtime<? AND dfid IN(?)', DateTime::create()->sub( new DateInterval( 'P' . $cat['clog'] . 'D' ) )->getTimestamp(), Db::i()->select( 'file_id', 'downloads_files', array( 'file_cat=?', $cat['cid'] ) ) ) );
+			\IPS\Db::i()->delete( 'downloads_downloads', array( 'dtime<? AND dfid IN(?)', \IPS\DateTime::create()->sub( new \DateInterval( 'P' . $cat['clog'] . 'D' ) )->getTimestamp(), \IPS\Db::i()->select( 'file_id', 'downloads_files', array( 'file_cat=?', $cat['cid'] ) ) ) );
 		}
 				
 		return NULL;
@@ -61,7 +53,7 @@ class logCleanup extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 		
 	}

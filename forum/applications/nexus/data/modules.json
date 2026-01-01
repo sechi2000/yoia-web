@@ -10,8 +10,18 @@
             "protected": 1,
             "default": 0
         },
+        "support": {
+            "default_controller": "home",
+            "protected": 0,
+            "default": 0
+        },
         "clients": {
             "default_controller": "purchases",
+            "protected": 0,
+            "default": 0
+        },
+        "promotion": {
+            "default_controller": "",
             "protected": 0,
             "default": 0
         },
@@ -29,6 +39,11 @@
         },
         "customers": {
             "default_controller": null,
+            "protected": 0,
+            "default": 0
+        },
+        "support": {
+            "default_controller": "",
             "protected": 0,
             "default": 0
         },

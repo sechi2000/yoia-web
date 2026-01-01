@@ -11,22 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Task;
-use IPS\Task\Exception;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Queue Task
  */
-class queue extends Task
+class _queue extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -37,30 +31,28 @@ class queue extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		$this->runUntilTimeout( function(){
 			/* Try and get a queue item */
 			try
 			{
 				/* Run the next queue task, if any */
-				Task::runQueue();
+				\IPS\Task::runQueue();
 
 				/* Continue */
 				return TRUE;
 			}
 			/* If there's no queue items left, disable this task and return */
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{				
 				$this->enabled = FALSE;
 				$this->save();
 				return FALSE;
 			}
 		});
-
-		return null;
 	}
 		
 	/**

@@ -12,28 +12,23 @@
 namespace IPS\blog\extensions\core\RssImport;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content;
-use IPS\Content\Search\Index;
-use IPS\core\Rss\Import;
-use IPS\Extensions\RssImportAbstract;
-use IPS\Helpers\Form;
-use IPS\Member;
-use IPS\Node\Model;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	RSS Import extension: RssImport
  */
-class RssImport extends RssImportAbstract
+class _RssImport
 {
-	public string $fileStorage = 'blog_Blogs';
+	/**
+	 * @brief	RSSImport Class
+	 */
+	public $classes = array();
+
+	public $fileStorage = 'blog_Blogs';
 
 	/**
 	 * Constructor
@@ -46,11 +41,23 @@ class RssImport extends RssImportAbstract
 	}
 
 	/**
+	 * Return available options for a Form\Select
+	 *
+	 * @return array
+	 */
+	public function availableOptions()
+	{
+		/* We don't want to set up Blog feeds in the ACP */
+		return array();
+	}
+
+	/**
 	 * Show in the Admin CP?
 	 *
+	 * @param	Object 	$class	The class to check
 	 * @return boolean
 	 */
-	public function showInAdminCp(): bool
+	public function showInAdminCp( $class ): bool
 	{
 		return false;
 	}
@@ -58,26 +65,26 @@ class RssImport extends RssImportAbstract
 	/**
 	 * Node selector options
 	 *
-	 * @param Import|null $rss	Existing RSS object if editing|null if not
+	 * @param 	\IPS\core\Rss\Import|null	$rss	Existing RSS object if editing|NULL if not
 	 * @return array
 	 */
-	public function nodeSelectorOptions( ?Import $rss ): array
+	public function nodeSelectorOptions( $rss )
 	{
 		return array( 'class' => 'IPS\blog\Blog', 'permissionCheck' => 'view' );
 	}
 
 	/**
-	 * @param Import 	$rss 		RSS object
-	 * @param array $article 	RSS feed article importing
-	 * @param Model 		$container  Container object
-	 * @param string $content	Post content with read more link if set
-	 * @return Content
+	 * @param \IPS\core\Rss\Import 	$rss 		RSS object
+	 * @param array 				$article 	RSS feed article importing
+	 * @param \IPS\Node\Model 		$container  Container object
+	 * @param	string				$content	Post content with read more link if set
+	 * @return \IPS\Content
 	 */
-	public function create( Import $rss, array $article, Model $container, string $content ): Content
+	public function create( \IPS\core\Rss\Import $rss, $article, \IPS\Node\Model $container, $content )
 	{
 		$settings = $rss->settings;
 		$class = $rss->_class;
-		$member = Member::load( $rss->member );
+		$member = \IPS\Member::load( $rss->member );
 		$entry = $class::createItem( $member, NULL, $article['date'], $container );
 		$entry->name = $article['title'];
 		$entry->content = $content;
@@ -85,7 +92,7 @@ class RssImport extends RssImportAbstract
 		$entry->save();
 
 		/* Add to search index */
-		Index::i()->index( $entry );
+		\IPS\Content\Search\Index::i()->index( $entry );
 
 		/* Send notifications */
 		$entry->sendNotifications();
@@ -98,25 +105,25 @@ class RssImport extends RssImportAbstract
 	/**
 	 * Addition Form elements
 	 *
-	 * @param Form $form	The form
-	 * @param Import|null $rss	Existing RSS object if editing|null if not
+	 * @param	\IPS\Helpers\Form			$form	The form
+	 * @param	\IPS\core\Rss\Import|null		$rss	Existing RSS object if editing|NULL if not
 	 * @return	void
 	 */
-	public function form( Form $form, ?Import $rss=NULL ): void
+	public function form( &$form, $rss=NULL )
 	{
-		/* Blogs has its own front end controller */
+		/* Blogs has it's own front end controller */
 	}
 
 	/**
 	 * Process additional fields unique to this extension
 	 *
-	 * @param array $values	Values from form
-	 * @param Import $rss	Existing RSS object
+	 * @param	array				$values	Values from form
+	 * @param	\IPS\core\Rss\Import		$rss	Existing RSS object
 	 * @return	array
 	 */
-	public function saveForm( array &$values, Import $rss ): array
+	public function saveForm( &$values, $rss )
 	{
-		/* Blogs has its own front end controller */
+		/* Blogs has it's own front end controller */
 		return array( $values );
 	}
 }

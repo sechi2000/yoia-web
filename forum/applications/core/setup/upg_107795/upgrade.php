@@ -22,7 +22,7 @@ if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * 4.7.20 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Remove oprhaned promotions

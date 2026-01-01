@@ -12,41 +12,23 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application\Module;
-use IPS\Content\Search\Index;
-use IPS\convert\Software;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Photopost Core Converter
  */
-class Photopost extends Software
+class _Photopost extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "Photopost (8.x)";
@@ -55,9 +37,9 @@ class Photopost extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "photopost";
@@ -66,9 +48,9 @@ class Photopost extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertGroups'				=> array(
@@ -85,9 +67,9 @@ class Photopost extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertGroups',
@@ -98,10 +80,10 @@ class Photopost extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 
@@ -112,15 +94,15 @@ class Photopost extends Software
 
 				$options = array();
 				$options['none'] = 'None';
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[$group->g_id] = $group->name;
 				}
 
 				foreach( $this->db->select( '*', 'usergroups' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['groupid']}"]			= $group['groupname'];
-					Member::loggedIn()->language()->words["map_group_{$group['groupid']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['groupid']}"]			= $group['groupname'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['groupid']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 
 					$return['convertGroups']["map_group_{$group['groupid']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -135,29 +117,29 @@ class Photopost extends Software
 			case 'convertMembers':
 				$return['convertMembers'] = array();
 
-				Member::loggedIn()->language()->words['photo_location_desc'] = Member::loggedIn()->language()->addToStack( 'photo_location_nodb_desc' );
+				\IPS\Member::loggedIn()->language()->words['photo_location_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'photo_location_nodb_desc' );
 				$return['convertMembers']['photo_location'] = array(
 					'field_class'			=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
 					'field_hint'			=> "The path to the folder where avatars are saved (no trailing slash - usually /path_to_photopost/data/avatars):",
-					'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 
 				/* And decide what to do about these... */
 				foreach( array( 'homepage', 'icq', 'aim', 'yahoo', 'location', 'interests', 'occupation', 'bio' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["field_{$field}"]		= Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => ucwords( $field ) ) );
-					Member::loggedIn()->language()->words["field_{$field}_desc"]	= Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}"]		= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => ucwords( $field ) ) );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
 					$return['convertMembers']["field_{$field}"] = array(
 						'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 						'field_default'			=> 'no_convert',
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'no_convert'			=> Member::loggedIn()->language()->addToStack( 'no_convert' ),
-								'create_field'			=> Member::loggedIn()->language()->addToStack( 'create_field' ),
+								'no_convert'			=> \IPS\Member::loggedIn()->language()->addToStack( 'no_convert' ),
+								'create_field'			=> \IPS\Member::loggedIn()->language()->addToStack( 'create_field' ),
 							),
 							'userSuppliedInput'		=> 'create_field'
 						),
@@ -173,23 +155,23 @@ class Photopost extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Non-Content Rebuilds */
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
 
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
 
 		return array( "f_search_index_rebuild", "f_clear_caches", "f_signatures_rebuild" );
 	}
@@ -199,7 +181,7 @@ class Photopost extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -219,7 +201,7 @@ class Photopost extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -233,7 +215,7 @@ class Photopost extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -281,7 +263,7 @@ class Photopost extends Software
 					/* We don't actually need this, but we need to make sure the field was created */
 					$this->app->getLink( $pseudo, 'core_pfields_data' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$libraryClass->convertProfileField( array(
 						'pf_id'				=> $pseudo,
@@ -307,26 +289,26 @@ class Photopost extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
 		/* If we can't access profiles, don't bother trying to redirect */
-		if( !Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+		if( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 		{
 			return NULL;
 		}
 
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'member.php' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'member.php' ) !== FALSE )
 		{
 			try
 			{
-				$data = (string) $this->app->getLink( Request::i()->cat, array( 'members', 'core_members' ) );
-				return Member::load( $data )->url();
+				$data = (string) $this->app->getLink( \IPS\Request::i()->cat, array( 'members', 'core_members' ) );
+				return \IPS\Member::load( $data )->url();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

@@ -11,33 +11,23 @@
 namespace IPS\core\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Extensions\DashboardAbstract;
-use IPS\Helpers\Chart;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Dashboard extension: Member Stats
  */
-class MemberStats extends DashboardAbstract
+class _MemberStats
 {
 	/**
 	* Can the current user view this dashboard item?
 	*
 	* @return	bool
 	*/
-	public function canView(): bool
+	public function canView()
 	{
 		return TRUE;
 	}
@@ -47,21 +37,21 @@ class MemberStats extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
 		$stats = NULL;
 		
 		/* check the cache */
 		try
 		{
-			$stats = Store::i()->acpWidget_memberStats;
+			$stats = \IPS\Data\Store::i()->acpWidget_memberStats;
 			
 			if ( ! isset( $stats['_cached'] ) or $stats['_cached'] < time() - ( 60 * 30 ) )
 			{
 				$stats = NULL;
 			}
 		}
-		catch( Exception $ex ) { }
+		catch( \Exception $ex ) { }
 
 		if ( $stats === NULL )
 		{
@@ -71,32 +61,32 @@ class MemberStats extends DashboardAbstract
 			$where = array( array( 'completed=?', true ) );
 	
 			/* Member count */
-			$stats['member_count'] = Db::i()->select( 'COUNT(*)', 'core_members', $where )->first();
+			$stats['member_count'] = \IPS\Db::i()->select( 'COUNT(*)', 'core_members', $where )->first();
 			
 			/* Opt in members */
 			$where[] = 'allow_admin_mails=1';
-			$stats['member_optin'] = Db::i()->select( 'COUNT(*)', 'core_members', $where )->first();
+			$stats['member_optin'] = \IPS\Db::i()->select( 'COUNT(*)', 'core_members', $where )->first();
 			
 			$stats['_cached'] = time();
 			
 			/* stil here? */
-			Store::i()->acpWidget_memberStats = $stats;
+			\IPS\Data\Store::i()->acpWidget_memberStats = $stats;
 		}
 		
 		/* Init Chart */
-		$chart = new Chart;
+		$chart = new \IPS\Helpers\Chart;
 		
 		/* Specify headers */
-		$chart->addHeader( Member::loggedIn()->language()->get('chart_email_marketing_type'), "string" );
-		$chart->addHeader( Member::loggedIn()->language()->get('chart_members'), "number" );
+		$chart->addHeader( \IPS\Member::loggedIn()->language()->get('chart_email_marketing_type'), "string" );
+		$chart->addHeader( \IPS\Member::loggedIn()->language()->get('chart_members'), "number" );
 		
 		/* Add Rows */
-		$chart->addRow( array( Member::loggedIn()->language()->addToStack( 'memberStatsDashboard_optin' ), $stats['member_optin'] ) );
-		$chart->addRow( array( Member::loggedIn()->language()->addToStack( 'memberStatsDashboard_optout' ), $stats['member_count'] - $stats['member_optin'] ) );
+		$chart->addRow( array( \IPS\Member::loggedIn()->language()->addToStack( 'memberStatsDashboard_optin' ), $stats['member_optin'] ) );
+		$chart->addRow( array( \IPS\Member::loggedIn()->language()->addToStack( 'memberStatsDashboard_optout' ), $stats['member_count'] - $stats['member_optin'] ) );
 		
 				
 		/* Output */
-		return Theme::i()->getTemplate( 'dashboard' )->memberStats( $stats, $chart->render( 'PieChart', array(
+		return \IPS\Theme::i()->getTemplate( 'dashboard' )->memberStats( $stats, $chart->render( 'PieChart', array( 
 			'backgroundColor' 	=> '#ffffff',
 			'pieHole' => 0.4,
 			'colors' => array( '#44af94', '#cc535f' ),

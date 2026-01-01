@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <javascript app="convert">
- <file javascript_app="convert" javascript_location="admin" javascript_path="controllers/convert" javascript_name="ips.convert.menu.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100">/**
+ <file javascript_app="convert" javascript_location="admin" javascript_path="controllers/convert" javascript_name="ips.convert.menu.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -45,7 +45,7 @@
 		}
 	} );
 }(jQuery, _));</file>
- <file javascript_app="convert" javascript_location="admin" javascript_path="controllers/forms" javascript_name="ips.forms.reactionmapper.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050">/**
+ <file javascript_app="convert" javascript_location="admin" javascript_path="controllers/forms" javascript_name="ips.forms.reactionmapper.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -61,7 +61,7 @@
 		initialize: function () {
 			var id = $(this.scope).data( 'reactionid' );
 
-			this.on( document, 'click', &quot;#elReactionMapper&quot; + id + &quot;_menu [data-action='selectReaction']&quot;, this.selectReaction );
+			this.on( document, 'click', &quot;#elReactionMapper&quot; + id + &quot;_menu .ipsMenu_item&quot;, this.selectReaction );
 
 			this.setup();
 		},
@@ -72,7 +72,7 @@
 		 * @returns		{void}
 		 */
 		setup: function () {
-			this.scope.find('[data-default=&quot;true&quot;]').click();
+			this.scope.find('a[data-default=&quot;true&quot;]').click();
 		},
 
 		/**
@@ -101,7 +101,8 @@ mustache
 Debug.js
 app.js</order>
  <order app="global" path="/dev/js//library//jquery">jquery.js
-jquery-migrate.js</order>
+jquery-migrate.js
+jquery.transform.js</order>
  <order app="global" path="/dev/js//library//linkify">linkify.min.js
 linkify-jquery.min.js</order>
 </javascript>

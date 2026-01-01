@@ -11,25 +11,16 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\Warnings\Warning;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Send Warning Notifications
  */
-class WarnNotifications extends QueueAbstract
+class _WarnNotifications
 {
 	/**
 	 * Run Background Task
@@ -39,11 +30,11 @@ class WarnNotifications extends QueueAbstract
 	 * @return	int						New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$classname = $data['class'];
         $exploded = explode( '\\', $classname );
-        if ( !class_exists( $classname ) or !Application::appIsEnabled( $exploded[1] ) )
+        if ( !class_exists( $classname ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
@@ -52,14 +43,14 @@ class WarnNotifications extends QueueAbstract
 		{
 			$item = $classname::load( $data['item'] );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			/* Item no longer exists, so we're done here. */
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 		
-		$sentTo = $data['sentTo'] ?? array();
-		$newOffset = $item->sendNotificationsBatch( $offset, $sentTo, $data['extra'] ?? NULL );
+		$sentTo = isset( $data['sentTo'] ) ? $data['sentTo'] : array();
+		$newOffset = $item->sendNotificationsBatch( $offset, $sentTo, isset( $data['extra'] ) ? $data['extra'] : NULL );
 		$data['sentTo'] = $sentTo;
 
 		if( $newOffset === NULL )
@@ -76,25 +67,14 @@ class WarnNotifications extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		$warning			= Warning::load( $data['item'] );
-		$numberofFollowers	= $warning->notificationsCount( $warning->getModerators() );
+		$warning			= \IPS\core\Warnings\Warning::load( $data['item'] );
+		$numberofFollowers	= \intval( $warning->notificationsCount( $warning->getModerators() ) );
 		$complete			= $numberofFollowers ? ( round( 100 / $numberofFollowers * $offset, 2 ) ) : 100;
 
-		return array( 'text' => Member::loggedIn()->language()->addToStack('backgroundQueue_follow', FALSE, array( 'htmlsprintf' => array( Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $warning->url(), TRUE, $warning->mapped('title'), FALSE ) ) ) ), 'complete' => $complete );
-	}
-
-	/**
-	 * Parse data before queuing
-	 *
-	 * @param array $data
-	 * @return    array|null
-	 */
-	public function preQueueData( array $data ): ?array
-	{
-		return $data;
-	}
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('backgroundQueue_follow', FALSE, array( 'htmlsprintf' => array( \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $warning->url(), TRUE, $warning->mapped('title'), FALSE ) ) ) ), 'complete' => $complete );
+	}	
 }

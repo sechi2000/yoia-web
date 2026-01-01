@@ -11,32 +11,27 @@
 
 namespace IPS\{app}\extensions\core\MemberExportPersonalInformation;
 
-use IPS\Extensions\MemberExportPiiAbstract;
-use IPS\Member as MemberClass;
-use function defined;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Export Personal Information
  */
-class {class} extends MemberExportPiiAbstract
+class _{class}
 {
 	/**
 	 * Return data
-	 * @param	MemberClass		$member		The member
+	 * @param	\IPS\Member		$member		The member
 	 *
 	 * @return	array
 	 */
-	public function getData( MemberClass $member ): array
+	public function getData( \IPS\Member $member ): array
 	{
-		return array();
+		$return = array();
+		return $return;
 	}
 }
-
-# 5664YT

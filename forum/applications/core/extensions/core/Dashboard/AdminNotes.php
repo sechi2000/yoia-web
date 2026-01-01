@@ -11,35 +11,23 @@
 namespace IPS\core\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Extensions\DashboardAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\TextArea;
-use IPS\Http\Url;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Dashboard extension: Admin notes
  */
-class AdminNotes extends DashboardAbstract
+class _AdminNotes
 {
 	/**
 	 * Can the current user view this dashboard item?
 	 *
 	 * @return	bool
 	 */
-	public function canView(): bool
+	public function canView()
 	{
 		return TRUE;
 	}
@@ -49,21 +37,21 @@ class AdminNotes extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
-		$form	= new Form( 'form', 'save', Url::internal( "app=core&module=overview&controller=dashboard&do=getBlock&appKey=core&blockKey=core_AdminNotes" )->csrf() );
-		$form->add( new TextArea( 'admin_notes', ( isset( Settings::i()->acp_notes ) ) ? htmlspecialchars( Settings::i()->acp_notes, ENT_DISALLOWED, 'UTF-8', FALSE ) : '' ) );
+		$form	= new \IPS\Helpers\Form( 'form', 'save', \IPS\Http\Url::internal( "app=core&module=overview&controller=dashboard&do=getBlock&appKey=core&blockKey=core_AdminNotes" )->csrf() );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'admin_notes', ( isset( \IPS\Settings::i()->acp_notes ) ) ? htmlspecialchars( \IPS\Settings::i()->acp_notes, ENT_DISALLOWED, 'UTF-8', FALSE ) : '' ) );
 
 		if( $values = $form->values() )
 		{
-			Settings::i()->changeValues( array( 'acp_notes' => $values['admin_notes'], 'acp_notes_updated' => time() ) );
+			\IPS\Settings::i()->changeValues( array( 'acp_notes' => $values['admin_notes'], 'acp_notes_updated' => time() ) );
 
-			if( Request::i()->isAjax() )
+			if( \IPS\Request::i()->isAjax() )
 			{
-				return (string) DateTime::ts( intval( Settings::i()->acp_notes_updated ) );
+				return (string) \IPS\DateTime::ts( \intval( \IPS\Settings::i()->acp_notes_updated ) );
 			}
 		}
 
-		return $form->customTemplate( array( Theme::i()->getTemplate( 'dashboard' ), 'adminnotes' ), ( isset( Settings::i()->acp_notes_updated ) and Settings::i()->acp_notes_updated ) ? (string) DateTime::ts( intval( Settings::i()->acp_notes_updated ) ) : '' );
+		return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'dashboard' ), 'adminnotes' ), ( isset( \IPS\Settings::i()->acp_notes_updated ) and \IPS\Settings::i()->acp_notes_updated ) ? (string) \IPS\DateTime::ts( \intval( \IPS\Settings::i()->acp_notes_updated ) ) : '' );
 	}
 }

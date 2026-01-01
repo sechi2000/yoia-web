@@ -11,25 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Member;
-use IPS\Theme;
-use LengthException;
-use function defined;
-use function floatval;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Interval input class for Form Builder
  */
-class Interval extends FormAbstract
+class _Interval extends FormAbstract
 {
 	/**
 	 * @brief	Seconds
@@ -78,7 +69,7 @@ class Interval extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'valueAs'			=> self::SECONDS,
 		'min'				=> 0,
 		'max'				=> NULL,
@@ -96,7 +87,7 @@ class Interval extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		$valueNumber = '';
 		$selectedUnit = $this->options['valueAs'];
@@ -145,7 +136,7 @@ class Interval extends FormAbstract
 			$minimum = static::convertValue( $this->options['min'], $this->options['valueAs'], static::SECONDS );
 		}
 						
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->interval( $this->name, $valueNumber, $selectedUnit, $this->required, $this->options['unlimited'], $this->options['unlimitedLang'], $this->options['unlimitedToggles'], $this->options['unlimitedToggleOn'], $this->options['valueToggles'], $minimum, $this->options['max'] === NULL ? NULL : static::convertValue( $this->options['max'], $this->options['valueAs'], static::SECONDS ), $this->options['disabled'], $this->suffix );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->interval( $this->name, $valueNumber, $selectedUnit, $this->required, $this->options['unlimited'], $this->options['unlimitedLang'], $this->options['unlimitedToggles'], $this->options['unlimitedToggleOn'], $this->options['valueToggles'], $minimum, $this->options['max'] === NULL ? NULL : static::convertValue( $this->options['max'], $this->options['valueAs'], static::SECONDS ), $this->options['disabled'], $this->suffix );
 	}
 	
 	/**
@@ -153,7 +144,7 @@ class Interval extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$rawValue = parent::getValue();
 		
@@ -164,9 +155,9 @@ class Interval extends FormAbstract
 		else
 		{
 			$rawValue['val'] = str_replace( trim( ',' ), '.', $rawValue['val'] );
-			if ( !is_numeric( $rawValue['val'] ) )
+			if ( !\is_numeric( $rawValue['val'] ) )
 			{
-				throw new InvalidArgumentException( 'form_number_bad' );
+				throw new \InvalidArgumentException( 'form_number_bad' );
 			}
 						
 			return static::convertValue( $rawValue['val'], $rawValue['unit'], $this->options['valueAs'] );
@@ -176,15 +167,15 @@ class Interval extends FormAbstract
 	/** 
 	 * Convert values
 	 *
-	 * @param int $value		The value
-	 * @param string $fromUnit	The unit that value is in (see constants)
-	 * @param string $toUnit		The unit to convert to (see constants)
-	 * @return	int|float
+	 * @param	int		$value		The value
+	 * @param	string	$fromUnit	The unit that value is in (see constants)
+	 * @param	string	$toUnit		The unit to convert to (see constants)
+	 * @return	int
 	 */
-	public static function convertValue( int $value, string $fromUnit, string $toUnit ): int|float
+	public static function convertValue( $value, $fromUnit, $toUnit )
 	{
 		/* Convert from $fromUnit to seconds */
-		$value = floatval( $value );
+		$value = \floatval( $value );
 		switch ( $fromUnit )
 		{
 			case static::WEEKS:
@@ -215,10 +206,10 @@ class Interval extends FormAbstract
 	/** 
 	 * Get best unit
 	 *
-	 * @param int $value		Number of seconds (modified by reference to the returned unit)
+	 * @param	int		$value		Number of seconds (modified by reference to the returned unit)
 	 * @return	string
 	 */
-	public static function bestUnit( int &$value ): string
+	public static function bestUnit( &$value )
 	{
 		if ( $value >= 604800 and ( $value % 604800 ) === 0 )
 		{
@@ -249,10 +240,10 @@ class Interval extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	LengthException
+	 * @throws	\LengthException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{	
 		parent::validate();
 								
@@ -260,23 +251,21 @@ class Interval extends FormAbstract
 		{	
 			if ( $this->value === 0 and $this->required )
 			{
-				throw new InvalidArgumentException('form_required');
+				throw new \InvalidArgumentException('form_required');
 			}
 				
 			if ( $this->options['min'] !== NULL and $this->value < $this->options['min'] )
 			{
 				$minValue = static::convertValue( $this->options['min'], $this->options['valueAs'], static::SECONDS );
 				$minUnit = static::bestUnit( $minValue );
-				throw new LengthException( Member::loggedIn()->language()->addToStack('form_interval_min_' . $minUnit, FALSE, array( 'pluralize' => array( $minValue ) ) ) );
+				throw new \LengthException( \IPS\Member::loggedIn()->language()->addToStack('form_interval_min_' . $minUnit, FALSE, array( 'pluralize' => array( $minValue ) ) ) );
 			}
 			if ( $this->options['max'] !== NULL and $this->value > $this->options['max'] )
 			{
 				$maxValue = static::convertValue( $this->options['max'], $this->options['valueAs'], static::SECONDS );
 				$maxUnit = static::bestUnit( $maxValue );
-				throw new LengthException( Member::loggedIn()->language()->addToStack('form_interval_max_' . $maxUnit, FALSE, array( 'pluralize' => array( $maxValue ) ) ) );
+				throw new \LengthException( \IPS\Member::loggedIn()->language()->addToStack('form_interval_max_' . $maxUnit, FALSE, array( 'pluralize' => array( $maxValue ) ) ) );
 			}
 		}
-
-		return TRUE;
 	}
 }

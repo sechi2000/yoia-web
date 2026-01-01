@@ -11,71 +11,51 @@
 namespace IPS\core\modules\front\sitemap;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Xml\SimpleXML;
-use UnderflowException;
-use function defined;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Print out sitemap
  */
-class sitemap extends Controller
+class _sitemap extends \IPS\Content\Controller
 {
 	/**
 	 * Print out the requested sitemap
 	 *
-	 * @return	mixed
+	 * @return	void
 	 */
-	protected function manage() : mixed
+	protected function manage()
 	{
-		if ( isset( Request::i()->file ) )
+		if ( isset( \IPS\Request::i()->file ) )
 		{
 			try
 			{
-				$content = Db::i()->select( 'data', 'core_sitemap', array( 'data IS NOT NULL AND sitemap=?', Request::i()->file ) )->first();
-				$content = str_replace( '<loc>{base_url}', '<loc>' . Settings::i()->base_url, $content );
+				$content = \IPS\Db::i()->select( 'data', 'core_sitemap', array( 'data IS NOT NULL AND sitemap=?', \IPS\Request::i()->file ) )->first();
+				$content = str_replace( '<loc>{base_url}', '<loc>' . \IPS\Settings::i()->base_url, $content );
 
 				/* http://www.w3.org/TR/REC-xml/#charsets */
 				$content = preg_replace ('/[^\x{0009}\x{000a}\x{000d}\x{0020}-\x{D7FF}\x{E000}-\x{FFFD}]+/u', '', $content);
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
-				Output::i()->error( 'sitemap_not_found', '2C152/1', 404, '' );
+				\IPS\Output::i()->error( 'sitemap_not_found', '2C152/1', 404, '' );
 			}
 		}
 		else
 		{
-			if( CIC )
+			$sitemapUrl = \IPS\Http\Url::external( \IPS\Settings::i()->sitemap_url ? rtrim( \IPS\Settings::i()->sitemap_url, '/' ) : rtrim( \IPS\Settings::i()->base_url, '/' ) . '/sitemap.php' );
+			
+			$content = \IPS\Xml\SimpleXML::create( 'sitemapindex', 'http://www.sitemaps.org/schemas/sitemap/0.9' );
+			foreach ( \IPS\Db::i()->select( array( 'sitemap', 'updated' ), 'core_sitemap', array( 'data IS NOT NULL' ) ) as $sitemap )
 			{
-				$sitemapUrl = Url::external( rtrim( Settings::i()->base_url, '/' ).'/sitemap.php' );
-			}
-			else
-			{
-				$sitemapUrl = Url::external( Settings::i()->sitemap_url ? rtrim( Settings::i()->sitemap_url, '/' ) : rtrim( Settings::i()->base_url, '/' ) . '/sitemap.php' );
-			}
-
-			$content = SimpleXML::create( 'sitemapindex', 'http://www.sitemaps.org/schemas/sitemap/0.9' );
-			foreach ( Db::i()->select( array( 'sitemap', 'updated' ), 'core_sitemap', array( 'data IS NOT NULL' ) ) as $sitemap )
-			{
-				$content->addChild( 'sitemap', array( 'loc' => $sitemapUrl->setQueryString( 'file', $sitemap['sitemap'] ), 'lastmod' => DateTime::ts( $sitemap['updated'] )->format('c') ) );
+				$content->addChild( 'sitemap', array( 'loc' => $sitemapUrl->setQueryString( 'file', $sitemap['sitemap'] ), 'lastmod' => \IPS\DateTime::ts( $sitemap['updated'] )->format('c') ) );
 			}
 			$content = $content->asXML();
 		}
 
-		Output::i()->sendOutput( $content, 200, 'text/xml' );
+		\IPS\Output::i()->sendOutput( $content, 200, 'text/xml' );
 	}
 }

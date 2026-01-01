@@ -11,28 +11,16 @@
 namespace IPS\Content\Api\GraphQL;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base mutator class for comments
  */
-abstract class ContentMutator
+abstract class _ContentMutator
 {
 	/**
 	 * Add attachments to content
@@ -40,29 +28,29 @@ abstract class ContentMutator
 	 * @param	string		$postKey		Post key
 	 * @param	string		$content		Post content
 	 * @return	void
-	 * @throws	DomainException	Size is too large
+	 * @throws	\DomainException	Size is too large
 	 */
-	protected function _addAttachmentsToContent( string $postKey, string &$content ): void
+	protected function _addAttachmentsToContent( $postKey, &$content )
 	{
-		$maxTotalSize = Editor::maxTotalAttachmentSize( Member::loggedIn(), 0 ); // @todo Currently set to 0 because editing is not supported. Once editing is supported by GraphQL, that will need to set the correct value
+		$maxTotalSize = \IPS\Helpers\Form\Editor::maxTotalAttachmentSize( \IPS\Member::loggedIn(), 0 ); // @todo Currently set to 0 because editing is not supported. Once editing is supported by GraphQL, that will need to set the correct value
 				
 		$fileAttachments = array();
 		$totalSize = 0;
-		foreach ( Db::i()->select( '*', 'core_attachments', array( 'attach_post_key=?', $postKey ) ) as $attachment )
+		foreach ( \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_post_key=?', $postKey ) ) as $attachment )
 		{
 			if ( $maxTotalSize !== NULL )
 			{
 				$totalSize += $attachment['attach_filesize'];
 				if ( $totalSize > $maxTotalSize )
 				{
-					throw new DomainException;
+					throw new \DomainException;
 				}
 			}
 			
 			$ext = mb_substr( $attachment['attach_file'], mb_strrpos( $attachment['attach_file'], '.' ) + 1 );
-			if ( in_array( mb_strtolower( $ext ), File::$videoExtensions ) )
+			if ( \in_array( mb_strtolower( $ext ), \IPS\File::$videoExtensions ) )
 			{
-				$content .= Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedVideo( $attachment['attach_location'], Url::baseUrl( Url::PROTOCOL_RELATIVE ) . "applications/core/interface/file/attachment.php?id=" . $attachment['attach_id'], $attachment['attach_file'], File::getMimeType( $attachment['attach_file'] ), $attachment['attach_id'] );
+				$content .= \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedVideo( $attachment['attach_location'], \IPS\Http\Url::baseUrl( \IPS\Http\Url::PROTOCOL_RELATIVE ) . "applications/core/interface/file/attachment.php?id=" . $attachment['attach_id'], $attachment['attach_file'], \IPS\File::getMimeType( $attachment['attach_file'] ), $attachment['attach_id'] );
 			}
 			elseif ( $attachment['attach_is_image'] )
 			{
@@ -77,19 +65,19 @@ abstract class ContentMutator
 					$width = $attachment['attach_img_width'];
 				}
 				
-				$content .= str_replace( '<fileStore.core_Attachment>', File::getClass('core_Attachment')->baseUrl(), Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedImage( $attachment['attach_location'], $attachment['attach_thumb_location'] ?: $attachment['attach_location'], $attachment['attach_file'], $attachment['attach_id'], $width, $ratio ) );
+				$content .= str_replace( '<fileStore.core_Attachment>', \IPS\File::getClass('core_Attachment')->baseUrl(), \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedImage( $attachment['attach_location'], $attachment['attach_thumb_location'] ? $attachment['attach_thumb_location'] : $attachment['attach_location'], $attachment['attach_file'], $attachment['attach_id'], $width, $ratio ) );
 			}
 			else
 			{
-				$fileAttachments[] = Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedFile( Url::baseUrl() . "applications/core/interface/file/attachment.php?id=" . $attachment['attach_id'] . ( $attachment['attach_security_key'] ? "&key={$attachment['attach_security_key']}" : '' ), $attachment['attach_file'], FALSE, $attachment['attach_ext'], $attachment['attach_id'], $attachment['attach_security_key'] );
+				$fileAttachments[] = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedFile( \IPS\Http\Url::baseUrl() . "applications/core/interface/file/attachment.php?id=" . $attachment['attach_id'] . ( $attachment['attach_security_key'] ? "&key={$attachment['attach_security_key']}" : '' ), $attachment['attach_file'], FALSE, $attachment['attach_ext'], $attachment['attach_id'], $attachment['attach_security_key'] );
 			}
 		}
 		
-		if( count( $fileAttachments ) )
+		if( \count( $fileAttachments ) )
 		{
 			$content .= "<p>" . implode( ' ', $fileAttachments ) . "</p>";
 		}
 				
-		Db::i()->update( 'core_attachments', array( 'attach_post_key' => '' ), array( 'attach_post_key=?', $postKey ) );
+		\IPS\Db::i()->update( 'core_attachments', array( 'attach_post_key' => '' ), array( 'attach_post_key=?', $postKey ) );
 	}
 }

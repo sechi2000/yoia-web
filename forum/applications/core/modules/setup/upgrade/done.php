@@ -11,46 +11,31 @@
 namespace IPS\core\modules\setup\upgrade;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\Application;
-use IPS\core\AdminNotification;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Output;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Upgrader: Finished Screen
  */
-class done extends Controller
+class _done extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Finished
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
-		Output::clearJsFiles();
+		\IPS\Output::clearJsFiles();
 		
 		/* Get rid of temporary upgrade data */
-		Db::i()->dropTable( 'upgrade_temp', TRUE );
+		\IPS\Db::i()->dropTable( 'upgrade_temp', TRUE );
 		
 		/* Reset theme maps to make sure bad data hasn't been cached by visits mid-setup */
-		foreach( Theme::themes() as $id => $set )
+		foreach( \IPS\Theme::themes() as $id => $set )
 		{
 			/* Update mappings */
 			$set->css_map = array();
@@ -58,8 +43,6 @@ class done extends Controller
 		}
 
 		/* Delete some variables we stored in our session */
-		unset( $_SESSION['apps'] );
-
 		if( isset( $_SESSION['upgrade_options'] ) )
 		{
 			unset( $_SESSION['upgrade_options'] );
@@ -78,24 +61,105 @@ class done extends Controller
 		unset( $_SESSION['key'] );
 
 		/* Clear recent datastore logs to prevent an error message displaying immediately after upgrade */
-		Db::i()->delete( 'core_log', array( '`category`=? AND `time`>?', 'datastore', DateTime::create()->sub( new DateInterval( 'PT1H' ) )->getTimestamp() ) );
+		\IPS\Db::i()->delete( 'core_log', array( '`category`=? AND `time`>?', 'datastore', \IPS\DateTime::create()->sub( new \DateInterval( 'PT1H' ) )->getTimestamp() ) );
 		
 		/* Unset settings datastore to prevent any upgrade settings that were overridden becoming persistent */
-		Settings::i()->clearCache();
+		\IPS\Settings::i()->clearCache();
 		
 		/* IPS Cloud Sync */
-		IPS::resyncIPSCloud('Upgraded community');
+		\IPS\IPS::resyncIPSCloud('Upgraded community');
 		
 		/* Remove any new version ACP Notifications */
-		AdminNotification::remove( 'core', 'NewVersion' );
+		\IPS\core\AdminNotification::remove( 'core', 'NewVersion' );
 
-		/* Clear any previous editor plugins */
-		Application::resetEditorPlugins();
+		/* Send v5 notification if the version actually changed */
+		if( !empty( $_SESSION['apps']['core'] ) AND $_SESSION['apps']['core']['current'] !== $_SESSION['apps']['core']['available'] AND !\IPS\IPS::isManaged() )
+		{
+			\IPS\core\AdminNotification::send( 'core', 'VersionFive', NULL, TRUE );
+		}
 
+		unset( $_SESSION['apps'] );
+
+		/* Check for php8 method substitution issues */
+		if ( \IPS\Application\Scanner::scanCustomizationIssues( false, true ) !== null )
+		{
+			$foundIssues = \IPS\Application\Scanner::scanCustomizationIssues()[0];
+			$disabledApps = array();
+			$disabledPlugins = array();
+			foreach ( $foundIssues as $appOrPlugin => $classes )
+			{
+				$components = explode( "-", $appOrPlugin );
+				$isApp = \mb_strtolower( trim( $components[0] ) ) === 'app';
+				$appDir = trim( $components[1] );
+
+				/* Disable the plugin/app and flag for manual intervention */
+				if ( $isApp and ( empty( $disabledApps[$appDir] ) ) )
+				{
+					/* IPS Code is flawless, skip it */
+					if ( \in_array( $appDir, \IPS\IPS::$ipsApps ) )
+					{
+						continue;
+					}
+
+					try
+					{
+						$app = \IPS\Application::load( $appDir );
+						$app->_enabled = false;
+
+						if ( ! \IPS\IN_DEV )
+						{
+							$app->requires_manual_intervention = 1;
+						}
+						
+						$app->save();
+						$disabledApps[$appDir] = $app->_title;
+					}
+					catch ( \InvalidArgumentException|\OutOfRangeException $e )
+					{
+						/* This still won't work, so don't leave it empty */
+						$disabledApps[$appDir] = $appDir;
+						continue;
+					}
+				}
+				elseif ( empty( $disabledPlugins[$appDir] ) )
+				{
+					try
+					{
+						$pluginId = \IPS\Db::i()->select( 'plugin_id', 'core_plugins', [ 'plugin_location=?', $appDir ], null, 1 )->first();
+						$plugin = \IPS\Plugin::load( $pluginId );
+						$plugin->_enabled = false;
+
+						if ( ! \IPS\IN_DEV )
+						{
+							$plugin->requires_manual_intervention = 1;
+						}
+
+						$plugin->save();
+						$disabledPlugins[$appDir] = $plugin->name;
+					}
+					catch ( \UnderflowException|\InvalidArgumentException|\OutOfRangeException $e )
+					{
+						/* This still won't work, so don't leave it empty */
+						$disabledPlugins[$appDir] = $appDir;
+						continue;
+					}
+				}
+			}
+
+			if ( \count( $disabledPlugins ) OR \count( $disabledApps ) )
+			{
+				\IPS\core\AdminNotification::send( 'core', 'ManualInterventionMessage' );
+
+				$_SESSION['upgrade_postUpgrade']['core'][] = \IPS\Theme::i()->getTemplate( 'global' )->methodIssues(
+					\IPS\Theme::i()->getTemplate( 'global' )->disabled3rdParty( array_keys( $disabledApps ), array_keys( $disabledPlugins ), false )
+				);
+			}
+		}
+		
 		/* And show the complete page - the template handles this step special already so we don't have to output anything */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('done');
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('done');
 		
 		/* The upgrader will cause a few syncs on Cloud2, but we don't have to wait for those. Clear the flag here. */
-		unset( Store::i()->syncCompleted );
+		unset( \IPS\Data\Store::i()->syncCompleted );
 	}
 }

@@ -12,44 +12,41 @@
 namespace IPS\downloads\extensions\core\ContentRouter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application\Module;
-use IPS\downloads\File;
-use IPS\Extensions\ContentRouterAbstract;
-use IPS\Member;
-use IPS\Member\Group;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Content Router extension: Downloads
  */
-class Files extends ContentRouterAbstract
+class _Files
 {
+	/**
+	 * @brief	Content Item Classes
+	 */
+	public $classes = array();
+	
 	/**
 	 * @brief	Can be shown in similar content
 	 */
-	public bool $similarContent = TRUE;
+	public $similarContent = TRUE;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Member|Group|NULL	$member		If checking access, the member/group to check for, or NULL to not check access
+	 * @param	\IPS\Member|IPS\Member\Group|NULL	$member		If checking access, the member/group to check for, or NULL to not check access
 	 * @return	void
 	 */
-	public function __construct( Member|Group $member = NULL )
+	public function __construct( $member = NULL )
 	{
-		if ( $member === NULL or $member->canAccessModule( Module::get( 'downloads', 'downloads', 'front' ) ) )
+		if ( $member === NULL or $member->canAccessModule( \IPS\Application\Module::get( 'downloads', 'downloads', 'front' ) ) )
 		{
 			$this->classes[] = 'IPS\downloads\File';
 		}
 
-		if( $member !== NULL AND ( $member instanceof Member ) AND File::modPermission( 'unhide', $member ) )
+		if( $member !== NULL AND ( $member instanceof \IPS\Member ) AND \IPS\downloads\File::modPermission( 'unhide', $member ) )
 		{
 			$this->classes[] = 'IPS\downloads\File\PendingVersion';
 		}

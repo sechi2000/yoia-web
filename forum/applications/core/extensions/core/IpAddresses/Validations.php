@@ -11,29 +11,28 @@
 namespace IPS\core\extensions\core\IpAddresses;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Dispatcher;
-use IPS\Extensions\IpAddressesAbstract;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Lookup: Validations
  */
-class Validations extends IpAddressesAbstract
+class _Validations
 {
+	/**
+	 * Supported in the ACP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInAcp()
+	{
+		return TRUE;
+	}
+
 	/**
 	 * Supported in the ModCP IP address lookup tool?
 	 *
@@ -49,19 +48,19 @@ class Validations extends IpAddressesAbstract
 	 * Find Records by IP
 	 *
 	 * @param	string			$ip			The IP Address
-	 * @param	Url|null	$baseUrl	URL table will be displayed on or NULL to return a count
-	 * @return	string|int|null
+	 * @param	\IPS\Http\Url	$baseUrl	URL table will be displayed on or NULL to return a count
+	 * @return	\IPS\Helpers\Table|int|null
 	 */
-	public function findByIp( string $ip, ?Url $baseUrl = NULL ): string|int|null
+	public function findByIp( $ip, \IPS\Http\Url $baseUrl = NULL )
 	{
 		/* Return count */
 		if ( $baseUrl === NULL )
 		{
-			return Db::i()->select( 'COUNT(*)', 'core_validating', array( "ip_address LIKE ?", $ip ) )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'core_validating', array( "ip_address LIKE ?", $ip ) )->first();
 		}
 		
 		/* Init Table */
-		$table = new TableDb( 'core_validating', $baseUrl, array( "ip_address LIKE ?", $ip ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_validating', $baseUrl, array( "ip_address LIKE ?", $ip ) );
 		$table->langPrefix = 'members_';
 				
 		/* Columns we need */
@@ -77,47 +76,45 @@ class Validations extends IpAddressesAbstract
 		$table->parsers = array(
 			'photo'				=> function( $val, $row )
 			{
-				$member = Member::load( $row['member_id'] );
-				return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'mini' );
+				$member = \IPS\Member::load( $row['member_id'] );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'mini' );
 			},
 			'entry_date'		=> function( $val, $row )
 			{
-				return DateTime::ts( $val )->localeDate();
+				return \IPS\DateTime::ts( $val )->localeDate();
 			},
 			'name'				=> function( $val, $row )
 			{
-				$member = Member::load( $row['member_id'] );
-				$link = ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' ) ? $member->url() : $member->acpUrl();
-				return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $link, FALSE, $member->name );
+				$member = \IPS\Member::load( $row['member_id'] );
+				$link = ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'front' ) ? $member->url() : $member->acpUrl();
+				return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $link, FALSE, $member->name );
 			},
 			'validatingType'	=> function( $val, $row )
 			{
 				if( $row['new_reg'] )
 				{
-					return Member::loggedIn()->language()->addToStack( 'validate_type_newreg' );
+					return \IPS\Member::loggedIn()->language()->addToStack( 'validate_type_newreg' );
 				}
 				elseif( $row['lost_pass'] )
 				{
-					return Member::loggedIn()->language()->addToStack( 'validate_type_lostpass' );
+					return \IPS\Member::loggedIn()->language()->addToStack( 'validate_type_lostpass' );
 				}
 				elseif( $row['email_chg'] )
 				{
-					return Member::loggedIn()->language()->addToStack( 'validate_type_emailchg' );
+					return \IPS\Member::loggedIn()->language()->addToStack( 'validate_type_emailchg' );
 				}
-
-				return '';
 			},
 		);
 		
 		/* Buttons */
 		$table->rowButtons = function( $row )
 		{
-            $member = Member::load( $row['member_id'] );
+            $member = \IPS\Member::load( $row['member_id'] );
 			return array(
 				'edit'	=> array(
 					'icon'		=> 'pencil',
 					'title'		=> 'edit',
-					'link'		=> ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' ) ? $member->url()->setQueryString( array( 'do' => 'edit' ) ) : $member->acpUrl(),
+					'link'		=> ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'front' ) ? $member->url()->setQueryString( array( 'do' => 'edit' ) ) : $member->acpUrl(),
 				),
 			);
 		};
@@ -140,11 +137,11 @@ class Validations extends IpAddressesAbstract
 		 	...
 	 	);
 	 * @endcode
-	 * @param	Member	$member	The member
-	 * @return	array|Select
+	 * @param	\IPS\Member	$member	The member
+	 * @return	array
 	 */
-	public function findByMember( Member $member ) : array|Select
+	public function findByMember( $member )
 	{
-		return Db::i()->select( 'ip_address AS ip, count(*) AS count, MIN(entry_date) AS first, MAX(entry_date) AS last', 'core_validating', array( 'member_id=?', $member->member_id ), NULL, NULL, 'ip_address' )->setKeyField( 'ip' );
+		return \IPS\Db::i()->select( 'ip_address AS ip, count(*) AS count, MIN(entry_date) AS first, MAX(entry_date) AS last', 'core_validating', array( 'member_id=?', $member->member_id ), NULL, NULL, 'ip_address' )->setKeyField( 'ip' );
 	}	
 }

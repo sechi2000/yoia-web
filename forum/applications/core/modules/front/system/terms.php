@@ -11,42 +11,30 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Http\Url\Exception;
-use IPS\Http\Url\Internal;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Terms of Use
  */
-class terms extends Controller
+class _terms extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Terms of Use
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Session::i()->setLocation( Url::internal( 'app=core&module=system&controller=terms', NULL, 'terms' ), array(), 'loc_viewing_reg_terms' );
+		\IPS\Session::i()->setLocation( \IPS\Http\Url::internal( 'app=core&module=system&controller=terms', NULL, 'terms' ), array(), 'loc_viewing_reg_terms' );
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('reg_terms');
-		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->bodyClasses[] = 'ipsLayout_minimal';
-		Output::i()->output = Theme::i()->getTemplate( 'system' )->terms();
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('reg_terms');
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimal';
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->terms();
 	}
 	
 	/**
@@ -54,37 +42,37 @@ class terms extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function dismiss() : void
+	protected function dismiss()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		Request::i()->setCookie( 'guestTermsDismissed', 1, NULL, FALSE );
+		\IPS\Request::i()->setCookie( 'guestTermsDismissed', 1, NULL, FALSE );
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array( 'message' => Member::loggedIn()->language()->addToStack( 'terms_dismissed' ) ) );
+			\IPS\Output::i()->json( array( 'message' => \IPS\Member::loggedIn()->language()->addToStack( 'terms_dismissed' ) ) );
 		}
 		else
 		{
-			if ( isset( Request::i()->ref ) )
+			if ( isset( \IPS\Request::i()->ref ) )
 			{
 				try
 				{
-					$url = Url::createFromString( base64_decode( Request::i()->ref ) );
+					$url = \IPS\Http\Url::createFromString( base64_decode( \IPS\Request::i()->ref ) );
 				}
-				catch( Exception $e )
+				catch( \IPS\Http\Url\Exception $e )
 				{
 					$url = NULL;
 				}
 				
-				if ( $url instanceof Internal and !$url->openRedirect() )
+				if ( $url instanceof \IPS\Http\Url\Internal and !$url->openRedirect() )
 				{
-					Output::i()->redirect( $url, 'terms_dismissed' );
+					\IPS\Output::i()->redirect( $url, 'terms_dismissed' );
 				}
 			}
 			
 			/* Still here? Just redirect to the index */
-			Output::i()->redirect( Url::internal( '' ), 'terms_dismissed' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( '' ), 'terms_dismissed' );
 		}
 	}
 }

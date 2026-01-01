@@ -12,40 +12,31 @@
 namespace IPS\core\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * spam
  */
-class spam extends Controller
+class _spam extends \IPS\Dispatcher\Controller
 {
 	
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'spam_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'spam_manage' );
 		parent::execute();
 	}
 
@@ -54,9 +45,13 @@ class spam extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
-	{
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_stats_spam');
-		Output::i()->output = (string) $chart = Chart::loadFromExtension( 'core', 'Spam' )->getChart( Url::internal( "app=core&module=stats&controller=spam" ) );
-	}
+	protected function manage()
+	{	
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'Spam' )->getChart( \IPS\Http\Url::internal( "app=core&module=stats&controller=spam" ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_stats_spam');
+		\IPS\Output::i()->output = (string) $chart;
+
+	} 
+	
+	// Create new methods with the same name as the 'do' parameter which should execute it
 }

@@ -11,40 +11,9 @@
 namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DateInterval;
-use DomainException;
-use Exception;
-use IPS\Api\Webhook;
-use IPS\Application;
-use IPS\Content;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Events\Event;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Notification;
-use IPS\Platform\Bridge;
-use IPS\Redis;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use RedisException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_called_class;
-use function get_class;
-use function is_array;
-use function strtolower;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0') . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -58,61 +27,63 @@ trait Reactable
 	 *
 	 * @return	string
 	 */
-	abstract public static function reactionType(): string;
+	public static function reactionType()
+	{
+		throw new \BadMethodCallException;
+	}
 	
 	/**
 	 * Reaction class
 	 *
 	 * @return	string
 	 */
-	public static function reactionClass(): string
+	public static function reactionClass()
 	{
-		return get_called_class();
+		return \get_called_class();
 	}
-
+	
 	/**
 	 * React
 	 *
-	 * @param Reaction $reaction The reaction
-	 * @param Member|null $member The member reacting, or NULL
-	 * @return    void
-	 * @throws    DomainException
-	 * @throws Exception
+	 * @param	\IPS\core\Reaction		$reaction	The reaction
+	 * @param	\IPS\Member				$member		The member reacting, or NULL 
+	 * @return	void
+	 * @throws	\DomainException
 	 */
-	public function react(Content\Reaction $reaction, ?Member $member = NULL ): void
+	public function react( \IPS\Content\Reaction $reaction, \IPS\Member $member = NULL )
 	{
 		/* Did we pass a member? */
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		/* Figure out the owner of this - if it is content, it will be the author. If it is a node, then it will be the person who created it */
-		if( $this instanceof Model )
-		{
-			$owner = $this->owner();
-		}
-		else
+		if ( $this instanceof \IPS\Content )
 		{
 			$owner = $this->author();
+		}
+		else if ( $this instanceof \IPS\Node\Model )
+		{
+			$owner = $this->owner();
 		}
 
 		/* Can we react? */
 		if ( !$this->canView( $member ) or !$this->canReact( $member ) or !$reaction->enabled )
 		{
-			throw new DomainException( 'cannot_react' );
+			throw new \DomainException( 'cannot_react' );
 		}
 		
 		/* Have we hit our limit? Also, why 999 for unlimited? */
 		if ( $member->group['g_rep_max_positive'] !== -1 )
 		{
-			$count = Db::i()->select( 'COUNT(*)', 'core_reputation_index', array( 'member_id=? AND rep_date>?', $member->member_id, DateTime::create()->sub( new DateInterval( 'P1D' ) )->getTimestamp() ) )->first();
+			$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_reputation_index', array( 'member_id=? AND rep_date>?', $member->member_id, \IPS\DateTime::create()->sub( new \DateInterval( 'P1D' ) )->getTimestamp() ) )->first();
 			if ( $count >= $member->group['g_rep_max_positive'] )
 			{
-				throw new DomainException( Member::loggedIn()->language()->addToStack( 'react_daily_exceeded', FALSE, array( 'sprintf' => array( $member->group['g_rep_max_positive'] ) ) ) );
+				throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'react_daily_exceeded', FALSE, array( 'sprintf' => array( $member->group['g_rep_max_positive'] ) ) ) );
 			}
 		}
 		
 		/* Figure out our app - we do it this way as content items and nodes will always have a lowercase namespace for the app, so if the match below fails, then 'core' can be assumed */
-		$app = explode( '\\', get_class( $this ) );
-		if ( strtolower( $app[1] ) === $app[1] )
+		$app = explode( '\\', \get_class( $this ) );
+		if ( \strtolower( $app[1] ) === $app[1] )
 		{
 			$app = $app[1];
 		}
@@ -123,7 +94,7 @@ trait Reactable
 		
 		/* If this is a comment, we need the parent items ID */
 		$itemId = 0;
-		if ( $this instanceof Comment)
+		if ( $this instanceof \IPS\Content\Comment )
 		{
 			$item			= $this->item();
 			$itemIdColumn	= $item::$databaseColumnId;
@@ -148,12 +119,12 @@ trait Reactable
 		
 		/* Actually insert it */
 		$idColumn = static::$databaseColumnId;
-		Db::i()->insert( 'core_reputation_index', array(
+		\IPS\Db::i()->insert( 'core_reputation_index', array(
 			'member_id'				=> $member->member_id,
 			'app'					=> $app,
 			'type'					=> static::reactionType(),
 			'type_id'				=> $this->$idColumn,
-			'rep_date'				=> DateTime::create()->getTimestamp(),
+			'rep_date'				=> \IPS\DateTime::create()->getTimestamp(),
 			'rep_rating'			=> $reaction->value,
 			'member_received'		=> $owner->member_id,
 			'rep_class'				=> static::reactionClass(),
@@ -162,21 +133,10 @@ trait Reactable
 			'reaction'				=> $reaction->id
 		) );
 
-		/* Fire event */
-		Event::fire( 'onReact', $member, [ $this, $reaction ] );
-
-		Webhook::fire( 'content_reaction_added', [ 'member' => $member, 'content' => $this, 'reaction' => $reaction ] );
-
-		/* Have we hit highlighted content? */
-		if( $this->isHighlighted() )
-		{
-			$owner->achievementAction( 'core', 'Highlight', [ 'content' => $this ] );
-		}
-
 		/* Send the notification but only if we aren't reacting to our own content, we can view the content, the user isn't ignored and we aren't changing from one reaction to another */
-		if ( $this->author()->member_id AND $this->author() !== $member AND $this->canView( $owner ) AND !$reacted AND !$member->isIgnoring( $this->author(), 'posts' ) )
+		if ( $this->author()->member_id AND $this->author() != \IPS\Member::loggedIn() AND $this->canView( $owner ) AND !$reacted AND !$member->isIgnoring( $this->author(), 'posts' ) )
 		{
-			$notification = new Notification( Application::load('core'), 'new_likes', $this, array( $this, $member ), array(), TRUE, Content\Reaction::isLikeMode() ? NULL : 'notification_new_react' );
+			$notification = new \IPS\Notification( \IPS\Application::load('core'), 'new_likes', $this, array( $this, $member ), array(), TRUE, \IPS\Content\Reaction::isLikeMode() ? NULL : 'notification_new_react' );
 			$notification->recipients->attach( $owner );
 			$notification->send();
 		}
@@ -190,47 +150,40 @@ trait Reactable
 		/* Reset some cached values */
 		$this->_reactionCount	= NULL;
 		$this->_reactions		= NULL;
-		$this->likeBlurb 		= [];
-		unset( $this->reputation );
 
 		$this->hasReacted[ $member->member_id ] = $reaction;
-		$item = ( ! $this instanceof Item) ? $this->item() : $this;
-		if ( Bridge::i()->featureIsEnabled( 'trending' ) )
-		{
-			/* We need to make sure we're using the item */
 
-			$itemIdColumn	= $item::$databaseColumnId;
-			$itemId			= $item->$itemIdColumn;
-			try
-			{
-				Redis::i()->zIncrBy( 'trending', time() * 0.4, get_class( $item ) .'__' . $itemId );
-			}
-			catch( BadMethodCallException | RedisException ) {}
+		if( \IPS\Application::appIsEnabled( 'cloud' ) and \IPS\cloud\Realtime::i()->isEnabled('realtime') )
+		{
+			$this->reactions();
+			\IPS\cloud\Realtime::i()->publishEvent( 'reaction-count', array('count' => $this->_reactionCount) );
 		}
 
-		if ( IPS::classUsesTrait( $item, 'IPS\Content\Statistics' ) )
+		if( \IPS\Application::appIsEnabled( 'cloud' ) and \IPS\cloud\Application::trendingIsEnabled() )
 		{
-			/* @var	Item $item */
-			$item->clearCachedStatistics();
+			/* We need to make sure we're using the item */
+			$item = ( ! $this instanceof \IPS\Content\Item ) ? $this->item() : $this;
+			$itemIdColumn	= $item::$databaseColumnId;
+			$itemId			= $item->$itemIdColumn;
+
+			try
+			{
+				\IPS\Redis::i()->zIncrBy( 'trending', time() * 0.4, \get_class( $item ) .'__' . $itemId );
+			}
+			catch( \BadMethodCallException | \RedisException $e ) {}
 		}
 	}
 	
 	/**
 	 * Remove Reaction
 	 *
-	 * @param	Member|NULL		$member					The member, or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL		$member					The member, or NULL for currently logged in member
 	 * @param	bool					$removeNotifications	Whether to remove notifications or not
 	 * @return	void
 	 */
-	public function removeReaction( ?Member $member = NULL, bool $removeNotifications = TRUE ): void
+	public function removeReaction( \IPS\Member $member = NULL, $removeNotifications = TRUE )
 	{
-		$member = $member ?: Member::loggedIn();
-
-		/* Reset some cached values */
-		$this->_reactionCount	= NULL;
-		$this->_reactions		= NULL;
-		$this->likeBlurb 		= [];
-		unset( $this->reputation );
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		try
 		{
@@ -240,22 +193,22 @@ trait Reactable
 				
 				$where = $this->getReactionWhereClause( NULL, FALSE );
 				$where[] = array( 'member_id=?', $member->member_id );
-				$rep		= Db::i()->select( '*', 'core_reputation_index', $where )->first();
+				$rep		= \IPS\Db::i()->select( '*', 'core_reputation_index', $where )->first();
 			}
-			catch( UnderflowException )
+			catch( \UnderflowException $e )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
-			$memberReceived		= Member::load( $rep['member_received'] );
-			$reaction			= Content\Reaction::load( $rep['reaction'] );
+			$memberReceived		= \IPS\Member::load( $rep['member_received'] );
+			$reaction			= \IPS\Content\Reaction::load( $rep['reaction'] );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
-			throw new DomainException;
+			throw new \DomainException;
 		}
 		
-		if( Db::i()->delete( 'core_reputation_index', array( "app=? AND type=? AND type_id=? AND member_id=?", static::$application, static::reactionType(), $this->$idColumn, $member->member_id ) ) )
+		if( \IPS\Db::i()->delete( 'core_reputation_index', array( "app=? AND type=? AND type_id=? AND member_id=?", static::$application, static::reactionType(), $this->$idColumn, $member->member_id ) ) )
 		{
 			if ( $memberReceived->member_id )
 			{
@@ -263,28 +216,28 @@ trait Reactable
 				$memberReceived->save();
 			}
 
-			/* Fire event */
-			Event::fire( 'onUnreact', $member, [ $this ] );
-			Webhook::fire( 'content_reaction_removed', [ 'member' => $member, 'content' => $this, 'reaction' => $reaction ] );
-
 			/* Remove Notifications */
 			if( $removeNotifications === TRUE )
 			{
 				$memberIds	= array();
 
-				foreach( Db::i()->select( '`member`', 'core_notifications', array( 'notification_key=? AND item_class=? AND item_id=?', 'new_likes', get_class( $this ), (int) $this->$idColumn ) ) as $memberToRecount )
+				foreach( \IPS\Db::i()->select( '`member`', 'core_notifications', array( 'notification_key=? AND item_class=? AND item_id=?', 'new_likes', (string) \get_class( $this ), (int) $this->$idColumn ) ) as $memberToRecount )
 				{
 					$memberIds[ $memberToRecount ]	= $memberToRecount;
 				}
 
-				Db::i()->delete( 'core_notifications', array( 'notification_key=? AND item_class=? AND item_id=?', 'new_likes', get_class( $this ), (int) $this->$idColumn ) );
+				\IPS\Db::i()->delete( 'core_notifications', array( 'notification_key=? AND item_class=? AND item_id=?', 'new_likes', (string) \get_class( $this ), (int) $this->$idColumn ) );
 
 				foreach( $memberIds as $memberToRecount )
 				{
-					Member::load( $memberToRecount )->recountNotifications();
+					\IPS\Member::load( $memberToRecount )->recountNotifications();
 				}
 			}
 		}
+
+		/* Reset some cached values */
+		$this->_reactionCount	= NULL;
+		$this->_reactions		= NULL;
 
 		if( isset( $this->hasReacted[ $member->member_id ] ) )
 		{
@@ -295,31 +248,20 @@ trait Reactable
 	/**
 	 * Can React
 	 *
-	 * @param	Member|NULL		$member	The member, or NULL for currently logged in
+	 * @param	\IPS\Member|NULL		$member	The member, or NULL for currently logged in
 	 * @return	bool
 	 */
-	public function canReact( ?Member $member = NULL ): bool
+	public function canReact( \IPS\Member $member = NULL )
 	{
-		/* Extensions go first */
-		if( $permCheck = Permissions::can( 'react', $this, $member ) )
-		{
-			return ( $permCheck === Permissions::PERM_ALLOW );
-		}
-
-		if( !$this->actionEnabled( 'react', $member ) )
-		{
-			return false;
-		}
-
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
-		if ( $this instanceof Model )
-		{
-			$owner = $this->owner();
-		}
-		else
+		if ( $this instanceof \IPS\Content )
 		{
 			$owner = $this->author();
+		}
+		else if ( $this instanceof \IPS\Node\Model )
+		{
+			$owner = $this->owner();
 		}
 		
 		/* Only members can react */
@@ -327,15 +269,15 @@ trait Reactable
 		{
 			return FALSE;
 		}
-
+		
 		/* Cannot react to guest content */
-		if ( !isset( $owner ) or !$owner->member_id )
+		if ( !$owner->member_id )
 		{
 			return FALSE;
 		}
 		
 		/* Protected Groups */
-		if ( $owner->inGroup( explode( ',', Settings::i()->reputation_protected_groups ) ) )
+		if ( $owner->inGroup( explode( ',', \IPS\Settings::i()->reputation_protected_groups ) ) )
 		{
 			return FALSE;
 		}
@@ -345,15 +287,15 @@ trait Reactable
 		{
 			return FALSE;
 		}
-
-		/* Unacknowledged warnings */
-		if ( $member->members_bitoptions['unacknowledged_warnings'] )
+		
+		/* React to own content */
+		if ( !\IPS\Settings::i()->reputation_can_self_vote AND $this->author()->member_id == $member->member_id )
 		{
 			return FALSE;
 		}
 		
-		/* React to own content */
-		if ( !Settings::i()->reputation_can_self_vote AND $this->author()->member_id == $member->member_id )
+		/* Unacknowledged warnings */
+		if ( $member->members_bitoptions['unacknowledged_warnings'] )
 		{
 			return FALSE;
 		}
@@ -365,14 +307,14 @@ trait Reactable
 	/**
 	 * @brief	Reactions Cache
 	 */
-	protected array|null $_reactions = NULL;
+	protected $_reactions = NULL;
 	
 	/**
 	 * Reactions
 	 *
 	 * @return	array
 	 */
-	public function reactions(): array
+	public function reactions()
 	{
 		if ( $this->_reactionCount === NULL )
 		{
@@ -381,11 +323,12 @@ trait Reactable
 		
 		if ( $this->_reactions === NULL )
 		{
+			$idColumn	= static::$databaseColumnId;
 			$this->_reactions = array();
-
-			if ( isset( $this->reputation ) )
+			
+			if ( \is_array( $this->reputation ) )
 			{
-				if ( $enabledReactions = Content\Reaction::enabledReactions() )
+				if ( $enabledReactions = \IPS\Content\Reaction::enabledReactions() )
 				{
 					foreach( $this->reputation AS $memberId => $reactionId )
 					{
@@ -400,14 +343,13 @@ trait Reactable
 			else
 			{
 				/* Set the data in $this->reputation to save queries later */
-				$_reputation = array();
-				foreach( Db::i()->select( '*', 'core_reputation_index', $this->getReactionWhereClause() )->join( 'core_reactions', 'reaction=reaction_id' ) AS $reaction )
+				$this->reputation = array();
+				foreach( \IPS\Db::i()->select( '*', 'core_reputation_index', $this->getReactionWhereClause() )->join( 'core_reactions', 'reaction=reaction_id' ) AS $reaction )
 				{
-					$_reputation[ $reaction['member_id'] ] = $reaction['reaction'];
+					$this->reputation[ $reaction['member_id'] ] = $reaction['reaction'];
 					$this->_reactions[ $reaction['member_id'] ][] = $reaction['reaction'];
 					$this->_reactionCount += $reaction['rep_rating'];
 				}
-				$this->reputation = $_reputation;
 			}
 		}
 		
@@ -417,14 +359,14 @@ trait Reactable
 	/**
 	 * @brief Reaction Count
 	 */
-	protected int|null $_reactionCount = NULL;
+	protected $_reactionCount = NULL;
 	
 	/**
 	 * Reaction Count
 	 *
 	 * @return int
 	 */
-	public function reactionCount(): int
+	public function reactionCount()
 	{
 		if( $this->_reactionCount === NULL )
 		{
@@ -433,55 +375,35 @@ trait Reactable
 
 		return $this->_reactionCount;
 	}
-
-	/**
-	 * Does this content reach the "reputation highlighted" threshhold?
-	 *
-	 * @return bool
-	 */
-	public function isHighlighted() : bool
-	{
-		return ( Settings::i()->reputation_enabled and Settings::i()->reputation_highlight and ( $this->reactionCount() >= Settings::i()->reputation_highlight ) );
-	}
 	
 	/**
 	 * Reaction Where Clause
 	 *
-	 * @param Reaction|array|int|NULL	$reactions			This can be any one of the following: An \IPS\Content\Reaction object, an array of \IPS\Content\Reaction objects, an integer, or an array of integers, or NULL
+	 * @param	\IPS\Content\Reaction|array|int|NULL	$reactions			This can be any one of the following: An \IPS\Content\Reaction object, an array of \IPS\Content\Reaction objects, an integer, or an array of integers, or NULL
 	 * @param	bool									$enabledTypesOnly 	If TRUE, only reactions of the enabled reaction types will be included (must join core_reactions)
 	 * @return	array
 	 */
-	public function getReactionWhereClause( Reaction|array|int|null $reactions = NULL, bool $enabledTypesOnly=TRUE ): array
+	public function getReactionWhereClause( $reactions = NULL, $enabledTypesOnly=TRUE )
 	{
-		$app = explode( '\\', static::reactionClass() );
-		if ( strtolower( $app[1] ) === $app[1] )
-		{
-			$app = $app[1];
-		}
-		else
-		{
-			$app = 'core';
-		}
-
 		$idColumn = static::$databaseColumnId;
-		$where = array( array( 'rep_class=? AND app=? AND type=? AND type_id=?', static::reactionClass(), $app, static::reactionType(), $this->$idColumn ) );
-
+		$where = array( array( 'rep_class=? AND type=? AND type_id=?', static::reactionClass(), static::reactionType(), $this->$idColumn ) );
+		
 		if ( $enabledTypesOnly )
 		{
 			$where[] = array( 'reaction_enabled=1' );
 		}
-
+		
 		if ( $reactions !== NULL )
 		{
-			if ( !is_array( $reactions ) )
+			if ( !\is_array( $reactions ) )
 			{
 				$reactions = array( $reactions );
 			}
-
+			
 			$in = array();
 			foreach( $reactions AS $reaction )
 			{
-				if ( $reaction instanceof Reaction)
+				if ( $reaction instanceof \IPS\Content\Reaction )
 				{
 					$in[] = $reaction->id;
 				}
@@ -490,40 +412,42 @@ trait Reactable
 					$in[] = $reaction;
 				}
 			}
-
-			if ( count( $in ) )
+			
+			if ( \count( $in ) )
 			{
-				$where[] = array( Db::i()->in( 'reaction', $in ) );
+				$where[] = array( \IPS\Db::i()->in( 'reaction', $in ) );
 			}
 		}
-
+		
 		return $where;
 	}
 	
 	/**
 	 * Reaction Table
 	 *
-	 * @param Reaction|int|NULL	$reaction			This can be any one of the following: An \IPS\Content\Reaction object, an integer, or NULL
-	 * @return    TableDb
+	 * @param	\IPS\Content\Reaction|int|NULL	$reaction			This can be any one of the following: An \IPS\Content\Reaction object, an integer, or NULL
+	 * @return	\IPS\Helpers\Table\Db
 	 */
-	public function reactionTable( Reaction|int|null $reaction=NULL ): TableDb
+	public function reactionTable( $reaction=NULL )
 	{
-		if ( !Member::loggedIn()->group['gbw_view_reps'] or !$this->canView() )
+		if ( !\IPS\Member::loggedIn()->group['gbw_view_reps'] or !$this->canView() )
 		{
-			throw new DomainException;
+			throw new \DomainException;
 		}
 		
-		$table = new TableDb( 'core_reputation_index', $this->url('showReactions'), $this->getReactionWhereClause( $reaction ) );
+		$idColumn = static::$databaseColumnId;
+		
+		$table = new \IPS\Helpers\Table\Db( 'core_reputation_index', $this->url('showReactions'), $this->getReactionWhereClause( $reaction ) );
 		$table->sortBy			= 'rep_date';
 		$table->sortDirection	= 'desc';
-		$table->tableTemplate = array( Theme::i()->getTemplate( 'global', 'core', 'front' ), 'reactionLogTable' );
-		$table->rowsTemplate = array( Theme::i()->getTemplate( 'global', 'core', 'front' ), 'reactionLog' );
+		$table->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' ), 'reactionLogTable' );
+		$table->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' ), 'reactionLog' );
 		$table->joins = array( array( 'from' => 'core_reactions', 'where' => 'reaction=reaction_id' ) );
 
 		$table->parsers = array(
 			'rep_date' => function( $date, $row )
 			{
-				if ( isset( Request::i()->item ) and Request::i()->item )
+				if ( isset( \IPS\Request::i()->item ) and \IPS\Request::i()->item )
 				{
 					/* This is an item level thing, and not a comment level thing */
 					try
@@ -531,14 +455,14 @@ trait Reactable
 						$class = $row['rep_class'];
 						$item = $class::load( $row['type_id'] );
 
-						return Member::loggedIn()->language()->addToStack( '_defart_from_date', FALSE, array( 'htmlsprintf' => array( $item->url(), $item->mapped('title'), DateTime::ts( $date )->html() ) ) );
+						return \IPS\Member::loggedIn()->language()->addToStack( '_defart_from_date', FALSE, array( 'htmlsprintf' => array( $item->url(), $item->mapped('title'), \IPS\DateTime::ts( $date )->html() ) ) );
 					}
-					catch( Exception )
+					catch( \Exception $e )
 					{
-						return DateTime::ts( $date )->html();
+						return \IPS\DateTime::ts( $date )->html();
 					}
 				}
-				return DateTime::ts( $date )->html();
+				return \IPS\DateTime::ts( $date )->html();
 			}
 		);
 
@@ -560,17 +484,17 @@ trait Reactable
 	/**
 	 * @brief	Cached Reacted
 	 */
-	protected array $hasReacted = array();
+	protected $hasReacted = array();
 
 	/**
 	 * Has reacted?
 	 *
-	 * @param	Member|NULL	$member	The member, or NULL for currently logged in
-	 * @return    Reaction|FALSE
+	 * @param	\IPS\Member|NULL	$member	The member, or NULL for currently logged in
+	 * @return	\IPS\Content\Reaction|FALSE
 	 */
-	public function reacted( ?Member $member = NULL ): Reaction|bool
+	public function reacted( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		if( !isset( $this->hasReacted[ $member->member_id ] ) )
 		{
@@ -578,22 +502,21 @@ trait Reactable
 
 			try
 			{
-				if ( $this->reputation and count( $this->reputation ) )
+				if ( \is_array( $this->reputation ) )
 				{
 					if ( isset( $this->reputation[ $member->member_id ] ) )
 					{
-						$this->hasReacted[ $member->member_id ] = Content\Reaction::load( $this->reputation[ $member->member_id ] );
+						$this->hasReacted[ $member->member_id ] = \IPS\Content\Reaction::load( $this->reputation[ $member->member_id ] );
 					}
 				}
-				elseif ( ! is_array( $this->reputation ) )
+				else
 				{
-					/* $this->reputation is not set, so we need to query the database */
 					$where = $this->getReactionWhereClause( NULL, FALSE );
 					$where[] = array( 'member_id=?', $member->member_id );
-					$this->hasReacted[ $member->member_id ] = Content\Reaction::load( Db::i()->select( 'reaction', 'core_reputation_index', $where )->first() );
+					$this->hasReacted[ $member->member_id ] = \IPS\Content\Reaction::load( \IPS\Db::i()->select( 'reaction', 'core_reputation_index', $where )->first() );
 				}
 			}
-			catch( UnderflowException ){}
+			catch( \UnderflowException $e ){}
 		}
 
 		return $this->hasReacted[ $member->member_id ];
@@ -602,37 +525,32 @@ trait Reactable
 	/**
 	 * @brief	Cached React Blurb
 	 */
-	public array|null $reactBlurb = NULL;
-
+	public $reactBlurb = NULL;
+	
 	/**
 	 * React Blurb
 	 *
-	 * @param array|null $reactionCounts
-	 * @return    array
+	 * @return	array
 	 */
-	public function reactBlurb( array|null $reactionCounts=null ): array
+	public function reactBlurb(): array
 	{
 		if ( $this->reactBlurb === NULL )
 		{
 			$this->reactBlurb = array();
 
-			if ( $reactionCounts !== null )
-			{
-				$this->reactBlurb = $reactionCounts;
-			}
 			/*
 			 	If we have lots of rows, then use a more efficient way of getting the data (but does increase query count and uses a group by).
 				I know this is an artibrary number, but it should mean that most communities never need to run this code, and just those with topics with more than 4,000 pages
 			*/
-			else if ( ( $this instanceof Item) and isset( $this::$databaseColumnMap['num_comments'] ) and $this->mapped( 'num_comments' ) >= 100000 )
+			if ( ( $this instanceof \IPS\Content\Item ) and isset( $this::$databaseColumnMap['num_comments'] ) and $this->mapped( 'num_comments' ) >= 100000 )
 			{
 				$enabledReactions = [];
-				foreach(Reaction::enabledReactions() as $reaction )
+				foreach( \IPS\Content\Reaction::enabledReactions() as $reaction )
 				{
 					$enabledReactions[] = $reaction->id;
 				}
 
-				foreach( Db::i()->select( 'COUNT(*) as count, reaction', 'core_reputation_index', $this->getReactionWhereClause( NULL , FALSE ), 'count DESC', NULL, 'reaction' ) as $row )
+				foreach( \IPS\Db::i()->select( 'COUNT(*) as count, reaction', 'core_reputation_index', $this->getReactionWhereClause( NULL , FALSE ), 'count DESC', NULL, 'reaction' ) as $row )
 				{
 					if( in_array( needle: $row['reaction'], haystack: $enabledReactions ) )
 					{
@@ -642,9 +560,10 @@ trait Reactable
 			}
 			else
 			{
-				if ( count( $this->reactions() ) )
+				if ( \count( $this->reactions() ) )
 				{
-					if ( is_array( $this->_reactions ) )
+					$idColumn = static::$databaseColumnId;
+					if ( \is_array( $this->_reactions ) )
 					{
 						foreach ( $this->_reactions as $memberId => $reactions )
 						{
@@ -661,7 +580,7 @@ trait Reactable
 					}
 					else
 					{
-						foreach ( Db::i()->select( 'reaction', 'core_reputation_index', $this->getReactionWhereClause() )->join( 'core_reactions', 'reaction=reaction_id' ) as $rep )
+						foreach ( \IPS\Db::i()->select( 'reaction', 'core_reputation_index', $this->getReactionWhereClause() )->join( 'core_reactions', 'reaction=reaction_id' ) as $rep )
 						{
 							if ( !isset( $this->reactBlurb[$rep] ) )
 							{
@@ -673,7 +592,7 @@ trait Reactable
 					}
 
 					/* Error suppressor for https://bugs.php.net/bug.php?id=50688 */
-					$enabledReactions = Content\Reaction::enabledReactions();
+					$enabledReactions = \IPS\Content\Reaction::enabledReactions();
 
 					@uksort( $this->reactBlurb, function ( $a, $b ) use ( $enabledReactions ) {
 						$positionA = $enabledReactions[$a]->position;
@@ -700,25 +619,22 @@ trait Reactable
 	/**
 	 * @brief	Cached like blurb
 	 */
-	public array $likeBlurb	= [];
+	public $likeBlurb	= NULL;
 	
 	/**
 	 * Who Reacted
 	 *
 	 * @param	bool|NULL	$isLike	Use like text instead? NULL to automatically determine
-	 * @param 	bool		$anonymized	Whether to anonymize the result; when true, the result will not contain "You"
-	 *
 	 * @return	string
 	 */
-	public function whoReacted( ?bool $isLike = NULL, bool $anonymized=false ): string
+	public function whoReacted( $isLike = NULL )
 	{
 		if ( $isLike === NULL )
 		{
-			$isLike =  Content\Reaction::isLikeMode();
+			$isLike =  \IPS\Content\Reaction::isLikeMode();
 		}
-
-		$blurbKey = $anonymized ? 'anon' : 'reg';
-		if( !isset( $this->likeBlurb[$blurbKey] ) )
+		
+		if( $this->likeBlurb === NULL )
 		{
 			$langPrefix = 'react_';
 			if ( $isLike )
@@ -727,14 +643,14 @@ trait Reactable
 			}
 
 			/* Did anyone like it? */
-			$numberOfLikes = count( $this->reactions() ); # int
+			$numberOfLikes = \count( $this->reactions() ); # int
 			if ( $numberOfLikes )
-			{
+			{				
 				/* Is it just us? */
-				$userLiked = ( !$anonymized AND $this->reacted() );
+				$userLiked = ( $this->reacted() );
 				if ( $userLiked and $numberOfLikes < 2 )
 				{
-					$this->likeBlurb[$blurbKey] = Member::loggedIn()->language()->addToStack("{$langPrefix}blurb_just_you");
+					$this->likeBlurb = \IPS\Member::loggedIn()->language()->addToStack("{$langPrefix}blurb_just_you");
 				}
 				/* Nope, we need to display a number... */
 				else
@@ -746,28 +662,33 @@ trait Reactable
 					/* If the user liked, we always show "You" first */
 					if ( $userLiked )
 					{
-						$peopleToDisplayInMainView[] = Member::loggedIn()->language()->addToStack("{$langPrefix}blurb_you_and_others");
+						$peopleToDisplayInMainView[] = \IPS\Member::loggedIn()->language()->addToStack("{$langPrefix}blurb_you_and_others");
 						$andXOthers--;
 					}
 										
 					/* Some random names */
 					$i = 0;
-					$where = $this->getReactionWhereClause();
-					if ( !$anonymized )
+					$app = explode( '\\', static::reactionClass() );
+					if ( \strtolower( $app[1] ) === $app[1] )
 					{
-						$where[] = array( 'member_id!=?', Member::loggedIn()->member_id ?: 0 );
+						$app = $app[1];
 					}
-
-					foreach (Db::i()->select( '*', 'core_reputation_index', $where, 'RAND()', Content\Reaction::isLikeMode() ? 18 : ( $userLiked ? 2 : 3 ) )->join( 'core_reactions', 'reaction=reaction_id' ) as $rep )
+					else
+					{
+						$app = 'core';
+					}
+					$where = $this->getReactionWhereClause();
+					$where[] = array( 'member_id!=?', \IPS\Member::loggedIn()->member_id ?: 0 );
+					foreach ( \IPS\Db::i()->select( '*', 'core_reputation_index', $where, 'RAND()', \IPS\Content\Reaction::isLikeMode() ? 18 : ( $userLiked ? 2 : 3 ) )->join( 'core_reactions', 'reaction=reaction_id' ) as $rep )
 					{
 						if ( $i < ( $userLiked ? 2 : 3 ) )
 						{
-							$peopleToDisplayInMainView[] = Theme::i()->getTemplate( 'global', 'core', 'front' )->userLink( Member::load( $rep['member_id'] ) );
+							$peopleToDisplayInMainView[] = \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->userLink( \IPS\Member::load( $rep['member_id'] ) );
 							$andXOthers--;
 						}
 						else
 						{
-							$peopleToDisplayInSecondaryView[] = htmlspecialchars( Member::load( $rep['member_id'] )->name, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', FALSE );
+							$peopleToDisplayInSecondaryView[] = htmlspecialchars( \IPS\Member::load( $rep['member_id'] )->name, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', FALSE );
 						}
 						$i++;
 					}
@@ -775,43 +696,43 @@ trait Reactable
 					/* If there's people to display in the secondary view, add that */
 					if ( $andXOthers )
 					{
-						if ( count( $peopleToDisplayInSecondaryView ) < $andXOthers )
+						if ( \count( $peopleToDisplayInSecondaryView ) < $andXOthers )
 						{
-							$peopleToDisplayInSecondaryView[] = Member::loggedIn()->language()->addToStack( "{$langPrefix}blurb_others_secondary", FALSE, array( 'pluralize' => array( $andXOthers - count( $peopleToDisplayInSecondaryView ) ) ) );
+							$peopleToDisplayInSecondaryView[] = \IPS\Member::loggedIn()->language()->addToStack( "{$langPrefix}blurb_others_secondary", FALSE, array( 'pluralize' => array( $andXOthers - \count( $peopleToDisplayInSecondaryView ) ) ) );
 						}
-						$peopleToDisplayInMainView[] = Theme::i()->getTemplate( 'global', 'core', 'front' )->reputationOthers( $this->url( 'showReactions' ), Member::loggedIn()->language()->addToStack( "{$langPrefix}blurb_others", FALSE, array( 'pluralize' => array( $andXOthers ) ) ), json_encode( $peopleToDisplayInSecondaryView ) );
+						$peopleToDisplayInMainView[] = \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->reputationOthers( $this->url( 'showReactions' ), \IPS\Member::loggedIn()->language()->addToStack( "{$langPrefix}blurb_others", FALSE, array( 'pluralize' => array( $andXOthers ) ) ), json_encode( $peopleToDisplayInSecondaryView ) );
 					}
 					
 					/* Put it all together */
-					$this->likeBlurb[$blurbKey] = Member::loggedIn()->language()->addToStack( "{$langPrefix}blurb", FALSE, array( 'pluralize' => array( $numberOfLikes ), 'htmlsprintf' => array( Member::loggedIn()->language()->formatList( $peopleToDisplayInMainView ) ) ) );
+					$this->likeBlurb = \IPS\Member::loggedIn()->language()->addToStack( "{$langPrefix}blurb", FALSE, array( 'pluralize' => array( $numberOfLikes ), 'htmlsprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $peopleToDisplayInMainView ) ) ) );
 				}				
 			}
 			/* Nobody liked it - show nothing */
 			else
 			{
-				$this->likeBlurb[$blurbKey] = '';
+				$this->likeBlurb = '';
 			}
 		}
 				
-		return $this->likeBlurb[$blurbKey];
+		return $this->likeBlurb;
 	}
 
 	/**
 	 * Return boolean indicating if *any* reaction elements are available to the user
 	 * Provides a convenient way of reducing logic in frontend templates rather than having to check every condition.
 	 *
-	 * @return	bool
+	 * @return	boolean
 	 */
-	public function hasReactionBar(): bool
+	public function hasReactionBar()
 	{
 		/* If we're in count mode and have > 0 */
-		if ( Settings::i()->reaction_count_display == 'count' && $this->reactionCount() )
+		if ( \IPS\Settings::i()->reaction_count_display == 'count' && $this->reactionCount() )
 		{
 			return TRUE;
 		}
 
 		/* Not in count mode and have some blurb to show */
-		if( Settings::i()->reaction_count_display !== 'count' && $this->reactBlurb() && count( $this->reactBlurb() ) )
+		if( \IPS\Settings::i()->reaction_count_display !== 'count' && $this->reactBlurb() && \count( $this->reactBlurb() ) )
 		{
 			return TRUE;
 		}

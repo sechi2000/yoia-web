@@ -11,20 +11,17 @@
 
 namespace IPS\{app}\extensions\core\MemberACPProfileTabs;
 
-use IPS\core\MemberACPProfile\MainTab;
-use function defined;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile Tab
  */
-class {class} extends MainTab
+class _{class} extends \IPS\core\MemberACPProfile\MainTab
 {
 	/**
 	 * Get left-column blocks
@@ -44,6 +41,18 @@ class {class} extends MainTab
 	 * @return	array
 	 */
 	public function mainColumnBlocks(): array
+	{
+		return array(
+			'IPS\{app}\extensions\core\MemberACPProfileBlocks\BlockName',
+		);
+	}
+	
+	/**
+	 * Get right-column blocks
+	 *
+	 * @return	array
+	 */
+	public function rightColumnBlocks(): array
 	{
 		return array(
 			'IPS\{app}\extensions\core\MemberACPProfileBlocks\BlockName',

@@ -11,88 +11,26 @@
 namespace IPS\core\modules\admin\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Application;
-use IPS\core\AdminNotification;
-use IPS\core\extensions\core\CommunityEnhancements\Zapier;
-use IPS\core\modules\admin\support\support;
-use IPS\core\Setup\Upgrade as UpgradeClass;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Db\Exception;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\Email;
-use IPS\Helpers\Form\Ftp;
-use IPS\Helpers\Form\Password;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Helpers\Wizard;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Text\Encrypt;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use XMLReader;
-use function call_user_func;
-use function count;
-use function defined;
-use function fclose;
-use function file_put_contents;
-use function fopen;
-use function function_exists;
-use function fwrite;
-use function get_class;
-use function in_array;
-use function intval;
-use function IPS\Cicloud\managedSupportEmail;
-use function is_array;
-use function is_string;
-use function substr;
-use const IPS\CIC;
-use const IPS\CIC2;
-use const IPS\DELTA_FORCE_FTP;
-use const IPS\IPS_ALPHA_BUILD;
-use const IPS\LONG_REQUEST_TIMEOUT;
-use const IPS\NO_WRITES;
-use const IPS\TEMP_DIRECTORY;
-use const IPS\TEST_DELTA_DETAILS;
-use const IPS\TEST_DELTA_ZIP;
-use const IPS\USE_DEVELOPMENT_BUILDS;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * upgrade
  */
-class upgrade extends Controller
+class _upgrade extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Steps that the AdminCP-based upgrader can handle
 	 */
-	protected static array $availableSteps = array(
+	protected static $availableSteps = array(
 		'queries'	=> '_upgradeQueries',
 		'theme'		=> '_upgradeTheme',
 		'lang'		=> '_upgradeLanguages',
@@ -102,17 +40,17 @@ class upgrade extends Controller
 	/**
 	 * @brief	IPS clientArea Password
 	 */
-	protected string $_clientAreaPassword = '';
+	protected $_clientAreaPassword;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_system.js', 'core', 'admin' ) );
-		Output::i()->responsive = FALSE;
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_system.js', 'core', 'admin' ) );
+		\IPS\Output::i()->responsive = FALSE;
 		parent::execute();
 	}
 
@@ -121,11 +59,12 @@ class upgrade extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Dispatcher::i()->checkAcpPermission( 'upgrade_manage', 'core', 'overview' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'upgrade_manage', 'core', 'overview' );
 
-		Output::i()->redirect( Url::external( "https://nullforums.net/resources/ips-community-suite-5-ips-nulled-5.9871/" ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('ips_suite_upgrade');
+		\IPS\Output::i()->redirect( \IPS\Http\Url::external( "https://nullforums.net/resources/categories/releases.122/" ) );
 	}
 
 	/**
@@ -134,17 +73,17 @@ class upgrade extends Controller
 	 * @param	array	$data	Wizard data
 	 * @return	string|array
 	 */
-	public function _selectVersion( array $data ) : array|string
+	public function _selectVersion( $data )
 	{
-		if ( isset( Request::i()->_chosenVersion ) )
+		if ( isset( \IPS\Request::i()->_chosenVersion ) )
 		{
-			$values = array( 'version' => Request::i()->_chosenVersion );
+			$values = array( 'version' => \IPS\Request::i()->_chosenVersion );
 		}
 		else
 		{
 			/* Check latest version */
 			$versions = array();
-			foreach ( Db::i()->select( '*', 'core_applications', Db::i()->in( 'app_directory', IPS::$ipsApps ) ) as $app )
+			foreach ( \IPS\Db::i()->select( '*', 'core_applications', \IPS\Db::i()->in( 'app_directory', \IPS\IPS::$ipsApps ) ) as $app )
 			{
 				if ( $app['app_enabled'] )
 				{
@@ -152,38 +91,38 @@ class upgrade extends Controller
 				}
 			}
 			$version = min( $versions );
-			$url = Url::ips('updateCheck5')->setQueryString( array( 'type' => 'upgrader', 'key' => Settings::i()->ipb_reg_number ) );
-			if ( USE_DEVELOPMENT_BUILDS )
+			$url = \IPS\Http\Url::ips('updateCheck')->setQueryString( array( 'type' => 'upgrader', 'key' => \IPS\Settings::i()->ipb_reg_number ) );
+			if ( \IPS\USE_DEVELOPMENT_BUILDS )
 			{
 				$url = $url->setQueryString( 'development', 1 );
 			}
-			if ( IPS_ALPHA_BUILD )
+			if ( \IPS\IPS_ALPHA_BUILD )
 			{
 				$url = $url->setQueryString( 'alpha', 1 );
 			}
 			try
 			{
 				$response = $url->setQueryString( 'version', $version )->request()->get()->decodeJson();
-				$coreApp = Application::load('core');
+				$coreApp = \IPS\Application::load('core');
 				$coreApp->update_version = json_encode( $response );
 				$coreApp->update_last_check = time();
 				$coreApp->save();
 
 				/* Check if we should allow the upgrade to proceed */
-				if( CIC AND IPS::isManaged() )
+				if( \IPS\CIC AND \IPS\IPS::isManaged() )
 				{
-					Output::i()->output = Theme::i()->getTemplate('system')->upgradeManagedContactUs( managedSupportEmail() );
-					Dispatcher::i()->finish();
+					\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('system')->upgradeManagedContactUs( \IPS\Cicloud\managedSupportEmail() );
+					\IPS\Dispatcher::i()->finish();
 				}
 			}
 			catch ( \Exception $e ) { }
 
 			/* Build form */
-			$form = new Form( 'select_version' );
+			$form = new \IPS\Helpers\Form( 'select_version' );
 			$options = array();
 			$descriptions = array();
 			$latestVersion = 0;
-			foreach( Application::load( 'core' )->availableUpgrade( FALSE, !isset( $data['patch'] ) ) as $possibleVersion )
+			foreach( \IPS\Application::load( 'core' )->availableUpgrade( FALSE, !isset( $data['patch'] ) ) as $possibleVersion )
 			{
 				$options[ $possibleVersion['longversion'] ] = $possibleVersion['version'];
 				$descriptions[ $possibleVersion['longversion'] ] = $possibleVersion;
@@ -192,7 +131,7 @@ class upgrade extends Controller
 					$latestVersion = $possibleVersion['longversion'];
 				}
 			}
-			if ( TEST_DELTA_ZIP )
+			if ( \IPS\TEST_DELTA_ZIP )
 			{
 				$options['test'] = 'x.y.z';
 				$descriptions['test'] = array(
@@ -204,14 +143,14 @@ class upgrade extends Controller
 			}
 			if ( !$options )
 			{
-				AdminNotification::remove( 'core', 'NewVersion' );
-				Output::i()->error( 'download_upgrade_nothing', '1C287/4', 403, '' );
+				\IPS\core\AdminNotification::remove( 'core', 'NewVersion' );
+				\IPS\Output::i()->error( 'download_upgrade_nothing', '1C287/4', 403, '' );
 			}
-			if ( CIC )
+			if ( \IPS\CIC )
 			{
 				$options = array( $latestVersion => $options[ $latestVersion ] ); // CIC can only actually do the actual latest version
 			}
-			$form->add( new Radio( 'version', $latestVersion, TRUE, array( 'options' => $options, '_details' => $descriptions ) ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'version', $latestVersion, TRUE, array( 'options' => $options, '_details' => $descriptions ) ) );
 
 			/* Handle submissions */
 			$values = $form->values();
@@ -221,63 +160,154 @@ class upgrade extends Controller
 		if ( $values )
 		{
 			/* Check requirements */
-			if( !CIC )
+			if( !\IPS\CIC )
 			{
 				try
 				{
-					$requirements = Url::ips('requirements')->setQueryString( 'version', $values['version'] )->request()->get()->decodeJson();
+					$requirements = \IPS\Http\Url::ips('requirements')->setQueryString( 'version', $values['version'] )->request()->get()->decodeJson();
 					$phpVersion = PHP_VERSION;
-					$mysqlVersion = Db::i()->server_info;
+					$mysqlVersion = \IPS\Db::i()->server_info;
 					if ( !( version_compare( $phpVersion, $requirements['php']['required'] ) >= 0 ) )
 					{
 						if ( $requirements['php']['required'] == $requirements['php']['recommended'] )
 						{
-							$message = Member::loggedIn()->language()->addToStack( 'requirements_php_version_fail_no_recommended', FALSE, array( 'sprintf' => array( $phpVersion, $requirements['php']['required'] ) ) );
+							$message = \IPS\Member::loggedIn()->language()->addToStack( 'requirements_php_version_fail_no_recommended', FALSE, array( 'sprintf' => array( $phpVersion, $requirements['php']['required'] ) ) );
 						}
 						else
 						{
-							$message = Member::loggedIn()->language()->addToStack( 'requirements_php_version_fail', FALSE, array( 'sprintf' => array( $phpVersion, $requirements['php']['required'], $requirements['php']['recommended'] ) ) );
+							$message = \IPS\Member::loggedIn()->language()->addToStack( 'requirements_php_version_fail', FALSE, array( 'sprintf' => array( $phpVersion, $requirements['php']['required'], $requirements['php']['recommended'] ) ) );
 						}
-						Output::i()->error( $message, '1C287/2' );
+						\IPS\Output::i()->error( $message, '1C287/2' );
 					}
 					if ( !( version_compare( $mysqlVersion, $requirements['mysql']['required'] ) >= 0 ) )
 					{
-						Output::i()->error( Member::loggedIn()->language()->addToStack( 'requirements_mysql_version_fail', FALSE, array( 'sprintf' => array( $mysqlVersion, $requirements['mysql']['required'], $requirements['mysql']['recommended'] ) ) ), '1C287/3', 403, '' );
+						\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack( 'requirements_mysql_version_fail', FALSE, array( 'sprintf' => array( $mysqlVersion, $requirements['mysql']['required'], $requirements['mysql']['recommended'] ) ) ), '1C287/3', 403, '' );
 					}
 				}
 				catch ( \Exception $e ) {}
 			}
 
 			/* Do a database check */
-			if( !IPS_ALPHA_BUILD )
+			if( !\IPS\IPS_ALPHA_BUILD )
 			{
 				/* If the files on disk are already newer (i.e. if the files were already applied, but the upgrade hasn't happened), go to upgrade now */
-				if( (int) Application::getAvailableVersion('core') > Application::load('core')->long_version AND Application::load('core')->version != Application::getAvailableVersion( 'core', TRUE ) )
+				if( (int) \IPS\Application::getAvailableVersion('core') > \IPS\Application::load('core')->long_version AND \IPS\Application::load('core')->version != \IPS\Application::getAvailableVersion( 'core', TRUE ) )
 				{
-					Output::i()->redirect( 'upgrade/?autologin=1' );
+					\IPS\Output::i()->redirect( 'upgrade/?autologin=1' );
 				}
 
 				/* Run the database check for each IPS app */
-				foreach ( Application::enabledApplications() as $app )
+				foreach ( \IPS\Application::enabledApplications() as $app )
 				{
-					if( in_array( $app->directory, IPS::$ipsApps ) )
+					if( \in_array( $app->directory, \IPS\IPS::$ipsApps ) )
 					{
 						if ( $app->databaseCheck() )
 						{
-							return Theme::i()->getTemplate('system')->upgradeDeltaDatabaseCheck( $values['version'] );
+							return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaDatabaseCheck( $values['version'] );
 						}
 					}
 				}
 			}
 
+			/* Check Resources for new versions */
+			if ( !isset( \IPS\Request::i()->skip_resource_check ) )
+			{
+				/* Check apps and plugins */
+				$row = \IPS\Db::i()->union(
+					array(
+						\IPS\Db::i()->select( "'applications' AS `table`, app_directory AS `id`, app_version AS `current`, app_long_version AS `long`", 'core_applications', [ \IPS\Db::i()->in( 'app_directory', \IPS\IPS::$ipsApps, TRUE ) ] ),
+						\IPS\Db::i()->select( "'plugins' AS `table`, plugin_id AS id, plugin_version_human AS `current`, plugin_version_long AS `long`", 'core_plugins' ),
+						\IPS\Db::i()->select( "'themes' AS `table`, set_id AS `id`, set_version AS `current`, set_long_version AS `long`", 'core_themes', [ 'set_customized=?', 1 ] ),
+						\IPS\Db::i()->select( "'languages' AS `table`, lang_id AS `id`, `lang_version` AS `current`, `lang_version_long` AS `long`", "core_sys_lang" )
+					),
+					NULL,
+					200
+				);
+
+				$output = [ 'custom' => [] ];
+				foreach ( $row as $r )
+				{
+					/* Load title */
+					try
+					{
+						switch( $r['table'] )
+						{
+							case 'applications':
+								$r['title'] = \IPS\Application::load( $r['id'] )->_title;
+								break;
+							case 'plugins':
+								$r['title'] = \IPS\Plugin::load( $r['id'] )->_title;
+								break;
+							case 'themes':
+								$r['title'] = \IPS\Theme::load( $r['id'] )->_title;
+								break;
+							case 'languages':
+								\IPS\Db::i()->select( 'word_id', 'core_sys_lang_words', array( 'lang_id=? AND word_export=1 AND word_custom IS NOT NULL', $r['id'], 1 ) )->first();
+								$r['title'] = \IPS\Lang::load( $r['id'] )->_title;
+								break;
+						}
+					}
+					catch( \RuntimeException | \OutOfRangeException $e )
+					{
+						continue;
+					}
+
+					$output['custom'][ $r['table'] . $r['id'] ] = $r;
+				}
+
+				return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaResourceIssues( $values['version'], $output );
+			}
+
 			/* Get details */
-			$data = array( 'version' => $values['version'], 'oldVersion' => Application::load('core')->long_version, 'changes' => array() );
+			$data = array( 'version' => $values['version'], 'oldVersion' => \IPS\Application::load('core')->long_version, 'changes' => array() );
 			$data['info'] = $this->_changeDetails( $data['oldVersion'], $values['version'] );
 			foreach ( $data['info']['steps'] as $k => $v )
 			{
 				if ( $v )
 				{
 					$data['changes'][ $k ] = $this->_changeDetails( $data['oldVersion'], $values['version'], $k );
+				}
+			}
+
+			/* Check theme compatibility (checks if any of the HTML templates or CSS files that have been customised on installed themes have changed between the version we are upgrading from to the version we are upgrading to) */
+			if ( $data['info']['steps']['theme'] )
+			{
+				if ( !isset( \IPS\Request::i()->skip_theme_check ) )
+				{
+					$conflicts = array();
+					$validThemeIds = array_keys( \IPS\Theme::themes() );
+
+					/* Check all of our customised HTML templates to see if any are in that list */
+					foreach ( \IPS\Db::i()->select( array( 'template_id', 'template_set_id', 'template_app', 'template_location', 'template_group', 'template_name' ), 'core_theme_templates', array( 'template_set_id>0' ) ) as $modifiedTemplate )
+					{
+						$templateKey = "{$modifiedTemplate['template_location']}/{$modifiedTemplate['template_group']}/{$modifiedTemplate['template_name']}";
+						if ( isset( $data['changes']['theme'][ $modifiedTemplate['template_app'] ] ) )
+						{
+							if ( \in_array( $modifiedTemplate['template_set_id'], $validThemeIds ) and \in_array( $templateKey, $data['changes']['theme'][ $modifiedTemplate['template_app'] ]['html']['edited'] ) )
+							{
+								$conflicts[ $modifiedTemplate['template_set_id'] ]['html'][ $modifiedTemplate['template_app'] . '/' . $templateKey ] = $modifiedTemplate['template_id'];
+							}
+						}
+					}
+
+					/* Check all of our customised CSS files to see if any are in that list */
+					foreach ( \IPS\Db::i()->select( array( 'css_id', 'css_set_id', 'css_app', 'css_location', 'css_path', 'css_name' ), 'core_theme_css', array( 'css_set_id>0' ) ) as $modifiedCss )
+					{
+						$cssKey = "{$modifiedCss['css_location']}/" . ( $modifiedCss['css_path'] ? "{$modifiedCss['css_path']}/" : '' ) . $modifiedCss['css_name'];
+						if ( isset( $data['changes']['theme'][ $modifiedCss['css_app'] ] ) )
+						{
+							if ( \in_array( $modifiedCss['css_set_id'], $validThemeIds ) and \in_array( $cssKey, $data['changes']['theme'][ $modifiedCss['css_app'] ]['css']['edited'] ) )
+							{
+								$conflicts[ $modifiedCss['css_set_id'] ]['css'][ $modifiedCss['css_app'] . '/' . $cssKey ] = $modifiedCss['css_set_id'];
+							}
+						}
+					}
+
+					/* If there was any, display that */
+					if ( \count( $conflicts ) )
+					{
+						return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaThemeConflicts( $values['version'], $conflicts );
+					}
 				}
 			}
 
@@ -288,33 +318,33 @@ class upgrade extends Controller
 				Both forceManualDownloadCiC and forceManualDownloadNoCiC can, instead of just being TRUE, be a link to an external URL which will
 				provide the user with instructions on how to upgrade, which would probably be needed for CiC where the user cannot download and
 				then apply an update */
-			if ( $data['info']['forceMainUpgrader'] and ( ( CIC and $data['info']['forceManualDownloadCiC'] ) or ( !CIC and $data['info']['forceManualDownloadNoCiC'] ) ) )
+			if ( $data['info']['forceMainUpgrader'] and ( ( \IPS\CIC and $data['info']['forceManualDownloadCiC'] ) or ( !\IPS\CIC and $data['info']['forceManualDownloadNoCiC'] ) ) )
 			{
-				$val = CIC ? $data['info']['forceManualDownloadCiC'] : $data['info']['forceManualDownloadNoCiC'];
-				if ( is_string( $val ) )
+				$val = \IPS\CIC ? $data['info']['forceManualDownloadCiC'] : $data['info']['forceManualDownloadNoCiC'];
+				if ( \is_string( $val ) )
 				{
-					Output::i()->redirect( $val );
+					\IPS\Output::i()->redirect( $val );
 				}
 				else
 				{
-					return Theme::i()->getTemplate('system')->manualUpgradeRequired();
+					return \IPS\Theme::i()->getTemplate('system')->manualUpgradeRequired();
 				}
 			}
 
 			/* Check if we will need any manual queries */
-			if ( !CIC and $data['info']['steps']['queries'] )
+			if ( !\IPS\CIC and $data['info']['steps']['queries'] )
 			{
 				$checkedTables = array();
 				foreach ( $data['changes']['queries'] as $app => $queries )
 				{
 					foreach ( $queries as $query )
 					{
-						if ( !in_array( $query['method'], array( 'dropTable', 'insert', 'renameTable' ) ) and ( $query['method'] != 'delete' OR isset( $query['params'][1] ) ) )
+						if ( !\in_array( $query['method'], array( 'dropTable', 'insert', 'renameTable' ) ) and ( $query['method'] != 'delete' OR isset( $query['params'][1] ) ) )
 						{
-							$tableName = ( isset( $query['params'][0] ) and is_string( $query['params'][0] ) ) ? $query['params'][0] : $query['params'][0]['name'];
+							$tableName = ( isset( $query['params'][0] ) and \is_string( $query['params'][0] ) ) ? $query['params'][0] : $query['params'][0]['name'];
 							if ( !isset( $checkedTables[ $tableName ] ) )
 							{
-								$checkedTables[ $tableName ] = Db::i()->recommendManualQuery( $tableName );
+								$checkedTables[ $tableName ] = \IPS\Db::i()->recommendManualQuery( $tableName );
 							}
 						}
 					}
@@ -325,13 +355,13 @@ class upgrade extends Controller
 				{
 					sort( $tablesWeWillNeedToDoManualQueriesOn );
 
-					if ( isset( Request::i()->skip_large_tables_check ) )
+					if ( isset( \IPS\Request::i()->skip_large_tables_check ) )
 					{
 						$data['largeTables'] = $tablesWeWillNeedToDoManualQueriesOn;
 					}
 					else
 					{
-						return Theme::i()->getTemplate('system')->upgradeDeltaLargeTables( $values['version'], $tablesWeWillNeedToDoManualQueriesOn );
+						return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaLargeTables( $values['version'], $tablesWeWillNeedToDoManualQueriesOn );
 					}
 				}
 				else
@@ -349,7 +379,7 @@ class upgrade extends Controller
 		}
 
 		/* Display */
-		return $form->customTemplate( array( Theme::i()->getTemplate( 'system' ), 'upgradeSelectVersion' ) );
+		return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'system' ), 'upgradeSelectVersion' ) );
 	}
 
 	/**
@@ -360,23 +390,23 @@ class upgrade extends Controller
 	 * @param	string|NULL		$item		If thing we want to know the derails of the changes for (e.g. "theme") or NULL for generic information
 	 * @return	array
 	 */
-	protected function _changeDetails( string $oldVersion, string $newVersion, ?string $item=NULL ) : array
+	protected function _changeDetails( $oldVersion, $newVersion, $item=NULL )
 	{
 		/* Get the details */
 		if ( $newVersion === 'test' )
 		{
-			$details = TEST_DELTA_DETAILS;
+			$details = \IPS\TEST_DELTA_DETAILS;
 			$details = $item ? $details[ $item ] : $details['info'];
 		}
 		else
 		{
 			try
 			{
-				$details = Url::ips( "upgrade/{$oldVersion}-{$newVersion}" . ( $item ? "/{$item}" : '' ) )->setQueryString( array( 'apps' => implode( ',', array_intersect( array_keys( Application::applications() ), IPS::$ipsApps ) ), 'alpha' => IPS_ALPHA_BUILD ) )->request()->get()->decodeJson();
+				$details = \IPS\Http\Url::ips( "upgrade/{$oldVersion}-{$newVersion}" . ( $item ? "/{$item}" : '' ) )->setQueryString( array( 'apps' => implode( ',', array_intersect( array_keys( \IPS\Application::applications() ), \IPS\IPS::$ipsApps ) ), 'alpha' => \IPS\IPS_ALPHA_BUILD ) )->request()->get()->decodeJson();
 			}
 			catch ( \Exception $e )
 			{
-				Output::i()->error( 'delta_upgrade_fail_server', '3C287/5', 500, NULL, array(), get_class( $e ) . '::' . $e->getCode() . ": " . $e->getMessage() );
+				\IPS\Output::i()->error( 'delta_upgrade_fail_server', '3C287/5', 500, NULL, array(), \get_class( $e ) . '::' . $e->getCode() . ": " . $e->getMessage() );
 			}
 		}
 
@@ -404,11 +434,11 @@ class upgrade extends Controller
 	 * @param	array	$data	Wizard data
 	 * @return	string|array
 	 */
-	public function _applyCic( array $data ) : array|string
+	public function _applyCic( $data )
 	{
-		if ( CIC2 )
+		if ( \IPS\CIC2 )
 		{
-			if ( isset( Request::i()->check ) )
+			if ( isset( \IPS\Request::i()->check ) )
 			{
 				return $data;
 			}
@@ -420,32 +450,32 @@ class upgrade extends Controller
 				/* Log who started the upgrade */
 				\IPS\Session::i()->log( 'acplog__upgrade_started' );
 
-				return Theme::i()->getTemplate('system')->upgradeExtractCic2();
+				return \IPS\Theme::i()->getTemplate('system')->upgradeExtractCic2();
 			}
 		}
 		else
 		{
-			if ( isset( Request::i()->fail ) )
+			if ( isset( \IPS\Request::i()->fail ) )
 			{
 				try
 				{
-					IPS::applyLatestFilesIPSCloud();
+					\IPS\IPS::applyLatestFilesIPSCloud();
 				}
 				catch( \IPS\Http\Request\Exception $e ){}
 
-				return Theme::i()->getTemplate('system')->upgradeDeltaFailedCic();
+				return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaFailedCic();
 			}
-			elseif ( isset( Request::i()->done ) )
+			elseif ( isset( \IPS\Request::i()->done ) )
 			{
 				return $data;
 			}
 
-			UpgradeClass::setUpgradingFlag( TRUE );
-			Session::i()->log( 'acplog__upgrade_started' );
+			\IPS\core\Setup\Upgrade::setUpgradingFlag( TRUE );
+			\IPS\Session::i()->log( 'acplog__upgrade_started' );
 
 			/* Check latest version */
 			$versions = array();
-			foreach ( Db::i()->select( '*', 'core_applications', Db::i()->in( 'app_directory', IPS::$ipsApps ) ) as $app )
+			foreach ( \IPS\Db::i()->select( '*', 'core_applications', \IPS\Db::i()->in( 'app_directory', \IPS\IPS::$ipsApps ) ) as $app )
 			{
 				if ( $app['app_enabled'] )
 				{
@@ -454,21 +484,21 @@ class upgrade extends Controller
 			}
 			$version = min( $versions );
 
-			$extractUrl = new Url( Settings::i()->base_url . 'admin/upgrade/extractCic.php' );
+			$extractUrl = new \IPS\Http\Url( \IPS\Settings::i()->base_url . \IPS\CP_DIRECTORY . '/upgrade/extractCic.php' );
 			$extractUrl = $extractUrl
 				->setScheme( NULL )	// Use protocol-relative in case the AdminCP is being loaded over https but rest of site is not
 				->setQueryString( array(
-					'account'		=> IPS::getCicUsername(),
-					'key'			=> md5( IPS::getCicUsername() . Settings::i()->sql_pass ),
+					'account'		=> \IPS\IPS::getCicUsername(),
+					'key'			=> md5( \IPS\IPS::getCicUsername() . \IPS\Settings::i()->sql_pass ),
 					'version'		=> $version
 				)
 			);
 
 			/* Send the request */
-			IPS::applyLatestFilesIPSCloud( $version );
+			\IPS\IPS::applyLatestFilesIPSCloud( $version );
 
 			/* NOTE: We still need to use an iframe here, as CiC would still be susceptible to the same failures. */
-			return Theme::i()->getTemplate('system')->upgradeExtractCic( $extractUrl );
+			return \IPS\Theme::i()->getTemplate('system')->upgradeExtractCic( $extractUrl );
 		}
 	}
 
@@ -478,27 +508,27 @@ class upgrade extends Controller
 	 * @param	array	$data	Wizard data
 	 * @return	string|array
 	 */
-	public function _login( array $data ) : array|string
+	public function _login( $data )
 	{
 		/* If we're just testing, we can skip this step */
-		if ( TEST_DELTA_ZIP and $data['version'] == 'test' )
+		if ( \IPS\TEST_DELTA_ZIP and $data['version'] == 'test' )
 		{
 			$data['key'] = 'test';
 			return $data;
 		}
 
 		/* Build form */
-		$form = new Form( 'login', 'continue' );
+		$form = new \IPS\Helpers\Form( 'login', 'continue' );
 		$form->hiddenValues['version'] = $data['version'];
-		$form->add( new Email( 'ips_email_address', NULL ) );
-		$form->add( new Password( 'ips_password', NULL ) );
+		$form->add( new \IPS\Helpers\Form\Email( 'ips_email_address', NULL ) );
+		$form->add( new \IPS\Helpers\Form\Password( 'ips_password', NULL ) );
 
-		if ( !CIC )
+		if ( !\IPS\CIC )
 		{
-			$form->add( new YesNo( 'upgrade_confirm_backup', FALSE, TRUE, array(), function( $val ) {
+			$form->add( new \IPS\Helpers\Form\YesNo( 'upgrade_confirm_backup', FALSE, TRUE, array(), function( $val ) {
 				if ( !$val )
 				{
-					throw new DomainException( 'form_required' );
+					throw new \DomainException( 'form_required' );
 				}
 			} ) );
 		}
@@ -509,7 +539,7 @@ class upgrade extends Controller
 			try
 			{
 				$this->_clientAreaPassword = $values['ips_password'];
-				if ( $downloadKey = $this->_getDownloadKey( $values['ips_email_address'], $values['version'] ?? NULL ) )
+				if ( $downloadKey = $this->_getDownloadKey( $values['ips_email_address'], isset( $values['version'] ) ? $values['version'] : NULL ) )
 				{
 					$data['key'] = $downloadKey;
 					$data['ips_email'] = $values['ips_email_address'];
@@ -518,23 +548,23 @@ class upgrade extends Controller
 				}
 				else
 				{
-					if ( Db::i()->select( 'MIN(app_long_version)', 'core_applications', Db::i()->in( 'app_directory', IPS::$ipsApps ) )->first() < Application::getAvailableVersion('core') )
+					if ( \IPS\Db::i()->select( 'MIN(app_long_version)', 'core_applications', \IPS\Db::i()->in( 'app_directory', \IPS\IPS::$ipsApps ) )->first() < \IPS\Application::getAvailableVersion('core') )
 					{
 						$data['key'] = NULL;
 						return $data;
 					}
-					$form->error = Member::loggedIn()->language()->addToStack('download_upgrade_nothing');
+					$form->error = \IPS\Member::loggedIn()->language()->addToStack('download_upgrade_nothing');
 				}
 			}
-			catch ( LogicException $e )
+			catch ( \LogicException $e )
 			{
-				Log::log( $e, 'auto_upgrade' );
+				\IPS\Log::log( $e, 'auto_upgrade' );
 				$form->error = $e->getMessage();
 			}
-			catch ( RuntimeException $e )
+			catch ( \RuntimeException $e )
 			{
-				Log::log( $e, 'auto_upgrade' );
-				$form->error = Member::loggedIn()->language()->addToStack('download_upgrade_error');
+				\IPS\Log::log( $e, 'auto_upgrade' );
+				$form->error = \IPS\Member::loggedIn()->language()->addToStack('download_upgrade_error');
 			}
 		}
 
@@ -548,16 +578,16 @@ class upgrade extends Controller
 	 * @param	string		$version			Version to download
 	 * @param	array		$files				If desired, specific files to download rather than a delta from current version
 	 * @return	string|NULL	string is a download key. NULL indicates already running the latest version
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 * @throws	\IPS\Http\Request\Exception
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	protected function _getDownloadKey( string $clientAreaEmail, string $version, array $files=array() ) : ?string
+	protected function _getDownloadKey( $clientAreaEmail, $version, $files=array() )
 	{
-		$key = IPS::licenseKey();
-		$url = Url::ips( 'build5/' . $key['key'] )->setQueryString( 'ip', Request::i()->ipAddress() );
+		$key = \IPS\IPS::licenseKey();
+		$url = \IPS\Http\Url::ips( 'build/' . $key['key'] )->setQueryString( 'ip', \IPS\Request::i()->ipAddress() );
 
-		if ( USE_DEVELOPMENT_BUILDS )
+		if ( \IPS\USE_DEVELOPMENT_BUILDS )
 		{
 			$url = $url->setQueryString( 'development', 1 );
 		}
@@ -565,14 +595,18 @@ class upgrade extends Controller
 		{
 			$url = $url->setQueryString( 'versionToDownload', $version );
 		}
-		if ( IPS_ALPHA_BUILD )
+		if ( \IPS\IPS_ALPHA_BUILD )
 		{
 			$url = $url->setQueryString( 'alpha', 1 );
 		}
+		if ( \IPS\CP_DIRECTORY !== 'admin' )
+		{
+			$url = $url->setQueryString( 'cp_directory', \IPS\CP_DIRECTORY );
+		}
 		/* Check whether the converter application is present and installed */
-		if ( array_key_exists( 'convert', Application::applications() )
+		if ( array_key_exists( 'convert', \IPS\Application::applications() )
 			AND file_exists( \IPS\ROOT_PATH . '/applications/convert/Application.php' )
-			AND Application::load( 'convert' )->version == Application::load('core')->version )
+			AND \IPS\Application::load( 'convert' )->version == \IPS\Application::load('core')->version )
 		{
 			$url = $url->setQueryString( 'includeConverters', 1 );
 		}
@@ -581,13 +615,13 @@ class upgrade extends Controller
 			$url = $url->setQueryString( 'files', implode( ',', $files ) );
 		}
 
-		$response = $url->request( LONG_REQUEST_TIMEOUT )->login( $clientAreaEmail, $this->_clientAreaPassword )->get();
+		$response = $url->request( \IPS\LONG_REQUEST_TIMEOUT )->login( $clientAreaEmail, $this->_clientAreaPassword )->get();
 		switch ( $response->httpResponseCode )
 		{
 			case 200:
 				if ( !preg_match( '/^ips_[a-z0-9]{5}$/', (string) $response ) )
 				{
-					throw new RuntimeException( (string) $response );
+					throw new \RuntimeException( (string) $response );
 				}
 				else
 				{
@@ -598,7 +632,7 @@ class upgrade extends Controller
 				return NULL;
 
 			default:
-				throw new LogicException( (string) $response );
+				throw new \LogicException( (string) $response );
 		}
 	}
 
@@ -608,20 +642,20 @@ class upgrade extends Controller
 	 * @param	array	$data	Wizard data
 	 * @return	string|array
 	 */
-	public function _ftpDetails( array $data ) : array|string
+	public function _ftpDetails( $data )
 	{
-		if ( !$data['info']['forceManualDownloadNoCiC'] and ( DELTA_FORCE_FTP or !is_writable( \IPS\ROOT_PATH . '/init.php' ) or !is_writable( \IPS\ROOT_PATH . '/applications/core/Application.php' ) or !is_writable( \IPS\ROOT_PATH . '/system/Db/Db.php' ) ) )
+		if ( !$data['info']['forceManualDownloadNoCiC'] and ( \IPS\DELTA_FORCE_FTP or !is_writable( \IPS\ROOT_PATH . '/init.php' ) or !is_writable( \IPS\ROOT_PATH . '/applications/core/Application.php' ) or !is_writable( \IPS\ROOT_PATH . '/system/Db/Db.php' ) ) )
 		{
 			/* If the server does not have the Ftp extension, we can't do this and have to prompt the user to downlad manually... */
-			if ( !function_exists( 'ftp_connect' ) )
+			if ( !\function_exists( 'ftp_connect' ) )
 			{
-				return Theme::i()->getTemplate('system')->upgradeDeltaFailed( 'ftp', isset( $data['key'] ) ? Url::ips("download/{$data['key']}") : NULL );
+				return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaFailed( 'ftp', isset( $data['key'] ) ? \IPS\Http\Url::ips("download/{$data['key']}") : NULL );
 			}
 			/* Otherwise, we can ask for FTP details... */
 			else
 			{
 				/* If they've clicked the button to manually apply patch, let them do that */
-				if ( isset( Request::i()->manual ) )
+				if ( isset( \IPS\Request::i()->manual ) )
 				{
 					$data['manual'] = TRUE;
 					return $data;
@@ -635,26 +669,26 @@ class upgrade extends Controller
 						{
 							if ( file_get_contents( \IPS\ROOT_PATH . '/conf_global.php' ) != $ftp->download( 'conf_global.php' ) )
 							{
-								throw new DomainException('delta_upgrade_ftp_details_no_match');
+								throw new \DomainException('delta_upgrade_ftp_details_no_match');
 							}
 						}
 						catch ( \IPS\Ftp\Exception $e )
 						{
-							throw new DomainException('delta_upgrade_ftp_details_err');
+							throw new \DomainException('delta_upgrade_ftp_details_err');
 						}
 					};
 
 					/* If we have details stored, retreive them */
 					$decodedFtpDetails = NULL;
-					if ( Settings::i()->upgrade_ftp_details )
+					if ( \IPS\Settings::i()->upgrade_ftp_details )
 					{
-						if ( substr( Settings::i()->upgrade_ftp_details, 0, 5 ) === '[!AES' )
+						if ( \substr( \IPS\Settings::i()->upgrade_ftp_details, 0, 5 ) === '[!AES' )
 						{
-							$decodedFtpDetails = Encrypt::fromTag( Settings::i()->upgrade_ftp_details )->decrypt();
+							$decodedFtpDetails = \IPS\Text\Encrypt::fromTag( \IPS\Settings::i()->upgrade_ftp_details )->decrypt();
 						}
 						else
 						{
-							$decodedFtpDetails = Encrypt::fromCipher( Settings::i()->upgrade_ftp_details )->decrypt();
+							$decodedFtpDetails = \IPS\Text\Encrypt::fromCipher( \IPS\Settings::i()->upgrade_ftp_details )->decrypt();
 						}
 						$decodedFtpDetails = @json_decode( $decodedFtpDetails, TRUE );
 					}
@@ -666,24 +700,24 @@ class upgrade extends Controller
 					else
 					{
 						$defaultDetails = array(
-							'server'	=> Url::internal('')->data['host'],
+							'server'	=> \IPS\Http\Url::internal('')->data['host'],
 							'un'		=> @get_current_user(),
 							'path'		=> str_replace( '/home/' . @get_current_user(), '', \IPS\ROOT_PATH )
 						);
 					}
 
 					/* Build the form */
-					$form = new Form( 'ftp_details', 'continue' );
-					$form->add( new Ftp( 'delta_upgrade_ftp_details', $defaultDetails, TRUE, array( 'rejectUnsupportedSftp' => TRUE, 'allowBypassValidation' => FALSE ), $validateCallback ) );
-					$form->add( new Checkbox( 'delta_upgrade_ftp_remember', TRUE ) );
+					$form = new \IPS\Helpers\Form( 'ftp_details', 'continue' );
+					$form->add( new \IPS\Helpers\Form\Ftp( 'delta_upgrade_ftp_details', $defaultDetails, TRUE, array( 'rejectUnsupportedSftp' => TRUE, 'allowBypassValidation' => FALSE ), $validateCallback ) );
+					$form->add( new \IPS\Helpers\Form\Checkbox( 'delta_upgrade_ftp_remember', TRUE ) );
 
 					/* Handle submissions */
 					if ( $values = $form->values() )
 					{
 						if ( $values['delta_upgrade_ftp_remember'] )
 						{
-							$encrypted = Encrypt::fromPlaintext( json_encode( $values['delta_upgrade_ftp_details'] ) );
-							Settings::i()->changeValues( array( 'upgrade_ftp_details' => $encrypted->tag() ) );
+							$encrypted = \IPS\Text\Encrypt::fromPlaintext( json_encode( $values['delta_upgrade_ftp_details'] ) );
+							\IPS\Settings::i()->changeValues( array( 'upgrade_ftp_details' => $encrypted->tag() ) );
 						}
 
 						$data['ftpDetails'] = 1;
@@ -691,7 +725,7 @@ class upgrade extends Controller
 					}
 
 					/* Display the form */
-					return Theme::i()->getTemplate('system')->upgradeDeltaFtp( (string) $form );
+					return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaFtp( (string) $form );
 				}
 			}
 		}
@@ -707,61 +741,61 @@ class upgrade extends Controller
 	 * @param	array	$data	Wizard data
 	 * @return	string|array
 	 */
-	public function _extractUpdate( array $data ) : array|string
+	public function _extractUpdate( $data )
 	{
 		/* If extraction failed, show error */
-		if ( isset( Request::i()->fail ) or ( ( ( CIC and $data['info']['forceManualDownloadCiC'] ) or ( !CIC and $data['info']['forceManualDownloadNoCiC'] ) ) and !isset( Request::i()->check ) ) )
+		if ( isset( \IPS\Request::i()->fail ) or ( ( ( \IPS\CIC and $data['info']['forceManualDownloadCiC'] ) or ( !\IPS\CIC and $data['info']['forceManualDownloadNoCiC'] ) ) and !isset( \IPS\Request::i()->check ) ) )
 		{
-			if( CIC )
+			if( \IPS\CIC )
 			{
 				try
 				{
-					IPS::applyLatestFilesIPSCloud();
+					\IPS\IPS::applyLatestFilesIPSCloud();
 				}
 				catch( \IPS\Http\Request\Exception $e ){}
 
-				return Theme::i()->getTemplate('system')->upgradeDeltaFailedCic();
+				return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaFailedCic();
 			}
 			else
 			{
-				return Theme::i()->getTemplate('system')->upgradeDeltaFailed( 'exception', isset( $data['key'] ) ? Url::ips("download/{$data['key']}") : NULL );
+				return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaFailed( 'exception', isset( $data['key'] ) ? \IPS\Http\Url::ips("download/{$data['key']}") : NULL );
 			}
 		}
 
 		/* Download & Extract */
-		if ( $data['key'] and !isset( Request::i()->check ) )
+		if ( $data['key'] and !isset( \IPS\Request::i()->check ) )
 		{
 			/* If we've asked to do it manually, just show that screen */
 			if ( isset( $data['manual'] ) and $data['manual'] )
 			{
-				return Theme::i()->getTemplate('system')->upgradeDeltaFailed( NULL, Url::ips("download/{$data['key']}") );
+				return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaFailed( NULL, isset( $data['key'] ) ? \IPS\Http\Url::ips("download/{$data['key']}") : NULL );;
 			}
 
 			/* Multiple Redirector */
-			$url = Url::internal('app=core&module=system&controller=upgrade');
-			return (string) new MultipleRedirect( $url, function( $mrData ) use ( $data )
+			$url = \IPS\Http\Url::internal('app=core&module=system&controller=upgrade');
+			return (string) new \IPS\Helpers\MultipleRedirect( $url, function( $mrData ) use ( $data )
 			{
 				/* Init */
-				if ( !is_array( $mrData ) )
+				if ( !\is_array( $mrData ) )
 				{
-					return array( array( 'status' => 'download' ), Member::loggedIn()->language()->addToStack('delta_upgrade_processing') );
+					return array( array( 'status' => 'download' ), \IPS\Member::loggedIn()->language()->addToStack('delta_upgrade_processing') );
 				}
 				/* Download */
 				elseif ( $mrData['status'] == 'download' )
 				{
 					if ( !isset( $mrData['tmpFileName'] ) )
 					{
-						$mrData['tmpFileName'] = tempnam( TEMP_DIRECTORY, 'IPS' ) . '.zip';
+						$mrData['tmpFileName'] = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' ) . '.zip';
 
-						return array( $mrData, Member::loggedIn()->language()->addToStack('delta_upgrade_downloading'), 0 );
+						return array( $mrData, \IPS\Member::loggedIn()->language()->addToStack('delta_upgrade_downloading'), 0 );
 					}
 					else
 					{
-						if ( TEST_DELTA_ZIP and $data['version'] == 'test' )
+						if ( \IPS\TEST_DELTA_ZIP and $data['version'] == 'test' )
 						{
-							file_put_contents( $mrData['tmpFileName'], file_get_contents( TEST_DELTA_ZIP ) );
+							\file_put_contents( $mrData['tmpFileName'], file_get_contents( \IPS\TEST_DELTA_ZIP ) );
 							$mrData['status'] = 'extract';
-							return array( $mrData, Member::loggedIn()->language()->addToStack('delta_upgrade_extracting'), 0 );
+							return array( $mrData, \IPS\Member::loggedIn()->language()->addToStack('delta_upgrade_extracting'), 0 );
 						}
 						else
 						{
@@ -772,9 +806,9 @@ class upgrade extends Controller
 							$startRange = $mrData['range'];
 							$endRange = $startRange + 1000000 - 1;
 
-							$response = Url::ips("download/{$data['key']}")->request( LONG_REQUEST_TIMEOUT )->setHeaders( array( 'Range' => "bytes={$startRange}-{$endRange}" ) )->get();
+							$response = \IPS\Http\Url::ips("download/{$data['key']}")->request( \IPS\LONG_REQUEST_TIMEOUT )->setHeaders( array( 'Range' => "bytes={$startRange}-{$endRange}" ) )->get();
 
-							Log::debug( "Fetching download [range={$startRange}-{$endRange}] with a response code: " . $response->httpResponseCode, 'auto_upgrade' );
+							\IPS\Log::debug( "Fetching download [range={$startRange}-{$endRange}] with a response code: " . $response->httpResponseCode, 'auto_upgrade' );
 
 							if ( $response->httpResponseCode == 404 )
 							{
@@ -783,40 +817,40 @@ class upgrade extends Controller
 									@unlink( $mrData['tmpFileName'] );
 								}
 
-								Log::log( "Cannot fetch delta download: " . var_export( $response, TRUE ), 'auto_upgrade' );
+								\IPS\Log::log( "Cannot fetch delta download: " . var_export( $response, TRUE ), 'auto_upgrade' );
 
-								if( CIC )
+								if( \IPS\CIC )
 								{
 									try
 									{
-										IPS::applyLatestFilesIPSCloud();
+										\IPS\IPS::applyLatestFilesIPSCloud();
 									}
 									catch( \IPS\Http\Request\Exception $e ){}
 
-									return Theme::i()->getTemplate('system')->upgradeDeltaFailedCic();
+									return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaFailedCic();
 								}
 								else
 								{
-									return array( Theme::i()->getTemplate('system')->upgradeDeltaFailed( 'unexpected_response', isset( $data['key'] ) ? Url::ips("download/{$data['key']}") : NULL ) );
+									return array( \IPS\Theme::i()->getTemplate('system')->upgradeDeltaFailed( 'unexpected_response', isset( $data['key'] ) ? \IPS\Http\Url::ips("download/{$data['key']}") : NULL ) );
 								}
 							}
 							elseif ( $response->httpResponseCode == 206 )
 							{
-								$totalFileSize = intval( mb_substr( $response->httpHeaders['Content-Range'], mb_strpos( $response->httpHeaders['Content-Range'], '/' ) + 1 ) );
+								$totalFileSize = \intval( mb_substr( $response->httpHeaders['Content-Range'], mb_strpos( $response->httpHeaders['Content-Range'], '/' ) + 1 ) );
 
-								$fh = fopen( $mrData['tmpFileName'], 'a' );
-								fwrite( $fh, (string) $response );
-								fclose( $fh );
+								$fh = \fopen( $mrData['tmpFileName'], 'a' );
+								\fwrite( $fh, (string) $response );
+								\fclose( $fh );
 
 								$mrData['range']	= $endRange + 1;
 								$complete			= 100 / $totalFileSize * $mrData['range'];
 
-								return array( $mrData, Member::loggedIn()->language()->addToStack('delta_upgrade_downloading'), ( $complete > 100 ) ? 100 : $complete );
+								return array( $mrData, \IPS\Member::loggedIn()->language()->addToStack('delta_upgrade_downloading'), ( $complete > 100 ) ? 100 : $complete );
 							}
 							else
 							{
 								$mrData['status'] = 'extract';
-								return array( $mrData, Member::loggedIn()->language()->addToStack('delta_upgrade_extracting'), 0 );
+								return array( $mrData, \IPS\Member::loggedIn()->language()->addToStack('delta_upgrade_extracting'), 0 );
 							}
 						}
 					}
@@ -824,26 +858,26 @@ class upgrade extends Controller
 				/* Extract */
 				elseif ( $mrData['status'] == 'extract' )
 				{
-					UpgradeClass::setUpgradingFlag( TRUE );
-					Session::i()->log( 'acplog__upgrade_started' );
+					\IPS\core\Setup\Upgrade::setUpgradingFlag( TRUE );
+					\IPS\Session::i()->log( 'acplog__upgrade_started' );
 
-					$extractUrl = new Url( Settings::i()->base_url . 'admin/upgrade/extract.php' );
+					$extractUrl = new \IPS\Http\Url( \IPS\Settings::i()->base_url . \IPS\CP_DIRECTORY . '/upgrade/extract.php' );
 					$extractUrl = $extractUrl
 						->setScheme( NULL )	// Use protocol-relative in case the AdminCP is being loaded over https but rest of site is not
 						->setQueryString( array(
 							'file'			=> $mrData['tmpFileName'],
 							'container'		=> $data['key'],
-							'key'			=> md5( Settings::i()->board_start . $mrData['tmpFileName'] . Settings::i()->sql_pass ),
+							'key'			=> md5( \IPS\Settings::i()->board_start . $mrData['tmpFileName'] . \IPS\Settings::i()->sql_pass ),
 							'ftp'			=> ( isset( $data['ftpDetails'] ) ) ? $data['ftpDetails'] : ''
 						)
 					);
 
-					return array( Theme::i()->getTemplate('system')->upgradeExtract( $extractUrl ) );
+					return array( \IPS\Theme::i()->getTemplate('system')->upgradeExtract( $extractUrl ) );
 				}
 			},
 			function()
 			{
-				Output::i()->redirect( Url::internal('app=core&module=system&controller=upgrade&check=1') );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=system&controller=upgrade&check=1') );
 			} );
 		}
 
@@ -857,30 +891,31 @@ class upgrade extends Controller
 	 * @param	array	$data	Wizard data
 	 * @return	string|array
 	 */
-	public function _upgrade( array $data ) : array|string
+	public function _upgrade( $data )
 	{
 		/* Resync */
-		IPS::resyncIPSCloud('Uploaded new version');
+		\IPS\IPS::resyncIPSCloud('Uploaded new version');
 
 		/* If we cannot handle this in the AdminCP, redirect them to the upgrader */
 		if ( $data['info']['forceMainUpgrader'] )
 		{
-			Output::i()->redirect( 'upgrade/?autologin=1' );
+			\IPS\Output::i()->redirect( 'upgrade/?autologin=1' );
+			return;
 		}
 
 		/* If we have an adsess we are coming from 4.4 to 4.5, so just send to the full upgrader now */
-		if( isset( Request::i()->adsess ) )
+		if( isset( \IPS\Request::i()->adsess ) )
 		{
-			Output::i()->redirect( 'upgrade/?autologin=1' );
+			\IPS\Output::i()->redirect( 'upgrade/?autologin=1' );
 		}
 
 		/* Otherwise let's do the upgrade! */
-		$url = Url::internal('app=core&module=system&controller=upgrade');
-		return (string) new MultipleRedirect( $url, function( $mrData ) use ( $data )
+		$url = \IPS\Http\Url::internal('app=core&module=system&controller=upgrade');
+		return (string) new \IPS\Helpers\MultipleRedirect( $url, function( $mrData ) use ( $data )
 		{
-			if ( !is_array( $mrData ) )
+			if ( !\is_array( $mrData ) )
 			{
-				return array( array( 'step' => 0 ), Member::loggedIn()->language()->addToStack('delta_upgrade_processing'), 0 );
+				return array( array( 'step' => 0 ), \IPS\Member::loggedIn()->language()->addToStack('delta_upgrade_processing'), 0 );
 			}
 			else
 			{
@@ -895,18 +930,19 @@ class upgrade extends Controller
 						}
 						else
 						{
-							Output::i()->redirect( 'upgrade/?autologin=1' ); // This is just a sanity check, should never be hit
+							\IPS\Output::i()->redirect( 'upgrade/?autologin=1' ); // This is just a sanity check, should never be hit
+							return;
 						}
 					}
 				}
 
-				if ( count( $steps ) AND array_key_exists( $mrData['step'], $steps ) )
+				if ( \count( $steps ) AND array_key_exists( $mrData['step'], $steps ) )
 				{
-					$perStepPercentage = ( 100 / count( $steps ) );
+					$perStepPercentage = ( 100 / \count( $steps ) );
 
 					$step = $steps[ $mrData['step'] ];
-					$percentage = $perStepPercentage * intval( $mrData['step'] );
-					$stepData = $mrData[$step] ?? array();
+					$percentage = $perStepPercentage * \intval( $mrData['step'] );
+					$stepData = isset( $mrData[ $step ] ) ? $mrData[ $step ] : array();
 
 					$return = $this->$step( $data, $stepData );
 					if ( $return === NULL )
@@ -915,7 +951,7 @@ class upgrade extends Controller
 						$mrData['step']++;
 						$percentage += $perStepPercentage;
 					}
-					elseif ( is_string( $return ) )
+					elseif ( \is_string( $return ) )
 					{
 						return array( $return );
 					}
@@ -925,24 +961,24 @@ class upgrade extends Controller
 						$percentage += ( $return[0] / ( 100 / $perStepPercentage ) );
 					}
 
-					return array( $mrData, Member::loggedIn()->language()->addToStack( 'delta_upgrade' . $step ), round( $percentage, 2 ) );
+					return array( $mrData, \IPS\Member::loggedIn()->language()->addToStack( 'delta_upgrade' . $step ), round( $percentage, 2 ) );
 				}
 				else
 				{
-					UpgradeClass::setUpgradingFlag( FALSE );
+					\IPS\core\Setup\Upgrade::setUpgradingFlag( FALSE );
 
 					$databaseErrors = FALSE;
-					foreach ( Application::applications() as $app )
+					foreach ( \IPS\Application::applications() as $app )
 					{
-						if( in_array( $app->directory, IPS::$ipsApps ) )
+						if( \in_array( $app->directory, \IPS\IPS::$ipsApps ) )
 						{
 							$versions = $app->getAllVersions();
 							$longVersions	= array_keys( $versions );
 							$humanVersions	= array_values( $versions );
 							$latestLVersion	= array_pop( $longVersions );
 							$latestHVersion	= array_pop( $humanVersions );
-							Db::i()->update( 'core_applications', array( 'app_version' => $latestHVersion, 'app_long_version' => $latestLVersion ), array( 'app_directory=?', $app->directory ) );
-							Db::i()->insert( 'core_upgrade_history', array( 'upgrade_version_human' => $latestHVersion, 'upgrade_version_id' => $latestLVersion, 'upgrade_date' => time(), 'upgrade_mid' => (int) Member::loggedIn()->member_id, 'upgrade_app' => $app->directory ) );
+							\IPS\Db::i()->update( 'core_applications', array( 'app_version' => $latestHVersion, 'app_long_version' => $latestLVersion ), array( 'app_directory=?', $app->directory ) );
+							\IPS\Db::i()->insert( 'core_upgrade_history', array( 'upgrade_version_human' => $latestHVersion, 'upgrade_version_id' => $latestLVersion, 'upgrade_date' => time(), 'upgrade_mid' => (int) \IPS\Member::loggedIn()->member_id, 'upgrade_app' => $app->directory ) );
 
 							if( !$app->enabled )
 							{
@@ -954,21 +990,27 @@ class upgrade extends Controller
 							{
 								$databaseErrors = TRUE;
 							}
+
+							/* If this is not a patch, send v5 notification */
+							if( $app->directory === 'core' AND $versions[ $data['oldVersion'] ] !== $latestHVersion AND !\IPS\IPS::isManaged() )
+							{
+								\IPS\core\AdminNotification::send( 'core', 'VersionFive', NULL, TRUE );
+							}
 						}
 					}
-					unset( Store::i()->applications, Store::i()->updatecount_applications );
+					unset( \IPS\Data\Store::i()->applications, \IPS\Data\Store::i()->updatecount_applications );
 
-					Zapier::rebuildRESTApiPermissions();
+					\IPS\core\extensions\core\CommunityEnhancements\Zapier::rebuildRESTApiPermissions();
 
-					AdminNotification::remove( 'core', 'NewVersion' );
+					\IPS\core\AdminNotification::remove( 'core', 'NewVersion' );
 
-					return array( Theme::i()->getTemplate('system')->upgradeFinished( $databaseErrors ) );
+					return array( \IPS\Theme::i()->getTemplate('system')->upgradeFinished( $databaseErrors ) );
 				}
 			}
 		},
 		function()
 		{
-			Output::i()->redirect( 'upgrade/?autologin=1' );
+			\IPS\Output::i()->redirect( 'upgrade/?autologin=1' );
 		} );
 	}
 
@@ -979,14 +1021,14 @@ class upgrade extends Controller
 	 * @param	array	$stepData	Data for this step
 	 * @return	array|null	array( percentage of this step complete, $stepData ) OR NULL if this step is complete
 	 */
-	public function _upgradeQueries( array $data, array $stepData ) : ?array
+	public function _upgradeQueries( $data, $stepData )
 	{
 		return $this->_appLoop( 'queries', $data, $stepData, function( $app, $data, $stepData )
 		{
 			/* If this is the first run, work out how many things we have to do, and remove any that need removing */
 			if ( !isset( $stepData['offset'] ) )
 			{
-				$numberOfChangesInThisApp = count( $data['changes']['queries'][ $app ] );
+				$numberOfChangesInThisApp = \count( $data['changes']['queries'][ $app ] );
 				if ( !$numberOfChangesInThisApp )
 				{
 					return NULL;
@@ -1007,14 +1049,15 @@ class upgrade extends Controller
 				$params = $queriesToRun[ $stepData['offset'] ]['params'];
 
 				/* Is it for a table that we need to run manual queries on? */
-				$tableName = ( isset( $params[0] ) and is_string( $params[0] ) ) ? $params[0] : $params[0]['name'];
-				if ( !isset( Request::i()->runQuery ) and in_array( $tableName, $data['largeTables'] ) )
+				$tableName = ( isset( $params[0] ) and \is_string( $params[0] ) ) ? $params[0] : $params[0]['name'];
+				if ( !isset( \IPS\Request::i()->runQuery ) and \in_array( $tableName, $data['largeTables'] ) )
 				{
-					if ( !isset( Request::i()->query_has_been_ran ) )
+					if ( !isset( \IPS\Request::i()->query_has_been_ran ) )
 					{
-						$query = Db::i()->returnQuery( $method, $params );
+						\IPS\Db::i()->returnQuery = TRUE;
+						$query = \IPS\Db::i()->$method( ...$params );;
 
-						return Theme::i()->getTemplate('system')->upgradeDeltaManualQuery( Request::i()->mr, $query );
+						return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaManualQuery( \IPS\Request::i()->mr, $query );
 					}
 					else
 					{
@@ -1028,24 +1071,26 @@ class upgrade extends Controller
 				{
 					try
 					{
-						Db::i()->$method( ...$params );
+						\IPS\Db::i()->$method( ...$params );
 					}
-					catch ( Exception $e )
+					catch ( \IPS\Db\Exception $e )
 					{
-						if ( !isset( Request::i()->query_has_been_ran ) )
+						if ( !isset( \IPS\Request::i()->query_has_been_ran ) )
 						{
-							if ( isset( Request::i()->runQuery ) )
+							if ( isset( \IPS\Request::i()->runQuery ) )
 							{
-								Output::i()->json( array( 'runManualQuery' => FALSE ) );
+								\IPS\Output::i()->json( array( 'runManualQuery' => FALSE ) );
+								exit;
 							}
 
-							return Theme::i()->getTemplate('system')->upgradeDeltaQueryFailed( Request::i()->mr, $e );
+							return \IPS\Theme::i()->getTemplate('system')->upgradeDeltaQueryFailed( \IPS\Request::i()->mr, $e );
 						}
 					}
 
-					if ( isset( Request::i()->runQuery ) )
+					if ( isset( \IPS\Request::i()->runQuery ) )
 					{
-						Output::i()->json( array( 'runManualQuery' => TRUE ) );
+						\IPS\Output::i()->json( array( 'runManualQuery' => TRUE ) );
+						exit;
 					}
 
 					$stepData['offset']++;
@@ -1065,7 +1110,7 @@ class upgrade extends Controller
 	 * @param	array	$stepData	Data for this step
 	 * @return	array|null	array( percentage of this step complete, $stepData ) OR NULL if this step is complete
 	 */
-	public function _upgradeTheme( array $data, array $stepData ) : ?array
+	public function _upgradeTheme( $data, $stepData )
 	{
 		return $this->_appLoop( 'theme', $data, $stepData, function( $app, $data, $stepData )
 		{
@@ -1078,7 +1123,7 @@ class upgrade extends Controller
 				$templateGroupsToClear = array();
 				foreach ( $data['changes']['theme'][ $app ]['html'] as $type => $templates )
 				{
-					$numberOfChangesInThisApp += count( $templates );
+					$numberOfChangesInThisApp += \count( $templates );
 
 					if ( $type == 'removed' )
 					{
@@ -1087,7 +1132,7 @@ class upgrade extends Controller
 							$exploded = explode( '/', $template );
 							$templateGroupsToClear[ $exploded[0] ][ $exploded[1] ] = TRUE;
 
-							Theme::removeTemplates( $app, $exploded[0], $exploded[1], NULL, FALSE, $exploded[2] );
+							\IPS\Theme::removeTemplates( $app, $exploded[0], $exploded[1], NULL, FALSE, $exploded[2] );
 						}
 					}
 				}
@@ -1095,15 +1140,15 @@ class upgrade extends Controller
 				/* CSS */
 				foreach ( $data['changes']['theme'][ $app ]['css'] as $type => $cssFiles )
 				{
-					$numberOfChangesInThisApp += count( $cssFiles );
+					$numberOfChangesInThisApp += \count( $cssFiles );
 
 					if ( $type == 'removed' )
 					{
 						foreach ( $cssFiles as $cssFile )
 						{
 							preg_match( '/^([^\/]+)\/(.+?)\/([^\/]+\.css)$/', $cssFile, $matches );
-							Theme::deleteCompiledCss( $app, $matches[1], $matches[2] ?: '.', $matches[3] );
-							Theme::removeCss( $app, $matches[1], $matches[2] ?: '.', NULL, FALSE, $matches[3] );
+							\IPS\Theme::deleteCompiledCss( $app, $matches[1], $matches[2] ?: '.', $matches[3] );
+							\IPS\Theme::removeCss( $app, $matches[1], $matches[2] ?: '.', NULL, FALSE, $matches[3] );
 						}
 					}
 				}
@@ -1111,15 +1156,15 @@ class upgrade extends Controller
 				/* Resources */
 				foreach ( $data['changes']['theme'][ $app ]['resources'] as $type => $resources )
 				{
-					$numberOfChangesInThisApp += count( $resources );
+					$numberOfChangesInThisApp += \count( $resources );
 
 					if ( $type == 'removed' )
 					{
 						foreach ( $resources as $resource )
 						{
 							preg_match( '/^([^\/]+)(.+?)([^\/]+)$/', $resource, $matches );
-							Theme::deleteCompiledResources( $app, $matches[1], $matches[2], $matches[3] );
-							Theme::removeResources( $app, $matches[1], $matches[2], NULL, FALSE, $matches[3] );
+							\IPS\Theme::deleteCompiledResources( $app, $matches[1], $matches[2], $matches[3] );
+							\IPS\Theme::removeResources( $app, $matches[1], $matches[2], NULL, FALSE, $matches[3] );
 						}
 					}
 				}
@@ -1147,7 +1192,7 @@ class upgrade extends Controller
 			while ( $xml->read() )
 			{
 				/* Skip to where we need to be */
-				if( $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -1167,14 +1212,14 @@ class upgrade extends Controller
 					if ( $location = $xml->getAttribute('template_location') and $group = $xml->getAttribute('template_group') and $template = $xml->getAttribute('template_name') )
 					{
 						$templateKey = "{$location}/{$group}/{$template}";
-						if ( in_array( $templateKey, $data['changes']['theme'][ $app ]['html']['edited'] ) )
+						if ( \in_array( $templateKey, $data['changes']['theme'][ $app ]['html']['edited'] ) )
 						{
-							Theme::removeTemplates( $app, $location, $group, NULL, FALSE, $template );
+							\IPS\Theme::removeTemplates( $app, $location, $group, NULL, FALSE, $template );
 							$stepData['templateGroupsToClear'][ $location ][ $group ] = TRUE;
 						}
-						if ( in_array( $templateKey, $data['changes']['theme'][ $app ]['html']['added'] ) or in_array( $templateKey, $data['changes']['theme'][ $app ]['html']['edited'] ) )
+						if ( \in_array( $templateKey, $data['changes']['theme'][ $app ]['html']['added'] ) or \in_array( $templateKey, $data['changes']['theme'][ $app ]['html']['edited'] ) )
 						{
-							Theme::addTemplate( array(
+							\IPS\Theme::addTemplate( array(
 								'app'				=> $app,
 								'group'				=> $group,
 								'name'				=> $template,
@@ -1193,14 +1238,14 @@ class upgrade extends Controller
 					if ( $location = $xml->getAttribute('css_location') and $path = $xml->getAttribute('css_path') and $name = $xml->getAttribute('css_name') )
 					{
 						$cssKey = "{$location}/" . ( ( $path and $path != '.' ) ? "{$path}/" : '' ) . $name;
-						if ( in_array( $cssKey, $data['changes']['theme'][ $app ]['css']['edited'] ) )
+						if ( \in_array( $cssKey, $data['changes']['theme'][ $app ]['css']['edited'] ) )
 						{
-							Theme::deleteCompiledCss( $app, $location, $path ?: '.', $name );
-							Theme::removeCss( $app, $location, $path ?: '.', NULL, FALSE, $name );
+							\IPS\Theme::deleteCompiledCss( $app, $location, $path ?: '.', $name );
+							\IPS\Theme::removeCss( $app, $location, $path ?: '.', NULL, FALSE, $name );
 						}
-						if ( in_array( $cssKey, $data['changes']['theme'][ $app ]['css']['added'] ) or in_array( $cssKey, $data['changes']['theme'][ $app ]['css']['edited'] ) )
+						if ( \in_array( $cssKey, $data['changes']['theme'][ $app ]['css']['added'] ) or \in_array( $cssKey, $data['changes']['theme'][ $app ]['css']['edited'] ) )
 						{
-							Theme::addCss( array(
+							\IPS\Theme::addCss( array(
 								'app'		=> $app,
 								'location'	=> $location,
 								'path'		=> $path,
@@ -1218,14 +1263,14 @@ class upgrade extends Controller
 					if ( $location = $xml->getAttribute('location') and $path = $xml->getAttribute('path') and $name = $xml->getAttribute('name') )
 					{
 						$resourceKey = "{$location}{$path}{$name}";
-						if ( isset( $templateKey ) AND in_array( $templateKey, $data['changes']['theme'][ $app ]['resources']['edited'] ) )
+						if ( \in_array( $templateKey, $data['changes']['theme'][ $app ]['resources']['edited'] ) )
 						{
-							Theme::deleteCompiledResources( $app, $location, $path, $name );
-							Theme::removeResources( $app, $location, $path, NULL, FALSE, $name );
+							\IPS\Theme::deleteCompiledResources( $app, $location, $path, $name );
+							\IPS\Theme::removeResources( $app, $location, $path, NULL, FALSE, $name );
 						}
-						if ( in_array( $resourceKey, $data['changes']['theme'][ $app ]['resources']['added'] ) or in_array( $resourceKey, $data['changes']['theme'][ $app ]['resources']['edited'] ) )
+						if ( \in_array( $resourceKey, $data['changes']['theme'][ $app ]['resources']['added'] ) or \in_array( $resourceKey, $data['changes']['theme'][ $app ]['resources']['edited'] ) )
 						{
-							Theme::addResource( array(
+							\IPS\Theme::addResource( array(
 								'app'		=> $app,
 								'location'	=> $location,
 								'path'		=> $path,
@@ -1251,12 +1296,12 @@ class upgrade extends Controller
 			{
 				foreach ( $groups as $group => $_ )
 				{
-					Theme::deleteCompiledTemplate( $app, $location, $group );
+					\IPS\Theme::deleteCompiledTemplate( $app, $location, $group );
 				}
 			}
-			if ( count( $data['changes']['theme'][ $app ]['resources']['removed'] ) )
+			if ( \count( $data['changes']['theme'][ $app ]['resources']['removed'] ) )
 			{
-				foreach( Theme::themes() as $id => $set )
+				foreach( \IPS\Theme::themes() as $id => $set )
 				{
 					$set->buildResourceMap( $app );
 				}
@@ -1272,20 +1317,20 @@ class upgrade extends Controller
 	 * @param	array	$stepData	Data for this step
 	 * @return	array|null	array( percentage of this step complete, $stepData ) OR NULL if this step is complete
 	 */
-	public function _upgradeLanguages( array $data, array $stepData ) : ?array
+	public function _upgradeLanguages( $data, $stepData )
 	{
 		return $this->_appLoop( 'lang', $data, $stepData, function( $app, $data, $stepData )
 		{
-			$languages	= array_keys( Lang::languages() );
+			$languages	= array_keys( \IPS\Lang::languages() );
 
 			/* Remove old */
 			if ( $data['changes']['lang'][ $app ]['normal']['removed'] )
 			{
-				Db::i()->delete( 'core_sys_lang_words', array( array( 'word_app=? AND word_js=0', $app ), array( Db::i()->in( 'word_key', $data['changes']['lang'][ $app ]['normal']['removed'] ) ) ) );
+				\IPS\Db::i()->delete( 'core_sys_lang_words', array( array( 'word_app=? AND word_js=0', $app ), array( \IPS\Db::i()->in( 'word_key', $data['changes']['lang'][ $app ]['normal']['removed'] ) ) ) );
 			}
 			if ( $data['changes']['lang'][ $app ]['js']['removed'] )
 			{
-				Db::i()->delete( 'core_sys_lang_words', array( array( 'word_app=? AND word_js=1', $app ), array( Db::i()->in( 'word_key', $data['changes']['lang'][ $app ]['js']['removed'] ) ) ) );
+				\IPS\Db::i()->delete( 'core_sys_lang_words', array( array( 'word_app=? AND word_js=1', $app ), array( \IPS\Db::i()->in( 'word_key', $data['changes']['lang'][ $app ]['js']['removed'] ) ) ) );
 			}
 			if ( !isset( $stepData['offset'] ) )
 			{
@@ -1295,15 +1340,15 @@ class upgrade extends Controller
 				{
 					foreach ( $types as $type => $langKeys )
 					{
-						if ( count( $langKeys ) )
+						if ( \count( $langKeys ) )
 						{
 							if ( $type == 'removed' )
 							{
-								Db::i()->delete( 'core_sys_lang_words', array( array( 'word_app=? AND word_js=?', $app, ( $jsOrNormal == 'js' ? 1 : 0 ) ), array( Db::i()->in( 'word_key', $langKeys ) ) ) );
+								\IPS\Db::i()->delete( 'core_sys_lang_words', array( array( 'word_app=? AND word_js=?', $app, ( $jsOrNormal == 'js' ? 1 : 0 ) ), array( \IPS\Db::i()->in( 'word_key', $langKeys ) ) ) );
 							}
 							else
 							{
-								$numberOfChangesInThisApp += count( $langKeys );
+								$numberOfChangesInThisApp += \count( $langKeys );
 							}
 						}
 					}
@@ -1317,6 +1362,7 @@ class upgrade extends Controller
 				{
 					$stepData['offset'] = 0;
 					$stepData['count'] = $numberOfChangesInThisApp;
+					$stepData['templateGroupsToClear'] = $templateGroupsToClear;
 					return array( 0, $stepData );
 				}
 			}
@@ -1335,7 +1381,7 @@ class upgrade extends Controller
 			while ( $xml->read() )
 			{
 				/* Skip to where we need to be */
-				if( $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -1356,7 +1402,7 @@ class upgrade extends Controller
 					{
 						$js = $xml->getAttribute('js');
 						$value = $xml->readString();
-						if ( in_array( $langKey, $data['changes']['lang'][ $app ][ $js ? 'js' : 'normal' ]['added'] ) or in_array( $langKey, $data['changes']['lang'][ $app ][ $js ? 'js' : 'normal' ]['edited'] ) )
+						if ( \in_array( $langKey, $data['changes']['lang'][ $app ][ $js ? 'js' : 'normal' ]['added'] ) or \in_array( $langKey, $data['changes']['lang'][ $app ][ $js ? 'js' : 'normal' ]['edited'] ) )
 						{
 							foreach ( $languages as $languageId )
 							{
@@ -1378,9 +1424,9 @@ class upgrade extends Controller
 				/* Have we got enough for a batch? */
 				if ( $done >= $batchSize )
 				{
-					if ( count( $inserts ) )
+					if ( \count( $inserts ) )
 					{
-						Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
+						\IPS\Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
 						$inserts = array();
 					}
 					$batchesDone++;
@@ -1389,9 +1435,9 @@ class upgrade extends Controller
 				/* Have we done the most we're allowed per loop? */
 				if( $done >= $perLoop )
 				{
-					if ( count( $inserts ) )
+					if ( \count( $inserts ) )
 					{
-						Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
+						\IPS\Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
 					}
 
 					$stepData['offset'] = $i;
@@ -1401,9 +1447,9 @@ class upgrade extends Controller
 			}
 
 			/* If we're still here, this app is complete */
-			if ( count( $inserts ) )
+			if ( \count( $inserts ) )
 			{
-				Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
+				\IPS\Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
 			}
 			return NULL;
 		} );
@@ -1416,7 +1462,7 @@ class upgrade extends Controller
 	 * @param	array	$stepData	Data for this step
 	 * @return	array|null	array( percentage of this step complete, $stepData ) OR NULL if this step is complete
 	 */
-	public function _upgradeJavascript( array $data, array $stepData ) : ?array
+	public function _upgradeJavascript( $data, $stepData )
 	{
 		return $this->_appLoop( 'javascript', $data, $stepData, function( $app, $data, $stepData )
 		{
@@ -1431,20 +1477,20 @@ class upgrade extends Controller
 						foreach ( $files as $file )
 						{
 							preg_match( '/^' . preg_quote( $app, '/' ) . '\/(.+?)\/(.*)\/(.+?)$/', $file, $matches );
-							Db::i()->delete( 'core_javascript', array( 'javascript_app=? AND javascript_location=? AND javascript_path=? AND javascript_name=?', $app, $matches[1], $matches[2], $matches[3] ) );
+							\IPS\Db::i()->delete( 'core_javascript', array( 'javascript_app=? AND javascript_location=? AND javascript_path=? AND javascript_name=?', $app, $matches[1], $matches[2], $matches[3] ) );
 						}
 					}
 					else
 					{
-						$numberOfChangesInThisApp += count( $files );
+						$numberOfChangesInThisApp += \count( $files );
 					}
 				}
 
 				if ( !$numberOfChangesInThisApp )
 				{
-					if ( count( $data['changes']['javascript'][ $app ]['files']['removed'] ) )
+					if ( \count( $data['changes']['javascript'][ $app ]['files']['removed'] ) )
 					{
-						Output::clearJsFiles( $app );
+						\IPS\Output::clearJsFiles( $app );
 					}
 					return NULL;
 				}
@@ -1465,7 +1511,7 @@ class upgrade extends Controller
 			while ( $xml->read() )
 			{
 				/* Skip to where we need to be */
-				if( $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -1485,11 +1531,12 @@ class upgrade extends Controller
 					{
 						$filePath = "{$app}/{$location}/{$path}/{$name}";
 
-						if ( in_array( $filePath, $data['changes']['javascript'][ $app ]['files']['added'] ) or in_array( $filePath, $data['changes']['javascript'][ $app ]['files']['edited'] ) )
+						if ( \in_array( $filePath, $data['changes']['javascript'][ $app ]['files']['added'] ) or \in_array( $filePath, $data['changes']['javascript'][ $app ]['files']['edited'] ) )
 						{
-							Db::i()->replace( 'core_javascript', array(
+							\IPS\Db::i()->replace( 'core_javascript', array(
 								'javascript_app'		=> $xml->getAttribute('javascript_app'),
 								'javascript_key'        => '',
+								'javascript_plugin'		=> '',
 								'javascript_location'	=> $xml->getAttribute('javascript_location'),
 								'javascript_path'		=> $xml->getAttribute('javascript_path'),
 								'javascript_name'		=> $xml->getAttribute('javascript_name'),
@@ -1513,7 +1560,7 @@ class upgrade extends Controller
 			}
 
 			/* If we're still here, this app is complete */
-			Output::clearJsFiles( $app );
+			\IPS\Output::clearJsFiles( $app );
 			return NULL;
 		} );
 	}
@@ -1524,19 +1571,19 @@ class upgrade extends Controller
 	 * @param	string			$step		The step to do
 	 * @param	array			$data		Data for upgrade
 	 * @param	array			$stepData	Data for this step
-	 * @param	callable			$code		Code to execute for each app
-	 * @return	array|string|null		array( percentage of this step complete, $stepData ) OR NULL if this step is complete
+	 * @param	callback			$code		Code to execute for each app
+	 * @return	array|null		array( percentage of this step complete, $stepData ) OR NULL if this step is complete
 	 */
-	protected function _appLoop( string $step, array $data, array $stepData, callable $code ) : array|string|null
+	protected function _appLoop( $step, $data, $stepData, $code )
 	{
 		$returnNext = FALSE;
-		$apps = array_keys( Application::applications() );
+		$apps = array_keys( \IPS\Application::applications() );
 		$percentage = 0;
-		$perAppPercentage = ( 100 / count( $apps ) );
+		$perAppPercentage = ( 100 / \count( $apps ) );
 
 		foreach ( $apps as $app )
 		{
-			if( !in_array( $app, IPS::$ipsApps ) or !isset( $data['changes'][ $step ][ $app ] ) )
+			if( !\in_array( $app, \IPS\IPS::$ipsApps ) or !isset( $data['changes'][ $step ][ $app ] ) )
 			{
 				continue;
 			}
@@ -1548,9 +1595,9 @@ class upgrade extends Controller
 
 			if ( $stepData['app'] == $app )
 			{
-				$val = call_user_func( $code, $app, $data, $stepData );
+				$val = \call_user_func( $code, $app, $data, $stepData );
 
-				if ( is_string( $val ) )
+				if ( \is_string( $val ) )
 				{
 					return $val;
 				}
@@ -1584,9 +1631,9 @@ class upgrade extends Controller
 	 *
 	 * @return  void
 	 */
-	public function databaseChecker() : void
+	public function databaseChecker()
 	{
 		/* We can re-use the method used for the support section, however we need to pass a different bool */
-		( new support )->_databaseChecker( TRUE );
+		( new \IPS\core\modules\admin\support\support )->_databaseChecker( TRUE );
 	}
 }

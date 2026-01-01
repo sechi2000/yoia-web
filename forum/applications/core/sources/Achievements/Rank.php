@@ -11,71 +11,46 @@
 namespace IPS\core\Achievements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ArrayIterator;
-use DomainException;
-use Exception;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Image;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\CustomBadge;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Theme;
-use XMLReader;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Rank Model
  */
-class Rank extends Model
+class _Rank extends \IPS\Node\Model
 {
-	use CustomBadge;
-
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_member_ranks';
+	public static $databaseTable = 'core_member_ranks';
 	
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'points';
+	public static $databaseColumnOrder = 'points';
 	
 	/**
 	 * @brief	[Node] Sortable?
 	 */
-	public static bool $nodeSortable = FALSE;
+	public static $nodeSortable = FALSE;
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'menu__core_achievements_ranks';
+	public static $nodeTitle = 'menu__core_achievements_ranks';
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'core_member_rank_';
+	public static $titleLangPrefix = 'core_member_rank_';
 
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -93,7 +68,7 @@ class Rank extends Model
 	'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'achievements',
 		'prefix'	=> 'ranks_',
@@ -103,14 +78,7 @@ class Rank extends Model
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = ['achievementRanks'];
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
+	protected $caches = ['achievementRanks'];
 	
 	/**
 	 * [ActiveRecord] Get cached rules
@@ -119,21 +87,21 @@ class Rank extends Model
 	 */
 	public static function getStore(): array
 	{
-		if ( !isset( Store::i()->achievementRanks ) )
+		if ( !isset( \IPS\Data\Store::i()->achievementRanks ) )
 		{
-			Store::i()->achievementRanks = iterator_to_array( Db::i()->select( '*', static::$databaseTable, NULL, 'points' )->setKeyField( static::$databasePrefix . static::$databaseColumnId ) );
+			\IPS\Data\Store::i()->achievementRanks = iterator_to_array( \IPS\Db::i()->select( '*', static::$databaseTable, NULL, 'points' )->setKeyField( static::$databasePrefix . static::$databaseColumnId ) );
 		}
 
-		return iterator_to_array( new ActiveRecordIterator( new ArrayIterator( Store::i()->achievementRanks ), 'IPS\core\Achievements\Rank' ) );
+		return iterator_to_array( new \IPS\Patterns\ActiveRecordIterator( new \ArrayIterator( \IPS\Data\Store::i()->achievementRanks ), 'IPS\core\Achievements\Rank' ) );
 	}
 	
 	/**
 	 * Work out the rank for a given number of points
 	 *
 	 * @param	int		$points		Number of points
-	 * @return    Rank|NULL
+	 * @return	\IPS\core\Achievements\Rank|NULL
 	 */
-	public static function fromPoints( int $points ): ?Rank
+	public static function fromPoints( $points ): ?\IPS\core\Achievements\Rank
 	{
 		$return = NULL;
 		foreach ( static::getStore() as $rank )
@@ -156,24 +124,19 @@ class Rank extends Model
 	 * @note	Return the class for the icon (e.g. 'globe', the 'fa fa-' is added automatically so you do not need this here)
 	 * @return	mixed
 	 */
-	protected function get__icon(): mixed
+	protected function get__icon()
 	{
-		if ( !$this->rank_use_image and $badge = $this->getRecordBadge() )
-		{
-			return $badge->file()?->url;
-		}
-
 		if ( $this->icon )
 		{
-			return File::get( 'core_Ranks', $this->icon );
+			return \IPS\File::get( 'core_Ranks', $this->icon );
 		}
 		else
 		{
-			return Theme::i()->resource( 'default_rank.png', 'core', 'global' );
+			return \IPS\Theme::i()->resource( 'default_rank.png', 'core', 'global' );
 		}
 	}
 
-	protected static array $rankPositions = [];
+	protected static $rankPositions = [];
 	/**
 	 * Fetch the rank position from all ranks
 	 *
@@ -197,7 +160,7 @@ class Rank extends Model
 
 			static::$rankPositions[ $this->id ] = [
 				'pos' => $pos,
-				'max' => count( static::getStore() )
+				'max' => \count( static::getStore() )
 			];
 		}
 
@@ -213,51 +176,36 @@ class Rank extends Model
 	 */
 	public function html( ?string $cssClass = NULL ): string
 	{
-		return Theme::i()->getTemplate( 'global', 'core', 'global' )->rank( $this, $cssClass );
+		return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->rank( $this, $cssClass );
 	}
 	
 	/**
 	 * [Node] Get Node Description
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	protected function get__description(): ?string
+	protected function get__description()
 	{
-		return Member::loggedIn()->language()->addToStack( 'achievements_awards_points', FALSE, [ 'pluralize' => [ $this->points ] ] );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'achievements_awards_points', FALSE, [ 'pluralize' => [ $this->points ] ] );
 	}
-
-	/**
-	 * @brief	Disable the number overlay for custom badges
-	 */
-	public static bool $customBadgeNumberOverlay = false;
-
-	/**
-	 * @brief	Toggle off these fields when generating a custom badge
-	 *
-	 * @var array|string[]
-	 */
-	public static array $customBadgeToggles = [ 'member_ranks_icon' ];
 		
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		/* Allow SVGs without the obscure hash removing the file extension */
-		File::$safeFileExtensions[] = 'svg';
+		\IPS\File::$safeFileExtensions[] = 'svg';
 
-		$form->add( new Translatable( 'member_ranks_word_custom', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? "core_member_rank_{$this->id}" : NULL ) ) ) );
-		$form->add( new Number( 'member_ranks_points', $this->points ?: 0, TRUE, array( 'min' => 0 ) ) );
-
-		parent::form( $form );
-
-		$form->add( new Upload( 'member_ranks_icon', $this->icon ? File::get( 'core_Ranks', $this->icon ) : NULL, TRUE, array( 'obscure' => TRUE, 'allowedFileTypes' => array_merge( Image::supportedExtensions(), ['svg'] ), 'checkImage' => TRUE, 'storageExtension' => 'core_Ranks' ), function( $val ) {
+		$form->add( new \IPS\Helpers\Form\Translatable( 'member_ranks_word_custom', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? "core_member_rank_{$this->id}" : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'member_ranks_points', $this->points ?: 0, TRUE, array( 'min' => 0 ) ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'member_ranks_icon', $this->icon ? \IPS\File::get( 'core_Ranks', $this->icon ) : NULL, TRUE, array( 'obscure' => TRUE, 'allowedFileTypes' => array_merge( \IPS\Image::supportedExtensions(), ['svg'] ), 'checkImage' => TRUE, 'storageExtension' => 'core_Ranks' ), function( $val ) {
 			if( !$val )
 			{
-				throw new DomainException('achievements_bad_image');
+				throw new \DomainException('achievements_bad_image');
 			}
 
 			/* Good luck with your fancy SVG */
@@ -266,11 +214,11 @@ class Rank extends Model
 			{
 				try
 				{
-					$image = Image::create( $val->contents() );
+					$image = \IPS\Image::create( $val->contents() );
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
-					throw new DomainException( 'achievements_bad_image' );
+					throw new \DomainException( 'achievements_bad_image' );
 				}
 			}
 		}, NULL, NULL, 'member_ranks_icon' ) );
@@ -282,14 +230,14 @@ class Rank extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( !$this->id )
 		{
 			$this->save();
 		}
 		
-		Lang::saveCustom( 'core', "core_member_rank_{$this->id}", $values['member_ranks_word_custom'] );
+		\IPS\Lang::saveCustom( 'core', "core_member_rank_{$this->id}", $values['member_ranks_word_custom'] );
 		unset( $values['member_ranks_word_custom'] );
 		
 		$_values = $values;
@@ -300,20 +248,13 @@ class Rank extends Model
 			{
 				$values[ mb_substr( $k, 13 ) ] = $v;
 			}
-			else if ( $k === 'custombadge_use_custom' )
-			{
-				$values[ 'rank_use_image' ] = !$v;
-			}
 			else
 			{
 				$values[ $k ]	= $v;
 			}
 		}
-
-		/* If we're using an image, disable the flag for the custom badge */
-		$values['custombadge_use_custom'] = !( isset( $values['rank_use_image'] ) and $values['rank_use_image'] );
-
-		return parent::formatFormValues( $values );
+		
+		return $values;
 	}
 
 	/**
@@ -323,7 +264,7 @@ class Rank extends Model
 	 */
 	public static function show(): bool
 	{
-		return !( ( Settings::i()->achievements_rebuilding or !Settings::i()->achievements_enabled ) );
+		return !( ( \IPS\Settings::i()->achievements_rebuilding or !\IPS\Settings::i()->achievements_enabled ) );
 	}
 
 	/**
@@ -347,11 +288,11 @@ class Rank extends Model
 		{
 			try
 			{
-				$image = File::get( 'core_Ranks', $oldImage );
-				$newImage = File::create( 'core_Ranks', $image->originalFilename, $image->contents() );
+				$image = \IPS\File::get( 'core_Ranks', $oldImage );
+				$newImage = \IPS\File::create( 'core_Ranks', $image->originalFilename, $image->contents() );
 				$this->icon = (string) $newImage;
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
 				$this->icon = NULL;
 			}
@@ -363,17 +304,17 @@ class Rank extends Model
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		if ( $this->icon )
 		{
 			try
 			{
-				File::get( 'core_Ranks', $this->icon )->delete();
+				\IPS\File::get( 'core_Ranks', $this->icon )->delete();
 			}
-			catch( Exception $ex ) { }
+			catch( \Exception $ex ) { }
 		}
 
 		parent::delete();
@@ -382,19 +323,19 @@ class Rank extends Model
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	int			id				ID number
 	 * @apiresponse	string		name			Name
 	 * @apiresponse	string		url				Path to the rank icon
 	 * @apiresponse	int			points			Points
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'id'			=> $this->id,
 			'name'			=> $this->_title,
-			'icon'			=> ($this->rank_use_image and $this->icon) ? (string) $this->_icon->url : $this->_icon,
+			'icon'			=> $this->icon ? (string) $this->_icon->url : $this->_icon,
 			'points'		=> $this->points
 		);
 	}
@@ -407,20 +348,20 @@ class Rank extends Model
 	 *
 	 * @return	void
 	 */
-	public static function importXml( string $file, ?bool $option=NULL ) : void
+	public static function importXml( $file, $option=NULL )
 	{
 		/* Open XML file */
 		$xml = \IPS\Xml\XMLReader::safeOpen( $file );
 
 		if ( ! @$xml->read() )
 		{
-			throw new DomainException( 'xml_upload_invalid' );
+			throw new \DomainException( 'xml_upload_invalid' );
 		}
 
 		/* Did we want to wipe first? */
 		if ( $option == 'wipe' )
 		{
-			foreach(Rank::getStore() as $rank )
+			foreach( \IPS\core\Achievements\Rank::getStore() as $rank )
 			{
 				$rank->delete();
 			}
@@ -429,7 +370,7 @@ class Rank extends Model
 		/* Start looping through each row */
 		while ( $xml->read() and $xml->name == 'rank' )
 		{
-			if( $xml->nodeType != XMLReader::ELEMENT )
+			if( $xml->nodeType != \XMLReader::ELEMENT )
 			{
 				continue;
 			}
@@ -442,7 +383,7 @@ class Rank extends Model
 
 			while ( $xml->read() and $xml->name != 'rank' )
 			{
-				if( $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -470,7 +411,7 @@ class Rank extends Model
 			/* Did we want to wipe existing ranks with the same points? */
 			if ( $option == 'replace' )
 			{
-				foreach(Rank::getStore() as $rank )
+				foreach( \IPS\core\Achievements\Rank::getStore() as $rank )
 				{
 					if ( $rank->points == $insert['points'] )
 					{
@@ -481,20 +422,20 @@ class Rank extends Model
 
 			if ( ! empty( $insert['icon_name'] ) and ! empty( $insert['icon_data'] ) )
 			{
-				$insert['icon'] = (string) File::create( 'core_Ranks', $insert['icon_name'], $insert['icon_data'], NULL, TRUE, NULL, FALSE );
+				$insert['icon'] = (string) \IPS\File::create( 'core_Ranks', $insert['icon_name'], $insert['icon_data'], NULL, TRUE, NULL, FALSE );
 
 				unset( $insert['icon_name'] );
 				unset( $insert['icon_data'] );
 			}
 
-			$insertId = Db::i()->insert( 'core_member_ranks', $insert );
+			$insertId = \IPS\Db::i()->insert( 'core_member_ranks', $insert );
 
 			if ( ! empty( $insert['title'] ) )
 			{
-				Lang::saveCustom( 'core', "core_member_rank_{$insertId}", $insert['title'] );
+				\IPS\Lang::saveCustom( 'core', "core_member_rank_{$insertId}", $insert['title'] );
 			}
 		}
 
-		unset( Store::i()->achievementRanks );
+		unset( \IPS\Data\Store::i()->achievementRanks );
 	}
 }

@@ -11,66 +11,39 @@
 namespace IPS\Content\Search;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Content;
-use IPS\Content\Comment;
-use IPS\Content\FuturePublishing;
-use IPS\Content\Item;
-use IPS\Content\Search\Elastic\MassIndexer;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Patterns\Singleton;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Text\Parser;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function chr;
-use function defined;
-use function get_class;
-use function intval;
-use function rtrim;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Abstract Search Index
  */
-abstract class Index extends Singleton
+abstract class _Index extends \IPS\Patterns\Singleton
 {
 	/**
 	 * @brief	Singleton Instances
 	 */
-	protected static ?Singleton $instance = NULL;
+	protected static $instance = NULL;
 	
 	/**
 	 * Get instance
 	 *
-	 * @param bool $skipCache	Do not use the cached instance if one exists
+	 * @param	bool	$skipCache	Do not use the cached instance if one exists
 	 * @return	static
 	 */
-	public static function i( bool $skipCache=FALSE ): static
+	public static function i( $skipCache=FALSE )
 	{
 		if( static::$instance === NULL OR $skipCache === TRUE )
 		{
-			if ( Settings::i()->search_method == 'elastic' )
+			if ( \IPS\Settings::i()->search_method == 'elastic' )
 			{
-				static::$instance = new Elastic\Index( Url::external( rtrim( Settings::i()->search_elastic_server, '/' ) . '/' . Settings::i()->search_elastic_index ) );
+				static::$instance = new \IPS\Content\Search\Elastic\Index( \IPS\Http\Url::external( rtrim( \IPS\Settings::i()->search_elastic_server, '/' ) . '/' . \IPS\Settings::i()->search_elastic_index ) );
 			}
 			else
 			{
-				static::$instance = new Mysql\Index;
+				static::$instance = new \IPS\Content\Search\Mysql\Index;
 			}
 		}
 		
@@ -82,11 +55,11 @@ abstract class Index extends Singleton
 	 *
 	 * @return	static
 	 */
-	public static function massIndexer(): static
+	public static function massIndexer()
 	{
-		if ( Settings::i()->search_method == 'elastic' )
+		if ( \IPS\Settings::i()->search_method == 'elastic' )
 		{
-			return new MassIndexer( Url::external( rtrim( Settings::i()->search_elastic_server, '/' ) . '/' . Settings::i()->search_elastic_index ) );
+			return new \IPS\Content\Search\Elastic\MassIndexer( \IPS\Http\Url::external( rtrim( \IPS\Settings::i()->search_elastic_server, '/' ) . '/' . \IPS\Settings::i()->search_elastic_index ) );
 		}
 		else
 		{
@@ -99,7 +72,7 @@ abstract class Index extends Singleton
 	 *
 	 * @return	void
 	 */
-	public function init(): void
+	public function init()
 	{
 		// Does nothing by default
 	}
@@ -109,47 +82,45 @@ abstract class Index extends Singleton
 	 *
 	 * @return	void
 	 */
-	public function rebuild(): void
+	public function rebuild()
 	{
 		/* Delete everything currently in it */
 		$this->prune();		
 		
 		/* If the queue is already running, clear it out */
-		Db::i()->delete( 'core_queue', array( "`key`=?", 'RebuildSearchIndex' ) );
+		\IPS\Db::i()->delete( 'core_queue', array( "`key`=?", 'RebuildSearchIndex' ) );
 		
 		/* And set the queue in motion to rebuild */
-		foreach( SearchContent::searchableClasses() as $class )
+		foreach ( \IPS\Content::routedClasses( FALSE ) as $class )
 		{
 			try
 			{
-				Task::queue( 'core', 'RebuildSearchIndex', array( 'class' => $class ), 5, array( 'class' ) );
+				if( is_subclass_of( $class, 'IPS\Content\Searchable' ) )
+				{
+					\IPS\Task::queue( 'core', 'RebuildSearchIndex', array( 'class' => $class ), 5, TRUE );
+				}
 			}
-			catch( OutOfRangeException ) {}
+			catch( \OutOfRangeException $ex ) {}
 		}
 	}
 	
 	/**
 	 * Index a single items comments and reviews if applicable.
 	 *
-	 * @param	Item	$object		The item to index
+	 * @param	\IPS\Content\Searchable	$object		The item to index
 	 * @return	void
 	 */
-	public function indexSingleItem( Item $object ): void
+	public function indexSingleItem( \IPS\Content\Searchable $object )
 	{
-		if( !SearchContent::isSearchable( $object ) )
-		{
-			return;
-		}
-		
 		/* It is possible for some items to not have a valid URL */
 		try
 		{
 			if( !$url = (string) $object->url() )
 			{
-				throw new LogicException;
+				throw new \LogicException;
 			}
 		}
-		catch( LogicException )
+		catch( \LogicException $e )
 		{
 			$url = '';
 		}
@@ -157,87 +128,66 @@ abstract class Index extends Singleton
 		try
 		{
 			$idColumn = $object::$databaseColumnId;
-			if ( isset( $object::$commentClass ) AND SearchContent::isSearchable( $object::$commentClass ) )
+			if ( isset( $object::$commentClass ) AND is_subclass_of( $object::$commentClass, 'IPS\Content\Searchable' ) )
 			{
-				Task::queue( 'core', 'IndexSingleItem', array( 'class' => $object::$commentClass, 'id' => $object->$idColumn, 'title' => $object->mapped('title'), 'url' => $url )  );
+				\IPS\Task::queue( 'core', 'IndexSingleItem', array( 'class' => $object::$commentClass, 'id' => $object->$idColumn, 'title' => $object->mapped('title'), 'url' => $url ), 5, TRUE );
 			}
 			
-			if ( isset( $object::$reviewClass ) AND SearchContent::isSearchable( $object::$reviewClass ) )
+			if ( isset( $object::$reviewClass ) AND is_subclass_of( $object::$reviewClass, 'IPS\Content\Searchable' ) )
 			{
-				Task::queue( 'core', 'IndexSingleItem', array( 'class' => $object::$reviewClass, 'id' => $object->$idColumn, 'title' => $object->mapped('title'), 'url' => $url )  );
+				\IPS\Task::queue( 'core', 'IndexSingleItem', array( 'class' => $object::$reviewClass, 'id' => $object->$idColumn, 'title' => $object->mapped('title'), 'url' => $url ), 5, TRUE );
 			}
 		}
-		catch( OutOfRangeException ) {}
+		catch( \OutOfRangeException $e ) {}
 	}
 	
 	/**
 	 * Get index data
 	 *
-	 * @param	Content	$object	Item to add
+	 * @param	\IPS\Content\Searchable	$object	Item to add
 	 * @return	array|NULL
 	 */
-	public function indexData( Content $object ): array|NULL
+	public function indexData( \IPS\Content\Searchable $object )
 	{
 		/* Init */
-		$class = get_class( $object );
-		if( !SearchContent::isSearchable( $class ) )
-		{
-			return NULL;
-		}
-
-		$extension = SearchContent::extension( $object );
-		if( $extension === null )
-		{
-			return NULL;
-		}
-		$extension->setObject( $object );
-
+		$class = \get_class( $object );
 		$idColumn = $class::$databaseColumnId;
-		$tags = ( IPS::classUsesTrait( $object, 'IPS\Content\Taggable' ) and Settings::i()->tags_enabled ) ? implode( ',', array_filter( $object->tags() ) ) : NULL;
-		$prefix = ( IPS::classUsesTrait( $object, 'IPS\Content\Taggable' ) and Settings::i()->tags_enabled ) ? $object->prefix() : NULL;
+		$tags = ( $object instanceof \IPS\Content\Tags and \IPS\Settings::i()->tags_enabled ) ? implode( ',', array_filter( $object->tags() ) ) : NULL;
+		$prefix = ( $object instanceof \IPS\Content\Tags and \IPS\Settings::i()->tags_enabled ) ? $object->prefix() : NULL;
 
 		/* If this is an item where the first comment is required, don't index because the comment will serve as both */
-		if ( $object instanceof Item and $object::$firstCommentRequired )
+		if ( $object instanceof \IPS\Content\Item and $class::$firstCommentRequired )
 		{
 			return NULL;
-		}
-
-		/* If this is a comment on an item that uses future publishing AND the item is in the future, don't index */
-		if( $object instanceof Comment )
-		{
-			$item = $object->item();
-			if( $item::$firstCommentRequired and $object->isFirst() and IPS::classUsesTrait( $item, FuturePublishing::class ) and $item->isFutureDate() )
-			{
-				return null;
-			}
 		}
 
 		/* Don't index if this is an item to be published in the future */
-		if ( IPS::classUsesTrait( $object, FuturePublishing::class ) AND $object->isFutureDate() )
+		if ( $object->isFutureDate() )
 		{
 			return NULL;
 		}
 
 		/* Or if this *is* the first comment, add the title and replace the tags */
-		$title = $extension->searchIndexTitle();
+		$title = $object->searchIndexTitle();
 		$isForItem = FALSE;
-		if ( $object instanceof Comment )
+		if ( $object instanceof \IPS\Content\Comment )
 		{
-			$itemClass = $object::$itemClass;
+			$itemClass = $class::$itemClass;
 			if ( $itemClass::$firstCommentRequired and $object->isFirst() )
 			{
 				try
 				{
 					$item = $object->item();
 				}
-				catch( OutOfRangeException )
+				catch( \OutOfRangeException $ex )
 				{
 					/* Comment has no working item, return */
 					return NULL;
 				}
 
-				$tags = ( IPS::classUsesTrait( $item, 'IPS\Content\Taggable' ) and Settings::i()->tags_enabled ) ? implode( ',', array_filter( $item->tags() ) ) : NULL;
-				$prefix = ( IPS::classUsesTrait( $item, 'IPS\Content\Taggable' ) and Settings::i()->tags_enabled ) ? $item->prefix() : NULL;
+				$title = $item->searchIndexTitle();
+				$tags = ( $item instanceof \IPS\Content\Tags and \IPS\Settings::i()->tags_enabled ) ? implode( ',', array_filter( $item->tags() ) ) : NULL;
+				$prefix = ( $item instanceof \IPS\Content\Tags and \IPS\Settings::i()->tags_enabled ) ? $item->prefix() : NULL;
 				$isForItem = TRUE;
 			}
 		}
@@ -252,7 +202,7 @@ abstract class Index extends Singleton
 		{
 			$dateUpdated = $object->mapped('date');
 			$dateCommented = $object->mapped('date');
-			if ( $object instanceof Item )
+			if ( $object instanceof \IPS\Content\Item )
 			{
 				foreach ( array( 'last_comment', 'last_review', 'updated' ) as $k )
 				{
@@ -271,15 +221,15 @@ abstract class Index extends Singleton
 			}
 		}
 		
-		/* Is this the latest content? */
+		/* Is the the latest content? */
 		$isLastComment = 0;
-		if ( $object instanceof Comment )
+		if ( $object instanceof \IPS\Content\Comment )
 		{
 			try
 			{
 				$item = $object->item();
 			}
-			catch( OutOfRangeException )
+			catch( \OutOfRangeException $ex )
 			{
 				/* Comment has no parent item, return */
 				return NULL;
@@ -298,9 +248,9 @@ abstract class Index extends Singleton
 			{
 				$isLastComment = 1;
 			}
-
+			
 			/* If this comment is hidden, don't actually mark as the last comment as that will cause this item to be hidden in search if we are getting only the last comment. */
-			if ( $isLastComment and $object->hidden() and !$object->isFirst() )
+			if ( $isLastComment AND $object->hidden() AND !$object->isFirst() )
 			{
 				$isLastComment = 0;
 			}
@@ -315,7 +265,7 @@ abstract class Index extends Singleton
 				}
 			}
 		}
-		else if ( $object instanceof Item and ! $object::$firstCommentRequired )
+		else if ( $object instanceof \IPS\Content\Item and ! $class::$firstCommentRequired )
 		{
 			/* If this is item itself and not a comment, then we will store it as the last comment so the activity stream fetches the data correctly */
 			$isLastComment = 1;
@@ -331,7 +281,7 @@ abstract class Index extends Singleton
 			
 			/* Is the item itself searchable but the comment not? */
 			$commentClass = $object::$commentClass;
-			if( !$commentClass OR !SearchContent::isSearchable( $commentClass ) )
+			if ( ! ( is_subclass_of( $commentClass, 'IPS\Content\Searchable' ) ) )
 			{
 				/* Then make this the last comment so it remains searchable */
 				$isLastComment = 1;
@@ -339,49 +289,34 @@ abstract class Index extends Singleton
 		}
 		
 		/* Strip spoilers */
-		$content = $extension->searchIndexContent();
+		$content = $object->searchIndexContent();
 		if ( preg_match( '#<div\s+?class=["\']ipsSpoiler["\']#', $content ) )
 		{
-			$content = Parser::removeElements( $content, array( 'div[class=ipsSpoiler]' ) );
+			$content = \IPS\Text\Parser::removeElements( $content, array( 'div[class=ipsSpoiler]' ) );
 		}
 		
 		/* Take the HTML out of the content */
-		$content = trim( str_replace( chr(0xC2) . chr(0xA0), ' ', strip_tags( preg_replace( "/(<br(?: \/)?>|<\/p>)/i", ' ', preg_replace( "#<blockquote(?:[^>]+?)>.+?(?<!<blockquote)</blockquote>#s", " ", preg_replace( "#<script(.*?)>(.*)</script>#uis", "", ' ' . $content . ' ' ) ) ) ) ) );
+		$content = trim( str_replace( \chr(0xC2) . \chr(0xA0), ' ', strip_tags( preg_replace( "/(<br(?: \/)?>|<\/p>)/i", ' ', preg_replace( "#<blockquote(?:[^>]+?)>.+?(?<!<blockquote)</blockquote>#s", " ", preg_replace( "#<script(.*?)>(.*)</script>#uis", "", ' ' . $content . ' ' ) ) ) ) ) );
 	
 		/* Work out the hidden status */
-		if( IPS::classUsesTrait( $object, 'IPS\Content\Hideable' ) )
+		$hiddenStatus = $object->hidden();
+		if ( $hiddenStatus === 0 and method_exists( $object, 'item' ) and $object->item()->hidden() )
 		{
-			try
-			{
-				$hiddenStatus = $object->hidden();
-				if ( $hiddenStatus === 0 and method_exists( $object, 'item' ) and $object->item()->hidden() )
-				{
-					$hiddenStatus = $isForItem ? $object->item()->hidden() : 2;
-				}
-				if ( $hiddenStatus !== 0 and method_exists( $object, 'item' ) and IPS::classUsesTrait( $object, 'IPS\Content\FuturePublishing' ) AND $object->isFutureDate() )
-				{
-					$hiddenStatus = 0;
-				}
-				if ( $hiddenStatus === -3 )
-				{
-					return NULL;
-				}
-			}
-			catch( RuntimeException )
-			{
-				/* Some classes implement Hideable for other reasons, but don't actually use it. See \IPS\nexus\Package\Item */
-				$hiddenStatus = 0;
-			}
+			$hiddenStatus = $isForItem ? $object->item()->hidden() : 2;
 		}
-		else
+		if ( $hiddenStatus !== 0 and method_exists( $object, 'item' ) and $object->item()->isFutureDate() )
 		{
 			$hiddenStatus = 0;
+		}
+		if ( $hiddenStatus === -3 )
+		{
+			return NULL;
 		}
 		
 		/* Get the item index ID */
 		$itemIndexId = NULL;
 		$itemClass = NULL;
-		if ( $object instanceof Comment )
+		if ( $object instanceof \IPS\Content\Comment )
 		{
 			$itemClass = $object::$itemClass;
 			if ( $itemClass::$firstCommentRequired )
@@ -396,7 +331,7 @@ abstract class Index extends Singleton
 
 					$itemIndexId = $this->getIndexId( $object->item()->firstComment() );
 				}
-				catch ( Exception ) { }
+				catch ( \Exception $e ) { }
 			}
 			else
 			{
@@ -404,22 +339,22 @@ abstract class Index extends Singleton
 				{
 					$itemIndexId = $this->getIndexId( $object->item() );
 				}
-				catch ( UnderflowException )
+				catch ( \UnderflowException $e )
 				{
 					try
 					{
 						/* Try and index parent */
-						Index::i()->index( $object->item() );
+						\IPS\Content\Search\Index::i()->index( $object->item() );
 						$itemIndexId = $this->getIndexId( $object->item() );
 					}
-					catch( Exception )
+					catch( \Exception $ex )
 					{
 						return NULL;
 					}
 				}
 			}
 		}
-		else if ( $object instanceof Item )
+		else if ( $object instanceof \IPS\Content\Item )
 		{
 			if ( ! $object::$firstCommentRequired )
 			{
@@ -429,35 +364,45 @@ abstract class Index extends Singleton
 					/* Good, we need the index_item_index_id so this is not wiped on re-index */
 					$itemIndexId = $this->getIndexId( $object );
 				}
-				catch ( Exception ) { }
+				catch ( \Exception $e ) { }
 			}
 		}
 
 		/* Club */
+		$container = NULL;
+		$containerId = NULL;
 		$clubId = NULL;
-		if ( $object instanceof Item )
+		if ( $object instanceof \IPS\Content\Item )
 		{
+			$containerId = (int) $object->searchIndexContainer();
 			$container = $object->containerWrapper();
 		}
 		else
 		{
+			$containerId = (int) $object->item()->mapped('container');
 			$container = $object->item()->containerWrapper();
 		}
-
-		if ( $container and IPS::classUsesTrait( $container, 'IPS\Content\ClubContainer' ) )
+		if ( $container and \IPS\IPS::classUsesTrait( $container, 'IPS\Content\ClubContainer' ) )
 		{
 			$clubId = $container->{$container::clubIdColumn()};
 		}
 
 		/* Work out the container class */
-		$containerClass = ( $extension->searchIndexContainerClass() ) ? get_class( $extension->searchIndexContainerClass() ) : null;
+		if( $object instanceof \IPS\Content\Item )
+		{
+			$containerClass = ( $object->searchIndexContainerClass() ) ? \get_class( $object->searchIndexContainerClass() ) : NULL;
+		}
+		else
+		{
+			$containerClass = ( $object->item()->searchIndexContainerClass() ) ? \get_class( $object->item()->searchIndexContainerClass() ) : NULL;
+		}
 
 		/* Do we have an extension to modify this? */
-		foreach( Application::enabledApplications() as $app )
+		foreach( \IPS\Application::enabledApplications() as $app )
 		{
-			foreach ( $app->extensions( 'core', 'SearchIndex' ) as $searchIndexExtension )
+			foreach ( $app->extensions( 'core', 'SearchIndex' ) as $extension )
 			{
-				$content = $searchIndexExtension->content( $object, $content );
+				$content = $extension->content( $object, $content );
 			}
 		}
 
@@ -465,26 +410,26 @@ abstract class Index extends Singleton
 		return array(
 			'index_class'				=> $class,
 			'index_object_id'			=> $object->$idColumn,
-			'index_item_id'				=> ( $object instanceof Item ) ? $object->$idColumn : $object->mapped('item'),
+			'index_item_id'				=> ( $object instanceof \IPS\Content\Item ) ? $object->$idColumn : $object->mapped('item'),
 			'index_container_class'		=> $containerClass,
-			'index_container_id'		=> $extension->searchIndexContainer(),
+			'index_container_id'		=> ( $object instanceof \IPS\Content\Item ) ? (int) $object->searchIndexContainer() : (int) $object->item()->mapped('container'),
 			'index_title'				=> $title,
 			'index_content'				=> $content,
-			'index_permissions'			=> $extension->searchIndexPermissions(),
-			'index_date_created'		=> intval( $object->mapped('date') ),
-			'index_date_updated'		=> intval( $dateUpdated ),
-			'index_date_commented'		=> intval( $dateCommented ),
+			'index_permissions'			=> $object->searchIndexPermissions(),
+			'index_date_created'		=> \intval( $object->mapped('date') ),
+			'index_date_updated'		=> \intval( $dateUpdated ),
+			'index_date_commented'		=> \intval( $dateCommented ),
 			'index_author'				=> (int) $object->mapped('author'),
 			'index_tags'				=> $tags,
 			'index_prefix'				=> $prefix,
 			'index_hidden'				=> $hiddenStatus,
 			'index_item_index_id'		=> $itemIndexId,
-			'index_item_author'			=> intval( ( $object instanceof Item ) ? $object->mapped('author') : $object->item()->mapped('author') ),
+			'index_item_author'			=> \intval( ( $object instanceof \IPS\Content\Item ) ? $object->mapped('author') : $object->item()->mapped('author') ),
 			'index_is_last_comment'		=> $isLastComment,
 			'index_club_id'				=> $clubId,
 			'index_class_type_id_hash'	=> md5( $class . ':' . $object->$idColumn ),
-			'index_is_anon'				=> (int) ( IPS::classUsesTrait( $object, 'IPS\Content\Anonymous' ) AND $object->isAnonymous() ),
-			'index_item_solved'			=> ( $itemClass and IPS::classUsesTrait( $itemClass, 'IPS\Content\Solvable' ) ) ? ( $object->item()->mapped('solved_comment_id') == $object->$idColumn ) ? 1 : 0 : NULL
+			'index_is_anon'				=> (int) $object->isAnonymous(),
+			'index_item_solved'			=> ( $itemClass and \IPS\IPS::classUsesTrait( $itemClass, 'IPS\Content\Solvable' ) ) ? ( $object->item()->mapped('solved_comment_id') == $object->$idColumn ) ? 1 : 0 : NULL
 		);
 	}
 
@@ -492,12 +437,12 @@ abstract class Index extends Singleton
 	 * Get the object ID of the first comment.
 	 * Used for posts, where the index_object_id is NOT the topic ID
 	 *
-	 * @param Content $object
+	 * @param \IPS\Content\Searchable $object
 	 * @return int|null
 	 */
-	protected function getFirstCommentId( Content $object ) : ?int
+	protected function getFirstCommentId( \IPS\Content\Searchable $object ) : ?int
 	{
-		if( $object instanceof Comment )
+		if( $object instanceof \IPS\Content\Comment )
 		{
 			$itemClass = $object::$itemClass;
 			if( $itemClass::$firstCommentRequired )
@@ -526,17 +471,17 @@ abstract class Index extends Singleton
 	/**
 	 * Index an item
 	 *
-	 * @param	Content	$object	Item to add
+	 * @param	\IPS\Content\Searchable	$object	Item to add
 	 * @return	void
 	 */
-	abstract public function index( Content $object ): void;
+	abstract public function index( \IPS\Content\Searchable $object );
 	
 	/**
 	 * Clear out any tasks associated with the search index method
 	 *
 	 * @return void
 	 */
-	public function clearTasks(): void
+	public function clearTasks()
 	{
 		// Do nothing by default
 	}
@@ -544,18 +489,18 @@ abstract class Index extends Singleton
 	/**
 	 * Retrieve the search ID for an item
 	 *
-	 * @param	Content	$object	Item to add
+	 * @param	\IPS\Content\Searchable	$object	Item to add
 	 * @return	string
 	 */
-	abstract public function getIndexId( Content $object ): string;
+	abstract public function getIndexId( \IPS\Content\Searchable $object ): string;
 	
 	/**
 	 * Remove item
 	 *
-	 * @param	Content	$object	Item to remove
+	 * @param	\IPS\Content\Searchable	$object	Item to remove
 	 * @return	void
 	 */
-	abstract public function removeFromSearchIndex( Content $object ): void;
+	abstract public function removeFromSearchIndex( \IPS\Content\Searchable $object );
 	
 	/**
 	 * Removes all content for a classs
@@ -565,21 +510,42 @@ abstract class Index extends Singleton
 	 * @param	int|NULL	$authorId			The author ID to delete, or NULL
 	 * @return	void
 	 */
-	abstract public function removeClassFromSearchIndex( string $class, int|null $containerId=NULL, int|null $authorId=NULL ): void;
-
+	abstract public function removeClassFromSearchIndex( $class, $containerId=NULL, $authorId=NULL );
+	
 	/**
 	 * Removes all content for a specific application from the index (for example, when uninstalling).
 	 *
-	 * @param	Application	$application The application
+	 * @param	\IPS\Application	$application The application
 	 * @return	void
 	 */
-	public function removeApplicationContent( Application $application ): void
+	public function removeApplicationContent( \IPS\Application $application )
 	{
-		foreach ( $application->extensions( 'core', 'SearchContent' ) as $extension )
+		foreach ( $application->extensions( 'core', 'ContentRouter' ) as $router )
 		{
-			foreach( $extension::supportedClasses() as $class )
+			foreach( $router->classes AS $class )
 			{
-				$this->removeClassFromSearchIndex( $class );
+				if ( is_subclass_of( $class, 'IPS\Content\Searchable' ) )
+				{
+					$this->removeClassFromSearchIndex( $class );
+					
+					if ( isset( $class::$commentClass ) )
+					{
+						$commentClass = $class::$commentClass;
+						if ( is_subclass_of( $commentClass, 'IPS\Content\Searchable' ) )
+						{
+							$this->removeClassFromSearchIndex( $commentClass );
+						}
+					}
+					
+					if ( isset( $class::$reviewClass ) )
+					{
+						$reviewClass = $class::$reviewClass;
+						if ( is_subclass_of( $reviewClass, 'IPS\Content\Searchable' ) )
+						{
+							$this->removeClassFromSearchIndex( $reviewClass );
+						}
+					}
+				}
 			}
 		}
 	}
@@ -599,61 +565,61 @@ abstract class Index extends Singleton
 	 * @param	bool				$addAuthorToPermissions		If true, the index_author_id will be added to $newPermissions - used when changing the permissions for a node which allows access only to author's items
 	 * @return	void
 	 */
-	abstract public function massUpdate( string $class, int|null $containerId = NULL, int|null $itemId = NULL, string|null $newPermissions = NULL, int|null $newHiddenStatus = NULL, int|null $newContainer = NULL, int|null $authorId = NULL, int|null $newItemId = NULL, int|null $newItemAuthorId = NULL, bool $addAuthorToPermissions = FALSE ): void;
+	abstract public function massUpdate( $class, $containerId = NULL, $itemId = NULL, $newPermissions = NULL, $newHiddenStatus = NULL, $newContainer = NULL, $authorId = NULL, $newItemId = NULL, $newItemAuthorId = NULL, $addAuthorToPermissions = FALSE );
 	
 	/**
 	 * Update data for the first and last comment after a merge
 	 * Sets index_is_last_comment on the last comment, and, if this is an item where the first comment is indexed rather than the item, sets index_title and index_tags on the first comment
 	 *
-	 * @param	Item	$item	The item
+	 * @param	\IPS\Content\Item	$item	The item
 	 * @return	void
 	 */
-	abstract public function rebuildAfterMerge( Item $item ): void;
+	abstract public function rebuildAfterMerge( \IPS\Content\Item $item );
 	
 	/**
 	 * Prune search index
 	 *
-	 * @param	DateTime|NULL	$cutoff	The date to delete index records from, or NULL to delete all
+	 * @param	\IPS\DateTime|NULL	$cutoff	The date to delete index records from, or NULL to delete all
 	 * @return	void
 	 */
-	abstract public function prune( DateTime $cutoff = NULL ): void;
+	abstract public function prune( \IPS\DateTime $cutoff = NULL );
 	
 	/**
 	 * Reset the last comment flag in any given class/index_item_id
 	 *
-	 * @param	array				$classes 						The class
+	 * @param	string				$class 						The class
 	 * @param	int|NULL			$indexItemId				The index item ID
 	 * @param	int|NULL			$ignoreId					ID to ignore because it is being removed
-	 * @param 	int|null			$firstCommentId				The first comment in this item, used only if $firstCommentRequired
+	 * @param int|null $firstCommentId The first comment in this item, used only if $firstCommentRequired
 	 * @return 	void
 	 */
-	abstract public function resetLastComment( array $classes, int|null $indexItemId, int|null $ignoreId = NULL, int|null $firstCommentId=null ): void;
+	abstract public function resetLastComment( $class, $indexItemId, $ignoreId = NULL, $firstCommentId = NULL );
 	
 	/**
 	 * Given a list of item index IDs, return the ones that a given member has participated in
 	 *
 	 * @param	array		$itemIndexIds	Item index IDs
-	 * @param	Member	$member			The member
+	 * @param	\IPS\Member	$member			The member
 	 * @return 	array
 	 */
-	abstract public function iPostedIn( array $itemIndexIds, Member $member ): array;
+	abstract public function iPostedIn( array $itemIndexIds, \IPS\Member $member );
 	
 	/**
 	 * Given a list of "index_class_type_id_hash"s, return the ones that a given member has permission to view
 	 *
 	 * @param	array		$hashes		Hashes
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	int|NULL	$limit		Number of results to return
 	 * @return 	array
 	 */
-	abstract public function hashesWithPermission( array $hashes, Member $member, int|null $limit = NULL ): array;
+	abstract public function hashesWithPermission( array $hashes, \IPS\Member $member, $limit = NULL );
 	
 	/**
 	 * Get timestamp of oldest thing in index
 	 *
 	 * @return 	int|null
 	 */
-	abstract public function firstIndexDate(): int|NULL;
+	abstract public function firstIndexDate();
 	
 	/**
 	 * Convert terms into stemmed terms for the highlighting JS
@@ -661,7 +627,7 @@ abstract class Index extends Singleton
 	 * @param	array	$terms	Terms
 	 * @return	array
 	 */
-	public function stemmedTerms( array $terms ): array
+	public function stemmedTerms( $terms )
 	{
 		return $terms;
 	}
@@ -671,7 +637,7 @@ abstract class Index extends Singleton
 	 *
 	 * @return	bool
 	 */
-	public function supportViewFiltering(): bool
+	public function supportViewFiltering()
 	{
 		return TRUE;
 	}

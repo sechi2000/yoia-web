@@ -11,26 +11,16 @@
 namespace IPS\Data\Cache;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Data\Cache;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Exception;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Dummy Storage Class
  */
-class None extends Cache
+class _None extends \IPS\Data\Cache
 {
 	/**
 	 * Constructor
@@ -39,43 +29,43 @@ class None extends Cache
 	 * @return	void
 	 * @note	Overridden for performance reasons
 	 */
-	public function __construct( array $configuration )
+	public function __construct( $configuration )
 	{
 	}
 
 	/**
 	 * Magic Method: Get
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	string	Value from the _datastore
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 * @note	Overridden for performance reasons
 	 */
-	public function __get( string $key ): string
+	public function __get( $key )
 	{
-		throw new OutOfRangeException;
+		throw new \OutOfRangeException;
 	}
 
 	/**
 	 * Magic Method: Set
 	 *
-	 * @param string $key	Key
-	 * @param string $value	Value
+	 * @param	string	$key	Key
+	 * @param	string	$value	Value
 	 * @return	void
 	 * @note	Overridden for performance reasons
 	 */
-	public function __set( string $key, mixed $value )
+	public function __set( $key, $value )
 	{
 	}
 
 	/**
 	 * Magic Method: Isset
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	bool
 	 * @note	Overridden for performance reasons
 	 */
-	public function __isset( string $key ): bool
+	public function __isset( $key )
 	{
 		return FALSE;
 	}
@@ -83,11 +73,11 @@ class None extends Cache
 	/**
 	 * Magic Method: Unset
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	void
 	 * @note	Overridden for performance reasons
 	 */
-	public function __unset( string $key )
+	public function __unset( $key )
 	{
 	}
 
@@ -96,7 +86,7 @@ class None extends Cache
 	 *
 	 * @return	bool
 	 */
-	public static function supported(): bool
+	public static function supported()
 	{
 		return TRUE;
 	}
@@ -104,49 +94,49 @@ class None extends Cache
 	/**
 	 * Abstract Method: Get
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	string	Value from the _datastore
 	 */
-	protected function get( string $key ): string
+	protected function get( $key )
 	{
-		throw new RuntimeException;
+		throw new \RuntimeException;
 	}
 	
 	/**
 	 * Get value using cache method if available or falling back to the database
 	 *
-	 * @param string $key	Key
-	 * @param bool $fallback	Use database if no caching method is available?
+	 * @param	string	$key	Key
+	 * @param	bool	$fallback	Use database if no caching method is available?
 	 * @return	mixed
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	public function getWithExpire( string $key, bool $fallback=FALSE ): mixed
+	public function getWithExpire( $key, $fallback=FALSE )
 	{
 		if ( $fallback )
 		{
 			try
 			{
-				return json_decode( Db::i()->select( 'cache_value', 'core_cache', array( 'cache_key=? AND cache_expire>?', $key, time() ) )->first(), TRUE );
+				return json_decode( \IPS\Db::i()->select( 'cache_value', 'core_cache', array( 'cache_key=? AND cache_expire>?', $key, time() ) )->first(), TRUE );
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
 		else
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 	}
 	
 	/**
 	 * Abstract Method: Set
 	 *
-	 * @param string $key	Key
-	 * @param string $value	Value
+	 * @param	string	$key	Key
+	 * @param	string	$value	Value
 	 * @return	bool
 	 */
-	protected function set( string $key, string $value ): bool
+	protected function set( $key, $value )
 	{
 		return FALSE;
 	}
@@ -154,17 +144,17 @@ class None extends Cache
 	/**
 	 * Store value using cache method if available or falling back to the database
 	 *
-	 * @param string $key		Key
+	 * @param	string			$key		Key
 	 * @param	mixed			$value		Value
-	 * @param	DateTime	$expire		Expiration if using database
-	 * @param bool $fallback	Use database if no caching method is available?
+	 * @param	\IPS\DateTime	$expire		Expiration if using database
+	 * @param	bool			$fallback	Use database if no caching method is available?
 	 * @return	bool
 	 */
-	public function storeWithExpire(string $key, mixed $value, DateTime $expire, bool $fallback=FALSE): bool
+	public function storeWithExpire( $key, $value, \IPS\DateTime $expire, $fallback=FALSE )
 	{
 		if ( $fallback )
 		{
-			Db::i()->replace( 'core_cache', array(
+			\IPS\Db::i()->replace( 'core_cache', array(
 				'cache_key'		=> $key,
 				'cache_value'	=> json_encode( $value ),
 				'cache_expire'	=> $expire->getTimestamp()
@@ -182,10 +172,10 @@ class None extends Cache
 	/**
 	 * Abstract Method: Exists?
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	protected function exists( string $key ): bool
+	protected function exists( $key )
 	{
 		return FALSE;
 	}
@@ -193,10 +183,10 @@ class None extends Cache
 	/**
 	 * Abstract Method: Delete
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	protected function delete( string $key ): bool
+	protected function delete( $key )
 	{
 		return TRUE;
 	}
@@ -206,13 +196,13 @@ class None extends Cache
 	 *
 	 * @return	void
 	 */
-	public function clearAll() : void
+	public function clearAll()
 	{
 		parent::clearAll();
 		try
 		{
-			Db::i()->delete( 'core_cache' );
+			\IPS\Db::i()->delete( 'core_cache' );
 		}
-		catch ( Exception $e ){}
+		catch ( \IPS\Db\Exception $e ){}
 	}
 }

@@ -12,92 +12,59 @@
 namespace IPS\nexus\modules\admin\customers;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Http\Url;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Customer\Address;
-use IPS\nexus\Customer\AlternativeContact;
-use IPS\nexus\Customer\CreditCard;
-use IPS\nexus\Customer\CustomField;
-use IPS\nexus\Gateway;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Tax;
-use IPS\nexus\Transaction;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * View
  */
-class view extends Controller
+class _view extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * @brief	Member
 	 */
-	protected Customer $member;
+	protected $member;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'customers_view' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'customers_view' );
 		
 		try
 		{
-			$this->member = Customer::load( Request::i()->id );
+			$this->member = \IPS\nexus\Customer::load( \IPS\Request::i()->id );
 			if ( !$this->member->member_id )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X233/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X233/1', 404, '' );
 		}
 		
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'customer.css', 'nexus', 'admin' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_customer.js', 'nexus', 'admin' ) );
-		Output::i()->title = "{$this->member->cm_name}";
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'customer.css', 'nexus', 'admin' ) );
+
+		if ( \IPS\Theme::i()->settings['responsive'] )
+		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'customer_responsive.css', 'nexus', 'admin' ) );
+		}
+
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'support.css', 'nexus', 'admin' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_customer.js', 'nexus', 'admin' ) );
+		\IPS\Output::i()->title = "{$this->member->cm_name}";		
 		
 		parent::execute();
 	}
@@ -108,9 +75,9 @@ class view extends Controller
 	 * @return	void
 	 * @deprecated
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Output::i()->redirect( $this->member->acpUrl() );
+		\IPS\Output::i()->redirect( $this->member->acpUrl() );
 	}
 	
 	/**
@@ -118,37 +85,37 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function addresses() : void
+	protected function addresses()
 	{
-		$addresses = new \IPS\Helpers\Table\Db( 'nexus_customer_addresses', Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( 'view', 'addresses' ), array( '`member`=?', $this->member->member_id ) );
-		$addresses->sortBy = 'primary_billing, added';
-		$addresses->include = array( 'address', 'primary_billing' );
+		$addresses = new \IPS\Helpers\Table\Db( 'nexus_customer_addresses', \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( 'view', 'addresses' ), array( '`member`=?', $this->member->member_id ) );
+		$addresses->sortBy = 'primary_billing, primary_shipping, added';
+		$addresses->include = array( 'address', 'primary_billing', 'primary_shipping' );
 		$addresses->parsers = array( 'address' => function( $val )
 		{
-			$address = GeoLocation::buildFromJson( $val );
-			return $address->toString( '<br>' ) . ( ( isset( $address->business ) and $address->business and isset( $address->vat ) and $address->vat ) ? ( '<br>' . Member::loggedIn()->language()->addToStack('cm_checkout_vat_number') . ': ' . Theme::i()->getTemplate( 'global', 'nexus' )->vatNumber( $address->vat ) ) : '' );
+			$address = \IPS\GeoLocation::buildFromJson( $val );
+			return $address->toString( '<br>' ) . ( ( isset( $address->business ) and $address->business and isset( $address->vat ) and $address->vat ) ? ( '<br>' . \IPS\Member::loggedIn()->language()->addToStack('cm_checkout_vat_number') . ': ' .\IPS\Theme::i()->getTemplate( 'global', 'nexus' )->vatNumber( $address->vat ) ) : '' );
 		} );
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_edit_details' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_edit_details' ) )
 		{
 			$addresses->rootButtons = array(
 				'add'	=> array(
-					'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( 'do', 'addressForm' ),
+					'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( 'do', 'addressForm' ),
 					'title'	=> 'add',
 					'icon'	=> 'plus',
-					'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('add_address') )
+					'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('add_address') )
 				)
 			);
 			$addresses->rowButtons = function( $row )
 			{
 				return array(
 					'edit'	=> array(
-						'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'addressForm', 'address_id' => $row['id'] ) ),
+						'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'addressForm', 'address_id' => $row['id'] ) ),
 						'title'	=> 'edit',
 						'icon'	=> 'pencil',
-						'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit_address') )
+						'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit_address') )
 					),
 					'delete'	=> array(
-						'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'deleteAddress', 'address_id' => $row['id'] ) ),
+						'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'deleteAddress', 'address_id' => $row['id'] ) ),
 						'title'	=> 'delete',
 						'icon'	=> 'times-circle',
 						'data'	=> array( 'delete' => '' )
@@ -157,9 +124,9 @@ class view extends Controller
 			};
 		}
 	
-		$addresses->tableTemplate = array( Theme::i()->getTemplate('customers'), 'addressTable' );
-		$addresses->rowsTemplate = array( Theme::i()->getTemplate('customers'), 'addressTableRows' );
-		Output::i()->output = Theme::i()->getTemplate('customers')->customerPopup( $addresses );
+		$addresses->tableTemplate = array( \IPS\Theme::i()->getTemplate('customers'), 'addressTable' );
+		$addresses->rowsTemplate = array( \IPS\Theme::i()->getTemplate('customers'), 'addressTableRows' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('customers')->customerPopup( $addresses );
 	}
 		
 	/**
@@ -167,18 +134,17 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
-		Dispatcher::i()->checkAcpPermission( 'customers_edit_details' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'customers_edit_details' );
 		
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		
-		$form->add( new Text( 'cm_first_name', $this->member->cm_first_name, FALSE ) );
-		$form->add( new Text( 'cm_last_name', $this->member->cm_last_name, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'cm_first_name', $this->member->cm_first_name, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'cm_last_name', $this->member->cm_last_name, FALSE ) );
 		
-		foreach ( CustomField::roots() as $field )
+		foreach ( \IPS\nexus\Customer\CustomField::roots() as $field )
 		{
-			/* @var CustomField $field */
 			$column = $field->column;
 			if ( $field->type === 'Editor' )
 			{
@@ -187,7 +153,7 @@ class view extends Controller
 			$form->add( $field->buildHelper( $this->member->$column ) );
 		}
 		
-		if ( $values = $form->values(TRUE) )
+		if ( $values = $form->values( TRUE ) )
 		{
 			$changes = array();
 			foreach ( array( 'cm_first_name', 'cm_last_name' ) as $k )
@@ -203,9 +169,8 @@ class view extends Controller
 					$this->member->$k = $values[ $k ];
 				}
 			}
-			foreach ( CustomField::roots() as $field )
+			foreach ( \IPS\nexus\Customer\CustomField::roots() as $field )
 			{
-				/* @var CustomField $field */
 				$column = $field->column;
 				if ( $this->member->$column != $values["nexus_ccfield_{$field->id}"] )
 				{
@@ -223,10 +188,10 @@ class view extends Controller
 				$this->member->log( 'info', $changes );
 			}
 			$this->member->save();
-			Output::i()->redirect( $this->member->acpUrl() );
+			\IPS\Output::i()->redirect( $this->member->acpUrl() );
 		}
 		
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -234,15 +199,15 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function credits() : void
+	public function credits()
 	{
-		Dispatcher::i()->checkAcpPermission( 'customers_edit_credit' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'customers_edit_credit' );
 		
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--edit-credits';
-		foreach ( Money::currencies() as $currency )
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical';
+		foreach ( \IPS\nexus\Money::currencies() as $currency )
 		{
-			$form->add( new Form\Number( $currency, isset( $this->member->cm_credits[ $currency ] ) ? $this->member->cm_credits[ $currency ]->amount : 0, FALSE, array( 'min' => 0, 'decimals' => Money::numberOfDecimalsForCurrency( $currency ) ), NULL, NULL, $currency ) );
+			$form->add( new \IPS\Helpers\Form\Number( $currency, isset( $this->member->cm_credits[ $currency ] ) ? $this->member->cm_credits[ $currency ]->amount : 0, FALSE, array( 'min' => 0, 'decimals' => \IPS\nexus\Money::numberOfDecimalsForCurrency( $currency ) ), NULL, NULL, $currency ) );
 		}
 		
 		if ( $values = $form->values() )
@@ -250,19 +215,19 @@ class view extends Controller
 			$credits = $this->member->cm_credits;
 			foreach ( $values as $currency => $amount )
 			{
-				$amount = new Number( number_format( $amount, Money::numberOfDecimalsForCurrency( $currency ), '.', '' ) );
+				$amount = new \IPS\Math\Number( number_format( $amount, \IPS\nexus\Money::numberOfDecimalsForCurrency( $currency ), '.', '' ) );
 				if ( ( isset( $this->member->cm_credits[ $currency ] ) and $this->member->cm_credits[ $currency ]->amount->compare( $amount ) !== 0 ) or $amount )
 				{
 					$this->member->log( 'comission', array( 'type' => 'manual', 'old' => isset( $this->member->cm_credits[ $currency ] ) ? $this->member->cm_credits[ $currency ]->amountAsString() : 0, 'new' => (string) $amount, 'currency' => $currency ) );
 				}
-				$credits[ $currency ] = new Money( $amount, $currency );
+				$credits[ $currency ] = new \IPS\nexus\Money( $amount, $currency );
 			}
 			$this->member->cm_credits = $credits;
 			$this->member->save();
-			Output::i()->redirect( $this->member->acpUrl() );
+			\IPS\Output::i()->redirect( $this->member->acpUrl() );
 		}
 		
-		Output::i()->output = (string) $form;
+		\IPS\Output::i()->output = (string) $form;
 	}
 	
 	/**
@@ -270,31 +235,31 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function noteForm() : void
+	public function noteForm()
 	{
 		$noteId = NULL;
 		$note = NULL;
-		if ( Request::i()->note_id )
+		if ( \IPS\Request::i()->note_id )
 		{
-			Dispatcher::i()->checkAcpPermission( 'customer_notes_edit' );
-			$noteId = intval( Request::i()->note_id );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'customer_notes_edit' );
+			$noteId = \intval( \IPS\Request::i()->note_id );
 			try
 			{
-				$note = Db::i()->select( 'note_text', 'nexus_notes', array( 'note_id=?', Request::i()->note_id ) )->first();
+				$note = \IPS\Db::i()->select( 'note_text', 'nexus_notes', array( 'note_id=?', \IPS\Request::i()->note_id ) )->first();
 			}
-			catch ( UnderflowException )
+			catch ( \UnderflowException $e )
 			{
-				Output::i()->error( 'node_error', '2X233/3', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2X233/3', 404, '' );
 			}
 		}
 		else
 		{
-			Dispatcher::i()->checkAcpPermission( 'customer_notes_add' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'customer_notes_add' );
 		}
 		
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--customer-notes';
-		$form->add( new Editor( 'customer_note', $note, TRUE, array(
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical';
+		$form->add( new \IPS\Helpers\Form\Editor( 'customer_note', $note, TRUE, array(
 			'app'			=> 'nexus',
 			'key'			=> 'Customer',
 			'autoSaveKey'	=> $noteId ? "nexus-note-{$this->member->member_id}-{$noteId}" : "nexus-note-{$this->member->member_id}-new",
@@ -302,31 +267,39 @@ class view extends Controller
 		) ) );
 		if ( $values = $form->values() )
 		{
-			if ( Request::i()->note_id )
+			if ( \IPS\Request::i()->note_id )
 			{
-				Db::i()->update( 'nexus_notes', array(
+				\IPS\Db::i()->update( 'nexus_notes', array(
 					'note_text'	=> $values['customer_note']
-				), array( 'note_id=?', Request::i()->note_id ) );
+				), array( 'note_id=?', \IPS\Request::i()->note_id ) );
 				
 				$this->member->log( 'note', 'edited' );
 			}
 			else
 			{
-				$noteId = Db::i()->insert( 'nexus_notes', array(
+				$noteId = \IPS\Db::i()->insert( 'nexus_notes', array(
 					'note_member'	=> $this->member->member_id,
 					'note_text'		=> $values['customer_note'],
-					'note_author'	=> Member::loggedIn()->member_id,
+					'note_author'	=> \IPS\Member::loggedIn()->member_id,
 					'note_date'		=> time(),
 				) );
 				
-				File::claimAttachments( "nexus-note-{$this->member->member_id}-new", $this->member->member_id, $noteId, 'note' );
+				\IPS\File::claimAttachments( "nexus-note-{$this->member->member_id}-new", $this->member->member_id, $noteId, 'note' );
 				
 				$this->member->log( 'note', 'added' );
 			}
-
-			Output::i()->redirect( $this->member->acpUrl() );
+			
+			if ( isset( \IPS\Request::i()->support ) and \IPS\Request::i()->support )
+			{
+				try
+				{
+					\IPS\Output::i()->redirect( \IPS\nexus\Support\Request::load( \IPS\Request::i()->support )->acpUrl() );
+				}
+				catch ( \OutOfRangeException $e ) {}
+			}
+			\IPS\Output::i()->redirect( $this->member->acpUrl() );
 		}
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/** 
@@ -334,17 +307,25 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function deleteNote() : void
+	public function deleteNote()
 	{
-		Dispatcher::i()->checkAcpPermission( 'customer_notes_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'customer_notes_delete' );
 		
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
-		Db::i()->delete( 'nexus_notes', array( 'note_id=?', Request::i()->note_id ) );
+		\IPS\Db::i()->delete( 'nexus_notes', array( 'note_id=?', \IPS\Request::i()->note_id ) );
 		$this->member->log( 'note', 'deleted' );
 		
-		Output::i()->redirect( $this->member->acpUrl() );
+		if ( isset( \IPS\Request::i()->support ) and \IPS\Request::i()->support )
+		{
+			try
+			{
+				\IPS\Output::i()->redirect( \IPS\nexus\Support\Request::load( \IPS\Request::i()->support )->acpUrl() );
+			}
+			catch ( \OutOfRangeException $e ) {}
+		}
+		\IPS\Output::i()->redirect( $this->member->acpUrl() );
 	}
 	
 	/**
@@ -352,34 +333,35 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function addressForm() : void
+	public function addressForm()
 	{
-		Dispatcher::i()->checkAcpPermission( 'customers_edit_details' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'customers_edit_details' );
 		
-		if ( Request::i()->address_id )
+		if ( \IPS\Request::i()->address_id )
 		{
 			try
 			{
-				$address = Address::load( Request::i()->address_id );
+				$address = \IPS\nexus\Customer\Address::load( \IPS\Request::i()->address_id );
 				if ( $address->member !== $this->member )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException $e )
 			{
-				Output::i()->error( 'node_error', '2X233/2', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2X233/2', 404, '' );
 			}
 		}
 		else
 		{
-			$address = new Address;
+			$address = new \IPS\nexus\Customer\Address;
 			$address->member = $this->member;
-			$address->primary_billing = ( Db::i()->select( 'COUNT(*)', 'nexus_customer_addresses', array( '`member`=? AND primary_billing=1', $this->member->member_id ) )->first() == 0 );
+			$address->primary_billing = ( \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customer_addresses', array( '`member`=? AND primary_billing=1', $this->member->member_id ) )->first() == 0 );
+			$address->primary_shipping = ( \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customer_addresses', array( '`member`=? AND primary_shipping=1', $this->member->member_id ) )->first() == 0 );
 		}
 		
 		$needTaxStatus = NULL;
-		foreach ( Tax::roots() as $tax )
+		foreach ( \IPS\nexus\Tax::roots() as $tax )
 		{
 			if ( $tax->type === 'eu' )
 			{
@@ -394,9 +376,10 @@ class view extends Controller
 		$addressHelperClass = $needTaxStatus ? 'IPS\nexus\Form\BusinessAddress' : 'IPS\Helpers\Form\Address';
 		$addressHelperOptions = ( $needTaxStatus === 'eu' ) ? array( 'vat' => TRUE ) : array();
 		
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->add( new $addressHelperClass( 'address', $address->address, TRUE, $addressHelperOptions ) );
-		$form->add( new YesNo( 'primary_billing', $address->primary_billing ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'primary_billing', $address->primary_billing ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'primary_shipping', $address->primary_shipping ) );
 		if ( $values = $form->values() )
 		{
 			if ( $address->id )
@@ -407,8 +390,13 @@ class view extends Controller
 				}
 				if ( $values['primary_billing'] and !$address->primary_billing )
 				{
-					Db::i()->update( 'nexus_customer_addresses', array( 'primary_billing' => 0 ), array( '`member`=?', $this->member->member_id ) );
+					\IPS\Db::i()->update( 'nexus_customer_addresses', array( 'primary_billing' => 0 ), array( '`member`=?', $this->member->member_id ) );
 					$this->member->log( 'address', array( 'type' => 'primary_billing', 'details' => json_encode( $values['address'] ) ) );
+				}
+				if ( $values['primary_shipping'] and !$address->primary_shipping )
+				{
+					\IPS\Db::i()->update( 'nexus_customer_addresses', array( 'primary_shipping' => 0 ), array( '`member`=?', $this->member->member_id ) );
+					$this->member->log( 'address', array( 'type' => 'primary_shipping', 'details' => json_encode( $values['address'] ) ) );
 				}
 			}
 			else
@@ -418,11 +406,12 @@ class view extends Controller
 			
 			$address->address = $values['address'];
 			$address->primary_billing = $values['primary_billing'];
+			$address->primary_shipping = $values['primary_shipping'];
 			$address->save();
 			
-			Output::i()->redirect( $this->member->acpUrl() );
+			\IPS\Output::i()->redirect( $this->member->acpUrl() );
 		}
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/** 
@@ -430,21 +419,21 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function deleteAddress() : void
+	public function deleteAddress()
 	{
-		Dispatcher::i()->checkAcpPermission( 'customers_edit_details' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'customers_edit_details' );
 		
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
 		try
 		{
-			$address = Address::load( Request::i()->address_id );
+			$address = \IPS\nexus\Customer\Address::load( \IPS\Request::i()->address_id );
 			$this->member->log( 'address', array( 'type' => 'delete', 'details' => json_encode( $address->address ) ) );
 			$address->delete();
 		}
-		catch ( OutOfRangeException ) { }
-		Output::i()->redirect( $this->member->acpUrl() );
+		catch ( \OutOfRangeException $e ) { }
+		\IPS\Output::i()->redirect( $this->member->acpUrl() );
 	}
 	
 	/** 
@@ -453,18 +442,18 @@ class view extends Controller
 	 * @csrfChecked	Uses Form helper in Gateway classes 7 Oct 2019
 	 * @return	void
 	 */
-	public function addCard() : void
+	public function addCard()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_gateways.js', 'nexus', 'global' ) );
-		$form = CreditCard::create( $this->member, TRUE );
-		if ( $form instanceof CreditCard )
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_gateways.js', 'nexus', 'global' ) );
+		$form = \IPS\nexus\Customer\CreditCard::create( $this->member, TRUE );
+		if ( $form instanceof \IPS\nexus\Customer\CreditCard )
 		{
 			$this->member->log( 'card', array( 'type' => 'add', 'number' => $form->card->lastFour ) );
-			Output::i()->redirect( $this->member->acpUrl() );
+			\IPS\Output::i()->redirect( $this->member->acpUrl() );
 		}
 		else
 		{
-			Output::i()->output = $form;
+			\IPS\Output::i()->output = $form;
 		}		
 	}
 	
@@ -473,19 +462,19 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function deleteCard() : void
+	public function deleteCard()
 	{
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
 		try
 		{
-			$card = CreditCard::load( Request::i()->card_id );
+			$card = \IPS\nexus\Customer\CreditCard::load( \IPS\Request::i()->card_id );
 			$this->member->log( 'card', array( 'type' => 'delete', 'number' => $card->card->lastFour ) );
 			$card->delete();
 		}
-		catch ( OutOfRangeException ) { }
-		Output::i()->redirect( $this->member->acpUrl() );
+		catch ( \OutOfRangeException $e ) { }
+		\IPS\Output::i()->redirect( $this->member->acpUrl() );
 	}
 	
 	/**
@@ -493,52 +482,54 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function alternativeContactForm() : void
+	public function alternativeContactForm()
 	{
 		$existing = NULL;
-		if ( isset( Request::i()->alt_id ) )
+		if ( isset( \IPS\Request::i()->alt_id ) )
 		{
 			try
 			{
-				$existing = AlternativeContact::constructFromData( Db::i()->select( '*', 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', $this->member->member_id, Request::i()->alt_id ) )->first() );
+				$existing = \IPS\nexus\Customer\AlternativeContact::constructFromData( \IPS\Db::i()->select( '*', 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', $this->member->member_id, \IPS\Request::i()->alt_id ) )->first() );
 			}
-			catch ( UnderflowException ) {}
+			catch ( \UnderflowException $e ) {}
 		}
 				
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		if ( !$existing )
 		{
-			$form->add( new Form\Member( 'altcontact_member_admin', NULL, TRUE, array(), function( $val )
+			$form->add( new \IPS\Helpers\Form\Member( 'altcontact_member_admin', NULL, TRUE, array(), function( $val )
 			{
 				if( $this->member->member_id === $val->member_id )
 				{
-					throw new DomainException('altcontact_member_admin_self');
+					throw new \DomainException('altcontact_member_admin_self');
 				}
 			} ) );
 		}
-		$form->add( new Node( 'altcontact_purchases_admin', $existing ? iterator_to_array( $existing->purchases ) : NULL, FALSE, array( 'class' => 'IPS\nexus\Purchase', 'forceOwner' => $this->member, 'multiple' => TRUE ) ) );
-		$form->add( new YesNo( 'altcontact_billing_admin', $existing ? $existing->billing : FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'altcontact_purchases_admin', $existing ? iterator_to_array( $existing->purchases ) : NULL, FALSE, array( 'class' => 'IPS\nexus\Purchase', 'forceOwner' => $this->member, 'multiple' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'altcontact_support_admin', $existing ? $existing->support : FALSE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'altcontact_billing_admin', $existing ? $existing->billing : FALSE ) );
 		if ( $values = $form->values() )
 		{
 			if ( $existing )
 			{
 				$altContact = $existing;
-				$this->member->log( 'alternative', array( 'type' => 'edit', 'alt_id' => $altContact->alt_id->member_id, 'alt_name' => $altContact->alt_id->name, 'purchases' => json_encode( $values['altcontact_purchases_admin'] ?: array() ), 'billing' => $values['altcontact_billing_admin'] ) );
+				$this->member->log( 'alternative', array( 'type' => 'edit', 'alt_id' => $altContact->alt_id->member_id, 'alt_name' => $altContact->alt_id->name, 'purchases' => json_encode( $values['altcontact_purchases_admin'] ? $values['altcontact_purchases_admin'] : array() ), 'billing' => $values['altcontact_billing_admin'], 'support' => $values['altcontact_support_admin'] ) );
 			}
 			else
 			{
-				$altContact = new AlternativeContact;
+				$altContact = new \IPS\nexus\Customer\AlternativeContact;
 				$altContact->main_id = $this->member;
 				$altContact->alt_id = $values['altcontact_member_admin'];
-				$this->member->log( 'alternative', array( 'type' => 'add', 'alt_id' => $values['altcontact_member_admin']->member_id, 'alt_name' => $values['altcontact_member_admin']->name, 'purchases' => json_encode( $values['altcontact_purchases_admin'] ?: array() ), 'billing' => $values['altcontact_billing_admin'] ) );
+				$this->member->log( 'alternative', array( 'type' => 'add', 'alt_id' => $values['altcontact_member_admin']->member_id, 'alt_name' => $values['altcontact_member_admin']->name, 'purchases' => json_encode( $values['altcontact_purchases_admin'] ? $values['altcontact_purchases_admin'] : array() ), 'billing' => $values['altcontact_billing_admin'], 'support' => $values['altcontact_support_admin'] ) );		
 			}
-			$altContact->purchases = $values['altcontact_purchases_admin'] ?: array();
+			$altContact->purchases = $values['altcontact_purchases_admin'] ? $values['altcontact_purchases_admin'] : array();
 			$altContact->billing = $values['altcontact_billing_admin'];
+			$altContact->support = $values['altcontact_support_admin'];
 			$altContact->save();
 			
-			Output::i()->redirect( $this->member->acpUrl() );
+			\IPS\Output::i()->redirect( $this->member->acpUrl() );
 		}
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/** 
@@ -546,19 +537,19 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function deleteAlternativeContact() : void
+	public function deleteAlternativeContact()
 	{
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 		
 		try
 		{
-			$contact = AlternativeContact::constructFromData( Db::i()->select( '*', 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', $this->member->member_id, Request::i()->alt_id ) )->first() );
+			$contact = \IPS\nexus\Customer\AlternativeContact::constructFromData( \IPS\Db::i()->select( '*', 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', $this->member->member_id, \IPS\Request::i()->alt_id ) )->first() );
 			$this->member->log( 'alternative', array( 'type' => 'delete', 'alt_id' => $contact->alt_id->member_id, 'alt_name' => $contact->alt_id->name ) );
 			$contact->delete();
 		}
-		catch ( OutOfRangeException ) { }
-		Output::i()->redirect( $this->member->acpUrl() );
+		catch ( \OutOfRangeException $e ) { }
+		\IPS\Output::i()->redirect( $this->member->acpUrl() );
 	}
 	
 	/** 
@@ -566,36 +557,37 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function void() : void
+	public function void()
 	{
-		Dispatcher::i()->checkAcpPermission( 'customers_void' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'customers_void' );
 		
-		if ( isset( Request::i()->process ) )
+		if ( isset( \IPS\Request::i()->process ) )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			$values = array(
-				'void_refund_transactions'			=> Request::i()->trans,
-				'void_cancel_billing_agreements'	=> Request::i()->ba,
-				'void_cancel_purchases' 			=> Request::i()->purch,
+				'void_refund_transactions'			=> \IPS\Request::i()->trans,
+				'void_cancel_billing_agreements'	=> \IPS\Request::i()->ba,
+				'void_cancel_purchases' 			=> \IPS\Request::i()->purch,
 			);
 		}
 		else
 		{		
-			$form = new Form( 'void_account', 'void_account' );
+			$form = new \IPS\Helpers\Form( 'void_account', 'void_account' );
 			$form->ajaxOutput = TRUE;
 			$form->addMessage( 'void_account_warning' );
-			$form->add( new YesNo( 'void_refund_transactions', TRUE ) );
-			if ( Gateway::billingAgreementGateways() )
+			$form->add( new \IPS\Helpers\Form\YesNo( 'void_refund_transactions', TRUE ) );
+			if ( \IPS\nexus\Gateway::billingAgreementGateways() )
 			{
-				$form->add( new YesNo( 'void_cancel_billing_agreements', TRUE ) );
+				$form->add( new \IPS\Helpers\Form\YesNo( 'void_cancel_billing_agreements', TRUE ) );
 			}
-			$form->add( new YesNo( 'void_cancel_purchases', TRUE ) );
-			$form->add( new YesNo( 'void_cancel_invoices', TRUE ) );
-			if ( $this->member->member_id != Member::loggedIn()->member_id )
+			$form->add( new \IPS\Helpers\Form\YesNo( 'void_cancel_purchases', TRUE ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'void_cancel_invoices', TRUE ) );
+			$form->add( new \IPS\Helpers\Form\Node( 'void_resolve_support', \IPS\Settings::i()->nexus_autoresolve_status, FALSE, array( 'class' => 'IPS\nexus\Support\Status', 'zeroVal' => 'do_not_change' ) ) );
+			if ( $this->member->member_id != \IPS\Member::loggedIn()->member_id )
 			{
-				$form->add( new YesNo( 'void_ban_account', TRUE ) );
+				$form->add( new \IPS\Helpers\Form\YesNo( 'void_ban_account', TRUE ) );
 			}
-			$form->add( new Editor( 'void_add_note', NULL, FALSE, array(
+			$form->add( new \IPS\Helpers\Form\Editor( 'void_add_note', NULL, FALSE, array(
 				'app'			=> 'nexus',
 				'key'			=> 'Customer',
 				'autoSaveKey'	=> "nexus-note-{$this->member->member_id}-new",
@@ -606,28 +598,32 @@ class view extends Controller
 			{
 				if ( $values['void_cancel_invoices'] )
 				{
-					Db::i()->update( 'nexus_invoices', array( 'i_status' => Invoice::STATUS_CANCELED ), array( 'i_member=? AND i_status<>?', $this->member->member_id, Invoice::STATUS_PAID ) );
+					\IPS\Db::i()->update( 'nexus_invoices', array( 'i_status' => \IPS\nexus\Invoice::STATUS_CANCELED ), array( 'i_member=? AND i_status<>?', $this->member->member_id, \IPS\nexus\Invoice::STATUS_PAID ) );
 				}
-				if ( $this->member->member_id != Member::loggedIn()->member_id and $values['void_ban_account'] )
+				if ( $values['void_resolve_support'] )
+				{
+					\IPS\Db::i()->update( 'nexus_support_requests', array( 'r_status' => $values['void_resolve_support']->_id ), array( 'r_member=?', $this->member->member_id ) );
+				}
+				if ( $this->member->member_id != \IPS\Member::loggedIn()->member_id and $values['void_ban_account'] )
 				{
 					$this->member->temp_ban = -1;
 					$this->member->save();
 				}
 				if ( $values['void_add_note'] )
 				{
-					$noteId = Db::i()->insert( 'nexus_notes', array(
+					$noteId = \IPS\Db::i()->insert( 'nexus_notes', array(
 						'note_member'	=> $this->member->member_id,
 						'note_text'		=> $values['void_add_note'],
-						'note_author'	=> Member::loggedIn()->member_id,
+						'note_author'	=> \IPS\Member::loggedIn()->member_id,
 						'note_date'		=> time(),
 					) );
 					
-					File::claimAttachments( "nexus-note-{$this->member->member_id}-new", $this->member->id, $noteId, 'note' );
+					\IPS\File::claimAttachments( "nexus-note-{$this->member->member_id}-new", $this->member->id, $noteId, 'note' );
 				}
 				
 				if ( !$values['void_refund_transactions'] and !$values['void_cancel_purchases'] and !$values['void_cancel_billing_agreements'] )
 				{
-					Output::i()->redirect( $this->member->acpUrl() );
+					\IPS\Output::i()->redirect( $this->member->acpUrl() );
 				}
 			}
 		}
@@ -636,36 +632,35 @@ class view extends Controller
 		{
 			$member = $this->member;
 						
-			Output::i()->output = new MultipleRedirect( Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array(
+			\IPS\Output::i()->output = new \IPS\Helpers\MultipleRedirect( \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array(
 				'do'		=> 'void',
 				'process'	=> 1,
 				'trans'		=> $values['void_refund_transactions'],
-				'ba'		=> $values['void_cancel_billing_agreements'] ?? FALSE,
+				'ba'		=> isset( $values['void_cancel_billing_agreements'] ) ? $values['void_cancel_billing_agreements'] : FALSE ,
 				'purch'		=> $values['void_cancel_purchases'],
 			) )->csrf(), function( $data ) use ( $member )
 			{		
-				if ( !is_array( $data ) )
+				if ( !\is_array( $data ) )
 				{
 					$data = array( 'trans' => 0, 'ba' => 0, 'purch' => 0, 'fail' => array() );
 				}
 				
 				$done = 0;
 				
-				if ( Request::i()->trans )
+				if ( \IPS\Request::i()->trans )
 				{
-					foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_transactions', array( 't_member=?', $member->member_id ), 't_id', array( $data['trans'], 10 ) ), 'IPS\nexus\Transaction' ) as $transaction )
+					foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_transactions', array( 't_member=?', $member->member_id ), 't_id', array( $data['trans'], 10 ) ), 'IPS\nexus\Transaction' ) as $transaction )
 					{
-						/* @var Transaction $transaction */
-						if ( in_array( $transaction->status, array( $transaction::STATUS_PENDING, $transaction::STATUS_WAITING, $transaction::STATUS_GATEWAY_PENDING ) ) )
+						if ( \in_array( $transaction->status, array( $transaction::STATUS_PENDING, $transaction::STATUS_WAITING, $transaction::STATUS_GATEWAY_PENDING ) ) )
 						{
 							$transaction->status = $transaction::STATUS_REVIEW;
 							$transaction->save();
 						}
-						elseif ( in_array( $transaction->status, array( $transaction::STATUS_PAID, $transaction::STATUS_HELD, $transaction::STATUS_REVIEW, $transaction::STATUS_PART_REFUNDED ) ) )
+						elseif ( \in_array( $transaction->status, array( $transaction::STATUS_PAID, $transaction::STATUS_HELD, $transaction::STATUS_REVIEW, $transaction::STATUS_PART_REFUNDED ) ) )
 						{
 							try
 							{
-								if ( $transaction->auth and in_array( $transaction->status, array( $transaction::STATUS_HELD, $transaction::STATUS_REVIEW ) ) )
+								if ( $transaction->auth and \in_array( $transaction->status, array( $transaction::STATUS_HELD, $transaction::STATUS_REVIEW ) ) )
 								{
 									$transaction->void();
 								}
@@ -674,9 +669,9 @@ class view extends Controller
 									$transaction->refund();
 								}
 								
-								$transaction->invoice->markUnpaid( Invoice::STATUS_CANCELED, Member::loggedIn() );
+								$transaction->invoice->markUnpaid( \IPS\nexus\Invoice::STATUS_CANCELED, \IPS\Member::loggedIn() );
 							}
-							catch ( Exception )
+							catch ( \Exception $e )
 							{
 								$data['fail'][] = $transaction->id;
 							}
@@ -686,34 +681,33 @@ class view extends Controller
 						$done++;
 						if ( $done >= 10 )
 						{
-							return array( $data, Member::loggedIn()->language()->addToStack('processing') );
+							return array( $data, \IPS\Member::loggedIn()->language()->addToStack('processing') );
 						}
 					}
 				}
 				
-				if ( Request::i()->ba )
+				if ( \IPS\Request::i()->ba )
 				{
-					foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_billing_agreements', array( 'ba_member=?', $member->member_id ), 'ba_id', array( $data['ba'], 10 ) ), 'IPS\nexus\Customer\BillingAgreement' ) as $billingAgreement )
+					foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_billing_agreements', array( 'ba_member=?', $member->member_id ), 'ba_id', array( $data['ba'], 10 ) ), 'IPS\nexus\Customer\BillingAgreement' ) as $billingAgreement )
 					{
-						/* @var Customer\BillingAgreement $billingAgreement */
 						try
 						{
 							$billingAgreement->cancel();
 						}
-						catch ( Exception ) { }
+						catch ( \Exception $e ) { }
 						
 						$data['ba']++;
 						$done++;
 						if ( $done >= 10 )
 						{
-							return array( $data, Member::loggedIn()->language()->addToStack('processing') );
+							return array( $data, \IPS\Member::loggedIn()->language()->addToStack('processing') );
 						}
 					}
 				}
 				
-				if ( Request::i()->purch )
+				if ( \IPS\Request::i()->purch )
 				{
-					foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', array( 'ps_member=?', $member->member_id ), 'ps_id', array( $data['purch'], 10 ) ), 'IPS\nexus\Purchase' ) as $purchase )
+					foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', array( 'ps_member=?', $member->member_id ), 'ps_id', array( $data['purch'], 10 ) ), 'IPS\nexus\Purchase' ) as $purchase )
 					{
 						$purchase->cancelled = TRUE;
 						$purchase->can_reactivate = FALSE;
@@ -723,7 +717,7 @@ class view extends Controller
 						$done++;
 						if ( $done >= 10 )
 						{
-							return array( $data, Member::loggedIn()->language()->addToStack('processing') );
+							return array( $data, \IPS\Member::loggedIn()->language()->addToStack('processing') );
 						}
 					}
 				}
@@ -732,19 +726,20 @@ class view extends Controller
 				return NULL;
 			}, function() use ( $member )
 			{
-				if ( count( $_SESSION['voidAccountFails'] ) )
+				if ( \count( $_SESSION['voidAccountFails'] ) )
 				{
-					Output::i()->redirect( $member->acpUrl()->setQueryString( 'do', 'voidFails' ) );
+					\IPS\Output::i()->redirect( $member->acpUrl()->setQueryString( 'do', 'voidFails' ) );
 				}
 				else
 				{
-					Output::i()->redirect( $member->acpUrl() );
+					\IPS\Output::i()->redirect( $member->acpUrl() );
 				}
 			} );
+			return;
 		}
 		else
 		{
-			Output::i()->output = $form;
+			\IPS\Output::i()->output = $form;
 		}
 	}
 	
@@ -753,8 +748,8 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function voidFails() : void
+	public function voidFails()
 	{
-		Output::i()->output = Theme::i()->getTemplate( 'customers' )->voidFails( $_SESSION['voidAccountFails'] );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'customers' )->voidFails( $_SESSION['voidAccountFails'] );
 	}
 }

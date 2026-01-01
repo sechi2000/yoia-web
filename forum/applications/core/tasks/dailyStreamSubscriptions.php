@@ -11,23 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Stream\Subscription;
-use IPS\Db;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * dailyStreamSubscriptions Task
  */
-class dailyStreamSubscriptions extends Task
+class _dailyStreamSubscriptions extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -38,12 +31,12 @@ class dailyStreamSubscriptions extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		/* Disable task if no subscriptions */
-		$select = Db::i()->select( '*', 'core_stream_subscriptions', array( 'frequency=?', 'daily' ));
+		$select = \IPS\Db::i()->select( '*', 'core_stream_subscriptions', array( 'frequency=?', 'daily' ));
 		if( !$select->count() )
 		{
 			$this->enabled = FALSE;
@@ -54,7 +47,7 @@ class dailyStreamSubscriptions extends Task
 
 		$this->runUntilTimeout( function()
 		{
-			return Subscription::sendBatch( 'daily' );
+			return \IPS\core\Stream\Subscription::sendBatch( 'daily' );
 		});
 		return NULL;
 	}

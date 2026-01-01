@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		[Database] Category Controller
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -12,67 +11,31 @@
 namespace IPS\cms\modules\front\database;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\cms\Categories;
-use IPS\cms\Databases;
-use IPS\cms\Databases\Controller;
-use IPS\cms\Databases\Dispatcher;
-use IPS\cms\Fields;
-use IPS\cms\Pages\Page;
-use IPS\cms\Records;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\Table\Content;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Xml\Rss;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_bool;
-use const IPS\Helpers\Table\SEARCH_BOOL;
-use const IPS\Helpers\Table\SEARCH_CHECKBOX;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-use const IPS\Helpers\Table\SEARCH_NUMERIC_TEXT;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * page
  */
-class category extends Controller
+class _category extends \IPS\cms\Databases\Controller
 {
 
 	/**
 	 * Store any active filters for this view
 	 *
-	 * @var	array
+	 * @param	array
 	 */	
-	static public array $activeFilters = array();
+	static public $activeFilters = array();
 	
 	/**
 	 * Determine which method to load
 	 *
 	 * @return void
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		$this->view();
 	}
@@ -82,23 +45,22 @@ class category extends Controller
 	 *
 	 * @return void
 	 */
-	public function clearFilters() : void
+	public function clearFilters()
 	{
-		Session::i()->csrfCheck();
-
-		/* @var Categories $catClass */
-		$catClass = 'IPS\cms\Categories' .  Dispatcher::i()->databaseId;
+		\IPS\Session::i()->csrfCheck();
+		
+		$catClass = 'IPS\cms\Categories' .  \IPS\cms\Databases\Dispatcher::i()->databaseId;
 
 		try
 		{
-			$category = $catClass::loadAndCheckPerms( Dispatcher::i()->categoryId );
-			$category::database()->saveFilterCookie( false, $category );
+			$category = $catClass::loadAndCheckPerms( \IPS\cms\Databases\Dispatcher::i()->categoryId );
+			$category->saveFilterCookie( FALSE );
 
-			Output::i()->redirect( $category->url(), 'cms_filters_cleared' );
+			\IPS\Output::i()->redirect( $category->url(), 'cms_filters_cleared' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2T254/1', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2T254/1', 403, '' );
 		}
 	}
 
@@ -107,92 +69,160 @@ class category extends Controller
 	 *
 	 * @return	void
 	 */
-	public function view() : void
+	public function view()
 	{
-		/* @var Categories $catClass
-		 * @var Fields $fieldClass */
 		$category     = NULL;
-		$fieldClass   = 'IPS\cms\Fields' .  Dispatcher::i()->databaseId;
-		$catClass     = 'IPS\cms\Categories' .  Dispatcher::i()->databaseId;
-		$database     = Databases::load( Dispatcher::i()->databaseId );
+		$fieldClass   = 'IPS\cms\Fields' .  \IPS\cms\Databases\Dispatcher::i()->databaseId;
+		$catClass     = 'IPS\cms\Categories' .  \IPS\cms\Databases\Dispatcher::i()->databaseId;
+		$database     = \IPS\cms\Databases::load( \IPS\cms\Databases\Dispatcher::i()->databaseId );
 		$breadcrumbs  = NULL;
 
 		try
 		{
-			$category = $catClass::loadAndCheckPerms( Dispatcher::i()->categoryId );
+			$category = $catClass::loadAndCheckPerms( \IPS\cms\Databases\Dispatcher::i()->categoryId );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2T254/2', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2T254/2', 403, '' );
 		}
-
+		
 		$customFields = $fieldClass::data( 'view', $category, $fieldClass::FIELD_SKIP_TITLE_CONTENT );
 
 		if ( ! $database->use_categories )
 		{
-			$breadcrumbs = Output::i()->breadcrumb;
+			$breadcrumbs = \IPS\Output::i()->breadcrumb;
 		}
-		
-		$recordsClass = $category::$contentItemClass;
+
+		$RecordsClass = $category::$contentItemClass;
 		
 		/* AdvancedSearch can wipe out the checked box as it is looking for _checkbox. Note to self in 4.5, rewrite the filter widget to avoid using advancedSearch :/ */
-		if ( ! isset( Request::i()->cms_record_i_started_checkbox ) and isset( Request::i()->cms_record_i_started ) and Request::i()->cms_record_i_started )
+		if ( ! isset( \IPS\Request::i()->cms_record_i_started_checkbox ) and isset( \IPS\Request::i()->cms_record_i_started ) and \IPS\Request::i()->cms_record_i_started )
 		{
-			Request::i()->cms_record_i_started_checkbox = Request::i()->cms_record_i_started;
+			\IPS\Request::i()->cms_record_i_started_checkbox = \IPS\Request::i()->cms_record_i_started;
 		}
 		
+		/* we need this language later (and in Widgets\DatabaseFilters which is executed just before output) */
+		\IPS\Member::loggedIn()->language()->words['cms_record_i_started'] = \IPS\Member::loggedIn()->language()->addToStack( 'cms_record_i_started_sprintf', FALSE, array( 'sprintf' => $database->recordWord() ) );
+
 		/* Check cookie */
 		$where = array();
-		$cookie = $category::database()->getFilterCookie( $category );
+		$cookie = $category->getFilterCookie();
 
 		if ( $cookie !== NULL )
 		{
 			foreach( $cookie as $f => $v )
 			{
-				if( $f == 'cms_record_i_started' and Member::loggedIn()->member_id )
+				if ( $f == 'cms_record_i_started' and \IPS\Member::loggedIn()->member_id )
 				{
+					$where[] = 'cms_custom_database_' . $database->id . '.member_id=' . \IPS\Member::loggedIn()->member_id;
+					
 					/* FilterMessage template only accepts \IPS\cms\Fields */
-					$field = new Fields;
+					$field = new \IPS\cms\Fields;
 					$field->id = 'cms_record_i_started';
-
-					Member::loggedIn()->language()->words['content_field_cms_record_i_started'] = Member::loggedIn()->language()->addToStack( 'cms_record_i_started_sprintf', FALSE, array( 'sprintf' => $database->recordWord() ) );
-
-					static::$activeFilters['cms_record_i_started'] = array( 'field' => $field, 'value' => Member::loggedIn()->language()->addToStack('content_field_cms_record_i_started_on') );
+					
+					\IPS\Member::loggedIn()->language()->words['content_field_cms_record_i_started'] = \IPS\Member::loggedIn()->language()->addToStack( 'cms_record_i_started_sprintf', FALSE, array( 'sprintf' => $database->recordWord() ) );
+					
+					static::$activeFilters['cms_record_i_started'] = array( 'field' => $field, 'value' => \IPS\Member::loggedIn()->language()->addToStack('content_field_cms_record_i_started_on') );
+					continue;
 				}
-				else
+				
+				$k = 'content_field_' . $f;
+				
+				$displayValue = $customFields[ $f ]->displayValue( $v );
+				$concat = ',';
+				
+				if ( $customFields[ $f ]->type === 'Member' )
 				{
-					$displayValue = $customFields[ $f ]->displayValue( $v );
-
-					if ( $customFields[ $f ]->type === 'Member' )
+					if ( ! empty( $v ) )
 					{
-						if ( ! empty( $v ) )
+						$newValue = array();
+						$newDisplayValue = array();
+						$concat = '\n';
+						
+						if ( \is_array( $v ) )
 						{
-							$newDisplayValue = array();
-							$concat = '\n';
-
-							if ( is_array( $v ) )
+							foreach( $v as $m )
 							{
-								foreach( $v as $m )
+								$member = \IPS\Member::load( $m );
+								$newValue[] = $member->member_id;
+								$newDisplayValue[] = $member->name;
+							}
+						}
+						else
+						{
+							$member = \IPS\Member::load( $v );
+							$newValue[] = $member->member_id;
+							$newDisplayValue[] = $member->name;
+						}
+	
+						$displayValue = implode( ', ', $newDisplayValue );
+						$v = $newValue;
+					}
+					else
+					{
+						/* The content_field_x can be an empty array from the member form */
+						continue;
+					}
+				}
+					
+				if ( isset( $customFields[ $f ] ) and !isset( \IPS\Request::i()->$k ) and $v !== '___any___' )
+				{
+					if ( \is_array( $v ) )
+					{
+						if ( array_key_exists( 'start', $v ) or array_key_exists( 'end', $v ) )
+						{
+							$start = ( $v['start'] instanceof \IPS\DateTime ) ? $v['start']->getTimestamp() : \intval( $v['start'] );
+							$end   = ( $v['end'] instanceof \IPS\DateTime )   ? $v['end']->getTimestamp()   : \intval( $v['end'] );
+							
+							if ( $start or $end )
+							{
+								$where[] = array( '( ' . mb_substr( $k, 8 ) . ' BETWEEN ' . $start . ' AND ' . $end . ' )' );
+							}
+						}
+						else
+						{
+							$like = array();
+							foreach( $v as $val )
+							{
+								if ( $val === 0 or ! empty( $val ) )
 								{
-									$member = Member::load( $m );
-									$newDisplayValue[] = $member->name;
+									$like[]  = "CONCAT( '{$concat}', " .  mb_substr( $k, 8 ) . ", '{$concat}') LIKE '%{$concat}" . \IPS\Db::i()->real_escape_string( $val ) . "{$concat}%'";
 								}
+							}
+							
+							$where[] = array( '( ' . \IPS\Db::i()->in( mb_substr( $k, 8 ), $v ) .  ( \count( $like ) ? " OR (" . implode( ' OR ', $like ) . ') )' : ')' ) );
+						}
+					}
+					else
+					{
+						if ( \is_bool( $v ) )
+						{
+							/* YesNo fields are false or true */
+							if ( $v === false )
+							{
+								$where[] = array( '(' . mb_substr( $k, 8 ) . ' IS NULL or ' . mb_substr( $k, 8 ) . '=0)' );
 							}
 							else
 							{
-								$member = Member::load( $v );
-								$newDisplayValue[] = $member->name;
+								$where[] = array( mb_substr( $k, 8 ) . "=1" );
 							}
-
-							$displayValue = implode( ', ', $newDisplayValue );
+						}
+						else
+						{
+							if ( $v !== 0 and ! $v )
+							{
+								$where[] = array( mb_substr( $k, 8 ) . " IS NULL" );
+							}
+							else
+							{
+								$where[] = array( mb_substr( $k, 8 ) . "=?", $v );
+							}
 						}
 					}
-
+					
 					static::$activeFilters[ $f ] = array( 'field' => $customFields[ $f ], 'value' => $displayValue );
 				}
 			}
-
-			$where = $category::database()->buildWhereFromCookie( $cookie, $category );
 		}
 		else
 		{
@@ -205,91 +235,68 @@ class category extends Controller
 					$names = NULL;
 					
 					/* We need to homogenize data, we store IDs, but the Form helper needs objects or names */ 
-					if ( isset( Request::i()->$requestField ) and ! isset( Request::i()->$didWeJustHitSubmit ) )
+					if ( isset( \IPS\Request::i()->$requestField ) and ! isset( \IPS\Request::i()->$didWeJustHitSubmit ) )
 					{
 						/* The URL alwyas uses IDs, so map these to names */
 						$names = array_map( function( $id )
 						{
-							return Member::load( $id )->name;
-						}, ( is_array( Request::i()->$requestField ) ? Request::i()->$requestField : array( Request::i()->$requestField ) ) );
+							return \IPS\Member::load( $id )->name;
+						}, ( \is_array( \IPS\Request::i()->$requestField ) ? \IPS\Request::i()->$requestField : array( \IPS\Request::i()->$requestField ) ) );
 					}
-					else if ( isset( Request::i()->$requestField ) )
+					else if ( isset( \IPS\Request::i()->$requestField ) )
 					{
 						/* The names are foo\nbar so already names */
-						$names = explode( "\n", Request::i()->$requestField );
+						$names = explode( "\n", \IPS\Request::i()->$requestField );
 					}
 				
 					if ( $names !== NULL )
 					{
-						Request::i()->$requestField = $names;
+						\IPS\Request::i()->$requestField = $names;
 					}
 				}
 			}
 		}
 
-		/* Set the meta image */
-		if( $category->image )
-		{
-			try
-			{
-				Output::i()->metaTags['og:image'] = File::get( 'cms_Categories', $category->image )->url;
-			}
-			catch( OutOfRangeException ){}
-		}
-
 		if ( ( $category->hasChildren() AND $category->show_records ) OR ! $category->hasChildren() )
 		{
-			if ( ! count( $where ) )
+			if ( ! \count( $where ) )
 			{
 				$where = NULL;
 			}
 
-			if( Request::i()->advanced_search_submitted )
+			if( \IPS\Request::i()->advanced_search_submitted )
 			{
-				Request::i()->csrfKey = Session::i()->csrfKey;
+				\IPS\Request::i()->csrfKey = \IPS\Session::i()->csrfKey;
 			}
-
-			/* @var Records $recordsClass */
-			$table = new Content( 'IPS\cms\Records' . Dispatcher::i()->databaseId, $category->url(), $where, $category, NULL, 'read', !isset(Request::i()->rss));
+			
+			$table = new \IPS\Helpers\Table\Content( 'IPS\cms\Records' . \IPS\cms\Databases\Dispatcher::i()->databaseId, $category->url(), $where, $category, NULL, 'read', isset( \IPS\Request::i()->rss ) ? FALSE : TRUE );
 			$table->tableTemplate = array( \IPS\cms\Theme::i()->getTemplate( $category->_template_listing, 'cms', 'database' ), 'categoryTable' );
 			$table->rowsTemplate = array( \IPS\cms\Theme::i()->getTemplate( $category->_template_listing, 'cms', 'database' ), 'recordRow' );
-			$table->baseUrl = $table->baseUrl->setQueryString( 'd', Dispatcher::i()->databaseId );
-
-			/* Does the category have a custom layout? */
-			if( $category->template_listing == 0 )
-			{
-				$layout = $database->display_settings['listing']['layout'];
-			}
-			elseif( $displaySettings = $category->display_settings )
-			{
-				$layout = $displaySettings['layout'];
-			}
-
-			$table->extra = [ 'layout' => $layout ?? 'table', 'db' => $database ];
-
+			$table->baseUrl = $table->baseUrl->setQueryString( 'd', \IPS\cms\Databases\Dispatcher::i()->databaseId );
 			$table->hover = TRUE;
-			$table->sortBy		  = ( isset( Request::i()->sortby ) ) ? Request::i()->sortby  : (  $database->field_sort ?  $recordsClass::$databaseTable . '.' . $recordsClass::$databasePrefix . $database->field_sort : 'record_last_comment' );
-			$table->sortDirection = ( isset( Request::i()->sortdirection ) ) ? Request::i()->sortdirection : ( $database->field_direction ? $database->field_direction : 'desc' );
+			$table->sortBy		  = ( isset( \IPS\Request::i()->sortby ) ) ? \IPS\Request::i()->sortby  : (  $database->field_sort ?  $RecordsClass::$databaseTable . '.' . $RecordsClass::$databasePrefix . $database->field_sort : 'record_last_comment' );
+			$table->sortDirection = ( isset( \IPS\Request::i()->sortdirection ) ) ? \IPS\Request::i()->sortdirection : ( $database->field_direction ? $database->field_direction : 'desc' );
 			if ( $database->field_sort )
 			{
-				$table->defaultSortBy = $recordsClass::$databasePrefix . $database->field_sort;
+				$table->defaultSortBy = $RecordsClass::$databasePrefix . $database->field_sort;
 				$table->defaultSortDirection = $database->field_direction;
 			}
 			$table->limit		  = $database->field_perpage   ? $database->field_perpage   : 25;
+			$table->title = \IPS\Member::loggedIn()->language()->addToStack( $database->use_categories ? 'x_records_in_this_category' : 'x_records' , FALSE, array( 'sprintf' => array( $category->_items, $database->recordWord( $category->_items ) ) ) );
 
 			/* Set up sort fields to allow sorting numerically or by date */
 			$sortFields = $customFields;
 			$sortFields[ $database->field_title ] = $fieldClass::load( $database->field_title );
 			foreach( $sortFields as $id => $obj )
 			{
-				if ( $table->sortBy == $recordsClass::$databaseTable . '.' . 'field_' . $id OR $table->sortBy == 'field_' . $id )
+				if ( $table->sortBy == $RecordsClass::$databaseTable . '.' . 'field_' . $id OR $table->sortBy == 'field_' . $id )
 				{
-					if ( in_array( $obj->type, array( 'Number', 'Date' ) ) )
+					if ( \in_array( $obj->type, array( 'Number', 'Date' ) ) )
 					{
 						$fieldName = $table->sortBy;
 						if ( mb_strstr( $table->sortBy, '.' ) )
 						{
-							[ $db, $fieldName ] = explode( '.', $table->sortBy );
+							list( $db, $fieldName ) = explode( '.', $table->sortBy );
 						}
 
 						$table->sortOptions[ $fieldName ] = 'CAST(`field_' . $id . '` AS UNSIGNED)';
@@ -301,7 +308,7 @@ class category extends Controller
 			/* Make sure table doesn't add breadcrumbs if we're not using categories */
 			if ( ! $database->use_categories )
 			{
-				Output::i()->breadcrumb = $breadcrumbs;
+				\IPS\Output::i()->breadcrumb = $breadcrumbs;
 			}
 
 			/* Custom Search */
@@ -324,9 +331,9 @@ class category extends Controller
 					'last_90_days'		=> 'last_90_days',
 			);
 
-			if ( Member::loggedIn()->member_id AND Member::loggedIn()->last_visit )
+			if ( \IPS\Member::loggedIn()->member_id AND \IPS\Member::loggedIn()->last_visit )
 			{
-				$timeFrameOptions['since_last_visit'] = Member::loggedIn()->language()->addToStack('since_last_visit', FALSE, array( 'sprintf' => array( DateTime::ts( (int) Member::loggedIn()->last_visit ) ) ) );
+				$timeFrameOptions['since_last_visit'] = \IPS\Member::loggedIn()->language()->addToStack('since_last_visit', FALSE, array( 'sprintf' => array( \IPS\DateTime::ts( \IPS\Member::loggedIn()->last_visit ) ) ) );
 			}
 
 			$sortBy = array(
@@ -341,7 +348,7 @@ class category extends Controller
 			$table->sortOptions = array_unique( array_merge( $table->sortOptions, array_combine( array_keys( $sortBy ), array_keys( $sortBy ) ) ) );
 			
 			/* To avoid confusion, label 'updated' as 'Recently Updated' as last comment */
-			Member::loggedIn()->language()->words[ $table->langPrefix . 'sort_updated' ] = Member::loggedIn()->language()->addToStack('content_record_last_comment');
+			\IPS\Member::loggedIn()->language()->words[ $table->langPrefix . 'sort_updated' ] = \IPS\Member::loggedIn()->language()->addToStack('content_record_last_comment');
 
 			if ( !isset( $sortBy[ $database->field_sort ] ) )
 			{
@@ -350,17 +357,17 @@ class category extends Controller
 					case 'primary_id_field':
 						$sortBy[ $database->field_sort ] = 'database_field__id';
 						$table->sortOptions['database_field__id'] = $database->field_sort;
-						Member::loggedIn()->language()->words['sort_database_field__id'] = Member::loggedIn()->language()->addToStack('database_field__id');
+						\IPS\Member::loggedIn()->language()->words['sort_database_field__id'] = \IPS\Member::loggedIn()->language()->addToStack('database_field__id');
 						break;
 					case 'member_id':
 						$sortBy[ $database->field_sort ] = 'database_field__member';
 						$table->sortOptions['database_field__member'] = $database->field_sort;
-						Member::loggedIn()->language()->words['sort_database_field__member'] = Member::loggedIn()->language()->addToStack('database_field__member');
+						\IPS\Member::loggedIn()->language()->words['sort_database_field__member'] = \IPS\Member::loggedIn()->language()->addToStack('database_field__member');
 						break;
 					case 'record_rating':
 						$sortBy[ $database->field_sort ] = 'database_field__rating';
 						$table->sortOptions['rating'] = $database->field_sort;
-						Member::loggedIn()->language()->words['sort_database_field__rating'] = Member::loggedIn()->language()->addToStack('database_field__rating');
+						\IPS\Member::loggedIn()->language()->words['sort_database_field__rating'] = \IPS\Member::loggedIn()->language()->addToStack('database_field__rating');
 						break;
 				}
 			}
@@ -386,64 +393,64 @@ class category extends Controller
 			{
 				if ( $database->field_title !== mb_substr( $database->field_sort, 6 ) )
 				{
-					$sortBy[ $database->field_sort ] = Member::loggedIn()->language()->addToStack( 'content_field_' . mb_substr( $database->field_sort, 6 ) );
+					$sortBy[ $database->field_sort ] = \IPS\Member::loggedIn()->language()->addToStack( 'content_field_' . mb_substr( $database->field_sort, 6 ) );
 					$table->sortOptions[ $database->field_sort ] = $database->field_sort;
 				}
 			}
 
 			$table->advancedSearch = array(
-				'record_type'	 => array( SEARCH_SELECT, array( 'options' => $filterOptions ) ),
-				'sort_by'		 => array( SEARCH_SELECT, array( 'options' => $sortBy ) ),
-				'sort_direction' => array( SEARCH_SELECT, array( 'options' => array(
+				'record_type'	 => array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => $filterOptions ) ),
+				'sort_by'		 => array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => $sortBy ) ),
+				'sort_direction' => array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => array(
 					'asc'			=> 'asc',
 					'desc'			=> 'desc',
 				) )
 				),
-				'time_frame'	=> array( SEARCH_SELECT, array( 'options' => $timeFrameOptions ) ),
-				'cms_record_i_started' => array( SEARCH_CHECKBOX, array() ),
+				'time_frame'	=> array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => $timeFrameOptions ) ),
+				'cms_record_i_started' => array( \IPS\Helpers\Table\SEARCH_CHECKBOX, array() ),
 			);
 
 			foreach( $customFields as $obj )
 			{
 				if ( $obj->filter )
 				{
-					Member::loggedIn()->language()->words['content_field_' . $obj->id ] = $obj->_title;
-					if ( in_array( $obj->type, array( 'Date', 'DateRange' ) ) )
+					\IPS\Member::loggedIn()->language()->words['content_field_' . $obj->id ] = $obj->_title;
+					if ( \in_array( $obj->type, array( 'Date', 'DateRange' ) ) )
 					{
-						$table->advancedSearch[ 'content_field_' . $obj->id ] = array( SEARCH_DATE_RANGE, array( 'noDefault' => true ) );
+						$table->advancedSearch[ 'content_field_' . $obj->id ] = array( \IPS\Helpers\Table\SEARCH_DATE_RANGE, array( 'noDefault' => true ) );
 					}
 					else if ( $obj->type == 'Number' )
 					{
-						$table->advancedSearch[ 'content_field_' . $obj->id ] = array( SEARCH_NUMERIC_TEXT, array( 'noDefault' => true ) );
+						$table->advancedSearch[ 'content_field_' . $obj->id ] = array( \IPS\Helpers\Table\SEARCH_NUMERIC_TEXT, array( 'noDefault' => true ) );
 					}
 					else if ( $obj->type == 'YesNo' )
 					{
-						$table->advancedSearch[ 'content_field_' . $obj->id ] = array( SEARCH_BOOL, array( 'noDefault' => true ) );
+						$table->advancedSearch[ 'content_field_' . $obj->id ] = array( \IPS\Helpers\Table\SEARCH_BOOL, array( 'noDefault' => true ) );
 					}
 					else if ( $obj->type == 'Member' )
 					{
 						/* Don't show this on the custom modal form because you cannot have two autocompletes with the same name on the same page, and the fix is more invasive than the value of this feature on the modal.
 						   The purpose of this is to show in the sidebar filter form */
-						if ( ! isset( Request::i()->advancedSearchForm ) )
+						if ( ! isset( \IPS\Request::i()->advancedSearchForm ) )
 						{
-							$table->advancedSearch[ 'content_field_' . $obj->id ] = array( SEARCH_MEMBER, array( 'noDefault' => true, 'multiple' => NULL ) );
+							$table->advancedSearch[ 'content_field_' . $obj->id ] = array( \IPS\Helpers\Table\SEARCH_MEMBER, array( 'noDefault' => true, 'multiple' => NULL ) );
 						}
 					}
 					else
 					{
-						$table->advancedSearch[ 'content_field_' . $obj->id ] = array( SEARCH_SELECT, array( 'options' => $obj->extra, 'multiple' => TRUE, 'noDefault' => true ) );
+						$table->advancedSearch[ 'content_field_' . $obj->id ] = array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => $obj->extra, 'multiple' => TRUE, 'noDefault' => true ) );
 					}
 					
 					$table->advancedSearch['sort_by'][1]['options']['field_' . $obj->id ] = 'content_field_' . $obj->id;
 				}
 
-				if ( in_array( $obj->type, array( 'Date', 'DateRange', 'Number' ) ) )
+				if ( \in_array( $obj->type, array( 'Date', 'DateRange', 'Number' ) ) )
 				{
 					$table->sortOptions[ 'field_' . $obj->id ] = 'CAST(`field_' . $obj->id . '` AS UNSIGNED)';
 				}
 				else
 				{
-					$table->sortOptions[ 'field_' . $obj->id ] = $table->sortOptions['field_' . $obj->id] ?? 'field_' . $obj->id;
+					$table->sortOptions[ 'field_' . $obj->id ] = isset( $table->sortOptions[ 'field_' . $obj->id ] ) ? $table->sortOptions[ 'field_' . $obj->id ] : 'field_' . $obj->id;
 				}
 			}
 
@@ -460,26 +467,37 @@ class category extends Controller
 						 
 						if ( $customFields[ $key ]->type === 'Member' )
 						{
-							if ( is_array( $v ) and count( $v ) )
+							if ( \is_array( $v ) and \count( $v ) )
 							{
+								$newValue = array();
+								$newDisplayValue = array();
+								$concat = '\n';
+								
 								foreach( $v as $member )
 								{
-									if ( $member instanceof Member )
+									if ( $member instanceof \IPS\Member )
 									{
-										$table->where[] = [ "FIND_IN_SET( " . $member->member_id . ", REPLACE(field_" . $key . ", '\\n',','))" ];
+										$newDisplayValue[] = $member->name;
+										$newValue[] = $member->member_id;
 									}
 								}
+		
+								$displayValue = implode( ', ', $newDisplayValue );
+								$v = $newValue;
 							}
-
-							continue;
+							else
+							{
+								/* The content_field_x can be an empty array from the member form */
+								continue;
+							}
 						}
 						
-						if ( is_array( $v ) )
+						if ( \is_array( $v ) )
 						{
 							if ( array_key_exists( 'start', $v ) or array_key_exists( 'end', $v ) )
 							{
-								$start = ( $v['start'] instanceof DateTime ) ? $v['start']->getTimestamp() : intval( $v['start'] );
-								$end   = ( $v['end'] instanceof DateTime )   ? $v['end']->getTimestamp()   : intval( $v['end'] );
+								$start = ( $v['start'] instanceof \IPS\DateTime ) ? $v['start']->getTimestamp() : \intval( $v['start'] );
+								$end   = ( $v['end'] instanceof \IPS\DateTime )   ? $v['end']->getTimestamp()   : \intval( $v['end'] );
 								
 								if ( $start or $end )
 								{
@@ -493,25 +511,18 @@ class category extends Controller
 								{
 									if ( $val === 0 or ! empty( $val ) )
 									{
-										$like[] = $val;
+										$like[]  = "CONCAT( '{$concat}', " .  mb_substr( $k, 8 ) . ", '{$concat}') LIKE '%{$concat}" . \IPS\Db::i()->real_escape_string( $val ) . "{$concat}%'";
 									}
 								}
-
-								if( $customFields[ $key ]->default_value and in_array( $customFields[ $key ]->default_value, $v ) )
-								{
-									$table->where[] = array( "( " . mb_substr( $k, 8 ) . " IS NULL OR " . Db::i()->findInSet( mb_substr( $k, 8 ), $like ) . ")" );
-								}
-								else
-								{
-									$table->where[] = array( Db::i()->findInSet( mb_substr( $k, 8 ), $like ) );
-								}
+								
+								$table->where[] = array( '( ' . \IPS\Db::i()->in( mb_substr( $k, 8 ), $v ) . ( \count( $like ) ? " OR (" . implode( ' OR ', $like ) . ') )' : ')' ) );
 							}
 						}
 						else
 						{
 							if ( $v !== '___any___' )
 							{ 
-								if ( is_bool( $v ) )
+								if ( \is_bool( $v ) )
 								{
 									/* YesNo fields are false or true */
 									if ( $v === false )
@@ -537,13 +548,13 @@ class category extends Controller
 							}
 						}
 
-						category::$activeFilters[ $key ] = array( 'field' => $customFields[ $key ], 'value' => $displayValue );
+						\IPS\cms\modules\front\database\category::$activeFilters[ $key ] = array( 'field' => $customFields[ $key ], 'value' => $displayValue );
 					}
 				}
 				
-				if ( isset( $values['cms_record_i_started'] ) and $values['cms_record_i_started'] and Member::loggedIn()->member_id )
+				if ( isset( $values['cms_record_i_started'] ) and $values['cms_record_i_started'] and \IPS\Member::loggedIn()->member_id )
 				{ 
-					$table->where[] = 'cms_custom_database_' . $database->id . '.member_id=' . Member::loggedIn()->member_id;
+					$table->where[] = 'cms_custom_database_' . $database->id . '.member_id=' . \IPS\Member::loggedIn()->member_id;
 				}
 
 				if ( isset( $values['record_type'] ) )
@@ -619,12 +630,12 @@ class category extends Controller
 							$days = 90;
 							break;
 						case 'since_last_visit':
-							$table->where[] = array( 'record_last_comment>?', Member::loggedIn()->last_visit );
+							$table->where[] = array( 'record_last_comment>?', \IPS\Member::loggedIn()->last_visit );
 							break;
 					}
 					if ( $days !== NULL )
 					{
-						$table->where[] = array( 'record_last_comment>?', DateTime::create()->sub( new DateInterval( 'P' . $days . 'D' ) )->getTimestamp() );
+						$table->where[] = array( 'record_last_comment>?', \IPS\DateTime::create()->sub( new \DateInterval( 'P' . $days . 'D' ) )->getTimestamp() );
 					}
 				}
 			};
@@ -634,13 +645,13 @@ class category extends Controller
 			{
 				$rssUrl  = $table->baseUrl->setQueryString('rss', 1 );
 				$rssName = $database->_title . ': ' . $category->metaTitle();
-				Output::i()->rssFeeds[ $rssName ] = $rssUrl;
+				\IPS\Output::i()->rssFeeds[ $rssName ] = $rssUrl;
 				
 				/* Show RSS feed */
-				if ( isset( Request::i()->rss ) )
+				if ( isset( \IPS\Request::i()->rss ) )
 				{
-					$rssName = Member::loggedIn()->language()->get('content_db_' . $database->id ) . ': ' . $category->metaTitle();
-					$document     = Rss::newDocument( $table->baseUrl, $rssName, $rssName );
+					$rssName = \IPS\Member::loggedIn()->language()->get('content_db_' . $database->id ) . ': ' . $category->metaTitle();
+					$document     = \IPS\Xml\Rss::newDocument( $table->baseUrl, $rssName, $rssName );
 					$contentField = 'field_' . $database->field_content;
 					
 					foreach ( $table->getRows( array() ) as $record )
@@ -654,43 +665,36 @@ class category extends Controller
 								$content = \IPS\cms\Theme::i()->getTemplate( $category->_template_listing, 'cms', 'database' )->rssItemWithImage( $content, $record->record_image );
 							}
 
-							$document->addItem( $record->_title, $record->url(), $content, DateTime::ts( ( $record->record_last_comment > $record->record_publish_date ) ? $record->record_publish_date : $record->record_last_comment ), $record->_id );
+							$document->addItem( $record->_title, $record->url(), $content, \IPS\DateTime::ts( ( $record->record_last_comment > $record->record_publish_date ) ? $record->record_publish_date : $record->record_last_comment ), $record->_id );
 						}
 					}
 			
 					/* @note application/rss+xml is not a registered IANA mime-type so we need to stick with text/xml for RSS */
-					Output::i()->sendOutput( $document->asXML(), 200, 'text/xml' );
+					\IPS\Output::i()->sendOutput( $document->asXML(), 200, 'text/xml', array(), TRUE );
 				}
 			}
 		}
 		else
 		{
+			\IPS\Output::i()->metaTags['title'] = $category->metaTitle();
+			\IPS\Output::i()->metaTags['description'] = $category->metaDescription();
+			\IPS\Output::i()->metaTags['og:title'] = $category->metaTitle();
+			\IPS\Output::i()->metaTags['og:description'] = $category->metaDescription();
+			\IPS\Output::i()->linkTags['canonical'] = (string) $category->url();
+
 			/* Set breadcrumb */
-			if ( $club = $category->_club )
+			foreach ( $category->parents() as $parent )
 			{
-				$club->setBreadcrumbs( $category );
+				\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 			}
-			else
-			{
-				foreach ( $category->parents() as $parent )
-				{
-					Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
-				}
 
-				Output::i()->breadcrumb[] = array( NULL, $category->_title );
-			}
+			\IPS\Output::i()->breadcrumb[] = array( NULL, $category->_title );
 		}
-
-        Output::i()->metaTags['title'] = $category->metaTitle();
-        Output::i()->metaTags['description'] = $category->metaDescription();
-        Output::i()->metaTags['og:title'] = $category->metaTitle();
-        Output::i()->metaTags['og:description'] = $category->metaDescription();
-        Output::i()->linkTags['canonical'] = (string) $category->url();
 
 		/* Node handler does not support keywords, so we need to do it manually */
 		if ( $category->meta_keywords )
 		{
-			Output::i()->metaTags['keywords'] = $category->meta_keywords;
+			\IPS\Output::i()->metaTags['keywords'] = $category->meta_keywords;
 		}
 
 		/* Show club header, if applicable */
@@ -698,38 +702,71 @@ class category extends Controller
 
 		/* Update location */
 		$permissions = $category->permissions();
-		Session::i()->setLocation( $category->url(), explode( ",", $permissions['perm_view'] ), 'loc_cms_viewing_db_cat', array( 'content_db_' . $database->id => TRUE, 'content_cat_name_' . $category->id => TRUE ) );
+		\IPS\Session::i()->setLocation( $category->url(), explode( ",", $permissions['perm_view'] ), 'loc_cms_viewing_db_cat', array( 'content_db_' . $database->id => TRUE, 'content_cat_name_' . $category->id => TRUE ) );
 
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'records/list.css', 'cms', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'records/list.css', 'cms', 'front' ) );
 
 		$stringTable = ( ( $category->hasChildren() AND $category->show_records ) OR ! $category->hasChildren() ) ? (string) $table : '';
 		
-		Dispatcher::i()->output .= \IPS\cms\Theme::i()->getTemplate( $category->_template_listing, 'cms', 'database' )->categoryHeader( $category, $stringTable, static::$activeFilters );
+		\IPS\cms\Databases\Dispatcher::i()->output .= \IPS\cms\Theme::i()->getTemplate( $category->_template_listing, 'cms', 'database' )->categoryHeader( $category, $stringTable, static::$activeFilters );
 		
-		Dispatcher::i()->output .= $stringTable;
+		\IPS\cms\Databases\Dispatcher::i()->output .= $stringTable;
 
-		Dispatcher::i()->output .= \IPS\cms\Theme::i()->getTemplate( $category->_template_listing, 'cms', 'database' )->categoryFooter( $category, $stringTable, static::$activeFilters );
+		\IPS\cms\Databases\Dispatcher::i()->output .= \IPS\cms\Theme::i()->getTemplate( $category->_template_listing, 'cms', 'database' )->categoryFooter( $category, $stringTable, static::$activeFilters );
 		
 		/* Set default search */
 		if ( ! $database->search )
 		{
-			Output::i()->defaultSearchOption = array( 'all', 'search_everything' );
+			\IPS\Output::i()->defaultSearchOption = array( 'all', 'search_everything' );
 		}
 		else
 		{
-			$type = mb_strtolower( str_replace( '\\', '_', mb_substr( $recordsClass, 4 ) ) );
-			Output::i()->defaultSearchOption = array( $type, "{$type}_pl" );
+			$type = mb_strtolower( str_replace( '\\', '_', mb_substr( $RecordsClass, 4 ) ) );
+			\IPS\Output::i()->defaultSearchOption = array( $type, "{$type}_pl" );
 		}
 
 		$titleSuffix = $database->use_categories ? $category->_title . ' - ' . $category->pageTitle() : $category->pageTitle();
 		
 		if( ( $category->hasChildren() AND $category->show_records ) OR ! $category->hasChildren() )
 		{
-			Output::i()->title = ( $table->page > 1 ) ? Member::loggedIn()->language()->addToStack( 'title_with_page_number', FALSE, array( 'sprintf' => array( $titleSuffix, $table->page ) ) ) : $titleSuffix;
+			\IPS\Output::i()->title = ( $table->page > 1 ) ? \IPS\Member::loggedIn()->language()->addToStack( 'title_with_page_number', FALSE, array( 'sprintf' => array( $titleSuffix, $table->page ) ) ) : $titleSuffix;
 		}
 		else
 		{
-			Output::i()->title = $titleSuffix;
+			\IPS\Output::i()->title = $titleSuffix;
+		}
+	}
+
+	/**
+	 * Show Club Header
+	 *
+	 * @param \IPS\cms\Categories $category
+	 * @return void
+	 */
+	protected function showClubHeader( \IPS\cms\Categories $category )
+	{
+		if ( $club = $category->_club )
+		{
+			\IPS\Output::i()->sidebar['contextual'] = '';
+
+			/* Club info in sidebar */
+			if ( \IPS\Settings::i()->clubs_header == 'sidebar' )
+			{
+				\IPS\Output::i()->sidebar['enabled'] = true;
+				\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'clubs', 'core', 'front' )->header( $club, $category, 'sidebar' );
+			}
+			else
+			{
+				\IPS\cms\Databases\Dispatcher::i()->output .= \IPS\Theme::i()->getTemplate( 'clubs', 'core', 'front' )->header( $club, $category, 'full' );
+			}
+
+			if( ( \IPS\GeoLocation::enabled() and \IPS\Settings::i()->clubs_locations AND $location = $club->location() ) )
+			{
+				\IPS\Output::i()->sidebar['enabled'] = true;
+				\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'clubs', 'core', 'front' )->clubLocationBox( $club, $location );
+			}
+
+			$club->setBreadcrumbs( $category );
 		}
 	}
 	
@@ -738,27 +775,23 @@ class category extends Controller
 	 *
 	 * @return	void
 	 */
-	public function form() : void
+	public function form()
 	{
-		Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_records.js', 'cms' ) );
+		\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_records.js', 'cms' ) );
 
-		/* @var Categories $categoryClass
-		 * @var Records $recordClass
-		 * @var Fields $fieldsClass
-		 */
-		$database		= Databases::load( Dispatcher::i()->databaseId );
-		$recordClass	= '\IPS\cms\Records' . Dispatcher::i()->databaseId;
-		$categoryClass	= '\IPS\cms\Categories' . Dispatcher::i()->databaseId;
-		$category		= $categoryClass::loadAndCheckPerms( Dispatcher::i()->categoryId );
-		$fieldsClass	= '\IPS\cms\Fields' . Dispatcher::i()->databaseId;
-		$title			= Member::loggedIn()->language()->addToStack( 'content_record_form_new_record', FALSE, array( 'sprintf' => array( $database->recordWord( 1, TRUE ) ) ) );
+		$database		= \IPS\cms\Databases::load( \IPS\cms\Databases\Dispatcher::i()->databaseId );
+		$recordClass	= '\IPS\cms\Records' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
+		$categoryClass	= '\IPS\cms\Categories' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
+		$category		= $categoryClass::loadAndCheckPerms( \IPS\cms\Databases\Dispatcher::i()->categoryId );
+		$fieldsClass	= '\IPS\cms\Fields' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
+		$title			= \IPS\Member::loggedIn()->language()->addToStack( 'content_record_form_new_record', FALSE, array( 'sprintf' => array( $database->recordWord( 1, TRUE ) ) ) );
 
 		$form = $recordClass::create( $category );
-		$form->class = 'ipsForm--vertical ipsForm--database-category';
+		$form->class = 'ipsForm_vertical';
 	
 		$hasModOptions = FALSE;
 		
-		$canHide = ( Member::loggedIn()->group['g_hide_own_posts'] == '1' or in_array( 'IPS\cms\Records' . Dispatcher::i()->databaseId, explode( ',', Member::loggedIn()->group['g_hide_own_posts'] ) ) );
+		$canHide = ( \IPS\Member::loggedIn()->group['g_hide_own_posts'] == '1' or \in_array( 'IPS\cms\Records' . \IPS\cms\Databases\Dispatcher::i()->databaseId, explode( ',', \IPS\Member::loggedIn()->group['g_hide_own_posts'] ) ) );
 		if ( $recordClass::modPermission( 'lock', NULL, $category ) or
 			 $recordClass::modPermission( 'pin', NULL, $category ) or
 			 $canHide or
@@ -766,17 +799,10 @@ class category extends Controller
 			 $fieldsClass::fixedFieldFormShow( 'record_allow_comments' ) or
 			 $fieldsClass::fixedFieldFormShow( 'record_expiry_date' ) or
 			 $fieldsClass::fixedFieldFormShow( 'record_comment_cutoff' ) or
-			 Member::loggedIn()->modPermission('can_content_edit_meta_tags') )
+			 \IPS\Member::loggedIn()->modPermission('can_content_edit_meta_tags') )
 		{
 			$hasModOptions = TRUE;
 		}
-
-		$this->showClubHeader( $category );
-		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->output = $form->customTemplate( array( \IPS\cms\Theme::i()->getTemplate( $database->template_form, 'cms', 'database' ), 'recordForm' ), NULL, $category, $database, Page::$currentPage, $title, $hasModOptions );
-		Dispatcher::i()->output .= Output::i()->output;
-		Output::i()->title = Member::loggedIn()->language()->addToStack( $title );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'records/form.css', 'cms', 'front' ) );
 
 		try
 		{
@@ -784,14 +810,23 @@ class category extends Controller
 			{
 				foreach( $category->parents() AS $parent )
 				{
-					Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+					\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 				}
-				Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
 			}
 		}
-		catch( Exception $e ) {}
-	
-		Output::i()->breadcrumb[] = array( NULL, $title );
+		catch( \Exception $e ) {}
+
+		\IPS\Output::i()->breadcrumb[] = array( NULL, $title );
+
+		$this->showClubHeader( $category );
+		\IPS\Output::i()->allowDefaultWidgets = FALSE;
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\cms\Pages\Page::$currentPage->getWidgets();
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\cms\Theme::i()->getTemplate( $database->template_form, 'cms', 'database' ), 'recordForm' ), NULL, $category, $database, \IPS\cms\Pages\Page::$currentPage, $title, $hasModOptions );
+		\IPS\cms\Databases\Dispatcher::i()->output .= \IPS\Output::i()->output;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( $title );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'records/form.css', 'cms', 'front' ) );
 	}
 	
 	/**
@@ -799,52 +834,21 @@ class category extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function markRead() : void
+	protected function markRead()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			/* @var Categories $meowBreed */
-			$meowBreed = '\IPS\cms\Categories' . Dispatcher::i()->databaseId;
-			$meow      = $meowBreed::load( Dispatcher::i()->categoryId );
-			Records::markContainerRead( $meow );
-			Output::i()->redirect( $meow->url() );
+			$meowBreed = '\IPS\cms\Categories' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
+			$meow      = $meowBreed::load( \IPS\cms\Databases\Dispatcher::i()->categoryId );
+			\IPS\cms\Records::markContainerRead( $meow );
+			\IPS\Output::i()->redirect( $meow->url() );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'module_no_permission', '2T254/3', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T254/3', 403, '' );
 		}
 	}
 
-	/**
-	 * Show Club header
-	 *
-	 * @param Categories $category
-	 * @return void
-	 */
-	protected function showClubHeader( Categories $category ) : void
-	{
-		if ( $club = $category->_club )
-		{
-			Output::i()->sidebar['contextual'] = '';
-
-			/* Club info in sidebar */
-			if ( Settings::i()->clubs_header == 'sidebar' )
-			{
-				Output::i()->sidebar['enabled'] = true;
-				Output::i()->sidebar['contextual'] .= Theme::i()->getTemplate( 'clubs', 'core', 'front' )->header( $club, $category, 'sidebar' );
-			}
-			else
-			{
-				Dispatcher::i()->output .= Theme::i()->getTemplate( 'clubs', 'core', 'front' )->header( $club, $category, 'full' );
-			}
-
-			if( ( GeoLocation::enabled() and Settings::i()->clubs_locations AND $location = $club->location() ) )
-			{
-				Output::i()->sidebar['enabled'] = true;
-				Output::i()->sidebar['contextual'] .= Theme::i()->getTemplate( 'clubs', 'core', 'front' )->clubLocationBox( $club, $location );
-			}
-		}
-	}
 }

@@ -12,31 +12,9 @@
 namespace IPS\convert\Library;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ErrorException;
-use Exception;
-use IPS\blog\Blog as BlogClass;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Club;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -44,12 +22,12 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * Invision Blog Converter
  * @note	We must extend the Core Library here so we can access methods like convertAttachment, convertFollow, etc
  */
-class Blog extends Core
+class _Blog extends Core
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $app = 'blog';
+	public $app = 'blog';
 
 	/**
 	 * Returns an array of items that we can convert, including the amount of rows stored in the Community Suite as well as the recommend value of rows to convert per cycle
@@ -57,7 +35,7 @@ class Blog extends Core
 	 * @param	bool	$rowCounts		enable row counts
 	 * @return	array
 	 */
-	public function menuRows( bool $rowCounts=FALSE ): array
+	public function menuRows( $rowCounts=FALSE )
 	{
 		$return		= array();
 		$extraRows 	= $this->software->extraMenuRows();
@@ -70,7 +48,7 @@ class Blog extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_blog_categories',
 						'step_method'		=> 'convertBlogCategories',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'blog_categories' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'blog_categories' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -82,7 +60,7 @@ class Blog extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_blogs',
 						'step_method'		=> 'convertBlogs',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'blog_blogs' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'blog_blogs' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertBlogCategories' ),
@@ -94,7 +72,7 @@ class Blog extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_blog_entries',
 						'step_method'		=> 'convertBlogEntries',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'blog_entries' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'blog_entries' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertBlogs', 'convertBlogEntryCategories' ),
@@ -106,7 +84,7 @@ class Blog extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_blog_entry_categories',
 						'step_method'		=> 'convertBlogEntryCategories',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'blog_entry_categories' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'blog_entry_categories' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -118,7 +96,7 @@ class Blog extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_blog_comments',
 						'step_method'		=> 'convertBlogComments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'blog_comments' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'blog_comments' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertBlogEntries' ),
@@ -130,7 +108,7 @@ class Blog extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_blog_rss_import',
 						'step_method'		=> 'convertBlogRssImport',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'blog_rss_import' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'blog_rss_import' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertBlogs' ),
@@ -142,7 +120,7 @@ class Blog extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_blogs',
 						'step_method'		=> 'convertClubBlogs',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'blog_blogs', array( "blog_club_id IS NOT NULL" ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'blog_blogs', array( "blog_club_id IS NOT NULL" ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubs' ),
@@ -154,7 +132,7 @@ class Blog extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_blog_entries',
 						'step_method'		=> 'convertClubBlogEntries',
-						'ips_rows'			=> Db::i()->select( 'SUM(blog_entries)', 'blog_blogs', array( "blog_club_id IS NOT NULL" ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'SUM(blog_entries)', 'blog_blogs', array( "blog_club_id IS NOT NULL" ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubBlogs' ),
@@ -167,7 +145,7 @@ class Blog extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_blog_comments',
 						'step_method'		=> 'convertClubBlogComments',
-						'ips_rows'			=> Db::i()->select( 'SUM(blog_comments)', 'blog_blogs', array( "blog_club_id IS NOT NULL" ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'SUM(blog_comments)', 'blog_blogs', array( "blog_club_id IS NOT NULL" ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubBlogEntries' ),
@@ -180,7 +158,7 @@ class Blog extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_blog_attachments',
 						'step_method'		=> 'convertAttachments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( 'location_key=? AND id1<>? AND id2 IS NULL', 'blog_Entries', 0 ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( 'location_key=? AND id1<>? AND id2 IS NULL', 'blog_Entries', 0 ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 10,
 						'dependencies'		=> array( 'convertBlogEntries', 'convertBlogComments' ),
@@ -214,12 +192,11 @@ class Blog extends Core
 	 * @param	string	$method	Method we are truncating
 	 * @return	array
 	 */
-	protected function truncate( string $method ) : array
+	protected function truncate( $method )
 	{
 		$return		= array();
-		$classname	= get_class( $this->software );
+		$classname	= \get_class( $this->software );
 
-		/* @var Software $classname */
 		if( $classname::canConvert() === NULL )
 		{
 			return array();
@@ -255,7 +232,8 @@ class Blog extends Core
 					break;
 				
 				case 'convertAttachments':
-					$return['convertAttachments']			= array( 'core_attachments' => array( 'attach_id IN ( ' . Db::i()->select( 'attachment_id', 'core_attachments_map', array( "location_key=?", 'blog_Entries' ) ) . ')' ),
+					$return['convertAttachments']			= array(
+						'core_attachments'		=> \IPS\Db::i()->in( 'attach_id', (string) \IPS\Db::i()->select( 'attachment_id', 'core_attachments_map', array( "location_key=?", 'blog_Entries' ) ) ),
 						'core_attachments_map'	=> array( "location_key=?", 'blog_Entries' )
 					);
 					break;
@@ -265,11 +243,11 @@ class Blog extends Core
 					break;
 
 				case 'convertClubBlogEntries':
-					$return['convertClubBlogEntries'] = array( 'blog_entries' => array( 'entry_id IN ( ' . Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_blog_entries' AND app={$this->software->app->app_id}" ) ) . ')' ) );
+					$return['convertClubBlogEntries'] = array( 'blog_entries' => array( 'entry_id IN ( ' . (string) \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_blog_entries' AND app={$this->software->app->app_id}" ) ) . ')' ) );
 					break;
 
 				case 'convertClubBlogComments':
-					$return['convertClubBlogComments'] = array( 'blog_comments' => array( 'comment_id IN ( ' . Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_blog_comments' AND app={$this->software->app->app_id}" ) ) . ')' ) );
+					$return['convertClubBlogComments'] = array( 'blog_comments' => array( 'comment_id IN ( ' . (string) \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_blog_comments' AND app={$this->software->app->app_id}" ) ) . ')' ) );
 					break;
 			}
 		}
@@ -296,15 +274,15 @@ class Blog extends Core
 	 *
 	 * @param	array				$info			Array of blog information
 	 * @param	array|NULL			$socialgroup	Array of data to be stored in core_sys_social_groups and core_sys_social_group_members
-	 * @param	string|NULL|bool	$filepath		URL/Path to cover photo, NULL to use raw file data, or FALSE to not convert
+	 * @param	string|NULL|boolean	$filepath		URL/Path to cover photo, NULL to use raw file data, or FALSE to not convert
 	 * @param	string|NULL			$filedata		If $filepath is NULL, this should contain the raw contents of the cover photo
-	 * @return	int|bool		The ID of the inserted blog, or FALSE on failure.
+	 * @return	integer|boolean		The ID of the inserted blog, or FALSE on failure.
 	 */
-	public function convertBlog( array $info, ?array $socialgroup=NULL, string|null|bool $filepath=FALSE, ?string $filedata=NULL ) : bool|int
+	public function convertBlog( array $info, $socialgroup=NULL, $filepath=FALSE, $filedata=NULL )
 	{
 		if ( !isset( $info['blog_id'] ) )
 		{
-			$this->software->app->log( 'blog_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'blog_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -314,7 +292,7 @@ class Blog extends Core
 			{
 				$info['blog_member_id'] = $this->software->app->getLink( $info['blog_member_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['blog_member_id'] = 0;
 			}
@@ -356,12 +334,12 @@ class Blog extends Core
 		
 		if ( isset( $info['blog_settings'] ) )
 		{
-			if ( !is_array( $info['blog_settings'] ) )
+			if ( !\is_array( $info['blog_settings'] ) )
 			{
 				$info['blog_settings'] = json_decode( $info['blog_settings'], TRUE );
 			}
 			
-			if ( !is_null( $info['blog_settings'] ) )
+			if ( !\is_null( $info['blog_settings'] ) )
 			{
 				$newSettings = array();
 				
@@ -402,7 +380,7 @@ class Blog extends Core
 		/* Name and Description */
 		if ( !isset( $info['blog_name'] ) )
 		{
-			$owner = Member::load( $info['blog_member_id'] );
+			$owner = \IPS\Member::load( $info['blog_member_id'] );
 			
 			if ( $owner->member_id )
 			{
@@ -419,7 +397,7 @@ class Blog extends Core
 			unset( $info['blog_name'] );
 		}
 		
-		$info['blog_seo_name'] = Url::seoTitle( $name );
+		$info['blog_seo_name'] = \IPS\Http\Url::seoTitle( $name );
 		
 		if ( isset( $info['blog_description'] ) )
 		{
@@ -433,13 +411,13 @@ class Blog extends Core
 		
 		if ( isset( $info['blog_groupblog_ids'] ) )
 		{
-			if ( !is_array( $info['blog_groupblog_ids'] ) )
+			if ( !\is_array( $info['blog_groupblog_ids'] ) )
 			{
 				$info['blog_groupblog_ids'] = explode( ',', $info['blog_groupblog_ids'] );
 			}
 			
 			$newGroups = array();
-			if ( count( $info['blog_groupblog_ids'] ) )
+			if ( \count( $info['blog_groupblog_ids'] ) )
 			{
 				foreach( $info['blog_groupblog_ids'] AS $group )
 				{
@@ -447,14 +425,14 @@ class Blog extends Core
 					{
 						$newGroups[] = $this->software->app->getLink( $group, 'core_groups', TRUE );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						continue;
 					}
 				}
 			}
 			
-			if ( count( $newGroups ) )
+			if ( \count( $newGroups ) )
 			{
 				$info['blog_groupblog_ids'] = implode( ',', $newGroups );
 			}
@@ -470,7 +448,7 @@ class Blog extends Core
 		
 		if ( isset( $info['blog_last_edate'] ) )
 		{
-			if ( $info['blog_last_edate'] instanceof DateTime )
+			if ( $info['blog_last_edate'] instanceof \IPS\DateTime )
 			{
 				$info['blog_last_edate'] = $info['blog_last_edate']->getTimestamp();
 			}
@@ -498,9 +476,9 @@ class Blog extends Core
 		/* Well update this later if we need too */
 		$info['blog_social_group'] = NULL;
 		
-		if ( is_array( $socialgroup ) )
+		if ( !\is_null( $socialgroup ) AND \is_array( $socialgroup ) )
 		{
-			$socialGroupId = Db::i()->insert( 'core_sys_social_groups', array( 'owner_id' => $info['blog_member_id'] ) );
+			$socialGroupId = \IPS\Db::i()->insert( 'core_sys_social_groups', array( 'owner_id' => $info['blog_member_id'] ) );
 			$members	= array();
 			$members[]	= array( 'group_id' => $socialGroupId, 'member_id' => $info['blog_member_id'] );
 			foreach( $socialgroup['members'] AS $member )
@@ -509,31 +487,36 @@ class Blog extends Core
 				{
 					$members[] = array( 'group_id' => $socialGroupId, 'member_id' => $this->software->app->getLink( $member, 'core_members', TRUE ) );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					continue;
 				}
 			}
-			Db::i()->insert( 'core_sys_social_group_members', $members );
+			\IPS\Db::i()->insert( 'core_sys_social_group_members', $members );
 			
 			$info['blog_social_group'] = $socialGroupId;
 		}
 		
 		/* And now cover photo */
-		if ( isset( $info['blog_cover_photo'] ) AND ( !is_null( $filedata ) OR !is_null( $filepath ) ) )
+		if ( isset( $info['blog_cover_photo'] ) AND ( !\is_null( $filedata ) OR !\is_null( $filepath ) ) )
 		{
 			try
 			{
-				if ( is_null( $filedata ) AND !is_null( $filepath ) )
+				if ( \is_null( $filedata ) AND !\is_null( $filepath ) )
 				{
 					$filedata = file_get_contents( $filepath );
 				}
 				
-				$file = File::create( 'blog_Blogs', $info['blog_cover_photo'], $filedata );
+				$file = \IPS\File::create( 'blog_Blogs', $info['blog_cover_photo'], $filedata );
 				$info['blog_cover_photo']			= (string) $file;
 				$info['blog_cover_photo_offset']	= 0;
 			}
-			catch( Exception|ErrorException $e )
+			catch( \Exception $e )
+			{
+				$info['blog_cover_photo']			= NULL;
+				$info['blog_cover_photo_offset']	= NULL;
+			}
+			catch( \ErrorException $e )
 			{
 				$info['blog_cover_photo']			= NULL;
 				$info['blog_cover_photo_offset']	= NULL;
@@ -551,7 +534,7 @@ class Blog extends Core
 			{
 				$info['blog_club_id'] = $this->software->app->getLink( $info['blog_club_id'], 'core_clubs', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['blog_club_id'] = NULL;
 			}
@@ -567,7 +550,7 @@ class Blog extends Core
 			{
 				$info['blog_category_id'] = $this->software->app->getLink( $info['blog_category_id'], 'blog_categories' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['blog_category_id'] = $this->_getOrphanedBlogCategory();
 			}
@@ -580,22 +563,22 @@ class Blog extends Core
 		$id = $info['blog_id'];
 		unset( $info['blog_id'] );
 		
-		$inserted_id = Db::i()->insert( 'blog_blogs', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'blog_blogs', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'blog_blogs' );
 		
-		Lang::saveCustom( 'blog', "blogs_blog_{$inserted_id}", $name );
-		Lang::saveCustom( 'blog', "blogs_blog_{$inserted_id}_desc", $desc );
+		\IPS\Lang::saveCustom( 'blog', "blogs_blog_{$inserted_id}", $name );
+		\IPS\Lang::saveCustom( 'blog', "blogs_blog_{$inserted_id}_desc", $desc );
 		
 		if ( $info['blog_club_id'] )
 		{
-			Db::i()->insert( 'core_clubs_node_map', array(
+			\IPS\Db::i()->insert( 'core_clubs_node_map', array(
 				'club_id'		=> $info['blog_club_id'],
 				'node_class'	=> "IPS\\blog\\Blog",
 				'node_id'		=> $inserted_id,
 				'name'			=> $name
 			) );
-
-			BlogClass::load( $inserted_id )->setPermissionsToClub( Club::load( $info['blog_club_id'] ) );
+			
+			\IPS\blog\Blog::load( $inserted_id )->setPermissionsToClub( \IPS\Member\Club::load( $info['blog_club_id'] ) );
 		}
 		
 		return $inserted_id;
@@ -605,20 +588,20 @@ class Blog extends Core
 	 * Convert a Blog Category
 	 *
 	 * @param	array				$info			Array of blog information
-	 * @return	int|bool						The ID of the inserted category, or FALSE on failure.
+	 * @return	integer|boolean						The ID of the inserted category, or FALSE on failure.
 	 */
-	public function convertBlogCategory( array $info ) : bool|int
+	public function convertBlogCategory( array $info )
 	{
 		if ( !isset( $info['category_id'] ) )
 		{
-			$this->software->app->log( 'blog_category_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'blog_category_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['category_name'] ) )
 		{
 			$name = "Converted Category {$info['category_id']}";
-			$this->software->app->log( 'blog_category_missing_name', __METHOD__, App::LOG_WARNING, $info['category_id'] );
+			$this->software->app->log( 'blog_category_missing_name', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['category_id'] );
 		}
 		else
 		{
@@ -626,7 +609,7 @@ class Blog extends Core
 			unset( $info['category_name'] );
 		}
 
-		$info['category_seo_name'] = Url::seoTitle( $name );
+		$info['category_seo_name'] = \IPS\Http\Url::seoTitle( $name );
 
 		if ( !array_key_exists( 'category_description', $info ) )
 		{
@@ -643,9 +626,9 @@ class Blog extends Core
 		{
 			try
 			{
-				$position = Db::i()->select( 'MAX(category_position)', 'blog_categories' )->first();
+				$position = \IPS\Db::i()->select( 'MAX(category_position)', 'blog_categories' )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$position = 0;
 			}
@@ -659,7 +642,7 @@ class Blog extends Core
 			{
 				$info['category_parent'] = $this->software->app->getLink( $info['category_parent'], 'blog_categories' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['category_conv_parent'] = $info['category_parent'];
 			}
@@ -672,13 +655,13 @@ class Blog extends Core
 		$id = $info['category_id'];
 		unset( $info['category_id'] );
 
-		$insertedId = Db::i()->insert( 'blog_categories', $info );
+		$insertedId = \IPS\Db::i()->insert( 'blog_categories', $info );
 		$this->software->app->addLink( $insertedId, $id, 'blog_categories' );
 
-		Lang::saveCustom( 'blogs', "blog_category_{$insertedId}", $name );
-		Lang::saveCustom( 'blogs', "blog_category_{$insertedId}_desc", $desc );
+		\IPS\Lang::saveCustom( 'blogs', "blog_category_{$insertedId}", $name );
+		\IPS\Lang::saveCustom( 'blogs', "blog_category_{$insertedId}_desc", $desc );
 
-		Db::i()->update( 'blog_categories', array( "category_parent" => $insertedId ), array( "category_conv_parent=?", $id ) );
+		\IPS\Db::i()->update( 'blog_categories', array( "category_parent" => $insertedId ), array( "category_conv_parent=?", $id ) );
 
 		return $insertedId;
 	}
@@ -689,13 +672,13 @@ class Blog extends Core
 	 * @param	array				$info		Array of entry information
 	 * @param	string|NULL			$filepath	Path to the Cover Photo, or NULL
 	 * @param	string|NULL			$filedata	Binary data for cover photo, or NULL
-	 * @return	int|bool		The ID of the inserted entry, or FALSE on failure
+	 * @return	integer|boolean		The ID of the inserted entry, or FALSE on failure
 	 */
-	public function convertBlogEntry( array $info, ?string $filepath=NULL, ?string $filedata=NULL ) : bool|int
+	public function convertBlogEntry( array $info, $filepath=NULL, $filedata=NULL )
 	{
 		if ( !isset( $info['entry_id'] ) )
 		{
-			$this->software->app->log( 'blog_entry_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'blog_entry_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -705,9 +688,9 @@ class Blog extends Core
 			{
 				$info['entry_blog_id'] = $this->software->app->getLink( $info['entry_blog_id'], 'blog_blogs' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'blog_entry_missing_blog', __METHOD__, App::LOG_WARNING, $info['entry_id'] );
+				$this->software->app->log( 'blog_entry_missing_blog', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['entry_id'] );
 				return FALSE;
 			}
 		}
@@ -715,14 +698,14 @@ class Blog extends Core
 		if ( !isset( $info['entry_name'] ) )
 		{
 			$info['entry_name'] = "Untitled Blog Entry {$info['entry_id']}";
-			$this->software->app->log( 'blog_entry_missing_name', __METHOD__, App::LOG_NOTICE, $info['entry_id'] );
+			$this->software->app->log( 'blog_entry_missing_name', __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['entry_id'] );
 		}
 		
-		$info['entry_name_seo'] = Url::seoTitle( $info['entry_name'] );
+		$info['entry_name_seo'] = \IPS\Http\Url::seoTitle( $info['entry_name'] );
 		
 		if ( empty( $info['entry_content'] ) )
 		{
-			$this->software->app->log( 'blog_entry_missing_content', __METHOD__, App::LOG_WARNING, $info['entry_content'] );
+			$this->software->app->log( 'blog_entry_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['entry_content'] );
 			return FALSE;
 		}
 		
@@ -732,7 +715,7 @@ class Blog extends Core
 			{
 				$info['entry_author_id'] = $this->software->app->getLink( $info['entry_author_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['entry_author_id'] = 0;
 			}
@@ -744,7 +727,7 @@ class Blog extends Core
 		
 		if ( !isset( $info['entry_author_name'] ) )
 		{
-			$author = Member::load( $info['entry_author_id'] );
+			$author = \IPS\Member::load( $info['entry_author_id'] );
 			
 			if ( $author->member_id )
 			{
@@ -758,7 +741,7 @@ class Blog extends Core
 		
 		if ( isset( $info['entry_date'] ) )
 		{
-			if ( $info['entry_date'] instanceof DateTime )
+			if ( $info['entry_date'] instanceof \IPS\DateTime )
 			{
 				$info['entry_date'] = $info['entry_date']->getTimestamp();
 			}
@@ -768,7 +751,7 @@ class Blog extends Core
 			$info['entry_date'] = time();
 		}
 		
-		if ( !isset( $info['entry_status'] ) OR !in_array( $info['entry_status'], array( 'published', 'draft' ) ) )
+		if ( !isset( $info['entry_status'] ) OR !\in_array( $info['entry_status'], array( 'published', 'draft' ) ) )
 		{
 			$info['entry_status'] = 'published';
 		}
@@ -788,7 +771,7 @@ class Blog extends Core
 			{
 				$info['entry_last_comment_mid'] = $this->software->app->getLink( $info['entry_last_comment_mid'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['entry_last_comment_mid'] = 0;
 			}
@@ -807,7 +790,7 @@ class Blog extends Core
 		
 		if ( isset( $info['entry_edit_time'] ) )
 		{
-			if ( $info['entry_edit_time'] instanceof DateTime )
+			if ( $info['entry_edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['entry_edit_time'] = $info['entry_edit_time']->getTimestamp();
 			}
@@ -834,7 +817,7 @@ class Blog extends Core
 		
 		if ( isset( $info['entry_last_update'] ) )
 		{
-			if ( $info['entry_last_update'] instanceof DateTime )
+			if ( $info['entry_last_update'] instanceof \IPS\DateTime )
 			{
 				$info['entry_last_update'] = $info['entry_last_update']->getTimestamp();
 			}
@@ -850,7 +833,7 @@ class Blog extends Core
 			{
 				$info['entry_gallery_album'] = $this->software->app->getSiblingLink( $info['entry_gallery_album'], 'gallery_albums', 'gallery' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['entry_gallery_album'] = NULL;
 			}
@@ -860,7 +843,7 @@ class Blog extends Core
 			$info['entry_gallery_album'] = NULL;
 		}
 		
-		if ( isset( $info['entry_poll_state'] ) AND is_array( $info['entry_poll_state'] ) )
+		if ( isset( $info['entry_poll_state'] ) AND \is_array( $info['entry_poll_state'] ) )
 		{
 			if ( $poll = $this->convertPoll( $info['entry_poll_state']['poll_data'], $info['entry_poll_state']['vote_data'] ) )
 			{
@@ -878,7 +861,7 @@ class Blog extends Core
 		
 		if ( isset( $info['entry_publish_date'] ) )
 		{
-			if ( $info['entry_publish_date'] instanceof DateTime )
+			if ( $info['entry_publish_date'] instanceof \IPS\DateTime )
 			{
 				$info['entry_publish_date'] = $info['entry_publish_date']->getTimestamp();
 			}
@@ -895,20 +878,20 @@ class Blog extends Core
 			$info['entry_ip_address'] = '127.0.0.1';
 		}
 		
-		if ( isset( $info['entry_cover_photo'] ) AND ( !is_null( $filepath ) OR !is_null( $filedata ) ) )
+		if ( isset( $info['entry_cover_photo'] ) AND ( !\is_null( $filepath ) OR !\is_null( $filedata ) ) )
 		{
 			try
 			{
-				if ( is_null( $filedata ) AND !is_null( $filepath ) )
+				if ( \is_null( $filedata ) AND !\is_null( $filepath ) )
 				{
 					$filedata = file_get_contents( $filepath );
 				}
 				
-				$file = File::create( 'blog_Entries', $info['entry_cover_photo'], $filedata );
+				$file = \IPS\File::create( 'blog_Entries', $info['entry_cover_photo'], $filedata );
 				$info['entry_cover_photo']			= (string) $file;
 				$info['entry_cover_photo_offset']	= 0;
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				$info['entry_cover_photo']			= NULL;
 				$info['entry_cover_photo_offset']	= NULL;
@@ -926,7 +909,7 @@ class Blog extends Core
 			{
 				$info['entry_category_id'] = $this->software->app->getLink( $info['entry_category_id'], 'blog_entry_categories' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['entry_category_id'] = NULL;
 			}
@@ -939,7 +922,7 @@ class Blog extends Core
 		$id = $info['entry_id'];
 		unset( $info['entry_id'] );
 		
-		$inserted_id = Db::i()->insert( 'blog_entries', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'blog_entries', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'blog_entries' );
 		
 		return $inserted_id;
@@ -949,47 +932,55 @@ class Blog extends Core
 	 * Convert a Blog Entry Category
 	 *
 	 * @param	array				$info			Array of blog information
-	 * @return	int|bool						The ID of the inserted category, or FALSE on failure.
+	 * @return	integer|boolean						The ID of the inserted category, or FALSE on failure.
 	 */
-	public function convertBlogEntryCategory( array $info ) : bool|int
+	public function convertBlogEntryCategory( array $info )
 	{
 		if ( !isset( $info['entry_category_id'] ) )
 		{
-			$this->software->app->log( 'blog_entry_category_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'blog_entry_category_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( !isset( $info['entry_category_blog_id'] ) )
 		{
-			$this->software->app->log( 'blog_entry_category_blog_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'blog_entry_category_blog_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
-		try
+		if ( isset( $info['entry_category_blog_id'] ) )
 		{
-			$info['entry_category_blog_id'] = $this->software->app->getLink( $info['entry_category_blog_id'], 'blog_blogs' );
+			try
+			{
+				$info['entry_category_blog_id'] = $this->software->app->getLink( $info['entry_category_blog_id'], 'blog_blogs' );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'blog_entry_category_missing_blog_id', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['entry_category_id'] );
+				return FALSE;
+			}
 		}
-		catch( OutOfRangeException $e )
+		else
 		{
-			$this->software->app->log( 'blog_entry_category_missing_blog_id', __METHOD__, App::LOG_WARNING, $info['entry_category_id'] );
+			$this->software->app->log( 'blog_entry_category_missing_blog_id', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['entry_category_id'] );
 			return FALSE;
 		}
 
 		if ( !isset( $info['entry_category_name'] ) )
 		{
 			$info['entry_category_name'] = "Converted Category {$info['entry_category_id']}";
-			$this->software->app->log( 'blog_entry_category_missing_name', __METHOD__, App::LOG_WARNING, $info['entry_category_id'] );
+			$this->software->app->log( 'blog_entry_category_missing_name', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['entry_category_id'] );
 		}
 
-		$info['entry_category_seo_name'] = Url::seoTitle( $info['entry_category_name'] );
+		$info['entry_category_seo_name'] = \IPS\Http\Url::seoTitle( $info['entry_category_name'] );
 
 		if ( !isset( $info['entry_category_position'] ) )
 		{
 			try
 			{
-				$position = Db::i()->select( 'MAX(entry_category_position)', 'blog_entry_categories', array( 'entry_category_blog_id=?', $info['entry_category_blog_id'] ) )->first();
+				$position = \IPS\Db::i()->select( 'MAX(entry_category_position)', 'blog_entry_categories', array( 'entry_category_blog_id=?', $info['entry_category_blog_id'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$position = 0;
 			}
@@ -1005,7 +996,7 @@ class Blog extends Core
 		$id = $info['entry_category_id'];
 		unset( $info['entry_category_id'] );
 
-		$insertedId = Db::i()->insert( 'blog_entry_categories', $info );
+		$insertedId = \IPS\Db::i()->insert( 'blog_entry_categories', $info );
 		$this->software->app->addLink( $insertedId, $id, 'blog_entry_categories' );
 
 		return $insertedId;
@@ -1015,13 +1006,13 @@ class Blog extends Core
 	 * Convert a blog comment
 	 *
 	 * @param	array				$info		Array of comment information
-	 * @return	int|bool		The ID of the inserted comment, or FALSE on failure.
+	 * @return	integer|boolean		The ID of the inserted comment, or FALSE on failure.
 	 */
-	public function convertBlogComment( array $info ) : bool|int
+	public function convertBlogComment( array $info )
 	{
 		if ( !isset( $info['comment_id'] ) )
 		{
-			$this->software->app->log( 'blog_comment_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'blog_comment_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -1031,21 +1022,21 @@ class Blog extends Core
 			{
 				$info['comment_entry_id'] = $this->software->app->getLink( $info['comment_entry_id'], 'blog_entries' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'blog_comment_missing_entry', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+				$this->software->app->log( 'blog_comment_missing_entry', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'blog_comment_missing_entry', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'blog_comment_missing_entry', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 		
 		if ( empty( $info['comment_text'] ) )
 		{
-			$this->software->app->log( 'blog_comment_missing_content', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'blog_comment_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 		
@@ -1055,7 +1046,7 @@ class Blog extends Core
 			{
 				$info['comment_member_id'] = $this->software->app->getLink( $info['comment_member_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['comment_member_id'] = 0;
 			}
@@ -1067,7 +1058,7 @@ class Blog extends Core
 		
 		if ( !isset( $info['comment_member_name'] ) )
 		{
-			$author = Member::load( $info['comment_member_id'] );
+			$author = \IPS\Member::load( $info['comment_member_id'] );
 			
 			if ( $author->member_id )
 			{
@@ -1086,7 +1077,7 @@ class Blog extends Core
 		
 		if ( isset( $info['comment_date'] ) )
 		{
-			if ( $info['comment_date'] instanceof DateTime )
+			if ( $info['comment_date'] instanceof \IPS\DateTime )
 			{
 				$info['comment_date'] = $info['comment_date']->getTimestamp();
 			}
@@ -1098,7 +1089,7 @@ class Blog extends Core
 		
 		if ( isset( $info['comment_edit_time'] ) )
 		{
-			if ( $info['comment_edit_time'] instanceof DateTime )
+			if ( $info['comment_edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['comment_edit_time'] = $info['comment_edit_time']->getTimestamp();
 			}
@@ -1126,7 +1117,7 @@ class Blog extends Core
 		$id = $info['comment_id'];
 		unset( $info['comment_id'] );
 		
-		$inserted_id = Db::i()->insert( 'blog_comments', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'blog_comments', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'blog_comments' );
 		
 		return $inserted_id;
@@ -1136,9 +1127,9 @@ class Blog extends Core
 	 * Convert a blog RSS import
 	 *
 	 * @param	array				$info		Array of RSS Import information
-	 * @return	int|bool		The ID of the inserted RSS import, or FALSE on failure
+	 * @return	integer|boolean		The ID of the inserted RSS import, or FALSE on failure
 	 */
-	public function convertBlogRssImport( array $info ) : bool|int
+	public function convertBlogRssImport( array $info )
 	{
 		$info['rss_import_class'] = 'IPS\\blogs\\Entry';
 
@@ -1153,13 +1144,13 @@ class Blog extends Core
 	 * @param	string|NULL			$filepath	URL/Path to attachment or NULL to use raw file data
 	 * @param	string|NULL			$filedata	If $filepath is NULL, this should contain the raw contents of the attachment
 	 * @param	string|NULL			$thumbnailpath	Path to thumbnail, or NULL
-	 * @return	int|bool		The ID of the inserted attachment, or FALSE on failure.
+	 * @return	integer|boolean		The ID of the inserted attachment, or FALSE on failure.
 	 */
-	public function convertAttachment( array $info=array(), array $map=array(), ?string $filepath = NULL, ?string $filedata = NULL, ?string $thumbnailpath = NULL ) : bool|int
+	public function convertAttachment( $info=array(), $map=array(), $filepath = NULL, $filedata = NULL, $thumbnailpath = NULL ) 
 	{
 		$map['id1_type']		= 'blog_entries';
 		$map['id1_from_parent']	= FALSE;
-		if ( !isset( $map['id2'] ) OR empty( $map['id2'] ) )
+		if ( !isset( $map['id2'] ) OR \is_null( $map['id2'] ) )
 		{
 			$map['location_key'] = 'blog_Entries';
 		}
@@ -1174,7 +1165,7 @@ class Blog extends Core
 		{
 			$map['id3_skip_link'] = true;
 		}
-
+		
 		return parent::convertAttachment( $info, $map, $filepath, $filedata, $thumbnailpath );
 	}
 
@@ -1182,9 +1173,9 @@ class Blog extends Core
 	 * Convert Club Blog
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly insertd blog, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly insertd blog, or FALSE on failure.
 	 */
-	public function convertClubBlog( array $info=array() ) : bool|int
+	public function convertClubBlog( $info=array() )
 	{
 		$insertedId = $this->convertBlog( $info );
 		if ( $insertedId )
@@ -1198,9 +1189,9 @@ class Blog extends Core
 	 * Convert a Club Blog Entry
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted entry, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted entry, or FALSE on failure.
 	 */
-	public function convertClubBlogEntry( array $info=array() ) : bool|int
+	public function convertClubBlogEntry( $info=array() )
 	{
 		$insertedId = $this->convertBlogEntry( $info );
 		if ( $insertedId )
@@ -1214,9 +1205,9 @@ class Blog extends Core
 	 * Convert a Club Blog Comment
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted comment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted comment, or FALSE on failure.
 	 */
-	public function convertClubBlogComment( array $info=array() ) : bool|int
+	public function convertClubBlogComment( $info=array() )
 	{
 		$insertedId = $this->convertBlogComment( $info );
 		if ( $insertedId )
@@ -1229,15 +1220,15 @@ class Blog extends Core
 	/**
 	 * Get Parent ID for Orphaned Blogs
 	 *
-	 * @return	int		The ID of the forum created for forums that do not have a parent forum.
+	 * @return	integer		The ID of the forum created for forums that do not have a parent forum.
 	 */
-	protected function _getOrphanedBlogCategory() : int
+	protected function _getOrphanedBlogCategory()
 	{
 		try
 		{
 			$id = $this->software->app->getLink( '__orphaned__', 'blog_categories' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			$id = $this->convertBlogCategory( array(
 				'category_id'		=> '__orphaned__',

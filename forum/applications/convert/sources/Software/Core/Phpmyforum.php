@@ -13,32 +13,23 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application\Module;
-use IPS\convert\Software;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PhpMyForum Core Converter
  */
-class Phpmyforum extends Software
+class _Phpmyforum extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "PhpMyForum";
@@ -47,9 +38,9 @@ class Phpmyforum extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "phpmyforum";
@@ -58,9 +49,9 @@ class Phpmyforum extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|NULL
+	 * @return	NULL
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return NULL;
 	}
@@ -68,26 +59,26 @@ class Phpmyforum extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
 		/* If we can't access profiles, don't bother trying to redirect */
-		if( !Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+		if( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 		{
 			return NULL;
 		}
 
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'profile.php' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'profile.php' ) !== FALSE )
 		{
 			try
 			{
-				$data = (string) $this->app->getLink( Request::i()->id, array( 'members', 'core_members' ) );
-				return Member::load( $data )->url();
+				$data = (string) $this->app->getLink( \IPS\Request::i()->id, array( 'members', 'core_members' ) );
+				return \IPS\Member::load( $data )->url();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

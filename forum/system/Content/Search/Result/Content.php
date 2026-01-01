@@ -11,67 +11,46 @@
 namespace IPS\Content\Search\Result;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Content\Comment;
-use IPS\Content\Search\Result;
-use IPS\Content\Search\SearchContent;
-use IPS\DateTime;
-use IPS\File;
-use IPS\Xml\Rss;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Search Result
  */
-class Content extends Result
+class _Content extends \IPS\Content\Search\Result
 {
 	/**
 	 * Index Data
 	 */
-	protected array $indexData;
+	protected $indexData;
 	
 	/**
 	 * Author Data
 	 */
-	protected array $authorData;
+	protected $authorData;
 	
 	/**
 	 * Item Data
 	 */
-	protected array $itemData;
+	protected $itemData;
 	
 	/**
 	 * Author Data
 	 */
-	protected array|null $containerData;
-
-	/**
-	 * Reputation Data
-	 */
-	protected array|null $reputationData;
+	protected $containerData;
 	
 	/**
 	 * Review Rating
 	 */
-	protected int|null $reviewRating;
+	protected $reviewRating;
 	
 	/**
 	 * If the user has posted in the item
 	 */
-	protected mixed $iPostedIn = array();
-	
-	/**
-	 * Reactions
-	 */
-	protected array $reactions;
+	protected $iPostedIn;
 	
 	/**
 	 * Constructor
@@ -86,10 +65,10 @@ class Content extends Result
 	 * @param	array		$reactions		Reaction Data
 	 * @return	void
 	 */
-	public function __construct( array $indexData, array $authorData, array $itemData, array|null $containerData, array $reputationData, int|null $reviewRating = NULL, bool $iPostedIn = FALSE, array $reactions=array() )
+	public function __construct( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating = NULL, $iPostedIn = FALSE, $reactions=array() )
 	{
-		$this->createdDate = DateTime::ts( $indexData['index_date_created'] );
-		$this->lastUpdatedDate = DateTime::ts( $indexData['index_date_updated'] );
+		$this->createdDate = \IPS\DateTime::ts( $indexData['index_date_created'] );
+		$this->lastUpdatedDate = \IPS\DateTime::ts( $indexData['index_date_updated'] );
 		$this->indexData = $indexData;
 		$this->authorData = $authorData;
 		$this->itemData = $itemData;
@@ -109,14 +88,10 @@ class Content extends Result
 	 * @param	array|NULL	$template	Optional custom template
 	 * @return	string
 	 */
-	public function html( string $view = 'expanded', bool $asItem = FALSE, bool $canIgnoreComments=FALSE, array|null $template=NULL ): string
+	public function html( $view = 'expanded', $asItem = FALSE, $canIgnoreComments=FALSE, $template=NULL )
 	{
-		if( $extension = SearchContent::extension( $this->indexData['index_class'] ) )
-		{
-			$searchResultTemplate = array( $extension, 'searchResult' );
-			return $searchResultTemplate( $this->indexData, $this->authorData, $this->itemData, $this->containerData, $this->reputationData, $this->reviewRating, $this->iPostedIn, $view, $asItem, $canIgnoreComments, $template, $this->reactions );
-		}
-		return "";
+		$searchResultTemplate = array( $this->indexData['index_class'], 'searchResult' );
+		return $searchResultTemplate( $this->indexData, $this->authorData, $this->itemData, $this->containerData, $this->reputationData, $this->reviewRating, $this->iPostedIn, $view, $asItem, $canIgnoreComments, $template, $this->reactions );
 	}
 	
 	/**
@@ -124,10 +99,8 @@ class Content extends Result
 	 *
 	 * @return array( 'indexData' => array() ... )
 	 */
-	public function asArray(): array
+	public function asArray()
 	{
-		$extension = SearchContent::extension( $this->indexData['index_class'] );
-
 		return array(
 			'indexData' => $this->indexData,
 			'authorData' => $this->authorData,
@@ -135,20 +108,17 @@ class Content extends Result
 			'containerData' => $this->containerData,
 			'reputationData' => $this->reputationData,
 			'reviewRating' => $this->reviewRating,
-			'iPostedIn' => $this->iPostedIn,
-			'template' => $extension ? $extension::searchResultBlock() : null,
-			'url' => $extension ? $extension::urlFromIndexData( $this->indexData, $this->itemData ) : null,
-			'searchResultClassName' => $extension ? $extension::$searchResultClassName : ''
+			'iPostedIn' => $this->iPostedIn
 		);
 	}
 	
 	/**
 	 * Add to RSS feed
 	 *
-	 * @param	Rss	$document	Document to add to
-	 * @return	void
+	 * @param	\IPS\Xml\Rss	$document	Document to add to
+	 * @return	string
 	 */
-	public function addToRssFeed( Rss $document ): void
+	public function addToRssFeed( \IPS\Xml\Rss $document )
 	{
 		try
 		{
@@ -161,19 +131,16 @@ class Content extends Result
 				$data = array_pop( $images );
 				$key = key( $data );
 
-				if( !empty( $data[ $key ] ) )
+				try
 				{
-					try
-					{
-						$enclosure = File::get( $key, $data[ $key ] );
-					}
-					catch( Exception ) { }
+					$enclosure = \IPS\File::get( $key, $data[ $key ] );
 				}
+				catch( \Exception $ex ) { }
 			}
 
-			$document->addItem( $object instanceof Comment ? $object->item()->mapped( 'title' ) : $object->mapped( 'title' ), $object->url(), Result::preDisplay( $this->indexData['index_content'] ), DateTime::ts( $this->indexData['index_date_created'] ), NULL, $enclosure );
+			$document->addItem( $object instanceof \IPS\Content\Comment ? $object->item()->searchIndexTitle() : $object->searchIndexTitle(), $object->url(), \IPS\Content\Search\Result::preDisplay( $this->indexData['index_content'] ), \IPS\DateTime::ts( $this->indexData['index_date_created'] ), NULL, $enclosure );
 		}
 		/* If the search result was orphaned, let us continue */
-		catch( OutOfRangeException ){}
+		catch( \OutOfRangeException $e ){}
 	}
 }

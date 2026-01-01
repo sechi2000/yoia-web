@@ -11,27 +11,24 @@
 
 namespace IPS\{app}\modules\{location}\{module};
 
-use IPS\Dispatcher\Controller;
-use function defined;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * {controller}
  */
-class {controller} extends Controller
+class _{controller} extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		{restriction}
 		parent::execute();
@@ -42,7 +39,7 @@ class {controller} extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		// This is the default method if no 'do' parameter is specified
 	}

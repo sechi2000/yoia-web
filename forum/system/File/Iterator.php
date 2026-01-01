@@ -11,51 +11,41 @@
 namespace IPS\File;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Countable;
-use Exception;
-use IPS\File;
-use IteratorIterator;
-use Traversable;
-use function defined;
-use function is_callable;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File IteratorIterator
  */
-class Iterator extends IteratorIterator implements Countable
+class _Iterator extends \IteratorIterator implements \Countable
 {
 	/**
 	 * @brief	Stroage Extension
 	 */
-	protected string|null $storageExtension = null;
+	protected $storageExtension;
 	
 	/**
 	 * @brief	URL Field
 	 */
-	protected $urlField = null;
+	protected $urlField;
 	
 	/**
 	 * @brief	URLs Only
 	 */
-	protected bool $fileUrlsOnly = false;
+	protected $fileUrlsOnly;
 	
 	/**
 	 * @brief	Used to restore 'real' names when filenames cleaned (eg adh1029_file.php back to fi^le.php)
 	 */
-	protected ?string $replaceNameField = null;
+	protected $replaceNameField;
 
 	/**
 	 * @brief	Used to pre-cache the filesize value if available
 	 */
-	protected ?string $fileSizeField = null;
+	protected $fileSizeField;
 
 	
 	/**
@@ -63,28 +53,28 @@ class Iterator extends IteratorIterator implements Countable
 	 *
 	 * @param	Traversable $iterator			The iterator
 	 * @param	string		$storageExtension	The storage extension
-	 * @param	string|callable|NULL	$urlField			If passed a string, will look for an element with that key in the data returned from the iterator
+	 * @param	string|NULL	$urlField			If passed a string, will look for an element with that key in the data returned from the iterator
 	 * @param	bool		$fileUrlsOnly		Only return the file URL instead of the file object
 	 * @param	string|NULL	$replaceNameField	If passed a string, it will replace the originalFilename with the data in the array. Used to restore 'real' names when filenames cleaned (eg adh1029_file.php back to fi^le.php)
-	 * @param 	string|null		$fileSizeField		Field to use to pre-cache the filesize
+	 * @param 	string		$fileSizeField		Field to use to pre-cache the filesize
 	 * @return	void
 	 */
-	public function __construct( Traversable $iterator, string $storageExtension, string|callable|null $urlField=NULL, bool $fileUrlsOnly=FALSE, ?string $replaceNameField=NULL, ?string $fileSizeField=NULL )
+	public function __construct( \Traversable $iterator, $storageExtension, $urlField=NULL, $fileUrlsOnly=FALSE, $replaceNameField=NULL, $fileSizeField=NULL )
 	{
 		$this->storageExtension = $storageExtension;
 		$this->urlField = $urlField;
 		$this->fileUrlsOnly = $fileUrlsOnly;
 		$this->replaceNameField = $replaceNameField;
 		$this->fileSizeField = $fileSizeField;
-		parent::__construct( $iterator );
+		return parent::__construct( $iterator );
 	}
 	
 	/**
 	 * Get current
 	 *
-	 * @return	File|string
+	 * @return	\IPS\File
 	 */
-	public function current() : File|string
+	public function current()
 	{
 		try
 		{
@@ -93,7 +83,7 @@ class Iterator extends IteratorIterator implements Countable
 			
 			if ( $this->urlField )
 			{
-				if ( !is_string( $this->urlField ) and is_callable( $this->urlField ) )
+				if ( !\is_string( $this->urlField ) and \is_callable( $this->urlField ) )
 				{
 					$urlFieldCallback = $this->urlField;
 					$urlField = $urlFieldCallback( $data );
@@ -105,7 +95,7 @@ class Iterator extends IteratorIterator implements Countable
 			}
 
 			$fileSize = ( $this->fileSizeField AND isset( $data[ $this->fileSizeField ] ) ) ? $data[ $this->fileSizeField ] : ( $this->fileSizeField === FALSE ? FALSE : NULL );
-			$obj = File::get( $this->storageExtension, $urlField ? $data[ $urlField ] : $data, $fileSize );
+			$obj = \IPS\File::get( $this->storageExtension, $urlField ? $data[ $urlField ] : $data, $fileSize );
 			
 			if ( $this->replaceNameField and ! empty( $data[ $this->replaceNameField ] ) )
 			{
@@ -114,7 +104,7 @@ class Iterator extends IteratorIterator implements Countable
 			
 			return ( $this->fileUrlsOnly ) ? (string) $obj->url : $obj;
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
 			$this->next();
 			return $this->current();
@@ -126,7 +116,7 @@ class Iterator extends IteratorIterator implements Countable
 	 *
 	 * @return	mixed
 	 */
-	public function data() : mixed
+	public function data()
 	{
 		return parent::current();
 	}
@@ -136,7 +126,7 @@ class Iterator extends IteratorIterator implements Countable
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
 		return $this->getInnerIterator()->count();
 	}

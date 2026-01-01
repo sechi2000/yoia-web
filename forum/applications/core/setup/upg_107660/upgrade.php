@@ -12,20 +12,16 @@
 namespace IPS\core\setup\upg_107660;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.7.9 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Update emoji cache
@@ -34,7 +30,7 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
+		\IPS\Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
 
 		return TRUE;
 	}

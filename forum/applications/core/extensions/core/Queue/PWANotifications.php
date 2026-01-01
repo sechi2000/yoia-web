@@ -12,32 +12,24 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Notification;
-use OutOfRangeException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class PWANotifications extends QueueAbstract
+class _PWANotifications
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		return $data;
 	}
@@ -50,7 +42,7 @@ class PWANotifications extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ): int
+	public function run( $data, $offset )
 	{
 		for ( $i = 0; $i < $offset; $i++ )
 		{
@@ -63,7 +55,7 @@ class PWANotifications extends QueueAbstract
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 		
-		Notification::sendPWANotifications( [ key( $data ) => $current ] );
+		\IPS\Notification::sendPWANotifications( [ key( $data ) => $current ] );
 		
 		return ++$offset;
 	}
@@ -74,13 +66,13 @@ class PWANotifications extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		return [
-			'text'		=> Member::loggedIn()->language()->addToStack('backgroundQueue_pwaNotifications'),
-			'complete'	=> round( 100 / count( $data ) * $offset, 2 ),
+			'text'		=> \IPS\Member::loggedIn()->language()->addToStack('backgroundQueue_pwaNotifications'),
+			'complete'	=> round( 100 / \count( $data ) * $offset, 2 ),
 		];
 	}
 
@@ -91,7 +83,7 @@ class PWANotifications extends QueueAbstract
 	 * @param	bool	$processed	Was anything processed or not? If preQueueData returns NULL, this will be FALSE.
 	 * @return	void
 	 */
-	public function postComplete( array $data, bool $processed = TRUE ) : void
+	public function postComplete( $data, $processed = TRUE )
 	{
 
 	}

@@ -10,6 +10,4 @@
 
 namespace IPS\Login\Handler\OAuth2;
 
-use Exception;
-
-class InitException extends Exception { }
+class _InitException extends \Exception { }

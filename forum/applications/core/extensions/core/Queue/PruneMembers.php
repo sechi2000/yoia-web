@@ -11,38 +11,25 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use OutOfBoundsException;
-use OutOfRangeException;
-use function count;
-use function defined;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Prune members
  */
-class PruneMembers extends QueueAbstract
+class _PruneMembers
 {
 
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		$data['count'] = $this->getQuery( 'COUNT(*)', $data )->first();
 
@@ -64,12 +51,12 @@ class PruneMembers extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		/* Skip accounts that we couldn't remove previously */
-		if( count( $data['skip_ids'] ) )
+		if( \count( $data['skip_ids'] ) )
 		{
-			$data['where'] = array_merge( $data['where'], array( Db::i()->in( 'core_members.member_id', $data['skip_ids'], TRUE ) ) );
+			$data['where'] = array_merge( $data['where'], array( \IPS\Db::i()->in( 'core_members.member_id', $data['skip_ids'], TRUE ) ) );
 		}
 
 		$total	= $this->getQuery( 'COUNT(*)', $data )->first();
@@ -79,7 +66,7 @@ class PruneMembers extends QueueAbstract
 			if( !empty( $data['group'] ) )
 			{
 				$cacheKey = 'groupMembersCount_' . $data['group'];
-				unset( Store::i()->$cacheKey );
+				unset( \IPS\Data\Store::i()->$cacheKey );
 			}
 
 			throw new \IPS\Task\Queue\OutOfRangeException;
@@ -91,16 +78,16 @@ class PruneMembers extends QueueAbstract
 		{
 			try
 			{
-				$member = Member::constructFromData( $row );
+				$member = \IPS\Member::constructFromData( $row );
 
-				if ( $member->member_id == Member::loggedIn()->member_id OR ( $member->isAdmin() AND !Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'member_delete_admin' ) ) )
+				if ( $member->member_id == \IPS\Member::loggedIn()->member_id OR ( $member->isAdmin() AND !\IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'member_delete_admin' ) ) )
 				{
-					throw new OutOfBoundsException;
+					throw new \OutOfBoundsException;
 				}
 
 				$member->delete();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				$data['skip_ids'][] = $row['member_id'];
 			}
@@ -116,16 +103,16 @@ class PruneMembers extends QueueAbstract
 	 *
 	 * @param	string	$select		What to select
 	 * @param	array	$data		Queue data
-	 * @param	bool|int	$applyLimit	Whether or not to apply the limit
-	 * @return	Select
+	 * @param	bool	$applyLimit	Whether or not to apply the limit
+	 * @return	\IPS\Db\Select
 	 */
-	protected function getQuery( string $select, array $data, int|bool $applyLimit=FALSE ) : Select
+	protected function getQuery( $select, $data, $applyLimit=FALSE )
 	{
-		return Db::i()->select( $select, 'core_members', $data['where'], 'core_members.member_id ASC', $applyLimit ? array( 0, REBUILD_SLOW ) : array() )
+		return \IPS\Db::i()->select( $select, 'core_members', $data['where'], 'core_members.member_id ASC', $applyLimit ? array( 0, \IPS\REBUILD_SLOW ) : array() )
 			->join( 'core_pfields_content', 'core_members.member_id=core_pfields_content.member_id' )
 			->join( array( 'core_validating', 'v' ), 'v.member_id=core_members.member_id')
 			->join( array( 'core_admin_permission_rows', 'm' ), "m.row_id=core_members.member_id AND m.row_id_type='member'" )
-			->join( array( 'core_admin_permission_rows', 'g' ), array( 'g.row_id', Db::i()->select( 'row_id', array( 'core_admin_permission_rows', 'sub' ), array( "((sub.row_id=core_members.member_group_id OR FIND_IN_SET( sub.row_id, core_members.mgroup_others ) ) AND sub.row_id_type='group') AND g.row_id_type='group'" ), NULL, array( 0, 1 ) ) ) );
+			->join( array( 'core_admin_permission_rows', 'g' ), array( 'g.row_id', \IPS\Db::i()->select( 'row_id', array( 'core_admin_permission_rows', 'sub' ), array( "((sub.row_id=core_members.member_group_id OR FIND_IN_SET( sub.row_id, core_members.mgroup_others ) ) AND sub.row_id_type='group') AND g.row_id_type='group'" ), NULL, array( 0, 1 ) ) ) );
 	}
 
 	/**
@@ -134,11 +121,11 @@ class PruneMembers extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		$text = Member::loggedIn()->language()->addToStack('pruning_members', FALSE );
+		$text = \IPS\Member::loggedIn()->language()->addToStack('pruning_members', FALSE, array() );
 
 		return array( 'text' => $text, 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $offset, 2 ) ) : 100 );
 	}

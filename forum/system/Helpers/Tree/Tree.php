@@ -11,36 +11,26 @@
 namespace IPS\Helpers\Tree;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\IPS;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use Throwable;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Tree Table
  */
-class Tree
+class _Tree
 {
 	/**
 	 * @brief	Title for tree table
 	 */
-	public ?string $title = '';
+	public $title = '';
 	
 	/**
 	 * @brief	URL where the tree table is displayed
 	 */
-	public mixed $url = NULL;
+	public $url = '';
 	
 	/**
 	 * @brief	Callback function to get the root rows
@@ -56,11 +46,6 @@ class Tree
 	 * @brief	Callback function to get the parent ID for a row
 	 */
 	public $getRowParentId;
-
-	/**
-	 * @brief	Callback function to get the root buttons
-	 */
-	public $getRootButtons;
 	
 	/**
 	 * @brief	Callback function to get the child rows for a row
@@ -70,45 +55,46 @@ class Tree
 	/**
 	 * @brief	Searchable?
 	 */
-	public bool $searchable = FALSE;
+	public $searchable = FALSE;
 	
 	/**
 	 * @brief	If true, will prevent any item from being moved out of its current parent, only allowing them to be reordered within their current parent
 	 */
-	protected bool $lockParents = FALSE;
+	protected $lockParents = FALSE;
 	
 	/**
 	 * @brief	If true, root cannot be turned into sub-items, and other items cannot be turned into roots
 	 */
-	protected bool $protectRoots = FALSE;
+	protected $protectRoots = FALSE;
 	
 	/**
 	 * @brief	Number of roots to show per page (NULL for unlimited). In most cases this doesn't make sense, since it makes re-ordering impossible. But for trees which are not orderable and which may contain a lot of roots, you can set this value
 	 */
-	public ?int $rootsPerPage = NULL;
+	public $rootsPerPage = NULL;
 
 	/**
 	 * @brief	If using $rootsPerPage, a callback function that returns the total number of roots
 	 */
 	public $getTotalRoots = NULL;
-
+		
 	/**
 	 * Constructor
 	 *
-	 * @param mixed $url URL where the tree table is displayed
-	 * @param string|null $title Tree Table title
-	 * @param callable|null $getRoots Callback function to get the root rows
-	 * @param callable|null $getRow Callback function to get a single row by ID
-	 * @param callable|null $getRowParentId Callback function to get the parent ID for a row
-	 * @param callable|null $getChildren Callback function to get the child rows for a row
-	 * @param callback|null $getRootButtons Callback function to get the root buttons
-	 * @param callback|bool $searchable Show the search bar?
-	 * @param bool $lockParents If true, will prevent any item from being moved out of its current parent, only allowing them to be reordered within their current parent
-	 * @param bool $protectRoots If true, root cannot be turned into sub-items, and other items cannot be turned into roots
-	 * @param int|null $rootsPerPage Number of roots to show per page (NULL for unlimited). In most cases this doesn't make sense, since it makes re-ordering impossible. But for trees which are not orderable and which may contain a lot of roots, you can set this value
-	 * @param callback|null $getTotalRoots If using $rootsPerPage, a callback function that returns the total number of roots
+	 * @param	string			$url					URL where the tree table is displayed
+	 * @param	string			$title					Tree Table title
+	 * @param	callback		$getRoots				Callback function to get the root rows
+	 * @param	callback		$getRow					Callback function to get a single row by ID
+	 * @param	callback		$getRowParentId			Callback function to get the parent ID for a row
+	 * @param	callback		$getChildren			Callback function to get the child rows for a row
+	 * @param	callback|null	$getRootButtons			Callback function to get the root buttons
+	 * @param	callback		$searchable				Show the search bar?
+	 * @param	bool			$lockParents			If true, will prevent any item from being moved out of its current parent, only allowing them to be reordered within their current parent
+	 * @param	bool			$protectRoots			If true, root cannot be turned into sub-items, and other items cannot be turned into roots
+	 * @param	int|null		$rootsPerPage			Number of roots to show per page (NULL for unlimited). In most cases this doesn't make sense, since it makes re-ordering impossible. But for trees which are not orderable and which may contain a lot of roots, you can set this value
+	 * @param	callback		$getTotalRoots			If using $rootsPerPage, a callback function that returns the total number of roots
+	 * @return	void
 	 */
-	public function __construct( mixed $url, ?string $title, ?callable $getRoots, ?callable $getRow, ?callable $getRowParentId, ?callable $getChildren, ?callable $getRootButtons=NULL, callable|bool $searchable=FALSE, bool $lockParents=FALSE, bool $protectRoots=FALSE, int $rootsPerPage = NULL, callable $getTotalRoots = NULL )
+	public function __construct( $url, $title, $getRoots, $getRow, $getRowParentId, $getChildren, $getRootButtons=NULL, $searchable=FALSE, $lockParents=FALSE, $protectRoots=FALSE, $rootsPerPage = NULL, $getTotalRoots = NULL )
 	{
 		$this->url = $url;
 		$this->title = $title;
@@ -134,11 +120,11 @@ class Tree
 		try
 		{
 			/* Get rows */
-			$page = isset( Request::i()->page ) ? intval( Request::i()->page ) : 1;
+			$page = isset( \IPS\Request::i()->page ) ? \intval( \IPS\Request::i()->page ) : 1;
 			$root = NULL;
 			$rootParent = NULL;
 
-			if( !Request::i()->root )
+			if( !\IPS\Request::i()->root )
 			{
 				$getRootsFunction = $this->getRoots;
 				$rows = $getRootsFunction( $this->rootsPerPage ? array( ( $page - 1 ) * $this->rootsPerPage, $this->rootsPerPage ) : NULL );
@@ -146,17 +132,17 @@ class Tree
 			else
 			{
 				$getChildrenFunction = $this->getChildren;
-				$rows = $getChildrenFunction( Request::i()->root );
+				$rows = $getChildrenFunction( \IPS\Request::i()->root );
 
-				if ( Request::i()->isAjax() )
+				if ( \IPS\Request::i()->isAjax() )
 				{
-					Output::i()->sendOutput( Theme::i()->getTemplate( 'trees', 'core' )->rows( $rows, mt_rand() ) );
+					return \IPS\Theme::i()->getTemplate( 'trees', 'core' )->rows( $rows, mt_rand() );
 				}
 				
 				$getRowFunction = $this->getRow;
-				$root = $getRowFunction( Request::i()->root, TRUE );
+				$root = $getRowFunction( \IPS\Request::i()->root, TRUE );
 				$getRowParentIdFunction = $this->getRowParentId;
-				$rootParent = $getRowParentIdFunction( Request::i()->root );
+				$rootParent = $getRowParentIdFunction( \IPS\Request::i()->root );
 			}
 			
 			/* Pagination? */
@@ -167,18 +153,21 @@ class Tree
 				$totalNumber = $getTotalRootsFunction();
 				if ( $totalNumber )
 				{
-					$pagination = Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $this->url, ceil( $totalNumber / $this->rootsPerPage ), $page, $this->rootsPerPage );
+					$pagination = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $this->url, ceil( $totalNumber / $this->rootsPerPage ), $page, $this->rootsPerPage );
 				}
 			}
 										
 			/* Display */
 			$getRootButtonsFunction = $this->getRootButtons;
-			return Theme::i()->getTemplate( 'trees', 'core' )->template( $this->url, $this->title, $root, $rootParent, $rows, $getRootButtonsFunction(), $this->lockParents, $this->protectRoots, $this->searchable, $pagination );
+			return \IPS\Theme::i()->getTemplate( 'trees', 'core' )->template( $this->url, $this->title, $root, $rootParent, $rows, $getRootButtonsFunction(), $this->lockParents, $this->protectRoots, $this->searchable, $pagination );
 		}
-		catch ( Exception | Throwable $e )
+		catch ( \Exception $e )
 		{
-			IPS::exceptionHandler( $e );
+			\IPS\IPS::exceptionHandler( $e );
 		}
-		return '';
+		catch ( \Throwable $e )
+		{
+			\IPS\IPS::exceptionHandler( $e );
+		}
 	}
 }

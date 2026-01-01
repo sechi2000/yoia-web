@@ -12,65 +12,40 @@
 namespace IPS\nexus\modules\front\subscriptions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\core\Facebook\Pixel;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\extensions\nexus\Item\Subscription;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Purchase;
-use IPS\nexus\Subscription\Package;
-use IPS\nexus\Subscription\Table;
-use IPS\nexus\Tax;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * subscriptions
  */
-class subscriptions extends Controller
+class _subscriptions extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		/* Work out currency */
-		if ( isset( Request::i()->currency ) and in_array( Request::i()->currency, Money::currencies() ) )
+		if ( isset( \IPS\Request::i()->currency ) and \in_array( \IPS\Request::i()->currency, \IPS\nexus\Money::currencies() ) )
 		{
-			if ( isset( Request::i()->csrfKey ) and Login::compareHashes( (string) Session::i()->csrfKey, (string) Request::i()->csrfKey ) )
+			if ( isset( \IPS\Request::i()->csrfKey ) and \IPS\Login::compareHashes( (string) \IPS\Session::i()->csrfKey, (string) \IPS\Request::i()->csrfKey ) )
 			{
 				$_SESSION['cart'] = array();
-				Request::i()->setCookie( 'currency', Request::i()->currency );
+				\IPS\Request::i()->setCookie( 'currency', \IPS\Request::i()->currency );
 
-				$url = Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' );
+				$url = \IPS\Http\Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' );
 
-				if( isset( Request::i()->register ) )
+				if( isset( \IPS\Request::i()->register ) )
 				{
-					$url = $url->setQueryString( 'register', (int) Request::i()->register );
+					$url = $url->setQueryString( 'register', (int) \IPS\Request::i()->register );
 				}
 
-				Output::i()->redirect( $url );
+				\IPS\Output::i()->redirect( $url );
 			}
 		}
 
@@ -82,45 +57,46 @@ class subscriptions extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		if ( ! Settings::i()->nexus_subs_enabled )
+		if ( ! \IPS\Settings::i()->nexus_subs_enabled )
 		{ 
-			Output::i()->error( 'nexus_no_subs', '2X379/1', 404, '' );
+			\IPS\Output::i()->error( 'nexus_no_subs', '2X379/1', 404, '' );
 		}
 
 		/* Send no-cache headers for this page, required for guest sign-ups */
-		Output::setCacheTime( false );
+		\IPS\Output::setCacheTime( false );
 
 		/* Create the table */
-		$table = new Table( Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' ) );
-		$current = \IPS\nexus\Subscription::loadByMember( Member::loggedIn(), FALSE );
+		$table = new \IPS\nexus\Subscription\Table( \IPS\Http\Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' ) );
+		$current = \IPS\nexus\Subscription::loadByMember( \IPS\Member::loggedIn(), FALSE );
 
 		if ( $current )
 		{
 			$table->activeSubscription = $current;
 		}
 
-		if ( isset( Request::i()->purchased ) and $table->activeSubscription )
+		if ( isset( \IPS\Request::i()->purchased ) and $table->activeSubscription )
 		{
 			try
 			{
-				$invoice = Invoice::load( $table->activeSubscription->invoice_id );
+				$invoice = \IPS\nexus\Invoice::load( $table->activeSubscription->invoice_id );
 
 				/* Fire the pixel event */
-				Pixel::i()->Purchase = array( 'value' => $invoice->total->amount, 'currency' => $invoice->total->currency );
-				Output::i()->inlineMessage = Member::loggedIn()->language()->addToStack( 'nexus_subs_paid_flash_msg');
+				\IPS\core\Facebook\Pixel::i()->Purchase = array( 'value' => $invoice->total->amount, 'currency' => $invoice->total->currency );
+				\IPS\Output::i()->inlineMessage = \IPS\Member::loggedIn()->language()->addToStack( 'nexus_subs_paid_flash_msg');
 			}
-			catch( Exception ) { }
+			catch( \Exception $e ) { }
 		}
 
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_subscriptions.js', 'nexus', 'front' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_subscriptions.js', 'nexus', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'subscriptions.css', 'nexus' ) );
 
-		Output::i()->breadcrumb['module'] = array( Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' ), Member::loggedIn()->language()->addToStack('nexus_front_subscriptions') );
+		\IPS\Output::i()->breadcrumb['module'] = array( \IPS\Http\Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' ), \IPS\Member::loggedIn()->language()->addToStack('nexus_front_subscriptions') );
 
-		Output::i()->linkTags['canonical'] = (string) Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('nexus_front_subscriptions');
-		Output::i()->output = $table;
+		\IPS\Output::i()->linkTags['canonical'] = (string) \IPS\Http\Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('nexus_front_subscriptions');
+		\IPS\Output::i()->output = $table;
 	}
 	
 	/**
@@ -128,40 +104,40 @@ class subscriptions extends Controller
 	 *
 	 * @return void just like life, it is meaningless and temporary so live in the moment, enjoy each day and eat chocolate unless you have an allergy in which case don't. See your GP before starting any new diet.
 	 */
-	protected function change() : void
+	protected function change()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$newPackage = Package::load( Request::i()->id );
+			$newPackage = \IPS\nexus\Subscription\Package::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'nexus_no_subs_package', '2X379/2', 404, '' );
+			\IPS\Output::i()->error( 'nexus_no_subs_package', '2X379/2', 404, '' );
 		}
 
 		/* Is the subscription purchasable ? */
 		if ( !$newPackage->enabled )
 		{
-			Output::i()->error( 'node_error', '2X379/7', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2X379/7', 403, '' );
 		}
 
 		try
 		{
-			$subscription = \IPS\nexus\Subscription::loadByMember( Member::loggedIn(), FALSE );
+			$subscription = \IPS\nexus\Subscription::loadByMember( \IPS\Member::loggedIn(), FALSE );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'nexus_no_subs_subs', '2X379/3', 404, '' );
+			\IPS\Output::i()->error( 'nexus_no_subs_subs', '2X379/3', 404, '' );
 		}
 
 		/* Fetch purchase */
 		$purchase = NULL;
 		if( $subscription )
 		{
-			foreach ( Subscription::getPurchases( Customer::loggedIn(), $subscription->package->id, TRUE, TRUE ) as $row )
+			foreach ( \IPS\nexus\extensions\nexus\Item\Subscription::getPurchases( \IPS\nexus\Customer::loggedIn(), $subscription->package->id, TRUE, TRUE ) as $row )
 			{
 				if ( !$row->cancelled OR ( $row->cancelled AND $row->can_reactivate ) )
 				{
@@ -173,34 +149,33 @@ class subscriptions extends Controller
 		
 		if ( $purchase === NULL )
 		{
-			Output::i()->error( 'nexus_sub_no_purchase', '2X379/4', 404, '' );
+			\IPS\Output::i()->error( 'nexus_sub_no_purchase', '2X379/4', 404, '' );
 		}
 
-		/* @var Purchase $purchase */
 		/* We cannot process changes if an active Billing Agreement is in place */
 		if( $purchase->billing_agreement and !$purchase->billing_agreement->canceled )
 		{
-			Output::i()->error( 'nexus_sub_no_change_ba', '2X379/B', 404, '' );
+			\IPS\Output::i()->error( 'nexus_sub_no_change_ba', '2X379/B', 404, '' );
 		}
 		
 		/* Right, that's all the "I'll tamper with the URLs for a laugh" stuff out of the way... */
-		$upgradeCost = $newPackage->costToUpgrade( $subscription->package, Customer::loggedIn() );
+		$upgradeCost = $newPackage->costToUpgrade( $subscription->package, \IPS\nexus\Customer::loggedIn() );
 		
 		if ( $upgradeCost === NULL )
 		{
-			Output::i()->error( 'nexus_no_subs_nocost', '2X379/5', 404, '' );
+			\IPS\Output::i()->error( 'nexus_no_subs_nocost', '2X379/5', 404, '' );
 		}
 		
 		$invoice = $subscription->package->upgradeDowngrade( $purchase, $newPackage );
 		
 		if ( $invoice )
 		{
-			Output::i()->redirect( $invoice->checkoutUrl() );
+			\IPS\Output::i()->redirect( $invoice->checkoutUrl() );
 		}
 		
 		$purchase->member->log( 'subscription', array( 'type' => 'change', 'id' => $purchase->id, 'old' => $purchase->name, 'name' => $newPackage->titleForLog(), 'system' => FALSE ) );
 		
-		Output::i()->redirect( Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' ) );
 	}
 		
 	/**
@@ -208,37 +183,37 @@ class subscriptions extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function purchase() : void
+	protected function purchase()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Send no-cache headers for this page, required for guest sign-ups */
-		Output::setCacheTime( false );
+		\IPS\Output::setCacheTime( false );
 		
 		/* Already purchased a subscription */
-		if ( $current = \IPS\nexus\Subscription::loadByMember( Customer::loggedIn(), FALSE ) AND ( $current->purchase AND ( !$current->purchase->cancelled OR $current->purchase->can_reactivate ) ) )
+		if ( $current = \IPS\nexus\Subscription::loadByMember( \IPS\nexus\Customer::loggedIn(), FALSE ) AND ( $current->purchase AND ( !$current->purchase->cancelled OR $current->purchase->can_reactivate ) ) )
 		{
-			Output::i()->error( 'nexus_subs_already_got_package', '2X379/6', 403, '' );
+			\IPS\Output::i()->error( 'nexus_subs_already_got_package', '2X379/6', 403, '' );
 		}
 				
-		$package = Package::load( Request::i()->id );
+		$package = \IPS\nexus\Subscription\Package::load( \IPS\Request::i()->id );
 
 		/* Is the subscription purchasable ? */
 		if ( !$package->enabled )
 		{
-			Output::i()->error( 'node_error', '2X379/7', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2X379/7', 403, '' );
 		}
 
 		$price = $package->price();
 		
-		$item = new Subscription( Customer::loggedIn()->language()->get( $package->_titleLanguageKey ), $price );
+		$item = new \IPS\nexus\extensions\nexus\Item\Subscription( \IPS\nexus\Customer::loggedIn()->language()->get( $package->_titleLanguageKey ), $price );
 		$item->id = $package->id;
 		try
 		{
-			$item->tax = Tax::load( $package->tax );
+			$item->tax = \IPS\nexus\Tax::load( $package->tax );
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 		if ( $package->gateways !== '*' )
 		{
 			$item->paymentMethodIds = explode( ',', $package->gateways );
@@ -246,19 +221,19 @@ class subscriptions extends Controller
 		$item->renewalTerm = $package->renewalTerm( $price->currency );
 		if ( $package->price and $costs = json_decode( $package->price, TRUE ) and isset( $costs['cost'] ) )
 		{
-			$item->initialInterval = new DateInterval( 'P' . $costs['term'] . mb_strtoupper( $costs['unit'] ) );
+			$item->initialInterval = new \DateInterval( 'P' . $costs['term'] . mb_strtoupper( $costs['unit'] ) );
 		}
 		
 		/* Generate the invoice */
-		$invoice = new Invoice;
+		$invoice = new \IPS\nexus\Invoice;
 		$invoice->currency = $price->currency;
-		$invoice->member = Customer::loggedIn();
+		$invoice->member = \IPS\nexus\Customer::loggedIn();
 		$invoice->addItem( $item );
 		$invoice->return_uri = "app=nexus&module=subscriptions&controller=subscriptions&purchased=1";
 		$invoice->save();
 		
 		/* Take them to it */
-		Output::i()->redirect( $invoice->checkoutUrl() );
+		\IPS\Output::i()->redirect( $invoice->checkoutUrl() );
 	}
 	
 	/**
@@ -266,30 +241,30 @@ class subscriptions extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function reactivate() : void
+	protected function reactivate()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Get subscription and purchase */
 		try
 		{
-			$package = Package::load( Request::i()->id );
+			$package = \IPS\nexus\Subscription\Package::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'nexus_no_subs_package', '2X379/2', 404, '' );
+			\IPS\Output::i()->error( 'nexus_no_subs_package', '2X379/2', 404, '' );
 		}
 		try
 		{
-			$subscription = \IPS\nexus\Subscription::loadByMemberAndPackage( Member::loggedIn(), $package, FALSE );
+			$subscription = \IPS\nexus\Subscription::loadByMemberAndPackage( \IPS\Member::loggedIn(), $package, FALSE );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'nexus_no_subs_subs', '2X379/8', 404, '' );
+			\IPS\Output::i()->error( 'nexus_no_subs_subs', '2X379/8', 404, '' );
 		}
 		$purchase = NULL;
-		foreach ( Subscription::getPurchases( Customer::loggedIn(), $subscription->package->id, TRUE, TRUE ) as $row )
+		foreach ( \IPS\nexus\extensions\nexus\Item\Subscription::getPurchases( \IPS\nexus\Customer::loggedIn(), $subscription->package->id, TRUE, TRUE ) as $row )
 		{
 			if ( $row->can_reactivate )
 			{
@@ -299,16 +274,15 @@ class subscriptions extends Controller
 		}
 		if ( $purchase === NULL )
 		{
-			Output::i()->error( 'nexus_sub_no_purchase', '2X379/9', 404, '' );
+			\IPS\Output::i()->error( 'nexus_sub_no_purchase', '2X379/9', 404, '' );
 		}
-
-		/* @var Purchase $purchase */
+		
 		/* Set renewal terms */
 		try
 		{
 			$currency = $purchase->original_invoice->currency;
 		}
-		catch ( Exception )
+		catch ( \Exception $e )
 		{
 			$currency = $purchase->member->defaultCurrency();
 		}
@@ -322,11 +296,11 @@ class subscriptions extends Controller
 		if ( !$purchase->active and $cycles = $purchase->canRenewUntil( NULL, TRUE ) AND $cycles !== FALSE )
 		{
 			$url = $cycles === 1 ? $purchase->url()->setQueryString( 'do', 'renew' )->csrf() : $purchase->url()->setQueryString( 'do', 'renew' );
-			Output::i()->redirect( $url );
+			\IPS\Output::i()->redirect( $url );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=subscriptions&controller=subscriptions', 'front', 'nexus_subscriptions' ) );
 		}
 	}
 }

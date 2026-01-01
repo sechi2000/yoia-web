@@ -11,68 +11,43 @@
 namespace IPS\Login\Handler\OAuth1;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Helpers\Form\Radio;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Login\Exception as LoginException;
-use IPS\Login\Handler\OAuth1;
-use IPS\Member;
-use IPS\Theme;
-use RuntimeException;
-use UnexpectedValueException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Twitter Login Handler
  */
-class Twitter extends OAuth1
+class _Twitter extends \IPS\Login\Handler\OAuth1
 {
 	/**
 	 * Get title
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return 'login_handler_Twitter';
 	}
-
-    /**
-     * Can this handler sync profile photos?
-     *
-     * @return bool
-     */
-    public function canSyncProfilePhoto() : bool
-    {
-        return true;
-    }
 	
 	/**
 	 * ACP Settings Form
 	 *
+	 * @param	string	$url	URL to redirect user to after successful submission
 	 * @return	array	List of settings to save - settings will be stored to core_login_methods.login_settings DB field
 	 * @code
 	 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{
-		Member::loggedIn()->language()->words['login_acp_desc'] = Member::loggedIn()->language()->addToStack('login_acp_will_reauth');
+		\IPS\Member::loggedIn()->language()->words['login_acp_desc'] = \IPS\Member::loggedIn()->language()->addToStack('login_acp_will_reauth');
 		
 		return array_merge(
 			array(
-				'name'				=> new Radio( 'login_real_name', ( isset( $this->settings['name'] ) ) ? $this->settings['name'] : 'any', TRUE, array(
+				'name'				=> new \IPS\Helpers\Form\Radio( 'login_real_name', ( isset( $this->settings['name'] ) ) ? $this->settings['name'] : 'any', TRUE, array(
 					'options' => array(
 						'real'		=> 'login_twitter_name_real',
 						'screen'	=> 'login_twitter_name_screen',
@@ -83,18 +58,11 @@ class Twitter extends OAuth1
 						'screen'	=> array( 'login_update_name_changes_inc_optional' ),
 					)
 				), NULL, NULL, NULL, 'login_real_name' ),
-                'real_photo' => new Radio( 'login_real_photo', $this->settings['real_photo'] ?? 1, false, array(
-                    'options' => array(
-                        1 => 'login_real_photo_twitter',
-                        0 => 'login_real_photo_disabled'
-                    ),
-                    'toggles' => array(
-                        1 => array( 'login_update_photo_changes_inc_optional' )
-                    )
-                ) )
 			),
 			parent::acpForm(),
-			array()
+			array(
+				'allow_status_import' => new \IPS\Helpers\Form\YesNo( 'login_generic_allow_status_import', ( isset( $this->settings['allow_status_import'] ) ) ? $this->settings['allow_status_import'] : FALSE, FALSE )
+			)
 		);
 	}
 	
@@ -103,7 +71,7 @@ class Twitter extends OAuth1
 	 *
 	 * @return	string
 	 */
-	public function buttonColor(): string
+	public function buttonColor()
 	{
 		return '#000000';
 	}
@@ -113,9 +81,9 @@ class Twitter extends OAuth1
 	 *
 	 * @return	string
 	 */
-	public function buttonIcon(): string
+	public function buttonIcon()
 	{
-		return 'x-twitter';
+		return 'twitter';
 	}
 	
 	/**
@@ -123,7 +91,7 @@ class Twitter extends OAuth1
 	 *
 	 * @return	string
 	 */
-	public function buttonText(): string
+	public function buttonText()
 	{
 		return 'login_twitter';
 	}
@@ -133,42 +101,42 @@ class Twitter extends OAuth1
 	 *
 	 * @return	string
 	 */
-	public function buttonClass(): string
+	public function buttonClass()
 	{
-		return 'ipsSocial--twitter';
+		return 'ipsSocial_twitter';
 	}
 	
 	/**
 	 * Get logo to display in information about logins with this method
 	 * Returns NULL for methods where it is not necessary to indicate the method, e..g Standard
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForDeviceInformation(): Url|string|null
+	public function logoForDeviceInformation()
 	{
-		return Theme::i()->resource( 'logos/login/X.png', 'core', 'interface' );
+		return \IPS\Theme::i()->resource( 'logos/login/X.png', 'core', 'interface' );
 	}
 	
 	/**
 	 * Authorization Endpoint
 	 *
-	 * @param	Login	$login	The login object
-	 * @return	Url
+	 * @param	\IPS\Login	$login	The login object
+	 * @return	\IPS\Http\Url
 	 */
-	protected function authorizationEndpoint( Login $login ): Url
+	protected function authorizationEndpoint( \IPS\Login $login )
 	{
-		$return = Url::external('https://api.twitter.com/oauth/authenticate');
+		$return = \IPS\Http\Url::external('https://api.twitter.com/oauth/authenticate');
 		
-		if ( $login->type === Login::LOGIN_ACP or $login->type === Login::LOGIN_REAUTHENTICATE )
+		if ( $login->type === \IPS\Login::LOGIN_ACP or $login->type === \IPS\Login::LOGIN_REAUTHENTICATE )
 		{
 			$return = $return->setQueryString( 'force_login', 'true' );
 		}
 		
-		if ( $login->type === Login::LOGIN_REAUTHENTICATE )
+		if ( $login->type === \IPS\Login::LOGIN_REAUTHENTICATE )
 		{
 			try
 			{
-				$token = Db::i()->select( array( 'token_access_token', 'token_secret' ), 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $login->reauthenticateAs->member_id ) )->first();
+				$token = \IPS\Db::i()->select( array( 'token_access_token', 'token_secret' ), 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $login->reauthenticateAs->member_id ) )->first();
 				$userDetails = $this->_userData( $token['token_access_token'], $token['token_secret'] );
 				if ( isset( $userDetails['screen_name'] ) )
 				{
@@ -184,21 +152,21 @@ class Twitter extends OAuth1
 	/**
 	 * Token Request Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function tokenRequestEndpoint(): Url
+	protected function tokenRequestEndpoint()
 	{
-		return Url::external('https://api.twitter.com/oauth/request_token');
+		return \IPS\Http\Url::external('https://api.twitter.com/oauth/request_token');
 	}
 	
 	/**
 	 * Access Token Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function accessTokenEndpoint(): Url
+	protected function accessTokenEndpoint()
 	{
-		return Url::external('https://api.twitter.com/oauth/access_token');
+		return \IPS\Http\Url::external('https://api.twitter.com/oauth/access_token');
 	}
 	
 	/**
@@ -208,7 +176,7 @@ class Twitter extends OAuth1
 	 * @param	string	$accessTokenSecret	Access Token Secret
 	 * @return	string
 	 */
-	protected function authenticatedUserId( string $accessToken, string $accessTokenSecret ): string
+	protected function authenticatedUserId( $accessToken, $accessTokenSecret )
 	{
 		return $this->_userData( $accessToken, $accessTokenSecret )['id'];
 	}
@@ -217,11 +185,11 @@ class Twitter extends OAuth1
 	 * Get authenticated user's username
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param string $accessToken		Access Token
-	 * @param string $accessTokenSecret	Access Token Secret
+	 * @param	string	$accessToken		Access Token
+	 * @param	string	$accessTokenSecret	Access Token Secret
 	 * @return	string|NULL
 	 */
-	protected function authenticatedUserName( string $accessToken, string $accessTokenSecret ): ?string
+	protected function authenticatedUserName( $accessToken, $accessTokenSecret )
 	{
 		if ( $this->settings['name'] == 'screen' )
 		{
@@ -238,11 +206,11 @@ class Twitter extends OAuth1
 	 * Get authenticated user's email address
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param string $accessToken		Access Token
-	 * @param string $accessTokenSecret	Access Token Secret
+	 * @param	string	$accessToken		Access Token
+	 * @param	string	$accessTokenSecret	Access Token Secret
 	 * @return	string|NULL
 	 */
-	protected function authenticatedEmail( string $accessToken, string $accessTokenSecret ): ?string
+	protected function authenticatedEmail( $accessToken, $accessTokenSecret )
 	{
 		return $this->_userData( $accessToken, $accessTokenSecret )['email'];
 	}
@@ -251,17 +219,17 @@ class Twitter extends OAuth1
 	 * Get user's profile name
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfileName( Member $member ): ?string
+	public function userProfileName( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) )
 		{
-			throw new LoginException( "", LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		return $this->_userData( $link['token_access_token'], $link['token_secret'] )['screen_name'];
@@ -271,28 +239,24 @@ class Twitter extends OAuth1
 	 * Get user's profile photo
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
-	 * @return	Url|NULL
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	\IPS\Member	$member	Member
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfilePhoto( Member $member ): ?Url
+	public function userProfilePhoto( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) )
 		{
-			throw new LoginException( "", LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
-
-        if ( isset( $this->settings['real_photo'] ) and $this->settings['real_photo'] )
-        {
-            $userData = $this->_userData( $link['token_access_token'], $link['token_secret'] );
-            if ( !$userData['default_profile_image'] )
-            {
-                return Url::external( str_replace( '_normal', '', $userData['profile_image_url_https'] ?: $userData['profile_image_url'] ) );
-            }
-        }
-
+				
+		$userData = $this->_userData( $link['token_access_token'], $link['token_secret'] );
+		if ( !$userData['default_profile_image'] )
+		{
+			return \IPS\Http\Url::external( str_replace( '_normal', '', $userData['profile_image_url_https'] ?: $userData['profile_image_url'] ) );
+		}
 		return NULL;
 	}
 		
@@ -300,26 +264,61 @@ class Twitter extends OAuth1
 	 * Get user's cover photo
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
-	 * @return	Url|NULL
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	\IPS\Member	$member	Member
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userCoverPhoto( Member $member ): ?Url
+	public function userCoverPhoto( \IPS\Member $member )
 	{
 		if ( !( $link = $this->_link( $member ) ) )
 		{
-			throw new LoginException( "", LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 				
 		$userData = $this->_userData( $link['token_access_token'], $link['token_secret'] );		
 		if ( isset( $userData['profile_banner_url'] ) and $userData['profile_banner_url'] )
 		{
-			return Url::external( $userData['profile_banner_url'] );
+			return \IPS\Http\Url::external( $userData['profile_banner_url'] );
 		}
 		
 		return NULL;
+	}
+
+	/**
+	 * Get user's statuses since a particular date
+	 *
+	 * @param	\IPS\Member			$member	Member
+	 * @param	\IPS\DateTime|NULL	$since	Date/Time to get statuses since then, or NULL to get the latest one
+	 * @return	array
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
+	 */
+	public function userStatuses( \IPS\Member $member, \IPS\DateTime $since = NULL )
+	{
+		if ( !( $link = $this->_link( $member ) ) )
+		{
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
+		}
+						
+		$return = array();
+		$response = $this->_sendRequest( 'get', \IPS\Http\Url::external('https://api.twitter.com/1.1/statuses/user_timeline.json'), $since ? array() : array( 'count' => 1 ), $link['token_access_token'], $link['token_secret'] )->decodeJson();
+		foreach ( $response as $statusData )
+		{
+			if ( $since and strtotime( $statusData['created_at'] ) < $since->getTimestamp() )
+			{
+				break;
+			}
+			
+			$status = \IPS\core\Statuses\Status::createItem( $member, $member->ip_address, new \IPS\DateTime( $statusData['created_at'] ) );
+			$status->content = $this->_parseStatusText( $member, nl2br( $statusData['text'], FALSE ) );
+					
+			$return[] = $status;
+		}
+		
+		return $return;
 	}
 	
 	/**
@@ -327,25 +326,25 @@ class Twitter extends OAuth1
 	 * May return NULL if server doesn't support this
 	 *
 	 * @param	string	$identifier	The ID Nnumber/string from remote service
-	 * @param string|null $username	The username from remote service
-	 * @return	Url|NULL
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	string	$username	The username from remote service
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userLink( string $identifier, ?string $username ): ?Url
+	public function userLink( $identifier, $username )
 	{
-		return Url::external( "https://twitter.com/" )->setPath( $username );
+		return \IPS\Http\Url::external( "https://twitter.com/" )->setPath( $username );
 	}
 	
 	/**
 	 * Syncing Options
 	 *
-	 * @param	Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
+	 * @param	\IPS\Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
 	 * @param	bool		$defaultOnly	If TRUE, only returns which options should be enabled by default for a new account
 	 * @return	array
 	 */
-	public function syncOptions( Member $member, bool $defaultOnly=FALSE ): array
+	public function syncOptions( \IPS\Member $member, $defaultOnly = FALSE )
 	{
 		$return = array();
 		
@@ -358,13 +357,14 @@ class Twitter extends OAuth1
 		{
 			$return[] = 'name';
 		}
-
-        if( isset( $this->settings['update_photo_changes'] ) and $this->settings['update_photo_changes'] == 'optional' and isset( $this->settings['real_photo'] ) and $this->settings['real_photo'] )
-        {
-            $return[] = 'photo';
-        }
-
+		
+		$return[] = 'photo';
 		$return[] = 'cover';
+		
+		if ( \IPS\Settings::i()->profile_comments and isset( $this->settings['allow_status_import'] ) and $this->settings['allow_status_import'] )
+		{
+			$return[] = 'status';
+		}
 		
 		return $return;
 	}
@@ -372,25 +372,25 @@ class Twitter extends OAuth1
 	/**
 	 * @brief	Cached user data
 	 */
-	protected array $_cachedUserData = array();
+	protected $_cachedUserData = array();
 	
 	/**
 	 * Get user data
 	 *
-	 * @param string $accessToken		Access Token
-	 * @param string $accessTokenSecret	Access Token Secret
+	 * @param	string	$accessToken		Access Token
+	 * @param	string	$accessTokenSecret	Access Token Secret
 	 * @return	array
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	protected function _userData( string $accessToken, string $accessTokenSecret ): array
+	protected function _userData( $accessToken, $accessTokenSecret )
 	{
 		if ( !isset( $this->_cachedUserData[ $accessToken ] ) )
 		{
-			$response = $this->_sendRequest( 'get', Url::external('https://api.twitter.com/1.1/account/verify_credentials.json'), array( 'include_email' => 'true' ), $accessToken, $accessTokenSecret )->decodeJson();
+			$response = $this->_sendRequest( 'get', \IPS\Http\Url::external('https://api.twitter.com/1.1/account/verify_credentials.json'), array( 'include_email' => 'true' ), $accessToken, $accessTokenSecret )->decodeJson();
 			if ( isset( $response['errors'] ) )
 			{
-				throw new LoginException( $response['errors'][0]['message'], LoginException::INTERNAL_ERROR );
+				throw new \IPS\Login\Exception( $response['errors'][0]['message'], \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 			
 			$this->_cachedUserData[ $accessToken ] = $response;
@@ -402,21 +402,21 @@ class Twitter extends OAuth1
 	/**
 	 * @brief       The length of the shortened URLs returned by Twitter's text parser https://developer.twitter.com/en/docs/counting-characters#:~:text=The%20current%20length%20of%20a,count%20towards%20the%20character%20limit.
 	 */
-	protected static int $defaultShortenedUrlLength = 23;
+	protected static $defaultShortenedUrlLength = 23;
 
 	/**
 	 * Post something to Twitter
 	 *
-	 * @param	Member			$member		Member posting
+	 * @param	\IPS\Member			$member		Member posting
 	 * @param	string				$content	Content to post
-	 * @param	Url|NULL	$url		Optional link
-	 * @return	bool
+	 * @param	\IPS\Http\Url|NULL	$url		Optional link
+	 * @return	void
 	 */
-	public function postToTwitter( Member $member, string $content, ?Url $url = NULL ) : bool
+	public function postToTwitter( \IPS\Member $member, $content, \IPS\Http\Url $url = NULL )
 	{
 		if ( !( $link = $this->_link( $member ) ) )
 		{
-			return false;
+			return FALSE;
 		}
 		
 		$data = array( 'status' => $content );
@@ -425,32 +425,32 @@ class Twitter extends OAuth1
 		if ( $url !== NULL )
 		{
 			/* Try to refresh if the stored response is more than a day old */
-			if ( !isset( Store::i()->twitter_config ) or Store::i()->twitter_config['time'] > time() - 86400 )
+			if ( !isset( \IPS\Data\Store::i()->twitter_config ) or \IPS\Data\Store::i()->twitter_config['time'] > time() - 86400 )
 			{
 				try
 				{
-					$response = $this->_sendRequest( 'get', Url::external('https://api.twitter.com/1.1/help/configuration.json'), array(), $link['token_access_token'], $link['token_secret'] );
-					if ( ( $response->httpResponseCode === 200 ) AND ( $payload = $response->decodeJson() ) )
+					$response = $this->_sendRequest( 'get', \IPS\Http\Url::external('https://api.twitter.com/1.1/help/configuration.json'), array(), $link['token_access_token'], $link['token_secret'] );
+					if ( ( $response->httpResponseCode === 200 ) AND ( $payload = $response->decodeJson() ) AND \is_array( $payload ) )
 					{
-						Store::i()->twitter_config = array_merge( $payload, array( 'time' => time() ) );
+						\IPS\Data\Store::i()->twitter_config = array_merge( $payload, array( 'time' => time() ) );
 					}
 					else
 					{
-						throw new UnexpectedValueException();
+						throw new \UnexpectedValueException();
 					}
 				}
-				catch ( \Exception| UnexpectedValueException $e )
+				catch ( \Exception|\UnexpectedValueException $e )
 				{
 					/* We should be fine hard coding to 23 if the deprecated configuration endpoint is no longer online https://developer.twitter.com/en/docs/counting-characters#:~:text=The%20current%20length%20of%20a,count%20towards%20the%20character%20limit. */
-					Store::i()->twitter_config['short_url_length'] = static::$defaultShortenedUrlLength;
+					\IPS\Data\Store::i()->twitter_config['short_url_length'] = static::$defaultShortenedUrlLength;
 				}
 			}
 
-			$maxUrlLen = Store::i()->twitter_config['short_url_length'] ?? static::$defaultShortenedUrlLength;
+			$maxUrlLen = \IPS\Data\Store::i()->twitter_config['short_url_length'] ?? static::$defaultShortenedUrlLength;
 			$data['status'] = mb_substr( $data['status'], 0, ( 140 - ( $maxUrlLen + 1 ) ) ) . ' ' . $url;
 		}
 				
-		$response = $this->_sendRequest( 'post', Url::external('https://api.twitter.com/1.1/statuses/update.json'), $data, $link['token_access_token'], $link['token_secret'] )->decodeJson();
+		$response = $this->_sendRequest( 'post', \IPS\Http\Url::external('https://api.twitter.com/1.1/statuses/update.json'), $data, $link['token_access_token'], $link['token_secret'] )->decodeJson();
 
 		return isset( $response['id_str'] );
 	}
@@ -460,10 +460,10 @@ class Twitter extends OAuth1
 	/**
 	 * Request a token
 	 *
-	 * @param Url $callback		Callback URL
-	 * @return    array
+	 * @param	\IPS\Http\Url	$callback		Callback URK
+	 * @return	string
 	 */
-	public function requestToken( Url $callback ): array
+	public function requestToken( $callback )
 	{
 		return $this->_sendRequest( 'get', $this->tokenRequestEndpoint(), array( 'oauth_callback' => (string) $callback ) )->decodeQueryString('oauth_token');
 	}
@@ -471,11 +471,11 @@ class Twitter extends OAuth1
 	/**
 	 * Get authenticated user's identifier (may not be a number)
 	 *
-	 * @param string $verifier			Verifier
-	 * @param string $accessToken	Access Token
+	 * @param	string	$verifier			Verifier
+	 * @param	string	$accessTokenSecret	Access Token
 	 * @return	array
 	 */
-	public function exchangeToken(string $verifier, string $accessToken ): array
+	public function exchangeToken( $verifier, $accessToken )
 	{
 		return $this->_sendRequest( 'post', $this->accessTokenEndpoint(), array( 'oauth_verifier' => $verifier ), $accessToken )->decodeQueryString('user_id');
 	}
@@ -483,15 +483,15 @@ class Twitter extends OAuth1
 	/**
 	 * Can we publish to this twitter account?
 	 *
-	 * @param string $accessToken		Access Token
-	 * @param string $accessTokenSecret	Access Token Secret
+	 * @param	string	$accessToken		Access Token
+	 * @param	string	$accessTokenSecret	Access Token Secret
 	 * @return	boolean
 	 */
-	public function hasWritePermissions( string $accessToken, string $accessTokenSecret ): bool
+	public function hasWritePermissions( $accessToken, $accessTokenSecret )
 	{
 		try
 		{
-			$response = $this->_sendRequest( 'get', Url::external('https://api.twitter.com/1.1/account/verify_credentials.json'), array(), $accessToken, $accessTokenSecret );
+			$response = $this->_sendRequest( 'get', \IPS\Http\Url::external('https://api.twitter.com/1.1/account/verify_credentials.json'), array(), $accessToken, $accessTokenSecret );
 			
 			if ( $response->httpResponseCode == 401 )
 			{
@@ -507,20 +507,33 @@ class Twitter extends OAuth1
 			
 			return TRUE;
 		}
-		catch ( Exception $e ) { }
+		catch ( \IPS\Http\Request\Exception $e ) { }
 		
 		return FALSE;
 	}
 	
 	/**
+	 * Send a status
+	 *
+	 * @param	array	$data				Post data to send
+	 * @param	string	$accessToken		Access Token
+	 * @param	string	$accessTokenSecret	Access Token Secret
+	 * @return	boolean
+	 */
+	public function sendStatus( $data, $accessToken, $accessTokenSecret )
+	{
+		return $this->_sendRequest( 'post', \IPS\Http\Url::external("https://api.twitter.com/1.1/statuses/update.json"), $data, $accessToken, $accessTokenSecret )->decodeJson();
+	}
+	
+	/**
 	 * Send media
 	 *
-	 * @param array $contents			Photo contents
-	 * @param string $accessToken		Access Token
-	 * @param string $accessTokenSecret	Access Token Secret
-	 * @return	array
+	 * @param	array	$contents			Photo contents
+	 * @param	string	$accessToken		Access Token
+	 * @param	string	$accessTokenSecret	Access Token Secret
+	 * @return	boolean
 	 */
-	public function sendMedia( array $contents, string $accessToken, string $accessTokenSecret ): array
+	public function sendMedia( $contents, $accessToken, $accessTokenSecret )
 	{
 		$mimeBoundary = sha1( microtime() );
 		
@@ -530,6 +543,48 @@ class Twitter extends OAuth1
         $data .= $contents . "\r\n";
         $data .= '--' . $mimeBoundary . '--' . "\r\n" . "\r\n";
 	        
-		return $this->_sendRequest( 'post', Url::external('https://upload.twitter.com/1.1/media/upload.json'), array(), $accessToken, $accessTokenSecret, array(), array( $mimeBoundary, $data ) )->decodeJson();
+		return $this->_sendRequest( 'post', \IPS\Http\Url::external('https://upload.twitter.com/1.1/media/upload.json'), array(), $accessToken, $accessTokenSecret, array(), array( $mimeBoundary, $data ) )->decodeJson();
+	}
+
+	/**
+	 * [Node] Set whether this node is enabled
+	 *
+	 * @param	bool|int	$enabled	Whether to set it enabled or disabled
+	 * @return	void
+	 */
+	protected function set__enabled( $enabled )
+	{
+		parent::set__enabled( $enabled );
+		$this->_checkSocialPromotes();
+	}
+
+	/**
+	 * [ActiveRecord] Delete Record
+	 *
+	 * @return	void
+	 */
+	public function delete()
+	{
+		parent::delete();
+		$this->_checkSocialPromotes();
+	}
+
+	/**
+	 * Disable social promotes Twitter method if all Twitter login handlers are disabled
+	 *
+	 * @return void
+	 */
+	protected function _checkSocialPromotes()
+	{
+		try
+		{
+			\IPS\Db::i()->select( '*', 'core_login_methods', array( 'login_classname=? AND login_id!=?', 'IPS\Login\Handler\OAuth1\Twitter', $this->_id ) )->first();
+		}
+		catch( \UnderflowException $e )
+		{
+			$promoter = \IPS\core\Promote::getPromoter('Twitter');
+			$promoter->enabled = FALSE;
+			$promoter->save();
+		}
 	}
 }

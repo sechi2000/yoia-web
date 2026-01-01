@@ -11,47 +11,37 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Guidelines
  */
-class guidelines extends Controller
+class _guidelines extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Guidelines
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		if ( Settings::i()->gl_type == "none" )
+		if ( \IPS\Settings::i()->gl_type == "none" )
 		{
-			Output::i()->error( 'node_error', '2C380/1', 404, 'guidelines_set_to_none_admin' );
+			\IPS\Output::i()->error( 'node_error', '2C380/1', 404, 'guidelines_set_to_none_admin' );
 		}
 
 		/* Set Session Location */
-		Session::i()->setLocation( Url::internal( 'app=core&module=system&controller=guidelines', NULL, 'guidelines' ), array(), 'loc_viewing_guidelines' );
+		\IPS\Session::i()->setLocation( \IPS\Http\Url::internal( 'app=core&module=system&controller=guidelines', NULL, 'guidelines' ), array(), 'loc_viewing_guidelines' );
 
-		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->bodyClasses[] = 'ipsLayout_minimal';
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimal';
 		
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('guidelines') );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('guidelines');
-		Output::i()->output = Theme::i()->getTemplate( 'system' )->guidelines( Settings::i()->gl_guidelines );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack('guidelines') );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('guidelines');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->guidelines( \IPS\Settings::i()->gl_guidelines );
 	}
 }

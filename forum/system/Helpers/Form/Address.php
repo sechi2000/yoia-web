@@ -11,26 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadFunctionCallException;
-use InvalidArgumentException;
-use IPS\GeoLocation;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Address input class for Form Builder
  */
-class Address extends FormAbstract
+class _Address extends FormAbstract
 {	
 	/**
 	 * @brief	Default Options
@@ -41,7 +31,7 @@ class Address extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'minimize' 				=> FALSE,
 		'requireFullAddress'	=> TRUE,
 		'preselectCountry'	=> TRUE,
@@ -52,12 +42,12 @@ class Address extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		/* If we don't have a value, set their country based on the HTTP headers */
-		if ( !$this->value OR ( $this->value instanceof GeoLocation AND !$this->value->country ) )
+		if ( !$this->value OR ( $this->value instanceof \IPS\GeoLocation AND !$this->value->country ) )
 		{
-			$this->value = ( $this->value instanceof GeoLocation ) ? $this->value : new GeoLocation;
+			$this->value = ( $this->value instanceof \IPS\GeoLocation ) ? $this->value : new \IPS\GeoLocation;
 			if ( $this->options['preselectCountry'] and $defaultCountry = static::calculateDefaultCountry() )
 			{
 				$this->value->country = $defaultCountry;
@@ -65,7 +55,7 @@ class Address extends FormAbstract
 		}
 		
 		/* Display */
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->address( $this->name, $this->value, Settings::i()->googleplacesautocomplete ? Settings::i()->google_maps_api_key : NULL, $this->options['minimize'], $this->options['requireFullAddress'] );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->address( $this->name, $this->value, \IPS\Settings::i()->googleplacesautocomplete ? \IPS\Settings::i()->google_maps_api_key : NULL, $this->options['minimize'], $this->options['requireFullAddress'] );
 	}
 	
 	/**
@@ -73,7 +63,7 @@ class Address extends FormAbstract
 	 *
 	 * @return	string|NULL
 	 */
-	public static function calculateDefaultCountry(): ?string
+	public static function calculateDefaultCountry()
 	{		
 		if ( isset( $_SERVER['HTTP_ACCEPT_LANGUAGE'] ) )
 		{
@@ -96,7 +86,7 @@ class Address extends FormAbstract
 
 				$dashPos = mb_strpos( $language, '-' );
 				$country = mb_strtoupper( $dashPos ? mb_substr( $language, $dashPos + 1 ) : $language );
-				if ( in_array( $country, GeoLocation::$countries ) )
+				if ( \in_array( $country, \IPS\GeoLocation::$countries ) )
 				{					
 					return $country;
 				}
@@ -111,12 +101,12 @@ class Address extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		/* Create the object */
 		$input = parent::getValue();
-		$value = new GeoLocation;
-		$value->addressLines = ( isset( $input['address'] ) and is_array( $input['address'] ) ) ? array_filter( $input['address'] ) : array();
+		$value = new \IPS\GeoLocation;
+		$value->addressLines = ( isset( $input['address'] ) and \is_array( $input['address'] ) ) ? array_filter( $input['address'] ) : array();
 		if ( empty( $value->addressLines ) )
 		{
 			$value->addressLines = array( NULL );
@@ -177,7 +167,7 @@ class Address extends FormAbstract
 				$partiallyCompleted = TRUE;
 			}
 			
-			if ( array_key_exists( $value->country, GeoLocation::$states ) )
+			if ( array_key_exists( $value->country, \IPS\GeoLocation::$states ) )
 			{
 				if ( !$value->region )
 				{
@@ -191,8 +181,8 @@ class Address extends FormAbstract
 		}
 		if ( trim( $value->region ) )
 		{
-			$states = ( isset( GeoLocation::$states[ $value->country ] ) ) ? GeoLocation::$states[ $value->country ] : array();
-			if ( !array_key_exists( $value->country, GeoLocation::$states ) or $value->region != array_shift( $states ) )
+			$states = ( isset( \IPS\GeoLocation::$states[ $value->country ] ) ) ? \IPS\GeoLocation::$states[ $value->country ] : array();
+			if ( !array_key_exists( $value->country, \IPS\GeoLocation::$states ) or $value->region != array_shift( $states ) )
 			{
 				$partiallyCompleted = TRUE;
 			}
@@ -205,11 +195,11 @@ class Address extends FormAbstract
 			{
 				if ( $this->required )
 				{
-					throw new InvalidArgumentException('form_partial_address_req');
+					throw new \InvalidArgumentException('form_partial_address_req');
 				}
 				else
 				{
-					throw new InvalidArgumentException('form_partial_address_opt');
+					throw new \InvalidArgumentException('form_partial_address_opt');
 				}
 			}
 			else
@@ -232,7 +222,7 @@ class Address extends FormAbstract
 		{
 			$value->getLatLong();
 		}
-		catch( BadFunctionCallException $e ){}
+		catch( \BadFunctionCallException $e ){}
 		
 		/* Return */
 		return $value;
@@ -241,14 +231,14 @@ class Address extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		if( $this->value === NULL and $this->required )
 		{
-			throw new InvalidArgumentException('form_required');
+			throw new \InvalidArgumentException('form_required');
 		}
 		
 		return parent::validate();
@@ -258,9 +248,9 @@ class Address extends FormAbstract
 	 * String Value
 	 *
 	 * @param	mixed	$value	The value
-	 * @return    string|int|null
+	 * @return	string
 	 */
-	public static function stringValue( mixed $value ): string|int|null
+	public static function stringValue( $value )
 	{
 		return json_encode( $value );
 	}

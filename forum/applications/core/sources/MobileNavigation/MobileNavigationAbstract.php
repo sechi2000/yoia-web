@@ -12,28 +12,23 @@
 namespace IPS\core\MobileNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Mobile Navigation Extension: Custom Item
  */
-abstract class MobileNavigationAbstract
+abstract class _MobileNavigationAbstract
 {
 	/**
 	 * Allow multiple instances?
 	 *
 	 * @return	bool
 	 */
-	public static function allowMultiple() : bool
+	public static function allowMultiple()
 	{
 		return FALSE;
 	}
@@ -42,10 +37,10 @@ abstract class MobileNavigationAbstract
 	 * Get configuration fields
 	 *
 	 * @param	array	$existingConfiguration	The existing configuration, if editing an existing item
-	 * @param	int|null		$id						The ID number of the existing item, if editing
+	 * @param	int		$id						The ID number of the existing item, if editing
 	 * @return	array
 	 */
-	public static function configuration( array $existingConfiguration, ?int $id = NULL ) : array
+	public static function configuration( $existingConfiguration, $id = NULL )
 	{
 		return array();
 	}
@@ -54,10 +49,10 @@ abstract class MobileNavigationAbstract
 	 * Parse configuration fields
 	 *
 	 * @param	array	$configuration	The values received from the form
-	 * @param	int|null		$id				The ID number of the existing item, if editing
+	 * @param	int		$id				The ID number of the existing item, if editing
 	 * @return	array
 	 */
-	public static function parseConfiguration( array $configuration, ?int $id ) : array
+	public static function parseConfiguration( $configuration, $id )
 	{
 		return $configuration;
 	}
@@ -65,26 +60,27 @@ abstract class MobileNavigationAbstract
 	/**
 	 * @brief	The configuration
 	 */
-	protected array $configuration = [];
+	protected $configuration;
 	
 	/**
 	 * @brief	The ID number
 	 */
-	public ?int $id = null;
+	public $id;
 	
 	/**
 	 * @brief	The permissions
 	 */
-	public array|string|null $permissions = null;
+	public $permissions;
 	
 	/**
 	 * Constructor
 	 *
 	 * @param	array	$configuration	The configuration
 	 * @param	int		$id				The ID number
-	 * @param	string|array	$permissions	The permissions (* or comma-delimited list of groups)
+	 * @param	string	$permissions	The permissions (* or comma-delimited list of groups)
+	 * @return	void
 	 */
-	public function __construct( array $configuration, int $id, string|array $permissions )
+	public function __construct( $configuration, $id, $permissions )
 	{
 		$this->configuration = $configuration;
 		$this->id = $id;
@@ -96,7 +92,7 @@ abstract class MobileNavigationAbstract
 	 *
 	 * @return	bool
 	 */
-	public static function permissionsCanInherit() : bool
+	public static function permissionsCanInherit()
 	{
 		return TRUE;
 	}
@@ -108,7 +104,7 @@ abstract class MobileNavigationAbstract
 	 *
 	 * @return	bool
 	 */
-	public static function isEnabled() : bool
+	public static function isEnabled()
 	{
 		return TRUE;
 	}
@@ -118,7 +114,7 @@ abstract class MobileNavigationAbstract
 	 *
 	 * @return	bool
 	 */
-	public function canAccessContent() : bool
+	public function canAccessContent()
 	{
 		return TRUE;
 	}
@@ -128,7 +124,7 @@ abstract class MobileNavigationAbstract
 	 *
 	 * @return	bool
 	 */
-	public function canView() : bool
+	public function canView()
 	{
 		if ( static::isEnabled() )
 		{
@@ -138,7 +134,7 @@ abstract class MobileNavigationAbstract
 			}
 			else
 			{
-				return $this->permissions == '*' ? TRUE : Member::loggedIn()->inGroup( explode( ',', $this->permissions ) );
+				return $this->permissions == '*' ? TRUE : \IPS\Member::loggedIn()->inGroup( explode( ',', $this->permissions ) );
 			}
 		}
 		return FALSE;
@@ -149,21 +145,21 @@ abstract class MobileNavigationAbstract
 	 *
 	 * @return	string
 	 */
-	abstract public function title() : string;
+	abstract public function title();	
 	
 	/**
 	 * Get Link
 	 *
-	 * @return	Url|string
+	 * @return	\IPS\Http\Url
 	 */
-	abstract public function link() : Url|string;
+	abstract public function link();
 
 	/**
 	 * Get icon
 	 *
 	 * @return	string|null
 	 */
-	public function icon() : ?string
+	public function icon()
 	{
 		return NULL;
 	}

@@ -11,50 +11,38 @@
 namespace IPS\core\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application;
-use IPS\core\AdminNotification;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use Throwable;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP Notification: IPS Bulletins
  */
-class Bulletin extends AdminNotification
+class _Bulletin extends \IPS\core\AdminNotification
 {
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'important';
+	public static $group = 'important';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 1;
+	public static $groupPriority = 1;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 2;
+	public static $itemPriority = 2;
 		
 	/**
 	 * Title for settings
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle(): string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_Bulletin';
 	}
@@ -62,10 +50,10 @@ class Bulletin extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member )
 	{
 		return $member->hasAcpRestriction( 'core', 'overview', 'ips_notifications' );
 	}
@@ -73,9 +61,9 @@ class Bulletin extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional(): bool
+	public static function mayBeOptional()
 	{
 		return FALSE;
 	}
@@ -85,7 +73,7 @@ class Bulletin extends AdminNotification
 	 *
 	 * @return	bool
 	 */
-	public static function mayRecur(): bool
+	public static function mayRecur()
 	{
 		return FALSE;
 	}
@@ -93,14 +81,14 @@ class Bulletin extends AdminNotification
 	/**
 	 * @brief	Cached data (so we don't query it multiple times)
 	 */
-	protected ?array $_bulletinData = NULL;
+	protected $_bulletinData = NULL;
 		
 	/**
 	 * Get notification data
 	 *
 	 * @return	array
 	 */
-	public function data() : array
+	public function data()
 	{
 		if( $this->_bulletinData !== NULL )
 		{
@@ -109,9 +97,9 @@ class Bulletin extends AdminNotification
 
 		try
 		{
-			$data = Db::i()->select( '*', 'core_ips_bulletins', array( 'id=?', $this->extra ) )->first();
+			$data = \IPS\Db::i()->select( '*', 'core_ips_bulletins', array( 'id=?', $this->extra ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			$data = array( 'cached' => 0, 'id' => $this->extra );
 		}
@@ -120,7 +108,7 @@ class Bulletin extends AdminNotification
 		{
 			try
 			{
-				$response = Url::ips("bulletin/{$data['id']}")->request()->get();
+				$response = \IPS\Http\Url::ips("bulletin/{$data['id']}")->request()->get();
 				$bulletin = $response->decodeJson();
 				if ( isset( $bulletin['title'] ) )
 				{
@@ -137,22 +125,22 @@ class Bulletin extends AdminNotification
 						'min_version'	=> $bulletin['minVersion'],
 						'max_version'	=> $bulletin['maxVersion']
 					);
-					Db::i()->update( 'core_ips_bulletins', $data, array( 'id=?', $this->extra ) );
+					\IPS\Db::i()->update( 'core_ips_bulletins', $data, array( 'id=?', $this->extra ) );
 				}
 				else
 				{
 					if( (int) $response->httpResponseCode === 410 )
 					{
-						Db::i()->delete( 'core_ips_bulletins', [ 'id=?', $this->extra ] );
+						\IPS\Db::i()->delete( 'core_ips_bulletins', [ 'id=?', $this->extra ] );
 						$this->delete();
 					}
 
-					throw new DomainException;
+					throw new \DomainException;
 				}
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				Db::i()->update( 'core_ips_bulletins', array( 'cached' => ( time() + 3600 - 900 ) ), array( 'id=?', $this->extra ) ); // Try again in 15 minutes
+				\IPS\Db::i()->update( 'core_ips_bulletins', array( 'cached' => ( time() + 3600 - 900 ) ), array( 'id=?', $this->extra ) ); // Try again in 15 minutes
 
 				$data = array(
 					'id' 			=> $data['id'],
@@ -180,7 +168,7 @@ class Bulletin extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{		
 		return $this->data()['title'];
 	}
@@ -188,9 +176,9 @@ class Bulletin extends AdminNotification
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body()
 	{
 		return $this->data()['body'];
 	}
@@ -200,7 +188,7 @@ class Bulletin extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function severity(): string
+	public function severity()
 	{
 		return $this->data()['severity'];
 	}
@@ -210,7 +198,7 @@ class Bulletin extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function dismissible(): string
+	public function dismissible()
 	{
 		return $this->data()['dismissible'];
 	}
@@ -218,9 +206,9 @@ class Bulletin extends AdminNotification
 	/**
 	 * Style
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
-	public function style(): string
+	public function style()
 	{
 		return $this->data()['style'];
 	}
@@ -228,9 +216,9 @@ class Bulletin extends AdminNotification
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url
+	 * @return	bool
 	 */
-	public function link(): Url
+	public function link()
 	{
 		return $this->data()['link'] ?: parent::link();
 	}
@@ -241,23 +229,23 @@ class Bulletin extends AdminNotification
 	 * @note	This is checked every time the notification shows. Should be lightweight.
 	 * @return	bool
 	 */
-	public function selfDismiss(): bool
+	public function selfDismiss()
 	{
 		try
 		{
-			if( $this->data()['min_version'] AND $this->data()['min_version'] > Application::load('core')->long_version )
+			if( $this->data()['min_version'] AND $this->data()['min_version'] > \IPS\Application::load('core')->long_version )
 			{
 				return TRUE;
 			}
 
-			if( $this->data()['max_version'] AND $this->data()['max_version'] < Application::load('core')->long_version )
+			if( $this->data()['max_version'] AND $this->data()['max_version'] < \IPS\Application::load('core')->long_version )
 			{
 				return TRUE;
 			}
 
 			return !@eval( $this->data()['conditions'] );
 		}
-		catch ( Throwable | Exception $e )
+		catch ( \Throwable | \Exception $e )
 		{
 			return FALSE;
 		}

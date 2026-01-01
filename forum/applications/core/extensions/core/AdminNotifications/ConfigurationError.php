@@ -11,126 +11,97 @@
 namespace IPS\core\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\core\AdminNotification;
-use IPS\core\Setup\Upgrade;
-use IPS\Data\Cache;
-use IPS\Data\Cache\None;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Email;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function function_exists;
-use function in_array;
-use function intval;
-use const IPS\CACHE_METHOD;
-use const IPS\CIC;
-use const IPS\TASK_OVERDUE_HOURS;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP Notification: Test
  */
-class ConfigurationError extends AdminNotification
+class _ConfigurationError extends \IPS\core\AdminNotification
 {
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'system';
+	public static $group = 'system';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 2;
+	public static $groupPriority = 2;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 2;
+	public static $itemPriority = 2;
 	
 	/**
 	 * Dangerous PHP functions
 	 */
-	public static array $dangerousPhpFunctions = array( 'exec', 'system', 'passthru', 'pcntl_exec', 'popen', 'proc_open', 'shell_exec' );
+	public static $dangerousPhpFunctions = array( 'exec', 'system', 'passthru', 'pcntl_exec', 'popen', 'proc_open', 'shell_exec' );
 	
 	/**
 	 * Check for any issues we may need to send a notification about
 	 *
 	 * @return	void
 	 */
-	public static function runChecksAndSendNotifications() : void
+	public static function runChecksAndSendNotifications()
 	{
 		/* Dangerous PHP functions */
-		if ( count( static::enabledDangerousFunctions() ) )
+		if ( \count( static::enabledDangerousFunctions() ) )
 		{
-			AdminNotification::send( 'core', 'ConfigurationError', 'dangerousFunctions', FALSE );
+			\IPS\core\AdminNotification::send( 'core', 'ConfigurationError', 'dangerousFunctions', FALSE );
 		}
 		else
 		{
-			AdminNotification::remove( 'core', 'ConfigurationError', 'dangerousFunctions' );
+			\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'dangerousFunctions' );
 		}
 		
 		/* display_errors */
 		if ( ( (bool) ini_get( 'display_errors' ) ) !== FALSE AND mb_strtolower( ini_get( 'display_errors' ) ) !== 'off' )
 		{
-			AdminNotification::send( 'core', 'ConfigurationError', 'displayErrors', FALSE );
+			\IPS\core\AdminNotification::send( 'core', 'ConfigurationError', 'displayErrors', FALSE );
 		}
 		else
 		{
-			AdminNotification::remove( 'core', 'ConfigurationError', 'displayErrors' );
+			\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'displayErrors' );
 		}
 		
 		/* System Requirement Recommendations */
-		$requirementsAndRecommendations = Upgrade::systemRequirements();
-		if ( isset( $requirementsAndRecommendations['advice'] ) and count( $requirementsAndRecommendations['advice'] ) )
+		$requirementsAndRecommendations = \IPS\core\Setup\Upgrade::systemRequirements();
+		if ( isset( $requirementsAndRecommendations['advice'] ) and \count( $requirementsAndRecommendations['advice'] ) )
 		{
-			AdminNotification::send( 'core', 'ConfigurationError', 'recommendations', FALSE );
+			\IPS\core\AdminNotification::send( 'core', 'ConfigurationError', 'recommendations', FALSE );
 		} 
 		else
 		{
-			AdminNotification::remove( 'core', 'ConfigurationError', 'recommendations' );
+			\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'recommendations' );
 		}
 		
 		/* orig_ database tables */
-		if( !Settings::i()->orig_tables_checked )
+		if( !\IPS\Settings::i()->orig_tables_checked )
 		{
 			/* Check if we have any orig_* tables */
-			$tables = Db::i()->getTables( 'orig_' . Db::i()->prefix );
+			$tables = \IPS\Db::i()->getTables( 'orig_' . \IPS\Db::i()->prefix );
 
 			/* If we don't have any, we're good. Set a flag so we don't check this every time */
-			if( !count( $tables ) )
+			if( !\count( $tables ) )
 			{
-				Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => 1 ), array( 'conf_key=?', 'orig_tables_checked' ) );
-				unset( Store::i()->settings );
-				AdminNotification::remove( 'core', 'ConfigurationError', 'origTables' );
+				\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => 1 ), array( 'conf_key=?', 'orig_tables_checked' ) );
+				unset( \IPS\Data\Store::i()->settings );
+				\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'origTables' );
 			}
 			else
 			{
 				/* Determine if the background queue task has already been launched */
 				try
 				{
-					Db::i()->select( '*', 'core_queue', array( "`key`=?", 'CleanupOrigTables' ) )->first();
+					\IPS\Db::i()->select( '*', 'core_queue', array( "`key`=?", 'CleanupOrigTables' ) )->first();
 					$inProgress = TRUE;
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					$inProgress = FALSE;
 				}
@@ -138,80 +109,93 @@ class ConfigurationError extends AdminNotification
 				/* If it isn't, show a warning */
 				if( !$inProgress )
 				{
-					AdminNotification::send( 'core', 'ConfigurationError', 'origTables', FALSE, NULL, TRUE ); // We don't send an email for this one since it "happens" as part of the upgrade and is more just an FYI
+					\IPS\core\AdminNotification::send( 'core', 'ConfigurationError', 'origTables', FALSE, NULL, TRUE ); // We don't send an email for this one since it "happens" as part of the upgrade and is more just an FYI
 				}
 			}
 		}
 		
 		/* Any tasks which were supposed to have run more than 36 hours ago */
-		if ( !CIC )
+		if ( !\IPS\CIC )
 		{
-			$taskWasSupposedToRun = Db::i()->select( 'next_run', 'core_tasks', array( 'core_tasks.enabled=1 AND core_applications.app_enabled=1' ), 'next_run ASC' )
+			$taskWasSupposedToRun = \IPS\Db::i()->select( 'next_run', 'core_tasks', array( 'core_tasks.enabled=1 AND (core_plugins.plugin_enabled=1 OR core_applications.app_enabled=1)' ), 'next_run ASC' )
 				->join( 'core_applications', array( 'core_applications.app_directory=core_tasks.app' ) )
+				->join( 'core_plugins', array( 'core_plugins.plugin_id=core_tasks.plugin' ) )
 				->first();
 			
-			if ( ( time() - $taskWasSupposedToRun ) > ( TASK_OVERDUE_HOURS * 3600 ) )
+			if ( ( time() - $taskWasSupposedToRun ) > ( \IPS\TASK_OVERDUE_HOURS * 3600 ) )
 			{
-				AdminNotification::send( 'core', 'ConfigurationError', 'tasksNotRunning', FALSE );
+				\IPS\core\AdminNotification::send( 'core', 'ConfigurationError', 'tasksNotRunning', FALSE );
 			}
 			else
 			{
-				AdminNotification::remove( 'core', 'ConfigurationError', 'tasksNotRunning' );
+				\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'tasksNotRunning' );
 			}
 		}
 		
 		/* Data storage not working */
-		if( !CIC AND (!Store::testStore() OR Db::i()->select( 'COUNT(*)', 'core_log', array( '`category`=? AND `time`>?', 'datastore', DateTime::create()->sub( new DateInterval( 'PT1H' ) )->getTimestamp() ) )->first() >= 10 ) )
+		if( !\IPS\CIC AND (!\IPS\Data\Store::testStore() OR \IPS\Db::i()->select( 'COUNT(*)', 'core_log', array( '`category`=? AND `time`>?', 'datastore', \IPS\DateTime::create()->sub( new \DateInterval( 'PT1H' ) )->getTimestamp() ) )->first() >= 10 ) )
 		{
-			if ( Settings::i()->last_data_store_update < DateTime::create()->sub( new DateInterval( 'PT24H' ) )->getTimestamp() )
+			if ( \IPS\Settings::i()->last_data_store_update < \IPS\DateTime::create()->sub( new \DateInterval( 'PT24H' ) )->getTimestamp() )
 			{
-				AdminNotification::send( 'core', 'ConfigurationError', 'dataStorageBroken', FALSE );
+				\IPS\core\AdminNotification::send( 'core', 'ConfigurationError', 'dataStorageBroken', FALSE );
 			}
 		}
 		else
 		{
-			AdminNotification::remove( 'core', 'ConfigurationError', 'dataStorageBroken' );
+			\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'dataStorageBroken' );
 		}
 		
 		/* Cache Set Up */
-		if ( !CIC AND CACHE_METHOD AND CACHE_METHOD != 'None' AND Cache::i() instanceof None )
+		if ( !\IPS\CIC AND \IPS\CACHE_METHOD AND \IPS\CACHE_METHOD != 'None' AND \IPS\Data\Cache::i() instanceof \IPS\Data\Cache\None )
 		{
-			AdminNotification::send( 'core', 'ConfigurationError', 'cacheBroken', FALSE );
+			\IPS\core\AdminNotification::send( 'core', 'ConfigurationError', 'cacheBroken', FALSE );
 		}
 		else
 		{
-			AdminNotification::remove( 'core', 'ConfigurationError', 'cacheBroken' );
+			\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'cacheBroken' );
 		}
 		
 		/* CiC Email Quota */
-		if ( CIC )
+		if ( \IPS\CIC )
 		{
 			try
 			{
-				$cicEmails = Url::external( IPS::$cicConfig['email']['quota_check'] )->setQueryString('account', \IPS\Cicloud\getCicUsername() )->request()->get()->decodeJson();
+				$cicEmails = \IPS\Http\Url::external( \IPS\IPS::$cicConfig['email']['quota_check'] )->setQueryString('account', \IPS\Cicloud\getCicUsername() )->request()->get()->decodeJson();
 				
 				if ( isset( $cicEmails['status'] ) AND $cicEmails['status'] == 'BLOCKED' )
 				{
-					AdminNotification::send( 'core', 'ConfigurationError', 'cicEmailQuota', FALSE );
+					\IPS\core\AdminNotification::send( 'core', 'ConfigurationError', 'cicEmailQuota', FALSE );
 				}
 				else
 				{
-					AdminNotification::remove( 'core', 'ConfigurationError', 'cicEmailQuota' );
+					\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'cicEmailQuota' );
 				}
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }			
 		}
 
 		/* Failed Emails, show notification if there are errors logs that haven't yet triggered a notification */
-		if( Email::countFailedMail() >= 3 )
+		if( \IPS\Email::countFailedMail() >= 3 )
 		{
-			AdminNotification::send( 'core', 'ConfigurationError', 'failedMail', TRUE, NULL, TRUE );
+			\IPS\core\AdminNotification::send( 'core', 'ConfigurationError', 'failedMail', TRUE, NULL, TRUE );
 		}
 		else
 		{
-			AdminNotification::remove( 'core', 'ConfigurationError', 'failedMail' );
-			Db::i()->update( 'core_mail_error_logs', [ 'mlog_notification_sent' => TRUE ], [ 'mlog_notification_sent=?', 0 ] );
+			\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'failedMail' );
+			\IPS\Db::i()->update( 'core_mail_error_logs', [ 'mlog_notification_sent' => TRUE ], [ 'mlog_notification_sent=?', 0 ] );
 		}
+
+		/* Username logins enabled */
+		$login = new \IPS\Login;
+		if( $login->authType() & \IPS\Login::AUTH_TYPE_USERNAME )
+		{
+			\IPS\core\AdminNotification::send( 'core', 'ConfigurationError', 'usernameLoginEnabled', FALSE );
+		}
+		else
+		{
+			\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'usernameLoginEnabled' );
+		}
+
 	}
 	
 	/**
@@ -219,12 +203,12 @@ class ConfigurationError extends AdminNotification
 	 *
 	 * @return	array
 	 */
-	public static function enabledDangerousFunctions() : array
+	public static function enabledDangerousFunctions()
 	{
 		$functions = array();
 		foreach ( static::$dangerousPhpFunctions as $function )
 		{
-			if ( function_exists( $function ) )
+			if ( \function_exists( $function ) )
 			{
 				$functions[] = $function;
 			}
@@ -237,7 +221,7 @@ class ConfigurationError extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle(): string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_ConfigurationError';
 	}
@@ -245,9 +229,9 @@ class ConfigurationError extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional(): bool
+	public static function mayBeOptional()
 	{
 		return FALSE;
 	}
@@ -257,7 +241,7 @@ class ConfigurationError extends AdminNotification
 	 *
 	 * @return	bool
 	 */
-	public static function mayRecur(): bool
+	public static function mayRecur()
 	{
 		return FALSE;
 	}
@@ -265,10 +249,10 @@ class ConfigurationError extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member )
 	{
 		return ( $member->hasAcpRestriction( 'core', 'members', 'member_delete_admin' ) or
 			$member->hasAcpRestriction( 'core', 'settings', 'advanced_manage_tasks' ) or
@@ -289,10 +273,10 @@ class ConfigurationError extends AdminNotification
 	/**
 	 * Can a member view this notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public function visibleTo( Member $member ) : bool
+	public function visibleTo( \IPS\Member $member )
 	{
 		if ( mb_substr( $this->extra, 0, 12 ) === 'supportAdmin' )
 		{
@@ -342,8 +326,10 @@ class ConfigurationError extends AdminNotification
 		{
 			return $member->hasAcpRestriction( 'core', 'overview', 'system_notifications' );
 		}
-
-		return false;
+		elseif ( $this->extra === 'usernameLoginEnabled' )
+		{
+			return $member->hasAcpRestriction( 'core', 'settings', 'login_access' );
+		}
 	}
 	
 	/**
@@ -351,59 +337,63 @@ class ConfigurationError extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{		
 		if ( mb_substr( $this->extra, 0, 12 ) === 'supportAdmin' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_support_account');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_support_account');
 		}
 		elseif ( mb_substr( $this->extra, 0, 8 ) === 'taskLock' )
 		{
-			return Member::loggedIn()->language()->addToStack( 'dashboard_tasks_broken', FALSE, array( 'sprintf' => array( Task::load( intval( mb_substr( $this->extra, 9 ) ) )->key ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'dashboard_tasks_broken', FALSE, array( 'sprintf' => array( \IPS\Task::load( \intval( mb_substr( $this->extra, 9 ) ) )->key ) ) );
 		}
 		elseif ( $this->extra === 'dangerousFunctions' )
 		{
-			return Member::loggedIn()->language()->addToStack('disable_functions_title');
+			return \IPS\Member::loggedIn()->language()->addToStack('disable_functions_title');
 		}
 		elseif ( $this->extra === 'displayErrors' )
 		{
-			return Member::loggedIn()->language()->addToStack('display_errors_title');
+			return \IPS\Member::loggedIn()->language()->addToStack('display_errors_title');
 		}
 		elseif ( $this->extra === 'recommendations' )
 		{
-			return Member::loggedIn()->language()->addToStack('system_check_title');
+			return \IPS\Member::loggedIn()->language()->addToStack('system_check_title');
 		}
 		elseif ( $this->extra === 'failedMail' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_email_broken');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_email_broken');
 		}
 		elseif ( $this->extra === 'origTables' )
 		{
-			return Member::loggedIn()->language()->addToStack('block_core_OrigTables');
+			return \IPS\Member::loggedIn()->language()->addToStack('block_core_OrigTables');
 		}
 		elseif ( $this->extra === 'tasksNotRunning' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_tasksrun_broken');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_tasksrun_broken');
 		}
 		elseif ( $this->extra === 'siteOffline' )
 		{
-			return Member::loggedIn()->language()->addToStack('offline_message_title');
+			return \IPS\Member::loggedIn()->language()->addToStack('offline_message_title');
 		}
 		elseif ( $this->extra === 'dataStorageBroken' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_datastore_broken');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_datastore_broken');
 		}
 		elseif ( $this->extra === 'cacheBroken' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_invalid_cachesetup');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_invalid_cachesetup');
 		}
 		elseif ( $this->extra === 'cicEmailQuota' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_cic_email_quota');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_cic_email_quota');
+		}
+		elseif ( $this->extra === 'usernameLoginEnabled' )
+		{
+			return \IPS\Member::loggedIn()->language()->addToStack('username_login_enabled');
 		}
 		elseif( $this->extra === 'groupPromotionGroup' )
 		{
-			return Member::loggedIn()->language()->addToStack('grouppromotion_error_group');
+			return \IPS\Member::loggedIn()->language()->addToStack('grouppromotion_error_group');
 		}
 		else
 		{
@@ -414,103 +404,106 @@ class ConfigurationError extends AdminNotification
 	/**
 	 * Notification Subtitle (no HTML)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function subtitle(): ?string
+	public function subtitle()
 	{
 		if ( mb_substr( $this->extra, 0, 12 ) === 'supportAdmin' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_support_account_desc');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_support_account_desc');
 		}
 		elseif ( mb_substr( $this->extra, 0, 8 ) === 'taskLock' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_tasks_broken_desc');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_tasks_broken_desc');
 		}
 		elseif ( $this->extra === 'dangerousFunctions' )
 		{
-			return Member::loggedIn()->language()->addToStack('disable_functions_desc');
+			return \IPS\Member::loggedIn()->language()->addToStack('disable_functions_desc');
 		}
 		elseif ( $this->extra === 'displayErrors' )
 		{
-			return Member::loggedIn()->language()->addToStack('display_errors_subtitle');
+			return \IPS\Member::loggedIn()->language()->addToStack('display_errors_subtitle');
 		}
 		elseif ( $this->extra === 'recommendations' )
 		{
-			return Member::loggedIn()->language()->addToStack('system_check_recommended_blurb');
+			return \IPS\Member::loggedIn()->language()->addToStack('system_check_recommended_blurb');
 		}
 		elseif ( $this->extra === 'failedMail' )
 		{
-			return Member::loggedIn()->language()->addToStack( 'dashboard_email_broken_desc_1', FALSE, array( 'sprintf' => array( Email::countFailedMail() ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'dashboard_email_broken_desc_1', FALSE, array( 'sprintf' => array( \IPS\Email::countFailedMail() ) ) );
 		}
 		elseif ( $this->extra === 'origTables' )
 		{
-			return Member::loggedIn()->language()->addToStack('orig_cleanup_desc');
+			return \IPS\Member::loggedIn()->language()->addToStack('orig_cleanup_desc');
 		}
 		elseif ( $this->extra === 'tasksNotRunning' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_tasksrun_broken_desc');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_tasksrun_broken_desc');
 		}
 		elseif ( $this->extra === 'siteOffline' )
 		{
-			return Member::loggedIn()->language()->addToStack( ( Settings::i()->task_use_cron == 'normal' AND !CIC ) ? 'offline_message_desc_task' : 'offline_message_desc_notask' );
+			return \IPS\Member::loggedIn()->language()->addToStack( ( \IPS\Settings::i()->task_use_cron == 'normal' AND !\IPS\CIC ) ? 'offline_message_desc_task' : 'offline_message_desc_notask' );
 		}
 		elseif ( $this->extra === 'dataStorageBroken' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_datastore_broken_subtitle');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_datastore_broken_subtitle');
 		}
 		elseif ( $this->extra === 'cacheBroken' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_invalid_cachesetup_subtitle');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_invalid_cachesetup_subtitle');
 		}
 		elseif ( $this->extra === 'cicEmailQuota' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_cic_email_quota_subtitle');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_cic_email_quota_subtitle');
 		}
-
+		elseif ( $this->extra === 'usernameLoginEnabled' )
+		{
+			return \IPS\Member::loggedIn()->language()->addToStack('username_login_enabled_desc');
+		}
 		return NULL;
 	}
 	
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body()
 	{
 		if ( mb_substr( $this->extra, 0, 12 ) === 'supportAdmin' )
 		{
-			return Theme::i()->getTemplate( 'notifications', 'core' )->supportAccountPresent( Member::load( intval( mb_substr( $this->extra, 13 ) ) ) );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core' )->supportAccountPresent( \IPS\Member::load( \intval( mb_substr( $this->extra, 13 ) ) ) );
 		}
 		elseif ( mb_substr( $this->extra, 0, 8 ) === 'taskLock' )
 		{
-			$task = Task::load( intval( mb_substr( $this->extra, 9 ) ) );
+			$task = \IPS\Task::load( \intval( mb_substr( $this->extra, 9 ) ) );
 			$langKey = 'task__' . $task->key;
 			
-			return Theme::i()->getTemplate( 'notifications', 'core' )->lockedTask( $task,  Member::loggedIn()->language()->checkKeyExists( $langKey ) ? $langKey : NULL );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core' )->lockedTask( $task,  \IPS\Member::loggedIn()->language()->checkKeyExists( $langKey ) ? $langKey : NULL );
 		}
 		elseif ( $this->extra === 'dangerousFunctions' )
 		{
-			return Theme::i()->getTemplate( 'notifications', 'core' )->dangerousPhpFunctions( static::enabledDangerousFunctions() );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core' )->dangerousPhpFunctions( static::enabledDangerousFunctions() );
 		}
 		elseif ( $this->extra === 'displayErrors' )
 		{
-			return Theme::i()->getTemplate( 'notifications', 'core' )->displayErrors();
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core' )->displayErrors();
 		}
 		elseif ( $this->extra === 'failedMail' )
 		{
 			$table = NULL;
-			if ( Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'email_errorlog' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'settings', 'email_errorlog' ) )
 			{
 				$where = array( array( 'mlog_notification_sent=?', FALSE ) );
-				$table = \IPS\core\modules\admin\settings\email::emailErrorLogTable( Url::internal('app=core&module=overview&controller=notifications&_table=core_ConfigurationError'), $where );
+				$table = \IPS\core\modules\admin\settings\email::emailErrorLogTable( \IPS\Http\Url::internal('app=core&module=overview&controller=notifications&_table=core_ConfigurationError'), $where );
 				$table->limit = 10;
 			}
 			
-			return Theme::i()->getTemplate( 'notifications', 'core' )->failedMail( Email::countFailedMail(), $table );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core' )->failedMail( \IPS\Email::countFailedMail(), $table );
 		}
 		elseif ( $this->extra === 'recommendations' )
 		{
-			$requirementsAndRecommendations = Upgrade::systemRequirements();
+			$requirementsAndRecommendations = \IPS\core\Setup\Upgrade::systemRequirements();
 			$advice = array();
 
 			if( isset( $requirementsAndRecommendations['advice'] ) )
@@ -520,45 +513,51 @@ class ConfigurationError extends AdminNotification
 					$advice = array_merge( $advice, $category );
 				}
 			}
-			return Theme::i()->getTemplate( 'notifications', 'core' )->systemRecommendations( $advice );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core' )->systemRecommendations( $advice );
 		}
 		elseif ( $this->extra === 'origTables' )
 		{
-			return Theme::i()->getTemplate( 'notifications', 'core' )->origTables();
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core' )->origTables();
 		}
 		elseif ( $this->extra === 'tasksNotRunning' )
 		{
-			$cronCommand = PHP_BINDIR . '/php -d memory_limit=-1 -d max_execution_time=0 ' . \IPS\ROOT_PATH . '/applications/core/interface/task/task.php ' . Settings::i()->task_cron_key;
-			$webCronUrl = (string) Url::internal( 'applications/core/interface/task/web.php?key=' . Settings::i()->task_cron_key, 'none' );
+			$cronCommand = PHP_BINDIR . '/php -d memory_limit=-1 -d max_execution_time=0 ' . \IPS\ROOT_PATH . '/applications/core/interface/task/task.php ' . \IPS\Settings::i()->task_cron_key;
+			$webCronUrl = (string) \IPS\Http\Url::internal( 'applications/core/interface/task/web.php?key=' . \IPS\Settings::i()->task_cron_key, 'none' );
 			
-			return Theme::i()->getTemplate( 'notifications', 'core' )->tasksNotRunning( $this, $cronCommand, $webCronUrl );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core' )->tasksNotRunning( $this, $cronCommand, $webCronUrl );
 		}
 		elseif ( $this->extra === 'siteOffline' )
 		{
-			return Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->siteOffline();
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->siteOffline();
 		}
 		elseif ( $this->extra === 'dataStorageBroken' )
 		{
-			if( CIC )
+			if( \IPS\CIC )
 			{
-				return Member::loggedIn()->language()->addToStack('dashboard_datastore_broken_desc_cic');
+				return \IPS\Member::loggedIn()->language()->addToStack('dashboard_datastore_broken_desc_cic');
 			}
-			return Member::loggedIn()->language()->addToStack('dashboard_datastore_broken_desc');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_datastore_broken_desc');
 		}
 		elseif ( $this->extra === 'cacheBroken' )
 		{
-			if( CIC )
+			if( \IPS\CIC )
 			{
-				return Member::loggedIn()->language()->addToStack('dashboard_invalid_cachesetup_desc_cic');
+				return \IPS\Member::loggedIn()->language()->addToStack('dashboard_invalid_cachesetup_desc_cic');
 			}
-			return Member::loggedIn()->language()->addToStack('dashboard_invalid_cachesetup_desc');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_invalid_cachesetup_desc');
 		}
 		elseif ( $this->extra === 'cicEmailQuota' )
 		{
-			return Member::loggedIn()->language()->addToStack('dashboard_cic_email_quota_desc');
+			return \IPS\Member::loggedIn()->language()->addToStack('dashboard_cic_email_quota_desc');
 		}
-
-		return null;
+		elseif ( $this->extra === 'usernameLoginEnabled' )
+		{
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core' )->usernameLoginEnabled();
+		}
+		elseif( $this->extra === 'groupPromotionGroup' )
+		{
+			return \IPS\Member::loggedIn()->language()->addToStack('grouppromotion_error_group_desc');
+		}
 	}
 	
 	/**
@@ -566,19 +565,15 @@ class ConfigurationError extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function severity(): string
+	public function severity()
 	{
 		if ( $this->extra === 'siteOffline' or $this->extra === 'cicEmailQuota' )
 		{
 			return static::SEVERITY_CRITICAL;
 		}
-		elseif ( in_array( $this->extra, array( 'tasksNotRunning', 'dataStorageBroken', 'cacheBroken' ) ) )
+		elseif ( \in_array( $this->extra, array( 'tasksNotRunning', 'dataStorageBroken', 'cacheBroken' ) ) )
 		{
 			return static::SEVERITY_HIGH;
-		}
-		elseif( $this->extra === 'groupPromotionGroup' )
-		{
-			return Member::loggedIn()->language()->addToStack('grouppromotion_error_group_desc');
 		}
 		else
 		{
@@ -591,11 +586,15 @@ class ConfigurationError extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function dismissible(): string
+	public function dismissible()
 	{		
-		if ( mb_substr( $this->extra, 0, 8 ) === 'taskLock' or in_array( $this->extra, array( 'failedMail', 'origTables', 'siteOffline', 'dataStorageBroken', 'cacheBroken' ) ) )
+		if ( mb_substr( $this->extra, 0, 8 ) === 'taskLock' or \in_array( $this->extra, array( 'failedMail', 'origTables', 'siteOffline', 'dataStorageBroken', 'cacheBroken' ) ) )
 		{
 			return static::DISMISSIBLE_NO;
+		}
+		elseif( $this->extra == 'usernameLoginEnabled' )
+		{
+			return static::DISMISSIBLE_PERMANENT;
 		}
 		else
 		{
@@ -606,13 +605,13 @@ class ConfigurationError extends AdminNotification
 	/**
 	 * Style
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
-	public function style(): string
+	public function style()
 	{
 		if ( $this->extra === 'siteOffline' )
 		{
-			if ( Settings::i()->task_use_cron == 'normal' AND !CIC )
+			if ( \IPS\Settings::i()->task_use_cron == 'normal' AND !\IPS\CIC )
 			{
 				return static::STYLE_WARNING;
 			}
@@ -631,7 +630,7 @@ class ConfigurationError extends AdminNotification
 		{
 			return static::STYLE_INFORMATION;
 		}
-		elseif ( mb_substr( $this->extra, 0, 8 ) === 'taskLock' or in_array( $this->extra, array( 'failedMail', 'tasksNotRunning', 'dataStorageBroken', 'cacheBroken', 'cicEmailQuota' ) ) )
+		elseif ( mb_substr( $this->extra, 0, 8 ) === 'taskLock' or \in_array( $this->extra, array( 'failedMail', 'tasksNotRunning', 'dataStorageBroken', 'cacheBroken', 'cicEmailQuota' ) ) )
 		{
 			return static::STYLE_ERROR;
 		}
@@ -644,13 +643,13 @@ class ConfigurationError extends AdminNotification
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url|null                    webg
+	 * @return	bool
 	 */
-	public function link(): Url|null
+	public function link()
 	{
 		if ( mb_substr( $this->extra, 0, 12 ) === 'supportAdmin' )
 		{
-			return Member::load( intval( mb_substr( $this->extra, 13 ) ) )->acpUrl();
+			return \IPS\Member::load( \intval( mb_substr( $this->extra, 13 ) ) )->acpUrl();
 		}
 		else
 		{
@@ -664,11 +663,11 @@ class ConfigurationError extends AdminNotification
 	 * @note	This is checked every time the notification shows. Should be lightweight.
 	 * @return	bool
 	 */
-	public function selfDismiss(): bool
+	public function selfDismiss()
 	{
 		if ( $this->extra === 'dangerousFunctions' )
 		{
-			return !count( static::enabledDangerousFunctions() );
+			return !\count( static::enabledDangerousFunctions() );
 		}
 		elseif ( $this->extra === 'displayErrors' )
 		{
@@ -676,20 +675,28 @@ class ConfigurationError extends AdminNotification
 		}
 		elseif ( $this->extra === 'recommendations' )
 		{
-			$requirementsAndRecommendations = Upgrade::systemRequirements();
-			return !isset( $requirementsAndRecommendations['advice'] ) or !count( $requirementsAndRecommendations['advice'] );
+			$requirementsAndRecommendations = \IPS\core\Setup\Upgrade::systemRequirements();
+			return !isset( $requirementsAndRecommendations['advice'] ) or !\count( $requirementsAndRecommendations['advice'] );
 		}
 		elseif ( mb_substr( $this->extra, 0, 8 ) === 'taskLock' )
 		{
 			try
 			{
-				return !Task::load( intval( mb_substr( $this->extra, 9 ) ) )->enabled;
+				return !\IPS\Task::load( \intval( mb_substr( $this->extra, 9 ) ) )->enabled;
 			}
-			catch( RuntimeException | OutOfRangeException $e )
+			catch( \RuntimeException | \OutOfRangeException $e )
 			{
 				return TRUE;
 			}
 		}
-		return parent::selfDismiss();
+		elseif( $this->extra == 'usernameLoginEnabled' )
+		{
+			$login = new \IPS\Login;
+			return !( $login->authType() & \IPS\Login::AUTH_TYPE_USERNAME );
+		}
+		elseif( $this->extra == 'tasksNotRunning' AND \IPS\CIC )
+		{
+			return TRUE;
+		}
 	}
 }

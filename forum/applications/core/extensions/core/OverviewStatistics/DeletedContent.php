@@ -12,30 +12,21 @@
 namespace IPS\core\extensions\core\OverviewStatistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\OverviewStatisticsAbstract;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use function round;
-use function time;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Overview statistics extension: DeletedContent
  */
-class DeletedContent extends OverviewStatisticsAbstract
+class _DeletedContent
 {
 	/**
-	 * @brief    Which statistics page (activity or user)
+	 * @brief	Which statistics page (activity or user)
 	 */
-	public string $page = 'activity';
+	public $page	= 'activity';
 
 	/**
 	 * Return the sub-block keys
@@ -43,7 +34,7 @@ class DeletedContent extends OverviewStatisticsAbstract
 	 * @note This is designed to allow one class to support multiple blocks, for instance using the ContentRouter to generate blocks.
 	 * @return array
 	 */
-	public function getBlocks (): array
+	public function getBlocks()
 	{
 		return array( 'deletedcontent' );
 	}
@@ -51,74 +42,36 @@ class DeletedContent extends OverviewStatisticsAbstract
 	/**
 	 * Return block details (title and description)
 	 *
-	 * @param string|NULL $subBlock The subblock we are loading as returned by getBlocks()
-	 * @return    array
+	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
+	 * @return	array
 	 */
-	public function getBlockDetails ( string $subBlock = NULL ): array
+	public function getBlockDetails( $subBlock = NULL )
 	{
 		/* Description can be null and will not be shown if so */
 		return array( 'app' => 'core', 'title' => 'stats_deletedcontent_percent', 'description' => 'stats_percentagedeleted_desc', 'refresh' => 60, 'form' => false );
-
+			
 	}
 
-	/**
+	/** 
 	 * Return the block HTML to show
 	 *
-	 * @param array|string|null $dateRange String for a fixed time period in days, NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
-	 * @param string|NULL $subBlock The subblock we are loading as returned by getBlocks()
-	 * @return    string
+	 * @param	array|NULL	$dateRange	NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
+	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
+	 * @return	string
 	 */
-	public function getBlock ( array|string $dateRange = NULL, string $subBlock = NULL ): string
+	public function getBlock( $dateRange = NULL, $subBlock = NULL )
 	{
-		if ( !Settings::i()->dellog_retention_period )
+		if( !\IPS\Settings::i()->dellog_retention_period )
 		{
 			$total = $deleted = $value = 0;
 		}
 		else
 		{
-			$values = $this->getBlockNumbersRaw();
-			$total = $values['total'];
-			$deleted = $values['deleted'];
-			$value = $values['value'];
+			$total		= \IPS\Db::i()->select( 'COUNT(*)', 'core_search_index', array( 'index_date_created > ?', time() - \IPS\Settings::i()->dellog_retention_period ) )->first();
+			$deleted	= \IPS\Db::i()->select( 'COUNT(*)', 'core_deletion_log', array() )->first();
+			$value = $total ? round( $deleted / $total * 100, 2 ) : 0;
 		}
 
-		return Theme::i()->getTemplate( 'activitystats', 'core' )->deletedPercentage( $value, $total, $deleted );
-	}
-
-	/**
-	 * Get the raw numbers relevant to this block
-	 *
-	 * @return array{total: number, deleted: number, value: number}
-	 */
-	protected function getBlockNumbersRaw () : array
-	{
-		$total		= Db::i()->select( 'COUNT(*)', 'core_search_index', array( 'index_date_created > ?', time() - Settings::i()->dellog_retention_period ) )->first();
-		$deleted	= Db::i()->select( 'COUNT(*)', 'core_deletion_log', array() )->first();
-		$value = $total ? round( $deleted / $total * 100, 2 ) : 0;
-
-		return [
-			'total' => $total,
-			'deleted' => $deleted,
-			'value' => $value,
-		];
-	}
-
-
-	/**
-	 * Get the block numbers
-	 *
-	 * @param array|string|null $dateRange String for a fixed time period in days, NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
-	 * @param string|NULL $subBlock The subblock we are loading as returned by getBlocks()
-	 *
-	 * @return array{stats_deletedcontent_csv_title: number|null}
-	 */
-	public function getBlockNumbers( array|string $dateRange = NULL, string $subBlock=NULL ) : array
-	{
-		if ( !Settings::i()->dellog_retention_period )
-		{
-			return [ 'stats_deletedcontent_csv_title' => null ];
-		}
-
-		return ['stats_deletedcontent_csv_title' => $this->getBlockNumbersRaw()['value']];
+		return \IPS\Theme::i()->getTemplate( 'activitystats', 'core' )->deletedPercentage( $value, $total, $deleted );
 	}
 }

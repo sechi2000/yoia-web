@@ -11,37 +11,33 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - DateTime
  */
-class Datetime
+class _Datetime
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = FALSE;
+	public static $canBeUsedInCss = FALSE;
 	
 	/**
 	 * Run the plug-in
 	 *
 	 * @param	string 		$data	  The initial data from the tag
 	 * @param	array		$options    Array of options
-	 * @return	array		Code to eval
+	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options ): array
+	public static function runPlugin( $data, $options )
 	{
 		$return = array();
 		$return['pre'] = '$val = ( ' . $data . ' instanceof \IPS\DateTime ) ? ' . $data . ' : \IPS\DateTime::ts( ' . $data . ' );';
-		$useTitle = isset( $options['notitle'] ) ? "useTitle: false" : "useTitle: true";
 
 		if( isset( $options['dateonly'] ) )
 		{
@@ -53,15 +49,15 @@ class Datetime
 		}
 		elseif ( isset( $options['lowercase'] ) )
 		{
-			$return['return'] = '$val->html(FALSE, ' . $useTitle . ')';
+			$return['return'] = '$val->html(FALSE)';
 		}
 		elseif ( isset( $options['short'] ) )
 		{
-			$return['return'] = '$val->html(TRUE, TRUE, ' . $useTitle . ')';
+			$return['return'] = '$val->html(TRUE, TRUE)';
 		}
 		else
 		{
-			$return['return'] = '$val->html(' . $useTitle . ')';
+			$return['return'] = '$val->html()';
 		}
 				
 		return $return;

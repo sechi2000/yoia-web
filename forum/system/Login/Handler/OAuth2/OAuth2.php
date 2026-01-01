@@ -12,65 +12,43 @@
 namespace IPS\Login\Handler;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Response;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Login;
-use IPS\Login\Exception;
-use IPS\Login\Handler;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use LogicException;
-use RuntimeException;
-use UnderflowException;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Abstract OAuth2 Login Handler
  */
-abstract class OAuth2 extends Handler
+abstract class _OAuth2 extends \IPS\Login\Handler
 {	
 	/* !Login Handler: Basics */
 	
 	/**
 	 * @brief	Any additional scopes to authenticate with
 	 */
-	public mixed $additionalScopes = NULL;
+	public $additionalScopes = NULL;
 
 	/**
 	 * @brief	Does this handler support PKCE?
 	 */
-	public bool $pkceSupported = TRUE;
+	public $pkceSupported = TRUE;
 	
 	/**
 	 * Get type
 	 *
 	 * @return	int
 	 */
-	public function type(): int
+	public function type()
 	{
 		if ( $this->grantType() === 'password' )
 		{
-			return Login::TYPE_USERNAME_PASSWORD;
+			return \IPS\Login::TYPE_USERNAME_PASSWORD;
 		}
 		else
 		{
-			return Login::TYPE_BUTTON;
+			return \IPS\Login::TYPE_BUTTON;
 		}
 	}
 	
@@ -82,16 +60,16 @@ abstract class OAuth2 extends Handler
 	 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{				
 		$return = array(
-			array( 'login_handler_oauth_settings', Member::loggedIn()->language()->addToStack( static::getTitle() . '_info', FALSE, array( 'sprintf' => array( (string) $this->redirectionEndpoint() ) ) ) ),
-			'client_id'		=> new Text( 'oauth_client_id', $this->settings['client_id'] ?? NULL, TRUE ),
-			'client_secret'	=> new Text( 'oauth_client_client_secret', $this->settings['client_secret'] ?? NULL, NULL, array(), NULL, NULL, NULL, 'client_secret' ),
+			array( 'login_handler_oauth_settings', \IPS\Member::loggedIn()->language()->addToStack( static::getTitle() . '_info', FALSE, array( 'sprintf' => array( (string) $this->redirectionEndpoint() ) ) ) ),
+			'client_id'		=> new \IPS\Helpers\Form\Text( 'oauth_client_id', isset( $this->settings['client_id'] ) ? $this->settings['client_id'] : NULL, TRUE ),
+			'client_secret'	=> new \IPS\Helpers\Form\Text( 'oauth_client_client_secret', isset( $this->settings['client_secret'] ) ? $this->settings['client_secret'] : NULL, NULL, array(), NULL, NULL, NULL, 'client_secret' ),
 		);
 				
 		$return[] = 'account_management_settings';
-		$return['show_in_ucp'] = new Radio( 'login_handler_show_in_ucp', $this->settings['show_in_ucp'] ?? 'always', FALSE, array(
+		$return['show_in_ucp'] = new \IPS\Helpers\Form\Radio( 'login_handler_show_in_ucp', isset( $this->settings['show_in_ucp'] ) ? $this->settings['show_in_ucp'] : 'always', FALSE, array(
 			'options' => array(
 				'always'		=> 'login_handler_show_in_ucp_always',
 				'loggedin'		=> 'login_handler_show_in_ucp_loggedin',
@@ -103,9 +81,9 @@ abstract class OAuth2 extends Handler
 		if ( $forceNameHandler = static::handlerHasForceSync( 'name', $this ) )
 		{
 			$nameChangesDisabled[] = 'force';
-			Member::loggedIn()->language()->words['login_update_changes_yes_name_desc'] = Member::loggedIn()->language()->addToStack( 'login_update_changes_yes_disabled', FALSE, array( 'sprintf' => $forceNameHandler->_title ) );
+			\IPS\Member::loggedIn()->language()->words['login_update_changes_yes_name_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'login_update_changes_yes_disabled', FALSE, array( 'sprintf' => $forceNameHandler->_title ) );
 		}
-		$return['update_name_changes'] = new Radio( 'login_update_name_changes', $this->settings['update_name_changes'] ?? 'disabled', FALSE, array( 'options' => array(
+		$return['update_name_changes'] = new \IPS\Helpers\Form\Radio( 'login_update_name_changes', isset( $this->settings['update_name_changes'] ) ? $this->settings['update_name_changes'] : 'disabled', FALSE, array( 'options' => array(
 			'force'		=> 'login_update_changes_yes_name',
 			'optional'	=> 'login_update_changes_optional',
 			'disabled'	=> 'login_update_changes_no',
@@ -115,30 +93,13 @@ abstract class OAuth2 extends Handler
 		if ( $forceEmailHandler = static::handlerHasForceSync( 'email', $this ) )
 		{
 			$emailChangesDisabled[] = 'force';
-			Member::loggedIn()->language()->words['login_update_changes_yes_email_desc'] = Member::loggedIn()->language()->addToStack( 'login_update_changes_yes_disabled', FALSE, array( 'sprintf' => $forceEmailHandler->_title ) );
+			\IPS\Member::loggedIn()->language()->words['login_update_changes_yes_email_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'login_update_changes_yes_disabled', FALSE, array( 'sprintf' => $forceEmailHandler->_title ) );
 		}
-		$return['update_email_changes'] = new Radio( 'login_update_email_changes', $this->settings['update_email_changes'] ?? 'optional', FALSE, array( 'options' => array(
+		$return['update_email_changes'] = new \IPS\Helpers\Form\Radio( 'login_update_email_changes', isset( $this->settings['update_email_changes'] ) ? $this->settings['update_email_changes'] : 'optional', FALSE, array( 'options' => array(
 			'force'		=> 'login_update_changes_yes_email',
 			'optional'	=> 'login_update_changes_optional',
 			'disabled'	=> 'login_update_changes_no',
 		), 'disabled' => $emailChangesDisabled ), NULL, NULL, NULL, 'login_update_email_changes_inc_optional' );
-
-        /* If this handler supports profile photos, add options for that */
-        if( $this->canSyncProfilePhoto() )
-        {
-            $photoChangesDisabled = array();
-            if( $forcePhotoHandler = static::handlerHasForceSync( 'photo', $this ) )
-            {
-                $photoChangesDisabled[] = 'force';
-                Member::loggedIn()->language()->words['login_update_changes_yes_photo_desc'] = Member::loggedIn()->language()->addToStack( 'login_update_changes_yes_disabled', FALSE, array( 'sprintf' => $forcePhotoHandler->_title ) );
-            }
-
-            $return['update_photo_changes'] = new Radio( 'login_update_photo_changes', $this->settings['update_photo_changes'] ?? 'optional', FALSE, array( 'options' => array(
-                'force'		=> 'login_update_changes_yes_photo',
-                'optional'	=> 'login_update_changes_optional',
-                'disabled'	=> 'login_update_changes_no',
-            ), 'disabled' => $photoChangesDisabled ), null, null, null, 'login_update_photo_changes_inc_optional' );
-        }
 		
 		return array_merge( $return, parent::acpForm() );		
 	}
@@ -147,9 +108,9 @@ abstract class OAuth2 extends Handler
 	 * Test Settings
 	 *
 	 * @return	bool
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function testSettings(): bool
+	public function testSettings()
 	{
 		parent::testSettings();
 		
@@ -166,7 +127,7 @@ abstract class OAuth2 extends Handler
 				
 				if ( isset( $response['error'] ) and $response['error'] === 'invalid_client' )
 				{
-					throw new LogicException( Member::loggedIn()->language()->addToStack( 'oauth_setup_error_secret' ) );
+					throw new \LogicException( \IPS\Member::loggedIn()->language()->addToStack( 'oauth_setup_error_secret' ) );
 				}
 			}
 			/* Password */
@@ -180,16 +141,14 @@ abstract class OAuth2 extends Handler
 
 				if ( !isset( $response['error'] ) or $response['error'] !== 'invalid_grant' )
 				{
-					throw new LogicException( Member::loggedIn()->language()->addToStack( 'oauth_setup_error_generic', FALSE, array( 'sprintf' => array( $response['error_description'] ?? NULL ) ) ) );
+					throw new \LogicException( \IPS\Member::loggedIn()->language()->addToStack( 'oauth_setup_error_generic', FALSE, array( 'sprintf' => array( isset( $response['error_description'] ) ? $response['error_description'] : NULL ) ) ) );
 				}
 			}
 		}
 		catch( \IPS\Http\Request\Exception $e )
 		{
-			throw new LogicException( Member::loggedIn()->language()->addToStack( 'oauth_setup_error_generic', FALSE, array( 'sprintf' => array( $e->getMessage() ) ) ) );
+			throw new \LogicException( \IPS\Member::loggedIn()->language()->addToStack( 'oauth_setup_error_generic', FALSE, array( 'sprintf' => array( $e->getMessage() ) ) ) );
 		}
-
-		return TRUE;
 	}
 	
 	/* !Button Authentication */
@@ -199,20 +158,20 @@ abstract class OAuth2 extends Handler
 	/**
 	 * Authenticate
 	 *
-	 * @param	Login	$login		The login object
-	 * @return	Member|null
-	 * @throws	Exception
+	 * @param	\IPS\Login	$login		The login object
+	 * @return	\IPS\Member
+	 * @throws	\IPS\Login\Exception
 	 */
-	public function authenticateButton( Login $login ): ?Member
+	public function authenticateButton( \IPS\Login $login )
 	{
 		/* If we have a code, process it */
-		if ( $this->grantType() === 'authorization_code' and ( isset( Request::i()->code ) or isset( Request::i()->error ) ) )
+		if ( $this->grantType() === 'authorization_code' and ( isset( \IPS\Request::i()->code ) or isset( \IPS\Request::i()->error ) ) )
 		{
 			return $this->_handleAuthorizationResponse( $login );
 		}
 		
 		/* If we have a token, process that */
-		elseif ( $this->grantType() === 'implicit' and ( isset( Request::i()->access_token ) or isset( Request::i()->error ) ) )
+		elseif ( $this->grantType() === 'implicit' and ( isset( \IPS\Request::i()->access_token ) or isset( \IPS\Request::i()->error ) ) )
 		{
 			return $this->_handleAuthorizationResponse( $login );
 		}
@@ -224,25 +183,25 @@ abstract class OAuth2 extends Handler
 				'client_id'		=> $this->settings['client_id'],
 				'response_type'	=> $this->grantType() === 'authorization_code' ? 'code' : 'token',
 				'redirect_uri'	=> (string) $this->redirectionEndpoint(),
-				'state'			=> $this->id . '-' . base64_encode( $login->url ) . '-' . Session::i()->csrfKey . '-' . Request::i()->ref,
+				'state'			=> $this->id . '-' . base64_encode( $login->url ) . '-' . \IPS\Session::i()->csrfKey . '-' . \IPS\Request::i()->ref,
 			);
 			
 			if ( $this->grantType() === 'authorization_code' AND $this->pkceSupported === TRUE )
 			{
-				$codeChallenge = Login::generateRandomString( 128 );
-				Request::i()->setCookie('codeVerifier', $codeChallenge, ( new DateTime )->add( new \DateInterval( 'PT10M' ) ) );
+				$codeChallenge = \IPS\Login::generateRandomString( 128 );
+				\IPS\Request::i()->setCookie('codeVerifier', $codeChallenge, ( new \IPS\DateTime )->add( new \DateInterval( 'PT10M' ) ) );
 				$data['code_challenge'] = rtrim( strtr( base64_encode( pack( 'H*', hash( 'sha256', $codeChallenge ) ) ), '+/', '-_' ), '=' );
 				$data['code_challenge_method'] = 'S256';
 			}
 			
 			$target = $this->authorizationEndpoint( $login )->setQueryString( $data );
 			
-			if ( $scopes = $this->scopesToRequest( isset( Request::i()->scopes ) ? explode( ',', Request::i()->scopes ) : NULL ) )
+			if ( $scopes = $this->scopesToRequest( isset( \IPS\Request::i()->scopes ) ? explode( ',', \IPS\Request::i()->scopes ) : NULL ) )
 			{
 				$target = $target->setQueryString( 'scope', implode( ' ', $scopes ) );
 			}
 			
-			Output::i()->redirect( $target );
+			\IPS\Output::i()->redirect( $target );
 		}
 	}
 	
@@ -253,22 +212,25 @@ abstract class OAuth2 extends Handler
 	/**
 	 * Authenticate
 	 *
-	 * @param	Login	$login				The login object
-	 * @param string $usernameOrEmail	The username or email address provided by the user
-	 * @param object $password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
-	 * @return	Member
-	 * @throws	Exception
+	 * @param	\IPS\Login	$login				The login object
+	 * @param	string		$usernameOrEmail	The username or email address provided by the user
+	 * @param	object		$password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @return	\IPS\Member
+	 * @throws	\IPS\Login\Exception
 	 */
-	public function authenticateUsernamePassword( Login $login, string $usernameOrEmail, object $password ): Member
+	public function authenticateUsernamePassword( \IPS\Login $login, $usernameOrEmail, $password )
 	{
 		if( !$usernameOrEmail )
 		{
 			$member = NULL;
 
-			$member = new Member;
-			$member->email = $usernameOrEmail;
+			if ( $this->authType() & \IPS\Login::AUTH_TYPE_EMAIL )
+			{
+				$member = new \IPS\Member;
+				$member->email = $usernameOrEmail;
+			}
 
-			throw new Exception( Member::loggedIn()->language()->addToStack( 'login_bad_username_or_password', FALSE ), Exception::NO_ACCOUNT, NULL, $member );
+			throw new \IPS\Login\Exception( \IPS\Member::loggedIn()->language()->addToStack( 'login_bad_username_or_password', FALSE, array( 'pluralize' => array( $this->authType() ) ) ), \IPS\Login\Exception::NO_ACCOUNT, NULL, $member );
 		}
 
 		$data =  array(
@@ -287,8 +249,8 @@ abstract class OAuth2 extends Handler
 		}
 		catch ( \Exception $e )
 		{
-			Log::log( $e, 'oauth' );
-			throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+			\IPS\Log::log( $e, 'oauth' );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		if ( isset( $accessToken['access_token'] ) )
@@ -301,39 +263,62 @@ abstract class OAuth2 extends Handler
 			{
 				$member = NULL;
 
-				$member = new Member;
-				$member->email = $usernameOrEmail;
+				if ( $this->authType() & \IPS\Login::AUTH_TYPE_EMAIL )
+				{
+					$member = new \IPS\Member;
+					$member->email = $usernameOrEmail;
+				}
 
-				throw new Exception( Member::loggedIn()->language()->addToStack( 'login_bad_username_or_password', FALSE ), Exception::NO_ACCOUNT, NULL, $member );
+				throw new \IPS\Login\Exception( \IPS\Member::loggedIn()->language()->addToStack( 'login_bad_username_or_password', FALSE, array( 'pluralize' => array( $this->authType() ) ) ), \IPS\Login\Exception::NO_ACCOUNT, NULL, $member );
 			}
 			
-			Log::log( print_r( $accessToken, TRUE ), 'oauth' );
-			throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+			\IPS\Log::log( print_r( $accessToken, TRUE ), 'oauth' );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 	}
 	
 	/**
 	 * Authenticate
 	 *
-	 * @param	Member	$member		The member
-	 * @param object $password	The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	\IPS\Member	$member		The member
+	 * @param	object		$password	The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	bool
 	 */
-	public function authenticatePasswordForMember( Member $member, object $password ): bool
+	public function authenticatePasswordForMember( \IPS\Member $member, $password )
 	{
-		try
+		if ( $this->authType() & \IPS\Login::AUTH_TYPE_USERNAME )
 		{
-			$response =  $this->_authenticatedRequest( $this->tokenEndpoint(), array(
-				'grant_type'	=> 'password',
-				'username'		=> $member->email,
-				'password'		=> (string) $password,
-			) )->decodeJson();
-			if ( isset( $response['access_token'] ) )
+			try
 			{
-				return TRUE;
+				$response = $this->_authenticatedRequest( $this->tokenEndpoint(), array(
+					'grant_type'	=> 'password',
+					'username'		=> $member->name,
+					'password'		=> (string) $password,
+				) )->decodeJson();
+				if ( isset( $response['access_token'] ) )
+				{
+					return TRUE;
+				}
 			}
+			catch ( \Exception $e ) { }
 		}
-		catch ( \Exception $e ) { }
+		
+		if ( $this->authType() & \IPS\Login::AUTH_TYPE_EMAIL )
+		{
+			try
+			{
+				$response =  $this->_authenticatedRequest( $this->tokenEndpoint(), array(
+					'grant_type'	=> 'password',
+					'username'		=> $member->email,
+					'password'		=> (string) $password,
+				) )->decodeJson();
+				if ( isset( $response['access_token'] ) )
+				{
+					return TRUE;
+				}
+			}
+			catch ( \Exception $e ) { }
+		}
 		
 		return FALSE;
 	}
@@ -348,19 +333,18 @@ abstract class OAuth2 extends Handler
 	 *
 	 * @return	string
 	 */
-	protected function _authenticationType(): string
+	protected function _authenticationType()
 	{
 		return static::AUTHENTICATE_HEADER;
 	}
-
+	
 	/**
 	 * Send request authenticated with client credentials
 	 *
-	 * @param Url $url The URL
-	 * @param array $data
-	 * @return    Response
+	 * @param	\IPS\Http\Url	$url	The URL
+	 * @return	\IPS\Http\Response
 	 */
-	protected function _authenticatedRequest( Url $url, array $data ): Response
+	protected function _authenticatedRequest( \IPS\Http\Url $url, $data )
 	{
 		$request = $url->request();
 		
@@ -380,40 +364,40 @@ abstract class OAuth2 extends Handler
 	/**
 	 * Handle authorization response
 	 *
-	 * @param	Login	$login		The login object
-	 * @return	Member|null
-	 * @throws	Exception
+	 * @param	\IPS\Login	$login		The login object
+	 * @return	\IPS\Member
+	 * @throws	\IPS\Login\Exception
 	 */
-	protected function _handleAuthorizationResponse( Login $login ): ?Member
+	protected function _handleAuthorizationResponse( \IPS\Login $login )
 	{
 		/* Did we get an error? */
-		if ( isset( Request::i()->error ) )
+		if ( isset( \IPS\Request::i()->error ) )
 		{
-			if ( Request::i()->error === 'access_denied' )
+			if ( \IPS\Request::i()->error === 'access_denied' )
 			{
 				return NULL;
 			}
 			else
 			{
-				Log::log( print_r( $_GET, TRUE ), 'oauth' );
-				throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+				\IPS\Log::log( print_r( $_GET, TRUE ), 'oauth' );
+				throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 		}
 		
 		/* If we have a code, swap it for an access token, otherwise, decode what we have */
-		if ( isset( Request::i()->code ) )
+		if ( isset( \IPS\Request::i()->code ) )
 		{
-			$accessToken = $this->_exchangeAuthorizationCodeForAccessToken( Request::i()->code );
+			$accessToken = $this->_exchangeAuthorizationCodeForAccessToken( \IPS\Request::i()->code );
 		}
 		else
 		{
 			$accessToken = array(
-				'access_token'	=> Request::i()->access_token,
-				'token_type'	=> isset( Request::i()->token_type ) ? Request::i()->token_type : 'bearer'
+				'access_token'	=> \IPS\Request::i()->access_token,
+				'token_type'	=> isset( \IPS\Request::i()->token_type ) ? \IPS\Request::i()->token_type : 'bearer'
 			);
-			if ( isset( Request::i()->expires_in ) )
+			if ( isset( \IPS\Request::i()->expires_in ) )
 			{
-				$accessToken['expires_in'] = Request::i()->expires_in;
+				$accessToken['expires_in'] = \IPS\Request::i()->expires_in;
 			}
 		}
 		
@@ -424,12 +408,12 @@ abstract class OAuth2 extends Handler
 	/**
 	 * Process an Access Token
 	 *
-	 * @param	Login	$login			The login object
-	 * @param array $accessToken	Access Token
-	 * @return	Member
-	 * @throws	Exception
+	 * @param	\IPS\Login	$login			The login object
+	 * @param	array		$accessToken	Access Token
+	 * @return	\IPS\Member
+	 * @throws	\IPS\Login\Exception
 	 */
-	protected function _processAccessToken( Login $login, array $accessToken ): Member
+	protected function _processAccessToken( \IPS\Login $login, $accessToken )
 	{		
 		/* Get user id */
 		try
@@ -438,8 +422,8 @@ abstract class OAuth2 extends Handler
 		}
 		catch ( \Exception $e )
 		{
-			Log::log( $e, 'oauth' );
-			throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+			\IPS\Log::log( $e, 'oauth' );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		/* What scopes did we get? */
@@ -455,20 +439,20 @@ abstract class OAuth2 extends Handler
 		/* Has this user signed in with this service before? */
 		try
 		{
-			$oauthAccess = Db::i()->select( '*', 'core_login_links', array( 'token_login_method=? AND token_identifier=?', $this->id, $userId ) )->first();
-			$member = Member::load( $oauthAccess['token_member'] );
+			$oauthAccess = \IPS\Db::i()->select( '*', 'core_login_links', array( 'token_login_method=? AND token_identifier=?', $this->id, $userId ) )->first();
+			$member = \IPS\Member::load( $oauthAccess['token_member'] );
 			
 			/* If the user never finished the linking process, or the account has been deleted, discard this access token */
 			if ( !$oauthAccess['token_linked'] or !$member->member_id )
 			{
-				Db::i()->delete( 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $oauthAccess['token_member'] ) );
-				throw new UnderflowException;
+				\IPS\Db::i()->delete( 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $oauthAccess['token_member'] ) );
+				throw new \UnderflowException;
 			}
 			
 			/* Otherwise, update our token without replacing values already set but not reset in this request... */
 			$update = array( 
 				'token_access_token'	=> $accessToken['access_token'],
-				'token_expires'			=> ( isset( $accessToken['expires_in'] ) ) ? ( time() + intval( $accessToken['expires_in'] ) ) : NULL
+				'token_expires'			=> ( isset( $accessToken['expires_in'] ) ) ? ( time() + \intval( $accessToken['expires_in'] ) ) : NULL
 			);
 
 			if( isset( $accessToken['refresh_token'] ) )
@@ -481,13 +465,13 @@ abstract class OAuth2 extends Handler
 				$update['token_scope'] = json_encode( $scope );
 			}
 
-			Db::i()->update( 'core_login_links', $update, array( 'token_login_method=? AND token_member=?', $this->id, $oauthAccess['token_member'] ) );
+			\IPS\Db::i()->update( 'core_login_links', $update, array( 'token_login_method=? AND token_member=?', $this->id, $oauthAccess['token_member'] ) );
 			
 			/* ... and return the member object */
 			return $member;
 		}
 		/* No, create or link the account */
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			/* Get the username + email */
 			$name = NULL;
@@ -506,9 +490,9 @@ abstract class OAuth2 extends Handler
 			
 			try
 			{
-				if ( $login->type === Login::LOGIN_UCP )
+				if ( $login->type === \IPS\Login::LOGIN_UCP )
 				{
-					$exception = new Exception( 'generic_error', Exception::MERGE_SOCIAL_ACCOUNT );
+					$exception = new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::MERGE_SOCIAL_ACCOUNT );
 					$exception->handler = $this;
 					$exception->member = $login->reauthenticateAs;
 					throw $exception;
@@ -516,14 +500,14 @@ abstract class OAuth2 extends Handler
 				
 				$member = $this->createAccount( $name, $email );
 				
-				Db::i()->replace( 'core_login_links', array(
+				\IPS\Db::i()->replace( 'core_login_links', array(
 					'token_login_method'	=> $this->id,
 					'token_member'			=> $member->member_id,
 					'token_identifier'		=> $userId,
 					'token_linked'			=> 1,
 					'token_access_token'	=> $accessToken['access_token'],
-					'token_expires'			=> isset( $accessToken['expires_in'] ) ? ( time() + intval( $accessToken['expires_in'] ) ) : NULL,
-					'token_refresh_token'	=> $accessToken['refresh_token'] ?? NULL,
+					'token_expires'			=> isset( $accessToken['expires_in'] ) ? ( time() + \intval( $accessToken['expires_in'] ) ) : NULL,
+					'token_refresh_token'	=> isset( $accessToken['refresh_token'] ) ? $accessToken['refresh_token'] : NULL,
 					'token_scope'			=> $scope ? json_encode( $scope ) : NULL,
 				) );
 				
@@ -549,30 +533,30 @@ abstract class OAuth2 extends Handler
 				
 				return $member;
 			}
-			catch ( Exception $exception )
+			catch ( \IPS\Login\Exception $exception )
 			{
-				if ( $exception->getCode() === Exception::MERGE_SOCIAL_ACCOUNT )
+				if ( $exception->getCode() === \IPS\Login\Exception::MERGE_SOCIAL_ACCOUNT )
 				{
 					try
 					{
-						$identifier = Db::i()->select( 'token_identifier', 'core_login_links', [ 'token_login_method=? AND token_member=?', $this->id, $exception->member->member_id ], flags: Db::SELECT_FROM_WRITE_SERVER )->first();
+						$identifier = \IPS\Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $exception->member->member_id ) )->first();
 
 						if( $identifier != $userId )
 						{
-							$exception->setCode( Exception::LOCAL_ACCOUNT_ALREADY_MERGED );
+							$exception->setCode( \IPS\Login\Exception::LOCAL_ACCOUNT_ALREADY_MERGED );
 							throw $exception;
 						}
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
-						Db::i()->replace( 'core_login_links', array(
+						\IPS\Db::i()->replace( 'core_login_links', array(
 							'token_login_method'	=> $this->id,
 							'token_member'			=> $exception->member->member_id,
 							'token_identifier'		=> $userId,
 							'token_linked'			=> 0,
 							'token_access_token'	=> $accessToken['access_token'],
-							'token_expires'			=> isset( $accessToken['expires_in'] ) ? ( time() + intval( $accessToken['expires_in'] ) ) : NULL,
-							'token_refresh_token'	=> $accessToken['refresh_token'] ?? NULL,
+							'token_expires'			=> isset( $accessToken['expires_in'] ) ? ( time() + \intval( $accessToken['expires_in'] ) ) : NULL,
+							'token_refresh_token'	=> isset( $accessToken['refresh_token'] ) ? $accessToken['refresh_token'] : NULL,
 							'token_scope'			=> $scope ? json_encode( $scope ) : NULL,
 						) );
 					}
@@ -586,11 +570,11 @@ abstract class OAuth2 extends Handler
 	/**
 	 * Exchange authorization code for access token
 	 *
-	 * @param string $code	Authorization code
+	 * @param	string	$code	Authorization code
 	 * @return	array
-	 * @throws	Exception
+	 * @throws	\IPS\Login\Exception
 	 */
-	protected function _exchangeAuthorizationCodeForAccessToken( string $code ): array
+	protected function _exchangeAuthorizationCodeForAccessToken( $code )
 	{
 		/* Make the request */
 		$data = NULL;
@@ -605,24 +589,24 @@ abstract class OAuth2 extends Handler
 
 			if( $this->pkceSupported === TRUE )
 			{
-				$post['code_verifier'] = Request::i()->cookie['codeVerifier'] ?? NULL;
+				$post['code_verifier'] = \IPS\Request::i()->cookie['codeVerifier'] ?: NULL;
 			}
 
 			$data = $this->_authenticatedRequest( $this->tokenEndpoint(), $post );
 
 			$response = $data->decodeJson();
-			Request::i()->setCookie('codeVerifier', NULL );
+			\IPS\Request::i()->setCookie('codeVerifier', NULL );
 		}
-		catch( RuntimeException $e )
+		catch( \RuntimeException $e )
 		{
-			Log::log( var_export( $data, true ), 'oauth' );
+			\IPS\Log::log( var_export( $data, true ), 'oauth' );
 		}
 		
 		/* Check for any errors */
 		if ( isset( $response['error'] ) or !isset( $response['access_token'] ) or ( isset( $response['token_type'] ) and mb_strtolower( $response['token_type'] ) !== 'bearer' ) )
 		{
-			Log::log( print_r( $response, TRUE ), 'oauth' );
-			throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+			\IPS\Log::log( print_r( $response, TRUE ), 'oauth' );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}		
 		
 		/* Return */
@@ -632,10 +616,10 @@ abstract class OAuth2 extends Handler
 	/**
 	 * Get link
 	 *
-	 * @param	Member	$member	Member
-	 * @return	array|null
+	 * @param	\IPS\Member	$member	Member
+	 * @return	array
 	 */
-	protected function _link( Member $member ): ?array
+	protected function _link( \IPS\Member $member )
 	{
 		$link = parent::_link( $member );
 
@@ -652,16 +636,18 @@ abstract class OAuth2 extends Handler
 				{
 					if( !isset( $newAccessToken['error'] ) OR $newAccessToken['error'] != 'invalid_grant' )
 					{
-						Log::log( print_r( $newAccessToken, TRUE ), 'oauth' );
+						\IPS\Log::log( print_r( $newAccessToken, TRUE ), 'oauth' );
 					}
 
-					Db::i()->update( 'core_login_links', array( 'token_refresh_token' => NULL ), array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) );
+					\IPS\Db::i()->update( 'core_login_links', array( 'token_refresh_token' => NULL ), array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) );
 					return $link;
 				}
 				
-				$update = array(
-					'token_access_token' => $newAccessToken['access_token']
-				);
+				$update = array();
+				if ( isset( $newAccessToken['access_token'] ) )
+				{
+					$update['token_access_token'] = $newAccessToken['access_token'];
+				}
 				if ( isset( $newAccessToken['expires_in'] ) )
 				{
 					$update['token_expires'] = ( time() + $newAccessToken['expires_in'] );
@@ -676,11 +662,11 @@ abstract class OAuth2 extends Handler
 					$link[ $k ] = $v;
 					$this->_cachedLinks[ $member->member_id ][ $k ] = $v;
 				}
-				Db::i()->update( 'core_login_links', $update, array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) );
+				\IPS\Db::i()->update( 'core_login_links', $update, array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) );
 			}
 			catch ( \Exception $e )
 			{
-				Log::log( $e, 'oauth' );
+				\IPS\Log::log( $e, 'oauth' );
 			}
 		}
 		
@@ -694,7 +680,7 @@ abstract class OAuth2 extends Handler
 	 *
 	 * @return	string
 	 */
-	abstract protected function grantType(): string;
+	abstract protected function grantType();
 	
 	/**
 	 * Get scopes to request
@@ -702,7 +688,7 @@ abstract class OAuth2 extends Handler
 	 * @param	array|NULL	$additional	Any additional scopes to request
 	 * @return	array
 	 */
-	protected function scopesToRequest( array $additional=NULL ): array
+	protected function scopesToRequest( $additional=NULL )
 	{
 		return array();
 	}
@@ -713,18 +699,17 @@ abstract class OAuth2 extends Handler
 	 * @param	string		$accessToken	Access Token
 	 * @return	array|NULL
 	 */
-	public function scopesIssued( string $accessToken ): ?array
+	public function scopesIssued( $accessToken )
 	{
 		return $this->scopesToRequest(); // Unless the individual handler overrides this, we'll just assume it's given us what we asked for (which is how the OAuth spec says you're supposed to do it anyway)
 	}
-
+	
 	/**
 	 * Authorized scopes
 	 *
-	 * @param Member $member
-	 * @return    array|NULL
+	 * @return	array|NULL
 	 */
-	public function authorizedScopes( Member $member ): ?array
+	public function authorizedScopes( \IPS\Member $member )
 	{
 		if ( !( $link = $this->_link( $member ) ) )
 		{
@@ -737,35 +722,35 @@ abstract class OAuth2 extends Handler
 	/**
 	 * Authorization Endpoint
 	 *
-	 * @param	Login	$login	The login object
-	 * @return	Url
+	 * @param	\IPS\Login	$login	The login object
+	 * @return	\IPS\Http\Url
 	 */
-	abstract protected function authorizationEndpoint( Login $login ): Url;
+	abstract protected function authorizationEndpoint( \IPS\Login $login );
 	
 	/**
 	 * Token Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	abstract protected function tokenEndpoint(): Url;
+	abstract protected function tokenEndpoint();
 	
 	/**
 	 * Redirection Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function redirectionEndpoint(): Url
+	protected function redirectionEndpoint()
 	{
-		return Url::internal( 'oauth/callback/', 'none' );
+		return \IPS\Http\Url::internal( 'oauth/callback/', 'none' );
 	}
 	
 	/**
 	 * Get authenticated user's identifier (may not be a number)
 	 *
 	 * @param	string	$accessToken	Access Token
-	 * @return	string|null
+	 * @return	string
 	 */
-	abstract protected function authenticatedUserId( string $accessToken ): ?string;
+	abstract protected function authenticatedUserId( $accessToken );
 	
 	/**
 	 * Get authenticated user's username
@@ -774,7 +759,7 @@ abstract class OAuth2 extends Handler
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedUserName( string $accessToken ): ?string
+	protected function authenticatedUserName( $accessToken )
 	{
 		return NULL;
 	}
@@ -786,7 +771,7 @@ abstract class OAuth2 extends Handler
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedEmail( string $accessToken ): ?string
+	protected function authenticatedEmail( $accessToken )
 	{
 		return NULL;
 	}
@@ -795,17 +780,17 @@ abstract class OAuth2 extends Handler
 	 * Get user's identifier (may not be a number)
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userId( Member $member ): ?string
+	public function userId( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		return $this->authenticatedUserId( $link['token_access_token'] );
@@ -815,17 +800,17 @@ abstract class OAuth2 extends Handler
 	 * Get user's profile name
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfileName( Member $member ): ?string
+	public function userProfileName( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		return $this->authenticatedUserName( $link['token_access_token'] );
@@ -835,17 +820,17 @@ abstract class OAuth2 extends Handler
 	 * Get user's email address
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userEmail( Member $member ): ?string
+	public function userEmail( \IPS\Member $member )
 	{
 		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		return $this->authenticatedEmail( $link['token_access_token'] );
@@ -856,10 +841,10 @@ abstract class OAuth2 extends Handler
 	/**
 	 * Show in Account Settings?
 	 *
-	 * @param	Member|NULL	$member	The member, or NULL for if it should show generally
+	 * @param	\IPS\Member|NULL	$member	The member, or NULL for if it should show generally
 	 * @return	bool
 	 */
-	public function showInUcp( Member $member = NULL ): bool
+	public function showInUcp( \IPS\Member $member = NULL )
 	{
 		$return = parent::showInUcp( $member );
 
@@ -876,7 +861,7 @@ abstract class OAuth2 extends Handler
 	 *
 	 * @return	bool
 	 */
-	public function hasSyncOptions(): bool
+	public function hasSyncOptions()
 	{
 		return TRUE;
 	}
@@ -886,18 +871,18 @@ abstract class OAuth2 extends Handler
 	 *
 	 * @return	string | NULL
 	 */
-	public function clientSecret() : ?string
+	public function clientSecret()
 	{
-		return $this->settings['client_secret'] ?? NULL;
+		return isset( $this->settings['client_secret'] ) ? $this->settings['client_secret'] : NULL;
 	}
 	
 	/**
 	 * [Node] Save Add/Edit Form
 	 *
 	 * @param	array	$values	Values from the form
-	 * @return    mixed
+	 * @return	void
 	 */
-	public function saveForm( array $values ): mixed
+	public function saveForm( $values )
 	{
         /* If we are prompting users we need to disable force syncing */
 		if( isset( $values['login_settings']['real_name'] ) AND $values['login_settings']['real_name'] == 0 )
@@ -905,6 +890,6 @@ abstract class OAuth2 extends Handler
 			$values['login_settings']['update_name_changes'] = "disabled";
 		}
 		
-		return parent::saveForm( $values );
+		parent::saveForm( $values );
 	}	
 }

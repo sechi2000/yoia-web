@@ -12,53 +12,40 @@
 namespace IPS\nexus\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * donations Widget
  */
-class donations extends PermissionCache implements Customizable
+class _donations extends \IPS\Widget\StaticCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'donations';
+	public $key = 'donations';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'nexus';
-
+	public $app = 'nexus';
+		
 	/**
-	 * Constructor
-	 *
-	 * @param String $uniqueKey				Unique key for this specific instance
-	 * @param	array				$configuration			Widget custom configuration
-	 * @param array|string|null $access					Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
-	 * @param string|null $orientation			Orientation (top, bottom, right, left)
-	 * @param string $layout
-	 * @return	void
+	 * @brief	Plugin
 	 */
-	public function __construct(string $uniqueKey, array $configuration, array|string $access=null, string $orientation=null, string $layout='table' )
+	public $plugin = '';
+
+	public function __construct( $uniqueKey, array $configuration, $access=null, $orientation=null )
 	{
-		parent::__construct( $uniqueKey, $configuration, $access, $orientation, $layout );
+		parent::__construct( $uniqueKey, $configuration, $access, $orientation );
 
-		$member = Member::loggedIn();
+		$member = \IPS\Member::loggedIn();
 
-		$theme = $member->skin ?: Theme::defaultTheme();
-		$this->cacheKey = "widget_{$this->key}_" . $this->uniqueKey . '_' . md5( json_encode( $configuration ) . "_" . $member->language()->id . "_" . ( $member->member_id ? 1 : 0 ) . "_" . $theme . "_" . $orientation );
+		$theme = $member->skin ?: \IPS\Theme::defaultTheme();
+		$this->cacheKey = "widget_{$this->key}_" . $this->uniqueKey . '_' . md5( json_encode( $configuration ) . "_" . $member->language()->id . "_" . $member->member_id ? 1 : 0 . "_" . $theme . "_" . $orientation );
 	}
 
 	/**
@@ -66,9 +53,10 @@ class donations extends PermissionCache implements Customizable
 	 *
 	 * @return void
 	 */ 
-	public function init(): void
+	public function init()
 	{
-		parent::init();
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'donations.css', 'nexus' ) );
+		return parent::init();
 	}
 
 	/**
@@ -76,14 +64,8 @@ class donations extends PermissionCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
-		/* Do we have any donation goals to show? */
-		if( !Settings::i()->donation_goals )
-		{
-			return "";
-		}
-
 		return $this->output();
 	}
 }

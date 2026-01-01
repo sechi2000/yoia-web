@@ -17,129 +17,71 @@
 namespace IPS\cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use DomainException;
-use ErrorException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Content;
-use IPS\CustomField;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Exception as DbException;
-use IPS\Dispatcher;
-use IPS\Extensions\CustomFieldAbstract;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Codemirror;
-use IPS\Helpers\Form\Color;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Stack;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\WidthHeight;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Node\Permissions;
-use IPS\Output;
-use IPS\Patterns\ActiveRecord;
-use IPS\Request;
-use IPS\Task;
-use IPS\Text\Encrypt;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use UnderflowException;
-use function call_user_func;
-use function call_user_func_array;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_integer;
-use function is_numeric;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Database Field Node
  */
-class Fields extends CustomField implements Permissions
+class _Fields extends \IPS\CustomField implements \IPS\Node\Permissions
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons = array();
+	protected static $multitons = array();
 		
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'cms_database_fields';
+	public static $databaseTable = 'cms_database_fields';
 	
 	/**
 	 * @brief	[Fields] Custom Database Id
 	 */
-	public static ?int $customDatabaseId = NULL;
+	public static $customDatabaseId = NULL;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'field_';
+	public static $databasePrefix = 'field_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array('field_id', 'field_key');
+	protected static $databaseIdFields = array('field_id', 'field_key');
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 	
 	/**
 	 * @brief	[CustomField] Title/Description lang prefix
 	 */
-	protected static string $langKey = 'content_field';
+	protected static $langKey = 'content_field';
 	
 	/**
 	 * @brief	Have fetched all?
 	 */
-	protected static bool $gotAll = FALSE;
+	protected static $gotAll = FALSE;
 	
 	/**
 	 * @brief	The map of permission columns
 	 */
-	public static array $permissionMap = array(
+	public static $permissionMap = array(
 			'view' 				=> 'view',
 			'edit'				=> 2,
 			'add'               => 3
@@ -148,22 +90,22 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * @brief	[Node] App for permission index
 	*/
-	public static ?string $permApp = 'cms';
+	public static $permApp = 'cms';
 	
 	/**
 	 * @brief	[Node] Type for permission index
 	 */
-	public static ?string $permType = 'fields';
+	public static $permType = 'fields';
 	
 	/**
 	 * @brief	[Node] Prefix string that is automatically prepended to permission matrix language strings
 	 */
-	public static string $permissionLangPrefix = 'perm_content_field_';
+	public static $permissionLangPrefix = 'perm_content_field_';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'cms',
 		'module'	=> 'databases',
 		'prefix'	=> 'cms_fields_',
@@ -172,42 +114,42 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'content_field_';
-
+	public static $titleLangPrefix = 'content_field_';
+	
 	/**
 	 * @brief	[Node] Sortable?
 	 */
-	public static bool $nodeSortable = TRUE;
+	public static $nodeSortable = TRUE;
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = '';
+	public static $nodeTitle = '';
 	
 	/**
 	 * @brief	[CustomField] Database table
 	 */
-	protected static string $contentDatabaseTable = '';
+	protected static $contentDatabaseTable;
 	
 	/**
 	 * @brief	[CustomField] Upload storage extension
 	 */
-	protected static string $uploadStorageExtension = 'cms_Records';
+	protected static $uploadStorageExtension = 'cms_Records';
 	
 	/**
 	 * @brief	[CustomField] Set to TRUE if uploads fields are capable of holding the submitted content for moderation
 	 */
-	public static bool $uploadsCanBeModerated = TRUE;
+	public static $uploadsCanBeModerated = TRUE;
 
 	/**
 	 * @brief	[CustomField] Cache retrieved fields
 	 */
-	protected static array $cache = array();
+	protected static $cache = array();
 
 	/**
 	 * @brief   Custom Media fields
 	 */
-	protected static array $mediaFields = array( 'Youtube', 'Spotify', 'Soundcloud' );
+	protected static $mediaFields = array( 'Youtube', 'Spotify', 'Soundcloud' );
 
 	/**
 	 * @brief	Skip the title and content fields
@@ -237,33 +179,30 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * @brief	Fields that cannot be title fields
 	 */
-	public static array $cannotBeTitleFields = array( 'Member', 'Editor', 'CheckboxSet', 'YesNo', 'Radio', 'Item' );
+	public static $cannotBeTitleFields = array( 'Member', 'Editor', 'CheckboxSet', 'YesNo', 'Radio', 'Item' );
 	
 	/**
 	 * @brief	Fields that cannot be content fields
 	 */
-	public static array $cannotBeContentFields = array();
+	public static $cannotBeContentFields = array();
 	
 	/**
 	 * @brief	Fields that can be filtered on the front end. These appear in \Table advanced search and also in the DatabaseFilters widget.
 	 */
-	protected static array $filterableFields = array( 'CheckboxSet', 'Radio', 'Select', 'YesNo', 'Date', 'Member' );
-
-	/**
-	 * @brief	Fields that use toggles
-	 */
-	public static array $canUseTogglesFields = array( 'Checkbox', 'CheckboxSet', 'Radio', 'Select', 'YesNo' );
-
+	protected static $filterableFields = array( 'CheckboxSet', 'Radio', 'Select', 'YesNo', 'Date', 'Member' );
+	
 	/**
 	 * Load Record
 	 *
-	 * @param int|string|null $id ID
-	 * @param string|null $idField The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
-	 * @param mixed $extraWhereClause Additional where clause(s) (see \IPS\Db::build for details)
-	 * @return ActiveRecord|Fields
-	 * @see        Db::build
+	 * @see		\IPS\Db::build
+	 * @param	int|string	$id					ID
+	 * @param	string		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
+	 * @param	mixed		$extraWhereClause	Additional where clause(s) (see \IPS\Db::build for details)
+	 * @return	static
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function load( int|string|null $id, string $idField=NULL, mixed $extraWhereClause=NULL ): ActiveRecord|static
+	public static function load( $id, $idField=NULL, $extraWhereClause=NULL )
 	{
 		if ( $idField === 'field_key' )
 		{
@@ -276,15 +215,15 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * Fetch All Root Nodes
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param mixed $where				Additional WHERE clause
-	 * @param array|null $limit				Limit/offset to use, or NULL for no limit (default)
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	mixed				$where				Additional WHERE clause
+	 * @param	array|NULL			$limit				Limit/offset to use, or NULL for no limit (default)
 	 * @return	array
 	 */
-	public static function roots( ?string $permissionCheck='view', Member $member=NULL, mixed $where=array(), array $limit=NULL ): array
+	public static function roots( $permissionCheck='view', $member=NULL, $where=array(), $limit=NULL )
 	{
-		$permissionCheck = ( Dispatcher::hasInstance() AND Dispatcher::i()->controllerLocation === 'admin' ) ? NULL : $permissionCheck;
+		$permissionCheck = ( \IPS\Dispatcher::hasInstance() AND \IPS\Dispatcher::i()->controllerLocation === 'admin' ) ? NULL : $permissionCheck;
 
 		if ( ! isset( static::$cache[ static::$customDatabaseId ][ $permissionCheck ] ) )
 		{
@@ -295,7 +234,7 @@ class Fields extends CustomField implements Permissions
 
 			foreach( static::$cache[ static::$customDatabaseId ][ $permissionCheck ] as $id => $obj )
 			{
-				if ( ! array_key_exists( $obj->type, static::$additionalFieldTypes ) AND ( ! class_exists( '\IPS\Helpers\Form\\' . IPS::mb_ucfirst( $obj->type ) ) AND ! class_exists( '\IPS\cms\Fields\\' . IPS::mb_ucfirst( $obj->type ) ) ) )
+				if ( ! array_key_exists( $obj->type, static::$additionalFieldTypes ) AND ( ! class_exists( '\IPS\Helpers\Form\\' . mb_ucfirst( $obj->type ) ) AND ! class_exists( '\IPS\cms\Fields\\' . mb_ucfirst( $obj->type ) ) ) )
 				{
 					unset( static::$cache[ static::$customDatabaseId ][ $permissionCheck ][ $id ] );
 					continue;
@@ -306,9 +245,9 @@ class Fields extends CustomField implements Permissions
 				$langToLoad[] = static::$langKey . '_' . $obj->id . '_warning';
 			}
 
-			if ( count( $langToLoad ) AND Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation !== 'setup' )
+			if ( \count( $langToLoad ) AND \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation !== 'setup' )
 			{
-				Member::loggedIn()->language()->get( $langToLoad );
+				\IPS\Member::loggedIn()->language()->get( $langToLoad );
 			}
 		}
 
@@ -320,31 +259,31 @@ class Fields extends CustomField implements Permissions
 	 *
 	 * @return array
 	 */
-	public static function databaseFieldIds(): array
+	public static function databaseFieldIds()
 	{
 		$key = 'cms_fieldids_' . static::$customDatabaseId;
 		
-		if ( ! isset( Store::i()->$key ) )
+		if ( ! isset( \IPS\Data\Store::i()->$key ) )
 		{
-			Store::i()->$key = iterator_to_array( Db::i()->select( 'field_id', 'cms_database_fields', array( array( 'field_database_id=?', static::$customDatabaseId ) ) )->setKeyField('field_id') );
+			\IPS\Data\Store::i()->$key = iterator_to_array( \IPS\Db::i()->select( 'field_id', 'cms_database_fields', array( array( 'field_database_id=?', static::$customDatabaseId ) ) )->setKeyField('field_id') );
 		}
 		
-		return Store::i()->$key;
+		return \IPS\Data\Store::i()->$key;
 	}
 	
 	/**
 	 * Get Field Data
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Model|NULL		$container			Parent container
+	 * @param	string|NULL		            $permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Node\Model|NULL		$container			Parent container
 	 * @param   INT                         $flags              Bit flags
 	 *
 	 * @return	array
 	 */
-	public static function data( string $permissionCheck=NULL, Model $container=NULL, int $flags=0 ): array
+	public static function data( $permissionCheck=NULL, \IPS\Node\Model $container=NULL, $flags=0 )
 	{
 		$fields   = array();
-		$database = Databases::load( static::$customDatabaseId );
+		$database = \IPS\cms\Databases::load( static::$customDatabaseId );
 		
 		foreach( static::roots( $permissionCheck ) as $row )
 		{
@@ -352,7 +291,7 @@ class Fields extends CustomField implements Permissions
 			{
 				if ( $container->fields !== '*' AND $container->fields !== NULL )
 				{
-					if ( ! in_array( $row->id, $container->fields ) AND $row->id != $database->field_title AND $row->id != $database->field_content )
+					if ( ! \in_array( $row->id, $container->fields ) AND $row->id != $database->field_title AND $row->id != $database->field_content )
 					{
 						continue;
 					}
@@ -386,18 +325,18 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * Get Fields
 	 *
-	 * @param array $values				Current values
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Model|NULL		$container			Parent container
-	 * @param int $flags				Bit flags
-	 * @param Records|null       $record             The record itself
-	 * @param bool $includeDefaultValue Include the default value for the field
+	 * @param	array			            $values				Current values
+	 * @param	string|NULL		            $permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Node\Model|NULL		$container			Parent container
+	 * @param	int				            $flags				Bit flags
+	 * @param   \IPS\cms\Records|NULL       $record             The record itself
+	 * @param   bool                        $includeDefaultValue	Include the default value for the field
 	 * @return	array
 	 */
-	public static function fields( array $values, ?string $permissionCheck='view', Model $container=NULL, int $flags=0, Records $record = NULL, bool $includeDefaultValue = TRUE ): array
+	public static function fields( $values, $permissionCheck='view', \IPS\Node\Model $container=NULL, $flags=0, \IPS\cms\Records $record = NULL, bool $includeDefaultValue = TRUE )
 	{
 		$fields        = array();
-		$database      = Databases::load( static::$customDatabaseId );
+		$database      = \IPS\cms\Databases::load( static::$customDatabaseId );
 
 		foreach( static::roots( $permissionCheck ) as $row )
 		{
@@ -407,7 +346,7 @@ class Fields extends CustomField implements Permissions
 			{
 				if ( $container->fields !== '*' AND $container->fields !== NULL )
 				{
-					if ( ! in_array( $row->id, $container->fields ) AND $row->id != $database->field_title AND $row->id != $database->field_content )
+					if ( ! \in_array( $row->id, $container->fields ) AND $row->id != $database->field_title AND $row->id != $database->field_content )
 					{
 						continue;
 					}
@@ -471,7 +410,6 @@ class Fields extends CustomField implements Permissions
 				$customValidationCode = function( $val ) use ( $database, $row, $record )
 				{
 					$class = 'IPS\cms\Fields' . static::$customDatabaseId;
-					/* @var $class Fields */
 					$class::validateUnique( $val, $row, $record );
 				};
 			}
@@ -482,7 +420,7 @@ class Fields extends CustomField implements Permissions
 				{
 					if( $val === NULL )
 					{
-						throw new DomainException( 'form_required' );
+						throw new \DomainException( 'form_required' );
 					}
 				};
 			}
@@ -496,22 +434,21 @@ class Fields extends CustomField implements Permissions
 				$fields[ $row->id ] = $row->buildHelper( $includeDefaultValue ? $row->default_value : NULL , $customValidationCode, $record, $flags );
 			}
 		}
-
 		return $fields;
 	}
 	
 	/**
 	 * Get Values
 	 *
-	 * @param array $values				Current values
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Model|NULL		$container			Parent container
+	 * @param	array			            $values				Current values
+	 * @param	string|NULL		            $permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Node\Model|NULL		$container			Parent container
 	 * @return	array
 	 */
-	public static function values( array $values, ?string $permissionCheck='view', Model $container=NULL ): array
+	public static function values( $values, $permissionCheck='view', \IPS\Node\Model $container=NULL )
 	{
 		$fields   = array();
-		$database = Databases::load( static::$customDatabaseId );
+		$database = \IPS\cms\Databases::load( static::$customDatabaseId );
 		
 		foreach( static::roots( $permissionCheck ) as $row )
 		{
@@ -519,7 +456,7 @@ class Fields extends CustomField implements Permissions
 			{
 				if ( $container->fields !== '*' AND $container->fields !== NULL )
 				{
-					if ( ! in_array( $row->id, $container->fields ) AND $row->id != $database->field_title AND $row->id != $database->field_content )
+					if ( ! \in_array( $row->id, $container->fields ) AND $row->id != $database->field_title AND $row->id != $database->field_content )
 					{
 						continue;
 					}
@@ -538,20 +475,20 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * Display Values
 	 *
-	 * @param array $values				Current values
-	 * @param string|null $display			Type of display (listing/display/raw/processed).
-	 * @param	Model|NULL		$container			Parent container
-	 * @param string $index              Field to index return array on
-	 * @param object|null $record				Record showing this field
+	 * @param	array			            $values				Current values
+	 * @param	string|NULL		            $display			Type of display (listing/display/raw/processed).
+	 * @param	\IPS\Node\Model|NULL		$container			Parent container
+	 * @param   string                      $index              Field to index return array on
+	 * @param	NULL|\IPS\cms\Record		$record				Record showing this field
 	 * @note    Raw means the value saved from the input field, processed has the form display value method called. Listing and display take the options set by the field (badges, custom, etc)
 	 * @return	array
 	 */
-	public static function display( array $values, ?string $display='listing', Model $container=NULL, string $index='key', object $record=NULL ): array
+	public static function display( $values, $display='listing', \IPS\Node\Model $container=NULL, $index='key', $record=NULL )
 	{
 		$fields   = array();
-		$database = Databases::load( static::$customDatabaseId );
+		$database = \IPS\cms\Databases::load( static::$customDatabaseId );
 
-		foreach( static::roots() as $row )
+		foreach( static::roots('view') as $row )
 		{
 			if ( $display !== 'record' AND ( $row->id == $database->field_title OR $row->id == $database->field_content ) )
 			{
@@ -562,7 +499,7 @@ class Fields extends CustomField implements Permissions
 			{
 				if ( $container->fields !== '*' AND $container->fields !== NULL )
 				{
-					if ( ! in_array( $row->id, $container->fields ) AND $row->id != $database->field_title AND $row->id != $database->field_content )
+					if ( ! \in_array( $row->id, $container->fields ) AND $row->id != $database->field_title AND $row->id != $database->field_content )
 					{
 						continue;
 					}
@@ -638,14 +575,14 @@ class Fields extends CustomField implements Permissions
 	 *
 	 * @param   mixed        $value         Processed value
 	 * @param   mixed        $formValue     Raw form value
-	 * @param string $type          Type of display (listing/display/raw/processed).
-	 * @param Records|null $record	Record showing this field
+	 * @param   string       $type          Type of display (listing/display/raw/processed).
+	 * @param	NULL|\IPS\cms\Records	$record	Record showing this field
 	 * @note    Raw means the value saved from the input field, processed has the form display value method called. Listing and display take the options set by the field (badges, custom, etc)
 	 *
 	 * @return mixed|string
-	 * @throws ErrorException
+	 * @throws \ErrorException
 	 */
-	public function formatForDisplay( mixed $value, mixed $formValue, string $type='listing', Records $record=NULL ): mixed
+	public function formatForDisplay( $value, $formValue, $type='listing', $record=NULL )
 	{
 		if ( $type === 'raw' )
 		{
@@ -656,18 +593,18 @@ class Fields extends CustomField implements Permissions
 					$images = array();
 					foreach( explode( ',', $value ) as $val )
 					{
-						$images[] = File::get( static::$uploadStorageExtension, $val )->url;
+						$images[] = \IPS\File::get( static::$uploadStorageExtension, $val )->url;
 					}
 					
 					return $images;
 				}
 				
-				return (string) File::get( static::$uploadStorageExtension, $value )->url;
+				return (string) \IPS\File::get( static::$uploadStorageExtension, $value )->url;
 			}
 
 			if ( $this->type === 'Item' )
 			{
-				if ( ! is_array( $formValue ) and mb_strstr( $formValue, ',' ) )
+				if ( ! \is_array( $formValue ) and mb_strstr( $formValue, ',' ) )
 				{
 					$value = explode( ',', $formValue );
 				}
@@ -676,14 +613,12 @@ class Fields extends CustomField implements Permissions
 					$value = array( $formValue );
 				}
 
-				if ( count( $value ) and isset( $this->extra['database'] ) and $this->extra['database'] )
+				if ( \count( $value ) and isset( $this->extra['database'] ) and $this->extra['database'] )
 				{
 					$results = array();
 					$class   = '\IPS\cms\Records' . $this->extra['database'];
-					/* @var $class Records */
-					/* @var $databaseColumnMap array */
 					$field   = $class::$databasePrefix . $class::$databaseColumnMap['title'];
-					$where   = array( Db::i()->in( $class::$databaseColumnId, $value ) );
+					$where   = array( \IPS\Db::i()->in( $class::$databaseColumnId, $value ) );
 
 					foreach ( $class::getItemsWithPermission( array( $where ), $field, NULL ) as $item )
 					{
@@ -706,16 +641,16 @@ class Fields extends CustomField implements Permissions
 			{
 				if ( $this->is_multiple )
 				{
-					$thumbs = iterator_to_array( Db::i()->select( '*', 'cms_database_fields_thumbnails', array( array( 'thumb_field_id=? AND thumb_record_id=?', $this->id, $record->_id ) ) )->setKeyField('thumb_original_location')->setValueField('thumb_location') );
+					$thumbs = iterator_to_array( \IPS\Db::i()->select( '*', 'cms_database_fields_thumbnails', array( array( 'thumb_field_id=? AND thumb_record_id=?', $this->id, $record->_id ) ) )->setKeyField('thumb_original_location')->setValueField('thumb_location') );
 					$images = array();
 				
 					foreach( $thumbs as $orig => $thumb )
 					{
 						try
 						{
-							$images[] = File::get( static::$uploadStorageExtension, $thumb )->url;
+							$images[] = \IPS\File::get( static::$uploadStorageExtension, $thumb )->url;
 						}
-						catch( Exception $e ) { }
+						catch( \Exception $e ) { }
 					}
 					
 					return $images;
@@ -724,9 +659,9 @@ class Fields extends CustomField implements Permissions
 				{
 					try
 					{
-						return (string) File::get( static::$uploadStorageExtension, Db::i()->select( 'thumb_location', 'cms_database_fields_thumbnails', array( array( 'thumb_field_id=? AND thumb_record_id=?', $this->id, $record->_id ) ) )->first() )->url;
+						return (string) \IPS\File::get( static::$uploadStorageExtension, \IPS\Db::i()->select( 'thumb_location', 'cms_database_fields_thumbnails', array( array( 'thumb_field_id=? AND thumb_record_id=?', $this->id, $record->_id ) ) )->first() )->url;
 					}
-					catch( Exception $e ) { }
+					catch( \Exception $e ) { }
 				}
 			}
 			
@@ -737,7 +672,7 @@ class Fields extends CustomField implements Permissions
 
 		if ( isset( $options[ $type ]['method'] ) AND $options[ $type ]['method'] !== 'simple' )
 		{
-			if ( in_array( $this->type, static::$mediaFields ) )
+			if ( \in_array( $this->type, static::$mediaFields ) )
 			{
 				$template = mb_strtolower( $this->type );
 
@@ -753,9 +688,9 @@ class Fields extends CustomField implements Permissions
 					{
 						try
 						{
-							$value = Theme::i()->getTemplate( 'records', 'cms', 'global' )->$template( $formValue, $this->extra );
+							$value = \IPS\Theme::i()->getTemplate( 'records', 'cms', 'global' )->$template( $formValue, $this->extra );
 						}
-						catch( Exception $e )
+						catch( \Exception $ex )
 						{
 							$value = $formValue;
 						}
@@ -784,11 +719,11 @@ class Fields extends CustomField implements Permissions
 						$objects = array();
 						foreach ( $files as $file )
 						{
-							$object = File::get( static::$uploadStorageExtension, (string) $file );
+							$object = \IPS\File::get( static::$uploadStorageExtension, (string) $file );
 							
 							if ( $object->isImage() and $type === 'display' )
 							{
-								Output::i()->metaTags['og:image:url'][] = (string) $object->url;
+								\IPS\Output::i()->metaTags['og:image:url'][] = (string) $object->url;
 							}
 							
 							$objects[] = $object;
@@ -808,16 +743,16 @@ class Fields extends CustomField implements Permissions
 				}
 				else if ( $options[ $type ]['method'] !== 'none' )
 				{
-					$class = 'ipsBadge--style' . ( is_numeric( $options[ $type ]['method'] ) ? $options[ $type ]['method'] : '1' );
+					$class = 'ipsBadge_style' . $options[ $type ]['method'];
 
 					if ( isset( $options[ $type ]['right'] ) AND $options[ $type ]['right'] )
 					{
-						$class .= ' ' . 'i-float_end';
+						$class .= ' ' . 'ipsPos_right';
 					}
 
-					if ( $this->type === 'Address' and $formValue and isset( $options[ $type ]['map'] ) AND $options[ $type ]['map'] AND GeoLocation::enabled() )
+					if ( $this->type === 'Address' and $formValue and isset( $options[ $type ]['map'] ) AND $options[ $type ]['map'] AND \IPS\GeoLocation::enabled() )
 					{
-						$value .= GeoLocation::buildFromJson( $formValue )->map()->render( $options[ $type ]['mapDims'][0], $options[ $type ]['mapDims'][1] );
+						$value .= \IPS\GeoLocation::buildFromJson( $formValue )->map()->render( $options[ $type ]['mapDims'][0], $options[ $type ]['mapDims'][1] );
 					}
 
 					if ( $this->type === 'Upload' )
@@ -834,21 +769,21 @@ class Fields extends CustomField implements Permissions
 						$parsed = array();
 						foreach( $files as $idx => $file )
 						{
-							$file = File::get( static::$uploadStorageExtension, (string) $file );
+							$file = \IPS\File::get( static::$uploadStorageExtension, (string) $file );
 
 							if ( $file->isImage() and $type === 'display' )
 							{
-								Output::i()->metaTags['og:image:url'][] = (string) $file->url;
+								\IPS\Output::i()->metaTags['og:image:url'][] = (string) $file->url;
 							}
 
-							$fileKey		= Encrypt::fromPlaintext( (string) $file )->tag();
-							$downloadUrl	= Url::internal( 'applications/core/interface/file/cfield.php', 'none' )->setqueryString( array(
+							$fileKey		= \IPS\Text\Encrypt::fromPlaintext( (string) $file )->tag();
+							$downloadUrl	= \IPS\Http\Url::internal( 'applications/core/interface/file/cfield.php', 'none' )->setqueryString( array(
 								'storage'	=> $file->storageExtension,
-								'path'		=> $file->originalFilename,
+								'path'		=> (string) $file->originalFilename,
 								'fileKey'   => $fileKey
 							) );
 							
-							$parsed[] = Theme::i()->getTemplate( 'global', 'cms', 'front' )->uploadDisplay( File::get( static::$uploadStorageExtension, $file ), $record, $downloadUrl, $fileKey );
+							$parsed[] = \IPS\Theme::i()->getTemplate( 'global', 'cms', 'front' )->uploadDisplay( \IPS\File::get( static::$uploadStorageExtension, $file ), $record, $downloadUrl, $fileKey );
 						}
 
 						$value = implode( " ", $parsed );
@@ -870,24 +805,24 @@ class Fields extends CustomField implements Permissions
 						{
 							try
 							{
-								$parsed[] = Member::load( $id )->link();
+								$parsed[] = \IPS\Member::load( $id )->link();
 							}
-							catch( Exception $e ) { }
+							catch( \Exception $e ) { }
 						}
 						
 						$value = implode( ", ", $parsed );
 						
 					}
 
-					$value = Theme::i()->getTemplate( 'records', 'cms', 'global' )->fieldBadge( $this->_title, $value, $class, $options[ $type ]['bgcolor'] ?? null, $options[ $type ]['color'] ?? null );
+					$value = \IPS\Theme::i()->getTemplate( 'records', 'cms', 'global' )->fieldBadge( $this->_title, $value, $class );
 				}
 			}
 		}
 		else
 		{
-			if ( $this->type === 'Address' and $formValue and isset( $options[ $type ]['map'] ) AND $options[ $type ]['map'] AND GeoLocation::enabled() )
+			if ( $this->type === 'Address' and $formValue and isset( $options[ $type ]['map'] ) AND $options[ $type ]['map'] AND \IPS\GeoLocation::enabled() )
 			{
-				$value .= GeoLocation::buildFromJson( $formValue )->map()->render( $options[ $type ]['mapDims'][0], $options[ $type ]['mapDims'][1] );
+				$value .= \IPS\GeoLocation::buildFromJson( $formValue )->map()->render( $options[ $type ]['mapDims'][0], $options[ $type ]['mapDims'][1] );
 			}
 			else if ( $this->type === 'Upload' )
 			{
@@ -900,37 +835,19 @@ class Fields extends CustomField implements Permissions
 					$files = array( $value );
 				}
 				
-				if ( count( $files ) )
+				if ( \count( $files ) )
 				{
 					$parsed = array();
 					foreach( $files AS $file )
 					{
-						$file = File::get( static::$uploadStorageExtension, (string) $file );
-
-						if( $options[ $type ]['method'] == 'simple' )
-						{
-							$fileKey		= Encrypt::fromPlaintext( (string) $file )->tag();
-							$downloadUrl	= Url::internal( 'applications/core/interface/file/cfield.php', 'none' )->setqueryString( array(
-								'storage'	=> $file->storageExtension,
-								'path'		=> $file->originalFilename,
-								'fileKey'   => $fileKey
-							) );
-
-							$parsed[] = Theme::i()->getTemplate( 'global', 'cms', 'front' )->uploadDisplay( File::get( static::$uploadStorageExtension, $file ), $record, $downloadUrl, $fileKey );
-						}
-						else
-						{
-							$parsed[] = Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $file->fullyQualifiedUrl( $file->url ) );
-						}
+						$file = \IPS\File::get( static::$uploadStorageExtension, (string) $file );
+						$parsed[] = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $file->fullyQualifiedUrl( $file->url ) );
 					}
-
 					$value = implode( '', $parsed );
 				}
-
-				$value = implode( " ", $parsed );
 			}
 			
-			$value = Theme::i()->getTemplate( 'records', 'cms', 'global' )->fieldDefault( $this->_title, $value );
+			$value = \IPS\Theme::i()->getTemplate( 'records', 'cms', 'global' )->fieldDefault( $this->_title, $value );
 		}
 
 		return $value;
@@ -939,15 +856,15 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * Parse custom HTML
 	 *
-	 * @param string $type           Type of display
-	 * @param string $template       The HTML to parse
-	 * @param string|null $formValue      The form value (key of select box, for example)
-	 * @param mixed $value          The display value
-	 * @param Records|null $record	Record showing this field
+	 * @param   string  $type           Type of display
+	 * @param   string  $template       The HTML to parse
+	 * @param   string  $formValue      The form value (key of select box, for example)
+	 * @param   string  $value          The display value
+	 * @param	NULL|\IPS\cms\Record	$record	Record showing this field
 	 *
-	 * @return string
+	 * @return \IPS\Theme
 	 */
-	public function parseCustomHtml( string $type, string $template, ?string $formValue, mixed $value, Records $record=null ): string
+	public function parseCustomHtml( $type, $template, $formValue, $value, $record=NULL )
 	{
 		$functionName = $this->fieldTemplateName( $type );
 		$options      = $this->display_json;
@@ -956,60 +873,38 @@ class Fields extends CustomField implements Permissions
 		{
 			$functionName .= '_' . mt_rand();
 			
-			$template = str_replace( '{map}'    , GeoLocation::buildFromJson( $formValue )->map()->render( $options[ $type ]['mapDims'][0], $options[ $type ]['mapDims'][1] ), $template );
-			$template = str_replace( '{address}', GeoLocation::parseForOutput( $formValue ), $template );
-			$template = Theme::compileTemplate( $template, $functionName, '$value, $formValue, $label, $record' );
+			$template = str_replace( '{map}'    , \IPS\GeoLocation::buildFromJson( $formValue )->map()->render( $options[ $type ]['mapDims'][0], $options[ $type ]['mapDims'][1] ), $template );
+			$template = str_replace( '{address}', \IPS\GeoLocation::parseForOutput( $formValue ), $template );
+			$template = \IPS\Theme::compileTemplate( $template, $functionName, '$value, $formValue, $label, $record', true );
 		}
 		else
 		{
 			if ( $this->type === 'Upload' )
 			{
-				if ( is_array( $value ) )
+				if ( \is_array( $value ) )
 				{
 					foreach( $value as $idx => $val )
 					{
-						if ( $val instanceof File )
+						if ( $val instanceof \IPS\File\FileSystem )
 						{
-							$fileKey		= Encrypt::fromPlaintext( (string) $val )->tag();
-							$downloadUrl	= Url::internal( 'applications/core/interface/file/cfield.php', 'none' )->setqueryString( array(
-								'storage'	=> $val->storageExtension,
-								'path'		=> $val->originalFilename,
-								'fileKey'   => $fileKey
-							) );
-
-							$value[ $idx ] = Theme::i()->getTemplate( 'global', 'cms', 'front' )->uploadDisplay( File::get( static::$uploadStorageExtension, $val ), $record, $downloadUrl, $fileKey );
+							$value[ $idx ] = (string) $val->url;
 						}
 					}
 				}
-				else if ( $value instanceof File )
+				else if ( $value instanceof \IPS\File\FileSystem )
 				{
-					$fileKey		= Encrypt::fromPlaintext( (string) $value )->tag();
-					$downloadUrl	= Url::internal( 'applications/core/interface/file/cfield.php', 'none' )->setqueryString( array(
-						'storage'	=> $value->storageExtension,
-						'path'		=> $value->originalFilename,
-						'fileKey'   => $fileKey
-					) );
-
-					$value = Theme::i()->getTemplate( 'global', 'cms', 'front' )->uploadDisplay( File::get( static::$uploadStorageExtension, $value ), $record, $downloadUrl, $fileKey );
+					$value = (string) $value->url;
 				}
-
-				/* Restructure formValue so that it has the full URL */
-				$updatedFormValue = [];
-				foreach( explode( ",", $formValue ) as $val )
-				{
-					$updatedFormValue[] = File::get( static::$uploadStorageExtension, $val )->url;
-				}
-				$formValue = implode( ",", $updatedFormValue );
 			}
-			if ( ! isset( Store::i()->$functionName ) )
+			if ( ! isset( \IPS\Data\Store::i()->$functionName ) )
 			{
-				Store::i()->$functionName = Theme::compileTemplate( $template, $functionName, '$value, $formValue, $label, $record' );
+				\IPS\Data\Store::i()->$functionName = \IPS\Theme::compileTemplate( $template, $functionName, '$value, $formValue, $label, $record', true );
 			}
 
-			$template = Store::i()->$functionName;
+			$template = \IPS\Data\Store::i()->$functionName;
 		}
 
-		Theme::runProcessFunction( $template, $functionName );
+		\IPS\Theme::runProcessFunction( $template, $functionName );
 
 		$themeFunction = 'IPS\\Theme\\'. $functionName;
 		return $themeFunction( $value, $formValue, $this->_title, $record );
@@ -1018,17 +913,17 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * Show this form field?
 	 * 
-	 * @param string $field		Field key
-	 * @param string $where		Where to show, form or record
-	 * @param Group|Member|null $member			The member or group to check (NULL for currently logged in member)
+	 * @param	 string	 	$field		Field key
+	 * @param	 string		$where		Where to show, form or record
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$member			The member or group to check (NULL for currently logged in member)
 	 * @return	 boolean
 	 */
-	public static function fixedFieldFormShow( string $field, string $where='form', Group|Member $member=NULL ): bool
+	public static function fixedFieldFormShow( $field, $where='form', $member=NULL )
 	{
-		$fixedFields = Databases::load( static::$customDatabaseId )->fixed_field_perms;
+		$fixedFields = \IPS\cms\Databases::load( static::$customDatabaseId )->fixed_field_perms;
 		$perm        = ( $where === 'form' ) ? 'perm_2' : 'perm_view';
 		
-		if ( ! in_array( $field, array_keys( $fixedFields ) ) )
+		if ( ! \in_array( $field, array_keys( $fixedFields ) ) )
 		{
 			return FALSE;
 		}
@@ -1043,13 +938,13 @@ class Fields extends CustomField implements Permissions
 		/* Load member */
 		if ( $member === NULL )
 		{
-			$member = Member::loggedIn();
+			$member = \IPS\Member::loggedIn();
 		}
 		
 		/* Finally check permissions */
-		if( $member instanceof Group )
+		if( $member instanceof \IPS\Member\Group )
 		{
-			return ( $permissions[ $perm ] === '*' or ( $permissions[ $perm ] and in_array( $member->g_id, explode( ',', $permissions[ $perm ] ) ) ) );
+			return ( $permissions[ $perm ] === '*' or ( $permissions[ $perm ] and \in_array( $member->g_id, explode( ',', $permissions[ $perm ] ) ) ) );
 		}
 		else
 		{
@@ -1060,14 +955,14 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * Get fixed field permissions as an array or a *
 	 * 
-	 * @param string|null $field		Field Key
+	 * @param	string|null		$field		Field Key
 	 * @return array|string|null
 	 */
-	public static function fixedFieldPermissions( string $field=NULL ): array|string|null
+	public static function fixedFieldPermissions( $field=NULL )
 	{
-		$fixedFields = Databases::load( static::$customDatabaseId )->fixed_field_perms;
+		$fixedFields = \IPS\cms\Databases::load( static::$customDatabaseId )->fixed_field_perms;
 		
-		if ( $field !== NULL AND in_array( $field, array_keys( $fixedFields ) ) )
+		if ( $field !== NULL AND \in_array( $field, array_keys( $fixedFields ) ) )
 		{
 			return $fixedFields[ $field ]; 
 		}
@@ -1078,53 +973,54 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * Set fixed field permissions
 	 *
-	 * @param string $field		Field Key
-	 * @param array $values		Perm values
+	 * @param	string	$field		Field Key
+	 * @param	array	$values		Perm values
 	 * @return  void
 	 */
-	public static function setFixedFieldPermissions( string $field, array $values ) : void
+	public static function setFixedFieldPermissions( $field, $values )
 	{
-		$fixedFields = Databases::load( static::$customDatabaseId )->fixed_field_perms;
+		$fixedFields = \IPS\cms\Databases::load( static::$customDatabaseId )->fixed_field_perms;
 
 		foreach( $values as $k => $v )
 		{
 			$fixedFields[ $field ][ $k ] = $v;
 		}
 
-		Databases::load( static::$customDatabaseId )->fixed_field_perms = $fixedFields;
-		Databases::load( static::$customDatabaseId )->save();
+		\IPS\cms\Databases::load( static::$customDatabaseId )->fixed_field_perms = $fixedFields;
+		\IPS\cms\Databases::load( static::$customDatabaseId )->save();
 	}
 	
 	/**
 	 * Set the visiblity
 	 *
-	 * @param string $field		Field Key
-	 * @param bool $value		True/False
+	 * @param	string	$field		Field Key
+	 * @param	bool	$value		True/False
 	 * @return  void
 	 */
-	public static function setFixedFieldVisibility( string $field, bool $value=FALSE ) : void
+	public static function setFixedFieldVisibility( $field, $value )
 	{
-		$fixedFields = Databases::load( static::$customDatabaseId )->fixed_field_perms;
+		$fixedFields = \IPS\cms\Databases::load( static::$customDatabaseId )->fixed_field_perms;
 	
 		$fixedFields[ $field ]['visible'] = $value;
 
-		Databases::load( static::$customDatabaseId )->fixed_field_perms = $fixedFields;
-		Databases::load( static::$customDatabaseId )->save();
+		\IPS\cms\Databases::load( static::$customDatabaseId )->fixed_field_perms = $fixedFields;
+		\IPS\cms\Databases::load( static::$customDatabaseId )->save();
 	}
 	
 	/**
 	 * Magic method to capture validateInput_{id} callbacks
-	 * @param	string $name		Name of method called
+	 * @param	string 		$name		Name of method called
 	 * @param	mixed 		$arguments	Args passed
-	 *@throws InvalidArgumentException
+	 * @throws \InvalidArgumentException
+	 * @return	mixed
 	 */
-	public static function __callStatic( string $name, mixed $arguments)
+	public static function __callStatic($name, $arguments)
 	{
 		if ( mb_substr( $name, 0, 14 ) === 'validateInput_' )
 		{
 			$id = mb_substr( $name, 14 );
 			
-			if ( is_numeric( $id ) )
+			if ( \is_numeric( $id ) )
 			{
 				$field = static::load( $id );
 			}
@@ -1133,7 +1029,7 @@ class Fields extends CustomField implements Permissions
 			{
 				if ( ! preg_match( $field->validator_custom, $arguments[0] ) )
 				{
-					throw new InvalidArgumentException( ( Member::loggedIn()->language()->addToStack('content_field_' . $field->id . '_validation_error') === 'content_field_' . $field->id . '_validation_error' ) ? 'content_exception_invalid_custom_validation' : Member::loggedIn()->language()->addToStack('content_field_' . $field->id . '_validation_error') );
+					throw new \InvalidArgumentException( ( \IPS\Member::loggedIn()->language()->addToStack('content_field_' . $field->id . '_validation_error') === 'content_field_' . $field->id . '_validation_error' ) ? 'content_exception_invalid_custom_validation' : \IPS\Member::loggedIn()->language()->addToStack('content_field_' . $field->id . '_validation_error') );
 				}
 			}
 		}
@@ -1143,22 +1039,22 @@ class Fields extends CustomField implements Permissions
 	 * Checks to see if this value is unique
 	 * Used in custom validation for fomr helpers
 	 *
-	 * @param mixed $val	The value to check
-	 * @param Fields $field	The field
-	 * @param Records|null $record	The record (if any)
+	 * @param	string		$val	The value to check
+	 * @param	\IPS\cms\Fields	$field	The field
+	 * @param	\IPS\cms\Records	$record	The record (if any)
 	 * @return	void
-	 * @throws LogicException
+	 * @throws \LogicException
 	 */
-	public static function validateUnique( mixed $val, Fields $field, ?Records $record ) : void
+	public static function validateUnique( $val, $field, $record )
 	{
 		if ( $val === '' )
 		{
 			return;
 		}
 		
-		$database = Databases::load( static::$customDatabaseId );
+		$database = \IPS\cms\Databases::load( static::$customDatabaseId );
 
-		if( $field->type == 'Member' AND $val instanceof Member )
+		if( $field->type == 'Member' AND $val instanceof \IPS\Member )
 		{
 			$val = $val->member_id;
 		}
@@ -1171,9 +1067,9 @@ class Fields extends CustomField implements Permissions
 			$where[] = array( 'primary_id_field != ?', $record->_id );
 		}
 
-		if ( Db::i()->select( 'COUNT(*)', 'cms_custom_database_' . $database->id, $where )->first() )
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'cms_custom_database_' . $database->id, $where )->first() )
 		{
-			throw new LogicException( Member::loggedIn()->language()->addToStack( "field_unique_entry_not_unique", FALSE, array( 'sprintf' => array( $database->recordWord( 1 ) ) ) ) );
+			throw new \LogicException( \IPS\Member::loggedIn()->language()->addToStack( "field_unique_entry_not_unique", FALSE, array( 'sprintf' => array( $database->recordWord( 1 ) ) ) ) );
 		}
 	}
 	
@@ -1200,7 +1096,7 @@ class Fields extends CustomField implements Permissions
 	 * 
 	 * @return void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->_data['extra'] = '';
 		$this->_data['default_value'] = '';
@@ -1209,16 +1105,16 @@ class Fields extends CustomField implements Permissions
 		$this->_data['topic_format'] = '';
 		$this->_data['allowed_extensions'] = '';
 		$this->_data['validator_custom'] = '';
-		$this->_data['display_json'] = array();
+		$this->_data['display_json'] = array();;
 	}
 
 	/**
 	 * Field custom template name
 	 *
-	 * @param string $type   Type of name to fetch
+	 * @param   string  $type   Type of name to fetch
 	 * @return	string
 	 */
-	public function fieldTemplateName( string $type ): string
+	public function fieldTemplateName( $type )
 	{
 		return 'pages_field_custom_html_' . $type . '_' . $this->id;
 	}
@@ -1226,12 +1122,12 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * Set the "display json" field
 	 *
-	 * @param mixed $value	Value
+	 * @param string|array $value	Value
 	 * @return void
 	 */
-	public function set_display_json( mixed $value ) : void
+	public function set_display_json( $value )
 	{
-		$this->_data['display_json'] = ( is_array( $value ) ? json_encode( $value ) : $value );
+		$this->_data['display_json'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
 	}
 
 	/**
@@ -1239,72 +1135,72 @@ class Fields extends CustomField implements Permissions
 	 *
 	 * @return array
 	 */
-	public function get_display_json(): array
+	public function get_display_json()
 	{
-		return ( is_array( $this->_data['display_json'] ) ) ? $this->_data['display_json'] : ( isset( $this->_data['display_json'] ) ? json_decode( $this->_data['display_json'], TRUE ) : [] );
+		return ( \is_array( $this->_data['display_json'] ) ) ? $this->_data['display_json'] : json_decode( $this->_data['display_json'], TRUE );
 	}
 
 	/**
 	 * Set the "Format Options" field
 	 *
-	 * @param mixed $value	Value
+	 * @param string|array $value	Value
 	 * @return void
 	 */
-	public function set_format_opts( mixed $value ) : void
+	public function set_format_opts( $value )
 	{
-		$this->_data['format_opts'] = ( is_array( $value ) ? json_encode( $value ) : $value );
+		$this->_data['format_opts'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
 	}
 	
 	/**
 	 * Get the "Format Options" field
 	 *
-	 * @return mixed
+	 * @return array
 	 */
-	public function get_format_opts(): mixed
+	public function get_format_opts()
 	{
-		return isset( $this->_data['format_opts'] ) ? json_decode( $this->_data['format_opts'], TRUE ) : [];
+		return json_decode( $this->_data['format_opts'], TRUE );
 	}
 	
 	/**
 	 * Set the "extra" field
 	 * 
-	 * @param mixed $value	Value
+	 * @param string|array $value	Value
 	 * @return void
 	 */
-	public function set_extra( mixed $value ) : void
+	public function set_extra( $value )
 	{
-		$this->_data['extra'] = ( is_array( $value ) ? json_encode( $value ) : $value );
+		$this->_data['extra'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
 	}
 	
 	/**
 	 * Set the "allowed_extensions" field
 	 *
-	 * @param mixed $value	Value
+	 * @param string|array $value	Value
 	 * @return void
 	 */
-	public function set_allowed_extensions( mixed $value ) : void
+	public function set_allowed_extensions( $value )
 	{
-		$this->_data['allowed_extensions'] = ( is_array( $value ) ? json_encode( $value ) : $value );
+		$this->_data['allowed_extensions'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
 	}
 	
 	/**
 	 * Get the "extra" field
 	 *
-	 * @return array|null
+	 * @return array
 	 */
-	public function get_extra(): ?array
+	public function get_extra()
 	{
-		return isset( $this->_data['extra'] ) ? json_decode( $this->_data['extra'], TRUE ) : [];
+		return json_decode( $this->_data['extra'], TRUE );
 	}
 	
 	/**
 	 * Get the "allowed_extensions" field
 	 *
-	 * @return array|null
+	 * @return array
 	 */
-	public function get_allowed_extensions(): ?array
+	public function get_allowed_extensions()
 	{
-		return isset( $this->_data['allowed_extensions'] ) ? json_decode( $this->_data['allowed_extensions'], TRUE ) : [];
+		return json_decode( $this->_data['allowed_extensions'], TRUE );
 	}
 	
 	/**
@@ -1312,7 +1208,7 @@ class Fields extends CustomField implements Permissions
 	 *
 	 * @return	string
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		if ( !$this->id )
 		{
@@ -1321,11 +1217,11 @@ class Fields extends CustomField implements Permissions
 		
 		try
 		{
-			return (string) Member::loggedIn()->language()->get( static::$langKey . '_' . $this->id ); # If the key doesn't exist, we populate with null
+			return \IPS\Member::loggedIn()->language()->get( static::$langKey . '_' . $this->id );
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
-			return '';
+			return FALSE;
 		}
 	}
 	
@@ -1334,13 +1230,13 @@ class Fields extends CustomField implements Permissions
 	 *
 	 * @return	string|null
 	 */
-	protected function get__description(): ?string
+	protected function get__description()
 	{
 		try
 		{
-			return Member::loggedIn()->language()->get( static::$langKey . '_' . $this->id . '_desc' );
+			return \IPS\Member::loggedIn()->language()->get( static::$langKey . '_' . $this->id . '_desc' );
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			return FALSE;
 		}
@@ -1351,17 +1247,17 @@ class Fields extends CustomField implements Permissions
 	 *
 	 * @return	NULL|array		Null for no badge, or an array of badge data (0 => CSS class type, 1 => language string, 2 => optional raw HTML to show instead of language string)
 	 */
-	protected function get__badge(): ?array
+	protected function get__badge()
 	{
 		$badge = null;
 
-		if ( Databases::load( $this->database_id )->field_title == $this->id )
+		if ( \IPS\cms\Databases::load( $this->database_id )->field_title == $this->id )
 		{
-			$badge = array( 0 => 'positive i-float_end', 1 => 'content_fields_is_title' );
+			$badge = array( 0 => 'positive ipsPos_right', 1 => 'content_fields_is_title' );
 		}
-		else if ( Databases::load( $this->database_id )->field_content == $this->id )
+		else if ( \IPS\cms\Databases::load( $this->database_id )->field_content == $this->id )
 		{
-			$badge = array( 0 => 'positive i-float_end', 1 => 'content_fields_is_content' );
+			$badge = array( 0 => 'positive ipsPos_right', 1 => 'content_fields_is_content' );
 		}
 		
 		return $badge;
@@ -1370,16 +1266,16 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * [Node] Get Icon for tree
 	 *
-	 * @note    Return the class for the icon (e.g. 'globe')
-	 * @return mixed
+	 * @note	Return the class for the icon (e.g. 'globe')
+	 * @return	string|null
 	 */
-	protected function get__icon(): mixed
+	protected function get__icon()
 	{
-		if ( class_exists( '\IPS\Helpers\Form\\' . IPS::mb_ucfirst( $this->type ) ) )
+		if ( class_exists( '\IPS\Helpers\Form\\' . mb_ucfirst( $this->type ) ) )
 		{
 			return NULL;
 		}
-		else if ( class_exists( '\IPS\cms\Fields\\' . IPS::mb_ucfirst( $this->type ) ) )
+		else if ( class_exists( '\IPS\cms\Fields\\' . mb_ucfirst( $this->type ) ) )
 		{
 			return NULL;
 		}
@@ -1390,19 +1286,19 @@ class Fields extends CustomField implements Permissions
 
 	/**
 	 * Truncate the field value
-	 *
-	 * @param string|null $text Value to truncate
-	 * @param boolean $oneLine Truncate to a single line?
-	 * @return    string|null
+	 * 
+	 * @param	string      $text	Value to truncate
+	 * @param   boolean     $oneLine    Truncate to a single line?
+	 * @return	string
 	 */
-	public function truncate( ?string $text, bool $oneLine=FALSE ): ?string
+	public function truncate( $text, $oneLine=FALSE )
 	{
 		if ( ! $this->truncate )
 		{
 			return $text;
 		}
 		
-		switch( IPS::mb_ucfirst( $this->type ) )
+		switch( mb_ucfirst( $this->type ) )
 		{
 			default:
 				// No truncate
@@ -1426,25 +1322,19 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * Display Value
 	 *
-	 * @param mixed $value The value
-	 * @param bool $showSensitiveInformation If TRUE, potentially sensitive data (like passwords) will be displayed - otherwise will be blanked out
-	 * @param string|null $separator Used to separate items when displaying a field with multiple values.
-	 * @return string|null
+	 * @param	mixed	$value						The value
+	 * @param	bool	$showSensitiveInformation	If TRUE, potentially sensitive data (like passwords) will be displayed - otherwise will be blanked out
+	 * @param	string	$separator					Used to separate items when displaying a field with multiple values.
+	 * @return	string
 	 */
-	public function displayValue( mixed $value=NULL, bool $showSensitiveInformation=FALSE, string $separator=NULL ): ?string
+	public function displayValue( $value=NULL, $showSensitiveInformation=FALSE, $separator=NULL )
 	{
-		$database = Databases::load( static::$customDatabaseId );
-
-		/* Extension */
-		if( $extension = $this->extension() )
-		{
-			return $extension::displayValue( $this, $value, $showSensitiveInformation, $separator );
-		}
+		$database = \IPS\cms\Databases::load( static::$customDatabaseId );
 		
-		if ( class_exists( '\IPS\cms\Fields\\' . IPS::mb_ucfirst( $this->type ) ) )
+		if ( class_exists( '\IPS\cms\Fields\\' . mb_ucfirst( $this->type ) ) )
 		{
 			/* Is special! */
-			$class = '\IPS\cms\Fields\\' . IPS::mb_ucfirst( $this->type );
+			$class = '\IPS\cms\Fields\\' . mb_ucfirst( $this->type );
 			
 			if ( method_exists( $class, 'displayValue' ) )
 			{
@@ -1452,7 +1342,7 @@ class Fields extends CustomField implements Permissions
 			}
 		}
 		
-		switch( IPS::mb_ucfirst( $this->type ) )
+		switch( mb_ucfirst( $this->type ) )
 		{
 			case 'Upload':
 				/* We need to return NULL if there's no value, File::get will return an URL object even if $value is empty */
@@ -1461,8 +1351,8 @@ class Fields extends CustomField implements Permissions
 					return NULL;
 				}
 
-				return File::get( 'cms_Records', $value )->url;
-
+				return \IPS\File::get( 'cms_Records', $value )->url;
+			break;
 			case 'Text':
 			case 'TextArea':
 				$value = $this->applyFormatter( $value );
@@ -1498,12 +1388,12 @@ class Fields extends CustomField implements Permissions
 					$this->extra = $extra;
 				}
 
-				if ( ! is_array( $value ) )
+				if ( ! \is_array( $value ) )
 				{
 					$value = explode( ',', $value );
 				}
 
-				if ( is_array( $value ) )
+				if ( \is_array( $value ) )
 				{
 					$return = array();
 					foreach( $value as $key )
@@ -1517,7 +1407,7 @@ class Fields extends CustomField implements Permissions
 				{
 					return ( isset( $this->extra[ $value ] ) ? htmlspecialchars( $this->extra[ $value ], ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE ) : htmlspecialchars( $value, ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE ) );
 				}
-
+			break;
 			case 'Member':
 				if ( ! $value )
 				{
@@ -1527,47 +1417,53 @@ class Fields extends CustomField implements Permissions
 				{
 					$links = array();
 
-					$value = is_array( $value ) ? $value : ( ( $value instanceof Member ) ? array( $value ) : explode( "\n", $value ) );
+					$value = \is_array( $value ) ? $value : ( ( $value instanceof \IPS\Member ) ? array( $value ) : explode( "\n", $value ) );
 					
 					foreach( $value as $id )
 					{
-						$links[] = ( $id instanceof Member ) ? $id->link() : Member::load( $id )->link();
+						$links[] = ( $id instanceof \IPS\Member ) ? $id->link() : \IPS\Member::load( $id )->link();
 					}
 					
 					return implode( ', ', $links );
 				}
-
+			break;
 			case 'Url':
-				if ( Dispatcher::hasInstance() AND class_exists( '\IPS\Dispatcher', FALSE ) and Dispatcher::i()->controllerLocation === 'front' )
+				if ( \IPS\Dispatcher::hasInstance() AND class_exists( '\IPS\Dispatcher', FALSE ) and \IPS\Dispatcher::i()->controllerLocation === 'front' )
 				{
-					return ( $value ) ? Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $value, TRUE, NULL, FALSE ) : NULL;
+					return ( $value ) ? \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $value, TRUE, NULL, FALSE ) : NULL;
 				}
 			break;
 			case 'Date':
 			case 'DateRange':
-				if ( is_numeric( $value ) )
+				if ( \is_numeric( $value ) )
 				{
-					$time = DateTime::ts( $value );
+					$time = \IPS\DateTime::ts( $value );
 					
 					if ( isset( $this->extra['timezone'] ) and $this->extra['timezone'] )
 					{
 						/* The timezone is already set to user by virtue of DateTime::ts() */
 						if ( $this->extra['timezone'] != 'user' )
 						{							
-							$time->setTimezone( new DateTimeZone( $this->extra['timezone'] ) );
+							if ( $time instanceof \IPS\DateTime )
+							{
+								$time->setTimezone( new \DateTimeZone( $this->extra['timezone'] ) );
+							}
 						}
 					}
 					else
 					{
-						$time->setTimezone( new DateTimeZone( 'UTC' ) );
+						if ( $time instanceof \IPS\DateTime )
+						{
+							$time->setTimezone( new \DateTimeZone( 'UTC' ) );
+						}
 					}
 	
 					return $this->extra['time'] ? (string) $time : $time->localeDate();
 				}
 				
-				if ( ! is_array( $value ) )
+				if ( ! \is_array( $value ) )
 				{
-					return Member::loggedIn()->language()->addToStack('field_no_value_entered');
+					return \IPS\Member::loggedIn()->language()->addToStack('field_no_value_entered');
 				}
 				
 				$start = NULL;
@@ -1576,14 +1472,14 @@ class Fields extends CustomField implements Permissions
 				{
 					if ( isset( $value[ $t ] ) )
 					{
-						$time = ( is_integer( $value[ $t ] ) ) ? DateTime::ts( $value[ $t ], TRUE ) : $value[ $t ];
+						$time = ( \is_integer( $value[ $t ] ) ) ? \IPS\DateTime::ts( $value[ $t ], TRUE ) : $value[ $t ];
 						if ( isset( $this->extra['timezone'] ) and $this->extra['timezone'] )
 						{
 							try
 							{
-								$time->setTimezone( new DateTimeZone( $this->extra['timezone'] ) );
+								$time->setTimezone( new \DateTimeZone( $this->extra['timezone'] ) );
 							}
-							catch( Exception $e ){}
+							catch( \Exception $e ){}
 						}
 						
 						$$t = $time->localeDate();
@@ -1592,23 +1488,23 @@ class Fields extends CustomField implements Permissions
 				
 				if ( $start and $end )
 				{
-					return Member::loggedIn()->language()->addToStack( 'field_daterange_start_end', FALSE, array( 'sprintf' => array( $start, $end ) ) );
+					return \IPS\Member::loggedIn()->language()->addToStack( 'field_daterange_start_end', FALSE, array( 'sprintf' => array( $start, $end ) ) );
 				}
 				else if ( $start )
 				{
-					return Member::loggedIn()->language()->addToStack( 'field_daterange_start', FALSE, array( 'sprintf' => array( $start ) ) );
+					return \IPS\Member::loggedIn()->language()->addToStack( 'field_daterange_start', FALSE, array( 'sprintf' => array( $start ) ) );
 				}
 				else if ( $end )
 				{
-					return Member::loggedIn()->language()->addToStack( 'field_daterange_end', FALSE, array( 'sprintf' => array( $end ) ) );
+					return \IPS\Member::loggedIn()->language()->addToStack( 'field_daterange_end', FALSE, array( 'sprintf' => array( $end ) ) );
 				}
 				else
 				{
-					return Member::loggedIn()->language()->addToStack('field_no_value_entered');
+					return \IPS\Member::loggedIn()->language()->addToStack('field_no_value_entered');
 				}
-
+			break;
 			case 'Item':
-				if ( ! is_array( $value ) and mb_strstr( $value, ',' ) )
+				if ( ! \is_array( $value ) and mb_strstr( $value, ',' ) )
 				{
 					$value = explode( ',', $value );
 				}
@@ -1617,27 +1513,26 @@ class Fields extends CustomField implements Permissions
 					$value = array( $value );
 				}
 
-				if ( count( $value ) and isset( $this->extra['database'] ) and $this->extra['database'] )
+				if ( \count( $value ) and isset( $this->extra['database'] ) and $this->extra['database'] )
 				{
 					$results = array();
 					$class   = '\IPS\cms\Records' . $this->extra['database'];
-					/* @var $databaseColumnMap array */
-					/* @var $class Records */
 					$field   = $class::$databasePrefix . $class::$databaseColumnMap['title'];
-					$where   = array( Db::i()->in( $class::$databaseColumnId, $value ) );
+					$where   = array( \IPS\Db::i()->in( $class::$databaseColumnId, $value ) );
 
 					foreach( $class::getItemsWithPermission( array( $where ), $field, NULL ) as $item )
 					{
 						$results[] = $item;
 					}
 
-                    if( count( $results ) )
+                    if( \count( $results ) )
                     {
-                        return Theme::i()->getTemplate( 'global', 'cms', 'front' )->basicRelationship( $results );
+                        return \IPS\Theme::i()->getTemplate( 'global', 'cms', 'front' )->basicRelationship( $results );
                     }
 				}
 
 				return NULL;
+				break;
 		}
 
 		/* Formatters */
@@ -1645,7 +1540,7 @@ class Fields extends CustomField implements Permissions
 		{
 			return parent::displayValue( $value, $showSensitiveInformation );
 		}
-		catch( InvalidArgumentException $ex )
+		catch( \InvalidArgumentException $ex )
 		{
 			return NULL;
 		}
@@ -1657,9 +1552,9 @@ class Fields extends CustomField implements Permissions
 	 * @param	mixed	$value	The value
 	 * @return	string
 	 */
-	public function applyFormatter( mixed $value ): string
+	public function applyFormatter( $value )
 	{
-		if ( is_array( $this->format_opts ) and count( $this->format_opts ) )
+		if ( \is_array( $this->format_opts ) and \count( $this->format_opts ) )
 		{
 			foreach( $this->format_opts as $id => $type )
 			{
@@ -1687,13 +1582,13 @@ class Fields extends CustomField implements Permissions
 					break;
 					
 					case 'numerical':
-						$value	= Member::loggedIn()->language()->formatNumber( $value );
+						$value	= \IPS\Member::loggedIn()->language()->formatNumber( $value );
 					break;
 				}
 			}
 		}
 		
-		return $value ?? '';
+		return $value;
 	}
 
 
@@ -1702,24 +1597,24 @@ class Fields extends CustomField implements Permissions
 	 * Example code explains return value
 	 *
 	 * @code
-	 * array(
-	 * array(
-	 * 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
-	 * 'title'	=> 'foo',		// Language key to use for button's title parameter
-	 * 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	 * 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	 * ),
-	 * ...							// Additional buttons
-	 * );
+	 array(
+	 array(
+	 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
+	 'title'	=> 'foo',		// Language key to use for button's title parameter
+	 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	 ),
+	 ...							// Additional buttons
+	 );
 	 * @endcode
-	 * @param Url $url		Base URL
+	 * @param	string	$url		Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons  = parent::getButtons( $url, $subnode );
-		$database = Databases::load( $this->database_id );
+		$database = \IPS\cms\Databases::load( $this->database_id );
 
 		if ( $this->canEdit() )
 		{
@@ -1738,22 +1633,12 @@ class Fields extends CustomField implements Permissions
 				if ( $this->canBeContentField() )
 				{
 					$buttons['set_as_content'] = array(
-						'icon'	=> 'file-text',
+						'icon'	=> 'file-text-o',
 						'title'	=> 'cms_set_field_as_content',
 						'link'	=> $url->setQueryString( array( 'do' => 'setAsContent', 'id' => $this->_id ) )->csrf(),
 						'data'	=> array()
 					);
 				}
-			}
-
-			if( in_array( $this->type, static::$canUseTogglesFields ) )
-			{
-				$buttons['toggles'] = array(
-					'icon' => 'toggle-on',
-					'title' => 'cms_fields_toggles',
-					'link' => $url->setQueryString( array( 'do' => 'toggles', 'id' => $this->_id ) ),
-					'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'cms_fields_toggles' ) )
-				);
 			}
 		}
 
@@ -1765,9 +1650,9 @@ class Fields extends CustomField implements Permissions
 	 *
 	 * @return boolean
 	 */
-	public function canBeTitleField(): bool
+	public function canBeTitleField()
 	{
-		if ( $this->is_multiple or in_array( IPS::mb_ucfirst( $this->type ), static::$cannotBeTitleFields ) )
+		if ( $this->is_multiple or \in_array( mb_ucfirst( $this->type ), static::$cannotBeTitleFields ) )
 		{
 			return FALSE;
 		}
@@ -1780,9 +1665,11 @@ class Fields extends CustomField implements Permissions
 	 *
 	 * @return boolean
 	 */
-	public function canBeContentField(): bool
+	public function canBeContentField()
 	{
-		if ( $this->is_multiple or in_array( IPS::mb_ucfirst( $this->type ), static::$cannotBeContentFields ) )
+		$no = array();
+
+		if ( $this->is_multiple or \in_array( mb_ucfirst( $this->type ), static::$cannotBeContentFields ) )
 		{
 			return FALSE;
 		}
@@ -1793,11 +1680,11 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * [Node] Does the currently logged in user have permission to delete this node?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canDelete(): bool
+	public function canDelete()
 	{
-		$database = Databases::load( $this->database_id );
+		$database = \IPS\cms\Databases::load( $this->database_id );
 
 		if ( $this->id == $database->field_title or $this->id == $database->field_content )
 		{
@@ -1813,7 +1700,7 @@ class Fields extends CustomField implements Permissions
 	 *
 	 * @return	bool
 	 */
-	public function canManagePermissions(): bool
+	public function canManagePermissions()
 	{
 		return true;
 	}
@@ -1821,38 +1708,38 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$form->hiddenValues['database_id'] = static::$customDatabaseId;
 
 		if ( $this->type )
 		{
 			$ok = FALSE;
-			if ( class_exists( '\IPS\Helpers\Form\\' . IPS::mb_ucfirst( $this->type ) ) )
+			if ( class_exists( '\IPS\Helpers\Form\\' . mb_ucfirst( $this->type ) ) )
 			{
 				$ok = TRUE;
 			}
-			else if ( class_exists( '\IPS\cms\Fields\\' . IPS::mb_ucfirst( $this->type ) ) )
+			else if ( class_exists( '\IPS\cms\Fields\\' . mb_ucfirst( $this->type ) ) )
 			{
 				$ok = TRUE;
 			}
 
 			if ( !$ok )
 			{
-				Output::i()->output .= Theme::i()->getTemplate( 'global', 'core', 'global' )->message( Member::loggedIn()->language()->addToStack( 'cms_field_no_type_warning', FALSE, array( 'sprintf' => array( $this->type ) ) ), 'warning', NULL, FALSE );
+				\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->message( \IPS\Member::loggedIn()->language()->addToStack( 'cms_field_no_type_warning', FALSE, array( 'sprintf' => array( $this->type ) ) ), 'warning', NULL, FALSE );
 			}
 		}
 
 		$form->addTab( 'field_generaloptions' );
 		$form->addHeader( 'pfield_settings' );
 
-		$form->add( new Translatable( 'field_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? static::$langKey . '_' . $this->id : NULL ) ) ) );
-		$form->add( new Translatable( 'field_description', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ? static::$langKey . '_' . $this->id . '_desc' : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'field_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? static::$langKey . '_' . $this->id : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'field_description', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ? static::$langKey . '_' . $this->id . '_desc' : NULL ) ) ) );
 
-		$displayDefaults = array( 'field_display_listing_json_badge', 'field_display_listing_json_custom', 'field_display_display_json_badge', 'field_display_display_json_custom', 'field_display_display_json_where' );
+		$displayDefaults = array( 'field_display_listing_json_badge', 'field_display_listing_json_badge_right', 'field_display_listing_json_custom', 'field_display_display_json_badge', 'field_display_display_json_custom', 'field_display_display_json_where' );
 
 		$options = array_merge( array(
             'Address'    => 'pf_type_Address',
@@ -1880,10 +1767,10 @@ class Fields extends CustomField implements Permissions
         ), static::$additionalFieldTypes );
 
 		$toggles = array(
-			'Address'	=> [ ...$displayDefaults ], // copy to a new array juuuust in case
+			'Address'	=> array_merge( array( 'field_show_map_listing', 'field_show_map_display', 'field_show_map_listing_dims', 'field_show_map_display_dims' ), $displayDefaults ),
 			'Codemirror'=> array_merge( array( 'field_default_value', 'field_truncate' ), $displayDefaults ),
 			'Checkbox'  => array_merge( array( 'field_default_value', 'field_truncate' ), $displayDefaults ),
-			'CheckboxSet' => array_merge( array( 'field_extra', 'field_default_value', 'field_truncate', 'field_option_other' ), $displayDefaults ),
+			'CheckboxSet' => array_merge( array( 'field_extra', 'field_default_value', 'field_truncate' ), $displayDefaults ),
 			'Date'		=> array_merge( array( 'field_default_value', 'field_date_time_override', 'field_date_time_time' ), $displayDefaults ),
 			'Editor'    => array_merge( array( 'field_max_length', 'field_default_value', 'field_truncate', 'field_allow_attachments' ), $displayDefaults ),
 			'Email'		=> array_merge( array( 'field_max_length', 'field_default_value', 'field_unique' ), $displayDefaults ),
@@ -1891,34 +1778,18 @@ class Fields extends CustomField implements Permissions
 			'Member'    => array_merge( array( 'field_is_multiple', 'field_unique' ), $displayDefaults ),
 			'Number'    => array_merge( array( 'field_default_value', 'field_number_decimals_on', 'field_number_decimals', 'field_unique', 'field_number_min', 'field_number_max' ), $displayDefaults ),
 			'Password'  => array_merge( array( 'field_default_value' ), $displayDefaults ),
-			'Radio'     => array_merge( array( 'field_extra', 'field_default_value', 'field_truncate', 'field_unique', 'field_option_other' ), $displayDefaults ),
-			'Select'    => array_merge( array( 'field_extra', 'field_default_value', 'field_is_multiple', 'field_truncate', 'field_unique', 'field_option_other' ), $displayDefaults ),
+			'Radio'     => array_merge( array( 'field_extra', 'field_default_value', 'field_truncate', 'field_unique' ), $displayDefaults ),
+			'Select'    => array_merge( array( 'field_extra', 'field_default_value', 'field_is_multiple', 'field_truncate', 'field_unique' ), $displayDefaults ),
 			'Tel'		=> array_merge( array( 'field_default_value', 'field_unique' ), $displayDefaults ),
 			'Text'		=> array_merge( array( 'field_validator', 'field_format_opts_on', 'field_max_length', 'field_default_value', 'field_html', 'field_truncate', 'field_unique' ), $displayDefaults ),
 			'TextArea'	=> array_merge( array( 'field_validator', 'field_format_opts_on', 'field_max_length', 'field_default_value', 'field_html', 'field_truncate', 'field_unique' ), $displayDefaults ),
 			'Upload'    => array_merge( array( 'field_upload_is_image', 'field_upload_is_multiple', 'field_upload_thumb' ), $displayDefaults ),
 			'Url'		=> array_merge( array( 'field_default_value', 'field_unique' ), $displayDefaults ),
 			'YesNo'		=> array_merge( array( 'field_default_value' ), $displayDefaults ),
-			'Youtube'   => array( 'media_params', 'media_display_listing_method', 'media_display_display_method', 'field_unique', 'field_display_display_json_where' ),
-			'Spotify'   => array( 'media_params', 'media_display_listing_method', 'media_display_display_method', 'field_unique', 'field_display_display_json_where' ),
-			'Soundcloud'=> array( 'media_params', 'media_display_listing_method', 'media_display_display_method', 'field_unique', 'field_display_display_json_where' )
+			'Youtube'   => array( 'media_params', 'media_display_listing_method', 'media_display_display_method', 'field_unique' ),
+			'Spotify'   => array( 'media_params', 'media_display_listing_method', 'media_display_display_method', 'field_unique' ),
+			'Soundcloud'=> array( 'media_params', 'media_display_listing_method', 'media_display_display_method', 'field_unique' )
 		);
-
-		foreach ( $toggles as $k => $v )
-		{
-			$toggles[$k] = array_merge( $v, [ 'field_display_listing', 'field_display_display' ] );
-		}
-
-		/* Add field options and toggles from the extensions */
-		foreach( Application::allExtensions( 'core', 'CustomField' ) as $ext )
-		{
-			/* @var CustomFieldAbstract $ext */
-			if( $ext::isEnabled() )
-			{
-				$options[ $ext::fieldType() ] = $ext::fieldTypeTitle();
-				$toggles[ $ext::fieldType() ] = $ext::fieldTypeToggles();
-			}
-		}
 		
 		foreach( static::$filterableFields as $field )
 		{
@@ -1927,7 +1798,7 @@ class Fields extends CustomField implements Permissions
 
 		foreach ( static::$additionalFieldTypes as $k => $v )
 		{
-			$toggles[ $k ] = static::$additionalFieldToggles[$k] ?? array('pf_not_null');
+			$toggles[ $k ] = isset( static::$additionalFieldToggles[ $k ] ) ? static::$additionalFieldToggles[ $k ] : array( 'pf_not_null' );
 		}
 		
 		/* Title or content? */
@@ -1935,7 +1806,7 @@ class Fields extends CustomField implements Permissions
 
 		if ( $this->id )
 		{
-			$database = Databases::load( static::$customDatabaseId );
+			$database = \IPS\cms\Databases::load( static::$customDatabaseId );
 		
 			if ( $this->id == $database->field_title )
 			{
@@ -1961,7 +1832,7 @@ class Fields extends CustomField implements Permissions
 
 		if ( !$this->_new )
 		{
-			Member::loggedIn()->language()->words['field_type_warning'] = Member::loggedIn()->language()->addToStack('custom_field_change');
+			\IPS\Member::loggedIn()->language()->words['field_type_warning'] = \IPS\Member::loggedIn()->language()->addToStack('custom_field_change');
 
 			foreach ( $toggles as $k => $_toggles )
 			{
@@ -1972,7 +1843,7 @@ class Fields extends CustomField implements Permissions
 			}
 		}
 
-		$form->add( new Select( 'field_type', $this->id ? IPS::mb_ucfirst( $this->type ) : 'Text', TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Select( 'field_type', $this->id ? mb_ucfirst( $this->type ) : 'Text', TRUE, array(
 				'options' => $options,
 				'toggles' => $toggles
 		) ) );
@@ -1982,7 +1853,7 @@ class Fields extends CustomField implements Permissions
 		{
 			$databases = array();
 			$disabled  = array();
-			foreach(Databases::databases() as $db )
+			foreach( \IPS\cms\Databases::databases() as $db )
 			{
 				if ( $db->page_id )
 				{
@@ -1991,29 +1862,29 @@ class Fields extends CustomField implements Permissions
 				else
 				{
 					$disabled[] = $db->id;
-					$databases[ $db->id ] = Member::loggedIn()->language()->addToStack( 'cms_db_relational_with_name_disabled', FALSE, array( 'sprintf' => array( $db->_title ) ) );
+					$databases[ $db->id ] = \IPS\Member::loggedIn()->language()->addToStack( 'cms_db_relational_with_name_disabled', FALSE, array( 'sprintf' => array( $db->_title ) ) );
 				}
 			}
-			if ( ! count( $databases ) )
+			if ( ! \count( $databases ) )
 			{
-				$databases[0] = Member::loggedIn()->language()->addToStack('cms_relational_field_no_dbs');
+				$databases[0] = \IPS\Member::loggedIn()->language()->addToStack('cms_relational_field_no_dbs');
 				$disabled[] = 0;
 			}
 
-			$form->add( new Select( 'field_relational_db', ($this->extra['database'] ?? NULL), FALSE, array( 'options' => $databases, 'disabled' => $disabled ), NULL, NULL, NULL, 'field_relational_db' ) );
-			$form->add( new YesNo( 'field_crosslink', $this->id && ( isset( $this->extra['crosslink'] ) and $this->extra['crosslink'] ), FALSE, array(), NULL, NULL, NULL, 'field_crosslink' ) );
+			$form->add( new \IPS\Helpers\Form\Select( 'field_relational_db', ( isset( $this->extra['database'] ) ? $this->extra['database'] : NULL ), FALSE, array( 'options' => $databases, 'disabled' => $disabled ), NULL, NULL, NULL, 'field_relational_db' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'field_crosslink', $this->id ? ( ( isset( $this->extra['crosslink'] ) and $this->extra['crosslink'] ) ? TRUE : FALSE ) : FALSE, FALSE, array(), NULL, NULL, NULL, 'field_crosslink' ) );
 		}
 
 		/* Number specific */
-		$form->add( new Number( 'field_number_min', ( $this->id and isset( $this->extra['min'] ) ) ? $this->extra['min'] : NULL, FALSE, array( 'unlimited' => '', 'unlimitedLang' => 'any', 'decimals' => true ), NULL, NULL, NULL, 'field_number_min' ) );
-		$form->add( new Number( 'field_number_max', ( $this->id and isset( $this->extra['max'] ) ) ? $this->extra['max'] : NULL, FALSE, array( 'unlimited' => '', 'unlimitedLang' => 'any', 'decimals' => true ), NULL, NULL, NULL, 'field_number_max' ) );
-		$form->add( new YesNo( 'field_number_decimals_on', $this->id && ( isset( $this->extra['on'] ) and $this->extra['on'] ), FALSE, array( 'togglesOn' => array( 'field_number_decimals' ) ), NULL, NULL, NULL, 'field_number_decimals_on' ) );
-		$form->add( new Number( 'field_number_decimals', $this->id ? ( ( isset( $this->extra['places'] ) and $this->extra['places'] ) ? $this->extra['places'] : 0 ) : 0, FALSE, array( 'max' => 6 ), NULL, NULL, NULL, 'field_number_decimals' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'field_number_min', $this->id and isset( $this->extra['min'] ) ? $this->extra['min'] : NULL, FALSE, array( 'unlimited' => '', 'unlimitedLang' => 'any' ), NULL, NULL, NULL, 'field_number_min' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'field_number_max', $this->id and isset( $this->extra['max'] ) ? $this->extra['max'] : NULL, FALSE, array( 'unlimited' => '', 'unlimitedLang' => 'any' ), NULL, NULL, NULL, 'field_number_max' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_number_decimals_on', $this->id ? ( ( isset( $this->extra['on'] ) and $this->extra['on'] ) ? TRUE : FALSE ) : FALSE, FALSE, array( 'togglesOn' => array( 'field_number_decimals' ) ), NULL, NULL, NULL, 'field_number_decimals_on' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'field_number_decimals', $this->id ? ( ( isset( $this->extra['places'] ) and $this->extra['places'] ) ? $this->extra['places'] : 0 ) : 0, FALSE, array( 'max' => 6 ), NULL, NULL, NULL, 'field_number_decimals' ) );
 
 		/* Upload specific */
-		$form->add( new YesNo( 'field_upload_is_multiple', $this->id ? $this->is_multiple : 0, FALSE, array( ), NULL, NULL, NULL, 'field_upload_is_multiple' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_upload_is_multiple', $this->id ? $this->is_multiple : 0, FALSE, array( ), NULL, NULL, NULL, 'field_upload_is_multiple' ) );
 
-		$form->add( new Radio( 'field_upload_is_image', $this->id ? ( ( isset( $this->extra['type'] ) and $this->extra['type'] == 'image' ) ? 'yes' : 'no' ) : 'yes', TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'field_upload_is_image', $this->id ? ( ( isset( $this->extra['type'] ) and $this->extra['type'] == 'image' ) ? 'yes' : 'no' ) : 'yes', TRUE, array(
 			'options'	=> array(
 				'yes' => 'cms_upload_field_is_image',
 				'no'  => 'cms_upload_field_is_not_image',
@@ -2037,11 +1908,11 @@ class Fields extends CustomField implements Permissions
 			}
 		}
 
-		$form->add( new WidthHeight( 'field_image_size', $this->id ? $widthHeight : array( 0, 0 ), FALSE, array( 'resizableDiv' => FALSE, 'unlimited' => array( 0, 0 ) ), NULL, NULL, NULL, 'field_image_size' ) );
+		$form->add( new \IPS\Helpers\Form\WidthHeight( 'field_image_size', $this->id ? $widthHeight : array( 0, 0 ), FALSE, array( 'resizableDiv' => FALSE, 'unlimited' => array( 0, 0 ) ), NULL, NULL, NULL, 'field_image_size' ) );
 		
-		$form->add( new WidthHeight( 'field_upload_thumb', $this->id ? $thumbWidthHeight : array( 0, 0 ), FALSE, array( 'resizableDiv' => FALSE, 'unlimited' => array( 0, 0 ), 'unlimitedLang' => 'field_upload_thumb_none' ), NULL, NULL, NULL, 'field_upload_thumb' ) );
+		$form->add( new \IPS\Helpers\Form\WidthHeight( 'field_upload_thumb', $this->id ? $thumbWidthHeight : array( 0, 0 ), FALSE, array( 'resizableDiv' => FALSE, 'unlimited' => array( 0, 0 ), 'unlimitedLang' => 'field_upload_thumb_none' ), NULL, NULL, NULL, 'field_upload_thumb' ) );
 		
-		$form->add( new Text( 'field_allowed_extensions', $this->id ? ( $this->allowed_extensions ?: NULL ) : NULL, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Text( 'field_allowed_extensions', $this->id ? ( $this->allowed_extensions ?: NULL ) : NULL, FALSE, array(
 			'autocomplete' => array( 'unique' => 'true' ),
 			'nullLang'     => 'content_any_extensions'
 		), NULL, NULL, NULL, 'field_allowed_extensions' ) );
@@ -2049,14 +1920,14 @@ class Fields extends CustomField implements Permissions
 		/* Editor Specific */
 		if( !$isTitleField )
 		{
-			$form->add( new YesNo( 'field_allow_attachments', $this->id ? $this->allow_attachments : 1, FALSE, array( ), NULL, NULL, NULL, 'field_allow_attachments' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'field_allow_attachments', $this->id ? $this->allow_attachments : 1, FALSE, array( ), NULL, NULL, NULL, 'field_allow_attachments' ) );
 		}
 
 		/* Date specific */
 		$tzValue = 'UTC';
 		if ( isset( $this->extra['timezone'] ) and $this->extra['timezone'] )
 		{
-			if ( ! in_array( $this->extra['timezone'], array( 'UTC', 'user' ) ) )
+			if ( ! \in_array( $this->extra['timezone'], array( 'UTC', 'user' ) ) )
 			{
 				 $tzValue = 'set';
 			}
@@ -2066,7 +1937,7 @@ class Fields extends CustomField implements Permissions
 			}
 		}
 		
-		$form->add( new Radio( 'field_date_time_override', $tzValue, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'field_date_time_override', $tzValue, FALSE, array(
 			'options' => array(
 				'UTC'  => 'field_date_tz_utc',
 				'set'  => 'field_date_tz_set',
@@ -2078,7 +1949,7 @@ class Fields extends CustomField implements Permissions
 		), NULL, NULL, NULL, 'field_date_time_override' ) );
 			
 		$timezones = array();
-		foreach ( DateTime::getTimezoneIdentifiers() as $tz )
+		foreach ( \IPS\DateTime::getTimezoneIdentifiers() as $tz )
 		{
 			if ( $pos = mb_strpos( $tz, '/' ) )
 			{
@@ -2089,30 +1960,30 @@ class Fields extends CustomField implements Permissions
 				$timezones[ $tz ] = 'timezone__' . $tz;
 			}
 		}
-		$form->add( new Select( 'field_date_timezone', ( $this->extra['timezone'] ?? Member::loggedIn()->timezone), FALSE, array( 'options' => $timezones ), NULL, NULL, NULL, 'field_date_timezone' ) );
-		$form->add( new YesNo( 'field_date_time_time', ( $this->extra['time'] ?? 0), FALSE, array(), NULL, NULL, NULL, 'field_date_time_time' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'field_date_timezone', ( isset( $this->extra['timezone'] ) ? $this->extra['timezone'] : \IPS\Member::loggedIn()->timezone ), FALSE, array( 'options' => $timezones ), NULL, NULL, NULL, 'field_date_timezone' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_date_time_time', ( isset( $this->extra['time'] ) ? $this->extra['time'] : 0 ), FALSE, array(), NULL, NULL, NULL, 'field_date_time_time' ) );
 
-		$form->add( new YesNo( 'field_is_multiple', $this->id ? $this->is_multiple : 0, FALSE, array(), NULL, NULL, NULL, 'field_is_multiple' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_is_multiple', $this->id ? $this->is_multiple : 0, FALSE, array(), NULL, NULL, NULL, 'field_is_multiple' ) );
 		
-		$form->add( new TextArea( 'field_default_value', $this->id ? $this->default_value : '', FALSE, array(), NULL, NULL, NULL, 'field_default_value' ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'field_default_value', $this->id ? $this->default_value : '', FALSE, array(), NULL, NULL, NULL, 'field_default_value' ) );
 
 		if ( ! $this->_new )
 		{
-			$form->add( new YesNo( 'field_default_update_existing', FALSE, FALSE, array(), NULL, NULL, NULL, 'field_default_update_existing' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'field_default_update_existing', FALSE, FALSE, array(), NULL, NULL, NULL, 'field_default_update_existing' ) );
 		}
 
-		$form->add( new Number( 'field_max_length', $this->id ? $this->max_length : NULL, FALSE, array( 'unlimited' => 0 ), NULL, NULL, NULL, 'field_max_length' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'field_max_length', $this->id ? $this->max_length : NULL, FALSE, array( 'unlimited' => 0 ), NULL, NULL, NULL, 'field_max_length' ) );
 		
-		$form->add( new YesNo( 'field_validator', $this->id ? intval( $this->validator ) : 0, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_validator', $this->id ? \intval( $this->validator ) : 0, FALSE, array(
 			'togglesOn' =>array( 'field_validator_custom', 'field_validator_error' )
 		), NULL, NULL, NULL, 'field_validator' ) );
 		
-		$form->add( new Text( 'field_validator_custom', $this->id ? $this->validator_custom : NULL, FALSE, array( 'placeholder' => '/[A-Z0-9]+/i' ), NULL, NULL, NULL, 'field_validator_custom' ) );
-		$form->add( new Translatable( 'field_validator_error', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ? static::$langKey . '_' . $this->id . '_validation_error' : NULL ) ), NULL, NULL, NULL, 'field_validator_error' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'field_validator_custom', $this->id ? $this->validator_custom : NULL, FALSE, array( 'placeholder' => '/[A-Z0-9]+/i' ), NULL, NULL, NULL, 'field_validator_custom' ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'field_validator_error', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ? static::$langKey . '_' . $this->id . '_validation_error' : NULL ) ), NULL, NULL, NULL, 'field_validator_error' ) );
 		
-		$form->add( new YesNo( 'field_format_opts_on', $this->id ? $this->format_opts : 0, FALSE, array( 'togglesOn' => array('field_format_opts') ), NULL, NULL, NULL, 'field_format_opts_on' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_format_opts_on', $this->id ? $this->format_opts : 0, FALSE, array( 'togglesOn' => array('field_format_opts') ), NULL, NULL, NULL, 'field_format_opts_on' ) );
 		
-		$form->add( new Select( 'field_format_opts', $this->id ? $this->format_opts : 'none', FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Select( 'field_format_opts', $this->id ? $this->format_opts : 'none', FALSE, array(
 				'options' => array(
 						'strtolower' => 'content_format_strtolower',
 						'strtoupper' => 'content_format_strtoupper',
@@ -2133,61 +2004,59 @@ class Fields extends CustomField implements Permissions
 			}
 		}
 		
-		$form->add( new Stack( 'field_extra', $extra, FALSE, array( 'stackFieldType' => 'KeyValue'), NULL, NULL, NULL, 'field_extra' ) );
-
-		$form->add( new YesNo( 'field_option_other', $this->format_opts['use_other'] ?? null, false, array(), null, null, null, 'field_option_other' ) );
+		$form->add( new \IPS\Helpers\Form\Stack( 'field_extra', $extra, FALSE, array( 'stackFieldType' => 'KeyValue'), NULL, NULL, NULL, 'field_extra' ) );
 
 		/* Media specific stack */
-		$form->add( new Stack( 'media_params', $extra, FALSE, array( 'stackFieldType' => 'KeyValue'), NULL, NULL, NULL, 'media_params' ) );
+		$form->add( new \IPS\Helpers\Form\Stack( 'media_params', $extra, FALSE, array( 'stackFieldType' => 'KeyValue'), NULL, NULL, NULL, 'media_params' ) );
 
 		$form->addheader( 'pfield_options' );
 		
-		$form->add( new YesNo( 'field_unique', $this->id ? $this->unique : 0, FALSE, array(), NULL, NULL, NULL, 'field_unique' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_unique', $this->id ? $this->unique : 0, FALSE, array(), NULL, NULL, NULL, 'field_unique' ) );
 		
-		$form->add( new YesNo( 'field_filter', $this->id ? $this->filter : 0, FALSE, array(), NULL, NULL, NULL, 'field_filter' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_filter', $this->id ? $this->filter : 0, FALSE, array(), NULL, NULL, NULL, 'field_filter' ) );
 
 		/* Until we have a mechanism for other field searching, remove this $form->add( new \IPS\Helpers\Form\YesNo( 'field_is_searchable', $this->id ? $this->is_searchable : 0, FALSE, array(), NULL, NULL, NULL, 'field_is_searchable' ) );*/
 
-		if ( isset( Request::i()->database_id ) )
+		if ( isset( \IPS\Request::i()->database_id ) )
 		{
-			$usingForum = Databases::load( Request::i()->database_id )->forum_record;
+			$usingForum = \IPS\cms\Databases::load( \IPS\Request::i()->database_id )->forum_record;
 			if ( ! $usingForum and $this->id )
 			{
-				$usingForum = Db::i()->select( 'COUNT(*)', 'cms_database_categories', array( 'category_database_id=? and category_forum_override=1 and category_forum_record=1', $this->id ) )->first();
+				$usingForum = \IPS\Db::i()->select( 'COUNT(*)', 'cms_database_categories', array( 'category_database_id=? and category_forum_override=1 and category_forum_record=1', $this->id ) )->first();
 			}
 			
 			if ( $usingForum )
 			{
-				$form->add( new TextArea( 'field_topic_format', $this->id ? $this->topic_format : '', FALSE, array( 'placeholder' => "<strong>{title}:</strong> {value}" ) ) );
+				$form->add( new \IPS\Helpers\Form\TextArea( 'field_topic_format', $this->id ? $this->topic_format : '', FALSE, array( 'placeholder' => "<strong>{title}:</strong> {value}" ) ) );
 			}
 		}
 
 		if ( !$isTitleField )
 		{
-			$form->add( new YesNo( 'field_required', $this->id ? $this->required : TRUE, FALSE ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'field_required', $this->id ? $this->required : TRUE, FALSE ) );
 		}
 
-		$form->add( new YesNo( 'field_html', $this->id ? $this->html : FALSE, FALSE, array( 'togglesOn' => array( 'field_html_warning' ) ), NULL, NULL, NULL, 'field_html' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_html', $this->id ? $this->html : FALSE, FALSE, array( 'togglesOn' => array( 'field_html_warning' ) ), NULL, NULL, NULL, 'field_html' ) );
 
 		$form->addTab( 'field_displayoptions' );
 
 		$isTitleOrContent = FALSE;
-		if ( $this->id AND ( $this->id == Databases::load( static::$customDatabaseId )->field_title OR $this->id == Databases::load( static::$customDatabaseId )->field_content ) )
+		if ( $this->id AND ( $this->id == \IPS\cms\Databases::load( static::$customDatabaseId )->field_title OR $this->id == \IPS\cms\Databases::load( static::$customDatabaseId )->field_content ) )
 		{
 			$isTitleOrContent = TRUE;
 
-			if ( $this->id == Databases::load( static::$customDatabaseId )->field_title )
+			if ( $this->id == \IPS\cms\Databases::load( static::$customDatabaseId )->field_title )
 			{
 				$form->addMessage( 'field_display_opts_title', 'ipsMessage ipsMessage_info' );
 			}
 
-			if ( $this->id == Databases::load( static::$customDatabaseId )->field_content )
+			if ( $this->id == \IPS\cms\Databases::load( static::$customDatabaseId )->field_content )
 			{
 				$form->addMessage( 'field_display_opts_content', 'ipsMessage ipsMessage_info' );
 			}
 		}
 
-		$form->add( new Text( 'field_key', $this->id ? $this->key : FALSE, FALSE, array(), function( $val )
+		$form->add( new \IPS\Helpers\Form\Text( 'field_key', $this->id ? $this->key : FALSE, FALSE, array(), function( $val )
 		{
 			try
 			{
@@ -2196,176 +2065,161 @@ class Fields extends CustomField implements Permissions
 					return true;
 				}
 
-				$class = '\IPS\cms\Fields' . Request::i()->database_id;
-				/* @var $class Fields */
+				$class = '\IPS\cms\Fields' . \IPS\Request::i()->database_id;
+
 				try
 				{
 					$testField = $class::load( $val, 'field_key');
 				}
-				catch( OutOfRangeException $ex )
+				catch( \OutOfRangeException $ex )
 				{
 					/* Doesn't exist? Good! */
 					return true;
 				}
 
 				/* It's taken... */
-				if ( Request::i()->id == $testField->id )
+				if ( \IPS\Request::i()->id == $testField->id )
 				{
 					/* But it's this one so that's ok */
 					return true;
 				}
 
 				/* and if we're here, it's not... */
-				throw new InvalidArgumentException('cms_field_key_not_unique');
+				throw new \InvalidArgumentException('cms_field_key_not_unique');
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				/* Slug is OK as load failed */
 				return true;
 			}
+
+			return true;
 		} ) );
 
-		$displayToggles = array(
-			'badge' => array( 'field_display_display_badge_bgcolor', 'field_display_display_badge_color' ),
-			'custom' => array( 'field_display_display_json_custom' )
-		);
-		$listingToggles = array(
-			'badge' => array( 'field_display_listing_badge_bgcolor', 'field_display_listing_badge_color' ),
-			'custom' => array( 'field_display_listing_json_custom' )
-		);
+		$displayToggles = array( 'custom' => array( 'field_display_display_json_custom' ) );
+		$listingToggles = array( 'custom' => array( 'field_display_listing_json_custom' ) );
 		$displayJson    = $this->display_json;
-		$displayDefault = $displayJson['display']['method'] ?? 'badge';
-		$listingDefault = $displayJson['listing']['method'] ?? 'badge';
-		$mediaDisplayDefault = $displayJson['display']['method'] ?? 'player';
-		$mediaListingDefault = $displayJson['listing']['method'] ?? 'url';
-		$mapDisplay = $displayJson['display']['map'] ?? FALSE;
-		$mapListing = $displayJson['listing']['map'] ?? FALSE;
-		$mapDisplayDims = $displayJson['display']['mapDims'] ?? array(200, 200);
-		$mapListingDims = $displayJson['listing']['mapDims'] ?? array(100, 100);
-		$listingOptions = array(
-			'badge' => Theme::i()->getTemplate( 'records', 'cms', 'global' )->fieldBadge( Member::loggedIn()->language()->addToStack('cms_badge_label'), Member::loggedIn()->language()->addToStack('cms_badge_value'), 'ipsBadge--front ipsBadge--style1', $displayJson['listing']['bgcolor'] ?? null, $displayJson['listing']['color'] ?? null ),
-			'simple' => Theme::i()->getTemplate( 'records', 'cms', 'global' )->fieldDefault( Member::loggedIn()->language()->addToStack('cms_badge_label'), Member::loggedIn()->language()->addToStack('cms_badge_value' ) ),
-			'custom' => Member::loggedIn()->language()->addToStack('field_display_custom'),
-			'none' => Member::loggedIn()->language()->addToStack('field_display_none')
-		);
+		$displayDefault = isset( $displayJson['display']['method'] ) ? $displayJson['display']['method'] : '1';
+		$listingDefault = isset( $displayJson['listing']['method'] ) ? $displayJson['listing']['method'] : '1';
+		$mediaDisplayDefault = isset( $displayJson['display']['method'] ) ? $displayJson['display']['method'] : 'player';
+		$mediaListingDefault = isset( $displayJson['listing']['method'] ) ? $displayJson['listing']['method'] : 'url';
+		$mapDisplay = isset( $displayJson['display']['map'] ) ? $displayJson['display']['map'] : FALSE;
+		$mapListing = isset( $displayJson['listing']['map'] ) ? $displayJson['listing']['map'] : FALSE;
+		$mapDisplayDims = isset( $displayJson['display']['mapDims'] ) ? $displayJson['display']['mapDims'] : array( 200, 200 );
+		$mapListingDims = isset( $displayJson['listing']['mapDims'] ) ? $displayJson['listing']['mapDims'] : array( 100, 100 );
+		$listingOptions = $displayOptions = array();
 
-		$displayOptions = $listingOptions;
-		$displayOptions['badge'] = Theme::i()->getTemplate( 'records', 'cms', 'global' )->fieldBadge( Member::loggedIn()->language()->addToStack('cms_badge_label'), Member::loggedIn()->language()->addToStack('cms_badge_value'), 'ipsBadge--front ipsBadge--style1', $displayJson['display']['bgcolor'] ?? null, $displayJson['display']['color'] ?? null );
+		foreach( range( 1, 7 ) as $id )
+		{
+			$displayOptions[ $id ] = $listingOptions[ $id ] = \IPS\Theme::i()->getTemplate( 'records', 'cms', 'global' )->fieldBadge( \IPS\Member::loggedIn()->language()->addToStack('cms_badge_label'), \IPS\Member::loggedIn()->language()->addToStack('cms_badge_value'), 'ipsBadge_front ipsBadge_style' . $id );
+			$listingToggles[ $id ] = array( 'field_display_listing_json_badge_right' );
+		}
 
-		$form->addHeader( 'field_display_listing_header' );
+		$displayOptions['simple'] = $listingOptions['simple'] = \IPS\Theme::i()->getTemplate( 'records', 'cms', 'global' )->fieldDefault( \IPS\Member::loggedIn()->language()->addToStack('cms_badge_label'), \IPS\Member::loggedIn()->language()->addToStack('cms_badge_value' ) );
+		$displayOptions['custom'] = $listingOptions['custom'] = \IPS\Member::loggedIn()->language()->addToStack('field_display_custom');
+		$displayOptions['none'] = $listingOptions['none']     = \IPS\Member::loggedIn()->language()->addToStack('field_display_none');
+
 		if ( ! $isTitleOrContent )
 		{
-			$form->add( new YesNo( 'field_display_listing', $this->id ? $this->display_listing : 1, FALSE, array(
-				'togglesOn' => array('field_display_listing_json_badge', 'field_show_map_listing', 'media_display_listing_method' )
+			$form->add( new \IPS\Helpers\Form\YesNo( 'field_display_listing', $this->id ? $this->display_listing : 1, FALSE, array(
+				'togglesOn' => array('field_display_listing_json_badge' )
 			), NULL, NULL, NULL, 'field_display_listing' ) );
 		}
 
-		$form->add( new Radio( 'field_display_listing_json_badge', $listingDefault, FALSE, array( 'options' => $listingOptions, 'toggles' => $listingToggles, 'parse' => 'raw' ), NULL, NULL, NULL, 'field_display_listing_json_badge' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'field_display_listing_json_badge', $listingDefault, FALSE, array( 'options' => $listingOptions, 'toggles' => $listingToggles, 'parse' => 'raw' ), NULL, NULL, NULL, 'field_display_listing_json_badge' ) );
 
-		$form->add( new Color( 'field_display_listing_badge_bgcolor', $displayJson['listing']['bgcolor'] ?? null, false, array( 'allowNone' => true, 'allowNoneLanguage' => 'field_display_badge_default' ), null, null, null, 'field_display_listing_badge_bgcolor' ) );
-		$form->add( new Color( 'field_display_listing_badge_color', $displayJson['listing']['color'] ?? null, false, array( 'allowNone' => true, 'allowNoneLanguage' => 'field_display_badge_default' ), null, null, null, 'field_display_listing_badge_color' ) );
+		if ( ! $isTitleOrContent )
+		{
+			$form->add( new \IPS\Helpers\Form\YesNo( 'field_display_listing_json_badge_right', ( isset( $displayJson['listing']['right'] ) ? $displayJson['listing']['right'] : 0 ), FALSE, array(), NULL, NULL, NULL, 'field_display_listing_json_badge_right' ) );
+		}
 
-		$form->add( new YesNo( 'field_show_map_listing', $mapListing, FALSE, array(
-			'togglesOn' => array( 'field_show_map_listing_dims' )
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_show_map_listing', $mapListing, FALSE, array(
+			'togglesOn' => [ 'field_show_map_listing_dims' ]
 		), NULL, NULL, NULL, 'field_show_map_listing' ) );
-		$form->add( new WidthHeight( 'field_show_map_listing_dims', $mapListingDims, FALSE, array( 'resizableDiv' => FALSE ), NULL, NULL, NULL, 'field_show_map_listing_dims' ) );
+		$form->add( new \IPS\Helpers\Form\WidthHeight( 'field_show_map_listing_dims', $mapListingDims, FALSE, array( 'resizableDiv' => FALSE ), NULL, NULL, NULL, 'field_show_map_listing_dims' ) );
 
-		$form->add( new Codemirror( 'field_display_listing_json_custom', ($displayJson['listing']['html'] ?? NULL), FALSE, array( 'placeholder' => '{label}: {value}', 'codeModeAllowedLanguages' => [ 'ipsphtml' ] ), function($val )
+		$form->add( new \IPS\Helpers\Form\Codemirror( 'field_display_listing_json_custom', ( isset( $displayJson['listing']['html'] ) ? $displayJson['listing']['html'] : NULL ), FALSE, array( 'placeholder' => '{label}: {value}' ), function( $val )
         {
             /* Test */
             try
             {
-	            Theme::checkTemplateSyntax( $val );
+	            \IPS\Theme::checkTemplateSyntax( $val );
             }
-            catch( LogicException $e )
+            catch( \LogicException $e )
             {
-	            throw new LogicException('cms_field_error_bad_syntax');
+	            throw new \LogicException('cms_field_error_bad_syntax');
             }
 
         }, NULL, NULL, 'field_display_listing_json_custom' ) );
 
 		/* Media listing */
 		$mediaListingOptions = array( 'player' => 'media_display_as_player', 'url' => 'media_display_as_url' );
-		$form->add( new Radio( 'media_display_listing_method', $mediaListingDefault, FALSE, array( 'options' => $mediaListingOptions ), NULL, NULL, NULL, 'media_display_listing_method' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'media_display_listing_method', $mediaListingDefault, FALSE, array( 'options' => $mediaListingOptions ), NULL, NULL, NULL, 'media_display_listing_method' ) );
 
 		if ( ! $isTitleOrContent )
 		{
-			$form->add( new Number( 'field_truncate', $this->id ? $this->truncate : 0, FALSE, array( 'unlimited' => 0 ), NULL, NULL, NULL, 'field_truncate' ) );
+			$form->add( new \IPS\Helpers\Form\Number( 'field_truncate', $this->id ? $this->truncate : 0, FALSE, array( 'unlimited' => 0 ), NULL, NULL, NULL, 'field_truncate' ) );
 		}
 
-		$form->addHeader( 'field_display_display_header' );
+		$form->addSeparator();
 
 		if ( ! $isTitleOrContent )
 		{
-			$form->add( new YesNo( 'field_display_display', $this->id ? $this->display_display : 1, FALSE, array(
-				'togglesOn' => array( 'field_display_display_json_badge', 'field_show_map_display', 'field_display_display_json_where', 'media_display_display_method' )
+			$form->add( new \IPS\Helpers\Form\YesNo( 'field_display_display', $this->id ? $this->display_display : 1, FALSE, array(
+				'togglesOn' => array( 'field_display_display_json_badge', 'field_display_display_json_where' )
 			), NULL, NULL, NULL, 'field_display_display' ) );
 		}
 
-		$form->add( new Radio( 'field_display_display_json_badge', $displayDefault, FALSE, array( 'options' => $displayOptions, 'toggles' => $displayToggles, 'parse' => 'raw' ), NULL, NULL, NULL, 'field_display_display_json_badge' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'field_display_display_json_badge', $displayDefault, FALSE, array( 'options' => $displayOptions, 'toggles' => $displayToggles, 'parse' => 'raw' ), NULL, NULL, NULL, 'field_display_display_json_badge' ) );
 
-		$form->add( new Color( 'field_display_display_badge_bgcolor', $displayJson['display']['bgcolor'] ?? null, false, array( 'allowNone' => true, 'allowNoneLanguage' => 'field_display_badge_default' ), null, null, null, 'field_display_display_badge_bgcolor' ) );
-		$form->add( new Color( 'field_display_display_badge_color', $displayJson['display']['color'] ?? null, false, array( 'allowNone' => true, 'allowNoneLanguage' => 'field_display_badge_default' ), null, null, null, 'field_display_display_badge_color' ) );
-
-		$form->add( new YesNo( 'field_show_map_display', $mapDisplay, FALSE, array(
-			'togglesOn' => array( 'field_show_map_display_dims' )
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_show_map_display', $mapDisplay, FALSE, array(
+			'togglesOn' => [ 'field_show_map_display_dims' ]
 		), NULL, NULL, NULL, 'field_show_map_display' ) );
-		$form->add( new WidthHeight( 'field_show_map_display_dims', $mapDisplayDims, FALSE, array( 'resizableDiv' => FALSE ), NULL, NULL, NULL, 'field_show_map_display_dims' ) );
+		$form->add( new \IPS\Helpers\Form\WidthHeight( 'field_show_map_display_dims', $mapDisplayDims, FALSE, array( 'resizableDiv' => FALSE ), NULL, NULL, NULL, 'field_show_map_display_dims' ) );
 
-		$form->add( new Codemirror( 'field_display_display_json_custom', ($displayJson['display']['html'] ?? NULL), FALSE, array( 'placeholder' => '{label}: {value}', 'codeModeAllowedLanguages' => [ 'ipsphtml' ] ), function($val )
+		$form->add( new \IPS\Helpers\Form\Codemirror( 'field_display_display_json_custom', ( isset( $displayJson['display']['html'] ) ? $displayJson['display']['html'] : NULL ), FALSE, array( 'placeholder' => '{label}: {value}' ), function( $val )
         {
             /* Test */
             try
             {
-	            Theme::checkTemplateSyntax( $val );
+	            \IPS\Theme::checkTemplateSyntax( $val );
             }
-            catch( LogicException $e )
+            catch( \LogicException $e )
             {
-	            throw new LogicException('cms_field_error_bad_syntax');
+	            throw new \LogicException('cms_field_error_bad_syntax');
             }
 
         }, NULL, NULL, 'field_display_display_json_custom' ) );
 
-		/* Media display */
-		$form->add( new Radio( 'media_display_display_method', $mediaDisplayDefault, FALSE, array( 'options' => $mediaListingOptions ), NULL, NULL, NULL, 'media_display_display_method' ) );
-
 		/* Display where? */
-		$form->add( new Radio( 'field_display_display_json_where', ($displayJson['display']['where'] ?? 'top'), FALSE, array( 'options' => array( 'top' => 'cms_field_display_top', 'bottom' => 'cms_field_display_bottom' ) ), NULL, NULL, NULL, 'field_display_display_json_where' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'field_display_display_json_where', ( isset( $displayJson['display']['where'] ) ? $displayJson['display']['where'] : 'top' ), FALSE, array( 'options' => array( 'top' => 'cms_field_display_top', 'bottom' => 'cms_field_display_bottom' ) ), NULL, NULL, NULL, 'field_display_display_json_where' ) );
+
+		/* Media display */
+		$form->add( new \IPS\Helpers\Form\Radio( 'media_display_display_method', $mediaDisplayDefault, FALSE, array( 'options' => $mediaListingOptions ), NULL, NULL, NULL, 'media_display_display_method' ) );
 
 		$form->addSeparator();
 
-		$form->add( new YesNo( 'field_display_commentform', $this->id ? $this->display_commentform : 0, FALSE, array(), NULL, NULL, NULL, 'field_display_commentform' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'field_display_commentform', $this->id ? $this->display_commentform : 0, FALSE, array(), NULL, NULL, NULL, 'field_display_commentform' ) );
+		\IPS\Output::i()->globalControllers[]  = 'cms.admin.fields.form';
+		\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_fields.js', 'cms' ) );
 
-		/* Add form fields from extensions */
-		foreach( Application::allExtensions( 'core', 'CustomField' ) as $ext )
-		{
-			/* @var CustomFieldAbstract $ext */
-			if( $ext::isEnabled() )
-			{
-				$ext::form( $form, $this );
-			}
-		}
-
-		Output::i()->globalControllers[]  = 'cms.admin.fields.form';
-		Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_fields.js', 'cms' ) );
-
-		Output::i()->title  = ( $this->id ) ? Member::loggedIn()->language()->addToStack('cms_edit_field', FALSE, array( 'sprintf' => array( $this->_title ) ) ) : Member::loggedIn()->language()->addToStack('cms_add_field');
+		\IPS\Output::i()->title  = ( $this->id ) ? \IPS\Member::loggedIn()->language()->addToStack('cms_edit_field', FALSE, array( 'sprintf' => array( $this->_title ) ) ) : \IPS\Member::loggedIn()->language()->addToStack('cms_add_field');
 	}
 
 	/**
 	 * @brief	Disable the copy button - useful when the forms are very distinctly different
 	 */
-	public bool $noCopyButton	= TRUE;
+	public $noCopyButton	= TRUE;
 
 	/**
 	 * @brief	Update the default value in records
 	 */
-	protected bool $_updateDefaultValue = FALSE;
+	protected $_updateDefaultValue = FALSE;
 
 	/**
 	 * @brief	Stores the old default value after a change
 	 */
-	protected ?string $_oldDefaultValue = NULL;
+	protected $_oldDefaultValue = NULL;
 
 	/**
 	 * [Node] Format form values from add/edit form for save
@@ -2374,11 +2228,11 @@ class Fields extends CustomField implements Permissions
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		static::$contentDatabaseTable = 'cms_custom_database_' . static::$customDatabaseId;
 
-		$values['field_max_length'] = ( isset( $values['field_max_length'] ) ) ? intval( $values['field_max_length'] ) : 0;
+		$values['field_max_length'] = ( isset( $values['field_max_length'] ) ) ? \intval( $values['field_max_length'] ) : 0;
 		
 		/* Work out the column definition */
 		if( isset( $values['field_type'] ) )
@@ -2391,7 +2245,7 @@ class Fields extends CustomField implements Permissions
 				case 'Radio':
 				case 'Select':
 					/* Reformat keyValue pairs */
-					if ( isset( $values['field_extra'] ) AND is_array( $values['field_extra'] ) )
+					if ( isset( $values['field_extra'] ) AND \is_array( $values['field_extra'] ) )
 					{
 						$extra = array();
 						foreach( $values['field_extra'] as $row )
@@ -2402,7 +2256,7 @@ class Fields extends CustomField implements Permissions
 							}
 						}
 
-						if ( count( $extra ) )
+						if ( \count( $extra ) )
 						{
 							$values['field_extra'] = $extra;
 						}
@@ -2416,26 +2270,12 @@ class Fields extends CustomField implements Permissions
 						$columnDefinition['type']	= 'VARCHAR';
 						$columnDefinition['length']	= 255;
 					}
-					if( $values['field_type'] != 'Member' )
-					{
-						if( isset( $values['field_option_other'] ) AND $values['field_option_other'] )
-						{
-							$values['field_format_opts_on'] = true;
-							$values['field_format_opts'] = [
-								'use_other' => true
-							];
-						}
-						else
-						{
-							$values['field_format_opts'] = null;
-						}
-					}
 					break;
 				case 'Youtube':
 				case 'Spotify':
 				case 'Soundcloud':
 					/* Reformat keyValue pairs */
-					if ( isset( $values['media_params'] ) AND is_array( $values['media_params'] ) )
+					if ( isset( $values['media_params'] ) AND \is_array( $values['media_params'] ) )
 					{
 						$extra = array();
 						foreach( $values['media_params'] as $row )
@@ -2446,7 +2286,7 @@ class Fields extends CustomField implements Permissions
 							}
 						}
 
-						if ( count( $extra ) )
+						if ( \count( $extra ) )
 						{
 							$values['field_extra'] = $extra;
 						}
@@ -2511,18 +2351,6 @@ class Fields extends CustomField implements Permissions
 					$columnDefinition['type'] = 'TEXT';
 					break;
 			}
-
-			/* Process values for extension */
-			foreach( Application::allExtensions( 'core', 'CustomField' ) as $ext )
-			{
-				/* @var CustomFieldAbstract $ext */
-				if( $ext::isEnabled() and $values['field_type'] == $ext::fieldType() )
-				{
-					$values = $ext::formatFormValues( $values );
-					$columnDefinition['type'] = $ext::columnDefinition();
-					break;
-				}
-			}
 			
 			if ( ! empty( $values['field_max_length'] ) )
 			{
@@ -2546,7 +2374,7 @@ class Fields extends CustomField implements Permissions
 			}
 		}
 
-		if( isset( $values['media_params'] ) )
+		if ( isset( $values['media_params'] ) )
 		{
 			unset( $values['media_params'] );
 		}
@@ -2567,9 +2395,9 @@ class Fields extends CustomField implements Permissions
 			{
 				try
 				{
-					Db::i()->addColumn( static::$contentDatabaseTable, $columnDefinition );
+					\IPS\Db::i()->addColumn( static::$contentDatabaseTable, $columnDefinition );
 				}
-				catch( DbException $e )
+				catch( \IPS\Db\Exception $e )
 				{
 					if ( $e->getCode() === 1118 )
 					{
@@ -2577,23 +2405,23 @@ class Fields extends CustomField implements Permissions
 						$columnDefinition['length'] = NULL;
 						$columnDefinition['type'] = 'TEXT';
 						
-						Db::i()->addColumn( static::$contentDatabaseTable, $columnDefinition );
+						\IPS\Db::i()->addColumn( static::$contentDatabaseTable, $columnDefinition );
 					}
 				}
 				if ( ! empty( $values['field_filter'] ) and $values['field_type'] != 'Upload' )
 				{
 					try
 					{
-						if ( in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
+						if ( \in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
 						{
-							Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
+							\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
 						}
 						else
 						{
-							Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
+							\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
 						}
 					}
-					catch( DbException $e )
+					catch( \IPS\Db\Exception $e )
 					{
 						if ( $e->getCode() !== 1069 )
 						{
@@ -2609,30 +2437,30 @@ class Fields extends CustomField implements Permissions
 			try
 			{
 				/* Drop the index if it exists */
-				if( Db::i()->checkForIndex( static::$contentDatabaseTable, "field_{$this->id}" ) )
+				if( \IPS\Db::i()->checkForIndex( static::$contentDatabaseTable, "field_{$this->id}" ) )
 				{
-					Db::i()->dropIndex( static::$contentDatabaseTable, "field_{$this->id}" );
+					\IPS\Db::i()->dropIndex( static::$contentDatabaseTable, "field_{$this->id}" );
 				}
-				Db::i()->dropColumn( static::$contentDatabaseTable, "field_{$this->id}" );
+				\IPS\Db::i()->dropColumn( static::$contentDatabaseTable, "field_{$this->id}" );
 			}
-			catch ( DbException $e ) { }
+			catch ( \IPS\Db\Exception $e ) { }
 
-			Db::i()->addColumn( static::$contentDatabaseTable, $columnDefinition );
+			\IPS\Db::i()->addColumn( static::$contentDatabaseTable, $columnDefinition );
 
 			if ( $values['field_type'] != 'Upload' )
 			{
 				try
 				{
-					if ( in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
+					if ( \in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
 					{
-						Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
+						\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
 					}
 					else
 					{
-						Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
+						\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
 					}
 				}
-				catch( DbException $e )
+				catch( \IPS\Db\Exception $e )
 				{
 					if ( $e->getCode() !== 1069 )
 					{
@@ -2647,28 +2475,28 @@ class Fields extends CustomField implements Permissions
 			try
 			{
 				/* Drop the index if it exists */
-				if( Db::i()->checkForIndex( static::$contentDatabaseTable, "field_{$this->id}" ) )
+				if( \IPS\Db::i()->checkForIndex( static::$contentDatabaseTable, "field_{$this->id}" ) )
 				{
-					Db::i()->dropIndex( static::$contentDatabaseTable, "field_{$this->id}" );
+					\IPS\Db::i()->dropIndex( static::$contentDatabaseTable, "field_{$this->id}" );
 				}
-				Db::i()->changeColumn( static::$contentDatabaseTable, "field_{$this->id}", $columnDefinition );
+				\IPS\Db::i()->changeColumn( static::$contentDatabaseTable, "field_{$this->id}", $columnDefinition );
 			}
-			catch ( DbException $e ) { }
+			catch ( \IPS\Db\Exception $e ) { }
 
 			if ( $values['field_filter'] and $values['field_type'] != 'Upload' )
 			{
 				try
 				{
-					if ( in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
+					if ( \in_array( $columnDefinition['type'], array( 'TEXT', 'MEDIUMTEXT' ) ) )
 					{
-						Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
+						\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'fulltext', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
 					}
 					else
 					{
-						Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
+						\IPS\Db::i()->addIndex( static::$contentDatabaseTable, array( 'type' => 'key', 'name' => "field_{$this->id}", 'columns' => array( "field_{$this->id}" ) ) );
 					}
 				}
-				catch( DbException $e )
+				catch( \IPS\Db\Exception $e )
 				{
 					if ( $e->getCode() !== 1069 )
 					{
@@ -2682,18 +2510,18 @@ class Fields extends CustomField implements Permissions
 		/* Save the name and desctipn */
 		if( isset( $values['field_title'] ) )
 		{
-			Lang::saveCustom( 'cms', static::$langKey . '_' . $this->id, $values['field_title'] );
+			\IPS\Lang::saveCustom( 'cms', static::$langKey . '_' . $this->id, $values['field_title'] );
 		}
 		
 		if ( isset( $values['field_description'] ) )
 		{
-			Lang::saveCustom( 'cms', static::$langKey . '_' . $this->id . '_desc', $values['field_description'] );
+			\IPS\Lang::saveCustom( 'cms', static::$langKey . '_' . $this->id . '_desc', $values['field_description'] );
 			unset( $values['field_description'] );
 		}
 		
 		if ( array_key_exists( 'field_validator_error', $values ) )
 		{
-			Lang::saveCustom( 'cms', static::$langKey . '_' . $this->id . '_validation_error', $values['field_validator_error'] );
+			\IPS\Lang::saveCustom( 'cms', static::$langKey . '_' . $this->id . '_validation_error', $values['field_validator_error'] );
 			unset( $values['field_validator_error'] );
 		}
 
@@ -2704,20 +2532,19 @@ class Fields extends CustomField implements Permissions
 
 		if ( isset( $values['field_key'] ) AND ! $values['field_key'] )
 		{
-			if ( is_array( $values['field_title'] ) )
+			if ( \is_array( $values['field_title'] ) )
 			{
 				/* We need to make sure the internal pointer on the array is on the first element */
 				reset( $values['field_title'] );
-				$values['field_key'] = Friendly::seoTitle( $values['field_title'][ key( $values['field_title'] ) ] );
+				$values['field_key'] = \IPS\Http\Url\Friendly::seoTitle( $values['field_title'][ key( $values['field_title'] ) ] );
 			}
 			else
 			{
-				$values['field_key'] = Friendly::seoTitle( $values['field_title'] );
+				$values['field_key'] = \IPS\Http\Url\Friendly::seoTitle( $values['field_title'] );
 			}
 
 			/* Now test it */
-			/* @var Fields $class */
-			$class = '\IPS\cms\Fields' . Request::i()->database_id;
+			$class = '\IPS\cms\Fields' . \IPS\Request::i()->database_id;
 
 			try
 			{
@@ -2729,7 +2556,7 @@ class Fields extends CustomField implements Permissions
 					$this->key .= '_' . mt_rand();
 				}
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
 				/* Doesn't exist? Good! */
 			}
@@ -2740,15 +2567,10 @@ class Fields extends CustomField implements Permissions
 			$displayJson = array( 'display' => array( 'method' => NULL ), 'listing' => array( 'method' => NULL ) );
 
 			/* Listing */
-			if ( in_array( $values['field_type'], static::$mediaFields ) )
+			if ( \in_array( $values['field_type'], static::$mediaFields ) )
 			{
 				$displayJson['listing']['method'] = $values['media_display_listing_method'];
 				$displayJson['display']['method'] = $values['media_display_display_method'];
-
-				if ( isset( $values['field_display_display_json_where'] ) )
-				{
-					$displayJson['display']['where'] = $values['field_display_display_json_where'];
-				}
 			}
 			else
 			{
@@ -2787,14 +2609,14 @@ class Fields extends CustomField implements Permissions
 						$displayJson['listing']['html'] = NULL;
 					}
 
-					$displayJson['listing']['method'] = $values['field_display_listing_json_badge'];
-					if ( $values['field_display_listing_json_badge'] != 'custom' )
+					if ( $values['field_display_listing_json_badge'] === 'custom' )
 					{
-						if( $values['field_display_listing_json_badge'] == 'badge' )
-						{
-							$displayJson['listing']['bgcolor'] = $values['field_display_listing_badge_bgcolor'];
-							$displayJson['listing']['color'] = $values['field_display_listing_badge_color'];
-						}
+						$displayJson['listing']['method'] = 'custom';
+					}
+					else
+					{
+						$displayJson['listing']['method'] = $values['field_display_listing_json_badge'];
+						$displayJson['listing']['right']  = isset( $values['field_display_listing_json_badge_right'] ) ? $values['field_display_listing_json_badge_right'] : FALSE;
 					}
 				}
 
@@ -2811,11 +2633,13 @@ class Fields extends CustomField implements Permissions
 						$displayJson['display']['html'] = NULL;
 					}
 
-					$displayJson['display']['method'] = $values['field_display_display_json_badge'];
-					if ( $values['field_display_display_json_badge'] == 'badge' )
+					if ( $values['field_display_display_json_badge'] === 'custom' )
 					{
-						$displayJson['display']['bgcolor'] = $values['field_display_display_badge_bgcolor'];
-						$displayJson['display']['color'] = $values['field_display_display_badge_color'];
+						$displayJson['display']['method'] = 'custom';
+					}
+					else
+					{
+						$displayJson['display']['method'] = $values['field_display_display_json_badge'];
 					}
 
 					if ( isset( $values['field_display_display_json_where'] ) )
@@ -2890,7 +2714,7 @@ class Fields extends CustomField implements Permissions
 		{
 			if ( array_key_exists( 'field_relational_db', $values ) and empty( $values['field_relational_db'] ) )
 			{
-				throw new LogicException( Member::loggedIn()->language()->addToStack('cms_relational_field_no_db_selected') );
+				throw new \LogicException( \IPS\Member::loggedIn()->language()->addToStack('cms_relational_field_no_db_selected') );
 			}
 			
 			if ( isset( $values['field_relational_db'] ) )
@@ -2904,7 +2728,7 @@ class Fields extends CustomField implements Permissions
 			}
 			
 			/* Best remove the stored data incase the crosslink setting changed */
-			unset( Store::i()->database_reciprocal_links );
+			unset( \IPS\Data\Store::i()->database_reciprocal_links );
 		}
 		
 		/* Special number stuff */
@@ -2914,7 +2738,7 @@ class Fields extends CustomField implements Permissions
 		}
 		
 		/* Remove the filter flag if this field cannot be filtered */
-		if ( isset( $values['field_type'] ) AND isset( $values['field_filter'] ) AND $values['field_filter'] and ! in_array( $values['field_type'], static::$filterableFields ) )
+		if ( isset( $values['field_type'] ) AND isset( $values['field_filter'] ) AND $values['field_filter'] and ! \in_array( $values['field_type'], static::$filterableFields ) )
 		{
 			$values['field_filter'] = false;
 		}
@@ -2925,7 +2749,7 @@ class Fields extends CustomField implements Permissions
 			$this->_oldDefaultValue    = $this->default_value;
 		}
 
-		foreach( array( 'field_crosslink', 'field_number_decimals_on', 'field_number_decimals', 'field_number_min', 'field_number_max', 'field_format_opts_on', 'field_relational_db', 'field_upload_is_multiple', 'field_default_update_existing', 'field_date_time_override', 'field_date_timezone', 'field_date_time_time', 'field_upload_is_image', 'field_image_size', 'field_upload_thumb', 'field_title', 'field_display_display_json_badge', 'field_display_display_json_custom', 'field_display_listing_json_badge', 'field_display_listing_json_custom', 'media_display_listing_method', 'media_display_display_method', 'field_show_map_listing', 'field_show_map_listing_dims', 'field_show_map_display', 'field_show_map_display_dims', 'field_display_display_json_where', 'field_option_other', 'field_display_listing_badge_bgcolor', 'field_display_listing_badge_color', 'field_display_display_badge_bgcolor', 'field_display_display_badge_color' ) as $field )
+		foreach( array( 'field_crosslink', 'field_number_decimals_on', 'field_number_decimals', 'field_number_min', 'field_number_max', 'field_format_opts_on', 'field_relational_db', 'field_upload_is_multiple', 'field_default_update_existing', 'field_date_time_override', 'field_date_timezone', 'field_date_time_time', 'field_upload_is_image', 'field_image_size', 'field_upload_thumb', 'field_title', 'field_display_display_json_badge', 'field_display_display_json_custom', 'field_display_listing_json_badge', 'field_display_listing_json_custom', 'field_display_listing_json_badge_right', 'media_display_listing_method', 'media_display_display_method', 'field_show_map_listing', 'field_show_map_listing_dims', 'field_show_map_display', 'field_show_map_display_dims', 'field_display_display_json_where' ) as $field )
 		{
 			if ( array_key_exists( $field, $values ) )
 			{
@@ -2942,7 +2766,7 @@ class Fields extends CustomField implements Permissions
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
 		/* Ensure it has some permissions */
 		$this->permissions();
@@ -2952,23 +2776,21 @@ class Fields extends CustomField implements Permissions
 			static::$contentDatabaseTable = 'cms_custom_database_' . static::$customDatabaseId;
 
 			$field = 'field_' . $this->id;
-			Db::i()->update( static::$contentDatabaseTable, array( $field => $this->default_value ), array( $field . '=?  OR ' . $field . ' IS NULL', $this->_oldDefaultValue ) );
+			\IPS\Db::i()->update( static::$contentDatabaseTable, array( $field => $this->default_value ), array( $field . '=?  OR ' . $field . ' IS NULL', $this->_oldDefaultValue ) );
 		}
-
-		parent::postSaveForm( $values );
 	}
 
 	/**
 	 * Does the change mean wiping the value?
 	 *
-	 * @param string $newType The new type
-	 * @return bool
+	 * @param	string	$newType	The new type
+	 * @return	array
 	 */
-	protected function canKeepValueOnChange( string $newType ): bool
+	protected function canKeepValueOnChange( $newType )
 	{
 		$custom = array( 'Youtube', 'Spotify', 'Soundcloud', 'Relational' );
 
-		if ( ! in_array( $this->type, $custom ) )
+		if ( ! \in_array( $this->type, $custom ) )
 		{
 			return parent::canKeepValueOnChange( $newType );
 		}
@@ -2976,13 +2798,13 @@ class Fields extends CustomField implements Permissions
 		switch ( $this->type )
 		{
 			case 'Youtube':
-				return in_array( $newType, array( 'Youtube', 'Text', 'TextArea' ) );
+				return \in_array( $newType, array( 'Youtube', 'Text', 'TextArea' ) );
 
 			case 'Spotify':
-				return in_array( $newType, array( 'Spotify', 'Text', 'TextArea' ) );
+				return \in_array( $newType, array( 'Spotify', 'Text', 'TextArea' ) );
 
 			case 'Soundcloud':
-				return in_array( $newType, array( 'Soundcloud', 'Text', 'TextArea' ) );
+				return \in_array( $newType, array( 'Soundcloud', 'Text', 'TextArea' ) );
 		}
 
 		return FALSE;
@@ -2991,25 +2813,25 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * [ActiveRecord] Save Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		static::$contentDatabaseTable = 'cms_custom_database_' . static::$customDatabaseId;
 		static::$cache = array();
 
 		$functionName = $this->fieldTemplateName('listing');
 
-		if ( isset( Store::i()->$functionName ) )
+		if ( isset( \IPS\Data\Store::i()->$functionName ) )
 		{
-			unset( Store::i()->$functionName );
+			unset( \IPS\Data\Store::i()->$functionName );
 		}
 
 		$functionName = $this->fieldTemplateName('display');
 
-		if ( isset( Store::i()->$functionName ) )
+		if ( isset( \IPS\Data\Store::i()->$functionName ) )
 		{
-			unset( Store::i()->$functionName );
+			unset( \IPS\Data\Store::i()->$functionName );
 		}
 
 		parent::save();
@@ -3018,16 +2840,16 @@ class Fields extends CustomField implements Permissions
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @param bool $skipDrop	Skip dropping the column/index, useful when we are deleting the entire table
-	 * @return    void
+	 * @param	bool	$skipDrop	Skip dropping the column/index, useful when we are deleting the entire table
+	 * @return	void
 	 */
-	public function delete( bool $skipDrop=FALSE ): void
+	public function delete( $skipDrop=FALSE )
 	{
-		static::$contentDatabaseTable = ''; // This ensures the parent class doesn't try to drop the column regardless
+		static::$contentDatabaseTable = NULL; // This ensures the parent class doesn't try to drop the column regardless
 		static::$cache = array();
 
 		/* Remove reciprocal map data */
-		Db::i()->delete( 'cms_database_fields_reciprocal_map', array( 'map_origin_database_id=? AND map_field_id=? ', static::$customDatabaseId, $this->id ) );
+		\IPS\Db::i()->delete( 'cms_database_fields_reciprocal_map', array( 'map_origin_database_id=? AND map_field_id=? ', static::$customDatabaseId, $this->id ) );
 
 		parent::delete();
 
@@ -3039,7 +2861,7 @@ class Fields extends CustomField implements Permissions
 		if( $this->type == 'Upload' )
 		{
 			/* Delete thumbnails */
-			Task::queue( 'core', 'FileCleanup', array(
+			\IPS\Task::queue( 'core', 'FileCleanup', array( 
 				'table'				=> 'cms_database_fields_thumbnails',
 				'column'			=> 'thumb_location',
 				'storageExtension'	=> 'cms_Records',
@@ -3048,7 +2870,7 @@ class Fields extends CustomField implements Permissions
 			), 4 );
 
 			/* Delete records */
-			Task::queue( 'core', 'FileCleanup', array(
+			\IPS\Task::queue( 'core', 'FileCleanup', array( 
 				'table'				=> 'cms_custom_database_' . static::$customDatabaseId,
 				'column'			=> 'field_' . $this->id,
 				'storageExtension'	=> 'cms_Records',
@@ -3062,44 +2884,45 @@ class Fields extends CustomField implements Permissions
 		{
 			try
 			{
-				Db::i()->dropColumn( 'cms_custom_database_' . static::$customDatabaseId, "field_{$this->id}" );
+				\IPS\Db::i()->dropColumn( 'cms_custom_database_' . static::$customDatabaseId, "field_{$this->id}" );
 			}
-			catch( DbException $e ) { }
+			catch( \IPS\Db\Exception $e ) { }
 		}
 		
-		Lang::deleteCustom( 'cms', "content_field_{$this->id}_desc" );
-		Lang::deleteCustom( 'cms', "content_field_{$this->id}_validation_error" );
+		\IPS\Lang::deleteCustom( 'cms', "content_field_{$this->id}_desc" );
+		\IPS\Lang::deleteCustom( 'cms', "content_field_{$this->id}_validation_error" );
 	}
 
 	/**
 	 * Build Form Helper
 	 *
-	 * @param mixed|null $value The value
-	 * @param callback|null $customValidationCode Custom validation code
-	 * @param Content|NULL $content The associated content, if editing
-	 * @param int $flags
-	 * @return Text|FormAbstract
+	 * @param	mixed	$value	                    The value
+	 * @param	callback	$customValidationCode	Custom validation code
+	 * @param   \IPS\cms\Records|NULL   $content     The record
+	 * @param	int				        $flags		Bit flags
+	 * @return \IPS\Helpers\Form\FormAbstract
 	 */
-	public function buildHelper( mixed $value=NULL, callable $customValidationCode=NULL, Content $content = NULL, int $flags=0 ): Text|FormAbstract
+	public function buildHelper( $value=NULL, $customValidationCode=NULL, \IPS\Content $content = NULL, $flags=0 )
 	{
-		if( $extension = $this->extension() )
-		{
-			$class = $extension::formClass();
-			$options = $extension::formHelperOptions( $this );
-		}
-		elseif ( class_exists( '\IPS\cms\Fields\\' . IPS::mb_ucfirst( $this->type ) ) )
+		if ( class_exists( '\IPS\cms\Fields\\' . mb_ucfirst( $this->type ) ) )
 		{
 			/* Is special! */
-			$class = '\IPS\cms\Fields\\' . IPS::mb_ucfirst( $this->type );
+			$class = '\IPS\cms\Fields\\' . mb_ucfirst( $this->type );
 		}
-		else if ( class_exists( '\IPS\Helpers\Form\\' . IPS::mb_ucfirst( $this->type ) ) )
+		else if ( class_exists( '\IPS\Helpers\Form\\' . mb_ucfirst( $this->type ) ) )
 		{
-			$class = '\IPS\Helpers\Form\\' . IPS::mb_ucfirst( $this->type );
+			$class = '\IPS\Helpers\Form\\' . mb_ucfirst( $this->type );
 
-			$options = $this->extra;
-			if( method_exists( $class, 'formatOptions' ) )
+			if ( !\is_array( $this->extra ) )
 			{
-				$options = $class->formatOptions( $options );
+				if ( method_exists( $class, 'formatOptions' ) )
+				{
+					$options = $class->formatOptions( json_decode( $this->extra ) );
+				}
+				else
+				{
+					$options = json_decode( $this->extra );
+				}
 			}
 		}
 		else
@@ -3110,7 +2933,7 @@ class Fields extends CustomField implements Permissions
 		}
 
 		$options    = array();
-		switch ( IPS::mb_ucfirst( $this->type ) )
+		switch ( mb_ucfirst( $this->type ) )
 		{
 			case 'Editor':
 				$options['app']         = 'cms';
@@ -3154,7 +2977,7 @@ class Fields extends CustomField implements Permissions
 					$options['multiple'] = TRUE;
 				}
 
-				if( $value and ! is_array( $value ) )
+				if( $value and ! \is_array( $value ) )
 				{
 					if ( mb_strstr( $value, ',' ) )
 					{
@@ -3165,9 +2988,9 @@ class Fields extends CustomField implements Permissions
 						{
 							try
 							{
-								$return[] = File::get( static::$uploadStorageExtension, $file );
+								$return[] = \IPS\File::get( static::$uploadStorageExtension, $file );
 							}
-							catch ( OutOfRangeException $e ) { }
+							catch ( \OutOfRangeException $e ) { }
 						}
 
 						$value = $return;
@@ -3176,9 +2999,9 @@ class Fields extends CustomField implements Permissions
 					{
 						try
 						{
-							$value = array( File::get( static::$uploadStorageExtension, $value ) );
+							$value = array( \IPS\File::get( static::$uploadStorageExtension, $value ) );
 						}
-						catch ( OutOfRangeException $e )
+						catch ( \OutOfRangeException $e )
 						{
 							$value = NULL;
 						}
@@ -3187,7 +3010,7 @@ class Fields extends CustomField implements Permissions
 				break;
 			case 'Select':
 			case 'CheckboxSet':
-				$options['multiple'] = ( IPS::mb_ucfirst( $this->type ) == 'CheckboxSet' ) ? TRUE : $this->is_multiple;
+				$options['multiple'] = ( mb_ucfirst( $this->type ) == 'CheckboxSet' ) ? TRUE : $this->is_multiple;
 				
 				if ( $flags & self::FIELD_DISPLAY_FILTERS or ( ! $this->default_value and ! $this->required ) )
 				{
@@ -3200,15 +3023,15 @@ class Fields extends CustomField implements Permissions
 					$this->required       = false;
 				}
 
-				if ( $options['multiple'] and ! is_array( $value ) )
+				if ( $options['multiple'] and ! \is_array( $value ) )
 				{
-					$exp   = $value ? explode( ',', $value ) : [];
+					$exp   = explode( ',', $value );
 					$value = array();
 					foreach( $exp as $val )
 					{
-						if ( is_numeric( $val ) and intval( $val ) == $val )
+						if ( \is_numeric( $val ) and \intval( $val ) == $val )
 						{
-							$value[] = intval( $val );
+							$value[] = \intval( $val );
 						}
 						else
 						{
@@ -3218,36 +3041,22 @@ class Fields extends CustomField implements Permissions
 				}
 				else
 				{
-					if ( is_numeric( $value ) and intval( $value ) == $value )
+					if ( \is_numeric( $value ) and \intval( $value ) == $value )
 					{
-						$value = intval( $value );
+						$value = \intval( $value );
 					}
 				}
 
 				$json = $this->extra;
-				$options['options'] = ( $json ) ?: array();
-
-				if( isset( $this->format_opts['use_other'] ) AND $this->format_opts['use_other'] and !( $flags & self::FIELD_DISPLAY_FILTERS ) )
-				{
-					$userSuppliedInput = 'content_field_other_' . $this->id;
-					$options['options'][$userSuppliedInput] = Member::loggedIn()->language()->get( 'field_opt_other' );
-					$options['userSuppliedInput'] = $userSuppliedInput;
-					$options['toggles'][ $userSuppliedInput ] = [ $userSuppliedInput ];
-				}
-
+				$options['options'] = ( $json ) ? $json : array();
 				break;
 			case 'Radio':
 				$json = $this->extra;
-				$options['options'] = ( $json ) ?: array();
-				if( isset( $this->format_opts['use_other'] ) AND $this->format_opts['use_other'] )
-				{
-					$options['options']['content_field_other_' . $this->id] = Member::loggedIn()->language()->get( 'field_opt_other' );
-					$options['userSuppliedInput'] = 'content_field_other_' . $this->id;
-				}
+				$options['options'] = ( $json ) ? $json : array();
 				$options['multiple'] = FALSE;
 				break;
 			case 'Address':
-				$value = GeoLocation::buildFromJson( $value );
+				$value = \IPS\GeoLocation::buildFromJson( $value );
 				break;
 			
 			case 'Member':
@@ -3258,20 +3067,20 @@ class Fields extends CustomField implements Permissions
 				
 				$options['multiple'] = $this->is_multiple ? NULL : 1;
 				
-				if ( is_string( $value ) )
+				if ( \is_string( $value ) )
 				{
 					$value = array_map( function( $id )
 					{
-						return Member::load( intval( $id ) );
+						return \IPS\Member::load( \intval( $id ) );
 					}, explode( "\n", $value ) );
 				}
 				
 				break;
 			case 'Date':
-				if ( is_numeric( $value ) )
+				if ( \is_numeric( $value ) )
 				{
 					/* We want to normalize based on user time zone here */
-					$value = DateTime::ts( $value );
+					$value = \IPS\DateTime::ts( $value );
 				}
 				
 				if ( isset( $this->extra['timezone'] ) and $this->extra['timezone'] )
@@ -3279,9 +3088,9 @@ class Fields extends CustomField implements Permissions
 					/* The timezone is already set to user by virtue of DateTime::ts() */
 					if ( $this->extra['timezone'] != 'user' )
 					{
-						$options['timezone'] = new DateTimeZone( $this->extra['timezone'] );
+						$options['timezone'] = new \DateTimeZone( $this->extra['timezone'] );
 						
-						if ( $value instanceof DateTime )
+						if ( $value instanceof \IPS\DateTime )
 						{
 							$value->setTimezone( $options['timezone'] );
 						}
@@ -3291,9 +3100,9 @@ class Fields extends CustomField implements Permissions
 					on who submits and who views */
 				else
 				{
-					$options['timezone'] = new DateTimeZone( 'UTC' );
+					$options['timezone'] = new \DateTimeZone( 'UTC' );
 
-					if ( $value instanceof DateTime )
+					if ( $value instanceof \IPS\DateTime )
 					{
 						$value->setTimezone( $options['timezone'] );
 					}
@@ -3331,34 +3140,10 @@ class Fields extends CustomField implements Permissions
 				}
 				break;
 		}
-
-		if( $this->toggles )
-		{
-			$toggles = json_decode( $this->toggles, true );
-			if( is_array( $toggles ) AND count( $toggles ) )
-			{
-				foreach( $toggles as $k => $v )
-				{
-					foreach( $v as $_k => $_v )
-					{
-						$toggles[$k][$_k] = 'content_field_' . $_v;
-					}
-				}
-
-				if( $this->type == 'YesNo' OR $this->type == 'Checkbox' )
-				{
-					$options = array_merge( $options, $toggles );
-				}
-				else
-				{
-					$options['toggles'] = $toggles;
-				}
-			}
-		}
-
+		
 		if ( $this->validator AND $this->validator_custom )
 		{
-			switch( IPS::mb_ucfirst( $this->type ) )
+			switch( mb_ucfirst( $this->type ) )
 			{
 				case 'Text':
 				case 'TextArea':
@@ -3367,9 +3152,9 @@ class Fields extends CustomField implements Permissions
 						$field = $this;
 						$customValidationCode = function( $val ) use ( $field, $content )
 						{
-							call_user_func_array( 'IPS\cms\Fields' . static::$customDatabaseId . '::validateUnique', array( $val, $field, $content ) );
+							\call_user_func_array( 'IPS\cms\Fields' . static::$customDatabaseId . '::validateUnique', array( $val, $field, $content ) );
 							
-							return call_user_func( 'IPS\cms\Fields' . static::$customDatabaseId . '::validateInput_' . $field->id, $val );
+							return \call_user_func( 'IPS\cms\Fields' . static::$customDatabaseId . '::validateInput_' . $field->id, $val );
 						};
 					}
 					else
@@ -3380,51 +3165,15 @@ class Fields extends CustomField implements Permissions
 			}
 		}
 
-		/* If the field is required, but can be toggled, change this to null */
-		if( $this->required AND in_array( $this->id, static::getToggledFieldIds() ) )
-		{
-			$this->required = null;
-		}
-
-		return new $class( 'content_field_' . $this->id, $value, $this->required, $options, $customValidationCode, null, null, 'content_field_' . $this->id );
+		return new $class( 'content_field_' . $this->id, $value, $this->required, $options, $customValidationCode );
 	}
-
-	/**
-	 * @var array|null
-	 */
-	protected static ?array $_cachedToggleIds = null;
-
-	/**
-	 * Returns all field IDs that might be toggled by another field
-	 *
-	 * @return array
-	 */
-	protected static function getToggledFieldIds() : array
-	{
-		if( static::$_cachedToggleIds === null )
-		{
-			$ids = [];
-			foreach( static::roots( null ) as $field )
-			{
-				if( $field->toggles AND $toggles = json_decode( $field->toggles, true ) )
-				{
-					foreach( $toggles as $k => $v )
-					{
-						$ids = array_merge( $ids, $v );
-					}
-				}
-			}
-			static::$_cachedToggleIds = array_unique( $ids );
-		}
-
-		return static::$_cachedToggleIds;
-	}
-
+	
+	
 	
 	/**
 	 * Get output for API
 	 *
-	 * @param			Member|NULL		$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param			\IPS\Member|NULL		$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return			array
 	 * @apiresponse		int					id					ID number
 	 * @apiresponse		string				title				Title
@@ -3434,7 +3183,7 @@ class Fields extends CustomField implements Permissions
 	 * @apiresponse		bool					required			If the field is required
 	 * @apiresponse		object|null			options				If the field has certain options (for example, it is a select field), the possible values
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'id'			=> $this->_id,
@@ -3442,7 +3191,7 @@ class Fields extends CustomField implements Permissions
 			'description'	=> $this->_description ?: NULL,
 			'type'			=> $this->type,
 			'default'		=> $this->default_value ?: NULL,
-			'required'		=> $this->required,
+			'required'		=> (bool) $this->required,
 			'options'		=> $this->extra
 		);
 	}

@@ -11,17 +11,9 @@
 namespace IPS\Login\Handler;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Login\Exception;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -35,9 +27,9 @@ trait ButtonHandler
 	 *
 	 * @return	int
 	 */
-	public function type(): int
+	public function type()
 	{
-		return Login::TYPE_BUTTON;
+		return \IPS\Login::TYPE_BUTTON;
 	}
 	
 	/**
@@ -45,46 +37,47 @@ trait ButtonHandler
 	 *
 	 * @return	string
 	 */
-	public function button(): string
+	public function button()
 	{
-		return Theme::i()->getTemplate( 'login', 'core', 'global' )->loginButton( $this );
+		return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->loginButton( $this );
 	}
 		
 	/**
 	 * Authenticate
 	 *
-	 * @param	Login	$login				The login object
-	 * @throws	Exception
+	 * @param	\IPS\Login	$login				The login object
+	 * @return	\IPS\Member
+	 * @throws	\IPS\Login\Exception
 	 */
-	abstract public function authenticateButton( Login $login );
+	abstract public function authenticateButton( \IPS\Login $login );
 	
 	/**
 	 * Get the button color
 	 *
 	 * @return	string
 	 */
-	abstract public function buttonColor(): string;
+	abstract public function buttonColor();
 	
 	/**
 	 * Get the button icon
 	 *
-	 * @return    string|File
+	 * @return	string
 	 */
-	abstract public function buttonIcon(): string|File;
+	abstract public function buttonIcon();
 	
 	/**
 	 * Get button text
 	 *
 	 * @return	string
 	 */
-	abstract public function buttonText(): string;
+	abstract public function buttonText();
 
 	/**
 	 * Get button class
 	 *
 	 * @return	string
 	 */
-	public function buttonClass(): string
+	public function buttonClass()
 	{
 		return '';
 	}
@@ -92,9 +85,9 @@ trait ButtonHandler
 	/**
 	 * Get logo to display in user cp sidebar
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForUcp(): Url|string|null
+	public function logoForUcp()
 	{
 		return $this->buttonIcon();
 	}

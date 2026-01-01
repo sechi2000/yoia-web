@@ -12,56 +12,38 @@
 namespace IPS\convert\Software\Gallery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Vbulletin as VBulletinSoftware;
-use IPS\File;
-use IPS\gallery\Album;
-use IPS\gallery\Image;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * vBulletin Gallery Converter
  */
-class Vbulletin extends Software
+class _Vbulletin extends \IPS\convert\Software
 {
 	/**
 	 * @brief	vBulletin 4 Stores all attachments under one table - this will store the content type for the forums app.
 	 */
-	protected static mixed $imageContentType		= NULL;
+	protected static $imageContentType		= NULL;
 	
 	/**
 	 * @brief	The schematic for vB3 and vB4 is similar enough that we can make specific concessions in a sinle converter for either version.
 	 */
-	protected static ?bool $isLegacy					= NULL;
+	protected static $isLegacy					= NULL;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 		
 		/* Is this vB3 or vB4? */
 		if ( $needDB )
@@ -84,21 +66,23 @@ class Vbulletin extends Software
 				
 				
 				/* If this is vB4, what is the content type ID for posts? */
-				if ( static::$imageContentType === NULL AND ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) )
+				if ( static::$imageContentType === NULL AND ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) )
 				{
 					static::$imageContentType = $this->db->select( 'contenttypeid', 'contenttype', array( "class=?", 'Album' ) )->first();
 				}
 			}
-			catch( Exception $e ) {}
+			catch( \Exception $e ) {}
 		}
+		
+		return $return;
 	}
 	
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "vBulletin Gallery (3.8.x/4.x)";
@@ -107,9 +91,9 @@ class Vbulletin extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "vbulletin";
@@ -118,14 +102,14 @@ class Vbulletin extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		$imageWhere = NULL;
 		$imageTable = 'picture';
 		
-		if ( !static::$isLegacy )
+		if ( static::$isLegacy == FALSE )
 		{
 			$imageWhere = array( "contenttypeid=?", static::$imageContentType );
 			$imageTable = 'attachment';
@@ -150,9 +134,9 @@ class Vbulletin extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -160,9 +144,9 @@ class Vbulletin extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'vbulletin' ) );
 	}
@@ -170,46 +154,43 @@ class Vbulletin extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
 
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_albums', 'extension' => 'gallery_Albums' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_albums', 'extension' => 'gallery_Albums' ), 2, array( 'app', 'link', 'extension' ) );
 		
 		/* Caches */
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'gallery_images', 'class' => 'IPS\gallery\Image' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'gallery_images', 'class' => 'IPS\gallery\Image' ), 3, array( 'app', 'link', 'class' ) );
 
 		return array( "f_gallery_images_rebuild", "f_gallery_cat_recount", "f_gallery_album_recount", "f_gallery_image_recount", "f_image_tags_recount" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix Post Data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string	$post	Post
+	 * @return	string	Fixed Posts
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return VBulletinSoftware::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Vbulletin::fixPostData( $post );
 	}
 
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -222,8 +203,8 @@ class Vbulletin extends Software
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'database'				=> Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
-								'file_system'			=> Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
+								'database'				=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
+								'file_system'			=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
 							),
 							'userSuppliedInput'	=> 'file_system',
 						),
@@ -240,9 +221,9 @@ class Vbulletin extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array( 'convertGalleryImages' );
 	}
@@ -252,7 +233,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryAlbums() : void
+	public function convertGalleryAlbums()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -295,7 +276,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryImages() : void
+	public function convertGalleryImages()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -324,7 +305,7 @@ class Vbulletin extends Software
 				{
 					$albumAndDate = $this->db->select( 'albumid, dateline', 'albumpicture', array( "pictureid=?", $image['pictureid'] ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					/* Orphaned */
 					$libraryClass->setLastKeyValue( $image['pictureid'] );
@@ -355,7 +336,7 @@ class Vbulletin extends Software
 				{
 					$data = $this->db->select( '*', 'filedata', array( "filedataid=?", $image['filedataid'] ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					$libraryClass->setLastKeyValue( $image['attachmentid'] );
 					continue;
@@ -395,7 +376,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryComments() : void
+	public function convertGalleryComments()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -435,7 +416,7 @@ class Vbulletin extends Software
 					{
 						$image_id = $this->db->select( 'attachmentid', 'attachment', array( array( 'filedataid=?', $comment['filedataid'] ) ) )->first();
 					}
-					catch( Exception $e )
+					catch( \Exception $e )
 					{
 						$image_id = 0;
 					}
@@ -459,55 +440,55 @@ class Vbulletin extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
 		try
 		{
-			if( isset( Request::i()->albumid ) AND mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'picture.php' ) === FALSE )
+			if( isset( \IPS\Request::i()->albumid ) AND mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'picture.php' ) === FALSE )
 			{
-				$data = $this->app->getLink( Request::i()->albumid, 'gallery_albums' );
-				$item = Album::load( $data );
+				$data = $this->app->getLink( \IPS\Request::i()->albumid, 'gallery_albums' );
+				$item = \IPS\gallery\Album::load( $data );
 
 				if( $item->can( 'view' ) )
 				{
 					return $item->url();
 				}
 			}
-			elseif( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'album.php' ) !== FALSE AND isset( Request::i()->pictureid ) )
+			elseif( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'album.php' ) !== FALSE AND isset( \IPS\Request::i()->pictureid ) )
 			{
-				$data = $this->app->getLink( Request::i()->pictureid, 'gallery_images' );
-				$item = Image::load( $data );
+				$data = $this->app->getLink( \IPS\Request::i()->pictureid, 'gallery_images' );
+				$item = \IPS\gallery\Image::load( $data );
 
 				if( $item->canView() )
 				{
 					return $item->url();
 				}
 			}
-			elseif( isset( Request::i()->userid ) )
+			elseif( isset( \IPS\Request::i()->userid ) )
 			{
-				$data = $this->app->getLink( Request::i()->userid, array( 'members', 'core_members' ) );
-				return Member::load( $data )->url();
+				$data = $this->app->getLink( \IPS\Request::i()->userid, array( 'members', 'core_members' ) );
+				return \IPS\Member::load( $data )->url();
 			}
-			elseif( ( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'picture.php' ) !== FALSE AND isset( Request::i()->pictureid ) ) OR
-					( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'attachment.php' ) !== FALSE AND isset( Request::i()->attachmentid ) ) )
+			elseif( ( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'picture.php' ) !== FALSE AND isset( \IPS\Request::i()->pictureid ) ) OR
+					( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'attachment.php' ) !== FALSE AND isset( \IPS\Request::i()->attachmentid ) ) )
 			{
 				try
 				{
-					$data = $this->app->getLink( Request::i()->pictureid ?: Request::i()->attachmentid, 'gallery_images' );
+					$data = $this->app->getLink( \IPS\Request::i()->pictureid ?: \IPS\Request::i()->attachmentid, 'gallery_images' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
-					$data = Request::i()->pictureid ?: Request::i()->attachmentid;
+					$data = \IPS\Request::i()->pictureid ?: \IPS\Request::i()->attachmentid;
 				}
 
-				return File::get( 'gallery_Images', Image::load( $data )->masked_file_name )->url;
+				return \IPS\File::get( 'gallery_Images', \IPS\gallery\Image::load( $data )->masked_file_name )->url;
 			}
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return NULL;
 		}

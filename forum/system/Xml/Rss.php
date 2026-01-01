@@ -11,39 +11,27 @@
 namespace IPS\Xml;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\DateTime;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use IPS\Settings;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Class for managing RSS documents
  */
-class Rss extends SimpleXML
+class _Rss extends SimpleXML
 {	
 	/**
 	 * Create RSS document
 	 *
-	 * @param	Url	$url			URL to document
-	 * @param string $title			Channel Title
-	 * @param string $description	Channel Description
-	 * @return	static
+	 * @param	\IPS\Http\Url	$url			URL to document
+	 * @param	string			$title			Channel Title
+	 * @param	string			$description	Channel Description
+	 * @return	void
 	 * @see		<a href='http://cyber.law.harvard.edu/rss/languages.html'>Allowable values for language in RSS</a>
 	 */
-	public static function newDocument( Url $url, string $title, string $description ) : static
+	public static function newDocument( \IPS\Http\Url $url, $title, $description )
 	{
 		$xml = new static( '<rss version="2.0" />' );
 		
@@ -53,7 +41,7 @@ class Rss extends SimpleXML
 		$channel->addChild( 'description', $description );
 		
 		/* Previously we were regexing and whitelisting language codes for some reason - we should just send the language code always */
-		$locale = mb_strtolower( Member::loggedIn()->language()->short );
+		$locale = mb_strtolower( \IPS\Member::loggedIn()->language()->short );
 		$locale = mb_substr( $locale, 0, mb_strpos( str_replace( '-', '_', $locale ), '_' ) );
 		$channel->addChild( 'language', $locale );
 	
@@ -63,20 +51,20 @@ class Rss extends SimpleXML
 	/**
 	 * Add Item
 	 *
-	 * @param string|null $title			Item title
-	 * @param	Url|NULL	$link			Item link
-	 * @param string|null $description	Item description/content
-	 * @param	DateTime|NULL	$date			Item date
-	 * @param string|null $guid			Item ID
-	 * @param File|null $enclosure		Enclosure file object
+	 * @param	string				$title			Item title
+	 * @param	\IPS\Http\Url|NULL	$link			Item link
+	 * @param	string|NULL			$description	Item description/content
+	 * @param	\IPS\DateTime|NULL	$date			Item date
+	 * @param	string				$guid			Item ID
+	 * @param	\IPS\File			$enclosure		Enclosure file object
 	 * @return	void
 	 * @todo	[Future] The feed will validate now, but unrecognized attribute values cause warnings when validating. Also, the validator recommends using an Atom feed with the atom:link attribute.
 	 */
-	public function addItem( string $title = NULL, Url $link = NULL, string $description = NULL, DateTime $date = NULL, string $guid = NULL, File $enclosure=NULL ) : void
+	public function addItem( $title = NULL, \IPS\Http\Url $link = NULL, $description = NULL, \IPS\DateTime $date = NULL, $guid = NULL, $enclosure=NULL )
 	{
 		if ( $title === NULL and $description === NULL )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 		
 		$item = $this->channel->addChild( 'item' );
@@ -91,7 +79,7 @@ class Rss extends SimpleXML
 		if ( $description !== NULL )
 		{
 			$description = preg_replace_callback( "/\s+?(srcset|src)=(['\"])\/\/([^'\"]+?)(['\"])/ims", function( $matches ){
-				$baseUrl = parse_url( Settings::i()->base_url );
+				$baseUrl = parse_url( \IPS\Settings::i()->base_url );
 	
 				/* Try to preserve http vs https */
 				if( isset( $baseUrl['scheme'] ) )
@@ -109,13 +97,12 @@ class Rss extends SimpleXML
 			$item->addChild( 'description', $description );
 		}
 
-		if ( $enclosure !== NULL and $enclosure->mediaType() == 'image' )
+		if ( $enclosure !== NULL and $enclosure instanceof \IPS\File and $enclosure->mediaType() == 'image' )
 		{
-			$enclosureUrl = Url::createFromString( $enclosure->url );
 			$child = $item->addChild( 'enclosure' );
-			$child->addAttribute( 'url', (string) $enclosureUrl->setScheme( ( Request::i()->isSecure() ) ? 'https' : 'http' ) );
+			$child->addAttribute( 'url', (string) $enclosure->url->setScheme( ( \IPS\Request::i()->isSecure() ) ? 'https' : 'http' ) );
 			$child->addAttribute( 'length', (string) $enclosure->filesize() );
-			$child->addAttribute( 'type', File::getMimeType( (string) $enclosure->url ) );
+			$child->addAttribute( 'type', \IPS\File::getMimeType( (string) $enclosure->url ) );
 		}
 		
 		if ( $guid !== NULL )
@@ -135,7 +122,7 @@ class Rss extends SimpleXML
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
 		return $this->channel->title;
 	}
@@ -143,14 +130,13 @@ class Rss extends SimpleXML
 	/**
 	 * Get articles
 	 *
-	 * @param mixed|null $guidKey	In previous versions, we encoded a key with the GUID. For legacy purposes, this can be passed here.
+	 * @param	mixed	$guidKey	In previous versions, we encoded a key with the GUID. For legacy purposes, this can be passed here.
 	 * @return	array
 	 */
-	public function articles( mixed $guidKey=NULL ): array
+	public function articles( $guidKey=NULL )
 	{
 		$articles	= array();
 		$items		= $this->getItems();
-		$namespaces = $this->getDocNamespaces();
 		foreach ( $items as $item )
 		{
 			$link = NULL;
@@ -158,9 +144,9 @@ class Rss extends SimpleXML
 			{
 				try
 				{
-					$link = Url::external( (string) $item->link );
+					$link = \IPS\Http\Url::external( (string) $item->link );
 				}
-				catch ( Exception $e ) {  }
+				catch ( \Exception $e ) {  }
 			}
 			
 			if ( isset( $item->guid ) )
@@ -184,7 +170,7 @@ class Rss extends SimpleXML
 			$text = isset( $item->description ) ? (string) $item->description : (string) $item->title;
 
 			/* If there is a <content:encoded> tag, get the contents of that instead of description */
-			if( count( $item->children( 'content', true ) ) AND count( $item->children( 'content', true )->encoded ) )
+			if( \count( $item->children( 'content', true ) ) AND \count( $item->children( 'content', true )->encoded ) )
 			{
 				$text = (string) $item->children( 'content', true )->encoded[0];
 			}
@@ -194,13 +180,13 @@ class Rss extends SimpleXML
 			
 			if ( $pubDate === NULL AND $this->channel->pubDate )
 			{
-				$pubDate = DateTime::ts( strtotime( $this->channel->pubDate ), TRUE );
+				$pubDate = \IPS\DateTime::ts( strtotime( $this->channel->pubDate ), TRUE );
 			}
 
 			$articles[ $guid ] = array(
 				'title'		=> ( (string) $item->title ) ?: ( mb_substr( $text, 0, 47 ) . '...' ),
-				'content'	=> $text,
-				'date'		=> $pubDate ?: DateTime::create(),
+				'content'	=> (string) $text,
+				'date'		=> $pubDate ?: \IPS\DateTime::create(),
 				'link'		=> $link
 			);
 
@@ -214,28 +200,6 @@ class Rss extends SimpleXML
 
 				$articles[ $guid ]['enclosure'] = $attr;
 			}
-
-			/* Loop through all child elements and just add them to the array
-			in case there is a custom extension to process them */
-			foreach( $item->children() as $name => $element )
-			{
-				if( !in_array( $name, [ 'link', 'guid', 'title', 'description', 'enclosure', 'pubDate' ] ) )
-				{
-					$articles[ $guid ][ $name ] = (string) $element;
-				}
-			}
-
-			foreach( $namespaces as $prefix => $namespace )
-			{
-				if( $prefix != 'content' and $elements = $item->children( $prefix, true ) )
-				{
-					foreach( $elements as $name => $element )
-					{
-						$articles[ $guid ][ $prefix . ':' . $name ] = (string) $element;
-					}
-				}
-			}
-
 		}
 		return $articles;
 	}
@@ -243,15 +207,15 @@ class Rss extends SimpleXML
 	/**
 	 * Fetch the date
 	 *
-	 * @param object $item	RSS item
-	 * @return	NULL|DateTime
+	 * @param	object	$item	RSS item
+	 * @return	NULL|\IPS\DateTime
 	 */
-	protected function getDate( object $item ): ?DateTime
+	protected function getDate( $item )
 	{
 		$pubDate = NULL;
 		if ( $item->pubDate )
 		{
-			$pubDate = DateTime::ts( strtotime( $item->pubDate ), TRUE );
+			$pubDate = \IPS\DateTime::ts( strtotime( $item->pubDate ), TRUE );
 		}
 
 		return $pubDate;
@@ -260,9 +224,9 @@ class Rss extends SimpleXML
 	/**
 	 * Fetch the items
 	 *
-	 * @return	self
+	 * @return	array
 	 */
-	protected function getItems(): self
+	protected function getItems()
 	{
 		return $this->channel->item;
 	}

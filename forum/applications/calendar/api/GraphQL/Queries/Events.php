@@ -11,34 +11,25 @@
 
 namespace IPS\calendar\api\GraphQL\Queries;
 
-use GraphQL\Type\Definition\ListOfType;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\calendar\api\GraphQL\Types\EventType;
-use IPS\calendar\Calendar;
-use IPS\calendar\Event;
-use IPS\Db;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use function count;
-use function defined;
-use function in_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0').' 403 Forbidden' );
+	header( ( isset( $_SERVER[ 'SERVER_PROTOCOL' ] ) ? $_SERVER[ 'SERVER_PROTOCOL' ] : 'HTTP/1.0' ).' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Calendar Events query for GraphQL API
  */
-class Events
+class _Events
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns a list of events";
+	public static $description = "Returns a list of events";
 
 	/*
 	 * Query arguments
@@ -59,7 +50,7 @@ class Events
 			'type' => TypeRegistry::eNum( [
 									  'name' => 'events_order_by',
 									  'description' => 'Fields on which events can be sorted',
-									  'values' => EventType::getOrderByOptions(),
+									  'values' => \IPS\calendar\api\GraphQL\Types\EventType::getOrderByOptions(),
 									  ] ),
 			'defaultValue' => NULL, // will use default sort option
 		],
@@ -81,7 +72,7 @@ class Events
 	/**
 	 * Return the query return type
 	 */
-	public function type(): ListOfType
+	public function type()
 	{
 		return TypeRegistry::listOf( \IPS\calendar\api\GraphQL\TypeRegistry::event() );
 	}
@@ -89,31 +80,30 @@ class Events
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @param mixed $info
-	 * @return    ActiveRecordIterator
+	 * @param mixed    Value passed into this resolver
+	 * @param array    Arguments
+	 * @param array    Context values
+	 * @return    \IPS\calendar\Event
 	 */
-	public function resolve( mixed $val, array $args, array $context, mixed $info ): ActiveRecordIterator
+	public function resolve( $val, $args, $context, $info )
 	{
 		$where = [];
-		Calendar::loadIntoMemory( 'view', Member::loggedIn() );
+		\IPS\calendar\Calendar::loadIntoMemory( 'view', \IPS\Member::loggedIn() );
 
 		$calendarIDs = [];
 
 		/* Are we filtering by calendards? */
-		if( isset( $args[ 'calendars' ] ) && count( $args[ 'calendars' ] ) )
+		if( isset( $args[ 'calendars' ] ) && \count( $args[ 'calendars' ] ) )
 		{
 			foreach( $args[ 'calendars' ] as $id )
 			{
-				$calendar = Calendar::loadAndCheckPerms( $id );
+				$calendar = \IPS\calendar\Calendar::loadAndCheckPerms( $id );
 				$calendarIDs[] = $calendar->id;
 			}
 
-			if( count( $calendarIDs ) )
+			if( \count( $calendarIDs ) )
 			{
-				$where[ 'container' ][] = [ Db::i()->in( 'calendar_events.event_calendar_id', array_filter( $calendarIDs ) ) ];
+				$where[ 'container' ][] = [ \IPS\Db::i()->in( 'calendar_events.event_calendar_id', array_filter( $calendarIDs ) ) ];
 			}
 		}
 
@@ -123,15 +113,15 @@ class Events
 		{
 			$orderBy = 'saved';
 		}
-		else if( in_array( $args[ 'orderBy' ], EventType::getOrderByOptions() ) )
+		else if( \in_array( $args[ 'orderBy' ], \IPS\calendar\api\GraphQL\Types\EventType::getOrderByOptions() ) )
 		{
 			$orderBy = $args[ 'orderBy' ];
 		}
 
-		$sortBy = Event::$databaseTable.'.'. Event::$databasePrefix."{$orderBy} {$args['orderDir']}";
+		$sortBy = \IPS\calendar\Event::$databaseTable.'.'.\IPS\calendar\Event::$databasePrefix."{$orderBy} {$args['orderDir']}";
 		$offset = max( $args[ 'offset' ], 0 );
 		$limit = min( $args[ 'limit' ], 50 );
 
-		return Event::getItemsWithPermission( $where, $sortBy, [ $offset, $limit ] );
+		return \IPS\calendar\Event::getItemsWithPermission( $where, $sortBy, [ $offset, $limit ], 'read' );
 	}
 }

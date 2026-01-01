@@ -12,33 +12,25 @@
 namespace IPS\nexus\extensions\core\GroupForm;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\GroupFormAbstract;
-use IPS\Helpers\Form;
-use IPS\Member\Group;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Admin CP Group Form
  */
-class PreventDeletion extends GroupFormAbstract
+class _PreventDeletion
 {
 	/**
 	 * Process Form
 	 *
-	 * @param	Form		$form	The form
-	 * @param	Group		$group	Existing Group
+	 * @param	\IPS\Helpers\Form		$form	The form
+	 * @param	\IPS\Member\Group		$group	Existing Group
 	 * @return	void
 	 */
-	public function process( Form $form, Group $group ): void
+	public function process( &$form, $group )
 	{		
 
 	}
@@ -47,10 +39,10 @@ class PreventDeletion extends GroupFormAbstract
 	 * Save
 	 *
 	 * @param	array				$values	Values from form
-	 * @param	Group	$group	The group
+	 * @param	\IPS\Member\Group	$group	The group
 	 * @return	void
 	 */
-	public function save( array $values, Group $group ) : void
+	public function save( $values, &$group )
 	{
 
 	}
@@ -58,28 +50,28 @@ class PreventDeletion extends GroupFormAbstract
 	/**
 	 * Can this group be deleted?
 	 *
-	 * @param	Group	$group	The group
-	 * @return	bool
+	 * @param	\IPS\Member\Group	$group	The group
+	 * @return	void
 	 */
-	public function canDelete( Group $group ) : bool
+	public function canDelete( $group ) : bool
 	{
 		// Is this group used for group promotion after a product purchase?
 		try
 		{
-			Db::i()->select( '*', 'nexus_packages', ['p_primary_group=? OR ' . Db::i()->findInSet('p_secondary_group', [$group->g_id] ), $group->g_id ] )->first();
+			\IPS\Db::i()->select( '*', 'nexus_packages', ['p_primary_group=? OR ' . \IPS\Db::i()->findInSet('p_secondary_group', [$group->g_id] ), $group->g_id ] )->first();
 			return FALSE;
 		}
-		catch(UnderflowException )
+		catch(\UnderflowException $e )
 		{
 		}
 
 		// Is this group used for group promotion after a subscription purchase?
 		try
 		{
-			Db::i()->select( '*', 'nexus_member_subscription_packages', ['sp_primary_group=? OR ' . Db::i()->findInSet('sp_secondary_group', [$group->g_id] ), $group->g_id ] )->first();
+			\IPS\Db::i()->select( '*', 'nexus_member_subscription_packages', ['sp_primary_group=? OR ' . \IPS\Db::i()->findInSet('sp_secondary_group', [$group->g_id] ), $group->g_id ] )->first();
 			return FALSE;
 		}
-		catch(UnderflowException )
+		catch(\UnderflowException $e )
 		{
 		}
 

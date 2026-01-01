@@ -12,45 +12,35 @@
 namespace IPS\nexus\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use IPS\nexus\Customer\CustomField;
-use Underflowexception;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: Customer Fields
  */
-class Customer extends FileStorageAbstract
+class _Customer
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
 		$where = array();
-		foreach ( CustomField::roots( NULL, NULL, array( 'f_type=?', 'Upload' ) ) as $field )
+		foreach ( \IPS\nexus\Customer\CustomField::roots( NULL, NULL, array( 'f_type=?', 'Upload' ) ) as $field )
 		{
 			$where[] = "field_{$field->id}<>''";
 		}
-		if ( !count( $where ) )
+		if ( !\count( $where ) )
 		{
 			return 0;
 		}
 		
-		return Db::i()->select( 'COUNT(*)', 'nexus_customers', implode( ' OR ', $where ) )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customers', implode( ' OR ', $where ) )->first();
 	}
 	
 	/**
@@ -59,38 +49,38 @@ class Customer extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	Underflowexception				When file record doesn't exist. Indicating there are no more files to move
+	 * @throws	\Underflowexception				When file record doesn't exist. Indicating there are no more files to move
 	 * @return	void
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
 		$ids = array();
 		$where = array();
-		foreach ( CustomField::roots( NULL, NULL, array( 'f_type=?', 'Upload' ) ) as $field )
+		foreach ( \IPS\nexus\Customer\CustomField::roots( NULL, NULL, array( 'f_type=?', 'Upload' ) ) as $field )
 		{
 			$ids[] = $field->id;
 			$where[] = "field_{$field->id}<>''";
 		}
-		if ( !count( $where ) )
+		if ( !\count( $where ) )
 		{
-			throw new Underflowexception;
+			throw new \Underflowexception;
 		}
 		
-		$customer = Db::i()->select( '*', 'nexus_customers', implode( ' OR ', $where ) )->first();
+		$customer = \IPS\Db::i()->select( '*', 'nexus_customers', implode( ' OR ', $where ) )->first();
 		$update = array();
 		foreach ( $ids as $id )
 		{
 			try
 			{
-				$update[ 'field_' . $id ] = (string) File::get( $oldConfiguration ?: 'nexus_Customer', $update[ 'field_' . $id ] )->move( $storageConfiguration );
+				$update[ 'field_' . $id ] = (string) \IPS\File::get( $oldConfiguration ?: 'nexus_Customer', $update[ 'field_' . $id ] )->move( $storageConfiguration );
 			}
-			catch( Exception )
+			catch( \Exception $e )
 			{
 				/* Any issues are logged */
 			}
 		}
 		
-		if ( count( $update ) )
+		if ( \count( $update ) )
 		{
 			foreach( $update as $k => $v )
 			{
@@ -100,9 +90,48 @@ class Customer extends FileStorageAbstract
 				}
 			}
 			
-			if ( count( $update ) )
+			if ( \count( $update ) )
 			{
-				Db::i()->update( 'nexus_customers', $update, array( 'member_id=?', $customer['member_id'] ) );
+				\IPS\Db::i()->update( 'nexus_customers', $update, array( 'member_id=?', $customer['member_id'] ) );
+			}
+		}
+	}
+	
+	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		$ids = array();
+		$where = array();
+		foreach ( \IPS\nexus\Customer\CustomField::roots( NULL, NULL, array( 'f_type=?', 'Upload' ) ) as $field )
+		{
+			$ids[] = $field->id;
+			$where[] = "field_{$field->id}<>''";
+		}
+		if ( !\count( $where ) )
+		{
+			throw new \Underflowexception;
+		}
+		
+		$customer = \IPS\Db::i()->select( '*', 'nexus_customers', implode( ' OR ', $where ) )->first();
+		$update = array();
+		foreach ( $ids as $id )
+		{
+			if ( $new = \IPS\File::repairUrl( $customer[ 'field_' . $id ] ) )
+			{
+				$update[ 'field_' . $id ] = $new;
+			}
+		}
+		
+		if ( \count( $update ) )
+		{
+			if ( \count( $update ) )
+			{
+				\IPS\Db::i()->update( 'nexus_customers', $update, array( 'member_id=?', $customer['member_id'] ) );
 			}
 		}
 	}
@@ -110,25 +139,25 @@ class Customer extends FileStorageAbstract
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
 		$_where = array();
-		foreach ( CustomField::roots( NULL, NULL, array( 'f_type=?', 'Upload' ) ) as $field )
+		foreach ( \IPS\nexus\Customer\CustomField::roots( NULL, NULL, array( 'f_type=?', 'Upload' ) ) as $field )
 		{
 			$_where[] = "field_{$field->id}=?";
 		}
-		if ( !count( $_where ) )
+		if ( !\count( $_where ) )
 		{
 			return FALSE;
 		}
 		
-		$where = array_fill( 0, count( $_where ), (string) $file );
+		$where = array_fill( 0, \count( $_where ), (string) $file );
 		array_unshift( $where, implode( ' OR ', $_where ) );
 		
-		return (bool) Db::i()->select( 'COUNT(*)', 'nexus_customers', $where )->first();
+		return (bool) \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customers', $where )->first();
 	}
 
 	/**
@@ -136,29 +165,29 @@ class Customer extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
 		$ids = array();
 		$where = array();
-		foreach ( CustomField::roots( NULL, NULL, array( 'f_type=?', 'Upload' ) ) as $field )
+		foreach ( \IPS\nexus\Customer\CustomField::roots( NULL, NULL, array( 'f_type=?', 'Upload' ) ) as $field )
 		{
 			$ids[] = $field->id;
 			$where[] = "field_{$field->id}<>''";
 		}
-		if ( !count( $where ) )
+		if ( !\count( $where ) )
 		{
 			return;
 		}
 		
-		foreach ( Db::i()->select( '*', 'nexus_customers', implode( ' OR ', $where ) ) as $customer )
+		foreach ( \IPS\Db::i()->select( '*', 'nexus_customers', implode( ' OR ', $where ) ) as $customer )
 		{
 			foreach ( $ids as $id )
 			{
 				try
 				{
-					File::get( 'nexus_Customer', $customer[ 'field_' . $id ] )->delete();
+					\IPS\File::get( 'nexus_Customer', $customer[ 'field_' . $id ] )->delete();
 				}
-				catch( Exception ){}
+				catch( \Exception $e ){}
 			}
 		}
 	}

@@ -14,32 +14,24 @@ namespace IPS\core\modules\front\system;
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
 use IPS\core\Alerts\Alert;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use OutOfRangeException;
-use function defined;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * alerts
  */
-class alerts extends Controller
+class _alerts extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		parent::execute();
 	}
@@ -49,31 +41,26 @@ class alerts extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function dismiss() : void
+	protected function dismiss()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Update user last seen */
 		try
 		{
-			$alert = Alert::load( Request::i()->id );
+			$alert = \IPS\core\Alerts\Alert::load( \IPS\Request::i()->id );
 
-			if( $alert->reply == Alert::REPLY_REQUIRED and Member::loggedIn()->member_id and Member::loggedIn()->canUseMessenger() and Member::load( $alert->member_id )->member_id )
+			if( $alert->reply == Alert::REPLY_REQUIRED and \IPS\Member::loggedIn()->member_id and \IPS\Member::loggedIn()->canUseMessenger() and \IPS\Member::load( $alert->member_id )->member_id )
 			{
-				Output::i()->error( 'alert_cant_dismiss', '3C428/1', 403, '' );
+				\IPS\Output::i()->error( 'alert_cant_dismiss', '3C428/1', 403, '' );
 			}
 
 			$alert->dismiss();
 		}
-		catch( OutOfRangeException $e ) {}
-
-		if ( Request::i()->isAjax() )
-		{
-			Output::i()->json( [ 'message' => 'ok' ] );
-		}
+		catch( \OutOfRangeException $e ) {}
 
 		/* Redirect */
-		Output::i()->redirect( base64_decode( Request::i()->ref ?: '' ) );
+		\IPS\Output::i()->redirect( base64_decode( \IPS\Request::i()->ref ) );
 	}
 
 	/**
@@ -81,10 +68,10 @@ class alerts extends Controller
 	 *
 	 * @return void
 	 */
-	protected function viewReplies() : void
+	protected function viewReplies()
 	{
-		Alert::setAlertCurrentlyFilteringMessages( Alert::load( Request::i()->id ) );
+		\IPS\core\Alerts\Alert::setAlertCurrentlyFilteringMessages( \IPS\core\Alerts\Alert::load( \IPS\Request::i()->id ) );
 
-		Output::i()->redirect( Url::internal('app=core&module=messaging&controller=messenger&overview=1') );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=messaging&controller=messenger&overview=1') );
 	}
 }

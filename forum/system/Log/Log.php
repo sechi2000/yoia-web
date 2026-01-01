@@ -11,131 +11,50 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DirectoryIterator;
-use Error;
-use Exception;
-use IPS\Patterns\ActiveRecord;
-use RuntimeException;
-use function defined;
-use function file_put_contents;
-use function get_called_class;
-use function get_class;
-use function is_array;
-use function str_replace;
-use function strrpos;
-use function substr;
-use function trim;
-use function ucwords;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0') . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Log Class
  */
-class Log extends ActiveRecord
+class _Log extends \IPS\Patterns\ActiveRecord
 {
-	const DEFAULT_LOG_LEVEL = 3;
-	const MAX_LOG_LEVEL = 5;
-
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
-
+	protected static $multitons;
+	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_log';
-
+	public static $databaseTable = 'core_log';
+	
 	/**
 	 * Set Default Values
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->time = time();
-		$this->url = Dispatcher::hasInstance() ? ( string ) Request::i()->url() : null;
 	}
-
+	
 	/**
 	 * @brief	Track if we are currently logging to prevent recursion for database issues
 	 */
-	static protected bool $currentlyLogging	= FALSE;
-
-	/***
-	 * Default log levels for different categories
-	 *
-	 * @var array
-	 */
-	protected static array $categoryLogLevels = [
-		'content_debug' => 1,
-		'redis_writes' => 1,
-		'redis_exception' => 1,
-		'upgrade' => 2,
-		'auto_upgrade' => 2,
-		'paypal' => 2,
-		'duplicate_comment' => 3,
-		'searchResults' => 3,
-		'profile_completion' => 3,
-		'digestBuild' => 3,
-		'index_single_item' => 3,
-		'spam-service' => 4,
-		'group_promotion' => 4,
-		'birthday_error' => 5,
-		'cookie' => 5,
-		'views' => 5,
-		'cicloud' => 5,
-		'facebook_oembed' => 5,
-		'achievements' => 5,
-		'embed_fail' => 5,
-		'template_store_building' => 5,
-		'deleteFilesTask' => 5,
-		'warn_fix' => 5
-	];
-
-	/**
-	 * Log categories that are only logged when we enable
-	 * the DEBUG_LOG constant
-	 *
-	 * @var array
-	 */
-	protected static array $excludeFromSettings = [
-		'ranges',
-		'runQueue_log',
-		'rebuildAttachmentThumbnails',
-		'rebuildItemCounts',
-		'rebuildContentImages',
-		'rebuildImageProxy',
-		'rebuildLazyLoad',
-		'rebuildSearchIndex',
-		'rebuildSitemap',
-		'RebuildUrlRels',
-		'RestoreBrokenAttachments',
-		'rebuildCategories',
-		'rebuildItems',
-		'rebuildPosts',
-		'rebuildTagCache',
-		'ICrebuildPosts',
-		'fixDeletionLog',
-		'UpdateMemberSeoNames',
-		'Upgrade46FeaturedContent'
-	];
+	static protected $currentlyLogging	= FALSE;
 
 	/**
 	 * Write a log message
 	 *
-	 * @param Exception|string|array $message	An Exception object or a generic message to log
-	 * @param string|null $category	An optional string identifying the type of log (for example "upgrade")
-	 * @return    Log|null
+	 * @param	\Exception|string	$message	An Exception object or a generic message to log
+	 * @param	string|null			$category	An optional string identifying the type of log (for example "upgrade")
+	 * @return	\IPS\Log|null
 	 */
-	public static function log( Exception|string|array $message, string $category = NULL ): ?Log
+	public static function log( $message, $category = NULL )
 	{
 		/* Anything to log? */
 		if( !$message )
@@ -148,16 +67,16 @@ class Log extends ActiveRecord
 		{
 			if( static::$currentlyLogging === TRUE )
 			{
-				throw new RuntimeException;
+				throw new \RuntimeException;
 			}
 
 			static::$currentlyLogging	= TRUE;
 
-			$log = new Log();
-
-			if ( $message instanceof Exception )
+			$log = new static;
+			
+			if ( $message instanceof \Exception )
 			{
-				$log->exception_class = get_class( $message );
+				$log->exception_class = \get_class( $message );
 				$log->exception_code = $message->getCode();
 
 				if ( method_exists( $message, 'extraLogData' ) AND $extraData = $message->extraLogData() )
@@ -173,273 +92,142 @@ class Log extends ActiveRecord
 			}
 			else
 			{
-				if ( is_array( $message ) )
+				if ( \is_array( $message ) )
 				{
 					$message = var_export( $message, TRUE );
 				}
 				$log->message = $message;
-				$log->backtrace = ( new Exception )->getTraceAsString();
+				$log->backtrace = ( new \Exception )->getTraceAsString();
 			}
 
 			/* If this is an actual request and not command line-invoked */
-			if( Dispatcher::hasInstance() AND mb_strpos( php_sapi_name(), 'cli' ) !== 0 )
+			if( \IPS\Dispatcher::hasInstance() AND mb_strpos( php_sapi_name(), 'cli' ) !== 0 )
 			{
+				$log->url = \IPS\Request::i()->url();
 				try
 				{
 					// Early exceptions may occur before the logged in object is set up.
-					$log->member_id = Member::loggedIn()->member_id ?: 0;
+					$log->member_id = \IPS\Member::loggedIn()->member_id ?: 0;
 				}
-				catch( Error $e )
+				catch( \Error $e )
 				{
 					$log->member_id = 0;
 				}
 			}
 
+			if ( \IPS\Application::load('core')->long_version >= 106149 ) #Column was added in 106149
+			{
+				$log->loaded_hooks = json_encode( \IPS\IPS::$loadedHooks );
+			}
 			$log->category = $category;
 			$log->save();
 
 			static::$currentlyLogging	= FALSE;
-
+			
 			return $log;
 		}
 		/* If that fails, log to disk */
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			if ( !NO_WRITES and !CIC )
+			if ( !\IPS\NO_WRITES and !\IPS\CIC )
 			{
 				/* What are we writing? */
-				try
-				{
-					$url = "URL: " . ( new Log() )->url . "\n";
-				}
-				catch( \Exception | \Error )
-				{
-					$url = '';
-				}
-
 				$date = date('r');
-				if ( $message instanceof Exception )
+				if ( $message instanceof \Exception )
 				{
-					$messageToLog = $date . "\n" . $url . get_class( $message ) . '::' . $message->getCode() . "\n" . $message->getMessage() . "\n" . $message->getTraceAsString();
+					$messageToLog = $date . "\n" . \get_class( $message ) . '::' . $message->getCode() . "\n" . $message->getMessage() . "\n" . $message->getTraceAsString();
 				}
 				else
 				{
-					if ( is_array( $message ) )
+					if ( \is_array( $message ) )
 					{
 						$message = var_export( $message, TRUE );
 					}
-					$messageToLog = $date . "\n" . $url . $message . "\n" . ( new Exception )->getTraceAsString();
+					$messageToLog = $date . "\n" . $message . "\n" . ( new \Exception )->getTraceAsString();
 				}
-
+				
 				/* Where are we writing it? */
-				$dir = str_replace( '{root}', ROOT_PATH, LOG_FALLBACK_DIR);
+				$dir = str_replace( '{root}', \IPS\ROOT_PATH, \IPS\LOG_FALLBACK_DIR );
 				if ( !is_dir( $dir ) )
 				{
-					if ( !@mkdir( $dir ) or !@chmod( $dir, IPS_FOLDER_PERMISSION) )
+					if ( !@mkdir( $dir ) or !@chmod( $dir, \IPS\IPS_FOLDER_PERMISSION ) )
 					{
-						return null;
+						return;
 					}
 				}
-
+				
 				/* Write it */
 				$header = "<?php exit; ?>\n\n";
 				$file = $dir . '/' . date( 'Y' ) . '_' . date( 'm' ) . '_' . date('d') . '_' . ( $category ?: 'nocategory' ) . '.php';
 				if ( file_exists( $file ) )
 				{
-					@file_put_contents( $file, "\n\n-------------\n\n" . $messageToLog, FILE_APPEND );
+					@\file_put_contents( $file, "\n\n-------------\n\n" . $messageToLog, FILE_APPEND );
 				}
 				else
 				{
-					@file_put_contents( $file, $header . $messageToLog );
+					@\file_put_contents( $file, $header . $messageToLog );
 				}
-				@chmod( $file, IPS_FILE_PERMISSION);
+				@chmod( $file, \IPS\IPS_FILE_PERMISSION );
 			}
 		}
-
+		
 		return NULL;
 	}
-
+	
 	/**
 	 * Write a debug message
 	 *
-	 * @param Exception|string $message	An Exception object or a generic message to log
-	 * @param string|null $category	An optional string identifying the type of log (for example "upgrade")
-	 * @param int|null $logLevel	An optional number to identify the logging level for this message. The lower the level,
-	 * the higher the priority
-	 * @return    Log|null
+	 * @param	\Exception|string	$message	An Exception object or a generic message to log
+	 * @param	string|null			$category	An optional string identifying the type of log (for example "upgrade")
+	 * @return	\IPS\Log|null
 	 */
-	public static function debug( Exception|string $message, string $category = NULL, ?int $logLevel=null ): ?Log
+	public static function debug( $message, $category = NULL )
 	{
-		/* If the constant is enabled, we log everything */
-		if ( defined('\IPS\DEBUG_LOG') and DEBUG_LOG )
+		if ( \defined('\IPS\DEBUG_LOG') and \IPS\DEBUG_LOG )
 		{
 			return static::log( $message, $category );
 		}
-
-		/* If the category is in the excluded settings, stop here */
-		if( $category === null or in_array( $category, static::$excludeFromSettings ) )
-		{
-			return null;
-		}
-
-		/* Check if we have a custom logging method for this category */
-		$method = '_debug' . str_replace( " ", "", ucwords( str_replace( '_', ' ', $category ) ) );
-		if( method_exists( get_called_class(), $method ) )
-		{
-			return static::$method( $message, $category );
-		}
-
-		/* If we didn't specify a log level, check if we have a default */
-		if( $logLevel === null )
-		{
-			$logLevel = static::$categoryLogLevels[ $category ] ?? static::DEFAULT_LOG_LEVEL;
-		}
-		elseif( $logLevel > static::MAX_LOG_LEVEL )
-		{
-			/* Make sure we didn't go over the max */
-			$logLevel = static::MAX_LOG_LEVEL;
-		}
-
-		/* Check settings - only log messages that at or below the current value */
-		if( Settings::i()->debug_log_level and Settings::i()->debug_log_level <= $logLevel )
-		{
-			return static::log( $message, $category );
-		}
-
 		return NULL;
 	}
-
-	/**
-	 * @param Exception|string|array $message
-	 * @param string|NULL $category
-	 * @return Log|null
-	 */
-	protected static function _debugRequest( Exception|string|array $message, string $category = NULL ): ?Log
-	{
-		if( !empty( Settings::i()->debug_log_requests ) )
-		{
-			/* This setting would have URLs or URL fragments that we should check */
-			foreach( json_decode( Settings::i()->debug_log_requests, true ) as $string )
-			{
-				if( strpos( $message, $string ) !== false )
-				{
-					return static::log( $message, $category );
-				}
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * @param Exception|string|array $message
-	 * @param string|NULL $category
-	 * @return Log|null
-	 */
-	protected static function _debugWebhookFireCall( Exception|string|array $message, string $category = NULL ): ?Log
-	{
-		if( !empty( Settings::i()->debug_log_webhooks ) )
-		{
-			/* This setting would have URLs or URL fragments that we should check */
-			foreach( json_decode( Settings::i()->debug_log_webhooks, true ) as $string )
-			{
-				$stringToCheck = '[event] => ' . $string;
-				if( strpos( $message, $stringToCheck ) !== false )
-				{
-					return static::log( $message, $category );
-				}
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * @param Exception|string|array $message
-	 * @param string|NULL $category
-	 * @return Log|null
-	 */
-	protected static function _debugEventFire( Exception|string|array $message, string $category = NULL ): ?Log
-	{
-		if( !empty( Settings::i()->debug_log_events ) )
-		{
-			/* This setting would listener classes and event names that we should check */
-			foreach( json_decode( Settings::i()->debug_log_events, true ) as $string )
-			{
-				$bits = explode( ":", $string );
-
-				/* Are we debugging this listener type? */
-				preg_match( '/\[listener] => (.+?)[\n\r]/is', $message, $match );
-				if( isset( $match[1] ) )
-				{
-					try
-					{
-						if( class_exists( $match[1] ) )
-						{
-							$parentClass = get_parent_class( $match[1] );
-							if( substr( $parentClass, strrpos( $parentClass, '\\' ) + 1 ) != $bits[0] )
-							{
-								continue;
-							}
-						}
-					}
-					catch( Exception )
-					{
-						continue;
-					}
-				}
-
-				/* Check if we are debugging this method */
-				$stringToCheck = '[event] => ' . trim( $bits[1] );
-				if( strpos( $message, $stringToCheck ) !== false )
-				{
-					return static::log( $message, $category );
-				}
-			}
-		}
-
-		return null;
-	}
-
+	
 	/**
 	 * Get fallback directory
 	 *
 	 * @return	string|null
 	 */
-	public static function fallbackDir(): ?string
+	public static function fallbackDir()
 	{
-		if (CIC)
+		if ( \IPS\CIC )
 		{
 			return NULL;
 		}
-		return str_replace( '{root}', ROOT_PATH, LOG_FALLBACK_DIR);
+		return str_replace( '{root}', \IPS\ROOT_PATH, \IPS\LOG_FALLBACK_DIR );
 	}
-
+	
 	/**
 	 * Prune logs
-	 *
-	 * @param int $days Older than (days) to prune
-	 * @return    void
-	 * @throws Exception
+	 * 
+	 * @param	int		$days	Older than (days) to prune
+	 * @return	void
 	 */
-	public static function pruneLogs( int $days ) : void
+	public static function pruneLogs( $days )
 	{
-		Db::i()->delete( static::$databaseTable, array( 'time<?', DateTime::create()->sub( new DateInterval( 'P' . $days . 'D' ) )->getTimestamp() ) );
-
-		if ( !NO_WRITES)
+		\IPS\Db::i()->delete( static::$databaseTable, array( 'time<?', \IPS\DateTime::create()->sub( new \DateInterval( 'P' . $days . 'D' ) )->getTimestamp() ) );
+		
+		if ( !\IPS\NO_WRITES )
 		{
 			$dir = static::fallbackDir();
 			if ( is_dir( $dir ) )
 			{
 				try
 				{
-					$it = new DirectoryIterator( $dir );
+					$it = new \DirectoryIterator( $dir );
 				}
 				catch ( Exception $e )
 				{
 					return;
 				}
-
+				
 				foreach( $it as $file )
 				{
 					try
@@ -448,8 +236,8 @@ class Log extends ActiveRecord
 						{
 							continue;
 						}
-
-						if( preg_match( "#.cgi$#", $file->getFilename(), $matches ) or ( preg_match( "#.php$#", $file->getFilename(), $matches ) and $file->getMTime() < ( time() - ( 60 * 60 * 24 * $days ) ) ) )
+				
+						if( preg_match( "#.cgi$#", $file->getFilename(), $matches ) or ( preg_match( "#.php$#", $file->getFilename(), $matches ) and $file->getMTime() < ( time() - ( 60 * 60 * 24 * (int) $days ) ) ) )
 						{
 							@unlink( $file->getPathname() );
 						}
@@ -459,22 +247,47 @@ class Log extends ActiveRecord
 			}
 		}
 	}
-
+	
 	/**
-	 * Get Hook details
+	 * Get Loaded Hooks
 	 *
-	 * @param string $file	filename of loaded hook
 	 * @return	array
 	 */
-	public static function hookDetails( string $file ): array
+	public function get_loaded_hooks()
+	{
+		return ( $this->_data['loaded_hooks'] ) ? json_decode( $this->_data['loaded_hooks'] ) : array();
+	}
+	
+	/**
+	 * Get Hook details
+	 * 
+	 * @param	string		$file	filename of loaded hook
+	 * @return	array
+	 */
+	public static function hookDetails( $file )
 	{
 		$bits = explode( '/', $file );
-
+		
 		$return = array();
-
-		$return['type'] = 'app';
-		$return['id'] = $bits[1];
-
+		
+		/* Plugins are always third party */
+		if ( $bits[0] === 'plugins' )
+		{
+			$plugin = NULL;
+			try
+			{
+				$plugin = \IPS\Plugin::getPluginFromPath( "/" . $file );
+			}
+			catch ( \Exception $e ) {}
+			
+			$return['type'] = 'plugin';
+			$return['id'] = ( $plugin ) ? $plugin->id : NULL;
+		}
+		else
+		{
+			$return['type'] = 'app';
+			$return['id'] = $bits[1];
+		}
 		return $return;
 	}
 }

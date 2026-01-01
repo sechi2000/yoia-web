@@ -11,74 +11,87 @@
 namespace IPS\Theme\Dev;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use IPS\Request;
-use IPS\Theme;
-use IPS\Theme\Template as ThemeTemplate;
-use function defined;
-use function function_exists;
-use function get_called_class;
-use function in_array;
-use const IPS\DEBUG_TEMPLATES;
-use const IPS\IN_DEV;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Magic Template Class for IN_DEV mode
  */
-class Template extends ThemeTemplate
+class _Template extends \IPS\Theme\Template
 {
 	/**
 	 * @brief	Source Folder
 	 */
-	public ?string $sourceFolder = NULL;
+	public $sourceFolder = NULL;
 	
 	/**
 	 * Contructor
 	 *
-	 * @param string $app				Application Key
-	 * @param string $templateLocation	Template location (admin/public/etc.)
-	 * @param string $templateName		Template Name
+	 * @param	string	$app				Application Key
+	 * @param	string	$templateLocation	Template location (admin/public/etc.)
+	 * @param	string	$templateName		Template Name
 	 * @return	void
 	 */
-	public function __construct( string $app, string $templateLocation, string $templateName )
+	public function __construct( $app, $templateLocation, $templateName )
 	{
 		parent::__construct( $app, $templateLocation, $templateName );
 		$this->app = $app;
 		$this->templateLocation = $templateLocation;
 		$this->templateName = $templateName;
-		$this->sourceFolder = \IPS\ROOT_PATH . "/applications/{$app}/dev/html/{$templateLocation}/{$templateName}/";
-
+		
+		if ( $this->app === 'core' and $this->templateLocation === 'global' and $this->templateName === 'plugins' )
+		{
+			$this->sourceFolder = \IPS\ROOT_PATH . '/plugins';
+		}
+		else
+		{
+			$this->sourceFolder = \IPS\ROOT_PATH . "/applications/{$app}/dev/html/{$templateLocation}/{$templateName}/";
+		}
 	}
 	
 	/**
 	 * Magic Method: Call Template Bit
 	 *
-	 * @param string $bit	Template Bit Name
-	 * @param array $params	Parameters
+	 * @param	string	$bit	Template Bit Name
+	 * @param	array	$params	Parameters
 	 * @return	string
 	 */
-	public function __call( string $bit, array $params )
+	public function __call( $bit, $params )
 	{
 		/* What are we calling this? */
 		$functionName = "theme_{$this->app}_{$this->templateLocation}_{$this->templateName}_{$bit}";
 
 		/* If it doesn't exist, build it */
-		if( !function_exists( 'IPS\\Theme\\'.$functionName ) )
+		if( !\function_exists( 'IPS\\Theme\\'.$functionName ) )
 		{
 			/* Find the file */
-			$file = $this->sourceFolder . $bit . '.phtml';
+			$file = NULL;
+			if ( $this->sourceFolder === \IPS\ROOT_PATH . '/plugins' )
+			{
+				foreach ( new \GlobIterator( $this->sourceFolder . '/*/dev/html/' . $bit . '.phtml' ) as $file )
+				{
+					break;
+				}
+			}
+			else
+			{
+				$file = $this->sourceFolder . $bit . '.phtml';
+			}
 			
 			/* Get the content or return an BadMethodCallException if the template doesn't exist */
-			if ( !file_exists( $file ) )
+			if ( $file === NULL or !file_exists( $file ) )
 			{
-				throw new BadMethodCallException( 'NO_TEMPLATE_FILE - ' . $file );
+				if ( !$file AND $this->sourceFolder === \IPS\ROOT_PATH . '/plugins' )
+				{
+					throw new \BadMethodCallException( 'NO_PLUGIN_TEMPLATE_FILE - ' . $bit );
+				}
+				else
+				{
+					throw new \BadMethodCallException( 'NO_TEMPLATE_FILE - ' . $file );
+				}
 			}
 			
 			$output = file_get_contents( $file );
@@ -86,18 +99,18 @@ class Template extends ThemeTemplate
 			/* Parse the header tag */
 			if ( !preg_match( '/^<ips:template parameters="(.+?)?"(\s+)?\/>(\r\n?|(\r\n?|\n))/', $output, $matches ) )
 			{
-				throw new BadMethodCallException( 'NO_HEADER - ' . $file );
+				throw new \BadMethodCallException( 'NO_HEADER - ' . $file );
 			}
 			
 			/* Strip it */
 			$output = preg_replace( '/^<ips:template parameters="(.+?)?"(\s+)?\/>(\r\n?|\n)/', '', $output );
 
-			if ( DEBUG_TEMPLATES and ! Request::i()->isAjax() )
+			if ( \IPS\DEBUG_TEMPLATES and ! \IPS\Request::i()->isAjax() )
 			{
 				$output = "<!-- " . $functionName . " -->" . $output;
 			}
 			
-			if ( IN_DEV AND get_called_class() !== 'IPS\Theme\System\Template' )
+			if ( \IPS\IN_DEV AND \get_called_class() !== 'IPS\Theme\System\Template' )
 			{
 				/* Template names that will allow inline style="" attributes */
 				$allowedInlineStyle = array(
@@ -123,11 +136,11 @@ class Template extends ThemeTemplate
 				);
 	
 				/* Check we're not being naughty */
-				if( preg_match( "/<.+?style=['\"].+?>/i", $output ) and !in_array( $functionName, $allowedInlineStyle ) && $this->app != 'documentation' )
+				if( preg_match( "/<.+?style=['\"].+?>/i", $output ) and !\in_array( $functionName, $allowedInlineStyle ) && $this->app != 'documentation' )
 				{
 					//trigger_error( "There is inline CSS in {$functionName}. Please move all styling into CSS files.", E_USER_ERROR );
 				}
-				if( !in_array( $bit, $allowedStyleBlocks ) and preg_match( "/<style.*?>/i", $output ) && $this->app != 'documentation' )
+				if( !\in_array( $bit, $allowedStyleBlocks ) and preg_match( "/<style.*?>/i", $output ) && $this->app != 'documentation' )
 				{
 					//trigger_error( "There is a style block in {$functionName}. Please move all styling into CSS files.", E_USER_ERROR );
 				}
@@ -135,14 +148,21 @@ class Template extends ThemeTemplate
 				{
 					//trigger_error( "There is a inline JavaScript {$functionName}. Please move all JavaScript into JS files.", E_USER_ERROR );
 				}
-				if( !in_array( $bit, $allowedScriptBlocks ) and $this->templateName !== 'embed' and preg_match( "/<script((?!src).)*>/i", $output ) && $this->app != 'documentation' )
+				if( !\in_array( $bit, $allowedScriptBlocks ) and $this->templateName !== 'embed' and preg_match( "/<script((?!src).)*>/i", $output ) && $this->app != 'documentation' )
 				{
 					//trigger_error( "There is a script block in {$functionName}. Please move all JavaScript into JS files.", E_USER_ERROR );
+				}
+				
+				/* Hooks */
+				$hookData = static::hookData();
+				if ( isset( $hookData[ $bit ] ) )
+				{
+					$output = \IPS\Theme::themeHooks( $output, $hookData[ $bit ] );
 				}
 			}
 			
 			/* Make it into a lovely function */
-			Theme::makeProcessFunction( $output, $functionName, ( $matches[1] ?? '' ) );
+			\IPS\Theme::makeProcessFunction( $output, $functionName, ( isset( $matches[1] ) ? $matches[1] : '' ), TRUE );
 		}
 		
 		/* Run it */

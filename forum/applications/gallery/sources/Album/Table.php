@@ -12,73 +12,57 @@
 namespace IPS\gallery\Album;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\gallery\Album;
-use IPS\gallery\Image;
-use IPS\Helpers\Table\Content;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Table Builder for Gallery albums
  */
-class Table extends Content
+class _Table extends \IPS\Helpers\Table\Content
 {
 	/**
 	 * @brief	Container
 	 */
-	protected ?Model $container = NULL;
+	protected $container;
 
 	/**
 	 * @brief	Additional CSS classes to apply to columns
 	 */
-	public array $classes = array( 'cGalleryAlbums' );
+	public $classes = array( 'cGalleryAlbums' );
 
 	/**
 	 * @brief	Pagination parameter
 	 */
-	protected string $paginationKey	= 'albumPage';
+	protected $paginationKey	= 'albumPage';
 
 	/**
 	 * @brief	Table resort parameter
 	 */
-	public string $resortKey			= 'albumResort';
+	public $resortKey			= 'albumResort';
 	
 	/**
 	 * @brief	No Moderate
 	 */
-	public bool $noModerate = TRUE;
-
-	/**
-	 * @brief	Where clauses
-	 */
-	public ?array $where;
+	public $noModerate = TRUE;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	Url|NULL		$url			Base URL (defaults to container URL)
-	 * @param	Model|NULL	$container		The container
+	 * @param	\IPS\Http\Url|NULL		$url			Base URL (defaults to container URL)
+	 * @param	\IPS\Node\Model|NULL	$container		The container
 	 * @return	void
 	 */
-	public function __construct( Url $url=NULL, Model $container=NULL )
+	public function __construct( \IPS\Http\Url $url=NULL, \IPS\Node\Model $container=NULL )
 	{
 		/* Set container */
 		if ( $container !== NULL )
 		{
 			if ( !$this->sortBy and $container->_sortBy )
 			{
-				$this->sortBy = Album::$databasePrefix . $container->_sortBy;
+				$this->sortBy = \IPS\gallery\Album::$databasePrefix . $container->_sortBy;
 				$this->sortDirection = $container->_sortOrder;
 			}
 			
@@ -96,18 +80,18 @@ class Table extends Content
 		/* Init */
 		parent::__construct( '\\IPS\\gallery\\Album\\Item', ( $url !== NULL ) ? $url : $container->url(), NULL, $container );
 		
-		$this->rowsTemplate = array( Theme::i()->getTemplate( 'browse', 'gallery' ), 'albums' );
+		$this->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'browse', 'gallery' ), 'albums' );
 		
 		/* If we can't moderate in this category, restrict results */
-		if( $container === NULL OR !Image::modPermission( 'edit', NULL, $container ) )
+		if( $container === NULL OR !\IPS\gallery\Image::modPermission( 'edit', NULL, $container ) )
 		{
-			if( count( Member::loggedIn()->socialGroups() ) )
+			if( \count( \IPS\Member::loggedIn()->socialGroups() ) )
 			{
-				$this->where[]	= array( '( album_type=1 OR ( album_type=2 AND album_owner_id=? ) OR ( album_type=3 AND ( album_owner_id=? OR ( album_allowed_access IS NOT NULL AND album_allowed_access IN(' . implode( ',', Member::loggedIn()->socialGroups() ) . ') ) ) ) )', Member::loggedIn()->member_id, Member::loggedIn()->member_id );
+				$this->where[]	= array( '( album_type=1 OR ( album_type=2 AND album_owner_id=? ) OR ( album_type=3 AND ( album_owner_id=? OR ( album_allowed_access IS NOT NULL AND album_allowed_access IN(' . implode( ',', \IPS\Member::loggedIn()->socialGroups() ) . ') ) ) ) )', \IPS\Member::loggedIn()->member_id, \IPS\Member::loggedIn()->member_id );
 			}
 			else
 			{
-				$this->where[]	= array( '( album_type=1 OR ( album_type IN (2,3) AND album_owner_id=? ) )', Member::loggedIn()->member_id );
+				$this->where[]	= array( '( album_type=1 OR ( album_type IN (2,3) AND album_owner_id=? ) )', \IPS\Member::loggedIn()->member_id );
 			}
 		}
 		else
@@ -138,10 +122,10 @@ class Table extends Content
 	/**
 	 * Set owner
 	 *
-	 * @param	Member	$member		The member to filter by
+	 * @param	\IPS\Member	$member		The member to filter by
 	 * @return	void
 	 */
-	public function setOwner( Member $member ) : void
+	public function setOwner( \IPS\Member $member )
 	{
 		$this->where[]	= array( 'album_owner_id=?', $member->member_id );
 	}
@@ -152,7 +136,7 @@ class Table extends Content
 	 * @param	array|NULL	$advancedSearchValues	Advanced search values
 	 * @return	array
 	 */
-	public function getHeaders( array $advancedSearchValues=NULL ): array
+	public function getHeaders( $advancedSearchValues )
 	{
 		return array();
 	}
@@ -160,10 +144,10 @@ class Table extends Content
 	/**
 	 * Does the user have permission to use the multi-mod checkboxes?
 	 *
-	 * @param string|null $action		Specific action to check (hide/unhide, etc.) or NULL for a generic check
+	 * @param	string|null		$action		Specific action to check (hide/unhide, etc.) or NULL for a generic check
 	 * @return	bool
 	 */
-	public function canModerate( string $action=NULL ): bool
+	public function canModerate( $action=NULL )
 	{
 		return FALSE;
 	}
@@ -172,10 +156,10 @@ class Table extends Content
 	 * Return the sort direction to use for links
 	 *
 	 * @note	Abstracted so other table helper instances can adjust as needed
-	 * @param string $column		Sort by string
+	 * @param	string	$column		Sort by string
 	 * @return	string [asc|desc]
 	 */
-	public function getSortDirection( string $column ): string
+	public function getSortDirection( $column )
 	{
 		if( $column == 'album_name' )
 		{

@@ -12,33 +12,9 @@
 namespace IPS\convert\Library;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ErrorException;
-use IPS\convert\App;
-use IPS\convert\Exception;
-use IPS\convert\Software;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\forums\Forum;
-use IPS\forums\Topic\ArchivedPost;
-use IPS\forums\Topic\Post;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Club;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -46,12 +22,12 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * Invision Forums Converter
  * @note	We must extend the Core Library here so we can access methods like convertAttachment, convertFollow, etc
  */
-class Forums extends Core
+class _Forums extends Core
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $app = 'forums';
+	public $app = 'forums';
 
 	/**
 	 * Returns an array of items that we can convert, including the amount of rows stored in the Community Suite as well as the recommend value of rows to convert per cycle
@@ -59,10 +35,10 @@ class Forums extends Core
 	 * @param	bool	$rowCounts		enable row counts
 	 * @return	array
 	 */
-	public function menuRows( bool $rowCounts=FALSE ) : array
+	public function menuRows( $rowCounts=FALSE )
 	{
 		$return		= array();
-		$classname	= get_class( $this->software );
+		$classname	= \get_class( $this->software );
 		$extraRows = $this->software->extraMenuRows();
 
 		foreach( $this->getConvertableItems() as $k => $v )
@@ -73,7 +49,7 @@ class Forums extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_forums_forums',
 						'step_method'	=> 'convertForumsForums',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'forums_forums' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'forums_forums' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array(),
@@ -85,7 +61,7 @@ class Forums extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_forums_topics',
 						'step_method'	=> 'convertForumsTopics',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'forums_topics' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'forums_topics' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertForumsForums' ),
@@ -97,7 +73,7 @@ class Forums extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_forums_posts',
 						'step_method'		=> 'convertForumsPosts',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'forums_posts' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'forums_posts' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertForumsTopics' ),
@@ -110,7 +86,7 @@ class Forums extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_forums_archive_posts',
 						'step_method'	=> 'convertForumsArchivePosts',
-						'ips_rows'		=> ArchivedPost::db()->select( 'COUNT(*)', 'forums_archive_posts' ),
+						'ips_rows'		=> \IPS\forums\Topic\ArchivedPost::db()->select( 'COUNT(*)', 'forums_archive_posts' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertForumsTopics' ),
@@ -122,7 +98,7 @@ class Forums extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_forums_topic_multimods',
 						'step_method'	=> 'convertForumsTopicMultimods',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'forums_topic_mmod' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'forums_topic_mmod' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertForumsForums' ),
@@ -134,7 +110,7 @@ class Forums extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_forums_rss_imports',
 						'step_method'	=> 'convertForumsRssImports',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'core_rss_import', [ 'rss_import_class=?', 'IPS\\forums\\Topic' ] ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'core_rss_import', [ 'rss_import_class=?', 'IPS\\forums\\Topic' ] ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertForumsForums' ),
@@ -146,7 +122,7 @@ class Forums extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_forums_rss_imported',
 						'step_method'	=> 'convertForumsRssImported',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'core_rss_imported', array( 'rss_imported_import_id IN(' . Db::i()->select( 'rss_import_id', 'core_rss_import', array( "rss_import_class='IPS\\forums\\Topic'" ) ) . ')' ) )->first(),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'core_rss_imported', array( 'rss_imported_import_id IN(' . (string) \IPS\Db::i()->select( 'rss_import_id', 'core_rss_import', array( "rss_import_class='IPS\\forums\\Topic'" ) ) . ')' ) )->first(),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertForumsTopics', 'convertForumsRssImports' ),
@@ -154,11 +130,35 @@ class Forums extends Core
 					);
 					break;
 				
+				case 'convertForumsQuestionRatings':
+					$return[ $k ] = array(
+						'step_title'	=> 'convert_forums_question_ratings',
+						'step_method'	=> 'convertForumsQuestionRatings',
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'forums_question_ratings' ),
+						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
+						'per_cycle'		=> 200,
+						'dependencies'	=> array( 'convertForumsTopics' ),
+						'link_type'		=> 'forums_question_ratings',
+					);
+					break;
+				
+				case 'convertForumsAnswerRatings':
+					$return[ $k ] = array(
+						'step_title'	=> 'convert_forums_answer_ratings',
+						'step_method'	=> 'convertForumsAnswerRatings',
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'forums_answer_ratings' ),
+						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
+						'per_cycle'		=> 200,
+						'dependencies'	=> array( 'convertForumsPosts' ),
+						'link_type'		=> 'forums_answer_ratings',
+					);
+					break;
+				
 				case 'convertAttachments':
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_forums_attachments',
 						'step_method'	=> 'convertAttachments',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( "location_key=?", 'forums_Forums' ) ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( "location_key=?", 'forums_Forums' ) ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 10,
 						'dependencies'	=> array( 'convertForumsPosts' ),
@@ -170,7 +170,7 @@ class Forums extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_club_forums',
 						'step_method'	=> 'convertClubForums',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'forums_forums', array( "club_id IS NOT NULL" ) ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'forums_forums', array( "club_id IS NOT NULL" ) ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertForumsForums' ),
@@ -182,7 +182,7 @@ class Forums extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_topics',
 						'step_method'		=> 'convertClubTopics',
-						'ips_rows'			=> Db::i()->select( 'COUNT(tid)', 'forums_topics', array( 'forum_id IN ( ' . Db::i()->select( 'id', 'forums_forums', array( "club_id IS NOT NULL" ) ) . ')' ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(tid)', 'forums_topics', array( 'forum_id IN ( ' . (string) \IPS\Db::i()->select( 'id', 'forums_forums', array( "club_id IS NOT NULL" ) ) . ')' ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubForums' ),
@@ -194,7 +194,7 @@ class Forums extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_posts',
 						'step_method'		=> 'convertClubPosts',
-						'ips_rows'			=> Db::i()->select( 'COUNT(pid)', 'forums_forums', array( "club_id IS NOT NULL" ) )
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(pid)', 'forums_forums', array( "club_id IS NOT NULL" ) )
 													->join( 'forums_topics', 'forums_topics.forum_id=forums_forums.id')
 													->join( 'forums_posts', 'forums_posts.topic_id=forums_topics.tid'),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
@@ -231,7 +231,7 @@ class Forums extends Core
 	 * @param	bool	$rowCount		Count local rows
 	 * @return	array
 	 */
-	public function getMethodFromMenuRows( string $method, bool $rowCount=FALSE ) : array
+	public function getMethodFromMenuRows( $method, $rowCount=FALSE )
 	{
 		if( $method == 'convertForumsBoards' )
 		{
@@ -247,12 +247,11 @@ class Forums extends Core
 	 * @param	string	$method	Method to truncate
 	 * @return	array
 	 */
-	protected function truncate( string $method ) : array
+	protected function truncate( $method )
 	{
 		$return		= array();
-		$classname	= get_class( $this->software );
+		$classname	= \get_class( $this->software );
 
-		/* @var Software $classname */
 		if( $classname::canConvert() === NULL )
 		{
 			return array();
@@ -278,6 +277,7 @@ class Forums extends Core
 																'core_ratings' => array( 'class=?', 'IPS\\forums\\Topic\\Post' ),
 																'core_tags' => array( 'tag_meta_app=? AND tag_meta_area=?', 'forums', 'forums' ),
 																'core_voters' => NULL,
+																'forums_question_ratings' => NULL,
 																'forums_topics' => NULL
 															);
 					break;
@@ -286,6 +286,7 @@ class Forums extends Core
 					$return['convertForumsPosts'] = array(
 																'core_edit_history' => array( 'class=?', 'IPS\\forums\\Topic\\Post' ),
 																'core_reputation_index' => array( 'app=? AND type=?', 'forums', 'pid' ),
+																'forums_answer_ratings' => NULL,
 																'forums_posts' => NULL
 															);
 					break;
@@ -303,16 +304,24 @@ class Forums extends Core
 					break;
 				
 				case 'convertForumsRssImported':
-					$return['convertForumsRssImported'] = array( 'forums_rss_imported' => NULL );
+					$retun['convertForumsRssImported'] = array( 'forums_rss_imported' => NULL );
+					break;
+				
+				case 'convertForumsQuestionRatings':
+					$retun['convertForumsQuestionRatings'] = array( 'forums_question_ratings' => NULL );
+					break;
+				
+				case 'convertForumsAnswerRatings':
+					$return['convertForumsAnswerRatings'] = array( 'forums_answer_ratings' => NULL );
 					break;
 				
 				case 'convertAttachments':
 					$attachIds = array();
-					foreach( Db::i()->select( 'attachment_id', 'core_attachments_map', array( 'location_key=?', 'forums_Forums' ) ) AS $attachment )
+					foreach( \IPS\Db::i()->select( 'attachment_id', 'core_attachments_map', array( 'location_key=?', 'forums_Forums' ) ) AS $attachment )
 					{
 						$attachIds[] = $attachment;
 					}
-					$return['convertAttachments'] = array( 'core_attachments' => Db::i()->in( 'attach_id', $attachIds ), 'core_attachments_map' => array( "location_key=?", 'forums_Forums' ) );
+					$return['convertAttachments'] = array( 'core_attachments' => \IPS\Db::i()->in( 'attach_id', $attachIds ), 'core_attachments_map' => array( "location_key=?", 'forums_Forums' ) );
 					break;
 
 				case 'convertClubForums':
@@ -320,11 +329,11 @@ class Forums extends Core
 					break;
 
 				case 'convertClubTopics':
-					$return['convertClubTopics'] = array( 'forums_topics' => array( 'tid IN ( ' . Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_topics' AND app={$this->software->app->app_id}" ) ) . ')' ) );
+					$return['convertClubTopics'] = array( 'forums_topics' => array( 'tid IN ( ' . (string) \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_topics' AND app={$this->software->app->app_id}" ) ) . ')' ) );
 					break;
 
 				case 'convertClubPosts':
-					$return['convertClubPosts'] = array( 'forums_posts' => array( 'pid IN ( ' . Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_posts' AND app={$this->software->app->app_id}" ) ) . ')' ) );
+					$return['convertClubPosts'] = array( 'forums_posts' => array( 'pid IN ( ' . (string) \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_posts' AND app={$this->software->app->app_id}" ) ) . ')' ) );
 					break;
 			}
 		}
@@ -352,20 +361,20 @@ class Forums extends Core
 	 * @param	array|NULL		$perms		Permissions or NULL to insert no permissions.
 	 * @param	string|NULL		$iconpath	The path to the forums icon, or NULL.
 	 * @param	string|NULL		$icondata	The binary data for the forums icon, or NULL.
-	 * @return	int|bool	The ID of the newly inserted forum, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted forum, or FALSE on failure.
 	 */
-	public function convertForumsForum( array $info=array(), ?array $perms=NULL, ?string $iconpath=NULL, ?string $icondata=NULL ) : bool|int
+	public function convertForumsForum( $info=array(), $perms=NULL, $iconpath=NULL, $icondata=NULL )
 	{
 		if ( !isset( $info['id'] ) )
 		{
-			$this->software->app->log( 'forums_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'forums_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['name'] ) )
 		{
 			$name = "Untitled Forum {$info['id']}";
-			$this->software->app->log( 'forum_missing_name', __METHOD__, App::LOG_WARNING, $info['id'] );
+			$this->software->app->log( 'forum_missing_name', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['id'] );
 		}
 		else
 		{
@@ -394,6 +403,39 @@ class Forums extends Core
 			$info['posts'] = 0;
 		}
 		
+		if ( isset( $info['last_post'] ) )
+		{
+			if ( $info['last_post'] instanceof \IPS\DateTime )
+			{
+				$info['last_post'] = $info['last_post']->getTimestamp();
+			}
+		}
+		else
+		{
+			$info['last_post'] = NULL;
+		}
+		
+		if ( isset( $info['last_poster_id'] ) )
+		{
+			try
+			{
+				$info['last_poster_id'] = $this->software->app->getLink( $info['last_poster_id'], 'core_members', TRUE );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$info['last_poster_id'] = 0;
+			}
+		}
+		else
+		{
+			$info['last_poster_id'] = 0;
+		}
+		
+		if ( !isset( $info['last_poster_name'] ) )
+		{
+			$info['last_poster_name'] = '';
+		}
+		
 		/* Do parent_id now - we'll need it later */
 		if ( !isset( $info['club_id'] ) )
 		{
@@ -405,7 +447,7 @@ class Forums extends Core
 					{
 						$info['parent_id'] = $this->software->app->getLink( $info['parent_id'], 'forums_forums' );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						/* Does the ID exist in the source? */
 						$info['conv_parent'] = $info['parent_id'];
@@ -431,9 +473,9 @@ class Forums extends Core
 					/* Clubs may not have a parent */
 					$where = array( "parent_id=?", $info['parent_id'] );
 				}
-				$position = Db::i()->select( 'MAX(position)', 'forums_forums', $where )->first();
+				$position = \IPS\Db::i()->select( 'MAX(position)', 'forums_forums', $where )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$position = 0;
 			}
@@ -449,7 +491,7 @@ class Forums extends Core
 		if ( isset( $info['password_override'] ) )
 		{
 			/* Array? */
-			if ( !is_array( $info['password_override'] ) )
+			if ( !\is_array( $info['password_override'] ) )
 			{
 				$info['password_override'] = explode( ',', $info['password_override'] );
 			}
@@ -461,7 +503,7 @@ class Forums extends Core
 				{
 					$passwordGroupsToSave[] = $this->software->app->getLink( $group, 'core_groups', TRUE );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					continue;
 				}
@@ -472,6 +514,14 @@ class Forums extends Core
 		{
 			$info['password_override'] = '';
 		}
+		
+		if ( !isset( $info['last_title'] ) )
+		{
+			$info['last_title'] = NULL;
+		}
+		
+		/* We can't know this yet */
+		$info['last_id'] = 0;
 		
 		if ( !isset( $info['sort_key'] ) )
 		{
@@ -508,7 +558,7 @@ class Forums extends Core
 		
 		if ( !isset( $info['redirect_on'] ) )
 		{
-			if ( !is_null( $info['redirect_url'] ) )
+			if ( !\is_null( $info['redirect_url'] ) )
 			{
 				$info['redirect_on'] = 1;
 			}
@@ -555,21 +605,55 @@ class Forums extends Core
 			$info['forum_allow_rating'] = 0;
 		}
 		
+		if ( !isset( $info['min_posts_post'] ) )
+		{
+			$info['min_posts_post'] = 0;
+		}
+		
+		if ( !isset( $info['min_posts_view'] ) )
+		{
+			$info['min_posts_view'] = 0;
+		}
+		
 		if ( !isset( $info['can_view_others'] ) )
 		{
 			$info['can_view_others'] = 1;
 		}
 		
 		/* Just reset this */
-		$info['name_seo'] = url::seoTitle( $name );
-
-		/* This will auto rebuild on first visit, then recalculate later */
-		unset( $info['last_post'], $info['last_poster_id'], $info['last_poster_name'], $info['seo_last_name'], $info['last_title'], $info['seo_last_title'], $info['last_id'] );
+		$info['name_seo'] = \IPS\Http\Url::seoTitle( $name );
+		
+		if ( !isset( $info['seo_last_title'] ) )
+		{
+			if ( !\is_null( $info['last_title'] ) )
+			{
+				$info['seo_last_title'] = \IPS\Http\Url::seoTitle( $info['last_title'] );
+			}
+			else
+			{
+				$info['seo_last_title'] = '';
+			}
+		}
+		
+		if ( !isset( $info['seo_last_name'] ) )
+		{
+			if ( !\is_null( $info['last_poster_name'] ) )
+			{
+				$info['seo_last_name'] = \IPS\Http\Url::seoTitle( $info['last_poster_name'] );
+			}
+			else
+			{
+				$info['seo_last_name'] = '';
+			}
+		}
+		
+		/* No longer used */
+		$info['last_x_topic_ids'] = NULL;
 		
 		$bitoptions = 0;
 		if ( isset( $info['forums_bitoptions'] ) )
 		{
-			foreach( Forum::$bitOptions['forums_bitoptions']['forums_bitoptions'] AS $key => $value )
+			foreach( \IPS\forums\Forum::$bitOptions['forums_bitoptions']['forums_bitoptions'] AS $key => $value )
 			{
 				if ( isset( $info['forums_bitoptions'][$key] ) AND $info['forums_bitoptions'][$key] )
 				{
@@ -613,12 +697,12 @@ class Forums extends Core
 		{
 			if ( $info['qa_rate_questions'] != '*' )
 			{
-				if ( !is_array( $info['qa_rate_questions'] ) )
+				if ( !\is_array( $info['qa_rate_questions'] ) )
 				{
 					$info['qa_rate_questions'] = explode( ',', $info['qa_rate_questions'] );
 				}
 				
-				if ( count( $info['qa_rate_questions'] ) )
+				if ( \count( $info['qa_rate_questions'] ) )
 				{
 					$qaQuestionGroups = array();
 					foreach( $info['qa_rate_questions'] AS $group )
@@ -627,13 +711,13 @@ class Forums extends Core
 						{
 							$qaQuestionGroups[] = $this->software->app->getLink( $group, 'core_groups', TRUE );
 						}
-						catch( OutOfRangeException $e )
+						catch( \OutOfRangeException $e )
 						{
 							continue;
 						}
 					}
 					
-					if ( count( $qaQuestionGroups ) )
+					if ( \count( $qaQuestionGroups ) )
 					{
 						$info['qa_rate_questions'] = implode( ',', $qaQuestionGroups );
 					}
@@ -657,12 +741,12 @@ class Forums extends Core
 		{
 			if ( $info['qa_rate_answers'] != '*' )
 			{
-				if ( !is_array( $info['qa_rate_answers'] ) )
+				if ( !\is_array( $info['qa_rate_answers'] ) )
 				{
 					$info['qa_rate_answers'] = explode( ',', $info['qa_rate_answers'] );
 				}
 				
-				if ( count( $info['qa_rate_anwsers'] ) )
+				if ( \count( $info['qa_rate_anwsers'] ) )
 				{
 					$qaAnswerGroups = array();
 					foreach( $info['qa_rate_answers'] AS $group )
@@ -671,13 +755,13 @@ class Forums extends Core
 						{
 							$qaAnswerGroups[] = $this->software->app->getLink( $group, 'core_groups', TRUE );
 						}
-						catch( OutOfRangeException $e )
+						catch( \OutOfRangeException $e )
 						{
 							continue;
 						}
 					}
 					
-					if ( count( $qaAnswerGroups ) )
+					if ( \count( $qaAnswerGroups ) )
 					{
 						$info['qa_rate_answers'] = implode( ',', $qaAnswerGroups );
 					}
@@ -699,13 +783,13 @@ class Forums extends Core
 		
 		try
 		{
-			if ( isset( $info['icon'] ) AND ( !is_null( $iconpath ) OR !is_null( $icondata ) ) )
+			if ( isset( $info['icon'] ) AND ( !\is_null( $iconpath ) OR !\is_null( $icondata ) ) )
 			{
-				if ( is_null( $icondata ) AND !is_null( $iconpath ) )
+				if ( \is_null( $icondata ) AND !\is_null( $iconpath ) )
 				{
 					$icondata = file_get_contents( $iconpath );
 				}
-				$file = File::create( 'forums_Icons', $info['icon'], $icondata );
+				$file = \IPS\File::create( 'forums_Icons', $info['icon'], $icondata );
 				$info['icon'] = (string) $file;
 			}
 			else
@@ -713,18 +797,22 @@ class Forums extends Core
 				$info['icon'] = NULL;
 			}
 		}
-		catch( \Exception|ErrorException $e )
+		catch( \Exception $e )
 		{
 			$info['icon'] = NULL;
 		}
-
+		catch( \ErrorException $e )
+		{
+			$info['icon'] = NULL;
+		}
+		
 		if ( isset( $info['club_id'] ) )
 		{
 			try
 			{
 				$info['club_id'] = $this->software->app->getLink( $info['club_id'], 'core_clubs', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				if ( $info['club_id'] )
 				{
@@ -732,7 +820,7 @@ class Forums extends Core
 					{
 						$info['parent_id'] = $this->software->app->getLink( '__orphan_club_forum__', 'core_clubs', TRUE );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						$info['parent_id'] = $this->convertForumsForum( array(
 							'id'		=> '__orphan_club_forum__',
@@ -753,25 +841,25 @@ class Forums extends Core
 		$id = $info['id'];
 		unset( $info['id'] );
 		
-		$inserted_id = Db::i()->insert( 'forums_forums', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'forums_forums', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'forums_forums' );
 		
-		Lang::saveCustom( 'forums', "forums_forum_{$inserted_id}", $name );
-		Lang::saveCustom( 'forums', "forums_forum_{$inserted_id}_desc", $desc );
+		\IPS\Lang::saveCustom( 'forums', "forums_forum_{$inserted_id}", $name );
+		\IPS\Lang::saveCustom( 'forums', "forums_forum_{$inserted_id}_desc", $desc );
 		
-		Db::i()->update( 'forums_forums', array( "parent_id" => $inserted_id ), array( "conv_parent=?", $id ) );
-		Db::i()->insert( 'core_permission_index', array( 'app' => 'forums', 'perm_type' => 'forum', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
+		\IPS\Db::i()->update( 'forums_forums', array( "parent_id" => $inserted_id ), array( "conv_parent=?", $id ) );
+		\IPS\Db::i()->insert( 'core_permission_index', array( 'app' => 'forums', 'perm_type' => 'forum', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
 		
 		if ( $info['club_id'] )
 		{
-			Db::i()->insert( 'core_clubs_node_map', array(
+			\IPS\Db::i()->insert( 'core_clubs_node_map', array(
 				'club_id'		=> $info['club_id'],
 				'node_class'	=> "IPS\\forums\\Forum",
 				'node_id'		=> $inserted_id,
 				'name'			=> $name
 			) );
 			
-			Forum::load( $inserted_id )->setPermissionsToClub( Club::load( $info['club_id'] ) );
+			\IPS\forums\Forum::load( $inserted_id )->setPermissionsToClub( \IPS\Member\Club::load( $info['club_id'] ) );
 		}
 		
 		return $inserted_id;
@@ -780,15 +868,15 @@ class Forums extends Core
 	/**
 	 * Get Parent Forum ID for Orphaned Forums
 	 *
-	 * @return	int		The ID of the forum created for forums that do not have a parent forum.
+	 * @return	integer		The ID of the forum created for forums that do not have a parent forum.
 	 */
-	protected function _getOrphanedForumCategory() : int
+	protected function _getOrphanedForumCategory()
 	{
 		try
 		{
 			$id = $this->software->app->getLink( '__orphaned__', 'forums_forums' );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			$id = $this->convertForumsForum( array(
 				'id'		=> '__orphaned__',
@@ -804,25 +892,25 @@ class Forums extends Core
 	 * Convert a topic
 	 *
 	 * @param	array	$info	Data to insert
-	 * @return	int|bool	The ID of the newly inserted topic, or FALSE on failure
+	 * @return	integer|boolean	The ID of the newly inserted topic, or FALSE on failure
 	 */
-	public function convertForumsTopic( array $info=array() ) : bool|int
+	public function convertForumsTopic( $info=array() )
 	{
 		if ( !isset( $info['tid'] ) )
 		{
-			$this->software->app->log( 'topic_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'topic_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['title'] ) )
 		{
 			$info['title'] = "Untitled Topic {$info['tid']}";
-			$this->software->app->log( 'topic_missing_title', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'topic_missing_title', __METHOD__, \IPS\convert\App::LOG_WARNING );
 		}
 		elseif( mb_strlen( $info['title'] ) > 255 )
 		{
 			$info['title'] = mb_substr( $info['title'], 0, 255 );
-			$this->software->app->log( 'topic_title_truncated', __METHOD__, App::LOG_NOTICE, $info['tid'] );
+			$this->software->app->log( 'topic_title_truncated', __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['tid'] );
 		}
 		
 		if ( isset( $info['forum_id'] ) )
@@ -831,19 +919,19 @@ class Forums extends Core
 			{
 				$info['forum_id'] = $this->software->app->getLink( $info['forum_id'], 'forums_forums' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'topic_missing_forum', __METHOD__, App::LOG_WARNING, $info['tid'] );
+				$this->software->app->log( 'topic_missing_forum', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['tid'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'topic_missing_forum', __METHOD__, App::LOG_WARNING, $info['tid'] );
+			$this->software->app->log( 'topic_missing_forum', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['tid'] );
 			return FALSE;
 		}
 		
-		if ( !isset( $info['state'] ) OR !in_array( $info['state'], array( 'open', 'closed' ) ) )
+		if ( !isset( $info['state'] ) OR !\in_array( $info['state'], array( 'open', 'closed' ) ) )
 		{
 			$info['state'] = 'open';
 		}
@@ -859,7 +947,7 @@ class Forums extends Core
 			{
 				$info['starter_id'] = $this->software->app->getLink( $info['starter_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['starter_id'] = 0;
 			}
@@ -871,7 +959,7 @@ class Forums extends Core
 		
 		if ( isset( $info['start_date'] ) )
 		{
-			if ( $info['start_date'] instanceof DateTime )
+			if ( $info['start_date'] instanceof \IPS\DateTime )
 			{
 				$info['start_date'] = $info['start_date']->getTimestamp();
 			}
@@ -887,7 +975,7 @@ class Forums extends Core
 			{
 				$info['last_poster_id'] = $this->software->app->getLink( $info['last_poster_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['last_poster_id'] = $info['starter_id'];
 			}
@@ -899,7 +987,7 @@ class Forums extends Core
 		
 		if ( isset( $info['last_post'] ) )
 		{
-			if ( $info['last_post'] instanceof DateTime )
+			if ( $info['last_post'] instanceof \IPS\DateTime )
 			{
 				$info['last_post'] = $info['last_post']->getTimestamp();
 			}
@@ -911,7 +999,7 @@ class Forums extends Core
 		
 		if ( !isset( $info['starter_name'] ) )
 		{
-			$starter = Member::load( $info['starter_id'] );
+			$starter = \IPS\Member::load( $info['starter_id'] );
 			
 			if ( $starter->member_id )
 			{
@@ -925,7 +1013,7 @@ class Forums extends Core
 		
 		if ( !isset( $info['last_poster_name'] ) )
 		{
-			$last = Member::load( $info['last_poster_id'] );
+			$last = \IPS\Member::load( $info['last_poster_id'] );
 			
 			if ( $last->member_id )
 			{
@@ -942,7 +1030,7 @@ class Forums extends Core
 		}
 		
 		/* Polls - pass off to the core library. Unlike ratings and follows, we need to do this here as we need to know the Poll ID. */
-		if ( isset( $info['poll_state'] ) AND is_array( $info['poll_state'] ) )
+		if ( isset( $info['poll_state'] ) AND \is_array( $info['poll_state'] ) )
 		{
 			if ( $info['poll_state'] = $this->convertPoll( $info['poll_state']['poll_data'], $info['poll_state']['vote_data'] ) )
 			{
@@ -950,9 +1038,9 @@ class Forums extends Core
 				{
 					try
 					{
-						$lastVote = Db::i()->select( 'vote_date', 'core_voters', array( "poll=?", $info['poll_state'] ) )->first();
+						$lastVote = \IPS\Db::i()->select( 'vote_date', 'core_voters', array( "poll=?", $info['poll_state'] ) )->first();
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
 						$lastVote = time();
 					}
@@ -961,7 +1049,7 @@ class Forums extends Core
 				}
 				else
 				{
-					if ( $info['last_vote'] instanceof DateTime )
+					if ( $info['last_vote'] instanceof \IPS\DateTime )
 					{
 						$info['last_vote'] = $info['last_vote']->getTimestamp();
 					}
@@ -999,7 +1087,7 @@ class Forums extends Core
 		
 		if ( isset( $info['moved_to'] ) )
 		{
-			if ( !is_array( $info['moved_to'] ) )
+			if ( !\is_array( $info['moved_to'] ) )
 			{
 				list( $topic, $forum ) = explode( '&', $info['moved_to'] );
 			}
@@ -1012,7 +1100,7 @@ class Forums extends Core
 			{
 				$topic = $this->software->app->getLink( $topic, 'forums_topics' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$topic = NULL;
 			}
@@ -1021,12 +1109,12 @@ class Forums extends Core
 			{
 				$forum = $this->software->app->getLink( $forum, 'forums_forums' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$forum = NULL;
 			}
 			
-			if ( is_null( $topic ) OR is_null( $forum ) )
+			if ( \is_null( $topic ) OR \is_null( $forum ) )
 			{
 				$info['moved_to'] = NULL;
 			}
@@ -1050,7 +1138,7 @@ class Forums extends Core
 		
 		if ( isset( $info['topic_open_time'] ) )
 		{
-			if ( $info['topic_open_time'] instanceof DateTime )
+			if ( $info['topic_open_time'] instanceof \IPS\DateTime )
 			{
 				$info['topic_open_time'] = $info['topic_open_time']->getTimestamp();
 			}
@@ -1062,7 +1150,7 @@ class Forums extends Core
 		
 		if ( isset( $info['topic_close_time'] ) )
 		{
-			if ( $info['topic_close_time'] instanceof DateTime )
+			if ( $info['topic_close_time'] instanceof \IPS\DateTime )
 			{
 				$info['topic_close_time'] = $info['topic_close_time']->getTimestamp();
 			}
@@ -1084,12 +1172,12 @@ class Forums extends Core
 		
 		if ( !isset( $info['title_seo'] ) )
 		{
-			$info['title_seo'] = Url::seoTitle( $info['title'] );
+			$info['title_seo'] = \IPS\Http\Url::seoTitle( $info['title'] );
 		}
 		
 		if ( isset( $info['moved_on'] ) )
 		{
-			if ( $info['moved_on'] instanceof DateTime )
+			if ( $info['moved_on'] instanceof \IPS\DateTime )
 			{
 				$info['moved_on'] = $info['moved_on']->getTimestamp();
 			}
@@ -1106,7 +1194,7 @@ class Forums extends Core
 		
 		if ( isset( $info['last_real_post'] ) )
 		{
-			if ( $info['last_real_post'] instanceof DateTime )
+			if ( $info['last_real_post'] instanceof \IPS\DateTime )
 			{
 				$info['last_real_post'] = $info['last_real_post']->getTimestamp();
 			}
@@ -1118,10 +1206,16 @@ class Forums extends Core
 		
 		/* Can't knew these */
 		$info['topic_answered_pid']	= 0;
+		$info['popular_time']		= 0;
 		
 		if ( !isset( $info['featured'] ) )
 		{
 			$info['featured'] = 0;
+		}
+		
+		if ( !isset( $info['question_rating'] ) )
+		{
+			$info['question_rating'] = NULL;
 		}
 		
 		if ( !isset( $info['topic_hiddenposts'] ) )
@@ -1132,7 +1226,7 @@ class Forums extends Core
 		$id = $info['tid'];
 		unset( $info['tid'] );
 		
-		$inserted_id = Db::i()->insert( 'forums_topics', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'forums_topics', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'forums_topics' );
 		
 		return $inserted_id;
@@ -1142,13 +1236,13 @@ class Forums extends Core
 	 * Convert a Forum Post
 	 *
 	 * @param	array			$info	Data to insert
-	 * @return	int|bool	The ID of the newly inserted post, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted post, or FALSE on failure.
 	 */
-	public function convertForumsPost( array $info=array() ) : bool|int
+	public function convertForumsPost( $info=array() )
 	{
 		if ( !isset( $info['pid'] ) )
 		{
-			$this->software->app->log( 'post_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'post_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -1158,9 +1252,9 @@ class Forums extends Core
 			{
 				$info['topic_id'] = $this->software->app->getLink( $info['topic_id'], 'forums_topics' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'post_missing_topic', __METHOD__, App::LOG_WARNING, $info['pid'] );
+				$this->software->app->log( 'post_missing_topic', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['pid'] );
 				return FALSE;
 			}
 		}
@@ -1171,13 +1265,13 @@ class Forums extends Core
 		}
 		else
 		{
-			$this->software->app->log( 'post_missing_topic', __METHOD__, App::LOG_WARNING, $info['pid'] );
+			$this->software->app->log( 'post_missing_topic', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['pid'] );
 			return FALSE;
 		}
 		
 		if ( empty( $info['post'] ) )
 		{
-			$this->software->app->log( 'post_missing_content', __METHOD__, App::LOG_WARNING, $info['pid'] );
+			$this->software->app->log( 'post_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['pid'] );
 			return FALSE;
 		}
 		
@@ -1188,7 +1282,7 @@ class Forums extends Core
 		
 		if ( isset( $info['edit_time'] ) )
 		{
-			if ( $info['edit_time'] instanceof DateTime )
+			if ( $info['edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['edit_time'] = $info['edit_time']->getTimestamp();
 			}
@@ -1204,7 +1298,7 @@ class Forums extends Core
 			{
 				$info['author_id'] = $this->software->app->getLink( $info['author_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['author_id'] = 0;
 			}
@@ -1216,7 +1310,7 @@ class Forums extends Core
 		
 		if ( !isset( $info['author_name'] ) )
 		{
-			$author = Member::load( $info['author_id'] );
+			$author = \IPS\Member::load( $info['author_id'] );
 			
 			if ( $author->member_id )
 			{
@@ -1231,7 +1325,7 @@ class Forums extends Core
 		
 		if ( isset( $info['post_date'] ) )
 		{
-			if ( $info['post_date'] instanceof DateTime )
+			if ( $info['post_date'] instanceof \IPS\DateTime )
 			{
 				$info['post_date'] = $info['post_date']->getTimestamp();
 			}
@@ -1274,7 +1368,7 @@ class Forums extends Core
 		$bitoptions		= 0;
 		if ( isset( $info['post_bwoptions'] ) )
 		{
-			foreach( Post::$bitOptions['post_bwoptions']['post_bwoptions'] AS $key => $value )
+			foreach( \IPS\forums\Topic\Post::$bitOptions['post_bwoptions']['post_bwoptions'] AS $key => $value )
 			{
 				if ( isset( $info['post_bwoptions'][$key] ) AND $info['post_bwoptions'][$key] )
 				{
@@ -1295,7 +1389,7 @@ class Forums extends Core
 		
 		if ( isset( $info['pdelete_time'] ) )
 		{
-			if ( $info['pdelete_time'] instanceof DateTime )
+			if ( $info['pdelete_time'] instanceof \IPS\DateTime )
 			{
 				$info['pdelete_time'] = $info['pdelete_time']->getTimestamp();
 			}
@@ -1324,8 +1418,8 @@ class Forums extends Core
 		$id = $info['pid'];
 		unset( $info['pid'] );
 		
-		$inserted_id = Db::i()->insert( 'forums_posts', $info );
-		$this->software->app->addLink( $inserted_id, $id, $info['new_topic'] ? 'forums_posts_first' : 'forums_posts' );
+		$inserted_id = \IPS\Db::i()->insert( 'forums_posts', $info );
+		$this->software->app->addLink( $inserted_id, $id, 'forums_posts' );
 		
 		$topicUpdate = array();
 		
@@ -1334,14 +1428,14 @@ class Forums extends Core
 			$topicUpdate['topic_firstpost'] = $inserted_id;
 		}
 		
-		if ( $isBestAnswer )
+		if ( $isBestAnswer == TRUE )
 		{
 			$topicUpdate['topic_answered_pid'] = $inserted_id;
 		}
 		
-		if ( count( $topicUpdate ) )
+		if ( \count( $topicUpdate ) )
 		{
-			Db::i()->update( 'forums_topics', $topicUpdate, array( "tid=?", $info['topic_id'] ) );
+			\IPS\Db::i()->update( 'forums_topics', $topicUpdate, array( "tid=?", $info['topic_id'] ) );
 		}
 		
 		return $inserted_id;
@@ -1351,9 +1445,9 @@ class Forums extends Core
 	 * Convert an Archived Post
 	 *
 	 * @param	array			$info	Data to insert
-	 * @return	int|bool	The ID of the newly inserted Archived Post, or FALSE on failure.
+	 * @param	integer|boolean	The ID of the newly inserted Archived Post, or FALSE on failure.
 	 */
-	public function convertForumsArchivedPost( array $info=array() ) : bool|int
+	public function convertForumsArchivedPost( $info=array() )
 	{
 		/* This works a little differently... we actually need to insert it into the main posts table first, then move it. As such, the $info array should match that of the main posts method EXCEPT for a few keys which we'll extract out. */
 		if ( isset( $info['archive_added'] ) )
@@ -1371,20 +1465,20 @@ class Forums extends Core
 		/* If $return is FALSE, stop here. Something went wrong. */
 		if ( $return === FALSE )
 		{
-			return false;
+			return $return;
 		}
 		
 		/* Re-extract the post. We need the topic too. */
 		try
 		{
-			$post	= Db::i()->select( '*', 'forums_posts', array( "pid=?", $return ) )->first();
-			$topic	= Db::i()->select( '*', 'forums_topics', array( "tid=?", $post['topic_id'] ) )->first();
+			$post	= \IPS\Db::i()->select( '*', 'forums_posts', array( "pid=?", $return ) )->first();
+			$topic	= \IPS\Db::i()->select( '*', 'forums_topics', array( "tid=?", $post['topic_id'] ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			/* Um... something really bad happened. */
-			$this->software->app->log( 'forums_archive_posts_omgonoes', __METHOD__, App::LOG_ERROR, $return );
-			throw new Exception;
+			$this->software->app->log( 'forums_archive_posts_omgonoes', __METHOD__, \IPS\convert\App::LOG_ERROR, $return );
+			throw new \IPS\convert\Exception;
 		}
 		
 		/* Remap everything so it can fit into the archive table */
@@ -1411,8 +1505,8 @@ class Forums extends Core
 			'archive_field_int'			=> $post['post_field_int']
 		);
 		
-		ArchivedPost::db()->insert( 'forums_archive_posts', $archive );
-		Db::i()->delete( 'forums_posts', array( "pid=?", $archive['archive_id'] ) );
+		\IPS\forums\Topic\ArchivedPost::db()->insert( 'forums_archive_posts', $archive );
+		\IPS\Db::i()->delete( 'forums_posts', array( "pid=?", $archive['archive_id'] ) );
 		
 		return $archive['archive_id'];
 	}
@@ -1421,9 +1515,9 @@ class Forums extends Core
 	 * Convert a forums topic multimod
 	 *
 	 * @param	array			$info	Data to insert
-	 * @return	int|bool	The ID of the newly inserted Multi Mod, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted Multi Mod, or FALSE on failure.
 	 */
-	public function convertForumsTopicMultimod( array $info=array() ) : bool|int
+	public function convertForumsTopicMultimod( $info=array() )
 	{
 		/* Another instance where we do not necessarily need this, but will store anyway if we have it */
 		$hasId = TRUE;
@@ -1435,7 +1529,7 @@ class Forums extends Core
 		if ( !isset( $info['mm_name'] ) )
 		{
 			$name = "Untitled Multi-Mod";
-			$this->software->app->log( 'forums_topic_mmod_missing_name', __METHOD__, App::LOG_NOTICE, ( $hasId ) ? $info['mm_id'] : NULL );
+			$this->software->app->log( 'forums_topic_mmod_missing_name', __METHOD__, \IPS\convert\App::LOG_NOTICE, ( $hasId ) ? $info['mm_id'] : NULL );
 		}
 		else
 		{
@@ -1448,12 +1542,12 @@ class Forums extends Core
 			$info['mm_enabled'] = 1;
 		}
 		
-		if ( !isset( $info['topic_state'] ) OR !in_array( $info['topic_state'], array( 'leave', 'open', 'close' ) ) )
+		if ( !isset( $info['topic_state'] ) OR !\in_array( $info['topic_state'], array( 'leave', 'open', 'close' ) ) )
 		{
 			$info['topic_state'] = 'leave';
 		}
 		
-		if ( !isset( $info['topic_pin'] ) OR !in_array( $info['topic_pin'], array( 'leave', 'pin', 'unpin' ) ) )
+		if ( !isset( $info['topic_pin'] ) OR !\in_array( $info['topic_pin'], array( 'leave', 'pin', 'unpin' ) ) )
 		{
 			$info['topic_pin'] = 'leave';
 		}
@@ -1469,7 +1563,7 @@ class Forums extends Core
 					$info['topic_move_link'] = 0;
 				}
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['topic_move']			= 0;
 				$info['topic_move_link']	= 0;
@@ -1518,13 +1612,13 @@ class Forums extends Core
 		{
 			if ( $info['mm_forums'] != '*' )
 			{
-				if ( !is_array( $info['mm_forums'] ) )
+				if ( !\is_array( $info['mm_forums'] ) )
 				{
 					$info['mm_forums'] = explode( ',', $info['mm_forums'] );
 				}
 				
 				$forums = array();
-				if ( count( $info['mm_forums'] ) )
+				if ( \count( $info['mm_forums'] ) )
 				{
 					foreach( $info['mm_forums'] AS $forum )
 					{
@@ -1532,14 +1626,14 @@ class Forums extends Core
 						{
 							$forums[] = $this->software->app->getLink( $forum, 'forums_forums' );
 						}
-						catch( OutOfRangeException $e )
+						catch( \OutOfRangeException $e )
 						{
 							continue;
 						}
 					}
 				}
 				
-				if ( count( $forums ) )
+				if ( \count( $forums ) )
 				{
 					$info['mm_forums'] = implode( ',', $forums );
 				}
@@ -1554,7 +1648,7 @@ class Forums extends Core
 			$info['mm_forums'] = '*';
 		}
 		
-		if ( !isset( $info['topic_approve'] ) OR !in_array( $info['topic_approve'], array( 0, 1, 2 ) ) )
+		if ( !isset( $info['topic_approve'] ) OR !\in_array( $info['topic_approve'], array( 0, 1, 2 ) ) )
 		{
 			$info['topic_approve'] = 0;
 		}
@@ -1565,8 +1659,8 @@ class Forums extends Core
 			unset( $info['mm_id'] );
 		}
 		
-		$inserted_id = Db::i()->insert( 'forums_topic_mmod', $info );
-		Lang::saveCustom( 'forums', "forums_mmod_{$inserted_id}", $name );
+		$inserted_id = \IPS\Db::i()->insert( 'forums_topic_mmod', $info );
+		\IPS\Lang::saveCustom( 'forums', "forums_mmod_{$inserted_id}", $name );
 		
 		if ( $hasId )
 		{
@@ -1580,9 +1674,9 @@ class Forums extends Core
 	 * Convert an RSS Import Feed
 	 *
 	 * @param	array			$info	Data to insert
-	 * @return	int|bool	The ID of the newly inserted import feed, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted import feed, or FALSE on failure.
 	 */
-	public function convertForumsRssImport( array $info=array() ) : bool|int
+	public function convertForumsRssImport( $info=array() )
 	{
 		$info['rss_import_class'] = 'IPS\\forums\\Topic';
 
@@ -1606,11 +1700,251 @@ class Forums extends Core
 	 * Convert an RSS Imported Topic... or try to, anyway.
 	 *
 	 * @param	array		$info	Data to insert
-	 * @return	bool|int		TRUE on success, or FALSE on failure.
+	 * @return	boolean		TRUE on success, or FALSE on failure.
 	 */
-	public function convertForumsRssImported( array $info=array() ) : bool|int
+	public function convertForumsRssImported( $info=array() )
 	{
 		return parent::convertRssImported( $info, 'forums_rss_import', 'forums_topics' );
+	}
+	
+	/**
+	 * Convert a question rating
+	 *
+	 * @param	array			$info	Data to insert
+	 * @return	integer|boolean	The ID of the newly inserted rating, or FALSE on failure.
+	 */
+	public function convertForumsQuestionRating( $info=array() )
+	{
+		/* We do not need to store an ID if one isn't present */
+		$hasId = TRUE;
+		if ( !isset( $info['id'] ) )
+		{
+			$hasId = FALSE;
+		}
+		
+		/* Everything but the date is required */
+		if ( isset( $info['topic'] ) )
+		{
+			try
+			{
+				$info['topic'] = $this->software->app->getLink( $info['topic'], 'forums_topics' );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'question_rating_missing_question', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+				return FALSE;
+			}
+		}
+		else
+		{
+			$this->software->app->log( 'question_rating_missing_question', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			return FALSE;
+		}
+		
+		if ( isset( $info['forum'] ) )
+		{
+			try
+			{
+				$info['forum'] = $this->software->app->getLink( $info['forum'], 'forums_forums' );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'question_rating_missing_forum', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+				return FALSE;
+			}
+		}
+		else
+		{
+			$this->software->app->log( 'question_rating_missing_forum', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			return FALSE;
+		}
+		
+		if ( isset( $info['member'] ) )
+		{
+			try
+			{
+				$info['member'] = $this->software->app->getLink( $info['member'], 'core_members', TRUE );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'question_rating_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+				return FALSE;
+			}
+		}
+		else
+		{
+			$this->software->app->log( 'question_rating_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			return FALSE;
+		}
+		
+		if ( !isset( $info['rating'] ) )
+		{
+			$this->software->app->log( 'question_rating_missing_rating', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			return FALSE;
+		}
+		else
+		{
+			if ( $info['rating'] >= 1 )
+			{
+				$info['rating'] = 1;
+			}
+			else if ( $info['rating'] <= -1 ) # that always looks so weird
+			{
+				$info['rating'] = -1;
+			}
+			else
+			{
+				$this->software->app->log( 'question_rating_invalid_rating', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+				return FALSE;
+			}
+		}
+		
+		if ( isset( $info['date'] ) )
+		{
+			if ( $info['date'] instanceof \IPS\DateTime )
+			{
+				$info['date'] = $info['date']->getTimestamp();
+			}
+		}
+		else
+		{
+			$info['date'] = time();
+		}
+		
+		if ( $hasId )
+		{
+			$id = $info['id'];
+			unset( $info['id'] );
+		}
+		
+		$inserted_id = \IPS\Db::i()->insert( 'forums_question_ratings', $info, TRUE );
+		
+		if ( $hasId )
+		{
+			$this->software->app->addLink( $inserted_id, $id, 'forums_question_ratings' );
+		}
+		
+		return $inserted_id;
+	}
+	
+	/**
+	 * Convert an Answer Rating
+	 *
+	 * @param	array			$info	Data to insert
+	 * @return	integer|boolean	The ID of the newly inserted rating, or FALSE on failure.
+	 */
+	public function convertForumsAnswerRating( $info=array() )
+	{
+		/* We do not need to store an ID if one is not present */
+		$hasId = TRUE;
+		if ( !isset( $info['id'] ) )
+		{
+			$hasId = FALSE;
+		}
+		
+		/* Everything but the date is required */
+		if ( isset( $info['post'] ) )
+		{
+			try
+			{
+				$info['post'] = $this->software->app->getLink( $info['post'], 'forums_posts' );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'answer_rating_missing_answer', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+				return FALSE;
+			}
+		}
+		else
+		{
+			$this->software->app->log( 'answer_rating_missing_answer', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			return FALSE;
+		}
+		
+		if ( isset( $info['member'] ) )
+		{
+			try
+			{
+				$info['member'] = $this->software->app->getLink( $info['member'], 'core_members', TRUE );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'answer_rating_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+				return FALSE;
+			}
+		}
+		else
+		{
+			$this->software->app->log( 'answer_rating_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			return FALSE;
+		}
+		
+		if ( !isset( $info['rating'] ) )
+		{
+			$this->software->app->log( 'answer_rating_missing_rating', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			return FALSE;
+		}
+		else
+		{
+			if ( $info['rating'] >= 1 )
+			{
+				$info['rating'] = 1;
+			}
+			else if ( $info['rating'] <= -1 )
+			{
+				$info['rating'] = -1;
+			}
+			else
+			{
+				$this->software->app->log( 'answer_rating_invalid_rating', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+				return FALSE;
+			}
+		}
+		
+		if ( isset( $info['date'] ) )
+		{
+			if ( $info['date'] instanceof \IPS\DateTime )
+			{
+				$info['date'] = $info['date']->getTimestamp();
+			}
+		}
+		else
+		{
+			$info['date'] = time();
+		}
+		
+		if ( isset( $info['topic'] ) )
+		{
+			try
+			{
+				$info['topic'] = $this->software->app->getLink( $info['topic'], 'forums_topics' );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$this->software->app->log( 'answer_rating_missing_topic', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+				return FALSE;
+			}
+		}
+		else
+		{
+			$this->software->app->log( 'answer_rating_missing_topic', __METHOD__, \IPS\convert\App::LOG_WARNING, ( $hasId ) ? $info['id'] : NULL );
+			return FALSE;
+		}
+		
+		if ( $hasId )
+		{
+			$id = $info['id'];
+			unset( $info['id'] );
+		}
+
+		$inserted_id = \IPS\Db::i()->insert( 'forums_answer_ratings', $info, TRUE );
+		
+		if ( $hasId )
+		{
+			$this->software->app->addLink( $inserted_id, $id, 'forums_answer_ratings' );
+		}
+		
+		return $inserted_id;
 	}
 	
 	/**
@@ -1621,9 +1955,9 @@ class Forums extends Core
 	 * @param	NULL|string		$filepath		The path to the attachment files or NULL if loading from the database.
 	 * @param	NULL|string		$filedata		If loading from the database, the content of the Binary column.
 	 * @param	NULL|string		$thumbnailpath	Path to thumbnail image
-	 * @return	bool|int	The ID of the newly inserted attachment, or FALSE on failure.
+	 * @return	boolean|integer	The ID of the newly inserted attachment, or FALSE on failure.
 	 */
-	public function convertAttachment( array $info=array(), array $map=array(), ?string $filepath=NULL, ?string $filedata=NULL, ?string $thumbnailpath=NULL ) : bool|int
+	public function convertAttachment( $info=array(), $map=array(), $filepath=NULL, $filedata=NULL, $thumbnailpath=NULL )
 	{
 		/* The Core Library handles most of this. We just need to make sure forum specific data is set. */
 		$map['id1_type']		= 'forums_topics';
@@ -1631,12 +1965,6 @@ class Forums extends Core
 		$map['id2_type']		= 'forums_posts';
 		$map['id2_from_parent']	= FALSE;
 		$map['location_key']	= 'forums_Forums';
-
-		if( isset( $map['first_post'] ) AND $map['first_post'] === TRUE )
-		{
-			$map['id2_type'] = 'forums_posts_first';
-			unset( $map['first_post'] );
-		}
 		
 		return parent::convertAttachment( $info, $map, $filepath, $filedata, $thumbnailpath );
 	}
@@ -1645,9 +1973,9 @@ class Forums extends Core
 	 * Convert a Club Forum
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted forum, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted forum, or FALSE on failure.
 	 */
-	public function convertClubForum( array $info=array() ) : bool|int
+	public function convertClubForum( $info=array() )
 	{
 		$insertedId = $this->convertForumsForum( $info );
 		if ( $insertedId )
@@ -1661,9 +1989,9 @@ class Forums extends Core
 	 * Convert a Club Topic
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted topic, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted topic, or FALSE on failure.
 	 */
-	public function convertClubTopic( array $info=array() ) : bool|int
+	public function convertClubTopic( $info=array() )
 	{
 		$insertedId = $this->convertForumsTopic( $info );
 		if ( $insertedId )
@@ -1677,9 +2005,9 @@ class Forums extends Core
 	 * Convert a Club Post
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted post, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted post, or FALSE on failure.
 	 */
-	public function convertClubPost( array $info=array() ) : bool|int
+	public function convertClubPost( $info=array() )
 	{
 		$insertedId = $this->convertForumsPost( $info );
 		if ( $insertedId )

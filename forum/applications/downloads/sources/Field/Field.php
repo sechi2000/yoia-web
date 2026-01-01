@@ -13,89 +13,75 @@ namespace IPS\downloads;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use IPS\Application;
-use IPS\CustomField;
-use IPS\Data\Store;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\YesNo;
 use IPS\Lang;
-use IPS\Log;
-use IPS\Member;
-use IPS\Node\Permissions;
-use IPS\Settings;
-use IPS\Theme;
-use ParseError;
-use function defined;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Field Node
  */
-class Field extends CustomField implements Permissions
+class _Field extends \IPS\CustomField implements \IPS\Node\Permissions
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'downloads_cfields';
+	public static $databaseTable = 'downloads_cfields';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'cf_';
+	public static $databasePrefix = 'cf_';
 		
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 
 	/**
 	 * @brief	[CustomField] Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'not_null'	=> 'not_null'
 	);
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'ccfields';
+	public static $nodeTitle = 'ccfields';
 	
 	/**
 	 * @brief	[CustomField] Title/Description lang prefix
 	 */
-	protected static string $langKey = 'downloads_field';
+	protected static $langKey = 'downloads_field';
 
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'downloads_field_';
+	public static $titleLangPrefix = 'downloads_field_';
 	
 	/**
 	 * @brief	[CustomField] Content Table
 	 */
-	public static string $contentDatabaseTable = 'downloads_ccontent';
+	public static $contentDatabaseTable = 'downloads_ccontent';
 	
 	/**
 	 * @brief	[CustomField] Set to TRUE if uploads fields are capable of holding the submitted content for moderation
 	 */
-	public static bool $uploadsCanBeModerated = TRUE;
+	public static $uploadsCanBeModerated = TRUE;
 
 	/**
 	 * @brief	The map of permission columns
 	 */
-	public static array $permissionMap = array(
+	public static $permissionMap = array(
 		'view' 				=> 'view',
 		'edit'				=> 2,
 		'add'               => 3
@@ -104,22 +90,22 @@ class Field extends CustomField implements Permissions
 	/**
 	 * @brief	[Node] App for permission index
 	 */
-	public static ?string $permApp = 'downloads';
+	public static $permApp = 'downloads';
 
 	/**
 	 * @brief	[Node] Type for permission index
 	 */
-	public static ?string $permType = 'fields';
+	public static $permType = 'fields';
 
 	/**
 	 * @brief	[Node] Prefix string that is automatically prepended to permission matrix language strings
 	 */
-	public static string $permissionLangPrefix = 'perm_cfield_';
+	public static $permissionLangPrefix = 'perm_cfield_';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'downloads',
 		'module'	=> 'downloads',
 		'prefix'	=> 'fields_',
@@ -128,36 +114,36 @@ class Field extends CustomField implements Permissions
 	/**
 	 * @brief	[CustomField] Editor Options
 	 */
-	public static array $editorOptions = array( 'app' => 'downloads', 'key' => 'Downloads' );
+	public static $editorOptions = array( 'app' => 'downloads', 'key' => 'Downloads' );
 	
 	/**
 	 * @brief	[CustomField] FileStorage Extension for Upload fields
 	 */
-	public static string $uploadStorageExtension = 'downloads_FileField';
+	public static $uploadStorageExtension = 'downloads_FileField';
 
 	/**
 	 * @brief   [CustomField] An array of the 'keys' of the Field types toggles that shouldn't be an option. The main use is for excluding polls
 	 */
-	public static array $disabledFieldTypes = array( 'Poll' );
+	public static $disabledFieldTypes = array( 'Poll' );
 
 
 	/**
 	 * Get topic format
 	 *
-	 * @return	string|null
+	 * @return	void
 	 */
-	public function get_topic_format() : string|null
+	public function get_topic_format()
 	{
 		return $this->format;
 	}
 
 	/**
 	 *
-	 * [Node] Does the currently logged-in user have permission to edit permissions for this node?
+	 * [Node] Does the currently logged in user have permission to edit permissions for this node?
 	 *
 	 * @return	bool
 	 */
-	public function canManagePermissions() : bool
+	public function canManagePermissions()
 	{
 		return true;
 	}
@@ -165,32 +151,32 @@ class Field extends CustomField implements Permissions
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		parent::form( $form );
 
-
+		
 		unset( $form->elements['']['pf_search_type'] );
 		unset( $form->elements['']['pf_search_type_on_off'] );
-		Member::loggedIn()->language()->words['field_displayoptions'] = Member::loggedIn()->language()->addToStack('pfield_displayoptions');
+		\IPS\Member::loggedIn()->language()->words['field_displayoptions'] = \IPS\Member::loggedIn()->language()->addToStack('pfield_displayoptions');
 
-		$form->add( new Radio( 'downloads_field_location', $this->id ? $this->display_location : 'below', FALSE, array( 'options' => array( 'sidebar' => 'idm_cfield_sidebar', 'below' => 'idm_cfield_below', 'tab' => 'idm_cfield_tab' ) ), NULL, NULL, NULL, 'idm_field_location' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'downloads_field_location', $this->id ? $this->display_location : 'below', FALSE, array( 'options' => array( 'sidebar' => 'idm_cfield_sidebar', 'below' => 'idm_cfield_below', 'tab' => 'idm_cfield_tab' ) ), NULL, NULL, NULL, 'idm_field_location' ) );
 
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->idm_nexus_on )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->idm_nexus_on )
 		{
-			$form->add( new YesNo( 'downloads_field_paid', $this->id ? $this->paid_field : FALSE, FALSE, array( 'togglesOff' => array( 'idm_cf_topic', 'idm_pf_format', 'form_' . ( $this->id ?? 'new' ) . '_header_category_forums_integration' ) ) ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'downloads_field_paid', $this->id ? $this->paid_field : FALSE, FALSE, array( 'togglesOff' => array( 'idm_cf_topic', 'idm_pf_format', 'form_' . ( $this->id ?? 'new' ) . '_header_category_forums_integration' ) ) ) );
 		}
 
-		if ( Application::appIsEnabled( 'forums' ) )
+		if ( \IPS\Application::appIsEnabled( 'forums' ) )
 		{
 			$form->addHeader('category_forums_integration');
-			$form->add( new YesNo( 'cf_topic', $this->topic, FALSE, array(), NULL, NULL, NULL, 'idm_cf_topic' ) );
-			$form->add( new TextArea( 'pf_format', $this->id ? $this->topic_format : '', FALSE, array(), NULL, NULL, NULL, 'idm_pf_format' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'cf_topic', $this->topic, FALSE, array(), NULL, NULL, NULL, 'idm_cf_topic' ) );
+			$form->add( new \IPS\Helpers\Form\TextArea( 'pf_format', $this->id ? $this->topic_format : '', FALSE, array(), NULL, NULL, NULL, 'idm_pf_format' ) );
 
-			Member::loggedIn()->language()->words['pf_format_desc'] = Member::loggedIn()->language()->addToStack('cf_format_desc');
+			\IPS\Member::loggedIn()->language()->words['pf_format_desc'] = \IPS\Member::loggedIn()->language()->addToStack('cf_format_desc');
 		}
 	}
 	
@@ -200,9 +186,9 @@ class Field extends CustomField implements Permissions
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
-		if ( Application::appIsEnabled( 'forums' ) AND isset( $values['cf_topic'] ) )
+		if ( \IPS\Application::appIsEnabled( 'forums' ) AND isset( $values['cf_topic'] ) )
 		{
 			/* Forcibly disable include in topic option if it is a paid field */
 			$values['topic'] = ( isset( $values['downloads_field_paid'] ) AND $values['downloads_field_paid'] ) ? 0 : $values['cf_topic'];
@@ -223,16 +209,16 @@ class Field extends CustomField implements Permissions
 	/**
 	 * Get output for API
 	 *
-	 * @param Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @param	array				$fieldValues		Current values for a specific file
 	 * @return	array
-	 * @apiresponse	int			id				ID number
-	 * @apiresponse	string		name			Name
-	 * @apiresponse	string		description		Description
-	 * @apiresponse	string		value			Current value for this file
-	 * @apiresponse	string|int|array|boolean		displayValue		Parsed Field value with all field data
+	 * @apiresponse	int			id								ID number
+	 * @apiresponse	string		name							Name
+	 * @apiresponse	string		description						Description
+	 * @apiresponse	string		value							Raw field value from the database
+	 * @apiresponse string|int|array|boolean	displayValue	Parsed Field value with all field data
 	 */
-	public function apiOutput( ?Member $authorizedMember = NULL, array $fieldValues=array() ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL, $fieldValues=array() )
 	{
 		$lang = $authorizedMember ? $authorizedMember->language() : Lang::load( Lang::defaultLanguage() );
 		return [
@@ -242,51 +228,5 @@ class Field extends CustomField implements Permissions
 			'value' => $fieldValues[ 'field_' . $this->id ] ?? null,
 			'displayValue' => $this->apiValue( $fieldValues[ 'field_' . $this->id ] )
 		];
-	}
-
-	/**
-	 * Parse the HTML logic to format the field
-	 *
-	 * @param	string	$rawValue	Raw value
-	 * @param	File	$file
-	 * @return	string
-	 */
-	public function formatValue( string $rawValue, File $file ) : string
-	{
-		/* If we are using the "default" formatting, set that up now */
-		$template = $this->format ?: "<strong><span data-ips-font-size=\"90\">{title} </span></strong> {content}";
-		$template = str_replace( [ '{title}', '{content}' ], [ "{\$title}", "{\$content}" ], $template );
-
-		try
-		{
-			$functionName = 'downloadsfields_cc_' .  md5( $template );
-
-			if ( ! isset( Store::i()->$functionName ) )
-			{
-				/* We need the "raw" content because HTML is typically used to format the value */
-				$template = str_replace( '{$processedContent}', '{$processedContent|raw}', $template );
-
-				/* If this an editor, we can safely use the |raw value as it is clean, otherwise the escaped value will display which is not what the user expects */
-				if ( $this->type == 'Editor' )
-				{
-					$template = str_replace( '{$content}', '{$content|raw}', $template );
-					$template = Theme::i()->getTemplate('global', 'core', 'global')->richText( $template );
-				}
-
-				/* $content is the raw content from the database, $processedContent is the parsed content ready for display */
-				Store::i()->$functionName = Theme::compileTemplate( $template, $functionName, '$title, $content, $processedContent, $file' );
-			}
-
-			Theme::runProcessFunction( Store::i()->$functionName, $functionName );
-
-			$themeFunction = 'IPS\\Theme\\'. $functionName;
-			return $themeFunction( Member::loggedIn()->language()->addToStack( static::$langKey . '_' . $this->id ), $rawValue, $this->displayValue( $rawValue ), $file );
-		}
-		catch ( ParseError $e )
-		{
-			@ob_end_clean();
-			Log::log( $e, 'pfield_error' );
-			return (string) $this->displayValue( $rawValue );
-		}
 	}
 }

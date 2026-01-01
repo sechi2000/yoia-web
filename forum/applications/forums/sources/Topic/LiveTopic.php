@@ -12,14 +12,9 @@
 namespace IPS\forums\Topic;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -38,13 +33,13 @@ trait LiveTopic
 	 */
 	public function getLiveTopic(): ?\IPS\cloud\LiveTopic
 	{
-		if ( Application::appIsEnabled( 'cloud' ) )
+		if ( \IPS\Application::appIsEnabled( 'cloud' ) )
 		{
 			try
 			{
 				return \IPS\cloud\LiveTopic::load( $this->tid, 'topic_topic_id' );
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException )
 			{
 				return NULL;
 			}

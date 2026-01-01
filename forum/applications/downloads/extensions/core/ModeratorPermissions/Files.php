@@ -12,32 +12,20 @@
 namespace IPS\downloads\extensions\core\ModeratorPermissions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\ModeratorPermissionsAbstract;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Moderator Permissions
  */
-class Files extends ModeratorPermissionsAbstract
+class _Files
 {
-	public function getPermissions( array $toggles ): array
-	{
-		/* Leave this empty because we are going to just add to the existing Downloads tab */
-		return [];
-	}
-
-
 	/**
 	 * Get Permissions
 	 *
-	 * @param array $toggles
 	 * @code
 	 	return array(
 	 		'key'	=> 'YesNo',	// Can just return a string with type
@@ -52,11 +40,34 @@ class Files extends ModeratorPermissionsAbstract
 	 * @endcode
 	 * @return	array
 	 */
-	public function getContentPermissions( array $toggles ): array
+	public function getPermissions()
 	{
 		return array(
 			'can_make_purchasable'		=> 'YesNo',
 			'can_make_unpurchasable'	=> 'YesNo'
 		);
+	}
+	
+	/**
+	 * After change
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @param	array	$changed	Values that were changed
+	 * @return	void
+	 */
+	public function onChange( $moderator, $changed )
+	{
+		
+	}
+	
+	/**
+	 * After delete
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @return	void
+	 */
+	public function onDelete( $moderator )
+	{
+		
 	}
 }

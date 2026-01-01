@@ -12,56 +12,38 @@
 namespace IPS\nexus\modules\front\clients;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\MFA\MFAHandler;
-use IPS\nexus\Customer;
-use IPS\nexus\Customer\Address;
-use IPS\nexus\Tax;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Addresses
  */
-class addresses extends Controller
+class _addresses extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		if ( !Member::loggedIn()->member_id )
+		if ( !\IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->error( 'no_module_permission_guest', '2X235/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission_guest', '2X235/1', 403, '' );
 		}
 		
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_forms.js', 'nexus', 'global' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'clients.css', 'nexus' ) );
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=nexus&module=clients&controller=addresses', 'front', 'clientsaddresses' ), Member::loggedIn()->language()->addToStack('client_addresses') );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('client_addresses');
-		Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_forms.js', 'nexus', 'global' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'clients.css', 'nexus' ) );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=addresses', 'front', 'clientsaddresses' ), \IPS\Member::loggedIn()->language()->addToStack('client_addresses') );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('client_addresses');
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
 		
-		if ( $output = MFAHandler::accessToArea( 'nexus', 'Addresses', Url::internal( 'app=nexus&module=clients&controller=addresses', 'front', 'clientsaddresses' ) ) )
+		if ( $output = \IPS\MFA\MFAHandler::accessToArea( 'nexus', 'Addresses', \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=addresses', 'front', 'clientsaddresses' ) ) )
 		{
-			Output::i()->output = Theme::i()->getTemplate('clients')->addresses( NULL, NULL, array() ) . $output;
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->addresses( NULL, NULL, array() ) . $output;
 			return;
 		}
 		
@@ -73,10 +55,11 @@ class addresses extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$addresses = new ActiveRecordIterator( Db::i()->select( '*', 'nexus_customer_addresses', array( '`member`=?', Member::loggedIn()->member_id ) ), 'IPS\nexus\Customer\Address' );
+		$addresses = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_customer_addresses', array( '`member`=?', \IPS\Member::loggedIn()->member_id ) ), 'IPS\nexus\Customer\Address' );
 
+		$shippingAddress = NULL;
 		$billingAddress = NULL;
 		$otherAddresses = array();
 
@@ -86,13 +69,19 @@ class addresses extends Controller
 			{
 				$billingAddress = $address;
 			}
-			else
+
+			if( $address->primary_shipping )
+			{
+				$shippingAddress = $address;
+			}
+
+			if( !$address->primary_shipping && !$address->primary_billing )
 			{
 				$otherAddresses[] = $address;
 			}
 		}
 
-		Output::i()->output = Theme::i()->getTemplate('clients')->addresses( $billingAddress, $otherAddresses );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->addresses( $billingAddress, $shippingAddress, $otherAddresses );
 	}
 	
 	/**
@@ -100,27 +89,27 @@ class addresses extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function form() : void
+	protected function form()
 	{
 		$existing = NULL;
-		if ( isset( Request::i()->id ) )
+		if ( isset( \IPS\Request::i()->id ) )
 		{
 			try
 			{
-				$existing = Address::load( Request::i()->id );
-				if ( $existing->member->member_id != Member::loggedIn()->member_id )
+				$existing = \IPS\nexus\Customer\Address::load( \IPS\Request::i()->id );
+				if ( $existing->member->member_id != \IPS\Member::loggedIn()->member_id )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException $e )
 			{
 				$existing = NULL;
 			}
 		}
 		
 		$needTaxStatus = NULL;
-		foreach ( Tax::roots() as $tax )
+		foreach ( \IPS\nexus\Tax::roots() as $tax )
 		{
 			if ( $tax->type === 'eu' )
 			{
@@ -135,40 +124,41 @@ class addresses extends Controller
 		$addressHelperClass = $needTaxStatus ? 'IPS\nexus\Form\BusinessAddress' : 'IPS\Helpers\Form\Address';
 		$addressHelperOptions = ( $needTaxStatus === 'eu' ) ? array( 'vat' => TRUE ) : array();
 
-		$form = new Form;
-		$form->add( new $addressHelperClass( 'address', $existing?->address, TRUE, $addressHelperOptions ) );
+		$form = new \IPS\Helpers\Form;		
+		$form->add( new $addressHelperClass( 'address', $existing ? $existing->address : NULL, TRUE, $addressHelperOptions ) );
 		
 		if ( $values = $form->values() )
 		{
 			if ( !$existing )
 			{
-				$existing = new Address;
-				$existing->member = Member::loggedIn();
-				$existing->primary_billing = !Db::i()->select( 'count(*)', 'nexus_customer_addresses', array( '`member`=? AND primary_billing=1', Member::loggedIn()->member_id ) )->first();
-
-				Customer::loggedIn()->log( 'address', array( 'type' => 'add', 'details' => json_encode( $values['address'] ) ) );
+				$existing = new \IPS\nexus\Customer\Address;
+				$existing->member = \IPS\Member::loggedIn();
+				$existing->primary_billing = !\IPS\Db::i()->select( 'count(*)', 'nexus_customer_addresses', array( '`member`=? AND primary_billing=1', \IPS\Member::loggedIn()->member_id ) )->first();
+				$existing->primary_shipping = !\IPS\Db::i()->select( 'count(*)', 'nexus_customer_addresses', array( '`member`=? AND primary_shipping=1', \IPS\Member::loggedIn()->member_id ) )->first();
+				
+				\IPS\nexus\Customer::loggedIn()->log( 'address', array( 'type' => 'add', 'details' => json_encode( $values['address'] ) ) );
 			}
 			else
 			{
-				Customer::loggedIn()->log( 'address', array( 'type' => 'edit', 'new' => json_encode( $values['address'] ), 'old' => json_encode( $existing->address ) ) );
+				\IPS\nexus\Customer::loggedIn()->log( 'address', array( 'type' => 'edit', 'new' => json_encode( $values['address'] ), 'old' => json_encode( $existing->address ) ) );
 			}
 			
 			$existing->address = $values['address'];
 			$existing->save();
 			
-			Request::i()->setCookie( 'location', NULL );
+			\IPS\Request::i()->setCookie( 'location', NULL );
 			
-			Output::i()->redirect( Url::internal( 'app=nexus&module=clients&controller=addresses', 'front', 'clientsaddresses' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=addresses', 'front', 'clientsaddresses' ) );
 		}
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			$form->class = 'ipsForm--vertical ipsForm--edit-address ipsForm--noLabels';
-			Output::i()->sendOutput( $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) ) );
+			$form->class = 'ipsForm_vertical ipsForm_noLabels';
+			\IPS\Output::i()->sendOutput( $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) ) );
 		}
 		else
 		{
-			Output::i()->output = $form;
+			\IPS\Output::i()->output = $form;	
 		}		
 	}
 	
@@ -177,27 +167,28 @@ class addresses extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function primary() : void
+	protected function primary()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		try
 		{
-			$address = Address::load( Request::i()->id );
-			if ( $address->member->member_id == Member::loggedIn()->member_id )
+			$address = \IPS\nexus\Customer\Address::load( \IPS\Request::i()->id );
+			if ( $address->member->member_id == \IPS\Member::loggedIn()->member_id )
 			{
-				Db::i()->update( 'nexus_customer_addresses', array( 'primary_billing' => 0 ), array( '`member`=?', Member::loggedIn()->member_id ) );
-				$address->primary_billing = TRUE;
+				$field = \IPS\Request::i()->primary === 'billing' ? 'primary_billing' : 'primary_shipping';
+				\IPS\Db::i()->update( 'nexus_customer_addresses', array( $field => 0 ), array( '`member`=?', \IPS\Member::loggedIn()->member_id ) );
+				$address->$field = TRUE;
 				$address->save();
 				
-				Customer::loggedIn()->log( 'address', array( 'type' => 'primary_billing', 'details' => json_encode( $address->address ) ) );
+				\IPS\nexus\Customer::loggedIn()->log( 'address', array( 'type' => ( \IPS\Request::i()->primary === 'billing' ? 'primary_billing' : 'primary_shipping' ), 'details' => json_encode( $address->address ) ) );
 			}
 		}
-		catch ( OutOfRangeException ) {}
+		catch ( \OutOfRangeException $e ) {}
 		
-		Request::i()->setCookie( 'location', NULL );
+		\IPS\Request::i()->setCookie( 'location', NULL );
 
-		Output::i()->redirect( Url::internal( 'app=nexus&module=clients&controller=addresses', 'front', 'clientsaddresses' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=addresses', 'front', 'clientsaddresses' ) );
 	}
 	
 	/**
@@ -205,24 +196,24 @@ class addresses extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 		
 		try
 		{
-			$address = Address::load( Request::i()->id );
-			if ( $address->member->member_id == Member::loggedIn()->member_id )
+			$address = \IPS\nexus\Customer\Address::load( \IPS\Request::i()->id );
+			if ( $address->member->member_id == \IPS\Member::loggedIn()->member_id )
 			{
 				$address->delete();
-				Customer::loggedIn()->log( 'address', array( 'type' => 'delete', 'details' => json_encode( $address->address ) ) );
+				\IPS\nexus\Customer::loggedIn()->log( 'address', array( 'type' => 'delete', 'details' => json_encode( $address->address ) ) );
 			}
 		}
-		catch ( OutOfRangeException ) {}
+		catch ( \OutOfRangeException $e ) {}
 
-		Output::i()->redirect( Url::internal( 'app=nexus&module=clients&controller=addresses', 'front', 'clientsaddresses' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=addresses', 'front', 'clientsaddresses' ) );
 	}
 }

@@ -11,37 +11,16 @@
 namespace IPS\core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\convert\App;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Email;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Patterns\ActiveRecord;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function method_exists;
-use function strlen;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Block
  */
-abstract class AdminNotification extends ActiveRecord
+abstract class _AdminNotification extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	Dynamic severity
@@ -112,29 +91,29 @@ abstract class AdminNotification extends ActiveRecord
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons = array();
+	protected static $multitons = array();
 	
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'acpNotifications', 'acpNotificationIds' );
+	protected $caches = array( 'acpNotifications', 'acpNotificationIds' );
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_acp_notifications';
+	public static $databaseTable = 'core_acp_notifications';
 	
 	/**
 	 * Get Number of Notifications
 	 *
-	 * @param	Member|NULL	$member		The member viewing, or NULL for currently logged in
+	 * @param	\IPS\Member|NULL	$member		The member viewing, or NULL for currently logged in
 	 * @param	array				$severities	The severities
 	 * @return	int
 	 */
-	public static function notificationCount( Member $member = NULL, array $severities = array( 'dynamic', 'optional', 'normal', 'high', 'critical' ) ) : int
+	public static function notificationCount( \IPS\Member $member = NULL, $severities = array( 'dynamic', 'optional', 'normal', 'high', 'critical' ) )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		$notificationIds = static::notificationIdsForMember( $member );
 				
 		$return = 0;
@@ -153,7 +132,7 @@ abstract class AdminNotification extends ActiveRecord
 			}
 			else
 			{
-				$return += count( $notificationIds[ $s ] );
+				$return += \count( $notificationIds[ $s ] );
 			}
 		}
 						
@@ -163,20 +142,20 @@ abstract class AdminNotification extends ActiveRecord
 	/**
 	 * Get Notifications that a particular member can see by severity
 	 *
-	 * @param	Member|NULL	$member		The member viewing, or NULL for currently logged in
+	 * @param	\IPS\Member|NULL	$member		The member viewing, or NULL for currently logged in
 	 * @param	array				$severities	The severities
-	 * @return array
+	 * @return	int
 	 */
-	public static function notifications( Member $member = NULL, array $severities = array( 'dynamic', 'optional', 'normal', 'high', 'critical' ) ) : array
+	public static function notifications( \IPS\Member $member = NULL, $severities = array( 'dynamic', 'optional', 'normal', 'high', 'critical' ) )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		$notificationIds = static::notificationIdsForMember( $member );
 		
 		$return = array();
 		foreach ( static::allNotifications() as $notification )
 		{
 			$severity = $notification->severity();
-			if ( in_array( $severity, $severities ) and in_array( $notification->id, $notificationIds[ $severity ] ) and ( $severity !== static::SEVERITY_DYNAMIC or $notification->dynamicShow( $member ) ) )
+			if ( \in_array( $severity, $severities ) and \in_array( $notification->id, $notificationIds[ $severity ] ) and ( $severity !== static::SEVERITY_DYNAMIC or $notification->dynamicShow( $member ) ) )
 			{
 				/* Check if this notification should dismiss itself first */
 				if ( $notification->selfDismiss() )
@@ -195,32 +174,32 @@ abstract class AdminNotification extends ActiveRecord
 	/**
 	 * Get Cached IDs of Notifications that a particular member can see by severity
 	 *
-	 * @param	Member	$member		The member
-	 * @return	array
+	 * @param	\IPS\Member|NULL	$member		The member
+	 * @return	int
 	 */
-	protected static function notificationIdsForMember( Member $member ) : array
+	protected static function notificationIdsForMember( \IPS\Member $member )
 	{
-		if ( !isset( Store::i()->acpNotificationIds ) or !isset( Store::i()->acpNotificationIds[ $member->member_id ] ) )
+		if ( !isset( \IPS\Data\Store::i()->acpNotificationIds ) or !isset( \IPS\Data\Store::i()->acpNotificationIds[ $member->member_id ] ) )
 		{
 			/* Init */
-			$data = isset( Store::i()->acpNotificationIds ) ? Store::i()->acpNotificationIds : array();
+			$data = isset( \IPS\Data\Store::i()->acpNotificationIds ) ? \IPS\Data\Store::i()->acpNotificationIds : array();
 			$data[ $member->member_id ] = array( static::SEVERITY_DYNAMIC => array(), static::SEVERITY_OPTIONAL => array(), static::SEVERITY_NORMAL => array(), static::SEVERITY_HIGH => array(), static::SEVERITY_CRITICAL => array() );
 			
 			/* Get our preferences */
-			$preferences = iterator_to_array( Db::i()->select( '*', 'core_acp_notifications_preferences', array( '`member`=?', $member->member_id ) )->setKeyField('type') );
+			$preferences = iterator_to_array( \IPS\Db::i()->select( '*', 'core_acp_notifications_preferences', array( '`member`=?', $member->member_id ) )->setKeyField('type') );
 			
 			/* Get our dismissals */
 			$dismissals = array();
-			foreach ( Db::i()->select( '*', 'core_acp_notifcations_dismissals', array( '`member`=?', $member->member_id ) ) as $row )
+			foreach ( \IPS\Db::i()->select( '*', 'core_acp_notifcations_dismissals', array( '`member`=?', $member->member_id ) ) as $row )
 			{
 				$dismissals[ $row['notification'] ] = $row['time'];
 			}
 			
 			/* Loop through them */
-			foreach ( static::allNotifications() as $notification )
+			foreach ( static::allNotifications( $member ) as $notification )
 			{
 				/* Check we want to see it if it's optional */
-				$exploded = explode( '\\', get_class( $notification ) );
+				$exploded = explode( '\\', \get_class( $notification ) );
 				$key = "{$exploded[1]}_{$exploded[5]}";
 				$view = isset( $preferences[ $key ] ) ? $preferences[ $key ]['view'] : $notification::defaultValue();
 				if ( !$view )
@@ -233,7 +212,7 @@ abstract class AdminNotification extends ActiveRecord
 				{
 					if ( $notification->dismissible() === static::DISMISSIBLE_TEMPORARY and $dismissals[ $notification->id ] < ( time() - 86400 ) )
 					{
-						Db::i()->delete( 'core_acp_notifcations_dismissals', array( 'notification=? AND `member`=?', $notification->id, $member->member_id ) );
+						\IPS\Db::i()->delete( 'core_acp_notifcations_dismissals', array( 'notification=? AND `member`=?', $notification->id, $member->member_id ) );
 					}
 					elseif ( $notification->dismissible() === static::DISMISSIBLE_UNTIL_RECUR and $dismissals[ $notification->id ] < $notification->sent->getTimestamp() )
 					{
@@ -252,10 +231,10 @@ abstract class AdminNotification extends ActiveRecord
 				}
 			}
 			
-			Store::i()->acpNotificationIds = $data;
+			\IPS\Data\Store::i()->acpNotificationIds = $data;
 		}
 		
-		return Store::i()->acpNotificationIds[ $member->member_id ];
+		return \IPS\Data\Store::i()->acpNotificationIds[ $member->member_id ];
 	}
 	
 	/**
@@ -263,28 +242,28 @@ abstract class AdminNotification extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	protected static function allNotifications() : array
+	protected static function allNotifications()
 	{
-		if ( !isset( Store::i()->acpNotifications ) )
+		if ( !isset( \IPS\Data\Store::i()->acpNotifications ) )
 		{
-			Store::i()->acpNotifications = iterator_to_array( Db::i()->select( '*', 'core_acp_notifications', NULL, 'sent DESC' ) );
+			\IPS\Data\Store::i()->acpNotifications = iterator_to_array( \IPS\Db::i()->select( '*', 'core_acp_notifications', NULL, 'sent DESC' ) );
 		}		
 				
 		$notifications = array();
-		foreach ( Store::i()->acpNotifications as $notification )
+		foreach ( \IPS\Data\Store::i()->acpNotifications as $notification )
 		{
-			if( Application::appIsEnabled( $notification['app'] ) )
+			if ( \IPS\Application::appIsEnabled( $notification['app'] ) )
 			{
-				try
+				$notificationObject = \IPS\core\AdminNotification::constructFromData( $notification );
+
+				if( $notificationObject )
 				{
-					$class = Application::getExtensionClass( $notification['app'], 'AdminNotifications', IPS::mb_ucfirst( $notification['ext'] ) );
-					$notificationObject = static::constructFromData( $notification );
-					$notifications[$notificationObject->id] = $notificationObject;
+					$notifications[ $notificationObject->id ] = $notificationObject;
 				}
-				catch( OutOfRangeException )
+				else
 				{
 					/* Remove orphan entry */
-					Db::i()->delete( 'core_acp_notifications', ['id=?', $notification['id']] );
+					\IPS\Db::i()->delete( 'core_acp_notifications', array( 'id=?', $notification['id'] ) );
 				}
 			}
 		}
@@ -297,21 +276,10 @@ abstract class AdminNotification extends ActiveRecord
 	 * @param	string		$app		Application key
 	 * @param	string		$extension	Extension key
 	 * @param	string|null	$extra		Any additional information
-	 * @param	bool		$forceRebuild	Force a rebuild of the cache; used primarily for sending, not removing
-	 * @return	static|null
+	 * @return	void
 	 */
-	public static function find( string $app, string $extension, ?string $extra = NULL, bool $forceRebuild=true ) : ?static
+	public static function find( $app, $extension, $extra = NULL )
 	{
-		/* Drop the cache before we search, to ensure that we have the latest data */
-		if( $forceRebuild )
-		{
-			try
-			{
-				unset( Store::i()->acpNotifications );
-			}
-			catch( OutOfRangeException ){}
-		}
-
 		foreach ( static::allNotifications() as $notification )
 		{
 			if ( $notification->app === $app and $notification->ext === $extension and $notification->extra === $extra )
@@ -330,11 +298,10 @@ abstract class AdminNotification extends ActiveRecord
 	 * @param	string|null			$extra				Any additional information which persists if the notification is resent
 	 * @param	bool|null			$resend				If an existing notification exists, it will be bumped / resent
 	 * @param	mixed				$extraForEmail		Any additional information specific to this instance which is used for the email but not saved
-	 * @param	bool|Member	$bypassEmail		If TRUE, no email will be sent, regardless of admin preferences - or if a member object, that admin will be skipped. Should only be used if the action is initiated by an admin making an email unnecessary
-	 * @param	array				$additionalData		Any additional data to save to the notification
+	 * @param	bool|\IPS\Member	$bypassEmail		If TRUE, no email will be sent, regardless of admin preferences - or if a member object, that admin will be skipped. Should only be used if the action is initiated by an admin making an email unnecessary 
 	 * @return	void
 	 */
-	public static function send( string $app, string $extension, ?string $extra = NULL, ?bool $resend = TRUE, mixed $extraForEmail = NULL, bool|Member $bypassEmail = FALSE, array $additionalData = [] ) : void
+	public static function send( $app, $extension, $extra = NULL, $resend = TRUE, $extraForEmail = NULL, $bypassEmail = FALSE )
 	{
 		/* Create or update */
 		if ( $notification = static::find( $app, $extension, $extra ) )
@@ -347,18 +314,13 @@ abstract class AdminNotification extends ActiveRecord
 		}
 		else
 		{
-			try
-			{
-				$classname = Application::getExtensionClass( $app, 'AdminNotifications', IPS::mb_ucfirst( $extension ) );
-				$notification = new $classname;
-				$notification->app = $app;
-				$notification->ext = $extension;
-				$notification->extra = $extra;
-				$notification->additionalData = $additionalData;
+			$classname = 'IPS\\' . $app . '\extensions\core\AdminNotifications\\' . mb_ucfirst( $extension );
+			$notification = new $classname;
+			$notification->app = $app;
+			$notification->ext = $extension;
+			$notification->extra = $extra;
 
-				unset( Store::i()->acpNotifications );
-			}
-			catch( OutOfRangeException ){}
+			unset( \IPS\Data\Store::i()->acpNotifications );
 		}		
 		
 		/* Is this a new notification? */
@@ -368,7 +330,7 @@ abstract class AdminNotification extends ActiveRecord
 		}
 				
 		/* Get where clause for email notifications */		
-		$exploded = explode( '\\', get_class( $notification ) );
+		$exploded = explode( '\\', \get_class( $notification ) );
 		$key = "{$exploded[1]}_{$exploded[5]}";
 		$where = array( array( 'type=?', $key ) );
 		$where[] = $notification->emailWhereClause( $extraForEmail );
@@ -381,12 +343,12 @@ abstract class AdminNotification extends ActiveRecord
 		{
 			/* Work out if we need to email this to anyone */
 			$emailRecipients = array();
-			foreach ( Db::i()->select( '`member`', 'core_acp_notifications_preferences', $where ) as $memberId )
+			foreach ( \IPS\Db::i()->select( '`member`', 'core_acp_notifications_preferences', $where ) as $memberId )
 			{
-				$member = Member::load( $memberId );
+				$member = \IPS\Member::load( $memberId );
 				if ( $member->member_id and $notification->visibleTo( $member ) )
 				{
-					if ( !( $bypassEmail instanceof Member ) or $bypassEmail->member_id !== $member->member_id )
+					if ( !( $bypassEmail instanceof \IPS\Member ) or $bypassEmail->member_id !== $member->member_id )
 					{
 						$emailRecipients[] = $member;
 					}
@@ -394,10 +356,10 @@ abstract class AdminNotification extends ActiveRecord
 			}
 											
 			/* And if we do, do it */
-			if ( count( $emailRecipients ) )
+			if ( \count( $emailRecipients ) )
 			{
-				$email = Email::buildFromTemplate( $exploded[1], 'acp_notification_' . $exploded[5], array( $notification, $extraForEmail ), Email::TYPE_TRANSACTIONAL );
-				$email->setUnsubscribe( 'core', 'unsubscribeAcpNotification', array( get_class( $notification ) ) );
+				$email = \IPS\Email::buildFromTemplate( $exploded[1], 'acp_notification_' . $exploded[5], array( $notification, $extraForEmail ), \IPS\Email::TYPE_TRANSACTIONAL );
+				$email->setUnsubscribe( 'core', 'unsubscribeAcpNotification', array( \get_class( $notification ) ) );
 				foreach ( $emailRecipients as $member )
 				{
 					$email->send( $member );
@@ -412,12 +374,12 @@ abstract class AdminNotification extends ActiveRecord
 	 * @param	string				$app		Application key
 	 * @param	string				$extension	Extension key
 	 * @param	string|null			$extra		Any additional information
-	 * @param	DateTime|null	$newTime		If provided, rather than deleting the notification, it will modify it's sent time to the specified time
+	 * @param	\IPS\DateTime|null	$newTime		If provided, rather than deleting the notification, it will modify it's sent time to the specified time
 	 * @return	void
 	 */
-	public static function remove( string $app, string $extension, ?string $extra = NULL, ?DateTime $newTime = NULL ) : void
+	public static function remove( $app, $extension, $extra = NULL, \IPS\DateTime $newTime = NULL )
 	{
-		if ( $notification = static::find( $app, $extension, $extra, false ) )
+		if ( $notification = static::find( $app, $extension, $extra ) )
 		{
 			if ( $newTime )
 			{
@@ -434,37 +396,42 @@ abstract class AdminNotification extends ActiveRecord
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    ActiveRecord
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static|false
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): ActiveRecord
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE ): static|false
 	{
-		$classname = Application::getExtensionClass( $data['app'], 'AdminNotifications', IPS::mb_ucfirst( $data['ext'] ) );
+		$classname = 'IPS\\' . $data['app'] . '\extensions\core\AdminNotifications\\' . mb_ucfirst( $data['ext'] );
+
+		if( !class_exists( $classname ) )
+		{
+			return false;
+		}
 
 		/* Initiate an object */
 		$obj = new $classname;
 		$obj->_new = FALSE;
-
+		
 		/* Import data */
-		$databasePrefixLength = strlen( static::$databasePrefix );
+		$databasePrefixLength = \strlen( static::$databasePrefix );
 		foreach ( $data as $k => $v )
 		{
 			if( static::$databasePrefix AND mb_strpos( $k, static::$databasePrefix ) === 0 )
 			{
-				$k = substr( $k, $databasePrefixLength );
+				$k = \substr( $k, $databasePrefixLength );
 			}
 
 			$obj->_data[ $k ] = $v;
 		}
 		$obj->changed = array();
-
+		
 		/* Init */
 		if ( method_exists( $obj, 'init' ) )
 		{
 			$obj->init();
 		}
-
+				
 		/* Return */
 		return $obj;
 	}
@@ -474,64 +441,43 @@ abstract class AdminNotification extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->sent = time();
 	}
-
-	/**
-	 * Set Additional Data
-	 *
-	 * @param $data
-	 * @return void
-	 */
-	public function set_additionalData( $data ): void
-	{
-		$this->_data['additional_data'] = json_encode( $data );
-	}
-
-	/**
-	 * Get Additional Data
-	 *
-	 * @return array
-	 */
-	public function get_additionalData(): array
-	{
-		return $this->_data['additional_data'] ? json_decode( $this->_data['additional_data'], TRUE ) : [];
-	}
-
+	
 	/**
 	 * Get sent time
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_sent() : DateTime
+	public function get_sent()
 	{
-		return DateTime::ts( $this->_data['sent'] );
+		return \IPS\DateTime::ts( $this->_data['sent'] );
 	}
 	
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'other';
+	public static $group = 'other';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 5;
+	public static $groupPriority = 5;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 3;
+	public static $itemPriority = 3;
 	
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ) : bool
+	public static function permissionCheck( \IPS\Member $member )
 	{
 		return TRUE;
 	}
@@ -541,15 +487,18 @@ abstract class AdminNotification extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	abstract public static function settingsTitle() : string;
+	public static function settingsTitle()
+	{
+		return \get_class(); // This is intended to be abstract but PHP 5.6 won't let you have abstract static functions
+	}
 		
 	/**
 	 * Can a member view this notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public function visibleTo( Member $member ) : bool
+	public function visibleTo( \IPS\Member $member )
 	{
 		return static::permissionCheck( $member );
 	}
@@ -558,10 +507,10 @@ abstract class AdminNotification extends ActiveRecord
 	 * For dynamic notifications: should this show for this member?
 	 *
 	 * @note	This is checked every time the notification shows. Should be lightweight.
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public function dynamicShow( Member $member ) : bool
+	public function dynamicShow( \IPS\Member $member )
 	{
 		return FALSE;
 	}
@@ -572,7 +521,7 @@ abstract class AdminNotification extends ActiveRecord
 	 * @note	This is checked every time the notification shows. Should be lightweight.
 	 * @return	bool
 	 */
-	public function selfDismiss() : bool
+	public function selfDismiss()
 	{
 		return FALSE;
 	}
@@ -582,7 +531,7 @@ abstract class AdminNotification extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public static function defaultValue() : bool
+	public static function defaultValue()
 	{
 		return TRUE;
 	}
@@ -592,7 +541,7 @@ abstract class AdminNotification extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public static function mayBeOptional() : bool
+	public static function mayBeOptional()
 	{
 		return TRUE;
 	}
@@ -602,7 +551,7 @@ abstract class AdminNotification extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public static function mayRecur() : bool
+	public static function mayRecur()
 	{
 		return TRUE;
 	}
@@ -610,11 +559,11 @@ abstract class AdminNotification extends ActiveRecord
 	/**
 	 * Custom per-admin setting for if email shoild be sent for this notification
 	 *
-	 * @param string $key	Setting field key
-	 * @param mixed $value	Current value
-	 * @return    FormAbstract|NULL
+	 * @param	string	$key	Setting field key
+	 * @param	mixed	$value	Current value
+	 * @return	\IPS\Helpers\Form\FormAbstract|NULL
 	 */
-	public static function customEmailConfigurationSetting( string $key, mixed $value ): ?FormAbstract
+	public static function customEmailConfigurationSetting( $key, $value )
 	{
 		return NULL;
 	}
@@ -622,10 +571,10 @@ abstract class AdminNotification extends ActiveRecord
 	/**
 	 * WHERE clause to use against core_acp_notifications_preferences for fetching members to email
 	 *
-	 * @param mixed $extraForEmail		Any additional information specific to this instance which is used for the email but not saved
-	 * @return    array
+	 * @param	mixed		$extraForEmail		Any additional information specific to this instance which is used for the email but not saved
+	 * @return	bool
 	 */
-	public function emailWhereClause( mixed $extraForEmail ): array
+	public function emailWhereClause( $extraForEmail )
 	{
 		if ( $this->_new )
 		{
@@ -642,14 +591,14 @@ abstract class AdminNotification extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	abstract public function title() : string;
+	abstract public function title();
 	
 	/**
 	 * Notification Subtitle (no HTML)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function subtitle() : ?string
+	public function subtitle()
 	{
 		return NULL;
 	}
@@ -657,30 +606,30 @@ abstract class AdminNotification extends ActiveRecord
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	abstract public function body() : ?string;
+	abstract public function body();
 		
 	/**
 	 * Severity
 	 *
 	 * @return	string
 	 */
-	abstract public function severity() : string;
+	abstract public function severity();
 	
 	/**
 	 * Dismissible?
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
-	abstract public function dismissible() : string;
+	abstract public function dismissible();
 	
 	/**
 	 * Style
 	 *
-	 * @return string
+	 * @return	bool
 	 */
-	public function style() : string
+	public function style()
 	{
 		switch ( $this->severity() )
 		{
@@ -696,21 +645,21 @@ abstract class AdminNotification extends ActiveRecord
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url|null
+	 * @return	bool
 	 */
-	public function link() : Url|null
+	public function link()
 	{
-		return Url::internal( 'app=core&module=overview&controller=notifications&highlightedId=' . $this->id );
+		return \IPS\Http\Url::internal( 'app=core&module=overview&controller=notifications&highlightedId=' . $this->id );
 	}
 		
 	/**
 	 * Delete
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		Db::i()->delete( 'core_acp_notifcations_dismissals', array( 'notification=?', $this->id ) );
+		\IPS\Db::i()->delete( 'core_acp_notifcations_dismissals', array( 'notification=?', $this->id ) );
 		parent::delete();
 	}
 
@@ -718,31 +667,31 @@ abstract class AdminNotification extends ActiveRecord
 	/**
 	 * Dismiss a notification for a member and rebuild the datastore
 	 *
-	 * @param int $notificationId
-	 * @param Member|null $member
+	 * @param $notificationId
+	 * @param \IPS\Member|NULL $member
 	 *
 	 * @return void
 	 */
-	public static function dismissNotification( int $notificationId, ?Member $member = NULL ) : void
+	public static function dismissNotification( $notificationId, \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
-		Db::i()->insert( 'core_acp_notifcations_dismissals', array(
+		\IPS\Db::i()->insert( 'core_acp_notifcations_dismissals', array(
 			'notification'	=> $notificationId,
 			'member'		=> $member->member_id,
 			'time'			=> time()
 		), TRUE );
 
-		if( isset( Store::i()->acpNotificationIds ) )
+		if( isset( \IPS\Data\Store::i()->acpNotificationIds ) )
 		{
-			$notificationCache = Store::i()->acpNotificationIds;
+			$notificationCache = \IPS\Data\Store::i()->acpNotificationIds;
 
 			if( isset( $notificationCache[ $member->member_id ] ) )
 			{
 				unset( $notificationCache[ $member->member_id ] );
 			}
 		
-			Store::i()->acpNotificationIds = $notificationCache;
+			\IPS\Data\Store::i()->acpNotificationIds = $notificationCache;
 		}
 	}
 }

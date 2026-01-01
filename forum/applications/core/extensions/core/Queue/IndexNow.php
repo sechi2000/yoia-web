@@ -12,39 +12,31 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\IndexNow as IndexNowClass;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use OutOfRangeException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class IndexNow extends QueueAbstract
+class _IndexNow
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
-		if( !IndexNowClass::i()->isEnabled() )
+		if( !\IPS\core\IndexNow::i()->isEnabled() )
 		{
 			return NULL;
 		}
 
-		if( isset( $data ['urls'] ) AND count($data ['urls'] ) )
+		if( isset( $data ['urls'] ) AND \count($data ['urls'] ) )
 		{
 			return $data;
 		}
@@ -60,9 +52,9 @@ class IndexNow extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ): int
+	public function run( $data, $offset )
 	{
-		IndexNowClass::i()->send( $data['urls'] );
+		\IPS\core\IndexNow::i()->send( $data['urls'] );
 		throw new \IPS\Task\Queue\OutOfRangeException;
 	}
 	
@@ -72,17 +64,17 @@ class IndexNow extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		if( isset( $data['type']))
 		{
-			return array( 'text' => Member::loggedIn()->language()->addToStack( 'indexnow_s_submitting', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( $data['type'], FALSE ), ) ) ), 'complete' => 0 );
+			return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'indexnow_s_submitting', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $data['type'], FALSE ), ) ) ), 'complete' => 0 );
 		}
 		else
 		{
-			return array( 'text' => Member::loggedIn()->language()->addToStack( 'indexnow_data_submitting' ), 'complete' => 0 );
+			return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'indexnow_data_submitting' ), 'complete' => 0 );
 		}
 	}
 }

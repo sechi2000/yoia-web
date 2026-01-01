@@ -1,19 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <language>
- <app key="forums" version="5001403">
+ <app key="forums" version="107827">
   <word key="__app_forums" js="0">Forums</word>
   <word key="frontnavigation_forums" js="0">Forums</word>
   <word key="__indefart_post" js="0">a post in a topic</word>
   <word key="__indefart_topic" js="0">a topic</word>
+  <word key="__indefart_answer" js="0">an answer to a question</word>
+  <word key="__indefart_question" js="0">a question</word>
   <word key="__defart_post" js="0">post in a topic</word>
   <word key="__defart_post_plural" js="0">{!#[1:post][?:posts]} in a topic</word>
   <word key="__defart_topic" js="0">topic</word>
   <word key="__defart_topic_plural" js="0">{!#[1:topic][?:topics]}</word>
+  <word key="__defart_answer" js="0">answer to a question</word>
+  <word key="__defart_answer_plural" js="0">{!#[1:answer][?:answers]} to a question</word>
+  <word key="__defart_question" js="0">question</word>
+  <word key="__defart_question_plural" js="0">{!#[1:question][?:questions]}</word>
   <word key="topic_container" js="0">Forum</word>
   <word key="search_contextual_item_forums" js="0">This Forum</word>
   <word key="search_contextual_item_topic" js="0">This Topic</word>
-  <word key="__defart_nodegroup__forums_pl" js="0">forums</word>
-  <word key="__defart_nodegroup__forums" js="0">forum</word>
   <word key="module__forums_forums" js="0">Forums</word>
   <word key="module__forums_stats" js="0">Statistics</word>
   <word key="filestorage__forums_Icons" js="0">Forum Icons</word>
@@ -24,8 +28,6 @@
   <word key="answer_lc" js="0">answer</word>
   <word key="editor__forums_Forums" js="0">Forums and Topics</word>
   <word key="acp_search_title_forums_Forums" js="0">Forums</word>
-  <word key="acpsearch__mm_forums" js="0">Saved Action Forums</word>
-  <word key="acpsearch__mm_title" js="0">Saved Action Name</word>
   <word key="menu__forums_forums" js="0">Forums</word>
   <word key="menu__forums_forums_forums" js="0">Forums</word>
   <word key="menu__forums_forums_savedActions" js="0">Saved Actions</word>
@@ -41,7 +43,6 @@
   <word key="r__forums_massManageContent" js="0">Can mass move/delete topics in forums?</word>
   <word key="r__forums_delete" js="0">Can delete forums?</word>
   <word key="r__archive_manage" js="0">Can manage archive settings?</word>
-  <word key="r__autolock_settings" js="0">Can manage autolock settings?</word>
   <word key="r__settings_access" js="0">Can access settings?</word>
   <word key="r__forum_settings" js="0">Can manage forums settings?</word>
   <word key="r__savedActions" js="0">Saved Actions</word>
@@ -53,32 +54,30 @@
   <word key="r__topics_manage" js="0">Can view statistics about topics</word>
   <word key="r__posts" js="0">New Post Statistics</word>
   <word key="r__posts_manage" js="0">Can view statistics about posts</word>
-  <word key="r__solvers" js="0">Top Solvers Statistics</word>
-  <word key="r__solvers_manage" js="0">Can view statistics about topic solutions</word>
   <word key="modperms__core_Content_forums_Topic" js="0">Forums</word>
-  <word key="can_pin_topic" js="0">Can pin topics?</word>
-  <word key="can_unpin_topic" js="0">Can unpin topics?</word>
-  <word key="can_feature_topic" js="0">Can feature topics?</word>
-  <word key="can_unfeature_topic" js="0">Can unfeature topics?</word>
-  <word key="can_edit_topic" js="0">Can edit topics?</word>
-  <word key="can_hide_topic" js="0">Can hide topics?</word>
-  <word key="can_unhide_topic" js="0">Can unhide topics?</word>
-  <word key="can_view_hidden_topic" js="0">Can view hidden topics?</word>
-  <word key="can_move_topic" js="0">Can move topics?</word>
-  <word key="can_move_topic_desc" js="0">Will be able to move topics only between the forums they can create new content within.</word>
-  <word key="can_lock_topic" js="0">Can lock topics?</word>
-  <word key="can_unlock_topic" js="0">Can unlock topics?</word>
-  <word key="can_reply_to_locked_topic" js="0">Can reply to locked topics?</word>
-  <word key="can_delete_topic" js="0">Can delete topics?</word>
-  <word key="can_split_merge_topic" js="0">Can split and merge topics?</word>
-  <word key="can_edit_post" js="0">Can edit posts?</word>
-  <word key="can_hide_post" js="0">Can hide posts?</word>
-  <word key="can_unhide_post" js="0">Can unhide posts?</word>
-  <word key="can_view_hidden_post" js="0">Can view hidden posts?</word>
-  <word key="can_delete_post" js="0">Can delete posts?</word>
-  <word key="can_read_all_topics" js="0">Can view all topics?</word>
-  <word key="can_read_all_topics_desc" js="0">Some forums are set up to only show topics to the user that posted them. When this setting is enabled, the moderator will be able to view topics/questions they did not post in those forums.</word>
-  <word key="can_set_best_answer" js="0">Can set best answer/solution for topics?</word>
+  <word key="can_pin_topic" js="0">Can pin topics/questions?</word>
+  <word key="can_unpin_topic" js="0">Can unpin topics/questions?</word>
+  <word key="can_feature_topic" js="0">Can feature topics/questions?</word>
+  <word key="can_unfeature_topic" js="0">Can unfeature topics/questions?</word>
+  <word key="can_edit_topic" js="0">Can edit topics/questions?</word>
+  <word key="can_hide_topic" js="0">Can hide topics/questions?</word>
+  <word key="can_unhide_topic" js="0">Can unhide topics/questions?</word>
+  <word key="can_view_hidden_topic" js="0">Can view hidden topics/questions?</word>
+  <word key="can_move_topic" js="0">Can move topics/questions?</word>
+  <word key="can_move_topic_desc" js="0">Will be able to move topics/questions only between the forums they can create new content within.</word>
+  <word key="can_lock_topic" js="0">Can lock topics/questions?</word>
+  <word key="can_unlock_topic" js="0">Can unlock topics/questions?</word>
+  <word key="can_reply_to_locked_topic" js="0">Can reply to locked topics/questions?</word>
+  <word key="can_delete_topic" js="0">Can delete topics/questions?</word>
+  <word key="can_split_merge_topic" js="0">Can split and merge topics/questions?</word>
+  <word key="can_edit_post" js="0">Can edit posts/answers?</word>
+  <word key="can_hide_post" js="0">Can hide posts/answers?</word>
+  <word key="can_unhide_post" js="0">Can unhide posts/answers?</word>
+  <word key="can_view_hidden_post" js="0">Can view hidden posts/answers?</word>
+  <word key="can_delete_post" js="0">Can delete posts/answers?</word>
+  <word key="can_read_all_topics" js="0">Can view all topics/questions?</word>
+  <word key="can_read_all_topics_desc" js="0">Some forums are set up to only show topics/questions to the user that posted them. When this setting is enabled, the moderator will be able to view topics/questions they did not post in those forums.</word>
+  <word key="can_set_best_answer" js="0">Can set best answer/solved for questions and topics?</word>
   <word key="can_feature_comments_topic" js="0">Can recommend posts on a topic?</word>
   <word key="can_unfeature_comments_topic" js="0">Can remove post recommendations on a topic?</word>
   <word key="can_add_item_message_topic" js="0">Can add messages to topics?</word>
@@ -87,21 +86,20 @@
   <word key="can_toggle_item_moderation_topic" js="0">Can enable/disable moderation on topics?</word>
   <word key="can_future_publish_topic" js="0">Can set a future publishing date?</word>
   <word key="can_view_future_topic" js="0">Can view pending publishing items authored by other members?</word>
-  <word key="can_view_reports_topic" js="0">Can view reported topics/questions?</word>
-  <word key="can_assign_topic" js="0">Can assign topics?</word>
   <word key="forums" js="0">Forums</word>
   <word key="forums_sg" js="0">Forum</word>
   <word key="forums_sg_lc" js="0">forum</word>
   <word key="forums_add_child" js="0">Create Subforum</word>
   <word key="forums_add_child_cat" js="0">Create Forum</word>
   <word key="all_public" js="0">All public</word>
-  <word key="view_all_topics" js="0">View all Topics</word>
   <word key="forum_name" js="0">Name</word>
   <word key="forum_description" js="0">Description</word>
   <word key="forum_description_placeholder" js="0">Add a description...</word>
   <word key="forum_type" js="0">Type</word>
   <word key="forum_type_normal" js="0">Discussions</word>
   <word key="forum_type_normal_desc" js="0">Users can start topics that other users can reply to. Replies are shown in the order they're posted.</word>
+  <word key="forum_type_qa" js="0">Questions</word>
+  <word key="forum_type_qa_desc" js="0">Users can ask questions that other users can post answers to. Answers can then be rated by other users and the highest rated answers are shown first.</word>
   <word key="forum_type_category" js="0">Category</word>
   <word key="forum_type_category_desc" js="0">Container for other forums. Nothing can be posted directly within them.</word>
   <word key="forum_type_redirect" js="0">Redirect</word>
@@ -126,10 +124,13 @@
   <word key="bw_fluid_view__warning" js="0">Combined fluid view cannot be enabled as this forum does not have any sub-forums</word>
   <word key="combined_fluid_view" js="0">Combined Fluid View</word>
   <word key="forum_settings" js="0">Forum Settings</word>
+  <word key="posting_settings" js="0">Posting Settings</word>
   <word key="forum_allow_poll" js="0">Allow polls?</word>
   <word key="posts" js="0">Posts</word>
   <word key="forum_preview_posts" js="0">Posts must be approved?</word>
+  <word key="forum_preview_posts_qa" js="0">Posts must be approved?</word>
   <word key="forum_preview_posts_topics" js="0">New Topics</word>
+  <word key="forum_preview_posts_questions" js="0">New Questions</word>
   <word key="forum_preview_posts_posts" js="0">Replies</word>
   <word key="forum_preview_posts_answers" js="0">Answers</word>
   <word key="forum_inc_postcount" js="0">Increase content counts?</word>
@@ -145,13 +146,22 @@
   <word key="forum_skin_id_default" js="0">-Do not override-</word>
   <word key="forum_display_forum" js="0">Forum Display</word>
   <word key="forum_display_topic" js="0">Topic Display</word>
+  <word key="forum_display_question" js="0">Question Display</word>
+  <word key="forum_forum_allow_rating" js="0">Enable Star Ratings?</word>
+  <word key="forum_forum_allow_rating_desc" js="0"><![CDATA[You can control which groups can rate in the <a href='{internal.app=core&module=members&controller=groups}'>Group Settings</a>]]></word>
   <word key="posting_requirements" js="0">Posting Requirements</word>
+  <word key="forum_min_posts_view" js="0">Minimum content count to see forum</word>
+  <word key="forum_min_posts_post" js="0">Minimum content count to post</word>
   <word key="forum_can_view_others" js="0">Users can see topics posted by other users?</word>
   <word key="forum_can_view_others_desc" js="0"><![CDATA[Moderators can (where they have permission) see all topics. You can use this setting to create a forum where users can communicate privately with staff.<br>Topics posted in a forum that doesn't allow others to view topics will not show in any sidebar, header or footer blocks.]]></word>
+  <word key="forum_can_view_others_qa" js="0">Users can see questions asked by other users?</word>
+  <word key="forum_can_view_others_qa_desc" js="0">Moderators can (where they have permission) see all questions. You can use this setting to create a private support forum.</word>
   <word key="forum_can_view_others_club" js="0">Users can see topics posted by other users?</word>
   <word key="forum_can_view_others_club_desc" js="0">You and any other moderators or leaders of this club will be able to see all topics. You can use this setting to create a forum where users can communicate privately with the club moderators.</word>
   <word key="forum_permission_showtopic" js="0">Users without read permission can open forum?</word>
   <word key="forum_permission_showtopic_desc" js="0">If a user does have permission to see the forum but not to read the topics, this setting controls whether or not they can open the forum and see the topic titles.</word>
+  <word key="forum_permission_showtopic_qa" js="0">Users without read permission can open forum?</word>
+  <word key="forum_permission_showtopic_qa_desc" js="0">If a user does have permission to see the forum but not to read the questions, this setting controls whether or not they can open the forum and see the question titles.</word>
   <word key="forum_disable_sharelinks" js="0">Enable Sharing?</word>
   <word key="forum_disable_sharelinks_desc" js="0"><![CDATA[<a href='{internal.app=core&module=promotion&controller=sharelinks}'>Sharing Settings</a>]]></word>
   <word key="forum_tag_predefined" js="0">Defined Tags</word>
@@ -159,6 +169,14 @@
   <word key="forum_tag_predefined_desc" js="0">If using a closed system, users will have to choose from these tags. If using an open system, tags entered here will show as suggestions.</word>
   <word key="forum_ipseo_priority" js="0">Sitemap Priority</word>
   <word key="forum_ipseo_priority_desc" js="0"><![CDATA[The priority value in a sitemap file indicates to search engines how important a page is compared to other pages on the site. <a href='{internal.app=core&module=promotion&controller=seo&tab=sitemap}'>Sitemap Settings</a>]]></word>
+  <word key="forum_qa_rate_questions" js="0">Who can rate questions?</word>
+  <word key="forum_qa_rate_questions_desc" js="0">Questions that have been rated the best within the last 30 days will show under 'Popular Questions' in the forum home.</word>
+  <word key="forum_qa_rate_answers" js="0">Who can rate answers?</word>
+  <word key="forum_qa_rate_answers_desc" js="0">Answers are ordered with the best rated answers first.</word>
+  <word key="bw_enable_answers_member" js="0">User who asked question can choose the best answer?</word>
+  <word key="bw_enable_answers_member_desc" js="0">The best answer is always displayed above all other answers.</word>
+  <word key="forum_icon" js="0">Icon</word>
+  <word key="forum_icon_desc" js="0"><![CDATA[The icon displays next to the forum in the forum list. It will automatically be faded out to indicate if there are no unread topics within the forum.<br>If none is provided, the default icon will be used.]]></word>
   <word key="forum_parent_id" js="0">Parent Forum</word>
   <word key="forum_parent_id_error" js="0">Only categories can have no parent.</word>
   <word key="forums_posts_per_page" js="0">Posts per page</word>
@@ -168,36 +186,49 @@
   <word key="forum_use_feature_color" js="0">Use a Feature Color?</word>
   <word key="forum_use_feature_color_desc" js="0">A feature color will be used in various places such as the forum/category title, forum badges and the forum index.</word>
   <word key="forum_feature_color" js="0">Feature color</word>
-  <word key="forum_card_image" js="0">Card Image</word>
-  <word key="forum_card_image_desc" js="0">When viewing forums as a grid or feed, your chosen image will appear as the cover photo.</word>
+  <word key="forum_card_image" js="0">Grid Card Image</word>
+  <word key="forum_card_image_desc" js="0">When viewing forums as a grid, your chosen image will appear as the background.</word>
+  <word key="bw_enable_answers_moderator" js="0">Enable Solved?</word>
+  <word key="bw_enable_answers_moderator_desc" js="0">Moderators (and optionally topic starters) can mark posts as the solution.</word>
+  <word key="bw_enable_answers__member" js="0">Allow the topic starter to mark solved?</word>
+  <word key="bw_enable_answers__member_desc" js="0">Optionally allow the topic starter to also mark posts as the solution.</word>
+  <word key="solved_stats_from_cutoff" js="0">Statistics Cutoff</word>
+  <word key="solved_stats_from_cutoff_desc" js="0"><![CDATA[Any topics marked as solved that were posted older than the timeframe configured here will be excluded from <a href='{internal.app=forums&module=stats&controller=solved&tab=time}' target='_blank'>Time to Solved</a> statistics for this forum. Note that statistics are built once daily, so changes here may not take effect immediately.]]></word>
   <word key="rebuilding_starter_ids" js="0">Rebuilding topic starter IDs</word>
   <word key="chart_forums" js="0">Filter by forums</word>
-  <word key="chart_groups" js="0">Filter by groups</word>
   <word key="forums_topic_post" js="0">Forum Posts</word>
   <word key="forums_topic" js="0">Forum Topics</word>
   <word key="forums_topic_pl" js="0">Topics</word>
   <word key="menu__forums_forums_settings" js="0">Settings</word>
+  <word key="forums_popular_now" js="0">Popular Now</word>
+  <word key="forums_popular_now_desc" js="0">Topics which are Popular Now are highlighted in the list.</word>
+  <word key="forums_popular_now_cloud_desc" js="0">Highlight Topics that have been trending within the defined time period.</word>
+  <word key="forums_popular_now_cloud_prefix" js="0">Within the last</word>
   <word key="posts_in_the_last" js="0">posts in the last</word>
   <word key="acplogs__forums_settings" js="0">Updated forums settings</word>
   <word key="topics" js="0">Topics</word>
+  <word key="questions" js="0">Questions</word>
   <word key="topic_settings" js="0">Topic Settings</word>
+  <word key="question_settings" js="0">Question Settings</word>
+  <word key="forums_questions_downvote" js="0">Questions can be negatively rated?</word>
+  <word key="forums_answers_downvote" js="0">Answers can be negatively rated?</word>
+  <word key="forums_new_questions" js="0">New Questions</word>
+  <word key="forums_new_questions_desc" js="0">New questions are highlighted at the top of the page when viewing a forum.</word>
+  <word key="forums_new_questions_best" js="0">Questions where a best answer has not been chosen.</word>
+  <word key="forums_new_questions_any" js="0">Questions which have not received any answers.</word>
   <word key="forums_rss" js="0">Enable RSS feeds?</word>
   <word key="forums_topics_per_page" js="0">Topics per page</word>
   <word key="forums_default_view" js="0">Default forum view</word>
-  <word key="forums_default_view_table" js="0">Table: A traditional forum index table view.</word>
-  <word key="forums_default_view_grid" js="0">Grid: Display forums as cards in a grid.</word>
-  <word key="forums_default_view_fluid" js="0">Fluid: A simpler dynamic listing topics with a forum filter box.</word>
+  <word key="forums_default_view_table" js="0">Table: A traditional forum index table view</word>
+  <word key="forums_default_view_grid" js="0">Grid: Display forums as cards in a grid</word>
+  <word key="forums_default_view_fluid" js="0">Fluid: A simpler dynamic listing topics with a forum filter box</word>
   <word key="forums_default_view_fluid_desc" js="0">Fluid view works best with fewer forums with less complex hierarchies. The fluid view selector will only display up to three levels deep.</word>
-  <word key="forums_default_view_modern" js="0"><![CDATA[<span class='ipsBadge ipsBadge--positive'>New</span> Content Focused: Card View]]></word>
-  <word key="forums_default_view_modern_desc" js="0">Show multiple recent topics from each forum with a grid image for each forum row.</word>
-  <word key="forums_fluid_pinned" js="0">Fluid mode honors pinned topics</word>
+  <word key="forums_default_view_choose" js="0">Members can choose?</word>
+  <word key="forums_default_view_choose_desc" js="0">Select the views you will allow members to choose from</word>
+  <word key="forums_default_view_choose_none" js="0">Do not allow members to choose</word>
+  <word key="forums_fluid_pinned" js="0">Honor Pinned Topics</word>
   <word key="forums_fluid_pinned_desc" js="0">Show pinned topics from selected forums at the top of the topic list when fluid mode is used</word>
-  <word key="forum_view" js="0">Forum Index View</word>
-  <word key="forum_list_view" js="0">Topic List View</word>
-  <word key="forum_topic_view" js="0">Topic View</word>
-  <word key="forums_topic_view_classic" js="0">Classic: Show posts with an author sidebar.</word>
-  <word key="forums_topic_view_modern" js="0"><![CDATA[<span class='ipsBadge ipsBadge--positive'>New</span> Content Focused: Simplified View]]></word>
-  <word key="forums_topic_view_modern_desc" js="0">Show posts with a smaller and simplified author area above the content.</word>
+  <word key="forums_default_view_choose_error" js="0">You must select at least two views for members to choose from</word>
   <word key="archiving" js="0">Archiving</word>
   <word key="archiving_blurb" js="0">If you have a very large site, it can be beneficial to reduce the size of the database table storing posts. Archiving topics is an alternative to deleting which allows them to still exist and be viewed as normal, but moves them to a separate database table. Archived topics cannot be posted in or edited, and will not show in search results. You can unarchive topics after they've been archived if you change your mind.</word>
   <word key="archiving_blurb_cloud" js="0"><![CDATA[Archiving older <strong>non-pinned</strong> and <strong>non-featured</strong> topics keeps your community running smoothly. Archived topics cannot be posted in or edited, and will not show in search results. You can unarchive topics after they've been archived if you change your mind.]]></word>
@@ -217,11 +248,13 @@
   <word key="poll_with_recent_vote" js="0">Last poll vote: %s</word>
   <word key="archive_topic_post" js="0">Posts</word>
   <word key="archive_topic_view" js="0">Views</word>
+  <word key="archive_topic_rating" js="0">Rating</word>
   <word key="archive_topic_starter" js="0">Started By</word>
   <word key="archive_topic_starter_not" js="0">Started By</word>
   <word key="archive_topics_not_where" js="0"><![CDATA[But not when <em>any</em> of the following conditions are true...]]></word>
   <word key="archive_not_topic_post" js="0">Posts</word>
   <word key="archive_not_topic_view" js="0">Views</word>
+  <word key="archive_not_topic_rating" js="0">Rating</word>
   <word key="archive_last_post" js="0">Last Post</word>
   <word key="archive_last_post_cloud" js="0">Last Post</word>
   <word key="archive_last_post_suffix" js="0">years ago</word>
@@ -235,12 +268,13 @@
   <word key="less_than" js="0">Less than</word>
   <word key="archive_rules_effects" js="0">Number of topics that will be archived with selected rules</word>
   <word key="forum_sort_key" js="0">Default sort order</word>
+  <word key="forum_sort_key_qa" js="0">Default sort order</word>
   <word key="archive_settings" js="0">Archiving Settings</word>
   <word key="archive_settings_cloud" js="0">Archive where...</word>
   <word key="archive_on" js="0">Enable Archiving?</word>
   <word key="task__archive" js="0">Archives posts.</word>
   <word key="task__unarchive" js="0">Unarchives posts.</word>
-  <word key="remove_archive_exclude_flag" js="0">Allow this topic to be archived</word>
+  <word key="remove_archive_exlude" js="0">Allow this topic to be archived</word>
   <word key="unarchive" js="0">Unarchive</word>
   <word key="unarchive_confirm" js="0">Unarchiving this topic will exclude it from being archived again in the future. After confirming, it will take about {# [1:minute][?:minutes]} until the topic is actually unarchived.</word>
   <word key="uanrchive_settings_change" js="0">Some topics that are already archived no longer match your archive settings. Would you like to unarchive them?</word>
@@ -266,12 +300,20 @@
   <word key="perm_forum_perm__view_rest" js="0"><![CDATA[See Forum<br><small>(with {# [1:item][?:items]} of content)</small>]]></word>
   <word key="perm_forum_perm__read" js="0">Read Topics</word>
   <word key="perm_forum_perm__read_pass" js="0"><![CDATA[Read Topics<br><small>(if password is provided)</small>]]></word>
+  <word key="perm_forum_perm__read_qa" js="0">Read Questions</word>
+  <word key="perm_forum_perm__read_qa_pass" js="0"><![CDATA[Read Questions<br><small>(if password is provided)</small>]]></word>
   <word key="perm_forum_perm__read2" js="0">Read Own Topics</word>
   <word key="perm_forum_perm__read2_pass" js="0"><![CDATA[Read Own Topics<br><small>(if password is provided)</small>]]></word>
+  <word key="perm_forum_perm__read2_qa" js="0">Read Own Questions</word>
+  <word key="perm_forum_perm__read2_qa_pass" js="0"><![CDATA[Read Own Questions<br><small>(if password is provided)</small>]]></word>
   <word key="perm_forum_perm__add" js="0">Post New Topics</word>
   <word key="perm_forum_perm__add_rest" js="0"><![CDATA[Post New Topics<br><small>(with {# [1:item][?:items]} of content)</small>]]></word>
   <word key="perm_forum_perm__reply" js="0">Reply To Topics</word>
   <word key="perm_forum_perm__reply_rest" js="0"><![CDATA[Reply To Topics<br><small>(with {# [1:item][?:items]} of content)</small>]]></word>
+  <word key="perm_forum_perm__add_qa" js="0">Ask New Questions</word>
+  <word key="perm_forum_perm__add_qa_rest" js="0"><![CDATA[Ask New Questions<br><small>(with {# [1:item][?:items]} of content)</small>]]></word>
+  <word key="perm_forum_perm__reply_qa" js="0">Post Answers</word>
+  <word key="perm_forum_perm__reply_qa_rest" js="0"><![CDATA[Post Answers<br><small>(with {# [1:item][?:items]} of content)</small>]]></word>
   <word key="perm_forum_perm__attachments" js="0">Download Attachments</word>
   <word key="posts_number" js="0">{# [1:post][?:posts]}</word>
   <word key="posts_no_number" js="0">{!# [1:post][?:posts]}</word>
@@ -282,19 +324,25 @@
   <word key="answers_no_number" js="0">{!# [1:answer][?:answers]}</word>
   <word key="votes_number" js="0">{# [-1:vote][1:vote][?:votes]}</word>
   <word key="votes_no_number" js="0">{!# [-1:vote][1:vote][?:votes]}</word>
-  <word key="queued_topics_badge" js="0">{# [1:topic][?:topics]}</word>
-  <word key="queued_posts_badge" js="0">{# [1:post][?:posts]}</word>
+  <word key="queued_topics_badge" js="0">{# queued [1:topic][?:topics]}</word>
+  <word key="queued_posts_badge" js="0">{# queued [1:post][?:posts]}</word>
   <word key="queued_topics" js="0">Unapproved topics</word>
   <word key="queued_posts" js="0">Topics with unapproved posts</word>
   <word key="start_new_topic" js="0">Start new topic</word>
   <word key="start_new_topic_lc" js="0">start new topic</word>
   <word key="start_new_topic_desc" js="0">Start a new topic in this forum</word>
+  <word key="ask_a_question" js="0">Ask a question</word>
+  <word key="ask_a_question_lc" js="0">ask a question</word>
+  <word key="ask_a_question_desc" js="0">Ask a question in this forum</word>
+  <word key="answer_this_question" js="0">Answer this question</word>
   <word key="reply_to_this_topic" js="0">Reply to this topic</word>
   <word key="mark_forum_read" js="0">Mark forum as read</word>
   <word key="mark_forum_read_title" js="0">Mark all topics in this forum as read</word>
   <word key="forum_password_bad" js="0">Password Incorrect.</word>
   <word key="topic_details" js="0">Topic Details</word>
   <word key="topic_mainTab" js="0">Content</word>
+  <word key="question_mainTab" js="0">Content</word>
+  <word key="question_title" js="0">Question</word>
   <word key="topic_title" js="0">Title</word>
   <word key="topic_tags" js="0">Tags</word>
   <word key="topic_content" js="0"></word>
@@ -308,30 +356,44 @@
   <word key="topic_type" js="0">Filter</word>
   <word key="all_topics" js="0">All</word>
   <word key="open_topics" js="0">Unlocked</word>
+  <word key="popular_now" js="0">Popular now</word>
   <word key="locked_topics" js="0">Locked</word>
   <word key="poll" js="0">Poll</word>
   <word key="moved_topics" js="0">Moved</word>
   <word key="topics_i_started" js="0">Topics I started</word>
   <word key="topics_i_posted_in" js="0">Topics I've posted in</word>
+  <word key="questions_i_asked" js="0">Questions I asked</word>
+  <word key="questions_i_posted_in" js="0">Questions I've posted an answer to</word>
+  <word key="question_answered" js="0">Questions with Best Answers</word>
+  <word key="question_not_answered" js="0">Questions without Best Answers</word>
   <word key="last_post" js="0">Last post date</word>
   <word key="last_poster" js="0">Name of last poster</word>
   <word key="topic_starter" js="0">Name of topic starter</word>
+  <word key="question_asker" js="0">Name of user who asked question</word>
   <word key="topic_started" js="0">Start Date</word>
   <word key="topic_started_date" js="0">Started %s</word>
-  <word key="topic_started_username_date" js="0">Started by %s, %s</word>
   <word key="replies" js="0">Replies</word>
   <word key="sort_direction" js="0">Sort Direction</word>
   <word key="sort_num_replies" js="0">Most Replies</word>
+  <word key="sort_question_rating" js="0">Most Votes</word>
   <word key="asc" js="0">Ascending (oldest first/alphabetically)</word>
   <word key="desc" js="0">Descending (newest first)</word>
   <word key="time_frame" js="0">Last Reply</word>
   <word key="since_last_visit" js="0">My Last Login (%s)</word>
   <word key="forum_home" js="0">Forum Home</word>
+  <word key="all_questions" js="0">All questions in this forum</word>
+  <word key="featured_question" js="0">Featured Question</word>
+  <word key="most_popular_questions" js="0">Most Popular Questions</word>
   <word key="from_the_past_30_days" js="0">From the past 30 days</word>
+  <word key="explore_questions_title" js="0">Explore Questions</word>
+  <word key="new_questions" js="0">New Questions</word>
+  <word key="awaiting_an_answer" js="0">Awaiting an answer</word>
+  <word key="best_answer_by" js="0">Best answer by %s, %s</word>
   <word key="ask_byline" js="0">Asked by %s, %s</word>
   <word key="ask_byline_itemprop" js="0">Asked by %s, %s</word>
   <word key="ask_byline_no_date" js="0">Asked by %s</word>
   <word key="forum_rss_title_topics" js="0">%s Latest Topics</word>
+  <word key="forum_rss_title_questions" js="0">%s Latest Questions</word>
   <word key="first_post" js="0">First post</word>
   <word key="latest_post" js="0">Latest post</word>
   <word key="latest_answer" js="0">Latest answer</word>
@@ -339,7 +401,13 @@
   <word key="best_answer_post" js="0">Best answer</word>
   <word key="topic_started_by" js="0">Started by %s</word>
   <word key="topic" js="0">Topic</word>
+  <word key="answer_count" js="0">{# [1:answer][?:answers]} to this question</word>
   <word key="reply_count" js="0">{# [1:post][?:posts]} in this topic</word>
+  <word key="best_answer_tooltip" js="0">Best answer to this question</word>
+  <word key="vote_answer_up" js="0">Vote this answer up</word>
+  <word key="vote_answer_down" js="0">Vote this answer down</word>
+  <word key="vote_question_up" js="0">Vote this question up</word>
+  <word key="vote_question_down" js="0">Vote this question down</word>
   <word key="remove_your_vote" js="0">Remove your vote</word>
   <word key="best_answers" js="0">Best Answers</word>
   <word key="set_as_best_answer" js="0">Mark this as a best answer</word>
@@ -348,12 +416,11 @@
   <word key="sort_by_date" js="0">Sort by date</word>
   <word key="select_forum" js="0">Select Forum</word>
   <word key="create_new_topic" js="0">Create New Topic</word>
+  <word key="ask_new_question" js="0">Ask New Question</word>
+  <word key="no_answers" js="0">There have been no answers to this question yet</word>
   <word key="no_forum_posts" js="0">No posts here yet</word>
-  <word key="no_forum_posts_password" js="0">Password protected</word>
+  <word key="no_forum_posts_password" js="0">No posts to show</word>
   <word key="no_posts_returned" js="0">There are no posts to show</word>
-  <word key="no_topics_in_forum" js="0">There are no topics in this forum.</word>
-  <word key="no_posts_show" js="0">No posts to show</word>
-  <word key="topic_show_all_replies" js="0">Show all replies</word>
   <word key="topic_pl" js="0">Topics</word>
   <word key="topic_pl_lc" js="0">topics</word>
   <word key="post_pl" js="0">Posts</word>
@@ -361,7 +428,8 @@
   <word key="archivedpost_pl" js="0">Archived Posts</word>
   <word key="archivedpost_pl_lc" js="0">archived posts</word>
   <word key="topic__comment_placeholder" js="0">Reply to this topic...</word>
-  <word key="moderator_checkbox" js="0">Moderator checkbox</word>
+  <word key="question__comment_placeholder" js="0">Answer this question...</word>
+  <word key="moderator_actions" js="0">Moderation Actions</word>
   <word key="toggle_this_category" js="0">Toggle this category</word>
   <word key="topic_locked" js="0">This topic is locked</word>
   <word key="topic_pinned" js="0">This topic is pinned</word>
@@ -390,40 +458,65 @@
   <word key="no_new_posts" js="0">No new posts in this topic</word>
   <word key="new_posts" js="0">New posts in this topic</word>
   <word key="featured_topic" js="0">Featured Topic</word>
+  <word key="next_question" js="0">Next question</word>
   <word key="next_topic" js="0">Next topic</word>
+  <word key="prev_question" js="0">Previous question</word>
   <word key="prev_topic" js="0">Previous topic</word>
   <word key="topic_create_state" js="0">After posting...</word>
   <word key="topic_information" js="0">Topic Information</word>
   <word key="topic_moderator_options" js="0">Moderator Options</word>
+  <word key="submit_question" js="0">Submit Question</word>
   <word key="submit_topic" js="0">Submit Topic</word>
   <word key="submit_topic_edit" js="0">Edit Topic</word>
+  <word key="submit_question_edit" js="0">Edit Question</word>
   <word key="topic_submit_comment" js="0">Submit Reply</word>
+  <word key="edit_question" js="0">Edit Question</word>
   <word key="edit_topic" js="0">Edit Topic</word>
   <word key="edit_reply" js="0">Edit Post</word>
   <word key="go_to_forum" js="0">Go to %s</word>
   <word key="go_back_to_forum" js="0">Go to topic listing</word>
+  <word key="go_back_to_qa_forum" js="0">Go to question listing</word>
   <word key="topic_is_archived" js="0">Archived</word>
   <word key="topic_archived_desc" js="0">This topic is now archived and is closed to further replies.</word>
   <word key="count_topics_in_forum" js="0">{# [1:topic][?:topics] in this forum}</word>
+  <word key="count_questions_in_forum" js="0">{# [1:question][?:questions] in this forum}</word>
   <word key="view_next_unread" js="0">Next unread topic</word>
+  <word key="view_next_unread_question" js="0">Next unread question</word>
   <word key="view_next_unread_title" js="0">Go to the next topic that has new content</word>
+  <word key="view_next_unread_question_title" js="0">Go to the next question that has new answers</word>
   <word key="hide_all_signatures" js="0">Hide all signatures</word>
   <word key="hide_members_signature" js="0">Hide %s's signature</word>
   <word key="go_to_new_location" js="0">Go to this topic in its new location</word>
   <word key="topic_moved_to" js="0"><![CDATA[Topic was moved to forum <a href='%s'><strong>%s</strong></a>]]></word>
+  <word key="question_moved_to" js="0"><![CDATA[Question was moved to forum <a href='%s'><strong>%s</strong></a>]]></word>
   <word key="topic_merged_to" js="0"><![CDATA[Topic was merged with <a href='%s'><strong>%s</strong></a>]]></word>
+  <word key="question_merged_to" js="0"><![CDATA[Question was merged with <a href='%s'><strong>%s</strong></a>]]></word>
   <word key="this_topic" js="0">This Topic</word>
   <word key="this_forum" js="0">This Forum</word>
   <word key="forum_id" js="0">Forum</word>
   <word key="announce_forums" js="0">Forums</word>
   <word key="embed_topic" js="0">Forum Topic</word>
+  <word key="questions_with_best_answers" js="0">Questions With Best Answers</word>
+  <word key="questions_without_best_answers" js="0">Questions Without Best Answers</word>
   <word key="this_is_a_popular_post" js="0">Popular Post</word>
+  <word key="rate_this_topic" js="0">Rate this topic</word>
+  <word key="rate_this_question" js="0">Rate this question</word>
+  <word key="sign_in_rate_question" js="0">Sign in to rate this question</word>
+  <word key="sign_in_rate_answer" js="0">Sign in to rate this answer</word>
+  <word key="no_questions_in_forum" js="0">There are no questions in this forum yet</word>
+  <word key="no_topics_in_forum" js="0">There are no topics in this forum yet</word>
+  <word key="submit_first_question" js="0">Ask the first question</word>
   <word key="submit_first_topic" js="0">Start the first topic</word>
   <word key="topic_pending_approval" js="0">This topic is not yet approved and is currently only visible to staff.</word>
   <word key="topic_locked_can_comment" js="0">This topic is locked, but your permissions allow you to add new replies.</word>
   <word key="topic_poll_can_comment" js="0">This is a poll-only topic, but your permissions allow you to add new replies.</word>
   <word key="topic_locked_cannot_comment" js="0">This topic is now closed to further replies.</word>
   <word key="ip_prefix" js="0">IP: %s</word>
+  <word key="popular_questions_title" js="0">Popular questions from the past month</word>
+  <word key="no_popular_questions" js="0">There are no popular questions to show right now</word>
+  <word key="new_questions_title_no_answer" js="0">Questions with no answers</word>
+  <word key="new_questions_title_no_best" js="0">Questions with no best answer</word>
+  <word key="no_new_questions" js="0">There are no new questions to show right now</word>
   <word key="topic_delete_title" js="0">Delete this topic</word>
   <word key="approve_title_topic" js="0">Approve this topic</word>
   <word key="no_perm_topic_password" js="0">This topic cannot be displayed because it is in a password protected forum.</word>
@@ -439,14 +532,14 @@
   <word key="topic_meta_unread" js="0">Unread replies</word>
   <word key="forum_follower_count" js="0">{# [1:follower][?:followers]}</word>
   <word key="topic_follower_count" js="0">{# [1:follower][?:followers]}</word>
-  <word key="forums_topic_list_snippet" js="0">Expanded View: Show topics with a preview of the post.</word>
-  <word key="forums_topic_list_list" js="0">Condensed View: Show topics as a list.</word>
-  <word key="topic_snippet_last_reply" js="0"><![CDATA[%s replied <a href='%s' title='Go to last post'>%s</a>]]></word>
+  <word key="forums_topic_list_snippet" js="0">Expanded View: Show topics with a preview of the post</word>
+  <word key="forums_topic_list_list" js="0">Condensed View: Show topics as a list</word>
+  <word key="topic_snippet_last_reply" js="0"><![CDATA[Last reply by %s, <a href='%s' title='Go to last post'>%s</a>]]></word>
   <word key="topic_posted_in_groups" js="0">Posts by %s</word>
   <word key="filter_hidden_topics" js="0">Hidden Topics</word>
   <word key="filter_hidden_posts_in_topics" js="0">Topics With Hidden Posts</word>
-  <word key="filter_assigned_topics" js="0">Assigned Topics</word>
   <word key="moderation_log" js="0">Moderation History</word>
+  <word key="cookie_forumpass_*_description" js="0">These cookies are used to track authentication for password protected forums. There may be multiple cookies with similar names where * is replaced with the forum ID.</word>
   <word key="saved_actions" js="0">Saved Actions</word>
   <word key="saved_actions_sg" js="0">Saved Action</word>
   <word key="mm_title" js="0">Name</word>
@@ -466,16 +559,14 @@
   <word key="topic_reply_content" js="0">Reply</word>
   <word key="topic_reply_postcount" js="0">Increment post count?</word>
   <word key="can_use_saved_actions" js="0">Can use saved actions?</word>
-  <word key="modlog__saved_action" js="0"><![CDATA[Ran "%s" saved action on topic: <a href='%s'>%s</a>]]></word>
-  <word key="modlog__unarchived_topic" js="0"><![CDATA[Unarchived topic: <a href='%s'>%s</a>]]></word>
-  <word key="modlog__removed_archive_exclude_topic" js="0"><![CDATA[Removed 'exclude from archive' state from topic: <a href='%s'>%s</a>]]></word>
-  <word key="cookie_forumpass_*_description" js="0">These cookies are used to track authentication for password protected forums. There may be multiple cookies with similar names where * is replaced with the forum ID.</word>
+  <word key="modlog__saved_action" js="0">Ran a saved action on topic</word>
+  <word key="modlog__unarchived_topic" js="0">Unarchived a topic</word>
+  <word key="modlog__removed_archive_exclude_topic" js="0">Removed 'exclude from archive' state from a topic</word>
   <word key="queue_deleting_legacy_topics" js="0">Deleting legacy topic data</word>
   <word key="queue_deleting_legacy_posts" js="0">Deleting legacy post data</word>
   <word key="queue_fixing_hidden_first_post" js="0">Updating incorrectly hidden topics</word>
   <word key="queue_rebuilding_new_topic_flag" js="0">Rebuilding new topic flag in posts</word>
   <word key="queue_rebuilding_solved_posts" js="0">Rebuilding solved post index</word>
-  <word key="queue_rebuilding_helpful_counts" js="0">Rebuilding topic helpful counts</word>
   <word key="block_forumStatistics" js="0">Forum Statistics</word>
   <word key="block_forumStatistics_desc" js="0">Shows general forum statistics</word>
   <word key="total_topics" js="0">Total Topics</word>
@@ -483,6 +574,8 @@
   <word key="block_latestTopics" js="0">Latest Topics</word>
   <word key="block_latestTopics_desc" js="0">Show the latest topics posted</word>
   <word key="view_this_topic" js="0">View the topic %s</word>
+  <word key="block_hotTopics" js="0">Popular Now</word>
+  <word key="block_hotTopics_desc" js="0">Show topics that are currently popular</word>
   <word key="block_featuredTopics" js="0">Featured Topics</word>
   <word key="block_featuredTopics_desc" js="0">Show topics that are currently featured</word>
   <word key="block_topicFeed" js="0">Topic Feed</word>
@@ -492,7 +585,9 @@
   <word key="digest_area_forums_topic" js="0">Topics</word>
   <word key="digest_area_forums_forum" js="0">Forums</word>
   <word key="x_created_topic_in" js="0">%s created a topic in %s</word>
+  <word key="x_asked_new_question" js="0">%s asked a new question in %s</word>
   <word key="x_replied_to_a_topic" js="0">%s replied to a topic</word>
+  <word key="x_answered_a_question" js="0">%s answered a question</word>
   <word key="loc_forums_viewing_topic" js="0">Viewing Topic: %s</word>
   <word key="loc_forums_viewing_topic_action" js="0">%s is reading a topic</word>
   <word key="loc_forums_viewing_forum" js="0">Viewing Forum: %s</word>
@@ -501,13 +596,24 @@
   <word key="loc_forums_creating_topic_action" js="0">%s is creating a topic</word>
   <word key="loc_forums_index" js="0">Viewing Forums Index</word>
   <word key="loc_forums_index_action" js="0">%s is viewing the forum list</word>
-  <word key="ad_forum_listing" js="0">Forum view, between topic rows</word>
-  <word key="ad_topic_view" js="0">Topic view, between posts</word>
+  <word key="ad_forum_listing" js="0">After the first topic in each forum</word>
+  <word key="ad_topic_view" js="0">After the first post in each topic</word>
   <word key="ad_fluid_index_view" js="0">Fluid view topic listing, between topic rows</word>
+  <word key="ad_fluid_index_view_number" js="0">Show this advert after every</word>
+  <word key="ad_fluid_index_view_number_suffix" js="0">topic rows when in fluid view mode</word>
+  <word key="ad_fluid_index_view_repeat" js="0">Repeated</word>
+  <word key="ad_fluid_index_view_repeat_suffix" js="0">times</word>
   <word key="stats_new_topics" js="0">Topics</word>
+  <word key="stats_new_posts" js="0">Posts</word>
+  <word key="stats_topics_tab_total" js="0">All Topics</word>
+  <word key="stats_topics_tab_byforum" js="0">Topics By Forum</word>
+  <word key="stats_topics_tab_noposts" js="0">Topics With No Posts</word>
   <word key="stats_topics_tab_solved" js="0">Solved Topics By Forum</word>
   <word key="stats_topics_title_solved" js="0">Solved Topics By Forum</word>
-  <word key="stats_new_posts" js="0">Posts</word>
+  <word key="stats_topics_tab_groups" js="0">Solved Topics By Group</word>
+  <word key="stats_topics_title" js="0">Topics by time period</word>
+  <word key="stats_topics_title_byforum" js="0">Topics by forum</word>
+  <word key="stats_topics_tab_unsolved" js="0">Unsolved Topics</word>
   <word key="topics_noposts_tid" js="0">Topic ID</word>
   <word key="topics_noposts_title" js="0">Title</word>
   <word key="topics_noposts_state" js="0">Status</word>
@@ -516,11 +622,6 @@
   <word key="topics_noposts_views" js="0">Views</word>
   <word key="topics_noposts_forum_id" js="0">Forum</word>
   <word key="topics_noposts_approved" js="0">Approved</word>
-  <word key="stats_topics_tab_total" js="0">All Topics</word>
-  <word key="stats_topics_tab_byforum" js="0">Topics By Forum</word>
-  <word key="stats_topics_tab_noposts" js="0">Topics With No Posts</word>
-  <word key="stats_topics_title" js="0">Topics by time period</word>
-  <word key="stats_topics_title_byforum" js="0">Topics by forum</word>
   <word key="stats_posts_tab_total" js="0">All Posts</word>
   <word key="stats_posts_tab_byforum" js="0">Posts By Forum</word>
   <word key="stats_posts_title" js="0">Posts by time period</word>
@@ -531,6 +632,12 @@
   <word key="stats_solved_tooltip_prev" js="0">%s topics were marked solved out of %s total topics for a solution rate of %s%%</word>
   <word key="stats_averagetimesolved" js="0">Average Time To Solution</word>
   <word key="stats_averagetimesolved_desc" js="0">The average amount of time that passed between the time the topic was started and the time a solution was marked</word>
+  <word key="menu__forums_stats_questions" js="0">Questions</word>
+  <word key="stats_question_ratings_title" js="0">Question up/down votes over time</word>
+  <word key="stats_question_ratings_negative" js="0">Downvote</word>
+  <word key="stats_question_ratings_positive" js="0">Upvote</word>
+  <word key="r__questions" js="0">Questions</word>
+  <word key="r__questions_manage" js="0">Can view question statistics?</word>
   <word key="menu__forums_stats_solvers" js="0">Top Solvers</word>
   <word key="top_solvers" js="0">Top Solvers</word>
   <word key="top_solvers_name" js="0">Username</word>
@@ -538,8 +645,6 @@
   <word key="top_solvers_solved_date" js="0">Date Range</word>
   <word key="top_solvers_date" js="0">Last Solution Date</word>
   <word key="top_solvers_member_group_id" js="0">Group</word>
-  <word key="stats_topics_tab_groups" js="0">Solved Topics by Group</word>
-  <word key="stats_topics_tab_unsolved" js="0">Unsolved Topics</word>
   <word key="widget_feed_container_topic" js="0">Forums</word>
   <word key="block_topicFeed_title" js="0">Topics</word>
   <word key="block_postFeed_title" js="0">Posts</word>
@@ -552,13 +657,15 @@
   <word key="__api_forums_posts" js="0">Posts</word>
   <word key="__api_forums_topics" js="0">Topics</word>
   <word key="__api_forums_forums" js="0">Forums</word>
+  <word key="recommend_post" js="0">Recommend Post</word>
+  <word key="recommended_posts" js="0">Recommended Posts</word>
   <word key="enable_topic_moderation" js="0">Enable Post Approval</word>
   <word key="disable_topic_moderation" js="0">Disable Post Approval</word>
   <word key="topic_moderation_enabled" js="0">Post Approval Enabled</word>
   <word key="enable_topic_moderation_confirm" js="0">If enabled, all new comments will require moderator approval before they will be displayed in this topic.</word>
   <word key="disable_topic_moderation_confirm" js="0">If disabled, new comments will no longer require moderator approval.</word>
-  <word key="solve_content" js="0">Mark as Solution</word>
   <word key="unsolve_content" js="0">Unmark as Solution</word>
+  <word key="solve_content" js="0">Mark as Solution</word>
   <word key="this_is_a_solved_post" js="0">Solution</word>
   <word key="solved_and_go" js="0">Go to solution</word>
   <word key="this_is_solved" js="0">Solved</word>
@@ -579,28 +686,6 @@
   <word key="solved_stats_rebuild_button" js="0">Rebuild Solved Statistics</word>
   <word key="solved_rebuilding_stats" js="0">Rebuilding solved statistics for forum %s</word>
   <word key="solved_stats_chart_desc" js="0">The data in this chart updates once per day.</word>
-  <word key="solved_stats_from_cutoff" js="0">Statistics Cutoff</word>
-  <word key="solved_stats_from_cutoff_desc" js="0"><![CDATA[Any topics marked as solved that were posted older than the timeframe configured here will be excluded from <a href='{internal.app=forums&module=stats&controller=solved&tab=time}' target='_blank'>Time to Solved</a> statistics for this forum. Note that statistics are built once daily, so changes here may not take effect immediately.]]></word>
-  <word key="cannot_mark_helpful" js="0">You can't mark this answer as helpful</word>
-  <word key="mark_helpful" js="0">Helpful</word>
-  <word key="unmark_helpful" js="0">Helpful</word>
-  <word key="helpful_users_found_helpful" js="0">Members that found this helpful</word>
-  <word key="gbw_view_helpful" js="0">Can view who found content helpful?</word>
-  <word key="forums_helpful_highlight" js="0">Feature most helpful post</word>
-  <word key="forums_helpful_highlight_prefix" js="0">when</word>
-  <word key="forums_helpful_highlight_suffix" js="0">or more people find it helpful</word>
-  <word key="forums_helpful_highlight_never" js="0">never</word>
-  <word key="helpful_go_to_most_helpful" js="0">Go to most helpful comment</word>
-  <word key="most_helpful_byline" js="0">Most helpful reply by %s</word>
-  <word key="helpful_all_replies" js="0">All Replies</word>
-  <word key="helpful_all_n_replies" js="0">Show {!#[1:][?:All ]}{# [1:Reply][?:Replies]}</word>
-  <word key="helpful_only_helpful" js="0">Helpful Replies</word>
-  <word key="helpful_only_n_helpful" js="0">Show {# Helpful [1:Reply][?:Replies]}</word>
-  <word key="forums_is_expert" js="0">Community Expert</word>
-  <word key="forums_is_expert_tooltip" js="0">%s has been recognized as a helpful expert in this area.</word>
-  <word key="bw_solved_set_by_moderator" js="0">Enabled Solved</word>
-  <word key="forums_solved_nudge_experts_prefix" js="0">if the topic is not solved and the topic was started</word>
-  <word key="forums_solved_nudge_experts_suffix" js="0">days ago or more</word>
   <word key="forums_simple_name_with_container" js="0"><![CDATA[By %s in <a href='%s'>%s</a>]]></word>
   <word key="forums_show_all_forums" js="0">Table view</word>
   <word key="forums_show_all_forums_tooltip" js="0">Show a table of categories and forums</word>
@@ -615,11 +700,10 @@
   <word key="forums_view_list_method" js="0">Default topic list view</word>
   <word key="forums_view_list_choose" js="0">Members can choose?</word>
   <word key="forums_view_list_choose_desc" js="0">Choose whether you wish to allow your members to toggle between the views. When set to 'no', members will always use the default topic list view.</word>
-  <word key="topicactivity_expand" js="0">Expand topic overview</word>
   <word key="topicactivity_created" js="0">Created</word>
   <word key="topicactivity_topposters" js="0">Top Posters In This Topic</word>
-  <word key="topicactivity_popularposts" js="0">Most Popular Posts</word>
-  <word key="topicactivity_helpfulposts" js="0">Most Helpful Posts</word>
+  <word key="topicactivity_topposters_qa" js="0">Top Posters For This Question</word>
+  <word key="topicactivity_popularposts" js="0">Popular Posts</word>
   <word key="topicactivity_populardays" js="0">Popular Days</word>
   <word key="topicactivity_images" js="0">Posted Images</word>
   <word key="topicactivity_number_posts" js="0">{# [1:post][?:posts]}</word>
@@ -633,14 +717,12 @@
   <word key="forums_topics_activity_pages_show_unlimited" js="0">Always show</word>
   <word key="forums_topics_activity_pages_show" js="0">Criteria</word>
   <word key="forums_topics_activity_pages_show_prefix" js="0">When the number of pages is at least</word>
-  <word key="topic_overview_settings" js="0">Topic Overview Settings</word>
+  <word key="topic_summary_settings" js="0">Topic Summary Settings</word>
   <word key="forums_topic_activity_features" js="0">Content</word>
   <word key="forums_topic_activity_features_popularDays" js="0">Popular Days</word>
   <word key="forums_topic_activity_features_popularDays_desc" js="0">A list of the 4 days which had the most posts</word>
   <word key="forums_topic_activity_features_topPost" js="0">Top Posts</word>
   <word key="forums_topic_activity_features_topPost_desc" js="0">A list of the 3 posts with the most positive reactions</word>
-  <word key="forums_topic_activity_features_helpful" js="0">Helpful Posts</word>
-  <word key="forums_topic_activity_features_helpful_desc" js="0">A list of the 3 most helpful posts</word>
   <word key="forums_topic_activity_features_uploads" js="0">Posted Images</word>
   <word key="forums_topics_show_meta" js="0">Show</word>
   <word key="forums_topic_show_meta_time" js="0">Large time gaps between posts</word>
@@ -648,8 +730,6 @@
   <word key="forums_topic_show_meta_moderation_desc" js="0"><![CDATA[You can specify which groups can see moderation events in the <a href='{internal.app=core&module=members&controller=groups}'>Group Settings</a>]]></word>
   <word key="forums_mod_actions_anon" js="0">Show moderator name alongside moderation events</word>
   <word key="forums_mod_actions_anon_desc" js="0">If disabled, the name of the moderator who performed the action will be hidden from other users who do not have permission to moderate within the forum.</word>
-  <word key="forum_post_use_minimal_editor" js="0">Use the comment editor for replies</word>
-  <word key="forum_post_use_minimal_editor_desc" js="0"><![CDATA[By default, topic replies use the same editor as the first post in the topic. With this enabled, the Comment Editor, used for secondary content such as Comments and Reviews, will be used for replies instead. The Comment Editor offers a reduced range of features and can be configured in the <a href='{internal.admin.app=core&module=settings&controller=posting&tab=simplifiedMode}'>Editor Permission settings <i class='fa-solid fa-external-link'></i></a> and the <a href='{internal.admin.app=core&module=members&controller=groups}'>settings for each group <i class='fa-solid fa-external-link'></i></a>]]></word>
   <word key="404_forums_topic" js="0">We could not find that topic.</word>
   <word key="403_forums_topic" js="0">You do not have permission to view this topic.</word>
   <word key="mobilenavigation_Topics" js="0">All Topics</word>
@@ -663,8 +743,13 @@
   <word key="app_incorrect_forum_password" js="0">The password to this forum wasn't provided</word>
   <word key="app_no_post" js="0">The post does not exist.</word>
   <word key="app_invalid_topic" js="0">The topic couldn't be loaded.</word>
+  <word key="app_not_question" js="0">This topic cannot be voted upon.</word>
+  <word key="app_cannot_vote" js="0">You cannot vote on this question.</word>
+  <word key="app_error_voting_question" js="0">There was a problem voting on this question.</word>
   <word key="app_replace_best_answer_title" js="0">Confirm</word>
   <word key="app_replace_best_answer_text" js="0">Are you sure you want to replace the current Best Answer with this one?</word>
+  <word key="app_question_asked_by" js="0">Question asked by {{name}}</word>
+  <word key="app_this_is_best_answer" js="0">Best answer to this question</word>
   <word key="app_all_topics" js="0">All Topics</word>
   <word key="app_all_topics_desc" js="0">Showing all topics from all forums</word>
   <word key="app_create_topic" js="0">Create Topic</word>
@@ -685,7 +770,7 @@
   <word key="app_topic_restricted_cannot_comment" js="0">Your account is currently restricted from posting.</word>
   <word key="app_topic_unacknowledged_warning_cannot_post" js="0">You have received a warning that you must acknowledge before being able to post.</word>
   <word key="app_topic_member_exceeded_posts_per_day" js="0">You have reached the maximum number posts you can make per day.</word>
-  <word key="AchievementAction__AnswerMarkedBest" js="0">Post is marked as helpful or the best answer</word>
+  <word key="AchievementAction__AnswerMarkedBest" js="0">Post is marked as the best answer</word>
   <word key="achievement_filter_AnswerMarkedBest_forum" js="0">Add a location condition</word>
   <word key="achievement_filter_AnswerMarkedBest_forum_prefix" js="0">The question is in the forum</word>
   <word key="achievement_filter_AnswerMarkedBest_poster" js="0">To the user who posted the answer</word>
@@ -696,46 +781,6 @@
   <word key="AchievementAction__AnswerMarkedBest_log_other" js="0">Question %s had an answer marked as the best answer</word>
   <word key="AchievementAction__AnswerMarkedBest_log_deleted" js="0">a deleted question</word>
   <word key="AchievementAction__AnswerMarkedBest_title" js="0">Best answer</word>
-  <word key="achievement_filter_AnswerMarkedBest_helpful_or_solved" js="0">Add a marked helpful or mark solved condition</word>
-  <word key="achievement_filter_AnswerMarkedBest_helpful_or_solved_helpful" js="0">Post marked helpful</word>
-  <word key="achievement_filter_AnswerMarkedBest_helpful_or_solved_solved" js="0">Post marked as the solution</word>
-  <word key="AchievementAction__AnswerMarkedHelpful_title" js="0">Marked helpful</word>
-  <word key="AchievementAction__AnswerMarkedBest_log_subject_helpful" js="0">Answer given to %s marked as helpful</word>
-  <word key="AchievementAction__AnswerMarkedBest_log_other_helpful" js="0">Question %s had an answer marked as helpful</word>
-  <word key="forum_customizations" js="0">Customization</word>
-  <word key="forum_solved_options" js="0">Support Forum Settings</word>
-  <word key="topic_and_post_settings" js="0"><![CDATA[Topics &amp; Posts]]></word>
-  <word key="forum_icon_choose" js="0">Icon</word>
-  <word key="forum_icon_choose_desc" js="0"><![CDATA[The icon displays next to the forum in the forum list. It will automatically be faded out to indicate if there are no unread topics within the forum.<br>If none is provided, the default icon will be used.]]></word>
-  <word key="forum_icon_choose_icon" js="0">Choose an icon</word>
-  <word key="forum_icon_choose_upload" js="0">Upload an icon</word>
-  <word key="forum_icon_picker" js="0">Icon Picker</word>
-  <word key="forum_icon_upload" js="0">Upload</word>
-  <word key="forum_icon_choose_icon_none" js="0">No custom icon</word>
-  <word key="forum_solved_mode" js="0">Topic Solutions</word>
-  <word key="forum_solved_mode_off" js="0">Off</word>
-  <word key="forum_solved_mode_off_desc" js="0">Do not allow anyone to mark posts as the solution to the topic question or allow members to add helpful votes on posts</word>
-  <word key="forum_solved_mode_mods" js="0">Moderators can mark as solved</word>
-  <word key="forum_solved_mode_starter" js="0">The topic starter and moderators can mark as solved</word>
-  <word key="forum_solved_mode_desc" js="0"><![CDATA[Solved mode allows posts to be marked as the solution helping new viewers find the solution quickly. Other members can vote replies as helpful which, when <a href='{internal.app=forums&module=forums&controller=settings&searchResult=form_forums_helpful_highlight}'>meet a threshold</a>, are featured until a specific post is marked as the solution. You can select which groups can mark content as 'Helpful' in the <a href='{internal.app=core&module=members&controller=groups&searchResult=gbw_can_mark_helpful}'>group settings</a>.]]></word>
-  <word key="forum_solved_mode_desc_front" js="0">Solved mode allows posts to be marked as the solution helping new viewers find the solution quickly. Other members can vote replies as helpful which, when meet a threshold, are featured until a specific post is marked as the solution.</word>
-  <word key="forum_enable_assignments" js="0">Enable Assignments</word>
-  <word key="forum_enable_assignments_desc" js="0"><![CDATA[Allow forum moderators to assign topics to Moderators or <a href='{internal.admin.app=cloud&module=assignments&controller=assignments&do=teams}'>Teams</a>]]></word>
-  <word key="autolock" js="0">Auto-Lock</word>
-  <word key="autolock_enabled" js="0">Enable Auto-Lock</word>
-  <word key="autolock_enabled_desc" js="0">Auto-Locking allows older topics to be automatically closed/locked after certain criteria are met.</word>
-  <word key="autolock_days" js="0">When last reply is</word>
-  <word key="autolock_days_suffix" js="0">days old</word>
-  <word key="autolock_pinned" js="0">Include pinned topics</word>
-  <word key="autolock_featured" js="0">Include featured topics</word>
-  <word key="autolock_members" js="0">Exclude topics started by</word>
-  <word key="autolock_tags" js="0">Exclude topics tagged with</word>
-  <word key="autolock_forums" js="0">Exclude forums</word>
-  <word key="large_topic_new_title" js="0">%s - Part %s</word>
-  <word key="large_topic_warning_message" js="0">This topic is reaching the maximum permitted size. It will be auto-closed within the next {# [1:post][?:posts]}. A new topic will be automatically opened and linked to this one.</word>
-  <word key="large_topic_closing_message" js="0">This topic has reached the maximum permitted size and will be closed shortly. A new topic will be automatically opened and linked to this one.</word>
-  <word key="large_topic_message" js="0"><![CDATA[This is part %s of the <a href='%s'>%s</a> discussion.]]></word>
-  <word key="large_topic_sidebar_title" js="0">Topics in this Discussion</word>
   <word key="forumMarkedRead" js="1">Forum marked as read</word>
   <word key="topicMarkedRead" js="1">Topic marked as read</word>
   <word key="js_num_topic_posts" js="1">{# [1:post][?:posts]} in this topic</word>

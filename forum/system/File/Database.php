@@ -11,26 +11,16 @@
 namespace IPS\File;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Member;
-use LogicException;
-use UnderflowException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Handler: Database
  */
-class Database extends File
+class _Database extends \IPS\File
 {
 	/* !ACP Configuration */
 	
@@ -40,7 +30,7 @@ class Database extends File
 	 * @param	array	$configuration		Configuration if editing a setting, or array() if creating a setting.
 	 * @return	array
 	 */
-	public static function settings( array $configuration=array() ) : array
+	public static function settings( $configuration=array() )
 	{
 		return array();
 	}
@@ -50,9 +40,9 @@ class Database extends File
 	 *
 	 * @param	array	$values	The submitted values
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public static function testSettings( array &$values ) : void
+	public static function testSettings( &$values )
 	{
 
 	}
@@ -63,9 +53,9 @@ class Database extends File
 	 * @param	array	$settings	Configuration settings
 	 * @return	string
 	 */
-	public static function displayName( array $settings ) : string
+	public static function displayName( $settings )
 	{
-		return Member::loggedIn()->language()->addToStack('filehandler__Database');
+		return \IPS\Member::loggedIn()->language()->addToStack('filehandler__Database');
 	}
 	
 	/* !File Handling */
@@ -73,14 +63,14 @@ class Database extends File
 	/**
 	 * Is this URL valid for this engine?
 	 *
-	 * @param   Url   $url            URL
+	 * @param   \IPS\Http\Url   $url            URL
 	 * @param   array           $configuration  Specific configuration for this method
 	 * @return  bool
 	 */
-	public static function isValidUrl( Url $url, array $configuration ) : bool
+	public static function isValidUrl( $url, $configuration )
 	{
-		$check = Url::internal( "applications/core/interface/file/index.php", 'none', NULL, array(), Url::PROTOCOL_RELATIVE );
-		if ( mb_substr( (string)$url, 0, mb_strlen( $check ) ) === $check )
+		$check = \IPS\Http\Url::internal( "applications/core/interface/file/index.php", 'none', NULL, array(), \IPS\Http\Url::PROTOCOL_RELATIVE );
+		if ( mb_substr( $url, 0, mb_strlen( $check ) ) === $check )
 		{
 			return TRUE;
 		}
@@ -94,7 +84,7 @@ class Database extends File
 	 * @param	array	$configuration	Storage configuration
 	 * @return	void
 	 */
-	public function __construct( array $configuration )
+	public function __construct( $configuration )
 	{
 		$this->container = 'monthly_' . date( 'Y' ) . '_' . date( 'm' );
 		parent::__construct( $configuration );
@@ -105,9 +95,9 @@ class Database extends File
 	 *
 	 * @return string
 	 */
-	public function baseUrl() : string
+	public function baseUrl()
 	{
-		return (string) Url::internal( "applications/core/interface/file/index.php?file=", 'none', NULL, array(), Url::PROTOCOL_RELATIVE );
+		return (string) \IPS\Http\Url::internal( "applications/core/interface/file/index.php?file=", 'none', NULL, array(), \IPS\Http\Url::PROTOCOL_RELATIVE );
 	}
 	
 	/**
@@ -116,9 +106,9 @@ class Database extends File
 	 * @param	string	$filename	The filename
 	 * @return	string
 	 */
-	public function encodeFileUrl( string $filename ) : string
+	public function encodeFileUrl( $filename )
 	{
-		return Url::encodeComponent( Url::COMPONENT_QUERY_VALUE, $filename );
+		return \IPS\Http\Url::encodeComponent( \IPS\Http\Url::COMPONENT_QUERY_VALUE, $filename );
 	}
 	
 	/**
@@ -126,7 +116,7 @@ class Database extends File
 	 *
 	 * @return	void
 	 */
-	public function load() : void
+	public function load()
 	{
 		parent::load();
 		
@@ -140,15 +130,15 @@ class Database extends File
 		{
 			try
 			{
-				$record = Db::i()->select( '*', 'core_files', array( 'id=? AND salt=?', $this->url->queryString['id'], $this->url->queryString['salt'] ) )->first();
+				$record = \IPS\Db::i()->select( '*', 'core_files', array( 'id=? AND salt=?', $this->url->queryString['id'], $this->url->queryString['salt'] ) )->first();
 				$this->contents = $record['contents'];
 				$this->filename = $record['filename'];
 				$this->originalFilename = $this->unObscureFilename( $this->filename );
 				$this->container = $record['container'];
 			}
-			catch( UnderflowException $ex )
+			catch( \UnderflowException $ex )
 			{
-				throw new Exception( $this->container . '/' . $this->filename, Exception::DOES_NOT_EXIST, $this->originalFilename );
+				throw new \IPS\File\Exception( $this->container . '/' . $this->filename, \IPS\File\Exception::DOES_NOT_EXIST, $this->originalFilename );
 			}
 		}
 	}
@@ -159,18 +149,18 @@ class Database extends File
 	 * @param	bool	$refresh	If TRUE, will fetch again
 	 * @return	string
 	 */
-	public function contents( bool $refresh=FALSE ) : string
+	public function contents( $refresh=FALSE )
 	{		
 		if ( $this->contents === NULL or $refresh === TRUE )
 		{
 			try
 			{
-				$record = Db::i()->select( '*', 'core_files', array( 'filename=? AND container=?', $this->filename, $this->container ) )->first();
+				$record = \IPS\Db::i()->select( '*', 'core_files', array( 'filename=? AND container=?', $this->filename, $this->container ) )->first();
 				$this->contents = $record['contents'];
 			}
-			catch( UnderflowException $ex )
+			catch( \UnderflowException $ex )
 			{
-				throw new Exception( $this->container . '/' . $this->filename, Exception::DOES_NOT_EXIST, $this->originalFilename );
+				throw new \IPS\File\Exception( $this->container . '/' . $this->filename, \IPS\File\Exception::DOES_NOT_EXIST, $this->originalFilename );
 			}
 		}
 		return $this->contents;
@@ -182,10 +172,10 @@ class Database extends File
 	 * @param	string	$contents	New contents
 	 * @return	void
 	 */
-	public function replace( string $contents ) : void
+	public function replace( $contents )
 	{
 		/* Ensure any existing files with this name are removed otherwise the wrong file may be selected from the database as it will store multiple copies when replace() is used */
-		Db::i()->delete( 'core_files', array( 'filename=? and container=?', $this->filename, $this->container ) );
+		\IPS\Db::i()->delete( 'core_files', array( 'filename=? and container=?', $this->filename, $this->container ) );
 		
 		parent::replace( $contents );
 	}
@@ -195,18 +185,18 @@ class Database extends File
 	 *
 	 * @return	void
 	 */
-	public function save() : void
+	public function save()
 	{
 		$salt = md5( mt_rand() );
 		
-		$id = Db::i()->insert( 'core_files', array(
+		$id = \IPS\Db::i()->insert( 'core_files', array(
 			'filename'	=> $this->filename,
 			'salt'		=> $salt,
 			'contents'	=> $this->contents(),
 			'container'	=> $this->container
 		) );
 
-		$this->url = Url::internal( "applications/core/interface/file/index.php?file={$this->container}/{$this->filename}", 'none', NULL, array(), Url::PROTOCOL_RELATIVE );
+		$this->url = \IPS\Http\Url::internal( "applications/core/interface/file/index.php?file={$this->container}/{$this->filename}", 'none', NULL, array(), \IPS\Http\Url::PROTOCOL_RELATIVE );
 	}
 	
 	/**
@@ -214,15 +204,15 @@ class Database extends File
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		Db::i()->delete( 'core_files', array( 'filename=? AND container=?', $this->filename, $this->container ) );
+		\IPS\Db::i()->delete( 'core_files', array( 'filename=? AND container=?', $this->filename, $this->container ) );
 
 		/* Log deletion request */
 		$immediateCaller = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 1 );
 		$debug = array_map( function( $row ) {
 			return array_filter( $row, function( $key ) {
-				return in_array( $key, array( 'class', 'function', 'line' ) );
+				return \in_array( $key, array( 'class', 'function', 'line' ) );
 			}, ARRAY_FILTER_USE_KEY );
 		}, debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ) );
 		$this->log( "file_deletion", 'delete', $debug, 'log' );
@@ -234,9 +224,9 @@ class Database extends File
 	 * @param	string	$container	Key
 	 * @return	void
 	 */
-	public function deleteContainer( string $container ) : void
+	public function deleteContainer( $container )
 	{
-		Db::i()->delete( 'core_files', array( 'container=?', $container ) );
+		\IPS\Db::i()->delete( 'core_files', array( 'container=?', $container ) );
 
 		/* Log deletion request */
 		$realContainer = $this->container;
@@ -252,7 +242,7 @@ class Database extends File
 	 * @param	array	$engines	All file storage engine extension objects
 	 * @return	array
 	 */
-	public function removeOrphanedFiles( int $fileIndex, array $engines ) : array
+	public function removeOrphanedFiles( $fileIndex, $engines )
 	{
 		/* Start off our results array */
 		$results	= array(
@@ -264,7 +254,7 @@ class Database extends File
 		$checked	= 0;
 
 		/* Loop over files */
-		foreach( Db::i()->select( '*', 'core_files', array(), 'id ASC', array( $fileIndex, 100 ) ) as $file )
+		foreach( \IPS\Db::i()->select( '*', 'core_files', array(), 'id ASC', array( $fileIndex, 100 ) ) as $file )
 		{
 			$checked++;
 

@@ -11,78 +11,74 @@
 namespace IPS\core\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application\Module;
-use IPS\core\FrontNavigation\FrontNavigationAbstract;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: All Activity
  */
-class AllActivity extends FrontNavigationAbstract
+class _AllActivity extends \IPS\core\FrontNavigation\FrontNavigationAbstract
 {
 	/**
-	 * @var string Default icon
+	 * Default Location
+	 *
+	 * @return	mixed
 	 */
-	public string $defaultIcon = '\f0ca';
-
+	public static function defaultLocation()
+	{
+		return static::DEFAULT_LOCATION_ACTIVITY;
+	}
+	
 	/**
 	 * Get Type Title which will display in the AdminCP Menu Manager
 	 *
 	 * @return	string
 	 */
-	public static function typeTitle(): string
+	public static function typeTitle()
 	{
-		return Member::loggedIn()->language()->addToStack('all_activity');
+		return \IPS\Member::loggedIn()->language()->addToStack('all_activity');
 	}
 		
 	/**
 	 * Can the currently logged in user access the content this item links to?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canAccessContent(): bool
+	public function canAccessContent()
 	{
-		return Member::loggedIn()->canAccessModule( Module::get( 'core', 'discover' ) );
+		return \IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'discover' ) );
 	}
 	
 	/**
 	 * Get Title
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack('all_activity');
+		return \IPS\Member::loggedIn()->language()->addToStack('all_activity');
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|string|null
+	public function link()
 	{
-		return Url::internal( "app=core&module=discover&controller=streams", 'front', 'discover_all' );
+		return \IPS\Http\Url::internal( "app=core&module=discover&controller=streams", 'front', 'discover_all' );
 	}
 	
 	/**
 	 * Is Active?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function active(): bool
+	public function active()
 	{
-		return Dispatcher::i()->application->directory === 'core' and Dispatcher::i()->module->key === 'discover' and Dispatcher::i()->controller === 'streams' and !isset( Request::i()->id ) and ( !isset( Request::i()->do ) or Request::i()->do != 'create' );
+		return \IPS\Dispatcher::i()->application->directory === 'core' and \IPS\Dispatcher::i()->module->key === 'discover' and \IPS\Dispatcher::i()->controller === 'streams' and !isset( \IPS\Request::i()->id ) and ( !isset( \IPS\Request::i()->do ) or \IPS\Request::i()->do != 'create' );
 	}
 }

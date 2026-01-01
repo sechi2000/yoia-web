@@ -11,191 +11,190 @@
 namespace IPS\GeoLocation\GeoCoder;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadFunctionCallException;
-use BadMethodCallException;
-use IPS\GeoLocation;
-use IPS\GeoLocation\GeoCoder;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Settings;
-use RuntimeException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Mapbox GeoCoder class
  */
-class Mapbox extends GeoCoder
+class _Mapbox extends \IPS\GeoLocation\GeoCoder
 {
 	/**
 	 * Get by location string
 	 *
 	 * @param string $location
-	 * @return GeoLocation
-	 * @throws BadFunctionCallException
+	 * @return \IPS\GeoLocation
+	 * @throws \BadFunctionCallException
 	 */
-	public static function decodeLocation( string $location ): GeoLocation
+	public static function decodeLocation( string $location )
 	{
-		if ( Settings::i()->mapbox AND Settings::i()->mapbox_api_key )
+		if ( \IPS\Settings::i()->mapbox AND \IPS\Settings::i()->mapbox_api_key )
 		{
-			$data = Url::external( "https://api.mapbox.com/geocoding/v5/mapbox.places/{$location}.json" )->setQueryString( array(
-				'access_token'		=> Settings::i()->mapbox_api_key,
+			$data = \IPS\Http\Url::external( "https://api.mapbox.com/geocoding/v5/mapbox.places/{$location}.json" )->setQueryString( array(
+				'access_token'		=> \IPS\Settings::i()->mapbox_api_key,
 			) )->request()->get()->decodeJson();
 
-			$obj = new GeoLocation;
+			$obj = new \IPS\GeoLocation;
 
-			if( !empty( $data['features'] ) )
+			$_address	= '';
+
+			/* Make sure the response from Mapbox is valid */
+			if( isset( $data['results'] ) AND \is_array( $data['results'] ) AND \count( $data['results'] ) )
 			{
-				if( !empty( $data['features'][0]['geometry'] ) )
+				if( isset( $data['results'][0]['geometry'] ) AND isset( $data['results'][0]['geometry']['coordinates'] ) )
 				{
-					$obj->long = $data['features'][0]['geometry']['coordinates'][0];
-					$obj->lat = $data['features'][0]['geometry']['coordinates'][1];
+					$obj->long = $data['results'][0]['geometry']['coordinates'][0];
+					$obj->lat = $data['results'][0]['geometry']['coordinates'][1];
 				}
 
-				$obj->placeName = $data['features'][0]['place_name'];
+				$obj->placeName = $data['results'][0]['place_name'];
 
-				/* If we are at address level, the address will not be in a property */
-				if( $data['features'][0]['place_type'][0] == 'address' )
+				foreach( $data['results'][0]['address_components'] as $component )
 				{
-					$obj->addressLines = [ $data['features'][0]['address'] . ' ' . $data['features'][0]['text'] ];
-				}
-
-				foreach( $data['features'][0]['context'] as $property )
-				{
-					$propertyType = mb_substr( $property['id'], 0, mb_strpos( $property['id'], '.' ) );
-					switch( $propertyType )
+					if( $component['types'][0] == 'street_number' )
 					{
-						case 'locality':
-							$obj->city = $property['text'];
-							break;
+						$_address	= $component['long_name'];
+					}
+					elseif( $component['types'][0] == 'route' )
+					{
+						$_address	.= " " . $component['long_name'];
+					}
 
-						case 'postcode':
-							$obj->postalCode = $property['text'];
-							break;
+					if( $component['types'][0] == 'postal_code' )
+					{
+						$obj->postalCode	= $component['long_name'];
+					}
 
-						case 'country':
-							$obj->country = $property['text'];
-							break;
+					if( $component['types'][0] == 'country' )
+					{
+						$obj->country	= $component['short_name'];
+					}
 
-						case 'region':
-							$obj->region = $property['text'];
-							break;
+					if( $component['types'][0] == 'administrative_area_level_1' )
+					{
+						$obj->region	= $component['long_name'];
+					}
 
-						case 'district':
-							$obj->county = $property['text'];
-							break;
+					if( $component['types'][0] == 'locality' )
+					{
+						$obj->city	= $component['long_name'];
 					}
 				}
+			}
+
+			if( $_address )
+			{
+				$obj->addressLines	= array( $_address );
 			}
 
 			return $obj;
 		}
 		else
 		{
-			throw new BadFunctionCallException;
+			throw new \BadFunctionCallException;
 		}
 	}
 
 	/**
 	 * Get by latitude and longitude
 	 *
-	 * @param float $lat	Latitude
-	 * @param float $long	Longitude
-	 * @return	GeoLocation
-	 * @throws	BadFunctionCallException
-	 * @throws	Exception
+	 * @param	float	$lat	Latitude
+	 * @param	float	$long	Longitude
+	 * @return	\IPS\GeoLocation
+	 * @throws	\BadFunctionCallException
+	 * @throws	\IPS\Http\Request\Exception
 	 */
-	public static function decodeLatLong( float $lat, float $long ): GeoLocation
+	public static function decodeLatLong( $lat, $long )
 	{
-		if ( Settings::i()->mapbox AND Settings::i()->mapbox_api_key )
+		if ( \IPS\Settings::i()->mapbox AND \IPS\Settings::i()->mapbox_api_key )
 		{
 			$location = $long . ',' . $lat;
-			$data = Url::external( "https://api.mapbox.com/geocoding/v5/mapbox.places/{$location}.json" )->setQueryString( array(
-				'access_token'		=> Settings::i()->mapbox_api_key,
+			$data = \IPS\Http\Url::external( "https://api.mapbox.com/geocoding/v5/mapbox.places/{$location}.json" )->setQueryString( array(
+				'access_token'		=> \IPS\Settings::i()->mapbox_api_key,
 			) )->request()->get()->decodeJson();
 			
-			$obj = new GeoLocation;
+			$obj = new \IPS\GeoLocation;
 			$obj->lat			= $lat;
 			$obj->long			= $long;
 
-			if( !empty( $data['features'] ) )
+			$_address	= '';
+
+			/* Make sure the response from Mapbox is valid */
+			if( isset( $data['results'] ) AND \is_array( $data['results'] ) AND \count( $data['results'] ) )
 			{
-				$obj->placeName = $data['features'][0]['place_name'];
-
-				/* If we are at address level, the address will not be in a property */
-				if( $data['features'][0]['place_type'][0] == 'address' )
+				foreach( $data['results'][0]['address_components'] as $component )
 				{
-					$obj->addressLines = [ $data['features'][0]['address'] . ' ' . $data['features'][0]['text'] ];
-				}
-
-				foreach( $data['features'][0]['context'] as $property )
-				{
-					$propertyType = mb_substr( $property['id'], 0, mb_strpos( $property['id'], '.' ) );
-					switch( $propertyType )
+					if( $component['types'][0] == 'street_number' )
 					{
-						case 'locality':
-							$obj->city = $property['text'];
-							break;
+						$_address	= $component['long_name'];
+					}
+					elseif( $component['types'][0] == 'route' )
+					{
+						$_address	.= " " . $component['long_name'];
+					}
 
-						case 'postcode':
-							$obj->postalCode = $property['text'];
-							break;
+					if( $component['types'][0] == 'postal_code' )
+					{
+						$obj->postalCode	= $component['long_name'];
+					}
 
-						case 'country':
-							$obj->country = $property['text'];
-							break;
+					if( $component['types'][0] == 'country' )
+					{
+						$obj->country	= $component['short_name'];
+					}
 
-						case 'region':
-							$obj->region = $property['text'];
-							break;
+					if( $component['types'][0] == 'administrative_area_level_1' )
+					{
+						$obj->region	= $component['long_name'];
+					}
 
-						case 'district':
-							$obj->county = $property['text'];
-							break;
+					if( $component['types'][0] == 'locality' )
+					{
+						$obj->city	= $component['long_name'];
 					}
 				}
+			}
+
+			if( $_address )
+			{
+				$obj->addressLines	= array( $_address );
 			}
 
 			return $obj;
 		}
 		else
 		{
-			throw new BadFunctionCallException;
+			throw new \BadFunctionCallException;
 		}
 	}
 
 	/**
 	 * Get the latitude and longitude for the current object. Address must be set.
 	 *
-	 * @param	GeoLocation	$geoLocation	Geolocation object
-	 * @param bool $setAddress		Whether or not to update the address information from the GeoCoder service
+	 * @param	\IPS\GeoLocation	$geoLocation	Geolocation object
+	 * @param	bool				$setAddress		Whether or not to update the address information from the GeoCoder service
 	 * @return	void
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function setLatLong( GeoLocation &$geoLocation, bool $setAddress=FALSE ) : void
+	public function setLatLong( \IPS\GeoLocation &$geoLocation, $setAddress = FALSE )
 	{
-		if ( Settings::i()->mapbox AND Settings::i()->mapbox_api_key AND $geoLocation->toString() )
+		if ( \IPS\Settings::i()->mapbox AND \IPS\Settings::i()->mapbox_api_key AND $geoLocation->toString() )
 		{
 			try
 			{
-				$data = Url::external( "https://api.mapbox.com/geocoding/v5/mapbox.places/" . urlencode( html_entity_decode( $geoLocation->toString() ) ) . ".json" )->setQueryString( array(
-					'access_token'		=> Settings::i()->mapbox_api_key,
+				$data = \IPS\Http\Url::external( "https://api.mapbox.com/geocoding/v5/mapbox.places/" . urlencode( html_entity_decode( $geoLocation->toString() ) ) . ".json" )->setQueryString( array(
+					'access_token'		=> \IPS\Settings::i()->mapbox_api_key,
 				) )->request()->get()->decodeJson();
 			}
-			catch( RuntimeException $e )
+			catch( \RuntimeException $e )
 			{
 				return;
 			}
 
-			if ( !isset( $data['features'] ) or !count( $data['features'] ) )
+			if ( !isset( $data['features'] ) or !\count( $data['features'] ) )
 			{
 				return;
 			}
@@ -207,45 +206,50 @@ class Mapbox extends GeoCoder
 
 			if( $setAddress === TRUE )
 			{
-				$geoLocation->placeName = $data['features'][0]['place_name'];
-
-				/* If we are at address level, the address will not be in a property */
-				if( $data['features'][0]['place_type'][0] == 'address' )
+				if( isset( $data['results'] ) AND \is_array( $data['results'] ) AND \count( $data['results'] ) )
 				{
-					$geoLocation->addressLines = [ $data['features'][0]['address'] . ' ' . $data['features'][0]['text'] ];
+					foreach( $data['results'][0]['address_components'] as $component )
+					{
+						if( $component['types'][0] == 'street_number' )
+						{
+							$_address	= $component['long_name'];
+						}
+						elseif( $component['types'][0] == 'route' )
+						{
+							$_address	.= " " . $component['long_name'];
+						}
+
+						if( $component['types'][0] == 'postal_code' )
+						{
+							$geoLocation->postalCode	= $component['long_name'];
+						}
+
+						if( $component['types'][0] == 'country' )
+						{
+							$geoLocation->country	= $component['short_name'];
+						}
+
+						if( $component['types'][0] == 'administrative_area_level_1' )
+						{
+							$geoLocation->region	= $component['long_name'];
+						}
+
+						if( $component['types'][0] == 'locality' )
+						{
+							$geoLocation->city	= $component['long_name'];
+						}
+					}
 				}
 
-				foreach( $data['features'][0]['context'] as $property )
+				if( $_address )
 				{
-					$propertyType = mb_substr( $property['id'], 0, mb_strpos( $property['id'], '.' ) );
-					switch( $propertyType )
-					{
-						case 'locality':
-							$geoLocation->city = $property['text'];
-							break;
-
-						case 'postcode':
-							$geoLocation->postalCode = $property['text'];
-							break;
-
-						case 'country':
-							$geoLocation->country = $property['text'];
-							break;
-
-						case 'region':
-							$geoLocation->region = $property['text'];
-							break;
-
-						case 'district':
-							$geoLocation->county = $property['text'];
-							break;
-					}
+					$geoLocation->addressLines	= array( $_address );
 				}
 			}
 		}
 		else
 		{
-			throw new BadFunctionCallException;
+			throw new \BadFunctionCallException;
 		}
 	}
 }

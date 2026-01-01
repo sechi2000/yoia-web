@@ -11,49 +11,28 @@
 namespace IPS\Login\Handler\OAuth2;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\File;
-use IPS\Helpers\Form\Color;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Login;
-use IPS\Login\Exception as LoginException;
-use IPS\Login\Handler\OAuth2;
-use IPS\Member;
-use IPS\Settings;
-use RuntimeException;
-use function defined;
-use function is_array;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invision Community Login Handler
  */
-class Invision extends OAuth2
+class _Invision extends \IPS\Login\Handler\OAuth2
 {
 	/**
 	 * @brief	Can we have multiple instances of this handler?
 	 */
-	public static bool $allowMultiple = TRUE;
+	public static $allowMultiple = TRUE;
 	
 	/**
 	 * Get title
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return 'login_handler_InvisionCommunity';
 	}
@@ -66,21 +45,21 @@ class Invision extends OAuth2
 	 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{
-		Member::loggedIn()->language()->words['login_acp_desc'] = Member::loggedIn()->language()->addToStack('login_acp_will_reauth');
+		\IPS\Member::loggedIn()->language()->words['login_acp_desc'] = \IPS\Member::loggedIn()->language()->addToStack('login_acp_will_reauth');
 		
 		$return = array();
 		
 		$return[] = array( 'login_handler_InvisionCommunity_info_title', 'login_handler_InvisionCommunity_info' );
-		$return['url'] = new \IPS\Helpers\Form\Url( 'oauth_invision_endpoint', $this->settings['url'] ?? NULL, TRUE, array( 'placeholder' => 'https://othercommunity.example.com' ), function( $val )
+		$return['url'] = new \IPS\Helpers\Form\Url( 'oauth_invision_endpoint', isset( $this->settings['url'] ) ? $this->settings['url'] : NULL, TRUE, array( 'placeholder' => 'https://othercommunity.example.com' ), function( $val )
 		{
-			if ( rtrim( (string) $val, '/' ) === rtrim( Settings::i()->base_url, '/' ) )
+			if ( rtrim( (string) $val, '/' ) === rtrim( \IPS\Settings::i()->base_url, '/' ) )
 			{
-				throw new DomainException('oauth_invision_endpoint_internal');
+				throw new \DomainException('oauth_invision_endpoint_internal');
 			}
 		} );
-		$return['grant_type'] = new Radio( 'oauth_invision_grant_type', $this->settings['grant_type'] ?? 'authorization_code', TRUE, array(
+		$return['grant_type'] = new \IPS\Helpers\Form\Radio( 'oauth_invision_grant_type', isset( $this->settings['grant_type'] ) ? $this->settings['grant_type'] : 'authorization_code', TRUE, array(
 			'options' => array(
 				'authorization_code'	=> 'invision_grant_type_authorization_code',
 				'password'				=> 'invision_grant_type_password',
@@ -98,21 +77,21 @@ class Invision extends OAuth2
 			{
 				$active = 'accountManagementSettings';
 			}
-			if ( !is_string( $v ) and !is_array( $v ) )
+			if ( !\is_string( $v ) and !\is_array( $v ) )
 			{
 				${$active}[ $k ] = $v;
 			}
 		}
 		
 		$return[] = 'login_handler_oauth_ui';
-		$return['auth_types'] = new Select( 'oauth_custom_auth_types', $this->settings['auth_types'] ?? ( Login::AUTH_TYPE_USERNAME + Login::AUTH_TYPE_EMAIL ), TRUE, array( 'options' => array(
-			Login::AUTH_TYPE_USERNAME + Login::AUTH_TYPE_EMAIL => 'username_or_email',
-			Login::AUTH_TYPE_EMAIL	=> 'email_address',
-			Login::AUTH_TYPE_USERNAME => 'username',
+		$return['auth_types'] = new \IPS\Helpers\Form\Select( 'oauth_custom_auth_types', isset( $this->settings['auth_types'] ) ? $this->settings['auth_types'] : ( \IPS\Login::AUTH_TYPE_USERNAME + \IPS\Login::AUTH_TYPE_EMAIL ), TRUE, array( 'options' => array(
+			\IPS\Login::AUTH_TYPE_USERNAME + \IPS\Login::AUTH_TYPE_EMAIL => 'username_or_email',
+			\IPS\Login::AUTH_TYPE_EMAIL	=> 'email_address',
+			\IPS\Login::AUTH_TYPE_USERNAME => 'username',
 		) ), NULL, NULL, NULL, 'oauth_custom_auth_types' );
-		$return['button_color'] = new Color( 'oauth_custom_button_color', $this->settings['button_color'] ?? '#3E4148', NULL, array(), NULL, NULL, NULL, 'button_color' );
-		$return['button_text'] = new Translatable( 'oauth_custom_button_text',  NULL, NULL, array( 'placeholder' => Member::loggedIn()->language()->addToStack('oauth_custom_button_text_invision_placeholder'), 'app' => 'core', 'key' => ( $this->id ? "core_custom_oauth_{$this->id}" : NULL ) ), NULL, NULL, NULL, 'button_text' );
-		$return['button_icon'] = new Upload( 'oauth_custom_button_icon',  ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? File::get( 'core_Login', $this->settings['button_icon'] ) : NULL, FALSE, array( 'storageExtension' => 'core_Login' ), NULL, NULL, NULL, 'button_icon' );
+		$return['button_color'] = new \IPS\Helpers\Form\Color( 'oauth_custom_button_color', isset( $this->settings['button_color'] ) ? $this->settings['button_color'] : '#3E4148', NULL, array(), NULL, NULL, NULL, 'button_color' );		
+		$return['button_text'] = new \IPS\Helpers\Form\Translatable( 'oauth_custom_button_text',  NULL, NULL, array( 'placeholder' => \IPS\Member::loggedIn()->language()->addToStack('oauth_custom_button_text_invision_placeholder'), 'app' => 'core', 'key' => ( $this->id ? "core_custom_oauth_{$this->id}" : NULL ) ), NULL, NULL, NULL, 'button_text' );
+		$return['button_icon'] = new \IPS\Helpers\Form\Upload( 'oauth_custom_button_icon',  ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? \IPS\File::get( 'core_Login', $this->settings['button_icon'] ) : NULL, FALSE, array( 'storageExtension' => 'core_Login' ), NULL, NULL, NULL, 'button_icon' );
 		
 		$return[] = 'account_management_settings';
 		foreach ( $accountManagementSettings as $k => $v )
@@ -129,7 +108,7 @@ class Invision extends OAuth2
 	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function acpFormSave( array &$values ): array
+	public function acpFormSave( &$values )
 	{
 		$return = parent::acpFormSave( $values );
 		$return['url'] = (string) $return['url'];
@@ -143,7 +122,7 @@ class Invision extends OAuth2
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if( isset( $values['oauth_custom_button_text'] ) )
 		{
@@ -151,7 +130,7 @@ class Invision extends OAuth2
 			{
 				$this->save();
 			}
-			Lang::saveCustom( 'core', "core_custom_oauth_{$this->id}", $values['oauth_custom_button_text'] );
+			\IPS\Lang::saveCustom( 'core', "core_custom_oauth_{$this->id}", $values['oauth_custom_button_text'] );
 			unset( $values['button_text'] );
 		}
 		
@@ -163,7 +142,7 @@ class Invision extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonColor(): string
+	public function buttonColor()
 	{
 		return $this->settings['button_color'];
 	}
@@ -171,11 +150,11 @@ class Invision extends OAuth2
 	/**
 	 * Get the button icon
 	 *
-	 * @return	string|File
+	 * @return	string
 	 */
-	public function buttonIcon(): string|File
+	public function buttonIcon()
 	{
-		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? File::get( 'core_Login', $this->settings['button_icon'] ) : '';
+		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? \IPS\File::get( 'core_Login', $this->settings['button_icon'] ) : NULL;
 	}
 
 	/**
@@ -183,28 +162,28 @@ class Invision extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonClass(): string
+	public function buttonClass()
 	{
-		return 'ipsSocial--ips';
+		return 'ipsSocial_ips';
 	}
-
+	
 	/**
 	 * Get logo to display in information about logins with this method
 	 * Returns NULL for methods where it is not necessary to indicate the method, e..g Standard
 	 *
-	 * @return Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForDeviceInformation(): Url|string|null
+	public function logoForDeviceInformation()
 	{
-		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? File::get( 'core_Login', $this->settings['button_icon'] )->url : NULL;
+		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? \IPS\File::get( 'core_Login', $this->settings['button_icon'] )->url : NULL;
 	}
-
+	
 	/**
 	 * Get logo to display in user cp sidebar
 	 *
-	 * @return Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForUcp(): Url|string|null
+	public function logoForUcp()
 	{
 		return $this->logoForDeviceInformation();
 	}
@@ -214,7 +193,7 @@ class Invision extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonText(): string
+	public function buttonText()
 	{
 		return "core_custom_oauth_{$this->id}";
 	}
@@ -224,7 +203,7 @@ class Invision extends OAuth2
 	 *
 	 * @return	string
 	 */
-	protected function _authenticationType(): string
+	protected function _authenticationType()
 	{
 		return static::AUTHENTICATE_POST; // Just because it's possible their server isn't configured to accept HTTP Authorization whereas we know this will always work
 	}
@@ -234,9 +213,9 @@ class Invision extends OAuth2
 	 *
 	 * @return	string
 	 */
-	protected function grantType(): string
+	protected function grantType()
 	{
-		return $this->settings['grant_type'] ?? 'authorization_code';
+		return isset( $this->settings['grant_type'] ) ? $this->settings['grant_type'] : 'authorization_code';
 	}
 	
 	/**
@@ -245,7 +224,7 @@ class Invision extends OAuth2
 	 * @param	array|NULL	$additional	Any additional scopes to request
 	 * @return	array
 	 */
-	protected function scopesToRequest( array $additional=NULL ): array
+	protected function scopesToRequest( $additional=NULL )
 	{
 		return array( 'profile', 'email' );
 	}
@@ -253,14 +232,14 @@ class Invision extends OAuth2
 	/**
 	 * Authorization Endpoint
 	 *
-	 * @param	Login	$login	The login object
-	 * @return	Url
+	 * @param	\IPS\Login	$login	The login object
+	 * @return	\IPS\Http\Url
 	 */
-	protected function authorizationEndpoint( Login $login ): Url
+	protected function authorizationEndpoint( \IPS\Login $login )
 	{
-		$return = Url::external( $this->settings['url'] . '/oauth/authorize/' );
+		$return = \IPS\Http\Url::external( $this->settings['url'] . '/oauth/authorize/' );
 		
-		if ( $login->type === Login::LOGIN_ACP or $login->type === Login::LOGIN_REAUTHENTICATE )
+		if ( $login->type === \IPS\Login::LOGIN_ACP or $login->type === \IPS\Login::LOGIN_REAUTHENTICATE )
 		{
 			$return = $return->setQueryString( 'prompt', 'login' );
 		}
@@ -271,20 +250,20 @@ class Invision extends OAuth2
 	/**
 	 * Token Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function tokenEndpoint(): Url
+	protected function tokenEndpoint()
 	{
-		return Url::external( $this->settings['url'] . '/oauth/token/' );
+		return \IPS\Http\Url::external( $this->settings['url'] . '/oauth/token/' );
 	}
 	
 	/**
 	 * Get authenticated user's identifier (may not be a number)
 	 *
 	 * @param	string	$accessToken	Access Token
-	 * @return	string|null
+	 * @return	string
 	 */
-	protected function authenticatedUserId( string $accessToken ): ?string
+	protected function authenticatedUserId( $accessToken )
 	{
 		$userData = $this->_userData( $accessToken );
 		if ( isset( $userData['id'] ) )
@@ -301,7 +280,7 @@ class Invision extends OAuth2
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedUserName( string $accessToken ): ?string
+	protected function authenticatedUserName( $accessToken )
 	{
 		$userData = $this->_userData( $accessToken );
 		if ( isset( $userData['name'] ) )
@@ -318,7 +297,7 @@ class Invision extends OAuth2
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedEmail( string $accessToken ): ?string
+	protected function authenticatedEmail( $accessToken )
 	{
 		$userData = $this->_userData( $accessToken );
 		if ( isset( $userData['email'] ) )
@@ -332,23 +311,23 @@ class Invision extends OAuth2
 	 * Get user's profile photo
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
-	 * @return	Url|NULL
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	\IPS\Member	$member	Member
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfilePhoto( Member $member ): ?Url
+	public function userProfilePhoto( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new LoginException( "", LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		$userData = $this->_userData( $link['token_access_token'] );
 		if ( ( !isset( $userData['photoUrlIsDefault'] ) or !$userData['photoUrlIsDefault'] ) AND isset( $userData['photoUrl'] ) )
 		{
-			return Url::external( $userData['photoUrl'] );
+			return \IPS\Http\Url::external( $userData['photoUrl'] );
 		}
 		return NULL;
 	}
@@ -357,17 +336,17 @@ class Invision extends OAuth2
 	 * Get user's profile name
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfileName( Member $member ): ?string
+	public function userProfileName( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new LoginException( "", LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		$userData = $this->_userData( $link['token_access_token'] );
@@ -383,23 +362,23 @@ class Invision extends OAuth2
 	 * Get user's cover photo
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
-	 * @return	Url|NULL
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	\IPS\Member	$member	Member
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userCoverPhoto( Member $member ): ?Url
+	public function userCoverPhoto( \IPS\Member $member )
 	{
 		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new LoginException( "", LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 				
 		$userData = $this->_userData( $link['token_access_token'] );		
 		if ( isset( $userData['coverPhotoUrl'] ) and $userData['coverPhotoUrl'] )
 		{
-			return Url::external( $userData['coverPhotoUrl'] );
+			return \IPS\Http\Url::external( $userData['coverPhotoUrl'] );
 		}
 		
 		return NULL;
@@ -410,25 +389,25 @@ class Invision extends OAuth2
 	 * May return NULL if server doesn't support this
 	 *
 	 * @param	string	$identifier	The ID Nnumber/string from remote service
-	 * @param string|null $username	The username from remote service
-	 * @return	Url|NULL
-	 * @throws    LoginException    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	string	$username	The username from remote service
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userLink( string $identifier, ?string $username ): ?Url
+	public function userLink( $identifier, $username )
 	{
-		return Url::external( $this->settings['url'] )->setQueryString( 'showuser', $identifier );
+		return \IPS\Http\Url::external( $this->settings['url'] )->setQueryString( 'showuser', $identifier );
 	}
 	
 	/**
 	 * Syncing Options
 	 *
-	 * @param	Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
+	 * @param	\IPS\Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
 	 * @param	bool		$defaultOnly	If TRUE, only returns which options should be enabled by default for a new account
 	 * @return	array
 	 */
-	public function syncOptions( Member $member, bool $defaultOnly=FALSE ): array
+	public function syncOptions( \IPS\Member $member, $defaultOnly = FALSE )
 	{
 		$return = array();
 		
@@ -451,21 +430,21 @@ class Invision extends OAuth2
 	/**
 	 * @brief	Cached user data
 	 */
-	protected array $_cachedUserData = array();
+	protected $_cachedUserData = array();
 	
 	/**
 	 * Get user data
 	 *
 	 * @param	string	$accessToken	Access Token
-	 * @return    array
-	 *@throws	RuntimeException		Unexpected error from service
-	 * @throws	LoginException	The token is invalid and the user needs to reauthenticate
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\RuntimeException		Unexpected error from service
+	 * @return	array|null
 	 */
-	protected function _userData( string $accessToken ): array
+	protected function _userData( $accessToken )
 	{
 		if ( !isset( $this->_cachedUserData[ $accessToken ] ) )
 		{
-			$response = Url::external( $this->settings['url'] . '/api/index.php?/core/me' )
+			$response = \IPS\Http\Url::external( $this->settings['url'] . '/api/index.php?/core/me' )
 				->request()
 				->setHeaders( array(
 					'Authorization' => "Bearer {$accessToken}"
@@ -475,12 +454,12 @@ class Invision extends OAuth2
 			
 			if ( isset( $response['errorCode'] ) )
 			{
-				throw new LoginException( $response['errorMessage'], LoginException::INTERNAL_ERROR );
+				throw new \IPS\Login\Exception( $response['errorMessage'], \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 						
 			try
 			{
-				$email = Url::external( $this->settings['url'] . '/api/index.php?/core/me/email' )
+				$email = \IPS\Http\Url::external( $this->settings['url'] . '/api/index.php?/core/me/email' )
 					->request()
 					->setHeaders( array(
 						'Authorization' => "Bearer {$accessToken}"
@@ -493,7 +472,7 @@ class Invision extends OAuth2
 					$response['email'] = $email['email'];
 				}
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 						
 			$this->_cachedUserData[ $accessToken ] = $response;
 		}
@@ -503,10 +482,10 @@ class Invision extends OAuth2
 	/**
 	 * Forgot Password URL
 	 *
-	 * @return	Url|NULL
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function forgotPasswordUrl(): ?Url
+	public function forgotPasswordUrl()
 	{
-		return Url::external( $this->settings['url'] . '/index.php?app=core&module=system&controller=lostpass' );
+		return \IPS\Http\Url::external( $this->settings['url'] . '/index.php?app=core&module=system&controller=lostpass' );
 	}
 }

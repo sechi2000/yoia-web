@@ -11,41 +11,31 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Update all members at once
  */
-class UpdateMembers extends QueueAbstract
+class _UpdateMembers
 {
 	/**
 	 * @brief Number of content items to rebuild per cycle
 	 */
-	public int $perCycle = 50000;
+	public $perCycle = 50000;
 
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
-		$data['count'] = Db::i()->select( 'COUNT(*)', 'core_members' )->first();
+		$data['count'] = \IPS\Db::i()->select( 'COUNT(*)', 'core_members' )->first();
 		$data['done'] = 0;
 		return $data;
 	}
@@ -58,10 +48,10 @@ class UpdateMembers extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		/* Make sure there's stuff to update */
-		if( ! isset( $data['update'] ) or ! count( $data['update'] ) )
+		if( ! isset( $data['update'] ) or ! \count( $data['update'] ) )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
@@ -71,11 +61,11 @@ class UpdateMembers extends QueueAbstract
 		
 		try
 		{
-			$maxId = Db::i()->select( 'member_id', 'core_members', 'member_id > ' . $lastId, 'member_id ASC', array( $this->perCycle - 1, 1 ) )->first();
+			$maxId = \IPS\Db::i()->select( 'member_id', 'core_members', 'member_id > ' . $lastId, 'member_id ASC', array( $this->perCycle - 1, 1 ) )->first();
 		}
-		catch( UnderflowException $e ) { }
+		catch( \UnderflowException $e ) { }
 		
-		$realMaxId = Db::i()->select( 'MAX(member_id)', 'core_members' )->first();
+		$realMaxId = \IPS\Db::i()->select( 'MAX(member_id)', 'core_members' )->first();
 		
 		if ( ! $maxId )
 		{
@@ -95,7 +85,7 @@ class UpdateMembers extends QueueAbstract
 			$update = NULL;
 			$firstKey = key( $data['update'] );
 			
-			if ( count( $data['update'] ) == 1 and is_numeric( $firstKey ) )
+			if ( \count( $data['update'] ) == 1 and \is_numeric( $firstKey ) )
 			{
 				$update = $data['update'][0];
 			}
@@ -109,7 +99,7 @@ class UpdateMembers extends QueueAbstract
 				throw new \IPS\Task\Queue\OutOfRangeException;
 			}
 			
-			Db::i()->update( 'core_members', $update, array( 'member_id >= ? and member_id <= ?', $lastId, $maxId ) );
+			\IPS\Db::i()->update( 'core_members', $update, array( 'member_id >= ? and member_id <= ?', $lastId, $maxId ) );
 			
 			$data['lastId'] = $maxId;
 			$data['done'] += $this->perCycle;
@@ -127,14 +117,14 @@ class UpdateMembers extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		$fields = NULL;
 		$firstKey = key( $data['update'] );
 		
-		if ( count( $data['update'] ) == 1 and is_numeric( $firstKey ) )
+		if ( \count( $data['update'] ) == 1 and \is_numeric( $firstKey ) )
 		{
 			$fields = mb_substr( $data['update'][0], 0, mb_strpos( $data['update'][0], '=' ) );
 		}
@@ -143,6 +133,6 @@ class UpdateMembers extends QueueAbstract
 			$fields = implode( ',', array_keys( $data['update'] ) );
 		}
 	
-		return array( 'text' => Member::loggedIn()->language()->addToStack('mass_member_update', FALSE, array( 'sprintf' => array( $fields ) ) ), 'complete' => $data['done'] ? ( round( 100 / $data['done'] * $data['count'], 2 ) ) : 0 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('mass_member_update', FALSE, array( 'sprintf' => array( $fields ) ) ), 'complete' => $data['done'] ? ( round( 100 / $data['done'] * $data['count'], 2 ) ) : 0 );
 	}
 }

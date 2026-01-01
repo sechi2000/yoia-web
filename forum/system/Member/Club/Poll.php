@@ -11,37 +11,31 @@
 namespace IPS\Member\Club;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Poll as SystemPoll;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Poll Model
  */
-class Poll extends SystemPoll
+class _Poll extends \IPS\Poll
 {
 	/**
 	 * @brief Club this poll exists within
 	 */
-	public ?Club $club = NULL;
+	public $club = NULL;
 
 	/**
 	 * Member can vote?
 	 *
-	 * @param	Member|NULL	$member	Member or NULL for currently logged in member
-	 * @return	bool
+	 * @param	\IPS\Member|NULL	$member	Member or NULL for currently logged in member
+	 * @return	void
 	 */
-	public function canVote( Member $member = NULL ) : bool
+	public function canVote( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		if( !parent::canVote( $member ) )
 		{

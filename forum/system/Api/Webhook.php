@@ -11,64 +11,42 @@
 namespace IPS\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\Form\WebhookSelector;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Url as FormUrl;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_object;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Webhook
  */
-class Webhook extends Model
+class _Webhook extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_api_webhooks';
+	public static $databaseTable = 'core_api_webhooks';
 	
 	/**
 	 * @brief	cache for get_url()
 	 */
-	protected mixed $_url = NULL;
+	protected $_url;
 	
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array('webhooks');
+	protected $caches = array('webhooks');
 
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'api_webhooks';
+	public static $nodeTitle = 'api_webhooks';
 
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -86,7 +64,7 @@ class Webhook extends Model
 	'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'applications',
 		'prefix' 	=> 'api_',
@@ -97,7 +75,7 @@ class Webhook extends Model
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->content_type = 'application/x-www-form-urlencoded';
 		$this->_data['filters'] = '{}';
@@ -108,14 +86,14 @@ class Webhook extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
-		$form->add( new FormUrl( 'url', $this->url ?? "", TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'url', $this->url ?? "", TRUE ) );
 
-		if( in_array($this->content_type, ['application/x-www-form-urlencoded', 'application/json']))
+		if( \in_array($this->content_type, ['application/x-www-form-urlencoded', 'application/json']))
 		{
 			$selectedHeader = $this->content_type;
 			$customHeader = '';
@@ -125,13 +103,13 @@ class Webhook extends Model
 			$selectedHeader = 'custom';
 			$customHeader = $this->content_type;
 		}
-		$form->add( new Select('webhook_content_type', $selectedHeader, TRUE , ['options' => ['application/x-www-form-urlencoded' => 'x-www-form-urlencoded', 'application/json' => 'application/json', 'custom' => 'Other'] , 'toggles'=> ['custom' => ['webhook_content_type_other'] ] ] ) );
-		$form->add( new Text('webhook_content_type_other', $customHeader, FALSE , [], NULL, NULL, NULL, 'webhook_content_type_other' ) );
+		$form->add( new \IPS\Helpers\Form\Select('webhook_content_type', $selectedHeader, TRUE , ['options' => ['application/x-www-form-urlencoded' => 'x-www-form-urlencoded', 'application/json' => 'application/json', 'custom' => 'Other'] , 'toggles'=> ['custom' => ['webhook_content_type_other'] ] ] ) );
+		$form->add( new \IPS\Helpers\Form\Text('webhook_content_type_other', $customHeader, FALSE , [], NULL, NULL, NULL, 'webhook_content_type_other' ) );
 		$events = [];
 
-		foreach (Webhook::getAvailableWebhooks() as $app => $hooks )
+		foreach ( \IPS\Api\Webhook::getAvailableWebhooks() as $app => $hooks )
 		{
-			if( count( $hooks ))
+			if( \count( $hooks ))
 			{
 				foreach( $hooks as $hook => $params)
 				{
@@ -140,9 +118,7 @@ class Webhook extends Model
 			}
 		}
 
-		$form->add( new WebhookSelector('webhook_events', $this->events ?? [], TRUE , [ 'options' => $events] ) );
-
-		$form->add( new Node( 'webhook_api_key', $this->api_key, false, array( 'class' => Key::class, 'multiple' => false ) ) );
+		$form->add( new \IPS\core\Form\WebhookSelector('webhook_events', $this->events ?? [], TRUE , [ 'options' => $events] ) );
 	}
 
 	/**
@@ -151,7 +127,7 @@ class Webhook extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		$values['events'] = $values['webhook_events'];
 
@@ -163,14 +139,13 @@ class Webhook extends Model
 		{
 			$values['content_type'] = $values['webhook_content_type'];
 		}
-		$values['api_key'] = ( $values['webhook_api_key'] instanceof Key ) ? $values['webhook_api_key']->id : '';
 
-		unset( $values['webhook_events'], $values['webhook_content_type'], $values['webhook_content_type_other'], $values['webhook_api_key'] );
+		unset( $values['webhook_events'], $values['webhook_content_type'], $values['webhook_content_type_other'] );
 
 		return $values;
 	}
 
-	public function get__title(): string
+	public function get__title()
 	{
 		return (string) $this->url;
 	}
@@ -180,9 +155,9 @@ class Webhook extends Model
 	 *
 	 * @return	string|null
 	 */
-	protected function get__description(): ?string
+	protected function get__description()
 	{
-		return Theme::i()->getTemplate( 'api', 'core' )->webhookDesc( $this );
+		return \IPS\Theme::i()->getTemplate( 'api', 'core' )->webhookDesc( $this );
 	}
 
 	/**
@@ -193,16 +168,16 @@ class Webhook extends Model
 	 * @param	array	$filters		Filters
 	 * @return	void
 	 */
-	public static function fire( string $event, mixed $data = NULL, array $filters = array() ) : void
+	public static function fire( $event, $data = NULL, $filters = array() )
 	{
 		/* This will intentionally not call $data::apiOutput to avoid unnecessary overhead here */
-		Log::debug(  print_r( array_merge(['event' => $event], ['payload' => $data], ['filters' =>  $filters ]) , TRUE ), 'webhook_fire_call');
+		\IPS\Log::debug(  print_r( array_merge(['event' => $event], ['payload' => $data], ['filters' =>  $filters ]) , TRUE ), 'webhook_fire_call');
 
 		/* Get our webhooks from cache */
-		if ( !isset( Store::i()->webhooks ) )
+		if ( !isset( \IPS\Data\Store::i()->webhooks ) )
 		{
 			$webhooks = array();
-			foreach ( Db::i()->select( '*', 'core_api_webhooks', array('enabled=1') ) as $row )
+			foreach ( \IPS\Db::i()->select( '*', 'core_api_webhooks', array('enabled=1') ) as $row )
 			{
 				foreach ( explode( ',', $row['events'] ) as $e )
 				{
@@ -219,24 +194,24 @@ class Webhook extends Model
 					);
 				}
 			}
-			Store::i()->webhooks = $webhooks;
+			\IPS\Data\Store::i()->webhooks = $webhooks;
 		}
 		
 		/* If we have webhooks for this event... */
 		$enable = FALSE;
-		if ( isset( Store::i()->webhooks[ $event ] ) )
+		if ( isset( \IPS\Data\Store::i()->webhooks[ $event ] ) )
 		{
 			/* Normalise data */
-			if ( is_object( $data ) and method_exists( $data, 'apiOutput' ) )
+			if ( \is_object( $data ) and method_exists( $data, 'apiOutput' ) )
 			{
 				$data = $data->apiOutput();
 			}
-			else if ( is_array( $data ) )
+			else if ( \is_array( $data ) )
 			{
 				foreach ( $data as $key => &$item )
 				{
 					/* Normalise data */
-					if ( is_object( $item ) and method_exists( $item, 'apiOutput' ) )
+					if ( \is_object( $item ) and method_exists( $item, 'apiOutput' ) )
 					{
 						$item = $item->apiOutput();
 					}
@@ -244,12 +219,12 @@ class Webhook extends Model
 			}
 
 			/* We need to replace and langstring hashes ( like node names) */
-			Member::loggedIn()->language()->parseOutputForDisplay( $data );
+			\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $data );
 
 			$data = $data ? json_encode( $data ) : NULL;
 			
 			/* Loop through each one... */
-			foreach ( Store::i()->webhooks[ $event ] as $id => $webhook )
+			foreach ( \IPS\Data\Store::i()->webhooks[ $event ] as $id => $webhook )
 			{					
 				/* Skip over it if the filters don't match */
 				if ( isset( $webhook['filters'][ $event ] ) )
@@ -258,9 +233,9 @@ class Webhook extends Model
 					{
 						if ( isset( $filters[ $k ] ) )
 						{
-							if ( is_array( $v ) and !is_array( $filters[ $k ] ) )
+							if ( \is_array( $v ) and !\is_array( $filters[ $k ] ) )
 							{
-								if ( !in_array( $filters[ $k ], $v ) )
+								if ( !\in_array( $filters[ $k ], $v ) )
 								{
 									continue 2;
 								}
@@ -278,7 +253,7 @@ class Webhook extends Model
 														
 				/* Insert it */
 				$enable = TRUE;
-				Db::i()->insert( 'core_api_webhook_fires', [
+				\IPS\Db::i()->insert( 'core_api_webhook_fires', [
 					'webhook'	=> $id,
 					'event'		=> $event,
 					'data'		=> $data,
@@ -291,38 +266,29 @@ class Webhook extends Model
 		/* Make sure the task is enabled */
 		if ( $enable )
 		{
-			Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'webhooks' ) );
+			\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'webhooks' ) );
 		}
 	}
 	
 	/**
 	 * Get API Key
 	 *
-	 * @return    Key|null
+	 * @return	\IPS\Api\Key
 	 */
-	public function get_api_key() : ?Key
+	public function get_api_key()
 	{
-		if( isset($this->_data['api_key'] ) && $this->_data['api_key'] )
-		{
-			try
-			{
-				return Key::load( $this->_data['api_key'] );
-			}
-			catch( OutOfRangeException ){}
-		}
-		return null;
+		return \IPS\Api\Key::load( $this->_data['api_key'] );
 	}
 	
 	/**
 	 * Set API Key
 	 *
-	 * @param Key|string|null $key		The API Key
+	 * @param	\IPS\Api\Key		$key		The API Key
 	 * @return	void
 	 */
-	public function set_api_key( Key|string|null $key ) : void
+	public function set_api_key( \IPS\Api\Key $key )
 	{
-		$key = ( $key instanceof Key ) ? $key->id : $key;
-		$this->_data['api_key'] = $key;
+		$this->_data['api_key'] = $key->id;
 	}
 	
 	/**
@@ -330,7 +296,7 @@ class Webhook extends Model
 	 *
 	 * @return	array
 	 */
-	public function get_events() : array
+	public function get_events()
 	{
 		return explode( ',', $this->_data['events'] );
 	}
@@ -341,9 +307,9 @@ class Webhook extends Model
 	 * @param	string|array	$events	List of events
 	 * @return	void
 	 */
-	public function set_events( string|array $events ) : void
+	public function set_events( $events )
 	{
-		if( !is_array( $events ) )
+		if( !\is_array( $events ) )
 		{
 			$events = [$events];
 		}
@@ -353,20 +319,20 @@ class Webhook extends Model
 	/**
 	 * Get URL
 	 *
-	 * @return Url|string
+	 * @return
 	 */
-	public function get_url() : Url|string
+	public function get_url()
 	{
-		return $this->_data['url'] ? new Url( $this->_data['url'] ) : '';
+		return $this->_data['url'] ? new \IPS\Http\Url( $this->_data['url'] ) : '';
 	}
 	
 	/**
 	 * Set Url
 	 *
-	 * @param	Url	$url		The URL
+	 * @param	\IPS\Http\Url	$url		The URL
 	 * @return	void
 	 */
-	public function set_url( Url $url ) : void
+	public function set_url( \IPS\Http\Url $url )
 	{
 		$this->_url = $url;
 		$this->_data['url'] = (string) $this->_url;
@@ -377,7 +343,7 @@ class Webhook extends Model
 	 *
 	 * @return	array
 	 */
-	public function get_filters() : array
+	public function get_filters()
 	{
 		return $this->_data['filters'] ? json_decode( $this->_data['filters'], TRUE ) : array();
 	}
@@ -388,7 +354,7 @@ class Webhook extends Model
 	 * @param	array	$filters		Filter
 	 * @return	void
 	 */
-	public function set_filters( array $filters ) : void
+	public function set_filters( array $filters )
 	{
 		$this->_data['filters'] = json_encode( $filters );
 	}
@@ -396,13 +362,13 @@ class Webhook extends Model
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse		int		id		ID number
 	 * @apiresponse		array	events	List of events this hook is subscribed to
 	 * @apiresponse		string	url		URL to send webhook to
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'id'		=> $this->id,
@@ -411,10 +377,10 @@ class Webhook extends Model
 		);
 	}
 
-	public static function getAvailableWebhooks() : array
+	public static function getAvailableWebhooks()
 	{
 		$hooks = [];
-		foreach ( Application::applications() as $app )
+		foreach ( \IPS\Application::applications() as $app )
 		{
 			if( $app->enabled )
 			{
@@ -434,7 +400,7 @@ class Webhook extends Model
 	 * @param	mixed		$where	Where clause
 	 * @return	array
 	 */
-	public static function search( string $column, string $query, string $order=NULL, mixed $where=array() ): array
+	public static function search( $column, $query, $order=NULL, $where=array() )
 	{
 		if ( $column === '_title' )
 		{
@@ -454,9 +420,9 @@ class Webhook extends Model
 	 *
 	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		Db::i()->delete( 'core_api_webhook_fires', array( 'webhook=?', $this->id ) );
+		\IPS\Db::i()->delete( 'core_api_webhook_fires', array( 'webhook=?', $this->id ) );
 		parent::delete();
 	}
 }

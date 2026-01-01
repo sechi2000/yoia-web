@@ -6,6 +6,9 @@
         "ContentRouter": {
             "gallery": "IPS\\gallery\\extensions\\core\\ContentRouter\\gallery"
         },
+        "CreateMenu": {
+            "gallery": "IPS\\gallery\\extensions\\core\\CreateMenu\\gallery"
+        },
         "Dashboard": {
             "Overview": "IPS\\gallery\\extensions\\core\\Dashboard\\Overview"
         },
@@ -42,6 +45,9 @@
         "MemberRestrictions": {
             "Gallery": "IPS\\gallery\\extensions\\core\\MemberRestrictions\\Gallery"
         },
+        "MemberSync": {
+            "Gallery": "IPS\\gallery\\extensions\\core\\MemberSync\\Gallery"
+        },
         "Permissions": {
             "Permissions": "IPS\\gallery\\extensions\\core\\Permissions\\Permissions"
         },
@@ -50,12 +56,9 @@
             "galleryImages": "IPS\\gallery\\extensions\\core\\Profile\\galleryImages"
         },
         "Queue": {
+            "CleanUpGalleryImages": "IPS\\gallery\\extensions\\core\\Queue\\CleanUpGalleryImages",
             "Follow": "IPS\\gallery\\extensions\\core\\Queue\\Follow",
             "RebuildGalleryImages": "IPS\\gallery\\extensions\\core\\Queue\\RebuildGalleryImages"
-        },
-        "SearchContent": {
-            "Albums": "IPS\\gallery\\extensions\\core\\SearchContent\\Albums",
-            "Images": "IPS\\gallery\\extensions\\core\\SearchContent\\Images"
         },
         "Sitemap": {
             "Images": "IPS\\gallery\\extensions\\core\\Sitemap\\Images",

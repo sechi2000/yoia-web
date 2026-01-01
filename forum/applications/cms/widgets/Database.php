@@ -12,102 +12,77 @@
 namespace IPS\cms\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Databases;
-use IPS\cms\Databases\Dispatcher;
-use IPS\cms\Pages\Page;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Select;
-use IPS\Member;
-use IPS\Request;
-use IPS\Widget;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Database Widget
  */
-class Database extends Widget
+class _Database extends \IPS\Widget
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'Database';
+	public $key = 'Database';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'cms';
+	public $app = 'cms';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * @brief	HTML if widget is called more than once, we store it.
 	 */
-	protected static ?string $html = NULL;
-
-	/**
-	 * @brief	Set to true if this widget must be the only one in its area
-	 */
-	public bool $soloWidget = true;
-
-	/**
-	 * @brief	Set to false if this widget should be hidden from the block list
-	 * 			in the Page Editor
-	 */
-	public static bool $showInBlockList = false;
-
-	/**
-	 * @brief	If a widget should not be dropped into a particular area (e.g. a database widget in the header), list those areas here
-	 */
-	public static array $disallowedAreas = [ 'header', 'footer', 'sidebar', 'globalfooter' ];
+	protected static $html = NULL;
 	
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	Form|NULL	$form	Form helper
-	 * @return	Form
+	 * @param	\IPS\Helpers\Form|NULL	$form	Form helper
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
  	{
 		$form = parent::configuration( $form );
 
  		$databases = array();
 	    $disabled  = array();
 
- 		foreach( Databases::databases() as $db )
+ 		foreach( \IPS\cms\Databases::databases() as $db )
  		{
 		    $databases[ $db->id ] = $db->_title;
 
-		    if ( $db->page_id and $db->page_id != Request::i()->pageID )
+		    if ( $db->page_id and $db->page_id != \IPS\Request::i()->pageID )
 		    {
 			    $disabled[] = $db->id;
 
 				try
 				{
-					$page = Page::load( $db->page_id );
-					$databases[ $db->id ] = Member::loggedIn()->language()->addToStack( 'cms_db_in_use_by_page', FALSE, array( 'sprintf' => array( $db->_title, $page->full_path ) ) );
+					$page = \IPS\cms\Pages\Page::load( $db->page_id );
+					$databases[ $db->id ] = \IPS\Member::loggedIn()->language()->addToStack( 'cms_db_in_use_by_page', FALSE, array( 'sprintf' => array( $db->_title, $page->full_path ) ) );
 				}
-				catch( OutOfRangeException $ex )
+				catch( \OutOfRangeException $ex )
 				{
 					unset( $databases[ $db->id ] );
 				}
 		    }
  		}
 
-	    if ( ! count( $databases ) )
+	    if ( ! \count( $databases ) )
 	    {
 		    $form->addMessage('cms_err_no_databases_to_use');
 	    }
  		else
 	    {
-			$form->add( new Select( 'database', ( isset( $this->configuration['database'] ) ? (int) $this->configuration['database'] : NULL ), FALSE, array( 'options' => $databases, 'disabled' => $disabled ) ) );
+			$form->add( new \IPS\Helpers\Form\Select( 'database', ( isset( $this->configuration['database'] ) ? (int) $this->configuration['database'] : NULL ), FALSE, array( 'options' => $databases, 'disabled' => $disabled ) ) );
 	    }
 
 		return $form;
@@ -119,11 +94,11 @@ class Database extends Widget
 	 * @param   array   $values     Form values
 	 * @return  array
 	 */
-	public function preConfig( array $values ): array
+	public function preConfig( $values )
 	{
-		if ( Request::i()->pageID and $values['database'] )
+		if ( \IPS\Request::i()->pageID and $values['database'] )
 		{
-			Page::load( Request::i()->pageID )->mapToDatabase( $values['database'] );
+			\IPS\cms\Pages\Page::load( \IPS\Request::i()->pageID )->mapToDatabase( $values['database'] );
 		}
 
 		return $values;
@@ -134,7 +109,7 @@ class Database extends Widget
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		if ( static::$html === NULL )
 		{
@@ -142,17 +117,17 @@ class Database extends Widget
 			{
 				try
 				{
-					$database = Databases::load( intval( $this->configuration['database'] ) );
+					$database = \IPS\cms\Databases::load( \intval( $this->configuration['database'] ) );
 					
-					if ( ! $database->page_id and Page::$currentPage )
+					if ( ! $database->page_id and \IPS\cms\Pages\Page::$currentPage )
 					{
-						$database->page_id = Page::$currentPage->id;
+						$database->page_id = \IPS\cms\Pages\Page::$currentPage->id;
 						$database->save();
 					}
 
-					static::$html = Dispatcher::i()->setDatabase( $database->id )->run();
+					static::$html = \IPS\cms\Databases\Dispatcher::i()->setDatabase( $database->id )->run();
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					static::$html = '';
 				}

@@ -10,17 +10,15 @@
 
 namespace IPS\Login\Handler\OAuth2;
 
-use Exception as PHPException;
-
 /**
  * OAuth2 Exception
  */
-class Exception extends PHPException
+class _Exception extends \Exception
 {
 	/**
 	 * @brief	Description of the error
 	 */
-	public ?string $description = NULL;
+	public $description;
 	
 	/**
 	 * Constructor
@@ -29,7 +27,7 @@ class Exception extends PHPException
 	 * @param	string|NULL	$description	Error Description or NULL.
 	 * @return	void
 	 */
-	public function __construct( string $message, ?string $description = null )
+	public function __construct( $message, $description = null )
 	{
 		parent::__construct( $message );
 		$this->description = $description;

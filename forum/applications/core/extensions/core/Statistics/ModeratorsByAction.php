@@ -19,6 +19,7 @@ use IPS\Member;
 use IPS\Member\Group;
 use IPS\Db;
 use IPS\Helpers\Form\Select;
+use IPS\Helpers\Form\Radio;
 use IPS\Theme;
 
 use DateInterval;
@@ -34,25 +35,25 @@ use function count;
 /* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class ModeratorsByAction extends ParentClass
+class _ModeratorsByAction extends ParentClass
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_stats_moderators_actions';
+	public $controller = 'core_stats_moderators_actions';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param Url $url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
 	public function getChart( Url $url ): Chart
 	{

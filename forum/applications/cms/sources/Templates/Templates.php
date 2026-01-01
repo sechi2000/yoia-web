@@ -13,39 +13,11 @@ namespace IPS\cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use BadMethodCallException;
-use Exception;
-use InvalidArgumentException;
 use IPS\cms\Pages\Page;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Http\Url\Internal;
-use IPS\Member;
-use IPS\Patterns\ActiveRecord;
-use IPS\Theme;
-use OutOfRangeException;
-use SimpleXMLElement;
-use UnderflowException;
-use UnexpectedValueException;
-use XMLReader;
-use XMLWriter;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_numeric;
-use function strtolower;
-use function substr;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -60,47 +32,47 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  *
  * Updating templates: Update where user_edited is FALSE and user_created is FALSE OR user_created is TRUE and original_group is in master groups
  */
-class Templates extends ActiveRecord
+class _Templates extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'template_';
+	public static $databasePrefix = 'template_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Table
 	 */
-	public static ?string $databaseTable = 'cms_templates';
+	public static $databaseTable = 'cms_templates';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'template_key', 'template_id' );
+	protected static $databaseIdFields = array( 'template_key', 'template_id' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 
 	/**
 	 * @brief	Master groups
 	 */
-	protected static ?array $masterGroups	= NULL;
+	protected static $masterGroups	= NULL;
 
 	/**
 	 * @brief	Master templates
 	 */
-	protected static ?array $masterTemplates = NULL;
+	protected static $masterTemplates = NULL;
 		
 	/**
 	 * @brief	Retusn all types
@@ -138,7 +110,7 @@ class Templates extends ActiveRecord
 	const RETURN_ONLY_TEMPLATE = 64;
 
 	/**
-	 * @brief	Return just contents of cms_templates ignoring IN_DEV
+	 * @brief	Return just contents of cms_templates ignoring IN_DEV and DESIGNERS' MODE
 	 */
 	const RETURN_DATABASE_ONLY = 128;
 
@@ -150,8 +122,8 @@ class Templates extends ActiveRecord
 	/**
 	 * @brief	Default database template group names
 	 */
-	public static array $databaseDefaults = array(
-		'index'   => 'category_articles',
+	public static $databaseDefaults = array(
+		'featured'   => 'category_articles',
 		'form'	     => 'form',
 		'display'    => 'display',
 		'listing'    => 'listing',
@@ -164,9 +136,9 @@ class Templates extends ActiveRecord
 	 * @param	string	$group	Group to load templates from
 	 * @return  void
 	 */
-	public static function fixTemplateTags( string $group ) : void
+	public static function fixTemplateTags( $group )
 	{
-		$templates = iterator_to_array( Db::i()->select( '*', 'cms_templates', array( array( 'template_group=?', $group ) ) )->setKeyField('template_title') );
+		$templates = iterator_to_array( \IPS\Db::i()->select( '*', 'cms_templates', array( array( 'template_group=?', $group ) ) )->setKeyField('template_title') );
 		
 		foreach( $templates as $template )
 		{
@@ -195,18 +167,18 @@ class Templates extends ActiveRecord
 
 						if ( isset( $options['app'] ) and $options['app'] == 'cms' and isset( $options['location'] ) and $options['location'] == 'database' and isset( $options['group'] ) and $options['group'] != $template['template_original_group'] )
 						{
-							if ( in_array( $value, array_keys( $templates ) ) )
+							if ( \in_array( $value, array_keys( $templates ) ) )
 							{
 								$options['group'] = $group;
 
-								$replace = '{template="' . $value . '" app="' . $options['app'] . '" location="' . $options['location'] . '" group="' . $options['group'] . '" params="' . ( $options['params'] ?? NULL ) . '"}';
+								$replace = '{template="' . $value . '" app="' . $options['app'] . '" location="' . $options['location'] . '" group="' . $options['group'] . '" params="' . ( isset($options['params']) ? $options['params'] : NULL ) . '"}';
 								$save['template_content'] = str_replace( $matches[$index][0], $replace, $template['template_content'] );
 							}
 						}
 						
-						if ( count( $save ) )
+						if ( \count( $save ) )
 						{
-							Db::i()->update( 'cms_templates', $save, array( 'template_id=?', $template['template_id'] ) );
+							\IPS\Db::i()->update( 'cms_templates', $save, array( 'template_id=?', $template['template_id'] ) );
 						}
 					}
 				}
@@ -219,53 +191,59 @@ class Templates extends ActiveRecord
 	 * Overloaded so we can force loading by key by default but still retain the template_id field as the primary key so
 	 * save still updates the primary ID.
 	 *
-	 * @see		Db::build
-	 * @param	int|string|null	$id					ID
-	 * @param	string|null		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
+	 * @see		\IPS\Db::build
+	 * @param	int|string	$id					ID
+	 * @param	string		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
 	 * @param	mixed		$extraWhereClause	Additional where clause(s) (see \IPS\Db::build for details)
-	 * @return	ActiveRecord|static
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
+	 * @return	static
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function load( int|string|null $id, string $idField=NULL, mixed $extraWhereClause=NULL ): ActiveRecord|static
+	public static function load( $id, $idField=NULL, $extraWhereClause=NULL )
 	{
-		if ( !is_numeric( $id ) and $idField === NULL )
+		if ( !\is_numeric( $id ) and $idField === NULL )
 		{
 			$idField = 'template_key';
 		}
 		
-		if ( !is_numeric( $id ) and \IPS\IN_DEV )
+		if ( !\is_numeric( $id ) and ( \IPS\IN_DEV or \IPS\Theme::designersModeEnabled() ) )
 		{
-			$templates = Theme::i()->getAllTemplates( '', '', '', \IPS\cms\Theme::RETURN_AS_OBJECT );
+			$templates = \IPS\cms\Theme::i()->getRawTemplates( NULL, NULL, NULL, \IPS\cms\Theme::RETURN_AS_OBJECT );
 
 			if ( isset( $templates[ $id ] ) )
 			{
 				return $templates[ $id ];
 			}
 		}
-
-		return parent::load( $id, $idField, $extraWhereClause );
+			
+		try
+		{
+			return parent::load( $id, $idField, $extraWhereClause );
+		}
+		catch( \OutOfRangeException $ex )
+		{
+			throw $ex;
+		}
 	}
 	
 	/**
 	 * Make a group_name readable (Group Name)
 	 *
-	 * @param	string|null	$name		Group name from the database
+	 * @param	string	$name		Group name from the database
 	 * @return	string
 	 */
-	public static function readableGroupName( ?string $name ) : string
+	public static function readableGroupName( $name )
 	{
-		switch( $name )
+		if ( $name === 'js' )
 		{
-			case null:
-				return '';
-			case 'js':
-				return 'JS';
-			case 'css':
-				return 'CSS';
-			default:
-				return ucwords( str_replace( array( '-', '_' ), ' ', $name ) );
+			return 'JS';
 		}
+		else if ( $name === 'css' )
+		{
+			return 'CSS';
+		}
+
+		return ucwords( str_replace( array( '-', '_' ), ' ', $name ) );
 	}
 
 	/**
@@ -278,7 +256,7 @@ class Templates extends ActiveRecord
 	{
 		if ( static::$masterTemplates === NULL )
 		{
-			static::$masterTemplates = iterator_to_array( Db::i()->select( '*, MD5( CONCAT( template_location, \'.\', template_group, \'.\', template_title ) ) as bit_key', 'cms_templates', array( 'template_master=1' ) )->setKeyField( 'bit_key' ) );
+			static::$masterTemplates = iterator_to_array( \IPS\Db::i()->select( '*, MD5( CONCAT( template_location, \'.\', template_group, \'.\', template_title ) ) as bit_key', 'cms_templates', array( 'template_master=1' ) )->setKeyField( 'bit_key' ) );
 		}
 
 		return static::$masterTemplates;
@@ -287,9 +265,9 @@ class Templates extends ActiveRecord
 	/**
 	 * Get the master template version of this template
 	 *
-	 * @return Templates|null
+	 * @return \IPS\cms\Templates|NULL
 	 */
-	public function getMasterOfThis(): ?Templates
+	public function getMasterOfThis()
 	{
 		if ( $this->master )
 		{
@@ -297,13 +275,12 @@ class Templates extends ActiveRecord
 		}
 
 		$key = md5( $this->location . '.'. $this->original_group . '.' . $this->title );
-		if ( in_array( $key, array_keys( static::getMasterTemplates() ) ) )
+		if ( \in_array( $key, array_keys( static::getMasterTemplates() ) ) )
 		{
-			/* @var static Templates */
 			return static::constructFromData( static::$masterTemplates[ $key ] );
 		}
 
-		return null;
+		return NULL;
 	}
 
 	/**
@@ -317,7 +294,7 @@ class Templates extends ActiveRecord
 		if ( static::$masterGroups === NULL )
 		{
 			static::$masterGroups = array();
-			foreach( Db::i()->select( 'template_group', static::$databaseTable, array( 'template_master=1 and template_original_group=template_group' ), 'template_group ASC', NULL, 'template_group' ) as $template )
+			foreach( \IPS\Db::i()->select( 'template_group', static::$databaseTable, array( 'template_master=1 and template_original_group=template_group' ), 'template_group ASC', NULL, 'template_group' ) as $template )
 			{
 				static::$masterGroups[ $template ] = $template;
 			}
@@ -329,28 +306,32 @@ class Templates extends ActiveRecord
 	/**
 	 * Get all template group
 	 *
-	 * @param string $returnType		Determines the content returned
+	 * @param	int|constant	$returnType		Determines the content returned
 	 * @return	array
 	 */
-	public static function getGroups( string $returnType ): array
+	public static function getGroups( $returnType=1 )
 	{
 		$where  = array();
 		$return = array();
-
-		switch( $returnType )
+		$locations = NULL;
+		
+		if ( \is_string( $returnType ) )
 		{
-			case 'all':
-				$returnType = self::RETURN_ALL;
+			switch( $returnType )
+			{
+				case 'all':
+					$returnType = self::RETURN_ALL;
 				break;
-			case 'block':
-				$returnType = self::RETURN_BLOCK;
+				case 'block':
+					$returnType = self::RETURN_BLOCK;
 				break;
-			case 'page':
-				$returnType = self::RETURN_PAGE;
+				case 'page':
+					$returnType = self::RETURN_PAGE;
 				break;
-			case 'database':
-				$returnType = self::RETURN_DATABASE;
+				case 'database':
+					$returnType = self::RETURN_DATABASE;
 				break;
+			}
 		}
 		
 		if ( $returnType & self::RETURN_ALL )
@@ -376,15 +357,15 @@ class Templates extends ActiveRecord
 				$locations[] = 'database';
 			}
 			
-			if ( ! count( $locations ) )
+			if ( ! \count( $locations ) )
 			{
-				throw new UnexpectedValueException();
+				throw new \UnexpectedValueException();
 			}
 			
 			$where[] = array( "template_location IN ('" . implode( "','", $locations ) . "')" );
 		}
 		
-		foreach( Db::i()->select( 'template_group', static::$databaseTable, $where, 'template_group ASC', NULL, 'template_group' ) as $template )
+		foreach( \IPS\Db::i()->select( 'template_group', static::$databaseTable, $where, 'template_group ASC', NULL, 'template_group' ) as $template )
 		{
 			$return[ $template ] = $template;
 		}
@@ -395,15 +376,16 @@ class Templates extends ActiveRecord
 	/**
 	 * Get all templates
 	 *
-	 * @param int $returnType		Determines the content returned
+	 * @param	int|constant	$returnType		Determines the content returned
 	 * @return	array
 	 */
-	public static function getTemplates( int $returnType=1 ): array
+	public static function getTemplates( $returnType=1 )
 	{
 		$where  = array();
 		$return = array();
+		$locations = NULL;
 
-		if ( ( \IPS\IN_DEV ) AND ( $returnType & self::RETURN_DATABASE_AND_IN_DEV ) AND ! ( $returnType & self::RETURN_DATABASE_ONLY ) )
+		if ( ( \IPS\IN_DEV or \IPS\Theme::designersModeEnabled() ) AND ( $returnType & self::RETURN_DATABASE_AND_IN_DEV ) AND ! ( $returnType & self::RETURN_DATABASE_ONLY ) )
 		{
 			$flags = \IPS\cms\Theme::RETURN_AS_OBJECT;
 
@@ -437,10 +419,10 @@ class Templates extends ActiveRecord
 				}
 			}
 
-			$return = Theme::i()->getAllTemplates( 'cms', '', '', $flags );
+			$return = \IPS\cms\Theme::i()->getRawTemplates( 'cms', NULL, NULL, $flags );
 		}
 
-		if ( ! ( \IPS\IN_DEV ) OR ( $returnType & self::RETURN_DATABASE_AND_IN_DEV ) OR ( $returnType & self::RETURN_DATABASE_ONLY ) )
+		if ( ! ( \IPS\IN_DEV or \IPS\Theme::designersModeEnabled() ) OR ( $returnType & self::RETURN_DATABASE_AND_IN_DEV ) OR ( $returnType & self::RETURN_DATABASE_ONLY ) )
 		{
 			if ( $returnType & self::RETURN_ALL )
 			{
@@ -477,15 +459,15 @@ class Templates extends ActiveRecord
 					$locations[] = 'database';
 				}
 
-				if ( !count( $locations ) )
+				if ( !\count( $locations ) )
 				{
-					throw new UnexpectedValueException();
+					throw new \UnexpectedValueException();
 				}
 
 				$where[] = array( "template_location IN ('" . implode( "','", $locations ) . "')" );
 			}
 
-			foreach ( Db::i()->select( '*', static::$databaseTable, $where, 'template_user_edited DESC' ) as $template )
+			foreach ( \IPS\Db::i()->select( '*', static::$databaseTable, $where, 'template_user_edited DESC' ) as $template )
 			{
 				/* user_edited version is returned first, so only add to the array if the key isn't already in $return */
 				if ( !isset( $return[ $template['template_key'] ] ) )
@@ -505,14 +487,14 @@ class Templates extends ActiveRecord
 	 * @param	int|string	$id					ID
 	 * @param	string		$idField			The database column that the $id parameter pertains to
 	 * @param	mixed		$extraWhereClause	Additional where clause(s)
-	 * @return	Select
+	 * @return	\IPS\Db\Select
 	 */
-	protected static function constructLoadQuery( int|string $id, string $idField, mixed $extraWhereClause ): Select
+	protected static function constructLoadQuery( $id, $idField, $extraWhereClause )
 	{
 		$where = array( array( $idField . '=?', $id ) );
 		if( $extraWhereClause !== NULL )
 		{
-			if ( !is_array( $extraWhereClause ) or !is_array( $extraWhereClause[0] ) )
+			if ( !\is_array( $extraWhereClause ) or !\is_array( $extraWhereClause[0] ) )
 			{
 				$extraWhereClause = array( $extraWhereClause );
 			}
@@ -528,13 +510,13 @@ class Templates extends ActiveRecord
 	 * @param array $templates	Template data from the database
 	 * @return array
 	 */
-	public static function buildTree( array $templates ) : array
+	public static function buildTree( $templates )
 	{
 		$return = array();
 
 		foreach( $templates as $id => $template )
 		{
-			if ( ! ( $template->location === 'database' and ! Member::loggedIn()->hasAcpRestriction( 'cms', 'databases', 'databases_use' ) ) )
+			if ( ! ( $template->location === 'database' and ! \IPS\Member::loggedIn()->hasAcpRestriction( 'cms', 'databases', 'databases_use' ) ) )
 			{
 				$return[$template->location][$template->group][$template->key] = $template;
 			}
@@ -547,9 +529,9 @@ class Templates extends ActiveRecord
 	 * Add a new template
 	 * 
 	 * @param	array	$template	Template Data
-	 * @return	static
+	 * @return	object	\IPS\cms\Templates
 	 */
-	public static function add( array $template ) : static
+	public static function add( $template )
 	{
 		$newTemplate = new static;
 
@@ -566,7 +548,7 @@ class Templates extends ActiveRecord
 		$newTemplate->save();
 
 		/* Create a unique key */
-		$newTemplate->key = $newTemplate->location . '_' . Friendly::seoTitle( $newTemplate->title ) . '_' . $newTemplate->id;
+		$newTemplate->key = $newTemplate->location . '_' . \IPS\Http\Url\Friendly::seoTitle( $newTemplate->title ) . '_' . $newTemplate->id;
 
 		/* Make sure there's no double __ in there */
 		foreach( array( 'group', 'title', 'key' ) as $field )
@@ -587,18 +569,18 @@ class Templates extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public static function deleteCompiledFiles() : void
+	public static function deleteCompiledFiles()
 	{
-		foreach( Db::i()->select( '*', 'cms_templates', array( 'template_file_object IS NOT NULL' ) ) as $template )
+		foreach( \IPS\Db::i()->select( '*', 'cms_templates', array( 'template_file_object IS NOT NULL' ) ) as $template )
 		{
 			try
 			{
-				File::get( 'core_Theme', $template['template_file_object'] )->delete();
+				\IPS\File::get( 'core_Theme', $template['template_file_object'] )->delete();
 			}
-			catch( Exception $ex ) { }
+			catch( \Exception $ex ) { }
 		}
 		
-		Db::i()->update( 'cms_templates', array( 'template_file_object' => NULL ) );
+		\IPS\Db::i()->update( 'cms_templates', array( 'template_file_object' => NULL ) );
 	}
 
 	/**
@@ -606,15 +588,15 @@ class Templates extends ActiveRecord
 	 *
 	 * @param 	bool 				$appPluginBuild			TRUE to customise form for app/plugin builds
 	 * @param 	array 				$preSelected			Array of default values for checkboxSet
-	 * @return 	Form
+	 * @return 	\IPS\Helpers\Form
 	 */
-	public static function exportForm( bool $appPluginBuild=FALSE, array $preSelected=array() ): Form
+	public static function exportForm( bool $appPluginBuild=FALSE, array $preSelected=array() ): \IPS\Helpers\Form
 	{
-		$form = new Form( 'form', $appPluginBuild ? 'save' : 'download' );
+		$form = new \IPS\Helpers\Form( 'form', $appPluginBuild ? 'save' : 'next' );
 		if( !$appPluginBuild )
 		{
 			$form->addMessage( 'cms_templates_export_description', 'ipsMessage ipsMessage_information' );
-			$form->addButton( 'cms_templates_export_return', 'link', Url::internal( "app=cms&module=pages&controller=templates" ) );
+			$form->addButton( 'cms_templates_export_return', 'link', \IPS\Http\Url::internal( "app=cms&module=pages&controller=templates" ) );
 		}
 		else
 		{
@@ -623,24 +605,28 @@ class Templates extends ActiveRecord
 
 		$templates = [];
 		
-		foreach(Templates::getTemplates( Templates::RETURN_DATABASE_AND_IN_DEV + Templates::RETURN_ALL ) as $template )
+		foreach( \IPS\cms\Templates::getTemplates( \IPS\cms\Templates::RETURN_DATABASE_ONLY + \IPS\cms\Templates::RETURN_ALL ) as $template )
 		{
-			$title = Templates::readableGroupName( $template->group );
+			$title = \IPS\cms\Templates::readableGroupName( $template->group );
 
-			if( $template->location == 'database' )
+			if ( $template->location === 'database' )
 			{
 				$templates['database'][ $template->group ] = $title;
 			}
-			else
+			else if ( $template->location === 'block' )
 			{
-				$templates[ $template->location ][ $template->key ] = $title . ' &gt; ' . $template->title;
+				$templates['block'][ $template->key ] = $title . ' &gt; ' . $template->title;
+			}
+			else if ( $template->location === 'page' )
+			{
+				$templates['page'][ $template->key ] = $title . ' &gt; ' . $template->title;
 			}
 		}
 
 		foreach( $templates as $location => $data )
 		{
 			$defaultValue = $preSelected[ 'templates_' . $location ] ?? FALSE;
-			$form->add( new CheckboxSet( 'templates_' . $location, $defaultValue, FALSE, array( 'options' => $data ) ) );
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'templates_' . $location, $defaultValue, FALSE, array( 'options' => $data ) ) );
 		}
 
 		return $form;
@@ -650,23 +636,23 @@ class Templates extends ActiveRecord
 	 * Export requested templates as XML
 	 *
 	 * @param	array				$values		Checkbox set values
-	 * @return 	XMLWriter|null
+	 * @return 	\XMLWriter|null
 	 */
-	public static function exportAsXml( array $values ):? XMLWriter
+	public static function exportAsXml( array $values ):? \XMLWriter
 	{
 		$templates = array();
-		foreach(Templates::getTemplates( Templates::RETURN_DATABASE_ONLY + Templates::RETURN_ALL ) as $template )
+		foreach( \IPS\cms\Templates::getTemplates( \IPS\cms\Templates::RETURN_DATABASE_ONLY + \IPS\cms\Templates::RETURN_ALL ) as $template )
 		{
 			$templates[ $template->location ][ $template->group ] = $template->title;
 		}
 		$exportTemplates = array();
-		foreach ( $templates as $location => $outerData )
+		foreach ( $templates as $location => $data )
 		{
-			if ( isset( $values[ 'templates_' . $location ] ) and count( $values[ 'templates_' . $location ] ) )
+			if ( isset( $values[ 'templates_' . $location ] ) and \count( $values[ 'templates_' . $location ] ) )
 			{
 				if ( $location === 'database' )
 				{
-					$tmp = \IPS\cms\Theme::i()->getAllTemplates( 'cms', array( 'database' ), array_values( $values[ 'templates_' . $location ] ), \IPS\cms\Theme::RETURN_DATABASE_ONLY + Theme::RETURN_ALL );
+					$tmp = \IPS\cms\Theme::i()->getRawTemplates( 'cms', array( 'database' ), array_values( $values[ 'templates_' . $location ] ), \IPS\cms\Theme::RETURN_DATABASE_ONLY + \IPS\cms\Theme::RETURN_ALL );
 
 					foreach ( $tmp['cms'] as $loc => $data )
 					{
@@ -684,7 +670,7 @@ class Templates extends ActiveRecord
 				}
 				else
 				{
-					$tmp = \IPS\cms\Theme::i()->getAllTemplates( 'cms', array( $location ), [], \IPS\cms\Theme::RETURN_DATABASE_ONLY + Theme::RETURN_ALL );
+					$tmp = \IPS\cms\Theme::i()->getRawTemplates( 'cms', array( $location ), NULL, \IPS\cms\Theme::RETURN_DATABASE_ONLY + \IPS\cms\Theme::RETURN_ALL );
 
 					foreach ( $tmp['cms'] as $loc => $data )
 					{
@@ -694,7 +680,7 @@ class Templates extends ActiveRecord
 							{
 								foreach ( $tdata as $tkey => $tkdata )
 								{
-									if ( in_array( $tkey, $values[ 'templates_' . $location ] ) )
+									if ( \in_array( $tkey, $values[ 'templates_' . $location ] ) )
 									{
 										$exportTemplates['cms'][ $location ][ $key ][ $tkey ] = $tkdata;
 									}
@@ -706,10 +692,10 @@ class Templates extends ActiveRecord
 			}
 		}
 
-		if ( count( $exportTemplates ) )
+		if ( \count( $exportTemplates ) )
 		{
 			/* Init */
-			$xml = new XMLWriter;
+			$xml = new \XMLWriter;
 			$xml->openMemory();
 			$xml->setIndent( TRUE );
 			$xml->startDocument( '1.0', 'UTF-8' );
@@ -730,13 +716,10 @@ class Templates extends ActiveRecord
 
 							foreach ( $templateData as $k => $v )
 							{
-								if ( !in_array( substr( $k, 9 ), array( 'content', 'params' ) ) )
+								if ( !\in_array( \substr( $k, 9 ), array( 'content', 'params' ) ) )
 								{
 									$xml->startAttribute( $k );
-									if( !empty( $v ) )
-									{
-										$xml->text( $v );
-									}
+									$xml->text( $v );
 									$xml->endAttribute();
 								}
 							}
@@ -747,7 +730,7 @@ class Templates extends ActiveRecord
 								if ( isset( $templateData[ $field ] ) )
 								{
 									$xml->startElement( $field );
-									if ( preg_match( '/[<>&]/', $templateData[ $field ] ) )
+									if ( preg_match( '/<|>|&/', $templateData[ $field ] ) )
 									{
 										$xml->writeCData( str_replace( ']]>', ']]]]><![CDATA[>', $templateData[ $field ] ) );
 									}
@@ -780,7 +763,7 @@ class Templates extends ActiveRecord
 	 *
 	 * @return boolean
 	 */
-	public function isSuitableForCustomWrapper(): bool
+	public function isSuitableForCustomWrapper()
 	{
 		if ( $this->location == 'page' and preg_match( '#<html([^>]+?)?>#', $this->content ) )
 		{
@@ -798,7 +781,7 @@ class Templates extends ActiveRecord
 	 *
 	 * @return boolean
 	 */
-	public function isSuitableForBuilderWrapper() : bool
+	public function isSuitableForBuilderWrapper()
 	{
 		if ( $this->location == 'page' and mb_stristr( $this->content, '{template="widgetContainer"' ) )
 		{
@@ -829,11 +812,13 @@ class Templates extends ActiveRecord
 	/**
 	 * Import User Template XML
 	 *
-	 * @param string|null $filePath Path to XML file
-	 * @param string|null $fileContents XML Contents as string
-	 * @return    Internal|null
+	 * @param	string 								$filePath			Path to XML file
+	 * @param	string 								$fileContents		XML Contents as string
+	 * @throws	\UnexpectedValueException
+	 * @throws 	\BadMethodCallException
+	 * @return	\IPS\Http\Url\Internal|null
 	 */
-	public static function importUserTemplateXml( string $filePath=NULL, string $fileContents=NULL ):? Internal
+	public static function importUserTemplateXml( string $filePath=NULL, string $fileContents=NULL ):? \IPS\Http\Url\Internal
 	{
 		/* Open XML file */
 		if( $filePath )
@@ -846,28 +831,28 @@ class Templates extends ActiveRecord
 
 			if( !$xml->xml( $fileContents, NULL, LIBXML_NONET ) )
 			{
-				throw new UnexpectedValueException('bad_xml_string');
+				throw \UnexpectedValueException('bad_xml_string');
 			}
 		}
 		else
 		{
-			throw new BadMethodCallException('path_or_data_missing');
+			throw new \BadMethodCallException('path_or_data_missing');
 		}
 
 		$conflictKey = md5( microtime() );
 
-		$templates = \IPS\cms\Theme::i()->getAllTemplates( 'cms', [ 'database', 'page', 'css', 'js' ], [], \IPS\cms\Theme::RETURN_DATABASE_ONLY + Theme::RETURN_ALL );
+		$templates = \IPS\cms\Theme::i()->getRawTemplates( 'cms', NULL, NULL, \IPS\cms\Theme::RETURN_DATABASE_ONLY + \IPS\cms\Theme::RETURN_ALL );
 
 		if ( ! @$xml->read() )
 		{
-			throw new UnexpectedValueException('xml_file_bad_format');
+			throw new \UnexpectedValueException('xml_file_bad_format');
 		}
 		$xml->read();
 		while ( $xml->read() )
 		{
-			if ( $xml->name == 'template' )
+			if ( $xml->name === 'template' )
 			{
-				$node      = new SimpleXMLElement( $xml->readOuterXML() );
+				$node      = new \SimpleXMLElement( $xml->readOuterXML() );
 				$attrs     = array();
 
 				foreach( $node->attributes() as $k => $v )
@@ -879,8 +864,9 @@ class Templates extends ActiveRecord
 				foreach( $node->children() as $k => $v )
 				{
 					$tryJson = json_decode( $v, TRUE );
-					$attrs[ $k ] =  ( $tryJson ) ?: (string) $v;
+					$attrs[ $k ] =  ( $tryJson ) ? $tryJson : (string) $v;
 				}
+
 
 				if ( isset( $attrs['template_title'] ) and isset( $attrs['template_location'] ) and isset( $attrs['template_group'] ) )
 				{
@@ -903,7 +889,7 @@ class Templates extends ActiveRecord
 							if ( $exists['template_master'] )
 							{
 								/* This is a master template bit, so it's totes fine to create a new one, as it will 'overload' this one */
-								$obj = new Templates;
+								$obj = new \IPS\cms\Templates;
 								$obj->location = $attrs['template_location'];
 								$obj->group = $attrs['template_group'];
 								$obj->title = $attrs['template_title'];
@@ -923,7 +909,7 @@ class Templates extends ActiveRecord
 								if ( $exists['template_user_edited'] )
 								{
 									/* User has edited this, so we should just log a conflict... */
-									Db::i()->insert( 'cms_template_conflicts', array(
+									\IPS\Db::i()->insert( 'cms_template_conflicts', array(
 										'conflict_key'     		=> $conflictKey,
 										'conflict_item_id'		=> $exists['template_id'],
 										'conflict_type'		    => $attrs['template_type'],
@@ -941,18 +927,18 @@ class Templates extends ActiveRecord
 									/* Not edited, so just update */
 									try
 									{
-										$template = Templates::load( $exists['template_key'], 'template_key' );
+										$template = \IPS\cms\Templates::load( $exists['template_key'], 'template_key' );
 										$template->params = $attrs['template_params'];
 										$template->content = $attrs['template_content'];
 										$template->save();
 									}
-									catch( Exception $e ) { }
+									catch( \Exception $e ) { }
 								}
 							}
 							else
 							{
 								/* This is an overloaded master template, so just update */
-								$template = Templates::load( $exists['template_key'], 'template_key' );
+								$template = \IPS\cms\Templates::load( $exists['template_key'], 'template_key' );
 								$template->user_edited = 1;
 								$template->params = $attrs['template_params'];
 								$template->content = $attrs['template_content'];
@@ -963,7 +949,7 @@ class Templates extends ActiveRecord
 
 					if ( $exists === NULL )
 					{
-						$obj = new Templates;
+						$obj = new \IPS\cms\Templates;
 						$obj->location = $attrs['template_location'];
 						$obj->group = $attrs['template_group'];
 						$obj->title = $attrs['template_title'];
@@ -982,9 +968,9 @@ class Templates extends ActiveRecord
 						{
 							try
 							{
-								$check = Db::i()->select( 'template_id', 'cms_templates', array( 'template_key=?', $attrs['template_key'] ) )->first();
+								$check = \IPS\Db::i()->select( 'template_id', 'cms_templates', array( 'template_key=?', $attrs['template_key'] ) )->first();
 
-								if ( $check['template_master'] == 1 and in_array( $attrs['template_group'], Templates::getMasterGroups() ) )
+								if ( $check['template_master'] == 1 and \in_array( $attrs['template_group'], \IPS\cms\Templates::getMasterGroups() ) )
 								{
 									/* it's OK to overload this with a user edited version */
 									$obj->user_created = 0;
@@ -993,14 +979,14 @@ class Templates extends ActiveRecord
 									$key = $attrs['template_key'];
 								}
 							}
-							catch( UnderflowException $e )
+							catch( \UnderflowException $e )
 							{
 								/* It doesn't exist! */
 								$key = $attrs['template_key'];
 							}
 						}
 
-						$obj->key = ( $key ) ?: $obj->location . Friendly::seoTitle( $obj->group ) . '_' . Friendly::seoTitle( $obj->title ) . '_' . $obj->id;
+						$obj->key = ( $key ) ? $key : $obj->location . \IPS\Http\Url\Friendly::seoTitle( $obj->group ) . '_' . \IPS\Http\Url\Friendly::seoTitle( $obj->title ) . '_' . $obj->id;
 						$obj->save();
 					}
 				}
@@ -1010,10 +996,10 @@ class Templates extends ActiveRecord
 		}
 
 		/* Check for conflicts */
-		$conflicts = Db::i()->select( 'count(*)', 'cms_template_conflicts', array( 'conflict_key=?', $conflictKey ) )->first();
+		$conflicts = \IPS\Db::i()->select( 'count(*)', 'cms_template_conflicts', array( 'conflict_key=?', $conflictKey ) )->first();
 		if( $conflicts )
 		{
-			return Url::internal( 'app=cms&module=pages&controller=templates&do=conflicts&key=' . $conflictKey );
+			return \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates&do=conflicts&key=' . $conflictKey );
 		}
 
 		return NULL;
@@ -1028,7 +1014,7 @@ class Templates extends ActiveRecord
 	 * @param   boolean     $update   	If updating, files written as master templates
 	 * @return	bool		Rows imported (true) or none imported (false)
 	 */
-	public static function importXml( string $file, ?int $offset=NULL, ?int $limit=NULL, bool $update=TRUE ) : bool
+	public static function importXml( $file, $offset=NULL, $limit=NULL, $update=TRUE )
 	{
 		$i		= 0;
 		$worked	= false;
@@ -1040,8 +1026,8 @@ class Templates extends ActiveRecord
 			{
 				if ( $update === TRUE )
 				{
-					Db::i()->delete( 'cms_templates', array( 'template_master=1' ) );
-					Theme::deleteCompiledTemplate( 'cms' );
+					\IPS\Db::i()->delete( 'cms_templates', array( 'template_master=1' ) );
+					\IPS\cms\Theme::deleteCompiledTemplate( 'cms' );
 				}
 			}
 
@@ -1051,7 +1037,7 @@ class Templates extends ActiveRecord
 
 			while( $xml->read() )
 			{
-				if( $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -1081,7 +1067,7 @@ class Templates extends ActiveRecord
 						$save[ 'template_' . $field ] = $xml->getAttribute( 'template_' . $field );
 					}
 
-					Db::i()->insert( 'cms_templates', $save );
+					\IPS\Db::i()->insert( 'cms_templates', $save );
 					$worked	= true;
 				}
 
@@ -1105,10 +1091,10 @@ class Templates extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public static function updateAllInheritedMasterTemplates() : void
+	public static function updateAllInheritedMasterTemplates()
 	{
 		/* Update existing template bits */
-		foreach( Db::i()->select( '*', 'cms_templates', array( 'template_master=0 and template_user_created=1 and template_user_edited=0' ) ) as $key => $template )
+		foreach( \IPS\Db::i()->select( '*', 'cms_templates', array( 'template_master=0 and template_user_created=1 and template_user_edited=0' ) ) as $key => $template )
 		{
 			$obj = static::constructFromData( $template );
 
@@ -1128,14 +1114,14 @@ class Templates extends ActiveRecord
 			$masterByGroup[ $template['template_group'] ][ $template['template_title'] ] = $template;
 		}
 
-		$customGroups = iterator_to_array( Db::i()->select( 'template_group, MIN(template_original_group) as template_original_group', static::$databaseTable, array( 'template_master=0 and template_original_group != template_group' ), 'template_group ASC', NULL, 'template_group' )->setKeyField('template_group')->setValueField('template_original_group') );
+		$customGroups = iterator_to_array( \IPS\Db::i()->select( 'template_group, MIN(template_original_group) as template_original_group', static::$databaseTable, array( 'template_master=0 and template_original_group != template_group' ), 'template_group ASC', NULL, 'template_group' )->setKeyField('template_group')->setValueField('template_original_group') );
 
 		foreach( $customGroups as $customGroup => $masterGroup )
 		{
 			if ( $masterGroup )
 			{
 				$groupByGroup = array();
-				foreach ( Db::i()->select( '*', static::$databaseTable, array('template_group=?', $customGroup) ) as $bit )
+				foreach ( \IPS\Db::i()->select( '*', static::$databaseTable, array('template_group=?', $customGroup) ) as $bit )
 				{
 					$groupByGroup[$bit['template_title']] = $bit;
 				}
@@ -1143,7 +1129,7 @@ class Templates extends ActiveRecord
 				/* Now, see if we're missing any */
 				foreach( $masterByGroup[ $masterGroup ] as $title => $template )
 				{
-					if ( ! in_array( $title, array_keys( $groupByGroup ) ) )
+					if ( ! \in_array( $title, array_keys( $groupByGroup ) ) )
 					{
 						$copy = $template;
 						foreach( array( 'template_id', 'template_file_object', 'bit_key' ) as $field )
@@ -1156,7 +1142,7 @@ class Templates extends ActiveRecord
 						$copy['template_group'] = $customGroup;
 						$copy['template_key'] = $copy['template_location'] . '_' . $customGroup . '_' . $title;
 
-						Db::i()->insert( 'cms_templates', $copy );
+						\IPS\Db::i()->insert( 'cms_templates', $copy );
 					}
 				}
 			}
@@ -1169,13 +1155,13 @@ class Templates extends ActiveRecord
 	 * 
 	 *  @return void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		Theme::deleteCompiledTemplate( 'cms', $this->location, $this->group );
+		\IPS\cms\Theme::deleteCompiledTemplate( 'cms', $this->location, $this->group );
 
 		if ( $this->user_created )
 		{
-			Db::i()->delete( 'cms_templates', array( 'template_key=? AND template_user_created=?', $this->key, 1 ) );
+			\IPS\Db::i()->delete( 'cms_templates', array( 'template_key=? AND template_user_created=?', $this->key, 1 ) );
 
 			if ( isset( static::$multitons[ $this->id ] ) )
 			{
@@ -1196,7 +1182,7 @@ class Templates extends ActiveRecord
 		{
 			if ( $this->user_edited )
 			{
-				Db::i()->delete( 'cms_templates', array( 'template_key=? AND template_user_edited=?', $this->key, 1 ) );
+				\IPS\Db::i()->delete( 'cms_templates', array( 'template_key=? AND template_user_edited=?', $this->key, 1 ) );
 
 				if ( isset( static::$multitons[ $this->id ] ) )
 				{
@@ -1215,7 +1201,7 @@ class Templates extends ActiveRecord
 			}
 			else
 			{
-				throw new OutOfRangeException('CANNOT_DELETE');
+				throw new \OutOfRangeException('CANNOT_DELETE');
 			}
 		}
 	}
@@ -1225,9 +1211,9 @@ class Templates extends ActiveRecord
 	 *
 	 * @return string
 	 */
-	public function get__inherited() : string
+	public function get__inherited()
 	{
-		if ( $this->user_created and ! in_array( $this->original_group, static::getMasterGroups() ) )
+		if ( $this->user_created and ! \in_array( $this->original_group, static::getMasterGroups() ) )
 		{
 			return 'custom';
 		}
@@ -1248,19 +1234,22 @@ class Templates extends ActiveRecord
 	 *
 	 * @return string
 	 */
-	public function get__file_object(): string
+	public function get__file_object()
 	{
 		if ( ! $this->file_object )
 		{
 			$content = $this->content;
 			
 			/* Build on demand */
-			if ( $this->type != 'js' )
+			if ( $this->type != 'js' and ( mb_stristr( $this->content, "{block=" ) or mb_stristr( $this->content, "{{if" ) or mb_stristr( $this->content, "{media=" ) ) )
 			{
-				$content = Theme::compileCustomCss( $content );
+				$functionName = 'css_' . mt_rand();
+				\IPS\Theme::makeProcessFunction( str_replace( '\\', '\\\\', $content ), $functionName );
+				$functionName = "IPS\Theme\\{$functionName}";
+				$content = $functionName();
 			}
 			
-			$this->file_object = (string) File::create( 'cms_Pages', $this->title, $content ?: ' ', 'page_objects', TRUE );
+			$this->file_object = (string) \IPS\File::create( 'cms_Pages', $this->title, $content ?: ' ', 'page_objects', TRUE );
 			parent::save(); # Go to parent save to prevent $this->save() from wiping file objects
 		}
 
@@ -1272,22 +1261,22 @@ class Templates extends ActiveRecord
 	 * 
 	 * @return void
 	 */
-	public function save(): void
+	public function save()
 	{
 		/* Trash file object if appropriate */
 		if ( $this->file_object )
 		{
 			try
 			{
-				File::get( 'cms_Pages', $this->file_object )->delete();
+				\IPS\File::get( 'cms_Pages', $this->file_object )->delete();
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
 				/* Just to be sure nothing is throw, we don't care too much if it's not deleted */
 			}
 
 			/* Trash all cached page file objects too */
-			Page::deleteCachedIncludes( $this->file_object );
+			\IPS\cms\Pages\Page::deleteCachedIncludes( $this->file_object );
 
 			$this->file_object = NULL;
 		}
@@ -1295,7 +1284,7 @@ class Templates extends ActiveRecord
 		parent::save();
 
 		/* Clear store */
-		$key = strtolower( 'template_cms_' . Theme::makeBuiltTemplateLookupHash( 'cms', $this->location, $this->group ) . '_' . $this->group );
-		unset( Store::i()->$key );
+		$key = \strtolower( 'template_cms_' . \IPS\cms\Theme::makeBuiltTemplateLookupHash( 'cms', $this->location, $this->group ) . '_' . $this->group );
+		unset( \IPS\Data\Store::i()->$key );
 	}
 }

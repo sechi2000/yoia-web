@@ -12,31 +12,23 @@
 namespace IPS\gallery\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\DashboardAbstract;
-use IPS\gallery\Image;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Dashboard extension: Overview
  */
-class Overview extends DashboardAbstract
+class _Overview
 {
 	/**
 	* Can the current user view this dashboard item?
 	*
 	* @return	bool
 	*/
-	public function canView(): bool
+	public function canView()
 	{
 		return TRUE;
 	}
@@ -46,26 +38,26 @@ class Overview extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
 		/* Basic stats */
 		$data = array(
-			'total_disk_spaceg'	=> (int) Db::i()->select( 'SUM(image_file_size)', 'gallery_images' )->first(),
-			'total_images'		=> (int) Db::i()->select( 'COUNT(*)', 'gallery_images' )->first(),
-			'total_views'		=> (int) Db::i()->select( 'SUM(image_views)', 'gallery_images' )->first(),
-			'total_comments'	=> (int) Db::i()->select( 'COUNT(*)', 'gallery_comments' )->first(),
-			'total_albums'		=> (int) Db::i()->select( 'COUNT(*)', 'gallery_albums' )->first(),
+			'total_disk_spaceg'	=> (int) \IPS\Db::i()->select( 'SUM(image_file_size)', 'gallery_images' )->first(),
+			'total_images'		=> (int) \IPS\Db::i()->select( 'COUNT(*)', 'gallery_images' )->first(),
+			'total_views'		=> (int) \IPS\Db::i()->select( 'SUM(image_views)', 'gallery_images' )->first(),
+			'total_comments'	=> (int) \IPS\Db::i()->select( 'COUNT(*)', 'gallery_comments' )->first(),
+			'total_albums'		=> (int) \IPS\Db::i()->select( 'COUNT(*)', 'gallery_albums' )->first(),
 		);
 		
 		/* Specific files (will fail if no files yet) */
 		try
 		{
-			$data['largest_image']		= Image::constructFromData( Db::i()->select( '*', 'gallery_images', NULL, 'image_file_size DESC', 1 )->first() );
-			$data['most_viewed_image']	= Image::constructFromData( Db::i()->select( '*', 'gallery_images', NULL, 'image_views DESC', 1 )->first() );
+			$data['largest_image']		= \IPS\gallery\Image::constructFromData( \IPS\Db::i()->select( '*', 'gallery_images', NULL, 'image_file_size DESC', 1 )->first() );
+			$data['most_viewed_image']	= \IPS\gallery\Image::constructFromData( \IPS\Db::i()->select( '*', 'gallery_images', NULL, 'image_views DESC', 1 )->first() );
 		}
-		catch ( Exception ) { }
+		catch ( \Exception $e ) { }
 		
 		/* Display */
-		return Theme::i()->getTemplate( 'dashboard', 'gallery' )->overview( $data );
+		return \IPS\Theme::i()->getTemplate( 'dashboard', 'gallery' )->overview( $data );
 	}
 }

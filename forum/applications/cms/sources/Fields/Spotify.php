@@ -12,49 +12,40 @@
 namespace IPS\cms\Fields;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use IPS\cms\Fields;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Spotify input class for Form Builder
  */
-class Spotify extends Text
+class _Spotify extends \IPS\Helpers\Form\Text
 {
 	/**
 	 * @brief	Default Options
 	 */
-	public array $childDefaultOptions = array(
+	public $childDefaultOptions = array(
 		'parameters' => array()
 	);
-
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|NULL $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=null, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=null, string $prefix=null, string $suffix=null, string $id=null )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
-		$this->childDefaultOptions['placeholder'] = Member::loggedIn()->language()->addToStack('field_placeholder_spotify');
+		$this->childDefaultOptions['placeholder'] = \IPS\Member::loggedIn()->language()->addToStack('field_placeholder_spotify');
 		
 		/* Call parent constructor */
 		parent::__construct( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
@@ -66,10 +57,10 @@ class Spotify extends Text
 	 * Get the display value
 	 * 
 	 * @param	mixed			$value			Stored value from form
-	 * @param	Fields	$customField	Custom Field Object
-	 * @return	string|null
+	 * @param	\IPS\cms\Field	$customField	Custom Field Object
+	 * @return	string
 	 */
-	public static function displayValue( mixed $value, Fields $customField ): ?string
+	public static function displayValue( $value, $customField )
 	{
 		if( !$value )
 		{
@@ -88,36 +79,34 @@ class Spotify extends Text
 			$params['height'] = 80;
 		}
 		
-		return Theme::i()->getTemplate( 'records', 'cms', 'global' )->spotify( $value, $params );
+		return \IPS\Theme::i()->getTemplate( 'records', 'cms', 'global' )->spotify( $value, $params );
 	}
 	
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
-	 * @throws	DomainException
-	 * @return	bool
+	 * @throws	\InvalidArgumentException
+	 * @throws	\DomainException
+	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		parent::validate();
 						
 		if ( $this->value )
 		{
 			/* Check the URL is valid */
-			if ( !( $this->value instanceof Url ) )
+			if ( !( $this->value instanceof \IPS\Http\Url ) )
 			{
-				throw new InvalidArgumentException('form_url_bad');
+				throw new \InvalidArgumentException('form_url_bad');
 			}
 			
 			/* Check its a valid Spotify URL */
 			if ( ! mb_stristr( $this->value->data['host'], 'spotify.com' ) )
 			{
-				throw new InvalidArgumentException('form_url_bad');
+				throw new \InvalidArgumentException('form_url_bad');
 			}
 		}
-
-		return true;
 	}
 	
 	/**
@@ -125,12 +114,12 @@ class Spotify extends Text
 	 *
 	 * @return	string
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$val = parent::getValue();
 		if ( $val and !mb_strpos( $val, '://' ) )
 		{
-			$val = "https://{$val}";
+			$val = "http://{$val}";
 		}
 		
 		return $val;
@@ -139,17 +128,17 @@ class Spotify extends Text
 	/**
 	 * Format Value
 	 *
-	 * @return	Url|string
+	 * @return	\IPS\Http\Url|string
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
-		if ( $this->value and !( $this->value instanceof Url ) )
+		if ( $this->value and !( $this->value instanceof \IPS\Http\Url ) )
 		{
 			try
 			{
-				return new Url( $this->value );
+				return new \IPS\Http\Url( $this->value );
 			}
-			catch ( InvalidArgumentException $e )
+			catch ( \InvalidArgumentException $e )
 			{
 				return $this->value;
 			}

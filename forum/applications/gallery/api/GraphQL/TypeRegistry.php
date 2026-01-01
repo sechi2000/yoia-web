@@ -10,17 +10,13 @@
  */
 
 namespace IPS\gallery\api\GraphQL;
-use IPS\gallery\api\GraphQL\Types\AlbumCommentType;
-use IPS\gallery\api\GraphQL\Types\AlbumItemType;
-use IPS\gallery\api\GraphQL\Types\AlbumType;
-use IPS\gallery\api\GraphQL\Types\ImageCommentType;
-use IPS\gallery\api\GraphQL\Types\ImageType;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -29,42 +25,42 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * so we'll generate singletons here.
  * @todo automate this somehow?
  */
-class TypeRegistry
+class _TypeRegistry
 {
     /**
      * Returns the album instance
      *
-     * @var AlbumType|null
+     * @var \IPS\gallery\api\GraphQL\Types\AlbumType
      */
-    protected static ?AlbumType $album = null;
+    protected static $album;
 
     /**
      * Returns the album comment instance
      *
-     * @var AlbumCommentType|null
+     * @var \IPS\gallery\api\GraphQL\Types\AlbumCommentType
      */
-    protected static ?AlbumCommentType $albumComment = null;
+    protected static $albumComment;
 
     /**
      * Returns the album item instance
      *
-     * @var AlbumItemType|null
+     * @var \IPS\gallery\api\GraphQL\Types\AlbumItemType
      */
-    protected static ?AlbumItemType $albumItem = null;
+    protected static $albumItem;
 
     /**
      * Returns the image instance
      *
-     * @var ImageType|null
+     * @var \IPS\gallery\api\GraphQL\Types\ImageType
      */
-    protected static ?ImageType $image = null;
+    protected static $image;
 
     /**
      * Returns the Image comment instance
      *
-     * @var ImageCommentType|null
+     * @var \IPS\gallery\api\GraphQL\Types\ImageCommentType
      */
-    protected static ?ImageCommentType $imageComment = null;
+    protected static $imageComment;
 
 	/**
 	 * Constructor
@@ -75,42 +71,42 @@ class TypeRegistry
 	}
 
 	/**
-	 * @return AlbumType
+	 * @return ImageType
 	 */
-	public static function album() : AlbumType
+	public static function album() : \IPS\gallery\api\GraphQL\Types\AlbumType
 	{
-		return self::$album ?: (self::$album = new AlbumType());
+		return self::$album ?: (self::$album = new \IPS\gallery\api\GraphQL\Types\AlbumType());
 	}
 
 	/**
 	 * @return AlbumCommentType
 	 */
-	public static function albumComment() : AlbumCommentType
+	public static function albumComment() : \IPS\gallery\api\GraphQL\Types\AlbumCommentType
 	{
-		return self::$albumComment ?: (self::$albumComment = new AlbumCommentType());
+		return self::$albumComment ?: (self::$albumComment = new \IPS\gallery\api\GraphQL\Types\AlbumCommentType());
 	}
 
 	/**
-	 * @return AlbumItemType
+	 * @return AlbumCommentType
 	 */
-	public static function albumItem() : AlbumItemType
+	public static function albumItem() : \IPS\gallery\api\GraphQL\Types\AlbumItemType
 	{
-		return self::$albumItem ?: (self::$albumItem = new AlbumItemType());
+		return self::$albumItem ?: (self::$albumItem = new \IPS\gallery\api\GraphQL\Types\AlbumItemType());
 	}
 
 	/**
 	 * @return ImageType
 	 */
-	public static function image() : ImageType
+	public static function image() : \IPS\gallery\api\GraphQL\Types\ImageType
 	{
-		return self::$image ?: (self::$image = new ImageType());
+		return self::$image ?: (self::$image = new \IPS\gallery\api\GraphQL\Types\ImageType());
 	}
 
 	/**
 	 * @return ImageCommentType
 	 */
-	public static function imageComment() : ImageCommentType
+	public static function imageComment() : \IPS\gallery\api\GraphQL\Types\ImageCommentType
 	{
-		return self::$imageComment ?: (self::$imageComment = new ImageCommentType());
+		return self::$imageComment ?: (self::$imageComment = new \IPS\gallery\api\GraphQL\Types\ImageCommentType());
 	}
 }

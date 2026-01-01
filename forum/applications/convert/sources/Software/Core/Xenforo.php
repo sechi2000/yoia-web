@@ -12,68 +12,33 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application\Module;
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Tools\Xenforo as XenforoTrait;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Login;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use OutOfRangeException;
-use PasswordHash;
-use UnderflowException;
-use function count;
-use function defined;
-use function extension_loaded;
-use function in_array;
-use function is_null;
-use function preg_match;
-use function stristr;
-use function unserialize;
-use const ENT_HTML5;
-use const ENT_QUOTES;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Xenforo Core Converter
  */
-class Xenforo extends Software
+class _Xenforo extends \IPS\convert\Software
 {
-	use XenforoTrait;
+	use \IPS\convert\Tools\Xenforo;
 
 	/**
 	 * @brief	The similarities between XF1 and XF2 are close enough that we can use the same converter 
 	 */
-	public static ?bool $isLegacy = NULL;
+	public static $isLegacy = NULL;
 
 	/**
 	 * @brief 	XF2.1 changed serialized data to json decoded
 	 */
-	public static bool $useJson = FALSE;
+	public static $useJson = FALSE;
 
 	/**
 	 * @brief	XF1&2 have different pseudo fields
 	 */
-	public static array $pseudoFields = array(
+	public static $pseudoFields = array(
 		1 => array( 'homepage', 'location', 'occupation', 'about', 'custom_title' ),
 		2 => array( 'website', 'location', 'about', 'custom_title' )
 	);
@@ -81,14 +46,14 @@ class Xenforo extends Software
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 
 		if ( $needDB )
 		{
@@ -97,7 +62,7 @@ class Xenforo extends Software
 				/* Is this XF1 or XF2 */
 				if ( static::$isLegacy === NULL )
 				{
-					$version = $this->db->select( 'MAX(version_id)', 'xf_template', array( Db::i()->in( 'addon_id', array( 'XF', 'XenForo' ) ) ) )->first();
+					$version = $this->db->select( 'MAX(version_id)', 'xf_template', array( \IPS\Db::i()->in( 'addon_id', array( 'XF', 'XenForo' ) ) ) )->first();
 
 					if ( $version < 2000010 )
 					{
@@ -115,16 +80,18 @@ class Xenforo extends Software
 					}
 				}
 			}
-			catch( Exception $e ) {} # If we can't query, we won't be able to do anything anyway
+			catch( \Exception $e ) {} # If we can't query, we won't be able to do anything anyway
 		}
+
+		return $return;
 	}
 
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		return "XenForo (1.5.x/2.0.x/2.1.x/2.2.x)";
 	}
@@ -132,9 +99,9 @@ class Xenforo extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		return 'xenforo';
 	}
@@ -142,9 +109,9 @@ class Xenforo extends Software
 	/**
 	 * Returns a block of text, or a language string, that explains what the admin must do to start this conversion
 	 *
-	 * @return    string|null
+	 * @return	string
 	 */
-	public static function getPreConversionInformation(): ?string
+	public static function getPreConversionInformation()
 	{
 		return 'convert_xf_preconvert';
 	}
@@ -152,9 +119,9 @@ class Xenforo extends Software
 	/**
 	 * Uses Prefix
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function usesPrefix(): bool
+	public static function usesPrefix()
 	{
 		return FALSE;
 	}
@@ -162,9 +129,9 @@ class Xenforo extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		$return = array(
 			'convertEmoticons'				=> array(
@@ -184,11 +151,19 @@ class Xenforo extends Software
 				'where'		=> NULL
 			),
 			'convertMemberHistory'			=> array(
-				'table'		=> ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) ? 'xf_change_log' : 'xf_user_change_log',
+				'table'		=> ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) ? 'xf_change_log' : 'xf_user_change_log',
 				'where'		=> NULL
 			),
 			'convertWarnReasons'			=> array(
 				'table'		=> 'xf_warning_definition',
+				'where'		=> NULL
+			),
+			'convertStatuses'				=> array(
+				'table'		=> 'xf_profile_post',
+				'where'		=> NULL
+			),
+			'convertStatusReplies'		=> array(
+				'table'		=> 'xf_profile_post_comment',
 				'where'		=> NULL
 			),
 			'convertIgnoredUsers'			=> array(
@@ -224,13 +199,13 @@ class Xenforo extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
@@ -240,33 +215,35 @@ class Xenforo extends Software
 				{
 					return $this->db->select( 'count(log_id)', 'xf_user_change_log', array( $this->db->in( 'field', array_keys( static::$changeLogTypes ) ) ) )->first();
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
-
+				break;
 			/* XF2 */
 			case 'xf_change_log':
 				try
 				{
 					return $this->db->select( 'count(log_id)', 'xf_change_log', array( 'content_type=? AND ' . $this->db->in( 'field', array_keys( static::$changeLogTypes ) ), 'user' ) )->first();
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -274,9 +251,9 @@ class Xenforo extends Software
 	/**
 	 * Can we convert settings?
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function canConvertSettings(): bool
+	public static function canConvertSettings()
 	{
 		return TRUE;
 	}
@@ -284,9 +261,9 @@ class Xenforo extends Software
 	/**
 	 * List of Conversion Methods that require more information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		$return = array(
 			'convertAttachments',
@@ -308,10 +285,10 @@ class Xenforo extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 
@@ -324,15 +301,15 @@ class Xenforo extends Software
 						'field_default'			=> NULL,
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(),
-						'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_xf_attach_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_xf_attach_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;
 
 			case 'convertEmoticons':
 				/* XenForo stores emoticons either as a remotely linked image, or relative to the installation path, so we need to change the verbiage here a bit. */
-				Member::loggedIn()->language()->words['emoticon_path'] = Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'XenForo' ) ) );
+				\IPS\Member::loggedIn()->language()->words['emoticon_path'] = \IPS\Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'XenForo' ) ) );
 				$return['convertEmoticons'] = array(
 					'emoticon_path'				=> array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Text',
@@ -340,7 +317,7 @@ class Xenforo extends Software
 						'field_required'	=> TRUE,
 						'field_extra'		=> array(),
 						'field_hint'		=> NULL,
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					),
 					'keep_existing_emoticons'	=> array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Checkbox',
@@ -356,16 +333,16 @@ class Xenforo extends Software
 				$return['convertProfileFields'] = array();
 				
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
 				{
 					$options[$field->_id] = $field->_title;
 				}
 				
 				foreach( $this->db->select( '*', 'xf_user_field' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["map_pfield_{$field['field_id']}"]		= $this->getPhrase( "user_field_{$field['field_id']}", "user_field_title.{$field['field_id']}" );
-					Member::loggedIn()->language()->words["map_pfield_{$field['field_id']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['field_id']}"]		= $this->getPhrase( "user_field_{$field['field_id']}", "user_field_title.{$field['field_id']}" );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['field_id']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
 					
 					$return['convertProfileFields']["map_pfield_{$field['field_id']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -382,15 +359,15 @@ class Xenforo extends Software
 
 				$options = array();
 				$options['none'] = 'None';
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[$group->g_id] = $group->name;
 				}
 
 				foreach( $this->db->select( '*', 'xf_user_group' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['user_group_id']}"]			= $group['title'];
-					Member::loggedIn()->language()->words["map_group_{$group['user_group_id']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['user_group_id']}"]			= $group['title'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['user_group_id']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 
 					$return['convertGroups']["map_group_{$group['user_group_id']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -405,28 +382,28 @@ class Xenforo extends Software
 				$return['convertMembers'] = array();
 
 				/* Find out where the photos live */
-				Member::loggedIn()->language()->words['photo_location_desc'] = Member::loggedIn()->language()->addToStack( 'photo_location_nodb_desc' );
+				\IPS\Member::loggedIn()->language()->words['photo_location_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'photo_location_nodb_desc' );
 				$return['convertMembers']['photo_location'] = array(
 					'field_class'			=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
-					'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_xf_avatar_path'),
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_xf_avatar_path'),
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 
 				foreach( static::$pseudoFields[  static::$isLegacy ? 1 : 2 ] AS $field )
 				{
-					Member::loggedIn()->language()->words["field_{$field}"]		= Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
-					Member::loggedIn()->language()->words["field_{$field}_desc"]	= Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}"]		= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
 					$return['convertMembers']["field_{$field}"] = array(
 						'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 						'field_default'			=> 'no_convert',
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'no_convert'			=> Member::loggedIn()->language()->addToStack( 'no_convert' ),
-								'create_field'			=> Member::loggedIn()->language()->addToStack( 'create_field' ),
+								'no_convert'			=> \IPS\Member::loggedIn()->language()->addToStack( 'no_convert' ),
+								'create_field'			=> \IPS\Member::loggedIn()->language()->addToStack( 'create_field' ),
 							),
 							'userSuppliedInput'		=> 'create_field'
 						),
@@ -464,14 +441,14 @@ class Xenforo extends Software
 					);
 
 					/* XenForo stores emoticons either as a remotely linked image, or relative to the installation path, so we need to change the verbiage here a bit. */
-					Member::loggedIn()->language()->words['reaction_path'] = Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'XenForo' ) ) );
+					\IPS\Member::loggedIn()->language()->words['reaction_path'] = \IPS\Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'XenForo' ) ) );
 					$return['convertReactions']['reaction_path'] = array(
 							'field_class'		=> 'IPS\\Helpers\\Form\\Text',
 							'field_default'		=> NULL,
 							'field_required'	=> TRUE,
 							'field_extra'		=> array(),
 							'field_hint'		=> NULL,
-							'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+							'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					);
 				}
 				break;
@@ -483,9 +460,9 @@ class Xenforo extends Software
 	/**
 	 * Settings Map
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function settingsMap(): array
+	public function settingsMap()
 	{
 		return array(
 			'boardTitle'	=> 'board_name',
@@ -495,9 +472,9 @@ class Xenforo extends Software
 	/**
 	 * Settings Map Listing
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function settingsMapList(): array
+	public function settingsMapList()
 	{
 		$settings = array();
 		foreach( $this->settingsMap() AS $theirs => $ours )
@@ -506,7 +483,7 @@ class Xenforo extends Software
 			{
 				$setting = $this->db->select( 'option_value', 'xf_option', array( "option_id=?", $theirs ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				continue;
 			}
@@ -518,7 +495,7 @@ class Xenforo extends Software
 				$title = $setting;
 			}
 
-			$settings[ $theirs ] = array( 'title' => $title, 'value' => $setting, 'our_key' => $ours, 'our_title' => Member::loggedIn()->language()->addToStack( $ours ) );
+			$settings[ $theirs ] = array( 'title' => $title, 'value' => $setting, 'our_key' => $ours, 'our_title' => \IPS\Member::loggedIn()->language()->addToStack( $ours ) );
 		}
 
 		return $settings;
@@ -528,54 +505,51 @@ class Xenforo extends Software
 	/**
 	 * Finish
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 		
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
 		
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\core\Messenger\Message' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\core\Messenger\Message' ), 3, array( 'class' ) );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
 
 		/* Rebuild Leaderboard */
-		Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
-		Db::i()->delete('core_reputation_leaderboard_history');
+		\IPS\Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
+		\IPS\Db::i()->delete('core_reputation_leaderboard_history');
 		
 		return array( "f_search_index_rebuild", "f_clear_caches", "f_rebuild_pms", "f_signatures_rebuild" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		// run everything through htmlspecialchars to prevent XSS
 		$post = htmlspecialchars( $post, ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE );
 
 		// find YouTube ID's and replace.
-		if ( preg_match( "#\[media=#i", $post ) )
+		if ( \preg_match( "#\[media=#i", $post ) )
 		{
 			$post = preg_replace( '#\[media=youtube\](.+?)\[/media\]#i', 'https://www.youtube.com/watch?v=$1', $post );
 			$post = preg_replace( '#\[media=facebook\](.+?)\[/media\]#i', 'https://www.facebook.com/video.php?v=$1', $post );
@@ -587,25 +561,25 @@ class Xenforo extends Software
 		}
 
 		// Remove extra attributes
-		if ( preg_match( "#\[img #i", $post ) )
+		if ( \preg_match( "#\[img #i", $post ) )
 		{
 			$post = preg_replace( '/\[img .*\](.*?)\[\/img\]/i', '[img]$1[/img]', $post );
 		}
-		if ( preg_match( "#\[url unfurl#i", $post ) )
+		if ( \preg_match( "#\[url unfurl#i", $post ) )
 		{
 			$post = preg_replace( '/\[url unfurl=.*\](.*?)\[\/url\]/i', '[url]$1[/url]', $post );
 		}
 
 		/* Quick check for the presence of user tags */
-		if ( preg_match( "#\[user=#i", $post ) )
+		if ( \preg_match( "#\[user=#i", $post ) )
 		{
 			/* Mentions */
 			preg_match_all( '#\[user=(\d+)\](.+?)\[\/user\]#i', $post, $matches );
 
-			if ( count( $matches ) )
+			if ( \count( $matches ) )
 			{
 				/* Make sure we actually have mention data */
-				if ( isset( $matches[1] ) and count( $matches[1] ) )
+				if ( isset( $matches[1] ) and \count( $matches[1] ) )
 				{
 					$mentions = array();
 					foreach ( $matches[1] as $k => $v )
@@ -616,7 +590,7 @@ class Xenforo extends Software
 						}
 					}
 
-					$maps = iterator_to_array( Db::i()->select( 'name, member_id', 'core_members', array( Db::i()->in( 'name', array_keys( $mentions ) ) ) )->setKeyField( 'name' )->setValueField( 'member_id' ) );
+					$maps = iterator_to_array( \IPS\Db::i()->select( 'name, member_id', 'core_members', array( \IPS\Db::i()->in( 'name', array_keys( $mentions ) ) ) )->setKeyField( 'name' )->setValueField( 'member_id' ) );
 
 					foreach ( $mentions as $memberName => $memberId )
 					{
@@ -633,13 +607,13 @@ class Xenforo extends Software
 		}
 
 		/* Quotes */
-		if ( preg_match( "#\[quote=#i", $post ) )
+		if ( \preg_match( "#\[quote=#i", $post ) )
 		{
 			$post = preg_replace( '#\[quote=&quot;([a-zA-Z0-9-_ ]+)(,([a-z0-9\s:])+)?(,([a-z0-9\s:])+)?&quot;]#i', "[quote name='$1']", $post );
 		}
 
 		/* Tables */
-		if ( stristr( $post, '[table]' ) )
+		if ( \stristr( $post, '[table]' ) )
 		{
 			$search = array( '[table]', '[/table]', '[th]', '[/th]', '[tr]', '[/tr]', '[td]', '[/td]' );
 			$replace = array( '<table>', '</table>', '<th>', '</th>', '<tr>', '</tr>', '<td>', '</td>' );
@@ -648,7 +622,7 @@ class Xenforo extends Software
 		}
 
 		/* Spoilers */
-		if ( preg_match( "#\[spoiler=#i", $post ) )
+		if ( \preg_match( "#\[spoiler=#i", $post ) )
 		{
 			$post = preg_replace( '/\[spoiler=(&quot;|&#039;|)([a-zA-Z0-9-_ ]+)(&quot;|&#039;|)\]/i', "[spoiler]", $post );
 		}
@@ -661,7 +635,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -675,9 +649,9 @@ class Xenforo extends Software
 			{
 				$conversation = $this->db->select( 'conversation_id', 'xf_conversation_message', array( "message_id=?", $row['content_id'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
-				$this->app->log( 'xf_attach_missing_conversation_link', __METHOD__, App::LOG_WARNING, $row['attachment_id'] );
+				$this->app->log( 'xf_attach_missing_conversation_link', __METHOD__, \IPS\convert\App::LOG_WARNING, $row['attachment_id'] );
 				$libraryClass->setLastKeyValue( $row['attachment_id'] );
 				continue;
 			}
@@ -718,17 +692,18 @@ class Xenforo extends Software
 				{
 					$messagePostId = $this->app->getLink( $row['content_id'], 'core_message_posts' );
 
-					$post = Db::i()->select( 'msg_post', 'core_message_posts', array( "msg_id=?", $messagePostId ) )->first();
+					$post = \IPS\Db::i()->select( 'msg_post', 'core_message_posts', array( "msg_id=?", $messagePostId ) )->first();
 
 					if ( preg_match( "/\[ATTACH([^\]]+?)?\]" . $row['attachment_id'] . "(\._xfImport)?\[\/ATTACH\]/i", $post ) )
 					{
 						$post = preg_replace( "/\[ATTACH([^\]]+?)?\]" . $row['attachment_id'] . "(\._xfImport)?\[\/ATTACH\]/i", '[attachment=' . $attachId . ':name]', $post );
 					}
 
-					Db::i()->update( 'core_message_posts', array( 'msg_post' => $post ), array( "msg_id=?", $messagePostId ) );
+					\IPS\Db::i()->update( 'core_message_posts', array( 'msg_post' => $post ), array( "msg_id=?", $messagePostId ) );
 				}
 			}
-			catch( UnderflowException|OutOfRangeException $e ) {}
+			catch( \UnderflowException $e ) {}
+			catch( \OutOfRangeException $e ) {}
 
 			$libraryClass->setLastKeyValue( $row['attachment_id'] );
 		}
@@ -739,7 +714,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertEmoticons() : void
+	public function convertEmoticons()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -761,9 +736,9 @@ class Xenforo extends Software
 				{
 					$images = $this->_imageFromSprite( rtrim( $this->app->_session['more_info']['convertEmoticons']['emoticon_path'], '/' ) . '/' . $row['image_url'], static::unpack( $row['sprite_params'] ) );
 				}
-				catch( InvalidArgumentException | OutOfRangeException $e )
+				catch( \InvalidArgumentException | \OutOfRangeException $e )
 				{
-					$this->app->log( 'xf_emo_sprite_convert_invalid_image', __METHOD__, App::LOG_WARNING, $row['smilie_id'] );
+					$this->app->log( 'xf_emo_sprite_convert_invalid_image', __METHOD__, \IPS\convert\App::LOG_WARNING, $row['smilie_id'] );
 					$libraryClass->setLastKeyValue( $row['smilie_id'] );
 					continue;
 				}
@@ -786,7 +761,7 @@ class Xenforo extends Software
 				$fileurl	= explode( '/', $row['image_url'] );
 				$filename	= array_pop( $fileurl );
 
-				if( !static::$isLegacy AND !empty( $row['image_url_2x'] ) )
+				if( static::$isLegacy == FALSE AND !empty( $row['image_url_2x'] ) )
 				{
 					$filedata	= file_get_contents( $row['image_url_2x'] );
 					$fileurlx2	= explode( '/', $row['image_url_2x'] );
@@ -799,7 +774,7 @@ class Xenforo extends Software
 				$filename	= array_pop( $fileurl );
 				$filepath	= rtrim( $this->app->_session['more_info']['convertEmoticons']['emoticon_path'], '/' ) . '/' . implode( '/', $fileurl );
 
-				if( !static::$isLegacy AND !empty( $row['image_url_2x'] ) )
+				if( static::$isLegacy == FALSE AND !empty( $row['image_url_2x'] ) )
 				{
 					$fileurlx2	= explode( '/', $row['image_url_2x'] );
 					$filenamex2	= array_pop( $fileurlx2 );
@@ -817,13 +792,13 @@ class Xenforo extends Software
 				$category	= $this->db->select( '*', 'xf_smilie_category', array( "smilie_category_id=?", $row['smilie_category_id'] ) )->first();
 				$title		= $this->getPhrase( "smilie_category_{$category['smilie_category_id']}_title", "smilie_category_title.{$category['smilie_category_id']}" );
 				
-				if ( is_null( $title ) )
+				if ( \is_null( $title ) )
 				{
 					/* Bubble Up */
-					throw new UnderflowException;
+					throw new \UnderflowException;
 				}
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$category = array(
 					'display_order'	=> 1,
@@ -857,7 +832,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfileFields() : void
+	public function convertProfileFields()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -869,11 +844,11 @@ class Xenforo extends Software
 			$info['pf_type']			= $this->_fieldMap( $row['field_type'] );
 			$info['pf_name']			= $this->getPhrase( "user_field_{$row['field_id']}", "user_field_title.{$row['field_id']}" );
 			$info['pf_desc']			= $this->getPhrase( "user_field_{$row['field_id']}_desc", "user_field_desc.{$row['field_id']}" );
-			$info['pf_content'] 		= ( !in_array( $row['field_type'], array( 'textbox', 'textarea' ) ) ) ? ( static::$isLegacy ? unserialize( $row['field_choices'] ) : json_decode( $row['field_choices'], TRUE ) ) : NULL;
+			$info['pf_content'] 		= ( !\in_array( $row['field_type'], array( 'textbox', 'textarea' ) ) ) ? ( static::$isLegacy ? \unserialize( $row['field_choices'] ) : json_decode( $row['field_choices'], TRUE ) ) : NULL;
 			$info['pf_not_null']		= $row['required'];
 			$info['pf_member_hide']		= ( $row['viewable_profile'] > 0 ) ? 'all' : 'hide';
 			$info['pf_max_input']		= $row['max_length'];
-			$info['pf_member_edit'] 	= ( in_array( $row['user_editable'], array( 'yes', 'once' ) ) ) ? 0 : 1;
+			$info['pf_member_edit'] 	= ( \in_array( $row['user_editable'], array( 'yes', 'once' ) ) ) ? 0 : 1;
 			$info['pf_position']		= $row['display_order'];
 			$info['pf_show_on_reg']		= ( $row['show_registration'] > 0 ) ? 1 : 0;
 			$info['pf_input_format']	= static::$isLegacy ? 
@@ -891,7 +866,7 @@ class Xenforo extends Software
 	 * @param	string	$type	XF Field Type
 	 * @return	string	IPS Field Type
 	 */
-	protected function _fieldMap( string $type ) : string
+	protected function _fieldMap( $type )
 	{
 		switch( $type )
 		{
@@ -899,15 +874,19 @@ class Xenforo extends Software
 			case 'radio':
 			case 'checkbox':
 				return ucwords( $type );
+				break;
 
 			case 'textarea':
 				return 'TextArea';
+				break;
 			
 			case 'multiselect':
 				return 'Select';
+				break;
 			
 			default:
 				return 'Text';
+				break;
 		}
 	}
 	
@@ -916,7 +895,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -950,6 +929,10 @@ class Xenforo extends Software
 						$info['g_view_board'] = ($perm['permission_value'] == 'allow') ? 1 : 0;
 						break;
 		
+					case 'deleteOwnPost' :
+						$info['g_delete_own_posts'] = ($perm['permission_value'] == 'allow') ? 1 : 0;
+						break;
+		
 					case 'editOwnPost':
 						$info['g_edit_posts'] = ($perm['permission_value'] == 'allow') ? 1 : 0;
 						break;
@@ -963,7 +946,6 @@ class Xenforo extends Software
 						break;
 
 					case 'deleteOwnThread':
-					case 'deleteOwnPost' :
 						$info['g_delete_own_posts'] = ($perm['permission_value'] == 'allow') ? 1 : 0;
 						break;
 
@@ -985,7 +967,7 @@ class Xenforo extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -999,7 +981,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertWarnReasons() : void
+	public function convertWarnReasons()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1042,14 +1024,14 @@ class Xenforo extends Software
 	/**
 	 * @brief	Member history type map
 	 */
-	protected static array $changeLogTypes = array( 'username' => 'display_name', 'email' => 'email_change', 'user_group_id' => 'group', 'secondary_group_ids' => 'group' );
+	protected static $changeLogTypes = array( 'username' => 'display_name', 'email' => 'email_change', 'user_group_id' => 'group', 'secondary_group_ids' => 'group' );
 
 	/**
 	 * Convert member history
 	 *
 	 * @return	void
 	 */
-	public function convertMemberHistory() : void
+	public function convertMemberHistory()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -1058,7 +1040,7 @@ class Xenforo extends Software
 		$userField = 'user_id';
 		$table = 'xf_user_change_log';
 
-		if( ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) )
+		if( ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) )
 		{
 			$table = 'xf_change_log';
 			$userField = 'content_id';
@@ -1097,7 +1079,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1126,13 +1108,13 @@ class Xenforo extends Software
 			{
 				if( !isset( $passwords[ $row['user_id'] ] ) )
 				{
-					throw new UnderflowException;
+					throw new \UnderflowException;
 				}
-				$data = unserialize( $passwords[ $row['user_id'] ] );
+				$data = \unserialize( $passwords[ $row['user_id'] ] );
 
 				if( !isset( $data['hash'] ) )
 				{
-					throw new UnderflowException;
+					throw new \UnderflowException;
 				}
 
 				$hash = $data['hash'];
@@ -1150,7 +1132,7 @@ class Xenforo extends Software
 					$salt = $data['username'];
 				}
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				/* Ut oh... do something random. */
 				$hash = md5( mt_rand() );
@@ -1162,13 +1144,13 @@ class Xenforo extends Software
 			{
 				$ip = $this->db->select( 'ip', 'xf_ip', array( "user_id=? AND action=?", $row['user_id'], 'register' ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				try
 				{
 					$ip = $this->db->select( 'ip', 'xf_ip', array( "user_id=? AND action=?", $row['user_id'], 'login' ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					$ip = '127.0.0.1';
 				}
@@ -1179,7 +1161,7 @@ class Xenforo extends Software
 			{
 				$last_warn = $this->db->select( 'warning_date', 'xf_warning', array( "user_id=?", $row['user_id'] ), "warning_id DESC" )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$last_warn = 0;
 			}
@@ -1189,7 +1171,7 @@ class Xenforo extends Software
 			{
 				$pm_count = $this->db->select( 'COUNT(*)', 'xf_conversation_master', array( "user_id=?", $row['user_id'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$pm_count = 0;
 			}
@@ -1210,7 +1192,7 @@ class Xenforo extends Software
 			{
 				if( !isset( $bans[ $row['user_id'] ] ) )
 				{
-					throw new UnderflowException;
+					throw new \UnderflowException;
 				}
 
 				$ban = $bans[ $row['user_id'] ];
@@ -1220,7 +1202,7 @@ class Xenforo extends Software
 					$ban = -1;
 				}
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$ban = 0;
 			}
@@ -1228,9 +1210,9 @@ class Xenforo extends Software
 			/* Timezone Verification */
 			try
 			{
-				$timezone = new DateTimeZone( $row['timezone'] ); # if invalid, this will throw an exception
+				$timezone = new \DateTimeZone( $row['timezone'] ); # if invalid, this will throw an exception
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				$timezone = 'UTC';
 			}
@@ -1238,7 +1220,7 @@ class Xenforo extends Software
 			/* Main Member Information */
 			$info = array(
 				'member_id'					=> $row['user_id'],
-				'name'						=> html_entity_decode( $row['username'], ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
+				'name'						=> html_entity_decode( $row['username'], \ENT_QUOTES | \ENT_HTML5, 'UTF-8' ),
 				'email'						=> $row['email'],
 				'conv_password'				=> $hash,
 				'conv_password_extra'		=> $salt,
@@ -1301,7 +1283,7 @@ class Xenforo extends Software
 					/* We don't actually need this, but we need to make sure the field was created */
 					$fieldId = $this->app->getLink( $pseudo, 'core_pfields_data' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$libraryClass->convertProfileField( array(
 						'pf_id'				=> $pseudo,
@@ -1365,16 +1347,89 @@ class Xenforo extends Software
 	}
 	
 	/**
+	 * Convert statuses
+	 *
+	 * @return	void
+	 */
+	public function convertStatuses()
+	{
+		$libraryClass = $this->getLibrary();
+		
+		$libraryClass::setKey( 'profile_post_id' );
+		
+		foreach( $this->fetch( 'xf_profile_post', 'profile_post_id' ) AS $row )
+		{
+			/* We have to query for the IP Address */
+			try
+			{
+				$ip = $this->db->select( 'ip', 'xf_ip', array( "ip_id=?", $row['ip_id'] ) )->first();
+			}
+			catch( \UnderflowException $e )
+			{
+				$ip = '127.0.0.1';
+			}
+			
+			/* Approval State */
+			switch( $row['message_state'] )
+			{
+				case 'visible':
+					$approved = 1;
+					break;
+				
+				case 'moderated':
+					$approved = 0;
+					break;
+				
+				case 'deleted':
+					$approved = -1;
+					break;
+			}
+			
+			$info = array(
+				'status_id'			=> $row['profile_post_id'],
+				'status_member_id'	=> $row['profile_user_id'],
+				'status_date'		=> $row['post_date'],
+				'status_content'	=> $row['message'],
+				'status_replies'	=> $row['comment_count'],
+				'status_author_id'	=> $row['user_id'],
+				'status_author_ip'	=> $ip,
+				'status_approved'	=> $approved,
+			);
+			
+			$id = $libraryClass->convertStatus( $info );
+
+			if( static::$useJson AND $id )
+			{
+				foreach( $this->db->select( '*', 'xf_reaction_content', array( "content_type=? AND content_id=?", 'profile_post', $row['profile_post_id'] ) ) as $reaction )
+				{
+					$libraryClass->convertReputation( array(
+						'id'				=> $reaction['reaction_content_id'],
+						'app'				=> 'core',
+						'type'				=> 'status_id',
+						'type_id'			=> $row['profile_post_id'],
+						'member_id'			=> $reaction['reaction_user_id'],
+						'member_received'	=> $row['profile_user_id'],
+						'reaction'			=> $reaction['reaction_id'],
+						'rep_date'			=> $reaction['reaction_date']
+					) );
+				}
+			}
+			
+			$libraryClass->setLastKeyValue( $row['profile_post_id'] );
+		}
+	}
+
+	/**
 	 * Convert one or more settings
 	 *
 	 * @param	array	$settings	Settings to convert
 	 * @return	void
 	 */
-	public function convertSettings( array $settings=array() ) : void
+	public function convertSettings( $settings=array() )
 	{
 		foreach( $this->settingsMap() AS $theirs => $ours )
 		{
-			if ( !isset( $settings[ $ours ] ) OR !$settings[$ours] )
+			if ( !isset( $values[ $ours ] ) OR $values[ $ours ] == FALSE )
 			{
 				continue;
 			}
@@ -1383,21 +1438,93 @@ class Xenforo extends Software
 			{
 				$setting = $this->db->select( 'option_value', 'xf_option', array( "option_id=?", $theirs ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				continue;
 			}
 
-			Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $setting ), array( "conf_key=?", $ours ) );
+			\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $setting ), array( "conf_key=?", $ours ) );
 		}
 	}
 
+	/**
+	 * Convert status replies
+	 *
+	 * @return	void
+	 */
+	public function convertStatusReplies()
+	{
+		$libraryClass = $this->getLibrary();
+		
+		$libraryClass::setKey( 'profile_post_comment_id' );
+		
+		foreach( $this->fetch( 'xf_profile_post_comment', 'profile_post_comment_id' ) AS $row )
+		{
+			/* We need to query for the IP Address */
+			try
+			{
+				$ip = $this->db->select( 'ip', 'xf_ip', array( "ip_id=?", $row['ip_id'] ) )->first();
+			}
+			catch( \UnderflowException $e )
+			{
+				$ip = '127.0.0.1';
+			}
+			
+			/* Approval State */
+			switch( $row['message_state'] )
+			{
+				case 'visible':
+					$approved = 1;
+					break;
+				
+				case 'moderated':
+					$approved = 0;
+					break;
+				
+				case 'deleted':
+					$approved = -1;
+					break;
+			}
+			
+			$info = array(
+				'reply_id'			=> $row['profile_post_comment_id'],
+				'reply_status_id'	=> $row['profile_post_id'],
+				'reply_member_id'	=> $row['user_id'],
+				'reply_date'		=> $row['comment_date'],
+				'reply_content'		=> $row['message'],
+				'reply_approved'	=> $approved,
+				'reply_ip_address'	=> $ip,
+			);
+			
+			$id = $libraryClass->convertStatusReply( $info );
+
+			if( static::$useJson AND $id )
+			{
+				foreach( $this->db->select( '*', 'xf_reaction_content', array( "content_type=? AND content_id=?", 'profile_post_comment', $row['profile_post_comment_id'] ) ) as $reaction )
+				{
+					$libraryClass->convertReputation( array(
+						'id'				=> $reaction['reaction_content_id'],
+						'app'				=> 'core',
+						'type'				=> 'status_reply_id',
+						'type_id'			=> $row['profile_post_comment_id'],
+						'member_id'			=> $reaction['reaction_user_id'],
+						'member_received'	=> $row['user_id'],
+						'reaction'			=> $reaction['reaction_id'],
+						'rep_date'			=> $reaction['reaction_date']
+					) );
+				}
+			}
+			
+			$libraryClass->setLastKeyValue( $row['profile_post_comment_id'] );
+		}
+	}
+	
 	/**
 	 * Convert ignored users
 	 *
 	 * @return	void
 	 */
-	public function convertIgnoredUsers() : void
+	public function convertIgnoredUsers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1416,7 +1543,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertReactions() : void
+	public function convertReactions()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'reaction_id' );
@@ -1438,9 +1565,9 @@ class Xenforo extends Software
 				{
 					$images = $this->_imageFromSprite( rtrim( $this->app->_session['more_info']['convertReactions']['reaction_path'], '/' ) . '/' . $row['image_url'], static::unpack( $row['sprite_params'] ) );
 				}
-				catch( InvalidArgumentException | OutOfRangeException $e )
+				catch( \InvalidArgumentException | \OutOfRangeException $e )
 				{
-					$this->app->log( 'xf_sprite_convert_invalid_image', __METHOD__, App::LOG_WARNING, $row['reaction_id'] );
+					$this->app->log( 'xf_sprite_convert_invalid_image', __METHOD__, \IPS\convert\App::LOG_WARNING, $row['reaction_id'] );
 					$libraryClass->setLastKeyValue( $row['reaction_id'] );
 					continue;
 				}
@@ -1453,7 +1580,7 @@ class Xenforo extends Software
 				}
 
 				/* We always save the sprites to PNG */
-				$filename = Friendly::seoTitle( $title ) . ".png";
+				$filename = \IPS\Http\Url\Friendly::seoTitle( $title ) . ".png";
 			}
 			elseif ( mb_substr( $row['image_url'], 0, 4 ) == 'http' )
 			{
@@ -1499,7 +1626,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1525,7 +1652,7 @@ class Xenforo extends Software
 				{
 					$recip = $this->db->select( '*', 'xf_conversation_recipient', array( "conversation_id=? AND user_id=?", $row['conversation_id'], $map['owner_user_id'] ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					$recip = array(
 						'conversation_id'	=> $row['conversation_id'],
@@ -1555,7 +1682,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1569,7 +1696,7 @@ class Xenforo extends Software
 				{
 					$ips[$row['ip_id']] = $this->db->select( 'ip', 'xf_ip', array( "ip_id=?", $row['ip_id'] ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					$ips[$row['ip_id']] = '127.0.0.1';
 				}
@@ -1591,17 +1718,17 @@ class Xenforo extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 * @todo	The proxy.php redirection is not validating the hash that XenForo set previously, derived from the globalSalt and the option imageLinkProxyKey. We need to either validate the hash (there is an open proxy concern), or we need to convert all calls to proxy.php in posted content to prevent broken images in posts.
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( preg_match( '#/members/(.+?)\.([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/members/(.+?)\.([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			/* If we can't access profiles, don't bother trying to redirect */
-			if( !Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+			if( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 			{
 				return NULL;
 			}
@@ -1609,19 +1736,19 @@ class Xenforo extends Software
 			try
 			{
 				$data = (string) $this->app->getLink( (int) $matches[2], array( 'members', 'core_members' ) );
-				return Member::load( $data )->url();
+				return \IPS\Member::load( $data )->url();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
 		}
-		elseif( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'proxy.php' ) !== FALSE AND isset( Request::i()->image ) )
+		elseif( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'proxy.php' ) !== FALSE AND isset( \IPS\Request::i()->image ) )
 		{
-			return Url::internal( "app=core&module=system&controller=redirect", 'front' )->setQueryString( array(
-						'url'		=> Request::i()->image,
+			return \IPS\Http\Url::internal( "app=core&module=system&controller=redirect", 'front' )->setQueryString( array(
+						'url'		=> \IPS\Request::i()->image,
 						'resource'	=> TRUE,
-						'key'		=> hash_hmac( "sha256", (string) Request::i()->image, Settings::i()->site_secret_key . 'r' )
+						'key'		=> hash_hmac( "sha256", (string) \IPS\Request::i()->image, \IPS\Settings::i()->site_secret_key . 'r' )
 					) );
 		}
 
@@ -1631,17 +1758,17 @@ class Xenforo extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
 		$password = html_entity_decode( $password );
 
 		// XF 1.2
 		require_once \IPS\ROOT_PATH . "/applications/convert/sources/Login/PasswordHash.php";
-		$ph = new PasswordHash( 10, TRUE );
+		$ph = new \PasswordHash( 10, TRUE );
 
 		if ( $ph->CheckPassword( $password, $member->conv_password ) )
 		{
@@ -1649,7 +1776,7 @@ class Xenforo extends Software
 		}
 
 		// XF 1.1
-		if ( extension_loaded( 'hash' ) )
+		if ( \extension_loaded( 'hash' ) )
 		{
 			$hashedPassword = hash( 'sha256', hash( 'sha256', $password ) . $member->misc );
 		}
@@ -1658,12 +1785,12 @@ class Xenforo extends Software
 			$hashedPassword = sha1( sha1( $password ) . $member->misc );
 		}
 
-		if ( Login::compareHashes( $member->conv_password, $hashedPassword ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, $hashedPassword ) )
 		{
 			return TRUE;
 		}
 
 		// If they converted vB > XF > IPB then passwords may be in vB format still - try that.
-		return Vbulletin::login( $member, $password );
+		return \IPS\convert\Software\Core\Vbulletin::login( $member, $password );
 	}
 }

@@ -12,50 +12,41 @@
 namespace IPS\cms\Records;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Fields;
-use IPS\cms\Records;
-use IPS\Login;
-use IPS\Member;
-use IPS\Patterns\ActiveRecord;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief Records Model
  */
-class Revisions extends ActiveRecord
+class _Revisions extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons = array();
+	protected static $multitons = array();
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'cms_database_revisions';
+	public static $databaseTable = 'cms_database_revisions';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'revision_';
+	public static $databasePrefix = 'revision_';
 
 	/**
 	 * @brief	Unpacked data
 	 */
-	protected ?array $_dataJson = NULL;
+	protected $_dataJson = NULL;
 	
 	/**
 	 * Constructor - Create a blank object with default values
@@ -68,7 +59,7 @@ class Revisions extends ActiveRecord
 		
 		if ( $this->_new )
 		{
-			$this->member_id = Member::loggedIn()->member_id;
+			$this->member_id = \IPS\Member::loggedIn()->member_id;
 			$this->date      = time();
 		}
 	}
@@ -79,7 +70,7 @@ class Revisions extends ActiveRecord
 	 * @param   string $key	Key of value to return
 	 * @return	mixed
 	 */
-	public function get( string $key ) : mixed
+	public function get( $key )
 	{
 		if ( $this->_dataJson === NULL )
 		{
@@ -97,15 +88,14 @@ class Revisions extends ActiveRecord
 	/**
 	 *  Compute differences
 	 *
-	 * @param int $databaseId     Database ID
-	 * @param Records $record         Record
-	 * @param boolean $justChanged    Get changed only
+	 * @param   int                 $databaseId     Database ID
+	 * @param   \IPS\cms\Records    $record         Record
+	 * @param   boolean             $justChanged    Get changed only
 	 * @return array
 	 */
-	public function getDiffHtmlTables( int $databaseId, Records $record, bool $justChanged=FALSE ): array
+	public function getDiffHtmlTables( $databaseId, $record, $justChanged=FALSE )
 	{
 		$fieldsClass  = 'IPS\cms\Fields' .  $databaseId;
-		/* @var $fieldsClass Fields */
 		$customFields = $fieldsClass::data( 'view' );
 		$conflicts    = array();
 
@@ -114,7 +104,7 @@ class Revisions extends ActiveRecord
 		{
 			$key = 'field_' . $field->id;
 
-			if( $justChanged === FALSE OR !Login::compareHashes( md5( $record->$key ), md5( $this->get( $key ) ) ) )
+			if( $justChanged === FALSE OR !\IPS\Login::compareHashes( md5( $record->$key ), md5( $this->get( $key ) ) ) )
 			{
 				$conflicts[] = array( 'original' => $this->get( $key ), 'current' => $record->$key, 'field' => $field );
 			}
@@ -129,9 +119,9 @@ class Revisions extends ActiveRecord
 	 * @param string|array $value
 	 * @return void
 	 */
-	public function set_data( string|array $value ) : void
+	public function set_data( $value )
 	{
-		$this->_data['data'] = ( is_array( $value ) ? json_encode( $value ) : $value );
+		$this->_data['data'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
 	}
 	
 	/**
@@ -139,7 +129,7 @@ class Revisions extends ActiveRecord
 	 *
 	 * @return array
 	 */
-	public function get_data() : array
+	public function get_data()
 	{
 		return json_decode( $this->_data['data'], TRUE );
 	}

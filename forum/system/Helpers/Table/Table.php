@@ -11,36 +11,9 @@
 namespace IPS\Helpers\Table;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\DateTime;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\DateRange;
-use IPS\Helpers\Form\Member as FormMember;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use Throwable;
-use function count;
-use function defined;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -61,7 +34,7 @@ const SEARCH_CHECKBOX = 12;
 /**
  * List Table Builder
  */
-abstract class Table
+abstract class _Table
 {
 	/**
 	 * @brief	Base URL of the page the list table is on
@@ -71,115 +44,115 @@ abstract class Table
 	/**
 	 * @brief	Elements to include (defaults to all - can use either this or $exclude)
 	 */
-	public ?array $include = NULL;
+	public $include = NULL;
 	
 	/**
 	 * @brief	Elements to exclude (defaults to none - can use either this or $include)
 	 */
-	public ?array $exclude = NULL;
+	public $exclude = NULL;
 
 	/**
 	 * @brief	Column to sort results by
 	 */
-	public ?string $sortBy = NULL;
+	public $sortBy;
 	
 	/**
 	 * @brief	Sort Direction - "asc" or "desc"
 	 */
-	public ?string $sortDirection = NULL;
+	public $sortDirection = NULL;
 	
 	/**
 	 * @brief	Columns that are not sortable
 	 */
-	public array $noSort = array();
+	public $noSort = array();
 
 	/**
 	 * @brief	Default column to sort results by
 	 */
-	public ?string $defaultSortBy = NULL;
+	public $defaultSortBy;
 
 	/**
 	 * @brief	Default sort direction - "asc" or "desc"
 	 */
-	public ?string $defaultSortDirection = NULL;
+	public $defaultSortDirection = NULL;
 	
 	/**
 	 * @brief	Filters
 	 */
-	public array $filters = array();
+	public $filters = array();
 	
 	/**
 	 * @brief	Current filter
 	 */
-	public mixed $filter = NULL;
+	public $filter = NULL;
 	
 	/**
 	 * @brief	Field to enable quick search on
 	 */
-	public mixed $quickSearch = NULL;
+	public $quickSearch = NULL;
 
 	/**
 	 * @brief	Whether to show advanced search/sort button or not
 	 * @note	It is possible to recreate the form external to the helper (e.g. search) in which case you may not want to show the button
 	 */
-	public bool $showAdvancedSearch	= TRUE;
+	public $showAdvancedSearch	= TRUE;
 
 	/**
 	 * @brief	Whether to use the placeholder loading style with this table
 	 */
-	public bool $dummyLoading = FALSE;
+	public $dummyLoading = FALSE;
 
 	/**
 	 * @brief	Fields to enable advanced sarch on
 	 * @note	Keys are the field names. Values are a IPS\Helpers\Table\SEARCH_* constant
 	 */
-	public array $advancedSearch = array();
+	public $advancedSearch = array();
 	
 	/**
 	 * @brief	Number of records to show
 	 */
-	public int $limit = 25;
+	public $limit = 25;
 	
 	/**
 	 * @brief	Number of pages
-	 * @see		Table::getRows()
+	 * @see		\IPS\Helpers\Table\getRows
 	 */
-	public int $pages = 1;
+	public $pages = 1;
 	
 	/**
 	 * @brief	Current Page
 	 */
-	public int $page = 1;
+	public $page = 1;
 
 	/**
 	 * @brief	Pagination parameter
 	 */
-	protected string $paginationKey	= 'page';
+	protected $paginationKey	= 'page';
 
 	/**
 	 * @brief	Use simple pagination
 	 */
-	public bool $simplePagination	= FALSE;
+	public $simplePagination	= FALSE;
 
 	/**
 	 * @brief	Table resort parameter
 	 */
-	public string $resortKey			= 'listResort';
+	public $resortKey			= 'listResort';
 	
 	/**
 	 * @brief	Language prefix for column names
 	 */
-	public string $langPrefix = '';
+	public $langPrefix = '';
 	
 	/**
 	 * @brief 	Language key for table title
 	 */
-	public string $title = '';
+	public $title = '';
 
 	/**
 	 * @brief 	Use realtime features within the table?
 	 */
-	public bool $enableRealtime = false;
+	public $enableRealtime = false;
 	
 	/**
 	 * @brief	Parsers
@@ -194,27 +167,27 @@ abstract class Table
 	 * @endcode
 	 * @note	When implementing, note that this will override the default parser which runs htmlentities, necessary for preventing XSS
 	 */
-	public array $parsers = array();
+	public $parsers = array();
 
 	/**
 	 * @brief	Column to highlight as the "main" column (e.g. the title)
 	 */
-	public ?string $mainColumn = NULL;
+	public $mainColumn = NULL;
 	
 	/**
 	 * @brief	Additional CSS classes to apply to the table
 	 */
-	public array $classes = array();
+	public $classes = array();
 
 	/**
 	 * @brief	Additional CSS classes to apply to individual columns
 	 */
-	public array $rowClasses = array();
+	public $rowClasses = array();
 	
 	/**
 	 * @brief	Rows to highlight
 	 */
-	public array $highlightRows = array();
+	public $highlightRows = array();
 	
 	/**
 	 * @brief	Buttons to show on the "root row"
@@ -233,7 +206,7 @@ abstract class Table
 	 	);
 	 * @endcode
 	 */
-	public ?array $rootButtons = NULL;
+	public $rootButtons = NULL;
 	
 	/**
 	 * @brief	Callback function to get buttons for a record
@@ -244,62 +217,62 @@ abstract class Table
 	 	}
 	 * @endcode
 	 */
-	public mixed $rowButtons = NULL;
+	public $rowButtons = NULL;
 	
 	/**
 	 * @brief	Column widths (in percentages)
 	 */
-	public array $widths = array();
+	public $widths = array();
 	
 	/**
 	 * @brief	Template for table
 	 */
-	public array $tableTemplate;
+	public $tableTemplate;
 	
 	/**
 	 * @brief	Template for rows
 	 */
-	public array $rowsTemplate;
+	public $rowsTemplate;
 	
 	/**
 	 * @brief	Sort options (used only on front-end)
 	 */
-	public array $sortOptions = array();
+	public $sortOptions;
 	
 	/**
 	 * @brief	Unique ID for this table
 	 */
-	public ?string $uniqueId = NULL;
+	public $uniqueId;
 	
 	/**
 	 * @brief 	Extra HTML to show below filter/search bar
 	 */
-	public string $extraHtml = '';
+	public $extraHtml = '';
 	
 	/**
 	 * @brief 	Extra Data
 	 */
-	public mixed $extra = NULL;
+	public $extra = NULL;
 	
 	/**
 	 * @brief  Store advanced search values
 	 */
-	protected string|array|null $advancedSearchValues = NULL;
+	protected $advancedSearchValues = NULL;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Url	$baseUrl	Base URL of the page the list table is on
+	 * @param	\IPS\Http\Url	$baseUrl	Base URL of the page the list table is on
 	 * @return	void
 	 */
-	public function __construct( Url $baseUrl )
+	public function __construct( \IPS\Http\Url $baseUrl )
 	{
 		/* Set page */
 		$parameter	= $this->paginationKey;
 
-		if ( Request::i()->$parameter )
+		if ( \IPS\Request::i()->$parameter )
 		{
-			$this->page = intval( Request::i()->$parameter );
+			$this->page = \intval( \IPS\Request::i()->$parameter );
 
 			if ( !$this->page OR $this->page < 1 )
 			{
@@ -308,27 +281,27 @@ abstract class Table
 		}
 		
 		/* Set sort options */
-		if( Request::i()->sortby )
+		if( \IPS\Request::i()->sortby )
 		{
-			$this->sortBy = Request::i()->sortby;
+			$this->sortBy = \IPS\Request::i()->sortby;
 		}
-		if( Request::i()->sortdirection )
+		if( \IPS\Request::i()->sortdirection )
 		{
-			$this->sortDirection = ( mb_strtolower( Request::i()->sortdirection ) === 'desc' or mb_strtolower( Request::i()->sortdirection ) === 'asc' ) ? mb_strtolower( Request::i()->sortdirection ) : NULL;
+			$this->sortDirection = ( mb_strtolower( \IPS\Request::i()->sortdirection ) === 'desc' or mb_strtolower( \IPS\Request::i()->sortdirection ) === 'asc' ) ? mb_strtolower( \IPS\Request::i()->sortdirection ) : NULL;
 		}
 
 		/* Filter? */
-		if ( Request::i()->filter )
+		if ( \IPS\Request::i()->filter )
 		{
-			$this->filter = Request::i()->filter;
+			$this->filter = \IPS\Request::i()->filter;
 		}
 		
 		/* Set base URL */
 		$this->baseUrl = $baseUrl->setQueryString( array( 'filter' => $this->filter, 'sortby' => $this->sortBy, 'sortdirection' => $this->sortDirection ) )->setPage( $this->paginationKey, $this->page );
 		
 		/* Templates */
-		$this->tableTemplate = array( Theme::i()->getTemplate( 'tables', 'core' ), 'table' );
-		$this->rowsTemplate = array( Theme::i()->getTemplate( 'tables', 'core' ), 'rows' );
+		$this->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'tables', 'core' ), 'table' );
+		$this->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'tables', 'core' ), 'rows' );
 
 		/* Create a unique id used by the template - can be overriden manually if desired */
 		$this->uniqueId	= md5( mt_rand() );
@@ -339,7 +312,7 @@ abstract class Table
 	 *
 	 * @return	string
 	 */
-	public function getPaginationKey(): string
+	public function getPaginationKey()
 	{
 		return $this->paginationKey;
 	}
@@ -347,20 +320,20 @@ abstract class Table
 	/**
 	 * Setting the page parameter means we need to recalculate the pages
 	 *
-	 * @param string $property	Property we are updating
+	 * @param	string	$property	Property we are updating
 	 * @param	mixed	$value		Value being set
 	 * @return	void
 	 */
-	public function __set( string $property, mixed $value )
+	public function __set( $property, $value )
 	{
 		if( $property == 'paginationKey' )
 		{
 			$this->baseUrl			= $this->baseUrl->stripQueryString( $this->paginationKey );
 			$this->paginationKey	= $value;
 
-			if ( Request::i()->$value )
+			if ( \IPS\Request::i()->$value )
 			{
-				$this->page = intval( Request::i()->$value );
+				$this->page = \intval( \IPS\Request::i()->$value );
 				if ( !$this->page OR $this->page < 1 )
 				{
 					$this->page = 1;
@@ -376,9 +349,9 @@ abstract class Table
 	 * For example, we might allow array( 'last_post', 'author' ) but the $this->sortBy property is often set as "app_table.last_post" meaning
 	 * that the filter drop down doesn't show the selected value correctly.
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function getSortByColumn(): ?string
+	public function getSortByColumn()
 	{
 		if ( mb_strpos( $this->sortBy, '.' ) )
 		{
@@ -394,19 +367,19 @@ abstract class Table
 	/**
 	 * Build Advanced Search Form
 	 *
-	 * @return	Form
+	 * @return	\IPS\Helpers\Form
 	 */
-	protected function advancedSearch(): Form
+	protected function advancedSearch()
 	{
-		$form = new Form( 'advanced_search', 'search', $this->baseUrl, array( 'data-role' => 'advancedSearch' ) );
-		$form->hiddenValues['filter']		 = Request::i()->filter;
-		$form->hiddenValues['sortby']		 = Request::i()->sortby;
-		$form->hiddenValues['sortdirection'] = Request::i()->sortdirection;
+		$form = new \IPS\Helpers\Form( 'advanced_search', 'search', $this->baseUrl, array( 'data-role' => 'advancedSearch' ) );
+		$form->hiddenValues['filter']		 = \IPS\Request::i()->filter;
+		$form->hiddenValues['sortby']		 = \IPS\Request::i()->sortby;
+		$form->hiddenValues['sortdirection'] = \IPS\Request::i()->sortdirection;
 
 		foreach ( $this->advancedSearch as $k => $type )
 		{
 			$options = array();
-			if ( is_array( $type ) )
+			if ( \is_array( $type ) )
 			{
 				$options = $type[1];
 				$type = $type[0];
@@ -415,58 +388,58 @@ abstract class Table
 			switch ( $type )
 			{
 				case SEARCH_CUSTOM:
-					$form->add( new Custom( $this->langPrefix . $k, NULL, FALSE, $options ) );
+					$form->add( new \IPS\Helpers\Form\Custom( $this->langPrefix . $k, NULL, FALSE, $options ) );
 					break;
 				
 				case SEARCH_CONTAINS_TEXT:
-					$form->add( new Text( $this->langPrefix . $k, NULL, FALSE, $options ) );
+					$form->add( new \IPS\Helpers\Form\Text( $this->langPrefix . $k, NULL, FALSE, $options ) );
 					break;
 					
 				case SEARCH_QUERY_TEXT:
-					$form->add( new Custom( $this->langPrefix . $k, NULL, FALSE, array(
+					$form->add( new \IPS\Helpers\Form\Custom( $this->langPrefix . $k, NULL, FALSE, array(
 						'getHtml'	=> function( $element )
 						{
-							return Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", ( is_array( $element->value ) AND isset( $element->value[0] ) ) ? $element->value[0] : NULL, $element->required, array(
-								'c'	 => Member::loggedIn()->language()->addToStack('contains'),
-								'bw' => Member::loggedIn()->language()->addToStack('begins_with'),
-								'eq' => Member::loggedIn()->language()->addToStack('exactly'),
+							return \IPS\Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", ( \is_array( $element->value ) AND isset( $element->value[0] ) ) ? $element->value[0] : NULL, $element->required, array(
+								'c'	 => \IPS\Member::loggedIn()->language()->addToStack('contains'),
+								'bw' => \IPS\Member::loggedIn()->language()->addToStack('begins_with'),
+								'eq' => \IPS\Member::loggedIn()->language()->addToStack('exactly'),
 							) )
 							. ' '
-							. Theme::i()->getTemplate( 'forms', 'core', 'global' )->text( "{$element->name}[1]", 'text', ( is_array( $element->value ) AND isset( $element->value[1] ) ) ? $element->value[1] : NULL, $element->required, NULL, FALSE, NULL, NULL, NULL, '', NULL, FALSE, NULL, array(), array(), array( $element->name . '-qty' ) );
+							. \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->text( "{$element->name}[1]", 'text', ( \is_array( $element->value ) AND isset( $element->value[1] ) ) ? $element->value[1] : NULL, $element->required, NULL, FALSE, NULL, NULL, NULL, '', NULL, FALSE, NULL, array(), array(), array( $element->name . '-qty' ) );
 						}
 					) ) );
 					break;
 					
 				case SEARCH_DATE_RANGE:
-					$form->add( new DateRange( $this->langPrefix . $k, array( 'start' => '', 'end' => '' ), FALSE, $options ) );
+					$form->add( new \IPS\Helpers\Form\DateRange( $this->langPrefix . $k, array( 'start' => '', 'end' => '' ), FALSE, $options ) );
 					break;
 				
 				case SEARCH_SELECT:
-					$form->add( new Select( $this->langPrefix . $k, NULL, FALSE, $options ) );
+					$form->add( new \IPS\Helpers\Form\Select( $this->langPrefix . $k, NULL, FALSE, $options ) );
 					break;
 
 				case SEARCH_RADIO:
-					$form->add( new Radio( $this->langPrefix . $k, NULL, FALSE, $options ) );
+					$form->add( new \IPS\Helpers\Form\Radio( $this->langPrefix . $k, NULL, FALSE, $options ) );
 					break;
 					
 				case SEARCH_MEMBER:
-					$form->add( new FormMember( $this->langPrefix . $k, NULL, FALSE, $options ) );
+					$form->add( new \IPS\Helpers\Form\Member( $this->langPrefix . $k, NULL, FALSE, $options ) );
 					break;
 					
 				case SEARCH_NODE:
-					$form->add( new Node( $this->langPrefix . $k, 0, FALSE, $options ) );
+					$form->add( new \IPS\Helpers\Form\Node( $this->langPrefix . $k, 0, FALSE, $options ) );
 					break;
 					
 				case SEARCH_NUMERIC:
 				case SEARCH_NUMERIC_TEXT:
-					$form->add( new Custom( $this->langPrefix . $k, NULL, FALSE, array(
+					$form->add( new \IPS\Helpers\Form\Custom( $this->langPrefix . $k, NULL, FALSE, array(
 						'getHtml'	=> function( $element )
 						{
-							return Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", ( is_array( $element->value ) AND isset( $element->value[0] ) ) ? $element->value[0] : NULL, $element->required, array(
-								'any'	=> Member::loggedIn()->language()->addToStack('any'),
-								'gt'	=> Member::loggedIn()->language()->addToStack('gt'),
-								'lt'	=> Member::loggedIn()->language()->addToStack('lt'),
-								'eq'	=> Member::loggedIn()->language()->addToStack('exactly'),
+							return \IPS\Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", ( \is_array( $element->value ) AND isset( $element->value[0] ) ) ? $element->value[0] : NULL, $element->required, array(
+								'any'	=> \IPS\Member::loggedIn()->language()->addToStack('any'),
+								'gt'	=> \IPS\Member::loggedIn()->language()->addToStack('gt'),
+								'lt'	=> \IPS\Member::loggedIn()->language()->addToStack('lt'),
+								'eq'	=> \IPS\Member::loggedIn()->language()->addToStack('exactly'),
 							),
 							FALSE,
 							NULL,
@@ -478,16 +451,16 @@ abstract class Table
 								'eq'	=> array( $element->name . '-qty' ),
 							) )
 							. ' '
-							. Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( "{$element->name}[1]", ( is_array( $element->value ) AND isset( $element->value[1] ) ) ? $element->value[1] : NULL, $element->required, NULL, FALSE, NULL, NULL, NULL, 0, NULL, FALSE, NULL, array(), array(), array( $element->name . '-qty' ) );
+							. \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( "{$element->name}[1]", ( \is_array( $element->value ) AND isset( $element->value[1] ) ) ? $element->value[1] : NULL, $element->required, NULL, FALSE, NULL, NULL, NULL, 0, NULL, FALSE, NULL, array(), array(), array( $element->name . '-qty' ) );
 						}
 					) ) );
 					break;
 				
 				case SEARCH_CHECKBOX:
-					$form->add( new Checkbox( $this->langPrefix . $k, NULL, FALSE, $options ) );
+					$form->add( new \IPS\Helpers\Form\Checkbox( $this->langPrefix . $k, NULL, FALSE, $options ) );
 					break;	
 				case SEARCH_BOOL:
-					$form->add( new YesNo( $this->langPrefix . $k, TRUE, FALSE, $options ) );
+					$form->add( new \IPS\Helpers\Form\YesNo( $this->langPrefix . $k, TRUE, FALSE, $options ) );
 					break;
 				case HEADER:
 					$form->addHeader( $this->langPrefix . $k );
@@ -513,10 +486,10 @@ abstract class Table
 			if ( !empty( $this->advancedSearch ) )
 			{
 				/* Are we displaying the advanced search form? */
-				if ( Request::i()->advancedSearchForm )
+				if ( \IPS\Request::i()->advancedSearchForm )
 				{
 					/* If we are showing just the advanced search form, send a noindex meta tag */
-					Output::i()->metaTags['robots']	= 'noindex';
+					\IPS\Output::i()->metaTags['robots']	= 'noindex';
 
 					return (string) $this->advancedSearch();
 				}
@@ -535,39 +508,39 @@ abstract class Table
 			{ 
 				if ( $this->pages and $this->page > $this->pages )
 				{
-					Output::i()->redirect( $this->baseUrl->setPage( $this->paginationKey, 1 ), NULL, 303 );
+					\IPS\Output::i()->redirect( $this->baseUrl->setPage( $this->paginationKey, 1 ), NULL, 303 );
 				} 
 			}
 			
 			/* Add link tags */
 			if ( $this->page != 1 )
 			{
-				if( !isset( Output::i()->linkTags['canonical'] ) )
+				if( !isset( \IPS\Output::i()->linkTags['canonical'] ) )
 				{
-					Output::i()->linkTags['canonical'] = (string) $this->baseUrl->setPage( $this->paginationKey, $this->page );
+					\IPS\Output::i()->linkTags['canonical'] = (string) $this->baseUrl->setPage( $this->paginationKey, $this->page );
 				}
 				
-				Output::i()->linkTags['first'] = (string) $this->baseUrl->setPage( $this->paginationKey, 1 );
-				Output::i()->linkTags['prev'] = (string) $this->baseUrl->setPage( $this->paginationKey, $this->page - 1 );
+				\IPS\Output::i()->linkTags['first'] = (string) $this->baseUrl->setPage( $this->paginationKey, 1 );
+				\IPS\Output::i()->linkTags['prev'] = (string) $this->baseUrl->setPage( $this->paginationKey, $this->page - 1 );
 			}
 			/* If we literally requested ?page=1 add canonical tag to get rid of the page query string param */
-			elseif( isset( $this->baseUrl->data[ Url::COMPONENT_QUERY ][ $this->paginationKey ] ) )
+			elseif( isset( $this->baseUrl->data[ \IPS\Http\Url::COMPONENT_QUERY ][ $this->paginationKey ] ) )
 			{
-				Output::i()->linkTags['canonical'] = (string) $this->baseUrl->setPage();
+				\IPS\Output::i()->linkTags['canonical'] = (string) $this->baseUrl->setPage();
 			}
 			if ( $this->pages > $this->page )
 			{
-				Output::i()->linkTags['next'] = (string) $this->baseUrl->setPage( $this->paginationKey, $this->page + 1 );
+				\IPS\Output::i()->linkTags['next'] = (string) $this->baseUrl->setPage( $this->paginationKey, $this->page + 1 );
 			}
 			if ( $this->pages != $this->page )
 			{
-				Output::i()->linkTags['last'] = (string) $this->baseUrl->setPage( $this->paginationKey, $this->pages );
+				\IPS\Output::i()->linkTags['last'] = (string) $this->baseUrl->setPage( $this->paginationKey, $this->pages );
 			}
 			
 			/* No rows to show? Add a noindex but follow for crawling later to check if content exists */
-			if ( ! count( $rows ) )
+			if ( ! \count( $rows ) )
 			{
-				Output::i()->metaTags['robots'] = 'noindex, follow';
+				\IPS\Output::i()->metaTags['robots'] = 'noindex, follow';
 			}
 			
 			/* Get table headers */
@@ -575,19 +548,19 @@ abstract class Table
 				
 			/* If this is an AJAX request, just return them, with pagination */
 			$resortKey	= $this->resortKey;
-			if( Request::i()->isAjax() and Request::i()->$resortKey )
+			if( \IPS\Request::i()->isAjax() and \IPS\Request::i()->$resortKey )
 			{
-				if ( count( $rows ) )
+				if ( \count( $rows ) )
 				{
 					$rowsTemplate = $this->rowsTemplate;
 					$rowHtml = $rowsTemplate( $this, $headers, $rows, $this->mainColumn, $this->rootButtons, array() );
 				}
 				else
 				{
-					$rowHtml = Theme::i()->getTemplate( 'tables', 'core', 'front' )->noRows();
+					$rowHtml = \IPS\Theme::i()->getTemplate( 'tables', 'core', 'front' )->noRows();
 				}
 				
-				Output::i()->json( array( 'rows' => $rowHtml, 'pagination' => Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $this->baseUrl, $this->pages, $this->page, $this->limit, TRUE, $this->paginationKey, $this->simplePagination ), 'extraHtml' => $this->extraHtml ) );
+				\IPS\Output::i()->json( array( 'rows' => $rowHtml, 'pagination' => \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $this->baseUrl, $this->pages, $this->page, $this->limit, TRUE, $this->paginationKey, $this->simplePagination ), 'extraHtml' => $this->extraHtml ) );
 			}
 			/* Otherwise, show the full table */
 			else
@@ -599,45 +572,47 @@ abstract class Table
 				}
 				
 				/* Add JS */
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_core.js', 'core', 'global' ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_core.js', 'core', 'global' ) );
 				
 				/* Build table */
 				$tableTemplate = $this->tableTemplate;
-				return $tableTemplate( $this, $headers, $rows, ( is_array( $this->quickSearch ) ? $this->quickSearch[1] : $this->quickSearch ), !empty( $this->advancedSearch ) );
+				return $tableTemplate( $this, $headers, $rows, ( \is_array( $this->quickSearch ) ? $this->quickSearch[1] : $this->quickSearch ), !empty( $this->advancedSearch ) );
 			}
 		}
-		catch ( Exception | Throwable $e )
+		catch ( \Exception $e )
 		{
-			IPS::exceptionHandler( $e );
+			\IPS\IPS::exceptionHandler( $e );
 		}
-
-		return '';
+		catch ( \Throwable $e )
+		{
+			\IPS\IPS::exceptionHandler( $e );
+		}
 	}
 	
 	/**
 	 * Convert the value of a search field into something we can put in the query string
 	 *
-	 * @param array $values	The values
+	 * @param	array	$values	The values
 	 * @return	array
 	 */
-	protected function _convertSearchValuesForQueryString( array $values ): array
+	protected function _convertSearchValuesForQueryString( $values )
 	{
 		$return = array();
 		foreach( $values as $k => $v )
 		{
-			if ( is_array( $v ) )
+			if ( \is_array( $v ) )
 			{
 				$return[ $k ] = $this->_convertSearchValuesForQueryString( $v );
 			}
-			elseif ( $v instanceof DateTime )
+			elseif ( $v instanceof \IPS\DateTime )
 			{
 				$return[ $k ] = $v->getTimestamp();
 			}
-			elseif ( $v instanceof Member )
+			elseif ( $v instanceof \IPS\Member )
 			{
 				$return[ $k ] = $v->name;
 			}
-			elseif ( $v instanceof Model )
+			elseif ( $v instanceof \IPS\Node\Model )
 			{
 				if ( isset( $this->advancedSearch[ mb_substr( $k, mb_strlen( $this->langPrefix ) ) ] ) AND 
 					!( $v instanceof $this->advancedSearch[ mb_substr( $k, mb_strlen( $this->langPrefix ) ) ][1]['class'] ) )
@@ -649,7 +624,7 @@ abstract class Table
 					$return[ $k ] = $v->_id;
 				}
 			}
-			else if( isset( $this->advancedSearch[ mb_substr( $k, mb_strlen( $this->langPrefix ) ) ][0] ) and $this->advancedSearch[ mb_substr( $k, mb_strlen( $this->langPrefix ) ) ][0] === SEARCH_BOOL)
+			else if( isset( $this->advancedSearch[ mb_substr( $k, mb_strlen( $this->langPrefix ) ) ][0] ) and $this->advancedSearch[ mb_substr( $k, mb_strlen( $this->langPrefix ) ) ][0] === \IPS\Helpers\Table\SEARCH_BOOL )
 			{
 				$return[ $k . '_checkbox' ] = $v;
 			}
@@ -665,10 +640,10 @@ abstract class Table
 	/**
 	 * Get rows
 	 *
-	 * @param array|null $advancedSearchValues	Values from the advanced search form
+	 * @param	array	$advancedSearchValues	Values from the advanced search form
 	 * @return	array
 	 */
-	abstract public function getRows( array $advancedSearchValues = NULL ): array;
+	abstract public function getRows( $advancedSearchValues );
 
 	/**
 	 * Return the table headers
@@ -676,7 +651,7 @@ abstract class Table
 	 * @param	array|NULL	$advancedSearchValues	Advanced search values
 	 * @return	array
 	 */
-	public function getHeaders( array $advancedSearchValues=NULL ): array
+	public function getHeaders( $advancedSearchValues )
 	{
 		/* Get headers */
 		if ( empty( $this->include ) )
@@ -693,7 +668,7 @@ abstract class Table
 		}
 		else
 		{
-			if( !empty( $advancedSearchValues ) AND !isset( Request::i()->noColumn ) )
+			if( !empty( $advancedSearchValues ) AND !isset( \IPS\Request::i()->noColumn ) )
 			{
 				$headers = array_combine( $this->include, $this->include );
 				
@@ -731,17 +706,17 @@ abstract class Table
 	 * @param	string|null		$action		Specific action to check (hide/unhide, etc.) or NULL for a generic check
 	 * @return	bool
 	 */
-	public function canModerate( string $action=NULL ): bool
+	public function canModerate( $action=NULL )
 	{
 		return FALSE;
 	}
-
+	
 	/**
 	 * Get the advanced search values
 	 *
-	 * @return array|string|null
+	 * @return	array
 	 */
-	public function getAdvancedSearchValues(): array|string|null
+	public function getAdvancedSearchValues()
 	{
 		/* Advanced Search */
 		$advancedSearchValues 		= array();
@@ -759,7 +734,7 @@ abstract class Table
 		if ( !empty( $this->advancedSearch ) )
 		{
 			/* Are we displaying the advanced search form? */
-			if ( Request::i()->advancedSearchForm )
+			if ( \IPS\Request::i()->advancedSearchForm )
 			{
 				return (string) $this->advancedSearch();
 			}
@@ -787,7 +762,7 @@ abstract class Table
 	
 					if ( !empty( $this->advancedSearchValues ) )
 					{
-						$this->baseUrl = $this->baseUrl->setQueryString( array_merge( array( 'advanced_search_submitted' => 1, 'csrfKey' => Session::i()->csrfKey ), $this->_convertSearchValuesForQueryString( $advancedSearchValuesQuery ) ) );
+						$this->baseUrl = $this->baseUrl->setQueryString( array_merge( array( 'advanced_search_submitted' => 1, 'csrfKey' => \IPS\Session::i()->csrfKey ), $this->_convertSearchValuesForQueryString( $advancedSearchValuesQuery ) ) );
 					}
 				}
 			}
@@ -800,10 +775,10 @@ abstract class Table
 	 * Return the sort direction to use for links
 	 *
 	 * @note	Abstracted so other table helper instances can adjust as needed
-	 * @param string $column		Sort by string
-	 * @return	string|null [asc|desc]
+	 * @param	string	$column		Sort by string
+	 * @return	string [asc|desc]
 	 */
-	public function getSortDirection( string $column ): ?string
+	public function getSortDirection( $column )
 	{
 		/* If the column we are sorting by is the default sort, use the default sort direction */
 		if ( $this->defaultSortBy AND $column == $this->defaultSortBy AND $this->defaultSortDirection )

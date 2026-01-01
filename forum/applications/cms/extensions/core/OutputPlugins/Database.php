@@ -12,39 +12,35 @@
 namespace IPS\cms\extensions\core\OutputPlugins;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Databases;
-use IPS\Extensions\OutputPluginsAbstract;
-use IPS\Member;
-use LogicException;
-use OutofRangeException;
-use function defined;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Content: Database
  */
-class Database extends OutputPluginsAbstract
+class _Database
 {
+	/**
+	 * @brief	Can be used when compiling CSS
+	 */
+	public static $canBeUsedInCss = FALSE;
+	
 	/**
 	 * @brief	Record how many database tags there are per page
 	 */
-	public static int $count = 0;
+	public static $count = 0;
 	
 	/**
 	 * Run the plug-in
 	 *
 	 * @param	string 		$data	  The initial data from the tag
 	 * @param	array		$options    Array of options
-	 * @return	string|array		Code to eval
+	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options ): string|array
+	public static function runPlugin( $data, $options )
 	{
 		if ( isset( $options['category'] ) )
 		{
@@ -57,41 +53,43 @@ class Database extends OutputPluginsAbstract
 	/**
 	 * Do any processing before a page is added/saved
 	 *
-	 * @param string $data	  The initial data from the tag
-	 * @param array $options  Array of options
-	 * @param object $page	  Page being edited/saved
+	 * @param	string 		$data	  The initial data from the tag
+	 * @param	array		$options  Array of options
+	 * @param	object		$page	  Page being edited/saved
 	 * @return	void
 	 */
-	public static function preSaveProcess( string $data, array $options, object $page ) : void
+	public static function preSaveProcess( $data, $options, $page )
 	{
 		/* Keep a count of databases used so far */
 		static::$count++;
 		
 		if ( static::$count > 1 )
 		{
-			throw new LogicException( Member::loggedIn()->language()->addToStack('cms_err_db_already_on_page') );
+			throw new \LogicException( \IPS\Member::loggedIn()->language()->addToStack('cms_err_db_already_on_page') );
 		}
 	}
 	
 	/**
 	 * Do any processing after a page is added/saved
 	 *
-	 * @param string $data	  The initial data from the tag
-	 * @param array $options  Array of options
-	 * @param object $page	  Page being edited/saved
+	 * @param	string 		$data	  The initial data from the tag
+	 * @param	array		$options  Array of options
+	 * @param	object		$page	  Page being edited/saved
 	 * @return	void
 	 */
-	public static function postSaveProcess( string $data, array $options, object $page ) : void
+	public static function postSaveProcess( $data, $options, $page )
 	{
+		$database = NULL;
+		
 		try
 		{
-			if ( is_numeric( $data ) )
+			if ( \is_numeric( $data ) )
 			{
-				$database = Databases::load( $data );
+				$database = \IPS\cms\Databases::load( $data );
 			}
 			else
 			{
-				$database = Databases::load( $data, 'database_key' );
+				$database = \IPS\cms\Databases::load( $data, 'database_key' );
 			}
 			
 			if ( $database->id AND $page->id )
@@ -100,13 +98,13 @@ class Database extends OutputPluginsAbstract
 				{
 					$page->mapToDatabase( $database->id );
 				}
-				catch( LogicException $ex )
+				catch( \LogicException $ex )
 				{
-					throw new LogicException( $ex->getMessage() );
+					throw new \LogicException( $ex->getMessage() );
 				}
 			}
 		}
-		catch( OutofRangeException $ex ) { }
+		catch( \OutofRangeException $ex ) { }
 	}
 
 }

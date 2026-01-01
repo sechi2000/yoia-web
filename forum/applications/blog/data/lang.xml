@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <language>
- <app key="blog" version="5001403">
+ <app key="blog" version="107827">
   <word key="__app_blog" js="0">Blogs</word>
   <word key="frontnavigation_blogs" js="0">Blogs</word>
   <word key="__indefart_blog_entry_comment" js="0">a comment on a blog entry</word>
@@ -11,7 +11,6 @@
   <word key="__defart_blog_entry_plural" js="0">{!#[1:blog entry][?:blog entries]}</word>
   <word key="blog_entry_container" js="0">blog</word>
   <word key="blog_entry_pl_lc" js="0">blog entries</word>
-  <word key="blog_categories_sg" js="0">Blog Category</word>
   <word key="module__blog_blogs" js="0">Blogs</word>
   <word key="menu__blog_blogs" js="0">Blogs</word>
   <word key="menu__blog_blogs_settings" js="0">Settings</word>
@@ -38,9 +37,13 @@
   <word key="blog_allow_rssimport" js="0">Allow RSS imports</word>
   <word key="blog_allow_rssimport_desc" js="0"><![CDATA[Allowing users to import RSS feeds will make your site susceptible to <a href='https://owasp.org/www-community/attacks/Server_Side_Request_Forgery' target='_blank' rel='noopener'>SSRF attacks</a>. You should not allow RSS imports to Blog if untrusted users are permitted to create blogs, and you should only import RSS feeds from sources that are trusted and that do not allow user-submitted content to be included in the feed.]]></word>
   <word key="blog_allow_rss" js="0">Allow RSS exports</word>
-  <word key="blog_view" js="0">Blog view</word>
-  <word key="blog_view_mode_grid" js="0">Grid: Display entries as cards</word>
-  <word key="blog_view_mode_table" js="0">Table: Traditional table view</word>
+  <word key="blog_allow_grid" js="0">Enable grid view</word>
+  <word key="blog_allow_grid_desc" js="0">Grid view showcases blog entries as cards with space for a feature photo</word>
+  <word key="blog_view_mode" js="0">Default view</word>
+  <word key="blog_view_mode_grid" js="0">Grid of latest entries</word>
+  <word key="blog_view_mode_grid_desc" js="0">Displays entries as cards in a grid with space for a feature photo</word>
+  <word key="blog_view_mode_list" js="0">List of blogs</word>
+  <word key="blog_view_mode_list_desc" js="0">Displays blogs as a sortable and filterable list</word>
   <word key="blogs" js="0">Blogs</word>
   <word key="blog_word_custom" js="0">Blog Name</word>
   <word key="blog_blog_member_id" js="0">Blog Author</word>
@@ -128,7 +131,7 @@
   <word key="next_entry" js="0">Next entry</word>
   <word key="blog_entry__comment_placeholder" js="0">Add a comment...</word>
   <word key="blog_entry_submit_comment" js="0">Submit Comment</word>
-  <word key="entry_actions" js="0"><![CDATA[<i class='fa-solid fa-gear'></i> Entry Actions]]></word>
+  <word key="entry_actions" js="0">Entry Actions</word>
   <word key="edit_title_blog" js="0">Edit this blog entry</word>
   <word key="feature_title_blog" js="0">Feature this blog entry</word>
   <word key="unfeature_title_blog" js="0">Unfeature this blog entry</word>
@@ -145,14 +148,14 @@
   <word key="unpublished" js="0">Unpublished</word>
   <word key="blog_entry_locked_can_comment" js="0">This blog entry is locked, but your permissions allow you to add new comments.</word>
   <word key="blog_entry_locked_cannot_comment" js="0">This blog entry is now closed to further comments.</word>
-  <word key="entry_posted" js="0">By %s</word>
-  <word key="entry_future_posted" js="0">By %s, publishes on</word>
+  <word key="entry_posted" js="0">Entry posted by %s</word>
+  <word key="entry_future_posted" js="0">Entry by %s publishes on</word>
   <word key="entry_images" js="0">Images</word>
-  <word key="entry_posted_with_cat" js="0">By %s in %s</word>
-  <word key="entry_future_posted_with_cat" js="0">By %s in %s, publishes on</word>
-  <word key="blog_comments" js="0">{!#[1:Comment][?:Comments]}</word>
-  <word key="blog_entries" js="0">{!#[1:Entry][?:Entries]}</word>
-  <word key="blog_views" js="0">{!#[1:View][?:Views]}</word>
+  <word key="entry_posted_with_cat" js="0">Entry posted by %s in %s</word>
+  <word key="entry_future_posted_with_cat" js="0">Entry by %s in %s publishes on</word>
+  <word key="blog_comments" js="0">{!#[1:comment][?:comments]}</word>
+  <word key="blog_entries" js="0">{!#[1:entry][?:entries]}</word>
+  <word key="blog_views" js="0">{!#[1:view][?:views]}</word>
   <word key="recent_entries" js="0">Recent Entries</word>
   <word key="featured_entries" js="0">Featured Entries</word>
   <word key="our_community_blogs" js="0">Our community blogs</word>
@@ -171,7 +174,6 @@
   <word key="read_blog" js="0">You've read this entry</word>
   <word key="go_to_blog" js="0">Go to the blog %s</word>
   <word key="latest_entry" js="0">Latest Entry</word>
-  <word key="latest_entry_by" js="0">Latest entry by %s, </word>
   <word key="entry_name_with_cat" js="0">%s in %s</word>
   <word key="no_entries" js="0">No blog entries have been created</word>
   <word key="pin_blog" js="0">Pin</word>
@@ -260,7 +262,6 @@
   <word key="can_add_item_message_blog_entry" js="0">Can add messages to entries?</word>
   <word key="can_edit_item_message_blog_entry" js="0">Can edit messages on entries?</word>
   <word key="can_delete_item_message_blog_entry" js="0">Can delete messages on entries?</word>
-  <word key="can_view_reports_blog_entry" js="0">Can view reported blog entries?</word>
   <word key="group__blog_Blog" js="0">Blog</word>
   <word key="g_blog_allowlocal" js="0">Can create blogs?</word>
   <word key="g_blog_maxblogs" js="0">Maximum number of blogs</word>

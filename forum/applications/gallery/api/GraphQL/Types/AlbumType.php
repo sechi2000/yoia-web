@@ -12,47 +12,45 @@
 namespace IPS\gallery\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Node\Api\GraphQL\NodeType;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * AlbumType for GraphQL API
  */
-class AlbumType extends NodeType
+class _AlbumType extends \IPS\Node\Api\GraphQL\NodeType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $nodeClass	= '\IPS\gallery\Album';
+	protected static $nodeClass	= '\IPS\gallery\Album';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'gallery_Album';
+	protected static $typeName = 'gallery_Album';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'An album';
+	protected static $typeDescription = 'An album';
 
 	/*
 	 * @brief 	Follow data passed in to FollowType resolver
 	 */
-	protected static array $followData = array('app' => 'gallery', 'area' => 'album');
+	protected static $followData = array('app' => 'gallery', 'area' => 'album');
 
 	/**
 	 * Return the fields available in this type
 	 *
 	 * @return	array
 	 */
-	public function fields(): array
+	public function fields()
 	{
 		$defaultFields = parent::fields();
 		$albumFields = array(
@@ -93,7 +91,7 @@ class AlbumType extends NodeType
 	 *
 	 * @return	ObjectType
 	 */
-	public static function getItemType(): ObjectType
+	public static function getItemType()
 	{
 		return \IPS\gallery\api\GraphQL\TypeRegistry::image();
 	}

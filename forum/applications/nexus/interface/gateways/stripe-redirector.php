@@ -9,26 +9,16 @@
  * @since		20 Jul 2017
  */
 
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Device;
-use IPS\nexus\Transaction;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Session\Front;
-use IPS\Settings;
-
-define('REPORT_EXCEPTIONS', TRUE);
+\define('REPORT_EXCEPTIONS', TRUE);
 require_once '../../../../init.php';
-Front::i();
+\IPS\Session\Front::i();
 
-Output::setCacheTime( false );
+\IPS\Output::setCacheTime( false );
 
 /* Little IN_DEV helper to prevent firing this until we've triggered the webhooks */
-if ( \IPS\IN_DEV and !isset( Request::i()->indevconfirm ) )
+if ( \IPS\IN_DEV and !isset( \IPS\Request::i()->indevconfirm ) )
 {
-	echo "<a href='" . Request::i()->url()->setQueryString( 'indevconfirm', 1 ) . "'>Continue</a>";
+	echo "<a href='" . \IPS\Request::i()->url()->setQueryString( 'indevconfirm', 1 ) . "'>Continue</a>";
 	exit;
 }
 
@@ -38,37 +28,37 @@ sleep( 5 );
 /* Load Source */
 try
 {
-	$transaction = Transaction::load( Request::i()->nexusTransactionId );
-	$intent = $transaction->method->api( 'payment_intents/' . Request::i()->payment_intent, null, 'GET' );
-	if( $intent['client_secret'] != Request::i()->payment_intent_client_secret )
+	$transaction = \IPS\nexus\Transaction::load( \IPS\Request::i()->nexusTransactionId );
+	$intent = $transaction->method->api( 'payment_intents/' . \IPS\Request::i()->payment_intent, null, 'GET' );
+	if( $intent['client_secret'] != \IPS\Request::i()->payment_intent_client_secret )
 	{
-		throw new Exception;
+		throw new \Exception;
 	}
 }
-catch (Exception )
+catch ( \Exception $e )
 {
-	Output::i()->redirect( Url::internal( "app=nexus&module=checkout&controller=checkout&do=transaction&id=&t=" . Request::i()->nexusTransactionId, 'front', 'nexus_checkout', Settings::i()->nexus_https ) );
+	\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=nexus&module=checkout&controller=checkout&do=transaction&id=&t=" . \IPS\Request::i()->nexusTransactionId, 'front', 'nexus_checkout', \IPS\Settings::i()->nexus_https ) );
 }
 
 /* If we're a guest, but the transaction belongs to a member, that's because the webhook has
 	processed the transaction and created an account - so we need to log the newly created
 	member in. This is okay to do because we've checked client_secret is correct, meaning
 	we know this is a genuine redirect back from Stripe after payment of this transaction */
-if ( !Member::loggedIn()->member_id and $transaction->member->member_id )
+if ( !\IPS\Member::loggedIn()->member_id and $transaction->member->member_id )
 {
-	Session::i()->setMember( $transaction->member );
-	Device::loadOrCreate( $transaction->member, FALSE )->updateAfterAuthentication( NULL );
+	\IPS\Session::i()->setMember( $transaction->member );
+	\IPS\Member\Device::loadOrCreate( $transaction->member, FALSE )->updateAfterAuthentication( NULL );
 }
 
 /* And then send them on */
 switch( $intent['status'] )
 {
 	case 'processing':
-		Output::i()->redirect( $transaction->url()->setQueryString( 'pending', 1 ) );
+		\IPS\Output::i()->redirect( $transaction->url()->setQueryString( 'pending', 1 ) );
 		break;
 
 	case 'succeeded':
-		Output::i()->redirect( $transaction->url() );
+		\IPS\Output::i()->redirect( $transaction->url() );
 		break;
 
 	default:
@@ -77,6 +67,6 @@ switch( $intent['status'] )
 		{
 			$url = $url->setQueryString( 'err', $intent['last_payment_error']['message'] );
 		}
-		Output::i()->redirect( $url );
+		\IPS\Output::i()->redirect( $url );
 		break;
 }

@@ -11,49 +11,24 @@
 namespace IPS\core\extensions\core\Notifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content as ContentClass;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Content\Review;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\NotificationsAbstract;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Radio;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Notification\Inline;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Notification Options
  */
-class Content extends NotificationsAbstract
+class _Content
 {
 	/**
 	 * Get fields for configuration
 	 *
-	 * @param	Member|null	$member		The member (to take out any notification types a given member will never see) or NULL if this is for the ACP
+	 * @param	\IPS\Member|null	$member		The member (to take out any notification types a given member will never see) or NULL if this is for the ACP
 	 * @return	array
 	 */
-	public static function configurationOptions( ?Member $member = NULL ): array
+	public static function configurationOptions( \IPS\Member $member = NULL ): array
 	{
 		$autoFollow	= array();
 		if ( $member )
@@ -67,20 +42,20 @@ class Content extends NotificationsAbstract
 				$autoFollow[]	= 'comments';
 			}
 			
-			$autoFollowField = new CheckboxSet( 'auto_track', $autoFollow, FALSE, array( 'options' => array( 'content' => 'auto_track_content', 'comments' => 'auto_track_comments' ), 'multiple' => TRUE, 'showAllNone' => FALSE ) );
+			$autoFollowField = new \IPS\Helpers\Form\CheckboxSet( 'auto_track', $autoFollow, FALSE, array( 'options' => array( 'content' => 'auto_track_content', 'comments' => 'auto_track_comments' ), 'multiple' => TRUE, 'showAllNone' => FALSE ) );
 		}
 		else
 		{
-			if ( Settings::i()->auto_follow_new_content )
+			if ( \IPS\Settings::i()->auto_follow_new_content )
 			{
 				$autoFollow[]	= 'content';
 			}
-			if( Settings::i()->auto_follow_replied_to )
+			if( \IPS\Settings::i()->auto_follow_replied_to )
 			{
 				$autoFollow[]	= 'comments';
 			}
 			
-			$autoFollowField = new CheckboxSet( 'auto_follow_defaults', $autoFollow, FALSE, array( 'options' => array( 'content' => 'auto_follow_new_content', 'comments' => 'auto_follow_replied_to' ), 'multiple' => TRUE, 'showAllNone' => FALSE ) );
+			$autoFollowField = new \IPS\Helpers\Form\CheckboxSet( 'auto_follow_defaults', $autoFollow, FALSE, array( 'options' => array( 'content' => 'auto_follow_new_content', 'comments' => 'auto_follow_replied_to' ), 'multiple' => TRUE, 'showAllNone' => FALSE ) );
 		}
 				
 		return array(
@@ -96,11 +71,11 @@ class Content extends NotificationsAbstract
 			'auto_track_type'	=> array(
 				'type'				=> 'custom',
 				'adminCanSetDefault'=> FALSE,
-				'field'				=> new Radio( 'auto_track_type', ( $member and $member->auto_follow['method'] ) ? $member->auto_follow['method'] : 'immediate', FALSE, array( 'options' => array(
-					'immediate'			=> Member::loggedIn()->language()->addToStack('follow_type_immediate'),
-					'daily'				=> Member::loggedIn()->language()->addToStack('follow_type_daily'),
-					'weekly'			=> Member::loggedIn()->language()->addToStack('follow_type_weekly'),
-					'none'				=> Member::loggedIn()->language()->addToStack('follow_type_none')
+				'field'				=> new \IPS\Helpers\Form\Radio( 'auto_track_type', ( $member and $member->auto_follow['method'] ) ? $member->auto_follow['method'] : 'immediate', FALSE, array( 'options' => array(
+					'immediate'			=> \IPS\Member::loggedIn()->language()->addToStack('follow_type_immediate'),
+					'daily'				=> \IPS\Member::loggedIn()->language()->addToStack('follow_type_daily'),
+					'weekly'			=> \IPS\Member::loggedIn()->language()->addToStack('follow_type_weekly'),
+					'none'				=> \IPS\Member::loggedIn()->language()->addToStack('follow_type_none')
 				) ), NULL, NULL, NULL, 'auto_track_type' )
 			),
 			'separator1'	=> array(
@@ -131,7 +106,7 @@ class Content extends NotificationsAbstract
 			'email_notifications_once' => array(
 				'type'				=> 'custom',
 				'adminCanSetDefault'=> TRUE,
-				'field'				=> $member ? new Checkbox( 'email_notifications_once', $member and $member->members_bitoptions['email_notifications_once'] ) : new Radio( 'notification_prefs_one_per_view', Settings::i()->notification_prefs_one_per_view ? 'default' : 'optional', FALSE, array(
+				'field'				=> $member ? new \IPS\Helpers\Form\Checkbox( 'email_notifications_once', $member and $member->members_bitoptions['email_notifications_once'] ) : new \IPS\Helpers\Form\Radio( 'notification_prefs_one_per_view', \IPS\Settings::i()->notification_prefs_one_per_view ? 'default' : 'optional', FALSE, array(
 					'options'			=> array(
 						'default'			=> 'admin_notification_pref_default',
 						'optional'			=> 'admin_notification_pref_optional',
@@ -147,12 +122,12 @@ class Content extends NotificationsAbstract
 	/**
 	 * Save "extra" value
 	 *
-	 * @param	Member|NULL	$member	The member or NULL if this is the admin setting defaults
+	 * @param	\IPS\Member|NULL	$member	The member or NULL if this is the admin setting defaults
 	 * @param	string				$key	The key
-	 * @param	mixed				$value	The value
+	 * @param	bool				$value	The value
 	 * @return	void
 	 */
-	public static function saveExtra( ?Member $member, string $key, mixed $value ) : void
+	public static function saveExtra( ?\IPS\Member $member, $key, $value )
 	{		
 		switch ( $key )
 		{
@@ -162,15 +137,15 @@ class Content extends NotificationsAbstract
 					$autoTrack = $member->auto_track ? json_decode( $member->auto_track, TRUE ) : array();
 					foreach ( array( 'content', 'comments' ) as $k )
 					{
-						$autoTrack[ $k ] = in_array( $k, $value );
+						$autoTrack[ $k ] = \in_array( $k, $value );
 					}				
 					$member->auto_track = json_encode( $autoTrack );
 				}
 				else
 				{
-					Settings::i()->changeValues( array(
-						'auto_follow_new_content'	=> in_array( 'content', $value ),
-						'auto_follow_replied_to'	=> in_array( 'comments', $value ),
+					\IPS\Settings::i()->changeValues( array(
+						'auto_follow_new_content'	=> \in_array( 'content', $value ),
+						'auto_follow_replied_to'	=> \in_array( 'comments', $value ),
 					) );
 				}
 				break;
@@ -188,7 +163,7 @@ class Content extends NotificationsAbstract
 				}
 				else
 				{
-					Settings::i()->changeValues( array(
+					\IPS\Settings::i()->changeValues( array(
 						'notification_prefs_one_per_view'	=> ( $value === 'default' )
 					) );
 				}
@@ -199,16 +174,16 @@ class Content extends NotificationsAbstract
 	/**
 	 * Disable all "extra" values for a particular type
 	 *
-	 * @param	Member|NULL	$member	The member or NULL if this is the admin setting defaults
+	 * @param	\IPS\Member|NULL	$member	The member or NULL if this is the admin setting defaults
 	 * @param	string				$method	The method type
 	 * @return	void
 	 */
-	public static function disableExtra( ?Member $member, string $method ) : void
+	public static function disableExtra( ?\IPS\Member $member, $method )
 	{
 		/* If we are disabling all emails, set any digest follows to be "no notification" */
 		if ( $method === 'email' )
 		{
-			Db::i()->update( 'core_follow', [
+			\IPS\Db::i()->update( 'core_follow', [
 				'follow_added'			=> time(),
 				'follow_notify_do'		=> 0,
 				'follow_notify_freq' 	=> 'none',
@@ -224,21 +199,21 @@ class Content extends NotificationsAbstract
 	 *
 	 * @return	void
 	 */
-	public static function resetExtra() : void
+	public static function resetExtra()
 	{
-		Db::i()->update( 'core_members', array( 'auto_track' => json_encode( array(
-			'content'	=> Settings::i()->auto_follow_new_content ? 1 : 0,
-			'comments'	=> Settings::i()->auto_follow_replied_to ? 1 : 0,
+		\IPS\Db::i()->update( 'core_members', array( 'auto_track' => json_encode( array(
+			'content'	=> \IPS\Settings::i()->auto_follow_new_content ? 1 : 0,
+			'comments'	=> \IPS\Settings::i()->auto_follow_replied_to ? 1 : 0,
 			'method'	=> 'immediate'
 		) ) ) );
 		
-		Db::i()->update( 'core_members', 'members_bitoptions2 = members_bitoptions2 ' . ( Settings::i()->notification_prefs_one_per_view ? '|' : '&~' ) . Member::$bitOptions['members_bitoptions']['members_bitoptions2']['email_notifications_once'] );
+		\IPS\Db::i()->update( 'core_members', 'members_bitoptions2 = members_bitoptions2 ' . ( \IPS\Settings::i()->notification_prefs_one_per_view ? '|' : '&~' ) . \IPS\Member::$bitOptions['members_bitoptions']['members_bitoptions2']['email_notifications_once'] );
 	}
 	
 	/**
 	 * Parse notification: new_content
 	 *
-	 * @param	Inline	$notification	The notification
+	 * @param	\IPS\Notification\Inline	$notification	The notification
 	 * @param	bool						$htmlEscape		TRUE to escape HTML in title
 	 * @return	array
 	 * @code
@@ -252,12 +227,12 @@ class Content extends NotificationsAbstract
 	 	);
 	 * @endcode
 	 */
-	public function parse_new_content( Inline $notification, bool $htmlEscape=TRUE ): array
+	public function parse_new_content( $notification, $htmlEscape=TRUE )
 	{
 		$item = $notification->item;
 		if ( !$item )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		/* If the content item is queued for deletion, add the query string parameter so we can see it */
@@ -268,14 +243,14 @@ class Content extends NotificationsAbstract
 			$url = $url->setQueryString( 'showDeleted', 1 );
 		}
 
-		$name = ( IPS::classUsesTrait( $item, 'IPS\Content\Anonymous' ) AND $item->isAnonymous() ) ? Member::loggedIn()->language()->addToStack( 'post_anonymously_placename' ) : $item->author()->name;
+		$name = ( $item->isAnonymous() ) ? \IPS\Member::loggedIn()->language()->addToStack( 'post_anonymously_placename' ) : $item->author()->name;
 		
 		return array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'notification__new_content', FALSE, array(
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'notification__new_content', FALSE, array(
 				( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array(
 					$name,
-					mb_strtolower( $item->indefiniteArticle() ),
-					$item->directContainer()->getTitleForLanguage( Member::loggedIn()->language(), $htmlEscape ? array( 'escape' => TRUE ) : array() ),
+					mb_strtolower( $item->indefiniteArticle() ), 
+					$item->searchIndexContainerClass()->getTitleForLanguage( \IPS\Member::loggedIn()->language(), $htmlEscape ? array( 'escape' => TRUE ) : array() ),
 					$item->mapped('title')
 				)
 			) ),
@@ -289,25 +264,25 @@ class Content extends NotificationsAbstract
 	/**
 	 * Parse notification for mobile: new_content
 	 *
-	 * @param	Lang			$language	The language that the notification should be in
-	 * @param	Item	$item		The item that was posted
+	 * @param	\IPS\Lang			$language	The language that the notification should be in
+	 * @param	\IPS\Content\Item	$item		The item that was posted
 	 * @return	array
 	 */
-	public static function parse_mobile_new_content( Lang $language, Item $item ) : array
+	public static function parse_mobile_new_content( \IPS\Lang $language, \IPS\Content\Item $item )
 	{
-		$name = ( IPS::classUsesTrait( $item, 'IPS\Content\Anonymous' ) AND $item->isAnonymous() ) ? Member::loggedIn()->language()->addToStack( 'post_anonymously_placename' ) : $item->author()->name;
+		$name = ( $item->isAnonymous() ) ? \IPS\Member::loggedIn()->language()->addToStack( 'post_anonymously_placename' ) : $item->author()->name;
 		$container = $item->containerWrapper();
 		$containerId = $container ? $container->_id : "-"; // This is used to generate the tag. Use ID if we have one, otherwise just a dash
 
 		return array(
 			'title'		=> $language->addToStack( 'notification__new_content_title', FALSE, array( 'htmlsprintf' => array(
-				mb_strtolower( $item->definiteArticle($language) ),
+				mb_strtolower( $item->definiteArticle( $language ) ),
 			) ) ),
 			'body'		=> $language->addToStack( 'notification__new_content', FALSE, array( 'htmlsprintf' => array(
 				$name,
 				mb_strtolower( $item->indefiniteArticle( $language ) ),
 				$container ? 
-					$language->addToStack( 'notification__container', FALSE, array( 'sprintf' => array( $container->getTitleForLanguage( $language ) ) ) )
+					$language->addToStack( 'notification__container', FALSE, array( 'sprintf' => array( $item->searchIndexContainerClass()->getTitleForLanguage( $language ) ) ) ) 
 					: "",
 				$item->mapped('title')
 			) ) ),
@@ -316,18 +291,18 @@ class Content extends NotificationsAbstract
 				'author'	=> $item->author(),
 				'grouped'	=> $language->addToStack( 'notification__new_content_grouped', FALSE, array(
 					'htmlsprintf'	=> array(
-						$item->definiteArticle($language, TRUE),
+						$item->definiteArticle( $language, TRUE ),
 						$container ? 
-							$language->addToStack( 'notification__container', FALSE, array( 'sprintf' => array( $container->getTitleForLanguage( $language ) ) ) )
+							$language->addToStack( 'notification__container', FALSE, array( 'sprintf' => array( $item->searchIndexContainerClass()->getTitleForLanguage( $language ) ) ) ) 
 							: "",
 					)
 				) ),
 				'groupedTitle' => $language->addToStack( 'notification__new_content_grouped_title', FALSE, array( 'htmlsprintf' => array(
-					$item->definiteArticle($language, TRUE),
+					$item->definiteArticle( $language, TRUE ),
 				) ) ),
-				'groupedUrl' => $container?->url()
+				'groupedUrl' => $container ? $container->url() : NULL
 			),
-			'tag' => md5( 'newcontent' . get_class( $item ) . $containerId ), // Group new item notifications by container ID (if available)
+			'tag' => md5( 'newcontent' . \get_class( $item ) . $containerId ), // Group new item notifications by container ID (if available)
 			'channelId'	=> 'followed',
 		);
 	}
@@ -335,7 +310,7 @@ class Content extends NotificationsAbstract
 	/**
 	 * Parse notification: new_content_bulk
 	 *
-	 * @param	Inline	$notification	The notification
+	 * @param	\IPS\Notification\Inline	$notification	The notification
 	 * @param	bool						$htmlEscape		TRUE to escape HTML in title
 	 * @return	array
 	 * @code
@@ -349,13 +324,13 @@ class Content extends NotificationsAbstract
 	 );
 	 * @endcode
 	 */
-	public function parse_new_content_bulk( Inline $notification, bool $htmlEscape=TRUE ) : array
+	public function parse_new_content_bulk( $notification, $htmlEscape=TRUE )
 	{
 		$node = $notification->item;
 		
 		if ( !$node )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 				
 		if ( $notification->extra )
@@ -364,22 +339,22 @@ class Content extends NotificationsAbstract
 				so we need to grab just the one array entry (the member ID we stored) */
 			$memberId = $notification->extra;
 
-			if( is_array( $memberId ) )
+			if( \is_array( $memberId ) )
 			{
 				$memberId = array_pop( $memberId );
 			}
 
-			$author = Member::load( $memberId );
+			$author = \IPS\Member::load( $memberId );
 		}
 		else
 		{
-			$author = new Member;
+			$author = new \IPS\Member;
 		}
 		
 		$contentClass = $node::$contentItemClass;
 		
 		return array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'notification__new_content_bulk', FALSE, array( ( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( $author->name, Member::loggedIn()->language()->get( $contentClass::$title . '_pl_lc' ), $node->_title ) ) ),
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'notification__new_content_bulk', FALSE, array( ( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( $author->name, \IPS\Member::loggedIn()->language()->get( $contentClass::$title . '_pl_lc' ), $node->_title ) ) ),
 			'url'		=> $node->url(),
 			'author'	=> $author
 		);
@@ -388,15 +363,14 @@ class Content extends NotificationsAbstract
 	/**
 	 * Parse notification for mobile: new_content_bulk
 	 *
-	 * @param	Lang			$language		The language that the notification should be in
-	 * @param	Model		$node			The node with the new content
-	 * @param	Member			$author			The author
+	 * @param	\IPS\Lang			$language		The language that the notification should be in
+	 * @param	\IPS\Node\Model		$node			The node with the new content
+	 * @param	\IPS\Member			$author			The author
 	 * @param	string				$contentClass	The content class
 	 * @return	array
 	 */
-	public static function parse_mobile_new_content_bulk( Lang $language, Model $node, Member $author, string $contentClass ) : array
+	public static function parse_mobile_new_content_bulk( \IPS\Lang $language, \IPS\Node\Model $node, \IPS\Member $author, $contentClass )
 	{
-		/* @var ContentClass $contentClass */
 		return array(
 			'title'		=> $language->addToStack( 'notification__new_content_bulk_title', FALSE, array( 'htmlsprintf' => array(
 				$language->get( $contentClass::$title . '_pl_lc' ),
@@ -418,7 +392,7 @@ class Content extends NotificationsAbstract
 	/**
 	 * Parse notification: new_comment
 	 *
-	 * @param	Inline	$notification	The notification
+	 * @param	\IPS\Notification\Inline	$notification	The notification
 	 * @param	bool						$htmlEscape		TRUE to escape HTML in title
 	 * @return	array
 	 * @code
@@ -432,12 +406,12 @@ class Content extends NotificationsAbstract
 	 	);
 	 * @endcode
 	 */
-	public function parse_new_comment( Inline $notification, bool $htmlEscape=TRUE ) : array
+	public function parse_new_comment( $notification, $htmlEscape=TRUE )
 	{
 		$item = $notification->item;
 		if ( !$item )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		$idColumn = $item::$databaseColumnId;
@@ -447,16 +421,15 @@ class Content extends NotificationsAbstract
 		try
 		{
 			/* Is there a newer notification for this item? */
-			$between = Db::i()->select( 'sent_time', 'core_notifications', array( '`member`=? AND item_id=? AND item_class=? AND sent_time>? AND notification_key=?', Member::loggedIn()->member_id, $item->$idColumn, get_class( $item ), $notification->sent_time->getTimestamp(), $notification->notification_key ) )->first();
+			$between = \IPS\Db::i()->select( 'sent_time', 'core_notifications', array( '`member`=? AND item_id=? AND item_class=? AND sent_time>? AND notification_key=?', \IPS\Member::loggedIn()->member_id, $item->$idColumn, \get_class( $item ), $notification->sent_time->getTimestamp(), $notification->notification_key ) )->first();
 		}
-		catch( UnderflowException $e ) {}
-
-		/* @var array $databaseColumnMap */
+		catch( \UnderflowException $e ) {}
+		
 		$where = array();
 		$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['item'] . '=?', $item->$idColumn );
 		$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['date'] . '>=?', $notification->sent_time->getTimestamp() );
 		$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['date'] . '<?', $between ); 
-		$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'] . ' !=?', Member::loggedIn()->member_id );
+		$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'] . ' !=?', \IPS\Member::loggedIn()->member_id );
 		
 		if ( isset( $commentClass::$databaseColumnMap['approved'] ) )
 		{
@@ -472,7 +445,7 @@ class Content extends NotificationsAbstract
 			$where[] = array( "( " . $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['is_anon'] . ' IS NULL OR ' . $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['is_anon'] . '!=? )', 1);
 		}
 
-		$commenters = Db::i()->select( 'DISTINCT ' . $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'], $commentClass::$databaseTable, $where );
+		$commenters = \IPS\Db::i()->select( 'DISTINCT ' . $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'], $commentClass::$databaseTable, $where );
 	
 
 		$names = array();
@@ -481,15 +454,15 @@ class Content extends NotificationsAbstract
 		/* If we have an anonymous author, add "anonymous" to the list */
 		if( $comment->isAnonymous() )
 		{
-			$names[] = Member::loggedIn()->language()->addToStack( 'post_anonymously_placename' );
+			$names[] = \IPS\Member::loggedIn()->language()->addToStack( 'post_anonymously_placename' );
 		}
-
+		
 		foreach ( $commenters as $member )
 		{
-			$name = Member::load( $member )->name;
-			if ( count( $names ) > 2 )
+			$name = \IPS\Member::load( $member )->name;
+			if ( \count( $names ) > 2 )
 			{
-				$names[] = Member::loggedIn()->language()->addToStack( 'x_others', FALSE, array( 'pluralize' => array( count( $commenters ) - 3 ) ) );
+				$names[] = \IPS\Member::loggedIn()->language()->addToStack( 'x_others', FALSE, array( 'pluralize' => array( \count( $commenters ) - 3 ) ) );
 				break;
 			}
 			$names[] = $name;
@@ -502,19 +475,19 @@ class Content extends NotificationsAbstract
 		{
 			$url = $url->setQueryString( 'showDeleted', 1 );
 		}
-		
+
 		/* Unread? */
-		$unread = false;
-		if ( $item->timeLastRead() instanceof DateTime )
+		$unread = true;
+		if ( $item->timeLastRead() instanceof \IPS\DateTime )
 		{
-			$unread = ( $item->timeLastRead()->getTimestamp() < $notification->updated_time->getTimestamp() );
+			$unread = (bool) ( $item->timeLastRead()->getTimestamp() < $notification->updated_time->getTimestamp() );
 		}
 		
 		return array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'notification__new_comment', FALSE, array(
-				'pluralize'									=> array( count( $commenters ) ),
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'notification__new_comment', FALSE, array(
+				'pluralize'									=> array( \count( $commenters ) ),
 				( $htmlEscape ? 'sprintf' : 'htmlsprintf' )	=> array(
-					Member::loggedIn()->language()->formatList( $names ), $item->mapped('title') ) )
+					\IPS\Member::loggedIn()->language()->formatList( $names ), $item->mapped('title') ) )
 				),
 			'url'		=> $url,
 			'content'	=> $comment->content(),
@@ -526,11 +499,11 @@ class Content extends NotificationsAbstract
 	/**
 	 * Parse notification for mobile: new_comment
 	 *
-	 * @param	Lang			$language		The language that the notification should be in
-	 * @param	Comment	$comment			The comment
+	 * @param	\IPS\Lang			$language		The language that the notification should be in
+	 * @param	\IPS\Content\Comment	$comment			The comment
 	 * @return	array
 	 */
-	public static function parse_mobile_new_comment( Lang $language, Comment $comment ) : array
+	public static function parse_mobile_new_comment( \IPS\Lang $language, \IPS\Content\Comment $comment )
 	{
 		$item = $comment->item();
 		$idColumn = $item::$databaseColumnId;
@@ -557,7 +530,7 @@ class Content extends NotificationsAbstract
 				'groupedTitle' => $language->addToStack( 'notification__new_comment_title' ), // Pluralized on the client
 				// No need for groupedUrl here - latest comment url will do
 			),
-			'tag' => md5( 'newcomment' . get_class( $item ) . $item->$idColumn ), // Group comment notifications by item ID (if available)
+			'tag' => md5( 'newcomment' . \get_class( $item ) . $item->$idColumn ), // Group comment notifications by item ID (if available)
 			'channelId'	=> 'followed',
 		);
 	}
@@ -565,7 +538,7 @@ class Content extends NotificationsAbstract
 	/**
 	 * Parse notification: new_review
 	 *
-	 * @param	Inline	$notification	The notification
+	 * @param	\IPS\Notification\Inline	$notification	The notification
 	 * @param	bool						$htmlEscape		TRUE to escape HTML in title
 	 * @return	array
 	 * @code
@@ -579,13 +552,13 @@ class Content extends NotificationsAbstract
 	 	);
 	 * @endcode
 	 */
-	public function parse_new_review( Inline $notification, bool $htmlEscape = TRUE ) : array
+	public function parse_new_review( $notification, $htmlEscape = TRUE )
 	{
 		$item = $notification->item;
 
 		if ( !$item )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		$idColumn = $item::$databaseColumnId;
@@ -593,18 +566,17 @@ class Content extends NotificationsAbstract
 		try
 		{
 			/* Is there a newer notification for this item? */
-			$between = Db::i()->select( 'sent_time', 'core_notifications', array( '`member`=? AND item_id=? AND item_class=? AND sent_time>?', Member::loggedIn()->member_id, $item->$idColumn, get_class( $item ), $notification->sent_time->getTimestamp() ) )->first();
+			$between = \IPS\Db::i()->select( 'sent_time', 'core_notifications', array( '`member`=? AND item_id=? AND item_class=? AND sent_time>?', \IPS\Member::loggedIn()->member_id, $item->$idColumn, \get_class( $item ), $notification->sent_time->getTimestamp() ) )->first();
 		}
-		catch( UnderflowException $e ) {}
+		catch( \UnderflowException $e ) {}
 		
 		$commentClass = $item::$reviewClass;
-
-		/* @var array $databaseColumnMap */
+		
 		$where = array();
 		$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['item'] . '=?', $item->$idColumn );
 		$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['date'] . '>=?', $notification->sent_time->getTimestamp() );
 		$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['date'] . '<?', $between ); 
-		$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'] . ' !=?', Member::loggedIn()->member_id );
+		$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'] . ' !=?', \IPS\Member::loggedIn()->member_id );
 		
 		if ( isset( $commentClass::$databaseColumnMap['approved'] ) )
 		{
@@ -615,32 +587,32 @@ class Content extends NotificationsAbstract
 			$where[] = array( $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['hidden'] . ' NOT IN(?,?)', -2, -3 );
 		}
 		
-		$commenters = Db::i()->select( 'DISTINCT ' . $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'], $commentClass::$databaseTable, $where );
+		$commenters = \IPS\Db::i()->select( 'DISTINCT ' . $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['author'], $commentClass::$databaseTable, $where );
 						
 		$names = array();
 		foreach ( $commenters as $member )
 		{
-			if ( count( $names ) > 2 )
+			if ( \count( $names ) > 2 )
 			{
-				$names[] = Member::loggedIn()->language()->addToStack( 'x_others', FALSE, array( 'pluralize' => array( count( $commenters ) - 3 ) ) );
+				$names[] = \IPS\Member::loggedIn()->language()->addToStack( 'x_others', FALSE, array( 'pluralize' => array( \count( $commenters ) - 3 ) ) );
 				break;
 			}
-			$names[] = Member::load( $member )->name;
+			$names[] = \IPS\Member::load( $member )->name;
 		}
 		
 		$review = $commentClass::loadAndCheckPerms( $notification->item_sub_id );
 		
 		/* Unread? */
 		$unread = false;
-		if ( $item->timeLastRead() instanceof DateTime )
+		if ( $item->timeLastRead() instanceof \IPS\DateTime )
 		{
-			$unread = ( $item->timeLastRead()->getTimestamp() > $notification->updated_time->getTimestamp() );
+			$unread = (bool) ( $item->timeLastRead()->getTimestamp() > $notification->updated_time->getTimestamp() );
 		}
 		
 		return array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'notification__new_review', FALSE, array(
-				'pluralize'									=> array( count( $commenters ) ),
-				( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( Member::loggedIn()->language()->formatList( $names ), $item->mapped('title') ) )
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'notification__new_review', FALSE, array(
+				'pluralize'									=> array( \count( $commenters ) ),
+				( $htmlEscape ? 'sprintf' : 'htmlsprintf' ) => array( \IPS\Member::loggedIn()->language()->formatList( $names ), $item->mapped('title') ) )
 			),
 			'url'		=> $review->url('find'),
 			'content'	=> $review->content(),
@@ -652,11 +624,11 @@ class Content extends NotificationsAbstract
 	/**
 	 * Parse notification for mobile: new_review
 	 *
-	 * @param	Lang			$language		The language that the notification should be in
-	 * @param	Review	$review			The review
+	 * @param	\IPS\Lang			$language		The language that the notification should be in
+	 * @param	\IPS\Content\Review	$review			The review
 	 * @return	array
 	 */
-	public static function parse_mobile_new_review( Lang $language, Review $review ) : array
+	public static function parse_mobile_new_review( \IPS\Lang $language, \IPS\Content\Review $review )
 	{
 		$item = $review->item();
 		$idColumn = $item::$databaseColumnId;
@@ -683,7 +655,7 @@ class Content extends NotificationsAbstract
 				'groupedTitle' => $language->addToStack( 'notification__new_review_title' ), // Pluralized on the client
 				// No need for groupedUrl here - latest comment url will do
 			),
-			'tag' => md5( 'newreview' . get_class( $item ) . $item->$idColumn ), // Group review notifications by item ID (if available)
+			'tag' => md5( 'newreview' . \get_class( $item ) . $item->$idColumn ), // Group review notifications by item ID (if available)
 			'channelId'	=> 'followed',
 		);
 	}

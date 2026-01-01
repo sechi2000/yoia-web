@@ -12,16 +12,9 @@
 namespace IPS\Poll;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use FilterIterator;
-use IPS\Patterns\ActiveRecordIterator;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -29,45 +22,45 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * Poll Votes Filter Iterator
  * @note	When we require PHP 5.4+ this can just be replaced with a CallbackFilterIterator
  */
-class Iterator extends FilterIterator
+class _Iterator extends \FilterIterator
 {
 	/**
 	 * @brief	Question
 	 */
-	protected ?int $question = NULL;
+	protected $question;
 	
 	/**
 	 * @brief	Option
 	 */
-	protected ?int $option = NULL;
+	protected $option;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	ActiveRecordIterator	$iterator	Iterator
+	 * @param	\IPS\Patterns\ActiveRecordIterator	$iterator	Iterator
 	 * @param	int|null							$question	Question
-	 * @param int|null $option		Option
+	 * @param	int|null							$option		Option
 	 * @return	void
 	 */
-	public function __construct(ActiveRecordIterator $iterator, int $question=NULL, int $option=NULL )
+	public function __construct( \IPS\Patterns\ActiveRecordIterator $iterator, $question=NULL, $option=NULL )
 	{
 		$this->question	= $question;
 		$this->option	= $option;
-		parent::__construct( $iterator );
+		return parent::__construct( $iterator );
 	}
 	
 	/**
 	 * Does this rule apply?
 	 *
-	 * @return	bool
+	 * @return	void
 	 */
-	public function accept() : bool
+	public function accept()
 	{	
 		$row = $this->getInnerIterator()->current();
 		
-		if ( is_array( $row->member_choices[ $this->question ] ) )
+		if ( \is_array( $row->member_choices[ $this->question ] ) )
 		{
-			return in_array( $this->option, $row->member_choices[ $this->question ] );
+			return (bool) \in_array( $this->option, $row->member_choices[ $this->question ] );
 		}
 		
 		return $row->member_choices[ $this->question ] == $this->option;

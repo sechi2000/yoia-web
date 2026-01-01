@@ -11,42 +11,16 @@
 namespace IPS\core\extensions\core\ProfileSteps;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Db;
-use IPS\Extensions\ProfileStepsAbstract;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Login;
-use IPS\Login\Exception;
-use IPS\Login\Handler;
-use IPS\Member;
-use IPS\Member\ProfileStep;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Xml\DOMDocument;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_array;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Core ProfileSteps Extension
  */
-class Core extends ProfileStepsAbstract
+class _Core
 {
 	/* !Extension Methods */
 	
@@ -55,17 +29,10 @@ class Core extends ProfileStepsAbstract
 	 *
 	 * @return	array	array( 'key' => 'lang_string' )
 	 */
-	public static function actions(): array
+	public static function actions()
 	{
-		$return = [];
-
-		/* Make sure we have at least one field available */
-		if( Settings::i()->profile_birthday_type != 'none' or Settings::i()->signatures_enabled )
-		{
-			$return['basic_profile'] = 'complete_profile_basic_profile';
-		}
-
-		foreach ( Login::methods() as $method )
+		$return = array( 'basic_profile' => 'complete_profile_basic_profile' );
+		foreach ( \IPS\Login::methods() as $method )
 		{
 			if ( $method->showInUcp() )
 			{
@@ -82,24 +49,21 @@ class Core extends ProfileStepsAbstract
 	 *
 	 * @return	array	array( 'key' => 'lang_string' )
 	 */
-	public static function subActions(): array
+	public static function subActions()
 	{
 		/* Basic stuff */
-		$return['basic_profile'] = [];
-
-		if( Settings::i()->profile_birthday_type != 'none' )
-		{
-			$return['basic_profile']['birthday'] = 'complete_profile_birthday';
-		}
+		$return['basic_profile'] = array(
+			'birthday'		=> 'complete_profile_birthday',
+		);
 		
 		/* Signatures */
-		if ( Settings::i()->signatures_enabled )
+		if ( \IPS\Settings::i()->signatures_enabled )
 		{
 			$return['basic_profile']['signature'] = 'complete_profile_signature';
 		}
 		
 		/* Social Integration */
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
 			if ( $method->showInUcp() )
 			{
@@ -114,18 +78,18 @@ class Core extends ProfileStepsAbstract
 	 * Can the actions have multiple choices?
 	 *
 	 * @param	string		$action		Action key (basic_profile, etc)
-	 * @return	bool|null
+	 * @return	boolean
 	 */
-	public static function actionMultipleChoice( string $action ): ?bool
+	public static function actionMultipleChoice( $action )
 	{
 		switch( $action )
 		{
 			case 'basic_profile':
 				return TRUE;
-
+			break;
 			case 'social_login':
 				return FALSE;
-
+			break;
 		}
 		
 		return FALSE;
@@ -137,7 +101,7 @@ class Core extends ProfileStepsAbstract
 	 * @return	array
 	 * @note	This is intended for items which have their own independent settings and dedicated enable pages, such as Social Login integration
 	 */
-	public static function canBeRequired() : array
+	public static function canBeRequired()
 	{
 		return array( 'basic_profile' );
 	}
@@ -146,30 +110,30 @@ class Core extends ProfileStepsAbstract
 	 * Format Form Values
 	 *
 	 * @param	array				$values	The form values
-	 * @param	Member			$member	The member
-	 * @param	Form	$form	The form object
+	 * @param	\IPS\Member			$member	The member
+	 * @param	\IPS\Helpers\Form	$form	The form object
 	 * @return	void
 	 */
-	public static function formatFormValues( array $values, Member $member, Form $form ) : void
+	public static function formatFormValues( $values, &$member, &$form )
 	{
 		if( array_key_exists( 'signature', $values ) )
 		{
 			$sigLimits = explode( ":", $member->group['g_signature_limits'] );
 			
 			/* Check Limits */
-			$signature = new DOMDocument( '1.0', 'UTF-8' );
-			$signature->loadHTML( DOMDocument::wrapHtml( $values['signature'] ) );
+			$signature = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
+			$signature->loadHTML( \IPS\Xml\DOMDocument::wrapHtml( $values['signature'] ) );
 			
 			$errors = array();
 				
 			/* Links */
-			if ( is_numeric( $sigLimits[4] ) and ( $signature->getElementsByTagName('a')->length + $signature->getElementsByTagName('iframe')->length ) > $sigLimits[4] )
+			if ( \is_numeric( $sigLimits[4] ) and ( $signature->getElementsByTagName('a')->length + $signature->getElementsByTagName('iframe')->length ) > $sigLimits[4] )
 			{
 				$errors[] = $member->language()->addToStack('sig_num_links_exceeded');
 			}
 
 			/* Number of Images */
-			if ( is_numeric( $sigLimits[1] ) and $signature->getElementsByTagName('img')->length > 0 )
+			if ( \is_numeric( $sigLimits[1] ) and $signature->getElementsByTagName('img')->length > 0 )
 			{
 				$imageCount = 0;
 				foreach ( $signature->getElementsByTagName('img') as $img )
@@ -186,7 +150,7 @@ class Core extends ProfileStepsAbstract
 			}
 			
 			/* Size of images */
-			if ( ( is_numeric( $sigLimits[2] ) and $sigLimits[2] ) or ( is_numeric( $sigLimits[3] ) and $sigLimits[3] ) )
+			if ( ( \is_numeric( $sigLimits[2] ) and $sigLimits[2] ) or ( \is_numeric( $sigLimits[3] ) and $sigLimits[3] ) )
 			{
 				foreach ( $signature->getElementsByTagName('img') as $image )
 				{
@@ -197,14 +161,14 @@ class Core extends ProfileStepsAbstract
 					{
 						try
 						{
-							$attachment = Db::i()->select( 'attach_location, attach_thumb_location', 'core_attachments', array( 'attach_id=?', $attachId ) )->first();
-							$imageProperties = File::get( 'core_Attachment', $attachment['attach_thumb_location'] ?: $attachment['attach_location'] )->getImageDimensions();
-							$src = (string) File::get( 'core_Attachment', $attachment['attach_location'] )->url;
+							$attachment = \IPS\Db::i()->select( 'attach_location, attach_thumb_location', 'core_attachments', array( 'attach_id=?', $attachId ) )->first();
+							$imageProperties = \IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] ?: $attachment['attach_location'] )->getImageDimensions();
+							$src = (string) \IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->url;
 						}
-						catch( UnderflowException $e ){}
+						catch( \UnderflowException $e ){}
 					}
 					
-					if( is_array( $imageProperties ) AND count( $imageProperties ) )
+					if( \is_array( $imageProperties ) AND \count( $imageProperties ) )
 					{
 						if( $imageProperties[0] > $sigLimits[2] OR $imageProperties[1] > $sigLimits[3] )
 						{
@@ -221,10 +185,10 @@ class Core extends ProfileStepsAbstract
 			foreach( $signature->getElementsByTagName('pre') AS $pre )
 			{
 				$content = nl2br( trim( $pre->nodeValue ) );
-				$preBreaks += count( explode( "<br />", $content ) );
+				$preBreaks += \count( explode( "<br />", $content ) );
 			}
 			
-			if ( is_numeric( $sigLimits[5] ) and ( $signature->getElementsByTagName('p')->length + $signature->getElementsByTagName('br')->length + $preBreaks ) > $sigLimits[5] )
+			if ( \is_numeric( $sigLimits[5] ) and ( $signature->getElementsByTagName('p')->length + $signature->getElementsByTagName('br')->length + $preBreaks ) > $sigLimits[5] )
 			{
 				$errors[] = $member->language()->addToStack('sig_num_lines_exceeded');
 			}
@@ -251,19 +215,18 @@ class Core extends ProfileStepsAbstract
 	/**
 	 * Has a specific step been completed?
 	 *
-	 * @param	ProfileStep	$step	The step to check
-	 * @param	Member|NULL		$member	The member to check, or NULL for currently logged in
+	 * @param	\IPS\Member\ProfileStep	$step	The step to check
+	 * @param	\IPS\Member|NULL		$member	The member to check, or NULL for currently logged in
 	 * @return	bool
 	 */
-	public function completed( ProfileStep $step, ?Member $member = NULL ): bool
+	public function completed( \IPS\Member\ProfileStep $step, \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
 		if ( !$member->member_id )
 		{
 			return FALSE;
 		}
 		
-		static::$_member = $member;
+		static::$_member = $member ?: \IPS\Member::loggedIn();
 		static::$_step = $step;
 		
 		foreach( $step->subcompletion_act as $item )
@@ -272,9 +235,9 @@ class Core extends ProfileStepsAbstract
 			{
 				try
 				{
-					return Handler::load( $item )->canProcess( static::$_member );
+					return \IPS\Login\Handler::load( $item )->canProcess( static::$_member );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					return TRUE;
 				}
@@ -295,7 +258,9 @@ class Core extends ProfileStepsAbstract
 				}
 				else
 				{
-					Log::debug( "missing_profile_step_method", 'profile_completion' );
+					\IPS\Log::debug( "missing_profile_step_method", 'profile_completion' );
+					
+					continue;
 				}
 			}
 		}
@@ -306,12 +271,12 @@ class Core extends ProfileStepsAbstract
 	/**
 	 * Wizard Steps
 	 *
-	 * @param	Member|NULL	$member	Member or NULL for currently logged in member
-	 * @return	array|string
+	 * @param	\IPS\Member|NULL	$member	Member or NULL for currently logged in member
+	 * @return	array
 	 */
-	public static function wizard( Member $member = NULL ): array|string
+	public static function wizard( \IPS\Member $member = NULL )
 	{
-		static::$_member = $member ?: Member::loggedIn();
+		static::$_member = $member ?: \IPS\Member::loggedIn();
 		
 		$return = array();
 
@@ -326,19 +291,19 @@ class Core extends ProfileStepsAbstract
 	/**
 	 * @brief	Member
 	 */
-	protected static ?Member $_member = NULL;
+	protected static $_member = NULL;
 	
 	/**
 	 * @brief	Step
 	 */
-	protected static ?ProfileStep $_step = NULL;
+	protected static $_step = NULL;
 	
 	/**
 	 * Added their birthday?
 	 *
 	 * @return	bool
 	 */
-	protected static function completedBirthday() : bool
+	protected static function completedBirthday()
 	{
 		return (bool) static::$_member->birthday;
 	}
@@ -348,7 +313,7 @@ class Core extends ProfileStepsAbstract
 	 *
 	 * @return	bool
 	 */
-	protected static function completedSignature() : bool
+	protected static function completedSignature()
 	{
 		if ( ! static::$_member->canEditSignature() )
 		{
@@ -366,12 +331,12 @@ class Core extends ProfileStepsAbstract
 	 *
 	 * @return	array
 	 */
-	protected static function wizardBasicProfile() : array
+	protected static function wizardBasicProfile()
 	{
 		$member = static::$_member;
 		$wizards = array();
 		
-		foreach( ProfileStep::loadAll() AS $step )
+		foreach( \IPS\Member\ProfileStep::loadAll() AS $step )
 		{
 			$include = array();
 			if ( $step->completion_act === 'basic_profile' )
@@ -381,14 +346,14 @@ class Core extends ProfileStepsAbstract
 					switch( $item )
 					{
 						case 'birthday':
-							if ( !static::completedBirthday() )
+							if ( !static::completedBirthday( static::$_member ) )
 							{
 								$include['birthday'] = $step;
 							}
 						break;
 						
 						case 'signature':
-							if ( !static::completedSignature() AND static::$_member->canEditSignature() )
+							if ( !static::completedSignature( static::$_member ) AND static::$_member->canEditSignature() )
 							{
 								$include['signature'] = $step;
 							}
@@ -396,10 +361,10 @@ class Core extends ProfileStepsAbstract
 					}
 				}
 				
-				if ( count( $include ) )
+				if ( \count( $include ) )
 				{
 					$wizards[ $step->key ] = function( $data ) use ( $member, $include, $step ) {
-						$form = new Form( 'profile_generic_' . $step->id, 'profile_complete_next' );
+						$form = new \IPS\Helpers\Form( 'profile_generic_' . $step->id, 'profile_complete_next' );
 
 						if ( isset( $include['birthday'] ) )
 						{
@@ -418,14 +383,14 @@ class Core extends ProfileStepsAbstract
 
 							if( $form->error )
 							{
-								return $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'profileCompleteTemplate' ), $step );
+								return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'profileCompleteTemplate' ), $step );
 							}
 
 							$member->save();
 							return $values;
 						}
 	
-						return $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'profileCompleteTemplate' ), $step );
+						return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'profileCompleteTemplate' ), $step );
 					};
 				}
 
@@ -440,11 +405,11 @@ class Core extends ProfileStepsAbstract
 	 *
 	 * @return	array
 	 */
-	protected static function wizardSocial() : array
+	protected static function wizardSocial()
 	{
 		$return = array();
 		$member = static::$_member;
-		foreach( ProfileStep::loadAll() AS $step )
+		foreach( \IPS\Member\ProfileStep::loadAll() AS $step )
 		{
 			if ( $step->completion_act === 'social_login' )
 			{
@@ -454,11 +419,11 @@ class Core extends ProfileStepsAbstract
 					{
 						try
 						{
-							$method = Handler::load( $item );
+							$method = \IPS\Login\Handler::load( $item );
 							
 							$return[ $step->key ] = function( $data ) use ( $member, $step, $method )
 							{
-								$login = new Login( Url::internal( 'app=core&module=system&controller=settings&do=completion', 'front', 'settings' ), Login::LOGIN_UCP );
+								$login = new \IPS\Login( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&do=completion', 'front', 'settings' ), \IPS\Login::LOGIN_UCP );
 								$login->reauthenticateAs = $member;
 								$error = NULL;
 								try
@@ -472,13 +437,13 @@ class Core extends ProfileStepsAbstract
 										}
 										else
 										{
-											$error = Member::loggedIn()->language()->addToStack( 'profilesync_already_associated', FALSE, array( 'sprintf' => array( $method->_title ) ) );
+											$error = \IPS\Member::loggedIn()->language()->addToStack( 'profilesync_already_associated', FALSE, array( 'sprintf' => array( $method->_title ) ) );
 										}
 									}
 								}
-								catch ( Exception $e )
+								catch ( \IPS\Login\Exception $e )
 								{
-									if ( $e->getCode() === Exception::MERGE_SOCIAL_ACCOUNT )
+									if ( $e->getCode() === \IPS\Login\Exception::MERGE_SOCIAL_ACCOUNT )
 									{
 										if ( $e->member->member_id === $member->member_id )
 										{
@@ -487,7 +452,7 @@ class Core extends ProfileStepsAbstract
 										}
 										else
 										{
-											$error = Member::loggedIn()->language()->addToStack( 'profilesync_email_exists', FALSE, array( 'sprintf' => array( $method->_title ) ) );
+											$error = \IPS\Member::loggedIn()->language()->addToStack( 'profilesync_email_exists', FALSE, array( 'sprintf' => array( $method->_title ) ) );
 										}
 									}
 									else
@@ -496,10 +461,10 @@ class Core extends ProfileStepsAbstract
 									}
 								}
 								
-								return Theme::i()->getTemplate( 'system' )->profileCompleteSocial( $step, Theme::i()->getTemplate( 'system' )->settingsProfileSyncLogin( $method, $login, $error ), Request::i()->url() );
+								return \IPS\Theme::i()->getTemplate( 'system' )->profileCompleteSocial( $step, \IPS\Theme::i()->getTemplate( 'system' )->settingsProfileSyncLogin( $method, $login, $error ), \IPS\Request::i()->url() );
 							};
 						}
-						catch ( OutOfRangeException $e ) { }
+						catch ( \OutOfRangeException $e ) { } 						
 					}
 				}
 			}
@@ -513,20 +478,20 @@ class Core extends ProfileStepsAbstract
 	/**
 	 * Birthday Form
 	 *
-	 * @param	Form		$form	The form
-	 * @param	ProfileStep	$step	The step
-	 * @param	Member				$member	The member
+	 * @param	\IPS\Helpers\Form		$form	The form
+	 * @param	\IPS\Member\ProfileStep	$step	The step
+	 * @param	\IPS\Member				$member	The member
 	 * @return	void
 	 */
-	protected static function birthdayForm( Form $form, ProfileStep $step, Member $member ) : void
+	protected static function birthdayForm( &$form, $step, $member )
 	{
-		$form->add( new Custom( 'bday', NULL, $step->required, array( 'getHtml' => function( $element ) use ( $member, $step )
+		$form->add( new \IPS\Helpers\Form\Custom( 'bday', NULL, $step->required, array( 'getHtml' => function( $element ) use ( $member, $step )
 		{
 			return strtr( $member->language()->preferredDateFormat(), array(
-				'DD'	=> Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_day( $element->name, $element->value, $element->error ),
-				'MM'	=> Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_month( $element->name, $element->value, $element->error ),
-				'YY'	=> Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_year( $element->name, $element->value, $element->error, $step->required ),
-				'YYYY'	=> Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_year( $element->name, $element->value, $element->error, $step->required ),
+				'DD'	=> \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_day( $element->name, $element->value, $element->error ),
+				'MM'	=> \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_month( $element->name, $element->value, $element->error ),
+				'YY'	=> \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_year( $element->name, $element->value, $element->error, $step->required ),
+				'YYYY'	=> \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_year( $element->name, $element->value, $element->error, $step->required ),
 			) );
 		} ),
 		/* Validation */
@@ -534,11 +499,11 @@ class Core extends ProfileStepsAbstract
 		{
 			if ( $step->required and ( ! $val['day'] or ! $val['month'] or ! $val['year'] ) )
 			{
-				throw new InvalidArgumentException('form_required');
+				throw new \InvalidArgumentException('form_required');
 			}
 		} ) );
 		
-		if ( Settings::i()->profile_birthday_type == 'private' )
+		if ( \IPS\Settings::i()->profile_birthday_type == 'private' )
 		{
 			$form->addMessage( 'profile_birthday_display_private', 'ipsMessage ipsMessage_info' );
 		}
@@ -547,13 +512,13 @@ class Core extends ProfileStepsAbstract
 	/**
 	 * Signature Form
 	 *
-	 * @param	Form		$form	The form
-	 * @param	ProfileStep	$step	The step
-	 * @param	Member				$member	The member
+	 * @param	\IPS\Helpers\Form		$form	The form
+	 * @param	\IPS\Member\ProfileStep	$step	The step
+	 * @param	\IPS\Member				$member	The member
 	 * @return	void
 	 */
-	protected static function signatureForm( Form $form, ProfileStep $step, Member $member ) : void
+	protected static function signatureForm( &$form, $step, $member )
 	{
-		$form->add( new Editor( 'signature', $member->signature, $step->required, array( 'app' => 'core', 'key' => 'Signatures', 'autoSaveKey' => "frontsig-" .$member->member_id, 'attachIds' => array( $member->member_id ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'signature', $member->signature, $step->required, array( 'app' => 'core', 'key' => 'Signatures', 'autoSaveKey' => "frontsig-" .$member->member_id, 'attachIds' => array( $member->member_id ) ) ) );
 	}
 }

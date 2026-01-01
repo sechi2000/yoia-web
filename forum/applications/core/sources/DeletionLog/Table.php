@@ -11,40 +11,29 @@
 namespace IPS\core\DeletionLog;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content;
-use IPS\Db;
-use IPS\Helpers\Table\Table as TableHelper;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use function defined;
-use function in_array;
-use function strtolower;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Deletion Log Table
  */
-class Table extends TableHelper
+class _Table extends \IPS\Helpers\Table\Table
 {
 	/**
 	 * @brief	Title
 	 */
-	public string $title = 'modcp_deleted';
+	public $title = 'modcp_deleted';
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Url|null	$url	Base URL
+	 * @param	\IPS\Http\Url	$url	Base URL
 	 * @return	void
 	 */
-	public function __construct( Url $url=NULL )
+	public function __construct( \IPS\Http\Url $url=NULL )
 	{
 		/* Init */	
 		parent::__construct( $url );
@@ -53,20 +42,20 @@ class Table extends TableHelper
 	/**
 	 * Get rows
 	 *
-	 * @param	array|null	$advancedSearchValues	Values from the advanced search form
+	 * @param	array	$advancedSearchValues	Values from the advanced search form
 	 * @return	array
 	 */
-	public function getRows( array $advancedSearchValues=NULL ): array
+	public function getRows( $advancedSearchValues=NULL )
 	{
-		$this->sortBy	= in_array( $this->sortBy, $this->sortOptions ) ? $this->sortBy : 'dellog_deleted_date';
-		$sortBy			= $this->sortBy . ' ' . ( ( $this->sortDirection and strtolower( $this->sortDirection ) == 'asc' ) ? 'asc' : 'desc' );
+		$this->sortBy	= \in_array( $this->sortBy, $this->sortOptions ) ? $this->sortBy : 'dellog_deleted_date';
+		$sortBy			= $this->sortBy . ' ' . ( \strtolower( $this->sortDirection ) == 'asc' ? 'asc' : 'desc' );
 		
 		/* Where Clause */
 		$where = array();
-		$where[] = array( "( " . Db::i()->findInSet( 'dellog_content_permissions', Member::loggedIn()->permissionArray() ) . " OR dellog_content_permissions=? )", '*' );
+		$where[] = array( \IPS\Db::i()->findInSet( 'dellog_content_permissions', \IPS\Member::loggedIn()->permissionArray() ) . " OR dellog_content_permissions=?", '*' );
 
 		/* Return only content from enabled apps */
-		$where[] = array( Db::i()->in( 'dellog_content_class', array_values( Content::routedClasses( TRUE, TRUE ) ) ) );
+		$where[] = \IPS\Db::i()->in( 'dellog_content_class', array_values( \IPS\Content::routedClasses( TRUE, TRUE ) ) );
 
 
 		if ( $advancedSearchValues )
@@ -82,10 +71,10 @@ class Table extends TableHelper
 			}
 		}
 		
-		$count = Db::i()->select( 'COUNT(*)', 'core_deletion_log', $where )->first();
+		$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_deletion_log', $where )->first();
 		
 		$this->pages = ceil( $count / $this->limit );
-		$it = new ActiveRecordIterator( Db::i()->select( '*', 'core_deletion_log', $where, $sortBy, array( ( $this->limit * ( $this->page - 1 ) ), $this->limit ) ), 'IPS\core\DeletionLog' );
+		$it = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_deletion_log', $where, $sortBy, array( ( $this->limit * ( $this->page - 1 ) ), $this->limit ) ), 'IPS\core\DeletionLog' );
 		
 		$return = array();
 		foreach( iterator_to_array( $it ) AS $row )
@@ -102,7 +91,7 @@ class Table extends TableHelper
 	 * @param	array|NULL	$advancedSearchValues	Advanced search values
 	 * @return	array
 	 */
-	public function getHeaders( array $advancedSearchValues=NULL ): array
+	public function getHeaders( $advancedSearchValues )
 	{
 		return array();
 	}
@@ -112,7 +101,7 @@ class Table extends TableHelper
 	 *
 	 * @return	array
 	 */
-	public function multimodActions(): array
+	public function multimodActions()
 	{
 		return array(
 			'restore',
@@ -127,7 +116,7 @@ class Table extends TableHelper
 	 * @param	NULL|string	$action	Action to take
 	 * @return	bool
 	 */
-	public function canModerate( string $action=NULL ): bool
+	public function canModerate( $action=NULL )
 	{
 		return TRUE;
 	}

@@ -12,21 +12,16 @@
 namespace IPS\core\setup\upg_106138;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.6.8 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 /**
 	 * Reorganise tracking code
@@ -37,23 +32,23 @@ class Upgrade
 	{
 		/* Move code to the appropriate setting */
 		
-		switch( Settings::i()->ipbseo_ga_provider )
+		switch( \IPS\Settings::i()->ipbseo_ga_provider )
 		{
 			case 'ga':
-				Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'ga_enabled', 'conf_value' => 1, 'conf_default' => 0, 'conf_app' => 'core' ), TRUE );
-				Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'ga_code', 'conf_value' => Settings::i()->ipseo_ga, 'conf_default' => "", 'conf_app' => 'core' ), TRUE );
+				\IPS\Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'ga_enabled', 'conf_value' => 1, 'conf_default' => 0, 'conf_app' => 'core' ), TRUE );
+				\IPS\Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'ga_code', 'conf_value' => \IPS\Settings::i()->ipseo_ga, 'conf_default' => "", 'conf_app' => 'core' ), TRUE );
 		
 				break;
 			
 			case 'piwik':
-				Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'matomo_enabled', 'conf_value' => 1, 'conf_default' => 0, 'conf_app' => 'core' ), TRUE );
-				Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'matomo_code', 'conf_value' => Settings::i()->ipseo_ga, 'conf_default' => "", 'conf_app' => 'core' ), TRUE );
+				\IPS\Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'matomo_enabled', 'conf_value' => 1, 'conf_default' => 0, 'conf_app' => 'core' ), TRUE );
+				\IPS\Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'matomo_code', 'conf_value' => \IPS\Settings::i()->ipseo_ga, 'conf_default' => "", 'conf_app' => 'core' ), TRUE );
 
 				break;
 			
 			case 'custom':	
-				Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'custom_body_code', 'conf_value' => Settings::i()->ipbseo_ga, 'conf_default' => "", 'conf_app' => 'core' ), TRUE );
-				Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'custom_page_view_js', 'conf_value' => Settings::i()->ipbseo_ga_paginatecode, 'conf_default' => "", 'conf_app' => 'core' ), TRUE );
+				\IPS\Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'custom_body_code', 'conf_value' => \IPS\Settings::i()->ipbseo_ga, 'conf_default' => "", 'conf_app' => 'core' ), TRUE );
+				\IPS\Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => 'custom_page_view_js', 'conf_value' => \IPS\Settings::i()->ipbseo_ga_paginatecode, 'conf_default' => "", 'conf_app' => 'core' ), TRUE );
 	
 				break;
 		}

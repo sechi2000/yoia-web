@@ -12,27 +12,25 @@
 namespace IPS\Api\GraphQL\Fields;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ForumType for GraphQL API
  */
-abstract class CoverPhotoField
+abstract class _CoverPhotoField
 {
 	/**
 	 * Get root type
 	 *
-	 * @param string $name
-	 * @return    array
+	 * @return	array
 	 */
-	public static function getDefinition( string $name ): array
+	public static function getDefinition($name): array
 	{	 
 		return [
 			'type' => new ObjectType([
@@ -47,10 +45,11 @@ abstract class CoverPhotoField
 					{
 						case 'image':
 							return ( $value->file ) ? (string) $value->file->url : null;
+						break;
 						case 'offset':
 							return ( $value->file ) ? $value->offset : null;
+						break;
 					}
-					return null;
 				}
 			]),
 			'description' => 'Returns a cover photo',

@@ -12,80 +12,61 @@
 namespace IPS\calendar;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DateTimeZone;
-use Exception;
-use InvalidArgumentException;
-use IPS\DateTime;
-use IPS\Dispatcher;
-use IPS\Helpers\Form\Date as FormDate;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Settings;
-use TypeError;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function strpos;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Calendar-specific date functions
  */
-class Date extends DateTime
+class _Date extends \IPS\DateTime
 {
 	/**
 	 * @brief	Data retrieved from get_date() with timezone accounted for
 	 */
-	protected array $dateInformation	= array();
+	protected $dateInformation	= array();
 
 	/**
 	 * @brief	Information about the first day of the month we are working with
 	 */
-	protected array $firstDayOfMonth	= array();
+	protected $firstDayOfMonth	= array();
 
 	/**
 	 * @brief	Information about the last day of the month we are working with
 	 */
-	protected array $lastDayOfMonth	= array();
+	protected $lastDayOfMonth	= array();
 
 	/**
 	 * @brief	Information about the first day of the week we are working with
 	 */
-	protected array $firstDayOfWeek	= array();
+	protected $firstDayOfWeek	= array();
 
 	/**
 	 * @brief	Information about the last day of the week we are working with
 	 */
-	protected array $lastDayOfWeek	= array();
+	protected $lastDayOfWeek	= array();
 
 	/**
 	 * @brief	Information about the previous month
 	 */
-	protected array $lastMonth	= array();
+	protected $lastMonth	= array();
 
 	/**
 	 * @brief	Information about the next month
 	 */
-	protected array $nextMonth	= array();
+	protected $nextMonth	= array();
 
 	/**
 	 * @brief	Timezone offset for the current user
 	 */
-	public ?int $offset	= NULL;
+	public $offset	= NULL;
 
 	/**
 	 * @brief	Custom date formatting options for calendar
 	 */
-	public static array $dateFormats	= array(
+	public static $dateFormats	= array(
 		'locale' => "%x",
 		'd_sm_y' => "%d %b %Y",
 		'd_lm_y' => "%d {monthName} %Y",
@@ -96,37 +77,37 @@ class Date extends DateTime
 	/**
 	 * @brief	Cache date objects we've created through getDate()
 	 */
-	protected static array $dateObjects	= array();
+	protected static $dateObjects	= array();
 
 	/**
 	 * Creates a new object to represent the requested date
 	 *
-	 * @param int|null $year	Year, or NULL for current year
-	 * @param int|null $month	Month, or NULL for current month
-	 * @param int|null $day	Day, or NULL for current day
-	 * @param int $hour	Hour (defaults to 0)
-	 * @param int $minute	Minutes (defaults to 0)
-	 * @param int $second	Seconds (defaults to 0)
-	 * @param int|null $offset	The offset from GMT (NULL to calculate automatically based on member's current time)
-	 * @return    static|DateTime
-	 * @throws	InvalidArgumentException
+	 * @param	int|NULL	$year	Year, or NULL for current year
+	 * @param	int|NULL	$month	Month, or NULL for current month
+	 * @param	int|NULL	$day	Day, or NULL for current day
+	 * @param	int			$hour	Hour (defaults to 0)
+	 * @param	int			$minute	Minutes (defaults to 0)
+	 * @param	int			$second	Seconds (defaults to 0)
+	 * @param	int			$offset	The offset from GMT (NULL to calculate automatically based on member's current time)
+	 * @return	\IPS\calendar\Date
+	 * @throws	\InvalidArgumentException
 	 */
-	public static function getDate( int $year=NULL, int $month=NULL, int $day=NULL, int $hour=0, int $minute=0, int $second=0, int $offset=NULL ): static|DateTime
+	public static function getDate( $year=NULL, $month=NULL, $day=NULL, $hour=0, $minute=0, $second=0, $offset=NULL )
 	{
 		/* Get our time zone offset */
 		$timezone = NULL;
 
-		if ( $offset === NULL and Member::loggedIn()->timezone )
+		if ( $offset === NULL and \IPS\Member::loggedIn()->timezone )
 		{
-			$timezone = DateTime::create();
+			$timezone = \IPS\DateTime::create();
 			$validTimezone = TRUE;
-			if( in_array( Member::loggedIn()->timezone, static::getTimezoneIdentifiers() ) )
+			if( \in_array( \IPS\Member::loggedIn()->timezone, static::getTimezoneIdentifiers() ) )
 			{
 				try
 				{
-					$timezone->setTimezone( new DateTimeZone( Member::loggedIn()->timezone ) );
+					$timezone->setTimezone( new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) );
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
 					$validTimezone = FALSE;
 				}
@@ -138,11 +119,11 @@ class Date extends DateTime
 
 			if( ! $validTimezone )
 			{
-				Member::loggedIn()->timezone = null;
+				\IPS\Member::loggedIn()->timezone = null;
 
-				if ( Member::loggedIn()->member_id )
+				if ( \IPS\Member::loggedIn()->member_id )
 				{
-					Member::loggedIn()->save();
+					\IPS\Member::loggedIn()->save();
 				}
 			}
 
@@ -170,12 +151,12 @@ class Date extends DateTime
 		{
 			if( !checkdate( $month, $day, $year ) )
 			{
-				throw new InvalidArgumentException;
+				throw new \InvalidArgumentException;
 			}
 		}
-		catch ( TypeError )
+		catch ( \TypeError $e )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 
 		/* Create the timestamp */
@@ -202,9 +183,10 @@ class Date extends DateTime
 	 *
 	 * @note	We override to update dateInformation and stored offset
 	 * @param	string				$time			Time
-	 * @param	DateTimeZone|null	$timezone		Timezone
+	 * @param	\DateTimeZone|null	$timezone		Timezone
+	 * @return	\IPS\calendar\Date
 	 */
-	public function __construct( string $time="now", ?DateTimeZone $timezone=NULL )
+	public function __construct( $time="now", $timezone=NULL )
 	{
 		if ( $timezone )
 		{
@@ -225,11 +207,11 @@ class Date extends DateTime
 	 * Convert the Root DateTime instance to a \IPS\calendar\Date instance
 	 *
 	 * @param \DateTime $dateTime
-	 * @return static|\DateTime
+	 * @return Date
 	 */
-	public static function dateTimeToCalendarDate( \DateTime $dateTime ): static|\DateTime
+	public static function dateTimeToCalendarDate( \DateTime $dateTime ): \IPS\calendar\Date
 	{
-		if( in_array( get_class( $dateTime ), [ 'DateTime', 'IPS\\DateTime'] ) )
+		if( \in_array( \get_class( $dateTime ), [ 'DateTime', 'IPS\\DateTime'] ) )
 		{
 			return new static( $dateTime->format('c'), $dateTime->getTimezone() );
 		}
@@ -241,10 +223,10 @@ class Date extends DateTime
 	 * Sets the time zone for the DateTime object
 	 *
 	 * @note	We override to update dateInformation and stored offset
-	 * @param	DateTimeZone	$timezone		New timezone
-	 * @return    \DateTime
+	 * @param	\DateTimeZone	$timezone		New timezone
+	 * @return	\IPS\calendar\Date|FALSE
 	 */
-	public function setTimezone( DateTimeZone $timezone ): \DateTime
+	public function setTimezone( $timezone )
 	{
 		$result	= parent::setTimezone( $timezone );
 
@@ -258,10 +240,10 @@ class Date extends DateTime
 	 * Get the date information
 	 *
 	 * @note	This is basically a timezone aware wrapper for getdate
-	 * @param int $time	Timestamp
+	 * @param	int		$time	Timestamp
 	 * @return	array
 	 */
-	public function getDateInformation( int $time ): array
+	public function getDateInformation( $time )
 	{
 		$this->dateInformation	= array(
 			'seconds'	=> (int) $this->strFormat( '%S' ),
@@ -283,29 +265,29 @@ class Date extends DateTime
 	 * Returns a date object created based on an arbitrary string. Used for both relative time strings and SQL datetime values.
 	 *
 	 * @note	Datetime values are stored in the database normalized to UTC
-	 * @param string $datetime		String-based date/time
-	 * @param bool $forceUTC		Force timezone to UTC (necessary when passing a datetime retrieved from the database)
-	 * @return    Date
+	 * @param	string	$datetime		String-based date/time
+	 * @param	bool	$forceUTC		Force timezone to UTC (necessary when passing a datetime retrieved from the database)
+	 * @return	\IPS\calendar\Date
 	 */
-	public static function parseTime( string $datetime, bool $forceUTC=FALSE): Date
+	public static function parseTime( $datetime, $forceUTC=FALSE )
 	{
 		/* Create an \IPS\DateTime object from the datetime value passed in */
-		if ( !$forceUTC AND Dispatcher::hasInstance() )
+		if ( !$forceUTC AND \IPS\Dispatcher::hasInstance() )
 		{
-			if( !Member::loggedIn()->timezone )
+			if( !\IPS\Member::loggedIn()->timezone )
 			{
 				$timezone	= NULL;
 			}
 			else
 			{
 				$validTimezone = TRUE;
-				if( in_array( Member::loggedIn()->timezone, static::getTimezoneIdentifiers() ) )
+				if( \in_array( \IPS\Member::loggedIn()->timezone, static::getTimezoneIdentifiers() ) )
 				{
 					try
 					{
-						$timezone	= new DateTimeZone( Member::loggedIn()->timezone );
+						$timezone	= new \DateTimeZone( \IPS\Member::loggedIn()->timezone );
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
 						$validTimezone = FALSE;
 					}
@@ -317,26 +299,26 @@ class Date extends DateTime
 
 				if( ! $validTimezone )
 				{
-					Member::loggedIn()->timezone = null;
+					\IPS\Member::loggedIn()->timezone = null;
 
-					if ( Member::loggedIn()->member_id )
+					if ( \IPS\Member::loggedIn()->member_id )
 					{
-						Member::loggedIn()->save();
+						\IPS\Member::loggedIn()->save();
 					}
 				}
 			}
 		}
 		else
 		{
-			$timezone	= new DateTimeZone( 'UTC' );
+			$timezone	= new \DateTimeZone( 'UTC' );
 		}
 
-		$datetime		= new DateTime( $datetime, $timezone );
+		$datetime		= new \IPS\DateTime( $datetime, $timezone );
 
 		/* Now correct it back if necessary */
-		if( $forceUTC === TRUE AND Dispatcher::hasInstance() AND Member::loggedIn()->timezone )
+		if( $forceUTC === TRUE AND \IPS\Dispatcher::hasInstance() AND \IPS\Member::loggedIn()->timezone )
 		{
-			$datetime->setTimezone( new DateTimeZone( Member::loggedIn()->timezone ) );
+			$datetime->setTimezone( new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) );
 		}
 
 		return static::getDate( $datetime->format('Y'), $datetime->format('m'), $datetime->format('d'), $datetime->format('H'), $datetime->format('i'), $datetime->format('s'), $datetime->getOffset() );
@@ -345,14 +327,14 @@ class Date extends DateTime
 	/**
 	 * Adjusts the date and returns a new date object representing the adjustment
 	 *
-	 * @param string $adjustment		String to turn into a \DateInterval object which will be applied to the current date/time (supports most strtotime adjustments)
-	 * @return    Date
+	 * @param	string	$adjustment		String to turn into a \DateInterval object which will be applied to the current date/time (supports most strtotime adjustments)
+	 * @return	\IPS\calendar\Date
 	 * @see		<a href='http://www.php.net/manual/en/dateinterval.createfromdatestring.php'>DateInterval::createFromDateString() docs</a>
 	 */
-	public function adjust( string $adjustment ): Date
+	public function adjust( $adjustment )
 	{
-		$datetime		= DateTime::ts( $this->dateInformation[0] )->setTimezone( new DateTimeZone( "UTC" ) );
-		$dateInterval= DateInterval::createFromDateString( $adjustment );
+		$datetime		= \IPS\DateTime::ts( $this->dateInformation[0] )->setTimezone( new \DateTimeZone( "UTC" ) );
+		$dateInterval=\DateInterval::createFromDateString( $adjustment );
 
 		if( $dateInterval )
 		{
@@ -366,7 +348,7 @@ class Date extends DateTime
 	/**
 	 * @brief	Cache results of getDayNames() for performance
 	 */
-	protected static ?array $cachedDayNames = NULL;
+	protected static $cachedDayNames = NULL;
 
 	/**
 	 * Get the localized day names in correct order
@@ -374,7 +356,7 @@ class Date extends DateTime
 	 * @return	array
 	 * @see		<a href='http://stackoverflow.com/questions/7765469/retrieving-day-names-in-php'>Get localized day names in PHP</a>
 	 */
-	public static function getDayNames(): array
+	public static function getDayNames()
 	{
 		if( static::$cachedDayNames !== NULL )
 		{
@@ -382,14 +364,14 @@ class Date extends DateTime
 		}
 
 		$dayNames	= array();
-		$startDay	= Settings::i()->ipb_calendar_mon ? 'Monday' : 'Sunday';
+		$startDay	= \IPS\Settings::i()->ipb_calendar_mon ? 'Monday' : 'Sunday';
 
 		for( $i = 0; $i < 7; $i++ )
 		{
 			$_time		= strtotime( 'next ' . $startDay . ' +' . $i . ' days' );
-			$_abbr		= Member::loggedIn()->language()->convertString( date( 'D', $_time ) );
+			$_abbr		= \IPS\Member::loggedIn()->language()->convertString( strftime( '%a', $_time ) );
 
-			$dayNames[]	= array( 'full' => Member::loggedIn()->language()->convertString( date( 'l', $_time ) ), 'english' => date( 'l', $_time ), 'abbreviated' => $_abbr, 'letter' => mb_substr( $_abbr, 0, 1 ), 'ical' => mb_strtoupper( mb_substr( date( 'D', $_time ), 0, 2 ) ) );
+			$dayNames[]	= array( 'full' => \IPS\Member::loggedIn()->language()->convertString( strftime( '%A', $_time ) ), 'english' => date( 'l', $_time ), 'abbreviated' => $_abbr, 'letter' => mb_substr( $_abbr, 0, 1 ), 'ical' => mb_strtoupper( mb_substr( date( 'D', $_time ), 0, 2 ) ) );
 		}
 
 		static::$cachedDayNames = $dayNames;
@@ -402,14 +384,14 @@ class Date extends DateTime
 	 *
 	 * @return	array
 	 */
-	public static function getTimezones(): array
+	public static function getTimezones()
 	{
-		$zones = DateTimeZone::listIdentifiers( DateTimeZone::ALL );
+		$zones = \DateTimeZone::listIdentifiers( \DateTimeZone::ALL );
 
-		$timezones[Member::loggedIn()->timezone] = Member::loggedIn()->timezone;
+		$timezones[\IPS\Member::loggedIn()->timezone] = \IPS\Member::loggedIn()->timezone;
 		foreach($zones as $timezone)
 		{
-			if( $timezone == Member::loggedIn()->timezone )
+			if( $timezone == \IPS\Member::loggedIn()->timezone )
 			{
 				continue;
 			}
@@ -422,15 +404,15 @@ class Date extends DateTime
 	/**
 	 * Return a date object based on supplied values, factoring in the timezone offset which could be in the "friendly" timezone format
 	 *
-	 * @param string $date		Date as a textual string, from the date form helper
-	 * @param string|null $time		Time as a textual string
-	 * @param string $timezone	Timezone chosen
-	 * @return    Date
+	 * @param	string	$date		Date as a textual string, from the date form helper
+	 * @param	string	$time		Time as a textual string
+	 * @param	string	$timezone	Timezone chosen
+	 * @return	\IPS\calendar\Date
 	 */
-	public static function createFromForm( string $date, ?string $time, string $timezone ): Date
+	public static function createFromForm( $date, $time, $timezone )
 	{
 		/* Correct date */
-		$date = FormDate::_convertDateFormat( $date );
+		$date = \IPS\Helpers\Form\Date::_convertDateFormat( $date );
 
 		/* Fix time inconsistencies */
 		if( $time )
@@ -438,9 +420,9 @@ class Date extends DateTime
 			$time	= mb_strtolower( $time );
 
 			/* If they typed in 'am', convert '12' to 00, and then strip 'am' */
-			if( strpos( $time, 'am' ) !== FALSE )
+			if( \strpos( $time, 'am' ) !== FALSE )
 			{
-				if( strpos( $time, '12' ) === 0 )
+				if( \strpos( $time, '12' ) === 0 )
 				{
 					$time	= substr_replace( $time, '00', 0, 2 );
 				}
@@ -448,10 +430,10 @@ class Date extends DateTime
 				$time	= str_replace( 'am', '', $time );
 			}
 			/* If they typed in 'pm', add 12 to anything other than 12 and strip 'pm' */
-			else if( strpos( $time, 'pm' ) !== FALSE )
+			else if( \strpos( $time, 'pm' ) !== FALSE )
 			{
 				$_timeBits		= explode( ':', $time );
-				$_timeBits[0]	= $_timeBits[0] < 12 ? ( (int)$_timeBits[0] + 12 ) : $_timeBits[0];
+				$_timeBits[0]	= $_timeBits[0] < 12 ? ( $_timeBits[0] + 12 ) : $_timeBits[0];
 				$time			= implode( ':', $_timeBits );
 
 				$time	= str_replace( 'pm', '', $time );
@@ -460,9 +442,9 @@ class Date extends DateTime
 			/* Make sure we have 3 pieces and that all are 2 digits */
 			$_timeBits		= explode( ':', $time );
 			
-			if ( count( $_timeBits ) < 3 )
+			if ( \count( $_timeBits ) < 3 )
 			{
-				while( count( $_timeBits ) < 3 )
+				while( \count( $_timeBits ) < 3 )
 				{
 					$_timeBits[]	= '00';
 				}
@@ -477,21 +459,20 @@ class Date extends DateTime
 			$time	= implode( ':', $_timeBits );
 		}
 
-		$dateObject	= new static( $date . ( $time ? ' ' . $time : '' ), new DateTimeZone( $timezone ) );
+		$dateObject	= new static( $date . ( $time ? ' ' . $time : '' ), new \DateTimeZone( $timezone ) );
 		
-		$dateObject->setTimezone( new DateTimeZone( 'UTC' ) );
-		return $dateObject;
+		return $dateObject->setTimezone( new \DateTimeZone( 'UTC' ) );
 	}
 
 	/**
 	 * Modified version of ISO-8601 used by iCalendar - omits the timezone identifier and all dashes and colons
 	 *
-	 * @param bool $includeTime		Whether to include time or not
-	 * @param bool $includeIdentifier	Whether to include 'Z' at the end or not
+	 * @param	bool	$includeTime		Whether to include time or not
+	 * @param	bool	$includeIdentifier	Whether to include 'Z' at the end or not
 	 * @return	string
 	 * @see		<a href='http://www.kanzaki.com/docs/ical/dateTime.html'>DateTime explanation</a>
 	 */
-	public function modifiedIso8601( bool $includeTime=TRUE, bool $includeIdentifier=FALSE ): string
+	public function modifiedIso8601( $includeTime=TRUE, $includeIdentifier=FALSE )
 	{
 		if( $includeTime )
 		{
@@ -506,10 +487,10 @@ class Date extends DateTime
 	/**
 	 * Return the date for use in calendar (used instead of localeDate() to allow admin to configure)
 	 *
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function calendarDate( Lang|Member $memberOrLanguage=NULL ): string
+	public function calendarDate( $memberOrLanguage=NULL )
 	{
 		return static::determineLanguage( $memberOrLanguage )->convertString( strftime( static::calendarDateFormat(), $this->getTimestamp() + $this->offset ) );
 	}
@@ -519,15 +500,15 @@ class Date extends DateTime
 	 *
 	 * @return	string
 	 */
-	public static function calendarDateFormat(): string
+	public static function calendarDateFormat()
 	{
-		if( Settings::i()->calendar_date_format == -1 AND Settings::i()->calendar_date_format_custom )
+		if( \IPS\Settings::i()->calendar_date_format == -1 AND \IPS\Settings::i()->calendar_date_format_custom )
 		{
-			return Settings::i()->calendar_date_format_custom;
+			return \IPS\Settings::i()->calendar_date_format_custom;
 		}
-		elseif( isset( static::$dateFormats[ Settings::i()->calendar_date_format ] ) )
+		elseif( isset( static::$dateFormats[ \IPS\Settings::i()->calendar_date_format ] ) )
 		{
-			return str_replace( '{monthName}', static::setMonthModifier(), static::$dateFormats[ Settings::i()->calendar_date_format ] );
+			return str_replace( '{monthName}', static::setMonthModifier(), static::$dateFormats[ \IPS\Settings::i()->calendar_date_format ] );
 		}
 		else
 		{
@@ -538,10 +519,10 @@ class Date extends DateTime
 	/**
 	 * Return the MySQL-style datetime value
 	 *
-	 * @param bool $includeTime	Whether to include time or not
+	 * @param	bool	$includeTime	Whether to include time or not
 	 * @return	string
 	 */
-	public function mysqlDatetime( bool $includeTime=TRUE ): string
+	public function mysqlDatetime( $includeTime=TRUE )
 	{
 		if( $includeTime )
 		{
@@ -559,7 +540,7 @@ class Date extends DateTime
 	 * @param	mixed	$key	Value we tried to retrieve
 	 * @return	mixed
 	 */
-	public function __get( mixed $key )
+	public function __get( $key )
 	{
 		return $this->_findValue( $key, $this->dateInformation );
 	}
@@ -570,7 +551,7 @@ class Date extends DateTime
 	 * @param	mixed	$key	Key (from getdate()) we want to retrieve
 	 * @return	mixed
 	 */
-	public function firstDayOfMonth( mixed $key ): mixed
+	public function firstDayOfMonth( $key )
 	{
 		if( !isset( $this->firstDayOfMonth[0] ) )
 		{
@@ -586,7 +567,7 @@ class Date extends DateTime
 	 * @param	mixed	$key	Key (from getdate()) we want to retrieve
 	 * @return	mixed
 	 */
-	public function lastDayOfMonth( mixed $key ): mixed
+	public function lastDayOfMonth( $key )
 	{
 		if( !isset( $this->lastDayOfMonth[0] ) )
 		{
@@ -602,7 +583,7 @@ class Date extends DateTime
 	 * @param	mixed	$key	Key (from getdate()) we want to retrieve
 	 * @return	mixed
 	 */
-	public function lastMonth( mixed $key ): mixed
+	public function lastMonth( $key )
 	{
 		if( !isset( $this->lastMonth[0] ) )
 		{
@@ -618,7 +599,7 @@ class Date extends DateTime
 	 * @param	mixed	$key	Key (from getdate()) we want to retrieve
 	 * @return	mixed
 	 */
-	public function nextMonth( mixed $key ): mixed
+	public function nextMonth( $key )
 	{
 		if( !isset( $this->nextMonth[0] ) )
 		{
@@ -634,7 +615,7 @@ class Date extends DateTime
 	 * @param	mixed	$key	Key (from getdate()) we want to retrieve
 	 * @return	mixed
 	 */
-	public function firstDayOfWeek( mixed $key ): mixed
+	public function firstDayOfWeek( $key )
 	{
 		if( !isset( $this->firstDayOfWeek[0] ) )
 		{
@@ -650,7 +631,7 @@ class Date extends DateTime
 	 * @param	mixed	$key	Key (from getdate()) we want to retrieve
 	 * @return	mixed
 	 */
-	public function lastDayOfWeek( mixed $key ): mixed
+	public function lastDayOfWeek( $key )
 	{
 		if( !isset( $this->lastDayOfWeek[0] ) )
 		{
@@ -665,7 +646,7 @@ class Date extends DateTime
 	 *
 	 * @return bool
 	 */
-	public function leapYear(): bool
+	public function leapYear()
 	{
 		return (bool) gmdate( 'L', $this->dateInformation[0] );
 	}
@@ -676,18 +657,18 @@ class Date extends DateTime
 	 * @return	bool
 	 * @see	<a href='http://stackoverflow.com/questions/6871258/how-to-determine-if-current-locale-has-24-hour-or-12-hour-time-format-in-php'>Check for 24 hour locale use</a>
 	 */
-	public static function usesAmPm(): bool
+	public static function usesAmPm()
 	{
-		return ( substr( gmstrftime( '%X', 57600 ), 0, 2) != 16 );
+		return ( \substr( gmstrftime( '%X', 57600 ), 0, 2) != 16 );
 	}
 
 	/**
 	 * Get the 12 hour version of an hour value
 	 *
-	 * @param int $hour	The hour value between 0 and 23
+	 * @param	int		$hour	The hour value between 0 and 23
 	 * @return	int
 	 */
-	public static function getTwelveHour( int $hour ): int
+	public static function getTwelveHour( $hour )
 	{
 		if( $hour == 0 )
 		{
@@ -706,10 +687,10 @@ class Date extends DateTime
 	/**
 	 * Get the AM/PM value for the current locale
 	 *
-	 * @param int $hour	The hour value between 0 and 23
+	 * @param	int		$hour	The hour value between 0 and 23
 	 * @return	string
 	 */
-	public static function getAmPm( int $hour ): string
+	public static function getAmPm( $hour )
 	{
 		return gmstrftime( '%p', $hour * 60 * 60 );
 	}
@@ -718,14 +699,14 @@ class Date extends DateTime
 	 * Find a value in the supplied array and return it. Also supports a few 'special' keys.
 	 *
 	 * @param	mixed	$key	Key (from getdate()) we want to retrieve
-	 * @param array $data	Array to look for the key in
+	 * @param	array	$data	Array to look for the key in
 	 * @return	mixed
 	 */
-	protected function _findValue( mixed $key, array $data ): mixed
+	protected function _findValue( $key, $data )
 	{
 		if( isset( $data[ $key ] ) )
 		{
-			if( $key == 'wday' AND Settings::i()->ipb_calendar_mon )
+			if( $key == 'wday' AND \IPS\Settings::i()->ipb_calendar_mon )
 			{
 				return ( $data[ $key ] == 0 ) ? 6: ( $data[ $key ] - 1 );
 			}
@@ -740,22 +721,22 @@ class Date extends DateTime
 
 		if( $key == 'monthName' AND isset( $data[0] ) )
 		{
-			return mb_convert_case( Member::loggedIn()->language()->convertString( strftime( static::setMonthModifier(), $data[0] ) ), MB_CASE_TITLE );
+			return mb_convert_case( \IPS\Member::loggedIn()->language()->convertString( strftime( static::setMonthModifier(), $data[0] ) ), MB_CASE_TITLE );
 		}
 
 		if( $key == 'monthNameShort' AND isset( $data[0] ) )
 		{
-			return mb_convert_case( Member::loggedIn()->language()->convertString( strftime( '%b', $data[0] ) ), MB_CASE_TITLE );
+			return mb_convert_case( \IPS\Member::loggedIn()->language()->convertString( strftime( '%b', $data[0] ) ), MB_CASE_TITLE );
 		}
 
 		if( $key == 'dayName' AND isset( $data[0] ) )
 		{
-			return mb_convert_case( Member::loggedIn()->language()->convertString( strftime( '%A', $data[0] ) ), MB_CASE_TITLE );
+			return mb_convert_case( \IPS\Member::loggedIn()->language()->convertString( strftime( '%A', $data[0] ) ), MB_CASE_TITLE );
 		}
 
 		if( $key == 'dayNameShort' AND isset( $data[0] ) )
 		{
-			return mb_convert_case( Member::loggedIn()->language()->convertString( strftime( '%a', $data[0] ) ), MB_CASE_TITLE );
+			return mb_convert_case( \IPS\Member::loggedIn()->language()->convertString( strftime( '%a', $data[0] ) ), MB_CASE_TITLE );
 		}
 
 		return NULL;
@@ -764,15 +745,15 @@ class Date extends DateTime
 	/**
 	 * @brief strftime-compatible modifier for month name
 	 */
-	protected static ?string $monthNameModifier = NULL;
+	protected static $monthNameModifier = NULL;
 
 	/**
 	 * Sets the month name modifier
 	 *
 	 * @note	Some languages on some OS's (e.g. FreeBSD) require using a different modifier for full month name
-	 * @return    string|null
+	 * @return	void
 	 */
-	static protected function setMonthModifier(): ?string
+	static protected function setMonthModifier()
 	{
 		if( static::$monthNameModifier === NULL )
 		{
@@ -794,12 +775,12 @@ class Date extends DateTime
 	/**
 	 * Format the time according to the user's locale (without the date)
 	 *
-	 * @param bool $seconds	If TRUE, will include seconds
-	 * @param bool $minutes	If TRUE, will include minutes
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	bool				$seconds	If TRUE, will include seconds
+	 * @param	bool				$minutes	If TRUE, will include minutes
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function localeTime( bool $seconds=TRUE, bool $minutes=TRUE, Lang|Member $memberOrLanguage=NULL ): string
+	public function localeTime( $seconds=TRUE, $minutes=TRUE, $memberOrLanguage=NULL )
 	{
 		return static::determineLanguage( $memberOrLanguage )->convertString( strftime( static::localeTimeFormat( $seconds, $minutes, $memberOrLanguage ), $this->getTimestamp() + $this->offset ) );
 	}

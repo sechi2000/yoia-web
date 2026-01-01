@@ -11,26 +11,20 @@
 namespace IPS\core\extensions\core\ModeratorPermissions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\ModeratorPermissionsAbstract;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Moderator Permissions: Warnings
  */
-class Warnings extends ModeratorPermissionsAbstract
+class _Warnings
 {
 	/**
 	 * Get Permissions
 	 *
-	 * @param array $toggles
 	 * @code
 	 	return array(
 	 		'key'	=> 'YesNo',	// Can just return a string with type
@@ -45,7 +39,7 @@ class Warnings extends ModeratorPermissionsAbstract
 	 * @endcode
 	 * @return	array
 	 */
-	public function getPermissions( array $toggles ): array
+	public function getPermissions()
 	{
 		return array(
 			'mod_see_warn'				=> array( 'YesNo', array( 'togglesOn' => array( 'mod_can_warn', 'mod_revoke_warn' ) ) ),
@@ -53,7 +47,7 @@ class Warnings extends ModeratorPermissionsAbstract
 			'mod_revoke_warn'			=> 'YesNo',
 			'warning_custom_noaction'	=> 'YesNo',
 			'warnings_enable_other'		=> 'YesNo',
-			'warn_mod_day'				=> array( 'Number', array(), NULL, Member::loggedIn()->language()->addToStack('per_day') )
+			'warn_mod_day'				=> array( 'Number', array(), NULL, \IPS\Member::loggedIn()->language()->addToStack('per_day') )
 		);
 	}
 
@@ -64,7 +58,7 @@ class Warnings extends ModeratorPermissionsAbstract
 	 * @param	array	$values		The submitted form values
 	 * @return	void
 	 */
-	public function preSave( array &$values ) : void
+	public function preSave( &$values )
 	{
 		if( $values['mod_use_restrictions'] != 'no' )
 		{
@@ -74,5 +68,28 @@ class Warnings extends ModeratorPermissionsAbstract
 				$values['mod_revoke_warn']	= FALSE;
 			}
 		}
+	}
+
+	/**
+	 * After change
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @param	array	$changed	Values that were changed
+	 * @return	void
+	 */
+	public function onChange( $moderator, $changed )
+	{
+		
+	}
+	
+	/**
+	 * After delete
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @return	void
+	 */
+	public function onDelete( $moderator )
+	{
+		
 	}
 }

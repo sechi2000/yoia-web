@@ -11,46 +11,21 @@
 namespace IPS\MFA\Authy;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\DateTime;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Address;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\MFA\Authy\Exception as AuthyException;
-use IPS\MFA\MFAHandler;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Multi Factor Authentication Handler for Authy
  */
-class Handler extends MFAHandler
+class _Handler extends \IPS\MFA\MFAHandler
 {
 	/**
 	 * @brief	Key
 	 */
-	protected string $key = 'authy';
+	protected $key = 'authy';
 	
 	/* !Setup */
 	
@@ -59,29 +34,29 @@ class Handler extends MFAHandler
 	 *
 	 * @return	bool
 	 */
-	public function isEnabled(): bool
+	public function isEnabled()
 	{
-		return Settings::i()->authy_enabled;
+		return \IPS\Settings::i()->authy_enabled;
 	}
 	
 	/**
 	 * Member *can* use this handler (even if they have not yet configured it)
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public function memberCanUseHandler( Member $member ): bool
+	public function memberCanUseHandler( \IPS\Member $member )
 	{
-		return Settings::i()->authy_groups == '*' or $member->inGroup( explode( ',', Settings::i()->authy_groups ) );
+		return \IPS\Settings::i()->authy_groups == '*' or $member->inGroup( explode( ',', \IPS\Settings::i()->authy_groups ) );
 	}
 	
 	/**
 	 * Member has configured this handler
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public function memberHasConfiguredHandler( Member $member ): bool
+	public function memberHasConfiguredHandler( \IPS\Member $member )
 	{
 		return isset( $member->mfa_details['authy'] ) and $member->mfa_details['authy']['setup'];
 	}
@@ -89,17 +64,17 @@ class Handler extends MFAHandler
 	/**
 	 * Show a setup screen
 	 *
-	 * @param	Member		$member						The member
+	 * @param	\IPS\Member		$member						The member
 	 * @param	bool			$showingMultipleHandlers	Set to TRUE if multiple options are being displayed
-	 * @param	Url	$url						URL for page
+	 * @param	\IPS\Http\Url	$url						URL for page
 	 * @return	string
 	 */
-	public function configurationScreen( Member $member, bool $showingMultipleHandlers, Url $url ): string
+	public function configurationScreen( \IPS\Member $member, $showingMultipleHandlers, \IPS\Http\Url $url )
 	{
 		$mfaDetails = $member->mfa_details;
 		
 		/* Starting again? */
-		if ( isset( $mfaDetails['authy']['pendingId'] ) and isset( Request::i()->_new ) )
+		if ( isset( $mfaDetails['authy']['pendingId'] ) and isset( \IPS\Request::i()->_new ) )
 		{
 			unset( $mfaDetails['authy']['pendingId'] );
 			$member->mfa_details = $mfaDetails;
@@ -110,42 +85,42 @@ class Handler extends MFAHandler
 		if ( isset( $mfaDetails['authy'] ) and isset( $mfaDetails['authy']['pendingId'] ) and !isset( $_SESSION['authyConfigureError'] ) )
 		{	
 			/* Asking for a text or call instead? */
-			$availableMethods = explode( ',', Settings::i()->authy_setup );
-			if ( isset( Request::i()->authy_method ) and $mfaDetails['authy']['setupMethod'] == 'authy' and in_array( Request::i()->authy_method, $availableMethods ) )
+			$availableMethods = explode( ',', \IPS\Settings::i()->authy_setup );
+			if ( isset( \IPS\Request::i()->authy_method ) and $mfaDetails['authy']['setupMethod'] == 'authy' and \in_array( \IPS\Request::i()->authy_method, $availableMethods ) )
 			{
 				try
 				{
 					/* Send text or make call */
-					if ( Request::i()->authy_method == 'phone' )
+					if ( \IPS\Request::i()->authy_method == 'phone' )
 					{
 						static::totp( "call/{$mfaDetails['authy']['pendingId']}", 'get', array( 'force' => 'true' ) );
 					}
-					elseif ( Request::i()->authy_method == 'sms' )
+					elseif ( \IPS\Request::i()->authy_method == 'sms' )
 					{
 						static::totp( "sms/{$mfaDetails['authy']['pendingId']}", 'get', array( 'force' => 'true' ) );
 					}
 					
 					/* Update details */
-					$mfaDetails['authy']['setupMethod'] = Request::i()->authy_method;
+					$mfaDetails['authy']['setupMethod'] = \IPS\Request::i()->authy_method;
 					$member->mfa_details = $mfaDetails;
 					$member->save();
 				}
 				catch ( \Exception $e )
 				{
-					Log::log( $e, 'authy' );
-					$_SESSION['authyAuthError'] = Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
+					\IPS\Log::log( $e, 'authy' );
+					$_SESSION['authyAuthError'] = \IPS\Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
 				}				
 			}
 
 			/* Display */
-			return Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( $mfaDetails['authy']['setupMethod'], TRUE, $_SESSION['authyAuthError'] ?? 'authy_error', TRUE, explode( ',', Settings::i()->authy_setup ), NULL, $url );
+			return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( $mfaDetails['authy']['setupMethod'], TRUE, isset( $_SESSION['authyAuthError'] ) ? $_SESSION['authyAuthError'] : 'authy_error', TRUE, explode( ',', \IPS\Settings::i()->authy_setup ), NULL, $url );
 		}
 		else
 		{
 			/* If they have used their allowed attempts, make them wait */
-			if ( isset( $mfaDetails['authy'] ) and isset( $mfaDetails['authy']['changeAttempts'] ) and $mfaDetails['authy']['changeAttempts'] >= Settings::i()->authy_setup_tries )
+			if ( isset( $mfaDetails['authy'] ) and isset( $mfaDetails['authy']['changeAttempts'] ) and $mfaDetails['authy']['changeAttempts'] >= \IPS\Settings::i()->authy_setup_tries )
 			{
-				$lockEndTime = $mfaDetails['authy']['lastChangeAttempt'] + ( Settings::i()->authy_setup_lockout * 3600 );
+				$lockEndTime = $mfaDetails['authy']['lastChangeAttempt'] + ( \IPS\Settings::i()->authy_setup_lockout * 3600 );
 				if ( $lockEndTime < time() )
 				{
 					$mfaDetails['authy']['changeAttempts'] = 0;
@@ -154,32 +129,32 @@ class Handler extends MFAHandler
 				}
 				else
 				{
-					return Theme::i()->getTemplate( 'login', 'core', 'global' )->authySetupLockout( $showingMultipleHandlers, DateTime::ts( $lockEndTime ) );
+					return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authySetupLockout( $showingMultipleHandlers, \IPS\DateTime::ts( $lockEndTime ) );
 				}
 			}
 			
 			/* Otherwise show the form */
-			return Theme::i()->getTemplate( 'login', 'core', 'global' )->authySetup( isset( Request::i()->countryCode ) ? Request::i()->countryCode : Address::calculateDefaultCountry(), isset( Request::i()->phoneNumber ) ? Request::i()->phoneNumber : '', $showingMultipleHandlers, explode( ',', Settings::i()->authy_setup ), $_SESSION['authyConfigureError'] ?? NULL );
+			return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authySetup( isset( \IPS\Request::i()->countryCode ) ? \IPS\Request::i()->countryCode : \IPS\Helpers\Form\Address::calculateDefaultCountry(), isset( \IPS\Request::i()->phoneNumber ) ? \IPS\Request::i()->phoneNumber : '', $showingMultipleHandlers, explode( ',', \IPS\Settings::i()->authy_setup ), isset( $_SESSION['authyConfigureError'] ) ? $_SESSION['authyConfigureError'] : NULL );
 		}
 	}
 	
 	/**
 	 * Submit configuration screen. Return TRUE if was accepted
 	 *
-	 * @param	Member		$member	The member
+	 * @param	\IPS\Member		$member	The member
 	 * @return	bool
 	 */
-	public function configurationScreenSubmit( Member $member ): bool
+	public function configurationScreenSubmit( \IPS\Member $member )
 	{
 		$mfaDetails = $member->mfa_details;
 		
 		/* If we've enterred a code, verify it */
-		if ( isset( $mfaDetails['authy'] ) and isset( $mfaDetails['authy']['pendingId'] ) and isset( Request::i()->authy_auth_code ) )
+		if ( isset( $mfaDetails['authy'] ) and isset( $mfaDetails['authy']['pendingId'] ) and isset( \IPS\Request::i()->authy_auth_code ) )
 		{
 			$_SESSION['authyAuthError'] = NULL;
 			try
 			{
-				$response = static::totp( "verify/" . preg_replace( '/[^A-Z0-9]/i', '', Request::i()->authy_auth_code ) . "/{$mfaDetails['authy']['pendingId']}" );
+				$response = static::totp( "verify/" . preg_replace( '/[^A-Z0-9]/i', '', \IPS\Request::i()->authy_auth_code ) . "/{$mfaDetails['authy']['pendingId']}", 'get' );
 				
 				$mfaDetails['authy'] = array( 'id' => $mfaDetails['authy']['pendingId'], 'setup' => true );
 				$member->mfa_details = $mfaDetails;
@@ -189,39 +164,39 @@ class Handler extends MFAHandler
 				
 				return true;
 			}
-			catch ( \IPS\Http\Request\Exception $e )
+			catch ( Exception $e )
 			{
-				if ( in_array( $e->getCode(), array( AuthyException::TOKEN_REUSED, AuthyException::TOKEN_INVALID ) ) )
+				if ( \in_array( $e->getCode(), array( Exception::TOKEN_REUSED, Exception::TOKEN_INVALID ) ) )
 				{
 					$_SESSION['authyAuthError'] = $e->getUserMessage();
 				}
 				else
 				{
-					Log::log( $e, 'authy' );
-					$_SESSION['authyAuthError'] = Member::loggedIn()->isAdmin() ? $e->getMessage() : $e->getUserMessage();
+					\IPS\Log::log( $e, 'authy' );
+					$_SESSION['authyAuthError'] = \IPS\Member::loggedIn()->isAdmin() ? $e->getMessage() : $e->getUserMessage();
 				}
 				return false;
 			}
 			catch ( \Exception $e )
 			{
-				Log::log( $e, 'authy' );
-				$_SESSION['authyAuthError'] = Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
+				\IPS\Log::log( $e, 'authy' );
+				$_SESSION['authyAuthError'] = \IPS\Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
 				return false;
 			}
 		}
 		
 		/* Otherwise we need to generate an ID */
-		elseif ( Request::i()->phoneNumber )
+		elseif ( \IPS\Request::i()->phoneNumber )
 		{
 			/* Do we need to wait a while? */
-			if ( isset( $mfaDetails['authy'] ) and isset( $mfaDetails['authy']['changeAttempts'] ) and $mfaDetails['authy']['changeAttempts'] >= Settings::i()->authy_setup_tries )
+			if ( isset( $mfaDetails['authy'] ) and isset( $mfaDetails['authy']['changeAttempts'] ) and $mfaDetails['authy']['changeAttempts'] >= \IPS\Settings::i()->authy_setup_tries )
 			{
 				return false;
 			}
 			
 			/* Call Authy */
-			$availableMethods = explode( ',', Settings::i()->authy_setup );
-			$method = ( isset( Request::i()->method ) and in_array( Request::i()->method, $availableMethods ) ) ? Request::i()->method : array_shift( $availableMethods );
+			$availableMethods = explode( ',', \IPS\Settings::i()->authy_setup );
+			$method = ( isset( \IPS\Request::i()->method ) and \in_array( \IPS\Request::i()->method, $availableMethods ) ) ? \IPS\Request::i()->method : array_shift( $availableMethods );
 			$_SESSION['authyConfigureError'] = NULL;
 			try
 			{
@@ -229,11 +204,11 @@ class Handler extends MFAHandler
 				$data = array(
 					'user'						=> array(
 						'email'						=> $member->email,
-						'cellphone'					=> Request::i()->phoneNumber,
-						'country_code'				=> explode( '-', Request::i()->countryCode )[1]
+						'cellphone'					=> \IPS\Request::i()->phoneNumber,
+						'country_code'				=> explode( '-', \IPS\Request::i()->countryCode )[1]
 					)
 				);
-				if ( Settings::i()->authy_method != 'authy' )
+				if ( \IPS\Settings::i()->authy_method != 'authy' )
 				{
 					$data['send_install_link_via_sms'] = false;
 				}
@@ -253,23 +228,23 @@ class Handler extends MFAHandler
 					static::totp( "sms/{$response['user']['id']}", 'get', array( 'force' => 'true' ) );
 				}
 			}
-			catch ( \IPS\Http\Request\Exception $e )
+			catch ( Exception $e )
 			{
-				if ( in_array( $e->getCode(), array( AuthyException::USER_INVALID, AuthyException::PHONE_NUMBER_INVALID ) ) )
+				if ( \in_array( $e->getCode(), array( Exception::USER_INVALID, Exception::PHONE_NUMBER_INVALID ) ) )
 				{
 					$_SESSION['authyConfigureError'] = $e->getUserMessage();
 				}
 				else
 				{
-					Log::log( $e, 'authy' );
-					$_SESSION['authyConfigureError'] = Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
+					\IPS\Log::log( $e, 'authy' );
+					$_SESSION['authyConfigureError'] = \IPS\Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
 				}
 				return false;
 			}
 			catch ( \Exception $e )
 			{
-				Log::log( $e, 'authy' );
-				$_SESSION['authyConfigureError'] = Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
+				\IPS\Log::log( $e, 'authy' );
+				$_SESSION['authyConfigureError'] = \IPS\Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
 				return false;
 			}
 			
@@ -303,14 +278,14 @@ class Handler extends MFAHandler
 	/**
 	 * Get the form for a member to authenticate
 	 *
-	 * @param	Member		$member		The member
-	 * @param	Url	$url		URL for page
+	 * @param	\IPS\Member		$member		The member
+	 * @param	\IPS\Http\Url	$url		URL for page
 	 * @return	string
 	 */
-	public function authenticationScreen( Member $member, Url $url ): string
+	public function authenticationScreen( \IPS\Member $member, \IPS\Http\Url $url )
 	{
 		$mfaDetails = $member->mfa_details;
-		$availableMethods = explode( ',', Settings::i()->authy_method );
+		$availableMethods = explode( ',', \IPS\Settings::i()->authy_method );
 		
 		/* If we sent a code, but it was more than one minute ago, log a failure and reset */
 		if ( isset( $mfaDetails['authy']['sent'] ) and $mfaDetails['authy']['sent']['time'] < ( time() - 60 ) )
@@ -322,46 +297,46 @@ class Handler extends MFAHandler
 		}
 				
 		/* If Authy app is one of the available options... */
-		if ( in_array( 'authy', $availableMethods ) )
+		if ( \in_array( 'authy', $availableMethods ) )
 		{
 			/* Are we getting a onetouch status? */
-			if ( Request::i()->onetouchCheck and Request::i()->isAjax() )
+			if ( \IPS\Request::i()->onetouchCheck and \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->json( array( 'status' => intval( $this->_onetouchCheck( $member, Request::i()->onetouchCheck ) ) ) );
+				\IPS\Output::i()->json( array( 'status' => \intval( $this->_onetouchCheck( $member, \IPS\Request::i()->onetouchCheck ) ) ) );
 			}
 			
 			/* If it is not the only option... */
-			if ( count( $availableMethods ) > 1 )
+			if ( \count( $availableMethods ) > 1 )
 			{
 				/* If they have asked for a text/call instead, do that */
-				if ( !isset( $mfaDetails['authy']['sent'] ) and isset( Request::i()->authy_method ) and in_array( Request::i()->authy_method, $availableMethods ) )
+				if ( !isset( $mfaDetails['authy']['sent'] ) and isset( \IPS\Request::i()->authy_method ) and \in_array( \IPS\Request::i()->authy_method, $availableMethods ) )
 				{
 					try
 					{
 						/* Send text or make call */
-						if ( Request::i()->authy_method == 'phone' )
+						if ( \IPS\Request::i()->authy_method == 'phone' )
 						{
 							static::totp( "call/{$mfaDetails['authy']['id']}", 'get', array( 'force' => 'true' ) );
 						}
-						elseif ( Request::i()->authy_method == 'sms' )
+						elseif ( \IPS\Request::i()->authy_method == 'sms' )
 						{
 							static::totp( "sms/{$mfaDetails['authy']['id']}", 'get', array( 'force' => 'true' ) );
 						}
 						
 						/* Update details */
-						$mfaDetails['authy']['sent'] = array( 'method' => Request::i()->authy_method, 'time' => time() );
+						$mfaDetails['authy']['sent'] = array( 'method' => \IPS\Request::i()->authy_method, 'time' => time() );
 						$member->mfa_details = $mfaDetails;
 						$member->save();
 					}
 					catch ( \Exception $e )
 					{
-						Log::log( $e, 'authy' );
-						$_SESSION['authyAuthError'] = Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
+						\IPS\Log::log( $e, 'authy' );
+						$_SESSION['authyAuthError'] = \IPS\Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
 					}				
 				}
 				if ( isset( $mfaDetails['authy']['sent'] ) )
 				{
-					return Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( $mfaDetails['authy']['sent']['method'], TRUE, $_SESSION['authyAuthError'] ?? 'authy_error', FALSE, $availableMethods, NULL, $url );
+					return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( $mfaDetails['authy']['sent']['method'], TRUE, isset( $_SESSION['authyAuthError'] ) ? $_SESSION['authyAuthError'] : 'authy_error', FALSE, $availableMethods, NULL, $url );
 				}
 				
 				/* Otherwise, check if they have the app installed. If they do, show the Authy authenticate page */
@@ -379,7 +354,7 @@ class Handler extends MFAHandler
 					
 					if ( $userHasAuthyApp )
 					{						
-						return Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( 'authy', TRUE, $_SESSION['authyAuthError'] ?? 'authy_error', FALSE, $availableMethods, $this->_onetouchInit( $member, $url ), $url );
+						return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( 'authy', TRUE, isset( $_SESSION['authyAuthError'] ) ? $_SESSION['authyAuthError'] : 'authy_error', FALSE, $availableMethods, $this->_onetouchInit( $member, $url ), $url );
 					}
 				}
 				catch ( \Exception $e ) { }
@@ -388,12 +363,12 @@ class Handler extends MFAHandler
 			/* If it is the only option, show it anyway */
 			else
 			{
-				return Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( 'authy', TRUE, $_SESSION['authyAuthError'] ?? 'authy_error', FALSE, $availableMethods, $this->_onetouchInit( $member, $url ), $url );
+				return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( 'authy', TRUE, isset( $_SESSION['authyAuthError'] ) ? $_SESSION['authyAuthError'] : 'authy_error', FALSE, $availableMethods, $this->_onetouchInit( $member, $url ), $url );
 			}
 		}
 		
 		/* If text message is the only available option, or we have chosen that option, do that... */
-		if ( in_array( 'sms', $availableMethods ) and ( count( $availableMethods ) == 1 ) or ( isset( $mfaDetails['authy']['sent'] ) and $mfaDetails['authy']['sent']['method'] == 'sms' ) or ( isset( Request::i()->authy_method ) and Request::i()->authy_method == 'sms' ) )
+		if ( \in_array( 'sms', $availableMethods ) and ( \count( $availableMethods ) == 1 ) or ( isset( $mfaDetails['authy']['sent'] ) and $mfaDetails['authy']['sent']['method'] == 'sms' ) or ( isset( \IPS\Request::i()->authy_method ) and \IPS\Request::i()->authy_method == 'sms' ) )
 		{
 			/* Send the text if we haven't already */
 			if ( !isset( $mfaDetails['authy']['sent'] ) )
@@ -404,8 +379,8 @@ class Handler extends MFAHandler
 				}
 				catch ( \Exception $e )
 				{
-					Log::log( $e, 'authy' );
-					return Theme::i()->getTemplate( 'login', 'core', 'global' )->authyError( $e->getMessage() );
+					\IPS\Log::log( $e, 'authy' );
+					return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authyError( $e->getMessage() );
 				}
 				
 				$mfaDetails['authy']['sent'] = array( 'method' => 'sms', 'time' => time() );
@@ -414,11 +389,11 @@ class Handler extends MFAHandler
 			}
 			
 			/* Show screen */
-			return Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( 'sms', TRUE, $_SESSION['authyAuthError'] ?? 'authy_error', FALSE, $availableMethods, NULL, $url );
+			return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( 'sms', TRUE, isset( $_SESSION['authyAuthError'] ) ? $_SESSION['authyAuthError'] : 'authy_error', FALSE, $availableMethods, NULL, $url );
 		}
 		
 		/* If we have confirmed the phone call, do that now */
-		if ( ( isset( $mfaDetails['authy']['sent'] ) and $mfaDetails['authy']['sent']['method'] == 'phone' ) or ( isset( Request::i()->authy_method ) and Request::i()->authy_method == 'phone' ) )
+		if ( ( isset( $mfaDetails['authy']['sent'] ) and $mfaDetails['authy']['sent']['method'] == 'phone' ) or ( isset( \IPS\Request::i()->authy_method ) and \IPS\Request::i()->authy_method == 'phone' ) )
 		{
 			/* Send the text if we haven't already */
 			if ( !isset( $mfaDetails['authy']['sent'] ) )
@@ -429,8 +404,8 @@ class Handler extends MFAHandler
 				}
 				catch ( \Exception $e )
 				{
-					Log::log( $e, 'authy' );
-					return Theme::i()->getTemplate( 'login', 'core', 'global' )->authyError( $e->getMessage() );
+					\IPS\Log::log( $e, 'authy' );
+					return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authyError( $e->getMessage() );
 				}
 				
 				$mfaDetails['authy']['sent'] = array( 'method' => 'call', 'time' => time() );
@@ -439,29 +414,29 @@ class Handler extends MFAHandler
 			}
 			
 			/* Show screen */
-			return Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( 'phone', TRUE, $_SESSION['authyAuthError'] ?? 'authy_error', FALSE, $availableMethods, NULL, $url );
+			return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( 'phone', TRUE, isset( $_SESSION['authyAuthError'] ) ? $_SESSION['authyAuthError'] : 'authy_error', FALSE, $availableMethods, NULL, $url );
 		}
 		
 		/* Otherwise we're going to show a screen */
-		return Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( count( $availableMethods ) == 1 ? 'phone' : 'choose', FALSE, $_SESSION['authyAuthError'] ?? 'authy_error', FALSE, $availableMethods, NULL, $url );
+		return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->authyAuthenticate( \count( $availableMethods ) == 1 ? 'phone' : 'choose', FALSE, isset( $_SESSION['authyAuthError'] ) ? $_SESSION['authyAuthError'] : 'authy_error', FALSE, $availableMethods, NULL, $url );
 	}
 	
 	/**
 	 * If enabled, initiate a OneTouch request and get the ID
 	 *
-	 * @param	Member		$member		The member
-	 * @param	Url	$url		URL for page
+	 * @param	\IPS\Member		$member		The member
+	 * @param	\IPS\Http\Url	$url		URL for page
 	 * @return	string|null
 	 */
-	protected function _onetouchInit( Member $member, Url $url ): ?string
+	protected function _onetouchInit( \IPS\Member $member, \IPS\Http\Url $url )
 	{		
-		if ( Settings::i()->authy_onetouch )
+		if ( \IPS\Settings::i()->authy_onetouch )
 		{
 			$mfaDetails = $member->mfa_details;
 
 			if ( isset( $mfaDetails['onetouch'] ) and $mfaDetails['onetouch']['time'] > ( time() - 30 ) )
 			{
-				$response = static::onetouch( "approval_requests/" . preg_replace( '/[^A-Z0-9\-]/i', '', $mfaDetails['onetouch']['id'] ) );
+				$response = static::onetouch( "approval_requests/" . preg_replace( '/[^A-Z0-9\-]/i', '', $mfaDetails['onetouch']['id'] ), 'get' );
 				
 				if ( $response['approval_request']['status'] === 'pending' )
 				{
@@ -489,23 +464,23 @@ class Handler extends MFAHandler
 		}
 		return NULL;
 	}
-
+	
 	/**
 	 * Check the status of a onetouch request
 	 *
-	 * @param Member $member The member
-	 * @param string $id The onetouch request ID
-	 * @return bool|string|null
+	 * @param	\IPS\Member	$member	The member
+	 * @param	string		$id		The onetouch request ID
+	 * @return	string|null
 	 */
-	protected function _onetouchCheck( Member $member, string $id ): bool|string|null
+	protected function _onetouchCheck( \IPS\Member $member, $id )
 	{
-		if ( Settings::i()->authy_onetouch )
+		if ( \IPS\Settings::i()->authy_onetouch )
 		{
 			$mfaDetails = $member->mfa_details;
 			
 			try
 			{				
-				$response = static::onetouch( "approval_requests/" . preg_replace( '/[^A-Z0-9\-]/i', '', $id ) );
+				$response = static::onetouch( "approval_requests/" . preg_replace( '/[^A-Z0-9\-]/i', '', $id ), 'get' );
 				return $response['approval_request']['status'] === 'approved';
 			}
 			catch ( \Exception $e ) {}
@@ -516,10 +491,10 @@ class Handler extends MFAHandler
 	/**
 	 * Submit authentication screen. Return TRUE if was accepted
 	 *
-	 * @param	Member		$member	The member
+	 * @param	\IPS\Member		$member	The member
 	 * @return	bool
 	 */
-	public function authenticationScreenSubmit( Member $member ): bool
+	public function authenticationScreenSubmit( \IPS\Member $member )
 	{
 		$mfaDetails = $member->mfa_details;
 
@@ -527,14 +502,14 @@ class Handler extends MFAHandler
 		
 		try
 		{
-			if ( isset( Request::i()->authy_auth_code ) )
+			if ( isset( \IPS\Request::i()->authy_auth_code ) )
 			{
-				$response = static::totp( "verify/" . preg_replace( '/[^A-Z0-9]/i', '', Request::i()->authy_auth_code ) . "/{$mfaDetails['authy']['id']}" );
+				$response = static::totp( "verify/" . preg_replace( '/[^A-Z0-9]/i', '', \IPS\Request::i()->authy_auth_code ) . "/{$mfaDetails['authy']['id']}", 'get' );
 				$mfaDetails['authy'] = array( 'id' => $mfaDetails['authy']['id'], 'setup' => true );
 			}
-			elseif ( isset( Request::i()->onetouch ) )
+			elseif ( isset( \IPS\Request::i()->onetouch ) )
 			{
-				return $this->_onetouchCheck( $member, Request::i()->onetouch );
+				return $this->_onetouchCheck( $member, \IPS\Request::i()->onetouch );
 			}
 			else
 			{
@@ -545,23 +520,23 @@ class Handler extends MFAHandler
 			
 			return true;
 		}
-		catch ( \IPS\Http\Request\Exception $e )
+		catch ( Exception $e )
 		{
-			if ( in_array( $e->getCode(), array( AuthyException::TOKEN_REUSED, AuthyException::TOKEN_INVALID ) ) )
+			if ( \in_array( $e->getCode(), array( Exception::TOKEN_REUSED, Exception::TOKEN_INVALID ) ) )
 			{
 				$_SESSION['authyAuthError'] = $e->getUserMessage();
 			}
 			else
 			{
-				Log::log( $e, 'authy' );
-				$_SESSION['authyAuthError'] = Member::loggedIn()->isAdmin() ? $e->getMessage() : $e->getUserMessage();
+				\IPS\Log::log( $e, 'authy' );
+				$_SESSION['authyAuthError'] = \IPS\Member::loggedIn()->isAdmin() ? $e->getMessage() : $e->getUserMessage();
 			}
 			return false;
 		}
 		catch ( \Exception $e )
 		{
-			Log::log( $e, 'authy' );
-			$_SESSION['authyAuthError'] = Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
+			\IPS\Log::log( $e, 'authy' );
+			$_SESSION['authyAuthError'] = \IPS\Member::loggedIn()->isAdmin() ? $e->getMessage() : 'authy_error';
 			return false;
 		}
 	}
@@ -572,22 +547,22 @@ class Handler extends MFAHandler
 	 * Toggle
 	 *
 	 * @param	bool	$enabled	On/Off
-	 * @return	void
+	 * @return	bool
 	 */
-	public function toggle( bool $enabled ): void
+	public function toggle( $enabled )
 	{
 		/* This handler is deprecated, so if it's already disabled, don't allow it to be re-enabled */
 		if( !$this->isEnabled() )
 		{
-			return;
+			return FALSE;
 		}
 
 		if ( $enabled )
 		{
-			static::verifyApiKey( Settings::i()->authy_key );
+			static::verifyApiKey( \IPS\Settings::i()->authy_key );
 		}
 		
-		Settings::i()->changeValues( array( 'authy_enabled' => $enabled ) );
+		\IPS\Settings::i()->changeValues( array( 'authy_enabled' => $enabled ) );
 	}
 	
 	/**
@@ -595,53 +570,53 @@ class Handler extends MFAHandler
 	 *
 	 * @return	string
 	 */
-	public function acpSettings(): string
+	public function acpSettings()
 	{
 		if( !$this->isEnabled() )
 		{
-			Output::i()->error( 'authy_deprecated_message', '2C345/3' );
+			\IPS\Output::i()->error( 'authy_deprecated_message', '2C345/3' );
 		}
 
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		
-		$form->add( new Text( 'authy_key', Settings::i()->authy_key, TRUE, array(), function( $val ) {
-			$details = Handler::verifyApiKey( $val );
-			if ( !$details['app']['sms_enabled'] and ( array_key_exists( 'sms', Request::i()->authy_setup ) or array_key_exists( 'sms', Request::i()->authy_method ) ) )
+		$form->add( new \IPS\Helpers\Form\Text( 'authy_key', \IPS\Settings::i()->authy_key, TRUE, array(), function( $val ) {
+			$details = \IPS\MFA\Authy\Handler::verifyApiKey( $val );
+			if ( !$details['app']['sms_enabled'] and ( array_key_exists( 'sms', \IPS\Request::i()->authy_setup ) or array_key_exists( 'sms', \IPS\Request::i()->authy_method ) ) )
 			{
-				throw new DomainException('authy_key_no_sms');
+				throw new \DomainException('authy_key_no_sms');
 			}
-			if ( !$details['app']['phone_calls_enabled'] and ( array_key_exists( 'phone', Request::i()->authy_setup ) or array_key_exists( 'phone', Request::i()->authy_method ) ) )
+			if ( !$details['app']['phone_calls_enabled'] and ( array_key_exists( 'phone', \IPS\Request::i()->authy_setup ) or array_key_exists( 'phone', \IPS\Request::i()->authy_method ) ) )
 			{
-				throw new DomainException('authy_key_no_sms');
+				throw new \DomainException('authy_key_no_sms');
 			}
-			if ( !$details['app']['onetouch_enabled'] and Request::i()->authy_onetouch )
+			if ( !$details['app']['onetouch_enabled'] and \IPS\Request::i()->authy_onetouch )
 			{
-				throw new DomainException('authy_key_no_onetouch');
+				throw new \DomainException('authy_key_no_onetouch');
 			}
-		}, NULL, Member::loggedIn()->language()->addToStack('authy_key_suffix') ) );
+		}, NULL, \IPS\Member::loggedIn()->language()->addToStack('authy_key_suffix') ) );
 		
-		$form->add( new CheckboxSet( 'authy_groups', Settings::i()->authy_groups == '*' ? '*' : explode( ',', Settings::i()->authy_groups ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'authy_groups', \IPS\Settings::i()->authy_groups == '*' ? '*' : explode( ',', \IPS\Settings::i()->authy_groups ), FALSE, array(
 			'multiple'		=> TRUE,
-			'options'		=> array_combine( array_keys( Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, Group::groups() ) ),
+			'options'		=> array_combine( array_keys( \IPS\Member\Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, \IPS\Member\Group::groups() ) ),
 			'unlimited'		=> '*',
 			'unlimitedLang'	=> 'everyone',
 			'impliedUnlimited' => TRUE
 		) ) );
 				
 		$form->addHeader('authy_setup_header');
-		$form->add( new CheckboxSet( 'authy_setup', explode( ',', Settings::i()->authy_setup ), TRUE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'authy_setup', explode( ',', \IPS\Settings::i()->authy_setup ), TRUE, array( 'options' => array(
 			'authy'			=> 'authy_method_authy',
 			'sms'			=> 'authy_method_sms',
 			'phone'			=> 'authy_method_phone',
 		) ) ) );
-		$form->add( new Custom( 'authy_setup_protection', array( Settings::i()->authy_setup_tries, Settings::i()->authy_setup_lockout ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Custom( 'authy_setup_protection', array( \IPS\Settings::i()->authy_setup_tries, \IPS\Settings::i()->authy_setup_lockout ), FALSE, array(
 			'getHtml' => function( $field ) {
-				return Theme::i()->getTemplate('settings')->authySetupProtection( $field->value );
+				return \IPS\Theme::i()->getTemplate('settings')->authySetupProtection( $field->value );
 			}
 		) ) );
 		
 		$form->addHeader('authy_authenticate_header');
-		$form->add( new CheckboxSet( 'authy_method', explode( ',', Settings::i()->authy_method ), TRUE, array(
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'authy_method', explode( ',', \IPS\Settings::i()->authy_method ), TRUE, array(
 			'options' => array(
 				'authy'			=> 'authy_method_authy',
 				'sms'			=> 'authy_method_sms',
@@ -651,7 +626,7 @@ class Handler extends MFAHandler
 				'authy'			=> array( 'authy_onetouch' )
 			)
 		) ) );
-		$form->add( new Radio( 'authy_onetouch', Settings::i()->authy_onetouch, TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'authy_onetouch', \IPS\Settings::i()->authy_onetouch, TRUE, array(
 			'options' => array(
 				'1'			=> 'authy_onetouch_on',
 				'0'			=> 'authy_onetouch_off',
@@ -668,8 +643,8 @@ class Handler extends MFAHandler
 			$values['authy_method'] = isset( $values['authy_method'] ) ? implode( ',', $values['authy_method'] ) : '';
 			$form->saveAsSettings( $values );	
 
-			Session::i()->log( 'acplogs__mfa_handler_enabled', array( "mfa_authy_title" => TRUE ) );
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=mfa' ), 'saved' );
+			\IPS\Session::i()->log( 'acplogs__mfa_handler_enabled', array( "mfa_authy_title" => TRUE ) );		
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=mfa' ), 'saved' );
 		}
 		
 		return (string) $form;
@@ -682,10 +657,10 @@ class Handler extends MFAHandler
 	/**
 	 * If member has configured this handler, disable it
 	 *
-	 * @param	Member	$member	The member
-	 * @return	void
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool
 	 */
-	public function disableHandlerForMember( Member $member ): void
+	public function disableHandlerForMember( \IPS\Member $member )
 	{
 		$mfaDetails = $member->mfa_details;
 		
@@ -694,7 +669,7 @@ class Handler extends MFAHandler
 			try
 			{
 				static::totp( "users/{$mfaDetails['authy']['id']}/delete", 'post', array(
-					'user_ip'	=> Request::i()->ipAddress()
+					'user_ip'	=> \IPS\Request::i()->ipAddress()
 				) );
 			}
 			catch ( \Exception $e ) { }
@@ -713,21 +688,21 @@ class Handler extends MFAHandler
 	 *
 	 * @return	string
 	 */
-	public function ucpTitle(): string
+	public function ucpTitle()
 	{
-		$availableMethods = explode( ',', Settings::i()->authy_method );
+		$availableMethods = explode( ',', \IPS\Settings::i()->authy_method );
 		
-		if ( in_array( 'authy', $availableMethods ) )
+		if ( \in_array( 'authy', $availableMethods ) )
 		{
-			return Member::loggedIn()->language()->addToStack('mfa_authy_title');
+			return \IPS\Member::loggedIn()->language()->addToStack('mfa_authy_title');
 		}
-		elseif ( in_array( 'sms', $availableMethods ) and count( $availableMethods ) == 1 )
+		elseif ( \in_array( 'sms', $availableMethods ) and \count( $availableMethods ) == 1 )
 		{
-			return Member::loggedIn()->language()->addToStack('mfa_sms_title');
+			return \IPS\Member::loggedIn()->language()->addToStack('mfa_sms_title');
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack('mfa_phone_title');
+			return \IPS\Member::loggedIn()->language()->addToStack('mfa_phone_title');
 		}
 	}
 	
@@ -736,32 +711,32 @@ class Handler extends MFAHandler
 	 *
 	 * @return	string
 	 */
-	public function ucpDesc(): string
+	public function ucpDesc()
 	{
-		$availableMethods = explode( ',', Settings::i()->authy_method );
+		$availableMethods = explode( ',', \IPS\Settings::i()->authy_method );
 		
-		if ( in_array( 'authy', $availableMethods ) )
+		if ( \in_array( 'authy', $availableMethods ) )
 		{
-			if ( count( $availableMethods ) == 1 )
+			if ( \count( $availableMethods ) == 1 )
 			{
-				return Member::loggedIn()->language()->addToStack('mfa_authy_only_desc_user');
+				return \IPS\Member::loggedIn()->language()->addToStack('mfa_authy_only_desc_user');
 			}
 			else
 			{
-				return Member::loggedIn()->language()->addToStack('mfa_authy_mixed_desc_user');
+				return \IPS\Member::loggedIn()->language()->addToStack('mfa_authy_mixed_desc_user');
 			}
 		}
-		elseif ( in_array( 'sms', $availableMethods ) and count( $availableMethods ) == 1 )
+		elseif ( \in_array( 'sms', $availableMethods ) and \count( $availableMethods ) == 1 )
 		{
-			return Member::loggedIn()->language()->addToStack('mfa_sms_desc_user');
+			return \IPS\Member::loggedIn()->language()->addToStack('mfa_sms_desc_user');
 		}
-		elseif ( in_array( 'phone', $availableMethods ) and count( $availableMethods ) == 1 )
+		elseif ( \in_array( 'phone', $availableMethods ) and \count( $availableMethods ) == 1 )
 		{
-			return Member::loggedIn()->language()->addToStack('mfa_phone_desc_user');
+			return \IPS\Member::loggedIn()->language()->addToStack('mfa_phone_desc_user');
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack('mfa_sms_or_phone_desc_user');
+			return \IPS\Member::loggedIn()->language()->addToStack('mfa_sms_or_phone_desc_user');
 		}
 	}
 	
@@ -770,21 +745,21 @@ class Handler extends MFAHandler
 	 *
 	 * @return	string
 	 */
-	public function recoveryButton(): string
+	public function recoveryButton()
 	{
-		$availableMethods = explode( ',', Settings::i()->authy_method );
+		$availableMethods = explode( ',', \IPS\Settings::i()->authy_method );
 		
-		if ( in_array( 'authy', $availableMethods ) and count( $availableMethods ) == 1 )
+		if ( \in_array( 'authy', $availableMethods ) and \count( $availableMethods ) == 1 )
 		{
-			return Member::loggedIn()->language()->addToStack('mfa_authy_recovery');
+			return \IPS\Member::loggedIn()->language()->addToStack('mfa_authy_recovery');
 		}
-		elseif ( in_array( 'sms', $availableMethods ) and count( $availableMethods ) == 1 )
+		elseif ( \in_array( 'sms', $availableMethods ) and \count( $availableMethods ) == 1 )
 		{
-			return Member::loggedIn()->language()->addToStack('mfa_sms_recovery');
+			return \IPS\Member::loggedIn()->language()->addToStack('mfa_sms_recovery');
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack('mfa_phone_recovery');
+			return \IPS\Member::loggedIn()->language()->addToStack('mfa_phone_recovery');
 		}
 	}
 	
@@ -793,12 +768,12 @@ class Handler extends MFAHandler
 	/**
 	 * Make TOTP API Call
 	 *
-	 * @param string $endpoint	The endpoint to call
-	 * @param string $method		'get' or 'post'
-	 * @param array|null $data		Post data or additional query string parameters
+	 * @param	string	$endpoint	The endpoint to call
+	 * @param	string	$method		'get' or 'post'
+	 * @param	array	$data		Post data or additional query string parameters
 	 * @return	array
 	 */
-	public static function totp( string $endpoint, string $method='get', array $data=NULL ): array
+	public static function totp( $endpoint, $method='get', $data=NULL )
 	{
 		return static::_api( "protected/json/{$endpoint}", $method, $data );
 	}
@@ -806,12 +781,12 @@ class Handler extends MFAHandler
 	/**
 	 * Make OneTouch API Call
 	 *
-	 * @param string $endpoint	The endpoint to call
-	 * @param string $method		'get' or 'post'
-	 * @param array|null $data		Post data or additional query string parameters
+	 * @param	string	$endpoint	The endpoint to call
+	 * @param	string	$method		'get' or 'post'
+	 * @param	array	$data		Post data or additional query string parameters
 	 * @return	array
 	 */
-	public static function onetouch( string $endpoint, string $method='get', array $data=NULL ): array
+	public static function onetouch( $endpoint, $method='get', $data=NULL )
 	{
 		return static::_api( "onetouch/json/{$endpoint}", $method, $data );
 	}
@@ -819,23 +794,18 @@ class Handler extends MFAHandler
 	/**
 	 * Make API Call
 	 *
-	 * @param string $endpoint	The endpoint to call
-	 * @param string $method		'get' or 'post'
-	 * @param array|null $data		Post data or additional query string parameters
+	 * @param	string	$endpoint	The endpoint to call
+	 * @param	string	$method		'get' or 'post'
+	 * @param	array	$data		Post data or additional query string parameters
 	 * @return	array
 	 */
-	protected static function _api( string $endpoint, string $method='get', array $data=NULL ): array
+	protected static function _api( $endpoint, $method='get', $data=NULL )
 	{
-		$url = Url::external("https://api.authy.com/{$endpoint}")->setQueryString( 'api_key', Settings::i()->authy_key );
+		$url = \IPS\Http\Url::external("https://api.authy.com/{$endpoint}")->setQueryString( 'api_key', \IPS\Settings::i()->authy_key );
 		
 		if ( $method == 'get' )
 		{
-			if( $data !== null )
-			{
-				$url = $url->setQueryString( $data );
-			}
-
-			$response = $url->request()->get();
+			$response = $url->setQueryString( $data )->request()->get();
 		}
 		else
 		{
@@ -846,7 +816,7 @@ class Handler extends MFAHandler
 		
 		if ( !$response['success'] )
 		{
-			throw new \IPS\Http\Request\Exception( $response['message'], $response['error_code'] );
+			throw new Exception( $response['message'], $response['error_code'] );
 		}
 		
 		return $response;
@@ -855,19 +825,19 @@ class Handler extends MFAHandler
 	/**
 	 * Verify an Authy API Key
 	 *
-	 * @param string $val	The API key submitted
+	 * @param	string	$val	The API key submitted
 	 * @return	array
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public static function verifyApiKey( string $val ): array
+	public static function verifyApiKey( $val )
 	{
 		try
 		{
-			return Url::external("https://api.authy.com/protected/json/app/details")->setQueryString( 'api_key', $val )->request()->get()->decodeJson();
+			return \IPS\Http\Url::external("https://api.authy.com/protected/json/app/details")->setQueryString( 'api_key', $val )->request()->get()->decodeJson();
 		}
 		catch ( \IPS\Http\Request\Exception $e )
 		{
-			throw new DomainException( $e->getMessage() );
+			throw new \DomainException( $e->getMessage() );
 		}
 	}
 	

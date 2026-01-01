@@ -12,27 +12,16 @@
 namespace IPS\cms\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Databases;
-use IPS\cms\Pages\Page;
-use IPS\cms\Records;
-use IPS\Db;
-use IPS\Task;
-use IPS\Task\Exception;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * updaterecords Task
  */
-class updaterecords extends Task
+class _updaterecords extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -43,16 +32,16 @@ class updaterecords extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		foreach( Databases::databases() as $database )
+		foreach( \IPS\cms\Databases::databases() as $database )
 		{
 			$recordClass = 'IPS\cms\Records' . $database->id;
-			/* @var $recordClass Records */
+			
 			$fixedFields = $database->fixed_field_perms;
-			if ( ! in_array( 'record_expiry_date', array_keys( $fixedFields ) ) )
+			if ( ! \in_array( 'record_expiry_date', array_keys( $fixedFields ) ) )
 			{
 				continue;
 			}
@@ -60,9 +49,9 @@ class updaterecords extends Task
 			/* Check the database is placed on a valid page */
 			try
 			{
-				Page::loadByDatabaseId( $database->id );
+				\IPS\cms\Pages\Page::loadByDatabaseId( $database->id );
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
 				continue;
 			}
@@ -71,7 +60,7 @@ class updaterecords extends Task
 			
 			if ( ! empty( $permissions['visible'] ) )
 			{
-				foreach( Db::i()->select( '*', $recordClass::$databaseTable, array( 'record_expiry_date > 0 and record_expiry_date <= ? and record_approved=1', time() ),'primary_id_field ASC', 250 ) as $row )
+				foreach( \IPS\Db::i()->select( '*', $recordClass::$databaseTable, array( 'record_expiry_date > 0 and record_expiry_date <= ? and record_approved=1', time() ),'primary_id_field ASC', 250 ) as $row )
 				{
 					$record = $recordClass::constructFromData( $row );
 					$record->hide( FALSE );

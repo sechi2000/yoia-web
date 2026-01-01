@@ -11,71 +11,60 @@
 namespace IPS\gallery\extensions\core\MemberACPProfileContentTab;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\Block;
-use IPS\Db;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output\Plugin\Filesize;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member ACP Profile - Content Statistics Tab: Gallery
  */
-class Gallery extends Block
+class _Gallery extends \IPS\core\MemberACPProfile\Block
 {
 	/**
 	 * Get output
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
-		$imageCount = Db::i()->select( 'COUNT(*)', 'gallery_images', array( 'image_member_id=?', $this->member->member_id ) )->first();
-		$diskspaceUsed = Db::i()->select( 'SUM(image_file_size)', 'gallery_images', array( 'image_member_id=?', $this->member->member_id ) )->first();
-		$numberOfViews = Db::i()->select( 'COUNT(*)', 'gallery_bandwidth', array( 'member_id=?', $this->member->member_id ) )->first();
-		$bandwidthUsed = Db::i()->select( 'SUM(bsize)', 'gallery_bandwidth', array( 'member_id=?', $this->member->member_id ) )->first();
+		$imageCount = \IPS\Db::i()->select( 'COUNT(*)', 'gallery_images', array( 'image_member_id=?', $this->member->member_id ) )->first();
+		$diskspaceUsed = \IPS\Db::i()->select( 'SUM(image_file_size)', 'gallery_images', array( 'image_member_id=?', $this->member->member_id ) )->first();
+		$numberOfViews = \IPS\Db::i()->select( 'COUNT(*)', 'gallery_bandwidth', array( 'member_id=?', $this->member->member_id ) )->first();
+		$bandwidthUsed = \IPS\Db::i()->select( 'SUM(bsize)', 'gallery_bandwidth', array( 'member_id=?', $this->member->member_id ) )->first();
 		
-		$allImages = Db::i()->select( 'COUNT(*)', 'gallery_images' )->first();
-		$totalFilesize = Db::i()->select( 'SUM(image_file_size)', 'gallery_images' )->first();
-		$allBandwidth = Db::i()->select( 'COUNT(*)', 'gallery_bandwidth' )->first();
-		$totalBandwidth = Db::i()->select( 'SUM(bsize)', 'gallery_bandwidth' )->first();
+		$allImages = \IPS\Db::i()->select( 'COUNT(*)', 'gallery_images' )->first();
+		$totalFilesize = \IPS\Db::i()->select( 'SUM(image_file_size)', 'gallery_images' )->first();
+		$allBandwidth = \IPS\Db::i()->select( 'COUNT(*)', 'gallery_bandwidth' )->first();
+		$totalBandwidth = \IPS\Db::i()->select( 'SUM(bsize)', 'gallery_bandwidth' )->first();
 		
-		return (string) Theme::i()->getTemplate( 'stats', 'gallery' )->information( $this->member, Theme::i()->getTemplate( 'global', 'core' )->definitionTable( array(
+		return \IPS\Theme::i()->getTemplate( 'stats', 'gallery' )->information( $this->member, \IPS\Theme::i()->getTemplate( 'global', 'core' )->definitionTable( array(
 			'images_submitted'		=> 
-				Member::loggedIn()->language()->addToStack( 'images_stat_of_total', FALSE, array( 'sprintf' => array(
-				Member::loggedIn()->language()->formatNumber( $imageCount ),
-				Member::loggedIn()->language()->formatNumber( ( ( $allImages ? ( 100 / $allImages ) : 0 ) * $imageCount ), 2 ) ) )
+				\IPS\Member::loggedIn()->language()->addToStack( 'images_stat_of_total', FALSE, array( 'sprintf' => array(
+				\IPS\Member::loggedIn()->language()->formatNumber( $imageCount ),
+				\IPS\Member::loggedIn()->language()->formatNumber( ( ( $allImages ? ( 100 / $allImages ) : 0 ) * $imageCount ), 2 ) ) )
 			),
 			'gdiskspace_used'		=> 
-				Member::loggedIn()->language()->addToStack( 'images_stat_of_total', FALSE, array( 'sprintf' => array(
-				Filesize::humanReadableFilesize( $diskspaceUsed ? :0 ),
-				Member::loggedIn()->language()->formatNumber( ( ( $totalFilesize ? ( 100 / $totalFilesize ) : 0 ) * $diskspaceUsed ), 2 ) ) )
+				\IPS\Member::loggedIn()->language()->addToStack( 'images_stat_of_total', FALSE, array( 'sprintf' => array(
+				\IPS\Output\Plugin\Filesize::humanReadableFilesize( $diskspaceUsed ),
+				\IPS\Member::loggedIn()->language()->formatNumber( ( ( $totalFilesize ? ( 100 / $totalFilesize ) : 0 ) * $diskspaceUsed ), 2 ) ) )
 			),
 			'gaverage_filesize'		=> 
-				Member::loggedIn()->language()->addToStack( 'images_stat_average' , FALSE, array( 'sprintf' => array(
-				Filesize::humanReadableFilesize( Db::i()->select( 'AVG(image_file_size)', 'gallery_images', array( 'image_member_id=?', $this->member->member_id ) )->first() ? :0),
-				Filesize::humanReadableFilesize( Db::i()->select( 'AVG(image_file_size)', 'gallery_images' )->first() ) ) ? :0)
+				\IPS\Member::loggedIn()->language()->addToStack( 'images_stat_average' , FALSE, array( 'sprintf' => array(
+				\IPS\Output\Plugin\Filesize::humanReadableFilesize( \IPS\Db::i()->select( 'AVG(image_file_size)', 'gallery_images', array( 'image_member_id=?', $this->member->member_id ) )->first() ),
+				\IPS\Output\Plugin\Filesize::humanReadableFilesize( \IPS\Db::i()->select( 'AVG(image_file_size)', 'gallery_images' )->first() ) ) )
 			),
 			'number_of_views'		=> 
-				Member::loggedIn()->language()->addToStack( 'images_stat_of_total', FALSE, array( 'sprintf' => array(
-				Member::loggedIn()->language()->formatNumber( $numberOfViews ),
-				Member::loggedIn()->language()->formatNumber( ( ( $allBandwidth ? ( 100 / $allBandwidth ) : 0 ) * $imageCount ), 2 ) ))
+				\IPS\Member::loggedIn()->language()->addToStack( 'images_stat_of_total', FALSE, array( 'sprintf' => array(
+				\IPS\Member::loggedIn()->language()->formatNumber( $numberOfViews ),
+				\IPS\Member::loggedIn()->language()->formatNumber( ( ( $allBandwidth ? ( 100 / $allBandwidth ) : 0 ) * $imageCount ), 2 ) ))
 			),
 			'gallery_bandwidth_used'		=> 
-				Member::loggedIn()->language()->addToStack( 'images_stat_of_total_link', FALSE, array( 'htmlsprintf' => array(
-				Filesize::humanReadableFilesize( $bandwidthUsed ? :0 ),
-				Member::loggedIn()->language()->formatNumber( ( ( $totalBandwidth ? ( 100 / $totalBandwidth ) : 0 ) * $bandwidthUsed ), 2 ),
-				Theme::i()->getTemplate( 'stats', 'gallery' )->bandwidthButton( $this->member ) ) )
+				\IPS\Member::loggedIn()->language()->addToStack( 'images_stat_of_total_link', FALSE, array( 'htmlsprintf' => array(
+				\IPS\Output\Plugin\Filesize::humanReadableFilesize( $bandwidthUsed ),
+				\IPS\Member::loggedIn()->language()->formatNumber( ( ( $totalBandwidth ? ( 100 / $totalBandwidth ) : 0 ) * $bandwidthUsed ), 2 ),
+				\IPS\Theme::i()->getTemplate( 'stats', 'gallery' )->bandwidthButton( $this->member ) ) )
 			)
 		) ) );
 	}
@@ -85,12 +74,12 @@ class Gallery extends Block
 	 *
 	 * @return	string
 	 */
-	public function edit(): string
+	public function edit()
 	{
-		$bandwidthChart = new Database( Url::internal( "app=core&module=members&controller=members&do=editBlock&block=IPS\\gallery\\extensions\\core\\MemberACPProfileContentTab\\Gallery&id={$this->member->member_id}&chart=downloads&_graph=1" ), 'gallery_bandwidth', 'bdate', '', array( 'vAxis' => array( 'title' => Member::loggedIn()->language()->addToStack( 'filesize_raw_k' ) ) ), 'LineChart', 'daily' );
+		$bandwidthChart = new \IPS\Helpers\Chart\Database( \IPS\Http\Url::internal( "app=core&module=members&controller=members&do=editBlock&block=IPS\\gallery\\extensions\\core\\MemberACPProfileContentTab\\Gallery&id={$this->member->member_id}&chart=downloads&_graph=1" ), 'gallery_bandwidth', 'bdate', '', array( 'vAxis' => array( 'title' => \IPS\Member::loggedIn()->language()->addToStack( 'filesize_raw_k' ) ) ), 'LineChart', 'daily' );
 		$bandwidthChart->groupBy = 'bdate';
 		$bandwidthChart->where[] = array( 'member_id=?', $this->member->member_id );
-		$bandwidthChart->addSeries( Member::loggedIn()->language()->addToStack('bandwidth_use_gallery'), 'number', 'ROUND((SUM(bsize)/1024),2)', FALSE );
-		return ( Request::i()->isAjax() and isset( Request::i()->_graph ) ) ? (string) $bandwidthChart : Theme::i()->getTemplate( 'stats', 'gallery' )->graphs( (string) $bandwidthChart );
+		$bandwidthChart->addSeries( \IPS\Member::loggedIn()->language()->addToStack('bandwidth_use_gallery'), 'number', 'ROUND((SUM(bsize)/1024),2)', FALSE );
+		return ( \IPS\Request::i()->isAjax() and isset( \IPS\Request::i()->_graph ) ) ? (string) $bandwidthChart : \IPS\Theme::i()->getTemplate( 'stats', 'gallery' )->graphs( (string) $bandwidthChart );
 	}
 }

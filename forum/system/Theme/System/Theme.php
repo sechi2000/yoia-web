@@ -11,43 +11,38 @@
 namespace IPS\Theme\System;
 	
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use function defined;
-use const IPS\DEFAULT_THEME_ID;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Basic themes
  */
-class Theme extends \IPS\Theme\Dev\Theme
+class _Theme extends \IPS\Theme\Dev\Theme
 {
 	/**
 	 * @brief	Template Classes
 	 */
-	 protected array $templates = array();
+	 protected $templates;
 	 
 	 /**
 	 * Get currently logged in member's theme
 	 *
-	 * @return	Theme
+	 * @return	\IPS\Theme
 	 */
-	public static function i(): Theme
+	public static function i()
 	{
 		if ( static::$memberTheme === null )
 		{
 			static::themes();
 			static::$memberTheme = new self;
 					
-			if ( Dispatcher::i()->controllerLocation === 'front' )
+			if ( \IPS\Dispatcher::i()->controllerLocation === 'front' )
 			{
 				/* Add in the default theme properties (_data array, etc) */
-				foreach( static::$multitons[ DEFAULT_THEME_ID ] as $k => $v )
+				foreach( static::$multitons[ \IPS\DEFAULT_THEME_ID ] as $k => $v )
 				{
 					static::$memberTheme->$k = $v;
 				}
@@ -60,30 +55,30 @@ class Theme extends \IPS\Theme\Dev\Theme
 	/**
 	 * Get a template
 	 *
-	 * @param string $group				Template Group
-	 * @param string|null $app				Application key (NULL for current application)
-	 * @param string|null $location		    Template Location (NULL for current template location)
-	 * @return    Template
+	 * @param	string	$group				Template Group
+	 * @param	string	$app				Application key (NULL for current application)
+	 * @param	string	$location		    Template Location (NULL for current template location)
+	 * @return	\IPS\Theme\Template
 	 */
-	public function getTemplate( string $group, string $app=NULL, string $location=NULL ): Template
+	public function getTemplate( $group, $app=NULL, $location=NULL )
 	{
 		/* Do we have an application? */
 		if ( $app === NULL )
 		{
-			$app = Dispatcher::i()->application->directory;
+			$app = \IPS\Dispatcher::i()->application->directory;
 		}
 		
-		return new Template( $app, $location, $group );
+		return new \IPS\Theme\System\Template( $app, $location, $group );
 	}
 	
 	/**
 	 * Returns the path for the IN_DEV .phtml files
-	 * @param string $app			Application Key
-	 * @param string|null $location		Location
-	 * @param string|null $path			Path or Filename
+	 * @param string 	 	  $app			Application Key
+	 * @param string|null	  $location		Location
+	 * @param string|null 	  $path			Path or Filename
 	 * @return string
 	 */
-	protected static function _getHtmlPath( string $app, string $location=null, string $path=null ): string
+	protected static function _getHtmlPath( $app, $location=null, $path=null )
 	{
 		return rtrim( \IPS\ROOT_PATH . "/applications/{$app}/data/html/{$location}/{$path}", '/' ) . '/';
 	}
@@ -92,7 +87,7 @@ class Theme extends \IPS\Theme\Dev\Theme
 	 * Returns the namespace for the template class
 	 * @return string
 	 */
-	protected static function _getTemplateNamespace(): string
+	protected static function _getTemplateNamespace()
 	{
 		return 'IPS\\Theme\\Basic\\';
 	}

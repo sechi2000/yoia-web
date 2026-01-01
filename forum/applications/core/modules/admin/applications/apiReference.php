@@ -11,42 +11,30 @@
 namespace IPS\core\modules\admin\applications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Dispatcher;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use ReflectionMethod;
-use function defined;
-use function extension_loaded;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * apiReference
  */
-class apiReference extends Dispatcher\Controller
+class _apiReference extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'api_reference' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'api_reference' );
 		parent::execute();
 	}
 
@@ -55,23 +43,23 @@ class apiReference extends Dispatcher\Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* If Opcache is enabled but opcache.save_comments is disabled, the API reference won't work */
-		if ( ( extension_loaded( 'opcache' ) OR extension_loaded( 'Zend Opcache' ) ) AND ini_get( 'opcache.save_comments' ) == 0 )
+		if ( ( \extension_loaded( 'opcache' ) OR \extension_loaded( 'Zend Opcache' ) ) AND ini_get( 'opcache.save_comments' ) == 0 )
 		{
-			Output::i()->error( 'api_opcache_disable', '4C331/1', 403, '' );
+			\IPS\Output::i()->error( 'api_opcache_disable', '4C331/1', 403, '' );
 		}
 
 		/* Get endpoint details */
-		$endpoints = Controller::getAllEndpoints();
+		$endpoints = \IPS\Api\Controller::getAllEndpoints();
 		$selected = NULL;
 		$content = '';
 		
 		/* If we're viewing a specific one, get information about it */
-		if ( isset( Request::i()->endpoint ) and array_key_exists( Request::i()->endpoint, $endpoints ) )
+		if ( isset( \IPS\Request::i()->endpoint ) and array_key_exists( \IPS\Request::i()->endpoint, $endpoints ) )
 		{
-			$selected = Request::i()->endpoint;
+			$selected = \IPS\Request::i()->endpoint;
 			
 			$additionalClassesToReference = array();
 
@@ -90,11 +78,11 @@ class apiReference extends Dispatcher\Controller
 
 			foreach( $params as $index => $data )
 			{
-				if ( mb_strpos( $data[0], '|' ) === FALSE AND !in_array( $data[0], array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
+				if ( mb_strpos( $data[0], '|' ) === FALSE AND !\in_array( $data[0], array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
 				{
 					if ( mb_substr( $data[0], 0, 1 ) == '[' )
 					{
-						if ( !in_array( mb_substr( $data[0], 1, -1 ), array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
+						if ( !\in_array( mb_substr( $data[0], 1, -1 ), array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
 						{
 							if( $returned = $this->_getAdditionalClasses( mb_substr( $data[0], 1, -1 ) ) )
 							{
@@ -120,13 +108,13 @@ class apiReference extends Dispatcher\Controller
 				}
 			}
 
-			$exceptions = $endpoints[$selected]['details']['throws'] ?? NULL;
+			$exceptions = isset( $endpoints[ $selected ]['details']['throws'] ) ? $endpoints[ $selected ]['details']['throws'] : NULL;
 			if ( isset( $endpoints[ $selected ]['details']['apimemberonly'] ) )
 			{
 				$exceptions[] = array(
 					'3S290/C',
 					'MEMBER_ONLY',
-					Member::loggedIn()->language()->addToStack('api_endpoint_member_only_err')
+					\IPS\Member::loggedIn()->language()->addToStack('api_endpoint_member_only_err')
 				);
 			}
 			if ( isset( $endpoints[ $selected ]['details']['apiclientonly'] ) )
@@ -134,13 +122,12 @@ class apiReference extends Dispatcher\Controller
 				$exceptions[] = array(
 					'3S290/D',
 					'CLIENT_ONLY',
-					Member::loggedIn()->language()->addToStack('api_endpoint_client_only_err')
+					\IPS\Member::loggedIn()->language()->addToStack('api_endpoint_client_only_err')
 				);
 			}
 
 			$response = NULL;
-			$endPointReturn = $endpoints[ $selected ]['details']['apireturn'] ?? $endpoints[ $selected ]['details']['return'];
-			$return = array_filter( $endPointReturn[0] );
+			$return = array_filter( $endpoints[ $selected ]['details']['return'][0] );
 			$return = array_pop( $return );
 			if ( $return == 'array' )
 			{
@@ -148,11 +135,11 @@ class apiReference extends Dispatcher\Controller
 				{
 					foreach ( $endpoints[ $selected ]['details']['apiresponse'] as $index => $data )
 					{
-						if ( mb_strpos( $data[0], '|' ) === FALSE AND !in_array( $data[0], array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
+						if ( mb_strpos( $data[0], '|' ) === FALSE AND !\in_array( $data[0], array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
 						{
 							if ( mb_substr( $data[0], 0, 1 ) == '[' )
 							{
-								if ( !in_array( mb_substr( $data[0], 1, -1 ), array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
+								if ( !\in_array( mb_substr( $data[0], 1, -1 ), array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
 								{
 									if( $returned = $this->_getAdditionalClasses( mb_substr( $data[0], 1, -1 ) ) )
 									{
@@ -177,14 +164,14 @@ class apiReference extends Dispatcher\Controller
 							}
 						}
 					}
-					$response = Theme::i()->getTemplate('api')->referenceTable( $endpoints[ $selected ]['details']['apiresponse'] );
+					$response = \IPS\Theme::i()->getTemplate('api')->referenceTable( $endpoints[ $selected ]['details']['apiresponse'] );
 				}
 			}
-			elseif ( mb_substr( $return, 0, mb_strlen( 'PaginatedResponse' ) ) == 'PaginatedResponse' )
+			elseif ( mb_substr( $return, 0, mb_strlen( '\IPS\Api\PaginatedResponse' ) ) == '\IPS\Api\PaginatedResponse' )
 			{
-				$class = mb_substr( trim( $return ), mb_strlen( 'PaginatedResponse' ) + 1, -1 );
+				$class = mb_substr( trim( $return ), mb_strlen( '\IPS\Api\PaginatedResponse' ) + 1, -1 );
 				$additionalClassesToReference = array_merge( $additionalClassesToReference, $this->_getAdditionalClasses( $class ) );
-				$response = Theme::i()->getTemplate('api')->referenceTable( array(
+				$response = \IPS\Theme::i()->getTemplate('api')->referenceTable( array(
 					array( 'int', 'page', 'api_int_page' ),
 					array( 'int', 'perPage', 'api_int_perpage' ),
 					array( 'int', 'totalResults', 'api_int_totalresults' ),
@@ -195,30 +182,20 @@ class apiReference extends Dispatcher\Controller
 			elseif ( $return = trim( $return ) and class_exists( $return ) and method_exists( $return, 'apiOutput' ) )
 			{
 				$additionalClassesToReference = array_merge( $additionalClassesToReference, $this->_getAdditionalClasses( $return, TRUE ) );
-				$reflection = new ReflectionMethod( $return, 'apiOutput' );
-				$decoded = Controller::decodeDocblock( $reflection->getDocComment() );
-				$response = Theme::i()->getTemplate('api')->referenceTable( $decoded['details']['apiresponse'] );
-			}
-			else
-			{
-				$return = array_filter( $endPointReturn[0] );
-				if( in_array( $return[0], array( 'int', 'string', 'float', 'datetime', 'bool' ) ) )
-				{
-					$response = Theme::i()->getTemplate('api')->referenceTable( array(
-						array( $return[0], '', $return[1] ?? '' )
-					) );
-				}
+				$reflection = new \ReflectionMethod( $return, 'apiOutput' );
+				$decoded = \IPS\Api\Controller::decodeDocblock( $reflection->getDocComment() );
+				$response = \IPS\Theme::i()->getTemplate('api')->referenceTable( $decoded['details']['apiresponse'] );
 			}
 			
 			$additionalClasses = array();
 			foreach ( $additionalClassesToReference as $class )
 			{
-				$reflection = new ReflectionMethod( $class, 'apiOutput' );
-				$decoded = Controller::decodeDocblock( $reflection->getDocComment() );
-				$additionalClasses[ mb_strtolower( mb_substr( $class, mb_strrpos( $class, '\\' ) + 1 ) ) ] = Theme::i()->getTemplate('api')->referenceTable( $decoded['details']['apiresponse'] );
+				$reflection = new \ReflectionMethod( $class, 'apiOutput' );
+				$decoded = \IPS\Api\Controller::decodeDocblock( $reflection->getDocComment() );
+				$additionalClasses[ mb_strtolower( mb_substr( $class, mb_strrpos( $class, '\\' ) + 1 ) ) ] = \IPS\Theme::i()->getTemplate('api')->referenceTable( $decoded['details']['apiresponse'] );
 			}
 			
-			$content = Theme::i()->getTemplate('api')->referenceEndpoint( $endpoints[ $selected ], $params, $exceptions, $response, $additionalClasses );
+			$content = \IPS\Theme::i()->getTemplate('api')->referenceEndpoint( $endpoints[ $selected ], $params, $exceptions, $response, $additionalClasses );
 		}
 
 		$endpointTree = array();
@@ -228,13 +205,13 @@ class apiReference extends Dispatcher\Controller
 			$endpointTree[ $pieces[0] ][ $pieces[1] ][ $key ] = $endpoint;
 		}
 		
-		if ( Request::i()->endpoint and Request::i()->isAjax() )
+		if ( \IPS\Request::i()->endpoint and \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->sendOutput( $content );
+			\IPS\Output::i()->sendOutput( $content, 200, 'text/html' );
 		}
 
 		/* Output */
-		Output::i()->output = Theme::i()->getTemplate('api')->referenceTemplate( $endpoints, $endpointTree, $selected, $content );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('api')->referenceTemplate( $endpoints, $endpointTree, $selected, $content );
 	}
 	
 	/**
@@ -244,7 +221,7 @@ class apiReference extends Dispatcher\Controller
 	 * @param	bool	$exclude	If FALSE, will include this class itself in the return array
 	 * @return	array|NULL
 	 */
-	protected function _getAdditionalClasses( string $class, bool $exclude=FALSE ) : ?array
+	protected function _getAdditionalClasses( $class, $exclude=FALSE )
 	{
 		if( !class_exists( $class ) )
 		{
@@ -252,15 +229,15 @@ class apiReference extends Dispatcher\Controller
 		}
 
 		$return = $exclude ? array() : array( $class => $class );
-		$reflection = new ReflectionMethod( $class, 'apiOutput' );
-		$decoded = Controller::decodeDocblock( $reflection->getDocComment() );
+		$reflection = new \ReflectionMethod( $class, 'apiOutput' );
+		$decoded = \IPS\Api\Controller::decodeDocblock( $reflection->getDocComment() );
 		foreach ( $decoded['details']['apiresponse'] as $response )
 		{
-			if ( mb_strpos( $response[0], '|' ) === FALSE AND !in_array( $response[0], array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
+			if ( mb_strpos( $response[0], '|' ) === FALSE AND !\in_array( $response[0], array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
 			{
 				if ( mb_substr( $response[0], 0, 1 ) == '[' )
 				{
-					if ( !in_array( mb_substr( $response[0], 1, -1 ), $return ) and !in_array( mb_substr( $response[0], 1, -1 ), array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
+					if ( !\in_array( mb_substr( $response[0], 1, -1 ), $return ) and !\in_array( mb_substr( $response[0], 1, -1 ), array( 'int', 'string', 'float', 'datetime', 'bool', 'object', 'array' ) ) )
 					{
 						if( $returned = $this->_getAdditionalClasses( mb_substr( $response[0], 1, -1 ) ) )
 						{
@@ -268,7 +245,7 @@ class apiReference extends Dispatcher\Controller
 						}
 					}
 				}
-				elseif ( !in_array( $response[0], $return ) )
+				elseif ( !\in_array( $response[0], $return ) )
 				{
 					if( $returned = $this->_getAdditionalClasses( $response[0] ) )
 					{

@@ -11,114 +11,87 @@
 namespace IPS\Content\Search\Mysql;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Content\Item;
-use IPS\Content\Search\Results;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Exception;
-use IPS\Db\Select;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Node\Grouping;
-use IPS\Settings;
-use IPS\IPS;
-use Throwable;
-use UnderflowException;
-use function array_slice;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_null;
-use function is_string;
-use const IPS\CIC;
-use const IPS\USE_MYSQL_SEARCH_OPTIMIZED_MODE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * MySQL Search Query
  */
-class Query extends \IPS\Content\Search\Query
+class _Query extends \IPS\Content\Search\Query
 {	
 	/**
 	 * @brief		The SELECT clause
 	 */
-	protected array $select = array( 'main' => 'main.*' );
+	protected $select = array( 'main' => 'main.*' );
 	
 	/**
      * @brief       The WHERE clause
      */
-    protected array $where = array();
+    protected $where = array();
     
     /**
      * @brief       The WHERE clause for hidden/unhidden
      */
-    protected array|null $hiddenClause = NULL;
+    protected $hiddenClause = NULL;
     
      /**
      * @brief       The WHERE clause for last updated date
      */
-    protected array|null $lastUpdatedClause = NULL;
+    protected $lastUpdatedClause = NULL;
     
     /**
      * @brief       The offset
      */
-    protected int $offset = 0;
+    protected $offset = 0;
     
     /**
      * @brief       The ORDER BY clause
      */
-    protected string|null $order = NULL;
+    protected $order = NULL;
     
     /**
      * @brief       Joins
      */
-    protected array $joins = array();
+    protected $joins = array();
     
     /**
      * @brief       Item classes included
      */
-    protected array|null $itemClasses = NULL;
+    protected $itemClasses = NULL;
     
     /**
      * @brief       Force specific table index
      */
-    protected string|null $forceIndex = NULL;
+    protected $forceIndex = NULL;
     
     /**
      * @brief       Filter by items I posted in?
      * @see			filterByItemsIPostedIn()
      */
-    protected bool $filterByItemsIPostedIn = FALSE;
+    protected $filterByItemsIPostedIn = FALSE;
     
     /**
      * @brief       Filter by unread items?
      * @see			filterByUnread()
      */
-    protected bool $filterByUnread = FALSE;
+    protected $filterByUnread = FALSE;
 	
     /**
      * @brief       InnoDb Stop words
      */
-    protected static array $innoDBStopWords = array( 'a','about','an','are','as','at','be','by','com','de','en','for','from','how','i','in','is','it','la','of','on','or','that','the','this','to','was','what','when','where','who','will','with','und','the','www' );
+    protected static $innoDBStopWords = array( 'a','about','an','are','as','at','be','by','com','de','en','for','from','how','i','in','is','it','la','of','on','or','that','the','this','to','was','what','when','where','who','will','with','und','the','www' );
     
 	/**
 	 * Filter by multiple content types
 	 *
 	 * @param	array	$contentFilters	Array of \IPS\Content\Search\ContentFilter objects
 	 * @param	bool	$type			TRUE means only include results matching the filters, FALSE means exclude all results matching the filters
-	 * @return	static	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByContent( array $contentFilters, bool $type = TRUE ): static
+	public function filterByContent( array $contentFilters, $type = TRUE )
 	{
 		/* Init */
 		$filters = array();
@@ -132,42 +105,29 @@ class Query extends \IPS\Content\Search\Query
 		foreach ( $contentFilters as $filter )
 		{
 			$clause = array();
-			if ( $type and ! empty( $filter->itemClass ) )
+			if ( $type and $filter->itemClass )
 			{
 				$this->itemClasses[] = $filter->itemClass;
 			}
 			
 			/* Set the class */
-			if ( count( $filter->classes ) > 1 )
+			if ( \count( $filter->classes ) > 1 )
 			{
-				$clause[] = Db::i()->in( 'index_class', $filter->classes );
+				$clause[] = \IPS\Db::i()->in( 'index_class', $filter->classes );
 			}
 			else
 			{
 				$clause[] = 'index_class=?';
 				$params[] = array_pop( $filter->classes );
 			}
-
+			
 			/* Set the containers */
 			if ( $filter->containerIdFilter !== NULL )
 			{
-				if ( $filter->containerIds )
-				{
-					if ( $filter->itemClass )
-					{
-						$itemClass = $filter->itemClass;
-						if ( isset( $itemClass::$containerNodeClass ) )
-						{
-							$containerClass = $itemClass::$containerNodeClass;
-							$filter->containerIds = $containerClass::normalizeIds( $filter->containerIds );
-						}
-					}
-				}
-
-				$clause[] = Db::i()->in( 'index_container_id', $filter->containerIds, $filter->containerIdFilter === FALSE );
+				$clause[] = \IPS\Db::i()->in( 'index_container_id', $filter->containerIds, $filter->containerIdFilter === FALSE );
 			}
 			
-			if ( ! empty( $filter->itemClass ) )
+			if ( $filter->itemClass )
 			{
 				$itemClass = $filter->itemClass;
 				if ( isset( $itemClass::$containerNodeClass ) )
@@ -177,7 +137,7 @@ class Query extends \IPS\Content\Search\Query
 					
 					if ( $unsearchableIds != NULL )
 					{
-						$clause[] = Db::i()->in( 'index_container_id', $unsearchableIds, TRUE );
+						$clause[] = \IPS\Db::i()->in( 'index_container_id', $unsearchableIds, TRUE );
 					}	
 				}
 			}
@@ -187,25 +147,24 @@ class Query extends \IPS\Content\Search\Query
 			{
 				if( $filter->containerClassExclusions !== NULL )
 				{
-					$clause[] = '(' . Db::i()->in( 'index_container_class', $filter->containerClasses ) . ' OR ' . Db::i()->in( 'index_class', $filter->containerClassExclusions ) . ')';
+					$clause[] = '(' . \IPS\Db::i()->in( 'index_container_class', $filter->containerClasses ) . ' OR ' . \IPS\Db::i()->in( 'index_class', $filter->containerClassExclusions ) . ')';
 				}
 				else
 				{
-					$clause[] = Db::i()->in( 'index_container_class', $filter->containerClasses );
+					$clause[] = \IPS\Db::i()->in( 'index_container_class', $filter->containerClasses );
 				}
 			}
 			
 			/* Set the item IDs */
 			if ( $filter->itemIdFilter !== NULL )
 			{
-				$clause[] = Db::i()->in( 'index_item_id', $filter->itemIds, $filter->itemIdFilter === FALSE );
+				$clause[] = \IPS\Db::i()->in( 'index_item_id', $filter->itemIds, $filter->itemIdFilter === FALSE );
 			}
 			if ( $filter->objectIdFilter !== NULL )
 			{
-				$clause[] = Db::i()->in( 'index_object_id', $filter->objectIds, $filter->objectIdFilter === FALSE );
+				$clause[] = \IPS\Db::i()->in( 'index_object_id', $filter->objectIds, $filter->objectIdFilter === FALSE );
 			}
-
-			/* @var array $databaseColumnMap */
+			
 			/* Minimum comments/reviews/views? */
 			if ( $filter->minimumComments or $filter->minimumReviews or $filter->minimumViews )
 			{
@@ -216,19 +175,19 @@ class Query extends \IPS\Content\Search\Query
 				if ( $filter->minimumComments AND isset( $class::$databaseColumnMap['num_comments'] ) )
 				{
 					$this->select[ $class::$databaseTable . '_comments' ] = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['num_comments'];
-					$clause[] = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['num_comments'] . '>=' . intval( $filter->minimumComments );
+					$clause[] = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['num_comments'] . '>=' . \intval( $filter->minimumComments );
 				}
 				
 				if ( $filter->minimumReviews AND isset( $class::$databaseColumnMap['num_reviews'] ) )
 				{
 					$this->select[ $class::$databaseTable . '_reviews' ] = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['num_reviews'];
-					$clause[] = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['num_reviews'] . '>=' . intval( $filter->minimumReviews );
+					$clause[] = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['num_reviews'] . '>=' . \intval( $filter->minimumReviews );
 				}
 				
 				if ( $filter->minimumViews AND isset( $class::$databaseColumnMap['views'] ) )
 				{
 					$this->select[ $class::$databaseTable . '_views' ] = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['views'];
-					$clause[] = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['views'] . '>=' . intval( $filter->minimumViews );
+					$clause[] = $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['views'] . '>=' . \intval( $filter->minimumViews );
 				}
 			}
 			
@@ -245,7 +204,7 @@ class Query extends \IPS\Content\Search\Query
 			}
 			
 			/* Put it together */
-			if ( count( $clause ) > 1 )
+			if ( \count( $clause ) > 1 )
 			{
 				$filters[] = '( ' . implode( ' AND ', $clause ) . ' )';
 			}
@@ -265,18 +224,18 @@ class Query extends \IPS\Content\Search\Query
 	/**
 	 * Filter by author
 	 *
-	 * @param	Member|int|array	$author		The author, or an array of author IDs
-	 * @return	static	(for daisy chaining)
+	 * @param	\IPS\Member|int|array	$author		The author, or an array of author IDs
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByAuthor( Member|int|array $author ): static
+	public function filterByAuthor( $author )
 	{
-		if ( is_array( $author ) )
+		if ( \is_array( $author ) )
 		{
-			$this->where[] = array( Db::i()->in( 'index_author', $author ) );
+			$this->where[] = array( \IPS\Db::i()->in( 'index_author', $author ) );
 		}
 		else
 		{
-			$this->where[] = array( 'index_author=?', $author instanceof Member ? $author->member_id : $author );
+			$this->where[] = array( 'index_author=?', $author instanceof \IPS\Member ? $author->member_id : $author );
 		}
 		 
 		return $this;
@@ -286,26 +245,43 @@ class Query extends \IPS\Content\Search\Query
 	/**
 	 * Filter by club
 	 *
-	 * @param	Club|int|array|null	$club	The club, or array of club IDs, or NULL to exclude content from clubs
-	 * @return	static	(for daisy chaining)
+	 * @param	\IPS\Member\Club|int|array|null	$club	The club, or array of club IDs, or NULL to exclude content from clubs
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByClub( Club|int|array|null $club ): static
+	public function filterByClub( $club )
 	{
 		if ( $club === NULL )
 		{
 			$this->where[] = 'index_club_id IS NULL';
 		}
-		if ( is_array( $club ) )
+		if ( \is_array( $club ) )
 		{
-			$this->where[] = array( Db::i()->in( 'index_club_id', $club ) );
+			$this->where[] = array( \IPS\Db::i()->in( 'index_club_id', $club ) );
 		}
 		else
 		{
-			$this->where[] = array( 'index_club_id=?', $club instanceof Club ? $club->id : $club );
+			$this->where[] = array( 'index_club_id=?', $club instanceof \IPS\Member\Club ? $club->id : $club );
+		}
+
+		/* Get the list of valid classes */
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
+		{
+			foreach ( $object->classes as $class )
+			{
+				if ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+				{
+					$classesChecked[]	= $class;
+				}
+			}
 		}
 
 		/* Give content item classes a chance to inspect and manipulate filters */
-		$this->customFiltering( TRUE );
+		$filters = array();
+		foreach( $classesChecked as $itemClass )
+		{
+			$itemClass::searchEngineFiltering( $filters, $this );
+		}
+
 		
 		return $this;
 	}
@@ -313,15 +289,43 @@ class Query extends \IPS\Content\Search\Query
 	/**
 	 * Filter for profile
 	 *
-	 * @param	Member	$member	The member whose profile is being viewed
-	 * @return	static	(for daisy chaining)
+	 * @param	\IPS\Member	$member	The member whose profile is being viewed
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterForProfile( Member $member ): static
+	public function filterForProfile( \IPS\Member $member )
 	{
-		$filterResult = $this->filterByAuthor( $member );
+		/* Check to see if this member has even had anyone write on their status */
+		$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_search_index', array( 'index_class=? AND index_container_id=?', 'IPS\core\Statuses\Status', $member->member_id ) )->first();
+		
+		if ( $count )
+		{
+			$this->where[] = array( '( index_author=? OR ( index_class=? AND index_container_id=? ) )', $member->member_id, 'IPS\core\Statuses\Status', $member->member_id );
+
+			$filterResult = $this;
+		}
+		else
+		{
+			$filterResult = $this->filterByAuthor( $member );
+		}
+
+		/* Get the list of valid classes */
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
+		{
+			foreach ( $object->classes as $class )
+			{
+				if ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+				{
+					$classesChecked[]	= $class;
+				}
+			}
+		}
 
 		/* Give content item classes a chance to inspect and manipulate filters */
-		$filterResult->customFiltering( TRUE );
+		$filters = array();
+		foreach( $classesChecked as $itemClass )
+		{
+			$itemClass::searchEngineFiltering( $filters, $filterResult );
+		}
 
 		return $filterResult;
 	}
@@ -329,10 +333,10 @@ class Query extends \IPS\Content\Search\Query
 	/**
 	 * Filter by item author
 	 *
-	 * @param	Member	$author		The author
-	 * @return	static	(for daisy chaining)
+	 * @param	\IPS\Member	$author		The author
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByItemAuthor( Member $author ): static
+	public function filterByItemAuthor( \IPS\Member $author )
 	{
 		$this->where[] = array( 'index_item_author=?', $author->member_id );
 		 
@@ -345,23 +349,23 @@ class Query extends \IPS\Content\Search\Query
 	 * @param	array	$classes	Container classes to exclude from results.
 	 * @param	array	$exclude	Content classes to exclude from the filter. For cases where multiple content classes may have the same container class
 	 * 								such as Gallery images, comments and reviews.
-	 * @return	static	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByContainerClasses( array $classes=array(), array $exclude=array() ): static
+	public function filterByContainerClasses( $classes=array(), $exclude=array() )
 	{
 		if( empty( $exclude ) )
 		{
-			$this->where[] = '( index_container_class IS NULL OR ' . Db::i()->in( 'index_container_class', $classes, TRUE ) . ')';
+			$this->where[] = '( index_container_class IS NULL OR ' . \IPS\Db::i()->in( 'index_container_class', $classes, TRUE ) . ')';
 		}
 		else
 		{
 			foreach( $classes as $i => $class )
 			{
-				$classes[$i] = "'" . DB::i()->real_escape_string( $class ) . "'";
+				$classes[$i] = "'" . \IPS\DB::i()->real_escape_string( $class ) . "'";
 			}
 			foreach( $exclude as $i => $class )
 			{
-				$exclude[$i] = "'" . DB::i()->real_escape_string( $class ) . "'";
+				$exclude[$i] = "'" . \IPS\DB::i()->real_escape_string( $class ) . "'";
 			}
 
 			$this->where[] = '( index_container_class IS NULL OR index_container_class NOT IN(' . implode( ',', $classes ) . ') OR index_class IN(' . implode( ',', $exclude ) . ') )';
@@ -376,9 +380,9 @@ class Query extends \IPS\Content\Search\Query
 	 * @param	bool	$includeContainers	Include content in containers the user follows?
 	 * @param	bool	$includeItems		Include items and comments/reviews on items the user follows?
 	 * @param	bool	$includeMembers		Include content posted by members the user follows?
-	 * @return	static	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByFollowed( bool $includeContainers, bool $includeItems, bool $includeMembers ): static
+	public function filterByFollowed( $includeContainers, $includeItems, $includeMembers )
 	{
 		$where = array();
 		$params = array();
@@ -397,7 +401,7 @@ class Query extends \IPS\Content\Search\Query
 			else
 			{
 				$classes = array();
-				foreach ( Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
+				foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
 				{
 					$classes = array_merge( $object->classes, $classes );
 				}
@@ -407,7 +411,7 @@ class Query extends \IPS\Content\Search\Query
 
 			foreach ( $classes as $class )
 			{
-				if( IPS::classUsesTrait( $class, 'IPS\Content\Followable' ) )
+				if( is_subclass_of( $class, 'IPS\Content\Followable' ) )
 				{
 					$followApps[ $class::$application ] = $class::$application;
 					$followArea = mb_strtolower( mb_substr( $class, mb_strrpos( $class, '\\' ) + 1 ) );
@@ -449,13 +453,13 @@ class Query extends \IPS\Content\Search\Query
 			}
 
 			/* Get the stuff we follow */
-			foreach( Db::i()->select( '*', 'core_follow', array( 'follow_member_id=? AND ' . Db::i()->in( 'follow_app', $followApps ) . ' AND ' . Db::i()->in( 'follow_area', $followAreas ), $this->member->member_id ) ) as $follow )
+			foreach( \IPS\Db::i()->select( '*', 'core_follow', array( 'follow_member_id=? AND ' . \IPS\Db::i()->in( 'follow_app', $followApps ) . ' AND ' . \IPS\Db::i()->in( 'follow_area', $followAreas ), $this->member->member_id ) ) as $follow )
 			{
 				if( array_key_exists( $follow['follow_area'], $case ) )
 				{
 					$followedItems[ $follow['follow_area'] ][]	= $follow['follow_rel_id'];
 				}
-				else if( in_array( $follow['follow_area'], $containerCase ) )
+				else if( \in_array( $follow['follow_area'], $containerCase ) )
 				{
 					$followedContainers[ $follow['follow_area'] ][]	= $follow['follow_rel_id'];
 				}
@@ -464,7 +468,7 @@ class Query extends \IPS\Content\Search\Query
 
 		foreach( $followedItems as $area => $item )
 		{
-			$where[] = '( ' . Db::i()->in( 'index_class', $case[ $area ] ) . " AND index_item_id IN(" . implode( ',', $item ) . ") )";
+			$where[] = '( ' . \IPS\Db::i()->in( 'index_class', $case[ $area ] ) . " AND index_item_id IN(" . implode( ',', $item ) . ") )";
 		}
 
 		foreach( $followedContainers as $area => $container )
@@ -479,7 +483,7 @@ class Query extends \IPS\Content\Search\Query
 				}
 			}
 
-			$where[] = '( ' . Db::i()->in( 'index_class', $indexClasses ) . " AND index_container_id IN(" . implode( ',', $container ) . ") )";
+			$where[] = '( ' . \IPS\Db::i()->in( 'index_class', $indexClasses ) . " AND index_container_id IN(" . implode( ',', $container ) . ") )";
 		}
 
 		/* Are we including content posted by followed members? */
@@ -488,18 +492,18 @@ class Query extends \IPS\Content\Search\Query
 			/* Another area where a small result set can drastically slow down the entire query */
 			try
 			{
-				$followed = iterator_to_array( Db::i()->select( 'follow_rel_id', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_member_id=?', 'core', 'member', $this->member->member_id ), 'follow_rel_id asc', array( 0, 501 ) ) );
+				$followed = iterator_to_array( \IPS\Db::i()->select( 'follow_rel_id', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_member_id=?', 'core', 'member', $this->member->member_id ), 'follow_rel_id asc', array( 0, 501 ) ) );
 
-				if ( count( $followed ) == 501 )
+				if ( \count( $followed ) == 501 )
 				{
 					/* Assume we have loads of matches, so do a full query */
 					$where[] = 'index_author IN(?)';
-					$params[] = Db::i()->select( 'follow_rel_id', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_member_id=?', 'core', 'member', $this->member->member_id ) );
+					$params[] = \IPS\Db::i()->select( 'follow_rel_id', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_member_id=?', 'core', 'member', $this->member->member_id ) );
 				}
-				else if ( count( $followed ) )
+				else if ( \count( $followed ) )
 				{
 					/* IN is not a SIN. It's been a long day */
-					$where[] = Db::i()->in( 'index_author', $followed );
+					$where[] = \IPS\Db::i()->in( 'index_author', $followed );
 				}
 				else if ( ! $includeItems and ! $includeContainers )
 				{
@@ -507,7 +511,7 @@ class Query extends \IPS\Content\Search\Query
 					$this->where[] = "1=2 /*Filter by followed returned nothing*/";
 				}
 			}
-			catch( UnderflowException )
+			catch( \UnderflowException $ex )
 			{
 				if ( ! $includeItems and ! $includeContainers )
 				{
@@ -516,9 +520,9 @@ class Query extends \IPS\Content\Search\Query
 				}
 			}
 		}
-		
+
 		/* Put it all together */
-		if ( count( $where ) )
+		if ( \count( $where ) )	
 		{
 			$this->where[] = array_merge( array( '( ' . implode( ' OR ', $where ) . ' )' ), $params );
 		}
@@ -535,9 +539,9 @@ class Query extends \IPS\Content\Search\Query
 	/**
 	 * Filter by content the user has posted in. This must be at the end of the chain.
 	 *
-	 * @return	static	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByItemsIPostedIn(): static
+	public function filterByItemsIPostedIn()
 	{
 		/* We have to set a property because we need the other data like other filters and ordering to figure this out */
 		$this->filterByItemsIPostedIn = TRUE;
@@ -550,9 +554,9 @@ class Query extends \IPS\Content\Search\Query
 	 * Filter by content the user has not read
 	 *
 	 * @note	If applicable, it is more efficient to call filterByContent() before calling this method
-	 * @return	static	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByUnread(): static
+	public function filterByUnread()
 	{		
 		/* Work out what classes we need to examine */
 		if ( $this->itemClasses !== NULL )
@@ -562,7 +566,7 @@ class Query extends \IPS\Content\Search\Query
 		else
 		{
 			$classes = array();
-			foreach ( Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
+			foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
 			{
 				$classes = array_merge( $object->classes, $classes );
 			}
@@ -573,7 +577,7 @@ class Query extends \IPS\Content\Search\Query
 		$params = array();
 		foreach ( $classes as $class )
 		{
-			if( IPS::classUsesTrait( $class, 'IPS\Content\ReadMarkers' ) )
+			if( is_subclass_of( $class, 'IPS\Content\ReadMarkers' ) )
 			{
 				/* Get the actual clause */
 				$unreadWhere = $this->_getUnreadWhere( $class );
@@ -590,7 +594,7 @@ class Query extends \IPS\Content\Search\Query
 				}
 				
 				/* Add it to the array */
-				$clause = array( Db::i()->in( 'index_class', $_classes ) );
+				$clause = array( \IPS\Db::i()->in( 'index_class', $_classes ) );
 				foreach ( $unreadWhere as $_clause )
 				{
 					$clause[] = array_shift( $_clause );
@@ -600,23 +604,21 @@ class Query extends \IPS\Content\Search\Query
 			}
 		}
 		
-		if ( count( $where ) )
+		if ( \count( $where ) )
 		{
 			/* Put it all together */		
 			$this->where[] = array_merge( array( '( ' . implode( ' OR ', $where ) . ' )' ), $params );
 		}
 		
 		$this->filterByUnread = TRUE;
-
-		return $this;
 	}
 
 	/**
 	 * Filter only solved content
 	 *
-	 * @return	static	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterBySolved(): static
+	public function filterBySolved()
 	{
 		$this->where[] = array( 'index_item_solved=?', 1 );
 
@@ -626,9 +628,9 @@ class Query extends \IPS\Content\Search\Query
 	/**
 	 * Filter only unsolved content
 	 *
-	 * @return	static	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByUnsolved(): static
+	public function filterByUnsolved()
 	{
 		$this->where[] = array( 'index_item_solved=?', 0 );
 
@@ -641,22 +643,21 @@ class Query extends \IPS\Content\Search\Query
 	 * @param	string	$class 		Content class (\IPS\forums\Forum)
 	 * @return	array
 	 */
-	protected function _getUnreadWhere( string $class ): array
+	protected function _getUnreadWhere( $class )
 	{
 		$classBits	    = explode( "\\", $class );
 		$application    = $classBits[1];
 		$resetTimes	    = $this->member->markersResetTimes( NULL );
-		$resetTimes		= $resetTimes[$application] ?? array();
+		$resetTimes		= isset( $resetTimes[ $application ] ) ? $resetTimes[ $application ] : array();
+		$oldestTime	    = time();
 		$markers	    = array();
+		$excludeIds     = array();
 		$where          = array();
 		$unreadWheres	= array();
 		$containerIds	= array();
+		$containerClass = isset( $class::$containerNodeClass ) ? $class::$containerNodeClass : NULL;
 
-		/* @var Item $class */
-		/* @var array $databaseColumnMap */
-		$containerClass = $class::$containerNodeClass ?? NULL;
-
-		if ( is_array( $resetTimes ) )
+		if ( \is_array( $resetTimes ) )
 		{
 			foreach( $resetTimes as $containerId => $timestamp )
 			{
@@ -674,9 +675,9 @@ class Query extends \IPS\Content\Search\Query
 				$containerIds[]	= $containerId;
 				$unreadWheres[]	= '( index_container_id=' . $containerId . ' AND index_date_updated > ' . (int) $timestamp . ')';
 				
-				$items = $this->member->markersItems( $application, $class::makeMarkerKey( $containerId ) );
+				$items = $this->member->markersItems( $application, \IPS\Content\Item::makeMarkerKey( $containerId ) );
 				
-				if ( count( $items ) )
+				if ( \count( $items ) )
 				{
 					foreach( $items as $mid => $mtime )
 					{
@@ -686,10 +687,10 @@ class Query extends \IPS\Content\Search\Query
 								in it's old location, with the previously 'read' time. In this circumstance, we need
 								to only use more recent read time, otherwise the topic may be incorrectly included
 								in the results */
-							if ( in_array( $mid, $markers ) )
+							if ( \in_array( $mid, $markers ) )
 							{
 								$_key = array_search( $mid, $markers );
-								$_mtime = intval( mb_substr( $_key, 0, mb_strpos( $_key, '.' ) ) );
+								$_mtime = \intval( mb_substr( $_key, 0, mb_strpos( $_key, '.' ) ) );
 								if ( $_mtime < $mtime )
 								{
 									unset( $markers[ $_key ] );
@@ -709,28 +710,30 @@ class Query extends \IPS\Content\Search\Query
 		} 
 		else 
 		{
-			$unreadWheres[] = "( index_date_updated > " . intval( $resetTimes ) . ")";
+			$unreadWheres[] = "( index_date_updated > " . \intval( $resetTimes ) . ")";
 		}
 		
-		if( count( $containerIds ) )
+		if( \count( $containerIds ) )
 		{
-			$unreadWheres[]	= "( index_date_updated > " . $this->member->marked_site_read . " AND ( index_container_id NOT IN(" . implode( ',', $containerIds ) . ") ) )";
+			$unreadWheres[]	= "( index_date_updated > " . \intval( $this->member->marked_site_read ) . " AND ( index_container_id NOT IN(" . implode( ',', $containerIds ) . ") ) )";
 		}
 		else
 		{
-			$unreadWheres[]	= "( index_date_updated > " . $this->member->marked_site_read . ")";
+			$unreadWheres[]	= "( index_date_updated > " . \intval( $this->member->marked_site_read ) . ")";
 		}
 	
-		if( count( $unreadWheres ) )
+		if( \count( $unreadWheres ) )
 		{
 			$where[] = array( "(" . implode( " OR ", $unreadWheres ) . ")" );
 		}
 	
-		if ( count( $markers ) )
+		if ( \count( $markers ) )
 		{
 			/* Avoid packet issues */
 			krsort( $markers );
-			$useIds = array_flip( array_slice( $markers, 0, 1000, TRUE ) );
+			$useIds = array_flip( \array_slice( $markers, 0, 1000, TRUE ) );
+			$select = '';
+			$from   = '';
 			$notIn  = array();
 			
 			/* What is the best date column? */
@@ -739,7 +742,7 @@ class Query extends \IPS\Content\Search\Query
 			{
 				if ( isset( $class::$databaseColumnMap[ $k ] ) )
 				{
-					if ( is_array( $class::$databaseColumnMap[ $k ] ) )
+					if ( \is_array( $class::$databaseColumnMap[ $k ] ) )
 					{
 						foreach ( $class::$databaseColumnMap[ $k ] as $v )
 						{
@@ -752,21 +755,21 @@ class Query extends \IPS\Content\Search\Query
 					}
 				}
 			}
-			$dateColumnExpression = count( $dateColumns ) > 1 ? ( 'GREATEST(' . implode( ',', $dateColumns ) . ')' ) : array_pop( $dateColumns );
+			$dateColumnExpression = \count( $dateColumns ) > 1 ? ( 'GREATEST(' . implode( ',', $dateColumns ) . ')' ) : array_pop( $dateColumns );
 			
-			foreach( Db::i()->select( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId. ' as _id, ' . $dateColumnExpression . ' as _date', $class::$databaseTable, Db::i()->in( $class::$databasePrefix . $class::$databaseColumnId, array_keys( $useIds ) ) ) as $row )
+			foreach( \IPS\Db::i()->select( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId. ' as _id, ' . $dateColumnExpression . ' as _date', $class::$databaseTable, \IPS\Db::i()->in( $class::$databasePrefix . $class::$databaseColumnId, array_keys( $useIds ) ) ) as $row )
 			{
 				if ( isset( $useIds[ $row['_id'] ] ) )
 				{
 					if ( $useIds[ $row['_id'] ] >= $row['_date'] )
 					{
 						/* Still read */
-						$notIn[] = intval( $row['_id'] );
+						$notIn[] = \intval( $row['_id'] );
 					}
 				}
 			}
 			
-			if ( count( $notIn ) )
+			if ( \count( $notIn ) )
 			{
 				$where[] = array( "( index_item_id NOT IN (" . implode( ',', $notIn ) . ") )" );
 			}
@@ -778,11 +781,11 @@ class Query extends \IPS\Content\Search\Query
 	/**
 	 * Filter by start date
 	 *
-	 * @param	DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
-	 * @param	DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
-	 * @return	static	(for daisy chaining)
+	 * @param	\IPS\DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
+	 * @param	\IPS\DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByCreateDate( DateTime|null $start = null, DateTime|null $end = null ): static
+	public function filterByCreateDate( \IPS\DateTime $start = NULL, \IPS\DateTime $end = NULL )
 	{
 		if ( $start )
 		{
@@ -798,11 +801,11 @@ class Query extends \IPS\Content\Search\Query
 	/**
 	 * Filter by last updated date
 	 *
-	 * @param	DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
-	 * @param	DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
-	 * @return	static	(for daisy chaining)
+	 * @param	\IPS\DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
+	 * @param	\IPS\DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function filterByLastUpdatedDate( DateTime|null $start = null, DateTime|null $end = null ): static
+	public function filterByLastUpdatedDate( \IPS\DateTime $start = NULL, \IPS\DateTime $end = NULL )
 	{
 		if ( $start )
 		{
@@ -818,18 +821,18 @@ class Query extends \IPS\Content\Search\Query
 	/**
 	 * Set hidden status
 	 *
-	 * @param	int|array|null	$statuses	The statuses (array of HIDDEN_ constants)
-	 * @return	static	(for daisy chaining)
+	 * @param	int|array	$statuses	The statuses (array of HIDDEN_ constants)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function setHiddenFilter( int|array|null $statuses ): static
+	public function setHiddenFilter( $statuses )
 	{
-		if ( is_null( $statuses ) )
+		if ( \is_null( $statuses ) )
 		{
 			$this->hiddenClause = NULL;
 		}
-		if ( is_array( $statuses ) )
+		if ( \is_array( $statuses ) )
 		{
-			$this->hiddenClause = array( Db::i()->in( 'index_hidden', $statuses ) );
+			$this->hiddenClause = array( \IPS\Db::i()->in( 'index_hidden', $statuses ) );
 		}
 		else
 		{
@@ -843,9 +846,9 @@ class Query extends \IPS\Content\Search\Query
 	 * Set page
 	 *
 	 * @param	int		$page	The page number
-	 * @return	static	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function setPage( int $page ): static
+	public function setPage( $page )
 	{
 		$this->offset = ( $page - 1 ) * $this->resultsToGet;
 		
@@ -856,9 +859,9 @@ class Query extends \IPS\Content\Search\Query
 	 * Set order
 	 *
 	 * @param	int		$order	Order (see ORDER_ constants)
-	 * @return	static	(for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function setOrder( int $order ): static
+	public function setOrder( $order )
 	{		
 		switch ( $order )
 		{
@@ -899,13 +902,13 @@ class Query extends \IPS\Content\Search\Query
 	 * @param	string		$operator	If $term contains more than one word, determines if searching for both ("and") or any ("or") of those terms
 	 * @return	array
 	 */
-	protected function _searchWhereClause( string|null $term = NULL, array|null $tags = NULL, int $method = 1, string $operator = 'and' ): array
+	protected function _searchWhereClause( $term = NULL, $tags = NULL, $method = 1, $operator = 'and' )
 	{
 		$tagWhere = NULL;
 		$termWhere = NULL;
 		
 		/* Do we have tags? */
-		if ( Settings::i()->tags_enabled AND $tags !== NULL )
+		if ( \IPS\Settings::i()->tags_enabled AND $tags !== NULL )
 		{
 			$itemsOnlyTagSearch = '';
 			
@@ -917,19 +920,19 @@ class Query extends \IPS\Content\Search\Query
 			/* Large index tables and small tag tables can cause a significant slow down in this query execution, so we attempt to pre-fetch some results */
 			try
 			{
-				$tagIds = iterator_to_array( Db::i()->select( 'index_id', 'core_search_index_tags', array( Db::i()->in( 'index_tag', $tags ) ), 'index_id asc', array( 0, 501 ) ) );
+				$tagIds = iterator_to_array( \IPS\Db::i()->select( 'index_id', 'core_search_index_tags', array( \IPS\Db::i()->in( 'index_tag', $tags ) ), 'index_id asc', array( 0, 501 ) ) );
 				
 				/* Now, if we have 501 results, then we have to assume there are more, so the join is required */
-				if ( count( $tagIds ) == 501 )
+				if ( \count( $tagIds ) == 501 )
 				{
-					$tagWhere = array( $itemsOnlyTagSearch . 'index_item_index_id IN (' . Db::i()->select( 'index_id', 'core_search_index_tags', array( Db::i()->in( 'index_tag', $tags ) ) ) . ')' );
+					$tagWhere = array( $itemsOnlyTagSearch . 'index_item_index_id IN (' . \IPS\Db::i()->select( 'index_id', 'core_search_index_tags', array( \IPS\Db::i()->in( 'index_tag', $tags ) ) ) . ')' );
 				}
 				else
 				{
-					$tagWhere = array( $itemsOnlyTagSearch . Db::i()->in( 'index_item_index_id', $tagIds ) );
+					$tagWhere = array( $itemsOnlyTagSearch . \IPS\Db::i()->in( 'index_item_index_id', $tagIds ) );
 				}
 			}
-			catch( UnderflowException )
+			catch( \UnderflowException $ex )
 			{
 				/* No matches at all */
 				if ( $method & static::TERM_AND_TAGS )
@@ -975,7 +978,7 @@ class Query extends \IPS\Content\Search\Query
 		}
 		
 		/* Only get stuff we have permission for */
-		$where[] = array( "( index_permissions = '*' OR " . Db::i()->findInSet( 'index_permissions', $this->permissionArray() ) . ' )' );
+		$where[] = array( "( index_permissions = '*' OR " . \IPS\Db::i()->findInSet( 'index_permissions', $this->permissionArray() ) . ' )' );
 		if ( $this->hiddenClause )
 		{
 			$where[] = $this->hiddenClause;
@@ -988,22 +991,29 @@ class Query extends \IPS\Content\Search\Query
 			try
 			{
 				/* Work out what classes we need to examine */
-				if ( $this->itemClasses !== null )
+				if ( $this->itemClasses !== NULL )
 				{
 					$classes = $this->itemClasses;
 				}
 				else
 				{
-					$classes = [];
-					foreach ( Application::allExtensions( 'core', 'ContentRouter', false ) as $object )
+					$classes = array();
+					foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
 					{
 						$classes = array_merge( $object->classes, $classes );
 					}
 				}
 
-				$results = iterator_to_array( Db::i()->select( 'index_item_id, index_class', ['core_search_index_item_map', 'sub'], [['index_author_id=' . intval( $this->member->member_id ) . ' AND ' . Db::i()->in( 'index_class', $classes )]], 'index_item_id desc', [0, 800] ) );
+				$results = iterator_to_array( \IPS\Db::i()->select( 'index_item_id, index_class', array( 'core_search_index_item_map', 'sub' ), array( array( 'index_author_id=' . \intval( $this->member->member_id ) . ' AND ' . \IPS\Db::i()->in( 'index_class', $classes ) ) ), 'index_item_id desc', array( 0, 801 ) ) );
 
-				if ( count( $results ) )
+				if ( \count( $results ) == 801 )
+				{
+					/* Assume we have loads of matches, so do a full query */
+					$subClause = array( array( 'sub.index_item_id=main.index_item_id AND index_author_id=' . \intval( $this->member->member_id ) . ' AND ' . $this->makeEmbeddedIfClauseForSearchMapTable('sub.index_class') ) );
+					$query = \IPS\Db::i()->select( 'index_item_id', array( 'core_search_index_item_map', 'sub' ), $subClause );
+					$where[] = array( 'EXISTS(?)', $query );
+				}
+				else if ( \count( $results ) )
 				{
 					$classIds = array();
 					foreach( $results as $result )
@@ -1021,7 +1031,7 @@ class Query extends \IPS\Content\Search\Query
 							$stack[] = $class::$commentClass;
 						}
 
-						$subWhere[] = '(' . Db::i()->in( 'index_class', $stack ) . ' and ' . Db::i()->in( 'index_item_id', $ids ) . ')';
+						$subWhere[] = '(' . \IPS\Db::i()->in( 'index_class', $stack ) . ' and ' . \IPS\Db::i()->in( 'index_item_id', $ids ) . ')';
 					}
 
 					/* IN is not a SIN. It's been a long day */
@@ -1033,7 +1043,7 @@ class Query extends \IPS\Content\Search\Query
 					$where[] = "1=2 /*Filter by items I posted in returned nothing*/";
 				}
 			}
-			catch( UnderflowException )
+			catch( \UnderflowException $ex )
 			{
 				/* There are no results */
 				$where[] = "1=2 /*Filter by items I posted in returned nothing*/";
@@ -1048,7 +1058,7 @@ class Query extends \IPS\Content\Search\Query
 				$where[] = $clause;
 			}
 		}
-		
+
 		/* Return */
 		return $where;
 	}
@@ -1059,7 +1069,7 @@ class Query extends \IPS\Content\Search\Query
 	 * @param	string		$column		Column to use in the clause
 	 * @return	string
 	 */
-	protected function makeEmbeddedIfClauseForSearchMapTable( string $column ): string
+	protected function makeEmbeddedIfClauseForSearchMapTable( $column )
 	{
 		/* Work out what classes we need to examine */
 		if ( $this->itemClasses !== NULL )
@@ -1069,7 +1079,7 @@ class Query extends \IPS\Content\Search\Query
 		else
 		{
 			$classes = array();
-			foreach ( Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
+			foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', FALSE ) as $object )
 			{
 				$classes = array_merge( $object->classes, $classes );
 			}
@@ -1083,16 +1093,16 @@ class Query extends \IPS\Content\Search\Query
 				$stack[ $class::$commentClass ] = $class;
 			}
 		}
-
-		$if = '';
-		if ( count( $stack ) )
+		
+		if ( \count( $stack ) )
 		{
+			$if = '';
 			foreach( $stack as $commentClass => $class )
 			{
-				$if .= " IF( main.index_class='" . Db::i()->escape_string( $commentClass ) . "', '" . Db::i()->escape_string( $class ) . "', ";
+				$if .= " IF( main.index_class='" . \IPS\Db::i()->escape_string( $commentClass ) . "', '" . \IPS\Db::i()->escape_string( $class ) . "', ";
 			}
 			
-			$if .= 'main.index_class' . str_repeat( ' )', count( $stack ) );
+			$if .= 'main.index_class' . str_repeat( ' )', \count( $stack ) );
 		}
 		
 		return $column . '=' . ( $if == '' ? $column : $if );
@@ -1107,7 +1117,7 @@ class Query extends \IPS\Content\Search\Query
 	 * @param	bool	$prepared			If FALSE, does not use prepared statements (used for the sorting algorithm because you can't use ?s in the select clause)
 	 * @return	array|string
 	 */
-	public static function matchClause( string $columns, string $term, string $defaultOperator='+', bool $prepared=TRUE ): array|string
+	public static function matchClause( $columns, $term, $defaultOperator='+', $prepared=TRUE )
 	{
 		/* Loop the words */
 		$words = array();
@@ -1126,7 +1136,7 @@ class Query extends \IPS\Content\Search\Query
 				$word = preg_replace( '/[+\-><\(\)~*\"@%]+/', '', $word );
 				
 				/* If any words are stop words the lookup will fail */
-				if ( $word and !in_array( $word, static::$innoDBStopWords ) )
+				if ( $word and !\in_array( $word, static::$innoDBStopWords ) )
 				{
 					$words[] = $word;
 				}
@@ -1140,23 +1150,24 @@ class Query extends \IPS\Content\Search\Query
 				if ( mb_strstr( $columns, ',' ) )
 				{
 					$like = array();
+					$extra = '';
 					foreach( explode( ',', $columns ) as $col )
 					{
-						$like[] = $col . ' LIKE \'%' . Db::i()->escape_string( $term ) . '%\'';
+						$like[] = $col . ' LIKE \'%' . \IPS\Db::i()->escape_string( $term ) . '%\'';
 					}
 					
 					$extra = implode( ' OR ', $like );
 				}
 				else
 				{
-					$extra = $columns . ' LIKE \'%' . Db::i()->escape_string( $term ) . '%\'';
+					$extra = $columns . ' LIKE \'%' . \IPS\Db::i()->escape_string( $term ) . '%\'';
 				}
 
 				return array( "MATCH({$columns}) AGAINST (? IN BOOLEAN MODE) AND (" . $extra . ")", $booleanTerm );
 			}
 			else
 			{
-				return "MATCH({$columns}) AGAINST ('" . Db::i()->escape_string( $booleanTerm ) . "' IN BOOLEAN MODE)";
+				return "MATCH({$columns}) AGAINST ('" . \IPS\Db::i()->escape_string( $booleanTerm ) . "' IN BOOLEAN MODE)";
 			}
 		}
 		else
@@ -1165,7 +1176,7 @@ class Query extends \IPS\Content\Search\Query
 			foreach ( static::termAsWordsArray( $term ) as $word )
 			{
 				/* Add the default operator */
-				if ( $defaultOperator and !in_array( mb_substr( $word, 0, 1 ), array( '+', '-', '~', '<', '>' ) ) )
+				if ( $defaultOperator and !\in_array( mb_substr( $word, 0, 1 ), array( '+', '-', '~', '<', '>' ) ) )
 				{
 					/* Clear out leading * symbols so we don't end up with +*a** */
 					$word = $defaultOperator . ltrim( $word, '*' );
@@ -1180,14 +1191,14 @@ class Query extends \IPS\Content\Search\Query
 
 				/* ? are not allowed either */
 				$word = str_replace( '?', '', $word );
-
+				
 				/* These rules only apply if we're not in a quoted phrase... */
 				if ( !static::termIsPhrase( $word ) )
 				{
 					/* We can't have any other operators as MySQL will interpret them as a separate word. If they exist, wrap the word in quotes */
 					if ( preg_match( '/^.+[\+\-~<>\.]/', $word ) )
 					{
-						$trimmedWord = Db::i()->escape_string( str_replace( '"', '', ltrim( $word, $defaultOperator ) ) );
+						$trimmedWord = \IPS\Db::i()->escape_string( str_replace( '"', '', ltrim( $word, $defaultOperator ) ) );
 						$likes = array();
 						foreach( explode( ',', $columns ) AS $column )
 						{
@@ -1228,11 +1239,11 @@ class Query extends \IPS\Content\Search\Query
 			if ( $prepared )
 			{
 				/* Force newest as of 4.2.6 to test search results */
-				if ( count( $likeWhere ) and count( $words ) )
+				if ( \count( $likeWhere ) and \count( $words ) )
 				{
 					$return = array( implode( ' AND ', $likeWhere ) . " AND MATCH({$columns}) AGAINST (? IN BOOLEAN MODE)", $term );
 				}
-				else if ( count( $likeWhere ) )
+				else if ( \count( $likeWhere ) )
 				{
 					$return = array( implode( ' AND ', $likeWhere ) );
 				}
@@ -1244,12 +1255,12 @@ class Query extends \IPS\Content\Search\Query
 			else
 			{
 				/* Force newest as of 4.2.6 to test search results */
-				if ( count( $likeWhere ) )
+				if ( \count( $likeWhere ) )
 				{
 					$return[] = implode( ' AND ', $likeWhere );
 				}
 				
-				$return[] = "MATCH({$columns}) AGAINST ('" . Db::i()->escape_string( $term ) . "' IN BOOLEAN MODE)";
+				$return[] = "MATCH({$columns}) AGAINST ('" . \IPS\Db::i()->escape_string( $term ) . "' IN BOOLEAN MODE)";
 
 				$return = implode( ' AND ', $return );
 			}
@@ -1265,12 +1276,12 @@ class Query extends \IPS\Content\Search\Query
 	 * @param	array|null	$tags		The tags to search for
 	 * @param	int			$method 	See \IPS\Content\Search\Query::TERM_* contants - controls where to search
 	 * @param	string|null	$operator	If $term contains more than one word, determines if searching for both ("and") or any ("or") of those terms. NULL will go to admin-defined setting
-	 * @return	Results
+	 * @return	\IPS\Content\Search\Results
 	 */
-	public function search( string|null $term = null, array|null $tags = null, int $method = 1, string|null $operator = null ): Results
+	public function search( $term = NULL, $tags = NULL, $method = 1, $operator = NULL )
 	{
 		/* What's our operator? */
-		$operator = $operator ?: Settings::i()->search_default_operator;
+		$operator = $operator ?: \IPS\Settings::i()->search_default_operator;
 		
 		/* Set the select clause */
 		$select = implode( ', ', $this->select );
@@ -1280,54 +1291,54 @@ class Query extends \IPS\Content\Search\Query
 		
 		/* Set order clause */
 		$order = $this->order;
-		
+
 		/* This forces MySQL to strongly hint a better index to the optimiser for MySQL 5.7+, even though sorting will not be affected */
-		if ( !CIC )
+		if ( !\IPS\CIC )
 		{
 			try
 			{
-				if ( $this->filterByUnread !== FALSE and ( !mb_stristr( Db::i()->server_info, '-MariaDB' ) and Db::i()->server_version >= 50700 ) )
+				if ( $this->filterByUnread !== FALSE and ( !mb_stristr( \IPS\Db::i()->server_info, '-MariaDB' ) and \IPS\Db::i()->server_version >= 50700 ) )
 				{
 					$order .= ", index_date_updated";
 				}
 
 				/* If we're filtering by unread, and not using MariaDB, then force an index because MySQL tends to use the incorrect one in this scenario. */
-				if ( !mb_stristr( Db::i()->server_info, '-MariaDB' ) and $this->filterByUnread === TRUE and Db::i()->server_version < 80000 )
+				if ( !mb_stristr( \IPS\Db::i()->server_info, '-MariaDB' ) and $this->filterByUnread === TRUE and \IPS\Db::i()->server_version < 80000 )
 				{
 					$this->forceIndex = 'index_date_updated';
 				}
 			}
-			catch( Throwable ) { /* Do nothing if server_info access fails */ }
+			catch( \Throwable $e ) { /* Do nothing if server_info access fails */ }
 		}
-
+			
 		/* But we're sorting by relevancy, we need to actually select that value with our fancy algorithm */
 		if ( mb_substr( $this->order, 0, 9 ) === 'calcscore' )
 		{
 			/* But we can only do that if there's a term (rather than tag-only) */
 			if ( static::canUseRelevancy() and $term !== NULL )
 			{
-				if ( Settings::i()->search_title_boost )
+				if ( \IPS\Settings::i()->search_title_boost )
 				{
-					$titleField = '(' . static::matchClause( 'index_title', $term, $operator === static::OPERATOR_AND ? '+' : '', FALSE ) . '*' . intval( Settings::i()->search_title_boost ) . ')'; // The title score times multiplier
+					$titleField = '(' . static::matchClause( 'index_title', $term, $operator === static::OPERATOR_AND ? '+' : '', FALSE ) . '*' . \intval( \IPS\Settings::i()->search_title_boost ) . ')'; // The title score times multiplier
 				}
 				else
 				{
 					$titleField = '(' . static::matchClause( 'index_title', $term, $operator === static::OPERATOR_AND ? '+' : '', FALSE ) . ')';
 				}
-
-				$select .= ', '
+								
+				$select .= ', ' 
 					. '('
-					. $titleField
-					. '+'
-					. '(' . static::matchClause( 'index_content,index_title', $term, $operator === static::OPERATOR_AND ? '+' : '', FALSE ) . ')'		// Plus the content score times 1
+						. $titleField
+						. '+'
+						. '(' . static::matchClause( 'index_content,index_title', $term, $operator === static::OPERATOR_AND ? '+' : '', FALSE ) . ')'		// Plus the content score times 1
 					. ')'
 					. '/'																																// Divided by
 					. 'POWER('
-					. '( ( UNIX_TIMESTAMP( NOW() ) - ( CASE WHEN index_date_updated <= UNIX_TIMESTAMP( NOW() ) THEN index_date_updated ELSE 0 END )) / 3600 ) + 2' // The number of days between now and the updated date, plus 2
+						. '( ( UNIX_TIMESTAMP( NOW() ) - ( CASE WHEN index_date_updated <= UNIX_TIMESTAMP( NOW() ) THEN index_date_updated ELSE 0 END )) / 3600 ) + 2' // The number of days between now and the updated date, plus 2
 					. ',1.5)'																															// To the power of 1.5
-					. ' AS calcscore';
+				. ' AS calcscore';
 			}
-			/* So if we don't have a term or cannot use relevancy, fallback to last updated */
+			/* So if we don't have a term ot can't use relevancy, fallback to last updated */
 			else
 			{
 				$order = 'index_date_updated DESC';
@@ -1335,10 +1346,10 @@ class Query extends \IPS\Content\Search\Query
 		}
 		
 		/* Construct the query */
-		$query = Db::i()->select( $select, array( 'core_search_index', 'main' ), $where, $order, array( $this->offset, $this->resultsToGet ) );
+		$query = \IPS\Db::i()->select( $select, array( 'core_search_index', 'main' ), $where, $order, array( $this->offset, $this->resultsToGet ), NULL, NULL );
 		foreach ( $this->joins as $data )
 		{
-			$query->join( $data['from'], $data['where'], $data['type'] ?? 'LEFT');
+			$query->join( $data['from'], $data['where'], isset( $data['type'] ) ? $data['type'] : 'LEFT' );
 		}
 		
 		/* Force index? */
@@ -1349,7 +1360,7 @@ class Query extends \IPS\Content\Search\Query
 		
 		/* Return */
 		$count = $this->count( $term, $tags, $method, $operator, FALSE );
-		return new Results( iterator_to_array( $query ), $count );
+		return new \IPS\Content\Search\Results( iterator_to_array( $query ), $count );
 	}
 	
 	/**
@@ -1360,18 +1371,18 @@ class Query extends \IPS\Content\Search\Query
 	 * @param	int			$method				See \IPS\Content\Search\Query::TERM_* contants
 	 * @param	string|null	$operator			If $term contains more than one word, determines if searching for both ("and") or any ("or") of those terms. NULL will go to admin-defined setting
 	 * @param	boolean		$returnCountAsInt	If TRUE, it will return the count as an integer, when FALSE it will return the \IPS\Db\Select object
-	 * @return	Query|int
+	 * @return	\IPS\Db\Query|int
 	 */
-	public function count( string|null $term = NULL, array|null $tags = NULL, int $method = 1, string|null $operator = NULL, bool $returnCountAsInt=TRUE ): Select|int
+	public function count( $term = NULL, $tags = NULL, $method = 1, $operator = NULL, $returnCountAsInt=TRUE )
 	{
 		/* Get the where clause */
 		$where = array_merge( $this->where, $this->_searchWhereClause( $term, $tags, $method, $operator ) );
 		
 		/* Construct the query */
-		$query = Db::i()->select( 'COUNT(*)', array( 'core_search_index', 'main' ), $where );
+		$query = \IPS\Db::i()->select( 'COUNT(*)', array( 'core_search_index', 'main' ), $where );
 		foreach ( $this->joins as $data )
 		{
-			$query->join( $data['from'], $data['where'], $data['type'] ?? 'LEFT');
+			$query->join( $data['from'], $data['where'], isset( $data['type'] ) ? $data['type'] : 'LEFT' );
 		}
 		
 		/* Return */
@@ -1383,9 +1394,9 @@ class Query extends \IPS\Content\Search\Query
 	 *
 	 * @return string
 	 */
-	public function getDefaultDateCutOff(): string
+	public function getDefaultDateCutOff()
 	{
-		if ( USE_MYSQL_SEARCH_OPTIMIZED_MODE )
+		if ( \IPS\USE_MYSQL_SEARCH_OPTIMIZED_MODE )
 		{
 			return 'year';
 		}
@@ -1398,9 +1409,9 @@ class Query extends \IPS\Content\Search\Query
 	 *
 	 * @return string
 	 */
-	public function getDefaultSortMethod(): string
+	public function getDefaultSortMethod()
 	{
-		if ( USE_MYSQL_SEARCH_OPTIMIZED_MODE )
+		if ( \IPS\USE_MYSQL_SEARCH_OPTIMIZED_MODE )
 		{
 			return 'newest';
 		}
@@ -1415,7 +1426,42 @@ class Query extends \IPS\Content\Search\Query
 	 */
 	public function canUseRelevancy(): bool
 	{
-		return ! USE_MYSQL_SEARCH_OPTIMIZED_MODE;
+		return ! \IPS\USE_MYSQL_SEARCH_OPTIMIZED_MODE;
+	}
+	
+	protected static $tableCount = NULL;
+	
+	/**
+	 * Get the row count from the core_search_index table
+	 *
+	 * @return string
+	 */
+	protected static function getTableSize()
+	{
+		if ( static::$tableCount === NULL )
+		{
+			/* Try and be more efficient */
+			try
+			{
+				if( $result = \IPS\Db::i()->query( "SELECT TABLE_ROWS as _size FROM `information_schema`.`TABLES` WHERE TABLE_SCHEMA = '" . \IPS\Settings::i()->sql_database . "' AND TABLE_NAME='" . \IPS\Db::i()->prefix . "core_search_index'" ) )
+				{
+					if( $resultSet = $result->fetch_assoc() )
+					{
+						static::$tableCount =  (int) $resultSet['_size'];
+					}
+				}
+			}
+			catch( \Exception $e ) { }
+		}
+
+		/* Did that fail? */
+		if ( static::$tableCount === NULL )
+		{
+			/* Do it the old-fashioned way */
+			static::$tableCount = \IPS\Db::i()->select( 'COUNT(*)', 'core_search_index' )->first();
+		}
+
+		return static::$tableCount;
 	}
 	
 	/**
@@ -1427,16 +1473,16 @@ class Query extends \IPS\Content\Search\Query
 	 * @param	int|NULL		$maxLength		The maximum length a sequence of characters can be for it to be considered a word. If null, ft_max_word_len/innodb_ft_max_token_size is used.
 	 * @return	array
 	 */
-	public static function termAsWordsArray( string $term, bool $ignorePhrase=FALSE, int|null $minLength=NULL, int|null $maxLength=NULL ): array
+	public static function termAsWordsArray( $term, $ignorePhrase=FALSE, $minLength=NULL, $maxLength=NULL )
 	{		
 		/* If we haven't set a preferred min/max length, use the MySQL configuration */
 		if ( $minLength === NULL or $maxLength === NULL )
 		{
 			/* If we don't already know what they are, get the values from the MySQL configuration */
-			if ( ( $minLength === NULL and !isset( Store::i()->mysqlMinWord ) ) or ( $maxLength === NULL and !isset( Store::i()->mysqlMaxWord ) ) )
+			if ( ( $minLength === NULL and !isset( \IPS\Data\Store::i()->mysqlMinWord ) ) or ( $maxLength === NULL and !isset( \IPS\Data\Store::i()->mysqlMaxWord ) ) )
 			{
 				/* The variable we need depends on whether the table is MyISAM or InnoDB */
-				$tableDefinition = Db::i()->getTableDefinition('core_search_index');
+				$tableDefinition = \IPS\Db::i()->getTableDefinition('core_search_index');
 				if ( $tableDefinition['engine'] == 'InnoDB' )
 				{
 					$minVariable = 'innodb_ft_min_token_size';
@@ -1451,39 +1497,39 @@ class Query extends \IPS\Content\Search\Query
 				/* Now fetch those */			
 				try
 				{
-					foreach ( new Select( 'SHOW VARIABLES WHERE Variable_Name=? OR Variable_Name=?', array( $minVariable, $maxVariable ), Db::i() ) as $row )
+					foreach ( new \IPS\Db\Select( 'SHOW VARIABLES WHERE Variable_Name=? OR Variable_Name=?', array( $minVariable, $maxVariable ), \IPS\Db::i() ) as $row )
 					{
 						if ( $row['Variable_name'] === $minVariable )
 						{
-							Store::i()->mysqlMinWord = intval( $row['Value'] );
+							\IPS\Data\Store::i()->mysqlMinWord = \intval( $row['Value'] );
 						}
 						elseif ( $row['Variable_name'] === $maxVariable )
 						{
-							Store::i()->mysqlMaxWord = intval( $row['Value'] );
+							\IPS\Data\Store::i()->mysqlMaxWord = \intval( $row['Value'] );
 						}
 					}
 				}
-				catch( Exception ) { }
+				catch( \IPS\Db\Exception $e ) { }
 				
 				/* If we weren't able to get them, set sensible defaults */
-				if ( !isset( Store::i()->mysqlMinWord ) )
+				if ( !isset( \IPS\Data\Store::i()->mysqlMinWord ) )
 				{
-					Store::i()->mysqlMinWord = 3;
+					\IPS\Data\Store::i()->mysqlMinWord = 3;
 				}
-				if ( !isset( Store::i()->mysqlMaxWord ) )
+				if ( !isset( \IPS\Data\Store::i()->mysqlMaxWord ) )
 				{
-					Store::i()->mysqlMaxWord = 84;
+					\IPS\Data\Store::i()->mysqlMaxWord = 84;
 				}
 			}
 			
 			/* Set */
 			if ( $minLength === NULL )
 			{
-				$minLength = Store::i()->mysqlMinWord;
+				$minLength = \IPS\Data\Store::i()->mysqlMinWord;
 			}
 			if ( $maxLength === NULL )
 			{
-				$maxLength = Store::i()->mysqlMaxWord;
+				$maxLength = \IPS\Data\Store::i()->mysqlMaxWord;
 			}
 		}
 		

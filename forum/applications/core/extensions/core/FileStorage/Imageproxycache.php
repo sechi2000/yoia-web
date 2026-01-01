@@ -11,40 +11,32 @@
 namespace IPS\core\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: Image proxy cache
  */
-class Imageproxycache extends FileStorageAbstract
+class _Imageproxycache
 {
 	/**
 	 * @brief Does this exist?
 	 */
-	protected static ?bool $tableExists = NULL;
+	protected static $tableExists = NULL;
 	
 	/**
 	 * Does the table exist? 
 	 *
 	 * @return boolean
 	 */
-	protected static function tableExists() : bool
+	protected static function tableExists()
 	{
 		if ( static::$tableExists === NULL )
 		{
-			static::$tableExists = Db::i()->checkForTable( 'core_image_proxy' );
+			static::$tableExists = \IPS\Db::i()->checkForTable( 'core_image_proxy' );
 		}
 		
 		return static::$tableExists;
@@ -55,11 +47,11 @@ class Imageproxycache extends FileStorageAbstract
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
 		if ( static::tableExists() )
 		{
-			return Db::i()->select( 'COUNT(*)', 'core_image_proxy' )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'core_image_proxy' )->first();
 		}
 		else
 		{
@@ -73,18 +65,18 @@ class Imageproxycache extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	UnderflowException					When file record doesn't exist. Indicating there are no more files to move
-	 * @return	void							An offset integer to use on the next cycle, or nothing
+	 * @throws	\UnderflowException					When file record doesn't exist. Indicating there are no more files to move
+	 * @return	void|int							An offset integer to use on the next cycle, or nothing
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
 		if ( static::tableExists() )
 		{
-			$cache = Db::i()->select( '*', 'core_image_proxy', array(), 'md5_url', array( $offset, 1 ) )->first();
+			$cache = \IPS\Db::i()->select( '*', 'core_image_proxy', array(), 'md5_url', array( $offset, 1 ) )->first();
 		}
 		else
 		{
-			throw new UnderflowException;
+			throw new \UnderflowException;
 		}
 		
 		/* Don't move a file if it doesn't have a filename */
@@ -95,14 +87,14 @@ class Imageproxycache extends FileStorageAbstract
 
 		try
 		{
-			$file = File::get( $oldConfiguration ?: 'core_Imageproxycache', $cache['location'] )->move( $storageConfiguration );
+			$file = \IPS\File::get( $oldConfiguration ?: 'core_Imageproxycache', $cache['location'] )->move( $storageConfiguration );
 
 			if ( (string) $file != $cache['location'] )
 			{
-				Db::i()->update( 'core_image_proxy', array( 'location' => (string) $file ), array( 'md5_url=?', $cache['md5_url'] ) );
+				\IPS\Db::i()->update( 'core_image_proxy', array( 'location' => (string) $file ), array( 'md5_url=?', $cache['md5_url'] ) );
 			}
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			/* Any issues are logged and the \IPS\Db::i()->update not run as the exception is thrown */
 		}
@@ -111,14 +103,14 @@ class Imageproxycache extends FileStorageAbstract
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
 		if ( static::tableExists() )
 		{
-			Db::i()->select( '*', 'core_image_proxy', array( 'location=?', (string) $file ) )->first();
+			\IPS\Db::i()->select( '*', 'core_image_proxy', array( 'location=?', (string) $file ) )->first();
 
 			return TRUE;
 		}
@@ -133,17 +125,43 @@ class Imageproxycache extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
 		if ( static::tableExists() )
 		{
-			foreach( Db::i()->select( '*', 'core_image_proxy', 'location IS NOT NULL' ) as $cache )
+			foreach( \IPS\Db::i()->select( '*', 'core_image_proxy', 'location IS NOT NULL' ) as $cache )
 			{
 				try
 				{
-					File::get( 'core_Imageproxycache', $cache['location'] )->delete();
+					\IPS\File::get( 'core_Imageproxycache', $cache['location'] )->delete();
 				}
-				catch( Exception $e ){}
+				catch( \Exception $e ){}
+			}
+		}
+	}
+	
+	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		if ( static::tableExists() ) 
+		{
+			$cache = \IPS\Db::i()->select( '*', 'core_image_proxy', array(), 'md5_url', array( $offset, 1 ) )->first();
+			
+			try
+			{
+				if ( $new = \IPS\File::repairUrl( $cache['location'] ) )
+				{
+					\IPS\Db::i()->update( 'core_image_proxy', array( 'location' => (string) $new ), array( 'md5_url=?', $cache['location'] ) );
+				}
+			}
+			catch( \Exception $e )
+			{
+				/* Any issues are logged and the \IPS\Db::i()->update not run as the exception is thrown */
 			}
 		}
 	}

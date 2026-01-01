@@ -12,34 +12,25 @@
 namespace IPS\nexus\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use UnderflowException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: Advertisement Images
  */
-class Ads extends FileStorageAbstract
+class _Ads
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
-		return Db::i()->select( 'COUNT(*)', 'core_advertisements', array( 'ad_member<>0 or ad_member IS NULL' ) )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'core_advertisements', array( 'ad_member<>0 or ad_member IS NULL' ) )->first();
 	}
 	
 	/**
@@ -48,47 +39,70 @@ class Ads extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	Underflowexception				When file record doesn't exist. Indicating there are no more files to move
+	 * @throws	\Underflowexception				When file record doesn't exist. Indicating there are no more files to move
 	 * @return	void
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-		$record = Db::i()->select( '*', 'core_advertisements', array( 'ad_member<>0 or ad_member IS NULL' ), 'ad_id', array( $offset, 1 ) )->first();
+		$record = \IPS\Db::i()->select( '*', 'core_advertisements', array( 'ad_member<>0 or ad_member IS NULL' ), 'ad_id', array( $offset, 1 ) )->first();
 		
 		$images = json_decode( $record['ad_images'], TRUE );
 		foreach ( $images as $key => $location )
 		{
 			try
 			{
-				$images[ $key ] = (string) File::get( $oldConfiguration ?: 'nexus_Ads', $location )->move( $storageConfiguration );
+				$images[ $key ] = (string) \IPS\File::get( $oldConfiguration ?: 'nexus_Ads', $location )->move( $storageConfiguration );
 			}
-			catch( Exception )
+			catch( \Exception $e )
 			{
 				/* Any issues are logged */
 			}
 		}
-		Db::i()->update( 'core_advertisements', array( 'ad_images' => json_encode( $images ) ), array( 'ad_id=?', $record['ad_id'] ) );
+		\IPS\Db::i()->update( 'core_advertisements', array( 'ad_images' => json_encode( $images ) ), array( 'ad_id=?', $record['ad_id'] ) );
+	}
+	
+	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		$record = \IPS\Db::i()->select( '*', 'core_advertisements', array( 'ad_member<>0 or ad_member IS NULL' ), 'ad_id', array( $offset, 1 ) )->first();
+		
+		$images = json_decode( $record['ad_images'], TRUE );
+		
+		foreach ( $images as $key => $location )
+		{
+			if ( $new = \IPS\File::repairUrl( $location ) )
+			{
+				$images[ $key ] = $new;
+			}
+		}
+		
+		\IPS\Db::i()->update( 'core_advertisements', array( 'ad_images' => json_encode( $images ) ), array( 'ad_id=?', $record['ad_id'] ) );
 	}
 	
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
 		try
 		{
-			foreach ( Db::i()->select( '*', 'core_advertisements', array( 'ad_member<>0 or ad_member IS NULL' ) ) as $ad )
+			foreach ( \IPS\Db::i()->select( '*', 'core_advertisements', array( 'ad_member<>0 or ad_member IS NULL' ) ) as $ad )
 			{
-				if ( in_array( (string) $file, json_decode( $ad['ad_images'], TRUE ) ) )
+				if ( \in_array( (string) $file, json_decode( $ad['ad_images'], TRUE ) ) )
 				{
 					return TRUE;
 				}
 			}
 		}
-		catch ( UnderflowException ) { }
+		catch ( \UnderflowException $e ) { }
 		
 		return FALSE;
 	}
@@ -98,17 +112,17 @@ class Ads extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		foreach( Db::i()->select( '*', 'core_advertisements', array( 'ad_member<>0 or ad_member IS NULL' ) ) as $ad )
+		foreach( \IPS\Db::i()->select( '*', 'core_advertisements', array( 'ad_member<>0 or ad_member IS NULL' ) ) as $ad )
 		{
 			foreach ( json_decode( $ad['ad_images'], TRUE ) as $key => $location )
 			{
 				try
 				{
-					File::get( 'nexus_Products', $location )->delete();
+					\IPS\File::get( 'nexus_Products', $location )->delete();
 				}
-				catch( Exception ){}
+				catch( \Exception $e ){}
 			}
 		}
 	}

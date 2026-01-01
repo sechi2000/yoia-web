@@ -11,50 +11,34 @@
 namespace IPS\core\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use IPS\IPS;
-use IPS\Member\Group;
-use IPS\Output;
-use IPS\Settings;
-use IPS\Theme as ThemeClass;
-use UnderflowException;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: Theme
  */
-class Theme extends FileStorageAbstract
+class _Theme
 {
 	/**
 	 * Some file storage engines need to store a gzip version of some files that can be served to a browser gzipped
 	 */
-	public static array $storeGzipExtensions = array( 'css', 'js' );
-	
+	public static $storeGzipExtensions = array( 'css', 'js' );
+
 	/**
 	 * The configuration settings have been updated
 	 *
 	 * @return void
 	 */
-	public static function settingsUpdated() : void
+	public static function settingsUpdated()
 	{
 		/* Clear out CSS as custom URL may have changed */
-		ThemeClass::deleteCompiledCss();
+		\IPS\Theme::deleteCompiledCss();
 		
 		/* Trash this JS */
-		Output::clearJsFiles();
+		\IPS\Output::clearJsFiles();
 	}
 	
 	/**
@@ -62,7 +46,7 @@ class Theme extends FileStorageAbstract
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
 		return 6; // While this isn't the number of files, it's the number of steps this will take to move them, which is all it's used for
 	}	
@@ -73,87 +57,87 @@ class Theme extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	UnderflowException					When file record doesn't exist. Indicating there are no more files to move
-	 * @return	void							An offset integer to use on the next cycle, or nothing
+	 * @throws	\UnderflowException					When file record doesn't exist. Indicating there are no more files to move
+	 * @return	void|int							An offset integer to use on the next cycle, or nothing
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
 		switch ( $offset )
 		{
 			case 0:
-				foreach ( Group::groups() as $group )
+				foreach ( \IPS\Member\Group::groups() as $group )
 				{
 					if ( $group->g_icon )
 					{
 						try
 						{
-							$group->g_icon = (string) File::get( $oldConfiguration ?: 'core_Theme', $group->g_icon )->move( $storageConfiguration );
+							$group->g_icon = (string) \IPS\File::get( $oldConfiguration ?: 'core_Theme', $group->g_icon )->move( $storageConfiguration );
 							$group->save();
 						}
-						catch( Exception $e )
+						catch( \Exception $e )
 						{
 							/* Any issues are logged */
 						}
 					}
 				}
-				return;
+				return TRUE;
 
 			case 1:
-				foreach ( Db::i()->select( '*', 'core_member_ranks' ) as $rank )
+				foreach ( \IPS\Db::i()->select( '*', 'core_member_ranks' ) as $rank )
 				{
 					if ( $rank['icon'] )
 					{
 						try
 						{
-							Db::i()->update( 'core_member_ranks', array( 'icon' => (string) File::get( $oldConfiguration ?: 'core_Theme', $rank['icon'] )->move( $storageConfiguration ) ), array( 'id=?', $rank['id'] ) );
+							\IPS\Db::i()->update( 'core_member_ranks', array( 'icon' => (string) \IPS\File::get( $oldConfiguration ?: 'core_Theme', $rank['icon'] )->move( $storageConfiguration ) ), array( 'id=?', $rank['id'] ) );
 						}
-						catch( Exception $e )
+						catch( \Exception $e )
 						{
 							/* Any issues are logged */
 						}
 					}
 				}
 
-				unset( Store::i()->ranks );
-				return;
+				unset( \IPS\Data\Store::i()->ranks );
+				return TRUE;
 
 			case 2:
-				foreach ( Db::i()->select( '*', 'core_reputation_levels' ) as $rep )
+				foreach ( \IPS\Db::i()->select( '*', 'core_reputation_levels' ) as $rep )
 				{
 					try
 					{
 						if ( $rep['level_image'] )
 						{
-							Db::i()->update( 'core_reputation_levels', array( 'level_image' => (string) File::get( $oldConfiguration ?: 'core_Theme', $rep['level_image'] )->move( $storageConfiguration ) ), array( 'level_id=?', $rep['level_id'] ) );
+							\IPS\Db::i()->update( 'core_reputation_levels', array( 'level_image' => (string) \IPS\File::get( $oldConfiguration ?: 'core_Theme', $rep['level_image'] )->move( $storageConfiguration ) ), array( 'level_id=?', $rep['level_id'] ) );
 						}
 					}
-					catch( Exception $e )
+					catch( \Exception $e )
 					{
 						/* Any issues are logged */
 					}
 				}
-				unset( Store::i()->reputationLevels );
-				return;
+				unset( \IPS\Data\Store::i()->reputationLevels );
+				return TRUE;
 
 			case 3:
 				/* Move logos */
-				foreach( ThemeClass::themes() as $id => $set )
+				foreach( \IPS\Theme::themes() as $id => $set )
 				{
 					$logos   = $set->logo;
 					$changed = false;
 					
 					foreach( array( 'front', 'sharer', 'favicon' ) as $icon )
 					{
-						if ( isset( $logos[ $icon ] ) AND is_array( $logos[ $icon ] ) )
+						if ( isset( $logos[ $icon ] ) AND \is_array( $logos[ $icon ] ) )
 						{
 							if ( ! empty( $logos[ $icon ]['url'] ) )
 							{
 								try
 								{
-									$logos[ $icon ]['url'] = (string) File::get( $oldConfiguration ?: 'core_Theme', $logos[ $icon ]['url'] )->move( $storageConfiguration );
+									$logos[ $icon ]['url'] = (string) \IPS\File::get( $oldConfiguration ?: 'core_Theme', $logos[ $icon ]['url'] )->move( $storageConfiguration );
 									$changed = true;
 								}
-								catch( Exception $e )
+								catch( \Exception $e )
 								{
 									/* Any issues are logged */
 								}
@@ -168,86 +152,229 @@ class Theme extends FileStorageAbstract
 				}
 				
 				/* All done */
-				return;
+				return TRUE;
 
 			case 4:
-				/* Trash old JS */
-				try
-				{
-					File::getClass( $oldConfiguration ?: 'core_Theme' )->deleteContainer( 'javascript_global' );
-				} catch( Exception $e ) { }
-					
-				foreach( Application::applications() as $key => $data )
+				/* Move custom theme settings (uploads) */
+				$uploads = \IPS\Db::i()->select( 'core_theme_settings_values.sv_value, core_theme_settings_values.sv_id', 'core_theme_settings_fields', array( 'sc_type=?', 'Upload' ) )
+							->join( 'core_theme_settings_values', 'core_theme_settings_fields.sc_id=core_theme_settings_values.sv_id' );
+
+				foreach( $uploads as $field )
 				{
 					try
 					{
-						File::getClass( $oldConfiguration ?: 'core_Theme' )->deleteContainer( 'javascript_' . $key );
-					} catch( Exception $e ) { }
+						\IPS\Db::i()->update( 'core_theme_settings_values', array( 'sv_value' => \IPS\File::get( $oldConfiguration ?: 'core_Theme', $field['sv_value'] )->move( $storageConfiguration ) ), array( 'sv_id=?', $field['sv_id'] ) );
+					}
+					catch( \Exception $e )
+					{
+						/* Any issues are logged */
+					}
+				}
+
+				/* Trash old JS */
+				try
+				{
+					\IPS\File::getClass( $oldConfiguration ?: 'core_Theme' )->deleteContainer( 'javascript_global' );
+				} catch( \Exception $e ) { }
+					
+				foreach( \IPS\Application::applications() as $key => $data )
+				{
+					try
+					{
+						\IPS\File::getClass( $oldConfiguration ?: 'core_Theme' )->deleteContainer( 'javascript_' . $key );
+					} catch( \Exception $e ) { }
 				}
 				
 				/* Trash this JS */
-				Output::clearJsFiles();
+				\IPS\Output::clearJsFiles();
 
 				/* Trash CSS and images */
-				foreach( ThemeClass::themes() as $id => $theme )
+				foreach( \IPS\Theme::themes() as $id => $theme )
 				{
 					/* Remove files, but don't fail if we can't */
 					try
 					{
-						File::getClass( $oldConfiguration ?: 'core_Theme' )->deleteContainer( 'set_resources_' . $theme->id );
-						File::getClass( $oldConfiguration ?: 'core_Theme' )->deleteContainer( 'css_built_' . $theme->id );
+						\IPS\File::getClass( $oldConfiguration ?: 'core_Theme' )->deleteContainer( 'set_resources_' . $theme->id );
+						\IPS\File::getClass( $oldConfiguration ?: 'core_Theme' )->deleteContainer( 'css_built_' . $theme->id );
 					}
-					catch( Exception $e ){}
+					catch( \Exception $e ){}
 				}
 				
-				/* Trash new CSS and images - but skip 1st party apps */
-				foreach( Application::applications() as $app )
-				{
-					if( !in_array( $app->directory, IPS::$ipsApps ) )
-					{
-						ThemeClass::clearFiles( ThemeClass::TEMPLATES + ThemeClass::CSS + ThemeClass::IMAGES, $app->directory );
-					}
-				}
+				/* Trash new CSS and images */
+				\IPS\Theme::clearFiles( \IPS\Theme::TEMPLATES + \IPS\Theme::CSS + \IPS\Theme::IMAGES );
 				
-				return;
+				return TRUE;
 			
 			case 5:
 				$settings = array();
-				foreach( Application::applications() AS $app )
+				foreach( \IPS\Application::applications() AS $app )
 				{
 					$settings = array_merge( $settings, $app->uploadSettings() );
 				}
 				
 				foreach( $settings AS $key )
 				{
-					if ( Settings::i()->$key )
+					if ( \IPS\Settings::i()->$key )
 					{
 						try
 						{
-							File::get( $oldConfiguration ?: 'core_Theme', Settings::i()->$key )->move( $storageConfiguration );
+							\IPS\File::get( $oldConfiguration ?: 'core_Theme', \IPS\Settings::i()->$key )->move( $storageConfiguration );
 						}
-						catch( Exception $e ) {}
+						catch( \Exception $e ) {}
 					}
 				}
 				
-				throw new UnderflowException;
+				throw new \UnderflowException;
 
 			default:
 				/* Go away already */
-				throw new UnderflowException;
+				throw new \UnderflowException;
+		}
+	}
+	
+	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		switch ( $offset )
+		{
+			case 0:
+				foreach ( \IPS\Member\Group::groups() as $group )
+				{
+					if ( $new = \IPS\File::repairUrl( $group->g_icon ) )
+					{
+						try
+						{
+							$group->g_icon = $new;
+							$group->save();
+						}
+						catch( \Exception $e )
+						{
+							/* Any issues are logged */
+						}
+					}
+				}
+				return TRUE;
+
+			case 1:
+				foreach ( \IPS\Db::i()->select( '*', 'core_member_ranks' ) as $rank )
+				{
+					if ( $new = \IPS\File::repairUrl( $rank['icon'] ) )
+					{
+						try
+						{
+							\IPS\Db::i()->update( 'core_member_ranks', array( 'icon' => $new ), array( 'id=?', $rank['id'] ) );
+						}
+						catch( \Exception $e )
+						{
+							/* Any issues are logged */
+						}
+					}
+				}
+
+				unset( \IPS\Data\Store::i()->ranks );
+				return TRUE;
+
+			case 2:
+				foreach ( \IPS\Db::i()->select( '*', 'core_reputation_levels' ) as $rep )
+				{
+					try
+					{
+						if ( $new = \IPS\File::repairUrl( $rep['level_image'] ) )
+						{
+							\IPS\Db::i()->update( 'core_reputation_levels', array( 'level_image' => $new ), array( 'level_id=?', $rep['level_id'] ) );
+						}
+					}
+					catch( \Exception $e )
+					{
+						/* Any issues are logged */
+					}
+				}
+				unset( \IPS\Data\Store::i()->reputationLevels );
+				return TRUE;
+
+			case 3:
+				/* Trash CSS and images */
+				\IPS\Theme::clearFiles( \IPS\Theme::TEMPLATES + \IPS\Theme::CSS + \IPS\Theme::IMAGES );
+				
+				return TRUE;
+
+			case 4:
+				/* Move logos */
+				foreach( \IPS\Theme::themes() as $id => $set )
+				{
+					$logos   = $set->logo;
+					$changed = false;
+					
+					foreach( array( 'front', 'sharer', 'favicon' ) as $icon )
+					{
+						if ( isset( $logos[ $icon ] ) AND \is_array( $logos[ $icon ] ) )
+						{
+							if ( ! empty( $logos[ $icon ]['url'] ) and $new = \IPS\File::repairUrl( $logos[ $icon ]['url'] ) )
+							{
+								try
+								{
+									$logos[ $icon ]['url'] = $new;
+									$changed = true;
+								}
+								catch( \Exception $e )
+								{
+									/* Any issues are logged */
+								}
+							}
+						}
+					}
+					
+					if ( $changed === true )
+					{
+						$set->saveSet( array( 'logo' => $logos ) );
+					}
+				}
+				
+				/* Trash JS */
+				\IPS\Output::clearJsFiles();
+				
+				/* All done */
+				return TRUE;
+			
+			case 5:
+				$settings = array();
+				foreach( \IPS\Application::applications() AS $app )
+				{
+					$settings = array_merge( $settings, $app->uploadSettings() );
+				}
+				
+				$update = array();
+				foreach( $settings AS $key )
+				{
+					if ( \IPS\Settings::i()->$key AND $new = \IPS\File::repairUrl( \IPS\Settings::i()->$key ) )
+					{
+						$update[ $key ] = $new;
+					}
+				}
+				if ( \count( $update ) )
+				{
+					\IPS\Settings::i()->changeValues( $update );
+				}
+				
+				throw new \UnderflowException;
 		}
 	}
 
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
 		/* Is it a group icon? */
-		foreach ( Group::groups() as $group )
+		foreach ( \IPS\Member\Group::groups() as $group )
 		{
 			if ( $group->g_icon == (string) $file )
 			{
@@ -256,7 +383,7 @@ class Theme extends FileStorageAbstract
 		}
 
 		/* Is it a rank icon? */
-		foreach ( Db::i()->select( '*', 'core_member_ranks' ) as $rank )
+		foreach ( \IPS\Db::i()->select( '*', 'core_member_ranks' ) as $rank )
 		{
 			if ( $rank['icon'] == (string) $file )
 			{
@@ -265,7 +392,7 @@ class Theme extends FileStorageAbstract
 		}
 
 		/* Is it a reputation level icon? */
-		foreach ( Db::i()->select( '*', 'core_reputation_levels' ) as $rep )
+		foreach ( \IPS\Db::i()->select( '*', 'core_reputation_levels' ) as $rep )
 		{
 			if ( $rep['level_image'] == (string) $file )
 			{
@@ -274,7 +401,7 @@ class Theme extends FileStorageAbstract
 		}
 
 		/* Is it a skin image? */
-		foreach ( Db::i()->select( '*', 'core_theme_resources' ) as $image )
+		foreach ( \IPS\Db::i()->select( '*', 'core_theme_resources' ) as $image )
 		{
 			if ( $image['resource_filename'] == (string) $file )
 			{
@@ -283,11 +410,11 @@ class Theme extends FileStorageAbstract
 		}
 		
 		/* Is it JS? */
-		if ( isset( Store::i()->javascript_map ) )
+		if ( isset( \IPS\Data\Store::i()->javascript_map ) )
 		{
-			foreach( Store::i()->javascript_map as $app => $data )
+			foreach( \IPS\Data\Store::i()->javascript_map as $app => $data )
 			{
-				foreach( Store::i()->javascript_map[ $app ] as $key => $js )
+				foreach( \IPS\Data\Store::i()->javascript_map[ $app ] as $key => $js )
 				{
 					if ( $js == (string) $file )
 					{
@@ -298,11 +425,11 @@ class Theme extends FileStorageAbstract
 		}
 
 		/* Is it a skin logo image or CSS? */
-		foreach( ThemeClass::themes() as $set )
+		foreach( \IPS\Theme::themes() as $set )
 		{
 			foreach( array( 'front', 'sharer', 'favicon' ) as $icon )
 			{
-				if ( isset( $set->logo[ $icon ] ) AND is_array( $set->logo[ $icon ] ) )
+				if ( isset( $set->logo[ $icon ] ) AND \is_array( $set->logo[ $icon ] ) )
 				{
 					if ( ! empty( $set->logo[ $icon ]['url'] ) AND $set->logo[ $icon ]['url'] == (string) $file )
 					{
@@ -322,14 +449,14 @@ class Theme extends FileStorageAbstract
 		
 		/* Setting? */
 		$settings = array();
-		foreach( Application::applications() AS $app )
+		foreach( \IPS\Application::applications() AS $app )
 		{
 			$settings = array_merge( $settings, $app->uploadSettings() );
 		}
 		
 		foreach( $settings AS $key )
 		{
-			if ( Settings::i()->$key AND Settings::i()->$key == (string) $file )
+			if ( \IPS\Settings::i()->$key AND \IPS\Settings::i()->$key == (string) $file )
 			{
 				return TRUE;
 			}
@@ -344,8 +471,9 @@ class Theme extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
 		// It's not possible to delete the core application, and this would break the entire site, so let's not bother with this
+		return;
 	}
 }

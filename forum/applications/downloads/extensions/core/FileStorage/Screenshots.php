@@ -12,34 +12,25 @@
 namespace IPS\downloads\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: Screenshots
  */
-class Screenshots extends FileStorageAbstract
+class _Screenshots
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
-		return Db::i()->select( 'COUNT(*)', 'downloads_files_records', array( 'record_type=?', 'ssupload' ) )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'downloads_files_records', array( 'record_type=?', 'ssupload' ) )->first();
 	}
 	
 	/**
@@ -48,24 +39,24 @@ class Screenshots extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	Underflowexception				When file record doesn't exist. Indicating there are no more files to move
+	 * @throws	\Underflowexception				When file record doesn't exist. Indicating there are no more files to move
 	 * @return	void
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-		$record		= Db::i()->select( '*', 'downloads_files_records', array( 'record_type=?', 'ssupload' ), 'record_id', array( $offset, 1 ) )->first();
+		$record		= \IPS\Db::i()->select( '*', 'downloads_files_records', array( 'record_type=?', 'ssupload' ), 'record_id', array( $offset, 1 ) )->first();
 		$updates	= array();
 
 		try
 		{
-			$file = File::get( $oldConfiguration ?: 'downloads_Screenshots', $record['record_location'] )->move( $storageConfiguration );
+			$file = \IPS\File::get( $oldConfiguration ?: 'downloads_Screenshots', $record['record_location'] )->move( $storageConfiguration );
 
 			if ( (string) $file != $record['record_location'] )
 			{
 				$updates['record_location'] = (string) $file;
 			}
 			
-			$file = File::get( $oldConfiguration ?: 'downloads_Screenshots', $record['record_thumb'] )->move( $storageConfiguration );
+			$file = \IPS\File::get( $oldConfiguration ?: 'downloads_Screenshots', $record['record_thumb'] )->move( $storageConfiguration );
 			
 			if ( (string) $file != $record['record_thumb'] )
 			{
@@ -74,7 +65,7 @@ class Screenshots extends FileStorageAbstract
 
 			if( $record['record_no_watermark'] )
 			{
-				$file = File::get( $oldConfiguration ?: 'downloads_Screenshots', $record['record_no_watermark'] )->move( $storageConfiguration );
+				$file = \IPS\File::get( $oldConfiguration ?: 'downloads_Screenshots', $record['record_no_watermark'] )->move( $storageConfiguration );
 				
 				if ( (string) $file != $record['record_no_watermark'] )
 				{
@@ -82,33 +73,59 @@ class Screenshots extends FileStorageAbstract
 				}
 			}
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			/* Any issues are logged */
 		}
 
-		if( count( $updates ) )
+		if( \count( $updates ) )
 		{
-			Db::i()->update( 'downloads_files_records', $updates, array( 'record_id=?', $record['record_id'] ) );
+			\IPS\Db::i()->update( 'downloads_files_records', $updates, array( 'record_id=?', $record['record_id'] ) );
+		}
+	}
+
+	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		$record = \IPS\Db::i()->select( '*', 'downloads_files_records', array( 'record_type=?', 'ssupload' ), 'record_id', array( $offset, 1 ) )->first();
+		
+		if ( $new = \IPS\File::repairUrl( $record['record_location'] ) )
+		{
+			\IPS\Db::i()->update( 'downloads_files_records', array( 'record_location' => $new ), array( 'record_id=?', $record['record_id'] ) );
+		}
+		
+		if ( $record['record_thumb'] and $new = \IPS\File::repairUrl( $record['record_thumb'] ) )
+		{
+			\IPS\Db::i()->update( 'downloads_files_records', array( 'record_thumb' => $new ), array( 'record_id=?', $record['record_id'] ) );
+		}
+
+		if ( $record['record_no_watermark'] and $new = \IPS\File::repairUrl( $record['record_no_watermark'] ) )
+		{
+			\IPS\Db::i()->update( 'downloads_files_records', array( 'record_no_watermark' => $new ), array( 'record_id=?', $record['record_id'] ) );
 		}
 	}
 
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
 		try
 		{
 			$fileName = (string) $file;
-			$record	= Db::i()->select( '*', 'downloads_files_records', array( '( record_location=? OR record_thumb=? OR record_no_watermark=? ) AND record_type=?', $fileName, $fileName, $fileName, 'ssupload' ) )->first();
+			$record	= \IPS\Db::i()->select( '*', 'downloads_files_records', array( '( record_location=? OR record_thumb=? OR record_no_watermark=? ) AND record_type=?', $fileName, $fileName, $fileName, 'ssupload' ) )->first();
 
 			return TRUE;
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return FALSE;
 		}
@@ -120,32 +137,32 @@ class Screenshots extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		foreach( Db::i()->select( '*', 'downloads_files_records', "record_location IS NOT NULL and record_type='ssupload'" ) as $screenshot )
+		foreach( \IPS\Db::i()->select( '*', 'downloads_files_records', "record_location IS NOT NULL and record_type='ssupload'" ) as $screenshot )
 		{
 			try
 			{
-				File::get( 'downloads_Screenshots', $screenshot['record_location'] )->delete();
+				\IPS\File::get( 'downloads_Screenshots', $screenshot['record_location'] )->delete();
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 
 			if( $screenshot['record_thumb'] )
 			{
 				try
 				{
-					File::get( 'downloads_Screenshots', $screenshot['record_thumb'] )->delete();
+					\IPS\File::get( 'downloads_Screenshots', $screenshot['record_thumb'] )->delete();
 				}
-				catch( Exception $e ){}
+				catch( \Exception $e ){}
 			}
 
 			if( $screenshot['record_no_watermark'] )
 			{
 				try
 				{
-					File::get( 'downloads_Screenshots', $screenshot['record_no_watermark'] )->delete();
+					\IPS\File::get( 'downloads_Screenshots', $screenshot['record_no_watermark'] )->delete();
 				}
-				catch( Exception $e ){}
+				catch( \Exception $e ){}
 			}
 		}
 	}

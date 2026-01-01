@@ -11,116 +11,100 @@
 namespace IPS\core\modules\admin\overview;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\Application;
-use IPS\DateTime;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use function in_array;
-use function intval;
-use function strpos;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP Dashboard
  */
-class dashboard extends Controller
+class _dashboard extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Show the ACP dashboard
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Dispatcher::i()->checkAcpPermission( 'view_dashboard' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'view_dashboard' );
 		
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js('admin_dashboard.js', 'core') );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/dashboard.css', 'core', 'admin' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('admin_dashboard.js', 'core') );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/dashboard.css', 'core', 'admin' ) );
 
 		/* Figure out which blocks we should show */
 		$toShow	= $this->current( TRUE );
-
+		
 		/* Now grab dashboard extensions */
 		$blocks	= array();
 		$info	= array();
-		foreach ( Application::allExtensions( 'core', 'Dashboard', TRUE, 'core' ) as $key => $extension )
+		foreach ( \IPS\Application::allExtensions( 'core', 'Dashboard', TRUE, 'core' ) as $key => $extension )
 		{
-			if ( $extension->canView() )
+			if ( !method_exists( $extension, 'canView' ) or $extension->canView() )
 			{
 				$info[ $key ]	= array(
-							'name'	=> Member::loggedIn()->language()->addToStack('block_' . $key ),
+							'name'	=> \IPS\Member::loggedIn()->language()->addToStack('block_' . $key ),
 							'key'	=> $key,
-							'app'	=> substr( $key, 0, strpos( $key, '_' ) )
+							'app'	=> \substr( $key, 0, \strpos( $key, '_' ) )
 				);
-				
-				foreach( $toShow as $row )
+
+				if( method_exists( $extension, 'getBlock' ) )
 				{
-					if( in_array( $key, $row ) )
+					foreach( $toShow as $row )
 					{
-						$blocks[ $key ]	= $extension->getBlock();
-						break;
+						if( \in_array( $key, $row ) )
+						{
+							$blocks[ $key ]	= $extension->getBlock();
+							break;
+						}
 					}
 				}
 			}
 		}
-
+		
 		/* Display */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('dashboard');
-		Output::i()->customHeader = Theme::i()->getTemplate( 'dashboard' )->dashboardHeader( $info, $blocks );
-		Output::i()->output	= Theme::i()->getTemplate( 'dashboard' )->dashboard( $toShow, $blocks, $info );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('dashboard');
+		\IPS\Output::i()->customHeader = \IPS\Theme::i()->getTemplate( 'dashboard' )->dashboardHeader( $info, $blocks );
+		\IPS\Output::i()->output	= \IPS\Theme::i()->getTemplate( 'dashboard' )->dashboard( $toShow, $blocks, $info );
 	}
 
 	/**
 	 * Return a json-encoded array of the current blocks to show
 	 *
 	 * @param	bool	$return	Flag to indicate if the array should be returned instead of output
-	 * @return	array|null
+	 * @return	void
 	 */
-	public function current( bool $return=FALSE ) : ?array
+	public function current( $return=FALSE )
 	{
-		if( Settings::i()->acp_dashboard_blocks )
+		if( \IPS\Settings::i()->acp_dashboard_blocks )
 		{
-			$blocks = json_decode( Settings::i()->acp_dashboard_blocks, TRUE );
+			$blocks = json_decode( \IPS\Settings::i()->acp_dashboard_blocks, TRUE );
 		}
 		else
 		{
 			$blocks = array();
 		}
 
-		$toShow	= isset( $blocks[ Member::loggedIn()->member_id ] ) ? $blocks[ Member::loggedIn()->member_id ] : array();
+		$toShow	= isset( $blocks[ \IPS\Member::loggedIn()->member_id ] ) ? $blocks[ \IPS\Member::loggedIn()->member_id ] : array();
 
 		if( !$toShow OR !isset( $toShow['main'] ) OR !isset( $toShow['side'] ) )
 		{
 			$toShow	= array(
-				'main'		=> array( 'core_Registrations', 'core_BackgroundQueue' ),
-				'side'		=> array( 'core_AdminNotes', 'core_OnlineUsers' ),
+				'main'		=> array( 'core_AdminNotes', 'core_Registrations', 'core_AwaitingValidation', 'core_BackgroundQueue' ),
+				'side'		=> array( 'core_OnlineAdmins', 'core_FailedLogins', 'core_OnlineUsers' ),
 				'collapsed'	=> array( 'core_BackgroundQueue' ),
 			);
 
-			$blocks[ Member::loggedIn()->member_id ]	= $toShow;
+			$blocks[ \IPS\Member::loggedIn()->member_id ]	= $toShow;
 
-			Settings::i()->changeValues( array( 'acp_dashboard_blocks' => json_encode( $blocks ) ) );
+			\IPS\Settings::i()->changeValues( array( 'acp_dashboard_blocks' => json_encode( $blocks ) ) );
 		}
 		/* Upon initial upgrade to 4.3 the key won't exist, so apply to bg queue by default */
 		elseif( !array_key_exists( 'collapsed', $toShow ) )
@@ -133,8 +117,7 @@ class dashboard extends Controller
 			return $toShow;
 		}
 
-		Output::i()->output		= json_encode( $toShow );
-		return null;
+		\IPS\Output::i()->output		= json_encode( $toShow );
 	}
 
 	/**
@@ -142,14 +125,14 @@ class dashboard extends Controller
 	 *
 	 * @return	void
 	 */
-	public function getBlock() : void
+	public function getBlock()
 	{
 		$output		= '';
 
 		/* Loop through the dashboard extensions in the specified application */
-		foreach( Application::load( Request::i()->appKey )->extensions( 'core', 'Dashboard', 'core' ) as $key => $_extension )
+		foreach( \IPS\Application::load( \IPS\Request::i()->appKey )->extensions( 'core', 'Dashboard', 'core' ) as $key => $_extension )
 		{
-			if( Request::i()->appKey . '_' . $key == Request::i()->blockKey )
+			if( \IPS\Request::i()->appKey . '_' . $key == \IPS\Request::i()->blockKey )
 			{
 				if( method_exists( $_extension, 'getBlock' ) )
 				{
@@ -160,7 +143,7 @@ class dashboard extends Controller
 			}
 		}
 
-		Output::i()->output	= $output;
+		\IPS\Output::i()->output	= $output;
 	}
 
 	/**
@@ -169,20 +152,20 @@ class dashboard extends Controller
 	 * @return	void
 	 * @note	When submitted via AJAX, the array should be json-encoded
 	 */
-	public function update() : void
+	public function update()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		if( Settings::i()->acp_dashboard_blocks )
+		if( \IPS\Settings::i()->acp_dashboard_blocks )
 		{
-			$blocks = json_decode( Settings::i()->acp_dashboard_blocks, TRUE );
+			$blocks = json_decode( \IPS\Settings::i()->acp_dashboard_blocks, TRUE );
 		}
 		else
 		{
 			$blocks = array();
 		}
 
-		$saveBlocks = Request::i()->blocks;
+		$saveBlocks = \IPS\Request::i()->blocks;
 		
 		foreach( array( 'main', 'side', 'collapsed' ) as $saveKey )
 		{
@@ -192,17 +175,17 @@ class dashboard extends Controller
 			}
 		}
 		
-		$blocks[ Member::loggedIn()->member_id ] = $saveBlocks;
+		$blocks[ \IPS\Member::loggedIn()->member_id ] = $saveBlocks;
 
-		Settings::i()->changeValues( array( 'acp_dashboard_blocks' => json_encode( $blocks ) ) );
+		\IPS\Settings::i()->changeValues( array( 'acp_dashboard_blocks' => json_encode( $blocks ) ) );
 
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = 1;
+			\IPS\Output::i()->output = 1;
 			return;
 		}
 
-		Output::i()->redirect( Url::internal( "app=core&module=overview&controller=dashboard" ), 'saved' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=overview&controller=dashboard" ), 'saved' );
 	}
 
 	/**
@@ -210,17 +193,17 @@ class dashboard extends Controller
 	 *
 	 * @return void
 	 */
-	public function switchSnooze() : void
+	public function switchSnooze()
 	{
 		$value = [ 'hits' => 1, 'lastClick' => time() ];
-		if ( isset( Request::i()->cookie['acpLinkSnooze'] ) and $value = json_decode( Request::i()->cookie['acpLinkSnooze'], true ) )
+		if ( isset( \IPS\Request::i()->cookie['acpLinkSnooze'] ) and $value = json_decode( \IPS\Request::i()->cookie['acpLinkSnooze'], true ) )
 		{
-			$value['hits'] = intval( $value['hits'] ) + 1;
+			$value['hits'] = \intval( $value['hits'] ) + 1;
 			$value['lastClick'] = time();
 		}
 
-		Request::i()->setCookie( 'acpLinkSnooze', json_encode( $value ), ( new DateTime )->add( new DateInterval( 'P2Y' ) ) );
+		\IPS\Request::i()->setCookie( 'acpLinkSnooze', json_encode( $value ), ( new \IPS\DateTime )->add( new \DateInterval( 'P2Y' ) ) );
 
-		Output::i()->redirect( Url::internal( "app=core&module=overview&controller=dashboard" ), 'The Switch to Cloud link won\'t show for a while' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=overview&controller=dashboard" ), 'The Switch to Cloud link won\'t show for a while' );
 	}
 }

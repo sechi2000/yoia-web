@@ -11,20 +11,16 @@
 namespace IPS\Task\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use OutOfRangeException as PHPOutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Task Exception
  */
-class OutOfRangeException extends PHPOutOfRangeException
+class _OutOfRangeException extends \OutOfRangeException
 {
 	/**
 	 * Constructor
@@ -33,8 +29,8 @@ class OutOfRangeException extends PHPOutOfRangeException
 	 * @param	string		$message	Error Message
 	 * @return	void
 	 */
-	public function __construct( string $message='' )
+	public function __construct( $message='' )
 	{
-		parent::__construct( $message );
+		return parent::__construct( $message );
 	}
 }

@@ -11,35 +11,29 @@
 namespace IPS\Node\Api\GraphQL;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\GraphQL\SafeException;
-use IPS\Member;
-use IPS\Node\Model;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base mutator class for nodes
  */
-class NodeMutator
+class _NodeMutator
 {
 	/**
 	 * Mark a node as read
 	 *
-	 * @param Model $node		The comment to add a reaction on
-	 * @return	Model
+	 * @param 	int 					$reactionID 	ID of reaction to add
+	 * @param	\IPS\Content\Comment	$comment		The comment to add a reaction on
+	 * @return	void
 	 */
-	protected function _markRead( Model $node ): Model
+	protected function _markRead( $node )
 	{
-		if( !Member::loggedIn()->member_id )
+		if( !\IPS\Member::loggedIn()->member_id )
 		{
-			throw new SafeException( 'NOT_LOGGED_IN', 'GQL/0004/1', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NOT_LOGGED_IN', 'GQL/0004/1', 403 );
 		}
 
 		try 
@@ -47,9 +41,9 @@ class NodeMutator
 			$itemClass = $node::$contentItemClass;
 			$itemClass::markContainerRead( $node );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'INVALID_NODE', 'GQL/0004/2', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_NODE', 'GQL/0004/2', 403 );
 		}
 
 		return $node;

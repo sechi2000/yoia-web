@@ -11,47 +11,39 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Output;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * "Content" functions Controller
  */
-class content extends Controller
+class _content extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Find content
 	 *
 	 * @return	void
 	 */
-	protected function find() : void
+	protected function find()
 	{
-		if ( ! Request::i()->content_class AND ! Request::i()->content_id AND ! Request::i()->content_commentid )
+		if ( ! \IPS\Request::i()->content_class AND ! \IPS\Request::i()->content_id AND ! \IPS\Request::i()->content_commentid )
 		{
-			Output::i()->error( 'node_error', '2S226/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2S226/1', 404, '' );
 		}
 		
-		$class = 'IPS\\' . implode( '\\', explode( '_', Request::i()->content_class ) );
+		$class = 'IPS\\' . implode( '\\', explode( '_', \IPS\Request::i()->content_class ) );
 
-		if ( ! class_exists( $class ) or ! in_array( 'IPS\Content', class_parents( $class ) ) )
+		if ( ! class_exists( $class ) or ! \in_array( 'IPS\Content', class_parents( $class ) ) )
 		{
-			Output::i()->error( 'node_error', '2S226/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2S226/2', 404, '' );
 		}
 		
 		try
 		{
-			$item = $class::load( Request::i()->content_id );
+			$item = $class::load( \IPS\Request::i()->content_id );
 
 			if( isset( $item::$archiveClass ) AND method_exists( $item, 'isArchived' ) AND $item->isArchived() )
 			{
@@ -62,21 +54,21 @@ class content extends Controller
 				$commentClass = $class::$commentClass;
 			}
 
-			$comment = $commentClass::load( Request::i()->content_commentid );
+			$comment = $commentClass::load( \IPS\Request::i()->content_commentid );
 		}
-		catch( OutOfRangeException $ex )
+		catch( \OutOfRangeException $ex )
 		{
-			Output::i()->error( 'node_error', '2S226/3', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2S226/3', 404, '' );
 		}
 		
 		/* Make sure we have permission to see this */
 		if ( $item->canView() AND $comment->canView() )
 		{
-			Output::i()->redirect( $comment->url() );
+			\IPS\Output::i()->redirect( $comment->url() );
 		}
 		else
 		{
-			Output::i()->error( 'node_error', '2S226/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2S226/4', 404, '' );
 		}
 	}
 }

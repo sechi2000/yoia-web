@@ -11,57 +11,41 @@
 namespace IPS\downloads\extensions\core\AchievementAction;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Achievements\Actions\AchievementActionAbstract;
-use IPS\core\Achievements\Rule;
-use IPS\Db;
-use IPS\downloads\Category;
-use IPS\downloads\File;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement Action Extension
  */
-class DownloadFile extends AchievementActionAbstract
+class _DownloadFile extends \IPS\core\Achievements\Actions\AbstractAchievementAction
 {	
 	/**
 	 * Get filter form elements
 	 *
 	 * @param	array|NULL		$filters	Current filter values (if editing)
-	 * @param	Url	$url		The URL the form is being shown on
+	 * @param	\IPS\Http\Url	$url		The URL the form is being shown on
 	 * @return	array
 	 */
-	public function filters( ?array $filters, Url $url ): array
+	public function filters( ?array $filters, \IPS\Http\Url $url ): array
 	{
-		$return	= parent::filters( $filters, $url );
+		$return	= array();
 
-		$return['nodes'] = new Node( 'achievement_filter_DownloadFile_nodes', ( $filters and isset( $filters['nodes'] ) and $filters['nodes'] ) ? $filters['nodes'] : 0, FALSE, [
+		$return['nodes'] = new \IPS\Helpers\Form\Node( 'achievement_filter_DownloadFile_nodes', ( $filters and isset( $filters['nodes'] ) and $filters['nodes'] ) ? $filters['nodes'] : 0, FALSE, [
 			'url'				=> $url,
 			'class'				=> 'IPS\downloads\Category',
 			'showAllNodes'		=> TRUE,
 			'multiple' 			=> TRUE,
-		], NULL, Member::loggedIn()->language()->addToStack( 'achievement_filter_NewContentItem_node_prefix', FALSE, [ 'sprintf' => [
-			Member::loggedIn()->language()->addToStack( 'downloads_file_sg_lc', FALSE ),
-			Member::loggedIn()->language()->addToStack( 'categories_sg_lc', FALSE )
+		], NULL, \IPS\Member::loggedIn()->language()->addToStack( 'achievement_filter_NewContentItem_node_prefix', FALSE, [ 'sprintf' => [
+			\IPS\Member::loggedIn()->language()->addToStack( 'downloads_file_sg_lc', FALSE ),
+			\IPS\Member::loggedIn()->language()->addToStack( 'categories_sg_lc', FALSE )
 		] ] ) );
-		$return['nodes']->label = Member::loggedIn()->language()->addToStack( 'achievement_filter_NewContentItem_node', FALSE, [ 'sprintf' => [ Member::loggedIn()->language()->addToStack( 'downloads_file_sg_lc', FALSE, [ 'strtolower' => TRUE ] ) ] ] );
+		$return['nodes']->label = \IPS\Member::loggedIn()->language()->addToStack( 'achievement_filter_NewContentItem_node', FALSE, [ 'sprintf' => [ \IPS\Member::loggedIn()->language()->addToStack( 'downloads_file_sg_lc', FALSE, [ 'strtolower' => TRUE ] ) ] ] );
 
-		$return['milestone'] = new Number( 'achievement_filter_DownloadFile_nth', ( $filters and isset( $filters['milestone'] ) and $filters['milestone'] ) ? $filters['milestone'] : 0, FALSE, [], NULL, Member::loggedIn()->language()->addToStack('achievement_filter_nth_their'), Member::loggedIn()->language()->addToStack('achievement_filter_DownloadFile_nth_suffix') );
-		$return['milestone']->label = Member::loggedIn()->language()->addToStack('achievement_filter_NewContentItem_nth');
+		$return['milestone'] = new \IPS\Helpers\Form\Number( 'achievement_filter_DownloadFile_nth', ( $filters and isset( $filters['milestone'] ) and $filters['milestone'] ) ? $filters['milestone'] : 0, FALSE, [], NULL, \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_nth_their'), \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_DownloadFile_nth_suffix') );
+		$return['milestone']->label = \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_NewContentItem_nth');
 
 		return $return;
 	}
@@ -74,7 +58,7 @@ class DownloadFile extends AchievementActionAbstract
 	 */
 	public function formatFilterValues( array $values ): array
 	{
-		$return = parent::formatFilterValues( $values );
+		$return = [];
 		if ( isset( $values['achievement_filter_DownloadFile_nodes'] ) )
 		{
 			$return['nodes'] = array_keys( $values['achievement_filter_DownloadFile_nodes'] );
@@ -93,16 +77,16 @@ class DownloadFile extends AchievementActionAbstract
 	 * calls that BEFORE making its change in the database (or there is read/write separation), you will need to add
 	 * 1 to the value being considered for milestones
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	array		$filters	The value returned by formatFilterValues()
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	bool
 	 */
-	public function filtersMatch( Member $subject, array $filters, mixed $extra = NULL ): bool
+	public function filtersMatch( \IPS\Member $subject, array $filters, $extra = NULL ): bool
 	{
 		if ( isset( $filters['nodes'] ) )
 		{
-			if ( !in_array( $extra['file']->container()->_id, $filters['nodes'] ) )
+			if ( !\in_array( $extra['file']->container()->_id, $filters['nodes'] ) )
 			{
 				return FALSE;
 			}
@@ -110,7 +94,7 @@ class DownloadFile extends AchievementActionAbstract
 
 		if ( isset( $filters['milestone'] ) )
 		{
-			if ( Db::i()->select( 'COUNT(*)', 'downloads_downloads', [ 'dmid=?', $subject->member_id ] )->first() < $filters['milestone'] )
+			if ( \IPS\Db::i()->select( 'COUNT(*)', 'downloads_downloads', [ 'dmid=?', $subject->member_id ] )->first() < $filters['milestone'] )
 			{
 				return FALSE;
 			}
@@ -141,54 +125,22 @@ class DownloadFile extends AchievementActionAbstract
 	 * @param	array|NULL	$filters	Current filter values
 	 * @return	array
 	 */
-	public function awardOther( mixed $extra = NULL, ?array $filters = NULL ): array
+	public function awardOther( $extra = NULL, ?array $filters = NULL ): array
 	{
 		return [ $extra['downloader'] ];
-	}
-
-	/**
-	 * Determines if the member has already completed this rule.
-	 * Used for retroactive rule completion.
-	 * So far, this is only used in Quests, but may be used elsewhere at a later point.
-	 *
-	 * @param Member $member
-	 * @param array $filters
-	 * @return bool
-	 */
-	public function isRuleCompleted( Member $member, array $filters ) : bool
-	{
-		$where = [
-			[ 'dmid=?', $member->member_id ]
-		];
-
-		if( !empty( $filters['nodes'] ) )
-		{
-			$where[] = [ Db::i()->in( 'file_cat', $filters['nodes'] ) ];
-		}
-
-		$total = Db::i()->select( 'count(*)', 'downloads_downloads', $where )
-			->join( 'downloads_files', 'dfid=file_id' )
-			->first();
-
-		if( !empty( $filters['milestone'] ) )
-		{
-			return $total >= $filters['milestone'];
-		}
-
-		return $total > 0;
 	}
 	
 	/**
 	 * Get identifier to prevent the member being awarded points for the same action twice
 	 * Must be unique within within of this domain, must not exceed 32 chars.
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	string
 	 */
-	public function identifier( Member $subject, mixed $extra = NULL ): string
+	public function identifier( \IPS\Member $subject, $extra = NULL ): string
 	{
-		return $extra['file']->id . '.' . $extra['downloader']->member_id;
+		return (string) $extra['file']->id . '.' . $extra['downloader']->member_id;
 	}
 	
 	/**
@@ -204,35 +156,35 @@ class DownloadFile extends AchievementActionAbstract
 
 		try
 		{
-			$item = File::load( $fileId );
+			$item = \IPS\downloads\File::load( $fileId );
 			$sprintf = [ 'htmlsprintf' => [
-				Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $item->url(), TRUE, $item->mapped('title') ?: $item->indefiniteArticle(), FALSE )
+				\IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $item->url(), TRUE, $item->mapped('title') ?: $item->indefiniteArticle(), FALSE )
 			] ];
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			$sprintf = [ 'sprintf' => [ Member::loggedIn()->language()->addToStack('modcp_deleted') ] ];
+			$sprintf = [ 'sprintf' => [ \IPS\Member::loggedIn()->language()->addToStack('modcp_deleted') ] ];
 		}
 
-		return Member::loggedIn()->language()->addToStack( 'AchievementAction__DownloadFile_log', FALSE, $sprintf );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__DownloadFile_log', FALSE, $sprintf );
 	}
 	
 	/**
 	 * Get "description" for rule
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	public function ruleDescription( Rule $rule ): ?string
+	public function ruleDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		$conditions = [];
 		if ( isset( $rule->filters['milestone'] ) )
 		{
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
 				'htmlsprintf' => [
-					Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'milestone', Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
+					\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'milestone', \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
 				],
-				'sprintf'		=> [ Member::loggedIn()->language()->addToStack('AchievementAction__DownloadFile_title_generic') ]
+				'sprintf'		=> [ \IPS\Member::loggedIn()->language()->addToStack('AchievementAction__DownloadFile_title_generic') ]
 			] );
 		}
 
@@ -241,13 +193,8 @@ class DownloadFile extends AchievementActionAbstract
 			$conditions[] = $nodeCondition;
 		}
 
-		if( $questCondition = $this->_questFilterDescription( $rule ) )
-		{
-			$conditions[] = $questCondition;
-		}
-
-		return Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescription(
-			Member::loggedIn()->language()->addToStack( 'AchievementAction__DownloadFile_title' ),
+		return \IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescription(
+			\IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__DownloadFile_title' ),
 			$conditions
 		);
 	}
@@ -255,10 +202,10 @@ class DownloadFile extends AchievementActionAbstract
 	/**
 	 * Get "description" for rule (usually a description of the rule's filters)
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	protected function _nodeFilterDescription( Rule $rule ): ?string
+	protected function _nodeFilterDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		if ( isset( $rule->filters['nodes'] ) )
 		{
@@ -267,20 +214,20 @@ class DownloadFile extends AchievementActionAbstract
 			{
 				try
 				{
-					$nodeNames[] = Category::load( $id )->_title;
+					$nodeNames[] = \IPS\downloads\Category::load( $id )->_title;
 				}
-				catch ( OutOfRangeException $e ) {}
+				catch ( \OutOfRangeException $e ) {}
 			}
 			if ( $nodeNames )
 			{
-				return Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location', FALSE, [
+				return \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location', FALSE, [
 					'htmlsprintf' => [
-						Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'location',
-							count( $nodeNames ) === 1 ? $nodeNames[0] : Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location_val', FALSE, [ 'sprintf' => [
-								count( $nodeNames ),
-								Member::loggedIn()->language()->addToStack( 'download_categories_lc', FALSE, [ 'strtolower' => TRUE ] )
+						\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'location',
+							\count( $nodeNames ) === 1 ? $nodeNames[0] : \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location_val', FALSE, [ 'sprintf' => [
+								\count( $nodeNames ),
+								\IPS\Member::loggedIn()->language()->addToStack( 'download_categories_lc', FALSE, [ 'strtolower' => TRUE ] )
 							] ] ),
-							count( $nodeNames ) === 1 ? NULL : $nodeNames
+							\count( $nodeNames ) === 1 ? NULL : $nodeNames
 						)
 					],
 				] );
@@ -295,7 +242,7 @@ class DownloadFile extends AchievementActionAbstract
 	 *
 	 * @return	array
 	 */
-	static public function rebuildData(): array
+	static public function rebuildData()
 	{
 		return [ [
 			'table' => 'downloads_downloads',
@@ -312,12 +259,12 @@ class DownloadFile extends AchievementActionAbstract
 	 * @param array		$data	Data collected when starting rebuild [table, pkey...]
 	 * @return void
 	 */
-	public static function rebuildRow( array $row, array $data ) : void
+	public static function rebuildRow( $row, $data )
 	{
-		$file = File::load( $row['dfid'] );
+		$file = \IPS\downloads\File::load( $row['dfid'] );
 		$file->author()->achievementAction( 'downloads', 'DownloadFile', [
 			'file' => $file,
-			'downloader' => Member::load( $row['dmid'] )
+			'downloader' => \IPS\Member::load( $row['dmid'] )
 		] );
 	}
 

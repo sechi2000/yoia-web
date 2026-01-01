@@ -12,44 +12,30 @@ namespace IPS\core\extensions\core\Sitemap;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use Exception;
-use IPS\Application;
-use IPS\Application\Module;
-use IPS\Content\ExtensionGenerator;
-use IPS\Content\Filter;
-use IPS\Content\Item;
 use IPS\Db;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\YesNo;
-use IPS\IPS;
 use IPS\Member;
-use IPS\Node\Model;
 use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Sitemap;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function in_array;
-use function intval;
-use const IPS\SITEMAP_MAX_PER_FILE;
+use function array_merge;
+use function class_implements;
+use function implode;
+use function json_encode;
+use function md5;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Support Content in sitemaps
  */
-class Content extends ExtensionGenerator
+class _Content extends \IPS\Content\ExtensionGenerator
 {
 	/**
 	 * @brief	If TRUE, will prevent comment classes being included
 	 */
-	protected static bool $contentItemsOnly = TRUE;
+	protected static $contentItemsOnly = TRUE;
 	
 	const RECOMMENDED_NODE_PRIORIY = 0.6;
 	const RECOMMENDED_ITEM_PRIORITY = 1;
@@ -58,16 +44,15 @@ class Content extends ExtensionGenerator
 	/**
 	 * @brief	Recommended Settings
 	 */
-	public array $recommendedSettings = array();
+	public $recommendedSettings = array();
 	
 	/**
 	 * Add settings for ACP configuration to the form
 	 *
 	 * @return	array
 	 */
-	public function settings(): array
+	public function settings()
 	{
-		/* @var Item $class */
 		$class = $this->class;
 		if ( $class::$includeInSitemap === FALSE )
 		{
@@ -84,16 +69,16 @@ class Content extends ExtensionGenerator
 		$this->recommendedSettings["sitemap_{$class::$title}_priority"] = self::RECOMMENDED_ITEM_PRIORITY;
 		$this->recommendedSettings["sitemap_{$class::$title}_include"] = true;
 	
-		$settings = Settings::i()->sitemap_content_settings ? json_decode( Settings::i()->sitemap_content_settings, TRUE ) : array();
+		$settings = \IPS\Settings::i()->sitemap_content_settings ? json_decode( \IPS\Settings::i()->sitemap_content_settings, TRUE ) : array();
 	
-		Member::loggedIn()->language()->words[ 'sitemap_core_Content_' . mb_substr( str_replace( '\\', '_', $class ), 4 ) ] = Member::loggedIn()->language()->addToStack( $class::$title . '_pl', FALSE );
-		Member::loggedIn()->language()->words[ "sitemap_{$class::$title}_priority_desc" ] = Member::loggedIn()->language()->addToStack( 'sitemap_priority_generic_desc', FALSE );
+		\IPS\Member::loggedIn()->language()->words[ 'sitemap_core_Content_' . mb_substr( str_replace( '\\', '_', $class ), 4 ) ] = \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl', FALSE );
+		\IPS\Member::loggedIn()->language()->words[ "sitemap_{$class::$title}_priority_desc" ] = \IPS\Member::loggedIn()->language()->addToStack( 'sitemap_priority_generic_desc', FALSE );
 	
 		$return = array();
 
-		$countToInclude = $settings["sitemap_{$class::$title}_count"] ?? $this->recommendedSettings["sitemap_{$class::$title}_count"];
+		$countToInclude = isset( $settings["sitemap_{$class::$title}_count"] ) ? $settings["sitemap_{$class::$title}_count"] : $this->recommendedSettings["sitemap_{$class::$title}_count"];
 
-		Member::loggedIn()->language()->words[ "sitemap_{$class::$title}_include" ] = Member::loggedIn()->language()->addToStack( 'sitemap_include_generic_desc', FALSE );
+		\IPS\Member::loggedIn()->language()->words[ "sitemap_{$class::$title}_include" ] = \IPS\Member::loggedIn()->language()->addToStack( 'sitemap_include_generic_desc', FALSE );
 		$toggles = array( "sitemap_{$class::$title}_count", "sitemap_{$class::$title}_priority" );
 
 		if ( isset( $class::$containerNodeClass ) )
@@ -101,20 +86,19 @@ class Content extends ExtensionGenerator
 			$toggles[] = "sitemap_{$nodeClass::$nodeTitle}_priority";
 		}
 
-		$return["sitemap_{$class::$title}_include"] = new YesNo( "sitemap_{$class::$title}_include", $countToInclude != 0, FALSE, array( 'togglesOn' => $toggles ), NULL, NULL, NULL, "sitemap_{$class::$title}_include" );
+		$return["sitemap_{$class::$title}_include"] = new \IPS\Helpers\Form\YesNo( "sitemap_{$class::$title}_include", $countToInclude != 0, FALSE, array( 'togglesOn' => $toggles ), NULL, NULL, NULL, "sitemap_{$class::$title}_include" );
 
 		if ( isset( $class::$containerNodeClass ) )
 		{
-			/* @var Model $nodeClass */
-			Member::loggedIn()->language()->words[ "sitemap_{$nodeClass::$nodeTitle}_priority_desc" ] = Member::loggedIn()->language()->addToStack( 'sitemap_priority_generic_desc', FALSE );
-			$return["sitemap_{$nodeClass::$nodeTitle}_priority"] = new Select( "sitemap_{$nodeClass::$nodeTitle}_priority", $settings["sitemap_{$nodeClass::$nodeTitle}_priority"] ?? $this->recommendedSettings["sitemap_{$nodeClass::$nodeTitle}_priority"], FALSE, array( 'options' => Sitemap::$priorities, 'unlimited' => '-1', 'unlimitedLang' => 'sitemap_dont_include' ), NULL, NULL, NULL, "sitemap_{$nodeClass::$nodeTitle}_priority" );
-			$return["sitemap_{$nodeClass::$nodeTitle}_priority"]->label	= Member::loggedIn()->language()->addToStack( 'sitemap_priority_container' );
+			\IPS\Member::loggedIn()->language()->words[ "sitemap_{$nodeClass::$nodeTitle}_priority_desc" ] = \IPS\Member::loggedIn()->language()->addToStack( 'sitemap_priority_generic_desc', FALSE );
+			$return["sitemap_{$nodeClass::$nodeTitle}_priority"] = new \IPS\Helpers\Form\Select( "sitemap_{$nodeClass::$nodeTitle}_priority", isset( $settings["sitemap_{$nodeClass::$nodeTitle}_priority"] ) ? $settings["sitemap_{$nodeClass::$nodeTitle}_priority"] : $this->recommendedSettings["sitemap_{$nodeClass::$nodeTitle}_priority"], FALSE, array( 'options' => \IPS\Sitemap::$priorities, 'unlimited' => '-1', 'unlimitedLang' => 'sitemap_dont_include' ), NULL, NULL, NULL, "sitemap_{$nodeClass::$nodeTitle}_priority" );
+			$return["sitemap_{$nodeClass::$nodeTitle}_priority"]->label	= \IPS\Member::loggedIn()->language()->addToStack( 'sitemap_priority_container' );
 		}
 		
-		$return["sitemap_{$class::$title}_count"]	 = new Number( "sitemap_{$class::$title}_count", $countToInclude, FALSE, array( 'min' => '-1', 'unlimited' => '-1' ), NULL, NULL, NULL, "sitemap_{$class::$title}_count" );
-		$return["sitemap_{$class::$title}_count"]->label	= Member::loggedIn()->language()->addToStack( 'sitemap_number_generic' );
-		$return["sitemap_{$class::$title}_priority"] = new Select( "sitemap_{$class::$title}_priority", $settings["sitemap_{$class::$title}_priority"] ?? $this->recommendedSettings["sitemap_{$class::$title}_priority"], FALSE, array( 'options' => Sitemap::$priorities, 'unlimited' => '-1', 'unlimitedLang' => 'sitemap_dont_include' ), NULL, NULL, NULL, "sitemap_{$class::$title}_priority" );
-		$return["sitemap_{$class::$title}_priority"]->label	= Member::loggedIn()->language()->addToStack( 'sitemap_priority_generic' );
+		$return["sitemap_{$class::$title}_count"]	 = new \IPS\Helpers\Form\Number( "sitemap_{$class::$title}_count", $countToInclude, FALSE, array( 'min' => '-1', 'unlimited' => '-1' ), NULL, NULL, NULL, "sitemap_{$class::$title}_count" );
+		$return["sitemap_{$class::$title}_count"]->label	= \IPS\Member::loggedIn()->language()->addToStack( 'sitemap_number_generic' );
+		$return["sitemap_{$class::$title}_priority"] = new \IPS\Helpers\Form\Select( "sitemap_{$class::$title}_priority", isset( $settings["sitemap_{$class::$title}_priority"] ) ? $settings["sitemap_{$class::$title}_priority"] : $this->recommendedSettings["sitemap_{$class::$title}_priority"], FALSE, array( 'options' => \IPS\Sitemap::$priorities, 'unlimited' => '-1', 'unlimitedLang' => 'sitemap_dont_include' ), NULL, NULL, NULL, "sitemap_{$class::$title}_priority" );
+		$return["sitemap_{$class::$title}_priority"]->label	= \IPS\Member::loggedIn()->language()->addToStack( 'sitemap_priority_generic' );
 		
 		return $return;
 	}
@@ -125,15 +109,14 @@ class Content extends ExtensionGenerator
 	 * @param	array	$values	Values
 	 * @return	void
 	 */
-	public function saveSettings( array $values ) : void
+	public function saveSettings( $values )
 	{
 		if ( $values['sitemap_configuration_info'] )
 		{
-			Settings::i()->changeValues( array( 'sitemap_content_settings' => json_encode( array() ) ) );
+			\IPS\Settings::i()->changeValues( array( 'sitemap_content_settings' => json_encode( array() ) ) );
 		}
 		else
 		{
-			/* @var Item $class */
 			$class = $this->class;
 
 			if ( $class::$includeInSitemap === FALSE )
@@ -141,7 +124,7 @@ class Content extends ExtensionGenerator
 				return;
 			}
 
-			$toSave = Settings::i()->sitemap_content_settings ? json_decode( Settings::i()->sitemap_content_settings, TRUE ) : array();
+			$toSave = \IPS\Settings::i()->sitemap_content_settings ? json_decode( \IPS\Settings::i()->sitemap_content_settings, TRUE ) : array();
 			
 			if ( isset( $class::$containerNodeClass ) )
 			{
@@ -159,7 +142,7 @@ class Content extends ExtensionGenerator
 				$toSave["sitemap_{$class::$title}_count"] = 0;
 			}
 			
-			Settings::i()->changeValues( array( 'sitemap_content_settings' => json_encode( $toSave ) ) );
+			\IPS\Settings::i()->changeValues( array( 'sitemap_content_settings' => json_encode( $toSave ) ) );
 		}
 	}
 
@@ -168,9 +151,8 @@ class Content extends ExtensionGenerator
 	 *
 	 * @return	array
 	 */
-	public function getFilenames(): array
+	public function getFilenames()
 	{
-		/* @var Item $class */
 		$class = $this->class;
 	
 		if ( $class::$includeInSitemap === FALSE )
@@ -179,9 +161,9 @@ class Content extends ExtensionGenerator
 		}
 
 		$files = array();
-		$settings = Settings::i()->sitemap_content_settings ? json_decode( Settings::i()->sitemap_content_settings, TRUE ) : array();
+		$settings = \IPS\Settings::i()->sitemap_content_settings ? json_decode( \IPS\Settings::i()->sitemap_content_settings, TRUE ) : array();
 
-		$requestedCount = $settings["sitemap_{$class::$title}_count"] ?? -1;
+		$requestedCount = isset( $settings["sitemap_{$class::$title}_count"] ) ? $settings["sitemap_{$class::$title}_count"] : -1;
 
 		if( $requestedCount == 0 )
 		{
@@ -191,19 +173,19 @@ class Content extends ExtensionGenerator
 		/* Check that guests can access the content at all */
 		try
 		{
-			$app = Application::load( $class::$application );
-			if ( !$app->canAccess( new Member ) )
+			$app = \IPS\Application::load( $class::$application );
+			if ( !$app->canAccess( new \IPS\Member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
-			$module = Module::get( $class::$application, $class::$module, 'front' );
-			if ( !$module->can( 'view', new Member ) )
+			$module = \IPS\Application\Module::get( $class::$application, $class::$module, 'front' );
+			if ( !$module->can( 'view', new \IPS\Member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			return array();
 		}
@@ -211,22 +193,22 @@ class Content extends ExtensionGenerator
 		if ( isset( $class::$containerNodeClass ) )
 		{
 			$containerClass = $class::$containerNodeClass;
-
+			
 			/* We need one file for the nodes */
 			$files[] = 'sitemap_content_' . str_replace( '\\', '_', mb_substr( $containerClass, 4 ) );
 			$where = [];
 
 			/* Get the count in the most efficient way possible */
-			if ( in_array( 'IPS\Node\Permissions', class_implements( $containerClass ) ) )
+			if ( \in_array( 'IPS\Content\Permissions', class_implements( $class ) ) )
 			{
 				$member = new Member;
 				$containerWhere = [];
 				$categories = [];
 				/* @var $permissionMap array */
-				$permQuery = Db::i()->select( 'perm_type_id', 'core_permission_index', array( "core_permission_index.app='" . $containerClass::$permApp . "' AND core_permission_index.perm_type='" . $containerClass::$permType . "' AND (" . Db::i()->findInSet( 'perm_' . $containerClass::$permissionMap['read'], $member->permissionArray() ) . ' OR ' . 'perm_' . $containerClass::$permissionMap['read'] . "='*' )" ) );
+				$permQuery = \IPS\Db::i()->select( 'perm_type_id', 'core_permission_index', array( "core_permission_index.app='" . $containerClass::$permApp . "' AND core_permission_index.perm_type='" . $containerClass::$permType . "' AND (" . \IPS\Db::i()->findInSet( 'perm_' . $containerClass::$permissionMap['read'], $member->permissionArray() ) . ' OR ' . 'perm_' . $containerClass::$permissionMap['read'] . "='*' )" ) );
 
 				/* If we cannot access clubs, skip them */
-				if ( IPS::classUsesTrait( $containerClass, 'IPS\Content\ClubContainer' ) AND !$member->canAccessModule( Module::get( 'core', 'clubs', 'front' ) ) )
+				if ( \IPS\IPS::classUsesTrait( $containerClass, 'IPS\Content\ClubContainer' ) AND !$member->canAccessModule( \IPS\Application\Module::get( 'core', 'clubs', 'front' ) ) )
 				{
 					$containerWhere[] = array( $containerClass::$databaseTable . '.' . $containerClass::$databasePrefix . $containerClass::clubIdColumn() . ' IS NULL' );
 				}
@@ -256,13 +238,13 @@ class Content extends ExtensionGenerator
 		else
 		{
 			/* And however many for the content items */
-			$contentItems = $class::getItemsWithPermission( $class::sitemapWhere(), NULL, NULL, 'read', Filter::FILTER_AUTOMATIC, 0, new Member, false, false, false, TRUE );
+			$contentItems = $class::getItemsWithPermission( $class::sitemapWhere(), NULL, NULL, 'read', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY, 0, new \IPS\Member, NULL, NULL, NULL, TRUE );
 		}
 
 		/* Choose which count to use to calculate the number of filess */
 		$usedCount = ( $requestedCount > $contentItems OR $requestedCount <= 0 ) ? $contentItems : $requestedCount;
 
-		$count = ceil( $usedCount / SITEMAP_MAX_PER_FILE );
+		$count = ceil( $usedCount / \IPS\SITEMAP_MAX_PER_FILE );
 		for( $i=1; $i <= $count; $i++ )
 		{
 			$files[] = 'sitemap_content_' . str_replace( '\\', '_', mb_substr( $class, 4 ) ) . '_' . $i;
@@ -275,12 +257,11 @@ class Content extends ExtensionGenerator
 	 * Generate the sitemap
 	 *
 	 * @param	string			$filename	The sitemap file to build (should be one returned from getFilenames())
-	 * @param	Sitemap	$sitemap	Sitemap object reference
-	 * @return	int|null
+	 * @param	\IPS\Sitemap	$sitemap	Sitemap object reference
+	 * @return	void
 	 */
-	public function generateSitemap( string $filename, Sitemap $sitemap ) : ?int
+	public function generateSitemap( $filename, $sitemap )
 	{
-		/* @var Item $class */
 		$class = $this->class;
 		if ( isset( $class::$containerNodeClass ) )
 		{
@@ -288,30 +269,28 @@ class Content extends ExtensionGenerator
 		}
 		$entries	= array();
 		$lastId		= 0;
-		$settings	= Settings::i()->sitemap_content_settings ? json_decode( Settings::i()->sitemap_content_settings, TRUE ) : array();
+		$settings	= \IPS\Settings::i()->sitemap_content_settings ? json_decode( \IPS\Settings::i()->sitemap_content_settings, TRUE ) : array();
 		
 		if ( isset( $nodeClass ) and $filename == 'sitemap_content_' . str_replace( '\\', '_', mb_substr( $nodeClass, 4 ) ) )
 		{
-			/* @var Model $nodeClass */
-			/* @var array $permissionMap */
 			$select = array();
-			if ( in_array( 'IPS\Node\Permissions', class_implements( $nodeClass ) ) )
+			if ( \in_array( 'IPS\Content\Permissions', class_implements( $nodeClass ) ) or \in_array( 'IPS\Node\Permissions', class_implements( $nodeClass ) ) )
 			{
-				$select = new ActiveRecordIterator( Db::i()->select( '*', $nodeClass::$databaseTable, array( '(' . Db::i()->findInSet( "perm_{$nodeClass::$permissionMap['read']}", array( Settings::i()->guest_group ) ) . ' OR ' . "perm_{$nodeClass::$permissionMap['read']}=? )", '*' ) )->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id={$nodeClass::$databaseTable}.{$nodeClass::$databasePrefix}{$nodeClass::$databaseColumnId}", $nodeClass::$permApp, $nodeClass::$permType ) ), $nodeClass );
+				$select = new ActiveRecordIterator( \IPS\Db::i()->select( '*', $nodeClass::$databaseTable, array( '(' . \IPS\Db::i()->findInSet( "perm_{$nodeClass::$permissionMap['read']}", array( \IPS\Settings::i()->guest_group ) ) . ' OR ' . "perm_{$nodeClass::$permissionMap['read']}=? )", '*' ) )->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id={$nodeClass::$databaseTable}.{$nodeClass::$databasePrefix}{$nodeClass::$databaseColumnId}", $nodeClass::$permApp, $nodeClass::$permType ) ), $nodeClass );
 			}
 			else if ( $nodeClass::$ownerTypes !== NULL and is_subclass_of( $nodeClass, 'IPS\Node\Model' ) )
 			{
-                $select = $nodeClass::roots( 'read', new Member );
+                $select = $nodeClass::roots( 'read', new \IPS\Member );
 			}
 
 			foreach ( $select as $node )
 			{
 				/* We only want nodes we can see, and that have actual content inside */
-				if( $node->can( 'view', new Member ) and $node->getContentItemCount() )
+				if( $node->can( 'view', new \IPS\Member ) and $node->getContentItemCount() )
 				{
-					$data = array( 'url' => $node->url(), 'lastmod' => $node->getLastCommentTime( new Member ) );
+					$data = array( 'url' => $node->url(), 'lastmod' => $node->getLastCommentTime( new \IPS\Member ) );
 				
-					$priority = intval( $settings["sitemap_{$nodeClass::$nodeTitle}_priority"] ?? self::RECOMMENDED_NODE_PRIORIY );
+					$priority = \intval( isset( $settings["sitemap_{$nodeClass::$nodeTitle}_priority"] ) ? $settings["sitemap_{$nodeClass::$nodeTitle}_priority"] : self::RECOMMENDED_NODE_PRIORIY );
 					if ( $priority !== -1 )
 					{
 						$data['priority'] = $priority;
@@ -326,8 +305,8 @@ class Content extends ExtensionGenerator
 			$exploded	= explode( '_', $filename );
 			$block		= (int) array_pop( $exploded );
 			$totalLimit	= ( isset( $settings["sitemap_{$class::$title}_count"] ) AND $settings["sitemap_{$class::$title}_count"] ) ? $settings["sitemap_{$class::$title}_count"] : self::RECOMMENDED_ITEM_LIMIT;
-			$offset		= ( $block - 1 ) * SITEMAP_MAX_PER_FILE;
-			$limit		= SITEMAP_MAX_PER_FILE;
+			$offset		= ( $block - 1 ) * \IPS\SITEMAP_MAX_PER_FILE;
+			$limit		= \IPS\SITEMAP_MAX_PER_FILE;
 			
 			if ( ! $totalLimit )
 			{
@@ -344,12 +323,12 @@ class Content extends ExtensionGenerator
 
 			$where	= $class::sitemapWhere();
 			
-			$direction = ( $totalLimit > SITEMAP_MAX_PER_FILE ) ? 'ASC' : 'DESC';
+			$direction = ( $totalLimit > \IPS\SITEMAP_MAX_PER_FILE ) ? 'ASC' : 'DESC';
 
 			/* Try to fetch the highest ID built in the last sitemap, if it exists */
 			try
 			{
-				$lastId = Db::i()->select( 'last_id', 'core_sitemap', array( array( 'sitemap=?', implode( '_', $exploded ) . '_' . ( $block - 1 ) ) ) )->first();
+				$lastId = \IPS\Db::i()->select( 'last_id', 'core_sitemap', array( array( 'sitemap=?', implode( '_', $exploded ) . '_' . ( $block - 1 ) ) ) )->first();
 
 				if( $lastId > 0 )
 				{
@@ -357,12 +336,12 @@ class Content extends ExtensionGenerator
 					$limitClause	= $limit;
 				}
 			}
-			catch( UnderflowException $e ){}
+			catch( \UnderflowException $e ){}
 
 			$idColumn = $class::$databaseColumnId;
 
-			$guest = new Member;
-			foreach ( $class::getItemsWithPermission( $where, $class::$databasePrefix . $class::$databaseColumnId . ' ' . $direction, $limitClause, 'read', Filter::FILTER_PUBLIC_ONLY, Item::SELECT_IDS_FIRST, new Member, TRUE ) as $item )
+			$guest = new \IPS\Member;
+			foreach ( $class::getItemsWithPermission( $where, $class::$databasePrefix . $class::$databaseColumnId . ' ' . $direction, $limitClause, 'read', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY, \IPS\Content\Item::SELECT_IDS_FIRST, new \IPS\Member, TRUE ) as $item )
 			{
 				try
 				{
@@ -382,7 +361,7 @@ class Content extends ExtensionGenerator
 						$data['lastmod'] = $lastMod;
 					}
 				
-					$priority = ( $item->sitemapPriority() ?: ( intval( $settings["sitemap_{$class::$title}_priority"] ?? self::RECOMMENDED_ITEM_PRIORITY ) ) );
+					$priority = ( $item->sitemapPriority() ?: ( \intval( isset( $settings["sitemap_{$class::$title}_priority"] ) ? $settings["sitemap_{$class::$title}_priority"] : self::RECOMMENDED_ITEM_PRIORITY ) ) );
 					if ( $priority !== -1 )
 					{
 						$data['priority'] = $priority;
@@ -390,7 +369,7 @@ class Content extends ExtensionGenerator
 
 					$entries[] = $data;
 				}
-				catch( Exception $e ) { }
+				catch( \Exception $e ) { }
 
 				$lastId = $item->$idColumn;
 			}

@@ -10,30 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use GraphQL\Type\Definition\ListOfType;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\PromotedItemType;
-use IPS\core\Feature;
-use function count;
-use function defined;
-use function is_int;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * OurPicks query for GraphQL API
  */
-class OurPicks
+class _OurPicks
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns promoted items";
+	public static $description = "Returns promoted items";
 
 	/*
 	 * Query arguments
@@ -47,10 +42,8 @@ class OurPicks
 
 	/**
 	 * Return the query return type
-	 *
-	 * @return ListOfType<PromotedItemType>
 	 */
-	public function type() : ListOfType
+	public function type() 
 	{
 		return TypeRegistry::listOf( \IPS\core\api\GraphQL\TypeRegistry::promotedItem() );
 	}
@@ -58,21 +51,21 @@ class OurPicks
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @return	array|null
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\core\Stream
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : ?array
+	public function resolve($val, $args, $context)
 	{
 		$limit = 7;
-		if( isset( $args['count'] ) && is_int( $args['count'] ) )
+		if( isset( $args['count'] ) && \is_int( $args['count'] ) )
 		{
 			$limit = $args['count'];
 		}
 
-		$items = Feature::internalStream( $limit );
-		if( !count( $items ) )
+		$items = \IPS\core\Promote::internalStream( $limit );
+		if( !\count( $items ) )
 		{
 			return NULL;
 		}

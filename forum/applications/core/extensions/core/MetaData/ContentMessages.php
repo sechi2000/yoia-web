@@ -11,40 +11,38 @@
 namespace IPS\core\extensions\core\MetaData;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use IPS\Content\Item;
-use IPS\Member;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Meta Data: Content Item Messages
  */
-class ContentMessages
+class _ContentMessages
 {
 	/**
 	 * Can perform an action on a message
 	 *
 	 * @param	string				$action		The action
-	 * @param	Item	$item		The content item
-	 * @param	Member|NULL	$member		The member, or NULL for currently logged in
+	 * @param	\IPS\Content\Item	$item		The content item
+	 * @param	\IPS\Member|NULL	$member		The member, or NULL for currently logged in
 	 * @return	bool
 	 */
-	public function canOnMessage( string $action, Item $item, ?Member $member = NULL ) : bool
+	public function canOnMessage( $action, \IPS\Content\Item $item, \IPS\Member $member = NULL )
 	{
-		if ( !in_array( 'core_ContentMessages', $item::supportedMetaDataTypes() ) )
+		if ( !( $item instanceof \IPS\Content\MetaData ) )
 		{
 			return FALSE;
 		}
 		
-		$member = $member ?: Member::loggedIn();
+		if ( !\in_array( 'core_ContentMessages', $item::supportedMetaDataTypes() ) )
+		{
+			return FALSE;
+		}
+		
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		if ( !$member->member_id )
 		{
@@ -57,7 +55,7 @@ class ContentMessages
 			{
 				return $item::modPermission( 'view_hidden', $member, $item->container() );
 			}
-			catch( BadMethodCallException $e )
+			catch( \BadMethodCallException $e )
 			{
 				return $item::modPermission( 'view_hidden', $member );
 			}
@@ -67,10 +65,12 @@ class ContentMessages
 		{
 			return $item::modPermission( "{$action}_item_message", $member, $item->container() );
 		}
-		catch( BadMethodCallException $e )
+		catch( \BadMethodCallException $e )
 		{
 			return $member->modPermission( "can_{$action}_item_message" );
 		}
+		
+		return FALSE;
 	}
 
 	/**
@@ -78,22 +78,24 @@ class ContentMessages
 	 *
 	 * @param	string				$message		The message
 	 * @param	string|NULL			$color			The message color
-	 * @param	Item	$item			The content item
-	 * @param	Member|NULL	$member			User adding the message
+	 * @param	\IPS\Content\Item	$item			The content item
+	 * @param	\IPS|Member|NULL	$member			User adding the message
 	 * @param	bool				$isPublic		Who should see the message
 	 * @return	int
 	 */
-	public function addMessage( string $message, ?string $color, Item $item, ?Member $member = NULL, bool $isPublic = TRUE ) : int
+	public function addMessage( $message, $color, \IPS\Content\Item $item, \IPS\Member $member = NULL, bool $isPublic = TRUE )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
-		return $item->addMeta( 'core_ContentMessages', array(
+		$id = $item->addMeta( 'core_ContentMessages', array(
 			'message'	=> $message,
 			'color'		=> $color,
 			'added_by'	=> $member->member_id,
 			'is_public' => $isPublic,
 			'date'			=> time(),
 		) );
+		
+		return $id;
 	}
 	
 	/**
@@ -102,14 +104,14 @@ class ContentMessages
 	 * @param	int					$id			The ID
 	 * @param	string				$message	The new message
 	 * @param	string|NULL			$color		The message color
-	 * @param	Item	$item		The content item
-	 * @param	Member|NULL	$member		The member editing the message, or NULL for currently logged in
+	 * @param	\IPS\Content\Item	$item		The content item
+	 * @param	\IPS\Member|NULL	$member		The member editing the message, or NULL for currently logged in
 	 * @param	bool				$isPublic		Who should see the message
 	 * @return	void
 	 */
-	public function editMessage( int $id, string $message, ?string $color, Item $item, ?Member $member = NULL, bool $isPublic = TRUE ) : void
+	public function editMessage( $id, $message, $color, \IPS\Content\Item $item, \IPS\Member $member = NULL, bool $isPublic = TRUE )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		$item->editMeta( $id, array(
 			'message'	=> $message,
@@ -123,29 +125,27 @@ class ContentMessages
 	 * Delete Item Message
 	 *
 	 * @param	int					$id			The ID
-	 * @param	Item	$item		The content item
-	 * @param	Member|NULL	$member		The member deleting the message
-	 * @return void
+	 * @param	\IPS\Content\Item	$item		The content item
+	 * @param	\IPS\Member|NULL	$member		The member deleting the message
 	 */
-	public function deleteMessage( int $id, Item $item, ?Member $member = NULL ) : void
+	public function deleteMessage( $id, \IPS\Content\Item $item, \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		$item->deleteMeta( $id );
 	}
-
+	
 	/**
 	 * Get Item Messages
 	 *
-	 * @param Item $item The content item
-	 * @param Member|null $member
-	 * @return    array
+	 * @param	\IPS\Content\Item	$item	The content item
+	 * @return	array
 	 */
-	public function getMessages( Item $item, ?Member $member = NULL ) : array
+	public function getMessages( \IPS\Content\Item $item, \IPS\Member $member = NULL )
 	{
 		if ( $meta = $item->getMeta() AND isset( $meta['core_ContentMessages'] ) )
 		{
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
 
 			/* None moderators see only public messages */
 			if ( !$this->canOnMessage('viewHidden', $item, $member) )

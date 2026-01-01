@@ -11,42 +11,39 @@
 
 namespace IPS\blog\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
-use IPS\blog\api\GraphQL\TypeRegistry;
-use IPS\blog\Blog;
-use IPS\Node\Api\GraphQL\NodeType;
-use function defined;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * BlogType for GraphQL API
  */
-class BlogType extends NodeType
+class _BlogType extends \IPS\Node\Api\GraphQL\NodeType
 {
     /*
      * @brief 	The item classname we use for this type
      */
-    protected static string $nodeClass	= Blog::class;
+    protected static $nodeClass	= \IPS\blog\Blog::class;
 
     /*
      * @brief 	GraphQL type name
      */
-    protected static string $typeName = 'blog_Blog';
+    protected static $typeName = 'blog_Blog';
 
     /*
      * @brief 	GraphQL type description
      */
-    protected static string $typeDescription = 'A blog';
+    protected static $typeDescription = 'A blog';
 
     /*
      * @brief 	Follow data passed in to FollowType resolver
      */
-    protected static array $followData = array('app' => 'blog', 'area' => 'blog');
+    protected static $followData = array('app' => 'blog', 'area' => 'blog');
 
 
     /**
@@ -54,8 +51,8 @@ class BlogType extends NodeType
      *
      * @return	ObjectType
      */
-    public static function getItemType(): ObjectType
-	{
-        return TypeRegistry::entry();
+    public static function getItemType()
+    {
+        return \IPS\blog\api\GraphQL\TypeRegistry::entry();
     }
 }

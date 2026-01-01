@@ -11,34 +11,21 @@
 namespace IPS\core\modules\setup\install;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\core\Setup\Install as InstallClass;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Installer: Install
  */
-class install extends Controller
+class _install extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Install
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		require \IPS\ROOT_PATH . '/conf_global.php';
 		
@@ -47,20 +34,20 @@ class install extends Controller
 		   a pause fixes the issue so we manually request a page refresh rather than doing it automatically */
 		if ( ! isset( $INFO['admin_user'] ) )
 		{
-			Output::i()->title	 = Member::loggedIn()->language()->addToStack('install');
-			Output::i()->output = Theme::i()->getTemplate( 'global' )->manualStart();
+			\IPS\Output::i()->title	 = \IPS\Member::loggedIn()->language()->addToStack('install');
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->manualStart();
 			
 			return;
 		}
 		
-		$multipleRedirect = new MultipleRedirect(
-			Url::internal( 'controller=install' ),
+		$multipleRedirect = new \IPS\Helpers\MultipleRedirect(
+			\IPS\Http\Url::internal( 'controller=install' ),
 			function( $data )
 			{
 				try
 				{
 					require \IPS\ROOT_PATH . '/conf_global.php';
-					$install = new InstallClass(
+					$install = new \IPS\core\Setup\Install(
 						$INFO['apps'],
 						$INFO['default_app'],
 						$INFO['base_url'],
@@ -72,43 +59,43 @@ class install extends Controller
 						$INFO['diagnostics_reporting']
 						);
 				}
-				catch ( InvalidArgumentException $e )
+				catch ( \InvalidArgumentException $e )
 				{
-					Output::i()->error( 'error', '4S112/1', 403, '' );
+					\IPS\Output::i()->error( 'error', '4S112/1', 403, '' );
 				}
 		
 				try
 				{
 					return $install->process( $data );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					$backtrace = $e->getTraceAsString();
 
-					$error = Theme::i()->getTemplate( 'global' )->error( "Error", $e->getMessage() ?: "Error", $e->getCode(), $backtrace );
+					$error = \IPS\Theme::i()->getTemplate( 'global' )->error( "Error", $e->getMessage() ?: "Error", $e->getCode(), $backtrace );
 					
-					Request::i()->start = true;
-					Output::i()->title	 = Member::loggedIn()->language()->addToStack('error');
-					Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'install', $error, FALSE );
+					\IPS\Request::i()->start = true;
+					\IPS\Output::i()->title	 = \IPS\Member::loggedIn()->language()->addToStack('error');
+					\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'install', $error, FALSE );
 					 
 					/* If we're still here - output */
-					if ( Request::i()->isAjax() )
+					if ( \IPS\Request::i()->isAjax() )
 					{
-						Output::i()->sendOutput( Output::i()->output, 200, 'text/html' );
+						\IPS\Output::i()->sendOutput( \IPS\Output::i()->output, 200, 'text/html' );
 					}
 					else
 					{
-						Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( Output::i()->title, Output::i()->output ), 403, 'text/html' );
+						\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( \IPS\Output::i()->title, \IPS\Output::i()->output ), 403, 'text/html' );
 					}
 				}
 			},
 			function()
 			{
-				Output::i()->redirect( Url::internal( 'controller=done' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'controller=done' ) );
 			}
 		);
 	
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('install');
-		Output::i()->output	= Theme::i()->getTemplate( 'global' )->block( 'install', $multipleRedirect, FALSE );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('install');
+		\IPS\Output::i()->output	= \IPS\Theme::i()->getTemplate( 'global' )->block( 'install', $multipleRedirect, FALSE );
 	}
 }

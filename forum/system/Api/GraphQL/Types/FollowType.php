@@ -12,27 +12,23 @@
 namespace IPS\Api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content;
-use IPS\Db;
-use IPS\Member;
-use UnderflowException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * FollowType for GraphQL API
  */
-class FollowType extends ObjectType
+class _FollowType extends ObjectType
 {
 	/**
 	 * Get root type
 	 *
+	 * @return	array
 	 */
 	public function __construct()
 	{		 
@@ -51,13 +47,13 @@ class FollowType extends ObjectType
 				'followID' => [
 					'type' => TypeRegistry::id(),
 					'resolve' => function ($followData) {
-						return md5( $followData['app'] . ';' . $followData['area'] . ';' . $followData['id'] . ';' .  Member::loggedIn()->member_id );
+						return md5( $followData['app'] . ';' . $followData['area'] . ';' . $followData['id'] . ';' .  \IPS\Member::loggedIn()->member_id );
 					}
 				],
 				'isFollowing' => [
 					'type' => TypeRegistry::boolean(),
 					'resolve' => function ($followData) {
-						return Member::loggedIn()->following( $followData['app'], $followData['area'], $followData['id'] );
+						return \IPS\Member::loggedIn()->following( $followData['app'], $followData['area'], $followData['id'] );
 					}
 				],
 				'followType' => [
@@ -66,18 +62,18 @@ class FollowType extends ObjectType
 						'values' => ['NOT_FOLLOWING', 'PUBLIC', 'ANONYMOUS']
 					]),
 					'resolve' => function ($followData) {
-						if( !Member::loggedIn()->following( $followData['app'], $followData['area'], $followData['id'] ) )
+						if( !\IPS\Member::loggedIn()->following( $followData['app'], $followData['area'], $followData['id'] ) )
 						{
 							return 'NOT_FOLLOWING';
 						}
 
 						try
 						{
-							$current = Db::i()->select( 'follow_is_anon', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=? AND follow_member_id=?', $followData['app'], $followData['area'], $followData['id'], Member::loggedIn()->member_id ), NULL, array() )->first();
+							$current = \IPS\Db::i()->select( 'follow_is_anon', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=? AND follow_member_id=?', $followData['app'], $followData['area'], $followData['id'], \IPS\Member::loggedIn()->member_id ), NULL, array(), NULL, NULL )->first();
 
 							return $current['follow_is_anon'] ? 'ANONYMOUS' : 'PUBLIC';
 						}
-						catch ( UnderflowException $e )
+						catch ( \UnderflowException $e )
 						{
 							return 'NOT_FOLLOWING';
 						}
@@ -111,11 +107,11 @@ class FollowType extends ObjectType
 						}
 						elseif( isset( $followData['member'] ) )
 						{
-							return $followData['member']->followersCount( Content::FOLLOW_ANONYMOUS );
+							return $followData['member']->followersCount( \IPS\Member::FOLLOW_ANONYMOUS );
 						}
 						else
 						{
-							return $followData['item']->followersCount( Content::FOLLOW_ANONYMOUS );
+							return $followData['item']->followersCount( $followData['itemClass']::FOLLOW_ANONYMOUS );
 						}
 					}
 				],
@@ -142,7 +138,7 @@ class FollowType extends ObjectType
 						}
 						elseif( isset( $followData['member'] ) )
 						{
-							$_followers = $followData['member']->followers( Content::FOLLOW_PUBLIC, array( 'none', 'immediate', 'daily', 'weekly' ), NULL, array( $offset, $limit ), 'name' );
+							$_followers = $followData['member']->followers( \IPS\Member::FOLLOW_PUBLIC, array( 'none', 'immediate', 'daily', 'weekly' ), NULL, array( $offset, $limit ), 'name' );
 						}
 						else
 						{
@@ -159,7 +155,7 @@ class FollowType extends ObjectType
 
 						foreach( $_followers as $followerRow )
 						{
-							$followers[] = Member::load( $followerRow['follow_member_id'] );
+							$followers[] = \IPS\Member::load( $followerRow['follow_member_id'] );
 						}
 
 						return $followers;
@@ -180,7 +176,7 @@ class FollowType extends ObjectType
 					]) ),
 					'resolve' => function ($followData, $args) {
 						// No options if we're a guest
-						if( !Member::loggedIn()->member_id )
+						if( !\IPS\Member::loggedIn()->member_id )
 						{
 							return array();
 						}
@@ -188,9 +184,9 @@ class FollowType extends ObjectType
 						/* Do we follow it? */
 						try
 						{
-							$current = Db::i()->select( '*', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=? AND follow_member_id=?', $followData['app'], $followData['area'], $followData['id'], Member::loggedIn()->member_id ), NULL, array() )->first();
+							$current = \IPS\Db::i()->select( '*', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=? AND follow_member_id=?', $followData['app'], $followData['area'], $followData['id'], \IPS\Member::loggedIn()->member_id ), NULL, array(), NULL, NULL )->first();
 						}
-						catch ( UnderflowException $e )
+						catch ( \UnderflowException $e )
 						{
 							$current = FALSE;
 						}
@@ -209,8 +205,8 @@ class FollowType extends ObjectType
 							$followType = 'new_comment';
 						}
 
-						$notificationConfiguration = Member::loggedIn()->notificationsConfiguration();
-						$notificationConfiguration = $notificationConfiguration[$followType] ?? array();
+						$notificationConfiguration = \IPS\Member::loggedIn()->notificationsConfiguration();
+						$notificationConfiguration = isset( $notificationConfiguration[ $followType ] ) ? $notificationConfiguration[ $followType ] : array();
 
 						// Now figure out which options we can have
 						$options = array( array(

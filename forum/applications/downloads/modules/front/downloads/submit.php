@@ -12,57 +12,25 @@
 namespace IPS\downloads\modules\front\downloads;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\core\FrontNavigation;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\downloads\Category;
-use IPS\downloads\File;
-use IPS\downloads\Form\LinkedScreenshots;
-use IPS\File\Iterator;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Stack;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Wizard;
-use IPS\Http\Url;
-use IPS\Image;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Submit File Controller
  */
-class submit extends Controller
+class _submit extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_submit.js', 'downloads', 'front' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_submit.js', 'downloads', 'front' ) );
 
 		parent::execute();
 	}
@@ -72,40 +40,40 @@ class submit extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$form = new Form( 'select_category', 'continue' );
-		$form->class = 'ipsForm--vertical ipsForm--submit-file ipsForm--noLabels';
-		$form->add( new Node( 'select_category', Request::i()->category ?? null, TRUE, array(
-			'url'					=> Url::internal( 'app=downloads&module=downloads&controller=submit', 'front', 'downloads_submit' ),
+		$form = new \IPS\Helpers\Form( 'select_category', 'continue' );
+		$form->class = 'ipsForm_vertical ipsForm_noLabels';
+		$form->add( new \IPS\Helpers\Form\Node( 'select_category', isset( \IPS\Request::i()->category ) ? \IPS\Request::i()->category : NULL, TRUE, array(
+			'url'					=> \IPS\Http\Url::internal( 'app=downloads&module=downloads&controller=submit', 'front', 'downloads_submit' ),
 			'class'					=> 'IPS\downloads\Category',
 			'permissionCheck'		=> 'add',
-			'clubs'					=> Settings::i()->club_nodes_in_apps
+			'clubs'					=> \IPS\Settings::i()->club_nodes_in_apps
 		) ) );
 
-		if ( Member::loggedIn()->group['idm_bulk_submit'] )
+		if ( \IPS\Member::loggedIn()->group['idm_bulk_submit'] )
 		{
-			$form->add( new YesNo( 'bulk', NULL, FALSE, array( 'label' => "bulk_upload_button" ) ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'bulk', NULL, FALSE, array( 'label' => "bulk_upload_button" ) ) );
 		}
 
 		if ( $values = $form->values() )
 		{
-			$url = Url::internal( 'app=downloads&module=downloads&controller=submit&do=submit', 'front', 'downloads_submit' )->setQueryString( 'category', $values['select_category']->_id );
+			$url = \IPS\Http\Url::internal( 'app=downloads&module=downloads&controller=submit&do=submit', 'front', 'downloads_submit' )->setQueryString( 'category', $values['select_category']->_id );
 			if ( isset( $values['bulk'] ) AND $values['bulk'] )
 			{
 				$url = $url->setQueryString( 'bulk', '1' );
 			}
-			if( isset( Request::i()->_new ) )
+			if( isset( \IPS\Request::i()->_new ) )
 			{
 				$url = $url->setQueryString(array( '_new' => '1' ) );
 			}
 					
-			Output::i()->redirect( $url );
+			\IPS\Output::i()->redirect( $url );
 		}
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'select_category' );
-		Output::i()->output = Theme::i()->getTemplate( 'submit' )->categorySelector( $form );
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( 'select_category' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'select_category' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'submit' )->categorySelector( $form );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( 'select_category' ) );
 	}
 
 	/**
@@ -113,7 +81,7 @@ class submit extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function submit() : void
+	protected function submit()
 	{		
 		$steps = array();
 
@@ -125,23 +93,23 @@ class submit extends Controller
 			/* Get category data */
 			try
 			{
-				$category = Category::loadAndCheckPerms( Request::i()->category );
+				$category = \IPS\downloads\Category::loadAndCheckPerms( \IPS\Request::i()->category );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				Output::i()->redirect( Url::internal( 'app=downloads&module=downloads&controller=submit&_step=select_category', 'front', 'downloads_submit' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=downloads&module=downloads&controller=submit&_step=select_category', 'front', 'downloads_submit' ) );
 			}
 
-			if( !$category->can('add') OR !Member::loggedIn()->group['idm_max_size'] )
+			if( !$category->can('add') OR !\IPS\Member::loggedIn()->group['idm_max_size'] )
 			{
-				Output::i()->error( 'add_files_no_perm', '3D286/1', 403, '' );
+				\IPS\Output::i()->error( 'add_files_no_perm', '3D286/1', 403, '' );
 			}
 
-			$form = new Form( 'upload_files', 'continue' );
+			$form = new \IPS\Helpers\Form( 'upload_files', 'continue' );
 
-			$form->class = 'ipsForm--vertical ipsForm--select-file-category';
+			$form->class = 'ipsForm_vertical';
 			$form->hiddenValues['category'] = $category->_id;
-			$form->hiddenValues['postKey'] = Request::i()->postKey ?: md5( mt_rand() );
+			$form->hiddenValues['postKey'] = ( \IPS\Request::i()->postKey ) ? \IPS\Request::i()->postKey : md5( mt_rand() );
 
 			/* Populate any existing records */
 			$files = array();
@@ -171,35 +139,35 @@ class submit extends Controller
 				$maximums[] = ( $category->maxfile / 1024 );
 			}
 
-			if( Member::loggedIn()->group['idm_max_size'] !== -1 )
+			if( \IPS\Member::loggedIn()->group['idm_max_size'] !== -1 )
 			{
-				$maximums[] = ( Member::loggedIn()->group['idm_max_size'] / 1024 );
+				$maximums[] = ( \IPS\Member::loggedIn()->group['idm_max_size'] / 1024 );
 			}
 
-			$form->add( new Upload( 'files', $files, ( !Member::loggedIn()->group['idm_linked_files'] and !Member::loggedIn()->group['idm_import_files'] ), array( 'storageExtension' => 'downloads_Files', 'allowedFileTypes' => $category->types, 'maxFileSize' => ( ( count( $maximums ) ) ? min( $maximums ) : NULL ), 'multiple' => $category->multiple_files, 'minimize' => FALSE ) ) );
+			$form->add( new \IPS\Helpers\Form\Upload( 'files', $files, ( !\IPS\Member::loggedIn()->group['idm_linked_files'] and !\IPS\Member::loggedIn()->group['idm_import_files'] ), array( 'storageExtension' => 'downloads_Files', 'allowedFileTypes' => $category->types, 'maxFileSize' => ( ( \count( $maximums ) ) ? min( $maximums ) : NULL ), 'multiple' => $category->multiple_files, 'minimize' => FALSE ) ) );
 
-			if ( !isset( Request::i()->bulk ) )
+			if ( !isset( \IPS\Request::i()->bulk ) )
 			{
-				if ( Member::loggedIn()->group['idm_linked_files'] )
+				if ( \IPS\Member::loggedIn()->group['idm_linked_files'] )
 				{
-					$form->add( new Stack( 'url_files', $data['url_files'] ?? array(), FALSE, array( 'stackFieldType' => 'Url' ), array( 'IPS\downloads\File', 'blacklistCheck' ) ) );
+					$form->add( new \IPS\Helpers\Form\Stack( 'url_files', isset( $data['url_files'] ) ? $data['url_files'] : array(), FALSE, array( 'stackFieldType' => 'Url' ), array( 'IPS\downloads\File', 'blacklistCheck' ) ) );
 				}
 
-				if ( Member::loggedIn()->group['idm_import_files']  )
+				if ( \IPS\Member::loggedIn()->group['idm_import_files']  )
 				{
-					$form->add( new Stack( 'import_files', array(), FALSE, array( 'placeholder' => \IPS\ROOT_PATH ), function( $val )
+					$form->add( new \IPS\Helpers\Form\Stack( 'import_files', array(), FALSE, array( 'placeholder' => \IPS\ROOT_PATH ), function( $val )
 					{
-						if( $val and is_array( $val ) )
+						if( $val and \is_array( $val ) )
 						{
 							foreach ( $val as $file )
 							{
 								if ( is_dir( $file ) )
 								{
-									throw new DomainException( Member::loggedIn()->language()->addToStack('err_import_files_dir', FALSE, array( 'sprintf' => array( $file ) ) ) );
+									throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack('err_import_files_dir', FALSE, array( 'sprintf' => array( $file ) ) ) );
 								}
 								elseif ( !is_file( $file ) )
 								{
-									throw new DomainException( Member::loggedIn()->language()->addToStack('err_import_files', FALSE, array( 'sprintf' => array( $file ) ) ) );
+									throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack('err_import_files', FALSE, array( 'sprintf' => array( $file ) ) ) );
 								}
 							}
 						}
@@ -214,21 +182,21 @@ class submit extends Controller
 						$maxDims = explode( 'x', $category->maxdims );
 						$image = array( 'maxWidth' => $maxDims[0], 'maxHeight' => $maxDims[1] );
 					}
-					$form->add( new Upload( 'screenshots', $screenshots, ( $category->bitoptions['reqss'] and !Member::loggedIn()->group['idm_linked_files'] ), array(
+					$form->add( new \IPS\Helpers\Form\Upload( 'screenshots', $screenshots, ( $category->bitoptions['reqss'] and !\IPS\Member::loggedIn()->group['idm_linked_files'] ), array(
 						'storageExtension'	=> 'downloads_Screenshots',
 						'image'				=> $image,
 						'maxFileSize'		=> $category->maxss ? ( $category->maxss / 1024 ) : NULL,
 						'multiple'			=> TRUE,
 						'template'			=> "downloads.submit.screenshot",
 					) ) );
-					if ( Member::loggedIn()->group['idm_linked_files'] )
+					if ( \IPS\Member::loggedIn()->group['idm_linked_files'] )
 					{
-						$form->add( new LinkedScreenshots( 'url_screenshots', isset( $data['url_screenshots'] ) ? array( 'values' => $data['url_screenshots'] ) : array(), FALSE, array( 'stackFieldType' => 'Url' ), array( 'IPS\downloads\File', 'blacklistCheck' ) ) );
+						$form->add( new \IPS\downloads\Form\LinkedScreenshots( 'url_screenshots', isset( $data['url_screenshots'] ) ? array( 'values' => $data['url_screenshots'] ) : array(), FALSE, array( 'stackFieldType' => 'Url' ), array( 'IPS\downloads\File', 'blacklistCheck' ) ) );
 					}
 				}
 
 				/* Form Elements */
-				foreach ( File::formElements( NULL, $category ) as $input )
+				foreach ( \IPS\downloads\File::formElements( NULL, $category ) as $input )
 				{
 					$form->add( $input );
 				}
@@ -236,11 +204,8 @@ class submit extends Controller
 				/* Version field (we only show this on create */
 				if( $category->version_numbers )
 				{
-					$form->add( new Text( 'file_version', '1.0.0', $category->version_numbers == 2, array( 'maxLength' => 32 ) ) );
+					$form->add( new \IPS\Helpers\Form\Text( 'file_version', '1.0.0', ( $category->version_numbers == 2 ) ? TRUE : FALSE, array( 'maxLength' => 32 ) ) );
 				}
-
-				/* Call UI extensions, because we bypass that in this controller */
-				File::extendForm( $form, null, $category );
 			}
 
 			if ( $values = $form->values() )
@@ -248,22 +213,22 @@ class submit extends Controller
 				/* Check */
 				if ( empty( $values['files'] ) and empty( $values['url_files'] ) and empty( $values['import_files'] ) )
 				{
-					$form->error = Member::loggedIn()->language()->addToStack('err_no_files');
-					return Theme::i()->getTemplate( 'submit' )->submissionForm( $form, $category, $category->message('subterms'), TRUE, ( Member::loggedIn()->group['idm_bulk_submit'] && Request::i()->bulk ) );
+					$form->error = \IPS\Member::loggedIn()->language()->addToStack('err_no_files');
+					return \IPS\Theme::i()->getTemplate( 'submit' )->submissionForm( $form, $category, $category->message('subterms'), TRUE, ( \IPS\Member::loggedIn()->group['idm_bulk_submit'] && \IPS\Request::i()->bulk ) );
 				}
-				elseif ( !$category->multiple_files AND is_array( $values['files'] ) AND ( count( $values['files'] ?? [] ) + count( $values['url_files'] ?? [] ) + count( $values['import_files'] ?? [] ) > 1 ) )
+				elseif ( !$category->multiple_files AND \is_array( $values['files'] ) AND ( \count( $values['files'] ?? [] ) + \count( $values['url_files'] ?? [] ) + \count( $values['import_files'] ?? [] ) > 1 ) )
 				{
-					$form->error = Member::loggedIn()->language()->addToStack('err_too_many_files');
-					return Theme::i()->getTemplate( 'submit' )->submissionForm( $form, $category, $category->message('subterms'), TRUE, ( Member::loggedIn()->group['idm_bulk_submit'] && Request::i()->bulk ) );
+					$form->error = \IPS\Member::loggedIn()->language()->addToStack('err_too_many_files');
+					return \IPS\Theme::i()->getTemplate( 'submit' )->submissionForm( $form, $category, $category->message('subterms'), TRUE, ( \IPS\Member::loggedIn()->group['idm_bulk_submit'] && \IPS\Request::i()->bulk ) );
 				}
-				if ( !isset( Request::i()->bulk ) && $category->bitoptions['reqss'] and empty( $values['screenshots'] ) and empty( $values['url_screenshots'] ) )
+				if ( !isset( \IPS\Request::i()->bulk ) && $category->bitoptions['reqss'] and empty( $values['screenshots'] ) and empty( $values['url_screenshots'] ) )
 				{
-					$form->error = Member::loggedIn()->language()->addToStack('err_no_screenshots');
-					return Theme::i()->getTemplate( 'submit' )->submissionForm( $form, $category, $category->message('subterms'), TRUE, ( Member::loggedIn()->group['idm_bulk_submit'] && Request::i()->bulk ) );
+					$form->error = \IPS\Member::loggedIn()->language()->addToStack('err_no_screenshots');
+					return \IPS\Theme::i()->getTemplate( 'submit' )->submissionForm( $form, $category, $category->message('subterms'), TRUE, ( \IPS\Member::loggedIn()->group['idm_bulk_submit'] && \IPS\Request::i()->bulk ) );
 				}
 												
 				/* Get any records we had before in case we need to delete them */
-				$existing = iterator_to_array( Db::i()->select( '*', 'downloads_files_records', array( 'record_post_key=?', Request::i()->postKey ) )->setKeyField( 'record_location' ) );
+				$existing = iterator_to_array( \IPS\Db::i()->select( '*', 'downloads_files_records', array( 'record_post_key=?', \IPS\Request::i()->postKey ) )->setKeyField( 'record_location' ) );
 				
 				/* Loop through the values we have */
 				$k					= 0;
@@ -276,7 +241,7 @@ class submit extends Controller
 
 				if( $values['files'] !== NULL )
 				{
-					if ( !is_array( $values['files'] ) )
+					if ( !\is_array( $values['files'] ) )
 					{
 						$values['files'] = [ $values['files'] ];
 					}
@@ -286,8 +251,8 @@ class submit extends Controller
 						$files[ $k ] = (string) $file;
 						if ( !isset( $existing[ (string) $file ] ) )
 						{
-							Db::i()->insert( 'downloads_files_records', array(
-								'record_post_key' => isset( Request::i()->bulk ) ? md5( Request::i()->postKey . "-{$k}" ) : Request::i()->postKey,
+							\IPS\Db::i()->insert( 'downloads_files_records', array(
+								'record_post_key' => isset( \IPS\Request::i()->bulk ) ? md5( \IPS\Request::i()->postKey . "-{$k}" ) : \IPS\Request::i()->postKey,
 								'record_type' => 'upload',
 								'record_location' => (string) $file,
 								'record_realname' => $file->originalFilename,
@@ -310,8 +275,8 @@ class submit extends Controller
 						$files[ $k ] = (string) $file;
 						if ( !isset( $existing[ (string) $file ] ) )
 						{
-							Db::i()->insert( 'downloads_files_records', array(
-								'record_post_key'	=> isset( Request::i()->bulk ) ? md5( Request::i()->postKey . "-{$k}" ) : Request::i()->postKey,
+							\IPS\Db::i()->insert( 'downloads_files_records', array(
+								'record_post_key'	=> isset( \IPS\Request::i()->bulk ) ? md5( \IPS\Request::i()->postKey . "-{$k}" ) : \IPS\Request::i()->postKey,
 								'record_type'		=> 'upload',
 								'record_location'	=> (string) $file,
 								'record_realname'	=> $file->originalFilename,
@@ -331,8 +296,8 @@ class submit extends Controller
 						$linkedFiles[] = (string) $url;
 						if ( !isset( $existing[ (string) $url ] ) )
 						{
-							Db::i()->insert( 'downloads_files_records', array(
-								'record_post_key'	=> Request::i()->postKey,
+							\IPS\Db::i()->insert( 'downloads_files_records', array(
+								'record_post_key'	=> \IPS\Request::i()->postKey,
 								'record_type'		=> 'link',
 								'record_location'	=> (string) $url,
 								'record_realname'	=> NULL,
@@ -351,21 +316,21 @@ class submit extends Controller
 						if ( !isset( $existing[ (string) $file ] ) )
 						{
 							$noWatermark = NULL;
-							if ( Settings::i()->idm_watermarkpath )
+							if ( \IPS\Settings::i()->idm_watermarkpath )
 							{
 								try
 								{
 									$noWatermark = (string) $file;
-									$watermark = Image::create( \IPS\File::get( 'core_Theme', Settings::i()->idm_watermarkpath )->contents() );
-									$image = Image::create( $file->contents() );
+									$watermark = \IPS\Image::create( \IPS\File::get( 'core_Theme', \IPS\Settings::i()->idm_watermarkpath )->contents() );
+									$image = \IPS\Image::create( $file->contents() );
 									$image->watermark( $watermark );
 									$file = \IPS\File::create( 'downloads_Screenshots', $file->originalFilename, $image );
 								}
-								catch ( Exception $e ) { }
+								catch ( \Exception $e ) { }
 							}
 							
-							Db::i()->insert( 'downloads_files_records', array(
-								'record_post_key'		=> Request::i()->postKey,
+							\IPS\Db::i()->insert( 'downloads_files_records', array(
+								'record_post_key'		=> \IPS\Request::i()->postKey,
 								'record_type'			=> 'ssupload',
 								'record_location'		=> (string) $file,
 								'record_thumb'			=> (string) $file->thumbnail( 'downloads_Screenshots' ),
@@ -373,7 +338,7 @@ class submit extends Controller
 								'record_size'			=> $file->filesize(),
 								'record_time'			=> time(),
 								'record_no_watermark'	=> $noWatermark,
-								'record_default'		=> ( Request::i()->screenshots_primary_screenshot AND Request::i()->screenshots_primary_screenshot == $_key ) ? 1 : 0
+								'record_default'		=> ( \IPS\Request::i()->screenshots_primary_screenshot AND \IPS\Request::i()->screenshots_primary_screenshot == $_key ) ? 1 : 0
 							) );
 						}
 						unset( $existing[ (string) $file ] );
@@ -386,15 +351,15 @@ class submit extends Controller
 						$linkedScreenshots[] = (string) $url;
 						if ( !isset( $existing[ (string) $url ] ) )
 						{
-							Db::i()->insert( 'downloads_files_records', array(
-								'record_post_key'	=> Request::i()->postKey,
+							\IPS\Db::i()->insert( 'downloads_files_records', array(
+								'record_post_key'	=> \IPS\Request::i()->postKey,
 								'record_type'		=> 'sslink',
 								'record_location'	=> (string) $url,
 								'record_thumb'		=> NULL,
 								'record_realname'	=> NULL,
 								'record_size'		=> 0,
 								'record_time'		=> time(),
-								'record_default'	=> ( Request::i()->screenshots_primary_screenshot AND Request::i()->screenshots_primary_screenshot == $_key ) ? 1 : 0
+								'record_default'	=> ( \IPS\Request::i()->screenshots_primary_screenshot AND \IPS\Request::i()->screenshots_primary_screenshot == $_key ) ? 1 : 0
 							) );
 						}
 						unset( $existing[ (string) $url ] );
@@ -408,7 +373,7 @@ class submit extends Controller
 					{
 						\IPS\File::get( $file['record_type'] === 'upload' ? 'downloads_Files' : 'downloads_Screenshots', $location )->delete();
 					}
-					catch ( Exception $e ) { }
+					catch ( \Exception $e ) { }
 
 					if( $file['record_thumb'] )
 					{
@@ -416,7 +381,7 @@ class submit extends Controller
 						{
 							\IPS\File::get( 'downloads_Screenshots', $file['record_thumb'] )->delete();
 						}
-						catch ( Exception $e ) { }
+						catch ( \Exception $e ) { }
 					}
 
 					if( $file['record_no_watermark'] )
@@ -425,63 +390,63 @@ class submit extends Controller
 						{
 							\IPS\File::get( 'downloads_Screenshots', $file['record_no_watermark'] )->delete();
 						}
-						catch ( Exception $e ) { }
+						catch ( \Exception $e ) { }
 					}
 					
-					Db::i()->delete( 'downloads_files_records', array( 'record_id=?', $file['record_id'] ) );
+					\IPS\Db::i()->delete( 'downloads_files_records', array( 'record_id=?', $file['record_id'] ) );
 				}
 				
 
-				if ( !isset( Request::i()->bulk ) )
+				if ( !isset( \IPS\Request::i()->bulk ) )
 				{
-					$file = File::createFromForm( array_merge( $data, $values, array( 'postKey' => Request::i()->postKey ) ), $category );
+					$file = \IPS\downloads\File::createFromForm( array_merge( $data, $values, array( 'postKey' => \IPS\Request::i()->postKey ) ), $category );
 					$file->markRead();
 
 					/* Redirect */
 					if ( isset( $values['guest_email'] ) )
 					{
-						$url = Url::internal( 'app=core&module=system&controller=register', 'front', 'register' );
+						$url = \IPS\Http\Url::internal( 'app=core&module=system&controller=register', 'front', 'register' );
 						$message = NULL;
 					}
 					elseif( $file->author()->member_id OR $file->canView() )
 					{
 						$url		= $file->url();
-						$message	= ( isset( $values['import_files'] ) AND count( $values['import_files'] ) ) ? Member::loggedIn()->language()->addToStack('file_imported_removed') : NULL;
+						$message	= ( isset( $values['import_files'] ) AND \count( $values['import_files'] ) ) ? \IPS\Member::loggedIn()->language()->addToStack('file_imported_removed') : NULL;
 					}
 					else
 					{
 						$url		= $category->url();
-						$message	= Member::loggedIn()->language()->addToStack('file_requires_approval_g');
+						$message	= \IPS\Member::loggedIn()->language()->addToStack('file_requires_approval_g');
 					}
 					
-					if ( Request::i()->isAjax() )
+					if ( \IPS\Request::i()->isAjax() )
 					{
-						Output::i()->json( array( 'redirect' => (string) $url ) );
+						\IPS\Output::i()->json( array( 'redirect' => (string) $url ) );
 					}
 					else
 					{
-						Output::i()->redirect( $url, $message );
+						\IPS\Output::i()->redirect( $url, $message );
 					}
 				}
 				else
 				{
 					/* This is a bulk file, so we want to go on to the next step */
-					return array( 'category' => $category->_id, 'postKey' => Request::i()->postKey, 'files' => $files, 'url_files' => $linkedFiles, 'screenshots' => $screenshots, 'url_screenshots' => $linkedScreenshots );
+					return array( 'category' => $category->_id, 'postKey' => \IPS\Request::i()->postKey, 'files' => $files, 'url_files' => $linkedFiles, 'screenshots' => $screenshots, 'url_screenshots' => $linkedScreenshots );
 				}
 			}
 			
-			$guestPostBeforeRegister = ( !Member::loggedIn()->member_id ) ? ( !$category->can( 'add', Member::loggedIn(), FALSE ) ) : FALSE;
-			$modQueued = File::moderateNewItems( Member::loggedIn(), $category, $guestPostBeforeRegister );
+			$guestPostBeforeRegister = ( !\IPS\Member::loggedIn()->member_id ) ? ( $category and !$category->can( 'add', \IPS\Member::loggedIn(), FALSE ) ) : NULL;
+			$modQueued = \IPS\downloads\File::moderateNewItems( \IPS\Member::loggedIn(), $category, $guestPostBeforeRegister );
 			if ( $guestPostBeforeRegister or $modQueued )
 			{
-				$postingInformation = Theme::i()->getTemplate( 'forms', 'core' )->postingInformation( $guestPostBeforeRegister, $modQueued, TRUE );
+				$postingInformation = \IPS\Theme::i()->getTemplate( 'forms', 'core' )->postingInformation( $guestPostBeforeRegister, $modQueued, TRUE );
 			}
 			else
 			{
 				$postingInformation = NULL;
 			}
 
-			return Theme::i()->getTemplate( 'submit' )->submissionForm( $form, $category, $category->message('subterms'), TRUE, ( Member::loggedIn()->group['idm_bulk_submit'] && Request::i()->bulk ), $postingInformation );
+			return \IPS\Theme::i()->getTemplate( 'submit' )->submissionForm( $form, $category, $category->message('subterms'), TRUE, ( \IPS\Member::loggedIn()->group['idm_bulk_submit'] && \IPS\Request::i()->bulk ), $postingInformation );
 		};
 
 		/**
@@ -492,14 +457,14 @@ class submit extends Controller
 			/* Get Category */
 			try
 			{
-				$category = Category::loadAndCheckPerms( $data['category'] );
+				$category = \IPS\downloads\Category::loadAndCheckPerms( $data['category'] );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				Output::i()->redirect( Url::internal( 'app=downloads&module=downloads&controller=submit', 'front', 'downloads_submit' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=downloads&module=downloads&controller=submit', 'front', 'downloads_submit' ) );
 			}
 			/* Init Form */
-			$form = new Form( 'file_information', 'continue' );
+			$form = new \IPS\Helpers\Form( 'file_information', 'continue' );
 			$existing = array();
 
 			foreach ( $data['files'] as $key => $file )
@@ -509,9 +474,9 @@ class submit extends Controller
 
 				try
 				{
-					$displayName = Db::i()->select( 'record_realname', 'downloads_files_records', array( 'record_location=?', (string) $file ) )->first();
+					$displayName = \IPS\Db::i()->select( 'record_realname', 'downloads_files_records', array( 'record_location=?', (string) $file ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					$displayName = $file->originalFilename;
 				}
@@ -520,10 +485,10 @@ class submit extends Controller
 				$form->addHeader( $displayName );
 				
 				/* Form Elements */
-				foreach ( File::formElements( NULL, $category, "filedata_{$key}_" ) as $input )
+				foreach ( \IPS\downloads\File::formElements( NULL, $category, "filedata_{$key}_" ) as $input )
 				{
-					Member::loggedIn()->language()->words[ $input->name ] = Member::loggedIn()->language()->addToStack( mb_substr( $input->name, mb_strlen( "filedata_{$key}_" ) ), FALSE );
-					if ( !$input->value and in_array( $input->name, array( "filedata_{$key}_file_title", "filedata_{$key}_file_desc" ) ) )
+					\IPS\Member::loggedIn()->language()->words[ $input->name ] = \IPS\Member::loggedIn()->language()->addToStack( mb_substr( $input->name, mb_strlen( "filedata_{$key}_" ) ), FALSE );
+					if ( !$input->value and \in_array( $input->name, array( "filedata_{$key}_file_title", "filedata_{$key}_file_desc" ) ) )
 					{
 						$input->value = $displayName;
 					}
@@ -533,7 +498,7 @@ class submit extends Controller
 				/* Screenshots */
 				if ( $category->bitoptions['allowss'] )
 				{
-					$existing[ $key ] = iterator_to_array( new Iterator( Db::i()->select( '*', 'downloads_files_records', array( 'record_post_key=? AND record_type=?', md5( "{$data['postKey']}-{$key}" ), 'ssupload' ) )->setValueField( function( $row ) { return $row['record_no_watermark'] ?: $row['record_location']; } )->setKeyField( function( $row ) { return $row['record_no_watermark'] ?: $row['record_location']; } ), 'downloads_Screenshots' ) );
+					$existing[ $key ] = iterator_to_array( new \IPS\File\Iterator( \IPS\Db::i()->select( '*', 'downloads_files_records', array( 'record_post_key=? AND record_type=?', md5( "{$data['postKey']}-{$key}" ), 'ssupload' ) )->setValueField( function( $row ) { return $row['record_no_watermark'] ?: $row['record_location']; } )->setKeyField( function( $row ) { return $row['record_no_watermark'] ?: $row['record_location']; } ), 'downloads_Screenshots' ) );
 
 					$image = TRUE;
 					if ( $category->maxdims and $category->maxdims != '0x0' )
@@ -542,21 +507,21 @@ class submit extends Controller
 						$image = array( 'maxWidth' => $maxDims[0], 'maxHeight' => $maxDims[1] );
 					}
 
-					$form->add( new Upload( "screenshots_{$key}", $existing[ $key ], ( $category->bitoptions['reqss'] and !Member::loggedIn()->group['idm_linked_files'] ), array(
+					$form->add( new \IPS\Helpers\Form\Upload( "screenshots_{$key}", $existing[ $key ], ( $category->bitoptions['reqss'] and !\IPS\Member::loggedIn()->group['idm_linked_files'] ), array(
 						'storageExtension'	=> 'downloads_Screenshots',
 						'image'				=> $image,
 						'maxFileSize'		=> $category->maxss ? ( $category->maxss / 1024 ) : NULL,
 						'multiple'			=> TRUE
 					) ) );
-					Member::loggedIn()->language()->words[ "screenshots_{$key}" ] = Member::loggedIn()->language()->addToStack( 'screenshots', FALSE );
+					\IPS\Member::loggedIn()->language()->words[ "screenshots_{$key}" ] = \IPS\Member::loggedIn()->language()->addToStack( 'screenshots', FALSE );
 				}
 
 									
 				/* Version field */
 				if( $category->version_numbers )
 				{
-					$form->add( new Text( "filedata_{$key}_file_version", '1.0.0', $category->version_numbers == 2, array( 'maxLength' => 32 ) ) );
-					Member::loggedIn()->language()->words[ "filedata_{$key}_file_version" ] = Member::loggedIn()->language()->addToStack( 'file_version', FALSE );
+					$form->add( new \IPS\Helpers\Form\Text( "filedata_{$key}_file_version", '1.0.0', ( $category->version_numbers == 2 ) ? TRUE : FALSE, array( 'maxLength' => 32 ) ) );
+					\IPS\Member::loggedIn()->language()->words[ "filedata_{$key}_file_version" ] = \IPS\Member::loggedIn()->language()->addToStack( 'file_version', FALSE );
 				}
 			}
 
@@ -566,37 +531,38 @@ class submit extends Controller
 			{
 				if ( $category->bitoptions['allowss'] )
 				{
-					foreach ( $data['files'] as $key => $fileUrl )
+					foreach ( $data['files'] as $key => $file )
 					{
 						/* Save Screenshots */
-						foreach ( $values["screenshots_{$key}"] as $screenshot )
+						foreach ( $values["screenshots_{$key}"] as $file )
 						{
-							if ( !isset( $existing[ $key ][ (string) $screenshot ] ) )
+							$screenshots[] = (string) $file;
+							if ( !isset( $existing[ $key ][ (string) $file ] ) )
 							{
 								$noWatermark = NULL;
-								if ( Settings::i()->idm_watermarkpath )
+								if ( \IPS\Settings::i()->idm_watermarkpath )
 								{
-									$noWatermark = (string) $screenshot;
-									$watermark = Image::create( \IPS\File::get( 'core_Theme', Settings::i()->idm_watermarkpath )->contents() );
-									$image = Image::create( $screenshot->contents() );
+									$noWatermark = (string) $file;
+									$watermark = \IPS\Image::create( \IPS\File::get( 'core_Theme', \IPS\Settings::i()->idm_watermarkpath )->contents() );
+									$image = \IPS\Image::create( $file->contents() );
 									$image->watermark( $watermark );
-									$screenshot = \IPS\File::create( 'downloads_Screenshots', $screenshot->originalFilename, $image );
+									$file = \IPS\File::create( 'downloads_Screenshots', $file->originalFilename, $image );
 								}
 								
-								Db::i()->insert( 'downloads_files_records', array(
+								\IPS\Db::i()->insert( 'downloads_files_records', array(
 									'record_post_key'		=> md5( "{$data['postKey']}-{$key}" ),
 									'record_type'			=> 'ssupload',
-									'record_location'		=> (string) $screenshot,
-									'record_thumb'			=> (string) $screenshot->thumbnail( 'downloads_Screenshots' ),
-									'record_realname'		=> $screenshot->originalFilename,
-									'record_size'			=> $screenshot->filesize(),
+									'record_location'		=> (string) $file,
+									'record_thumb'			=> (string) $file->thumbnail( 'downloads_Screenshots' ),
+									'record_realname'		=> $file->originalFilename,
+									'record_size'			=> $file->filesize(),
 									'record_time'			=> time(),
 									'record_no_watermark'	=> $noWatermark
 								) );
 							}
 							else
 							{
-								unset( $existing[ $key ][ (string) $screenshot ] );
+								unset( $existing[ $key ][ (string) $file ] );
 							}
 						}
 						
@@ -609,9 +575,9 @@ class submit extends Controller
 							{
 								$file->delete();
 							}
-							catch ( Exception $e ) { }
+							catch ( \Exception $e ) { }
 							
-							Db::i()->delete( 'downloads_files_records', array( 'record_location=? OR record_no_watermark=?', (string) $file, (string) $file ) );
+							\IPS\Db::i()->delete( 'downloads_files_records', array( 'record_location=? OR record_no_watermark=?', (string) $file, (string) $file ) );
 						}
 					}
 				}
@@ -636,7 +602,7 @@ class submit extends Controller
 						}
 					}
 					
-					$file = File::createFromForm( $save, $category, FALSE );
+					$file = \IPS\downloads\File::createFromForm( $save, $category, FALSE );
 					\IPS\File::claimAttachments( "filedata_{$key}_downloads-new-file", $file->id, NULL, 'desc' );
 					foreach ( $customFields as $k )
 					{
@@ -645,79 +611,79 @@ class submit extends Controller
 					$file->markRead();
 				}
 
-				if ( Member::loggedIn()->moderateNewContent() OR File::moderateNewItems( Member::loggedIn(), $category ) )
+				if ( \IPS\Member::loggedIn()->moderateNewContent() OR \IPS\downloads\File::moderateNewItems( \IPS\Member::loggedIn(), $category ) )
 				{
-					File::_sendUnapprovedNotifications( $category );
+					\IPS\downloads\File::_sendUnapprovedNotifications( $category );
 				}
 				else
 				{
-					File::_sendNotifications( $category );
+					\IPS\downloads\File::_sendNotifications( $category );
 				}
 			
 				/* Redirect */
-				if ( Request::i()->isAjax() )
+				if ( \IPS\Request::i()->isAjax() )
 				{
-					Output::i()->json( array( 'redirect' => (string) $category->url() ) );
+					\IPS\Output::i()->json( array( 'redirect' => (string) $category->url() ) );
 				}
 				else
 				{
-					Output::i()->redirect( $category->url() );
+					\IPS\Output::i()->redirect( $category->url() );
 				}
 			}
 
-			return Theme::i()->getTemplate( 'submit' )->bulkForm( $form, $category );
+			return \IPS\Theme::i()->getTemplate( 'submit' )->bulkForm( $form, $category );
 		};
 
 
 		/* Build Wizard */
-		$url = Url::internal( 'app=downloads&module=downloads&controller=submit&do=submit', 'front', 'downloads_submit' );
-		if ( isset( Request::i()->category ) and Request::i()->category )
+		$url = \IPS\Http\Url::internal( 'app=downloads&module=downloads&controller=submit&do=submit', 'front', 'downloads_submit' );
+		if ( isset( \IPS\Request::i()->category ) and \IPS\Request::i()->category )
 		{
-			$url = $url->setQueryString( 'category', Request::i()->category );
+			$url = $url->setQueryString( 'category', \IPS\Request::i()->category );
 		}
-		if ( isset( Request::i()->bulk ) and Request::i()->bulk  )
+		if ( isset( \IPS\Request::i()->bulk ) and \IPS\Request::i()->bulk  )
 		{
 			$url = $url->setQueryString( 'bulk', 1 );
 		}
-		$wizard = new Wizard( $steps, $url );
-		$wizard->template = array( Theme::i()->getTemplate( 'submit' ), 'wizardForm' );
+		$wizard = new \IPS\Helpers\Wizard( $steps, $url );
+		$wizard->template = array( \IPS\Theme::i()->getTemplate( 'submit' ), 'wizardForm' );
 		
 		/* Online User Location */
-		Session::i()->setLocation( Url::internal( 'app=downloads&module=downloads&controller=submit', 'front', 'downloads_submit' ), array(), 'loc_downloads_adding_file' );
+		\IPS\Session::i()->setLocation( \IPS\Http\Url::internal( 'app=downloads&module=downloads&controller=submit', 'front', 'downloads_submit' ), array(), 'loc_downloads_adding_file' );
 		
 		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack( isset( Request::i()->bulk ) ? 'submit_multiple_files' : 'submit_a_file' );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( isset( \IPS\Request::i()->bulk ) ? 'submit_multiple_files' : 'submit_a_file' );
 		if ( \IPS\IN_DEV )
 		{
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'plupload/moxie.js', 'core', 'interface' ) );
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'plupload/plupload.dev.js', 'core', 'interface' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'plupload/moxie.js', 'core', 'interface' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'plupload/plupload.dev.js', 'core', 'interface' ) );
 		}
 		else
 		{
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'plupload/plupload.full.min.js', 'core', 'interface' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'plupload/plupload.full.min.js', 'core', 'interface' ) );
 		}
 		
 		$category = NULL;
-		Output::i()->sidebar['enabled'] = FALSE;
-		if ( isset( Request::i()->category ) )
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		if ( isset( \IPS\Request::i()->category ) )
 		{
 			try
 			{
-				$category = Category::loadAndCheckPerms( Request::i()->category );
+				$category = \IPS\downloads\Category::loadAndCheckPerms( \IPS\Request::i()->category );
 				if ( $club = $category->club() )
 				{
-					FrontNavigation::$clubTabActive = TRUE;
-					Output::i()->breadcrumb = array();
-					Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), Member::loggedIn()->language()->addToStack('module__core_clubs') );
-					Output::i()->breadcrumb[] = array( $club->url(), $club->name );
-					Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
+					\IPS\core\FrontNavigation::$clubTabActive = TRUE;
+					\IPS\Output::i()->breadcrumb = array();
+					\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), \IPS\Member::loggedIn()->language()->addToStack('module__core_clubs') );
+					\IPS\Output::i()->breadcrumb[] = array( $club->url(), $club->name );
+					\IPS\Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
 				}
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 		
-		Output::i()->output = (string) $wizard;
+		\IPS\Output::i()->output = (string) $wizard;
 		
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( 'submit_a_file' ) );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( 'submit_a_file' ) );
 	}
 }

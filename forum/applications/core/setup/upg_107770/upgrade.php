@@ -21,7 +21,7 @@ if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * 4.7.18 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Remove CommunityHive Widget and orphaned JS files
@@ -33,6 +33,7 @@ class Upgrade
 		$allApps = array_keys(\IPS\Application::applications() );
 		$where= [];
 		$where[] = array( \IPS\Db::i()->in( 'javascript_app', $allApps, TRUE ) );
+		$where[] = ['javascript_plugin=?', ''];
 		\IPS\Db::i()->delete( 'core_javascript', $where );
 		
 		\IPS\Widget::deprecateWidget('communityhive', 'core' );

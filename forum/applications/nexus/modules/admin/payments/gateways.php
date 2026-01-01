@@ -12,52 +12,35 @@
 namespace IPS\nexus\modules\admin\payments;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Dispatcher;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Wizard;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\nexus\Gateway;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Task;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Payment Gateways
  */
-class gateways extends Controller
+class _gateways extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\nexus\Gateway';
+	protected $nodeClass = 'IPS\nexus\Gateway';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'gateways_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'gateways_manage' );
 		parent::execute();
 	}
 	
@@ -66,7 +49,7 @@ class gateways extends Controller
 	 *
 	 * @return	array
 	 */
-	public function _getRootButtons(): array
+	public function _getRootButtons()
 	{
 		$buttons = parent::_getRootButtons();
 		
@@ -83,34 +66,39 @@ class gateways extends Controller
 	 *
 	 * @return void
 	 */
-	protected function form() : void
+	protected function form()
 	{
-		if ( Request::i()->id )
+		if ( \IPS\Request::i()->id )
 		{
-			parent::form();
+			return parent::form();
 		}
 		else
 		{
 			if ( \IPS\IN_DEV )
 			{
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'plupload/moxie.js', 'core', 'interface' ) );
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'plupload/plupload.dev.js', 'core', 'interface' ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'plupload/moxie.js', 'core', 'interface' ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'plupload/plupload.dev.js', 'core', 'interface' ) );
 			}
 			else
 			{
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'plupload/plupload.full.min.js', 'core', 'interface' ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'plupload/plupload.full.min.js', 'core', 'interface' ) );
 			}
-			Output::i()->output = (string) new Wizard( array(
+			\IPS\Output::i()->output = (string) new \IPS\Helpers\Wizard( array(
 				'gateways_gateway'	=> function( $data )
 				{
 					$options = array();
-					foreach ( Gateway::gateways() as $key => $class )
+					foreach ( \IPS\nexus\Gateway::gateways() as $key => $class )
 					{
+						/* Deprecate Authorize.net, Braintree and 2Checkout don't allow them to be used for new gateways */
+						if( \in_array( $key, array( 'AuthorizeNet', 'TwoCheckout', 'Braintree' ) ) )
+						{
+							continue;
+						}
 						$options[ $key ] = 'gateway__' . $key;
 					}
 
-					$form = new Form;
-					$form->add( new Radio( 'gateways_gateway', TRUE, NULL, array( 'options' => $options ) ) );
+					$form = new \IPS\Helpers\Form;
+					$form->add( new \IPS\Helpers\Form\Radio( 'gateways_gateway', TRUE, NULL, array( 'options' => $options ) ) );
 					if ( $values = $form->values() )
 					{
 						return array( 'gateway' => $values['gateways_gateway'] );
@@ -119,8 +107,8 @@ class gateways extends Controller
 				},
 				'gateways_details'	=> function( $data )
 				{
-					$form = new Form('gw');
-					$class = Gateway::gateways()[ $data['gateway'] ];
+					$form = new \IPS\Helpers\Form('gw');
+					$class = \IPS\nexus\Gateway::gateways()[ $data['gateway'] ];
 					$obj = new $class;
 					$obj->gateway = $data['gateway'];
 					$obj->active = TRUE;
@@ -140,7 +128,7 @@ class gateways extends Controller
 						{
 							$settings = $obj->testSettings( $settings );
 						}
-						catch ( InvalidArgumentException $e )
+						catch ( \InvalidArgumentException $e )
 						{
 							$form->error = $e->getMessage();
 							return $form;
@@ -156,14 +144,14 @@ class gateways extends Controller
 						}
 
 						$obj->save();
-						Lang::saveCustom( 'nexus', "nexus_paymethod_{$obj->id}", $name );
-						Session::i()->log( 'acplogs__nexus_added_gateway', array( "nexus_paymethod_{$obj->id}" => TRUE ) );
+						\IPS\Lang::saveCustom( 'nexus', "nexus_paymethod_{$obj->id}", $name );
+						\IPS\Session::i()->log( 'acplogs__nexus_added_gateway', array( "nexus_paymethod_{$obj->id}" => TRUE ) );
 
-						Output::i()->redirect( Url::internal('app=nexus&module=payments&controller=paymentsettings&tab=gateways') );
+						\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=nexus&module=payments&controller=paymentsettings&tab=gateways') );
 					}
 					return $form;
 				}
-			), Url::internal('app=nexus&module=payments&controller=paymentsettings&tab=gateways&do=form') );
+			), \IPS\Http\Url::internal('app=nexus&module=payments&controller=paymentsettings&tab=gateways&do=form') );
 		}
 	}
 
@@ -172,43 +160,42 @@ class gateways extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
 		/* Get node */
-		/* @var Gateway $nodeClass */
 		$nodeClass = $this->nodeClass;
-		if ( Request::i()->subnode )
+		if ( \IPS\Request::i()->subnode )
 		{
 			$nodeClass = $nodeClass::$subnodeClass;
 		}
 		
 		try
 		{
-			$node = $nodeClass::load( Request::i()->id );
+			$node = $nodeClass::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X411/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X411/1', 404, '' );
 		}
 		 
 		/* Permission check */
 		if( !$node->canDelete() )
 		{
-			Output::i()->error( 'node_noperm_delete', '2X411/2', 403, '' );
+			\IPS\Output::i()->error( 'node_noperm_delete', '2X411/2', 403, '' );
 		}
 
 		if( $node->hasActiveBillingAgreements() )
 		{
 			/* Make sure the user confirmed the deletion */
-			Request::i()->confirmedDelete();
+			\IPS\Request::i()->confirmedDelete();
 			
-			Task::queue( 'nexus', 'DeletePaymentMethod', array( 'id' => $node->id ), 3, array( 'id' ) );
-			Session::i()->log( 'acplog__node_deleted_c', array( $node->_title => TRUE, $node->titleForLog() => FALSE ) );
-			Output::i()->redirect( $this->url->setQueryString( array( 'root' => ( $node->parent() ? $node->parent()->_id : '' ) ) ), 'deleted' );
+			\IPS\Task::queue( 'nexus', 'DeletePaymentMethod', array( 'id' => $node->id ), 3, array( 'id' ) );
+			\IPS\Session::i()->log( 'acplog__node_deleted_c', array( $this->title => TRUE, $node->titleForLog() => FALSE ) );
+			\IPS\Output::i()->redirect( $this->url->setQueryString( array( 'root' => ( $node->parent() ? $node->parent()->_id : '' ) ) ), 'deleted' );
 		}
 		else
 		{
-			parent::delete();
+			return parent::delete();
 		}
 	}
 }

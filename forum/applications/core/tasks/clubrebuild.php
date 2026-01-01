@@ -11,26 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Task;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * clubrebuild Task
  */
-class clubrebuild extends Task
+class _clubrebuild extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -41,35 +31,53 @@ class clubrebuild extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		if ( !Settings::i()->clubs )
+		if ( !\IPS\Settings::i()->clubs )
 		{
-			Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'clubrebuild' ) );
+			\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'clubrebuild' ) );
 			return NULL;
 		}
 		
 		$this->runUntilTimeout( function()
 		{
-			$select = Db::i()->select( '*', 'core_clubs', array( 'rebuilt is null or rebuilt<?', time() - 1200 ), 'rebuilt ASC', 10 );
+			$select = \IPS\Db::i()->select( '*', 'core_clubs', array( 'rebuilt is null or rebuilt<?', time() - 1200 ), 'rebuilt ASC', 10 );
 
 			if ( !$select->count() )
 			{
 				return FALSE;
 			}
-
-			foreach ( new ActiveRecordIterator( $select, 'IPS\Member\Club' ) as $club )
+			
+			foreach ( new \IPS\Patterns\ActiveRecordIterator( $select, 'IPS\Member\Club' ) as $club )
 			{
-				/* @var Club $club */
-				$club->updateLastActivityAndItemCount( new Member );
+				$club->content = 0;
+				$club->last_activity = 0;
+				
+				foreach ( $club->nodes() as $node )
+				{
+					try
+					{
+						$nodeClass = $node['node_class'];
+						$node = $nodeClass::load( $node['node_id'] );
+						
+						if ( $lastCommentTime = $node->getLastCommentTime( new \IPS\Member ) and $lastCommentTime->getTimestamp() > $club->last_activity )
+						{
+							$club->last_activity = $lastCommentTime->getTimestamp();
+						}
+						
+						$club->content += (int) $node->getContentItemCount();
+					}
+					catch ( \Exception $e ) { }
+				}
+				
+				$club->rebuilt = time();
+				$club->save();
 			}
 			
 			return TRUE;
 		} );
-
-		return null;
 	}
 	
 	/**

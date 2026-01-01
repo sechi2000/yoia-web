@@ -12,46 +12,40 @@
 namespace IPS\downloads\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\downloads\File;
-use IPS\Output;
-use IPS\Theme;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * downloadStats Widget
  */
-class downloadStats extends PermissionCache implements Customizable
+class _downloadStats extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'downloadStats';
+	public $key = 'downloadStats';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'downloads';
+	public $app = 'downloads';
 		
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
  	/**
 	 * Init the widget
 	 *
 	 * @return	void
 	 */
- 	public function init(): void
+ 	public function init()
  	{
- 		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'downloads', 'front' ) );
+ 		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'downloads', 'front' ) );
 
  		parent::init();
  	}
@@ -61,13 +55,13 @@ class downloadStats extends PermissionCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
-		$stats = Db::i()->select( 'COUNT(*) AS totalFiles, SUM(file_comments) AS totalComments, SUM(file_reviews) AS totalReviews', 'downloads_files', array( "file_open=?", 1 ) )->first();
-		$stats['totalAuthors'] = Db::i()->select( 'COUNT(DISTINCT file_submitter)', 'downloads_files' )->first();
+		$stats = \IPS\Db::i()->select( 'COUNT(*) AS totalFiles, SUM(file_comments) AS totalComments, SUM(file_reviews) AS totalReviews', 'downloads_files', array( "file_open=?", 1 ) )->first();
+		$stats['totalAuthors'] = \IPS\Db::i()->select( 'COUNT(DISTINCT file_submitter)', 'downloads_files' )->first();
 		
 		$latestFile = NULL;
-		foreach ( File::getItemsWithPermission( array(), NULL, 1 ) as $latestFile )
+		foreach ( \IPS\downloads\File::getItemsWithPermission( array(), NULL, 1 ) as $latestFile )
 		{
 			break;
 		}

@@ -12,114 +12,79 @@
 namespace IPS\cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\Application;
-use IPS\cms\Pages\Page;
-use IPS\Content\Search\Index;
-use IPS\Content\ViewUpdates;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Node\Permissions;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Widget\Area;
-use LogicException;
-use OutOfBoundsException;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Databases Model
  */
-class Databases extends Model implements Permissions
+class _Databases extends \IPS\Node\Model implements \IPS\Node\Permissions
 {
-	use ViewUpdates;
+	use \IPS\Content\ViewUpdates;
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons = array();
+	protected static $multitons = array();
 
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'database_reciprocal_links', 'cms_databases' );
+	protected $caches = array( 'database_reciprocal_links', 'cms_databases' );
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'database_';
+	public static $databasePrefix = 'database_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Table
 	 */
-	public static ?string $databaseTable = 'cms_databases';
+	public static $databaseTable = 'cms_databases';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'database_key', 'database_page_id' );
+	protected static $databaseIdFields = array( 'database_key', 'database_page_id' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'id';
+	public static $databaseColumnOrder = 'id';
 	
 	/**
 	 * @brief	[Node] Sortable?
 	 */
-	public static bool $nodeSortable = FALSE;
+	public static $nodeSortable = FALSE;
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = '';
+	public static $nodeTitle = '';
 	
 	/**
 	 * @brief	Have fetched all?
 	 */
-	protected static bool $gotAll = FALSE;
+	protected static $gotAll = FALSE;
 	
 	/**
 	 * @brief	The map of permission columns
 	 */
-	public static array $permissionMap = array(
+	public static $permissionMap = array(
 			'view' 				=> 'view',
 			'read'				=> 2,
 			'add'				=> 3,
@@ -132,27 +97,27 @@ class Databases extends Model implements Permissions
 	/**
 	 * @brief	[Node] App for permission index
 	 */
-	public static ?string $permApp = 'cms';
+	public static $permApp = 'cms';
 	
 	/**
 	 * @brief	[Node] Type for permission index
 	 */
-	public static ?string $permType = 'databases';
+	public static $permType = 'databases';
 	
 	/**
 	 * @brief	[Node] Prefix string that is automatically prepended to permission matrix language strings
 	 */
-	public static string $permissionLangPrefix = 'perm_content_';
+	public static $permissionLangPrefix = 'perm_content_';
 		
 	/**
 	 * @brief	[Node] Show forms modally?
 	 */
-	public static bool $modalForms = FALSE;
+	public static $modalForms = FALSE;
 
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'content_db_';
+	public static $titleLangPrefix = 'content_db_';
 
 	/**
 	 * [Brief]	Bump on edit only
@@ -177,9 +142,9 @@ class Databases extends Model implements Permissions
 	/**
 	 * [Brief] Database template groups
 	 */
-	public static array $templateGroups = array(
+	public static $templateGroups = array(
 		'categories' => 'category_index',
-		'index'   => 'category_articles',
+		'featured'   => 'category_articles',
 		'listing'    => 'listing',
 		'display'    => 'display',
 		'form'       => 'form'
@@ -188,7 +153,7 @@ class Databases extends Model implements Permissions
 	/**
 	 * @brief	Bitwise values for database_options field
 	 */
-	public static array $bitOptions = array(
+	public static $bitOptions = array(
 		'options' => array(
 			'options' => array(
 				'comments'              => 1,   // Enable comments?
@@ -196,57 +161,31 @@ class Databases extends Model implements Permissions
 				'comments_mod'          => 4,   // Enable comment moderation?
 				'reviews_mod'           => 8,   // Enable reviews moderation?
 			    'indefinite_own_edit'   => 16,  // Enable authors to indefinitely edit their own articles
-				'assignments'			=> 32,	// Enable assignments on this database
 			)
 		)
-	);
-
-	/**
-	 * Mapping of node columns to specific actions (e.g. comment, review)
-	 * Note: Mappings can also reference bitoptions keys.
-	 *
-	 * @var array
-	 */
-	public static array $actionColumnMap = array(
-		'comments' 			=> 'comments',
-		'reviews'			=> 'reviews',
-		'moderate_comments'	=> 'comments_mod',
-		'moderate_items'	=> 'record_approve',
-		'moderate_reviews'  => 'reviews_mod',
-		'tags'				=> 'tags_enabled',
-		'prefix'			=> 'tags_noprefixes'
 	);
 	
 	/**
 	 * @brief	Page title
 	 */
-	protected ?string $pageTitle = NULL;
+	protected $pageTitle = NULL;
 
 	/**
 	 * @breif   Used by the dataLayer
 	 */
-	public static string $contentArea = 'pages_database';
+	public static $contentArea = 'pages_database';
 
 	/**
 	 * @breif   Used by the dataLayer
 	 */
-	public static string $containerType = 'pages_database_category';
-
-    public static bool $_hasLoadedPerms = false;
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
+	public static $containerType = 'pages_database_category';
 
 	/**
 	 * Get the properties that can be added to the datalayer for this key
 	 *
 	 * @return  array
 	 */
-	public function getDataLayerProperties(): array
+	public function getDataLayerProperties()
 	{
 		if ( empty( $this->_dataLayerProperties ) )
 		{
@@ -258,76 +197,30 @@ class Databases extends Model implements Permissions
 
 		return $this->_dataLayerProperties;
 	}
-
-	/**
-	 * Check the action column map if the action is enabled in this node
-	 *
-	 * @param string $action
-	 * @return bool
-	 */
-	public function checkAction( string $action ) : bool
-	{
-		$return = parent::checkAction( $action );
-
-		/* Some actions here are reversed, we mark them as disabled instead of enabled */
-		if( $action == 'prefix' )
-		{
-			return !$return;
-		}
-
-		return $return;
-	}
-
-    /**
-     * Load Record
-     *
-     * @param int|string|null $id ID
-     * @param string|null $idField The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
-     * @param mixed $extraWhereClause Additional where clause(s) (see \IPS\Db::build for details) - if used will cause multiton store to be skipped and a query always ran
-     * @return ActiveRecord|Databases
-     * @see        Db::build
-     */
-    public static function load( int|string|null $id, string $idField=NULL, mixed $extraWhereClause=NULL ): ActiveRecord|static
-    {
-        if ( ! Bridge::i()->pagesAllowDatabaseAccess() )
-        {
-            throw new OutOfRangeException('pages_not_available');
-        }
-
-        return parent::load( $id, $idField, $extraWhereClause );
-    }
 	
 	/**
 	 * Return all databases
 	 *
 	 * @return	array
 	 */
-	public static function databases(): array
+	public static function databases()
 	{
-        if ( ! Bridge::i()->pagesAllowDatabaseAccess() )
-        {
-            static::$gotAll = true;
-            static::$multitons = [];
-        }
-        else
-        {
-            if ( ! static::$gotAll )
+		if ( ! static::$gotAll )
+		{
+			/* Avoid using SHOW TABLES LIKE / checkForTable() */
+            try
             {
-                /* Avoid using SHOW TABLES LIKE / checkForTable() */
-                try
+                foreach( static::getStore() as $db )
                 {
-                    foreach( static::getStore() as $db )
-                    {
-                        $id = $db[ static::$databasePrefix . static::$databaseColumnId ];
-                        static::$multitons[ $id ] = static::constructFromData( $db );
-                    }
+                    $id = $db[ static::$databasePrefix . static::$databaseColumnId ];
+                    static::$multitons[ $id ] = static::constructFromData( $db );
                 }
-                catch( Exception $e ) { }
-
-                static::$gotAll = true;
             }
-        }
-
+            catch( \Exception $e ) { }
+				
+			static::$gotAll = true;
+		}
+		
 		return static::$multitons;
 	}
 	
@@ -336,12 +229,12 @@ class Databases extends Model implements Permissions
 	 *
 	 * @return array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( ! isset( Store::i()->cms_databases ) )
+		if ( ! isset( \IPS\Data\Store::i()->cms_databases ) )
 		{
-			Store::i()->cms_databases = iterator_to_array(
-				Db::i()->select(
+			\IPS\Data\Store::i()->cms_databases = iterator_to_array(
+				\IPS\Db::i()->select(
 						static::$databaseTable . '.*, core_permission_index.perm_id, core_permission_index.perm_view, core_permission_index.perm_2, core_permission_index.perm_3, core_permission_index.perm_4, core_permission_index.perm_5, core_permission_index.perm_6, core_permission_index.perm_7',
 						static::$databaseTable
 					)->join(
@@ -352,17 +245,27 @@ class Databases extends Model implements Permissions
 			);
 		}
 		
-		return Store::i()->cms_databases;
+		return \IPS\Data\Store::i()->cms_databases;
+	}
+	
+	/**
+	 * Can we promote stuff to Pages?
+	 *
+	 * @return	boolean
+	 */
+	public static function canPromote()
+	{
+		return TRUE;
 	}
 
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    static
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): static
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
 		$obj = parent::constructFromData( $data, $updateMultitonStoreIfExists );
 		$obj->preLoadWords();
@@ -384,20 +287,20 @@ class Databases extends Model implements Permissions
 		}
 		
 		$fieldsClass = '\IPS\cms\Fields' . $this->id;
-		/* @var $fieldsClass Fields */
+		
 		try
 		{
-			if ( ! in_array( IPS::mb_ucfirst( $fieldsClass::load( $this->field_title )->type ), array( 'Text', 'TextArea', 'Editor' ) ) )
+			if ( ! \in_array( mb_ucfirst( $fieldsClass::load( $this->field_title )->type ), array( 'Text', 'TextArea', 'Editor' ) ) )
 			{
 				return FALSE;
 			}
 			
-			if ( ! in_array( IPS::mb_ucfirst( $fieldsClass::load( $this->field_content )->type ), array( 'TextArea', 'Editor' ) ) )
+			if ( ! \in_array( mb_ucfirst( $fieldsClass::load( $this->field_content )->type ), array( 'TextArea', 'Editor' ) ) )
 			{
 				return FALSE;
 			}
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return FALSE;
 		}
@@ -410,14 +313,14 @@ class Databases extends Model implements Permissions
 	 * 
 	 * @return array
 	 */
-	public static function acpMenu(): array
+	public static function acpMenu()
 	{
 		$menu = array();
 
 		foreach(
-			Db::i()->select( '*, core_sys_lang_words.word_custom as database_name, core_sys_lang_words2.word_custom as record_name', 'cms_databases', NULL, 'core_sys_lang_words.word_custom' )
-				->join( 'core_sys_lang_words', "core_sys_lang_words.word_key=CONCAT( 'content_db_', cms_databases.database_id ) AND core_sys_lang_words.lang_id=" . Member::loggedIn()->language()->id )
-				->join( array( 'core_sys_lang_words', 'core_sys_lang_words2' ), "core_sys_lang_words2.word_key=CONCAT( 'content_db_lang_pu_', cms_databases.database_id ) AND core_sys_lang_words2.lang_id=" . Member::loggedIn()->language()->id )
+			\IPS\Db::i()->select( '*, core_sys_lang_words.word_custom as database_name, core_sys_lang_words2.word_custom as record_name', 'cms_databases', NULL, 'core_sys_lang_words.word_custom' )
+				->join( 'core_sys_lang_words', "core_sys_lang_words.word_key=CONCAT( 'content_db_', cms_databases.database_id ) AND core_sys_lang_words.lang_id=" . \IPS\Member::loggedIn()->language()->id )
+				->join( array( 'core_sys_lang_words', 'core_sys_lang_words2' ), "core_sys_lang_words2.word_key=CONCAT( 'content_db_lang_pu_', cms_databases.database_id ) AND core_sys_lang_words2.lang_id=" . \IPS\Member::loggedIn()->language()->id )
 			as $row )
 		{
 			$menu[] = array(
@@ -434,24 +337,24 @@ class Databases extends Model implements Permissions
 	/**
 	 * Checks and fixes existing DB
 	 *
-	 * @param int $id     Database ID
+	 * @param   int     $id     Database ID
 	 * @return  int     $fixes  Number of fixes made (0 if none)
 	 *
-	 * @throws OutOfRangeException
+	 * @throws \OutOfRangeException
 	 */
-	public static function checkandFixDatabaseSchema(int $id ): int
+	public static function checkandFixDatabaseSchema( $id )
 	{
 		$fixes     = 0;
 		$json      = json_decode( @file_get_contents( \IPS\ROOT_PATH . "/applications/cms/data/databaseschema.json" ), true );
 		$table     = $json['cms_custom_database_1'];
 		$tableName = 'cms_custom_database_' . $id;
 
-		if ( ! Db::i()->checkForTable( $tableName ) )
+		if ( ! \IPS\Db::i()->checkForTable( $tableName ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
-		$schema		= Db::i()->getTableDefinition( $tableName );
+		$schema		= \IPS\Db::i()->getTableDefinition( $tableName );
 		$changes	= array();
 
 		/* Columns */
@@ -459,7 +362,7 @@ class Databases extends Model implements Permissions
 		{
 			if ( ! isset( $schema['columns'][ $key ] ) )
 			{
-				$changes[] = "ADD COLUMN " . Db::i()->compileColumnDefinition( $data );
+				$changes[] = "ADD COLUMN " . \IPS\Db::i()->compileColumnDefinition( $data );
 				$fixes++;
 			}
 		}
@@ -470,10 +373,10 @@ class Databases extends Model implements Permissions
 			/* No index */
 			if ( ! isset( $schema['indexes'][ $key ] ) )
 			{
-				$changes[] = Db::i()->buildIndex( $tableName, $data );
+				$changes[] = \IPS\Db::i()->buildIndex( $tableName, $data );
 				$fixes++;
 			}
-			else if ( implode( '.', $data['columns'] ) != implode( '.', (array) $schema['indexes'][ $key ]['columns'] ) )
+			else if ( implode( '.', $data['columns'] ) != implode( '.', $schema['indexes'][ $key ]['columns'] ) )
 			{
 				/* Check columns */
 				if( $key == 'PRIMARY KEY' )
@@ -482,18 +385,18 @@ class Databases extends Model implements Permissions
 				}
 				else
 				{
-					$changes[] = "DROP KEY `" . Db::i()->escape_string( $key ) . "`";
+					$changes[] = "DROP KEY `" . \IPS\Db::i()->escape_string( $key ) . "`";
 				}
 
-				$changes[] =  Db::i()->buildIndex( $tableName, $data );
+				$changes[] =  \IPS\Db::i()->buildIndex( $tableName, $data );
 				$fixes++;
 			}
 		}
 
 		/* We collect all the changes so we can run one database query instead of, potentially, dozens */
-		if( count( $changes ) )
+		if( \count( $changes ) )
 		{
-			Db::i()->query( "ALTER TABLE " . Db::i()->prefix . $tableName . " " . implode( ', ', $changes ) );
+			\IPS\Db::i()->query( "ALTER TABLE " . \IPS\Db::i()->prefix . $tableName . " " . implode( ', ', $changes ) );
 		}
 
 		return $fixes;
@@ -502,10 +405,10 @@ class Databases extends Model implements Permissions
 	/**
 	 * Create a new database
 	 * 
-	 * @param Databases $database		ID of database to create
+	 * @param 	\IPS\cms\Databases 	$database		ID of database to create
 	 * @return	void
 	 */
-	public static function createDatabase( Databases $database ) : void
+	public static function createDatabase( $database )
 	{
 		$json  = json_decode( @file_get_contents( \IPS\ROOT_PATH . "/applications/cms/data/databaseschema.json" ), true );
 		$table = $json['cms_custom_database_1'];
@@ -530,14 +433,14 @@ class Databases extends Model implements Permissions
 		
 		try
 		{
-			if ( ! Db::i()->checkForTable( $table['name'] ) )
+			if ( ! \IPS\Db::i()->checkForTable( $table['name'] ) )
 			{
-				Db::i()->createTable( $table );
+				\IPS\Db::i()->createTable( $table );
 			}
 		}
-		catch( Db\Exception $ex )
+		catch( \IPS\Db\Exception $ex )
 		{
-			throw new LogicException( $ex );
+			throw new \LogicException( $ex );
 		}
 
 		/* Populate default custom fields */
@@ -547,14 +450,14 @@ class Databases extends Model implements Permissions
 		$catTitle     = array();
 		$catDesc      = array();
 
-		foreach( Lang::languages() as $id => $lang )
+		foreach( \IPS\Lang::languages() as $id => $lang )
 		{
 			/* Try to get the actual database noun if it has been created */
 			try
 			{
 				$title = $lang->get( 'content_db_lang_pu_' . $database->id );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				$title = $lang->get('content_database_noun_pu');
 			}
@@ -582,7 +485,7 @@ class Databases extends Model implements Permissions
 		$database->field_title = $titleField->id;
 		$perms = $titleField->permissions();
 
-		Db::i()->update( 'core_permission_index', array(
+		\IPS\Db::i()->update( 'core_permission_index', array(
              'perm_view'	 => '*',
              'perm_2'		 => '*',
              'perm_3'        => '*'
@@ -606,7 +509,7 @@ class Databases extends Model implements Permissions
 		$database->field_content = $contentField->id;
 		$perms = $contentField->permissions();
 
-		Db::i()->update( 'core_permission_index', array(
+		\IPS\Db::i()->update( 'core_permission_index', array(
              'perm_view'	 => '*',
              'perm_2'		 => '*',
              'perm_3'        => '*'
@@ -625,13 +528,12 @@ class Databases extends Model implements Permissions
              'category_description'  => $catDesc,
              'category_parent_id'    => 0,
              'category_has_perms'    => 0,
-             'category_show_records' => 1,
-			 'category_image' => null
+             'category_show_records' => 1
          ) ) );
 
 		$perms = $category->permissions();
 
-		Db::i()->update( 'core_permission_index', array(
+		\IPS\Db::i()->update( 'core_permission_index', array(
              'perm_view'	 => '*',
              'perm_2'		 => '*',
              'perm_3'        => '*'
@@ -642,16 +544,16 @@ class Databases extends Model implements Permissions
 	}
 
 	/**
-	 * @brief   Language strings preloaded
+	 * @brief   Language strings pre-loaded
 	 */
-	protected bool $langLoaded = FALSE;
+	protected $langLoaded = FALSE;
 
 	/**
 	 * Get database id
 	 * 
-	 * @return int
+	 * @return string
 	 */
-	public function get__id(): int
+	public function get__id()
 	{
 		return $this->id;
 	}
@@ -661,7 +563,7 @@ class Databases extends Model implements Permissions
 	 *
 	 * @return int
 	 */
-	public function get__comment_bump(): int
+	public function get__comment_bump()
 	{
 		if ( $this->comment_bump === 0 )
 		{
@@ -675,9 +577,6 @@ class Databases extends Model implements Permissions
 		{
 			return static::BUMP_ON_EDIT + static::BUMP_ON_COMMENT;
 		}
-
-		/* Still here? Use the default */
-		return static::BUMP_ON_COMMENT;
 	}
 	
 	/**
@@ -685,30 +584,29 @@ class Databases extends Model implements Permissions
 	 *
 	 * @return string
 	 */
-	public function get__title(): string
+	public function get__title()
 	{
-		return Member::loggedIn()->language()->addToStack('content_db_' . $this->id);
+		return \IPS\Member::loggedIn()->language()->addToStack('content_db_' . $this->id);
 	}
-
+	
 	/**
 	 * Get database description
 	 *
-	 * @return string|null
+	 * @return string
 	 */
-	public function get__description(): ?string
+	public function get__description()
 	{
-		return Member::loggedIn()->language()->addToStack('content_db_' . $this->id . '_desc');
+		return \IPS\Member::loggedIn()->language()->addToStack('content_db_' . $this->id . '_desc');
 	}
 
 	/**
 	 * Get default category
 	 *
-	 * @return string|null
+	 * @return string
 	 */
-	public function get__default_category(): ?string
+	public function get__default_category()
 	{
 		$categoryClass = '\IPS\cms\Categories' . $this->id;
-		/* @var $categoryClass Categories */
 		if ( $this->default_category )
 		{
 			try
@@ -716,7 +614,7 @@ class Databases extends Model implements Permissions
 				$categoryClass::load( $this->default_category );
 				return $this->default_category;
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$this->default_category = NULL;
 			}
@@ -726,7 +624,7 @@ class Databases extends Model implements Permissions
 		{
 			$roots = $categoryClass::roots( NULL );
 
-			if ( ! count( $roots ) )
+			if ( ! \count( $roots ) )
 			{
 				/* Create a category */
 				$category = new $categoryClass;
@@ -735,7 +633,7 @@ class Databases extends Model implements Permissions
 				$catTitle = array();
 				$catDesc  = array();
 
-				foreach( Lang::languages() as $id => $lang )
+				foreach( \IPS\Lang::languages() as $id => $lang )
 				{
 					$catTitle[ $id ] = $lang->get('content_database_noun_pu');
 					$catDesc[ $id ]  = '';
@@ -751,7 +649,7 @@ class Databases extends Model implements Permissions
 
 				$perms = $category->permissions();
 
-				Db::i()->update( 'core_permission_index', array(
+				\IPS\Db::i()->update( 'core_permission_index', array(
 					'perm_view'	 => '*',
 					'perm_2'	 => '*',
 					'perm_3'     => '*'
@@ -766,7 +664,7 @@ class Databases extends Model implements Permissions
 			$this->save();
 
 			/* Update records */
-			Db::i()->update( 'cms_custom_database_' . $this->id, array( 'category_id' => $category->id ), array( 'category_id=0' ) );
+			\IPS\Db::i()->update( 'cms_custom_database_' . $this->id, array( 'category_id' => $category->id ), array( 'category_id=0' ) );
 		}
 
 		return $this->default_category;
@@ -777,14 +675,14 @@ class Databases extends Model implements Permissions
 	 * 
 	 * @return array
 	 */
-	public function get_fixed_field_perms(): array
+	public function get_fixed_field_perms()
 	{
-		if ( ! is_array( $this->_data['fixed_field_perms'] ) )
+		if ( ! \is_array( $this->_data['fixed_field_perms'] ) )
 		{
-			$this->_data['fixed_field_perms'] = json_decode( (string) $this->_data['fixed_field_perms'], true );
+			$this->_data['fixed_field_perms'] = json_decode( $this->_data['fixed_field_perms'], true );
 		}
 		
-		if ( is_array( $this->_data['fixed_field_perms'] ) )
+		if ( \is_array( $this->_data['fixed_field_perms'] ) )
 		{
 			return $this->_data['fixed_field_perms'];
 		}
@@ -795,12 +693,12 @@ class Databases extends Model implements Permissions
 	/**
 	 * Set the "fixed field" field
 	 *
-	 * @param mixed $value
+	 * @param string|array $value
 	 * @return void
 	 */
-	public function set_fixed_field_perms( mixed $value ) : void
+	public function set_fixed_field_perms( $value )
 	{
-		$this->_data['fixed_field_perms'] = ( is_array( $value ) ? json_encode( $value ) : $value );
+		$this->_data['fixed_field_perms'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
 	}
 
 	/**
@@ -808,14 +706,14 @@ class Databases extends Model implements Permissions
 	 *
 	 * @return array
 	 */
-	public function get_fixed_field_settings(): array
+	public function get_fixed_field_settings()
 	{
-		if ( ! is_array( $this->_data['fixed_field_settings'] ) )
+		if ( ! \is_array( $this->_data['fixed_field_settings'] ) )
 		{
-			$this->_data['fixed_field_settings'] = json_decode( (string) $this->_data['fixed_field_settings'], true );
+			$this->_data['fixed_field_settings'] = json_decode( $this->_data['fixed_field_settings'], true );
 		}
 
-		if ( is_array( $this->_data['fixed_field_settings'] ) )
+		if ( \is_array( $this->_data['fixed_field_settings'] ) )
 		{
 			return $this->_data['fixed_field_settings'];
 		}
@@ -826,134 +724,64 @@ class Databases extends Model implements Permissions
 	/**
 	 * Set the "fixed field" settings field
 	 *
-	 * @param mixed $value
+	 * @param string|array $value
 	 * @return void
 	 */
-	public function set_fixed_field_settings( mixed $value ) : void
+	public function set_fixed_field_settings( $value )
 	{
-		$this->_data['fixed_field_settings'] = ( is_array( $value ) ? json_encode( $value ) : $value );
+		$this->_data['fixed_field_settings'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
 	}
 
 	/**
-	 * @return Page|null
+	 * Get feature settings, settings
+	 *
+	 * @return array
 	 */
-	public function get_page() : ?Page
+	public function get_featured_settings()
 	{
-		if( $this->page_id )
+		if ( ! \is_array( $this->_data['featured_settings'] ) )
 		{
-			try
-			{
-				return Page::load( $this->page_id );
-			}
-			catch( OutOfRangeException ){}
+			$this->_data['featured_settings'] = json_decode( $this->_data['featured_settings'], true );
 		}
 
-		return null;
+		if ( \is_array( $this->_data['featured_settings'] ) )
+		{
+			return $this->_data['featured_settings'];
+		}
+
+		return array();
 	}
 
 	/**
-	 * @return bool
+	 * Set the "featured settings" field
+	 *
+	 * @param string|array $value
+	 * @return void
 	 */
-	public function get_allow_club_categories() : bool
+	public function set_featured_settings( $value )
 	{
-		if( Settings::i()->clubs )
+		$this->_data['featured_settings'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
+	}
+
+	/**
+	 * @return false|mixed
+	 */
+	public function get_allow_club_categories()
+	{
+		if( \IPS\Settings::i()->clubs )
 		{
 			return $this->_data['allow_club_categories'];
 		}
 
 		return false;
 	}
-
-	/**
-	 * @return array
-	 */
-	public function get_display_settings() : array
-	{
-		$return = [];
-		if( isset( $this->_data['display_settings'] ) and $this->_data['display_settings'] )
-		{
-			$return = json_decode( $this->_data['display_settings'], true );
-		}
-
-		$default = array(
-			'index' => [ 'type' => 'all', 'layout' => 'featured', 'template' => null ],
-			'categories' => [ 'layout' => 'table', 'template' => null ],
-			'listing' => [ 'layout' => 'table', 'template' => null ],
-			'display' => [ 'layout' => 'custom', 'template' => 'display' ],
-			'form' => [ 'layout' => 'custom', 'template' => 'form' ]
-		);;
-
-		foreach( $default as $k => $v )
-		{
-			if( !isset( $return[ $k ] ) )
-			{
-				$return[ $k ] = $v;
-			}
-		}
-
-		return $return;
-	}
-
-	/**
-	 * @param array|null $val
-	 * @return void
-	 */
-	public function set_display_settings( ?array $val ) : void
-	{
-		$this->_data['display_settings'] = ( is_array( $val ) and count( $val ) ) ? json_encode( $val ) : null;
-	}
-
-	/**
-	 * @return string
-	 */
-	public function get_template_form() : string
-	{
-		return $this->display_settings['form']['template'] ?? 'form';
-	}
-
-	/**
-	 * @return string
-	 */
-	public function get_template_display() : string
-	{
-		return $this->display_settings['display']['template'] ?? 'display';
-	}
-
-	/**
-	 * @return string
-	 */
-	public function get_template_listing() : string
-	{
-		return ( $this->display_settings['listing']['layout'] == 'custom' and $this->display_settings['listing']['template'] ) ? $this->display_settings['listing']['template'] : 'listing';
-	}
-
-	/**
-	 * @return string
-	 */
-	public function get_template_categories() : string
-	{
-		return ( $this->display_settings['categories']['layout'] == 'custom' and $this->display_settings['categories']['template'] ) ? $this->display_settings['categories']['template'] : 'category_index';
-	}
-
-	/**
-	 * @return string
-	 */
-	public function get_template_featured() : string
-	{
-		if( $this->display_settings['index']['type'] != 'categories' )
-		{
-			return ( $this->display_settings['index']['layout'] == 'custom' and $this->display_settings['index']['template'] ) ? $this->display_settings['index']['template'] : 'category_articles';
-		}
-
-		return $this->template_categories;
-	}
-
+	
 	/**
 	 * Get the title of the page when using a database
 	 *
 	 * @return string
 	 */
-	public function pageTitle(): string
+	public function pageTitle()
 	{
 		if ( $this->pageTitle === NULL )
 		{
@@ -965,34 +793,34 @@ class Databases extends Model implements Permissions
 			{
 				try
 				{
-					$this->pageTitle = Page::load( $this->page_id )->getHtmlTitle();
+					$this->pageTitle = \IPS\cms\Pages\Page::load( $this->page_id )->getHtmlTitle();
 				}
-				catch( Exception $e ) { }
+				catch( \Exception $e ) { }
 			}
 		}
 		
 		return $this->pageTitle;
 	}
-
+	
 	/**
 	 * Check permissions
 	 *
 	 * @param	mixed								$permission						A key which has a value in static::$permissionMap['view'] matching a column ID in core_permission_index
-	 * @param Group|Member|null $member							The member or group to check (NULL for currently logged in member)
-	 * @param bool $considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$member							The member or group to check (NULL for currently logged in member)
+	 * @param	bool								$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
 	 * @return	bool
-	 * @throws	OutOfBoundsException	If $permission does not exist in static::$permissionMap
+	 * @throws	\OutOfBoundsException	If $permission does not exist in static::$permissionMap
 	 */
-	public function can( mixed $permission, Group|Member $member=NULL, bool $considerPostBeforeRegistering = TRUE ): bool
+	public function can( $permission, $member=NULL, $considerPostBeforeRegistering = TRUE )
 	{
 		/* If we're looking from the front, make sure the database page also passes */
-		if ( $permission === 'view' and Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' and $this->page_id )
+		if ( $permission === 'view' and \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'front' and $this->page_id )
 		{
 			try
 			{
-				return parent::can( 'view', $member, $considerPostBeforeRegistering ) AND Page::load( $this->page_id )->can( 'view', $member, $considerPostBeforeRegistering );
+				return parent::can( 'view', $member, $considerPostBeforeRegistering ) AND \IPS\cms\Pages\Page::load( $this->page_id )->can( 'view', $member, $considerPostBeforeRegistering );
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
 				return parent::can( 'view', $member, $considerPostBeforeRegistering );
 			}
@@ -1002,14 +830,47 @@ class Databases extends Model implements Permissions
 	}
 
 	/**
+	 * Disabled permissions
+	 * Allow node classes to define permissions that are unselectable in the permission matrix
+	 *
+	 * @return array	array( {group_id} => array( 'read', 'view', 'perm_7' );
+	 * @throws UnderflowException (if guest group ID is invalid)
+	 */
+	public function disabledPermissions()
+	{
+		$disabled = array();
+
+		try
+		{
+			$permissions = \IPS\cms\Pages\Page::load( $this->page_id )->permissions();
+
+			if( $permissions['perm_view'] != '*' )
+			{
+				$pageViewPermissions = explode( ',', $permissions['perm_view'] );
+
+				foreach ( \IPS\Member\Group::groups() as $group )
+				{
+					if ( ! \in_array( $group->g_id, $pageViewPermissions ) )
+					{
+						$disabled[ $group->g_id ] = array( 'view', 2, 3, 4, 5, 6, 7 );
+					}
+				}
+			}
+		}
+		catch( \OutOfRangeException $e ){}
+
+		return $disabled;
+	}
+
+	/**
 	 * Sets up and preloads some words
 	 *
 	 * @return void
 	 */
-	public function preLoadWords() : void
+	public function preLoadWords()
 	{
 		/* Skip this during installation / uninstallation as the words won't be loaded */
-		if ( !Dispatcher::hasInstance() or Dispatcher::i()->controllerLocation === 'setup' OR ( Dispatcher::i()->controllerLocation === 'admin' and Dispatcher::i()->module and Dispatcher::i()->module->key === 'applications' ) )
+		if ( !\IPS\Dispatcher::hasInstance() or \IPS\Dispatcher::i()->controllerLocation === 'setup' OR ( \IPS\Dispatcher::i()->controllerLocation === 'admin' AND \IPS\Dispatcher::i()->module->key === 'applications' ) )
 		{
 			$this->langLoaded = TRUE;
 			return;
@@ -1017,24 +878,24 @@ class Databases extends Model implements Permissions
 		 
 		if ( ! $this->langLoaded )
 		{
-			if ( Dispatcher::i()->controllerLocation === 'admin' )
+			if ( \IPS\Dispatcher::i()->controllerLocation === 'admin' )
 			{
 				/* Moderator tools */
-				Member::loggedIn()->language()->words['modperms__core_Content_cms_Records' . $this->id ] = $this->_title;
-				Member::loggedIn()->language()->words['cms' . $this->id ] = Member::loggedIn()->language()->addToStack('categories');
+				\IPS\Member::loggedIn()->language()->words['modperms__core_Content_cms_Records' . $this->id ] = $this->_title;
+				\IPS\Member::loggedIn()->language()->words['cms' . $this->id ] = \IPS\Member::loggedIn()->language()->addToStack('categories');
 				
 				/* Editor Areas */
-				Member::loggedIn()->language()->words['editor__cms_Records' . $this->id ] = $this->_title;
+				\IPS\Member::loggedIn()->language()->words['editor__cms_Records' . $this->id ] = $this->_title;
 
-				foreach( array( 'pin', 'unpin', 'feature', 'unfeature', 'edit', 'hide', 'unhide', 'view_hidden', 'future_publish', 'view_future', 'move', 'lock', 'unlock', 'reply_to_locked', 'delete', 'feature_comments', 'unfeature_comments', 'add_item_message', 'edit_item_message', 'delete_item_message', 'view_reports', 'assign' ) as $lang )
+				foreach( array( 'pin', 'unpin', 'feature', 'unfeature', 'edit', 'hide', 'unhide', 'view_hidden', 'future_publish', 'view_future', 'move', 'lock', 'unlock', 'reply_to_locked', 'delete', 'feature_comments', 'unfeature_comments', 'add_item_message', 'edit_item_message', 'delete_item_message' ) as $lang )
 				{
-					Member::loggedIn()->language()->words['can_' . $lang . '_content_db_lang_sl_' . $this->id ] = Member::loggedIn()->language()->addToStack( 'can_' . $lang . '_record', FALSE, array( 'sprintf' => array( $this->recordWord(1) ) ) );
-					Member::loggedIn()->language()->words['can_' . $lang . '_content_db_lang_su_' . $this->id ] = Member::loggedIn()->language()->addToStack( 'can_' . $lang . '_record', FALSE, array( 'sprintf' => array( $this->recordWord(1, TRUE) ) ) );
+					\IPS\Member::loggedIn()->language()->words['can_' . $lang . '_content_db_lang_sl_' . $this->id ] = \IPS\Member::loggedIn()->language()->addToStack( 'can_' . $lang . '_record', FALSE, array( 'sprintf' => array( $this->recordWord( 1 ) ) ) );
+					\IPS\Member::loggedIn()->language()->words['can_' . $lang . '_content_db_lang_su_' . $this->id ] = \IPS\Member::loggedIn()->language()->addToStack( 'can_' . $lang . '_record', FALSE, array( 'sprintf' => array( $this->recordWord( 1, TRUE ) ) ) );
 
-					if ( in_array( $lang, array( 'edit', 'hide', 'unhide', 'view_hidden', 'delete' ) ) )
+					if ( \in_array( $lang, array( 'edit', 'hide', 'unhide', 'view_hidden', 'delete' ) ) )
 					{
-						Member::loggedIn()->language()->words['can_' . $lang . '_content_record_comments_title_' . $this->id ] = Member::loggedIn()->language()->addToStack( 'can_' . $lang . '_rcomment', FALSE, array( 'sprintf' => array( $this->recordWord(1) ) ) );
-						Member::loggedIn()->language()->words['can_' . $lang . '_content_record_reviews_title_' . $this->id ] = Member::loggedIn()->language()->addToStack( 'can_' . $lang . '_rreview', FALSE, array( 'sprintf' => array( $this->recordWord(1) ) ) );
+						\IPS\Member::loggedIn()->language()->words['can_' . $lang . '_content_record_comments_title_' . $this->id ] = \IPS\Member::loggedIn()->language()->addToStack( 'can_' . $lang . '_rcomment', FALSE, array( 'sprintf' => array( $this->recordWord( 1 ) ) ) );
+						\IPS\Member::loggedIn()->language()->words['can_' . $lang . '_content_record_reviews_title_' . $this->id ] = \IPS\Member::loggedIn()->language()->addToStack( 'can_' . $lang . '_rreview', FALSE, array( 'sprintf' => array( $this->recordWord( 1 ) ) ) );
 
 					}
 				}
@@ -1047,30 +908,30 @@ class Databases extends Model implements Permissions
 	/**
 	 * "Records" / "Record" word
 	 *
-	 * @param int $number	Number
-	 * @param bool $upper  ucfirst string
+	 * @param	int	    $number	Number
+	 * @param   bool    $upper  ucfirst string
 	 * @return	string
 	 */
-	public function recordWord( int $number = 2, bool $upper=FALSE ): string
+	public function recordWord( $number = 2, $upper = FALSE )
 	{
-		if ( Application::appIsEnabled('cms') )
+		if ( \IPS\Application::appIsEnabled('cms') )
 		{
-			return Member::loggedIn()->language()->recordWord( $number, $upper, $this->id );
+			return \IPS\Member::loggedIn()->language()->recordWord( $number, $upper, $this->id );
 		}
 		else
 		{
 			/* If the Pages app is disabled, just load a generic phrase */
 			$key = "content_database_noun_" . ( $number > 1 ? "p" : "s" ) . ( $upper ? "u" : "l" );
-			return Member::loggedIn()->language()->addToStack( $key );
+			return \IPS\Member::loggedIn()->language()->addToStack( $key ); 
 		}
 	}
 	
 	/**
 	 * [ActiveRecord] Save Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		/* If we are enabling search, we will need to index that content */
 		$rebuildSearchIndex = ( !$this->_new AND isset( $this->changed['search'] ) AND $this->changed['search'] );
@@ -1081,40 +942,37 @@ class Databases extends Model implements Permissions
 		/* If this database isn't searchable, make sure its content is not in the search index */
 		if( $removeSearchIndex )
 		{
-			Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records' . $this->id );
-			Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records\Comment' . $this->id );
-			Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records\Review' . $this->id );
+			\IPS\Content\Search\Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records' . $this->id );
+			\IPS\Content\Search\Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records\Comment' . $this->id );
+			\IPS\Content\Search\Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records\Review' . $this->id );
 
 			/* If there are any bg tasks to rebuild index, clear them */
-			foreach( Db::i()->select( '*', 'core_queue', array( '`key`=?', 'RebuildSearchIndex' ) ) as $queue )
+			foreach( \IPS\Db::i()->select( '*', 'core_queue', array( '`key`=?', 'RebuildSearchIndex' ) ) as $queue )
 			{
 				$details = json_decode( $queue['data'], true );
 
 				if( isset( $details['class'] ) AND $details['class'] == 'IPS\cms\Records' . $this->id )
 				{
-					Db::i()->delete( 'core_queue', array( 'id=?', $queue['id'] ) );
+					\IPS\Db::i()->delete( 'core_queue', array( 'id=?', $queue['id'] ) );
 				}
 			}
 		}
 		elseif( $rebuildSearchIndex )
 		{
-			Task::queue( 'core', 'RebuildSearchIndex', array( 'class' => 'IPS\cms\Records' . $this->id ), 5, TRUE );
+			\IPS\Task::queue( 'core', 'RebuildSearchIndex', array( 'class' => 'IPS\cms\Records' . $this->id ), 5, TRUE );
 		}
 	}
 	
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		$fieldsClass = '\IPS\cms\Fields' . $this->id;
 
-		$class = '\IPS\cms\Categories' . $this->id;
-		/* @var $class Categories */
-		/* @var $fieldsClass Fields */
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'cms_database_categories', array( 'category_database_id=?', $this->id ) ), '\IPS\cms\Categories' . $this->id ) as $cat )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'cms_database_categories', array( 'category_database_id=?', $this->id ) ), '\IPS\cms\Categories' . $this->id ) as $cat )
 		{
 			$cat->delete();
 		}
@@ -1131,7 +989,7 @@ class Databases extends Model implements Permissions
 				$fileFields[] = 'field_' . $field->id;
 
 				/* Delete thumbnails */
-				Task::queue( 'core', 'FileCleanup', array(
+				\IPS\Task::queue( 'core', 'FileCleanup', array( 
 					'table'				=> 'cms_database_fields_thumbnails',
 					'column'			=> 'thumb_location',
 					'storageExtension'	=> 'cms_Records',
@@ -1147,14 +1005,14 @@ class Databases extends Model implements Permissions
 		}
 		
 		/* Delete comments */
-		Db::i()->delete( 'cms_database_comments', array( 'comment_database_id=?', $this->id ) );
-		Db::i()->delete( 'cms_database_reviews', array( 'review_database_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'cms_database_comments', array( 'comment_database_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'cms_database_reviews', array( 'review_database_id=?', $this->id ) );
 
 		/* Delete from view counter */
-		Db::i()->delete( 'core_view_updates', array( 'classname=? ', 'IPS\cms\Records' . $this->id ) );
+		\IPS\Db::i()->delete( 'core_view_updates', array( 'classname=? ', 'IPS\cms\Records' . $this->id ) );
 
 		/* Delete records */
-		Task::queue( 'core', 'FileCleanup', array(
+		\IPS\Task::queue( 'core', 'FileCleanup', array( 
 			'table'				=> 'cms_custom_database_' . $this->id,
 			'column'			=> $fileFields,
 			'storageExtension'	=> 'cms_Records',
@@ -1164,16 +1022,15 @@ class Databases extends Model implements Permissions
 		), 4 );
 		
 		/* Delete revisions */
-		Db::i()->delete( 'cms_database_revisions', array( 'revision_database_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'cms_database_revisions', array( 'revision_database_id=?', $this->id ) );
 		
 		/* Remove any reciprocal linking */
-		Db::i()->delete( 'cms_database_fields_reciprocal_map', array( 'map_foreign_database_id=? or map_origin_database_id=?', $this->id, $this->id ) );
+		\IPS\Db::i()->delete( 'cms_database_fields_reciprocal_map', array( 'map_foreign_database_id=? or map_origin_database_id=?', $this->id, $this->id ) );
 
 		/* Remove any fields in other databases associated to this DB */
-		foreach( Db::i()->select( '*', 'cms_database_fields', array( 'field_type=?', 'Item' ) ) as $fieldData )
+		foreach( \IPS\Db::i()->select( '*', 'cms_database_fields', array( 'field_type=?', 'Item' ) ) as $fieldData )
 		{
 			$fieldClass     = '\IPS\cms\Fields' .  $fieldData['field_database_id'];
-			/* @var $fieldClass Fields */
 			if ($field = $fieldClass::load($fieldData['field_id']) AND isset( $field->extra['database'] ) and $field->extra['database'] AND $field->extra['database'] == $this->id )
 			{
 				$field->delete();
@@ -1183,69 +1040,64 @@ class Databases extends Model implements Permissions
 		/* Delete notifications */
 		$memberIds	= array();
 
-		foreach( Db::i()->select( '`member`', 'core_notifications', array( 'item_class=? ', 'IPS\cms\Records' . $this->id ) ) as $member )
+		foreach( \IPS\Db::i()->select( '`member`', 'core_notifications', array( 'item_class=? ', 'IPS\cms\Records' . $this->id ) ) as $member )
 		{
 			$memberIds[ $member ]	= $member;
 		}
 
-		Db::i()->delete( 'core_notifications', array( 'item_class=? ', 'IPS\cms\Records' . $this->id ) );
-		Db::i()->delete( 'core_follow', array( 'follow_app=? AND follow_area=?', 'cms', 'records' . $this->id ) );
+		\IPS\Db::i()->delete( 'core_notifications', array( 'item_class=? ', 'IPS\cms\Records' . $this->id ) );
+		\IPS\Db::i()->delete( 'core_follow', array( 'follow_app=? AND follow_area=?', 'cms', 'records' . $this->id ) );
 
 		/* Remove promoted content */
-		Db::i()->delete( 'core_content_promote', array( 'promote_class=?', 'IPS\cms\Records' . $this->id ) );
+		\IPS\Db::i()->delete( 'core_social_promote', array( 'promote_class=?', 'IPS\cms\Records' . $this->id ) );
 
 		/* remove deletion log */
-		Db::i()->delete( 'core_deletion_log', array( 'dellog_content_class=?', 'IPS\cms\Records' . $this->id  ) );
-		Db::i()->delete( 'core_deletion_log', array( 'dellog_content_class=?', 'IPS\cms\Records\Comment' . $this->id  ) );
-		Db::i()->delete( 'core_deletion_log', array( 'dellog_content_class=?', 'IPS\cms\Records\Review' . $this->id  ) );
+		\IPS\Db::i()->delete( 'core_deletion_log', array( 'dellog_content_class=?', 'IPS\cms\Records' . $this->id  ) );
+		\IPS\Db::i()->delete( 'core_deletion_log', array( 'dellog_content_class=?', 'IPS\cms\Records\Comment' . $this->id  ) );
+		\IPS\Db::i()->delete( 'core_deletion_log', array( 'dellog_content_class=?', 'IPS\cms\Records\Review' . $this->id  ) );
 
 		/* remove metadata */
-		Db::i()->delete( 'core_content_meta', array( "meta_class=? ", 'IPS\cms\Records' . $this->id  ) );
+		\IPS\Db::i()->delete( 'core_content_meta', array( "meta_class=? ", 'IPS\cms\Records' . $this->id  ) );
 
 		foreach( $memberIds as $member )
 		{
-			Member::load( $member )->recountNotifications();
+			\IPS\Member::load( $member )->recountNotifications();
 		}
 
 		/* Remove rss imports */
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_rss_import', array( 'rss_import_class=?', 'IPS\cms\Records' . $this->id ) ), 'IPS\core\Rss\Import' ) as $import )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_rss_import', array( 'rss_import_class=?', 'IPS\cms\Records' . $this->id ) ), 'IPS\core\Rss\Import' ) as $import )
 		{
 			$import->delete();
 		}
 
 		/* Remove from search */
-		Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records' . $this->id );
-		Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records\Comment' . $this->id );
-		Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records\Review' . $this->id );
+		\IPS\Content\Search\Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records' . $this->id );
+		\IPS\Content\Search\Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records\Comment' . $this->id );
+		\IPS\Content\Search\Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records\Review' . $this->id );
 
 		/* Delete custom languages */
-		Lang::deleteCustom( 'cms', "content_db_" . $this->id );
-		Lang::deleteCustom( 'cms', "content_db_" . $this->id . '_desc');
-		Lang::deleteCustom( 'cms', "content_db_lang_sl_" . $this->id );
-		Lang::deleteCustom( 'cms', "content_db_lang_pl_" . $this->id );
-		Lang::deleteCustom( 'cms', "content_db_lang_su_" . $this->id );
-		Lang::deleteCustom( 'cms', "content_db_lang_pu_" . $this->id );
-		Lang::deleteCustom( 'cms', "content_db_lang_ia_" . $this->id );
-		Lang::deleteCustom( 'cms', "content_db_lang_sl_" . $this->id . '_pl' );
-		Lang::deleteCustom( 'cms', "__indefart_content_db_lang_sl_" . $this->id );
-		Lang::deleteCustom( 'cms', "__defart_content_db_lang_sl_" . $this->id );
-		Lang::deleteCustom( 'cms', "cms_records" . $this->id . '_pl' );
-		Lang::deleteCustom( 'cms', "module__cms_records" . $this->id );
-		Lang::deleteCustom( 'cms', "digest_area_cms_records" . $this->id );
-		Lang::deleteCustom( 'cms', "digest_area_cms_categories" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "content_db_" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "content_db_" . $this->id . '_desc');
+		\IPS\Lang::deleteCustom( 'cms', "content_db_lang_sl_" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "content_db_lang_pl_" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "content_db_lang_su_" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "content_db_lang_pu_" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "content_db_lang_ia_" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "content_db_lang_sl_" . $this->id . '_pl' );
+		\IPS\Lang::deleteCustom( 'cms', "__indefart_content_db_lang_sl_" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "__defart_content_db_lang_sl_" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "cms_create_menu_records_" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "cms_records" . $this->id . '_pl' );
+		\IPS\Lang::deleteCustom( 'cms', "module__cms_records" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "digest_area_cms_records" . $this->id );
+		\IPS\Lang::deleteCustom( 'cms', "digest_area_cms_categories" . $this->id );
 
 		/* Unclaim attachments */
-		File::unclaimAttachments( 'cms_Records', NULL, NULL, $this->id );
-		File::unclaimAttachments( 'cms_Records' . $this->id );
+		\IPS\File::unclaimAttachments( 'cms_Records', NULL, NULL, $this->id );
+		\IPS\File::unclaimAttachments( 'cms_Records' . $this->id );
 
 		/* Remove widgets */
 		$this->removeWidgets();
-
-		/* Delete the page */
-		if( $page = $this->page )
-		{
-			$page->delete();
-		}
 
 		/* Delete the database record */
 		parent::delete();
@@ -1256,29 +1108,29 @@ class Databases extends Model implements Permissions
 	 *
 	 * @return void
 	 */
-	public function removeWidgets() : void
+	public function removeWidgets()
 	{
 		$databaseWidgets = array( 'Database', 'LatestArticles' );
 
-		foreach ( Db::i()->select( '*', 'cms_page_widget_areas' ) as $item )
+		foreach ( \IPS\Db::i()->select( '*', 'cms_page_widget_areas' ) as $item )
 		{
-			if( $pageBlocks = json_decode( $item['area_tree'], true ) )
+			$pageBlocks   = json_decode( $item['area_widgets'], TRUE );
+			$resaveBlock  = NULL;
+			foreach( $pageBlocks as $id => $pageBlock )
 			{
-				$update = false;
-				$area = new Area( $pageBlocks, $item['area_area'] );
-				foreach( $area->getAllWidgets() as $widget )
+				if( $pageBlock['app'] == 'cms' AND \in_array( $pageBlock['key'], $databaseWidgets ) AND ! empty( $pageBlock['configuration']['database'] ) )
 				{
-					if( $widget['app'] == 'cms' and in_array( $widget['key'], $databaseWidgets ) and !empty( $widget['configuration']['database'] ) and $widget['configuration']['database'] == $this->_id )
+					if ( $pageBlock['configuration']['database'] == $this->id )
 					{
-						$area->removeWidget( $widget['unique'] );
-						$update = true;
+						$resaveBlock = $pageBlocks;
+						unset( $resaveBlock[ $id ] );
 					}
 				}
+			}
 
-				if( $update )
-				{
-					Db::i()->update( 'cms_page_widget_areas', array( 'area_tree' => json_encode( $area->toArray( true, false ) ) ), array( 'area_page_id=? and area_area=?', $item['area_page_id'], $item['area_area'] ) );
-				}
+			if ( $resaveBlock !== NULL )
+			{
+				\IPS\Db::i()->update( 'cms_page_widget_areas', array( 'area_widgets' => json_encode( $resaveBlock ) ), array( 'area_page_id=? and area_area=?', $this->id, $item['area_area'] ) );
 			}
 		}
 	}
@@ -1286,40 +1138,31 @@ class Databases extends Model implements Permissions
 	/**
 	 * Set the permission index permissions
 	 *
-	 * @param array $insert	Permission data to insert
+	 * @param	array	$insert	Permission data to insert
 	 * @return  void
 	 */
-	public function setPermissions( array $insert ) : void
+	public function setPermissions( $insert )
 	{
 		parent::setPermissions( $insert );
 		
 		/* Clear cache */
-		unset( Store::i()->cms_databases );
+		unset( \IPS\Data\Store::i()->cms_databases );
 		
 		/* Clone these permissions to all categories that do not have permissions */
 		$class = '\IPS\cms\Categories' . $this->id;
-		/* @var $class Categories */
 		foreach( $class::roots( NULL ) as $category )
 		{
 			$this->setPermssionsRecursively( $category );
-		}
-
-		/* Clone the view permissions to the page */
-		if( $page = $this->page )
-		{
-			$page->setPermissions([
-				'app' => $page::$permApp, 'perm_type' => $page::$permType, 'perm_type_id' => $page->_id, 'perm_view' => $insert['perm_view']
-			]);
 		}
 	}
 	
 	/**
 	 * Recursively set permissions
 	 *
-	 * @param Categories $category		Category object
+	 * @param	\IPS\cms\Categrories	$category		Category object
 	 * @return	void
 	 */
-	protected function setPermssionsRecursively( Categories $category ) : void
+	protected function setPermssionsRecursively( $category )
 	{
 		if ( ! $category->has_perms )
 		{
@@ -1342,13 +1185,13 @@ class Databases extends Model implements Permissions
 		static $count = null;
 		if ( $count === NULL )
 		{
-			$count = Db::i()->select( 'count(*)', 'cms_database_categories', array( 'category_database_id=?', $this->_id ) )->first();
+			$count = \IPS\Db::i()->select( 'count(*)', 'cms_database_categories', array( 'category_database_id=?', $this->_id ) )->first();
 		}
 		return $count;
 	}
 
 	/**
-	 * Get the number of club categories in this database
+	 * Get the number of categories in this database
 	 *
 	 * @return  int
 	 */
@@ -1357,23 +1200,22 @@ class Databases extends Model implements Permissions
 		static $count = null;
 		if ( $count === NULL )
 		{
-			$count = Db::i()->select( 'count(*)', 'cms_database_categories', array( 'category_database_id=? AND category_club_id IS NOT NULL', $this->_id ) )->first();
+			$count = \IPS\Db::i()->select( 'count(*)', 'cms_database_categories', array( 'category_database_id=? AND category_club_id IS NOT NULL', $this->_id ) )->first();
 		}
 		return $count;
 	}
-
-
+	
 	/**
 	 * Determines if any fields from other databases are crosslinking to items in this database via the Relational field
 	 *
-	 * @param int $databaseId		The ID of the database
+	 * @param	int		$databaseId		The ID of the database
 	 * @return boolean
 	 */
-	public static function hasReciprocalLinking( int $databaseId ): bool
+	public static function hasReciprocalLinking( $databaseId )
 	{
-		if ( isset( Store::i()->database_reciprocal_links ) )
+		if ( isset( \IPS\Data\Store::i()->database_reciprocal_links ) )
 		{
-			$values = Store::i()->database_reciprocal_links;
+			$values = \IPS\Data\Store::i()->database_reciprocal_links;
 		}
 		else
 		{
@@ -1381,7 +1223,7 @@ class Databases extends Model implements Permissions
 			foreach( static::databases() as $database )
 			{
 				$fieldsClass = 'IPS\cms\Fields' . $database->_id;
-				/* @var $fieldsClass Fields */
+
 				foreach( $fieldsClass::data() as $field )
 				{
 					if ( $field->type === 'Item' )
@@ -1394,11 +1236,11 @@ class Databases extends Model implements Permissions
 					}
 				}
 
-				Store::i()->database_reciprocal_links = $values;
+				\IPS\Data\Store::i()->database_reciprocal_links = $values;
 			}
 		}
 
-		if ( is_array( $values ) )
+		if ( \is_array( $values ) )
 		{
 			foreach( $values as $id => $fields )
 			{
@@ -1423,9 +1265,9 @@ class Databases extends Model implements Permissions
 	 */
 	public static function isUsedAsReciprocalField( int $databaseId ) : bool
 	{
-		if ( isset( Store::i()->database_reciprocal_links ) )
+		if ( isset( \IPS\Data\Store::i()->database_reciprocal_links ) )
 		{
-			$values = Store::i()->database_reciprocal_links;
+			$values = \IPS\Data\Store::i()->database_reciprocal_links;
 		}
 		else
 		{
@@ -1433,7 +1275,7 @@ class Databases extends Model implements Permissions
 			foreach( static::databases() as $database )
 			{
 				$fieldsClass = 'IPS\cms\Fields' . $database->_id;
-				/* @var $fieldsClass Fields */
+
 				foreach( $fieldsClass::data() as $field )
 				{
 					if ( $field->type === 'Item' )
@@ -1446,11 +1288,11 @@ class Databases extends Model implements Permissions
 					}
 				}
 
-				Store::i()->database_reciprocal_links = $values;
+				\IPS\Data\Store::i()->database_reciprocal_links = $values;
 			}
 		}
 
-		if ( is_array( $values ) )
+		if ( \is_array( $values ) )
 		{
 			foreach( $values as $id => $fields )
 			{
@@ -1472,204 +1314,31 @@ class Databases extends Model implements Permissions
 	 *
 	 * @return void
 	 */
-	public static function rebuildReciprocalLinkMaps() : void
+	public static function rebuildReciprocalLinkMaps()
 	{
 		/* Ensure the SPL are loaded from /cms/Application.php as this may be called by a task or upgrade module */
-		Application::load('cms');
+		\IPS\Application::load('cms');
 		
-		Db::i()->delete( 'cms_database_fields_reciprocal_map' );
+		\IPS\Db::i()->delete( 'cms_database_fields_reciprocal_map' );
 		
 		foreach( static::databases() as $database )
 		{
 			$fieldsClass = 'IPS\cms\Fields' . $database->_id;
-			/* @var $fieldsClass Fields */
+				
 			foreach( $fieldsClass::data() as $field )
 			{
 				if ( $field->type === 'Item' )
 				{
-					Task::queue( 'cms', 'RebuildReciprocalMaps', array( 'database' => $database->_id, 'field' => $field->id ), 2, array( 'field' ) );
+					\IPS\Task::queue( 'cms', 'RebuildReciprocalMaps', array( 'database' => $database->_id, 'field' => $field->id ), 2, array( 'field' ) );
 				}
 			}
 		}
-	}
-
-	/**
-	 * Get the filter cookie for this category/database
-	 *
-	 * @param Categories|null $category
-	 * @return array|null
-	 */
-	public function getFilterCookie( ?Categories $category=null ): ?array
-	{
-		$key = $category ? $category->id : 'd' . $this->id;
-		if ( isset( Request::i()->cookie['cms_filters'] ) )
-		{
-			$saved = json_decode( Request::i()->cookie['cms_filters'], TRUE );
-
-			if ( array_key_exists( $key, $saved ) and count( $saved[ $key ] ) )
-			{
-				return $saved[ $key ];
-			}
-		}
-
-		return NULL;
-	}
-
-	/**
-	 * Save filter cookie for this category
-	 *
-	 * @param array|bool $values Filter values to save (array) or FALSE to remove cookie
-	 * @param Categories|null $category
-	 * @return void
-	 */
-	public function saveFilterCookie( array|bool $values, ?Categories $category=null ): void
-	{
-		$key = $category ? $category->id : 'd' . $this->id;
-		$cookie = ( isset( Request::i()->cookie['cms_filters'] ) ) ? json_decode( Request::i()->cookie['cms_filters'], TRUE ) : array();
-
-		if ( $values === FALSE )
-		{
-			if ( array_key_exists( $key, $cookie ) )
-			{
-				unset( $cookie[ $key ] );
-			}
-		}
-		else
-		{
-			/* We only want to include ones where we have actually specified values to filter on */
-			$toSave = array();
-			foreach( $values AS $k => $v )
-			{
-				if ( is_numeric( $k ) or $k == 'cms_record_i_started' )
-				{
-					$toSave[ $k ] = $v;
-				}
-			}
-
-			$cookie[ $key ] = $toSave;
-		}
-
-		Request::i()->setCookie( 'cms_filters', json_encode( $cookie ), DateTime::create()->add( new DateInterval( 'P7D' ) ) );
-	}
-
-	/**
-	 * Use the cookie to build filters
-	 *
-	 * @param array $cookie
-	 * @param Categories|null $category
-	 * @return array
-	 */
-	public function buildWhereFromCookie( array $cookie, ?Categories $category=null ) : array
-	{
-		$where = [];
-
-		/** @var Fields $fieldClass */
-		$fieldClass = 'IPS\cms\Fields' . $this->id;
-		$customFields = $fieldClass::data( 'view', $category, $fieldClass::FIELD_SKIP_TITLE_CONTENT );
-
-		foreach( $cookie as $f => $v )
-		{
-			if ( $f == 'cms_record_i_started' and Member::loggedIn()->member_id )
-			{
-				$where[] = array( 'cms_custom_database_' . $this->id . '.member_id=' . Member::loggedIn()->member_id );
-				continue;
-			}
-
-			$k = 'content_field_' . $f;
-
-			if ( $customFields[ $f ]->type === 'Member' )
-			{
-				if ( ! empty( $v ) )
-				{
-					if ( is_array( $v ) )
-					{
-						foreach( $v as $m )
-						{
-							$member = Member::load( $m );
-							$where[] = [ "FIND_IN_SET( " . $member->member_id . ", REPLACE(field_" . $f . ", '\n',','))" ];
-						}
-					}
-					else
-					{
-						$member = Member::load( $v );
-						$where[] = [ "FIND_IN_SET( " . $member->member_id . ", REPLACE(field_" . $f . ", '\n',','))" ];
-					}
-				}
-
-				continue;
-			}
-
-			if ( isset( $customFields[ $f ] ) and $v !== '___any___' )
-			{
-				if ( is_array( $v ) )
-				{
-					if ( array_key_exists( 'start', $v ) or array_key_exists( 'end', $v ) )
-					{
-						$start = ( $v['start'] instanceof DateTime ) ? $v['start']->getTimestamp() : intval( $v['start'] );
-						$end   = ( $v['end'] instanceof DateTime )   ? $v['end']->getTimestamp()   : intval( $v['end'] );
-
-						if ( $start or $end )
-						{
-							$where[] = array( '( ' . mb_substr( $k, 8 ) . ' BETWEEN ' . $start . ' AND ' . $end . ' )' );
-						}
-					}
-					else
-					{
-						$like = array();
-						foreach( $v as $val )
-						{
-							if ( $val === 0 or ! empty( $val ) )
-							{
-								$like[] = $val;
-							}
-						}
-
-						if( $customFields[ $f ]->default_value and in_array( $customFields[ $f ]->default_value, $v ) )
-						{
-							$where[] = array( "( " . mb_substr( $k, 8 ) . " IS NULL OR " . Db::i()->findInSet( mb_substr( $k, 8 ), $like ) . ")" );
-						}
-						else
-						{
-							$where[] = array( Db::i()->findInSet( mb_substr( $k, 8 ), $like ) );
-						}
-					}
-				}
-				else
-				{
-					if ( is_bool( $v ) )
-					{
-						/* YesNo fields are false or true */
-						if ( $v === false )
-						{
-							$where[] = array( '(' . mb_substr( $k, 8 ) . ' IS NULL or ' . mb_substr( $k, 8 ) . '=0)' );
-						}
-						else
-						{
-							$where[] = array( mb_substr( $k, 8 ) . "=1" );
-						}
-					}
-					else
-					{
-						if ( $v !== 0 and ! $v )
-						{
-							$where[] = array( mb_substr( $k, 8 ) . " IS NULL" );
-						}
-						else
-						{
-							$where[] = array( mb_substr( $k, 8 ) . "=?", $v );
-						}
-					}
-				}
-			}
-		}
-
-		return $where;
 	}
 
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse			int					id				ID number
 	 * @apiresponse			string				name			Name
@@ -1678,7 +1347,7 @@ class Databases extends Model implements Permissions
 	 * @apiresponse			string				url				URL
 	 * @clientapiresponse	object|null			permissions		Node permissions
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		$return = array(
 			'id'			=> $this->id,
@@ -1690,7 +1359,6 @@ class Databases extends Model implements Permissions
 		{
 			$return['fields'] = array();
 			$fieldsClass = '\IPS\cms\Fields' . $this->id;
-			/* @var $fieldsClass Fields */
 			foreach ( $fieldsClass::roots() as $field )
 			{
 				$return['fields'][] = $field->apiOutput( $authorizedMember );
@@ -1699,17 +1367,17 @@ class Databases extends Model implements Permissions
 		
 		try
 		{
-			$pagePath   = Page::loadByDatabaseId( $this->id )->full_path;
-			$return['url'] = (string) Url::internal( "app=cms&module=pages&controller=page&path=" . $pagePath, 'front', 'content_page_path' );
+			$pagePath   = \IPS\cms\Pages\Page::loadByDatabaseId( $this->id )->full_path;
+			$return['url'] = (string) \IPS\Http\Url::internal( "app=cms&module=pages&controller=page&path=" . $pagePath, 'front', 'content_page_path' );
 		}
-		catch( OutOfRangeException $ex )
+		catch( \OutOfRangeException $ex )
 		{
 			$return['url'] = NULL;		
 		}
 
 		if( $authorizedMember === NULL )
 		{
-			$return['permissions']	= in_array( 'IPS\Node\Permissions', class_implements( get_class( $this ) ) ) ? $this->permissions() : NULL;
+			$return['permissions']	= \in_array( 'IPS\Node\Permissions', class_implements( \get_class( $this ) ) ) ? $this->permissions() : NULL;
 		}
 		
 		return $return;

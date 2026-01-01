@@ -12,23 +12,16 @@
 namespace IPS\{app}\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File as SystemFile;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: {class}
  */
-class {class} extends FileStorageAbstract
+class _{class}
 {
 	/**
 	 * Count stored files
@@ -37,7 +30,7 @@ class {class} extends FileStorageAbstract
 	 */
 	public function count(): int
 	{
-		return Db::i()->select( 'COUNT(*)', '...', '...' )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', '...', '...' )->first();
 	}
 	
 	/**
@@ -46,23 +39,22 @@ class {class} extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	UnderflowException					When file record doesn't exist. Indicating there are no more files to move
-	 * @return	void
+	 * @throws	\UnderflowException					When file record doesn't exist. Indicating there are no more files to move
+	 * @return	void|int							An offset integer to use on the next cycle, or nothing
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-		SystemFile::get( $oldConfiguration ?: '{app}_{class}', '...' )->move( $storageConfiguration );
+		\IPS\File::get( $oldConfiguration ?: '{app}_{class}', '...' )->move( $storageConfiguration );
 	}
 
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	SystemFile|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( SystemFile|string $file ): bool
+	public function isValidFile( $file ): bool
 	{
-	    return FALSE;
 	}
 
 	/**
@@ -70,7 +62,7 @@ class {class} extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
 	}
 }

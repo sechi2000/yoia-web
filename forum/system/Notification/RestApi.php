@@ -13,21 +13,21 @@ namespace IPS\Notification;
 /* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * REST API Notification RESPONSE
  */
-class RestApi extends Inline
+class _RestApi extends \IPS\Notification\Inline
 {
 	/**
 	 * Get data from extension
 	 *
-	 * @param bool $htmlEscape	TRUE to escape HTML
+	 * @param	bool $htmlEscape	TRUE to escape HTML
 	 */
-	public function getData( bool $htmlEscape = TRUE ): array
+	public function getData( $htmlEscape = TRUE )
 	{
 		$methodName = "parse_rest_{$this->notification_key}";
 

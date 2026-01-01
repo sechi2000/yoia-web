@@ -11,49 +11,21 @@
 namespace IPS\MFA\SecurityQuestions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\core\modules\admin\settings\securityquestions;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Matrix;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\MFA\MFAHandler;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Text\Encrypt;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Multi Factor Authentication Handler for Security Questions
  */
-class Handler extends MFAHandler
+class _Handler extends \IPS\MFA\MFAHandler
 {	
 	/**
 	 * @brief	Key
 	 */
-	protected string $key = 'questions';
+	protected $key = 'questions';
 	
 	/* !Setup */
 	
@@ -62,29 +34,29 @@ class Handler extends MFAHandler
 	 *
 	 * @return	bool
 	 */
-	public function isEnabled(): bool
+	public function isEnabled()
 	{
-		return Settings::i()->security_questions_enabled;
+		return \IPS\Settings::i()->security_questions_enabled;
 	}
 		
 	/**
 	 * Member *can* use this handler (even if they have not yet configured it)
 	 *
-	 * @param	Member		$member		Member to check
+	 * @param	\IPS\Member		$member		Member to check
 	 * @return	bool
 	 */
-	public function memberCanUseHandler( Member $member ): bool
+	public function memberCanUseHandler( \IPS\Member $member )
 	{
-		return Settings::i()->security_questions_groups == '*' or $member->inGroup( explode( ',', Settings::i()->security_questions_groups ) );
+		return \IPS\Settings::i()->security_questions_groups == '*' or $member->inGroup( explode( ',', \IPS\Settings::i()->security_questions_groups ) );
 	}
 	
 	/**
 	 * Member has configured this handler
 	 *
-	 * @param	Member		$member		Member to check
+	 * @param	\IPS\Member		$member		Member to check
 	 * @return	bool
 	 */
-	public function memberHasConfiguredHandler( Member $member ): bool
+	public function memberHasConfiguredHandler( \IPS\Member $member )
 	{
 		return $member->members_bitoptions['has_security_answers'];
 	}
@@ -92,12 +64,12 @@ class Handler extends MFAHandler
 	/**
 	 * Show a setup screen
 	 *
-	 * @param	Member		$member						The member
+	 * @param	\IPS\Member		$member						The member
 	 * @param	bool			$showingMultipleHandlers	Set to TRUE if multiple options are being displayed
-	 * @param	Url	$url						URL for page
+	 * @param	\IPS\Http\Url	$url						URL for page
 	 * @return	string
 	 */
-	public function configurationScreen( Member $member, bool $showingMultipleHandlers, Url $url ): string
+	public function configurationScreen( \IPS\Member $member, $showingMultipleHandlers, \IPS\Http\Url $url )
 	{
 		$securityQuestions = array();
 		foreach ( Question::roots() as $question )
@@ -105,34 +77,34 @@ class Handler extends MFAHandler
 			$securityQuestions[ $question->id ] = $question->_title;
 		}
 				
-		return Theme::i()->getTemplate( 'login', 'core', 'global' )->securityQuestionsSetup( $securityQuestions, $showingMultipleHandlers );
+		return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->securityQuestionsSetup( $securityQuestions, $showingMultipleHandlers );
 	}
 	
 	/**
 	 * Submit configuration screen. Return TRUE if was accepted
 	 *
-	 * @param	Member		$member	The member
+	 * @param	\IPS\Member		$member	The member
 	 * @return	bool
 	 */
-	public function configurationScreenSubmit( Member $member ): bool
+	public function configurationScreenSubmit( \IPS\Member $member )
 	{
 		$answers = array();
 		
 		$isReconfiguring = $this->memberHasConfiguredHandler( $member );
 		
-		foreach ( Request::i()->security_question as $k => $v )
+		foreach ( \IPS\Request::i()->security_question as $k => $v )
 		{
 			$answers[ $v ] = array(
 				'answer_question_id'	=> $v,
 				'answer_member_id'		=> $member->member_id,
-				'answer_answer'			=> Encrypt::fromPlaintext( Request::i()->security_answer[ $k ] )->tag()
+				'answer_answer'			=> \IPS\Text\Encrypt::fromPlaintext( \IPS\Request::i()->security_answer[ $k ] )->tag()
 			);
 		}
 		
-		if ( count( $answers ) >= Settings::i()->security_questions_number )
+		if ( \count( $answers ) >= \IPS\Settings::i()->security_questions_number )
 		{		
-			Db::i()->delete( 'core_security_answers', array( 'answer_member_id=?', $member->member_id ) );
-			Db::i()->insert( 'core_security_answers', $answers );
+			\IPS\Db::i()->delete( 'core_security_answers', array( 'answer_member_id=?', $member->member_id ) );
+			\IPS\Db::i()->insert( 'core_security_answers', $answers );
 			
 			$member->members_bitoptions['has_security_answers'] = TRUE;
 			$member->save();
@@ -151,59 +123,59 @@ class Handler extends MFAHandler
 	/**
 	 * Get the form for a member to authenticate
 	 *
-	 * @param	Member		$member		The member
-	 * @param	Url	$url		URL for page
+	 * @param	\IPS\Member		$member		The member
+	 * @param	\IPS\Http\Url	$url		URL for page
 	 * @return	string
 	 */
-	public function authenticationScreen( Member $member, Url $url ): string
+	public function authenticationScreen( \IPS\Member $member, \IPS\Http\Url $url )
 	{
 		try
 		{
-			$chosenAnswer = Db::i()->select( '*', 'core_security_answers', array( 'answer_member_id=? AND answer_is_chosen=1', $member->member_id ) )->first();
+			$chosenAnswer = \IPS\Db::i()->select( '*', 'core_security_answers', array( 'answer_member_id=? AND answer_is_chosen=1', $member->member_id ) )->first();
 			$chosenQuestion = Question::load( $chosenAnswer['answer_question_id'] );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
 			$chosenQuestion = NULL;
-			foreach ( Db::i()->select( '*', 'core_security_answers', array( 'answer_member_id=?', $member->member_id ), 'RAND()' ) as $chosenAnswer )
+			foreach ( \IPS\Db::i()->select( '*', 'core_security_answers', array( 'answer_member_id=?', $member->member_id ), 'RAND()' ) as $chosenAnswer )
 			{
 				try
 				{
 					$chosenQuestion = Question::load( $chosenAnswer['answer_question_id'] );
-					Db::i()->update( 'core_security_answers', array( 'answer_is_chosen' => 1 ), array( 'answer_member_id=? AND answer_question_id=?', $member->member_id, $chosenQuestion->id ) );
+					\IPS\Db::i()->update( 'core_security_answers', array( 'answer_is_chosen' => 1 ), array( 'answer_member_id=? AND answer_question_id=?', $member->member_id, $chosenQuestion->id ) );
 					break;
 				}
-				catch ( OutOfRangeException $e ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 			if ( !$chosenQuestion )
 			{
-				return '';
+				return NULL;
 			}
 		}
 		
-		return Theme::i()->getTemplate( 'login', 'core', 'global' )->securityQuestionsAuth( $chosenQuestion );
+		return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->securityQuestionsAuth( $chosenQuestion );
 	}
 	
 	/**
 	 * Submit authentication screen. Return TRUE if was accepted
 	 *
-	 * @param	Member		$member	The member
-	 * @return	bool
+	 * @param	\IPS\Member		$member	The member
+	 * @return	string
 	 */
-	public function authenticationScreenSubmit( Member $member ): bool
+	public function authenticationScreenSubmit( \IPS\Member $member )
 	{
 		try
 		{
-			$authenticated = Request::i()->security_answer == Encrypt::fromTag( Db::i()->select( 'answer_answer', 'core_security_answers', array( 'answer_member_id=? AND answer_is_chosen=1', $member->member_id ) )->first() )->decrypt();
+			$authenticated = \IPS\Request::i()->security_answer == \IPS\Text\Encrypt::fromTag( \IPS\Db::i()->select( 'answer_answer', 'core_security_answers', array( 'answer_member_id=? AND answer_is_chosen=1', $member->member_id ) )->first() )->decrypt();
 			
 			if( $authenticated )
 			{
-				Db::i()->update( 'core_security_answers', array( 'answer_is_chosen' => 0 ), array( 'answer_member_id=? AND answer_is_chosen=?', $member->member_id, 1 ) );
+				\IPS\Db::i()->update( 'core_security_answers', array( 'answer_is_chosen' => 0 ), array( 'answer_member_id=? AND answer_is_chosen=?', $member->member_id, 1 ) );
 			}
 
 			return $authenticated;
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return FALSE;
 		}
@@ -215,20 +187,20 @@ class Handler extends MFAHandler
 	 * Toggle
 	 *
 	 * @param	bool	$enabled	On/Off
-	 * @return	void
+	 * @return	bool
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		if( $enabled )
 		{
 			/* Check we have some questions */
-			if ( !count( Question::roots() ) )
+			if ( !count( \IPS\MFA\SecurityQuestions\Question::roots() ) )
 			{
-				throw new DomainException( 'no_questions' );
+				throw new \DomainException( 'no_questions' );
 			}
 		}
 
-		Settings::i()->changeValues( array( 'security_questions_enabled' => $enabled ) );
+		\IPS\Settings::i()->changeValues( array( 'security_questions_enabled' => $enabled ) );
 	}
 	
 	/**
@@ -236,7 +208,7 @@ class Handler extends MFAHandler
 	 *
 	 * @return	string
 	 */
-	public function acpSettings(): string
+	public function acpSettings()
 	{
 		/* Init */
 		$activeTabContents = '';
@@ -244,21 +216,21 @@ class Handler extends MFAHandler
 			'settings' 	=> 'security_question_settings',
 			'questions'	=> 'security_questions_questions'
 		);
-		$activeTab = ( isset( Request::i()->tab ) and array_key_exists( Request::i()->tab, $tabs ) ) ? Request::i()->tab : 'handlers';
+		$activeTab = ( isset( \IPS\Request::i()->tab ) and array_key_exists( \IPS\Request::i()->tab, $tabs ) ) ? \IPS\Request::i()->tab : 'handlers';
 		
 		/* Settings Form */
 		if ( $activeTab === 'settings' )
 		{
-			$form = new Form;
-			$form->add( new CheckboxSet( 'security_questions_groups', Settings::i()->security_questions_groups == '*' ? '*' : explode( ',', Settings::i()->security_questions_groups ), FALSE, array(
+			$form = new \IPS\Helpers\Form;
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'security_questions_groups', \IPS\Settings::i()->security_questions_groups == '*' ? '*' : explode( ',', \IPS\Settings::i()->security_questions_groups ), FALSE, array(
 				'multiple'		=> TRUE,
-				'options'		=> array_combine( array_keys( Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, Group::groups() ) ),
+				'options'		=> array_combine( array_keys( \IPS\Member\Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, \IPS\Member\Group::groups() ) ),
 				'unlimited'		=> '*',
 				'unlimitedLang'	=> 'everyone',
 				'impliedUnlimited' => TRUE
 			), NULL, NULL, NULL, 'security_questions_groups' ) );
-			$form->add( new Radio( 'security_questions_prompt', Settings::i()->security_questions_prompt, FALSE, array( 'options' => array( 'register' => 'security_questions_prompt_register', 'optional' => 'security_questions_prompt_optional', 'access' => 'security_questions_prompt_access' ) ), NULL, NULL, NULL, 'security_questions_prompt' ) );
-			$form->add( new Number( 'security_questions_number', Settings::i()->security_questions_number, FALSE, array( 'min' => 1, 'max' => Db::i()->select( 'COUNT(*)', 'core_security_questions' )->first() ?: NULL ), NULL, NULL, NULL, 'security_questions_number' ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'security_questions_prompt', \IPS\Settings::i()->security_questions_prompt, FALSE, array( 'options' => array( 'register' => 'security_questions_prompt_register', 'optional' => 'security_questions_prompt_optional', 'access' => 'security_questions_prompt_access' ) ), NULL, NULL, NULL, 'security_questions_prompt' ) );
+			$form->add( new \IPS\Helpers\Form\Number( 'security_questions_number', \IPS\Settings::i()->security_questions_number, FALSE, array( 'min' => 1, 'max' => \IPS\Db::i()->select( 'COUNT(*)', 'core_security_questions' )->first() ?: NULL ), NULL, NULL, NULL, 'security_questions_number' ) );
 
 			$form->addMessage('nexus_mfa_reset_answers');
 
@@ -266,8 +238,8 @@ class Handler extends MFAHandler
 			{
 				$values['security_questions_groups'] = ( $values['security_questions_groups'] == '*' ) ? '*' : implode( ',', $values['security_questions_groups'] );
 				$form->saveAsSettings( $values );			
-				Session::i()->log( 'acplogs__mfa_handler_enabled', array( "mfa_questions_title" => TRUE ) );
-				Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=mfa' ), 'saved' );
+				\IPS\Session::i()->log( 'acplogs__mfa_handler_enabled', array( "mfa_questions_title" => TRUE ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=mfa' ), 'saved' );
 			}
 			
 			$activeTabContents = (string) $form;
@@ -276,49 +248,49 @@ class Handler extends MFAHandler
 		/* Questions table */
 		else
 		{
-			$controller = new securityquestions;
+			$controller = new \IPS\core\modules\admin\settings\securityquestions;
 			$controller->execute();
-			$activeTabContents = Output::i()->output;
+			$activeTabContents = \IPS\Output::i()->output;
 		}
 		
 		
 		/* Output */
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
 			return $activeTabContents;
 		}
 		else
 		{
-			return Theme::i()->getTemplate( 'global' )->tabs( $tabs, $activeTab, $activeTabContents, Url::internal( "app=core&module=settings&controller=mfa&tab=handlers&do=settings&key=questions" ) );
+			return \IPS\Theme::i()->getTemplate( 'global' )->tabs( $tabs, $activeTab, $activeTabContents, \IPS\Http\Url::internal( "app=core&module=settings&controller=mfa&tab=handlers&do=settings&key=questions" ) );
 		}
 	}
 	
 	/**
 	 * Configuration options when editing member account in ACP
 	 *
-	 * @param	Member			$member		The member
+	 * @param	\IPS\Member			$member		The member
 	 * @return	array
 	 */
-	public function acpConfiguration( Member $member ): array
+	public function acpConfiguration( \IPS\Member $member )
 	{
 		$return = array();
-		$return[] = new YesNo( "mfa_{$this->key}_title", $this->memberHasConfiguredHandler( $member ), FALSE, array( 'togglesOn' => array( 'security_question_matrix' ) ) );
+		$return[] = new \IPS\Helpers\Form\YesNo( "mfa_{$this->key}_title", $this->memberHasConfiguredHandler( $member ), FALSE, array( 'togglesOn' => array( 'security_question_matrix' ) ) );
 		
 		$securityQuestions = array();
-		foreach (Question::roots() as $question )
+		foreach ( \IPS\MFA\SecurityQuestions\Question::roots() as $question )
 		{
 			$securityQuestions[ $question->id ] = $question->_title;
 		}
 		
-		$matrix = new Matrix('security_question_matrix');
+		$matrix = new \IPS\Helpers\Form\Matrix('security_question_matrix');
 		$matrix->columns = array(
 			'security_question_q'	=> function( $key, $value, $data ) use ( $securityQuestions )
 			{
-				return new Select( $key, $value, FALSE, array( 'options' => $securityQuestions ) );
+				return new \IPS\Helpers\Form\Select( $key, $value, FALSE, array( 'options' => $securityQuestions ) );
 			},
 			'security_question_a'	=> function( $key, $value, $data )
 			{
-				return new Text( $key, $value );
+				return new \IPS\Helpers\Form\Text( $key, $value );
 			},
 		);
 		
@@ -326,7 +298,7 @@ class Handler extends MFAHandler
 		{
 			$matrix->rows[] = array(
 				'security_question_q'	=> $questionId,
-				'security_question_a'	=> Encrypt::fromTag( $answer )->decrypt()
+				'security_question_a'	=> \IPS\Text\Encrypt::fromTag( $answer )->decrypt()
 			);
 		}
 		
@@ -339,11 +311,11 @@ class Handler extends MFAHandler
 	/**
 	 * Save configuration when editing member account in ACP
 	 *
-	 * @param	Member		$member		The member
-	 * @param array $values		Values from form
-	 * @return	void
+	 * @param	\IPS\Member		$member		The member
+	 * @param	array			$values		Values from form
+	 * @return	array
 	 */
-	public function acpConfigurationSave( Member $member, array $values ): void
+	public function acpConfigurationSave( \IPS\Member $member, $values )
 	{		
 		if ( isset( $values["mfa_{$this->key}_title"] ) and !$values["mfa_{$this->key}_title"] )
 		{
@@ -354,7 +326,7 @@ class Handler extends MFAHandler
 			return;
 		}
 		
-		Db::i()->delete( 'core_security_answers', array( 'answer_member_id=?', $member->member_id ) );
+		\IPS\Db::i()->delete( 'core_security_answers', array( 'answer_member_id=?', $member->member_id ) );
 		
 		$toInsert = array();
 		
@@ -365,17 +337,17 @@ class Handler extends MFAHandler
 				$toInsert[ $row['security_question_q'] ] = array(
 					'answer_question_id'	=> $row['security_question_q'],
 					'answer_member_id'		=> $member->member_id,
-					'answer_answer'			=> Encrypt::fromPlaintext( $row['security_question_a'] )->tag()
+					'answer_answer'			=> (string) \IPS\Text\Encrypt::fromPlaintext( $row['security_question_a'] )->tag()
 				);
 			}
 		}
 		
-		if ( count( $toInsert ) )
+		if ( \count( $toInsert ) )
 		{
-			Db::i()->insert( 'core_security_answers', $toInsert );
+			\IPS\Db::i()->insert( 'core_security_answers', $toInsert );
 		}
 		
-		if ( count( $toInsert ) >= Settings::i()->security_questions_number )
+		if ( \count( $toInsert ) >= \IPS\Settings::i()->security_questions_number )
 		{
 			$member->members_bitoptions['has_security_answers'] = TRUE;
 		}
@@ -390,12 +362,12 @@ class Handler extends MFAHandler
 	/**
 	 * If member has configured this handler, disable it
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	void
 	 */
-	public function disableHandlerForMember( Member $member ) : void
+	public function disableHandlerForMember( \IPS\Member $member )
 	{
-		Db::i()->delete( 'core_security_answers', array( 'answer_member_id=?', $member->member_id ) );
+		\IPS\Db::i()->delete( 'core_security_answers', array( 'answer_member_id=?', $member->member_id ) );
 		$member->members_bitoptions['has_security_answers'] = FALSE;
 		$member->save();
 

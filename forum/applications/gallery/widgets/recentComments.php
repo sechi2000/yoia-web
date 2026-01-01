@@ -12,38 +12,39 @@
 namespace IPS\gallery\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\WidgetComment;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Recent comments widget
  */
-class recentComments extends WidgetComment
+class _recentComments extends \IPS\Content\WidgetComment
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'recentComments';
+	public $key = 'recentComments';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'gallery';
+	public $app = 'gallery';
+	
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * @brief Class
 	 */
-	protected static string $class = 'IPS\gallery\Image\Comment';
+	protected static $class = 'IPS\gallery\Image\Comment';
 
 	/**
 	 * @brief	Moderator permission to generate caches on [optional]
 	 */
-	protected array $moderatorPermissions	= array( 'can_view_hidden_content', 'can_view_hidden_gallery_image_comment' );
+	protected $moderatorPermissions	= array( 'can_view_hidden_content', 'can_view_hidden_gallery_image_comment' );
 }

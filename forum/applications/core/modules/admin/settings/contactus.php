@@ -11,47 +11,30 @@
 namespace IPS\core\modules\admin\settings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Output;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * contactus
  */
-class contactus extends Controller
+class _contactus extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'contactus_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'contactus_manage' );
 		parent::execute();
 	}
 
@@ -60,11 +43,11 @@ class contactus extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$form = $this->_getConfigForm();
 
-		if ( $values = $form->values(true) )
+		if ( $values = $form->values( true ) )
 		{
 			/* If we unselect 'everyone' and save, an empty string is passed through, so the default value is picked up in Settings::changeValues(),
 				which is the 'everyone' preference...the end result is that everyone gets rechecked when you uncheck it. To counter that, we'll store an invalid
@@ -76,30 +59,33 @@ class contactus extends Controller
 
 			$form->saveAsSettings( $values );
 
-			Session::i()->log( 'acplogs__contactus_settings' );
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=contactus' ), 'saved' );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			\IPS\Session::i()->log( 'acplogs__contactus_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=contactus' ), 'saved' );
 
 		}
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack( 'r__contactus' );
-		Output::i()->output	.= Theme::i()->getTemplate( 'global' )->block( '', $form );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack( 'r__contactus' );
+		\IPS\Output::i()->output	.= \IPS\Theme::i()->getTemplate( 'global' )->block( '', $form );
 	}
 
 	/**
 	 * Build the configuration form
 	 *
-	 * @return Form
+	 * @return \IPS\Helpers\Form
 	 */
-	protected function _getConfigForm() : Form
+	protected function _getConfigForm()
 	{
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$options = array();
 		$toggles = array();
 		$disabled = array();
 		$formFields = array();
 
-		$form->add( new CheckboxSet( 'contact_access', ( Settings::i()->contact_access == '*' ) ? '*' : explode( ',', Settings::i()->contact_access ), FALSE, array(
-			'options' 	=> array_combine( array_keys( Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, Group::groups() ) ),
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'contact_access', ( \IPS\Settings::i()->contact_access == '*' ) ? '*' : explode( ',', \IPS\Settings::i()->contact_access ), FALSE, array(
+			'options' 	=> array_combine( array_keys( \IPS\Member\Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, \IPS\Member\Group::groups() ) ),
 			'multiple' 	=> true,
 			'unlimited'		=> '*',
 			'unlimitedLang'	=> 'everyone',
@@ -107,14 +93,14 @@ class contactus extends Controller
 		), NULL, NULL, NULL, 'contact_access' ) );
 
 		/* Get extensions */
-		$extensions = Application::allExtensions( 'core', 'ContactUs', FALSE, 'core', 'InternalEmail', TRUE );
+		$extensions = \IPS\Application::allExtensions( 'core', 'ContactUs', FALSE, 'core', 'InternalEmail', TRUE );
 
 		foreach ( $extensions as $k => $class )
 		{
 			$class->process( $form, $formFields, $options, $toggles, $disabled );
 		}
 
-		$form->add( new Radio( 'contact_type', Settings::i()->contact_type, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'contact_type', \IPS\Settings::i()->contact_type, FALSE, array(
 			'options' => $options,
 			'toggles' => $toggles,
 			'disabled' => $disabled
@@ -125,7 +111,7 @@ class contactus extends Controller
 			$form->add( $field );
 		}
 		
-		$form->add( new YesNo( 'contact_email_verify', Settings::i()->contact_email_verify, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'contact_email_verify', \IPS\Settings::i()->contact_email_verify, TRUE ) );
 
 		return $form;
 	}

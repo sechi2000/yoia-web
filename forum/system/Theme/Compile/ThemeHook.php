@@ -11,24 +11,20 @@
 namespace IPS\Theme\Compile;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
- * @deprecated 
  * Theme Hook skeleton class
  */
-class ThemeHook
+class _ThemeHook
 {
 	/**
-	 * @param string $name
-	 * @param array $arguments
+	 * @param   $name
+	 * @param   $arguments
 	 * @return  string
 	 */
 	public function __call( string $name, array $arguments ): string
@@ -37,8 +33,8 @@ class ThemeHook
 	}
 
 	/**
-	 * @param string $name
-	 * @param array $arguments
+	 * @param   $name
+	 * @param   $arguments
 	 * @return  string
 	 */
 	public static function __callStatic( string $name, array $arguments ): string
@@ -47,8 +43,7 @@ class ThemeHook
 	}
 
 	/**
-	 * @param string $name
-	 * @param mixed $value
+	 * @param   $name
 	 * @return  void
 	 */
 	public function __set( string $name, mixed $value ): void

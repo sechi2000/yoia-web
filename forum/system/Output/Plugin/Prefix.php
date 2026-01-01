@@ -11,39 +11,35 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Vendor prefix
  */
-class Prefix
+class _Prefix
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = TRUE;
+	public static $canBeUsedInCss = TRUE;
 	
 	/**
 	 * Defined here so that we can remove names later as browser support for the non-prefixed version improves, without changing our css.
 	 *
 	 * @brief	The styles this plugin will prefix
 	 */
-	protected static array $supportedStyles = array(
+	protected static $supportedStyles = array(
 		'user-select'
 	);
 
 	/**
 	 * @brief	Supported vendor prefixes
 	 */
-	protected static array $prefixes = array( '-webkit-', '-moz-', '-ms-', '-o-', '' );
+	protected static $prefixes = array( '-webkit-', '-moz-', '-ms-', '-o-', '' );
 
 	/**
 	 * Run the plug-in
@@ -53,9 +49,9 @@ class Prefix
 	 * @return	string		Code to eval
 	 * @note	Occasionally a style isn't consistent between browsers, so simply adding a prefix isn't always sufficient - you may need other CSS to resolve browser inconsistencies
 	 */
-	public static function runPlugin( string $data, array $options ): string
+	public static function runPlugin( $data, $options )
 	{
-		if ( in_array( $data, static::$supportedStyles ) )
+		if ( \in_array( $data, static::$supportedStyles ) )
 		{
 			$output = array();
 

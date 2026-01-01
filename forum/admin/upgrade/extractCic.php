@@ -26,9 +26,14 @@ if ( file_exists( "../../constants.php" ) )
 	require "../../constants.php";
 }
 
+if ( !defined( 'CP_DIRECTORY' ) )
+{
+	define( 'CP_DIRECTORY', 'admin' );
+}
+
 if ( !defined( 'ROOT_PATH' ) )
 {
-	define( 'ROOT_PATH', str_replace( 'admin/upgrade', '', __DIR__ ) );
+	define( 'ROOT_PATH', str_replace( CP_DIRECTORY . '/upgrade', '', __DIR__ ) );
 }
 
 require "../../conf_global.php";
@@ -42,13 +47,13 @@ require "../../conf_global.php";
 */
 function compareHashes( $expected, $provided )
 {
-	if ( !is_string( $expected ) || !is_string( $provided ) || $expected === '*0' || $expected === '*1' || $provided === '*0' || $provided === '*1' ) // *0 and *1 are failures from crypt() - if we have ended up with an invalid hash anywhere, we will reject it to prevent a possible vulnerability from deliberately generating invalid hashes
+	if ( !\is_string( $expected ) || !\is_string( $provided ) || $expected === '*0' || $expected === '*1' || $provided === '*0' || $provided === '*1' ) // *0 and *1 are failures from crypt() - if we have ended up with an invalid hash anywhere, we will reject it to prevent a possible vulnerability from deliberately generating invalid hashes
 	{
 		return FALSE;
 	}
 	
-	$len = strlen( $expected );
-	if ( $len !== strlen( $provided ) )
+	$len = \strlen( $expected );
+	if ( $len !== \strlen( $provided ) )
 	{
 		return FALSE;
 	}
@@ -56,7 +61,7 @@ function compareHashes( $expected, $provided )
 	$status = 0;
 	for ( $i = 0; $i < $len; $i++ )
 	{
-		$status |= ord( $expected[ $i ] ) ^ ord( $provided[ $i ] );
+		$status |= \ord( $expected[ $i ] ) ^ \ord( $provided[ $i ] );
 	}
 	
 	return $status === 0;
@@ -87,17 +92,17 @@ function writeLogFile( $message )
 {
 	/* What are we writing? */
 	$date = date('r');
-	if ( $message instanceof Exception)
+	if ( $message instanceof \Exception )
 	{
-		$messageToLog = $date . "\n" . get_class( $message ) . '::' . $message->getCode() . "\n" . $message->getMessage() . "\n" . $message->getTraceAsString();
+		$messageToLog = $date . "\n" . \get_class( $message ) . '::' . $message->getCode() . "\n" . $message->getMessage() . "\n" . $message->getTraceAsString();
 	}
 	else
 	{
-		if ( is_array( $message ) )
+		if ( \is_array( $message ) )
 		{
 			$message = var_export( $message, TRUE );
 		}
-		$messageToLog = $date . "\n" . $message . "\n" . ( new Exception)->getTraceAsString();
+		$messageToLog = $date . "\n" . $message . "\n" . ( new \Exception )->getTraceAsString();
 	}
 	
 	/* Where are we writing it? */
@@ -108,11 +113,11 @@ function writeLogFile( $message )
 	$file = $dir . '/' . date( 'Y' ) . '_' . date( 'm' ) . '_' . date('d') . '_' . ( 'extractfailure' ) . '.php';
 	if ( file_exists( $file ) )
 	{
-		@file_put_contents( $file, "\n\n-------------\n\n" . $messageToLog, FILE_APPEND );
+		@\file_put_contents( $file, "\n\n-------------\n\n" . $messageToLog, FILE_APPEND );
 	}
 	else
 	{
-		@file_put_contents( $file, $header . $messageToLog );
+		@\file_put_contents( $file, $header . $messageToLog );
 	}
 	@chmod( $file, IPS_FILE_PERMISSION );
 }
@@ -131,13 +136,13 @@ try
 	$adsess	= $_GET['adsess'] ?? '';
 	if ( $done )
 	{
-		if ( function_exists( 'opcache_reset' ) )
+		if ( \function_exists( 'opcache_reset' ) )
 		{
 			@opcache_reset();
 		}
 
 		$siteurl	= $INFO['base_url'] ?? $INFO['board_url'];
-		$upgradeUrl = rtrim( $siteurl, '/' ) . "/admin/upgrade/";
+		$upgradeUrl = rtrim( $siteurl, '/' ) . '/' . CP_DIRECTORY . "/upgrade/";
 		
 		echo <<<HTML
 <div class='ipsLoader_container'>

@@ -10,38 +10,30 @@
  */
 
 namespace IPS\forums\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Api\GraphQL\ItemMutator;
-use IPS\Content\Item;
-use IPS\forums\api\GraphQL\Types\TopicType;
-use IPS\forums\Forum;
-use IPS\forums\Topic;
-use IPS\Member;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Create topic mutation for GraphQL API
  */
-class CreateTopic extends ItemMutator
+class _CreateTopic extends \IPS\Content\Api\GraphQL\ItemMutator
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\forums\Topic';
+	protected $class = 'IPS\forums\Topic';
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Create a new topic";
+	public static $description = "Create a new topic";
 
 	/*
 	 * Mutation arguments
@@ -60,52 +52,51 @@ class CreateTopic extends ItemMutator
 
 	/**
 	 * Return the mutation return type
-	 *
-	 * @return TopicType
 	 */
-	public function type()  : TopicType
+	public function type() 
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::topic();
 	}
 
 	/**
-	 * Resolves this query
+	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @param 	array $context 	Context values
-	 * @param	mixed $info
-	 * @return	Topic
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\forums\Topic
 	 */
-	public function resolve( mixed $val, array $args, array $context, mixed $info ) : Item
+	public function resolve($val, $args, $context, $info)
 	{
 		/* Get forum */
 		try
 		{
-			$forum = Forum::loadAndCheckPerms( $args['forumID'] );
+			$forum = \IPS\forums\Forum::loadAndCheckPerms( $args['forumID'] );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'NO_FORUM', '1F294/2_graphl', 400 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_FORUM', '1F294/2_graphl', 400 );
 		}
 		
 		/* Check permission */
-		if ( !$forum->can( 'add', Member::loggedIn() ) )
+		if ( !$forum->can( 'add', \IPS\Member::loggedIn() ) )
 		{
-			throw new SafeException( 'NO_PERMISSION', '2F294/9_graphl', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_PERMISSION', '2F294/9_graphl', 403 );
 		}
 		
 		/* Check we have a title and a post */
 		if ( !$args['title'] )
 		{
-			throw new SafeException( 'NO_TITLE', '1F294/5_graphl', 400 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_TITLE', '1F294/5_graphl', 400 );
 		}
 		if ( !$args['content'] )
 		{
-			throw new SafeException( 'NO_POST', '1F294/4_graphl', 400 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_POST', '1F294/4_graphl', 400 );
 		}
 		
 		
-		return $this->_create( $args, $forum, $args['postKey'] ?? NULL );
+		$item = $this->_create( $args, $forum, $args['postKey'] ?? NULL );
+
+		return $item;
 	}
 }

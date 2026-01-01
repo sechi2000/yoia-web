@@ -12,55 +12,45 @@
 namespace IPS\core\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\Custom;
-use IPS\Member;
-use IPS\Theme;
-use LogicException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member Filter Extension
  */
-class Referrals extends MemberFilterAbstract
+class _Referrals
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param	string	$area	Area to check (bulkmail, group_promotions, automatic_moderation, passwordreset)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'bulkmail', 'group_promotions' ) );
+		return \in_array( $area, array( 'bulkmail', 'group_promotions' ) );
 	}
 
 	/** 
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		return array(
-			new Custom( 'mf_referrals', array( 0 => $criteria['referrals_operator'] ?? NULL, 1 => $criteria['referrals'] ?? NULL ), FALSE, array(
+			new \IPS\Helpers\Form\Custom( 'mf_referrals', array( 0 => isset( $criteria['referrals_operator'] ) ? $criteria['referrals_operator'] : NULL, 1 => isset( $criteria['referrals'] ) ? $criteria['referrals'] : NULL ), FALSE, array(
 				'getHtml'	=> function( $element )
 				{
-					return Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", $element->value[0], $element->required, array(
-						'any'	=> Member::loggedIn()->language()->addToStack('any'),
-						'gt'	=> Member::loggedIn()->language()->addToStack('gt'),
-						'lt'	=> Member::loggedIn()->language()->addToStack('lt'),
-						'eq'	=> Member::loggedIn()->language()->addToStack('exactly'),
+					return \IPS\Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", $element->value[0], $element->required, array(
+						'any'	=> \IPS\Member::loggedIn()->language()->addToStack('any'),
+						'gt'	=> \IPS\Member::loggedIn()->language()->addToStack('gt'),
+						'lt'	=> \IPS\Member::loggedIn()->language()->addToStack('lt'),
+						'eq'	=> \IPS\Member::loggedIn()->language()->addToStack('exactly'),
 					),
 						FALSE,
 						NULL,
@@ -72,7 +62,7 @@ class Referrals extends MemberFilterAbstract
 							'eq'	=> array( 'elNumber_' . $element->name . '-qty' ),
 						) )
 					. ' '
-					. Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( "{$element->name}[1]", $element->value[1], $element->required, NULL, FALSE, NULL, NULL, NULL, 0, NULL, FALSE, NULL, array(), array(), array(), $element->name . '-qty' );
+					. \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( "{$element->name}[1]", $element->value[1], $element->required, NULL, FALSE, NULL, NULL, NULL, 0, NULL, FALSE, NULL, array(), array(), array(), $element->name . '-qty' );
 				}
 			) )
 		);
@@ -82,10 +72,10 @@ class Referrals extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return	array			False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array
+	public function save( $post )
 	{
 		return array( 'referrals_operator' => $post['mf_referrals'][0], 'referrals' => $post['mf_referrals'][1] );
 	}
@@ -93,26 +83,26 @@ class Referrals extends MemberFilterAbstract
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		if ( isset( $data['referrals_operator'] ) and isset( $data['referrals'] ) )
 		{
-			$referralsSelect = Db::i()->select( 'COUNT(*)', 'core_referrals', array( 'referred_by=core_members.member_id' ) );
+			$referralsSelect = \IPS\Db::i()->select( 'COUNT(*)', 'core_referrals', array( 'referred_by=core_members.member_id' ) );
 
 			switch ( $data['referrals_operator'] )
 			{
 				case 'gt':
 					return array( "(" . $referralsSelect . ")>{$data['referrals']}" );
-
+					break;
 				case 'lt':
 					return array( "(" . $referralsSelect . ")<{$data['referrals']}" );
-
+					break;
 				case 'eq':
 					return array( "(" . $referralsSelect . ")={$data['referrals']}" );
-
+					break;
 			}
 		}
 
@@ -123,12 +113,12 @@ class Referrals extends MemberFilterAbstract
 	 * Determine if a member matches specified filters
 	 *
 	 * @note	This is only necessary if availableIn() includes group_promotions
-	 * @param	Member	$member		Member object to check
+	 * @param	\IPS\Member	$member		Member object to check
 	 * @param	array 		$filters	Previously defined filters
 	 * @param	object|NULL	$object		Calling class
 	 * @return	bool
 	 */
-	public function matches( Member $member, array $filters, ?object $object=NULL ) : bool
+	public function matches( \IPS\Member $member, $filters, $object=NULL )
 	{
 		/* If we aren't filtering by this, then any member matches */
 		if( !isset( $filters['referrals_operator'] ) OR !isset( $filters['referrals'] ) )
@@ -136,19 +126,19 @@ class Referrals extends MemberFilterAbstract
 			return TRUE;
 		}
 
-		$count = Db::i()->select( 'COUNT(*)', 'core_referrals', array( 'referred_by=?', $member->member_id ) )->first();
+		$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_referrals', array( 'referred_by=?', $member->member_id ) )->first();
 
 		switch ( $filters['referrals_operator'] )
 		{
 			case 'gt':
-				return ( $count > (int) $filters['referrals'] );
-
+				return (bool) ( $count > (int) $filters['referrals'] );
+				break;
 			case 'lt':
-				return ( $count < (int) $filters['referrals'] );
-
+				return (bool) ( $count < (int) $filters['referrals'] );
+				break;
 			case 'eq':
-				return ( $count == (int) $filters['referrals'] );
-
+				return (bool) ( $count == (int) $filters['referrals'] );
+				break;
 		}
 
 		/* If we are still here, then there wasn't an appropriate operator (maybe they selected 'any') so return true */

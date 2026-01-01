@@ -12,68 +12,41 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Application\Module;
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Library;
-use IPS\convert\Software;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Db\Exception as DbException;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function stristr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invision Core Converter
  */
-class Invisioncommunity extends Software
+class _Invisioncommunity extends \IPS\convert\Software
 {
 	/**
 	 * @brief 	Whether the versions of IPS4 match
 	 */
-	public static bool $versionMatch = FALSE;
+	public static $versionMatch = FALSE;
 
 	/**
 	 * @brief 	Whether the database has been required
 	 */
-	public static bool $dbNeeded = FALSE;
+	public static $dbNeeded = FALSE;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
 		/* Set filename obscuring flag */
-		Library::$obscureFilenames = FALSE;
+		\IPS\convert\Library::$obscureFilenames = FALSE;
 
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 
 		if( $needDB )
 		{
@@ -84,32 +57,34 @@ class Invisioncommunity extends Software
 				$version = $this->db->select( 'app_version', 'core_applications', array( 'app_directory=?', 'core' ) )->first();
 
 				/* We're matching against the human version since the long version can change with patches */
-				if ( $version == Application::load( 'core' )->version )
+				if ( $version == \IPS\Application::load( 'core' )->version )
 				{
 					static::$versionMatch = TRUE;
 				}
 			}
-			catch( DbException $e ) {}
+			catch( \IPS\Db\Exception $e ) {}
 		}
+
+		return $return;
 	}
 
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
-		return 'Invision Community (' . Application::load( 'core' )->version . ')';
+		return 'Invision Community (' . \IPS\Application::load( 'core' )->version . ')';
 	}
 
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "invisioncommunity";
@@ -118,9 +93,9 @@ class Invisioncommunity extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		if( !static::$versionMatch AND static::$dbNeeded )
 		{
@@ -196,6 +171,14 @@ class Invisioncommunity extends Software
 				'table'		=> 'core_member_history',
 				'where'		=> array( 'log_app=? AND log_type=?', 'core', 'display_name' )
 			),
+			'convertStatuses'		=> array(
+				'table'		=> 'core_member_status_updates',
+				'where'		=> NULL
+			),
+			'convertStatusReplies'		=> array(
+				'table'		=> 'core_member_status_replies',
+				'where'		=> NULL
+			),
 			'convertMemberHistory'		=> array(
 				'table'		=> 'core_member_history',
 				'where'		=> array( 'log_app=? AND log_type!=?', 'core', 'display_name' )
@@ -238,9 +221,9 @@ class Invisioncommunity extends Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -248,9 +231,9 @@ class Invisioncommunity extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertEmoticons',
@@ -267,10 +250,10 @@ class Invisioncommunity extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Method name
-	 * @return    array|null
+	 * @param	string	$method	Method name
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 
@@ -282,16 +265,16 @@ class Invisioncommunity extends Software
 			case 'convertClubs':
 			case 'convertAttachments':
 			case 'convertReactions':
-				Member::loggedIn()->language()->words["upload_path"] = Member::loggedIn()->language()->addToStack( 'convert_invision_upload_input' );
-				Member::loggedIn()->language()->words["upload_path_desc"] = Member::loggedIn()->language()->addToStack( 'convert_invision_upload_input_desc' );
+				\IPS\Member::loggedIn()->language()->words["upload_path"] = \IPS\Member::loggedIn()->language()->addToStack( 'convert_invision_upload_input' );
+				\IPS\Member::loggedIn()->language()->words["upload_path_desc"] = \IPS\Member::loggedIn()->language()->addToStack( 'convert_invision_upload_input_desc' );
 				$return[ $method ] = array(
 					'upload_path'				=> array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Text',
-						'field_default'		=> $this->app->_session['more_info']['convertEmoticons']['upload_path'] ?? NULL,
+						'field_default'		=> isset( $this->app->_session['more_info']['convertEmoticons']['upload_path'] ) ? $this->app->_session['more_info']['convertEmoticons']['upload_path'] : NULL,
 						'field_required'	=> TRUE,
 						'field_extra'		=> array(),
-						'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_invision_upload_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_invision_upload_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 
@@ -311,16 +294,16 @@ class Invisioncommunity extends Software
 				$return['convertProfileFields'] = array();
 
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
 				{
 					$options[ $field->_id ] = $field->_title;
 				}
 
 				foreach( $this->db->select( '*', 'core_pfields_data' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["map_pfield_{$field['pf_id']}"]		= $this->getWord( 'core_pfield_' . $field['pf_id'] );
-					Member::loggedIn()->language()->words["map_pfield_{$field['pf_id']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['pf_id']}"]		= $this->getWord( 'core_pfield_' . $field['pf_id'] );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['pf_id']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
 
 					$return['convertProfileFields']["map_pfield_{$field['pf_id']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -337,15 +320,15 @@ class Invisioncommunity extends Software
 
 				$options = array();
 				$options['none'] = 'None';
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[$group->g_id] = $group->name;
 				}
 
 				foreach( $this->db->select( '*', 'core_groups' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['g_id']}"]		= $this->getWord( 'core_group_' . $group['g_id'] );
-					Member::loggedIn()->language()->words["map_group_{$group['g_id']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['g_id']}"]		= $this->getWord( 'core_group_' . $group['g_id'] );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['g_id']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 
 					$return['convertGroups']["map_group_{$group['g_id']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -364,29 +347,29 @@ class Invisioncommunity extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 		
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 
 		/* Clubs */
-		Task::queue( 'convert', 'RecountClubMembers', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RecountClubMembers', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 		
 		return array( "f_search_index_rebuild", "f_clear_caches" );
 	}
@@ -449,7 +432,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertAcronyms() : void
+	public function convertAcronyms()
 	{
 		$libraryClass = $this->getLibrary();	
 		$libraryClass::setKey( 'a_id' );
@@ -470,7 +453,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertEmoticons() : void
+	public function convertEmoticons()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'id' );
@@ -490,14 +473,14 @@ class Invisioncommunity extends Software
 
 			/* Remap rows */
 			$name = explode( '/', $row['image'] );
-			$row['filename'] = $name[1] ?? $name[0];
+			$row['filename'] = isset( $name[1] ) ? $name[1] : $name[0];
 			$path = ( isset( $name[1] ) ) ? $this->app->_session['more_info']['convertEmoticons']['upload_path'] . "/{$name[0]}" : $this->app->_session['more_info']['convertEmoticons']['upload_path'];
 			$path2 = NULL;
 
 			if( $row['image_2x'] )
 			{
 				$name2 = explode( '/', $row['image_2x'] );
-				$row['filenamex2'] = $name2[1] ?? $name2[0];
+				$row['filenamex2'] = isset( $name2[1] ) ? $name2[1] : $name2[0];
 				$path2 = ( isset( $name2[1] ) ) ? $this->app->_session['more_info']['convertEmoticons']['upload_path'] . "/{$name2[0]}" : $this->app->_session['more_info']['convertEmoticons']['upload_path'];
 			}
 
@@ -513,22 +496,22 @@ class Invisioncommunity extends Software
 			{
 				try
 				{
-					File::get( 'core_Emoticons', $row['filename'] );
+					\IPS\File::get( 'core_Emoticons', $row['filename'] );
 				}
-				catch( Exception $ex )
+				catch( \Exception $ex )
 				{
-					File::create( 'core_Emoticons', $row['filename'], file_get_contents( $path . '/' . $row['filename'] ), 'emoticons', FALSE, NULL, FALSE );
+					\IPS\File::create( 'core_Emoticons', $row['filename'], file_get_contents( $path . '/' . $row['filename'] ), 'emoticons', FALSE, NULL, FALSE );
 				}
 
 				if( isset( $path2 ) )
 				{
 					try
 					{
-						File::get( 'core_Emoticons', $row['filenamex2'] );
+						\IPS\File::get( 'core_Emoticons', $row['filenamex2'] );
 					}
-					catch( Exception $ex )
+					catch( \Exception $ex )
 					{
-						File::create( 'core_Emoticons', $row['filenamex2'], file_get_contents( $path2 . '/' . $row['filenamex2'] ), 'emoticons', FALSE, NULL, FALSE );
+						\IPS\File::create( 'core_Emoticons', $row['filenamex2'], file_get_contents( $path2 . '/' . $row['filenamex2'] ), 'emoticons', FALSE, NULL, FALSE );
 					}
 				}
 			}
@@ -542,7 +525,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertBanFilters() : void
+	public function convertBanFilters()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'ban_id' );
@@ -562,7 +545,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'g_id' );
@@ -583,7 +566,7 @@ class Invisioncommunity extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -597,7 +580,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfileFieldGroups() : void
+	public function convertProfileFieldGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'pf_group_id' );
@@ -620,7 +603,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfileFields() : void
+	public function convertProfileFields()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'pf_id' );
@@ -647,7 +630,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'member_id' );
@@ -658,7 +641,7 @@ class Invisioncommunity extends Software
 			$this->unsetNonStandardColumns( $row, 'core_members' );
 
 			$profilePhotoName = NULL;
-			if( !in_array( $row['pp_photo_type'], array( 'letter', 'none', 'twitter', 'facebook', 'microsoft', '' ) ) )
+			if( !\in_array( $row['pp_photo_type'], array( 'letter', 'none', 'twitter', 'facebook', 'microsoft', '' ) ) )
 			{
 				$bits = explode( '/', $row['pp_main_photo'] );
 				$profilePhotoName = array_pop( $bits );
@@ -684,7 +667,7 @@ class Invisioncommunity extends Software
 					$profileFields[ str_replace( 'field_', '', $key ) ] = $value;
 				}
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$profileFields = array();
 			}
@@ -692,9 +675,9 @@ class Invisioncommunity extends Software
 			/* Load TZ into an object and validate */
 			try
 			{
-				$row['timezone'] = new DateTimeZone( $row['timezone'] );
+				$row['timezone'] = new \DateTimeZone( $row['timezone'] );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				unset( $row['timezone'] );
 			}
@@ -705,7 +688,7 @@ class Invisioncommunity extends Software
 			unset( $row['members_bitoptions'], $row['members_bitoptions2'] );
 	
 			$path = $this->app->_session['more_info']['convertMembers']['upload_path'] . '/';
-			$libraryClass->convertMember( $row, $profileFields, $profilePhotoName, $path . ( $bits[0] ?? '' ), NULL, $coverPhotoName, $path . ( $coverBits[0] ?? '' ) );
+			$libraryClass->convertMember( $row, $profileFields, $profilePhotoName, $path . ( isset( $bits[0] ) ? $bits[0] : '' ), NULL, $coverPhotoName, $path . ( isset( $coverBits[0] ) ? $coverBits[0] : '' ) );
 
 			/* Any friends need converting to followers? */
 			foreach( $this->db->select( '*', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=?', 'core', 'member', $row['member_id'] ) ) as $follow )
@@ -747,7 +730,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfanityFilters() : void
+	public function convertProfanityFilters()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'wid' );
@@ -767,7 +750,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertQuestionAndAnswers() : void
+	public function convertQuestionAndAnswers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'qa_id' );
@@ -792,7 +775,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertReputationLevels() : void
+	public function convertReputationLevels()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'level_id' );
@@ -818,7 +801,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertReactions() : void
+	public function convertReactions()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'reaction_id' );
@@ -833,7 +816,7 @@ class Invisioncommunity extends Software
 
 			/* Remap rows */
 			$name = explode( '/', $row['reaction_icon'] );
-			$row['filename'] = $name[1] ?? $name[0];
+			$row['filename'] = isset( $name[1] ) ? $name[1] : $name[0];
 			$path = ( isset( $name[1] ) ) ? $this->app->_session['more_info']['convertReactions']['upload_path'] . "/{$name[0]}" : $this->app->_session['more_info']['convertReactions']['upload_path'];
 
 			/* We'll figure this out later */
@@ -850,7 +833,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertWarnReasons() : void
+	public function convertWarnReasons()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'wr_id' );
@@ -873,7 +856,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAnnouncements() : void
+	public function convertAnnouncements()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'announce_id' );
@@ -893,7 +876,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertDnameChanges() : void
+	public function convertDnameChanges()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'log_id' );
@@ -910,11 +893,51 @@ class Invisioncommunity extends Software
 	}
 
 	/**
+	 * Convert status updates
+	 *
+	 * @return	void
+	 */
+	public function convertStatuses()
+	{
+		$libraryClass = $this->getLibrary();
+		$libraryClass::setKey( 'status_id' );
+		
+		foreach( $this->fetch( 'core_member_status_updates', 'status_id' ) AS $row )
+		{
+			/* Remove non-standard columns */
+			$this->unsetNonStandardColumns( $row, 'core_member_status_updates' );
+
+			$libraryClass->convertStatus( $row  );		
+			$libraryClass->setLastKeyValue( $row['status_id'] );
+		}
+	}
+
+	/**
+	 * Convert status updates
+	 *
+	 * @return	void
+	 */
+	public function convertStatusReplies()
+	{
+		$libraryClass = $this->getLibrary();
+		$libraryClass::setKey( 'reply_id' );
+		
+		foreach( $this->fetch( 'core_member_status_replies', 'status_id' ) AS $row )
+		{
+			/* Remove non-standard columns */
+			$this->unsetNonStandardColumns( $row, 'core_member_status_replies' );
+
+			$libraryClass->convertStatusReply( $row  );		
+			$libraryClass->setLastKeyValue( $row['reply_id'] );
+		}
+	}
+
+	/**
 	 * Convert ignored users
 	 *
 	 * @return	void
 	 */
-	public function convertIgnoredUsers() : void
+	public function convertIgnoredUsers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'ignore_id' );
@@ -934,7 +957,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'mt_id' );
@@ -956,7 +979,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'msg_id' );
@@ -976,7 +999,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertModerators() : void
+	public function convertModerators()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'id' );
@@ -996,7 +1019,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertClubs() : void
+	public function convertClubs()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'id' );
@@ -1024,7 +1047,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertClubMembers() : void
+	public function convertClubMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'club_id' );
@@ -1044,7 +1067,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertClubPages() : void
+	public function convertClubPages()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'page_id' );
@@ -1064,12 +1087,12 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'attach_id' );
 
-		$mapTypes = array_keys( Application::load('core')->extensions( 'core', 'EditorLocations', FALSE ) );
+		$mapTypes = array_keys( \IPS\Application::load('core')->extensions( 'core', 'EditorLocations', FALSE, FALSE ) );
 		array_walk( $mapTypes, function( &$value )
 		{
 			$value = 'core_' . $value;
@@ -1079,9 +1102,9 @@ class Invisioncommunity extends Software
 		{
 			try
 			{
-				$attachmentMap = $this->db->select( '*', 'core_attachments_map', array( 'attachment_id=? AND ' . Db::i()->in( 'location_key', $mapTypes ), $row['attach_id'] ) )->first();
+				$attachmentMap = $this->db->select( '*', 'core_attachments_map', array( 'attachment_id=? AND ' . \IPS\Db::i()->in( 'location_key', $mapTypes ), $row['attach_id'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$libraryClass->setLastKeyValue( $row['attach_id'] );
 				continue;
@@ -1117,6 +1140,7 @@ class Invisioncommunity extends Software
 						// Can't convert this type
 						$libraryClass->setLastKeyValue( $row['attach_id'] );
 						continue 2;
+					break;
 			}
 
 			/* This applies to all options */
@@ -1144,7 +1168,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertMemberHistory() : void
+	public function convertMemberHistory()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'log_id' );
@@ -1163,14 +1187,14 @@ class Invisioncommunity extends Software
 	/**
 	 * @brief 	Default language
 	 */
-	protected ?int $_defaultLanguage = NULL;
+	protected $_defaultLanguage = NULL;
 
 	/**
 	 * Get default language id
 	 *
 	 * @return 	int
 	 */
-	protected function _defaultLanguage() : int
+	protected function _defaultLanguage()
 	{
 		if( $this->_defaultLanguage !== NULL )
 		{
@@ -1183,7 +1207,7 @@ class Invisioncommunity extends Software
 	/**
 	 * @brief 	Word storage
 	 */
-	protected array $_words = [];
+	protected $_words = [];
 
 	/**
 	 * Get word from language system
@@ -1191,7 +1215,7 @@ class Invisioncommunity extends Software
 	 * @param 	string 		$key 		Word key 
 	 * @return 	string
 	 */
-	public function getWord( string $key ) : string
+	public function getWord( $key )
 	{
 		if( isset( $this->_words[ $key ] ) )
 		{
@@ -1200,10 +1224,10 @@ class Invisioncommunity extends Software
 
 		try
 		{
-			$result = $this->db->select( 'word_custom, word_default', 'core_sys_lang_words', array( 'word_key=? AND lang_id=?', $key, $this->_defaultLanguage() ) )->first();
+			$result = $this->_words[ $key ] = $this->db->select( 'word_custom, word_default', 'core_sys_lang_words', array( 'word_key=? AND lang_id=?', $key, $this->_defaultLanguage() ) )->first();
 		}
 		/* Can't find the word, so return the original string */
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			return $this->_words[ $key ] = $key;
 		}
@@ -1220,17 +1244,17 @@ class Invisioncommunity extends Software
 	/**
 	 * @brief 	Table schema storage
 	 */
-	protected array $_schemas = array();
+	protected $_schemas = array();
 
 	/**
 	 * Remove non-standard columns from row data
 	 *
 	 * @param 	array 		$row 		Database result row
 	 * @param 	string 		$table 		Table name
-	 * @param 	string|null 		$app 		App to check
+	 * @param 	string 		$app 		App to check
 	 * @return 	void
 	 */
-	public function unsetNonStandardColumns( array &$row, string $table, ?string $app=NULL ) : void
+	public function unsetNonStandardColumns( &$row, $table, $app=NULL )
 	{
 		if( $app === NULL )
 		{
@@ -1259,24 +1283,24 @@ class Invisioncommunity extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( !stristr( $url->data[ Url::COMPONENT_PATH ], 'ic-merge-' . $this->app->app_id ) )
+		if( !\stristr( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'ic-merge-' . $this->app->app_id ) )
 		{
 			return NULL;
 		}
 
 		/* account for non-mod_rewrite links */
-		$searchOn = stristr( $url->data[ Url::COMPONENT_PATH ], 'index.php' ) ? $url->data[ Url::COMPONENT_QUERY ] : $url->data[ Url::COMPONENT_PATH ];
+		$searchOn = \stristr( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'index.php' ) ? $url->data[ \IPS\Http\Url::COMPONENT_QUERY ] : $url->data[ \IPS\Http\Url::COMPONENT_PATH ];
 
 		if( preg_match( '#/profile/([0-9]+)-(.+?)#i', $searchOn, $matches ) )
 		{
 			/* If we can't access profiles, don't bother trying to redirect */
-			if( !Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+			if( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 			{
 				return NULL;
 			}
@@ -1284,9 +1308,9 @@ class Invisioncommunity extends Software
 			try
 			{
 				$data = (string) $this->app->getLink( (int) $matches[1], array( 'members', 'core_members' ) );
-				return Member::load( $data )->url();
+				return \IPS\Member::load( $data )->url();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

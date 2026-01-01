@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Categories
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -13,50 +12,35 @@
 namespace IPS\downloads\modules\admin\downloads;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\downloads\Category;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Controller;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Task;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Categories
  */
-class categories extends Controller
+class _categories extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\downloads\Category';
+	protected $nodeClass = 'IPS\downloads\Category';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'categories_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'categories_manage' );
 		parent::execute();
 	}
 	
@@ -65,23 +49,23 @@ class categories extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function recountDownloads() : void
+	protected function recountDownloads()
 	{
-		Dispatcher::i()->checkAcpPermission( 'categories_recount_downloads' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'categories_recount_downloads' );
+		\IPS\Session::i()->csrfCheck();	
 	
 		try
 		{
-			$category = Category::load( Request::i()->id );
+			$category = \IPS\downloads\Category::load( \IPS\Request::i()->id );
 			
-			Db::i()->update( 'downloads_files', array( 'file_downloads' => Db::i()->select( 'COUNT(*)', 'downloads_downloads', array( 'dfid=file_id' ) ) ), array( 'file_cat=?', $category->id ) );
-			Session::i()->log( 'acplogs__downloads_recount_downloads', array( $category->_title => FALSE ) );
+			\IPS\Db::i()->update( 'downloads_files', array( 'file_downloads' => \IPS\Db::i()->select( 'COUNT(*)', 'downloads_downloads', array( 'dfid=file_id' ) ) ), array( 'file_cat=?', $category->id ) );
+			\IPS\Session::i()->log( 'acplogs__downloads_recount_downloads', array( $category->_title => FALSE ) );
 		
-			Output::i()->redirect( Url::internal( "app=downloads&module=downloads&controller=categories&do=form&id=" . Request::i()->id ), 'clog_recount_done' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=downloads&module=downloads&controller=categories&do=form&id=" . \IPS\Request::i()->id ), 'clog_recount_done' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2D180/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2D180/1', 404, '' );
 		}
 	}
 
@@ -90,17 +74,17 @@ class categories extends Controller
 	 *
 	 * @return void
 	 */
-	protected function form() : void
+	protected function form()
 	{
 		parent::form();
 
-		if ( Request::i()->id )
+		if ( \IPS\Request::i()->id )
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('edit_category')  . ': ' . Output::i()->title;
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('edit_category')  . ': ' . \IPS\Output::i()->title;
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('add_category');
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('add_category');
 		}
 	}
 
@@ -109,15 +93,13 @@ class categories extends Controller
 	 *
 	 * @return void
 	 */
-	public function rebuildTopicContent() : void
+	public function rebuildTopicContent()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();	
 		
 		$class = $this->nodeClass;
-		Task::queue( 'core', 'ResyncTopicContent', array( 'class' => $class, 'categoryId' => Request::i()->id ), 3, array( 'categoryId' ) );
-
-		/* @var Model $class */
-		Session::i()->log( 'acplogs__downloads_resync_topics', array( $class::$titleLangPrefix . Request::i()->id => TRUE ) );
-		Output::i()->redirect( Url::internal( 'app=downloads&module=downloads&controller=categories&do=form&id=' . Request::i()->id ), Member::loggedIn()->language()->addToStack('rebuilding_stuff', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( 'category_forums_integration' ) ) ) ) );
+		\IPS\Task::queue( 'core', 'ResyncTopicContent', array( 'class' => $class, 'categoryId' => \IPS\Request::i()->id ), 3, array( 'categoryId' ) );
+		\IPS\Session::i()->log( 'acplogs__downloads_resync_topics', array( $class::$titleLangPrefix . \IPS\Request::i()->id => TRUE ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=downloads&module=downloads&controller=categories&do=form&id=' . \IPS\Request::i()->id ), \IPS\Member::loggedIn()->language()->addToStack('rebuilding_stuff', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( 'category_forums_integration' ) ) ) ) );
 	}
 }

@@ -12,73 +12,46 @@
 namespace IPS\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Matrix;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Stack;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Url as FormUrl;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Device;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * OAuth Client
  */
-class OAuthClient extends Model
+class _OAuthClient extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_oauth_clients';
+	public static $databaseTable = 'core_oauth_clients';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'oauth_';
+	public static $databasePrefix = 'oauth_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'client_id';
+	public static $databaseColumnId = 'client_id';
 	
 	/**
 	 * @brief	[Node] Enabled/Disabled Column
 	 */
-	public static ?string $databaseColumnEnabledDisabled = 'enabled';
+	public static $databaseColumnEnabledDisabled = 'enabled';
 				
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'oauth_clients';
+	public static $nodeTitle = 'oauth_clients';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -96,7 +69,7 @@ class OAuthClient extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'applications',
 		'prefix' 	=> 'oauth_',
@@ -105,14 +78,14 @@ class OAuthClient extends Model
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'core_oauth_client_';
+	public static $titleLangPrefix = 'core_oauth_client_';
 
 	/**
 	 * Set Default Values (overriding $defaultValues)
 	 *
 	 * @return	void
 	 */
-	protected function setDefaultValues() : void
+	protected function setDefaultValues()
 	{
 		$this->access_token_length = 168;
 		$this->prompt = 'reauthorize';
@@ -124,10 +97,10 @@ class OAuthClient extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$form->id = 'oauth';
 		
@@ -146,9 +119,9 @@ class OAuthClient extends Model
 				
 		$form->addTab('oauth_basic_settings');
 		$form->addHeader('oauth_basic_settings');
-		$form->add( new Translatable( 'oauth_client_name', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->client_id ? "core_oauth_client_{$this->client_id}" : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'oauth_client_name', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->client_id ? "core_oauth_client_{$this->client_id}" : NULL ) ) ) );
 
-		$form->add( new Radio( 'oauth_client_type', $type, TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'oauth_client_type', $type, TRUE, array(
 			'options'	=> array(
 				'invision'		=> 'client_type_invision',
 				'wordpress'		=> 'client_type_wordpress',
@@ -163,7 +136,7 @@ class OAuthClient extends Model
 			)
 		) ) );
 
-		$form->add( new Radio( 'oauth_api_access', $this->api_access ? $this->api_access : 'rest', TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'oauth_api_access', $this->api_access ? $this->api_access : 'rest', TRUE, array(
 			'options'	=> array(
 				'rest'			=> 'oauth_api_type_rest',
 				'graphql'		=> 'oauth_api_type_graphql',
@@ -176,13 +149,13 @@ class OAuthClient extends Model
 			)
 		), NULL, NULL, NULL, 'oauth_api_access' ) );
 
-		$form->add( new Radio( 'oauth_invision_grant_type', $this->client_id ? $this->grant_types : 'authorization_code', NULL, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'oauth_invision_grant_type', $this->client_id ? $this->grant_types : 'authorization_code', NULL, array(
 			'options'	=> array(
 				'authorization_code'	=> 'invision_grant_type_server_authorization_code',
 				'password'				=> 'invision_grant_type_server_password',
 			),
 		), NULL, NULL, NULL, 'oauth_grant_types_invision' ) );
-		$confidentialGrant = new CheckboxSet( 'oauth_grant_types_confidential', $this->client_id ? explode( ',', $this->grant_types ) : array( 'authorization_code' ), NULL, array(
+		$confidentialGrant = new \IPS\Helpers\Form\CheckboxSet( 'oauth_grant_types_confidential', $this->client_id ? explode( ',', $this->grant_types ) : array( 'authorization_code' ), NULL, array(
 			'options'	=> array(
 				'authorization_code'	=> 'grant_type_authorization_code',
 				'implicit'				=> 'grant_type_implicit',
@@ -193,13 +166,13 @@ class OAuthClient extends Model
 				'authorization_code'	=> array( 'oauth_pkce', 'oauth_use_refresh_tokens' )
 			)
 		), function( $val ) {
-			if ( !$val and Request::i()->oauth_client_type === 'confidential' ) {
-				throw new DomainException('form_required');
+			if ( !$val and \IPS\Request::i()->oauth_client_type === 'confidential' ) {
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'oauth_grant_types_confidential' );
-		$confidentialGrant->label = Member::loggedIn()->language()->addToStack('oauth_grant_types');
+		$confidentialGrant->label = \IPS\Member::loggedIn()->language()->addToStack('oauth_grant_types');
 		$form->add( $confidentialGrant );
-		$publicGrant = new CheckboxSet( 'oauth_grant_types_public', $this->client_id ? explode( ',', $this->grant_types ) : array( 'implicit' ), NULL, array(
+		$publicGrant = new \IPS\Helpers\Form\CheckboxSet( 'oauth_grant_types_public', $this->client_id ? explode( ',', $this->grant_types ) : array( 'implicit' ), NULL, array(
 			'options'	=> array(
 				'authorization_code'	=> 'grant_type_authorization_code',
 				'implicit'				=> 'grant_type_implicit',
@@ -209,86 +182,85 @@ class OAuthClient extends Model
 				'authorization_code'	=> array( 'oauth_pkce', 'oauth_use_refresh_tokens' )
 			)
 		), function( $val ) {
-			if ( !$val and Request::i()->oauth_client_type === 'public' ) {
-				throw new DomainException('form_required');
+			if ( !$val and \IPS\Request::i()->oauth_client_type === 'public' ) {
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'oauth_grant_types_public' );
-		$publicGrant->label = Member::loggedIn()->language()->addToStack('oauth_grant_types');
+		$publicGrant->label = \IPS\Member::loggedIn()->language()->addToStack('oauth_grant_types');
 		$form->add( $publicGrant );
 		$redirectUris = json_decode( $this->redirect_uris, TRUE );
-		$form->add( new FormUrl( 'oauth_invision_endpoint', isset( $redirectUris[0] ) ? preg_replace( '#/oauth/callback/$#i', '/', $redirectUris[0] ) : NULL, NULL, array( 'placeholder' => 'https://othercommunity.example.com/', 'allowedProtocols' => NULL ), function( $val ) {
-			if ( !$val and Request::i()->oauth_client_type == 'invision' ) {
-				throw new DomainException('form_required');
+		$form->add( new \IPS\Helpers\Form\Url( 'oauth_invision_endpoint', isset( $redirectUris[0] ) ? preg_replace( '#/oauth/callback/$#i', '/', $redirectUris[0] ) : NULL, NULL, array( 'placeholder' => 'https://othercommunity.example.com/', 'allowedProtocols' => NULL ), function( $val ) {
+			if ( !$val and \IPS\Request::i()->oauth_client_type == 'invision' ) {
+				throw new \DomainException('form_required');
 			}
-			if ( $val and $val instanceof Url and $val->data[ Url::COMPONENT_FRAGMENT ] ) {
-				throw new DomainException('oauth_redirect_uris_no_fragment');
+			if ( $val and $val instanceof \IPS\Http\Url and $val->data[ \IPS\Http\Url::COMPONENT_FRAGMENT ] ) {
+				throw new \DomainException('oauth_redirect_uris_no_fragment');
 			}
-			if ( $val and rtrim( (string) $val, '/' ) === rtrim( Settings::i()->base_url, '/' ) ) {
-				throw new DomainException('oauth_invision_endpoint_internal');
+			if ( $val and rtrim( (string) $val, '/' ) === rtrim( \IPS\Settings::i()->base_url, '/' ) ) {
+				throw new \DomainException('oauth_invision_endpoint_internal');
 			}
 		}, NULL, NULL, 'oauth_invision_endpoint' ) );
-		$form->add( new FormUrl( 'oauth_wordpress_endpoint', $redirectUris[0] ?? NULL, NULL, array( 'placeholder' => 'https://wordpress.example.com/', 'allowedProtocols' => NULL ), function( $val ) {
-			if ( !$val and Request::i()->oauth_client_type == 'wordpress' ) {
-				throw new DomainException('form_required');
+		$form->add( new \IPS\Helpers\Form\Url( 'oauth_wordpress_endpoint', isset( $redirectUris[0] ) ? $redirectUris[0] : NULL, NULL, array( 'placeholder' => 'https://wordpress.example.com/', 'allowedProtocols' => NULL ), function( $val ) {
+			if ( !$val and \IPS\Request::i()->oauth_client_type == 'wordpress' ) {
+				throw new \DomainException('form_required');
 			}
-			if ( $val and $val instanceof Url and $val->data[ Url::COMPONENT_FRAGMENT ] ) {
-				throw new DomainException('oauth_redirect_uris_no_fragment');
+			if ( $val and $val instanceof \IPS\Http\Url and $val->data[ \IPS\Http\Url::COMPONENT_FRAGMENT ] ) {
+				throw new \DomainException('oauth_redirect_uris_no_fragment');
 			}
 		}, NULL, NULL, 'oauth_wordpress_endpoint' ) );
-		$form->add( new Radio( 'oauth_pkce', $this->pkce ?: 'none', FALSE, array( 'options' => array( 'S256' => 'oauth_pkce_256', 'plain' => 'oauth_pkce_plain', 'none' => 'oauth_pkce_none' ) ), NULL, NULL, NULL, 'oauth_pkce' ) );
-		$form->add( new Stack( 'oauth_redirect_uris', $redirectUris, NULL, array( 'stackFieldType' => 'Url', 'placeholder' => 'https://www.example.com/redirect_uri', 'allowedProtocols' => NULL ), function( $val ) {
-			if ( !in_array( Request::i()->oauth_client_type, array('invision', 'wordpress') ) ) {
-				$chosenGrantTypes = Request::i()->oauth_client_type === 'public' ? Request::i()->oauth_grant_types_public : Request::i()->oauth_grant_types_confidential;
+		$form->add( new \IPS\Helpers\Form\Radio( 'oauth_pkce', $this->pkce ?: 'none', FALSE, array( 'options' => array( 'S256' => 'oauth_pkce_256', 'plain' => 'oauth_pkce_plain', 'none' => 'oauth_pkce_none' ) ), NULL, NULL, NULL, 'oauth_pkce' ) );
+		$form->add( new \IPS\Helpers\Form\Stack( 'oauth_redirect_uris', $redirectUris, NULL, array( 'stackFieldType' => 'Url', 'placeholder' => 'https://www.example.com/redirect_uri', 'allowedProtocols' => NULL ), function( $val ) {
+			if ( !\in_array( \IPS\Request::i()->oauth_client_type, array('invision', 'wordpress') ) ) {
+				$chosenGrantTypes = \IPS\Request::i()->oauth_client_type === 'public' ? \IPS\Request::i()->oauth_grant_types_public : \IPS\Request::i()->oauth_grant_types_confidential;
 				if ( !$val and ( isset( $chosenGrantTypes['authorization_code'] ) or isset( $chosenGrantTypes['implicit'] ) ) ) {
-					throw new DomainException('form_required');
+					throw new \DomainException('form_required');
 				}
-				if ( $val and $val instanceof Url and $val->data[ Url::COMPONENT_FRAGMENT ] ) {
-					throw new DomainException('oauth_redirect_uris_no_fragment');
+				if ( $val and $val instanceof \IPS\Http\Url and $val->data[ \IPS\Http\Url::COMPONENT_FRAGMENT ] ) {
+					throw new \DomainException('oauth_redirect_uris_no_fragment');
 				}
 			}
 		}, NULL, NULL, 'oauth_redirect_uris' ) );
 		
 		$form->addHeader('oauth_authorization_screen');
-		$form->add( new Radio( 'oauth_prompt', $this->prompt, FALSE, array( 'options' => array( 'none' => 'oauth_prompt_none', 'automatic' => 'oauth_prompt_automatic', 'reauthorize' => 'oauth_prompt_reauthorize', 'login' => 'oauth_prompt_login' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'oauth_prompt', $this->prompt, FALSE, array( 'options' => array( 'none' => 'oauth_prompt_none', 'automatic' => 'oauth_prompt_automatic', 'reauthorize' => 'oauth_prompt_reauthorize', 'login' => 'oauth_prompt_login' ) ) ) );
 
-		$form->add( new YesNo( 'oauth_choose_scopes', $this->choose_scopes, FALSE, array(), NULL, NULL, NULL, 'oauth_choose_scopes' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'oauth_choose_scopes', $this->choose_scopes, FALSE, array(), NULL, NULL, NULL, 'oauth_choose_scopes' ) );
 
-		$form->add( new YesNo( 'oauth_ucp', $this->ucp, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'oauth_ucp', $this->ucp, FALSE ) );
 
 		$form->addHeader('oauth_access_tokens');
-		$form->add( new Interval( 'oauth_access_token_length', $this->access_token_length, NULL, array( 'valueAs' => Interval::HOURS, 'unlimited' => 0, 'unlimitedLang' => 'forever' ), NULL, NULL, NULL, 'oauth_access_token_length' ) );
-		$form->add( new YesNo( 'oauth_use_refresh_tokens', $this->use_refresh_tokens, NULL, array( 'togglesOn' => array( 'oauth_refresh_token_length' ) ), NULL, NULL, NULL, 'oauth_use_refresh_tokens' ) );
-		$form->add( new Interval( 'oauth_refresh_token_length', $this->refresh_token_length, NULL, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'forever' ), NULL, NULL, NULL, 'oauth_refresh_token_length' ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'oauth_access_token_length', $this->access_token_length, NULL, array( 'valueAs' => \IPS\Helpers\Form\Interval::HOURS, 'unlimited' => 0, 'unlimitedLang' => 'forever' ), NULL, NULL, NULL, 'oauth_access_token_length' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'oauth_use_refresh_tokens', $this->use_refresh_tokens, NULL, array( 'togglesOn' => array( 'oauth_refresh_token_length' ) ), NULL, NULL, NULL, 'oauth_use_refresh_tokens' ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'oauth_refresh_token_length', $this->refresh_token_length, NULL, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'forever' ), NULL, NULL, NULL, 'oauth_refresh_token_length' ) );
 
 		$form->addTab('oauth_scopes');
 		$form->addMessage('oauth_scopes_blurb');
-		$matrix = new Matrix;
+		$matrix = new \IPS\Helpers\Form\Matrix;
 		$matrix->classes[] = 'cApiPermissionsMatrix';
 		$matrix->langPrefix = 'oauth_scope_';
 		$matrix->columns = array(
 			'name'	=> function( $key, $value, $data )
 			{
-				return new Custom( $key, $value, FALSE, array(
+				return new \IPS\Helpers\Form\Custom( $key, $value, FALSE, array(
 					'getHtml'	=> function( $field )
 					{
-						return Theme::i()->getTemplate( 'api' )->oauthScopeField( $field->name, $field->value );
+						return \IPS\Theme::i()->getTemplate( 'api' )->oauthScopeField( $field->name, $field->value );
 					}
 				) );
 			},
 			'endpoints'	=> function( $key, $value, $data )
 			{
-				return new Custom( $key, $value ?: array(), FALSE, array(
+				return new \IPS\Helpers\Form\Custom( $key, $value ?: array(), FALSE, array(
 					'getHtml'	=> function( $field )
 					{
-						$endpoints = Controller::getAllEndpoints();
-						$endpointTree = [];
+						$endpoints = \IPS\Api\Controller::getAllEndpoints();
 						foreach ( $endpoints as $key => $endpoint )
 						{
 							$pieces = explode('/', $key);
 							$endpointTree[ $pieces[0] ][ $pieces[1] ][ $key ] = $endpoint;
 						}
 
-						return Theme::i()->getTemplate( 'api' )->permissionsFieldHtml( $endpointTree, $field->name, $field->value );
+						return \IPS\Theme::i()->getTemplate( 'api' )->permissionsFieldHtml( $endpointTree, $field->name, $field->value );
 					}
 				) );
 			}
@@ -296,13 +268,13 @@ class OAuthClient extends Model
 		if ( !$this->client_id )
 		{
 			$matrix->rows[] = array(
-				'name'		=> array( 'key' => 'profile', 'desc' => Member::loggedIn()->language()->get('oauth_default_scope_profile') ),
+				'name'		=> array( 'key' => 'profile', 'desc' => \IPS\Member::loggedIn()->language()->get('oauth_default_scope_profile') ),
 				'endpoints'	=> array(
 					'core/me/GETindex'	=> array( 'access' => TRUE, 'log' => FALSE ),
 				)
 			);
 			$matrix->rows[] = array(
-				'name'		=> array( 'key' => 'email', 'desc' => Member::loggedIn()->language()->get('oauth_default_scope_email') ),
+				'name'		=> array( 'key' => 'email', 'desc' => \IPS\Member::loggedIn()->language()->get('oauth_default_scope_email') ),
 				'endpoints'	=> array(
 					'core/me/GETitem'	=> array( 'access' => TRUE, 'log' => FALSE ),
 				)
@@ -324,7 +296,7 @@ class OAuthClient extends Model
 	/**
 	 * @brief	Temporary storage for the client secret
 	 */
-	public ?string $_clientSecret = null;
+	public $_clientSecret;
 	
 	/**
 	 * [Node] Format form values from add/edit form for save
@@ -332,10 +304,10 @@ class OAuthClient extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		/* Normalise the settings */
-		$originalClientType = $values['oauth_client_type'] ?? $this->type;
+		$originalClientType = isset( $values['oauth_client_type'] ) ? $values['oauth_client_type'] : $this->type;
 
 		if ( $values['oauth_client_type'] === 'invision' )
 		{
@@ -349,13 +321,13 @@ class OAuthClient extends Model
 			$values['oauth_api_access'] = 'rest';
 			$values['scopes'] = array(
 				array(
-					'name'		=> array( 'key' => 'profile', 'desc' => Member::loggedIn()->language()->get('oauth_default_scope_profile') ),
+					'name'		=> array( 'key' => 'profile', 'desc' => \IPS\Member::loggedIn()->language()->get('oauth_default_scope_profile') ),
 					'endpoints'	=> array(
 						'core/me/GETindex'	=> array( 'access' => TRUE, 'log' => FALSE ),
 					)
 				),
 				array(
-					'name'		=> array( 'key' => 'email', 'desc' => Member::loggedIn()->language()->get('oauth_default_scope_email') ),
+					'name'		=> array( 'key' => 'email', 'desc' => \IPS\Member::loggedIn()->language()->get('oauth_default_scope_email') ),
 					'endpoints'	=> array(
 						'core/me/GETitem'	=> array( 'access' => TRUE, 'log' => FALSE ),
 					)
@@ -376,7 +348,7 @@ class OAuthClient extends Model
 			$values['oauth_api_access'] = 'rest';
 			$values['scopes'] = array(
 				array(
-					'name'		=> array( 'key' => 'email', 'desc' => Member::loggedIn()->language()->get('oauth_default_scope_email') ),
+					'name'		=> array( 'key' => 'email', 'desc' => \IPS\Member::loggedIn()->language()->get('oauth_default_scope_email') ),
 					'endpoints'	=> array(
 						'core/me/GETindex'	=> array( 'access' => TRUE, 'log' => FALSE ),
 						'core/me/GETitem'	=> array( 'access' => TRUE, 'log' => FALSE ),
@@ -404,9 +376,9 @@ class OAuthClient extends Model
 		{
 			do
 			{
-				$values['oauth_client_id'] = Login::generateRandomString( 32 );
+				$values['oauth_client_id'] = \IPS\Login::generateRandomString( 32 );
 			}
-			while ( Db::i()->select( 'COUNT(*)', 'core_oauth_clients', array( 'oauth_client_id=?', $values['oauth_client_id'] ) )->first() );
+			while ( \IPS\Db::i()->select( 'COUNT(*)', 'core_oauth_clients', array( 'oauth_client_id=?', $values['oauth_client_id'] ) )->first() );
 		}
 		
 		/* And secret */
@@ -414,7 +386,7 @@ class OAuthClient extends Model
 		{
 			if ( !$this->client_secret )
 			{
-				$this->_clientSecret = Login::generateRandomString( 48 );
+				$this->_clientSecret = \IPS\Login::generateRandomString( 48 );
 				$values['oauth_client_secret'] = password_hash( $this->_clientSecret, PASSWORD_DEFAULT );
 			}
 			$values['oauth_grant_types'] = $values['oauth_grant_types_confidential'];
@@ -429,11 +401,11 @@ class OAuthClient extends Model
 		
 		/* Save the name */
 		$clientId = $this->client_id ?: $values['oauth_client_id'];
-		Lang::saveCustom( 'core', "core_oauth_client_{$clientId}", $values['oauth_client_name'] );
+		\IPS\Lang::saveCustom( 'core', "core_oauth_client_{$clientId}", $values['oauth_client_name'] );
 		unset( $values['oauth_client_name'] );
 		
 		/* Redirect URIs */
-		if ( in_array( $originalClientType, array( 'public', 'invision', 'wordpress' ) ) or in_array( 'authorization_code', $values['oauth_grant_types'] ) or in_array( 'implicit', $values['oauth_grant_types'] ) )
+		if ( \in_array( $originalClientType, array( 'public', 'invision', 'wordpress' ) ) or \in_array( 'authorization_code', $values['oauth_grant_types'] ) or \in_array( 'implicit', $values['oauth_grant_types'] ) )
 		{
 			$values['oauth_redirect_uris'] = json_encode( array_map( function( $url ) { return (string) $url; }, $values['oauth_redirect_uris'] ) );
 		}
@@ -450,7 +422,7 @@ class OAuthClient extends Model
 			if ( $row['name']['key'] )
 			{
 				$scopes[ $row['name']['key'] ] = array(
-					'description'	=> $row['name']['desc'] ?? NULL,
+					'description'	=> isset( $row['name']['desc'] ) ? $row['name']['desc'] : NULL,
 					'endpoints'		=> $row['endpoints']
 				);
 			}
@@ -467,10 +439,10 @@ class OAuthClient extends Model
 	 *
 	 * @return	NULL|array		Null for no badge, or an array of badge data (0 => CSS class type, 1 => language string, 2 => optional raw HTML to show instead of language string)
 	 */
-	public function get__badge(): ?array
+	public function get__badge()
 	{
 		return array(
-			0	=> 'ipsBadge ipsBadge--neutral i-float_end i-margin-end_icon',
+			0	=> 'ipsBadge ipsBadge_neutral ipsPos_right ipsMargin_right:half',
 			1	=> 'api_access_' . $this->api_access,
 		);
 	}
@@ -480,7 +452,7 @@ class OAuthClient extends Model
 	 *
 	 * @return	string|null
 	 */
-	protected function get__description(): ?string
+	protected function get__description()
 	{
 		return $this->client_id;
 	}
@@ -490,7 +462,7 @@ class OAuthClient extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canCopy(): bool
+	public function canCopy()
 	{
 		return FALSE;
 	}
@@ -500,21 +472,21 @@ class OAuthClient extends Model
 	 * Example code explains return value
 	 *
 	 * @code
-	* array(
-	* array(
-	* 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
-	* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	* ),
-	* ...							// Additional buttons
-	* );
+	array(
+	array(
+	'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
+	'title'	=> 'foo',		// Language key to use for button's title parameter
+	'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	),
+	...							// Additional buttons
+	);
 	 * @endcode
-	 * @param Url $url		Base URL
+	 * @param	string	$url		Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = array();
 		
@@ -524,7 +496,7 @@ class OAuthClient extends Model
 			'link'	=> $url->setQueryString( array( 'do' => 'view', 'client_id' => $this->client_id ) )
 		);
 		
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'oauth_tokens' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'oauth_tokens' ) )
 		{
 			$buttons['tokens'] = array(
 				'icon'	=> 'key',
@@ -536,37 +508,37 @@ class OAuthClient extends Model
 		$_parentButtons = parent::getButtons( $url, $subnode );		
 		if ( isset( $_parentButtons['delete'] ) )
 		{
-			$_parentButtons['delete']['data'] = array( 'confirm' => '', 'confirmSubMessage' => Member::loggedIn()->language()->addToStack('oauth_client_delete_warning') );
+			$_parentButtons['delete']['data'] = array( 'confirm' => '', 'confirmSubMessage' => \IPS\Member::loggedIn()->language()->addToStack('oauth_client_delete_warning') );
 		}
 				
 		return $buttons + $_parentButtons;
 	}
-
+	
 	/**
 	 * Generate or renew an access token
 	 *
-	 * @param Member|NULL $member The member or NULL for client_credentials
-	 * @param array|null $scopes Array of scopes or NULL if none were requested
-	 * @param string $grantType Type of grant
-	 * @param bool $skipRefreshToken If TRUE, will not generate a refresh token (for example, when using implicit grant type)
-	 * @param string|NULL $authorizationCode The authorization code which generated the token, if applicable
-	 * @param string|null $authUserAgent
-	 * @param string|null $grantUserAgent
-	 * @param Device|NULL $device The device used to obtain this access token, if known
-	 * @param array|null $tokenToRefresh If we are refreshing, the existing access token to refresh
-	 * @return    array
+	 * @param	\IPS\Member|NULL			$member				The member or NULL for client_credentials
+	 * @param	array|null				$scopes				Array of scopes or NULL if none were requested
+	 * @param	string					$grantType			Type of grant
+	 * @param	bool						$skipRefreshToken	If TRUE, will not generate a refresh token (for example, when using implicit grant type)
+	 * @param	string|NULL				$authorizationCode	The authorization code which generated the token, if applicable
+	 * @param	string|NULL				$userAgent			The user agent that the user performed authentication on, if known
+	 * @param	string|NULL				$issueUserAgent		The user agent that the access token was issued to, if known
+	 * @param	\IPS\Member\Device|NULL	$device				The device used to obtain this access token, if known
+	 * @param	array					$tokenToRefresh		If we are refreshing, the existing access token to refresh
+	 * @return	array
 	 */
-	public function generateAccessToken( ?Member $member, ?array $scopes, string $grantType, bool $skipRefreshToken = FALSE, ?string $authorizationCode = NULL, ?string $authUserAgent = NULL, ?string $grantUserAgent = NULL, ?Device $device = NULL, ?array $tokenToRefresh = NULL ) : array
+	public function generateAccessToken( ?\IPS\Member $member, $scopes, $grantType, $skipRefreshToken = FALSE, $authorizationCode = NULL, $authUserAgent = NULL, $grantUserAgent = NULL, \IPS\Member\Device $device = NULL, $tokenToRefresh = NULL )
 	{
 		do
 		{
-			$accessToken = Login::generateRandomString( 64 );
+			$accessToken = \IPS\Login::generateRandomString( 64 );
 		}
 		while ( $this->validateAccessToken( $accessToken ) );
 		
 		$data = array(
 			'client_id'				=> $this->client_id,
-			'member_id'				=> $member?->member_id,
+			'member_id'				=> $member ? $member->member_id : NULL,
 			'access_token'			=> $accessToken,
 			'access_token_expires'	=> $this->access_token_length ? ( time() + ( $this->access_token_length * 3600 ) ) : NULL,
 			'refresh_token'			=> NULL,
@@ -576,7 +548,7 @@ class OAuthClient extends Model
 			'issued'					=> time(),
 			'auth_user_agent'		=> $authUserAgent,
 			'issue_user_agent'		=> $grantUserAgent,
-			'device_key'				=> $device?->device_key,
+			'device_key'				=> $device ? $device->device_key : NULL,
 			'status'				=> 'active',
 		);
 		
@@ -586,7 +558,7 @@ class OAuthClient extends Model
 			{
 				do
 				{
-					$data['refresh_token'] = Login::generateRandomString( 64 );
+					$data['refresh_token'] = \IPS\Login::generateRandomString( 64 );
 				}
 				while ( $this->validateRefreshToken( $data['refresh_token'] ) );
 				
@@ -603,12 +575,12 @@ class OAuthClient extends Model
 		
 		if ( $grantType === 'refresh_token' and $tokenToRefresh )
 		{
-			Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'client_id=? AND access_token=?', $tokenToRefresh['client_id'], $tokenToRefresh['access_token'] ) );
-			Db::i()->insert( 'core_oauth_server_access_tokens', $data );
+			\IPS\Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'client_id=? AND access_token=?', $tokenToRefresh['client_id'], $tokenToRefresh['access_token'] ) );
+			\IPS\Db::i()->insert( 'core_oauth_server_access_tokens', $data );
 		}
 		else
 		{		
-			Db::i()->insert( 'core_oauth_server_access_tokens', $data );
+			\IPS\Db::i()->insert( 'core_oauth_server_access_tokens', $data );
 			if ( $member )
 			{
 				$member->logHistory( 'core', 'oauth', array( 'type' => 'issued_access_token', 'client' => $this->client_id, 'grant' => $grantType, 'scopes' => $scopes ), FALSE );
@@ -619,7 +591,7 @@ class OAuthClient extends Model
 		{
 			$device->last_seen = time();
 			$device->save();
-			$device->logIpAddress( Request::i()->ipAddress() );
+			$device->logIpAddress( \IPS\Request::i()->ipAddress() );
 		}
 		
 		$data['access_token'] = $this->client_id . '_' . $data['access_token'];
@@ -631,27 +603,27 @@ class OAuthClient extends Model
 	 * Get access token details, checking it isn't expired
 	 *
 	 * @param	string	$accessToken	The access token
-	 * @return	array
-	 * @throws	UnderflowException
-	 * @throws    Exception
+	 * @return	\IPS\Member|NULL
+	 * @throws	\UnderflowException
+	 * @throws	\IPS\Api\Exception
 	 */
-	public static function accessTokenDetails( string $accessToken ) : array
+	public static function accessTokenDetails( $accessToken )
 	{
 		$exploded = explode( '_', $accessToken );
 		
 		if ( !isset( $exploded[0] ) or !isset( $exploded[1] ) )
 		{
-			throw new UnderflowException;
+			throw new \UnderflowException;
 		}
 		
-		$return = Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'client_id=? AND access_token=?', $exploded[0], $exploded[1] ) )->first();
+		$return = \IPS\Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'client_id=? AND access_token=?', $exploded[0], $exploded[1] ) )->first();
 		if ( $return['status'] == 'revoked' )
 		{
-			throw new Exception( 'REVOKED_ACCESS_TOKEN', '1S290/F', 401, 'invalid_token' );
+			throw new \IPS\Api\Exception( 'REVOKED_ACCESS_TOKEN', '1S290/F', 401, 'invalid_token' );
 		}
 		if ( $return['access_token_expires'] and $return['access_token_expires'] < time() )
 		{
-			throw new Exception( 'EXPIRED_ACCESS_TOKEN', '1S290/E', 401, 'invalid_token' );
+			throw new \IPS\Api\Exception( 'EXPIRED_ACCESS_TOKEN', '1S290/E', 401, 'invalid_token' );
 		}
 		
 		return $return;
@@ -661,43 +633,41 @@ class OAuthClient extends Model
 	 * Validate an access token
 	 *
 	 * @param	string	$accessToken	The access token
-	 * @return	Member|NULL
+	 * @return	\IPS\Member|NULL
 	 */
-	public function validateAccessToken( string $accessToken ) : ?Member
+	public function validateAccessToken( $accessToken )
 	{
 		try
 		{
-			$row = Db::i()->select( array( 'member_id', 'access_token_expires' ), 'core_oauth_server_access_tokens', array( 'client_id=? AND access_token=?', $this->client_id, $accessToken ) )->first();
+			$row = \IPS\Db::i()->select( array( 'member_id', 'access_token_expires' ), 'core_oauth_server_access_tokens', array( 'client_id=? AND access_token=?', $this->client_id, $accessToken ) )->first();
 			if ( $row['status'] == 'revoked' )
 			{
-				return null;
+				return;
 			}
 			if ( $row['access_token_expires'] and $row['access_token_expires'] < time() )
 			{
-				return null;
+				return;
 			}
 			
-			$member = Member::load( $row['member_id'] );
+			$member = \IPS\Member::load( $row['member_id'] );
 			if ( $member->member_id )
 			{
 				return $member;
 			}
 		}
-		catch ( UnderflowException $e ) { }
-
-		return null;
+		catch ( \UnderflowException $e ) { }
 	}
 	
 	/**
 	 * Get an existing access token with particular scopes, if they exist
 	 *
-	 * @param	Member|NULL	$member		The member or NULL for client_credentials
+	 * @param	\IPS\Member|NULL	$member		The member or NULL for client_credentials
 	 * @param	array				$scopes		The scopes
 	 * @return	array|NULL
 	 */
-	public function getAccessToken( ?Member $member = NULL, array $scopes = array() ) : ?array
+	public function getAccessToken( \IPS\Member $member = NULL, $scopes = array() )
 	{
-		foreach ( Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'client_id=? AND member_id=?', $this->client_id, $member->member_id ) ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'client_id=? AND member_id=?', $this->client_id, $member->member_id ) ) as $row )
 		{
 			if ( $row['status'] == 'revoked' )
 			{
@@ -718,15 +688,13 @@ class OAuthClient extends Model
 				}
 			}
 			
-			if ( count( array_diff( $scopes, $row['scope'] ? json_decode( $row['scope'] ) : array() ) ) )
+			if ( \count( array_diff( $scopes, $row['scope'] ? json_decode( $row['scope'] ) : array() ) ) )
 			{
 				continue;
 			}
 		
 			return $row;
 		}
-
-		return null;
 	}
 	
 	/**
@@ -735,25 +703,23 @@ class OAuthClient extends Model
 	 * @param	string	$refreshToken	The refresh token
 	 * @return	array|NULL
 	 */
-	public function validateRefreshToken( string $refreshToken ) : ?array
+	public function validateRefreshToken( $refreshToken )
 	{
 		try
 		{
-			$row = Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'client_id=? AND refresh_token=?', $this->client_id, $refreshToken ) )->first();
+			$row = \IPS\Db::i()->select( '*', 'core_oauth_server_access_tokens', array( 'client_id=? AND refresh_token=?', $this->client_id, $refreshToken ) )->first();
 			if ( $row['status'] == 'revoked' )
 			{
-				return null;
+				return;
 			}
 			if ( $row['refresh_token_expires'] and $row['refresh_token_expires'] < time() )
 			{
-				return null;
+				return;
 			}
 			
 			return $row;
 		}
-		catch ( UnderflowException $e ) { }
-
-		return null;
+		catch ( \UnderflowException $e ) { }
 	}
 	
 	/**
@@ -765,7 +731,7 @@ class OAuthClient extends Model
 	 * @param	string	$method				Method
 	 * @return	string|NULL
 	 */
-	public function scopesCanAccess( array $authorizedScopes, string $app, string $controller, string $method ) : ?string
+	public function scopesCanAccess( $authorizedScopes, $app, $controller, $method )
 	{
 		$scopes = $this->scopes ? json_decode( $this->scopes, TRUE ) : array();
 		
@@ -773,7 +739,7 @@ class OAuthClient extends Model
 		{
 			if ( isset( $scopes[ $scope ] ) )
 			{				
-				if ( isset( $scopes[ $scope ]['endpoints']["{$app}/{$controller}/{$method}"] ) and $scopes[$scope]['endpoints']["{$app}/{$controller}/{$method}"]['access'] )
+				if ( isset( $scopes[ $scope ]['endpoints']["{$app}/{$controller}/{$method}"] ) and $scopes[ $scope ]['endpoints']["{$app}/{$controller}/{$method}"]['access'] == TRUE )
 				{
 					return $scope;
 				}
@@ -792,7 +758,7 @@ class OAuthClient extends Model
 	 * @param	string	$method				Method
 	 * @return	bool
 	 */
-	public function scopeShouldLog( string $scope, string $app, string $controller, string $method ) : bool
+	public function scopeShouldLog( $scope, $app, $controller, $method )
 	{
 		$scopes = $this->scopes ? json_decode( $this->scopes, TRUE ) : array();
 		return isset( $scopes[ $scope ]['endpoints']["{$app}/{$controller}/{$method}"] ) and isset( $scopes[ $scope ]['endpoints']["{$app}/{$controller}/{$method}"]['log'] ) and $scopes[ $scope ]['endpoints']["{$app}/{$controller}/{$method}"]['log'] == TRUE;
@@ -801,13 +767,13 @@ class OAuthClient extends Model
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		Db::i()->delete( 'core_oauth_server_access_tokens', array( 'client_id=?', $this->client_id ) );
-		Db::i()->delete( 'core_oauth_server_authorization_codes', array( 'client_id=?', $this->client_id ) );
+		\IPS\Db::i()->delete( 'core_oauth_server_access_tokens', array( 'client_id=?', $this->client_id ) );
+		\IPS\Db::i()->delete( 'core_oauth_server_authorization_codes', array( 'client_id=?', $this->client_id ) );
 		
-		parent::delete();
+		return parent::delete();
 	}
 }

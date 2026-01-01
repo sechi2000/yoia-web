@@ -8,37 +8,43 @@
  * @since		18 Feb 2013
  */
 
-use IPS\Application;
-use IPS\Db;
-use IPS\Lang;
-use IPS\Output;
-use IPS\Request;
-
 define('REPORT_EXCEPTIONS', TRUE);
 require_once '../../../../init.php';
 
-Output::setCacheTime( false );
+\IPS\Output::setCacheTime( false );
 
-$langId	= intval( Request::i()->langId );
+$langId	= \intval( \IPS\Request::i()->langId );
 $_lang	= array();
 
-foreach ( Db::i()->select( '*', 'core_sys_lang_words', array( 'lang_id=? AND word_js=?', $langId, TRUE ) ) as $row )
+foreach ( \IPS\Db::i()->select( '*', 'core_sys_lang_words', array( 'lang_id=? AND word_js=?', $langId, TRUE ) ) as $row )
 {
 	$_lang[ $row['word_key'] ] = $row['word_custom'] ?: $row['word_default'];
 }
 
 if ( \IPS\IN_DEV )
 {
-	foreach ( Application::applications() as $app )
+	foreach ( \IPS\Application::applications() as $app )
 	{
-		if( Application::appIsEnabled( $app->directory ) )
+		if( \IPS\Application::appIsEnabled( $app->directory ) )
 		{
-			$_lang = array_merge( $_lang, Lang::readLangFiles( $app->directory, true ) );
+			if ( file_exists( \IPS\ROOT_PATH . "/applications/{$app->directory}/dev/jslang.php" ) )
+			{
+				require \IPS\ROOT_PATH . "/applications/{$app->directory}/dev/jslang.php";
+				$_lang = array_merge( $_lang, $lang );
+			}
+		}
+	}
+	foreach ( \IPS\Plugin::plugins() as $plugin )
+	{
+		if ( file_exists( \IPS\ROOT_PATH . "/plugins/{$plugin->location}/dev/jslang.php" ) )
+		{
+			require \IPS\ROOT_PATH . "/plugins/{$plugin->location}/dev/jslang.php";
+			$_lang = array_merge( $_lang, $lang );
 		}
 	}
 }
 
-$cacheHeaders	= ( \IPS\IN_DEV !== true ) ? Output::getCacheHeaders( time(), 360 ) : array();
+$cacheHeaders	= ( \IPS\IN_DEV !== true AND \IPS\Theme::designersModeEnabled() !== true ) ? \IPS\Output::getCacheHeaders( time(), 360 ) : array();
 
 /* Display */
-Output::i()->sendOutput( 'ips.setString( ' . json_encode( $_lang ) . ')', 200, 'text/javascript', $cacheHeaders );
+\IPS\Output::i()->sendOutput( 'ips.setString( ' . json_encode( $_lang ) . ')', 200, 'text/javascript', $cacheHeaders );

@@ -1,6 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <javascript app="blog">
- <file javascript_app="blog" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.manageCategories.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="blog" javascript_location="front" javascript_path="controllers/browse" javascript_name="ips.browse.grid.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150"><![CDATA[/**
+ * Invision Community
+ * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
+ *
+ * ips.browse.list.js - Blog browse list controller
+ *
+ * Author: Rikki Tissier
+ */
+;( function($, _, undefined){
+	"use strict";
+
+	ips.controller.register('blog.front.browse.grid', {
+
+		initialize: function () {
+          	this.on('click', '.cBlog_grid_item', this.clickNewsItem);
+			this.setup();
+		},
+
+		setup: function () {
+			
+		},
+      
+      	clickNewsItem: function (e) {
+          	var link = $( e.currentTarget ).find('[data-role="newsTitle"]');
+          
+			if( $( e.target ).closest('a').length > 0 ){
+				return;
+			}
+			
+			if( $( e.target ).closest('input').length > 0 ){
+				return;
+			}
+          
+          	window.location = link.attr('href');
+      	}
+	});
+}(jQuery, _));]]></file>
+ <file javascript_app="blog" javascript_location="front" javascript_path="controllers/browse" javascript_name="ips.browse.list.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150">/**
+ * Invision Community
+ * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
+ *
+ * ips.browse.list.js - Blog browse list controller
+ *
+ * Author: Rikki Tissier
+ */
+;( function($, _, undefined){
+	&quot;use strict&quot;;
+
+	ips.controller.register('blog.front.browse.list', {
+
+		initialize: function () {
+			this.on( 'change', '[data-role=&quot;moderation&quot;]', this.selectEntry );
+		},
+
+		/**
+		 * Toggles classes when the moderation checkbox is checked
+		 *
+		 * @param	{event} 	e 		Event object
+		 * @returns {void}
+		 */
+		selectEntry: function (e) {
+			var row = $( e.currentTarget ).closest('.cBlogView_entry');
+			row.toggleClass( 'cBlogView_entrySelected', $( e.currentTarget ).is(':checked') );
+		}
+	});
+}(jQuery, _));</file>
+ <file javascript_app="blog" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.manageCategories.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -31,8 +97,8 @@
 				});
 			
 			/* Save button changes */
-			$('.ipsTabs [role="tablist"] a').on( 'click', this.tabChange );			
-			$('.ipsForm .ipsButtons').append( ips.templates.render('blog.view.addButton') );
+			$('.ipsTabs ul[role="tablist"] a').on( 'click', this.tabChange );			
+			$('.ipsForm .ipsToolList').append( ips.templates.render('blog.view.addButton') );
 			$('[data-action="addNew"]').on( 'click', _.bind( this.newRow, this ) );
 			
 			this.renderList();
@@ -71,8 +137,8 @@
 			});
 
 			if( !$('#form_tab_blog_entry_categories').length ) {
-				$('[type="submit"]').addClass('ipsHide');
-				$('[data-action="addNew"]').removeClass('ipsHide');
+				$('button[type="submit"]').addClass('ipsHide');
+				$('button[data-action="addNew"]').removeClass('ipsHide');
 			}
 		},
 		
@@ -169,7 +235,7 @@
 		 * @returns {void}
 		 */
 		tabChange: function (e) {
-			if ($('#form_tab_blog_entry_categories').attr('aria-selected') == 'false') { // This looks back to front but the tab status is changed after this has fired
+			if ( ! $('#form_tab_blog_entry_categories').hasClass('ipsTabs_activeItem') ) { // This looks back to front but the tab status is changed after this has fired
 				$('button[type="submit"]').addClass('ipsHide');
 				$('button[data-action="addNew"]').removeClass('ipsHide');
 			} else {
@@ -277,23 +343,23 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="blog" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.view.js" javascript_type="template" javascript_version="5001403" javascript_position="1000050"><![CDATA[/* CLASS LIST TEMPLATES */
+ <file javascript_app="blog" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.view.js" javascript_type="template" javascript_version="107827" javascript_position="1000050"><![CDATA[/* CLASS LIST TEMPLATES */
 ips.templates.set('blog.view.addButton', "\
-<li><button type=\"button\" class=\"ipsButton ipsButton--primary ipsHide\" data-action=\"addNew\">{{#lang}}manage_cats_new_row{{/lang}}</button></li>\
+<button type=\"button\" class=\"ipsButton ipsButton_primary ipsHide\" data-action=\"addNew\">{{#lang}}manage_cats_new_row{{/lang}}</button>\
 ");
 
 ips.templates.set('blog.view.categoryRow', "\
-<li class=\"ipsData__item\" itemprop=\"itemListElement\" data-category-id=\"{{cat}}\">\
-	<span data-role=\"sortHandle\" class=\"i-cursor_move\"><i class=\"fa-solid fa-bars\"></i></span>\
-	<div class=\"ipsData__main i-flex i-gap_1\">\
-		<span class=\"ipsData__title\" data-role=\"title_{{cat}}\">{{name}}</span>\
-		<input type=\"text\" name=\"blog_name_{{cat}}\" value=\"\" data-role=\"input_{{cat}}\" class=\"ipsInput ipsHide\">\
-		<button type='button' data-role=\"saveChanges\" data-category-id=\"{{cat}}\" class=\"ipsHide i-flex_00 ipsButton ipsButton--positive\">{{#lang}}save{{/lang}}</button>\
-		<button type='button' data-role=\"cancelChanges\" data-category-id=\"{{cat}}\" class=\"ipsHide i-flex_00 ipsButton ipsButton--negative\">{{#lang}}cancel{{/lang}}</button>\
+<li class=\"ipsDataItem ipsClearfix\" itemprop=\"itemListElement\" data-category-id=\"{{cat}}\">\
+	<div class=\"ipsDataItem_main\">\
+		<span data-role=\"sortHandle\" class=\"ipsCursor_drag\"><i class=\"fa fa-bars\"></i></span>&nbsp;\
+		<span class=\"ipsDataItem_title\" data-role=\"title_{{cat}}\">{{name}}</span>\
+		<input type=\"text\" name=\"blog_name_{{cat}}\" value=\"\" data-role=\"input_{{cat}}\" class=\"ipsHide\">\
+		<a href=\"#\" data-role=\"saveChanges\" data-category-id=\"{{cat}}\" class=\"ipsHide ipsButton ipsButton_verySmall ipsButton_light ipsButton_narrow\" data-ipstooltip=\"\" title=\"{{#lang}}save{{/lang}}\">{{#lang}}save{{/lang}}</a>\
+		<a href=\"#\" data-role=\"cancelChanges\" data-category-id=\"{{cat}}\" class=\"ipsHide\" data-ipstooltip=\"\" title=\"{{#lang}}cancel{{/lang}}\">{{#lang}}cancel{{/lang}}</a>\
 	</div>\
-	<div class=\"cBlog_manage_edit ipsButtonGroup\">\
-		<button type='button data-action=\"delete\" data-category-id=\"{{cat}}\" class=\"ipsButton\" data-ipstooltip title=\"{{#lang}}delete{{/lang}}\"><i class=\"fa-solid fa-circle-xmark\"></i></button>\
-		<button type='button data-action=\"edit\" data-category-id=\"{{cat}}\" class=\"ipsButton\" data-ipstooltip title=\"{{#lang}}edit{{/lang}}\"><i class\=\"fa-solid fa-pencil\"></i></button>\
+	<div class=\"ipsDataItem_generic ipsDataItem_size3 cBlog_manage_edit ipsPos_top ipsType_right\">\
+		<a href=\"#\" data-action=\"delete\" data-category-id=\"{{cat}}\" class=\"ipsButton ipsButton_verySmall ipsButton_light ipsButton_narrow ipsPos_right\" data-ipstooltip title=\"{{#lang}}delete{{/lang}}\"><i class=\"fa fa-times-circle\"></i></a>\
+		<a href=\"#\" data-action=\"edit\" data-category-id=\"{{cat}}\" class=\"ipsButton ipsButton_verySmall ipsButton_light ipsButton_narrow ipsPos_right\" data-ipstooltip title=\"{{#lang}}edit{{/lang}}\"><i class\=\"fa fa-pencil\"></i></a>\
 	</div>\
 </li>\
 ");
@@ -310,7 +376,8 @@ mustache
 Debug.js
 app.js</order>
  <order app="global" path="/dev/js//library//jquery">jquery.js
-jquery-migrate.js</order>
+jquery-migrate.js
+jquery.transform.js</order>
  <order app="global" path="/dev/js//library//linkify">linkify.min.js
 linkify-jquery.min.js</order>
 </javascript>

@@ -11,28 +11,16 @@
 namespace IPS\core\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\core\Feature;
-use IPS\Db;
-use IPS\Node\Api\NodeController;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * @brief	Promotions API
  */
-class promotions extends NodeController
+class _promotions extends \IPS\Node\Api\NodeController
 {
     /**
      * GET /core/promotions
@@ -40,32 +28,31 @@ class promotions extends NodeController
      *
      * @apiparam	int		page			Page number
      * @apiparam	int		perPage			Number of results per page - defaults to 25
-     * @apireturn		PaginatedResponse<IPS\core\Feature>
+     * @return		\IPS\Api\PaginatedResponse<IPS\core\Promote>
      * @throws		2C429/1	NO_PERMISSION	The current authorized user does not have permission to issue warnings and as such cannot view the list of warn reasons
-	 * @return PaginatedResponse<Feature>
      */
-    public function GETindex(): PaginatedResponse
+    public function GETindex()
     {
-		$page		= isset( Request::i()->page ) ? Request::i()->page : 1;
-		$perPage	= isset( Request::i()->perPage ) ? Request::i()->perPage : 25;
+		$page		= isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1;
+		$perPage	= isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : 25;
 
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 
-		$sortBy = ( isset( Request::i()->sortBy ) and in_array( mb_strtolower( Request::i()->sortBy ), array( 'promote_id', 'promote_scheduled' ) ) ) ? Request::i()->sortBy  :'promote_id';
+		$sortBy = ( isset( \IPS\Request::i()->sortBy ) and \in_array( mb_strtolower( \IPS\Request::i()->sortBy ), array( 'promote_id', 'promote_scheduled' ) ) ) ? \IPS\Request::i()->sortBy  :'promote_id';
 
 		/* Check permissions */
         if( $this->member AND !$this->member->modPermission('mod_see_warn') )
         {
-            throw new Exception( 'NO_PERMISSION', '2C429/1', 403 );
+            throw new \IPS\Api\Exception( 'NO_PERMISSION', '2C429/1', 403 );
         }
 
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', 'core_content_promote', array(), "{$sortBy} {$sortDir}" ),
+			\IPS\Db::i()->select( '*', 'core_social_promote', array(), "{$sortBy} {$sortDir}" ),
 			$page,
-			'IPS\core\Feature',
-			Db::i()->select( 'COUNT(*)', 'core_content_promote', array() )->first(),
+			'IPS\core\Promote',
+			\IPS\Db::i()->select( 'COUNT(*)', 'core_social_promote', array() )->first(),
 			$this->member,
 			$perPage
 		);
@@ -77,21 +64,20 @@ class promotions extends NodeController
      *
      * @param		int		$id			ID Number
      * @throws		12C429/2	INVALID_ID	The promotion does not exist
-     * @apireturn		\IPS\core\Feature
-	 * @return Response
+     * @return		\IPS\core\Promote
      */
-    public function GETitem( int $id ): Response
+    public function GETitem( $id )
     {
         try
         {
-            $promotion = Feature::load( $id );
+            $promotion = \IPS\core\Promote::load( $id );
 
 			/* Return */
-			return new Response( 200, $promotion->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $promotion->apiOutput( $this->member ) );
         }
-        catch ( OutOfRangeException $e )
+        catch ( \OutOfRangeException $e )
         {
-            throw new Exception( 'INVALID_ID', '2C429/2', 404 );
+            throw new \IPS\Api\Exception( 'INVALID_ID', '2C429/2', 404 );
         }
     }
 }

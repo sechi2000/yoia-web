@@ -12,47 +12,48 @@
 namespace IPS\blog\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\WidgetComment;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * blogCommentFeed Widget
  */
-class blogCommentFeed extends WidgetComment
+class _blogCommentFeed extends \IPS\Content\WidgetComment
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'blogCommentFeed';
+	public $key = 'blogCommentFeed';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'blog';
+	public $app = 'blog';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Class
 	 */
-	protected static string $class = 'IPS\blog\Entry\Comment';
+	protected static $class = 'IPS\blog\Entry\Comment';
 
 	/**
 	 * @brief	Moderator permission to generate caches on [optional]
 	 */
-	protected array $moderatorPermissions	= array( 'can_view_hidden_content', 'can_view_hidden_blog_entry_comment' );
+	protected $moderatorPermissions	= array( 'can_view_hidden_content', 'can_view_hidden_blog_entry_comment' );
 	
 	/**
 	 * Get where clause
 	 *
 	 * @return	array
 	 */
-	protected function buildWhere(): array
+	protected function buildWhere()
 	{
 		$where = parent::buildWhere();
 		$where['item'][] = array( 'entry_status!=?', 'draft' );

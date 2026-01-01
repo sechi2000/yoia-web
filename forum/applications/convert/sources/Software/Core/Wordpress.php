@@ -12,39 +12,23 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Login;
-use IPS\Member;
-use IPS\Settings;
-use IPS\Task;
-use OutOfRangeException;
-use PasswordHash;
-use function defined;
-use function strlen;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Wordpress Core Converter
  */
-class Wordpress extends Software
+class _Wordpress extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "WordPress (5.x/6.x)";
@@ -53,9 +37,9 @@ class Wordpress extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "wordpress";
@@ -64,9 +48,9 @@ class Wordpress extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertMembers'				=> array(
@@ -79,9 +63,9 @@ class Wordpress extends Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -89,9 +73,9 @@ class Wordpress extends Software
 	/**
 	 * Returns a block of text, or a language string, that explains what the admin must do to start this conversion
 	 *
-	 * @return    string|null
+	 * @return	string
 	 */
-	public static function getPreConversionInformation(): ?string
+	public static function getPreConversionInformation()
 	{
 		return 'convert_wordpress_preconvert';
 	}
@@ -99,9 +83,9 @@ class Wordpress extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertMembers',
@@ -109,15 +93,12 @@ class Wordpress extends Software
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		return nl2br( $post );
 	}
@@ -125,10 +106,10 @@ class Wordpress extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 
@@ -139,23 +120,23 @@ class Wordpress extends Software
 					'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 					'field_default'			=> 'display_name',
 					'field_required'		=> TRUE,
-					'field_extra'			=> array( 'options' => array( 'username' => Member::loggedIn()->language()->addToStack( 'user_name' ), 'display_name' => Member::loggedIn()->language()->addToStack( 'display_name' ) ) ),
-					'field_hint'			=> Member::loggedIn()->language()->addToStack( 'username_hint' ),
+					'field_extra'			=> array( 'options' => array( 'username' => \IPS\Member::loggedIn()->language()->addToStack( 'user_name' ), 'display_name' => \IPS\Member::loggedIn()->language()->addToStack( 'display_name' ) ) ),
+					'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack( 'username_hint' ),
 				);
 				
 				/* Pseudo Fieds */
 				foreach( array( 'first_name', 'last_name', 'user_url' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["field_{$field}"]		= Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => ucwords( str_replace( '_', ' ', $field ) ) ) );
-					Member::loggedIn()->language()->words["field_{$field}_desc"]	= Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}"]		= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => ucwords( str_replace( '_', ' ', $field ) ) ) );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
 					$return['convertMembers']["field_{$field}"] = array(
 						'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 						'field_default'			=> 'no_convert',
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'no_convert'			=> Member::loggedIn()->language()->addToStack( 'no_convert' ),
-								'create_field'			=> Member::loggedIn()->language()->addToStack( 'create_field' ),
+								'no_convert'			=> \IPS\Member::loggedIn()->language()->addToStack( 'no_convert' ),
+								'create_field'			=> \IPS\Member::loggedIn()->language()->addToStack( 'create_field' ),
 							),
 							'userSuppliedInput'		=> 'create_field'
 						),
@@ -173,7 +154,7 @@ class Wordpress extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -184,10 +165,10 @@ class Wordpress extends Software
 			/* Main Members Table */
 			$info = array(
 				'member_id'					=> $user['ID'],
-				'ips_group_id'				=> $user['user_level'] > 9 ? Settings::i()->admin_group : Settings::i()->member_group,
+				'ips_group_id'				=> $user['user_level'] > 9 ? \IPS\Settings::i()->admin_group : \IPS\Settings::i()->member_group,
 				'name'						=> $this->app->_session['more_info']['convertMembers']['username'] == 'username' ? $user['user_login'] : $user['display_name'],
 				'email'						=> $user['user_email'],
-				'joined'					=> new DateTime( $user['user_registered'] ),
+				'joined'					=> new \IPS\DateTime( $user['user_registered'] ),
 				'conv_password'				=> $user['user_pass']
 			);
 			
@@ -206,7 +187,7 @@ class Wordpress extends Software
 					{
 						$fieldId = $this->app->getLink( $field, 'core_pfields_data' );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						$libraryClass->convertProfileField( array(
 							'pf_id'				=> $field,
@@ -245,22 +226,22 @@ class Wordpress extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
 
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
 
 		return array( "f_search_index_rebuild", "f_clear_caches" );
 	}
@@ -268,28 +249,28 @@ class Wordpress extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
 		$success = FALSE;
 
 		// If the hash is still md5...
-		if ( strlen( $member->conv_password ) <= 32 )
+		if ( \strlen( $member->conv_password ) <= 32 )
 		{
-			$success = Login::compareHashes( $member->conv_password, md5( $password ) );
+			$success = ( \IPS\Login::compareHashes( $member->conv_password, md5( $password ) ) ) ? TRUE : FALSE;
 		}
 		// New pass hash check
 		else
 		{
 			// Init the pass class
 			require_once \IPS\ROOT_PATH . "/applications/convert/sources/Login/PasswordHash.php";
-			$ph = new PasswordHash( 8, TRUE );
+			$ph = new \PasswordHash( 8, TRUE );
 
 			// Check it
-			$success = $ph->CheckPassword( $password, $member->conv_password );
+			$success = $ph->CheckPassword( $password, $member->conv_password ) ? TRUE : FALSE;
 		}
 
 		return $success;

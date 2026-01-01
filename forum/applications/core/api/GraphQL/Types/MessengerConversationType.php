@@ -12,42 +12,40 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Api\GraphQL\ItemType;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * MessengerConversation for GraphQL API
  */
-class MessengerConversationType extends ItemType
+class _MessengerConversationType extends \IPS\Content\Api\GraphQL\ItemType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $itemClass	= '\IPS\core\Messenger\Conversation';
+	protected static $itemClass	= '\IPS\core\Messenger\Conversation';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'core_MessengerConversation';
+	protected static $typeName = 'core_MessengerConversation';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'A messenger conversation';
+	protected static $typeDescription = 'A messenger conversation';
 
 	/**
 	 * Return the fields available in this type
 	 *
 	 * @return	array
 	 */
-	public function fields(): array
+	public function fields()
 	{
         $defaultFields = parent::fields();
 		$conversationFields = array(
@@ -132,9 +130,9 @@ class MessengerConversationType extends ItemType
 	 * Here we adjust the resolver for the commentInformation field to check whether this is
 	 * a poll-only topic.
 	 *
-	 * @return	array
+	 * @return	string|null
 	 */
-	public static function getItemPermissionFields(): array
+	public static function getItemPermissionFields()
 	{
         $defaultFields = parent::getItemPermissionFields();
 
@@ -151,7 +149,7 @@ class MessengerConversationType extends ItemType
 	 *
 	 * @return	array
 	 */
-	public static function getOrderByOptions(): array
+	public static function getOrderByOptions()
 	{
         // Note: these options all get prefixed with 'mt_' when passed into the query.
 		return array('last_post_time', 'start_time', 'replies');
@@ -162,8 +160,21 @@ class MessengerConversationType extends ItemType
 	 *
 	 * @return	ObjectType
 	 */
-	protected static function getCommentType(): ObjectType
+	protected static function getCommentType()
 	{
 		return \IPS\core\api\GraphQL\TypeRegistry::messengerReply();
 	}
+
+	/**
+	 * Resolve the comments field - overridden from ItemType
+	 * If this is a question and order isn't date, then force order by votes
+	 *
+	 * @param 	\IPS\forums\Topic
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	array
+	 */
+	/*protected static function comments($topic, $args)
+	{
+		return parent::comments($topic, $args);
+	}*/
 }

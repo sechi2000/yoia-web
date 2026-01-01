@@ -11,9 +11,6 @@
 
 namespace IPS\forums\modules\admin\stats;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
 use IPS\Dispatcher\Controller;
 use IPS\Dispatcher;
 use IPS\Output;
@@ -38,33 +35,34 @@ use const IPS\Helpers\Table\SEARCH_NODE;
 use const IPS\Helpers\Table\SEARCH_MEMBER;
 use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
 
+/* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * solved
  */
-class solved extends Controller
+class _solved extends Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		Dispatcher::i()->checkAcpPermission( 'topics_manage' );
 		parent::execute();
@@ -83,7 +81,7 @@ class solved extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$tabs = array(
 			'time' 		 => 'forums_solved_stats_time',
@@ -100,44 +98,44 @@ class solved extends Controller
 			'link'		=> Url::internal( 'app=forums&module=stats&controller=solved&do=rebuildStats' )->csrf(),
 			'data'		=> array( 'confirm' => '' )
 		);
-
+		
 		Request::i()->tab ??= 'time';
 		$activeTab = ( isset( Request::i()->tab ) and array_key_exists( Request::i()->tab, $tabs ) ) ? Request::i()->tab : 'time';
-
-		$url =  Url::internal( "app=forums&module=stats&controller=solved&tab={$activeTab}" );
-		$chart = match( $activeTab ) {
-			'percentage'	=>  Chart::loadFromExtension( 'forums', 'PercentageSolved' )->getChart( $url ),
-			'solved'		=>  Chart::loadFromExtension( 'forums', 'SolvedByForum' )->getChart( $url ),
-			'groups'		=>  Chart::LoadFromExtension( 'forums', 'SolvedByGroup' )->getChart( $url ),
-			'unsolved'		=>  $this->_unsolved(),
-			default			=>  Chart::loadFromExtension( 'forums', 'TimeSolved' )->getChart( $url )
+		
+		$url = Url::internal( "app=forums&module=stats&controller=solved&tab={$activeTab}" );
+		$output = match( $activeTab ) {
+			'percentage'	=> Chart::loadFromExtension( 'forums', 'PercentageSolved' )->getChart( $url ),
+			'solved'		=> Chart::loadFromExtension( 'forums', 'SolvedByForum' )->getChart( $url ),
+			'groups'		=> CHart::LoadFromExtension( 'forums', 'SolvedByGroup' )->getChart( $url ),
+			'unsolved'		=> $this->_unsolved(),
+			default			=> Chart::loadFromExtension( 'forums', 'TimeSolved' )->getChart( $url )
 		};
 		
 		if ( Request::i()->isAjax() )
 		{
-			Output::i()->output = (string)$chart;
+			Output::i()->output = (string) $output;
 		}
 		else
 		{
 			Output::i()->title = Member::loggedIn()->language()->addToStack( 'menu__forums_stats_solved' );
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string)$chart, Url::internal( "app=forums&module=stats&controller=solved" ), 'tab', '', '' );
+			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string) $output, Url::internal( "app=forums&module=stats&controller=solved" ) );
 		}
 	}
 	
 	/**
 	 * Unsolved Topics
 	 *
-	 * @return	TableDb
+	 * @return	\IPS\Helpers\Table\Db
 	 */
 	protected function _unsolved(): TableDb
 	{
 		/* Load Forums into Memory */
 		Forum::loadIntoMemory( NULL );
-
+		
 		$table							= new TableDb( 'forums_topics', Url::internal( "app=forums&module=stats&controller=solved&tab=unsolved" ), static::_unsolvedWHere() );
 		$table->langPrefix				= 'topics_noposts_';
 		$table->include					= array( 'tid', 'title', 'state', 'start_date', 'starter_id', 'views', 'forum_id', 'approved' );
-
+		
 		$table->parsers = array(
 			'title'			=> function( $val, $row )
 			{
@@ -154,7 +152,7 @@ class solved extends Controller
 			},
 			'start_date'	=> function( $val )
 			{
-				return (string) DateTime::ts( $val );
+				return (string) \IPS\DateTime::ts( $val );
 			},
 			'starter_id'	=> function( $val, $row )
 			{
@@ -176,7 +174,7 @@ class solved extends Controller
 						{
 							$guest->name = $row['starter_name'];
 						}
-
+						
 						return $guest->name;
 					}
 				}
@@ -196,7 +194,7 @@ class solved extends Controller
 				{
 					$title = $forum->_title;
 				}
-
+				
 				return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $forum->url(), TRUE, $title );
 			},
 			'approved'		=> function( $val )
@@ -211,21 +209,21 @@ class solved extends Controller
 				}
 			}
 		);
-
+		
 		$table->filters = array(
 			'open'			=> "state='open'",
 			'locked'		=> "state='closed'",
 			'approved'		=> "approved=1",
 			'unapproved'	=> "approved=0"
 		);
-
+		
 		$table->advancedSearch['forum_id']		= array( SEARCH_NODE, array( 'class' => 'IPS\\forums\\Forum', 'clubs' => TRUE ) );
 		$table->advancedSearch['starter_id']	= SEARCH_MEMBER;
 		$table->advancedSearch['start_date']	= SEARCH_DATE_RANGE;
-
+		
 		return $table;
 	}
-
+	
 	/**
 	 * Get Unsolved Topics Where Clause
 	 *
@@ -240,15 +238,15 @@ class solved extends Controller
 		$where[] = array( Db::i()->in( 'approved', array( 0, 1 ) ) );
 		$where[] = array( Db::i()->in( 'forum_id', Db::i()->select( 'id', 'forums_forums' ) ) );
 		$where[] = array( Db::i()->in( 'state', array( 'link', 'merged' ), TRUE ) );
-
+		
 		return $where;
 	}
-
+	
 	/**
 	 * Kick off a rebuild of the stats
 	 *
 	 */
-	public function rebuildStats() : void
+	public function rebuildStats()
 	{
 		Session::i()->csrfCheck();
 
@@ -257,7 +255,7 @@ class solved extends Controller
 			Task::queue( 'forums', 'RebuildSolvedStats', array( 'forum_id' => $forum['id'] ) );
 		}
 
-		Output::i()->redirect( Url::internal('app=forums&module=stats&controller=solved'), 'solved_stats_rebuild_started' );
+		Output::i()->redirect( \IPS\Http\Url::internal('app=forums&module=stats&controller=solved'), 'solved_stats_rebuild_started' );
 	}
 	
 	/**
@@ -265,7 +263,7 @@ class solved extends Controller
 	 *
 	 * @return array
 	 */
-	protected function getValidForumIds(): array
+	protected function getValidForumIds()
 	{
 		$validForumIds = [];
 		

@@ -5,15 +5,13 @@
 ( function () {
 	"use strict";
 
-	let _origin;
-	let _div;
-	let _embedId = '';
-	let _failSafe = null;
-
-	/**
-	 * @type {ResizeObserver}
-	 */
-	let _ro;
+	var _origin;
+	var _div;
+	var _posting = false;
+	var _timer;
+	var _timeout = 200; //ms
+	var _embedId = '';
+	var _failSafe = null;
 
 	/**
 	 * Init method, called when the document is ready
@@ -28,10 +26,15 @@
 
 		// Work out our URL
 		_div = ips.utils.get('ipsEmbed');
-		const url = new URL(window.location.href);
+		var url = ips.utils.parseURL( window.location );
+
+		if( url.protocol == '' || url.protocol == ':' ){
+			utils.log( url );
+			url.protocol = window.location.protocol;
+		}
 
 		// Set our origin
-		_origin = url.origin;
+		_origin = url.protocol + '//' + url.host;
 		ips.utils.log( "Origin in loader is " + _origin );	
 
 		// Hide the content
@@ -58,73 +61,75 @@
 			}
 			counter++;
 		}, 1000 );
-	}
+	};
 
 	/**
 	 * Starts our main loop, which posts messages to the parent frame as needed
 	 *
 	 * @returns {void}
 	 */
-	function createResizeObserver() {
-		ips.utils.log("Creating resize observer for external embed...");
-		let debounceLastCall=0, debounceTimeout, debounceInterval=200, sentMessage=false;
-		const debouncePostMessage = (height) => {
-			clearTimeout(debounceTimeout);
-			const delta = Date.now() - debounceLastCall - debounceInterval;
-			debounceLastCall = Date.now();
-			debounceTimeout = setTimeout(
-				() => {
-					if (!sentMessage) {
-						sentMessage = true;
-						ips.utils.fadeIn(_div);
-					}
-					_div.parentNode.className = '';
-					_postMessage('height', {height})
-				},
-				Math.max(0, -delta)
-			);
-		}
+	function startTimeout() {
 
-		_ro = new ResizeObserver((entries) => {
-			for (const entry of entries) {
-				if (entry.target === _div) {
-					if (typeof entry.borderBoxSize?.[0]?.blockSize === 'number') {
-						debouncePostMessage(entry.borderBoxSize[0].blockSize + 10);
-					}
-					break;
+		var currentSize = 0;
+		var repeats = 0;
+
+		ips.utils.log("Starting timeout...");
+
+		// Main loop
+		_timer = setInterval( function () {			
+			// What we want to do here is make the loading process more pleasant and less jumpy.
+			// To do that, we'll make the embed invisible until we've fetched the same height 6 times
+			// in a row (approx 1 second). If that happens we'll assume it has finished loading, and then
+			// we'll fade it in and start sending the recorded height to the parent for resizing.
+
+			var height = ips.utils.getObjHeight( _div );
+
+			if( !height )
+			{
+				return;
+			}
+
+			ips.utils.log("Determined height as " + height + ' for embed ID ' + _embedId );
+
+			// If we HAVEN'T started posting our size
+			if( !_posting ){
+				if( height == currentSize ){
+					repeats++;
+				} else {
+					// The height has changed, so reset our repeat counter
+					repeats = 0;
+				}
+
+				if( repeats == 6 ){
+					_posting = true;
+					ips.utils.fadeIn( _div );
 				}
 			}
-		});
 
-		_ro.observe(
-			_div,
-			{box: 'border-box'}
-		);
+			currentSize = height;
 
-		// resize observers usually call the callback right when .observe() is called, but just in case we manually send the height if there hasn't been one
-		setTimeout(() => {
-			// still hasn't been called?
-			if (debounceLastCall === 0) {
-				const height = ips.utils.getObjHeight(_div);
-				ips.utils.log("Determined height as " + height + ' for external embed ID ' + _embedId );
+			if( _posting ){
+				_div.parentNode.className = '';
 
-				// getting the height can force a reflow, so just double check it stil hasn't been called
-				if (debounceLastCall === 0) {
-					debounceLastCall = Date.now(); // do this outside the last call
-					debouncePostMessage(height);
-				}
+				_postMessage('height', {
+					height: ( height + 10 )
+				});
 			}
-		}, 20);
-	}
+		}, _timeout);
+	};
 
 	/**
 	 * Posts a message to the iframe
 	 *
+	 * @param	{number} 	[pageNo]	Page number to load
 	 * @returns {void}
 	 */
 	var _postMessage = function (method, obj) {
 		// Send to parent window
-		window.top.postMessage(JSON.stringify( {...obj, method, embedId: _embedId}), _origin);
+		window.top.postMessage( JSON.stringify( ips.utils.extendObj( obj || {}, { 
+			method: method,
+			embedId: _embedId
+		} ) ), _origin );
 	};	
 
 	/**
@@ -137,16 +142,16 @@
 		 * @param 	{object} 	data 	Data from the iframe
 		 * @returns {void}
 		 */
-		ready(data) {
+		ready: function (data) {
 			_embedId = data.embedId;
 			_postMessage('ok');
 
-			createResizeObserver();
+			startTimeout();
 			clearInterval( _failSafe ); // Stop our emergency timer
 		},
 
-		stop() {
-			_ro?.disconnect();
+		stop: function (data) {
+			clearInterval( _timer );
 			clearInterval( _failSafe ); // Stop our emergency timer
 			eventHandler.off( window, 'message', windowMessage );
 		}
@@ -163,25 +168,12 @@
 			ips.utils.log( e.origin + ' does not equal ' + _origin );
 			return;
 		}
-		if (typeof e.data !== "string") {
-			return;
-		}
-
-		let pmData;
-		try {
-			pmData = JSON.parse(e.data);
-			if (typeof pmData !== 'object') {
-				return;
-			}
-		} catch (e) {
-			return; // we don't log here because the message could have come from somewhere else
-		}
 
 		try {
-			var method = pmData.method;
+			var pmData = JSON.parse( e.data );
+			var method = pmData.method;	
 		} catch (err) {
 			ips.utils.error("iframe: invalid data.");
-			ips.utils.error(err.message)
 			return;
 		}			
 
@@ -191,7 +183,7 @@
 		} else {
 			ips.utils.log("Method " + method + " doesn't exist");
 		}
-	}
+	};
 
 	
 	ips.utils.contentLoaded( window, function () {

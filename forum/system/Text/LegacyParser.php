@@ -11,96 +11,72 @@
 namespace IPS\Text;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Db;
-use IPS\File;
-use IPS\gallery\Album;
-use IPS\gallery\Image;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Settings;
-use IPS\Theme;
-use UnderflowException;
-use UnexpectedValueException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function str_ireplace;
-use function str_replace;
-use function stristr;
-use function strstr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Legacy Text Parser
  */
-class LegacyParser
+class _LegacyParser
 {	
 	/**
 	 * @brief	Maximum number of embeds we will try.
 	 * @note	Attempting to pull too many during the rebuild process can easily time out
 	 */
-	public int $maxEmbeds	= 10;
+	public $maxEmbeds	= 10;
 
 	/**
 	 * Parse statically
 	 *
-	 * @param string $value				The value to parse
-	 * @param Member|null $member				The member posting. NULL will use currently logged in member.
-	 * @param bool $allowHtml			Allow HTML
-	 * @param string|null $attachClass		Key to use for attachments
-	 * @param int $id1				ID1 to use for attachments
-	 * @param int $id2				ID2 to use for attachments
-	 * @param int|null $id3				ID3 to use for attachments
-	 * @param string|null $itemClass			The *item* classname (e.g. IPS\forums\Topic)
+	 * @param	string				$value				The value to parse
+	 * @param	\IPS\Member|null	$member				The member posting. NULL will use currently logged in member.
+	 * @param	bool				$allowHtml			Allow HTML
+	 * @param	string				$attachClass		Key to use for attachments
+	 * @param	int					$id1				ID1 to use for attachments
+	 * @param	int					$id2				ID2 to use for attachments
+	 * @param	int|NULL			$id3				ID3 to use for attachments
+	 * @param	string				$itemClass			The *item* classname (e.g. IPS\forums\Topic)
 	 * @return	string
 	 * @see		__construct
 	 */
-	public static function parseStatic(string $value, Member $member=NULL, bool $allowHtml=FALSE, string $attachClass=null, int $id1=0, int $id2=0, int $id3=NULL, string $itemClass=NULL ): string
+	public static function parseStatic( $value, $member=NULL, $allowHtml=FALSE, $attachClass=null, $id1=0, $id2=0, $id3=NULL, $itemClass=NULL )
 	{
-		$obj = new static($member, $allowHtml, $attachClass, $id1, $id2, $id3, $itemClass);
+		$obj = new static( $member, $allowHtml, $attachClass, $id1, $id2, $id3, $itemClass );
 		return $obj->parse( $value );
 	}
 	
 	/**
 	 * @brief	BBcodes
 	 */
-	public ?array $bbcodes	= NULL;
+	public $bbcodes	= NULL;
 
 	/**
 	 * @brief	Emoticons
 	 */
-	public ?array $emoticons	= NULL;
+	public $emoticons	= NULL;
 
 	/**
 	 * Can use plugin?
 	 *
-	 * @param	Member	$member	The member
-	 * @param string $bbcode	BBCode
+	 * @param	\IPS\Member	$member	The member
+	 * @param	string		$bbcode	BBCode
 	 * @return	bool
 	 */
-	public static function canUse(Member $member, string $bbcode ): bool
+	public static function canUse( \IPS\Member $member, $bbcode )
 	{
 		foreach( static::$bbcodes as $code )
 		{
-			if( $code['bbcode_tag'] == $bbcode OR ( $code['bbcode_aliases'] AND in_array( $bbcode, explode( ',', $code['bbcode_aliases'] ) ) ) )
+			if( $code['bbcode_tag'] == $bbcode OR ( $code['bbcode_aliases'] AND \in_array( $bbcode, explode( ',', $code['bbcode_aliases'] ) ) ) )
 			{
 				if( $code['bbcode_groups'] == 'all' )
 				{
 					return true;
 				}
 
-				if( $member->inGroup( explode( ',', $code['bbcode_groups'] ) ) )
+				if( $member->inGroup( explode( ',', $bbcode['bbcode_groups'] ) ) )
 				{
 					return true;
 				}
@@ -113,64 +89,64 @@ class LegacyParser
 	/**
 	 * @brief	Member
 	 */
-	protected ?Member $member		= NULL;
+	protected $member		= NULL;
 
 	/**
 	 * @brief	Allow HTML
 	 */
-	protected bool $allowHtml	= FALSE;
+	protected $allowHtml	= FALSE;
 
 	/**
 	 * @brief	Parser object
 	 */
-	public mixed $parser		= NULL;
+	public $parser		= NULL;
 
 	/**
 	 * @brief	Key for attachments
 	 */
-	protected ?string $attachClass		= NULL;
+	protected $attachClass		= NULL;
 	
 	/**
 	 * @brief	Item classname
 	 */
-	protected ?string $itemClass	= NULL;
+	protected $itemClass	= NULL;
 
 	/**
 	 * @brief	ID1 to use for attachments
 	 */
-	protected int $idOne			= 0;
+	protected $idOne			= 0;
 
 	/**
 	 * @brief	ID2 to use for attachments
 	 */
-	protected int $idTwo			= 0;
+	protected $idTwo			= 0;
 	
 	/**
 	 * @brief	ID3 to use for attachments
 	 */
-	protected ?int $idThree			= 0;
+	protected $idThree			= 0;
 
 	/**
 	 * @brief   Are Acronyms Supported?
 	 */
-	protected static ?bool $_newAcronyms = null;
+	protected static $_newAcronyms = null;
 
 	/**
 	 * Constructor
 	 *
-	 * @param Member|null $member				The member posting. NULL will use guest.
-	 * @param bool $allowHtml			Allow HTML
-	 * @param string|null $attachClass		Key to use for attachments
-	 * @param int $id1				ID1 to use for attachments
-	 * @param int $id2				ID2 to use for attachments
-	 * @param int|null $id3				ID3 to use for attachments
-	 * @param string|null $itemClass			The *item* classname (e.g. IPS\forums\Topic)
+	 * @param	\IPS\Member|null	$member				The member posting. NULL will use guest.
+	 * @param	bool				$allowHtml			Allow HTML
+	 * @param	string				$attachClass		Key to use for attachments
+	 * @param	int					$id1				ID1 to use for attachments
+	 * @param	int					$id2				ID2 to use for attachments
+	 * @param	int|NULL			$id3				ID3 to use for attachments
+	 * @param	string				$itemClass			The *item* classname (e.g. IPS\forums\Topic)
 	 * @return	void
 	 */
-	public function __construct( Member $member=NULL, bool $allowHtml=FALSE, string $attachClass=null, int $id1=0, int $id2=0, int $id3=NULL, string $itemClass=NULL )
+	public function __construct( $member=NULL, $allowHtml=FALSE, $attachClass=null, $id1=0, $id2=0, $id3=NULL, $itemClass=NULL )
 	{
 		/* Get member */
-		$this->member = $member === NULL ? Member::load(0) : $member;
+		$this->member = $member === NULL ? \IPS\Member::load(0) : $member;
 
 		/* Remember if we allow HTML */
 		$this->allowHtml	= $allowHtml;
@@ -187,9 +163,9 @@ class LegacyParser
 		/* Grab legacy custom bbcodes */
 		try
 		{
-			$this->bbcodes	= iterator_to_array( Db::i()->select( '*', 'convert_custom_bbcode' )->setKeyField( 'bbcode_tag' ) );
+			$this->bbcodes	= iterator_to_array( \IPS\Db::i()->select( '*', 'custom_bbcode' )->setKeyField( 'bbcode_tag' ) );
 		}
-		catch(Db\Exception $e )
+		catch( \IPS\Db\Exception $e )
 		{
 			$this->bbcodes	= array();
 		}
@@ -197,9 +173,9 @@ class LegacyParser
 		/* Grab emoticons */
 		try
 		{
-			$this->emoticons	= iterator_to_array( Db::i()->select( '*', 'core_emoticons' )->setKeyField( 'typed' ) );
+			$this->emoticons	= iterator_to_array( \IPS\Db::i()->select( '*', 'core_emoticons' )->setKeyField( 'typed' ) );
 		}
-		catch(Db\Exception $e )
+		catch( \IPS\Db\Exception $e )
 		{
 			$this->emoticons	= array();
 		}
@@ -207,20 +183,20 @@ class LegacyParser
 		/* The `a_type` column is added in 4.5, so we need to account for this if running the legacy parser during an older upgrade */
 		if( static::$_newAcronyms === NULL )
 		{
-			static::$_newAcronyms = Db::i()->checkForColumn( 'core_acronyms', 'a_type' );
+			static::$_newAcronyms = \IPS\Db::i()->checkForColumn( 'core_acronyms', 'a_type' );
 		}
 
 		/* Grab a new parser object */
-		Parser::$requestTimeout = 1;
-		$this->parser	= new ConverterParser( TRUE, $this->idOne ? array( $this->idOne, $this->idTwo, $this->idThree ) : NULL, $this->member, $this->attachClass, TRUE, ( $this->allowHtml ? FALSE : TRUE ), NULL, static::$_newAcronyms );
+		\IPS\Text\Parser::$requestTimeout = 1;
+		$this->parser	= new \IPS\Text\Parser( TRUE, $this->idOne ? array( $this->idOne, $this->idTwo, $this->idThree ) : NULL, $this->member, $this->attachClass, TRUE, ( $this->allowHtml ? FALSE : TRUE ), NULL, static::$_newAcronyms );
 
 		/* If we're in the upgrader and the new acronym support hasn't been added yet, populate acronyms manually */
 		if( !static::$_newAcronyms )
 		{
-			$this->parser->caseSensitiveAcronyms = iterator_to_array( Db::i()->select( array( 'a_short', 'a_long', "'acronym' as `a_type`" ), 'core_acronyms', array( 'a_casesensitive=1' ) )->setKeyField( 'a_short' ) );
+			$this->parser->caseSensitiveAcronyms = iterator_to_array( \IPS\Db::i()->select( array( 'a_short', 'a_long', "'acronym' as `a_type`" ), 'core_acronyms', array( 'a_casesensitive=1' ) )->setKeyField( 'a_short' ) );
 			
 			$this->parser->caseInsensitiveAcronyms = array();
-			foreach ( Db::i()->select( array( 'a_short', 'a_long', "'acronym' as `a_type`" ), 'core_acronyms', array( 'a_casesensitive=0' ) )->setKeyField( 'a_short' ) as $k => $v )
+			foreach ( \IPS\Db::i()->select( array( 'a_short', 'a_long', "'acronym' as `a_type`" ), 'core_acronyms', array( 'a_casesensitive=0' ) )->setKeyField( 'a_short' ) as $k => $v )
 			{
 				$this->parser->caseInsensitiveAcronyms[ mb_strtolower( $k ) ] = $v;
 			} 
@@ -243,37 +219,37 @@ class LegacyParser
 	/**
 	 * Parse
 	 *
-	 * @param string $value	Text to parse
+	 * @param	string	$value	Text to parse
 	 * @return	string
 	 */
-	public function parse( string $value ): string
+	public function parse( $value )
 	{
 		/* We have to fix up newlines a little bit */
 		$codeBlocks = array();
 		$value	= str_replace( array( "\r\n", "\r" ), "\n", $value );
 
-		if ( ! strstr( $value, "\n" ) && ( stristr( $value, '<br>' ) || stristr( $value, '<br />' ) ) )
+		if ( ! \strstr( $value, "\n" ) && ( \stristr( $value, '<br>' ) || \stristr( $value, '<br />' ) ) )
 		{
-			$value = str_ireplace( array( '<br>', '<br />' ), "\n", $value );
+			$value = \str_ireplace( array( '<br>', '<br />' ), "\n", $value );
 		}
 		else
 		{
-			if ( stristr( $value, '<br>' ) || stristr( $value, '<br />' ) || stristr( $value, '<p>' ) )
+			if ( \stristr( $value, '<br>' ) || \stristr( $value, '<br />' ) || \stristr( $value, '<p>' ) )
 			{
 				/* Protect code tags first... */
 				$value = preg_replace_callback( "/\[(?:code|codebox|sql|php|xml|html).*?\](.+?)\[\/(?:code|codebox|sql|php|xml|html)\]/ims", function( $match ) use ( &$codeBlocks ) {
 					$hash = md5( $match[0] . mt_rand() );
-					$codeBlocks[ $hash ] = ( stristr( $match[0], '<br>' ) || stristr( $match[0], '<br />' ) || stristr( $match[0], '<p>' ) ) ? str_replace( "\n", "", $match[0] ) : $match[0];
+					$codeBlocks[ $hash ] = ( \stristr( $match[0], '<br>' ) || \stristr( $match[0], '<br />' ) || \stristr( $match[0], '<p>' ) ) ? \str_replace( "\n", "", $match[0] ) : $match[0];
 					return $hash;
 				}, $value );
 
 				$value = preg_replace_callback( "/\<pre\s+?class=[\"']_prettyXprint(?:.*?)[\"']\>(.+?)\<\/pre\>/ims", function( $match ) use ( &$codeBlocks ) {
 					$hash = md5( $match[0] . mt_rand() );
-					$codeBlocks[ $hash ] = ( stristr( $match[0], '<br>' ) || stristr( $match[0], '<br />' ) || stristr( $match[0], '<p>' ) ) ? str_replace( "\n", "", $match[0] ) : $match[0];
+					$codeBlocks[ $hash ] = ( \stristr( $match[0], '<br>' ) || \stristr( $match[0], '<br />' ) || \stristr( $match[0], '<p>' ) ) ? \str_replace( "\n", "", $match[0] ) : $match[0];
 					return $hash;
 				}, $value );
 
-				$value = str_replace( "\n", "", $value );
+				$value = \str_replace( "\n", "", $value );
 			}
 		}
 
@@ -291,7 +267,7 @@ class LegacyParser
 		/* If we had any code blocks, put them back now */
 		foreach( $codeBlocks as $hash => $code )
 		{
-			$value = str_replace( $hash, $code, $value );
+			$value = \str_replace( $hash, $code, $value );
 		}
 
 		/* In case the content rebuild has ran or partially ran on this content... */
@@ -305,7 +281,7 @@ class LegacyParser
 
 		preg_match_all( "#(<img(?:[^>]+?)class=['\"]bbc_emoticon[\"'](?:[^>]+?)alt=['\"](.+?)[\"'](?:[^>]+?)?>)#is", $value, $matches );
 
-		if( is_array($matches[1]) AND count($matches[1]) )
+		if( \is_array($matches[1]) AND \count($matches[1]) )
 		{
 			foreach( $matches[1] as $index => $match )
 			{
@@ -327,14 +303,14 @@ class LegacyParser
 		{
 			$code	= str_replace( '<', '&lt;', str_replace( '>', '&gt;', $emoticon['typed'] ) );	
 
-			if( !$code or !stristr( $value, $code ) )
+			if( !$code or !\stristr( $value, $code ) )
 			{
 				continue;
 			}
 
-			if ( ! File::isFullyQualifiedUrl( $emoticon['image'] ) )
+			if ( ! \IPS\File::isFullyQualifiedUrl( $emoticon['image'] ) )
 			{
-				$emoticon['image'] = File::getClass('core_Emoticons')->baseUrl() . '/' . $emoticon['image'];
+				$emoticon['image'] = \IPS\File::getClass('core_Emoticons')->baseUrl() . '/' . $emoticon['image'];
 			}
 
 			$quotedCode = preg_quote( $code, '/' );
@@ -373,7 +349,7 @@ class LegacyParser
 
 		foreach( $matches[0] as $k => $m )
 		{
-			$c = count( $codeboxes );
+			$c = \count( $codeboxes );
 			$codeboxes[ $c ] = $m;
 
 			$replacement = '<!--codeboxes{' . $c . '}-->';
@@ -385,7 +361,7 @@ class LegacyParser
 
 		foreach( $matches[0] as $k => $m )
 		{
-			$c = count( $codeboxes );
+			$c = \count( $codeboxes );
 			$codeboxes[ $c ] = $m;
 
 			$replacement = '<!--codeboxes{' . $c . '}-->';
@@ -398,8 +374,8 @@ class LegacyParser
 		$tables = array();
 		foreach( $matches[0] as $k => $m )
 		{
-			$c = count( $tables );
-			$tables[ $c ] = str_ireplace( '<td><br />', '<td>', $m ); // Fix up un-needed BRs added earlier in this method
+			$c = \count( $tables );
+			$tables[ $c ] = \str_ireplace( '<td><br />', '<td>', $m ); // Fix up un-needed BRs added earlier in this method
 
 			$replacement = '<!--tables{' . $c . '}-->';
 
@@ -456,7 +432,7 @@ class LegacyParser
 		$value = str_replace( "[/quote]", "</div></blockquote>", $value );
 
 		/* Fix download manager embedded screenshot URLs */
-		$value = preg_replace_callback( "#<img src=['\"]" . preg_quote( rtrim( Settings::i()->base_url, '/' ), '#' ) . "/index\.php\?app=downloads(?:&amp;|&)module=display(?:&amp;|&)section=screenshot(?:&amp;|&)id=(\d+?)['\"]([^>]*?)>#si", array( $this, '_fixDownloadsScreenshots' ), $value );
+		$value = preg_replace_callback( "#<img src=['\"]" . preg_quote( rtrim( \IPS\Settings::i()->base_url, '/' ), '#' ) . "/index\.php\?app=downloads(?:&amp;|&)module=display(?:&amp;|&)section=screenshot(?:&amp;|&)id=(\d+?)['\"]([^>]*?)>#si", array( $this, '_fixDownloadsScreenshots' ), $value );
 
 		/* These were auto-replacements previously */
 		$value = str_ireplace( "(c)"	, "&copy;"	, $value );
@@ -481,10 +457,10 @@ class LegacyParser
 		}
 
 		/* Convert bbcode tags, but only those our new parser doesn't handle */
-		foreach( $this->parser->bbcodes as $code )
+		foreach( $this->bbcodes as $code )
 		{
 			/* If we don't have a regex replacement, probably because we used to use a plugin, we can't do this automatically */
-			if( !isset( $code['bbcode_replace'] ) or !$code['bbcode_replace'] )
+			if( !$code['bbcode_replace'] )
 			{
 				continue;
 			}
@@ -544,7 +520,7 @@ class LegacyParser
 
 			preg_match_all( "/\[attachment=(.+?):(.+?)\]/ims", $value, $matches );
 
-			if( count( $matches[1] ) )
+			if( \count( $matches[1] ) )
 			{
 				foreach( $matches[1] as $id )
 				{
@@ -559,11 +535,11 @@ class LegacyParser
 				$where[]	= array( 'id2=?', $this->idTwo );
 			}
 
-			$mappedAttachments		= iterator_to_array( Db::i()->select( '*', 'core_attachments_map', $where )->setKeyField( 'attachment_id' ) );
+			$mappedAttachments		= iterator_to_array( \IPS\Db::i()->select( '*', 'core_attachments_map', $where )->setKeyField( 'attachment_id' ) );
 
 			foreach( $mappedAttachments as $attachmentId => $map )
 			{
-				if( !in_array( $attachmentId, $embeddedAttachments ) )
+				if( !\in_array( $attachmentId, $embeddedAttachments ) )
 				{
 					$value	.= '<p>[attachment=' . $attachmentId . ':name]</p>';
 				}
@@ -578,11 +554,11 @@ class LegacyParser
 				case 'calendar':
 					try
 					{
-						$event = Db::i()->select( '*', 'calendar_events', array( 'event_id=?', (int) $matches[3] ) )->first();
-						$url = Url::internal( "app=calendar&module=events&controller=event&id={$event['event_id']}", 'front', 'calendar_event', $event['event_title_seo'] );
+						$event = \IPS\Db::i()->select( '*', 'calendar_events', array( 'event_id=?', (int) $matches[3] ) )->first();
+						$url = \IPS\Http\Url::internal( "app=calendar&module=events&controller=event&id={$event['event_id']}", 'front', 'calendar_event', $event['event_title_seo'] );
 						return "<p><a href='{$url}'>{$url}</a></p>";
 					}
-					catch( Exception $e )
+					catch( \Exception $e )
 					{
 						return "";
 					}
@@ -590,7 +566,7 @@ class LegacyParser
 	
 				case 'gallery':
 					/* Make sure gallery is enabled first */
-					if ( Application::appIsEnabled( 'gallery' ) === FALSE )
+					if ( \IPS\Application::appIsEnabled( 'gallery' ) === FALSE )
 					{
 						return "";
 					}
@@ -599,10 +575,10 @@ class LegacyParser
 					{
 						try
 						{
-							$image = Image::constructFromData( Db::i()->select( '*', 'gallery_images', array( 'image_id=?', (int) $matches[3] ) )->first() );
+							$image = \IPS\gallery\Image::constructFromData( \IPS\Db::i()->select( '*', 'gallery_images', array( 'image_id=?', (int) $matches[3] ) )->first() );
 							return "<p><a href='{$image->url()}'><img src='{$image->embedImage()->url}' alt='{$image->caption}'></a></p>";
 						}
-						catch( Exception $e )
+						catch( \Exception $e )
 						{
 							return "";
 						}
@@ -611,10 +587,10 @@ class LegacyParser
 					{
 						try
 						{
-							$album = Album::constructFromData( Db::i()->select( '*', 'gallery_albums', array( 'album_id=?', (int) $matches[3] ) )->first() );
-							return Parser::embeddableMedia( Url::createFromString( $album->url(), TRUE, TRUE ), FALSE, $this->member );
+							$album = \IPS\gallery\Album::constructFromData( \IPS\Db::i()->select( '*', 'gallery_albums', array( 'album_id=?', (int) $matches[3] ) )->first() );
+							return \IPS\Text\Parser::embeddableMedia( \IPS\Http\Url::createFromString( $album->url(), TRUE, TRUE ), FALSE, $this->member );
 						}
-						catch( Exception $e )
+						catch( \Exception $e )
 						{
 							return "";
 						}
@@ -624,11 +600,11 @@ class LegacyParser
 				case 'downloads':
 					try
 					{
-						$file = Db::i()->select( '*', 'downloads_files', array( 'file_id=?', (int) $matches[3] ) )->first();
-						$url = Url::internal( "app=downloads&module=downloads&controller=view&id={$file['file_id']}", 'front', 'downloads_file', $file['file_name_furl'] );
+						$file = \IPS\Db::i()->select( '*', 'downloads_files', array( 'file_id=?', (int) $matches[3] ) )->first();
+						$url = \IPS\Http\Url::internal( "app=downloads&module=downloads&controller=view&id={$file['file_id']}", 'front', 'downloads_file', $file['file_name_furl'] );
 						return "<p><a href='{$url}'>{$url}</a></p>";
 					}
-					catch( Exception $e )
+					catch( \Exception $e )
 					{
 						return "";
 					}
@@ -642,11 +618,11 @@ class LegacyParser
 				case 'blog':
 					try
 					{
-						$entry = Db::i()->select( '*', 'blog_entries', array( 'entry_id=?', (int) $matches[3] ) )->first();
-						$url = Url::internal( "app=blog&module=blogs&controller=entry&id={$entry['entry_id']}", 'front', 'blog_entry', $entry['entry_name_seo'] );
+						$entry = \IPS\Db::i()->select( '*', 'blog_entries', array( 'entry_id=?', (int) $matches[3] ) )->first();
+						$url = \IPS\Http\Url::internal( "app=blog&module=blogs&controller=entry&id={$entry['entry_id']}", 'front', 'blog_entry', $entry['entry_name_seo'] );
 						return "<p><a href='{$url}'>{$url}</a></p>";
 					}
-					catch( Exception $e )
+					catch( \Exception $e )
 					{
 						return "";
 					}
@@ -766,7 +742,7 @@ class LegacyParser
 				$url = preg_replace( "/#entry(\d+)/", $sep . "do=findComment&amp;comment=$1", $url );
 			}
 
-			$c = count( $urls );
+			$c = \count( $urls );
 			$urls[ $c ] = str_replace( $matches[1][ $k ], $url, $m );
 
 			$replacement = '<!--url{' . $c . '}-->';
@@ -774,12 +750,12 @@ class LegacyParser
 			try
 			{
 				/* In 3.x, hyperlinked YouTube URLs did replace as long as a data attribute wasn't present */
-				if( ! mb_strpos( $matches[1][ $k ], Settings::i()->base_url ) AND ( mb_strpos( $matches[0][ $k ], 'youtube.co' ) OR mb_strpos( $matches[0][ $k ], 'youtu.be' ) ) and ! mb_strpos( $matches[0][ $k ], 'nomediaparse' ) AND $response = Parser::embeddableMedia( Url::createFromString( $matches[1][ $k ], FALSE, TRUE ), FALSE, $this->member ) )
+				if( ! mb_strpos( $matches[1][ $k ], \IPS\Settings::i()->base_url ) AND ( mb_strpos( $matches[0][ $k ], 'youtube.co' ) OR mb_strpos( $matches[0][ $k ], 'youtu.be' ) ) and ! mb_strpos( $matches[0][ $k ], 'nomediaparse' ) AND $response = \IPS\Text\Parser::embeddableMedia( \IPS\Http\Url::createFromString( $matches[1][ $k ], FALSE, TRUE ), FALSE, $this->member ) )
 				{
 					$urls[ $c ] = $response;
 				}
 			}
-			catch( UnexpectedValueException $e ){}
+			catch( \UnexpectedValueException $e ){}
 
 			$value = str_replace( $m, $replacement, $value );
 		}
@@ -789,7 +765,7 @@ class LegacyParser
 
 		foreach( $matches[0] as $m )
 		{
-			$c = count( $urls );
+			$c = \count( $urls );
 			$urls[ $c ] = $m;
 			
 			$value = str_replace( $m, '<!--url{' . $c . '}-->', $value );
@@ -800,7 +776,7 @@ class LegacyParser
 
 		foreach( $matches[1] as $k => $m )
 		{
-			$c = count( $urls );
+			$c = \count( $urls );
 			$urls[ $c ] = "<a href='{$m}'>{$m}</a>";
 			
 			$value = str_replace( $matches[0][ $k ], '<!--url{' . $c . '}-->', $value );
@@ -833,9 +809,9 @@ class LegacyParser
 
 				try
 				{
-					$me = Parser::embeddableMedia( Url::createFromString( $url, FALSE, TRUE ), FALSE, $this->member );
+					$me = \IPS\Text\Parser::embeddableMedia( \IPS\Http\Url::createFromString( $url, FALSE, TRUE ), FALSE, $this->member );
 				}
-				catch( Exception $e ){}
+				catch( \Exception $e ){}
 			}
 
 			if( $me )
@@ -843,7 +819,7 @@ class LegacyParser
 				$embedCount++;
 			}
 
-			$c = count( $urls );
+			$c = \count( $urls );
 			$urls[ $c ] = $me ?: "<a href='{$m}'>{$m}</a>";
 			
 			$value = str_replace( $matches[1][ $k ], '<!--url{' . $c . '}-->', $value );
@@ -860,14 +836,14 @@ class LegacyParser
 		$value = preg_replace_callback( "/\[attachment=(.+?):(.+?)\]/ims", function( $matches ) {
 			try
 			{
-				$attachment = Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', (int) $matches[1] ) )->first();
+				$attachment = \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', (int) $matches[1] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$attachment = array( 'attach_is_image' => 0, 'attach_location' => '' );
 			}
 
-			$url = Url::baseUrl( Url::PROTOCOL_RELATIVE ) . "applications/core/interface/file/attachment.php?id=" . $attachment['attach_id'];
+			$url = \IPS\Http\Url::baseUrl( \IPS\Http\Url::PROTOCOL_RELATIVE ) . "applications/core/interface/file/attachment.php?id=" . $attachment['attach_id'];
 			if ( $attachment['attach_security_key'] )
 			{
 				$url .= "&key={$attachment['attach_security_key']}";
@@ -876,15 +852,15 @@ class LegacyParser
 			if( $attachment['attach_is_image'] )
 			{
 				$attachment['attach_thumb_location']	= $attachment['attach_thumb_location'] ?: $attachment['attach_location'];
-				$return = "<a class='ipsAttachLink ipsAttachLink_image' href='{fileStore.core_Attachment}/{$attachment['attach_location']}'><img src='{fileStore.core_Attachment}/{$attachment['attach_thumb_location']}' data-fileid='" . Settings::i()->base_url . "applications/core/interface/file/attachment.php?id={$attachment['attach_id']}' class='ipsImage ipsImage_thumbnailed'></a>";
+				$return = "<a class='ipsAttachLink ipsAttachLink_image' href='{fileStore.core_Attachment}/{$attachment['attach_location']}'><img src='{fileStore.core_Attachment}/{$attachment['attach_thumb_location']}' data-fileid='" . \IPS\Settings::i()->base_url . "applications/core/interface/file/attachment.php?id={$attachment['attach_id']}' class='ipsImage ipsImage_thumbnailed'></a>";
 			}
-			elseif( in_array( $attachment['attach_ext'], File::$videoExtensions ) )
+			elseif( \in_array( $attachment['attach_ext'], \IPS\File::$videoExtensions ) )
 			{
-				$return =  Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedVideo( $attachment['attach_location'], $url, $attachment['attach_file'], File::getMimeType( $attachment['attach_file'] ), $attachment['attach_id'] );
+				$return =  \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedVideo( $attachment['attach_location'], $url, $attachment['attach_file'], \IPS\File::getMimeType( $attachment['attach_file'] ), $attachment['attach_id'] );
 			}
-			elseif( in_array( $attachment['attach_ext'], File::$audioExtensions ) )
+			elseif( \in_array( $attachment['attach_ext'], \IPS\File::$audioExtensions ) )
 			{
-				$return = Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedAudio( $attachment['attach_location'], $url, $attachment['attach_file'], File::getMimeType( $attachment['attach_file'] ), $attachment['attach_id'] );
+				$return = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedAudio( $attachment['attach_location'], $url, $attachment['attach_file'], \IPS\File::getMimeType( $attachment['attach_file'] ), $attachment['attach_id'] );
 			}
 			else
 			{
@@ -1013,13 +989,13 @@ class LegacyParser
 		/* Return */
 		if ( mb_stristr( $value, '<fileStore.' ) )
 		{
-			Output::i()->parseFileObjectUrls( $value );
+			\IPS\Output::i()->parseFileObjectUrls( $value );
 		}
 		
 		$result = $this->parser->parse( $value );
 
 		/* If they are not using UTF8MB4, we need to convert emoji back to html entities as HTMLPurifier will have converted them on us */
-		if ( Settings::i()->getFromConfGlobal('sql_utf8mb4') !== TRUE )
+		if ( \IPS\Settings::i()->getFromConfGlobal('sql_utf8mb4') !== TRUE )
 		{
 			$result = preg_replace_callback( '/[\x{10000}-\x{10FFFF}]/u', function( $mb4Character ) {
 				return mb_convert_encoding( $mb4Character[0], 'HTML-ENTITIES', 'UTF-8' );
@@ -1035,10 +1011,10 @@ class LegacyParser
 	/**
 	 * Parse new quotes
 	 *
-	 * @param array $matches	Data from preg_replace callback
+	 * @param	array	$matches	Data from preg_replace callback
 	 * @return	string	Converted text
 	 */
-	protected function _parseOldQuote( array $matches=array() ): string
+	protected function _parseOldQuote( $matches=array() )
 	{
 		if ( !$matches[1] )
 		{
@@ -1057,7 +1033,7 @@ class LegacyParser
 			
 			if ( $match[1] )
 			{
-				$return[]	= " post='" . intval($match[1]) . "'";
+				$return[]	= " post='" . \intval($match[1]) . "'";
 			}
 			
 			if ( $match[2] )
@@ -1072,14 +1048,14 @@ class LegacyParser
 	/**
 	 * Parse new quotes #2
 	 *
-	 * @param array $matches	Data from preg_replace callback
+	 * @param	array	$matches	Data from preg_replace callback
 	 * @return	string	Converted text
 	 */
-	protected function _parseOldBlockquote( array $matches=array() ): string
+	protected function _parseOldBlockquote( $matches=array() )
 	{
 		$parameters	= array( 'data-ipsQuote' => '', 'class' => 'ipsQuote' );
 
-		if( count( $matches ) )
+		if( \count( $matches ) )
 		{
 			preg_match( "/data-author=['\"](.+?)[\"']/i", static::_cleanQuoteName( $matches[1] ), $author );
 			preg_match( "/data-cid=['\"](.+?)[\"']/i", $matches[1], $cid );
@@ -1125,14 +1101,14 @@ class LegacyParser
 	/**
 	 * Parse new quotes #3
 	 *
-	 * @param array $matches	Data from preg_replace callback
+	 * @param	array	$matches	Data from preg_replace callback
 	 * @return	string	Converted text
 	 */
-	protected function _parseOldQuoteBbcode( array $matches=array() ): string
+	protected function _parseOldQuoteBbcode( $matches=array() )
 	{
 		$parameters	= array( 'data-ipsQuote' => '', 'class' => 'ipsQuote' );
 
-		if( count( $matches ) )
+		if( \count( $matches ) )
 		{
 			preg_match( "/name=['\"](.+?)[\"']/i", $matches[1], $author );
 			preg_match( "/post=['\"](.+?)[\"']/i", $matches[1], $cid );
@@ -1186,10 +1162,10 @@ class LegacyParser
 	/**
 	 * Convert flash HTML back into BBCode
 	 *
-	 * @param array $matches	Data from preg_replace callback
+	 * @param	array	$matches	Data from preg_replace callback
 	 * @return	string	Converted text
 	 */
-	protected function _parseOldFlash( array $matches=array() ): string
+	protected function _parseOldFlash( $matches=array() )
 	{
 		$f_arr	= explode( "+", $matches[1] );
 		
@@ -1199,10 +1175,10 @@ class LegacyParser
 	/**
 	 * Convert old code tags back into bbcode
 	 *
-	 * @param array $matches	Data from preg_replace callback
+	 * @param	array	$matches	Data from preg_replace callback
 	 * @return	string	Converted text
 	 */
-	protected function _parseOldCode( array $matches=array() ): string
+	protected function _parseOldCode( $matches=array() )
 	{
 		return '[code]' . rtrim( str_replace( "</span>", '', preg_replace( "#<span style='.+?'>#is", "", stripslashes( $matches[2] ) ) ) ) . '[/code]';
 	}
@@ -1210,20 +1186,20 @@ class LegacyParser
 	/**
 	 * Convert download manager screenshot URLs
 	 *
-	 * @param array $matches	Data from preg_replace callback
+	 * @param	array	$matches	Data from preg_replace callback
 	 * @return	string	Converted text
 	 */
-	protected function _fixDownloadsScreenshots( array $matches ): string
+	protected function _fixDownloadsScreenshots( $matches )
 	{
 		if( isset( $matches[1] ) )
 		{
 			try
 			{
-				$screenshot = Db::i()->select( 'record_location, record_realname', 'downloads_files_records', array( "record_file_id=? and record_type IN('sslink','ssupload')", (int) $matches[1] ), 'record_id ASC', array( 0, 1 ) )->first();
+				$screenshot = \IPS\Db::i()->select( 'record_location, record_realname', 'downloads_files_records', array( "record_file_id=? and record_type IN('sslink','ssupload')", (int) $matches[1] ), 'record_id ASC', array( 0, 1 ) )->first();
 
 				return "<img src='{$screenshot['record_location']}' alt='{$screenshot['record_realname']}'>";
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return $matches[0];
 			}
@@ -1240,7 +1216,7 @@ class LegacyParser
 	 * @param	string	$name	Name
 	 * @return	string	Converted name
 	 */
-	protected static function _cleanQuoteName( string $name ): string
+	protected static function _cleanQuoteName( $name )
 	{
 		$name = str_replace( "'", '&#39;', $name );
 		$name = str_replace( '$', '&#36;', $name );

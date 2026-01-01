@@ -12,61 +12,40 @@
 namespace IPS\core\Followed;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Content\Tag;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Table Builder for followed content
  */
-class Table extends \IPS\Helpers\Table\Db
+class _Table extends \IPS\Helpers\Table\Db
 {	
 	/**
 	 * @brief	Follow class data
 	 */
-	protected array $currentType = [];
-
-	/**
-	 * @var string
-	 */
-	protected string $className = '';
+	protected $currentType;
 	
 	/**
 	 * Constructor
 	 *
 	 * @param	string	$className		Name of class to load data from
 	 * @param	array	$currentType	Follow class data
+	 * @return	void
 	 */
 	public function __construct( $className, $currentType )
 	{
 		$this->className	= $className;
 		$this->currentType	= $currentType;
 		$this->include		= array( 'follow_added', 'follow_app', 'follow_area', 'follow_rel_id', 'follow_notify_freq', 'follow_is_anon' );
-		$this->classes[]	= 'ipsData--table ipsData--manageFollowedContent';
+		$this->classes[]	= 'ipsDataList_zebra';
 
 		/* Allow to filter by digests only */
 		$this->filters['digest']	= array( "follow_notify_freq IN('daily','weekly')" );
 
-		$return	= parent::__construct( 'core_follow', Url::internal( 'app=core&module=system&controller=followed', 'front', 'followed_content' )->setQueryString( 'type', "{$currentType[0]}_{$currentType[1]}" ), array( 'follow_member_id=? AND follow_app=? AND follow_area=?', Member::loggedIn()->member_id, $currentType[0], $currentType[1] ) );
+		$return	= parent::__construct( 'core_follow', \IPS\Http\Url::internal( 'app=core&module=system&controller=followed', 'front', 'followed_content' )->setQueryString( 'type', "{$currentType[0]}_{$currentType[1]}" ), array( 'follow_member_id=? AND follow_app=? AND follow_area=?', \IPS\Member::loggedIn()->member_id, $currentType[0], $currentType[1] ) );
 
 		if ( !$this->sortBy )
 		{
@@ -76,7 +55,6 @@ class Table extends \IPS\Helpers\Table\Db
 
 		if( is_subclass_of( $className, 'IPS\Content\Item' ) )
 		{
-			/* @var array $databaseColumnMap */
 			$this->rowsTemplate = $className::manageFollowRows();
 			$containerClass = $className::$containerNodeClass;
 			
@@ -85,36 +63,37 @@ class Table extends \IPS\Helpers\Table\Db
 			);
 			
 			/* Exclude hidden items */
-			if ( IPS::classUSesTrait( $className, 'IPS\Content\Hideable' ) and !$className::canViewHiddenItems() )
+			if ( \in_array( 'IPS\Content\Hideable', class_implements( $className ) ) and !$className::canViewHiddenItems() )
 			{
 				$authorCol = $className::$databaseTable . '.' . $className::$databasePrefix . $className::$databaseColumnMap['author'];
 				if ( isset( $className::$databaseColumnMap['approved'] ) )
 				{
 					$col = $className::$databaseTable . '.' . $className::$databasePrefix . $className::$databaseColumnMap['approved'];
-					$this->where[0] .= " AND ( {$col}=1 OR ( {$col}=0 AND {$authorCol}=" . Member::loggedIn()->member_id . " ) )";
+					$this->where[0] .= " AND ( {$col}=1 OR ( {$col}=0 AND {$authorCol}=" . \IPS\Member::loggedIn()->member_id . " ) )";
 				}
 				elseif ( isset( $className::$databaseColumnMap['hidden'] ) )
 				{
 					$col = $className::$databaseTable . '.' . $className::$databasePrefix . $className::$databaseColumnMap['hidden'];
-					$this->where[0] .= " AND ( {$col}=0 OR ( {$col}=1 AND {$authorCol}=" . Member::loggedIn()->member_id . " ) )";
+					$this->where[0] .= " AND ( {$col}=0 OR ( {$col}=1 AND {$authorCol}=" . \IPS\Member::loggedIn()->member_id . " ) )";
 				}
 			}
 			
 			/* Additional where */
-			$joinContainer = (bool )$className::$containerNodeClass;
+			$joinContainer = $className::$containerNodeClass ? TRUE : FALSE;
 			$joins = array();
 			$extraWhere = $className::followWhere( $joinContainer, $joins );
-
+						
 			if ( $joinContainer )
 			{
+				$containerClass = $className::$containerNodeClass;
 				$this->joins[] = array( 'from' => $containerClass::$databaseTable, 'where' => $containerClass::$databaseTable . '.' . $containerClass::$databasePrefix . $containerClass::$databaseColumnId . '=' . $className::$databaseTable . '.' . $className::$databasePrefix . $className::$databaseColumnMap['container'], 'type' => 'STRAIGHT_JOIN' );
 			}
 			
 			/* Permissions */
-			if( in_array( 'IPS\Node\Permissions', class_implements( $containerClass ) ) )
+			if ( \in_array( 'IPS\Content\Permissions', class_implements( $className ) ) )
 			{
-				/* @var array $permissionMap */
-				$this->where[0] .= ' AND (' . Db::i()->findInSet( 'core_permission_index.perm_' . $containerClass::$permissionMap['view'], Member::loggedIn()->permissionArray() ) . ' OR core_permission_index.perm_' . $containerClass::$permissionMap['view'] . "='*' )";
+				$containerClass = $className::$containerNodeClass;
+				$this->where[0] .= ' AND (' . \IPS\Db::i()->findInSet( 'core_permission_index.perm_' . $containerClass::$permissionMap['view'], \IPS\Member::loggedIn()->permissionArray() ) . ' OR core_permission_index.perm_' . $containerClass::$permissionMap['view'] . "='*' )";
 			}
 			
 			$this->joins[] = array( 'from' => 'core_permission_index', 'where' => array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . $containerClass::$databaseTable . '.' . $containerClass::$databasePrefix . $containerClass::$databaseColumnId, $containerClass::$permApp, $containerClass::$permType ) );
@@ -145,15 +124,10 @@ class Table extends \IPS\Helpers\Table\Db
 		}
 		elseif( $className == "\IPS\Member" )
 		{
-			$this->rowsTemplate = array( Theme::i()->getTemplate( 'system', 'core', 'front' ), 'followedContentMemberRow' );
-		}
-		elseif( $className == "IPS\Content\Tag" )
-		{
-			$this->rowsTemplate = array( Theme::i()->getTemplate( 'system', 'core', 'front' ), 'followedContentTagRow' );
+			$this->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'system', 'core', 'front' ), 'followedContentMemberRow' );
 		}
 		else
 		{
-			/* @var Model $className */
 			$this->rowsTemplate = $className::manageFollowNodeRow();
 
 			$this->joins	= array(
@@ -162,10 +136,9 @@ class Table extends \IPS\Helpers\Table\Db
 			);
 
 			/* Permission check? */
-			if ( in_array( 'IPS\Node\Permissions', class_implements( $className ) ) )
+			if ( \in_array( 'IPS\Node\Permissions', class_implements( $className ) ) )
 			{
-				/* @var array $permissionMap */
-				$this->where[0] .= ' AND (' . Db::i()->findInSet( 'core_permission_index.perm_' . $className::$permissionMap['view'], Member::loggedIn()->permissionArray() ) . ' OR ' . 'core_permission_index.perm_' . $className::$permissionMap['view'] . "='*' )";
+				$this->where[0] .= ' AND (' . \IPS\Db::i()->findInSet( 'core_permission_index.perm_' . $className::$permissionMap['view'], \IPS\Member::loggedIn()->permissionArray() ) . ' OR ' . 'core_permission_index.perm_' . $className::$permissionMap['view'] . "='*' )";
 			}
 			
 			/* Additional where */
@@ -192,7 +165,7 @@ class Table extends \IPS\Helpers\Table\Db
 		}
 
 		/* Do any multi-mod */
-		if ( isset( Request::i()->modaction ) )
+		if ( isset( \IPS\Request::i()->modaction ) )
 		{
 			$this->multiMod();
 		}
@@ -203,10 +176,10 @@ class Table extends \IPS\Helpers\Table\Db
 	/**
 	 * Get rows
 	 *
-	 * @param	array|null	$advancedSearchValues	Values from the advanced search form
+	 * @param	array	$advancedSearchValues	Values from the advanced search form
 	 * @return	array
 	 */
-	public function getRows( array $advancedSearchValues = NULL ): array
+	public function getRows( $advancedSearchValues )
 	{
 		$rows	= parent::getRows( $advancedSearchValues );
 
@@ -214,19 +187,13 @@ class Table extends \IPS\Helpers\Table\Db
 		{
 			if( $row['follow_area'] == 'member' AND $row['follow_app'] == 'core' )
 			{
-				$object = Member::load( $row['follow_rel_id'] );
+				$object = \IPS\Member::load( $row['follow_rel_id'] );
 				$object->_followData = $row;
 				$rows[ $index ]	= $object;
 			}
-			elseif( $row['follow_area'] == 'tag' and $row['follow_app'] == 'core' )
-			{
-				$object = Tag::load( $row['follow_rel_id'] );
-				$object->_followData = $row;
-				$rows[ $index ] = $object;
-			}
 			else 
 			{
-				foreach( Application::load( $row['follow_app'] )->extensions( 'core', 'ContentRouter' ) as $key => $router )
+				foreach( \IPS\Application::load( $row['follow_app'] )->extensions( 'core', 'ContentRouter' ) as $key => $router )
 				{
 					foreach( $router->classes as $class )
 					{
@@ -240,12 +207,12 @@ class Table extends \IPS\Helpers\Table\Db
 								$object->_followData = $row;
 								$rows[ $index ]	= $object;
 							}
-							catch( OutOfRangeException $e )
+							catch( \OutOfRangeException $e )
 							{
 								unset( $rows[ $index ] );
 
 								/* If the item doesn't exist we may as well clean up core_follow */
-								Db::i()->delete( 'core_follow', array( array( 'follow_app=? AND follow_area=? AND follow_rel_id=?', $row['follow_app'], $row['follow_area'], $row['follow_rel_id'] ) ) );
+								\IPS\Db::i()->delete( 'core_follow', array( array( 'follow_app=? AND follow_area=? AND follow_rel_id=?', $row['follow_app'], $row['follow_area'], $row['follow_rel_id'] ) ) );
 							}
 						}
 						else
@@ -273,16 +240,16 @@ class Table extends \IPS\Helpers\Table\Db
 								{
 									try
 									{
-										$object = $container::load( $row['follow_rel_id'] );
+										$object = $container::load( $row['follow_rel_id'] );;
 										$object->_followData = $row;
 										$rows[ $index ]	= $object;
 									}
-									catch( OutOfRangeException $e )
+									catch( \OutOfRangeException $e )
 									{
 										unset( $rows[ $index ] );
 		
 										/* If the item doesn't exist we may as well clean up core_follow */
-										Db::i()->delete( 'core_follow', array( array( 'follow_app=? AND follow_area=? AND follow_rel_id=?', $row['follow_app'], $row['follow_area'], $row['follow_rel_id'] ) ) );
+										\IPS\Db::i()->delete( 'core_follow', array( array( 'follow_app=? AND follow_area=? AND follow_rel_id=?', $row['follow_app'], $row['follow_area'], $row['follow_rel_id'] ) ) );
 									}
 								}
 							}
@@ -298,19 +265,19 @@ class Table extends \IPS\Helpers\Table\Db
 	/**
 	 * @brief	Return table filters
 	 */
-	public bool $showFilters	= TRUE;
+	public $showFilters	= TRUE;
 	
 	/**
 	 * Saved Actions (for multi-moderation)
 	 */
-	public array $savedActions = array();
+	public $savedActions = array();
 	
 	/**
 	 * Return the filters that are available for selecting table rows
 	 *
 	 * @return	array
 	 */
-	public function getFilters() : array
+	public function getFilters()
 	{
 		return array(
 			'follow_freq_immediate', 'follow_freq_daily', 'follow_freq_weekly', 'follow_freq_none',
@@ -325,7 +292,7 @@ class Table extends \IPS\Helpers\Table\Db
 	 * @param	string|null		$action		Specific action to check (hide/unhide, etc.) or NULL for a generic check
 	 * @return	bool
 	 */
-	public function canModerate( ?string $action=NULL ): bool
+	public function canModerate( $action=NULL )
 	{
 		if ( $action === NULL )
 		{
@@ -340,13 +307,13 @@ class Table extends \IPS\Helpers\Table\Db
 	 * @param	object	$item	Item
 	 * @return	array
 	 */
-	public function multimodActions( object $item ) : array
+	public function multimodActions( $item )
 	{	
 		$return = array();
 			
 		if ( $item->_followData )
 		{
-			if ( !( $item instanceof Member ) )
+			if ( !( $item instanceof \IPS\Member ) )
 			{
 				foreach ( array( 'immediate', 'daily', 'weekly', 'none' ) as $k )
 				{
@@ -377,45 +344,45 @@ class Table extends \IPS\Helpers\Table\Db
 	 *
 	 * @return	void
 	 */
-	protected function multimod() : void
+	protected function multimod()
 	{
-		if( !is_array( Request::i()->moderate ) )
+		if( !\is_array( \IPS\Request::i()->moderate ) )
 		{
 			return;
 		}
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		$where = array( array( 'follow_member_id=? AND follow_app=? AND follow_area=?', Member::loggedIn()->member_id, $this->currentType[0], $this->currentType[1] ), Db::i()->in( 'follow_rel_id', array_keys( Request::i()->moderate ) ) );
+		$where = array( array( 'follow_member_id=? AND follow_app=? AND follow_area=?', \IPS\Member::loggedIn()->member_id, $this->currentType[0], $this->currentType[1] ), \IPS\Db::i()->in( 'follow_rel_id', array_keys( \IPS\Request::i()->moderate ) ) );
 		
 		$update = array();
-		switch ( Request::i()->modaction )
+		switch ( \IPS\Request::i()->modaction )
 		{
 			case 'follow_immediate':
-				Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'immediate' ), $where );
+				\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'immediate' ), $where );
 				break;
 			case 'follow_daily':
-				Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'daily' ), $where );
+				\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'daily' ), $where );
 				break;
 			case 'follow_weekly':
-				Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'weekly' ), $where );
+				\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'weekly' ), $where );
 				break;
 			case 'follow_none':
-				Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'none' ), $where );
+				\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'none' ), $where );
 				break;
 			
 			case 'follow_public':
-				Db::i()->update( 'core_follow', array( 'follow_is_anon' => 0 ), $where );
+				\IPS\Db::i()->update( 'core_follow', array( 'follow_is_anon' => 0 ), $where );
 				break;
 			case 'follow_anonymous':
-				Db::i()->update( 'core_follow', array( 'follow_is_anon' => 1 ), $where );
+				\IPS\Db::i()->update( 'core_follow', array( 'follow_is_anon' => 1 ), $where );
 				break;
 				
 			case 'unfollow':
-				Db::i()->delete( 'core_follow', $where );
+				\IPS\Db::i()->delete( 'core_follow', $where );
 				break;
 		}
 		
-		Output::i()->redirect( $this->baseUrl );
+		\IPS\Output::i()->redirect( $this->baseUrl );
 	}
 }

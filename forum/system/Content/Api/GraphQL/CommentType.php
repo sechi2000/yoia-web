@@ -11,38 +11,33 @@
 namespace IPS\Content\Api\GraphQL;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Member;
-use function defined;
-use function get_class;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base mutator class for Content Comments
  */
-class CommentType extends ObjectType
+class _CommentType extends ObjectType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $commentClass	= '\IPS\Content\Comment';
+	protected static $commentClass	= '\IPS\Content\Comment';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'core_Comment';
+	protected static $typeName = 'core_Comment';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'A generic content comment item';
+	protected static $typeDescription = 'A generic content comment item';
 
 	public function __construct()
 	{
@@ -62,7 +57,7 @@ class CommentType extends ObjectType
 	 *
 	 * @return	array
 	 */
-	public function fields(): array
+	public function fields()
 	{
 		return array(
 			'id' => [
@@ -166,14 +161,13 @@ class CommentType extends ObjectType
 						],
 					],
 					'resolveField' => function ($item, $args, $context, $info) {
-						$className = get_class( $item );
+						$className = \get_class( $item );
 
-						/* @var Item $className */
 						switch( $info->fieldName )
 						{
 							case 'indefinite':
-								return $className::_indefiniteArticle();
-
+								return $className::_indefiniteArticle( NULL );
+							break;
 							case 'definite':
 								if( $args['withItem'] === FALSE )
 								{
@@ -183,9 +177,9 @@ class CommentType extends ObjectType
 								} 
 								
 								// Return normal definite article string handled by \IPS\Content
-								return $className::_definiteArticle( NULL, NULL, $args['uppercase'] ? array( 'ucfirst' => TRUE ) : array() );
+								return $className::_definiteArticle( NULL, NULL, $args['uppercase'] ? array( 'ucfirst' => TRUE ) : array() );									
+							break;
 						}
-						return '';
 					}
 				]),
 				'resolve' => function ($item) {
@@ -215,28 +209,28 @@ class CommentType extends ObjectType
 	 *
 	 * @return	array
 	 */
-	public static function getCommentPermissionFields(): array
+	public static function getCommentPermissionFields()
 	{
 		return array(
 			'canShare' => [
 				'type' => TypeRegistry::boolean(),
 				'description' => 'Can the user share this item?',
 				'resolve' => function ($comment) {
-					return $comment->canShare( Member::loggedIn() );
+					return $comment->canShare( \IPS\Member::loggedIn() );
 				}
 			],
 			'canReport' => [
 				'type' => TypeRegistry::boolean(),
 				'description' => 'Can the user report this item?',
 				'resolve' => function ($comment) {
-					return $comment->canReport( Member::loggedIn() ) === TRUE;
+					return $comment->canReport( \IPS\Member::loggedIn() ) === TRUE;
 				}
 			],
 			'canReportOrRevoke' => [
 				'type' => TypeRegistry::boolean(),
 				'description' => 'Can the user report (or revoke a report) on this comment?',
 				'resolve' => function ($comment) {
-					return $comment->canReportOrRevoke( Member::loggedIn() ) === TRUE;
+					return $comment->canReportOrRevoke( \IPS\Member::loggedIn() ) === TRUE;
 				}
 			]
 		);
@@ -247,7 +241,7 @@ class CommentType extends ObjectType
 	 *
 	 * @return	array
 	 */
-	public static function args(): array
+	public static function args()
 	{
 		return array(
 			'offsetPosition' => [
@@ -307,7 +301,7 @@ class CommentType extends ObjectType
 	 *
 	 * @return	ObjectType
 	 */
-	public static function getItemType(): ObjectType
+	public static function getItemType()
 	{
 		return \IPS\Content\Api\GraphQL\TypeRegistry::item();
 	}
@@ -315,12 +309,10 @@ class CommentType extends ObjectType
 	/**
 	 * Return the definite article, but without the item type
 	 *
-	 * @param Comment $post
-	 * @param array $options
-	 * @return    string
+	 * @return	string
 	 */
-	public static function definiteArticleNoItem( Comment $post, array $options = array()): string
+	public static function definiteArticleNoItem($post, $options = array())
 	{
-		return Member::loggedIn()->language()->addToStack( '__defart_comment', FALSE );
+		return \IPS\Member::loggedIn()->language()->addToStack( '__defart_comment', FALSE );
 	}
 }

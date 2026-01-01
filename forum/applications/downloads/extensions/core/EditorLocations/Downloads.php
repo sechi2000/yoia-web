@@ -12,40 +12,36 @@
 namespace IPS\downloads\extensions\core\EditorLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content;
-use IPS\downloads\File;
-use IPS\downloads\File\Comment;
-use IPS\downloads\File\Review;
-use IPS\Extensions\EditorLocationsAbstract;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: File descriptions and comments
  */
-class Downloads extends EditorLocationsAbstract
+class _Downloads
 {
+	/**
+	 * Can we use HTML in this editor?
+	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
+	 */
+	public function canUseHtml( $member )
+	{
+		return NULL;
+	}
+	
 	/**
 	 * Can we use attachments in this editor?
 	 *
-	 * @param	Member					$member	The member
-	 * @param	Editor	$field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
 	 */
-	public function canAttach( Member $member, Editor $field ): ?bool
+	public function canAttach( $member, $field )
 	{
 		return NULL;
 	}
@@ -54,11 +50,11 @@ class Downloads extends EditorLocationsAbstract
 	 * Can whatever is posted in this editor be moderated?
 	 * If this returns TRUE, we must ensure the content is ran through word, link and image filters
 	 *
-	 * @param	Member					$member	The member
-	 * @param	Editor	$field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool
 	 */
-	public function canBeModerated( Member $member, Editor $field ): bool
+	public function canBeModerated( $member, $field )
 	{
 		/* Uploading a new file */
 		if ( preg_match( '/^(?:filedata_\d+_)?downloads\-new\-file$/', $field->options['autoSaveKey'] ) )
@@ -90,17 +86,16 @@ class Downloads extends EditorLocationsAbstract
 		{
 			if ( \IPS\IN_DEV )
 			{
-				throw new RuntimeException( 'Unknown canBeModerated: ' . $field->options['autoSaveKey'] );
+				throw new \RuntimeException( 'Unknown canBeModerated: ' . $field->options['autoSaveKey'] );
 			}
-
-			return parent::canBeModerated( $member, $field );
+			return FALSE;
 		}
 	}
 
 	/**
 	 * Permission check for attachments
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	int|null	$id1		Primary ID
 	 * @param	int|null	$id2		Secondary ID
 	 * @param	string|null	$id3		Arbitrary data
@@ -108,14 +103,14 @@ class Downloads extends EditorLocationsAbstract
 	 * @param	bool		$viewOnly	If true, just check if the user can see the attachment rather than download it
 	 * @return	bool
 	 */
-	public function attachmentPermissionCheck( Member $member, ?int $id1, ?int $id2, ?string $id3, array $attachment, bool $viewOnly=FALSE ): bool
+	public function attachmentPermissionCheck( $member, $id1, $id2, $id3, $attachment, $viewOnly=FALSE )
 	{
 		try
 		{
-			$file = File::load( $id1 );
+			$file = \IPS\downloads\File::load( $id1 );
 			return $file->canView( $member );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}
@@ -127,29 +122,29 @@ class Downloads extends EditorLocationsAbstract
 	 * @param	int|null	$id1	Primary ID
 	 * @param	int|null	$id2	Secondary ID
 	 * @param	string|null	$id3	Arbitrary data
-	 * @return	Url|Content|Model|Member|null
-	 * @throws	LogicException
+	 * @return	\IPS\Http\Url|\IPS\Content|\IPS\Node\Model
+	 * @throws	\LogicException
 	 */
-	public function attachmentLookup( int $id1=NULL, int $id2=NULL, string $id3=NULL ): Model|Content|Url|Member|null
+	public function attachmentLookup( $id1, $id2, $id3 )
 	{
 		if ( $id2 )
 		{
 			if ( $id3 === 'fields' )
 			{
-				return File::load( $id1 );
+				return \IPS\downloads\File::load( $id1 );
 			}
 			else if ( $id3 === 'review' )
 			{
-				return Review::load( $id2 );
+				return \IPS\downloads\File\Review::load( $id2 );
 			}
 			else
 			{
-				return Comment::load( $id2 );
+				return \IPS\downloads\File\Comment::load( $id2 );
 			}
 		}
 		else
 		{
-			return File::load( $id1 );
+			return \IPS\downloads\File::load( $id1 );
 		}
 	}
 }

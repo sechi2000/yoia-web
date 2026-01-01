@@ -11,88 +11,70 @@
 namespace IPS\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use ErrorException;
-use IPS\Application;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output;
-use IPS\Settings;
-use ReflectionClass;
-use ReflectionMethod;
-use RuntimeException;
-use function count;
-use function defined;
-use function get_called_class;
-use function in_array;
-use function method_exists;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Base API Controller
  */
-abstract class Controller
+abstract class _Controller
 {
 	/**
 	 * @brief	API Key
 	 */
-	protected ?Key $apiKey = null;
+	protected $apiKey;
 	
 	/**
 	 * @brief	OAuth Client
 	 */
-	protected ?OAuthClient $client = null;
+	protected $client;
 	
 	/**
 	 * @brief	OAuth Authenticated Member
 	 */
-	protected ?Member $member = null;
+	protected $member;
 	
 	/**
 	 * @brief	OAuth Scopes
 	 */
-	protected ?array $scopes = null;
+	protected $scopes;
 	
 	/**
 	 * @brief	Used OAuth Scope
 	 */
-	protected ?string $usedScope = null;
+	protected $usedScope;
 
 	/**
 	 * @brief	Parameters to mask in logs. Keys are the method names and values an array of field or request keys.
 	 */
-	public array $parametersToMask = array();
+	public $parametersToMask = array();
 
 	/**
 	 * @brief	Name of the method we called
 	 */
-	public ?string $methodCalled	 = NULL;
+	public $methodCalled	 = NULL;
 
 	/**
 	 * Constructor
 	 *
-	 * @param Key|null $apiKey			The API key being used to access, if applicable
+	 * @param	\IPS\Api\Key	$apiKey			The API key being used to access, if applicable
 	 * @param	array|null		$accessToken	Access token for OAuth-authenticated requests
 	 * @return	void
 	 */
-	public function __construct( ?Key $apiKey = NULL, ?array $accessToken = NULL )
+	public function __construct( \IPS\Api\Key $apiKey = NULL, $accessToken = NULL )
 	{
 		$this->apiKey = $apiKey;
 		
 		if ( $accessToken )
 		{
-			$this->client = OAuthClient::load( $accessToken['client_id'] );
+			$this->client = \IPS\Api\OAuthClient::load( $accessToken['client_id'] );
 			$this->scopes = $accessToken['scope'] ? json_decode( $accessToken['scope'] ) : NULL;
 			if ( $accessToken['member_id'] )
 			{
-				$this->member = Member::load( $accessToken['member_id'] );
+				$this->member = \IPS\Member::load( $accessToken['member_id'] );
 			}
 		}
 	}
@@ -105,7 +87,7 @@ abstract class Controller
 	 * @param	string	$method		Method
 	 * @return	bool
 	 */
-	protected function canAccess( string $app, string $controller, string $method ) : bool
+	protected function canAccess( $app, $controller, $method )
 	{
 		if ( $this->apiKey )
 		{
@@ -129,7 +111,7 @@ abstract class Controller
 	 * @param	string	$method		Method
 	 * @return	bool
 	 */
-	protected function shouldLog( string $app, string $controller, string $method ) : bool
+	protected function shouldLog( $app, $controller, $method )
 	{
 		if ( $this->apiKey )
 		{
@@ -146,47 +128,47 @@ abstract class Controller
 	 *
 	 * @param	array	$pathBits	The parts to the path called
 	 * @param	bool	$shouldLog	Gets set to TRUE if this call should log
-	 * @return    Response
-	 * @throws    Exception
+	 * @return	\IPS\Api\Response
+	 * @throws	\IPS\Api\Exception
 	 */
-	public function execute( array $pathBits, bool &$shouldLog ) : Response
+	public function execute( $pathBits, &$shouldLog )
 	{
-		$method = ( isset( $_SERVER['REQUEST_METHOD'] ) and in_array( mb_strtoupper( $_SERVER['REQUEST_METHOD'] ), array( 'GET', 'POST', 'PUT', 'DELETE' ) ) ) ? mb_strtoupper( $_SERVER['REQUEST_METHOD'] ) : 'GET';
+		$method = ( isset( $_SERVER['REQUEST_METHOD'] ) and \in_array( mb_strtoupper( $_SERVER['REQUEST_METHOD'] ), array( 'GET', 'POST', 'PUT', 'DELETE' ) ) ) ? mb_strtoupper( $_SERVER['REQUEST_METHOD'] ) : 'GET';
 		$params = array();
 		
 		try
 		{
 			$endpointData = $this->_getEndpoint( $pathBits, $method );
 		}
-		catch ( RuntimeException $e )
+		catch ( \RuntimeException $e )
 		{
-			throw new Exception( 'NO_ENDPOINT', '2S291/1', 404 );
+			throw new \IPS\Api\Exception( 'NO_ENDPOINT', '2S291/1', 404 );
 		}
 				
 		if ( method_exists( $this, "{$method}{$endpointData['endpoint']}" ) )
 		{
-			preg_match( '/^IPS\\\(.+?)\\\api\\\(.+?)$/', get_called_class(), $matches );
+			preg_match( '/^IPS\\\(.+?)\\\api\\\(.+?)$/', \get_called_class(), $matches );
 			
+			$shouldLog = $this->shouldLog( $matches[1], $matches[2], "{$method}{$endpointData['endpoint']}" );
 			if ( !$this->canAccess( $matches[1], $matches[2], "{$method}{$endpointData['endpoint']}" ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2S291/7', 403, 'insufficient_scope' );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2S291/7', 403, 'insufficient_scope' );
 			}
-			$shouldLog = $this->shouldLog( $matches[1], $matches[2], "{$method}{$endpointData['endpoint']}" );
 			
-			$reflection = new ReflectionMethod( $this, "{$method}{$endpointData['endpoint']}" );
+			$reflection = new \ReflectionMethod( $this, "{$method}{$endpointData['endpoint']}" );
 			$docBlock = static::decodeDocblock( $reflection->getDocComment() );
 			if ( !$this->member )
 			{
 				if ( isset( $docBlock['details']['apimemberonly'] ) )
 				{
-					throw new Exception( 'NO_PERMISSION', '2S291/5', 403, 'insufficient_scope' );
+					throw new \IPS\Api\Exception( 'NO_PERMISSION', '2S291/5', 403, 'insufficient_scope' );
 				}
 			}
 			else
 			{
 				if ( isset( $docBlock['details']['apiclientonly'] ) )
 				{
-					throw new Exception( 'NO_PERMISSION', '2S291/6', 403, 'insufficient_scope' );
+					throw new \IPS\Api\Exception( 'NO_PERMISSION', '2S291/6', 403, 'insufficient_scope' );
 				}
 			}
 			
@@ -199,7 +181,7 @@ abstract class Controller
 		}
 		else
 		{
-			throw new Exception( 'BAD_METHOD', '3S291/2', 405 );
+			throw new \IPS\Api\Exception( 'BAD_METHOD', '3S291/2', 405 );
 		}
 	}
 	
@@ -209,21 +191,21 @@ abstract class Controller
 	 * @param	array	$pathBits	The parts to the path called
 	 * @param	string	$method		HTTP method verb
 	 * @return	array
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	protected function _getEndpoint( array $pathBits, string $method = 'GET' ) : array
+	protected function _getEndpoint( $pathBits, $method = 'GET' )
 	{
 		$endpoint = NULL;
 		$params = array();
 		
-		if ( count( $pathBits ) === 0 )
+		if ( \count( $pathBits ) === 0 )
 		{
 			$endpoint = 'index';
 		}
-		elseif ( count( $pathBits ) === 1 )
+		elseif ( \count( $pathBits ) === 1 )
 		{
 			/* Sometimes we want to do something like /api/core/clubs/contenttypes but this is treated as an item */
-			if( method_exists( $this, $method . $pathBits[0] ) )
+			if( \method_exists( $this, $method . $pathBits[0] ) )
 			{
 				$endpoint = array_shift( $pathBits );
 			}
@@ -233,18 +215,18 @@ abstract class Controller
 				$endpoint = 'item';
 			}
 		}
-		elseif ( count( $pathBits ) === 2 )
+		elseif ( \count( $pathBits ) === 2 )
 		{
 			$params[] = array_shift( $pathBits );
 			$endpoint = 'item_' . array_shift( $pathBits );
 		}
-		elseif ( count( $pathBits ) === 3 )
+		elseif ( \count( $pathBits ) === 3 )
 		{
 			$params[] = array_shift( $pathBits );
 			$endpoint = 'item_' . array_shift( $pathBits );
 			$params[] = array_shift( $pathBits );
 		}
-		elseif ( count( $pathBits ) === 4 )
+		elseif ( \count( $pathBits ) === 4 )
 		{
 			$params[] = array_shift( $pathBits );
 			$endpoint = 'item_' . array_shift( $pathBits );
@@ -253,7 +235,7 @@ abstract class Controller
 		}
 		else
 		{
-			throw new RuntimeException;
+			throw new \RuntimeException;
 		}
 		
 		return array( 'endpoint' => $endpoint, 'params' => $params );
@@ -266,47 +248,38 @@ abstract class Controller
 	 * @param	bool		$includeAll	Should also disabled applications be returned
 	 * @return	array
 	 */
-	public static function getAllEndpoints( ?string $type = NULL, bool $includeAll = FALSE ) : array
+	public static function getAllEndpoints( $type = NULL, $includeAll = FALSE )
 	{
 		$return = array();
-		foreach ( Application::applications() as $app )
+		foreach ( \IPS\Application::applications() as $app )
 		{
 			if ( $app->enabled OR $includeAll )
 			{
 				$apiDir = $app->getApplicationPath() . '/api';
 				if ( file_exists( $apiDir ) )
 				{
-					$directory = new DirectoryIterator( $apiDir );
+					$directory = new \DirectoryIterator( $apiDir );
 					foreach ( $directory as $file )
 					{
 						if ( !$file->isDot() and mb_substr( $file, 0, 1 ) != '.' )
 						{
 							$controllerName = mb_substr( $file, 0, -4 );
 							$class = 'IPS\\' . $app->directory . '\\api\\' . $controllerName;
-
-							try
+							if( class_exists( $class ) )
 							{
-								if( class_exists( $class ) )
+								$reflection = new \ReflectionClass( $class );
+								foreach ( $reflection->getMethods() as $method )
 								{
-									$reflection = new ReflectionClass( $class );
-									foreach ( $reflection->getMethods() as $method )
+									if ( $method->getName() != 'execute' and !$method->isStatic() and $method->isPublic() and mb_substr( $method->getName(), 0, 1 ) != '_' )
 									{
-										if ( $method->getName() != 'execute' and !$method->isStatic() and $method->isPublic() and mb_substr( $method->getName(), 0, 1 ) != '_' )
-										{
-											$details = static::decodeDocblock( $method->getDocComment() );
+										$details = static::decodeDocblock( $method->getDocComment() );
 
-											if ( ( $type !== 'client' or !isset( $details['details']['apimemberonly'] ) ) and ( $type !== 'member' or !isset( $details['details']['apiclientonly'] ) ) )
-											{
-												$return[ $app->directory . '/' . $controllerName . '/' . $method->getName() ] = $details;
-											}
+										if ( ( $type !== 'client' or !isset( $details['details']['apimemberonly'] ) ) and ( $type !== 'member' or !isset( $details['details']['apiclientonly'] ) ) )
+										{
+											$return[ $app->directory . '/' . $controllerName . '/' . $method->getName() ] = $details;
 										}
 									}
 								}
-							}
-							catch( ErrorException $e )
-							{
-								/* This can happen if we have legacy files floating around */
-								Log::debug( "BAD_API_CLASS", 'api' );
 							}
 						}
 					}
@@ -322,7 +295,7 @@ abstract class Controller
 	 * @param	string	$comment	The docblock comment
 	 * @return	array
 	 */
-	public static function decodeDocblock( string $comment ) : array
+	public static function decodeDocblock( $comment )
 	{
 		$comment = explode( "\n", $comment );
 		array_shift( $comment );
@@ -377,31 +350,31 @@ abstract class Controller
 	 * @param	bool	$includeBaseUrl	Whether or not to include the URL base in the endpoint URL
 	 * @return	string
 	 */
-	public static function parseEndpointForDisplay( string $endpoint, string $size='small', bool $includeBaseUrl=FALSE ) : string
+	public static function parseEndpointForDisplay( $endpoint, $size='small', $includeBaseUrl=FALSE )
 	{
 		$badgeStyles = array(
-			'GET' => 'ipsBadge--positive',
-			'POST' => 'ipsBadge--style2',
-			'DELETE' => 'ipsBadge--negative',
-			'PUT' => 'ipsBadge--intermediary'
+			'GET' => 'ipsBadge_positive',
+			'POST' => 'ipsBadge_style2',
+			'DELETE' => 'ipsBadge_negative',
+			'PUT' => 'ipsBadge_intermediary'
 		);
 
 		$pieces = explode( ' ', $endpoint );
-		if ( !in_array( $pieces[0], array_keys( $badgeStyles ) ) )
+		if ( !\in_array( $pieces[0], array_keys( $badgeStyles ) ) )
 		{
-			Output::i()->error( Member::loggedIn()->language()->addToStack( 'api_endpoint_phpdoc_error', FALSE, array( "sprintf" => array( $endpoint ) ) ), '3S291/4' );
+			\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack( 'api_endpoint_phpdoc_error', FALSE, array( "sprintf" => array( $endpoint ) ) ), '3S291/4', 500 );
 		}
-		$pieces[0] = "<span class='ipsBadge ipsBadge--{$size} " . $badgeStyles[ $pieces[0] ] . "'>" . $pieces[0] . "</span>";
+		$pieces[0] = "<span class='ipsBadge ipsBadge_{$size} " . $badgeStyles[ $pieces[0] ] . "'>" . $pieces[0] . "</span>";
 		
 		if ( $includeBaseUrl )
 		{
-			if ( Settings::i()->use_friendly_urls and Settings::i()->htaccess_mod_rewrite )
+			if ( \IPS\Settings::i()->use_friendly_urls and \IPS\Settings::i()->htaccess_mod_rewrite )
 			{
-				$url = Url::external( rtrim( Settings::i()->base_url, '/' ) . '/api' );
+				$url = \IPS\Http\Url::external( rtrim( \IPS\Settings::i()->base_url, '/' ) . '/api' );
 			}
 			else
 			{
-				$url = Url::external( rtrim( Settings::i()->base_url, '/' ) . '/api/index.php?' );
+				$url = \IPS\Http\Url::external( rtrim( \IPS\Settings::i()->base_url, '/' ) . '/api/index.php?' );
 			}
 			$pieces[1] = $url . $pieces[1];
 		}

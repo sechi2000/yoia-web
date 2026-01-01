@@ -12,63 +12,33 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application\Module;
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Exception as SoftwareException;
-use IPS\core\Ignore;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use PasswordHash;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function is_null;
-use function strpos;
-use function unserialize;
-use const ENT_HTML5;
-use const ENT_QUOTES;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * vBulletin 5 Core Converter
  */
-class Vbulletin5 extends Software
+class _Vbulletin5 extends \IPS\convert\Software
 {
 	/**
 	 * @brief	is vB 5.5.3 or newer
 	 */
-	protected static ?bool $skipCustomProfilePic = NULL;
+	protected static $skipCustomProfilePic = NULL;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 
 		if ( $needDB )
 		{
@@ -81,16 +51,18 @@ class Vbulletin5 extends Software
 					static::$skipCustomProfilePic = version_compare( $version, '5.5.3', '>=' );
 				}
 			}
-			catch( Exception $e ) {} # If we can't query, we won't be able to do anything anyway
+			catch( \Exception $e ) {} # If we can't query, we won't be able to do anything anyway
 		}
+
+		return $return;
 	}
 
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "vBulletin (5.x)";
@@ -99,9 +71,9 @@ class Vbulletin5 extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "vbulletin5";
@@ -110,9 +82,9 @@ class Vbulletin5 extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertEmoticons'				=> array(
@@ -165,9 +137,9 @@ class Vbulletin5 extends Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -175,13 +147,13 @@ class Vbulletin5 extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
@@ -192,24 +164,26 @@ class Vbulletin5 extends Software
 					
 					return $this->db->select( 'COUNT(*)', 'privatemessage', array( "privatemessage.msgtype=? AND node.parentid=?", 'message', $node ) )->join( 'node', 'privatemessage.nodeid = node.nodeid' )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					return 0;
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 				
 			case 'node':
 				if ( $where === 'clubs' )
 				{
-					return count( $this->fetchClubs() );
+					return \count( $this->fetchClubs() );
 				}
 				else
 				{
 					return parent::countRows( $table, $where, $recache );
 				}
+				break;
 			
 			case 'groupintopic':
 				$clubs = array();
@@ -220,28 +194,31 @@ class Vbulletin5 extends Software
 				
 				$where = array( $this->db->in( 'nodeid', $clubs ) );
 				return parent::countRows( $table, $where, $recache );
+				break;
 
 			case 'userchangelog':
 				try
 				{
 					return $this->db->select( 'count(changeid)', 'userchangelog', array( $this->db->in( 'fieldname', array_keys( static::$changeLogTypes ) ) ) )->first();
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 				
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 	
 	/**
 	 * Can we convert settings?
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function canConvertSettings(): bool
+	public static function canConvertSettings()
 	{
 		return TRUE;
 	}
@@ -249,9 +226,9 @@ class Vbulletin5 extends Software
 	/**
 	 * Settings Map
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function settingsMap(): array
+	public function settingsMap()
 	{
 		return array(
 			'bbtitle'	=> 'board_name',
@@ -261,9 +238,9 @@ class Vbulletin5 extends Software
 	/**
 	 * Settings Map Listing
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function settingsMapList(): array
+	public function settingsMapList()
 	{
 		$settings = array();
 		foreach( $this->settingsMap() AS $theirs => $ours )
@@ -272,7 +249,7 @@ class Vbulletin5 extends Software
 			{
 				$setting = $this->db->select( 'varname, value', 'setting', array( "varname=?", $theirs ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				continue;
 			}
@@ -281,12 +258,12 @@ class Vbulletin5 extends Software
 			{
 				$title = $this->db->select( 'text', 'phrase', array( "varname=?", "setting_{$setting['varname']}_title" ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$title = $setting['varname'];
 			}
 			
-			$settings[$setting['varname']] = array( 'title' => $title, 'value' => $setting['value'], 'our_key' => $ours, 'our_title' => Member::loggedIn()->language()->addToStack( $ours ) );
+			$settings[$setting['varname']] = array( 'title' => $title, 'value' => $setting['value'], 'our_key' => $ours, 'our_title' => \IPS\Member::loggedIn()->language()->addToStack( $ours ) );
 		}
 		
 		return $settings;
@@ -295,9 +272,9 @@ class Vbulletin5 extends Software
 	/**
 	 * Returns a block of text, or a language string, that explains what the admin must do to start this conversion
 	 *
-	 * @return    string|null
+	 * @return	string
 	 */
-	public static function getPreConversionInformation(): ?string
+	public static function getPreConversionInformation()
 	{
 		return 'convert_vb5_preconvert';
 	}
@@ -305,9 +282,9 @@ class Vbulletin5 extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertEmoticons',
@@ -322,10 +299,10 @@ class Vbulletin5 extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		
@@ -338,8 +315,8 @@ class Vbulletin5 extends Software
 						'field_default'		=> NULL,
 						'field_required'	=> TRUE,
 						'field_extra'		=> array(),
-						'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_vb5_smilie_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_vb5_smilie_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					),
 					'keep_existing_emoticons'	=> array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Checkbox',
@@ -355,8 +332,8 @@ class Vbulletin5 extends Software
 				$return['convertProfileFieldGroups'] = array();
 				
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_pfields_groups' ), 'IPS\core\ProfileFields\Group' ) AS $group )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_pfields_groups' ), 'IPS\core\ProfileFields\Group' ) AS $group )
 				{
 					$options[$group->_id] = $group->_title;
 				}
@@ -367,14 +344,14 @@ class Vbulletin5 extends Software
 
 					try
 					{
-						Member::loggedIn()->language()->words["map_pfgroup_{$id}"]	= $this->db->select( 'text', 'phrase', array( "varname=?", "category{$id}_title" ) )->first();
+						\IPS\Member::loggedIn()->language()->words["map_pfgroup_{$id}"]	= $this->db->select( 'text', 'phrase', array( "varname=?", "category{$id}_title" ) )->first();
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
-						Member::loggedIn()->language()->words["map_pfgroup_{$id}"] = "vBulletin Profile Group {$id}";
+						\IPS\Member::loggedIn()->language()->words["map_pfgroup_{$id}"] = "vBulletin Profile Group {$id}";
 					}
 
-					Member::loggedIn()->language()->words["map_pfgroup_{$id}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_pfgroup_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_pfgroup_{$id}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_pfgroup_desc' );
 					
 					$return['convertProfileFieldGroups']["map_pfgroup_{$group['profilefieldcategoryid']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -390,8 +367,8 @@ class Vbulletin5 extends Software
 				$return['convertProfileFields'] = array();
 				
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
 				{
 					$options[$field->_id] = $field->_title;
 				}
@@ -400,13 +377,13 @@ class Vbulletin5 extends Software
 				{
 					try
 					{
-						Member::loggedIn()->language()->words["map_pfield_{$field['profilefieldid']}"]	= $this->db->select( 'text', 'phrase', array( "varname=?", "field{$field['profilefieldid']}_title" ) )->first();
+						\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['profilefieldid']}"]	= $this->db->select( 'text', 'phrase', array( "varname=?", "field{$field['profilefieldid']}_title" ) )->first();
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
-						Member::loggedIn()->language()->words["map_pfield_{$field['profilefieldid']}"] = "vBulletin Profile Field {$field['profilefieldid']}";
+						\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['profilefieldid']}"] = "vBulletin Profile Field {$field['profilefieldid']}";
 					}
-					Member::loggedIn()->language()->words["map_pfield_{$field['profilefieldid']}_desc"] = Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['profilefieldid']}_desc"] = \IPS\Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
 
 					$return['convertProfileFields']["map_pfield_{$field['profilefieldid']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -423,15 +400,15 @@ class Vbulletin5 extends Software
 				
 				$options = array();
 				$options['none'] = 'None';
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[$group->g_id] = $group->name;
 				}
 				
 				foreach( $this->db->select( '*', 'usergroup' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['usergroupid']}"]			= $group['title'];
-					Member::loggedIn()->language()->words["map_group_{$group['usergroupid']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['usergroupid']}"]			= $group['title'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['usergroupid']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 					
 					$return['convertGroups']["map_group_{$group['usergroupid']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -451,7 +428,7 @@ class Vbulletin5 extends Software
 					'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 					'field_default'			=> 'avatars',
 					'field_required'		=> TRUE,
-					'field_extra'			=> array( 'options' => array( 'avatars' => Member::loggedIn()->language()->addToStack( 'avatars' ), 'profile_photos' => Member::loggedIn()->language()->addToStack( 'profile_photos' ) ) ),
+					'field_extra'			=> array( 'options' => array( 'avatars' => \IPS\Member::loggedIn()->language()->addToStack( 'avatars' ), 'profile_photos' => \IPS\Member::loggedIn()->language()->addToStack( 'profile_photos' ) ) ),
 					'field_hint'			=> NULL,
 				);
 				
@@ -462,28 +439,28 @@ class Vbulletin5 extends Software
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(
 						'options'				=> array(
-							'database'				=> Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
-							'file_system'			=> Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
+							'database'				=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
+							'file_system'			=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
 						),
 						'userSuppliedInput'	=> 'file_system',
 					),
 					'field_hint'			=> NULL,
-					'field_validation'	=> function( $value ) { if ( $value != 'database' AND !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_validation'	=> function( $value ) { if ( $value != 'database' AND !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				
 				/* And decide what to do about these... */
 				foreach( array( 'homepage', 'icq', 'aim', 'yahoo', 'msn', 'skype', 'google', 'user_title' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["field_{$field}"]		= Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
-					Member::loggedIn()->language()->words["field_{$field}_desc"]	= Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}"]		= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
 					$return['convertMembers']["field_{$field}"] = array(
 						'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 						'field_default'			=> 'no_convert',
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'no_convert'			=> Member::loggedIn()->language()->addToStack( 'no_convert' ),
-								'create_field'			=> Member::loggedIn()->language()->addToStack( 'create_field' ),
+								'no_convert'			=> \IPS\Member::loggedIn()->language()->addToStack( 'no_convert' ),
+								'create_field'			=> \IPS\Member::loggedIn()->language()->addToStack( 'create_field' ),
 							),
 							'userSuppliedInput'		=> 'create_field'
 						),
@@ -493,7 +470,7 @@ class Vbulletin5 extends Software
 				break;
 			
 			case 'convertClubs':
-				Member::loggedIn()->language()->words['club_photo_location']	= Member::loggedIn()->language()->addToStack( 'photo_location' );
+				\IPS\Member::loggedIn()->language()->words['club_photo_location']	= \IPS\Member::loggedIn()->language()->addToStack( 'photo_location' );
 
 				$return['convertClubs'] = array();
 				$return['convertClubs']['club_photo_location'] = array(
@@ -502,13 +479,13 @@ class Vbulletin5 extends Software
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(
 						'options'				=> array(
-							'database'				=> Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
-							'file_system'			=> Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
+							'database'				=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
+							'file_system'			=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
 						),
 						'userSuppliedInput'	=> 'file_system',
 					),
 					'field_hint'			=> NULL,
-					'field_validation'	=> function( $value ) { if ( $value != 'database' AND !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_validation'	=> function( $value ) { if ( $value != 'database' AND !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				break;
 		}
@@ -519,53 +496,50 @@ class Vbulletin5 extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Non-Content Rebuilds */
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
 		
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
 
 		/* Clubs */
-		Task::queue( 'convert', 'RecountClubMembers', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RecountClubMembers', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
 		
 		return array( "f_search_index_rebuild", "f_clear_caches", "f_rebuild_pms", "f_signatures_rebuild" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		/* IMG2 BBcode - Needs to be ran before htmlspecialchars due to it containing JSON */
 		$matches = array();
 		preg_match_all( "/\[IMG2=JSON](.+?)\[\/IMG2\]/i", $post, $matches );
 
-		if ( count( $matches ) )
+		if ( \count( $matches ) )
 		{
 			foreach( $matches[0] as $k => $v )
 			{
@@ -574,7 +548,7 @@ class Vbulletin5 extends Software
 					/* Make sure the JSON value exists */
 					if( !isset( $matches[1][ $k ] ) )
 					{
-						throw new DomainException;
+						throw new \DomainException;
 					}
 
 					$decoded = json_decode( $matches[1][ $k ], TRUE );
@@ -582,12 +556,12 @@ class Vbulletin5 extends Software
 					/* Make sure the JSON is valid and contains src */
 					if( !isset( $decoded['src'] ) OR empty( $decoded['src'] ) )
 					{
-						throw new DomainException;
+						throw new \DomainException;
 					}
 
 					$post = str_replace( $v, "[img]{$decoded['src']}[/img]", $post );
 				}
-				catch( DomainException $e )
+				catch( \DomainException $e )
 				{
 					continue;
 				}
@@ -598,10 +572,10 @@ class Vbulletin5 extends Software
 		$matches = array();
 		preg_match_all( '#\[user(=\"?(\d+)\"?)?\](.+?)\[\/user\]#i', $post, $matches ); // this purposefully matches more than the default vB mention.
 
-		if ( count( $matches ) )
+		if ( \count( $matches ) )
 		{
 			/* Make sure we actually have mention data */
-			if ( isset( $matches[1] ) AND count( $matches[1] ) )
+			if ( isset( $matches[1] ) AND \count( $matches[1] ) )
 			{
 				$mentions = array();
 				foreach ( $matches[1] AS $k => $v )
@@ -612,7 +586,7 @@ class Vbulletin5 extends Software
 					}
 				}
 
-				$maps = iterator_to_array( Db::i()->select( 'name, member_id', 'core_members', array( Db::i()->in( 'name', array_keys( $mentions ) ) ) )->setKeyField( 'name' )->setValueField( 'member_id' ) );
+				$maps = iterator_to_array( \IPS\Db::i()->select( 'name, member_id', 'core_members', array( \IPS\Db::i()->in( 'name', array_keys( $mentions ) ) ) )->setKeyField( 'name' )->setValueField( 'member_id' ) );
 
 				foreach ( $mentions AS $memberName => $memberId )
 				{
@@ -646,7 +620,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertEmoticons() : void
+	public function convertEmoticons()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -668,7 +642,7 @@ class Vbulletin5 extends Software
 			{
 				$imageCategory = $this->db->select( '*', 'imagecategory', array( "imagecategoryid=?", $emoticon['imagecategoryid'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$imageCategory = array(
 					'title'			=> "Converted",
@@ -693,7 +667,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfileFieldGroups() : void
+	public function convertProfileFieldGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -705,7 +679,7 @@ class Vbulletin5 extends Software
 			{
 				$name = $this->db->select( 'text', 'phrase', array( "varname=?", "category{$group['profilefieldcategoryid']}_title" ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$name = "vBulletin Profile Group {$group['profilefieldcategoryid']}";
 			}
@@ -727,7 +701,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfileFields() : void
+	public function convertProfileFields()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -739,7 +713,7 @@ class Vbulletin5 extends Software
 			{
 				$name = $this->db->select( 'text', 'phrase', array( "varname=?", "field{$field['profilefieldid']}_title" ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$name = "vBulletin Profile Field {$field['profilefieldid']}";
 			}
@@ -748,16 +722,16 @@ class Vbulletin5 extends Software
 			{
 				$desc = $this->db->select( 'text', 'phrase', array( "varname=?", "field{$field['profilefieldid']}_desc" ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$desc = "";
 			}
 			
 			$merge = ( $this->app->_session['more_info']['convertProfileFields']["map_pfield_{$field['profilefieldid']}"] != 'none' ) ? $this->app->_session['more_info']['convertProfileFields']["map_pfield_{$field['profilefieldid']}"] : NULL;
 			
-			if ( in_array( mb_strtolower( $field['type'] ), array( 'select', 'radio', 'checkbox', 'select_multiple' ) ) )
+			if ( \in_array( mb_strtolower( $field['type'] ), array( 'select', 'radio', 'checkbox', 'select_multiple' ) ) )
 			{
-				$content = json_encode( @unserialize( $field['data'] ) );
+				$content = json_encode( @\unserialize( $field['data'] ) );
 			}
 			else
 			{
@@ -778,7 +752,7 @@ class Vbulletin5 extends Software
 				'pf_desc'			=> $desc,
 				'pf_type'			=> $type,
 				'pf_content'		=> $content,
-				'pf_not_null'		=> ( in_array( $field['required'], array( 1, 3 ) ) ) ? 1 : 0,
+				'pf_not_null'		=> ( \in_array( $field['required'], array( 1, 3 ) ) ) ? 1 : 0,
 				'pf_member_hide'	=> $field['hidden'] ? 'hide' : 'all',
 				'pf_max_input'		=> $field['maxlength'],
 				'pf_member_edit'	=> ( $field['editable'] >= 1 ) ? 1 : 0,
@@ -801,7 +775,7 @@ class Vbulletin5 extends Software
 	 * @param	string	$type	The vB Field Type
 	 * @return	string	The IPS Field Type
 	 */
-	protected static function _pfieldMap( string $type ) : string
+	protected static function _pfieldMap( $type )
 	{
 		switch( mb_strtolower( $type ) )
 		{
@@ -809,16 +783,20 @@ class Vbulletin5 extends Software
 			case 'radio':
 			case 'checkbox':
 				return ucwords( $type );
+				break;
 
 			case 'textarea':
 				return 'TextArea';
+				break;
 			
 			case 'select_multiple':
 				return 'Select';
+				break;
 			
 			/* Just do Text as default */
 			default:
 				return 'Text';
+				break;
 		}
 	}
 	
@@ -827,7 +805,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -839,7 +817,7 @@ class Vbulletin5 extends Software
 			$self = $this;
 			$checkpermission = function ( $name, $perm ) use ( $group, $self )
 			{
-				if ( $group[$name] & self::$bitOptions[$name][$perm] )
+				if ( $group[$name] & $self::$bitOptions[$name][$perm] )
 				{
 					return TRUE;
 				}
@@ -857,7 +835,7 @@ class Vbulletin5 extends Software
 				$promotion = $this->db->select( '*', 'userpromotion', array( "usergroupid=?", $group['usergroupid'] ) )->first();
 				
 				/* We only support Posts or Join Date */
-				if ( in_array( $promotion['strategy'], array( 17, 18 ) ) )
+				if ( \in_array( $promotion['strategy'], array( 17, 18 ) ) )
 				{
 					switch( $promotion['strategy'] )
 					{
@@ -872,7 +850,7 @@ class Vbulletin5 extends Software
 					}
 				}
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			/* Work out photo vars - vBulletin has a concept of avatars and profile photos, so we are just going to use the larger of the two */
 			$g_max_photo_vars	= array();
@@ -931,8 +909,10 @@ class Vbulletin5 extends Software
 				'g_signature_limits'	=> $g_signature_limits,
 				'g_bitoptions'			=> array(
 					'gbw_promote_unit_type'		=> $gbw_promote_unit, 			// Type of group promotion to use. 1 is days since joining, 0 is content count. Corresponds to g_promotion
+					'gbw_no_status_update'		=> !$checkpermission( 'visitormessagepermissions', 'canmessageownprofile' ), 			// Can NOT post status updates
 					'gbw_allow_upload_bgimage'	=> 1, 		// Can upload a cover photo?
 					'gbw_view_reps'				=> $checkpermission( 'genericpermissions2', 'canprofilerep' ), 		// Can view who gave reputation?
+					'gbw_no_status_import'		=> !$checkpermission( 'visitormessagepermissions', 'canmessageownprofile' ), 	// Can NOT import status updates from Facebook/Twitter
 					'gbw_disable_tagging'		=> !$checkpermission( 'genericpermissions', 'cancreatetag' ), 	// Can NOT use tags
 					'gbw_disable_prefixes'		=> !$checkpermission( 'genericpermissions', 'cancreatetag' ), 	// Can NOT use prefixes
 					'gbw_pm_override_inbox_full'=> $checkpermission( 'pmpermissions', 'canignorequota' ),	// 1 means this group can send other members PMs even when that member's inbox is full
@@ -941,7 +921,8 @@ class Vbulletin5 extends Software
 				'g_hide_own_posts'		=> $checkpermission( 'forumpermissions', 'candeletepost' ),
 				'g_pm_flood_mins'		=> $this->_setting( 'pmfloodtime' ) / 60,
 				'g_post_polls'			=> $checkpermission( 'forumpermissions', 'canpostpoll' ) ? 1 : 0,
-				'g_vote_polls'			=> $checkpermission( 'forumpermissions', 'canvote' ) ? 1 : 0
+				'g_vote_polls'			=> $checkpermission( 'forumpermissions', 'canvote' ) ? 1 : 0,
+				'g_topic_rate_setting'	=> $checkpermission( 'forumpermissions', 'canthreadrate' ) ? 1 : 0
 			);
 			
 			$merge = ( $this->app->_session['more_info']['convertGroups']["map_group_{$group['usergroupid']}"] != 'none' ) ? $this->app->_session['more_info']['convertGroups']["map_group_{$group['usergroupid']}"] : NULL;
@@ -952,7 +933,7 @@ class Vbulletin5 extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -964,14 +945,14 @@ class Vbulletin5 extends Software
 	/**
 	 * @brief	Member history type map
 	 */
-	protected static array $changeLogTypes = array( 'username' => 'display_name', 'email' => 'email_change', 'usergroupid' => 'group', 'membergroupids' => 'group' );
+	protected static $changeLogTypes = array( 'username' => 'display_name', 'email' => 'email_change', 'usergroupid' => 'group', 'membergroupids' => 'group' );
 
 	/**
 	 * Convert member history
 	 *
 	 * @return	void
 	 */
-	public function convertMemberHistory() : void
+	public function convertMemberHistory()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'changeid' );
@@ -1005,7 +986,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1029,7 +1010,7 @@ class Vbulletin5 extends Software
 					$key = $name;
 				}
 				
-				if ( $user[$key] & self::$bitOptions[$name][$perm] )
+				if ( $user[$key] & $self::$bitOptions[$name][$perm] )
 				{
 					return TRUE;
 				}
@@ -1045,7 +1026,7 @@ class Vbulletin5 extends Software
 			{
 				$warn_lastwarn = $this->db->select( 'actiondateline', 'infraction', array( "infracteduserid=?", $user['userid'] ), "actiondateline DESC", 1 )->first();
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			/* Birthday */
 			if ( $user['birthday'] )
@@ -1090,7 +1071,7 @@ class Vbulletin5 extends Software
 					$temp_ban = -1;
 				}
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			/* Figure Out Password - they differ between 5.0 and 5.1 */
 			if ( !isset( $user['password'] ) AND ( isset( $user['token'] ) AND isset( $user['scheme'] ) ) )
@@ -1109,7 +1090,7 @@ class Vbulletin5 extends Software
 				'member_id'					=> $user['userid'],
 				'member_group_id'			=> $user['usergroupid'],
 				'mgroup_others'				=> $user['membergroupids'],
-				'name'						=> html_entity_decode( $user['username'], ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
+				'name'						=> html_entity_decode( $user['username'], \ENT_QUOTES | \ENT_HTML5, 'UTF-8' ),
 				'email'						=> $user['email'],
 				'joined'					=> $user['joindate'],
 				'ip_address'				=> $user['ipaddress'],
@@ -1150,7 +1131,7 @@ class Vbulletin5 extends Software
 
 				$info['members_bitoptions']['validating'] = TRUE;
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$activation = NULL;
 			}
@@ -1169,7 +1150,7 @@ class Vbulletin5 extends Software
 					$profileFields[ str_replace( 'field', '', $key ) ] = $value;
 				}
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$profileFields = array();
 			}
@@ -1189,7 +1170,7 @@ class Vbulletin5 extends Software
 					/* We don't actually need this, but we need to make sure the field was created */
 					$fieldId = $this->app->getLink( $pseudo, 'core_pfields_data' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$libraryClass->convertProfileField( array(
 						'pf_id'				=> $pseudo,
@@ -1206,7 +1187,7 @@ class Vbulletin5 extends Software
 
 				if( $pseudo == 'user_title' )
 				{
-					$profileFields[ $pseudo ] = in_array( $user['usertitle'], $userTitles ) ? NULL : $user['usertitle'];
+					$profileFields[ $pseudo ] = \in_array( $user['usertitle'], $userTitles ) ? NULL : $user['usertitle'];
 				}
 				else
 				{
@@ -1228,7 +1209,7 @@ class Vbulletin5 extends Software
 				{
 					if( $firstTable === FALSE )
 					{
-						throw new UnderflowException();
+						throw new \UnderflowException();
 					}
 
 					foreach( $this->db->select( 'filedata, filename', $firstTable, array( "userid=?", $user['userid'] ) )->first() AS $key => $value )
@@ -1244,13 +1225,13 @@ class Vbulletin5 extends Software
 					}
 					$filepath = NULL;
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					try
 					{
 						if( $secondTable === FALSE )
 						{
-							throw new UnderflowException();
+							throw new \UnderflowException();
 						}
 
 						foreach( $this->db->select( 'filedata, filename', $secondTable, array( "userid=?", $user['userid'] ) )->first() AS $key => $value )
@@ -1266,7 +1247,7 @@ class Vbulletin5 extends Software
 						}
 						$filepath = NULL;
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
 						list( $filedata, $filename, $filepath ) = array( NULL, NULL, NULL );
 					}
@@ -1290,7 +1271,7 @@ class Vbulletin5 extends Software
 					{
 						if( $firstTable === FALSE )
 						{
-							throw new UnderflowException();
+							throw new \UnderflowException();
 						}
 
 						$ext = $this->db->select( 'filename', $firstTable, array( "userid=?", $user['userid'] ) )->first();
@@ -1304,14 +1285,14 @@ class Vbulletin5 extends Software
 						else
 						{
 							/* Throw an exception so we can try the other */
-							throw new UnderflowException;
+							throw new \UnderflowException;
 						}
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
 						if( $secondTable === FALSE )
 						{
-							throw new UnderflowException();
+							throw new \UnderflowException();
 						}
 
 						$ext = $this->db->select( 'filename', $secondTable, array( "userid=?", $user['userid'] ) )->first();
@@ -1325,11 +1306,11 @@ class Vbulletin5 extends Software
 						else
 						{
 							/* Throw an exception so we can try the other */
-							throw new UnderflowException;
+							throw new \UnderflowException;
 						}
 					}
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					list( $filedata, $filename, $filepath ) = array( NULL, NULL, NULL );
 				}
@@ -1340,12 +1321,12 @@ class Vbulletin5 extends Software
 			/* If we are validating, store our validation row entry */
 			if( $activation !== NULL AND $memberId )
 			{
-				Db::i()->replace( 'core_validating', array(
+				\IPS\Db::i()->replace( 'core_validating', array(
 					'vid'			=> md5( $activation['activationid'] . $activation['useractivationid'] ),
 					'member_id'		=> $memberId,
 					'entry_date'	=> $activation['dateline'],
-					'new_reg'		=> $activation['emailchange'] == 0,
-					'email_chg'		=> $activation['emailchange'] == 1,
+					'new_reg'		=> ( $activation['emailchange'] == 0 ? TRUE : FALSE ),
+					'email_chg'		=> ( $activation['emailchange'] == 1 ? TRUE : FALSE ),
 					'user_verified'	=> FALSE,
 					'ip_address'	=> $user['ipaddress'],
 					'email_sent'	=> $activation['dateline']
@@ -1371,7 +1352,7 @@ class Vbulletin5 extends Software
 				{
 					$node = $this->db->select( 'userid, description', 'node', array( "nodeid=?", $warn['nodeid'] ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					continue;
 				}
@@ -1408,11 +1389,11 @@ class Vbulletin5 extends Software
 	 * @param	array	$settings	Settings to convert
 	 * @return	void
 	 */
-	public function convertSettings( array $settings=array() ) : void
+	public function convertSettings( $settings=array() )
 	{
 		foreach( $this->settingsMap() AS $theirs => $ours )
 		{
-			if ( !isset( $settings[$ours] ) OR !$settings[$ours] )
+			if ( !isset( $values[$ours] ) OR $values[$ours] == FALSE )
 			{
 				continue;
 			}
@@ -1421,12 +1402,12 @@ class Vbulletin5 extends Software
 			{
 				$setting = $this->db->select( 'value', 'setting', array( "varname=?", $theirs ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				continue;
 			}
 			
-			Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $setting ), array( "conf_key=?", $ours ) );
+			\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $setting ), array( "conf_key=?", $ours ) );
 		}
 	}
 	
@@ -1435,7 +1416,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertIgnoredUsers() : void
+	public function convertIgnoredUsers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1447,7 +1428,7 @@ class Vbulletin5 extends Software
 				'ignore_ignore_id'	=> $ignore['relationid'],
 			);
 			
-			foreach( Ignore::types() AS $type )
+			foreach( \IPS\core\Ignore::types() AS $type )
 			{
 				$info['ignore_' . $type] = 1;
 			}
@@ -1461,7 +1442,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$node = $this->db->select( 'nodeid', 'channel', array( "guid=?", 'vbulletin-4ecbdf567f3da8.31769341' ) )->first();
 		
@@ -1475,7 +1456,7 @@ class Vbulletin5 extends Software
 			{
 				$replies = $this->db->select( 'COUNT(*)', 'node', array( "parentid=?", $pm['nodeid'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$replies = 1;
 			}
@@ -1485,7 +1466,7 @@ class Vbulletin5 extends Software
 			foreach( $this->db->select( 'userid', 'node', array( "parentid=?", $pm['nodeid'] ) ) AS $userid )
 			{
 				$to[$userid] = $userid;
-				if ( is_null( $toId ) AND $userid != $pm['userid'] )
+				if ( \is_null( $toId ) AND $userid != $pm['userid'] )
 				{
 					$toId = $userid;
 				}
@@ -1498,7 +1479,7 @@ class Vbulletin5 extends Software
 				'mt_starter_id'		=> $pm['userid'],
 				'mt_start_time'		=> $pm['publishdate'],
 				'mt_last_post_time'	=> $pm['lastcontent'],
-				'mt_to_count'		=> count( $to ),
+				'mt_to_count'		=> \count( $to ),
 				'mt_to_member_id'	=> $toId,
 				'mt_replies'		=> $replies,
 				'mt_first_msg_id'	=> $pm['nodeid'],
@@ -1540,7 +1521,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$node = $this->db->select( 'nodeid', 'channel', array( "guid=?", 'vbulletin-4ecbdf567f3da8.31769341' ) )->first();
 
@@ -1556,7 +1537,7 @@ class Vbulletin5 extends Software
 				{
 					$pm['rawtext'] = $this->db->select( 'message', 'pmtext', array( "pmtextid=?", $pm['oldid'] ) )->first();
 				}
-				catch( UnderflowException $e ) { }
+				catch( \UnderflowException $e ) { }
 			}
 
 			$libraryClass->convertPrivateMessageReply( array(
@@ -1577,7 +1558,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertClubs() : void
+	public function convertClubs()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'nodeid' );
@@ -1586,10 +1567,10 @@ class Vbulletin5 extends Software
 		{
 			$mainNodeId = $this->db->select( 'nodeid', 'channel', array( "guid=?", static::$guids['clubs'] ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			/* shrug */
-			throw new SoftwareException;
+			throw new \IPS\convert\Software\Exception;
 		}
 		
 		$categories = array();
@@ -1619,7 +1600,7 @@ class Vbulletin5 extends Software
 			{
 				$channel = $this->db->select( '*', 'channel', array( "nodeid=?", $row['nodeid'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$channel = array( 'filedataid' => 0 );
 			}
@@ -1631,7 +1612,7 @@ class Vbulletin5 extends Software
 				{
 					$filedata = $this->db->select( '*', 'filedata', array( "filedataid=?", $channel['filedataid'] ) )->first();
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 			
 			$info = array(
@@ -1673,7 +1654,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertClubMembers() : void
+	public function convertClubMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		$clubs = array();
@@ -1696,7 +1677,7 @@ class Vbulletin5 extends Software
 	 * @brief	Silly Bit Options for Groups. Typically we would leave out app specific options (such as Forums here) however we need them for some general permissions, like uploading.
 	 * @note	This is public simply because I do not want to do this ever again if it ever changes.
 	 */
-	public static array $bitOptions = array(
+	public static $bitOptions = array(
 		'forumpermissions' => array(
 			'canview'					=> 1,
 			'canviewothers'				=> 2,
@@ -1876,7 +1857,7 @@ class Vbulletin5 extends Software
 	/**
 	 * @brief	Fetched Settings Cache
 	 */
-	protected array $settingsCache = array();
+	protected $settingsCache = array();
 	
 	/**
 	 * Get Setting Value - useful for global settings that need to be translated to group or member settings
@@ -1884,7 +1865,7 @@ class Vbulletin5 extends Software
 	 * @param	string	$key	The setting key
 	 * @return	mixed
 	 */
-	protected function _setting( string $key ) : mixed
+	protected function _setting( $key )
 	{
 		if ( isset( $this->settingsCache[$key] ) )
 		{
@@ -1904,7 +1885,7 @@ class Vbulletin5 extends Software
 				$this->settingsCache[$key] = $setting['defaultvalue'];
 			}
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			/* If we failed to find it, we probably will fail again on later attempts */
 			$this->settingsCache[$key] = NULL;
@@ -1916,9 +1897,9 @@ class Vbulletin5 extends Software
 	/**
 	 * Helper method to retrieve forums from nodes
 	 *
-	 * @return array
+	 * @return void
 	 */
-	protected function fetchForums() : array
+	protected function fetchForums()
 	{
 		$forums = array();
 
@@ -1934,7 +1915,7 @@ class Vbulletin5 extends Software
 	 * @brief 	Channel GUID Mappins.
 	 * @note	As far as I can tell, these are static and not unique per installation. Only the ones that are used are present.
 	 */
-	public static array $guids = array(
+	public static $guids = array(
 		'clubs'				=> 'vbulletin-4ecbdf567f3a38.99555306',
 		'private_messages'	=> 'vbulletin-4ecbdf567f3da8.31769341'
 	);
@@ -1944,7 +1925,7 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	array
 	 */
-	protected function fetchClubs() : array
+	protected function fetchClubs()
 	{
 		$clubs = array();
 	
@@ -1965,7 +1946,7 @@ class Vbulletin5 extends Software
 				$clubs[ $row['nodeid'] ] = $row;
 			}
 		}
-		catch( UnderflowException $e ) { /* Just in case something goofy happened and there is no main channel */ }
+		catch( \UnderflowException $e ) { /* Just in case something goofy happened and there is no main channel */ }
 		
 		return $clubs;
 	}
@@ -1973,7 +1954,7 @@ class Vbulletin5 extends Software
 	/**
 	 * @brief	Types Cache
 	 */
-	protected array $typesCache = array();
+	protected $typesCache = array();
 
 	/**
 	 * Helper method to retrieve content type ids
@@ -1981,7 +1962,7 @@ class Vbulletin5 extends Software
 	 * @param	string	$type	Content type
 	 * @return	string
 	 */
-	protected function fetchType( string $type ) : string
+	protected function fetchType( $type )
 	{
 		if ( !empty( $this->typesCache ) )
 		{
@@ -2001,26 +1982,26 @@ class Vbulletin5 extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
 		/* If we can't access profiles, don't bother trying to redirect */
-		if( !Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+		if( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 		{
 			return NULL;
 		}
 
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( preg_match( '#/member/([0-9]+)\-#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/member/([0-9]+)\-#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			try
 			{
 				$data = (string) $this->app->getLink( $matches[1], array( 'members', 'core_members' ) );
-				return Member::load( $data )->url();
+				return \IPS\Member::load( $data )->url();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
@@ -2032,16 +2013,16 @@ class Vbulletin5 extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
 		/* If no algorithm is defined, use the legacy handler */
-		if ( strpos( $member->misc, 'blowfish' ) === FALSE and strpos( $member->misc, 'legacy' ) === FALSE )
+		if ( \strpos( $member->misc, 'blowfish' ) === FALSE and \strpos( $member->misc, 'legacy' ) === FALSE )
 		{
-			return Vbulletin::login( $member, $password );
+			return \IPS\convert\Software\Core\Vbulletin::login( $member, $password );
 		}
 
 		/* Which do we need to use? */
@@ -2053,16 +2034,17 @@ class Vbulletin5 extends Software
 				/* vBulletin uses PasswordHash, however they md5 once the password prior to checking */
 				$md5_once_password = md5( $password );
 				require_once \IPS\ROOT_PATH . "/applications/convert/sources/Login/PasswordHash.php";
-				$ph = new PasswordHash( $algo[ 1 ], FALSE );
+				$ph = new \PasswordHash( $algo[ 1 ], FALSE );
 				return $ph->CheckPassword( $md5_once_password, $member->conv_password );
+			break;
 
 			case 'legacy':
 				/* Legacy Passwords are stored in a format of HASH SALT so we need to explode on the space. */
 				$token = explode( ' ', $member->conv_password );
 				$member->conv_password = $token[0];
 				$member->conv_password_extra = $token[1];
-				return Vbulletin::login( $member, $password );
-
+				return \IPS\convert\Software\Core\Vbulletin::login( $member, $password );
+			break;
 			/**  vBulletin 5.6.2 was able to also use the Argon2id password hashing scheme. */
 			case 'argon2id':
 				if( defined('PASSWORD_ARGON2ID') ) {
@@ -2072,8 +2054,8 @@ class Vbulletin5 extends Software
 				{
 					return FALSE;
 				}
-		}
 
-		return false;
+			break;
+		}
 	}
 }

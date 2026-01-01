@@ -12,46 +12,31 @@
 namespace IPS\cms\extensions\core\RssImport;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\cms\Databases;
-use IPS\cms\Fields;
-use IPS\Content;
-use IPS\core\Rss\Import;
-use IPS\Db;
-use IPS\Extensions\RssImportAbstract;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Http\Response;
-use IPS\Image;
-use IPS\Member;
-use IPS\Node\Model;
-use function count;
-use function defined;
-use function get_class;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	RSS Import extension: RssImport
  */
-class RssImport extends RssImportAbstract
+class _RssImport
 {
+	/**
+	 * @brief    RSSImport Classes
+	 */
+	public $classes = array();
+
 	/**
 	 * @brief    Filestorage class
 	 */
-	public string $fileStorage = 'cms_Records';
+	public $fileStorage = 'cms_Records';
 
 	/**
-	 * @brief    Enclosure images to process
+	 * @brief    Encosure images to process
 	 */
-	public static array $enclosures = array();
+	public static $enclosures = array();
 
 	/**
 	 * Constructor
@@ -62,7 +47,7 @@ class RssImport extends RssImportAbstract
 	{
 		try
 		{
-			foreach ( Databases::databases() as $id => $database )
+			foreach ( \IPS\cms\Databases::databases() as $id => $database )
 			{
 				if ( $database->canImportRss() )
 				{
@@ -70,9 +55,20 @@ class RssImport extends RssImportAbstract
 				}
 			}
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
 		}
+	}
+
+	/**
+	 * Show in the Admin CP?
+	 *
+	 * @param	Object 	$class	The class to check
+	 * @return boolean
+	 */
+	public function showInAdminCp( $class ): bool
+	{
+		return true;
 	}
 
 	/**
@@ -80,12 +76,12 @@ class RssImport extends RssImportAbstract
 	 *
 	 * @return array
 	 */
-	public function availableOptions(): array
+	public function availableOptions()
 	{
 		$options = array();
 		try
 		{
-			foreach ( Databases::databases() as $id => $database )
+			foreach ( \IPS\cms\Databases::databases() as $id => $database )
 			{
 				if ( $database->canImportRss() )
 				{
@@ -93,7 +89,7 @@ class RssImport extends RssImportAbstract
 				}
 			}
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
 		} // If you have not upgraded pages but it is installed, this throws an error
 
@@ -103,10 +99,10 @@ class RssImport extends RssImportAbstract
 	/**
 	 * Node selector options
 	 *
-	 * @param Import|null $rss Existing RSS object if editing|null if not
+	 * @param \IPS\core\Rss\Import|null $rss Existing RSS object if editing|NULL if not
 	 * @return array
 	 */
-	public function nodeSelectorOptions( ?Import $rss ): array
+	public function nodeSelectorOptions( $rss )
 	{
 		/* Get the correct class */
 		$class = $rss->_class;
@@ -116,19 +112,17 @@ class RssImport extends RssImportAbstract
 	}
 
 	/**
-	 * @param Import 	$rss 		RSS object
+	 * @param \IPS\core\Rss\Import 	$rss 		RSS object
 	 * @param array 				$article 	RSS feed article importing
-	 * @param Model 		$container  Container object
+	 * @param \IPS\Node\Model 		$container  Container object
 	 * @param	string				$content	Post content with read more link if set
-	 * @return Content|null
+	 * @return \IPS\Content
 	 */
-	public function create( Import $rss, array $article, Model $container, string $content ): ?Content
+	public function create( \IPS\core\Rss\Import $rss, $article, \IPS\Node\Model $container, $content )
 	{
 		$settings = $rss->settings;
 		$recordClass = $rss->_class;
-		$member = Member::load( $rss->member );
-
-		/* @var Fields $fieldsClass */
+		$member = \IPS\Member::load( $rss->member );
 		$fieldsClass  = '\IPS\cms\Fields' . $recordClass::database()->id;
 		$customFields = $fieldsClass::fields( $settings, 'add' );
 		$fieldData = $fieldsClass::data();
@@ -202,7 +196,7 @@ class RssImport extends RssImportAbstract
 			}
 			else if ( isset( $article['attachment'] ) )
 			{
-				Db::i()->insert( 'core_attachments_map', array(
+				\IPS\Db::i()->insert( 'core_attachments_map', array(
 					'attachment_id' => $article['attachment']['attach_id'],
 					'location_key' => 'cms_Records' . $recordClass::database()->id,
 					'id1' => $record->primary_id_field,
@@ -220,7 +214,7 @@ class RssImport extends RssImportAbstract
 
 			return $record;
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return NULL;
 		}
@@ -229,15 +223,16 @@ class RssImport extends RssImportAbstract
 	/**
 	 * Process the enclosure
 	 *
-	 * @param Import $rss
-	 * @param Response $response
+	 * @param \IPS\core\Rss\Import $rss
+	 * @param \IPS\Http $response
 	 * @param array $article
 	 * @return bool
 	 */
-	public function processEnclosure( Import $rss, Response $response, array $article ): bool
+	public function processEnclosure( \IPS\core\Rss\Import $rss, \IPS\Http\Response $response, $article )
 	{
 		$settings = $rss->settings;
 		$recordClass = $rss->_class;
+		$fieldsClass  = '\IPS\cms\Fields' . $recordClass::database()->id;
 
 		if ( empty( $settings['record_image'] ) )
 		{
@@ -246,7 +241,7 @@ class RssImport extends RssImportAbstract
 
 		try
 		{
-			$image = Image::create( $response );
+			$image = \IPS\Image::create( $response );
 			$fixedFieldSettings = $recordClass::database()->fixed_field_settings;
 
 			$dims = NULL;
@@ -260,11 +255,11 @@ class RssImport extends RssImportAbstract
 				$image->resizeToMax( $fixedFieldSettings['record_image']['image_dims'][0], $fixedFieldSettings['record_image']['image_dims'][1] );
 			}
 
-			static::$enclosures[ $article['guid'] ] = File::create( $this->fileStorage, 'rssImage-' . $article['guid'] . '.' . $image->type, (string)$image );
+			static::$enclosures[ $article['guid'] ] = \IPS\File::create( $this->fileStorage, 'rssImage-' . $article['guid'] . '.' . $image->type, (string)$image );
 
 			return TRUE;
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return FALSE;
 		}
@@ -273,29 +268,27 @@ class RssImport extends RssImportAbstract
 	/**
 	 * Addition Form elements
 	 *
-	 * @param Form $form	The form
-	 * @param	Import|null		$rss	Existing RSS object
+	 * @param	\IPS\Helpers\Form			$form	The form
+	 * @param	\IPS\core\Rss\Import		$rss	Existing RSS object
 	 * @return	void
 	 */
-	public function form( Form $form, ?Import $rss=null ) : void
+	public function form( &$form, \IPS\core\Rss\Import $rss )
 	{
 		$settings = $rss->settings;
 		$recordClass = $rss->_class;
 		$nodeClass = $recordClass::$containerNodeClass;
-
-		/* @var Fields $fieldsClass */
 		$fieldsClass  = '\IPS\cms\Fields' . $recordClass::database()->id;
 		$customFields = $fieldsClass::fields( $settings, 'add', $rss->node_id ? $nodeClass::load( $rss->node_id ) : NULL );
 
-		$form->add( new Radio( 'rss_import_record_open', ( $settings ? $settings['record_open'] : 1 ), FALSE, array( 'options' => array( 1 => 'unlocked', 0 => 'locked' ) ) ) );
-		$form->add( new Radio( 'rss_import_record_hide', ( $settings ? $settings['record_hide'] : 0 ), FALSE, array( 'options' => array( 0 => 'unhidden', 1 => 'hidden' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'rss_import_record_open', ( $settings ? $settings['record_open'] : 1 ), FALSE, array( 'options' => array( 1 => 'unlocked', 0 => 'locked' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'rss_import_record_hide', ( $settings ? $settings['record_hide'] : 0 ), FALSE, array( 'options' => array( 0 => 'unhidden', 1 => 'hidden' ) ) ) );
 
 		if ( $rss->has_enclosures and $fieldsClass::fixedFieldFormShow( 'record_image' ) )
 		{
-			$form->add( new Radio( 'rss_import_record_image', ( $settings ? $settings['record_image'] : 1 ), FALSE, array( 'options' => array( 1 => 'rss_import_record_image_header', 0 => 'rss_import_record_image_inline' ) ) ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'rss_import_record_image', ( $settings ? $settings['record_image'] : 1 ), FALSE, array( 'options' => array( 1 => 'rss_import_record_image_header', 0 => 'rss_import_record_image_inline' ) ) ) );
 		}
 
-		if ( count( $customFields ) )
+		if ( \count( $customFields ) )
 		{
 			$fields = array();
 			foreach( $customFields as $id => $field )
@@ -308,10 +301,10 @@ class RssImport extends RssImportAbstract
 				$fields[] = $field;
 			}
 
-			if ( count( $fields ) )
+			if ( \count( $fields ) )
 			{
 				$form->addHeader('rss_import_cms_defaults');
-				$form->addMessage('rss_import_cms_defaults_desc', 'i-color_soft');
+				$form->addMessage('rss_import_cms_defaults_desc', 'ipsType_light');
 
 				foreach( $fields as $f )
 				{
@@ -324,11 +317,11 @@ class RssImport extends RssImportAbstract
 	/**
 	 * Process additional fields unique to this extension
 	 *
-	 * @param array $values	Values from form
-	 * @param Import $rss	Existing RSS object
+	 * @param	array				$values	Values from form
+	 * @param	\IPS\core\Rss\Import		$rss	Existing RSS object
 	 * @return	array
 	 */
-	public function saveForm( array &$values, Import $rss ): array
+	public function saveForm( &$values, $rss )
 	{
 		$return = array(
 			'record_open' => $values['rss_import_record_open'],
@@ -357,8 +350,7 @@ class RssImport extends RssImportAbstract
 			}
 		}
 
-		/* @var Fields $fieldsClass */
-		$customFields = $fieldsClass::fields( $customValues, 'add' );
+		$customFields = $fieldsClass::fields( $customValues, 'add', NULL );
 
 		foreach( $customFields as $key => $field )
 		{
@@ -369,9 +361,9 @@ class RssImport extends RssImportAbstract
 
 			$key = 'field_' . $key;
 
-			if ( isset( $customValues[ $field->name ] ) and get_class( $field ) == 'IPS\Helpers\Form\Upload' )
+			if ( isset( $customValues[ $field->name ] ) and \get_class( $field ) == 'IPS\Helpers\Form\Upload' )
 			{
-				if ( is_array( $customValues[ $field->name ] ) )
+				if ( \is_array( $customValues[ $field->name ] ) )
 				{
 					$items = array();
 					foreach( $customValues[ $field->name ] as $obj )
@@ -386,13 +378,13 @@ class RssImport extends RssImportAbstract
 				}
 			}
 			/* If we're using decimals, then the database field is set to DECIMALS, so we cannot using stringValue() */
-			else if ( isset( $customValues[ $field->name ] ) and get_class( $field ) == 'IPS\Helpers\Form\Number' and ( isset( $field->options['decimals'] ) and $field->options['decimals'] > 0 ) )
+			else if ( isset( $customValues[ $field->name ] ) and \get_class( $field ) == 'IPS\Helpers\Form\Number' and ( isset( $field->options['decimals'] ) and $field->options['decimals'] > 0 ) )
 			{
 				$return[ $key ] = $field->value;
 			}
 			else
 			{
-				$return[ $key ] = $field::stringValue($customValues[$field->name] ?? NULL);
+				$return[ $key ] = $field::stringValue( isset( $customValues[ $field->name ] ) ? $customValues[ $field->name ] : NULL );
 			}
 		}
 

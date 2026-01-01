@@ -12,77 +12,64 @@
 namespace IPS\nexus\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application\Module;
-use IPS\core\FrontNavigation\FrontNavigationAbstract;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Alternative Contacts
  */
-class Alternatives extends FrontNavigationAbstract
-{
-	/**
-	 * @var string Default icon
-	 */
-	public string $defaultIcon = '\f2b9';
-
+class _Alternatives extends \IPS\core\FrontNavigation\FrontNavigationAbstract
+{	
 	/**
 	 * Get Type Title which will display in the AdminCP Menu Manager
 	 *
 	 * @return	string
 	 */
-	public static function typeTitle(): string
+	public static function typeTitle()
 	{
-		return Member::loggedIn()->language()->addToStack('client_alternatives');
+		return \IPS\Member::loggedIn()->language()->addToStack('client_alternatives');
 	}
 		
 	/**
 	 * Can the currently logged in user access the content this item links to?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canAccessContent(): bool
+	public function canAccessContent()
 	{
-		return ( Member::loggedIn()->member_id AND Member::loggedIn()->canAccessModule( Module::get( 'nexus', 'clients' ) ) );
+		return ( \IPS\Member::loggedIn()->member_id AND \IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'nexus', 'clients' ) ) );
 	}
 	
 	/**
 	 * Get Title
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack('client_alternatives');
+		return \IPS\Member::loggedIn()->language()->addToStack('client_alternatives');
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|string|null
+	public function link()
 	{
-		return Url::internal( "app=nexus&module=clients&controller=alternatives", 'front', 'clientsalternatives' );
+		return \IPS\Http\Url::internal( "app=nexus&module=clients&controller=alternatives", 'front', 'clientsalternatives' );
 	}
 	
 	/**
 	 * Is Active?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function active(): bool
+	public function active()
 	{
-		return Dispatcher::i()->application->directory === 'nexus' and Dispatcher::i()->module and Dispatcher::i()->module->key === 'clients' and Dispatcher::i()->controller == 'alternatives';
+		return \IPS\Dispatcher::i()->application->directory === 'nexus' and \IPS\Dispatcher::i()->module and \IPS\Dispatcher::i()->module->key === 'clients' and \IPS\Dispatcher::i()->controller == 'alternatives';
 	}
 }

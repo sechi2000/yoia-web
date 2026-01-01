@@ -11,89 +11,67 @@
 namespace IPS\core\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Language extends \IPS\core\Statistics\Chart
+class _Language extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_stats_preferences_theme';
+	public $controller = 'core_stats_preferences_theme';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$counts = iterator_to_array( Db::i()->select( 'language, COUNT(member_id) as count', 'core_members', array( "language > ?", 0), NULL, NULL, "language" )->setKeyField( 'language' ) );
+		$chart	= new \IPS\Helpers\Chart;
+		$counts = iterator_to_array( \IPS\Db::i()->select( 'language, COUNT(member_id) as count', 'core_members', array( "language > ?", 0), NULL, NULL, "language" )->setKeyField( 'language' ) );
 
-		$chart	= new Database( $url, 'core_members', 'language', '', array(
-			'isStacked'			=> FALSE,
-			'backgroundColor' 	=> '#ffffff',
-			'colors'			=> array( '#10967e', '#ea7963', '#de6470', '#6b9dde', '#b09be4', '#eec766', '#9fc973', '#e291bf', '#55c1a6', '#5fb9da' ),
-			'hAxis'				=> array( 'gridlines' => array( 'color' => '#f5f5f5' ) ),
-			'lineWidth'			=> 1,
-			'areaOpacity'		=> 0.4
-		),
-			'PieChart',
-			'monthly',
-			array( 'start' => 0, 'end' => 0 ),
-			array(),
-			'skin' );
-		$chart->where = array( "language > ?", 0);
-
+		$chart->addHeader( "language", "string" );
+		$chart->addHeader( \IPS\Member::loggedIn()->language()->get('chart_members'), "number" );
+		
 		/* We need to make sure the language exists - otherwise apply the count to the default language. */
 		$rows = [];
 		foreach( $counts as $id => $lang )
 		{
 			try
 			{
-				$l = Lang::load( $id );
+				$l = \IPS\Lang::load( $id );
 				if ( !isset( $rows[ $id ] ) )
 				{
 					$rows[ $id ] = array( 'title' => $l->title, 'count' => 0 );
 				}
 				$rows[ $id ]['count'] += $lang['count'];
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				if ( !isset( $rows[ Lang::defaultLanguage() ] ) )
+				if ( !isset( $rows[ \IPS\Lang::defaultLanguage() ] ) )
 				{
-					$rows[ Lang::defaultLanguage() ] = array( 'title' => Lang::load( Lang::defaultLanguage() )->title, 'count' => 0 );
+					$rows[ \IPS\Lang::defaultLanguage() ] = array( 'title' => \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->title, 'count' => 0 );
 				}
-				$rows[ Lang::defaultLanguage() ]['count'] += $lang['count'];
+				$rows[ \IPS\Lang::defaultLanguage() ]['count'] += $lang['count'];
 			}
 		}
 		
 		/* Now add the rows to the chart */
 		foreach( $rows AS $row )
 		{
-			$chart->addRow( array( 'key' => $row['title'], 'value' => $row['count'] ) );
+			$chart->addRow( array( $row['title'], $row['count'] ) );
 		}
 		
-		$chart->title = Member::loggedIn()->language()->addToStack('stats_language_title');
-		$chart->availableTypes = array( 'PieChart' );
-
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('stats_language_title');
+		
 		return $chart;
 	}
 }

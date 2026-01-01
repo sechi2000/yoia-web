@@ -10,27 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\ClubType;
-use IPS\Member\Club as ClubClass;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Club query for GraphQL API
  */
-class Club
+class _Club
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns a club";
+	public static $description = "Returns a club";
 
 	/*
 	 * Query arguments
@@ -44,7 +42,7 @@ class Club
 	/**
 	 * Return the query return type
 	 */
-	public function type() : ClubType
+	public function type() 
 	{
 		return \IPS\core\api\GraphQL\TypeRegistry::club();
 	}
@@ -52,13 +50,13 @@ class Club
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @return	ClubClass
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\Member\Club
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : ClubClass
+	public function resolve($val, $args, $context)
 	{
-		return ClubClass::loadAndCheckPerms( $args['id'] );
+		return \IPS\Member\Club::loadAndCheckPerms( $args['id'] );
 	}
 }

@@ -11,123 +11,103 @@
 namespace IPS\Application;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Node\Permissions;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Node class for Modules
  */
-class Module extends Model implements Permissions
+class _Module extends \IPS\Node\Model implements \IPS\Node\Permissions
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_modules';
+	public static $databaseTable = 'core_modules';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'sys_module_';
+	public static $databasePrefix = 'sys_module_';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'sys_module_key' );
+	protected static $databaseIdFields = array( 'sys_module_key' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 		
 	/**
 	 * @brief	[Node] Parent Node ID Database Column
 	 */
-	public static string $parentNodeColumnId = 'application';
+	public static $parentNodeColumnId = 'application';
 	
 	/**
 	 * @brief	[Node] Parent Node Class
 	 */
-	public static string $parentNodeClass = 'IPS\Application';
+	public static $parentNodeClass = 'IPS\Application';
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'applications_and_modules';
+	public static $nodeTitle = 'applications_and_modules';
 	
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 	
 	/**
 	 * @brief	[Node] Enabled/Disabled Column
 	 */
-	public static ?string $databaseColumnEnabledDisabled = 'visible';
+	public static $databaseColumnEnabledDisabled = 'visible';
 	
 	/**
 	* @brief	[Node] App for permission index
 	*/
-	public static ?string $permApp = 'core';
+	public static $permApp = 'core';
 		
 	/**
 	 * @brief	[Node] Type for permission index
 	 */
-	public static ?string $permType = 'module';
+	public static $permType = 'module';
 	
 	/**
 	 * @brief	[Node] Prefix string that is automatically prepended to permission matrix language strings
 	 */
-	public static string $permissionLangPrefix = 'module_';
+	public static $permissionLangPrefix = 'module_';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
 	 */
-	protected static ?array $restrictions = array( 'app' => 'core', 'module' => 'applications', 'all' => 'module_manage' );
+	protected static $restrictions = array( 'app' => 'core', 'module' => 'applications', 'all' => 'module_manage' );
 
 	/**
 	 * @brief	[Node] Sortable?
 	 */
-	public static bool $nodeSortable = FALSE;
+	public static $nodeSortable = FALSE;
 	
 	/**
 	 * @brief	All modules
 	 */
-	protected static ?array $modules = NULL;
-
-	/**
-	 * @var bool
-	 */
-	public bool $_skipClearingMenuCache = false;
-
+	protected static $modules 	= NULL;
+	
 	/**
 	 * Get Modules
 	 *
-	 * @return array
+	 * @return	array
 	 */
-	public static function modules(): array
+	public static function modules()
 	{
 		if( static::$modules === NULL )
 		{
@@ -147,31 +127,31 @@ class Module extends Model implements Permissions
 	 * @return	array
 	 * @note	Note that all records are returned, even disabled report rules. Enable status needs to be checked in userland code when appropriate.
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->modules ) )
+		if ( !isset( \IPS\Data\Store::i()->modules ) )
 		{
-			Store::i()->modules = iterator_to_array( Db::i()->select( '*', 'core_modules', NULL, 'sys_module_position' )->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=core_modules.sys_module_id", 'core', 'module' ) ) );
+			\IPS\Data\Store::i()->modules = iterator_to_array( \IPS\Db::i()->select( '*', 'core_modules', NULL, 'sys_module_position' )->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=core_modules.sys_module_id", 'core', 'module' ) ) );
 		}
 		
-		return Store::i()->modules;
+		return \IPS\Data\Store::i()->modules;
 	}
 	
 	/**
 	 * Get a module
 	 *
-	 * @param string $app
-	 * @param string $key
-	 * @param string|null $area
-	 * @return    Module
-	 * @throws	OutOfRangeException
+	 * @param	string		$app
+	 * @param	string		$key
+	 * @param	string|NULL	$area
+	 * @return	\IPS\Application\Module
+	 * @throws	\OutOfRangeException
 	 */
-	public static function get( string $app, string $key, string $area=NULL ): Module
+	public static function get( $app, $key, $area=NULL )
 	{
 		$modules = static::modules();
 		if ( isset( $modules[ $app ] ) )
 		{
-			$area = $area ?: Dispatcher::i()->controllerLocation;
+			$area = $area ?: \IPS\Dispatcher::i()->controllerLocation;
 			if ( isset( $modules[ $app ][ $area ] ) )
 			{
 				if ( isset( $modules[ $app ][ $area ][ $key ] ) )
@@ -181,7 +161,7 @@ class Module extends Model implements Permissions
 			}
 		}
 		
-		throw new OutOfRangeException;
+		throw new \OutOfRangeException;
 	}
 	
 	/**
@@ -189,11 +169,14 @@ class Module extends Model implements Permissions
 	 *
 	 * @return void
 	 */
-	public function setAsDefault() : void
+	public function setAsDefault()
 	{
-		Db::i()->update( 'core_modules', array( 'sys_module_default' => 0 ), array( 'sys_module_area=? AND sys_module_application=?', $this->area, $this->application ) );
-		Db::i()->update( 'core_modules', array( 'sys_module_default' => 1 ), array( 'sys_module_id=?', $this->id ) );
-		unset( Store::i()->modules );
+		\IPS\Db::i()->update( 'core_modules', array( 'sys_module_default' => 0 ), array( 'sys_module_area=? AND sys_module_application=?', $this->area, $this->application ) );
+		\IPS\Db::i()->update( 'core_modules', array( 'sys_module_default' => 1 ), array( 'sys_module_id=?', $this->id ) );
+		unset( \IPS\Data\Store::i()->modules );
+
+		/* Clear guest page caches */
+		\IPS\Data\Cache::i()->clearAll();
 	}
 	
 	/**
@@ -205,21 +188,21 @@ class Module extends Model implements Permissions
 	 * @param	mixed		$where	Where clause
 	 * @return	array
 	 */
-	public static function search( string $column, string $query, string $order=NULL, mixed $where=array() ): array
+	public static function search( $column, $query, $order=NULL, $where=array() )
 	{
 		if ( $column === '_title' )
 		{
 			$return = array();
-			foreach( Member::loggedIn()->language()->words as $k => $v )
+			foreach( \IPS\Member::loggedIn()->language()->words as $k => $v )
 			{
 				if ( preg_match( '/^module__([a-z]*)_([a-z]*)$/', $k, $matches ) and mb_strpos( mb_strtolower( $v ), mb_strtolower( $query ) ) !== FALSE )
 				{
 					try
 					{
-						$module = static::load( $matches[2], 'sys_module_key', count( $where ) ? array_merge( array( array( 'sys_module_application=? and sys_module_area=?', $matches[1], 'front' ) ), array( $where ) ) : array( array( 'sys_module_application=?', $matches[1] ) ) );
+						$module = static::load( $matches[2], 'sys_module_key', \count( $where ) ? array_merge( array( array( 'sys_module_application=? and sys_module_area=?', $matches[1], 'front' ) ), array( $where ) ) : array( array( 'sys_module_application=?', $matches[1] ) ) );
 						$return[ $module->_id ] = $module;
 					}
-					catch ( OutOfRangeException $e ) { }
+					catch ( \OutOfRangeException $e ) { }
 				}
 			}
 			return $return;
@@ -232,24 +215,24 @@ class Module extends Model implements Permissions
 	 * Example code explains return value
 	 *
 	 * @code
-	 	* array(
-	 		* array(
-	 			* 'icon'	=>	array(
-	 				* 'icon.png'			// Path to icon
-	 				* 'core'				// Application icon belongs to
-	 			* ),
-	 			* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	 			* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	 			* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	 		* ),
-	 		* ...							// Additional buttons
-	 	* );
+	 	array(
+	 		array(
+	 			'icon'	=>	array(
+	 				'icon.png'			// Path to icon
+	 				'core'				// Application icon belongs to
+	 			),
+	 			'title'	=> 'foo',		// Language key to use for button's title parameter
+	 			'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	 			'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	 		),
+	 		...							// Additional buttons
+	 	);
 	 * @endcode
-	 * @param Url $url Base URL
+	 * @param	string	$url	Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = array();
 
@@ -259,12 +242,12 @@ class Module extends Model implements Permissions
 				'icon'	=> 'lock',
 				'title'	=> 'permissions',
 				'link'	=> "{$url}&do=permissions&id={$this->_id}" . ( $subnode ? '&subnode=1' : '' ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('permissions') )
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('permissions') )
 			);
 		}
 
 		$buttons['default']	= array(
-			'icon'		=> $this->default ? 'star' : 'regular fa-star',
+			'icon'		=> $this->default ? 'star' : 'star-o',
 			'title'		=> 'make_default_module',
 			'link'		=> $url->csrf() . "&do=setDefaultModule&id={$this->_id}&default=1",
 		);
@@ -277,10 +260,10 @@ class Module extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		$key = "module__{$this->application}_{$this->key}";
-		return Member::loggedIn()->language()->addToStack( $key );
+		return \IPS\Member::loggedIn()->language()->addToStack( $key );
 	}
 	
 	/**
@@ -288,13 +271,13 @@ class Module extends Model implements Permissions
 	 *
 	 * @return	string|null
 	 */
-	public function titleForLog(): ?string
+	public function titleForLog()
 	{
 		try
 		{ 
-			return Lang::load( Lang::defaultLanguage() )->get( "module__{$this->application}_{$this->key}" );
+			return \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( "module__{$this->application}_{$this->key}" );
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return $this->_title;
 		}
@@ -305,7 +288,7 @@ class Module extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	protected function get__icon(): mixed
+	protected function get__icon()
 	{
 		return 'cube';
 	}
@@ -316,7 +299,7 @@ class Module extends Model implements Permissions
 	 * @note	Return value NULL indicates the node cannot be enabled/disabled
 	 * @return	bool|null
 	 */
-	protected function get__locked(): ?bool
+	protected function get__locked()
 	{
 		return $this->protected;
 	}
@@ -327,7 +310,7 @@ class Module extends Model implements Permissions
 	 * @return	bool
 	 * @note	Modules don't really have "child nodes".  Controllers are not addable via the ACP.
 	 */
-	public function canAdd(): bool
+	public function canAdd()
 	{
 		return false;
 	}
@@ -337,7 +320,7 @@ class Module extends Model implements Permissions
 	 *
 	 * @return	bool
 	 */
-	public function canManagePermissions(): bool
+	public function canManagePermissions()
 	{
 		if ( $this->protected )
 		{
@@ -350,13 +333,13 @@ class Module extends Model implements Permissions
 	/**
 	 * [Node] Does this node have children?
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param bool $subnodes			Include subnodes?
-	 * @param mixed $_where				Additional WHERE clause
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	bool				$subnodes			Include subnodes?
+	 * @param	mixed				$_where				Additional WHERE clause
 	 * @return	bool
 	 */
-	public function hasChildren( ?string $permissionCheck='view', Member $member=NULL, bool $subnodes=TRUE, mixed $_where=array() ): bool
+	public function hasChildren( $permissionCheck='view', $member=NULL, $subnodes=TRUE, $_where=array() )
 	{
 		return false;
 	}
@@ -364,14 +347,14 @@ class Module extends Model implements Permissions
 	/**
 	 * [Node] Fetch Child Nodes
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULL to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param bool|null $subnodes			Include subnodes?
-	 * @param array|null $skip				Children IDs to skip
-	 * @param mixed $_where				Additional WHERE clause
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULL to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	bool				$subnodes			Include subnodes?
+	 * @param	array|NULL			$skip				Children IDs to skip
+	 * @param	mixed				$_where				Additional WHERE clause
 	 * @return	array
 	 */
-	public function children( ?string $permissionCheck='view', Member $member=NULL, bool|null $subnodes=TRUE, array $skip=null, mixed $_where=array() ): array
+	public function children( $permissionCheck='view', $member=NULL, $subnodes=TRUE, $skip=null, $_where=array() )
 	{
 		return array();
 	}
@@ -379,19 +362,22 @@ class Module extends Model implements Permissions
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void {}
+	public function form( &$form ){}
 
 	/**
 	 * Save
 	 *
-	 * @return    void
+	 * @param	bool	$skipMember		Skip clearing member cache clearing
+	 * @return	void
 	 */
-	public function save(): void
+	public function save( $skipMember=FALSE )
 	{
 		$new = $this->_new;
+
+		$this->_skipClearingMenuCache = $skipMember;
 		
 		parent::save();
 
@@ -401,7 +387,7 @@ class Module extends Model implements Permissions
 		{
 			/* There is a unique constraint against app + perm_type + perm_type_id, so we use replace() instead of insert()
 				in case there is already a row in the database for this constraint */
-			Db::i()->replace( 'core_permission_index', array(
+			\IPS\Db::i()->replace( 'core_permission_index', array(
 					'app'			=> 'core',
 					'perm_type'		=> 'module',
 					'perm_type_id'	=> $this->id,
@@ -414,5 +400,26 @@ class Module extends Model implements Permissions
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'modules' );
+	protected $caches = array( 'modules' );
+
+	/**
+	 * @brief Skip clearing create menu cache
+	 */
+	protected $_skipClearingMenuCache = FALSE;
+
+	/**
+	 * Clear any defined caches
+	 *
+	 * @param	bool	$removeMultiton		Should the multiton record also be removed?
+	 * @return void
+	 */
+	public function clearCaches( $removeMultiton=FALSE )
+	{
+		parent::clearCaches( $removeMultiton );
+
+		if( $this->_skipClearingMenuCache === FALSE )
+		{
+			\IPS\Member::clearCreateMenu();
+		}
+	}
 }

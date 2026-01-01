@@ -11,28 +11,20 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\DateTime;
-use IPS\Request;
-use IPS\Theme;
-use LengthException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Date range input class for Form Builder
  */
-class DateRange extends FormAbstract
+class _DateRange extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
-	 * @see        Date
+	 * @see		\IPS\Helpers\Form\Date::$defaultOptions
 	 * @code
 	 	$defaultOptions = array(
 	 		'start'			=> array( ... ),
@@ -45,7 +37,7 @@ class DateRange extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'start'		=> array(
 			'min'				=> NULL,
 			'max'				=> NULL,
@@ -76,37 +68,38 @@ class DateRange extends FormAbstract
 	/**
 	 * @brief	Start Date Object
 	 */
-	public ?Date $start = NULL;
+	public $start = NULL;
 	
 	/**
 	 * @brief	End Date Object
 	 */
-	public ?Date $end = NULL;
+	public $end = NULL;
 
 	/**
 	 * @brief	Name for unlimited checkbox
 	 */
-	public string $unlimitedName = '';
-
+	public $unlimitedName = '';
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		$startOptions = isset( $options['start'] ) ? array_merge( $this->defaultOptions['start'], $options['start'] ) : $this->defaultOptions['start'];
-		$this->start = new Date( "{$name}[start]", $defaultValue['start'] ?? NULL, FALSE, $startOptions );
+		$this->start = new \IPS\Helpers\Form\Date( "{$name}[start]", isset( $defaultValue['start'] ) ? $defaultValue['start'] : NULL, FALSE, $startOptions );
 
 		$endOptions = isset( $options['end'] ) ? array_merge( $this->defaultOptions['end'], $options['end'] ) : $this->defaultOptions['end'];
-		$this->end = new Date( "{$name}[end]", $defaultValue['end'] ?? NULL, FALSE, $endOptions );
+		$this->end = new \IPS\Helpers\Form\Date( "{$name}[end]", isset( $defaultValue['end'] ) ? $defaultValue['end'] : NULL, FALSE, $endOptions );
 		$this->unlimitedName = "{$name}_unlimited";
 		
 		parent::__construct( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
@@ -117,7 +110,7 @@ class DateRange extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getLabelForAttribute(): mixed
+	public function getLabelForAttribute()
 	{
 		return NULL;
 	}
@@ -128,25 +121,25 @@ class DateRange extends FormAbstract
 	 * @note	Returns an array with keys 'start' and 'end' normally, but if using the unlimited checkbox option will return that value if checked
 	 * @return	mixed
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
 		/* The start time may be offset a few hours depending on the users timezone, let's fix that now */
 		$start = $this->start->formatValue();
-		if ( $start instanceof DateTime and $this->options['start']['time'] === FALSE )
+		if ( $start instanceof \IPS\DateTime and $this->options['start']['time'] === FALSE )
 		{
 			$start->setTime( 00, 00, 00 );
 		}
 
 		/* The end date needs to be 23:59:59 rather than 00:00:00 as we need to go right up to the end of the day */
 		$end = $this->end->formatValue();
-		if ( $end instanceof DateTime and $this->options['end']['time'] === FALSE )
+		if ( $end instanceof \IPS\DateTime and $this->options['end']['time'] === FALSE )
 		{
 			$end->setTime( 23, 59, 59 );
 		}
 
 		/* Unlimited? */
 		$unlimitedName = $this->unlimitedName;
-		if ( $this->options['unlimited'] !== NULL and isset( Request::i()->$unlimitedName ) )
+		if ( $this->options['unlimited'] !== NULL and isset( \IPS\Request::i()->$unlimitedName ) )
 		{
 			return $this->options['unlimited'];
 		}
@@ -163,9 +156,9 @@ class DateRange extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->dateRange(
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->dateRange( 
 			$this->start->html(), 
 			$this->end->html(),
 			$this->options['unlimited'],
@@ -180,18 +173,18 @@ class DateRange extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
-	 * @throws	LengthException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\LengthException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		$this->start->validate();
 		$this->end->validate();
 		
 		if ( $this->required and $this->value['start'] === NULL and $this->value['end'] === NULL )
 		{
-			throw new InvalidArgumentException('form_required');
+			throw new \InvalidArgumentException('form_required');
 		}
 		
 		if( $this->customValidationCode !== NULL )
@@ -199,7 +192,5 @@ class DateRange extends FormAbstract
 			$validationFunction = $this->customValidationCode;
 			$validationFunction( $this->value );
 		}
-
-		return TRUE;
 	}
 }

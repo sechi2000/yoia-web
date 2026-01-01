@@ -12,205 +12,152 @@ namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use Diff;
-use DomainException;
-use DOMText;
-use DOMXPath;
-use ErrorException;
-use Exception;
-use InvalidArgumentException;
-use IPS\cms\Pages\Page;
-use IPS\Data\Store;
-use IPS\Dispatcher\Front;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Codemirror;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Theme\CustomTemplate;
-use IPS\Theme\Editor\Category;
-use IPS\Theme\Editor\Setting;
-use IPS\Theme\SandboxedTemplate;
-use IPS\Theme\Dev\Theme as DevTheme;
-use IPS\Theme\Setup\Theme as SetupTheme;
-use IPS\Theme\TemplateException;
-use IPS\Xml\DOMDocument;
-use LogicException;
-use OutOfRangeException;
-use OverflowException;
-use ParseError;
-use UnderflowException;
-use UnexpectedValueException;
-use XMLReader;
-use function array_combine;
-use function array_merge;
-use function count;
-use function defined;
-use function file_get_contents;
-use function file_put_contents;
-use function function_exists;
-use function get_called_class;
-use function glob;
+use function hexdec;
 use function implode;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_string;
-use function iterator_to_array;
-use function json_decode;
-use function json_encode;
-use function mb_substr;
-use function md5;
 use function preg_match;
-use function preg_match_all;
-use function preg_replace;
-use function rtrim;
 use function str_replace;
-use function stristr;
-use function strlen;
-use function strstr;
-use function strtolower;
-use function substr;
-use function unlink;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Skin set
  */
-class Theme extends Model
+class _Theme extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_themes';
+	public static $databaseTable = 'core_themes';
 
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'set_';
+	public static $databasePrefix = 'set_';
 
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array('set_id', 'set_key', 'set_edit_in_progress');
+	protected static $databaseIdFields = array('set_id', 'set_key');
 
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
+
+	/**
+	 * @brief	[Node] Parent Node ID Database Column
+	 */
+	public static $databaseColumnParent = 'parent_id';
 
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'order';
+	public static $databaseColumnOrder = 'order';
 
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'menu__core_customization_themes';
+	public static $nodeTitle = 'menu__core_customization_themes';
 
 	/**
 	 * @brief	[Node] Show forms modally?
 	 */
-	public static bool $modalForms = TRUE;
+	public static $modalForms = TRUE;
 
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'core_theme_set_title_';
+	public static $titleLangPrefix = 'core_theme_set_title_';
 
 	/**
 	 * @brief	IN_DEV "theme"
 	 */
-	public static ?Theme $inDevTheme = NULL;
+	public static $inDevTheme = NULL;
 
 	/**
 	 * @brief	Setup "theme"
 	 */
-	protected static Theme|SetupTheme|null $setupSkin = NULL;
+	protected static $setupSkin = NULL;
 
 	/**
 	 * @brief	Admin "theme"
 	 */
-	public static Theme|DevTheme|null $adminSkin = NULL;
+	public static $adminSkin = NULL;
 
 	/**
 	 * @brief	Member's "theme"
 	 */
-	public static mixed $memberTheme = NULL;
+	public static $memberTheme = NULL;
+
+	/**
+	 * @brief	[SkinSets] Store theme set parent/id relationship for parent/child recursion
+	 */
+	public static $themeSetRelationships = array();
 
 	/**
 	 * @brief	Have fetched all?
 	 */
-	protected static bool $gotAll = FALSE;
+	protected static $gotAll = FALSE;
 
 	/**
 	 * @brief	[SkinSets] Stores the default theme set id
 	 */
-	public static int $defaultFrontendThemeSet = 0;
+	public static $defaultFrontendThemeSet = 0;
 
 	/**
 	 * @brief	[SkinSets] Templates already loaded and evald via getTemplate()
 	 */
-	public static array $calledTemplates = array();
+	public static $calledTemplates = array();
 
 	/**
 	 * @brief	[SkinSets] Some CSS files are built from a directory to save on http requests. They are saved as {$location}_{$folder}.css (so front_responsive.css for example)
 	 */
-	protected static array $buildGrouping = array(
-		'css'  => array(
-			'core' => array(
-				'global'=> array( 'framework' ),
-				'admin' => array( 'core' )
+	protected static $buildGrouping = array(
+			'css'  => array(
+				'core' => array(
+					'global'=> array( 'framework', 'responsive' ),
+					'front' => array( 'custom' ),
+					'admin' => array( 'core', 'responsive' )
+					)
 				)
-			)
-		);
+			);
 
 	/**
-	 * @brief	Return type for getAllTemplates/getRawCss: Return all
+	 * @brief	Return type for getRawTemplates/getRawCss: Return all
 	 */
 	const RETURN_ALL = 1;
 
 	/**
-	 * @brief	Return type for getAllTemplates/getRawCss: Return groups and names as a tree
+	 * @brief	Return type for getRawTemplates/getRawCss: Return groups and names as a tree
 	 */
 	const RETURN_BIT_NAMES = 2;
 
 	/**
-	 * @brief	Return type for getAllTemplates/getRawCss: Return groups and names as a tree with array of data without content
+	 * @brief	Return type for getRawTemplates/getRawCss: Return groups and names as a tree with array of data without content
 	 */
 	const RETURN_ALL_NO_CONTENT = 4;
 
 	/**
-	 * @brief	Return type for getAllTemplates/getRawCss: Returns bit names as a flat array
+	 * @brief	Return type for getRawTemplates/getRawCss: Returns bit names as a flat array
 	 */
 	const RETURN_ARRAY_BIT_NAMES = 8;
 
 	/**
-	 * @brief	Return type for getAllTemplates/getRawCss: Uses DB if not IN_DEV, otherwise uses disk .phtml look up
+	 * @brief	Return type for getRawTemplates/getRawCss: Uses DB if not IN_DEV, otherwise uses disk .phtml look up
 	 */
 	const RETURN_NATIVE = 16;
 
@@ -245,58 +192,38 @@ class Theme extends Model
 	const TEMPLATE_SETTINGS_DEFAULT = 4;
 
 	/**
-	 * @brief Bit option for getting css variables
-	 */
-	const CUSTOM_ONLY = 1;
-
-	/**
-	 * @brief Bit option to use the default values
-	 */
-	const FORCE_DEFAULT = 2;
-
-	/**
-	 * @brief Name of variable filename
-	 */
-	const CSS_VARIABLE_FILENAME = '1-2-settings.css';
-
-	/**
 	 * @brief	Disable the copy button - useful when the forms are very distinctly different
 	 */
-	public bool $noCopyButton = TRUE;
+	public $noCopyButton = TRUE;
 
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'updatecount_themes' );
-
-	/**
-	 * @brief Save a few cycles not json_decoding constantly
-	 */
-	protected array $_layoutValues = [];
+	protected $caches = array( 'updatecount_themes' );
 
 	/**
 	 * Get currently logged in member's theme
 	 *
-	 * @return    static|SetupTheme|DevTheme
+	 * @return	\IPS\Theme
 	 */
-	public static function i(): static|SetupTheme|DevTheme
+	public static function i()
 	{
-		if ( Dispatcher::hasInstance() AND class_exists( '\IPS\Dispatcher', FALSE ) and Dispatcher::i()->controllerLocation === 'setup' )
+		if ( \IPS\Dispatcher::hasInstance() AND class_exists( '\IPS\Dispatcher', FALSE ) and \IPS\Dispatcher::i()->controllerLocation === 'setup' )
 		{
 			if ( static::$setupSkin === NULL )
 			{
-				static::$setupSkin = new SetupTheme;
+				static::$setupSkin = new \IPS\Theme\Setup\Theme;
 			}
 			return static::$setupSkin;
 		}
-		else if (RECOVERY_MODE)
+		else if ( \IPS\RECOVERY_MODE )
 		{
 			if ( static::$memberTheme === NULL )
 			{
 				foreach( static::themes() as $theme )
 				{
-					if ( ! $theme->isCustomized() )
+					if ( ! $theme->hasCustomizations() )
 					{
 						static::$memberTheme = $theme;
 						break;
@@ -313,48 +240,65 @@ class Theme extends Model
 			/* Still here because all themes are customized? */
 			if ( static::$memberTheme === NULL )
 			{
-				$newTheme = new Theme;
-				$newTheme->permissions = Member::loggedIn()->member_group_id;
+				$newTheme = new \IPS\Theme;
+				$newTheme->permissions = \IPS\Member::loggedIn()->member_group_id;
 				$newTheme->save();
+				$newTheme->installThemeSettings();
+				$newTheme->copyResourcesFromSet();
 
-				Lang::saveCustom( 'core', "core_theme_set_title_" . $newTheme->id, "IPS Default" );
+				\IPS\Lang::saveCustom( 'core', "core_theme_set_title_" . $newTheme->id, "IPS Default" );
 
 				static::$memberTheme = $newTheme;
 			}
 
 			return static::$memberTheme;
 		}
-		else if (IN_DEV)
+		else if ( \IPS\Theme::designersModeEnabled() AND \IPS\Dispatcher::hasInstance() AND class_exists( '\IPS\Dispatcher', FALSE ) and \IPS\Dispatcher::i()->controllerLocation === 'front' )
+		{
+			if ( \IPS\IN_DEV )
+			{
+				die("Please disable IN_DEV while in Designer's Mode");
+			}
+			if ( static::$memberTheme === NULL )
+			{
+				static::themes();
+
+				static::$memberTheme = new \IPS\Theme\Advanced\Theme;
+
+				/* Add in the default theme properties (_data array, etc) */
+				foreach( static::$multitons[ \IPS\Theme\Advanced\Theme::$currentThemeId ] as $k => $v )
+				{
+					static::$memberTheme->$k = $v;
+				}
+			}
+
+			return static::$memberTheme;
+		}
+		else if ( \IPS\IN_DEV )
 		{
 			if ( static::$inDevTheme === NULL )
 			{
-				static::$inDevTheme = new DevTheme();
+				static::$inDevTheme = new \IPS\Theme\Dev\Theme;
 				static::themes();
 
 				/* Add in the default theme properties (_data array, etc) */
-				$default = ( isset( static::$multitons[DEFAULT_THEME_ID] ) ) ? static::$multitons[DEFAULT_THEME_ID] : reset( static::$multitons );
+				$default = ( isset( static::$multitons[ \IPS\DEFAULT_THEME_ID ] ) ) ? static::$multitons[ \IPS\DEFAULT_THEME_ID ] : reset( static::$multitons );
 
 				foreach( $default as $k => $v )
 				{
 					static::$inDevTheme->$k = $v;
 				}
-			}
 
-			if ( Member::loggedIn()->isEditingTheme() )
-			{
-				try
+				if ( static::isUsingEasyModeEditor() )
 				{
-					static::$memberTheme = static::byEditingMember();
-				}
-				catch( Exception )
-				{
-					static::$memberTheme = static::load( static::defaultTheme() );
+					$setId = \intval( \IPS\Request::i()->cookie['vseThemeId'] );
+					static::$memberTheme = empty( $setId ) ? static::defaultTheme() : static::load( $setId );
 				}
 			}
 
 			return static::$inDevTheme;
 		}
-		else if ( Dispatcher::hasInstance() AND class_exists( '\IPS\Dispatcher', FALSE ) and Dispatcher::i()->controllerLocation === 'admin' )
+		else if ( \IPS\Dispatcher::hasInstance() AND class_exists( '\IPS\Dispatcher', FALSE ) and \IPS\Dispatcher::i()->controllerLocation === 'admin' )
 		{
 			if ( static::$adminSkin === NULL )
 			{
@@ -369,17 +313,17 @@ class Theme extends Model
 				static::themes();
 
 				$setId = NULL;
-				if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'front' )
+				if ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation == 'front' )
 				{
 					$setId = static::currentThemeId();
 
 					if ( $setId )
 					{
-						if( ! Request::i()->isAjax() and Session\Front::loggedIn() )
+						if( ! \IPS\Request::i()->isAjax() and \IPS\Session\Front::loggedIn() )
 						{
 							/* Not an ajax call, so reset theme_id */
 							$setId = NULL;
-							Session\Front::i()->setTheme(0);
+							\IPS\Session\Front::i()->setTheme(0);
 						}
 						else
 						{
@@ -390,7 +334,7 @@ class Theme extends Model
 									$setId = NULL;
 								}
 							}
-							catch ( OutOfRangeException $ex )
+							catch ( \OutOfRangeException $ex )
 							{
 								$setId = NULL;
 							}
@@ -399,20 +343,20 @@ class Theme extends Model
 					}
 				}
 
-				if ( ! $setId and Member::loggedIn()->skin and array_key_exists( Member::loggedIn()->skin, static::themes() ) )
+				if ( ! $setId and \IPS\Member::loggedIn()->skin and array_key_exists( \IPS\Member::loggedIn()->skin, static::themes() ) )
 				{
-					$setId = Member::loggedIn()->skin;
+					$setId = \IPS\Member::loggedIn()->skin;
 
 					if ( static::load( $setId )->canAccess() !== true )
 					{
 						$setId = static::defaultTheme();
 
 						/* Restore default theme for member */
-						Member::loggedIn()->skin = $setId;
+						\IPS\Member::loggedIn()->skin = $setId;
 
-						if( Member::loggedIn()->member_id )
+						if( \IPS\Member::loggedIn()->member_id )
 						{
-							Member::loggedIn()->save();
+							\IPS\Member::loggedIn()->save();
 						}
 					}
 				}
@@ -421,21 +365,46 @@ class Theme extends Model
 					$setId = static::defaultTheme();
 				}
 
-				if ( Member::loggedIn()->isEditingTheme() )
+				if ( static::isUsingEasyModeEditor() )
 				{
-					try
+					$setId = \intval( \IPS\Request::i()->cookie['vseThemeId'] );
+
+					if ( ! empty( $setId ) )
 					{
-						static::$memberTheme = static::byEditingMember();
+						$ok = false;
+
+						try
+						{
+							$theme = static::load( $setId );
+
+							if ( $theme->by_skin_gen )
+							{
+								$ok = true;
+							}
+						}
+						catch( \OutOfRangeException $ex )
+						{
+							$ok = false;
+						}
+
+						if ( $ok !== true )
+						{
+							/* Update the current member */
+							\IPS\Member::loggedIn()->members_bitoptions['bw_using_skin_gen'] = 0;
+							\IPS\Member::loggedIn()->save();
+
+							\IPS\Request::i()->setCookie( 'vseThemeId', 0 );
+
+							$setId = static::defaultTheme();
+						}
 					}
-					catch( Exception )
+					else
 					{
-						static::$memberTheme = static::load( $setId );
+						$setId = static::defaultTheme();
 					}
 				}
-				else
-				{
-					static::$memberTheme = static::load( $setId );
-				}
+
+				static::$memberTheme = static::load( $setId );
 			}
 
 			return static::$memberTheme;
@@ -447,14 +416,14 @@ class Theme extends Model
 	 *
 	 * @return int|null
 	 */
-	public static function currentThemeId(): ?int
+	public static function currentThemeId()
 	{
-		if ( Session\Front::loggedIn() )
+		if ( \IPS\Session\Front::loggedIn() )
 		{
-			return Session\Front::i()->getTheme();
+			return \IPS\Session\Front::i()->getTheme();
 		}
 
-		return isset( Request::i()->cookie['theme'] ) ? Request::i()->cookie['theme'] : NULL;
+		return isset( \IPS\Request::i()->cookie['theme'] ) ? \IPS\Request::i()->cookie['theme'] : NULL;
 	}
 
 	/**
@@ -462,20 +431,21 @@ class Theme extends Model
 	 *
 	 * @return	array
 	 */
-	public static function themes(): array
+	public static function themes()
 	{
 		if ( !static::$gotAll )
 		{
 			static::$gotAll = true;
+			static::$themeSetRelationships = array();
 
-			if ( isset( Store::i()->themes ) )
+			if ( isset( \IPS\Data\Store::i()->themes ) )
 			{
-				$rows = Store::i()->themes;
+				$rows = \IPS\Data\Store::i()->themes;
 			}
 			else
 			{
-				$rows = iterator_to_array( Db::i()->select( '*', 'core_themes', NULL, 'set_order' )->setKeyField('set_id') );
-				Store::i()->themes = $rows;
+				$rows = iterator_to_array( \IPS\Db::i()->select( '*', 'core_themes', NULL, 'set_order' )->setKeyField('set_id') );
+				\IPS\Data\Store::i()->themes = $rows;
 			}
 
 			foreach( $rows as $id => $theme )
@@ -485,11 +455,10 @@ class Theme extends Model
 					static::$defaultFrontendThemeSet = $theme['set_id'];
 				}
 
+				static::$themeSetRelationships[ $theme['set_parent_id'] ][ $theme['set_id'] ] = $theme;
+
 				static::$multitons[ $theme['set_id'] ] = static::constructFromData( $theme );
 			}
-
-			/* Load all theme settings upfront */
-			Setting::loadAllKeys();
 		}
 		return static::$multitons;
 	}
@@ -499,29 +468,66 @@ class Theme extends Model
 	 *
 	 * @return array
 	 */
-	public static function getThemesWithAccessPermission(): array
+	public static function getThemesWithAccessPermission()
 	{
 		$visibleThemes = array();
-		foreach(Theme::roots() as $theme )
+		foreach( \IPS\Theme::roots() as $theme )
 		{
 			if ( $theme->canAccess() )
 			{
 				$visibleThemes[$theme->id] = $theme;
 			}
+
+			static::getChildrenWithAccessPermission( $theme, $visibleThemes );
 		}
 
 		return $visibleThemes;
 	}
 
 	/**
+	 * Returns only the visible children
+	 * @param	\IPS\Theme	$theme	Parent theme
+	 * @param	Array	$visibleThemes	Visible themes array passed by reference
+	 *
+	 * @return void
+	 */
+	public static function getChildrenWithAccessPermission( \IPS\Theme $theme, Array &$visibleThemes )
+	{
+		foreach ( $theme->children() as $child )
+		{
+			if( $child->canAccess() )
+			{
+				$visibleThemes[ $child->id ] = $child;
+				static::getChildrenWithAccessPermission( $child, $visibleThemes );
+			}
+		}
+	}
+
+	/**
 	 * Fetch the master theme object
 	 *
-	 * @return Theme|DevTheme
+	 * @return	\IPS\Theme
 	 */
-	public static function master(): Theme|DevTheme
+	public static function master()
 	{
 		static::themes();
-		return static::$multitons[ static::$defaultFrontendThemeSet ];
+		$default = static::$multitons[ static::$defaultFrontendThemeSet ];
+		$master = static::constructFromData( array_merge( static::$themeSetRelationships[ $default->parent_id ][ $default->id ], array( 'set_id' => 0 ) ) );
+		$master->_data['settings'] = $default->getThemeSettings( static::TEMPLATE_SETTINGS_DEFAULT | static::THEME_KEY_VALUE_PAIRS );
+
+		unset( static::$multitons[ 0 ] );
+
+		return $master;
+	}
+
+	/**
+	 * Is designer's mode enabled?
+	 *
+	 * @return boolean
+	 */
+	public static function designersModeEnabled()
+	{
+		return (boolean) \IPS\Settings::i()->theme_designers_mode;
 	}
 
 	/**
@@ -529,7 +535,7 @@ class Theme extends Model
 	 *
 	 * @return	int
 	 */
-	public static function defaultTheme(): int
+	public static function defaultTheme()
 	{
 		if ( !static::$gotAll )
 		{
@@ -542,19 +548,19 @@ class Theme extends Model
 	/**
 	 * Switches the currently initialized theme during execution
 	 *
-	 * @param int $themeId        Id of the theme to switch to
-	 * @param boolean $persistent		Allow to persist through ajax calls
+	 * @param   int     $themeId        Id of the theme to switch to
+	 * @param	boolean	$persistent		Allow to persist through ajax calls
 	 * @return  boolean
 	 * @note    This will not check to ensure the member has permission to view the theme
 	 */
-	public static function switchTheme( int $themeId, bool $persistent=TRUE ): bool
+	public static function switchTheme( $themeId, $persistent=TRUE )
 	{
 		static::themes();
 
 		try
 		{
 			/* Make sure the member theme is set */
-			Theme::i();
+			\IPS\Theme::i();
 
 			$class = static::i();
 			static::$memberTheme = $class::load( $themeId );
@@ -562,48 +568,48 @@ class Theme extends Model
 			/* Store the ID in sessions so ajax loads correct theme */
 			if ( $persistent )
 			{
-				Session\Front::i()->setTheme( $themeId );
+				\IPS\Session\Front::i()->setTheme( $themeId );
 			}
 
 			/* Flush loaded CSS */
-			Output::i()->cssFiles = array();
+			\IPS\Output::i()->cssFiles = array();
 
-			Front::baseCss();
+			\IPS\Dispatcher\Front::baseCss();
 
 			/* App CSS */
-			$app = Front::i()->application;
-			$app::outputCss();
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( \IPS\Dispatcher\Front::i()->application->directory . '.css', \IPS\Dispatcher\Front::i()->application->directory, \IPS\Dispatcher\Front::i()->controllerLocation ) );
+			if ( \IPS\Theme::i()->settings['responsive'] )
+			{
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( \IPS\Dispatcher\Front::i()->application->directory . '_responsive.css', \IPS\Dispatcher\Front::i()->application->directory, \IPS\Dispatcher\Front::i()->controllerLocation ) );
+			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}
-
-		return TRUE;
 	}
 
 	/**
 	 * @brief Prevent CSS from being loaded more than once
 	 */
-	protected static array $usedCss = array();
+	protected static $usedCss = array();
 
 	/**
 	 * Get CSS
 	 * This method is used to return the built CSS stored in the file objects system
 	 *
-	 * @param string $file		Filename
-	 * @param string|null $app		Application
-	 * @param string|null $location	Location (e.g. 'admin', 'front')
+	 * @param	string		$file		Filename
+	 * @param	string|null	$app		Application
+	 * @param	string|null	$location	Location (e.g. 'admin', 'front')
 	 * @return	array		URLs to CSS files
 	 */
-	public function css( string $file, string $app=NULL, string $location=NULL ): array
+	public function css( $file, $app=NULL, $location=NULL )
 	{
-		$app      = $app      ?: Dispatcher::i()->application->directory;
-		$location = $location ?: Dispatcher::i()->controllerLocation;
+		$app      = $app      ?: \IPS\Dispatcher::i()->application->directory;
+		$location = $location ?: \IPS\Dispatcher::i()->controllerLocation;
 		$paths    = explode( '/', $file );
 		$name     = array_pop( $paths );
-		$path     = ( count( $paths ) ) ? implode( '/', $paths ) : '.';
-
+		$path     = ( \count( $paths ) ) ? implode( '/', $paths ) : '.';
 		$cacheKey = $file . ',' . $app . ',' . $location . ',' . $this->_id;
 
 		if ( isset( static::$usedCss[ $cacheKey ] ) )
@@ -613,35 +619,17 @@ class Theme extends Model
 
 		if ( $location === 'interface' )
 		{
-			/* Legacy code support. The following directories were moved to /static */
-			if ( ( $app === "core" or $app === null) and preg_match( "/^(?:codemirror|fontawesome)/", $file ) )
-			{
-				$file = "static/" . $file;
-			}
-
-			static::$usedCss[ $cacheKey ] = array( rtrim( Url::baseUrl( Url::PROTOCOL_RELATIVE ), '/' ) . "/applications/{$app}/interface/{$file}" );
+			static::$usedCss[ $cacheKey ] = array( rtrim( \IPS\Http\Url::baseUrl( \IPS\Http\Url::PROTOCOL_RELATIVE ), '/' ) . "/applications/{$app}/interface/{$file}" );
 			return static::$usedCss[ $cacheKey ];
 		}
 
-		$key = static::cssFilePrefix( $app, $location, $path );
+		$key = static::makeBuiltTemplateLookupHash( $app, $location, $path . '/' . $name );
 
-		if( in_array( $app, IPS::$ipsApps ) AND $file != 'custom.css' )
+		if ( \in_array( $key, array_keys( $this->css_map ) ) )
 		{
-			static::$usedCss[ $cacheKey ] = array( rtrim( Url::baseUrl( Url::PROTOCOL_RELATIVE ), '/' ) . "/static/css/" . $key . "_{$name}" );
-			return static::$usedCss[ $cacheKey ];
-		}
-
-		/* We use a different format for when we compile CSS outside first party static files */
-		$cssMapKey = static::makeBuiltTemplateLookupHash( $app, $location, str_contains( $file, '/' ) ? $file : './' . $file );
-
-		if( array_key_exists( $cssMapKey, $this->css_map ) )
-		{
-			if ( $this->css_map[ $cssMapKey ] !== null )
+			if ( $this->css_map[ $key ] !== null )
 			{
-				if( !in_array( $app, IPS::$ipsApps ) or $file == 'custom.css' )
-				{
-					static::$usedCss[ $cacheKey ] = array( File::get( 'core_Theme', $this->css_map[ $cssMapKey ] )->url );
-				}
+				static::$usedCss[ $cacheKey ] = array( \IPS\File::get( 'core_Theme', $this->css_map[ $key ] )->url );
 			}
 			else
 			{
@@ -653,7 +641,7 @@ class Theme extends Model
 		else
 		{
 			/* We're setting up, do nothing to avoid compilation requests when tables are incomplete */
-			if ( ! isset( Settings::i()->setup_in_progress ) OR Settings::i()->setup_in_progress )
+			if ( ! isset( \IPS\Settings::i()->setup_in_progress ) OR \IPS\Settings::i()->setup_in_progress )
 			{
 				/* Do not store a cache here as this will break later when we want CSS */
 				//return array();
@@ -670,31 +658,16 @@ class Theme extends Model
 			/* Still not here? Then add a key but as null to prevent it from attempting to rebuild on every single page
 			 * load thus hitting the DB multiple times */
 			$cssMap = $this->css_map;
-			if ( ! in_array( $cssMapKey, array_keys( $this->css_map ) ) )
+			if ( ! \in_array( $key, array_keys( $this->css_map ) ) )
 			{
-				$cssMap[ $cssMapKey ] = null;
+				$cssMap[ $key ] = null;
 
 				$this->css_map = $cssMap;
 				$this->save();
 			}
 			else
 			{
-				if( in_array( $app, IPS::$ipsApps ) AND $file != 'custom.css' )
-				{
-					static::$usedCss[ $cacheKey ] = array( "/static/css/". $key . "_{$name}" );
-				}
-				else
-				{
-					try
-					{
-						static::$usedCss[ $cacheKey ] = array( File::get( 'core_Theme', $this->css_map[ $cssMapKey ] )->url );
-					}
-					catch( Exception )
-					{
-						static::$usedCss[ $cacheKey ] = array();
-					}
-				}
-
+				static::$usedCss[ $cacheKey ] = array( \IPS\File::get( 'core_Theme', $this->css_map[ $key ] )->url );
 				return static::$usedCss[ $cacheKey ];
 			}
 		}
@@ -703,84 +676,28 @@ class Theme extends Model
 	}
 
 	/**
-	 * Returns a human brain digestable unique prefix for CSS files
-	 *
-	 * @param string $app
-	 * @param string $location
-	 * @param string $path
-	 * @return	string	Md5 Key
-	 */
-	public static function cssFilePrefix( string $app, string $location, string $path ): string
-	{
-		return str_replace( '/', '-', mb_strtolower( $app ) . '_' . mb_strtolower( $location ) . ( ( $path and $path != '.' ) ? '_' . mb_strtolower( $path ) : '' ) );
-	}
-
-	/**
-	 * Resets the hook point flags in the core_theme_templates database
-	 *
-	 * @param string|null $app
-	 * @return void
-	 */
-	public static function rebuildHookPointFlags( string $app=null ): void
-	{
-		/* Reset flags */
-		$where = $app ? [ 'template_app=?', $app ] : [];
-		Db::i()->update( 'core_theme_templates', [ 'template_has_hookpoints' => 0 ], $where );
-
-		/* We might need to get more fancy at some point but now that no one can edit templates, it's unlikely data-ips-hook= will be used in any other way.
-		   If it becomes a problem, we can simply iterate over and use xpath to check for reals. */
-		Db::i()->update( 'core_theme_templates', [ 'template_has_hookpoints' => 1 ], [ array_merge( $where, Db::i()->like( 'template_content', ' data-ips-hook=', FALSE, TRUE, TRUE ) ) ] );
-	}
-
-	/**
 	 * Get Theme Resource (image, font, theme-specific JS, etc)
 	 *
-	 * @param string $path		Path to resource
-	 * @param string|null $app		Application key
-	 * @param string|null $location	Location
-	 * @return    Url|string|NULL		URL to resource
+	 * @param	string		$path		Path to resource
+	 * @param	string|null	$app		Application key
+	 * @param	string|null	$location	Location
+	 * @return	\IPS\Http\Url|NULL		URL to resource
 	 */
-	public function resource( string $path, string $app=NULL, string $location=NULL, $noProtocol=FALSE ): Url|string|null
+	public function resource( $path, $app=NULL, $location=NULL, $noProtocol=FALSE )
 	{
-		$app      = $app      ?: Dispatcher::i()->application->directory;
-		$location = $location ?: Dispatcher::i()->controllerLocation;
+		$app      = $app      ?: \IPS\Dispatcher::i()->application->directory;
+		$location = $location ?: \IPS\Dispatcher::i()->controllerLocation;
 		$paths    = explode( '/', $path );
 		$name     = array_pop( $paths );
-		$path     = ( count( $paths ) ) ? ( '/' . implode( '/', $paths ) . '/' ) : '/';
+		$path     = ( \count( $paths ) ) ? ( '/' . implode( '/', $paths ) . '/' ) : '/';
 		$key      = static::makeBuiltTemplateLookupHash($app, $location, $path) . '_' .$name;
 
 		if ( $location === 'interface' )
 		{
-			return Url::internal( "applications/{$app}/interface{$path}{$name}", 'interface', NULL, array(), Url::PROTOCOL_RELATIVE );
+			return \IPS\Http\Url::internal( "applications/{$app}/interface{$path}{$name}", 'interface', NULL, array(), \IPS\Http\Url::PROTOCOL_RELATIVE );
 		}
 
-		/* Are these core IPS apps? If so, we store these in the static directory and won't be in the resource map */
-		if( in_array( $app, IPS::$ipsApps ) and str_replace( '/', '', $path ) !== 'custom' )
-		{
-			$url = Url::internal( 'static/resources/' . $app . '_' . static::makeBuiltTemplateLookupHash($app, $location, $path) . '_' .$name, 'static' );
-
-			if( $noProtocol )
-			{
-				$url = $url->setScheme(NULL);
-			}
-
-			return $url;
-		}
-
-		/* Make sure that resource_map is an array */
-		if( !is_array( $this->resource_map ) )
-		{
-			if( $json = json_decode( $this->resource_map, TRUE ) )
-			{
-				$this->resource_map = $json;
-			}
-			else
-			{
-				return NULL;
-			}
-		}
-
-		if ( in_array( $key, array_keys( $this->resource_map ) ) )
+		if ( \in_array( $key, array_keys( $this->resource_map ) ) )
 		{
 			if ( $this->resource_map[ $key ] === NULL )
 			{
@@ -788,9 +705,9 @@ class Theme extends Model
 			}
 			else
 			{
-				$url = File::get( 'core_Theme', $this->resource_map[ $key ] )->url;
+				$url = \IPS\File::get( 'core_Theme', $this->resource_map[ $key ] )->url;
 
-				if( $noProtocol and $url instanceof Url )
+				if( $noProtocol and $url instanceof \IPS\Http\Url )
 				{
 					$url = $url->setScheme(NULL);
 				}
@@ -805,7 +722,7 @@ class Theme extends Model
 		try
 		{
 			/* We're setting up, do nothing to avoid compilation requests when tables are incomplete */
-			if ( ! isset( Settings::i()->setup_in_progress ) OR Settings::i()->setup_in_progress )
+			if ( ! isset( \IPS\Settings::i()->setup_in_progress ) OR \IPS\Settings::i()->setup_in_progress )
 			{
 				return NULL;
 			}
@@ -818,10 +735,11 @@ class Theme extends Model
 
 			static::lock( $flagKey );
 
-			$resource = Db::i()->select( '*', 'core_theme_resources', array( 'resource_set_id=? AND resource_app=? AND resource_location=? AND resource_path=? AND resource_name=?', $this->id, $app, $location, $path, $name ) )->first();
+			$resource = \IPS\Db::i()->select( '*', 'core_theme_resources', array( 'resource_set_id=? AND resource_app=? AND resource_location=? AND resource_path=? AND resource_name=?', $this->id, $app, $location, $path, $name ) )->first();
 
-			$resourceMap[ $key ] = (string) File::create( 'core_Theme', $key, $resource['resource_data'], 'set_resources_' . $this->id, TRUE, NULL, FALSE );
-			Db::i()->update( 'core_theme_resources', array( 'resource_added' => time(), 'resource_filename' => $resourceMap[ $key ] ), array( 'resource_id=?', $resource['resource_id'] ) );
+			$resourceMap[ $key ] = (string) \IPS\File::create( 'core_Theme', $key, $resource['resource_data'], 'set_resources_' . $this->id, TRUE, NULL, FALSE );
+
+			\IPS\Db::i()->update( 'core_theme_resources', array( 'resource_added' => time(), 'resource_filename' => $resourceMap[ $key ] ), array( 'resource_id=?', $resource['resource_id'] ) );
 
 			/* Save map */
 			$this->resource_map = $resourceMap;
@@ -829,23 +747,16 @@ class Theme extends Model
 
 			static::unlock( $flagKey );
 
-			if( in_array( $app, IPS::$ipsApps ) and $resource['resource_path'] !== '/custom/' )
-			{
-				$url = rtrim( Settings::i()->base_url, '/' ) . '/' . $resourceMap[ $key ];
-			}
-			else
-			{
-				$url = File::get( 'core_Theme', $resourceMap[ $key ] )->url;
-			}
+			$url = \IPS\File::get( 'core_Theme', $resourceMap[ $key ] )->url;
 
-			if( $noProtocol and $url instanceof Url)
+			if( $noProtocol and $url instanceof \IPS\Http\Url )
 			{
 				$url = $url->setScheme(NULL);
 			}
 
 			return $url;
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			/* Doesn't exist, add null entry to map to prevent it from being rebuilt on each page load */
 			$resourceMap[ $key ] = null;
@@ -861,49 +772,67 @@ class Theme extends Model
 	/**
 	 * Get a template
 	 *
-	 * @param string $group Template Group
-	 * @param string|null $app Application key (NULL for current application)
-	 * @param string|null $location Template Location (NULL for current template location)
-	 * @return    mixed
-	 * @throws    UnexpectedValueException
-	 * @throws ErrorException
+	 * @param	string	$group				Template Group
+	 * @param	string	$app				Application key (NULL for current application)
+	 * @param	string	$location		    Template Location (NULL for current template location)
+	 * @return	\IPS\Output\Template
+	 * @throws	\UnexpectedValueException
 	 */
-	public function getTemplate( string $group, string $app=NULL, string $location=NULL ): mixed
+	public function getTemplate( $group, $app=NULL, $location=NULL )
 	{
 		/* Do we have an application? */
 		if( $app === NULL )
 		{
-			$app = Dispatcher::i()->application->directory;
+			$app = \IPS\Dispatcher::i()->application->directory;
 		}
 
 		/* How about a template location? */
 		if( $location === NULL )
 		{
-			$location = Dispatcher::i()->controllerLocation;
+			$location = \IPS\Dispatcher::i()->controllerLocation;
 		}
 
-		$hashedKey = strtolower( static::makeBuiltTemplateLookupHash( $app, $location, $group ) . '_' . static::cleanGroupName( $group ) );
+		$hashedKey = \strtolower( static::makeBuiltTemplateLookupHash( $app, $location, $group ) . '_' . static::cleanGroupName( $group ) );
 		$key = 'template_' . $this->id . '_' . $hashedKey;
 
 		$cachedObject = NULL;
-		$class = "\\IPS\\Theme\\" . 'class_' . $app . '_' . $location . '_' . $group;
-
-		/* First-party apps should be pre-compiled */
-		if( in_array( $app, IPS::$ipsApps ) AND !IN_DEV )
-		{
-			$templateFile = ROOT_PATH . '/static/templates/' . $app . '_' . $location . '_' . $group . '.php';
-			if( file_exists( $templateFile ) )
-			{
-				require_once( $templateFile );
-				return new SandboxedTemplate( new $class( $app, $location, $group ) );
-			}
-		}
 
 		/* We cannot use isset( static::$calledTemplates[ $key ] ) here because it fails with NULL while in_array does not */
-		if ( !in_array( $hashedKey, array_keys( static::$calledTemplates ) ) )
+		if ( !\in_array( $hashedKey, array_keys( static::$calledTemplates ) ) )
 		{
+			/* First, are we on the front end and using a disk cache? */
+			if ( static::isUsingTemplateDiskCache() and $location != 'admin' )
+			{
+				$cache = new \IPS\Theme\Cache\Template( $app, $location, $group );
+
+				if ( $cache->exists() )
+				{
+					$cachedObject = $cache->get();
+				}
+				else
+				{
+					/* If it exists in datastore, use that to write the value */
+					if ( isset( \IPS\Data\Store::i()->$key ) )
+					{
+						try
+						{
+							$cache->set( str_replace( 'namespace IPS\Theme;', 'namespace IPS\Theme\Cache;', \IPS\Data\Store::i()->$key ) );
+						}
+						catch( \RuntimeException $e )
+						{
+							/* Should we log, ignore or collect failures to notify admin? */
+						}
+					}
+					else
+					{
+						/* We'll compile it now, but let datastore serve the template this time round */
+						$this->compileTemplates( $app, $location, $group );
+					}
+				}
+			}
+
 			/* If we don't have a compiled template, do that now */
-			if ( ! $cachedObject and !isset( Store::i()->$key ) )
+			if ( ! $cachedObject and !isset( \IPS\Data\Store::i()->$key ) )
 			{
 				/* It can take a few seconds for templates to finish compiling if initiated elsewhere, so let's try a few times sleeping 1 second between attempts
 				   to give the compilation time to finish */
@@ -913,10 +842,10 @@ class Theme extends Model
 					if ( $attempts === 5 )
 					{
 						/* Rebuild in progress */
-						Log::debug( "Template store key: {$key} rebuilding and requested again ({$app}, {$location}, {$group})", "template_store_building" );
+						\IPS\Log::debug( "Template store key: {$key} rebuilding and requested again ({$app}, {$location}, {$group})", "template_store_building" );
 
 						/* Since we can't do anything else, this ends up just being an uncaught exception - show the error page right away to avoid the unnecessary logging */
-						IPS::genericExceptionPage();
+						\IPS\IPS::genericExceptionPage();
 					}
 
 					$built = $this->compileTemplates( $app, $location, $group );
@@ -933,11 +862,11 @@ class Theme extends Model
 				}
 
 				/* Still no key? */
-				if ( ! isset( Store::i()->$key ) )
+				if ( ! isset( \IPS\Data\Store::i()->$key ) )
 				{
-					Log::log( "Template store key: {$key} missing ({$app}, {$location}, {$group})", "template_store_missing" );
+					\IPS\Log::log( "Template store key: {$key} missing ({$app}, {$location}, {$group})", "template_store_missing" );
 
-					throw new ErrorException( 'template_store_missing' );
+					throw new \ErrorException( 'template_store_missing' );
 				}
 			}
 
@@ -945,13 +874,13 @@ class Theme extends Model
 			if ( $cachedObject )
 			{
 				/* Init */
-				static::$calledTemplates[ $hashedKey ] = new SandboxedTemplate( $cachedObject );
+				static::$calledTemplates[ $hashedKey ] = new \IPS\Theme\SandboxedTemplate( $cachedObject );
 			}
 			else
 			{
-				$compiledGroup = Store::i()->$key;
+				$compiledGroup = \IPS\Data\Store::i()->$key;
 
-				if (DEBUG_TEMPLATES)
+				if ( \IPS\DEBUG_TEMPLATES )
 				{
 					static::runDebugTemplate( $key, $compiledGroup );
 				}
@@ -961,17 +890,20 @@ class Theme extends Model
 					{
 						if ( @eval( $compiledGroup ) === FALSE )
 						{
-							throw new TemplateException( 'Invalid Template', 1000, NULL, array( 'group' => $group, 'app' => $app, 'location' => $location ), $this );
+							throw new \IPS\Theme\TemplateException( 'Invalid Template', 1000, NULL, array( 'group' => $group, 'app' => $app, 'location' => $location ), $this );
 						}
 					}
-					catch ( ParseError $e )
+					catch ( \ParseError $e )
 					{
-						throw new UnexpectedValueException;
+						throw new \UnexpectedValueException;
 					}
 				}
 
+				/* Hooks */
+				$class = "\\IPS\\Theme\\" . static::overloadHooks( 'class_' . $app . '_' . $location . '_' . $group );
+
 				/* Init */
-				static::$calledTemplates[ $hashedKey ] = new SandboxedTemplate( new $class( $app, $location, $group ) );
+				static::$calledTemplates[ $hashedKey ] = new \IPS\Theme\SandboxedTemplate( new $class( $app, $location, $group ) );
 			}
 		}
 
@@ -981,18 +913,58 @@ class Theme extends Model
 	/**
 	 * Determine the path to load the file from
 	 *
-	 * @param string $file	File path
+	 * @param	string	$file	File path
 	 * @return	string
 	 */
-	public static function getHookPath( string $file ): string
+	public static function getHookPath( $file )
 	{
-		$path = ROOT_PATH;
-		if ( CIC2 AND IPS::isThirdParty( $file ) )
+		$path = \IPS\ROOT_PATH;
+		if ( \IPS\CIC2 AND \IPS\IPS::isThirdParty( $file ) )
 		{
-			$path = SITE_FILES_PATH;
+			$path = \IPS\SITE_FILES_PATH;
 		}
 
 		return $path;
+	}
+
+	/**
+	 * Eval hooks into life
+	 *
+	 * @param	string	$class 	Class name
+	 * @param	string	$namespace	Namespace for the templates
+	 * @return	Modified classname
+	 */
+	public static function overloadHooks( $class, $namespace="IPS\\Theme" )
+	{
+		if ( isset( \IPS\IPS::$hooks[ "\\IPS\\Theme\\{$class}" ] ) AND \IPS\RECOVERY_MODE === FALSE )
+		{
+			foreach ( \IPS\IPS::$hooks[ "\\IPS\\Theme\\{$class}" ] as $id => $data )
+			{
+				$path = static::getHookPath( $data['file'] );
+
+				if ( file_exists( $path . '/' . $data['file'] ) )
+				{
+					if ( class_exists( "{$namespace}\\" . $data['class'], FALSE ) )
+					{
+						$class = $data['class'];
+						continue;
+					}
+
+					$contents = "namespace {$namespace};\n\n" . str_replace( '_HOOK_CLASS_', $class, file_get_contents( $path . '/' . $data['file'] ) );
+
+					try
+					{
+						if( eval( $contents ) !== FALSE )
+						{
+							$class = $data['class'];
+						}
+					}
+					catch ( \ParseError $e ) { }
+				}
+			}
+		}
+
+		return $class;
 	}
 
 	/*! Active Record */
@@ -1000,31 +972,38 @@ class Theme extends Model
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    ActiveRecord
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): ActiveRecord
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
 		$obj = parent::constructFromData( $data, $updateMultitonStoreIfExists );
 
 		/* Extra set up */
 		$logo = json_decode( $obj->logo_data, true );
 
-		$obj->_data['logo'] = array( 'front' => null, 'front-dark' => null, 'mobile' => null, 'mobile-dark' => null );
+		$obj->_data['logo'] = array( 'front' => null );
 
-		if ( is_array( $logo ) )
+		if ( \is_array( $logo ) )
 		{
-			foreach( [ 'front', 'front-dark', 'mobile', 'mobile-dark' ] as $type )
+			if ( isset( $logo['front'] ) )
 			{
-				if ( isset( $logo[$type] ) )
-				{
-					$obj->_data['logo'][$type] = $logo[$type];
-				}
+				$obj->_data['logo']['front'] = $logo['front'];
 			}
 		}
 
-		if ( ! is_array( $obj->_data['resource_map'] ) )
+		if ( $settings = json_decode( $obj->_data['template_settings'], true ) )
+		{
+			$obj->_data['settings'] = $settings;
+		}
+		else
+		{
+			/* No settings here */
+			$obj->_data['settings'] = array();
+		}
+
+		if ( ! \is_array( $obj->_data['resource_map'] ) )
 		{
 			if( $obj->id > 0 )
 			{
@@ -1039,18 +1018,18 @@ class Theme extends Model
 			}
 			else
 			{
-				if( !isset( Store::i()->acp_resource_map ) )
+				if( !isset( \IPS\Data\Store::i()->acp_resource_map ) )
 				{
 					$obj->_data['resource_map'] = [];
 				}
 				else
 				{
-					$obj->_data['resource_map'] = Store::i()->acp_resource_map;
+					$obj->_data['resource_map'] = \IPS\Data\Store::i()->acp_resource_map;
 				}
 			}
 		}
 
-		if ( ! is_array( $obj->_data['css_map'] ) )
+		if ( ! \is_array( $obj->_data['css_map'] ) )
 		{
 			if ( $obj->id > 0 )
 			{
@@ -1065,205 +1044,47 @@ class Theme extends Model
 			}
 			else
 			{
-				$obj->_data['css_map'] = json_decode( Settings::i()->acp_css_map, true );
+				$obj->_data['css_map'] = json_decode( \IPS\Settings::i()->acp_css_map, true );
 			}
 		}
 
 		return $obj;
 	}
 
-    public function get_logo() : array
-    {
-        if( isset( $this->_data['logo'] ) )
-        {
-            $update = false;
-            foreach( $this->_data['logo'] as $type => $logo )
-            {
-                if( isset( $logo['filename'] ) and empty( $logo['url'] ) )
-                {
-                    $update = true;
-					/* Check to see if $logo['filename'] starts with a 'monthly_' */
-					if ( str_starts_with( $logo['filename'], 'monthly_' ) )
-					{
-						/* Originally, logos were stored in monthly folders before they were moved to the theme resources area */
-						try
-						{
-							$this->_data['logo'][ $type ]['url'] = (string) File::get( 'core_Theme', $logo['filename'] )->url;
-						}
-						catch ( Exception $e ) { }
-					}
-					else
-					{
-						$this->_data['logo'][ $type ]['url'] = (string) $this->resource( 'custom/' . $logo['filename'], 'core', 'front' );
-					}
-                }
-            }
-
-            if( $update )
-            {
-                $this->logo_data = json_encode( $this->_data['logo'] );
-                $this->save();
-            }
-        }
-
-        return $this->_data['logo'] ?? [];
-    }
-
 	/**
 	 * Save resource map
 	 *
-	 * @param	$value        array    Value to save
-	 * @return void
+	 * @param	$value		array	Value to save
 	 */
-	public function set_resource_map( array $value ) : void
+	public function set_resource_map( $value )
 	{
-		$this->_data['resource_map'] = json_encode( $value );
-
-		if ( $this->id === 0 )
+		if ( \is_array( $value ) )
 		{
-			Store::i()->acp_resource_map = $value;
+			$this->_data['resource_map'] = json_encode( $value );
+
+			if ( $this->id === 0 )
+			{
+				\IPS\Data\Store::i()->acp_resource_map = $value;
+			}
 		}
 	}
 
 	/**
 	 * Save CSS map
 	 *
-	 * @param	$value        array    Value to save
+	 * @param	$value		array	Value to save
 	 */
-	public function set_css_map( array $value ) : void
+	public function set_css_map( $value )
 	{
-		$this->_data['css_map'] = json_encode( $value );
-
-		if ( $this->id === 0 )
+		if ( \is_array( $value ) )
 		{
-			Settings::i()->changeValues( array( 'acp_css_map' => json_encode( $value ) ) );
+			$this->_data['css_map'] = json_encode( $value );
+
+			if ( $this->id === 0 )
+			{
+				\IPS\Settings::i()->changeValues( array( 'acp_css_map' => json_encode( $value ) ) );
+			}
 		}
-	}
-
-	/**
-	 * Make sure we clean out the custom CSS to prevent anyone adding closing style tags
-	 *
-	 * @param string $value
-	 * @return void
-	 */
-	public function set_custom_css( string $value ) : void
-	{
-		$value = str_replace( '</style>', '', $value );
-		$this->_data['custom_css'] = $value;
-
-		$key = $this->_id . '_theme_editor_custom_css';
-		if ( isset( Store::i()->$key ) )
-		{
-			unset( Store::i()->$key );
-		}
-	}
-
-	/**
-	 * Clear any compiled JS when we save
-	 *
-	 * @param string $value
-	 * @return void
-	 */
-	public function set_core_js( string $value ) : void
-	{
-		$this->_data['core_js'] = $value;
-		$key = $this->_id . '_theme_editor_custom_js';
-		if( isset( Store::i()->$key ) )
-		{
-			unset( Store::i()->$key );
-		}
-	}
-
-	/**
-	 * Return the JS, compiled, from the cache
-	 *
-	 * @return string
-	 */
-	public function getCustomJsForOutput() : string
-	{
-		$key = $this->_id . '_theme_editor_custom_js';
-		if ( ! isset( Store::i()->$key ) )
-		{
-			/* If we didn't specify a function name, create one */
-			$functionName = $functionName ?? "js_" . uniqid();
-
-			static::makeProcessFunction( static::fixResourceTags( (string) $this->core_js, 'front' ), $functionName, '', false, true );
-
-			$fqFunc		= 'IPS\\Theme\\'. $functionName;
-			$content = $fqFunc();
-
-			/* Replace any <fileStore.xxx> tags in the CSS */
-			Output::i()->parseFileObjectUrls( $content );
-			Store::i()->$key = $content;
-		}
-
-		return Store::i()->$key;
-	}
-
-	/**
-	 * Return the CSS, compiled, from the cache
-	 *
-	 * @return string
-	 */
-	public function getCustomCssForOutput(): string
-	{
-		/* Use pending changes, if we have any */
-		if( $data = $this->editingSessionData() )
-		{
-			/* Compile the pending CSS but don't store it */
-			return static::compileCustomCss( $data['custom_css'] ?? '' );
-		}
-
-		if( !$this->custom_css )
-		{
-			return '';
-		}
-
-		$key = $this->_id . '_theme_editor_custom_css';
-		if ( ! isset( Store::i()->$key ) )
-		{
-			Store::i()->$key = static::compileCustomCss( (string) $this->custom_css );
-		}
-
-		return Store::i()->$key;
-	}
-
-	/**
-	 * Compile custom CSS for output
-	 *
-	 * @param string $content
-	 * @param string|null $functionName
-	 * @return string
-	 */
-	public static function compileCustomCss( string $content, ?string $functionName=null ) : string
-	{
-		/* If we didn't specify a function name, create one */
-		$functionName = $functionName ?? "css_" . uniqid();
-
-		static::makeProcessFunction( static::fixResourceTags( $content, 'front' ), $functionName, '', FALSE, TRUE );
-
-		$fqFunc		= 'IPS\\Theme\\'. $functionName;
-		$content	= static::minifyCss( $fqFunc() );
-
-		/* Replace any <fileStore.xxx> tags in the CSS */
-		Output::i()->parseFileObjectUrls( $content );
-
-		return $content;
-	}
-
-	/**
-	 * Get the source CSS that is compiled then returned in getCustomCssForOutput
-	 *
-	 * @return string
-	 */
-	public function getCustomCssForThemeEditorCodebox(): string
-	{
-		if( $data = $this->editingSessionData() )
-		{
-			return $data['custom_css'] ?? '';
-		}
-
-		return (string) $this->custom_css;
 	}
 
 	/**
@@ -1271,21 +1092,21 @@ class Theme extends Model
 	 *
 	 * @return void
 	 */
-	public function fixHeaderAndFooterTags(): void
+	public function fixHeaderAndFooterTags()
 	{
 		/* Check the globalTemplate for the special tags we need */
 		try
 		{
-			$template = Db::i()->select( '*', 'core_theme_templates', [ 'template_set_id=? AND template_app=? AND template_group=? AND template_location=? and template_name=?', $this->_id, 'core', 'global', 'front', 'globalTemplate'] )->first();
+			$template = \IPS\Db::i()->select( '*', 'core_theme_templates', [ 'template_set_id=? AND template_app=? AND template_group=? AND template_location=? and template_name=?', $this->_id, 'core', 'global', 'front', 'globalTemplate'] )->first();
 			$update = FALSE;
 
-			if ( ! stristr( $template['template_content'], '{theme="headerHtml"}') )
+			if ( ! \stristr( $template['template_content'], '{theme="headerHtml"}') )
 			{
 				$template['template_content'] = preg_replace( '#(<body.*>\n)#i', "$1\n{theme=\"headerHtml\"}\n", $template['template_content'] );
 				$update = TRUE;
 			}
 
-			if ( ! stristr( $template['template_content'], '{theme="footerHtml"}') )
+			if ( ! \stristr( $template['template_content'], '{theme="footerHtml"}') )
 			{
 				$template['template_content'] = preg_replace( '#(</body>\n)#i', "{theme=\"footerHtml\"}\n$1", $template['template_content'] );
 				$update = TRUE;
@@ -1293,11 +1114,11 @@ class Theme extends Model
 
 			if ( $update )
 			{
-				Db::i()->update( 'core_theme_templates', [ 'template_content' => $template['template_content'] ], [ 'template_id=?', $template['template_id'] ] );
+				\IPS\Db::i()->update( 'core_theme_templates', [ 'template_content' => $template['template_content'] ], [ 'template_id=?', $template['template_id'] ] );
 			}
 
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			/* No custom template, so we're good */
 		}
@@ -1306,12 +1127,20 @@ class Theme extends Model
 	/**
 	 * Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	function save()
 	{
+		if ( ! $this->editor_skin )
+		{
+			$this->editor_skin = 'ips';
+		}
+
+		/* Re-calculate customised flag */
+		$this->customized = $this->isCustomized();
+
 		parent::save();
-		unset( Store::i()->themes );
+		unset( \IPS\Data\Store::i()->themes );
 
 		/* If we are using a customized globalTemplate, we need to slap in the header/footer tags */
 		if ( ! empty( $this->custom_footer ) or ! empty( $this->customer_header ) )
@@ -1322,14 +1151,14 @@ class Theme extends Model
 		foreach( [ 'header', 'footer' ] as $type )
 		{
 			$key = 'custom_' . $type . '_' . $this->_id;
-			if ( isset( Store::i()->$key ) )
+			if ( isset( \IPS\Data\Store::i()->$key ) )
 			{
-				unset( Store::i()->$key );
+				unset( \IPS\Data\Store::i()->$key );
 			}
 		}
 
 		/* Reset map arrays */
-		if ( !isset( $this->_data['resource_map'] ) OR  ! is_array( $this->_data['resource_map'] ) )
+		if ( !isset( $this->_data['resource_map'] ) OR  ! \is_array( $this->_data['resource_map'] ) )
 		{
 			if ( isset( $this->_data['resource_map'] ) AND $imgMap = json_decode( $this->_data['resource_map'], true ) )
 			{
@@ -1341,7 +1170,7 @@ class Theme extends Model
 			}
 		}
 
-		if ( !isset( $this->_data['css_map'] ) OR ! is_array( $this->_data['css_map'] ) )
+		if ( !isset( $this->_data['css_map'] ) OR ! \is_array( $this->_data['css_map'] ) )
 		{
 			if ( isset( $this->_data['css_map'] ) AND $cssMap = json_decode( $this->_data['css_map'], true ) )
 			{
@@ -1359,28 +1188,117 @@ class Theme extends Model
 	/**
 	 * Get header logo
 	 *
-	 * @return    Url|string
+	 * @return	\IPS\Http\Url|string
 	 */
-	public function get_logo_front(): Url|string
+	public function get_logo_front()
 	{
 		return $this->logoImage( 'front' );
 	}
 
 	/**
+	 * Return a string of CSS var definitions
+	 *
+	 * @return	string
+	 */
+	public function get_css_vars()
+	{
+		$output = array();
+
+		foreach( $this->settings as $key => $value )
+		{
+			if( preg_match( '/^#[0-9a-fA-F]{6}$/', $value ) )
+			{
+				$value = str_replace('#', '', $value);
+				$rgb = array();
+
+				if( \strlen( $value ) === 3 )
+				{
+					$rgb[] = hexdec( \substr( $value, 0, 1 ) . \substr( $value, 0, 1 ) );
+					$rgb[] = hexdec( \substr( $value, 1, 1 ) . \substr( $value, 1, 1 ) );
+					$rgb[] = hexdec( \substr( $value, 2, 1 ) . \substr( $value, 2, 1 ) );
+				}
+				else
+				{
+					$rgb[] = hexdec( \substr( $value, 0, 2 ) );
+					$rgb[] = hexdec( \substr( $value, 2, 2 ) );
+					$rgb[] = hexdec( \substr( $value, 4, 2 ) );
+				}
+
+				$output[] = "\t--theme-" . $key . ": " . implode(', ', $rgb) . ";";
+			}
+		}
+
+		return implode("\n", $output);
+	}
+
+	/**
+	 * Get the offline css vars. We don't need 3kb of CSS vars for a simple offline page.
+	 *
+	 * @return string
+	 */
+	public function get_offline_css_vars() : string
+	{
+		$output = array();
+		$varsWeActuallyCareAbout = [
+			"text_color",
+			"page_background",
+			"text_dark",
+			"important_button",
+			"important_button_font",
+		];
+
+		foreach( $varsWeActuallyCareAbout as $key )
+		{
+			if ( !isset( $this->settings[$key] ) )
+			{
+				continue;
+			}
+			else
+			{
+				$value = $this->settings[$key];
+			}
+
+			if( preg_match( '/^#[0-9a-fA-F]{6}$/', $value ) )
+			{
+				$value = str_replace('#', '', $value);
+				$rgb = array();
+
+				if( \strlen( $value ) === 3 )
+				{
+					$rgb[] = hexdec( \substr( $value, 0, 1 ) . \substr( $value, 0, 1 ) );
+					$rgb[] = hexdec( \substr( $value, 1, 1 ) . \substr( $value, 1, 1 ) );
+					$rgb[] = hexdec( \substr( $value, 2, 1 ) . \substr( $value, 2, 1 ) );
+				}
+				else
+				{
+					$rgb[] = hexdec( \substr( $value, 0, 2 ) );
+					$rgb[] = hexdec( \substr( $value, 2, 2 ) );
+					$rgb[] = hexdec( \substr( $value, 4, 2 ) );
+				}
+
+				$output[] = "--theme-" . $key . ":" . implode(',', $rgb) . ";";
+			}
+		}
+
+		return implode(" ", $output);
+
+	}
+
+	/**
 	 * Return logo image
 	 *
-	 * @param string $type	Type of logo image
-	 * @return    Url|string
+	 * @param	string	$type	Type of logo image
+	 * @return	\IPS\Http\Url|string
 	 */
-	protected function logoImage( string $type ): Url|string
+	protected function logoImage( $type )
 	{
-		if( !empty( $this->logo[ $type ]['url'] ) )
+		if( isset( \IPS\Theme::i()->logo[ $type ]['url'] ) )
 		{
 			try
 			{
-				return File::get( 'core_Theme', $this->logo[ $type ]['url'] )->url;
+				return \IPS\File::get( 'core_Theme', \IPS\Theme::i()->logo[ $type ]['url'] )->url;
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return '';
 			}
@@ -1394,60 +1312,23 @@ class Theme extends Model
 	 *
 	 * @return	string|null
 	 */
-	protected function get__description(): ?string
+	protected function get__description()
 	{
-		return Theme::i()->getTemplate( 'customization', 'core' )->themeDescription( $this );
+		return \IPS\Theme::i()->getTemplate( 'customization', 'core' )->themeDescription( $this );
 	}
 
 	/**
 	 * Get the authors website
 	 *	 *
-	 * @return Url|null
+	 * @return \IPS\Http\Url|null
 	 */
-	public function website(): ?Url
+	public function website()
 	{
 		if ( $this->_data['author_url'] )
 		{
-			return Url::createFromString( $this->_data['author_url'] );
+			return \IPS\Http\Url::createFromString( $this->_data['author_url'] );
 		}
 		return NULL;
-	}
-
-	/**
-	 * Store the default so that we can determine if this is customized or not
-	 *
-	 * @var array[]
-	 */
-	public static array $defaultThemeEditorData = [
-		'header' => [
-			'logo' => 4,
-			'navigation' => 5,
-			'user' => 6,
-			'breadcrumb' => 7,
-			'search' => 9,
-		]
-	];
-
-	/**
-	 * @return array
-	 */
-	public function get_theme_editor_data() : array
-	{
-		$editorData = isset( $this->_data['theme_editor_data'] ) ? json_decode( $this->_data['theme_editor_data'], true ) : [];
-		if( !isset( $editorData['header'] ) )
-		{
-			$editorData['header'] = static::$defaultThemeEditorData['header'];
-		}
-		return $editorData;
-	}
-
-	/**
-	 * @param mixed $val
-	 * @return void
-	 */
-	public function set_theme_editor_data( mixed $val ) : void
-	{
-		$this->_data['theme_editor_data'] = is_array( $val ) ? json_encode( $val ) : null;
 	}
 
 	/**
@@ -1455,47 +1336,80 @@ class Theme extends Model
 	 *
 	 * @return	NULL|array		Null for no badge, or an array of badge data (0 => CSS class type, 1 => language string, 2 => optional raw HTML to show instead of language string)
 	 */
-	protected function get__badge(): ?array
+	protected function get__badge()
 	{
 		/* Is there an update to show? */
 		$badge	= NULL;
 
-		if ( $this->is_default )
+		if ( static::designersModeEnabled() )
 		{
-			$message = 'default_no_parenthesis';
-
-			$badge	= array(
-				0	=> 'positive',
-				1	=> $message
-			);
-		}
-
-		if ( $this->update_data )
-		{
-			$data	= json_decode( $this->update_data, TRUE );
-
-			if( !empty($data['longversion']) AND $data['longversion'] > $this->long_version )
+			if ( $this->is_default )
 			{
-				$released	= NULL;
-
-				if( $data['released'] AND intval($data['released']) == $data['released'] AND strlen($data['released']) == 10 )
-				{
-					$released	= DateTime::ts( $data['released'] )->localeDate();
-				}
-				else if( $data['released'] )
-				{
-					$released	= $data['released'];
-				}
+				$message = 'theme_is_default_with_id';
 
 				$badge	= array(
-						0	=> 'new',
-						1	=> '',
-						2	=> Theme::i()->getTemplate( 'global', 'core' )->updatebadge( $data['version'], $data['updateurl'], $released )
+					0	=> 'positive ipsPos_right',
+					1	=> \IPS\Member::loggedIn()->language()->addToStack( $message, FALSE, array( 'sprintf' => array( $this->id ) ) )
 				);
+			}
+			else
+			{
+				$badge = array(
+					0 => 'style7 ipsPos_right',
+					1 => \IPS\Member::loggedIn()->language()->addToStack('theme_with_id', FALSE, array( 'sprintf' => array( $this->id ) ) )
+				);
+			}
+		}
+		else
+		{
+			if ( $this->is_default )
+			{
+				$message = 'default_no_parenthesis';
+
+				$badge	= array(
+					0	=> 'positive ipsPos_right',
+					1	=> $message
+				);
+			}
+
+			if ( $this->update_data )
+			{
+				$data	= json_decode( $this->update_data, TRUE );
+
+				if( !empty($data['longversion']) AND $data['longversion'] > $this->long_version )
+				{
+					$released	= NULL;
+
+					if( $data['released'] AND \intval($data['released']) == $data['released'] AND \strlen($data['released']) == 10 )
+					{
+						$released	= (string) \IPS\DateTime::ts( $data['released'] )->localeDate();
+					}
+					else if( $data['released'] )
+					{
+						$released	= $data['released'];
+					}
+
+					$badge	= array(
+							0	=> 'new',
+							1	=> '',
+							2	=> \IPS\Theme::i()->getTemplate( 'global', 'core' )->updatebadge( $data['version'], $data['updateurl'], $released )
+					);
+				}
 			}
 		}
 
 		return $badge;
+	}
+
+	/**
+	 * [Node] Get Icon for tree
+	 *
+	 * @note	Return the class for the icon (e.g. 'fa-globe')
+	 * @return	string|null
+	 */
+	protected function get__icon()
+	{
+		return ( $this->by_skin_gen ) ? 'magic' : '';
 	}
 
 	/**
@@ -1510,11 +1424,11 @@ class Theme extends Model
 			return;
 		}
 
-		$originalId = $this->_data['id'];
-		$title      = Member::loggedIn()->language()->get( static::$titleLangPrefix . $originalId );
+		$title      = \IPS\Member::loggedIn()->language()->get( static::$titleLangPrefix . $this->_id );
+		$originalId = $this->get__id();
 
 		/* Unset custom properties */
-		foreach( array( 'resource_map', 'css_map', 'logo', 'name_translated', 'title' ) as $f )
+		foreach( array( 'settings', 'resource_map', 'css_map', 'logo', 'name_translated', 'title' ) as $f )
 		{
 			unset( $this->_data[ $f ] );
 		}
@@ -1522,26 +1436,104 @@ class Theme extends Model
 
 		parent::__clone();
 
+		/* Dynamically produce insert list so we don't have to update each time the table changes */
+		$templateTable  = \IPS\Db::i()->getTableDefinition( 'core_theme_templates', TRUE );
+		$cssTable       = \IPS\Db::i()->getTableDefinition( 'core_theme_css', TRUE );
+		$templateFields = array_keys( $templateTable['columns'] );
+		$cssFields      = array_keys( $cssTable['columns'] );
+
+		array_walk( $templateFields, function( &$name, $i, $setId )
+		{
+			switch( $name )
+			{
+				case 'template_id':
+					$name = 'null';
+					break;
+				case 'template_set_id':
+					$name = $setId;
+					break;
+			}
+		}, $this->id );
+
+		array_walk( $cssFields, function( &$name, $i, $setId )
+		{
+			switch( $name )
+			{
+				case 'css_id':
+					$name = 'null';
+					break;
+				case 'css_set_id':
+					$name = $setId;
+					break;
+			}
+		}, $this->id );
+
 		/* Insert new language bit */
-		Lang::saveCustom( 'core', "core_theme_set_title_" . $this->id, sprintf( Member::loggedIn()->language()->get( 'theme_clone_copy_of' ), $title ) );
+		\IPS\Lang::saveCustom( 'core', "core_theme_set_title_" . $this->id, sprintf( \IPS\Member::loggedIn()->language()->get( 'theme_clone_copy_of' ), $title ) );
+
+		/* Copy across any template bits */
+		\IPS\Db::i()->insert( 'core_theme_templates', \IPS\Db::i()->select( implode(',', $templateFields ), 'core_theme_templates', array( 'template_set_id=?', $originalId ) ) );
+
+		/* Copy across any CSS bits */
+		\IPS\Db::i()->insert( 'core_theme_css', \IPS\Db::i()->select( implode(',', $cssFields ), 'core_theme_css', array( 'css_set_id=?', $originalId ) ) );
+
+		/* Copy across any settings */
+		$settingFields = array();
+
+		foreach( \IPS\Db::i()->select( '*', 'core_theme_settings_fields', array( 'sc_set_id=?', $originalId ) ) as $row )
+		{
+			$settingFields[ $row['sc_id'] ] = $row;
+		}
+
+		$settingValues = iterator_to_array( \IPS\Db::i()->select( 'sv_id, sv_value', 'core_theme_settings_values', array( \IPS\Db::i()->in( 'sv_id', array_keys( $settingFields ) ) ) )->setKeyField('sv_id')->setValueField('sv_value') );
+
+		foreach( $settingFields as $id => $row )
+		{
+			$origId = $row['sc_id'];
+			unset( $row['sc_id'] );
+
+			$row['sc_set_id'] = $this->id;
+
+			$newId = \IPS\Db::i()->insert( 'core_theme_settings_fields', $row );
+
+			\IPS\Db::i()->insert( 'core_theme_settings_values', array(
+				'sv_id'    => $newId,
+				'sv_value' => ( array_key_exists( $origId, $settingValues ) ) ? $settingValues[ $origId ] : $row['sc_default']
+			) );
+		}
+
+		/* Copy any language keys */
+		foreach( \IPS\Db::i()->select( '*', 'core_sys_lang_words', array( 'word_theme=?', $originalId ) ) AS $word )
+		{
+			$word['word_theme'] = $this->id;
+			unset( $word['word_id'] );
+			\IPS\Db::i()->insert( 'core_sys_lang_words', $word );
+		}
+
+		/* Copy across resources */
+		$this->copyResourcesFromSet( $originalId );
 
 		/* Make sure data objects are loaded correctly */
 		static::$gotAll = false;
 
 		/* Save css/img maps */
-		Theme::load( $this->id )->saveSet();
+		\IPS\Theme::load( $this->id )->saveSet();
 
-		Session::i()->log( 'acplogs__themeset_created', array( sprintf( Member::loggedIn()->language()->get( 'theme_clone_copy_of' ), Member::loggedIn()->language()->get( 'core_theme_set_title_' . $originalId ) ) => FALSE ) );
+		/* Copy logos */
+		$this->logo_data = NULL;
+		$this->copyLogosFromSet( $originalId );
+
+		\IPS\Session::i()->log( 'acplogs__themeset_created', array( sprintf( \IPS\Member::loggedIn()->language()->get( 'theme_clone_copy_of' ), \IPS\Member::loggedIn()->language()->get( 'core_theme_set_title_' . $originalId ) ) => FALSE ) );
 	}
 
 	/**
-	 * [Node] Does the currently logged-in user have permission to delete this node?
+	 * [Node] Does the currently logged in user have permission to delete this node?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canDelete(): bool
+	public function canDelete()
 	{
-		if ( IN_DEV AND $this->_id == DEFAULT_THEME_ID)
+		if ( \IPS\IN_DEV AND $this->_id == \IPS\DEFAULT_THEME_ID )
 		{
 			return FALSE;
 		}
@@ -1565,122 +1557,118 @@ class Theme extends Model
 	/**
 	 * [Node] Delete the theme set
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		if ( IN_DEV AND $this->_id == DEFAULT_THEME_ID)
+		if ( \IPS\IN_DEV AND $this->_id == \IPS\DEFAULT_THEME_ID )
 		{
-			Output::i()->error( 'theme_error_not_available_in_dev', '2S140/1', 403, '' );
+			\IPS\Output::i()->error( 'theme_error_not_available_in_dev', '2S140/1', 403, '' );
 		}
 
 		if ( $this->is_default )
 		{
-			Output::i()->error( 'core_theme_cannot_delete_default_theme', '2S162/1', 403, '' );
+			\IPS\Output::i()->error( 'core_theme_cannot_delete_default_theme', '2S162/1', 403, '' );
 		}
 
 		/* Clear out existing built bits */
-		File::getClass('core_Theme')->deleteContainer( 'css_built_' . $this->_id );
-		File::getClass('core_Theme')->deleteContainer( 'set_resources_' . $this->_id );
+		\IPS\File::getClass('core_Theme')->deleteContainer( 'css_built_' . $this->_id );
+		\IPS\File::getClass('core_Theme')->deleteContainer( 'set_resources_' . $this->_id );
 
-		$templates = $this->getAllTemplates();
+		$templates = $this->getRawTemplates();
 
 		foreach( $templates as $app => $v )
 		{
-			foreach( $v as $location => $groups )
+			foreach( $templates[ $app ] as $location => $groups )
 			{
-				foreach( $v[ $location ] as $group => $bits )
+				foreach( $templates[ $app ][ $location ] as $group => $bits )
 				{
-					foreach( $v[ $location ][ $group ] as $name => $data )
+					foreach( $templates[ $app ][ $location ][ $group ] as $name => $data )
 					{
 						/* Store it */
-						$key = strtolower( 'template_' . $this->_id . '_' .static::makeBuiltTemplateLookupHash( $app, $location, $group ) . '_' . static::cleanGroupName( $group ) );
+						$key = \strtolower( 'template_' . $this->_id . '_' .static::makeBuiltTemplateLookupHash( $app, $location, $group ) . '_' . static::cleanGroupName( $group ) );
 
-						unset( Store::i()->$key );
+						unset( \IPS\Data\Store::i()->$key );
 					}
 				}
 			}
 		}
 
-		Db::i()->delete( 'core_theme_resources', array( 'resource_set_id=?', $this->_id ) );
-		Db::i()->delete( 'core_theme_css', array( 'css_set_id=?', $this->_id ) );
-		Db::i()->delete( 'core_theme_templates', array( 'template_set_id=?', $this->_id ) );
-		Db::i()->delete( 'core_sys_lang_words', array( 'word_theme=?', $this->_id ) );
-		Db::i()->delete( 'core_theme_templates_custom', [ 'template_set_id=?', $this->_id ] );
+		\IPS\Db::i()->delete( 'core_theme_resources', array( 'resource_set_id=?', $this->_id ) );
+		\IPS\Db::i()->delete( 'core_theme_css', array( 'css_set_id=?', $this->_id ) );
+		\IPS\Db::i()->delete( 'core_theme_templates', array( 'template_set_id=?', $this->_id ) );
+		\IPS\Db::i()->delete( 'core_sys_lang_words', array( 'word_theme=?', $this->_id ) );
 
-		/* Delete theme editor settings */
-		Db::i()->delete( 'core_theme_editor_settings', [ 'setting_set_id=?', $this->_id ] );
-
-		/* Check the categories. If there are settings from another app, then we leave the category,
-		and change the application key */
-		$categories = iterator_to_array(
-			Db::i()->select( '*', 'core_theme_editor_categories', [ 'cat_set_id=?', $this->_id ] )
-		);
-
-		foreach( $categories as $category )
+		/* Delete theme settings */
+		$settingFields = array();
+		foreach( \IPS\Db::i()->select( '*', 'core_theme_settings_fields', array( 'sc_set_id=?', $this->_id ) ) as $row )
 		{
-			try
-			{
-				$otherSetting = Db::i()->select( '*', 'core_theme_editor_settings', [ 'setting_category_id=? and setting_set_id != ?', $category['cat_id'], $this->_id ], 'setting_position', array( 0, 1 ) )->first();
-				Db::i()->update( 'core_theme_editor_categories', [ 'cat_set_id' => 0 ], [ 'cat_id=?', $category['cat_id'] ] );
-			}
-			catch( UnderflowException )
-			{
-				Db::i()->delete( 'core_theme_editor_categories', [ 'cat_id=?', $category['cat_id'] ] );
-			}
+			$settingFields[ $row['sc_id'] ] = $row;
+		}
+
+		if ( \count( $settingFields ) )
+		{
+			\IPS\Db::i()->delete( 'core_theme_settings_values', array( \IPS\Db::i()->in( 'sv_id', array_keys( $settingFields ) ) ) );
 		}
 
 		/** reset member skin  */
-		Db::i()->update( 'core_members', array( 'skin' => 0 ), array('skin=?', $this->_id ) );
+		\IPS\Db::i()->update( 'core_members', array( 'skin' => 0 ), array('skin=?', $this->_id ) );
+
+		\IPS\Db::i()->delete( 'core_theme_settings_fields', array( 'sc_set_id=?', $this->_id ) );
 
 		parent::delete();
-		unset( Store::i()->themes );
+		unset( \IPS\Data\Store::i()->themes );
 	}
 
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param Form $form The form
-	 * @return    void
-	 * @throws Exception
+	 * @param	\IPS\Helpers\Form	$form	The form
+	 * @return	void
 	 */
-	public function form( Form &$form ): void
+	public function form( &$form )
 	{
 		/* Check permission */
-		Dispatcher::i()->checkAcpPermission( 'theme_sets_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'theme_sets_manage' );
 
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'customization/themes.css', 'core', 'admin' ) );
-		Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_customization.js', 'core', 'admin' ) );
-		$form->attributes[ 'data-controller' ] = 'core.admin.customization.themeForm';
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'customization/themes.css', 'core', 'admin' ) );
+		\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_customization.js', 'core', 'admin' ) );
 
 		/* General */
 		if ( $this->id )
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('core_theme_editing_set', FALSE, array( 'sprintf' => array( $this->_title ) ) );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('core_theme_editing_set', FALSE, array( 'sprintf' => array( $this->_title ) ) );
 
 			$form->addTab( 'theme_set_tab__general' );
-
-			$groups = array();
-			foreach( Group::groups() as $group )
-			{
-				if ( $group->g_bitoptions['gbw_change_layouts'] )
-				{
-					$groups[] = Theme::i()->getTemplate( 'customization' )->groupLink( $group->g_id, $group->name );
-				}
-			}
-
-			$form->addHtml( Theme::i()->getTemplate( 'customization' )->layoutPermissionBlurb( $groups ) );
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('theme_set_add_button');
-			$form->addTab( 'theme_set_tab__new_custom_set' );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('theme_set_add_button');
+
+			$form->hiddenValues['theme_type'] = \IPS\Request::i()->type;
+			$form->addTab( ( \IPS\Request::i()->type === 'vse' ) ? 'theme_set_tab__new_vse_set' : 'theme_set_tab__new_custom_set' );
 		}
 
-		$form->add( new Translatable( 'core_theme_set_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? "core_theme_set_title_{$this->id}" : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'core_theme_set_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? "core_theme_set_title_{$this->id}" : NULL ) ) ) );
+
+		$class = \get_called_class();
+
+		$form->add( new \IPS\Helpers\Form\Node( 'core_theme_parent_id', \intval( $this->parent_id ), FALSE, array(
+			'class'          => '\IPS\Theme',
+			'subnodes'        => FALSE,
+			'zeroVal'         => 'core_theme_parent_id_none',
+			'permissionCheck' => function( $node ) use ( $class )
+			{
+				if( isset( $class::$subnodeClass ) AND $class::$subnodeClass AND $node instanceof $class::$subnodeClass )
+				{
+					return FALSE;
+				}
+
+				return !isset( \IPS\Request::i()->id ) or ( $node->id != \IPS\Request::i()->id and !$node->isChildOf( $node::load( \IPS\Request::i()->id ) ) );
+			} ) ) );
 
 		$id = $this->id;
-		$form->add( new YesNo( 'core_theme_set_is_default' , $this->is_default, false, array( 'togglesOff'  => array('core_theme_set_permissions') ), function( $val ) use ( $id )
+		$form->add( new \IPS\Helpers\Form\YesNo( 'core_theme_set_is_default' , $this->is_default, false, array( 'togglesOff'  => array('core_theme_set_permissions') ), function( $val ) use ( $id )
 		{
 			$where = array( array( 'set_is_default=1' ) );
 			if ( $id )
@@ -1688,71 +1676,310 @@ class Theme extends Model
 				$where[] = array('set_id<>?', $id );
 			}
 
-			if ( !$val and !Db::i()->select( 'COUNT(*)', 'core_themes', $where )->first() )
+			if ( !$val and !\IPS\Db::i()->select( 'COUNT(*)', 'core_themes', $where )->first() )
 			{
-				throw new DomainException('core_theme_set_is_default_error');
+				throw new \DomainException('core_theme_set_is_default_error');
 			}
 		} ) );
 
-		$form->add( new CheckboxSet(
+		$form->add( new \IPS\Helpers\Form\CheckboxSet(
 				'core_theme_set_permissions',
 				( $this->id ) ? ( $this->permissions === '*' ? '*' : explode( ",", $this->permissions ) ) : '*',
 				FALSE,
-				array( 'options' => Group::groups(), 'multiple' => TRUE, 'parse' => 'normal', 'unlimited' => '*', 'unlimitedLang' => 'all', 'impliedUnlimited' => TRUE ),
+				array( 'options' => \IPS\Member\Group::groups(), 'multiple' => TRUE, 'parse' => 'normal', 'unlimited' => '*', 'unlimitedLang' => 'all', 'impliedUnlimited' => TRUE ),
 				NULL,
 				NULL,
 				NULL,
 				'core_theme_set_permissions'
 		) );
 
-		if (IN_DEV)
+		if ( \IPS\IN_DEV OR \IPS\Theme::designersModeEnabled() )
 		{
-			$form->add( new Text( 'theme_template_export_author_name', $this->author_name, false ) );
-			$form->add( new Text( 'theme_template_export_author_url' , $this->author_url, false ) );
-			$form->add( new Text( 'theme_update_check' , $this->update_check, false ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'theme_template_export_author_name', $this->author_name, false ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'theme_template_export_author_url' , $this->author_url, false ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'theme_update_check' , $this->update_check, false ) );
 
-			$form->add( new Text( 'theme_template_export_version'        , $this->version ? $this->version : '1.0'    , true, array( 'placeholder' => '1.0.0' ) ) );
-			$form->add( new Number( 'theme_template_export_long_version' , $this->long_version ?: 10000, true ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'theme_template_export_version'        , $this->version ? $this->version : '1.0'    , true, array( 'placeholder' => '1.0.0' ) ) );
+			$form->add( new \IPS\Helpers\Form\Number( 'theme_template_export_long_version' , $this->long_version ? $this->long_version : 10000, true ) );
 		}
 
-		/* Header, footer and custom CSS */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'customization', 'theme_templates_manage' ) )
+		/* Logo */
+		$form->addTab( 'theme_set_tab__logo' );
+
+		/* SITE LOGO */
+		$form->addHeader( 'core_theme_set_logo_manage' );
+
+		$form->add( new \IPS\Helpers\Form\Upload( 'core_theme_set_logo', ( isset( $this->logo['front']['url'] ) ? \IPS\File::get( 'core_Theme', $this->logo['front']['url'] ) : NULL ), FALSE, array( 'image' => true, 'storageExtension' => 'core_Theme' ), NULL, NULL, NULL, 'core_theme_set_logo' ) );
+
+		$form->add( new \IPS\Helpers\Form\Number( 'core_theme_set_logo_height', ( isset( $this->logo['front']['height'] ) ? $this->logo['front']['height'] : 100 ), FALSE, array( 'min' => 1, 'max' => 100 ), NULL, NULL, '%' ) );
+
+		/* EDITOR */
+		$form->addTab('core_theme_set_editor_header');
+		if ( \IPS\IN_DEV )
 		{
-			$form->addTab('core_theme_set_header_and_footer_header');
-			$form->add( new Codemirror( 'theme_simple_header_settings', $this->custom_header, FALSE, [ 'codeModeAllowedLanguages' => [ 'ipsphtml' ], 'height' => 600 ], function( $val ) {
-				try
+			$form->addMessage( \IPS\Member::loggedIn()->language()->get('core_theme_set_editor_dev'), 'ipsMessage ipsMessage_warning' );
+		}
+		$form->addMessage( \IPS\Member::loggedIn()->language()->addToStack( 'core_theme_set_editor_blurb', FALSE, array( 'sprintf' => array( \IPS\Helpers\Form\Editor::ckeditorVersion() ) ) ) );
+		if ( !\IPS\NO_WRITES and class_exists( 'ZipArchive', FALSE ) )
+		{
+			$form->add( new \IPS\Helpers\Form\Radio( 'core_theme_set_editor', 'existing', FALSE, array(
+				'options' => array( 'existing' => 'core_theme_set_editor_existing_sel', 'new' => 'core_theme_set_editor_new_sel' ),
+				'toggles' => array( 'existing' => array( 'core_theme_set_editor_existing' ), 'new' => array( 'core_theme_set_editor_new' ) )
+			) ) );
+		}
+		else
+		{
+			\IPS\Member::loggedIn()->language()->words['core_theme_set_editor_existing_desc'] = \IPS\Member::loggedIn()->language()->get('core_theme_set_editor_existing_instr');
+		}
+		$skins = array();
+		if ( is_dir( \IPS\ROOT_PATH . '/applications/core/interface/ckeditor/ckeditor/skins' ) )
+		{
+			foreach ( new \DirectoryIterator( \IPS\ROOT_PATH . '/applications/core/interface/ckeditor/ckeditor/skins' ) as $f )
+			{
+				if ( !$f->isDot() and $f->isDir() )
 				{
-					static::makeProcessFunction( $val, 'template_' . md5( mt_rand() . time() ), '', TRUE, FALSE );
+					$_name				= (string) $f;
+
+					if( \IPS\Member::loggedIn()->language()->checkKeyExists( 'ckeditor_theme_' . $_name ) )
+					{
+						$skins[ $_name ]	= \IPS\Member::loggedIn()->language()->addToStack( 'ckeditor_theme_' . $_name );
+					}
+					else
+					{
+						$skins[ $_name ]	= $_name;
+					}
 				}
-				catch( ParseError $e )
-				{
-					throw new DomainException( 'core_theme_template_parse_error' );
-				}
-			}, NULL, NULL, 'theme_header' ) );
-			$form->add( new Codemirror( 'theme_simple_footer_settings', $this->custom_footer, FALSE, [ 'codeModeAllowedLanguages' => [ 'ipsphtml' ], 'height' => 600 ], function( $val ) {
-				try
-				{
-					static::makeProcessFunction( $val, 'template_' . md5( mt_rand() . time() ), '', TRUE, FALSE );
-				}
-				catch( ParseError $e )
-				{
-					throw new DomainException( 'core_theme_template_parse_error' );
-				}
-			}, NULL, NULL, 'theme_footer' ) );
+			}
 		}
 
-		$form->canSaveAndReload = true;
+		if ( \IPS\CIC2 )
+		{
+			if ( is_dir( \IPS\SITE_FILES_PATH . '/ckeditor_custom' ) )
+			{
+				foreach( new \DirectoryIterator( \IPS\SITE_FILES_PATH . '/ckeditor_custom' ) AS $f )
+				{
+					if ( !$f->isDot() AND $f->isDir() )
+					{
+						$_name = (string) $f;
+
+						if ( mb_substr( $_name, 0, 5) === 'skin_' )
+						{
+							$_name = str_replace( 'skin_', '', $_name );
+							if ( \IPS\Member::loggedIn()->language()->checkKeyExists( 'ckeditor_name_' . $_name ) )
+							{
+								$skins[ $_name ] = \IPS\Member::loggedIn()->language()->addToStack( 'ckeditor_theme_' . $_name );
+							}
+							else
+							{
+								$skins[ $_name ] = $_name;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		$form->add( new \IPS\Helpers\Form\Select( 'core_theme_set_editor_existing', $this->id ? $this->editor_skin : 'ips', FALSE, array( 'options' => $skins ), NULL, NULL, NULL, 'core_theme_set_editor_existing' ) );
+
+		if ( \IPS\CIC2 OR ( !\IPS\NO_WRITES and class_exists( 'ZipArchive', FALSE ) ) )
+		{
+			if ( !\IPS\CIC2 AND !is_writable( \IPS\ROOT_PATH . '/applications/core/interface/ckeditor/ckeditor/skins' ) )
+			{
+				$form->add( new \IPS\Helpers\Form\Custom( 'core_theme_set_editor_new', NULL, TRUE, array(
+					'getHtml' => function()
+					{
+						return \IPS\Theme::i()->getTemplate( 'global' )->message( 'editor_skin_nowrite', 'error' );
+					},
+					'getValue' => function()
+					{
+						return NULL;
+					}
+				), NULL, NULL, NULL, 'core_theme_set_editor_new' ) );
+			}
+			else
+			{
+				$form->add( new \IPS\Helpers\Form\Upload( 'core_theme_set_editor_new', NULL, FALSE, array( 'allowedFileTypes' => array( 'zip' ), 'temporary' => TRUE ), NULL, NULL, NULL, 'core_theme_set_editor_new' ) );
+			}
+		}
+
+		$form->addTab('core_theme_set_header_and_footer_header');
+		$form->add( new \IPS\Helpers\Form\Codemirror( 'theme_simple_header_settings', $this->custom_header, FALSE, [ 'mode' => 'htmlmixed', 'height' => 400 ], function( $val ) {
+			try
+			{
+				static::makeProcessFunction( $val, 'template_' . md5( mt_rand() . time() ), '', TRUE, FALSE );
+			}
+			catch( \ParseError $e )
+			{
+				throw new \DomainException( 'core_theme_template_parse_error' );
+			}
+		} ) );
+		$form->add( new \IPS\Helpers\Form\Codemirror( 'theme_simple_footer_settings', $this->custom_footer, FALSE, [ 'mode' => 'htmlmixed', 'height' => 400 ], function( $val ) {
+			try
+			{
+				static::makeProcessFunction( $val, 'template_' . md5( mt_rand() . time() ), '', TRUE, FALSE );
+			}
+			catch( \ParseError $e )
+			{
+				throw new \DomainException( 'core_theme_template_parse_error' );
+			}
+		} ) );
+
+		/* THEME SETTINGS */
+		if ( $this->id )
+		{
+			if ( static::designersModeEnabled() )
+			{
+				\IPS\Theme\Advanced\Theme::loadLanguage( $this->id );
+			}
+
+			$customTabs = array();
+			foreach( \IPS\Db::i()->select( 'sc.*, sv.sv_value', array( 'core_theme_settings_fields', 'sc' ), array( 'sc.sc_set_id=? AND app_enabled=1', $this->id ), 'sc_order' )
+				->join( array( 'core_theme_settings_values', 'sv' ), 'sv.sv_id=sc.sc_id' )
+				->join( array( 'core_applications', 'a' ), 'sc.sc_app=a.app_directory' )
+			as $data ) {
+				$customTabs[ $data['sc_tab_key'] ][] = $data;
+			}
+
+			ksort( $customTabs );
+
+			foreach( $customTabs as $tabKey => $data )
+			{
+				$form->addTab( 'theme_custom_tab_' . $tabKey );
+
+				if ( \IPS\IN_DEV AND $this->_id === \IPS\DEFAULT_THEME_ID )
+				{
+					$form->addHeader( 'core_theme_default_dev_reminder' );
+				}
+
+				foreach( $data as $row )
+				{
+					if ( $field = $this->getCustomSettingField( $row ) )
+					{
+						$form->add( $field );
+					}
+				}
+			}
+
+			$form->canSaveAndReload = true;
+		}
 	}
+
+	/**
+	 * Custom Settings
+	 *
+	 * @param	array	$row	Row from core_theme_settings_fields
+	 * @return	\IPS\Helpers\Form\FormAbstract
+	 */
+	public function getCustomSettingField( $row )
+	{
+		if ( $row['sc_condition'] )
+		{
+			if ( !@eval( $row['sc_condition'] ) )
+			{
+				return NULL;
+			}
+		}
+
+		$row['sc_type'] = ( empty( $row['sc_type'] ) ) ? 'Text' : $row['sc_type'];
+
+		/* What's the value */
+		$value = ( isset( $row['sv_value'] ) ) ? $row['sv_value'] : $row['sc_default'];
+		if( $row['sc_multiple'] and \in_array( $row['sc_type'], array( 'Select', 'Radio' ) ) )
+		{
+			$value = explode( ",", $value );
+		}
+
+		if ( $row['sc_type'] === 'other' )
+		{
+			$theme = $this;
+			$field = eval( $row['sc_content'] );
+		}
+		else
+		{
+			$class = '\IPS\Helpers\Form\\' . $row['sc_type'];
+
+			$options = array();
+			switch ( $row['sc_type'] )
+			{
+				case 'Select':
+					$options['multiple'] = $row['sc_multiple'];
+					// No break
+				case 'Radio':
+					$content = json_decode( $row['sc_content'], true );
+					$values  = array();
+
+					foreach( $content as $data )
+					{
+						if ( isset( $data['key'] ) )
+						{
+							$values[ $data['key'] ] = $data['value'];
+						}
+						else
+						{
+							$values[] = $data;
+						}
+					}
+
+					$options['options'] = $values;
+				break;
+
+				case 'Editor':
+					$options['app']			= 'core';
+					$options['key']			= 'Admin';
+					$options['autoSaveKey']	= 'theme_custom_autosave_' . $row['sc_id'];
+					$options['attachIds']   = array( $this->id, $row['sc_id'] );
+				break;
+
+				case 'TextArea':
+					$options['rows'] = 8;
+				break;
+				case 'Upload':
+					$options['storageExtension'] = 'core_Theme';
+
+					if ( $value )
+					{
+						try
+						{
+							$value = \IPS\File::get( $options['storageExtension'], $value );
+						}
+						catch ( \OutOfRangeException $e )
+						{
+							$value = NULL;
+						}
+					}
+				break;
+			}
+
+			$suffix = ( $row['sc_type'] == 'Color' and isset( $row['sv_value'] ) and ( mb_strtolower( $row['sc_default'] ) != mb_strtolower( $row['sv_value'] ) ) ) ? \IPS\Theme::i()->getTemplate( 'customization', 'core', 'admin' )->themeSettingRevert( $this->id, $row ) : NULL;
+
+			$field = new $class( "core_theme_setting_title_{$row['sc_id']}", $value, false, $options, NULL, NULL, $suffix, 'theme_setting_' . $row['sc_key'] );
+		}
+
+		$desc = $row['sc_title'] . '_desc';
+		$field->description = \IPS\Member::loggedIn()->language()->addToStack( $desc, FALSE, array( 'returnBlank' => TRUE, 'returnInto' => \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->rowDesc( $desc, $field ) ) );
+
+		if ( \IPS\IN_DEV OR \IPS\Theme::designersModeEnabled() )
+		{
+			$field->label = \IPS\Theme::i()->getTemplate( 'customization', 'core', 'admin' )->themeSettingLabelWithKey( $row );
+		}
+		else
+		{
+			$field->label = \IPS\Member::loggedIn()->language()->addToStack( $row['sc_title'] );
+		}
+
+		return $field;
+	}
+
 
 	/**
 	 * [Node] Get buttons to display in tree
 	 * Example code explains return value
 	 *
-	 * @param Url $url		Base URL
-	 * @param bool $subnode	Is this a subnode?
-	 * @return    array
+	 * @param	string	$url		Base URL
+	 * @param	bool	$subnode	Is this a subnode?
+	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ): array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$parentButtons = array();
 		$buttons       = array();
@@ -1764,34 +1991,59 @@ class Theme extends Model
 
 		unset( $parentButtons['edit']['data']['ipsDialog'], $parentButtons['edit']['data']['ipsDialog-title'] );
 
-		$buttons['edit'] = $parentButtons['edit'];
+		if ( $this->by_skin_gen AND \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'customization', 'theme_easy_editor' ) )
+		{
+			$buttons[] = array(
+					'icon'	   => 'magic',
+					'title'    => 'core_theme_launch_vse_tooltip',
+					'link'	   => \IPS\Http\Url::internal( "app=core&module=customization&controller=themes&do=launchvse&id={$this->_id}" )->csrf(),
+					'target'   => '_blank'
+			);
+
+			$buttons['edit'] = $parentButtons['edit'];
+		}
+
+		/* Add in our buttons */
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'customization', 'theme_templates_manage' ) )
+		{
+			$buttons['edit_templates'] = array(
+				'icon'	=> 'code',
+				'title'	=> 'theme_set_manage_templates_css',
+				'link'	=> \IPS\Http\Url::internal( "app=core&module=customization&controller=themes&do=templates&id={$this->_id}" )
+			);
+		}
+
+		if ( ! $this->by_skin_gen )
+		{
+			$buttons['edit'] = $parentButtons['edit'];
+		}
 
 		$buttons['resources'] = array(
-			'icon'	=> 'file-image',
+			'icon'	=> 'file-image-o',
 			'title'	=> 'theme_set_manage_resources',
-			'link'	=> Url::internal( "app=core&module=customization&controller=media&set_id={$this->_id}" ),
+			'link'	=> \IPS\Http\Url::internal( "app=core&module=customization&controller=themes&do=resources&set_id={$this->_id}" ),
 			'data'	=> array()
 		);
 
 		$buttons['copy'] = $parentButtons['copy'];
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'customization', 'theme_download_upload' ) AND !DEMO_MODE)
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'customization', 'theme_download_upload' ) AND !\IPS\DEMO_MODE )
 		{
 			$buttons['upload'] = array(
-					'icon' => 'upload',
-					'title' => 'theme_set_import',
-					'link' => Url::internal( "app=core&module=customization&controller=themes&do=importForm&id={$this->_id}" ),
-					'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'theme_set_import_title', FALSE, array( 'sprintf' => array( $this->_title ) ) ) )
+				'icon' => 'upload',
+				'title' => 'theme_set_import',
+				'link' => \IPS\Http\Url::internal( "app=core&module=customization&controller=themes&do=importForm&id={$this->_id}" ),
+				'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack( 'theme_set_import_title', FALSE, array( 'sprintf' => array( $this->_title ) ) ) )
 			);
 
 			$buttons['download'] = array(
 					'icon'	=> 'download',
 					'title'	=> 'theme_set_export',
-					'link'	=> Url::internal( "app=core&module=customization&controller=themes&do=exportForm&id={$this->_id}" . ( ( IN_DEV or Settings::i()->theme_designer_mode ) ? '' : '&form_submitted=1' ) )
+					'link'	=> \IPS\Http\Url::internal( "app=core&module=customization&controller=themes&do=exportForm&id={$this->_id}" . ( ( \IPS\IN_DEV or \IPS\Theme::designersModeEnabled() ) ? '' : '&form_submitted=1' ) )
 			);
 		}
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'member_edit' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'member_edit' ) )
 		{
 			$buttons['member_theme_set'] = array(
 					'icon'	=> 'user',
@@ -1801,41 +2053,54 @@ class Theme extends Model
 			);
 		}
 
+		if ( $this->by_skin_gen )
+		{
+			$buttons['convert_to_full'] = array(
+					'icon'	=> 'exchange',
+					'title'	=> 'theme_set_convert_vsecustom_link',
+					'link'	=> $url->setQueryString( array( 'do' => 'convertToCustom', 'id' => $this->_id ) )->csrf(),
+					'data' 	=> array( 'confirm' => '', 'confirmMessage' => \IPS\Member::loggedIn()->language()->addToStack('theme_set_convert_vsecustom') )
+			);
+		}
+
 		if ( $this->canDelete() )
 		{
 			$buttons['delete'] = $parentButtons['delete'];
 		}
 
-		if ( $this->isCustomized() )
+		if ( \IPS\IN_DEV OR \IPS\Theme::designersModeEnabled() )
 		{
-			$buttons['theme_revert'] = [
-				'icon' => 'reply',
-				'title' => 'theme_set_revert',
-				'link' => Url::internal( "app=core&module=customization&controller=themes&do=revertCustomizations&set_id={$this->_id}" ),
-				'data' => [ 'confirm' => 'true', 'confirmMessage' => Member::loggedIn()->language()->addToStack( 'theme_set_revert_explain' )]
-			];
+			$buttons['theme_settings'] = array(
+				'icon'	=> 'cog',
+				'title'	=> 'theme_set_custom_setting',
+				'link'	=> \IPS\Http\Url::internal( "app=core&module=customization&controller=themesettings&set_id={$this->_id}" )
+			);
+
+			if ( $this->is_default OR \IPS\Theme::designersModeEnabled() )
+			{
+				$buttons['dev_import'] = array(
+						'icon'	=> 'cogs',
+						'title'	=> 'theme_set_import_master',
+						'link'	=> \IPS\Http\Url::internal( "app=core&module=customization&controller=themes&do=devImport&id={$this->_id}" )->csrf()
+				);
+			}
+
+			/*$buttons[] = array(
+					'icon'	=> 'cogs',
+					'title'	=> 'theme_set_build',
+					'link'	=> \IPS\Http\Url::internal( "{$url}&do=build&id={$this->_id}" )->csrf()
+			);*/
 		}
 
-		if ( IN_DEV or Settings::i()->theme_designer_mode )
+		if ( \IPS\Theme::designersModeEnabled() )
 		{
-			$buttons['theme_settings'] = [
-				'icon' => 'sliders',
-				'title' => 'theme_set_editor_settings',
-				'link' => Url::internal( "app=core&module=customization&controller=themeeditor&set_id={$this->_id}" )
-			];
-
-			$buttons['theme_core_cssjs'] = [
-				'icon' => 'file-code',
-				'title' => 'theme_set_designer_core_cssjs',
-				'link' => Url::internal( "app=core&module=customization&controller=themes&do=designerCore&set_id={$this->_id}" )
-			];
-
-			$buttons['custom_templates'] = array(
-				'icon'	=> 'code',
-				'title'	=> 'theme_set_manage_templates_custom',
-				'link'	=> Url::internal( "app=core&module=customization&controller=customtemplates&type=themes&set_id={$this->_id}" ),
-				'data'	=> array()
-			);
+			foreach( array( 'delete', 'copy', 'convert_to_full', 'upload', 'resources', 'edit_templates' ) as $btn )
+			{
+				if ( isset( $buttons[ $btn ] ) )
+				{
+					unset( $buttons[ $btn ] );
+				}
+			}
 		}
 
 		return $buttons;
@@ -1845,9 +2110,9 @@ class Theme extends Model
 	 * [Node] Save Add/Edit Form
 	 *
 	 * @param	array	$values	Values from the form
-	 * @return    mixed
+	 * @return	void
 	 */
-	public function saveForm( array $values ): mixed
+	public function saveForm( $values )
 	{
 		$creating = FALSE;
 
@@ -1855,43 +2120,121 @@ class Theme extends Model
 		if ( ! $this->id )
 		{
 			$creating = TRUE;
-			$this->long_version = Application::load( 'core' )->long_version;
+			$this->parent_array = '[]';
+			$this->child_array  = '[]';
+			$this->parent_id    = ( $values['core_theme_parent_id'] instanceof \IPS\Theme ) ? $values['core_theme_parent_id']->id : 0;
+			$this->by_skin_gen  = ( \IPS\Request::i()->theme_type === 'vse' ) ? 1 : 0;
+			$this->long_version = \IPS\Application::load( 'core' )->long_version;
 			$this->save();
+
+			/* Copy across resources */
+			$this->copyResourcesFromSet( $this->parent_id );
 		}
 
 		if ( isset( $values['core_theme_set_new_import'] ) )
 		{
 			/* Move it to a temporary location */
-			$tempFile = tempnam( TEMP_DIRECTORY, 'IPS' );
+			$tempFile = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
 			move_uploaded_file( $values['core_theme_set_new_import'], $tempFile );
 
 			/* Store values */
 			$key = 'core_theme_import_' . md5_file( $tempFile );
-			Store::i()->$key = array( 'apps'  		=> 'all',
+			\IPS\Data\Store::i()->$key = array( 'apps'  		=> 'all',
 										        'resources'		=> true,
 										        'html'			=> true,
 										        'css'			=> true );
 
 			/* Initate a redirector */
-			Output::i()->redirect( Url::internal( 'app=core&module=customization&controller=themes&do=import' )->setQueryString( array( 'file' => $tempFile, 'key' => md5_file( $tempFile ), 'id' => $this->id ) ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=customization&controller=themes&do=import' )->setQueryString( array( 'file' => $tempFile, 'key' => md5_file( $tempFile ), 'id' => $this->id ) ) );
 		}
 		else
 		{
 			/* Name */
-			Lang::saveCustom( 'core', "core_theme_set_title_{$this->id}", $values['core_theme_set_title'] );
+			\IPS\Lang::saveCustom( 'core', "core_theme_set_title_{$this->id}", $values['core_theme_set_title'] );
+
+			/* CKEditor Skin */
+			if ( isset( $values['core_theme_set_editor'] ) and $values['core_theme_set_editor'] === 'new' and $values['core_theme_set_editor_new'] )
+			{
+				/* Get the theme name */
+				$zip = zip_open( $values['core_theme_set_editor_new'] );
+				$name = zip_entry_name( zip_read( $zip ) );
+				$values['core_theme_set_editor_existing'] = mb_substr( $name, 0, mb_strpos( $name, '/' ) );
+				zip_close( $zip );
+
+				if ( \IPS\CIC2 )
+				{
+					$tmpName = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
+					move_uploaded_file( $values['core_theme_set_editor_new'], $tmpName );
+
+					\IPS\Cicloud\file( "IPScustomcke_skin_{$values['core_theme_set_editor_existing']}.zip", \file_get_contents( $tmpName ) );
+
+					do
+					{
+						if ( isset( \IPS\Data\Store::i()->syncCompleted ) AND \IPS\Data\Store::i()->syncCompleted )
+						{
+							break;
+						}
+					}
+					while( TRUE );
+				}
+				else
+				{
+					/* Extract it */
+					$zip = new \ZipArchive;
+					$zip->open( $values['core_theme_set_editor_new'] );
+					$zip->extractTo( \IPS\ROOT_PATH . '/applications/core/interface/ckeditor/ckeditor/skins' );
+					$zip->close();
+				}
+
+				/* Delete the temp file */
+				unlink( $values['core_theme_set_editor_new'] );
+
+				/* IPS Cloud Resync */
+				\IPS\IPS::resyncIPSCloud('Added CKEditor theme');
+			}
 
 			$dataChanged = false;
 			$save        = array();
+			$changedSettings = false;
+
+			/* SITE LOGO */
+			if ( $values['core_theme_set_logo'] )
+			{
+				$url   = (string) $values['core_theme_set_logo'];
+				try
+				{
+					$image = \IPS\Image::create( \IPS\File::get( 'core_Theme', $url )->contents() );
+					$this->_data['logo']['front'] = array( 'url' => $url, 'height' => 100 );
+				}
+				catch ( \RuntimeException $e )
+				{
+					$this->_data['logo']['front'] = NULL;
+				}
+
+				if ( isset( $values['core_theme_set_logo_height'] ) )
+				{
+					$this->_data['logo']['front']['height'] = $values['core_theme_set_logo_height'];
+				}
+
+				$dataChanged = true;
+				$changedSettings = true;
+			}
+			else
+			{
+				$dataChanged = true;
+				$this->_data['logo']['front'] = NULL;
+			}
+
 
 			if ( $values['core_theme_set_is_default'] )
 			{
-				Db::i()->update( 'core_themes', array( 'set_is_default' => 0 ), array( 'set_id<>?', $this->id ) );
+				\IPS\Db::i()->update( 'core_themes', array( 'set_is_default' => 0 ), array( 'set_id<>?', $this->id ) );
 				$dataChanged = true;
 			}
 
-			if ( $dataChanged OR IN_DEV)
+			if ( $dataChanged OR ( \IPS\IN_DEV OR \IPS\Theme::designersModeEnabled() ) )
 			{
-				if (IN_DEV)
+				if ( \IPS\IN_DEV OR \IPS\Theme::designersModeEnabled() )
 				{
 					$save['set_author_name']  = $values['theme_template_export_author_name'];
 					$save['set_author_url']   = $values['theme_template_export_author_url'];
@@ -1902,10 +2245,110 @@ class Theme extends Model
 				$this->save();
 				$this->saveSet( $save );
 			}
+
+			$this->editor_skin = $values['core_theme_set_editor_existing'];
+			unset( \IPS\Data\Store::i()->syncCompleted );
+		}
+
+		if ( $creating === FALSE )
+		{
+			$themeSettings = $this->getThemeSettings( static::THEME_ID_KEY );
+
+			$save = array();
+			$json = array();
+			foreach( $themeSettings as $settingId => $row )
+			{
+				if ( array_key_exists( "core_theme_setting_title_{$row['sc_id']}", $values ) )
+				{
+					$field       = $this->getCustomSettingField( $row, TRUE );
+					$stringValue = $field::stringValue( $values["core_theme_setting_title_{$row['sc_id']}"] );
+
+					if ( \get_class( $field ) == 'IPS\Helpers\Form\Editor' )
+					{
+						\IPS\File::claimAttachments( 'theme_custom_autosave_' . $row['sc_id'], $this->id, $row['sc_id'] );
+					}
+
+					if ( $values["core_theme_setting_title_{$row['sc_id']}"] and \get_class( $field ) == 'IPS\Helpers\Form\Upload' )
+					{
+						if ( \is_array( $values["core_theme_setting_title_{$row['sc_id']}"] ) )
+						{
+							$items = array();
+							foreach( $values["core_theme_setting_title_{$row['sc_id']}"] as $obj )
+							{
+								$items[] = (string) $obj;
+							}
+							$save[ $row['sc_id'] ] = implode( ',', $items );
+							$json[ $row['sc_key'] ] = implode( ',', array_map( function( $v )
+							{
+								return '<fileStore.core_Theme>/' .  $v;
+							}, $items ) );
+						}
+						else
+						{
+							$save[ $row['sc_id'] ] = (string) $values["core_theme_setting_title_{$row['sc_id']}"];
+							$json[ $row['sc_key'] ] = '<fileStore.core_Theme>/' . $save[ $row['sc_id'] ];
+						}
+					}
+					else
+					{
+						$save[ $row['sc_id'] ]  = $stringValue;
+						$json[ $row['sc_key'] ] = $save[ $row['sc_id'] ];
+					}
+				}
+			}
+
+			if ( \count( $save ) )
+			{
+				foreach( $save as $id => $value )
+				{
+					if ( $themeSettings[ $id ]['_value'] != $value )
+					{
+						$changedSettings = true;
+					}
+
+					\IPS\Db::i()->delete( 'core_theme_settings_values', array( 'sv_id=?', $id ) );
+					\IPS\Db::i()->insert( 'core_theme_settings_values', array( 'sv_id' => $id, 'sv_value' => (string) $value ) );
+
+					if ( \IPS\IN_DEV AND $this->id === \IPS\DEFAULT_THEME_ID )
+					{
+						\IPS\Db::i()->update( 'core_theme_settings_fields', array( 'sc_default' => (string) $value ), array( 'sc_set_id=? and sc_id=?', \IPS\DEFAULT_THEME_ID, $id ) );
+					}
+				}
+
+				\IPS\Db::i()->update( 'core_themes', array( 'set_template_settings' => json_encode( $json ) ), array( 'set_id=?', $this->id ) );
+
+				if ( \IPS\IN_DEV AND $this->id === \IPS\DEFAULT_THEME_ID )
+				{
+					\IPS\Theme\Dev\Theme::writeThemeSettingsToDisk();
+				}
+			}
+		}
+
+		/* Designers mode needs specialist attention */
+		if ( $creating and \IPS\Theme::designersModeEnabled() AND \IPS\IN_DEV === FALSE )
+		{
+			\IPS\Theme\Advanced\Theme::$buildingFiles = true;
+			\IPS\Theme\Advanced\Theme::$currentThemeId = $this->id;
+
+			foreach( \IPS\Application::applications() as $app )
+			{
+				\IPS\Theme\Advanced\Theme::exportTemplates( $app->directory );
+				\IPS\Theme\Advanced\Theme::exportCss( $app->directory );
+				\IPS\Theme\Advanced\Theme::exportResources( $app->directory );
+			}
+		}
+
+		/* Clear out compiled CSS so CSS theme plugins are up to date and rebuild parent/child trees */
+		$themeSetToBuild = static::load( $this->id );
+
+		if ( $changedSettings )
+		{
+			static::themeSettingsHaveChanged( $this->id );
 		}
 
 		$this->is_default  = $values['core_theme_set_is_default'];
 		$this->permissions = ( $values['core_theme_set_permissions'] === '*' ) ? '*' : implode( ',', $values['core_theme_set_permissions'] );
+		$this->parent_id   = ( $values['core_theme_parent_id'] instanceof \IPS\Theme ) ? $values['core_theme_parent_id']->id : 0;
 		$this->css_updated = time();
 
 		if ( isset( $values['theme_simple_header_settings'] ) )
@@ -1918,101 +2361,26 @@ class Theme extends Model
 			$this->custom_footer = $values['theme_simple_footer_settings'];
 		}
 
-		if ( isset( $values['theme_simple_css'] ) )
-		{
-			$this->custom_css = $values['theme_simple_css'];
-		}
-
-		$headerKey = 'custom_header_' . $this->id;
-		$footerKey = 'custom_footer_' . $this->id;
-		unset( Store::i()->$headerKey);
-		unset( Store::i()->$footerKey);
-
-		/* Remove compiled templates to ensure the globalTemplate gets the latest updates */
-		static::deleteCompiledTemplate( 'core', 'front', 'global', $this->id );
-
-		/* Remove compiled CSS */
-		static::deleteCompiledCss( 'core', 'front', 'custom', 'custom.css', $this->id );
-
-		/* Finally, save the theme */
 		$this->save();
 
-		return NULL;
-	}
-
-	/**
-	 * Return the value of a layout setting
-	 *
-	 * @param string $what
-	 * @return string
-	 * @throws InvalidArgumentException
-	 */
-	public function getLayoutValue( string $what ): string
-	{
-		/* Check the session data first */
-		$sessionData = $this->editingSessionData()['data'] ?? [];
-
-		/* For consistency, the theme editor prefixes layout options with 'layout_' */
-		if( isset( $sessionData['layouts'] ) and isset( $sessionData['layouts'][ 'layout_' . $what ] ) )
+		if ( $creating === TRUE AND $this->id )
 		{
-			return $sessionData['layouts'][ 'layout_' . $what ];
+			$this->installThemeSettings();
+
+			if ( $this->parent_id )
+			{
+				$this->copyLogosFromSet( $this->parent_id );
+			}
 		}
-		elseif( isset( $sessionData['vars'] ) and isset( $sessionData['vars'][ 'layout_' . $what ] ) )
-		{
-			return $sessionData['vars'][ 'layout_' . $what ];
-		}
-
-		if ( empty( $this->_layoutValues ) )
-		{
-			$this->_layoutValues = $this->view_options ? json_decode( $this->view_options, TRUE ) : [];
-		}
-
-		if ( isset( $this->_layoutValues[ $what ] ) )
-		{
-			return $this->_layoutValues[ $what ];
-		}
-
-		/* Got a default? */
-		$vars = $this->getCssVariables();
-		if( isset( $vars[ 'layout_' . $what ] ) )
-		{
-			return $vars[ 'layout_' . $what ];
-		}
-
-		/* Can't really help you */
-		throw new InvalidArgumentException( 'Invalid layout value' );
-	}
-
-	/**
-	 * Return the available layout options
-	 *
-	 * @return array
-	 */
-	public function getAvailableLayoutOptionsForThemeEditor(): array
-	{
-		$return = [];
-
-		foreach( Application::enabledApplications() as $dir => $app )
-		{
-			$return = array_merge( $return, $app->getThemeLayoutOptionsForThisPage() );
-		}
-
-		/* loop through $return array and prepend 'layout_' to each value */
-		foreach ( $return as &$value )
-		{
-			$value = 'layout_' . $value;
-		}
-
-		return $return;
 	}
 
 	/**
 	 * Build resource map of "human URL" to File Object URL
 	 *
-	 * @param array|string|null $app	App (e.g. core, forum)
+	 * @param	string|array	$app	App (e.g. core, forum)
 	 * @return	void
 	 */
-	public function buildResourceMap( array|string $app=NULL )
+	public function buildResourceMap( $app=NULL )
 	{
 		$flagKey = 'resource_compiling_' . $this->_id . '_' . $app;
 		if ( static::checkLock( $flagKey ) )
@@ -2025,13 +2393,15 @@ class Theme extends Model
 		$resourceMap = $this->resource_map;
 
 		$where = ( $app !== null ) ? array( 'resource_set_id=? and resource_app=?', $this->_id, $app ) : array('resource_set_id=?', $this->_id );
+		$keysSeen = array();
 
-		foreach (Db::i()->select( '*', 'core_theme_resources', $where ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'core_theme_resources', $where ) as $row )
 		{
 			$name = static::makeBuiltTemplateLookupHash( $row['resource_app'], $row['resource_location'], $row['resource_path'] ) . '_' . $row['resource_name'];
 
 			if ( $row['resource_filename'] )
 			{
+				$keysSeen[]         = $name;
 				$resourceMap[$name] = $row['resource_filename'];
 			}
 			else
@@ -2042,18 +2412,6 @@ class Theme extends Model
 		}
 
 		$this->resource_map = $resourceMap;
-
-        /* Any time we rebuild the resources, we need to rebuild the logos */
-        $logoData = isset( $this->_data['logo_data'] ) ? json_decode( $this->_data['logo_data'], true ) : [];
-        foreach( $logoData as $type => $logo )
-        {
-            if( isset( $logo['url'] ) )
-            {
-                unset( $logoData[ $type ]['url'] );
-            }
-        }
-        $this->logo_data = json_encode( $logoData );
-
 		$this->save();
 
 		static::unlock( $flagKey );
@@ -2063,25 +2421,16 @@ class Theme extends Model
 	 * Copy all resources from set $id to this set
 	 * Theme resources should be raw binary data everywhere (filesystem and DB) except in the theme XML download where they are base64 encoded.
 	 *
-	 * @param int $id		ID to copy from. 0 is the 'master' resources (same as the default when first installed)
-	 * @param int $offset
-	 * @param int|null $limit
+	 * @param	int		$id		ID to copy from. 0 is the 'master' resources (same as the default when first installed)
 	 * @return  void
 	 */
-	public function copyResourcesFromSet( int $id=0, int $offset=0, ?int $limit=null ): void
+	public function copyResourcesFromSet( $id=0 )
 	{
-		$resourceMap = $this->resource_map ?? [];
-		if( !is_array( $resourceMap ) )
-		{
-			$resourceMap = json_decode( $resourceMap, true );
-		}
+		\IPS\Db::i()->delete( 'core_theme_resources', array( 'resource_set_id=?', $this->_id ) );
 
-		if( $limit !== null )
-		{
-			$limit = [ $offset, $limit ];
-		}
+		$resourceMap = array();
 
-		foreach (Db::i()->select( '*', 'core_theme_resources', array( 'resource_set_id=?', $id ), 'resource_id', $limit ) as $data )
+		foreach ( \IPS\Db::i()->select( '*', 'core_theme_resources', array( 'resource_set_id=?', $id ) ) as $data )
 		{
 			$key = static::makeBuiltTemplateLookupHash($data['resource_app'], $data['resource_location'], $data['resource_path']) . '_' . $data['resource_name'];
 
@@ -2089,9 +2438,9 @@ class Theme extends Model
 			{
 				try
 				{
-					$fileName = (string) File::create( 'core_Theme', $key, $data['resource_data'], 'set_resources_' . $this->_id, FALSE, NULL, FALSE );
+					$fileName = (string) \IPS\File::create( 'core_Theme', $key, $data['resource_data'], 'set_resources_' . $this->_id, FALSE, NULL, FALSE );
 
-					Db::i()->insert( 'core_theme_resources', array(
+					\IPS\Db::i()->insert( 'core_theme_resources', array(
 							'resource_set_id'      => $this->_id,
 							'resource_app'         => $data['resource_app'],
 							'resource_location'    => $data['resource_location'],
@@ -2100,12 +2449,13 @@ class Theme extends Model
 							'resource_added'	   => time(),
 							'resource_filename'    => $fileName,
 							'resource_data'        => $data['resource_data'],
+							'resource_plugin'	   => isset( $data['resource_plugin'] ) ? $data['resource_plugin'] : NULL,
 							'resource_user_edited' => $data['resource_user_edited']
 					) );
 
 					$resourceMap[ $key ] = $fileName;
 				}
-				catch( Exception $e ) { }
+				catch( \Exception $e ) { }
 			}
 		}
 
@@ -2117,27 +2467,24 @@ class Theme extends Model
 	/**
 	 * Copy all logos from a set
 	 *
-	 * @param int $id			ID to copy from
+	 * @param	int		$id			ID to copy from
 	 * @return  void
 	 */
-	public function copyLogosFromSet( int $id ): void
+	public function copyLogosFromSet( $id )
 	{
 		try
 		{
 			$original = static::load( $id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			throw new OutOfRangeException("CANNOT_LOAD_THEME");
+			throw new \OutOfRangeException("CANNOT_LOAD_THEME");
 		}
 
 		if ( $original->logo_data === NULL )
 		{
 			return;
 		}
-
-		/* Allow SVGs without the obscure hash removing the file extension */
-		File::$safeFileExtensions[] = 'svg';
 
 		$currentLogos = json_decode( $this->logo_data, TRUE );
 		$logos        = array();
@@ -2153,14 +2500,14 @@ class Theme extends Model
 				try
 				{
 					/* Create new file */
-					$original = File::get( 'core_Theme', $data['url'] );
-					$newImage = File::create( 'core_Theme', $original->originalFilename, $original->contents() );
+					$original = \IPS\File::get( 'core_Theme', $data['url'] );
+					$original->contents();
+					$image = \IPS\Image::create( $original->contents() );
+					$newImage = \IPS\File::create( 'core_Theme', $original->originalFilename, $original->contents() );
 
-					$data['url'] = (string) $newImage;
-                    $data['filename'] = $newImage->originalFilename;
-					$logos[$file] = $data;
+					$logos[$file] = array( 'url' => (string) $newImage, 'height' => $data['height'] );
 				}
-				catch ( Exception $e ) {}
+				catch ( \Exception $e ) { }
 			}
 		}
 
@@ -2169,291 +2516,122 @@ class Theme extends Model
 	}
 
 	/**
-	 * Copy the editor settings and categories from the specified theme
-	 *
-	 * @param int $id
-	 * @return void
-	 */
-	public function copyEditorSettings( int $id ) : void
-	{
-		$categoryMapping = [];
-		foreach( new ActiveRecordIterator(
-			Db::i()->select( '*', Category::$databaseTable, [ 'cat_set_id=?', $id ], 'cat_parent, cat_position' ),
-			Category::class
-				 ) as $cat )
-		{
-			/* Copy the category and change the theme ID */
-			$newCategory = clone $cat;
-			$newCategory->set_id = $this->_id;
-			if( $newCategory->parent and array_key_exists( $cat->parent, $categoryMapping ) )
-			{
-				$newCategory->parent = $categoryMapping[ $cat->parent ];
-			}
-			$newCategory->save();
-
-			/* Map the category IDs, we'll need them later */
-			$categoryMapping[ $cat->id ] = $newCategory->id;
-		}
-
-		/* Now loop through the settings */
-		foreach( new ActiveRecordIterator(
-			Db::i()->select( '*', Setting::$databaseTable, [ 'setting_set_id=?', $id ], 'setting_position' ),
-			Setting::class
-				 ) as $setting )
-		{
-			$newSetting = clone $setting;
-			$newSetting->set_id = $this->_id;
-			$newSetting->category_id = $categoryMapping[ $newSetting->category_id ] ?? 0;
-			$newSetting->save();
-		}
-	}
-
-	/**
-	 * Copy any custom templates from the original theme
-	 *
-	 * @param int $id
-	 * @return void
-	 */
-	public function copyCustomTemplates( int $id ) : void
-	{
-		foreach( new ActiveRecordIterator(
-			Db::i()->select( '*', 'core_theme_templates_custom', [ 'template_set_id=?', $id ] ),
-			CustomTemplate::class
-				 ) as $template )
-		{
-			$newTemplate = clone $template;
-			$newTemplate->set_id = $this->id;
-			$newTemplate->updated = time();
-			$newTemplate->save();
-		}
-	}
-
-	/**
-	 * Install the theme editor settings for this theme
+	 * It installs theme settings. What did you really expect?
 	 *
 	 * @return void
 	 */
-	public function installThemeEditorSettings() : void
+	public function installThemeSettings()
 	{
+		/* Make sure theme setting fields are clear */
+		\IPS\Db::i()->delete( 'core_theme_settings_fields', array( 'sc_set_id=?', $this->id ) );
 
-	}
-
-	/**
-	 * Compile all CSS for a first party application
-	 *
-	 * @param string $app
-	 * @return void
-	 */
-	public static function compileStatic( string $app='' ) : void
-	{
-		if( !in_array( $app, IPS::$ipsApps ) )
+		if ( ! $this->parent_id )
 		{
-			return;
-		}
-
-		$themeXmlFile = Application::load( $app )->getApplicationPath() . "/data/theme.xml";
-		if( ! file_exists( $themeXmlFile ) )
-		{
-			return;
-		}
-
-		/* Try to prevent timeouts to the extent possible */
-		$cutOff			= null;
-
-		if( $maxExecution = @ini_get( 'max_execution_time' ) )
-		{
-			/* If max_execution_time is set to "no limit" we should add a hard limit to prevent browser timeouts */
-			if ( $maxExecution == -1 )
+			foreach( \IPS\Application::applications() as $appKey => $data )
 			{
-				$maxExecution = 30;
-			}
+				$path = static::getHookPath( "applications/{$appKey}/data/themesettings.json" );
 
-			$cutOff	= time() + ( $maxExecution * .5 );
-		}
+				/* Root skin? Add default theme settings */
+				if ( ! file_exists( $path . "/applications/{$appKey}/data/themesettings.json" ) )
+				{
+					continue;
+				}
 
-		/* Remove old templates... */
-		$files = glob( ROOT_PATH . '/static/templates/' . $app . '_*' );
-		foreach( $files as $file )
-		{
-			@unlink( $file );
-		}
+				$json = json_decode( file_get_contents( $path . "/applications/{$appKey}/data/themesettings.json" ), true );
 
-		/* Remove old CSS... */
-		$files = glob( ROOT_PATH . '/static/css/' . $app . '_*' );
-		foreach( $files as $file )
-		{
-			@unlink( $file );
-		}
-
-		/* Remove old resources... */
-		$files = glob( ROOT_PATH . '/static/resources/' . $app . '_*' );
-		foreach( $files as $file )
-		{
-			@unlink( $file );
-		}
-
-		/* Open XML file */
-		$xml = Xml\XMLReader::safeOpen( $themeXmlFile );
-		$xml->read();
-
-		$functions = array();
-		$styles = array();
-		while( $xml->read() )
-		{
-			if( $xml->nodeType != XMLReader::ELEMENT )
-			{
-				continue;
-			}
-
-			switch( $xml->name )
-			{
-				case 'template':
-					$template	= array(
-						'group'		=> $xml->getAttribute('template_group'),
-						'name'		=> $xml->getAttribute('template_name'),
-						'variables'	=> $xml->getAttribute('template_data'),
-						'content'	=> $xml->readString(),
-						'location'	=> $xml->getAttribute('template_location')
-					);
-
-					if( !isset( $functions[ $template['location'] ][ $template['group'] ] ) )
-					{
-						$functions[ $template['location'] ][ $template['group'] ] = [];
-					}
-
-					$functions[ $template['location'] ][ $template['group'] ][ $template['name'] ] = static::compileTemplate( $template['content'], $template['name'], $template['variables'], true, false, $app, $template['location'], $template['group'] );
-					break;
-
-				case 'css':
-					$location = $xml->getAttribute( 'css_location' );
-					$path = $xml->getAttribute( 'css_path' );
-					$name = $xml->getAttribute( 'css_name' );
-					$content = $xml->readString();
-					if( !isset( $styles[ $location ][ $path ] ) )
-					{
-						$styles[ $location ][ $path ] = [];
-					}
-					$styles[ $location ][ $path ][ $name ] = $content;
-					break;
-
-				case 'resource':
-					static::addResource( array(
-						'app'		=> $app,
-						'location'	=> $xml->getAttribute('location'),
-						'path'		=> $xml->getAttribute('path'),
-						'name'		=> $xml->getAttribute('name'),
-						'content'	=> base64_decode( $xml->readString() ),
+				/* Add */
+				foreach( $json as $key => $data)
+				{
+					$insertId = \IPS\Db::i()->insert( 'core_theme_settings_fields', array(
+						'sc_set_id'		 => $this->id,
+						'sc_key'		 => $data['sc_key'],
+						'sc_tab_key'	 => $data['sc_tab_key'],
+						'sc_type'		 => $data['sc_type'],
+						'sc_multiple'	 => $data['sc_multiple'],
+						'sc_default'	 => $data['sc_default'],
+						'sc_content'	 => $data['sc_content'],
+						'sc_show_in_vse' => ( isset( $data['sc_show_in_vse'] ) ) ? $data['sc_show_in_vse'] : 0,
+						'sc_updated'	 => time(),
+						'sc_app'		 => $appKey,
+						'sc_title'		 => $data['sc_title'],
+						'sc_order'		 => $data['sc_order'],
+						'sc_condition'	 => $data['sc_condition'],
 					) );
-					break;
+
+					\IPS\Db::i()->insert( 'core_theme_settings_values', array( 'sv_id' => $insertId, 'sv_value' => (string) $data['sc_default'] ) );
+				}
 			}
 		}
-
-		/* Loop through all functions and write them to the static directory */
-		$path = '/static/templates/';
-		if( !is_dir( ROOT_PATH. $path ) )
+		else
 		{
-			mkdir( ROOT_PATH . $path, IPS_FOLDER_PERMISSION, TRUE );
-		}
+			$parent = \IPS\Theme::load( $this->parent_id );
+			$themeSettings = $parent->getThemeSettings( static::THEME_ID_KEY );
 
-		foreach( $functions as $location => $groups )
-		{
-			foreach( $groups as $group => $templates )
+			$save = array();
+
+			foreach( $themeSettings as $settingId => $row )
 			{
-				/* Put them in a class */
-				$templateContent = <<<EOF
-<?php
-namespace IPS\Theme;
-class class_{$app}_{$location}_{$group} extends \IPS\Theme\Template
-{
-EOF;
-				$templateContent .= implode( "\n\n", $templates );
-				$templateContent .= <<<EOF
-}
-EOF;
+				$insertId = \IPS\Db::i()->insert( 'core_theme_settings_fields', array(
+					'sc_set_id'      => $this->id,
+					'sc_key'         => $row['sc_key'],
+					'sc_tab_key'     => $row['sc_tab_key'],
+					'sc_type'        => $row['sc_type'],
+					'sc_multiple'    => $row['sc_multiple'],
+					'sc_default'     => $row['sc_default'],
+					'sc_content'     => $row['sc_content'],
+					'sc_show_in_vse' => ( isset( $row['sc_show_in_vse'] ) ) ? $row['sc_show_in_vse'] : 0,
+					'sc_updated'     => time(),
+					'sc_app'	     => $row['sc_app'],
+					'sc_title'		 => $row['sc_title'],
+					'sc_order'		 => $row['sc_order'],
+					'sc_condition'	 => $row['sc_condition'],
+				) );
 
-				$templateFileName = $path . $app . '_' . $location. '_' . $group . '.php';
-				$result = (bool) @file_put_contents( ROOT_PATH . $templateFileName, $templateContent, LOCK_EX );
-
-				/* Sometimes LOCK_EX is unavailable and throws file_put_contents(): Exclusive locks are not supported for this stream.
-					While we would prefer an exclusive lock, it would be better to write the file if possible. */
-				if( !$result )
-				{
-					@unlink( ROOT_PATH . $templateFileName );
-					$result = (bool) @file_put_contents( ROOT_PATH . $templateFileName, $templateContent );
-				}
-
-				@chmod( ROOT_PATH . $templateFileName, IPS_FILE_PERMISSION );
+				\IPS\Db::i()->insert( 'core_theme_settings_values', array( 'sv_id' => $insertId, 'sv_value' => (string) $row['_value'] ) );
 			}
 		}
 
-		/**
-		 * Everything that is a single CSS file in the /dev/css area should be a single file unless
-		 * you're in the special building rules because oooh I'm so special look at me.
-		 */
-		foreach( $styles as $location => $paths )
+		$themeSettings = $this->getThemeSettings();
+
+		$json = array();
+		foreach( $themeSettings as $settingId => $row )
 		{
-			foreach( $paths as $path => $data )
-			{
-				if( $path == '.' OR empty( $path ) )
-				{
-					foreach ( $data as $cssName => $cssData )
-					{
-						/* forums/front/widgets.css should be written as forums_front_widgets.css */
-						static::writeCss( [
-							'css_app' => $app,
-							'css_location' => $location,
-							'css_path' => '.',
-							'css_name' => $cssName,
-							'css_content' => $cssData,
-							'css_set_id' => 0
-						] );
-					}
-				}
-				else
-				{
-					/* Special rules... */
-					if ( isset( static::$buildGrouping['css'][ $app ][ $location ] ) and in_array( $path, static::$buildGrouping['css'][ $app ][ $location ] ) )
-					{
-						/* We want this packaged up as one file */
-						static::writeCss( [
-							'css_app' => $app,
-							'css_location' => $location,
-							'css_path' => $path,
-							'css_name' => $path . '.css',
-							'css_content' => implode( "\n\n", $data ),
-							'css_set_id' => 0
-						] );
-					}
-					else
-					{
-						/* Otherwise we don't (e.g. core/front/styles/foo.css should be written as core_front_styles_foo.css) */
-						foreach( $data as $cssName => $cssData )
-						{
-							static::writeCss( array(
-								'css_app' => $app,
-								'css_location' => $location,
-								'css_path' => $path,
-								'css_name' => $cssName,
-								'css_content' => $cssData,
-								'css_set_id' => 0
-							) );
-						}
-					}
-				}
-			}
+			$json[ $row['sc_key'] ]	= $row['_value'];
 		}
+
+		$this->_data['settings'] = $json;
+		$this->template_settings = json_encode( $json );
+		$this->save();
 	}
+
+	/**
+	 * Return all children
+	 *
+	 * @param	array	$return	Array to return children into
+	 * @return	array
+	 */
+	 public function allChildren( &$return=array() )
+	 {
+		 foreach( $this->children() as $child )
+		 {
+			 $return[ $child->id ] = $child;
+
+			 $child->allChildren( $return );
+		 }
+
+		 return $return;
+	 }
 
 	/**
 	 * Compile CSS ready for non IN_DEV use. This replaces any HTML logic such as {resource="foo.png"} with full URLs
 	 *
-	 * @param array|string $app CSS app (e.g. core, forum)
-	 * @param array|string $location CSS location (e.g. admin,global,front)
-	 * @param array|string $group CSS group (e.g. custom, framework)
-	 * @param string $name CSS name (e.g. foo.css)
+	 * @param string|array	$app		CSS app (e.g. core, forum)
+	 * @param string|array	$location	CSS location (e.g. admin,global,front)
+	 * @param string|array	$group		CSS group (e.g. custom, framework)
+	 * @param string		$name		CSS name (e.g. foo.css)
 	 * @return boolean|null
 	 */
-	public function compileCss( array|string $app='', array|string $location='', array|string $group='', string $name='' ): ?bool
+	public function compileCss( $app=null, $location=null, $group=null, $name=null )
 	{
 		$flagKey = 'css_compiling_' . $this->_id . '_' . md5( $app . ',' . $location . ',' . $name );
 		if ( static::checkLock( $flagKey ) )
@@ -2478,13 +2656,13 @@ EOF;
 			}
 		}
 
-		$css    = $this->getAllCss( $app, $location, $group );
+		$css    = $this->getRawCss( $app, $location, $group );
 		$cssMap = $this->css_map;
 
 		if ( $name === null )
 		{
 			/* Clear out existing built bits */
-			File::getClass('core_Theme')->deleteContainer( 'css_built_' . $this->_id );
+			\IPS\File::getClass('core_Theme')->deleteContainer( 'css_built_' . $this->_id );
 
 			$cssMap = array();
 		}
@@ -2499,7 +2677,7 @@ EOF;
 				{
 					foreach( $css[ $app ][ $location ][ $path ] as $cssName => $cssData )
 					{
-						if ( isset( static::$buildGrouping['css'][ $app ][ $location ] ) AND in_array( $path,  static::$buildGrouping['css'][ $app ][ $location ] ) )
+						if ( isset( static::$buildGrouping['css'][ $app ][ $location ] ) AND \in_array( $path,  static::$buildGrouping['css'][ $app ][ $location ] ) )
 						{
 							if ( $name === null OR $name == ( $path . '.css' ) )
 							{
@@ -2531,7 +2709,7 @@ EOF;
 				}
 
 				/* Write combined css */
-				if ( count( $built ) )
+				if ( \count( $built ) )
 				{
 					foreach( $built as $id => $cssData )
 					{
@@ -2541,19 +2719,6 @@ EOF;
 					}
 				}
 			}
-		}
-
-		if ( ! empty( trim( $this->custom_css ) ) )
-		{
-			$store = static::makeBuiltTemplateLookupHash( 'core', 'front', 'custom/custom.css');
-			$cssMap[ $store ] = (string) static::writeCss( [
-				'css_content' => $this->custom_css,
-				'css_name'    => 'custom.css',
-				'css_path'    => 'custom',
-				'css_location' => 'front',
-				'css_app' => 'core',
-				'css_set_id' => $this->id
-			] );
 		}
 
 		$this->css_map = $cssMap;
@@ -2568,12 +2733,12 @@ EOF;
 	 * Build Templates ready for non IN_DEV use
 	 * This fetches all templates in a group, converts HTML logic into ready to eval PHP and stores as a single PHP class per template group
 	 *
-	 * @param array|string|null $app		Templates app (e.g. core, forum)
-	 * @param array|string|null $location	Templates location (e.g. admin,global,front)
-	 * @param array|string|null $group		Templates group (e.g. forms, members)
+	 * @param	string|array	$app		Templates app (e.g. core, forum)
+	 * @param	string|array	$location	Templates location (e.g. admin,global,front)
+	 * @param	string|array	$group		Templates group (e.g. forms, members)
 	 * @return	boolean|null
 	 */
-	public function compileTemplates( array|string $app=null, array|string $location=null, array|string $group=null ): ?bool
+	public function compileTemplates( $app=null, $location=null, $group=null )
 	{
 		$flagKey = 'template_compiling_' . $this->_id . '_' . md5( $app . ',' . $location . ',' . $group );
 		if ( static::checkLock( $flagKey ) )
@@ -2583,7 +2748,7 @@ EOF;
 
 		static::lock( $flagKey );
 
-		$templates = $this->getAllTemplates( $app === null ? '' : $app, $location === null ? '' : $location, $group === null ? '' : $group );
+		$templates = $this->getRawTemplates( $app, $location, $group );
 
 		foreach( $templates as $app => $v )
 		{
@@ -2591,10 +2756,42 @@ EOF;
 			{
 				foreach( $templates[ $app ][ $location ] as $group => $bits )
 				{
+					/* Any template hooks? */
+					$templateHooks = array();
+					if( isset( \IPS\IPS::$hooks[ "\\IPS\\Theme\\class_{$app}_{$location}_{$group}" ] ) AND \IPS\RECOVERY_MODE === FALSE )
+					{
+						foreach ( \IPS\IPS::$hooks[ "\\IPS\\Theme\\class_{$app}_{$location}_{$group}" ] as $k => $data )
+						{
+							if ( !class_exists( "IPS\\Theme\\" . $data['class'] . "_tmp", FALSE ) )
+							{
+								$path = static::getHookPath( $data['file'] );
+
+								/* Like code hooks, we should only attempt to load the files contents if it actually exists */
+								if ( file_exists( $path . '/' . $data['file'] ) )
+								{
+									try
+									{
+										if ( eval( "namespace IPS\\Theme;\n\n" . str_replace( array( ' extends _HOOK_CLASS_', 'parent::hookData()' ), array( '_tmp EXTENDS \IPS\Theme\Compile\ThemeHook', 'array()' ), file_get_contents( $path . '/' . $data['file'] ) ) ) !== FALSE )
+										{
+											$class = "IPS\\Theme\\" . $data['class'] . "_tmp";
+											$templateHooks = array_merge_recursive( $templateHooks, $class::hookData() );
+										}
+									}
+									catch ( \ParseError $e ) { }
+								}
+							}
+						}
+					}
+
 					/* Build all the functions */
 					$functions = array();
 					foreach( $templates[ $app ][ $location ][ $group ] as $name => $data )
 					{
+						if ( isset( $templateHooks[ $name ] ) )
+						{
+							$data['template_content'] = static::themeHooks( $data['template_content'], $templateHooks[ $name ] );
+						}
+
 						$functions[ $name ] = static::compileTemplate( $data['template_content'], $name, $data['template_data'], true, false, $app, $location, $group );
 					}
 
@@ -2603,6 +2800,8 @@ EOF;
 namespace _NAMESPACE_;
 class class_{$app}_{$location}_{$group} extends \IPS\Theme\Template
 {
+	public \$cache_key = '{$this->cache_key}';
+
 EOF;
 
 					$template .= implode( "\n\n", $functions );
@@ -2612,8 +2811,22 @@ EOF;
 EOF;
 
 					/* Store it */
-					$key = strtolower( 'template_' . $this->_id . '_' .static::makeBuiltTemplateLookupHash( $app, $location, $group ) . '_' . static::cleanGroupName( $group ) );
-					Store::i()->$key = str_replace( 'namespace _NAMESPACE_', 'namespace IPS\Theme', $template );
+					$key = \strtolower( 'template_' . $this->_id . '_' .static::makeBuiltTemplateLookupHash( $app, $location, $group ) . '_' . static::cleanGroupName( $group ) );
+					\IPS\Data\Store::i()->$key = str_replace( 'namespace _NAMESPACE_', 'namespace IPS\Theme', $template );
+
+					if ( static::isUsingTemplateDiskCache() and $location != 'admin' )
+					{
+						/* We need a different namespace to prevent a "class already exists" when a cache loads, but is out of date so datastore is loaded and evalled with the exact same class name */
+						$cache = new \IPS\Theme\Cache\Template( $app, $location, $group );
+						try
+						{
+							$cache->set( str_replace( 'namespace _NAMESPACE_', 'namespace IPS\Theme\Cache', $template ) );
+						}
+						catch( \RuntimeException $e )
+						{
+							/* Should we log, ignore or collect failures to notify admin? */
+						}
+					}
 				}
 			}
 		}
@@ -2626,27 +2839,34 @@ EOF;
 	/**
 	 * Clean the group name
 	 *
-	 * @param string $name       The name to clean
+	 * @param   string      $name       The name to clean
 	 * @return  string
 	 */
-	public static function cleanGroupName( string $name ): string
+	public static function cleanGroupName( $name )
 	{
-		return str_replace( '-', '_', Friendly::seoTitle( $name ) );
+		return str_replace( '-', '_', \IPS\Http\Url\Friendly::seoTitle( $name ) );
 	}
 
 	/**
 	 * Find templates in a template group
 	 *
-	 * @param string $group		Template group to search in
-	 * @param string|null $app		Application key
-	 * @param string|null $location	Template location
+	 * @param	string		$group		Template group to search in
+	 * @param	string|null	$app		Application key
+	 * @param	string|null	$location	Template location
 	 * @return	array
 	 */
-	public static function findTemplatesByGroup( string $group, string $app=NULL, string $location=NULL ): array
+	public static function findTemplatesByGroup( $group, $app=NULL, $location=NULL )
 	{
-		if (IN_DEV)
+		/*
+			Upon review, designers mode should not be used by developers, and subsequently the areas calling this method shouldn't see new templates only available
+			in designers mode before they are imported to the database.
+		if ( \IPS\Theme::designersModeEnabled() )
 		{
-			return Theme::findTemplatesByGroup( $group, $app, $location );
+			return \IPS\Theme\Advanced\Theme::findTemplatesByGroup( $group, $app, $location );
+		}
+		else*/ if ( \IPS\IN_DEV )
+		{
+			return \IPS\Theme\Dev\Theme::findTemplatesByGroup( $group, $app, $location );
 		}
 
 		$where	= array( array( 'template_group=?', $group ) );
@@ -2663,7 +2883,7 @@ EOF;
 
 		$results	= array();
 
-		foreach(Db::i()->select( 'template_name', 'core_theme_templates', $where ) as $result )
+		foreach( \IPS\Db::i()->select( 'template_name', 'core_theme_templates', $where ) as $result )
 		{
 			$results[ $result['template_name'] ]	= $result['template_name'];
 		}
@@ -2676,9 +2896,248 @@ EOF;
 	 *
 	 * @return	bool
 	 */
-	public function canManagePermissions(): bool
+	public function canManagePermissions()
 	{
 		return false;
+	}
+
+	/**
+	 * Delete CSS
+	 * If the CSS is customized in this theme set, it will just delete the custom CSS giving the appearance of a revert.
+	 * If the CSS is new in this theme set, then it will be deleted completely.
+	 *
+	 * @param	int $itemId	Specific CSS ID to remove
+	 * @return	array
+	 * @throws	\UnderflowException
+	 */
+	public function deleteCssById( $itemId )
+	{
+		$children = array( $this->_id );
+
+		foreach( $this->allChildren() as $id => $child )
+		{
+			$children[] = $child->_id;
+		}
+
+		$css = \IPS\Db::i()->select( '*', 'core_theme_css', array( 'css_id=?', (int) $itemId ) )->first();
+
+		static::deleteCompiledCss( $css['css_app'], $css['css_location'], $css['css_path'], $css['css_name'], $css['css_set_id'] );
+
+		/* Inherited from master */
+		if ( $css['css_added_to'] == 0 )
+		{
+			/* Inherited from master css */
+			if ( $css['css_set_id'] > 0 )
+			{
+				/* Clear any existing CSS if it's been modified from set 0 */
+				\IPS\Db::i()->delete( 'core_theme_css', array( 'css_id=?', (int) $itemId ) );
+			}
+		}
+		else
+		{
+			/* This is CSS unique to this theme set, so remove it from this set and all children */
+			\IPS\Db::i()->delete( 'core_theme_css', array(
+											"css_app=? AND css_location=? AND css_path=? AND css_name=? AND css_set_id IN(" . implode( ',', $children ) . ")",
+											$css['css_app'], $css['css_location'], $css['css_path'], $css['css_name'] ) );
+		}
+
+		if ( ! empty( $css['css_set_id'] ) )
+		{
+			static::setThemeCustomized( $css['css_set_id'] );
+		}
+
+		$csses = $this->getRawCss( array( $css['css_app'] ), array( $css['css_location'] ), array( $css['css_path'] ) );
+
+		if ( isset( $csses[ $css['css_app'] ][ $css['css_location'] ][ $css['css_path'] ][ $css['css_name'] ] ) )
+		{
+			return $csses[ $css['css_app'] ][ $css['css_location'] ][ $css['css_path'] ][ $css['css_name'] ];
+		}
+		else
+		{
+			return array();
+		}
+	}
+
+	/**
+	 * Save CSS
+	 * Saves a CSS template
+	 *
+	 * @param	array	$data	array( 'app' => .., 'location' => .., 'group' => .., 'name' => .., 'set_id' => .., 'item_id' => .., 'position' => .., 'content' => .., 'variables' => .. )
+	 * @return	int		Template ID
+	 * @throws	\OutOfBoundsException
+	 * @throws	\UnderflowException
+	 */
+	public function saveCss( $data )
+	{
+		$css      = array();
+		$children = array( $this->_id );
+
+		foreach( $this->allChildren() as $child )
+		{
+			$children[] = $child->_id;
+		}
+
+		/* Save */
+		if ( ! empty( $data['item_id'] ) )
+		{
+			$css = \IPS\Db::i()->select( '*', 'core_theme_css', array( 'css_id=?', (int) $data['item_id'] ) )->first();
+		}
+		else
+		{
+			$group  = ( empty( $data['group'] ) ) ? '.' : $data['group'];
+			$master = array();
+
+			if ( mb_substr( $data['name'], -4 ) != '.css' )
+			{
+				$data['name'] .= '.css';
+			}
+
+			try
+			{
+				$master = \IPS\Db::i()->select( '*', 'core_theme_css', array( 'css_set_id=0 and css_app=? and css_path=? and css_location=? and css_name=?', $data['app'], $group, $data['location'], $data['name'] ) )->first();
+			}
+			catch( \UnderflowException $ex ) { }
+
+
+			/* Set up some default data here */
+			$css = array( 'css_app'         => $data['app'],
+						  'css_path'        => $group,
+						  'css_location'    => $data['location'],
+						  'css_name'	    => $data['name'],
+						  'css_version'     => \IPS\Theme::load( $data['set_id'] )->long_version,
+						  'css_user_edited' => \IPS\Application::load( $data['app'] )->long_version,
+					      'css_position'	=> 0,
+						  'css_content'     => $data['content'],
+						  'css_added_to'    => $data['set_id'],
+						  'css_plugin'      => isset( $master['css_plugin'] ) ? $master['css_plugin'] : NULL );
+		}
+
+		/* Test to make sure CSS isn't broken */
+		try
+		{
+			static::makeProcessFunction( static::fixResourceTags( $data['content'], $css['css_location'] ), 'css_' . md5( mt_rand() . time() ), '', FALSE, TRUE );
+		}
+		catch( \InvalidArgumentException $e )
+		{
+			throw new \InvalidArgumentException( $e->getMessage() );
+		}
+
+		if ( ! empty( $data['item_id'] ) AND $data['set_id'] == $css['css_set_id'] )
+		{
+			\IPS\Db::i()->update( 'core_theme_css', array( 'css_attributes'  => ( ! empty( $data['attributes'] ) ) ? $data['attributes'] : '',
+														   'css_content'     => $data['content'],
+														   'css_user_edited' =>  \IPS\Application::load( $data['app'] )->long_version,
+														   'css_updated'     => time() ), array('css_id=?', (int)$data['item_id'] ) );
+
+			$newCssId = $data['item_id'];
+		}
+		else
+		{
+			/* First modification in this css set */
+			$newCssId = \IPS\Db::i()->insert( 'core_theme_css', array( 'css_set_id'      => $data['set_id'],
+																	   'css_path'        => $css['css_path'],
+																	   'css_location'    => $css['css_location'],
+																	   'css_app'    	 => $css['css_app'],
+																	   'css_content'     => $data['content'],
+																	   'css_name'        => $css['css_name'],
+																	   'css_attributes'  => ( ! empty( $data['attributes'] ) ) ? $data['attributes'] : '',
+																	   'css_added_to'    => $css['css_added_to'],
+																	   'css_position'    => \intval( $css['css_position'] ),
+																	   'css_version'     => \IPS\Theme::load( $data['set_id'] )->long_version,
+																	   'css_user_edited' => \IPS\Application::load( $css['css_app'] )->long_version,
+																	   'css_updated'     => time(),
+																	   'css_plugin'      => isset( $css['css_plugin'] ) ? $css['css_plugin'] : NULL ), TRUE );
+		}
+
+		static::deleteCompiledCss( $css['css_app'], $css['css_location'], $css['css_path'], $css['css_name'], $data['set_id'] );
+
+		static::setThemeCustomized( $data['set_id'] );
+
+		/* Update the CSS last updated timestamp */
+		$this->css_updated = time();
+		$this->save();
+
+		return $newCssId;
+	}
+
+	/**
+	 * Delete a template bit
+	 * If the template is customized in this theme set, it will just delete the custom template bit giving the appearance of a revert.
+	 * If the template is new in this theme set, then it will be deleted from templates completely.
+	 *
+	 * @param 	int		$itemId	Actual template ID to remove
+	 * @return	array	Template bit row
+	 * @throws	\UnderflowException
+	 */
+	public function deleteTemplateById( $itemId )
+	{
+		$children = array( $this->_id );
+
+		foreach( $this->allChildren() as $child )
+		{
+			$children[] = $child->_id;
+		}
+
+		$template = \IPS\Db::i()->select( '*', 'core_theme_templates', array( 'template_id=?', (int) $itemId ) )->first();
+
+		/* Master template bit? */
+		if ( $template['template_set_id'] == 0 AND $template['template_added_to'] == 0 )
+		{
+			return false;
+		}
+
+		static::deleteCompiledTemplate( $template['template_app'], $template['template_location'], $template['template_group'], $template['template_set_id'] );
+
+		/* What to do */
+		if ( $template['template_added_to'] == $this->_id  )
+		{
+			/* Does it exist in set ID 0? */
+			$select = \IPS\Db::i()->select( 'template_id', 'core_theme_templates', array(
+				"template_set_id=? AND template_user_added=? AND template_name=? AND template_group=? AND template_app=? AND template_location=?",
+				0, 0, $template['template_name'], $template['template_group'], $template['template_app'], $template['template_location']
+			) );
+
+			/* Is from master theme? */
+			if ( \count( $select ) )
+			{
+				\IPS\Db::i()->delete( 'core_theme_templates', array( 'template_id=?', (int) $itemId ) );
+			}
+			else
+			{
+				# Remove it from the theme set and any children
+				\IPS\Db::i()->delete( 'core_theme_templates', array(
+					"template_name=? AND template_group=? AND template_app=? AND template_location=? AND " . \IPS\Db::i()->in( 'template_set_id', $children ),
+					$template['template_name'], $template['template_group'], $template['template_app'], $template['template_location']
+				) );
+			}
+		}
+		else
+		{
+			\IPS\Db::i()->delete( 'core_theme_templates', array( 'template_id=?', (int) $itemId ) );
+		}
+
+		if ( ! empty( $template['template_set_id'] ) )
+		{
+			static::setThemeCustomized( $template['template_set_id'] );
+		}
+
+		/* Make all template disk caches stale */
+		$this->resetCacheKey();
+		foreach( $this->children() as $child )
+		{
+			$child->resetCacheKey();
+		}
+
+		$templates = $this->getRawTemplates( array( $template['template_app'] ), array( $template['template_location'] ), array( $template['template_group'] ) );
+
+		if ( isset( $templates[ $template['template_app'] ][ $template['template_location'] ][ $template['template_group'] ][ $template['template_name'] ] ) )
+		{
+			return $templates[ $template['template_app'] ][ $template['template_location'] ][ $template['template_group'] ][ $template['template_name'] ];
+		}
+		else
+		{
+			return array();
+		}
 	}
 
 	/**
@@ -2686,107 +3145,340 @@ EOF;
 	 *
 	 * @return	bool
 	 */
-	public function canAccess(): bool
+	public function canAccess()
 	{
 		if ( $this->is_default )
 		{
 			return true;
 		}
 
-		return ( $this->permissions === '*' OR Member::loggedIn()->inGroup( explode( ',', $this->permissions ) ) );
+		return (bool) ( $this->permissions === '*' OR \IPS\Member::loggedIn()->inGroup( explode( ',', $this->permissions ) ) );
+	}
+
+	/**
+	 * Save Template
+	 * Saves a HTML template
+	 *
+	 * @param	array	$data	array( 'app' => .., 'location' => .., 'group' => .., 'name' => .., 'set_id' => .., 'item_id' => ..,  'content' => .., 'variables' => .. )
+	 * @return	int		Template ID
+	 * @throws	\OutOfBoundsException
+	 * @throws	\UnderflowException
+	 */
+	public function saveTemplate( $data )
+	{
+		$template = array();
+
+		/* Save */
+		if ( $data['item_id'] )
+		{
+			$template = \IPS\Db::i()->select( '*', 'core_theme_templates', array( 'template_id=?', (int) $data['item_id'] ) )->first();
+		}
+		else
+		{
+			/* Set up some default data here */
+			$template = array( 'template_app'        => $data['app'],
+							   'template_group'      => $data['group'],
+							   'template_location'   => $data['location'],
+							   'template_name'	     => $data['name'],
+							   'template_added_to'   => $data['set_id'],
+							   'template_user_added' => 1 );
+		}
+
+		/* Test to make sure CSS isn't broken */
+		try
+		{
+			static::makeProcessFunction( $data['content'], 'template_' . md5( mt_rand() . time() ), $data['variables'], TRUE, FALSE );
+		}
+		/* PHP 5 */
+		catch( \InvalidArgumentException $e )
+		{
+			throw new \InvalidArgumentException( 'core_theme_template_parse_error' );
+		}
+		/* PHP 7 */
+		catch( \ParseError $e )
+		{
+			throw new \InvalidArgumentException( 'core_theme_template_parse_error' );
+		}
+
+		$theme = \IPS\Theme::load( $data['set_id'] );
+
+		if ( $data['item_id'] AND $data['set_id'] == $template['template_set_id'] )
+		{
+			$save = array(
+				'template_content'		=> $data['content'],
+				'template_user_edited'	=> \IPS\Application::load( $template['template_app'] )->long_version,
+				'template_version'		=> $theme->long_version,
+				'template_updated'		=> time()
+			);
+
+			if( $data['variables'] )
+			{
+				$save['template_data']	= $data['variables'];
+			}
+
+			\IPS\Db::i()->update( 'core_theme_templates', $save, array( 'template_id=?', (int) $data['item_id'] ) );
+
+			$newTemplateId = $data['item_id'];
+		}
+		else
+		{
+			$newTemplateId = \IPS\Db::i()->insert( 'core_theme_templates', array( 'template_set_id'      => $data['set_id'],
+																				  'template_group'       => $template['template_group'],
+																				  'template_location'    => $template['template_location'],
+																				  'template_app'    	 => $template['template_app'],
+																				  'template_content'     => $data['content'],
+																				  'template_name'        => $template['template_name'],
+																				  'template_data'        => $data['variables'] ?: $template['template_data'],
+																				  'template_added_to'    => $template['template_added_to'],
+																				  'template_user_added'  => $template['template_user_added'],
+																				  'template_user_edited' => \IPS\Application::load( $template['template_app'] )->long_version,
+																				  'template_removable'   => 1,
+																				  'template_version'     => $theme->long_version,
+																				  'template_updated'     => time() ) );
+		}
+
+		/* If this is a user-added template bit and we're editing it in the same theme, update master */
+		if ( $template['template_id'] && $template['template_user_added'] && $template['template_added_to'] == $data['set_id'] )
+		{
+			\IPS\Db::i()->update( 'core_theme_templates',
+				array( 'template_content' => $data['content'] ),
+				array( "template_set_id=? AND template_group=? AND template_name=? AND template_app=? AND template_location=?", 0, $template['template_group'], $template['template_name'], $template['template_app'], $template['template_location'] )
+			);
+		}
+
+		/* Make all template disk caches stale */
+		$theme->resetCacheKey();
+		foreach( $theme->children() as $child )
+		{
+			$child->resetCacheKey();
+		}
+
+		static::deleteCompiledTemplate( $template['template_app'], $template['template_location'], $template['template_group'], $data['set_id'] );
+		static::setThemeCustomized( $data['set_id'] );
+
+		return $newTemplateId;
+	}
+
+	/**
+	 * Returns theme setting DB data with a special array _value which holds the 'true' value fo this setting.
+	 *
+	 * @param	$flags		Bit option flags
+	 * @return	array
+	 */
+	public function getThemeSettings( $flags=0 )
+	{
+		$settings = array();
+
+		$rows = \IPS\Db::i()->select( 'sc.*, sv.sv_value', array('core_theme_settings_fields', 'sc'), array( 'sc.sc_set_id=?', $this->id ) )
+			->join( array('core_theme_settings_values', 'sv'), 'sv.sv_id=sc.sc_id' );
+
+		foreach ( $rows as $row )
+		{
+			if ( $flags & static::TEMPLATE_SETTINGS_DEFAULT )
+			{
+				$row['_value'] = $row['sc_default'];
+			}
+			else
+			{
+				$row['_value'] = ( array_key_exists( 'sv_value', $row ) AND $row['sv_value'] !== NULL ) ? $row['sv_value'] : $row['sc_default'];
+			}
+
+			if ( $row['_value'] and $row['sc_type'] === 'Upload' )
+			{
+				try
+				{
+					$row['_value'] = (string) \IPS\File::get( 'core_Theme', $row['_value'] )->url;
+				}
+				catch( \Exception $ex )
+				{
+
+				}
+			}
+
+			if ( $flags & static::THEME_ID_KEY )
+			{
+				$settings[ $row['sc_id'] ] = $row;
+			}
+			else if ( $flags & static::THEME_KEY_VALUE_PAIRS )
+			{
+				$settings[ $row['sc_key'] ] = $row['_value'];
+			}
+			else
+			{
+				$settings[ $row['sc_key'] ] = $row;
+			}
+		}
+
+		return $settings;
+	}
+
+	/**
+	 * Ensure children get new theme settings
+	 *
+	 * @return void
+	 */
+	public function updateChildrenThemeSettings()
+	{
+		$mainRows = iterator_to_array( \IPS\Db::i()->select( 'sc.*, sv.sv_value', array('core_theme_settings_fields', 'sc'), array( 'sc.sc_set_id=?', $this->id ) )
+			->join( array('core_theme_settings_values', 'sv'), 'sv.sv_id=sc.sc_id' ) );
+
+		$mainRowsByKey = [];
+
+		foreach( $mainRows as $row )
+		{
+			$mainRowsByKey[ $row['sc_key'] ] = $row;
+		}
+
+		foreach( $this->children() as $child )
+		{
+			$childRows = iterator_to_array( \IPS\Db::i()->select( 'sc.*, sv.sv_value', array('core_theme_settings_fields', 'sc'), array( 'sc.sc_set_id=?', $child->id ) )
+				->join( array('core_theme_settings_values', 'sv'), 'sv.sv_id=sc.sc_id' ) );
+
+			$rowsByKey = [];
+			foreach( $childRows as $row )
+			{
+				$rowsByKey[ $row['sc_key'] ] = $row;
+			}
+
+			$diff = array_diff( array_keys( $mainRowsByKey ), array_keys( $rowsByKey ) );
+			if ( \count( $diff ) )
+			{
+				foreach( $diff as $keyName )
+				{
+					$save = [];
+					foreach( $mainRowsByKey[ $keyName ] as $k => $v )
+					{
+						if ( \mb_substr( $k, 0, 3 ) == 'sc_' and $k != 'sc_id' )
+						{
+							$save[ $k ] = $v;
+						}
+					}
+
+					$save['sc_set_id'] = $child->id;
+					$save['sc_order'] = \IPS\Db::i()->select( 'MAX(sc_order)', 'core_theme_settings_fields', array( 'sc_set_id=? AND sc_tab_key=?', $child->id, $save['sc_tab_key'] ) )->first() + 1;
+					$id = \IPS\Db::i()->insert( 'core_theme_settings_fields', $save );
+
+					$themeSettings = $child->getThemeSettings();
+
+					$json = array();
+					foreach( $themeSettings as $settingId => $row )
+					{
+						$json[ $row['sc_key'] ]	= $row['_value'];
+					}
+
+					$child->template_settings = json_encode( $json );
+					$child->save();
+				}
+			}
+		}
 	}
 
 	/**
 	 * Get theme header and footer
 	 *
-	 * @param string	$type	header|footer
-	 * @return string
+	 * @return array
 	 */
-	public function getHeaderAndFooter( string $type = 'header' ): string
+	public function getHeaderAndFooter(): array
 	{
-		$key = "custom_{$type}_{$this->_id}";
-		$content = "";
-		switch( $type )
-		{
-			case 'header':
-				$content = $this->custom_header;
-				break;
+		$return = [ 'header' => null, 'footer' => null ];
 
-			case 'footer':
-				$content = $this->custom_footer;
-				break;
-		}
-
-		if( $content )
+		if ( $this->custom_header )
 		{
-			if ( ! isset( Store::i()->$key ) )
+			$key = 'custom_header_' . $this->_id;
+			if ( ! isset( \IPS\Data\Store::i()->$key ) )
 			{
-				Store::i()->$key = static::compileTemplate( $content, $key );
+				\IPS\Data\Store::i()->$key = static::compileTemplate( $this->custom_header, NULL );
 			}
 
-			static::runProcessFunction( Store::i()->$key, $key );
-			$themeFunction = 'IPS\\Theme\\'. $key;
-			return $themeFunction();
+			$return['header'] = \IPS\Data\Store::i()->$key;
 		}
 
-		return "";
+		if ( $this->custom_footer )
+		{
+			$key = 'custom_footer_' . $this->_id;
+			if ( ! isset( \IPS\Data\Store::i()->$key ) )
+			{
+				\IPS\Data\Store::i()->$key = static::compileTemplate( $this->custom_footer, NULL );
+			}
+
+			$return['footer'] = \IPS\Data\Store::i()->$key;
+		}
+
+		return $return;
 	}
 
 	/**
-	 * Get all CSS. Raw means {resource..} tags and uncompiled
+	 * Get raw CSS. Raw means {resource..} tags and uncompiled
 	 *
-	 * @param array|string|null $app CSS app (e.g. core, forum)
-	 * @param array|string|null $location CSS location (e.g. admin,global,front)
-	 * @param array|string|null $path CSS group (e.g. custom, framework)
-	 * @param int|null $returnType Determines the content returned
-	 * @param bool $returnThisSetOnly
+	 * @param string|array	$app				CSS app (e.g. core, forum)
+	 * @param string|array	$location			CSS location (e.g. admin,global,front)
+	 * @param string|array	$path				CSS group (e.g. custom, framework)
+	 * @param int|constant	$returnType			Determines the content returned
+	 * @param boolean		$returnThisSetOnly  Returns rows unique to this set only
 	 * @return array
 	 */
-	public function getAllCss( array|string|null $app= null, array|string|null $location=array(), array|string|null $path=array(), int $returnType=null, bool $returnThisSetOnly=false ): array
+	public function getRawCss( $app=array(), $location=array(), $path=array(), $returnType=null, $returnThisSetOnly=false )
 	{
 		$returnType = ( $returnType === null )   ? static::RETURN_ALL   : $returnType;
-		$app        = ( is_string( $app )      AND $app != ''      ) ? array( $app )      : $app;
-		$location   = ( is_string( $location ) AND $location != '' ) ? array( $location ) : $location;
-		$path       = ( is_string( $path )     AND $path != ''    )  ? array( $path )     : $path;
+		$app        = ( \is_string( $app )      AND $app != ''      ) ? array( $app )      : $app;
+		$location   = ( \is_string( $location ) AND $location != '' ) ? array( $location ) : $location;
+		$path       = ( \is_string( $path )     AND $path != ''    )  ? array( $path )     : $path;
 		$where      = array();
 		$css	    = array();
 
-		$where[] = "css_set_id IN (" . $this->_id .  ", 0)";
+		$parents = array( $this->_id );
 
-		if ( is_array( $app ) AND count( $app ) )
+		try
+		{
+			$allParents = array();
+			foreach( $this->parents() as $parent )
+			{
+				$allParents[] = $parent->_id;
+			}
+
+			if ( \count( $allParents ) )
+			{
+				foreach( array_reverse( $allParents ) as $id )
+				{
+					$parents[] = $id;
+				}
+			}
+		}
+		catch( \OutOfRangeException $e ) { }
+
+		/* Append master theme set */
+		array_push( $parents, 0 );
+
+		$where[] = "css_set_id IN (" . implode( ',' , $parents ) . ")";
+
+		if ( \is_array( $app ) AND \count( $app ) )
 		{
 			$where[] = "css_app IN ('" . implode( "','", $app ) . "')";
 		}
 
-		if ( is_array( $location ) AND count( $location ) )
+		if ( \is_array( $location ) AND \count( $location ) )
 		{
 			$where[] = "css_location IN ('" . implode( "','", $location ) . "')";
 		}
 
-		if ( is_array( $path ) AND count( $path ) )
+		if ( \is_array( $path ) AND \count( $path ) )
 		{
 			$where[] = "css_path IN ('" . implode( "','", $path ) . "')";
 		}
 
-		$select = ( $returnType & static::RETURN_BIT_NAMES ) ? 'css_set_id, css_app, css_location, css_path, css_id, css_name, css_modules, css_attributes, css_hidden' : '*';
+		$select = ( $returnType & static::RETURN_BIT_NAMES ) ? 'css_app, css_location, css_path, css_set_id, css_id, css_name, css_modules, css_attributes, css_removed, css_added_to, css_hidden, css_user_edited' : '*';
 
 		foreach(
-			Db::i()->select(
-				$select . ', INSTR(\',' . $this->_id . ', 0,\', CONCAT(\',\',css_set_id,\',\') ) as theorder',
+			\IPS\Db::i()->select(
+				$select . ', INSTR(\',' . implode( ',' , $parents ) . ',\', CONCAT(\',\',css_set_id,\',\') ) as theorder',
 				'core_theme_css',
 				implode( " AND ", $where ),
 				'css_location, css_path, css_name, theorder desc'
 			)
-			as $row )
-		{
+			as $row
+		) {
 			/* App installed? */
-			if ( ! Application::appIsEnabled( $row['css_app'] ) )
-			{
-				continue;
-			}
-
-			/* CSS not to be included */
-			if ( ! empty( $row['css_hidden'] ) )
+			if ( ! \IPS\Application::appIsEnabled( $row['css_app'] ) )
 			{
 				continue;
 			}
@@ -2798,6 +3490,35 @@ EOF;
 				{
 					continue;
 				}
+			}
+
+			/* CSS has been removed up the tree? */
+			if ( ! empty( $row['css_removed'] ) )
+			{
+				continue;
+			}
+
+			/* CSS not to be included */
+			if ( ! empty( $row['css_hidden'] ) )
+			{
+				continue;
+			}
+
+			if ( $row['css_set_id'] === 0 )
+			{
+				$row['InheritedValue'] = 'original';
+			}
+			else if ( $row['css_set_id'] != $this->_id )
+			{
+				$row['InheritedValue'] = 'inherit';
+			}
+			else if ( $row['css_added_to'] != 0 )
+			{
+				$row['InheritedValue'] = 'custom';
+			}
+			else
+			{
+				$row['InheritedValue'] = ( $row['css_user_edited'] < \IPS\Application::load( $row['css_app'] )->long_version ) ? 'outofdate' : 'changed';
 			}
 
 			/* ensure set ID is correct */
@@ -2855,299 +3576,120 @@ EOF;
 	}
 
 	/**
-	 * @var array The CSS variables for this theme, cached to prevent multiple DB calls
-	 */
-	protected array $cssVariablesCached = [];
-
-	/**
-	 * Return the CSS variables for this theme
+	 * Get raw templates. Raw means HTML logic and variables are still in {{format}}
 	 *
-	 * @param int $flag
-	 * @return array|null
-	 */
-	public function getCssVariables( int $flag=0 ): array|null
-	{
-		if ( ! isset( $this->cssVariablesCached[ $flag ] ) )
-		{
-			$customValues = [];
-
-			/* Add custom settings that were added from other apps/themes */
-			foreach( new ActiveRecordIterator(
-						 Db::i()->select( '*', 'core_theme_editor_settings', [
-							 [ "(setting_app not in ('" . implode( "','", IPS::$ipsApps ) . "') OR (setting_set_id != ? and setting_set_id=?) )", 0, $this->_id ]
-						 ] ),
-						 Setting::class
-					 ) as $setting )
-			{
-				$value = $setting->value( true );
-				if( is_array( $value ) )
-				{
-					foreach( $value as $_k => $_v )
-					{
-						$customValues[ $_k . '__' . $setting->key ] = $_v;
-					}
-				}
-				else
-				{
-					$customValues[ $setting->key ] = $value;
-				}
-			}
-
-			if( !( $flag & static::FORCE_DEFAULT ) )
-			{
-				if ( ! empty( $this->css_variables ) and $variables = json_decode( $this->css_variables, true ) )
-				{
-					foreach( $variables as $k => $v )
-					{
-						$customValues[ $k ] = $v;
-					}
-				}
-
-				if( ! empty( $this->view_options ) and $layouts = json_decode( $this->view_options, true ) )
-				{
-					foreach( $layouts as $k =>  $v )
-					{
-						$customValues[ 'layout_' . $k ] = $v;
-					}
-				}
-			}
-
-			/* Add any pending changes */
-			if( !( $flag & static::FORCE_DEFAULT ) )
-			{
-				$data = $this->editingSessionData()['data'] ?? [];
-				foreach( $data as $group => $vars )
-				{
-					if( is_array( $vars ) )
-					{
-						$customValues = array_merge( $customValues, $vars );
-					}
-				}
-			}
-
-			if ( $flag & static::CUSTOM_ONLY )
-			{
-				/* We just want the custom/changed variables only */
-				$this->cssVariablesCached[ $flag ] = $customValues;
-				return $this->cssVariablesCached[ $flag ];
-			}
-
-			/* If we are still here, we want to merge in any custom variables with the default variables (from the master set) */
-			if ( IN_DEV )
-			{
-				/* Try the dev theme */
-				$cssData = file_get_contents( ROOT_PATH . "/applications/core/dev/css/global/framework/" . static::CSS_VARIABLE_FILENAME );
-			}
-			else
-			{
-				try
-				{
-					/* Try the master theme in the core/global/framework path if not IN_DEV */
-					$cssData = Db::i()->select( 'css_content', 'core_theme_css', ['css_set_id=? AND css_app=? AND css_location=? AND css_path=? AND css_name=?', 0, 'core', 'global', 'framework', static::CSS_VARIABLE_FILENAME] )->first();
-				}
-				catch( UnderflowException )
-				{
-					$cssData = '';
-				}
-			}
-
-			// Regular expression to find CSS variables
-			$pattern = '/--([\w-]+)\s*:\s*([^;]+)/';
-			preg_match_all( $pattern, $cssData, $matches );
-			$variableNames = $matches[1] ?? [];
-			$variableValues = $matches[2] ?? [];
-
-			/* Include any editor settings that are not in the main CSS file */
-			foreach( new ActiveRecordIterator(
-						 Db::i()->select( '*', 'core_theme_editor_settings' ),
-						 Setting::class
-					 ) as $setting )
-			{
-				try
-				{
-					$value = $setting->value( ( $flag & static::FORCE_DEFAULT ) );
-					if( is_array( $value ) )
-					{
-						foreach( $value as $_k => $_v )
-						{
-							$variableNames[] = $_k . '__' . $setting->key;
-							$variableValues[] = $_v;
-						}
-					}
-					else
-					{
-						$variableNames[] = $setting->key;
-						$variableValues[] = $value;
-					}
-				}
-				catch( InvalidArgumentException $e )
-				{
-					Log::debug( $e, 'template_error' );
-					$variableValues[] = "";
-				}
-			}
-
-			$this->cssVariablesCached[ $flag ] = array_merge( array_combine( $variableNames, $variableValues ), $customValues );
-		}
-
-		return $this->cssVariablesCached[ $flag ];
-	}
-
-	/**
-	 * Return any saved CSS variables for <style id="themeVariables">
-	 *
-	 * @return string
-	 */
-	public function getInlineCssVariables(): string
-	{
-		$cssData = '';
-		$customCssVars = $this->getCssVariables( Theme::CUSTOM_ONLY );
-
-		if ( $customCssVars and count( $customCssVars ) )
-		{
-			$cssData = ":root{\n\n";
-
-			foreach( $customCssVars as $key => $value )
-			{
-				/* Skip layout values, they don't belong here */
-				if( str_starts_with( $key, 'layout' ) )
-				{
-					continue;
-				}
-
-				/* Parse the value based on the setting type */
-				try
-				{
-					$setting = Setting::load( $key, 'setting_key' );
-					$value = $setting->parsedValue( $value );
-					if( $setting->type == Setting::SETTING_IMAGE )
-					{
-						if( empty( $value ) )
-						{
-							continue;
-						}
-
-						$value = "url('" . $value . "')";
-					}
-				}
-				catch( OutOfRangeException ){}
-
-				if( $value !== '' )
-				{
-					$cssData .= "--{$key}: {$value};\n";
-				}
-			}
-
-			$cssData .= "\n}";
-		}
-
-		return $cssData;
-	}
-
-	/**
-	 * @param array $cssVariables
-	 * @return void
-	 */
-	public function setCssVariables( array $cssVariables ): void
-	{
-		$this->css_variables = json_encode( $cssVariables );
-		$this->save();
-
-		$this->cssVariablesCached = [];
-	}
-
-	/**
-	 * Get a CSS variable from its key
-	 *
-	 * @param $key
-	 * @return string
-	 */
-	public function getCssVariableFromKey( $key ): string
-	{
-		$cssVariables = $this->getCssVariables();
-		return $cssVariables[ $key ] ?? '';
-	}
-
-	/**
-	 * Get the parsed css variable (what is directly added to themes). Returns an empty string when the provided key is unset
-	 *
-	 * @param string $key
-	 *
-	 * @return string
-	 */
-	public function getParsedCssVariableFromKey( string $key ) : string
-	{
-		$variables = $this->getCssVariables();
-		$value = $variables[$key] ?? null;
-
-		try
-		{
-			$setting = Setting::load( $key, "setting_key" );
-			$value = $setting->parsedValue( $value ?? ( $setting->default ) );
-		}
-		catch ( OutOfRangeException ) {}
-
-		return (string) $value;
-	}
-
-	/**
-	 * Get the current scheme (light/dark)
-	 *
-	 * @return "light"|"dark"|string
-	 */
-	public function getCurrentCSSScheme() : string
-	{
-		if ( isset( Request::i()->cookie['scheme_preference']) and $this->getParsedCssVariableFromKey( "set__i-change-scheme" ) == "1" )
-		{
-			return Request::i()->cookie['scheme_preference'];
-		}
-		return $this->getParsedCssVariableFromKey( 'set__i-default-scheme' );
-	}
-
-	/**
-	 * Get all templates. Raw means HTML logic and variables are still in {{format}}
-	 *
-	 * @param array|string $app				Template app (e.g. core, forum)
-	 * @param array|string $location			Template location (e.g. admin,global,front)
-	 * @param array|string $group				Template group (e.g. login, share)
-	 * @param int|null $returnType			Determines the content returned
+	 * @param string|array	$app				Template app (e.g. core, forum)
+	 * @param string|array	$location			Template location (e.g. admin,global,front)
+	 * @param string|array	$group				Template group (e.g. login, share)
+	 * @param int|constant	$returnType			Determines the content returned
+	 * @param boolean		$returnThisSetOnly  Returns rows unique to this set only
 	 * @return array
 	 */
-	public function getAllTemplates( array|string $app=array(), array|string $location=array(), array|string $group=array(), int $returnType=null): array
+	public function getRawTemplates( $app=array(), $location=array(), $group=array(), $returnType=null, $returnThisSetOnly=false )
 	{
 		$returnType = ( $returnType === null )  ? static::RETURN_ALL   : $returnType;
-		$app        = ( is_string( $app )      AND $app != ''      ) ? array( $app )      : $app;
-		$location   = ( is_string( $location ) AND $location != '' ) ? array( $location ) : $location;
-		$group      = ( is_string( $group )    AND $group != ''    ) ? array( $group )    : $group;
+		$app        = ( \is_string( $app )      AND $app != ''      ) ? array( $app )      : $app;
+		$location   = ( \is_string( $location ) AND $location != '' ) ? array( $location ) : $location;
+		$group      = ( \is_string( $group )    AND $group != ''    ) ? array( $group )    : $group;
 		$where      = array();
 		$templates  = array();
 
-		if ( is_array( $app ) AND count( $app ) )
+		$parents = array( $this->_id );
+
+		try
+		{
+			$allParents = array();
+			foreach( $this->parents() as $parent )
+			{
+				$allParents[] = $parent->_id;
+			}
+
+			if ( \count( $allParents ) )
+			{
+				foreach( array_reverse( $allParents ) as $id )
+				{
+					$parents[] = $id;
+				}
+			}
+		}
+		catch( \OutOfRangeException $e ) { }
+
+		/* Append master theme set */
+		array_push( $parents, 0 );
+
+		$where[] = "template_set_id IN (" . implode( ',' , $parents ) . ")";
+
+		if ( \is_array( $app ) AND \count( $app ) )
 		{
 			$where[] = "template_app IN ('" . implode( "','", $app ) . "')";
 		}
 
-		if ( is_array( $location ) AND count( $location ) )
+		if ( \is_array( $location ) AND \count( $location ) )
 		{
 			$where[] = "template_location IN ('" . implode( "','", $location ) . "')";
 		}
 
-		if ( is_array( $group ) AND count( $group ) )
+		if ( \is_array( $group ) AND \count( $group ) )
 		{
 			$where[] = "template_group IN ('" . implode( "','", $group ) . "')";
 		}
 
-		$select = ( $returnType & static::RETURN_BIT_NAMES ) ? 'template_app, template_location, template_group, template_id, template_name, template_data' : '*';
+		$select = ( $returnType & static::RETURN_BIT_NAMES ) ? 'template_added_to, template_app, template_location, template_group, template_set_id, template_id, template_name, template_data' : '*';
 
-		foreach( Db::i()->select( $select, 'core_theme_templates', implode( " AND ", $where ), 'template_location, template_group, template_name' ) as $row )
-		{
+		foreach(
+			\IPS\Db::i()->select(
+				$select . ', INSTR(\',' . implode( ',' , $parents ) . ',\', CONCAT(\',\',template_set_id,\',\') ) as theorder',
+				'core_theme_templates',
+				implode( " AND ", $where ),
+				'template_location, template_group, template_name, theorder desc'
+			)
+			as $row
+		) {
 			/* App installed? */
-			if ( ! Application::appIsEnabled( $row['template_app'] ) )
+			if ( ! \IPS\Application::appIsEnabled( $row['template_app'] ) )
 			{
 				continue;
 			}
 
+			/* This set only? */
+			if ( $returnThisSetOnly === true )
+			{
+				if ( $row['template_set_id'] != $this->_id )
+				{
+					continue;
+				}
+			}
+
+			if ( $row['template_set_id'] === 0 and ! $row['template_user_added'] )
+			{
+				$row['InheritedValue'] = 'original';
+			}
+			else if ( $row['template_user_added'] and \in_array( $row['template_added_to'], array_values( $allParents ) ) )
+			{
+				$row['InheritedValue'] = ( $row['template_removable'] and $this->_id == $row['template_set_id'] ) ? 'changed' : 'inherit';
+			}
+			else if ( $row['template_user_added'] and ( $row['template_added_to'] != $this->_id and $row['template_set_id'] != $this->_id ) )
+			{
+				$row['InheritedValue'] = 'original';
+			}
+			else if ( $row['template_user_added'] )
+			{
+				if ( $row['template_added_to'] == $this->_id )
+				{
+					$row['InheritedValue'] = 'custom';
+				}
+				else
+				{
+					$row['InheritedValue'] = ( $row['template_user_edited'] < \IPS\Application::load( $row['template_app'] )->long_version ) ? 'outofdate' : 'changed';
+				}
+			}
+			else
+			{
+				$row['InheritedValue'] = ( $row['template_user_edited'] < \IPS\Application::load( $row['template_app'] )->long_version ) ? 'outofdate' : 'changed';
+			}
+
 			/* ensure set ID is correct */
+			$row['template_set_id'] = $this->_id;
 			$row['TemplateKey']     = $row['template_app'] . '_' . $row['template_location'] . '_' . $row['template_group'] . '_' . $row['template_name'];
 			$row['jsDataKey']       = str_replace( '.', '--', $row['TemplateKey'] );
 
@@ -3201,47 +3743,86 @@ EOF;
 	}
 
 	/**
-	 * Get all available hook points in the templates
+	 * Save the visual skin editor CSS
 	 *
-	 * @param array|string|null $app
-	 * @return array
+	 * @param	array	$colors			Theme setting colors
+	 * @param	string	$customCss		User added CSS
+	 * @param	array	$settings		Settings to update
+	 * @return	void
 	 */
-	public function getHookPoints( array|string $app=null ): array
+	public function vseSave( $colors, $customCss, $settings )
 	{
-		$hookPoints = [];
-		$where      = [ [ 'template_has_hookpoints=?', 1 ] ];
+		$css = $this->getRawCss( 'core', 'front', 'custom', static::RETURN_ALL, true );
 
-		if ( $app )
+		$custom = array( 'app' 	    => 'core',
+						 'location' => 'front',
+						 'group'    => 'custom',
+						 'name'	    => 'custom.css',
+						 'set_id'   => $this->id,
+						 'content'  => $customCss
+		);
+
+		/* Do we have custom already? */
+		if ( isset( $css['core']['front']['custom']['custom.css'] ) )
 		{
-			if ( is_array( $app ) )
+			$custom['item_id'] = $css['core']['front']['custom']['custom.css']['css_id'];
+		}
+
+		$this->saveCss( $custom );
+
+		/* Settings first */
+		$themeSettings      = $this->getThemeSettings( static::THEME_ID_KEY );
+		$themeSettingsByKey = array();
+
+		foreach( $themeSettings as $themeSettingId => $themeSettingData )
+		{
+			$themeSettingsByKey[ $themeSettingData['sc_key'] ] = $themeSettingData;
+		}
+
+		if( !\is_array( $settings ) )
+		{
+			$settings = array();
+		}
+
+		$settings = array_merge( $settings, $colors );
+
+		foreach( $settings as $key => $value )
+		{
+			if ( \stristr( $key, 'core_theme_setting_title_' ) )
 			{
-				$where[] = [ Db::i()->in( 'template_app', $app ) ];
+				$keyId = str_replace( 'core_theme_setting_title_', '', $key );
+
+				if ( isset( $themeSettings[ $keyId ] ) )
+				{
+					\IPS\Db::i()->delete('core_theme_settings_values', array( 'sv_id=?', $keyId ) );
+					\IPS\Db::i()->insert('core_theme_settings_values', array( 'sv_id' => $keyId, 'sv_value' => (string)$value ) );
+				}
 			}
 			else
 			{
-				$where[] = [ 'template_app=?', $app ];
+				if ( isset( $themeSettingsByKey[ $key ] ) )
+				{
+					\IPS\Db::i()->delete('core_theme_settings_values', array( 'sv_id=?', $themeSettingsByKey[ $key ]['sc_id'] ) );
+					\IPS\Db::i()->insert('core_theme_settings_values', array( 'sv_id' => $themeSettingsByKey[ $key ]['sc_id'], 'sv_value' => (string)$value ) );
+				}
 			}
 		}
 
-		foreach( Db::i()->select( '*', 'core_theme_templates', $where ) as $row )
-		{
-			$path = $row['template_app'] . '/' . $row['template_location'] . '/' . $row['template_group'] . '/' . $row['template_name'];
-			$hookPoints[ $path ] = static::extractHookNames( $row['template_content'] );
-		}
+		$this->saveSet();
 
-		return $hookPoints;
+		static::deleteCompiledCss( 'core', 'front', 'custom', null, $this->id );
 	}
 
 	/**
 	 * Save a theme set
 	 *
-	 * @param array $data	Skin set data
+	 * @param	array $data	Skin set data
 	 * @return	void
 	 */
-	public function saveSet( array $data=array() ): void
+	public function saveSet( $data=array() )
 	{
 		$save    = array();
-		$fields  = array( 'name', 'key', 'permissions', 'is_default', 'author_name', 'author_url', 'resource_dir', 'emo_dir', 'hide_from_list', 'order', 'version', 'long_version', 'update_check' );
+		$fields  = array( 'name', 'key', 'parent_id', 'permissions', 'is_default', 'author_name', 'author_url', 'resource_dir', 'emo_dir', 'hide_from_list', 'order', 'version', 'long_version', 'update_check' );
 
 		foreach( $fields as $k )
 		{
@@ -3253,24 +3834,21 @@ EOF;
 
 		if ( ! $this->_id )
 		{
-			$save['set_long_version'] = ( ! empty( $save['set_long_version'] ) ) ? (int) $save['set_long_version'] : Application::load( 'core' )->long_version;
+			$save['set_long_version'] = ( ! empty( $save['set_long_version'] ) ) ? (int) $save['set_long_version'] : \IPS\Application::load( 'core' )->long_version;
 		}
 		else if ( isset( $save['set_long_version'] ) )
 		{
-			$save['set_long_version'] = intval( $save['set_long_version'] );
+			$save['set_long_version'] = \intval( $save['set_long_version'] );
 		}
 
-		foreach( [ 'front', 'front-dark', 'mobile', 'mobile-dark' ] as $type )
+		if ( isset( $data['logo']['front'] ) )
 		{
-			if ( isset( $data['logo'][ $type ] ) )
-			{
-				$this->_data['logo'][ $type ] = $data['logo'][ $type ];
-			}
+			$this->_data['logo']['front'] = $data['logo']['front'];
 		}
 
 		if ( isset( $data['set_name'] ) )
 		{
-			Lang::saveCustom( 'core', "core_theme_set_title_{$this->_id}", $data['set_name'] );
+			\IPS\Lang::saveCustom( 'core', "core_theme_set_title_{$this->_id}", $data['set_name'] );
 		}
 
 		$save['set_logo_data'] = ( isset( $this->_data['logo'] ) ? json_encode( $this->_data['logo'] ) : '{}' );
@@ -3285,14 +3863,19 @@ EOF;
 			$save['set_resource_map'] = json_encode( $data['set_resource_map'] );
 		}
 
-		if ( isset( $data['set_theme_editor_data'] ) )
+		$json          = array();
+		$themeSettings = $this->getThemeSettings();
+
+		foreach ( $themeSettings as $key => $row )
 		{
-			$save['set_theme_editor_data'] = json_encode( $data['set_theme_editor_data'] );
+			$json[ $row['sc_key'] ] = $row['_value'];
 		}
 
-		Db::i()->update( 'core_themes', $save, array( 'set_id=?', (int) $this->_id ) );
+		$save['set_template_settings'] = json_encode( $json );
 
-		unset( Store::i()->themes );
+		\IPS\Db::i()->update( 'core_themes', $save, array( 'set_id=?', (int) $this->_id ) );
+
+		unset( \IPS\Data\Store::i()->themes );
 	}
 
 	/**
@@ -3301,16 +3884,16 @@ EOF;
 	 *
 	 * @return void
 	 */
-	public function saveHistorySnapshot(): void
+	public function saveHistorySnapshot()
 	{
 		/* Remove all current template records for this theme set */
-		Db::i()->delete( 'core_theme_content_history', array( 'content_set_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'core_theme_content_history', array( 'content_set_id=?', $this->id ) );
 
 		/* Templates */
-		Db::i()->insert( 'core_theme_content_history', Db::i()->select( "null, template_set_id, 'template', template_app, template_location, template_group, template_name, template_data, template_content, IFNULL(template_version, 10000), template_updated", 'core_theme_templates', array( 'template_set_id=?', $this->id ) ) );
+		\IPS\Db::i()->insert( 'core_theme_content_history', \IPS\Db::i()->select( "null, template_set_id, 'template', template_app, template_location, template_group, template_name, template_data, template_content, IFNULL(template_version, 10000), template_updated", 'core_theme_templates', array( 'template_set_id=?', $this->id ) ) );
 
 		/* CSS */
-		Db::i()->insert( 'core_theme_content_history', Db::i()->select( "null, css_set_id, 'css', css_app, css_location, css_path, css_name, css_attributes, css_content, IFNULL(css_version, 10000), css_updated", 'core_theme_css', array( 'css_set_id=?', $this->id ) ) );
+		\IPS\Db::i()->insert( 'core_theme_content_history', \IPS\Db::i()->select( "null, css_set_id, 'css', css_app, css_location, css_path, css_name, css_attributes, css_content, IFNULL(css_version, 10000), css_updated", 'core_theme_css', array( 'css_set_id=?', $this->id ) ) );
 	}
 
 	/**
@@ -3318,16 +3901,16 @@ EOF;
 	 *
 	 * @return	array	array( 'templates' => array(), 'css' => array() )
 	 */
-	public function getDiff(): array
+	public function getDiff()
 	{
 		$templates = array();
 		$css       = array();
-		$results   = [];
-		$history   = array( 'templates' => [], 'css' => [] );
+		$results   = array( 'template' => array(), 'css' => array() );
+		$history   = array( 'template' => array(), 'css' => array() );
 
-		require_once ROOT_PATH . "/system/3rd_party/Diff/class.Diff.php";
+		require_once \IPS\ROOT_PATH . "/system/3rd_party/Diff/class.Diff.php";
 
-		foreach(Db::i()->select(
+		foreach( \IPS\Db::i()->select(
 				"*, MD5( CONCAT( content_app, '.', content_location, '.', content_path, '.', content_name ) ) as bit_key",
 				'core_theme_content_history',
 				array( 'content_set_id=?', $this->id )
@@ -3343,19 +3926,19 @@ EOF;
 			}
 		}
 
-		$results['templates'] = iterator_to_array( Db::i()->select(
+		$results['templates'] = iterator_to_array( \IPS\Db::i()->select(
 				'*, MD5( CONCAT( template_app, \'.\', template_location, \'.\', template_group, \'.\', template_name ) ) as bit_key',
 				'core_theme_templates',
 				array( 'template_set_id=?', $this->id )
 		)->setKeyField('bit_key') );
 
-		$results['css'] = iterator_to_array( Db::i()->select(
+		$results['css'] = iterator_to_array( \IPS\Db::i()->select(
 				'*, MD5( CONCAT( css_app, \'.\', css_location, \'.\', css_path, \'.\', css_name ) ) as bit_key',
 				'core_theme_css',
 				array( 'css_set_id=?', $this->id )
 		)->setKeyField('bit_key') );
 
-		$masterTemplateBits  = Theme::master()->getAllTemplates();
+		$masterTemplateBits  = \IPS\Theme::master()->getRawTemplates();
 
 		/* Find changed and new template bits */
 		foreach( $results['templates'] as $key => $data )
@@ -3367,12 +3950,12 @@ EOF;
 
 			if ( isset( $history['template'][ $key ] ) )
 			{
-				$data['oldHumanVersion'] = Application::load( $history['template'][ $key ]['content_app'] )->getHumanVersion( $history['template'][ $key ]['content_long_version'] );
-				$data['newHumanVersion'] = Application::load( $results['templates'][ $key ]['template_app'] )->getHumanVersion( $results['templates'][ $key ]['template_version'] );
+				$data['oldHumanVersion'] = \IPS\Application::load( $history['template'][ $key ]['content_app'] )->getHumanVersion( $history['template'][ $key ]['content_long_version'] );
+				$data['newHumanVersion'] = \IPS\Application::load( $results['templates'][ $key ]['template_app'] )->getHumanVersion( $results['templates'][ $key ]['template_version'] );
 
 				if ( md5( $history['template'][ $key ]['content_content'] ) != md5( $data['template_content'] ) )
 				{
-					$data['diff'] = Diff::toTable( Diff::compare( $history['template'][ $key ]['content_content'], $data['template_content'] ) );
+					$data['diff'] = \Diff::toTable( \Diff::compare( $history['template'][ $key ]['content_content'], $data['template_content'] ) );
 				}
 				else
 				{
@@ -3383,12 +3966,12 @@ EOF;
 			}
 			else if ( $masterSetTemplate and md5( $masterSetTemplate['template_content'] ) != md5( $data['template_content'] ) )
 			{
-				$data['diff'] = Diff::toTable( Diff::compare( $masterSetTemplate['template_content'], $data['template_content'] ) );
+				$data['diff'] = \Diff::toTable( \Diff::compare( $masterSetTemplate['template_content'], $data['template_content'] ) );
 			}
 			else
 			{
 				$data['added'] = true;
-				$data['diff']  = Diff::toTable( Diff::compare( '', $data['template_content'] ) );
+				$data['diff']  = \Diff::toTable( \Diff::compare( '', $data['template_content'] ) );
 			}
 
 			$templates[ $data['template_app'] ][ $data['template_location'] ][ $data['template_group'] ][ $data['template_name'] ] = $data;
@@ -3402,12 +3985,12 @@ EOF;
 
 			if ( isset( $history['css'][ $key ] ) )
 			{
-				$data['oldHumanVersion'] = Application::load( $history['css'][ $key ]['content_app'] )->getHumanVersion( $history['css'][ $key ]['content_long_version'] );
-				$data['newHumanVersion'] = Application::load( $results['css'][ $key ]['css_app'] )->getHumanVersion( $results['css'][ $key ]['css_version'] );
+				$data['oldHumanVersion'] = \IPS\Application::load( $history['css'][ $key ]['content_app'] )->getHumanVersion( $history['css'][ $key ]['content_long_version'] );
+				$data['newHumanVersion'] = \IPS\Application::load( $results['css'][ $key ]['css_app'] )->getHumanVersion( $results['css'][ $key ]['css_version'] );
 
 				if ( md5( $history['css'][ $key ]['content_content'] ) != md5( $data['css_content'] ) )
 				{
-					$data['diff'] = Diff::toTable( Diff::compare( $history['css'][ $key ]['content_content'], $data['css_content'] ) );
+					$data['diff'] = \Diff::toTable( \Diff::compare( $history['css'][ $key ]['content_content'], $data['css_content'] ) );
 				}
 				else
 				{
@@ -3419,7 +4002,7 @@ EOF;
 			else
 			{
 				$data['added'] = true;
-				$data['diff']  = Diff::toTable( Diff::compare( '', $data['css_content'] ) );
+				$data['diff']  = \Diff::toTable( \Diff::compare( '', $data['css_content'] ) );
 			}
 
 			$css[ $data['css_app'] ][ $data['css_location'] ][ $data['css_path'] ][ $data['css_name'] ] = $data;
@@ -3436,7 +4019,7 @@ EOF;
 				'template_group'    => $data['content_path'],
 				'template_name'     => $data['content_name'],
 				'template_content'  => $data['content_content'],
-				'diff'    			=> Diff::toTable( Diff::compare( $history['template'][ $key ]['content_content'], '' ) ),
+				'diff'    			=> \Diff::toTable( \Diff::compare( $history['template'][ $key ]['content_content'], '' ) ),
 				'added'				=> false,
 				'deleted'			=> true
 			);
@@ -3453,7 +4036,7 @@ EOF;
 				'css_path'    	=> $data['content_path'],
 				'css_name'     	=> $data['content_name'],
 				'css_content'  	=> $data['content_content'],
-				'diff'    		=> Diff::toTable( Diff::compare( $history['css'][ $key ]['content_content'], '' ) ),
+				'diff'    		=> \Diff::toTable( \Diff::compare( $history['css'][ $key ]['content_content'], '' ) ),
 				'added'			=> false,
 				'deleted'		=> true
 			);
@@ -3494,16 +4077,42 @@ EOF;
 	}
 
 	/**
+	 * Does this theme have any CSS/HTML/Resource customizations?
+	 * @note This will return true even if theme settings have been altered.
+	 *
+	 * @return boolean
+	 */
+	public function hasCustomizations()
+	{
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_theme_css', array( 'css_set_id=? or css_added_to=?', $this->id, $this->id ) )->first() )
+		{
+			return TRUE;
+		}
+
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_theme_templates', array( 'template_set_id=? or template_added_to=?', $this->id, $this->id ) )->first() )
+		{
+			return TRUE;
+		}
+
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_theme_resources', array( 'resource_set_id=? and resource_user_edited=1', $this->id ) )->first() )
+		{
+			return TRUE;
+		}
+
+		return FALSE;
+	}
+
+	/**
 	 * Delete compiled templates
 	 * Removes compiled templates bits for all themes that match the arguments
 	 *
-	 * @param string|null $app		Application Directory (core, forums, etc)
-	 * @param array|string|null $location	Template location (front, admin, global, etc)
-	 * @param array|string|null $group		Template group (forms, messaging, etc)
-	 * @param int|null $themeId	Limit to a specific theme (and children)
+	 * @param	string		$app		Application Directory (core, forums, etc)
+	 * @param	string|null	$location	Template location (front, admin, global, etc)
+	 * @param	string|null	$group		Template group (forms, messaging, etc)
+	 * @param	int|null	$themeId	Limit to a specific theme (and children)
 	 * @return 	void
 	 */
-	public static function deleteCompiledTemplate( string $app=null, array|string|null $location=null, array|string|null $group=null, int $themeId=null ): void
+	public static function deleteCompiledTemplate( $app=null, $location=null, $group=null, $themeId=null )
 	{
 		$where     = array();
 		$themeSets = array( 0 );
@@ -3515,22 +4124,24 @@ EOF;
 
 		if ( $location !== null )
 		{
-			$where[] = array( Db::i()->in( 'template_location', ( is_array( $location ) ) ? $location : array( $location ) ) );
+			$where[] = array( \IPS\Db::i()->in( 'template_location', ( \is_array( $location ) ) ? $location : array( $location ) ) );
 		}
 
 		if ( $group !== null )
 		{
-			$where[] = array( Db::i()->in( 'template_group', ( is_array( $group ) ) ? $group : array( $group ) ) );
+			$where[] = array( \IPS\Db::i()->in( 'template_group', ( \is_array( $group ) ) ? $group : array( $group ) ) );
 		}
 
 		if ( ! empty( $themeId ) )
 		{
 			$themeSet  = static::load( $themeId );
-			$where[] = array( Db::i()->in( 'template_set_id', array_keys( $themeSets ) ) );
+			$themeSets = array( $themeId => $themeSet ) + $themeSet->allChildren();
+
+			$where[] = array( \IPS\Db::i()->in( 'template_set_id', array_keys( $themeSets ) ) );
 		}
 
 		foreach(
-			Db::i()->select(
+			\IPS\Db::i()->select(
 				"template_app, template_location, template_group, MD5( CONCAT(',', template_app, ',', template_location, ',', template_group) ) as group_key",
 				'core_theme_templates',
 				$where,
@@ -3541,11 +4152,11 @@ EOF;
 			/* ... remove from each theme */
 			foreach( static::themes() as $id => $set )
 			{
-				if ( $themeId === null OR in_array( $id, array_keys( $themeSets ) ) )
+				if ( $themeId === null OR \in_array( $id, array_keys( $themeSets ) ) )
 				{
-					$key = strtolower( 'template_' . $set->id . '_' .static::makeBuiltTemplateLookupHash( $data['template_app'], $data['template_location'], $data['template_group'] ) . '_' . static::cleanGroupName( $data['template_group'] ) );
+					$key = \strtolower( 'template_' . $set->id . '_' .static::makeBuiltTemplateLookupHash( $data['template_app'], $data['template_location'], $data['template_group'] ) . '_' . static::cleanGroupName( $data['template_group'] ) );
 
-					unset( Store::i()->$key );
+					unset( \IPS\Data\Store::i()->$key );
 				}
 			}
 		}
@@ -3555,14 +4166,14 @@ EOF;
 	 * Delete compiled Css
 	 * Removes compiled Css for all themes that match the arguments
 	 *
-	 * @param array|string|null $app		CSS Directory (core, forums, etc)
-	 * @param array|string|null $location	CSS location (front, admin, global, etc)
-	 * @param string|null $path		CSS path (forms, messaging, etc)
-	 * @param string|null $name		CSS file to remove
-	 * @param int|null $themeId	Limit to a specific theme (and children)
+	 * @param	string|null	$app		CSS Directory (core, forums, etc)
+	 * @param	string|null	$location	CSS location (front, admin, global, etc)
+	 * @param	string|null	$path		CSS path (forms, messaging, etc)
+	 * @param	string|null $name		CSS file to remove
+	 * @param	int|null	$themeId	Limit to a specific theme (and children)
 	 * @return 	void
 	 */
-	public static function deleteCompiledCss( array|string|null $app=null, array|string|null $location=null, string|null $path=null, string $name=null, int $themeId=null ): void
+	public static function deleteCompiledCss( $app=null, $location=null, $path=null, $name=null, $themeId=null )
 	{
 		$where     = array();
 		$themeSets = array( 0 );
@@ -3570,8 +4181,9 @@ EOF;
 		if ( $themeId !== null )
 		{
 			$themeSet  = static::load( $themeId );
-			$themeSets = array( $themeId => $themeSet );
-			$where[] = array( Db::i()->in( 'css_set_id', array_keys( $themeSets ) ) );
+			$themeSets = array( $themeId => $themeSet ) + $themeSet->allChildren();
+
+			$where[] = array( \IPS\Db::i()->in( 'css_set_id', array_keys( $themeSets ) ) );
 		}
 
 		if ( $app === null )
@@ -3579,9 +4191,9 @@ EOF;
 			/* Each theme... */
 			foreach( static::themes() as $id => $set )
 			{
-				if ( $themeId === null OR in_array( $id, array_keys( $themeSets ) ) )
+				if ( $themeId === null OR \in_array( $id, array_keys( $themeSets ) ) )
 				{
-					File::getClass( 'core_Theme')->deleteContainer('css_built_' . $set->_id );
+					\IPS\File::getClass( 'core_Theme')->deleteContainer('css_built_' . $set->_id );
 
 					$set->css_map = array();
 					$set->css_updated = time();
@@ -3590,26 +4202,9 @@ EOF;
 			}
 
 			/* ACP CSS */
-			Settings::i()->changeValues( array( 'acp_css_map' => '[]' ) );
+			\IPS\Settings::i()->changeValues( array( 'acp_css_map' => '[]' ) );
 
 			/* Done */
-			return;
-		}
-
-		/* Custom CSS? */
-		if ( $app == 'core' and $location == 'front' and $path == 'custom' and $name == 'custom.css' and $themeId )
-		{
-			/* @var $themeSet Theme */
-			$map = $themeSet->css_map;
-			$key = static::makeBuiltTemplateLookupHash( 'core', 'front', 'custom/custom.css' );
-			if ( isset( $map[ $key ] ) )
-			{
-				File::get( 'core_Theme', $map[ $key ] )->delete();
-				unset( $map[ $key ] );
-
-				$themeSet->css_map = $map;
-			}
-
 			return;
 		}
 
@@ -3629,11 +4224,13 @@ EOF;
 			}
 		}
 
-		$where[] = array( Db::i()->in( 'css_app', ( is_array( $app ) ) ? $app : array( $app ) ) );
-
+		if ( $app !== null )
+		{
+			$where[] = array( \IPS\Db::i()->in( 'css_app', ( \is_array( $app ) ) ? $app : array( $app ) ) );
+		}
 		if ( $location !== null )
 		{
-			$where[] = array( Db::i()->in( 'css_location', ( is_array( $location ) ) ? $location : array( $location ) ) );
+			$where[] = array( \IPS\Db::i()->in( 'css_location', ( \is_array( $location ) ) ? $location : array( $location ) ) );
 		}
 
 		if ( $path !== null )
@@ -3641,21 +4238,20 @@ EOF;
 			$where[] = array( 'css_path=?', $path );
 		}
 
-		$css = iterator_to_array( Db::i()->select( "*", 'core_theme_css', $where )->setKeyField('css_id') );
-		if ( count( $css ) )
+		$css = iterator_to_array( \IPS\Db::i()->select( "*", 'core_theme_css', $where )->setKeyField('css_id') );
+		if ( \count( $css ) )
 		{
 			/* Each theme... */
-			static::$gotAll = false;
 			foreach( static::themes() as $id => $set )
 			{
-				if ( $themeId === null OR in_array( $id, array_keys( $themeSets ) ) )
+				if ( $themeId === null OR \in_array( $id, array_keys( $themeSets ) ) )
 				{
 					$built = array();
 					$map   = $set->css_map;
 
 					foreach( $css as $cssId => $data )
 					{
-						if ( isset( static::$buildGrouping['css'][ $data['css_app'] ][ $data['css_location'] ] ) AND in_array( $data['css_path'], static::$buildGrouping['css'][ $data['css_app'] ][ $data['css_location'] ] ) )
+						if ( isset( static::$buildGrouping['css'][ $data['css_app'] ][ $data['css_location'] ] ) AND \in_array( $data['css_path'], static::$buildGrouping['css'][ $data['css_app'] ][ $data['css_location'] ] ) )
 						{
 							$key = static::makeBuiltTemplateLookupHash( $data['css_app'], $data['css_location'], $data['css_path'] );
 
@@ -3675,32 +4271,31 @@ EOF;
 
 							if ( isset( $map[ $key ] ) )
 							{
-								File::get( 'core_Theme', $map[ $key ] )->delete();
+								\IPS\File::get( 'core_Theme', $map[ $key ] )->delete();
 								unset( $map[ $key ] );
 							}
 						}
 					}
 
 					/* Write combined css */
-					if ( count( $built ) )
+					if ( \count( $built ) )
 					{
-						foreach( $built as $cssData )
+						foreach( $built as $id => $cssData )
 						{
 							$key = static::makeBuiltTemplateLookupHash( $cssData['css_app'], $cssData['css_location'], $cssData['css_path'] . '/' . $cssData['css_name'] );
 
 							if ( isset( $map[ $key ] ) )
 							{
-								File::get( 'core_Theme', $map[ $key ] )->delete();
+								\IPS\File::get( 'core_Theme', $map[ $key ] )->delete();
 								unset( $map[ $key ] );
 							}
 						}
 					}
 
 					/* Update mappings */
-					$theme = static::load( $id );
-					$theme->css_map = $map;
-					$theme->css_updated = time();
-					$theme->save();
+					$set->css_map = $map;
+					$set->css_updated = time();
+					$set->save();
 				}
 			}
 		}
@@ -3711,22 +4306,23 @@ EOF;
 	 * Removes stored resource file objects and associated mappings but doesn't actually remove the resource
 	 * row from the database.
 	 *
-	 * @param array|string|null $app		App Directory (core, forums, etc)
-	 * @param array|string|null $location	location (front, admin, global, etc)
-	 * @param array|string|null $path		Path (forms, messaging, etc)
-	 * @param string|null $name		Resource file to remove
-	 * @param int|null $themeId	Limit to a specific theme (and children)
+	 * @param	string|null	$app		App Directory (core, forums, etc)
+	 * @param	string|null	$location	location (front, admin, global, etc)
+	 * @param	string|null	$path		Path (forms, messaging, etc)
+	 * @param	string|null $name		Resource file to remove
+	 * @param	int|null	$themeId	Limit to a specific theme (and children)
 	 * @return 	void
 	 */
-	public static function deleteCompiledResources( array|string|null $app=null, array|string|null $location=null, array|string|null $path=null, string $name=null, int $themeId=null ): void
+	public static function deleteCompiledResources( $app=null, $location=null, $path=null, $name=null, $themeId=null )
 	{
 		$query     = array();
-		$themeSet  = null;
+		$themeSets = null;
 		$map       = array();
 
 		if ( ! empty( $themeId ) )
 		{
-			$themeSet = static::load( $themeId );
+			$themeSet    = static::load( $themeId );
+			$themeSets = array( $themeId => $themeSet ) + $themeSet->allChildren();
 		}
 
 		if ( $app === null )
@@ -3734,23 +4330,11 @@ EOF;
 			/* Each theme... */
 			foreach( static::themes() as $id => $set )
 			{
-				if ( $themeId === null or $themeId == $set->_id )
+				if ( $themeId === null OR \in_array( $id, array_keys( $themeSets ) ) )
 				{
-					File::getClass( 'core_Theme' )->deleteContainer('set_resources_' . $set->_id );
+					\IPS\File::getClass( 'core_Theme' )->deleteContainer('set_resources_' . $set->_id );
 
 					$set->resource_map = array();
-
-                    /* Clear any cached logos */
-                    $logoData = $set->logo_data ? json_decode( $set->logo_data, true ) : [];
-                    foreach( $logoData as $type => $logo )
-                    {
-                        if( isset( $logo['url'] ) )
-                        {
-                            unset( $logoData[ $type ]['url'] );
-                        }
-                    }
-                    $set->logo_data = json_encode( $logoData );
-
 					$set->save();
 				}
 			}
@@ -3758,27 +4342,27 @@ EOF;
 
 		if ( $app !== NULL )
 		{
-			$query[] = Db::i()->in( 'resource_app', ( is_array( $app ) ) ? $app : array( $app ) );
+			$query[] = \IPS\Db::i()->in( 'resource_app', ( \is_array( $app ) ) ? $app : array( $app ) );
 		}
 
 		if ( $location !== null )
 		{
-			$query[] = Db::i()->in( 'resource_location', ( is_array( $location ) ) ? $location : array( $location ) );
+			$query[] = \IPS\Db::i()->in( 'resource_location', ( \is_array( $location ) ) ? $location : array( $location ) );
 		}
 
 		if ( $path !== null )
 		{
-			$query[] = Db::i()->in( 'resource_path', ( is_array( $path ) ) ? $path : array( $path ) );
+			$query[] = \IPS\Db::i()->in( 'resource_path', ( \is_array( $path ) ) ? $path : array( $path ) );
 		}
 
-		if ( $themeSet !== null )
+		if ( $themeId !== null )
 		{
-			$query[] = Db::i()->in( 'resource_set_id', [ $themeSet ] );
+			$query[] = \IPS\Db::i()->in( 'resource_set_id', array_keys( $themeSets ) );
 		}
 
 		if ( $app !== NULL )
 		{
-			foreach (Db::i()->select( "*", 'core_theme_resources', array( implode( ' AND ', $query ) ) ) as $row )
+			foreach ( \IPS\Db::i()->select( "*", 'core_theme_resources', array( implode( ' AND ', $query ) ) ) as $row )
 			{
 				try
 				{
@@ -3799,20 +4383,20 @@ EOF;
 						{
 							if ( $row['resource_filename'] )
 							{
-								File::get( 'core_Theme', $row['resource_filename'] )->delete();
+								\IPS\File::get( 'core_Theme', $row['resource_filename'] )->delete();
 							}
 						}
-						catch ( InvalidArgumentException $ex ) { }
+						catch ( \InvalidArgumentException $ex ) { }
 					}
 				}
-				catch ( OutOfRangeException $ex )
+				catch ( \OutOfRangeException $ex )
 				{
 					$map[$row['resource_set_id']] = array();
 				}
 			}
 		}
 
-		Db::i()->update( 'core_theme_resources', array( 'resource_filename' => null ), ( count( $query ) ? array( implode( ' AND ', $query ) ) : NULL ) );
+		\IPS\Db::i()->update( 'core_theme_resources', array( 'resource_filename' => null ), ( \count( $query ) ? array( implode( ' AND ', $query ) ) : NULL ) );
 
 		/* Update mappings */
 		foreach( $map as $setId => $data )
@@ -3824,26 +4408,235 @@ EOF;
 				$set->save();
 				$set->saveSet();
 			}
-			catch( OutOfRangeException $ex ) { }
+			catch( \OutOfRangeException $ex ) { }
 		}
 
 		if ( empty( $themeId ) )
 		{
 			/* ACP CSS and Resources */
-			Settings::i()->changeValues( array( 'acp_css_map' => '[]' ) );
-			unset( Store::i()->acp_resource_map );
+			\IPS\Settings::i()->changeValues( array( 'acp_css_map' => '[]' ) );
+			unset( \IPS\Data\Store::i()->acp_resource_map );
 		}
 	}
 
 	/**
-	 * Run the template content via the compiler and eval methods to see if there's any broken syntax
+	 * Process Theme Hooks
 	 *
-	 * @param string $content        The template content
-	 * @param string $params         The template params
-	 * @return  false                   False if the template is good
-	 * @throws  LogicException          If template has issues, $e->getMessage() has the details
+	 * @param	string	$rawContent			The current (uncompiled) template bit contents
+	 * @param	array	$hookData			Hook data
+	 * @return	string						The (uncompiled) template bit contents, with theme hooks
 	 */
-	public static function checkTemplateSyntax( string $content, string $params='' ): bool
+	public static function themeHooks( $rawContent, $hookData )
+	{
+		/* Encode any {{PHP code}}, {$var}s and {tag=""} tags to stop phpQuery encoding it */
+		$phpQueryI = 0;
+		$phpQueryStore = array();
+		$jsonAttrI = 0;
+		$jsonAttrStore = array();
+
+		$pseudoSelectors = array(
+			'active', 'checked', 'disabled', 'empty', 'enabled', 'first-child', 'first-of-type', 'focus', 'hover', 'in-range', 'invalid', 'lang', 'last-child',
+			'last-of-type', 'link', 'eq', 'not', 'nth-child', 'nth-last-child', 'nth-last-of-type', 'only-of-type', 'only-child', 'optional', 'out-of-range', 'read-only', 'read-write', 'required',
+			'root', 'target', 'valid', 'visited',
+			'after', 'before', 'first-letter', 'first-line', 'selection'
+		);
+
+		/* We sometimes need to use single quotes as the data attr contains json */
+		$content = preg_replace_callback( "/([\d\w0-9-]+?)='\{([^']+?)\|raw\}'/", function( $matches ) use ( &$jsonAttrI, &$jsonAttrStore )
+		{
+			$jsonAttrStore[ ++$jsonAttrI ] = $matches;
+			return $matches[1] . '="json--' . $jsonAttrI . '--"';
+		}, $rawContent );
+
+		/* Remove raw JS as this can cause a timeout if there is a lot of it */
+		$content = preg_replace_callback( '#<script\b[^>]*>([\s\S]*?)<\/script>#', function( $matches ) use ( &$phpQueryI, &$phpQueryStore )
+		{
+			$phpQueryStore[ ++$phpQueryI ] = $matches[0];
+			return 'he-' . $phpQueryI . '--';
+		}, $content );
+
+		$content = preg_replace_callback( array( '/{{?(?>[^{}]|(?R))*}?}/', '/\{([a-z]+?=([\'"]).+?\\2 ?+)}/' ), function( $matches ) use ( &$phpQueryI, &$phpQueryStore )
+		{
+			$phpQueryStore[ ++$phpQueryI ] = $matches[0];
+			return 'he-' . $phpQueryI . '--';
+		}, $content );
+
+		/* Make custom classes like ipsPadding_top:half selectable by PQ */
+		preg_match_all( '#class\s?=\s?[\'"]([^\'"]+?)[\'"]#', $content, $classes, PREG_SET_ORDER );
+
+		foreach( $classes as $idx => $data )
+		{
+			$cleaned = preg_replace_callback( "/([\d\w0-9-]+?):(.+?)(\.|\s|\(|$)/", function( $matches ) use ( $pseudoSelectors )
+			{
+				foreach( $pseudoSelectors as $selector )
+				{
+					if ( $matches[2] == $selector )
+					{
+						/* It's a pseudo selector */
+						return $matches[0];
+					}
+				}
+
+				/* Still here? */
+				return str_replace( ':', '---cln---', $matches[0] );
+			}, $data[1] );
+
+			$content = str_replace( $data[1], $cleaned, $content );
+		}
+
+		/* Swap out certain tags that confuse phpQuery */
+		$content = preg_replace( '/<(\/)?(html|head|body)(>| (.+?))/', '<$1temp$2$3', $content );
+		$content = str_replace( '<!DOCTYPE html>', '<tempdoctype></tempdoctype>', $content );
+
+		/* Load phpQuery  */
+		require_once \IPS\ROOT_PATH . '/system/3rd_party/phpQuery/phpQuery.php';
+		libxml_use_internal_errors(TRUE);
+		$phpQuery = \phpQuery::newDocumentHTML( '<ipscontent id="ipscontent">' . $content . '</ipscontent>' );
+
+		/* Loop through all the hooks on this template bit */
+		foreach ( $hookData as $hook )
+		{
+			/* Temporarily adjust class names with : in it that are not also psuedo-selectors */
+			if ( isset( $hook['selector'] ) )
+			{
+				$hook['selector'] = preg_replace_callback( "/([\d\w0-9-]+?):(.+?)(\.|\s|\(|$)/", function( $matches ) use ( $pseudoSelectors )
+				{
+					foreach( $pseudoSelectors as $selector )
+					{
+						if ( $matches[2] == $selector )
+						{
+							/* It's a pseudo selector */
+							return $matches[0];
+						}
+					}
+
+					/* Still here? */
+					return str_replace( ':', '---cln---', $matches[0] );
+
+				}, $hook['selector'] );
+			}
+
+			/* Encode */
+			if ( isset( $hook['content'] ) )
+			{
+				$hook['content'] = preg_replace_callback( array( '/{{?.+?}?}/', '/\{([a-z]+?=([\'"]).+?\\2 ?+)}/' ), function( $matches ) use ( &$phpQueryI, &$phpQueryStore )
+				{
+					$phpQueryStore[ ++$phpQueryI ] = $matches[0];
+					return 'he-' . $phpQueryI . '--';
+				}, $hook['content'] );
+			}
+
+			/* If the selector uses [attribute=""] syntax, we need to make the attribute lowercase since phpQuery is sensitive to that */
+			$hook['selector'] = preg_replace_callback( '/\[([^\s\/<>\'"=]+)(=("[^"&]*"|\'[^\'&]*\'|[^\s=\'"<>`]*))?\]/i', function( $matches )
+			{
+				return '[' . mb_strtolower( $matches[1] ) . ( isset( $matches[2] ) ? $matches[2] : '' ) . ']';
+			}, $hook['selector'] );
+
+			/* Do stuff */
+			$results = \pq( '#ipscontent ' . preg_replace( '/\b(html|head|body)\b/', 'temp$1', $hook['selector'] ) );
+
+			switch ( $hook['type'] )
+			{
+				case 'add_before':
+					$results->before( $hook['content'] );
+					break;
+
+				case 'add_inside_start':
+					$results->prepend( $hook['content'] );
+					break;
+
+				case 'add_inside_end':
+					$results->append( $hook['content'] );
+					break;
+
+				case 'add_after':
+					$results->after( $hook['content'] );
+					break;
+
+				case 'add_class':
+					foreach ( $hook['css_classes'] as $cssClass )
+					{
+						$results->addClass( $cssClass );
+					}
+					break;
+
+				case 'remove_class':
+					foreach ( $hook['css_classes'] as $cssClass )
+					{
+						$results->removeClass( $cssClass );
+					}
+					break;
+
+				case 'add_attribute':
+					foreach ( $hook['attributes_add'] as $attribute )
+					{
+						$results->attr( $attribute['key'], $attribute['value'] );
+					}
+					break;
+
+				case 'remove_attribute':
+					foreach ( $hook['attributes_remove'] as $attr )
+					{
+						$results->removeAttr( $attr );
+					}
+					break;
+
+				case 'replace':
+					$results->replaceWith( $hook['content'] );
+					break;
+			}
+		}
+
+		$return = $phpQuery->find( '#' . 'ipscontent' )->html();
+
+		/* Put our single quoted data back */
+		foreach( $jsonAttrStore as $id => $matches )
+		{
+			$return = preg_replace( '#' . $matches[1] . '="json--' . $id . '--"#', $matches[0], $return );
+		}
+
+		/* Fix ---cln--- classes */
+		preg_match_all( '#class\s?=\s?[\'"]([^\'"]+?)[\'"]#', $return, $classes, PREG_SET_ORDER );
+
+		foreach( $classes as $idx => $data )
+		{
+			$return = str_replace( $data[1], str_replace( '---cln---', ':', $data[1] ), $return );
+		}
+
+		/* Put our {{PHP code}} back */
+		$return = preg_replace_callback( '/he-(.+?)--/', function( $matches ) use ( $phpQueryStore )
+		{
+			return isset( $phpQueryStore[ $matches[1] ] ) ? $phpQueryStore[ $matches[1] ] : '';
+		}, $return );
+
+		/* Swap back certain tags that confuse phpQuery */
+		$return = preg_replace( '/<(\/)?temp(html|head|body)(.*?)>/', '<$1$2$3>', $return );
+		$return = str_replace( '<tempdoctype></tempdoctype>', '<!DOCTYPE html>', $return );
+
+		/* Return */
+		return $return;
+	}
+
+	/**
+	 * Encode the content for php query
+	 *
+	 * @return void
+	 */
+	protected static function encodeForPhpQuery()
+	{
+
+
+	}
+
+	/**
+	 * Run the template content via the compile and eval methods to see if there's any broken syntax
+	 *
+	 * @param   string  $content        The template content
+	 * @param   string  $params         The template params
+	 * @return  false                   False if the template is good
+	 * @throws  \LogicException          If template has issues, $e->getMessage() has the details
+	 */
+	public static function checkTemplateSyntax( $content, $params='' )
 	{
 		ob_start();
 
@@ -3851,10 +4644,10 @@ EOF;
 		{
 			static::makeProcessFunction( $content, 'unique_function_so_it_doesnt_look_in_function_exists_' . mt_rand(), $params );
 		}
-		catch( ParseError $e )
+		catch( \ParseError $e )
 		{
 			ob_end_clean();
-			throw new LogicException( $e->getMessage() );
+			throw new \LogicException( $e->getMessage() );
 		}
 
 		$return = ob_get_contents();
@@ -3862,7 +4655,7 @@ EOF;
 
 		if ( $return )
 		{
-			throw new LogicException( $return );
+			throw new \LogicException( $return );
 		}
 
 		return false;
@@ -3872,14 +4665,14 @@ EOF;
 	 * Make process function
 	 * Parses template into executable function and evals it.
 	 *
-	 * @param string $content		Content with variables and parse tags
-	 * @param string $functionName	Desired function name
-	 * @param string $params			Parameter list
-	 * @param bool $isHTML			If TRUE, HTML will automatically be escaped
-	 * @param bool $isCSS			If TRUE, the plugins will be checked for $canBeUsedInCss
-	 * @return void
+	 * @param	string	$content		Content with variables and parse tags
+	 * @param	string	$functionName	Desired function name
+	 * @param	string	$params			Parameter list
+	 * @param	bool	$isHTML			If TRUE, HTML will automatically be escaped
+	 * @param	bool	$isCSS			If TRUE, the plugins will be checked for $canBeUsedInCss
+	 * @return	string	Function name to eval
 	 */
-	public static function makeProcessFunction( string $content, string $functionName, string $params='', bool $isHTML=TRUE, bool $isCSS=FALSE ) : void
+	public static function makeProcessFunction( $content, $functionName, $params='', $isHTML=TRUE, $isCSS=FALSE )
 	{
 		static::runProcessFunction( static::compileTemplate( $content, $functionName, $params, $isHTML, $isCSS ), $functionName );
 	}
@@ -3888,14 +4681,14 @@ EOF;
 	 * Make process function
 	 * Parses template into executable function and evals it.
 	 *
-	 * @param string $content		Compiled content with variables and parse tags
-	 * @param string $functionName	Desired function name
+	 * @param	string	$content		Compiled content with variables and parse tags
+	 * @param	string	$functionName	Desired function name
 	 * @return	void
 	 */
-	public static function runProcessFunction( string $content, string $functionName ): void
+	public static function runProcessFunction( $content, $functionName )
 	{
 		/* If it's already been built, we don't need to do it again */
-		if( function_exists( 'IPS\Theme\\' . $functionName ) )
+		if( \function_exists( 'IPS\Theme\\' . $functionName ) )
 		{
 			return;
 		}
@@ -3904,7 +4697,7 @@ EOF;
 		$function = 'namespace IPS\Theme;' . "\n" . $content;
 
 		/* Make it */
-		if (DEBUG_TEMPLATES)
+		if ( \IPS\DEBUG_TEMPLATES and ! static::isUsingTemplateDiskCache() )
 		{
 			static::runDebugTemplate( $functionName, $function );
 		}
@@ -3913,7 +4706,7 @@ EOF;
 			if( eval( $function ) === FALSE )
 			{
 				/* Throw exception for PHP 5 */
-				throw new InvalidArgumentException;
+				throw new \InvalidArgumentException;
 			}
 		}
 	}
@@ -3921,14 +4714,14 @@ EOF;
 	/**
 	 * Run the template as a PHP file, not an eval to debug errors
 	 *
-	 * @param string $functionName	Function name
-	 * @param string $content		Compiled content with variables and parse tags
+	 * @param	string	$functionName	Function name
+	 * @param	string	$content		Compiled content with variables and parse tags
 	 * @return	void
 	 */
-	public static function runDebugTemplate( string $functionName, string $content ): void
+	protected static function runDebugTemplate( $functionName, $content )
 	{
-		$temp = tempnam( TEMP_DIRECTORY, $functionName );
-		file_put_contents( $temp, "<?php\n" . $content );
+		$temp = tempnam( \IPS\TEMP_DIRECTORY, $functionName );
+		\file_put_contents( $temp, "<?php\n" . $content );
 		include $temp;
 		register_shutdown_function( function( $temp ) {
 			unlink( $temp );
@@ -3938,271 +4731,143 @@ EOF;
 	/**
 	 * Expand shortcuts
 	 *
-	 * @param string $content		Content with shortcuts
+	 * @param	string	$content		Content with shortcuts
 	 * @return	string	Content with shortcuts expanded
 	 */
-	public static function expandShortcuts( string $content ): string
+	public static function expandShortcuts( $content )
 	{
 		/* Parse shortcuts */
-		foreach ( array( 'member' => 'loggedIn', 'settings' => 'i', 'output' => 'i' ) as $class => $function )
+		foreach ( array( 'request' => 'i', 'member' => 'loggedIn', 'settings' => 'i', 'output' => 'i' ) as $class => $function )
 		{
-			$content = preg_replace( '/(^|[^$\\\])' . $class . "\.(\S+?)/", '$1\IPS\\' . IPS::mb_ucfirst( $class ) . '::' . $function . '()->$2', $content );
+			$content = preg_replace( '/(^|[^\$\\\])' . $class . "\.(\S+?)/", '$1\IPS\\' . mb_ucfirst( $class ) . '::' . $function . '()->$2', $content );
 		}
 
-		$content = preg_replace( '/(^|[^$\\\])(?:request\\.|\\\\?IPS\\\\Request::i\\(\\)->)(\S+?)/', '$1\IPS\Widget\Request::i()->$2', $content );
-
-		$content = preg_replace( '/(^|[^$\\\])cookie\.(.([a-zA-Z0-9_]+))/', '$1 (\IPS\\Request::i()->cookie[\'$2\'])', $content );
-
-		/* Parse special CSS variable shortcut */
-		$content = preg_replace( '/(^|[^$\\\])(cssvar|theme)\\.([a-zA-Z0-9_\-]+)/', '$1\IPS\Theme::i()->getCssVariableFromKey(\'$3\')', $content );
-
-		return preg_replace( '/(^|[^$\\\])view\.([a-zA-Z0-9_\-]+)/', '$1\IPS\Theme::i()->getLayoutValue(\'$2\')', $content );
-	}
-
-	/**
-	 * @param string $content
-	 * @param string $path
-	 * @param string $params
-	 * @return string
-	 */
-	public static function expandHookPoints( string $content, string $path, string $params='' ): string
-	{
-		if ( ! mb_stristr( $content, 'data-ips-hook') )
+		foreach( array( 'theme' => '\IPS\\Theme::i()->settings', 'cookie' => '\IPS\\Request::i()->cookie' ) as $shortcut => $array )
 		{
-			return $content;
+			$content = preg_replace( '/(^|[^\$\\\])' . $shortcut .'\.(.([a-zA-Z0-9_]+))/', '$1'. $array . '[\'$2\']', $content );
 		}
 
-		/* Swap out certain tags that confuse phpQuery */
-		$content = preg_replace( '/<(\/)?(html|head|body)(>| (.+?))/', '<$1temp$2$3', $content );
-		$content = str_replace( '<!DOCTYPE html>', '<tempdoctype></tempdoctype>', $content );
-
-		$domQueryI = 0;
-		$domQueryStore = array();
-		$jsonAttrI = 0;
-		$jsonAttrStore = array();
-
-		/* Remove raw JS as this can cause a timeout if there is a lot of it */
-		$content = preg_replace_callback( '#<script\b[^>]*>([\s\S]*?)<\/script>#', function( $matches ) use ( &$domQueryI, &$domQueryStore )
-		{
-			$domQueryStore[ ++$domQueryI ] = $matches[0];
-			return 'he-' . $domQueryI . '--';
-		}, $content );
-
-		/* We sometimes need to use single quotes as the data attr contains json */
-		$content = preg_replace_callback( "/([\d\w0-9-]+?)='\{([^']+?)\|raw\}'/", function( $matches ) use ( &$jsonAttrI, &$jsonAttrStore )
-		{
-			$jsonAttrStore[ ++$jsonAttrI ] = $matches;
-			return $matches[1] . '="json--' . $jsonAttrI . '--"';
-		}, $content );
-
-		/* Remove any HTML logic as it confuses DOMDocument */
-		$content = preg_replace_callback( array( '/{{?(?>[^{}]|(?R))*}?}/', '/\{([a-z]+?=([\'"]).+?\\2 ?+)}/' ), function( $matches ) use ( &$domQueryI, &$domQueryStore )
-		{
-			$domQueryStore[ ++$domQueryI ] = $matches[0];
-			return 'he-' . $domQueryI . '--';
-		}, $content );
-
-		/* Parse the HTML */
-		$doc = new DOMDocument( '1.0', 'UTF-8' );
-		$doc->loadHTML( DOMDocument::wrapHtml( $content ) );
-		$xpath = new DOMXPath($doc);
-
-		if( $params )
-		{
-			preg_match_all( '/(\$[a-zA-Z0-9_]+)/', $params, $matches );
-			$paramList = implode( ',', array_unique( $matches[1] ) );
-		}
-		else
-		{
-			$paramList = '';
-		}
-
-		/* Fetch all tags with the data-ips-hook attribute */
-		$tags = $xpath->query("//*[@data-ips-hook]");
-		foreach( $tags as $element )
-		{
-			if ( $element->hasAttribute('data-ips-hook') )
-			{
-				/* Add in content BEFORE the tag opens */
-				if ( $element->parentNode )
-				{
-					$element->parentNode->insertBefore( new DOMText( '{customtemplate="' . $path . '" params="' . $paramList . '" hook="' . $element->getAttribute( 'data-ips-hook' ) . ':before"}' ), $element );
-				}
-
-				/* Add in content AFTER the tag opens */
-				if ( $firstChild = $element->firstChild )
-				{
-					$element->insertBefore( new DOMText( '{customtemplate="' . $path . '" params="' . $paramList . '" hook="' . $element->getAttribute( 'data-ips-hook' ) . ':inside-start"}' ), $firstChild );
-				}
-
-				/* Add in content BEFORE the tag closes */
-				$element->appendChild( new DOMText( '{customtemplate="' . $path . '" params="' . $paramList . '" hook="' . $element->getAttribute( 'data-ips-hook' ) . ':inside-end"}' ) );
-
-				/* Add in content AFTER the tag has closed */
-				if ( $element->parentNode and $nextSibling = $element->nextSibling )
-				{
-					$element->parentNode->insertBefore( new DOMText( '{customtemplate="' . $path . '" params="' . $paramList . '" hook="' . $element->getAttribute( 'data-ips-hook' ) . ':after"}' ), $nextSibling );
-				}
-				elseif( $element->parentNode and $element->nextSibling === null )
-				{
-					$element->parentNode->appendChild( new DOMText( '{customtemplate="' . $path . '" params="' . $paramList . '" hook="' . $element->getAttribute( 'data-ips-hook' ) . ':after"}' ) );
-				}
-			}
-		}
-
-		$return = substr( $doc->saveHTML( $doc->getElementsByTagName('body')->item(0) ), 6, -7);
-
-		/* Put our single quoted data back */
-		foreach( $jsonAttrStore as $id => $matches )
-		{
-			$return = preg_replace( '#' . $matches[1] . '="json--' . $id . '--"#', $matches[0], $return );
-		}
-
-		/* Put our moved code back */
-		$return = preg_replace_callback( '/he-(.+?)--/', function( $matches ) use ( $domQueryStore )
-		{
-			return $domQueryStore[$matches[1]] ?? '';
-		}, $return );
-
-		/* Swap back certain tags that confuse */
-		$return = preg_replace( '/<(\/)?temp(html|head|body)(.*?)>/', '<$1$2$3>', $return );
-		$return = str_replace( '<tempdoctype></tempdoctype>', '<!DOCTYPE html>', $return );
-
-		return $return;
+		return $content;
 	}
 
 	/**
 	 * Process template into executable code.
 	 *
-	 * @param string $content		Content with variables and parse tags
-	 * @param string|null $functionName	Desired function name if given, otherwise <<<CONTENT CONTENT; is returned without a function wrapper or $return .= statement
-	 * @param string $params			Parameter list
-	 * @param bool $isHTML			If TRUE, HTML will automatically be escaped
-	 * @param bool $isCSS			If TRUE, the plugins will be checked for $canBeUsedInCss
-	 * @param string|null $app			Application the template belongs to
-	 * @param string|null $location		Location the template belongs to (admin,front)
-	 * @param string|null $group			Group the template belongs to
+	 * @param	string	$content		Content with variables and parse tags
+	 * @param	string|NULL	$functionName	Desired function name if given, otherwise <<<CONTENT CONTENT; is returned without a function wrapper or $return .= statement
+	 * @param	string	$params			Parameter list
+	 * @param	bool	$isHTML			If TRUE, HTML will automatically be escaped
+	 * @param	bool	$isCSS			If TRUE, the plugins will be checked for $canBeUsedInCss
+	 * @param	string	$app			Application the template belongs to
+	 * @param	string	$location		Location the template belongs to (admin,front)
+	 * @param	string	$group			Group the template belongs to
 	 * @return	string	Function name to eval
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public static function compileTemplate( string $content, ?string $functionName, string $params='', bool $isHTML=TRUE, bool $isCSS=FALSE, string $app=null, string $location=null, string $group=null ): string
+	public static function compileTemplate( $content, $functionName, $params='', $isHTML=TRUE, $isCSS=FALSE, $app=null, $location=null, $group=null )
 	{
-		$calledClass = get_called_class();
+		$calledClass = \get_called_class();
 
 		if( $functionName == 'theme_core_front_global_footer' or ( $functionName == 'footer' and $app == 'core' and $location == 'front' and $group == 'global' ) )
 		{
-			$content = $content . "\n<p class='ipsCopyright'>
-	<span class='ipsCopyright__user'>{lang=\"copyright_line_value\"}</span>
-	<a rel='nofollow' title='Invision Community' href='https://www.invisioncommunity.com/'>Powered by <span translate='no'>Invision Community</span></a><br><a href='https://nullforums.net' style='display:none'>Invision Community Support forums</a>
+			$content = $content . "\n<p id='elCopyright'>
+	<span id='elCopyright_userLine'>{lang=\"copyright_line_value\"}</span>
+	<a rel='nofollow' title='Invision Community' href='https://www.invisioncommunity.com/'>Powered by Invision Community</a><br><a href='https://nullforums.net' style='display:none'>Invision Community Support forums</a>
 </p>";
 		}
 
-		/* Expand hook points */
-		if ( ! $isCSS and mb_stristr( $content, 'data-ips-hook=' ) )
-		{
-			if ( $app == NULL and $location == NULL and $group == NULL and mb_substr( $functionName, 0, 6 ) == 'theme_' )
-			{
-				/* Yeah, preg_match because we can't just explode on '_' as some template names may have them */
-				preg_match( '#theme_([^_]+?)_([^_]+?)_([^_]+?)_(.*)#', $functionName, $matches );
-				$path = $matches[1] . '/' . $matches[2] . '/' . $matches[3] . '/' . $matches[4];
-			}
-			else
-			{
-				$path = $app . '/' . $location . '/' . $group . '/' . $functionName;
-			}
-
-			$content = static::expandHookPoints( $content, $path, $params );
-		}
-
-		return static::_compileTemplate( $content, $functionName, $isHTML, $isCSS, $params );
-	}
-
-	/**
-	 * Compile the template into executable code
-	 * @note This is a separate function so that we can call it outside of the main function
-	 *
-	 * @param string $content
-	 * @param ?string $functionName
-	 * @param bool $isHTML
-	 * @param bool $isCSS
-	 * @param string $params
-	 * @return string
-	 */
-	public static function _compileTemplate( string $content, ?string $functionName, bool $isHTML=true, bool $isCSS=FALSE, string $params='' ): string
-	{
-		$contentName = $isCSS ? "'IPSCONTENT'" : 'IPSCONTENT';
-		$calledClass = get_called_class();
-
-		// Prevent anyone from attempting to hijack the theme system
-		$content = preg_replace( "#((?:^|\\n)\\s*IPSCONTENT;)#si", "\$1\n\$return .= <<<IPSCONTENT_ESC\n\$1\nIPSCONTENT_ESC;\n\$return .= <<<{$contentName}\n", $content );
-
 		/* Parse out {{code}} tags */
-		$content = preg_replace_callback( '/{{(.+?)}}/', function( $matches ) use ( $contentName )
+		$content = preg_replace_callback( '/{{(.+?)}}/', function( $matches )
 		{
 			/* Parse shortcuts */
-			$matches[1] = Theme::expandShortcuts( $matches[1] );
+			$matches[1] = \IPS\Theme::expandShortcuts( $matches[1] );
+
 			/* Make conditionals and loops valid PHP */
 			if( $matches[1] === 'else' )
 			{
 				$matches[1] .= ':';
 			}
-			elseif( substr( $matches[1], 0, 3 ) === 'end' )
+			elseif( \substr( $matches[1], 0, 3 ) === 'end' )
 			{
 				$matches[1] .= ';';
 			}
-			elseif( in_array( substr( $matches[1], 0, 4 ), array( 'for ', 'for(' ) ) )
+			elseif( \in_array( \substr( $matches[1], 0, 4 ), array( 'for ', 'for(' ) ) )
 			{
-				$matches[1] = 'for (' . substr( $matches[1], 3 ) . ' ):';
+				$matches[1] = 'for (' . \substr( $matches[1], 3 ) . ' ):';
 			}
 			else
 			{
 				foreach ( array( 'if', 'elseif', 'foreach' ) as $tag )
 				{
-					if( substr( $matches[1], 0, strlen( $tag ) ) === $tag )
+					if( \substr( $matches[1], 0, \strlen( $tag ) ) === $tag )
 					{
-						$matches[1] = $tag .' (' . substr( $matches[1], strlen( $tag ) ) . ' ):';
+						$matches[1] = $tag .' (' . \substr( $matches[1], \strlen( $tag ) ) . ' ):';
 					}
 				}
 			}
 
-			return "\nIPSCONTENT;\n\n{$matches[1]}\n\$return .= <<<{$contentName}\n";
+			return "\nCONTENT;\n\n{$matches[1]}\n\$return .= <<<CONTENT\n";
 		}, $content );
 
 		/* Make sure any literal \{\{This should not be treated as PHP\}\} is converted back into {{this shoud not be treated as PHP}} */
 		$content = preg_replace( '/\\\{\\\{(.+?)\\\}\\\}/', '{{\1}}', $content );
 
-		if ( ! $functionName )
-		{
-			$function = <<<PHP
-		<<<{$contentName}\n
-{$content}
-IPSCONTENT;\n
-PHP;
-		}
-		else
+		/* Make it into a lovely function - templates created by plugins get try/catches so they can't break things */
+		if ( $app == 'core' and $location == 'global' and $group == 'plugins' )
 		{
 			$function = <<<PHP
 	function {$functionName}( {$params} ) {
 		\$return = '';
-		\$return .= <<<{$contentName}\n
+		try
+		{
+			\$return .= <<<CONTENT\n
 {$content}
-IPSCONTENT;\n
+CONTENT;\n
+		}
+		catch ( \Exception \$exception )
+		{
+			\IPS\Log::log( \$exception, "template_{$functionName}" );
+		}
 		return \$return;
 }
 PHP;
+
+		}
+		else
+		{
+			if ( ! $functionName )
+			{
+				$function = <<<PHP
+		<<<CONTENT\n
+{$content}
+CONTENT;\n
+PHP;
+			}
+			else
+			{
+				$function = <<<PHP
+	function {$functionName}( {$params} ) {
+		\$return = '';
+		\$return .= <<<CONTENT\n
+{$content}
+CONTENT;\n
+		return \$return;
+}
+PHP;
+			}
 		}
 
 		/* Parse {plugin="foo"} tags */
 		$function = preg_replace_callback
 		(
 			'/\{([a-z]+?=([\'"]).+?\\2 ?+)}/',
-			function( $matches ) use ( $functionName, $isCSS, $calledClass, $contentName )
+			function( $matches ) use ( $functionName, $isCSS, $calledClass )
 			{
 				/* Work out the plugin and the values to pass */
 				preg_match_all( '/(.+?)='.$matches[2].'([^' . $matches[2] . ']*)'.$matches[2].'\s?/', $matches[1], $submatches );
 
 				$plugin = array_shift( $submatches[1] );
-				$pluginClass = 'IPS\\Output\\Plugin\\' . IPS::mb_ucfirst( $plugin );
+				$pluginClass = 'IPS\\Output\\Plugin\\' . mb_ucfirst( $plugin );
 
 				$value = array_shift( $submatches[2] );
 				$options = array();
@@ -4215,16 +4880,13 @@ PHP;
 				/* Work out if this plugin belongs to an application, and if so, include it */
 				if( !class_exists( $pluginClass ) )
 				{
-					foreach( Application::applications() as $app )
+					foreach ( \IPS\Application::applications() as $app )
 					{
-						try
+						$path = static::getHookPath( "applications/{$app->directory}/extensions/core/OutputPlugins/" . mb_ucfirst( $plugin ) . ".php" );
+
+						if ( file_exists( $path . "/applications/{$app->directory}/extensions/core/OutputPlugins/" . mb_ucfirst( $plugin ) . ".php" ) )
 						{
-							$pluginClass = Application::getExtensionClass( $app, 'OutputPlugins', IPS::mb_ucfirst( $plugin ) );
-							break;
-						}
-						catch( OutOfRangeException )
-						{
-							/* Just keep going here, because the plugin may not be part of this app */
+							$pluginClass = 'IPS\\' . $app->directory . '\\extensions\\core\\OutputPlugins\\' . mb_ucfirst( $plugin );
 						}
 					}
 				}
@@ -4238,12 +4900,12 @@ PHP;
 				/* can be used in CSS? */
 				if ( $isCSS AND $pluginClass::$canBeUsedInCss !== TRUE )
 				{
-					throw new InvalidArgumentException( 'invalid_plugin:' . $functionName . ' - ' . $plugin );
+					throw new \InvalidArgumentException( 'invalid_plugin:' . $plugin );
 				}
 
 				$code = $pluginClass::runPlugin( $value, $options, $functionName, $calledClass );
 
-				if( !is_array( $code ) )
+				if( !\is_array( $code ) )
 				{
 					$code = array( 'return' => $code );
 				}
@@ -4258,78 +4920,79 @@ PHP;
 				}
 
 				$return = <<<PHP
-\nIPSCONTENT;\n
+\nCONTENT;\n
 {$code['pre']}
 PHP;
-				if ( $code['return'] )
-				{
-					$return .= <<<PHP
+	if ( $code['return'] )
+	{
+		$return .= <<<PHP
 \$return .= {$code['return']};
 PHP;
-				}
-				$return .= <<<PHP
+	}
+	$return .= <<<PHP
 {$code['post']}
-\$return .= <<<{$contentName}
-
+\$return .= <<<CONTENT\n
 PHP;
-				return $return;
+			return $return;
 			},
 			$function
 		);
 
 		/* Escape output */
-		if ( $isCSS )
+		preg_match_all( '#\$return\s{0,}(?:\.)?=\s{0,}<<<CONTENT\n(.+?)CONTENT;(\n|$)#si', $function, $matches, PREG_SET_ORDER );
+		foreach( $matches as $id => $match )
 		{
-			/* For the raw css content, we want to slap it inside a NOWDOC, not a HEREDOC, so that variables and backslashes are never processed. */
-			$function = preg_replace( '#(\\$return\\s*(?:\\.)?=\\s*<<<)IPSCONTENT(\\n.+?\\n\\s*IPSCONTENT;(\\n|$))#si', '$1\'IPSCONTENT\'$2', $function );
-		}
-		else
-		{
-			preg_match_all( '#\$return\s{0,}(?:\.)?=\s{0,}<<<IPSCONTENT[\r\n](.+?)IPSCONTENT;(\n|\r|$)#si', $function, $matches, PREG_SET_ORDER );
-			foreach ( $matches as $id => $match )
+			$all     = $match[0];
+			$content = $match[1];
+			$rawFinds = array();
+			$rawReplaces = array();
+
+			if ( $isHTML === TRUE )
 			{
-				$all = $match[0];
-				$content = $match[1];
-				$rawFinds = array();
-				$rawReplaces = array();
+				preg_match_all( '#\{\$([^\}]+?)\}#', $content, $varMatches, PREG_SET_ORDER );
 
-				if ( $isHTML === TRUE )
+				foreach ( $varMatches as $id => $var )
 				{
-					preg_match_all( '#\{\$([^\}]+?)\}#', $content, $varMatches, PREG_SET_ORDER );
-
-					foreach ( $varMatches as $index => $var )
+					if ( \stristr( $var[1], '|raw' ) )
 					{
-						if ( stristr( $var[1], '|raw' ) )
+						$rawFinds[]    = $var[0];
+						$rawReplaces[] = str_ireplace( '|raw', '', $var[0] );
+					}
+					else
+					{
+						if ( \stristr( $var[1], '|doubleencode' ) )
 						{
-							$rawFinds[] = $var[0];
-							$rawReplaces[] = str_ireplace( '|raw', '', $var[0] );
+							$replace = "\nCONTENT;\n\$return .= htmlspecialchars( \$" . str_ireplace( '|doubleencode', '', $var[1] ) . ", ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', TRUE );\n\$return .= <<<CONTENT\n";
 						}
 						else
 						{
-							if ( stristr( $var[1], '|doubleencode' ) )
-							{
-								$replace = "\nIPSCONTENT;\n\$return .= \IPS\Theme\Template::htmlspecialchars( \$" . str_ireplace( '|doubleencode', '', $var[1] ) . ", ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', TRUE );\n\$return .= <<<IPSCONTENT\n";
-							}
-							else
-							{
-								$replace = "\nIPSCONTENT;\n\$return .= \IPS\Theme\Template::htmlspecialchars( \$" . $var[1] . ", ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', FALSE );\n\$return .= <<<IPSCONTENT\n";
-							}
-
-							$all = str_replace( $var[0], $replace, $all );
+							$replace = "\nCONTENT;\n\$return .= htmlspecialchars( \$" . $var[1] . ", ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', FALSE );\n\$return .= <<<CONTENT\n";
 						}
-					}
-					$all = str_replace( $rawFinds, $rawReplaces, $all );
 
-					if ( $all != $match[0] )
-					{
-						$function = str_replace( $match[0], $all, $function );
+						$all = str_replace( $var[0], $replace, $all );
 					}
 				}
-				else
+				$all = str_replace( $rawFinds, $rawReplaces, $all );
+
+				if ( $all != $match[0] )
 				{
-					$all = preg_replace( '/\{\$([^\}]+?)\|raw\}/', '{\$$1}', $all );
 					$function = str_replace( $match[0], $all, $function );
 				}
+			}
+			else if ( $isCSS )
+			{
+				/* Preserve backslashes */
+				$all = str_replace( $content, str_replace( '\\', '\\\\', $content ), $all );
+
+				if ( $all != $match[0] )
+				{
+					$function = str_replace( $match[0], $all, $function );
+				}
+			}
+			else
+			{
+				$all = preg_replace( '/\{\$([^\}]+?)\|raw\}/', '{\$$1}', $all );
+				$function = str_replace( $match[0], $all, $function );
 			}
 		}
 
@@ -4341,39 +5004,38 @@ PHP;
 	 * Used when building templates to core_theme_templates_built and also when selecting
 	 * from that same table.
 	 *
-	 * @param string $app
-	 * @param string $location
-	 * @param string|null $group
-	 * @return    string    Md5 Key
+	 * @param	string	$app
+	 * @param	string	$location
+	 * @param	string	$group
+	 * @return	string	Md5 Key
 	 */
-	public static function makeBuiltTemplateLookupHash( string $app, string $location, string|null $group ): string
+	public static function makeBuiltTemplateLookupHash( $app, $location, $group )
 	{
-		return md5( mb_strtolower( $app ) . ';' . mb_strtolower( $location ) . ';' . mb_strtolower( (string) $group ) );
+		return md5( mb_strtolower( $app ) . ';' . mb_strtolower( $location ) . ';' . mb_strtolower( $group ) );
 	}
 
 	/**
 	 * Clears theme files from \IPS\File and the store.
 	 * @note    This does not remove rows from the theme database tables.
 	 *
-	 * @param int $bit    Bitwise options for files to remove
-	 * @param string|null	$app
+	 * @param	int		$bit    Bitwise options for files to remove
 	 * @return	void
 	 */
-	public static function clearFiles( int $bit, ?string $app=null ): void
+	public static function clearFiles( $bit )
 	{
 		if ( $bit & static::TEMPLATES )
 		{
-			static::deleteCompiledTemplate( $app );
+			static::deleteCompiledTemplate();
 		}
 
 		if ( $bit & static::CSS )
 		{
-			static::deleteCompiledCss( $app );
+			static::deleteCompiledCss();
 		}
 
 		if ( $bit & static::IMAGES )
 		{
-			static::deleteCompiledResources( $app );
+			static::deleteCompiledResources();
 		}
 
 		foreach( static::themes() as $id => $theme )
@@ -4381,10 +5043,10 @@ PHP;
 			/* Remove files, but don't fail if we can't */
 			try
 			{
-				File::getClass('core_Theme')->deleteContainer( 'set_resources_' . $theme->id );
-				File::getClass('core_Theme')->deleteContainer( 'css_built_' . $theme->id );
+				\IPS\File::getClass('core_Theme')->deleteContainer( 'set_resources_' . $theme->id );
+				\IPS\File::getClass('core_Theme')->deleteContainer( 'css_built_' . $theme->id );
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 
 			/* Clear map */
 			$theme->resource_map = array();
@@ -4393,117 +5055,8 @@ PHP;
 		}
 
 		/* ACP CSS and Resources */
-		Settings::i()->changeValues( array( 'acp_css_map' => '[]' ) );
-		unset( Store::i()->acp_resource_map );
-	}
-
-	/**
-	 * Add CSS.
-	 * A check is first made to ensure we're not overwriting an existing master CSS file.
-	 *
-	 * @param	array $data	Data to insert (app, location, path, name, content)
-	 * @return	int		Insert Id
-	 *@throws	OverflowException
-	 * @throws	InvalidArgumentException
-	 */
-	public static function addCss( array $data ): int
-	{
-		if ( empty( $data['app'] ) OR empty( $data['location'] ) OR empty( $data['path'] ) OR empty( $data['name'] ) )
-		{
-			throw new InvalidArgumentException;
-		}
-
-		/* Check for existing */
-		try
-		{
-			$check = Db::i()->select( 'css_id', 'core_theme_css', array(
-				'css_app=? AND css_location=? AND css_path=? AND css_name=LOWER(?) AND css_set_id=?',
-				mb_strtolower( $data['app'] ),
-				mb_strtolower( $data['location'] ),
-				mb_strtolower( $data['path'] ),
-				mb_strtolower( $data['name'] ),
-				$data['set_id'] ?? 0
-			) )->first();
-
-			/* This exists */
-			throw new OverflowException;
-		}
-		catch( UnderflowException $e )
-		{
-			/* That's ok, it doesn't exist */
-		}
-
-		/* Insert */
-		$insertId = Db::i()->insert( 'core_theme_css', array(
-			'css_set_id'	 => $data['set_id'] ?? 0,
-			'css_app'		 => mb_strtolower( $data['app'] ),
-			'css_location'   => mb_strtolower( $data['location'] ),
-			'css_path'		 => mb_strtolower( $data['path'] ),
-			'css_name'       => mb_strtolower( $data['name'] ),
-			'css_content'    => $data['content'],
-			'css_updated' 	 => time(),
-			'css_version'    => Application::load('core')->long_version,
-		), TRUE );
-
-		if ( empty( $data['set_id'] ) )
-		{
-			Db::i()->update( 'core_themes', ['set_css_updated' => time()] );
-		}
-
-		return $insertId;
-	}
-
-	/**
-	 * Add a template
-	 * A check is first made to ensure we're not overwriting an existing master template bit.
-	 *
-	 * @param	array $data	Data to insert (app, location, group, name, variables, content)
-	 * @return	int		Insert Id
-	 *@throws	OverflowException
-	 * @throws	InvalidArgumentException
-	 */
-	public static function addTemplate( array $data ): int
-	{
-		if ( empty( $data['app'] ) OR empty( $data['location'] ) OR empty( $data['group'] ) OR empty( $data['name'] ) )
-		{
-			throw new InvalidArgumentException;
-		}
-
-		/* Check for existing and there is not existing template, then it will throw an an UnderflowException */
-		try
-		{
-			$check = Db::i()->select( 'template_id, template_set_id', 'core_theme_templates', array(
-				'template_app=? AND template_location=? AND template_group=? AND LOWER(template_name)=?',
-				mb_strtolower( $data['app'] ),
-				mb_strtolower( $data['location'] ),
-				mb_strtolower( $data['group'] ),
-				mb_strtolower( $data['name'] )
-			) )->first();
-
-			/* Master bit exists, skip */
-			throw new OverflowException;
-		}
-		catch( UnderflowException $e )
-		{
-			/* Template doesn't exist, so it's all good bro */
-		}
-
-		/* Insert */
-		$insertId = Db::i()->insert( 'core_theme_templates', array(
-			'template_set_id'	  => 0,
-			'template_app'		  => $data['app'],
-			'template_location'   => $data['location'],
-			'template_group'	  => $data['group'],
-			'template_name'       => $data['name'],
-			'template_data'       => $data['variables'],
-			'template_content'    => $data['content'],
-			'template_updated'	  => time(),
-			'template_version'    => Application::load('core')->long_version,
-		), TRUE );
-
-		static::rebuildHookPointFlags( $data['app'] );
-
-		return $insertId;
+		\IPS\Settings::i()->changeValues( array( 'acp_css_map' => '[]' ) );
+		unset( \IPS\Data\Store::i()->acp_resource_map );
 	}
 
 	/**
@@ -4512,23 +5065,23 @@ PHP;
 	 * Theme resources should be raw binary data everywhere (filesystem and DB) except in the theme XML download where they are base64 encoded.
 	 *
 	 * @note	$data['content'] should be the raw binary data, not base64_encoded data
-	 * @param	array $data	        Array of data (app, location, path, name, content, [plugin])
-	 * @param boolean $addToMaster    Add to master set 0
+	 * @param	array	$data	        Array of data (app, location, path, name, content, [plugin])
+	 * @param   boolean $addToMaster    Add to master set 0
+	 * @throws	\InvalidArgumentException
 	 * @return	void
-	 *@throws	InvalidArgumentException
 	 */
-	public static function addResource( array $data, bool $addToMaster=FALSE ): void
+	public static function addResource( $data, $addToMaster=FALSE )
 	{
 		if ( empty( $data['app'] ) OR empty( $data['location'] ) OR empty( $data['path'] ) OR empty( $data['name'] ) )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 
 		$name = static::makeBuiltTemplateLookupHash( $data['app'], $data['location'], $data['path'] ) . '_' . $data['name'];
 
 		if ( $addToMaster )
 		{
-			Db::i()->insert( 'core_theme_resources', array(
+			\IPS\Db::i()->insert( 'core_theme_resources', array(
                  'resource_set_id'   => 0,
                  'resource_app'      => $data['app'],
                  'resource_location' => $data['location'],
@@ -4537,17 +5090,18 @@ PHP;
                  'resource_added'	  => time(),
                  'resource_filename' => NULL,
                  'resource_data'     => $data['content'],
+                 'resource_plugin'	  => isset( $data['plugin'] ) ? $data['plugin'] : NULL
              ) );
 		}
 
-		foreach(Theme::themes() as $id => $theme )
+		foreach( \IPS\Theme::themes() as $id => $theme )
 		{
 			$resource = NULL;
 			try
 			{
-				$resource = Db::i()->select( '*', 'core_theme_resources', array( 'resource_set_id=? and resource_app=? and resource_location=? and resource_path=? and resource_name=?', $theme->id, $data['app'], $data['location'], $data['path'], $data['name'] ) )->first();
+				$resource = \IPS\Db::i()->select( '*', 'core_theme_resources', array( 'resource_set_id=? and resource_app=? and resource_location=? and resource_path=? and resource_name=?', $theme->id, $data['app'], $data['location'], $data['path'], $data['name'] ) )->first();
 			}
-			catch( UnderflowException $ex ) { }
+			catch( \UnderflowException $ex ) { }
 
 			if ( $resource !== NULL and isset( $resource['resource_user_edited'] ) )
 			{
@@ -4558,7 +5112,7 @@ PHP;
 			}
 
 			/* Clear out old rows */
-			Db::i()->delete( 'core_theme_resources', array( 'resource_set_id=? and resource_app=? and resource_location=? and resource_path=? and resource_name=?', $theme->id, $data['app'], $data['location'], $data['path'], $data['name'] ) );
+			\IPS\Db::i()->delete( 'core_theme_resources', array( 'resource_set_id=? and resource_app=? and resource_location=? and resource_path=? and resource_name=?', $theme->id, $data['app'], $data['location'], $data['path'], $data['name'] ) );
 
 			$resourceMap = $theme->resource_map;
 
@@ -4572,23 +5126,9 @@ PHP;
 					$saveName = mb_substr( $name, 0, ( mb_strrpos( $name, '.' ) ) ) . '_' . mt_rand() . '.' . $ext;
 				}
 
-				if( in_array( $data['app'], IPS::$ipsApps ) )
-				{
-					$path = '/static/resources/';
-					if( !is_dir( ROOT_PATH . $path ) )
-					{
-						mkdir( ROOT_PATH . $path, IPS_FOLDER_PERMISSION, TRUE );
-					}
+				$fileName = (string) \IPS\File::create( 'core_Theme', $saveName, $data['content'], 'set_resources_' . $theme->id, FALSE, NULL, FALSE );
 
-					$fileName = $path . $data['app'] . '_' . $saveName;
-					@file_put_contents( ROOT_PATH . $fileName, $data['content'] );
-				}
-				else
-				{
-					$fileName = (string) File::create( 'core_Theme', $saveName, $data['content'], 'set_resources_' . $theme->id, FALSE, NULL, FALSE );
-				}
-
-				Db::i()->insert( 'core_theme_resources', array(
+				\IPS\Db::i()->insert( 'core_theme_resources', array(
 						'resource_set_id'   => $theme->id,
 						'resource_app'      => $data['app'],
 						'resource_location' => $data['location'],
@@ -4597,6 +5137,7 @@ PHP;
 						'resource_added'	 => time(),
 						'resource_filename' => $fileName,
 						'resource_data'     => $data['content'],
+						'resource_plugin'	 => isset( $data['plugin'] ) ? $data['plugin'] : NULL
 				) );
 			}
 
@@ -4608,22 +5149,208 @@ PHP;
 			$theme->resource_map = $resourceMap;
 			$theme->save();
 		}
+
+		// create the plugin template
+		if( \IPS\IN_DEV AND $data['app'] === 'core' AND $data['location'] === 'global' AND $data['path'] === '/plugins/' )
+		{
+			$plugin = \IPS\Plugin::load( $data['plugin'] );
+
+			\file_put_contents( \IPS\ROOT_PATH . "/plugins/{$plugin->location}/dev/resources/{$data['name']}", $data['content'] );
+			@chmod( \IPS\ROOT_PATH . "/plugins/{$plugin->location}/dev/resources/{$data['name']}", \IPS\IPS_FILE_PERMISSION );
+		}
 	}
 
+	/**
+	 * Add CSS.
+	 * As CSS files have inheritance, this will always go to theme set 0. A check is first made to
+	 * ensure we're not overwriting an existing master CSS file.
+	 *
+	 * @param	array	$data	Data to insert (app, location, path, name, content, [added_to], [plugin])
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OverflowException
+	 * @return	int		Insert Id
+	 */
+	public static function addCss( $data )
+	{
+		if ( empty( $data['app'] ) OR empty( $data['location'] ) OR empty( $data['path'] ) OR empty( $data['name'] ) )
+		{
+			throw new \InvalidArgumentException;
+		}
+
+		/* Check for existing */
+		try
+		{
+			$check = \IPS\Db::i()->select( 'css_id, css_plugin', 'core_theme_css', array(
+				'css_app=? AND css_location=? AND css_path=? AND css_name=LOWER(?) AND css_set_id=?',
+				mb_strtolower( $data['app'] ),
+				mb_strtolower( $data['location'] ),
+				mb_strtolower( $data['path'] ),
+				mb_strtolower( $data['name'] ),
+				isset( $data['set_id'] ) ? $data['set_id'] : 0
+			) )->first();
+
+			if ( isset( $data['plugin'] ) and $data['plugin'] == $check['css_plugin'] )
+			{
+				throw new \OverflowException;
+			}
+			else if ( empty( $data['plugin'] ) )
+			{
+				throw new \OverflowException;
+			}
+		}
+		catch( \UnderflowException $e )
+		{
+			/* That's ok, it doesn't exist */
+		}
+
+		/* Insert */
+		$saveSetId = isset( $data['set_id'] ) ? $data['set_id'] : 0;
+		$insertId = \IPS\Db::i()->insert( 'core_theme_css', array(
+				'css_set_id'	 => $saveSetId,
+				'css_app'		 => mb_strtolower( $data['app'] ),
+				'css_location'   => mb_strtolower( $data['location'] ),
+				'css_path'		 => mb_strtolower( $data['path'] ),
+				'css_name'       => mb_strtolower( $data['name'] ),
+				'css_content'    => $data['content'],
+				'css_added_to'   => ( isset( $data['added_to'] ) ) ? \intval( $data['added_to'] ) : 0,
+				'css_updated' 	 => time(),
+				'css_version'    => \IPS\Application::load('core')->long_version,
+				'css_plugin'	 => isset( $data['plugin'] ) ? $data['plugin'] : NULL
+		), TRUE );
+
+		if ( ! empty( $data['set_id'] ) )
+		{
+			/* This is a specific theme set */
+			static::setThemeCustomized( $data['set_id'] );
+		}
+		else
+		{
+			/* Update all themes to let them know that a new master CSS has been added */
+			\IPS\Db::i()->update( 'core_themes', array( 'set_css_updated' => time() ) );
+		}
+
+		// create the plugin template
+		if( \IPS\IN_DEV AND $data['app'] === 'core' AND $data['location'] === 'front' AND $data['path'] === 'custom' AND isset( $data['plugin'] ) )
+		{
+			$plugin = \IPS\Plugin::load( $data['plugin'] );
+
+			\file_put_contents( \IPS\ROOT_PATH . "/plugins/{$plugin->location}/dev/css/{$data['name']}", $data['content'] );
+			@chmod( \IPS\ROOT_PATH . "/plugins/{$plugin->location}/dev/css/{$data['name']}", \IPS\IPS_FILE_PERMISSION );
+		}
+
+		return $insertId;
+	}
+
+	/**
+	 * Add a template
+	 * As templates have inheritance, this will always go to theme set 0. A check is first made to
+	 * ensure we're not overwriting an existing master template bit.
+	 *
+	 * @param	array	$data	Data to insert (app, location, group, name, variables, content, [added_to])
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OverflowException
+	 * @return	int		Insert Id
+	 */
+	public static function addTemplate( $data )
+	{
+		if ( empty( $data['app'] ) OR empty( $data['location'] ) OR empty( $data['group'] ) OR empty( $data['name'] ) )
+		{
+			throw new \InvalidArgumentException;
+		}
+
+		/* Check for existing and there is not existing template, then it will throw an an UnderflowException */
+		try
+		{
+			$check = \IPS\Db::i()->select( 'template_id, template_added_to, template_set_id', 'core_theme_templates', array(
+				'template_app=? AND template_location=? AND template_group=? AND LOWER(template_name)=? AND template_set_id=?',
+				mb_strtolower( $data['app'] ),
+				mb_strtolower( $data['location'] ),
+				mb_strtolower( $data['group'] ),
+				mb_strtolower( $data['name'] ),
+				( isset( $data['set_id'] ) ) ? $data['set_id'] : 0
+			) )->first();
+
+			/* Template bit exists, are we trying to add a new master template with the same name as a third party template? */
+			if ( isset( $data['_default_template'] ) and $check['template_added_to'] > 0 )
+			{
+				/* Update it to make it belong to the theme that added it so it is revertable before adding the new one to fix an issue with early 4.0 releases */
+				try
+				{
+					\IPS\Db::i()->update( 'core_theme_templates', array(
+						'template_set_id'     => $check['template_added_to']
+					), array( 'template_id=?', $check['template_id'] ) );
+				}
+				catch( \Exception $e )
+				{
+					/* This template bit exists in a custom template and also in the master space as a custom theme added this bit
+					   as of 4.3 we will not be polluting the master space with additional templates so this can be removed then.
+					   For now, we will remove the master template bit to allow the insert to work below */
+					\IPS\Db::i()->delete( 'core_theme_templates', array( 'template_id=?', $check['template_id'] ) );
+				}
+			}
+			else
+			{
+				/* Master bit exists, skip */
+				throw new \OverflowException;
+			}
+		}
+		catch( \UnderflowException $e )
+		{
+			/* Template doesn't exist, so it's all good bro */
+		}
+
+		/* Insert */
+		$insertId = \IPS\Db::i()->insert( 'core_theme_templates', array(
+				'template_set_id'	  => ( isset( $data['set_id'] ) ) ? $data['set_id'] : 0,
+				'template_app'		  => $data['app'],
+				'template_location'   => $data['location'],
+				'template_group'	  => $data['group'],
+				'template_name'       => $data['name'],
+				'template_data'       => $data['variables'],
+				'template_content'    => $data['content'],
+				'template_added_to'   => ( isset($data['added_to']) ) ? \intval( $data['added_to'] ) : 0,
+				'template_updated'	  => time(),
+				'template_user_added' => ( isset($data['_default_template']) ) ? 0 : 1,
+				'template_version'    => \IPS\Application::load('core')->long_version,
+				'template_plugin'	  => isset( $data['plugin'] ) ? $data['plugin'] : NULL
+		), TRUE );
+
+		if ( ! empty( $data['set_id'] ) )
+		{
+			static::setThemeCustomized( $data['set_id'] );
+		}
+
+		/* Reset disk cache */
+		if ( static::isUsingTemplateDiskCache() )
+		{
+			static::resetAllCacheKeys();
+		}
+
+		// create the plugin templates
+		if( \IPS\IN_DEV AND $data['app'] === 'core' AND $data['location'] === 'global' AND $data['group']	=== 'plugins' )
+		{
+			$plugin = \IPS\Plugin::load( $data['plugin'] );
+
+			\file_put_contents( \IPS\ROOT_PATH . "/plugins/{$plugin->location}/dev/html/{$data['name']}.phtml", $data['rawContent'] );
+			@chmod( \IPS\ROOT_PATH . "/plugins/{$plugin->location}/dev/html/{$data['name']}.phtml", \IPS\IPS_FILE_PERMISSION );
+		}
+
+		return $insertId;
+	}
 
 	/**
 	 * Remove templates completely from the system.
-	 * Used by application manager, etc.
+	 * Used by hooks/application manager, etc.
 	 *
-	 * @param string $app		Application Key
-	 * @param string|null $location	Location
-	 * @param string|null $group		Group
-	 * @param int|null $plugin		Plugin ID
-	 * @param bool $doAll		Delete all - by default only the master set is cleared
-	 * @param string|null $template	Template name if you just want to do one template. If specified, deleteCompiledTemplate is NOT called and must be done manually
+	 * @param	string		$app		Application Key
+	 * @param	string|null	$location	Location
+	 * @param	string|null $group		Group
+	 * @param	int|null	$plugin		Plugin ID
+	 * @param	bool		$doAll		Delete all - by default only the master set is cleared
+	 * @param	string|null $template	Template name if you just want to do one template. If specified, deleteCompiledTemplate is NOT called and must be done manually
 	 * @return	void
 	 */
-	public static function removeTemplates( string $app, string $location=NULL, string $group=NULL, int $plugin=NULL, bool $doAll=FALSE, string $template=NULL ): void
+	public static function removeTemplates( $app, $location=NULL, $group=NULL, $plugin=NULL, $doAll=FALSE, $template=NULL )
 	{
 		if ( !$template )
 		{
@@ -4647,28 +5374,44 @@ PHP;
 			$where[] = array( 'template_name=?', $template );
 		}
 
+		if ( $plugin !== NULL )
+		{
+			$where[] = array( 'template_plugin=?', $plugin );
+		}
+		else
+		{
+			$where[] = array( 'template_plugin IS NULL' );
+		}
+
 		/* Coming from build script */
 		if ( !$doAll )
 		{
-			$where[] = array( 'template_set_id=0' );
+			if ( $plugin )
+			{
+				$where[] = array( 'template_set_id=0' );
+			}
+			else
+			{
+				$where[] = array( '(template_set_id=0 and template_user_added=0)' );
+			}
 		}
 
-		Db::i()->delete( 'core_theme_templates', $where );
+		\IPS\Db::i()->delete( 'core_theme_templates', $where );
 	}
 
 	/**
 	 * Remove CSS completely from the system.
-	 * Used by application manager, etc.
+	 * Used by hooks/application manager, etc.
 	 *
-	 * @param string $app		Application Key
-	 * @param string|null $location	Location
-	 * @param string|null $path		Group
-	 * @param int|null $plugin		Plugin ID
-	 * @param bool $doAll		Delete all - by default only the master set is cleared
-	 * @param string|null $name		CSS file name if you just want to do one file. If specified, deleteCompiledCss is NOT called and must be done manually
+	 * @param	string		$app		Application Key
+	 * @param	string|null	$location	Location
+	 * @param	string|null $path		Group
+	 * @param	int|null	$plugin		Plugin ID
+	 * @param	bool		$doAll		Delete all - by default only the master set is cleared
+	 * @param	string|null $name		CSS file name if you just want to do one file. If specified, deleteCompiledCss is NOT called and must be done manually
 	 * @return	void
 	 */
-	public static function removeCss( string $app, string $location=NULL, string $path=NULL, int $plugin=NULL, bool $doAll=FALSE, string $name=NULL ): void
+	public static function removeCss( $app, $location=NULL, $path=NULL, $plugin=NULL, $doAll=FALSE, $name=NULL )
 	{
 		if ( !$name )
 		{
@@ -4692,28 +5435,37 @@ PHP;
 			$where[] = array( 'css_name=?', $name );
 		}
 
+		if ( $plugin !== NULL )
+		{
+			$where[] = array( 'css_plugin=?', $plugin );
+		}
+		else
+		{
+			$where[] = array( 'css_plugin IS NULL' );
+		}
+
 		/* Coming from build script */
 		if ( !$doAll )
 		{
-			$where[] = array( 'css_set_id=0' );
+			$where[] = array( '(css_set_id=0 and css_added_to=0)' );
 		}
 
-		Db::i()->delete( 'core_theme_css', $where );
+		\IPS\Db::i()->delete( 'core_theme_css', $where );
 	}
 
 	/**
 	 * Remove resources completely from the system.
-	 * Used by application manager, etc.
+	 * Used by hooks/application manager, etc.
 	 *
-	 * @param string $app		Application Key
-	 * @param string|null $location	Location
-	 * @param string|null $path		Path
-	 * @param int|null $plugin		Plugin ID
-	 * @param bool $doAll		Delete all - by default only the master set is cleared
-	 * @param string|null $name		Resource file name if you just want to do one file. If specified, deleteCompiledResources AND buildResourceMap are both NOT called and must be done manually
+	 * @param	string		$app		Application Key
+	 * @param	string|null	$location	Location
+	 * @param	string|null $path		Path
+	 * @param	int|null	$plugin		Plugin ID
+	 * @param	bool		$doAll		Delete all - by default only the master set is cleared
+	 * @param	string|null $name		Resource file name if you just want to do one file. If specified, deleteCompiledResources AND buildResourceMap are both NOT called and must be done manually
 	 * @return void
 	 */
-	public static function removeResources( string $app, string $location=NULL, string $path=NULL, int $plugin=NULL, bool $doAll=FALSE, string $name=NULL ): void
+	public static function removeResources( $app, $location=NULL, $path=NULL, $plugin=NULL, $doAll=FALSE, $name=NULL )
 	{
 		if ( !$name )
 		{
@@ -4737,13 +5489,22 @@ PHP;
 			$where[] = array( 'resource_name=?', $name );
 		}
 
+		if ( $plugin !== NULL )
+		{
+			$where[] = array( 'resource_plugin=?', $plugin );
+		}
+		else
+		{
+			$where[] = array( 'resource_plugin IS NULL' );
+		}
+
 		/* Coming from build script */
 		if ( !$doAll )
 		{
 			$where[] = array( '(resource_set_id=0 OR resource_user_edited=0)' );
 		}
 
-		Db::i()->delete( 'core_theme_resources', $where );
+		\IPS\Db::i()->delete( 'core_theme_resources', $where );
 
 		if ( !$name )
 		{
@@ -4755,72 +5516,14 @@ PHP;
 	}
 
 	/**
-	 * Remove any editor settings from this application
-	 *
-	 * @param string $app
-	 * @return void
-	 */
-	public static function removeEditorSettings( string $app ) : void
-	{
-		Db::i()->delete( 'core_theme_editor_settings', [ 'setting_app=?', $app ] );
-
-		/* Check the categories. If there are settings from another app, then we leave the category,
-		and change the application key */
-		$categories = iterator_to_array(
-			Db::i()->select( '*', 'core_theme_editor_categories', [ 'cat_app=?', $app ] )
-		);
-
-		foreach( $categories as $category )
-		{
-			try
-			{
-				$otherSetting = Db::i()->select( '*', 'core_theme_editor_settings', [ 'setting_category_id=? and setting_app != ?', $category['cat_id'], $app ], 'setting_position', array( 0, 1 ) )->first();
-				Db::i()->update( 'core_theme_editor_categories', [ 'cat_app' => null ], [ 'cat_id=?', $category['cat_id'] ] );
-			}
-			catch( UnderflowException )
-			{
-				Db::i()->delete( 'core_theme_editor_categories', [ 'cat_id=?', $category['cat_id'] ] );
-			}
-		}
-	}
-
-	/**
-	 * Removes all customizations made by the theme editor except uploaded logos
-	 *
-	 * @return void
-	 */
-	public function removeThemeEditorCustomizations(): void
-	{
-		/* Delete the CSS file */
-		Db::i()->delete( 'core_theme_css', [ 'css_set_id=? and css_location=? and css_path=? and css_name=?', $this->id, 'front', 'custom', '1-variables.css' ] );
-		static::deleteCompiledCss( 'core', 'front', 'custom', '1-variables.css', Theme::i()->_id );
-
-		/* Remove any other non logo data from the theme editor json */
-		$data = $this->theme_editor_data;
-		if ( is_array( $data ) )
-		{
-			if ( isset( $data['header'] ) )
-			{
-				unset( $data['header'] );
-			}
-		}
-
-		$this->custom_css = '';
-		$this->css_variables = null;
-		$this->view_options = null;
-		$this->theme_editor_data = $data;
-		$this->save();
-	}
-
-	/**
 	 * Because css still has {resource} tags when built, and the building is done via the ACP,
 	 * Tags without a set "location" parameter are set to "admin" incorrectly.
 	 *
-	 * @param string $css		CSS Text
-	 * @param string $location   CSS Location
+	 * @param   string	$css		CSS Text
+	 * @param   string  $location   CSS Location
 	 * @return  string	Fixed CSS
 	 */
-	public static function fixResourceTags( string $css, string $location ): string
+	public static function fixResourceTags( $css, $location )
 	{
 		preg_match_all( '#\{resource=([\'"])(\S+?)\\1([^\}]+?)?\}#i', $css, $items, PREG_SET_ORDER );
 
@@ -4829,17 +5532,17 @@ PHP;
 			/* Has manually added params */
 			if ( isset( $attr[3] ) )
 			{
-				if ( ! strstr( $attr[3], 'location=' ) )
+				if ( ! \strstr( $attr[3], 'location=' ) )
 				{
-					$new = str_replace( $attr[3], $attr[3] . ' location="' . $location . '"', $attr[0] );
+					$new = \str_replace( $attr[3], $attr[3] . ' location="' . $location . '"', $attr[0] );
 
-					$css = str_replace( $attr[0], $new, $css );
+					$css = \str_replace( $attr[0], $new, $css );
 				}
 			}
 			else
 			{
-				$new = str_replace( '}',  ' location="' . $location . '"}', $attr[0] );
-				$css = str_replace( $attr[0], $new, $css );
+				$new = \str_replace( '}',  ' location="' . $location . '"}', $attr[0] );
+				$css = \str_replace( $attr[0], $new, $css );
 			}
 		}
 
@@ -4849,59 +5552,37 @@ PHP;
 	/**
 	 * Inserts a built record
 	 *
-	 * @param array $css	css_* table data
-	 * @return File|string
+	 * @param	array	$css	css_* table data
+	 * @return	object	IPS\File
 	 */
-	protected static function writeCss( array $css ): File|string
+	protected static function writeCss( $css )
 	{
-		$css['css_path']    = ( empty( $css['css_path'] ) or $css['css_path'] == '.' ) ? '.' : $css['css_path'];
+		$css['css_path']    = ( empty( $css['css_path'] ) ) ? '.' : $css['css_path'];
+
 		$functionName = "css_" . $css['css_app'] . '_' . $css['css_location'] . '_' . str_replace( array( '-', '/', '.' ), '_', $css['css_path'] . '_' . $css['css_name'] );
 
-		if ( !function_exists( $functionName ) )
+		if ( !\function_exists( $functionName ) )
 		{
 			static::makeProcessFunction( static::fixResourceTags( $css['css_content'], $css['css_location'] ), $functionName, '', FALSE, TRUE );
 		}
 
 		$fqFunc		= 'IPS\\Theme\\'. $functionName;
 		$content	= static::minifyCss( $fqFunc() );
-		$name		= static::cssFilePrefix( $css['css_app'], $css['css_location'], $css['css_path'] ) . '_' . $css['css_name'];
+		$name		= static::makeBuiltTemplateLookupHash( $css['css_app'], $css['css_location'], $css['css_path'] . '/' .$css['css_name'] ) . '_' . $css['css_name'];
 
 		/* Replace any <fileStore.xxx> tags in the CSS */
-		Output::i()->parseFileObjectUrls( $content );
+		\IPS\Output::i()->parseFileObjectUrls( $content );
 
-		if( in_array( $css['css_app'], IPS::$ipsApps ) AND $css['css_path'] != 'custom' )
-		{
-			$path = '/static/css/'; // Applications are in the root on Cloud2
-			if( !is_dir( ROOT_PATH. $path ) )
-			{
-				mkdir( ROOT_PATH . $path, IPS_FOLDER_PERMISSION, TRUE );
-			}
-
-			$cssFileName = $path . $name;
-			$result = (bool) @file_put_contents( ROOT_PATH . $cssFileName, $content, LOCK_EX );
-
-			/* Sometimes LOCK_EX is unavailable and throws file_put_contents(): Exclusive locks are not supported for this stream.
-				While we would prefer an exclusive lock, it would be better to write the file if possible. */
-			if( !$result )
-			{
-				@unlink( ROOT_PATH . $cssFileName );
-				$result = (bool) @file_put_contents( ROOT_PATH . $cssFileName, $content );
-			}
-
-			@chmod( ROOT_PATH . $cssFileName, IPS_FILE_PERMISSION );
-			return $cssFileName;
-		}
-
-		return File::create( 'core_Theme', $name, $content, 'css_built_' . $css['css_set_id'], FALSE, NULL, FALSE );
+		return \IPS\File::create( 'core_Theme', $name, $content, 'css_built_' . $css['css_set_id'], FALSE, NULL, FALSE );
 	}
 
 	/**
 	 * Minifies CSS
 	 *
-	 * @param string $content	Content to minify
+	 * @param   string  $content	Content to minify
 	 * @return	string  $content	Minified
 	 */
-	public static function minifyCss( string $content ): string
+	public static function minifyCss( $content )
 	{
 		/* Comments */
 		$content = preg_replace( '#/\*[^*]*\*+([^/][^*]*\*+)*/#', '', $content );
@@ -4924,20 +5605,35 @@ PHP;
 	/**
 	 * This method is executed when theme settings have changed from saveForm()
 	 *
-	 * @param int $setId		Theme set id
+	 * @param	int		$setId		Theme set id
 	 * @erturn  void
 	 */
-	public static function themeSettingsHaveChanged( int $setId ): void
+	public static function themeSettingsHaveChanged( $setId )
 	{
-		if( Application::appIsEnabled( 'cms' ) )
-		{
-			Page::deleteCachedIncludes();
-		}
-
 		$themeSetToBuild = static::load( $setId );
 
-		File::getClass('core_Theme')->deleteContainer( 'css_built_' . $themeSetToBuild->id );
+		\IPS\File::getClass('core_Theme')->deleteContainer( 'css_built_' . $themeSetToBuild->id );
 		$themeSetToBuild->css_map = array();
+
+		foreach( $themeSetToBuild->allChildren() as $id => $child )
+		{
+			\IPS\File::getClass('core_Theme')->deleteContainer( 'css_built_' . $child->id );
+			$child->css_map = array();
+			$child->css_updated = time();
+			$child->save();
+		}
+	}
+
+	/**
+	 * Reset the cache key
+	 * This will make all existing template caches stale for this theme
+	 *
+	 * @return void
+	 */
+	public function resetCacheKey()
+	{
+		$this->cache_key = md5( microtime() . mt_rand( 0, 1000 ) );
+		$this->save();
 	}
 
 	/**
@@ -4945,29 +5641,30 @@ PHP;
 	 *
 	 * @return boolean
 	 */
-	public function isCustomized(): bool
+	public function isCustomized()
 	{
-		if( $this->theme_editor_data !== static::$defaultThemeEditorData )
+		try
 		{
-			return true;
+			\IPS\Db::i()->select( 'template_id', 'core_theme_templates', array( 'template_set_id=?', $this->id ) )->first();
+			return TRUE;
 		}
+		catch( \UnderflowException $e ) { }
 
-		if ( $this->custom_css )
+		try
 		{
-			return true;
+			\IPS\Db::i()->select( 'css_id', 'core_theme_css', array( 'css_set_id=?', $this->id ) )->first();
+			return TRUE;
 		}
+		catch( \UnderflowException $e ) { }
 
-		if ( $this->css_variables )
+		try
 		{
-			return true;
+			\IPS\Db::i()->select( 'resource_id', 'core_theme_resources', array( 'resource_set_id=? and resource_user_edited=1', $this->id ) )->first();
+			return TRUE;
 		}
+		catch( \UnderflowException $e ) { }
 
-		if( $this->view_options )
-		{
-			return true;
-		}
-
-		return false;
+		return FALSE;
 	}
 
 	/**
@@ -4975,9 +5672,60 @@ PHP;
 	 *
 	 * @return string
 	 */
-	public function cssCacheBustKey(): string
+	public function cssCacheBustKey()
 	{
-		return CACHEBUST_KEY . $this->css_updated;
+		return \IPS\CACHEBUST_KEY . $this->css_updated;
+	}
+
+	/**
+	 * Static wrapper for customized
+	 *
+	 * return @void
+	 */
+	public static function setThemeCustomized( $themeId )
+	{
+		try
+		{
+			$theme = static::load( $themeId );
+			$theme->customized = $theme->isCustomized();
+			$theme->save();
+		}
+		catch( \OutOfRangeException $e )
+		{
+
+		}
+	}
+
+	/**
+	 * Reset all cache keys
+	 * This will make all existing template caches stale for all themes
+	 *
+	 * @return void
+	 */
+	public static function resetAllCacheKeys()
+	{
+		/* There is no specific need for each theme to have a unique key */
+		\IPS\Db::i()->update( 'core_themes', array( 'set_cache_key' => md5( microtime() . mt_rand( 0, 1000 ) ) ) );
+
+		if ( isset( \IPS\Data\Store::i()->themes ) )
+		{
+			unset( \IPS\Data\Store::i()->themes );
+		}
+	}
+
+	/**
+	 * Simple check to see if we have template caching enabled
+	 *
+	 * @return boolean
+	 */
+	public static function isUsingTemplateDiskCache()
+	{
+		if ( \IPS\CIC )
+		{
+			return FALSE;
+		}
+
+		return \IPS\Settings::i()->theme_disk_cache_templates and \IPS\Settings::i()->theme_disk_cache_path and is_dir( \IPS\Settings::i()->theme_disk_cache_path );
 	}
 
 	/**
@@ -4986,9 +5734,9 @@ PHP;
 	 * @param	string	$key 	Unique key to sign the lock
 	 * @return	void
 	 */
-	public static function lock( string $key ): void
+	public static function lock( $key )
 	{
-		Db::i()->replace( 'core_cache', array(
+		\IPS\Db::i()->replace( 'core_cache', array(
 			'cache_key'    => 'locking_' . $key,
 			'cache_value'  => $key,
 			'cache_expire' => time() + 30
@@ -5001,14 +5749,14 @@ PHP;
 	 * @param	string	$key 	Unique key to sign the lock
 	 * @return	boolean
 	 */
-	public static function checkLock( string $key ): bool
+	public static function checkLock( $key )
 	{
 		try
 		{
-			Db::i()->select( 'SQL_NO_CACHE *', 'core_cache', array( 'cache_key=? and cache_expire > ?', 'locking_' . $key, time() - 30 ), NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first();
+			\IPS\Db::i()->select( 'SQL_NO_CACHE *', 'core_cache', array( 'cache_key=? and cache_expire > ?', 'locking_' . $key, time() - 30 ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 			return true;
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
 			return false;
 		}
@@ -5020,197 +5768,54 @@ PHP;
 	 * @param	string	$key 	Unique key to sign the lock
 	 * @return	void
 	 */
-	public static function unlock( string $key ): void
+	public static function unlock( $key )
 	{
-		Db::i()->delete( 'core_cache', array( 'cache_key=?', 'locking_' . $key ) );
+		\IPS\Db::i()->delete( 'core_cache', array( 'cache_key=?', 'locking_' . $key ) );
 	}
 
 	/**
-	 * Get the hook names from a template's contents
+	 * Are we actively editing an easy mode theme?
 	 *
-	 * @param string $contents
-	 * @return array
+	 * @return bool
 	 */
-	public static function extractHookNames( string $contents ): array
+	public static function isUsingEasyModeEditor(): bool
 	{
-		$names = [];
-		preg_match_all( '/data-ips-hook=["\']([^"\']+)["\']/', $contents, $matches, PREG_SET_ORDER );
+		return isset( \IPS\Request::i()->cookie['vseThemeId'] ) AND \IPS\Member::loggedIn()->isAdmin() AND \IPS\Member::loggedIn()->members_bitoptions['bw_using_skin_gen'];
+	}
 
-		if ( $matches and is_array( $matches ) and count( $matches ) )
+	/**
+	 * Pre output handling for easy mode theme if actively used
+	 *
+	 * @return void
+	 */
+	public static function easyModePreOutput()
+	{
+		/* We are using the easy mode editor, and we're a logged in admin and the theme is an easy mode theme */
+		if ( static::isUsingEasyModeEditor() and static::$memberTheme->by_skin_gen )
 		{
-			foreach( $matches as $index => $match )
+			$storage = \IPS\File::getClass( 'core_Theme' );
+			$baseUrl = parse_url( \IPS\Http\Url::internal('') );
+			$storageUrl = parse_url( $storage->baseUrl() );
+
+			/* is it a different host? */
+			if ( $storageUrl['host'] != $baseUrl['host'] )
 			{
-				$names[] = $match[1];
+				$cssFiles = [];
+				foreach( \IPS\Output::i()->cssFiles as $css )
+				{
+					if ( $css->data['host'] == $storageUrl['host'] )
+					{
+						$cssFiles[] = \IPS\Http\Url::internal('app=core&module=system&controller=easymode&do=proxy')->setQueryString( [ 'f' => base64_encode( (string) $css ) ] );
+					}
+					else
+					{
+						$cssFiles[] = $css;
+					}
+				}
+
+				\IPS\Output::i()->cssFiles = $cssFiles;
 			}
-		}
-
-		return $names;
-	}
-
-	/**
-	 * Start a theme editing session
-	 *
-	 * @param Member|null $member
-	 * @return void
-	 */
-	public function editingStart( ?Member $member=null ): void
-	{
-		$member = $member ?: Member::loggedIn();
-		$member->members_bitoptions['bw_using_skin_gen'] = 1;
-		$member->save();
-
-		$this->edit_in_progress = $member->member_id;
-		$this->save();
-
-		/* Start a session with any existing custom CSS; this way we can tell if it's been deleted */
-		Db::i()->replace( 'core_theme_editor_sessions', [ 'member_id' => $member->member_id, 'custom_css' => $this->custom_css, 'set_id' => $this->id ] );
-	}
-
-	/**
-	 * Finish a theme editing session
-	 *
-	 * @param Member|null $member
-	 * @return void
-	 */
-	public function editingFinish( ?Member $member=null ): void
-	{
-		$member = $member ?: Member::loggedIn();
-		$member->members_bitoptions['bw_using_skin_gen'] = 0;
-		$member->save();
-
-		$this->edit_in_progress = 0;
-		$this->save();
-
-		/* Clear ALL sessions so that everyone gets the latest data */
-		Db::i()->delete( 'core_theme_editor_sessions', [ 'set_id=?', $this->id ] );
-	}
-
-	/**
-	 * @var array|null
-	 */
-	protected ?array $_session = null;
-
-	/**
-	 * Load data for the current session
-	 *
-	 * @param Member|null $member
-	 * @return array
-	 */
-	protected function editingSessionData( ?Member $member=null ) : array
-	{
-		$member = $member ?: Member::loggedIn();
-		if( !$member->isEditingTheme() )
-		{
-			return [];
-		}
-
-		if( $this->_session === null )
-		{
-			try
-			{
-				$row = Db::i()->select( "*", 'core_theme_editor_sessions', [ 'member_id=? and set_id=?', $member->member_id, $this->_id ] )->first();
-				$row['data'] = !empty( $row['data'] ) ? json_decode( $row['data'], true ) : [];
-				$this->_session = $row;
-			}
-			catch( UnderflowException )
-			{
-				$this->_session = [];
-			}
-		}
-
-		return $this->_session;
-	}
-
-	/**
-	 * Clear out the session data for this member
-	 *
-	 * @param Member|null $member
-	 * @return void
-	 */
-	public function clearEditingSession( ?Member $member=null ) : void
-	{
-		$member = $member ?: Member::loggedIn();
-		if( $member->isEditingTheme() )
-		{
-			Db::i()->delete( 'core_theme_editor_sessions', [ 'member_id=? and set_id=?', $member->member_id, $this->id ] );
-		}
-	}
-
-	/**
-	 * Update the custom CSS that we have stored in the session
-	 *
-	 * @param string $css
-	 * @param Member|null $member
-	 * @return void
-	 */
-	public function updateSessionCss( string $css, ?Member $member=null ) : void
-	{
-		$member = $member ?: Member::loggedIn();
-
-		if( !empty( $this->editingSessionData( $member ) ) )
-		{
-			Db::i()->update( 'core_theme_editor_sessions', [ 'custom_css' => $css ], [ 'member_id=?', $member->member_id ] );
-		}
-		else
-		{
-			Db::i()->replace( 'core_theme_editor_sessions', [
-				'member_id' => $member->member_id,
-				'set_id' => $this->id,
-				'custom_css' => $css
-			] );
-		}
-
-		$this->_session = null;
-	}
-
-	/**
-	 * Update any changed settings
-	 *
-	 * @param array $vars
-	 * @param Member|null $member
-	 * @return void
-	 */
-	public function updateSessionVars( array $vars, ?Member $member=null ) : void
-	{
-		$member = $member ?: Member::loggedIn();
-		if( !empty( $this->editingSessionData( $member ) ) )
-		{
-			Db::i()->update( 'core_theme_editor_sessions', [ 'data' => json_encode( $vars ) ], [ 'member_id=?', $member->member_id ] );
-		}
-		else
-		{
-			Db::i()->replace( 'core_theme_editor_sessions', [
-				'member_id' => $member->member_id,
-				'set_id' => $this->id,
-				'data' => json_encode( $vars )
-			] );
-		}
-
-		$this->_session = null;
-	}
-
-	/**
-	 * Return the theme that is currently being edited by this member
-	 * If no theme is being edited, an OutOfRangeException is thrown
-	 *
-	 * @param Member|null $member
-	 * @return Theme
-	 */
-	public static function byEditingMember( ?Member $member=null ): Theme
-	{
-		$member = $member ?: Member::loggedIn();
-
-		try
-		{
-			return static::load( $member->member_id, 'set_edit_in_progress' );
-		}
-		catch( Exception )
-		{
-			/* No theme currently being edited by this member, so turn off editing */
-			$member->members_bitoptions['bw_using_skin_gen'] = 0;
-			$member->save();
-
-			throw new OutOfRangeException();
 		}
 	}
 }
+

@@ -12,42 +12,16 @@
 namespace IPS\core\setup\upg_106100;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Content\Search\Index;
-use IPS\core\Achievements\Badge;
-use IPS\core\Achievements\Rank;
-use IPS\core\Achievements\Rule;
-use IPS\core\ProfileFields\Field;
-use IPS\core\ProfileFields\Group;
-use IPS\core\Feature;
-use IPS\core\Setup\Upgrade as UpgradeClass;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Db\Exception as DbException;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Notification;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use function call_user_func_array;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.6.0 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * ...
@@ -88,9 +62,9 @@ JSON;
 		{
 			try
 			{
-				$run = call_user_func_array( array( Db::i(), $query['method'] ), $query['params'] );
+				$run = \call_user_func_array( array( \IPS\Db::i(), $query['method'] ), $query['params'] );
 			}
-			catch( DbException $e )
+			catch( \IPS\Db\Exception $e )
 			{
 				if( !in_array( $e->getCode(), array( 1007, 1008, 1050, 1060, 1061, 1062, 1091, 1051 ) ) )
 				{
@@ -119,7 +93,7 @@ JSON;
  	 */
  	public function step2()
  	{
- 		Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
+ 		\IPS\Settings::i()->changeValues( array( 'emoji_cache' => time() ) );
 		 
 		return TRUE;
  	}
@@ -141,10 +115,10 @@ JSON;
  	 */
  	public function step3()
  	{
- 		if( Db::i()->select( 'count(*)', 'core_rc_comments', array( Db::i()->like( 'comment', 'imageproxy.php' ) ) ) )
+ 		if( \IPS\Db::i()->select( 'count(*)', 'core_rc_comments', array( \IPS\Db::i()->like( 'comment', 'imageproxy.php' ) ) ) )
  		{
- 			unset( Store::i()->currentImageProxyRebuild );
- 			Task::queue( 'core', 'RebuildImageProxyNonContent', array( 'extension' => 'core_Reports' ), 4, array( 'extension' ) );
+ 			unset( \IPS\Data\Store::i()->currentImageProxyRebuild );
+ 			\IPS\Task::queue( 'core', 'RebuildImageProxyNonContent', array( 'extension' => 'core_Reports' ), 4, array( 'extension' ) );
  		}
 
  		return TRUE;
@@ -168,7 +142,7 @@ JSON;
 	public function step4()
 	{
 		/* It is likely this will be attempted before settings are created */
-		$currentDefaults = iterator_to_array( Db::i()->select( '*', 'core_sys_conf_settings' )->setKeyField('conf_key')->setValueField('conf_default') );
+		$currentDefaults = iterator_to_array( \IPS\Db::i()->select( '*', 'core_sys_conf_settings' )->setKeyField('conf_key')->setValueField('conf_default') );
 
 		foreach ( array(
 					  array( 'key' => 'vapid_public_key', 'default' => '' ),
@@ -176,19 +150,19 @@ JSON;
 		{
 			if ( ! array_key_exists( $setting['key'], $currentDefaults ) )
 			{
-				Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => $setting['key'], 'conf_value' => $setting['default'], 'conf_default' => $setting['default'], 'conf_app' => 'core' ), TRUE );
+				\IPS\Db::i()->insert( 'core_sys_conf_settings', array( 'conf_key' => $setting['key'], 'conf_value' => $setting['default'], 'conf_default' => $setting['default'], 'conf_app' => 'core' ), TRUE );
 			}
 		}
 
 		/* Generate VAPID keys for web push notifications */
 		try 
 		{
-			$vapid = Notification::generateVapidKeys();
-			Settings::i()->changeValues( array( 'vapid_public_key' => $vapid['publicKey'], 'vapid_private_key' => $vapid['privateKey'] ) );
+			$vapid = \IPS\Notification::generateVapidKeys();
+			\IPS\Settings::i()->changeValues( array( 'vapid_public_key' => $vapid['publicKey'], 'vapid_private_key' => $vapid['privateKey'] ) );
 		}
-		catch (Exception $ex)
+		catch (\Exception $ex)
 		{
-			Log::log( $ex, 'create_vapid_keys' );
+			\IPS\Log::log( $ex, 'create_vapid_keys' );
 		}
 
 		return TRUE;
@@ -212,13 +186,13 @@ JSON;
 	public function step5()
 	{
 		$perCycle = 500;
-		$limit    = isset( Request::i()->extra ) ? Request::i()->extra : 0;
+		$limit    = isset( \IPS\Request::i()->extra ) ? \IPS\Request::i()->extra : 0;
 		$did      = 0;
 
 		/* Make sure we have included Application.php files, since Pages has its own autoloader, we need to define it */
-		Application::applications();
+		\IPS\Application::applications();
 
-		foreach( Db::i()->select( '*', 'core_content_meta', [ 'meta_type=?', 'core_FeaturedComments' ], 'meta_id ASC', [ $limit, $perCycle ] ) as $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_content_meta', [ 'meta_type=?', 'core_FeaturedComments' ], 'meta_id ASC', [ $limit, $perCycle ] ) as $row )
 		{
 			$did++;
 			$class = $row['meta_class'];
@@ -230,13 +204,13 @@ JSON;
 				{
 					$commentClass = $class::$commentClass;
 					$comment = $commentClass::load( $data['comment'] );
-					Db::i()->update( 'core_content_meta', [
+					\IPS\Db::i()->update( 'core_content_meta', [
 						'meta_item_author' => $comment->author()->member_id,
 						'meta_added' => $comment->mapped('date')
 					],
 						[ 'meta_id=?', $row['meta_id'] ] );
 				}
-				catch( Exception $e ){ }
+				catch( \Exception $e ){ }
 			}
 		}
 
@@ -250,7 +224,7 @@ JSON;
 	 */
 	public function step5CustomTitle()
 	{
-		$limit = isset( Request::i()->extra ) ? Request::i()->extra : 0;
+		$limit = isset( \IPS\Request::i()->extra ) ? \IPS\Request::i()->extra : 0;
 		return "Updating recommended content ({$limit} processed so far)";
 	}
 
@@ -262,10 +236,10 @@ JSON;
 	public function step6()
 	{
 		$perCycle = 500;
-		$limit    = isset( Request::i()->extra ) ? Request::i()->extra : 0;
+		$limit    = isset( \IPS\Request::i()->extra ) ? \IPS\Request::i()->extra : 0;
 		$did      = 0;
 
-		foreach( Db::i()->select( '*', 'core_social_promote', NULL, 'promote_id ASC', [ $limit, $perCycle ] ) as $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_social_promote', NULL, 'promote_id ASC', [ $limit, $perCycle ] ) as $row )
 		{
 			$did++;
 
@@ -276,11 +250,11 @@ JSON;
 
 			try
 			{
-				$promote = Feature::constructFromData( $row );
+				$promote = \IPS\core\Promote::constructFromData( $row );
 				$promote->author_id = $promote->objectAuthor->member_id;
 				$promote->save();
 			}
-			catch( Exception $e ){ }
+			catch( \Exception $e ){ }
 		}
 
 		return ( $did ) ? ( $limit + $did ) : TRUE;
@@ -293,7 +267,7 @@ JSON;
 	 */
 	public function step6CustomTitle()
 	{
-		$limit = isset( Request::i()->extra ) ? Request::i()->extra : 0;
+		$limit = isset( \IPS\Request::i()->extra ) ? \IPS\Request::i()->extra : 0;
 		return "Updating promoted content ({$limit} processed so far)";
 	}
 
@@ -304,7 +278,7 @@ JSON;
 	 */
 	public function step7()
 	{
-		foreach ( Application::allExtensions( 'core', 'ContentRouter' ) as $extension )
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter' ) as $extension )
 		{
 			foreach ( $extension->classes as $class )
 			{
@@ -312,9 +286,9 @@ JSON;
 				{
 					try
 					{
-						Task::queue( 'core', 'Upgrade46FeaturedContent', array( 'class' => $class ), 2 );
+						\IPS\Task::queue( 'core', 'Upgrade46FeaturedContent', array( 'class' => $class ), 2 );
 					}
-					catch( Exception $e ) { }
+					catch( \Exception $e ) { }
 				}
 			}
 		}
@@ -339,19 +313,19 @@ JSON;
 	 */
 	public function step8()
 	{
-		$core = Application::load('core');
+		$core = \IPS\Application::load('core');	
 
 		/* Manually installed badges are good for recognize system and aren't tied to rules */
-		Badge::importXml( $core->getApplicationPath() . "/data/achievements/badges.xml" );
+		\IPS\core\Achievements\Badge::importXml( $core->getApplicationPath() . "/data/achievements/badges.xml" );
 		
 		if ( $_SESSION['upgrade_options']['core']['106000']["rule_option"] == 'new' )
 		{
-			Rule::importXml( $core->getApplicationPath() . "/data/achievements/rules.xml", TRUE );
-			Rank::importXml( $core->getApplicationPath() . "/data/achievements/ranks.xml", 'wipe' );
+			\IPS\core\Achievements\Rule::importXml( $core->getApplicationPath() . "/data/achievements/rules.xml", TRUE );
+			\IPS\core\Achievements\Rank::importXml( $core->getApplicationPath() . "/data/achievements/ranks.xml", 'wipe' );
 		}
 		else
 		{
-			Db::i()->insert( 'core_achievements_rules', [
+			\IPS\Db::i()->insert( 'core_achievements_rules', [
 				'action' => 'core_Comment',
 				'filters' => NULL,
 				'milestone' => 0,
@@ -362,7 +336,7 @@ JSON;
 				'enabled' => 1
 			]);
 			
-			Db::i()->insert( 'core_achievements_rules', [
+			\IPS\Db::i()->insert( 'core_achievements_rules', [
 				'action' => 'core_NewContentItem',
 				'filters' => NULL,
 				'milestone' => 0,
@@ -374,10 +348,10 @@ JSON;
 			]);
 
 			/* Reset the member's achievement points to the same number of posts to retain existing rank position */
-			Db::i()->update( 'core_members', "achievements_points=member_posts" );
+			\IPS\Db::i()->update( 'core_members', "achievements_points=member_posts" );
 
 			/* Set the rebuild date so the badge times are not from 1970 */
-			Settings::i()->changeValues( array( 'achievements_last_rebuilt' => time() ) );
+			\IPS\Settings::i()->changeValues( array( 'achievements_last_rebuilt' => time() ) );
 		}
 
 		return TRUE;
@@ -401,13 +375,13 @@ JSON;
 	 */
 	public function step9()
 	{
-		$group = new Group;
+		$group = new \IPS\core\ProfileFields\Group;
 		$group->save();
 
-		Lang::saveCustom( 'core', "core_pfieldgroups_{$group->id}", 'Retained' );
+		\IPS\Lang::saveCustom( 'core', "core_pfieldgroups_{$group->id}", 'Retained' );
 
 		/* Create the about me profile field */
-		$memberTitleField	= new Field;
+		$memberTitleField	= new \IPS\core\ProfileFields\Field;
 		$memberTitleField->group_id		= $group->id;
 		$memberTitleField->type			= "Text";
 		$memberTitleField->content		= NULL;
@@ -424,13 +398,13 @@ JSON;
 		try
 		{
 			$memberTitleField->save();
-			Lang::saveCustom( 'core', 'core_pfield_' . $memberTitleField->id, "Member Title" );
-			Lang::saveCustom( 'core', 'core_pfield_' . $memberTitleField->id . '_desc', "" );
+			\IPS\Lang::saveCustom( 'core', 'core_pfield_' . $memberTitleField->id, "Member Title" );
+			\IPS\Lang::saveCustom( 'core', 'core_pfield_' . $memberTitleField->id . '_desc', "" );
 			$_SESSION['106100-TITLE-FIELD'] = $memberTitleField->id;
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
-			Log::log( $ex, 'upgrade' );
+			\IPS\Log::log( $ex, 'upgrade' );
 		}
 		
 		return TRUE;
@@ -458,17 +432,17 @@ JSON;
 			return TRUE;
 		}
 
-		$toRun = UpgradeClass::runManualQueries( array( array(
+		$toRun = \IPS\core\Setup\Upgrade::runManualQueries( array( array(
 			'table' => 'core_members',
-			'query' => "UPDATE " . Db::i()->prefix . "core_pfields_content c INNER JOIN " . Db::i()->prefix . "core_members m ON m.member_id=c.member_id SET c.field_" . $_SESSION['106100-TITLE-FIELD'] . "=m.member_title WHERE LENGTH(m.member_title) > 0"
+			'query' => "UPDATE " . \IPS\Db::i()->prefix . "core_pfields_content c INNER JOIN " . \IPS\Db::i()->prefix . "core_members m ON m.member_id=c.member_id SET c.field_" . $_SESSION['106100-TITLE-FIELD'] . "=m.member_title WHERE LENGTH(m.member_title) > 0"
 		) ) );
 
-		if ( count( $toRun ) )
+		if ( \count( $toRun ) )
 		{
-			UpgradeClass::adjustMultipleRedirect( array( 1 => 'core', 'extra' => array( '_upgradeStep' => 11 ) ) );
+			\IPS\core\Setup\Upgrade::adjustMultipleRedirect( array( 1 => 'core', 'extra' => array( '_upgradeStep' => 11 ) ) );
 
 			/* Queries to run manually */
-			return array( 'html' => Theme::i()->getTemplate( 'forms' )->queries( $toRun, Url::internal( 'controller=upgrade' )->setQueryString( array( 'key' => $_SESSION['uniqueKey'], 'mr_continue' => 1, 'mr' => Request::i()->mr ) ) ) );
+			return array( 'html' => \IPS\Theme::i()->getTemplate( 'forms' )->queries( $toRun, \IPS\Http\Url::internal( 'controller=upgrade' )->setQueryString( array( 'key' => $_SESSION['uniqueKey'], 'mr_continue' => 1, 'mr' => \IPS\Request::i()->mr ) ) ) );
 		}
 
 		return TRUE;
@@ -481,9 +455,9 @@ JSON;
 	 */
 	public function finish()
 	{
-		if( isset( Settings::i()->search_method ) AND Settings::i()->search_method == 'mysql' )
+		if( isset( \IPS\Settings::i()->search_method ) AND \IPS\Settings::i()->search_method == 'mysql' )
 		{
-			Index::i()->rebuild();
+			\IPS\Content\Search\Index::i()->rebuild();
 		}
 
 		return TRUE;

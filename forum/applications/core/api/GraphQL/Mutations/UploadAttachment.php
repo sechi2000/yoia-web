@@ -10,34 +10,26 @@
  */
 
 namespace IPS\core\api\GraphQL\Mutations;
-use Exception;
+use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\UnionType;
-use InvalidArgumentException;
-use IPS\Api\GraphQL\SafeException;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\File;
-use IPS\Helpers\Form\Editor;
-use IPS\Image;
-use IPS\Member;
-use function defined;
-use function in_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Upload attachment mutation for GraphQL API
  */
-class UploadAttachment
+class _UploadAttachment
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Upload a file to be an attachment";
+	public static $description = "Upload a file to be an attachment";
 	
 	/*
 	 * Mutation arguments
@@ -57,7 +49,7 @@ class UploadAttachment
 	/**
 	 * Return the mutation return type
 	 */
-	public function type() : UnionType
+	public function type() 
 	{
 		return new UnionType([
 			'name' => 'core_UploadAttachment',
@@ -81,24 +73,23 @@ class UploadAttachment
 	/**
 	 * Resolves this mutation
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @param mixed $info
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
 	 * @return	array
 	 */
-	public function resolve( mixed $val, array $args, array $context, mixed $info ) : array
+	public function resolve($val, $args, $context, $info)
 	{
-		$storageClass = File::getClass( 'core_Attachment' );
+		$storageClass = \IPS\File::getClass( 'core_Attachment' );
 		$contents = base64_decode( $args['contents'] );
 		
 		/* Check allowed types */
 		$ext = mb_substr( $args['name'], mb_strrpos( $args['name'], '.' ) + 1 );
-		if( $allowedFileTypes = Editor::allowedFileExtensions() )
+		if( $allowedFileTypes = \IPS\Helpers\Form\Editor::allowedFileExtensions() )
 		{
-			if( !in_array( mb_strtolower( $ext ), array_map( 'mb_strtolower', $allowedFileTypes ) ) )
+			if( !\in_array( mb_strtolower( $ext ), array_map( 'mb_strtolower', $allowedFileTypes ) ) )
 			{
-				throw new SafeException( 'FILE_TYPE_NOT_ALLOWED', '2C399/1_graphql', 403 );
+				throw new \IPS\Api\GraphQL\SafeException( 'FILE_TYPE_NOT_ALLOWED', '2C399/1_graphql', 403 );
 			}
 		}
 		
@@ -124,15 +115,15 @@ class UploadAttachment
 				$file = $storageClass->chunkFinish( $ref, 'core_Attachment' );
 				
 				/* If it's got an image extension, check it's actually a valid image */
-				if ( in_array( $ext, Image::supportedExtensions() ) )
+				if ( \in_array( $ext, \IPS\Image::supportedExtensions() ) )
 				{
 					try
 					{
 						$file->getImageDimensions();
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
-						throw new SafeException( 'NOT_VALID_IMAGE', '2C399/2_graphql', 403 );
+						throw new \IPS\Api\GraphQL\SafeException( 'NOT_VALID_IMAGE', '2C399/2_graphql', 403 );
 					}
 				}
 			}
@@ -150,30 +141,31 @@ class UploadAttachment
 		else
 		{
 			/* If it's got an image extension, check it's actually a valid image */
-			if ( in_array( $ext, Image::supportedExtensions() ) )
+			if ( \in_array( $ext, \IPS\Image::supportedExtensions() ) )
 			{
 				try
 				{
-					$image = Image::create( $contents );
+					$image = \IPS\Image::create( $contents );
 				}
-				catch ( InvalidArgumentException $e )
+				catch ( \InvalidArgumentException $e )
 				{
-					throw new SafeException( $e->getMessage(), '2C399/2_graphql', 403 );
+					throw new \IPS\Api\GraphQL\SafeException( $e->getMessage(), '2C399/2_graphql', 403 );
 				}
 			}
 			
 			/* Create the file */
 			try
 			{
-				$file = File::create( 'core_Attachment', $args['name'], $contents );
+				$file = \IPS\File::create( 'core_Attachment', $args['name'], $contents );
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				throw new SafeException( 'FILE_CREATION_FAILED', '2C399/3_graphql', 403 );
+				throw new \IPS\Api\GraphQL\SafeException( 'FILE_CREATION_FAILED', '2C399/3_graphql', 403 );
 			}
 		}
 		
 		/* Make it into an attachment */		
-		return $file->makeAttachment( $args['postKey'], Member::loggedIn() );
+		$attachment = $file->makeAttachment( $args['postKey'], \IPS\Member::loggedIn() );
+		return $attachment;
 	}
 }

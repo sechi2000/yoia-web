@@ -11,23 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\File;
-use IPS\Task;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Task that removes attachments that were never claimed
  */
-class cleanupattachments extends Task
+class _cleanupattachments extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -38,23 +31,23 @@ class cleanupattachments extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		/* Cleanup - this is deliberately slightly different to the one in \IPS\Text\Parser as it will only delete attachments which have been "saved" (i.e. are not in the middle of being posted) */
-		foreach ( Db::i()->select( '*', 'core_attachments', array( array( 'attach_id NOT IN(?) AND attach_post_key=?', Db::i()->select( 'DISTINCT attachment_id', 'core_attachments_map' ), '' ) ) ) as $attachment )
+		foreach ( \IPS\Db::i()->select( '*', 'core_attachments', array( array( 'attach_id NOT IN(?) AND attach_post_key=?', \IPS\Db::i()->select( 'DISTINCT attachment_id', 'core_attachments_map' ), '' ) ) ) as $attachment )
 		{
 			try
 			{
-				Db::i()->delete( 'core_attachments', array( 'attach_id=?', $attachment['attach_id'] ) );
-				File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
+				\IPS\Db::i()->delete( 'core_attachments', array( 'attach_id=?', $attachment['attach_id'] ) );
+				\IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
 				if ( $attachment['attach_thumb_location'] )
 				{
-					File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
+					\IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
 				}
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
 		return NULL;

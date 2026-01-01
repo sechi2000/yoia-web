@@ -11,33 +11,33 @@
 namespace IPS\File;
 
 /* Set use statements to make Uncle Matt happy */
-
-use IPS\Application;
-use IPS\Platform\Bridge;
 use IPS\DateTime AS DT;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\File;
+use IPS\File\Amazon;
 use IPS\Http\Url;
-use IPS\Http\Response;
-use IPS\Request;
+use IPS\Http\Request\Exception as RequestException;
 use IPS\Member;
 use DateInterval;
-use OutOfRangeException;
+
+use function array_filter;
+use function array_map;
+use function debug_backtrace;
 use function defined;
 use function header;
+use function in_array;
 use function mb_strstr;
-use function strlen;
-use const IPS\VERY_LONG_REQUEST_TIMEOUT;
+use function trim;
+
+use const ARRAY_FILTER_USE_KEY;
+use const DEBUG_BACKTRACE_IGNORE_ARGS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
-class Backblaze extends Amazon
+class _Backblaze extends Amazon
 {
 	/**
 	 * Settings
@@ -45,7 +45,7 @@ class Backblaze extends Amazon
 	 * @param	array	$configuration		Configuration if editing a setting, or array() if creating a setting.
 	 * @return	array
 	 */
-	public static function settings( array $configuration=array() ): array
+	public static function settings( $configuration=array() )
 	{
 		$default = ( isset( $configuration['custom_url'] ) and ! empty( $configuration['custom_url'] ) ) ? TRUE : FALSE;
 		$return = parent::settings( $configuration );
@@ -65,7 +65,7 @@ class Backblaze extends Amazon
 	 * @param	array	$settings	Configuration settings
 	 * @return	string
 	 */
-	public static function displayName( array $settings ): string
+	public static function displayName( $settings )
 	{
 		return Member::loggedIn()->language()->addToStack( 'filehandler_display_name', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack('filehandler__Backblaze'), $settings['bucket'] ) ) );
 	}
@@ -76,16 +76,16 @@ class Backblaze extends Amazon
 	 * @param	string		$uri				The URI (relative to the bucket)
 	 * @param	string		$verb				The HTTP verb to use
 	 * @param	array 		$configuration		The configuration for this instance
-	 * @param	int|null			$configurationId	The configuration ID
+	 * @param	int			$configurationId	The configuration ID
 	 * @param	string|null	$content			The content to send
 	 * @param	string|null	$storageExtension	Storage extension
 	 * @param	bool		$skipExtraChecks	Skips the endpoint check (to prevent infinite looping)
 	 * @param	bool		$isPrivate			This can be set to true to access/store private files (i.e. that are not publicly readable)
 	 * @param	array 		$queryString		Array of key => value pairs
-	 * @return    Response
+	 * @return	\IPS\Http\Response
 	 * @throws	\IPS\Http\Request\Exception
 	 */
-	protected static function makeRequest( string $uri, string $verb, array $configuration, ?int $configurationId, ?string $content=NULL, ?string $storageExtension=NULL, bool $skipExtraChecks=FALSE, ?bool $isPrivate=false, array $queryString=array() ): Response
+	protected static function makeRequest( $uri, $verb, $configuration, $configurationId, $content=NULL, $storageExtension=NULL, $skipExtraChecks=FALSE, $isPrivate=false, $queryString=array() )
 	{
 		/* Amazon requires filename characters to be properly encoded - let's urlencode the filename here */
 		$uriPieces	= explode( '/', $uri );
@@ -93,29 +93,29 @@ class Backblaze extends Amazon
 		$uri		= ltrim( implode( '/', $uriPieces ) . '/' . rawurlencode( $filename ), '/' );
 		
 		/* Build a request */
-		$url = Url::external( static::buildBaseUrl( $configuration ) . $uri );
+		$url = \IPS\Http\Url::external( static::buildBaseUrl( $configuration ) . $uri );
 		if ( $queryString )
 		{
 			$url = $url->setQueryString( $queryString );
 		}
-		$request = $url->request( VERY_LONG_REQUEST_TIMEOUT, NULL, FALSE ); # Amazon will send a 301 header code, but no Location header, if we need to try another endpoint
+		$request = $url->request( \IPS\VERY_LONG_REQUEST_TIMEOUT, NULL, FALSE ); # Amazon will send a 301 header code, but no Location header, if we need to try another endpoint
 		
 		/* When using virtual hosted–style buckets with SSL, the SSL wild card certificate only matches buckets that do not contain periods. To work around this, use HTTP or write your own certificate verification logic. @link http://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html */
-		if ( Request::i()->isSecure() and mb_strstr( $configuration['bucket'], '.' ) )
+		if ( \IPS\Request::i()->isSecure() and mb_strstr( $configuration['bucket'], '.' ) )
 		{
 			$request->sslCheck( FALSE );
 		}
 		
 		/* Set headers */
 		$headers = array(
-			'Content-Type'	=> File::getMimeType( $uri ),
+			'Content-Type'	=> \IPS\File::getMimeType( $uri ),
 			'Content-MD5'	=> base64_encode( md5( $content, TRUE ) ),
 		);
 	
 		/* If uploading a file, need to specify length and cache control */
 		if( mb_strtoupper( $verb ) === 'PUT' )
 		{
-			$headers['Content-Length']	= strlen( $content );
+			$headers['Content-Length']	= \strlen( $content );
 	
 			$cacheSeconds = 3600 * 24 * 365;
 	
@@ -123,15 +123,12 @@ class Backblaze extends Amazon
 			if( $storageExtension !== NULL AND mb_strpos( $storageExtension, '_' ) !== FALSE )
 			{
 				$bits     = explode( '_', $storageExtension );
-				try
+				$class    = '\IPS\\' . $bits[0] . '\extensions\core\FileStorage\\' . $bits[1];
+	
+				if ( isset( $class::$cacheControlTtl ) and $class::$cacheControlTtl )
 				{
-					$class = Application::getExtensionClass( $bits[0], 'FileStorage', $bits[1] );
-					if ( isset( $class::$cacheControlTtl ) and $class::$cacheControlTtl )
-					{
-						$cacheSeconds = $class::$cacheControlTtl;
-					}
+					$cacheSeconds = $class::$cacheControlTtl;
 				}
-				catch( OutOfRangeException ){}
 			}
 			
 			$headers['Cache-Control'] = 'public, max-age=' . $cacheSeconds;
@@ -196,8 +193,8 @@ class Backblaze extends Amazon
 	
 					if ( $configurationId )
 					{
-						Db::i()->update( 'core_file_storage', array( 'configuration' => json_encode( $configuration ) ), array( "id=?", $configurationId ) );
-						unset( Store::i()->storageConfigurations );
+						\IPS\Db::i()->update( 'core_file_storage', array( 'configuration' => json_encode( $configuration ) ), array( "id=?", $configurationId ) );
+						unset( \IPS\Data\Store::i()->storageConfigurations );
 					}
 				}
 	
@@ -216,8 +213,8 @@ class Backblaze extends Amazon
 					$configuration['region'] = (string) $xml->Region;
 					if ( $configurationId )
 					{
-						Db::i()->update( 'core_file_storage', array( 'configuration' => json_encode( $configuration ) ), array( 'id=?', $configurationId ) );
-						unset( Store::i()->storageConfigurations );
+						\IPS\Db::i()->update( 'core_file_storage', array( 'configuration' => json_encode( $configuration ) ), array( 'id=?', $configurationId ) );
+						unset( \IPS\Data\Store::i()->storageConfigurations );
 					}
 					return static::makeRequest( $uri, $verb, $configuration, $configurationId, $content );
 				}
@@ -235,13 +232,8 @@ class Backblaze extends Amazon
 	 * @param	$validForSeconds	int	The number of seconds the link should be valid for
 	 * @return	Url
 	 */
-	public function generateTemporaryDownloadUrl( int $validForSeconds = 1200 ): Url
+	public function generateTemporaryDownloadUrl( $validForSeconds = 1200 )
 	{
-		if ( $url = Bridge::i()->b2GenerateTemporaryDownloadUrl( $this, $validForSeconds ) and str_starts_with( $this->configuration['bucket'], 'cloud3-media' ) )
-		{
-			return $url;
-		}
-		
 		$expires = ( new DT )->add( new DateInterval( "PT{$validForSeconds}S" ) );
 		
 		/* Authorize */
@@ -286,12 +278,12 @@ class Backblaze extends Amazon
 	 * @param   array   $configuration  Configuration data
 	 * @return string
 	 */
-	public static function buildBaseUrl( array $configuration ): string
+	public static function buildBaseUrl( $configuration )
 	{
 		if ( mb_strstr( $configuration['bucket'], '.' ) )
 		{
 			return (
-			Request::i()->isSecure() ? "https" : "http" ) . "://"
+			\IPS\Request::i()->isSecure() ? "https" : "http" ) . "://"
 			. ( isset( $configuration['endpoint'] ) ? $configuration['endpoint'] : "s3.backblazeb2.com" )
 			. "/{$configuration['bucket']}"
 			. static::bucketPath( $configuration )
@@ -300,7 +292,7 @@ class Backblaze extends Amazon
 		else
 		{
 			return (
-			Request::i()->isSecure() ? "https" : "http" ) . "://{$configuration['bucket']}."
+			\IPS\Request::i()->isSecure() ? "https" : "http" ) . "://{$configuration['bucket']}."
 			. ( isset( $configuration['endpoint'] ) ? $configuration['endpoint'] : "s3.backblazeb2.com" )
 			. static::bucketPath( $configuration )
 			. '/';
@@ -312,7 +304,7 @@ class Backblaze extends Amazon
 	 *
 	 * @return boolean
 	 */
-	public function needsGzipVersion(): bool
+	public function needsGzipVersion()
 	{
 		return false;
 	}

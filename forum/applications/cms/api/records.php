@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Database Records API
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -13,56 +12,21 @@
 namespace IPS\cms\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Application;
-use IPS\cms\Categories;
-use IPS\cms\Databases;
-use IPS\cms\Fields;
-use IPS\cms\Records as RecordsClass;
-use IPS\cms\Records\Comment;
-use IPS\cms\Records\Review;
-use IPS\cms\Records\Revisions;
-use IPS\Content\Api\ItemController;
-use IPS\Content\Item;
-use IPS\Content\Reaction;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Http\Url\Friendly;
-use IPS\Image;
-use IPS\Member;
-use IPS\Request;
-use IPS\Text\Parser;
-use OutOfRangeException;
-use RuntimeException;
-use Throwable;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Database Records API
  */
-class records extends ItemController
+class _records extends \IPS\Content\Api\ItemController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = '';
+	protected $class = NULL;
 	
 	/**
 	 * Get endpoint data
@@ -70,25 +34,25 @@ class records extends ItemController
 	 * @param	array	$pathBits	The parts to the path called
 	 * @param	string	$method		HTTP method verb
 	 * @return	array
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	protected function _getEndpoint( array $pathBits, string $method = 'GET' ): array
+	protected function _getEndpoint( $pathBits, $method = 'GET' )
 	{
-		if ( !count( $pathBits ) )
+		if ( !\count( $pathBits ) )
 		{
-			throw new RuntimeException;
+			throw new \RuntimeException;
 		}
 		
 		$database = array_shift( $pathBits );
-		if ( !count( $pathBits ) )
+		if ( !\count( $pathBits ) )
 		{
 			return array( 'endpoint' => 'index', 'params' => array( $database ) );
 		}
 		
 		$nextBit = array_shift( $pathBits );
-		if ( intval( $nextBit ) != 0 )
+		if ( \intval( $nextBit ) != 0 )
 		{
-			if ( count( $pathBits ) )
+			if ( \count( $pathBits ) )
 			{
 				return array( 'endpoint' => 'item_' . array_shift( $pathBits ), 'params' => array( $database, $nextBit ) );
 			}
@@ -98,7 +62,7 @@ class records extends ItemController
 			}
 		}
 				
-		throw new RuntimeException;
+		throw new \RuntimeException;
 	}
 		
 	/**
@@ -119,31 +83,30 @@ class records extends ItemController
 	 * @apiparam	int		page				Page number
 	 * @apiparam	int		perPage				Number of results per page - defaults to 25
 	 * @throws		2T306/1	INVALID_DATABASE	The database ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		PaginatedResponse<IPS\cms\Records>
-	 * @return PaginatedResponse<RecordsClass>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\cms\Records>
 	 */
-	public function GETindex( int $database ): PaginatedResponse
+	public function GETindex( $database )
 	{
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			if ( $this->member and !$database->can( 'view', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			$this->class = 'IPS\cms\Records' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '2T306/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '2T306/1', 404 );
 		}	
 		
 		/* Where clause */
 		$where = array();
 		
 		/* Return */
-		return $this->_list( $where );
+		return $this->_list( $where, 'categories' );
 	}
 	
 	/**
@@ -154,43 +117,41 @@ class records extends ItemController
 	 * @param		int		$record			Record ID Number
 	 * @throws		2T306/2	INVALID_DATABASE	The database ID does not exist or the authorized user does not have permission to view it
 	 * @throws		2T306/3	INVALID_ID			The record ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\cms\Records
-	 * @return Response
+	 * @return		\IPS\cms\Records
 	 */
-	public function GETitem( int $database, int $record ): Response
+	public function GETitem( $database, $record )
 	{
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			if ( $this->member and !$database->can( 'view', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
 			$this->class = 'IPS\cms\Records' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '2T306/2', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '2T306/2', 404 );
 		}
 		
 		/* Return */
 		try
 		{
-			/* @var RecordsClass $className */
 			$className = $this->class;
 			$record = $className::load( $record );
 			if ( $this->member and !$record->can( 'read', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
-			return new Response( 200, $record->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $record->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2T306/3', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2T306/3', 404 );
 		}
 	}
 	
@@ -224,40 +185,38 @@ class records extends ItemController
 	 * @throws		1T306/H				UPLOAD_FIELD_IMAGE_NOT_SUPPORTED	Field of type Upload was supplied with an image was of an unsupported extension
 	 * @throws		1T306/I				UPLOAD_FIELD_IMAGES_ONLY	Field of type Upload set to be image only was supplied with a non-image attachment
 	 * @throws		1T306/J				UPLOAD_FIELD_EXTENSION_NOT_ALLOWED	Field of type Upload was supplied with one or more attachments of a non-supported file extension
-	 * @apireturn		\IPS\cms\Records
-	 * @return Response
+	 * @return		\IPS\cms\Records
 	 */
-	public function POSTindex( int $database ): Response
+	public function POSTindex( $database )
 	{		
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			$this->class = 'IPS\cms\Records' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '2T306/4', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '2T306/4', 404 );
 		}
 				
 		/* Get category */
 		try
 		{
-			/* @var Categories $categoryClass */
 			$categoryClass = 'IPS\cms\Categories' . $database->id;
 
 			if ( $database->use_categories )
 			{
-				$category = $categoryClass::load( Request::i()->category );
+				$category = $categoryClass::load( \IPS\Request::i()->category );
 			}
 			else
 			{
 				$category = $categoryClass::load( $database->default_category );
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_CATEGORY', '1T306/5', 400 );
+			throw new \IPS\Api\Exception( 'NO_CATEGORY', '1T306/5', 400 );
 		}
 		
 		/* Get author */
@@ -265,30 +224,30 @@ class records extends ItemController
 		{
 			if ( !$category->can( 'add', $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2T306/G', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2T306/G', 403 );
 			}
 			$author = $this->member;
 		}
 		else
 		{
-			if ( Request::i()->author )
+			if ( \IPS\Request::i()->author )
 			{
-				$author = Member::load( Request::i()->author );
+				$author = \IPS\Member::load( \IPS\Request::i()->author );
 				if ( !$author->member_id )
 				{
-					throw new Exception( 'NO_AUTHOR', '1T306/6', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1T306/6', 400 );
 				}
 			}
 			else
 			{
-				if ( (int) Request::i()->author === 0 )
+				if ( (int) \IPS\Request::i()->author === 0 ) 
 				{
-					$author = new Member;
-					$author->name = Request::i()->author_name;
+					$author = new \IPS\Member;
+					$author->name = \IPS\Request::i()->author_name;
 				}
 				else 
 				{
-					throw new Exception( 'NO_AUTHOR', '1T306/6', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1T306/6', 400 );
 				}
 			}
 		}
@@ -297,15 +256,14 @@ class records extends ItemController
 		{
 			$record = $this->_create( $category, $author );
 		}
-		catch( DomainException $e )
+		catch( \DomainException $e )
 		{
-			throw new Exception( $e->getMessage(), '1T306/D', 400 );
+			throw new \IPS\Api\Exception( $e->getMessage(), '1T306/D', 400 );
 		}
 
 		/* Sync Topic */
-		/* @var RecordsClass $class */
 		$class = $this->class;
-		if ( !$class::$skipTopicCreation and Application::appIsEnabled('forums') and $record->_forum_record and $record->_forum_forum and ! $record->hidden() and ! $record->record_future_date )
+		if ( !$class::$skipTopicCreation and \IPS\Application::appIsEnabled('forums') and $record->_forum_record and $record->_forum_forum and ! $record->hidden() and ! $record->record_future_date )
 		{
 			try
 			{
@@ -320,7 +278,7 @@ class records extends ItemController
 		$record->container()->save();
 
 		/* Do it */
-		return new Response( 201, $record->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 201, $record->apiOutput( $this->member ) );
 	}
 	
 	/**
@@ -353,80 +311,77 @@ class records extends ItemController
 	 * @throws		1T306/H				UPLOAD_FIELD_IMAGE_NOT_SUPPORTED	Field of type Upload was supplied with an image was of an unsupported extension
 	 * @throws		1T306/I				UPLOAD_FIELD_IMAGES_ONLY	Field of type Upload set to be image only was supplied with a non-image attachment
 	 * @throws		1T306/J				UPLOAD_FIELD_EXTENSION_NOT_ALLOWED	Field of type Upload was supplied with one or more attachments of a non-supported file extension
-	 * @apireturn		\IPS\cms\Records
-	 * @return Response
+	 * @return		\IPS\cms\Records
 	 */
-	public function POSTitem( int $database, int $record ): Response
+	public function POSTitem( $database, $record )
 	{
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			$this->class = 'IPS\cms\Records' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '2T306/9', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '2T306/9', 404 );
 		}
 		
 		/* Load record */
 		try
 		{
-			/* @var RecordsClass $className */
 			$className = $this->class;
 			$record = $className::load( $record );
 			if ( $this->member and !$record->can( 'read', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2T306/6', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2T306/6', 404 );
 		}
 		if ( $this->member and !$record->canEdit( $this->member ) )
 		{
-			throw new Exception( 'NO_PERMISSION', '2T306/H', 403 );
+			throw new \IPS\Api\Exception( 'NO_PERMISSION', '2T306/H', 403 );
 		}
 			
 		/* New category */
-		if ( $database->use_categories and isset( Request::i()->category ) and Request::i()->category != $record->category_id and ( !$this->member or $record->canMove( $this->member ) ) )
+		if ( $database->use_categories and isset( \IPS\Request::i()->category ) and \IPS\Request::i()->category != $record->category_id and ( !$this->member or $record->canMove( $this->member ) ) )
 		{
 			try
 			{
-				/* @var Categories $categoryClass */
 				$categoryClass = 'IPS\cms\Categories' . $database->id;
 
-				$newCategory = $categoryClass::load( Request::i()->category );
+				$newCategory = $categoryClass::load( \IPS\Request::i()->category );
 				if ( $this->member and !$newCategory->can( 'add', $this->member ) )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 				
 				$record->move( $newCategory );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				throw new Exception( 'NO_CATEGORY', '1T306/7', 400 );
+				throw new \IPS\Api\Exception( 'NO_CATEGORY', '1T306/7', 400 );
 			}
 		}
 		
 		/* New author */
-		if ( !$this->member and isset( Request::i()->author ) )
+		if ( !$this->member and isset( \IPS\Request::i()->author ) )
 		{				
 			try
 			{
-				$member = Member::load( Request::i()->author );
+				$member = \IPS\Member::load( \IPS\Request::i()->author );
 				if ( !$member->member_id )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 				
 				$record->changeAuthor( $member );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				throw new Exception( 'NO_AUTHOR', '1T306/8', 400 );
+				throw new \IPS\Api\Exception( 'NO_AUTHOR', '1T306/8', 400 );
 			}
 		}
 		
@@ -437,9 +392,8 @@ class records extends ItemController
 		$record->save();
 
 		/* Sync Topic */
-		/* @var RecordsClass $class */
 		$class = $this->class;
-		if ( !$class::$skipTopicCreation and Application::appIsEnabled('forums') and $record->_forum_record and $record->_forum_forum and ! $record->hidden() and ! $record->record_future_date )
+		if ( !$class::$skipTopicCreation and \IPS\Application::appIsEnabled('forums') and $record->_forum_record and $record->_forum_forum and ! $record->hidden() and ! $record->record_future_date )
 		{
 			try
 			{
@@ -448,34 +402,33 @@ class records extends ItemController
 			catch( \Exception $ex ) { }
 		}
 
-		return new Response( 200, $record->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $record->apiOutput( $this->member ) );
 	}
 
 	/**
 	 * Create or update record
 	 *
-	 * @param	Item	$item	The item
+	 * @param	\IPS\Content\Item	$item	The item
 	 * @param	string				$type	add or edit
-	 * @return	Item
+	 * @return	\IPS\Content\Item
 	 */
-	protected function _createOrUpdate( Item $item, string $type='add' ): Item
+	protected function _createOrUpdate( \IPS\Content\Item $item, $type='add' )
 	{
 		$thumbImages = [];
 		$linkedFields = [];
 		/* Set field values */
-		if ( isset( Request::i()->fields ) )
+		if ( isset( \IPS\Request::i()->fields ) )
 		{
-			/* @var Fields $fieldsClass */
-			$fieldsClass = str_replace( 'Records', 'Fields', get_class( $item ) );
+			$fieldsClass = str_replace( 'Records', 'Fields', \get_class( $item ) );
 
 			/* Store a revision before we change any values */
 			if ( $type == 'edit' AND $item::database()->revisions )
 			{
-				$revision = new Revisions;
+				$revision = new \IPS\cms\Records\Revisions;
 				$revision->database_id = $item::$customDatabaseId;
 				$revision->record_id   = $item->_id;
 				$revision->data        = $item->fieldValues( TRUE );
-
+				
 				if ( $this->member )
 				{
 					$memberId = $this->member->member_id;
@@ -484,51 +437,51 @@ class records extends ItemController
 				{
 					$memberId = $item->author()->member_id;
 				}
-
+				
 				$revision->member_id = $memberId;
 				$revision->save();
 			}
-
+			
 			foreach ( $fieldsClass::data() as $key => $field )
 			{
-				if ( isset( Request::i()->fields[ $field->id ] ) )
+				if ( isset( \IPS\Request::i()->fields[ $field->id ] ) )
 				{
 					if ( !$this->member or $field->can( $type, $this->member ) )
 					{
 						$key = "field_{$field->_id}";
 
-						$value = Request::i()->fields[ $field->id ];
+						$value = \IPS\Request::i()->fields[ $field->id ];
 						if ( $field->type === 'Editor' and $this->member )
 						{
-							$value = Parser::parseStatic( $value, NULL, $this->member, 'cms_Records' );
+							$value = \IPS\Text\Parser::parseStatic( $value, TRUE, NULL, $this->member, 'cms_Records' );
 						}
 						elseif ( $field->type === 'Upload' )
 						{
 							$multiple = $field->is_multiple;
 							$imageOnly = ( isset( $field->extra[ 'type' ] ) AND $field->extra[ 'type' ] === 'image' );
-							$extensions = is_array( $field->allowed_extensions ) ? $field->allowed_extensions : array();
+							$extensions = \is_array( $field->allowed_extensions ) ? $field->allowed_extensions : array();
 
 							/* Did they meet the api parameter type requirement (the field must be an object) */
-							if ( !is_array( Request::i()->fields[ $field->id ] ) )
+							if ( !\is_array( \IPS\Request::i()->fields[ $field->id ] ) )
 							{
-								throw new Exception( 'UPLOAD_FIELD_NOT_OBJECT', '1S306/E', 400 );
+								throw new \IPS\Api\Exception( 'UPLOAD_FIELD_NOT_OBJECT', '1S306/E', 400 );
 							}
 
 							/* Are we actually uploading files? */
-							if ( empty( Request::i()->fields[ $field->id ] ) )
+							if ( empty( \IPS\Request::i()->fields[ $field->id ] ) )
 							{
-								throw new Exception( 'UPLOAD_FIELD_NO_FILES', '1T306/F', 400 );
+								throw new \IPS\Api\Exception( 'UPLOAD_FIELD_NO_FILES', '1T306/F', 400 );
 							}
 
 							/* Can we upload more than one file? */
-							if ( !$multiple AND ( count( Request::i()->fields[ $field->id ] ) > 1 ) )
+							if ( !$multiple AND ( \count( \IPS\Request::i()->fields[ $field->id ] ) > 1 ) )
 							{
-								throw new Exception( 'UPLOAD_FIELD_MULTIPLE_NOT_ALLOWED', '1T306/G', 400 );
+								throw new \IPS\Api\Exception( 'UPLOAD_FIELD_MULTIPLE_NOT_ALLOWED', '1T306/G', 400 );
 							}
 							
 							/* Does each file meet the criteria? */
 							$files = array();
-							foreach ( array_keys( Request::i()->fields[ $field->id ] ) as $name )
+							foreach ( array_keys( \IPS\Request::i()->fields[ $field->id ] ) as $name )
 							{
 								$files[] = $name;
 								$components = explode( '.', $name );
@@ -538,44 +491,44 @@ class records extends ItemController
 								if ( $imageOnly )
 								{
 									/* Is the image type supported? */
-									if ( !in_array( $extension, Image::supportedExtensions() ) )
+									if ( !\in_array( $extension, \IPS\Image::supportedExtensions() ) )
 									{
-										throw new Exception( 'UPLOAD_FIELD_IMAGE_NOT_SUPPORTED', '1T306/H', 400 );
+										throw new \IPS\Api\Exception( 'UPLOAD_FIELD_IMAGE_NOT_SUPPORTED', '1T306/H', 400 );
 									}
 
 									/* Is there a max image dimensions specified? */
-									$maxSize = ( isset( $field->extra[ 'maxsize' ] ) AND is_array( $field->extra[ 'maxsize' ] ) ) ? $field->extra[ 'maxsize' ] : array( 0, 0 );
+									$maxSize = ( isset( $field->extra[ 'maxsize' ] ) AND \is_array( $field->extra[ 'maxsize' ] ) ) ? $field->extra[ 'maxsize' ] : array( 0, 0 );
 
 									try
 									{
 										/* Is it valid image data? */
-										$image = Image::create( $_POST[ 'fields' ][ $field->id ][ $name ] );
+										$image = \IPS\Image::create( $_POST[ 'fields' ][ $field->id ][ $name ] );
 
 										/* Resize if too large */
 										$image->resizeToMax( (int) $maxSize[0] ?: NULL, (int) $maxSize[1] ?: NULL );
 										$_POST[ 'fields' ][ $field->id ][ $name ] = (string) $image;
 									}
-									catch ( InvalidArgumentException $e )
+									catch ( \InvalidArgumentException $e )
 									{
-										throw new Exception( 'UPLOAD_FIELD_IMAGES_ONLY', '1T306/I', 400 );
+										throw new \IPS\Api\Exception( 'UPLOAD_FIELD_IMAGES_ONLY', '1T306/I', 400 );
 									}
 								}
 
 								/* Can we add a file of this type? */
-								if ( ( count( $extensions ) > 0 ) AND !in_array( '.' . $extension, $extensions ) )
+								if ( ( \count( $extensions ) > 0 ) AND !\in_array( '.' . $extension, $extensions ) )
 								{
-									throw new Exception( 'UPLOAD_FIELD_EXTENSION_NOT_ALLOWED', '1T306/J', 400 );
+									throw new \IPS\Api\Exception( 'UPLOAD_FIELD_EXTENSION_NOT_ALLOWED', '1T306/J', 400 );
 								}
 							}
 
 							$urls = array();
 							foreach ( $files as $name )
 							{
-								$file = File::create( 'cms_Records', $name, $_POST[ 'fields' ][ $field->id ][ $name ] );
+								$file = \IPS\File::create( 'cms_Records', $name, $_POST[ 'fields' ][ $field->id ][ $name ] );
 								$urls[] = (string) $file;
 
 								/* Do we have to create a thumbnail? */
-								if ( $imageOnly AND isset( $field->extra['thumbsize'] ) AND is_array( $field->extra['thumbsize'] ) AND ( (int) $field->extra['thumbsize'][0] OR (int) $field->extra['thumbsize'][1] ) )
+								if ( $imageOnly AND isset( $field->extra['thumbsize'] ) AND \is_array( $field->extra['thumbsize'] ) AND ( (int) $field->extra['thumbsize'][0] OR (int) $field->extra['thumbsize'][1] ) )
 								{
 									$thumbImages[$name] = array( $file, $field );
 								}
@@ -593,7 +546,7 @@ class records extends ItemController
 			}
 		}
 
-		$date = ( !$this->member and Request::i()->date ) ? new DateTime( Request::i()->date ) : DateTime::create();
+		$date = ( !$this->member and \IPS\Request::i()->date ) ? new \IPS\DateTime( \IPS\Request::i()->date ) : \IPS\DateTime::create();
 
 		if( !$item->record_saved )
 		{
@@ -605,11 +558,11 @@ class records extends ItemController
 			$item->record_updated		= $item->record_saved;
 		}
 		
-		if ( isset( Request::i()->image ) AND isset( Request::i()->image['name'] ) AND isset( Request::i()->image['contents'] ) )
+		if ( isset( \IPS\Request::i()->image ) AND isset( \IPS\Request::i()->image['name'] ) AND isset( \IPS\Request::i()->image['contents'] ) )
 		{
 			try
 			{
-				$image = File::create( 'cms_Records', Request::i()->image['name'], base64_decode( Request::i()->image['contents'] ) );
+				$image = \IPS\File::create( 'cms_Records', \IPS\Request::i()->image['name'], base64_decode( \IPS\Request::i()->image['contents'] ) );
 				$image->save();
 				$fixedFieldSettings = $item::database()->fixed_field_settings;
 
@@ -627,32 +580,32 @@ class records extends ItemController
 				{
 					if ( $item->record_image )
 					{
-						File::get( 'cms_Records', $item->record_image )->delete();
+						\IPS\File::get( 'cms_Records', $item->record_image )->delete();
 					}
 					
 					if ( $item->record_image_thumb )
 					{
-						File::get( 'cms_Records', $item->record_image_thumb )->delete();
+						\IPS\File::get( 'cms_Records', $item->record_image_thumb )->delete();
 					}
 				}
-				catch( Throwable ) { }
+				catch( \Throwable ) { }
 				
 				$item->record_image			= (string) $image;
 				$item->record_image_thumb	= (string) $thumb;
 			}
-			catch( Throwable $e ) { }
+			catch( \Throwable $e ) { }
 			
 		}
 
 		if( $type == 'add' AND ( !$item->_title OR !$item->_content ) )
 		{
-			throw new DomainException( 'TITLE_CONTENT_REQUIRED' );
+			throw new \DomainException( 'TITLE_CONTENT_REQUIRED' );
 		}
 		
 		/* Set FURL */
-		if ( isset( Request::i()->fields['fields'][ $item->database()->field_title ] ) )
+		if ( isset( \IPS\Request::i()->fields['fields'][ $item->database()->field_title ] ) )
 		{
-			$item->record_dynamic_furl = Friendly::seoTitle( Request::i()->fields['fields'][ $item->database()->field_title ] );
+			$item->record_dynamic_furl = \IPS\Http\Url\Friendly::seoTitle( \IPS\Request::i()->fields['fields'][ $item->database()->field_title ] );
 		}
 
 		$item = parent::_createOrUpdate( $item, $type );
@@ -666,7 +619,7 @@ class records extends ItemController
 			$thumbWidth = ( isset( $field->extra['thumbsize'][0] ) ) ? (int) $field->extra[ 'thumbsize' ][0] : NULL;
 			$thumbHeight = ( isset( $field->extra['thumbsize'][1] ) ) ? (int) $field->extra[ 'thumbsize' ][1] : NULL;
 			$thumbnail = $file->thumbnail( 'cms_Records', $thumbWidth ?: NULL, $thumbHeight ?: NULL );
-			Db::i()->insert( 'cms_database_fields_thumbnails', array(
+			\IPS\Db::i()->insert( 'cms_database_fields_thumbnails', array(
 				'thumb_original_location' => (string) $file,
 				'thumb_location'		  => (string) $thumbnail,
 				'thumb_field_id'		  => $field->id,
@@ -697,25 +650,24 @@ class records extends ItemController
 	 * @apiparam	int		perPage		Number of results per page - defaults to 25
 	 * @throws		2T306/C		INVALID_DATABASE	The database ID does not exist or the authorized user does not have permission to view it
 	 * @throws		2T306/D		INVALID_ID	The entry ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		PaginatedResponse<IPS\cms\Records\Comment>
-	 * @return PaginatedResponse<Comment>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\cms\Records\Comment>
 	 */
-	public function GETitem_comments( int $database, int $record ): PaginatedResponse
+	public function GETitem_comments( $database, $record )
 	{
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			if ( $this->member and !$database->can( 'view', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
 			$this->class = 'IPS\cms\Records' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '2T306/C', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '2T306/C', 404 );
 		}
 		
 		/* Return */
@@ -723,9 +675,9 @@ class records extends ItemController
 		{
 			return $this->_comments( $record, 'IPS\cms\Records\Comment' . $database->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2T306/D', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2T306/D', 404 );
 		}
 	}
 	
@@ -741,25 +693,24 @@ class records extends ItemController
 	 * @apiparam	int		perPage		Number of results per page - defaults to 25
 	 * @throws		2T306/E		INVALID_DATABASE	The database ID does not exist or the authorized user does not have permission to view it
 	 * @throws		2T306/F		INVALID_ID	The entry ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		PaginatedResponse<IPS\cms\Records\Review>
-	 * @return PaginatedResponse<Review>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\cms\Records\Review>
 	 */
-	public function GETitem_reviews( int $database, int $record ): PaginatedResponse
+	public function GETitem_reviews( $database, $record )
 	{
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			if ( $this->member and !$database->can( 'view', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
 			$this->class = 'IPS\cms\Records' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '2T306/E', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '2T306/E', 404 );
 		}
 		
 		/* Return */
@@ -767,9 +718,9 @@ class records extends ItemController
 		{
 			return $this->_comments( $record, 'IPS\cms\Records\Review' . $database->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2T306/F', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2T306/F', 404 );
 		}
 	}
 		
@@ -782,46 +733,44 @@ class records extends ItemController
 	 * @throws		2T306/A		INVALID_DATABASE	The database ID does not exist or the authorized user does not have permission to view it
 	 * @throws		2T306/B		INVALID_ID			The entry ID does not exist
 	 * @throws		2T306/I		NO_PERMISSION		The authorized user does not have permission to delete the record.
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function DELETEitem(int $database, int $record ): Response
+	public function DELETEitem( $database, $record )
 	{
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			if ( $this->member and !$database->can( 'view', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
 			$this->class = 'IPS\cms\Records' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '2T306/A', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '2T306/A', 404 );
 		}
 		
 		/* Load record */
 		try
 		{
-			/* @var RecordsClass $className */
 			$className = $this->class;
 			$record = $className::load( $record );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2T306/B', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2T306/B', 404 );
 		}
 		if ( $this->member and !$record->canDelete( $this->member ) )
 		{
-			throw new Exception( 'NO_PERMISSION', '2T306/I', 404 );
+			throw new \IPS\Api\Exception( 'NO_PERMISSION', '2T306/I', 404 );
 		}
 		
 		/* Delete and return */
 		$record->delete();
-		return new Response( 200, NULL );
+		return new \IPS\Api\Response( 200, NULL );
 	}
 
 	/**
@@ -832,58 +781,56 @@ class records extends ItemController
 	 * @param		int			$record			Record ID Number
 	 * @apiparam	int		id			ID of the reaction to add
 	 * @apiparam	int     author      ID of the member reacting
-	 * @apireturn		\IPS\cms\Records
+	 * @return		\IPS\cms\Records
 	 * @throws		1T306/K		INVALID_DATABASE	The database ID does not exist or the authorized user does not have permission to view it
 	 * @throws		1T306/L		NO_REACTION	The reaction ID does not exist
 	 * @throws		1T306/M		REACT_ERROR	Error adding the reaction
 	 * @throws		1T306/N		INVALID_ID	Object ID does not exist
 	 * @note		If the author has already reacted to this content, any existing reaction will be removed first
-	 * @return Response
 	 */
-	public function DELETEitem_react( int $database, int $record ): Response
+	public function DELETEitem_react( $database, $record ): \IPS\Api\Response
 	{
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			if ( $this->member and !$database->can( 'view', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
 			$this->class = 'IPS\cms\Records' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '1T306/K', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '1T306/K', 404 );
 		}
 
 		try
 		{
-			$member = Member::load( Request::i()->author );
+			$member = \IPS\Member::load( \IPS\Request::i()->author );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_AUTHOR', '1T306/L', 404 );
+			throw new \IPS\Api\Exception( 'NO_AUTHOR', '1T306/L', 404 );
 		}
 
 		try
 		{
-			/* @var RecordsClass $class */
 			$class = $this->class;
-			$object = $class::load( $record );
+			$object = $class::load( $id );
 
 			$object->removeReaction( $member );
 
-			return new Response( 200, $object->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $object->apiOutput( $this->member ) );
 		}
-		catch ( DomainException $e )
+		catch ( \DomainException $e )
 		{
-			throw new Exception( $e->getMessage(), '1T306/M', 403 );
+			throw new \IPS\Api\Exception( $e->getMessage(), '1T306/M', 403 );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1T306/N', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1T306/N', 404 );
 		}
 	}
 
@@ -895,67 +842,65 @@ class records extends ItemController
 	 * @param		int			$record			Record ID Number
 	 * @apiparam	int		id			ID of the reaction to add
 	 * @apiparam	int     author      ID of the member reacting
-	 * @apireturn		\IPS\cms\Records
+	 * @return		\IPS\cms\Records
 	 * @throws		1T306/O		INVALID_DATABASE	The database ID does not exist or the authorized user does not have permission to view it
 	 * @throws		1T306/P		NO_REACTION	The reaction ID does not exist
 	 * @throws		1T306/Q		NO_AUTHOR	The author ID does not exist
 	 * @throws		1T306/R		REACT_ERROR	Error adding the reaction
 	 * @throws		1T306/S		INVALID_ID	Object ID does not exist
 	 * @note		If the author has already reacted to this content, any existing reaction will be removed first
-	 * @return Response
 	 */
-	public function POSTitem_react( int $database, int $record ): Response
+	public function POSTitem_react( $database, $record ): \IPS\Api\Response
 	{
 		/* Load database */
 		try
 		{
-			$database = Databases::load( $database );
+			$database = \IPS\cms\Databases::load( $database );
 			if ( $this->member and !$database->can( 'view', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
 			$this->class = 'IPS\cms\Records' . $database->id;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_DATABASE', '1T306/O', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_DATABASE', '1T306/O', 404 );
 		}
 
 		try
 		{
-			$reaction = Reaction::load( Request::i()->id );
+			$reaction = \IPS\Content\Reaction::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_REACTION', '1T306/P', 404 );
-		}
-
-		try
-		{
-			$member = Member::load( Request::i()->author );
-		}
-		catch( OutOfRangeException $e )
-		{
-			throw new Exception( 'NO_AUTHOR', '1T306/Q', 404 );
+			throw new \IPS\Api\Exception( 'NO_REACTION', '1T306/P', 404 );
 		}
 
 		try
 		{
-			/* @var RecordsClass $class */
+			$member = \IPS\Member::load( \IPS\Request::i()->author );
+		}
+		catch( \OutOfRangeException $e )
+		{
+			throw new \IPS\Api\Exception( 'NO_AUTHOR', '1T306/Q', 404 );
+		}
+
+		try
+		{
 			$class = $this->class;
 			$object = $class::load( $record );
 			$object->react( $reaction, $member );
 
-			return new Response( 200, $object->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $object->apiOutput( $this->member ) );
 		}
-		catch ( DomainException $e )
+		catch ( \DomainException $e )
 		{
-			throw new Exception( 'REACT_ERROR_' . $e->getMessage(), '1T306/R', 403 );
+			throw new \IPS\Api\Exception( 'REACT_ERROR_' . $e->getMessage(), '1T306/R', 403 );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1T306/S', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1T306/S', 404 );
 		}
 	}
 }

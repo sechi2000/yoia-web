@@ -10,30 +10,26 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\GroupType;
-use IPS\Member\Group as GroupClass;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Group query for GraphQL API
  */
-class Group
+class _Group
 {
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns a member group";
+	public static $description = "Returns a member group";
 
 	/*
 	 * @brief 	Query arguments
@@ -48,7 +44,7 @@ class Group
 	/**
 	 * Return the query return type
 	 */
-	public function type() : GroupType
+	public function type() 
 	{
 		return \IPS\core\api\GraphQL\TypeRegistry::group();
 	}
@@ -56,20 +52,20 @@ class Group
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @return	GroupClass
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\Member\Group
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : GroupClass
+	public function resolve($val, $args, $context)
 	{
 		try
 		{
-			return GroupClass::load( $args['id'] );
+			return \IPS\Member\Group::load( $args['id'] );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'INVALID_GROUP', '1invalid_group_graph', 400 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_GROUP', '1invalid_group_graph', 400 );
 		}
 	}
 }

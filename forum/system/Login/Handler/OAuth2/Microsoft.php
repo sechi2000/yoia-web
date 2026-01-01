@@ -11,41 +11,28 @@
 namespace IPS\Login\Handler\OAuth2;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\File;
-use IPS\Helpers\Form\Radio;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Login\Exception;
-use IPS\Login\Handler\OAuth2;
-use IPS\Member;
-use IPS\Theme;
-use RuntimeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Microsoft Login Handler
  */
-class Microsoft extends OAuth2
+class _Microsoft extends \IPS\Login\Handler\OAuth2
 {
 	/**
 	 * Get title
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return 'login_handler_Live';
 	}
 	
-	protected static bool $enableAcpLoginByDefault = FALSE;
+	protected static $enableAcpLoginByDefault = FALSE;
 	
 	/**
 	 * ACP Settings Form
@@ -55,14 +42,14 @@ class Microsoft extends OAuth2
 	 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{
-		Member::loggedIn()->language()->words['login_acp_desc'] = Member::loggedIn()->language()->addToStack('login_acp_cannot_reauth');
-		Member::loggedIn()->language()->words['oauth_client_id'] = Member::loggedIn()->language()->addToStack('login_live_client');
-		Member::loggedIn()->language()->words['oauth_client_client_secret'] = Member::loggedIn()->language()->addToStack('login_live_secret');
+		\IPS\Member::loggedIn()->language()->words['login_acp_desc'] = \IPS\Member::loggedIn()->language()->addToStack('login_acp_cannot_reauth');
+		\IPS\Member::loggedIn()->language()->words['oauth_client_id'] = \IPS\Member::loggedIn()->language()->addToStack('login_live_client');
+		\IPS\Member::loggedIn()->language()->words['oauth_client_client_secret'] = \IPS\Member::loggedIn()->language()->addToStack('login_live_secret');
 
 		return array_merge( array(
-			'real_name'	=> new Radio( 'login_real_name', $this->settings['real_name'] ?? 1, FALSE, array(
+			'real_name'	=> new \IPS\Helpers\Form\Radio( 'login_real_name', isset( $this->settings['real_name'] ) ? $this->settings['real_name'] : 1, FALSE, array(
 				'options' => array(
 					1			=> 'login_real_name_microsoft',
 					0			=> 'login_real_name_disabled',
@@ -79,7 +66,7 @@ class Microsoft extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonColor(): string
+	public function buttonColor()
 	{
 		return '#008b00';
 	}
@@ -87,9 +74,9 @@ class Microsoft extends OAuth2
 	/**
 	 * Get the button icon
 	 *
-	 * @return	string|File
+	 * @return	string
 	 */
-	public function buttonIcon(): string|File
+	public function buttonIcon()
 	{
 		return 'windows';
 	}
@@ -99,7 +86,7 @@ class Microsoft extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonText(): string
+	public function buttonText()
 	{
 		return 'login_live';
 	}
@@ -109,20 +96,20 @@ class Microsoft extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonClass(): string
+	public function buttonClass()
 	{
-		return 'ipsSocial--microsoft';
+		return 'ipsSocial_microsoft';
 	}
 	
 	/**
 	 * Get logo to display in information about logins with this method
 	 * Returns NULL for methods where it is not necessary to indicate the method, e..g Standard
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForDeviceInformation(): Url|string|null
+	public function logoForDeviceInformation()
 	{
-		return Theme::i()->resource( 'logos/login/Microsoft.png', 'core', 'interface' );
+		return \IPS\Theme::i()->resource( 'logos/login/Microsoft.png', 'core', 'interface' );
 	}
 	
 	/**
@@ -130,7 +117,7 @@ class Microsoft extends OAuth2
 	 *
 	 * @return	string
 	 */
-	protected function grantType(): string
+	protected function grantType()
 	{
 		return 'authorization_code';
 	}
@@ -141,7 +128,7 @@ class Microsoft extends OAuth2
 	 * @param	array|NULL	$additional	Any additional scopes to request
 	 * @return	array
 	 */
-	protected function scopesToRequest( array $additional=NULL ): array
+	protected function scopesToRequest( $additional=NULL )
 	{
 		return array(
 			'openid',
@@ -153,45 +140,45 @@ class Microsoft extends OAuth2
 	/**
 	 * Authorization Endpoint
 	 *
-	 * @param	Login	$login	The login object
-	 * @return	Url
+	 * @param	\IPS\Login	$login	The login object
+	 * @return	\IPS\Http\Url
 	 */
-	protected function authorizationEndpoint( Login $login ): Url
+	protected function authorizationEndpoint( \IPS\Login $login )
 	{
-		return Url::external('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
+		return \IPS\Http\Url::external('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
 	}
 	
 	/**
 	 * Token Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function tokenEndpoint(): Url
+	protected function tokenEndpoint()
 	{
-		return Url::external('https://login.microsoftonline.com/common/oauth2/v2.0/token');
+		return \IPS\Http\Url::external('https://login.microsoftonline.com/common/oauth2/v2.0/token');
 	}
 	
 	/**
 	 * Redirection Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function redirectionEndpoint(): Url
+	protected function redirectionEndpoint()
 	{
 		if ( isset( $this->settings['legacy_redirect'] ) and $this->settings['legacy_redirect'] )
 		{
-			return Url::internal( 'applications/core/interface/microsoft/auth.php', 'none' );
+			return \IPS\Http\Url::internal( 'applications/core/interface/microsoft/auth.php', 'none' );
 		}
 		return parent::redirectionEndpoint();
 	}
-
+	
 	/**
 	 * Get authenticated user's identifier (may not be a number)
 	 *
-	 * @param string $accessToken Access Token
-	 * @return string|null
+	 * @param	string	$accessToken	Access Token
+	 * @return	string
 	 */
-	protected function authenticatedUserId( string $accessToken ): ?string
+	protected function authenticatedUserId( $accessToken )
 	{
 		return $this->_userData( $accessToken )['id'];
 	}
@@ -203,7 +190,7 @@ class Microsoft extends OAuth2
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedUserName( string $accessToken ): ?string
+	protected function authenticatedUserName( $accessToken )
 	{
 		if ( isset( $this->settings['real_name'] ) and $this->settings['real_name'] )
 		{
@@ -219,7 +206,7 @@ class Microsoft extends OAuth2
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedEmail( string $accessToken ): ?string
+	protected function authenticatedEmail( $accessToken )
 	{
 		return $this->_userData( $accessToken )['userPrincipalName'];
 	}
@@ -228,17 +215,17 @@ class Microsoft extends OAuth2
 	 * Get user's profile name
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfileName( Member $member ): ?string
+	public function userProfileName( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new Exception( "", Exception::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		return $this->_userData( $link['token_access_token'] )['displayName'];
@@ -247,11 +234,11 @@ class Microsoft extends OAuth2
 	/**
 	 * Syncing Options
 	 *
-	 * @param	Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
+	 * @param	\IPS\Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
 	 * @param	bool		$defaultOnly	If TRUE, only returns which options should be enabled by default for a new account
 	 * @return	array
 	 */
-	public function syncOptions( Member $member, bool $defaultOnly=FALSE ): array
+	public function syncOptions( \IPS\Member $member, $defaultOnly = FALSE )
 	{
 		$return = array();
 		
@@ -271,20 +258,20 @@ class Microsoft extends OAuth2
 	/**
 	 * @brief	Cached user data
 	 */
-	protected array $_cachedUserData = array();
+	protected $_cachedUserData = array();
 	
 	/**
 	 * Get user data
 	 *
 	 * @param	string	$accessToken	Access Token
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	protected function _userData( string $accessToken ): array
+	protected function _userData( $accessToken )
 	{
 		if ( !isset( $this->_cachedUserData[ $accessToken ] ) )
 		{
-			$response = Url::external( "https://graph.microsoft.com/v1.0/me" )
+			$response = \IPS\Http\Url::external( "https://graph.microsoft.com/v1.0/me" )
 				->request()
 				->setHeaders( array(
 					'Authorization' => "Bearer {$accessToken}"
@@ -294,7 +281,7 @@ class Microsoft extends OAuth2
 
 			if ( isset( $response['error'] ) )
 			{
-				throw new Exception( $response['error']['message'], Exception::INTERNAL_ERROR );
+				throw new \IPS\Login\Exception( $response['error']['message'], \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 				
 			$this->_cachedUserData[ $accessToken ] = $response;

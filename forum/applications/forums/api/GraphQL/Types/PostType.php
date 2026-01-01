@@ -12,44 +12,40 @@
 namespace IPS\forums\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Api\GraphQL\CommentType;
-use IPS\Content\Comment;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PostType for GraphQL API
  */
-class PostType extends CommentType
+class _PostType extends \IPS\Content\Api\GraphQL\CommentType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $commentClass	= '\IPS\forums\Topic\Post';
+	protected static $commentClass	= '\IPS\forums\Topic\Post';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'forums_Post';
+	protected static $typeName = 'forums_Post';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'A post';
+	protected static $typeDescription = 'A post';
 
 	/**
 	 * Get the item type that goes with this item type
 	 *
 	 * @return	ObjectType
 	 */
-	public static function getItemType(): ObjectType
+	public static function getItemType()
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::topic();
 	}
@@ -59,7 +55,7 @@ class PostType extends CommentType
 	 *
 	 * @return	array
 	 */
-	public function fields(): array
+	public function fields()
 	{
 		$defaultFields = parent::fields();
 		$postFields = array(
@@ -69,11 +65,60 @@ class PostType extends CommentType
 					return $post->item();
 				}
 			],
+			/* Q&A STUFF */
+			'isQuestion' => [
+				'type' => TypeRegistry::boolean(),
+				'description' => "Boolean indicating whether this post is a question, i.e. the first post in a question topic",
+				'resolve' => function ($post) {
+					return $post->item()->isQuestion() && $post->new_topic;
+				}
+			],
+			'answerVotes' => [
+				'type' => TypeRegistry::int(),
+				'resolve' => function ($post) {
+					return $post->post_field_int;
+				}
+			],
 			'isBestAnswer' => [
 				'type' => TypeRegistry::boolean(),
 				'description' => "Whether this post is the best answer in a question",
 				'resolve' => function ($post) {
 					return $post->post_bwoptions['best_answer'];
+				}
+			],
+			'canVoteUp' => [
+				'type' => TypeRegistry::boolean(),
+				'resolve' => function ($post) {
+					if( !$post->item()->isQuestion() )
+					{
+						return NULL;
+					}
+
+					return $post->canVote(1);
+				}
+			],
+			'canVoteDown' => [
+				'type' => TypeRegistry::boolean(),
+				'resolve' => function ($post) {
+					if( !$post->item()->isQuestion() )
+					{
+						return NULL;
+					}
+
+					return $post->canVote(-1) && \IPS\Settings::i()->forums_questions_downvote;
+				}
+			],
+			'vote' => [
+				'type' => \IPS\forums\api\GraphQL\TypeRegistry::vote(),
+				'resolve' => function ($post) {
+					$ratings = $post->item()->answerVotes( \IPS\Member::loggedIn() );
+					
+					if( !$post->item()->isQuestion() || !isset( $ratings[ $post->pid ] ) )
+					{
+						return NULL;
+					}
+
+					return $ratings[ $post->pid ] === -1 ? 'DOWN' : 'UP';
 				}
 			]
 		);
@@ -87,13 +132,11 @@ class PostType extends CommentType
 	/**
 	 * Return the definite article, but without the item type
 	 *
-	 * @param Comment $post
-	 * @param array $options
-	 * @return    string
+	 * @return	string
 	 */
-	public static function definiteArticleNoItem( Comment $post, array $options = array() ): string
+	public static function definiteArticleNoItem($post, $options = array())
 	{
-		$type = 'post_lc';
-		return Member::loggedIn()->language()->addToStack( $type, FALSE, $options);
+		$type = $post->item()->isQuestion() ? 'answer_lc' : 'post_lc';
+		return \IPS\Member::loggedIn()->language()->addToStack($type, FALSE, $options);
 	}
 }

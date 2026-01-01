@@ -11,62 +11,47 @@
 namespace IPS\core\modules\admin\membersettings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\ProfileStep;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOFRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Profile Completion
  */
-class profilecompletion extends Controller
+class _profilecompletion extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = '\IPS\Member\ProfileStep';
+	protected $nodeClass = '\IPS\Member\ProfileStep';
 
 	/**
 	 * Show the "add" button in the page root rather than the table root
 	 */
-	protected bool $_addButtonInRoot = FALSE;
+	protected $_addButtonInRoot = FALSE;
 	
 	/**
 	 * Get Root Buttons
 	 *
 	 * @return	array
 	 */
-	public function _getRootButtons(): array
+	public function _getRootButtons()
 	{
 		$return = parent::_getRootButtons();
 		
-		if ( isset( Output::i()->sidebar['actions']['add'] ) )
+		if ( isset( \IPS\Output::i()->sidebar['actions']['add'] ) )
 		{
-			$class = new ProfileStep;
+			$class = new \IPS\Member\ProfileStep;
 			if ( ! $class->canAdd() )
 			{
-				unset( Output::i()->sidebar['actions']['add'] );
+				unset( \IPS\Output::i()->sidebar['actions']['add'] );
 			}
 		}
 		
@@ -78,9 +63,9 @@ class profilecompletion extends Controller
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'profilefields_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'profilefields_manage' );
 		parent::execute();
 	}
 
@@ -89,10 +74,10 @@ class profilecompletion extends Controller
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
-		$class = new ProfileStep;
-		Output::i()->output = Theme::i()->getTemplate( 'members' )->profileCompleteBlurb( $class->canAdd() );
+		$class = new \IPS\Member\ProfileStep;
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'members' )->profileCompleteBlurb( $class->canAdd() );
 		parent::manage();
 	}
 
@@ -101,15 +86,15 @@ class profilecompletion extends Controller
 	 *
 	 * @return	void
 	 */
-	public function enableQuickRegister() : void
+	public function enableQuickRegister()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		Settings::i()->changeValues( array( 'quick_register' => 1 ) );
+		\IPS\Settings::i()->changeValues( array( 'quick_register' => 1 ) );
 		
-		Session::i()->log( 'acplog__quick_register_enabled' );
+		\IPS\Session::i()->log( 'acplog__quick_register_enabled' );
 		
-		Output::i()->redirect( Url::internal( 'app=core&module=membersettings&controller=profiles&tab=profilecompletion' ), 'profile_complete_quick_register_off_enabled' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=profiles&tab=profilecompletion' ), 'profile_complete_quick_register_off_enabled' );
 	}
 	
 	/**
@@ -117,23 +102,23 @@ class profilecompletion extends Controller
 	 *
 	 * @return	void
 	 */
-	public function form() : void
+	public function form()
 	{
-		$form = new Form;
-		if ( isset( Request::i()->id ) )
+		$form = new \IPS\Helpers\Form;
+		if ( isset( \IPS\Request::i()->id ) )
 		{
 			try
 			{
-				$step = ProfileStep::load( Request::i()->id );
+				$step = \IPS\Member\ProfileStep::load( \IPS\Request::i()->id );
 			}
-			catch( OutOFRangeException $e )
+			catch( \OutOFRangeException $e )
 			{
-				Output::i()->error( 'node_error', '2C360/1', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2C360/1', 404, '' );
 			}
 		}
 		else
 		{
-			$step = new ProfileStep;
+			$step = new \IPS\Member\ProfileStep;
 		}
 		
 		$step->form( $form );
@@ -142,25 +127,27 @@ class profilecompletion extends Controller
 		{
 			$values = $step->formatFormValues( $values );
 			
-			$extension = ProfileStep::loadExtensionFromAction( $values['step_completion_act'] );
-			$step->required = ( isset( $values['step_required'] ) ) ? $values['step_required'] : FALSE;
-			$step->registration = $values['step_registration'];
+			$step->extension = \IPS\Member\ProfileStep::findExtensionFromAction( $values['step_completion_act'] );
+			$step->required = ( isset( $values['step_required'] ) ) ? $values['step_required'] : FALSE;		
 			$step->completion_act = $values['step_completion_act'];
-			$step->subcompletion_act = $values['step_subcompletion_act'] ?? NULL;
+			$step->subcompletion_act = isset( $values['step_subcompletion_act'] ) ? $values['step_subcompletion_act'] : NULL;
 			$step->save();
 			
 			$step->postSaveForm( $values );
 			
-			$extension->postAcpSave( $step, $values );
+			if ( method_exists( $step->extension, 'postAcpSave' ) )
+			{
+				$step->extension->postAcpSave( $step, $values );
+			}
 			
-			Member::updateAllMembers( array( "members_bitoptions2 = members_bitoptions2 & ~" . Member::$bitOptions['members_bitoptions']['members_bitoptions2']['profile_completed'] ) );
+			\IPS\Member::updateAllMembers( array( "members_bitoptions2 = members_bitoptions2 & ~" . \IPS\Member::$bitOptions['members_bitoptions']['members_bitoptions2']['profile_completed'] ) );
 			
-			Session::i()->log( 'acplog__profile_step_added', array( "profile_step_title_{$step->id}" => TRUE ) );
+			\IPS\Session::i()->log( 'acplog__profile_step_added', array( "profile_step_title_{$step->id}" => TRUE ) );
 			
-			Output::i()->redirect( Url::internal( "app=core&module=membersettings&controller=profiles&tab=profilecompletion" ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=membersettings&controller=profiles&tab=profilecompletion" ), 'saved' );
 		}
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack( 'profile_completion' );
-		Output::i()->output	= $form;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack( 'profile_completion' );
+		\IPS\Output::i()->output	= $form;
 	}
 }

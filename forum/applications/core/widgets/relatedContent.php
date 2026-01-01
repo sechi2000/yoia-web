@@ -12,71 +12,58 @@
 namespace IPS\core\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Controller;
-use IPS\Dispatcher;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Translatable;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Related Content Widget
  */
-class relatedContent extends PermissionCache implements Customizable
+class _relatedContent extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'relatedContent';
+	public $key = 'relatedContent';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'core';
-
-
+	public $app = 'core';
+	
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Constructor
 	 *
-	 * @param String $uniqueKey				Unique key for this specific instance
+	 * @param	String				$uniqueKey				Unique key for this specific instance
 	 * @param	array				$configuration			Widget custom configuration
-	 * @param array|string|null $access					Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
-	 * @param string|null $orientation			Orientation (top, bottom, right, left)
-	 * @param string $layout
+	 * @param	null|string|array	$access					Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
+	 * @param	null|string			$orientation			Orientation (top, bottom, right, left)
 	 * @return	void
 	 */
-	public function __construct(string $uniqueKey, array $configuration, array|string $access=null, string $orientation=null, string $layout='table' )
+	public function __construct( $uniqueKey, array $configuration, $access=null, $orientation=null )
 	{
-		parent::__construct( $uniqueKey, $configuration, $access, $orientation, $layout );
+		parent::__construct( $uniqueKey, $configuration, $access, $orientation );
 		
 		/* We can't run the URL related logic if we have no dispatcher because this class could also be initialized by the CLI cron job */
-		if( Dispatcher::hasInstance() )
+		if( \IPS\Dispatcher::hasInstance() )
 		{
 			/* Cache per item, not per block */
-			$parts = parse_url( (string) Request::i()->url()->setPage() );
+			$parts = parse_url( (string) \IPS\Request::i()->url()->setPage() );
 
-			if ( Settings::i()->htaccess_mod_rewrite )
+			if ( \IPS\Settings::i()->htaccess_mod_rewrite )
 			{
-				$url = $parts['scheme'] . "://" . $parts['host'] . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' ) . ( $parts['path'] ?? '' );
+				$url = $parts['scheme'] . "://" . $parts['host'] . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' ) . $parts['path'];
 			}
 			else
 			{
-				$url = $parts['scheme'] . "://" . $parts['host'] . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' ) . ( $parts['path'] ?? '' ) . ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
+				$url = $parts['scheme'] . "://" . $parts['host'] . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' ) . $parts['path'] . ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
 			}
 
 			$this->cacheKey .= '_' . md5( $url );
@@ -89,7 +76,7 @@ class relatedContent extends PermissionCache implements Customizable
 	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function preConfig( array $values ): array
+	public function preConfig( $values )
 	{
 		if ( !isset( $this->configuration['language_key'] ) )
 		{
@@ -97,7 +84,7 @@ class relatedContent extends PermissionCache implements Customizable
 		}
 		$values['language_key'] = $this->configuration['language_key'];
 
-		Lang::saveCustom( 'core', $this->configuration['language_key'], $values['widget_feed_title'] );
+		\IPS\Lang::saveCustom( 'core', $this->configuration['language_key'], $values['widget_feed_title'] );
 		unset( $values['widget_feed_title'] );
 
 		return $values;
@@ -106,62 +93,48 @@ class relatedContent extends PermissionCache implements Customizable
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
  	{
 		$form = parent::configuration( $form );
 
 		/* Block title */
-		$form->add( new Translatable( 'widget_feed_title', isset( $this->configuration['language_key'] ) ? NULL : Member::loggedIn()->language()->addToStack( 'block_relatedContent' ), FALSE, array( 'app' => 'core', 'key' => ( $this->configuration['language_key'] ?? NULL ) ) ) );
-		$form->add( new Number( 'toshow', $this->configuration['toshow'] ?? 5, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'widget_feed_title', isset( $this->configuration['language_key'] ) ? NULL : \IPS\Member::loggedIn()->language()->addToStack( 'block_relatedContent' ), FALSE, array( 'app' => 'core', 'key' => ( isset( $this->configuration['language_key'] ) ? $this->configuration['language_key'] : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'toshow', isset( $this->configuration['toshow'] ) ? $this->configuration['toshow'] : 5, TRUE ) );
 		
 		return $form;
  	}
-
-    /**
-     * Can this widget be used on this page?
-     *
-     * @param string $app
-     * @param string $module
-     * @param string $controller
-     * @return bool
-     */
-    public function isExecutableByPage( string $app, string $module, string $controller ) : bool
-    {
-        $class = 'IPS\\' . $app . '\\modules\\front\\' . $module . '\\' . $controller;
-        return is_subclass_of( $class, Controller::class );
-    }
  	
 	/**
 	 * Render a widget
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
-		if( !( Dispatcher::i()->dispatcherController instanceof Controller ) )
+		if( !( \IPS\Dispatcher::i()->dispatcherController instanceof \IPS\Content\Controller ) )
 		{
 			return '';
 		}
 
-		$limit = $this->configuration['toshow'] ?? 5;
+		$limit = isset ( $this->configuration['toshow'] ) ? $this->configuration['toshow'] : 5;
 
-		$related	= Dispatcher::i()->dispatcherController->getSimilarContent( $limit );
+		$related	= \IPS\Dispatcher::i()->dispatcherController->getSimilarContent( $limit );
 
-		if( $related === NULL or !count( $related ) )
+		if( $related === NULL or !\count( $related ) )
 		{
 			return '';
 		}
 
 		if ( isset( $this->configuration['language_key'] ) )
 		{
-			$title = Member::loggedIn()->language()->addToStack( $this->configuration['language_key'], FALSE, array( 'escape' => TRUE ) );
+			$title = \IPS\Member::loggedIn()->language()->addToStack( $this->configuration['language_key'], FALSE, array( 'escape' => TRUE ) );
 		}
 		else
 		{
-			$title = Member::loggedIn()->language()->addToStack( 'block_relatedContent' );
+			$title = \IPS\Member::loggedIn()->language()->addToStack( 'block_relatedContent' );
 		}
 
 		return $this->output( $related, $title );

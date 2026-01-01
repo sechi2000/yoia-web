@@ -11,21 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Helpers\Form;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Custom input class for Form Builder
  */
-class Custom extends FormAbstract
+class _Custom extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -37,7 +32,7 @@ class Custom extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'getHtml'		=> NULL,
 		'formatValue'	=> NULL,
 		'validate'		=> NULL,
@@ -48,7 +43,7 @@ class Custom extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		$htmlFunction = $this->options['getHtml'];
 		return $htmlFunction( $this );
@@ -57,10 +52,10 @@ class Custom extends FormAbstract
 	/**
 	 * Get HTML
 	 *
-	 * @param	Form|null	$form	Form helper object
+	 * @param	\IPS\Helpers\Form|null	$form	Form helper object
 	 * @return	string
 	 */
-	public function rowHtml( Form $form=NULL ): string
+	public function rowHtml( $form=NULL )
 	{
 		if ( isset( $this->options['rowHtml'] ) )
 		{
@@ -75,7 +70,7 @@ class Custom extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
 		if ( $this->options['formatValue'] !== NULL )
 		{
@@ -91,10 +86,10 @@ class Custom extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{		
 		parent::validate();
 		
@@ -102,8 +97,6 @@ class Custom extends FormAbstract
 		{
 			$validationFunction = $this->options['validate'];
 			$validationFunction( $this );
-		}
-
-		return TRUE;
+		}	
 	}
 }

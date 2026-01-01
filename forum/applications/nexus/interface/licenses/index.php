@@ -9,29 +9,19 @@
  * @since		01 Apr 2015
  */
 
-use IPS\Dispatcher\External;
-use IPS\nexus\Customer;
-use IPS\nexus\Purchase\LicenseKey;
-use IPS\Output;
-use IPS\Request;
-use const IPS\NEXUS_LKEY_API_ALLOW_IP_OVERRIDE;
-use const IPS\NEXUS_LKEY_API_CHECK_IP;
-use const IPS\NEXUS_LKEY_API_DISABLE;
-
-define('REPORT_EXCEPTIONS', TRUE);
+\define('REPORT_EXCEPTIONS', TRUE);
 require_once '../../../../init.php';
-External::i();
+\IPS\Dispatcher\External::i();
 
-if ( NEXUS_LKEY_API_ALLOW_IP_OVERRIDE )
+if ( \IPS\NEXUS_LKEY_API_ALLOW_IP_OVERRIDE )
 {
-	$_SERVER['REMOTE_ADDR'] = isset( Request::i()->ip ) ? Request::i()->ip : $_SERVER['REMOTE_ADDR'];
+	$_SERVER['REMOTE_ADDR'] = isset( \IPS\Request::i()->ip ) ? \IPS\Request::i()->ip : $_SERVER['REMOTE_ADDR'];
 }
 
 /**
  * API Exception
  */
-class ApiException extends Exception
-{ }
+class ApiException extends \Exception { }
 
 /**
  * API class to verify license keys
@@ -45,31 +35,30 @@ class Api
 	 * @param	string	$message		Status message
 	 * @return	void
 	 */
-	public function error( int $code, string $message ) : void
+	public function error( $code, $message )
 	{
-		Output::setCacheTime( false );
-		Output::i()->sendOutput( json_encode( array( 'errorCode' => $code, 'errorMessage' => $message ) ), 400, 'application/json' );
+		\IPS\Output::setCacheTime( false );
+		\IPS\Output::i()->sendOutput( json_encode( array( 'errorCode' => $code, 'errorMessage' => $message ) ), 400, 'application/json' );
 	}
 	
 	/**
 	 * Get key
 	 *
 	 * @param	bool	$validateIdentifier	Should the identifier be validated?
-	 * @return	LicenseKey
-	 * @throws ApiException
+	 * @return	\IPS\nexus\Purchase\LicenseKey
 	 */
-	protected function getKey( bool $validateIdentifier=TRUE ) : LicenseKey
+	protected function getKey( $validateIdentifier=TRUE )
 	{
 		try
 		{	
-			$key = LicenseKey::load( isset( Request::i()->key ) ? Request::i()->key : NULL );
+			$key = \IPS\nexus\Purchase\LicenseKey::load( isset( \IPS\Request::i()->key ) ? \IPS\Request::i()->key : NULL );
 			
-			if ( $key->key !== Request::i()->key )
+			if ( $key->key !== \IPS\Request::i()->key )
 			{
 				throw new ApiException( 'BAD_KEY_OR_ID', 105 );
 			}
 			
-			if ( $validateIdentifier and $identifier = $this->getIdentifier( $key ) and ( !isset( Request::i()->identifier ) or $identifier != Request::i()->identifier ) )
+			if ( $validateIdentifier and $identifier = $this->getIdentifier( $key ) and ( !isset( \IPS\Request::i()->identifier ) or $identifier != \IPS\Request::i()->identifier ) )
 			{
 				throw new ApiException( 'BAD_KEY_OR_ID', 101 );
 			}
@@ -89,7 +78,7 @@ class Api
 						
 			return $key;
 		}
-		catch (OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			throw new ApiException( 'BAD_KEY_OR_ID', 101 );
 		}
@@ -98,24 +87,24 @@ class Api
 	/**
 	 * Get identifier
 	 *
-	 * @param	LicenseKey	$key	The license key
+	 * @param	\IPS\nexus\Purchase\LicenseKey	$key	The license key
 	 * @return	string|NULL
 	 */
-	protected function getIdentifier( LicenseKey $key ) : string|null
+	protected function getIdentifier( \IPS\nexus\Purchase\LicenseKey $key )
 	{
 		$identifier = NULL;
 		switch ( $key->identifier )
 		{
 			case 'name':
-				$identifier = Customer::load( $key->member )->cm_name;
+				$identifier = \IPS\nexus\Customer::load( $key->member )->cm_name;
 				break;
 				
 			case 'email':
-				$identifier = Customer::load( $key->member )->email;
+				$identifier = \IPS\nexus\Customer::load( $key->member )->email;
 				break;
 				
 			case 'username':
-				$identifier = Customer::load( $key->member )->name;
+				$identifier = \IPS\nexus\Customer::load( $key->member )->name;
 				break;
 		
 			default:
@@ -133,9 +122,8 @@ class Api
 	 * Activate
 	 *
 	 * @return	void
-	 * @throws  ApiException
 	 */
-	public function activate() : void
+	public function activate()
 	{
 		$key = $this->getKey( FALSE );
 		
@@ -145,19 +133,19 @@ class Api
 		}
 		
 		$identifier = $this->getIdentifier( $key );
-		$providedIdentifier = isset( Request::i()->identifier ) ? Request::i()->identifier : NULL;
-		if ( isset( Request::i()->setIdentifier ) and Request::i()->setIdentifier )
+		$providedIdentifier = isset( \IPS\Request::i()->identifier ) ? \IPS\Request::i()->identifier : NULL;
+		if ( isset( \IPS\Request::i()->setIdentifier ) and \IPS\Request::i()->setIdentifier )
 		{
 			if ( $identifier != $providedIdentifier )
 			{
-				if ( $identifier or in_array( $key->identifier, array( 'name', 'email', 'username' ) ) )
+				if ( $identifier or \in_array( $key->identifier, array( 'name', 'email', 'username' ) ) )
 				{
 					throw new ApiException( 'BAD_KEY_OR_ID', 101 );
 				}
 				else
 				{
 					$cfields = $key->purchase->custom_fields;
-					$cfields[ $key->identifier ] = $providedIdentifier;
+					$cfields[ $key->identifier ] = \IPS\Request::i()->setIdentifier;
 					$key->purchase->custom_fields = $cfields;
 					$key->purchase->save();
 				}
@@ -168,9 +156,9 @@ class Api
 			throw new ApiException( 'BAD_KEY_OR_ID', 101 );
 		}
 		
-		if ( defined( 'NEXUS_LKEY_API_ALLOW_IP_OVERRIDE' ) )
+		if ( \defined( 'NEXUS_LKEY_API_ALLOW_IP_OVERRIDE' ) )
 		{
-			$ip = $this->params['ip'] ?: $_SERVER['REMOTE_ADDR'];
+			$ip = $this->params['ip'] ? $this->params['ip'] : $_SERVER['REMOTE_ADDR'];
 		}
 		else
 		{
@@ -184,26 +172,25 @@ class Api
 			'activated'		=> time(),
 			'ip'			=> $ip,
 			'last_checked'	=> 0,
-			'extra'			=> isset( Request::i()->extra ) ? json_decode( Request::i()->extra ) : NULL,
+			'extra'			=> isset( \IPS\Request::i()->extra ) ? json_decode( \IPS\Request::i()->extra ) : NULL,
 		);
 		
 		$key->activate_data = $activateData;
 		$key->uses++;
 		$key->save();
 		
-		Customer::load( $key->member )->log( 'lkey', array( 'type' => 'activated', 'key' => $key->key, 'ps_id' => $key->purchase->id ), FALSE );
-
-		Output::setCacheTime( false );
-		Output::i()->sendOutput( json_encode( array( 'response' => 'OKAY', 'usage_id' => $k ) ), 200, 'application/json' );
+		\IPS\nexus\Customer::load( $key->member )->log( 'lkey', array( 'type' => 'activated', 'key' => $key->key, 'ps_id' => $key->purchase->id ), FALSE );
+		
+		\IPS\Output::setCacheTime( false );
+		\IPS\Output::i()->sendOutput( json_encode( array( 'response' => 'OKAY', 'usage_id' => $k ) ), 200, 'application/json' );
 	}
 	
 	/**
 	 * Check
 	 *
 	 * @return	void
-	 * @throws ApiException
 	 */
-	public function check() : void
+	public function check()
 	{
 		try
 		{
@@ -215,9 +202,9 @@ class Api
 			{
 				case 102:
 				case 103:
-					Output::i()->sendOutput( json_encode( array( 'status' => 'INACTIVE' ) ), 200, 'application/json', Output::getCacheHeaders( time(), 360 ) );
+					\IPS\Output::i()->sendOutput( json_encode( array( 'status' => 'INACTIVE' ) ), 200, 'application/json', \IPS\Output::getCacheHeaders( time(), 360 ) );
 				case 104:
-					Output::i()->sendOutput( json_encode( array( 'status' => 'EXPIRED' ) ), 200, 'application/json', Output::getCacheHeaders( time(), 360 ) );
+					\IPS\Output::i()->sendOutput( json_encode( array( 'status' => 'EXPIRED' ) ), 200, 'application/json', \IPS\Output::getCacheHeaders( time(), 360 ) );
 					
 				default:
 					throw $e;
@@ -225,29 +212,28 @@ class Api
 		}
 		
 		$activateData = $key->activate_data;
-		if ( !isset( Request::i()->usage_id ) or !isset( $activateData[ Request::i()->usage_id ] ) )
+		if ( !isset( \IPS\Request::i()->usage_id ) or !isset( $activateData[ \IPS\Request::i()->usage_id ] ) )
 		{
 			throw new ApiException( 'BAD_USAGE_ID', 303 );
 		}
-		if ( NEXUS_LKEY_API_CHECK_IP and $activateData[ Request::i()->usage_id ]['ip'] != $_SERVER['REMOTE_ADDR'] )
+		if ( \IPS\NEXUS_LKEY_API_CHECK_IP and $activateData[ \IPS\Request::i()->usage_id ]['ip'] != $_SERVER['REMOTE_ADDR'] )
 		{
 			throw new ApiException( 'BAD_IP', 304 );
 		}
 		
-		$activateData[ Request::i()->usage_id ]['last_checked'] = time();
+		$activateData[ \IPS\Request::i()->usage_id ]['last_checked'] = time();
 		$key->activate_data = $activateData;
 		$key->save();
 		
-		Output::i()->sendOutput( json_encode( array( 'status' => 'ACTIVE', 'uses' => $key->uses, 'max_uses' => $key->max_uses ) ), 200, 'application/json', Output::getCacheHeaders( time(), 360 ) );
+		\IPS\Output::i()->sendOutput( json_encode( array( 'status' => 'ACTIVE', 'uses' => $key->uses, 'max_uses' => $key->max_uses ) ), 200, 'application/json', \IPS\Output::getCacheHeaders( time(), 360 ) );
 	}
 	
 	/**
 	 * Get Information
 	 *
 	 * @return	void
-	 * @throws ApiException
 	 */
-	public function info() : void
+	public function info()
 	{
 		$key = $this->getKey();
 		
@@ -267,7 +253,7 @@ class Api
 			);
 		}
 		
-		Output::i()->sendOutput( json_encode( array(
+		\IPS\Output::i()->sendOutput( json_encode( array(
 			'key'				=> $key->key,
 			'identifier'		=> $this->getIdentifier( $key ),
 			'generated'			=> $key->generated->getTimestamp(),
@@ -280,48 +266,47 @@ class Api
 			'purchase_start'	=> $key->purchase->start->getTimestamp(),
 			'purchase_expire'	=> $key->purchase->expire ? $key->purchase->expire->getTimestamp() : NULL,
 			'purchase_children'	=> $children,
-			'customer_name'		=> Customer::load( $key->member )->cm_name,
-			'customer_email'	=> Customer::load( $key->member )->email,
+			'customer_name'		=> \IPS\nexus\Customer::load( $key->member )->cm_name,
+			'customer_email'	=> \IPS\nexus\Customer::load( $key->member )->email,
 			'uses'				=> $key->uses,
 			'max_uses'			=> $key->max_uses
-		) ), 200, 'application/json', Output::getCacheHeaders( time(), 360 ) );
+		) ), 200, 'application/json', \IPS\Output::getCacheHeaders( time(), 360 ) );
 	}
 	
 	/**
 	 * Update extra information
 	 *
 	 * @return	void
-	 * @throws ApiException
 	 */
-	public function updateExtra() : void
+	public function updateExtra()
 	{
 		$key = $this->getKey();
 		
 		$activateData = $key->activate_data;
-		if ( !isset( Request::i()->usage_id ) or !isset( $activateData[ Request::i()->usage_id ] ) )
+		if ( !isset( \IPS\Request::i()->usage_id ) or !isset( $activateData[ \IPS\Request::i()->usage_id ] ) )
 		{
 			throw new ApiException( 'BAD_USAGE_ID', 303 );
 		}
-		if ( NEXUS_LKEY_API_CHECK_IP and $activateData[ Request::i()->usage_id ]['ip'] != $_SERVER['REMOTE_ADDR'] )
+		if ( \IPS\NEXUS_LKEY_API_CHECK_IP and $activateData[ \IPS\Request::i()->usage_id ]['ip'] != $_SERVER['REMOTE_ADDR'] )
 		{
 			throw new ApiException( 'BAD_IP', 304 );
 		}
 						
-		$activateData[ Request::i()->usage_id ]['extra'] = isset( Request::i()->extra ) ? json_decode( Request::i()->extra ) : NULL;
+		$activateData[ \IPS\Request::i()->usage_id ]['extra'] = isset( \IPS\Request::i()->extra ) ? json_decode( \IPS\Request::i()->extra ) : NULL;
 		$key->activate_data = $activateData;
 		$key->save();
 
-		Output::setCacheTime( false );
-		Output::i()->sendOutput( json_encode( array( 'status' => 'OKAY' ) ), 200, 'application/json' );
+		\IPS\Output::setCacheTime( false );
+		\IPS\Output::i()->sendOutput( json_encode( array( 'status' => 'OKAY' ) ), 200, 'application/json' );
 	}
 }
 
-$api = new Api;
-if ( !NEXUS_LKEY_API_DISABLE )
+$api = new api;
+if ( !\IPS\NEXUS_LKEY_API_DISABLE )
 {
 	foreach ( array( 'activate', 'check', 'info', 'updateExtra' ) as $k )
 	{
-		if ( isset( Request::i()->$k ) )
+		if ( isset( \IPS\Request::i()->$k ) )
 		{
 			try
 			{
@@ -329,9 +314,9 @@ if ( !NEXUS_LKEY_API_DISABLE )
 			}
 			catch ( ApiException $e )
 			{
-				$api->error( $e->getCode(), $e->getMessage() );
+				$api->error( $e->getMessage(), $e->getCode() );
 			}
-			catch ( Exception )
+			catch ( Exception $e )
 			{
 				$api->error( 0, 'INTERNAL_ERROR' );
 			}

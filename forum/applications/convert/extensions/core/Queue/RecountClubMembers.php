@@ -12,35 +12,26 @@
 namespace IPS\convert\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task\Queue\OutOfRangeException;
-use function defined;
-use const IPS\REBUILD_NORMAL;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class RecountClubMembers extends QueueAbstract
+class _RecountClubMembers
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data	Data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
-		$data['count'] = Db::i()->select( 'count(id)', 'core_clubs' )->first();
+		$data['count'] = \IPS\Db::i()->select( 'count(id)', 'core_clubs' )->first();
 
 		if( $data['count'] == 0 )
 		{
@@ -58,13 +49,13 @@ class RecountClubMembers extends QueueAbstract
 	 * @param	mixed						$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int							$offset	Offset
 	 * @return	int							New offset
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$last = NULL;
 
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_clubs', array( "id>?", $offset ), "id ASC", array( 0, REBUILD_NORMAL ) ), 'IPS\Member\Club' ) AS $club )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_clubs', array( "id>?", $offset ), "id ASC", array( 0, \IPS\REBUILD_NORMAL ) ), 'IPS\Member\Club' ) AS $club )
 		{
 			$club->recountMembers();
 			$last = $club->id;
@@ -73,7 +64,7 @@ class RecountClubMembers extends QueueAbstract
 
 		if( $last === NULL )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		return $last;
@@ -86,8 +77,8 @@ class RecountClubMembers extends QueueAbstract
 	 * @param	int						$offset	Offset
 	 * @return	array	Text explaining task and percentage complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' =>  Member::loggedIn()->language()->addToStack( 'queue_recounting_club_members' ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
+		return array( 'text' =>  \IPS\Member::loggedIn()->language()->addToStack( 'queue_recounting_club_members' ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
 	}
 }

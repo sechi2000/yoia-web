@@ -12,56 +12,36 @@
 namespace IPS\nexus\Invoice;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ArrayIterator;
-use DateInterval;
-use Exception;
-use IPS\Application;
-use IPS\DateTime;
-use IPS\Http\Url;
-use IPS\nexus\Customer;
-use IPS\nexus\Invoice\Item\Renewal;
-use IPS\nexus\Money;
-use IPS\nexus\Package\CustomField;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Tax;
-use IPS\Text\Encrypt;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function is_object;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invoice Items Iterator
  */
-class ItemsIterator extends ArrayIterator
+class _ItemsIterator extends \ArrayIterator
 {
 	/**
 	 * @brief	Currency
 	 */
-	public string $currency;
+	public $currency;
 	
 	/**
 	 * @brief	Class Names
 	 */
-	protected static ?array $classnames = NULL;
+	protected static $classnames = NULL;
 	
 	/**
 	 * Convert array into object
 	 *
-	 * @param	array|Item	$data	Data
-	 * @return    Item
+	 * @param	array	$data	Data
+	 * @return	\IPS\nexus\Invoice\Item
 	 */
-	public function arrayToObject( array|Item $data ) : Item
+	public function arrayToObject( $data )
 	{
-		if ( is_object( $data ) )
+		if ( \is_object( $data ) )
 		{
 			return $data;
 		}
@@ -69,29 +49,29 @@ class ItemsIterator extends ArrayIterator
 		/* Load correct class */
 		if ( $data['act'] === 'renewal' )
 		{
-			$obj = new Renewal( $data['itemName'], new Money( $data['cost'], $this->currency ) );
+			$obj = new \IPS\nexus\Invoice\Item\Renewal( $data['itemName'], new \IPS\nexus\Money( $data['cost'], $this->currency ) );
 		}
 		else
 		{
 			if ( static::$classnames === NULL )
 			{
 				static::$classnames = array();
-				foreach ( Application::allExtensions( 'nexus', 'Item', FALSE, NULL, NULL, FALSE ) as $ext )
+				foreach ( \IPS\Application::allExtensions( 'nexus', 'Item', FALSE, NULL, NULL, FALSE ) as $ext )
 				{
 					static::$classnames[ $ext::$application ][ $ext::$type ] = $ext;
 				}
 			}
-			if ( $data['app'] === 'nexus' and in_array( $data['type'], array( 'product', 'ad' ) ) )
+			if ( $data['app'] === 'nexus' and \in_array( $data['type'], array( 'product', 'ad' ) ) )
 			{
 				$data['type'] = 'package';
 			}
 			
-			$class = static::$classnames[$data['app']][$data['type']] ?? NULL;
+			$class = isset( static::$classnames[ $data['app'] ][ $data['type'] ] ) ? static::$classnames[ $data['app'] ][ $data['type'] ] : NULL;
 			if ( !$class )
 			{
 				$class = 'IPS\nexus\extensions\nexus\Item\MiscellaneousCharge';
 			}
-			$obj = new $class( $data['itemName'], new Money( number_format( $data['cost'], Money::numberOfDecimalsForCurrency( $this->currency ), '.', '' ), $this->currency ) );
+			$obj = new $class( $data['itemName'], new \IPS\nexus\Money( number_format( $data['cost'], \IPS\nexus\Money::numberOfDecimalsForCurrency( $this->currency ), '.', '' ), $this->currency ) );
 		}
 		
 		/* Basic information */
@@ -110,13 +90,13 @@ class ItemsIterator extends ArrayIterator
 				$purchaseDetails[ $key ] = $value;
 				try
 				{
-					$field = CustomField::load( $key );
+					$field = \IPS\nexus\Package\CustomField::load( $key );
 					if ( $field->invoice )
 					{
 						switch( $field->type )
 						{
 							case 'UserPass':
-								$value = json_decode( Encrypt::fromTag( $value )->decrypt(), TRUE );
+								$value = json_decode( \IPS\Text\Encrypt::fromTag( $value )->decrypt(), TRUE );
 								$display = array();
 								if ( $value['un'] )
 								{
@@ -132,8 +112,8 @@ class ItemsIterator extends ArrayIterator
 								break;
 							
 							case 'Ftp':
-								$value = json_decode( Encrypt::fromTag( $value )->decrypt(), TRUE );
-								$details[ $key ] = (string) Url::createFromComponents(
+								$value = json_decode( \IPS\Text\Encrypt::fromTag( $value )->decrypt(), TRUE );
+								$details[ $key ] = (string) \IPS\Http\Url::createFromComponents(
 									$value['server'],
 									( isset( $value['protocol'] ) ) ? "{$value['protocol']}://" : 'ftp://',
 									( isset( $value['path'] ) ) ? $value['path'] : NULL,
@@ -150,7 +130,7 @@ class ItemsIterator extends ArrayIterator
 						}
 					}
 				}
-				catch( OutOfRangeException ) {}
+				catch( \OutOfRangeException $e ) {}
 			}
 		}
 
@@ -162,31 +142,50 @@ class ItemsIterator extends ArrayIterator
 		{
 			try
 			{
-				$obj->tax = Tax::load( $data['tax'] );
+				$obj->tax = \IPS\nexus\Tax::load( $data['tax'] );
 			}
-			catch ( Exception ) { }
+			catch ( \Exception $e ) { }
 		}
 		
 		/* Renewal terms */
 		if ( isset( $data['renew_term'] ) and $data['renew_term'] )
 		{
-			$obj->renewalTerm = new RenewalTerm( new Money( $data['renew_cost'], $this->currency ), new DateInterval( 'P' . $data['renew_term'] . mb_strtoupper( $data['renew_units'] ) ), $obj->tax, FALSE, isset( $data['grace_period'] ) ? new DateInterval( 'PT' . $data['grace_period'] . 'S' ) : NULL );
+			$obj->renewalTerm = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $data['renew_cost'], $this->currency ), new \DateInterval( 'P' . $data['renew_term'] . mb_strtoupper( $data['renew_units'] ) ), $obj->tax, FALSE, isset( $data['grace_period'] ) ? new \DateInterval( 'PT' . $data['grace_period'] . 'S' ) : NULL );
 			if ( isset( $data['initial_interval_term'] ) and $data['initial_interval_term'] )
 			{
-				$obj->initialInterval = new DateInterval( 'P' . $data['initial_interval_term'] . mb_strtoupper( $data['initial_interval_unit'] ) );
+				$obj->initialInterval = new \DateInterval( 'P' . $data['initial_interval_term'] . mb_strtoupper( $data['initial_interval_unit'] ) );
 			}
 		}
 		
 		/* Expire Date */
 		if ( isset( $data['expires'] ) and $data['expires'] )
 		{
-			$obj->expireDate = DateTime::ts( $data['expires'] );
+			$obj->expireDate = \IPS\DateTime::ts( $data['expires'] );
 		}
 		
 		/* Available methods */
 		if ( isset( $data['methods'] ) and $data['methods'] !== '*' )
 		{
 			$obj->paymentMethodIds = $data['methods'];
+		}
+		
+		/* Shipping */
+		if ( isset( $data['physical'] ) AND $data['physical'] )
+		{
+			$obj->physical = TRUE;
+			if ( isset( $data['shipping'] ) and $data['shipping'] !== '*' )
+			{
+				$obj->shippingMethodIds = $data['shipping'];
+			}
+			$obj->weight = new \IPS\nexus\Shipping\Weight( $data['weight'] );
+			$obj->length = new \IPS\nexus\Shipping\Length( $data['length'] );
+			$obj->width = new \IPS\nexus\Shipping\Length( $data['width'] );
+			$obj->height = new \IPS\nexus\Shipping\Length( $data['height'] );
+			
+			if ( isset( $data['chosen_shipping'] ) and $data['chosen_shipping'] )
+			{
+				$obj->chosenShippingMethodId = $data['chosen_shipping'];
+			}
 		}
 		
 		/* Parent */
@@ -196,16 +195,16 @@ class ItemsIterator extends ArrayIterator
 			{
 				try
 				{
-					$obj->parent = Purchase::load( $data['assoc'] );
+					$obj->parent = \IPS\nexus\Purchase::load( $data['assoc'] );
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 			else
 			{
 				$obj->parent = $data['assoc'];
 			}
 			
-			$obj->groupWithParent = $data['groupParent'] ?? FALSE;
+			$obj->groupWithParent = isset( $data['groupParent'] ) ? $data['groupParent'] : FALSE;
 		}
 		
 		/* Paying another member? */
@@ -213,17 +212,17 @@ class ItemsIterator extends ArrayIterator
 		{
 			try
 			{
-				$obj->payTo = Customer::load( $data['payTo'] );
+				$obj->payTo = \IPS\nexus\Customer::load( $data['payTo'] );
 				if ( isset( $data['commission'] ) )
 				{
 					$obj->commission = ( $data['commission'] <= 100 ) ? $data['commission'] : 100;
 				}
 				if ( isset( $data['fee'] ) )
 				{
-					$obj->fee = new Money( $data['fee'], $this->currency );
+					$obj->fee = new \IPS\nexus\Money( $data['fee'], $this->currency );
 				}
 			}
-			catch ( Exception ) { }
+			catch ( \Exception $e ) { }
 		}
 		
 		/* URIs? */
@@ -248,9 +247,9 @@ class ItemsIterator extends ArrayIterator
 	/**
 	 * Get current
 	 *
-	 * @return	Item
+	 * @return	\IPS\Patterns\ActiveRecord
 	 */
-	public function current(): Item
+	public function current()
 	{
 		return $this->arrayToObject( parent::current() );
 	}
@@ -258,11 +257,11 @@ class ItemsIterator extends ArrayIterator
 	/**
 	 * Get offset
 	 *
-	 * @param	mixed	$key	Index
-	 * @return	Item
+	 * @param	string	$index	Index
+	 * @return	mixed
 	 */
-	public function offsetGet( mixed $key ): Item
+	public function offsetGet( $index )
 	{
-		return $this->arrayToObject( parent::offsetGet( $key ) );
+		return $this->arrayToObject( parent::offsetGet( $index ) );
 	}
 }

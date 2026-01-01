@@ -11,80 +11,42 @@
 namespace IPS\core\Achievements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Image;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\CustomBadge;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecord;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use XMLReader;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Badge Model (as in, a representation of a badge a member *can* earn, not a badge a particular member *has* earned)
  */
-class Badge extends Model
+class _Badge extends \IPS\Node\Model
 {
-	use CustomBadge;
-
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_badges';
+	public static $databaseTable = 'core_badges';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'menu__core_achievements_badges';
+	public static $nodeTitle = 'menu__core_achievements_badges';
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'core_badges_';
+	public static $titleLangPrefix = 'core_badges_';
 
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 * @note	If using this, declare a static $multitonMap = array(); in the child class to prevent duplicate loading queries
 	 */
-	protected static array $databaseIdFields = array('recognize');
-
-	/**
-	 * @brief	[ActiveRecord] Caches
-	 * @note	Defined cache keys will be cleared automatically as needed
-	 */
-	protected array $caches = array( 'badges' );
-
-	/**
-	 * @brief	[ActiveRecord] Attempt to load from cache
-	 * @note	If this is set to TRUE you should define a getStore() method to return the objects from cache
-	 */
-	protected static bool $loadFromCache = true;
+	protected static $databaseIdFields = array('recognize');
 
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -102,7 +64,7 @@ class Badge extends Model
 	'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'achievements',
 		'prefix'	=> 'badges_',
@@ -110,30 +72,23 @@ class Badge extends Model
 	);
 
 	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
-
-	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    ActiveRecord
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): ActiveRecord
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
 		$obj = parent::constructFromData( $data, $updateMultitonStoreIfExists );
 
-		if ( isset( $obj->recognize ) and ! empty( $obj->recognize ) and is_numeric( $obj->recognize ) )
+		if ( isset( $obj->recognize ) and ! empty( $obj->recognize ) )
 		{
 			try
 			{
-				$obj->recognize = Recognize::load( $obj->recognize );
+				$obj->recognize = \IPS\core\Achievements\Recognize::load( $obj->recognize );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				/* Problem loading, so reset to 0 */
 				$obj->recognize = 0;
@@ -151,7 +106,7 @@ class Badge extends Model
 	/**
 	 * @var null|array
 	 */
-	static ?array $badgeAwardLangBits = NULL;
+	static $badgeAwardLangBits = NULL;
 
 	/**
 	 * Show the public reason for this badge award
@@ -164,7 +119,7 @@ class Badge extends Model
 	{
 		if ( static::$badgeAwardLangBits === NULL )
 		{
-			foreach( Db::i()->select( 'word_key, word_default, word_custom', 'core_sys_lang_words', [ 'lang_id=? AND (word_key LIKE \'core_award_subject_badge_%\' OR word_key LIKE \'core_award_other_badge_%\')', Member::loggedIn()->language()->id ] ) as $row )
+			foreach( \IPS\Db::i()->select( 'word_key, word_default, word_custom', 'core_sys_lang_words', [ 'lang_id=? AND (word_key LIKE \'core_award_subject_badge_%\' OR word_key LIKE \'core_award_other_badge_%\')', \IPS\Member::loggedIn()->language()->id ] ) as $row )
 			{
 				static::$badgeAwardLangBits[ $row['word_key'] ] = $row['word_custom'] ?: $row['word_default'];
 			}
@@ -172,33 +127,23 @@ class Badge extends Model
 
 		return static::$badgeAwardLangBits['core_award_' . $actor . '_badge_' . $ruleId] ?? NULL;
 	}
-
-	/**
-	 * @brief	Toggle off these fields when generating a custom badge
-	 *
-	 * @var array|string[]
-	 */
-	public static array $customBadgeToggles = [ 'badge_image' ];
 	
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		/* Allow SVGs without the obscure hash removing the file extension */
-		File::$safeFileExtensions[] = 'svg';
+		\IPS\File::$safeFileExtensions[] = 'svg';
 
-		$form->add( new Translatable( 'badge_name', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? "core_badges_{$this->id}" : NULL ) ) ) );
-
-		parent::form( $form );
-
-		$form->add( new Upload( 'badge_image', $this->image ? File::get( 'core_Badges', $this->image ) : NULL, TRUE, array( 'obscure' => TRUE, 'checkImage' => TRUE, 'allowedFileTypes' => array_merge( Image::supportedExtensions(), ['svg'] ), 'storageExtension' => 'core_Badges', 'allowStockPhotos' => FALSE ), function( $val ) {
+		$form->add( new \IPS\Helpers\Form\Translatable( 'badge_name', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? "core_badges_{$this->id}" : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'badge_image', $this->image ? \IPS\File::get( 'core_Badges', $this->image ) : NULL, TRUE, array( 'obscure' => TRUE, 'checkImage' => TRUE, 'allowedFileTypes' => array_merge( \IPS\Image::supportedExtensions(), ['svg'] ), 'storageExtension' => 'core_Badges', 'allowStockPhotos' => FALSE ), function( $val ) {
 			if( !$val )
 			{
-				throw new DomainException('achievements_bad_image');
+				throw new \DomainException('achievements_bad_image');
 			}
 
 			/* Good luck with your fancy SVG */
@@ -207,16 +152,16 @@ class Badge extends Model
 			{
 				try
 				{
-					$image = Image::create( $val->contents() );
+					$image = \IPS\Image::create( $val->contents() );
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
-					throw new DomainException( 'achievements_bad_image' );
+					throw new \DomainException( 'achievements_bad_image' );
 				}
 			}
-		}, null, null, 'badge_image' ) );
+		} ) );
 
-		$form->add( new YesNo( 'badge_manually_awarded', $this->manually_awarded ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'badge_manually_awarded', $this->manually_awarded ) );
 	}
 	
 	/**
@@ -225,21 +170,21 @@ class Badge extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( !$this->id )
 		{
 			$this->save();
 		}
 		
-		Lang::saveCustom( 'core', "core_badges_{$this->id}", $values['badge_name'] );
+		\IPS\Lang::saveCustom( 'core', "core_badges_{$this->id}", $values['badge_name'] );
 		unset( $values['badge_name'] );
 		
 		$_values = $values;
 		$values = array();
 		foreach ( $_values as $k => $v )
 		{
-			if( in_array( $k, [ 'badge_image', 'badge_manually_awarded' ] ) )
+			if( mb_substr( $k, 0, 6 ) === 'badge_' )
 			{
 				$values[ mb_substr( $k, 6 ) ] = $v;
 			}
@@ -248,13 +193,7 @@ class Badge extends Model
 				$values[ $k ]	= $v;
 			}
 		}
-
-		$values['badge_use_image'] = !$values['custombadge_use_custom'];
-		if( !$values['badge_use_image'] )
-		{
-			$values['image'] = null;
-		}
-
+		
 		return $values;
 	}
 	
@@ -264,37 +203,21 @@ class Badge extends Model
 	 * @note	Return the class for the icon (e.g. 'globe', the 'fa fa-' is added automatically so you do not need this here)
 	 * @return	string|null
 	 */
-	protected function get__icon(): mixed
+	protected function get__icon()
 	{
-		if ( !$this->badge_use_image and $badge = $this->getRecordBadge() )
-		{
-            if( !$badge->file() )
-            {
-                $badge->save();
-            }
-
-			return $badge->file()->url;
-		}
-
-		if( $this->image )
-		{
-			return File::get( 'core_Badges', $this->image );
-		}
-
-		return null;
+		return \IPS\File::get( 'core_Badges', $this->image );
 	}
-
+	
 	/**
 	 * Get badge HTML
 	 *
-	 * @param string|null $cssClass Additional CSS class to apply
-	 * @param bool|null $tooltip Whether or not to apply a tooltip to the badge
-	 * @param bool|null $showRare
-	 * @return    string
+	 * @param	string|null		$cssClass	Additional CSS class to apply
+	 * @param	bool|null		$tooltip	Whether or not to apply a tooltip to the badge
+	 * @return	string
 	 */
 	public function html( ?string $cssClass = NULL, ?bool $tooltip = TRUE, ?bool $showRare = FALSE ): string
 	{
-		return Theme::i()->getTemplate( 'global', 'core', 'global' )->badge( $this, $cssClass, $tooltip, $showRare );
+		return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->badge( $this, $cssClass, $tooltip, $showRare );
 	}
 	
 	/**
@@ -304,23 +227,23 @@ class Badge extends Model
 	 */
 	public function isRare(): bool
 	{
-		if ( !Settings::i()->rare_badge_percent )
+		if ( !\IPS\Settings::i()->rare_badge_percent )
 		{
 			return FALSE;
 		}
 
 		$stats = $this->getBadgeStats();
 
-		return ( 100 / $stats['memberCount'] * $stats['badgeCount'][ $this->id ] ) < Settings::i()->rare_badge_percent;
+		return ( 100 / $stats['memberCount'] * $stats['badgeCount'][ $this->id ] ) < \IPS\Settings::i()->rare_badge_percent;
 	}
 
 	/**
 	 * Return number of people who have this badge
 	 *
 	 * @param bool|null $roundUp Round number to nearest 100 to be less specific
-	 * @return int|null
+	 * @return int
 	 */
-	public function ownedByCount( ?bool $roundUp=FALSE ) : ?int
+	public function ownedByCount( bool $roundUp=FALSE )
 	{
 		if ( $stats = $this->getBadgeStats() and isset( $stats['badgeCount'][ $this->id ] ) )
 		{
@@ -347,9 +270,9 @@ class Badge extends Model
 		/* Fetch the counts we need from the datastore. If they are old or non-existent, refresh and store in datastore for next time. */
 		$stats	= NULL;
 
-		if( isset( Store::i()->badgeStats ) )
+		if( isset( \IPS\Data\Store::i()->badgeStats ) )
 		{
-			$stats	= json_decode( Store::i()->badgeStats, true );
+			$stats	= json_decode( \IPS\Data\Store::i()->badgeStats, true );
 
 			if( !isset( $stats['expiration'] ) OR time() > $stats['expiration'] OR !isset( $stats['badgeCount'][ $this->id ] ) )
 			{
@@ -359,35 +282,35 @@ class Badge extends Model
 
 		if( $stats === NULL )
 		{
-			$exclude = json_decode( Settings::i()->rules_exclude_groups, TRUE );
+			$exclude = json_decode( \IPS\Settings::i()->rules_exclude_groups, TRUE );
 			$where   = [ [ 'completed=?', true ] ];
 			$subQuery = NULL;
 
-			if ( is_array( $exclude ) and count( $exclude ) )
+			if ( \is_array( $exclude ) and \count( $exclude ) )
 			{
-				$subQuery = Db::i()->select( 'member_id', 'core_members', [ Db::i()->in( 'member_group_id', $exclude ) ] );
-				$where[]  = [ Db::i()->in( 'member_group_id', $exclude, TRUE ) ];
+				$subQuery = \IPS\Db::i()->select( 'member_id', 'core_members', [ \IPS\Db::i()->in( 'member_group_id', $exclude ) ] );
+				$where[]  = [ \IPS\Db::i()->in( 'member_group_id', $exclude, TRUE ) ];
 			}
 
 			$stats	= array(
 				'expiration'	=> time() + ( 3600 * 6 ),		// Cache for 6 hours
-				'memberCount'	=> Db::i()->select( 'COUNT(*)', 'core_members', $where )->first(),
+				'memberCount'	=> \IPS\Db::i()->select( 'COUNT(*)', 'core_members', $where )->first(),
 				'badgeCount'	=> array(),
 			);
 
-			foreach( Db::i()->select( 'id', 'core_badges' ) as $badgeId )
+			foreach( \IPS\Db::i()->select( 'id', 'core_badges' ) as $badgeId )
 			{
 				$where = [ [ 'badge=?', $badgeId ] ];
 
-				if ( is_array( $exclude ) and count( $exclude ) )
+				if ( \is_array( $exclude ) and \count( $exclude ) )
 				{
-					$where[]  = [ Db::i()->in( 'core_member_badges.member', $subQuery, TRUE ) ];
+					$where[]  = [ \IPS\Db::i()->in( 'core_member_badges.member', $subQuery, TRUE ) ];
 				}
 
-				$stats['badgeCount'][ $badgeId ] = Db::i()->select( 'COUNT(*)', 'core_member_badges', $where )->first();
+				$stats['badgeCount'][ $badgeId ] = \IPS\Db::i()->select( 'COUNT(*)', 'core_member_badges', $where )->first();
 			}
 
-			Store::i()->badgeStats = json_encode( $stats );
+			\IPS\Data\Store::i()->badgeStats = json_encode( $stats );
 		}
 
 		return $stats;
@@ -410,17 +333,17 @@ class Badge extends Model
 
 		parent::__clone();
 
-		Lang::saveCustom( 'core', "core_badges_{$this->id}", iterator_to_array( Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', "core_badges_{$oldId}" ) )->setKeyField( 'lang_id' )->setValueField('word_custom') ) );
+		\IPS\Lang::saveCustom( 'core', "core_badges_{$this->id}", iterator_to_array( \IPS\Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', "core_badges_{$oldId}" ) )->setKeyField( 'lang_id' )->setValueField('word_custom') ) );
 		
 		if ( $oldImage )
 		{
 			try
 			{
-				$image = File::get( 'core_Badges', $oldImage );
-				$newImage = File::create( 'core_Badges', $image->originalFilename, $image->contents() );
+				$image = \IPS\File::get( 'core_Badges', $oldImage );
+				$newImage = \IPS\File::create( 'core_Badges', $image->originalFilename, $image->contents() );
 				$this->image = (string) $newImage;
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
 				$this->image = NULL;
 			}
@@ -432,47 +355,29 @@ class Badge extends Model
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		/* Remove from recognize where just the badge is used, and no points */
-		Db::i()->delete( 'core_member_recognize', [ 'r_points=0 and r_badge=?', $this->id ] );
+		\IPS\Db::i()->delete( 'core_member_recognize', [ 'r_points=0 and r_badge=?', $this->id ] );
 
 		/* Remove the badge from recognize, but leave points */
-		Db::i()->update( 'core_member_recognize', [ 'r_badge' => 0 ], [ 'r_badge=?', $this->id ] );
+		\IPS\Db::i()->update( 'core_member_recognize', [ 'r_badge' => 0 ], [ 'r_badge=?', $this->id ] );
 
 		if ( $this->image )
 		{
 			try
 			{
-				File::get( 'core_Badges', $this->image )->delete();
+				\IPS\File::get( 'core_Badges', $this->image )->delete();
 			}
-			catch( Exception $ex ) { }
+			catch( \Exception $ex ) { }
 		}
 		
 		parent::delete();
 
-		Db::i()->delete( 'core_member_badges', [ 'badge=?', $this->id ] );
-		Lang::deleteCustom( 'core', "core_badges_{$this->id}" );
-	}
-
-	/**
-	 * Attempt to load cached data
-	 *
-	 * @note	This should be overridden in your class if you define $cacheToLoadFrom
-	 * @return    array
-	 */
-	public static function getStore(): array
-	{
-		try
-		{
-			return Store::i()->badges;
-		}
-		catch( OutOfRangeException ){}
-
-		Store::i()->badges = iterator_to_array( Db::i()->select( '*', static::$databaseTable, NULL, static::$databasePrefix . static::$databaseColumnId )->setKeyField( static::$databasePrefix . static::$databaseColumnId ) );
-		return Store::i()->badges;
+		\IPS\Db::i()->delete( 'core_member_badges', [ 'badge=?', $this->id ] );
+		\IPS\Lang::deleteCustom( 'core', "core_badges_{$this->id}" );
 	}
 
 	/**
@@ -482,7 +387,7 @@ class Badge extends Model
 	 */
 	public static function show(): bool
 	{
-		return !( ( Settings::i()->achievements_rebuilding or !Settings::i()->achievements_enabled ) );
+		return !( ( \IPS\Settings::i()->achievements_rebuilding or !\IPS\Settings::i()->achievements_enabled ) );
 	}
 
 	/**
@@ -493,7 +398,7 @@ class Badge extends Model
 	public static function getAssignedBadgeIds(): array
 	{
 		$assignedBadges = [];
-		foreach( Db::i()->select( 'badge_subject, badge_other', 'core_achievements_rules', [ 'badge_subject > 0 or badge_other > 0' ] ) as $row )
+		foreach( \IPS\Db::i()->select( 'badge_subject, badge_other', 'core_achievements_rules', [ 'badge_subject > 0 or badge_other > 0' ] ) as $row )
 		{
 			if ( $row['badge_subject'] )
 			{
@@ -517,14 +422,14 @@ class Badge extends Model
 	 *
 	 * @return	void
 	 */
-	public static function importXml( string $file, bool $deleteExisting=FALSE ) : void
+	public static function importXml( $file, $deleteExisting=FALSE )
 	{
 		/* Open XML file */
 		$xml = \IPS\Xml\XMLReader::safeOpen( $file );
 
 		if ( ! @$xml->read() )
 		{
-			throw new DomainException( 'xml_upload_invalid' );
+			throw new \DomainException( 'xml_upload_invalid' );
 		}
 
 		/* Did we want to wipe first? */
@@ -533,12 +438,12 @@ class Badge extends Model
 			$assignedBadges = static::getAssignedBadgeIds();
 
 			$where = NULL;
-			if ( count( $assignedBadges ) )
+			if ( \count( $assignedBadges ) )
 			{
-				$where = [ Db::i()->in( '`id`', $assignedBadges, TRUE ) ];
+				$where = [ \IPS\Db::i()->in( '`id`', $assignedBadges, TRUE ) ];
 			}
 
-			foreach( Db::i()->select('*', 'core_badges', $where ) as $row )
+			foreach( \IPS\Db::i()->select('*', 'core_badges', $where ) as $row )
 			{
 				static::constructFromData( $row )->delete();
 			}
@@ -547,7 +452,7 @@ class Badge extends Model
 		/* Start looping through each row */
 		while ( $xml->read() and $xml->name == 'badge' )
 		{
-			if( $xml->nodeType != XMLReader::ELEMENT )
+			if( $xml->nodeType != \XMLReader::ELEMENT )
 			{
 				continue;
 			}
@@ -557,7 +462,7 @@ class Badge extends Model
 
 			while ( $xml->read() and $xml->name != 'badge' )
 			{
-				if( $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -581,17 +486,17 @@ class Badge extends Model
 
 			if ( ! empty( $insert['icon_name'] ) and ! empty( $insert['icon_data'] ) )
 			{
-				$insert['image'] = (string) File::create( 'core_Badges', $insert['icon_name'], $insert['icon_data'], NULL, TRUE, NULL, FALSE );
+				$insert['image'] = (string) \IPS\File::create( 'core_Badges', $insert['icon_name'], $insert['icon_data'], NULL, TRUE, NULL, FALSE );
 
 				unset( $insert['icon_name'] );
 				unset( $insert['icon_data'] );
 			}
 
-			$insertId = Db::i()->insert( 'core_badges', $insert );
+			$insertId = \IPS\Db::i()->insert( 'core_badges', $insert );
 
 			if ( ! empty( $title ) )
 			{
-				Lang::saveCustom( 'core', "core_badges_{$insertId}", $title );
+				\IPS\Lang::saveCustom( 'core', "core_badges_{$insertId}", $title );
 			}
 		}
 	}
@@ -599,20 +504,20 @@ class Badge extends Model
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	int			id				ID number
 	 * @apiresponse	string		name			Name
-	 * @apiresponse	array		statistics				Badge Statistics
+	 * @apiresponse	array		statistcs				Badge Statistics
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
-		$stats = $this->getBadgeStats();
-
-		return array(
+		$return = array(
 			'id'			=> $this->id,
 			'name'			=> $this->_title,
-			'statistics'	=> [ 'badgeCount' => $stats['badgeCount'][ $this->id ] ?? 0 ]
+			'statistics'	=> $this->getBadgeStats(),
 		);
+
+		return $return;
 	}
 }

@@ -1,26 +1,118 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <javascript app="gallery">
- <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/global" javascript_name="ips.global.nsfw.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000200">;( function($, _, undefined){
+ <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/browse" javascript_name="ips.browse.carousel.js" javascript_type="controller" javascript_version="107827" javascript_position="1000200"><![CDATA[/**
+ * Invision Community
+ * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
+ *
+ * ips.browse.carousel.js - Controller for Gallery carousel
+ *
+ * Author: Ehren Harber
+ */
+;( function(){
+	"use strict";
+
+	ips.controller.register('gallery.front.browse.carousel', {
+		
+		initialize () {
+
+			this.carouselControls = this.scope[0].closest('[data-carousel-controls]');
+			this.carousel = document.getElementById(this.carouselControls.dataset.carouselControls);
+
+			if(this.carouselControls && this.carousel.scrollWidth > this.carousel.clientWidth){
+				this.showArrows();
+			} else {
+				return;
+			}
+
+			this.buttons = this.scope[0].querySelectorAll('[data-carousel-arrow]');
+			this.buttons.forEach(button => {
+				button.addEventListener('click', this.scrollPanels);
+			});
+
+		},
+
+		showArrows: function(){
+
+			this.carouselControls.hidden = false;
+
+		},
+
+		scrollPanels: function(ev) {
+
+			let carouselControls = this.closest('[data-carousel-controls]'),
+				carousel = document.getElementById(carouselControls.dataset.carouselControls),
+				direction = this.dataset.carouselArrow,
+				currentScroll = carousel.scrollLeft,
+			 	scrollByVar = getComputedStyle(carousel).getPropertyValue('--carousel--scroll'),
+			 	carouselChildWidth = carousel.firstElementChild.offsetWidth,
+			 	scrollBy = scrollByVar * (carouselChildWidth);
+
+			if (direction == 'prev'){
+			 	scrollBy = -scrollBy;
+			}
+			if (currentScroll == '0' && direction == 'prev'){
+				carousel.scrollLeft = carousel.scrollWidth;
+			} else if ((currentScroll == carousel.scrollWidth - carousel.clientWidth) && (direction == 'next')){
+				carousel.scrollLeft = 0;
+			} else {
+				carousel.scrollLeft = currentScroll + scrollBy;
+			}
+		},
+
+	});
+}());]]></file>
+ <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/browse" javascript_name="ips.browse.list.js" javascript_type="controller" javascript_version="107827" javascript_position="1000200">/**
+ * Invision Community
+ * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
+ *
+ * ips.browse.list.js - Gallery browse list controller
+ *
+ * Author: Rikki Tissier
+ */
+;( function($, _, undefined){
+	&quot;use strict&quot;;
+
+	ips.controller.register('gallery.front.browse.list', {
+
+		initialize: function () {
+			this.on( 'change', '[data-role=&quot;moderation&quot;]', this.selectImage );
+		},
+
+		/**
+		 * Toggles classes when the moderation checkbox is checked
+		 *
+		 * @param	{event} 	e 		Event object
+		 * @returns {void}
+		 */
+		selectImage: function (e) {
+			var row = $( e.currentTarget ).closest('.cGalleryImageItem');
+			row.toggleClass( 'cGalleryImageItem_selected', $( e.currentTarget ).is(':checked') );
+		}
+	});
+}(jQuery, _));</file>
+ <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/global" javascript_name="ips.global.nsfw.js" javascript_type="controller" javascript_version="107827" javascript_position="1000250">;( function($, _, undefined){
     &quot;use strict&quot;;
 
     ips.controller.register('gallery.front.global.nsfw', {
 
         initialize () {
-            this.on( 'click', '.ipsNsfwOverlay button', this.removeOverlays );
+            this.on( 'click', '.ipsImageBlock__nsfw button', this.removeOverlays );
         },
 
         removeOverlays( e ) {
-            let expires = new Date();
+            e.preventDefault();
+
+            var expires = new Date();
             expires.setDate( expires.getDate() + 365 );
             ips.utils.cookie.set( 'nsfwImageOptIn', true, expires.toUTCString() );
 
-            $('.ipsNsfwOverlay').fadeOut(500, function() { this.remove() });
+            $('.ipsImageBlock__nsfw').fadeOut(500, function() { this.remove() });
         },
 
     });
 
 }(jQuery, _));</file>
- <file javascript_app="gallery" javascript_location="admin" javascript_path="controllers/settings" javascript_name="ips.settings.settings.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050">/**
+ <file javascript_app="gallery" javascript_location="admin" javascript_path="controllers/settings" javascript_name="ips.settings.settings.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -77,7 +169,7 @@
 
 	});
 }(jQuery, _));</file>
- <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.chooseCategory.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.chooseCategory.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -154,8 +246,41 @@
 		 * @returns {void}
 		 */
 		_resizeFormDiv: function (form) {
-			this.scope.find('[data-role="chooseAlbumType"]').attr("hidden", "");
-			form.removeAttr("hidden");
+			this.scope.find('[data-role="chooseAlbumType"]').hide();
+			var self = this;
+
+			var resize = function (animate) {
+				var height = form.innerHeight() + 130;
+				var submitHeight = form.find('.cGalleryDialog_submitBar').height();
+				
+				if( animate ){
+					self.scope.closest('.cGalleryDialog').animate({
+						minHeight: ( height + submitHeight ) + 'px'
+					});
+				} else {
+					self.scope.closest('.cGalleryDialog').css({
+						minHeight: ( height + submitHeight ) + 'px'
+					});
+				}
+			}
+
+			form.show().css({
+				opacity: "0.001"
+			});
+
+			if( this.scope.closest('.ipsDialog').length ){
+				resize(true);
+			}
+
+			form.animate({
+				opacity: "1"
+			}, function () {
+				if( self.scope.closest('.ipsDialog').length ){
+					self._resizeTimer = setInterval( function () {
+						resize(false);
+					}, 500);
+				}
+			});
 		},
 
 		/**
@@ -244,7 +369,7 @@
 	});
 }(jQuery, _));
 ]]></file>
- <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.existingAlbums.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.existingAlbums.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -263,7 +388,18 @@
 		 */
 		initialize: function () {
 			this.on( 'click', '#elGallerySubmit_albumChooser > li', this.clickAlbum );
-			this.clickAlbum();
+			this._checkSelected();
+		},
+
+		/**
+		 * Event handler for clicking an album entry
+		 *
+		 * @param	{event} 	e 	Event object
+		 * @returns {void}
+		 */
+		clickAlbum: function (e) {
+			$( e.currentTarget ).find('input[type="radio"]').prop( 'checked', true );
+			this._checkSelected();
 		},
 
 		/**
@@ -271,16 +407,16 @@
 		 *
 		 * @returns {void}
 		 */
-		clickAlbum: function (e) {
-			if( this.scope.find('[name="existing_album"]:checked').length ){
-				this.scope.find('[type="submit"]').prop( 'disabled', false );
+		_checkSelected: function () {
+			if( this.scope.find('input[name="existing_album"]:checked').length ){
+				this.scope.find('button[type="submit"]').prop( 'disabled', false );
 			} else {
-				this.scope.find('[type="submit"]').prop( 'disabled', true );
+				this.scope.find('button[type="submit"]').prop( 'disabled', true );
 			}
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.uploadImages.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.uploadImages.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -327,8 +463,8 @@
 			$('.cGallerySubmit_bottomBar').removeClass('ipsHide');
 
 			//  We want to move the allowed types of files span
-			$('[data-role="allowedTypes"]').html( this.scope.find('span.i-color_soft.i-font-size_-2').html() );
-			this.scope.find('span.i-color_soft.i-font-size_-2').remove();
+			$('[data-role="allowedTypes"]').html( this.scope.find('span.ipsType_light.ipsType_small').html() );
+			this.scope.find('span.ipsType_light.ipsType_small').remove();
 
 			//  And change the uploader message
 			this.scope.find('.ipsAttachment_supportDrag').html( ips.getString('uploader_add_images') );
@@ -411,7 +547,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.wrapper.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.wrapper.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -449,7 +585,7 @@
 			this.on( 'click', '[data-role="imageDescriptionUseEditor"]', this.setUpImageDescriptionRich );
 			this.on( 'click', '[data-role="imageDescriptionUseTextarea"]', this.setUpImageDescriptionPlain );
 			this.on( 'click', '[data-role="addCopyrightCredit"]', this.showCopyrightCredit );
-			this.on( 'click', '[data-role="saveDetails"]', this.saveDetails );
+			this.on( 'click', '[data-role="saveInfo"]', this.saveInfo );
 
 			// Handle events from uploader
 			this.on( 'gallery.activateSubmitButton', this.activateSubmitButton );
@@ -471,8 +607,8 @@
 		 * @returns {void}
 		 */
 		setup: function () {
-			// On initial load, destroy the tiptap object as it will be recreated for each individual form
-			ips.ui.editorv5.destruct( this.scope.find('[data-ipseditorv5]') );
+			// On initial load, destroy the ckeditor object as it will be recreated for each individual form
+			ips.ui.editor.destruct( this.scope.find('[data-ipseditor]') );
 
 			if( this.scope.find('.cGalleryDialog_imageForm').is(':visible') ){
 				this._enlargeUploadStep();
@@ -562,35 +698,13 @@
 		},
 
 		/**
-		 * Mobile-specific functionality for 'save' button
+		 * Closes the copyright/credit menu
 		 *
 		 * @returns {void}
 		 */
-		saveDetails: function (e) {
-			if( e ){
-				e.preventDefault();
-			}
-
-			this._markActiveImageAsSaved();
-
-			// Show and then hide a 'saved' message
-			$(e.currentTarget).next('[data-role="savedMessage"]').fadeIn();
-			setTimeout( function () {
-				$(e.currentTarget).next('[data-role="savedMessage"]').fadeOut();
-			}, 2000 );
-
-			// Hide any error messages
-			if( e ){
-				$( e.currentTarget ).closest('.cGallerySubmit_details').find('[data-errorField]').hide();
-			}
-
-			// Mobile-only behavior
-			if( ips.utils.responsive.enabled() && ips.utils.responsive.currentIs('phone') ){
-				// Fade out details form
-				this._toggleDetailsPanelMobile(false);
-				// Remove active selection styles
-				this.scope.find('.cGallerySubmit_activeFile').removeClass('cGallerySubmit_activeFile');
-			}
+		saveInfo: function (e) {
+			e.preventDefault();
+			$(e.currentTarget).trigger('closeMenu');
 		},
 
 		/**
@@ -639,22 +753,33 @@
 		 * @returns {void}
 		 */
 		setUpImageDetailsForm: function (e) {
+
 			// Remove selection from all other files
 			this.scope.find('.cGallerySubmit_activeFile').removeClass('cGallerySubmit_activeFile');
 			$( e.currentTarget ).addClass('cGallerySubmit_activeFile');
+			let imageId;
+			let tempId;
+			const detailsPanel = this.scope.find('[data-role="imageDetails"]');
 
 			// Get the image ID first
-			if( $( e.currentTarget ).attr('data-fileid').indexOf('o_') != -1 )
-			{
-				var imageId = $('input[name="images_existing\\[' + $( e.currentTarget ).attr('data-fileid') + '\\]"').val();
-			}
-			else
-			{
-				var imageId = $( e.currentTarget ).attr('data-fileid');
+			if ($(e.currentTarget).attr('data-uploading-temp-id')) {
+				// if the details pane was opened before the fileid was set, we use the existing temp id
+				imageId = $(e.currentTarget).attr('data-uploading-temp-id')
+			} else if( $( e.currentTarget ).attr('data-fileid').startsWith('o_') ) {
+				imageId = $('input[name="images_existing\\[' + $( e.currentTarget ).attr('data-fileid') + '\\]"').val();
+				if (!imageId) {
+					imageId = $(e.currentTarget).attr('data-fileid');
+					$(e.currentTarget).attr('data-uploading-temp-id', $(e.currentTarget).attr('data-fileid'))
+				}
+			} else if ( $(e.currentTarget).attr('data-fileid') && parseInt($(e.currentTarget).attr('data-fileid')) ) {
+				imageId = $( e.currentTarget ).attr('data-fileid');
+			} else {
+				// in this case, we assume it's still uploading
+				tempId = imageId = Math.round(Math.random() * Math.pow(2, 32)).toString(16)
+				$(e.currentTarget).attr('data-uploading-temp-id', imageId)
 			}
 
-			var imagePreview = $( e.currentTarget ).find('[data-role="preview"] img').attr('src');
-			var detailsPanel = this.scope.find('[data-role="imageDetails"]');
+			var imagePreview = $( e.currentTarget ).find('.ipsImage').attr('src');
 
 			// Hide our existing form, if any
 			detailsPanel.find('.cGallerySubmit_details, [data-role="submitHelp"]').hide();
@@ -668,6 +793,7 @@
 				}
 			} else {
 				// Otherwise, clone our existing form to use
+				$('[data-role="defaultImageDetailsForm"]').find('#cke_filedata__image_description_DEFAULT').remove();
 				var htmlToInsert = $('[data-role="defaultImageDetailsForm"]').html();
 				htmlToInsert	 = '<div id="image_details_' + imageId + '">' + htmlToInsert.replace( /name="image_tags_DEFAULT"/g, 'name="image_tags_DEFAULT" data-ipsAutocomplete ').replace( /_DEFAULT/g, '_' + imageId ) + "</div>";
 
@@ -681,17 +807,25 @@
 				var filenameWithoutExt = filename.replace(/\.[^/.]+$/, '');
 				$('#elInput_image_title_' + imageId ).val( filenameWithoutExt );
 
+				// Fix yes/no fields as they will reinitialize and break
+				detailsPanel.find('> form #image_details_' + imageId ).find('.ipsToggle').remove();
 
 				if( !_.isUndefined( imagePreview ) ){
 					imageForm
 						.find('.cGallerySubmit_preview')
-							.html( $("<img class='ipsImage' alt=''/>").attr('src', imagePreview ) )
+							.removeClass('ipsBox_transparent')
+							.removeClass('ipsNoThumb')
+							.removeClass('ipsNoThumb_video')
+							.html( $("<img class='ipsImage'/>").attr('src', imagePreview ) )
 							.show();
 				}
 				else {
 					imageForm
 						.find('.cGallerySubmit_preview')
-							.html("<i></i>")
+							.addClass('ipsBox_transparent')
+							.addClass('ipsNoThumb')
+							.addClass('ipsNoThumb_video')
+							.html("")
 							.show();
 				}
 
@@ -764,16 +898,16 @@
 		 * @returns {void}
 		 */
 		setUpImageDescriptionRich: function(e) {
-			const currentDescription = $(e.currentTarget).closest('[data-role="imageDescriptionTextarea"]')
-				.find('> textarea')
+			var currentDescription = $( e.currentTarget ).closest('[data-role="imageDescriptionTextarea"]')
+				.find( '> textarea' )
 				.val()
 				.trim();
 			if( currentDescription.length ){
-				const editorObj = ips.ui.editorv5.getObj($(e.currentTarget).closest('[data-role="imageDescriptionTextarea"]')
+				var editorObj = ips.ui.editor.getObj( $( e.currentTarget ).closest('[data-role="imageDescriptionTextarea"]')
 					.prev('[data-role="imageDescriptionEditor"]')
-					.find('[data-ipseditorv5]'));
-				const editorInstance = editorObj.getInstance();
-				editorInstance.commands.setContent( currentDescription );
+					.find('[data-ipseditor]') );
+				var editorInstance = editorObj.getInstance();
+				editorInstance.setData( currentDescription );
 				$( e.currentTarget ).closest('[data-role="imageDescriptionTextarea"]')
 					.find( '> textarea' )
 					.val('');
@@ -793,9 +927,9 @@
 		 * @returns {void}
 		 */
 		setUpImageDescriptionPlain: function (e) {
-			const editorObj = ips.ui.editorv5.getObj($(e.currentTarget).closest('[data-role="imageDescriptionEditor"]')
-				.find('[data-ipseditorv5]'));
-			const currentDescription = $(editorObj.getInstance().getHTML()).text()
+			var editorObj = ips.ui.editor.getObj( $( e.currentTarget ).closest('[data-role="imageDescriptionEditor"]')
+				.find('[data-ipseditor]') );
+			var currentDescription = $( editorObj.getInstance().getData() ).text()
 				.trim();
 			if( currentDescription.length ){
 				$( e.currentTarget ).closest('[data-role="imageDescriptionEditor"]')
@@ -846,12 +980,12 @@
 			// If we are submitting images, get the info we need
 			if( form.attr('id') == 'elGallerySubmit' ){
 				// Sync editor to its textarea
-				this.scope.find('[data-ipseditorv5]').each( function(){
+				this.scope.find('[data-ipseditor]').each( function(){
 					try {
-						var editorObj = ips.ui.editorv5.getObj( $( this ) );
+						var editorObj = ips.ui.editor.getObj( $( this ) );
 						var editorInstance = editorObj.getInstance();
 
-						$( this ).find('textarea[data-role="contentEditor"]').val( editorInstance.getHTML() );
+						$( this ).find('textarea[data-role="contentEditor"]').val( editorInstance.getData() );
 					} catch (err) {
 						Debug.error("Couldn't update textarea from editor");
 					}
@@ -898,7 +1032,20 @@
 				form.find('textarea[name="images_order"]').val( JSON.stringify( imageOrder ) );
 
 				// And get the individual image details and store in the submission
-				form.find('textarea[name="images_info"]').val( JSON.stringify( $('#form_imageDetails').serializeArray() ) );
+				const tempIdMap = {}
+				form.find('[data-uploading-temp-id][data-fileid]').each(function() {
+					tempIdMap[$(this).attr('data-uploading-temp-id')] = $(this).attr('data-fileid');
+				})
+
+				form.find('textarea[name="images_info"]').val( JSON.stringify( $('#form_imageDetails').serializeArray().map(({name, value}) => {
+					for(const key in tempIdMap) {
+						if (name.includes(key)) {
+							name = name.replaceAll(key, tempIdMap[key])
+							break;
+						}
+					}
+					return {name, value}
+				}) ) );
 
 				// Hide/disable some stuff
 				this.scope.find('[data-role="imageDetails"]').addClass('ipsHide');
@@ -994,7 +1141,7 @@
 
 			if( response.imageTags && wrapper.find('.cGalleryTagsField').hasClass('ipsHide') ){
 				wrapper.find('.cGalleryTagsField').removeClass('ipsHide');
-				wrapper.find('.cGalleryTagsField .ipsFieldRow__content').append( response.imageTags );
+				wrapper.find('.cGalleryTagsField .ipsFieldRow_content').append( response.imageTags );
 			}
 
 			if( response.tagsField && wrapper.find('.cGalleryTagsButton').hasClass('ipsHide') )	{
@@ -1128,8 +1275,6 @@
 					wrapper.find('[data-role="images"]').animate({
 						opacity: "1"
 					});
-				
-					dialogElem.find('.ipsDialog_close').hide();
 
 					$( document ).trigger( 'contentChange', [ wrapper ] );
 				});
@@ -1155,7 +1300,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.image.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150"><![CDATA[/**
+ <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.image.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1164,22 +1309,7 @@
  * Author: Rikki Tissier
  */
 ;( function($, _, undefined){
-	"use strict";
-
-	/**
-	 * @typedef {{id: number|string, content:string}[]}	ImageNavLinks
-	 * @typedef {Object&{image: string, url: string, info: string, title: string, id: string|number, images_prev: ImageNavLinks, images_next: ImageNavLinks, image_link_current:string}} ImageFetchResponse
-	 */
-
-	const selectorPropertyMap = {
-		comments: '[data-role="imageComments"]',
-		image: '[data-role="imageFrame"]',
-		info: '[data-role="imageInfo"]',
-		breadcrumb_top: 'nav.ipsBreadcrumb--top',
-		breadcrumb_bottom: 'nav.ipsBreadcrumb--bottom',
-		breadcrumb_mobile: 'nav.ipsBreadcrumb--mobile',
-		breadcrumb_off_canvas: 'nav.ipsOffCanvas__breadcrumb'
-	};
+	&quot;use strict&quot;;
 
 	ips.controller.register('gallery.front.view.image', {
 
@@ -1187,17 +1317,9 @@
 			this.on( 'menuOpened', this.menuOpened );
 			this.on( 'menuClosed', this.menuClosed );
 			this.on( document, 'keydown', this.keyDown );
-			this.on( 'click', '[data-action="setAsCover"]', this.setAsCover );
-			this.on( 'click', '[data-action="setAsProfile"]', this.setAsProfile );
-			this.on( 'click', '[data-action="rotateImage"]', this.rotateImage );
-			this.on( 'click', '[data-action="changeImage"]', this.changeImage );
-			this._stateUpdate = e => this.stateUpdate(e);
-			ips.utils.history.replaceState({id: this.getCurrentImageId()}, 'gallery.view.image', window.location.href);
-			window.addEventListener('historychange', this._stateUpdate);
-		},
-
-		destroy() {
-			window.removeEventListener('historychange:gallery.view.image', this._stateUpdate);
+			this.on( 'click', '[data-action=&quot;setAsCover&quot;]', this.setAsCover );
+			this.on( 'click', '[data-action=&quot;setAsProfile&quot;]', this.setAsProfile );
+			this.on( 'click', '[data-action=&quot;rotateImage&quot;]', this.rotateImage );
 		},
 
 		/**
@@ -1232,10 +1354,10 @@
 
 			switch( e.keyCode ){
 				case ips.ui.key.LEFT:
-					this.scope.find('[data-action="changeImage"][data-direction="prev"]')[0].click();
+					this.scope.find('[data-action=&quot;prevMedia&quot;]')[0].click();
 				break;
 				case ips.ui.key.RIGHT:
-					this.scope.find('[data-action="changeImage"][data-direction="next"]')[0].click();
+					this.scope.find('[data-action=&quot;nextMedia&quot;]')[0].click();
 				break;
 			}
 		},
@@ -1309,359 +1431,18 @@
 				showLoading: true
 			} )
 				.done( function (response) {
-					self.scope.find('[data-role="theImage"]')[0].src = response.src;
-					self.scope.find('[data-role="theImage"]').css( { 'width': response.width + 'px', 'height': response.height + 'px' } );
-					self.scope.find('[data-role="theImage"]').closest('.cGalleryViewImage').css( { 'width': response.width + 'px', 'height': response.height + 'px' } );
+					self.scope.find('[data-role=&quot;theImage&quot;]')[0].src = response.src;
+					self.scope.find('[data-role=&quot;theImage&quot;]').css( { 'width': response.width + 'px', 'height': response.height + 'px' } );
+					self.scope.find('[data-role=&quot;theImage&quot;]').closest('.cGalleryViewImage').css( { 'width': response.width + 'px', 'height': response.height + 'px' } );
 					ips.ui.flashMsg.show( response.message );
 				})
 				.fail( function () {
 					window.location = url;
 				});
-		},
-
-		/**
-		 * Fetch new image and replace existing HTML so we don't need to refresh the page
-		 *
-		 * @param	{Event} 	e 		Event object
-		 * @returns {void}
-		 */
-		changeImage: async function(e){
-			e.preventDefault();
-
-			let commentTab;
-			const tabsContainer = this.elem.querySelector(`${selectorPropertyMap.comments} i-tabs`);
-			if (tabsContainer) {
-				let tab = tabsContainer.querySelector(`[href][aria-selected="true"]`)?.href;
-				if (tab && tab.endsWith('comments')) {
-					commentTab = 'comments';
-				} else if (tab) {
-					commentTab = 'reviews';
-				}
-			}
-			let url = $( e.currentTarget ).attr('href');
-			const currentId = this.getCurrentImageId();
-			const urlObj = new URL(url, window.location.href);
-			urlObj.updateSearchParams({param: 'browse', value: '1'});
-
-			try {
-				// Fetch new image data
-				let selectedId;
-				if (urlObj.searchParams.get('do') === 'previous' && currentId && currentId in this._prevIdCache) {
-					selectedId = this._prevIdCache[currentId];
-				} else if (urlObj.searchParams.get('do') === 'next' && currentId && currentId in this._nextIdCache) {
-					selectedId = this._nextIdCache[currentId];
-				} else if (e.currentTarget.closest(`#gallery-image-thumbs > [data-image-id]`)) {
-					selectedId = e.currentTarget.closest(`#gallery-image-thumbs > [data-image-id]`).dataset.imageId;
-				}
-
-				if (selectedId && selectedId === currentId) {
-					Debug.log(`Not loading image ${selectedId} from ${urlObj} because it is the current image`);
-					return;
-				}
-
-				for (const selector of Object.values(selectorPropertyMap)) {
-					this.elem.querySelectorAll(`${selector}:not(${selector} *)`).forEach(el => el.classList.add('ipsLoading'));
-				}
-
-				const response = await this.fetchImageData(urlObj.toString(), commentTab, selectedId);
-
-				// Update browser URL
-				url = new URL(response.url, window.location.href)
-				if (commentTab) {
-					url.updateSearchParams({param: "tab", value: commentTab});
-				}
-				ips.utils.history.pushState({url:url.toString(), response, commentTab, id: response.id.toString()}, `gallery.view.image`, url.toString(), e);
-				if (this.historyPromise) {
-					await this.historyPromise;
-				}
-
-				const currentThumbIDs = new Set(
-					[...this.elem.querySelectorAll("#gallery-image-thumbs [data-image-id]")]
-						.map(elem => elem.dataset.imageId)
-				);
-
-				let thumbsChanged = false;
-				for (const thumb of this.elem.querySelectorAll("#gallery-image-thumbs [data-image-id]")) {
-					if (!currentThumbIDs.has(thumb.dataset.imageId)) {
-						thumbsChanged = true;
-						break;
-					}
-					currentThumbIDs.delete(thumb.dataset.imageId);
-				}
-
-				if (currentThumbIDs.size && !thumbsChanged) {
-					thumbsChanged = true;
-				}
-				selectedId = this.getCurrentImageId();
-				if (selectedId) {
-					// We need to clear out the existing prev/next associations if an image was added or deleted, otherwise it will skip images and/or display the cached deleted image and content feed, creating issues
-					if (thumbsChanged) {
-						this._prevIdCache = {};
-						this._nextIdCache = {};
-					}
-
-					const urlObj = new URL(response.url, window.location.href);
-					if (urlObj.searchParams.get('do') === 'previous' && currentId) {
-						this._prevIdCache[currentId] = selectedId;
-						this._nextIdCache[selectedId] = currentId;
-					} else if (urlObj.searchParams.get('do') === 'next' && currentId) {
-						this._nextIdCache[currentId] = selectedId;
-						this._prevIdCache[selectedId] = currentId;
-					}
-				}
-			} catch (e) {
-				Debug.warn(e);
-			}
-		},
-
-		/**
-		 * Get the image data based on details
-		 * @param url
-		 * @param commentTab
-		 * @param id
-		 * @return {Promise<ImageFetchResponse>}
-		 */
-		async fetchImageData(url, commentTab, id) {
-			url = new URL(url, window.location.href)
-				.updateSearchParams({params: {
-					tab: ['comments','reviews'].includes(commentTab) ? commentTab : null, // null removes this param if it's set
-					browse: 1,
-				}})
-				.toString();
-			commentTab = commentTab || 'reviews';
-			const response = this._resultCache?.[commentTab]?.[id] || await ips.fetch(url, {bypassRedirect: 'none'});
-			if (typeof response !== 'object' || ['image','url','info','title', 'id'].some(prop => !(prop in response))) {
-				throw new RangeError(`The response from the endpoint ${urlObj} is not a JSON object containing image, url, info and title properties.`);
-			}
-
-			if (id) {
-				this._resultCache[commentTab] = this._resultCache[commentTab] || {};
-				this._resultCache[commentTab][id] = response;
-			}
-
-			return response;
-		},
-
-		/**
-		 * Handle a state update
-		 * @param {CustomEvent<Object&{detail: 'replace'|'pop'|'push'|string,state: {"gallery.view.image": Object&{response: Object|undefined, commentTab: string|undefined, id:string|number}}}>}e
-		 * @return {Promise<void>}
-		 */
-		async stateUpdate(e) {
-			if (e.detail.type === 'replace') {
-				return;
-			}
-			let _resolve, _reject;
-			let {response, commentTab, id} = e.detail.state['gallery.view.image'];
-			this.historyPromise = new Promise(((resolve, reject) => {
-				_resolve = resolve;
-				_reject = reject;
-			}));
-			if (!id || id === this.getCurrentImageId()) {
-				Debug.log(`Not handling a state update for the gallery view because the id has not changed`);
-				_reject(`The view wasn't actually changed`);
-				return;
-			}
-			if (!response || !commentTab) {
-				let tab = this.elem.querySelector(`${selectorPropertyMap.comments} i-tabs [href][aria-selected="true"]`)?.href;
-				if (tab && tab.endsWith('comments')) {
-					commentTab = 'comments';
-				} else if (tab) {
-					commentTab = 'reviews';
-				}
-
-				response = await this.fetchImageData(window.location.href, commentTab, id);
-				ips.utils.history.replaceState({...e.detail.state['gallery.view.image'], response, commentTab, id, url: response.url});
-			}
-
-			for (const [property, selector] of Object.entries(selectorPropertyMap)) {
-				const root = ['breadcrumb_top','breadcrumb_bottom','breadcrumb_mobile', 'breadcrumb_off_canvas'].includes(property) ? document.body : this.elem;
-				root.querySelectorAll(`${selector}:not(${selector} *)`).forEach(el => {
-					el.insertAdjacentHTML("afterend", response[property] || "");
-					el.remove();
-				});
-			}
-			this.updateActiveThumb(response);
-
-			document.title = response.title;
-
-			// Refresh content
-			$( document ).trigger( 'contentChange', [ $(this.elem) ] );
-
-			if (response.dataLayer) {
-				this.scope.trigger('ipsDataLayerProperties', {_properties: response.dataLayer});
-			}
-			_resolve();
-		},
-
-		/**
-		 * @type {Promise<void>|undefined}
-		 */
-		historyPromise: undefined,
-
-		/**
-		 * Get the id of the currently visible image.
-		 * @return {string | undefined}
-		 */
-		getCurrentImageId() {
-			const id = this.elem.querySelector("[data-role='imageFrame'][data-image-id]")?.dataset.imageId;
-			if (id === undefined) {
-				Debug.warn(new RangeError(`Could not determine the current image id from the image frame`));
-			}
-			return id;
-		},
-
-		/**
-		 * Since the prev/next buttons use the current image, and do=next in the URL, we have to cache the image ID after the request is done
-		 * @type {Object<string, string>}
-		 */
-		_nextIdCache: {},
-
-		/**
-		 * Since the prev/next buttons use the current image, and do=next in the URL, we have to cache the image ID after the request is done
-		 * @type {Object<string, string>}
-		 */
-		_prevIdCache: {},
-
-		/**
-		 *
-		 */
-		_resultCache: {},
-
-		/**
-		 * @param {ImageFetchResponse|undefined}	response
-		 */
-		updateActiveThumb(response) {
-			if (response) {
-				// merge in images before this one
-				const allImages = [...this.elem.querySelectorAll(`#gallery-image-thumbs > [data-image-id]`)];
-				const remainingIds = new Set(allImages.map(img => parseInt(img.dataset.imageId)));
-
-				/**
-				 * @type {ImageNavLinks}
-				 */
-				const toInsert = [...response.images_prev, {id: response.id, content:response.image_link_current}, ...response.images_next];
-
-				// first is there any overlap?
-				const overlap = toInsert.findIndex(val => remainingIds.has((parseInt(val.id))));
-				if (overlap !== -1) {
-					const id = parseInt(toInsert[overlap].id);
-					const overlapDOMIdx = allImages.findIndex(img => parseInt(img.dataset.imageId) === id);
-
-					// merge in any ids that aren't currently in the page
-					const prevInDOM = allImages.slice(0,overlapDOMIdx).reverse();
-					const prevIdsRemaining = new Set(prevInDOM.map(img => parseInt(img.dataset.imageId)));
-					const prevToInsert = toInsert.slice(0, overlap).reverse();
-					for (let i = 0; i < prevToInsert.length; i++) {
-						const id = parseInt(prevToInsert[i].id);
-
-
-						// just insert if there's no images before this one in the DOM
-						if (!prevInDOM.length && !remainingIds.has(id)) {
-							requestAnimationFrame(() => {
-								this.elem.querySelector(`#gallery-image-thumbs`).insertAdjacentHTML('afterbegin', prevToInsert[i].content);
-							});
-							continue;
-						}
-
-						if (prevIdsRemaining.has(id)) {
-							prevIdsRemaining.delete(id);
-							while (prevInDOM.length > 1 && parseInt(prevInDOM[0].dataset.imageId) !== id) {
-								const skipped = prevInDOM.shift();
-								prevIdsRemaining.delete(parseInt(skipped.dataset.imageId));
-							}
-							continue;
-						}
-
-						// if there's already an element for this, skip it
-						if (remainingIds.has(id)) {
-							continue;
-						}
-
-						// insert this before the first image
-						const chunk = [];
-						while (i < prevToInsert.length && !remainingIds.has(parseInt(prevToInsert[i].id))) {
-							chunk.unshift(prevToInsert[i].content);
-							i++;
-						}
-						requestAnimationFrame(() => {
-							prevInDOM[0].insertAdjacentHTML('beforebegin', chunk.join(''));
-						});
-					}
-
-					const nextToInsert = toInsert.slice(overlap + 1);
-					const nextInDOM = allImages.slice(overlapDOMIdx);
-					const nextIdsRemaining = new Set(nextInDOM.map(img => parseInt(img.dataset.imageId)));
-					for (let i = 0; i < nextToInsert.length; i++) {
-						const id = parseInt(nextToInsert[i].id);
-						// just insert if there's no images before this one in the DOM
-						if (!nextInDOM.length) {
-							requestAnimationFrame(() => {
-								this.elem.querySelector(`#gallery-image-thumbs`).insertAdjacentHTML('beforeend', nextToInsert[i].content);
-							});
-							continue;
-						}
-
-						if (nextIdsRemaining.has(id)) {
-							nextIdsRemaining.delete(id);
-							while (nextInDOM.length > 1 && parseInt(nextInDOM[0].dataset.imageId) !== id) {
-								const skipped = nextInDOM.shift();
-								nextIdsRemaining.delete(parseInt(skipped.dataset.imageId));
-							}
-							continue;
-						}
-
-						if (remainingIds.has(id)) {
-							continue;
-						}
-
-						// insert this before the first image
-						let chunk = [];
-						while (i < nextToInsert.length && !remainingIds.has(parseInt(nextToInsert[i].id))) {
-							chunk.push(nextToInsert[i].content);
-							i++;
-						}
-						requestAnimationFrame(() => {
-							nextInDOM[0].insertAdjacentHTML('afterend', chunk.join(''));
-						});
-					}
-				} else if (toInsert.length) {
-					requestAnimationFrame(() => {
-						// no overlap? Well then we need to replace the links as we have no way to properly merge the lists
-						this.elem.querySelector('#gallery-image-thumbs').innerHTML = toInsert.map(img => img.content).join('\n');
-					});
-				}
-			}
-
-			const currentlyActiveThumb = this.getCurrentImageId();
-			requestAnimationFrame(() => {
-				this.elem.querySelectorAll(`#gallery-image-thumbs > [data-active]`).forEach(el => delete el.dataset.active);
-			});
-			if (currentlyActiveThumb) {
-				let img;
-				requestAnimationFrame(() => {
-					this.elem.querySelectorAll(`#gallery-image-thumbs > [data-image-id="${currentlyActiveThumb}"]`).forEach(el => {
-						el.dataset.active = '';
-						img = el;
-					});
-					if (img) {
-						requestAnimationFrame(() => {
-							const imgRect = img.getBoundingClientRect();
-							const scroller = img.closest('#gallery-image-thumbs');
-							const scrollerRect = scroller.getBoundingClientRect();
-							if (imgRect.left < scrollerRect.left) {
-								scroller.scrollBy({left: imgRect.left - scrollerRect.left});
-							} else if (imgRect.right > scrollerRect.right) {
-								scroller.scrollBy({left: imgRect.right - scrollerRect.right});
-							}
-						});
-					}
-				});
-			}
 		}
 	});
-}(jQuery, _));]]></file>
- <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.note.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150"><![CDATA[/**
+}(jQuery, _));</file>
+ <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.note.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -2054,7 +1835,6 @@
 			var self = this;
 
 			// If the note block is now out of view, flip it to the other side
-			/*
 			var parent = this.scope.closest('.cGalleryViewImage');
 			var notePos = this.scope.position();
 
@@ -2081,7 +1861,6 @@
 					}
 				}
 			}
-			*/
 
 			// If this is a new note, we don't want to update the position remotely yet.
 			// We'll only do that once the note text is saved for the first time.
@@ -2121,7 +1900,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.notes.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150"><![CDATA[/**
+ <file javascript_app="gallery" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.notes.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -2204,35 +1983,35 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="gallery" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.browse.js" javascript_type="template" javascript_version="5001403" javascript_position="1000050">// Empty</file>
- <file javascript_app="gallery" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.submit.js" javascript_type="template" javascript_version="5001403" javascript_position="1000050"><![CDATA[ips.templates.set('gallery.submit.imageItem', " \
-	<div class='ipsAttach ipsImageAttach {{#done}}ipsAttach_done{{/done}}' id='{{id}}' data-role='file' data-fileid='{{id}}' data-fullsizeurl='{{imagesrc}}' data-thumbnailurl='{{thumbnail}}' data-isImage='1'>\
-		<ul class='ipsImageAttach_controls'>\
-			<li data-role='insert' {{#insertable}}style='display: none'{{/insertable}}><a href='#' data-action='insertFile' class='ipsAttach_selection' data-ipsTooltip title='{{#lang}}insertIntoPost{{/lang}}'><i class='fa-solid fa-plus'></i></a></li>\
+ <file javascript_app="gallery" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.browse.js" javascript_type="template" javascript_version="107827" javascript_position="1000050">// Empty</file>
+ <file javascript_app="gallery" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.submit.js" javascript_type="template" javascript_version="107827" javascript_position="1000050"><![CDATA[ips.templates.set('gallery.submit.imageItem', " \
+	<div class='ipsAttach ipsImageAttach ipsPad_half ipsAreaBackground_light {{#done}}ipsAttach_done{{/done}}' id='{{id}}' data-role='file' data-fileid='{{id}}' data-fullsizeurl='{{imagesrc}}' data-thumbnailurl='{{thumbnail}}' data-isImage='1'>\
+		<ul class='ipsList_inline ipsImageAttach_controls'>\
+			<li data-role='insert' {{#insertable}}style='display: none'{{/insertable}}><a href='#' data-action='insertFile' class='ipsAttach_selection' data-ipsTooltip title='{{#lang}}insertIntoPost{{/lang}}'><i class='fa fa-plus'></i></a></li>\
 			</li>\
-			<li class='i-margin-start_auto' {{#newUpload}}style='display: none'{{/newUpload}} data-role='deleteFileWrapper'>\
+			<li class='ipsPos_right' {{#newUpload}}style='display: none'{{/newUpload}} data-role='deleteFileWrapper'>\
 				<input type='hidden' name='{{field_name}}_keep[{{id}}]' value='1'>\
-				<a href='#' data-role='deleteFile' class='ipsButton ipsButton--small ipsButton--soft' data-ipsTooltip title='{{#lang}}attachRemove{{/lang}}'><i class='fa-regular fa-trash-can'></i></a>\
+				<a href='#' data-role='deleteFile' class='ipsButton ipsButton_verySmall ipsButton_light' data-ipsTooltip title='{{#lang}}attachRemove{{/lang}}'><i class='fa fa-trash-o'></i></a>\
 			</li>\
 		</ul>\
-		<div class='ipsImageAttach_thumb' data-role='preview' data-grid-ratio='65' data-action='insertFile' {{#thumb}}style='background-image: url( \"{{thumbnail}}\" )'{{/thumb}}>\
+		<div class='ipsImageAttach_thumb ipsType_center' data-role='preview' data-grid-ratio='65' data-action='insertFile' {{#thumb}}style='background-image: url( \"{{thumbnail}}\" )'{{/thumb}}>\
 			{{#status}}\
-				<span class='ipsImageAttach_status i-color_soft' data-role='status'>{{{status}}}</span>\
-				<meter class='ipsMeter' data-role='progressbar' max='100'></meter>\
+				<span class='ipsImageAttach_status ipsType_light' data-role='status'>{{{status}}}</span>\
+				<span class='ipsAttachment_progress'><span data-role='progressbar'></span></span>\
 			{{/status}}\
 			{{#thumb}}\
 				{{{thumb}}}\
 			{{/thumb}}\
 		</div>\
-		<h2 class='ipsAttach_title ipsTruncate_1 cGalleryImageAttach_info' data-role='title'>{{title}}</h2>\
-		<p class='cGalleryImageAttach_info'>{{size}} {{#statusText}}&middot; <span data-role='status'>{{statusText}}</span>{{/statusText}}</p>\
+		<h2 class='ipsType_reset ipsAttach_title ipsType_medium ipsTruncate ipsTruncate_line cGalleryImageAttach_info' data-role='title'>{{title}}</h2>\
+		<p class='ipsType_light cGalleryImageAttach_info'>{{size}} {{#statusText}}&middot; <span data-role='status'>{{statusText}}</span>{{/statusText}}</p>\
 	</div>\
 ");
 
 ips.templates.set('gallery.submit.imageItemWrapper', " \
 	<div class='cGallerySubmit_fileList'>{{{content}}}</div>\
 ");]]></file>
- <file javascript_app="gallery" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.view.js" javascript_type="template" javascript_version="5001403" javascript_position="1000050"><![CDATA[ips.templates.set('gallery.notes.wrapper', " \
+ <file javascript_app="gallery" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.view.js" javascript_type="template" javascript_version="107827" javascript_position="1000050"><![CDATA[ips.templates.set('gallery.notes.wrapper', " \
 <div class='cGalleryNote' data-controller='gallery.front.view.note' data-noteID='{{id}}' data-note=\"{{note}}\" {{#editable}}data-editable{{/editable}} data-posLeft='{{left}}' data-posTop='{{top}}' data-dimWidth='{{width}}' data-dimHeight='{{height}}'>\
 	<div class='cGalleryNote_border'></div>\
 	<div class='cGalleryNote_note' style='display: none'>\
@@ -2247,9 +2026,9 @@ ips.templates.set('gallery.notes.delete', " \
 
 ips.templates.set('gallery.notes.edit', " \
 	<textarea>{{note}}</textarea>\
-	<ul class='ipsButtons i-justify-content_start i-margin-top_2'>\
-		<li><button data-action='save' class='ipsButton ipsButton--positive'>{{#lang}}save_note{{/lang}}</button></li>\
-		<li><a href='#' class='ipsButton ipsButton--inherit' data-action='cancel'>{{#lang}}cancel_note{{/lang}}</a></li>\
+	<ul class='ipsList_inline'>\
+		<li><button data-action='save' class='ipsButton ipsButton_light ipsButton_verySmall'>{{#lang}}save_note{{/lang}}</button></li>\
+		<li><a href='#' data-action='cancel'>{{#lang}}cancel_note{{/lang}}</a></li>\
 	</ul>\
 ");]]></file>
  <order app="global" path="/dev/js//framework/">templates
@@ -2264,7 +2043,8 @@ mustache
 Debug.js
 app.js</order>
  <order app="global" path="/dev/js//library//jquery">jquery.js
-jquery-migrate.js</order>
+jquery-migrate.js
+jquery.transform.js</order>
  <order app="global" path="/dev/js//library//linkify">linkify.min.js
 linkify-jquery.min.js</order>
 </javascript>

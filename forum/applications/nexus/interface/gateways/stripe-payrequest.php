@@ -9,66 +9,52 @@
  * @since		20 Jul 2017
  */
 
-use IPS\Log;
-use IPS\Member;
-use IPS\Member\Device;
-use IPS\nexus\Gateway;
-use IPS\nexus\Gateway\Stripe;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Transaction;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Session\Front;
-use IPS\Settings;
-
-define('REPORT_EXCEPTIONS', TRUE);
+\define('REPORT_EXCEPTIONS', TRUE);
 require_once '../../../../init.php';
-Front::i();
+\IPS\Session\Front::i();
 
-Output::setCacheTime( false );
+\IPS\Output::setCacheTime( false );
 
 /* Get the invoice */
 try
 {
-	$invoice = Invoice::load( Request::i()->invoice );
+	$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->invoice );
 	
 	if ( !$invoice->canView() )
 	{
-		throw new OutOfRangeException;
+		throw new \OutOfRangeException;
 	}
 }
-catch (OutOfRangeException )
+catch ( \OutOfRangeException $e )
 {
-	Output::i()->sendOutput( json_encode( array( 'success' => 0 ) ), 500, 'application/json' );
+	\IPS\Output::i()->sendOutput( json_encode( array( 'success' => 0 ) ), 500, 'application/json' );
 }
 
 /* Get the gateway */
 try
 {
-	$gateway = Gateway::load( Request::i()->gateway );
-	if ( !( $gateway instanceof Stripe ) )
+	$gateway = \IPS\nexus\Gateway::load( \IPS\Request::i()->gateway );
+	if ( !( $gateway instanceof \IPS\nexus\Gateway\Stripe ) )
 	{
-		throw new OutOfRangeException;
+		throw new \OutOfRangeException;
 	}
 }
-catch (OutOfRangeException )
+catch ( \OutOfRangeException $e )
 {
-	Output::i()->sendOutput( json_encode( array( 'success' => 0 ) ), 500, 'application/json' );
+	\IPS\Output::i()->sendOutput( json_encode( array( 'success' => 0 ) ), 500, 'application/json' );
 }
 
 /* Create a transaction */
-$transaction = new Transaction;
-$transaction->member = Member::loggedIn();
+$transaction = new \IPS\nexus\Transaction;
+$transaction->member = \IPS\Member::loggedIn();
 $transaction->invoice = $invoice;
-$transaction->amount = new Money( Request::i()->amount, mb_strtoupper( Request::i()->currency ) );
-$transaction->ip = Request::i()->ipAddress();
+$transaction->amount = new \IPS\nexus\Money( \IPS\Request::i()->amount, mb_strtoupper( \IPS\Request::i()->currency ) );
+$transaction->ip = \IPS\Request::i()->ipAddress();
 $transaction->method = $gateway;
 
 /* Create a MaxMind request */
 $maxMind = NULL;
-if ( Settings::i()->maxmind_key and ( !Settings::i()->maxmind_gateways or Settings::i()->maxmind_gateways == '*' or in_array( $transaction->method->id, explode( ',', Settings::i()->maxmind_gateways ) ) ) )
+if ( \IPS\Settings::i()->maxmind_key and ( !\IPS\Settings::i()->maxmind_gateways or \IPS\Settings::i()->maxmind_gateways == '*' or \in_array( $transaction->method->id, explode( ',', \IPS\Settings::i()->maxmind_gateways ) ) ) )
 {
 	$maxMind = new \IPS\nexus\Fraud\MaxMind\Request;
 	$maxMind->setTransaction( $transaction );
@@ -78,25 +64,25 @@ if ( Settings::i()->maxmind_key and ( !Settings::i()->maxmind_gateways or Settin
 try
 {
 	/* Authorize */
-	$transaction->auth = $gateway->auth( $transaction, array( "{$gateway->id}_card" => Request::i()->token ), $maxMind );
+	$transaction->auth = $gateway->auth( $transaction, array( "{$gateway->id}_card" => \IPS\Request::i()->token ), $maxMind );
 	
 	/* Check Fraud Rules and capture */
 	$memberJustCreated = $transaction->checkFraudRulesAndCapture( $maxMind );
 	if ( $memberJustCreated )
 	{
-		Session::i()->setMember( $memberJustCreated );
-		Device::loadOrCreate( $memberJustCreated, FALSE )->updateAfterAuthentication( NULL );
+		\IPS\Session::i()->setMember( $memberJustCreated );
+		\IPS\Member\Device::loadOrCreate( $memberJustCreated, FALSE )->updateAfterAuthentication( NULL );
 	}
 	
 }
-catch (Exception $e )
+catch ( \Exception $e )
 {
-	Log::log( $e, 'applepay' );
-	Output::i()->sendOutput( json_encode( array( 'success' => 0 ) ), 500, 'application/json' );
+	\IPS\Log::log( $e, 'applepay' );
+	\IPS\Output::i()->sendOutput( json_encode( array( 'success' => 0 ) ), 500, 'application/json' );
 }
 
 /* Send email receipt */
 $transaction->sendNotification();
 
 /* Return */
-Output::i()->sendOutput( json_encode( array( 'success' => 1, 'url' => (string) $transaction->url() ) ), 200, 'application/json' );
+\IPS\Output::i()->sendOutput( json_encode( array( 'success' => 1, 'url' => (string) $transaction->url() ) ), 200, 'application/json' );

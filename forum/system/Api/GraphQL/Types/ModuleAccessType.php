@@ -10,28 +10,25 @@
  */
 
 namespace IPS\Api\GraphQL\Types;
-use Exception;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Application\Module;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ModuleAccessType for GraphQL API
  */
-class ModuleAccessType extends ObjectType
+class _ModuleAccessType extends ObjectType
 {
     /**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -50,9 +47,9 @@ class ModuleAccessType extends ObjectType
                             $canAccess = FALSE;
                             try 
                             {
-                                $canAccess = Member::loggedIn()->canAccessModule( Module::get( $app, $args['module'], 'front' ) );
+                                $canAccess = \IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( $app, $args['module'], 'front' ) );
                             } 
-                            catch (Exception $e)
+                            catch (\Exception $e)
                             {
                                 // Just fall through so we return false                                
                             }

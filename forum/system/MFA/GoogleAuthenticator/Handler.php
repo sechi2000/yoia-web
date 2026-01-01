@@ -11,51 +11,21 @@
 namespace IPS\MFA\GoogleAuthenticator;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BaconQrCode\Renderer\Image\SvgImageBackEnd;
-use BaconQrCode\Renderer\ImageRenderer;
-use BaconQrCode\Renderer\RendererStyle\RendererStyle;
-use BaconQrCode\Writer;
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\MFA\MFAHandler;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use UnderflowException;
-use function chr;
-use function count;
-use function defined;
-use function function_exists;
-use function in_array;
-use function ord;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Multi Factor Authentication Handler for Google Authenticator
  */
-class Handler extends MFAHandler
+class _Handler extends \IPS\MFA\MFAHandler
 {
 	/**
 	 * @brief	Key
 	 */
-	protected string $key = 'google';
+	protected $key = 'google';
 	
 	/* !Setup */
 	
@@ -64,29 +34,28 @@ class Handler extends MFAHandler
 	 *
 	 * @return	bool
 	 */
-	public function isEnabled(): bool
+	public function isEnabled()
 	{
-		return Settings::i()->googleauth_enabled;
+		return \IPS\Settings::i()->googleauth_enabled;
 	}
-
+	
 	/**
 	 * Member *can* use this handler (even if they have not yet configured it)
 	 *
-	 * @param Member $member
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function memberCanUseHandler( Member $member ): bool
+	public function memberCanUseHandler( \IPS\Member $member )
 	{
-		return Settings::i()->googleauth_groups == '*' or $member->inGroup( explode( ',', Settings::i()->googleauth_groups ) );
+		return \IPS\Settings::i()->googleauth_groups == '*' or $member->inGroup( explode( ',', \IPS\Settings::i()->googleauth_groups ) );
 	}
 	
 	/**
 	 * Member has configured this handler
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public function memberHasConfiguredHandler( Member $member ): bool
+	public function memberHasConfiguredHandler( \IPS\Member $member )
 	{
 		return isset( $member->mfa_details['google'] );
 	}
@@ -94,76 +63,75 @@ class Handler extends MFAHandler
 	/**
 	 * Show a setup screen
 	 *
-	 * @param	Member		$member						The member
+	 * @param	\IPS\Member		$member						The member
 	 * @param	bool			$showingMultipleHandlers	Set to TRUE if multiple options are being displayed
-	 * @param	Url	$url						URL for page
+	 * @param	\IPS\Http\Url	$url						URL for page
 	 * @return	string
 	 */
-	public function configurationScreen( Member $member, bool $showingMultipleHandlers, Url $url ): string
+	public function configurationScreen( \IPS\Member $member, $showingMultipleHandlers, \IPS\Http\Url $url )
 	{
 		/* Generate a secret */
-		if ( isset( Request::i()->secret ) )
+		if ( isset( \IPS\Request::i()->secret ) )
 		{
-			$secret = Request::i()->secret;
+			$secret = \IPS\Request::i()->secret;
 		}
 		else
 		{
-			if ( function_exists( 'random_bytes' ) )
+			if ( \function_exists( 'random_bytes' ) )
 			{
 				$randomString = random_bytes( 16 );
 			}
-			elseif ( function_exists( 'mcrypt_create_iv' ) )
+			elseif ( \function_exists( 'mcrypt_create_iv' ) )
 			{
 				$randomString = mcrypt_create_iv( 16, MCRYPT_DEV_URANDOM );
 			}
-			elseif ( function_exists( 'openssl_random_pseudo_bytes' ) )
+			elseif ( \function_exists( 'openssl_random_pseudo_bytes' ) )
 			{
 				$randomString = openssl_random_pseudo_bytes( 16 );
 			}
 			else
 			{
-				$randomString = substr( md5( uniqid( microtime(), true ) ) . md5( uniqid( microtime(), true ) ), 0, 16 );
+				$randomString = \substr( md5( uniqid( microtime(), true ) ) . md5( uniqid( microtime(), true ) ), 0, 16 );
 			}
 			$validChars = array( 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',  'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '2', '3', '4', '5', '6', '7', '=' );
 			$secret = '';
 			for ( $i = 0; $i < 16; ++$i )
 			{
-	            $secret .= $validChars[ ord( $randomString[ $i ] ) & 31 ];
+	            $secret .= $validChars[ \ord( $randomString[ $i ] ) & 31 ];
 	        }
 	    }
-		
-		/* Generate QR code */
-		IPS::$PSR0Namespaces['BaconQrCode'] = \IPS\ROOT_PATH . '/system/3rd_party/BaconQrCode/src';
-		IPS::$PSR0Namespaces['DASPRiD'] = \IPS\ROOT_PATH . '/system/3rd_party/DASPRiD';
-		$renderer = new ImageRenderer(
-			new RendererStyle(150),
-			new SvgImageBackEnd()
+
+		\IPS\IPS::$PSR0Namespaces['BaconQrCode'] = \IPS\ROOT_PATH . '/system/3rd_party/BaconQrCode/src';
+		\IPS\IPS::$PSR0Namespaces['DASPRiD'] = \IPS\ROOT_PATH . '/system/3rd_party/DASPRiD';
+		$renderer = new \BaconQrCode\Renderer\ImageRenderer(
+			new \BaconQrCode\Renderer\RendererStyle\RendererStyle(150),
+			new \BaconQrCode\Renderer\Image\SvgImageBackEnd()
 		);
-		$writer = new Writer($renderer);
-		$data   = "otpauth://totp/{$member->email}?secret={$secret}&issuer=" . rawurlencode( Settings::i()->board_name );
+		$writer = new \BaconQrCode\Writer($renderer);
+		$data   = "otpauth://totp/{$member->email}?secret={$secret}&issuer=" . rawurlencode( \IPS\Settings::i()->board_name );
 
 		$str = $writer->writeString($data);
 
 		$qrCode = 'data:image/svg+xml;utf8,' . rawurlencode($str);
 		
 		/* Display */
-		return Theme::i()->getTemplate( 'login', 'core', 'global' )->googleAuthenticatorSetup( $qrCode, $secret, $showingMultipleHandlers );
+		return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->googleAuthenticatorSetup( $qrCode, $secret, $showingMultipleHandlers );
 	}
 	
 	/**
 	 * Submit configuration screen. Return TRUE if was accepted
 	 *
-	 * @param	Member		$member	The member
+	 * @param	\IPS\Member		$member	The member
 	 * @return	bool
 	 */
-	public function configurationScreenSubmit( Member $member ): bool
+	public function configurationScreenSubmit( \IPS\Member $member )
 	{
-		if ( Request::i()->google_authenticator_setup_code )
+		if ( \IPS\Request::i()->google_authenticator_setup_code )
 		{
-			if ( static::checkSubmittedCode( Request::i()->google_authenticator_setup_code, Request::i()->secret, $member ) )
+			if ( static::checkSubmittedCode( \IPS\Request::i()->google_authenticator_setup_code, \IPS\Request::i()->secret, $member ) )
 			{
 				$mfaDetails = $member->mfa_details;
-				$mfaDetails['google'] = Request::i()->secret;
+				$mfaDetails['google'] = \IPS\Request::i()->secret;
 				$member->mfa_details = $mfaDetails;
 				$member->save();
 
@@ -181,37 +149,37 @@ class Handler extends MFAHandler
 	/**
 	 * Get the form for a member to authenticate
 	 *
-	 * @param	Member		$member		The member
-	 * @param	Url	$url		URL for page
+	 * @param	\IPS\Member		$member		The member
+	 * @param	\IPS\Http\Url	$url		URL for page
 	 * @return	string
 	 */
-	public function authenticationScreen( Member $member, Url $url ): string
+	public function authenticationScreen( \IPS\Member $member, \IPS\Http\Url $url )
 	{
 		try
 		{
-			$waitUntil = ( Db::i()->select( 'time', 'core_googleauth_used_codes', array( '`member`=?', $member->member_id ), 'time DESC', 1 )->first() * 30 ) + 30;
+			$waitUntil = ( \IPS\Db::i()->select( 'time', 'core_googleauth_used_codes', array( '`member`=?', $member->member_id ), 'time DESC', 1 )->first() * 30 ) + 30;
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			$waitUntil = NULL;
 		}
 				
-		return Theme::i()->getTemplate( 'login', 'core', 'global' )->googleAuthenticatorAuth( $waitUntil );
+		return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->googleAuthenticatorAuth( $waitUntil );
 	}
 	
 	/**
 	 * Submit authentication screen. Return TRUE if was accepted
 	 *
-	 * @param	Member		$member	The member
-	 * @return	bool
+	 * @param	\IPS\Member		$member	The member
+	 * @return	string
 	 */
-	public function authenticationScreenSubmit( Member $member ): bool
+	public function authenticationScreenSubmit( \IPS\Member $member )
 	{
-		if ( Request::i()->google_authenticator_auth_code )
+		if ( \IPS\Request::i()->google_authenticator_auth_code )
 		{
-			if ( $codeTime = static::checkSubmittedCode( Request::i()->google_authenticator_auth_code, $member->mfa_details['google'], $member ) )
+			if ( $codeTime = static::checkSubmittedCode( \IPS\Request::i()->google_authenticator_auth_code, $member->mfa_details['google'], $member ) )
 			{
-				Db::i()->insert( 'core_googleauth_used_codes', array(
+				\IPS\Db::i()->insert( 'core_googleauth_used_codes', array(
 					'member'	=> $member->member_id,
 					'time'		=> $codeTime
 				) );
@@ -228,11 +196,11 @@ class Handler extends MFAHandler
 	 * Toggle
 	 *
 	 * @param	bool	$enabled	On/Off
-	 * @return	void
+	 * @return	bool
 	 */
-	public function toggle( bool $enabled ): void
+	public function toggle( $enabled )
 	{
-		Settings::i()->changeValues( array( 'googleauth_enabled' => $enabled ) );
+		\IPS\Settings::i()->changeValues( array( 'googleauth_enabled' => $enabled ) );
 	}
 	
 	/**
@@ -240,12 +208,12 @@ class Handler extends MFAHandler
 	 *
 	 * @return	string
 	 */
-	public function acpSettings(): string
+	public function acpSettings()
 	{
-		$form = new Form;
-		$form->add( new CheckboxSet( 'googleauth_groups', Settings::i()->googleauth_groups == '*' ? '*' : explode( ',', Settings::i()->googleauth_groups ), FALSE, array(
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'googleauth_groups', \IPS\Settings::i()->googleauth_groups == '*' ? '*' : explode( ',', \IPS\Settings::i()->googleauth_groups ), FALSE, array(
 			'multiple'		=> TRUE,
-			'options'		=> array_combine( array_keys( Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, Group::groups() ) ),
+			'options'		=> array_combine( array_keys( \IPS\Member\Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, \IPS\Member\Group::groups() ) ),
 			'unlimited'		=> '*',
 			'unlimitedLang'	=> 'everyone',
 			'impliedUnlimited' => TRUE
@@ -255,8 +223,8 @@ class Handler extends MFAHandler
 		{
 			$values['googleauth_groups'] = ( $values['googleauth_groups'] == '*' ) ? '*' : implode( ',', $values['googleauth_groups'] );
 			$form->saveAsSettings( $values );	
-			Session::i()->log( 'acplogs__mfa_handler_enabled', array( "mfa_google_title" => TRUE ) );
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=mfa' ), 'saved' );
+			\IPS\Session::i()->log( 'acplogs__mfa_handler_enabled', array( "mfa_google_title" => TRUE ) );		
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=mfa' ), 'saved' );
 		}
 		
 		return (string) $form;
@@ -267,10 +235,10 @@ class Handler extends MFAHandler
 	/**
 	 * If member has configured this handler, disable it
 	 *
-	 * @param	Member	$member	The member
-	 * @return	void
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool
 	 */
-	public function disableHandlerForMember( Member $member ): void
+	public function disableHandlerForMember( \IPS\Member $member )
 	{
 		$mfaDetails = $member->mfa_details;
 		unset( $mfaDetails['google'] );
@@ -286,23 +254,23 @@ class Handler extends MFAHandler
 	/**
 	 * Verify a submitted code with a ±30 seconds leeway
 	 *
-	 * @param string $submittedCode		The code that was submitted
-	 * @param string $secret				The secret key
-	 * @param Member $member				The member this is for
+	 * @param	string			$submittedCode		The code that was submitted
+	 * @param	string			$secret				The secret key
+	 * @param	\IPS\Member		$member				The member this is for
 	 * @return	int|FALSE
 	 */
-	protected static function checkSubmittedCode(string $submittedCode, string $secret, Member $member ): int|FALSE
+	protected static function checkSubmittedCode( $submittedCode, $secret, $member )
 	{
 		$submittedCode = str_replace( ' ', '', $submittedCode );
 				
-		$validTimes = array( new DateTime(), ( new DateTime() )->add( new DateInterval('PT30S') ), ( new DateTime() )->sub( new DateInterval('PT30S') ) );
-		$blockedTimes = iterator_to_array( Db::i()->select( 'time', 'core_googleauth_used_codes', array( '`member`=?', $member->member_id ) ) );
+		$validTimes = array( new \IPS\DateTime(), ( new \IPS\DateTime() )->add( new \DateInterval('PT30S') ), ( new \IPS\DateTime() )->sub( new \DateInterval('PT30S') ) );
+		$blockedTimes = iterator_to_array( \IPS\Db::i()->select( 'time', 'core_googleauth_used_codes', array( '`member`=?', $member->member_id ) ) );
 
 		$allowedCodes = array();
 		foreach ( $validTimes as $time )
 		{
 			$codeTime = floor( $time->getTimestamp() / 30 );
-			if ( !in_array( $codeTime, $blockedTimes ) )
+			if ( !\in_array( $codeTime, $blockedTimes ) )
 			{
 				$allowedCodes[ static::getCodeForSecretAtTime( $secret, $time ) ] = $codeTime;
 			}
@@ -310,7 +278,7 @@ class Handler extends MFAHandler
 		
 		foreach ( $allowedCodes as $code => $time )
 		{
-			if ( Login::compareHashes( (string) $code, $submittedCode ) )
+			if ( \IPS\Login::compareHashes( (string) $code, $submittedCode ) )
 			{
 				return $time;
 			}
@@ -322,11 +290,11 @@ class Handler extends MFAHandler
 	/**
 	 * Get the code
 	 *
-	 * @param string $secret		The secret key for the user
-	 * @param	DateTime	$time	Timestamp
+	 * @param	string			$secret		The secret key for the user
+	 * @param	\IPS\DateTime	$time	Timestamp
 	 * @return	string
 	 */
-	protected static function getCodeForSecretAtTime( string $secret, DateTime $time ): string
+	protected static function getCodeForSecretAtTime( $secret, \IPS\DateTime $time )
 	{
 		/* Decode secret key */
 		$secret = str_split( str_replace( '=', '', $secret ) );
@@ -340,17 +308,17 @@ class Handler extends MFAHandler
                 $block .= str_pad( base_convert( $chars[ $secret[ $i + $j ] ], 10, 2 ), 5, '0', STR_PAD_LEFT );
             }
             $eightBits = str_split( $block, 8 );
-            for ( $z = 0; $z < count( $eightBits ); ++$z )
+            for ( $z = 0; $z < \count( $eightBits ); ++$z )
             {
-                $decodedSecretKey .=  ( ( $y = chr( base_convert( $eightBits[ $z ], 2, 10) ) ) || ord( $y ) == 48) ? $y : '';
+                $decodedSecretKey .=  ( ( $y = \chr( base_convert( $eightBits[ $z ], 2, 10) ) ) || \ord( $y ) == 48) ? $y : '';
             }
 		}
 		        
         /* Hash the timestamp with the secret key */
-        $hash = hash_hmac('SHA1', chr(0). chr(0). chr(0). chr(0).pack('N*', floor( $time->getTimestamp() / 30 ) ), $decodedSecretKey, true);
+        $hash = hash_hmac('SHA1', \chr(0).\chr(0).\chr(0).\chr(0).pack('N*', floor( $time->getTimestamp() / 30 ) ), $decodedSecretKey, true);
         
         /* Unpack it */
-        $value = unpack( 'N', substr( $hash, ord( substr( $hash, -1 ) ) & 0x0F, 4 ) );
+        $value = unpack( 'N', \substr( $hash, \ord( \substr( $hash, -1 ) ) & 0x0F, 4 ) );
         $value = $value[1];
         
         /* Get 32 bits */

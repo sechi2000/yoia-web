@@ -11,49 +11,35 @@
 namespace IPS\core\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Interval;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * onlineusers
  */
-class onlineusers extends Controller
+class _onlineusers extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'onlineusers_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'onlineusers_manage' );
 		parent::execute();
 	}
 
@@ -62,20 +48,19 @@ class onlineusers extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Show button to adjust settings */
-		Output::i()->sidebar['actions']['settings'] = array(
+		\IPS\Output::i()->sidebar['actions']['settings'] = array(
 			'icon'		=> 'cog',
 			'title'		=> 'prunesettings',
-			'link'		=> Url::internal( 'app=core&module=stats&controller=onlineusers&do=settings' ),
-			'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('prunesettings') )
+			'link'		=> \IPS\Http\Url::internal( 'app=core&module=stats&controller=onlineusers&do=settings' ),
+			'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('prunesettings') )
 		);
 
-		$chart = Chart::loadFromExtension( 'core', 'OnlineUsers' )->getChart( Url::internal( "app=core&module=stats&controller=onlineusers" ) );
-
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_stats_onlineusers');
-		Output::i()->output	= (string) $chart;
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'OnlineUsers' )->getChart( \IPS\Http\Url::internal( "app=core&module=stats&controller=onlineusers" ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_stats_onlineusers');
+		\IPS\Output::i()->output	= (string) $chart;
 	}
 
 	/**
@@ -83,19 +68,19 @@ class onlineusers extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function settings() : void
+	protected function settings()
 	{
-		$form = new Form;
-		$form->add( new Interval( 'stats_online_users_prune', Settings::i()->stats_online_users_prune, FALSE, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL, 'prune_log_moderator' ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Interval( 'stats_online_users_prune', \IPS\Settings::i()->stats_online_users_prune, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), NULL, 'prune_log_moderator' ) );
 	
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings();
-			Session::i()->log( 'acplog__statsonlineusers_settings' );
-			Output::i()->redirect( Url::internal( 'app=core&module=stats&controller=onlineusers' ), 'saved' );
+			\IPS\Session::i()->log( 'acplog__statsonlineusers_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=stats&controller=onlineusers' ), 'saved' );
 		}
 	
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('prunesettings');
-		Output::i()->output 	= Theme::i()->getTemplate('global')->block( 'prunesettings', $form, FALSE );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('prunesettings');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate('global')->block( 'prunesettings', $form, FALSE );
 	}
 }

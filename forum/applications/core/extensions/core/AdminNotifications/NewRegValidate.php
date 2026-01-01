@@ -11,55 +11,43 @@
 namespace IPS\core\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Theme;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP Notification: New Registration Requires Admin Validation
  */
-class NewRegValidate extends AdminNotification
+class _NewRegValidate extends \IPS\core\AdminNotification
 {
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'members';
+	public static $group = 'members';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 3;
+	public static $groupPriority = 3;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 2;
+	public static $itemPriority = 2;
 	
 	/**
 	 * Get queue HTML
 	 *
 	 * @return	string
 	 */
-	public static function queueHtml() : string
+	public static function queueHtml()
 	{
 		$users = array();
 		
 		foreach (
-			Db::i()->select(
+			\IPS\Db::i()->select(
 				"*",
 				'core_validating',
 				array( 'user_verified=?', TRUE ),
@@ -71,12 +59,12 @@ class NewRegValidate extends AdminNotification
 			) as $user
 		)
 		{
-			$users[ $user['member_id'] ] = Member::constructFromData( $user );
+			$users[ $user['member_id'] ] = \IPS\Member::constructFromData( $user );
 		}
 		
-		if ( count( $users ) )
+		if ( \count( $users ) )
 		{
-			return Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->adminValidations( $users );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->adminValidations( $users );
 		}
 		else
 		{
@@ -87,10 +75,10 @@ class NewRegValidate extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member )
 	{
 		return $member->hasAcpRestriction( 'core', 'members' );
 	}
@@ -100,7 +88,7 @@ class NewRegValidate extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle(): string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_NewRegValidate';
 	}
@@ -108,9 +96,9 @@ class NewRegValidate extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional(): bool
+	public static function mayBeOptional()
 	{
 		return TRUE;
 	}
@@ -120,7 +108,7 @@ class NewRegValidate extends AdminNotification
 	 *
 	 * @return	bool
 	 */
-	public static function mayRecur(): bool
+	public static function mayRecur()
 	{
 		return TRUE;
 	}
@@ -130,12 +118,12 @@ class NewRegValidate extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		$others = Db::i()->select( 'COUNT(*)', 'core_validating', array( 'user_verified=?', TRUE ) )->first();
+		$others = \IPS\Db::i()->select( 'COUNT(*)', 'core_validating', array( 'user_verified=?', TRUE ) )->first();
 		$names = array();
 		foreach (
-			Db::i()->select(
+			\IPS\Db::i()->select(
 				"*",
 				'core_validating',
 				array( 'user_verified=?', TRUE ),
@@ -152,24 +140,24 @@ class NewRegValidate extends AdminNotification
 		}
 		if ( $others )
 		{
-			$names[] = Member::loggedIn()->language()->addToStack( 'and_x_others', FALSE, array( 'pluralize' => array( $others ) ) );
+			$names[] = \IPS\Member::loggedIn()->language()->addToStack( 'and_x_others', FALSE, array( 'pluralize' => array( $others ) ) );
 		}
 		
-		return Member::loggedIn()->language()->addToStack( 'new_users_need_admin_validation', FALSE, array( 'pluralize' => array( count( $names ) ), 'sprintf' => array( Member::loggedIn()->language()->formatList( $names ) ) ) );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'new_users_need_admin_validation', FALSE, array( 'pluralize' => array( \count( $names ) ), 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $names ) ) ) );
 	}
 	
 	/**
 	 * Notification Subtitle (no HTML)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function subtitle(): ?string
+	public function subtitle()
 	{
 		try
 		{
-			return DateTime::ts( Db::i()->select( 'entry_date', 'core_validating', array( 'user_verified=?', TRUE ), 'entry_date asc', 1 )->first() )->relative();
+			return \IPS\DateTime::ts( \IPS\Db::i()->select( 'entry_date', 'core_validating', array( 'user_verified=?', TRUE ), 'entry_date asc', 1 )->first() )->relative();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return NULL;
 		}
@@ -178,11 +166,11 @@ class NewRegValidate extends AdminNotification
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js('admin_dashboard.js', 'core') );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('admin_dashboard.js', 'core') );
 		
 		return static::queueHtml();
 	}
@@ -192,7 +180,7 @@ class NewRegValidate extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function severity(): string
+	public function severity()
 	{
 		return static::SEVERITY_OPTIONAL;
 	}
@@ -202,7 +190,7 @@ class NewRegValidate extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function dismissible(): string
+	public function dismissible()
 	{
 		return static::DISMISSIBLE_NO;
 	}
@@ -210,9 +198,9 @@ class NewRegValidate extends AdminNotification
 	/**
 	 * Style
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
-	public function style(): string
+	public function style()
 	{
 		return static::STYLE_WARNING;
 	}
@@ -220,10 +208,10 @@ class NewRegValidate extends AdminNotification
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url
+	 * @return	bool
 	 */
-	public function link(): Url
+	public function link()
 	{
-		return Url::internal( 'app=core&module=members&controller=members&filter=members_filter_validating' );
+		return \IPS\Http\Url::internal( 'app=core&module=members&controller=members&filter=members_filter_validating' );
 	}
 }

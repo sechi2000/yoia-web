@@ -12,83 +12,44 @@
 namespace IPS\blog\modules\front\blogs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\blog\Blog;
-use IPS\blog\Entry;
-use IPS\blog\Entry\Category;
-use IPS\core\FrontNavigation;
-use IPS\core\Rss\Import;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\CoverPhoto;
-use IPS\Helpers\CoverPhoto\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Url;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Table\Content;
-use IPS\Http\Url\Friendly;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use IPS\Xml\Atom;
-use IPS\Xml\Rss;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * View Blog Controller
  */
-class view extends Controller
+class _view extends \IPS\Helpers\CoverPhoto\Controller
 {
 	
 	/**
 	 * [Content\Controller]	Class
 	 */
-	protected static string $contentModel = 'IPS\blog\Blog';
-
-	/**
-	 * Blog object
-	 */
-	protected ?Blog $blog = NULL;
-
+	protected static $contentModel = 'IPS\blog\Blog';
+	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		/* Load blog and check permissions */
 		try
 		{
-			$this->blog	= Blog::loadAndCheckPerms( Request::i()->id, 'read' );
+			$this->blog	= \IPS\blog\Blog::loadAndCheckPerms( \IPS\Request::i()->id, 'read' );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2B201/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2B201/1', 404, '' );
 		}
 
 		if ( $this->blog->cover_photo )
 		{
-			Output::i()->metaTags['og:image'] = File::get( $this->_coverPhotoStorageExtension(), $this->blog->cover_photo )->url;
+			\IPS\Output::i()->metaTags['og:image'] = \IPS\File::get( $this->_coverPhotoStorageExtension(), $this->blog->cover_photo )->url;
 		}
-
-		Output::i()->bodyAttributes['contentClass'] = Blog::class;
 		
 		parent::execute();
 	}
@@ -98,16 +59,16 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$this->blog->clubCheckRules();
 		
 		/* Build table */
 		$tableUrl = $this->blog->url();
 		$where = array();
-		if ( !in_array( $this->blog->id, array_keys( Blog::loadByOwner( Member::loggedIn() ) ) ) AND !Entry::canViewHiddenItems( Member::loggedIn(), $this->blog ) )
+		if ( !\in_array( $this->blog->id, array_keys( \IPS\blog\Blog::loadByOwner( \IPS\Member::loggedIn() ) ) ) AND !\IPS\blog\Entry::canViewHiddenItems( \IPS\Member::loggedIn(), $this->blog ) )
 		{
-			if ( !( $club = $this->blog->club() AND in_array( $club->memberStatus( Member::loggedIn() ), array( Club::STATUS_LEADER, Club::STATUS_MODERATOR ) ) ) )
+			if ( !( $club = $this->blog->club() AND \in_array( $club->memberStatus( \IPS\Member::loggedIn() ), array( \IPS\Member\Club::STATUS_LEADER, \IPS\Member\Club::STATUS_MODERATOR ) ) ) )
 			{
 				$where[] = array( "entry_status!='draft'" );
 			}
@@ -116,10 +77,10 @@ class view extends Controller
 		/* Are we limiting by category? */
 		try
 		{
-			$category = Category::load( (int) Request::i()->cat );
+			$category = \IPS\blog\Entry\Category::load( \IPS\Request::i()->cat );
 			$tableUrl = $tableUrl->setQueryString( [ 'cat' => $category->id ] );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
 			$category = NULL;
 		}
@@ -129,27 +90,24 @@ class view extends Controller
 			$where[] = array( "entry_category_id=?", $category->id );
 		}
 		
-		$table = new Content( 'IPS\blog\Entry', $tableUrl, $where, $this->blog );
+		$table = new \IPS\Helpers\Table\Content( 'IPS\blog\Entry', $tableUrl, $where, $this->blog );
 		
-		$table->tableTemplate = array( Theme::i()->getTemplate( 'view' ), 'blogTable' );
-
-		$viewMode = Member::loggedIn()->getLayoutValue( 'blog_view' );
-		$template = ( $viewMode == 'grid' ) ? 'rowsGrid' : 'rows';
-		$table->rowsTemplate = array( Theme::i()->getTemplate( 'view' ), $template );
-		$table->title = Member::loggedIn()->language()->addToStack('entries_in_this_blog');
-        $table->sortBy = Request::i()->sortby ?: 'date';
+		$table->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'view' ), 'blogTable' );
+		if ( \IPS\Settings::i()->blog_allow_grid )
+		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'grid.css', 'blog', 'front' ) );
+			$table->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'view' ), 'rowsGrid' );
+		}
+		else
+		{
+			$table->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'view' ), 'rows' );
+		}
+		
+		$table->title = \IPS\Member::loggedIn()->language()->addToStack('entries_in_this_blog');
+        $table->sortBy = \IPS\Request::i()->sortby ?: 'date';
 
 		/* Update views */
-		Db::i()->update(
-			'blog_blogs',
-			"`blog_num_views`=`blog_num_views`+1",
-			array( "blog_id=?", $this->blog->id ),
-			array(),
-			NULL,
-			Db::LOW_PRIORITY
-		);
-
-		if ( ! Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
 			$this->blog->updateViews();
 		}
@@ -157,48 +115,48 @@ class view extends Controller
 		/* Online User Location */
 		if( !$this->blog->social_group )
 		{
-			Session::i()->setLocation( $this->blog->url(), array(), 'loc_blog_viewing_blog', array( "blogs_blog_{$this->blog->id}" => TRUE ) );
+			\IPS\Session::i()->setLocation( $this->blog->url(), array(), 'loc_blog_viewing_blog', array( "blogs_blog_{$this->blog->id}" => TRUE ) );
 		}
 
-		if( Settings::i()->blog_allow_rss and $this->blog->settings['allowrss'] )
+		if( \IPS\Settings::i()->blog_allow_rss and $this->blog->settings['allowrss'] )
 		{
-			Output::i()->rssFeeds['blog_rss_title'] = \IPS\Http\Url::internal( "app=blog&module=blogs&controller=view&id={$this->blog->_id}", 'front', 'blogs_rss', array( $this->blog->seo_name ) );
+			\IPS\Output::i()->rssFeeds['blog_rss_title'] = \IPS\Http\Url::internal( "app=blog&module=blogs&controller=view&id={$this->blog->_id}", 'front', 'blogs_rss', array( $this->blog->seo_name ) );
 
-			if ( Member::loggedIn()->member_id )
+			if ( \IPS\Member::loggedIn()->member_id )
 			{
-				$key = Member::loggedIn()->getUniqueMemberHash();
+				$key = \IPS\Member::loggedIn()->getUniqueMemberHash();
 
-				Output::i()->rssFeeds['blog_rss_title'] = Output::i()->rssFeeds['blog_rss_title']->setQueryString( array( 'member' => Member::loggedIn()->member_id , 'key' => $key ) );
+				\IPS\Output::i()->rssFeeds['blog_rss_title'] = \IPS\Output::i()->rssFeeds['blog_rss_title']->setQueryString( array( 'member' => \IPS\Member::loggedIn()->member_id , 'key' => $key ) );
 			}
 		}
 
 		/* Add JSON-ld */
-		Output::i()->jsonLd['blog']	= array(
-			'@context'		=> "https://schema.org",
+		\IPS\Output::i()->jsonLd['blog']	= array(
+			'@context'		=> "http://schema.org",
 			'@type'			=> "Blog",
 			'url'			=> (string) $this->blog->url(),
 			'name'			=> $this->blog->_title,
-			'description'	=> $this->blog->member_id ? $this->blog->desc : Member::loggedIn()->language()->addToStack( Blog::$titleLangPrefix . $this->blog->_id . Blog::$descriptionLangSuffix, TRUE, array( 'striptags' => TRUE, 'escape' => TRUE ) ),
+			'description'	=> $this->blog->member_id ? $this->blog->desc : \IPS\Member::loggedIn()->language()->addToStack( \IPS\blog\Blog::$titleLangPrefix . $this->blog->_id . \IPS\blog\Blog::$descriptionLangSuffix, TRUE, array( 'striptags' => TRUE, 'escape' => TRUE ) ),
 			'commentCount'	=> $this->blog->_comments,
 			'interactionStatistic'	=> array(
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/ViewAction",
+					'interactionType'		=> "http://schema.org/ViewAction",
 					'userInteractionCount'	=> $this->blog->num_views
 				),
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/FollowAction",
-					'userInteractionCount'	=> Entry::containerFollowerCount( $this->blog )
+					'interactionType'		=> "http://schema.org/FollowAction",
+					'userInteractionCount'	=> \IPS\blog\Entry::containerFollowerCount( $this->blog )
 				),
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/CommentAction",
+					'interactionType'		=> "http://schema.org/CommentAction",
 					'userInteractionCount'	=> $this->blog->_comments
 				),
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/WriteAction",
+					'interactionType'		=> "http://schema.org/WriteAction",
 					'userInteractionCount'	=> $this->blog->_items
 				)
 			)
@@ -206,36 +164,36 @@ class view extends Controller
 
 		if( $this->blog->coverPhoto()->file )
 		{
-			Output::i()->jsonLd['blog']['image'] = (string) $this->blog->coverPhoto()->file->url;
+			\IPS\Output::i()->jsonLd['blog']['image'] = (string) $this->blog->coverPhoto()->file->url;
 		}
 
 		if( $this->blog->member_id )
 		{
-			Output::i()->jsonLd['blog']['author'] = array(
+			\IPS\Output::i()->jsonLd['blog']['author'] = array(
 				'@type'		=> 'Person',
-				'name'		=> Member::load( $this->blog->member_id )->name,
-				'url'		=> (string) Member::load( $this->blog->member_id )->url(),
-				'image'		=> Member::load( $this->blog->member_id )->get_photo( TRUE, TRUE )
+				'name'		=> \IPS\Member::load( $this->blog->member_id )->name,
+				'url'		=> (string) \IPS\Member::load( $this->blog->member_id )->url(),
+				'image'		=> \IPS\Member::load( $this->blog->member_id )->get_photo( TRUE, TRUE )
 			);
 		}
 
-		if( Settings::i()->blog_enable_sidebar and $this->blog->sidebar )
+		if( \IPS\Settings::i()->blog_enable_sidebar and $this->blog->sidebar )
 		{
-			Output::i()->sidebar['contextual'] = Theme::i()->getTemplate('view')->blogSidebar( $this->blog->sidebar );
+			\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate('view')->blogSidebar( $this->blog->sidebar );
 		}
 
-		Output::i()->breadcrumb = array();
+		\IPS\Output::i()->breadcrumb = array();
 		if ( $club = $this->blog->club() )
 		{
-			FrontNavigation::$clubTabActive = TRUE;
-			Output::i()->breadcrumb = array();
-			Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), Member::loggedIn()->language()->addToStack('module__core_clubs') );
-			Output::i()->breadcrumb[] = array( $club->url(), $club->name );
+			\IPS\core\FrontNavigation::$clubTabActive = TRUE;
+			\IPS\Output::i()->breadcrumb = array();
+			\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), \IPS\Member::loggedIn()->language()->addToStack('module__core_clubs') );
+			\IPS\Output::i()->breadcrumb[] = array( $club->url(), $club->name );
 
 		}
 		else
 		{
-			Output::i()->breadcrumb['module'] = array( \IPS\Http\Url::internal( 'app=blog', 'front', 'blogs' ), Member::loggedIn()->language()->addToStack( '__app_blog' ) );
+			\IPS\Output::i()->breadcrumb['module'] = array( \IPS\Http\Url::internal( 'app=blog', 'front', 'blogs' ), \IPS\Member::loggedIn()->language()->addToStack( '__app_blog' ) );
 		}
 
 
@@ -243,23 +201,23 @@ class view extends Controller
 		{
 		    	foreach( $this->blog->category()->parents() as $parent )
 			{
-				Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 			}
-			Output::i()->breadcrumb[] = array( $this->blog->category()->url(), $this->blog->category()->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $this->blog->category()->url(), $this->blog->category()->_title );
 		} 
-		catch (OutOfRangeException ) {}
+		catch (\OutOfRangeException $e) {}
 		
-		Output::i()->breadcrumb[] = array( $this->blog->url(), $this->blog->_title );
+		\IPS\Output::i()->breadcrumb[] = array( $this->blog->url(), $this->blog->_title );
 
 		/* Categories */
-		$categories = Category::roots( NULL, NULL, array( 'entry_category_blog_id=?', $this->blog->id ) );
+		$categories = \IPS\blog\Entry\Category::roots( NULL, NULL, array( 'entry_category_blog_id=?', $this->blog->id ) );
 
 		/* Set default search option */
-		Output::i()->defaultSearchOption = array( 'blog_entry', 'blog_entry_pl' );
+		\IPS\Output::i()->defaultSearchOption = array( 'blog_entry', 'blog_entry_pl' );
 
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_browse.js', 'blog', 'front' ) );
-		Output::i()->output	= Theme::i()->getTemplate( 'view' )->view( $this->blog, (string) $table, $category );
-		Output::i()->contextualSearchOptions[ Member::loggedIn()->language()->addToStack( 'search_contextual_item_blogs' ) ] = array( 'type' => 'blog_entry', 'nodes' => $this->blog->_id );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_browse.js', 'blog', 'front' ) );
+		\IPS\Output::i()->output	= \IPS\Theme::i()->getTemplate( 'view' )->view( $this->blog, (string) $table, $category );
+		\IPS\Output::i()->contextualSearchOptions[ \IPS\Member::loggedIn()->language()->addToStack( 'search_contextual_item_blogs' ) ] = array( 'type' => 'blog_entry', 'nodes' => $this->blog->_id );
 	}
 	
 	/**
@@ -267,18 +225,18 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function editBlog() : void
+	protected function editBlog()
 	{
 		if( !$this->blog->canEdit() OR $this->blog->groupblog_ids or $this->blog->club_id )
 		{
-			Output::i()->error( 'no_module_permission', '2B201/2', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2B201/2', 403, '' );
 		}
 	
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 	
 		/* Build form */
-		$form = new Form( 'form', 'save', $this->blog->url()->setQueryString( array( 'do' => 'editBlog' ) )->csrf() );
-		$form->class .= 'ipsForm--vertical ipsForm--edit-blog';
+		$form = new \IPS\Helpers\Form( 'form', 'save', $this->blog->url()->setQueryString( array( 'do' => 'editBlog' ) )->csrf() );
+		$form->class .= 'ipsForm_vertical';
 	
 		$this->blog->form( $form, TRUE );
 	
@@ -287,22 +245,22 @@ class view extends Controller
 		{
 			if( !$values['blog_name'] )
 			{
-				$form->elements['']['blog_name']->error	= Member::loggedIn()->language()->addToStack('form_required');
+				$form->elements['']['blog_name']->error	= \IPS\Member::loggedIn()->language()->addToStack('form_required');
 	
-				Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+				\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 				return;
 			}
 	
 			$this->blog->saveForm( $this->blog->formatFormValues( $values ) );
 				
-			Output::i()->redirect( $this->blog->url() );
+			\IPS\Output::i()->redirect( $this->blog->url() );
 		}
 	
 		/* Display form */
-		Output::i()->title = $this->blog->_title;
-		Output::i()->breadcrumb[] = array( $this->blog->url(), $this->blog->_title );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_view.js', 'blog', 'front' ) );
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->title = $this->blog->_title;
+		\IPS\Output::i()->breadcrumb[] = array( $this->blog->url(), $this->blog->_title );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_view.js', 'blog', 'front' ) );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/**
@@ -310,26 +268,26 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function deleteBlog() : void
+	protected function deleteBlog()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		if( !$this->blog->canDelete() or $this->blog->club_id )
 		{
-			Output::i()->error( 'no_module_permission', '2B201/3', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2B201/3', 403, '' );
 		}
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 		
 		$this->blog->disabled = TRUE;
 		$this->blog->save();
 
 		/* Log */
-		Session::i()->modLog( 'modlog__action_delete_blog', array( $this->blog->name => FALSE ) );
+		\IPS\Session::i()->modLog( 'modlog__action_delete_blog', array( $this->blog->name => FALSE ) );
 
-		Task::queue( 'core', 'DeleteOrMoveContent', array( 'class' => 'IPS\blog\Blog', 'id' => $this->blog->id, 'deleteWhenDone' => TRUE ) );
-		Output::i()->redirect( \IPS\Http\Url::internal( 'app=blog&module=blogs&controller=browse', 'front', 'blogs' ) );
+		\IPS\Task::queue( 'core', 'DeleteOrMoveContent', array( 'class' => 'IPS\blog\Blog', 'id' => $this->blog->id, 'deleteWhenDone' => TRUE ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=blog&module=blogs&controller=browse', 'front', 'blogs' ) );
 	}
 	
 	/**
@@ -337,27 +295,27 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function changePin() : void
+	protected function changePin()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Do we have permission */
-		if ( ( $this->blog->pinned and !Member::loggedIn()->modPermission('can_unpin_content') ) or ( !$this->blog->pinned and !Member::loggedIn()->modPermission('can_pin_content') ) or $this->blog->club_id )
+		if ( ( $this->blog->pinned and !\IPS\Member::loggedIn()->modPermission('can_unpin_content') ) or ( !$this->blog->pinned and !\IPS\Member::loggedIn()->modPermission('can_pin_content') ) or $this->blog->club_id )
 		{
-			Output::i()->error( 'no_module_permission', '2B201/4', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2B201/4', 403, '' );
 		}
 		
-		$this->blog->pinned = !$this->blog->pinned;
+		$this->blog->pinned = $this->blog->pinned ? FALSE : TRUE;		
 		$this->blog->save();
 		
 		/* Respond or redirect */
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 		else
 		{
-			Output::i()->redirect( $this->blog->url() );
+			\IPS\Output::i()->redirect( $this->blog->url() );
 		}
 	}
 
@@ -366,65 +324,107 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function rssImport() : void
+	protected function rssImport()
 	{
-		if( !Settings::i()->blog_allow_rssimport )
+		if( !\IPS\Settings::i()->blog_allow_rssimport )
 		{
-			Output::i()->error( 'rss_import_disabled', '2B201/7', 403, '' );
+			\IPS\Output::i()->error( 'rss_import_disabled', '2B201/7', 403, '' );
 		}
 		
 		if( !$this->blog->canEdit() )
 		{
-			Output::i()->error( 'no_module_permission', '2B201/6', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2B201/6', 403, '' );
 		}
 		
 		/* Check for existing feed */
 		try
 		{
-			$existing = Db::i()->select( '*', 'core_rss_import', array( 'rss_import_class=? AND rss_import_node_id=?', 'IPS\\blog\\Entry', $this->blog->id ) )->first();
-			$feed = Import::constructFromData( $existing );
+			$existing = \IPS\Db::i()->select( '*', 'core_rss_import', array( 'rss_import_class=? AND rss_import_node_id=?', 'IPS\\blog\\Entry', $this->blog->id ) )->first();
+			$feed = \IPS\core\Rss\Import::constructFromData( $existing );
 		}
-		catch ( UnderflowException )
+		catch ( \UnderflowException $e )
 		{
-			$feed = new Import;
+			$feed = new \IPS\core\Rss\Import;
 			$feed->class = 'IPS\\blog\\Entry';
 		}
 
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 
-		$form->add( new YesNo( 'blog_enable_rss_import', (bool)$feed->url, FALSE, array( 'togglesOn' => array( 'blog_rss_import_url', 'blog_rss_import_auth_user', 'blog_rss_import_auth_pass', 'blog_rss_import_show_link', 'blog_rss_import_tags' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'blog_enable_rss_import', $feed->url ? TRUE : FALSE, FALSE, array( 'togglesOn' => array( 'blog_rss_import_url', 'blog_rss_import_auth_user', 'blog_rss_import_auth_pass', 'blog_rss_import_show_link', 'blog_rss_import_tags' ) ) ) );
 
-		$form->add( new Url( 'blog_rss_import_url', $feed->url, TRUE, array(), NULL, NULL, NULL, 'blog_rss_import_url' ) );
-		$form->add( new Text( 'blog_rss_import_auth_user', $feed->auth_user ?: null, FALSE, array(), NULL, NULL, NULL, 'blog_rss_import_auth_user' ) );
-		$form->add( new Text( 'blog_rss_import_auth_pass', $feed->auth_pass ?: null, FALSE, array(), NULL, NULL, NULL, 'blog_rss_import_auth_pass' ) );
-		$form->add( new Text( 'blog_rss_import_show_link', $feed->showlink ?: Member::loggedIn()->language()->addToStack('blog_rss_import_show_link_default' ), FALSE, array(), NULL, NULL, NULL, 'blog_rss_import_show_link' ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'blog_rss_import_url', $feed ? $feed->url : NULL, TRUE, array(), NULL, NULL, NULL, 'blog_rss_import_url' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'blog_rss_import_auth_user', $feed ? $feed->auth_user : NULL, FALSE, array(), NULL, NULL, NULL, 'blog_rss_import_auth_user' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'blog_rss_import_auth_pass', $feed ? $feed->auth_pass : NULL, FALSE, array(), NULL, NULL, NULL, 'blog_rss_import_auth_pass' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'blog_rss_import_show_link', $feed->showlink ?: \IPS\Member::loggedIn()->language()->addToStack('blog_rss_import_show_link_default' ), FALSE, array(), NULL, NULL, NULL, 'blog_rss_import_show_link' ) );
 
-		$options = array(
-			'autocomplete' => array(
-				'unique' => TRUE,
-				'minimized' => FALSE,
-				'source' => Entry::definedTags(),
-				'freeChoice' => false
-			)
-		);
-
-		if ( Settings::i()->tags_force_lower )
+		$options = array( 'autocomplete' => array( 'unique' => TRUE, 'minimized' => FALSE, 'source' => \IPS\Content\Item::definedTags( $this->blog ), 'freeChoice' => ( \IPS\Settings::i()->tags_open_system ? TRUE : FALSE ) ) );
+		if ( \IPS\Settings::i()->tags_force_lower )
 		{
 			$options['autocomplete']['forceLower'] = TRUE;
 		}
-		if ( Settings::i()->tags_min )
+		if ( \IPS\Settings::i()->tags_min )
 		{
-			$options['autocomplete']['minItems'] = Settings::i()->tags_min;
+			$options['autocomplete']['minItems'] = \IPS\Settings::i()->tags_min;
 		}
-		if ( Settings::i()->tags_max )
+		if ( \IPS\Settings::i()->tags_max )
 		{
-			$options['autocomplete']['maxItems'] = Settings::i()->tags_max;
+			$options['autocomplete']['maxItems'] = \IPS\Settings::i()->tags_max;
 		}
-
-		$options['autocomplete']['prefix'] = Entry::canPrefix( NULL, $this->blog );
+		if ( \IPS\Settings::i()->tags_len_min )
+		{
+			$options['autocomplete']['minLength'] = \IPS\Settings::i()->tags_len_min;
+		}
+		if ( \IPS\Settings::i()->tags_len_max )
+		{
+			$options['autocomplete']['maxLength'] = \IPS\Settings::i()->tags_len_max;
+		}
+		if ( \IPS\Settings::i()->tags_clean )
+		{
+			$options['autocomplete']['filterProfanity'] = TRUE;
+		}
+		if ( \IPS\Settings::i()->tags_alphabetical )
+		{
+			$options['autocomplete']['alphabetical'] = TRUE;
+		}
+			
+		$options['autocomplete']['prefix'] = \IPS\Content\Item::canPrefix( NULL, $this->blog );
 		$options['autocomplete']['disallowedCharacters'] = array( '#' ); // @todo Pending \IPS\Http\Url rework, hashes cannot be used in URLs
 
-		$form->add( new Text( 'blog_rss_import_tags', $feed->tags ? json_decode( $feed->tags, TRUE ) : array(), Settings::i()->tags_min and Settings::i()->tags_min_req, $options, NULL, NULL, NULL, 'blog_rss_import_tags' ) );
+		/* Language strings for tags description */
+		if ( \IPS\Settings::i()->tags_open_system )
+		{
+			$extralang = array();
+
+			if ( \IPS\Settings::i()->tags_min && \IPS\Settings::i()->tags_max )
+			{
+				$extralang[] = \IPS\Member::loggedIn()->language()->addToStack( 'tags_desc_min_max', FALSE, array( 'sprintf' => array( \IPS\Settings::i()->tags_max ), 'pluralize' => array( \IPS\Settings::i()->tags_min ) ) );
+			}
+			else if( \IPS\Settings::i()->tags_min )
+			{
+				$extralang[] = \IPS\Member::loggedIn()->language()->addToStack( 'tags_desc_min', FALSE, array( 'pluralize' => array( \IPS\Settings::i()->tags_min ) ) );
+			}
+			else if( \IPS\Settings::i()->tags_min )
+			{
+				$extralang[] = \IPS\Member::loggedIn()->language()->addToStack( 'tags_desc_max', FALSE, array( 'pluralize' => array( \IPS\Settings::i()->tags_max ) ) );
+			}
+
+			if( \IPS\Settings::i()->tags_len_min && \IPS\Settings::i()->tags_len_max )
+			{
+				$extralang[] = \IPS\Member::loggedIn()->language()->addToStack( 'tags_desc_len_min_max', FALSE, array( 'sprintf' => array( \IPS\Settings::i()->tags_len_min, \IPS\Settings::i()->tags_len_max ) ) );
+			}
+			else if( \IPS\Settings::i()->tags_len_min )
+			{
+				$extralang[] = \IPS\Member::loggedIn()->language()->addToStack( 'tags_desc_len_min', FALSE, array( 'pluralize' => array( \IPS\Settings::i()->tags_len_min ) ) );
+			}
+			else if( \IPS\Settings::i()->tags_len_max )
+			{
+				$extralang[] = \IPS\Member::loggedIn()->language()->addToStack( 'tags_desc_len_max', FALSE, array( 'sprintf' => array( \IPS\Settings::i()->tags_len_max ) ) );
+			}
+
+			$options['autocomplete']['desc'] = \IPS\Member::loggedIn()->language()->addToStack('tags_desc') . ( ( \count( $extralang ) ) ? '<br>' . implode( ' ', $extralang ) : '' );
+		}
+		
+		$form->add( new \IPS\Helpers\Form\Text( 'blog_rss_import_tags', $feed ? json_decode( $feed->tags, TRUE ) : array(), \IPS\Settings::i()->tags_min and \IPS\Settings::i()->tags_min_req, $options, NULL, NULL, NULL, 'blog_rss_import_tags' ) );
 		
 		if ( $values = $form->values() )
 		{
@@ -443,14 +443,14 @@ class view extends Controller
 
 					if ( $response->httpResponseCode == 401 )
 					{
-						$form->error = Member::loggedIn()->language()->addToStack( 'rss_import_auth' );
+						$form->error = \IPS\Member::loggedIn()->language()->addToStack( 'rss_import_auth' );
 					}
 
 					$response = $response->decodeXml();
 					
-					if ( !( $response instanceof Rss ) and !( $response instanceof Atom ) )
+					if ( !( $response instanceof \IPS\Xml\Rss ) and !( $response instanceof \IPS\Xml\Atom ) )
 					{
-						$form->error = Member::loggedIn()->language()->addToStack( 'rss_import_invalid' );
+						$form->error = \IPS\Member::loggedIn()->language()->addToStack( 'rss_import_invalid' );
 					}
 
 					if( !$form->error )
@@ -460,7 +460,7 @@ class view extends Controller
 						$feed->showlink = $values['blog_rss_import_show_link'];
 						$feed->auth_user = $values['blog_rss_import_auth_user'];
 						$feed->auth_pass = $values['blog_rss_import_auth_pass'];
-						$feed->member = $this->blog->owner() ? $this->blog->owner()->member_id : Member::loggedIn()->member_id;
+						$feed->member = $this->blog->owner() ? $this->blog->owner()->member_id : \IPS\Member::loggedIn()->member_id;
 						$feed->settings = json_encode( array( 'tags' => $values['blog_rss_import_tags'] ) );
 						$feed->save();
 						
@@ -468,33 +468,33 @@ class view extends Controller
 						{
 							$feed->run();
 						}
-						catch ( Exception ) { }
+						catch ( \Exception $e ) { }
 						
 						/* Redirect */
-						Output::i()->redirect( $this->blog->url() );
+						\IPS\Output::i()->redirect( $this->blog->url() );
 					}
 
 				}
-				catch ( \IPS\Http\Request\Exception )
+				catch ( \IPS\Http\Request\Exception $e )
 				{
-					$form->error = Member::loggedIn()->language()->addToStack( 'form_url_bad' );
+					$form->error = \IPS\Member::loggedIn()->language()->addToStack( 'form_url_bad' );
 				}
-				catch ( Exception )
+				catch ( \Exception $e )
 				{
-					$form->error = Member::loggedIn()->language()->addToStack( 'rss_import_invalid' );
+					$form->error = \IPS\Member::loggedIn()->language()->addToStack( 'rss_import_invalid' );
 				}
 			}
 			else
 			{
-				Db::i()->delete( 'core_rss_import', array( 'rss_import_class=? AND rss_import_node_id=?', 'IPS\\blog\\Entry', $this->blog->id ) );
+				\IPS\Db::i()->delete( 'core_rss_import', array( 'rss_import_class=? AND rss_import_node_id=?', 'IPS\\blog\\Entry', $this->blog->id ) );
 
 				/* Redirect */
-				Output::i()->redirect( $this->blog->url() );
+				\IPS\Output::i()->redirect( $this->blog->url() );
 			}
 		}
 				
 		/* Display */
-		Output::i()->output = $form->error ? $form : Theme::i()->getTemplate( 'view', 'blog', 'front' )->rssImport( $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) ) );
+		\IPS\Output::i()->output = $form->error ? $form : \IPS\Theme::i()->getTemplate( 'view', 'blog', 'front' )->rssImport( $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) ) );
 	}
 	
 	/**
@@ -502,7 +502,7 @@ class view extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _coverPhotoStorageExtension(): string
+	protected function _coverPhotoStorageExtension()
 	{
 		return 'blog_Blogs';
 	}
@@ -510,22 +510,22 @@ class view extends Controller
 	/**
 	 * Set Cover Photo
 	 *
-	 * @param	CoverPhoto	$photo	New Photo
+	 * @param	\IPS\Helpers\CoverPhoto	$photo	New Photo
 	 * @return	void
 	 */
-	protected function _coverPhotoSet( CoverPhoto $photo ) : void
+	protected function _coverPhotoSet( \IPS\Helpers\CoverPhoto $photo )
 	{
 		$this->blog->cover_photo = (string) $photo->file;
-		$this->blog->cover_photo_offset = $photo->offset;
+		$this->blog->cover_photo_offset = (int) $photo->offset;
 		$this->blog->save();
 	}
 	
 	/**
 	 * Get Cover Photo
 	 *
-	 * @return	CoverPhoto
+	 * @return	\IPS\Helpers\CoverPhoto
 	 */
-	protected function _coverPhotoGet(): CoverPhoto
+	protected function _coverPhotoGet()
 	{
 		return $this->blog->coverPhoto();
 	}
@@ -535,10 +535,10 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function categoriesJson() : void
+	protected function categoriesJson()
 	{
 		$cats = array();
-		foreach( Category::roots( NULL, NULL, array( 'entry_category_blog_id=?', $this->blog->id ) ) as $meow )
+		foreach( \IPS\blog\Entry\Category::roots( NULL, NULL, array( 'entry_category_blog_id=?', $this->blog->id ) ) as $meow )
 		{
 			$cats[] = array(
 				'id'   => $meow->id,
@@ -546,7 +546,7 @@ class view extends Controller
 			);
 		}
 			
-		Output::i()->json( array( 'categories' => $cats ) );
+		\IPS\Output::i()->json( array( 'categories' => $cats ) );
 	}
 
 	/**
@@ -554,54 +554,54 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manageCategories() : void
+	protected function manageCategories()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_view.js', 'blog', 'front' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_view.js', 'blog', 'front' ) );
 
 		if( !$this->blog->canEdit()  )
 		{
-			Output::i()->error( 'no_module_permission', '2B201/A', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2B201/A', 403, '' );
 		}
 
-		$form = new Form;
-		$form->addHtml( Theme::i()->getTemplate( 'view', 'blog', 'front' )->manageCategories( $this->blog ) );
+		$form = new \IPS\Helpers\Form;
+		$form->addHtml( \IPS\Theme::i()->getTemplate( 'view', 'blog', 'front' )->manageCategories( $this->blog ) );
 		$form->hiddenValues['submitted'] = 1;
 
 		if( $values = $form->values() )
 		{
-			Output::i()->redirect( $this->blog->url() );
+			\IPS\Output::i()->redirect( $this->blog->url() );
 		}
 
 		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('blog_manage_entry_categories');
-		Output::i()->output = $form->error ? $form : Theme::i()->getTemplate( 'view', 'blog', 'front' )->rssImport( $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('blog_manage_entry_categories');
+		\IPS\Output::i()->output = $form->error ? $form : \IPS\Theme::i()->getTemplate( 'view', 'blog', 'front' )->rssImport( $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) ) );
 	}
 
 	/**
 	 * Edit a category name
 	 *
-	 * @return void
+	 * @return string
 	 */
-	protected function editCategoryName(): void
+	protected function editCategoryName()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		if( !$this->blog->canEdit() )
 		{
-			Output::i()->error( 'no_module_permission', '2B201/C', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2B201/C', 403, '' );
 		}
 		
-		if( ! Request::i()->name )
+		if( ! \IPS\Request::i()->name )
 		{
-			Output::i()->error( 'blog_error_missing_name', '1B201/B', 403, '' );
+			\IPS\Output::i()->error( 'blog_error_missing_name', '1B201/B', 403, '' );
 		}
 			
 		/* New category? */
-		if ( Request::i()->cat === 'new' )
+		if ( \IPS\Request::i()->cat === 'new' )
 		{
-			$newCategory = new Category;
-			$newCategory->name = Request::i()->name;
-			$newCategory->seo_name = Friendly::seoTitle( Request::i()->name );
+			$newCategory = new \IPS\blog\Entry\Category;
+			$newCategory->name = \IPS\Request::i()->name;
+			$newCategory->seo_name = \IPS\Http\Url\Friendly::seoTitle( \IPS\Request::i()->name );
 
 			$newCategory->blog_id = $this->blog->id;
 			$newCategory->save();
@@ -610,23 +610,23 @@ class view extends Controller
 		{
 			try
 			{
-				$category = Category::load( Request::i()->cat );
+				$category = \IPS\blog\Entry\Category::load( \IPS\Request::i()->cat );
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException $e )
 			{
-				Output::i()->error( 'blog_error_not_find_category', '2B201/D', 403, '' );
+				\IPS\Output::i()->error( 'blog_error_not_find_category', '2B201/D', 403, '' );
 			}
 	
 			if( $category->blog_id !== $this->blog->id )
 			{
-				Output::i()->error( 'blog_error_not_find_category', '2B201/E', 403, '' );
+				\IPS\Output::i()->error( 'blog_error_not_find_category', '2B201/E', 403, '' );
 			}
 			
-			$category->name = Request::i()->name;
+			$category->name = \IPS\Request::i()->name;
 			$category->save();
 		}
 		
-		Output::i()->json( 'OK' );
+		\IPS\Output::i()->json( 'OK' );
 	}
 	
 	/**
@@ -634,42 +634,42 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function deleteCategory() : void
+	protected function deleteCategory()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		if( !$this->blog->canEdit()  )
 		{
-			Output::i()->error( 'no_module_permission', '2B201/8', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2B201/8', 403, '' );
 		}
 
 		try
 		{
-			$category = Category::load( Request::i()->cat );
+			$category = \IPS\blog\Entry\Category::load( \IPS\Request::i()->cat );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->redirect( $this->blog->url() );
+			\IPS\Output::i()->redirect( $this->blog->url() );
 		}
 
 		if( $category->blog_id !== $this->blog->id )
 		{
-			Output::i()->error( 'no_module_permission', '2B201/9', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2B201/9', 403, '' );
 		}
 
 		/* Update Entries */
-		Db::i()->update( 'blog_entries', array( 'entry_category_id' => NULL ), array( 'entry_category_id=?', $category->id ) );
+		\IPS\Db::i()->update( 'blog_entries', array( 'entry_category_id' => NULL ), array( 'entry_category_id=?', $category->id ) );
 
 		$category->delete();
 
 		/* Redirect */
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 		else
 		{
-			Output::i()->redirect( $this->blog->url(), 'deleted' );
+			\IPS\Output::i()->redirect( $this->blog->url(), 'deleted' );
 		}
 	}
 
@@ -678,26 +678,26 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function categoriesReorder() : void
+	public function categoriesReorder()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		if( !$this->blog->canEdit() )
 		{
-			Output::i()->error( 'no_module_permission', '2B201/F', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2B201/F', 403, '' );
 		}
 
 		/* Set order */
 		$position = 1;
 
-		if( !Request::i()->isAjax() )
+		if( !\IPS\Request::i()->isAjax() )
 		{
-			Request::i()->ajax_order = explode( ',', Request::i()->ajax_order );
+			\IPS\Request::i()->ajax_order = explode( ',', \IPS\Request::i()->ajax_order );
 		}
 
-		foreach( Request::i()->ajax_order as $category )
+		foreach( \IPS\Request::i()->ajax_order as $category )
 		{
-			$node = Category::load( $category );
+			$node = \IPS\blog\Entry\Category::load( $category );
 
 			/* No funny business trying to reorder another blog's categories */
 			if( $node->blog_id !== $this->blog->id )
@@ -711,13 +711,13 @@ class view extends Controller
 			$position++;
 		}
 
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'ok' );
+			\IPS\Output::i()->json( 'ok' );
 		}
 		else
 		{
-			Output::i()->redirect( $this->blog->url(), 'saved' );
+			\IPS\Output::i()->redirect( $this->blog->url(), 'saved' );
 		}
 	}
 }

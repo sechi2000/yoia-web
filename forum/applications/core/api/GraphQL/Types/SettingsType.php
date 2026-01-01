@@ -10,38 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Types;
-use Exception;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Application;
-use IPS\core\Reports\Report;
-use IPS\core\Reports\Types;
-use IPS\File;
-use IPS\forums\Topic;
-use IPS\GeoLocation;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Upload;
-use IPS\Login;
-use IPS\Member;
-use IPS\Settings;
-use function defined;
-use function strtoupper;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * SettingsType for GraphQL API
  */
-class SettingsType extends ObjectType
+class _SettingsType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -104,7 +91,7 @@ class SettingsType extends ObjectType
 							'values' => ['NORMAL', 'FULL', 'REDIRECT', 'DISABLED']
 						]),
 						'resolve' => function ($val, $args, $context, $info) {
-							return strtoupper( Login::registrationType() );
+							return \strtoupper( \IPS\Login::registrationType() );
 						}
 					],
 					'allow_reg_target' => [
@@ -116,13 +103,13 @@ class SettingsType extends ObjectType
 					'geolocation_enabled' => [
 						'type' => TypeRegistry::boolean(),
 						'resolve' => function () {
-							return GeoLocation::enabled();
+							return \IPS\GeoLocation::enabled();
 						}
 					],
 					'version' => [
 						'type' => TypeRegistry::int(),
 						'resolve' => function () {
-							return Application::load('core')->long_version;
+							return \IPS\Application::load('core')->long_version;
 						}
 					],
 
@@ -134,13 +121,13 @@ class SettingsType extends ObjectType
 							'values' => ['INTERNAL', 'EXTERNAL', 'NONE']
 						]),
 						'resolve' => function ($val) {
-							return mb_strtoupper( Settings::i()->privacy_type );
+							return mb_strtoupper( \IPS\Settings::i()->privacy_type );
 						}
 					],
 					'privacy_text' => [
 						'type' => TypeRegistry::richText(),
 						'resolve' => function () {
-							return Member::loggedIn()->language()->get('privacy_text_value');
+							return \IPS\Member::loggedIn()->language()->get('privacy_text_value');
 						}
 					],
 					'privacy_link' => [
@@ -149,7 +136,7 @@ class SettingsType extends ObjectType
 					'reg_rules' => [
 						'type' => TypeRegistry::richText(),
 						'resolve' => function () {
-							return Member::loggedIn()->language()->get('reg_rules_value');
+							return \IPS\Member::loggedIn()->language()->get('reg_rules_value');
 						}
 					],
 					'guidelines_type' => [
@@ -158,28 +145,31 @@ class SettingsType extends ObjectType
 							'values' => ['INTERNAL', 'EXTERNAL', 'NONE']
 						]),
 						'resolve' => function ($val) {
-							return mb_strtoupper( Settings::i()->gl_type );
+							return mb_strtoupper( \IPS\Settings::i()->gl_type );
 						}
 					],
 					'guidelines_text' => [
 						'type' => TypeRegistry::richText(),
 						'resolve' => function ($val) {
-							return Member::loggedIn()->language()->get('guidelines_value');
+							return \IPS\Member::loggedIn()->language()->get('guidelines_value');
 						}
 					],
 					'guidelines_link' => [
 						'type' => TypeRegistry::string(),
 						'resolve' => function ($val) {
-							return Settings::i()->gl_link;
+							return \IPS\Settings::i()->gl_link;
 						}
 					],
 
 					/* -------------------------------- */
 					/* Forums settings */
+					'forums_questions_downvote' => [
+						'type' => TypeRegistry::boolean()
+					],
 					'forums_uses_solved' => [
 						'type' => TypeRegistry::boolean(),
 						'resolve' => function ($val) {
-							return Application::appIsEnabled('forums') && Topic::anyContainerAllowsSolvable();
+							return \IPS\Application::appIsEnabled('forums') && \IPS\forums\Topic::anyContainerAllowsSolvable();
 						}
 					],
 
@@ -189,14 +179,14 @@ class SettingsType extends ObjectType
 						'type' => TypeRegistry::listOf( TypeRegistry::string() ),
 						'description' => "File extensions that are allowed to be uploaded or NULL for any extensions. Note: may be an empty array which means attachments not allowed.",
 						'resolve' => function() {
-							return Editor::allowedFileExtensions();
+							return \IPS\Helpers\Form\Editor::allowedFileExtensions();
 						}
 					],
 					'chunkingSupported' => [
 						'type' => TypeRegistry::boolean(),
 						'description' => "If chunking is supported",
 						'resolve' => function() {
-							$storageClass = File::getClass( 'core_Attachment' );
+							$storageClass = \IPS\File::getClass( 'core_Attachment' );
 							return $storageClass::$supportsChunking;
 						}
 					],
@@ -204,7 +194,7 @@ class SettingsType extends ObjectType
 						'type' => TypeRegistry::int(),
 						'description' => "The maximum size (in bytes) the server can handle without crashing. If chunking is supported, you can send chunks of up to this size - if it isn't, this effectively becomes the maximum size per file.",
 						'resolve' => function() {
-							return Upload::maxChunkSize();
+							return \IPS\Helpers\Form\Upload::maxChunkSize();
 						}
 					],
 
@@ -214,7 +204,7 @@ class SettingsType extends ObjectType
 						'type' => TypeRegistry::boolean(),
 						'description' => "Whether the automoderation feature is enabled",
 						'resolve' => function () {
-							return Settings::i()->automoderation_enabled;
+							return \IPS\Settings::i()->automoderation_enabled;
 						}
 					],
 					'reportReasons' => [
@@ -224,11 +214,11 @@ class SettingsType extends ObjectType
 							$options = array();
 
 							$options[] = array(
-								'id' => Report::TYPE_MESSAGE,
-								'reason' => Member::loggedIn()->language()->addToStack('report_message_item')
+								'id' => \IPS\core\Reports\Report::TYPE_MESSAGE, 
+								'reason' => \IPS\Member::loggedIn()->language()->addToStack('report_message_item') 
 							);
 
-							foreach( Types::roots() as $type )
+							foreach( \IPS\core\Reports\Types::roots() as $type )
 							{
 								$options[] = array(
 									'id' => $type->id,
@@ -245,9 +235,9 @@ class SettingsType extends ObjectType
 				$setting = $info->fieldName;
 				try 
 				{
-					return Settings::i()->$setting;
+					return \IPS\Settings::i()->$setting;
 				} 
-				catch(Exception $error)
+				catch(\Exception $error)
 				{
 					return null;
 				}

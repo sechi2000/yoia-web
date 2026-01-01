@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <language>
- <app key="cms" version="5001403">
+ <app key="cms" version="107827">
   <word key="__app_cms" js="0">Pages</word>
   <word key="menutab__cms" js="0">Pages</word>
-  <word key="menutab__cms_icon" js="0">file</word>
+  <word key="menutab__cms_icon" js="0">files-o</word>
   <word key="__indefart_content_db_lang_sl" js="0">a %s</word>
   <word key="__indefart_cms_page" js="0">a page</word>
   <word key="__indefart_content_record_comments_title" js="0">a comment</word>
   <word key="__indefart_content_record_reviews_title" js="0">a review</word>
-  <word key="__defart_cms_page" js="0">page</word>
-  <word key="__defart_cms_page_plural" js="0">pages</word>
   <word key="__defart_content_db_lang_sl" js="0">%s</word>
   <word key="__defart_content_record_comments_title" js="0">comment</word>
   <word key="__defart_content_record_comments_title_plural" js="0">{!#[1:comment][?:comments]}</word>
@@ -74,8 +72,6 @@
   <word key="can_delete_item_message_record" js="0">Can delete messages on %s?</word>
   <word key="can_copy_topic_database" js="0">Can copy topics to a database?</word>
   <word key="can_copy_topic_database_desc" js="0">If enabled, then the user can copy topics in forums they are allowed to moderate in, to databases they are allowed to create records in</word>
-  <word key="can_view_reports_record" js="0">Can view reported content on %s?</word>
-  <word key="can_assign_record" js="0">Can assign %s?</word>
   <word key="r__page_add" js="0">Can create pages?</word>
   <word key="r__page_edit" js="0">Can edit pages?</word>
   <word key="r__page_delete" js="0">Can delete pages?</word>
@@ -115,8 +111,6 @@
   <word key="filestorage__cms_Records" js="0">CMS Records</word>
   <word key="filestorage__cms_Pages" js="0">CMS Pages</word>
   <word key="filestorage__cms_Media" js="0">CMS Media</word>
-  <word key="filestorage__cms_Categories" js="0">CMS Categories</word>
-  <word key="filestorage__cms_PagesImages" js="0">CMS Pages Images</word>
   <word key="modperms__cms_Databases" js="0">Databases</word>
   <word key="can_content_revisions_content" js="0">Can Manage Revisions</word>
   <word key="can_content_edit_meta_tags" js="0">Can manage meta tags</word>
@@ -151,7 +145,6 @@
   <word key="content_block_add_type_custom_desc" js="0">You can author HTML or PHP for advertisements, javascript widgets (e.g. stock tickers, gamer feeds, etc.) and notices/announcements.</word>
   <word key="content_block_add_custom_type_wysiwyg" js="0">Editor</word>
   <word key="content_block_add_custom_type_html" js="0">Manual HTML</word>
-  <word key="content_block_php_disabled" js="0"><![CDATA[This was a PHP block in Invision Community 4.<br> PHP blocks are deprecated with Invision Community 5 and will be treated as a HTML block.]]></word>
   <word key="content_block_add_custom_type_html_desc" js="0">Allows use of HTML and Invision Community template logic that you'll enter manually</word>
   <word key="content_block_add_custom_type_php" js="0">Manual PHP</word>
   <word key="content_block_add_custom_type_php_desc" js="0"><![CDATA[Allows use of raw PHP that you'll enter manually. Note: don't include &lt;?php ?&gt; tags; Invision Community will handle this for you.]]></word>
@@ -187,12 +180,11 @@
   <word key="cms_block_preview_refresh" js="0">Refresh Preview</word>
   <word key="cms_db_feed_title" js="0">Database Feeds</word>
   <word key="cms_db_feed_block_with_name" js="0">Feed from %s</word>
-  <word key="cms_db_feed_block_with_name_desc" js="0">Create a customizable feed of %s</word>
   <word key="cms_db_feed_block_with_name_disabled" js="0">Cannot create a feed for %s as this database is not assigned to a page</word>
   <word key="cms_db_relational_with_name_disabled" js="0">Cannot use database '%s' as this database is not assigned to a page</word>
   <word key="cms_block_form_display" js="0">Templates</word>
   <word key="block_key" js="0">Template Key</word>
-  <word key="block_key_desc" js="0"><![CDATA[<p class='ipsMessage ipsMessage_info'>The block key ('my_block_key') can be used in HTML templates and manual pages to fetch a specific block, for instance: <span class='i-font-family_monospace'>{block="my_block_key"}</span></p><br>The key must be unique for this block. If omitted, a key will be automatically generated.]]></word>
+  <word key="block_key_desc" js="0"><![CDATA[<p class='ipsMessage ipsMessage_info'>The block key ('my_block_key') can be used in HTML templates and manual pages to fetch a specific block, for instance: <span class='ipsType_monospace'>{block="my_block_key"}</span></p><br>The key must be unique for this block. If omitted, a key will be automatically generated.]]></word>
   <word key="cms_block_key_not_unique" js="0">The block key is not unique</word>
   <word key="block_cache" js="0">Cache this block</word>
   <word key="block_cache_desc" js="0">If your block contains dynamic elements, such as member data, database counts, etc, you will need to prevent this block from being cached.</word>
@@ -231,8 +223,8 @@
   <word key="block_template_theme_import" js="0">Theme set</word>
   <word key="template_database_group" js="0">Type</word>
   <word key="cms_new_db_template_group_listing" js="0">Record Listing (Shown when clicking a category)</word>
-  <word key="cms_new_db_template_group_index" js="0">Index (First page when viewing a database)</word>
-  <word key="cms_new_db_template_group_categories" js="0">Category List (Shows all available database categories)</word>
+  <word key="cms_new_db_template_group_featured" js="0">Featured Records (First page when viewing a database set to show featured articles)</word>
+  <word key="cms_new_db_template_group_categories" js="0">Category List (First page when viewing a database)</word>
   <word key="cms_new_db_template_group_display" js="0">Record (Displays the record and comments)</word>
   <word key="cms_new_db_template_group_form" js="0">Record Form (Used when adding/editing a record)</word>
   <word key="database_template_type" js="0">Template Type</word>
@@ -248,15 +240,15 @@
   <word key="template_group_new_desc" js="0">Please use only a-z and 0-9 without any special characters or spaces. The group name must start with a letter or underscore.</word>
   <word key="template_title_desc" js="0">Please use only a-z and 0-9 without any special characters or spaces. The title must start with a letter or underscore.</word>
   <word key="template_reserved_word" js="0">The template name may not be any of the following: %s</word>
+  <word key="cms_theme_designer_mode_warning" js="0"><![CDATA[Theme editing is currently unavailable in the ACP as you have designers' mode enabled.<br /><a href='%s'>Switch off designers' mode.</a>]]></word>
+  <word key="cms_media_designer_mode_warning" js="0"><![CDATA[Media editing is currently unavailable in the ACP as you have designers' mode enabled.<br /><a href='%s'>Switch off designers' mode.</a>]]></word>
   <word key="cms_templates_export_title" js="0">Download Templates</word>
   <word key="cms_templates_export_description" js="0">Select the templates to export from the list below. These templates will be added to a single XML file that can be imported to other Invision Community communities.</word>
-  <word key="cms_templates_export_description_app" js="0">Select the templates to export from the list below. These templates will be included when you build your application.</word>
+  <word key="cms_templates_export_description_app" js="0">Select the templates to export from the list below. These templates will be included when you build your application/plugin.</word>
   <word key="cms_templates_export_return" js="0">Return to the template editor</word>
   <word key="templates_block" js="0">Blocks</word>
   <word key="templates_database" js="0">Database</word>
   <word key="templates_page" js="0">Pages</word>
-  <word key="templates_css" js="0">CSS</word>
-  <word key="templates_js" js="0">Javascript</word>
   <word key="cms_no_templates_selected" js="0">You must select templates to export</word>
   <word key="cms_templates_import_title" js="0">Upload Templates</word>
   <word key="cms_templates_import" js="0">Upload</word>
@@ -269,17 +261,14 @@
   <word key="cms_template_title_exists" js="0">That template title already exists.</word>
   <word key="database_form_template_link" js="0">Edit Templates</word>
   <word key="cms_block_list_key" js="0">{block=&quot;%s&quot;}</word>
-  <word key="cms_block_list_pages" js="0">Used on Pages: </word>
   <word key="cms_theme_template_custom" js="0">Custom Templates</word>
   <word key="cms_theme_template_default" js="0">Default Templates</word>
   <word key="delete_db_confirm_detail_msg" js="0">Any fields in other databases linking to this database will be deleted automatically.</word>
-  <word key="theme_template_new" js="0">Add...</word>
   <word key="page_database_display" js="0">Contains database: %s</word>
-  <word key="page_database_edit_message" js="0"><![CDATA[Database page properties must be managed from the <a href='%s'>database</a>]]></word>
   <word key="content_edit_folder" js="0">Edit Folder</word>
   <word key="content_add_folder" js="0">Add Folder</word>
   <word key="content_add_page" js="0">Add Page</word>
-  <word key="content_edit_page" js="0">Page Options</word>
+  <word key="content_edit_page" js="0">Edit Page</word>
   <word key="content_editing_page" js="0">Editing Page %s</word>
   <word key="folder_name" js="0">Folder Name</word>
   <word key="folder_parent_id" js="0">Folder Parent</word>
@@ -297,30 +286,22 @@
   <word key="page_folder_id" js="0">Page Folder</word>
   <word key="page_meta_keywords" js="0">Meta Keywords</word>
   <word key="page_meta_description" js="0">Meta Description</word>
-  <word key="page_meta_image" js="0">Meta Image</word>
-  <word key="page_meta_image_desc" js="0">This image will be used for external sharing</word>
   <word key="page_meta_index" js="0">Index</word>
   <word key="page_meta_index_desc" js="0">Allow Search Engines to index this page.</word>
   <word key="page_meta_index_desc_disabled" js="0">The page is not visible to guests, so it cannot be indexed.</word>
+  <word key="page_show_sidebar" js="0">Show the suite sidebar on this page</word>
   <word key="page_type" js="0">Content Editor</word>
-  <word key="page_type_builder" js="0">Page Editor (recommended)</word>
+  <word key="page_type_builder" js="0">Page Builder</word>
   <word key="page_type_builder_desc" js="0">A visual editor for drag and drop page creation</word>
   <word key="page_type_manual" js="0">Manual HTML</word>
-  <word key="page_type_manual_desc" js="0">A code level editor for complete control. Includes support for Invision Template Tags.</word>
+  <word key="page_type_manual_desc" js="0">A code level editor for complete control</word>
   <word key="page_ipb_wrapper" js="0">Use suite HTML wrapper</word>
   <word key="page_ipb_wrapper_desc" js="0">Outputs your page within the suite header/footer wrapper. If you select 'None', you will be responsible for the full page html (including doctype, head, body, etc. tags)</word>
   <word key="content_err_no_page" js="0">Could not load a page to edit</word>
   <word key="content_edit_page_content_title" js="0">Editing page content for %s</word>
   <word key="page_content" js="0">Content</word>
-  <word key="content_default_page" js="0">Set default page</word>
-  <word key="err__no_page_default" js="0">The %s member group will have no default page. Please adjust your selection or set another default page for this group first.</word>
+  <word key="content_default_page" js="0">Make default page for this folder</word>
   <word key="content_default_error_page" js="0">Make default error page</word>
-  <word key="set_page_default" js="0">Set as default page</word>
-  <word key="set_page_default_desc" js="0">Make this the default page for any groups that do not have an override</word>
-  <word key="group_defaults" js="0">Default for groups: %s</word>
-  <word key="set_group_defaults" js="0">For groups</word>
-  <word key="default_page" js="0">Default Page</word>
-  <word key="set_page_default_info" js="0"><![CDATA[A member's default page is determined <em>only</em> by their primary group.]]></word>
   <word key="content_remove_error_page" js="0">Remove as default error page</word>
   <word key="content_database_form_options_page" js="0">Page</word>
   <word key="content_database_form_options_page_msg" js="0">You may optionally create a page for this database. After creation, you may edit the page as normal.</word>
@@ -328,20 +309,19 @@
   <word key="database_create_page_existing" js="0">I will add this database into an existing page</word>
   <word key="database_create_page_new" js="0">I want to create a new page for this database</word>
   <word key="content_err_page_save_exception" js="0">Page could not be saved: %s</word>
-  <word key="content_acp_err_page_db_delete" js="0">Database pages cannot be deleted.</word>
   <word key="cms_err_db_page_never_used" js="0">This database was never added to any pages</word>
   <word key="cms_err_db_already_on_page" js="0">A page may only have one database embedded</word>
   <word key="cms_err_db_does_not_exist" js="0">That database does not exist.</word>
   <word key="cms_err_db_in_use_other_page" js="0">The database added is being used by another page.</word>
   <word key="content_acp_page_builder_msg_new" js="0">You can edit this page's content by visiting the page once it has been created.</word>
   <word key="content_acp_page_builder_msg_edit" js="0"><![CDATA[You can edit this page's content by visiting the <a href='%s' target='_blank' rel='noopener'>page.</a>]]></word>
-  <word key="content_launch_page_builder" js="0">Open Page Editor</word>
+  <word key="content_launch_page_builder" js="0">Open page builder</word>
   <word key="content_launch_page_view" js="0">View page</word>
   <word key="page_theme" js="0">Theme</word>
   <word key="page_theme_desc" js="0">Select which theme to use for this page. The theme is used for default widgets and the global template.</word>
   <word key="cms_page_theme_id_default" js="0">Default Theme</word>
   <word key="page_template" js="0">Template</word>
-  <word key="page_template_desc" js="0">Select which template to use for the Page Editor. Changing this for an existing page may lose any existing widget layouts.</word>
+  <word key="page_template_desc" js="0">Select which template to use for the page builder. Changing this for an existing page may lose any existing widget layouts.</word>
   <word key="content_launch_page" js="0">View Page</word>
   <word key="cms_db_used_on_page" js="0">Used on page: %s</word>
   <word key="content_folder_name_furl_collision" js="0">This folder name cannot be used as it causes a URL collision with another installed application.</word>
@@ -351,7 +331,7 @@
   <word key="content_page_form_tab__includes" js="0">Page Includes</word>
   <word key="page_includes_js" js="0">Javascript</word>
   <word key="page_includes_css" js="0">CSS</word>
-  <word key="cms_page_includes_message" js="0"><![CDATA[Page includes will not work unless your content or custom wrapper template contains the following tags:<br><span class='i-font-family_monospace'>{template="includeCSS" app="core" group="global" location="global" params=""} {template="includeJS" app="core" group="global" location="global" params=""}</span>]]></word>
+  <word key="cms_page_includes_message" js="0"><![CDATA[Page includes will not work unless your content or custom wrapper template contains the following tags:<br><span class='ipsType_monospace'>{template="includeCSS" app="core" group="global" location="global" params=""} {template="includeJS" app="core" group="global" location="global" params=""}</span>]]></word>
   <word key="page_wrapper_template" js="0">Page Wrapper</word>
   <word key="page_wrapper_template_desc" js="0">Wrapper template for this page</word>
   <word key="cms_page_wrapper_template_none" js="0">None</word>
@@ -374,20 +354,6 @@
   <word key="database_canonical_flag_1" js="0">All pages should be considered different</word>
   <word key="database_canonical_flag_1_desc" js="0"><![CDATA[An example is a database where you post a link or video for review, and receive pages of comments and reviews.<br>In this example, the canonical tag will be set to the current page as the page of user generated content is more important.]]></word>
   <word key="add_word_reason_pages" js="0">Phrases you create here can be used in custom HTML pages and theme templates to provide content in different languages.</word>
-  <word key="cms_import_wrappers" js="0">Page Wrappers</word>
-  <word key="cms_template_no_import" js="0">Do not import</word>
-  <word key="content_import_dev_templates_info" js="0">Select the templates you wish to import, and map it to a template type</word>
-  <word key="content_import_db" js="0">Database Templates</word>
-  <word key="content_import_wrappers" js="0">Custom Wrappers</word>
-  <word key="content_page_history" js="0">Past versions</word>
-  <word key="revision_date" js="0">Date</word>
-  <word key="revision_member_id" js="0">Member</word>
-  <word key="view_page_revision" js="0">View this version</word>
-  <word key="revision_page_manual" js="0">Manual Saves Only</word>
-  <word key="revision_manual_save" js="0">Type</word>
-  <word key="revision_page_type_manual" js="0">Stored when the Page Editor was closed</word>
-  <word key="revision_page_type_auto" js="0">Stored when the Page Editor made a change</word>
-  <word key="revision_page_last_session" js="0">Last Editing Session</word>
   <word key="menu_content_page" js="0">Page</word>
   <word key="content_page_form_tab__menu" js="0">Menu</word>
   <word key="page_add_to_menu" js="0">Add to front navigation menu</word>
@@ -475,8 +441,6 @@
   <word key="cms_cannot_find_field" js="0">Cannot locate that custom field</word>
   <word key="cms_badge_label" js="0">Label</word>
   <word key="cms_badge_value" js="0">Value</word>
-  <word key="field_display_listing_header" js="0">Listing View</word>
-  <word key="field_display_display_header" js="0">Display View</word>
   <word key="field_display_display_json_badge" js="0">Display View Format</word>
   <word key="field_display_custom" js="0">Custom</word>
   <word key="field_display_display_json_custom" js="0">Display Custom Format</word>
@@ -485,14 +449,9 @@
   <word key="field_display_listing_json_custom" js="0">Listing Custom Format</word>
   <word key="field_display_listing_json_custom_desc" js="0"><![CDATA[Use {$label} to show the field label, {$value} to show the display field value and {$formValue} to show the value from the form.<br />For example, your dropdown may use a key of 'open' with a value of 'Open Record'. In this example, {$formValue} would contain 'open' and {$value} would contain 'Open Record'. You may need to add the '|raw' modifier to preserve HTML, i.e. {$value|raw}, but this can introduce security issues if not used carefully. You may use Invision Community template logic such as {{if}}.<br>If using an Address field, you can show a map by using {map} and the address with {address}.<br>If using multiple uploads, $value is an array of File Objects.]]></word>
   <word key="field_display_listing_json_badge_right" js="0">Show to the right of the listing area</word>
-  <word key="field_display_listing_badge_bgcolor" js="0">Badge Background</word>
-  <word key="field_display_listing_badge_color" js="0">Badge Color</word>
-  <word key="field_display_display_badge_bgcolor" js="0">Badge Background</word>
-  <word key="field_display_display_badge_color" js="0">Badge Color</word>
-  <word key="field_display_badge_default" js="0">Use Default</word>
   <word key="cms_field_error_bad_syntax" js="0">The HTML syntax for the custom format is incorrect.</word>
   <word key="field_key" js="0">Template Key</word>
-  <word key="field_key_desc" js="0"><![CDATA[<p class='ipsMessage ipsMessage_info'>The field key can be used in HTML templates to fetch a specific field, for instance: <span class='i-font-family_monospace'>{$record->customFieldDisplayByKey('my_key', 'listing')|raw}</span></p><br>The key must be unique for this database. If omitted, a key will be automatically generated. Valid values for the second parameter include 'listing', 'display', 'raw', and 'processed'.]]></word>
+  <word key="field_key_desc" js="0"><![CDATA[<p class='ipsMessage ipsMessage_info'>The field key can be used in HTML templates to fetch a specific field, for instance: <span class='ipsType_monospace'>{$record->customFieldDisplayByKey('my_key', 'listing')|raw}</span></p><br>The key must be unique for this database. If omitted, a key will be automatically generated. Valid values for the second parameter include 'listing', 'display', 'raw', and 'processed'.]]></word>
   <word key="cms_field_key_not_unique" js="0">The field key is not unique</word>
   <word key="field_generaloptions" js="0">General Options</word>
   <word key="pfield_options" js="0">Settings</word>
@@ -517,8 +476,8 @@
   <word key="field_image_size_desc" js="0">Any image larger that these dimensions will be resized automatically</word>
   <word key="field_upload_is_image" js="0">Upload type</word>
   <word key="cms_field_no_type_warning" js="0">The custom field type %s does not exist, please select a valid field type.</word>
-  <word key="field_display_opts_title" js="0"><![CDATA[This field is set to be the record title. The title is not included in the list of custom fields when displayed in the default templates. You can adjust the display options here for when using <span class='i-font-family_monospace'>{$record->customFieldDisplayByKey('title_key', ['display|listing'])|raw}</span>. Using <span class='i-font-family_monospace'>$record->_title</span> will always get the article formatted title.]]></word>
-  <word key="field_display_opts_content" js="0"><![CDATA[This field is set to be the record content. The content field is not included in the list of custom fields when displayed in the default templates. You can adjust the display options here for when using <span class='i-font-family_monospace'>{$record->customFieldDisplayByKey('content_key', ['display|listing'])|raw}</span>. Using <span class='i-font-family_monospace'>$record->_content</span> will always get the article formatted content.]]></word>
+  <word key="field_display_opts_title" js="0"><![CDATA[This field is set to be the record title. The title is not included in the list of custom fields when displayed in the default templates. You can adjust the display options here for when using <span class='ipsType_monospace'>{$record->customFieldDisplayByKey('title_key', ['display|listing'])|raw}</span>. Using <span class='ipsType_monospace'>$record->_title</span> will always get the article formatted title.]]></word>
+  <word key="field_display_opts_content" js="0"><![CDATA[This field is set to be the record content. The content field is not included in the list of custom fields when displayed in the default templates. You can adjust the display options here for when using <span class='ipsType_monospace'>{$record->customFieldDisplayByKey('content_key', ['display|listing'])|raw}</span>. Using <span class='ipsType_monospace'>$record->_content</span> will always get the article formatted content.]]></word>
   <word key="field_date_time_override" js="0">Timezone</word>
   <word key="field_date_time_time" js="0">Allow time input</word>
   <word key="field_date_timezone" js="0">Timezone</word>
@@ -544,20 +503,12 @@
   <word key="field_allow_attachments" js="0">Allow attachments?</word>
   <word key="field_upload_thumb" js="0">Thumbnail</word>
   <word key="field_upload_thumb_none" js="0">Do not create a thumbnail</word>
-  <word key="cms_fields_toggles" js="0">Field Toggles</word>
-  <word key="cms_fields_toggles_info" js="0">Toggle other fields on the form based on the options below</word>
-  <word key="field_toggles_off" js="0">Off/Unchecked</word>
-  <word key="field_toggles_on" js="0">On/Checked</word>
-  <word key="field_option_other" js="0"><![CDATA[Allow &quot;Other&quot; option]]></word>
-  <word key="field_option_other_desc" js="0"><![CDATA[When enabled, users will have an option for &quot;Other&quot; and can enter any value in a text field]]></word>
-  <word key="field_opt_other" js="0">Other</word>
   <word key="content_content_form_tab__config" js="0">Configuration</word>
   <word key="content_cat_db_title" js="0">%s Categories</word>
   <word key="content_cat_furl_not_unique" js="0">The FURL slug is not unique</word>
   <word key="category_furl_name_choice" js="0">Manually enter Friendly URL slug?</word>
   <word key="category_furl_name" js="0">FURL Slug</word>
   <word key="category_parent_id" js="0">Parent</word>
-  <word key="category_image" js="0">Cover Image</word>
   <word key="category_show_records" js="0">Show Records in Listing?</word>
   <word key="category_has_perms" js="0">Set Custom Permissions</word>
   <word key="category_has_perms_desc" js="0">When enabled, you can select member group permissions independently of the parent database</word>
@@ -581,7 +532,6 @@
   <word key="content_tree_title" js="0">Category Tree</word>
   <word key="club_category_meta_index" js="0">Index</word>
   <word key="club_category_meta_index_desc" js="0">Allow Search Engines to index this category.</word>
-  <word key="category_listing_layout" js="0">Listing Layout</word>
   <word key="content_record_db_title" js="0">%s Records</word>
   <word key="content_db_table_title" js="0">Title</word>
   <word key="content_db_table_primary_id_field" js="0">ID</word>
@@ -662,8 +612,6 @@
   <word key="content_database_form_details" js="0">Details</word>
   <word key="content_database_form_options" js="0">Options</word>
   <word key="content_database_form_lang" js="0">Language</word>
-  <word key="content_database_form_templates" js="0">Display</word>
-  <word key="content_database_form_options_layouts" js="0">Layouts</word>
   <word key="database_use_as_page_title" js="0">Page title</word>
   <word key="database_use_as_page_title_desc" js="0">Determine which to use when using this database on a page</word>
   <word key="database_use_as_page_title_yes" js="0">Use database name as page title</word>
@@ -697,8 +645,6 @@
   <word key="database_comment_bump_comment" js="0">When a new comment is made only</word>
   <word key="database_rss_enable" js="0">Enable RSS feed</word>
   <word key="database_rss_enable_desc" js="0"><![CDATA[Only content that is available to guests will be shown. For more options, create a <a href='{internal.app=core&module=discovery&controller=rss}'>Custom RSS Feed</a>]]></word>
-  <word key="cms_bitoptions_assignments" js="0">Enable Assignments</word>
-  <word key="cms_bitoptions_assignments_desc" js="0"><![CDATA[Allow database moderators to assign records to Moderators or <a href='{internal.admin.app=cloud&module=assignments&controller=assignments&do=teams}'>Teams</a>]]></word>
   <word key="database_rss" js="0">Number of items to show</word>
   <word key="database_tags_enabled" js="0">Can use tags?</word>
   <word key="database_tags_noprefixes" js="0">Can set tag prefixes?</word>
@@ -762,7 +708,17 @@
   <word key="content_database_noun_pu" js="0">Records</word>
   <word key="content_database_noun_ia" js="0">a record</word>
   <word key="content_acp_err_db_creation_fail" js="0">Database creation failed: %s</word>
+  <word key="database_cat_index_type" js="0">Database index</word>
+  <word key="database_display_index_as_categories" js="0"><![CDATA[<span data-lang='index_as_categories'>Show categories</span>]]></word>
+  <word key="database_display_index_as_articles" js="0">Show records like articles</word>
+  <word key="database_display_index_as_articles_desc" js="0">This displays records in an article or blog format showing more of the record content.</word>
+  <word key="database_template_featured" js="0">Articles template</word>
   <word key="database_template_form" js="0">Add/Edit Form Template</word>
+  <word key="database_featured_perpage" js="0">Records to show</word>
+  <word key="database_featured_pagination" js="0">Allow pagination</word>
+  <word key="database_featured_pagination_desc" js="0">If there are more records than the 'Records to show' value, then pagination links will show if enabled</word>
+  <word key="database_featured_sort" js="0">Sort by</word>
+  <word key="database_featured_direction" js="0">Order</word>
   <word key="cms_download_db" js="0">Download Database</word>
   <word key="cms_download_db_explain" js="0"><![CDATA[This will download a file with the database settings, templates, custom fields and categories which can be uploaded to another community.<br>Records are <em>not</em> included.]]></word>
   <word key="cms_database_add" js="0">Add Database</word>
@@ -770,7 +726,6 @@
   <word key="cms_database_add_upload" js="0">Upload Database</word>
   <word key="cms_add_db_normal" js="0">Create a new custom database for this community.</word>
   <word key="cms_database_import" js="0">Database .xml file</word>
-  <word key="cms_database_import_info" js="0">Note: If you are importing a database that was downloaded from version 4, custom templates will not be imported.</word>
   <word key="cms_db_import_progress" js="0">Importing %s</word>
   <word key="cms_manage_database" js="0">Database Settings</word>
   <word key="cms_database_permissions" js="0">Database Permissions</word>
@@ -784,6 +739,7 @@
   <word key="database_allow_club_categories_yes" js="0"><![CDATA[<strong>Yes</strong>, allow categories to be created in Clubs]]></word>
   <word key="database_allow_club_categories_no" js="0"><![CDATA[<strong>No</strong>, only use regular categories]]></word>
   <word key="cms_db_cats_disabled" js="0"><![CDATA[<em>Categories not used</em>]]></word>
+  <word key="database_featured_featured" js="0">Show featured records only</word>
   <word key="cms_bitoptions_comments" js="0">Allow comments</word>
   <word key="cms_bitoptions_comments_mod" js="0">Comments must be approved?</word>
   <word key="cms_bitoptions_reviews" js="0">Allow reviews</word>
@@ -791,9 +747,10 @@
   <word key="cms_comments_and_reviews" js="0">Comments and Reviews</word>
   <word key="perm_content_perm__review" js="0">Add Reviews</word>
   <word key="cms_all_categories" js="0">Any categories</word>
+  <word key="database_featured_categories" js="0">Categories</word>
   <word key="cms_database_form_display" js="0">Templates</word>
   <word key="database_key" js="0">Database Key</word>
-  <word key="database_key_desc" js="0"><![CDATA[<p class='ipsMessage ipsMessage_info'>The database key can be used in HTML templates and manual pages to fetch a specific database, for instance: <span class='i-font-family_monospace'>{database="my_database_key"}</span></p><br>The key must be unique for this database. If omitted, a key will be automatically generated.]]></word>
+  <word key="database_key_desc" js="0"><![CDATA[<p class='ipsMessage ipsMessage_info'>The database key can be used in HTML templates and manual pages to fetch a specific database, for instance: <span class='ipsType_monospace'>{database="my_database_key"}</span></p><br>The key must be unique for this database. If omitted, a key will be automatically generated.]]></word>
   <word key="cms_database_key_not_unique" js="0">The database key is not unique</word>
   <word key="cms_editing_database" js="0">Editing Database %s</word>
   <word key="cms_adding_database" js="0">Adding Database</word>
@@ -807,33 +764,16 @@
   <word key="database_record_image_desc" js="0">This adds an image upload field to the record form. The image is displayed within the record text area by default.</word>
   <word key="cms_no_db_page_no_forum_link" js="0">These settings will have no effect until this database is added to a page.</word>
   <word key="cms_database_no_forum_selected" js="0">You have post topic enabled but have not selected a forum.</word>
+  <word key="cms_database_promote" js="0">Promote from Forums</word>
+  <word key="cms_promote_enabled" js="0">Enable</word>
+  <word key="cms_promote_cat" js="0">Add to category</word>
+  <word key="cms_promote_groups" js="0">Available for</word>
   <word key="database_rebuild_topics_desc" js="0">This tool will add a background task to resychronize the content generated in the first post of a topic created by this database. It will also create topics for records if a topic does not exist.</word>
   <word key="database_rebuild_topics_button" js="0">Continue</word>
   <word key="database_rebuild_added" js="0">Rebuild task added to the queue.</word>
   <word key="database_rebuild_commentcount_desc" js="0">This tool will add a background task to recount the number of comments and reviews for each item.</word>
   <word key="database_rebuild_commentcount_button" js="0">Continue</word>
   <word key="database_page_permissions_restrict" js="0"><![CDATA[Only groups with permission to view the page will be able to view content from this database regardless of the permissions set here. You may wish to adjust the <a href='{internal.app=cms&module=pages&controller=pages&do=permissions&subnode=1&id=}%s'>page's permissions</a> as well if you are attempting to adjust access to this database.]]></word>
-  <word key="database_no_page" js="0">No page associated</word>
-  <word key="database_index_type" js="0">Index Page</word>
-  <word key="database_index_type_featured" js="0">Featured Content only</word>
-  <word key="database_index_type_categories" js="0">Category Listing</word>
-  <word key="database_index_type_all" js="0">All Content</word>
-  <word key="database_index_layout" js="0">Index Layout</word>
-  <word key="database_layout_custom" js="0">Custom</word>
-  <word key="database_categories_layout" js="0">Category Listing Layout</word>
-  <word key="database_listing_layout" js="0">Listing Layout</word>
-  <word key="database_template_index" js="0">Index Template Group</word>
-  <word key="core_pagebuilder_wrap__wrap" js="0">Bricks</word>
-  <word key="core_pagebuilder_wrap__grid" js="0">Grid</word>
-  <word key="core_pagebuilder_wrap__center" js="0">Center</word>
-  <word key="core_pagebuilder_wrap__carousel" js="0">Carousel</word>
-  <word key="core_pagebuilder_wrap__columnLeft" js="0">Side Column (Left)</word>
-  <word key="core_pagebuilder_wrap__columnRight" js="0">Side Column (Right)</word>
-  <word key="core_pagebuilder_wrap__minimal" js="0">Minimal</word>
-  <word key="core_pagebuilder_wrap__featured" js="0">Featured</word>
-  <word key="core_pagebuilder_wrap__mini-grid" js="0">Minimal Grid</word>
-  <word key="core_pagebuilder_wrap__table" js="0">Rows</word>
-  <word key="core_pagebuilder_wrap__wallpaper" js="0">Wallpaper</word>
   <word key="menu__cms_pages_media" js="0">Media</word>
   <word key="r__media" js="0">Media</word>
   <word key="r__media_manage" js="0">View Media</word>
@@ -841,8 +781,12 @@
   <word key="r__media_edit" js="0">Edit Media</word>
   <word key="r__media_delete" js="0">Delete Media</word>
   <word key="cms_add_media_folder" js="0">New Folder</word>
+  <word key="cms_add_media" js="0">Upload New Media</word>
+  <word key="cms_delete_selected_media" js="0">Delete Selected</word>
+  <word key="cms_search_media" js="0">Search media...</word>
   <word key="media_folders" js="0">Folders</word>
   <word key="media_file_overview" js="0">File Overview</word>
+  <word key="replace_media_file" js="0">Replace file...</word>
   <word key="media_root_folder" js="0">Pages Media</word>
   <word key="media_tag_title" js="0">Media Tag</word>
   <word key="media_tag_desc" js="0">Insert this tag in your pages/templates to insert this media item.</word>
@@ -850,9 +794,10 @@
   <word key="media_folder_parent" js="0">Parent</word>
   <word key="cms_media_preview" js="0">Preview</word>
   <word key="cms_no_media" js="0">Could not locate that media item</word>
-  <word key="cms_add_media" js="0">Upload New Media</word>
-  <word key="cms_delete_selected_media" js="0">Delete Selected</word>
-  <word key="cms_search_media" js="0">Search media...</word>
+  <word key="media_filename" js="0">Filename</word>
+  <word key="media_uploaded" js="0">Uploaded</word>
+  <word key="media_size" js="0">File Size</word>
+  <word key="media_dims" js="0">Dimensions</word>
   <word key="media_parent" js="0">Parent</word>
   <word key="cms_media_key" js="0"><![CDATA[View page &amp; template tag]]></word>
   <word key="cms_key_view" js="0"><![CDATA[This key can be used in blocks, pages and templates to fetch the URL of this media item.<br>The current URL for this item is: %s.]]></word>
@@ -863,6 +808,7 @@
   <word key="rss_import_record_hide" js="0">Record Hidden/Unhidden?</word>
   <word key="content_categories_title" js="0">Categories</word>
   <word key="content_subcategories_title" js="0">Subcategories</word>
+  <word key="club_categories_title" js="0">Club Categories</word>
   <word key="x_records" js="0">%d %s</word>
   <word key="x_records_in_this_category" js="0">%d %s in this category</word>
   <word key="content_categories_index_no_records" js="0">No %s here yet</word>
@@ -928,9 +874,8 @@
   <word key="cms_no_cats_to_show" js="0">There are no categories to show</word>
   <word key="cms_no_records_to_show" js="0">There are no %s to show</word>
   <word key="cms_unread_record" js="0">This has not been read</word>
-  <word key="cms_byline" js="0"><![CDATA[By %s in <a href='%s' class='i-font-weight_600'>%s</a>]]></word>
+  <word key="cms_byline" js="0"><![CDATA[By %s, in <a href='%s'>%s</a>, ]]></word>
   <word key="cms_show_categories" js="0">Show all categories</word>
-  <word key="cms_show_categories_short" js="0">Show all</word>
   <word key="cms_show_featured" js="0">Show featured %s</word>
   <word key="content_record_form_rating_value" js="0">Your rating</word>
   <word key="content_record_form_review_text" js="0">Your review</word>
@@ -949,6 +894,7 @@
   <word key="content_record_form_auto_follow" js="0"></word>
   <word key="cms_locked_can_comment" js="0">This %s is locked, but your permissions allow you to add new replies.</word>
   <word key="cms_select_category" js="0">Select a category</word>
+  <word key="cms_create_menu_records_x" js="0">%s in %s</word>
   <word key="record_display_field_change" js="0">Add a comment recording this change.</word>
   <word key="record_information" js="0">%s Information</word>
   <word key="record_no_revision_data" js="0">No changes recorded</word>
@@ -960,9 +906,8 @@
   <word key="field_daterange_start" js="0">From %s</word>
   <word key="field_daterange_end" js="0">To %s</word>
   <word key="cms_number_none" js="0">None</word>
-  <word key="viewing_page_revision" js="0">You are viewing a previous version of this page. This page cannot be edited.</word>
-  <word key="page_version_use" js="0">Restore this version</word>
   <word key="cms_rf_database" js="0">Database</word>
+  <word key="cms_rf_database_desc" js="0">This cannot be changed. If you want to create a feed from a different database, please create a new custom block.</word>
   <word key="cms_rf_database_description" js="0"><![CDATA[<br/>This cannot be changed. If you want to create a feed from a different database, please create a new custom block.]]></word>
   <word key="cms_rf_category" js="0">Categories</word>
   <word key="cms_rf_all_categories" js="0">All categories</word>
@@ -994,8 +939,6 @@
   <word key="block_Editor_desc" js="0">Adds entered text as HTML</word>
   <word key="block_Wysiwyg" js="0">WYSIWYG Editor</word>
   <word key="block_Wysiwyg_desc" js="0">Rich text editor</word>
-  <word key="block_Codemirror" js="0">Raw HTML</word>
-  <word key="block_Codemirror_desc" js="0">A code level editor for HTML and IPS template code</word>
   <word key="block_Database" js="0">Database</word>
   <word key="block_Database_desc" js="0">Adds a database to the page</word>
   <word key="block_LatestArticles" js="0">Latest Records</word>
@@ -1008,13 +951,10 @@
   <word key="block_Categories" js="0">Database Category Menu</word>
   <word key="block_Categories_desc" js="0">Displays a list of categories for the database used on the page</word>
   <word key="cms_err_no_databases_to_use" js="0">No databases are available to be added.</word>
-  <word key="cms_widget_filters_remember_text" js="0">Remember filters</word>
+  <word key="cms_widget_filters_remember_text" js="0"><![CDATA[&nbsp; Remember filters]]></word>
   <word key="cms_widget_filters_remember" js="0"></word>
   <word key="block_Blocks" js="0">Custom Blocks</word>
-  <word key="block_Blocks_desc" js="0">Select any of the Custom Blocks you have created</word>
-  <word key="block_Blocks_custom_link" js="0">Create or Edit Blocks</word>
-  <word key="block_Blocks_custom_link_desc" js="0"><![CDATA[Custom Blocks are created in the AdminCP for use in the Page Editor, Templates, and for Embedding Externally. <br><br> You can <a target='_blank' href='{internal.admin.app=cms&module=pages&controller=blocks&do=addBlockType}'>add a new block <i class='fa-solid fa-external-link'></i></a> or <a href='{internal.admin.app=cms&module=pages&controller=blocks}' target='_blank'>manage existing blocks <i class='fa-solid fa-external-link'></i></a> in the AdminCP]]></word>
-  <word key="block_Blocks_desc_default" js="0">This is a custom block created in the AdminCP</word>
+  <word key="block_Blocks_desc" js="0">Select one of the custom blocks you have created</word>
   <word key="cms_err_no_pugins_to_use" js="0">No custom blocks are available to be added.</word>
   <word key="cms_widget_custom_block" js="0">Custom Block</word>
   <word key="database" js="0">Database</word>
@@ -1028,13 +968,6 @@
   <word key="widget_feed_container_cms" js="0">Categories</word>
   <word key="cms_record_i_started_sprintf" js="0">Show my %s only</word>
   <word key="content_field_cms_record_i_started_on" js="0">On</word>
-  <word key="block_DatabaseNavigation" js="0">Database Navigation</word>
-  <word key="block_DatabaseNavigation_desc" js="0">Show a Table of Contents for database categories and records</word>
-  <word key="block_FolderNavigation" js="0">Folder Navigation</word>
-  <word key="block_FolderNavigation_desc" js="0">Show a Table of Contents for a folder</word>
-  <word key="block_nav_title" js="0">Block Title</word>
-  <word key="block_nav_folder" js="0">Folder</word>
-  <word key="cms_navigation_root_folder" js="0">Use Root</word>
   <word key="loc_cms_viewing_page" js="0">Viewing %s</word>
   <word key="loc_cms_viewing_db_cat" js="0">Viewing %s category %s</word>
   <word key="loc_cms_viewing_db_record" js="0">Viewing %s in category %s: %s</word>
@@ -1065,7 +998,7 @@
   <word key="acplogs__cms_deleted_record" js="0">Deleted %s from database %s</word>
   <word key="acplogs__cms_moved_record" js="0">Moved %s from %s to %s in %s</word>
   <word key="acplogs__cms_added_record" js="0">Added %s to %s</word>
-  <word key="acplogs__cms_edited_record" js="0">Edited %s in %s</word>
+  <word key="acplogs__cms_edited_recored" js="0">Edited %s in %s</word>
   <word key="acplogs__cms_deleted_media" js="0">Deleted %s media files in Pages</word>
   <word key="acplogs__cms_replaced_media" js="0">Replaced media file in Pages: %s</word>
   <word key="acplogs__cms_uploaded_media" js="0">Uploaded %s media files in Pages</word>
@@ -1076,7 +1009,6 @@
   <word key="acplogs__cms_template_delete" js="0">Deleted Pages template: %s</word>
   <word key="acplogs__cms_template_save" js="0">Edited Pages template: %s</word>
   <word key="acplogs__cms_template_group_delete" js="0">Deleted Pages template group: %s</word>
-  <word key="acplogs__cms_page_set_default" js="0"><![CDATA[Set <em>%s</em> page as default in folder <em>%s</em>]]></word>
   <word key="block_embed_options" js="0">External embed</word>
   <word key="block_embed_title" js="0">External Embed</word>
   <word key="embed_message" js="0"><![CDATA[This feature allows you to embed this block on an external page that <strong>isn't</strong> part of your Invision Community. For pages created within Invision Community, use the normal embedding method instead.]]></word>
@@ -1110,11 +1042,11 @@
   <word key="comments_meta_message" js="0">Message</word>
   <word key="comments_meta_color" js="0">Message color</word>
   <word key="default_copyposts_message" js="0">Please be aware that these comments were copied here from another source and that the date and time shown for each comment may not be accurate.</word>
-  <word key="block_pagebuildertext" js="0">Text</word>
+  <word key="block_pagebuildertext" js="0">Page Builder: Text</word>
   <word key="block_pagebuildertext_desc" js="0">Add simple text to the page</word>
-  <word key="block_pagebuilderoembed" js="0">Media Embed</word>
+  <word key="block_pagebuilderoembed" js="0">Page Builder: Media Embed</word>
   <word key="block_pagebuilderoembed_desc" js="0">Embed external content, such as YouTube, Vimeo, GIPHY and more</word>
-  <word key="block_pagebuilderupload" js="0">Images Widget</word>
+  <word key="block_pagebuilderupload" js="0">Page Builder: Upload Images</word>
   <word key="block_pagebuilderupload_desc" js="0">Add a single image, or a carousel of images</word>
   <word key="pagebuilderupload_upload" js="0">Upload</word>
   <word key="pagebuilder_text" js="0">Text</word>
@@ -1131,12 +1063,19 @@
   <word key="pagebuilderupload_urls" js="0">URLs</word>
   <word key="pagebuilderupload_urls_desc" js="0">These must be ordered the same as the uploaded photos</word>
   <word key="pagebuilderupload_height" js="0">Block Height</word>
-  <word key="pagebuilderupload_backdrop" js="0">Apply Backdrop</word>
-  <word key="pagebuilderupload_backdrop_desc" js="0">Use a backdrop behind the image so that it better stands out from the background</word>
-  <word key="pagebuilderupload_tab" js="0">Open links in new tab</word>
   <word key="cms_download_db" js="1">Download Database</word>
   <word key="cms_download_db_explain" js="1"><![CDATA[This will download a file with the database settings, templates, custom fields and categories which can be uploaded to another community.<br>Records are <em>not</em> included.]]></word>
   <word key="index_as_categories" js="1">Show categories</word>
   <word key="index_as_records" js="1">Show record list</word>
+  <word key="mediaNoneSelected" js="1">No media items selected</word>
+  <word key="mediaMultipleSelected" js="1">{# [1:media item selected][?:media items selected]}</word>
+  <word key="mediaEmptyFolder" js="1">There are no items in this folder yet</word>
+  <word key="mediaConfirmDelete" js="1">Are you sure you want to delete {!# [1:this file][?:# selected files]}?</word>
+  <word key="mediaErrorDeleting" js="1">There was an error deleting {!# [1:this file][?:these files]}</word>
+  <word key="mediaNoResults" js="1">No files match your search term</word>
+  <word key="mediaUploadedCount" js="1">{!# [1:A file was][?:# files were]} added to this folder</word>
+  <word key="replaceMediaFile" js="1">Replace File</word>
+  <word key="mediaUploadedReplace" js="1">The file has been updated</word>
+  <word key="template_title_desc" js="1">Please use only a-z and 0-9 without any special characters or spaces. The title must start with a letter or underscore.</word>
  </app>
 </language>

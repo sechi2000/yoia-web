@@ -12,76 +12,69 @@
 namespace IPS\nexus\extensions\nexus\Item;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\nexus\Coupon;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item\Charge;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Coupon Discount
  */
-class CouponDiscount extends Charge
+class _CouponDiscount extends \IPS\nexus\Invoice\Item\Charge
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'nexus';
+	public static $application = 'nexus';
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $type = 'coupon';
+	public static $type = 'coupon';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'ticket';
+	public static $icon = 'ticket';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'coupon';
+	public static $title = 'coupon';
 	
 	/**
 	 * On Paid
 	 *
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public function onPaid( Invoice $invoice ): void
+	public function onPaid( \IPS\nexus\Invoice $invoice )
 	{
 		try
 		{
-			$coupon = Coupon::load( $this->id );
+			$coupon = \IPS\nexus\Coupon::load( $this->id );
 			if ( $coupon->uses >= 1 )
 			{
 				$coupon->uses--;
 				$coupon->save();
 			}
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 	}
 	
 	/**
 	 * On Unpaid
 	 *
-	 * @param	Invoice	$invoice	The invoice
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
 	 * @param	string				$status		Status
-	 * @return    void
+	 * @return	void
 	 */
-	public function onUnpaid( Invoice $invoice, string $status ): void
+	public function onUnpaid( \IPS\nexus\Invoice $invoice, $status )
 	{
 		try
 		{
-			$coupon = Coupon::load( $this->id );
+			$coupon = \IPS\nexus\Coupon::load( $this->id );
 			if ( $coupon->uses != -1 )
 			{
 				$coupon->uses++;
@@ -90,22 +83,22 @@ class CouponDiscount extends Charge
 			
 			$this->onInvoiceCancel( $invoice );
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 	}
 	
 	/**
 	 * On Invoice Cancel (when unpaid)
 	 *
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public function onInvoiceCancel( Invoice $invoice ): void
+	public function onInvoiceCancel( \IPS\nexus\Invoice $invoice )
 	{
 		try
 		{
-			$coupon = Coupon::load( $this->id );
+			$coupon = \IPS\nexus\Coupon::load( $this->id );
 			$uses = $coupon->used_by ? json_decode( $coupon->used_by, TRUE ) : array();
-			$member = $this->extra['usedBy'] ?? $invoice->member->member_id;
+			$member = isset( $this->extra['usedBy'] ) ? $this->extra['usedBy'] : $invoice->member->member_id;
 			if ( isset( $uses[ $member ] ) )
 			{
 				if ( $uses[ $member ] === 1 )
@@ -120,6 +113,6 @@ class CouponDiscount extends Charge
 				$coupon->save();
 			}
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 	}
 }

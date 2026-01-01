@@ -12,30 +12,16 @@
 namespace IPS\nexus\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Email;
-use IPS\Member;
-use IPS\nexus\Invoice;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Task\Exception;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Expire Invoices Task
  */
-class expireInvoices extends Task
+class _expireInvoices extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -45,15 +31,15 @@ class expireInvoices extends Task
 	 * If an error occurs which means the task could not finish running, throw an \IPS\Task\Exception - do not log an error as a normal log.
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
-	 * @return	string|null	Message to log or NULL
-	 * @throws	Exception
+	 * @return	mixed	Message to log or NULL
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : string|null
+	public function execute()
 	{
-        $expireDate = DateTime::create();
-        if( Settings::i()->cm_invoice_expireafter )
+        $expireDate = \IPS\DateTime::create();
+        if( \IPS\Settings::i()->cm_invoice_expireafter )
         {
-            $expireDate->sub( new DateInterval( 'P' . Settings::i()->cm_invoice_expireafter . 'D' )  );
+            $expireDate->sub( new \DateInterval( 'P' . \IPS\Settings::i()->cm_invoice_expireafter . 'D' )  );
         }
 		else
 		{
@@ -61,16 +47,16 @@ class expireInvoices extends Task
 			return NULL;
 		}
 
-		foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_invoices', array( 'i_status=? AND i_date<?', Invoice::STATUS_PENDING, $expireDate->getTimestamp() ), 'i_date ASC', 100 ), 'IPS\nexus\Invoice' ) as $invoice )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_invoices', array( 'i_status=? AND i_date<?', \IPS\nexus\Invoice::STATUS_PENDING, $expireDate->getTimestamp() ), 'i_date ASC', 100 ), 'IPS\nexus\Invoice' ) as $invoice )
 		{
 			$invoice->status = $invoice::STATUS_EXPIRED;
 			$invoice->save();
 
 			/* Send tracked notifications */
-			foreach ( Db::i()->select( 'member_id', 'nexus_invoice_tracker', array( 'invoice_id=?', $invoice->id ) ) as $trackingMember )
+			foreach ( \IPS\Db::i()->select( 'member_id', 'nexus_invoice_tracker', array( 'invoice_id=?', $invoice->id ) ) as $trackingMember )
 			{
-				$trackingMember = Member::load( $trackingMember );
-				Email::buildFromTemplate( 'nexus', 'invoiceTrackExpired', array( $invoice, $invoice->summary() ), Email::TYPE_LIST )
+				$trackingMember = \IPS\Member::load( $trackingMember );
+				\IPS\Email::buildFromTemplate( 'nexus', 'invoiceTrackExpired', array( $invoice, $invoice->summary( $trackingMember->language() ) ), \IPS\Email::TYPE_LIST )
 					->send( $trackingMember );
 			}
 
@@ -82,10 +68,8 @@ class expireInvoices extends Task
                     'title'	=> $invoice->title,
                 ), FALSE );
             }
-            catch ( OutOfRangeException ) {}
+            catch ( \OutOfRangeException $exception ) {}
 		}
-
-		return null;
 	}
 	
 	/**
@@ -97,7 +81,7 @@ class expireInvoices extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 		
 	}

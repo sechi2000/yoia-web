@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <language>
- <app key="gallery" version="5001403">
+ <app key="gallery" version="107827">
   <word key="__app_gallery" js="0">Gallery</word>
   <word key="frontnavigation_gallery" js="0">Gallery</word>
   <word key="gallery_title" js="0">Gallery</word>
@@ -39,6 +39,7 @@
   <word key="filestorage__gallery_Images" js="0">Gallery Images</word>
   <word key="acp_search_title_gallery_Categories" js="0">Gallery Categories</word>
   <word key="acp_search_title_gallery_Albums" js="0">Gallery Albums</word>
+  <word key="gallery_images" js="0">Images</word>
   <word key="gallery_media" js="0">Gallery Videos</word>
   <word key="block_gallery_Overview" js="0">Gallery Overview</word>
   <word key="total_images" js="0">Total Images</word>
@@ -194,7 +195,6 @@
   <word key="can_unhide_gallery_image" js="0">Can unhide images?</word>
   <word key="can_view_hidden_gallery_image" js="0">Can view hidden images?</word>
   <word key="can_delete_gallery_image" js="0">Can delete images?</word>
-  <word key="can_view_reports_gallery_image" js="0">Can view reported images?</word>
   <word key="can_edit_gallery_image_comment" js="0">Can edit comments?</word>
   <word key="can_hide_gallery_image_comment" js="0">Can hide comments?</word>
   <word key="can_unhide_gallery_image_comment" js="0">Can unhide comments?</word>
@@ -215,7 +215,6 @@
   <word key="can_edit_item_message_gallery_album" js="0">Can edit messages on albums?</word>
   <word key="can_delete_item_message_gallery_album" js="0">Can delete messages on albums?</word>
   <word key="can_delete_gallery_album" js="0">Can delete albums?</word>
-  <word key="can_view_reports_gallery_album" js="0">Can view reported albums?</word>
   <word key="can_edit_gallery_album_comment" js="0">Can edit album comments?</word>
   <word key="can_hide_gallery_album_comment" js="0">Can hide album comments?</word>
   <word key="can_unhide_gallery_album_comment" js="0">Can unhide album comments?</word>
@@ -226,7 +225,6 @@
   <word key="can_unhide_gallery_album_review" js="0">Can unhide album reviews?</word>
   <word key="can_view_hidden_gallery_album_review" js="0">Can view hidden album reviews?</word>
   <word key="can_delete_gallery_album_review" js="0">Can delete album reviews?</word>
-  <word key="can_view_reports_gallery_album_review" js="0">Can view reported album reviews?</word>
   <word key="can_edit_gallery_image_review" js="0">Can edit reviews?</word>
   <word key="can_hide_gallery_image_review" js="0">Can hide reviews?</word>
   <word key="can_unhide_gallery_image_review" js="0">Can unhide reviews?</word>
@@ -261,12 +259,6 @@
   <word key="cleaning_up_gallery_images" js="0">Cleaning up Gallery images </word>
   <word key="gallery_maps_default" js="0">Enable maps by default</word>
   <word key="gallery_maps_default_desc" js="0">Users can choose whether or not to show a map next to images that have geolocation data embedded into the image. This option controls whether those maps are enabled by default or not, however users can override this preference while submitting their images.</word>
-  <word key="gallery_metadata_none" js="0">Hide all image metadata</word>
-  <word key="gallery_metadata_sensitive" js="0">Hide sensitive metadata</word>
-  <word key="gallery_metadata_sensitive_desc" js="0">Hides sensitive details, such as GPS geolocation data from images taken with mobile phones</word>
-  <word key="gallery_metadata_all" js="0">Show all image metadata</word>
-  <word key="gallery_metadata_desc_gd" js="0"><![CDATA[<strong>Note:</strong> All EXIF data is stripped from the image file itself and stored separately. The above setting determines what metadata will be visible to other users.]]></word>
-  <word key="gallery_metadata_desc_imagick" js="0"><![CDATA[<strong>Note:</strong> EXIF data is stripped from the image file based on <a href='{internal.admin.app=core&module=overview&controller=files&do=imagesettings&searchResult=imagick_strip_exif}'>your image settings</a>. The above setting determines what metadata will be visible to other users.]]></word>
   <word key="member__gallery_Images" js="0">Gallery</word>
   <word key="remove_gallery_access" js="0">Allowed to access gallery?</word>
   <word key="remove_gallery_upload" js="0">Allowed to upload images?</word>
@@ -281,7 +273,6 @@
   <word key="bdate" js="0">Date</word>
   <word key="bsize" js="0">Image size</word>
   <word key="bandwidth_stats" js="0">Bandwidth Usage</word>
-  <word key="gallery_images" js="0">Images</word>
   <word key="images_submitted" js="0">Images Submitted</word>
   <word key="gdiskspace_used" js="0">Diskspace Used</word>
   <word key="gaverage_filesize" js="0">Average Filesize</word>
@@ -341,7 +332,6 @@
   <word key="image_new_album" js="0">Create new album?</word>
   <word key="image__comment_placeholder" js="0">Add a comment...</word>
   <word key="image_submit_comment" js="0">Submit Comment</word>
-  <word key="filedata__image_description" js="0">Description</word>
   <word key="map_enabled" js="0">Show map?</word>
   <word key="map_enabled_lightbox" js="0">Show map?</word>
   <word key="map_privacy" js="0">Map privacy</word>
@@ -529,15 +519,16 @@
   <word key="block_albums" js="0">Album Feed</word>
   <word key="block_albums_desc" js="0">Create a listing of albums</word>
   <word key="widget_feed_container_gallery_album" js="0">Category</word>
-  <word key="widget_feed_album_empty" js="0">Include empty albums</word>
   <word key="profile_gallery_album" js="0">Albums</word>
   <word key="gallery_category_id" js="0">Category</word>
   <word key="profile_gallery_gallery" js="0">Albums</word>
   <word key="profile_gallery_galleryImages" js="0">Images</word>
+  <word key="choose_album" js="0">Choose Album</word>
   <word key="choose_category" js="0">Choose Category</word>
   <word key="upload_images" js="0">Upload Images</word>
   <word key="image_information" js="0">Add Information</word>
   <word key="process" js="0">Finish</word>
+  <word key="create_new_album" js="0">Create new album</word>
   <word key="choose_selected_album" js="0">Use Selected Album</word>
   <word key="submit_breadcrumb" js="0">Submit Image</word>
   <word key="submit_directly_to" js="0">Post directly to the category %s</word>
@@ -559,6 +550,7 @@
   <word key="create_album" js="0">Create Album</word>
   <word key="create_an_album" js="0">Create an album</word>
   <word key="add_to_existing_album" js="0">Add to an existing album</word>
+  <word key="choose_existing_album" js="0">Use an existing album</word>
   <word key="change_album" js="0">change</word>
   <word key="set_tags" js="0">Set tags...</word>
   <word key="set_copyright" js="0">Set copyright...</word>
@@ -580,7 +572,6 @@
   <word key="add_gallery_image_limit" js="0"><![CDATA[Planning to add these to an album? Albums can contain up to <strong>{# [1:image or video][?:images or videos]}</strong>.]]></word>
   <word key="add_gallery_album_limit" js="0"><![CDATA[You can upload up to <strong>{# [1:image or video][?:images or videos]}</strong> to this album]]></word>
   <word key="album_full" js="0">Album full</word>
-  <word key="choose_album" js="0">Choose Album</word>
   <word key="album_full_desc" js="0">You can't add any more images to this album</word>
   <word key="x_more_images_album" js="0">You can add {# [1:more image][?:more images]} to this album</word>
   <word key="saving_images" js="0">Saving Images</word>
@@ -588,13 +579,11 @@
   <word key="adding_to_category_x" js="0"><![CDATA[Adding images to <strong>%s</strong>]]></word>
   <word key="add_copyright_image" js="0">Add a copyright for this image</word>
   <word key="add_credit_image" js="0">Add a credit for this image</word>
-  <word key="create_new_album" js="0">Create new album</word>
   <word key="cannot_create_album" js="0">Sorry, you don't have permission to create a new album in this category.</word>
   <word key="used_max_albums" js="0">You can't create any more albums (maximum of %d).</word>
   <word key="no_existing_albums" js="0">You have no albums in this category to choose from</word>
   <word key="use_no_album" js="0">Continue without using an album</word>
   <word key="uploading_to_x" js="0">Uploading to %s</word>
-  <word key="choose_existing_album" js="0">Use an existing album</word>
   <word key="files_had_errors" js="0">Some files had errors</word>
   <word key="copyright" js="0">Copyright</word>
   <word key="set_copyright_desc" js="0">Sets the copyright for each image you're uploading except ones you individually add a copyright for.</word>
@@ -879,7 +868,7 @@
   <word key="gallery_new_images_count" js="0">Number of new images to show</word>
   <word key="gallery_nsfw" js="0">Enable NSFW?</word>
   <word key="gallery_nsfw_desc" js="0">Images can be set as not safe for work (NSFW) and will appear blurred unless the member opts in to viewing them.</word>
-  <word key="gallery_image_is_nsfw" js="0">This media is NSFW</word>
+  <word key="gallery_image_is_nsfw" js="0">This image is NSFW</word>
   <word key="gallery_nsfw_view_anyway" js="0">View anyway</word>
   <word key="nsfw_set_all" js="0">Set NSFW on all</word>
   <word key="nsfw_enable_all" js="0">Mark all images as not safe for work</word>

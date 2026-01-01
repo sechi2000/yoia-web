@@ -11,53 +11,36 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Data\Store;
-use IPS\Extensions\SSOAbstract;
-use IPS\Patterns\Singleton;
-use function defined;
-use function in_array;
-use function is_object;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Settings class
  */
-class Settings extends Singleton
+class _Settings extends \IPS\Patterns\Singleton
 {
 	/**
 	 * @brief	Singleton Instances
 	 */
-	protected static ?Singleton $instance = NULL;
+	protected static $instance = NULL;
 	
 	/**
 	 * @brief	Data Store
 	 */
-	protected ?array $data = array();
+	protected $data = NULL;
 	
 	/**
 	 * @brief	Settings loaded?
 	 */
-	protected bool $loaded = FALSE;
+	protected $loaded = FALSE;
 	
 	/**
 	 * @brief	Store $INFO so we know what came from conf_global later
 	 */
-	protected static array $confGlobal = array();
-
-	/**
-	 * Allow list of settings the SSO extension can override.
-	 * @var array|string[]
-	 */
-	protected array $ssoExtensionAllowList = [ 'post_before_registering', 'allow_reg', 'allow_reg_target',
-		'allow_email_changes', 'allow_email_changes_target', 'allow_password_changes', 'allow_password_changes_target',
-		'allow_forgot_password', 'allow_forgot_password_target' ];
+	protected static $confGlobal = array();
 		
 	/**
 	 * Constructor
@@ -66,21 +49,11 @@ class Settings extends Singleton
 	 */
 	protected function __construct()
 	{
-		if ( file_exists( SITE_FILES_PATH . '/conf_global.php' ) )
+		if ( file_exists( \IPS\SITE_FILES_PATH . '/conf_global.php' ) )
 		{
 			$allowedFields = $this->getAllowedFields();
 			
-			require( SITE_FILES_PATH . '/conf_global.php' );
-
-            if ( CIC2 )
-            {
-                /* cannot import with use as it cicloud may not exist */
-                $auth = \IPS\Cicloud\getMysqlPassword();
-
-                $INFO['sql_pass']		= $auth['sql_pass'];
-                $INFO['sql_read_pass']	= $auth['sql_read_pass'];
-            }
-
+			require( \IPS\SITE_FILES_PATH . '/conf_global.php' );
 			if ( isset( $INFO ) )
 			{
 				if( isset( $INFO['board_url'] ) AND ( !isset( $INFO['base_url'] ) OR !$INFO['base_url'] ) )
@@ -98,7 +71,7 @@ class Settings extends Singleton
 				
 				foreach( $INFO as $k => $v )
 				{
-					if ( ! in_array( $k, $allowedFields ) )
+					if ( ! \in_array( $k, $allowedFields ) )
 					{
 						unset( $INFO[ $k ] );
 					}
@@ -116,7 +89,7 @@ class Settings extends Singleton
 	 *
 	 * @return array
 	 */
-	public function getAllowedFields(): array
+	public function getAllowedFields()
 	{
 		return array( 'sql_host', 'sql_database', 'sql_user', 'sql_pass', 'sql_port', 'sql_socket', 'sql_tbl_prefix', 'sql_utf8mb4', 'board_start', 'installed', 'base_url', 'guest_group', 'member_group', 'admin_group' );
 	}
@@ -127,42 +100,21 @@ class Settings extends Singleton
 	 * @param	mixed	$key	Key
 	 * @return	mixed	Value from the datastore
 	 */
-	public function __get( mixed $key ) :mixed
+	public function __get( $key )
 	{
 		/* CiC hardcoded */
-		if ( CIC )
+		if ( \IPS\CIC )
 		{
-			if ( in_array( $key, array( 'xforward_matching', 'use_friendly_urls', 'htaccess_mod_rewrite', 'seo_r_on', 'archive_on' ) ) )
+			if ( \in_array( $key, array( 'xforward_matching', 'use_friendly_urls', 'htaccess_mod_rewrite', 'seo_r_on' ) ) )
 			{
 				return TRUE;
 			}
-
-			if ( $key == 'nexus_prune_history' )
-			{
-				return 4383; # This is 12 years or there abouts in days
-			}
-
-			if ( $key == 'prune_member_history' )
-			{
-				return 365; # This is 1 year or there abouts in days
-			}
-
-			if ( $key == 'api_log_prune' )
-			{
-				return 3;
-			}
-
-			if ( $key == 'api_log_prune_failures' )
-			{
-				return 14;
-			}
-
 			if ( $key == 'task_use_cron' )
 			{
 				return 'normal';
 			}
 		}
-        
+		
 		/* Get normally */
 		$return = parent::__get( $key );
 		if ( $return === NULL and !$this->loaded )
@@ -180,9 +132,9 @@ class Settings extends Singleton
 	 * @param	mixed	$key	Key
 	 * @return	mixed	Value
 	 */
-	public function getFromConfGlobal( mixed $key ): mixed
+	public function getFromConfGlobal( $key )
 	{	
-		return $this->data[$key] ?? NULL;
+		return isset( $this->data[ $key ] ) ? $this->data[ $key ] : NULL;
 	}
 	
 	/**
@@ -191,7 +143,7 @@ class Settings extends Singleton
 	 * @param	mixed	$key	Key
 	 * @return	bool
 	 */
-	public function __isset( mixed $key ): bool
+	public function __isset( $key )
 	{
 		$return = parent::__isset( $key );
 		
@@ -209,41 +161,26 @@ class Settings extends Singleton
 	 *
 	 * @return	void
 	 */
-	protected function loadFromDb() : void
+	protected function loadFromDb()
 	{
 		$settings = [];
-		if ( isset( Store::i()->settings ) )
+		if ( isset( \IPS\Data\Store::i()->settings ) )
 		{
-			$settings = Store::i()->settings;
+			$settings = \IPS\Data\Store::i()->settings;
 		}
 		else
 		{
-			foreach (Db::i()->select( 'conf_key, conf_default, conf_value', 'core_sys_conf_settings' )->setKeyField( 'conf_key' ) as $k => $data )
+			foreach ( \IPS\Db::i()->select( 'conf_key, conf_default, conf_value', 'core_sys_conf_settings' )->setKeyField( 'conf_key' ) as $k => $data )
 			{
 				$settings[ $k ] = ( $data['conf_value'] === '' ) ? $data['conf_default'] : $data['conf_value'];
 			}
-			Store::i()->settings = $settings;
+			\IPS\Data\Store::i()->settings = $settings;
 		}
 
 		/* We don't want to 'cache' what is in conf_global */
 		$this->data = array_merge( $this->data, $settings );
 
 		$this->loaded = TRUE;
-
-		/* Check SSO Extensions for overloads */
-		foreach( Application::allExtensions( 'core', 'SSO', FALSE ) as $ext )
-		{
-			/* @var SSOAbstract $ext */
-			if( $ext->isEnabled() )
-			{
-				$newSettings = $ext->overrideSettings();
-				$overrides = [];
-				array_walk( $newSettings, function( $val, $key ) use ( &$overrides ) {
-					if( in_array( $key, $this->ssoExtensionAllowList ) ) { $overrides[ $key ] = $val; }
-				} );
-				$this->data = array_merge( $this->data, $overrides );
-			}
-		}
 	}
 
 	/**
@@ -253,9 +190,9 @@ class Settings extends Singleton
 	 	the same values to be written, which is not desired
 	 * @return	void
 	 */
-	public function clearCache() : void
+	public function clearCache()
 	{
-		unset( Store::i()->settings );
+		unset( \IPS\Data\Store::i()->settings );
 		$this->data		= static::$confGlobal;
 		$this->loaded	= FALSE;
 	}
@@ -263,10 +200,10 @@ class Settings extends Singleton
 	/**
 	 * Change values
 	 *
-	 * @param array $newValues	New values
+	 * @param	array	$newValues	New values
 	 * @return	void
 	 */
-	public function changeValues( array $newValues ) : void
+	public function changeValues( $newValues )
 	{
 		/* Get the current values if we don't have them already */
 		if ( !$this->loaded )
@@ -283,21 +220,21 @@ class Settings extends Singleton
 				$defaultValues[] = $k;
 			}
 		}
-		$defaultValues	= iterator_to_array( Db::i()->select( array( 'conf_default', 'conf_key' ), 'core_sys_conf_settings', Db::i()->in( 'conf_key', $defaultValues ) )->setKeyField( 'conf_key' )->setValueField( 'conf_default' ) );
-		$validKeys		= iterator_to_array( Db::i()->select( 'conf_key', 'core_sys_conf_settings', Db::i()->in( 'conf_key', array_keys( $newValues ) ) ) );
+		$defaultValues	= iterator_to_array( \IPS\Db::i()->select( array( 'conf_default', 'conf_key' ), 'core_sys_conf_settings', \IPS\Db::i()->in( 'conf_key', $defaultValues ) )->setKeyField( 'conf_key' )->setValueField( 'conf_default' ) );
+		$validKeys		= iterator_to_array( \IPS\Db::i()->select( 'conf_key', 'core_sys_conf_settings', \IPS\Db::i()->in( 'conf_key', array_keys( $newValues ) ) ) );
 		
 		/* Update the database */
 		$changed = FALSE;
 		foreach ( $newValues as $k => $v )
 		{
-			$valueToCache = $defaultValues[$k] ?? $v;
+			$valueToCache = isset( $defaultValues[ $k ] ) ? $defaultValues[ $k ] : $v;
 
 			/* Make sure the key is valid */
-			if( !in_array( $k, $validKeys ) )
+			if( !\in_array( $k, $validKeys ) )
 			{
-				if (IN_DEV)
+				if ( \IPS\IN_DEV )
 				{
-					throw new InvalidArgumentException( 'unknown_setting: ' . $k );
+					throw new \InvalidArgumentException( 'unknown_setting: ' . $k );
 				}
 				continue;
 			}
@@ -305,7 +242,7 @@ class Settings extends Singleton
 			if ( $this->$k != $valueToCache )
 			{
 				$this->$k = $valueToCache;
-				Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $v ), array( 'conf_key=?', $k ) );
+				\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $v ), array( 'conf_key=?', $k ) );
 				
 				$changed = TRUE;
 			}
@@ -320,7 +257,7 @@ class Settings extends Singleton
 				if ( ! isset( static::$confGlobal[ $dk ] ) )
 				{
 					/* Make sure objects are cast to string as the DB bind layer will do this automatically when saving */
-					if ( is_object( $dv ) and method_exists( $dv, '__toString' ) )
+					if ( \is_object( $dv ) and method_exists( $dv, '__toString' ) )
 					{
 						$dv = (string) $dv;
 					}
@@ -328,7 +265,7 @@ class Settings extends Singleton
 					$toStore[ $dk ] = $dv;
 				}
 			}
-			Store::i()->settings = $toStore;
+			\IPS\Data\Store::i()->settings = $toStore;
 		}
 	}
 }

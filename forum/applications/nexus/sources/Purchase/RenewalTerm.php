@@ -12,65 +12,53 @@
 namespace IPS\nexus\Purchase;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use IPS\DateTime;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Money;
-use IPS\nexus\Tax;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Renewal Term Object
  */
-class RenewalTerm
+class _RenewalTerm
 {
 	/**
 	 * @brief	Cost
 	 */
-	public Money|array|null $cost = null;
+	public $cost;
 	
 	/**
 	 * @brief	Interval
 	 */
-	public ?DateInterval $interval = null;
+	public $interval;
 	
 	/**
 	 * @brief	Tax
 	 */
-	public ?Tax $tax = null;
+	public $tax;
 	
 	/**
 	 * @brief	Add to base price?
 	 */
-	public bool $addToBase = FALSE;
+	public $addToBase = FALSE;
 	
 	/**
 	 * @brief	Grace period
 	 */
-	public ?DateInterval $gracePeriod = null;
+	public $gracePeriod;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Money|array	$cost			Cost
-	 * @param	DateInterval|null			$interval		Interval
-	 * @param	Tax|NULL		$tax			Tax
+	 * @param	\IPS\nexus\Money|array	$cost			Cost
+	 * @param	\DateInterval			$interval		Interval
+	 * @param	\IPS\nexus\Tax|NULL		$tax			Tax
 	 * @param	bool					$addToBase		Add to base?
-	 * @param	DateInterval|NULL		$gracePeriod	Grace period
+	 * @param	\DateInterval|NULL		$gracePeriod	Grace period
 	 * @return	void
 	 */ 
-	public function __construct( Money|array $cost, ?DateInterval $interval = NULL, Tax $tax = NULL, bool $addToBase = FALSE, ?DateInterval $gracePeriod = NULL )
+	public function __construct( $cost, \DateInterval $interval = NULL, \IPS\nexus\Tax $tax = NULL, $addToBase = FALSE, \DateInterval $gracePeriod = NULL )
 	{
 		$this->cost = $cost;
 		$this->interval = $interval;
@@ -84,7 +72,7 @@ class RenewalTerm
 	 *
 	 * @return	array
 	 */
-	public function getTerm() : array
+	public function getTerm()
 	{
 		if( $this->interval->y )
 		{
@@ -105,10 +93,10 @@ class RenewalTerm
 	 *
 	 * @return	string
 	 */
-	public function getTermUnit() : string
+	public function getTermUnit()
 	{
 		$term = $this->getTerm();
-		$lang = Member::loggedIn()->language();
+		$lang = \IPS\Member::loggedIn()->language();
 		switch( $term['unit'] )
 		{
 			case 'd':
@@ -125,8 +113,6 @@ class RenewalTerm
 			case 'y':
 				return $lang->pluralize( $lang->get('renew_years'), array( $term['term'] ) );
 		}
-
-		return "";
 	}
 	
 	/**
@@ -136,15 +122,15 @@ class RenewalTerm
 	 */
 	public function days(): string
 	{
-		return number_format( DateTime::intervalToDays( $this->interval ), 2, '.', '' );
+		return number_format( \IPS\DateTime::intervalToDays( $this->interval ), 2, '.', '' );
 	}
 	
 	/**
 	 * Calculate cost per day
 	 *
-	 * @return	Money|int	Cost per day
+	 * @return	\IPS\nexus\Money	Cost per day
 	 */
-	public function costPerDay() : Money|int
+	public function costPerDay()
 	{
 		$days = $this->days();
 		if ( !$days )
@@ -153,23 +139,23 @@ class RenewalTerm
 		}
 		else
 		{
-			return new Money( $this->cost->amount->divide( new Number("{$days}") ), $this->cost->currency );
+			return new \IPS\nexus\Money( $this->cost->amount->divide( new \IPS\Math\Number("{$days}") ), $this->cost->currency );
 		}
 	}
 	
 	/**
 	 * Get the combined cost of this term and another term (used for grouping)
 	 *
-	 * @param RenewalTerm $term	Term to add
-	 * @return	Money
-	 * @throws	DomainException
+	 * @param	\IPS\nexus\Purchase\RenewalTerm	$term	Term to add
+	 * @return	\IPS\nexus\Money
+	 * @throws	\DomainException
 	 */
-	public function add( RenewalTerm $term ) : Money
+	public function add( RenewalTerm $term )
 	{
 		/* They need to have the same currency */
 		if ( $this->cost->currency !== $term->cost->currency )
 		{
-			throw new DomainException('currencies_dont_match');
+			throw new \DomainException('currencies_dont_match');
 		}
 		
 		/* Get some details */
@@ -224,23 +210,23 @@ class RenewalTerm
 		/* If they're not the same term, adjust */
 		if ( $thisTerm['term'] != $otherTerm['term'] )
 		{
-			$adjustedCost = $adjustedCost->multiply( ( ( new Number("{$thisTerm['term']}") )->divide( new Number("{$otherTerm['term']}") ) ) );
+			$adjustedCost = $adjustedCost->multiply( ( ( new \IPS\Math\Number("{$thisTerm['term']}") )->divide( new \IPS\Math\Number("{$otherTerm['term']}") ) ) );
 		}
 		
 		/* And return */
-		return new Money( $this->cost->amount->add( $adjustedCost ), $this->cost->currency );
+		return new \IPS\nexus\Money( $this->cost->amount->add( $adjustedCost ), $this->cost->currency );
 	}
 	
 	/**
 	 * Get the cost of this term subtract another term (used for grouping)
 	 *
-	 * @param RenewalTerm $term	Term to subtract
-	 * @return	Money
-	 * @throws	DomainException
+	 * @param	\IPS\nexus\Purchase\RenewalTerm	$term	Term to subtract
+	 * @return	\IPS\nexus\Money
+	 * @throws	\DomainException
 	 */
-	public function subtract( RenewalTerm $term ) : Money
+	public function subtract( RenewalTerm $term )
 	{
-		$term->cost->amount = $term->cost->amount->multiply( new Number( '-1' ) );
+		$term->cost->amount = $term->cost->amount->multiply( new \IPS\Math\Number( '-1' ) );
 		return $this->add( $term );
 	}
 	
@@ -250,26 +236,25 @@ class RenewalTerm
 	 * @param	int	$n	The number to times by
 	 * @return	string
 	 */
-	public function times( int $n ) : string
+	public function times( $n )
 	{
-		$cost = new Money( $this->cost->amount->multiply( new Number("{$n}") ), $this->cost->currency );
-		return sprintf( Member::loggedIn()->language()->get( 'renew_option'), $cost, $this->getTermUnit() );
+		$cost = new \IPS\nexus\Money( $this->cost->amount->multiply( new \IPS\Math\Number("{$n}") ), $this->cost->currency );
+		return sprintf( \IPS\Member::loggedIn()->language()->get( 'renew_option'), $cost, $this->getTermUnit() );
 	}
 	
 	/**
 	 * Get difference between this term and another
 	 *
-	 * @param RenewalTerm $otherTerm				The other term
+	 * @param	\IPS\nexus\Purchase\RenewalTerm	$otherTerm				The other term
 	 * @param	bool							$returnAsPercentage		If TRUE, will return percentage difference rather than money amount
-	 * @return	Money|Number
-	 * @throws DomainException
+	 * @return	\IPS\nexus\Money|\IPS\Math\Number
 	 */
-	public function diff( RenewalTerm $otherTerm, bool $returnAsPercentage = FALSE ) : Money|Number
+	public function diff( $otherTerm, $returnAsPercentage = FALSE )
 	{
 		/* Sanity check */
 		if ( $this->cost->currency !== $otherTerm->cost->currency )
 		{
-			throw new DomainException('currencies_dont_match');
+			throw new \DomainException('currencies_dont_match');
 		}
 		
 		/* Try to normalise the terms so we can work off multiplying - we want to either be dealing in days or months */
@@ -292,14 +277,14 @@ class RenewalTerm
 		/* If the two terms are now based on the same unit of time, we can just multiply */		
 		if ( $thisTermDetails['unit'] === $otherTermDetails['unit'] )
 		{
-			$factor = ( new Number( (string) $thisTermDetails['term'] ) )->divide( ( new Number( (string) $otherTermDetails['term'] ) ) );
+			$factor = ( new \IPS\Math\Number( (string) $thisTermDetails['term'] ) )->divide( ( new \IPS\Math\Number( (string) $otherTermDetails['term'] ) ) );
 			$thisCostPerDivision = $this->cost->amount;
 			$otherCostPerDivision = $otherTerm->cost->amount->multiply( $factor );
 		}
 		/* Otherwise we have to work it out based on the cost per day */
 		else
 		{
-			$days = new Number( $this->days() );
+			$days = new \IPS\Math\Number( (string) $this->days() );
 			$thisCostPerDivision = $this->costPerDay()->amount->multiply( $days );
 			$otherCostPerDivision = $otherTerm->costPerDay()->amount->multiply( $days );
 		}
@@ -310,11 +295,11 @@ class RenewalTerm
 		/* Return in desired format */
 		if ( $returnAsPercentage )
 		{			
-			return ( new Number('100') )->divide( $otherCostPerDivision, 4 )->multiply( $saving );
+			return ( new \IPS\Math\Number('100') )->divide( $otherCostPerDivision, 4 )->multiply( $saving );
 		}
 		else
 		{
-			return new Money( $saving, $this->cost->currency );
+			return new \IPS\nexus\Money( $saving, $this->cost->currency );
 		}
 	}
 	
@@ -323,54 +308,54 @@ class RenewalTerm
 	 *
 	 * @return	string
 	 */
-	public function __toString() : string
+	public function __toString()
 	{		
-		return sprintf( Member::loggedIn()->language()->get( 'renew_option'), $this->cost, $this->getTermUnit() )	;
+		return sprintf( \IPS\Member::loggedIn()->language()->get( 'renew_option'), $this->cost, $this->getTermUnit() )	;
 	}
 	
 	/**
 	 * To String incl. tax
 	 *
-	 * @param	Customer|NULL	$customer			The customer (NULL for currently logged in member)
+	 * @param	\IPS\nexus\Customer|NULL	$customer			The customer (NULL for currently logged in member)
 	 * @param	int							$quantity			The quantity to times amount by
 	 * @return	string
 	 */
-	public function toDisplay( ?Customer $customer = NULL, int $quantity = 1 ) : string
+	public function toDisplay( \IPS\nexus\Customer $customer = NULL, $quantity = 1 )
 	{
 		$cost = $this->cost;
-		if ( Settings::i()->nexus_show_tax and $this->tax )
+		if ( \IPS\Settings::i()->nexus_show_tax and $this->tax )
 		{
-			$customer = $customer ?: Customer::loggedIn();
-			$taxRate = new Number( $this->tax->rate( $customer->estimatedLocation() ) );
-			$cost = new Money( $cost->amount->add( $cost->amount->multiply( $taxRate ) ), $cost->currency );
+			$customer = $customer ?: \IPS\nexus\Customer::loggedIn();
+			$taxRate = new \IPS\Math\Number( $this->tax->rate( $customer->estimatedLocation() ) );
+			$cost = new \IPS\nexus\Money( $cost->amount->add( $cost->amount->multiply( $taxRate ) ), $cost->currency );
 		}
 		
 		if ( $quantity != 1 )
 		{
-			$cost = new Money( $cost->amount->multiply( new Number( "$quantity" ) ), $cost->currency );
+			$cost = new \IPS\nexus\Money( $cost->amount->multiply( new \IPS\Math\Number( "$quantity" ) ), $cost->currency );
 		}
 		
-		return sprintf( Member::loggedIn()->language()->get( 'renew_option'), $cost, $this->getTermUnit() );
+		return sprintf( \IPS\Member::loggedIn()->language()->get( 'renew_option'), $cost, $this->getTermUnit() );
 	}
 	
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse		string				term		'd' for days; 'w' for weeks; 'm' for months; 'y' for years
 	 * @apiresponse		int					unit		The number for term. For example, if the renewal term is every 6 months, term will be 'm' and unit will be 6
 	 * @apiresponse		\IPS\nexus\Money	price		The renewal price
 	 * @apiresponse		\IPS\nexus\Tax		taxClass	If the renewal price is taxed, the tax class that applies
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		$term = $this->getTerm();
 		return array(
 			'term'			=> $term['term'],
 			'unit'			=> $term['unit'],
 			'price'			=> $this->cost->apiOutput( $authorizedMember ),
-			'taxClass'		=> $this->tax?->apiOutput($authorizedMember),
+			'taxClass'		=> $this->tax ? $this->tax->apiOutput( $authorizedMember ) : null,
 		);
 	}
 }

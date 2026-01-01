@@ -11,34 +11,22 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\File;
-use IPS\Member;
-use OutOfRangeException;
-use function count;
-use function defined;
-use const IPS\REBUILD_NORMAL;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Deleted Moved Files
  */
-class DeleteMovedFiles extends QueueAbstract
+class _DeleteMovedFiles
 {
 	
 	/**
 	 * @brief Number of files to delete per cycle
 	 */
-	public int $batch = REBUILD_NORMAL;
+	public $batch = \IPS\REBUILD_NORMAL;
 	
 	/**
 	 * Run Background Task
@@ -48,7 +36,7 @@ class DeleteMovedFiles extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$ids   = array();
 
@@ -56,26 +44,26 @@ class DeleteMovedFiles extends QueueAbstract
 			This is required since the task is created before the relevant 'move' logs are created */
 		if( empty( $data['realCount'] ) )
 		{
-			$data['realCount'] = Db::i()->select( 'COUNT(log_id)', 'core_file_logs', array( 'log_type=?', 'move' ) )->first();
+			$data['realCount'] = \IPS\Db::i()->select( 'COUNT(log_id)', 'core_file_logs', array( 'log_type=?', 'move' ) )->first();
 		}
 		
-		foreach( Db::i()->select( '*', 'core_file_logs', array( 'log_type=?', 'move' ), 'log_date DESC', array( 0, $this->batch ) ) as $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_file_logs', array( 'log_type=?', 'move' ), 'log_date DESC', array( 0, $this->batch ) ) as $row )
 		{
 			$ids[] = $row['log_id'];
 			try
 			{
 				/* We shouldn't need to make sure the image has moved because any issue would have been logged and the moved flag not set */
-				File::get( $row['log_configuration_id'], trim( ( ( ! empty( $row['log_container'] ) ) ? $row['log_container'] . '/'  : '' ) . $row['log_filename'], '/' ) )->delete();
+				\IPS\File::get( $row['log_configuration_id'], trim( ( ( ! empty( $row['log_container'] ) ) ? $row['log_container'] . '/'  : '' ) . $row['log_filename'], '/' ) )->delete();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				/* Any issues with deletion will be logged, so we can still remove this row */
 			}
 		}
 
-		if ( count( $ids ) )
+		if ( \count( $ids ) )
 		{
-			Db::i()->delete( 'core_file_logs', array( Db::i()->in( 'log_id', array_values( $ids ) ) ) );
+			\IPS\Db::i()->delete( 'core_file_logs', array( \IPS\Db::i()->in( 'log_id', array_values( $ids ) ) ) );
 			
 			return $this->batch + $offset;
 		}
@@ -89,9 +77,9 @@ class DeleteMovedFiles extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		/* If we have a more accurate total count, use that */
 		if ( isset( $data['realCount'] ) )
@@ -107,44 +95,8 @@ class DeleteMovedFiles extends QueueAbstract
 		else
 		{
 			/* If a count wasn't provided, just query for it */
-			$count = Db::i()->select( 'COUNT(*)', 'core_file_logs', array( 'log_type=?', 'move' ) )->first();
+			$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_file_logs', array( 'log_type=?', 'move' ) )->first();
 		}
-		return array( 'text' => Member::loggedIn()->language()->addToStack('deleting_moved_files'), 'complete' => $count ? round( ( 100 / $count * $offset ), 2 ) : 100 );
-	}
-
-	/**
-	 * Parse data before queuing
-	 *
-	 * @param array $data
-	 * @return    array|null
-	 */
-	public function preQueueData( array $data ): ?array
-	{
-		return $data;
-	}
-
-	/**
-	 * Perform post-completion processing
-	 *
-	 * @param	array	$data		Data returned from preQueueData
-	 * @param	bool	$processed	Was anything processed or not? If preQueueData returns NULL, this will be FALSE.
-	 * @return	void
-	 */
-	public function postComplete( array $data, bool $processed = TRUE ) : void
-	{
-		$queueData = json_decode( $data['data'], true );
-
-		$count = Db::i()->select( 'COUNT(*)', 'core_file_logs', array( 'log_type=?', 'move' ) )->first();
-
-		if( !$count AND isset( $queueData['storageToDelete'] ) )
-		{
-			Db::i()->delete( 'core_file_storage', array( 'id=?', $queueData['storageToDelete'] ) );
-
-			try
-			{
-				unset( Store::i()->storageConfigurations );
-			}
-			catch( OutOfRangeException $e ){}
-		}
-	}
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('deleting_moved_files'), 'complete' => $count ? round( ( 100 / $count * $offset ), 2 ) : 100 );
+	}	
 }

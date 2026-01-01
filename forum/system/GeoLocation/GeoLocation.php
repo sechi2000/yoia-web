@@ -11,70 +11,21 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadFunctionCallException;
-use BadMethodCallException;
-use IPS\GeoLocation\GeoCoder;
-use IPS\GeoLocation\Maps\Google;
-use IPS\GeoLocation\Maps\Mapbox;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Platform\Bridge;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * GeoLocation
  */
-class GeoLocation
+class _GeoLocation
 {
-	/**
-	 * @brief	EU Member States
-	 */
-	const EU = array(
-		'AT',
-		'BE',
-		'BG',
-		'HR',
-		'CY',
-		'CZ',
-		'DK',
-		'EE',
-		'FI',
-		'FR',
-		'DE',
-		'GR',
-		'HU',
-		'IE',
-		'IT',
-		'LV',
-		'LT',
-		'LU',
-		'MT',
-		'NL',
-		'PL',
-		'PT',
-		'RO',
-		'SK',
-		'SI',
-		'ES',
-		'SE'
-	);
-
 	/**
 	 * @brief	Country Code List
 	 */
-	public static array $countries = array(
+	public static $countries = array(
 		'AF', // Afghanistan
 		'AX', // Åland Islands
 		'AL', // Albania
@@ -329,7 +280,7 @@ class GeoLocation
 	/**
 	 * @brief	State List
 	 */
-	public static array $states = array(
+	public static $states = array(
 		'AU' => array(
 			'Australian Capital Territory',
 			'New South Wales',
@@ -475,100 +426,89 @@ class GeoLocation
 	/**
 	 * @brief	Latitude
 	 */
-	public ?float $lat = NULL;
+	public $lat;
 	
 	/**
 	 * @brief	Longitude
 	 */
-	public ?float $long = NULL;
+	public $long;
 	
 	/**
 	 * @brief	Address Lines
 	 */
-	public array $addressLines = array( NULL );
+	public $addressLines = array( NULL );
 	
 	/**
 	 * @brief	City
 	 */
-	public ?string $city = NULL;
+	public $city;
 	
 	/**
 	 * @brief	Region
 	 */
-	public ?string $region = NULL;
+	public $region;
 	
 	/**
 	 * @brief	Country (2 character code)
 	 */
-	public ?string $country = NULL;
+	public $country;
 	
 	/**
 	 * @brief	Postal Code
 	 */
-	public ?string $postalCode = NULL;
+	public $postalCode;
 
 	/**
 	 * @brief	Place Name
 	 */
-	public ?string $placeName = NULL;
-
-	/**
-	 * @brief	County
-	 */
-	public ?string $county = NULL;
+	public $placeName;
 		
 	/**
 	 * @brief	Map
 	 */
-	protected mixed $map = NULL;
+	protected $map;
 
-	/**
-	 * @brief	VAT (used in Commerce)
-	 */
-	public ?string $vat = NULL;
 
-	/**
-	 * @brief	Optional business name used for Commerce
-	 */
-	public ?string $business = null;
-	
 	/**
 	 * Get Requester Location
 	 *
-	 * @return	GeoLocation
-	 */
-	public static function getRequesterLocation(): GeoLocation
+	 * @return	\IPS\GeoLocation
+	 * @throws	\BadFunctionCallException        Service is not available
+	 * @throws	\IPS\Http\Request\Exception        Error communicating with external service
+	 * @throws	\RuntimeException                Error within the external service
+ 	*/
+	public static function getRequesterLocation(): \IPS\GeoLocation
 	{
-		return Bridge::i()->getRequesterLocation();
+		return static::getByIp( \IPS\Request::i()->ipAddress() );
 	}
 	
 	/**
 	 * Get by IP address
 	 *
-	 * @param array|string $ip	IP Address or array of IP addresses
-	 * @return    GeoLocation|array
-	 * @throws	BadFunctionCallException		Service is not available
-	 * @throws	Exception		Error communicating with external service
-	 * @throws	RuntimeException				Error within the external service
-	 * @throws	OutOfRangeException			IP address has no data
+	 * @param	string|array	$ip	IP Address or array of IP addresses
+	 * @return	\IPS\GeoLocation|array
+	 * @throws	\BadFunctionCallException		Service is not available
+	 * @throws	\IPS\Http\Request\Exception		Error communicating with external service
+	 * @throws	\RuntimeException				Error within the external service 
+	 * @throws	\OutOfRangeException			IP address has no data
 	 */
-	public static function getByIp( array|string $ip ): GeoLocation|array
+	public static function getByIp( $ip )
 	{
 		/* If the service is not turned on - throw an exception */
-		if ( !Settings::i()->ipsgeoip )
+		if ( !\IPS\Settings::i()->ipsgeoip )
 		{
-			throw new BadFunctionCallException;
+			throw new \BadFunctionCallException;
 		}
 		
 		/* If the license key is invalid or expired the service won't work, so throw an exception */
-		$licenseData = IPS::licenseKey();
+		$licenseData = \IPS\IPS::licenseKey();
 		if( !$licenseData or !$licenseData['active'] )
 		{
-			throw new BadFunctionCallException;
+			throw new \BadFunctionCallException;
 		}
 
 		/* If the parameter is an array, the response will be an array */
-		if( is_array( $ip ) )
+		if( \is_array( $ip ) )
 		{
 			$result			= array();
 			$needToLookup	= array();
@@ -577,7 +517,7 @@ class GeoLocation
 		/* Check the cache */
 		try
 		{
-			if( is_array( $ip ) )
+			if( \is_array( $ip ) )
 			{
 				$atLeastOneFailed = FALSE;
 
@@ -585,11 +525,11 @@ class GeoLocation
 				{
 					try
 					{
-						$data = Db::i()->select( 'data', 'core_geoip_cache', array( 'ip_address=?', $ipAddress ) )->first();
+						$data = \IPS\Db::i()->select( 'data', 'core_geoip_cache', array( 'ip_address=?', $ipAddress ) )->first();
 						
 						$result[ $ipAddress ] = $data;
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
 						$atLeastOneFailed	= TRUE;
 						$needToLookup[]		= $ipAddress;
@@ -599,31 +539,31 @@ class GeoLocation
 				/* If any of the requested IP addresses failed, we need to look them up */
 				if( $atLeastOneFailed )
 				{
-					throw new UnderflowException;
+					throw new \UnderflowException;
 				}
 			}
 			else
 			{
-				$data = Db::i()->select( 'data', 'core_geoip_cache', array( 'ip_address=?', $ip ) )->first();
+				$data = \IPS\Db::i()->select( 'data', 'core_geoip_cache', array( 'ip_address=?', $ip ) )->first();
 				if ( !$data )
 				{
 					/* @note This was changed from an \UnderflowException to be consistent with the \OutOfRangeException thrown later on, otherwise the system will keep trying even when it should not. cleanup task will remove out of date entries and it can try again then. */
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 			}
 		}
 		
 		/* Not in the cache - get from the external service */
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			/* Fetch the details */
-			if( is_array( $ip ) AND count( $needToLookup ) )
+			if( \is_array( $ip ) AND \count( $needToLookup ) )
 			{
-				$response = Url::ips( 'geoip/' . urlencode( json_encode( $needToLookup ) ) )->request()->login( Settings::i()->ipb_reg_number, '' )->get();
+				$response = \IPS\Http\Url::ips( 'geoip/' . urlencode( json_encode( $needToLookup ) ) )->request()->login( \IPS\Settings::i()->ipb_reg_number, '' )->get();
 			}
 			else
 			{
-				$response = Url::ips( 'geoip/' . urlencode( $ip ) )->request()->login( Settings::i()->ipb_reg_number, '' )->get();
+				$response = \IPS\Http\Url::ips( 'geoip/' . urlencode( $ip ) )->request()->login( \IPS\Settings::i()->ipb_reg_number, '' )->get();
 			}
 
 			/* If it's a 404, the IP doesn't exist, we still store NULL to prevent multiple calls */
@@ -635,8 +575,8 @@ class GeoLocation
 			/* If it's anything other than a 200, log it and throw exception */
 			elseif ( $response->httpResponseCode != 200 )
 			{
-				Log::log( "GeoIP Error\n\nRequested IP: {$ip}\n\nResponse:\n" . print_r( $response, TRUE ), 'geoip' );
-				throw new RuntimeException;
+				\IPS\Log::log( "GeoIP Error\n\nRequested IP: {$ip}\n\nResponse:\n" . print_r( $response, TRUE ), 'geoip' );
+				throw new \RuntimeException;
 			} 
 			
 			/* Otherwise it's fine */
@@ -644,16 +584,16 @@ class GeoLocation
 			{
 				$data = (string) $response;
 
-				if( is_array( $ip ) )
+				if( \is_array( $ip ) )
 				{
 					$data = json_decode( $data, true );
 				}
 			}
 
 			/* Cache */
-			if( is_array( $ip ) )
+			if( \is_array( $ip ) )
 			{
-				if( is_array( $data ) )
+				if( \is_array( $data ) )
 				{
 					foreach( $data as $k => $v )
 					{
@@ -661,7 +601,7 @@ class GeoLocation
 						$v = $v ? json_encode( $v ) : NULL;
 
 						$result[ $k ] = $v;
-						Db::i()->replace( 'core_geoip_cache', array(
+						\IPS\Db::i()->replace( 'core_geoip_cache', array(
 							'ip_address'	=> $k,
 							'data'			=> $v,
 							'date'			=> time()
@@ -671,7 +611,7 @@ class GeoLocation
 			}
 			else
 			{
-				Db::i()->replace( 'core_geoip_cache', array(
+				\IPS\Db::i()->replace( 'core_geoip_cache', array(
 					'ip_address'	=> $ip,
 					'data'			=> $data,
 					'date'			=> time()
@@ -680,7 +620,7 @@ class GeoLocation
 		}
 		
 		/* Return */
-		if( is_array( $ip ) and isset( $result ))
+		if( \is_array( $ip ) )
 		{
 			foreach( $result as $ipAddress => $ipData )
 			{
@@ -692,9 +632,9 @@ class GeoLocation
 		else
 		{
 			/* If there's nothing, throw an exception */
-			if ( !isset( $data ) or !$data )
+			if ( !$data )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
 			return static::buildFromJson( $data );
@@ -704,36 +644,36 @@ class GeoLocation
 	/**
 	 * Geocode Location
 	 *
-	 * @param string|null $input 		Location search term
+	 * @param 	string 	$input 		Location search term
 	 * @return	static
 	 */
-	public static function geocodeLocation( string $input = NULL ): static
+	public static function geocodeLocation( $input = NULL )
 	{
-		return GeoCoder::i()->decodeLocation( $input );
+		return \IPS\GeoLocation\GeoCoder::i()->decodeLocation( $input );
 	}
 
 	/**
 	 * @brief Cached lookups to prevent duplicate lookups
 	 */
-	static protected array $lookupCache = array( 'latlong' => array(), 'address' => array() );
+	static protected $lookupCache = array( 'latlong' => array(), 'address' => array() );
 
 	/**
 	 * Get by latitude and longitude
 	 *
-	 * @param float $lat	Latitude
-	 * @param float $long	Longitude
-	 * @return    GeoLocation
-	 * @throws	BadFunctionCallException
-	 * @throws	Exception
+	 * @param	float	$lat	Latitude
+	 * @param	float	$long	Longitude
+	 * @return	\IPS\GeoLocation
+	 * @throws	\BadFunctionCallException
+	 * @throws	\IPS\Http\Request\Exception
 	 */
-	public static function getByLatLong( float $lat, float $long ): GeoLocation
+	public static function getByLatLong( $lat, $long )
 	{
 		if( isset( static::$lookupCache['latlong'][ $lat . 'x' . $long ] ) )
 		{
 			return static::$lookupCache['latlong'][ $lat . 'x' . $long ];
 		}
 
-		static::$lookupCache['latlong'][ $lat . 'x' . $long ] = GeoCoder::i()->decodeLatLong( $lat, $long );
+		static::$lookupCache['latlong'][ $lat . 'x' . $long ] = \IPS\GeoLocation\GeoCoder::i()->decodeLatLong( $lat, $long );
 
 		return static::$lookupCache['latlong'][ $lat . 'x' . $long ];
 	}
@@ -741,11 +681,11 @@ class GeoLocation
 	/**
 	 * Get the latitude and longitude for the current object. Address must be set.
 	 *
-	 * @param bool $setAddress	Whether or not to update the address information from the GeoCoder service
+	 * @param	bool	$setAddress	Whether or not to update the address information from the GeoCoder service
 	 * @return	void
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function getLatLong(bool $setAddress=FALSE ) : void
+	public function getLatLong( $setAddress = FALSE )
 	{
 		$lookupKey = md5( $this->toString() );
 
@@ -761,7 +701,7 @@ class GeoLocation
 			return;
 		}
 
-		GeoCoder::i()->setLatLong( $this, $setAddress );
+		\IPS\GeoLocation\GeoCoder::i()->setLatLong( $this, $setAddress );
 
 		static::$lookupCache['address'][ $lookupKey ] = json_encode( $this );
 	}
@@ -769,30 +709,21 @@ class GeoLocation
 	/**
 	 * Build from JSON
 	 *
-	 * @param string|null $json	JSON data
-	 * @return	GeoLocation
+	 * @param 	string	$json	JSON data
+	 * @return	|IPS\GeoLocation
 	 */
-	public static function buildFromJson( ?string $json ): static
+	public static function buildFromJson( $json )
 	{
-		if( empty( $json ) )
+		$json = json_decode( $json, TRUE );
+		$obj = new static;
+		if ( !empty( $json ) )
 		{
-			return new static;
-		}
-
-		if( $json = json_decode( $json, TRUE ) )
-		{
-			$obj = new static;
-			if ( !empty( $json ) )
+			foreach ( $json as $k => $v )
 			{
-				foreach ( $json as $k => $v )
-				{
-					$obj->$k = $v;
-				}
+				$obj->$k = $v;
 			}
-			return $obj;
 		}
-
-		return new static;
+		return $obj;
 	}
 	
 	/**
@@ -808,13 +739,13 @@ class GeoLocation
 	/**
 	 * Convert to string
 	 *
-	 * @param string $separator	Separator
-	 * @param string|null $name	Optional name to add to the address
+	 * @param	string	$separator	Separator
+	 * @param	string|null	$name	Optional name to add to the address
 	 * @return	string
 	 * @note	While some places like France capitalize the surname, this cannot be done automatically because the surname could be supplied as the first or last
-	* name value, and the name could contain more than one string that constitutes the surname.
+	name value, and the name could contain more than one string that constitutes the surname.
 	 */
-	public function toString( string $separator=', ', string $name=NULL ): string
+	public function toString( $separator=', ', $name=NULL )
 	{
 		$output	= array();
 
@@ -827,7 +758,7 @@ class GeoLocation
 		{
 			if ( isset( $this->$k ) and $this->$k )
 			{
-				if ( is_array( $this->$k ) )
+				if ( \is_array( $this->$k ) )
 				{
 					foreach ( $this->$k as $v )
 					{
@@ -843,13 +774,13 @@ class GeoLocation
 				}
 			}
 		}
-		if ( $this->country and $this->country !== static::buildFromJson( Settings::i()->site_address )->country )
+		if ( $this->country and $this->country !== static::buildFromJson( \IPS\Settings::i()->site_address )->country )
 		{
 			try
 			{
-				$output[] = strtoupper( Member::loggedIn()->language()->get( htmlspecialchars( 'country-' . $this->country, ENT_DISALLOWED, 'UTF-8', FALSE ) ) );
+				$output[] = \IPS\Member::loggedIn()->language()->get( htmlspecialchars( 'country-' . $this->country, ENT_DISALLOWED, 'UTF-8', FALSE ), FALSE, array( 'strtoupper' => TRUE ) );
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				$output[] = htmlspecialchars( $this->country, ENT_DISALLOWED, 'UTF-8', FALSE );
 			}
@@ -870,24 +801,24 @@ class GeoLocation
 	/**
 	 * Build Map
 	 *
-	 * @return	mixed
-	 * @throws	BadMethodCallException
+	 * @return	\IPS\GeoLocation\Map
+	 * @throws	\BadMethodCallException
 	 */
-	public function map(): mixed
+	public function map()
 	{
 		if ( $this->map === NULL )
 		{
-			if ( Settings::i()->googlemaps and Settings::i()->google_maps_api_key )
+			if ( \IPS\Settings::i()->googlemaps and \IPS\Settings::i()->google_maps_api_key )
 			{
-				$this->map = new Google( $this );
+				$this->map = new \IPS\GeoLocation\Maps\Google( $this );
 			}
-			else if ( Settings::i()->mapbox and Settings::i()->mapbox_api_key)
+			else if ( \IPS\Settings::i()->mapbox and \IPS\Settings::i()->mapbox_api_key)
 			{
-				$this->map = new Mapbox( $this );
+				$this->map = new \IPS\GeoLocation\Maps\Mapbox( $this );
 			}
 			else
 			{
-				throw new BadMethodCallException;
+				throw new \BadMethodCallException;
 			}
 		}
 
@@ -897,15 +828,15 @@ class GeoLocation
 	/**
 	 * Return value to use in template
 	 *
-	 * @param string $data	Data to parse
+	 * @param	string	$data	Data to parse
 	 * @return	string
 	 */
-	public static function parseForOutput( string $data ): string
+	public static function parseForOutput( $data )
 	{
 		$address	= json_decode( $data, TRUE );
 		$mapper		= new static;
 
-		if ( is_array( $address ) )
+		if ( \is_array( $address ) )
 		{
 			foreach( $address as $k => $v )
 			{
@@ -915,21 +846,21 @@ class GeoLocation
 
 		return (string) $mapper;
 	}
-
+	
 	/**
 	 * Get output for API
 	 *
-	 * @param Member|NULL $authorizedMember The member making the API request or NULL for API Key / client_credentials
-	 * @return GeoLocation|array
-	 * @apiresponse		float			lat				Latitude
-	 * @apiresponse		float			long			Longitude
-	 * @apiresponse 	[string]		addressLines	Lines of the street address
-	 * @apiresponse		string			city			City
-	 * @apiresponse		string			region			State/Region
-	 * @apiresponse		string			country			2-letter country code
-	 * @apiresponse		string			postalCode		ZIP/Postal Code
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @return	array
+	 * @apiresponse	float		lat				Latitude
+	 * @apiresponse	float		long			Longitude
+	 * @apiresponse	[string]	addressLines	Lines of the street address
+	 * @apiresponse	string		city			City
+	 * @apiresponse	string		region			State/Region
+	 * @apiresponse	string		country			2-letter country code
+	 * @apiresponse	string		postalCode		ZIP/Postal Code
 	 */
-	public function apiOutput( ?Member $authorizedMember = NULL ): GeoLocation|array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		$returnObject = clone $this;
 		$returnObject->addressLines = array_values( $returnObject->addressLines );
@@ -942,8 +873,8 @@ class GeoLocation
 	 *
 	 * @return	bool
 	 */
-	public static function enabled(): bool
+	public static function enabled()
 	{
-		return ( ( Settings::i()->googlemaps and Settings::i()->google_maps_api_key ) || ( Settings::i()->mapbox and Settings::i()->mapbox_api_key ) );
+		return ( ( \IPS\Settings::i()->googlemaps and \IPS\Settings::i()->google_maps_api_key ) || ( \IPS\Settings::i()->mapbox and \IPS\Settings::i()->mapbox_api_key ) );
 	}
 }

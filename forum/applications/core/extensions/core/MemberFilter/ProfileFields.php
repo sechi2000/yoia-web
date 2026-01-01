@@ -12,56 +12,39 @@
 namespace IPS\core\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\ProfileFields\Field;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\DateRange;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Member;
-use IPS\Theme;
-use LogicException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member Filter Extension
  */
-class ProfileFields extends MemberFilterAbstract
+class _ProfileFields
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param	string	$area	Area to check (bulkmail, group_promotions, automatic_moderation, passwordreset)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'bulkmail', 'group_promotions' ) );
+		return \in_array( $area, array( 'bulkmail', 'group_promotions' ) );
 	}
 
 	/** 
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		$return = array();
 
-		foreach ( Field::fieldData() as $group => $fields )
+		foreach ( \IPS\core\ProfileFields\Field::fieldData() as $group => $fields )
 		{
 			foreach ( $fields as $id => $field )
 			{
@@ -78,20 +61,20 @@ class ProfileFields extends MemberFilterAbstract
 					case 'IPS\Helpers\Form\Email':
 					case 'IPS\Helpers\Form\TextArea':
 					case 'IPS\Helpers\Form\Url':
-						$helper = new Text( $langKey, ( isset( $criteria[ $langKey ] ) ) ? $criteria[ $langKey ] : NULL, FALSE );
+						$helper = new \IPS\Helpers\Form\Text( $langKey, ( isset( $criteria[ $langKey ] ) ) ? $criteria[ $langKey ] : NULL, FALSE );
 						break;
 					case 'IPS\Helpers\Form\Date':
-						$helper = new DateRange( $langKey, ( isset( $criteria[ $langKey ] ) ) ? $criteria[ $langKey ] : NULL, FALSE );
+						$helper = new \IPS\Helpers\Form\DateRange( $langKey, ( isset( $criteria[ $langKey ] ) ) ? $criteria[ $langKey ] : NULL, FALSE );
 						break;
 					case 'IPS\Helpers\Form\Number':
-						$helper = new Custom( $langKey, ( isset( $criteria[ $langKey ] ) ) ? $criteria[ $langKey ] : NULL, FALSE, array(
+						$helper = new \IPS\Helpers\Form\Custom( $langKey, ( isset( $criteria[ $langKey ] ) ) ? $criteria[ $langKey ] : NULL, FALSE, array(
 							'getHtml'	=> function( $element )
 							{
-								return Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", ( is_array( $element->value ) AND isset( $element->value[0] ) ) ? $element->value[0] : NULL, $element->required, array(
-									'any'	=> Member::loggedIn()->language()->addToStack('any'),
-									'gt'	=> Member::loggedIn()->language()->addToStack('gt'),
-									'lt'	=> Member::loggedIn()->language()->addToStack('lt'),
-									'eq'	=> Member::loggedIn()->language()->addToStack('exactly'),
+								return \IPS\Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", ( \is_array( $element->value ) AND isset( $element->value[0] ) ) ? $element->value[0] : NULL, $element->required, array(
+									'any'	=> \IPS\Member::loggedIn()->language()->addToStack('any'),
+									'gt'	=> \IPS\Member::loggedIn()->language()->addToStack('gt'),
+									'lt'	=> \IPS\Member::loggedIn()->language()->addToStack('lt'),
+									'eq'	=> \IPS\Member::loggedIn()->language()->addToStack('exactly'),
 								),
 								FALSE,
 								NULL,
@@ -103,7 +86,7 @@ class ProfileFields extends MemberFilterAbstract
 									'eq'	=> array( $element->name . '-qty' ),
 								) )
 								. ' '
-								. Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( "{$element->name}[1]", ( is_array( $element->value ) AND isset( $element->value[1] ) ) ? $element->value[1] : NULL, $element->required, NULL, FALSE, NULL, NULL, NULL, 0, NULL, FALSE, NULL, array(), array(), array( $element->name . '-qty' ) );
+								. \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( "{$element->name}[1]", ( \is_array( $element->value ) AND isset( $element->value[1] ) ) ? $element->value[1] : NULL, $element->required, NULL, FALSE, NULL, NULL, NULL, 0, NULL, FALSE, NULL, array(), array(), array( $element->name . '-qty' ) );
 							}
 						) );
 						break;
@@ -113,7 +96,7 @@ class ProfileFields extends MemberFilterAbstract
 							1 => 'checked',
 							0 => 'unchecked'
 						);
-						$helper = new Select( $langKey, $criteria[ $langKey ] ?? NULL, FALSE, array( 'options' => $options ) );
+						$helper = new \IPS\Helpers\Form\Select( $langKey, $criteria[ $langKey ] ?? NULL, FALSE, array( 'options' => $options ) );
 						break;
 					case 'IPS\Helpers\Form\YesNo':
 						$options = array(
@@ -121,7 +104,7 @@ class ProfileFields extends MemberFilterAbstract
 							1 => 'yes',
 							0 => 'no'
 						);
-						$helper = new Select( $langKey, $criteria[ $langKey ] ?? NULL, FALSE, array( 'options' => $options ) );
+						$helper = new \IPS\Helpers\Form\Select( $langKey, $criteria[ $langKey ] ?? NULL, FALSE, array( 'options' => $options ) );
 						break;
 					case 'IPS\Helpers\Form\Select':
 					case 'IPS\Helpers\Form\Radio':
@@ -136,7 +119,7 @@ class ProfileFields extends MemberFilterAbstract
 
 						$_options = json_decode( $field['pf_content'], true );
 
-						if( count( $_options ) )
+						if( \count( $_options ) )
 						{
 							foreach ( $_options as $option )
 							{
@@ -144,11 +127,12 @@ class ProfileFields extends MemberFilterAbstract
 							}
 						}
 
-						$helper = new Select( $langKey, ( isset( $criteria[ $langKey ] ) ) ? $criteria[ $langKey ] : NULL, FALSE, array( 'options' => $options, 'multiple' => (bool)$field['pf_multiple'], 'noDefault' => true ) );
+						$helper = new \IPS\Helpers\Form\Select( $langKey, ( isset( $criteria[ $langKey ] ) ) ? $criteria[ $langKey ] : NULL, FALSE, array( 'options' => $options, 'multiple' => ( $field['pf_multiple'] ) ? TRUE : FALSE, 'noDefault' => true ) );
 						break;
+
 					case 'IPS\Helpers\Form\CheckboxSet':
 						$options = json_decode( $field['pf_content'], true );
-						$helper = new Select( $langKey, ( isset( $criteria[$langKey] ) ) ? $criteria[$langKey] : null, false, ['options' => $options, 'multiple' => true, 'noDefault' => true] );
+						$helper = new \IPS\Helpers\Form\Select( $langKey, ( isset( $criteria[ $langKey ] ) ) ? $criteria[ $langKey ] : NULL, FALSE, array( 'options' => $options, 'multiple' => TRUE, 'noDefault' => true ) );
 						break;
 				}
 
@@ -166,14 +150,14 @@ class ProfileFields extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return	array			False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array
+	public function save( $post )
 	{
 		$values = array();
 
-		foreach ( Field::fieldData() as $group => $fields )
+		foreach ( \IPS\core\ProfileFields\Field::fieldData() as $group => $fields )
 		{
 			foreach ( $fields as $id => $field )
 			{
@@ -195,14 +179,14 @@ class ProfileFields extends MemberFilterAbstract
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		$where	= array();
 
-		foreach ( Field::fieldData() as $group => $fields )
+		foreach ( \IPS\core\ProfileFields\Field::fieldData() as $group => $fields )
 		{
 			foreach ( $fields as $id => $field )
 			{
@@ -238,18 +222,18 @@ class ProfileFields extends MemberFilterAbstract
 					case 'IPS\Helpers\Form\Email':
 					case 'IPS\Helpers\Form\TextArea':
 					case 'IPS\Helpers\Form\Url':
-						$where[] = "field_{$id} LIKE '%" . Db::i()->real_escape_string( $data[ $langKey ] ) . "%'";
+						$where[] = "field_{$id} LIKE '%" . \IPS\Db::i()->real_escape_string( $data[ $langKey ] ) . "%'";
 						break;
 					case 'IPS\Helpers\Form\Date':
 						if ( $data[ $langKey ]['start'] )
 						{
-							$data[ $langKey ]['start'] = new DateTime( $data[ $langKey ]['start'] );
+							$data[ $langKey ]['start'] = new \IPS\DateTime( $data[ $langKey ]['start'] );
 
 							$where[] = "field_{$id}>" . $data[ $langKey ]['start']->getTimestamp();
 						}
 						if ( $data[ $langKey ]['end'] )
 						{
-							$data[ $langKey ]['end'] = new DateTime( $data[ $langKey ]['end'] );
+							$data[ $langKey ]['end'] = new \IPS\DateTime( $data[ $langKey ]['end'] );
 
 							$where[] = "field_{$id}<" . $data[ $langKey ]['end']->getTimestamp();
 						}
@@ -275,9 +259,9 @@ class ProfileFields extends MemberFilterAbstract
 					case 'IPS\Helpers\Form\Select':
 					case 'IPS\Helpers\Form\Radio':
 					case 'IPS\Helpers\Form\CheckboxSet':
-						if ( isset( $field['pf_multiple'] ) AND $field['pf_multiple'] )
+						if ( isset( $field['pf_multiple'] ) AND $field['pf_multiple'] == TRUE )
 						{
-							$where[] = Db::i()->findInSet( 'field_' . $id, $data[ $langKey ] );
+							$where[] = \IPS\Db::i()->findInSet( 'field_' . $id, $data[ $langKey ] );
 						}
 						else
 						{
@@ -288,7 +272,7 @@ class ProfileFields extends MemberFilterAbstract
 			}
 		}
 
-		if( !count( $where ) )
+		if( !\count( $where ) )
 		{
 			return NULL;
 		}
@@ -302,11 +286,11 @@ class ProfileFields extends MemberFilterAbstract
 	 * Callback for member retrieval database query
 	 * Can be used to set joins
 	 *
-	 * @param array $data	The array returned from the save() method
-	 * @param	Db\Select	$query	The query
+	 * @param	mixed			$data	The array returned from the save() method
+	 * @param	\IPS\Db\Query	$query	The query
 	 * @return	void
 	 */
-	public function queryCallback( array $data, Db\Select $query ) : void
+	public function queryCallback( $data, &$query )
 	{
 		$query->join( 'core_pfields_content', "core_members.member_id=core_pfields_content.member_id" );
 	}
@@ -315,16 +299,16 @@ class ProfileFields extends MemberFilterAbstract
 	 * Determine if a member matches specified filters
 	 *
 	 * @note	This is only necessary if availableIn() includes group_promotions
-	 * @param	Member	$member		Member object to check
+	 * @param	\IPS\Member	$member		Member object to check
 	 * @param	array 		$filters	Previously defined filters
 	 * @param	object|NULL	$object		Calling class
 	 * @return	bool
 	 */
-	public function matches( Member $member, array $filters, ?object $object=NULL ) : bool
+	public function matches( \IPS\Member $member, $filters, $object=NULL )
 	{
-		$profileFieldData = $member->profileFields( Field::STAFF );
+		$profileFieldData = $member->profileFields( \IPS\core\ProfileFields\Field::STAFF );
 
-		foreach ( Field::fieldData() as $group => $fields )
+		foreach ( \IPS\core\ProfileFields\Field::fieldData() as $group => $fields )
 		{
 			foreach ( $fields as $id => $field )
 			{
@@ -357,11 +341,11 @@ class ProfileFields extends MemberFilterAbstract
 						$end = NULL;
 						if ( $filters[ $langKey ]['start'] )
 						{
-							$start = ( new DateTime( $filters[ $langKey ]['start'] ) )->getTimestamp();
+							$start = ( new \IPS\DateTime( $filters[ $langKey ]['start'] ) )->getTimestamp();
 						}
 						if ( $filters[ $langKey ]['end'] )
 						{
-							$end = ( new DateTime( $filters[ $langKey ]['end'] ) )->getTimestamp();
+							$end = ( new \IPS\DateTime( $filters[ $langKey ]['end'] ) )->getTimestamp();
 						}
 
 						if( ( $start OR $end ) AND !$profileFieldData['core_pfieldgroups_' . $group ][ $langKey ] )
@@ -404,13 +388,13 @@ class ProfileFields extends MemberFilterAbstract
 							return FALSE;
 						}
 
-						if ( isset( $field['pf_multiple'] ) AND $field['pf_multiple'] )
+						if ( isset( $field['pf_multiple'] ) AND $field['pf_multiple'] == TRUE )
 						{
 							$values = explode( ',', $profileFieldData['core_pfieldgroups_' . $group ][ $langKey ] );
 
 							foreach( $filters[ $langKey ] as $_filter )
 							{
-								if( !in_array( $_filter, $values ) )
+								if( !\in_array( $_filter, $values ) )
 								{
 									return FALSE;
 								}

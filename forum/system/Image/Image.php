@@ -11,72 +11,61 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Image\Gd;
-use IPS\Image\Imagemagick;
-use LogicException;
-use function defined;
-use function file_put_contents;
-use function function_exists;
-use function in_array;
-use function strlen;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Image Class
  */
-abstract class Image
+abstract class _Image
 {
 	/**
 	 * @brief	Image Extensions
 	 */
-	public static array $imageExtensions = array( 'gif', 'jpeg', 'jpe', 'jpg', 'png' );
+	public static $imageExtensions = array( 'gif', 'jpeg', 'jpe', 'jpg', 'png' );
 	
 	/**
 	 * @brief	Image Mime Types
 	 */
-	public static array $imageMimes = array( 'image/gif', 'image/jpeg', 'image/pjpeg', 'image/png', 'image/webp', 'image/avif' );
+	public static $imageMimes = array( 'image/gif', 'image/jpeg', 'image/pjpeg', 'image/png', 'image/webp' );
 	
 	/**
 	 * @brief	Allow EXIF processing
 	 */
-	public static bool $exifEnabled = TRUE;
+	public static $exifEnabled = TRUE;
 	
 	/**
 	 * Determine if EXIF extraction is supported
 	 *
 	 * @return	bool
 	 */
-	public static function exifSupported(): bool
+	public static function exifSupported()
 	{
-		return function_exists( 'exif_read_data' ) and static::$exifEnabled;
+		return \function_exists( 'exif_read_data' ) and static::$exifEnabled;
 	}
 	
 	/**
 	 * @brief	Has the image been automatically rotated?
 	 */
-	public bool $hasBeenRotated = FALSE;
+	public $hasBeenRotated = FALSE;
 
 	/**
 	 * Create Object
 	 *
 	 * @param	string	$contents	    Contents
 	 * @param   bool    $checkRotation  Check image to correct rotation
-	 * @return    Imagemagick|Gd|Image
-	 * @throws	InvalidArgumentException
+	 * @return	\IPS\Image
+	 * @throws	\InvalidArgumentException
 	 * @link	https://en.wikipedia.org/wiki/List_of_file_signatures
 	 */
-	public static function create( string $contents, bool $checkRotation=TRUE ): Imagemagick|Image|Gd
+	public static function create( string $contents, bool $checkRotation=TRUE )
 	{
 		/* Work out the type */
 		$imageType = NULL;
+		$isAnimated = FALSE;
 		$signatures = array(
 			'gif'	=> array(
 				'47' . '49' . '46' . '38' . '37' . '61',
@@ -91,18 +80,12 @@ abstract class Image
 		);
 
 		$bytesNeeded = max( array_merge( array_map( 'strlen', array_map( 'hex2bin', array_merge( $signatures['gif'], $signatures['jpeg'], $signatures['png'] ) ) ), array( 12 ) ) );
-		$fileHeader = substr( $contents, 0, $bytesNeeded );
+		$fileHeader = \substr( $contents, 0, $bytesNeeded );
 
 		/* Try webp first since it's special: RIFF, 4 bytes for size, WEBP:  */
-		if ( bin2hex( substr( $fileHeader, 0, 4 ) ) === '52' . '49' . '46' . '46' AND bin2hex( substr( $fileHeader, 8, 4 ) ) === '57' . '45' . '42' . '50' )
+		if ( bin2hex( \substr( $fileHeader, 0, 4 ) ) === '52' . '49' . '46' . '46' AND bin2hex( \substr( $fileHeader, 8, 4 ) ) === '57' . '45' . '42' . '50' )
 		{
 			$imageType = 'webp';
-		}
-
-		/* AVIF has 3 bytes of 00, then another byte that varies, and then ftypavif */
-		if( bin2hex( substr( $fileHeader, 0, 3 ) ) === '00' . '00' . '00' AND bin2hex( substr( $fileHeader, 4, 8 ) ) === '66' . '74' . '79' . '70' . '61' . '76' . '69' . '66' )
-		{
-			$imageType = 'avif';
 		}
 
 		/* If it's not webp, try the rest of the image types */
@@ -112,7 +95,7 @@ abstract class Image
 			{
 				foreach ( $_signatures as $signature )
 				{
-					if ( bin2hex( substr( $fileHeader, 0, strlen( hex2bin( $signature ) ) ) ) === $signature )
+					if ( bin2hex( \substr( $fileHeader, 0, \strlen( hex2bin( $signature ) ) ) ) === $signature )
 					{
 						$imageType = $type;
 						break 2;
@@ -123,22 +106,22 @@ abstract class Image
 
 		if ( $imageType === NULL )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 				
 		/* Create object */
-		if( Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) )
+		if( \IPS\Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) )
 		{
-			$obj = new Imagemagick( $contents );
+			$obj = new Image\Imagemagick( $contents );
 		}
 		else
 		{
-			$obj = new Gd( $contents );
+			$obj = new Image\Gd( $contents );
 		}
 		$obj->type = $imageType;
 		
 		/* Animated? @see https://www.php.net/manual/en/function.imagecreatefromgif.php#102915 */
-		if ( $obj->type === 'gif' and preg_match( '#\x00\x21\xF9\x04.{4}\x00(\x2C|\x21)#s', $contents ) )
+		if ( $obj->type === 'gif' and (boolean) preg_match( '#\x00\x21\xF9\x04.{4}\x00(\x2C|\x21)#s', $contents ) )
 		{
 			$obj->isAnimatedGif = TRUE;
 			$obj->contents = $contents;
@@ -148,44 +131,29 @@ abstract class Image
 		if( static::exifSupported() AND $checkRotation )
 		{
 			$obj->setExifData( $contents );
-
+		
 			/* If the image is misoriented, attempt to automatically reorient */
 			$orientation = $obj->getImageOrientation();
-
-			/* Valid orientation values:
-			1 = 0 degrees: the correct orientation, no adjustment is required.
-			2 = 0 degrees, mirrored: image has been flipped back-to-front.
-			3 = 180 degrees: image is upside down.
-			4 = 180 degrees, mirrored: image has been flipped back-to-front and is upside down.
-			5 = 90 degrees: image has been flipped back-to-front and is on its side.
-			6 = 90 degrees, mirrored: image is on its side.
-			7 = 270 degrees: image has been flipped back-to-front and is on its far side.
-			8 = 270 degrees, mirrored: image is on its far side.*/
-
-			/* Differences in orientation between GD and ImageMagick can cause auto-reorient to not work properly
-			GD rotates counter-clockwise; ImageMagick rotates clockwise */
-
+			
+			/* Differences in orientation between GD and ImageMagick can cause auto-reorient to not work properly */
 			if ( !( $obj instanceof Image\Imagemagick ) )
 			{
 				switch ( $orientation )
 				{
 					case 3:
-					case 4:
 						$obj->rotate( 180 );
 						$obj->hasBeenRotated = TRUE;
-						break;
+					break;
 
-					case 5:
 					case 6:
 						$obj->rotate( -90 );
 						$obj->hasBeenRotated = TRUE;
-						break;
-
-					case 7:
+					break;
+		
 					case 8:
 						$obj->rotate( 90 );
 						$obj->hasBeenRotated = TRUE;
-						break;
+					break;
 				}
 			}
 			else
@@ -193,30 +161,24 @@ abstract class Image
 				switch( $orientation )
 				{
 					case 3:
-					case 4:
 						$obj->rotate( 180 );
 						$obj->hasBeenRotated = TRUE;
-						break;
-
-					case 5:
+					break;
+					
 					case 6:
 						$obj->rotate( 90 );
 						$obj->hasBeenRotated = TRUE;
-						break;
-
-					case 7:
+					break;
+					
 					case 8:
 						$obj->rotate( -90 );
 						$obj->hasBeenRotated = TRUE;
-						break;
+					break;
 				}
 			}
-
-			/* Has the image been flipped? */
-			if( in_array( $orientation, array( 2, 4, 5, 7 ) ) )
-			{
-				$obj->flip();
-			}
+			
+			/* ImageMagick requires orientation be reset when rotated */
+			$obj->setImageOrientation( 1 );
 		}
 		
 		/* Return */
@@ -226,42 +188,42 @@ abstract class Image
 	/**
 	 * @brief	Type ('png', 'jpeg' or 'gif')
 	 */
-	public ?string $type = NULL;
+	public $type;
 	
 	/**
 	 * @brief	Width
 	 */
-	public ?int $width = null;
+	public $width;
 	
 	/**
 	 * @brief	Height
 	 */
-	public ?int $height = null;
+	public $height;
 		
 	/**
 	 * @brief	Is this an animated gif?
 	 */
-	public bool $isAnimatedGif	= FALSE;
+	public $isAnimatedGif	= FALSE;
 	
 	/**
 	 * @brief	Contents of the image file when animated gif
 	 */
-	public ?string $contents			= NULL;
+	public $contents			= NULL;
 
 	/**
 	 * @brief	EXIF data - has to be pulled and stored before GD manipulates image
 	 */
-	protected array $exif				= array();
+	protected $exif				= array();
 	
 	/**
 	 * Resize to maximum
 	 *
-	 * @param int|null $maxWidth		Max Width (in pixels) or NULL
-	 * @param int|null $maxHeight		Max Height (in pixels) or NULL
-	 * @param bool $retainRatio	If TRUE, the image will keep it's current width/height ratio rather than being squashed
+	 * @param	int|NULL		$maxWidth		Max Width (in pixels) or NULL
+	 * @param	int|NULL		$maxHeight		Max Height (in pixels) or NULL
+	 * @param	bool		$retainRatio	If TRUE, the image will keep it's current width/height ratio rather than being squashed
 	 * @return	bool		Returns TRUE if it actually resized, or FALSE if it wasn't necessary
 	 */
-	public function resizeToMax(int $maxWidth=NULL, int $maxHeight=NULL, bool $retainRatio=TRUE ): bool
+	public function resizeToMax( $maxWidth=NULL, $maxHeight=NULL, $retainRatio=TRUE )
 	{
 		/* If the image is smaller than max we can skip */
 		if( ( $maxWidth == NULL or $this->width < $maxWidth ) and ( $maxHeight == NULL or $this->height < $maxHeight ) )
@@ -301,10 +263,10 @@ abstract class Image
 	/**
 	 * Add Watermark
 	 *
-	 * @param Image $watermark	The watermark
+	 * @param	\IPS\Image	$watermark	The watermark
 	 * @return	void
 	 */
-	public function watermark( Image $watermark ) : void
+	public function watermark( \IPS\Image $watermark )
 	{
 		/* If it's too big, resize the watermark */
 		$watermark->resizeToMax( $this->width, $this->height );
@@ -317,16 +279,16 @@ abstract class Image
 	 * Parse file object to extract EXIF data
 	 *
 	 * @return	array
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function parseExif(): array
+	public function parseExif()
 	{
 		if( !static::exifSupported() )
 		{
-			throw new LogicException( 'NO_EXIF' );
+			throw new \LogicException( 'NO_EXIF' );
 		}
 
-		if( !in_array( $this->type, array( 'jpeg', 'jpg', 'jpe' ) ) )
+		if( !\in_array( $this->type, array( 'jpeg', 'jpg', 'jpe' ) ) )
 		{
 			return array();
 		}
@@ -354,7 +316,7 @@ abstract class Image
 	 *
 	 * @return	array
 	 */
-	public function getExifData(): array
+	public function getExifData()
 	{
 		return $this->exif;
 	}
@@ -362,19 +324,19 @@ abstract class Image
 	/**
 	 * Get EXIF data, if possible
 	 *
-	 * @param string $contents	Image contents
+	 * @param	string	$contents	Image contents
 	 * @return	void
 	 */
-	public function setExifData( string $contents ) : void
+	public function setExifData( $contents )
 	{
-		if( !in_array( $this->type, array( 'jpeg', 'jpg', 'jpe' ) ) )
+		if( !\in_array( $this->type, array( 'jpeg', 'jpg', 'jpe' ) ) )
 		{
 			return;
 		}
 
 		/* Exif requires a file on disk, so write it temporarily */
-		$temporary	= tempnam( TEMP_DIRECTORY, 'exif' );
-		file_put_contents( $temporary, $contents );
+		$temporary	= tempnam( \IPS\TEMP_DIRECTORY, 'exif' );
+		\file_put_contents( $temporary, $contents );
 
 		$result	= @exif_read_data( $temporary, NULL, TRUE );
 
@@ -390,32 +352,32 @@ abstract class Image
 	/**
 	 * Create a new blank canvas image
 	 *
-	 * @param int $width	Width
-	 * @param int $height	Height
-	 * @param array $rgb	Color to use for bg
-	 * @return    Image
+	 * @param	int		$width	Width
+	 * @param	int		$height	Height
+	 * @param	array 	$rgb	Color to use for bg
+	 * @return	\IPS\Image
 	 */
-	public static function newImageCanvas( int $width, int $height, array $rgb ): Image
+	public static function newImageCanvas( $width, $height, $rgb )
 	{
-		if( Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) )
+		if( \IPS\Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) )
 		{
-			return Imagemagick::newImageCanvas( $width, $height, $rgb );
+			return Image\Imagemagick::newImageCanvas( $width, $height, $rgb );
 		}
 		else
 		{
-			return Gd::newImageCanvas( $width, $height, $rgb );
+			return Image\Gd::newImageCanvas( $width, $height, $rgb );
 		}
 	}
 
 	/**
 	 * Write text on our image
 	 *
-	 * @param string $text	Text
-	 * @param string $font	Path to font to use
-	 * @param int $size	Size of text
+	 * @param	string	$text	Text
+	 * @param	string	$font	Path to font to use
+	 * @param	int		$size	Size of text
 	 * @return	void
 	 */
-	abstract public function write( string $text, string $font, int $size ) : void;
+	abstract public function write( $text, $font, $size );
 
 	/**
 	 * Get Contents
@@ -427,91 +389,74 @@ abstract class Image
 	/**
 	 * Resize
 	 *
-	 * @param int $width			Width (in pixels)
-	 * @param int $height			Height (in pixels)
+	 * @param	int		$width			Width (in pixels)
+	 * @param	int		$height			Height (in pixels)
 	 * @return	void
 	 */
-	abstract public function resize( int $width, int $height ) : void;
+	abstract public function resize( $width, $height );
 
 	/**
 	 * Crop to a given width and height (will attempt to downsize first)
 	 *
-	 * @param int $width			Width (in pixels)
-	 * @param int $height			Height (in pixels)
+	 * @param	int		$width			Width (in pixels)
+	 * @param	int		$height			Height (in pixels)
 	 * @return	void
 	 */
-	abstract public function crop( int $width, int $height ) : void;
+	abstract public function crop( $width, $height );
 	
 	/**
 	 * Crop at specific points
 	 *
-	 * @param int $point1X		x-point for top-left corner
-	 * @param int $point1Y		y-point for top-left corner
-	 * @param int $point2X		x-point for bottom-right corner
-	 * @param int $point2Y		y-point for bottom-right corner
+	 * @param	int		$point1X		x-point for top-left corner
+	 * @param	int		$point1Y		y-point for top-left corner
+	 * @param	int		$point2X		x-point for bottom-right corner
+	 * @param	int		$point2Y		y-point for bottom-right corner
 	 * @return	void
 	 */
-	abstract public function cropToPoints( int $point1X, int $point1Y, int $point2X, int $point2Y ) : void;
+	abstract public function cropToPoints( $point1X, $point1Y, $point2X, $point2Y );
 	
 	/**
 	 * Impose image
 	 *
-	 * @param Image $image	Image to impose
-	 * @param int $x		Location to impose to, x axis
-	 * @param int $y		Location to impose to, y axis
+	 * @param	\IPS\Image	$image	Image to impose
+	 * @param	int			$x		Location to impose to, x axis
+	 * @param	int			$y		Location to impose to, y axis
 	 * @return	void
 	 */
-	abstract public function impose( Image $image, int $x=0, int $y=0 ) : void;
+	abstract public function impose( $image, $x=0, $y=0 );
 
 	/**
 	 * Rotate image
 	 *
-	 * @param int $angle	Angle of rotation
+	 * @param	int		$angle	Angle of rotation
 	 * @return	void
 	 */
-	abstract public function rotate( int $angle ) : void;
-
-	/**
-	 * @return void
-	 */
-	abstract public function flip():void;
+	abstract public function rotate( $angle );
 	
 	/**
 	 * Get Image Orientation
 	 *
 	 * @return	int|NULL
 	 */
-	public function getImageOrientation(): ?int
-	{
-		if ( static::exifSupported() )
-		{
-			$exif = $this->parseExif();
-
-			if ( isset( $exif['IFD0.Orientation'] ) )
-			{
-				return (int) $exif['IFD0.Orientation'];
-			}
-		}
-		return null;
-	}
+	abstract public function getImageOrientation();
 	
 	/**
 	 * Set Image Orientation
 	 *
-	 * @param int $orientation The orientation
+	 * @param	int		$orientation The orientation
 	 * @return	void
 	 */
-	abstract public function setImageOrientation( int $orientation ) : void;
+	abstract public function setImageOrientation( $orientation );
 
 	/**
 	 * Can we write text reliably on an image?
 	 *
 	 * @return	bool
 	 */
-	public static function canWriteText(): bool
+	public static function canWriteText()
 	{
 		/* Create object */
-		if( Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) )
+		if( \IPS\Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) )
 		{
 			return Image\Imagemagick::canWriteText();
 		}
@@ -526,9 +471,9 @@ abstract class Image
 	 *
 	 * @return	array
 	 */
-	public static function supportedExtensions(): array
+	public static function supportedExtensions()
 	{
-		if( Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) )
+		if( \IPS\Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) )
 		{
 			return Image\Imagemagick::supportedExtensions();
 		}
@@ -543,7 +488,7 @@ abstract class Image
 	 *
 	 * @return bool
 	 */
-	public function isSquare(): bool
+	public function isSquare() : bool
 	{
 		return $this->width === $this->height;
 	}

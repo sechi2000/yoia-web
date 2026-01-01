@@ -11,20 +11,17 @@
 
 namespace IPS\{app}\extensions\core\MemberHistory;
 
-use IPS\Extensions\MemberHistoryAbstract;
-use function defined;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member History: {class}
  */
-class {class} extends MemberHistoryAbstract
+class _{class}
 {
 	/**
 	 * Return the valid member history log types
@@ -43,7 +40,7 @@ class {class} extends MemberHistoryAbstract
 	 * @param	array		$row		entire log row
 	 * @return	string
 	 */
-	public function parseLogType( string $value, array $row ): string
+	public function parseLogType( $value, $row ): string
 	{
 		return $value;
 	}
@@ -55,7 +52,7 @@ class {class} extends MemberHistoryAbstract
 	 * @param	array		$row		entire log row
 	 * @return	string
 	 */
-	public function parseLogData( string $value, array $row ): string
+	public function parseLogData( $value, $row ): string
 	{
 		return $value;
 	}

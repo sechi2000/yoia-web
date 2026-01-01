@@ -11,44 +11,38 @@
 namespace IPS\core\extensions\core\EditorLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Content;
-use IPS\core\ProfileFields\Field;
-use IPS\Db;
-use IPS\Extensions\EditorLocationsAbstract;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Text\Parser;
-use LogicException;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: CustomField
  */
-class CustomField extends EditorLocationsAbstract
+class _CustomField
 {
+	/**
+	 * Can we use HTML in this editor?
+	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
+	 */
+	public function canUseHtml( $member )
+	{
+		return NULL;
+	}
+
 	/**
 	 * Can we use attachments in this editor?
 	 *
-	 * @param	Member	$member	The member
-	 * @param	Editor $field The editor instance
+	 * @param	\IPS\Member	$member	The member
+	 * @param	\IPS\Helpers\Form\Editor $editor The editor instance
 	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
 	 */
-	public function canAttach( Member $member, Editor $field ): ?bool
+	public function canAttach( $member, $editor )
 	{
-		if( !$field->options['allowAttachments'] )
+		if( !$editor->options['allowAttachments'] )
 		{
 			return FALSE;
 		}
@@ -59,7 +53,7 @@ class CustomField extends EditorLocationsAbstract
 	/**
 	 * Permission check for attachments
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	int|null	$id1		Primary ID
 	 * @param	int|null	$id2		Secondary ID
 	 * @param	string|null	$id3		Arbitrary data
@@ -67,15 +61,15 @@ class CustomField extends EditorLocationsAbstract
 	 * @param	bool		$viewOnly	If true, just check if the user can see the attachment rather than download it
 	 * @return	bool
 	 */
-	public function attachmentPermissionCheck( Member $member, ?int $id1, ?int $id2, ?string $id3, array $attachment, bool $viewOnly=FALSE ): bool
+	public function attachmentPermissionCheck( $member, $id1, $id2, $id3, $attachment, $viewOnly=FALSE )
 	{
 		$staff = ( $member->isAdmin() OR $member->modPermissions() );
 
 		try
 		{
-			$customField = Field::loadAndCheckPerms( $id2 );
+			$customField = \IPS\core\ProfileFields\Field::loadAndCheckPerms( $id2 );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}
@@ -90,10 +84,10 @@ class CustomField extends EditorLocationsAbstract
 		{
 			case 'all':
 				return TRUE;
-
+				break;
 			default:
-				return ( $member->member_id === Member::load( $id1 )->member_id );
-
+				return ( $member->member_id === \IPS\Member::load( $id1 )->member_id );
+				break;
 		}
 	}
 	
@@ -103,12 +97,24 @@ class CustomField extends EditorLocationsAbstract
 	 * @param	int|null	$id1	Primary ID
 	 * @param	int|null	$id2	Secondary ID
 	 * @param	string|null	$id3	Arbitrary data
-	 * @return    Content|Member|Model|Url|null
-	 * @throws	LogicException
+	 * @return	\IPS\Http\Url|\IPS\Content|\IPS\Node\Model
+	 * @throws	\LogicException
 	 */
-	public function attachmentLookup( int $id1=NULL, int $id2=NULL, string $id3=NULL ): Model|Content|Url|Member|null
+	public function attachmentLookup( $id1, $id2, $id3 )
 	{
-		return Member::load( $id1 );
+		return \IPS\Member::load( $id1 );
+	}
+
+	/**
+	 * Rebuild attachment images in non-content item areas
+	 *
+	 * @param	int|null	$offset	Offset to start from
+	 * @param	int|null	$max	Maximum to parse
+	 * @return	int			Number completed
+	 */
+	public function rebuildAttachmentImages( $offset, $max )
+	{
+		return $this->performRebuild( $offset, $max, array( 'IPS\Text\Parser', 'rebuildAttachmentUrls' ) );
 	}
 
 	/**
@@ -119,10 +125,15 @@ class CustomField extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildContent( ?int $offset, ?int $max ): int
+	public function rebuildContent( $offset, $max )
 	{
 		return $this->performRebuild( $offset, $max, array( 'IPS\Text\LegacyParser', 'parseStatic' ) );
 	}
+
+	/**
+	 * @brief	Use the cached image URL instead of the original URL
+	 */
+	protected $proxyUrl	= FALSE;
 
 	/**
 	 * Rebuild content to add or remove image proxy
@@ -133,25 +144,31 @@ class CustomField extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildImageProxy( ?int $offset, ?int $max, bool $proxyUrl = FALSE ): int
+	public function rebuildImageProxy( $offset, $max, $proxyUrl = FALSE )
 	{
-		$callback = function( $value ) use ( $proxyUrl ) {
-			return Parser::removeImageProxy( $value, $proxyUrl );
-		};
-		return $this->performRebuild( $offset, $max, $callback );
+		$this->proxyUrl = $proxyUrl;
+		return $this->performRebuild( $offset, $max, 'parseImageProxy' );
 	}
+
+	/**
+	 * @brief	Store lazy loading status ( true = enabled )
+	 */
+	protected $_lazyLoadStatus = null;
 
 	/**
 	 * Rebuild content to add or remove lazy loading
 	 *
 	 * @param	int|null		$offset		Offset to start from
 	 * @param	int|null		$max		Maximum to parse
+	 * @param	bool			$status		Enable/Disable lazy loading
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildLazyLoad( ?int $offset, ?int $max ): int
+	public function rebuildLazyLoad( $offset, $max, $status=TRUE )
 	{
-		return $this->performRebuild( $offset, $max, [ 'IPS\Text\Parser', 'parseLazyLoad' ] );
+		$this->_lazyLoadStatus = $status;
+
+		return $this->performRebuild( $offset, $max, 'parseLazyLoad' );
 	}
 
 	/**
@@ -162,7 +179,7 @@ class CustomField extends EditorLocationsAbstract
 	 * @param	callable	$callback	Method to call to rebuild content
 	 * @return	int			Number completed
 	 */
-	protected function performRebuild( ?int $offset, ?int $max, callable $callback ): int
+	protected function performRebuild( $offset, $max, $callback )
 	{
 		$did	= 0;
 
@@ -170,19 +187,19 @@ class CustomField extends EditorLocationsAbstract
 		$editorFields	= array();
 		$whereClause	= array();
 
-		foreach( Db::i()->select( '*', 'core_pfields_data', "pf_type='Editor'" ) as $field )
+		foreach( \IPS\Db::i()->select( '*', 'core_pfields_data', "pf_type='Editor'" ) as $field )
 		{
 			$editorFields[]	= 'field_' . $field['pf_id'];
 			$whereClause[]	= '(field_' . $field['pf_id'] . ' IS NOT NULL AND field_' . $field['pf_id'] . " != '')";
 		}
 
-		if( !count( $editorFields ) )
+		if( !\count( $editorFields ) )
 		{
 			return $did;
 		}
 
 		/* Now update the content */
-		foreach( Db::i()->select( '*', 'core_pfields_content', implode( " OR ", $whereClause ), 'member_id ASC', array( $offset, $max ) ) as $member )
+		foreach( \IPS\Db::i()->select( '*', 'core_pfields_content', implode( " OR ", $whereClause ), 'member_id ASC', array( $offset, $max ) ) as $member )
 		{
 			$did++;
 
@@ -191,21 +208,28 @@ class CustomField extends EditorLocationsAbstract
 
 			foreach( $editorFields as $fieldId )
 			{
-				$rebuilt = FALSE;
 				try
 				{
-					if( is_array( $callback ) and $callback[1] == 'parseStatic' )
+					if( $callback == 'parseImageProxy' )
 					{
-						$rebuilt = $callback( $member[ $fieldId ], Member::load( $member['member_id'] ), FALSE, 'core_ProfileField', $member['member_id'] );
+						$rebuilt = \IPS\Text\Parser::removeImageProxy( $member[ $fieldId ], $this->proxyUrl );
 					}
-					elseif( !empty( $member[ $fieldId ] ) )
+					elseif( $callback == 'parseLazyLoad' )
 					{
-						$rebuilt = $callback( $member[ $fieldId ] );
+						$rebuilt = \IPS\Text\Parser::parseLazyLoad( $member[ $fieldId ], $this->_lazyLoadStatus );
+					}
+					elseif( $callback[1] == 'rebuildAttachmentUrls' )
+					{
+						$rebuilt = \IPS\Text\Parser::rebuildAttachmentUrls( $member[ $fieldId ], \IPS\Member::load( $member['member_id'] ) );
+					}
+					elseif( $callback[1] == 'parseStatic' )
+					{
+						$rebuilt = \IPS\Text\LegacyParser::parseStatic( $member[ $fieldId ], \IPS\Member::load( $member['member_id'] ), FALSE, 'core_ProfileField', $member['member_id'] );
 					}
 				}
-				catch( InvalidArgumentException $e )
+				catch( \InvalidArgumentException $e )
 				{
-					if( is_array( $callback ) and $callback[1] == 'parseStatic' AND $e->getcode() == 103014 )
+					if( $callback[1] == 'parseStatic' AND $e->getcode() == 103014 )
 					{
 						$rebuilt	= preg_replace( "#\[/?([^\]]+?)\]#", '', $member[ $fieldId ] );
 					}
@@ -221,9 +245,9 @@ class CustomField extends EditorLocationsAbstract
 				}
 			}
 
-			if( count( $toUpdate ) )
+			if( \count( $toUpdate ) )
 			{
-				Db::i()->update( 'core_pfields_content', $toUpdate, array( 'member_id=?', $member['member_id'] ) );
+				\IPS\Db::i()->update( 'core_pfields_content', $toUpdate, array( 'member_id=?', $member['member_id'] ) );
 			}
 		}
 
@@ -235,21 +259,21 @@ class CustomField extends EditorLocationsAbstract
 	 *
 	 * @return	int			Total Count
 	 */
-	public function contentCount(): int
+	public function contentCount()
 	{
 		/* Get editor fields */
 		$editorFields	= array();
 
-		foreach( Db::i()->select( '*', 'core_pfields_data', "pf_type='Editor'" ) as $field )
+		foreach( \IPS\Db::i()->select( '*', 'core_pfields_data', "pf_type='Editor'" ) as $field )
 		{
 			$editorFields[]	= 'field_' . $field['pf_id'];
 		}
 
-		if( !count( $editorFields ) )
+		if( !\count( $editorFields ) )
 		{
 			return 0;
 		}
 
-		return Db::i()->select( 'COUNT(*) as count', 'core_pfields_content', implode( " IS NOT NULL OR ", $editorFields ) . " IS NOT NULL" )->first();
+		return \IPS\Db::i()->select( 'COUNT(*) as count', 'core_pfields_content', implode( " IS NOT NULL OR ", $editorFields ) . " IS NOT NULL" )->first();
 	}
 }

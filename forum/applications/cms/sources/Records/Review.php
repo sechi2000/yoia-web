@@ -12,79 +12,58 @@
 namespace IPS\cms\Records;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use IPS\Content\EditHistory;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Hideable;
-use IPS\Content\Item;
-use IPS\Content\Reactable;
-use IPS\Content\Reportable;
-use IPS\Content\Review as ContentReview;
-use IPS\Content\Shareable;
-use IPS\DateTime;
-use IPS\Http\Url;
-use IPS\Http\Url\Exception;
-use IPS\Member;
-use IPS\Output;
-use IPS\Patterns\ActiveRecord;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Post Model
  */
-class Review extends ContentReview implements Embeddable,
-	Filter
+class _Review extends \IPS\Content\Review implements \IPS\Content\EditHistory, \IPS\Content\Hideable, \IPS\Content\Shareable, \IPS\Content\Searchable, \IPS\Content\Embeddable
 {
-	use Reactable, Reportable, Shareable, EditHistory, Hideable;
+	use \IPS\Content\Reactable, \IPS\Content\Reportable;
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 		
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[Content\Comment]	Item Class
 	 */
-	public static ?string $itemClass = NULL;
+	public static $itemClass = NULL;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'cms_database_reviews';
+	public static $databaseTable = 'cms_database_reviews';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'review_';
+	public static $databasePrefix = 'review_';
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'cms';
+	public static $application = 'cms';
 
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'content_review';
+	public static $title = 'content_review';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'item'				=> 'item',
 		'author'			=> 'author',
 		'author_name'		=> 'author_name',
@@ -105,28 +84,30 @@ class Review extends ContentReview implements Embeddable,
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'star';
+	public static $icon = 'comment';
 	
 	/**
 	 * @brief	[Content\Comment]	Comment Template
 	 */
-	public static array $commentTemplate = array( array( 'display', 'cms', 'database' ), 'reviewContainer' );
+	public static $commentTemplate = array( array( 'display', 'cms', 'database' ), 'reviewContainer' );
 	
 	/**
 	 * @brief	Database ID
 	 */
-	public static ?int $customDatabaseId = NULL;
+	public static $customDatabaseId = NULL;
 
 	/**
 	 * Load Record
 	 *
-	 * @param int|string|null $id ID
-	 * @param string|null $idField The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
-	 * @param mixed $extraWhereClause Additional where clause(s) (see \IPS\Db::build for details) - if used will cause multiton store to be skipped and a query always ran
-	 * @return ActiveRecord|Review
-	 * @see        \IPS\Db::build
+	 * @see		\IPS\Db::build
+	 * @param	int|string	$id					ID
+	 * @param	string		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
+	 * @param	mixed		$extraWhereClause	Additional where clause(s) (see \IPS\Db::build for details) - if used will cause multiton store to be skipped and a query always ran
+	 * @return	static
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function load( int|string|null $id, string $idField=NULL, mixed $extraWhereClause=NULL ): ActiveRecord|static
+	public static function load( $id, $idField=NULL, $extraWhereClause=NULL )
 	{
 		if( $extraWhereClause === NULL )
 		{
@@ -143,33 +124,43 @@ class Review extends ContentReview implements Embeddable,
 	/**
 	 * Create first comment (created with content item)
 	 *
-	 * @param Item $item The content item just created
-	 * @param string $comment The comment
-	 * @param bool $first Is the first comment?
-	 * @param string|null $guestName If author is a guest, the name to use
-	 * @param bool|null $incrementPostCount
-	 * @param Member|null $member The author of this comment. If NULL, uses currently logged in member.
-	 * @param DateTime|null $time The time
-	 * @param string|null $ipAddress The IP address or NULL to detect automatically
-	 * @param int|null $hiddenStatus NULL to set automatically or override: 0 = unhidden; 1 = hidden, pending moderator approval; -1 = hidden (as if hidden by a moderator)
-	 * @param int|null $anonymous NULL for no value, 0 or 1 for a value (0=no, 1=yes)
-	 * @return Review|null
+	 * @param	\IPS\Content\Item		$item			The content item just created
+	 * @param	string					$comment		The comment
+	 * @param	bool					$first			Is the first comment?
+	 * @param	int						$rating			The rating (1-5)
+	 * @param	string					$guestName		If author is a guest, the name to use
+	 * @param	\IPS\Member|NULL		$member			The author of this comment. If NULL, uses currently logged in member.
+	 * @param	\IPS\DateTime|NULL		$time			The time
+	 * @param	string|NULL				$ipAddress		The IP address or NULL to detect automatically
+	 * @param	int|NULL				$hiddenStatus		NULL to set automatically or override: 0 = unhidden; 1 = hidden, pending moderator approval; -1 = hidden (as if hidden by a moderator)
+	 * @param	int|NULL				$anonymous			NULL for no value, 0 or 1 for a value (0=no, 1=yes)
+	 * @return	static
+	 * @throws	\InvalidArgumentException
 	 */
-	public static function create( Item $item, string $comment, bool $first=false, string|null $guestName=null, bool|null $incrementPostCount= null, Member|null $member= null, DateTime|null $time= null, string|null $ipAddress= null, int|null $hiddenStatus= null, int|null $anonymous= null ): static|null
+	public static function create( $item, $comment, $first=FALSE, $rating=NULL, $guestName=NULL, $member=NULL, \IPS\DateTime $time=NULL, $ipAddress=NULL, $hiddenStatus=NULL, $anonymous=NULL )
 	{
-		$review = parent::create( $item, $comment, $first, $guestName, $member, $time, $ipAddress, $hiddenStatus, $anonymous );
+		$review = parent::create( $item, $comment, $first, $rating, $guestName, $member, $time, $ipAddress, $hiddenStatus, $anonymous );
 
 		$review->database_id = static::$customDatabaseId;
 		$review->save();
 
 		/* Have to do these AFTER database id is set */
-		/* @var array $databaseColumnMap */
 		$ratingField = $item::$databaseColumnMap['rating'];
 
-		$review->item()->$ratingField = (int) $review->item()->averageReviewRating() ?: 0;
+		$review->item()->$ratingField = $review->item()->averageReviewRating() ?: 0;
 		$review->item()->save();
 		
 		return $review;
+	}
+
+	/**
+	 * WHERE clause for getting items for ACP overview statistics
+	 *
+	 * @return	array
+	 */
+	public static function overviewStatisticsWhere()
+	{
+		return [ static::commentWhere() ];
 	}
 
 	/**
@@ -178,7 +169,7 @@ class Review extends ContentReview implements Embeddable,
 	 * @param   int     $id     Content item to delete from
 	 * @return array
 	 */
-	public static function deleteWhereSql( int $id ) : array
+	public static function deleteWhereSql( $id )
 	{
 		return array( array( static::$databasePrefix . static::$databaseColumnMap['item'] . '=?', $id ), array( static::$databasePrefix . 'database_id=?', static::$customDatabaseId ) );
 	}
@@ -188,7 +179,7 @@ class Review extends ContentReview implements Embeddable,
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		$template = static::$commentTemplate[1];
 		static::$commentTemplate[0][0] = $this->item()->database()->template_display;
@@ -200,11 +191,11 @@ class Review extends ContentReview implements Embeddable,
 	 * Get URL for doing stuff
 	 *
 	 * @param	string|NULL		$action		Action
-	 * @return	Url
-	 * @throws	BadMethodCallException
-	 * @throws	Exception
+	 * @return	\IPS\Http\Url
+	 * @throws	\BadMethodCallException
+	 * @throws	\IPS\Http\Url\Exception
 	 */
-	public function url( ?string $action='find' ): Url
+	public function url( $action='find' )
 	{
 		$url = parent::url( $action );
 
@@ -221,7 +212,7 @@ class Review extends ContentReview implements Embeddable,
 	 *
 	 * @return	array
 	 */
-	public function attachmentIds(): array
+	public function attachmentIds()
 	{
 		$item = $this->item();
 		$idColumn = $item::$databaseColumnId;
@@ -234,7 +225,7 @@ class Review extends ContentReview implements Embeddable,
 	 *
 	 * @return	array|NULL
 	 */
-	public static function commentWhere(): ?array
+	public static function commentWhere()
 	{
 		return array( 'review_database_id=?', static::$customDatabaseId );
 	}
@@ -245,7 +236,7 @@ class Review extends ContentReview implements Embeddable,
 	 * @return	string
 	 * @todo This was implemented improperly before - look into upgrade routine to fix
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		$databaseId = static::$customDatabaseId;
 		return "review_id_{$databaseId}";
@@ -257,9 +248,9 @@ class Review extends ContentReview implements Embeddable,
 	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'cms', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'cms' )->embedRecordReview( $this, $this->item(), $this->url()->setQueryString( $params ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'cms', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'cms' )->embedRecordReview( $this, $this->item(), $this->url()->setQueryString( $params ) );
 	}
 }

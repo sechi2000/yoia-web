@@ -12,75 +12,38 @@ namespace IPS\core\modules\admin\moderation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use DomainException;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\GeoLocation;
 use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Matrix;
-use IPS\Helpers\Form\Number;
 use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Stack;
 use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Login;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
 use IPS\Settings;
-use IPS\Theme;
-use UnderflowException;
-use function defined;
-use function in_array;
-use function intval;
-use const IPS\CIC;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_NUMERIC;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Spam Prevention Settings
  */
-class spam extends Controller
+class _spam extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
-
-	/**
-	 * @brief	The current tab
-	 */
-	protected mixed $activeTab;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		/* Get tab content */
-		$this->activeTab = Request::i()->tab ?: 'captcha';
+		$this->activeTab = \IPS\Request::i()->tab ?: 'captcha';
 
-		Dispatcher::i()->checkAcpPermission( 'spam_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'spam_manage' );
 		parent::execute();
 	}
 
@@ -89,16 +52,16 @@ class spam extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Work out output */
-		$methodFunction = '_manage' . IPS::mb_ucfirst( $this->activeTab );
+		$methodFunction = '_manage' . mb_ucfirst( $this->activeTab );
 		$activeTabContents = $this->$methodFunction();
 
 		/* If this is an AJAX request, just return it */
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $activeTabContents;
+			\IPS\Output::i()->output = $activeTabContents;
 			return;
 		}
 
@@ -108,49 +71,49 @@ class spam extends Controller
 		$tabs['flagging']	= 'spamprevention_flagging';
 		$tabs['service']	= 'enhancements__core_SpamMonitoring';
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'qanda_manage' ) and in_array( Login::registrationType(), array( 'normal', 'full' ) ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'qanda_manage' ) )
 		{
 			$tabs['qanda']		= 'qanda_settings';
 		}
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'geolocation' ) and in_array( Login::registrationType(), array( 'normal', 'full' ) ) AND Settings::i()->ipsgeoip )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'geolocation' ) )
 		{
 			$tabs['geolocation']  = 'geolocation_settings';
 		}
 
 		/* Add a button for logs */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'spam_service_log' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'spam_service_log' ) )
 		{
-			Output::i()->sidebar['actions']['errorLog'] = array(
+			\IPS\Output::i()->sidebar['actions']['errorLog'] = array(
 					'title'		=> 'spamlogs',
 					'icon'		=> 'exclamation-triangle',
-					'link'		=> Url::internal( 'app=core&module=moderation&controller=spam&do=serviceLogs' ),
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=serviceLogs' ),
 			);
 		}
 
 		/* Add a button for whitelist */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'spam_whitelist_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'spam_whitelist_manage' ) )
 		{
-			Output::i()->sidebar['actions']['whitelist'] = array(
+			\IPS\Output::i()->sidebar['actions']['whitelist'] = array(
 					'title'		=> 'spam_whitelist',
 					'icon'		=> 'shield',
-					'link'		=> Url::internal( 'app=core&module=moderation&controller=spam&do=whitelist' ),
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=whitelist' ),
 			);
 		}
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'membertools_delete' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'membertools_delete' ) )
 		{
-			Output::i()->sidebar['actions']['delete_guest_content'] = array(
+			\IPS\Output::i()->sidebar['actions']['delete_guest_content'] = array(
 					'title'		=> 'member_delete_guest_content',
-					'icon'		=> 'trash',
-					'link'		=> Url::internal( 'app=core&module=members&controller=members&do=deleteGuestContent' ),
-					'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('member_delete_guest_content') )
+					'icon'		=> 'trash-o',
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=members&controller=members&do=deleteGuestContent' ),
+					'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('member_delete_guest_content') )
 			);
 		}
 
 		/* Display */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('menu__core_moderation_spam');
-		Output::i()->output 	= Theme::i()->getTemplate( 'global' )->tabs( $tabs, $this->activeTab, $activeTabContents, Url::internal( "app=core&module=moderation&controller=spam" ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('menu__core_moderation_spam');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate( 'global' )->tabs( $tabs, $this->activeTab, $activeTabContents, \IPS\Http\Url::internal( "app=core&module=moderation&controller=spam" ) );
 	}
 
 	/**
@@ -173,10 +136,11 @@ class spam extends Controller
 					'hcaptcha' 		=> 'captcha_type_hcaptcha'
 				];
 
-				if( Settings::i()->bot_antispam_type  != 'keycaptcha' )
+				if( \IPS\Settings::i()->bot_antispam_type  != 'keycaptcha' )
 				{
 					unset( $options['keycaptcha'] );
 				}
+
 				return $options;
 
 			case 'toggles':
@@ -188,11 +152,11 @@ class spam extends Controller
 					'keycaptcha'	=> [ 'keycaptcha_privatekey' ],
 					'hcaptcha'		=> [ 'hcaptcha_sitekey', 'hcaptcha_secret' ]
 				];
-				if( Settings::i()->bot_antispam_type  != 'keycaptcha' )
+
+				if( \IPS\Settings::i()->bot_antispam_type  != 'keycaptcha' )
 				{
 					unset( $toggles['keycaptcha'] );
 				}
-
 				return $toggles;
 		}
 
@@ -204,10 +168,10 @@ class spam extends Controller
 	 *
 	 * @return	string	HTML to display
 	 */
-	protected function _manageCaptcha() : string
+	protected function _manageCaptcha()
 	{
 		/* Build Form */
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		static::captchaForm( $form );
 
 		/* Save values */
@@ -215,31 +179,27 @@ class spam extends Controller
 		{
 			$form->saveAsSettings();
 
-			Session::i()->log( 'acplogs__spamprev_settings' );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			\IPS\Session::i()->log( 'acplogs__spamprev_settings' );
 		}
 
 		return $form;
 	}
 
+	/**
+	 * @param \IPS\Helpers\Form $form
+	 * @return void
+	 */
 	public static function captchaForm( Form $form ): void
 	{
 		$form->add( new Radio( 'bot_antispam_type', Settings::i()->bot_antispam_type, TRUE, array(
 			'options'	=> static::getCaptchaOptions( 'options' ),
 			'toggles'	=> static::getCaptchaOptions( 'toggles' ),
 		), NULL, NULL, NULL, 'bot_antispam_type' ) );
-		$form->add( new Text( 'turnstile_site_key', Settings::i()->turnstile_site_key, ( CIC ? false : null ), [], function( $val )
-		{
-			if( empty( $val ) and Request::i()->bot_antispam_type == 'turnstile' and !CIC )
-			{
-				throw new DomainException( 'field_required' );
-			}
-		}, id: 'turnstile_site_key' ) );
-		$form->add( new Text( 'turnstile_secret_key', Settings::i()->turnstile_secret_key, ( CIC ? false : null ), [], function( $val ) {
-			if( empty( $val ) and Request::i()->bot_antispam_type == 'turnstile' and !CIC )
-			{
-				throw new DomainException( 'field_required' );
-			}
-		}, id: 'turnstile_secret_key' ) );
+		$form->add( new Text( 'turnstile_site_key', Settings::i()->turnstile_site_key, id: 'turnstile_site_key' ) );
+		$form->add( new Text( 'turnstile_secret_key', Settings::i()->turnstile_secret_key, id: 'turnstile_secret_key' ) );
 
 		if( \IPS\CIC )
 		{
@@ -248,11 +208,10 @@ class spam extends Controller
 
 		$form->add( new Text( 'recaptcha2_public_key', Settings::i()->recaptcha2_public_key, FALSE, array(), NULL, NULL, NULL, 'recaptcha2_public_key' ) );
 		$form->add( new Text( 'recaptcha2_private_key', Settings::i()->recaptcha2_private_key, FALSE, array(), NULL, NULL, NULL, 'recaptcha2_private_key' ) );
-		if( Settings::i()->bot_antispam_type  == 'keycaptcha' )
+		if( \IPS\Settings::i()->bot_antispam_type  == 'keycaptcha' )
 		{
-			$form->add( new Text( 'keycaptcha_privatekey', Settings::i()->keycaptcha_privatekey, FALSE, array(), NULL, NULL, NULL, 'keycaptcha_privatekey' ) );
+			$form->add( new Text( 'keycaptcha_privatekey', Settings::i()->keycaptcha_privatekey, FALSE, [], NULL, NULL, NULL, 'keycaptcha_privatekey' ) );
 		}
-
 		$form->add( new Text( 'hcaptcha_sitekey', Settings::i()->hcaptcha_sitekey, FALSE, array(), NULL, NULL, NULL, 'hcaptcha_sitekey' ) );
 		$form->add( new Text( 'hcaptcha_secret', Settings::i()->hcaptcha_secret, FALSE, array(), NULL, NULL, NULL, 'hcaptcha_secret' ) );
 
@@ -263,11 +222,11 @@ class spam extends Controller
 	 *
 	 * @return	string	HTML to display
 	 */
-	protected function _manageFlagging() : string
+	protected function _manageFlagging()
 	{
 		/* Build Form */
-		$form = new Form;
-		$form->add( new CheckboxSet( 'spm_option', explode( ',', Settings::i()->spm_option ), FALSE, array(
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'spm_option', explode( ',', \IPS\Settings::i()->spm_option ), FALSE, array(
 			'options' 	=> array( 'disable' => 'spm_option_disable', 'unapprove' => 'spm_option_unapprove', 'delete' => 'spm_option_delete', 'ban' => 'spm_option_ban' ),
 		) ) );
 
@@ -275,7 +234,7 @@ class spam extends Controller
 		if ( $form->values() )
 		{
 			$form->saveAsSettings();
-			Session::i()->log( 'acplogs__spamprev_settings' );
+			\IPS\Session::i()->log( 'acplogs__spamprev_settings' );
 		}
 
 		return $form;
@@ -286,46 +245,46 @@ class spam extends Controller
 	 *
 	 * @return	string	HTML to display
 	 */
-	protected function _manageService() : string
+	protected function _manageService()
 	{
-		$licenseData = IPS::licenseKey();
+		$licenseData = \IPS\IPS::licenseKey();
 
 		/* Build Form */
 		$actions = array( 1 => 'spam_service_act_1', 5 => 'spam_service_act_5', 2 => 'spam_service_act_2', 3 => 'spam_service_act_3', 4 => 'spam_service_act_4' );
-		$days = json_decode( Settings::i()->spam_service_days, TRUE );
+		$days = json_decode( \IPS\Settings::i()->spam_service_days, TRUE );
 
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->addHeader( 'enhancements__core_SpamMonitoring' );
 
 		$disabled = FALSE;
 		if( !$licenseData or !isset( $licenseData['products']['spam'] ) or !$licenseData['products']['spam'] or ( !$licenseData['cloud'] AND strtotime( $licenseData['expires'] ) < time() ) )
 		{
 			$disabled = TRUE;
-			if( !Settings::i()->ipb_reg_number )
+			if( !\IPS\Settings::i()->ipb_reg_number )
 			{
-				Member::loggedIn()->language()->words['spam_service_enabled_desc'] = Member::loggedIn()->language()->addToStack( '__ipbnullforums__nulling_null_alert' ); //Changing error message to custom'
+				\IPS\Member::loggedIn()->language()->words['spam_service_enabled_desc'] = \IPS\Member::loggedIn()->language()->addToStack( '__ipbnullforums__nulling_null_alert' ); //Changing error message to custom
 			}
 			else
 			{
-				Member::loggedIn()->language()->words['spam_service_enabled_desc'] = Member::loggedIn()->language()->addToStack( '__ipbnullforums__nulling_null_alert' ); //Changing error message to custom'
+				\IPS\Member::loggedIn()->language()->words['spam_service_enabled_desc'] = \IPS\Member::loggedIn()->language()->addToStack( '__ipbnullforums__nulling_null_alert' ); //Changing error message to custom
 			}
 		}
 
-		$form->add( new YesNo( 'spam_service_enabled', Settings::i()->spam_service_enabled, FALSE, array( 'disabled' => $disabled, 'togglesOn' => array( 'spam_service_send_to_ips', 'spam_service_action_0', 'spam_service_action_1', 'spam_service_action_2', 'spam_service_action_3', 'spam_service_action_4', 'spam_service_disposable' ) ) ) );
-		$form->add( new YesNo( 'spam_service_send_to_ips', Settings::i()->spam_service_send_to_ips, FALSE, array( 'disabled' => $disabled ), NULL, NULL, NULL, 'spam_service_send_to_ips' ) );
-		$form->add( new Select( 'spam_service_action_1', Settings::i()->spam_service_action_1, FALSE, array( 'disabled' => $disabled, 'options' => $actions, 'toggles' => array( '5' => array( 'spam_service_action_1_num' ) ) ), NULL, NULL, NULL, 'spam_service_action_1' ) );
-		$form->add( new Number( 'spam_service_action_1_num', ( $days[1] ?? -1 ), FALSE, array( 'unlimited' => -1, 'unlimitedLang' => 'spam_service_action_unlimited_days'), NULL, NULL, Member::loggedIn()->language()->addToStack('days'), 'spam_service_action_1_num' ) );
-		$form->add( new Select( 'spam_service_action_2', Settings::i()->spam_service_action_2, FALSE, array( 'disabled' => $disabled, 'options' => $actions, 'toggles' => array( '5' => array( 'spam_service_action_2_num' ) ) ), NULL, NULL, NULL, 'spam_service_action_2' ) );
-		$form->add( new Number( 'spam_service_action_2_num', ( $days[2] ?? -1 ), FALSE, array( 'unlimited' => -1, 'unlimitedLang' => 'spam_service_action_unlimited_days'), NULL, NULL, Member::loggedIn()->language()->addToStack('days'), 'spam_service_action_2_num' ) );
-		$form->add( new Select( 'spam_service_action_3', Settings::i()->spam_service_action_3, FALSE, array( 'disabled' => $disabled, 'options' => $actions, 'toggles' => array( '5' => array( 'spam_service_action_3_num' ) ) ), NULL, NULL, NULL, 'spam_service_action_3' ) );
-		$form->add( new Number( 'spam_service_action_3_num', ( $days[3] ?? -1 ), FALSE, array( 'unlimited' => -1, 'unlimitedLang' => 'spam_service_action_unlimited_days'), NULL, NULL, Member::loggedIn()->language()->addToStack('days'), 'spam_service_action_3_num' ) );
-		$form->add( new Select( 'spam_service_action_4', Settings::i()->spam_service_action_4, FALSE, array( 'disabled' => $disabled, 'options' => $actions, 'toggles' => array( '5' => array( 'spam_service_action_4_num' ) ) ), NULL, NULL, NULL, 'spam_service_action_4' ) );
-		$form->add( new Number( 'spam_service_action_4_num', ( $days[4] ?? -1 ), FALSE, array( 'unlimited' => -1, 'unlimitedLang' => 'spam_service_action_unlimited_days'), NULL, NULL, Member::loggedIn()->language()->addToStack('days'), 'spam_service_action_4_num' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'spam_service_enabled', \IPS\Settings::i()->spam_service_enabled, FALSE, array( 'disabled' => $disabled, 'togglesOn' => array( 'spam_service_send_to_ips', 'spam_service_action_0', 'spam_service_action_1', 'spam_service_action_2', 'spam_service_action_3', 'spam_service_action_4', 'spam_service_disposable' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'spam_service_send_to_ips', \IPS\Settings::i()->spam_service_send_to_ips, FALSE, array( 'disabled' => $disabled ), NULL, NULL, NULL, 'spam_service_send_to_ips' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'spam_service_action_1', \IPS\Settings::i()->spam_service_action_1, FALSE, array( 'disabled' => $disabled, 'options' => $actions, 'toggles' => array( '5' => array( 'spam_service_action_1_num' ) ) ), NULL, NULL, NULL, 'spam_service_action_1' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'spam_service_action_1_num', ( isset( $days[1] ) ? $days[1] : -1 ), FALSE, array( 'unlimited' => -1, 'unlimitedLang' => 'spam_service_action_unlimited_days'), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('days'), 'spam_service_action_1_num' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'spam_service_action_2', \IPS\Settings::i()->spam_service_action_2, FALSE, array( 'disabled' => $disabled, 'options' => $actions, 'toggles' => array( '5' => array( 'spam_service_action_2_num' ) ) ), NULL, NULL, NULL, 'spam_service_action_2' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'spam_service_action_2_num', ( isset( $days[2] ) ? $days[2] : -1 ), FALSE, array( 'unlimited' => -1, 'unlimitedLang' => 'spam_service_action_unlimited_days'), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('days'), 'spam_service_action_2_num' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'spam_service_action_3', \IPS\Settings::i()->spam_service_action_3, FALSE, array( 'disabled' => $disabled, 'options' => $actions, 'toggles' => array( '5' => array( 'spam_service_action_3_num' ) ) ), NULL, NULL, NULL, 'spam_service_action_3' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'spam_service_action_3_num', ( isset( $days[3] ) ? $days[3] : -1 ), FALSE, array( 'unlimited' => -1, 'unlimitedLang' => 'spam_service_action_unlimited_days'), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('days'), 'spam_service_action_3_num' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'spam_service_action_4', \IPS\Settings::i()->spam_service_action_4, FALSE, array( 'disabled' => $disabled, 'options' => $actions, 'toggles' => array( '5' => array( 'spam_service_action_4_num' ) ) ), NULL, NULL, NULL, 'spam_service_action_4' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'spam_service_action_4_num', ( isset( $days[4] ) ? $days[4] : -1 ), FALSE, array( 'unlimited' => -1, 'unlimitedLang' => 'spam_service_action_unlimited_days'), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('days'), 'spam_service_action_4_num' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'spam_service_disposable', \IPS\Settings::i()->spam_service_disposable, FALSE, array( 'disabled' => $disabled, 'options' => $actions, 'toggles' => array( '5' => array( 'spam_service_disposable_num' ) ) ), NULL, NULL, NULL, 'spam_service_disposable' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'spam_service_disposable_num', ( isset( $days['disposable'] ) ? $days['disposable'] : -1 ), FALSE, array( 'unlimited' => -1, 'unlimitedLang' => 'spam_service_action_unlimited_days'), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('days'), 'spam_service_disposable_num' ) );
 
-		$form->add( new Select( 'spam_service_disposable', Settings::i()->spam_service_disposable, FALSE, array( 'disabled' => $disabled, 'options' => $actions, 'toggles' => array( '5' => array( 'spam_service_disposable_num' ) ) ), NULL, NULL, NULL, 'spam_service_disposable' ) );
-		$form->add( new Number( 'spam_service_disposable_num', ( $days['disposable'] ?? -1 ), FALSE, array( 'unlimited' => -1, 'unlimitedLang' => 'spam_service_action_unlimited_days'), NULL, NULL, Member::loggedIn()->language()->addToStack('days'), 'spam_service_disposable_num' ) );
 
-		$form->add( new Select( 'spam_service_action_0', Settings::i()->spam_service_action_0, FALSE, array( 'disabled' => $disabled, 'options' => $actions ), NULL, NULL, NULL, 'spam_service_action_0' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'spam_service_action_0', \IPS\Settings::i()->spam_service_action_0, FALSE, array( 'disabled' => $disabled, 'options' => $actions ), NULL, NULL, NULL, 'spam_service_action_0' ) );
 
 		if ( $values = $form->values() )
 		{
@@ -343,7 +302,7 @@ class spam extends Controller
 			$values['spam_service_days'] = json_encode( $values['spam_service_days'] );
 
 			$form->saveAsSettings( $values );
-			Session::i()->log( 'acplog__enhancements_edited', array( 'enhancements__core_SpamMonitoring' => TRUE ) );
+			\IPS\Session::i()->log( 'acplog__enhancements_edited', array( 'enhancements__core_SpamMonitoring' => TRUE ) );
 		}
 
 		return $form;
@@ -354,20 +313,20 @@ class spam extends Controller
 	 *
 	 * @return	string	HTML to display
 	 */
-	protected function _manageQanda() : string
+	protected function _manageQanda()
 	{
-		Dispatcher::i()->checkAcpPermission( 'qanda_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'qanda_manage' );
 
 		/* Create the table */
-		$table					= new TableDb( 'core_question_and_answer', Url::internal( 'app=core&module=moderation&controller=spam&tab=qanda' ) );
+		$table					= new \IPS\Helpers\Table\Db( 'core_question_and_answer', \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&tab=qanda' ) );
 		$table->include			= array( 'qa_question' );
 		$table->joins			= array(
-										array( 'select' => 'w.word_custom', 'from' => array( 'core_sys_lang_words', 'w' ), 'where' => "w.word_key=CONCAT( 'core_question_and_answer_', core_question_and_answer.qa_id ) AND w.lang_id=" . Member::loggedIn()->language()->id )
+										array( 'select' => 'w.word_custom', 'from' => array( 'core_sys_lang_words', 'w' ), 'where' => "w.word_key=CONCAT( 'core_question_and_answer_', core_question_and_answer.qa_id ) AND w.lang_id=" . \IPS\Member::loggedIn()->language()->id )
 									);
 		$table->parsers			= array(
 										'qa_question'		=> function( $val, $row )
 										{
-											return ( $row['word_custom'] ?: $row['qa_question'] );
+											return ( $row['word_custom'] ? $row['word_custom'] : $row['qa_question'] );
 										}
 									);
 		$table->mainColumn		= 'qa_question';
@@ -375,13 +334,13 @@ class spam extends Controller
 		$table->quickSearch		= array( 'word_custom', 'qa_question' );
 		$table->sortDirection	= $table->sortDirection ?: 'asc';
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'qanda_add' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'qanda_add' ) )
 		{
 			$table->rootButtons	= array(
 				'add'	=> array(
 					'icon'		=> 'plus',
 					'title'		=> 'qanda_add_question',
-					'link'		=> Url::internal( 'app=core&module=moderation&controller=spam&do=question' ),
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=question' ),
 				)
 			);
 		}
@@ -390,21 +349,21 @@ class spam extends Controller
 		{
 			$return	= array();
 
-			if ( Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'qanda_edit' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'qanda_edit' ) )
 			{
 				$return['edit'] = array(
 					'icon'		=> 'pencil',
 					'title'		=> 'edit',
-					'link'		=> Url::internal( 'app=core&module=moderation&controller=spam&do=question&id=' ) . $row['qa_id'],
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=question&id=' ) . $row['qa_id'],
 				);
 			}
 
-			if ( Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'qanda_delete' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'qanda_delete' ) )
 			{
 				$return['delete'] = array(
 					'icon'		=> 'times-circle',
 					'title'		=> 'delete',
-					'link'		=> Url::internal( 'app=core&module=moderation&controller=spam&do=delete&id=' ) . $row['qa_id'],
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=delete&id=' ) . $row['qa_id'],
 					'data'		=> array( 'delete' => '' ),
 				);
 			}
@@ -412,7 +371,7 @@ class spam extends Controller
 			return $return;
 		};
 
-		return Theme::i()->getTemplate( 'spam' )->spamQandASettings( $table );
+		return \IPS\Theme::i()->getTemplate( 'spam' )->spamQandASettings( $table );
 	}
 
 	/**
@@ -420,31 +379,31 @@ class spam extends Controller
 	 *
 	 * @return void
 	 */
-	protected function question() : void
+	protected function question()
 	{
 		/* Init */
 		$id			= 0;
 		$question	= array();
 
 		/* Start the form */
-		$form	= new Form;
+		$form	= new \IPS\Helpers\Form;
 
 		/* Load question */
 		try
 		{
-			$id	= intval( Request::i()->id );
+			$id	= \intval( \IPS\Request::i()->id );
 			$form->hiddenValues['id'] = $id;
-			$question	= Db::i()->select( '*', 'core_question_and_answer', array( 'qa_id=?', $id ) )->first();
+			$question	= \IPS\Db::i()->select( '*', 'core_question_and_answer', array( 'qa_id=?', $id ) )->first();
 
-			Dispatcher::i()->checkAcpPermission( 'qanda_edit' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'qanda_edit' );
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			Dispatcher::i()->checkAcpPermission( 'qanda_add' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'qanda_add' );
 		}
 
-		$form->add( new Translatable( 'qa_question', NULL, TRUE, array( 'app' => 'core', 'key' => ( $id ? "core_question_and_answer_{$id}" : NULL ) ) ) );
-		$form->add( new Stack( 'qa_answers', $id ? json_decode( $question['qa_answers'], TRUE ) : array(), TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'qa_question', NULL, TRUE, array( 'app' => 'core', 'key' => ( $id ? "core_question_and_answer_{$id}" : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Stack( 'qa_answers', $id ? json_decode( $question['qa_answers'], TRUE ) : array(), TRUE ) );
 
 		/* Handle submissions */
 		if ( $values = $form->values() )
@@ -455,25 +414,25 @@ class spam extends Controller
 
 			if ( $id )
 			{
-				Db::i()->update( 'core_question_and_answer', $save, array( 'qa_id=?', $question['qa_id'] ) );
+				\IPS\Db::i()->update( 'core_question_and_answer', $save, array( 'qa_id=?', $question['qa_id'] ) );
 
-				Session::i()->log( 'acplogs__question_edited' );
+				\IPS\Session::i()->log( 'acplogs__question_edited' );
 			}
 			else
 			{
-				$id	= Db::i()->insert( 'core_question_and_answer', $save );
-				Session::i()->log( 'acplogs__question_added' );
+				$id	= \IPS\Db::i()->insert( 'core_question_and_answer', $save );
+				\IPS\Session::i()->log( 'acplogs__question_added' );
 			}
 
-			Lang::saveCustom( 'core', "core_question_and_answer_{$id}", $values['qa_question'] );
+			\IPS\Lang::saveCustom( 'core', "core_question_and_answer_{$id}", $values['qa_question'] );
 
-			Output::i()->redirect( Url::internal( 'app=core&module=moderation&controller=spam&tab=qanda' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&tab=qanda' ), 'saved' );
 		}
 
 		/* Display */
-		Output::i()->title	 		= Member::loggedIn()->language()->addToStack('qanda_settings');
-		Output::i()->breadcrumb[]	= array( NULL, Output::i()->title );
-		Output::i()->output 		= Theme::i()->getTemplate( 'global' )->block( Output::i()->title, $form );
+		\IPS\Output::i()->title	 		= \IPS\Member::loggedIn()->language()->addToStack('qanda_settings');
+		\IPS\Output::i()->breadcrumb[]	= array( NULL, \IPS\Output::i()->title );
+		\IPS\Output::i()->output 		= \IPS\Theme::i()->getTemplate( 'global' )->block( \IPS\Output::i()->title, $form );
 	}
 
 	/**
@@ -481,21 +440,21 @@ class spam extends Controller
 	 *
 	 * @return void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
-		$id = intval( Request::i()->id );
-		Dispatcher::i()->checkAcpPermission( 'qanda_delete' );
+		$id = \intval( \IPS\Request::i()->id );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'qanda_delete' );
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
-		Db::i()->delete( 'core_question_and_answer', array( 'qa_id=?', $id ) );
-		Session::i()->log( 'acplogs__question_deleted' );
+		\IPS\Db::i()->delete( 'core_question_and_answer', array( 'qa_id=?', $id ) );
+		\IPS\Session::i()->log( 'acplogs__question_deleted' );
 
-		Lang::deleteCustom( 'core', "core_question_and_answer_{$id}" );
+		\IPS\Lang::deleteCustom( 'core', "core_question_and_answer_{$id}" );
 
 		/* And redirect */
-		Output::i()->redirect( Url::internal( "app=core&module=moderation&controller=spam&tab=qanda" ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=moderation&controller=spam&tab=qanda" ) );
 	}
 
 	/**
@@ -503,12 +462,12 @@ class spam extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function serviceLogs() : void
+	protected function serviceLogs()
 	{
-		Dispatcher::i()->checkAcpPermission( 'spam_service_log' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'spam_service_log' );
 
 		/* Create the table */
-		$table = new TableDb( 'core_spam_service_log', Url::internal( 'app=core&module=moderation&controller=spam&do=serviceLogs' ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_spam_service_log', \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=serviceLogs' ) );
 
 		$table->langPrefix = 'spamlogs_';
 
@@ -520,34 +479,34 @@ class spam extends Controller
 
 		/* Search */
 		$table->advancedSearch = array(
-				'email_address'		=> SEARCH_CONTAINS_TEXT,
-				'ip_address'		=> SEARCH_CONTAINS_TEXT,
-				'log_code'			=> SEARCH_NUMERIC,
+				'email_address'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+				'ip_address'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+				'log_code'			=> \IPS\Helpers\Table\SEARCH_NUMERIC,
 		);
 
 		$table->quickSearch = 'email_address';
 
 		/* Custom parsers */
 		$table->parsers = array(
-				'log_date'				=> function( $val )
+				'log_date'				=> function( $val, $row )
 				{
-					return DateTime::ts( $val )->localeDate();
+					return \IPS\DateTime::ts( $val )->localeDate();
 				},
 		);
 
 		/* Add a button for settings */
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 				'settings'	=> array(
 						'title'		=> 'prunesettings',
 						'icon'		=> 'cog',
-						'link'		=> Url::internal( 'app=core&module=moderation&controller=spam&do=serviceLogSettings' ),
-						'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('prunesettings') )
+						'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=serviceLogSettings' ),
+						'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('prunesettings') )
 				),
 		);
 
 		/* Display */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('spamlogs');
-		Output::i()->output	= (string) $table;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('spamlogs');
+		\IPS\Output::i()->output	= (string) $table;
 	}
 
 	/**
@@ -555,23 +514,23 @@ class spam extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function serviceLogSettings() : void
+	protected function serviceLogSettings()
 	{
-		Dispatcher::i()->checkAcpPermission( 'spam_service_log' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'spam_service_log' );
 
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 
-		$form->add( new Interval( 'prune_log_spam', Settings::i()->prune_log_spam, FALSE, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL, 'prune_log_spam' ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'prune_log_spam', \IPS\Settings::i()->prune_log_spam, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), NULL, 'prune_log_spam' ) );
 
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings();
-			Session::i()->log( 'acplog__spamlog_settings' );
-			Output::i()->redirect( Url::internal( 'app=core&module=moderation&controller=spam&do=serviceLogs' ), 'saved' );
+			\IPS\Session::i()->log( 'acplog__spamlog_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=serviceLogs' ), 'saved' );
 		}
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('spamlogssettings');
-		Output::i()->output 	= Theme::i()->getTemplate('global')->block( 'spamlogssettings', $form, FALSE );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('spamlogssettings');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate('global')->block( 'spamlogssettings', $form, FALSE );
 	}
 
 	/**
@@ -579,10 +538,10 @@ class spam extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function whitelist() : void
+	protected function whitelist()
 	{
-		Dispatcher::i()->checkAcpPermission( 'spam_whitelist_manage' );
-		$table = new TableDb( 'core_spam_whitelist', Url::internal( 'app=core&module=moderation&controller=spam&do=whitelist' ) );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'spam_whitelist_manage' );
+		$table = new \IPS\Helpers\Table\Db( 'core_spam_whitelist', \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=whitelist' ) );
 
 		$table->filters = array(
 				'spam_whitelist_ip'		=> 'whitelist_type=\'ip\'',
@@ -597,27 +556,27 @@ class spam extends Controller
 		$table->sortDirection = $table->sortDirection ?: 'asc';
 		$table->quickSearch   = 'whitelist_content';
 		$table->advancedSearch = array(
-			'whitelist_reason'	=> SEARCH_CONTAINS_TEXT,
-			'whitelist_date'	=> SEARCH_DATE_RANGE
+			'whitelist_reason'	=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'whitelist_date'	=> \IPS\Helpers\Table\SEARCH_DATE_RANGE
 		);
 
 		/* Custom parsers */
 		$table->parsers = array(
-				'whitelist_date'			=> function( $val )
+				'whitelist_date'			=> function( $val, $row )
 				{
-					return DateTime::ts( $val )->localeDate();
+					return \IPS\DateTime::ts( $val )->localeDate();
 				},
-				'whitelist_type'			=> function( $val )
+				'whitelist_type'			=> function( $val, $row )
 				{
 					switch( $val )
 					{
 						default:
 						case 'ip':
-							return Member::loggedIn()->language()->addToStack('spam_whitelist_ip_select');
-
+							return \IPS\Member::loggedIn()->language()->addToStack('spam_whitelist_ip_select');
+						break;
 						case 'domain':
-							return Member::loggedIn()->language()->addToStack('spam_whitelist_domain_select');
-
+							return \IPS\Member::loggedIn()->language()->addToStack('spam_whitelist_domain_select');
+						break;
 					}
 				}
 		);
@@ -627,22 +586,22 @@ class spam extends Controller
 		{
 			$return = array();
 
-			if ( Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'spam_whitelist_edit' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'spam_whitelist_edit' ) )
 			{
 				$return['edit'] = array(
 							'icon'		=> 'pencil',
 							'title'		=> 'edit',
-							'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit') ),
-							'link'		=> Url::internal( 'app=core&module=moderation&controller=spam&do=whitelistForm&id=' ) . $row['whitelist_id'],
+							'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit') ),
+							'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=whitelistForm&id=' ) . $row['whitelist_id'],
 				);
 			}
 
-			if ( Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'spam_whitelist_delete' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'spam_whitelist_delete' ) )
 			{
 				$return['delete'] = array(
 							'icon'		=> 'times-circle',
 							'title'		=> 'delete',
-							'link'		=> Url::internal( 'app=core&module=moderation&controller=spam&do=whitelistDelete&id=' ) . $row['whitelist_id'],
+							'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=whitelistDelete&id=' ) . $row['whitelist_id'],
 							'data'		=> array( 'delete' => '' ),
 				);
 			}
@@ -651,22 +610,22 @@ class spam extends Controller
 		};
 
 		/* Add an add button for whitelist */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'spam_whitelist_add' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'moderation', 'spam_whitelist_add' ) )
 		{
-			Output::i()->sidebar['actions'] = array(
+			\IPS\Output::i()->sidebar['actions'] = array(
 				'add'	=> array(
 					'primary'	=> TRUE,
 					'icon'		=> 'plus',
 					'title'		=> 'spam_whitelist_add',
-					'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('spam_whitelist_add') ),
-					'link'		=> Url::internal( 'app=core&module=moderation&controller=spam&do=whitelistForm' )
+					'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('spam_whitelist_add') ),
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=whitelistForm' )
 				)
 			);
 		}
 
         /* Display */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('spam_whitelist');
-		Output::i()->output	= (string) $table;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('spam_whitelist');
+		\IPS\Output::i()->output	= (string) $table;
 	}
 
 	/**
@@ -674,23 +633,23 @@ class spam extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function whitelistForm() : void
+	protected function whitelistForm()
 	{
 		$current = NULL;
-		if ( Request::i()->id )
+		if ( \IPS\Request::i()->id )
 		{
-			$current = Db::i()->select( '*', 'core_spam_whitelist', array( 'whitelist_id=?', Request::i()->id ) )->first();
+			$current = \IPS\Db::i()->select( '*', 'core_spam_whitelist', array( 'whitelist_id=?', \IPS\Request::i()->id ) )->first();
 
-			Dispatcher::i()->checkAcpPermission( 'spam_whitelist_edit' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'spam_whitelist_edit' );
 		}
 		else
 		{
-			Dispatcher::i()->checkAcpPermission( 'spam_whitelist_add' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'spam_whitelist_add' );
 		}
 
 		/* Build form */
-		$form = new Form();
-		$form->add( new Select( 'whitelist_type', $current ? $current['whitelist_type'] : NULL, TRUE,
+		$form = new \IPS\Helpers\Form();
+		$form->add( new \IPS\Helpers\Form\Select( 'whitelist_type', $current ? $current['whitelist_type'] : NULL, TRUE,
 				array(
 					'options' => array(
 						'ip'    => 'spam_whitelist_ip_select',
@@ -702,14 +661,14 @@ class spam extends Controller
 					)
 			) ) );
 
-		$form->add( new Text( 'whitelist_ip_content', $current ? $current['whitelist_content'] : NULL, TRUE, array(), NULL, NULL, NULL, 'whitelist_ip_content' ) );
-		$form->add( new Text( 'whitelist_domain_content', $current ? $current['whitelist_content'] : NULL, TRUE, array( 'placeholder' => 'mycompany.com' ), function( $value ) {
+		$form->add( new \IPS\Helpers\Form\Text( 'whitelist_ip_content', $current ? $current['whitelist_content'] : NULL, TRUE, array(), NULL, NULL, NULL, 'whitelist_ip_content' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'whitelist_domain_content', $current ? $current['whitelist_content'] : NULL, TRUE, array( 'placeholder' => 'mycompany.com' ), function( $value ) {
 			if( isset( $value ) AND mb_stripos( $value, '@' ) )
 			{
-				throw new DomainException( 'whitelist_domain_email_detected' );
+				throw new \DomainException( 'whitelist_domain_email_detected' );
 			}
 		}, NULL, NULL, 'whitelist_domain_content' ) );
-		$form->add( new Text( 'whitelist_reason', $current ? $current['whitelist_reason'] : NULL ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'whitelist_reason', $current ? $current['whitelist_reason'] : NULL ) );
 
 		/* Handle submissions */
 		if ( $values = $form->values() )
@@ -725,20 +684,20 @@ class spam extends Controller
 			if ( $current )
 			{
 				unset( $save['whitelist_date'] );
-				Db::i()->update( 'core_spam_whitelist', $save, array( 'whitelist_id=?', $current['whitelist_id'] ) );
-				Session::i()->log( 'acplog__spam_whitelist_edited', array( 'spam_whitelist_' . $save['whitelist_type'] . '_select' => TRUE, $save['whitelist_content'] => FALSE ) );
+				\IPS\Db::i()->update( 'core_spam_whitelist', $save, array( 'whitelist_id=?', $current['whitelist_id'] ) );
+				\IPS\Session::i()->log( 'acplog__spam_whitelist_edited', array( 'spam_whitelist_' . $save['whitelist_type'] . '_select' => TRUE, $save['whitelist_content'] => FALSE ) );
 			}
 			else
 			{
-				Db::i()->insert( 'core_spam_whitelist', $save );
-				Session::i()->log( 'acplog__spam_whitelist_created', array( 'spam_whitelist_' . $save['whitelist_type'] . '_select' => TRUE, $save['whitelist_content'] => FALSE ) );
+				\IPS\Db::i()->insert( 'core_spam_whitelist', $save );
+				\IPS\Session::i()->log( 'acplog__spam_whitelist_created', array( 'spam_whitelist_' . $save['whitelist_type'] . '_select' => TRUE, $save['whitelist_content'] => FALSE ) );
 			}
 
-			Output::i()->redirect( Url::internal( 'app=core&module=moderation&controller=spam&do=whitelist' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=whitelist' ), 'saved' );
 		}
 
 		/* Display */
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( $current ? $current['whitelist_content'] : 'add', $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( $current ? $current['whitelist_content'] : 'add', $form, FALSE );
 	}
 
 	/**
@@ -746,22 +705,22 @@ class spam extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function whitelistDelete() : void
+	protected function whitelistDelete()
 	{
-		Dispatcher::i()->checkAcpPermission( 'spam_whitelist_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'spam_whitelist_delete' );
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
 		try
 		{
-			$current = Db::i()->select( '*', 'core_spam_whitelist', array( 'whitelist_id=?', Request::i()->id ) )->first();
-			Session::i()->log( 'acplog__spam_whitelist_deleted', array( 'whitelist_filter_' . $current['whitelist_type'] . '_select' => TRUE, $current['whitelist_content'] => FALSE ) );
-			Db::i()->delete( 'core_spam_whitelist', array( 'whitelist_id=?', Request::i()->id ) );
+			$current = \IPS\Db::i()->select( '*', 'core_spam_whitelist', array( 'whitelist_id=?', \IPS\Request::i()->id ) )->first();
+			\IPS\Session::i()->log( 'acplog__spam_whitelist_deleted', array( 'whitelist_filter_' . $current['whitelist_type'] . '_select' => TRUE, $current['whitelist_content'] => FALSE ) );
+			\IPS\Db::i()->delete( 'core_spam_whitelist', array( 'whitelist_id=?', \IPS\Request::i()->id ) );
 		}
-		catch ( UnderflowException $e ) { }
+		catch ( \UnderflowException $e ) { }
 
-		Output::i()->redirect( Url::internal( 'app=core&module=moderation&controller=spam&do=whitelist' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&do=whitelist' ) );
 	}
 
 	/**
@@ -769,38 +728,39 @@ class spam extends Controller
 	 *
 	 * @return	string	HTML to display
 	 */
-	protected function _manageGeolocation() : string
+	protected function _manageGeolocation()
 	{
-		$licenseData = IPS::licenseKey();
+		$licenseData = \IPS\IPS::licenseKey();
 
 		/* Build Form */
-		$settings = Settings::i()->spam_geo_settings ? json_decode( Settings::i()->spam_geo_settings, true ) : array();
+		$settings = \IPS\Settings::i()->spam_geo_settings ? json_decode( \IPS\Settings::i()->spam_geo_settings, true ) : array();
 
-		$matrix = new Matrix;
+		$form = new \IPS\Helpers\Form;
+		$matrix = new \IPS\Helpers\Form\Matrix;
 
 		if( !$licenseData or !isset( $licenseData['products']['spam'] ) or !$licenseData['products']['spam'] or ( !$licenseData['cloud'] AND strtotime( $licenseData['expires'] ) < time() ) )
 		{
-			if( !Settings::i()->ipb_reg_number )
+			if( !\IPS\Settings::i()->ipb_reg_number )
 			{
-				Member::loggedIn()->language()->words['spam_service_enabled_desc'] = Member::loggedIn()->language()->addToStack( '__ipbnullforums__nulling_null_alert' ); //Changing error message to custom'
+				\IPS\Member::loggedIn()->language()->words['spam_service_enabled_desc'] = \IPS\Member::loggedIn()->language()->addToStack( '__ipbnullforums__nulling_null_alert' ); //Changing error message to custom
 			}
 			else
 			{
-				Member::loggedIn()->language()->words['spam_service_enabled_desc'] = Member::loggedIn()->language()->addToStack( '__ipbnullforums__nulling_null_alert' ); //Changing error message to custom'
+				\IPS\Member::loggedIn()->language()->words['spam_service_enabled_desc'] = \IPS\Member::loggedIn()->language()->addToStack( '__ipbnullforums__nulling_null_alert' ); //Changing error message to custom
 			}
 		}
 
 		$matrix->columns = array(
 			'country'	=> function( $key, $value, $data ) {
 				$options = array();
-				foreach( GeoLocation::$countries AS $country )
+				foreach( \IPS\GeoLocation::$countries AS $country )
 				{
-					$options[ $country ] = Member::loggedIn()->language()->addToStack( 'country-' . $country );
+					$options[ $country ] = \IPS\Member::loggedIn()->language()->addToStack( 'country-' . $country );
 				}
-				return new Select( $key, $value, TRUE, array( 'options' => $options ) );
+				return new \IPS\Helpers\Form\Select( $key, $value, TRUE, array( 'options' => $options ) );
 			},
 			'action'	=> function( $key, $value, $data ) {
-				return new Select( $key, $value, TRUE, array( 'options' => array( 'moderate' => 'spam_service_act_2', 'block' => 'spam_service_act_4' ) ) );
+				return new \IPS\Helpers\Form\Select( $key, $value, TRUE, array( 'options' => array( 'moderate' => 'spam_service_act_2', 'block' => 'spam_service_act_4' ) ) );
 			}
 		);
 
@@ -812,19 +772,19 @@ class spam extends Controller
 				'action'		=> $action
 			);
 		}
-
-		if ( $values = $matrix->values() )
+		$form->addMatrix( 'geolocation', $matrix );
+		if ( $values = $form->values() )
 		{
 			$save = array();
-			foreach( $values AS $key => $value )
+			foreach( $values['geolocation'] AS $key => $value )
 			{
 				$save[ $value['country'] ] = $value['action'];
 			}
 
-			Settings::i()->changeValues( array( 'spam_geo_settings' => json_encode( $save ) ) );
-			Output::i()->redirect( Url::internal( "app=core&module=moderation&controller=spam&tab=geolocation" ), 'saved' );
+			\IPS\Settings::i()->changeValues( array( 'spam_geo_settings' => json_encode( $save ) ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=moderation&controller=spam&tab=geolocation" ), 'saved' );
 		}
 
-		return Theme::i()->getTemplate( 'spam' )->spamGeoSettings( $matrix );
+		return \IPS\Theme::i()->getTemplate( 'spam' )->spamGeoSettings( $form );
 	}
 }

@@ -11,114 +11,99 @@
 namespace IPS\Helpers\Chart;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use function count;
-use function defined;
-use function header;
-use function in_array;
-use function is_array;
-use function mb_strlen;
-use function mb_substr;
-use function md5;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Dynamic Database Chart Helper
  */
-class Database extends Dynamic
+class _Database extends \IPS\Helpers\Chart\Dynamic
 {
 	/**
 	 * @brief	Database Table
 	 */
-	protected ?string $table = null;
+	protected $table;
 	
 	/**
 	 * @brief	Database column that contains date
 	 */
-	protected ?string $dateField = null;
+	protected $dateField;
 	
 	/**
 	 * @brief	Where clauses
 	 */
-	public array $where	= array();
+	public $where	= array();
 
 	/**
 	 * @brief	Query joins
 	 */
-	public array $joins	= array();
+	public $joins	= array();
 	
 	/**
 	 * @brief	Extra column to group by (useful for multi-data line charts)
 	 */
-	public string $groupBy	= '';
+	public $groupBy	= '';
 
 	/**
 	 * @brief	Group by keys for the series
 	 */
-	protected array $groupByKeys = array();
+	protected $groupByKeys = array();
 
 	/**
 	 * @brief	Table Columns
 	 */
-	public array $tableInclude = array();
+	public $tableInclude = array();
 	
 	/**
 	 * @brief	Table Column Formatters
 	 */
-	public array $tableParsers = array();
+	public $tableParsers = array();
+	
+	/**
+	 * @brief	Table Lang Prefix
+	 */
+	public $tableLangPrefix = NULL;
 
 	/**
 	 * @brief   Along with the other series, show one of the sum of all
 	 */
-	public bool $allRecordsSeries = FALSE;
+	public $allRecordsSeries = FALSE;
 
 	/**
 	 * @brief   The lang string used to label the 'all records' series
 	 */
-	public string $allRecordsLang  = 'database_chart_all_series';
+	public $allRecordsLang  = 'database_chart_all_series';
 	
 	/**
 	 * @brief	Custom form
 	 */
-	public bool|array $customFiltersForm = FALSE;
+	public $customFiltersForm = FALSE;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Url	$url			The URL the chart will be displayed on
-	 * @param	string $table			Database Table
-	 * @param string $dateField		Database column that contains date
-	 * @param string $title			Title
-	 * @param array $options		Options
-	 * @param string $defaultType	The default chart type
-	 * @param string $defaultTimescale	The default timescale to use
-	 * @param array $defaultTimes	The default start/end times to use
-	 * @param array $tableInclude	Table columns to include in results
-	 * @param string $identifier		If there will be more than one chart per page, provide a unique identifier
-	 * @param DateTime|null $minimumDate	The earliest available date for this chart
+	 * @param	\IPS\Http\Url	$url			The URL the chart will be displayed on
+	 * @param	string			$table			Database Table
+	 * @param	string			$dateField		Database column that contains date
+	 * @param	string			$title			Title
+	 * @param	array			$options		Options
+	 * @param	string			$defaultType	The default chart type
+	 * @param	string			$defaultTimescale	The default timescale to use
+	 * @param	array			$defaultTimes	The default start/end times to use
+	 * @param	array 			$tableInclude	Table columns to include in results
+	 * @param	string			$identifier		If there will be more than one chart per page, provide a unique identifier
+	 * @param	\IPS\DateTime|NULL	$minimumDate	The earliest available date for this chart
+	 * @see		<a href='https://google-developers.appspot.com/chart/interactive/docs/gallery'>Charts Gallery - Google Charts - Google Developers</a>
 	 * @return	void
-	 *@see		<a href='https://google-developers.appspot.com/chart/interactive/docs/gallery'>Charts Gallery - Google Charts - Google Developers</a>
 	 */
-	public function __construct( Url $url, string $table, string $dateField, string $title='', array $options=array(), string $defaultType='AreaChart', string $defaultTimescale='monthly', array $defaultTimes=array( 'start' => 0, 'end' => 0 ), array $tableInclude=array(), string $identifier='', DateTime $minimumDate=null )
+	public function __construct( \IPS\Http\Url $url, $table, $dateField, $title='', $options=array(), $defaultType='AreaChart', $defaultTimescale='monthly', $defaultTimes=array( 'start' => 0, 'end' => 0 ), $tableInclude=array(), $identifier='', $minimumDate=NULL )
 	{
 		$this->table		= $table;
 		$this->dateField	= $dateField;
-		$this->identifier	= substr( md5( $table . $dateField ), 0, 6 ) . $identifier . ( Request::i()->chartId ?: '_default' );
+		$this->identifier	= \substr( md5( $table . $dateField ), 0, 6 ) . $identifier . ( \IPS\Request::i()->chartId ?: '_default' );
 
 		if ( !empty( $tableInclude ) )
 		{
@@ -127,24 +112,24 @@ class Database extends Dynamic
 
 		parent::__construct( $url, $title, $options, $defaultType, $defaultTimescale, $defaultTimes, $identifier, $minimumDate );
 	}
-
+	
 	/**
 	 * Add Series
 	 *
 	 * @param	mixed	$name		Either a string with the series name or an array [ 'value' => "Series Name", 'key' => "XX" ]. Keys are used to give a country code for GeoCharts.
-	 * @param string $type		Type of value
+	 * @param	string	$type		Type of value
 	 *	@li	string
 	 *	@li	number
 	 *	@li	boolean
 	 *	@li	date
 	 *	@li	datetime
 	 *	@li	timeofday
-	 * @param string $sql		SQL expression to get value
-	 * @param bool $filterable	If TRUE, will show as a filter option to be toggled on/off
-	 * @param string|null $groupByKey	If $this->groupBy is set, the raw key value
+	 * @param	string	$sql		SQL expression to get value
+	 * @param	bool	$filterable	If TRUE, will show as a filter option to be toggled on/off
+	 * @param	string	$groupByKey	If $this->groupBy is set, the raw key value
 	 * @return	void
 	 */
-	public function addSeries( mixed $name, string $type, string $sql, bool $filterable=TRUE, string $groupByKey=NULL ) : void
+	public function addSeries( $name, $type, $sql, $filterable=TRUE, $groupByKey=NULL )
 	{
 		if ( $groupByKey !== NULL )
 		{
@@ -152,16 +137,16 @@ class Database extends Dynamic
 		}
 		else
 		{
-			$name = is_array( $name ) ? $name['value'] : $name;
-			Member::loggedIn()->language()->parseOutputForDisplay( $name );
+			$name = \is_array( $name ) ? $name['value'] : $name;
+			\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $name );
 			$filterKey = $name;
 		}
-
-		if ( !$filterable or !isset( Request::i()->filters[ $this->identifier ] ) or in_array( $filterKey, Request::i()->filters[ $this->identifier ] ) )
+		
+		if ( !$filterable or !isset( \IPS\Request::i()->filters[ $this->identifier ] ) or \in_array( $filterKey, \IPS\Request::i()->filters[ $this->identifier ] ) )
 		{
 			if ( $this->type !== 'PieChart' and $this->type !== 'GeoChart' )
 			{
-				$this->addHeader( is_array( $name ) ? $name['value'] : $name, $type );
+				$this->addHeader( \is_array( $name ) ? $name['value'] : $name, $type );
 			}
 
 			if( $this->groupBy )
@@ -170,71 +155,68 @@ class Database extends Dynamic
 			}
 
 			$this->series[ $filterKey ] = $sql;
-
+			
 			if ( $filterable )
 			{
 				$this->currentFilters[] = $filterKey;
-
-				if ( isset( Request::i()->filters[ $this->identifier ] ) )
+				
+				if ( isset( \IPS\Request::i()->filters[ $this->identifier ] ) )
 				{
 					$this->url = $this->url->setQueryString( 'filters', array( $this->identifier => $this->currentFilters ) );
 				}
 			}
 		}
-
+		
 		if ( $filterable )
 		{
 			$this->availableFilters[ $filterKey ] = $name;
 		}
 	}
-
-
+	
+	
 	/**
 	 * Init the data array
 	 *
 	 * @return array
 	 */
-	protected function initData(): array
+	protected function initData()
 	{
 		$data = parent::initData();
-
+		
 		if ( $this->customFiltersForm )
 		{
 			if ( $values = $this->getCustomFiltersForm()->values() )
 			{
 				$whereFunction = $this->customFiltersForm['where'];
 				$seriesFunction = $this->customFiltersForm['series'];
-
+				
 				foreach( $values as $k => $v )
 				{
 					unset( $values[ $k ] );
-					$values[ mb_substr( $k, mb_strlen( $this->identifier ) ) ] = $v;
+					$values[ \mb_substr( $k, \mb_strlen( $this->identifier ) ) ] = $v;
 				}
 
 				$this->groupBy = $this->customFiltersForm['groupBy'];
 
 				$whereFunctionResult = $whereFunction( $values );
-
-				$this->where[] = is_array( $whereFunctionResult ) ? $whereFunctionResult : array( $whereFunctionResult );
-
+				
+				$this->where[] = \is_array( $whereFunctionResult ) ? $whereFunctionResult : array( $whereFunctionResult );
+				
 				foreach( $seriesFunction( $values ) as $series )
 				{
 					$this->addSeries( $series[0], $series[1], $series[2], $series[3], $series[4] );
 				}
 			}
-			else if ( $this->savedCustomFilters and count( $this->savedCustomFilters ) )
+			else if ( $this->savedCustomFilters and \count( $this->savedCustomFilters ) )
 			{
 				$whereFunction = $this->customFiltersForm['where'];
 				$seriesFunction = $this->customFiltersForm['series'];
-
+				
 				$this->groupBy = $this->customFiltersForm['groupBy'];
 
 				$whereFunctionResult = $whereFunction( $this->savedCustomFilters );
-				if( !empty( $whereFunctionResult ) )
-				{
-					$this->where[] = is_array( $whereFunctionResult ) ? $whereFunctionResult : array( $whereFunctionResult );
-				}
-
+				$this->where[] = \is_array( $whereFunctionResult ) ? $whereFunctionResult : array( $whereFunctionResult );
+				
 				foreach( $seriesFunction( $this->savedCustomFilters ) as $series )
 				{
 					$this->addSeries( $series[0], $series[1], $series[2], $series[3], $series[4] );
@@ -286,12 +268,12 @@ class Database extends Dynamic
 			}
 
 			$fromUnixTime = "FROM_UNIXTIME( IFNULL( {$this->dateField}, 0 ) )";
-			if ( !$this->timezoneError and Member::loggedIn()->timezone and in_array( Member::loggedIn()->timezone, DateTimeZone::listIdentifiers() ) )
+			if ( !$this->timezoneError and \IPS\Member::loggedIn()->timezone and \in_array( \IPS\Member::loggedIn()->timezone, \DateTimeZone::listIdentifiers() ) )
 			{
-				$fromUnixTime = "CONVERT_TZ( {$fromUnixTime}, @@session.time_zone, '" . Db::i()->escape_string( Member::loggedIn()->timezone ) . "' )";
+				$fromUnixTime = "CONVERT_TZ( {$fromUnixTime}, @@session.time_zone, '" . \IPS\Db::i()->escape_string( \IPS\Member::loggedIn()->timezone ) . "' )";
 			}
 
-			$allRecordsStatement = Db::i()->select(
+			$allRecordsStatement = \IPS\Db::i()->select(
 				"SQL_BIG_RESULT DATE_FORMAT( {$fromUnixTime}, '{$timescale}' ) AS time_as_alias, COUNT(*) as $this->allRecordsLang",
 				$this->table,
 				$where,
@@ -306,22 +288,23 @@ class Database extends Dynamic
 				$data[ $allRecordsRow['time_as_alias'] ][$this->allRecordsLang] = $allRecordsRow[$this->allRecordsLang];
 			}
 
-			$this->addSeries( Member::loggedIn()->language()->addToStack($this->allRecordsLang), 'number', 'COUNT(*)', FALSE, $this->allRecordsLang );
+			$this->addSeries( \IPS\Member::loggedIn()->language()->addToStack($this->allRecordsLang), 'number', 'COUNT(*)', FALSE, $this->allRecordsLang );
 		}
 
 		return $data;
 	}
-
+	
 	/**
 	 * Compile Data for Output
 	 *
-	 * @return    void
+	 * @param	array	$data	The data
+	 * @return	void
 	 */
-	public function compileForOutput() : void
+	public function compileForOutput()
 	{
 		/* Init data */
 		$data = $this->initData();
-
+		
 		/* Work out where clause */
 		$where = $this->where;
 		$where[] = array( "{$this->dateField}>?", 0 );
@@ -333,7 +316,7 @@ class Database extends Dynamic
 		{
 			$where[] = array( "{$this->dateField}<?", $this->end->getTimestamp() );
 		}
-
+		
 		/* What's our SQL time? */
 		switch ( $this->timescale )
 		{
@@ -344,23 +327,23 @@ class Database extends Dynamic
 			case 'daily':
 				$timescale = '%Y-%c-%e';
 				break;
-
+			
 			case 'weekly':
 				$timescale = '%x-%v';
 				break;
-
+				
 			case 'monthly':
 				$timescale = '%Y-%c';
 				break;
 		}
-
+		
 		/* Pie Chart */
 		if ( $this->type === 'PieChart' or $this->type === 'GeoChart' )
-		{
+		{						
 			$keys = array_unique( $this->series );
 			$key = array_pop( $keys );
-
-			$stmt = Db::i()->select(
+			
+			$stmt = \IPS\Db::i()->select(
 				"{$key}" . ( $this->groupBy ? ", {$this->groupBy}" : '' ),
 				$this->table,
 				$where,
@@ -369,11 +352,11 @@ class Database extends Dynamic
 				$this->groupBy
 			);
 
-			if( count( $this->joins ) )
+			if( \count( $this->joins ) )
 			{
 				foreach( $this->joins as $join )
 				{
-					$stmt = $stmt->join( $join[0], $join[1], ( $join[2] ?? 'LEFT' ), ( $join[3] ?? FALSE ) );
+					$stmt = $stmt->join( $join[0], $join[1], ( isset( $join[2] ) ? $join[2] : 'LEFT' ), ( isset( $join[3] ) ? $join[3] : FALSE ) );
 				}
 			}
 
@@ -382,26 +365,26 @@ class Database extends Dynamic
 
 			foreach ( $stmt as $k => $v )
 			{
-				if( !in_array( $k, $this->currentFilters ) )
+				if( \count( $this->availableFilters ) and !\in_array( $k, $this->currentFilters ) )
 				{
 					continue;
 				}
 				$this->addRow( array( 'key' => $this->availableFilters[ $k ], 'value' => $v ) );
 			}
 		}
-
+		
 		/* Graph */
 		else
 		{
 			/* Fetch */
 			$fromUnixTime = "FROM_UNIXTIME( IFNULL( {$this->dateField}, 0 ) )";
-			if ( !$this->timezoneError and Member::loggedIn()->timezone and in_array( Member::loggedIn()->timezone, DateTimeZone::listIdentifiers() ) )
+			if ( !$this->timezoneError and \IPS\Member::loggedIn()->timezone and \in_array( \IPS\Member::loggedIn()->timezone, \DateTimeZone::listIdentifiers() ) )
 			{
-				$fromUnixTime = "CONVERT_TZ( {$fromUnixTime}, @@session.time_zone, '" . Db::i()->escape_string( Member::loggedIn()->timezone ) . "' )";
+				$fromUnixTime = "CONVERT_TZ( {$fromUnixTime}, @@session.time_zone, '" . \IPS\Db::i()->escape_string( \IPS\Member::loggedIn()->timezone ) . "' )";
 			}
 
-			$stmt = Db::i()->select(
-				"SQL_BIG_RESULT DATE_FORMAT( {$fromUnixTime}, '{$timescale}' ) AS time_as_alias" . ( count( $this->series ) ? "," : "" ) . implode( ', ', array_unique( $this->series ) ) . ( $this->groupBy ? ", " . $this->groupBy : '' ),
+			$stmt = \IPS\Db::i()->select(
+				"SQL_BIG_RESULT DATE_FORMAT( {$fromUnixTime}, '{$timescale}' ) AS time_as_alias" . ( \count( $this->series ) ? "," : "" ) . implode( ', ', array_unique( $this->series ) ) . ( $this->groupBy ? ", " . $this->groupBy : '' ),
 				$this->table,
 				$where,
 				'time_as_alias ASC',
@@ -409,21 +392,21 @@ class Database extends Dynamic
 				$this->groupBy ? array( 'time_as_alias', $this->groupBy ) : 'time_as_alias'
 			);
 
-			if( count( $this->joins ) )
+			if( \count( $this->joins ) )
 			{
 				foreach( $this->joins as $join )
 				{
-					$stmt = $stmt->join( $join[0], $join[1], ( $join[2] ?? 'LEFT' ), ( $join[3] ?? FALSE ) );
+					$stmt = $stmt->join( $join[0], $join[1], ( isset( $join[2] ) ? $join[2] : 'LEFT' ), ( isset( $join[3] ) ? $join[3] : FALSE ) );
 				}
 			}
 
 			foreach ( $stmt as $row )
 			{
 				$result	= array();
-
+	
 				if( $this->groupBy )
 				{
-					if( count( $this->availableFilters ) AND !in_array( $row[ $this->groupBy ], $this->currentFilters ) )
+					if( \count( $this->availableFilters ) AND !\in_array( $row[ $this->groupBy ], $this->currentFilters ) )
 					{
 						continue;
 					}
@@ -448,29 +431,29 @@ class Database extends Dynamic
 						$result[ $column ]	= $row[ $column ];
 					}
 				}
-
+	
 				$data[ $row['time_as_alias'] ] = $result;
 			}
 
 			ksort( $data, SORT_NATURAL );
-
+			
 			/* Add to graph */
 			$min = NULL;
 			$max = NULL;
 			foreach ( $data as $time => $d )
 			{
-				$datetime = new DateTime;
+				$datetime = new \IPS\DateTime;
 
-				if ( Member::loggedIn()->timezone )
+				if ( \IPS\Member::loggedIn()->timezone )
 				{
 					try
 					{
-						$datetime->setTimezone( new DateTimeZone( Member::loggedIn()->timezone ) );
+						$datetime->setTimezone( new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) );
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
-						Member::loggedIn()->timezone	= null;
-						Member::loggedIn()->save();
+						\IPS\Member::loggedIn()->timezone	= null;
+						\IPS\Member::loggedIn()->save();
 					}
 				}
 
@@ -487,26 +470,26 @@ class Database extends Dynamic
 					switch ( $this->timescale )
 					{
 						case 'none':
-							$datetime = DateTime::ts( $time );
+							$datetime = \IPS\DateTime::ts( $time );
 							break;
 
 						case 'daily':
 							$datetime->setDate( (float) $exploded[0], $exploded[1], $exploded[2] );
 							//$datetime = $datetime->localeDate();
 							break;
-
+							
 						case 'weekly':
 							$datetime->setISODate( (float) $exploded[0], $exploded[1] );
 							//$datetime = $datetime->localeDate();
 							break;
-
+							
 						case 'monthly':
 							$datetime->setDate( (float) $exploded[0], $exploded[1], 1 );
 							//$datetime = $datetime->format( 'F Y' );
 							break;
 					}
 				}
-
+							
 				if ( empty( $d ) )
 				{
 					if ( empty( $this->series ) )
@@ -515,7 +498,7 @@ class Database extends Dynamic
 					}
 					else
 					{
-						$this->addRow( array_merge( array( $datetime ), array_fill( 0, count( $this->series ), 0 ) ) );
+						$this->addRow( array_merge( array( $datetime ), array_fill( 0, \count( $this->series ), 0 ) ) );
 					}
 				}
 				else
@@ -527,14 +510,14 @@ class Database extends Dynamic
 						{
 							$_values[ $id ] = ( isset( $d[ $id ] ) ) ? $d[ $id ] : ( $this->plotZeros ? 0 : NULL );
 						}
-
+						
 						$this->addRow( array_merge( array( $datetime ), $_values ) );
 					}
 					else
 					{
-						if( count($d) < count($this->series) )
+						if( \count($d) < \count($this->series) )
 						{
-							$this->addRow( array_merge( array( $datetime ), $d, array_fill( 0, count($this->series) - count($d), 0 ) ) );
+							$this->addRow( array_merge( array( $datetime ), $d, array_fill( 0, \count($this->series) - \count($d), 0 ) ) );
 						}
 						else
 						{
@@ -543,20 +526,20 @@ class Database extends Dynamic
 					}
 				}
 			}
-
-			if ( count( $data ) === 1 )
+			
+			if ( \count( $data ) === 1 )
 			{
 				$this->options['domainAxis']['type'] = 'category';
 			}
 		}
 	}
-
+	
 	/**
 	 * Get the chart output
 	 *
 	 * @return	string
 	 */
-	public function getOutput(): string
+	public function getOutput()
 	{
 		/* Auto-support tables where appropriate */
 		if ( !empty( $this->tableInclude ) )
@@ -566,7 +549,7 @@ class Database extends Dynamic
 				$this->availableTypes[] = 'Table';
 			}
 		}
-
+		
 		/* Work out where clause */
 		$where = $this->where;
 		$where[] = array( "{$this->dateField}>?", 0 );
@@ -578,31 +561,31 @@ class Database extends Dynamic
 		{
 			$where[] = array( "{$this->dateField}<?", $this->end->getTimestamp() );
 		}
-
+		
 		/* Table... */
 		if ( $this->type === 'Table' )
 		{
 			/* Are we filtering? */
 			if( $this->groupBy )
 			{
-				if( count( $this->availableFilters ) AND count( $this->currentFilters ) )
+				if( \count( $this->availableFilters ) AND \count( $this->currentFilters ) )
 				{
-					$where[] = array( Db::i()->in( $this->groupBy, $this->currentFilters ) );
+					$where[] = array( \IPS\Db::i()->in( $this->groupBy, $this->currentFilters ) );
 				}
 			}
 
-			$table = new TableDb( $this->table, $this->url, $where );
+			$table = new \IPS\Helpers\Table\Db( $this->table, $this->url, $where );
 
 			/* Reformat chart join for the table helper */
-			if( is_array( $this->joins ) )
+			if( \is_array( $this->joins ) )
 			{
 				array_walk( $this->joins, function ( $item ) use ( $table )
 				{
-					$table->joins[] = array('from' => $item[0], 'where' => $item[1], 'type' => $item[2] ?? 'LEFT' );
+					$table->joins[] = array('from' => $item[0], 'where' => $item[1], 'type' => isset( $item[2] ) ? $item[2] : 'LEFT');
 				} );
 			}
 
-			if( count( $this->tableInclude ) )
+			if( \count( $this->tableInclude ) )
 			{
 				$table->include = $this->tableInclude;
 			}
@@ -612,8 +595,8 @@ class Database extends Dynamic
 			}
 			$table->parsers = $this->tableParsers;
 			$table->sortBy = $table->sortBy ?: $this->dateField;
-
-			if ( isset( Request::i()->download ) )
+			
+			if ( isset( \IPS\Request::i()->download ) )
 			{
 				$headers = array();
 				foreach( $table->getHeaders( $table->getAdvancedSearchValues() ) AS $header )
@@ -622,13 +605,13 @@ class Database extends Dynamic
 					{
 						continue;
 					}
-
+					
 					$headers[] = array(
-						'label'		=> Member::loggedIn()->language()->addToStack( $header ),
+						'label'		=> \IPS\Member::loggedIn()->language()->addToStack( $header ),
 						'type'		=> 'string'
 					);
 				}
-
+				
 				$rows = array();
 				foreach( $table->getRows( $table->getAdvancedSearchValues() ) AS $k => $v )
 				{
@@ -638,20 +621,20 @@ class Database extends Dynamic
 						$rows[$k][] = trim( strip_tags( (string) $value ) );
 					}
 				}
-
-				$this->download( $headers, $rows, Output::i()->title );
-				return '';
+				
+				return $this->download( $headers, $rows, \IPS\Output::i()->title );
 			}
+			
+			$output = (string) $table;
 
-			return (string) $table;
+			return $output;
 		}
-
+		
 		$this->compileForOutput();
 
-		if ( isset( Request::i()->download ) )
+		if ( isset( \IPS\Request::i()->download ) )
 		{
-			$this->download();
-			return '';
+			return $this->download();
 		}
 		else
 		{

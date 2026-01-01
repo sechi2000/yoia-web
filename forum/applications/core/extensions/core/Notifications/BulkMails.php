@@ -11,30 +11,24 @@
 namespace IPS\core\extensions\core\Notifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\NotificationsAbstract;
-use IPS\Member;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Notification Options: Bulk Mails
  */
-class BulkMails extends NotificationsAbstract
+class _BulkMails
 {
 	/**
 	 * Get fields for configuration
 	 *
-	 * @param	Member|null	$member		The member (to take out any notification types a given member will never see) or NULL if this is for the ACP
+	 * @param	\IPS\Member|null	$member		The member (to take out any notification types a given member will never see) or NULL if this is for the ACP
 	 * @return	array
 	 */
-	public static function configurationOptions( ?Member $member = NULL ): array
+	public static function configurationOptions( \IPS\Member $member = NULL ): array
 	{
 		return array(
 			'allow_admin_mails'	=> array(
@@ -48,10 +42,10 @@ class BulkMails extends NotificationsAbstract
 				'extra'				=> array(
 					'newsletter'		=> array(
 						'title'				=> 'member_notifications_email',
-						'icon'				=> 'envelope',
+						'icon'				=> 'envelope-o',
 						'value'				=> $member ? ( $member->allow_admin_mails ) : NULL,
 						'adminCanSetDefault'=> TRUE,
-						'default'			=> ( Settings::i()->updates_consent_default === 'enabled' ),
+						'default'			=> ( \IPS\Settings::i()->updates_consent_default === 'enabled' ),
 						'admin_lang'		=> array(
 							'title'		=> 'updates_consent_default',
 							'desc'		=> 'updates_consent_default_desc',
@@ -67,12 +61,12 @@ class BulkMails extends NotificationsAbstract
 	/**
 	 * Save "extra" value
 	 *
-	 * @param	Member|NULL	$member	The member or NULL if this is the admin setting defaults
+	 * @param	\IPS\Member|NULL	$member	The member or NULL if this is the admin setting defaults
 	 * @param	string				$key	The key
 	 * @param	bool				$value	The value
 	 * @return	void
 	 */
-	public static function saveExtra( ?Member $member, string $key, bool $value ) : void
+	public static function saveExtra( ?\IPS\Member $member, $key, $value )
 	{
 		switch ( $key )
 		{
@@ -87,7 +81,7 @@ class BulkMails extends NotificationsAbstract
 				}
 				else
 				{
-					Settings::i()->changeValues( array( 'updates_consent_default' => $value ? 'enabled' : 'disabled' ) );
+					\IPS\Settings::i()->changeValues( array( 'updates_consent_default' => $value ? 'enabled' : 'disabled' ) );
 				}
 				break;
 		}
@@ -96,11 +90,11 @@ class BulkMails extends NotificationsAbstract
 	/**
 	 * Disable all "extra" values for a particular type
 	 *
-	 * @param	Member|NULL	$member	The member or NULL if this is the admin setting defaults
+	 * @param	\IPS\Member|NULL	$member	The member or NULL if this is the admin setting defaults
 	 * @param	string				$method	The method type
 	 * @return	void
 	 */
-	public static function disableExtra( ?Member $member, string $method ) : void
+	public static function disableExtra( ?\IPS\Member $member, $method )
 	{
 		if ( $method === 'email' and $member->allow_admin_mails )
 		{
@@ -108,5 +102,15 @@ class BulkMails extends NotificationsAbstract
 			$member->save();
 			$member->logHistory( 'core', 'admin_mails', array( 'enabled' => false ) );
 		}
+	}
+	
+	/**
+	 * Reset "extra" value to the default for all accounts
+	 *
+	 * @return	void
+	 */
+	public static function resetExtra()
+	{
+		// Deliberately does nothing. There is no way to mass update the bulk mail preferences
 	}
 }

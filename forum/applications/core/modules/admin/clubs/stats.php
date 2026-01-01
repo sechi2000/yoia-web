@@ -11,50 +11,30 @@
 namespace IPS\core\modules\admin\clubs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Callback;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics
  */
-class stats extends Controller
+class _stats extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'stats_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'stats_manage' );
 		parent::execute();
 	}
 
@@ -63,40 +43,40 @@ class stats extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* If clubs are not enabled, stop now */
-		if ( !Settings::i()->clubs )
+		if ( !\IPS\Settings::i()->clubs )
 		{
 			$availableTypes = array();
-			foreach ( Club::availableNodeTypes() as $class )
+			foreach ( \IPS\Member\Club::availableNodeTypes( NULL ) as $class )
 			{
-				$availableTypes[] = Member::loggedIn()->language()->addToStack( $class::clubAcpTitle() );
+				$availableTypes[] = \IPS\Member::loggedIn()->language()->addToStack( $class::clubAcpTitle() );
 			}
 			
-			$availableTypes = Member::loggedIn()->language()->formatList( $availableTypes );
+			$availableTypes = \IPS\Member::loggedIn()->language()->formatList( $availableTypes );
 			
-			Output::i()->output = Theme::i()->getTemplate( 'clubs' )->disabled( $availableTypes );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'clubs' )->disabled( $availableTypes );
 			return;
 		}
 
 		/* Generate the tabs */
 		$tabs		= array( 'overview' => 'overview', 'total' => 'stats_club_activity', 'byclub' => 'stats_club_club_activity' );
-		$activeTab	= ( isset( Request::i()->tab ) and array_key_exists( Request::i()->tab, $tabs ) ) ? Request::i()->tab : 'overview';
+		$activeTab	= ( isset( \IPS\Request::i()->tab ) and array_key_exists( \IPS\Request::i()->tab, $tabs ) ) ? \IPS\Request::i()->tab : 'overview';
 
 		/* Get the HTML to output */
 		$method = '_' . $activeTab;
 		$output = $this->$method();
 
 		/* And then print it */
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = (string) $output;
+			\IPS\Output::i()->output = (string) $output;
 		}
 		else
 		{	
-			Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_clubs_stats');
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string) $output, Url::internal( "app=core&module=clubs&controller=stats" ) );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_clubs_stats');
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string) $output, \IPS\Http\Url::internal( "app=core&module=clubs&controller=stats" ) );
 		}
 	}
 
@@ -105,23 +85,23 @@ class stats extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _overview() : string
+	protected function _overview()
 	{
 		$clubTypePieChart	= $this->_getClubTypePieChart();
 		$clubSignups		= $this->_getClubSignups();
 		$clubCreations		= $this->_getClubCreations();
 
-		return Theme::i()->getTemplate( 'clubs', 'core' )->statsOverview( $clubTypePieChart, $clubSignups, $clubCreations );
+		return \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->statsOverview( $clubTypePieChart, $clubSignups, $clubCreations );
 	}
 
 	/**
 	 * Get line chart showing club signups
 	 *
-	 * @return Chart
+	 * @return \IPS\Helpers\Chart
 	 */
-	protected function _getClubSignups() : Chart
+	protected function _getClubSignups()
 	{
-		$chart	= new Database( Url::internal( 'app=core&module=clubs&controller=stats&fetch=signups' ), 'core_clubs_memberships', 'joined', '', array(
+		$chart	= new \IPS\Helpers\Chart\Database( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=stats&fetch=signups' ), 'core_clubs_memberships', 'joined', '', array( 
 			'isStacked' => TRUE,
 			'backgroundColor' 	=> '#ffffff',
 			'hAxis'				=> array( 'gridlines' => array( 'color' => '#f5f5f5' ) ),
@@ -132,17 +112,17 @@ class stats extends Controller
 		$chart->joins[] = array( 'core_clubs', 'core_clubs.id=core_clubs_memberships.club_id' );
 		$chart->groupBy = 'club_id';
 
-		foreach( Club::clubs( NULL, NULL, 'name' ) as $club )
+		foreach( \IPS\Member\Club::clubs( NULL, NULL, 'name' ) as $club )
 		{
 			$chart->addSeries( $club->name, 'number', 'COUNT(*)', TRUE, $club->id );
 		}
 
-		$chart->title = Member::loggedIn()->language()->addToStack('stats_clubs_signups');
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('stats_clubs_signups');
 		$chart->availableTypes = array( 'ColumnChart', 'BarChart' );
 
-		if( Request::i()->fetch == 'signups' AND Request::i()->isAjax() )
+		if( \IPS\Request::i()->fetch == 'signups' AND \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->sendOutput( (string) $chart );
+			\IPS\Output::i()->sendOutput( (string) $chart, 200 );
 		}
 
 		return $chart;
@@ -151,11 +131,11 @@ class stats extends Controller
 	/**
 	 * Get line chart showing club creations
 	 *
-	 * @return Chart
+	 * @return \IPS\Helpers\Chart
 	 */
-	protected function _getClubCreations() : Chart
+	protected function _getClubCreations()
 	{
-		$chart	= new Database( Url::internal( 'app=core&module=clubs&controller=stats&fetch=clubs' ), 'core_clubs', 'created', '', array(
+		$chart	= new \IPS\Helpers\Chart\Database( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=stats&fetch=clubs' ), 'core_clubs', 'created', '', array( 
 			'isStacked' => FALSE,
 			'backgroundColor' 	=> '#ffffff',
 			'colors'			=> array( '#10967e' ),
@@ -163,13 +143,13 @@ class stats extends Controller
 			'lineWidth'			=> 1,
 			'areaOpacity'		=> 0.4
 		 ), 'ColumnChart', 'monthly', array( 'start' => 0, 'end' => 0 ), array(), 'signups' );
-		$chart->addSeries( Member::loggedIn()->language()->addToStack('stats_clubs_creations'), 'number', 'COUNT(*)', FALSE );
-		$chart->title = Member::loggedIn()->language()->addToStack('stats_clubs_creations');
+		$chart->addSeries( \IPS\Member::loggedIn()->language()->addToStack('stats_clubs_creations'), 'number', 'COUNT(*)', FALSE );
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('stats_clubs_creations');
 		$chart->availableTypes = array( 'ColumnChart', 'BarChart' );
 
-		if( Request::i()->fetch == 'clubs' AND Request::i()->isAjax() )
+		if( \IPS\Request::i()->fetch == 'clubs' AND \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->sendOutput( (string) $chart );
+			\IPS\Output::i()->sendOutput( (string) $chart, 200 );
 		}
 
 		return $chart;
@@ -178,15 +158,15 @@ class stats extends Controller
 	/**
 	 * Get pie chart showing club types
 	 *
-	 * @return string
+	 * @return \IPS\Helpers\Chart
 	 */
-	protected function _getClubTypePieChart() : string
+	protected function _getClubTypePieChart()
 	{
 		$percentages	= array();
 		$counts			= array();
 		$total			= 0;
 
-		foreach( Db::i()->select( 'type, COUNT(*) as total', 'core_clubs', array(), NULL, NULL, array( 'type' ) ) as $clubs )
+		foreach( \IPS\Db::i()->select( 'type, COUNT(*) as total', 'core_clubs', array(), NULL, NULL, array( 'type' ) ) as $clubs )
 		{
 			$counts[ $clubs['type'] ] = $clubs['total'];
 			$total += $clubs['total'];
@@ -197,18 +177,18 @@ class stats extends Controller
 			$percentages[ $type ] = number_format( round( 100 / $total * $typeTotal, 2 ), 2 );
 		}
 
-		return Theme::i()->getTemplate( 'clubs', 'core' )->clubTypesBar( $percentages, $counts );
+		return \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->clubTypesBar( $percentages, $counts );
 	}
 
 	/**
 	 * Total club activity
 	 *
-	 * @return	Callback
+	 * @return	\IPS\Helpers\Chart\Dynamic
 	 */
-	protected function _total() : Chart
+	protected function _total()
 	{
-		$chart = new Callback(
-			Url::internal( 'app=core&module=clubs&controller=stats&tab=total' ),
+		$chart = new \IPS\Helpers\Chart\Callback( 
+			\IPS\Http\Url::internal( 'app=core&module=clubs&controller=stats&tab=total' ), 
 			array( $this, 'getResults' ),
 			'', 
 			array( 
@@ -220,17 +200,17 @@ class stats extends Controller
 			), 
 			'ColumnChart', 
 			'monthly',
-			array( 'start' => ( new DateTime )->sub( new DateInterval('P6M') ), 'end' => DateTime::create() ),
+			array( 'start' => ( new \IPS\DateTime )->sub( new \DateInterval('P6M') ), 'end' => \IPS\DateTime::create() ),
 			'total'
 		);
 
-		foreach( Club::availableNodeTypes() as $nodeType )
+		foreach( \IPS\Member\Club::availableNodeTypes( NULL ) as $nodeType )
 		{
 			$contentClass = $nodeType::$contentItemClass;
-			$chart->addSeries( Member::loggedIn()->language()->get( $contentClass::$title . '_pl' ), 'number');
+			$chart->addSeries( \IPS\Member::loggedIn()->language()->get( $contentClass::$title . '_pl' ), 'number', TRUE );
 		}
 
-		$chart->title = Member::loggedIn()->language()->addToStack( 'stats_club_activity' );
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack( 'stats_club_activity' );
 		$chart->availableTypes = array( 'AreaChart', 'ColumnChart', 'BarChart' );
 
 		return $chart;
@@ -241,10 +221,10 @@ class stats extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _byclub() : string
+	protected function _byclub()
 	{
-		$chart = new Callback(
-			Url::internal( 'app=core&module=clubs&controller=stats&tab=byclub' ),
+		$chart = new \IPS\Helpers\Chart\Callback( 
+			\IPS\Http\Url::internal( 'app=core&module=clubs&controller=stats&tab=byclub' ), 
 			array( $this, 'getResults' ),
 			'', 
 			array( 
@@ -256,16 +236,16 @@ class stats extends Controller
 			), 
 			'ColumnChart', 
 			'monthly',
-			array( 'start' => ( new DateTime )->sub( new DateInterval('P6M') ), 'end' => DateTime::create() ),
+			array( 'start' => ( new \IPS\DateTime )->sub( new \DateInterval('P6M') ), 'end' => \IPS\DateTime::create() ),
 			'byclub'
 		);
 
-		foreach( Club::clubs( NULL, NULL, 'name' ) as $club )
+		foreach( \IPS\Member\Club::clubs( NULL, NULL, 'name' ) as $club )
 		{
 			$chart->addSeries( $club->name, 'number', TRUE );
 		}
 
-		$chart->title = Member::loggedIn()->language()->addToStack( 'stats_club_club_activity' );
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack( 'stats_club_club_activity' );
 		$chart->availableTypes = array( 'AreaChart', 'ColumnChart', 'BarChart' );
 
 		return $chart;
@@ -274,13 +254,13 @@ class stats extends Controller
 	/**
 	 * Fetch the results
 	 *
-	 * @param	Callback	$chart	Chart object
+	 * @param	\IPS\Helpers\Chart\Callback	$chart	Chart object
 	 * @return	array
 	 */
-	public function getResults( Callback $chart ) : array
+	public function getResults( $chart )
 	{
 		/* Get the info we need */
-		$nodeTypes	= Club::availableNodeTypes();
+		$nodeTypes	= \IPS\Member\Club::availableNodeTypes( NULL );
 		$clubNodes	= array();
 		$classes	= array();
 		$classMap	= array();
@@ -312,7 +292,7 @@ class stats extends Controller
 		{
 			$clubNodeMap = array();
 
-			foreach( Db::i()->select( '*', 'core_clubs_node_map' ) as $nodeMap )
+			foreach( \IPS\Db::i()->select( '*', 'core_clubs_node_map' ) as $nodeMap )
 			{
 				$nodeClass = $nodeMap['node_class'];
 				$nodeClass = $nodeClass::$contentItemClass;
@@ -342,15 +322,21 @@ class stats extends Controller
 			$where	= array();
 			$join	= NULL;
 
+			/* Get our container IDs */
+			$containerIds = array();
+			foreach( $clubNodes[ $classMap[ $class ] ] as $node )
+			{
+				$containerIds[] = $node->id;
+			}
+
 			if( is_subclass_of( $class, '\IPS\Content\Comment' ) )
 			{
 				/* We're going to need a subquery... */
 				$parentClass = $class::$itemClass;
 
-				/* @var array $databaseColumnMap */
 				$where[] = array( 
 					$class::$databasePrefix . $class::$databaseColumnMap['item'] . " IN(" .					
-					Db::i()->select( $parentClass::$databasePrefix . $parentClass::$databaseColumnId, $parentClass::$databaseTable, array( Db::i()->in( $parentClass::$databasePrefix . $parentClass::$databaseColumnMap['container'], array_keys( $clubNodes[ $classMap[ $class ] ] ) ) ) )
+					(string) \IPS\Db::i()->select( $parentClass::$databasePrefix . $parentClass::$databaseColumnId, $parentClass::$databaseTable, array( \IPS\Db::i()->in( $parentClass::$databasePrefix . $parentClass::$databaseColumnMap['container'], $containerIds ) ) )
 					. ")"
 				);
 
@@ -368,8 +354,7 @@ class stats extends Controller
 			}
 			else
 			{
-				/* @var array $databaseColumnMap */
-				$where[] = array( Db::i()->in( $class::$databasePrefix . $class::$databaseColumnMap['container'], array_keys( $clubNodes[ $classMap[ $class ] ] ) ) );
+				$where[] = array( \IPS\Db::i()->in( $class::$databasePrefix . $class::$databaseColumnMap['container'], $containerIds ) );
 
 				if( mb_strpos( $chart->identifier, 'byclub' ) !== FALSE )
 				{
@@ -379,11 +364,11 @@ class stats extends Controller
 
 			$stmt = $this->getSqlResults(
 				$class::$databaseTable,
-				$class::$databasePrefix . ( $class::$databaseColumnMap['updated'] ?? $class::$databaseColumnMap['date'] ),
+				$class::$databasePrefix . ( isset( $class::$databaseColumnMap['updated'] ) ? $class::$databaseColumnMap['updated'] : $class::$databaseColumnMap['date'] ),
 				$class::$databasePrefix . $class::$databaseColumnMap['author'],
 				$chart,
 				$where,
-				( $groupByContainer ?? false ),
+				$groupByContainer,
 				$join
 			);
 
@@ -397,19 +382,25 @@ class stats extends Controller
 
 					if( mb_strpos( $chart->identifier, 'byclub' ) !== FALSE )
 					{
-						foreach( Club::clubs( NULL, NULL, 'name' ) as $club )
+						foreach( \IPS\Member\Club::clubs( NULL, NULL, 'name' ) as $club )
 						{
 							$results[ $row['time'] ][ $club->name ] = 0;
 						}
 					}
 					else
 					{
-						foreach( Club::availableNodeTypes() as $nodeType )
+						foreach( \IPS\Member\Club::availableNodeTypes( NULL ) as $nodeType )
 						{
 							$contentClass = $nodeType::$contentItemClass;
-							$key = Member::loggedIn()->language()->get( $contentClass::$title . '_pl' );
-							Member::loggedIn()->language()->parseOutputForDisplay( $key );
-							$results[ $row['time'] ][ $key ] = 0;
+							$languageKey = \IPS\Member::loggedIn()->language()->words[ $contentClass::$title . '_pl'];
+
+							/* Pages Databases may need the language string parsing */
+							if( mb_substr( $contentClass, 0, 15 ) === 'IPS\cms\Records' )
+							{
+								\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $languageKey );
+							}
+
+							$results[ $row['time'] ][ $languageKey ] = 0;
 						}
 					}
 				}
@@ -418,14 +409,24 @@ class stats extends Controller
 
 				if( mb_strpos( $chart->identifier, 'byclub' ) !== FALSE )
 				{
-					$results[ $row['time'] ][ Club::load( $clubNodeMap[ $class::$databaseTable . '-' . $row['container'] ] )->name ] += $row['total'];
+					try
+					{
+						$results[ $row['time'] ][ \IPS\Member\Club::load( $clubNodeMap[ $class::$databaseTable . '-' . $row['container'] ] )->name ] += $row['total'];
+					}
+					catch( \OutOfRangeException $e ){}
 				}
 				else
 				{
+					$languageKey = \IPS\Member::loggedIn()->language()->words[ $contentClass::$title . '_pl'];
+
+					/* Pages Databases may need the language string parsing */
+					if( mb_substr( $contentClass, 0, 15 ) === 'IPS\cms\Records' )
+					{
+						\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $languageKey );
+					}
+
 					$contentClass = $classMap[ $class ]::$contentItemClass;
-					$key = Member::loggedIn()->language()->get( $contentClass::$title . '_pl' );
-					Member::loggedIn()->language()->parseOutputForDisplay( $key );
-					$results[ $row['time'] ][ $key ] += $row['total'];
+					$results[ $row['time'] ][ $languageKey ] += $row['total'];
 				}
 			}
 		}
@@ -444,9 +445,9 @@ class stats extends Controller
 	 * @param	array		$where				Where clause
 	 * @param	bool|string	$groupByContainer	If a string is provided, it must be a column name to group by in addition to time
 	 * @param	NULL|array	$join				Join data, if needed (only used when $groupByContainer is set)
-	 * @return	Select
+	 * @return	array
 	 */
-	protected function getSqlResults( string $table, string $date, string $author, object $chart, array $where = array(), bool|string $groupByContainer = FALSE, ?array $join = NULL ) : Select
+	protected function getSqlResults( $table, $date, $author, $chart, $where = array(), $groupByContainer = FALSE, $join = NULL )
 	{
 		/* What's our SQL time? */
 		switch ( $chart->timescale )
@@ -460,7 +461,6 @@ class stats extends Controller
 				break;
 				
 			case 'monthly':
-			default:
 				$timescale = '%Y-%c';
 				break;
 		}
@@ -478,14 +478,14 @@ class stats extends Controller
 
 		/* First we need to get search index activity */
 		$fromUnixTime = "FROM_UNIXTIME( IFNULL( {$date}, 0 ) )";
-		if ( !$chart->timezoneError and Member::loggedIn()->timezone and in_array( Member::loggedIn()->timezone, DateTime::getTimezoneIdentifiers() ) )
+		if ( !$chart->timezoneError and \IPS\Member::loggedIn()->timezone and \in_array( \IPS\Member::loggedIn()->timezone, \IPS\DateTime::getTimezoneIdentifiers() ) )
 		{
-			$fromUnixTime = "CONVERT_TZ( {$fromUnixTime}, @@session.time_zone, '" . Db::i()->escape_string( Member::loggedIn()->timezone ) . "' )";
+			$fromUnixTime = "CONVERT_TZ( {$fromUnixTime}, @@session.time_zone, '" . \IPS\Db::i()->escape_string( \IPS\Member::loggedIn()->timezone ) . "' )";
 		}
 
 		if( $groupByContainer !== FALSE )
 		{
-			$stmt = Db::i()->select( "DATE_FORMAT( {$fromUnixTime}, '{$timescale}' ) AS time, COUNT(*) as total, {$groupByContainer} as container", $table, $where, 'time ASC', NULL, array( 'time', 'container' ) );
+			$stmt = \IPS\Db::i()->select( "DATE_FORMAT( {$fromUnixTime}, '{$timescale}' ) AS time, COUNT(*) as total, {$groupByContainer} as container", $table, $where, 'time ASC', NULL, array( 'time', 'container' ) );
 
 			if( $join !== NULL )
 			{
@@ -494,7 +494,7 @@ class stats extends Controller
 		}
 		else
 		{
-			$stmt = Db::i()->select( "DATE_FORMAT( {$fromUnixTime}, '{$timescale}' ) AS time, COUNT(*) as total", $table, $where, 'time ASC', NULL, array( 'time' ) );
+			$stmt = \IPS\Db::i()->select( "DATE_FORMAT( {$fromUnixTime}, '{$timescale}' ) AS time, COUNT(*) as total", $table, $where, 'time ASC', NULL, array( 'time' ) );
 		}
 
 		return $stmt;

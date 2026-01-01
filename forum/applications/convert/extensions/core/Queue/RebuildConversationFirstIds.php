@@ -12,42 +12,30 @@
 namespace IPS\convert\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task\Queue\OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class RebuildConversationFirstIds extends QueueAbstract
+class _RebuildConversationFirstIds
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data	Data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		try
 		{
-			$data['count'] = Db::i()->select( 'count(mt_id)', 'core_message_topics' )->first();
+			$data['count'] = \IPS\Db::i()->select( 'count(mt_id)', 'core_message_topics' )->first();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			throw new \OutOfRangeException;
 		}
@@ -68,21 +56,21 @@ class RebuildConversationFirstIds extends QueueAbstract
 	 * @param	mixed						$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int							$offset	Offset
 	 * @return	int							New offset
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$last = NULL;
 
 		$topicIdsToReset			= array();
 		$firstPostIds				= array();
 
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_message_topics', array( "mt_id>?", $offset ), "mt_id ASC", array( 0, REBUILD_SLOW ) ), 'IPS\core\Messenger\Conversation' ) AS $conversation )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_message_topics', array( "mt_id>?", $offset ), "mt_id ASC", array( 0, \IPS\REBUILD_SLOW ) ), 'IPS\core\Messenger\Conversation' ) AS $conversation )
 		{
 			try
 			{
 				/* Set first post */
-				$conversation->first_msg_id = Db::i()->select( 'msg_id', 'core_message_posts', array( 'msg_topic_id=?', $conversation->id ), 'msg_date ASC', 1 )->first();
+				$conversation->first_msg_id = \IPS\Db::i()->select( 'msg_id', 'core_message_posts', array( 'msg_topic_id=?', $conversation->id ), 'msg_date ASC', 1 )->first();
 				$conversation->save();
 
 				/* Reset new_topic value for topic */
@@ -90,26 +78,26 @@ class RebuildConversationFirstIds extends QueueAbstract
 				$firstPostIds[]		= $conversation->first_msg_id;
 			}
 			/* Underflow exception may occur if the topic doesn't have any posts for an unknown reason */
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 
 			$last = $conversation->id;
 			$data['completed']++;
 		}
 
 		/* Reset flags as needed */
-		if( count( $topicIdsToReset ) )
+		if( \count( $topicIdsToReset ) )
 		{
-			Db::i()->update( 'core_message_posts', array( 'msg_is_first_post' => 0 ), array( 'msg_topic_id IN(' . implode( ',', $topicIdsToReset ) . ')' ) );
+			\IPS\Db::i()->update( 'core_message_posts', array( 'msg_is_first_post' => 0 ), array( 'msg_topic_id IN(' . implode( ',', $topicIdsToReset ) . ')' ) );
 		}
 
-		if( count( $firstPostIds ) )
+		if( \count( $firstPostIds ) )
 		{
-			Db::i()->update( 'core_message_posts', array( 'msg_is_first_post' => 1 ), array( 'msg_id IN(' . implode( ',', $firstPostIds ) . ')' ) );
+			\IPS\Db::i()->update( 'core_message_posts', array( 'msg_is_first_post' => 1 ), array( 'msg_id IN(' . implode( ',', $firstPostIds ) . ')' ) );
 		}
 
 		if( $last === NULL )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		return $last;
@@ -122,8 +110,8 @@ class RebuildConversationFirstIds extends QueueAbstract
 	 * @param	int						$offset	Offset
 	 * @return	array	Text explaining task and percentage complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' =>  Member::loggedIn()->language()->addToStack('queue_rebuilding_conversation_first_id'), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
+		return array( 'text' =>  \IPS\Member::loggedIn()->language()->addToStack('queue_rebuilding_conversation_first_id'), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
 	}
 }

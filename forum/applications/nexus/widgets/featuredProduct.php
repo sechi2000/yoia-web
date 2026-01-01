@@ -12,67 +12,57 @@
 namespace IPS\nexus\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\nexus\Package;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Theme;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * featuredProduct Widget
  */
-class featuredProduct extends PermissionCache implements Customizable
+class _featuredProduct extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'featuredProduct';
+	public $key = 'featuredProduct';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'nexus';
-
+	public $app = 'nexus';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
+	
 	/**
 	 * Initialise this widget
 	 *
 	 * @return void
 	 */ 
-	public function init(): void
+	public function init()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'nexus' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'nexus' ) );
 		parent::init();
 	}
 	
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
 		$form = parent::configuration( $form );
 		
 		$value = 0;
 		if ( isset( $this->configuration['package'] ) )
 		{
-			if ( is_array( $this->configuration['package'] ) )
+			if ( \is_array( $this->configuration['package'] ) )
 			{
 				$value = $this->configuration['package'];
 			}
@@ -82,7 +72,7 @@ class featuredProduct extends PermissionCache implements Customizable
 			}
 		}
 		
-		$form->add( new Node( 'package', $value, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Node( 'package', $value, FALSE, array(
 			'class'           => '\IPS\nexus\Package',
 			'permissionCheck' => function( $node )
 			{
@@ -105,9 +95,9 @@ class featuredProduct extends PermissionCache implements Customizable
 	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function preConfig( array $values ): array
+	public function preConfig( $values )
 	{
-		if ( is_array( $values['package'] ) )
+		if ( \is_array( $values['package'] ) )
 		{
 			$save = array();
 			foreach( $values['package'] AS $pkg )
@@ -129,27 +119,27 @@ class featuredProduct extends PermissionCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		//Load the product
 		$packages = array();
 		if( isset( $this->configuration['package'] ) )
 		{
-			if ( is_array( $this->configuration['package'] ) )
+			if ( \is_array( $this->configuration['package'] ) )
 			{
-				$packages = new ActiveRecordIterator( Db::i()->select( '*', 'nexus_packages', array( array( 'p_store=1' ), array( Db::i()->in( 'p_id', $this->configuration['package'] ) ) ) ), 'IPS\nexus\Package' );
+				$packages = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_packages', array( array( 'p_store=1' ), array( \IPS\Db::i()->in( 'p_id', $this->configuration['package'] ) ) ) ), 'IPS\nexus\Package' );
 			}
 			else
 			{
 				try
 				{
-					$packages = array( Package::load( $this->configuration['package'] ) );
+					$packages = array( \IPS\nexus\Package::load( $this->configuration['package'] ) );
 				}
-				catch ( OutOfRangeException ){}
+				catch ( \OutOfRangeException $e ){}
 			}
 		}
 
-		if ( !count( $packages ) )
+		if ( !\count( $packages ) )
 		{
 			return "";
 		}

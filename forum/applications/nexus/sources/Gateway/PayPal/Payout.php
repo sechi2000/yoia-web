@@ -13,56 +13,31 @@ namespace IPS\nexus\Gateway\PayPal;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use DomainException;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Form\Email;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Payout as NexusPayout;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
 use IPS\Settings;
-use IPS\Theme;
-use RuntimeException;
-use UnexpectedValueException;
-use function defined;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PayPal Pay Out Gateway
  */
-class Payout extends NexusPayout
+class _Payout extends \IPS\nexus\Payout
 {
-	/**
-	 * Extra HTML to display when the admin view the Payout in the ACP
-	 *
-	 * @return string
-	 */
-	public function acpHtml() : string
-	{
-		return Theme::i()->getTemplate( 'payouts', 'nexus' )->PayPal( $this );
-	}
-
 	/**
 	 * ACP Settings
 	 *
 	 * @return	array
 	 */
-	public static function settings() : array
+	public static function settings()
 	{
-		$settings = json_decode( Settings::i()->nexus_payout, TRUE );
+		$settings = json_decode( \IPS\Settings::i()->nexus_payout, TRUE );
 		
 		$return = array();
-		$return[] = new Text( 'paypal_client_id', ( isset( $settings['PayPal']['client_id'] ) AND $settings['PayPal']['client_id'] ) ? $settings['PayPal']['client_id'] : '', NULL );
-		$return[] = new Text( 'paypal_secret', ( isset( $settings['PayPal']['secret'] ) AND $settings['PayPal']['secret'] ) ? $settings['PayPal']['secret'] : '', NULL );
+		$return[] = new \IPS\Helpers\Form\Text( 'paypal_client_id', ( isset( $settings['PayPal']['client_id'] ) AND isset( $settings['PayPal']['client_id'] ) AND $settings['PayPal']['client_id'] ) ? $settings['PayPal']['client_id'] : '', NULL );
+		$return[] = new \IPS\Helpers\Form\Text( 'paypal_secret', ( isset( $settings['PayPal']['secret'] ) AND $settings['PayPal']['secret'] ) ? $settings['PayPal']['secret'] : '', NULL );
 		return $return;
 	}
 	
@@ -71,14 +46,14 @@ class Payout extends NexusPayout
 	 *
 	 * @return	array
 	 */
-	public static function form() : array
+	public static function form()
 	{		
 		$return = array();
-		$return[] = new Email( 'paypal_email', Member::loggedIn()->email, NULL, array(), function( $val )
+		$return[] = new \IPS\Helpers\Form\Email( 'paypal_email', \IPS\Member::loggedIn()->email, NULL, array(), function( $val )
 		{
-			if ( !$val and Request::i()->withdraw_method === 'PayPal' )
+			if ( !$val and \IPS\Request::i()->withdraw_method === 'PayPal' )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		} );
 		return $return;
@@ -89,25 +64,24 @@ class Payout extends NexusPayout
 	 *
 	 * @param	array	$values	Values from form
 	 * @return	mixed
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function getData( array $values ) : mixed
+	public function getData( array $values )
 	{
 		return $values['paypal_email'];
 	}
-
-	/**
-	 * Process the payout
-	 * Return the new status for this payout record
+	
+	/** 
+	 * Process
 	 *
-	 * @return	string
-	 * @throws	Exception
+	 * @return	void
+	 * @throws	\Exception
 	 */
-	public function process() : string
+	public function process()
 	{
 		static::checkToken();
 
-		$settings = json_decode( Settings::i()->nexus_payout, true );
+		$settings = json_decode( \IPS\Settings::i()->nexus_payout, true );
 
 		$data = array(
 			'items' => array(
@@ -122,11 +96,11 @@ class Payout extends NexusPayout
 			),
 			'sender_batch_header' => array(
 				'recipient_type' => 'EMAIL',
-				'sender_batch_id' => "Payout " . DateTime::create()->rfc3339()
+				'sender_batch_id' => "Payout " . \IPS\DateTime::create()->rfc3339()
 			)
 		);
 
-		$response = Url::external( 'https://' . ( \IPS\NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api.paypal.com' ) . '/v1/payments/payouts' )
+		$response = \IPS\Http\Url::external( 'https://' . ( \IPS\NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api.paypal.com' ) . '/v1/payments/payouts' )
 			->request()
 			->forceTls()
 			->setHeaders( array(
@@ -139,7 +113,7 @@ class Payout extends NexusPayout
 
 		if( $response->httpResponseCode != 201 )
 		{
-			throw new Exception( $json['message'] );
+			throw new \IPS\Http\Request\Exception( $json['message'] );
 		}
 
 		if( isset( $json['batch_header'] ) AND $json['batch_header']['payout_batch_id'] )
@@ -149,34 +123,33 @@ class Payout extends NexusPayout
 			{
 				case 'DENIED':
 				case 'CANCELED':
-					return static::STATUS_CANCELED;
+					$this->status = static::STATUS_CANCELED;
 					break;
 				case 'SUCCESS':
-					return static::STATUS_COMPLETE;
+					$this->status = static::STATUS_COMPLETE;
 					break;
 				default:
-					return static::STATUS_PROCESSING;
+					$this->status = static::STATUS_PROCESSING;
 					break;
 			}
-		}
 
-		/* If we are still here, keep it at the current status */
-		return $this->status;
+			$this->save();
+		}
 	}
 	
 	/** 
 	 * Mass Process
 	 *
-	 * @param	ActiveRecordIterator	$payouts	Iterator of payouts to process
+	 * @param	\IPS\Patterns\ActiveRecordIterator	$payouts	Iterator of payouts to process
 	 * @return	void
 	 * @throws	\Exception
 	 */
-	public static function massProcess( ActiveRecordIterator $payouts ) : void
+	public static function massProcess( \IPS\Patterns\ActiveRecordIterator $payouts )
 	{
 		/* Make sure we check the token first so that we have proper authorization to API calls */
 		static::checkToken();
 
-		$settings = json_decode( Settings::i()->nexus_payout, TRUE );
+		$settings = json_decode( \IPS\Settings::i()->nexus_payout, TRUE );
 
 		/* Build a batch of payout items */
 		$payoutIds = $payoutData = [];
@@ -199,11 +172,11 @@ class Payout extends NexusPayout
 				'items' => $batchData,
 				'sender_batch_header' => [
 					'recipient_type' => 'EMAIL',
-					'sender_batch_id' => "Payout-{$currency}-" . DateTime::create()->rfc3339()
+					'sender_batch_id' => "Payout-{$currency}-" . \IPS\DateTime::create()->rfc3339()
 				]
 			];
 
-			$response = Url::external( 'https://' . ( \IPS\NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api.paypal.com' ) . '/v1/payments/payouts' )
+			$response = \IPS\Http\Url::external( 'https://' . ( \IPS\NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api.paypal.com' ) . '/v1/payments/payouts' )
 				->request()
 				->forceTls()
 				->setHeaders( [
@@ -214,7 +187,7 @@ class Payout extends NexusPayout
 
 			if( $response->httpResponseCode != 201 )
 			{
-				throw new RuntimeException( (string) $response, $response->httpResponseCode );
+				throw new \RuntimeException( (string) $response, $response->httpResponseCode );
 			}
 
 			$response = $response->decodeJson();
@@ -239,7 +212,7 @@ class Payout extends NexusPayout
 						break;
 				}
 
-				Db::i()->update( 'nexus_payouts', $update, Db::i()->in( 'po_id', $payoutIds[ $currency ] ) );
+				\IPS\Db::i()->update( 'nexus_payouts', $update, \IPS\Db::i()->in( 'po_id', $payoutIds[ $currency ] ) );
 			}
 		}
 	}
@@ -265,9 +238,9 @@ class Payout extends NexusPayout
 		/* Make sure we check the token first so that we have proper authorization to API calls */
 		static::checkToken();
 
-		$settings = json_decode( Settings::i()->nexus_payout, TRUE );
+		$settings = json_decode( \IPS\Settings::i()->nexus_payout, TRUE );
 
-		$response = Url::external( 'https://' . ( \IPS\NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api.paypal.com' ) . '/v1/payments/payouts/' . $batchId )
+		$response = \IPS\Http\Url::external( 'https://' . ( \IPS\NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api.paypal.com' ) . '/v1/payments/payouts/' . $batchId )
 			->request()
 			->forceTls()
 			->setHeaders( array(
@@ -301,17 +274,17 @@ class Payout extends NexusPayout
 	 * Get Token
 	 *
 	 * @return	void
-	 * @throws	Exception
-	 * @throws	UnexpectedValueException
+	 * @throws	\IPS\Http\Request\Exception
+	 * @throws	\UnexpectedValueException
 	 */
-	protected static function checkToken() : void
+	protected static function checkToken()
 	{
-		$payoutSettings = json_decode( Settings::i()->nexus_payout, true );
+		$payoutSettings = json_decode( \IPS\Settings::i()->nexus_payout, true );
 		$settings = $payoutSettings['PayPal'];
 
 		if ( !isset( $settings['token'] ) or $settings['token_expire'] < time() )
 		{
-			$response = Url::external( 'https://' . ( \IPS\NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api.paypal.com' ) . '/v1/oauth2/token' )
+			$response = \IPS\Http\Url::external( 'https://' . ( \IPS\NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api.paypal.com' ) . '/v1/oauth2/token' )
 				->request()
 				->forceTls()
 				->setHeaders( array(
@@ -324,14 +297,14 @@ class Payout extends NexusPayout
 
 			if ( !isset( $response['access_token'] ) )
 			{
-				throw new UnexpectedValueException($response['error_description'] ?? $response);
+				throw new \UnexpectedValueException( isset( $response['error_description'] ) ? $response['error_description'] : $response );
 			}
 
 			$settings['token'] = $response['access_token'];
 			$settings['token_expire'] = ( time() + $response['expires_in'] );
 			$payoutSettings['PayPal'] = $settings;
 
-			Settings::i()->changeValues( array(
+			\IPS\Settings::i()->changeValues( array(
 				'nexus_payout' => json_encode( $payoutSettings )
 			) );
 		}

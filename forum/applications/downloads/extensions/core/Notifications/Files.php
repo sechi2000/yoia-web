@@ -12,33 +12,24 @@
 namespace IPS\downloads\extensions\core\Notifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\downloads\File;
-use IPS\Extensions\NotificationsAbstract;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Notification\Inline;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Notification Options
  */
-class Files extends NotificationsAbstract
+class _Files
 {
 	/**
 	 * Get fields for configuration
 	 *
-	 * @param	Member|null	$member		The member (to take out any notification types a given member will never see) or NULL if this is for the ACP
+	 * @param	\IPS\Member|null	$member		The member (to take out any notification types a given member will never see) or NULL if this is for the ACP
 	 * @return	array
 	 */
-	public static function configurationOptions( Member $member = NULL ): array
+	public static function configurationOptions( \IPS\Member $member = NULL ): array
 	{
 		return array(
 			'new_file_version'	=> array(
@@ -56,30 +47,30 @@ class Files extends NotificationsAbstract
 	/**
 	 * Parse notification: new_file_version
 	 *
-	 * @param Inline $notification	The notification
-	 * @param bool $htmlEscape		TRUE to escape HTML in title
+	 * @param	\IPS\Notification\Inline	$notification	The notification
+	 * @param	bool						$htmlEscape		TRUE to escape HTML in title
 	 * @return	array
 	 * @code
-	 	* return array(
-	 		* 'title'		=> "Mark has replied to A Topic",			// The notification title
-	 		* 'url'		=> \IPS\Http\Url\Friendly::internal( ... ),	// The URL the notification should link to
-	 		* 'content'	=> "Lorem ipsum dolar sit",					// [Optional] Any appropriate content. Do not format this like an email where the text
-	 																* // explains what the notification is about - just include any appropriate content.
-	 																* // For example, if the notification is about a post, set this as the body of the post.
-	 		* 'author'	=>  \IPS\Member::load( 1 ),					// [Optional] The user whose photo should be displayed for this notification
-	 	* );
+	 	return array(
+	 		'title'		=> "Mark has replied to A Topic",			// The notification title
+	 		'url'		=> \IPS\Http\Url\Friendly::internal( ... ),	// The URL the notification should link to
+	 		'content'	=> "Lorem ipsum dolar sit",					// [Optional] Any appropriate content. Do not format this like an email where the text
+	 																// explains what the notification is about - just include any appropriate content.
+	 																// For example, if the notification is about a post, set this as the body of the post.
+	 		'author'	=>  \IPS\Member::load( 1 ),					// [Optional] The user whose photo should be displayed for this notification
+	 	);
 	 * @endcode
 	 */
-	public function parse_new_file_version(Inline $notification, bool $htmlEscape=TRUE ): array
+	public function parse_new_file_version( $notification, $htmlEscape=TRUE )
 	{
 		$item = $notification->item;
 		if ( !$item )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
                 
 		return array(
-			'title'		=> ( $item->container()->version_numbers ) ? Member::loggedIn()->language()->addToStack( 'notification__new_file_version_with', FALSE, array( 'sprintf' => array( $item->author()->name, $item->version, $item->mapped('title') ) ) ) : Member::loggedIn()->language()->addToStack( 'notification__new_file_version', FALSE, array( 'sprintf' => array( $item->author()->name, $item->mapped('title') ) ) ),
+			'title'		=> ( $item->container()->version_numbers ) ? \IPS\Member::loggedIn()->language()->addToStack( 'notification__new_file_version_with', FALSE, array( 'sprintf' => array( $item->author()->name, $item->version, $item->mapped('title') ) ) ) : \IPS\Member::loggedIn()->language()->addToStack( 'notification__new_file_version', FALSE, array( 'sprintf' => array( $item->author()->name, $item->mapped('title') ) ) ),
 			'url'		=> $notification->item->url(),
 			'content'	=> $notification->item->content(),
 			'author'	=> $notification->extra ?: $notification->item->author(),
@@ -90,11 +81,11 @@ class Files extends NotificationsAbstract
 	/**
 	 * Parse notification for mobile: new_file_version
 	 *
-	 * @param	Lang			$language	The language that the notification should be in
-	 * @param	File	$file		The file
+	 * @param	\IPS\Lang			$language	The language that the notification should be in
+	 * @param	\IPS\downloads\File	$file		The file
 	 * @return	array
 	 */
-	public static function parse_mobile_new_file_version( Lang $language, File $file ): array
+	public static function parse_mobile_new_file_version( \IPS\Lang $language, \IPS\downloads\File $file )
 	{
 		return array(
 			'title'		=> $language->addToStack( 'notification__new_file_version_title' ),

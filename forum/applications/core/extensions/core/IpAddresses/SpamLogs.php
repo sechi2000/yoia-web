@@ -11,28 +11,28 @@
 namespace IPS\core\extensions\core\IpAddresses;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Extensions\IpAddressesAbstract;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Lookup: Spam Service Logs
  */
-class SpamLogs extends IpAddressesAbstract
+class _SpamLogs
 {
+	/**
+	 * Supported in the ACP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInAcp()
+	{
+		return TRUE;
+	}
+
 	/**
 	 * Supported in the ModCP IP address lookup tool?
 	 *
@@ -48,27 +48,27 @@ class SpamLogs extends IpAddressesAbstract
 	 * Find Records by IP
 	 *
 	 * @param	string			$ip			The IP Address
-	 * @param	Url|null	$baseUrl	URL table will be displayed on or NULL to return a count
-	 * @return	string|int|null
+	 * @param	\IPS\Http\Url	$baseUrl	URL table will be displayed on or NULL to return a count
+	 * @return	\IPS\Helpers\Table|int|null
 	 */
-	public function findByIp( string $ip, ?Url $baseUrl = NULL ): string|int|null
+	public function findByIp( $ip, \IPS\Http\Url $baseUrl = NULL )
 	{
 		/* Return count */
 		if ( $baseUrl === NULL )
 		{
-			return Db::i()->select( 'COUNT(*)', 'core_spam_service_log', array( "ip_address LIKE ?", $ip ) )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'core_spam_service_log', array( "ip_address LIKE ?", $ip ) )->first();
 		}
 		
 		/* Init Table */
-		$table = new TableDb( 'core_spam_service_log', $baseUrl, array( "ip_address LIKE ?", $ip ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_spam_service_log', $baseUrl, array( "ip_address LIKE ?", $ip ) );
 				
 		/* Columns we need */
 		$table->include = array( 'log_code', 'email_address', 'log_date', 'ip_address' );
 		$table->mainColumn = 'log_date';
 		$table->langPrefix = 'spamlogs_';
 
-		$table->tableTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
-		$table->rowsTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
+		$table->tableTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
+		$table->rowsTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
 				
 		/* Default sort options */
 		$table->sortBy = $table->sortBy ?: 'log_date';
@@ -78,7 +78,7 @@ class SpamLogs extends IpAddressesAbstract
 		$table->parsers = array(
 			'log_date'			=> function( $val, $row )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
 		);
 		
@@ -100,10 +100,10 @@ class SpamLogs extends IpAddressesAbstract
 		 	...
 	 	);
 	 * @endcode
-	 * @param	Member	$member	The member
-	 * @return	array|Select
+	 * @param	\IPS\Member	$member	The member
+	 * @return	array
 	 */
-	public function findByMember( Member $member ) : array|Select
+	public function findByMember( $member )
 	{
 		return array();
 	}	

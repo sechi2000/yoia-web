@@ -12,23 +12,16 @@
 namespace IPS\nexus\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Expire Purchases Task
  */
-class expirePurchases extends Task
+class _expirePurchases extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -38,12 +31,12 @@ class expirePurchases extends Task
 	 * If an error occurs which means the task could not finish running, throw an \IPS\Task\Exception - do not log an error as a normal log.
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
-	 * @return	string|null	Message to log or NULL
-	 * @throws	Exception
+	 * @return	mixed	Message to log or NULL
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : string|null
+	public function execute()
 	{
-		foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', array( 'ps_active=1 AND ps_expire>0 AND ( ps_expire + ps_grace_period < ? )', time() ), 'ps_expire ASC', 100 ), 'IPS\nexus\Purchase' ) as $purchase )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', array( 'ps_active=1 AND ps_expire>0 AND ( ps_expire + ps_grace_period < ? )', time() ), 'ps_expire ASC', 100 ), 'IPS\nexus\Purchase' ) as $purchase )
 		{
 			$purchase->active = FALSE;
 			$purchase->save();
@@ -54,8 +47,6 @@ class expirePurchases extends Task
 				'name'	=> $purchase->name,
 			), FALSE );
 		}
-
-		return null;
 	}
 	
 	/**
@@ -67,7 +58,7 @@ class expirePurchases extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 		
 	}

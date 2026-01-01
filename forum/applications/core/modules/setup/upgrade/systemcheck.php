@@ -7,104 +7,91 @@
  * @package		Invision Community
  * @since		20 May 2014
  */
- 
+
 namespace IPS\core\modules\setup\upgrade;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\core\Setup\Upgrade;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Upgrader: System Check
  */
-class systemcheck extends Controller
+class _systemcheck extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Show Form
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		/* Do we have an older upgrade session hanging around? */
-		if ( ! isset( Request::i()->skippreviousupgrade ) AND Db::i()->checkForTable( 'upgrade_temp' ) )
+		if ( ! isset( \IPS\Request::i()->skippreviousupgrade ) AND \IPS\Db::i()->checkForTable( 'upgrade_temp' ) )
 		{
 			try
 			{
-				$row  = Db::i()->select( '*', 'upgrade_temp' )->first();
+				$row  = \IPS\Db::i()->select( '*', 'upgrade_temp' )->first();
 				$json = json_decode( $row['upgrade_data'], TRUE );
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$json = NULL;
 			}
 
-			if ( is_array( $json ) and isset( $json['session'] ) and isset( $json['data'] ) )
+			if ( \is_array( $json ) and isset( $json['session'] ) and isset( $json['data'] ) )
 			{
-				Output::i()->title		= Member::loggedIn()->language()->addToStack('unfinished_upgrade');
-				Output::i()->output	= Theme::i()->getTemplate( 'global' )->unfinishedUpgrade( $json, $row['lastaccess'] );
+				\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('unfinished_upgrade');
+				\IPS\Output::i()->output	= \IPS\Theme::i()->getTemplate( 'global' )->unfinishedUpgrade( $json, $row['lastaccess'] );
 				return;
 			}
 		}
-		elseif( isset( Request::i()->skippreviousupgrade ) AND Request::i()->skippreviousupgrade )
+		elseif( isset( \IPS\Request::i()->skippreviousupgrade ) AND \IPS\Request::i()->skippreviousupgrade )
 		{
 			/* If we skip the previous upgrade remove the temp upgrade data now. That way if we hit utf8 upgrader and come back to upgrader we are
 				not prompted again to continue our upgrade we already elected to start over */
-			Db::i()->dropTable( 'upgrade_temp', TRUE );
+			\IPS\Db::i()->dropTable( 'upgrade_temp', TRUE );
 		}
-		
+
 		/* Do we need to disable designer mode? */
-		if ( isset( Request::i()->disableDesignersMode ) )
+		if ( isset( \IPS\Request::i()->disableDesignersMode ) )
 		{
-			Settings::i()->changeValues( array( 'theme_designer_mode' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'theme_designers_mode' => 0 ) );
 		}
-		
+
 		/* Get requirements */
-		$requirements = Upgrade::systemRequirements();
+		$requirements = \IPS\core\Setup\Upgrade::systemRequirements();
+		$designersModeEnabled = ( \IPS\Application::load('core')->long_version >= 40000 and \IPS\Theme::designersModeEnabled() ) ? TRUE : FALSE;
 
 		/* Can we just skip this screen? */
-		$canProceed = FALSE;
-		$canProceed = !isset( $requirements['advice'] ) or !count( $requirements['advice'] );
-		if ( $canProceed )
+		$canProceed = TRUE;
+		if ( !$designersModeEnabled )
 		{
-			foreach ( $requirements['requirements'] as $k => $_requirements )
+			$canProceed = !isset( $requirements['advice'] ) or !\count( $requirements['advice'] );
+			if ( $canProceed )
 			{
-				foreach ( $_requirements as $item )
+				foreach ( $requirements['requirements'] as $k => $_requirements )
 				{
-					if ( !$item['success'] )
+					foreach ( $_requirements as $item )
 					{
-						$canProceed = FALSE;
+						if ( !$item['success'] )
+						{
+							$canProceed = FALSE;
+						}
 					}
 				}
 			}
 		}
-		
+
 		/* Display */
 		if ( $canProceed )
 		{
-			Output::i()->redirect( Url::internal("controller=license&key={$_SESSION['uniqueKey']}") );
-		}		
-		Output::i()->title	 = Member::loggedIn()->language()->addToStack('healthcheck');
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->healthcheck( $requirements );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal("controller=license&key={$_SESSION['uniqueKey']}") );
+		}
+		\IPS\Output::i()->title	 = \IPS\Member::loggedIn()->language()->addToStack('healthcheck');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->healthcheck( $requirements, $designersModeEnabled );
 	}
 }

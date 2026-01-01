@@ -11,53 +11,35 @@
 namespace IPS\core\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\DateRange;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member visit statistics
  */
-class membervisits extends Controller
+class _membervisits extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'membervisits_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'membervisits_manage' );
 		parent::execute();
 	}
 
@@ -66,34 +48,34 @@ class membervisits extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$count		= NULL;
 		$table		= NULL;
 		$start		= NULL;
 		$end		= NULL;
 
-		$defaults = array( 'start' => DateTime::create()->setDate( date('Y'), date('m'), 1 ), 'end' => new DateTime );
+		$defaults = array( 'start' => \IPS\DateTime::create()->setDate( date('Y'), date('m'), 1 ), 'end' => new \IPS\DateTime );
 
-		if( isset( Request::i()->visitDateStart ) AND isset( Request::i()->visitDateEnd ) )
+		if( isset( \IPS\Request::i()->visitDateStart ) AND isset( \IPS\Request::i()->visitDateEnd ) )
 		{
-			$defaults = array( 'start' => DateTime::ts( (int) Request::i()->visitDateStart ), 'end' => DateTime::ts( (int) Request::i()->visitDateEnd ) );
+			$defaults = array( 'start' => \IPS\DateTime::ts( \IPS\Request::i()->visitDateStart ), 'end' => \IPS\DateTime::ts( \IPS\Request::i()->visitDateEnd ) );
 		}
 
-		$groupOptions = array_combine( array_keys( Group::groups( TRUE, FALSE ) ), array_map( function( $_group ) { return (string) $_group; }, Group::groups( TRUE, FALSE ) ) );
+		$groupOptions = array_combine( array_keys( \IPS\Member\Group::groups( TRUE, FALSE ) ), array_map( function( $_group ) { return (string) $_group; }, \IPS\Member\Group::groups( TRUE, FALSE ) ) );
 
-		if( isset( Request::i()->visitGroups ) )
+		if( isset( \IPS\Request::i()->visitGroups ) )
 		{
-			$defaultGroups = explode( ',', Request::i()->visitGroups );
+			$defaultGroups = explode( ',', \IPS\Request::i()->visitGroups );
 		}
 		else
 		{
 			$defaultGroups = array_keys( $groupOptions );
 		}
 
-		$form = new Form( 'visits', 'continue' );
-		$form->add( new DateRange( 'date', $defaults, TRUE ) );
-		$form->add( new CheckboxSet( 'groups', $defaultGroups, FALSE, array( 'options' => $groupOptions ), NULL, NULL, NULL, 'group_filters' ) );
+		$form = new \IPS\Helpers\Form( 'visits', 'continue' );
+		$form->add( new \IPS\Helpers\Form\DateRange( 'date', $defaults, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'groups', $defaultGroups, FALSE, array( 'options' => $groupOptions ), NULL, NULL, NULL, 'group_filters' ) );
 
 		if( $values = $form->values() )
 		{
@@ -104,7 +86,7 @@ class membervisits extends Controller
 			$start		= $values['date']['start']->html();
 			$end		= $values['date']['end']->html();
 
-			$groups		= ( count( array_diff( array_keys( $groupOptions ), $values['groups'] ) ) ) ? $values['groups'] : NULL;
+			$groups		= ( \count( array_diff( array_keys( $groupOptions ), $values['groups'] ) ) ) ? $values['groups'] : NULL;
 		}
 		else
 		{
@@ -115,7 +97,7 @@ class membervisits extends Controller
 			$start		= $defaults['start']->html();
 			$end		= $defaults['end']->html();
 
-			$groups		= ( count( array_diff( array_keys( $groupOptions ), $defaultGroups ) ) ) ? $defaultGroups : NULL;
+			$groups		= ( \count( array_diff( array_keys( $groupOptions ), $defaultGroups ) ) ) ? $defaultGroups : NULL;
 		}
 
 		/* Do we have our date ranges? */
@@ -133,7 +115,7 @@ class membervisits extends Controller
 			$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_members', $where )->first();
 			
 			/* And now build the table */
-			$table = new Db( 'core_members', Request::i()->url()->setQueryString( array( 'visitDateStart' => $startTime, 'visitDateEnd' => $endTime, 'visitGroups' => is_array( $groups ) ? implode( ',', $groups ) : NULL ) ), $where );
+			$table = new \IPS\Helpers\Table\Db( 'core_members', \IPS\Request::i()->url()->setQueryString( array( 'visitDateStart' => $startTime, 'visitDateEnd' => $endTime, 'visitGroups' => \is_array( $groups ) ? implode( ',', $groups ) : NULL ) ), $where );
 
 			$table->include = array( 'name', 'email', 'last_visit', 'group_name', 'ip_address' );
 			$table->mainColumn = 'name';
@@ -148,20 +130,20 @@ class membervisits extends Controller
 			$table->parsers = array(
 				'name'			=> function( $val, $row )
 				{
-					$member = Member::constructFromData( $row );
-					return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
+					$member = \IPS\Member::constructFromData( $row );
+					return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
 				},
-				'email'				=> function( $val )
+				'email'				=> function( $val, $row )
 				{
-					return Theme::i()->getTemplate( 'members', 'core', 'admin' )->memberEmailCell( htmlentities( $val, ENT_DISALLOWED, 'UTF-8', FALSE ) );
+					return \IPS\Theme::i()->getTemplate( 'members', 'core', 'admin' )->memberEmailCell( htmlentities( $val, ENT_DISALLOWED, 'UTF-8', FALSE ) );				
 				},
-				'last_visit'				=> function( $val )
+				'last_visit'				=> function( $val, $row )
 				{
-					return DateTime::ts( $val )->html();
+					return \IPS\DateTime::ts( $val )->html();
 				},
 				'group_name'	=> function( $val, $row )
 				{
-					$secondary = Member::constructFromData( $row )->groups;
+					$secondary = \IPS\Member::constructFromData( $row )->groups;
 					
 					foreach( $secondary as $k => $v )
 					{
@@ -171,28 +153,28 @@ class membervisits extends Controller
 							continue;
 						}
 						
-						$secondary[ $k ] = Group::load( $v );
+						$secondary[ $k ] = \IPS\Member\Group::load( $v );
 					}
 
-					return Theme::i()->getTemplate( 'members', 'core', 'admin' )->groupCell( Group::load( $row['member_group_id'] ), $secondary );
+					return \IPS\Theme::i()->getTemplate( 'members', 'core', 'admin' )->groupCell( \IPS\Member\Group::load( $row['member_group_id'] ), $secondary );
 				},
-				'ip_address'	=> function( $val )
+				'ip_address'	=> function( $val, $row )
 				{
-					if ( Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'membertools_ip' ) )
+					if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'membertools_ip' ) )
 					{
-						return "<a href='" . Url::internal( "app=core&module=members&controller=ip&ip={$val}" ) . "'>{$val}</a>";
+						return "<a href='" . \IPS\Http\Url::internal( "app=core&module=members&controller=ip&ip={$val}" ) . "'>{$val}</a>";
 					}
 					return $val;
 				},
 			);
 
-			$table->extraHtml = Theme::i()->getTemplate( 'stats' )->tableheader( $start, $end, $count, "member_visits_results" );
+			$table->extraHtml = \IPS\Theme::i()->getTemplate( 'stats' )->tableheader( $start, $end, $count, "member_visits_results" );
 		}
 
-		$formHtml = $form->customTemplate( array( Theme::i()->getTemplate( 'stats' ), 'filtersFormTemplate' ) );
+		$formHtml = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'stats' ), 'filtersFormTemplate' ) );
 
-		Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_stats.js', 'core' ) );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_stats_membervisits');
-		Output::i()->output = Theme::i()->getTemplate( 'stats' )->membervisits( $formHtml, $count, $table );
+		\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_stats.js', 'core' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_stats_membervisits');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'stats' )->membervisits( $formHtml, $count, $table );
 	}
 }

@@ -10,33 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Application;
-use IPS\core\api\GraphQL\Types\NotificationType;
-use IPS\Db;
-use IPS\Member;
-use IPS\Notification\Api;
-use UnderflowException;
-use function defined;
-use function intval;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Mark notification read mutation for GraphQL API
  */
-class MarkNotificationRead
+class _MarkNotificationRead
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Mark a notification as read";
+	public static $description = "Mark a notification as read";
 
 	/*
 	 * Mutation arguments
@@ -51,7 +43,7 @@ class MarkNotificationRead
 	/**
 	 * Return the mutation return type
 	 */
-	public function type() : NotificationType
+	public function type() 
 	{
 		return \IPS\core\Api\GraphQL\TypeRegistry::notification();
 	}
@@ -59,44 +51,45 @@ class MarkNotificationRead
 	/**
 	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
 	 * @return	array|NULL
 	 */
-	public function resolve( mixed $val, array $args ) : ?array
+	public function resolve($val, $args)
 	{
-		if( !Member::loggedIn()->member_id )
+		if( !\IPS\Member::loggedIn()->member_id )
 		{
-			throw new SafeException( 'NOT_LOGGED_IN', 'GQL/0003/1', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NOT_LOGGED_IN', 'GQL/0003/1', 403 );
 		}
 
 		$where = array();
-		$where[] = array( "notification_app IN('" . implode( "','", array_keys( Application::enabledApplications() ) ) . "')" );
-		$where[] = array( "member = ?", Member::loggedIn()->member_id );
+		$where[] = array( "notification_app IN('" . implode( "','", array_keys( \IPS\Application::enabledApplications() ) ) . "')" );
+		$where[] = array( "member = ?", \IPS\Member::loggedIn()->member_id );
 
-		if( isset( $args['id'] ) )
+		if( isset( $args['id'] ) && $args['id'] !== NULL )
 		{
-			$where[] = array( "id = ?", intval( $args['id'] ) );
+			$where[] = array( "id = ?", \intval( $args['id'] ) );
 		}
 
 		try 
 		{
-			$row = Db::i()->select( '*', 'core_notifications', $where )->first();
-			$notification = Api::constructFromData( $row );
+			$row = \IPS\Db::i()->select( '*', 'core_notifications', $where )->first();
+			$notification = \IPS\Notification\Api::constructFromData( $row );
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			if( isset( $args['id'] ) )
+			if( isset( $args['id'] ) && $args['id'] !== NULL )
 			{
 				// Only throw an error if we were trying to work on a specific notification
-				throw new SafeException( 'INVALID_NOTIFICATION', 'GQL/0003/2', 403 );
+				throw new \IPS\Api\GraphQL\SafeException( 'INVALID_NOTIFICATION', 'GQL/0003/2', 403 );
 			}
 		}
 
-		Db::i()->update( 'core_notifications', array( 'read_time' => time() ), $where );
-		Member::loggedIn()->recountNotifications();
+		\IPS\Db::i()->update( 'core_notifications', array( 'read_time' => time() ), $where );
+		\IPS\Member::loggedIn()->recountNotifications();		
 
-		if( isset( $notification ) )
+		if( $notification )
 		{
 			return array( 'notification' => $notification, 'data' => $notification->getData() );
 		}

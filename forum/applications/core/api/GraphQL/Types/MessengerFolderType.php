@@ -12,29 +12,26 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * MessengerFolder for GraphQL API
  */
-class MessengerFolderType extends ObjectType
+class _MessengerFolderType extends ObjectType
 {
 
-    public ?array $memberFolders = NULL;
+    public $memberFolders = NULL;
 
     /**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -84,7 +81,7 @@ class MessengerFolderType extends ObjectType
      * @Param   boolean     $refetch    If true, will force folder data to be refetched rather than served from cached values
 	 * @return	array
 	 */
-    public function getMemberFolders( bool $refetch = FALSE ) : array
+    public function getMemberFolders($refetch = FALSE)
     {
         if( $this->memberFolders !== NULL && !$refetch )
         {
@@ -92,15 +89,15 @@ class MessengerFolderType extends ObjectType
         }
 		
 		/* Get folders */
-		$folders = array( 'myconvo'	=> Member::loggedIn()->language()->addToStack('messenger_folder_inbox') );
-		if ( Member::loggedIn()->pconversation_filters )
+		$folders = array( 'myconvo'	=> \IPS\Member::loggedIn()->language()->addToStack('messenger_folder_inbox') );
+		if ( \IPS\Member::loggedIn()->pconversation_filters )
 		{
-			$folders = $folders + array_filter( json_decode( Member::loggedIn()->pconversation_filters, TRUE ) );
+			$folders = $folders + array_filter( json_decode( \IPS\Member::loggedIn()->pconversation_filters, TRUE ) );
 		}
 		
 		/* What are our folder counts? */
 		/* Note: The setKeyField and setValueField calls here were causing the folder counts to be incorrect (if you had two folders with 1 message in each, then both showed a count of 2) */
-		$counts = iterator_to_array( Db::i()->select( 'map_folder_id, count(*) as count', 'core_message_topic_user_map', array( 'map_user_id=? AND map_user_active=1', Member::loggedIn()->member_id ), NULL, NULL, 'map_folder_id' ) );
+		$counts = iterator_to_array( \IPS\Db::i()->select( 'map_folder_id, count(*) as count', 'core_message_topic_user_map', array( 'map_user_id=? AND map_user_active=1', \IPS\Member::loggedIn()->member_id ), NULL, NULL, 'map_folder_id' ) );
 		$folderCounts = array();
 		foreach( $counts AS $k => $count )
 		{
@@ -112,8 +109,8 @@ class MessengerFolderType extends ObjectType
             $this->memberFolders[ $id ] = array(
                 'id' => $id,
                 'name' => $name,
-                'url' => Url::internal( "app=core&module=messaging&controller=messenger", 'front', 'messaging' )->setQueryString('folder', $id),
-                'count' => $folderCounts[$id] ?? 0
+                'url' => \IPS\Http\Url::internal( "app=core&module=messaging&controller=messenger", 'front', 'messaging' )->setQueryString('folder', $id),
+                'count' => isset( $folderCounts[ $id ] ) ? $folderCounts[ $id ] : 0
             );
         }
 

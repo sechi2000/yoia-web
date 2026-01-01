@@ -11,29 +11,16 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ErrorException;
-use IPS\Application;
-use IPS\Content\Comment;
-use IPS\Db\Exception;
-use IPS\Extensions\QueueAbstract;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use OutOfRangeException;
-use function defined;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Delete or move content
  */
-class MemberContent extends QueueAbstract
+class _MemberContent
 {
 	/**
 	 * Parse data before queuing
@@ -41,12 +28,12 @@ class MemberContent extends QueueAbstract
 	 * @param	array	$data
 	 * @return	array|NULL
 	 */
-	public function preQueueData( array $data ) : ?array
+	public function preQueueData( $data )
 	{
 		$classname = $data['class'];
 		
 		/* Check the app is enabled */
-		if ( ! Application::appIsEnabled( $classname::$application ) )
+		if ( ! \IPS\Application::appIsEnabled( $classname::$application ) )
 		{
 			return NULL;
 		}
@@ -56,7 +43,7 @@ class MemberContent extends QueueAbstract
 		{
 			return NULL;
 		}
-		if ( $data['action'] == 'hide' and !IPS::classUsesTrait( $classname, 'IPS\Content\Hideable' ) )
+		if ( $data['action'] == 'hide' and !\in_array( 'IPS\Content\Hideable', class_implements( $classname ) ) )
 		{
 			return NULL;
 		}
@@ -70,7 +57,7 @@ class MemberContent extends QueueAbstract
 			{
 				$data['count'] = $classname::db()->select( 'COUNT(*)', $classname::$databaseTable, static::_getWhere( $data ) )->first();
 			}
-			catch( Exception $e )
+			catch( \IPS\Db\Exception $e )
 			{
 				return NULL;
 			}
@@ -92,27 +79,27 @@ class MemberContent extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$classname = $data['class'];
 		$idColumn = $classname::$databaseColumnId;
         $exploded = explode( '\\', $classname );
-        if ( !class_exists( $classname ) or !Application::appIsEnabled( $exploded[1] ) )
+        if ( !class_exists( $classname ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 		
-		$select = $classname::db()->select( '*', $classname::$databaseTable, static::_getWhere( $data ), $classname::$databasePrefix.$classname::$databaseColumnId, REBUILD_SLOW );
+		$select = $classname::db()->select( '*', $classname::$databaseTable, static::_getWhere( $data ), $classname::$databasePrefix.$classname::$databaseColumnId, \IPS\REBUILD_SLOW );
 		
 		/* Keep track of how many we did since we cannot rely on the count for guests */
 		$did = 0;
-		foreach ( new ActiveRecordIterator( $select, $classname ) as $item )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( $select, $classname ) as $item )
 		{
 			$did++;
 			$data['last_id'] = $item->$idColumn;
 
 			/* If this is the first comment on an item where a first comment is required (e.g. posts) do nothing, as when we get to the item, that will handle it */
-			if ( $item instanceof Comment )
+			if ( $item instanceof \IPS\Content\Comment )
 			{
 				$itemClass = $item::$itemClass;
 				if ( $itemClass::$firstCommentRequired and $item->isFirst() )
@@ -123,11 +110,11 @@ class MemberContent extends QueueAbstract
 						try
 						{
 							$item->changeIpAddress( '' );
-							$item->changeAuthor( new Member );
+							$item->changeAuthor( new \IPS\Member );
 						}
-						catch( OutOfRangeException $e ) {}
+						catch( \OutOfRangeException $e ) {}
 					}
-						
+
 					continue;
 				}
 			}
@@ -138,15 +125,15 @@ class MemberContent extends QueueAbstract
 				switch ( $data['action'] )
 				{
 					case 'hide':
-						$item->hide( isset( $data['initiated_by_member_id'] ) ? Member::load( $data['initiated_by_member_id'] ) : NULL );
+						$item->hide( isset( $data['initiated_by_member_id'] ) ? \IPS\Member::load( $data['initiated_by_member_id'] ) : NULL );
 						break;
 						
 					case 'delete':
-						$item->delete( isset( $data['initiated_by_member_id'] ) ? Member::load( $data['initiated_by_member_id'] ) : NULL );
+						$item->delete( isset( $data['initiated_by_member_id'] ) ? \IPS\Member::load( $data['initiated_by_member_id'] ) : NULL );
 						break;
 					
 					case 'merge':
-						$member = Member::load( $data['merge_with_id'] );
+						$member = \IPS\Member::load( $data['merge_with_id'] );
 						
 						if ( ! $data['merge_with_id'] and $data['merge_with_name'] )
 						{
@@ -161,20 +148,15 @@ class MemberContent extends QueueAbstract
 						}
 						break;
 				}
-				
-				$did++;
 			}
-			catch( OutOfRangeException | ErrorException $e )
-			{
-				$did++;
-			}
+			catch( \OutOfRangeException | \ErrorException $e ) {}
 		}
 		
 		if ( !$did )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
-
+		
 		return ( $offset + $did );
 	}
 	
@@ -184,29 +166,29 @@ class MemberContent extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		$classname = $data['class'];
         $exploded = explode( '\\', $classname );
-        if ( !class_exists( $classname ) or !Application::appIsEnabled( $exploded[1] ) )
+        if ( !class_exists( $classname ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
-		$member = Member::load( $data['member_id'] );
+		$member = \IPS\Member::load( $data['member_id'] );
 		if ( $member->member_id )
 		{
 			/* htmlsprintf is safe here because $member->link() uses a template */
-			$sprintf = array( 'htmlsprintf' => array( $member->link(), Member::loggedIn()->language()->addToStack( $classname::$title . '_pl_lc' ) ) );
+			$sprintf = array( 'htmlsprintf' => array( $member->link(), \IPS\Member::loggedIn()->language()->addToStack( $classname::$title . '_pl_lc' ) ) );
 		}
 		else
 		{
-			$sprintf = array( 'sprintf' => array( $data['name'], Member::loggedIn()->language()->addToStack( $classname::$title . '_pl_lc' ) ) );
+			$sprintf = array( 'sprintf' => array( $data['name'], \IPS\Member::loggedIn()->language()->addToStack( $classname::$title . '_pl_lc' ) ) );
 		}
 				
-		$text = Member::loggedIn()->language()->addToStack( 'backgroundQueue_membercontent_' . $data['action'], FALSE, $sprintf );
+		$text = \IPS\Member::loggedIn()->language()->addToStack( 'backgroundQueue_membercontent_' . $data['action'], FALSE, $sprintf );
 		
 		if ( !$data['member_id'] )
 		{
@@ -224,16 +206,15 @@ class MemberContent extends QueueAbstract
 	 * @param	array	$data
 	 * @return	array
 	 */
-	protected static function _getWhere( array $data ) : array
+	protected static function _getWhere( $data )
 	{
-		/* @var array $databaseColumnMap */
 		$classname = $data['class'];
 		$where = [
 			[
 				$classname::$databasePrefix . $classname::$databaseColumnId . '>?', $data['last_id']
 			]
 		];
-		
+
 		if ( !$data['member_id'] )
 		{
 			$where[] = [ $classname::$databasePrefix . $classname::$databaseColumnMap['author_name'] . '=?', $data['name'] ];

@@ -11,33 +11,16 @@
 namespace IPS\nexus\extensions\core\AchievementAction;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Achievements\Actions\AchievementActionAbstract;
-use IPS\core\Achievements\Rule;
-use IPS\Db;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Subscription as NexusSubscription;
-use IPS\nexus\Subscription\Package;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement Action Extension
  */
-class Subscription extends AchievementActionAbstract // NOTE: Other classes exist to provided bases for common situations, like where node-based filters will be required
+class _Subscription extends \IPS\core\Achievements\Actions\AbstractAchievementAction // NOTE: Other classes exist to provided bases for common situations, like where node-based filters will be required
 {
 	/**
 	 * Can use this rule?
@@ -46,32 +29,32 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 	 */
 	public function canUse(): bool
 	{
-		return parent::canUse() and Settings::i()->nexus_subs_enabled;
+		return (bool) parent::canUse() and \IPS\Settings::i()->nexus_subs_enabled;
 	}
 
 	/**
 	 * Get filter form elements
 	 *
 	 * @param	array|NULL		$filters	Current filter values (if editing)
-	 * @param	Url	$url		The URL the form is being shown on
+	 * @param	\IPS\Http\Url	$url		The URL the form is being shown on
 	 * @return	array
 	 */
-	public function filters( ?array $filters, Url $url ): array
+	public function filters( ?array $filters, \IPS\Http\Url $url ): array
 	{
-		$return	= parent::filters( $filters, $url );
+		$return	= array();
 
-		$return['subscriptions'] = new Node( 'achievement_filter_Subscriptions', ( $filters and isset( $filters['subscriptions'] ) and $filters['subscriptions'] ) ? $filters['subscriptions'] : 0, FALSE, [
+		$return['subscriptions'] = new \IPS\Helpers\Form\Node( 'achievement_filter_Subscriptions', ( $filters and isset( $filters['subscriptions'] ) and $filters['subscriptions'] ) ? $filters['subscriptions'] : 0, FALSE, [
 			'url'				=> $url,
 			'class'				=> 'IPS\nexus\Subscription\Package',
 			'showAllNodes'		=> TRUE,
 			'multiple' 			=> TRUE,
-		], NULL, Member::loggedIn()->language()->addToStack( 'achievement_filter_Subscriptions_node_prefix', FALSE, [ 'sprintf' => [
-			Member::loggedIn()->language()->addToStack( 'nexus_sub_package_id', FALSE ),
-			Member::loggedIn()->language()->addToStack( 'calendars_sg', FALSE, [ 'strtolower' => TRUE ] )
+		], NULL, \IPS\Member::loggedIn()->language()->addToStack( 'achievement_filter_Subscriptions_node_prefix', FALSE, [ 'sprintf' => [
+			\IPS\Member::loggedIn()->language()->addToStack( 'nexus_sub_package_id', FALSE ),
+			\IPS\Member::loggedIn()->language()->addToStack( 'calendars_sg', FALSE, [ 'strtolower' => TRUE ] )
 		] ] ) );
 
-		$return['subscriptions_active'] = new YesNo( 'achievement_filter_Subscriptions_active', $filters and isset( $filters['subscriptions_active'] ) and $filters['subscriptions_active'], FALSE, [],NULL,
-			Member::loggedIn()->language()->addToStack( 'nexus_sub_active', FALSE )
+		$return['subscriptions_active'] = new \IPS\Helpers\Form\YesNo( 'achievement_filter_Subscriptions_active', $filters and isset( $filters['subscriptions_active'] ) and $filters['subscriptions_active'], FALSE, [],NULL,
+			\IPS\Member::loggedIn()->language()->addToStack( 'nexus_sub_active', FALSE )
 		 );
 
 		return $return;
@@ -85,7 +68,7 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 	 */
 	public function formatFilterValues( array $values ): array
 	{
-		$return = parent::formatFilterValues( $values );
+		$return = [];
 		if ( isset( $values['achievement_filter_Subscriptions'] ) )
 		{
 			$return['subscriptions'] = array_keys( $values['achievement_filter_Subscriptions'] );
@@ -104,16 +87,16 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 	 * calls that BEFORE making its change in the database (or there is read/write separation), you will need to add
 	 * 1 to the value being considered for milestones
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	array		$filters	The value returned by formatFilterValues()
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	bool
 	 */
-	public function filtersMatch( Member $subject, array $filters, mixed $extra = NULL ): bool
+	public function filtersMatch( \IPS\Member $subject, array $filters, $extra = NULL ): bool
 	{
 		if ( isset( $filters['subscriptions'] ) )
 		{
-			if ( !in_array( $extra->package_id, $filters['subscriptions'] ) )
+			if ( !\in_array( $extra->package_id, $filters['subscriptions'] ) )
 			{
 				return FALSE;
 			}
@@ -125,12 +108,12 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 			{
 				try
 				{
-					NexusSubscription::loadByMemberAndPackage( $subject, Package::load( $id ), TRUE );
+					\IPS\nexus\Subscription::loadByMemberAndPackage( $subject, \IPS\nexus\Subscription\Package::load( $id ), TRUE );
 
 					/* Still here? */
 					return TRUE;
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 
 			/* No active matches */
@@ -139,46 +122,16 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 
 		return TRUE;
 	}
-
-	/**
-	 * Determines if the member has already completed this rule.
-	 * Used for retroactive rule completion.
-	 * So far, this is only used in Quests, but may be used elsewhere at a later point.
-	 *
-	 * @param Member $member
-	 * @param array $filters
-	 * @return bool
-	 */
-	public function isRuleCompleted( Member $member, array $filters ) : bool
-	{
-		$where = [
-			[ 'ps_app=?', 'nexus' ],
-			[ 'ps_type=?', 'subscription' ],
-			[ 'ps_member=?', $member->member_id ]
-		];
-
-		iF( !empty( $filters['subscriptions'] ) )
-		{
-			$where[] = [ Db::i()->in( 'ps_item_id', $filters['subscriptions'] ) ];
-		}
-
-		if( isset( $filters['subscriptions_active'] ) )
-		{
-			$where[] = [ 'ps_active=?', 1 ];
-		}
-
-		return (bool) Db::i()->select( 'count(*)', 'nexus_purchases', $where )->first();
-	}
 	
 	/**
 	 * Get identifier to prevent the member being awarded points for the same action twice
 	 * Must be unique within within of this domain, must not exceed 32 chars.
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	string
 	 */
-	public function identifier( Member $subject, mixed $extra = NULL ): string
+	public function identifier( \IPS\Member $subject, $extra = NULL ): string
 	{
 		return (string) $extra->id;
 	}
@@ -198,20 +151,20 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 	/**
 	 * Get "description" for rule
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	public function ruleDescription( Rule $rule ): ?string
+	public function ruleDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		$conditions = [];
 
 		if ( isset( $rule->filters['subscriptions_active'] ) AND $rule->filters['subscriptions_active'] )
 		{
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'achievement_filter_Subscriptions_active');
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievement_filter_Subscriptions_active');
 		}
 		else
 		{
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'achievement_filter_Subscriptions_node_prefix');
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievement_filter_Subscriptions_node_prefix');
 		}
 
 		if ( $nodeCondition = $this->_nodeFilterDescription( $rule ) )
@@ -219,13 +172,8 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 			$conditions[] = $nodeCondition;
 		}
 
-		if( $questCondition = $this->_questFilterDescription( $rule ) )
-		{
-			$conditions[] = $questCondition;
-		}
-
-		return Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescription(
-			Member::loggedIn()->language()->addToStack( 'AchievementAction__Subscription_title' ),
+		return \IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescription(
+			\IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__Subscription_title' ),
 			$conditions
 		);
 	}
@@ -233,10 +181,10 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 	/**
 	 * Get "description" for rule (usually a description of the rule's filters)
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	protected function _nodeFilterDescription( Rule $rule ): ?string
+	protected function _nodeFilterDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		if ( isset( $rule->filters['subscriptions'] ) )
 		{
@@ -245,21 +193,21 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 			{
 				try
 				{
-					$nodeNames[] = Package::load( $id )->_title;
+					$nodeNames[] = \IPS\nexus\Subscription\Package::load( $id )->_title;
 				}
-				catch ( OutOfRangeException ) {}
+				catch ( \OutOfRangeException $e ) {}
 			}
 
 			if ( $nodeNames )
 			{
-				return Member::loggedIn()->language()->addToStack( 'achievements_filter_Subscription_type', FALSE, [
+				return \IPS\Member::loggedIn()->language()->addToStack( 'achievements_filter_Subscription_type', FALSE, [
 					'htmlsprintf' => [
-						Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'achievements_filter_Subscription_type',
-							count( $nodeNames ) === 1 ? $nodeNames[0] : Member::loggedIn()->language()->addToStack( 'achievements_filter_Subscription_pl', FALSE, [ 'sprintf' => [
-								count( $nodeNames ),
-								Member::loggedIn()->language()->addToStack( 'nexus_sub_package_id', FALSE, [ 'strtolower' => TRUE ] )
+						\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'achievements_filter_Subscription_type',
+							\count( $nodeNames ) === 1 ? $nodeNames[0] : \IPS\Member::loggedIn()->language()->addToStack( 'achievements_filter_Subscription_pl', FALSE, [ 'sprintf' => [
+								\count( $nodeNames ),
+								\IPS\Member::loggedIn()->language()->addToStack( 'nexus_sub_package_id', FALSE, [ 'strtolower' => TRUE ] )
 							] ] ),
-							count( $nodeNames ) === 1 ? NULL : $nodeNames
+							\count( $nodeNames ) === 1 ? NULL : $nodeNames
 						)
 					],
 				] );
@@ -274,7 +222,7 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 	 *
 	 * @return	array
 	 */
-	static public function rebuildData(): array
+	static public function rebuildData()
 	{
 		return [ [
 			'table' => 'nexus_member_subscriptions',
@@ -291,9 +239,9 @@ class Subscription extends AchievementActionAbstract // NOTE: Other classes exis
 	 * @param array		$data	Data collected when starting rebuild [table, pkey...]
 	 * @return void
 	 */
-	public static function rebuildRow( array $row, array $data ) : void
+	public static function rebuildRow( $row, $data )
 	{
-		Member::load( $row['sub_member_id'] )->achievementAction( 'nexus', 'Subscription', NexusSubscription::load( $row['sub_id'] ) );
+		\IPS\Member::load( $row['sub_member_id'] )->achievementAction( 'nexus', 'Subscription', \IPS\nexus\Subscription::load( $row['sub_id'] ) );
 	}
 
 }

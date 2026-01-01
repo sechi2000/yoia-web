@@ -12,13 +12,9 @@
 namespace IPS\nexus\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Form\Ftp as FtpHelper;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -26,7 +22,7 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * Ftp input class for Form Builder
  * @note This class is necessary, because it is defined as an additional field type for Commerce Custom Fields, which will attempt to load this class.
  */
-class Ftp extends FtpHelper
+class _Ftp extends \IPS\Helpers\Form\Ftp
 {
 	
 }

@@ -12,21 +12,16 @@
 namespace IPS\forums\setup\upg_107025;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Task;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.7.2 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Changes to solved mode
@@ -36,12 +31,12 @@ class Upgrade
 	public function step1()
 	{
 		/* Prevent all topics from being emailed after upgrade, just leave those that have been started within the last 14 days as able to be emailed */
-		Db::i()->update( 'forums_topics', [ 'solved_reminder_sent' => time() ], [ 'start_date < ?', ( time() - ( 14 * 86400 ) ) ] );
+		\IPS\Db::i()->update( 'forums_topics', [ 'solved_reminder_sent' => time() ], [ 'start_date < ?', ( time() - ( 14 * 86400 ) ) ] );
 		
 		/* Kick off a rebuild so stats are populated */
-		foreach( Db::i()->select( '*', 'forums_forums', array( 'topics>? and ( forums_bitoptions & ? or forums_bitoptions & ? or forums_bitoptions & ? )', 0, 4, 8, 16 ) ) as $forum )
+		foreach( \IPS\Db::i()->select( '*', 'forums_forums', array( 'topics>? and ( forums_bitoptions & ? or forums_bitoptions & ? or forums_bitoptions & ? )', 0, 4, 8, 16 ) ) as $forum )
 		{
-			Task::queue( 'forums', 'RebuildSolvedStats', array( 'forum_id' => $forum['id'] ) );
+			\IPS\Task::queue( 'forums', 'RebuildSolvedStats', array( 'forum_id' => $forum['id'] ) );
 		}
 
 		return TRUE;

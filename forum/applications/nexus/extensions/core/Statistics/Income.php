@@ -11,53 +11,36 @@
 namespace IPS\nexus\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Gateway;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Transaction;
-use IPS\Request;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Income extends \IPS\core\Statistics\Chart
+class _Income extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'nexus_reports_income_totals';
+	public $controller = 'nexus_reports_income_totals';
 	
 	/**
 	 * @brief	Identifier
 	 */
-	protected string $_identifier = 'totals';
+	protected $_identifier = 'totals';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$chart = new Database(
+		$chart = new \IPS\Helpers\Chart\Database(
 			$url,
 			'nexus_transactions',
 			't_date',
@@ -69,54 +52,54 @@ class Income extends \IPS\core\Statistics\Chart
 				'lineWidth'			=> 1,
 				'areaOpacity'		=> 0.4
 			),
-			( Request::i()->tab == 'members' ) ? 'PieChart' : 'AreaChart',
+			( \IPS\Request::i()->tab == 'members' ) ? 'PieChart' : 'AreaChart',
 			'monthly',
 			array( 'start' => 0, 'end' => 0 ),
 			array(),
 			$this->_identifier
 		);
 		$chart->setExtension( $this );
-		$chart->where[] = array( '( t_status=? OR t_status=? ) AND t_method>0', Transaction::STATUS_PAID, Transaction::STATUS_PART_REFUNDED );
+		$chart->where[] = array( '( t_status=? OR t_status=? ) AND t_method>0', \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_PART_REFUNDED );		
 		
 		$chart->tableInclude = array( 't_id', 't_member', 't_invoice', 't_method', 't_amount', 't_date' );
 		$chart->tableParsers = array(
 			't_member'	=> function( $val ) {
-				return Theme::i()->getTemplate('global', 'nexus')->userLink( Member::load( $val ) );
+				return \IPS\Theme::i()->getTemplate('global', 'nexus')->userLink( \IPS\Member::load( $val ) );
 			},
 			't_method'	=> function( $val ) {
 				if ( $val )
 				{
 					try
 					{
-						return Gateway::load( $val )->_title;
+						return \IPS\nexus\Gateway::load( $val )->_title;
 					}
-					catch ( OutOfRangeException )
+					catch ( \OutOfRangeException $e )
 					{
 						return '';
 					}
 				}
 				else
 				{
-					return Member::loggedIn()->language()->addToStack('account_credit');
+					return \IPS\Member::loggedIn()->language()->addToStack('account_credit');
 				}
 			},
 			't_amount'	=> function( $val, $row )
 			{
-				return (string) new Money( $val, $row['t_currency'] );
+				return (string) new \IPS\nexus\Money( $val, $row['t_currency'] );
 			},
 			't_invoice'	=> function( $val )
 			{
 				try
 				{
-					return Theme::i()->getTemplate('invoices', 'nexus')->link( Invoice::load( $val ) );
+					return \IPS\Theme::i()->getTemplate('invoices', 'nexus')->link( \IPS\nexus\Invoice::load( $val ) );
 				}
-				catch ( OutOfRangeException )
+				catch ( \OutOfRangeException $e )
 				{
 					return '';
 				}
 			},
 			't_date'	=> function( $val ) {
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			}
 		);
 		
@@ -126,13 +109,12 @@ class Income extends \IPS\core\Statistics\Chart
 	/**
 	 * Set Extra
 	 *
-	 * @param	Chart	$chart	Chart
+	 * @param	\IPS\Helpers\Chart	$chart	Chart
 	 * @param	string				$what	What we're setting.
-	 * @return void
 	 */
-	public function setExtra( Chart $chart, string $what ) : void
+	public function setExtra( \IPS\Helpers\Chart &$chart, string $what )
 	{
-		$currencies = Money::currencies();
+		$currencies = \IPS\nexus\Money::currencies();
 		$this->controller	= "nexus_reports_income_{$what}";
 		$this->_identifier	= $what;
 		
@@ -149,7 +131,7 @@ class Income extends \IPS\core\Statistics\Chart
 		{
 			$chart->groupBy = 't_member';
 
-			if( count( $currencies ) === 1 )
+			if( \count( $currencies ) === 1 )
 			{
 				$chart->format = array_pop( $currencies );
 			}
@@ -159,9 +141,9 @@ class Income extends \IPS\core\Statistics\Chart
 				$chart->where[]	= array( 't_currency=?', $chart->format );
 			}
 			
-			foreach ( Db::i()->select( 't_member, SUM(t_amount)-SUM(t_partial_refund) as _amount', 'nexus_transactions', $chart->where, '_amount DESC', array( 0, 20 ), 't_member' ) as $member )
+			foreach ( \IPS\Db::i()->select( 't_member, SUM(t_amount)-SUM(t_partial_refund) as _amount', 'nexus_transactions', $chart->where, '_amount DESC', array( 0, 20 ), 't_member' ) as $member )
 			{
-				$chart->addSeries( Member::load( $member['t_member'] )->name, 'number', 'SUM(t_amount)-SUM(t_partial_refund)', TRUE, $member['t_member'] );
+				$chart->addSeries( \IPS\Member::load( $member['t_member'] )->name, 'number', 'SUM(t_amount)-SUM(t_partial_refund)', TRUE, $member['t_member'] );
 			}
 		}
 		else
@@ -170,7 +152,7 @@ class Income extends \IPS\core\Statistics\Chart
 			$chart->groupBy = 't_method';
 			$chart->format = $what;
 			
-			foreach ( Gateway::roots() as $gateway )
+			foreach ( \IPS\nexus\Gateway::roots() as $gateway )
 			{
 				$chart->addSeries( $gateway->_title, 'number', 'SUM(t_amount)-SUM(t_partial_refund)', TRUE, $gateway->id );
 			}

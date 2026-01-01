@@ -11,44 +11,34 @@
 namespace IPS\core\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Api\Response;
-use IPS\Application;
-use IPS\IPS;
-use IPS\Settings;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Hello API
  */
-class hello extends Controller
+class _hello extends \IPS\Api\Controller
 {
 	/**
 	 * GET /core/hello
 	 * Get basic information about the community.
 	 *
-	 * @apireturn	array
+	 * @return	array
 	 * @apiresponse	string	communityName	The name of the community
 	 * @apiresponse	string	communityUrl	The community URL
 	 * @apiresponse	string	ipsVersion		The Invision Community version number
 	 * @apiresponse	array	applications	The installed IPS Applications
-	 * @return Response
 	 */
-	public function GETindex(): Response
+	public function GETindex()
 	{
-		return new Response( 200, array(
-			'communityName'	=> Settings::i()->board_name,
-			'communityUrl'	=> Settings::i()->base_url,
-			'ipsVersion'	=> Application::load('core')->version,
-			'ipsApplications' => array_filter( array_keys( Application::applications() ), function( $k ) { return in_array( $k, IPS::$ipsApps ); }  )
+		return new \IPS\Api\Response( 200, array(
+			'communityName'	=> \IPS\Settings::i()->board_name,
+			'communityUrl'	=> \IPS\Settings::i()->base_url,
+			'ipsVersion'	=> \IPS\Application::load('core')->version,
+			'ipsApplications' => array_filter( array_keys( \IPS\Application::applications() ), function( $k ) { return \in_array( $k, \IPS\IPS::$ipsApps ); }  )
 			) );
 	}
 }

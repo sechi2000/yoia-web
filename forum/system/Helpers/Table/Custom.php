@@ -11,56 +11,47 @@
 namespace IPS\Helpers\Table;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Http\Url;
-use IPS\Request;
-use function array_slice;
-use function count;
-use function defined;
-use function in_array;
-use function is_callable;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * List Table Builder using an array datasource
  */
-class Custom extends Table
+class _Custom extends Table
 {
 	/**
 	 * @brief	Data
 	 */
-	protected array $dataSource;
+	protected $dataSource;
 	
 	/**
 	 * @brief	Parse Source
 	 */
-	public bool $parseSource = TRUE;
+	public $parseSource = TRUE;
 	
 	/**
 	 * Number of results
 	 */
-	public int $count = 0;
+	public $count = 0;
 	
 	/**
 	 * Number of pages
 	 */
-	public int $pages = 0;
+	public $pages = NULL;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param array $dataSource		Data source
-	 * @param	Url	$baseUrl		Base URL
+	 * @param	array			$dataSource		Data source
+	 * @param	\IPS\Http\Url	$baseUrl		Base URL
 	 */
-	public function __construct( array $dataSource, Url $baseUrl, int $count = NULL )
+	public function __construct( $dataSource, \IPS\Http\Url $baseUrl, $count = NULL )
 	{
 		$this->dataSource = $dataSource;
-		$this->count      = count( $this->dataSource );
+		$this->count      = \count( $this->dataSource );
 		
 		return parent::__construct( $baseUrl );
 	}
@@ -68,11 +59,11 @@ class Custom extends Table
 	/**
 	 * Get rows
 	 *
-	 * @param	array|null	$advancedSearchValues	Values from the advanced search form
+	 * @param	array	$advancedSearchValues	Values from the advanced search form
 	 * @note	$advancedSearchValues is currently ignored
 	 * @return	array
 	 */
-	public function getRows( array $advancedSearchValues = NULL ): array
+	public function getRows( $advancedSearchValues )
 	{
 		if ( ! $this->pages )
 		{
@@ -83,13 +74,13 @@ class Custom extends Table
 		$rows = array();
 		foreach ( $this->dataSource as $i => $data )
 		{
-			$row = $this->include ? array_combine( $this->include, array_fill( 0, count( $this->include ), NULL ) ) : array();
+			$row = $this->include ? array_combine( $this->include, array_fill( 0, \count( $this->include ), NULL ) ) : array();
 
 			/* Get the columns from the XML */
 			foreach ( $data as $k => $v )
 			{
 				/* Are we including this one? */
-				if( ( $this->include !== NULL and !in_array( $k, $this->include ) ) or ( $this->exclude !== NULL and in_array( $k, $this->exclude ) ) )
+				if( ( $this->include !== NULL and !\in_array( $k, $this->include ) ) or ( $this->exclude !== NULL and \in_array( $k, $this->exclude ) ) )
 				{
 					continue;
 				}
@@ -103,15 +94,15 @@ class Custom extends Table
 		}
 				
 		/* Quicksearch */
-		if ( $this->quickSearch !== NULL and Request::i()->quicksearch )
+		if ( $this->quickSearch !== NULL and \IPS\Request::i()->quicksearch )
 		{
 			$quickSearchColumn = $this->quickSearch;
-			$rows = array_filter( $rows, is_callable( $this->quickSearch ) ? $this->quickSearch : function( $row ) use ( $quickSearchColumn )
+			$rows = array_filter( $rows, \is_callable( $this->quickSearch ) ? $this->quickSearch : function( $row ) use ( $quickSearchColumn )
 			{
-				return mb_strpos( mb_strtolower( $row[ $quickSearchColumn ] ), mb_strtolower( trim( Request::i()->quicksearch ) ) ) !== FALSE;
+				return mb_strpos( mb_strtolower( $row[ $quickSearchColumn ] ), mb_strtolower( trim( \IPS\Request::i()->quicksearch ) ) ) !== FALSE;
 			} );
 
-			$this->count = count( $rows );
+			$this->count = \count( $rows );
 			$this->pages = ceil( $this->count / $this->limit );
 		}
 
@@ -136,7 +127,7 @@ class Custom extends Table
 		/* Limit */
 		if ( $this->limit and $this->count > $this->limit and $this->parseSource )
 		{
-			$rows = array_slice( $rows, ( $this->limit * ( $this->page - 1 ) ), $this->limit, TRUE );
+			$rows = \array_slice( $rows, ( $this->limit * ( $this->page - 1 ) ), $this->limit, TRUE );
 		}
 
 		/* Apply parsers */
@@ -150,7 +141,7 @@ class Custom extends Table
 					$parserFunction = $this->parsers[ $k ];
 					$v = $parserFunction( $v, $this->dataSource[ $i ] );
 				}
-				else if ( is_string( $v ) )
+				else
 				{
 					$v = htmlspecialchars( $v, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', FALSE );
 				}

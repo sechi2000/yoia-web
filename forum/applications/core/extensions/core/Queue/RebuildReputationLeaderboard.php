@@ -11,57 +11,39 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DateTimeZone;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Settings;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Rebuild Reputation leader board
  */
-class RebuildReputationLeaderboard extends QueueAbstract
+class _RebuildReputationLeaderboard
 {
 	/**
 	 * @brief Number of days to rebuild per cycle
 	 */
-	public int $rebuild	= 30;
+	public $rebuild	= 30;
 
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		
 		try
 		{
-			$date = Db::i()->select( 'MIN(rep_date)', 'core_reputation_index' )->first();
-
-			if( empty( $date ) )
-			{
-				throw new OutOfRangeException;
-			}
-
+			$date = \IPS\Db::i()->select( 'MIN(rep_date)', 'core_reputation_index' )->first();
 			$data = array();
 			
 			/* We work a day in arrears */
-			$oldest = DateTime::ts( $date )->setTime( 12, 0 )->add( new DateInterval('P1D') );
-			$newest = DateTime::ts( time() )->setTime( 12, 0 );
+			$oldest = \IPS\DateTime::ts( $date )->setTime( 12, 0 )->add( new \DateInterval('P1D') );
+			$newest = \IPS\DateTime::ts( time() )->setTime( 12, 0 );
 			
 			$diff = $newest->diff( $oldest );
 			
@@ -69,9 +51,9 @@ class RebuildReputationLeaderboard extends QueueAbstract
 			$data['date'] = $oldest->getTimeStamp();
 			$data['max'] = $newest->getTimeStamp();
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		if( $data['count'] == 0 )
@@ -90,14 +72,14 @@ class RebuildReputationLeaderboard extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$done = 0;
 		for( $i = 0; $i < $this->rebuild; $i++ )
 		{
-			$timezone = new DateTimeZone( Settings::i()->reputation_timezone );
-			$start = DateTime::ts( $data['date'], true )->setTimezone( $timezone )->sub( new DateInterval('P1D') )->setTime( 0, 0, 1 );
-			$end   = DateTime::ts( $data['date'], true )->setTimezone( $timezone )->sub( new DateInterval('P1D') )->setTime( 23, 59, 59 );
+			$timezone = new \DateTimeZone( \IPS\Settings::i()->reputation_timezone );
+			$start = \IPS\DateTime::ts( $data['date'], true )->setTimezone( $timezone )->sub( new \DateInterval('P1D') )->setTime( 0, 0, 1 );
+			$end   = \IPS\DateTime::ts( $data['date'], true )->setTimezone( $timezone )->sub( new \DateInterval('P1D') )->setTime( 23, 59, 59 );
 			
 			if ( $end->getTimeStamp() >= $data['max'] )
 			{
@@ -110,13 +92,13 @@ class RebuildReputationLeaderboard extends QueueAbstract
 			/* Get top rated contributors */
 			$where = array();
 			$where[] = array( 'member_received > 0 AND rep_date BETWEEN ? and ?', $start->getTimeStamp(), $end->getTimeStamp() );
-			$where[] = Db::i()->in( 'member_group_id', explode( ',',  Settings::i()->leaderboard_excluded_groups ), TRUE );
+			$where[] = \IPS\Db::i()->in( 'member_group_id', explode( ',',  \IPS\Settings::i()->leaderboard_excluded_groups ), TRUE );
 
-			foreach( Db::i()->select( 'core_reputation_index.member_received as themember, SUM(rep_rating) as rep', 'core_reputation_index', $where, 'rep DESC', 4, 'themember' )->join( 'core_members', array( 'core_reputation_index.member_received = core_members.member_id' ) )->setKeyField('themember')->setValueField('rep') as $member => $rep )
+			foreach( \IPS\Db::i()->select( 'core_reputation_index.member_received as themember, SUM(rep_rating) as rep', 'core_reputation_index', $where, 'rep DESC', 4, 'themember' )->join( 'core_members', array( 'core_reputation_index.member_received = core_members.member_id' ) )->setKeyField('themember')->setValueField('rep') as $member => $rep )
 			{
 				if ( $member and $rep )
 				{
-					Db::i()->replace( 'core_reputation_leaderboard_history', array(
+					\IPS\Db::i()->replace( 'core_reputation_leaderboard_history', array(
 						'leader_date' 	   => $start->setTime( 12, 0 )->getTimeStamp(),
 						'leader_member_id' => $member,
 						'leader_position'  => ++$position,
@@ -130,7 +112,7 @@ class RebuildReputationLeaderboard extends QueueAbstract
 			{
 				while( $position < 4 )
 				{
-					Db::i()->replace( 'core_reputation_leaderboard_history', array(
+					\IPS\Db::i()->replace( 'core_reputation_leaderboard_history', array(
 						'leader_date' 	   => $start->setTime( 12, 0 )->getTimeStamp() - $position,
 						'leader_member_id' => 0,
 						'leader_position'  => ++$position,
@@ -139,7 +121,7 @@ class RebuildReputationLeaderboard extends QueueAbstract
 				}
 			}
 			
-			$data['date'] = DateTime::ts( $data['date'] )->add( new DateInterval('P1D') )->getTimeStamp();
+			$data['date'] = \IPS\DateTime::ts( $data['date'] )->add( new \DateInterval('P1D') )->getTimeStamp();
 			$done++;
 		}
 		
@@ -157,10 +139,10 @@ class RebuildReputationLeaderboard extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' => Member::loggedIn()->language()->addToStack('rebuilding_reputation_leaderboard'), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $offset, 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('rebuilding_reputation_leaderboard'), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $offset, 2 ) ) : 100 );
 	}
 }

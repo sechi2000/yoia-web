@@ -12,29 +12,23 @@
 namespace IPS\nexus\Gateway\Stripe;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\nexus\Payout as NexusPayout;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Stripe Pay Out Gateway
  */
-class Payout extends NexusPayout
+class _Payout extends \IPS\nexus\Payout
 {
 	/**
 	 * ACP Settings
 	 *
 	 * @return	array
 	 */
-	public static function settings() : array
+	public static function settings()
 	{
 		return array();
 	}
@@ -44,7 +38,7 @@ class Payout extends NexusPayout
 	 *
 	 * @return	array
 	 */
-	public static function form() :array
+	public static function form()
 	{
 		return array();
 	}
@@ -54,22 +48,21 @@ class Payout extends NexusPayout
 	 *
 	 * @param	array	$values	Values from form
 	 * @return	mixed
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function getData( array $values ) : mixed
+	public function getData( array $values )
 	{
 		return NULL;	
 	}
-
-	/**
-	 * Process the payout
-	 * Return the new status for this payout record
+	
+	/** 
+	 * Process
 	 *
-	 * @return	string
-	 * @throws	Exception
+	 * @return	void
+	 * @throws	\Exception
 	 */
-	public function process() : string
+	public function process()
 	{
-		throw new DomainException('stripe_payout_deprecated');
+		throw new \DomainException('stripe_payout_deprecated');
 	}
 }

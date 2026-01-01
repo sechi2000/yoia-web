@@ -9,52 +9,40 @@
  * @since		07 Mar 2014
  */
 
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Member\Device;
-use IPS\nexus\Gateway\PayPal\BillingAgreement;
-use IPS\nexus\Transaction;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Session\Front;
-use IPS\Settings;
-
-define('REPORT_EXCEPTIONS', TRUE);
+\define('REPORT_EXCEPTIONS', TRUE);
 require_once '../../../../init.php';
-Front::i();
+\IPS\Session\Front::i();
 
 /* Load Transaction */
 try
 {
-	$transaction = Transaction::load( Request::i()->nexusTransactionId );
+	$transaction = \IPS\nexus\Transaction::load( \IPS\Request::i()->nexusTransactionId );
 	
-	if ( $transaction->status !== Transaction::STATUS_PENDING )
+	if ( $transaction->status !== \IPS\nexus\Transaction::STATUS_PENDING )
 	{
-		throw new OutOfRangeException;
+		throw new \OutofRangeException;
 	}
 }
-catch (OutOfRangeException )
+catch ( \OutOfRangeException $e )
 {
-	Output::i()->redirect( Url::internal( "app=nexus&module=checkout&controller=checkout&do=transaction&id=&t=" . Request::i()->nexusTransactionId, 'front', 'nexus_checkout' ) );
+	\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=nexus&module=checkout&controller=checkout&do=transaction&id=&t=" . \IPS\Request::i()->nexusTransactionId, 'front', 'nexus_checkout' ) );
 }
 
 $fraudCheck = function( $transaction, $refuseExecute=TRUE ) {
 	/* Check fraud rules */
 	$maxMind = NULL;
-	if ( Settings::i()->maxmind_key and ( !Settings::i()->maxmind_gateways or Settings::i()->maxmind_gateways == '*' or in_array( $transaction->method->id, explode( ',', Settings::i()->maxmind_gateways ) ) ) )
+	if ( \IPS\Settings::i()->maxmind_key and ( !\IPS\Settings::i()->maxmind_gateways or \IPS\Settings::i()->maxmind_gateways == '*' or \in_array( $transaction->method->id, explode( ',', \IPS\Settings::i()->maxmind_gateways ) ) ) )
 	{
 		$maxMind = new \IPS\nexus\Fraud\MaxMind\Request;
 		$maxMind->setTransaction( $transaction );
 		$maxMind->setTransactionType( 'paypal' );
 	}
 	$fraudResult = $transaction->runFraudCheck( $maxMind );
-	if ( $refuseExecute AND $fraudResult === Transaction::STATUS_REFUSED )
+	if ( $refuseExecute AND $fraudResult === \IPS\nexus\Transaction::STATUS_REFUSED )
 	{
 		$transaction->executeFraudAction( $fraudResult, FALSE );
 		$transaction->sendNotification();
-		Output::i()->redirect( $transaction->url() );
+		\IPS\Output::i()->redirect( $transaction->url() );
 	}
 
 	return $fraudResult;
@@ -64,45 +52,67 @@ $fraudCheck = function( $transaction, $refuseExecute=TRUE ) {
 try
 {
 	/* Subscription */
-	if ( isset( Request::i()->subscription ) )
+	if ( isset( \IPS\Request::i()->subscription ) )
 	{
+		/* Sometimes PayPal doesn't include the subscription ID, so let's check if we have it in the transaction */
+		$subscriptionId = \IPS\Request::i()->subscription_id ?? $transaction->gw_id;
+
+		/* If we have no subscription ID, but the transaction is already linked to a Billing agreement, use that */
+		if( empty( \IPS\Request::i()->subscription_id ) )
+		{
+			try
+			{
+				$billingAgreement = \IPS\nexus\Gateway\PayPal\BillingAgreement::load( \IPS\Db::i()->select( 't_billing_agreement', 'nexus_transactions', [ 't_id=?', $transaction->id ], flags: \IPS\Db::SELECT_FROM_WRITE_SERVER )->first() );
+			}
+			catch( \OutOfRangeException | \UnderflowException )
+			{
+				/* Log it, along with the whole request, so that we can try to see what's happening */
+				\IPS\Log::log( "Missing subscription_id " . print_r( \IPS\Request::i(), true ), 'paypal' );
+				throw new Exception( \IPS\Member::loggedIn()->language()->get( 'billing_agreement_start_error' ) );
+			}
+		}
+
 		/* Get details */
-		$response = $transaction->method->api( "billing/subscriptions/" . Request::i()->subscription_id, NULL, 'get' );
-		
-		/* Create Billing Agreement */
-		try
+		if( !isset( $billingAgreement ) )
 		{
-			$billingAgreement = BillingAgreement::constructFromData( Db::i()->select( '*', 'nexus_billing_agreements', array( 'ba_gw_id=? AND ba_method=?', $response['id'], $transaction->method->id ), flags: Db::SELECT_FROM_WRITE_SERVER )->first() );
+			$response = $transaction->method->api( "billing/subscriptions/" . $subscriptionId, NULL, 'get' );
+
+			/* Create Billing Agreement */
+			try
+			{
+				/* @note SELECT_FROM_WRITE_SERVER transaction race condition */
+				$billingAgreement = \IPS\nexus\Gateway\PayPal\BillingAgreement::constructFromData( \IPS\Db::i()->select( '*', 'nexus_billing_agreements', array( 'ba_gw_id=? AND ba_method=?', $response['id'], $transaction->method->id ), flags: \IPS\Db::SELECT_FROM_WRITE_SERVER )->first() );
+			}
+			catch ( \UnderflowException $e )
+			{
+				$billingAgreement = new \IPS\nexus\Gateway\PayPal\BillingAgreement;
+				$billingAgreement->gw_id = $response['id'];
+				$billingAgreement->method = $transaction->method;
+				$billingAgreement->member = $transaction->member;
+				$billingAgreement->started = \IPS\DateTime::create();
+				$billingAgreement->next_cycle = ( new \IPS\DateTime( $response['billing_info']['next_billing_time'] ) );
+				$billingAgreement->save();
+			}
+			$transaction->billing_agreement = $billingAgreement;
+			$transaction->save();
 		}
-		catch (UnderflowException )
-		{
-			$billingAgreement = new BillingAgreement;
-			$billingAgreement->gw_id = $response['id'];
-			$billingAgreement->method = $transaction->method;
-			$billingAgreement->member = $transaction->member;
-			$billingAgreement->started = \IPS\DateTime::create();
-			$billingAgreement->next_cycle = ( new \IPS\DateTime( $response['billing_info']['next_billing_time'] ) );
-			$billingAgreement->save();
-		}
-		$transaction->billing_agreement = $billingAgreement;
-		$transaction->save();
 
 		/* Check Fraud */
 		$fraudResult = $fraudCheck( $transaction, FALSE );
 
 		/* Just save that we're waiting for the webhook, but also try again in a few minutes because PayPal is flakey */
-		$transaction->status = Transaction::STATUS_GATEWAY_PENDING;
+		$transaction->status = \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING;
 		$transaction->save();
 		$transaction->sendNotification();
-		Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), "`key`='gatewayPending'" );
-		Output::i()->redirect( $transaction->url() );
+		\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), "`key`='gatewayPending'" );
+		\IPS\Output::i()->redirect( $transaction->url() );
 	}
 	
 	/* Billing Agreement (DEPRECATED) */
-	elseif ( isset( Request::i()->billingAgreement ) )
+	elseif ( isset( \IPS\Request::i()->billingAgreement ) )
 	{
 		/* Execute */
-		$response = $transaction->method->api( "payments/billing-agreements/" . Request::i()->token . "/agreement-execute" );
+		$response = $transaction->method->api( "payments/billing-agreements/" . \IPS\Request::i()->token . "/agreement-execute" );
 		$agreementId = $response['id'];
 		if ( isset( $response['payer'] ) and isset( $response['payer']['status'] ) )
 		{
@@ -112,12 +122,12 @@ try
 		}
 				
 		/* Create Billing Agreement */
-		$billingAgreement = new BillingAgreement;
+		$billingAgreement = new \IPS\nexus\Gateway\PayPal\BillingAgreement;
 		$billingAgreement->gw_id = $agreementId;
 		$billingAgreement->method = $transaction->method;
 		$billingAgreement->member = $transaction->member;
 		$billingAgreement->started = \IPS\DateTime::create();
-		$billingAgreement->next_cycle = \IPS\DateTime::create()->add( new DateInterval( 'P' . $response['plan']['payment_definitions'][0]['frequency_interval'] . mb_substr( $response['plan']['payment_definitions'][0]['frequency'], 0, 1 ) ) );
+		$billingAgreement->next_cycle = \IPS\DateTime::create()->add( new \DateInterval( 'P' . $response['plan']['payment_definitions'][0]['frequency_interval'] . mb_substr( $response['plan']['payment_definitions'][0]['frequency'], 0, 1 ) ) );
 		$billingAgreement->save();
 		$transaction->billing_agreement = $billingAgreement;
 		$transaction->save();
@@ -134,7 +144,7 @@ try
 
 				/* Check Fraud Actions */
 				$fraudResult = $fraudCheck( $transaction );
-				if ( $fraudResult and $fraudResult !== Transaction::STATUS_PAID )
+				if ( $fraudResult and $fraudResult !== \IPS\nexus\Transaction::STATUS_PAID )
 				{
 					$transaction->executeFraudAction( $fraudResult, TRUE );
 				}
@@ -151,30 +161,30 @@ try
 					$memberJustCreated = $transaction->approve();
 					if ( $memberJustCreated )
 					{
-						Session::i()->setMember( $memberJustCreated );
-						Device::loadOrCreate( $memberJustCreated, FALSE )->updateAfterAuthentication( NULL );
+						\IPS\Session::i()->setMember( $memberJustCreated );
+						\IPS\Member\Device::loadOrCreate( $memberJustCreated, FALSE )->updateAfterAuthentication( NULL );
 					}
 				}
 
 				$transaction->sendNotification();
-				Output::i()->redirect( $transaction->url() );
+				\IPS\Output::i()->redirect( $transaction->url() );
 			}
 		}
 				
 		/* Just save that we're waiting for the webhook */
-		$transaction->status = Transaction::STATUS_GATEWAY_PENDING;
+		$transaction->status = \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING;
 		$transaction->save();
 		$transaction->sendNotification();
-		Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), "`key`='gatewayPending'" );
-		Output::i()->redirect( $transaction->url() );
+		\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), "`key`='gatewayPending'" );
+		\IPS\Output::i()->redirect( $transaction->url() );
 	}
 	
 	/* Normal */
 	else
 	{
 		$response = $transaction->method->api( "checkout/orders/{$transaction->gw_id}/authorize", array(
-			'payer_id'	=> Request::i()->PayerID,
-		), 'post', TRUE, NULL, md5( $transaction->invoice->checkoutUrl() . ';' . $transaction->id . ';' . $transaction->gw_id ), 2 );
+			'payer_id'	=> \IPS\Request::i()->PayerID,
+		), 'post', TRUE, NULL, NULL, 2 );
 		$transaction->gw_id = $response['purchase_units'][0]['payments']['authorizations'][0]['id']; // Was previously a payment ID. This sets it to the actual transaction ID for the authorization. At capture, it will be updated again to the capture transaction ID
 		$transaction->auth = \IPS\DateTime::ts( strtotime( $response['purchase_units'][0]['payments']['authorizations'][0]['expiration_time'] ) );
 		if ( isset( $response['payer'] ) and isset( $response['payer']['status'] ) )
@@ -194,22 +204,23 @@ try
 	{
 		$transaction->executeFraudAction( $fraudResult, TRUE );
 	}
-	if ( !$fraudResult or $fraudResult === Transaction::STATUS_PAID )
+	if ( !$fraudResult or $fraudResult === \IPS\nexus\Transaction::STATUS_PAID )
 	{
 		$memberJustCreated = $transaction->captureAndApprove();
 		if ( $memberJustCreated )
 		{
-			Session::i()->setMember( $memberJustCreated );
-			Device::loadOrCreate( $memberJustCreated, FALSE )->updateAfterAuthentication( NULL );
+			\IPS\Session::i()->setMember( $memberJustCreated );
+			\IPS\Member\Device::loadOrCreate( $memberJustCreated, FALSE )->updateAfterAuthentication( NULL );
 		}
 	}
 	$transaction->sendNotification();
 	
 	/* Redirect */
-	Output::i()->redirect( $transaction->url() );
+	\IPS\Output::i()->redirect( $transaction->url() );
 }
-catch (Exception $e )
+catch ( \Exception $e )
 {
-	Log::log( $e, 'paypal' );
-	Output::i()->redirect( $transaction->invoice->checkoutUrl()->setQueryString( array( '_step' => 'checkout_pay', 'err' => $e->getMessage() ) ) );
+	$transaction->method->processException( $transaction, $e );
+	\IPS\Log::log( $e, 'paypal' );
+	\IPS\Output::i()->redirect( $transaction->invoice->checkoutUrl()->setQueryString( array( '_step' => 'checkout_pay', 'err' => $e->getMessage() ) ) );
 }

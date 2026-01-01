@@ -10,9 +10,7 @@
 
 namespace IPS\Db;
 
-use function defined;
-
-if( !defined( 'IPS\\SUITE_UNIQUE_KEY' ) )
+if( !\defined( 'IPS\\SUITE_UNIQUE_KEY' ) )
 {
     die( "Unauthorized Access" );
 }
@@ -20,26 +18,26 @@ if( !defined( 'IPS\\SUITE_UNIQUE_KEY' ) )
 /**
  * Binding Class for Prepared Statements
  */
-class Bind
+class _Bind
 {
 	/**
 	 * @brief	Values
 	 */
-	public array $values = array();
+	public $values = array();
 	
 	/**
 	 * @brief	Types
 	 */
-	protected string $types = '';
+	protected $types = ''; 
     
     /** 
      * Add value
      *
-     * @param string $type	Type
+     * @param	string	$type	Type
      * @param	mixed	$value	Value
      * @return	void
      */
-    public function add( string $type, mixed $value ) : void
+    public function add( $type, $value )
     { 
         $this->values[] = $value; 
         $this->types .= $type; 
@@ -50,8 +48,8 @@ class Bind
      *
      * @return bool
      */
-    public function haveBinds(): bool
-	{
+    public function haveBinds()
+    {
 	    return !( empty( $this->values ) );
     }
     
@@ -61,8 +59,8 @@ class Bind
      * @see		<a href='http://php.net/manual/en/mysqli-stmt.bind-param.php'>mysqli_stmt::bind_param</a>
      * @return	array
      */
-    public function get(): array
-	{
+    public function get()
+    {
     	$values = array();
     	foreach ( $this->values as $k => $v )
     	{

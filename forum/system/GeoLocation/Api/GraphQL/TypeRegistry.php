@@ -10,21 +10,21 @@
  */
 
 namespace IPS\GeoLocation\Api\GraphQL;
-use function defined;
+use GraphQL\Type\Definition\Type;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * \IPS\GeoLocation base types
  */
-class TypeRegistry
+class _TypeRegistry
 {
-	protected static ?GeoLocationType $geolocation = null;
+	protected static $geolocation;
 
 	/**
 	 * Constructor
@@ -37,8 +37,8 @@ class TypeRegistry
 	/**
 	 * @return GeoLocationType
 	 */
-	public static function geolocation() : GeoLocationType
+	public static function geolocation()
 	{
-		return self::$geolocation ?: (self::$geolocation = new GeoLocationType());
+		return self::$geolocation ?: (self::$geolocation = new \IPS\GeoLocation\Api\GraphQL\GeoLocationType());
 	}
 }

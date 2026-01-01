@@ -12,78 +12,64 @@
 namespace IPS\nexus\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application\Module;
-use IPS\core\FrontNavigation\FrontNavigationAbstract;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Store
  */
-class Store extends FrontNavigationAbstract
+class _Store extends \IPS\core\FrontNavigation\FrontNavigationAbstract
 {
-	/**
-	 * @var string Default icon
-	 */
-	public string $defaultIcon = '\f07a';
-
 	/**
 	 * Get Type Title which will display in the AdminCP Menu Manager
 	 *
 	 * @return	string
 	 */
-	public static function typeTitle(): string
+	public static function typeTitle()
 	{
-		return Member::loggedIn()->language()->addToStack('module__nexus_store');
+		return \IPS\Member::loggedIn()->language()->addToStack('module__nexus_store');
 	}
 		
 	/**
 	 * Can the currently logged in user access the content this item links to?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canAccessContent(): bool
+	public function canAccessContent()
 	{
-		return Member::loggedIn()->canAccessModule( Module::get( 'nexus', 'store' ) );
+		return \IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'nexus', 'store' ) );
 	}
 	
 	/**
 	 * Get Title
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack('module__nexus_store');
+		return \IPS\Member::loggedIn()->language()->addToStack('module__nexus_store');
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|string|null
+	public function link()
 	{
-		return Url::internal( "app=nexus&module=store&controller=store", 'front', 'store' );
+		return \IPS\Http\Url::internal( "app=nexus&module=store&controller=store", 'front', 'store' );
 	}
 	
 	/**
 	 * Is Active?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function active(): bool
+	public function active()
 	{
-		return Dispatcher::i()->application->directory === 'nexus' and Dispatcher::i()->module and Dispatcher::i()->module->key === 'store' and in_array( Dispatcher::i()->controller, array( 'cart', 'product', 'store' ) );
+		return \IPS\Dispatcher::i()->application->directory === 'nexus' and \IPS\Dispatcher::i()->module and \IPS\Dispatcher::i()->module->key === 'store' and \in_array( \IPS\Dispatcher::i()->controller, array( 'cart', 'product', 'store' ) );
 	}
 }

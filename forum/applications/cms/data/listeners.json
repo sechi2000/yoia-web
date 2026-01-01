@@ -1,7 +1,0 @@
-{
-    "Databases": {
-        "type": "MemberListenerType",
-        "classname": "IPS\\cms\\listeners\\Databases",
-        "extends": "IPS\\Member"
-    }
-}

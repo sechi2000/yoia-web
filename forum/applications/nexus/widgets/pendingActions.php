@@ -12,77 +12,70 @@
 namespace IPS\nexus\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Member;
-use IPS\nexus\Payout;
-use IPS\nexus\Transaction;
-use IPS\Output;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Widget;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Pending Actions Widget
  */
-class pendingActions extends Widget
+class _pendingActions extends \IPS\Widget
 {
 	/**
 	 * @brief	Options
 	 */
-	protected static array $options = array(
+	protected static $options = array(
 		'transactions'	=> 'pending_transactions',
+		'shipments'		=> 'pending_shipments',
 		'withdrawals'	=> 'pending_widthdrawals',
+		'support'		=> 'open_support_requests',
 		'ads'			=> 'pending_advertisements',
 	);
 	
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'pendingActions';
+	public $key = 'pendingActions';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'nexus';
-
+	public $app = 'nexus';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
+	
 	/**
 	 * Initialise this widget
 	 *
 	 * @return void
 	 */ 
-	public function init(): void
+	public function init()
 	{
 		if ( !isset( $this->configuration['pendingActions_stuff'] ) )
 		{
 			$this->configuration['pendingActions_stuff'] = array_keys( static::$options );
 		}
 		
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'nexus', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'nexus', 'front' ) );
 		parent::init();
 	}
 		
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
 		$form = parent::configuration( $form );
 
- 		$form->add( new CheckboxSet( 'pendingActions_stuff', $this->configuration['pendingActions_stuff'], TRUE, array( 'options' => static::$options ) ) );
+ 		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'pendingActions_stuff', $this->configuration['pendingActions_stuff'], TRUE, array( 'options' => static::$options ) ) );
  		
  		return $form;
  	} 
@@ -92,30 +85,41 @@ class pendingActions extends Widget
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
-		if ( !Member::loggedIn()->isAdmin() )
+		if ( !\IPS\Member::loggedIn()->isAdmin() )
 		{
 			return '';
 		}
 		
 		/* Pending transactions *might* happen some weird way, so always get the count... but only show the count if we have fraud rules set up */
 		$pendingTransactions = NULL;
-		if ( in_array( 'transactions', $this->configuration['pendingActions_stuff'] ) and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' ) )
+		if ( \in_array( 'transactions', $this->configuration['pendingActions_stuff'] ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' ) )
 		{
-			$pendingTransactions = Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( 't_status=?', Transaction::STATUS_HELD ) )->first();
-			if ( !$pendingTransactions and !Db::i()->select( 'COUNT(*)', 'nexus_fraud_rules' )->first() )
+			$pendingTransactions = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( 't_status=?', \IPS\nexus\Transaction::STATUS_HELD ) )->first();
+			if ( !$pendingTransactions and !\IPS\Db::i()->select( 'COUNT(*)', 'nexus_fraud_rules' )->first() )
 			{
 				$pendingTransactions = NULL;
 			}
 		}
-
+		
+		/* Same with shipments */
+		$pendingShipments = NULL;
+		if ( \in_array( 'shipments', $this->configuration['pendingActions_stuff'] ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'shiporders_manage' ) )
+		{
+			$pendingShipments = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_ship_orders', array( 'o_status=?', \IPS\nexus\Shipping\Order::STATUS_PENDING ) )->first();
+			if ( !$pendingShipments and !\IPS\Db::i()->select( 'COUNT(*)', 'nexus_packages_products', 'p_physical=1' )->first() )
+			{
+				$pendingShipments = NULL;
+			}
+		}
+		
 		/* And advertisements */
 		$pendingAdvertisements = NULL;
-		if ( in_array( 'ads', $this->configuration['pendingActions_stuff'] ) and Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'advertisements_manage' ) )
+		if ( \in_array( 'ads', $this->configuration['pendingActions_stuff'] ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'advertisements_manage' ) )
 		{
-			$pendingAdvertisements = Db::i()->select( 'COUNT(*)', 'core_advertisements', array( 'ad_active=-1' ) )->first();
-			if ( !$pendingAdvertisements and !Db::i()->select( 'COUNT(*)', 'nexus_packages_ads' )->first() )
+			$pendingAdvertisements = \IPS\Db::i()->select( 'COUNT(*)', 'core_advertisements', array( 'ad_active=-1' ) )->first();
+			if ( !$pendingAdvertisements and !\IPS\Db::i()->select( 'COUNT(*)', 'nexus_packages_ads' )->first() )
 			{
 				$pendingAdvertisements = NULL;
 			}
@@ -123,11 +127,19 @@ class pendingActions extends Widget
 		
 		/* Withdrawals will only be if enabled */
 		$pendingWithdrawals = NULL;
-		if ( in_array( 'withdrawals', $this->configuration['pendingActions_stuff'] ) and Settings::i()->nexus_payout and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_manage' ) )
+		if ( \in_array( 'withdrawals', $this->configuration['pendingActions_stuff'] ) and \IPS\Settings::i()->nexus_payout and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_manage' ) )
 		{
-			$pendingWithdrawals = Db::i()->select( 'COUNT(*)', 'nexus_payouts', array( 'po_status=?', Payout::STATUS_PENDING ) )->first();
+			$pendingWithdrawals = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_payouts', array( 'po_status=?', \IPS\nexus\Payout::STATUS_PENDING ) )->first();
+		}
+		
+		/* Show support if there are departments we can see */
+		$openSupportRequests = NULL;
+		if ( \in_array( 'support', $this->configuration['pendingActions_stuff'] ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'support', 'requests_manage' ) and \IPS\Db::i()->select( '*', 'nexus_support_departments', array( "( dpt_staff='*' OR " . \IPS\Db::i()->findInSet( 'dpt_staff', \IPS\nexus\Support\Department::staffDepartmentPerms() ) . ')' ) ) )
+		{
+			$myStream = \IPS\nexus\Support\Stream::myStream();
+			$openSupportRequests = $myStream->count( \IPS\Member::loggedIn() );
 		}
 				
-		return $this->output( $pendingTransactions, $pendingWithdrawals, $pendingAdvertisements );
+		return $this->output( $pendingTransactions, $pendingShipments, $pendingWithdrawals, $openSupportRequests, $pendingAdvertisements );
 	}
 }

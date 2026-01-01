@@ -11,50 +11,41 @@
 namespace IPS\core\modules\admin\settings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Controller;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Request;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Security Questions
  */
-class securityquestions extends Controller
+class _securityquestions extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = '\IPS\MFA\SecurityQuestions\Question';
+	protected $nodeClass = '\IPS\MFA\SecurityQuestions\Question';
 
 	/**
 	 * Show the "add" button in the page root rather than the table root
 	 */
-	protected bool $_addButtonInRoot = FALSE;
+	protected $_addButtonInRoot = FALSE;
 
 	/**
 	 * Form
 	 *
 	 * @return	void
 	 */
-	public function form() : void
+	public function form()
 	{
-		Output::i()->breadcrumb[] = array( Url::internal('app=core&module=settings&controller=mfa&tab=handlers'), Member::loggedIn()->language()->addToStack('menu__core_settings_mfa') );
-		Output::i()->breadcrumb[] = array( Url::internal('app=core&module=settings&controller=mfa&tab=questions&do=settings&key=questions'), Member::loggedIn()->language()->addToStack("mfa_questions_title") );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal('app=core&module=settings&controller=mfa&tab=handlers'), \IPS\Member::loggedIn()->language()->addToStack('menu__core_settings_mfa') );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal('app=core&module=settings&controller=mfa&tab=questions&do=settings&key=questions'), \IPS\Member::loggedIn()->language()->addToStack("mfa_questions_title") );
 		parent::form();
 	}
 		
@@ -63,28 +54,28 @@ class securityquestions extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function settings() : void
+	protected function settings()
 	{
-		$this->manage();
+		return $this->manage();
 	}
-
+	
 	/**
 	 * Redirect after save
 	 *
-	 * @param Model|null $old A clone of the node as it was before or NULL if this is a creation
-	 * @param Model $new The node now
-	 * @param string $lastUsedTab The tab last used in the form
-	 * @return    void
+	 * @param	\IPS\Node\Model	$old			A clone of the node as it was before or NULL if this is a creation
+	 * @param	\IPS\Node\Model	$new			The node now
+	 * @param	string			$lastUsedTab	The tab last used in the form
+	 * @return	void
 	 */
-	protected function _afterSave( ?Model $old, Model $new, mixed $lastUsedTab = FALSE ): void
+	protected function _afterSave( ?\IPS\Node\Model $old, \IPS\Node\Model $new, $lastUsedTab = FALSE )
 	{
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array() );
+			\IPS\Output::i()->json( array() );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal('app=core&module=settings&controller=mfa&tab=handlers&do=settings&key=questions&tab=questions'), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=settings&controller=mfa&tab=handlers&do=settings&key=questions&tab=questions'), 'saved' );
 		}
 	}
 }

@@ -11,92 +11,71 @@
 namespace IPS\core\StaffDirectory;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Member as FormMember;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Translatable;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Settings;
-use LogicException;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Staff Directory User Node
  */
-class User extends Model
+class _User extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_leaders';
+	public static $databaseTable = 'core_leaders';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'leader_';
+	public static $databasePrefix = 'leader_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'leader_type_id' );
+	protected static $databaseIdFields = array( 'leader_type_id' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Parent Node ID Database Column
 	 */
-	public static string $parentNodeColumnId = 'group_id';
+	public static $parentNodeColumnId = 'group_id';
 	
 	/**
 	 * @brief	[Node] Parent Node Class
 	 */
-	public static string $parentNodeClass = 'IPS\core\StaffDirectory\Group';
+	public static $parentNodeClass = 'IPS\core\StaffDirectory\Group';
 	
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'staff_directory';
+	public static $nodeTitle = 'staff_directory';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'staff',
 		'prefix'	=> 'leaders_',
@@ -108,7 +87,7 @@ class User extends Model
 	 * @param	int|null		$group	[Optional] Group to return users from
 	 * @return	array
 	 */
-	public static function staff( ?int $group=NULL ) : array
+	public static function staff( $group=NULL )
 	{
 		if( $group === NULL )
 		{
@@ -131,12 +110,12 @@ class User extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
-		$form->add( new Radio( 'leader_type', $this->type ?: 'm', TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'leader_type', $this->type ?: 'm', TRUE, array(
 			'options' 	=> array( 'm' => 'leader_type_member', 'g' => 'leader_type_group' ),
 			'toggles'	=> array(
 				'm'			=> array( 'leader_id_member', 'leader_name_toggle', 'leader_title_toggle', 'leader_custom_bio_id' ),
@@ -144,18 +123,18 @@ class User extends Model
 			),
 		) ) );
 
-		$form->add( new Select( 'leader_id_group', $this->type === 'g' ? $this->type_id : NULL, FALSE, array( 'options' => Group::groups( TRUE, FALSE ), 'parse' => 'normal' ), NULL, NULL, NULL, 'leader_id_group' ) );
-		$form->add( new FormMember( 'leader_id_member', ( $this->type === 'm' AND !$this->_new ) ? Member::load( $this->type_id )->name : NULL, FALSE, array(), function( $val )
+		$form->add( new \IPS\Helpers\Form\Select( 'leader_id_group', $this->type === 'g' ? $this->type_id : NULL, FALSE, array( 'options' => \IPS\Member\Group::groups( TRUE, FALSE ), 'parse' => 'normal' ), NULL, NULL, NULL, 'leader_id_group' ) );
+		$form->add( new \IPS\Helpers\Form\Member( 'leader_id_member', ( $this->type === 'm' AND !$this->_new ) ? \IPS\Member::load( $this->type_id )->name : NULL, FALSE, array(), function( $val )
 		{
-			if ( !$val and Request::i()->leader_type === 'm' )
+			if ( !$val and \IPS\Request::i()->leader_type === 'm' )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'leader_id_member' ) );
-		$form->add( new Radio( 'leader_use_custom_name', ( Member::loggedIn()->language()->checkKeyExists("core_staff_directory_name_{$this->id}") ) ? 1 : 0, FALSE, array( 'options' => array( 0 => 'leader_custom_name_default', 1 => 'leader_custom_name_custom' ), 'toggles' => array( 1 => array( 'leader_custom_name' ) ) ), NULL, NULL, NULL, 'leader_name_toggle' ) );
-		$form->add( new Translatable( 'leader_custom_name', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ? "core_staff_directory_name_{$this->id}" : NULL ) ), NULL, NULL, NULL, 'leader_custom_name' ) );
-		$form->add( new Translatable( 'leader_custom_title', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ? "core_staff_directory_title_{$this->id}" : NULL ) ), NULL, NULL, NULL, 'leader_custom_title' ) );
-		$form->add( new Translatable( 'leader_custom_bio', NULL, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'leader_use_custom_name', ( \IPS\Member::loggedIn()->language()->checkKeyExists("core_staff_directory_name_{$this->id}") ) ? 1 : 0, FALSE, array( 'options' => array( 0 => 'leader_custom_name_default', 1 => 'leader_custom_name_custom' ), 'toggles' => array( 1 => array( 'leader_custom_name' ) ) ), NULL, NULL, NULL, 'leader_name_toggle' ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'leader_custom_name', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ? "core_staff_directory_name_{$this->id}" : NULL ) ), NULL, NULL, NULL, 'leader_custom_name' ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'leader_custom_title', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ? "core_staff_directory_title_{$this->id}" : NULL ) ), NULL, NULL, NULL, 'leader_custom_title' ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'leader_custom_bio', NULL, FALSE, array(
 			'app'			=> 'core',
 			'key'			=> ( $this->id ) ? "core_staff_directory_bio_{$this->id}" : NULL,
 			'editor'		=> array(
@@ -173,21 +152,21 @@ class User extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if( isset( $values['leader_type'] ) )
 		{
 			try
 			{
-				if( Db::i()->select( '*', 'core_leaders', array( 'leader_type=? AND leader_type_id=?', $values['leader_type'], $values['leader_type'] === 'm' ? $values['leader_id_member']->member_id : $values['leader_id_group'] ) )->first() )
+				if( \IPS\Db::i()->select( '*', 'core_leaders', array( 'leader_type=? AND leader_type_id=?', $values['leader_type'], $values['leader_type'] === 'm' ? $values['leader_id_member']->member_id : $values['leader_id_group'] ) )->first() )
 				{
 					if( !$this->id OR ( $this->id AND $this->type != $values['leader_type'] OR $this->type_id != ( $values['leader_type'] === 'm' ? $values['leader_id_member']->member_id : $values['leader_id_group'] ) ) )
 					{
-						throw new LogicException( Member::loggedIn()->language()->addToStack("only_one_leader") );
+						throw new \LogicException( \IPS\Member::loggedIn()->language()->addToStack("only_one_leader") );
 					}
 				}
 			}
-			catch( UnderflowException $e ){}
+			catch( \UnderflowException $e ){}
 		}
 
 		if( isset( $values['leader_type'] ) AND ( isset( $values['leader_id_member'] ) OR $values['leader_id_group'] ) )
@@ -202,13 +181,13 @@ class User extends Model
 		if ( !$this->id )
 		{
 			$this->save();
-			File::claimAttachments( 'leader-new', $this->id, NULL, NULL, TRUE );
+			\IPS\File::claimAttachments( 'leader-new', $this->id, NULL, NULL, TRUE );
 
-			$values['position']			= ( Db::i()->select( 'MAX(leader_position)', 'core_leaders' )->first() + 1 );
+			$values['position']			= ( \IPS\Db::i()->select( 'MAX(leader_position)', 'core_leaders' )->first() + 1 );
 		}
 		else
 		{
-			File::claimAttachments( "leader-{$this->id}", $this->id, NULL, NULL, TRUE );
+			\IPS\File::claimAttachments( "leader-{$this->id}", $this->id, NULL, NULL, TRUE );
 		}
 
 		$toUnset	= array();
@@ -218,17 +197,17 @@ class User extends Model
 			$toUnset[]	= 'leader_use_custom_name';
 			$toUnset[]	= 'leader_custom_name';
 
-			Lang::deleteCustom( 'core', "core_staff_directory_name_{$this->id}" );
+			\IPS\Lang::deleteCustom( 'core', "core_staff_directory_name_{$this->id}" );
 		}
 
 		if( isset( $values['leader_custom_name'] ) AND isset( $values['leader_use_custom_name'] ) AND $values['leader_use_custom_name'] )
 		{
-			Lang::saveCustom( 'core', "core_staff_directory_name_{$this->id}", $values['leader_custom_name'] );
+			\IPS\Lang::saveCustom( 'core', "core_staff_directory_name_{$this->id}", $values['leader_custom_name'] );
 		}
 
 		if( isset( $values['leader_custom_title'] ) )
 		{
-			Lang::saveCustom( 'core', "core_staff_directory_title_{$this->id}", $values['leader_custom_title'] );
+			\IPS\Lang::saveCustom( 'core', "core_staff_directory_title_{$this->id}", $values['leader_custom_title'] );
 			unset( $values['leader_custom_title'] );
 		}
 
@@ -237,11 +216,11 @@ class User extends Model
 			$toUnset[]	= 'leader_custom_bio';
 			if ( isset ( $values['leader_custom_bio'] ) )
 			{
-				Lang::saveCustom( 'core', "core_staff_directory_bio_{$this->id}", $values['leader_custom_bio'] );
+				\IPS\Lang::saveCustom( 'core', "core_staff_directory_bio_{$this->id}", $values['leader_custom_bio'] );
 			}
 		}
 
-		if( count( $toUnset ) )
+		if( \count( $toUnset ) )
 		{
 			foreach( $toUnset as $_key )
 			{
@@ -257,7 +236,7 @@ class User extends Model
 	 *
 	 * @return	string
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		if ( !$this->id )
 		{
@@ -266,29 +245,29 @@ class User extends Model
 		
 		if ( $this->type === 'm' )
 		{
-			if( Member::loggedIn()->language()->checkKeyExists("core_staff_directory_name_{$this->id}") and Member::loggedIn()->language()->get("core_staff_directory_name_{$this->id}") )
+			if( \IPS\Member::loggedIn()->language()->checkKeyExists("core_staff_directory_name_{$this->id}") and \IPS\Member::loggedIn()->language()->get("core_staff_directory_name_{$this->id}") )
 			{
-				return Member::loggedIn()->language()->addToStack( "core_staff_directory_name_{$this->id}", FALSE, array( 'escape' => TRUE ) );
+				return \IPS\Member::loggedIn()->language()->addToStack( "core_staff_directory_name_{$this->id}", FALSE, array( 'escape' => TRUE ) );
 			}
 
-			$member = Member::load( $this->type_id );
+			$member = \IPS\Member::load( $this->type_id );
 
 			if( $member->member_id )
 			{
 				return $member->name;
 			}
 
-			return Member::loggedIn()->language()->addToStack('deleted_member');
+			return \IPS\Member::loggedIn()->language()->addToStack('deleted_member');
 		}
 		else
 		{
 			try
 			{
-				return Group::load( $this->type_id )->name;
+				return \IPS\Member\Group::load( $this->type_id )->name;
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				return Member::loggedIn()->language()->addToStack('deleted_group');
+				return \IPS\Member::loggedIn()->language()->addToStack('deleted_group');
 			}
 		}
 	}
@@ -298,7 +277,7 @@ class User extends Model
 	 *
 	 * @return	string
 	 */
-	protected function get__icon(): mixed
+	protected function get__icon()
 	{
 		return $this->type === 'm' ? 'fa-user' : 'fa-group';
 	}
@@ -306,18 +285,18 @@ class User extends Model
 	/**
 	 * @brief	Member
 	 */
-	public ?Member $member = null;
+	public $member;
 
 	/**
 	 * Get member data for user
 	 *
-	 * @return	Member
+	 * @return	\IPS\Member
 	 */
-	public function member() : Member
+	public function member()
 	{
 		if ( $this->member === NULL )
 		{
-			$this->member =  Member::load( $this->type_id );
+			$this->member =  \IPS\Member::load( $this->type_id );
 		}
 		
 		return $this->member;
@@ -328,7 +307,7 @@ class User extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canAdd(): bool
+	public function canAdd()
 	{
 		return FALSE;
 	}
@@ -338,7 +317,7 @@ class User extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canCopy(): bool
+	public function canCopy()
 	{
 		return FALSE;
 	}
@@ -348,7 +327,7 @@ class User extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canManagePermissions(): bool
+	public function canManagePermissions()
 	{
 		return FALSE;
 	}
@@ -356,11 +335,11 @@ class User extends Model
 	/**
 	 * Delete
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		File::unclaimAttachments( 'core_Staffdirectory', $this->id );
+		\IPS\File::unclaimAttachments( 'core_Staffdirectory', $this->id );
 		parent::delete();
 		static::updateEmptySetting();
 	}
@@ -368,9 +347,9 @@ class User extends Model
 	/**
 	 * Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		parent::save();
 		static::updateEmptySetting( FALSE );
@@ -382,13 +361,14 @@ class User extends Model
 	 * @param	bool|NULL	$value	If we already know the value (because we've just set it), will save a query
 	 * @return	void
 	 */
-	public static function updateEmptySetting( ?bool $value = NULL ) : void
+	public static function updateEmptySetting( $value = NULL )
 	{
 		if ( $value == NULL )
 		{
-			$value = !( Db::i()->select( 'COUNT(*)', 'core_leaders', NULL, NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first() );
+			/* @note SELECT_FROM_WRITE_SERVER Added in fa59a59 to account for a race condition */
+			$value = !( (bool) \IPS\Db::i()->select( 'COUNT(*)', 'core_leaders', NULL, NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first() );
 		}
 		
-		Settings::i()->changeValues( array( 'staff_directory_empty' => $value ) );
+		\IPS\Settings::i()->changeValues( array( 'staff_directory_empty' => $value ) );
 	}
 }

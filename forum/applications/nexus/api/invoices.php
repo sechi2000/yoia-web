@@ -12,28 +12,16 @@
 namespace IPS\nexus\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Db;
-use IPS\nexus\Invoice;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Invoices API
  */
-class invoices extends Controller
+class _invoices extends \IPS\Api\Controller
 {
 	/**
 	 * GET /nexus/invoices
@@ -46,10 +34,9 @@ class invoices extends Controller
 	 * @apiparam	string	sortDir				Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page				Page number
 	 * @apiparam	int		perPage				Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\nexus\Invoice>
-	 * @return PaginatedResponse<Invoice>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\nexus\Invoice>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = array();
@@ -59,37 +46,37 @@ class invoices extends Controller
 		{
 			$where[] = array( 'i_member=?', $this->member->member_id );
 		}
-		elseif ( isset( Request::i()->customers ) )
+		elseif ( isset( \IPS\Request::i()->customers ) )
 		{
-			$where[] = array( Db::i()->in( 'i_member', array_map( 'intval', array_filter( explode( ',', Request::i()->customers ) ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( 'i_member', array_map( 'intval', array_filter( explode( ',', \IPS\Request::i()->customers ) ) ) ) );
 		}
 		
 		/* Statuses */
-		if ( isset( Request::i()->statuses ) )
+		if ( isset( \IPS\Request::i()->statuses ) )
 		{
-			$where[] = array( Db::i()->in( 'i_status', array_filter( explode( ',', Request::i()->statuses ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( 'i_status', array_filter( explode( ',', \IPS\Request::i()->statuses ) ) ) );
 		}
 				
 		/* Sort */
-		if ( isset( Request::i()->sortBy ) and in_array( Request::i()->sortBy, array( 'date', 'title', 'total' ) ) )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'date', 'title', 'total' ) ) )
 		{
-			$sortBy = 'i_' . Request::i()->sortBy;
+			$sortBy = 'i_' . \IPS\Request::i()->sortBy;
 		}
 		else
 		{
 			$sortBy = 'i_id';
 		}
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 		
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', 'nexus_invoices', $where, "{$sortBy} {$sortDir}" ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			\IPS\Db::i()->select( '*', 'nexus_invoices', $where, "{$sortBy} {$sortDir}" ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			'IPS\nexus\Invoice',
-			Db::i()->select( 'COUNT(*)', 'nexus_invoices', $where )->first(),
+			\IPS\Db::i()->select( 'COUNT(*)', 'nexus_invoices', $where )->first(),
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 	
@@ -99,24 +86,23 @@ class invoices extends Controller
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		2X299/1	INVALID_ID	The invoice ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\nexus\Invoice
-	 * @return Response
+	 * @return		\IPS\nexus\Invoice
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{
-			$object = Invoice::load( $id );
+			$object = \IPS\nexus\Invoice::load( $id );
 			if ( $this->member and !$object->canView( $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
-			return new Response( 200, $object->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $object->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2X299/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2X299/1', 404 );
 		}
 	}
 }

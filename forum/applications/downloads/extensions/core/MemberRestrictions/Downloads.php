@@ -11,34 +11,26 @@
 namespace IPS\downloads\extensions\core\MemberRestrictions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\Restriction;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\YesNo;
-use IPS\Member;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member Restrictions: Downloads
  */
-class Downloads extends Restriction
+class _Downloads extends \IPS\core\MemberACPProfile\Restriction
 {
 	/**
 	 * Modify Edit Restrictions form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form $form ) : void
+	public function form( \IPS\Helpers\Form $form )
 	{
-		$form->add( new YesNo( 'idm_block_submissions', !$this->member->idm_block_submissions ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'idm_block_submissions', !$this->member->idm_block_submissions ) );
 	}
 	
 	/**
@@ -47,16 +39,16 @@ class Downloads extends Restriction
 	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function save( array $values ): array
+	public function save( $values )
 	{
 		$return = array();
-		
+
 		if ( $this->member->idm_block_submissions == $values['idm_block_submissions'] )
 		{
 			$return['idm_block_submissions'] = array( 'old' => $this->member->idm_block_submissions, 'new' => !$values['idm_block_submissions'] );
 			$this->member->idm_block_submissions = !$values['idm_block_submissions'];
 		}
-		
+
 		return $return;
 	}
 	
@@ -65,7 +57,7 @@ class Downloads extends Restriction
 	 *
 	 * @return	array
 	 */
-	public function activeRestrictions(): array
+	public function activeRestrictions()
 	{
 		$return = array();
 		
@@ -88,7 +80,7 @@ class Downloads extends Restriction
 	{
 		if ( isset( $changes['idm_block_submissions'] ) )
 		{
-			return array( Member::loggedIn()->language()->addToStack( 'history_restrictions_downloads_' . intval( $changes['idm_block_submissions']['new'] ) ) );
+			return array( \IPS\Member::loggedIn()->language()->addToStack( 'history_restrictions_downloads_' . \intval( $changes['idm_block_submissions']['new'] ) ) );
 		}
 		return array();
 	}

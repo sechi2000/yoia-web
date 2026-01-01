@@ -11,48 +11,31 @@
 namespace IPS\Data;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Data\Cache\Exception;
-use IPS\Data\Cache\None;
-use IPS\DateTime;
-use IPS\Settings;
-use IPS\Text\Encrypt;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function function_exists;
-use function in_array;
-use function is_array;
-use const IPS\CACHE_CONFIG;
-use const IPS\CACHE_METHOD;
-use const IPS\CACHING_LOG;
-use const IPS\TEST_CACHING;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Abstract Storage Class
  */
-abstract class Cache extends AbstractData
+abstract class _Cache extends AbstractData
 {
 	/**
 	 * @brief	Instance
 	 */
-	protected static ?Cache $instance = NULL;
+	protected static $instance;
 
 	/**
 	 * @brief	Caches already retrieved this instance
 	 */
-	protected array $cache	= array();
+	protected $cache	= array();
 	
 	/**
 	 * @brief	Log
 	 */
-	public array $log	= array();
+	public $log	= array();
 
 	/**
 	 * Available Cache Store Methods
@@ -67,7 +50,7 @@ abstract class Cache extends AbstractData
 			'Redis' => 'IPS\Data\Cache\Redis',
 		];
 
-		if( TEST_CACHING )
+		if( \IPS\TEST_CACHING )
 		{
 			$return['Test'] = 'IPS\Data\Cache\Test';
 		}
@@ -78,32 +61,32 @@ abstract class Cache extends AbstractData
 	/**
 	 * Get instance
 	 *
-	 * @return    Cache|null
+	 * @return	\IPS\Data\Cache
 	 */
-	public static function i(): ?Cache
+	public static function i()
 	{
 		if( static::$instance === NULL )
 		{
 			$classname = '\IPS\Data\Cache\None';
-			if( isset( static::availableMethods()[ CACHE_METHOD ] ) AND class_exists( static::availableMethods()[ CACHE_METHOD ] ) )
+			if( isset( static::availableMethods()[ \IPS\CACHE_METHOD ] ) AND class_exists( static::availableMethods()[ \IPS\CACHE_METHOD ] ) )
 			{
-				$classname = static::availableMethods()[ CACHE_METHOD ];
+				$classname = static::availableMethods()[ \IPS\CACHE_METHOD ];
 			}
 
 			if ( $classname::supported() )
 			{
 				try
 				{
-					static::$instance = new $classname( json_decode( CACHE_CONFIG, TRUE ) );
+					static::$instance = new $classname( json_decode( \IPS\CACHE_CONFIG, TRUE ) );
 				}
-				catch( Exception $e )
+				catch( \IPS\Data\Cache\Exception $e )
 				{
-					static::$instance = new None( array() );
+					static::$instance = new \IPS\Data\Cache\None( array() );
 				}
 			}
 			else
 			{
-				static::$instance = new None( array() );
+				static::$instance = new \IPS\Data\Cache\None( array() );
 			}
 		}
 		
@@ -115,7 +98,7 @@ abstract class Cache extends AbstractData
 	 *
 	 * @return boolean
 	 */
-	public function checkKeys(): bool
+	public function checkKeys()
 	{
 		return true;
 	}
@@ -123,17 +106,17 @@ abstract class Cache extends AbstractData
 	/**
 	 * Store value using cache method if available or falling back to the database
 	 *
-	 * @param string $key		Key
+	 * @param	string			$key		Key
 	 * @param	mixed			$value		Value
-	 * @param	DateTime	$expire		Expiration if using database
-	 * @param bool $fallback	Use database if no caching method is available?
+	 * @param	\IPS\DateTime	$expire		Expiration if using database
+	 * @param	bool			$fallback	Use database if no caching method is available?
 	 * @return	bool
 	 */
-	public function storeWithExpire( string $key, mixed $value, DateTime $expire, bool $fallback=FALSE ): bool
+	public function storeWithExpire( $key, $value, \IPS\DateTime $expire, $fallback=FALSE )
 	{
 		$value = array( 'value' => $value, 'expires' => $expire->getTimestamp() );
 		
-		if ( CACHING_LOG )
+		if ( \IPS\CACHING_LOG )
 		{
 			$this->log[ microtime(true) ] = array( 'set', $key, json_encode( $value, JSON_PRETTY_PRINT ), var_export( debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ), TRUE ) );
 		}
@@ -152,20 +135,20 @@ abstract class Cache extends AbstractData
 	/**
 	 * Get value using cache method if available or falling back to the database
 	 *
-	 * @param string $key	Key
-	 * @param bool $fallback	Use database if no caching method is available?
+	 * @param	string	$key	Key
+	 * @param	bool	$fallback	Use database if no caching method is available?
 	 * @return	mixed
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	public function getWithExpire( string $key, bool $fallback=FALSE ): mixed
+	public function getWithExpire( $key, $fallback=FALSE )
 	{
 		if ( !isset( $this->$key ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		$data = $this->$key;
-		if( count( $data ) and isset( $data['value'] ) and isset( $data['expires'] ) )
+		if( \count( $data ) and isset( $data['value'] ) and isset( $data['expires'] ) )
 		{
 			/* Is it expired? */
 			if( $data['expires'] AND time() < $data['expires'] )
@@ -175,13 +158,13 @@ abstract class Cache extends AbstractData
 			else
 			{
 				unset( $this->$key );
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
 		else
 		{
 			unset( $this->$key );
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 	}
 	
@@ -190,13 +173,13 @@ abstract class Cache extends AbstractData
 	 *
 	 * @return	void
 	 */
-	public function clearAll() : void
+	public function clearAll()
 	{
 		/* cacheKeys stored md5 hashes of the correct value, and the cache
 			is only used if the value it returns matches the hash, so clearing
 			this out invalidates all caches, even if the caching engine
 			does not allow us to actually clear them */
-		Store::i()->cacheKeys = array();
+		\IPS\Data\Store::i()->cacheKeys = array();
 	}
 	
 	/**
@@ -204,10 +187,10 @@ abstract class Cache extends AbstractData
 	 *
 	 * @return	string
 	 */
-	protected function _encryptionKey(): string
+	protected function _encryptionKey()
 	{
-		$password = Settings::i()->sql_pass;
-		if ( function_exists( 'openssl_digest' ) and in_array( 'sha256', openssl_get_md_methods() ) )
+		$password = \IPS\Settings::i()->sql_pass;
+		if ( \function_exists( 'openssl_digest' ) and \in_array( 'sha256', openssl_get_md_methods() ) )
 		{
 			$password = openssl_digest( $password, 'sha256', TRUE );
 		}
@@ -220,9 +203,9 @@ abstract class Cache extends AbstractData
 	 * @param	mixed	$value	Value
 	 * @return	string
 	 */
-	protected function encode( mixed $value ): string
+	protected function encode( $value )
 	{
-		return Encrypt::fromPlaintext( json_encode( $value ) )->tag();
+		return \IPS\Text\Encrypt::fromPlaintext( json_encode( $value ) )->tag();
 	}
 	
 	/**
@@ -231,22 +214,22 @@ abstract class Cache extends AbstractData
 	 * @param	mixed	$value	Value
 	 * @return	mixed
 	 */
-	protected function decode( mixed $value ): mixed
+	protected function decode( $value )
 	{
-		return json_decode( Encrypt::fromTag( $value )->decrypt(), TRUE );
+		return json_decode( \IPS\Text\Encrypt::fromTag( $value )->decrypt(), TRUE );
 	}
 	
 	/**
 	 * Magic Method: Isset
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	public function __isset( string $key ): bool
+	public function __isset( $key )
 	{
 		if ( parent::__isset( $key ) )
 		{
-			return ( is_array( $this->$key ) or $this->$key === 0 ) ? true : (bool) $this->$key;
+			return ( \is_array( $this->$key ) or $this->$key === 0 ) ? true : (bool) $this->$key;
 		}
 		return FALSE;
 	}

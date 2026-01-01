@@ -11,33 +11,25 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Log;
-use IPS\Sitemap;
-use IPS\Task;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Task to generate sitemaps
  */
-class sitemapgenerator extends Task
+class _sitemapgenerator extends \IPS\Task
 {
 	/**
 	 * Execute
 	 *
-	 * @return	mixed
+	 * @return	void
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		$generator	= new Sitemap;
+		$generator	= new \IPS\Sitemap;
 
 		$this->runUntilTimeout( function() use( $generator )
 		{
@@ -46,15 +38,15 @@ class sitemapgenerator extends Task
 				/* If it returns false, we're done for now */
 				return $generator->buildNextSitemap();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
-				Log::log( $e, 'sitemap_generator' );
+				\IPS\Log::log( $e, 'sitemap_generator' );
 				$generator->log[] = $e->getMessage();
 				return FALSE;
 			}
 		} );
 
-		if( count( $generator->log ) )
+		if( \count( $generator->log ) )
 		{
 			return $generator->log;
 		}

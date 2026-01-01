@@ -11,27 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Db;
-use IPS\Lang;
-use IPS\Output;
-use IPS\Theme;
-use ValueError;
-use function defined;
-use function is_array;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Translatable text input class for Form Builder
  */
-class Translatable extends FormAbstract
+class _Translatable extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -45,7 +34,7 @@ class Translatable extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'key'			=> NULL,
 		'editor'		=> NULL,
 		'textArea'		=> FALSE,
@@ -56,21 +45,22 @@ class Translatable extends FormAbstract
 	/**
 	 * @brief	Editors
 	 */
-	protected ?array $editors = NULL;
-
+	protected $editors = NULL;
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		/* Call parent constructor */
 		parent::__construct( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
@@ -81,18 +71,18 @@ class Translatable extends FormAbstract
 			$values = array();
 			if ( $this->options['key'] )
 			{
-				foreach( Db::i()->select( '*', 'core_sys_lang_words', array( 'word_key=?', $this->options['key'] ) )->setKeyField('lang_id') as $k => $v )
+				foreach( \IPS\Db::i()->select( '*', 'core_sys_lang_words', array( 'word_key=?', $this->options['key'] ) )->setKeyField('lang_id') as $k => $v )
 				{
-					$v = $v['word_custom'] ?? $v['word_default'];
+					$v = $v['word_custom'];
 					if ( $v or !isset( $values[ $k ] ) )
 					{
-						if ( is_array( $this->options['sprintf'] ) )
+						if ( \is_array( $this->options['sprintf'] ) )
 						{
 							try
 							{
 								$values[ $k ] = vsprintf( $v, $this->options[ 'sprintf' ] );
 							}
-							catch ( ValueError $e )
+							catch ( \ValueError $e )
 							{
 								/* Note in pre-PHP8, vsprintf() returns FALSE */
 								$values[ $k ] = FALSE;
@@ -108,10 +98,10 @@ class Translatable extends FormAbstract
 			
 			$this->value = $values;
 		}
-		elseif ( is_string( $this->value ) )
+		elseif ( \is_string( $this->value ) )
 		{
 			$values = array();
-			foreach ( Lang::getEnabledLanguages() as $lang )
+			foreach ( \IPS\Lang::getEnabledLanguages() as $lang )
 			{
 				$values[ $lang->id ] = $this->value;
 			}
@@ -119,26 +109,26 @@ class Translatable extends FormAbstract
 		}
 		
 		/* Add flags.css */
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'flags.css', 'core', 'global' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'flags.css', 'core', 'global' ) );
 	}
 	
 	/**
 	 * Get editors
 	 *
-	 * @return	array|null
+	 * @return	array
 	 */
-	protected function _getEditors(): ?array
+	protected function _getEditors()
 	{
 		if ( isset( $this->options['editor'] ) )
 		{
 			if ( $this->editors === NULL )
 			{
-				foreach ( Lang::getEnabledLanguages() as $lang )
+				foreach ( \IPS\Lang::getEnabledLanguages() as $lang )
 				{
 					$options = $this->options['editor'];
 					$options['autoSaveKey'] .= $lang->id;
 					$options['attachIdsLang'] = $lang->id;		
-					$this->editors[ $lang->id ] = new Editor( "{$this->name}[{$lang->id}]", $this->value[$lang->id] ?? NULL, $this->required, $options );
+					$this->editors[ $lang->id ] = new Editor( "{$this->name}[{$lang->id}]", isset( $this->value[ $lang->id ] ) ? $this->value[ $lang->id ] : NULL, $this->required, $options );
 				}
 			}
 			return $this->editors;
@@ -154,9 +144,9 @@ class Translatable extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{		
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->translatable( $this->name, Lang::getEnabledLanguages(), $this->value, $this->_getEditors(), $this->options['placeholder'], $this->options['textArea'], $this->required );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->translatable( $this->name, \IPS\Lang::getEnabledLanguages(), $this->value, $this->_getEditors(), $this->options['placeholder'], $this->options['textArea'], $this->required );
 	}
 	
 		
@@ -165,7 +155,7 @@ class Translatable extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		if ( isset( $this->options['editor'] ) )
 		{
@@ -185,18 +175,18 @@ class Translatable extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		parent::validate();
 		
 		if ( $this->required )
 		{
-			if ( ! trim( $this->value[ Lang::defaultLanguage() ] ) )
+			if ( ! trim( $this->value[ \IPS\Lang::defaultLanguage() ] ) )
 			{
-				throw new InvalidArgumentException('form_required');
+				throw new \InvalidArgumentException('form_required');
 			}
 		}
 		

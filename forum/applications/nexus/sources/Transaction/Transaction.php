@@ -12,46 +12,16 @@
 namespace IPS\nexus;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\core\AdminNotification;
-use IPS\DateTime;
-use IPS\Email;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\nexus\Customer\BillingAgreement;
-use IPS\nexus\Fraud\MaxMind\Request;
-use IPS\nexus\Fraud\MaxMind\Response;
-use IPS\nexus\Fraud\Rule;
-use IPS\Patterns\ActiveRecord;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use ReflectionClass;
-use RuntimeException;
-use function defined;
-use function get_called_class;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Transaction Model
- *
- * @property Customer $member
- * @property Invoice $invoice
- * @property Gateway $method
  */
-
-class Transaction extends ActiveRecord
+class _Transaction extends \IPS\Patterns\ActiveRecord
 {
 	const STATUS_PAID			= 'okay'; // Transaction has been paid successfully
 	const STATUS_PENDING		= 'pend'; // Payment not yet submitted (for example, has been redirected to external site)
@@ -67,32 +37,31 @@ class Transaction extends ActiveRecord
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_transactions';
+	public static $databaseTable = 'nexus_transactions';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 't_';
+	public static $databasePrefix = 't_';
 	
 	/**
 	 * Load and check permissions
 	 *
-	 * @param int	$id
-	 * @return	static
-	 * @throws	OutOfRangeException
+	 * @return	\IPS\Content\Item
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadAndCheckPerms( int $id ) : static
+	public static function loadAndCheckPerms( $id )
 	{
 		$obj = static::load( $id );
 
-		if ( $obj->member->member_id !== Member::loggedIn()->member_id )
+		if ( $obj->member->member_id !== \IPS\Member::loggedIn()->member_id )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		return $obj;
@@ -103,10 +72,10 @@ class Transaction extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public static function statuses(): array
+	public static function statuses()
 	{
 		$options = array();
-		$reflection = new ReflectionClass( get_called_class() );
+		$reflection = new \ReflectionClass( \get_called_class() );
 		foreach ( $reflection->getConstants() as $k => $v )
 		{
 			if ( mb_substr( $k, 0, 7 ) === 'STATUS_' )
@@ -121,14 +90,13 @@ class Transaction extends ActiveRecord
 	 * Get transaction table
 	 *
 	 * @param	array	$where	Where clause
-	 * @param   Url 	$url
 	 * @param	string	$ref	Referrer
-	 * @return	Db
+	 * @return	\IPS\Helpers\Table\Db
 	 */
-	public static function table( array $where, Url $url, string $ref = 't' ) : Db
+	public static function table( $where, \IPS\Http\Url $url, $ref = 't' )
 	{
 		/* Create the table */
-		$table = new Db( 'nexus_transactions', $url, $where );
+		$table = new \IPS\Helpers\Table\Db( 'nexus_transactions', $url, $where );
 		$table->sortBy = $table->sortBy ?: 't_date';
 
 		/* Format Columns */
@@ -137,7 +105,7 @@ class Transaction extends ActiveRecord
 		$table->parsers = array(
 			't_status'	=> function( $val )
 			{
-				return Theme::i()->getTemplate('transactions', 'nexus')->status( $val );
+				return \IPS\Theme::i()->getTemplate('transactions', 'nexus')->status( $val );
 			},
 			't_method'	=> function( $val )
 			{
@@ -145,40 +113,40 @@ class Transaction extends ActiveRecord
 				{
 					try
 					{
-						return Gateway::load( $val )->_title;
+						return \IPS\nexus\Gateway::load( $val )->_title;
 					}
-					catch ( OutOfRangeException )
+					catch ( \OutOfRangeException $e )
 					{
-						return Member::loggedIn()->language()->addToStack('gateway_deleted');
+						return \IPS\Member::loggedIn()->language()->addToStack('gateway_deleted');
 					}
 				}
 				else
 				{
-					return Member::loggedIn()->language()->addToStack('account_credit');
+					return \IPS\Member::loggedIn()->language()->addToStack('account_credit');
 				}
 			},
 			't_member'	=> function ( $val )
 			{
-				return Theme::i()->getTemplate('global', 'nexus')->userLink( Member::load( $val ) );
+				return \IPS\Theme::i()->getTemplate('global', 'nexus')->userLink( \IPS\Member::load( $val ) );
 			},
 			't_amount'	=> function( $val, $row )
 			{
-				return (string) new Money( $val, $row['t_currency'] );
+				return (string) new \IPS\nexus\Money( $val, $row['t_currency'] );
 			},
 			't_invoice'	=> function( $val )
 			{
 				try
 				{
-					return Theme::i()->getTemplate('invoices', 'nexus')->link( Invoice::load( $val ) );
+					return \IPS\Theme::i()->getTemplate('invoices', 'nexus')->link( \IPS\nexus\Invoice::load( $val ) );
 				}
-				catch ( OutOfRangeException )
+				catch ( \OutOfRangeException $e )
 				{
 					return '';
 				}
 			},
 			't_date'	=> function( $val )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			}
 		);
 				
@@ -189,9 +157,9 @@ class Transaction extends ActiveRecord
 				'view'	=> array(
 					'icon'	=> 'search',
 					'title'	=> 'transaction_view',
-					'link'	=> Url::internal( "app=nexus&module=payments&controller=transactions&do=view&id={$row['t_id']}" )->getSafeUrlFromFilters()
+					'link'	=> \IPS\Http\Url::internal( "app=nexus&module=payments&controller=transactions&do=view&id={$row['t_id']}" )->getSafeUrlFromFilters()
 				),
-			), Transaction::constructFromData( $row )->buttons( $ref ) );
+			), \IPS\nexus\Transaction::constructFromData( $row )->buttons( $ref ) );
 		};
 		
 		return $table;	
@@ -202,10 +170,10 @@ class Transaction extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->status = static::STATUS_PENDING;
-		$this->date = new DateTime;
+		$this->date = new \IPS\DateTime;
 		$this->fraud_blocked = NULL;
 		$this->extra = array();
 	}
@@ -213,15 +181,15 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get member
 	 *
-	 * @return	Customer|null
+	 * @return	\IPS\Member
 	 */
-	public function get_member() : Customer|null
+	public function get_member()
 	{
 		try
 		{
-			return Customer::load( $this->_data['member'] );
+			return \IPS\nexus\Customer::load( $this->_data['member'] );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -230,10 +198,10 @@ class Transaction extends ActiveRecord
 	/**
 	 * Set member
 	 *
-	 * @param	Member $member
+	 * @param	\IPS\Member
 	 * @return	void
 	 */
-	public function set_member( Member $member ) : void
+	public function set_member( \IPS\Member $member )
 	{
 		$this->_data['member'] = (int) $member->member_id;
 
@@ -248,16 +216,16 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get invoice
 	 *
-	 * @return    Invoice|NULL
+	 * @return	\IPS\nexus\Invoice|NULL
 	 */
-	public function get_invoice() : Invoice|null
+	public function get_invoice()
 	{
 		/* If an invoice is deleted, then the transaction will remain present, which then can result in uncaught exception errors. */
 		try
 		{
-			return Invoice::load( $this->_data['invoice'] );
+			return \IPS\nexus\Invoice::load( $this->_data['invoice'] );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -266,10 +234,10 @@ class Transaction extends ActiveRecord
 	/**
 	 * Set invoice
 	 *
-	 * @param Invoice $invoice
+	 * @param	\IPS\nexus\Invoice
 	 * @return	void
 	 */
-	public function set_invoice(Invoice $invoice ) : void
+	public function set_invoice( \IPS\nexus\Invoice $invoice )
 	{
 		$this->_data['invoice'] = $invoice->id;
 	}
@@ -277,9 +245,9 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get payment gateway
 	 *
-	 * @return    Gateway|int|null
+	 * @return	\IPS\nexus\Gateway
 	 */
-	public function get_method() : Gateway|int|null
+	public function get_method()
 	{
 		if ( !isset( $this->_data['method'] ) or $this->_data['method'] === 0 )
 		{
@@ -288,9 +256,9 @@ class Transaction extends ActiveRecord
 		
 		try
 		{
-			return Gateway::load( $this->_data['method'] );
+			return \IPS\nexus\Gateway::load( $this->_data['method'] );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -299,10 +267,10 @@ class Transaction extends ActiveRecord
 	/**
 	 * Set payment gateway
 	 *
-	 * @param Gateway $gateway
+	 * @param	\IPS\nexus\Gateway
 	 * @return	void
 	 */
-	public function set_method( Gateway $gateway ) : void
+	public function set_method( \IPS\nexus\Gateway $gateway )
 	{
 		$this->_data['method'] = $gateway->id;
 	}
@@ -310,20 +278,21 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get amount
 	 *
-	 * @return    Money
+	 * @return	\IPS\nexus\Money
 	 */
-	public function get_amount() : Money
+	public function get_amount()
 	{		
-		return new Money( $this->_data['amount'], $this->_data['currency'] );
+		$amount = new \IPS\nexus\Money( $this->_data['amount'], $this->_data['currency'] );
+		return $amount;
 	}
 	
 	/**
 	 * Set total
 	 *
-	 * @param Money $amount	The total
+	 * @param	\IPS\nexus\Money	$amount	The total
 	 * @return	void
 	 */
-	public function set_amount( Money $amount ) : void
+	public function set_amount( \IPS\nexus\Money $amount )
 	{
 		$this->_data['amount'] = $amount->amount;
 		$this->_data['currency'] = $amount->currency;
@@ -332,20 +301,20 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get date
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_date() : DateTime
+	public function get_date()
 	{
-		return DateTime::ts( $this->_data['date'] );
+		return \IPS\DateTime::ts( $this->_data['date'] );
 	}
 	
 	/**
 	 * Set date
 	 *
-	 * @param	DateTime	$date	The invoice date
+	 * @param	\IPS\DateTime	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_date( DateTime $date ) : void
+	public function set_date( \IPS\DateTime $date )
 	{
 		$this->_data['date'] = $date->getTimestamp();
 	}
@@ -355,18 +324,18 @@ class Transaction extends ActiveRecord
 	 *
 	 * @return	mixed
 	 */
-	public function get_extra() : array
+	public function get_extra()
 	{
-		return json_decode( $this->_data['extra'], TRUE ) ?: array();
+		return json_decode( $this->_data['extra'], TRUE );
 	}
 	
 	/**
 	 * Set extra information
 	 *
-	 * @param	array	$extra	The data
+	 * @param	mixed	$extra	The data
 	 * @return	void
 	 */
-	public function set_extra( array $extra ) : void
+	public function set_extra( $extra )
 	{
 		$this->_data['extra'] = json_encode( $extra );
 	}
@@ -374,20 +343,20 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get MaxMind data
 	 *
-	 * @return	Response|null
+	 * @return	\IPS\nexus\Fraud\MaxMind\Response 
 	 */
-	public function get_fraud() : Response|null
+	public function get_fraud()
 	{
-		return ( isset( $this->_data['fraud'] ) and $this->_data['fraud'] ) ? Response::buildFromJson( $this->_data['fraud'] ) : NULL;
+		return ( isset( $this->_data['fraud'] ) and $this->_data['fraud'] ) ? \IPS\nexus\Fraud\MaxMind\Response::buildFromJson( $this->_data['fraud'] ) : NULL;
 	}
 	
 	/**
 	 * Set MaxMind data
 	 *
-	 * @param	Response 	$maxMind	The data
+	 * @param	\IPS\nexus\Fraud\MaxMind\Response 	$maxMind	The data
 	 * @return	void
 	 */
-	public function set_fraud( Response $maxMind ) : void
+	public function set_fraud( \IPS\nexus\Fraud\MaxMind\Response $maxMind )
 	{
 		$this->_data['fraud'] = (string) $maxMind;
 	}
@@ -395,15 +364,15 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get triggered fraud rule
 	 *
-	 * @return	Rule|NULL
+	 * @return	\IPS\nexus\Fraud\Rule|NULL
 	 */
-	public function get_fraud_blocked() : Rule|null
+	public function get_fraud_blocked()
 	{
 		try
 		{
-			return $this->_data['fraud_blocked'] ? Rule::load( $this->_data['fraud_blocked'] ) : NULL;
+			return $this->_data['fraud_blocked'] ? \IPS\nexus\Fraud\Rule::load( $this->_data['fraud_blocked'] ) : NULL;
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -412,10 +381,10 @@ class Transaction extends ActiveRecord
 	/**
 	 * Set triggered fraud rule
 	 *
-	 * @param	Rule|null 	$rule The rule
+	 * @param	\IPS\nexus\Fraud\Rule 	$rule The rule
 	 * @return	void
 	 */
-	public function set_fraud_blocked( Rule $rule = NULL ) : void
+	public function set_fraud_blocked( \IPS\nexus\Fraud\Rule $rule = NULL )
 	{
 		$this->_data['fraud_blocked'] = $rule ? $rule->id : 0;
 	}
@@ -423,20 +392,20 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get partial refund amount
 	 *
-	 * @return    Money
+	 * @return	\IPS\nexus\Money
 	 */
-	public function get_partial_refund() : Money
+	public function get_partial_refund()
 	{		
-		return new Money( $this->_data['partial_refund'], $this->_data['currency'] );
+		return new \IPS\nexus\Money( $this->_data['partial_refund'], $this->_data['currency'] );
 	}
 	
 	/**
 	 * Set partial refund amount
 	 *
-	 * @param Money $amount	The total
+	 * @param	\IPS\nexus\Money	$amount	The total
 	 * @return	void
 	 */
-	public function set_partial_refund(Money $amount ) : void
+	public function set_partial_refund( \IPS\nexus\Money $amount )
 	{
 		$this->_data['partial_refund'] = (string) $amount->amount;
 	}
@@ -444,20 +413,20 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get credit amount
 	 *
-	 * @return    Money
+	 * @return	\IPS\nexus\Money
 	 */
-	public function get_credit() : Money
+	public function get_credit()
 	{		
-		return new Money( $this->_data['credit'] ?? "0", $this->_data['currency'] );
+		return new \IPS\nexus\Money( $this->_data['credit'], $this->_data['currency'] );
 	}
 	
 	/**
 	 * Set credit amount
 	 *
-	 * @param Money $amount	The total
+	 * @param	\IPS\nexus\Money	$amount	The total
 	 * @return	void
 	 */
-	public function set_credit(Money $amount ) : void
+	public function set_credit( \IPS\nexus\Money $amount )
 	{
 		$this->_data['credit'] = (string) $amount->amount;
 	}
@@ -465,59 +434,59 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get date transaction must be captured by (is set after authorisation. once captured, should be NULL)
 	 *
-	 * @return	DateTime|null
+	 * @return	\IPS\DateTime
 	 */
-	public function get_auth() : DateTime|null
+	public function get_auth()
 	{
-		return $this->_data['auth'] ? DateTime::ts( $this->_data['auth'] ) : NULL;
+		return $this->_data['auth'] ? \IPS\DateTime::ts( $this->_data['auth'] ) : NULL;
 	}
 	
 	/**
 	 * Set date transaction must be captured by (is set after authorisation. once captured, should be NULL)
 	 *
-	 * @param	DateTime|null	$date	The invoice date
+	 * @param	\IPS\DateTime	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_auth( ?DateTime $date = NULL ) : void
+	public function set_auth( \IPS\DateTime $date = NULL )
 	{
-		$this->_data['auth'] = $date?->getTimestamp();
+		$this->_data['auth'] = $date === NULL ? NULL : $date->getTimestamp();
 	}
 	
 	/**
 	 * Get billing agreement
 	 *
-	 * @return	BillingAgreement|NULL
+	 * @return	\IPS\nexus\Customer\BillingAgreement|NULL
 	 */
-	public function get_billing_agreement() : BillingAgreement|null
+	public function get_billing_agreement()
 	{
-		return ( isset( $this->_data['billing_agreement'] ) AND $this->_data['billing_agreement'] ) ? BillingAgreement::load( $this->_data['billing_agreement'] ) : NULL;
+		return ( isset( $this->_data['billing_agreement'] ) AND $this->_data['billing_agreement'] ) ? \IPS\nexus\Customer\BillingAgreement::load( $this->_data['billing_agreement'] ) : NULL;
 	}
 	
 	/**
 	 * Set billing agreement
 	 *
-	 * @param	BillingAgreement|NULL	$billingAgreement	The billing agreement
+	 * @param	\IPS\nexus\Customer\BillingAgreement|NULL	$billingAgreement	The billing agreement
 	 * @return	void
 	 */
-	public function set_billing_agreement( ?BillingAgreement $billingAgreement = NULL ) : void
+	public function set_billing_agreement( \IPS\nexus\Customer\BillingAgreement $billingAgreement = NULL )
 	{
-		$this->_data['billing_agreement'] = $billingAgreement?->id;
+		$this->_data['billing_agreement'] = $billingAgreement === NULL ? NULL : $billingAgreement->id;
 	}
 	
 	/**
 	 * Run Anti-Fraud Checks and return status for transaction
 	 *
-	 * @param	Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made
+	 * @param	\IPS\nexus\Fraud\MaxMind\Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made	
 	 * @return	string
 	 */
-	public function runFraudCheck( ?Request $maxMind=NULL ) : string
+	public function runFraudCheck( $maxMind=NULL )
 	{
 		/* Run MaxMind */
-		if ( Settings::i()->maxmind_key and ( !Settings::i()->maxmind_gateways or Settings::i()->maxmind_gateways == '*' or in_array( $this->method->id, explode( ',', Settings::i()->maxmind_gateways ) ) ) )
+		if ( \IPS\Settings::i()->maxmind_key and ( !\IPS\Settings::i()->maxmind_gateways or \IPS\Settings::i()->maxmind_gateways == '*' or \in_array( $this->method->id, explode( ',', \IPS\Settings::i()->maxmind_gateways ) ) ) )
 		{
 			if ( $maxMind === NULL )
 			{
-				$maxMind = new Request;
+				$maxMind = new \IPS\nexus\Fraud\MaxMind\Request;
 				$maxMind->setTransaction( $this );
 			}
 			
@@ -529,16 +498,16 @@ class Transaction extends ActiveRecord
 				$this->save();
 			
 				/* If MaxMind fails, stop here */
-				if ( $this->fraud->error() and Settings::i()->maxmind_error == 'hold' )
+				if ( $this->fraud->error() and \IPS\Settings::i()->maxmind_error == 'hold' )
 				{
 					return static::STATUS_HELD;
 				}
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				Log::log( $e, 'maxmind_error' );
+				\IPS\Log::log( $e, 'maxmind_error' );
 				
-				if ( Settings::i()->maxmind_error == 'hold' )
+				if ( \IPS\Settings::i()->maxmind_error == 'hold' )
 				{
 					return static::STATUS_HELD;
 				}
@@ -546,7 +515,7 @@ class Transaction extends ActiveRecord
 		}
 		
 		/* Check Fraud Rules */
-		foreach ( Rule::roots() as $rule )
+		foreach ( \IPS\nexus\Fraud\Rule::roots() as $rule )
 		{
 			if ( $rule->matches( $this ) )
 			{
@@ -564,17 +533,17 @@ class Transaction extends ActiveRecord
 	/**
 	 * Check fraud rules and capture
 	 *
-	 * @param	Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made
-	 * @return	Member|NULL	If the invoice belonged to a guest, a member will be created by approving and returned here
-	 * @throws	LogicException
+	 * @param	\IPS\nexus\Fraud\MaxMind\Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made	
+	 * @return	\IPS\Member|NULL	If the invoice belonged to a guest, a member will be created by approving and returned here
+	 * @throws	\LogicException
 	 */
-	public function checkFraudRulesAndCapture( ?Request $maxMind=NULL ) : Member|null
+	public function checkFraudRulesAndCapture( $maxMind=NULL )
 	{
 		/* Check fraud rules */
 		$fraudResult = $this->runFraudCheck( $maxMind );
 		if ( $fraudResult )
 		{
-			$this->executeFraudAction( $fraudResult );
+			$this->executeFraudAction( $fraudResult, TRUE );
 		}
 		
 		/* If we're not being fraud blocked, we can capture and approve */
@@ -591,9 +560,9 @@ class Transaction extends ActiveRecord
 	 * @param	string					$fraudResult	Status as returned by runFraudCheck()
 	 * @param	bool					$isApproved		Has the payment already been approved? If so and the fraus rule wants to refuse, we will void
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function executeFraudAction( string $fraudResult, bool $isApproved=TRUE ) : void
+	public function executeFraudAction( $fraudResult, $isApproved=TRUE )
 	{		
 		/* If the fraud rule wants to hold or refuse... */
 		if ( $fraudResult !== static::STATUS_PAID )
@@ -620,9 +589,9 @@ class Transaction extends ActiveRecord
 			) );
 			
 			/* Notification */
-			if ( in_array( $fraudResult, array( static::STATUS_HELD, static::STATUS_REVIEW, static::STATUS_DISPUTED ) ) )
+			if ( \in_array( $fraudResult, array( static::STATUS_HELD, static::STATUS_REVIEW, static::STATUS_DISPUTED ) ) )
 			{
-				AdminNotification::send( 'nexus', 'Transaction', $fraudResult, TRUE, $this );
+				\IPS\core\AdminNotification::send( 'nexus', 'Transaction', $fraudResult, TRUE, $this );
 			}
 		}
 		
@@ -633,10 +602,10 @@ class Transaction extends ActiveRecord
 	/**
 	 * Capture and approve
 	 *
-	 * @return	Member|NULL	If the invoice belonged to a guest, a member will be created by approving and returned here
-	 * @throws	LogicException
+	 * @return	\IPS\Member|NULL	If the invoice belonged to a guest, a member will be created by approving and returned here
+	 * @throws	\LogicException
 	 */
-	public function captureAndApprove() : Member|null
+	public function captureAndApprove()
 	{		
 		$this->capture();
 		
@@ -655,9 +624,9 @@ class Transaction extends ActiveRecord
 	 * Capture
 	 *
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function capture() : void
+	public function capture()
 	{
 		$this->method->capture( $this );
 		$this->auth = NULL;
@@ -667,10 +636,10 @@ class Transaction extends ActiveRecord
 	/**
 	 * Approve
 	 *
-	 * @param	Member|NULL	$by	The staff member approving, or NULL if it's automatic
-	 * @return	Member|NULL	If the invoice belonged to a guest, a member will be created by approving and returned here
+	 * @param	\IPS\Member|NULL	$by	The staff member approving, or NULL if it's automatic
+	 * @return	\IPS\Member|NULL	If the invoice belonged to a guest, a member will be created by approving and returned here
 	 */
-	public function approve( ?Member $by = NULL ) : Member|null
+	public function approve( $by = NULL )
 	{
 		/* Get the amount to pay before storing this as a paid transaction */
 		$amountToPayOnInvoice = $this->invoice->amountToPay();
@@ -707,27 +676,27 @@ class Transaction extends ActiveRecord
 	 * Void
 	 *
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\Exception
 	 */
-	public function void() : void
+	public function void()
 	{
 		/* Void it */
 		$this->method->void( $this );
 		
 		/* Update transaction */
 		$extra = $this->extra;
-		$extra['history'][] = array( 's' => Transaction::STATUS_REFUSED, 'on' => time(), 'by' => Member::loggedIn()->member_id );
+		$extra['history'][] = array( 's' => \IPS\nexus\Transaction::STATUS_REFUSED, 'on' => time(), 'by' => \IPS\Member::loggedIn()->member_id );
 		$this->extra = $extra;
-		$this->status = Transaction::STATUS_REFUSED;
+		$this->status = \IPS\nexus\Transaction::STATUS_REFUSED;
 		$this->auth = NULL;
 		$this->save();
 		
 		/* Log it */
-		if ( $this->member->member_id )
+		if ( $this->member )
 		{
 			$this->member->log( 'transaction', array(
 				'type'		=> 'status',
-				'status'	=> Transaction::STATUS_REFUSED,
+				'status'	=> \IPS\nexus\Transaction::STATUS_REFUSED,
 				'id'		=> $this->id
 			) );
 		}
@@ -737,21 +706,21 @@ class Transaction extends ActiveRecord
 	 * Refund
 	 *
 	 * @param	string		$refundMethod	"gateway", "credit", or "none"
-	 * @param	mixed	$amount			Amount (NULL for full amount)
-	 * @param	string|null		$reason			Reason for refund, if applicable (provided by gateway's refundReasons())
+	 * @param	float|NULL	$amount			Amount (NULL for full amount)
+	 * @param	string		$reason			Reason for refund, if applicable (provided by gateway's refundReasons())
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\Exception
 	 */
-	public function refund( string $refundMethod='gateway', mixed $amount=NULL, ?string $reason=NULL ) : void
+	public function refund( $refundMethod='gateway', $amount=NULL, $reason=NULL )
 	{
 		$extra = $this->extra;
 		
 		/* What's the amount? */
 		if ( $amount )
 		{
-			if ( !( $amount instanceof Number ) )
+			if ( !( $amount instanceof \IPS\Math\Number ) )
 			{
-				$amount = new Number( number_format( $amount, Money::numberOfDecimalsForCurrency( $this->amount->currency ), '.', '' ) );
+				$amount = new \IPS\Math\Number( number_format( $amount, \IPS\nexus\Money::numberOfDecimalsForCurrency( $this->amount->currency ), '.', '' ) );
 			}
 		}
 		if ( !$amount or $this->amount->amount->compare( $amount ) === 0 )
@@ -770,7 +739,7 @@ class Transaction extends ActiveRecord
 			{
 				$this->status = static::STATUS_REFUNDED;
 				
-				$extra['history'][] = array( 's' => static::STATUS_REFUNDED, 'by' => Member::loggedIn()->member_id, 'on' => time(), 'to' => $refundMethod, 'ref' => $refundReference );
+				$extra['history'][] = array( 's' => static::STATUS_REFUNDED, 'by' => \IPS\Member::loggedIn()->member_id, 'on' => time(), 'to' => $refundMethod, 'ref' => $refundReference );
 				
 				if ( $this->member )
 				{
@@ -787,7 +756,7 @@ class Transaction extends ActiveRecord
 			}
 			else
 			{
-				$this->partial_refund = new Money( $this->partial_refund->amount->add( $amount ), $this->currency );
+				$this->partial_refund = new \IPS\nexus\Money( $this->partial_refund->amount->add( $amount ), $this->currency );
 				
 				if ( $amount >= $this->amount->amount )
 				{
@@ -797,7 +766,7 @@ class Transaction extends ActiveRecord
 				{
 					$this->status = static::STATUS_PART_REFUNDED;
 				}
-				$extra['history'][] = array( 's' => $this->status, 'by' => Member::loggedIn()->member_id, 'on' => time(), 'to' => $refundMethod, 'amount' => $amount, 'ref' => $refundReference );
+				$extra['history'][] = array( 's' => $this->status, 'by' => \IPS\Member::loggedIn()->member_id, 'on' => time(), 'to' => $refundMethod, 'amount' => $amount, 'ref' => $refundReference );
 				
 				if ( $this->member )
 				{
@@ -828,10 +797,10 @@ class Transaction extends ActiveRecord
 			
 			/* Update transaction */
 			$this->status = static::STATUS_PART_REFUNDED;
-			$this->credit = new Money( $this->credit->amount->add( $amount ), $this->currency );
+			$this->credit = new \IPS\nexus\Money( $this->credit->amount->add( $amount ), $this->currency );
 			
 			/* Log */
-			$extra['history'][] = array( 's' => static::STATUS_PART_REFUNDED, 'by' => Member::loggedIn()->member_id, 'on' => time(), 'to' => $refundMethod, 'amount' => $amount, 'ref' => NULL );
+			$extra['history'][] = array( 's' => static::STATUS_PART_REFUNDED, 'by' => \IPS\Member::loggedIn()->member_id, 'on' => time(), 'to' => $refundMethod, 'amount' => $amount, 'ref' => NULL );
 			if ( $this->member )
 			{
 				$this->member->log( 'transaction', array(
@@ -849,7 +818,7 @@ class Transaction extends ActiveRecord
 		{
 			/* Update transaction */
 			$this->status = static::STATUS_REFUSED;
-			$extra['history'][] = array( 's' => static::STATUS_REFUSED, 'by' => Member::loggedIn()->member_id, 'on' => time() );
+			$extra['history'][] = array( 's' => static::STATUS_REFUSED, 'by' => \IPS\Member::loggedIn()->member_id, 'on' => time() );
 			
 			/* Log */
 			if ( $this->member )
@@ -872,9 +841,9 @@ class Transaction extends ActiveRecord
 	 * Reverse previously given credit (will log, but does not change status - status must be set separately)
 	 *
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\Exception
 	 */
-	public function reverseCredit() : void
+	public function reverseCredit()
 	{
 		$credits = $this->member->cm_credits;
 		$credits[ $this->amount->currency ]->amount = $credits[ $this->amount->currency ]->amount->subtract( $this->credit->amount );
@@ -882,7 +851,7 @@ class Transaction extends ActiveRecord
 		$this->member->save();
 				
 		$extra = $this->extra;
-		$extra['history'][] = array( 's' => 'undo_credit', 'by' => Member::loggedIn()->member_id, 'on' => time(), 'amount' => $this->credit->amount );
+		$extra['history'][] = array( 's' => 'undo_credit', 'by' => \IPS\Member::loggedIn()->member_id, 'on' => time(), 'amount' => $this->credit->amount );
 		if ( $this->member )
 		{
 			$this->member->log( 'transaction', array(
@@ -894,7 +863,7 @@ class Transaction extends ActiveRecord
 		}
 		$this->extra = $extra;
 		
-		$this->credit = new Money( 0, $this->currency );
+		$this->credit = new \IPS\nexus\Money( 0, $this->currency );
 
 		$this->save();
 	}
@@ -904,7 +873,7 @@ class Transaction extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function sendNotification() : void
+	public function sendNotification()
 	{		
 		switch ( $this->status )
 		{	
@@ -940,11 +909,11 @@ class Transaction extends ActiveRecord
 				break;
 
 			default:
-				throw new RuntimeException;
+				throw new \RuntimeException;
 				break;
 		}
 
-		Email::buildFromTemplate( 'nexus', $key, array( $this, $this->invoice, $this->invoice->summary() ), Email::TYPE_TRANSACTIONAL )
+		\IPS\Email::buildFromTemplate( 'nexus', $key, array( $this, $this->invoice, $this->invoice->summary( $this->invoice->member->language() ) ), \IPS\Email::TYPE_TRANSACTIONAL )
 			->send(
 				$this->invoice->member,
 				array_map(
@@ -954,25 +923,25 @@ class Transaction extends ActiveRecord
 					},
 					iterator_to_array( $this->invoice->member->alternativeContacts( array( 'billing=1' ) ) )
 				),
-				( ( in_array( $emailKey, explode( ',', Settings::i()->nexus_notify_copy_types ) ) AND Settings::i()->nexus_notify_copy_email ) ? explode( ',', Settings::i()->nexus_notify_copy_email ) : array() )
+				( ( \in_array( $emailKey, explode( ',', \IPS\Settings::i()->nexus_notify_copy_types ) ) AND \IPS\Settings::i()->nexus_notify_copy_email ) ? explode( ',', \IPS\Settings::i()->nexus_notify_copy_email ) : array() )
 			);
 	}
 
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 
 	/**
 	 * Get URL
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	function url(): Url|string|null
+	public function url()
 	{
 		if( $this->_url === NULL )
 		{
-			$this->_url = Url::internal( "app=nexus&module=checkout&controller=checkout&do=transaction&id={$this->invoice->id}&t={$this->id}", 'front', 'nexus_checkout' );
+			$this->_url = \IPS\Http\Url::internal( "app=nexus&module=checkout&controller=checkout&do=transaction&id={$this->invoice->id}&t={$this->id}", 'front', 'nexus_checkout' );
 		}
 
 		return $this->_url;
@@ -981,11 +950,11 @@ class Transaction extends ActiveRecord
 	/**
 	 * ACP URL
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function acpUrl() : Url
+	public function acpUrl()
 	{
-		return Url::internal( "app=nexus&module=payments&controller=transactions&do=view&id={$this->id}", 'admin' );
+		return \IPS\Http\Url::internal( "app=nexus&module=payments&controller=transactions&do=view&id={$this->id}", 'admin' );
 	}
 	
 	/**
@@ -994,13 +963,13 @@ class Transaction extends ActiveRecord
 	 * @param	string	$ref	Referer
 	 * @return	array
 	 */
-	public function buttons( string $ref='v' ) : array
+	public function buttons( $ref='v' )
 	{
 		$url = $this->acpUrl()->setQueryString( 'r', $ref );
 		$return = array();
 		
 		/* Approve button */
-		if ( $this->method and in_array( $this->status, array( static::STATUS_WAITING, static::STATUS_HELD, static::STATUS_REVIEW ) ) and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_edit' ) )
+		if ( $this->method and \in_array( $this->status, array( static::STATUS_WAITING, static::STATUS_HELD, static::STATUS_REVIEW ) ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_edit' ) )
 		{
 			$return['approve'] = array(
 				'title'		=> $this->auth ? 'transaction_capture' : 'transaction_approve',
@@ -1011,7 +980,7 @@ class Transaction extends ActiveRecord
 		}
 		
 		/* Review button */
-		if ( in_array( $this->status, array( static::STATUS_WAITING, static::STATUS_HELD ) ) and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_edit' ) )
+		if ( \in_array( $this->status, array( static::STATUS_WAITING, static::STATUS_HELD ) ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_edit' ) )
 		{
 			$return['review'] = array(
 				'title'		=> 'transaction_flag_review',
@@ -1021,7 +990,7 @@ class Transaction extends ActiveRecord
 		}
 				
 		/* Void button */
-		if ( $this->auth and in_array( $this->status, array( static::STATUS_HELD, static::STATUS_REVIEW  ) ) and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_edit' ) )
+		if ( $this->auth and \in_array( $this->status, array( static::STATUS_HELD, static::STATUS_REVIEW  ) ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_edit' ) )
 		{
 			$return['void'] = array(
 				'title'		=> 'transaction_void',
@@ -1032,7 +1001,7 @@ class Transaction extends ActiveRecord
 		}
 		
 		/* Cancel button for manual */
-		elseif ( $this->status === static::STATUS_WAITING and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_edit' ) )
+		elseif ( $this->status === static::STATUS_WAITING and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_edit' ) )
 		{
 			$return['void'] = array(
 				'title'		=> 'cancel',
@@ -1043,24 +1012,24 @@ class Transaction extends ActiveRecord
 		}
 		
 		/* Refund button */
-		elseif ( in_array( $this->status, array( static::STATUS_PAID, static::STATUS_HELD, static::STATUS_REVIEW, static::STATUS_PART_REFUNDED ) ) and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_refund' ) )
+		elseif ( \in_array( $this->status, array( static::STATUS_PAID, static::STATUS_HELD, static::STATUS_REVIEW, static::STATUS_PART_REFUNDED ) ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_refund' ) )
 		{
 			$return['refund'] = array(
 				'title'		=> 'transaction_refund_credit',
 				'icon'		=> 'reply',
 				'link'		=> $url->setQueryString( array( 'do' => 'refund' ) ),
-				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'transaction_refund_credit_title', FALSE, array( 'sprintf' => array( $this->amount ) ) ) )
+				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack( 'transaction_refund_credit_title', FALSE, array( 'sprintf' => array( $this->amount ) ) ) )
 			);
 		}
 				
 		/* Delete button */
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_delete' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_delete' ) )
 		{
 			$return['delete'] = array(
 				'title'		=> 'delete',
 				'icon'		=> 'times-circle',
 				'link'		=> $url->setQueryString( 'do', 'delete' )->csrf()->getSafeUrlFromFilters(),
-				'data'		=> array( 'confirm' => '', 'confirmSubMessage' => Member::loggedIn()->language()->addToStack('trans_delete_warning') )
+				'data'		=> array( 'confirm' => '', 'confirmSubMessage' => \IPS\Member::loggedIn()->language()->addToStack('trans_delete_warning') )
 			);
 		}
 		return $return;
@@ -1071,7 +1040,7 @@ class Transaction extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function history() : array
+	public function history()
 	{
 		$return = array();
 		$extra = $this->extra;
@@ -1082,12 +1051,12 @@ class Transaction extends ActiveRecord
 		}
 		else
 		{
-			if ( !in_array( $this->status, array( static::STATUS_PENDING, static::STATUS_WAITING, static::STATUS_GATEWAY_PENDING ) ) )
+			if ( !\in_array( $this->status, array( static::STATUS_PENDING, static::STATUS_WAITING, static::STATUS_GATEWAY_PENDING ) ) )
 			{
 				$return[] = array(
 					's'		=> $this->status,
-					'by'	=> $extra['status_by'] ?? NULL,
-					'on'	=> $extra['status_on'] ?? NULL,
+					'by'	=> isset( $extra['status_by'] ) ? $extra['status_by'] : NULL,
+					'on'	=> isset( $extra['status_on'] ) ? $extra['status_on'] : NULL,
 				);
 			}
 		}
@@ -1098,7 +1067,7 @@ class Transaction extends ActiveRecord
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse			int						id				ID number
 	 * @apiresponse			string					status			Status: 'okay' = Paid; 'pend' = Pending, waiting for gateway; 'wait' = Pending, manual approval required; 'hold' = Held for manual approval; 'revw' = Flagged for review; 'fail' = Failed; 'rfnd' = Refunded; 'prfd' = Partially refunded
@@ -1106,20 +1075,20 @@ class Transaction extends ActiveRecord
 	 * @apiresponse			\IPS\nexus\Money		amount			Amount
 	 * @apiresponse			\IPS\nexus\Money		refundAmount	If partially refunded, the amount that has been refunded
 	 * @apiresponse			\IPS\nexus\Money		credit			If credited, the amount that has been credited
-	 * @apiresponse			\IPS\nexus\Gateway		gateway			The used gateway, or null if account credit was used
+	 * @apiresponse			\IPS\nexus\Gateway		gateway			The gateway
 	 * @clientapiresponse	string					gatewayId		Any ID number provided by the gateway to identify the transaction on their end
 	 * @apiresponse			datetime				date			Date
 	 * @apiresponse			\IPS\nexus\Customer		customer		Customer
 	 */
-	public function apiOutput( ?Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'id'			=> $this->id,
 			'status'		=> $this->status,
 			'invoiceId'		=> $this->invoice->id,
 			'amount'		=> $this->amount->apiOutput( $authorizedMember ),
-			'refundAmount'	=> $this->partial_refund?->apiOutput($authorizedMember),
-			'creditAmount'	=> $this->credit?->apiOutput($authorizedMember),
+			'refundAmount'	=> $this->partial_refund ? $this->partial_refund->apiOutput( $authorizedMember ) : null,
+			'creditAmount'	=> $this->credit ? $this->credit->apiOutput( $authorizedMember ) : null,
 			'gateway'		=> $this->method ? $this->method->apiOutput( $authorizedMember ) : null,
 			'gatewayId'		=> $this->gw_id,
 			'date'			=> $this->date->rfc3339(),

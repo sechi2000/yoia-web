@@ -62,16 +62,23 @@ class FormatInformation
     /**
      * Offset i holds the number of 1 bits in the binary representation of i.
      *
-     * @var int[]
+     * @var array
      */
     private const BITS_SET_IN_HALF_BYTE = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
 
     /**
      * Error correction level.
+     *
+     * @var ErrorCorrectionLevel
      */
-    private ErrorCorrectionLevel $ecLevel;
+    private $ecLevel;
 
-    private int $dataMask;
+    /**
+     * Data mask.
+     *
+     * @var int
+     */
+    private $dataMask;
 
     protected function __construct(int $formatInfo)
     {

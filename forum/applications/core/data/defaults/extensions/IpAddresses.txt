@@ -12,44 +12,68 @@
 namespace IPS\{app}\extensions\core\IpAddresses;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Extensions\IpAddressesAbstract;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member as MemberClass;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Lookup extension
  */
-class {class} extends IpAddressesAbstract
+class _{class}
 {
 	/**
+	 * Removes the logged IP address
+	 *
+	 * @param int $timestamp
+	 * @return void
+	 */
+	public function pruneIpAddresses(int $time)
+	{
+		//
+	}
+
+	/**
+	 * Supported in the ACP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInAcp(): bool
+	{
+		return TRUE;
+	}
+
+	/**
+	 * Supported in the ModCP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInModCp(): bool
+	{
+		return TRUE;
+	}
+
+	/** 
 	 * Find Records by IP
 	 *
 	 * @param	string			$ip			The IP Address
-	 * @param	Url|null	$baseUrl	URL table will be displayed on or NULL to return a count
-	 * @return	string|int|null
+	 * @param	\IPS\Http\Url	$baseUrl	URL table will be displayed on or NULL to return a count
+	 * @return	\IPS\Helpers\Table|int|null
 	 */
-	public function findByIp( string $ip, ?Url $baseUrl = NULL ): string|int|null
+	public function findByIp( $ip, \IPS\Http\Url $baseUrl = NULL )
 	{
 		/* Return count */
 		if ( $baseUrl === NULL )
 		{
-			return Db::i()->select( 'COUNT(*)', 'database_table_name', array( "ip_address LIKE ?", $ip ) )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'database_table_name', array( "ip_address LIKE ?", $ip ) )->first();
 		}
 		
 		/* Init Table */
 		// Replace database_table_name with the database table
-		$table = new TableDb( 'database_table_name', $baseUrl, array( "ip_address LIKE ?", $ip ) );
+		$table = new \IPS\Helpers\Table\Db( 'database_table_name', $baseUrl, array( "ip_address LIKE ?", $ip ) );
 		
 		/* Return */
 		return (string) $table;
@@ -69,10 +93,10 @@ class {class} extends IpAddressesAbstract
 		 	...
 	 	);
 	 * @endcode
-	 * @param	MemberClass	$member	The member
-	 * @return	array|Select
+	 * @param	\IPS\Member	$member	The member
+	 * @return	array|NULL
 	 */
-	public function findByMember( MemberClass $member ): array|Select
+	public function findByMember( $member )
 	{
 		return array();
 	}	

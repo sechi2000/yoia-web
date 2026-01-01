@@ -25,8 +25,10 @@ if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * 4.7.22 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
+	private string $defaultKey = '6LcH7UEUAAAAAIGWgOoyBKAqjLmOIKzfJTOjyC7z';
+
 	/**
 	 * Classic: If using our global key, move the key to 'custom' setting, so it's retained after we wipe the default.
 	 *
@@ -34,8 +36,34 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		// This step runs later in 5.0.9 Beta 1
+		$captchaType = Settings::i()->bot_antispam_type;
+		$recaptchaPublicKey = Settings::i()->recaptcha2_public_key;
+		$recaptchaSecretKey = Settings::i()->recaptcha2_private_key;
+
+		/* Are we using the services with the global key? */
+		if( !\IPS\CIC AND in_array( $captchaType, [ 'invisible', 'recaptcha2' ] ) AND $recaptchaPublicKey == $this->defaultKey )
+		{
+			/* Set the defaults */
+			Db::i()->update( 'core_sys_conf_settings', [ 'conf_default' => '', ], [ 'conf_key=? OR conf_key=?', 'recaptcha2_public_key', 'recaptcha2_private_key' ] );
+			Db::i()->update( 'core_sys_conf_settings', [ 'conf_default' => 'none', ], [ 'conf_key=?', 'bot_antispam_type' ] );
+			Settings::i()->clearCache();
+
+			/* Set the global keys to custom settings for now */
+			Settings::i()->changeValues( [
+				'bot_antispam_type' 		=> $captchaType,
+				'recaptcha2_public_key' 	=> $recaptchaPublicKey,
+				'recaptcha2_private_key'	=> $recaptchaSecretKey
+			] );
+		}
+		/* Switch Cloud customers to use Turnstile */
+		elseif( \IPS\CIC AND in_array( $captchaType, [ 'invisible', 'recaptcha2' ] ) AND $recaptchaPublicKey == $this->defaultKey )
+		{
+			Settings::i()->changeValues( [ 'bot_antispam_type' => 'turnstile' ] );
+		}
 
 		return TRUE;
 	}
+	
+	// You can create as many additional methods (step2, step3, etc.) as is necessary.
+	// Each step will be executed in a new HTTP request
 }

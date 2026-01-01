@@ -11,30 +11,21 @@
 namespace IPS\core\extensions\core\OverviewStatistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\ProfileFields\Field;
-use IPS\Db;
-use IPS\Extensions\OverviewStatisticsAbstract;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Overview statistics extension: ProfileFields
  */
-class ProfileFields extends OverviewStatisticsAbstract
+class _ProfileFields
 {
 	/**
 	 * @brief	Which statistics page (activity or user)
 	 */
-	public string $page	= 'user';
+	public $page	= 'user';
 
 	/**
 	 * Return the sub-block keys
@@ -42,15 +33,15 @@ class ProfileFields extends OverviewStatisticsAbstract
 	 * @note This is designed to allow one class to support multiple blocks, for instance using the ContentRouter to generate blocks.
 	 * @return array
 	 */
-	public function getBlocks(): array
+	public function getBlocks()
 	{
 		$return = array();
 
-		foreach ( Field::fieldData() as $group => $fields )
+		foreach ( \IPS\core\ProfileFields\Field::fieldData() as $group => $fields )
 		{
 			foreach ( $fields as $id => $field )
 			{
-				if( in_array( $field['pf_type'], array( 'Select', 'Radio', 'Checkbox', 'Rating', 'YesNo' ) ) AND !$field['pf_multiple'] )
+				if( \in_array( $field['pf_type'], array( 'Select', 'Radio', 'Checkbox', 'Rating', 'YesNo' ) ) AND !$field['pf_multiple'] )
 				{
 					$return[] = $id;
 				}
@@ -66,9 +57,9 @@ class ProfileFields extends OverviewStatisticsAbstract
 	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
 	 * @return	array
 	 */
-	public function getBlockDetails( string $subBlock = NULL ): array
+	public function getBlockDetails( $subBlock = NULL )
 	{
-		foreach ( Field::fieldData() as $group => $fields )
+		foreach ( \IPS\core\ProfileFields\Field::fieldData() as $group => $fields )
 		{
 			foreach ( $fields as $id => $field )
 			{
@@ -85,24 +76,19 @@ class ProfileFields extends OverviewStatisticsAbstract
 	/** 
 	 * Return the block HTML to show
 	 *
-	 * @param	array|string|null    $dateRange	String for a fixed time period in days, NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
+	 * @param	array|NULL	$dateRange	NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
 	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
 	 * @return	string
 	 */
-	public function getBlock( array|string $dateRange = NULL, string $subBlock = NULL ): string
+	public function getBlock( $dateRange = NULL, $subBlock = NULL )
 	{
-		foreach ( Field::fieldData() as $group => $fields )
+		foreach ( \IPS\core\ProfileFields\Field::fieldData() as $group => $fields )
 		{
 			foreach ( $fields as $id => $field )
 			{
 				if( $id == $subBlock )
 				{
-					$pieBarData = $this->_getChart( $field );
-					foreach ( $pieBarData as &$slice )
-					{
-						$slice['name'] = Member::loggedIn()->language()->addToStack( $slice['name'] );
-					}
-					return Theme::i()->getTemplate( 'global', 'core', 'global'  )->applePieChart( $pieBarData );
+					return $this->_getChart( $field );
 				}
 			}
 		}
@@ -110,54 +96,13 @@ class ProfileFields extends OverviewStatisticsAbstract
 		return '';
 	}
 
-
-	/**
-	 * Get the numbers to enter in the CSV export for this block
-	 *
-	 * @param array|string|NULL $dateRange
-	 * @param string|NULL $subBlock
-	 * @return array
-	 */
-	public function getBlockNumbers( array|string $dateRange = NULL, string $subBlock = NULL ) : array
-	{
-		$numbers = [ 'statsreports_current_total' => 0 ];
-		foreach ( Field::fieldData() as $group => $fields )
-		{
-			foreach ( $fields as $id => $field )
-			{
-				if( $id == $subBlock )
-				{
-					$pieBarData = $this->_getChart( $field );
-					foreach ( $pieBarData as $slice )
-					{
-						$name = $slice['name'];
-
-						/* Hacky, but in the case of ratings we use this formatted string */
-						if ( isset( $slice['colTitle'] ) )
-						{
-							$name = Member::loggedIn()->language()->addToStack( $slice['colTitle'], options: [
-								'pluralize' => $slice['name'],
-								'sprintf' => [ $slice['name'] ]
-							] );
-							Member::loggedIn()->language()->parseOutputForDisplay( $name );
-						}
-						$numbers[$name] = $slice['value'];
-						$numbers['statsreports_current_total'] += $slice['value'];
-					}
-					return $numbers;
-				}
-			}
-		}
-		return $numbers;
-	}
-
 	/**
 	 * Return the HTML to display for this block
 	 *
 	 * @param	array	$field	Field data
-	 * @return	array
+	 * @return	string
 	 */
-	protected function _getChart( array $field ) : array
+	protected function _getChart( $field )
 	{
 		/* Init Chart */
 		$pieBarData = array();
@@ -165,7 +110,7 @@ class ProfileFields extends OverviewStatisticsAbstract
 		$limit = 15;
 		
 		/* Add Rows */
-		$select	= Db::i()->select( 'COUNT(*) as total, field_' . $field['pf_id'], 'core_pfields_content', NULL, 'total DESC', NULL, 'field_' . $field['pf_id'] );
+		$select	= \IPS\Db::i()->select( 'COUNT(*) as total, field_' . $field['pf_id'], 'core_pfields_content', NULL, 'total DESC', NULL, 'field_' . $field['pf_id'] );
 		$total	= 0;
 
 		$i = 0;
@@ -181,7 +126,7 @@ class ProfileFields extends OverviewStatisticsAbstract
 				}
 				else
 				{
-					$otherKey = Member::loggedIn()->language()->addToStack('stats_overview_others');
+					$otherKey = \IPS\Member::loggedIn()->language()->addToStack('stats_overview_others');
 					$results[$otherKey] = [ 'total' => 5 ];
 				}
 
@@ -192,13 +137,13 @@ class ProfileFields extends OverviewStatisticsAbstract
 		if( $field['pf_type'] == 'Checkbox' )
 		{
 			$pieBarData[] = array(
-				'name' =>  'stats_pfields__unchecked',
+				'name' =>  \IPS\Member::loggedIn()->language()->addToStack('stats_pfields__unchecked'),
 				'value' => isset( $results[0] ) ? $results[0]['total'] : 0,
 				'percentage' => ( isset( $results[0] ) AND $results[0]['total'] > 0 ) ? round( ( $results[0]['total'] / $total ) * 100, 2 ) : 0
 			);
 
 			$pieBarData[] = array(
-				'name' =>  'stats_pfields__checked',
+				'name' =>  \IPS\Member::loggedIn()->language()->addToStack('stats_pfields__checked'),
 				'value' => isset( $results[1] ) ? $results[1]['total'] : 0,
 				'percentage' => ( isset( $results[1] ) AND $results[1]['total'] > 0 ) ? round( ( $results[1]['total'] / $total ) * 100, 2 ) : 0
 			);
@@ -206,13 +151,13 @@ class ProfileFields extends OverviewStatisticsAbstract
 		elseif( $field['pf_type'] == 'YesNo' )
 		{
 			$pieBarData[] = array(
-				'name' =>  'stats_pfields__no',
+				'name' =>  \IPS\Member::loggedIn()->language()->addToStack('stats_pfields__no'),
 				'value' => isset( $results[0] ) ? $results[0]['total'] : 0,
 				'percentage' => ( isset( $results[0] ) AND $results[0]['total'] > 0 ) ? round( ( $results[0]['total'] / $total ) * 100, 2 ) : 0
 			);
 
 			$pieBarData[] = array(
-				'name' =>  'stats_pfields__yes',
+				'name' =>  \IPS\Member::loggedIn()->language()->addToStack('stats_pfields__yes'),
 				'value' => isset( $results[1] ) ? $results[1]['total'] : 0,
 				'percentage' => ( isset( $results[1] ) AND $results[1]['total'] > 0 ) ? round( ( $results[1]['total'] / $total ) * 100, 2 ) : 0
 			);
@@ -223,8 +168,7 @@ class ProfileFields extends OverviewStatisticsAbstract
 			{
 				$pieBarData[] = array(
 					'name' =>  $step,
-					'nameRaw' => str_repeat( "<i class='fa-solid fa-star'></i>", $step ),
-					'colTitle' => 'stats_pfields__stars',
+					'nameRaw' => str_repeat( "<i class='fa fa-star'></i>", $step ),
 					'value' => isset( $results[$step] ) ? $results[$step]['total'] : 0,
 					'percentage' => ( isset( $results[$step] ) AND $results[$step]['total'] > 0 ) ? round( ( $results[$step]['total'] / $total ) * 100, 2 ) : 0
 				);
@@ -244,8 +188,8 @@ class ProfileFields extends OverviewStatisticsAbstract
 					$percentage = $resultValue > 0 ? round( ( $resultValue / $total ) * 100, 2 ) : 0;
 
 					$pieBarData[] = array(
-						'name' =>  ( $v ?: Member::loggedIn()->language()->addToStack( 'stats_pfields__novalue' ) ),
-						'tooltip'	=> ( $v ?: Member::loggedIn()->language()->addToStack( 'no_value') ) . ": " . $resultValue . ' (' . $percentage . '%)',
+						'name' =>  $v,
+						'tooltip'	=> $v . ": " . $resultValue . ' (' . $percentage . '%)',
 						'value' => $resultValue,
 						'percentage' => $percentage
 					);
@@ -253,8 +197,8 @@ class ProfileFields extends OverviewStatisticsAbstract
 				else
 				{
 					$pieBarData[] = array(
-						'name' =>  ( $v ?: Member::loggedIn()->language()->addToStack( 'stats_pfields__novalue' ) ),
-						'tooltip' => ( $v ?: Member::loggedIn()->language()->addToStack( 'no_value' ) ) . ": 0 (0%)",
+						'name' =>  $v,
+						'tooltip' => $v . ": 0 (0%)",
 						'value' => 0,
 						'percentage' => 0
 					);
@@ -262,6 +206,6 @@ class ProfileFields extends OverviewStatisticsAbstract
 			}
 		}
 
-		return $pieBarData;
+		return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global'  )->applePieChart( $pieBarData );
 	}
 }

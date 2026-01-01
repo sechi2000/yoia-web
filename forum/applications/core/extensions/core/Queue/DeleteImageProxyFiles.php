@@ -11,39 +11,28 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\File;
-use IPS\Member;
-use IPS\Settings;
-use OutOfRangeException;
-use function defined;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class DeleteImageProxyFiles extends QueueAbstract
+class _DeleteImageProxyFiles
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
-		$data['count']			= Db::i()->select( 'count(*)', 'core_image_proxy' )->first();
+		$data['count']			= \IPS\Db::i()->select( 'count(*)', 'core_image_proxy' )->first();
 		$data['deleted']		= 0;
-		$data['cachePeriod']	= Settings::i()->image_proxy_cache_period;
+		$data['cachePeriod']	= \IPS\Settings::i()->image_proxy_cache_period;
 
 		return $data;
 	}
@@ -56,7 +45,7 @@ class DeleteImageProxyFiles extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		/* We don't want to delete the files if we are caching indefinitely */
 		if( !$data['cachePeriod'] )
@@ -65,12 +54,12 @@ class DeleteImageProxyFiles extends QueueAbstract
 		}
 
 		/* Kill the process if there table doesn't exist anymore */
-		if( !Db::i()->checkForTable( 'core_image_proxy' ) )
+		if( !\IPS\Db::i()->checkForTable( 'core_image_proxy' ) )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
-		$select = Db::i()->select( 'location', 'core_image_proxy', array(), 'cache_time ASC', REBUILD_SLOW );
+		$select = \IPS\Db::i()->select( 'location', 'core_image_proxy', array(), 'cache_time ASC', \IPS\REBUILD_SLOW );
 
 		$completed	= 0;
 
@@ -78,11 +67,11 @@ class DeleteImageProxyFiles extends QueueAbstract
 		{
 			try
 			{
-				File::get( 'core_Imageproxycache', $location )->delete();
+				\IPS\File::get( 'core_Imageproxycache', $location )->delete();
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 
-			Db::i()->delete( 'core_image_proxy', array( 'location=?', $location ) );
+			\IPS\Db::i()->delete( 'core_image_proxy', array( 'location=?', $location ) );
 
 			$data['deleted']++;
 			$completed++;
@@ -102,11 +91,11 @@ class DeleteImageProxyFiles extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' => Member::loggedIn()->language()->addToStack('deleting_imageproxy_files'), 'complete' => $data['count'] ? ( round( ( 100 / $data['count'] ) * $data['deleted'], 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('deleting_imageproxy_files'), 'complete' => $data['count'] ? ( round( ( 100 / $data['count'] ) * $data['deleted'], 2 ) ) : 100 );
 	}
 
 	/**
@@ -116,8 +105,8 @@ class DeleteImageProxyFiles extends QueueAbstract
 	 * @param	bool	$processed	Was anything processed or not? If preQueueData returns NULL, this will be FALSE.
 	 * @return	void
 	 */
-	public function postComplete( array $data, bool $processed = TRUE ) : void
+	public function postComplete( $data, $processed = TRUE )
 	{
-		Db::i()->dropTable( 'core_image_proxy' );
+		\IPS\Db::i()->dropTable( 'core_image_proxy' );
 	}
 }

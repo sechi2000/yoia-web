@@ -12,51 +12,40 @@
 namespace IPS\downloads\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Member;
-use IPS\Output;
-use IPS\Theme;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * topSubmitters Widget
  */
-class topSubmitters extends PermissionCache implements Customizable
+class _topSubmitters extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'topSubmitters';
+	public $key = 'topSubmitters';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'downloads';
+	public $app = 'downloads';
 		
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	* Init the widget
 	*
 	* @return	void
 	*/
-	public function init(): void
+	public function init()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'downloads', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'downloads', 'front' ) );
 
 		parent::init();
 	}
@@ -64,14 +53,14 @@ class topSubmitters extends PermissionCache implements Customizable
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
  	{
 		$form = parent::configuration( $form );
  		
-		$form->add( new Number( 'number_to_show', $this->configuration['number_to_show'] ?? 5, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'number_to_show', isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 5, TRUE ) );
 		return $form;
  	}
 
@@ -80,7 +69,7 @@ class topSubmitters extends PermissionCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		foreach ( array( 'week' => 'P1W', 'month' => 'P1M', 'year' => 'P1Y', 'all' => NULL ) as $time => $interval )
 		{
@@ -88,7 +77,7 @@ class topSubmitters extends PermissionCache implements Customizable
 			$intervalWhere = NULL;
 			if ( $interval )
 			{
-				$intervalWhere = array( 'file_submitted>?', DateTime::create()->sub( new DateInterval( $interval ) )->getTimestamp() );
+				$intervalWhere = array( 'file_submitted>?', \IPS\DateTime::create()->sub( new \DateInterval( $interval ) )->getTimestamp() );
 			}
 			
 			/* Get the submitters ordered by their rating */
@@ -97,32 +86,32 @@ class topSubmitters extends PermissionCache implements Customizable
 			{
 				$where[] = $intervalWhere;
 			}
-			$ratings = iterator_to_array( Db::i()->select(
+			$ratings = iterator_to_array( \IPS\Db::i()->select(
 				'downloads_files.file_submitter, AVG(file_rating) as rating, count(file_id) AS files',
 				'downloads_files',
 				$where,
 				'files DESC, rating DESC',
-				$this->configuration['number_to_show'] ?? 5, 'file_submitter'
+				isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 5, 'file_submitter'
 			)->setKeyField('file_submitter')->setValueField('rating') );
 			
 			${$time} = array();
 
-			if( count( $ratings ) )
+			if( \count( $ratings ) )
 			{
 				/* Get their file counts */
-				$where = array( array( Db::i()->in( 'file_submitter', array_keys( $ratings ) ) ) );
+				$where = array( array( \IPS\Db::i()->in( 'file_submitter', array_keys( $ratings ) ) ) );
 				if ( $interval )
 				{
 					$where[] = $intervalWhere;
 				}
 				
-				$fileCounts = iterator_to_array( Db::i()->select( 'file_submitter, count(*) AS count', 'downloads_files', $where, NULL, NULL, 'file_submitter' )->setKeyField('file_submitter')->setValueField('count') );
+				$fileCounts = iterator_to_array( \IPS\Db::i()->select( 'file_submitter, count(*) AS count', 'downloads_files', $where, NULL, NULL, 'file_submitter' )->setKeyField('file_submitter')->setValueField('count') );
 							
 				/* Get member data and put it together */
-				foreach( Db::i()->select( '*', 'core_members', Db::i()->in( 'member_id', array_keys( $ratings ) ) ) as $key => $memberData )
+				foreach( \IPS\Db::i()->select( '*', 'core_members', \IPS\Db::i()->in( 'member_id', array_keys( $ratings ) ) ) as $key => $memberData )
 				{
-					${$time}[$key]['member'] = Member::constructFromData( $memberData );
-					${$time}[$key]['files']  = $fileCounts[$memberData['member_id']] ?? 0;
+					${$time}[$key]['member'] = \IPS\Member::constructFromData( $memberData );
+					${$time}[$key]['files']  = isset( $fileCounts[ $memberData['member_id'] ] ) ? $fileCounts[ $memberData['member_id'] ] : 0;
 					${$time}[$key]['rating'] = $ratings[ $memberData['member_id'] ];
 				}
 			}

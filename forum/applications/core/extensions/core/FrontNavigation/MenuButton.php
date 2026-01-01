@@ -12,39 +12,35 @@
 namespace IPS\core\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Menu Button
  */
-class MenuButton
+class _MenuButton
 {
 	/**
 	 * @brief	The language string for the title
 	 */
-	protected ?string $title = null;
+	protected $title;
 	
 	/**
 	 * @brief	The target URL
 	 */
-	protected ?Url $link = null;
+	protected $link;
 	
 	/**
 	 * Constructor
 	 *
 	 * @param	string			$title		The language string for the title
-	 * @param	Url	$link		The target URL
+	 * @param	\IPS\Http\Url	$link		The target URL
+	 * @return	void
 	 */
-	public function __construct( string $title, Url $link )
+	public function __construct( $title, \IPS\Http\Url $link )
 	{
 		$this->title = $title;
 		$this->link = $link;
@@ -55,7 +51,7 @@ class MenuButton
 	 *
 	 * @return	bool
 	 */
-	public function canView(): bool
+	public function canView()
 	{
 		return TRUE;
 	}
@@ -65,17 +61,17 @@ class MenuButton
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack( $this->title );
+		return \IPS\Member::loggedIn()->language()->addToStack( $this->title );
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return	Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|null
+	public function link()
 	{
 		return $this->link;
 	}
@@ -84,21 +80,10 @@ class MenuButton
 	 * Children
 	 *
 	 * @param	bool	$noStore	If true, will skip datastore and get from DB (used for ACP preview)
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function children( bool $noStore=FALSE ): ?array
+	public function children( $noStore=FALSE )
 	{
 		return NULL;
-	}
-
-	/**
-	 * Is this item available for the specified type?
-	 *
-	 * @param string $type
-	 * @return bool
-	 */
-	public function isAvailableFor( string $type ): bool
-	{
-		return true;
 	}
 }

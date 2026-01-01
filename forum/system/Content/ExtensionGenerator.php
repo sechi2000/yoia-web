@@ -11,55 +11,48 @@
 namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content;
-use IPS\Dispatcher;
-use IPS\Lang;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Content Extension Generator
  */
-abstract class ExtensionGenerator
+abstract class _ExtensionGenerator
 {
 	/**
 	 * @brief	If TRUE, will prevent comment classes being included
 	 */
-	protected static bool $contentItemsOnly = FALSE;
+	protected static $contentItemsOnly = FALSE;
 
 	/**
 	 * @brief	If TRUE, will include archive classes
 	 */
-	protected static bool $includeArchive = FALSE;
+	protected static $includeArchive = FALSE;
 	
 	/**
 	 * Generate Extensions
 	 *
 	 * @return	array
 	 */
-	public static function generate(): array
+	public static function generate()
 	{
 		$return = array();
 		
-		foreach ( Content::routedClasses( FALSE, static::$includeArchive, static::$contentItemsOnly ) as $_class )
+		foreach ( \IPS\Content::routedClasses( FALSE, static::$includeArchive, static::$contentItemsOnly ) as $_class )
 		{
 			$obj = new static;
 			$obj->class = $_class;
 			
-			if ( Dispatcher::hasInstance()  )
+			if ( \IPS\Dispatcher::hasInstance()  )
 			{
-				$language = Member::loggedIn()->language();
+				$language = \IPS\Member::loggedIn()->language();
 			}
 			else
 			{
-				$language = Lang::load( Lang::defaultLanguage() );
+				$language = \IPS\Lang::load( \IPS\Lang::defaultLanguage() );
 			}
 
 			$language->words[ 'ipAddresses__core_Content_' . str_replace( '\\', '_', mb_substr( $_class, 4 ) ) ] = $language->addToStack( ( ( isset( $_class::$archiveTitle ) ) ? $_class::$archiveTitle : $_class::$title ) . '_pl', FALSE );
@@ -72,5 +65,5 @@ abstract class ExtensionGenerator
 	/**
 	 * @brief	Content Class
 	 */
-	public string $class;
+	public $class;
 }

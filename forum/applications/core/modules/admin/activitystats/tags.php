@@ -11,44 +11,35 @@
 namespace IPS\core\modules\admin\activitystats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Tag Usage
  */
-class tags extends Controller
+class _tags extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'tagsusage_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'tagsusage_manage' );
 		parent::execute();
 	}
 
@@ -57,11 +48,10 @@ class tags extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$chart = Chart::loadFromExtension( 'core', 'Tags' )->getChart( Url::internal( "app=core&module=activitystats&controller=tags" ) );
-
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_activitystats_tags');
-		Output::i()->output = (string) $chart;
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'Tags' )->getChart( \IPS\Http\Url::internal( "app=core&module=activitystats&controller=tags" ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_activitystats_tags');
+		\IPS\Output::i()->output = (string) $chart;
 	}
 }

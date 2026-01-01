@@ -11,133 +11,255 @@
 namespace IPS\core\extensions\core\ModCp;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\core\Approval;
-use IPS\Data\Cache;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\ModCpAbstract;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\IPS;
-use Exception;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Content Pending Approval
  */
-class Unapproved extends ModCpAbstract
+class _Unapproved
 {
 	/**
 	 * Returns the primary tab key for the navigation bar
 	 *
 	 * @return	string
 	 */
-	public function getTab() : string
+	public function getTab()
 	{
 		return 'approval';
 	}
-
-	/**
-	 * What do I manage?
-	 * Acceptable responses are: content, members, or other
-	 *
-	 * @return	string
-	 */
-	public function manageType() : string
-	{
-		return 'content';
-	}
-
-	/**
-	 * Any counters that will be displayed in the ModCP Header.
-	 * This should return an array of counters, where each item contains
-	 * 		title (a language string)
-	 * 		total
-	 * 		id (optional element ID)
-	 *
-	 * @return array
-	 */
-	public function getCounters() : array
-	{
-		$count = Request::i()->isAjax() ? $this->getApprovalQueueCount(true) : $this->getApprovalQueueCount();
-		return [
-			[ 'id' => 'elModCPApprovalCount', 'title' => 'modcp_approval', 'total' => $count ]
-		];
-	}
-
-	/**
-	 * get unapproved counter for the ajax update
-	 * 
-	 * @return void
-	 */
-	public function getCount(): void
-	{
-		Output::i()->json(['total' => $this->getApprovalQueueCount(true) ]);
-	}
-
+	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
-		if ( isset( Request::i()->modaction ) AND in_array( Request::i()->modaction, array( 'hide', 'approve', 'delete' ) ) )
-		{
-			$this->modaction();
-		}
-		
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('modcp_approval') );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('modcp_approval');
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/clubs.css', 'core', 'front' ) );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack('modcp_approval') );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('modcp_approval');
 
-		$types = $this->_getContentTypes();
-		$table = new \IPS\Helpers\Table\Db( 'core_approval_queue', Url::internal( "app=core&module=modcp&controller=modcp&tab=approval", "front", "modcp_approval" ), $this->_buildWhere( $types ) );
-		$table->tableTemplate = array( Theme::i()->getTemplate( 'modcp' ), 'approvalQueueTable' );
-		$table->rowsTemplate = array( Theme::i()->getTemplate( 'modcp' ), 'approvalQueueRows' );
-		$table->title = 'modcp_approval';
-		$table->limit = 5;
-		$table->sortBy = 'approval_id';
-		$table->sortDirection = 'asc';
-
-		foreach( $types as $key => $class )
+		if ( isset( \IPS\Request::i()->go ) )
 		{
-			$classesToCheck = [ $class ];
-			if( isset( $class::$commentClass ) )
+			$showSplash = FALSE;
+
+			/* If the user wants to skip this splash next time, set a cookie we can look for */
+			if ( isset( \IPS\Request::i()->skipnext ) )
 			{
-				$classesToCheck[] = $class::$commentClass;
-			}
-			if( isset( $class::$reviewClass ) )
-			{
-				$classesToCheck[] = $class::$reviewClass;
-			}
-			$table->filters[ $class::$title . '_pl' ] = array( Db::i()->in( 'approval_content_class', $classesToCheck ) );
-		}
+				\IPS\Request::i()->setCookie( 'ipsApprovalQueueSplash', true, \IPS\DateTime::ts( time() )->add( new \DateInterval( 'P1Y' ) ) );	
+			}	
 
-		$resortKey = $table->resortKey;
-		if( Request::i()->isAjax() AND isset( Request::i()->$resortKey ) )
+			$_SESSION['ipsApprovalQueueSplash'] = TRUE;		
+		}
+		elseif ( isset( $_SESSION['ipsApprovalQueueSplash'] ) )
 		{
-			Output::i()->sendOutput( (string) $table );
+			$showSplash = FALSE;
+		}
+		elseif ( isset( \IPS\Request::i()->cookie['ipsApprovalQueueSplash'] ) )
+		{
+			$showSplash = FALSE;
+			$skipNextTime = FALSE;
 		}
 		else
 		{
-			Output::i()->output = (string) $table;
+			$showSplash = TRUE;
+			$skipNextTime = TRUE;
+		}
+
+		if ( $showSplash )
+		{
+			return \IPS\Theme::i()->getTemplate('modcp')->approvalQueueSplash( $skipNextTime );
+		}
+		else
+		{
+			return $this->_getNext();
+		}
+	}
+	
+	/**
+	 * Get Next Content
+	 *
+	 * @return	string
+	 */
+	protected function _getNext()
+	{
+		if ( !isset( $_SESSION['ipsApprovalQueueSkip'] ) )
+		{
+			$_SESSION['ipsApprovalQueueSkip'] = array();
+		}
+		if ( isset( \IPS\Request::i()->skip ) )
+		{
+			if ( !isset( $_SESSION['ipsApprovalQueueSkip'][ \IPS\Request::i()->class ] ) )
+			{
+				$_SESSION['ipsApprovalQueueSkip'][ \IPS\Request::i()->class ] = array();
+			}
+			$_SESSION['ipsApprovalQueueSkip'][ \IPS\Request::i()->class ][] = \IPS\Request::i()->id;
+			
+			if ( \IPS\Request::i()->isAjax() )
+			{
+				\IPS\Output::i()->json( 'OK' );
+			}
+		}
+				
+		foreach ( \IPS\Content::routedClasses( TRUE ) as $class )
+		{
+			if ( \in_array( 'IPS\Content\Hideable', class_implements( $class ) ) )
+			{
+				$where = array();				
+				if ( isset( $class::$databaseColumnMap['hidden'] ) )
+				{
+					$where[] = array( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['hidden'] . '=1' );
+				}
+				elseif ( isset( $class::$databaseColumnMap['approved'] ) )
+				{
+					$where[] = array( $class::$databaseTable . '.' .  $class::$databasePrefix . $class::$databaseColumnMap['approved'] . '=0' );
+				}
+				else
+				{
+					continue;
+				}
+				
+				if ( isset( $_SESSION['ipsApprovalQueueSkip'][ md5( $class ) ] ) )
+				{
+					$where[] = '!' . \IPS\Db::i()->in( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId, $_SESSION['ipsApprovalQueueSkip'][ md5( $class ) ] );
+				}
+
+				if ( is_subclass_of( $class, 'IPS\Content\Comment' ) AND $class::commentWhere() !== NULL )
+				{
+					$where[] = $class::commentWhere();
+				}
+
+				foreach ( $class::getItemsWithPermission( $where, "{$class::$databasePrefix}{$class::$databaseColumnId} ASC", 1 ) as $item )
+				{					
+					$idColumn = $item::$databaseColumnId;
+					$container = NULL;
+					if ( $item instanceof \IPS\Content\Comment AND !( $item instanceof \IPS\core\Statuses\Reply ) )
+					{
+						if ( $item instanceof \IPS\Content\Review )
+						{
+							$approveUrl = $item->url()->setQueryString( array( 'do' => 'unhideReview', 'review' => $item->$idColumn ) )->csrf();
+							$deleteUrl = $item->url()->setQueryString( array( 'do' => 'deleteReview', 'review' => $item->$idColumn ) )->csrf();
+							$hideUrl = $item->url()->setQueryString( array( 'do' => 'hideReview', 'review' => $item->$idColumn, '_fromApproval' => 1 ) )->csrf();
+						}
+						else
+						{
+							$approveUrl = $item->url()->setQueryString( array( 'do' => 'unhideComment', 'comment' => $item->$idColumn ) )->csrf();
+							$deleteUrl = $item->url()->setQueryString( array( 'do' => 'deleteComment', 'comment' => $item->$idColumn ) )->csrf();
+							$hideUrl = $item->url()->setQueryString( array( 'do' => 'hideComment', 'comment' => $item->$idColumn, '_fromApproval' => 1 ) )->csrf();
+						}
+						$itemClass = $item::$itemClass;
+						$ref = base64_encode( json_encode( array( 'app' => $itemClass::$application, 'module' => $itemClass::$module, 'id_1' => $item->mapped('item'), 'id_2' => $item->id ) ) );
+						$title = $item->item()->mapped('title');
+					}
+					else
+					{
+						$approveUrl = $item->url()->setQueryString( array( 'do' => 'moderate', 'action' => 'unhide' ) )->csrf();
+						$deleteUrl = $item->url()->setQueryString( array( 'do' => 'moderate', 'action' => 'delete' ) )->csrf();
+						$hideUrl = $item->url()->setQueryString( array( 'do' => 'moderate', 'action' => 'hide', '_fromApproval' => 1 ) )->csrf();
+
+						if( $item instanceof \IPS\core\Statuses\Reply )
+						{
+							$itemClass = $item::$itemClass;
+							$ref = base64_encode( json_encode( array( 'app' => $itemClass::$application, 'module' => $itemClass::$module, 'id_1' => $item->mapped('item'), 'id_2' => $item->id ) ) );
+
+							$approveUrl = $approveUrl->setQueryString( 'type', 'reply' )->setQueryString( 'reply', $item->id );
+							$deleteUrl = $deleteUrl->setQueryString( 'type', 'reply' )->setQueryString( 'reply', $item->id );
+							$hideUrl = $hideUrl->setQueryString( 'type', 'reply' )->setQueryString( 'reply', $item->id );
+						}
+						else
+						{
+							$ref = base64_encode( json_encode( array( 'app' => $item::$application, 'module' => $item::$module, 'id_1' => $item->id ) ) );
+						}
+
+						try
+						{
+							$container = $item->container();
+						}
+						catch ( \Exception $e ) { }
+
+						$title = $item->mapped('title');
+					}
+					$skipUrl = \IPS\Http\Url::internal( 'app=core&module=modcp&controller=modcp&tab=approval', 'front', 'modcp_approval' )->setQueryString( array( 'skip' => '1', 'class' => md5( $class ), 'id' => $item->$idColumn ) );
+					
+					if ( !$item->canUnhide() )
+					{
+						$approveUrl = NULL;
+					}
+					if ( !$item->canDelete() )
+					{
+						$deleteUrl = NULL;
+					}
+					if ( !$item->canHide() )
+					{
+						$hideUrl = FALSE;
+					}
+					
+					$return = \IPS\Theme::i()->getTemplate('modcp')->approvalQueueHeader( $item, $approveUrl, $skipUrl, $deleteUrl, $hideUrl );
+
+					$return .= $item->approvalQueueHtml( $ref, $container, $title );
+
+					if ( \IPS\Request::i()->isAjax() )
+					{
+						return \IPS\Output::i()->json( array( 'html' => $return, 'count' => $this->getApprovalQueueCount( TRUE ) ) );
+					}
+					else
+					{
+						return \IPS\Theme::i()->getTemplate('modcp')->approvalQueue( $return );
+					}
+				}
+			}
+		}
+		if ( \IPS\Settings::i()->clubs and \IPS\Settings::i()->clubs_require_approval and \IPS\Member::loggedIn()->modPermission('can_access_all_clubs') )
+		{
+			$where = array( 'approved=0' );
+			if ( isset( $_SESSION['ipsApprovalQueueSkip'][ md5( 'IPS\Member\Club' ) ] ) )
+			{
+				$where[0] .= ' AND ' . \IPS\Db::i()->in( 'id', $_SESSION['ipsApprovalQueueSkip'][ md5( 'IPS\Member\Club' ) ], TRUE );
+			}
+			
+			foreach ( \IPS\Member\Club::clubs( NULL, NULL, 'name', FALSE, array(), $where ) as $club )
+			{
+				$approveUrl = $club->url()->setQueryString( array( 'do' => 'approve', 'approved' => 1 ) )->csrf();
+				$deleteUrl = $club->url()->setQueryString( array( 'do' => 'approve', 'approved' => 0 ) )->csrf();
+				$skipUrl = \IPS\Http\Url::internal( 'app=core&module=modcp&controller=modcp&tab=approval', 'front', 'modcp_approval' )->setQueryString( array( 'skip' => '1', 'class' => md5( 'IPS\Member\Club' ), 'id' => $club->id ) );
+				
+				$return = \IPS\Theme::i()->getTemplate('modcp')->approvalQueueHeader( NULL, $approveUrl, $skipUrl, $deleteUrl, FALSE );
+				$return .= \IPS\Theme::i()->getTemplate('clubs')->clubCard( $club, TRUE );
+				
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/clubs.css', 'core', 'front' ) );
+				if ( \IPS\Theme::i()->settings['responsive'] )
+				{
+					\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/clubs_responsive.css', 'core', 'front' ) );
+				}
+				
+				if ( \IPS\Request::i()->isAjax() )
+				{
+					return \IPS\Output::i()->json( array( 'html' => $return, 'count' => $this->getApprovalQueueCount( TRUE ) ) );
+				}
+				else
+				{
+					return \IPS\Theme::i()->getTemplate('modcp')->approvalQueue( $return );
+				}
+			}
+		}
+		
+		/* Did we skip any? If so, clear it and loop through again. */
+		if ( \count( $_SESSION['ipsApprovalQueueSkip'] ) )
+		{
+			$_SESSION['ipsApprovalQueueSkip'] = array();
+			return $this->_getNext();
+		}
+		
+		if ( \IPS\Request::i()->isAjax() )
+		{
+			return \IPS\Output::i()->json( array( 'html' => \IPS\Theme::i()->getTemplate('modcp')->approvalQueueEmpty(), 'count' => 0 ) );
+		}
+		else
+		{
+			return \IPS\Theme::i()->getTemplate('modcp')->approvalQueueEmpty();
 		}
 	}
 
@@ -147,163 +269,61 @@ class Unapproved extends ModCpAbstract
 	 * @param	bool	$bypassCache	Ignore cache and refetch the count
 	 * @return	int
 	 */
-	public function getApprovalQueueCount( bool $bypassCache = FALSE ) : int
+	public function getApprovalQueueCount( $bypassCache = FALSE )
 	{
 		try
 		{
 			if( $bypassCache === TRUE )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
-			$approvalQueueCount = Cache::i()->getWithExpire( 'modCpApprovalQueueCount_' . Member::loggedIn()->member_id, TRUE );
+			$approvalQueueCount = \IPS\Data\Cache::i()->getWithExpire( 'modCpApprovalQueueCount_' . \IPS\Member::loggedIn()->member_id, TRUE );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			$approvalQueueCount = (int) Db::i()->select( 'count(approval_id)', 'core_approval_queue', $this->_buildWhere( $this->_getContentTypes() ) )->first();
+			$approvalQueueCount = 0;
 
-			Cache::i()->storeWithExpire( 'modCpApprovalQueueCount_' . Member::loggedIn()->member_id, $approvalQueueCount, DateTime::create()->add( new DateInterval( 'PT5M' ) ), TRUE );
+			foreach ( \IPS\Content::routedClasses( TRUE ) as $class )
+			{
+				if ( \in_array( 'IPS\Content\Hideable', class_implements( $class ) ) )
+				{
+					$where = array();				
+					if ( isset( $class::$databaseColumnMap['hidden'] ) )
+					{
+						$where[] = array( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['hidden'] . '=1' );
+					}
+					elseif ( isset( $class::$databaseColumnMap['approved'] ) )
+					{
+						$where[] = array( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnMap['approved'] . '=0' );
+					}
+					else
+					{
+						continue;
+					}
+					
+					if ( isset( $_SESSION['ipsApprovalQueueSkip'][ md5( $class ) ] ) )
+					{
+						$where[] = '!' . \IPS\Db::i()->in( $class::$databaseTable . '.' . $class::$databasePrefix . $class::$databaseColumnId, $_SESSION['ipsApprovalQueueSkip'][ md5( $class ) ] );
+					}
+
+					if ( is_subclass_of( $class, 'IPS\Content\Comment' ) AND $class::commentWhere() !== NULL )
+					{
+						$where[] = $class::commentWhere();
+					}
+
+					$approvalQueueCount += $class::getItemsWithPermission( $where, NULL, 1, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, FALSE, FALSE, FALSE, TRUE );
+				}
+			}
+
+			if ( \IPS\Settings::i()->clubs and \IPS\Settings::i()->clubs_require_approval and \IPS\Member::loggedIn()->modPermission('can_access_all_clubs') )
+			{
+				$approvalQueueCount += \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs', 'approved=0' )->first();
+			}
+
+			\IPS\Data\Cache::i()->storeWithExpire( 'modCpApprovalQueueCount_' . \IPS\Member::loggedIn()->member_id, $approvalQueueCount, \IPS\DateTime::create()->add( new \DateInterval( 'PT15M' ) ), TRUE );
 		}
 
 		return $approvalQueueCount;
-	}
-
-	/**
-	 * Get hidden content types
-	 *
-	 * @return	array
-	 */
-	protected function _getContentTypes(): array
-	{
-		$types = array();
-		foreach ( \IPS\Content::routedClasses( TRUE, FALSE, TRUE ) as $class )
-		{
-			if ( IPS::classUsesTrait( $class, 'IPS\Content\Hideable' ) )
-			{
-				if ( Member::loggedIn()->modPermission( 'can_view_hidden_content' ) or Member::loggedIn()->modPermission( 'can_view_hidden_' . $class::$title ) )
-				{
-					$types[ mb_strtolower( str_replace( '\\', '_', mb_substr( $class, 4 ) ) ) ] = $class;
-				}
-			}
-		}
-
-		/* Remove pending file versions */
-		if( isset( $types['downloads_file_pendingversion'] ) )
-		{
-			unset( $types['downloads_file_pendingversion'] );
-		}
-
-		/* Add clubs */
-		if ( Settings::i()->clubs and Settings::i()->clubs_require_approval and Member::loggedIn()->modPermission('can_access_all_clubs') )
-		{
-			$types[ 'core_clubs' ] = Club::class;
-		}
-
-		return $types;
-	}
-
-	/**
-	 * Build the where clause to filter by content
-	 *
-	 * @param array	$types
-	 * @return array
-	 */
-	protected function _buildWhere( array $types ) : array
-	{
-		/* No content types, so no results */
-		if( !count( $types ) )
-		{
-			return array( array( '1=0' ) );
-		}
-		
-		$clause = [];
-		$binds = [];
-		foreach( $types as $class )
-		{
-			$allowedContainers = null;
-			$classesToUse = [ str_replace( '\\', '\\\\', $class ) ];
-			if ( isset( $class::$containerNodeClass ) )
-			{
-				$containerClass = $class::$containerNodeClass;
-				if ( isset( $containerClass::$modPerm ) )
-				{
-					$allowedContainers = Member::loggedIn()->modPermission( $containerClass::$modPerm );
-				}
-			}
-
-			if( isset( $class::$commentClass ) AND IPS::classUsesTrait( $class::$commentClass, 'IPS\Content\Hideable' ) )
-			{
-				$classesToUse[] = str_replace( '\\', '\\\\', $class::$commentClass );
-			}
-			if( isset( $class::$reviewClass ) AND IPS::classUsesTrait( $class::$reviewClass, 'IPS\Content\Hideable' ) )
-			{
-				$classesToUse[] = str_replace( '\\', '\\\\', $class::$reviewClass );
-			}
-
-			if( $allowedContainers !== null AND $allowedContainers !== -1 AND $allowedContainers !== true )
-			{
-				/* It could be an array or empty. If it's empty we have no permission to this class at all */
-				if( is_array( $allowedContainers ) )
-				{
-					$clause[] = "(approval_content_class in ('" . implode( "','", $classesToUse ) . "') AND approval_container_id IN(?))";
-					$binds[] = implode( ",", $allowedContainers );
-				}
-			}
-			else
-			{
-				$clause[] = "approval_content_class in ('" . implode( "','", $classesToUse ) . "')";
-			}
-		}
-
-		return array(
-			array_merge( array( "(" . implode( " OR ", $clause ) . ")" ), $binds ),
-		);
-	}
-
-	/**
-	 * Mod Action
-	 *
-	 * @return    void
-	 * @throws Exception
-	 */
-	public function modaction(): void
-	{
-		Session::i()->csrfCheck();
-
-		$ids = array_keys( Request::i()->moderate );
-		$rows = iterator_to_array(
-			new ActiveRecordIterator(
-				Db::i()->select( '*', 'core_approval_queue', Db::i()->in( 'approval_id', $ids ) ),
-				Approval::class,
-			),
-		);
-
-		foreach( $rows as $row )
-		{
-			if( $item = $row->item() )
-			{
-				if( $item instanceof Club )
-				{
-					switch( Request::i()->modaction )
-					{
-						case 'approve':
-							$item->approved = true;
-							$item->save();
-							$item->onApprove();
-							break;
-
-						case 'delete':
-							$item->delete();
-							break;
-					}
-				}
-				elseif( $item instanceof \IPS\Content )
-				{
-					$item->modAction( Request::i()->modaction == 'approve' ? 'unhide' : Request::i()->modaction );
-				}
-			}
-		}
-
-		Output::i()->redirect( Url::internal( "app=core&module=modcp&controller=modcp&tab=approval", 'front', 'modcp_approval' ), 'saved' );
 	}
 }

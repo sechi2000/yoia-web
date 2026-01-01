@@ -12,63 +12,43 @@
 namespace IPS\convert\Software\Gallery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task;
-use IPS\Text\Parser;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_array;
-use function is_null;
-use function json_decode;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Xenforo Gallery Converter
  */
-class Xenforo extends Software
+class _Xenforo extends \IPS\convert\Software
 {
 	/**
 	 * @brief	The similarities between XF1 and XF2 are close enough that we can use the same converter
 	 */
-	public static ?bool $isLegacy = NULL;
+	public static $isLegacy = NULL;
 
 	/**
 	 * @brief	XF2 Has prefixes on RM tables
 	 */
-	public static string $tablePrefix = 'xengallery_';
+	public static $tablePrefix = 'xengallery_';
 
 	/**
 	 * @brief XF2.1 changed serialized data to json decoded
 	 */
-	public static bool $useJson = FALSE;
+	public static $useJson = FALSE;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 
 		if ( $needDB )
 		{
@@ -77,7 +57,7 @@ class Xenforo extends Software
 				/* Is this XF1 or XF2 */
 				if ( static::$isLegacy === NULL )
 				{
-					$version = $this->db->select( 'MAX(version_id)', 'xf_template', array( Db::i()->in( 'addon_id', array( 'XF', 'XenForo' ) ) ) )->first();
+					$version = $this->db->select( 'MAX(version_id)', 'xf_template', array( \IPS\Db::i()->in( 'addon_id', array( 'XF', 'XenForo' ) ) ) )->first();
 
 					if ( $version < 2000010 )
 					{
@@ -95,16 +75,18 @@ class Xenforo extends Software
 					}
 				}
 			}
-			catch( Exception $e ) {} # If we can't query, we won't be able to do anything anyway
+			catch( \Exception $e ) {} # If we can't query, we won't be able to do anything anyway
 		}
+
+		return $return;
 	}
 
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "XenForo Media Gallery (1.5.x/2.0.x/2.1.x/2.2.x)";
@@ -113,9 +95,9 @@ class Xenforo extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "xenforo";
@@ -124,9 +106,9 @@ class Xenforo extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertGalleryCategories'	=> array(
@@ -151,13 +133,13 @@ class Xenforo extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
@@ -176,17 +158,16 @@ class Xenforo extends Software
 
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
-
-		return 0;
 	}
 
 	/**
 	 * Uses Prefix
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function usesPrefix(): bool
+	public static function usesPrefix()
 	{
 		return FALSE;
 	}
@@ -194,9 +175,9 @@ class Xenforo extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -204,9 +185,9 @@ class Xenforo extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'xenforo' ) );
 	}
@@ -214,9 +195,9 @@ class Xenforo extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertGalleryAlbums',
@@ -227,17 +208,17 @@ class Xenforo extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
 		{
 			case 'convertGalleryAlbums':
 				$options = array();
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'gallery_categories' ), 'IPS\gallery\Category' ) AS $category )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'gallery_categories' ), 'IPS\gallery\Category' ) AS $category )
 				{
 					$options[$category->_id] = $category->_title;
 				}
@@ -258,25 +239,25 @@ class Xenforo extends Software
 					'field_default'		=> NULL,
 					'field_required'	=> TRUE,
 					'field_extra'		=> array(),
-					'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_xf_attach_path'),
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_xf_attach_path'),
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				$return['convertGalleryImages']['media_thumb_location'] = array(
 					'field_class'		=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'		=> NULL,
 					'field_required'	=> TRUE,
 					'field_extra'		=> array(),
-					'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_xf_gal_path'),
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_xf_gal_path'),
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 
 				/* Get our reactions to let the admin map them */
 				$options		= array();
 				$descriptions	= array();
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
 				{
 					$options[ $reaction->id ]		= $reaction->_icon->url;
-					$descriptions[ $reaction->id ]	= Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
+					$descriptions[ $reaction->id ]	= \IPS\Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
 				}
 
 				$return['convertGalleryImages']['rep_like'] = array(
@@ -296,19 +277,19 @@ class Xenforo extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
 
 		/* Caches */
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'gallery_images', 'class' => 'IPS\gallery\Image' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'gallery_images', 'class' => 'IPS\gallery\Image' ), 3, array( 'app', 'link', 'class' ) );
 
 		return array( "f_gallery_images_rebuild", "f_gallery_cat_recount", "f_gallery_album_recount", "f_gallery_image_recount", "f_image_tags_recount" );
 	}
@@ -320,14 +301,14 @@ class Xenforo extends Software
 	 * @param	string			$xfTwoTitle		XF2 Phrase Title
 	 * @return	string|null
 	 */
-	protected function getPhrase( string $xfOneTitle, string $xfTwoTitle ) : ?string
+	protected function getPhrase( $xfOneTitle, $xfTwoTitle )
 	{
 		try
 		{
-			$title = ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) ? $xfTwoTitle : $xfOneTitle;
+			$title = ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) ? $xfTwoTitle : $xfOneTitle;
 			return $this->db->select( 'phrase_text', 'xf_phrase', array( "title=?", $title ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			return NULL;
 		}
@@ -338,7 +319,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryCategories() : void
+	public function convertGalleryCategories()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -348,10 +329,10 @@ class Xenforo extends Software
 		{
 			$libraryClass->convertGalleryCategory( array(
 				'category_id'			=> $row['category_id'],
-				'category_name'			=> $row['category_title'] ?? $row['title'],
-				'category_desc'			=> $row['category_description'] ?? $row['description'],
+				'category_name'			=> isset( $row['category_title'] ) ? $row['category_title'] : $row['title'],
+				'category_desc'			=> isset( $row['category_description'] ) ? $row['category_description'] : $row['description'],
 				'category_parent_id'	=> $row['parent_category_id'],
-				'category_count_imgs'	=> $row['category_media_count'] ?? $row['media_count'],
+				'category_count_imgs'	=> isset( $row['category_media_count'] ) ? $row['category_media_count'] : $row['media_count'],
 				'category_position'		=> $row['display_order']
 			) );
 			
@@ -381,7 +362,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryAlbums() : void
+	public function convertGalleryAlbums()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -394,9 +375,9 @@ class Xenforo extends Software
 				try
 				{
 					$perm = $this->db->select( '*', 'xengallery_album_permission', array( "album_id=? AND permission=?", $row['album_id'], 'view' ) )->first();
-					$perm['share_users'] = unserialize( $perm['share_users'] );
+					$perm['share_users'] = \unserialize( $perm['share_users'] );
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					/* If the permission row is missing for some reason, err on the side of caution and set this album private */
 					$perm = array(
@@ -426,7 +407,7 @@ class Xenforo extends Software
 						$users = $perm['share_users'];
 						$socialgroup['members'] = array();
 						
-						if ( count( $users ) )
+						if ( \count( $users ) )
 						{
 							foreach( $users AS $key => $user )
 							{
@@ -465,15 +446,15 @@ class Xenforo extends Software
 			
 			$info = array(
 				'album_id'					=> $row['album_id'],
-				'album_owner_id'			=> $row['album_user_id'] ?? $row['user_id'],
-				'album_description'			=> $row['album_description'] ?? $row['description'],
-				'album_name'				=> $row['album_title'] ?? $row['title'],
+				'album_owner_id'			=> isset( $row['album_user_id'] ) ? $row['album_user_id'] : $row['user_id'],
+				'album_description'			=> isset( $row['album_description'] ) ? $row['album_description'] : $row['description'],
+				'album_name'				=> isset( $row['album_title'] ) ? $row['album_title'] : $row['title'],
 				'album_type'				=> $type,
-				'album_count_imgs'			=> $row['album_media_count'] ?? $row['media_count'],
-				'album_count_comments'		=> $row['album_comment_count'] ?? $row['comment_count'],
-				'album_rating_aggregate'	=> $row['album_rating_avg'] ?? $row['rating_avg'],
-				'album_rating_count'		=> $row['album_rating_count'] ?? $row['rating_count'],
-				'album_rating_total'		=> $row['album_rating_sum'] ?? $row['rating_sum'],
+				'album_count_imgs'			=> isset( $row['album_media_count'] ) ? $row['album_media_count'] : $row['media_count'],
+				'album_count_comments'		=> isset( $row['album_comment_count'] ) ? $row['album_comment_count'] : $row['comment_count'],
+				'album_rating_aggregate'	=> isset( $row['album_rating_avg'] ) ? $row['album_rating_avg'] : $row['rating_avg'],
+				'album_rating_count'		=> isset( $row['album_rating_count'] ) ? $row['album_rating_count'] : $row['rating_count'],
+				'album_rating_total'		=> isset( $row['album_rating_sum'] ) ? $row['album_rating_sum'] : $row['rating_sum'],
 			);
 			
 			$category = $this->app->_session['more_info']['convertGalleryAlbums']['members_gallery_category'];
@@ -512,7 +493,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryImages() : void
+	public function convertGalleryImages()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -551,7 +532,7 @@ class Xenforo extends Software
 			{
 				$ip = $this->db->select( '*', 'xf_ip', array( "ip_id=?", $row['ip_id'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$ip = '127.0.0.1';
 			}
@@ -568,7 +549,7 @@ class Xenforo extends Software
 							->join( 'xf_attachment_data', 'xf_attachment.data_id = xf_attachment_data.data_id' )
 							->first();
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
 						/* If the file data is missing, we can't do anything. */
 						$libraryClass->setLastKeyValue( $row['media_id'] );
@@ -578,7 +559,7 @@ class Xenforo extends Software
 					$group			= floor( $file_data['data_id'] / 1000 );
 					$path			= rtrim( $this->app->_session['more_info']['convertGalleryImages']['file_location'], '/' ) . '/' . $group . '/' . $file_data['data_id'] . '-' . $file_data['file_hash'] . '.data';
 					$file_name		= $file_data['filename'];
-					$description	= $row['media_description'] ?? $row['description'];
+					$description	= isset( $row['media_description'] ) ? $row['media_description'] : $row['description'];
 					
 					break;
 				
@@ -600,16 +581,16 @@ class Xenforo extends Software
 					{
 						$memberId = $this->app->getLink( $row['user_id'], 'core_members', TRUE );
 
-						$em = Parser::embeddableMedia( Url::createFromString( $row['media_embed_url'] ), FALSE, Member::load( $memberId ) );
+						$em = \IPS\Text\Parser::embeddableMedia( \IPS\Http\Url::createFromString( $row['media_embed_url'] ), FALSE, \IPS\Member::load( $memberId ) );
 					}
-					catch( Exception $e )
+					catch( \Exception $e )
 					{
 						/* If anything went wrong, back out */
 						$libraryClass->setlastKeyValue( $row['media_id'] );
 						continue 2;
 					}
 
-					$description = ( $row['media_description'] ?? $row['description'] );
+					$description = ( isset( $row['media_description'] ) ? $row['media_description'] : $row['description'] );
 					$description = $em . "<br>" . $description;
 					
 					break;
@@ -620,8 +601,8 @@ class Xenforo extends Software
 				'image_album_id'		=> $row['album_id'],
 				'image_category_id'		=> $row['category_id'],
 				'image_member_id'		=> $row['user_id'],
-				'image_caption'			=> $row['media_title'] ?? $row['title'],
-				'image_views'			=> $row['media_view_count'] ?? $row['view_count'],
+				'image_caption'			=> isset( $row['media_title'] ) ? $row['media_title'] : $row['title'],
+				'image_views'			=> isset( $row['media_view_count'] ) ? $row['media_view_count'] : $row['view_count'],
 				'image_comments'		=> $row['comment_count'],
 				'image_ratings_total'	=> $row['rating_sum'],
 				'image_ratings_count'	=> $row['rating_count'],
@@ -665,13 +646,13 @@ class Xenforo extends Software
 			/* Reputation */
 			if ( !static::$useJson )
 			{
-				$likes = unserialize( $row['like_users'] );
+				$likes = \unserialize( $row['like_users'] );
 			}
 			else
 			{
-				$likes = json_decode( $row['reaction_score'], TRUE );
+				$likes = \json_decode( $row['reaction_score'], TRUE );
 			}
-			if ( is_array( $likes ) AND count( $likes ) )
+			if ( \is_array( $likes ) AND \count( $likes ) )
 			{
 				foreach( $likes AS $like )
 				{
@@ -710,24 +691,24 @@ class Xenforo extends Software
 			/* Tags 1.0.x */
 			if( isset( $row['media_content_tag_cache'] ) )
 			{
-				$tags = unserialize( $row['media_content_tag_cache'] );
+				$tags = \unserialize( $row['media_content_tag_cache'] );
 			}
 			/* Tags 1.1.x */
 			elseif( isset( $row['tags'] ) )
 			{
-				$tags = unserialize( $row['tags'] );
+				$tags = \unserialize( $row['tags'] );
 			}
 
-			if ( is_array( $tags ) and count( $tags ) )
+			if ( \is_array( $tags ) and \count( $tags ) )
 			{
 				foreach( $tags AS $k => $tag )
 				{
 					$libraryClass->convertTag( array(
 						'tag_meta_app'			=> 'gallery',
 						'tag_meta_area'			=> 'gallery',
-						'tag_meta_parent_id'	=> ( $row['album_id'] ) ?: $row['category_id'],
+						'tag_meta_parent_id'	=> ( $row['album_id'] ) ? $row['album_id'] : $row['category_id'],
 						'tag_meta_id'			=> $row['media_id'],
-						'tag_text'				=> $tag['tag_clean'] ?? $tag['tag'], // Select 1.0 or 1.1 version
+						'tag_text'				=> isset( $tag['tag_clean'] ) ? $tag['tag_clean'] : $tag['tag'], // Select 1.0 or 1.1 version
 						'tag_prefix'			=> 0,
 						'tag_member_id'			=> $row['user_id'],
 						'tag_added'             => $row['media_date']
@@ -744,7 +725,7 @@ class Xenforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryComments() : void
+	public function convertGalleryComments()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -757,7 +738,7 @@ class Xenforo extends Software
 			{
 				$ip = $this->db->select( 'ip', 'xf_ip', array( "ip_id=?", $row['ip_id'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$ip = '127.0.0.1';
 			}
@@ -792,13 +773,13 @@ class Xenforo extends Software
 			/* Reputation */
 			if ( !static::$useJson )
 			{
-				$likes = unserialize( $row['like_users'] );
+				$likes = \unserialize( $row['like_users'] );
 			}
 			else
 			{
-				$likes = json_decode( $row['reaction_score'], TRUE );
+				$likes = \json_decode( $row['reaction_score'], TRUE );
 			}
-			if ( is_array( $likes ) AND count( $likes ) )
+			if ( \is_array( $likes ) AND \count( $likes ) )
 			{
 				foreach( $likes AS $like )
 				{

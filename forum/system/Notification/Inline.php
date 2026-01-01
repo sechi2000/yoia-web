@@ -11,45 +11,33 @@
 namespace IPS\Notification;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\DateTime;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecord;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use function defined;
-use function get_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Inline Notification Model
  */
-class Inline extends ActiveRecord
+class _Inline extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_notifications';
+	public static $databaseTable = 'core_notifications';
 	
 	/**
 	 * Set Default Values
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->sent_time = time();
 		$this->updated_time = time();
@@ -58,40 +46,40 @@ class Inline extends ActiveRecord
 	/**
 	 * Get sent time
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_sent_time(): DateTime
+	public function get_sent_time()
 	{
-		return DateTime::ts( $this->_data['sent_time'] );
+		return \IPS\DateTime::ts( $this->_data['sent_time'] );
 	}
 	
 	/**
 	 * Get updated time
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_updated_time(): DateTime
+	public function get_updated_time()
 	{
-		return DateTime::ts( $this->_data['updated_time'] );
+		return \IPS\DateTime::ts( $this->_data['updated_time'] );
 	}
 	
 	/**
 	 * Get member
 	 *
-	 * @return	Member
+	 * @return	\IPS\Member
 	 */
-	public function get_member(): Member
+	public function get_member()
 	{
-		return Member::load( $this->_data['member'] );
+		return \IPS\Member::load( $this->_data['member'] );
 	}
-
+	
 	/**
 	 * Set member
 	 *
-	 * @param Member $member
-	 * @return    void
+	 * @param	|IPS\Member	$member	The member
+	 * @return	void
 	 */
-	public function set_member( Member $member ) : void
+	public function set_member( \IPS\Member $member )
 	{
 		$this->_data['member'] = $member->member_id;
 	}
@@ -101,7 +89,7 @@ class Inline extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function get_member_data(): array
+	public function get_member_data()
 	{
 		return json_decode( $this->_data['member_data'], TRUE );
 	}
@@ -112,7 +100,7 @@ class Inline extends ActiveRecord
 	 * @param	mixed	$data	Member data
 	 * @return	void
 	 */
-	public function set_member_data( mixed $data ) : void
+	public function set_member_data( $data )
 	{
 		$this->_data['member_data'] = $data ? json_encode( $data ) : NULL;
 	}
@@ -122,7 +110,7 @@ class Inline extends ActiveRecord
 	 *
 	 * @return	object|NULL
 	 */
-	public function get_item(): ?object
+	public function get_item()
 	{
 		if ( $this->_data['item_class'] and $this->_data['item_id'] )
 		{
@@ -134,7 +122,7 @@ class Inline extends ActiveRecord
 					return $class::load( $this->_data['item_id'] );
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				return NULL;
 			}
@@ -145,13 +133,13 @@ class Inline extends ActiveRecord
 	/**
 	 * Set item
 	 *
-	 * @param object $item	The item
+	 * @param	object	$item	The item
 	 * @return	void
 	 */
-	public function set_item( object $item ) : void
+	public function set_item( $item )
 	{
 		$idColumn = $item::$databaseColumnId;
-		$this->_data['item_class'] = get_class( $item );
+		$this->_data['item_class'] = \get_class( $item );
 		$this->_data['item_id'] = $item->$idColumn;
 	}
 	
@@ -160,7 +148,7 @@ class Inline extends ActiveRecord
 	 *
 	 * @return	object|NULL
 	 */
-	public function get_item_sub(): ?object
+	public function get_item_sub()
 	{
 		if ( $this->_data['item_sub_class'] and $this->_data['item_sub_id'] )
 		{
@@ -172,7 +160,7 @@ class Inline extends ActiveRecord
 					return $class::load( $this->_data['item_sub_id'] );
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				return NULL;
 			}
@@ -183,20 +171,20 @@ class Inline extends ActiveRecord
 	/**
 	 * Get application
 	 *
-	 * @return	Application
+	 * @return	\IPS\Application
 	 */
-	public function get_notification_app(): Application
+	public function get_notification_app()
 	{
-		return Application::load( $this->_data['notification_app'] );
+		return \IPS\Application::load( $this->_data['notification_app'] );
 	}
 	
 	/**
 	 * Set application
 	 *
-	 * @param	Application	$app
+	 * @param	mixed	$data	Member data
 	 * @return	void
 	 */
-	public function set_notification_app( Application $app ) : void
+	public function set_notification_app( \IPS\Application $app )
 	{
 		$this->_data['notification_app'] = $app->directory;
 	}
@@ -206,7 +194,7 @@ class Inline extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function get_extra(): array
+	public function get_extra()
 	{
 		return $this->_data['extra'] ? json_decode( $this->_data['extra'], TRUE ) : array();
 	}
@@ -217,7 +205,7 @@ class Inline extends ActiveRecord
 	 * @param	mixed	$data	Member data
 	 * @return	void
 	 */
-	public function set_extra( mixed $data ) : void
+	public function set_extra( $data )
 	{
 		$this->_data['extra'] = $data ? json_encode( $data ) : NULL;
 	}
@@ -225,9 +213,9 @@ class Inline extends ActiveRecord
 	/**
 	 * Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		parent::save();
 		$this->member->recountNotifications();
@@ -236,11 +224,11 @@ class Inline extends ActiveRecord
 	/**
 	 * Get data from extension
 	 *
-	 * @param bool $htmlEscape	TRUE to escape HTML
+	 * @param	bool $htmlEscape	TRUE to escape HTML
 	 * @return	array
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public function getData( bool $htmlEscape = TRUE ): array
+	public function getData( $htmlEscape = TRUE )
 	{
 		$method = "parse_{$this->notification_key}";
 		
@@ -258,13 +246,13 @@ class Inline extends ActiveRecord
 				return $return;
 			}
 		}
-		throw new RuntimeException;
+		throw new \RuntimeException;
 	}
 
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	string	notificationType	The type (key) of notification sent
 	 * @apiresponse	string	notificationApp		The app that processes this type of notification
@@ -279,13 +267,13 @@ class Inline extends ActiveRecord
 	 * @apiresponse	datetime|null	readDate	Date and time the notification was read by the user
 	 * @apiresponse	array	notificationData	Array of additional data relevant to this specific notification
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		try
 		{
 			$ourData = $this->getData();
 		}
-		catch( LogicException | RuntimeException $e )
+		catch( \LogicException | \RuntimeException $e )
 		{
 			$ourData = array();
 		}
@@ -301,17 +289,17 @@ class Inline extends ActiveRecord
 			'itemSub'				=> ( $this->item_sub AND method_exists( $this->item_sub, 'apiOutput' ) ) ? $this->item_sub->apiOutput( $authorizedMember ) : NULL,
 			'sentDate'				=> $this->sent_time->rfc3339(),
 			'updatedDate'			=> $this->updated_time->rfc3339(),
-			'readDate'				=> $this->read_time ? DateTime::ts( $this->read_time )->rfc3339() : NULL,
+			'readDate'				=> $this->read_time ? \IPS\DateTime::ts( $this->read_time )->rfc3339() : NULL,
 			'notificationData'		=> array_map( function( $val ) {
-				if( $val instanceof Url )
+				if( $val instanceof \IPS\Http\Url )
 				{
 					return (string) $val;
 				}
-				elseif( $val instanceof Member )
+				elseif( $val instanceof \IPS\Member )
 				{
 					return $val->apiOutput();
 				}
-				elseif( $val instanceof DateTime )
+				elseif( $val instanceof \IPS\DateTime )
 				{
 					return $val->rfc3339();
 				}

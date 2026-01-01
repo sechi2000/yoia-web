@@ -11,202 +11,91 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use ErrorException;
-use Exception;
-use IPS\cms\Widget as CmsWidget;
-use IPS\Data\Store;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Codemirror;
-use IPS\Helpers\Form\Color;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Trbl;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Table\Custom;
-use IPS\Http\Url;
-use IPS\Member\Club;
-use IPS\Platform\Bridge;
-use IPS\Widget\Area;
-use IPS\Widget\Builder;
-use IPS\Widget\Customizable;
-use IPS\Widget\Polymorphic;
-use OutOfRangeException;
-use Throwable;
-use UnderflowException;
-use function count;
-use function defined;
-use function file_put_contents;
-use function func_get_args;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_countable;
-use function is_numeric;
-use function is_string;
-use function json_decode;
-use function mb_substr;
-use function strlen;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Sidebar Widget Class
  */
-abstract class Widget
+abstract class _Widget
 {
 	/**
 	 * @brief	The number of widgets that can be expired per request (to prevent loads of rebuilds on a single request which would slow the page down). Deliberately hardcoded.
 	 */
-	protected static int $expirePerRequest = 1;
+	protected static $expirePerRequest = 1;
 	
 	/**
 	 * @brief	Configuration
 	 */
-	public array $configuration = array();
+	public $configuration = array();
 	
 	/**
 	 * @brief	Access. Array of allowed apps that execute the widgets. Null for no restriction
 	 */
-	protected mixed $access = null;
+	protected $access = null;
 	
 	/**
 	 * @brief	Custom template callback
 	 */
-	public mixed $template = null;
+	public $template = null;
 	
 	/**
 	 * @brief	Orientation
 	 */
-	protected ?string $orientation = null;
-
-	/**
-	 * @brief	Layout currently in use, calculated by the widget area
-	 */
-	public string $currentLayout = '';
-
-	/**
-	 * @var string
-	 */
-	public string $defaultLayout = '';
+	protected $orientation = null;
 	
 	/**
 	 * @brief	Menu style
 	 */
-	public string $menuStyle = 'menu';
-
-	/**
-	 * @var array
-	 */
-	public array $layouts = array();
+	public $menuStyle = 'menu';
 	
 	/**
 	 * @brief	Allow block to be reused
 	 */
-	public bool $allowReuse = false;
-
-	/**
-	 * @brief	Show the padding controls in the page builder
-	 */
-	public bool $allowCustomPadding = false;
-
-	/**
-	 * @brief	Show the no wrap option in the page builder
-	 */
-	public bool $allowNoBox = false;
+	public $allowReuse = false;
 
 	/**
 	 * @brief	Unique key for this widget
 	 */
-	public string|int|null $uniqueKey = NULL;
+	public $uniqueKey = NULL;
 	
 	/**
 	 * @brief	Prevent caching for this block
 	 */
-	public bool $neverCache = FALSE;
+	public $neverCache = FALSE;
 
 	/**
 	 * @brief	Error language string key shown after the configuration
 	 */
-	public string $errorMessage = 'widget_blank_or_no_context';
-
-	/**
-	 * @brief	Set to true if this widget must be the only one in its area
-	 */
-	public bool $soloWidget = false;
-
-	/**
-	 * @brief	Set to false if this widget should be hidden from the block list
-	 * 			in the Page Editor
-	 */
-	public static bool $showInBlockList = true;
-
-	/**
-	 * @brief	If a widget should not be dropped into a particular area (e.g. a database widget in the header), list those areas here
-	 */
-	public static array $disallowedAreas = [];
-
-	/**
-	 * These layouts are the default allowed "feed" layouts
-	 *
-	 * @var string[] $defaultFeedLayouts
-	 */
-	public static array $defaultFeedLayouts = array(
-		"featured",
-		"featured-carousel",
-		"grid",
-		"grid-carousel",
-		"minimal",
-		'minimal-carousel',
-		"mini-grid",
-		"mini-grid-carousel",
-		"table",
-		"table-carousel",
-		"wallpaper",
-		"wallpaper-carousel"
-	);
+	public $errorMessage = 'widget_blank_or_no_context';
 	
 	/**
 	 * Constructor
 	 *
-	 * @param String $uniqueKey			Unique key for this specific instance
+	 * @param	String				$uniqueKey			Unique key for this specific instance
 	 * @param	array				$configuration		Widget custom configuration
-	 * @param array|string|null $access				Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
-	 * @param string|null $orientation		Horizontal or vertical orientation
-	 * @param string $layout		Current layout in use
+	 * @param	null|string|array	$access				Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
+	 * @param	string				$orientation		Horizontal or vertical orientation
 	 * @return	void
 	 */
-	public function __construct( string $uniqueKey, array $configuration, array|string $access=null, string $orientation=null, string $layout='' )
+	public function __construct( $uniqueKey, array $configuration, $access=null, $orientation=null )
 	{
 		$this->configuration = $configuration;
 		$this->orientation = $orientation;
-
-		if( empty( $layout ) )
-		{
-			$layout = $this->defaultLayout ?? 'table';
-		}
-
-		$this->currentLayout = $layout;
 		
-		if ( $access !== null and is_string( $access ) )
+		if ( $access !== null and \is_string( $access ) )
 		{
 			$test = json_decode( $access, true );
 			
-			if ( is_array( $test ) AND count( $test ) )
+			if ( \is_array( $test ) AND \count( $test ) )
 			{
 				$this->access = $test;
 			}
 		}
-		else if ( is_array( $access ) AND count( $access ) )
+		else if ( \is_array( $access ) AND \count( $access ) )
 		{
 			$this->access = $access;
 		}
@@ -220,65 +109,35 @@ abstract class Widget
 			$this->errorMessage = 'widget_blank_or_no_context_no_config';
 		}
 	}
-
+	
 	/**
 	 * Initialise this widget
 	 *
 	 * @return void
-	 * @throws ErrorException
-	 */
-	public function init(): void
+	 */ 
+	public function init()
 	{
-		if ( $this->app and $this->template === null )
+		if ( $this->app )
 		{
-			$this->template( array( Theme::i()->getTemplate( 'widgets', $this->app, 'front' ), $this->key ) );
+			$this->template( array( \IPS\Theme::i()->getTemplate( 'widgets', $this->app, 'front' ), $this->key ) );
 		}
-	}
-
-
-	/**
-	 * Is this a block builder widget?
-	 *
-	 * @return bool
-	 */
-	public function isBuilderWidget() : bool
-	{
-		return in_array( Builder::class, class_implements( $this ) );
-	}
-
-	/**
-	 * Can this widget be customized?
-	 * @return bool
-	 */
-	public function isCustomizableWidget() : bool
-	{
-		return in_array( Customizable::class, class_implements( $this ) );
 	}
 	
 	/**
 	 * Constructor
 	 *
-	 * @param array|string $app	Application key (core,cms,gallery, etc)
-	 * @return	bool
+	 * @param	string|array	$app	Application key (core,cms,gallery, etc)
+	 * @return	boolean
 	 */
-	public function isExecutableByApp( array|string $app ): bool
+	public function isExecutableByApp( $app )
 	{
-        if ( ! Bridge::i()->pagesAllowDatabaseAccess() )
-        {
-            $databaseWidgets = [ 'Categories', 'Database', 'DatabaseFilters', 'RecordFeed' ];
-            if ( $this->app === 'cms' and in_array( $this->key, $databaseWidgets ) )
-            {
-                return false;
-            }
-        }
-
-		if ( $this->access === null or ( is_array( $this->access ) and ! count($this->access ) ) )
+		if ( $this->access === null or ( \is_array( $this->access ) and ! \count($this->access ) ) )
 		{
 			return true;
 		}
 		else
 		{
-			if ( is_string( $app ) )
+			if ( \is_string( $app ) )
 			{
 				$checkApps = array( $app );
 			}
@@ -289,7 +148,7 @@ abstract class Widget
 			
 			foreach( $checkApps as $check )
 			{
-				if ( in_array( $check, $this->access ) )
+				if ( \in_array( $check, $this->access ) )
 				{
 					return true;
 				}
@@ -299,27 +158,14 @@ abstract class Widget
 		return false;
 	}
 
-    /**
-     * Can this widget be used on this page?
-     *
-     * @param string $app
-     * @param string $module
-     * @param string $controller
-     * @return bool
-     */
-    public function isExecutableByPage( string $app, string $module, string $controller ) : bool
-    {
-        return true;
-    }
-
 	/**
 	 * Fetch the application for this widget
 	 *
-	 * @return    Application
+	 * @return	\IPS\Application
 	 */
-	public function application(): Application
+	public function application()
 	{
-		return Application::load( $this->app );
+		return \IPS\Application::load( $this->app );
 	}
 
 	/**
@@ -327,9 +173,9 @@ abstract class Widget
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack( 'block_' . $this->key );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'block_' . $this->key );
 	}
 	
 	/**
@@ -337,18 +183,18 @@ abstract class Widget
 	 *
 	 * @return	string
 	 */
-	public function description(): string
+	public function description()
 	{
-		return Member::loggedIn()->language()->addToStack( 'block_' . $this->key . '_desc' );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'block_' . $this->key . '_desc' );
 	}
 	
 	/**
 	 * Set the template for this widget
 	 *
-	 * @param	mixed		$callback		Function to use for template callback
-	 * @return	void
+	 * @param	Array|Function		$callback		Function to use for template callback
+	 * @return	string
 	 */
-	public function template( mixed $callback ): void
+	public function template( $callback )
 	{
 		$this->template = $callback;
 	}
@@ -358,9 +204,9 @@ abstract class Widget
 	 * Returns the template app/location/group/name params
 	 * @return array
 	 */
-	public function getTemplateLocation(): array
+	public function getTemplateLocation()
 	{
-		$class = get_class( $this->template[0] );
+		$class = \get_class( $this->template[0] );
 		if ( $class === 'IPS\Theme\Dev\Template' )
 		{
 			$params = $this->template[0]->getParams();
@@ -374,273 +220,47 @@ abstract class Widget
 	}
 
 	/**
-	 * Return any extra classes that should be added to the widget wrapper
-	 * Placeholder method in case an override is necessary for individual widgets.
-	 *
-	 * @return array
-	 */
-	public function getWrapperClasses() : array
-	{
-		return [];
-	}
-
-	/**
-	 * Return all data attributes that will be placed on the widget container
-	 * for block management
-	 *
-	 * @return array
-	 */
-	public function dataAttributes() : array
-	{
-		$return = [
-			'blocktitle' => $this->title(),
-			'blockID' => 'app_' . $this->app . '_' . $this->key . '_' . $this->uniqueKey,
-			'blockErrorMessage' => Member::loggedIn()->language()->addToStack( $this->errorMessage ),
-			'menuStyle' => $this->menuStyle ?? 'menu'
-		];
-
-		if( !empty( $this->allowReuse ) )
-		{
-			$return['allowReuse'] = true;
-		}
-
-		if( $this->hasConfiguration() )
-		{
-			$return['blockConfig'] = true;
-		}
-
-		if( $this->isBuilderWidget() )
-		{
-			$return['blockBuilder'] = true;
-		}
-
-		if( $this->soloWidget )
-		{
-			$return['widget-is-solo'] = true;
-		}
-
-		if( $this->isCustomizableWidget() )
-		{
-			$return['widget-customizable'] = true;
-			$return['widget-layouts'] = implode( ",", $this->layouts );
-		}
-
-		if ( !empty( $this->getSearchTerms() ) )
-		{
-			$return['searchterms'] = implode( ',', $this->getSearchTerms() );
-		}
-
-		if( $this->allowCustomPadding )
-		{
-			$return['widget-paddingallowed']  = true;
-		}
-
-		if( $this->allowNoBox )
-		{
-			$return['widget-noboxallowed']  = true;
-		}
-
-		if( count( static::$disallowedAreas ) )
-		{
-			$return['widget-disallowed-areas'] = implode( ",", static::$disallowedAreas );
-		}
-
-		return $return;
-	}
-
-	/**
-	 * Get the current layout, or the first supported layout is not supported
-	 *
-	 * @return string
-	 */
-	public function getCurrentLayout() : string
-	{
-		if ( empty( $this->currentLayout ) or ( $this->isCustomizableWidget() and !in_array( $this->currentLayout, $this->getSupportedLayouts() ) ) )
-		{
-			$this->currentLayout = $this->defaultLayout ?: $this->getSupportedLayouts()[0];
-		}
-
-		return $this->currentLayout;
-	}
-
-	/** @var array */
-	protected static array $baseWidgetConfig = [];
-	protected static array $widgetConfigs = [];
-
-	/**
-	 * Get config data from an app, caching all to avoid loads of queries for widget heavy pages
-	 *
-	 * @param string $app
-	 * @param string $key
-	 * @return array
-	 */
-	protected static function getWidgetDataByKeyAndApp( string $app, string $key ): array
-	{
-		if ( ! count( static::$widgetConfigs ) )
-		{
-			foreach( Db::i()->select( '*', 'core_widgets' ) as $widget )
-			{
-				static::$widgetConfigs[ $widget['app'] ][ $widget['key'] ] = $widget;
-			}
-		}
-
-		if ( isset( static::$widgetConfigs[ $app ][ $key ] ) )
-		{
-			return static::$widgetConfigs[ $app ][ $key ];
-		}
-
-		/* Still here? Oops */
-		throw new UnderflowException;
-	}
-
-	/**
-	 * Get the search terms allowed for this widget
-	 *
-	 * @return string[]
-	 */
-	public function getSearchTerms() : array
-	{
-		if ( !isset( static::$baseWidgetConfig[ $this::class ]['searchterms'] ) )
-		{
-			if ( !isset( static::$baseWidgetConfig[ $this::class ]['searchterms'] ) )
-			{
-				$class = trim( $this::class, '\\' );
-				$components = explode( '\\', $class );
-				if ( @$components[0] === 'IPS' and @$components[1] and $components[1] === strtolower( $components[1] ) and @$components[2] === 'widgets' )
-				{
-					$app = $components[1];
-					$widget = $components[3];
-					try
-					{
-						static::$baseWidgetConfig[ $this::class ] = static::getWidgetDataByKeyAndApp( $app, $widget );
-					}
-					catch ( UnderflowException )
-					{
-						return [];
-					}
-				}
-			}
-		}
-		return is_string( @static::$baseWidgetConfig[ $this::class ][ 'searchterms' ] ) ? explode( ',', static::$baseWidgetConfig[ $this::class ][ 'searchterms' ] ) : [];
-	}
-
-	/**
-	 * @return string[]
-	 */
-	public function getSupportedLayouts() : array
-	{
-		if ( !isset( static::$baseWidgetConfig[ $this::class ]['layouts'] ) OR !is_array( static::$baseWidgetConfig[ $this::class ]['layouts'] ) )
-		{
-			$layouts = ['table'];
-			if ( $this->isCustomizableWidget() )
-			{
-				$class = trim( $this::class, '\\' );
-				$components = explode( '\\', $class );
-				if ( @$components[0] === 'IPS' and @$components[1] and $components[1] === strtolower( $components[1] ) and @$components[2] === 'widgets' )
-				{
-					$app = $components[1];
-					$widget = $components[3];
-					try
-					{
-						$baseConfig = static::getWidgetDataByKeyAndApp( $app, $widget );
-					}
-					catch ( UnderflowException )
-					{
-						$baseConfig = [];
-					}
-
-					if ( !isset( $baseConfig['layouts'] ) or empty( $baseConfig['layouts'] ) )
-					{
-						$layouts = Widget::$defaultFeedLayouts;
-					}
-					elseif ( $baseConfig['layouts'] === '*' )
-					{
-						$layouts = Area::$allowedWrapBehaviors;
-					}
-					else
-					{
-						$layouts = array_intersect( Area::$allowedWrapBehaviors, explode( ',', $baseConfig['layouts'] ) );
-					}
-
-					if( isset( $baseConfig['default_layout'] ) and $baseConfig['default_layout'] )
-					{
-						array_unshift( $layouts, $baseConfig['default_layout'] );
-					}
-
-					/* Make sure base layouts all have a carousel equivalent */
-					foreach ( Area::$carouselToRegularLayouts as $carouselLayout => $regularLayouts )
-					{
-						if ( in_array( $carouselLayout, $layouts ) )
-						{
-							continue;
-						}
-
-						foreach ( $regularLayouts as $regularLayout )
-						{
-							if ( in_array( $regularLayout, $layouts ) )
-							{
-								$layouts[] = $carouselLayout;
-								continue 2;
-							}
-						}
-					}
-
-					static::$baseWidgetConfig[ $this::class ] = $baseConfig;
-				}
-			}
-
-			static::$baseWidgetConfig[ $this::class ]['layouts'] = array_values( $layouts );
-		}
-
-		return static::$baseWidgetConfig[ $this::class ]['layouts'];
-	}
-
-	/**
 	 * Get HTML using the template (language strings not parsed)
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
-		$currentLayout = $this->getCurrentLayout();
-
-		$args = func_get_args();
-		$args[] = str_replace( '-carousel', '', $currentLayout );
-		$args[] = str_ends_with( $currentLayout, "-carousel" );
+		$args = \func_get_args();
+		$args[] = $this->orientation;
 
 		$template = $this->template;
 
 		$output = $template( ...$args );
-
-		if( $this->isBuilderWidget() )
+		
+		if ( \in_array( 'IPS\Widget\Builder', class_implements( $this ) ) )
 		{
 			$config = array();
 			foreach( $this->configuration as $key => $value )
 			{
-				if ( mb_substr( $key, 0, 12 ) === 'widget_adv__' )
+				if ( \mb_substr( $key, 0, 12 ) === 'widget_adv__' )
 				{
-					$config[ mb_substr( $key, 12 ) ] = $value;
+					$config[ \mb_substr( $key, 12 ) ] = $value;
 				}
 			}
 			
 			$config['class'] = 'app_' . $this->app . '_' . $this->key . '_' . $this->uniqueKey;
 			$config['style'] = static::buildInlineStyles( $config );
 			
-			return Theme::i()->getTemplate( 'widgets', 'core' )->builderWrapper( $output, $config );
+			return \IPS\Theme::i()->getTemplate( 'widgets', 'core' )->builderWrapper( $output, $config );
 		}
 		else
 		{
 			return $output;
 		}
 	}
-
+	
 	/**
 	 * Build inline styles
 	 *
-	 * @param array $config
 	 * @return array
 	 */
-	public static function buildInlineStyles( array $config ): array
+	public static function buildInlineStyles( $config ): array
 	{
 		$css = array();
 
@@ -649,9 +269,13 @@ abstract class Widget
 			$css['padding'] = $config['padding_custom'][0] . 'px ' .  $config['padding_custom'][1] . 'px ' . $config['padding_custom'][2] . 'px ' . $config['padding_custom'][3] . 'px';
 		}
 		
-		if ( isset( $config['background_custom'] ) and $config['background_custom'] == 'image' and ! empty( $config['background_custom_image'] ) )
+		if ( isset( $config['background_custom'] ) and $config['background_custom'] == 'transparent' )
 		{
-			$css['background-image'] = 'url("' . File::get( 'core_Attachment', $config['background_custom_image'] )->url . '")';
+			$css['background-color'] = 'transparent';
+		}
+		elseif ( isset( $config['background_custom'] ) and $config['background_custom'] == 'image' and ! empty( $config['background_custom_image'] ) )
+		{
+			$css['background-image'] = 'url("' . \IPS\File::get( 'core_Attachment', $config['background_custom_image'] )->url . '")';
 			$css['background-size'] = 'cover';
 			$css['background-repeat'] = 'no-repeat';
 			$css['background-position'] = 'center';
@@ -664,7 +288,7 @@ abstract class Widget
 		
 		if ( ! empty( $config['fontcolor'] ) )
 		{
-			if ( isset( $config['fontcolor_custom'] ) and $config['fontcolor_custom'] == 'custom' )
+			if ( isset( $config['fontcolor_custom'] ) and $config['fontcolor_custom'] == 'custom' and ! empty( $config['fontcolor'] ) )
 			{
 				$css['color'] = $config['fontcolor'];
 			}
@@ -682,10 +306,10 @@ abstract class Widget
 		{
 			$fontWeight = 400;
 			
-			if ( mb_substr( $config['font'], -6 ) === ' black' )
+			if ( \mb_substr( $config['font'], -6 ) === ' black' )
 			{
 				$fontWeight = 900;
-				$config['font'] = mb_substr( $config['font'], 0, -6 );
+				$config['font'] = \mb_substr( $config['font'], 0, -6 );
 			}
 			
 			$css['font-family'] = '"' . $config['font'] . '"';
@@ -710,9 +334,9 @@ abstract class Widget
 	/**
 	 * Efficient way to see if a widget has configuration
 	 *
-	 * @return bool
+	 * @return boolean
 	 */
-	public function hasConfiguration(): bool
+	public function hasConfiguration()
 	{
 		return method_exists( $this, 'configuration' );
 	}
@@ -730,35 +354,35 @@ abstract class Widget
 	/**
 	 * Factory Method
 	 *
-	 * @param Application $parent				Widget application
-	 * @param String $widgetKey			Widget key used to load class
-	 * @param String $uniqueKey			Unique key for this specific instance
-	 * @param array $configuration		Current configuration
-	 * @param array|string|null $access				Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
-	 * @param string|null $orientation		Horizontal or vertical orientation
-	 * @param string	$layout		Current layout in use
-	 * @return    Widget
-	 * @throws	OutOfRangeException
+	 * @param	\IPS\Application|\IPS\Plugin	$parent				Widget application or plugin
+	 * @param	String							$widgetKey			Widget key used to load class
+	 * @param	String							$uniqueKey			Unique key for this specific instance
+	 * @param	Array							$configuration		Current configuration
+	 * @param	null|string|array				$access				Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
+	 * @param	string							$orientation		Horizontal or vertical orientation
+	 * @return	\IPS\Widget
+	 * @throws	\OutOfRangeException
 	 */
-	public static function load( Application $parent, string $widgetKey, string $uniqueKey, array $configuration=array(), array|string $access=null, string $orientation=null, string $layout='' ): Widget
+	public static function load( $parent, $widgetKey, $uniqueKey, $configuration=array(), $access=null, $orientation=null )
 	{
-		/* If our parent is not enabled, do not attempt to use this widget */
-		if ( !$parent->enabled )
+		/* If our parent is not enabled, do not attempt to use this widget - both \IPS\Application and \IPS\Plugin have get__enabled() methods, so this covers both */
+		if ( $parent->enabled == FALSE )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
-
-		/* Is this a valid widget? */
-		if( !static::isValidWidget( $parent, $widgetKey ) )
+		
+		$class = NULL;
+		if ( $parent instanceof \IPS\Application )
 		{
-			throw new OutOfRangeException;
+			$class = '\IPS\\' . $parent->directory . '\widgets\\' . $widgetKey;
 		}
-
-		$class = '\IPS\\' . $parent->directory . '\widgets\\' . $widgetKey;
-		$baseWidgetKey = $widgetKey;
-		if ( class_exists( $class ) and in_array( "IPS\\Widget\\Polymorphic", class_implements( $class ) ) )
+		else
 		{
-			$baseWidgetKey = $class::getBaseKey();
+			if ( file_exists( \IPS\SITE_FILES_PATH . '/plugins/' . $parent->location . '/widgets/' . $widgetKey . '.php' ) )
+			{
+				require_once \IPS\SITE_FILES_PATH . '/plugins/' . $parent->location . '/widgets/' . $widgetKey . '.php';
+				$class = '\IPS\\plugins\\' . $parent->location . '\\widgets\\' . $widgetKey;
+			}
 		}
 		
 		/* Return */
@@ -766,28 +390,13 @@ abstract class Widget
 		{
 			if ( ! empty( $configuration['widget_adv__custom'] ) )
 			{
-				Output::i()->headCss = Output::i()->headCss . "\n" . $configuration['widget_adv__custom'];
+				\IPS\Output::i()->headCss = \IPS\Output::i()->headCss . "\n" . $configuration['widget_adv__custom'];
 			}
 		
-			return new $class( $uniqueKey, $configuration, $access, $orientation, $layout );
+			return new $class( $uniqueKey, $configuration, $access, $orientation );
 		}
 		
-		throw new OutOfRangeException;
-	}
-
-	/**
-	 * Make sure that the widget actually is supported by the app
-	 *
-	 * @param Application|string $app
-	 * @param string $widgetKey
-	 * @return bool
-	 */
-	public static function isValidWidget( Application|string $app, string $widgetKey ) : bool
-	{
-		$app = ( $app instanceof Application ) ? $app : Application::load( $app );
-		$class = '\IPS\\' . $app->directory . '\widgets\\' . $widgetKey;
-
-		return ( in_array( $widgetKey, $app->getValidWidgetKeys() ) and class_exists( $class ) );
+		throw new \OutOfRangeException;
 	}
 	
 	/**
@@ -795,7 +404,7 @@ abstract class Widget
 	 *
 	 * @return	array
 	 */
-	public static function widgetTypes(): array
+	public static function widgetTypes()
 	{
 		return array(
 			'default'			=> '\IPS\Widget',
@@ -807,63 +416,51 @@ abstract class Widget
 	/**
 	 * Dev Table
 	 *
-	 * @param string $json				Path to JSON file
-	 * @param Url $url				URL to page
-	 * @param string $widgetDirectory	Directory where PHP files are stored
-	 * @param string $subpackage			The value to use for the subpackage in the widget file's header
-	 * @param string $namespace			The namespace for the widget file
-	 * @param int|string $appKeyOrPluginId	If widget belongs to an application, it's key, or if a plugin, it's ID
+	 * @param	string			$json				Path to JSON file
+	 * @param	\IPS\Http\Url	$url				URL to page
+	 * @param	string			$widgetDirectory	Directory where PHP files are stored
+	 * @param	string			$subpackage			The value to use for the subpackage in the widget file's header
+	 * @param	string			$namespace			The namespace for the widget file
+	 * @param	int|string		$appKeyOrPluginId	If widget belongs to an application, it's key, or if a plugin, it's ID
 	 * @return	string
 	 */
-	public static function devTable( string $json, Url $url, string $widgetDirectory, string $subpackage, string $namespace, int|string $appKeyOrPluginId ): string
+	public static function devTable( $json, $url, $widgetDirectory, $subpackage, $namespace, $appKeyOrPluginId )
 	{
 		if ( !file_exists( $json ) )
 		{
-			file_put_contents( $json, json_encode( array() ) );
+			\file_put_contents( $json, json_encode( array() ) );
 		}
 	
-		switch ( Request::i()->widgetTable )
+		switch ( \IPS\Request::i()->widgetTable )
 		{
 			case 'form':
-
-				/* Build the list of layouts that are allowed on a widget */
-				$layouts = [];
-				foreach( Area::$widgetOnlyLayouts as $wrapBehavior )
-				{
-					if( !str_ends_with( $wrapBehavior, '-carousel' ) )
-					{
-						$layouts[ $wrapBehavior ] = 'core_pagebuilder_wrap__' . $wrapBehavior;
-					}
-				}
-
+				
 				$current = NULL;
-				if ( isset( Request::i()->key ) )
+				if ( isset( \IPS\Request::i()->key ) )
 				{
 					$widgets = json_decode( file_get_contents( $json ), TRUE );
-					if ( array_key_exists( Request::i()->key, $widgets ) )
+					if ( array_key_exists( \IPS\Request::i()->key, $widgets ) )
 					{
 						$current = array(
-								'dev_widget_key'			=> Request::i()->key,
-								'dev_widget_class'			=> $widgets[ Request::i()->key ]['class'],
-								'dev_widget_restrict'		=> $widgets[ Request::i()->key ]['restrict'],
-								'dev_widget_allow_reuse'	=> isset($widgets[ Request::i()->key ]['allow_reuse'])  ? $widgets[ Request::i()->key ]['allow_reuse']  : 0,
-								'dev_widget_menu_style'		=> isset($widgets[ Request::i()->key ]['menu_style'])   ? $widgets[ Request::i()->key ]['menu_style']   : 'menu',
-								'dev_widget_layouts'		=> $widgets[ Request::i()->key ]['layouts'] ?? implode( ",", $layouts ),
-								'dev_widget_searchterms'	=> is_string( @$widgets[ Request::i()->key ]['searchterms'] ) ? explode( ',', $widgets[ Request::i()->key ]['searchterms'] ) : [],
-						        'dev_widget_embeddable'     => isset($widgets[ Request::i()->key ]['embeddable'])   ? $widgets[ Request::i()->key ]['embeddable']   : 1,
-								'dev_widget_allow_padding'		=> isset( $widgets[ Request::i()->key ]['padding'] ) ? $widgets[ Request::i()->key]['padding'] : 0,
-								'dev_widget_default_layout' => $widgets[ Request::i()->key ]['default_layout'] ?? null
+								'dev_widget_key'			=> \IPS\Request::i()->key,
+								'dev_widget_class'			=> $widgets[ \IPS\Request::i()->key ]['class'],
+								'dev_widget_restrict'		=> $widgets[ \IPS\Request::i()->key ]['restrict'],
+								'dev_widget_default_area'	=> isset($widgets[ \IPS\Request::i()->key ]['default_area']) ? $widgets[ \IPS\Request::i()->key ]['default_area'] : NULL,
+								'dev_widget_allow_reuse'	=> isset($widgets[ \IPS\Request::i()->key ]['allow_reuse'])  ? $widgets[ \IPS\Request::i()->key ]['allow_reuse']  : 0,
+								'dev_widget_menu_style'		=> isset($widgets[ \IPS\Request::i()->key ]['menu_style'])   ? $widgets[ \IPS\Request::i()->key ]['menu_style']   : 'menu',
+						        'dev_widget_embeddable'     => isset($widgets[ \IPS\Request::i()->key ]['embeddable'])   ? $widgets[ \IPS\Request::i()->key ]['embeddable']   : 1,
+
 						);
 					}
 					unset( $widgets );
 				}
 	
-				$form = new Form;
-				$form->add( new Text( 'dev_widget_key', $current ? $current['dev_widget_key'] : NULL, TRUE, array( 'maxLength' => 255, 'regex' => '/^[a-z][a-z0-9]*$/i' ), function( $val ) use ( $current )
+				$form = new \IPS\Helpers\Form;
+				$form->add( new \IPS\Helpers\Form\Text( 'dev_widget_key', $current ? $current['dev_widget_key'] : NULL, TRUE, array( 'maxLength' => 255, 'regex' => '/^[a-z][a-z0-9]*$/i' ), function( $val ) use ( $current )
 				{
                     if( mb_strpos( $val, "_" ) !== FALSE )
                     {
-                        throw new DomainException( 'dev_widget_key_err_alpha' );
+                        throw new \DomainException( 'dev_widget_key_err_alpha' );
                     }
 
 					$where = array( array( '`key`=?', $val ) );
@@ -872,9 +469,9 @@ abstract class Widget
 						$where[] = array( '`key`<>?', $current['dev_widget_key'] );
 					}
 						
-					if ( Db::i()->select( 'count(*)', 'core_widgets', $where )->first() )
+					if ( \IPS\Db::i()->select( 'count(*)', 'core_widgets', $where )->first() )
 					{
-                        throw new DomainException( 'dev_widget_key_err' );
+                        throw new \DomainException( 'dev_widget_key_err' );
 					}
 				} ) );
 				
@@ -882,44 +479,36 @@ abstract class Widget
 				foreach ( static::widgetTypes() as $key => $class )
 				{
 					$classes[ $class ] = $class;
-					Member::loggedIn()->language()->words[ $class . '_desc' ] = Member::loggedIn()->language()->get( 'widget_class_' . $key );
+					\IPS\Member::loggedIn()->language()->words[ $class . '_desc' ] = \IPS\Member::loggedIn()->language()->get( 'widget_class_' . $key );
 				}
-				$form->add( new Radio( 'dev_widget_class', ( is_array( $current ) ? $current['dev_widget_class'] : NULL ), TRUE, array( 'options' => $classes ) ) );
+				$form->add( new \IPS\Helpers\Form\Radio( 'dev_widget_class', ( \is_array( $current ) ? $current['dev_widget_class'] : NULL ), TRUE, array( 'options' => $classes ) ) );
 				
-				$form->add( new CheckboxSet( 'dev_widget_restrict', ( is_array( $current ) and !empty( $current['dev_widget_restrict'] ) ) ? $current['dev_widget_restrict'] :  array( 'sidebar', 'cms' ), FALSE, array(
+				$form->add( new \IPS\Helpers\Form\CheckboxSet( 'dev_widget_restrict', ( \is_array( $current ) and !empty( $current['dev_widget_restrict'] ) ) ? $current['dev_widget_restrict'] :  array( 'sidebar', 'cms' ), FALSE, array(
 					'options' => array(
-						'sidebar'	=> Member::loggedIn()->language()->addToStack('dev_widget_restrict_sidebar'),
-						'cms'       => Member::loggedIn()->language()->addToStack('dev_widget_restrict_cms'),
+						'sidebar'	=> \IPS\Member::loggedIn()->language()->addToStack('dev_widget_restrict_sidebar'),
+						'cms'       => \IPS\Member::loggedIn()->language()->addToStack('dev_widget_restrict_cms'),
 					),
 					'multiple' => true ) ) );
 				
-				$form->add( new Radio( 'dev_widget_menu_style', ( is_array( $current ) ? $current['dev_widget_menu_style'] : 'menu' ), FALSE, array(
-					'options' => array(
-						'menu'	=> Member::loggedIn()->language()->addToStack('dev_widget_menu_style_menu'),
-						'modal'       => Member::loggedIn()->language()->addToStack('dev_widget_menu_style_modal'),
-				) ) ) );
-
-
-				$form->add( new Form\Stack( 'dev_widget_searchterms', $current['dev_widget_searchterms'] ?? null, false ) );
-
-				$form->add( new CheckboxSet( 'dev_widget_layouts', ( is_array( $current ) AND $current['dev_widget_layouts'] ) ? explode( ",", $current['dev_widget_layouts'] ) : $layouts, false, array(
-					'options' => $layouts,
-					'noDefault' => true,
-					'class' => 'widget_layouts__container'
-				) ) );
-
-				$form->add( new Select( 'dev_widget_default_layout', ( is_array( $current ) and $current['dev_widget_default_layout'] ) ? $current['dev_widget_default_layout'] : null, false, array(
-					'options' => array( '' => '' ) + $layouts,
-					'parse' => 'lang'
-				) ) );
+				$form->add( new \IPS\Helpers\Form\Radio( 'dev_widget_default_area', ( \is_array( $current ) ? ( $current['dev_widget_default_area'] ?: 'none' ) : 'none' ), FALSE, array(
+						'options' => array(
+								'none'		=> \IPS\Member::loggedIn()->language()->addToStack('none'),
+								'sidebar'	=> \IPS\Member::loggedIn()->language()->addToStack('dev_widget_default_area_sidebar'),
+								'header'	=> \IPS\Member::loggedIn()->language()->addToStack('dev_widget_default_area_header'),
+								'footer'	=> \IPS\Member::loggedIn()->language()->addToStack('dev_widget_default_area_footer'),
+								
+						),
+						'multiple' => false ) ) );
 				
-				$form->add( new YesNo( 'dev_widget_allow_reuse', ( is_array( $current ) ? $current['dev_widget_allow_reuse'] : 0 ) ) );
+				$form->add( new \IPS\Helpers\Form\Radio( 'dev_widget_menu_style', ( \is_array( $current ) ? $current['dev_widget_menu_style'] : 'menu' ), FALSE, array(
+					'options' => array(
+						'menu'	=> \IPS\Member::loggedIn()->language()->addToStack('dev_widget_menu_style_menu'),
+						'modal'       => \IPS\Member::loggedIn()->language()->addToStack('dev_widget_menu_style_modal'),
+				) ) ) );
+				
+				$form->add( new \IPS\Helpers\Form\YesNo( 'dev_widget_allow_reuse', ( \is_array( $current ) ? $current['dev_widget_allow_reuse'] : 0 ), FALSE, [], NULL, NULL, NULL, md5(uniqid() ) ) );
 
-				$form->add( new YesNo( 'dev_widget_allow_padding', ( is_array( $current ) ? $current['dev_widget_allow_padding'] : 0 ) ) );
-
-				/** @deprecated - This option will not be supported in a future version which is why it's hidden */
-				$form->add( new YesNo( 'dev_widget_embeddable', ( is_array( $current ) ? $current['dev_widget_embeddable'] : 0 ), options: ["rowClasses" => ["ipsHide"]] ) );
-				Member::loggedIn()->language()->words['dev_widget_embeddable'] = "(Deprecated) " . Member::loggedIn()->language()->get( "dev_widget_embeddable" );
+				$form->add( new \IPS\Helpers\Form\YesNo( 'dev_widget_embeddable', ( \is_array( $current ) ? $current['dev_widget_embeddable'] : 0 ), FALSE, [], NULL, NULL, NULL, md5(uniqid() ) ) );
 
 				if ( $values = $form->values() )
 				{
@@ -930,10 +519,10 @@ abstract class Widget
 						if ( !is_dir( $widgetDirectory ) )
 						{
 							mkdir( $widgetDirectory );
-							chmod( $widgetDirectory, IPS_FOLDER_PERMISSION);
+							chmod( $widgetDirectory, \IPS\IPS_FOLDER_PERMISSION );
 						}
 	
-						file_put_contents( $widgetFile, str_replace(
+						\file_put_contents( $widgetFile, str_replace(
 								array(
 										'{key}',
 										"{subpackage}\n",
@@ -941,6 +530,7 @@ abstract class Widget
 										'{namespace}',
 										'{class}',
 										'{appkey}',
+										'{pluginid}'
 								),
 								array(
 										$values['dev_widget_key'],
@@ -948,73 +538,65 @@ abstract class Widget
 										date( 'd M Y' ),
 										$namespace,
 										$values['dev_widget_class'],
-										$appKeyOrPluginId
+										\is_string( $appKeyOrPluginId ) ? $appKeyOrPluginId : NULL,
+										\is_numeric( $appKeyOrPluginId ) ? $appKeyOrPluginId : NULL,
 								),
-								file_get_contents( ROOT_PATH . "/applications/core/data/defaults/Widget.txt" )
+								file_get_contents( \IPS\ROOT_PATH . "/applications/core/data/defaults/Widget.txt" )
 						) );
-						chmod( $widgetFile, IPS_FILE_PERMISSION);
+						chmod( $widgetFile, \IPS\IPS_FILE_PERMISSION );
 					}
-
-					/* Figure out the layouts */
-					$values['dev_widget_layouts'] = implode( ",", $values['dev_widget_layouts'] );
-					$values['dev_widget_searchterms'] = implode( ",", $values['dev_widget_searchterms'] );
-
+						
 					/* Add to DB */
-					$query = Db::i()->replace( 'core_widgets', array(
-							'app'			=> $appKeyOrPluginId,
+					\IPS\Db::i()->replace( 'core_widgets', array(
+							'app'			=> \is_string( $appKeyOrPluginId ) ? $appKeyOrPluginId : NULL,
+							'plugin'		=> \is_numeric( $appKeyOrPluginId ) ? $appKeyOrPluginId : NULL,
 							'key'			=> $values['dev_widget_key'],
 							'class'			=> $values['dev_widget_class'],
-							'restrict'		=> ( ! count( $values['dev_widget_restrict'] ) ? FALSE : json_encode( array_values( $values['dev_widget_restrict'] ) ) ),
+							'restrict'		=> ( ! \count( $values['dev_widget_restrict'] ) ? FALSE : json_encode( array_values( $values['dev_widget_restrict'] ) ) ),
+							'default_area'	=> ( $values['dev_widget_default_area'] === 'none' ) ? '' : $values['dev_widget_default_area'],
 							'allow_reuse'	=> $values['dev_widget_allow_reuse'],
 							'menu_style'    => $values['dev_widget_menu_style'],
-							'layouts'		=> $values['dev_widget_layouts'],
-							'searchterms'		=> $values['dev_widget_searchterms'],
-					        'embeddable'    => $values['dev_widget_embeddable'],
-							'padding'		=> $values['dev_widget_allow_padding'],
-							'default_layout' => $values['dev_widget_default_layout']
+					        'embeddable'    => $values['dev_widget_embeddable']
 					) );
-					unset( Store::i()->widgets );
+					unset( \IPS\Data\Store::i()->widgets );
 						
 					/* Add to JSON file */
 					$widgets = json_decode( file_get_contents( $json ), TRUE );
 					$widgets[ $values['dev_widget_key'] ] = array(
 						'class'    	   => $values['dev_widget_class'],
-						'restrict' 	   => ( ! count( $values['dev_widget_restrict'] ) ? FALSE : array_values( $values['dev_widget_restrict'] ) ),
+						'restrict' 	   => ( ! \count( $values['dev_widget_restrict'] ) ? FALSE : array_values( $values['dev_widget_restrict'] ) ),
+						'default_area' => ( $values['dev_widget_default_area'] === 'none' ) ? '' : $values['dev_widget_default_area'],
 						'allow_reuse'  => $values['dev_widget_allow_reuse'],
 						'menu_style'   => $values['dev_widget_menu_style'],
-						'layouts'		=> $values['dev_widget_layouts'],
-						'embeddable'   => $values['dev_widget_embeddable'],
-						'padding'		=> $values['dev_widget_allow_padding'],
-						'default_layout' => $values['dev_widget_default_layout'],
-						'searchterms' => $values['dev_widget_searchterms']
+						'embeddable'   => $values['dev_widget_embeddable']
 					);
 					
-					Application::writeJson( $json, $widgets );
+					\IPS\Application::writeJson( $json, $widgets );
 						
 					/* Redirect */
-					Output::i()->redirect( $url, 'saved' );
+					\IPS\Output::i()->redirect( $url, 'saved' );
 				}
 	
 				return $form;
 	
 			case 'delete':
-				Session::i()->csrfCheck();
+				\IPS\Session::i()->csrfCheck();
 
 				$widgets = json_decode( file_get_contents( $json ), TRUE );
-				if ( array_key_exists( Request::i()->key, $widgets ) )
+				if ( array_key_exists( \IPS\Request::i()->key, $widgets ) )
 				{
-					unset( $widgets[ Request::i()->key ] );
-					file_put_contents( $json, json_encode( $widgets, JSON_PRETTY_PRINT ) );
+					unset( $widgets[ \IPS\Request::i()->key ] );
+					\file_put_contents( $json, json_encode( $widgets, JSON_PRETTY_PRINT ) );
 						
-					if ( file_exists( $widgetDirectory . "/" . Request::i()->key . ".php" ) )
+					if ( file_exists( $widgetDirectory . "/" . \IPS\Request::i()->key . ".php" ) )
 					{
-						unlink( $widgetDirectory . "/" . Request::i()->key . ".php" );
+						unlink( $widgetDirectory . "/" . \IPS\Request::i()->key . ".php" );
 					}
 						
-					Db::i()->delete( 'core_widgets', array( 'app=? AND `key`=?', $appKeyOrPluginId, Request::i()->key ) );
-					unset( Store::i()->widgets );
+					\IPS\Db::i()->delete( 'core_widgets', array( ( \is_string( $appKeyOrPluginId ) ? 'app' : 'plugin' ) . '=? AND `key`=?', $appKeyOrPluginId, \IPS\Request::i()->key ) );
+					unset( \IPS\Data\Store::i()->widgets );
 				}
-				Output::i()->redirect( $url, 'saved' );
+				\IPS\Output::i()->redirect( $url, 'saved' );
 					
 			default:
 	
@@ -1024,47 +606,37 @@ abstract class Widget
 					$data[ $k ] = array(
 							'dev_widget_key'		=> $k,
 							'dev_widget_class'		=> $json['class'],
-							'dev_widget_restrict' 	=> $json['restrict'] === FALSE ? Member::loggedIn()->language()->addToStack('dev_widget_nowhere') : ( ( ( count( $json['restrict'] ) > 0 and count( $json['restrict'] ) !== 2 ) ? implode( ',', array_map( function($val ) { return Member::loggedIn()->language()->addToStack('dev_widget_restrict_'.$val); }, $json['restrict'] ) ) : Member::loggedIn()->language()->addToStack('everywhere') ) )
+							'dev_widget_restrict' 	=> $json['restrict'] === FALSE ? \IPS\Member::loggedIn()->language()->addToStack('dev_widget_nowhere') : ( ( ( \count( $json['restrict'] ) > 0 and \count( $json['restrict'] ) !== 2 ) ? implode( ',', array_map( function( $val ) { return \IPS\Member::loggedIn()->language()->addToStack('dev_widget_restrict_'.$val); }, $json['restrict'] ) ) : \IPS\Member::loggedIn()->language()->addToStack('everywhere') ) ),
+							'dev_widget_area'		=> isset($json['default_area']) ? ( $json['default_area'] ? \IPS\Member::loggedIn()->language()->addToStack( 'dev_widget_default_area_' . $json['default_area'] ) : \IPS\Member::loggedIn()->language()->addToStack('none') ) : 'sidebar',
+							'dev_widget_embeddable'	=> isset($json['embeddable'])   ? ( $json['embeddable'] ? '&#10003;' : '&#10007;' ) : '&#10007;'
 					);
 				}
 	
-				$table = new Custom( $data, $url );
-				$table->quickSearch = 'dev_widget_key';
+				$table = new \IPS\Helpers\Table\Custom( $data, $url );
 				$table->rootButtons = array(
 						'add' => array(
 								'icon'	=> 'plus',
 								'title'	=> 'add',
 								'link'	=> $url->setQueryString( 'widgetTable', 'form' ),
-								'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('add') )
+								'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('add') )
 						)
 				);
-				$table->rowButtons = function( $row ) use ( $url, $widgetDirectory )
+				$table->rowButtons = function( $row ) use ( $url )
 				{
-					$buttons = [];
-
-					$filePath = $widgetDirectory . "/" . $row['dev_widget_key'] . ".php";
-					if( $ideLink = Developer::getIdeHref( $filePath ) )
-					{
-						$buttons['ide'] = [
-						'icon'		=> 'fa-file-code',
-						'title'		=> 'open_in_ide',
-						'link'		=> $ideLink
-						];
-					};
-
-					$buttons['edit'] = array(
+					return array(
+							'edit' => array(
 									'icon'	=> 'pencil',
 									'title'	=> 'edit',
 									'link'	=> $url->setQueryString( 'widgetTable', 'form' )->setQueryString( 'key', $row['dev_widget_key'] ),
-									'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit') )
-							);
-					$buttons['delete'] = array(
+									'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit') )
+							),
+							'delete' => array(
 									'icon'	=> 'times-circle',
 									'title'	=> 'delete',
 									'link'	=> $url->setQueryString( 'widgetTable', 'delete' )->setQueryString( 'key', $row['dev_widget_key'] )->csrf(),
 									'data'	=> array( 'delete' => '' )
-							);
-					return $buttons;
+							)
+					);
 				};
 	
 				return $table;
@@ -1075,24 +647,25 @@ abstract class Widget
 	/**
 	 * Get all cache keys (for all possible permissions, etc.)
 	 *
-	 * @param String|null $key				Widget key
-	 * @param String|null $app				Parent application
+	 * @param	String	$key				Widget key
+	 * @param	String	$app				Parent application
+	 * @param	String	$plugin				Parent plugin
 	 * @return	array
 	 * @note	This method does not take responsibility for checking if caches are expired
 	 */
-	public static function getCaches( string $key=NULL, string $app=NULL ): array
+	public static function getCaches( $key=NULL, $app=NULL, $plugin=NULL )
 	{
 		$caches = array();
 
 		try
 		{
-			foreach(Db::i()->select( '*', 'core_widgets', static::_buildWhere( $key, $app ) ) as $widget )
+			foreach( \IPS\Db::i()->select( '*', 'core_widgets', static::_buildWhere( $key, $app, $plugin ) ) as $widget )
 			{
 				if( $widget['caches'] )
 				{
 					$json = json_decode( $widget['caches'], TRUE );
 					
-					if ( ! is_array( $json ) )
+					if ( ! \is_array( $json ) )
 					{
 						return array();
 					}
@@ -1105,7 +678,7 @@ abstract class Widget
 			}
 			
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 		}
 
@@ -1116,40 +689,36 @@ abstract class Widget
 	/**
 	 * Delete caches
 	 *
-	 * @param String|null $key				Widget key
-	 * @param String|null $app				Parent application
+	 * @param	String	$key				Widget key
+	 * @param	String	$app				Parent application
+	 * @param	String	$plugin				Parent plugin
 	 * @return	void
 	 */
-	public static function deleteCaches( string $key=NULL, string $app=NULL ) : void
+	public static function deleteCaches( $key=NULL, $app=NULL, $plugin=NULL )
 	{
-		if( Application::appIsEnabled( 'cms' ) )
-		{
-			CmsWidget::deleteCachesForBlocks( $key, $app );
-		}
-
-		$caches = static::getCaches( $key, $app );
+		$caches = static::getCaches( $key, $app, $plugin );
 
 		foreach ( $caches as $cacheKey => $time )
 		{
-			unset( Store::i()->$cacheKey );
+			unset( \IPS\Data\Store::i()->$cacheKey );
 		}
 
-		Db::i()->update( 'core_widgets', array( 'caches' => NULL ), static::_buildWhere( $key, $app ) );
-		unset( Store::i()->widgets );
+		\IPS\Db::i()->update( 'core_widgets', array( 'caches' => NULL ), static::_buildWhere( $key, $app, $plugin ) );
+		unset( \IPS\Data\Store::i()->widgets );
 	}
 
 	/**
 	 * Store this widget instance as trash incase we need to fetch the configuration
 	 * when another column is updated due to a widget being moved from one column to another.
 	 *
-	 * @param string $uniqueId       Widget's Unique ID
-	 * @param array $data           Widget Data
+	 * @param   string  $uniqueId       Widget's Unique ID
+	 * @param   array   $data           Widget Data
 	 * @return  void
 	 */
-	public static function trash( string $uniqueId, array $data ) : void
+	public static function trash( $uniqueId, $data )
 	{
-		Db::i()->delete( 'core_widget_trash', array( 'id=?', $uniqueId ) );
-		Db::i()->insert( 'core_widget_trash', array(
+		\IPS\Db::i()->delete( 'core_widget_trash', array( 'id=?', (string) $uniqueId ) );
+		\IPS\Db::i()->insert( 'core_widget_trash', array(
 			'id'    => $uniqueId,
 		    'data'  => json_encode( $data ),
 		    'date'  => time()
@@ -1157,75 +726,89 @@ abstract class Widget
 	}
 
 	/**
-	 * @var array
-	 */
-	protected static array $cachedConfiguration = [];
-
-	/**
-	 * Get and cache all configs to prevent one query per widget
-	 * 
-	 * @return array
-	 */
-	protected static function getAllConfigurations(): array
-	{
-		/* Try the json first */
-		foreach( Db::i()->select( '*', 'core_widget_areas' ) as $item )
-		{
-			$widgets = json_decode( $item['widgets'], TRUE );
-			foreach( $widgets as $widget )
-			{
-				static::$cachedConfiguration[ $widget['unique'] ] = $widget['configuration'];
-			}
-		}
-
-		/* Now try the inline data as this may be more accurate */
-		foreach( Db::i()->select( '*', 'core_widgets_config' ) as $widget )
-		{
-			static::$cachedConfiguration[ $widget['id'] ] = json_decode( $widget['data'], true );
-		}
-
-		return static::$cachedConfiguration;
-	}
-	/**
 	 * Fetch the configuration for this unqiue ID. Looks in active tables and trash. When a widget is moved, saveOrder is called twice,
 	 * once to remove the widget from column A and again to add it to column B. We store the widget removed from column A into the trash
 	 * table.
 	 *
-	 * @param string $uniqueId   Widget's unique ID
+	 * @param   string  $uniqueId   Widget's unique ID
 	 * @return  array
 	 */
-	public static function getConfiguration( string $uniqueId ): array
+	public static function getConfiguration( $uniqueId )
 	{
-		if ( ! count( static::$cachedConfiguration ) )
+		foreach( \IPS\Db::i()->select( '*', 'core_widget_areas' ) as $item )
 		{
-			static::getAllConfigurations();
+			$widgets = json_decode( $item['widgets'], TRUE );
+
+			foreach( $widgets as $widget )
+			{
+				if ( $widget['unique'] == $uniqueId )
+				{
+					if ( isset( $widget['configuration'] ) )
+					{
+						return $widget['configuration'];
+					}
+				}
+			}
 		}
 
 		/* Still here? rummage in the trash */
-		if( !isset( static::$cachedConfiguration[ $uniqueId ] ) )
+		try
 		{
-			try
+			$widget = \IPS\Db::i()->select( '*', 'core_widget_trash', array( 'id=?', $uniqueId ) )->first();
+
+			$data = json_decode( $widget['data'], TRUE );
+
+			if ( isset( $data['configuration'] ) )
 			{
-				$widget = Db::i()->select( '*', 'core_widget_trash', array( 'id=?', $uniqueId ) )->first();
-				$data = json_decode( $widget['data'], TRUE );
-				if ( isset( $data['configuration'] ) )
-				{
-					static::$cachedConfiguration[ $uniqueId ] = $data['configuration'];
-				}
-			}
-			catch( UnderflowException $ex )
-			{
-				static::$cachedConfiguration[ $uniqueId ] = [];
+				return $data['configuration'];
 			}
 		}
+		catch( \UnderflowException $ex ) { }
 
-		return static::$cachedConfiguration[ $uniqueId ] ?? array();
+		return array();
+	}	
+	
+	/**
+	 * Get default widgets for an application
+	 *
+	 * @param	\IPS\Application	$app	The application
+	 * @return	array
+	 */
+	public static function appDefaults( \IPS\Application $app )
+	{
+		if ( !isset( \IPS\Data\Store::i()->widgets ) )
+		{
+			$widgets = array();
+			foreach ( \IPS\Db::i()->select( '*', 'core_widgets' ) as $row )
+			{
+				if ( $row['app'] )
+				{
+					$widgets[ $row['app'] ][ $row['key'] ] = $row;
+				}
+			}
+			
+			\IPS\Data\Store::i()->widgets = $widgets;
+		}
+		
+		$return = array();
+		if ( isset( \IPS\Data\Store::i()->widgets[ $app->directory ] ) )
+		{
+			foreach ( \IPS\Data\Store::i()->widgets[ $app->directory ] as $widget )
+			{
+				if ( $widget['default_area'] )
+				{
+					$return[] = $widget;
+				}
+			}
+		}
+		
+		return $return;
 	}
 
 	/**
 	 * @brief	Cached output to prevent rendering widget twice
 	 */
-	protected ?string $cachedOutput	= NULL;
+	protected $cachedOutput	= NULL;
 
 	/**
 	 * Return the widget output or an empty string if the widget shouldn't be returned on this page
@@ -1234,16 +817,17 @@ abstract class Widget
 	 */
 	protected function _render() : string
 	{
-		if( Settings::i()->clubs AND  isset( $this->configuration['clubs_visibility'] ) )
+
+		if( \IPS\Settings::i()->clubs AND  isset( $this->configuration['clubs_visibility'] ) )
 		{
 			switch ( $this->configuration['clubs_visibility'] )
 			{
 				case 'all':
 					return $this->render();
 				case 'without_clubs':
-					 return ( Club::userIsInClub() ) ? '' : $this->render();
+					 return ( \IPS\Member\Club::userIsInClub() ) ? '' : $this->render();
 				case 'only_clubs':
-					return ( Club::userIsInClub() ) ?  $this->render() : '';
+					return ( \IPS\Member\Club::userIsInClub() ) ?  $this->render() : '';
 			}
 		}
 		return $this->render();
@@ -1262,7 +846,7 @@ abstract class Widget
 			/* Put the app check here as it needs to check the member's secondary groups but the PermissionCache only stores the primary group IDs */
 			if ( $this->app )
 			{
-				if ( ! $this->application()->canAccess( Member::loggedIn() ) )
+				if ( ! $this->application()->canAccess( \IPS\Member::loggedIn() ) )
 				{
 					return '';
 				}
@@ -1278,10 +862,10 @@ abstract class Widget
 			if ( $this->cachedOutput === NULL )
 			{
 				/* Does this go in the store? Things like active users don't get stored, and if in developer or designer mode, nothing does */
-				if ( isset( $this->cacheKey ) AND ( !isset( Request::i()->cookie['vle_editor'] ) or !Request::i()->cookie['vle_editor'] ) AND !IN_DEV)
+				if ( isset( $this->cacheKey ) AND ( !isset( \IPS\Request::i()->cookie['vle_editor'] ) or !\IPS\Request::i()->cookie['vle_editor'] ) AND !\IPS\IN_DEV AND !\IPS\Theme::designersModeEnabled() )
 				{		
 					/* How long does the store last (in seconds)? */
-					$expiration = Settings::i()->widget_cache_ttl;
+					$expiration = \IPS\Settings::i()->widget_cache_ttl;
 					if ( isset( $this->cacheExpiration ) )
 					{
 						$expiration = $this->cacheExpiration;
@@ -1292,21 +876,21 @@ abstract class Widget
 					{							
 						/* Add/update in the store if it isn't there or it's expired */
 						$cacheKey = $this->cacheKey;
-						if ( !isset( Store::i()->$cacheKey ) or ( $widget = Store::i()->$cacheKey and $widget['built'] < ( time() - $expiration ) and static::$expirePerRequest-- ) )
+						if ( !isset( \IPS\Data\Store::i()->$cacheKey ) or ( $widget = \IPS\Data\Store::i()->$cacheKey and $widget['built'] < ( time() - $expiration ) and static::$expirePerRequest-- ) )
 						{
 							/* The render() call below may take a long time to run for some widgets - we don't want lots of users to call
 								it simultaneously, so save a blank widget for now. For a second or two (until we've built and stored
 								the correct output which is done right after calling render) users will see nothing, which isn't ideal
 								but is better than killing the server */
-							Store::i()->$cacheKey = array( 'built' => time(), 'html' => '' );
+							\IPS\Data\Store::i()->$cacheKey = array( 'built' => time(), 'html' => '' );
 							
 							/* Render and store */
 							$content = $this->_render();
-							Member::loggedIn()->language()->parseOutputForDisplay( $content );
-							Store::i()->$cacheKey = array( 'built' => time(), 'html' => $content ); // Corrects the blank output written above
+							\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $content );
+							\IPS\Data\Store::i()->$cacheKey = array( 'built' => time(), 'html' => $content ); // Corrects the blank output written above
 							
 							/* Log that cache key so if we need to delete all the caches for this widget later we have it */
-							$caches = static::getCaches( $this->key, $this->app );
+							$caches = static::getCaches( $this->key, $this->app, $this->plugin );
 							
 							foreach( $caches as $key => $timeBuilt )
 							{
@@ -1317,9 +901,9 @@ abstract class Widget
 								
 								if ( $timeBuilt < ( time() - $expiration ) )
 								{
-									if ( isset( Store::i()->$key ) )
+									if ( isset( \IPS\Data\Store::i()->$key ) )
 									{
-										unset( Store::i()->$key );
+										unset( \IPS\Data\Store::i()->$key );
 									}
 			
 									unset( $caches[ $key ] );
@@ -1327,21 +911,11 @@ abstract class Widget
 							}
 							
 							$caches[ $cacheKey ] = time();
-
-							$keyForCacheStore = $this->key;
-
-							if( in_array( Polymorphic::class, class_implements( $this ) ) )
-							{
-								/* @var Polymorphic $widgetClass */
-								$widgetClass = get_class( $this );
-								$keyForCacheStore = $widgetClass::getBaseKey();
-							}
-
-							Db::i()->update( 'core_widgets', array( 'caches' => json_encode( $caches ) ), static::_buildWhere( $keyForCacheStore, $this->app ) );
+							\IPS\Db::i()->update( 'core_widgets', array( 'caches' => json_encode( $caches ) ), static::_buildWhere( $this->key, $this->app, $this->plugin ) );
 						}
 						
 						/* Then use what the store has */
-						$widget = Store::i()->$cacheKey;
+						$widget = \IPS\Data\Store::i()->$cacheKey;
 						$this->cachedOutput = $widget['html'];
 					}
 				}
@@ -1356,28 +930,30 @@ abstract class Widget
 			/* And render */
 			return static::parseOutput( $this->cachedOutput );
 		}
-		catch ( Exception | Throwable $e )
+		catch ( \Exception $e )
 		{
-			IPS::exceptionHandler( $e );
+			\IPS\IPS::exceptionHandler( $e );
 		}
-
-		return '';
+		catch ( \Throwable $e )
+		{
+			\IPS\IPS::exceptionHandler( $e );
+		}
 	}
 
 	/**
 	 * Parse <time> tags to avoid caching with another's timezone
 	 *
-	 * @param string $output HTML code which may contain the tag
+	 * @param  string $output HTML code which may contain the tag
 	 * @return string
 	 */
-	public static function parseOutput( string $output ): string
+	public static function parseOutput( $output )
 	{
 		if ( mb_stristr( $output, '<time' ) )
 		{
 			$output = preg_replace_callback( '#<time([^>]+?)?>([^<]+?)</time>#i', function( $matches )
 			{
 				$time = NULL;
-				if ( is_numeric( $matches[2] ) and strlen( $matches[2] ) === 10 )
+				if ( \is_numeric( $matches[2] ) and \strlen( $matches[2] ) === 10 )
 				{
 					$time = $matches[2];
 				}
@@ -1399,12 +975,12 @@ abstract class Widget
 						$options[ str_replace( 'data-', '', $data[1] ) ] = $data[2];
 					}
 
-					$obj = DateTime::ts( $time );
+					$obj = \IPS\DateTime::ts( $time );
 					$val = $obj->html();
 
 					if ( isset( $options['dateonly'] ) )
 					{
-						$val = $obj->localeDate();
+						$val = (string)$obj->localDate();
 					}
 					else
 					{
@@ -1425,177 +1001,135 @@ abstract class Widget
 	/**
 	 * Empty the widget trash
 	 *
-	 * @param int $seconds	Seconds old to remove
+	 * @param	int	$seconds	Seconds old to remove
 	 * @return	void
 	 */
-	public static function emptyTrash( int $seconds=86400 ) : void
+	public static function emptyTrash( $seconds=86400 )
 	{
 		$uniqueIds = static::getUniqueIds();
 
-		foreach( Db::i()->select( '*', 'core_widget_trash', array( array( 'date < ?', time() - $seconds ) ) ) as $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_widget_trash', array( array( 'date < ?', time() - $seconds ) ) ) as $row )
 		{
 			$data = json_decode( $row['data'], TRUE );
 			
 			if ( ! empty( $data['app'] ) and ! empty( $data['key'] ) and ! empty( $data['unique'] ) )
 			{
 				/* Is this unique ID actually used elsewhere? Sometimes moving blocks around can add a row in the trash table with the same unique ID */
-				if ( in_array( $data['unique'], $uniqueIds ) )
+				if ( \in_array( $data['unique'], $uniqueIds ) )
 				{
 					continue;
 				}
 				
 				try
 				{
-					$widget = static::load( Application::load( $data['app'] ), $data['key'], $data['unique'], $data['configuration'] ?? NULL );
+					$widget = static::load( \IPS\Application::load( $data['app'] ), $data['key'], $data['unique'], isset( $data['configuration'] ) ? $data['configuration'] : NULL );
 					$widget->delete();
 				}
-				catch( Exception $ex ) { }
+				catch( \Exception $ex ) { }
 			}
 		}
 		
-		Db::i()->delete( 'core_widget_trash', array( 'date < ?', time() - $seconds ) );
+		\IPS\Db::i()->delete( 'core_widget_trash', array( 'date < ?', time() - $seconds ) );
 	}
-
-	/**
-	 * Return an array of all areas that use this widget
-	 *
-	 * @param Application $app
-	 * @param string $key
-	 * @return array
-	 */
-	public static function usedWhere( Application $app, string $key ): array
-	{
-		$areas = [];
-		foreach ( Db::i()->select( '*', 'core_widget_areas' ) as $row )
-		{
-			$data = json_decode( $row['widgets'], TRUE );
-
-			if ( is_countable( $data ) AND count( $data ) )
-			{
-				foreach( $data as $widget )
-				{
-					if ( isset( $widget['unique'] ) and $widget['app'] === $app->directory and $widget['key'] === $key )
-					{
-						$areas[] = [
-							'id'	=> $row['id'],
-							'app'	=> $row['app'],
-							'module' => $row['module'],
-							'controller' => $row['controller'],
-							'area'	=> $row['area']
-						];
-					}
-				}
-			}
-		}
-
-		return $areas;
-	}
-
+	
 	/**
 	 * Return unique IDs in use
 	 *
 	 * @return array
 	 */
-	public static function getUniqueIds(): array
+	public static function getUniqueIds()
 	{
 		$uniqueIds = array();
-		foreach ( Db::i()->select( '*', 'core_widget_areas' ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'core_widget_areas' ) as $row )
 		{
-			if( $row['widgets'] )
+			$data = json_decode( $row['widgets'], TRUE );
+			
+			if ( is_countable( $data ) AND \count( $data ) )
 			{
-				$data = json_decode( $row['widgets'], TRUE );
-
-				if ( is_countable( $data ) )
+				foreach( $data as $widget )
 				{
-					foreach( $data as $widget )
-					{
-						if ( isset( $widget['unique'] ) )
-						{
-							$uniqueIds[] = $widget['unique'];
-						}
-					}
-				}
-			}
-
-			if( $row['tree'] )
-			{
-				$area = new Area( json_decode( $row['tree'], true ), $row['area'] );
-				foreach( $area->getAllWidgets() as $widget )
-				{
-					if( isset( $widget['unique'] ) )
-					{
+					if ( isset( $widget['unique'] ) )
+					{ 
 						$uniqueIds[] = $widget['unique'];
 					}
 				}
 			}
 		}
 
-		return array_unique( $uniqueIds );
+		return $uniqueIds;
 	}
-
+	
 	/**
-	 * Build the where clause based on key, app
+	 * Build the where clause based on key, app, plugin
 	 *
-	 * @param string|null $key Key
-	 * @param string|null $app Application
-	 * @return    array
+	 * @param	string	$key	Key
+	 * @param	string	$app	Application
+	 * @param	string	$plugin	Plugin
+	 * @return	array
 	 */
-	protected static function _buildWhere( ?string $key, ?string $app ): array
+	protected static function _buildWhere( $key, $app, $plugin )
 	{
 		$where = array();
 		
 		if( $key )
 		{
-			$where[] = array( '`key`=?', $key );
+			$where[] = array( '`key`=?', (string) $key );
 		}
 
 		if( $app )
 		{
-			$where[] = array( 'app=?', $app );
+			$where[] = array( 'app=?', (string) $app );
 		}
-		
+
+		if( $plugin )
+		{
+			$where[] = array( 'plugin=?', (string) $plugin );
+		}
+
 		return $where;
 	}
 
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param Form|null $form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
 		if ( $form === null )
 		{
-			$form = new Form;
+			$form = new \IPS\Helpers\Form;
 		}
 
 		/* Only show visibility options if we are editing from block manager as configuration is specific to each instance */
-		if( Dispatcher::i()->controllerLocation == 'front' )
+		if( \IPS\Dispatcher::i()->controllerLocation == 'front' )
 		{
-			$form->add( new CheckboxSet( 'devices_to_show', $this->configuration['devices_to_show'] ?? array( 'Phone', 'Tablet', 'Desktop' ), FALSE, array( 'options' => array( 'Phone' => Member::loggedIn()->language()->addToStack( 'device_phone' ), 'Tablet' => Member::loggedIn()->language()->addToStack( 'device_tablet' ), 'Desktop' => Member::loggedIn()->language()->addToStack( 'device_desktop' ) ) ), NULL, NULL, NULL, 'devices_to_show' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'show_on_all_devices', isset( $this->configuration['devices_to_show'] ) ? empty( array_diff( array( 'Phone', 'Tablet', 'Desktop' ), $this->configuration['devices_to_show'] ) ) : TRUE, FALSE, array( 'togglesOff' => array( 'devices_to_show' ) ) ) );
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'devices_to_show', isset( $this->configuration['devices_to_show'] ) ? $this->configuration['devices_to_show'] : array( 'Phone', 'Tablet', 'Desktop' ), FALSE, array( 'options' => array( 'Phone' => \IPS\Member::loggedIn()->language()->addToStack( 'device_phone' ), 'Tablet' => \IPS\Member::loggedIn()->language()->addToStack( 'device_tablet' ), 'Desktop' => \IPS\Member::loggedIn()->language()->addToStack( 'device_desktop' ) ) ), NULL, NULL, NULL, 'devices_to_show' ) );
 		}
 
-		if( Settings::i()->clubs AND ( ( Request::i()->pageApp === 'core' AND  Request::i()->pageModule === 'clubs' ) OR  ( Request::i()->pageApp !== 'core' AND Request::i()->pageApp !== 'nexus'  ) ) )
+		if( \IPS\Settings::i()->clubs AND ( ( \IPS\Request::i()->pageApp === 'core' AND  \IPS\Request::i()->pageModule === 'clubs' ) OR  ( \IPS\Request::i()->pageApp !== 'core' AND \IPS\Request::i()->pageApp !== 'nexus'  ) ) )
 		{
-			$form->add( new Radio( 'clubs_visibility', $this->configuration['clubs_visibility'] ?? 'all', FALSE, array( 'options' => array( 'all' => 'everywhere', 'without_clubs' => 'without_clubs', 'only_clubs' => 'only_clubs')) ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'clubs_visibility', isset( $this->configuration['clubs_visibility'] ) ? $this->configuration['clubs_visibility']  : 'all', FALSE, array( 'options' => array( 'all' => 'everywhere', 'without_clubs' => 'without_clubs', 'only_clubs' => 'only_clubs')) ) );
 		}
-
-		if( $this->isBuilderWidget() )
+		
+		if ( \in_array( 'IPS\Widget\Builder', class_implements( $this ) ) )
 		{
-			Output::i()->linkTags['googlefonts'] = array( 'rel' => 'stylesheet', 'href' => "https://fonts.googleapis.com/css?family=Lato|Merriweather|Open+Sans|Raleway:400,900|Roboto:400,900&display=swap" );
+			\IPS\Output::i()->linkTags['googlefonts'] = array( 'rel' => 'stylesheet', 'href' => "https://fonts.googleapis.com/css?family=Lato|Merriweather|Open+Sans|Raleway:400,900|Roboto:400,900&display=swap" );
 			
-			if ( ! isset( $this->configuration['widget_adv__custom'] ) and isset( Request::i()->block ) )
+			if ( ! isset( $this->configuration['widget_adv__custom'] ) and isset( \IPS\Request::i()->block ) )
 			{
-				$customCss = '.' . Request::i()->block . " {\n\n}";
+				$customCss = '.' . \IPS\Request::i()->block . " {\n\n}";
 			}
 			else
 			{
-				$customCss = $this->configuration['widget_adv__custom'] ?? '';
+				$customCss = isset( $this->configuration['widget_adv__custom'] ) ? $this->configuration['widget_adv__custom'] : '';
 			}
 			
 			/* Box model */
-			$form->add( new Select( 'widget_adv__padding', $this->configuration['widget_adv__padding'] ?? 'full', FALSE,
+			$form->add( new \IPS\Helpers\Form\YesNo( 'widget_adv__border', isset( $this->configuration['widget_adv__border'] ) ? $this->configuration['widget_adv__border'] : TRUE, FALSE ) );
+			$form->add( new \IPS\Helpers\Form\Select( 'widget_adv__padding', isset( $this->configuration['widget_adv__padding'] ) ? $this->configuration['widget_adv__padding'] : 'full', FALSE,
 				array(
 					'options' => array(
 						'none' => 'widget_adv__padding_none',
@@ -1608,24 +1142,24 @@ abstract class Widget
 					)
 			) ) );
 			
-			$form->add( new Trbl( 'widget_adv__padding_custom', ( $this->configuration['widget_adv__padding_custom'] ?? 0 ), FALSE, array(), NULL, NULL, NULL, 'padding_custom' ) );
+			$form->add( new \IPS\Helpers\Form\Trbl( 'widget_adv__padding_custom', ( isset( $this->configuration['widget_adv__padding_custom'] ) ? $this->configuration['widget_adv__padding_custom'] : 0 ), FALSE, array(), NULL, NULL, NULL, 'padding_custom' ) );
 			
 			/* Font size */
-			$form->add( new Select( 'widget_adv__fontsize', $this->configuration['widget_adv__fontsize'] ?? 'i-font-size_1', FALSE,
+			$form->add( new \IPS\Helpers\Form\Select( 'widget_adv__fontsize', isset( $this->configuration['widget_adv__fontsize'] ) ? $this->configuration['widget_adv__fontsize'] : 'ipsType_medium', FALSE,
 				array(
 					'options' => array(
 						'inherit'    		   => 'widget_adv__inherit',
-						'ipsTitle ipsTitle--h3'    => 'widget_adv__fontsize_pagetitle',
-						'i-font-size_2'	   	   => 'widget_adv__fontsize_large',
-						'i-font-size_1' 	   => 'widget_adv__fontsize_medium',
-						'i-font-size_-1' 	   => 'widget_adv__fontsize_small',
+						'ipsType_pageTitle'    => 'widget_adv__fontsize_pagetitle',
+						'ipsType_large'	   	   => 'widget_adv__fontsize_large',
+						'ipsType_medium' 	   => 'widget_adv__fontsize_medium',
+						'ipsType_small' 	   => 'widget_adv__fontsize_small',
 						'custom'			   => 'custom',
 					),
 					'toggles'  => array(
 						'custom'	=> array( 'font_custom' )
 					)
 			) ) );
-			$form->add( new Number( 'widget_adv__fontsize_custom', ( $this->configuration['widget_adv__fontsize_custom'] ?? 12 ), FALSE, array(), NULL, NULL, 'px', 'font_custom' ) );
+			$form->add( new \IPS\Helpers\Form\Number( 'widget_adv__fontsize_custom', ( isset( $this->configuration['widget_adv__fontsize_custom'] ) ? $this->configuration['widget_adv__fontsize_custom'] : 12 ), FALSE, array(), NULL, NULL, 'px', 'font_custom' ) );
 			
 			/* Font face */
 			$fontOptions = array( 'inherit' => 'widget_adv__inherit' );
@@ -1635,12 +1169,12 @@ abstract class Widget
 				$fontOptions[ ucfirst( $font ) ] = 'widget_adv__font_' . str_replace( ' ', '_', $font );
 			}
 			
-			$form->add( new Select( 'widget_adv__font', $this->configuration['widget_adv__font'] ?? 'inherit', FALSE,
+			$form->add( new \IPS\Helpers\Form\Select( 'widget_adv__font', isset( $this->configuration['widget_adv__font'] ) ? $this->configuration['widget_adv__font'] : 'inherit', FALSE,
 				array(
 					'options' => $fontOptions
 			) ) );
 			
-			$form->add( new Select( 'widget_adv__fontalign', $this->configuration['widget_adv__fontalign'] ?? 'left', FALSE,
+			$form->add( new \IPS\Helpers\Form\Select( 'widget_adv__fontalign', isset( $this->configuration['widget_adv__fontalign'] ) ? $this->configuration['widget_adv__fontalign'] : 'left', FALSE,
 				array(
 					'options' => array(
 						'left'      => 'widget_adv__fontalign_left',
@@ -1650,7 +1184,7 @@ abstract class Widget
 			) ) );
 			
 			/* Font color */
-			$form->add( new Select( 'widget_adv__fontcolor_custom', $this->configuration['widget_adv__fontcolor_custom'] ?? FALSE, FALSE,
+			$form->add( new \IPS\Helpers\Form\Select( 'widget_adv__fontcolor_custom', isset( $this->configuration['widget_adv__fontcolor_custom'] ) ? $this->configuration['widget_adv__fontcolor_custom'] : FALSE, FALSE,
 				array(
 					'options' => array(
 						'inherit'    	 => 'widget_adv__inherit',
@@ -1659,16 +1193,16 @@ abstract class Widget
 					'toggles'  => array(
 						'custom'	=> array( 'fontcolor_custom' )
 					)
-			), NULL, NULL, NULL, 'fontcolor_selector' ) );
+			) ), NULL, NULL, NULL, 'fontcolor_selector' );
 			
-			$form->add( new Color( 'widget_adv__fontcolor', $this->configuration['widget_adv__fontcolor'] ?? '', FALSE, array( 'swatches' => TRUE, 'rgba' => TRUE ), NULL, NULL, NULL, 'fontcolor_custom' ) );
+			$form->add( new \IPS\Helpers\Form\Color( 'widget_adv__fontcolor', isset( $this->configuration['widget_adv__fontcolor'] ) ? $this->configuration['widget_adv__fontcolor'] : '', FALSE, array( 'swatches' => TRUE, 'rgba' => TRUE ), NULL, NULL, NULL, 'fontcolor_custom' ) );
 			
 			/* Background color */
-			$form->add( new Select( 'widget_adv__background_custom', $this->configuration['widget_adv__background_custom'] ?? FALSE, FALSE,
+			$form->add( new \IPS\Helpers\Form\Select( 'widget_adv__background_custom', isset( $this->configuration['widget_adv__background_custom'] ) ? $this->configuration['widget_adv__background_custom'] : FALSE, FALSE,
 				array(
 					'options' => array(
 						'inherit'    	 => 'widget_adv__inherit',
-						//'transparent'    => 'widget_adv__fontcolor_custom_transparent',
+						'transparent'    => 'widget_adv__fontcolor_custom_transparent',
 						'custom'		 => 'widget_adv__background_custom_color',
 						'image'			 => 'widget_adv__background_custom_image',
 					),
@@ -1676,43 +1210,17 @@ abstract class Widget
 						'custom'	=> array( 'background_custom' ),
 						'image'	=> array( 'background_image', 'background_overlay' )
 					)
-			), NULL, NULL, NULL, 'background_selector' ) );
+			) ), NULL, NULL, NULL, 'background_selector' );
 			
-			$form->add( new Upload( 'widget_adv__background_custom_image', isset( $this->configuration['widget_adv__background_custom_image'] ) ? File::get( 'core_Attachment', $this->configuration['widget_adv__background_custom_image'] ) : '', FALSE, array(  'storageExtension' => 'core_Attachment', 'allowStockPhotos' => TRUE, 'image' => true ), NULL, NULL, NULL, 'background_image' ) );
-			$form->add( new Color( 'widget_adv__background_custom_image_overlay', $this->configuration['widget_adv__background_custom_image_overlay'] ?? '', FALSE, array( 'swatches' => TRUE, 'rgba' => TRUE, 'allowNone' => true ), NULL, NULL, NULL, 'background_overlay' ) );
+			$form->add( new \IPS\Helpers\Form\Upload( 'widget_adv__background_custom_image', isset( $this->configuration['widget_adv__background_custom_image'] ) ? \IPS\File::get( 'core_Attachment', $this->configuration['widget_adv__background_custom_image'] ) : '', FALSE, array(  'storageExtension' => 'core_Attachment', 'allowStockPhotos' => TRUE, 'image' => true ), NULL, NULL, NULL, 'background_image' ) );
+			$form->add( new \IPS\Helpers\Form\Color( 'widget_adv__background_custom_image_overlay', isset( $this->configuration['widget_adv__background_custom_image_overlay'] ) ? $this->configuration['widget_adv__background_custom_image_overlay'] : '', FALSE, array( 'swatches' => TRUE, 'rgba' => TRUE ), NULL, NULL, NULL, 'background_overlay' ) );
 
-			$form->add( new Color( 'widget_adv__background', $this->configuration['widget_adv__background'] ?? '', FALSE, array( 'swatches' => TRUE, 'rgba' => TRUE ), NULL, NULL, NULL, 'background_custom' ) );
+			$form->add( new \IPS\Helpers\Form\Color( 'widget_adv__background', isset( $this->configuration['widget_adv__background'] ) ? $this->configuration['widget_adv__background'] : '', FALSE, array( 'swatches' => TRUE, 'rgba' => TRUE ), NULL, NULL, NULL, 'background_custom' ) );
 
-			$form->add( new Codemirror( 'widget_adv__custom', $customCss, FALSE, array( 'codeModeAllowedLanguages' => [ 'css' ] ) ) );
+			$form->add( new \IPS\Helpers\Form\Codemirror( 'widget_adv__custom', $customCss, FALSE, array() ) );
 		}
 
 		return $form;
-	}
-
-	/**
-	 * Get the widget from the stored data
-	 *
-	 * @param 	array 	$data		The data stored for the widget, either in the core_widget_areas table or the cms_page_widget_areas table
-	 *
-	 * @return Widget|null
-	 */
-	public static function createWidgetFromStoredData( array $data ) : ?Widget
-	{
-		$config = ( isset( $data['configuration'] ) AND !empty( $data['configuration'] ) ) ? $data['configuration'] : static::getConfiguration( $data['unique'] );
-		try
-		{
-			$widget = static::load( Application::load( $data['app'] ), $data['key'], $data['unique'], $config, $data['restrict'] ?? null, $data['orientation'] ?? 'horizontal', $data['layout'] ?? '' ); // todo wtf does orientation do?
-			if ( $data['key'] === 'Database' and !\IPS\cms\Databases\Dispatcher::i()->databaseId )
-			{
-				$widget->render();
-			}
-			return $widget;
-		}
-		catch( OutOfRangeException )
-		{
-			/* The app might be disabled, so just skip it */
-			return null;
-		}
 	}
 
 	/**
@@ -1722,10 +1230,10 @@ abstract class Widget
 	 * @param string $app			The app the widget belongs to
 	 * @return bool
 	 */
-	final public static function deprecateWidget( string $widgetkey, string $app ): bool
+	final public static function deprecateWidget(string $widgetkey, string $app )
 	{
 		$areas = array( 'core_widget_areas' );
-		if ( Application::appIsEnabled('cms') )
+		if ( \IPS\Application::appIsEnabled('cms') )
 		{
 			$areas[] = 'cms_page_widget_areas';
 		}
@@ -1733,7 +1241,7 @@ abstract class Widget
 		foreach ( $areas as $table )
 		{
 			$widgetsColumn = $table == 'core_widget_areas' ? 'widgets' : 'area_widgets';
-			foreach (Db::i()->select( '*', $table ) as $area )
+			foreach ( \IPS\Db::i()->select( '*', $table ) as $area )
 			{
 				$whereClause = $table == 'core_widget_areas' ? array( 'id=? AND area=?', $area['id'], $area['area'] ) : array( 'area_page_id=? AND area_area=?', $area['area_page_id'], $area['area_area'] );
 
@@ -1751,7 +1259,7 @@ abstract class Widget
 				}
 				if ( $update )
 				{
-					Db::i()->update( $table, array( $widgetsColumn => json_encode( $widgets ) ), $whereClause );
+					\IPS\Db::i()->update( $table, array( $widgetsColumn => json_encode( $widgets ) ), $whereClause );
 				}
 			}
 		}

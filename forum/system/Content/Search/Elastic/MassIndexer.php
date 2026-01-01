@@ -11,57 +11,48 @@
 namespace IPS\Content\Search\Elastic;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Http\Url;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Elasticsearch Mass Indexer
  */
-class MassIndexer extends Index
+class _MassIndexer extends \IPS\Content\Search\Elastic\Index
 {
 	/**
 	 * @brief	Data to store in bulk
 	 */
-	protected ?array $data = array();
+	protected $data = array();
 	
 	/**
 	 * Index an item
 	 *
-	 * @param	Content	$object	Item to add
+	 * @param	\IPS\Content\Searchable	$object	Item to add
 	 * @return	void
 	 */
-	public function index( Content $object ): void
+	public function index( \IPS\Content\Searchable $object )
 	{
 		if ( $indexData = $this->indexData( $object ) and $indexData['index_permissions'] )
 		{
-			$indexData['index_id'] = $this->getIndexId( $object );
-
-			if ( $object instanceof Item )
+			if ( $object instanceof \IPS\Content\Item )
 			{
 				$parent = $object;
 			}
-			elseif ( $object instanceof Comment )
+			elseif ( $object instanceof \IPS\Content\Comment )
 			{
 				$parent = $object->item();
 			}
 			
 			$this->data[] = array(
 				'index'		=> array(
-					'_index'	=> trim( $this->url->data[ Url::COMPONENT_PATH ], '/' ),
+					'_index'	=> trim( $this->url->data[ \IPS\Http\Url::COMPONENT_PATH ], '/' ),
+					'_type'		=> '_doc',
 					'_id'		=> $this->getIndexId( $object ),
 				)
 			);
-
 			$this->data[] = $indexData;
 		}
 	}
@@ -82,7 +73,7 @@ class MassIndexer extends Index
 			}
 			$json = implode( "\n", $json );
 			
-			Index::request( $this->url->setPath( '/_bulk' ) )->setHeaders( array( 'Content-Type' => 'application/x-ndjson' ) )->post( $json . "\n" );
+			\IPS\Content\Search\Elastic\Index::request( $this->url->setPath( '/_bulk' ) )->setHeaders( array( 'Content-Type' => 'application/x-ndjson' ) )->post( $json . "\n" );
 		}
 	}
 }

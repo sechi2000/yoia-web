@@ -11,28 +11,16 @@
 namespace IPS\Login\Handler;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Login\Exception;
-use IPS\Login\Handler;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Standard Internal Database Login Handler
  */
-class Standard extends Handler
+class _Standard extends \IPS\Login\Handler
 {
 	use UsernamePasswordHandler;
 	
@@ -41,64 +29,83 @@ class Standard extends Handler
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return 'login_handler_Internal';
-	}
-
-	/**
-	 * ACP Settings Form
-	 *
-	 * @return	array	List of settings to save - settings will be stored to core_login_methods.login_settings DB field
-	 * @code
-	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
-	 * @endcode
-	 */
-	public function acpForm(): array
-	{
-		$id = $this->id ?: 'new';
-		return array();
 	}
 	
 	/**
 	 * Authenticate
 	 *
-	 * @param	Login	$login				The login object
-	 * @param string $usernameOrEmail		The username or email address provided by the user
-	 * @param object $password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
-	 * @return	Member
-	 * @throws	Exception
+	 * @param	\IPS\Login	$login				The login object
+	 * @param	string		$usernameOrEmail		The username or email address provided by the user
+	 * @param	object		$password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @return	\IPS\Member
+	 * @throws	\IPS\Login\Exception
 	 */
-	public function authenticateUsernamePassword( Login $login, string $usernameOrEmail, object $password ): Member
+	public function authenticateUsernamePassword( \IPS\Login $login, $usernameOrEmail, $password )
 	{
+		$type = 'username_or_email';
+		switch ( $this->authType() )
+		{
+			case \IPS\Login::AUTH_TYPE_USERNAME + \IPS\Login::AUTH_TYPE_EMAIL:
+				$type = 'username_or_email';
+				break;
+				
+			case \IPS\Login::AUTH_TYPE_USERNAME:
+				$type = 'username';
+				break; 
+				
+			case \IPS\Login::AUTH_TYPE_EMAIL:
+				$type = 'email_address';
+				break;
+		}
+
 		/* Make sure we have the username or email */
 		if( !$usernameOrEmail )
 		{
-			throw new Exception( Member::loggedIn()->language()->addToStack( 'login_err_no_account', FALSE ), Exception::NO_ACCOUNT );
+			throw new \IPS\Login\Exception( \IPS\Member::loggedIn()->language()->addToStack( 'login_err_no_account', FALSE, array( 'pluralize' => array( $this->authType() ) ) ), \IPS\Login\Exception::NO_ACCOUNT );
 		}
 
 		/* Get member(s) */
 		$where = array();
 		$params = array();
-
-		$where[] = 'email=?';
-		$params[] = $usernameOrEmail;
-
-		if ( $usernameOrEmail !== Request::legacyEscape( $usernameOrEmail ) )
+		if ( $this->authType() & \IPS\Login::AUTH_TYPE_USERNAME )
+		{
+			$where[] = 'name=?';
+			$params[] = $usernameOrEmail;
+			
+			if ( $usernameOrEmail !== \IPS\Request::legacyEscape( $usernameOrEmail ) )
+			{
+				$where[] = 'name=?';
+				$params[] = \IPS\Request::legacyEscape( $usernameOrEmail );
+			}
+		}
+		if ( $this->authType() & \IPS\Login::AUTH_TYPE_EMAIL )
 		{
 			$where[] = 'email=?';
-			$params[] = Request::legacyEscape( $usernameOrEmail );
+			$params[] = $usernameOrEmail;
+			
+			if ( $usernameOrEmail !== \IPS\Request::legacyEscape( $usernameOrEmail ) )
+			{
+				$where[] = 'email=?';
+				$params[] = \IPS\Request::legacyEscape( $usernameOrEmail );
+			}
 		}
-
-		$members = new ActiveRecordIterator( Db::i()->select( '*', 'core_members', array_merge( array( implode( ' OR ', $where ) ), $params ) ), 'IPS\Member' );
+		$members = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', array_merge( array( implode( ' OR ', $where ) ), $params ) ), 'IPS\Member' );
 		
 		/* If we didn't match any, throw an exception */
-		if ( !count( $members ) )
+		if ( !\count( $members ) )
 		{
-			$member = new Member;
-			$member->email = $usernameOrEmail;
+			$member = NULL;
 
-			throw new Exception( Member::loggedIn()->language()->addToStack( 'login_err_no_account', FALSE ), Exception::NO_ACCOUNT, NULL, $member );
+			if ( $this->authType() & \IPS\Login::AUTH_TYPE_EMAIL )
+			{
+				$member = new \IPS\Member;
+				$member->email = $usernameOrEmail;
+			}
+
+			throw new \IPS\Login\Exception( \IPS\Member::loggedIn()->language()->addToStack( 'login_err_no_account', FALSE, array( 'pluralize' => array( $this->authType() ) ) ), \IPS\Login\Exception::NO_ACCOUNT, NULL, $member );
 		}
 		
 		/* Check the password for each possible account */
@@ -119,17 +126,17 @@ class Standard extends Handler
 		}
 
 		/* Still here? Throw a password incorrect exception */
-		throw new Exception( Member::loggedIn()->language()->addToStack( 'login_err_bad_password', FALSE ), Exception::BAD_PASSWORD, NULL, $member );
+		throw new \IPS\Login\Exception( \IPS\Member::loggedIn()->language()->addToStack( 'login_err_bad_password', FALSE, array( 'pluralize' => array( $this->authType() ) ) ), \IPS\Login\Exception::BAD_PASSWORD, NULL, $member );
 	}
 	
 	/**
 	 * Authenticate
 	 *
-	 * @param	Member	$member		The member
-	 * @param object $password	The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	\IPS\Member	$member		The member
+	 * @param	object		$password	The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	bool
 	 */
-	public function authenticatePasswordForMember( Member $member, object $password ): bool
+	public function authenticatePasswordForMember( \IPS\Member $member, $password )
 	{
 		if ( password_verify( $password, $member->members_pass_hash ) === TRUE )
 		{
@@ -142,25 +149,23 @@ class Standard extends Handler
 		
 		return FALSE;
 	}
-
+	
 	/**
-	 * Can this handler process a login for a member?
+	 * Can this handler process a login for a member? 
 	 *
-	 * @param Member $member
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canProcess( Member $member ): bool
+	public function canProcess( \IPS\Member $member )
 	{
 		return (bool) $member->members_pass_hash;
 	}
-
+	
 	/**
-	 * Can this handler process a password change for a member?
+	 * Can this handler process a password change for a member? 
 	 *
-	 * @param Member $member
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canChangePassword( Member $member ): bool
+	public function canChangePassword( \IPS\Member $member )
 	{
 		/* If it's forced, then yes. */
 		if ( $member->members_bitoptions['password_reset_forced'] AND !$member->members_pass_hash )
@@ -176,7 +181,7 @@ class Standard extends Handler
 	 *
 	 * @return	bool
 	 */
-	public function canSyncPassword(): bool
+	public function canSyncPassword()
 	{
 		return TRUE;
 	}
@@ -184,11 +189,11 @@ class Standard extends Handler
 	/**
 	 * Change Password
 	 *
-	 * @param	Member	$member			The member
-	 * @param	object|string		$newPassword		New Password wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	\IPS\Member	$member			The member
+	 * @param	object		$newPassword		New Password wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	void
 	 */
-	public function changePassword( Member $member, object|string $newPassword ) : void
+	public function changePassword( \IPS\Member $member, $newPassword )
 	{
 		$member->setLocalPassword( $newPassword );
 		$member->save();
@@ -197,11 +202,11 @@ class Standard extends Handler
 	/**
 	 * Force Password Reset URL
 	 *
-	 * @param	Member			$member		The member
-	 * @param	Url|NULL	$ref		Referrer
-	 * @return	Url|NULL
+	 * @param	\IPS\Member			$member		The member
+	 * @param	\IPS\Http\Url|NULL	$ref		Referrer
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function forcePasswordResetUrl( Member $member, ?Url $ref = NULL ): ?Url
+	public function forcePasswordResetUrl( \IPS\Member $member, ?\IPS\Http\Url $ref = NULL ): ?\IPS\Http\Url
 	{
 		return $member->passwordResetForced( $ref );
 	}
@@ -209,10 +214,10 @@ class Standard extends Handler
 	/**
 	 * Show in Account Settings?
 	 *
-	 * @param	Member|NULL	$member	The member, or NULL for if it should show generally
+	 * @param	\IPS\Member|NULL	$member	The member, or NULL for if it should show generally
 	 * @return	bool
 	 */
-	public function showInUcp( Member $member = NULL ): bool
+	public function showInUcp( \IPS\Member $member = NULL )
 	{
 		return FALSE;
 	}

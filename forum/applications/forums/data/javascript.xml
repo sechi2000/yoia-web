@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <javascript app="forums">
- <file javascript_app="forums" javascript_location="front" javascript_path="controllers/forum" javascript_name="ips.forum.flow.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="forums" javascript_location="front" javascript_path="controllers/forum" javascript_name="ips.forum.flow.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -81,8 +81,7 @@
 				$( document ).trigger( 'updateTableURL', { [this.urlParam] : _.uniq( _.values( this._ids ) ).join(',') } );
 			}
 			
-			this._button = $('body').find("[data-ipsDialog-content='#elFluidFormFilters']");
-			this._buttonText = $('body').find('[data-role="fluidForumMobileDesc"]');
+			this._button = $('body').find('[data-role="fluidForumMobileDesc"]');
 			this._updateButtonText();
 		},
 		
@@ -118,7 +117,7 @@
 		 *
 		 */
 		isSelected: function(id) {
-			return this.scope.find('[data-node-id="' + id + '"]').hasClass('cForumMiniList__selected') ? true : false;
+			return this.scope.find('[data-node-id="' + id + '"]').hasClass('cForumMiniList_selected') ? true : false;
 		},
 		
 		/**
@@ -129,7 +128,7 @@
 			Debug.log("Select child: " + id );
 			this._ids.push( id );
 			var node = this.scope.find('[data-node-id="' + id + '"]');
-			node.addClass('cForumMiniList__selected');
+			node.addClass('cForumMiniList_selected');
 			var parentId = node.attr('data-parent-id');
 
 			/* Mark any children, but we do not need to keep individual row markings */
@@ -153,7 +152,7 @@
 		childUnselect: function(id) {
 			Debug.log("UNselect child: " + id );
 			/* Remove marking */
-			this.scope.find('[data-node-id="' + id + '"]').removeClass('cForumMiniList__selected');
+			this.scope.find('[data-node-id="' + id + '"]').removeClass('cForumMiniList_selected');
 			
 			/* Remove from local storage and id stack */
 			this._ids = _.without( this._ids, id );
@@ -181,7 +180,7 @@
 		parentSelect: function(parentId) {
 			Debug.log("Select parent: " + parentId );
 			/* Mark category and children as selected */
-			this.scope.find('[data-node-id="' + parentId + '"]').addClass('cForumMiniList__selected');
+			this.scope.find('[data-node-id="' + parentId + '"]').addClass('cForumMiniList_selected');
 			
 			/* Remove children from the arrays as PHP handles this */
 			if ( this._rootForum === null ) {
@@ -206,7 +205,7 @@
 			Debug.log("UNselect parent: " + parentId );
 			/* Unselect parent as marked */
 			var node = this.scope.find('[data-node-id="' + parentId + '"]');
-			node.removeClass('cForumMiniList__selected');
+			node.removeClass('cForumMiniList_selected');
 			
 			this._ids = _.without( this._ids, parentId );
 			this.updateCookie();
@@ -253,30 +252,27 @@
 		 * @returns		{void}
 		 */
 		_updateButtonText: function () {
-			var blobs = this.scope.find('.cForumMiniList__blob');
+			var blobs = this.scope.find('.cForumMiniList_blob');
 			var selectedBlobRows = blobs.filter( function () {
-				if( $( this ).closest('.cForumMiniList__selected').length ){
+				if( $( this ).closest('.cForumMiniList_selected').length ){
 					return true;
 				}
 				return false;
 			});
-			var text = '', buttonClass = '';
+			var text = '';
 
 			// If the counts are the same, we know we've selected all of them
 			if( blobs.length == selectedBlobRows.length || selectedBlobRows.length === 0 ){
 				text = ips.getString('topicsFromAllForums');
-				buttonClass = 'ipsButton--inherit';
 			} else {
 				text = ips.pluralize( ips.getString( 'topicsFromXForums' ), selectedBlobRows.length );
-				buttonClass = 'ipsButton--secondary';
 			}
 
-			this._buttonText.text( text );
-			this._button.removeClass("ipsButton--inherit ipsButton--secondary").addClass(buttonClass);
+			this._button.text( text );
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="forums" javascript_location="front" javascript_path="controllers/forum" javascript_name="ips.forum.forumList.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="forums" javascript_location="front" javascript_path="controllers/forum" javascript_name="ips.forum.forumList.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -284,67 +280,78 @@
  *
  * Author: Rikki Tissier
  */
-;( function($, _){
+;( function($, _, undefined){
 	"use strict";
 
 	ips.controller.register('forums.front.forum.forumList', {
-
-		/**
-		* Initializes the controller
-		 *
-		* @returns {void}
-		*/
-		initialize() {
-			this.on( 'ips:toggleForumCategory', this.toggleCategory );
+		initialize: function () {
+			this.on( 'click', '[data-action="toggleCategory"]', this.toggleCategory );
+			this.on( 'markedAsRead', this.forumMarkedRead );
 			this.setup();
 		},
 
 		/**
 		 * Setup method
-		 *
 		 * Hides categories the user has already hidden
 		 *
 		 * @returns {void}
 		 */
-		setup() {
-			let hiddenCategories = ips.utils.db.get( 'hiddenCategories' );
+		setup: function () {
+			var self = this;
+			var hiddenCategories = ips.utils.db.get( 'hiddenCategories' );
 
 			if( _.isObject( hiddenCategories ) && _.size( hiddenCategories ) ){
-				_.each( hiddenCategories, function (val, key) {		
-					document.querySelector("[aria-controls='forum-category_" + key + "']")?.setAttribute('aria-expanded', 'false');
-					document.getElementById('forum-category_' + key)?.setAttribute('hidden', '');
+				_.each( hiddenCategories, function (val, key) {
+					self.scope.find('[data-categoryID="' + key + '"]')
+						.addClass('cForumRow_hidden')
+						.attr( 'data-hidden', true )
+						.find( '[data-role="forums"]' )
+							.hide();
 				});
 			}
 		},
 
 		/**
-		 * Event handler for storing toggle status
+		 * Event handler for toggling a category
 		 * Hidden categories are stored localDB
 		 *
-		 * @param 	{ipsUiHiddenToggleEvent} 	e 	Event object
-		 *
+		 * @param 	{event} 	e 	Event object
 		 * @returns {void}
 		 */
-		toggleCategory(e) {
-			/* Get the category which triggered the event and its ID */
-			const category = e.target;
-			const categoryID = category.closest('[data-categoryID]')?.dataset.categoryid;
+		toggleCategory: function (e) {
+			e.preventDefault();
 
-			if (!category || !categoryID) {
-				Debug.warn(`The forum list got a category hidden toggle event but couldn't determine which category was toggled`);
-				return;
-			}
+			var category = $( e.currentTarget ).closest('[data-categoryID]');
 
-			if (e.detail.hidden) {
-				ips.utils.db.set( 'hiddenCategories', categoryID, true );
+			if( !category.attr('data-hidden') ){
+				ips.utils.db.set( 'hiddenCategories', category.attr('data-categoryID'), true );
+				category
+					.addClass('cForumRow_hidden')
+					.attr( 'data-hidden', true )
+					.find('[data-role="forums"]')
+						.hide();
 			} else {
-				ips.utils.db.remove( 'hiddenCategories', categoryID );
+				ips.utils.anim.go( 'fadeIn', category.find('[data-role="forums"]') );
+				ips.utils.db.remove( 'hiddenCategories', category.attr('data-categoryID') );
+				category
+					.removeClass('cForumRow_hidden')
+					.removeAttr( 'data-hidden' );
 			}
-			
+		},
+
+		/**
+		 * Event handler for a forum being marked as read
+		 * We need to do some extra work for grid-style forums
+		 *
+		 * @param 	{event} 	e 	Event object
+		 * @returns {void}
+		 */
+		forumMarkedRead: function(e) {
+			$( e.target ).closest( '.cForumGrid' ).removeClass('cForumGrid--unread').removeClass('ipsDataItem_unread').addClass('cForumGrid--read');
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="forums" javascript_location="front" javascript_path="controllers/forum" javascript_name="ips.forum.forumPage.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="forums" javascript_location="front" javascript_path="controllers/forum" javascript_name="ips.forum.forumPage.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -353,22 +360,24 @@
  * Author: Rikki Tissier
  */
 ;( function($, _, undefined){
-	"use strict";
+	&quot;use strict&quot;;
 
 	ips.controller.register('forums.front.forum.forumPage', {
 
 		initialize: function () {
-			this.on( 'click', '[data-action="markForumRead"]', this.markForumRead );
+			this.on( 'click', '[data-action=&quot;markForumRead&quot;]', this.markForumRead );
 		},
 
 		/**
 		 * Marks all topics in a forum table as read, triggering an event on the table
 		 *
-		 * @param 	{Event} 	e 	Event object
+		 * @param 	{event} 	e 	Event object
 		 * @returns {void}
 		 */
-		markForumRead (e) {
+		markForumRead: function (e) {
 			e.preventDefault();
+
+			var self = this;
 
 			ips.ui.alert.show( {
 				type: 'confirm',
@@ -376,16 +385,16 @@
 				message: ips.getString('markForumAsReadConfirm'),
 				subText: '',
 				callbacks: {
-					ok: () => {
-						const url = $(e.currentTarget).attr('href');
+					ok: function () {
+						var url = $( e.currentTarget ).attr('href');
 
 						ips.getAjax()( url, {
 							showLoading: true,
 							bypassRedirect: true
 						})
-							.done( () => {
+							.done( function () {
 								// Trigger event on the table to hide unread markets
-								this.triggerOn( 'core.global.core.table', 'markTableRead' );
+								self.triggerOn( 'core.global.core.table', 'markTableRead' );
 
 								// Hide the link we've just clicked
 								ips.utils.anim.go( 'fadeOut', $( e.currentTarget ) );
@@ -400,8 +409,8 @@
 			});
 		}
 	});
-}(jQuery, _));]]></file>
- <file javascript_app="forums" javascript_location="front" javascript_path="controllers/forum" javascript_name="ips.forum.hovercard.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100">/**
+}(jQuery, _));</file>
+ <file javascript_app="forums" javascript_location="front" javascript_path="controllers/forum" javascript_name="ips.forum.hovercard.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -447,11 +456,11 @@
 			});
 
 			// Hide the link
-			$( e.currentTarget ).addClass('i-opacity_4').attr('data-disabled');
+			$( e.currentTarget ).addClass('ipsFaded').attr('data-disabled');
 		}
 	});
 }(jQuery, _));</file>
- <file javascript_app="forums" javascript_location="admin" javascript_path="controllers/settings" javascript_name="ips.settings.archiveRules.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050"><![CDATA[/**
+ <file javascript_app="forums" javascript_location="admin" javascript_path="controllers/settings" javascript_name="ips.settings.archiveRules.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -476,8 +485,8 @@
 			var currentPercentage = parseInt( this.scope.find('[data-role="percentage"]').text() );
 
 			this.scope
-				.find('.ipsProgress')
-					.toggleClass('i-opacity_4', !currentPercentage );
+				.find('.ipsProgressBar')
+					.toggleClass('ipsFaded', !currentPercentage );
 		},
 
 		/**
@@ -498,8 +507,8 @@
 				var currentPercentage = parseInt( self.scope.find('[data-role="percentage"]').text() );
 
 				self.scope
-					.find('.ipsProgress')
-						.toggleClass('i-opacity_4', !parseInt( response.percentage ) )
+					.find('.ipsProgressBar')
+						.toggleClass('ipsFaded', !parseInt( response.percentage ) )
 					.end()
 					.find('[data-role="percentage"]')
 						.text( response.percentage )
@@ -516,7 +525,7 @@
 	});
 }(jQuery, _));
 ]]></file>
- <file javascript_app="forums" javascript_location="front" javascript_path="controllers/topic" javascript_name="ips.topic.activity.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050">/**
+ <file javascript_app="forums" javascript_location="front" javascript_path="controllers/topic" javascript_name="ips.topic.activity.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -534,11 +543,161 @@
         },
         
         toggleOverview: function (e) {
-            this.scope.toggleClass('cTopicOverview--expanded');
+            e.preventDefault();
+
+            if( this.scope.hasClass('cTopicOverview--expanded') ){
+                this.scope.find('[data-role=&quot;preview&quot;]').removeClass('ipsHide');
+                this.scope.find('[data-role=&quot;overview&quot;]').addClass('ipsHide');
+                this.scope.removeClass('cTopicOverview--expanded');
+            } else {
+                this.scope.find('[data-role=&quot;preview&quot;]').addClass('ipsHide');
+                this.scope.find('[data-role=&quot;overview&quot;]').removeClass('ipsHide');
+                this.scope.addClass('cTopicOverview--expanded');
+            }
         }
 	});
 }(jQuery, _));</file>
- <file javascript_app="forums" javascript_location="front" javascript_path="controllers/topic" javascript_name="ips.topic.reply.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050">/**
+ <file javascript_app="forums" javascript_location="front" javascript_path="controllers/topic" javascript_name="ips.topic.answers.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050"><![CDATA[/**
+ * Invision Community
+ * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
+ *
+ * ips.topic.answers.js - Profile body controller
+ *
+ * Author: Rikki Tissier
+ */
+;( function($, _, undefined){
+	"use strict";
+
+	ips.controller.register('forums.front.topic.answers', {
+
+		ajaxObj: null,
+
+		/**
+ 		 * Initialize controller events
+		 *
+		 * @returns 	{void}
+		 */
+		initialize: function () {
+			this.on( 'click', 'a.cAnswerRate', this.rate );
+		},
+
+		/**
+		 * Rate answers
+		 *
+		 * @param 	{event} 	e 	Event object
+		 * @returns {void}
+		 */
+		rate: function (e) {
+			e.preventDefault();
+
+			var self = this;
+			var clicked = $( e.currentTarget );
+
+			if( this.scope.find('.cAnswerRate_up').is('.ipsType_positive') ) {
+				var currentVote	= 'positive';
+			} 
+			else if( this.scope.find('.cAnswerRate_down').is('.ipsType_negative') ) {
+				var currentVote	= 'negative';
+			}
+			else {
+				var currentVote = false;
+			}
+
+			var positive		= clicked.hasClass('cAnswerRate_up');
+			var voteCount		= this.scope.find('[data-role="voteCount"]');
+			var currentVotes	= parseInt( voteCount.attr('data-voteCount') );
+
+			var newVoteCount	= 0;
+			var setPositive		= false;
+			var setNegative		= false;
+
+			// Do we have a current vote?
+			if( currentVote !== false ) {
+				// If our current vote is positive and we clicked it again, we're removing our vote 
+				if( positive && currentVote == 'positive' ) {
+					newVoteCount = currentVotes - 1;
+				}
+				// If our current vote is negative and we clicked it again, we're removing our vote 
+				else if( !positive && currentVote == 'negative' ) {
+					newVoteCount = currentVotes + 1;
+				}
+				// Otherwise if our current vote is positive and we clicked negative...
+				else if( !positive && currentVote == 'positive' ) {
+					newVoteCount = currentVotes - 2;
+					setNegative  = true;
+				}
+				// Or our current vote is negative and we clicked positive
+				else if( positive && currentVote == 'negative' ) {
+					newVoteCount = currentVotes + 2;
+					setPositive  = true;
+				}
+			}
+			// Otherwise if we clicked the positive icon...
+			else if( positive ) {
+				newVoteCount = currentVotes + 1;
+				setPositive  = true;
+			}
+			// Or we clicked the negative icon
+			else {
+				newVoteCount = currentVotes - 1;
+				setNegative  = true;
+			}
+
+			this.setStyles( setPositive, setNegative );
+
+			voteCount
+				.toggleClass( 'ipsType_positive', setPositive )
+				.toggleClass( 'ipsType_negative', setNegative )
+				.text( newVoteCount )
+				.attr( 'data-voteCount', newVoteCount );
+
+			// Send request
+			if( this.ajaxObj && _.isFunction( this.ajaxObj.abort ) ){
+				this.ajaxObj.abort();
+			}
+
+			this.ajaxObj = ips.getAjax()( clicked.attr('href') )
+				.done( function (response) {
+
+					Debug.log( response );
+
+					voteCount.text( response.votes );
+					self.scope.find('.ipsType_light').text( ips.pluralize( ips.getString( 'votes_no_number' ), response.votes ) );
+				});
+		},
+
+		/**
+		 * Reset CSS classes
+		 *
+		 * @param {bool}	Set positive
+		 * @param {bool}	Set negative
+		 */
+		 setStyles: function( setPositive, setNegative ) {
+			this.scope.find('.cAnswerRate_up').toggleClass( 'ipsType_positive', setPositive );
+			this.scope.find('.cAnswerRate_down').toggleClass( 'ipsType_negative', setNegative );
+			this.scope.toggleClass( 'cRatingColumn_up', setPositive ).toggleClass( 'cRatingColumn_down', setNegative );
+
+			// Reset tooltips
+			this.scope.find('a.cAnswerRate_up').removeAttr( '_title' );
+			this.scope.find('a.cAnswerRate_down').removeAttr( '_title' );
+
+			if( setPositive ) {
+				this.scope.find('a.cAnswerRate_up').attr( 'title', ips.getString('js_remove_your_vote') );
+			}
+			else {
+				this.scope.find('a.cAnswerRate_up').attr( 'title', ips.getString('js_vote_answer_up') );
+			}
+			
+			if( setNegative ) {
+				this.scope.find('a.cAnswerRate_down').attr( 'title', ips.getString('js_remove_your_vote') );
+			}
+			else {
+				this.scope.find('a.cAnswerRate_down').attr( 'title', ips.getString('js_vote_answer_down') );
+			}
+		 }
+	});
+}(jQuery, _));]]></file>
+ <file javascript_app="forums" javascript_location="front" javascript_path="controllers/topic" javascript_name="ips.topic.reply.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -562,12 +721,11 @@
 		 * @returns {void}
 		 */
 		replyToTopic: function (e) {
-			e.preventDefault();
 			$( document ).trigger( 'replyToTopic' );
 		}
 	});
 }(jQuery, _));</file>
- <file javascript_app="forums" javascript_location="front" javascript_path="controllers/topic" javascript_name="ips.topic.solved.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050"><![CDATA[/**
+ <file javascript_app="forums" javascript_location="front" javascript_path="controllers/topic" javascript_name="ips.topic.solved.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -605,7 +763,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="forums" javascript_location="front" javascript_path="controllers/topic" javascript_name="ips.topic.view.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050">/**
+ <file javascript_app="forums" javascript_location="front" javascript_path="controllers/topic" javascript_name="ips.topic.view.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -620,20 +778,8 @@
 
 		initialize: function () {
 			$( document ).on( 'replyToTopic', _.bind( this.replyToTopic, this ) );
-			this.on( 'paginationClicked', this.paginationClicked );
 			this.on( 'click', '[data-action=&quot;showMoreActivity&quot;]', this.showActivity );
 			this.on( 'click', '[data-action=&quot;closeMoreActivity&quot;]', this.hideActivity );
-		},
-
-		/**
-		 * Hide any helpful filters on page one
-		 *
-		 * @param 	{event} 	e 		Event object
-		 * @param 	{object} 	data	Data object
-		 * @returns {void}
-		 */
-		paginationClicked: function ( e, data ) {
-			document.getElementById('ipsTopicView').dataset.ipsTopicFirstPage = ( data.pageNo == 1 );
 		},
 			
 		/**
@@ -671,7 +817,7 @@
 		 * @returns {void}
 		 */
 		replyToTopic: function (e) {
-			ips.ui.editorv5.getObjWithInit( this.scope.find('[data-role=&quot;replyArea&quot;] [data-ipsEditorv5]'), function(editor){
+			ips.ui.editor.getObjWithInit( this.scope.find('[data-role=&quot;replyArea&quot;] [data-ipsEditor]'), function(editor){
 				editor.unminimize(function(){
 					editor.focus();
 				});
@@ -691,7 +837,8 @@ mustache
 Debug.js
 app.js</order>
  <order app="global" path="/dev/js//library//jquery">jquery.js
-jquery-migrate.js</order>
+jquery-migrate.js
+jquery.transform.js</order>
  <order app="global" path="/dev/js//library//linkify">linkify.min.js
 linkify-jquery.min.js</order>
 </javascript>

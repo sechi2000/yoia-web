@@ -11,30 +11,23 @@
 namespace IPS\core\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\DashboardAbstract;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Dashboard extension: Current online admins
  */
-class OnlineAdmins extends DashboardAbstract
+class _OnlineAdmins
 {
 	/**
 	* Can the current user view this dashboard item?
 	*
 	* @return	bool
 	*/
-	public function canView(): bool
+	public function canView()
 	{
 		return TRUE;
 	}
@@ -44,13 +37,13 @@ class OnlineAdmins extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
 		$admins	= array();
 
-		foreach( Db::i()->select( '*', 'core_sys_cp_sessions', NULL, 'session_running_time DESC' ) as $admin )
+		foreach( \IPS\Db::i()->select( '*', 'core_sys_cp_sessions', NULL, 'session_running_time DESC' ) as $admin )
 		{
-			$user	= Member::load( $admin['session_member_id'] );
+			$user	= \IPS\Member::load( $admin['session_member_id'] );
 
 			if( $user->member_id )
 			{
@@ -59,6 +52,6 @@ class OnlineAdmins extends DashboardAbstract
 		}
 
 
-		return Theme::i()->getTemplate( 'dashboard' )->onlineAdmins( $admins );
+		return \IPS\Theme::i()->getTemplate( 'dashboard' )->onlineAdmins( $admins );
 	}
 }

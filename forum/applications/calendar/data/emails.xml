@@ -15,7 +15,7 @@
 <table width='100%' cellpadding='0' cellspacing='0' border='0'>
 	<tr>
 		<td dir='{dir}' width='40' valign='top' class='hidePhone' style='width: 0; max-height: 0; overflow: hidden; float: left;'>
-			<img src='{$content->author()->get_photo( true, true )}' width='40' height='40' style='border-radius: 6px; vertical-align: middle;'>
+			<img src='{$content->author()->get_photo( true, true )}' width='40' height='40' style='border: 1px solid #777777; vertical-align: middle;'>
 		</td>
 		<td dir='{dir}' width='30' valign='top' class='hidePhone' style='width: 0; max-height: 0; overflow: hidden; float: left;'>
 			<br />
@@ -27,7 +27,7 @@
 					<td dir='{dir}'>
 						<table width='100%' cellpadding='5' cellspacing='0' border='0'>
 							<tr>
-								<td dir='{dir}' style="font-family: 'Helvetica Neue', helvetica, sans-serif; line-height: 1.5; font-size: 14px; color: #5e7a98">
+								<td dir='{dir}' style="font-family: 'Helvetica Neue', helvetica, sans-serif; line-height: 1.5; font-size: 14px; color: #8d8d8d">
 									{$email->language->addToStack("email_posted_in", FALSE, array( 'sprintf' => array( $content->container()->getTitleForLanguage( $email->language ) ) ) )}
 								</td>
 							</tr>
@@ -55,51 +55,6 @@
 {{if $content->location}}{$email->language->addToStack("email_event_reminder_where", FALSE, array( 'htmlsprintf' => array( \IPS\GeoLocation::buildFromjson( $content->location )->toString() ) ) )}{{endif}}
 
 {$email->language->addToStack("go_to_this_x", FALSE, array( 'htmlsprintf' => array( mb_strtolower( $email->language->addToStack( $content::$title, FALSE ) ) ) ) )}: {$content->url()}
-
--- {setting="board_name"}]]></template_content_plaintext><template_pinned>0</template_pinned></template><template><template_app>calendar</template_app><template_name>notification_event_rsvp</template_name><template_content_html><![CDATA[
-{$email->language->addToStack("email_event_rsvp", FALSE, array( 'sprintf' => array( $member->name, $content->url(), $content->mapped('title') ) ) )}
-
-<br />
-<br />
-
-<table cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#ffffff" class='responsive_table'>
-	<tr>
-		<td dir='{dir}' width="100%" class='responsive_fullwidth' bgcolor="#f9f9f9">
-			<table cellpadding="10" cellspacing="0" border="0" width="100%">
-				<tr>
-					<td dir='{dir}' colspan='2' style="font-family: 'Helvetica Neue', helvetica, sans-serif; font-size: 15px; color: #333333; line-height: 21px" bgcolor="#f0f0f0">
-						<strong>{$email->language->get("rsvp_attend_event")}</strong>
-					</td>
-					<td dir='{dir}' style="font-family: 'Helvetica Neue', helvetica, sans-serif; font-size: 15px; color: #333333; line-height: 21px">
-					    {$email->language->addToStack( 'x_members', false, array( 'pluralize' => array( $content->attendeeCount( $content::RSVP_YES ) ) ) )}
-					</td>
-				</tr>
-				<tr>
-					<td dir='{dir}' colspan='2' style="font-family: 'Helvetica Neue', helvetica, sans-serif; font-size: 15px; color: #333333; line-height: 21px" bgcolor="#f0f0f0">
-						<strong>{$email->language->get("rsvp_maybe_event")}</strong>
-					</td>
-					<td dir='{dir}' style="font-family: 'Helvetica Neue', helvetica, sans-serif; font-size: 15px; color: #333333; line-height: 21px">
-					    {$email->language->addToStack( 'x_members', false, array( 'pluralize' => array( $content->attendeeCount( $content::RSVP_MAYBE ) ) ) )}
-					</td>
-				</tr>
-				<tr>
-					<td dir='{dir}' colspan='2' style="font-family: 'Helvetica Neue', helvetica, sans-serif; font-size: 15px; color: #333333; line-height: 21px" bgcolor="#f0f0f0">
-						<strong>{$email->language->get("rsvp_notgoing_event")}</strong>
-					</td>
-					<td dir='{dir}' style="font-family: 'Helvetica Neue', helvetica, sans-serif; font-size: 15px; color: #333333; line-height: 21px">
-					    {$email->language->addToStack( 'x_members', false, array( 'pluralize' => array( $content->attendeeCount( $content::RSVP_NO ) ) ) )}
-					</td>
-				</tr>
-			</table>
-		</td>
-	</tr>
-</table>
-<br /><br />
-<em style='color: #8c8c8c'>&mdash; {setting="board_name"}</em>]]></template_content_html><template_data>$content, $member, $email</template_data><template_content_plaintext><![CDATA[{$email->language->addToStack("email_event_rsvp_plain", FALSE, array( 'htmlsprintf' => array( $member->name, $content->mapped('title') ) ) )}
-
-{$email->language->get("rsvp_attend_event")}: {$email->language->addToStack( 'x_members', false, array( 'pluralize' => array( $content->attendeeCount( $content::RSVP_YES ) ) ) )}
-{$email->language->get("rsvp_maybe_event")}: {$email->language->addToStack( 'x_members', false, array( 'pluralize' => array( $content->attendeeCount( $content::RSVP_MAYBE ) ) ) )}
-{$email->language->get("rsvp_notgoing_event")}: {$email->language->addToStack( 'x_members', false, array( 'pluralize' => array( $content->attendeeCount( $content::RSVP_NO ) ) ) )}
 
 -- {setting="board_name"}]]></template_content_plaintext><template_pinned>0</template_pinned></template><template><template_app>calendar</template_app><template_name>notification_new_content</template_name><template_content_html><![CDATA[
 {{if $content->author()->member_id}}

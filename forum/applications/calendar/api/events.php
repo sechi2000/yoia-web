@@ -12,46 +12,21 @@
 namespace IPS\calendar\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Api\Webhook;
-use IPS\calendar\Calendar;
-use IPS\calendar\Date;
-use IPS\calendar\Event;
-use IPS\calendar\Event\Comment;
-use IPS\calendar\Event\Review;
-use IPS\Content\Api\ItemController;
-use IPS\Content\Item;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\GeoLocation;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Request;
-use IPS\Text\Parser;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Calendar Events API
  */
-class events extends ItemController
+class _events extends \IPS\Content\Api\ItemController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\calendar\Event';
+	protected $class = 'IPS\calendar\Event';
 	
 	/**
 	 * GET /calendar/events
@@ -70,51 +45,50 @@ class events extends ItemController
 	 * @apiparam	string	sortDir			Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page			Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\calendar\Event>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\calendar\Event>
 	 * @throws		1L296/M	INVALID_DATE	The rangeStart and/or rangeEnd value was not a valid date in YYYY-MM-DD format
-	 * @return PaginatedResponse<Event>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = array();
 
 		/* Are we limiting to a date range? */
-		if( isset( Request::i()->rangeStart ) OR isset( Request::i()->rangeEnd ) )
+		if( isset( \IPS\Request::i()->rangeStart ) OR isset( \IPS\Request::i()->rangeEnd ) )
 		{
 			$startDate = $endDate = NULL;
 
 			foreach( array( 'start', 'end' ) as $limiter )
 			{
-				$inputKey = 'range' . IPS::mb_ucfirst( $limiter );
+				$inputKey = 'range' . mb_ucfirst( $limiter );
 
-				if( Request::i()->$inputKey )
+				if( \IPS\Request::i()->$inputKey )
 				{
-					$datePieces = explode( '-', Request::i()->$inputKey );
+					$datePieces = explode( '-', \IPS\Request::i()->$inputKey );
 
 					/* Let's make sure the date is valid... */
 					if( @checkdate( $datePieces[1], $datePieces[2], $datePieces[0] ) )
 					{
 						if( $limiter === 'start' )
 						{
-							$startDate	= Date::getDate( $datePieces[0], $datePieces[1], $datePieces[2] );
+							$startDate	= \IPS\calendar\Date::getDate( $datePieces[0], $datePieces[1], $datePieces[2] );
 						}
 						else
 						{
-							$endDate	= Date::getDate( $datePieces[0], $datePieces[1], $datePieces[2], 23, 59, 59 );
+							$endDate	= \IPS\calendar\Date::getDate( $datePieces[0], $datePieces[1], $datePieces[2], 23, 59, 59 );
 						}
 					}
 					else
 					{
-						throw new Exception( 'INVALID_DATE', '1L296/M', 403 );
+						throw new \IPS\Api\Exception( 'INVALID_DATE', '1L296/M', 403 );
 					}
 				}
 			}
 
 			/* Get the events within this range */
-			$events		= Event::retrieveEvents( $startDate, $endDate, NULL, NULL, FALSE, new Member, NULL, TRUE );
+			$events		= \IPS\calendar\Event::retrieveEvents( $startDate, $endDate, NULL, NULL, FALSE, new \IPS\Member, NULL, TRUE );
 
-			if( !count( $events ) )
+			if( !\count( $events ) )
 			{
 				/* Force no results */
 				$where[] = array( '0=1' );
@@ -128,9 +102,9 @@ class events extends ItemController
 		/* Sort by */
 		$sortBy = NULL;
 
-		if ( isset( Request::i()->sortBy ) and in_array( Request::i()->sortBy, array( 'start', 'end' ) ) )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'start', 'end' ) ) )
 		{
-			$sortBy = 'event_' . Request::i()->sortBy . '_date';
+			$sortBy = 'event_' . \IPS\Request::i()->sortBy . '_date';
 		}
 				
 		/* Return */
@@ -143,18 +117,17 @@ class events extends ItemController
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		1F294/1	INVALID_ID	The event ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\calendar\Event
-	 * @return Response
+	 * @return		\IPS\calendar\Event
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{
 			return $this->_view( $id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2L296/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2L296/1', 404 );
 		}
 	}
 	
@@ -188,19 +161,18 @@ class events extends ItemController
 	 * @throws		1L296/A				INVALID_START	The start date is invalid
 	 * @throws		1L296/B				INVALID_END		The end date is invalid
 	 * @throws		2L296/C				NO_PERMISSION	The authorized user does not have permission to create an event in that calendar
-	 * @apireturn		\IPS\calendar\Event
-	 * @return Response
+	 * @return		\IPS\calendar\Event
 	 */
-	public function POSTindex(): Response
+	public function POSTindex()
 	{
 		/* Get calendar */
 		try
 		{
-			$calendar = Calendar::load( Request::i()->calendar );
+			$calendar = \IPS\calendar\Calendar::load( \IPS\Request::i()->calendar );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_CALENDAR', '1L296/6', 400 );
+			throw new \IPS\Api\Exception( 'NO_CALENDAR', '1L296/6', 400 );
 		}
 		
 		/* Get author */
@@ -208,66 +180,66 @@ class events extends ItemController
 		{
 			if ( !$calendar->can( 'add', $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2L296/C', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2L296/C', 403 );
 			}
 			$author = $this->member;
 		}
 		else
 		{
-			if ( Request::i()->author )
+			if ( \IPS\Request::i()->author )
 			{
-				$author = Member::load( Request::i()->author );
+				$author = \IPS\Member::load( \IPS\Request::i()->author );
 				if ( !$author->member_id )
 				{
-					throw new Exception( 'NO_AUTHOR', '1L296/7', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1L296/7', 400 );
 				}
 			}
 			else
 			{
-				if ( (int) Request::i()->author === 0 )
+				if ( (int) \IPS\Request::i()->author === 0 ) 
 				{
-					$author = new Member;
+					$author = new \IPS\Member;
 				}
 				else 
 				{
-					throw new Exception( 'NO_AUTHOR', '1L296/7', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1L296/7', 400 );
 				}
 			}
 		}
 		
 		/* Check we have a title and a description */
-		if ( !Request::i()->title )
+		if ( !\IPS\Request::i()->title )
 		{
-			throw new Exception( 'NO_TITLE', '1L296/8', 400 );
+			throw new \IPS\Api\Exception( 'NO_TITLE', '1L296/8', 400 );
 		}
-		if ( !Request::i()->description )
+		if ( !\IPS\Request::i()->description )
 		{
-			throw new Exception( 'NO_DESC', '1L296/9', 400 );
+			throw new \IPS\Api\Exception( 'NO_DESC', '1L296/9', 400 );
 		}
 		
 		/* Validate dates */
 		try
 		{
-			new DateTime( Request::i()->start );
+			new \IPS\DateTime( \IPS\Request::i()->start );
 		}
 		catch ( \Exception $e )
 		{
-			throw new Exception( 'INVALID_START', '1L296/A', 400 );
+			throw new \IPS\Api\Exception( 'INVALID_START', '1L296/A', 400 );
 		}
-		if ( isset( Request::i()->end ) )
+		if ( isset( \IPS\Request::i()->end ) )
 		{
 			try
 			{
-				new DateTime( Request::i()->end );
+				new \IPS\DateTime( \IPS\Request::i()->end );
 			}
 			catch ( \Exception $e )
 			{
-				throw new Exception( 'INVALID_END', '1L296/B', 400 );
+				throw new \IPS\Api\Exception( 'INVALID_END', '1L296/B', 400 );
 			}
 		}
 		
 		/* Do it */
-		return new Response( 201, $this->_create( $calendar, $author )->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 201, $this->_create( $calendar, $author )->apiOutput( $this->member ) );
 	}
 	
 	/**
@@ -292,89 +264,87 @@ class events extends ItemController
 	 * @apiparam	int					hidden			0 = unhidden; 1 = hidden, pending moderator approval; -1 = hidden (as if hidden by a moderator)
 	 * @apiparam	int					featured		1/0 indicating if the event should be featured
 	 * @apiparam	bool				anonymous		If 1, the item will be posted anonymously.
-	 * @param int $id
 	 * @throws		1L296/I				INVALID_ID		The event ID is invalid or the authorized user does not have permission to view it
 	 * @throws		1L296/D				NO_CALENDAR		The calendar ID does not exist or the authorized user does not have permission to post in it
 	 * @throws		1L296/E				NO_AUTHOR		The author ID does not exist
 	 * @throws		1L296/G				INVALID_START	The start date is invalid
 	 * @throws		1L296/H				INVALID_END		The end date is invalid
 	 * @throws		2L296/D				NO_PERMISSION	The authorized user does not have permission to edit the topic
-	 * @apireturn		\IPS\calendar\Event
-	 * @return Response
+	 * @return		\IPS\calendar\Event
 	 */
-	public function POSTitem( int $id ): Response
+	public function POSTitem( $id )
 	{
 		try
 		{
-			$event = Event::load( $id );
+			$event = \IPS\calendar\Event::load( $id );
 			if ( $this->member and !$event->can( 'read', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			if ( $this->member and !$event->canEdit( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2L296/D', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2L296/D', 403 );
 			}
 			
 			/* New calendar */
-			if ( isset( Request::i()->calendar ) and Request::i()->calendar != $event->calendar_id and ( !$this->member or $event->canMove( $this->member ) ) )
+			if ( isset( \IPS\Request::i()->calendar ) and \IPS\Request::i()->calendar != $event->calendar_id and ( !$this->member or $event->canMove( $this->member ) ) )
 			{
 				try
 				{
-					$newCalendar = Calendar::load( Request::i()->calendar );
+					$newCalendar = \IPS\calendar\Calendar::load( \IPS\Request::i()->calendar );
 					if ( $this->member and !$newCalendar->can( 'add', $this->member ) )
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 					
 					$event->move( $newCalendar );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					throw new Exception( 'NO_CALENDAR', '1L296/D', 400 );
+					throw new \IPS\Api\Exception( 'NO_CALENDAR', '1L296/D', 400 );
 				}
 			}
 			
 			/* New author */
-			if ( !$this->member and isset( Request::i()->author ) )
+			if ( !$this->member and isset( \IPS\Request::i()->author ) )
 			{				
 				try
 				{
-					$member = Member::load( Request::i()->author );
+					$member = \IPS\Member::load( \IPS\Request::i()->author );
 					if ( !$member->member_id )
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 					
 					$event->changeAuthor( $member );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					throw new Exception( 'NO_AUTHOR', '1L296/E', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1L296/E', 400 );
 				}
 			}
 			
 			/* Validate dates */
-			if ( isset( Request::i()->start ) )
+			if ( isset( \IPS\Request::i()->start ) )
 			{
 				try
 				{
-					new DateTime( Request::i()->start );
+					new \IPS\DateTime( \IPS\Request::i()->start );
 				}
 				catch ( \Exception $e )
 				{
-					throw new Exception( 'INVALID_START', '1L296/G', 400 );
+					throw new \IPS\Api\Exception( 'INVALID_START', '1L296/G', 400 );
 				}
 			}
-			if ( isset( Request::i()->end ) )
+			if ( isset( \IPS\Request::i()->end ) )
 			{
 				try
 				{
-					new DateTime( Request::i()->end );
+					new \IPS\DateTime( \IPS\Request::i()->end );
 				}
 				catch ( \Exception $e )
 				{
-					throw new Exception( 'INVALID_END', '1L296/H', 400 );
+					throw new \IPS\Api\Exception( 'INVALID_END', '1L296/H', 400 );
 				}
 			}
 			
@@ -383,11 +353,11 @@ class events extends ItemController
 			
 			/* Save and return */
 			$event->save();
-			return new Response( 200, $event->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $event->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1L296/D', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1L296/D', 404 );
 		}
 	}
 	
@@ -401,18 +371,17 @@ class events extends ItemController
 	 * @apiparam	int		page		Page number
 	 * @apiparam	int		perPage		Number of results per page - defaults to 25
 	 * @throws		2L296/2	INVALID_ID	The event ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		PaginatedResponse<IPS\calendar\Event\Comment>
-	 * @return PaginatedResponse<Comment>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\calendar\Event\Comment>
 	 */
-	public function GETitem_comments( int $id ): PaginatedResponse
+	public function GETitem_comments( $id )
 	{
 		try
 		{
 			return $this->_comments( $id, 'IPS\calendar\Event\Comment' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2L296/2', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2L296/2', 404 );
 		}
 	}
 	
@@ -426,18 +395,17 @@ class events extends ItemController
 	 * @apiparam	int		page		Page number
 	 * @apiparam	int		perPage		Number of results per page - defaults to 25
 	 * @throws		2L296/3	INVALID_ID	The event ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		PaginatedResponse<IPS\calendar\Event\Review>
-	 * @return PaginatedResponse<Review>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\calendar\Event\Review>
 	 */
-	public function GETitem_reviews( int $id ): PaginatedResponse
+	public function GETitem_reviews( $id )
 	{
 		try
 		{
 			return $this->_comments( $id, 'IPS\calendar\Event\Review' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2L296/3', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2L296/3', 404 );
 		}
 	}
 	
@@ -447,24 +415,23 @@ class events extends ItemController
 	 *
 	 * @param		int				$id				ID Number
 	 * @throws		2L296/3			INVALID_ID		The event ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		array
+	 * @return		array
 	 * @apiresponse	[\IPS\Member]	attending		Members that have confirmed they are attending the event
 	 * @apiresponse	[\IPS\Member]	notAttending	Members that have confirmed they are not attending the event
 	 * @apiresponse	[\IPS\Member]	maybeAttending	Members that have said they may attend the event
-	 * @return Response
 	 */
-	public function GETitem_rsvps( int $id ): Response
+	public function GETitem_rsvps( $id )
 	{
 		try
 		{
-			$event = Event::load( $id );
+			$event = \IPS\calendar\Event::load( $id );
 			if ( $this->member and !$event->can( 'read', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
 			$attendees = $event->attendees();
-			return new Response( 200, array(
+			return new \IPS\Api\Response( 200, array(
 				'attending'			=> array_values( array_map( function( $member ) {
 					return $member->apiOutput( $this->member );
 				}, $attendees[1] ) ),
@@ -476,9 +443,9 @@ class events extends ItemController
 				}, $attendees[2] ) ),
 			) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2L296/4', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2L296/4', 404 );
 		}
 	}
 	
@@ -492,63 +459,53 @@ class events extends ItemController
 	 * @param		int				$memberId		Member ID NUmber
 	 * @throws		2L296/J			INVALID_ID		The event ID does not exist
 	 * @throws		2L296/K			INVALID_MEMBER	The member ID was not valid
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function PUTitem_rsvps( int $id, int $memberId ): Response
+	public function PUTitem_rsvps( $id, $memberId )
 	{
-		if ( !isset( Request::i()->response ) or !in_array( (int) Request::i()->response, range( 0, 2 ) ) )
+		if ( !isset( \IPS\Request::i()->response ) or !\in_array( (int) \IPS\Request::i()->response, range( 0, 2 ) ) )
 		{
-			throw new Exception( 'INVALID_RESPONSE', '1L296/L', 400 );
+			throw new \IPS\Api\Exception( 'INVALID_RESPONSE', '1L296/L', 400 );
 		}
 		
 		if ( $this->member and $memberId != $this->member->member_id )
 		{
-			throw new Exception( 'INVALID_MEMBER', '2L296/K', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_MEMBER', '2L296/K', 404 );
 		}
 		
 		try
 		{
-			$event = Event::load( $id );
+			$event = \IPS\calendar\Event::load( $id );
 			
 			try
 			{
-				$member = Member::load( $memberId );
+				$member = \IPS\Member::load( $memberId );
 				if ( !$member->member_id )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				throw new Exception( 'INVALID_MEMBER', '2L296/K', 404 );
+				throw new \IPS\Api\Exception( 'INVALID_MEMBER', '2L296/K', 404 );
 			}
 			
-			Db::i()->delete( 'calendar_event_rsvp', array( 'rsvp_event_id=? AND rsvp_member_id=?', $event->id, $member->member_id ) );
+			\IPS\Db::i()->delete( 'calendar_event_rsvp', array( 'rsvp_event_id=? AND rsvp_member_id=?', $event->id, $member->member_id ) );
 			
-			Db::i()->insert( 'calendar_event_rsvp', array(
+			\IPS\Db::i()->insert( 'calendar_event_rsvp', array(
 				'rsvp_event_id'		=> $event->id,
 				'rsvp_member_id'	=> $member->member_id,
 				'rsvp_date'			=> time(),
-				'rsvp_response'		=> (int) Request::i()->response
+				'rsvp_response'		=> (int) \IPS\Request::i()->response
 			) );
-
-			$webhookData = [
-				'event' => $event->apiOutput(),
-				'action' => (int) Request::i()->response,
-				'attendee' => $member->apiOutput(),
-			];
-			
-
-			Webhook::fire( 'calendarEvent_rsvp', $webhookData );
 
 			$member->achievementAction( 'calendar', 'Rsvp', $event );
 			
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_EVENT', '2L296/J', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_EVENT', '2L296/J', 404 );
 		}
 	}
 	
@@ -559,37 +516,36 @@ class events extends ItemController
 	 * @note		For requests using an OAuth Access Token for a particular member, the member ID must be the authorized member's ID
 	 * @param		int		$id				Event ID NUmber
 	 * @param		int		$memberId		Member ID NUmber
-	 * @apireturn		void
+	 * @return		void
 	 * @throws		2L296/K			INVALID_MEMBER	The member ID was not valid
-	 * @return Response
 	 */
-	public function DELETEitem_rsvps( int $id, int $memberId ): Response
+	public function DELETEitem_rsvps( $id, $memberId )
 	{
 		if ( $this->member and $memberId != $this->member->member_id )
 		{
-			throw new Exception( 'INVALID_MEMBER', '2L296/K', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_MEMBER', '2L296/K', 404 );
 		}
 		
-		Db::i()->delete( 'calendar_event_rsvp', array( 'rsvp_event_id=? AND rsvp_member_id=?', $id, $memberId ) );
-		return new Response( 200, NULL );
+		\IPS\Db::i()->delete( 'calendar_event_rsvp', array( 'rsvp_event_id=? AND rsvp_member_id=?', \intval( $id ), \intval( $memberId ) ) );
+		return new \IPS\Api\Response( 200, NULL );
 	}
 	
 	/**
 	 * Create or update event
 	 *
-	 * @param	Item	$item	The item
+	 * @param	\IPS\Content\Item	$item	The item
 	 * @param	string				$type	add or edit
-	 * @return	Item
+	 * @return	\IPS\Content\Item
 	 */
-	protected function _createOrUpdate( Item $item, string $type='add' ): Item
+	protected function _createOrUpdate( \IPS\Content\Item $item, $type='add' )
 	{
 		/* Start/End date */
-		$startDate = new DateTime( Request::i()->start );
+		$startDate = new \IPS\DateTime( \IPS\Request::i()->start );
 		$item->start_date = $startDate->format( 'Y-m-d H:i' );
 		$item->end_date = NULL;
-		if ( isset( Request::i()->end ) )
+		if ( isset( \IPS\Request::i()->end ) )
 		{
-			$endDate = new DateTime( Request::i()->end );
+			$endDate = new \IPS\DateTime( \IPS\Request::i()->end );
 			$item->end_date = $endDate->format( 'Y-m-d H:i' );
 		}
 		else
@@ -598,26 +554,26 @@ class events extends ItemController
 		}
 		
 		/* Recurrence */
-		if ( isset( Request::i()->recurrence ) )
+		if ( isset( \IPS\Request::i()->recurrence ) )
 		{
-			$item->recurring = Request::i()->recurrence;
+			$item->recurring = \IPS\Request::i()->recurrence;
 		}
 		
 		/* Description */
-		$descriptionContents = Request::i()->description;
+		$descriptionContents = \IPS\Request::i()->description;
 		if ( $this->member )
 		{
-			$descriptionContents = Parser::parseStatic( $descriptionContents, NULL, $this->member, 'calendar_Calendar' );
+			$descriptionContents = \IPS\Text\Parser::parseStatic( $descriptionContents, TRUE, NULL, $this->member, 'calendar_Calendar' );
 		}
 		$item->content = $descriptionContents;
 		
 		/* RSVP */
-		if ( isset( Request::i()->rsvp ) and ( !$this->member or $item->container()->can( 'askrsvp', $this->member ) ) )
+		if ( isset( \IPS\Request::i()->rsvp ) and ( !$this->member or $item->container()->can( 'askrsvp', $this->member ) ) )
 		{
-			$item->rsvp = intval( Request::i()->rsvp );
-			if ( $item->rsvp and isset( Request::i()->rsvpLimit ) and Request::i()->rsvpLimit )
+			$item->rsvp = \intval( \IPS\Request::i()->rsvp );
+			if ( $item->rsvp and isset( \IPS\Request::i()->rsvpLimit ) and \IPS\Request::i()->rsvpLimit )
 			{
-				$item->rsvp_limit = Request::i()->rsvpLimit;
+				$item->rsvp_limit = \IPS\Request::i()->rsvpLimit;
 			}
 			else
 			{
@@ -626,11 +582,11 @@ class events extends ItemController
 		}
 		
 		/* Location */
-		if ( isset( Request::i()->location ) )
+		if ( isset( \IPS\Request::i()->location ) )
 		{
-			if ( Request::i()->location )
+			if ( \IPS\Request::i()->location )
 			{
-				$location = GeoLocation::buildFromJson( json_encode( Request::i()->location ) );
+				$location = \IPS\GeoLocation::buildFromJson( json_encode( \IPS\Request::i()->location ) );
 				if ( !$location->lat or !$location->long )
 				{
 					try
@@ -653,26 +609,25 @@ class events extends ItemController
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		2L296/5	INVALID_ID	The event ID does not exist
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
 		try
 		{
-			$item = Event::load( $id );
+			$item = \IPS\calendar\Event::load( $id );
 			if ( $this->member and !$item->canDelete( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2F294/B', 404 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2F294/B', 404 );
 			}
 			
 			$item->delete();
 			
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2L296/5', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2L296/5', 404 );
 		}
 	}
 }

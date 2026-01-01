@@ -11,281 +11,169 @@
 namespace IPS\Helpers;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application;
-use IPS\Db;
-use IPS\Extensions\FormsAbstract;
-use IPS\File;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Helpers\Form\Matrix;
-use IPS\Helpers\Form\SocialGroup;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang\Setup\Lang;
-use IPS\Login;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use Throwable;
-use UnderflowException;
-use function count;
-use function defined;
-use function func_get_args;
-use function in_array;
-use function is_array;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Form Builder
  */
-class Form
+class _Form
 {
-	/* Used by the Forms Extensions */
-	const FORM_REGISTRATION = 'registration';
-	const FORM_CHECKOUT = 'checkout';
-
 	/**
 	 * @brief	Form ID
 	 */
-	public ?string $id = '';
+	public $id = '';
 	
 	/**
 	 * @brief	Action URL
 	 */
-	public string|Url $action = '';
+	public $action = '';
 	
 	/**
 	 * @brief	Input Elements HTML
 	 */
-	public array $elements = array();
-
-	/**
-	 * @brief	Hidden Fields
-	 */
-	public array $hiddenFields = array();
+	public $elements = array();
 	
 	/**
 	 * @brief	Tabs
 	 */
-	protected array $tabs = array();
+	protected $tabs = array();
 	
 	/**
 	 * @brief	Current Tab we're adding elements to
 	 */
-	protected string $currentTab = '';
+	protected $currentTab = '';
 	
 	/**
 	 * @brief	Active tab
 	 */
-	public ?string $activeTab = NULL;
+	public $activeTab = NULL;
 	
 	/**
 	 * @brief	Additional class for tables
 	 */
-	protected array $tabClasses = array();
+	protected $tabClasses = array();
 		
 	/**
 	 * @brief	Sidebar
 	 */
-	public array $sidebar = array();
+	public $sidebar = array();
 	
 	/**
 	 * @brief	CSS Class(es)
 	 */
-	public string $class = 'ipsForm--default ';
+	public $class = 'ipsForm_horizontal';
 	
 	/**
 	 * @brief	Generic Form Error
 	 */
-	public string $error = '';
+	public $error = '';
 	
 	/**
 	 * @brief	Hidden Values
 	 */
-	public array $hiddenValues = array();
+	public $hiddenValues = array();
 	
 	/**
 	 * @brief	Extra attributes for `<form>` tag
 	 */
-	public array $attributes = array();
+	public $attributes = array();
 	
 	/**
 	 * @brief	Action Buttons
 	 */
-	public array $actionButtons = array();
+	public $actionButtons = array();
 		
 	/**
 	 * @brief	If form has upload field, the maximum size (Needed to add enctype="multipart/form-data")
 	 * @note	Only actually affects no-JS uploads, Plupload does it's own thing
 	 */
-	protected mixed $uploadField = FALSE;
+	protected $uploadField = FALSE;
 	
 	/**
 	 * @brief	If enabled, and this form is submitted in a modal popup window, the next screen will be shown within the modal popup
 	 */
-	public bool $ajaxOutput = FALSE;
+	public $ajaxOutput = FALSE;
 	
 	/**
 	 * @brief	Is the form using tabs with icons
 	 */
-	protected bool $iconTabs = FALSE;
+	protected $iconTabs = FALSE;
 	
 	/**
 	 * @brief	Copy Button URL
 	 */
-	public mixed $copyButton = NULL;
+	public $copyButton = NULL;
 	
 	/**
 	 * @brief	Language keys to preload for efficiency
 	 */
-	protected array $languageKeys = array();
+	protected $languageKeys = array();
 	
 	/**
 	 * @brief	This form can be reloaded after saving
 	 */
-	public bool $canSaveAndReload = false;
-
-	/**
-	 * @brief	Active filters (currently only used for achievement rules)
-	 */
-	public array $_activeFilters = [];
-
+	public $canSaveAndReload = false;
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string|null $id Form ID
-	 * @param string|null $submitLang Language string for submit button
-	 * @param Url|null $action Action URL
-	 * @param array $attributes Extra attributes for `<form>` tag
+	 * @param	string				$id			Form ID
+	 * @param	string				$submitLang	Language string for submit button
+	 * @param	\IPS\Http\Url|NULL	$action		Action URL
+	 * @param	array				$attributes	Extra attributes for `<form>` tag
+	 * @return	void
 	 */
-	public function __construct( ?string $id='form', ?string $submitLang='save', Url $action=NULL, array $attributes=array() )
+	public function __construct( $id='form', $submitLang='save', $action=NULL, $attributes=array() )
 	{
 		$this->id = $id;
-		$this->action = $action ?: Request::i()->url()->stripQueryString( array( 'csrfKey', 'ajaxValidate' ) );
+		$this->action = $action ?: \IPS\Request::i()->url()->stripQueryString( array( 'csrfKey', 'ajaxValidate' ) );	
 		
 		$this->attributes = $attributes;
 		
 		if( $submitLang )
 		{
-			$this->actionButtons[] = Theme::i()->getTemplate( 'forms', 'core', 'global' )->button( $submitLang, 'submit', null, 'ipsButton ipsButton--primary', array( 'tabindex' => '2', 'accesskey' => 's' ) );
+			$this->actionButtons[] = \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->button( $submitLang, 'submit', null, 'ipsButton ipsButton_primary', array( 'tabindex' => '2', 'accesskey' => 's' ) );
 		}
 		
-		$this->hiddenValues['csrfKey'] = Session::i()->csrfKey;
+		$this->hiddenValues['csrfKey'] = \IPS\Session::i()->csrfKey;
 		
 		$potentialMaxUploadValues	= array();
 		if( (float) ini_get('upload_max_filesize') > 0 )
 		{
-			$potentialMaxUploadValues[]	= File::returnBytes( ini_get('upload_max_filesize') );
+			$potentialMaxUploadValues[]	= \IPS\File::returnBytes( ini_get('upload_max_filesize') );
 		}
 		if( (float) ini_get('post_max_size') > 0 )
 		{
 			/* We need to reduce post_max_size lower because it includes the ENTIRE post and other data, such as the number of chunks, will also be sent with the request */
-			$potentialMaxUploadValues[]	= File::returnBytes( ini_get('post_max_size') ) - 1048576;
+			$potentialMaxUploadValues[]	= \IPS\File::returnBytes( ini_get('post_max_size') ) - 1048576;
 		}
 		if( (float) ini_get('memory_limit') > 0 )
 		{
-			$potentialMaxUploadValues[]	= File::returnBytes( ini_get('memory_limit') );
+			$potentialMaxUploadValues[]	= \IPS\File::returnBytes( ini_get('memory_limit') );
 		}
 		$this->uploadField = min( $potentialMaxUploadValues );
 		
 		/* This can be overridden in userland code, but by default takes the value sent by \IPS\Node\Controller::_afterSave() */
-		if ( isset( Request::i()->activeTab ) )
+		if ( isset( \IPS\Request::i()->activeTab ) )
 		{
-			$this->activeTab = Request::i()->activeTab;
-		}
-	}
-
-	/**
-	 * Returns all form types available for extension
-	 *
-	 * @return array
-	 */
-	public static function availableForExtension() : array
-	{
-		return [
-			static::FORM_REGISTRATION,
-			static::FORM_CHECKOUT
-		];
-	}
-
-	/**
-	 * Check application extensions for custom fields
-	 *
-	 * @param string $formType
-	 * @param array|null $params
-	 * @return void
-	 */
-	public function addExtensionFields( string $formType, ?array $params=null ) : void
-	{
-		/* Validation check */
-		if( !in_array( $formType, static::availableForExtension() ) )
-		{
-			return;
-		}
-
-		$params = is_array( $params ) ? array_values( $params ) : array();
-		foreach( Application::allExtensions( 'core', 'Forms' ) as $ext )
-		{
-			/* @var FormsAbstract $ext */
-			if( $ext::formType() == $formType )
-			{
-				foreach( $ext->formElements( ...$params ) as $element )
-				{
-					$this->add( $element );
-				}
-			}
-		}
-	}
-
-	/**
-	 * Save any custom fields added by extensions
-	 *
-	 * @param string $formType
-	 * @param array	$values
-	 * @param array|null $params
-	 * @return void
-	 */
-	public static function saveExtensionFields( string $formType, array $values, ?array $params = null ) : void
-	{
-		/* Validation check */
-		if( !in_array( $formType, static::availableForExtension() ) )
-		{
-			return;
-		}
-
-		$params = is_array( $params ) ? array_values( $params ) : array();
-		foreach( Application::allExtensions( 'core', 'Forms' ) as $ext )
-		{
-			/* @var FormsAbstract $ext */
-			if( $ext::formType() == $formType )
-			{
-				$ext->processFormValues( $values, ...$params );
-			}
+			$this->activeTab = \IPS\Request::i()->activeTab;
 		}
 	}
 	
 	/**
 	 * Add Tab
 	 *
-	 * @param string $lang		Language key
-	 * @param string|null $icon		Icon to use
-	 * @param string|null $blurbLang	Language to use for the blurb
-	 * @param string|null $css		CSS class to use for the tab
+	 * @param	string			$lang		Language key
+	 * @param	string|null		$icon		Icon to use
+	 * @param	string|null		$blurbLang	Language to use for the blurb
+	 * @param	string|null		$css		CSS class to use for the tab
 	 * @return	void
 	 */
-	public function addTab( string $lang, string $icon=NULL, string $blurbLang=NULL, string $css=NULL ) : void
+	public function addTab( $lang, $icon=NULL, $blurbLang=NULL, $css=NULL )
 	{
 		$this->tabs[$lang]['title'] = $lang;
 		$this->currentTab = $lang;
@@ -302,7 +190,7 @@ class Form
 		
 		if ( $blurbLang )
 		{
-			$this->elements[ $this->currentTab ][] = Theme::i()->getTemplate( 'forms', 'core' )->blurb( $blurbLang, true, true );
+			$this->elements[ $this->currentTab ][] = \IPS\Theme::i()->getTemplate( 'forms', 'core' )->blurb( $blurbLang );
 		}
 		
 		if ( $css )
@@ -314,42 +202,42 @@ class Form
 	/**
 	 * Add Header
 	 *
-	 * @param string $lang		Language key
-	 * @param string|null $after		The key of element to insert after
-	 * @param string|null $tab		The tab to insert onto
+	 * @param	string			$lang		Language key
+	 * @param	string|NULL		$after		The key of element to insert after
+	 * @param	string|NULL		$tab		The tab to insert onto
 	 * @return	void
 	 */
-	public function addHeader( string $lang, string $after=NULL, string $tab=NULL ) : void
+	public function addHeader( $lang, $after=NULL, $tab=NULL )
 	{
 		/* Place the input into the correct position */
-		$this->_insert( Theme::i()->getTemplate( 'forms', 'core' )->header( $lang, "{$this->id}_header_{$lang}" ), NULL, $tab, $after );
+		$this->_insert( \IPS\Theme::i()->getTemplate( 'forms', 'core' )->header( $lang, "{$this->id}_header_{$lang}" ), NULL, $tab, $after );
 	}
 
 	/**
 	 * Add Seperator
 	 *
-	 * @param string|null $after		The key of element to insert after
-	 * @param string|null $tab		The tab to insert onto
+	 * @param	string|NULL		$after		The key of element to insert after
+	 * @param	string|NULL		$tab		The tab to insert onto
 	 * @return	void
 	 */
-	public function addSeparator( string $after=NULL, string $tab=NULL ) : void
+	public function addSeparator( $after=NULL, $tab=NULL )
 	{
 		/* Place the input into the correct position */
-		$this->_insert( Theme::i()->getTemplate( 'forms', 'core', 'front' )->seperator(), NULL, $tab, $after );
+		$this->_insert( \IPS\Theme::i()->getTemplate( 'forms', 'core', 'front' )->seperator(), NULL, $tab, $after );
 	}
 
 	/**
 	 * Add Message Row
 	 *
-	 * @param string $lang		Language key or formatted string to display
-	 * @param string|null $css		Custom CSS class(es) to apply
-	 * @param bool $parse		Set this to false if the language string passed is already formatted for display
-	 * @param string|null $_id		HTML ID
-	 * @param string|null $after		The key of element to insert after
-	 * @param string|null $tab		The tab to insert onto
+	 * @param	string			$lang		Language key or formatted string to display
+	 * @param	string			$css		Custom CSS class(es) to apply
+	 * @param	bool			$parse		Set this to false if the language string passed is already formatted for display
+	 * @param	string			$_id		HTML ID
+	 * @param	string|NULL		$after		The key of element to insert after
+	 * @param	string|NULL		$tab		The tab to insert onto
 	 * @return	void
 	 */
-	public function addMessage( string $lang, ?string $css='', bool $parse=TRUE, string $_id=NULL, string $after=NULL, string $tab=NULL ) : void
+	public function addMessage( $lang, $css='', $parse=TRUE, $_id=NULL, $after=NULL, $tab=NULL )
 	{
 		if ( !$_id )
 		{
@@ -361,18 +249,18 @@ class Form
 		}
 
 		/* Place the input into the correct position */
-		$this->_insert( Theme::i()->getTemplate( 'forms', 'core', 'global' )->message( $lang, $_id, ( $css ?? '' ), $parse ), NULL, $tab, $after );
+		$this->_insert( \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->message( $lang, $_id, $css, $parse ), NULL, $tab, $after );
 	}
 	
 	/**
 	 * Add Html
 	 *
-	 * @param string $html	HTML to add
-	 * @param string|null $after	The key of element to insert after
-	 * @param string|null $tab	The tab to insert onto
+	 * @param	string			$html	HTML to add
+	 * @param	string|NULL		$after	The key of element to insert after
+	 * @param	string|NULL		$tab	The tab to insert onto
 	 * @return	void
 	 */
-	public function addHtml( string $html, string $after=NULL, string $tab=NULL ) : void
+	public function addHtml( $html, $after=NULL, $tab=NULL )
 	{
 		/* Place the input into the correct position */
 		$this->_insert( $html, NULL, $tab, $after );
@@ -381,10 +269,10 @@ class Form
 	/**
 	 * Add Sidebar
 	 *
-	 * @param string $contents	Contents
+	 * @param	string	$contents	Contents
 	 * @return	void
 	 */
-	public function addSidebar( string $contents ) : void
+	public function addSidebar( $contents )
 	{
 		$this->sidebar[ $this->currentTab ] = $contents;
 	}
@@ -393,15 +281,15 @@ class Form
 	 * Add Matrix
 	 *
 	 * @param	mixed						$name	Name to identify matrix
-	 * @param Matrix $matrix	The Matrix
-	 * @param string|null $after	The key of element to insert after
-	 * @param string|null $tab	The tab to insert onto
+	 * @param	\IPS\Helpers\Form\Matrix	$matrix	The Matrix
+	 * @param	string|NULL					$after	The key of element to insert after
+	 * @param	string|NULL					$tab	The tab to insert onto
 	 * @return	void
 	 */
-	public function addMatrix( mixed $name, Matrix $matrix, string $after=NULL, string $tab=NULL ) : void
+	public function addMatrix( $name, $matrix, $after=NULL, $tab=NULL )
 	{
 		$matrix->formId = $this->id;
-		$this->tabClasses[ $this->currentTab ] = 'ipsForm--matrix';
+		$this->tabClasses[ $this->currentTab ] = 'ipsMatrix';
 
 		/* Place the input into the correct position */
 		$this->_insert( $matrix, $name, $tab, $after );
@@ -410,51 +298,46 @@ class Form
 	/**
 	 * Add Button
 	 *
-	 * @param string $lang	Language key
-	 * @param string $type	'link', 'button' or 'submit'
-	 * @param string|null $href	If type is 'link', the target
-	 * @param string $class 	CSS class(es) to applys
-	 * @param array $attributes Attributes to apply
+	 * @param	string	$lang	Language key
+	 * @param	string	$type	'link', 'button' or 'submit'
+	 * @param	string	$href	If type is 'link', the target
+	 * @param	string	$class 	CSS class(es) to applys
+	 * @param 	array 	$attributes Attributes to apply
 	 * @return	void
 	 */
-	public function addButton( string $lang, string $type, string $href=NULL, string $class='', array $attributes=array() ) : void
+	public function addButton( $lang, $type, $href=NULL, $class='', $attributes=array() )
 	{
-		$this->actionButtons[] = ' ' . Theme::i()->getTemplate( 'forms', 'core', 'global' )->button( $lang, $type, $href, $class, $attributes );
+		$this->actionButtons[] = ' ' . \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->button( $lang, $type, $href, $class, $attributes );
 	}
 	
 	/**
 	 * Add Dummy Row
 	 *
-	 * @param string $langKey	Language key
-	 * @param string $value		Value
-	 * @param string $desc		Field description
-	 * @param string $warning	Field warning
-	 * @param string $id			Element ID
-	 * @param string|null $after		The key of element to insert after
-	 * @param string|null $tab		The tab to insert onto
+	 * @param	string			$langKey	Language key
+	 * @param	string			$value		Value
+	 * @param	string			$desc		Field description
+	 * @param	string			$warning	Field warning
+	 * @param	string			$id			Element ID
+	 * @param	string|NULL		$after		The key of element to insert after
+	 * @param	string|NULL		$tab		The tab to insert onto
 	 * @return	void
 	 */
-	public function addDummy( string $langKey, string $value, string $desc='', string $warning='', string $id='', string $after=NULL, string $tab=NULL ) : void
+	public function addDummy( $langKey, $value, $desc='', $warning='', $id='', $after=NULL, $tab=NULL )
 	{
 		/* Place the input into the correct position */
-		$this->_insert( Theme::i()->getTemplate( 'forms', 'core' )->row( Member::loggedIn()->language()->addToStack( $langKey ), $value, $desc, $warning, FALSE, NULL, NULL, NULL, $id ), NULL, $tab, $after );
+		$this->_insert( \IPS\Theme::i()->getTemplate( 'forms', 'core' )->row( \IPS\Member::loggedIn()->language()->addToStack( $langKey ), $value, $desc, $warning, FALSE, NULL, NULL, NULL, $id ), NULL, $tab, $after );
 	}
 
 	/**
 	 * Add Input
 	 *
-	 * @param mixed $input	Form element to add
-	 * @param string|null $after	The key of element to insert after
-	 * @param string|null $tab	The tab to insert onto
+	 * @param	\IPS\Helpers\Form\FormAbstract	$input	Form element to add
+	 * @param	string|NULL						$after	The key of element to insert after
+	 * @param	string|NULL						$tab	The tab to insert onto
 	 * @return	void
 	 */
-	public function add( mixed $input, string $after=NULL, string $tab=NULL ) : void
+	public function add( $input, $after=NULL, $tab=NULL )
 	{
-		/* Check if we have custom positioning */
-		/* @var FormAbstract $input */
-		$after = $after ?: $input->afterElement;
-		$tab = $tab ?: $input->tab;
-
 		/* Place the input into the correct position */
 		$this->_insert( $input, $input->name, $tab, $after );
 		
@@ -476,7 +359,7 @@ class Form
 				$this->languageKeys[] = $input->name . '_desc';
 				$this->languageKeys[] = $input->name . '_warning';
 				
-				if ( isset( $input->options['options'] ) and count( $input->options['options'] ) )
+				if ( isset( $input->options['options'] ) and \count( $input->options['options'] ) )
 				{
 					$this->languageKeys = array_merge( $this->languageKeys, array_map(
 							function ($v )
@@ -503,16 +386,15 @@ class Form
 	 * Actually place the element in the correct position
 	 *
 	 * @param	mixed			$element	Thing we are adding (could be a form input, message, etc.)
-	 * @param string|null $elementKey	The key of the element
-	 * @param string|null $tab		The tab to insert this thing into
-	 * @param string|null $after		The key of the element we want to insert this thing after
+	 * @param	string|NULL		$elementKey	The key of the element
+	 * @param	string|NULL		$tab		The tab to insert this thing into
+	 * @param	string|NULL		$after		The key of the element we want to insert this thing after
 	 * @return	void
 	 */
-	protected function _insert( mixed $element, string $elementKey=NULL, string $tab=NULL, string $after=NULL ) : void
+	protected function _insert( $element, $elementKey=NULL, $tab=NULL, $after=NULL )
 	{
 		$tab = $tab ?: $this->currentTab;
-		$added = false;
-
+		
 		if ( $after )
 		{
 			$elements = array();
@@ -522,20 +404,15 @@ class Form
 				if ( $key === $after )
 				{
 					$elements[ $elementKey ] = $element;
-					$added = true;
 				}
 			}
-
 			$this->elements[ $tab ] = $elements;
 		}
 		elseif( $elementKey )
 		{
 			$this->elements[ $tab ][ $elementKey ] = $element;
-			$added = true;
 		}
-
-		/* If we haven't added the field yet, tack it on to the end */
-		if( !$added )
+		else
 		{
 			$this->elements[ $tab ][] = $element;
 		}
@@ -549,13 +426,13 @@ class Form
 	public function __toString()
 	{
 		/* Preload languages */
-		if ( count( $this->languageKeys ) and !( Member::loggedIn()->language() instanceof Lang ) )
+		if ( \count( $this->languageKeys ) and !( \IPS\Member::loggedIn()->language() instanceof \IPS\Lang\Setup\Lang ) )
 		{
 			try
 			{
-				Member::loggedIn()->language()->get( $this->languageKeys );
+				\IPS\Member::loggedIn()->language()->get( $this->languageKeys );
 			}
-			catch( UnderflowException $e ) { }
+			catch( \UnderflowException $e ) { }
 		}
 		
 		try
@@ -569,43 +446,45 @@ class Form
 				{
 					if ( $element instanceof Form\Matrix )
 					{
-						$html[ $tab ] .= Theme::i()->getTemplate( 'forms', 'core' )->emptyRow( $element->nested(), $k );
+						$html[ $tab ] .= \IPS\Theme::i()->getTemplate( 'forms', 'core' )->emptyRow( $element->nested(), $k );
 						continue;
 					}
-					if ( !is_string( $element ) and $element->error )
+					if ( !\is_string( $element ) and $element->error )
 					{
 						$errorTabs[] = $tab;
 					}
-					$html[ $tab ] .= ( $element instanceof FormAbstract ) ? $element->rowHtml( $this ) : (string) $element;
+					$html[ $tab ] .= ( $element instanceof \IPS\Helpers\Form\FormAbstract ) ? $element->rowHtml( $this ) : (string) $element;
 				}
 			}
 			
 			if ( $this->canSaveAndReload )
 			{
-				$this->addButton( 'save_and_reload', 'submit', null, 'ipsButton ipsButton--primary', array( 'name' => 'save_and_reload', 'value' => 1 ) );
+				$this->addButton( 'save_and_reload', 'submit', null, 'ipsButton ipsButton_primary', array( 'name' => 'save_and_reload', 'value' => 1 ) );
 			}
 			
-			return Theme::i()->getTemplate( 'forms', 'core' )->template( $this->id, $this->action, $html, $this->activeTab, $this->error, $errorTabs, $this->hiddenValues, $this->actionButtons, $this->uploadField, $this->sidebar, $this->tabClasses, $this->class, $this->attributes, $this->tabs, $this->iconTabs );
+			return \IPS\Theme::i()->getTemplate( 'forms', 'core' )->template( $this->id, $this->action, $html, $this->activeTab, $this->error, $errorTabs, $this->hiddenValues, $this->actionButtons, $this->uploadField, $this->sidebar, $this->tabClasses, $this->class, $this->attributes, $this->tabs, $this->iconTabs );
 		}
-		catch ( Exception | Throwable $e )
+		catch ( \Exception $e )
 		{
-			IPS::exceptionHandler( $e );
+			\IPS\IPS::exceptionHandler( $e );
 		}
-
-		return '';
+		catch ( \Throwable $e )
+		{
+			\IPS\IPS::exceptionHandler( $e );
+		}
 	}
 	
 	/**
 	 * Get HTML using custom template
 	 *
-	 * @param callback $template	The template to use
+	 * @param	callback	$template	The template to use
 	 * @return	string
 	 */
-	public function customTemplate( callable $template ): string
+	public function customTemplate( $template )
 	{
-		$args = func_get_args();
+		$args = \func_get_args();
 		
-		if ( count( $args ) > 1 )
+		if ( \count( $args ) > 1 )
 		{
 			array_shift( $args );
 		}
@@ -615,13 +494,13 @@ class Form
 		}
 		
 		/* Preload languages */
-		if ( count( $this->languageKeys ) )
+		if ( \count( $this->languageKeys ) )
 		{
 			try
 			{
-				Member::loggedIn()->language()->get( $this->languageKeys );
+				\IPS\Member::loggedIn()->language()->get( $this->languageKeys );
 			}
-			catch( UnderflowException $e ) { }
+			catch( \UnderflowException $e ) { }
 		}
 
 		$errorTabs = array();
@@ -629,7 +508,7 @@ class Form
 		{
 			foreach ( $elements as $k => $element )
 			{
-				if ( !( $element instanceof Form\Matrix ) and !is_string( $element ) and $element->error )
+				if ( !( $element instanceof Form\Matrix ) and !\is_string( $element ) and $element->error )
 				{
 					$errorTabs[] = $tab;
 				}
@@ -643,26 +522,26 @@ class Form
 	/**
 	 * Return the last used tab in the current form
 	 *
-	 * @return string
+	 * @return null|string
 	 */
-	public function getLastUsedTab(): string
+	public function getLastUsedTab()
 	{
 		$name = "{$this->id}_activeTab";
-		if ( isset( Request::i()->$name ) )
+		if ( isset( \IPS\Request::i()->$name ) )
 		{
-			return Request::i()->$name;
+			return \IPS\Request::i()->$name;
 		}
 		
-		return '';
+		return null;
 	}
 	
 	/**
 	 * Get submitted values
 	 *
-	 * @param bool $stringValues	If true, all values will be returned as strings
+	 * @param	bool	$stringValues	If true, all values will be returned as strings
 	 * @return	array|FALSE		Array of field values or FALSE if the form has not been submitted or if there were validation errors
 	 */
-	public function values( bool $stringValues=FALSE ): array|FALSE
+	public function values( $stringValues=FALSE )
 	{
 		$values = array();
 		$name = "{$this->id}_submitted";
@@ -671,7 +550,7 @@ class Form
 		$uploadCurrentFiles = array();
 		
 		/* Did we submit the form? */
-		if( isset( Request::i()->$name ) and Login::compareHashes( Session::i()->csrfKey, (string) Request::i()->csrfKey ) )
+		if( isset( \IPS\Request::i()->$name ) and \IPS\Login::compareHashes( (string) \IPS\Session::i()->csrfKey, (string) \IPS\Request::i()->csrfKey ) )
 		{
 			/* Work out which fields are being toggled by other fields */
 			$htmlIdsToIgnoreBecauseTheyAreHiddenByToggles = array();
@@ -680,10 +559,9 @@ class Form
 			{
 				foreach ( $elements as $_name => $element )
 				{
-					/* @var FormAbstract $element */
 					if ( isset( $element->options['togglesOn'] ) )
 					{
-						if ( !$element->value or in_array( $element->htmlId, $htmlIdsToIgnoreBecauseTheyAreHiddenByToggles ) )
+						if ( !$element->value )
 						{
 							$htmlIdsToIgnoreBecauseTheyAreHiddenByToggles = array_merge( $htmlIdsToIgnoreBecauseTheyAreHiddenByToggles, $element->options['togglesOn'] );
 						}
@@ -718,16 +596,8 @@ class Form
 					{
 						foreach ( $element->options['toggles'] as $toggleValue => $toggleHtmlIds )
 						{
-							if ( $element instanceof CheckboxSet and $element->value === '*' )
-							{
-								$match = true;
-							}
-							else
-							{
-								$match = is_array( $element->value ) ? in_array( $toggleValue, $element->value ) : $toggleValue == $element->value;
-							}
-
-							if ( !$match or in_array( $element->htmlId, $htmlIdsToIgnoreBecauseTheyAreHiddenByToggles ) )
+							$match = \is_array( $element->value ) ? \in_array( $toggleValue, $element->value ) : $toggleValue == $element->value;
+							if ( !$match )
 							{
 								$htmlIdsToIgnoreBecauseTheyAreHiddenByToggles = array_merge( $htmlIdsToIgnoreBecauseTheyAreHiddenByToggles, $toggleHtmlIds );
 							}
@@ -762,7 +632,7 @@ class Form
 					
 					/* If this is dependant on a toggle which isn't set, don't return a value so that it doesn't
 						trigger an error we cannot see */
-					if ( $element->htmlId and in_array( $element->htmlId, $htmlIdsToIgnore ) )
+					if ( $element->htmlId and \in_array( $element->htmlId, $htmlIdsToIgnore ) )
 					{ 
 						$values[ $_name ] = $stringValues ? $element::stringValue( $element->defaultValue ) : $element->defaultValue;
 						continue;
@@ -781,7 +651,7 @@ class Form
 						if ( $element->options['retainDeleted'] )
 						{
 							$uploadRetainDeleted[] = $element->name;
-							if ( is_array( $element->value ) )
+							if ( \is_array( $element->value ) )
 							{
 								foreach( $element->value AS $value )
 								{
@@ -798,7 +668,7 @@ class Form
 					/* If it has an error, set it and return */
 					if( !empty( $element->error ) )
 					{
-						Output::i()->httpHeaders['X-IPS-FormError'] = "true";
+						\IPS\Output::i()->httpHeaders['X-IPS-FormError'] = "true";
 						return FALSE;
 					}
 
@@ -809,7 +679,7 @@ class Form
 					}
 
 					/* If it's a social group, save it */
-					if ( $element instanceof SocialGroup )
+					if ( $element instanceof \IPS\Helpers\Form\SocialGroup )
 					{
 						$element->saveValue();
 					}
@@ -817,7 +687,7 @@ class Form
 					/* If the element has requested the form doesn't submit, return */
 					if ( $element->reloadForm === TRUE )
 					{
-						Output::i()->httpHeaders['X-IPS-FormNoSubmit'] = "true";
+						\IPS\Output::i()->httpHeaders['X-IPS-FormNoSubmit'] = "true";
 						return FALSE;
 					}
 					
@@ -835,29 +705,29 @@ class Form
 			}
 
 			/* If we've reached this point, all fields have acceptable values. If we're just checking that, return that it's okay */
-			if ( Request::i()->isAjax() and Request::i()->ajaxValidate )
+			if ( \IPS\Request::i()->isAjax() and \IPS\Request::i()->ajaxValidate )
 			{
 				if ( $this->ajaxOutput === TRUE )
 				{
-					Output::i()->httpHeaders['X-IPS-FormNoSubmit'] = "true";
+					\IPS\Output::i()->httpHeaders['X-IPS-FormNoSubmit'] = "true";
 				}
 				else
 				{
-					Output::i()->json( array( 'validate' => true ) );
+					\IPS\Output::i()->json( array( 'validate' => true ) );
 				}
 			}
 			
 			/* At this point we are about to return the values. Any uploaded files are now the responsibility of the controller, so release the hold on them */
 			foreach ( $uploadFieldNames as $name )
 			{
-				if ( !in_array( $name, $uploadRetainDeleted ) )
+				if ( !\in_array( $name, $uploadRetainDeleted ) )
 				{
-					Db::i()->delete( 'core_files_temp', array( 'upload_key=?', md5( $name . session_id() ) ) );
+					\IPS\Db::i()->delete( 'core_files_temp', array( 'upload_key=?', md5( $name . session_id() ) ) );
 				}
 				else
 				{
 					/* If we're retaining deleted files, then remove any files that are actually are a part of the value */
-					Db::i()->delete( 'core_files_temp', array( "upload_key=? AND " . Db::i()->in( 'filename', $uploadCurrentFiles ), md5( $name . session_id() ) ) );
+					\IPS\Db::i()->delete( 'core_files_temp', array( "upload_key=? AND " . \IPS\Db::i()->in( 'filename', $uploadCurrentFiles ), md5( $name . session_id() ) ) );
 				}
 			}
 			
@@ -874,19 +744,19 @@ class Form
 	/**
 	 * Save values to settings table
 	 *
-	 * @param array|null $values		Form Values
+	 * @param array|NULL 	$values		Form Values
 	 * @return bool
 	 */
-	public function saveAsSettings( array $values=NULL ): bool
+	public function saveAsSettings( $values=NULL )
 	{
 		if ( !$values )
 		{
-			$values = $this->values(TRUE);
+			$values = $this->values( TRUE );
 		}
 		
 		if ( $values )
 		{
-			Settings::i()->changeValues( $values );
+			\IPS\Settings::i()->changeValues( $values );
 			return TRUE;
 		}
 		
@@ -898,13 +768,13 @@ class Form
 	 *
 	 * @return	void
 	 */
-	public static function floodCheck() : void
+	public static function floodCheck()
 	{
-		if ( Settings::i()->flood_control and !Member::loggedIn()->group['g_avoid_flood'] )
+		if ( \IPS\Settings::i()->flood_control and !\IPS\Member::loggedIn()->group['g_avoid_flood'] )
 		{
-			if ( time() - Member::loggedIn()->member_last_post < Settings::i()->flood_control )
+			if ( time() - \IPS\Member::loggedIn()->member_last_post < \IPS\Settings::i()->flood_control )
 			{
-				throw new DomainException( Member::loggedIn()->language()->addToStack('error_flood_control', FALSE, array( 'sprintf' => array( Settings::i()->flood_control - ( time() - Member::loggedIn()->member_last_post ) ) ) ) );
+				throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack('error_flood_control', FALSE, array( 'sprintf' => array( \IPS\Settings::i()->flood_control - ( time() - \IPS\Member::loggedIn()->member_last_post ) ) ) ) );
 			}
 		}
 	}

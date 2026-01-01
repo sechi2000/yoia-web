@@ -11,40 +11,29 @@
 namespace IPS\core\DataLayer;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Data\Store;
-use IPS\Settings;
-use OutOfRangeException;
-use UnexpectedValueException;
-use function defined;
-use function is_array;
-use function preg_replace;
-use function str_replace;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Data Layer Handler class
  */
-#[\AllowDynamicProperties]
-class Handler
+class _Handler
 {
-	public static string $cicHandlerClass = '\IPS\cloud\DataLayer\Handler';
+	public static $cicHandlerClass = '\IPS\cloud\DataLayer\Handler';
 
-	public static string $handlerCacheKey = 'dataLayerHandlers';
+	public static $handlerCacheKey = 'dataLayerHandlers';
 
-	public string $id = 'gtm';
+	public $id = 'gtm';
 
 	/**
 	 * Returns the enabled handlers to be used in the global template as an array of head and body HTML snippets.
 	 *
 	 * @return array
 	 */
-	public static function loadForTemplates() : array
+	public static function loadForTemplates()
 	{
 		$return = array();
 
@@ -52,16 +41,16 @@ class Handler
 		$key = static::$handlerCacheKey;
 		try
 		{
-			$cached = json_decode( Store::i()->$key, true );
-			if ( is_array( $cached ) )
+			$cached = json_decode( \IPS\Data\Store::i()->$key, true );
+			if ( \is_array( $cached ) )
 			{
 				return $cached;
 			}
 		}
-		catch ( OutOfRangeException $e ) {}
+		catch ( \OutOfRangeException $e ) {}
 
 		$handlers = static::loadEnabled();
-		if ( Settings::i()->core_datalayer_use_gtm )
+		if ( \IPS\Settings::i()->core_datalayer_use_gtm )
 		{
 			$handlers[] = static::gtm();
 		}
@@ -135,9 +124,9 @@ class Handler
     initcode{$handler->id}(IpsDataLayerContext || {});
 </script>
 HTML;
-				$code           = preg_replace( '/\/\/(.*)[\n|\r]/', '/*$1*/', $code );
-				$code           = preg_replace( '/\s+/', ' ', $code);
-				$headInserts    .= str_replace("\n", ' ', $code ) . "\n";
+				$code           = \preg_replace( '/\/\/(.*)[\n|\r]/', '/*$1*/', $code );
+				$code           = \preg_replace( '/\s+/', ' ', $code);
+				$headInserts    .= \str_replace("\n", ' ', $code ) . "\n";
 			}
 
 			if ( $handler->event_handler AND $handler->use_js )
@@ -152,9 +141,9 @@ HTML;
     }
 } )
 JS;
-				$code           = preg_replace( '/\/\/(.*)[\n|\r]?/', '/*$1*/', $code );
-				$code               = preg_replace( '/\s+/', ' ', $code);
-				$eventCallbacks[]   = str_replace( "\n", ' ', $code );
+				$code           = \preg_replace( '/\/\/(.*)[\n|\r]?/', '/*$1*/', $code );
+				$code               = \preg_replace( '/\s+/', ' ', $code);
+				$eventCallbacks[]   = \str_replace( "\n", ' ', $code );
 			}
 
 			if ( $handler->properties_handler AND $handler->use_js )
@@ -169,9 +158,9 @@ JS;
     }
 } )
 JS;
-				$code           = preg_replace( '/\/\/(.*)[\n|\r]?/', '/*$1*/', $code );
-				$code                   = preg_replace( '/\s+/', ' ', $code);
-				$propertiesCallbacks[]  = str_replace( "\n", ' ', $code );
+				$code           = \preg_replace( '/\/\/(.*)[\n|\r]?/', '/*$1*/', $code );
+				$code                   = \preg_replace( '/\s+/', ' ', $code);
+				$propertiesCallbacks[]  = \str_replace( "\n", ' ', $code );
 			}
 		}
 
@@ -184,7 +173,7 @@ JS;
 <script>
 const IpsDataLayerEventHandlers = [
     $eventsJoined
-]
+];
 </script>
 <!-- END Event Callbacks -->
 
@@ -197,7 +186,7 @@ HTML;
 <script>
 const IpsDataLayerPropertiesHandlers = [
     $propertiesJoined
-]
+];
 </script>
 <!-- END Properties Callbacks -->
 
@@ -212,7 +201,7 @@ HTML;
 		);
 
 		/* add to cache before returning */
-		Store::i()->$key = json_encode( $return );
+		\IPS\Data\Store::i()->$key = json_encode( $return );
 
 		return $return;
 	}
@@ -222,7 +211,7 @@ HTML;
 	 *
 	 * @return static[]
 	 */
-	public static function loadEnabled() : array
+	public static function loadEnabled()
 	{
 		if ( class_exists( static::$cicHandlerClass ) )
 		{
@@ -237,7 +226,7 @@ HTML;
 	 *
 	 * @return static
 	 */
-	public static function gtm() : static
+	public static function gtm()
 	{
 		$gtm = new static();
 		$gtm->initializer_code = <<<JS
@@ -250,10 +239,10 @@ if (context instanceof Object) {
 Debug.log( 'Invalid Data Layer Context: The IPS GTM Data Layer Initializer failed because the context wasn\'t an Object' );
 
 JS;
-		$gtm->head_code = Settings::i()->googletag_head_code;
+		$gtm->head_code = \IPS\Settings::i()->googletag_head_code;
 		$gtm->use_js    = true;
-		$gtm->body_code = Settings::i()->googletag_noscript_code;
-		$gtm->datalayer_key = Settings::i()->core_datalayer_gtmkey ?: 'window.dataLayer';
+		$gtm->body_code = \IPS\Settings::i()->googletag_noscript_code;
+		$gtm->datalayer_key = \IPS\Settings::i()->core_datalayer_gtmkey ?: 'window.dataLayer';
 		$gtm->event_handler = <<<JS
 
 if ( (_event._properties instanceof Object) && (typeof _event._key === 'string')) {
@@ -286,9 +275,9 @@ JS;
 	 * @param   array   $where   The where clause
 	 *
 	 * @return  array
-	 * @throws UnexpectedValueException If $where contains invalid fields and/or invalid SQL logic
+	 * @throws \UnexpectedValueException If $where contains invalid fields and/or invalid SQL logic
 	 */
-	public static function loadWhere( array $where=array() ) : array
+	public static function loadWhere( array $where=array() )
 	{
 		if ( ( $class = static::$cicHandlerClass ) AND class_exists( $class ) )
 		{
@@ -302,7 +291,7 @@ JS;
 	 *
 	 * @return bool
 	 */
-	public function mockFunction() : bool
+	public function mockFunction()
 	{
 		return true;
 	}

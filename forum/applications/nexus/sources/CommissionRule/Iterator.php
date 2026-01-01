@@ -12,18 +12,9 @@
 namespace IPS\nexus\CommissionRule;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Countable;
-use FilterIterator;
-use IPS\Db;
-use IPS\Member;
-use IPS\nexus\Invoice;
-use IPS\Patterns\ActiveRecordIterator;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -31,47 +22,47 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * Commission Rule Filter Iterator
  * @note	When we require PHP 5.4+ this can just be replaced with a CallbackFilterIterator
  */
-class Iterator extends FilterIterator implements Countable
+class _Iterator extends \FilterIterator implements \Countable
 {
 	/**
 	 * @brief	Member
 	 */
-	protected ?Member $member = NULL;
+	protected $member;
 	
 	/**
 	 * @brief	Number of purchases
 	 */
-	protected ?int $numberOfPurchases = NULL;
+	protected $numberOfPurchases = NULL;
 	
 	/**
 	 * @brief	Value of purchases
 	 */
-	protected mixed $valueOfPurchases = NULL;
+	protected $valueOfPurchases = NULL;
 	
 	/**
 	 * @brief	Number of referral rules
 	 */
-	protected ?int $numberOfRules= NULL;
+	protected $numberOfRules= NULL;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	ActiveRecordIterator	$iterator	Iterator
-	 * @param	Member							$member		Member
+	 * @param	\IPS\Patterns\ActiveRecordIterator	$iterator	Iterator
+	 * @param	\IPS\Member							$member		Member
 	 * @return	void
 	 */
-	public function __construct( ActiveRecordIterator $iterator, Member $member )
+	public function __construct( \IPS\Patterns\ActiveRecordIterator $iterator, \IPS\Member $member )
 	{
 		$this->member = $member;
-		parent::__construct( $iterator );
+		return parent::__construct( $iterator );
 	}
 	
 	/**
 	 * Does this rule apply?
 	 *
-	 * @return	bool
+	 * @return	void
 	 */
-	public function accept(): bool
+	public function accept()
 	{	
 		$rule = $this->getInnerIterator()->current();
 		
@@ -138,11 +129,11 @@ class Iterator extends FilterIterator implements Countable
 	 *
 	 * @return	int
 	 */
-	protected function numberOfPurchases(): int
+	protected function numberOfPurchases()
 	{
 		if ( $this->numberOfPurchases === NULL )
 		{
-			$this->numberOfPurchases = Db::i()->select( 'COUNT( i_id )', 'nexus_invoices', array( "i_member=? AND i_status=?", $this->member->member_id, Invoice::STATUS_PAID ) )->first();
+			$this->numberOfPurchases = \IPS\Db::i()->select( 'COUNT( i_id )', 'nexus_invoices', array( "i_member=? AND i_status=?", $this->member->member_id, \IPS\nexus\Invoice::STATUS_PAID ) )->first();
 		}
 		return $this->numberOfPurchases;
 	}
@@ -150,13 +141,13 @@ class Iterator extends FilterIterator implements Countable
 	/**
 	 * Get the amounts spent
 	 *
-	 * @return	mixed
+	 * @return	int
 	 */
-	protected function valueOfPurchases(): mixed
+	protected function valueOfPurchases()
 	{
 		if ( $this->valueOfPurchases === NULL )
 		{
-			$this->valueOfPurchases = iterator_to_array( Db::i()->select( 'i_currency, SUM( i_total ) as value', 'nexus_invoices', array( "i_member=? AND i_status=?", $this->member->member_id, Invoice::STATUS_PAID ), NULL, NULL, 'i_currency' )->setKeyField( 'i_currency' )->setValueField( 'value' ) );
+			$this->valueOfPurchases = iterator_to_array( \IPS\Db::i()->select( 'i_currency, SUM( i_total ) as value', 'nexus_invoices', array( "i_member=? AND i_status=?", $this->member->member_id, \IPS\nexus\Invoice::STATUS_PAID ), NULL, NULL, 'i_currency' )->setKeyField( 'i_currency' )->setValueField( 'value' ) );
 		}
 		return $this->valueOfPurchases;
 	}
@@ -170,7 +161,7 @@ class Iterator extends FilterIterator implements Countable
 	{
 		if ( $this->numberOfRules === NULL )
 		{
-			$this->numberOfRules = (int) Db::i()->select( 'COUNT(*)', 'nexus_referral_rules' )->first();
+			$this->numberOfRules = (int) \IPS\Db::i()->select( 'COUNT(*)', 'nexus_referral_rules' )->first();
 		}
 		return $this->numberOfRules;
 	}

@@ -11,41 +11,16 @@
 namespace IPS\File;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use DomainException;
-use FilesystemIterator;
-use InvalidArgumentException;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Member;
-use IPS\Request;
-use IPS\Settings;
-use LogicException;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
-use RuntimeException;
-use function copy;
-use function defined;
-use function file_put_contents;
-use function function_exists;
-use function fwrite;
-use function in_array;
-use function rename;
-use const IPS\IPS_FILE_PERMISSION;
-use const IPS\IPS_FOLDER_PERMISSION;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Handler: File System
  */
-class FileSystem extends File
+class _FileSystem extends \IPS\File
 {
 	/* !ACP Configuration */
 	
@@ -55,7 +30,7 @@ class FileSystem extends File
 	 * @param	array	$configuration		Configuration if editing a setting, or array() if creating a setting.
 	 * @return	array
 	 */
-	public static function settings( array $configuration=array() ) : array
+	public static function settings( $configuration=array() )
 	{
 		$default = ( isset( $configuration['custom_url'] ) and ! empty( $configuration['custom_url'] ) ) ? TRUE : FALSE;
 		
@@ -73,9 +48,9 @@ class FileSystem extends File
 	 *
 	 * @param	array	$values	The submitted values
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public static function testSettings( array &$values ) : void
+	public static function testSettings( &$values )
 	{
 		$values['dir'] = rtrim( $values['dir'], '\\/' );
 		$testDir = str_replace( '{root}', \IPS\ROOT_PATH, $values['dir'] );
@@ -88,15 +63,15 @@ class FileSystem extends File
 
 		if ( !$testDir )
 		{
-			throw new DomainException( Member::loggedIn()->language()->addToStack( 'dir_not_provided', FALSE ) );
+			throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'dir_not_provided', FALSE ) );
 		}
 		if ( !is_dir( $testDir ) )
 		{
-			throw new DomainException( Member::loggedIn()->language()->addToStack( 'dir_does_not_exist', FALSE, array( 'sprintf' => array( $testDir ) ) ) );
+			throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'dir_does_not_exist', FALSE, array( 'sprintf' => array( $testDir ) ) ) );
 		}
 		if ( !is_writable( $testDir ) )
 		{
-			throw new DomainException( Member::loggedIn()->language()->addToStack( 'dir_is_not_writable', FALSE, array( 'sprintf' => array( $testDir ) ) ) );
+			throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'dir_is_not_writable', FALSE, array( 'sprintf' => array( $testDir ) ) ) );
 		}
 		
 		if ( ! empty( $values['custom_url'] ) )
@@ -115,7 +90,7 @@ class FileSystem extends File
 			
 			if ( filter_var( $test, FILTER_VALIDATE_URL ) === false )
 			{
-				throw new DomainException( Member::loggedIn()->language()->addToStack( 'url_is_not_real', FALSE, array( 'sprintf' => array( $values['custom_url'] ) ) ) );
+				throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'url_is_not_real', FALSE, array( 'sprintf' => array( $values['custom_url'] ) ) ) );
 			}
 		}
 	}
@@ -127,7 +102,7 @@ class FileSystem extends File
 	 * @param	array		$oldConfiguration   Existing Storage Configuration
 	 * @return	boolean
 	 */
-	public static function moveCheck( array $configuration, array $oldConfiguration ) : bool
+	public static function moveCheck( $configuration, $oldConfiguration )
 	{
 		if ( str_replace( '{root}', \IPS\ROOT_PATH, preg_replace( '#/{1,}/#', '/', rtrim( $configuration['dir'], '/' ) ) ) !== str_replace( '{root}', \IPS\ROOT_PATH, preg_replace( '#/{1,}/#', '/', rtrim( $oldConfiguration['dir'], '/' ) ) ) )
 		{
@@ -143,9 +118,9 @@ class FileSystem extends File
 	 * @param	array	$settings	Configuration settings
 	 * @return	string
 	 */
-	public static function displayName( array $settings ) : string
+	public static function displayName( $settings )
 	{
-		return Member::loggedIn()->language()->addToStack( 'filehandler_display_name', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack('filehandler__FileSystem'), str_replace( '{root}', \IPS\ROOT_PATH, $settings['dir'] ) ) ) );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'filehandler_display_name', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack('filehandler__FileSystem'), str_replace( '{root}', \IPS\ROOT_PATH, $settings['dir'] ) ) ) );
 	}
 
 	/* !File Handling */
@@ -153,7 +128,7 @@ class FileSystem extends File
 	/**
 	 * @brief	Does this storage method support chunked uploads?
 	 */
-	public static bool $supportsChunking = TRUE;
+	public static $supportsChunking = TRUE;
 	
 	/**
 	 * Constructor
@@ -161,7 +136,7 @@ class FileSystem extends File
 	 * @param	array	$configuration	Storage configuration
 	 * @return	void
 	 */
-	public function __construct( array $configuration )
+	public function __construct( $configuration )
 	{
 		$this->container = 'monthly_' . date( 'Y' ) . '_' . date( 'm' );
 		$configuration['dir'] = str_replace( '{root}', \IPS\ROOT_PATH, $configuration['dir'] );
@@ -172,7 +147,7 @@ class FileSystem extends File
 	/**
 	 * @brief	Store the path to the file so we can just move it later
 	 */
-	protected ?string $temporaryFilePath	= NULL;
+	protected $temporaryFilePath	= NULL;
 	
 	/**
 	 * Set the file
@@ -180,7 +155,7 @@ class FileSystem extends File
 	 * @param	string	$filepath	The path to the file on disk
 	 * @return  void
 	 */
-	public function setFile( string $filepath ) : void
+	public function setFile( $filepath )
 	{
 		$this->temporaryFilePath	= $filepath;
 	}
@@ -190,10 +165,10 @@ class FileSystem extends File
 	 *
 	 * @return string
 	 */
-	public function baseUrl() : string
+	public function baseUrl()
 	{
-		$url = ( empty( $this->configuration['custom_url'] ) ) ? rtrim( Settings::i()->base_url, '/' ) . '/' . ltrim( $this->configuration['url'], '/' ) : $this->configuration['custom_url'];
-		if ( Request::i()->isSecure() )
+		$url = ( empty( $this->configuration['custom_url'] ) ) ? rtrim( \IPS\Settings::i()->base_url, '/' ) . '/' . ltrim( $this->configuration['url'], '/' ) : $this->configuration['custom_url'];
+		if ( \IPS\Request::i()->isSecure() )
 		{
 			$url = str_replace( 'http://', 'https://', $url );
 		}
@@ -205,9 +180,9 @@ class FileSystem extends File
 	 *
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param   int         $flags                  Bitwise Flags
-	 * @return	File
+	 * @return	\IPS\File
 	 */
-	public function move( int $storageConfiguration, int $flags=0 ) : File
+	public function move( $storageConfiguration, $flags=0 )
 	{
 		if ( $this->configurationId === $storageConfiguration and isset( $this->configuration['old_url'] ) )
 		{
@@ -223,7 +198,7 @@ class FileSystem extends File
 			if (  mb_substr( $this->url, 0, mb_strlen( $this->configuration['url'] ) ) != $this->configuration['url'] )
 			{
 				/* No? Something has gone wrong */
-				throw new RuntimeException('url_update_incorrect_url');
+				throw new \RuntimeException('url_update_incorrect_url');
 			}
 			else
 			{
@@ -253,7 +228,7 @@ class FileSystem extends File
 	 * @param	int|null	$throttle	Throttle speed
 	 * @return	void
 	 */
-	public function printFile( ?int $start=NULL, ?int $length=NULL, ?int $throttle=NULL ) : void
+	public function printFile( $start=NULL, $length=NULL, $throttle=NULL )
 	{
 		$file	= $this->configuration['dir'] . '/' . $this->container . '/' . $this->filename;
 
@@ -265,9 +240,9 @@ class FileSystem extends File
 	 *
 	 * @param	bool	$refresh	If TRUE, will fetch again
 	 * @return	string
-	 * @throws  RuntimeException
+	 * @throws  \RuntimeException
 	 */
-	public function contents( bool $refresh=FALSE ) : string
+	public function contents( $refresh=FALSE )
 	{
 		if ( $this->contents === NULL or $refresh === TRUE )
 		{
@@ -277,12 +252,12 @@ class FileSystem extends File
 				
 				if ( $this->contents === FALSE )
 				{
-					throw new Exception( $this->container . '/' . $this->filename, Exception::CANNOT_OPEN, $this->originalFilename );
+					throw new \IPS\File\Exception( $this->container . '/' . $this->filename, \IPS\File\Exception::CANNOT_OPEN, $this->originalFilename );
 				}
 			}
 			else
 			{
-				throw new Exception( $this->container . '/' . $this->filename, Exception::DOES_NOT_EXIST, $this->originalFilename );
+				throw new \IPS\File\Exception( $this->container . '/' . $this->filename, \IPS\File\Exception::DOES_NOT_EXIST, $this->originalFilename );
 			}
 		}
 
@@ -293,22 +268,22 @@ class FileSystem extends File
 	 * If the file is an image, get the dimensions
 	 *
 	 * @return	array
-	 * @throws	DomainException
-	 * @throws  RuntimeException
-	 * @throws	InvalidArgumentException
+	 * @throws	\DomainException
+	 * @throws  \RuntimeException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function getImageDimensions() : array
+	public function getImageDimensions()
 	{
 		if( !$this->isImage() )
 		{
-			throw new DomainException;
+			throw new \DomainException;
 		}
 
 		$file	= $this->configuration['dir'] . '/' . $this->container . '/' . $this->filename;
 		
 		if ( ! file_exists( $file ) )
 		{
-			throw new RuntimeException;
+			throw new \RuntimeException;
 		}
 		
 		if( ( $image = getimagesize( $file ) ) === FALSE )
@@ -323,9 +298,9 @@ class FileSystem extends File
 	 * Save File
 	 *
 	 * @return	void
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public function save() : void
+	public function save()
 	{
 		/* Make the folder */
 		$folder = $this->configuration['dir'] . '/' . $this->getFolder();
@@ -335,60 +310,64 @@ class FileSystem extends File
 		{
 			if( static::$copyFiles === TRUE )
 			{
-				if( !@copy( $this->temporaryFilePath, "{$folder}/{$this->filename}" ) )
+				if( !@\copy( $this->temporaryFilePath, "{$folder}/{$this->filename}" ) )
 				{
-					Log::log( "Could not copy file {$folder}/{$this->filename}" , 'FileSystem' );
-					throw new Exception( "{$folder}/{$this->filename}", Exception::CANNOT_COPY, $this->originalFilename );
+					\IPS\Log::log( "Could not copy file {$folder}/{$this->filename}" , 'FileSystem' );
+					throw new \IPS\File\Exception( "{$folder}/{$this->filename}", \IPS\File\Exception::CANNOT_COPY, $this->originalFilename );
 				}
 			}
 			else
 			{
-				if( !@rename( $this->temporaryFilePath, "{$folder}/{$this->filename}" ) )
+				if( !@\rename( $this->temporaryFilePath, "{$folder}/{$this->filename}" ) )
 				{
-					Log::log( "Could not move file {$folder}/{$this->filename}" , 'FileSystem' );
-					throw new Exception( "{$folder}/{$this->filename}", Exception::CANNOT_MOVE, $this->originalFilename );
+					\IPS\Log::log( "Could not move file {$folder}/{$this->filename}" , 'FileSystem' );
+					throw new \IPS\File\Exception( "{$folder}/{$this->filename}", \IPS\File\Exception::CANNOT_MOVE, $this->originalFilename );
 				}
 			}
+
+			@chmod( "{$folder}/{$this->filename}", \IPS\IPS_FILE_PERMISSION );
 		}
 		else
 		{
 			if ( $contents = $this->contents() )
 			{				
-				if ( !@file_put_contents( "{$folder}/{$this->filename}", $contents ) )
+				if ( !@\file_put_contents( "{$folder}/{$this->filename}", $contents ) )
 				{					
-					Log::log( "Could not write file {$folder}/{$this->filename}" , 'FileSystem' );
-					throw new Exception( "{$folder}/{$this->filename}", Exception::CANNOT_WRITE, $this->originalFilename );
+					\IPS\Log::log( "Could not write file {$folder}/{$this->filename}" , 'FileSystem' );
+					throw new \IPS\File\Exception( "{$folder}/{$this->filename}", \IPS\File\Exception::CANNOT_WRITE, $this->originalFilename );
 				}
+
+				@chmod( "{$folder}/{$this->filename}", \IPS\IPS_FILE_PERMISSION );
 			}
 			else
 			{
 				$return = touch( "{$folder}/{$this->filename}" );
+				@chmod( "{$folder}/{$this->filename}", \IPS\IPS_FILE_PERMISSION );
 			}
 		}
-
-		@chmod( "{$folder}/{$this->filename}", IPS_FILE_PERMISSION );
 		
 		/* Clear zend opcache if enabled */
-		if ( function_exists( 'opcache_invalidate' ) )
+		if ( \function_exists( 'opcache_invalidate' ) )
 		{
 			@opcache_invalidate( "{$folder}/{$this->filename}" );
 		}
 		
 		/* Set the URL */
-		$this->url = Url::createFromString( $this->fullyQualifiedUrl( "{$this->container}/{$this->filename}" ), FALSE );
+		$this->url = \IPS\Http\Url::createFromString( $this->fullyQualifiedUrl( "{$this->container}/{$this->filename}" ), FALSE );
 	}
 		
 	/**
 	 * Delete
 	 *
+	 * @return	bool
 	 */
-	public function delete() : void
+	public function delete()
 	{		
 		/* Log deletion request */
 		$immediateCaller = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 1 );
 		$debug = array_map( function( $row ) {
 			return array_filter( $row, function( $key ) {
-				return in_array( $key, array( 'class', 'function', 'line' ) );
+				return \in_array( $key, array( 'class', 'function', 'line' ) );
 			}, ARRAY_FILTER_USE_KEY );
 		}, debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ) );
 		$this->log( "file_deletion", 'delete', $debug, 'log' );
@@ -398,10 +377,16 @@ class FileSystem extends File
 			$result = @unlink( "{$this->configuration['dir']}/{$this->container}/{$this->filename}" );
 
 			/* Clear zend opcache if enabled */
-			if ( function_exists( 'opcache_invalidate' ) )
+			if ( \function_exists( 'opcache_invalidate' ) )
 			{
 				@opcache_invalidate( "{$this->configuration['dir']}/{$this->container}/{$this->filename}" );
 			}
+
+			return $result;
+		}
+		else
+		{
+			return false;
 		}
 	}
 	
@@ -412,7 +397,7 @@ class FileSystem extends File
 	 * @param	bool	$skipClear	Skip clearing the opcache, used for recursive calls since the parent call will do it
 	 * @return	void
 	 */
-	public function deleteContainer( string $container, bool $skipClear = FALSE ) : void
+	public function deleteContainer( $container, $skipClear = FALSE )
 	{
 		$dir = $this->configuration['dir'] . '/' . $container;
 
@@ -421,7 +406,7 @@ class FileSystem extends File
 			$files	= array();
 			$dirs	= array();
 
-			foreach ( new DirectoryIterator( $dir ) as $f )
+			foreach ( new \DirectoryIterator( $dir ) as $f )
 			{
 				if ( !$f->isDot() )
 				{
@@ -448,7 +433,7 @@ class FileSystem extends File
 				unlink( $file );
 
 				/* Clear zend opcache if enabled */
-				if( $skipClear === FALSE and function_exists( 'opcache_invalidate' ) )
+				if( $skipClear === FALSE and \function_exists( 'opcache_invalidate' ) )
 				{
 					@opcache_invalidate( $file );
 				}
@@ -471,10 +456,10 @@ class FileSystem extends File
 	 * @param	string		$filename	The desired filename
 	 * @param	string|null	$container	Key to identify container for storage
 	 * @param	bool		$obscure		Controls if an md5 hash should be added to the filename
-	 * @return	array					A reference to be passed to chunkProcess() and chunkFinish()
-	 * @throws	RuntimeException
+	 * @return	mixed					A reference to be passed to chunkProcess() and chunkFinish()
+	 * @throws	\RuntimeException
 	 */
-	public function chunkInit( string $filename, ?string $container = '', bool $obscure = TRUE ) : array
+	public function chunkInit( $filename, $container = '', $obscure = TRUE )
 	{
 		/* If we don't have a chunk folder, create one */
 		$tempFolder = $this->getFolder( 'chunks' );
@@ -492,32 +477,32 @@ class FileSystem extends File
 	/**
 	 * Append more contents in a chunked upload
 	 *
-	 * @param	array	$ref							The reference for this upload as returned by chunkInit()
+	 * @param	mixed	$ref							The reference for this upload as returned by chunkInit() 
 	 * @param	string	$temporaryFileOrContents		The contents to write, or the path to the temporary file on disk with the contents
 	 * @param	int		$chunkNumber					Which chunk this is (0 for the first chunk, 1 for the second, etc)
 	 * @param	bool	$isContents					If TRUE, $temporaryFileOrContents is treated as raw contents. If FALSE, is path to file
-	 * @return	array								Updated reference fore future chunkProcess() calls and chunkFinish()
-	 * @throws	RuntimeException
+	 * @return	mixed								Updated reference fore future chunkProcess() calls and chunkFinish()
+	 * @throws	\RuntimeException
 	 */
-	public function chunkProcess( array $ref, string $temporaryFileOrContents, int $chunkNumber, bool $isContents = FALSE ) : array
+	public function chunkProcess( $ref, $temporaryFileOrContents, $chunkNumber, $isContents = FALSE )
 	{
 		$file = fopen( $ref['temp'], 'ab' );
 		if ( $isContents )
 		{
-			fwrite( $file, $temporaryFileOrContents );
+			\fwrite( $file, $temporaryFileOrContents );
 		}
 		else
 		{
 			$_chunk = fopen( $temporaryFileOrContents, 'rb' );
 			while ( $buffer = fread( $_chunk, 4096 ) )
 			{
-				fwrite( $file, $buffer );
+				\fwrite( $file, $buffer );
 			}
 			@unlink( $temporaryFileOrContents );
 		}
 		fclose( $file );
 		
-		if ( function_exists( 'opcache_invalidate' ) )
+		if ( \function_exists( 'opcache_invalidate' ) )
 		{
 			@opcache_invalidate( $ref['temp'] );
 		}
@@ -530,14 +515,14 @@ class FileSystem extends File
 	 *
 	 * @param   array       $ref                    The reference for this upload as returned by chunkInit()
 	 * @param   string      $storageConfiguration   Storage configuration name
-	 * @return  File                           The file object just created
-	 * @throws  RuntimeException
+	 * @return  \IPS\File                           The file object just created
+	 * @throws  \RuntimeException
 	 */
-	public function chunkFinish( array $ref, string $storageConfiguration ): File
+	public function chunkFinish( array $ref, string $storageConfiguration ): \IPS\File
 	{
 		rename( $ref['temp'], "{$this->configuration['dir']}/{$ref['final']}" );
 
-		$fileObj = File::get( $storageConfiguration,$ref['final'] );
+		$fileObj = \IPS\File::get( $storageConfiguration,$ref['final'] );
 
 		/* This isn't preserved for chunk uploads, so we need to set it so apps can get the real value */
 		if( !empty( $ref['original'] ) )
@@ -556,17 +541,17 @@ class FileSystem extends File
 	 * @param	string|null	$folderName	Folder name - if NULL, a monthly name will be used
 	 * @return	string
 	 */
-	protected function getFolder( ?string $folderName=NULL ) : string
+	protected function getFolder( $folderName=NULL )
 	{
 		$folderName = $folderName ?: $this->container;
 		$folder = $this->configuration['dir'] . '/' . $folderName;
 		if( !is_dir( $folder ) )
 		{
-			if( @mkdir( $folder, IPS_FOLDER_PERMISSION, TRUE ) === FALSE or @chmod( $folder, IPS_FOLDER_PERMISSION ) === FALSE )
+			if( @mkdir( $folder, \IPS\IPS_FOLDER_PERMISSION, TRUE ) === FALSE or @chmod( $folder, \IPS\IPS_FOLDER_PERMISSION ) === FALSE )
 			{
-				throw new Exception( $folder, Exception::CANNOT_MAKE_DIR );
+				throw new \IPS\File\Exception( $folder, \IPS\File\Exception::CANNOT_MAKE_DIR );
 			}
-			@file_put_contents( $folder . '/index.html', '' );
+			@\file_put_contents( $folder . '/index.html', '' );
 		}
 		
 		return $folderName;
@@ -579,7 +564,7 @@ class FileSystem extends File
 	 * @param	array	$engines	All file storage engine extension objects
 	 * @return	array
 	 */
-	public function removeOrphanedFiles( int $fileIndex, array $engines ) : array
+	public function removeOrphanedFiles( $fileIndex, $engines )
 	{
 		/* Start off our results array */
 		$results	= array(
@@ -596,12 +581,12 @@ class FileSystem extends File
 
 		if ( is_dir( $dir ) )
 		{
-			$iterator	= new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS | FilesystemIterator::UNIX_PATHS ) );
+			$iterator	= new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::UNIX_PATHS ) );
 
 			foreach ( $iterator as $f )
 			{
 				/* We aren't checking directories */
-				if( $f->isDir() OR $f->getFilename() == 'index.html' OR mb_substr( $f->getFilename(), 0, 1 ) === '.' OR mb_substr( $f->getSubPathname(), 0, 5 ) === 'logs/' )
+				if( $f->isDir() OR $f->getFilename() == 'index.html' OR mb_substr( $f->getFilename(), 0, 1 ) === '.' OR mb_substr( $iterator->getSubPathname(), 0, 5 ) === 'logs/' )
 				{
 					continue;
 				}
@@ -627,19 +612,19 @@ class FileSystem extends File
 					/* If this file is valid for the engine, skip to the next file */
 					try
 					{
-						if( $engine->isValidFile( $engine->getSubPathname() ) )
+						if( $engine->isValidFile( $iterator->getSubPathname() ) )
 						{
 							continue 2;
 						}
 					}
-					catch( InvalidArgumentException $e )
+					catch( \InvalidArgumentException $e )
 					{
 						continue 2;
 					}
 				}
 								
 				/* If we are still here, the file was not valid */
-				$this->logOrphanedFile( $f->getSubPathname() );
+				$this->logOrphanedFile( $iterator->getSubPathname() );
 			}
 		}
 
@@ -657,9 +642,9 @@ class FileSystem extends File
 	/**
 	 * Get filesize (in bytes)
 	 *
-	 * @return	int|bool
+	 * @return	string|bool
 	 */
-	public function filesize() : int|bool
+	public function filesize()
 	{
 		if( $this->_cachedFilesize !== NULL )
 		{

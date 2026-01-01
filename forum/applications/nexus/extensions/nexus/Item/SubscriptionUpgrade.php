@@ -12,85 +12,75 @@
 namespace IPS\nexus\extensions\nexus\Item;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item\Charge;
-use IPS\nexus\Purchase;
-use IPS\nexus\Subscription\Package;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
- * Invoice Item Class for Subscription Upgrade Charges
+ * Invoice Item Class for Shipping Charges
  */
-class SubscriptionUpgrade extends Charge
+class _SubscriptionUpgrade extends \IPS\nexus\Invoice\Item\Charge
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'nexus';
+	public static $application = 'nexus';
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $type = 'sub_upgrade';
+	public static $type = 'sub_upgrade';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'turn-up';
+	public static $icon = 'level-up';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'upgrade_charge';
+	public static $title = 'upgrade_charge';
 	
 	/**
 	 * On Paid
 	 *
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public function onPaid( Invoice $invoice ): void
+	public function onPaid( \IPS\nexus\Invoice $invoice )
 	{
 		try
 		{
-			$purchase = Purchase::load( $this->id );
+			$purchase = \IPS\nexus\Purchase::load( $this->id );
 			
-			$oldPackage = Package::load( $this->extra['oldPackage'] );
-			$newPackage = Package::load( $this->extra['newPackage'] );
+			$oldPackage = \IPS\nexus\Subscription\Package::load( $this->extra['oldPackage'] );
+			$newPackage = \IPS\nexus\Subscription\Package::load( $this->extra['newPackage'] );
 			$oldPackage->upgradeDowngrade( $purchase, $newPackage, TRUE );
 			$purchase->member->log( 'subscription', array( 'type' => 'change', 'id' => $purchase->id, 'old' => $oldPackage->titleForLog(), 'name' => $newPackage->titleForLog(), 'system' => TRUE ) );
 		}
-		catch ( OutOfRangeException ){ }
+		catch ( \OutOfRangeException $e ){ }
 	}
 	
 	/**
 	 * On Unpaid description
 	 *
-	 * @param	Invoice	$invoice	The invoice
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
 	 * @return	array
 	 */
-	public function onUnpaidDescription( Invoice $invoice ): array
+	public function onUnpaidDescription( \IPS\nexus\Invoice $invoice )
 	{
 		$return = parent::onUnpaidDescription( $invoice );
 		
 		try
 		{
-			$oldPackage = Package::load( $this->extra['oldPackage'] );
-			$newPackage = Package::load( $this->extra['newPackage'] );
+			$oldPackage = \IPS\nexus\Subscription\Package::load( $this->extra['oldPackage'] );
+			$newPackage = \IPS\nexus\Subscription\Package::load( $this->extra['newPackage'] );
 			
-			$return[] = Member::loggedIn()->language()->addToStack( 'invoice_unpaid_change', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( 'purchase_number', FALSE, array( 'sprintf' => array( $this->id ) ) ), $newPackage->_title, $oldPackage->_title ) ) );
+			$return[] = \IPS\Member::loggedIn()->language()->addToStack( 'invoice_unpaid_change', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( 'purchase_number', FALSE, array( 'sprintf' => array( $this->id ) ) ), $newPackage->_title, $oldPackage->_title ) ) );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e ){}
 		
 		return $return;
 	}
@@ -98,35 +88,35 @@ class SubscriptionUpgrade extends Charge
 	/**
 	 * On Unpaid
 	 *
-	 * @param	Invoice	$invoice	The invoice
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
 	 * @param	string				$status		Status
-	 * @return    void
+	 * @return	void
 	 */
-	public function onUnpaid( Invoice $invoice, string $status ): void
+	public function onUnpaid( \IPS\nexus\Invoice $invoice, $status )
 	{
 		try
 		{	
-			$purchase = Purchase::load( $this->id );
-			$oldPackage = Package::load( $this->extra['oldPackage'] );
-			$newPackage = Package::load( $this->extra['newPackage'] );
+			$purchase = \IPS\nexus\Purchase::load( $this->id );
+			$oldPackage = \IPS\nexus\Subscription\Package::load( $this->extra['oldPackage'] );
+			$newPackage = \IPS\nexus\Subscription\Package::load( $this->extra['newPackage'] );
 			$newPackage->upgradeDowngrade( $purchase, $oldPackage, TRUE );
 			$purchase->member->log( 'subscription', array( 'type' => 'change', 'id' => $purchase->id, 'old' => $newPackage->_title, 'name' => $oldPackage->_title, 'system' => TRUE ) );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e ){}
 	}
 	
 	/**
 	 * Client Area URL
 	 *
-	 * @return Url|string|null
+	 * @return |IPS\Http\Url|NULL
 	 */
-	function url(): Url|string|null
+	public function url()
 	{
 		try
 		{
-			return Purchase::load( $this->id )->url();
+			return \IPS\nexus\Purchase::load( $this->id )->url();
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -135,15 +125,15 @@ class SubscriptionUpgrade extends Charge
 	/**
 	 * ACP URL
 	 *
-	 * @return Url|null
+	 * @return |IPS\Http\Url|NULL
 	 */
-	public function acpUrl(): Url|null
+	public function acpUrl()
 	{
 		try
 		{
-			return Purchase::load( $this->id )->acpUrl();
+			return \IPS\nexus\Purchase::load( $this->id )->acpUrl();
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}

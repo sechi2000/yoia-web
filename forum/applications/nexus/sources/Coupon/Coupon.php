@@ -12,68 +12,46 @@
 namespace IPS\nexus;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Application;
-use IPS\DateTime;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Date;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Math\Number;
-use IPS\Member\Group;
-use IPS\nexus\extensions\nexus\Item\CouponDiscount;
-use IPS\nexus\Invoice\Item\Renewal;
-use IPS\Node\Model;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Coupon Node
  */
-class Coupon extends Model
+class _Coupon extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_coupons';
+	public static $databaseTable = 'nexus_coupons';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'c_';
+	public static $databasePrefix = 'c_';
 			
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'menu__nexus_store_coupons';
+	public static $nodeTitle = 'menu__nexus_store_coupons';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'c_code' );
+	protected static $databaseIdFields = array( 'c_code' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -91,161 +69,102 @@ class Coupon extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'nexus',
 		'module'	=> 'store',
 		'prefix'	=> 'coupons_',
 	);
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
 	
 	/**
 	 * [Node] Get title
 	 *
 	 * @return	string
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		return $this->code;
-	}
-
-	/**
-	 * @return array|string
-	 */
-	public function get_products() : array|string
-	{
-		if( isset( $this->_data['products'] ) and $this->_data['products'] !== '*' )
-		{
-			if( $test = json_decode( $this->_data['products'], true ) )
-			{
-				return $test;
-			}
-
-			return [
-				'product' => [
-					'products' => explode( ",", $this->_data['products'] )
-				]
-			];
-		}
-
-		return '*';
-	}
-
-	/**
-	 * @param array|string|null $val
-	 * @return void
-	 */
-	public function set_products( array|string|null $val ) : void
-	{
-		$this->_data['products'] = ( is_array( $val ) and count( $val ) ) ? json_encode( $val ) : '*';
 	}
 	
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$groups = array();
-		foreach ( Group::groups() as $group )
+		foreach ( \IPS\Member\Group::groups() as $group )
 		{
 			$groups[ $group->g_id ] = $group->name;
 		}
 		
+		if ( $this->id and $this->products !== '*' )
+		{
+			$products = array();
+			foreach ( explode( ',', $this->products ) as $packageId )
+			{
+				try
+				{
+					$products[] = \IPS\nexus\Package::load( $packageId );
+				}
+				catch ( \OutOfRangeException $e ) { }
+			}
+		}
+		else
+		{
+			$products = 0;
+		}
+		
+		
 		$form->addHeader( 'coupon_basic_settings' );
 		$id = $this->id ?: NULL;
-		$form->add( new Text( 'c_code', $this->id ? $this->code : mb_strtoupper( mb_substr( md5( mt_rand() ), 0, 5 ) ), TRUE, array( 'maxLength' => 25 ), function( $val ) use ( $id )
+		$form->add( new \IPS\Helpers\Form\Text( 'c_code', $this->id ? $this->code : mb_strtoupper( mb_substr( md5( mt_rand() ), 0, 5 ) ), TRUE, array( 'maxLength' => 25 ), function( $val ) use ( $id )
 		{
 			try
 			{
-				$coupon = Coupon::load( $val, 'c_code' );
+				$coupon = \IPS\nexus\Coupon::load( $val, 'c_code' );
 				if ( $coupon->id AND $coupon->id != $id )
 				{
-					throw new DomainException('c_code_err');
+					throw new \DomainException('c_code_err');
 				}
 			}
-			catch ( OutOfRangeException ) {}
+			catch ( \OutOfRangeException $e ) {}
 		} ) );
-		$form->add( new Radio( 'c_unit', $this->id ? $this->unit : 'v', TRUE, array( 'options' => array( 'v' => 'c_unit_v', 'p' => 'c_unit_p' ), 'toggles' => array( 'v' => array( 'c_discount_v' ), 'p' => array( 'c_discount_p' ) ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'c_unit', $this->id ? $this->unit : 'v', TRUE, array( 'options' => array( 'v' => 'c_unit_v', 'p' => 'c_unit_p' ), 'toggles' => array( 'v' => array( 'c_discount_v' ), 'p' => array( 'c_discount_p', 'c_limit_discount' ) ) ) ) );
 		$form->add( new \IPS\nexus\Form\Money( 'c_discount_v', $this->unit === 'v' ? $this->discount : NULL, NULL, array(), function( $val )
 		{
-			if ( !$val and Request::i()->c_unit === 'v' )
+			if ( !$val and \IPS\Request::i()->c_unit === 'v' )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'c_discount_v' ) );
-		$form->add( new Form\Number( 'c_discount_p', $this->unit === 'p' ? $this->discount : NULL, NULL, array( 'max' => 100 ), function($val )
+		$form->add( new \IPS\Helpers\Form\Number( 'c_discount_p', $this->unit === 'p' ? $this->discount : NULL, NULL, array( 'max' => 100 ), function( $val )
 		{
-			if ( !$val and Request::i()->c_unit === 'p' )
+			if ( !$val and \IPS\Request::i()->c_unit === 'p' )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		}, NULL, '%', 'c_discount_p' ) );
 		
 		$form->addHeader( 'coupon_products' );
-		$form->add( new Radio( 'c_limit_discount', $this->limit_discount, FALSE, array(
-			'options' => array(
-				0 => 'c_limit_discount_no',
-				1 => 'c_limit_discount_yes'
-			),
-			'toggles' => array(
-				1 => array( 'c_products', 'c_renewals' )
-			)
-		), NULL, NULL, NULL, 'c_limit_discount' ) );
-
-		$productTypes = [];
-		$productFields = [];
-		$toggles = [];
-		foreach( Application::allExtensions( 'nexus', 'Item', null, null, null, false ) as $extension )
+		$form->add( new \IPS\Helpers\Form\Node( 'c_products', $products, FALSE, array( 'class' => 'IPS\nexus\Package\Group', 'multiple' => TRUE, 'zeroVal' => 'no_restriction', 'zeroValTogglesOff' => array( 'c_renewals' ), 'permissionCheck' => function( $node )
 		{
-			if( method_exists( $extension, 'customFormElements' ) )
-			{
-				$fields = $extension::customFormElements( $this->products );
-				if( count( $fields ) )
-				{
-					$productTypes[$extension::$title] = $extension::$title;
-					$toggles[$extension::$title] = [];
-					foreach( $fields as $field )
-					{
-						/* @var FormAbstract $field */
-						$productFields[] = $field;
-						$toggles[$extension::$title][] = $field->htmlId ?? $field->name;
-					}
-				}
-			}
-		}
-
-		$form->add( new CheckboxSet( 'c_products', ( $this->products === '*' ? null : array_keys( $this->products ) ), null, array(
-			'options' => $productTypes,
-			'toggles' => $toggles,
-			'noDefault' => true
-		), null, null, null, 'c_products' ) );
-
-		foreach( $productFields as $field )
-		{
-			$form->add( $field );
-		}
-
-		$form->add( new YesNo( 'c_renewals', (int) $this->renewals, false, array(), null, null, null, 'c_renewals' ) );
-
-		$form->addHeader( 'coupon_dates' );
-		$form->add( new Date( 'c_start', $this->id ? DateTime::ts( $this->start ) : DateTime::ts( time() ), TRUE, array( 'time' => TRUE ) ) );
-		$form->add( new Date( 'c_end', ( $this->id and $this->end ) ? DateTime::ts( $this->end ) : 0, TRUE, array( 'time' => TRUE, 'unlimited' => 0, 'unlimitedLang' => 'no_end_date' ) ) );
+			return !( $node instanceof \IPS\nexus\Package\Group );
+		} ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'c_renewals', $this->renewals ?: FALSE, FALSE, array(), NULL, NULL, NULL, 'c_renewals' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'c_limit_discount', $this->limit_discount, FALSE, array( 'options' => array( 0 => 'c_limit_discount_no', 1 => 'c_limit_discount_yes' ) ), NULL, NULL, NULL, 'c_limit_discount' ) );
+		
+		$form->addHeader( 'coupon_dates' );	
+		$form->add( new \IPS\Helpers\Form\Date( 'c_start', $this->id ? \IPS\DateTime::ts( $this->start ) : \IPS\DateTime::ts( time() ), TRUE, array( 'time' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Date( 'c_end', ( $this->id and $this->end ) ? \IPS\DateTime::ts( $this->end ) : 0, TRUE, array( 'time' => TRUE, 'unlimited' => 0, 'unlimitedLang' => 'no_end_date' ) ) );
 		
 		$form->addHeader( 'coupon_restrictions' );
-		$form->add( new YesNo( 'c_combine', $this->combine ) );
-		$form->add( new Form\Number( 'c_uses', $this->id ? $this->uses : -1, FALSE, array( 'unlimited' => -1 ) ) );
-		$form->add( new Form\Number( 'c_member_uses', $this->id ? $this->member_uses : 1, FALSE, array( 'unlimited' => -1 ) ) );
-		$form->add( new CheckboxSet( 'c_groups', ( $this->id and $this->groups !== '*' ) ? explode( ',', $this->groups ) : '*', FALSE, array( 'options' => $groups, 'multiple' => TRUE, 'unlimited' => '*', 'impliedUnlimited' => TRUE ) ) );
-
-        parent::form( $form );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'c_combine', $this->combine ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'c_uses', $this->id ? $this->uses : -1, FALSE, array( 'unlimited' => -1 ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'c_member_uses', $this->id ? $this->member_uses : 1, FALSE, array( 'unlimited' => -1 ) ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'c_groups', ( $this->id and $this->groups !== '*' ) ? explode( ',', $this->groups ) : '*', FALSE, array( 'options' => $groups, 'multiple' => TRUE, 'unlimited' => '*', 'impliedUnlimited' => TRUE ) ) );
+		
 	}
 		
 	/**
@@ -254,7 +173,7 @@ class Coupon extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if( isset( $values['c_unit'] ) )
 		{
@@ -263,27 +182,23 @@ class Coupon extends Model
 			unset( $values['c_discount_v'] );
 			unset( $values['c_discount_p'] );
 		}
-
-		/* We need to loop through the extensions even if we
-		are not going to use the data, because the fields need to be unset */
-		$productData = [];
-		foreach( Application::allExtensions( 'nexus', 'Item', null, null, null, false ) as $extension )
+		
+		if( isset( $values['c_products'] ) )
 		{
-			if( method_exists( $extension, 'saveCustomForm' ) )
+			if ( $values['c_products'] )
 			{
-				if( $extensionData = $extension::saveCustomForm( $values, $this ) )
+				$products = array();
+				foreach ( $values['c_products'] as $package )
 				{
-					$productData[ $extension::$title ] = $extensionData;
+					$products[ $package->id ] = $package->id;
 				}
+				$values['c_products'] = implode( ',', $products );
+			}
+			else
+			{
+				$values['c_products'] = '*';
 			}
 		}
-
-		if( $values['c_limit_discount'] != 1 )
-		{
-			$productData = '*';
-		}
-
-		$values['c_products'] = $productData;
 		
 		if( isset( $values['c_start'] ) )
 		{
@@ -297,7 +212,7 @@ class Coupon extends Model
 		
 		if( isset( $values['c_groups'] ) )
 		{
-			$values['c_groups'] = is_array( $values['c_groups'] ) ? implode( ',', $values['c_groups'] ) : '*';
+			$values['c_groups'] = \is_array( $values['c_groups'] ) ? implode( ',', $values['c_groups'] ) : '*';
 		}
 		
 		return $values;
@@ -308,21 +223,21 @@ class Coupon extends Model
 	 * Example code explains return value
 	 *
 	 * @code
-	 	* array(
-	 		* array(
-	 			* 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
-	 			* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	 			* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	 			* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	 		* ),
-	 		* ...							// Additional buttons
-	 	* );
+	 	array(
+	 		array(
+	 			'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
+	 			'title'	=> 'foo',		// Language key to use for button's title parameter
+	 			'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	 			'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	 		),
+	 		...							// Additional buttons
+	 	);
 	 * @endcode
-	 * @param Url $url		Base URL
+	 * @param	string	$url		Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		return array_merge( array(
 			'view'	=> array(
@@ -336,12 +251,12 @@ class Coupon extends Model
 	/**
 	 * Use coupon
 	 *
-	 * @param Invoice $invoice	Invoice to use against
-	 * @param Customer $customer	The customer using
-	 * @return	CouponDiscount
-	 * @throws	DomainException
+	 * @param	\IPS\nexus\Invoice	$invoice	Invoice to use against
+	 * @param	\IPS\nexus\Customer	$customer	The customer using		
+	 * @return	\IPS\nexus\extensions\nexus\Item\CouponDiscount
+	 * @throws	\DomainException
 	 */
-	public function useCoupon( Invoice $invoice, Customer $customer ) : CouponDiscount
+	public function useCoupon( \IPS\nexus\Invoice $invoice, \IPS\nexus\Customer $customer )
 	{
 		/* Restricted to groups? */
 		if ( $this->groups !== '*' )
@@ -357,24 +272,24 @@ class Coupon extends Model
 			}
 			if ( !$inGroup )
 			{
-				throw new DomainException( 'coupon_not_in_group' );
+				throw new \DomainException( 'coupon_not_in_group' );
 			}
 		}
 		
 		/* Valid dates */
 		if ( $this->start and $this->start > time() )
 		{
-			throw new DomainException( 'coupon_not_started' );
+			throw new \DomainException( 'coupon_not_started' );
 		}
 		if ( $this->end and $this->end < time() )
 		{
-			throw new DomainException( 'coupon_expired' );
+			throw new \DomainException( 'coupon_expired' );
 		}
 		
 		/* Maximum uses? */
 		if ( $this->uses == 0 )
 		{
-			throw new DomainException( 'coupon_expired' );
+			throw new \DomainException( 'coupon_expired' );
 		}
 		
 		/* Maximum uses per member? */
@@ -384,24 +299,24 @@ class Coupon extends Model
 		{
 			if ( isset( $uses[ $customerIdentifier ] ) and $uses[ $customerIdentifier ] >= $this->member_uses )
 			{
-				throw new DomainException( 'coupon_exceeded_member_uses' );
+				throw new \DomainException( 'coupon_exceeded_member_uses' );
 			}
 		}
 		
 		/* Use in conjunction with other coupons? */
 		foreach ( $invoice->items as $item )
 		{
-			if ( $item instanceof CouponDiscount )
+			if ( $item instanceof \IPS\nexus\extensions\nexus\Item\CouponDiscount )
 			{
 				if ( $item->id === $this->id )
 				{
-					throw new DomainException( 'coupon_already_used' );
+					throw new \DomainException( 'coupon_already_used' );
 				}
 				else
 				{
 					if ( !$this->combine )
 					{
-						throw new DomainException( $customer->language()->addToStack( 'coupon_not_in_conjunction', FALSE, array( 'sprintf' => array( $this->code ) ) ) );
+						throw new \DomainException( $customer->language()->addToStack( 'coupon_not_in_conjunction', FALSE, array( 'sprintf' => array( $this->code ) ) ) );
 					}
 					else
 					{
@@ -410,10 +325,10 @@ class Coupon extends Model
 							$otherCoupon = static::load( $item->id );
 							if ( !$otherCoupon->combine )
 							{
-								throw new DomainException( $customer->language()->addToStack( 'coupon_not_in_conjunction', FALSE, array( 'sprintf' => array( $otherCoupon->code ) ) ) );
+								throw new \DomainException( $customer->language()->addToStack( 'coupon_not_in_conjunction', FALSE, array( 'sprintf' => array( $otherCoupon->code ) ) ) );
 							}
 						}
-						catch ( OutOfRangeException ) { }
+						catch ( \OutOfRangeException $e ) { }
 					}
 				}
 			}
@@ -423,47 +338,52 @@ class Coupon extends Model
 		$items = NULL;
 		if ( $this->products !== '*' )
 		{
+			$allowedProductIds = explode( ',', $this->products );
 			$hasAllowedProduct = FALSE;
-			$productTotal = new Number('0');
+			$productTotal = new \IPS\Math\Number('0');
 			
 			$items = array();
 			
 			foreach ( $invoice->items as $k => $item )
 			{
-				if( $item instanceof \IPS\nexus\Invoice\Item\Purchase )
+				if ( $item instanceof \IPS\nexus\extensions\nexus\Item\Package and \in_array( $item->id, $allowedProductIds ) )
 				{
-					if( $item->isValid( $this->products, $invoice, $customer ) )
-					{
-						$hasAllowedProduct = TRUE;
-						$productTotal = $productTotal->add( $item->price->amount->multiply( new Number("{$item->quantity}") ) );
-						$items[] = $k;
-					}
+					$hasAllowedProduct = TRUE;
+					$productTotal = $productTotal->add( $item->price->amount->multiply( new \IPS\Math\Number("{$item->quantity}") ) );
+					
+					$items[] = $k;
 				}
-				elseif ( $this->renewals and $item instanceof Renewal )
+				elseif ( $this->renewals and $item instanceof \IPS\nexus\Invoice\Item\Renewal )
 				{
-					if( $item->isValid( $this->products, $invoice, $customer ) )
+					try
 					{
-						$hasAllowedProduct = TRUE;
-						$productTotal = $productTotal->add( $item->price->amount );
-						$items[] = $k;
+						$purchase = \IPS\nexus\Purchase::load( $item->id );
+						if ( $purchase->app == 'nexus' and $purchase->type == 'package' and \in_array( $purchase->item_id, $allowedProductIds ) )
+						{
+							$hasAllowedProduct = TRUE;
+							$productTotal = $productTotal->add( $item->price->amount );
+							
+							$items[] = $k;
+						}
 					}
+					catch ( \OutOfRangeException $e ) { }
 				}
 			}
 			
 			if ( !$hasAllowedProduct )
 			{
-				throw new DomainException( 'coupon_invalid_products' );
+				throw new \DomainException( 'coupon_invalid_products' );
 			}
 		}
 						
 		/* How much are we taking off? */
-		$discount = new Money( 0, $invoice->currency );
+		$discount = new \IPS\nexus\Money( 0, $invoice->currency );
 		if ( $this->unit === 'v' )
 		{
 			$prices = json_decode( $this->discount, TRUE );
 			if ( isset( $prices[ $invoice->currency ] ) )
 			{
-				$discount = new Money( -$prices[ $invoice->currency ]['amount'], $invoice->currency );
+				$discount = new \IPS\nexus\Money( -$prices[ $invoice->currency ]['amount'], $invoice->currency );
 			}
 		}
 		else
@@ -477,14 +397,14 @@ class Coupon extends Model
 				$summary = $invoice->summary();
 				$base = $summary['subtotal']->amount;
 			}
-
-			$discount = new Money( $base->percentage( $this->discount )->multiply( new Number( '-1' ) ), $invoice->currency );
+						
+			$discount = new \IPS\nexus\Money( $base->percentage( new \IPS\Math\Number( $this->discount ) )->multiply( new \IPS\Math\Number( '-1' ) ), $invoice->currency );
 		}
 		
 		/* Never allow a discount greater than the invoice total */
-		if ( $discount->amount->multiply( new Number( '-1' ) )->compare( $invoice->total->amount ) === 1 )
+		if ( $discount->amount->multiply( new \IPS\Math\Number( '-1' ) )->compare( $invoice->total->amount ) === 1 )
 		{
-			$discount = new Money( $invoice->total->amount->multiply( new Number( '-1' ) ), $invoice->currency );
+			$discount = new \IPS\nexus\Money( $invoice->total->amount->multiply( new \IPS\Math\Number( '-1' ) ), $invoice->currency );
 		}
 				
 		/* Save that we've used it */
@@ -500,7 +420,7 @@ class Coupon extends Model
 		$this->save();
 				
 		/* Generate item */
-		$item = new CouponDiscount( $this->code, $discount );
+		$item = new \IPS\nexus\extensions\nexus\Item\CouponDiscount( $this->code, $discount );
 		$item->id = $this->id;
 		$item->extra['usedBy'] = $customer->member_id;
 		$item->extra['type'] = $this->unit;
@@ -537,7 +457,7 @@ class Coupon extends Model
 	 * @param	mixed		$where	Where clause
 	 * @return	array
 	 */
-	public static function search( string $column, string $query, ?string $order=NULL, mixed $where=array() ): array
+	public static function search( $column, $query, $order, $where=array() )
 	{
 		if( $column === '_title' )
 		{

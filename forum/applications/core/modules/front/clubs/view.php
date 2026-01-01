@@ -11,71 +11,32 @@
 namespace IPS\core\modules\front\clubs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Content\Search\Query;
-use IPS\core\extensions\nexus\Item\ClubMembership;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher\Front;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\CoverPhoto;
-use IPS\Helpers\CoverPhoto\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Member as FormMember;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Image;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Club\Page;
-use IPS\nexus\Customer;
-use IPS\Notification;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use IPS\Widget;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function mb_stristr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Clubs View
  */
-class view extends Controller
+class _view extends \IPS\Helpers\CoverPhoto\Controller
 {
 	/**
 	 * @brief	The club being viewed
 	 */
-	protected ?Club $club = null;
+	protected $club;
 	
 	/**
 	 * @brief	The logged in user's status
 	 */
-	protected ?string $memberStatus = '';
+	protected $memberStatus;
 
 	/**
 	 * @brief These properties are used to specify datalayer context properties.
 	 *
 	 */
-	public static array $dataLayerContext = array(
+	public static $dataLayerContext = array(
 		'community_area' =>  [ 'value' => 'clubs', 'odkUpdate' => 'true']
 	);
 	
@@ -84,80 +45,84 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		if ( Request::i()->do != 'embed' )
+		if ( \IPS\Request::i()->do != 'embed' )
 		{
 			/* Permission check */
-			if ( !Settings::i()->clubs )
+			if ( !\IPS\Settings::i()->clubs )
 			{
-				Output::i()->error( 'no_module_permission', '2C350/P', 403, '' );
+				\IPS\Output::i()->error( 'no_module_permission', '2C350/P', 403, '' );
 			}
 			
 			/* Load the club */
 			try
 			{
-				$this->club = Club::load( Request::i()->id );
+				$this->club = \IPS\Member\Club::load( \IPS\Request::i()->id );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				Output::i()->error( 'node_error', '2C350/1', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2C350/1', 404, '' );
 			}
-			$this->memberStatus = $this->club->memberStatus( Member::loggedIn() );
+			$this->memberStatus = $this->club->memberStatus( \IPS\Member::loggedIn() );
 			
 			/* If we can't even know it exists, show an error */
 			if ( !$this->club->canView() )
 			{
-				Output::i()->error( Member::loggedIn()->member_id ? 'no_module_permission' : 'no_module_permission_guest', '2C350/2', 403, '' );
+				\IPS\Output::i()->error( \IPS\Member::loggedIn()->member_id ? 'no_module_permission' : 'no_module_permission_guest', '2C350/2', 403, '' );
 			}
 							
 			/* Sort out the breadcrumb */
-			Output::i()->breadcrumb = array(
-				array( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), Member::loggedIn()->language()->addToStack('module__core_clubs') )
+			\IPS\Output::i()->breadcrumb = array(
+				array( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), \IPS\Member::loggedIn()->language()->addToStack('module__core_clubs') )
 			);
 			
 			/* Add a "Search in this club" contextual search option and set to default*/
-			Output::i()->contextualSearchOptions[ Member::loggedIn()->language()->addToStack( 'search_contextual_item_club' ) ] = array( 'type' => '', 'club' => "c{$this->club->id}" );
-			Output::i()->defaultSearchOption = array( '', 'search_contextual_item_club' );
+			\IPS\Output::i()->contextualSearchOptions[ \IPS\Member::loggedIn()->language()->addToStack( 'search_contextual_item_club' ) ] = array( 'type' => '', 'club' => "c{$this->club->id}" );
+			\IPS\Output::i()->defaultSearchOption = array( '', 'search_contextual_item_club' );
 
 			/* CSS */
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/clubs.css', 'core', 'front' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/clubs.css', 'core', 'front' ) );
+			if ( \IPS\Theme::i()->settings['responsive'] )
+			{
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/clubs_responsive.css', 'core', 'front' ) );
+			}
 	
 			/* JS */
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_clubs.js', 'core', 'front' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_clubs.js', 'core', 'front' ) );
 			
 			/* Location for online list */
-			if ( $this->club->type !== Club::TYPE_PRIVATE )
+			if ( $this->club->type !== \IPS\Member\Club::TYPE_PRIVATE )
 			{
-				Session::i()->setLocation( $this->club->url(), array(), 'loc_clubs_club', array( $this->club->name => FALSE ) );
+				\IPS\Session::i()->setLocation( $this->club->url(), array(), 'loc_clubs_club', array( $this->club->name => FALSE ) );
 			}
 			else
 			{
-				Session::i()->setLocation( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), array(), 'loc_clubs_directory' );
+				\IPS\Session::i()->setLocation( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), array(), 'loc_clubs_directory' );
 			}
 
-			Output::i()->sidebar['contextual'] = '';
+			\IPS\Output::i()->sidebar['contextual'] = '';
 
 			/* Club info in sidebar */
-			if ( Settings::i()->clubs_header == 'sidebar' )
+			if ( \IPS\Settings::i()->clubs_header == 'sidebar' )
 			{
-				Output::i()->sidebar['contextual'] .= Theme::i()->getTemplate( 'clubs', 'core' )->header( $this->club, NULL, 'sidebar' );
+				\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->header( $this->club, NULL, 'sidebar' );
 			}
 			$club = $this->club;
 
-			if( ( GeoLocation::enabled() and Settings::i()->clubs_locations AND $location = $this->club->location() ) )
+			if( ( \IPS\GeoLocation::enabled() and \IPS\Settings::i()->clubs_locations AND $location = $this->club->location() ) )
 			{
-				Output::i()->sidebar['contextual'] .= Theme::i()->getTemplate( 'clubs', 'core' )->clubLocationBox( $this->club, $location );
+				\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->clubLocationBox( $this->club, $location );
 			}
 			if( $this->club->type != $club::TYPE_PUBLIC AND $this->club->canViewMembers() )
 			{
-				Output::i()->sidebar['contextual'] .= Theme::i()->getTemplate( 'clubs', 'core' )->clubMemberBox( $this->club );
+				\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->clubMemberBox( $this->club );
 			}
 		}
 		
-		if ( !in_array( Request::i()->do, array( 'rules', 'leave', 'embed' ) ) AND $this->club->memberStatus( Member::loggedIn() ) !== NULL AND !$this->club->rulesAcknowledged()  )
+		if ( !\in_array( \IPS\Request::i()->do, array( 'rules', 'leave', 'embed' ) ) AND $this->club->memberStatus( \IPS\Member::loggedIn() ) !== NULL AND !$this->club->rulesAcknowledged()  )
 		{
-			Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'rules' )->addRef( Request::i()->url() ) );
+			\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'rules' )->addRef( \IPS\Request::i()->url() ) );
 		}
 		
 		/* Pass upwards */
@@ -169,25 +134,25 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$firstTab = $this->club->firstTab();
 
 		$key = key($firstTab);
 
-		if ( !in_array( $key, array( 'club_home', 'club_members') ) )
+		if ( !\in_array( $key, array( 'club_home', 'club_members') ) )
 		{
-			Output::i()->redirect( (string) $firstTab[ $key ]['href'] );
+			\IPS\Output::i()->redirect( (string) $firstTab[ $key ]['href'] );
 		}
-
-		if( $key == 'club_members' )
-		{
-			$this->members();
-		}
-		else
-		{
-			$this->overview();
-		}
+			if( $key == 'club_members' )
+			{
+				$this->members();
+			}
+			else
+			{
+				$this->overview();
+			}
+			return;
 	}
 
 	/**
@@ -195,13 +160,13 @@ class view extends Controller
 	 *
 	 * @return void
 	 */
-	protected function overview() : void
+	protected function overview()
 	{
 		/* Get the activity stream */
-		$activity = Query::init()->filterByClub( $this->club )->setOrder( Query::ORDER_NEWEST_CREATED )->search();
+		$activity = \IPS\Content\Search\Query::init()->filterByClub( $this->club )->setOrder( \IPS\Content\Search\Query::ORDER_NEWEST_CREATED )->search();
 
 		/* Get who joined the club in between those results */
-		if ( $this->club->type != Club::TYPE_PUBLIC )
+		if ( $this->club->type != \IPS\Member\Club::TYPE_PUBLIC )
 		{
 			$lastTime = NULL;
 			foreach ( $activity as $key => $result )
@@ -219,20 +184,20 @@ class view extends Controller
 
 			if( $this->club->canViewMembers() )
 			{
-				$joinWhere = array( array( 'club_id=?', $this->club->id ), array( Db::i()->in( 'status', array( Club::STATUS_MEMBER, Club::STATUS_MODERATOR, Club::STATUS_LEADER ) ) ) );
+				$joinWhere = array( array( 'club_id=?', $this->club->id ), array( \IPS\Db::i()->in( 'status', array( \IPS\Member\Club::STATUS_MEMBER, \IPS\Member\Club::STATUS_MODERATOR, \IPS\Member\Club::STATUS_LEADER ) ) ) );
 				if ( $lastTime )
 				{
 					$joinWhere[] = array( 'core_clubs_memberships.joined>?', $lastTime );
 				}
 				$select = 'core_clubs_memberships.joined' . ',' . implode( ',', array_map( function( $column ) {
 						return 'core_members.' . $column;
-					}, Member::columnsForPhoto() ) );
-				foreach ( Db::i()->select( $select, 'core_clubs_memberships', $joinWhere, 'joined DESC', array( 0, 50 ), NULL, NULL, Db::SELECT_MULTIDIMENSIONAL_JOINS )->join( 'core_members', 'core_members.member_id=core_clubs_memberships.member_id' ) as $join )
+					}, \IPS\Member::columnsForPhoto() ) );
+				foreach ( \IPS\Db::i()->select( $select, 'core_clubs_memberships', $joinWhere, 'joined DESC', array( 0, 50 ), NULL, NULL, \IPS\Db::SELECT_MULTIDIMENSIONAL_JOINS )->join( 'core_members', 'core_members.member_id=core_clubs_memberships.member_id' ) as $join )
 				{
 					$joins[] = new \IPS\Content\Search\Result\Custom(
-						DateTime::ts( $join['core_clubs_memberships']['joined'] ),
-						Member::loggedIn()->language()->addToStack( 'clubs_activity_joined', FALSE, array( 'htmlsprintf' => Theme::i()->getTemplate( 'global', 'core', 'front' )->userLinkFromData( $join['core_members']['member_id'], $join['core_members']['name'], $join['core_members']['members_seo_name'] ) ) ),
-						Theme::i()->getTemplate( 'global', 'core', 'front' )->userPhotoFromData( $join['core_members']['member_id'], $join['core_members']['name'], $join['core_members']['members_seo_name'], Member::photoUrl( $join['core_members'] ), 'tiny' )
+						\IPS\DateTime::ts( $join['core_clubs_memberships']['joined'] ),
+						\IPS\Member::loggedIn()->language()->addToStack( 'clubs_activity_joined', FALSE, array( 'htmlsprintf' => \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->userLinkFromData( $join['core_members']['member_id'], $join['core_members']['name'], $join['core_members']['members_seo_name'] ) ) ),
+						\IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->userPhotoFromData( $join['core_members']['member_id'], $join['core_members']['name'], $join['core_members']['members_seo_name'], \IPS\Member::photoUrl( $join['core_members'] ), 'tiny' )
 					);
 				}
 			}
@@ -261,18 +226,18 @@ class view extends Controller
 		}
 
 		/* Display */
-		Output::i()->linkTags['canonical'] = (string) $this->club->url();
-		Output::i()->title = $this->club->name;
-		Output::i()->output = Theme::i()->getTemplate('clubs')->view( $this->club, $activity, $this->club->fieldValues() );
+		\IPS\Output::i()->linkTags['canonical'] = (string) $this->club->url();
+		\IPS\Output::i()->title = $this->club->name;
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clubs')->view( $this->club, $activity, $this->club->fieldValues() );
 
 		if( $firstTab = $this->club->firstTab() AND !isset( $firstTab['club_home'] ) )
 		{
-			Output::i()->breadcrumb[] = array( $this->club->url(), $this->club->name );
-			Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( 'club_home' ) );
+			\IPS\Output::i()->breadcrumb[] = array( $this->club->url(), $this->club->name );
+			\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( 'club_home' ) );
 		}
 		else
 		{
-			Output::i()->breadcrumb[] = array( NULL, $this->club->name );
+			\IPS\Output::i()->breadcrumb[] = array( NULL, $this->club->name );
 		}
 
 		/* Set some meta tags for the club */
@@ -284,9 +249,9 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function mapPopup() : void
+	protected function mapPopup()
 	{
-		Output::i()->output = Theme::i()->getTemplate('clubs')->mapPopup( $this->club );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clubs')->mapPopup( $this->club );
 	}
 	
 	/**
@@ -294,11 +259,11 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function edit() : void
+	protected function edit()
 	{
-		if ( !( $this->club->owner and $this->club->owner->member_id == Member::loggedIn()->member_id ) and !Member::loggedIn()->modPermission('can_access_all_clubs') )
+		if ( !( $this->club->owner and $this->club->owner->member_id == \IPS\Member::loggedIn()->member_id ) and !\IPS\Member::loggedIn()->modPermission('can_access_all_clubs') )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/A', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/A', 403, '' );
 		}
 		
 		$form = $this->club->form();
@@ -314,8 +279,8 @@ class view extends Controller
 
 			if ( !empty( $changes ) )
 			{
-				Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'product_change_blurb', array(
-					'product_change_blurb_existing'	=> Url::internal( "app=core&module=clubs&controller=view&do=updateExisting&id={$this->club->id}" )->setQueryString( 'changes', json_encode( $changes ) )->csrf(),
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'product_change_blurb', array(
+					'product_change_blurb_existing'	=> \IPS\Http\Url::internal( "app=core&module=clubs&controller=view&do=updateExisting&id={$this->club->id}" )->setQueryString( 'changes', json_encode( $changes ) )->csrf(),
 					'product_change_blurb_new'		=> $this->club->url(),
 				) );
 
@@ -323,18 +288,18 @@ class view extends Controller
 			}
 			else
 			{
-				Output::i()->redirect( $this->club->url() );
+				\IPS\Output::i()->redirect( $this->club->url() );
 			}
 		}
 
-		Output::i()->title = $this->club->name;
-		if( Request::i()->isAjax() )
+		\IPS\Output::i()->title = $this->club->name;
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+			\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 		}
 		else
 		{
-			Output::i()->output = $form;
+			\IPS\Output::i()->output = $form;
 		}
 
 	}
@@ -344,32 +309,28 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function editPhoto() : void
+	protected function editPhoto()
 	{
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/R', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/R', 403, '' );
 		}
-		Output::i()->title = $this->club->name;
+		\IPS\Output::i()->title = $this->club->name;
 		
-		$form = new Form( 'club_profile_photo', 'continue' );
+		$form = new \IPS\Helpers\Form( 'club_profile_photo', 'continue' );
 		$form->ajaxOutput = TRUE;
-		$form->add( new Upload( 'club_profile_photo', $this->club->profile_photo_uncropped ? File::get( 'core_Clubs', $this->club->profile_photo_uncropped ) : NULL, FALSE, array( 'storageExtension' => 'core_Clubs', 'allowStockPhotos' => TRUE, 'image' => array( 'maxWidth' => 200, 'maxHeight' => 200 ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'club_profile_photo', $this->club->profile_photo_uncropped ? \IPS\File::get( 'core_Clubs', $this->club->profile_photo_uncropped ) : NULL, FALSE, array( 'storageExtension' => 'core_Clubs', 'allowStockPhotos' => TRUE, 'image' => array( 'maxWidth' => 200, 'maxHeight' => 200 ) ) ) );
 		if ( $values = $form->values() )
 		{
 			if ( !$values['club_profile_photo'] or $this->club->profile_photo_uncropped != (string) $values['club_profile_photo'] )
 			{
 				foreach ( array( 'profile_photo', 'profile_photo_uncropped' ) as $k )
 				{
-					if( $this->club->$k )
+					try
 					{
-						try
-						{
-							File::get( 'core_Clubs', $this->club->$k )->delete();
-						}
-						catch ( Exception $e ) { }
+						\IPS\File::get( 'core_Clubs', $this->club->$k )->delete();
 					}
-
+					catch ( \Exception $e ) { }
 					$this->club->$k = NULL;
 				}
 			}
@@ -379,24 +340,24 @@ class view extends Controller
 				$this->club->profile_photo_uncropped = (string) $values['club_profile_photo'];
 				$this->club->save();
 				
-				if ( Request::i()->isAjax() )
+				if ( \IPS\Request::i()->isAjax() )
 				{					
 					$this->cropPhoto();
 					return;
 				}
 				else
 				{
-					Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'cropPhoto' ) );
+					\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'cropPhoto' ) );
 				}
 			}
 			else
 			{
 				$this->club->save();
-				Output::i()->redirect( $this->club->url() );
+				\IPS\Output::i()->redirect( $this->club->url() );
 			}
 		}
 		
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/**
@@ -404,21 +365,21 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function cropPhoto() : void
+	protected function cropPhoto()
 	{
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/V', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/V', 403, '' );
 		}
-		Output::i()->title = $this->club->name;
+		\IPS\Output::i()->title = $this->club->name;
 		
 		/* Get the photo */
 		if ( !$this->club->profile_photo_uncropped )
 		{
-			Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'editPhoto' ) );
+			\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'editPhoto' ) );
 		}
-		$original = File::get( 'core_Clubs', $this->club->profile_photo_uncropped );
-		$image = Image::create( $original->contents() );
+		$original = \IPS\File::get( 'core_Clubs', $this->club->profile_photo_uncropped );
+		$image = \IPS\Image::create( $original->contents() );
 		
 		/* Work out which dimensions to suggest */
 		if ( $image->width < $image->height )
@@ -431,12 +392,12 @@ class view extends Controller
 		}
 		
 		/* Build form */
-		$form = new Form( 'photo_crop', 'save', $this->club->url()->setQueryString( 'do', 'cropPhoto' ) );
-		$form->class = 'ipsForm--noLabels';
-		$form->add( new Custom('photo_crop', array( 0, 0, $suggestedWidth, $suggestedHeight ), FALSE, array(
+		$form = new \IPS\Helpers\Form( 'photo_crop', 'save', $this->club->url()->setQueryString( 'do', 'cropPhoto' ) );
+		$form->class = 'ipsForm_noLabels';
+		$form->add( new \IPS\Helpers\Form\Custom('photo_crop', array( 0, 0, $suggestedWidth, $suggestedHeight ), FALSE, array(
 			'getHtml'	=> function( $field ) use ( $original )
 			{
-				return Theme::i()->getTemplate('members', 'core', 'global')->photoCrop( $field->name, $field->value, $this->club->url()->setQueryString( 'do', 'cropPhotoGetPhoto' )->csrf() );
+				return \IPS\Theme::i()->getTemplate('members', 'core', 'global')->photoCrop( $field->name, $field->value, $this->club->url()->setQueryString( 'do', 'cropPhotoGetPhoto' )->csrf() );
 			}
 		) ) );
 		
@@ -451,26 +412,26 @@ class view extends Controller
 			{
 				try
 				{
-					File::get( 'core_Clubs', $this->club->profile_photo )->delete();
+					\IPS\File::get( 'core_Clubs', $this->club->profile_photo )->delete();
 				}
-				catch ( Exception $e ) { }
+				catch ( \Exception $e ) { }
 			}
 						
 			/* Save it */
 			$croppedFilename = mb_substr( $original->originalFilename, 0, mb_strrpos( $original->originalFilename, '.' ) ) . '.cropped' . mb_substr( $original->originalFilename, mb_strrpos( $original->originalFilename, '.' ) );
-			$cropped = File::create( 'core_Clubs', $croppedFilename, (string) $image );
+			$cropped = \IPS\File::create( 'core_Clubs', $croppedFilename, (string) $image );
 			$this->club->profile_photo = (string) $cropped;
 			$this->club->save();
 
 			/* Edited member, so clear widget caches (stats, widgets that contain photos, names and so on) */
-			Widget::deleteCaches();
+			\IPS\Widget::deleteCaches();
 							
 			/* Redirect */
-			Output::i()->redirect( $this->club->url() );
+			\IPS\Output::i()->redirect( $this->club->url() );
 		}
 		
 		/* Display */
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/**
@@ -480,16 +441,12 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function cropPhotoGetPhoto() : void
+	protected function cropPhotoGetPhoto()
 	{
-		Session::i()->csrfCheck();
-
-		/* Bypass the CSRF check, otherwise the image doesn't load when IN_DEV */
-		Output::i()->bypassCsrfKeyCheck = true;
-
-		$original = File::get( 'core_Clubs', $this->club->profile_photo_uncropped );
-		$headers = array( "Content-Disposition" => Output::getContentDisposition( 'inline', $original->filename ) );
-		Output::i()->sendOutput( $original->contents(), 200, File::getMimeType( $original->filename ), $headers );
+		\IPS\Session::i()->csrfCheck();
+		$original = \IPS\File::get( 'core_Clubs', $this->club->profile_photo_uncropped );
+		$headers = array( "Content-Disposition" => \IPS\Output::getContentDisposition( 'inline', $original->filename ) );
+		\IPS\Output::i()->sendOutput( $original->contents(), 200, \IPS\File::getMimeType( $original->filename ), $headers );
 	}
 	
 	/**
@@ -497,70 +454,70 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function members() : void
+	protected function members()
 	{
 		/* Public groups have no member list */
 		if ( !$this->club->canViewMembers() )
 		{
-			Output::i()->error( 'node_error', '2C350/H', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C350/H', 404, '' );
 		}
 		
 		/* What members are we getting? */
 		$filter = NULL;
-		$statuses = array( Club::STATUS_MEMBER, Club::STATUS_MODERATOR, Club::STATUS_LEADER );
+		$statuses = array( \IPS\Member\Club::STATUS_MEMBER, \IPS\Member\Club::STATUS_MODERATOR, \IPS\Member\Club::STATUS_LEADER );
 		$baseUrl = $this->club->url()->setQueryString( 'do', 'members' );
-		if ( isset( Request::i()->filter ) )
+		if ( isset( \IPS\Request::i()->filter ) )
 		{
-			switch ( Request::i()->filter )
+			switch ( \IPS\Request::i()->filter )
 			{
-				case Club::STATUS_LEADER:
-					$filter = Club::STATUS_LEADER;
-					$statuses = array( Club::STATUS_MODERATOR, Club::STATUS_LEADER );
-					$baseUrl = $baseUrl->setQueryString( 'filter', Club::STATUS_LEADER );
+				case \IPS\Member\Club::STATUS_LEADER:
+					$filter = \IPS\Member\Club::STATUS_LEADER;
+					$statuses = array( \IPS\Member\Club::STATUS_MODERATOR, \IPS\Member\Club::STATUS_LEADER );
+					$baseUrl = $baseUrl->setQueryString( 'filter', \IPS\Member\Club::STATUS_LEADER );
 					break;
 				
-				case Club::STATUS_REQUESTED:
+				case \IPS\Member\Club::STATUS_REQUESTED:
 					if ( $this->club->isLeader() )
 					{
-						$filter = Club::STATUS_REQUESTED;
-						$statuses = array( Club::STATUS_REQUESTED );
-						$baseUrl = $baseUrl->setQueryString( 'filter', Club::STATUS_REQUESTED );
+						$filter = \IPS\Member\Club::STATUS_REQUESTED;
+						$statuses = array( \IPS\Member\Club::STATUS_REQUESTED );
+						$baseUrl = $baseUrl->setQueryString( 'filter', \IPS\Member\Club::STATUS_REQUESTED );
 					}
 					break;
 					
-				case Club::STATUS_WAITING_PAYMENT:
+				case \IPS\Member\Club::STATUS_WAITING_PAYMENT:
 					if ( $this->club->isLeader() )
 					{
-						$filter = Club::STATUS_WAITING_PAYMENT;
-						$statuses = array( Club::STATUS_WAITING_PAYMENT );
-						$baseUrl = $baseUrl->setQueryString( 'filter', Club::STATUS_WAITING_PAYMENT );
+						$filter = \IPS\Member\Club::STATUS_WAITING_PAYMENT;
+						$statuses = array( \IPS\Member\Club::STATUS_WAITING_PAYMENT );
+						$baseUrl = $baseUrl->setQueryString( 'filter', \IPS\Member\Club::STATUS_WAITING_PAYMENT );
 					}
 					break;
 					
-				case Club::STATUS_BANNED:
+				case \IPS\Member\Club::STATUS_BANNED:
 					if ( $this->club->isLeader() )
 					{
-						$filter = Club::STATUS_BANNED;
-						$statuses = array( Club::STATUS_DECLINED, Club::STATUS_BANNED );
-						$baseUrl = $baseUrl->setQueryString( 'filter', Club::STATUS_BANNED );
+						$filter = \IPS\Member\Club::STATUS_BANNED;
+						$statuses = array( \IPS\Member\Club::STATUS_DECLINED, \IPS\Member\Club::STATUS_BANNED );
+						$baseUrl = $baseUrl->setQueryString( 'filter', \IPS\Member\Club::STATUS_BANNED );
 					}
 					break;
 					
-				case Club::STATUS_INVITED:
+				case \IPS\Member\Club::STATUS_INVITED:
 					if ( $this->club->isLeader() )
 					{
-						$filter = Club::STATUS_INVITED;
-						$statuses = array( Club::STATUS_INVITED, Club::STATUS_INVITED_BYPASSING_PAYMENT );
-						$baseUrl = $baseUrl->setQueryString( 'filter', Club::STATUS_INVITED );
+						$filter = \IPS\Member\Club::STATUS_INVITED;
+						$statuses = array( \IPS\Member\Club::STATUS_INVITED, \IPS\Member\Club::STATUS_INVITED_BYPASSING_PAYMENT );
+						$baseUrl = $baseUrl->setQueryString( 'filter', \IPS\Member\Club::STATUS_INVITED );
 					}
 					break;
 					
-				case Club::STATUS_EXPIRED:
+				case \IPS\Member\Club::STATUS_EXPIRED:
 					if ( $this->club->isLeader() )
 					{
-						$filter = Club::STATUS_EXPIRED;
-						$statuses = array( Club::STATUS_EXPIRED, Club::STATUS_EXPIRED_MODERATOR );
-						$baseUrl = $baseUrl->setQueryString( 'filter', Club::STATUS_EXPIRED );
+						$filter = \IPS\Member\Club::STATUS_EXPIRED;
+						$statuses = array( \IPS\Member\Club::STATUS_EXPIRED, \IPS\Member\Club::STATUS_EXPIRED_MODERATOR );
+						$baseUrl = $baseUrl->setQueryString( 'filter', \IPS\Member\Club::STATUS_EXPIRED );
 					}
 					break;
 			}
@@ -569,7 +526,7 @@ class view extends Controller
 		/* What are we sorting by? */
 		$orderByClause = 'core_clubs_memberships.joined DESC';
 		$sortBy = 'joined';
-		if ( isset( Request::i()->sortby ) and Request::i()->sortby === 'name' )
+		if ( isset( \IPS\Request::i()->sortby ) and \IPS\Request::i()->sortby === 'name' )
 		{
 			$orderByClause = 'core_members.name ASC';
 			$sortBy = 'name';
@@ -578,7 +535,7 @@ class view extends Controller
 		/* Sort out the offset */
 		$perPage = $this->club->membersPerPage();
 
-		$activePage = isset( Request::i()->page ) ? intval( Request::i()->page ) : 1;
+		$activePage = isset( \IPS\Request::i()->page ) ? \intval( \IPS\Request::i()->page ) : 1;
 
 		if( $activePage < 1 )
 		{
@@ -590,36 +547,36 @@ class view extends Controller
 		/* Fetch them */
 		$members = $this->club->members( $statuses, array( $offset, $perPage ), $orderByClause, $this->club->isLeader() ? 5 : 1 );
 
-		$pagination = Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $baseUrl, ceil( $this->club->members( $statuses, NULL, $orderByClause, 4 ) / $perPage ), $activePage, $perPage );
+		$pagination = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $baseUrl, ceil( $this->club->members( $statuses, NULL, $orderByClause, 4 ) / $perPage ), $activePage, $perPage );
 
 
 		/* Display */
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array( 'rows' => Theme::i()->getTemplate( 'clubs' )->membersRows( $this->club, $members ), 'pagination' => $pagination, 'extraHtml' => '' ) );
+			\IPS\Output::i()->json( array( 'rows' => \IPS\Theme::i()->getTemplate( 'clubs' )->membersRows( $this->club, $members ), 'pagination' => $pagination, 'extraHtml' => '' ) );
 		}
 		else
 		{
-			$staffStatuses = array( Club::STATUS_LEADER, Club::STATUS_MODERATOR );
-			if ( $this->club->isLeader( Member::loggedIn() ) )
+			$staffStatuses = array( \IPS\Member\Club::STATUS_LEADER, \IPS\Member\Club::STATUS_MODERATOR );
+			if ( $this->club->isLeader( \IPS\Member::loggedIn() ) )
 			{
-				$staffStatuses[] = Club::STATUS_EXPIRED_MODERATOR;
+				$staffStatuses[] = \IPS\Member\Club::STATUS_EXPIRED_MODERATOR;
 			}
-			$clubStaff = $this->club->members( $staffStatuses, NULL, "IF(core_clubs_memberships.status='leader',0,1), core_clubs_memberships.joined ASC", $this->club->isLeader( Member::loggedIn() ) ? 5 : 3 );
+			$clubStaff = $this->club->members( $staffStatuses, NULL, "IF(core_clubs_memberships.status='leader',0,1), core_clubs_memberships.joined ASC", $this->club->isLeader( \IPS\Member::loggedIn() ) ? 5 : 3 );
 			
-			Output::i()->title = $this->club->name;
+			\IPS\Output::i()->title = $this->club->name;
 
 			if( $firstTab = $this->club->firstTab() AND !isset( $firstTab['club_members'] ) )
 			{
-				Output::i()->breadcrumb[] = array( $this->club->url(), $this->club->name );
-				Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( 'club_members' ) );
+				\IPS\Output::i()->breadcrumb[] = array( $this->club->url(), $this->club->name );
+				\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( 'club_members' ) );
 			}
 			else
 			{
-				Output::i()->breadcrumb[] = array( NULL, $this->club->name );
+				\IPS\Output::i()->breadcrumb[] = array( NULL, $this->club->name );
 			}
 
-			Output::i()->output = Theme::i()->getTemplate( 'clubs' )->members( $this->club, $members, $pagination, $sortBy, $filter, $clubStaff );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'clubs' )->members( $this->club, $members, $pagination, $sortBy, $filter, $clubStaff );
 		}
 
 		/* Set some meta tags for the club */
@@ -631,68 +588,68 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function acceptRequest() : void
+	protected function acceptRequest()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/3', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/3', 403, '' );
 		}
 		
 		/* Check the member's request is pending */
-		$member = Member::load( Request::i()->member );
-		if ( $this->club->memberStatus( $member ) != Club::STATUS_REQUESTED )
+		$member = \IPS\Member::load( \IPS\Request::i()->member );
+		if ( $this->club->memberStatus( $member ) != \IPS\Member\Club::STATUS_REQUESTED )
 		{
-			Output::i()->error( 'node_error', '2C350/4', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C350/4', 403, '' );
 		}
 		
 		/* Add them */
-		$status = Club::STATUS_MEMBER;
-		if ( $this->club->isPaid() and !isset( Request::i()->waiveFee ) )
+		$status = \IPS\Member\Club::STATUS_MEMBER;
+		if ( $this->club->isPaid() and !isset( \IPS\Request::i()->waiveFee ) )
 		{
-			$status = Club::STATUS_WAITING_PAYMENT;
+			$status = \IPS\Member\Club::STATUS_WAITING_PAYMENT;
 		}
-		$this->club->addMember( $member, $status, TRUE, Member::loggedIn(), NULL, TRUE );
+		$this->club->addMember( $member, $status, TRUE, \IPS\Member::loggedIn(), NULL, TRUE );
 		$this->club->recountMembers();
 		
 		/* Notify the member */
-		$notification = new Notification( Application::load('core'), 'club_response', $this->club, array( $this->club, TRUE ) );
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'club_response', $this->club, array( $this->club, TRUE ) );
 		$notification->recipients->attach( $member );
 		$notification->send();
 		
 		/* Send a notification to any leaders besides ourselves */
-		$notification = new Notification( Application::load('core'), 'club_join', $this->club, array( $this->club, $member ), array( 'response' => TRUE ) );
-		foreach ( $this->club->members( array( Club::STATUS_LEADER ), NULL, NULL, 2 ) as $leader )
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'club_join', $this->club, array( $this->club, $member ), array( 'response' => TRUE ) );
+		foreach ( $this->club->members( array( \IPS\Member\Club::STATUS_LEADER ), NULL, NULL, 2 ) as $leader )
 		{
-			$leader = Member::constructFromData( $leader );
-			if ( $leader->member_id != Member::loggedIn()->member_id )
+			$leader = \IPS\Member::constructFromData( $leader );
+			if ( $leader->member_id != \IPS\Member::loggedIn()->member_id )
 			{
 				$notification->recipients->attach( $leader );
 			}
 		}
-		if ( count( $notification->recipients ) )
+		if ( \count( $notification->recipients ) )
 		{
 			$notification->send();
 		}
 		
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array( 'status' => 'approved' ) );
+			\IPS\Output::i()->json( array( 'status' => 'approved' ) );
 		}
 		else
 		{
 			/* If other requests are pending, send us back, otherwise take us to the main member list */
 			$url = $this->club->url()->setQueryString( 'do', 'members' );
-			if ( count( $this->club->members( array( Club::STATUS_REQUESTED ) ) ) )
+			if ( \count( $this->club->members( array( \IPS\Member\Club::STATUS_REQUESTED ) ) ) )
 			{
-				Output::i()->redirect( $url->setQueryString( 'filter', Club::STATUS_REQUESTED ) );
+				\IPS\Output::i()->redirect( $url->setQueryString( 'filter', \IPS\Member\Club::STATUS_REQUESTED ) );
 			}
 			else
 			{
-				Output::i()->redirect( $url );
+				\IPS\Output::i()->redirect( $url );
 			}
 		}
 	}
@@ -702,47 +659,47 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function declineRequest() : void
+	protected function declineRequest()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/F', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/F', 403, '' );
 		}
 		
 		/* Check the member's request is pending */
-		$member = Member::load( Request::i()->member );
-		if ( $this->club->memberStatus( $member ) != Club::STATUS_REQUESTED )
+		$member = \IPS\Member::load( \IPS\Request::i()->member );
+		if ( $this->club->memberStatus( $member ) != \IPS\Member\Club::STATUS_REQUESTED )
 		{
-			Output::i()->error( 'node_error', '2C350/G', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C350/G', 403, '' );
 		}
 		
 		/* Decline them */
-		$this->club->addMember( $member, Club::STATUS_DECLINED, TRUE, Member::loggedIn() );
+		$this->club->addMember( $member, \IPS\Member\Club::STATUS_DECLINED, TRUE, \IPS\Member::loggedIn() );
 		
 		/* Notify the member */
-		$notification = new Notification( Application::load('core'), 'club_response', $this->club, array( $this->club, FALSE ) );
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'club_response', $this->club, array( $this->club, FALSE ) );
 		$notification->recipients->attach( $member );
 		$notification->send();
 		
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array( 'status' => 'declined' ) );
+			\IPS\Output::i()->json( array( 'status' => 'declined' ) );
 		}
 		else
 		{
 			/* If other requests are pending, send us back, otherwise take us to the main member list */
 			$url = $this->club->url()->setQueryString( 'do', 'members' );
-			if ( count( $this->club->members( array( Club::STATUS_REQUESTED ) ) ) )
+			if ( \count( $this->club->members( array( \IPS\Member\Club::STATUS_REQUESTED ) ) ) )
 			{
-				Output::i()->redirect( $url->SetQueryString( 'filter', Club::STATUS_REQUESTED ) );
+				\IPS\Output::i()->redirect( $url->SetQueryString( 'filter', \IPS\Member\Club::STATUS_REQUESTED ) );
 			}
 			else
 			{
-				Output::i()->redirect( $url );
+				\IPS\Output::i()->redirect( $url );
 			}
 		}
 	}
@@ -752,30 +709,30 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function makeLeader() : void
+	protected function makeLeader()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/6', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/6', 403, '' );
 		}
 		
 		/* Get member */
-		$member = Member::load( Request::i()->member );
-		if ( !in_array( $this->club->memberStatus( $member ), array( Club::STATUS_MEMBER, Club::STATUS_EXPIRED, Club::STATUS_MODERATOR, Club::STATUS_EXPIRED_MODERATOR ) ) )
+		$member = \IPS\Member::load( \IPS\Request::i()->member );
+		if ( !\in_array( $this->club->memberStatus( $member ), array( \IPS\Member\Club::STATUS_MEMBER, \IPS\Member\Club::STATUS_EXPIRED, \IPS\Member\Club::STATUS_MODERATOR, \IPS\Member\Club::STATUS_EXPIRED_MODERATOR ) ) )
 		{
-			Output::i()->error( 'node_error', '2C350/7', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C350/7', 403, '' );
 		}
 		
 		/* Promote */
-		$this->club->addMember( $member, Club::STATUS_LEADER, TRUE );
+		$this->club->addMember( $member, \IPS\Member\Club::STATUS_LEADER, TRUE );
 		$this->club->recountMembers();
 		
 		/* Redirect */
-		Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
+		\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
 	}
 	
 	/**
@@ -783,33 +740,33 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function demoteLeader() : void
+	protected function demoteLeader()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/8', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/8', 403, '' );
 		}
 		
 		/* Get member */
-		$member = ( Application::appIsEnabled('nexus') and Settings::i()->clubs_paid_on ) ? Customer::load( Request::i()->member ) : Member::load( Request::i()->member );
-		if ( $this->club->memberStatus( $member ) != Club::STATUS_LEADER )
+		$member = ( \IPS\Application::appIsEnabled('nexus') and \IPS\Settings::i()->clubs_paid_on ) ? \IPS\nexus\Customer::load( \IPS\Request::i()->member ) : \IPS\Member::load( \IPS\Request::i()->member );
+		if ( $this->club->memberStatus( $member ) != \IPS\Member\Club::STATUS_LEADER )
 		{
-			Output::i()->error( 'node_error', '2C350/9', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C350/9', 403, '' );
 		}
 		
 		/* Are they expired? */
-		$status = Club::STATUS_MEMBER;
-		if ( Application::appIsEnabled('nexus') and Settings::i()->clubs_paid_on and $this->club->renewal_price )
+		$status = \IPS\Member\Club::STATUS_MEMBER;
+		if ( \IPS\Application::appIsEnabled('nexus') and \IPS\Settings::i()->clubs_paid_on and $this->club->renewal_price )
 		{
-			foreach ( ClubMembership::getPurchases( $member, $this->club->id ) as $purchase )
+			foreach ( \IPS\core\extensions\nexus\Item\ClubMembership::getPurchases( $member, $this->club->id ) as $purchase )
 			{
 				if ( $purchase->expire and $purchase->expire->getTimestamp() < time() )
 				{
-					$status = Club::STATUS_EXPIRED;
+					$status = \IPS\Member\Club::STATUS_EXPIRED;
 				}
 			}
 		}
@@ -819,7 +776,7 @@ class view extends Controller
 		$this->club->recountMembers();
 		
 		/* Redirect */
-		Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
+		\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
 	}
 	
 	/**
@@ -827,33 +784,33 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function makeModerator() : void
+	protected function makeModerator()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/K', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/K', 403, '' );
 		}
 		
 		/* Get member */
-		$member = ( Application::appIsEnabled('nexus') and Settings::i()->clubs_paid_on ) ? Customer::load( Request::i()->member ) : Member::load( Request::i()->member );
-		if ( !in_array( $this->club->memberStatus( $member ), array( Club::STATUS_MEMBER, Club::STATUS_EXPIRED, Club::STATUS_LEADER ) ) )
+		$member = ( \IPS\Application::appIsEnabled('nexus') and \IPS\Settings::i()->clubs_paid_on ) ? \IPS\nexus\Customer::load( \IPS\Request::i()->member ) : \IPS\Member::load( \IPS\Request::i()->member );
+		if ( !\in_array( $this->club->memberStatus( $member ), array( \IPS\Member\Club::STATUS_MEMBER, \IPS\Member\Club::STATUS_EXPIRED, \IPS\Member\Club::STATUS_LEADER ) ) )
 		{
-			Output::i()->error( 'node_error', '2C350/L', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C350/L', 403, '' );
 		}
 		
 		/* Are they expired? */
-		$status = Club::STATUS_MODERATOR;
-		if ( Application::appIsEnabled('nexus') and Settings::i()->clubs_paid_on and $this->club->renewal_price )
+		$status = \IPS\Member\Club::STATUS_MODERATOR;
+		if ( \IPS\Application::appIsEnabled('nexus') and \IPS\Settings::i()->clubs_paid_on and $this->club->renewal_price )
 		{
-			foreach ( ClubMembership::getPurchases( $member, $this->club->id ) as $purchase )
+			foreach ( \IPS\core\extensions\nexus\Item\ClubMembership::getPurchases( $member, $this->club->id ) as $purchase )
 			{
 				if ( $purchase->expire and $purchase->expire->getTimestamp() < time() )
 				{
-					$status = Club::STATUS_EXPIRED_MODERATOR;
+					$status = \IPS\Member\Club::STATUS_EXPIRED_MODERATOR;
 				}
 			}
 		}
@@ -863,7 +820,7 @@ class view extends Controller
 		$this->club->recountMembers();
 		
 		/* Redirect */
-		Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
+		\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
 	}
 	
 	/**
@@ -871,33 +828,33 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function demoteModerator() : void
+	protected function demoteModerator()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/M', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/M', 403, '' );
 		}
 		
 		/* Get member */
-		$member = ( Application::appIsEnabled('nexus') and Settings::i()->clubs_paid_on ) ? Customer::load( Request::i()->member ) : Member::load( Request::i()->member );
-		if ( !in_array( $this->club->memberStatus( $member ), array( Club::STATUS_MODERATOR, Club::STATUS_EXPIRED_MODERATOR ) ) )
+		$member = ( \IPS\Application::appIsEnabled('nexus') and \IPS\Settings::i()->clubs_paid_on ) ? \IPS\nexus\Customer::load( \IPS\Request::i()->member ) : \IPS\Member::load( \IPS\Request::i()->member );
+		if ( !\in_array( $this->club->memberStatus( $member ), array( \IPS\Member\Club::STATUS_MODERATOR, \IPS\Member\Club::STATUS_EXPIRED_MODERATOR ) ) )
 		{
-			Output::i()->error( 'node_error', '2C350/N', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C350/N', 403, '' );
 		}
 		
 		/* Are they expired? */
-		$status = Club::STATUS_MEMBER;
-		if ( Application::appIsEnabled('nexus') and Settings::i()->clubs_paid_on and $this->club->renewal_price )
+		$status = \IPS\Member\Club::STATUS_MEMBER;
+		if ( \IPS\Application::appIsEnabled('nexus') and \IPS\Settings::i()->clubs_paid_on and $this->club->renewal_price )
 		{
-			foreach ( ClubMembership::getPurchases( $member, $this->club->id ) as $purchase )
+			foreach ( \IPS\core\extensions\nexus\Item\ClubMembership::getPurchases( $member, $this->club->id ) as $purchase )
 			{
 				if ( $purchase->expire and $purchase->expire->getTimestamp() < time() )
 				{
-					$status = Club::STATUS_EXPIRED;
+					$status = \IPS\Member\Club::STATUS_EXPIRED;
 				}
 			}
 		}
@@ -907,7 +864,7 @@ class view extends Controller
 		$this->club->recountMembers();
 		
 		/* Redirect */
-		Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
+		\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
 	}
 	
 	/**
@@ -915,40 +872,37 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function removeMember() : void
+	protected function removeMember()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/C', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/C', 403, '' );
 		}
 		
 		/* Get member */
-		$member = Member::load( Request::i()->member );
+		$member = \IPS\Member::load( \IPS\Request::i()->member );
 		$status = $this->club->memberStatus( $member );
 		
 		/* If this was just an invite, then just remove that */
-		if ( in_array( $status, array( Club::STATUS_INVITED, Club::STATUS_INVITED_BYPASSING_PAYMENT ) ) )
+		if ( \in_array( $status, array( \IPS\Member\Club::STATUS_INVITED, \IPS\Member\Club::STATUS_INVITED_BYPASSING_PAYMENT ) ) )
 		{
 			$this->club->removeMember( $member );
-			Db::i()->delete( 'core_notifications', array( '`member`=? AND notification_app=? AND notification_key=? and item_id=?', $member->member_id, 'core', 'club_invitation', $this->club->id ) );
+			\IPS\Db::i()->delete( 'core_notifications', array( '`member`=? AND notification_app=? AND notification_key=? and item_id=?', $member->member_id, 'core', 'club_invitation', $this->club->id ) );
 			$member->recountNotifications();
-
-			/* Log to member history */
-			$member->logHistory( 'core', 'club_membership', array('club_id' => $this->club->id, 'type' => $status, 'remove' => true ) );
 		}
 		
 		/* If they were previously accepted and waiting for payment, treat it as a decline */
-		elseif ( $status == Club::STATUS_WAITING_PAYMENT )
+		elseif ( \in_array( $status, array( \IPS\Member\Club::STATUS_WAITING_PAYMENT ) ) )
 		{
 			/* Decline them */
-			$this->club->addMember( $member, Club::STATUS_DECLINED, TRUE, Member::loggedIn() );
+			$this->club->addMember( $member, \IPS\Member\Club::STATUS_DECLINED, TRUE, \IPS\Member::loggedIn() );
 			
 			/* Notify the member */
-			$notification = new Notification( Application::load('core'), 'club_response', $this->club, array( $this->club, FALSE ) );
+			$notification = new \IPS\Notification( \IPS\Application::load('core'), 'club_response', $this->club, array( $this->club, FALSE ) );
 			$notification->recipients->attach( $member );
 			$notification->send();
 		}
@@ -956,19 +910,19 @@ class view extends Controller
 		/* Otherwise check they are actually a member that can be removed */
 		else
 		{
-			if ( !in_array( $status, array( Club::STATUS_MEMBER, Club::STATUS_MODERATOR, Club::STATUS_LEADER, Club::STATUS_EXPIRED, Club::STATUS_EXPIRED_MODERATOR ) ) )
+			if ( !\in_array( $status, array( \IPS\Member\Club::STATUS_MEMBER, \IPS\Member\Club::STATUS_MODERATOR, \IPS\Member\Club::STATUS_LEADER, \IPS\Member\Club::STATUS_EXPIRED, \IPS\Member\Club::STATUS_EXPIRED_MODERATOR ) ) ) 
 			{
-				Output::i()->error( 'node_error', '2C350/9', 403, '' );
+				\IPS\Output::i()->error( 'node_error', '2C350/9', 403, '' );
 			}
 			if ( $this->club->owner and $this->club->owner->member_id === $member->member_id )
 			{
-				Output::i()->error( 'club_cannot_remove_owner', '2C350/E', 403, '' );
+				\IPS\Output::i()->error( 'club_cannot_remove_owner', '2C350/E', 403, '' );
 			}
 			
 			/* Cancel purchase */
-			if ( Application::appIsEnabled('nexus') and Settings::i()->clubs_paid_on )
+			if ( \IPS\Application::appIsEnabled('nexus') and \IPS\Settings::i()->clubs_paid_on )
 			{
-				foreach ( ClubMembership::getPurchases( Customer::load( Request::i()->member ), $this->club->id ) as $purchase )
+				foreach ( \IPS\core\extensions\nexus\Item\ClubMembership::getPurchases( \IPS\nexus\Customer::load( \IPS\Request::i()->member ), $this->club->id ) as $purchase )
 				{
 					$purchase->cancelled = TRUE;
 					$purchase->member->log( 'purchase', array( 'type' => 'cancel', 'id' => $purchase->id, 'name' => $purchase->name ) );
@@ -978,14 +932,14 @@ class view extends Controller
 			}
 			
 			/* Remove */
-			$this->club->addMember( $member, Club::STATUS_BANNED, TRUE, Member::loggedIn() );
+			$this->club->addMember( $member, \IPS\Member\Club::STATUS_BANNED, TRUE, \IPS\Member::loggedIn() );
 		}
 		
 		/* Recount */
 		$this->club->recountMembers();
 		
 		/* Redirect */
-		Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
+		\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
 	}
 	
 	/**
@@ -993,35 +947,35 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function bypassPayment() : void
+	protected function bypassPayment()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
-		if ( !$this->club->isLeader() or !Application::appIsEnabled('nexus') or !Settings::i()->clubs_paid_on )
+		if ( !$this->club->isLeader() or !\IPS\Application::appIsEnabled('nexus') or !\IPS\Settings::i()->clubs_paid_on )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/W', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/W', 403, '' );
 		}
 		
 		/* Get member */
-		$member = Customer::load( Request::i()->member );
+		$member = \IPS\nexus\Customer::load( \IPS\Request::i()->member );
 		
 		/* Do it */
 		switch ( $this->club->memberStatus( $member ) )
 		{
 			/* If they were waiting for payment, just go ahead and promote them to a member */
-			case Club::STATUS_WAITING_PAYMENT:
-				$this->club->addMember( $member, Club::STATUS_MEMBER, TRUE );
+			case \IPS\Member\Club::STATUS_WAITING_PAYMENT:
+				$this->club->addMember( $member, \IPS\Member\Club::STATUS_MEMBER, TRUE );
 				break;
 				
 			/* If they were already in the club, find their purchase and remove the expiry date */
-			case Club::STATUS_MEMBER:
-			case Club::STATUS_EXPIRED:
-			case Club::STATUS_MODERATOR:
-			case Club::STATUS_EXPIRED_MODERATOR:
-			case Club::STATUS_LEADER:
-				foreach ( ClubMembership::getPurchases( $member, $this->club->id ) as $purchase )
+			case \IPS\Member\Club::STATUS_MEMBER:
+			case \IPS\Member\Club::STATUS_EXPIRED:
+			case \IPS\Member\Club::STATUS_MODERATOR:
+			case \IPS\Member\Club::STATUS_EXPIRED_MODERATOR:
+			case \IPS\Member\Club::STATUS_LEADER:
+				foreach ( \IPS\core\extensions\nexus\Item\ClubMembership::getPurchases( $member, $this->club->id ) as $purchase )
 				{
 					$extra = $purchase->extra;
 					$extra['originalExpire'] = $purchase->expire ? $purchase->expire->getTimestamp() : NULL;
@@ -1034,18 +988,18 @@ class view extends Controller
 				break;
 				
 			/* If they have been invited, just change their status to invited bypassing payment */
-			case Club::STATUS_INVITED:
-				$this->club->addMember( $member, Club::STATUS_INVITED_BYPASSING_PAYMENT, TRUE );
+			case \IPS\Member\Club::STATUS_INVITED:
+				$this->club->addMember( $member, \IPS\Member\Club::STATUS_INVITED_BYPASSING_PAYMENT, TRUE );
 				break;			
 				
 			/* For anything else, we can't do this... */
 			default:
-				Output::i()->error( 'node_error', '2C350/X', 403, '' );
+				\IPS\Output::i()->error( 'node_error', '2C350/X', 403, '' );
 		}
 		$this->club->recountMembers();
 		
 		/* Redirect */
-		Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
+		\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
 	}
 	
 	/**
@@ -1053,33 +1007,33 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function restorePayment() : void
+	protected function restorePayment()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
-		if ( !$this->club->isLeader() or !Application::appIsEnabled('nexus') or !Settings::i()->clubs_paid_on )
+		if ( !$this->club->isLeader() or !\IPS\Application::appIsEnabled('nexus') or !\IPS\Settings::i()->clubs_paid_on )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/W', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/W', 403, '' );
 		}
 		
 		/* Get member */
-		$member = Customer::load( Request::i()->member );
+		$member = \IPS\nexus\Customer::load( \IPS\Request::i()->member );
 		
 		/* Do it */
 		$status = $this->club->memberStatus( $member );
 		switch ( $status )
 		{
 			/* If they were already in the club, find their purchase and restore the expiry date */
-			case Club::STATUS_MEMBER:
-			case Club::STATUS_EXPIRED:
-			case Club::STATUS_MODERATOR:
-			case Club::STATUS_EXPIRED_MODERATOR:
-			case Club::STATUS_LEADER:
+			case \IPS\Member\Club::STATUS_MEMBER:
+			case \IPS\Member\Club::STATUS_EXPIRED:
+			case \IPS\Member\Club::STATUS_MODERATOR:
+			case \IPS\Member\Club::STATUS_EXPIRED_MODERATOR:
+			case \IPS\Member\Club::STATUS_LEADER:
 				
 				$foundPurchase = FALSE;
-				foreach ( ClubMembership::getPurchases( $member, $this->club->id ) as $purchase )
+				foreach ( \IPS\core\extensions\nexus\Item\ClubMembership::getPurchases( $member, $this->club->id ) as $purchase )
 				{
 					$foundPurchase = TRUE;
 					
@@ -1089,11 +1043,11 @@ class view extends Controller
 					}
 					if ( isset( $purchase->extra['originalExpire'] ) )
 					{
-						$newExpiry = DateTime::ts( $purchase->extra['originalExpire'] );
+						$newExpiry = \IPS\DateTime::ts( $purchase->extra['originalExpire'] );
 					}
 					else
 					{
-						$newExpiry = DateTime::create()->add( $purchase->renewals->interval );
+						$newExpiry = \IPS\DateTime::create()->add( $purchase->renewals->interval );					
 					}
 					$purchase->expire = $newExpiry;
 					$purchase->save();
@@ -1101,24 +1055,24 @@ class view extends Controller
 					
 					if ( $newExpiry->getTimestamp() < time() )
 					{
-						if ( $status === Club::STATUS_MEMBER )
+						if ( $status === \IPS\Member\Club::STATUS_MEMBER )
 						{
-							$this->club->addMember( $member, Club::STATUS_EXPIRED, TRUE );
+							$this->club->addMember( $member, \IPS\Member\Club::STATUS_EXPIRED, TRUE );
 						}
-						elseif ( $status === Club::STATUS_MODERATOR )
+						elseif ( $status === \IPS\Member\Club::STATUS_MODERATOR )
 						{
-							$this->club->addMember( $member, Club::STATUS_EXPIRED_MODERATOR, TRUE );
+							$this->club->addMember( $member, \IPS\Member\Club::STATUS_EXPIRED_MODERATOR, TRUE );
 						}
 					}
 					else
 					{
-						if ( $status === Club::STATUS_EXPIRED )
+						if ( $status === \IPS\Member\Club::STATUS_EXPIRED )
 						{
-							$this->club->addMember( $member, Club::STATUS_MEMBER, TRUE );
+							$this->club->addMember( $member, \IPS\Member\Club::STATUS_MEMBER, TRUE );
 						}
-						elseif ( $status === Club::STATUS_EXPIRED_MODERATOR )
+						elseif ( $status === \IPS\Member\Club::STATUS_EXPIRED_MODERATOR )
 						{
-							$this->club->addMember( $member, Club::STATUS_MODERATOR, TRUE );
+							$this->club->addMember( $member, \IPS\Member\Club::STATUS_MODERATOR, TRUE );
 						}
 					}
 				}
@@ -1126,9 +1080,9 @@ class view extends Controller
 				/* If we couldn't find a purchase, we'll have to remove them and re-invite them */
 				if ( !$foundPurchase )
 				{
-					$this->club->addMember( $member, Club::STATUS_INVITED, TRUE, NULL, Member::loggedIn(), TRUE );
+					$this->club->addMember( $member, \IPS\Member\Club::STATUS_INVITED, TRUE, NULL, \IPS\Member::loggedIn(), TRUE );
 					
-					$notification = new Notification( Application::load('core'), 'club_invitation', $this->club, array( $this->club, Member::loggedIn() ), array( 'invitedBy' => Member::loggedIn()->member_id ) );
+					$notification = new \IPS\Notification( \IPS\Application::load('core'), 'club_invitation', $this->club, array( $this->club, \IPS\Member::loggedIn() ), array( 'invitedBy' => \IPS\Member::loggedIn()->member_id ) );
 					$notification->recipients->attach( $member );
 					$notification->send();
 				}
@@ -1136,18 +1090,18 @@ class view extends Controller
 				break;
 				
 			/* If they have been invited, just change their status to invited NOT bypassing payment */
-			case Club::STATUS_INVITED_BYPASSING_PAYMENT:
-				$this->club->addMember( $member, Club::STATUS_INVITED, TRUE );
+			case \IPS\Member\Club::STATUS_INVITED_BYPASSING_PAYMENT:
+				$this->club->addMember( $member, \IPS\Member\Club::STATUS_INVITED, TRUE );
 				break;
 				
 			/* For anything else, we can't do this... */
 			default:
-				Output::i()->error( 'node_error', '2C350/X', 403, '' );
+				\IPS\Output::i()->error( 'node_error', '2C350/X', 403, '' );
 		}
 		$this->club->recountMembers();
 		
 		/* Redirect */
-		Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
+		\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'members' ) );
 	}
 	
 	/**
@@ -1155,19 +1109,19 @@ class view extends Controller
 	 *
 	 * @return void
 	 */
-	protected function rules() : void
+	protected function rules()
 	{
 		if ( $this->club->rules_required AND !$this->club->rulesAcknowledged() )
 		{
-			$form = new Form( 'form', 'accept' );
+			$form = new \IPS\Helpers\Form( 'form', 'accept' );
 			$form->hiddenValues['accepted'] = 1;
-			if ( $referrer = Request::i()->referrer() )
+			if ( $referrer = \IPS\Request::i()->referrer() )
 			{
 				$form->hiddenValues['ref'] = base64_encode( (string) $referrer );
 			}
-			$form->class = 'ipsForm--vertical ipsForm--club-rules';
+			$form->class = 'ipsForm_vertical';
 
-			if ( $this->club->memberStatus( Member::loggedIn() ) === NULL )
+			if ( $this->club->memberStatus( \IPS\Member::loggedIn() ) === NULL )
 			{
 				$form->addButton( 'cancel', 'link', $this->club->url() );
 			}
@@ -1179,34 +1133,34 @@ class view extends Controller
 			if ( $values = $form->values() )
 			{
 				/* If we're not a member of this club yet, send us back to the join form */
-				if( $this->club->memberStatus( Member::loggedIn() ) === NULL  )
+				if( $this->club->memberStatus( \IPS\Member::loggedIn() ) === NULL  )
 				{
-					if( $referrer = Request::i()->referrer() )
+					if( $referrer = \IPS\Request::i()->referrer() )
 					{
-						Output::i()->redirect( $referrer->setQueryString( 'rulesAcknowledged', 1 ), 'accepted' );
+						\IPS\Output::i()->redirect( $referrer->setQueryString( 'rulesAcknowledged', 1 ), 'accepted' );
 					}
 					else
 					{
-						Output::i()->redirect( $this->club->url()->setQueryString( 'rulesAcknowledged', 1 ), 'accepted' );
+						\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'rulesAcknowledged', 1 ), 'accepted' );
 					}
 				}
 
-				$this->club->acknowledgeRules( Member::loggedIn() );
-				if ( $referrer = Request::i()->referrer() )
+				$this->club->acknowledgeRules( \IPS\Member::loggedIn() );
+				if ( $referrer = \IPS\Request::i()->referrer() )
 				{
-					Output::i()->redirect( $referrer, 'accepted' );
+					\IPS\Output::i()->redirect( $referrer, 'accepted' );
 				}
 				
-				Output::i()->redirect( $this->club->url(), 'accepted' );
+				\IPS\Output::i()->redirect( $this->club->url(), 'accepted' );
 			}
 			
-			Output::i()->title = Member::loggedIn()->language()->addToStack( 'club_rules' );
-			Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'clubs', 'core' ), 'rulesForm' ), $this->club );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'club_rules' );
+			\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'clubs', 'core' ), 'rulesForm' ), $this->club );
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack( 'club_rules' );
-			Output::i()->output = Theme::i()->getTemplate( 'clubs', 'core' )->clubRules( $this->club );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'club_rules' );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->clubRules( $this->club );
 		}
 	}
 	
@@ -1215,51 +1169,51 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function join() : void
+	protected function join()
 	{
 		/* Can we join? */
 		if ( !$this->club->canJoin() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/I', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/I', 403, '' );
 		}
 
 		/* Are there rules that need to be acknowledged which we haven't acknowledged yet? */
-		if( $this->club->rules_required AND !$this->club->rulesAcknowledged() AND !Request::i()->rulesAcknowledged )
+		if( $this->club->rules_required AND !$this->club->rulesAcknowledged() AND !\IPS\Request::i()->rulesAcknowledged )
 		{
 			$rulesUrl = $this->club->url()->setQueryString( 'do', 'rules' );
 
-			if( $referrer = Request::i()->referrer() )
+			if( $referrer = \IPS\Request::i()->referrer() )
 			{
-				$rulesUrl	= $rulesUrl->addRef( Request::i()->url()->addRef( $referrer ) );
+				$rulesUrl	= $rulesUrl->addRef( \IPS\Request::i()->url()->addRef( $referrer ) );
 			}
 
-			Output::i()->redirect( $rulesUrl );
+			\IPS\Output::i()->redirect( $rulesUrl );
 		}
 		
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* If this is an open club, or the member was invited, or they have mod access anyway go ahead and add them */
-		if ( in_array( $this->memberStatus, array( Club::STATUS_INVITED, Club::STATUS_INVITED_BYPASSING_PAYMENT, Club::STATUS_WAITING_PAYMENT ) ) or $this->club->type === Club::TYPE_OPEN or Member::loggedIn()->modPermission('can_access_all_clubs') )
+		if ( \in_array( $this->memberStatus, array( \IPS\Member\Club::STATUS_INVITED, \IPS\Member\Club::STATUS_INVITED_BYPASSING_PAYMENT, \IPS\Member\Club::STATUS_WAITING_PAYMENT ) ) or $this->club->type === \IPS\Member\Club::TYPE_OPEN or \IPS\Member::loggedIn()->modPermission('can_access_all_clubs') )
 		{
 			/* Unless they have to pay */
-			if ( $this->club->isPaid() and $this->memberStatus !== Club::STATUS_INVITED_BYPASSING_PAYMENT )
+			if ( $this->club->isPaid() and $this->memberStatus !== \IPS\Member\Club::STATUS_INVITED_BYPASSING_PAYMENT )
 			{
 				if ( $this->club->joiningFee() )
 				{
 					$invoiceUrl = $this->club->generateInvoice();
 					
 					/* Take them to it */
-					Output::i()->redirect( $invoiceUrl );
+					\IPS\Output::i()->redirect( $invoiceUrl );
 				}
 				else
 				{
-					Output::i()->error( 'club_paid_unavailable', '1C350/N', 403, '' );
+					\IPS\Output::i()->error( 'club_paid_unavailable', '1C350/N', 403, '' );
 				}
 			}
 			else
 			{
-				$this->club->addMember( Member::loggedIn(), Club::STATUS_MEMBER, TRUE, NULL, NULL, TRUE );
+				$this->club->addMember( \IPS\Member::loggedIn(), \IPS\Member\Club::STATUS_MEMBER, TRUE, NULL, NULL, TRUE );
 				$this->club->recountMembers();
 				$notificationKey = 'club_join';
 			}
@@ -1267,38 +1221,38 @@ class view extends Controller
 		/* Otherwise, add the request */
 		else
 		{
-			$this->club->addMember( Member::loggedIn(), Club::STATUS_REQUESTED );
+			$this->club->addMember( \IPS\Member::loggedIn(), \IPS\Member\Club::STATUS_REQUESTED );
 			$notificationKey = 'club_request';
 		}
 		
 		/* Send a notification to any leaders */
-		$notification = new Notification( Application::load('core'), $notificationKey, $this->club, array( $this->club, Member::loggedIn() ), array( Member::loggedIn()->member_id ) );
-		foreach ( $this->club->members( array( Club::STATUS_LEADER ), NULL, NULL, 2 ) as $member )
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), $notificationKey, $this->club, array( $this->club, \IPS\Member::loggedIn() ), array( \IPS\Member::loggedIn()->member_id ) );
+		foreach ( $this->club->members( array( \IPS\Member\Club::STATUS_LEADER ), NULL, NULL, 2 ) as $member )
 		{
-			$notification->recipients->attach( Member::constructFromData( $member ) );
+			$notification->recipients->attach( \IPS\Member::constructFromData( $member ) );
 		}
 		$notification->send();
 
 		/* If we just accepted the rules, set the flag */
-		if( Request::i()->rulesAcknowledged )
+		if( \IPS\Request::i()->rulesAcknowledged )
 		{
-			$this->club->acknowledgeRules( Member::loggedIn() );
+			$this->club->acknowledgeRules( \IPS\Member::loggedIn() );
 		}
 		
 		/* Redirect */
 		if ( ! $this->club->rulesAcknowledged() )
 		{
-			Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'rules' ) );
+			\IPS\Output::i()->redirect( $this->club->url()->setQueryString( 'do', 'rules' ) );
 		}
 		else
 		{
-			if ( $url = Request::i()->referrer() )
+			if ( $url = \IPS\Request::i()->referrer() )
 			{
-				Output::i()->redirect( $url );
+				\IPS\Output::i()->redirect( $url );
 			}
 			else
 			{
-				Output::i()->redirect( $this->club->url() );
+				\IPS\Output::i()->redirect( $this->club->url() );
 			}
 		}
 	}
@@ -1308,21 +1262,21 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function leave() : void
+	protected function leave()
 	{
 		/* Can we leave? */
-		if ( !in_array( $this->club->memberStatus( Member::loggedIn() ), array( Club::STATUS_MEMBER, Club::STATUS_MODERATOR, Club::STATUS_LEADER, Club::STATUS_EXPIRED, Club::STATUS_EXPIRED_MODERATOR, Club::STATUS_WAITING_PAYMENT, Club::STATUS_INVITED, Club::STATUS_REQUESTED ) ) or ( $this->club->owner and $this->club->owner->member_id == Member::loggedIn()->member_id ) )
+		if ( !\in_array( $this->club->memberStatus( \IPS\Member::loggedIn() ), array( \IPS\Member\Club::STATUS_MEMBER, \IPS\Member\Club::STATUS_MODERATOR, \IPS\Member\Club::STATUS_LEADER, \IPS\Member\Club::STATUS_EXPIRED, \IPS\Member\Club::STATUS_EXPIRED_MODERATOR, \IPS\Member\Club::STATUS_WAITING_PAYMENT, \IPS\Member\Club::STATUS_INVITED, \IPS\Member\Club::STATUS_REQUESTED ) ) or ( $this->club->owner and $this->club->owner->member_id == \IPS\Member::loggedIn()->member_id ) )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/S', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/S', 403, '' );
 		}
 		
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Cancel purchase */
-		if ( Application::appIsEnabled('nexus') and Settings::i()->clubs_paid_on )
+		if ( \IPS\Application::appIsEnabled('nexus') and \IPS\Settings::i()->clubs_paid_on )
 		{
-			foreach ( ClubMembership::getPurchases( Customer::loggedIn(), $this->club->id ) as $purchase )
+			foreach ( \IPS\core\extensions\nexus\Item\ClubMembership::getPurchases( \IPS\nexus\Customer::loggedIn(), $this->club->id ) as $purchase )
 			{
 				$purchase->cancelled = TRUE;
 				$purchase->member->log( 'purchase', array( 'type' => 'cancel', 'id' => $purchase->id, 'name' => $purchase->name ) );
@@ -1332,18 +1286,16 @@ class view extends Controller
 		}
 		
 		/* Leave */
-		$this->club->removeMember( Member::loggedIn() );
+		$this->club->removeMember( \IPS\Member::loggedIn() );
 		$this->club->recountMembers();
 		$this->club->save();
-
-		Member::loggedIn()->logHistory( 'core', 'club_membership', array('club_id' => $this->club->id, 'type' => Club::STATUS_LEFT ) );
 		
 		/* Delete the invitation */
-		Db::i()->delete( 'core_notifications', array( '`member`=? AND notification_app=? AND notification_key=? and item_id=?', Member::loggedIn()->member_id, 'core', 'club_invitation', $this->club->id ) );
-		Member::loggedIn()->recountNotifications();
+		\IPS\Db::i()->delete( 'core_notifications', array( '`member`=? AND notification_app=? AND notification_key=? and item_id=?', \IPS\Member::loggedIn()->member_id, 'core', 'club_invitation', $this->club->id ) );
+		\IPS\Member::loggedIn()->recountNotifications();
 
 		/* Redirect */
-		Output::i()->redirect( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ) );
 	}
 
 	/**
@@ -1351,28 +1303,26 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function cancelJoin() : void
+	protected function cancelJoin()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Leave */
-		$this->club->removeMember( Member::loggedIn() );
+		$this->club->removeMember( \IPS\Member::loggedIn() );
 		$this->club->recountMembers();
 		$this->club->save();
 
-		Member::loggedIn()->logHistory( 'core', 'club_membership', array('club_id' => $this->club->id, 'type' => Club::STATUS_LEFT ) );
-
 		/* Update notification counts */
-		Db::i()->delete( 'core_notifications', array( 'notification_key=? and item_id=? and extra=?', 'club_request', $this->club->id, json_encode( array( Member::loggedIn()->member_id ) ) ) );
+		\IPS\Db::i()->delete( 'core_notifications', array( 'notification_key=? and item_id=? and extra=?', 'club_request', $this->club->id, json_encode( array( \IPS\Member::loggedIn()->member_id ) ) ) );
 		foreach( $this->club->members( array( 'moderator', 'leader' ), 250, NULL, 2 ) as $member )
 		{
-			$member = Member::constructFromData( $member );
+			$member = \IPS\Member::constructFromData( $member );
 			$member->recountNotifications();
 		}
 
 		/* Redirect */
-		Output::i()->redirect( $this->club->url(), 'clubs_request_cancelled' );
+		\IPS\Output::i()->redirect( $this->club->url(), 'clubs_request_cancelled' );
 	}
 
 	/**
@@ -1380,30 +1330,30 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function renew() : void
+	protected function renew()
 	{
 		/* Can we renew? */
-		if ( !in_array( $this->club->memberStatus( Member::loggedIn() ), array( Club::STATUS_EXPIRED, Club::STATUS_EXPIRED_MODERATOR ) ) )
+		if ( !\in_array( $this->club->memberStatus( \IPS\Member::loggedIn() ), array( \IPS\Member\Club::STATUS_EXPIRED, \IPS\Member\Club::STATUS_EXPIRED_MODERATOR ) ) )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/Y', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/Y', 403, '' );
 		}
 		
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Find the purchase */
-		foreach ( ClubMembership::getPurchases( Customer::loggedIn(), $this->club->id ) as $purchase )
+		foreach ( \IPS\core\extensions\nexus\Item\ClubMembership::getPurchases( \IPS\nexus\Customer::loggedIn(), $this->club->id ) as $purchase )
 		{
 			if ( $invoice = $purchase->invoice_pending )
 			{
-				Output::i()->redirect( $invoice->checkoutUrl() );
+				\IPS\Output::i()->redirect( $invoice->checkoutUrl() );
 			}
-
-			Output::i()->redirect( $purchase->url()->setQueryString( array( 'do' => 'renew', 'cycles' => 1 ) )->csrf() );
+			
+			\IPS\Output::i()->redirect( $purchase->url()->setQueryString( array( 'do' => 'renew', 'cycles' => 1 ) )->csrf() );
 		}
 		
 		/* Couldn't find it? */
-		Output::i()->error( 'no_module_permission', '2C350/Z', 500, '' );
+		\IPS\Output::i()->error( 'no_module_permission', '2C350/Z', 500, '' );
 	}
 	
 	/**
@@ -1411,76 +1361,51 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function invite() : void
+	protected function invite()
 	{
 		if ( !$this->club->canInvite() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/5', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/5', 403, '' );
 		}
 		
-		$form = new Form( 'form', 'club_send_invitations' );
-		$form->class = 'ipsForm--vertical ipsForm--club-invite';
-		$form->add( new FormMember( 'members', NULL, TRUE, array( 'multiple' => NULL ) ) );
+		$form = new \IPS\Helpers\Form( 'form', 'club_send_invitations' );
+		$form->class = 'ipsForm_vertical';
+		$form->add( new \IPS\Helpers\Form\Member( 'members', NULL, TRUE, array( 'multiple' => NULL ) ) );
 		if ( $this->club->isPaid() and $this->club->isLeader() )
 		{
-			$form->add( new YesNo( 'club_invite_waive_fee', FALSE ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'club_invite_waive_fee', FALSE ) );
 			if ( $this->club->renewal_price )
 			{
-				Member::loggedIn()->language()->words['club_invite_waive_fee_desc'] = Member::loggedIn()->language()->addToStack('club_invite_waive_fee_renewal');
+				\IPS\Member::loggedIn()->language()->words['club_invite_waive_fee_desc'] = \IPS\Member::loggedIn()->language()->addToStack('club_invite_waive_fee_renewal');
 			}
 		}
 		
 		if ( $values = $form->values() )
 		{
-			$status = Club::STATUS_INVITED;
+			$status = \IPS\Member\Club::STATUS_INVITED;
 			if ( $this->club->isPaid() and $this->club->isLeader() and $values['club_invite_waive_fee'] )
 			{
-				$status = Club::STATUS_INVITED_BYPASSING_PAYMENT;
+				$status = \IPS\Member\Club::STATUS_INVITED_BYPASSING_PAYMENT;
 			}
 
 			foreach ( $values['members'] as $member )
 			{
-				if ( $member instanceof Member )
+				if ( $member instanceof \IPS\Member )
 				{
 					$memberStatus = $this->club->memberStatus( $member );
-					if ( !$memberStatus or in_array( $memberStatus, array( Club::STATUS_INVITED, Club::STATUS_REQUESTED, Club::STATUS_DECLINED, Club::STATUS_BANNED ) ) )
+					if ( !$memberStatus or \in_array( $memberStatus, array( \IPS\Member\Club::STATUS_INVITED, \IPS\Member\Club::STATUS_REQUESTED, \IPS\Member\Club::STATUS_DECLINED, \IPS\Member\Club::STATUS_BANNED ) ) )
 					{
-						$this->club->addMember( $member, $status, TRUE, NULL, Member::loggedIn(), TRUE );
+						$this->club->addMember( $member, $status, TRUE, NULL, \IPS\Member::loggedIn(), TRUE );
 					}
 				}
 			}
-			$this->club->sendInvitation( Member::loggedIn(), $values['members'] );
+			$this->club->sendInvitation( \IPS\Member::loggedIn(), $values['members'] );
 			
-			Output::i()->redirect( $this->club->url(), 'club_notifications_sent' );
+			\IPS\Output::i()->redirect( $this->club->url(), 'club_notifications_sent' );
 		}
 		
-		Output::i()->title = $this->club->name;
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
-	}
-
-	/**
-	 * Resend a pending invitation
-	 *
-	 * @return void
-	 */
-	protected function resendInvite() : void
-	{
-		Session::i()->csrfCheck();
-
-		if ( !$this->club->canInvite() )
-		{
-			Output::i()->error( 'no_module_permission', '2C350/5', 403, '' );
-		}
-
-		$member = Member::load( Request::i()->member );
-		$memberStatus = $this->club->memberStatus( $member );
-		if( in_array( $memberStatus, [ Club::STATUS_INVITED, Club::STATUS_INVITED_BYPASSING_PAYMENT ] ) )
-		{
-			$this->club->sendInvitation( Member::loggedIn(), [ $member ] );
-			$member->logHistory( 'core', 'club_membership', array('club_id' => $this->club->id, 'type' => $memberStatus ) );
-		}
-
-		Output::i()->redirect( $this->club->url(), 'club_notifications_sent' );
+		\IPS\Output::i()->title = $this->club->name;
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/**
@@ -1488,43 +1413,43 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function reInvite() : void
+	protected function reInvite()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/J', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/J', 403, '' );
 		}
 		
 		/* Check the member needs to be reinvited */
-		$member = Member::load( Request::i()->member );
-		if ( !in_array( $this->club->memberStatus( $member ), array( Club::STATUS_DECLINED, Club::STATUS_BANNED ) ) )
+		$member = \IPS\Member::load( \IPS\Request::i()->member );
+		if ( !\in_array( $this->club->memberStatus( $member ), array( \IPS\Member\Club::STATUS_DECLINED, \IPS\Member\Club::STATUS_BANNED ) ) )
 		{
-			Output::i()->error( 'node_error', '2C350/K', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C350/K', 403, '' );
 		}
 		
 		/* Add them */
 		$this->club->removeMember( $member );
-		$this->club->addMember( $member, Club::STATUS_INVITED, FALSE, NULL, Member::loggedIn() );
+		$this->club->addMember( $member, \IPS\Member\Club::STATUS_INVITED, FALSE, NULL, \IPS\Member::loggedIn() );
 		$this->club->recountMembers();
 		
 		/* Notify the member */
-		$notification = new Notification( Application::load('core'), 'club_invitation', $this->club, array( $this->club, Member::loggedIn() ), array( 'invitedBy' => Member::loggedIn()->member_id ) );
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'club_invitation', $this->club, array( $this->club, \IPS\Member::loggedIn() ), array( 'invitedBy' => \IPS\Member::loggedIn()->member_id ) );
 		$notification->recipients->attach( $member );
 		$notification->send();
 				
 		/* If other requests are banned, send us back, otherwise take us to the main member list */
 		$url = $this->club->url()->setQueryString( 'do', 'members' );
-		if ( count( $this->club->members( array( Club::STATUS_DECLINED, Club::STATUS_BANNED ) ) ) )
+		if ( \count( $this->club->members( array( \IPS\Member\Club::STATUS_DECLINED, \IPS\Member\Club::STATUS_BANNED ) ) ) )
 		{
-			Output::i()->redirect( $url->SetQueryString( 'filter', Club::STATUS_BANNED ) );
+			\IPS\Output::i()->redirect( $url->SetQueryString( 'filter', \IPS\Member\Club::STATUS_BANNED ) );
 		}
 		else
 		{
-			Output::i()->redirect( $url );
+			\IPS\Output::i()->redirect( $url );
 		}
 	}
 	
@@ -1533,15 +1458,15 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function feature() : void
+	protected function feature()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
-		if ( !Member::loggedIn()->modPermission('can_manage_featured_clubs') )
+		if ( !\IPS\Member::loggedIn()->modPermission('can_manage_featured_clubs') )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/Q', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/Q', 403, '' );
 		}
 		
 		/* Feature */
@@ -1549,7 +1474,7 @@ class view extends Controller
 		$this->club->save();
 		
 		/* Redirect */
-		Output::i()->redirect( $this->club->url() );
+		\IPS\Output::i()->redirect( $this->club->url() );
 	}
 	
 	/**
@@ -1557,15 +1482,15 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function unfeature() : void
+	protected function unfeature()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
-		if ( !Member::loggedIn()->modPermission('can_manage_featured_clubs') )
+		if ( !\IPS\Member::loggedIn()->modPermission('can_manage_featured_clubs') )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/Q', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/Q', 403, '' );
 		}
 		
 		/* Unfeature */
@@ -1573,7 +1498,7 @@ class view extends Controller
 		$this->club->save();
 		
 		/* Redirect */
-		Output::i()->redirect( $this->club->url() );
+		\IPS\Output::i()->redirect( $this->club->url() );
 	}
 	
 	/**
@@ -1581,25 +1506,25 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function approve() : void
+	protected function approve()
 	{
 		/* CSRF Check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
-		if ( !Member::loggedIn()->modPermission('can_manage_featured_clubs') or $this->club->approved or !Settings::i()->clubs_require_approval )
+		if ( !\IPS\Member::loggedIn()->modPermission('can_manage_featured_clubs') or $this->club->approved or !\IPS\Settings::i()->clubs_require_approval )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/U', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/U', 403, '' );
 		}
 		
 		/* Approve... */
-		if ( Request::i()->approved )
+		if ( \IPS\Request::i()->approved )
 		{
 			$this->club->approved = TRUE;
 			$this->club->save();
 			$this->club->onApprove();
 			
-			Output::i()->redirect( $this->club->url() );
+			\IPS\Output::i()->redirect( $this->club->url() );
 		}
 		
 		/* ... or delete */
@@ -1607,7 +1532,7 @@ class view extends Controller
 		{
 			$this->club->delete();
 			
-			Output::i()->redirect( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ) );
 		}
 	}
 	
@@ -1616,30 +1541,30 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function nodeForm() : void
+	protected function nodeForm()
 	{
 		/* Permission check */
-		$class = Request::i()->type;
-		if ( !$this->club->isLeader() or !in_array( $class, Club::availableNodeTypes( Member::loggedIn() ) ) or ( Settings::i()->clubs_require_approval and !$this->club->approved ) )
+		$class = \IPS\Request::i()->type;
+		if ( !$this->club->isLeader() or !\in_array( $class, \IPS\Member\Club::availableNodeTypes( \IPS\Member::loggedIn() ) ) or ( \IPS\Settings::i()->clubs_require_approval and !$this->club->approved ) )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/T', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/T', 403, '' );
 		}
 		
 		/* Load if editing */
-		if ( isset( Request::i()->node ) )
+		if ( isset( \IPS\Request::i()->node ) )
 		{
 			try
 			{
-				$node = $class::load( (int) Request::i()->node );
+				$node = $class::load( (int) \IPS\Request::i()->node );
 				$club = $node->club();
 				if ( !$club or $club->id !== $this->club->id )
 				{
-					throw new Exception;
+					throw new \Exception;
 				}
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				Output::i()->error( 'node_error', '2C350/O', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2C350/O', 404, '' );
 			}
 		}
 		else
@@ -1648,20 +1573,20 @@ class view extends Controller
 		}
 		
 		/* Build Form */
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--club-create-node';
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical';
 		$node->clubForm( $form, $this->club );
 		
 		/* Handle submissions */
 		if ( $values = $form->values() )
 		{
 			$node->saveClubForm( $this->club, $values );
-			Output::i()->redirect( $node->url() );
+			\IPS\Output::i()->redirect( $node->url() );
 		}
 		
 		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('club_create_node');
-		Output::i()->output = Request::i()->isAjax() ? $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) ) : $form;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('club_create_node');
+		\IPS\Output::i()->output = \IPS\Request::i()->isAjax() ? $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) ) : $form;
 	}
 	
 	/**
@@ -1669,51 +1594,51 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function nodeDelete() : void
+	protected function nodeDelete()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Permission check */
 		if ( !$this->club->isLeader() )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/AA', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/AA', 403, '' );
 		}
 		
 		/* Load */
-		$class = Request::i()->type;
+		$class = \IPS\Request::i()->type;
 
 		try
 		{
-			if ( !in_array( 'IPS\Node\Model', class_parents( $class ) ) )
+			if ( !\in_array( 'IPS\Node\Model', class_parents( $class ) ) )
 			{
-				throw new Exception;
+				throw new \Exception;
 			}
 
-			$node = $class::load( (int) Request::i()->node );
+			$node = $class::load( (int) \IPS\Request::i()->node );
 			$club = $node->club();
 			if ( !$club or $club->id !== $this->club->id )
 			{
-				throw new Exception;
+				throw new \Exception;
 			}
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Output::i()->error( 'node_error', '2C350/AB', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C350/AB', 404, '' );
 		}
 		
 		/* Permission check */
 		$itemClass = $node::$contentItemClass;
-		if ( !$node->modPermission( 'delete', Member::loggedIn(), $itemClass ) and $itemClass::contentCount( $node, TRUE, TRUE, TRUE, 1 ) )
+		if ( !$node->modPermission( 'delete', \IPS\Member::loggedIn(), $itemClass ) and $itemClass::contentCount( $node, TRUE, TRUE, TRUE, 1 ) )
 		{
-			Output::i()->error( 'no_module_permission', '2C350/AC', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C350/AC', 403, '' );
 		}
 		
 		/* Delete */
-		Db::i()->delete( 'core_clubs_node_map', array( 'club_id=? AND node_class=? AND node_id=?', $club->id, $class, $node->_id ) );
+		\IPS\Db::i()->delete( 'core_clubs_node_map', array( 'club_id=? AND node_class=? AND node_id=?', $club->id, $class, $node->_id ) );
 		$node->deleteOrMoveFormSubmit( array() );
 		
 		/* Redirect */
-		Output::i()->redirect( $club->url() );
+		\IPS\Output::i()->redirect( $club->url() );
 	}
 	
 	/**
@@ -1721,27 +1646,27 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function addPage() : void
+	public function addPage()
 	{
 		/* Init form */
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--club-add-page';
-		Page::form( $form, $this->club );
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical';
+		\IPS\Member\Club\Page::form( $form, $this->club );
 		
 		/* Form Submission */
 		if ( $values = $form->values() )
 		{
-			$page = new Page;
+			$page = new \IPS\Member\Club\Page;
 			$page->formatFormValues( $values );
 			$page->save();
 			
-			File::claimAttachments( 'club-page-new', $page->id );
+			\IPS\File::claimAttachments( 'club-page-new', $page->id );
 			
-			Output::i()->redirect( $page->url() );
+			\IPS\Output::i()->redirect( $page->url() );
 		}
 		
-		Output::i()->title		= Member::loggedIn()->language()->addToStack( "add_page_to_club", NULL, array( "sprintf" => array( $this->club->name ) ) );
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack( "add_page_to_club", NULL, array( "sprintf" => array( $this->club->name ) ) );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/* !Cover Photo */
@@ -1751,7 +1676,7 @@ class view extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _coverPhotoStorageExtension(): string
+	protected function _coverPhotoStorageExtension()
 	{
 		return 'core_Clubs';
 	}
@@ -1759,22 +1684,22 @@ class view extends Controller
 	/**
 	 * Set Cover Photo
 	 *
-	 * @param	CoverPhoto	$photo	New Photo
+	 * @param	\IPS\Helpers\CoverPhoto	$photo	New Photo
 	 * @return	void
 	 */
-	protected function _coverPhotoSet( CoverPhoto $photo ) : void
+	protected function _coverPhotoSet( \IPS\Helpers\CoverPhoto $photo )
 	{
 		$this->club->cover_photo = (string) $photo->file;
-		$this->club->cover_offset = $photo->offset;
+		$this->club->cover_offset = (int) $photo->offset;
 		$this->club->save();
 	}
 	
 	/**
 	 * Get Cover Photo
 	 *
-	 * @return	CoverPhoto
+	 * @return	\IPS\Helpers\CoverPhoto
 	 */
-	protected function _coverPhotoGet(): CoverPhoto
+	protected function _coverPhotoGet()
 	{
 		return $this->club->coverPhoto();
 	}
@@ -1784,52 +1709,52 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function embed() : void
+	protected function embed()
 	{
-		$title = Member::loggedIn()->language()->addToStack( 'error_title' );
+		$title = \IPS\Member::loggedIn()->language()->addToStack( 'error_title' );
 		
 		try
 		{
-			$club = Club::load( Request::i()->id );
+			$club = \IPS\Member\Club::load( \IPS\Request::i()->id );
 			if ( !$club->canView() )
 			{
-				$output = Theme::i()->getTemplate( 'embed', 'core', 'global' )->embedNoPermission();
+				$output = \IPS\Theme::i()->getTemplate( 'embed', 'core', 'global' )->embedNoPermission();
 			}
 			else
 			{
-				$output = $club->embedContent();
+				$output = \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->embedClub( $club );
 			}
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
-			$output = Theme::i()->getTemplate( 'embed', 'core', 'global' )->embedUnavailable();
+			$output = \IPS\Theme::i()->getTemplate( 'embed', 'core', 'global' )->embedUnavailable();
 		}
 		
 		/* Make sure our iframe contents get the necessary elements and JS */
 		$js = array(
-			Output::i()->js( 'js/commonEmbedHandler.js', 'core', 'interface' ),
-			Output::i()->js( 'js/internalEmbedHandler.js', 'core', 'interface' )
+			\IPS\Output::i()->js( 'js/commonEmbedHandler.js', 'core', 'interface' ),
+			\IPS\Output::i()->js( 'js/internalEmbedHandler.js', 'core', 'interface' )
 		);
-		Output::i()->base = '_parent';
+		\IPS\Output::i()->base = '_parent';
 
 		/* We need to keep any embed.css files that have been specified so that we can re-add them after we re-fetch the css framework */
 		$embedCss = array();
-		foreach( Output::i()->cssFiles as $cssFile )
+		foreach( \IPS\Output::i()->cssFiles as $cssFile )
 		{
-			if( mb_stristr( $cssFile, 'embed.css' ) )
+			if( \mb_stristr( $cssFile, 'embed.css' ) )
 			{
 				$embedCss[] = $cssFile;
 			}
 		}
 
 		/* We need to reset the included CSS files because by this point the responsive files are already in the output CSS array */
-		Output::i()->cssFiles = array();
-		Output::i()->responsive = FALSE;
-		Front::baseCss();
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, $embedCss );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/embeds.css', 'core', 'front' ) );
+		\IPS\Output::i()->cssFiles = array();
+		\IPS\Output::i()->responsive = FALSE;
+		\IPS\Dispatcher\Front::baseCss();
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, $embedCss );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/embeds.css', 'core', 'front' ) );
 
-		Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core', 'front' )->embedInternal( $output, $js ) );
+		\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->embedInternal( $output, $js ), 200, 'text/html' );
 	}
 
 	/**
@@ -1837,24 +1762,24 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function saveMenu() : void
+	protected function saveMenu()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Permission check */
 		if ( !$this->club->canManageNavigation() )
 		{
-			Output::i()->error( 'no_module_permission', '1C350/O', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '1C350/O', 403, '' );
 		}
 
-		if ( is_array( Request::i()->tabOrder ) )
+		if ( \is_array( \IPS\Request::i()->tabOrder ) )
 		{
-			$tabs =  Request::i()->tabOrder;
+			$tabs =  \IPS\Request::i()->tabOrder;
 			$this->club->menu_tabs = json_encode( $tabs );
 			$this->club->save();
 		}
 
-		Output::i()->json( 'ok' );
+		\IPS\Output::i()->json( 'ok' );
 	}
 
 	/**
@@ -1862,19 +1787,19 @@ class view extends Controller
 	 *
 	 * @return void
 	 */
-	protected function _setDefaultMetaTags() : void
+	protected function _setDefaultMetaTags()
 	{
 		if( $this->club->cover_photo )
 		{
-			Output::i()->metaTags['og:image'] = File::get( 'core_Clubs', $this->club->cover_photo )->url;
+			\IPS\Output::i()->metaTags['og:image'] = \IPS\File::get( 'core_Clubs', $this->club->cover_photo )->url;
 		}
 		
-		Output::i()->metaTags['og:title'] = $this->club->name;
+		\IPS\Output::i()->metaTags['og:title'] = $this->club->name;
 
 		if( $this->club->about )
 		{
-			Output::i()->metaTags['description'] = $this->club->about;
-			Output::i()->metaTags['og:description'] = $this->club->about;
+			\IPS\Output::i()->metaTags['description'] = $this->club->about;
+			\IPS\Output::i()->metaTags['og:description'] = $this->club->about;
 		}
 	}
 
@@ -1883,21 +1808,21 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function updateExisting() : void
+	public function updateExisting()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Make sure logged-in user has permission */
-		if ( !( $this->club->owner and $this->club->owner->member_id == Member::loggedIn()->member_id ) and !Member::loggedIn()->modPermission('can_access_all_clubs') )
+		if ( !( $this->club->owner and $this->club->owner->member_id == \IPS\Member::loggedIn()->member_id ) and !\IPS\Member::loggedIn()->modPermission('can_access_all_clubs') )
 		{
-			Output::i()->error( 'no_module_permission', '3C350/Q', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '3C350/Q', 403, '' );
 		}
 
-		$changes = json_decode( Request::i()->changes, TRUE );
+		$changes = json_decode( \IPS\Request::i()->changes, TRUE );
 
-		Task::queue( 'core', 'UpdateClubRenewals', array( 'changes' => $changes, 'club' => $this->club->id ), 5 );
+		\IPS\Task::queue( 'core', 'UpdateClubRenewals', array( 'changes' => $changes, 'club' => $this->club->id ), 5 );
 
 		/* Redirect */
-		Output::i()->redirect( $this->club->url(), 'saved' );
+		\IPS\Output::i()->redirect( $this->club->url(), 'saved' );
 	}
 }

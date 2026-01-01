@@ -12,27 +12,21 @@
 namespace IPS\{app}\extensions\core\Sitemap;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\SitemapAbstract;
-use IPS\Settings as SettingsClass;
-use IPS\Sitemap;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Support {class} in sitemaps
  */
-class {class} extends SitemapAbstract
+class _{class}
 {
 	/**
 	 * @brief	Recommended Settings
 	 */
-	public array $recommendedSettings = array();
+	public $recommendedSettings = array();
 
 	/**
 	 * Add settings for ACP configuration to the form
@@ -50,17 +44,17 @@ class {class} extends SitemapAbstract
 	 * @param	array	$values	Values
 	 * @return	void
 	 */
-	public function saveSettings( array $values ) : void
+	public function saveSettings( $values )
 	{
 		if ( $values['sitemap_configuration_info'] )
 		{
 			// Store default  values for any settings you define
-			//SettingsClass::i()->changeValues( array(  ) );
+			//\IPS\Settings::i()->changeValues( array(  ) );
 		}
 		else
 		{
 			// Store the actual submitted value for any settings you define, from the $values array
-			//SettingsClass::i()->changeValues( array(  ) );
+			//\IPS\Settings::i()->changeValues( array(  ) );
 		}
 	}
 
@@ -77,13 +71,12 @@ class {class} extends SitemapAbstract
 	/**
 	 * Generate the sitemap
 	 *
-	 * @param	string		$filename	The sitemap file to build (should be one returned from getFilenames())
-	 * @param	Sitemap 	$sitemap	Sitemap object reference
-	 * @return	int|null
+	 * @param	string			$filename	The sitemap file to build (should be one returned from getFilenames())
+	 * @param	\IPS\Sitemap	$sitemap	Sitemap object reference
+	 * @return	void
 	 */
-	public function generateSitemap( string $filename, Sitemap $sitemap ) : ?int
+	public function generateSitemap( $filename, $sitemap )
 	{
-	    return null;
 	}
 
 }

@@ -26,6 +26,14 @@
         "menu_style": "menu",
         "embeddable": true
     },
+    "recentStatusUpdates": {
+        "class": "\\IPS\\Widget\\StaticCache",
+        "restrict": [],
+        "default_area": "",
+        "allow_reuse": false,
+        "menu_style": "menu",
+        "embeddable": true
+    },
     "topContributors": {
         "class": "\\IPS\\Widget\\StaticCache",
         "restrict": [],
@@ -111,6 +119,17 @@
         "menu_style": "menu",
         "embeddable": true
     },
+    "twitter": {
+        "class": "\\IPS\\Widget\\StaticCache",
+        "restrict": [
+            "sidebar",
+            "cms"
+        ],
+        "default_area": "",
+        "allow_reuse": true,
+        "menu_style": "modal",
+        "embeddable": true
+    },
     "invite": {
         "class": "\\IPS\\Widget\\StaticCache",
         "restrict": [
@@ -154,43 +173,5 @@
         "allow_reuse": true,
         "menu_style": "menu",
         "embeddable": true
-    },
-    "advertisements": {
-        "class": "\\IPS\\Widget",
-        "restrict": [
-            "sidebar",
-            "cms"
-        ],
-        "default_area": "",
-        "allow_reuse": true,
-        "menu_style": "menu",
-        "embeddable": true
-    },
-    "tableofcontents": {
-        "class": "\\IPS\\Widget\\StaticCache",
-        "restrict": [
-            "sidebar",
-            "cms"
-        ],
-        "default_area": "",
-        "allow_reuse": false,
-        "menu_style": "menu",
-        "layouts": "wrap",
-        "embeddable": false
-    },
-    "tags": {
-        "class": "\\IPS\\Widget\\PermissionCache",
-        "restrict": [
-            "sidebar",
-            "cms"
-        ],
-        "default_area": "",
-        "allow_reuse": true,
-        "menu_style": "menu",
-        "layouts": "",
-        "embeddable": false,
-        "padding": false,
-        "default_layout": null,
-        "searchterms": "tag"
     }
 }

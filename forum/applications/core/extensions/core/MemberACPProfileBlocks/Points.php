@@ -11,40 +11,25 @@
 namespace IPS\core\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\core\Achievements\Rank;
-use IPS\core\MemberACPProfile\Block;
-use IPS\DateTime;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function get_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile Block
  */
-class Points extends Block
+class _Points extends \IPS\core\MemberACPProfile\Block
 {
 	/**
 	 * Get output
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
-		return (string) Theme::i()->getTemplate('memberprofile')->rank( $this->member );
+		return \IPS\Theme::i()->getTemplate('memberprofile')->rank( $this->member );
 	}
 	
 	/**
@@ -52,20 +37,20 @@ class Points extends Block
 	 *
 	 * @return	string
 	 */
-	public function edit(): string
+	public function edit()
 	{
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'member_edit' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'member_edit' ) )
 		{
-			Output::i()->sidebar['actions']['addpoints'] = array(
+			\IPS\Output::i()->sidebar['actions']['addpoints'] = array(
 				'primary' => true,
 				'icon' => 'pencil',
 				'link' => $this->member->acpUrl()->setQueryString('do', 'points')->csrf(),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('acp_profile_points_manage_title' ) ),
-				'title' => Member::loggedIn()->language()->addToStack( 'acp_profile_edit_points', FALSE, [ 'sprintf' => $this->member->name ] ),
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('acp_profile_points_manage_title' ) ),
+				'title' => \IPS\Member::loggedIn()->language()->addToStack( 'acp_profile_edit_points', FALSE, [ 'sprintf' => $this->member->name ] ),
 			);
 		}
 
-		$table = new Db( 'core_points_log', $this->member->acpUrl()->setQueryString( array( 'do' => 'editBlock', 'block' => get_class( $this ) ) ), [ [ '`member`=?', $this->member->member_id ] ] );
+		$table = new \IPS\Helpers\Table\Db( 'core_points_log', $this->member->acpUrl()->setQueryString( array( 'do' => 'editBlock', 'block' => \get_class( $this ) ) ), [ [ '`member`=?', $this->member->member_id ] ] );
 		$table->joins[] = [
 			'select'	=> 'action,identifier',
 			'from'		=> 'core_achievements_log',
@@ -91,25 +76,25 @@ class Points extends Block
 				if ( isset( $exploded[1] ) )
 				{
                     try{
-                        $extension = Application::load( $exploded[0] )->extensions( 'core', 'AchievementAction' )[$exploded[1]];
+                        $extension = \IPS\Application::load( $exploded[0] )->extensions( 'core', 'AchievementAction' )[$exploded[1]];
                         return $extension->logRow( $row['identifier'], explode( ',', $row['actor'] ) );
                     }
-                    catch( OutOfRangeException $e )
+                    catch( \OutOfRangeException $e )
                     {
-                        return Member::loggedIn()->language()->addToStack( 'acp_points_rule_deleted');
+                        return \IPS\Member::loggedIn()->language()->addToStack( 'acp_points_rule_deleted');
                     }
 				}
 				else if ( isset( $row['rules'] ) and empty( $row['rules'] ) )
 				{
-					return Member::loggedIn()->language()->addToStack( 'acp_points_log_manual');
+					return \IPS\Member::loggedIn()->language()->addToStack( 'acp_points_log_manual');
 				}
 				else
 				{
-					return Member::loggedIn()->language()->addToStack( 'acp_points_rule_deleted');
+					return \IPS\Member::loggedIn()->language()->addToStack( 'acp_points_rule_deleted');
 				}
 			},
 			'datetime' => function( $val ) {
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
 			'new_rank' => function( $val, $row )
 			{
@@ -120,17 +105,17 @@ class Points extends Block
 				
 				try
 				{
-					$rank = Rank::load( $val );
-					return Theme::i()->getTemplate( 'global' )->genericLink( Url::internal( "app=core&module=achievements&controller=ranks", 'admin' ), $rank->_title );
+					$rank = \IPS\core\Achievements\Rank::load( $val );
+					return \IPS\Theme::i()->getTemplate( 'global' )->genericLink( \IPS\Http\Url::internal( "app=core&module=achievements&controller=ranks", 'admin' ), $rank->_title );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					return Member::loggedIn()->language()->addToStack('deleted');
+					return \IPS\Member::loggedIn()->language()->addToStack('deleted');
 				}
 			}
 		];
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack('acp_profile_points_manage_title');
-		return Output::i()->output = Theme::i()->getTemplate( 'members' )->pointsLog( $table, $this->member );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('acp_profile_points_manage_title');
+		return \IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'members' )->pointsLog( $table, $this->member );
 	}
 }

@@ -11,71 +11,57 @@
 namespace IPS\Session\Store;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Useragent;
-use IPS\Member;
-use IPS\Request;
-use IPS\Session\Front;
-use IPS\Session\Store;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Database Session Handler
  */
-class Database extends Store
+class _Database extends \IPS\Session\Store
 {
 	/**
 	 * Load the session from the storage engine 
 	 *
-	 * @param string $sessionId	Session ID
+	 * @param	string	$sessionId	Session ID
 	 * @return	array|NULL
 	 */
-	public function loadSession( string $sessionId ): ?array
+	public function loadSession( $sessionId )
 	{ 
 		$session = NULL;
 		/* Get from the database */
 		try
 		{
 			/* If it looks like we're logged in, join the member row to save a query later */
-			if ( Front::loggedIn() )
+			if ( \IPS\Session\Front::loggedIn() )
 			{ 
-				$session = Db::i()->select( '*', 'core_sessions', array( 'id=?', $sessionId ), NULL, NULL, NULL, NULL, Db::SELECT_MULTIDIMENSIONAL_JOINS )->join( 'core_members', 'core_members.member_id=core_sessions.member_id' )->first();
+				$session = \IPS\Db::i()->select( '*', 'core_sessions', array( 'id=?', $sessionId ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_MULTIDIMENSIONAL_JOINS )->join( 'core_members', 'core_members.member_id=core_sessions.member_id' )->first();
 				if ( $session['core_members']['member_id'] )
 				{
-					Member::constructFromData( $session['core_members'], FALSE );
+					\IPS\Member::constructFromData( $session['core_members'], FALSE );
 				}
 				$session = $session['core_sessions'];
 			}
 			/* If we're not logged in, just look at the session */
 			else
 			{
-				$userAgent = Useragent::parse();
+				$userAgent = \IPS\Http\Useragent::parse();
 				
 				/* Spiders match by IP and useragent */
 				if ( $userAgent->bot )
 				{
-					$session = Db::i()->select( '*', 'core_sessions', array( 'id=? OR ( ip_address=? AND browser=? )', $sessionId, Request::i()->ipAddress(), $_SERVER['HTTP_USER_AGENT'] ) )->first();
+					$session = \IPS\Db::i()->select( '*', 'core_sessions', array( 'id=? OR ( ip_address=? AND browser=? )', $sessionId, \IPS\Request::i()->ipAddress(), $_SERVER['HTTP_USER_AGENT'] ) )->first();
 				}
 				/* Normal users don't */
 				else
 				{
-					$session = Db::i()->select( '*', 'core_sessions', array( 'id=?', $sessionId ) )->first();
+					$session = \IPS\Db::i()->select( '*', 'core_sessions', array( 'id=?', $sessionId ) )->first();
 				}
 			}
 		}
-		catch ( UnderflowException $e ) { }
+		catch ( \UnderflowException $e ) { }
 		
 		return $session;
 	}
@@ -83,23 +69,23 @@ class Database extends Store
 	/**
 	 * Update the session storage engine
 	 *
-	 * @param array $data		Session Data
+	 * @param	string	$data		Session Data
 	 * @return void
 	 */
-	public function updateSession( array $data ) : void
+	public function updateSession( $data )
 	{
-		Db::i()->insert( 'core_sessions', $data, TRUE );
+		\IPS\Db::i()->insert( 'core_sessions', $data, TRUE );
 	}
 	
 	/**
 	 * Delete from the session engine
 	 *
-	 * @param string $sessionId	Session ID
+	 * @param	string	$sessionId	Session ID
 	 * @return	void
 	 */
-	public function deleteSession( string $sessionId ) : void
+	public function deleteSession( $sessionId )
 	{
-		Db::i()->delete( 'core_sessions', array( 'id=?', $sessionId ) );
+		\IPS\Db::i()->delete( 'core_sessions', array( 'id=?', $sessionId ) );
 	}
 	
 	/**
@@ -110,7 +96,7 @@ class Database extends Store
 	 * @param	array|NULL	$keepSessionIds	Array of session ids to keep [optional]
 	 * @return	void
 	 */
-	public function deleteByMember( int $memberId, string $userAgent=NULL, array $keepSessionIds=NULL ) : void
+	public function deleteByMember( int $memberId, string $userAgent=NULL, array $keepSessionIds=NULL )
 	{
 		$where = array( array( 'member_id=?', $memberId ) );
 		
@@ -119,27 +105,27 @@ class Database extends Store
 			$where[] = array( 'browser=?', $userAgent );
 		}
 		
-		if ( is_array( $keepSessionIds ) AND count( $keepSessionIds ) )
+		if ( \is_array( $keepSessionIds ) AND \count( $keepSessionIds ) )
 		{
-			$where[] = array( Db::i()->in( 'id', $keepSessionIds, TRUE ) );
+			$where[] = array( \IPS\Db::i()->in( 'id', $keepSessionIds, TRUE ) );
 		}
 		
-		Db::i()->delete( 'core_sessions', $where );
+		\IPS\Db::i()->delete( 'core_sessions', $where );
 	}
 	
 	/**
 	 * Delete from the session engine
 	 *
-	 * @param int $memberId	You can probably figure this out right?
+	 * @param	int		$memberId	You can probably figure this out right?
 	 * @return	array|FALSE
 	 */
-	public function getLatestMemberSession( int $memberId ): array|FALSE
+	public function getLatestMemberSession( $memberId )
 	{
 		try
 		{
-			return Db::i()->select( '*', 'core_sessions', array( 'member_id=?', $memberId ), 'running_time DESC' )->first();
+			return \IPS\Db::i()->select( '*', 'core_sessions', array( 'member_id=?', $memberId ), 'running_time DESC' )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return FALSE;
 		}
@@ -150,56 +136,56 @@ class Database extends Store
 	 *
 	 * @return	array or session IDs
 	 */
-	public function getSessionIds(): array
+	public function getSessionIds()
 	{
-		return iterator_to_array( Db::i()->select( 'id', 'core_sessions' ) );
+		return iterator_to_array( \IPS\Db::i()->select( 'id', 'core_sessions' ) );
 	}
 	
 	/**
 	 * Clear sessions - abstracted so it can be called externally without initiating a session
 	 *
-	 * @param int $timeout	Sessions older than the number of seconds provided will be deleted
+	 * @param	int		$timeout	Sessions older than the number of seconds provided will be deleted
 	 * @return void
 	 */
-	public static function clearSessions( int $timeout ) : void
+	public static function clearSessions( $timeout )
 	{
-		Db::i()->delete( 'core_sessions', array( 'running_time<?', ( time() - $timeout ) ) );
+		\IPS\Db::i()->delete( 'core_sessions', array( 'running_time<?', ( time() - $timeout ) ) );
 	}
 	
 	/**
 	 * Fetch all online users (but not spiders)
 	 *
-	 * @param int $flags				Bitwise flags
-	 * @param string $sort				Sort direction
-	 * @param array|null $limit				Limit [ offset, limit ]
-	 * @param int|null $memberGroup		Limit by a specific member group ID
-	 * @param boolean $showAnonymous		Show anonymously logged in peoples?
-	 * @return array|int
+	 * @param	int			$flags				Bitwise flags
+	 * @param	string		$sort				Sort direction
+	 * @param	array|NULL	$limit				Limit [ offset, limit ]
+	 * @param	int			$memberGroup		Limit by a specific member group ID
+	 * @param	boolean		$showAnonymous		Show anonymously logged in peoples?	
+	 * @return array
 	 */
-	public function getOnlineUsers( int $flags=0, string $sort='desc', array $limit=NULL, int $memberGroup=NULL, bool $showAnonymous=FALSE ): array|int
+	public function getOnlineUsers( $flags=0, $sort='desc', $limit=NULL, $memberGroup=NULL, $showAnonymous=FALSE )
 	{
 		/* Query */
 		$where = array(
-			array( 's.running_time>?', DateTime::create()->sub( new DateInterval( 'PT30M' ) )->getTimeStamp() ),
-			array( "s.login_type!=?", Front::LOGIN_TYPE_SPIDER )
+			array( 's.running_time>?', \IPS\DateTime::create()->sub( new \DateInterval( 'PT30M' ) )->getTimeStamp() ),
+			array( "s.login_type!=?", \IPS\Session\Front::LOGIN_TYPE_SPIDER )
 		);
 		
 		if ( ! $showAnonymous )
 		{
-			if( Member::loggedIn()->member_id )
+			if( \IPS\Member::loggedIn()->member_id )
 			{
-				$where[] = array( "(s.login_type!=? OR s.member_id=?)", Front::LOGIN_TYPE_ANONYMOUS, Member::loggedIn()->member_id );
+				$where[] = array( "(s.login_type!=? OR s.member_id=?)", \IPS\Session\Front::LOGIN_TYPE_ANONYMOUS, \IPS\Member::loggedIn()->member_id );
 			}
 			else
 			{
-				$where[] = array( "s.login_type!=?", Front::LOGIN_TYPE_ANONYMOUS );
+				$where[] = array( "s.login_type!=?", \IPS\Session\Front::LOGIN_TYPE_ANONYMOUS );
 			}
 		}
 
 		if ( ! $flags and ! $limit )
 		{
 			/* Simple query for PHP processing */
-			return iterator_to_array( Db::i()->select( 's.id,s.member_id,s.member_name,s.seo_name,s.member_group,s.login_type', array( 'core_sessions', 's' ), $where, 's.running_time ' . $sort )->setKeyField('id') );
+			return iterator_to_array( \IPS\Db::i()->select( 's.id,s.member_id,s.member_name,s.seo_name,s.member_group,s.login_type', array( 'core_sessions', 's' ), $where, 's.running_time ' . $sort )->setKeyField('id') );
 		}
 		else
 		{
@@ -216,7 +202,7 @@ class Database extends Store
 				$where = array(
 					array(
 						"core_sessions.id IN(?)",
-						Db::i()->select( 'MAX(id)', array( 'core_sessions', 's' ), $memberSubWhere, NULL, NULL, 'member_id' ),
+						\IPS\Db::i()->select( 'MAX(id)', array( 'core_sessions', 's' ), $memberSubWhere, NULL, NULL, 'member_id' ),
 					)
 				);
 			}
@@ -225,7 +211,7 @@ class Database extends Store
 				$where = array(
 					array(
 						"core_sessions.id IN(?)",
-						Db::i()->select( 'MAX(id)', array( 'core_sessions', 's' ), $guestSubWhere, NULL, NULL, 'ip_address' )
+						\IPS\Db::i()->select( 'MAX(id)', array( 'core_sessions', 's' ), $guestSubWhere, NULL, NULL, 'ip_address' )
 					)
 				);
 			}
@@ -234,8 +220,8 @@ class Database extends Store
 				$where = array(
 					array(
 						"( core_sessions.id IN(?) OR core_sessions.id IN(?) )",
-						Db::i()->select( 'MAX(id)', array( 'core_sessions', 's' ), $memberSubWhere, NULL, NULL, 'member_id' ),
-						Db::i()->select( 'MAX(id)', array( 'core_sessions', 's' ), $guestSubWhere, NULL, NULL, 'ip_address' )
+						\IPS\Db::i()->select( 'MAX(id)', array( 'core_sessions', 's' ), $memberSubWhere, NULL, NULL, 'member_id' ),
+						\IPS\Db::i()->select( 'MAX(id)', array( 'core_sessions', 's' ), $guestSubWhere, NULL, NULL, 'ip_address' )
 					)
 				);
 			}
@@ -261,44 +247,44 @@ class Database extends Store
 			/* Just fetching a count? */
 			if ( $flags & static::ONLINE_COUNT_ONLY )
 			{
-				return Db::i()->select( 'COUNT(*)', 'core_sessions', $where )->first();
+				return \IPS\Db::i()->select( 'COUNT(*)', 'core_sessions', $where )->first();
 			}
 
-			return iterator_to_array( Db::i()->select( '*', 'core_sessions', $where, 'core_sessions.running_time ' . $sort, $limit )->setKeyField('id') );
+			return iterator_to_array( \IPS\Db::i()->select( '*', 'core_sessions', $where, 'core_sessions.running_time ' . $sort, $limit )->setKeyField('id') );
 		}
 	}
 	
 	/**
 	 * Fetch all members active at a specific location
 	 *
-	 * @param string $app		Application directory (core, forums, etc)
-	 * @param string $module		Module
-	 * @param string $controller Controller
-	 * @param int $id			Current item ID (empty if none)
-	 * @param string $url		Current viewing URL
+	 * @param	string	$app		Application directory (core, forums, etc)
+	 * @param	string	$module		Module
+	 * @param	string	$controller Controller
+	 * @param	int		$id			Current item ID (empty if none)
+	 * @param	string	$url		Current viewing URL
 	 * @return array
 	 */
-	public function getOnlineMembersByLocation( string $app, string $module, string $controller, ?int $id, string $url ): array
+	public function getOnlineMembersByLocation( $app, $module, $controller, $id, $url )
 	{ 
 		$members = array();
 		$where = array(
-			array( 'core_sessions.login_type=' . Front::LOGIN_TYPE_MEMBER ),
+			array( 'core_sessions.login_type=' . \IPS\Session\Front::LOGIN_TYPE_MEMBER ),
 			array( 'core_sessions.current_appcomponent=?', $app ),
 			array( 'core_sessions.current_module=?', $module ),
 			array( 'core_sessions.current_controller=?', $controller ),
-			array( 'core_sessions.running_time>' . DateTime::create()->sub( new DateInterval( 'PT30M' ) )->getTimeStamp() ),
+			array( 'core_sessions.running_time>' . \IPS\DateTime::create()->sub( new \DateInterval( 'PT30M' ) )->getTimeStamp() ),
 			array( 'core_sessions.location_url IS NOT NULL AND location_url LIKE ?', "{$url}%" ),
 			array( 'core_sessions.member_id IS NOT NULL' )
 		);
 
 		if( $id )
 		{
-			$where[] = array( 'core_sessions.current_id = ?', Request::i()->id );
+			$where[] = array( 'core_sessions.current_id = ?', \IPS\Request::i()->id );
 		}
 
-		foreach( Db::i()->select( 'core_sessions.member_id,core_sessions.member_name,core_sessions.seo_name,core_sessions.member_group,core_sessions.login_type,core_sessions.in_editor', 'core_sessions', $where, 'core_sessions.running_time DESC' ) as $row )
+		foreach( \IPS\Db::i()->select( 'core_sessions.member_id,core_sessions.member_name,core_sessions.seo_name,core_sessions.member_group,core_sessions.login_type,core_sessions.in_editor', 'core_sessions', $where, 'core_sessions.running_time DESC' ) as $row )
 		{
-			if( $row['login_type'] == Front::LOGIN_TYPE_MEMBER and $row['member_name'] )
+			if( $row['login_type'] == \IPS\Session\Front::LOGIN_TYPE_MEMBER and $row['member_name'] )
 			{
 				$members[ $row['member_id'] ] = $row;
 			}

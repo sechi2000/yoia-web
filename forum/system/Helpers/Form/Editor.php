@@ -11,56 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use DomainException;
-use Exception;
-use Garfix\JsMinify\Minifier;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\core\Profanity;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Image;
-use IPS\Lang;
-use IPS\Login;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Text\Parser;
-use IPS\Theme;
-use IPS\Xml\SimpleXML;
-use OutOfBoundsException;
-use UnderflowException;
-use UnexpectedValueException;
-use function count;
-use function defined;
-use function file_get_contents;
-use function in_array;
-use function is_array;
-use function is_null;
-use function is_string;
-use function md5;
-use function session_id;
-use function strlen;
-use const IPS\ROOT_PATH;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor class for Form Builder
  */
-class Editor extends FormAbstract
+class _Editor extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -75,146 +35,151 @@ class Editor extends FormAbstract
 	 			'foo'
 	 		),
 			'attachIdsLang'	=> NULL,		// Language ID number if this Editor is part of a Translatable field.
-	 		'minimize'		=> 'clickme',	// Language string to use for minimized view. NULL will mean editor is not minimized.
+	 		'minimize'		=> 'clickme',	// Language string to use for minimized view. NULL will mean editor is not minimized.0
+	 		'minimizeIcon'	=> 'flag-us',	// Icon to use for minimized view
+			'minimizeAfterReset' => FALSE, 	// Whether to minimize the editor after resetting (note resetting is handled by JS usually after AJAX submission)
+	 		'allButtons'	=> FALSE,		// Only used for the customisation ACP page. Do not use.
 	 		'tags'			=> array(),		// An array of extra insertable tags in key => value pair with key being what is inserted and value serving as a description
+	 		'autoGrow'		=> FALSE,		// Used to specify if editor should grow in size as content is added. Defaults to TRUE.
+	 		'controller'	=> NULL,		// Used to specify the editor controller. Defaults to NULL, which will use app=core&module=system&controller=editor
+	 		'defaultIfNoAutoSave'=> FALSE,	// If TRUE, the default value will not override any autosaved content
 	 		'minimizeWithContent'=> FALSE,	// If TRUE, the editor will be minimized even if there is default content
 	 		'maxLength'		=> FALSE,	// The maximum length. Note that the content is HTML, so this isn't the maximum number of visible characters, so should only be used for database limits. The database's max allowed packet will override if smaller
 	 		'editorId'		=> NULL,	// Passed to editorAttachments. Only necessary if the name may be changed
 	 		'allowAttachments => TRUE,	// Should the editor show upload options?
 	 		'contentClass'	 => NULL,		// If set to a string, will check this class for prioritizing mentions to participants.
 	 		'contentId'			=> NULL,	// If set, will check this particular item ID for prioritizing mentions to participants.
-	 		"comments" => false 			// If true, this editor uses the member's restrictions for the comment editor
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'app'					=> NULL,
 		'key'					=> NULL,
 		'autoSaveKey'			=> NULL,
 		'attachIds'				=> NULL,
 		'attachIdsLang'			=> NULL,
 		'minimize'				=> NULL,
+		'minimizeIcon'			=> 'fa fa-comment-o',
+		'minimizeAfterReset'	=> FALSE,
+		'allButtons'			=> FALSE,
 		'tags'					=> array(),
+		'autoGrow'				=> TRUE,
+		'controller'			=> NULL,
+		'defaultIfNoAutoSave'	=> FALSE,
 		'minimizeWithContent'	=> FALSE,
 		'maxLength'				=> 16777215, // The default for MEDIUMTEXT */
 		'editorId'				=> NULL,
 		'allowAttachments'		=> TRUE,
+		'ipsPlugins'			=> "ipsautolink,ipsautosave,ipsctrlenter,ipscode,ipscontextmenu,ipsemoticon,ipsimage,ipslink,ipsmentions,ipspage,ipspaste,ipsquote,ipsspoiler,ipsautogrow,ipssource,removeformat",
 		'profanityBlock'		=> TRUE,
 		'contentClass'			=> NULL,
-		'contentId'				=> NULL,
-		"comments"				=> false, //whether this is for a comment
+		'contentId'				=> NULL
 	);
 	
 	/**
 	 * @brief	The extension that owns this type of editor
 	 */
-	protected mixed $extension = NULL;
+	protected $extension;
 	
 	/**
 	 * @brief	The uploader helper
 	 */
-	protected Upload|null|false $uploader = NULL;
+	protected $uploader = NULL;
 
 	/**
 	 * @brief	Editor identifier
 	 */
-	protected ?string $postKey = NULL;
-
-	/**
-	 * These restrictions are global restrictions that can be applied to the editor
-	 *
-	 * @var string[] $editorRestrictions
-	 */
-	protected static array $editorRestrictions = [
-		"heading",
-		"heading_1",
-		'tables',
-		"box",
-		"box_color",
-		"float",
-		"font_family",
-		"font_size",
-		"font_color",
-		"giphy",
-		"internal_embed",
-		"external_embed",
-		"external_media", // both images and video
-		"external_image",
-		"external_video",
-		'og_embed',
-		"raw_embed",
-		'native_emoji',
-		'custom_emoji',
-		'fa_icons'
-	];
-
-	/**
-	 * Mapping of restriction -> dependency
-	 *
-	 * @var string[]
-	 */
-	protected static array $dependentRestrictions = [
-		'heading_1' => 'heading',
-		'box_color' => 'box',
-		"external_media" => 'external_embed',
-		"external_image" => "external_media",
-		"external_video" => "external_media",
-		'raw_embed' => 'external_embed',
-		'og_embed'	=> 'external_embed',
-		'giphy' => 'external_image',
-	];
-
+	protected $postKey;
+		
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		$this->postKey = md5( $options['autoSaveKey'] . ':' . session_id() );
 
-		if ( isset( Request::i()->usingEditor ) and Request::i()->isAjax() and Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'front' )
+		if ( \IPS\Settings::i()->giphy_enabled )
 		{
-			Session::i()->setUsingEditor();
-			Output::i()->json( array( true ) );
+            $this->defaultOptions['ipsPlugins'] .= ',ipsgiphy';
 		}
 
-		/* Get our extension */
-		$extensions = Application::load( $options['app'] )->extensions( 'core', 'EditorLocations' );
-		if ( !isset( $extensions[ $options['key'] ] ) )
+        if( \IPS\Dispatcher::hasInstance() and ( \IPS\Dispatcher::i()->controllerLocation == 'front' OR ( \IPS\Dispatcher::i()->controllerLocation == 'admin' AND \IPS\Dispatcher::i()->module->key === 'editor' AND \IPS\Dispatcher::i()->controller == 'toolbar'   )))
+        {
+            $this->defaultOptions['ipsPlugins'] .= ',ipspreview';
+        }
+
+		if ( isset( $options['allButtons'] ) AND $options['allButtons'] )
 		{
-			throw new OutOfBoundsException( $options['key'] );
+			$showStockReplies = TRUE;
+		}
+		else
+		{
+			$showStockReplies = FALSE;
+			foreach ( \IPS\core\StoredReplies::getStore() as $reply )
+			{
+				$reply = \IPS\core\StoredReplies::constructFromData( $reply );
+				if ( $reply->enabled and $reply->can( 'view' ) )
+				{
+					$showStockReplies = TRUE;
+				}
+			}
 		}
 
-		$this->extension = $extensions[ $options['key'] ];
+		if ( $showStockReplies )
+		{
+			$this->defaultOptions['ipsPlugins'] .= ',ipsstockreplies';
+		}
 
+		if ( isset( \IPS\Request::i()->usingEditor ) and \IPS\Request::i()->isAjax() and \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation == 'front' )
+		{
+			\IPS\Session::i()->setUsingEditor();
+			\IPS\Output::i()->json( array( true ) );
+		}
+		
+		$this->defaultOptions['controller'] = 'app=core&module=system&controller=editor';
+		
+		/* Get our extension */		
+		if ( !isset( $options['allButtons'] ) or !$options['allButtons'] )
+		{
+			$extensions = \IPS\Application::load( $options['app'] )->extensions( 'core', 'EditorLocations' );
+			if ( !isset( $extensions[ $options['key'] ] ) )
+			{
+				throw new \OutOfBoundsException( $options['key'] );
+			}
+			
+			$this->extension = $extensions[ $options['key'] ];
+		}
+		
 		/* Don't minimize if we have a value */
-		$name = $options['editorId'] ?? $name;
-		if ( ( !isset( $options['minimizeWithContent'] ) or !$options['minimizeWithContent'] ) and ( $defaultValue or Request::i()->$name or ( Lang::vleActive() ) ) )
+		$name = isset( $options['editorId'] ) ? $options['editorId'] : $name;
+		if ( ( !isset( $options['minimizeWithContent'] ) or !$options['minimizeWithContent'] ) and ( $defaultValue or \IPS\Request::i()->$name or ( \IPS\Lang::vleActive() ) ) )
 		{
 			$options['minimize'] = NULL;
 		}
-
+		
 		/* Create the upload helper - if the form has been submitted, this has to be done before parent::__construct() as we need the uploader present for getValue(), but for views, we won't load until the editor is clicked */
 		$this->options = array_merge( $this->defaultOptions, $options );
 		if ( $this->canAttach() AND $this->options['allowAttachments'] )
 		{
-			if ( ( isset( Request::i()->getUploader ) and Request::i()->getUploader === $name ) or ( isset( Request::i()->postKey ) and Request::i()->postKey === $this->postKey and isset( Request::i()->deleteFile ) ) )
+			if ( isset( \IPS\Request::i()->getUploader ) and \IPS\Request::i()->getUploader === $name or ( isset( \IPS\Request::i()->postKey ) and \IPS\Request::i()->postKey === $this->postKey and isset( \IPS\Request::i()->deleteFile ) ) )
 			{
 				if ( $uploader = $this->getUploader( $name ) )
 				{
-					Output::i()->sendOutput( $uploader->html() );
+					\IPS\Output::i()->sendOutput( $uploader->html() );
 				}
 				else
 				{
-					Output::i()->sendOutput( Theme::i()->getTemplate( 'forms', 'core', 'global' )->editorAttachmentsPlaceholder( $name, $this->postKey ) );
+					\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->editorAttachmentsPlaceholder( $name, $this->postKey ) );
 				}
 			}
 			elseif( mb_strtolower( $_SERVER['REQUEST_METHOD'] ) == 'post' or !$this->options['minimize'] )
@@ -226,114 +191,159 @@ class Editor extends FormAbstract
 				$this->uploader = FALSE;
 			}
 		}
-
+		
 		/* Work out the biggest value MySQL will allow */
-		if ( !isset( Store::i()->maxAllowedPacket ) )
+		if ( !isset( \IPS\Data\Store::i()->maxAllowedPacket ) )
 		{
 			$maxAllowedPacket = 0;
-			foreach ( Db::i()->query("SHOW VARIABLES LIKE 'max_allowed_packet'") as $row )
+			foreach ( \IPS\Db::i()->query("SHOW VARIABLES LIKE 'max_allowed_packet'") as $row )
 			{
 				$maxAllowedPacket = $row['Value'];
 			}
-			Store::i()->maxAllowedPacket = $maxAllowedPacket;
+			\IPS\Data\Store::i()->maxAllowedPacket = $maxAllowedPacket;
 		}
-		if ( Store::i()->maxAllowedPacket )
+		if ( \IPS\Data\Store::i()->maxAllowedPacket )
 		{
-			if ( !isset( $options['maxLength'] ) or $options['maxLength'] > Store::i()->maxAllowedPacket )
+			if ( !isset( $options['maxLength'] ) or $options['maxLength'] > \IPS\Data\Store::i()->maxAllowedPacket )
 			{
-				$options['maxLength'] = Store::i()->maxAllowedPacket;
+				$options['maxLength'] = \IPS\Data\Store::i()->maxAllowedPacket;
 			}
 		}
-
+		
 		/* Go */
 		parent::__construct( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
-
-		/* Load Editor JS */
-		static::loadEditorFiles( $this->options['minimize'] );
-	}
-
-	/**
-	 * @var bool
-	 */
-	protected static bool $_editorFilesAdded = false;
-
-	/**
-	 * Load required editor files. Moved to static method
-	 * so that we can call it from the Codemirror helper when necessary
-	 *
-	 * @param string|null $minimize
-	 * @return void
-	 */
-	public static function loadEditorFiles( ?string $minimize=null ) : void
-	{
-		/* Include editor JS - but not if this page was loaded via ajax OR if we're a guest and the editor is minimized - because the JS loader will handle that on demand */
-		if ( !(\IPS\IN_DEV AND defined('EDITOR_DEV') AND \EDITOR_DEV) and !static::$_editorFilesAdded and ( !$minimize or Member::loggedIn()->member_id ) and !Request::i()->isAjax() )
+		
+		/* Preview? */
+		if ( \IPS\Request::i()->isAjax() and isset( \IPS\Request::i()->_previewField ) and \IPS\Request::i()->_previewField === $this->name )
 		{
-			$dir = Application::load( 'core' )->directory;
-			$manifest = json_decode( file_get_contents( ROOT_PATH . "/applications/{$dir}/data/editorManifest.json" ), true );
-			foreach ( $manifest as $entry )
+			\IPS\Output::i()->sendOutput( $this->getValue() );
+		}
+				
+		/* Include editor JS - but not if this page was loaded via ajax OR if we're a guest and the editor is minimized - because the JS loader will handle that on demand */
+		if( ( !$this->options['minimize'] or \IPS\Member::loggedIn()->member_id ) and !\IPS\Request::i()->isAjax() )
+		{
+			if ( \IPS\IN_DEV )
 			{
-				if ( !@$entry['isEntry'] ) {
-					continue;
-				}
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, array( Url::internal( "applications/core/interface/static/tiptap/{$entry['file']}", 'none', NULL, array(), Url::PROTOCOL_RELATIVE ) ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, array( (string) \IPS\Http\Url::internal( 'applications/core/dev/ckeditor/ckeditor.js', 'none', NULL, array(), \IPS\Http\Url::PROTOCOL_RELATIVE ) ) );
 			}
+			else
+			{
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, array( \IPS\Http\Url::internal( 'applications/core/interface/ckeditor/ckeditor/ckeditor.js', 'none', NULL, array(), \IPS\Http\Url::PROTOCOL_RELATIVE ) ) );
+			}
+		}
 
-			Output::i()->jsVars['editorPreloading'] = true;
+		/* And send a preload header for editor.css if we can, but not if we are using IN_DEV */
+		if( !\IPS\Request::i()->isAjax() AND !\IPS\IN_DEV )
+		{
+			/* If we don't have the 'timestamp' parameter cached we need to fetch it */
+			if( !isset( \IPS\Data\Store::i()->editorTimestamp ) OR !\IPS\Data\Store::i()->editorTimestamp )
+			{
+				$scriptCode	= \file_get_contents( \IPS\ROOT_PATH . '/applications/core/interface/ckeditor/ckeditor/ckeditor.js' );
+				preg_match( "/\{timestamp:\"(.+?)\"/", $scriptCode, $matches );
+				
+				\IPS\Data\Store::i()->editorTimestamp = $matches[1];
+			}
+			
+			$cssUrl = \IPS\Http\Url::external( rtrim( \IPS\Settings::i()->base_url, '/' ) . '/applications/core/interface/ckeditor/ckeditor/skins/' . \IPS\Theme::i()->editor_skin . '/editor.css?t=' . \IPS\Data\Store::i()->editorTimestamp );
 
-			static::$_editorFilesAdded = true;
+			\IPS\Output::i()->linkTags[] = array( 'as' => 'style', 'rel' => 'preload', 'href' => (string) $cssUrl );
 		}
 	}
 	
 	/**
 	 * Get HTML
 	 *
-	 * @param bool $raw	If TRUE, will return without HTML any chrome
+	 * @param	bool	$raw	If TRUE, will return without HTML any chrome
 	 * @return	string
 	 */
-	public function html( bool $raw=FALSE ): string
+	public function html( $raw=FALSE )
 	{
+		/* What buttons should we show? */
+		$allowed = NULL;
+		if ( !$this->options['allButtons'] )
+		{
+			$toolbars	= json_decode( \IPS\Settings::i()->ckeditor_toolbars, TRUE );
+			$allowed	= array();
+			
+			foreach ( $toolbars as $device => $rows )
+			{
+				foreach ( $rows as $rowId => $data )
+				{
+					if ( \is_array( $data ) )
+					{
+						$allowed[ $device ][ $rowId ]['name'] = $data['name'];
+						foreach ( $data['items'] as $k => $v )
+						{
+							if ( \IPS\Text\Parser::canUse( \IPS\Member::loggedIn(), $v, "{$this->options['app']}_{$this->options['key']}" ) )
+							{
+								$allowed[ $device ][ $rowId ]['items'][] = $v;
+							}
+						}
+					}
+					else
+					{
+						$allowed[ $device ][ $rowId ] = $data;
+					}
+				}
+			}
+
+			/* Can we use HTML? */
+			if ( $this->canUseHtml() === TRUE )
+			{
+				if ( !empty( $allowed['desktop'][0]['items'] ) )
+				{
+					array_unshift( $allowed[ 'desktop' ][ 0 ][ 'items' ], 'Source' );
+				}
+				if ( !empty( $allowed['tablet'][0]['items'] ) )
+				{
+					array_unshift( $allowed[ 'tablet' ][ 0 ][ 'items' ], 'Source' );
+				}
+				if ( !empty( $allowed['phone'][0]['items'] ) )
+				{
+					array_unshift( $allowed[ 'phone' ][ 0 ][ 'items' ], 'Source' );
+				}
+			}
+		}
+		
 		/* Clean resources in ACP */
 		$value = $this->value;
-		Output::i()->parseFileObjectUrls( $value );
-
-		// Todo we can probably can be deleted. The <br> is now saved, and we also have CSS that makes the empty <p></p> tags hidden. Needs Ehren's signoff :)
-		/* The editor will replace <p></p> (which doesn't display anything in a normal post) with <p><br></p> (which does)
+		\IPS\Output::i()->parseFileObjectUrls( $value );
+		
+		/* Fix Emoji */		
+		$value = \IPS\Output::i()->replaceEmojiWithImages( $value );
+		
+		/* CKEditor will replace <p></p> (which doesn't display anything in a normal post) with <p><br></p> (which does)
 			which creates a discrepency between wheat displays in a post and what displays in the editor */
-//		$value = preg_replace( '/<p>\s*<\/p>/', '', $value );
-
-		/* It is possible that the autosave key was updated, so we make doubly sure the uploader's post key matches our own */
-		$finalPostKey = md5( $this->options['autoSaveKey'] . ':' . session_id() );
+		$value = preg_replace( '/<p>\s*<\/p>/', '', $value );
 
 		/* Show full uploader */
 		if ( $this->uploader )
 		{
-			$this->uploader->options['postKey'] = $finalPostKey;
 			$attachmentArea = $this->uploader->html();
 		}
 		/* Or show a loading icon where the uploader will go if the editor is minimized */
 		elseif ( $this->uploader === FALSE )
 		{
-			$attachmentArea = Theme::i()->getTemplate( 'forms', 'core', 'global' )->editorAttachmentsMinimized( $this->name );
+			$attachmentArea = \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->editorAttachmentsMinimized( $this->name );
 			
 			/* We still need to include plupload otherwise it won't work when they click in */
 			if ( \IPS\IN_DEV )
 			{
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'plupload/moxie.js', 'core', 'interface' ) );
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'plupload/plupload.dev.js', 'core', 'interface' ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'plupload/moxie.js', 'core', 'interface' ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'plupload/plupload.dev.js', 'core', 'interface' ) );
 			}
 			else
 			{
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'plupload/plupload.full.min.js', 'core', 'interface' ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'plupload/plupload.full.min.js', 'core', 'interface' ) );
 			}
 		}
 		/* Or if the user can't attach, just show a bar */
 		else
 		{
-			$attachmentArea = Theme::i()->getTemplate( 'forms', 'core', 'global' )->editorAttachmentsPlaceholder( $this->name, $finalPostKey, $this->noUploaderError, $this->canUseMediaExtension() );
+			$attachmentArea = \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->editorAttachmentsPlaceholder( $this->name, $this->postKey, $this->noUploaderError, $this->canUseMediaExtension() );
 		}
 
-		if ( Member::loggedIn()->group['g_bypass_badwords'] )
+		if ( \IPS\Member::loggedIn()->group['g_bypass_badwords'] )
 		{
 			$this->options['profanityBlock'] = FALSE;
 		}
@@ -341,7 +351,7 @@ class Editor extends FormAbstract
 		if ( $this->options['profanityBlock'] )
 		{
 			$this->options['profanityBlock'] = [];
-			foreach( Profanity::getProfanity() AS $profanity )
+			foreach( \IPS\core\Profanity::getProfanity() AS $profanity )
 			{
 				if ( $profanity->action == 'block' )
 				{
@@ -350,32 +360,65 @@ class Editor extends FormAbstract
 			}
 		}
 
-		/* Check for plugins */
-		$this->options['loadPlugins'] = static::hasPlugins();
-
 		/* Display */
-		$template = $raw ? 'editorRawV5' : 'editor';
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->$template( $this->name, $value, $this->options, md5( $this->options['autoSaveKey'] . ':' . session_id() ), $attachmentArea, json_encode( array() ), $this->options['tags'], $this->options['contentClass'], $this->options['contentId'] );
+		$template = $raw ? 'editorRaw' : 'editor';
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->$template( $this->name, $value, $this->options, $allowed, md5( $this->options['autoSaveKey'] . ':' . session_id() ), $attachmentArea, json_encode( array() ), $this->options['tags'], $this->options['contentClass'], $this->options['contentId'] );
+	}
+	
+	/**
+	 * Convert the value to something that will look okay for the no-JS fallback
+	 *
+	 * @param	string	$value	Value
+	 * @return	string
+	 */
+	public static function valueForNoJsFallback( $value )
+	{		
+		$value = preg_replace( "/\<br(\s*)?\/?\>(\s*)?/i", "\n", html_entity_decode( $value ) );
+		
+		$value = trim( $value );
+		
+		$value = preg_replace( '/<\/p>\s*<p>/', "\n\n", $value );
+		
+		if ( mb_substr( $value, 0, 3 ) === '<p>' )
+		{
+			$value = mb_substr( $value, 3 );
+		}
+		if ( mb_substr( $value, -4 ) === '</p>' )
+		{
+			$value = mb_substr( $value, 0, -4 );
+		}
+		
+		return $value;
 	}
 
 	/**
 	 * @brief Save on queries and fetch the alt label would just the once
 	 */
-	protected ?string $_altLabelWord = NULL;
+	protected $_altLabelWord = NULL;
 
 	/**
 	 * Get Value
 	 *
-	 * @return	mixed
+	 * @return	string
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$error = NULL;
 		$value = parent::getValue();
 		
-		/* Remove any invisible spaces used by the editor JS */
-		$value = preg_replace( '/[\x{200B}\x{2063}]/u', '', $value );
-
+		/* If it was made without JS, convert linebreaks to <br>s */
+		$noJsKey = $this->name . '_noscript';
+		if ( isset( \IPS\Request::i()->$noJsKey ) )
+		{
+			$value = nl2br( \IPS\Request::i()->$noJsKey, FALSE );
+		}
+		
+		/* Or remove any invisible spaces used by the editor JS */
+		else
+		{
+			$value = preg_replace( '/[\x{200B}\x{2063}]/u', '', $value );
+		}
+					
 		/* Parse value */
 		if ( $value )
 		{
@@ -391,73 +434,73 @@ class Editor extends FormAbstract
 
 			foreach ( $this->getAttachments() as $attachment )
 			{
-				if ( !isset( $parser ) or !in_array( $attachment['attach_id'], $parser->mappedAttachments ) or array_key_exists( $attachment['attach_id'], $parser->existingAttachments ) )
+				if ( !isset( $parser ) or !\in_array( $attachment['attach_id'], $parser->mappedAttachments ) or array_key_exists( $attachment['attach_id'], $parser->existingAttachments ) )
 				{
 					$ext = mb_substr( $attachment['attach_file'], mb_strrpos( $attachment['attach_file'], '.' ) + 1 );
-					if ( in_array( mb_strtolower( $ext ), File::$videoExtensions ) or in_array( mb_strtolower( $ext ), File::$audioExtensions ) )
+					if ( \in_array( mb_strtolower( $ext ), \IPS\File::$videoExtensions ) or \in_array( mb_strtolower( $ext ), \IPS\File::$audioExtensions ) )
 					{
-						$url = Url::baseUrl( Url::PROTOCOL_RELATIVE ) . "applications/core/interface/file/attachment.php?id=" . $attachment['attach_id'];
+						$url = \IPS\Http\Url::baseUrl( \IPS\Http\Url::PROTOCOL_RELATIVE ) . "applications/core/interface/file/attachment.php?id=" . $attachment['attach_id'];
 						if ( $attachment['attach_security_key'] )
 						{
 							$url .= "&key={$attachment['attach_security_key']}";
 						}
 
-						if ( in_array( mb_strtolower( $ext ), File::$videoExtensions ) )
+						if ( \in_array( mb_strtolower( $ext ), \IPS\File::$videoExtensions ) )
 						{
-							$value .= Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedVideo( $attachment['attach_location'], $url, $attachment['attach_file'], File::getMimeType( $attachment['attach_file'] ), $attachment['attach_id'] );
+							$value .= \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedVideo( $attachment['attach_location'], $url, $attachment['attach_file'], \IPS\File::getMimeType( $attachment['attach_file'] ), $attachment['attach_id'] );
 						}
-						elseif ( in_array( mb_strtolower( $ext ), File::$audioExtensions ) )
+						elseif ( \in_array( mb_strtolower( $ext ), \IPS\File::$audioExtensions ) )
 						{
-							$value .= Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedAudio( $attachment['attach_location'], $url, $attachment['attach_file'], File::getMimeType( $attachment['attach_file'] ), $attachment['attach_id'] );
+							$value .= \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedAudio( $attachment['attach_location'], $url, $attachment['attach_file'], \IPS\File::getMimeType( $attachment['attach_file'] ), $attachment['attach_id'] );
 						}
 					}
 					elseif ( $attachment['attach_is_image'] )
 					{
 						if ( $attachment['attach_thumb_location'] )
 						{
-							$height = $attachment['attach_thumb_height'];
+							$ratio = round( ( $attachment['attach_thumb_height'] / $attachment['attach_thumb_width'] ) * 100, 2 );
 							$width = $attachment['attach_thumb_width'];
 						}
 						else
 						{
-							$height = $attachment['attach_img_height'];
+							$ratio = round( ( $attachment['attach_img_height'] / $attachment['attach_img_width'] ) * 100, 2 );
 							$width = $attachment['attach_img_width'];
 						}
 
 						$altText = NULL;
 
-						if ( Settings::i()->ips_imagescanner_enable_discovery and ! empty( $attachment['attach_labels'] ) )
+						if ( \IPS\Settings::i()->ips_imagescanner_enable_discovery and ! empty( $attachment['attach_labels'] ) )
 						{
 							if ( $this->_altLabelWord === NULL )
 							{
 								/* This is stored with the post, so it cannot be the user's language */
-								$this->_altLabelWord = Lang::load( Lang::defaultLanguage() )->get( 'alt_label_could_be' );
+								$this->_altLabelWord = \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( 'alt_label_could_be' );
 							}
 
-							$altText = $this->_altLabelWord . ' ' . implode( ', ', Parser::getAttachmentLabels( $attachment ) );
+							$altText = $this->_altLabelWord . ' ' . implode( ', ', \IPS\Text\Parser::getAttachmentLabels( $attachment ) );
 						}
 
-						$value .= Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedImage( $attachment['attach_location'], $attachment['attach_thumb_location'] ?: $attachment['attach_location'], $attachment['attach_file'], $attachment['attach_id'], $width, $height, $altText );
+						$value .= \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedImage( $attachment['attach_location'], $attachment['attach_thumb_location'] ? $attachment['attach_thumb_location'] : $attachment['attach_location'], $attachment['attach_file'], $attachment['attach_id'], $width, $ratio, $altText );
 					}
 					else
 					{
-						$url = Url::baseUrl() . "applications/core/interface/file/attachment.php?id=" . $attachment['attach_id'];
+						$url = \IPS\Http\Url::baseUrl() . "applications/core/interface/file/attachment.php?id=" . $attachment['attach_id'];
 						if ( $attachment['attach_security_key'] )
 						{
 							$url .= "&key={$attachment['attach_security_key']}";
 						}
-						$fileAttachments[] = Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedFile( $url, $attachment['attach_file'], FALSE, $attachment['attach_ext'], $attachment['attach_id'], $attachment['attach_security_key'] );
+						$fileAttachments[] = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedFile( $url, $attachment['attach_file'], FALSE, $attachment['attach_ext'], $attachment['attach_id'], $attachment['attach_security_key'] );
 					}
 
-					if ( !isset( $parser ) or !in_array( $attachment['attach_id'], $parser->mappedAttachments ) )
+					if ( !isset( $parser ) or !\in_array( $attachment['attach_id'], $parser->mappedAttachments ) )
 					{
 						$inserts[] = array(
 							'attachment_id'	=> $attachment['attach_id'],
 							'location_key'	=> "{$this->options['app']}_{$this->options['key']}",
-							'id1'			=> ( is_array( $this->options['attachIds'] ) and isset( $this->options['attachIds'][0] ) ) ? $this->options['attachIds'][0] : NULL,
-							'id2'			=> ( is_array( $this->options['attachIds'] ) and isset( $this->options['attachIds'][1] ) ) ? $this->options['attachIds'][1] : NULL,
-							'id3'			=> ( is_array( $this->options['attachIds'] ) and isset( $this->options['attachIds'][2] ) ) ? $this->options['attachIds'][2] : NULL,
-							'temp'			=> is_string( $this->options['attachIds'] ) ? $this->options['attachIds'] : ( $this->options['attachIds'] === NULL ? md5( $this->options['autoSaveKey'] ) : $this->options['attachIds'] ),
+							'id1'			=> ( \is_array( $this->options['attachIds'] ) and isset( $this->options['attachIds'][0] ) ) ? $this->options['attachIds'][0] : NULL,
+							'id2'			=> ( \is_array( $this->options['attachIds'] ) and isset( $this->options['attachIds'][1] ) ) ? $this->options['attachIds'][1] : NULL,
+							'id3'			=> ( \is_array( $this->options['attachIds'] ) and isset( $this->options['attachIds'][2] ) ) ? $this->options['attachIds'][2] : NULL,
+							'temp'			=> \is_string( $this->options['attachIds'] ) ? $this->options['attachIds'] : ( $this->options['attachIds'] === NULL ? md5( $this->options['autoSaveKey'] ) : $this->options['attachIds'] ),
 							'lang'			=> $this->options['attachIdsLang'],
 						);
 					}
@@ -465,36 +508,37 @@ class Editor extends FormAbstract
 			}
 
 			/* Add any file attachments on a single line */
-			if( count( $fileAttachments ) )
+			if( \count( $fileAttachments ) )
 			{
-				$value .= str_replace( Url::baseUrl(), '<___base_url___>/', "<p>" . implode( ' ', $fileAttachments ) . "</p>" );
+				$value .= str_replace( \IPS\Http\Url::baseUrl(), '<___base_url___>/', "<p>" . implode( ' ', $fileAttachments ) . "</p>" );
 			}
 
-			if( count( $inserts ) )
+			if( \count( $inserts ) and !isset( \IPS\Request::i()->_previewField ) )
 			{
-				Db::i()->insert( 'core_attachments_map', $inserts, TRUE );
+				\IPS\Db::i()->insert( 'core_attachments_map', $inserts, TRUE );
 			}
 
 			/* Clear out the post key for attachments that are claimed automatically */
 			if ( $this->options['attachIds'] )
 			{
-				Db::i()->update( 'core_attachments', array( 'attach_post_key' => '' ), array( 'attach_post_key=?', $this->postKey ) );
+				\IPS\Db::i()->update( 'core_attachments', array( 'attach_post_key' => '' ), array( 'attach_post_key=?', $this->postKey ) );
 			}
 		}
 
 		/* Remove abandoned attachments */
-		foreach ( Db::i()->select( '*', 'core_attachments', array( array( 'attach_id NOT IN(?)', Db::i()->select( 'DISTINCT attachment_id', 'core_attachments_map', NULL, NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER ) ), array( 'attach_member_id=? AND attach_date<?', Member::loggedIn()->member_id, time() - 86400 ) ) ) as $attachment )
+		/* @note SELECT_FROM_WRITE_SERVER Added in d901b5446e4fca3fc88c55d2de19397aeafc8911 We need to fetch from the write server to make sure we have all recenty added attachments */
+		foreach ( \IPS\Db::i()->select( '*', 'core_attachments', array( array( 'attach_id NOT IN(?)', \IPS\Db::i()->select( 'DISTINCT attachment_id', 'core_attachments_map', NULL, NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER ) ), array( 'attach_member_id=? AND attach_date<?', \IPS\Member::loggedIn()->member_id, time() - 86400 ) ) ) as $attachment )
 		{
 			try
 			{
-				Db::i()->delete( 'core_attachments', array( 'attach_id=?', $attachment['attach_id'] ) );
-				File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
+				\IPS\Db::i()->delete( 'core_attachments', array( 'attach_id=?', $attachment['attach_id'] ) );
+				\IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
 				if ( $attachment['attach_thumb_location'] )
 				{
-					File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
+					\IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
 				}
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
 		/* Throw any errors */
@@ -513,43 +557,62 @@ class Editor extends FormAbstract
 	 *
 	 * @param	bool	$initial	Whether this is the initial call or not. Do not reset default values on subsequent calls.
 	 * @param	bool	$force		Set the value even if one was not submitted (done on the final validation when getting values)?
-	 * @return    void
+	 * @return	void
 	 */
-	public function setValue( bool $initial=FALSE, bool $force=FALSE ): void
+	public function setValue( $initial=FALSE, $force=FALSE )
 	{
 		// @todo extend this to all form elements. See commit notes.
 		
-		if ( !isset( Request::i()->csrfKey ) or !Login::compareHashes( Session::i()->csrfKey, (string) Request::i()->csrfKey ) )
+		if ( !isset( \IPS\Request::i()->csrfKey ) or !\IPS\Login::compareHashes( (string) \IPS\Session::i()->csrfKey, (string) \IPS\Request::i()->csrfKey ) )
 		{
 			$name = $this->name;
-			unset( Request::i()->$name );
+			unset( \IPS\Request::i()->$name );
 		}
 		
-		parent::setValue( $initial, $force );
+		return parent::setValue( $initial, $force );
 	}
 
 	/**
 	 * Get parser object
 	 *
-	 * @return	Parser
+	 * @return	\IPS\Text\Parser
 	 */
-	protected function _getParser(): Parser
+	protected function _getParser()
 	{
-		return new Parser( ( $this->options['attachIds'] === NULL ? md5( $this->options['autoSaveKey'] ) : $this->options['attachIds'] ), NULL, "{$this->options['app']}_{$this->options['key']}", !$this->bypassFilterProfanity(), method_exists( $this->extension, 'htmlPurifierConfig' ) ? array( $this->extension, 'htmlPurifierConfig' ) : NULL, TRUE, $this->options['attachIdsLang'] );
+		return new \IPS\Text\Parser( TRUE, ( $this->options['attachIds'] === NULL ? md5( $this->options['autoSaveKey'] ) : $this->options['attachIds'] ), NULL, "{$this->options['app']}_{$this->options['key']}", !$this->bypassFilterProfanity(), !$this->canUseHtml(), method_exists( $this->extension, 'htmlPurifierConfig' ) ? array( $this->extension, 'htmlPurifierConfig' ) : NULL, TRUE, $this->options['attachIdsLang'] );
 	}
 		
+	/**
+	 * Can use HTML?
+	 *
+	 * @return	bool
+	 */
+	protected function canUseHtml()
+	{
+		$canUseHtml = (bool) \IPS\Member::loggedIn()->group['g_dohtml'];
+		if ( $this->extension )
+		{
+			$extensionCanUseHtml = $this->extension->canUseHtml( \IPS\Member::loggedIn(), $this );
+			if ( $extensionCanUseHtml !== NULL )
+			{
+				$canUseHtml = $extensionCanUseHtml;
+			}
+		}
+		return $canUseHtml;
+	}
+	
 	/**
 	 * Can Attach?
 	 *
 	 * @return	bool
 	 */
-	protected function canAttach(): bool
+	protected function canAttach()
 	{
-		$canAttach = !( ( Member::loggedIn()->group['g_attach_max'] == '0' ) );
+		$canAttach = ( \IPS\Member::loggedIn()->group['g_attach_max'] == '0' ) ? FALSE : TRUE;
 
 		if ( $this->extension )
 		{
-			$extensionCanAttach = $this->extension->canAttach( Member::loggedIn(), $this );
+			$extensionCanAttach = $this->extension->canAttach( \IPS\Member::loggedIn(), $this );
 			if ( $extensionCanAttach !== NULL )
 			{
 				$canAttach = $extensionCanAttach;
@@ -563,21 +626,21 @@ class Editor extends FormAbstract
 	 *
 	 * @return bool
 	 */
-	protected function canUseMediaExtension(): bool
+	protected function canUseMediaExtension()
 	{
 		/* If we have an extension and it implicit disallows any attaachments, don't allow media extensions too , i.e. contact us form needs this */
 		if ( $this->extension )
 		{
-			$extensionCanAttach = $this->extension->canAttach( Member::loggedIn(), $this );
+			$extensionCanAttach = $this->extension->canAttach( \IPS\Member::loggedIn(), $this );
 			if ( $extensionCanAttach === FALSE )
 			{
 				return FALSE;
 			}
 		}
 
-		foreach ( Application::allExtensions( 'core', 'EditorMedia' ) as $k => $class )
+		foreach ( \IPS\Application::allExtensions( 'core', 'EditorMedia' ) as $k => $class )
 		{
-			if ( $class->count( Member::loggedIn(), '' ) )
+			if ( $class->count( \IPS\Member::loggedIn(), '' ) )
 			{
 				return TRUE;
 			}
@@ -588,18 +651,18 @@ class Editor extends FormAbstract
 	/**
 	 * @brief	Error message to display if we're not showing the uploader
 	 */
-	protected ?string $noUploaderError = NULL;
+	protected $noUploaderError = NULL;
 	
 	/**
 	 * Get uploader
 	 *
 	 * @param	string	$name	Form name
-	 * @return    Upload|NULL
+	 * @return	\IPS\Helpers\Form\Upload|NULL
 	 */
-	protected function getUploader( string $name ): ?Upload
+	protected function getUploader( $name )
 	{
 		/* Attachments enabled? */
-		if ( Settings::i()->attach_allowed_types == 'none' )
+		if ( \IPS\Settings::i()->attach_allowed_types == 'none' )
 		{
 			return NULL;
 		}
@@ -611,8 +674,8 @@ class Editor extends FormAbstract
 		{
 			try
 			{
-				$file = File::get( 'core_Attachment', $attachment['attach_location'], $attachment['attach_filesize'] );
-				$file->attachmentThumbnailUrl = $attachment['attach_thumb_location'] ? File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->url : $file->url;
+				$file = \IPS\File::get( 'core_Attachment', $attachment['attach_location'], $attachment['attach_filesize'] );
+				$file->attachmentThumbnailUrl = $attachment['attach_thumb_location'] ? \IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->url : $file->url;
 				
 				/* Reset the original filename based on the attachment record as filenames can be renamed if they contain special characters as AWS being the lowest common denominator cannot
 				   handle special characters */
@@ -623,27 +686,27 @@ class Editor extends FormAbstract
 				
 				$currentPostUsage += $attachment['attach_filesize'];
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 	
 		/* Can we upload more? */
 		$error = NULL;
 		$maxTotalSize = NULL;
-		if ( $maxTotalSize = static::maxTotalAttachmentSize( Member::loggedIn(), $currentPostUsage, $error ) )
+		if ( $maxTotalSize = static::maxTotalAttachmentSize( \IPS\Member::loggedIn(), $currentPostUsage, $error ) )
 		{
-			$maxTotalSize = $maxTotalSize / 1048576; // Bytes -> MB or KB -> GB
+			$maxTotalSize = $maxTotalSize / 1048576;
 			$this->noUploaderError = $error;
 		}
 		
 		/* Create the uploader */
 		if ( $maxTotalSize === NULL or $maxTotalSize > 0 )
 		{
-			$maxTotalSize = ( !is_null( $maxTotalSize ) ) ? $maxTotalSize : NULL;
+			$maxTotalSize = ( !\is_null( $maxTotalSize ) ) ? $maxTotalSize : NULL;
 			$postKey = $this->postKey;
 
 			$allowStockPhotos = FALSE;
 
-			if ( ( Settings::i()->pixabay_enabled ) and ( Settings::i()->pixabay_editor_permissions == '*' OR Member::loggedIn()->inGroup( explode( ',', Settings::i()->pixabay_editor_permissions ) ) ) )
+			if ( ( \IPS\Settings::i()->pixabay_enabled ) and ( \IPS\Settings::i()->pixabay_editor_permissions == '*' OR \IPS\Member::loggedIn()->inGroup( explode( ',', \IPS\Settings::i()->pixabay_editor_permissions ) ) ) )
 			{
 				$allowStockPhotos = TRUE;
 			}
@@ -656,74 +719,75 @@ class Editor extends FormAbstract
 				'storageExtension'	=> 'core_Attachment',
 				'retainDeleted'		=> TRUE,
 				'totalMaxSize'		=> $maxTotalSize,
-				'maxFileSize'		=> Member::loggedIn()->group['g_attach_per_post'] ? ( Member::loggedIn()->group['g_attach_per_post'] * 1024 ) / 1048576 : NULL,
+				'maxFileSize'		=> \IPS\Member::loggedIn()->group['g_attach_per_post'] ? ( \IPS\Member::loggedIn()->group['g_attach_per_post'] * 1024 ) / 1048576 : NULL,
 				'allowStockPhotos'  => $allowStockPhotos,
-				'canBeModerated'	=> ( $this->extension AND Dispatcher::i()->module->key != 'developer' AND method_exists( $this->extension, 'canBeModerated' ) and $this->extension->canBeModerated( Member::loggedIn(), $this ) ),
+				'canBeModerated'	=> ($this->extension AND method_exists( $this->extension, 'canBeModerated' ) and $this->extension->canBeModerated( \IPS\Member::loggedIn(), $this ) ),
 				'callback' => function( $file ) use ( $postKey )
 				{
 					try
 					{
-						$fileInfo = Db::i()->select( 'requires_moderation, labels', 'core_files_temp', array( 'contents=?', (string) $file ), NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first();
+						/* @note SELECT_FROM_WRITE_SERVER added 735824c35ab73cd81bd31cdfcc0435a71104f942 "RW DB issue with inserting data into core_temp_files and then reading it back" */
+						$fileInfo = \IPS\Db::i()->select( 'requires_moderation, labels', 'core_files_temp', array( 'contents=?', (string) $file ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 						$requiresModeration = (bool) $fileInfo['requires_moderation'];
 						$labels = $fileInfo['labels'];
 					}
-					catch ( UnderflowException $e )
+					catch ( \UnderflowException $e )
 					{
 						$requiresModeration = FALSE;
 						$labels = NULL;
 					}
 
-					Db::i()->delete( 'core_files_temp', array( 'contents=?', (string) $file ) );
+					\IPS\Db::i()->delete( 'core_files_temp', array( 'contents=?', (string) $file ) );
 					
-					$attachment = $file->makeAttachment( $postKey, Member::loggedIn(), $requiresModeration, $labels );
+					$attachment = $file->makeAttachment( $postKey, \IPS\Member::loggedIn(), $requiresModeration, $labels );
 					return $attachment['attach_id'];
 				}
 			);
 						
-			if ( Settings::i()->attachment_resample_size )
+			if ( \IPS\Settings::i()->attachment_resample_size )
 			{
-				$maxImageSizes = explode( 'x', Settings::i()->attachment_resample_size );
+				$maxImageSizes = explode( 'x', \IPS\Settings::i()->attachment_resample_size );
 				if ( $maxImageSizes[0] and $maxImageSizes[1] )
 				{
 					$options['image'] = array( 'maxWidth' => $maxImageSizes[0], 'maxHeight' => $maxImageSizes[1] );
-					if ( Settings::i()->attach_allowed_types != 'images' )
+					if ( \IPS\Settings::i()->attach_allowed_types != 'images' )
 					{
 						$options['image']['optional'] = TRUE;
 					}
 				}
-				elseif ( Settings::i()->attach_allowed_types == 'images' )
+				elseif ( \IPS\Settings::i()->attach_allowed_types == 'images' )
 				{
 					$options['image'] = TRUE;
 				}
 			}
-			elseif ( Settings::i()->attach_allowed_types == 'images' )
+			elseif ( \IPS\Settings::i()->attach_allowed_types == 'images' )
 			{
 				$options['image'] = TRUE;
 			}
 			
 			$uploaderName = str_replace( array( '[', ']' ), '_', $name ) . '_upload';
-			unset( Request::i()->$uploaderName ); // We are setting the value here, so we don't want the normal form helper to overload, which will wipe out any attachments if there is an error elsewhere in the form
-			$uploader = new Upload( $uploaderName, $existing, FALSE, $options );
-			$uploader->template = array( Theme::i()->getTemplate( 'forms', 'core', 'global' ), 'editorAttachments' );
+			unset( \IPS\Request::i()->$uploaderName ); // We are setting the value here, so we don't want the normal form helper to overload, which will wipe out any attachments if there is an error elsewhere in the form
+			$uploader = new \IPS\Helpers\Form\Upload( $uploaderName, $existing, FALSE, $options );
+			$uploader->template = array( \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' ), 'editorAttachments' );
 			
 			/* Handle delete calls */
-			if ( isset( Request::i()->postKey ) and Request::i()->postKey == $this->postKey and isset( Request::i()->deleteFile ) )
+			if ( isset( \IPS\Request::i()->postKey ) and \IPS\Request::i()->postKey == $this->postKey and isset( \IPS\Request::i()->deleteFile ) )
 			{
 				/* CSRF check */
-				Session::i()->csrfCheck();
+				\IPS\Session::i()->csrfCheck();
 				
 				/* Get the attachment */
 				try
 				{				
-					$attachment = Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', Request::i()->deleteFile ) )->first();
+					$attachment = \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', \IPS\Request::i()->deleteFile ) )->first();
 				}
-				catch ( UnderflowException $e )
+				catch ( \UnderflowException $e )
 				{
-					Output::i()->json( 'NO_ATTACHMENT' );
+					\IPS\Output::i()->json( 'NO_ATTACHMENT' );
 				}
 				
 				/* Delete the maps - Only do this for attachments that have actually been saved (if they haven't been saved, there's nothing in core_attachments_map for us to delete */
-				if ( isset( $this->options['attachIds'] ) and is_array( $this->options['attachIds'] ) and count( $this->options['attachIds'] ) )
+				if ( isset( $this->options['attachIds'] ) and \is_array( $this->options['attachIds'] ) and \count( $this->options['attachIds'] ) )
 				{
 					$where = array( array( 'location_key=?', "{$this->options['app']}_{$this->options['key']}" ), array( 'attachment_id=?', $attachment['attach_id'] ) );
 					$i = 1;
@@ -738,39 +802,39 @@ class Editor extends FormAbstract
 						$where[] = array( "lang=?", $this->options['attachIdsLang'] );
 					}
 
-					Db::i()->delete( 'core_attachments_map', $where );
+					\IPS\Db::i()->delete( 'core_attachments_map', $where );
 				}
 				else
 				{
 					/* If the attachment hasn't been claimed yet, it should only be deletable by the person who uploaded it */
-					if( $attachment['attach_member_id'] != Member::loggedIn()->member_id )
+					if( $attachment['attach_member_id'] != \IPS\Member::loggedIn()->member_id )
 					{
-						Output::i()->json( 'NO_ATTACHMENT' );
+						\IPS\Output::i()->json( 'NO_ATTACHMENT' );
 					}
 				}
 				
 				/* If there's no other maps, we can delete the attachment itself */
-				$otherMaps = Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( 'attachment_id=?', $attachment['attach_id'] ) )->first();
+				$otherMaps = \IPS\Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( 'attachment_id=?', $attachment['attach_id'] ) )->first();
 				if ( !$otherMaps )
 				{
-					Db::i()->delete( 'core_attachments', array( 'attach_id=?', $attachment['attach_id'] ) );
+					\IPS\Db::i()->delete( 'core_attachments', array( 'attach_id=?', $attachment['attach_id'] ) );
 					try
 					{
-						File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
+						\IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
 					}
-					catch ( Exception $e ) { }
+					catch ( \Exception $e ) { }
 					if ( $attachment['attach_thumb_location'] )
 					{
 						try
 						{
-							File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
+							\IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
 						}
-						catch ( Exception $e ) { }
+						catch ( \Exception $e ) { }
 					}
 				}
 				
 				/* Output */
-				Output::i()->json( 'OK' );
+				\IPS\Output::i()->json( 'OK' );
 			}
 		}
 		else
@@ -785,20 +849,20 @@ class Editor extends FormAbstract
 	/**
 	 * Attachments
 	 */
-	protected mixed $attachments = NULL;
+	protected $attachments;
 
 	/**
 	 * Fetch existing attachments
 	 *
-	 * @return	mixed
+	 * @return	array
 	 */
-	protected function getAttachments(): mixed
+	protected function getAttachments()
 	{
 		if ( $this->attachments === NULL )
 		{
 			$existingAttachments = '';
 			$where = array();
-			if ( isset( $this->options['attachIds'] ) and is_array( $this->options['attachIds'] ) and count( $this->options['attachIds'] ) )
+			if ( isset( $this->options['attachIds'] ) and \is_array( $this->options['attachIds'] ) and \count( $this->options['attachIds'] ) )
 			{
 				$where = array( array( 'location_key=?', "{$this->options['app']}_{$this->options['key']}" ) );
 				$i = 1;
@@ -814,19 +878,19 @@ class Editor extends FormAbstract
 					$setToAllLangs = [];
 					$_existingAttachments = [];
 										
-					foreach ( Db::i()->select( '*', 'core_attachments_map', $where ) as $existingAttachment )
+					foreach ( \IPS\Db::i()->select( '*', 'core_attachments_map', $where ) as $existingAttachment )
 					{
 						if ( $existingAttachment['lang'] === NULL )
 						{
 							$existingAttachment['lang'] = $this->options['attachIdsLang'];
-							if ( !in_array( $existingAttachment['attachment_id'], $setToAllLangs ) )
+							if ( !\in_array( $existingAttachment['attachment_id'], $setToAllLangs ) )
 							{
-								Db::i()->delete( 'core_attachments_map', [ 'attachment_id=? AND location_key=? AND id1=? AND id2=? AND id3=? and lang IS NULL', $existingAttachment['attachment_id'], $existingAttachment['location_key'], $existingAttachment['id1'], $existingAttachment['id2'], $existingAttachment['id3'] ] );
-								foreach ( Lang::languages() as $lang )
+								\IPS\Db::i()->delete( 'core_attachments_map', [ 'attachment_id=? AND location_key=? AND id1=? AND id2=? AND id3=? and lang IS NULL', $existingAttachment['attachment_id'], $existingAttachment['location_key'], $existingAttachment['id1'], $existingAttachment['id2'], $existingAttachment['id3'] ] );
+								foreach ( \IPS\Lang::languages() as $lang )
 								{
 									$newRow = $existingAttachment;
 									$newRow['lang'] = $lang->id;
-									Db::i()->insert( 'core_attachments_map', $newRow );
+									\IPS\Db::i()->insert( 'core_attachments_map', $newRow );
 								}
 								$setToAllLangs[] = $existingAttachment['attachment_id'];
 							}
@@ -841,19 +905,37 @@ class Editor extends FormAbstract
 				}
 				else
 				{
-					$_existingAttachments = iterator_to_array( Db::i()->select( 'attachment_id', 'core_attachments_map', $where ) );
+					$_existingAttachments = iterator_to_array( \IPS\Db::i()->select( 'attachment_id', 'core_attachments_map', $where ) );
 				}
 				
 				if ( !empty( $_existingAttachments ) )
 				{
-					$existingAttachments = Db::i()->in( 'attach_id', $_existingAttachments ) . ' OR ';
+					$existingAttachments = \IPS\Db::i()->in( 'attach_id', $_existingAttachments ) . ' OR ';
 				}
 			}
 			
-			$this->attachments = Db::i()->select( '*', 'core_attachments', array( $existingAttachments . 'attach_post_key=?', $this->postKey ) );
+			$this->attachments = \IPS\Db::i()->select( '*', 'core_attachments', array( $existingAttachments . 'attach_post_key=?', $this->postKey ) );
 		}
 		
 		return $this->attachments;
+	}
+	
+	/**
+	 * Get CKEditor Version
+	 *
+	 * @return	string
+	 */
+	public static function ckeditorVersion()
+	{
+		if ( file_exists( \IPS\ROOT_PATH . '/Credits.txt' ) )
+		{
+			preg_match( '#\s+Included version: (.+?)\s+?Website: http://ckeditor.com#', file_get_contents( \IPS\ROOT_PATH . '/Credits.txt' ), $matches );
+			return $matches[1];
+		}
+		else
+		{
+			return "[Could not determine the CKEditor version. Please restore Credits.txt to your suite's root directory.]";
+		}
 	}
 
 	/**
@@ -861,31 +943,24 @@ class Editor extends FormAbstract
 	 *
 	 * @return bool
 	 */
-	protected function bypassFilterProfanity(): bool
+	protected function bypassFilterProfanity()
 	{
-		return  (bool) Member::loggedIn()->group['g_bypass_badwords'];
+		return  (bool) \IPS\Member::loggedIn()->group['g_bypass_badwords'];
 	}
 	
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		parent::validate();
 		
-		if ( $this->options['maxLength'] and strlen( $this->value ) > $this->options['maxLength'] )
+		if ( $this->options['maxLength'] and \strlen( $this->value ) > $this->options['maxLength'] )
 		{
-			throw new DomainException('form_maxlength_unspecific');
-		}
-
-		/* Check for empty content. Considered stripping tags for a more accurate check but there are too many tags that would be allowed,
-		so my level of care is low. */
-		if( $this->required and $this->value == '<p></p>' )
-		{
-			throw new InvalidArgumentException('form_required');
+			throw new \DomainException('form_maxlength_unspecific');
 		}
 		
 		return TRUE;
@@ -896,23 +971,23 @@ class Editor extends FormAbstract
 	 *
 	 * @return	array|NULL
 	 */
-	public static function allowedFileExtensions(): ?array
+	public static function allowedFileExtensions()
 	{
-		if ( Settings::i()->attach_allowed_types == 'none' )
+		if ( \IPS\Settings::i()->attach_allowed_types == 'none' )
 		{
 			return array();
 		}
-		elseif ( Settings::i()->attach_allowed_types == 'all' and Settings::i()->attach_allowed_extensions )
+		elseif ( \IPS\Settings::i()->attach_allowed_types == 'all' and \IPS\Settings::i()->attach_allowed_extensions )
 		{
-			return explode( ',', Settings::i()->attach_allowed_extensions );
+			return explode( ',', \IPS\Settings::i()->attach_allowed_extensions );
 		}
-		elseif ( Settings::i()->attach_allowed_types == 'media' )
+		elseif ( \IPS\Settings::i()->attach_allowed_types == 'media' )
 		{
-			return array_merge( Image::supportedExtensions(), File::$videoExtensions );
+			return array_merge( \IPS\Image::supportedExtensions(), \IPS\File::$videoExtensions );
 		}
-		elseif ( Settings::i()->attach_allowed_types == 'images' )
+		elseif ( \IPS\Settings::i()->attach_allowed_types == 'images' )
 		{
-			return Image::supportedExtensions();
+			return \IPS\Image::supportedExtensions();
 		}
 		else
 		{
@@ -921,19 +996,19 @@ class Editor extends FormAbstract
 	}
 	
 	/**
-	 * @var	Cache|array used within maxTotalAttachmentSize()
+	 * @var	Cache used within maxTotalAttachmentSize()
 	 */
-	protected static array|Cache $membersAttachmentUsage = [];
+	protected static $membersAttachmentUsage = [];
 	
 	/**
 	 * Get the maximum combined size of attachments that can be used or NULL for no limit
 	 *
-	 * @param	Member	$member				The member
-	 * @param int $currentPostUsage	Size, in bytes, of current attachments in the post
-	 * @param string|null $error				If a value is passed by reference, will be set to an error string if the value is 0
+	 * @param	\IPS\Member	$member				The member
+	 * @param	int			$currentPostUsage	Size, in bytes, of current attachments in the post
+	 * @param	string		$error				If a value is passed by reference, will be set to an error string if the value is 0
 	 * @return	int|NULL
 	 */
-	public static function maxTotalAttachmentSize(Member $member, int $currentPostUsage, string &$error = NULL ): ?int
+	public static function maxTotalAttachmentSize( \IPS\Member $member, $currentPostUsage, &$error = NULL )
 	{
 		$maxTotalSize = array();
 		
@@ -942,7 +1017,7 @@ class Editor extends FormAbstract
 		{
 			if( !isset( $membersAttachmentUsage[ $member->member_id ] ) )
 			{
-				$membersAttachmentUsage[ $member->member_id ] = Db::i()->select( 'SUM(attach_filesize)', 'core_attachments', array( 'attach_member_id=?', Member::loggedIn()->member_id ) )->first();
+				$membersAttachmentUsage[ $member->member_id ] = \IPS\Db::i()->select( 'SUM(attach_filesize)', 'core_attachments', array( 'attach_member_id=?', \IPS\Member::loggedIn()->member_id ) )->first();
 			}
 			$globalSpaceRemaining = ( ( $member->group['g_attach_max'] * 1024 ) - $membersAttachmentUsage[ $member->member_id ] );
 
@@ -967,367 +1042,5 @@ class Editor extends FormAbstract
 		
 		/* Return whichever is lower */
 		return $maxTotalSize ? min( $maxTotalSize ) : NULL;
-	}
-
-	/**
-	 * Determines if we have any editor plugins
-	 *
-	 * @return bool
-	 */
-	public static function hasPlugins() : bool
-	{
-		/* If we are in dev, just check if we have any editor files at all */
-		if( \IPS\IN_DEV )
-		{
-			foreach( Application::enabledApplications() as $app )
-			{
-				$path = Application::getRootPath( $app->directory ) . "/applications/" . $app->directory . "/dev/editor";
-				if( file_exists( $path ) )
-				{
-					foreach( new DirectoryIterator( $path ) as $file )
-					{
-						if( !$file->isDir() and !$file->isDot() and $file->getFilename() != 'js' )
-						{
-							$components = explode( '.', $file->getFilename() );
-							$extension = array_pop( $components );
-							if( $extension == 'js' )
-							{
-								return true;
-							}
-						}
-					}
-				}
-			}
-
-			return false;
-		}
-
-		/* Return if we have plugins already */
-		if( !empty( Store::i()->editorPluginJs ) )
-		{
-			return TRUE;
-		}
-
-		/* If we are not in dev, check if we have the bundled JS, and if not, build it */
-		$pluginJs = "";
-		$hasPlugins = false;
-		foreach( Application::enabledApplications() as $app )
-		{
-			$editorFile = Application::getRootPath( $app->directory ) . "/applications/" . $app->directory . "/data/editor.xml";
-			if( file_exists( $editorFile ) )
-			{
-				try
-				{
-					$xml = SimpleXML::loadFile( $editorFile );
-					if ( !isset( $xml->plugin ) or !is_iterable( $xml->plugin ) )
-					{
-						throw new UnexpectedValueException;
-					}
-				}
-				catch ( Exception $e )
-				{
-					continue;
-				}
-				foreach( $xml->plugin as $plugin )
-				{
-					$contents = (string) $plugin;
-					if( $contents )
-					{
-						$hasPlugins = true;
-					}
-					$pluginJs .= <<<js
-;((() => {
-"use strict";
-try {
-
-{$contents}
-
-} catch (e) {
-
-window.Debug?.error(e);
-
-}
-})());
-js;
-
-				}
-			}
-		}
-
-
-		/* This tells the editor that the file is done processing */
-		$pluginJs .= <<<js
-
-document.dispatchEvent(new CustomEvent('ips:editorPluginsReady'));
-js;
-
-		if( $hasPlugins )
-		{
-			require_once( ROOT_PATH . '/system/3rd_party/JsMinify/Minifier.php' );
-			require_once( ROOT_PATH . '/system/3rd_party/JsMinify/MinifierError.php' );
-			require_once( ROOT_PATH . '/system/3rd_party/JsMinify/MinifierExpressions.php' );
-
-			$pluginJs = Minifier::minify( $pluginJs, array( 'flaggedComments' => false ) );
-
-			$jsFile = File::create( 'core_Theme', "editorPlugins.js", $pluginJs, container: 'editor', obscure: false );
-			Store::i()->editorPluginJs = (string) $jsFile;
-		}
-
-		return $hasPlugins;
-	}
-
-	/**
-	 * Get all restrictions that can be applied to the editor
-	 *
-	 * @return string[]
-	 */
-	public static function getAllRestrictions() : array
-	{
-		return static::$editorRestrictions;
-	}
-
-	/**
-	 * Get the cached restriction setting (saves DB queries)
-	 *
-	 * @return array
-	 */
-	public static function getRestrictionSetting() : array
-	{
-		if ( !isset( static::$restrictionCache ) )
-		{
-			static::$restrictionCache = [];
-			$setting = json_decode( Settings::i()->editor_mode_restrictions, true );
-			foreach ( $setting as $k => $v )
-			{
-				static::$restrictionCache[$k] = array_values( $v ); // it is possible that this gets stored as an associative array/object, but we want a standard indexed array
-			}
-		}
-
-		return static::$restrictionCache;
-	}
-
-	/**
-	 * @return string[]
-	 */
-	public static function getRestrictionDependencies() : array
-	{
-		return static::$dependentRestrictions;
-	}
-
-	/**
-	 * Check if a member has permission to use a feature
-	 *
-	 * @param string $permission	The permission key. This is one of the keys returned by getAllRestrictions()
-	 * @param Member|null $member	The member/null for logged in member
-	 * @param bool $comments		Whether to use restrictions for the comment editor rather than the normal one
-	 *
-	 * @return bool
-	 */
-	public static function memberHasPermission( string $permission, ?Member $member=null, bool $comments = false ) : bool
-	{
-		$member = $member ?: Member::loggedIn();
-		$settings = static::getRestrictionSetting();
-		$restrictionLevel = in_array( $permission, $settings[0] ?? [] ) ? 0 : ( in_array( $permission, $settings[1] ?? [] ) ? 1 : null );
-		if ( $restrictionLevel === null )
-		{
-			return true;
-		}
-
-		foreach ( $member->groups as $gid )
-		{
-			$group = Member\Group::load( $gid );
-			if ( $group->getEditorRestrictionLevel( $comments ) > $restrictionLevel )
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * Get editor restrictions for the member based on group settings
-	 *
-	 * @param Member|null $member	The member/null for logged in member
-	 * @param bool $comments		Whether to use restrictions for the comment editor rather than the normal one
-	 *
-	 * @return int
-	 */
-	public static function getMemberRestrictionLevel( ?Member $member=null, bool $comments = false ) : int
-	{
-		$member = $member ?: Member::loggedIn();
-		static $restrictLevelCache = [];
-		$cacheKey = ($member->member_id ?: 0) . '-' . ((int) $comments);
-		if ( !isset( $restrictLevelCache[$cacheKey] ) )
-		{
-			$restrictLevel = 0;
-			foreach ( $member->groups as $gid )
-			{
-				$group = Member\Group::load( $gid );
-				$restrictLevel = max( $group->getEditorRestrictionLevel( $comments ), $restrictLevel );
-
-				// 2 is the advanced editor, we won't find one more advanced
-				if ( $restrictLevel >= 2 )
-				{
-					$restrictLevel = 2;
-					break;
-				}
-			}
-			$restrictLevelCache[$cacheKey] = $restrictLevel;
-		}
-
-		return $restrictLevelCache[$cacheKey];
-	}
-
-	/**
-	 * Get editor restrictions for the member based on group settings
-	 *
-	 * @param Member|null $member	The member/null for logged in member
-	 * @param bool $comments		Whether to use restrictions for the comment editor rather than the normal one
-	 *
-	 * @return string[]
-	 */
-	public static function getMemberRestrictions( ?Member $member=null, bool $comments = false ) : array
-	{
-		$member = $member ?: Member::loggedIn();
-		$settings = static::getRestrictionSetting();
-		Output::i()->jsVars['editor_restrictions'] = []; // this needs to be shared to make sure the editor uses saved restriction settings of custom plugins rather than the defaults
-		$restrictions = [];
-
-		$restrictLevel = static::getMemberRestrictionLevel( $member, $comments );
-
-		foreach ( $settings as $level => $_restrictions )
-		{
-			foreach( $_restrictions as $restriction )
-			{
-				if ( preg_match( "/^ipsCustom(Node|Mark|Extension)__/", $restriction ) )
-				{
-					Output::i()->jsVars['editor_restrictions'][ $restriction ] = (int)$level;
-				}
-
-				if ( $restrictLevel <= (int) $level )
-				{
-					$restrictions[] = $restriction;
-				}
-			}
-		}
-
-		// Make sure we factor in each dependent restriction
-		foreach ( static::$dependentRestrictions as $dependentRestriction => $dependency )
-		{
-			if ( in_array( $dependency, $restrictions ) and !in_array( $dependentRestriction, $restrictions ) )
-			{
-				$restrictions[] = $dependentRestriction;
-			}
-		}
-
-		if ( empty( Output::i()->jsVars['editor_restrictions'] ) )
-		{
-			unset( Output::i()->jsVars['editor_restrictions'] );
-		}
-
-		return $restrictions;
-	}
-
-	/**
-	 * Save the level of a restriction
-	 *
-	 * @param string 	$restriction	The restriction
-	 * @param int 		$level			Set the level of restriction. -1 everywhere, 0 - not in the comment editor, 1 - only in advanced mode
-	 *
-	 * @return void
-	 */
-	public static function setRestrictionLevel( string $restriction, int $level ) : void
-	{
-		$settings = static::getRestrictionSetting();
-		if ( !in_array( $restriction, @$settings[$level] ?: [] ) )
-		{
-			foreach ( $settings as $_level => $restrictions )
-			{
-				if ( $_level != $level and in_array( $restriction, $restrictions ) )
-				{
-					$settings[ $_level ] = array_filter( $restrictions, function( $val ) use ( $restriction ) {
-						return $val !== $restriction;
-					});
-				}
-			}
-
-			$settings[$level][] = $restriction;
-
-			Settings::i()->changeValues( [ "editor_mode_restrictions" => json_encode( $settings ) ] );
-			static::$restrictionCache = $settings;
-		}
-
-
-		// we're always going to have to change dependencies
-		foreach ( static::$dependentRestrictions as $dependent => $dependency )
-		{
-			if ( $dependency == $restriction and static::getRestrictionLevel( $dependent ) < $level )
-			{
-				static::setRestrictionLevel( $dependent, $level );
-			}
-		}
-	}
-
-	/**
-	 * Remove a custom restriction from the settings array so it's reset to the default (or never used)
-	 *
-	 * @param string $restriction
-	 *
-	 * @return void
-	 */
-	public static function removeRestriction( string $restriction ) : void
-	{
-		$settings = static::getRestrictionSetting();
-		foreach ( $settings as $level => $restrictions )
-		{
-			$newRestrictions = [];
-			foreach ( $restrictions as $_restriction )
-			{
-				if ( $restriction == $_restriction )
-				{
-					continue;
-				}
-				$newRestrictions[] = $_restriction;
-			}
-			$settings[$level] = $newRestrictions;
-		}
-		static::$restrictionCache = $settings;
-		Settings::i()->changeValues( [ "editor_mode_restrictions" => json_encode( $settings ) ] );
-	}
-
-	/**
-	 * Cache of the restriction setting to reduce json_decode calls and db queries
-	 * @var array
-	 */
-	protected static array $restrictionCache;
-
-	/**
-	 * Get the level of a restriction based on the settings
-	 *
-	 * @param string    $restriction        The key of the restriction
-	 * @param ?int      $default=null       The default value of the restriction
-	 *
-	 * @return int
-	 */
-	public static function getRestrictionLevel( string $restriction, ?int $default =null ) : int
-	{
-		$settings = static::getRestrictionSetting();
-		foreach ( $settings as $level => $restrictions )
-		{
-			if ( in_array( $restriction, $restrictions ) )
-			{
-				$dependentLevel = -1;
-				if ( isset( static::$dependentRestrictions[$restriction] ) )
-				{
-					$dependentLevel = static::getRestrictionLevel( static::$dependentRestrictions[ $restriction ] );
-				}
-
-				// we want to give the stricter restriction, this or its dependency
-				return max( $dependentLevel, (int) $level );
-			}
-		}
-
-		return $default ?? -1;
 	}
 }

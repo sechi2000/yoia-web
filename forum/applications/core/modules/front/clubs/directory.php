@@ -11,47 +11,16 @@
 namespace IPS\core\modules\front\clubs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\Application;
-use IPS\Content\Search\Query;
-use IPS\core\Stream;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Address;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Club\CustomField;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function count;
-use function defined;
-use function floatval;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Clubs List
  */
-class directory extends Controller
+class _directory extends \IPS\Dispatcher\Controller
 {
 
 	/**
@@ -61,7 +30,7 @@ class directory extends Controller
 	'community_area' => array( 'value' => 'search', 'odkUpdate' => 'true' )
 	 * )
 	 */
-	public static array $dataLayerContext = array(
+	public static $dataLayerContext = array(
 		'community_area' =>  [ 'value' => 'clubs', 'odkUpdate' => 'true']
 	);
 
@@ -70,22 +39,26 @@ class directory extends Controller
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		/* Permission check */
-		if ( !Settings::i()->clubs )
+		if ( !\IPS\Settings::i()->clubs )
 		{
-			Output::i()->error( 'no_module_permission', '2C349/2', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C349/2', 403, '' );
 		}
 		
 		/* CSS */
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/clubs.css', 'core', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/clubs.css', 'core', 'front' ) );
+		if ( \IPS\Theme::i()->settings['responsive'] )
+		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/clubs_responsive.css', 'core', 'front' ) );
+		}
 
 		/* JS */
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_clubs.js', 'core', 'front' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_clubs.js', 'core', 'front' ) );
 		
 		/* Location for online list */
-		Session::i()->setLocation( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), array(), 'loc_clubs_directory' );
+		\IPS\Session::i()->setLocation( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), array(), 'loc_clubs_directory' );
 
 		/* Pass up */
 		parent::execute();
@@ -96,91 +69,51 @@ class directory extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{	
-		$baseUrl = Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' );
+		$baseUrl = \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' );
 
 		/* Display */
-		$view = Settings::i()->clubs_default_view;
-		if ( Settings::i()->clubs_allow_view_change )
+		$view = \IPS\Settings::i()->clubs_default_view;
+		if ( \IPS\Settings::i()->clubs_allow_view_change )
 		{
-			if ( isset( Request::i()->view ) and in_array( Request::i()->view, array( 'grid', 'list' ) ) )
+			if ( isset( \IPS\Request::i()->view ) and \in_array( \IPS\Request::i()->view, array( 'grid', 'list' ) ) )
 			{
-				Session::i()->csrfCheck();
-				Request::i()->setCookie( 'clubs_view', Request::i()->view, DateTime::create()->add( new DateInterval('P1Y' ) ) );
-				$view = Request::i()->view;
+				\IPS\Session::i()->csrfCheck();
+				\IPS\Request::i()->setCookie( 'clubs_view', \IPS\Request::i()->view, \IPS\DateTime::create()->add( new \DateInterval('P1Y' ) ) );
+				$view = \IPS\Request::i()->view;
 
-				Output::i()->redirect( $baseUrl );
+				\IPS\Output::i()->redirect( $baseUrl );
 			}
-			elseif ( isset( Request::i()->cookie['clubs_view'] ) and in_array( Request::i()->cookie['clubs_view'], array( 'grid', 'list' ) ) )
+			elseif ( isset( \IPS\Request::i()->cookie['clubs_view'] ) and \in_array( \IPS\Request::i()->cookie['clubs_view'], array( 'grid', 'list' ) ) )
 			{
-				$view = Request::i()->cookie['clubs_view'];
+				$view = \IPS\Request::i()->cookie['clubs_view'];
 			}
 		}
 		
 		/* All Clubs: Sort */
-		$sortOption = Settings::i()->clubs_default_sort;
-		$allSortOptions = array( 'last_activity', 'members', 'content', 'created', 'name' );
-		if( Settings::i()->clubs_locations and GeoLocation::enabled() )
+		$sortOption = \IPS\Settings::i()->clubs_default_sort;
+		if ( isset( \IPS\Request::i()->sort ) and \in_array( \IPS\Request::i()->sort, array( 'last_activity', 'members', 'content', 'created', 'name' ) ) )
 		{
-			$allSortOptions[] = 'distance';
-		}
-		if ( isset( Request::i()->sort ) and in_array( Request::i()->sort, $allSortOptions ) )
-		{
-			$sortOption = Request::i()->sort;
+			$sortOption = \IPS\Request::i()->sort;
 
 			$baseUrl = $baseUrl->setQueryString( 'sort', $sortOption );
 		}
-
-        /* All Clubs: Filters */
+		
+		/* All Clubs: Filters */
 		$filters = array();
 		$mineOnly = FALSE;
-		$extraWhere = [];
-		if ( ! empty( Request::i()->name ) )
-		{
-			$baseUrl = $baseUrl->setQueryString( 'name', Request::i()->name );
-			$extraWhere[] = Db::i()->like( 'name', Request::i()->name, true, true, true );
-		}
-		if ( isset( Request::i()->filter ) and Request::i()->filter === 'mine' AND Member::loggedIn()->member_id )
+		$extraWhere = NULL;
+		if ( isset( \IPS\Request::i()->filter ) and \IPS\Request::i()->filter === 'mine' AND \IPS\Member::loggedIn()->member_id )
 		{
 			$mineOnly = TRUE;
 			$baseUrl = $baseUrl->setQueryString( 'filter', 'mine' );
 		}
-
-        /* Are we sorting by location? */
-        $location = null;
-        if( ( $sortOption == 'distance' or ( isset( Request::i()->location ) and Request::i()->location ) ) and Settings::i()->clubs_locations )
-        {
-            if( isset( Request::i()->location ) )
-            {
-                $baseUrl = $baseUrl->setQueryString( 'location', Request::i()->location );
-                $geo = explode( ",", Request::i()->location );
-                $location = array( 'lat' => $geo[0], 'lon' => $geo[1] );
-
-				/* If we are filtering by location, we can leave out clubs with no location */
-				$extraWhere[] = [ 'location_lat is not null AND location_long is not null' ];
-            }
-            elseif( GeoLocation::enabled() )
-            {
-                /* Do an IP lookup */
-                try
-                {
-                    $geo = GeoLocation::getRequesterLocation();
-                    $location = array( 'lat' => $geo->lat, 'lon' => $geo->long );
-                }
-                catch ( Exception $e )
-                {
-                    $location = array( 'lat' => Settings::i()->map_center_lat, 'lon' => Settings::i()->map_center_lon );
-                }
-            }
-        }
-
-
-		if ( isset( Request::i()->type ) and in_array( Request::i()->type, array( 'free', 'paid' ) ) )
+		if ( isset( \IPS\Request::i()->type ) and \in_array( \IPS\Request::i()->type, array( 'free', 'paid' ) ) )
 		{
-			$baseUrl = $baseUrl->setQueryString( 'type', Request::i()->type );
+			$baseUrl = $baseUrl->setQueryString( 'type', \IPS\Request::i()->type );
 			
-			if ( Request::i()->type === 'free' )
+			if ( \IPS\Request::i()->type === 'free' )
 			{
 				$extraWhere[] = array( 'fee IS NULL' );
 			}
@@ -189,19 +122,19 @@ class directory extends Controller
 				$extraWhere[] = array( 'fee IS NOT NULL' );
 			}
 		}
-		foreach ( CustomField::fields() as $field )
+		foreach ( \IPS\Member\Club\CustomField::fields() as $field )
 		{
 			$k = "f{$field->id}";
-			if ( $field->filterable and isset( Request::i()->$k ) )
+			if ( $field->filterable and isset( \IPS\Request::i()->$k ) )
 			{
 				switch ( $field->type )
 				{
 					case 'Checkbox':
 					case 'YesNo':
-						if ( in_array( Request::i()->$k, array( 0, 1 ) ) )
+						if ( \in_array( \IPS\Request::i()->$k, array( 0, 1 ) ) )
 						{
-							$filters[ $field->id ] = Request::i()->$k;
-							$baseUrl = $baseUrl->setQueryString( 'f' . $field->id, Request::i()->$k );
+							$filters[ $field->id ] = \IPS\Request::i()->$k;
+							$baseUrl = $baseUrl->setQueryString( 'f' . $field->id, \IPS\Request::i()->$k );
 						}
 						break;
 						
@@ -209,7 +142,7 @@ class directory extends Controller
 					case 'Radio':
 					case 'Select':
 						$options = json_decode( $field->extra, TRUE );
-						foreach ( Request::i()->$k as $id )
+						foreach ( \IPS\Request::i()->$k as $id )
 						{
 							if ( isset( $options[ $id ] ) )
 							{
@@ -234,28 +167,28 @@ class directory extends Controller
 		}
 		
 		/* Get Featured Clubs */
-		$featuredClubs = Club::clubs( Member::loggedIn(), NULL, 'RAND()', FALSE, array(), 'featured=1' );
+		$featuredClubs = \IPS\Member\Club::clubs( \IPS\Member::loggedIn(), NULL, 'RAND()', FALSE, array(), 'featured=1' );
 		
 		/* Get All Clubs */
 		$perPage = 24;
-		$page = isset( Request::i()->page ) ? intval( Request::i()->page ) : 1;
+		$page = isset( \IPS\Request::i()->page ) ? \intval( \IPS\Request::i()->page ) : 1;
 		if( $page < 1 )
 		{
 			$page = 1;
 		}
 
-		$clubsCount	= Club::clubs( Member::loggedIn(), array( ( $page - 1 ) * $perPage, $perPage ), $sortOption, $mineOnly, $filters, $extraWhere, TRUE, $location );
-		$allClubs	= iterator_to_array( Club::clubs( Member::loggedIn(), array( ( $page - 1 ) * $perPage, $perPage ), $sortOption, $mineOnly, $filters, $extraWhere, false, $location ) );
-		$pagination	= Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $baseUrl, ceil( $clubsCount / $perPage ), $page, $perPage );
+		$clubsCount	= \IPS\Member\Club::clubs( \IPS\Member::loggedIn(), array( ( $page - 1 ) * $perPage, $perPage ), $sortOption, $mineOnly, $filters, $extraWhere, TRUE );
+		$allClubs	= \IPS\Member\Club::clubs( \IPS\Member::loggedIn(), array( ( $page - 1 ) * $perPage, $perPage ), $sortOption, $mineOnly, $filters, $extraWhere );
+		$pagination	= \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $baseUrl, ceil( $clubsCount / $perPage ), $page, $perPage );
 		
 		/* Get my clubs and invites */
 		$myClubsActivity = NULL;
 		$myClubsInvites = NULL;
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
-			$myClubsActivity = new Stream;
-			$myClubsActivity = $myClubsActivity->query()->filterByClub( Member::loggedIn()->clubs() )->setLimit(6)->setOrder( Query::ORDER_NEWEST_UPDATED )->search();
-			$myClubsInvites = new ActiveRecordIterator( Db::i()->select( '*', 'core_clubs_memberships', array( 'member_id=? and ( status=? or status=? )', Member::loggedIn()->member_id, Club::STATUS_REQUESTED, Club::STATUS_INVITED )
+			$myClubsActivity = new \IPS\core\Stream;
+			$myClubsActivity = $myClubsActivity->query()->filterByClub( \IPS\Member::loggedIn()->clubs() )->setLimit(6)->setOrder( \IPS\Content\Search\Query::ORDER_NEWEST_UPDATED )->search();
+			$myClubsInvites = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_clubs_memberships', array( 'member_id=? and ( status=? or status=? )', \IPS\Member::loggedIn()->member_id, \IPS\Member\Club::STATUS_REQUESTED, \IPS\Member\Club::STATUS_INVITED )
 								)->join(
 										'core_clubs',
 										"core_clubs_memberships.club_id=core_clubs.id"
@@ -264,60 +197,62 @@ class directory extends Controller
 		
 		/* Build Map */
 		$mapMarkers = NULL;
-		if ( GeoLocation::enabled() )
+		if ( \IPS\GeoLocation::enabled() )
 		{
 			$mapMarkers = array();
 			
 			$where = array( array( 'location_lat IS NOT NULL' ) );
-			if ( !Member::loggedIn()->member_id )
+			if ( !\IPS\Member::loggedIn()->member_id )
 			{
-				$where[] = array( "type<>?", Club::TYPE_PRIVATE );
+				$where[] = array( "type<>?", \IPS\Member\Club::TYPE_PRIVATE );
 			}
-			elseif ( !Member::loggedIn()->modPermission('can_access_all_clubs') )
+			elseif ( !\IPS\Member::loggedIn()->modPermission('can_access_all_clubs') )
 			{
-				$where[] = array( "( type<>? OR status IN('" . Club::STATUS_MEMBER .  "','" . Club::STATUS_MODERATOR . "','" . Club::STATUS_LEADER . "','" . Club::STATUS_EXPIRED . "','" . Club::STATUS_EXPIRED_MODERATOR . "') )", Club::TYPE_PRIVATE );
+				$where[] = array( "( type<>? OR status IN('" . \IPS\Member\Club::STATUS_MEMBER .  "','" . \IPS\Member\Club::STATUS_MODERATOR . "','" . \IPS\Member\Club::STATUS_LEADER . "','" . \IPS\Member\Club::STATUS_EXPIRED . "','" . \IPS\Member\Club::STATUS_EXPIRED_MODERATOR . "') )", \IPS\Member\Club::TYPE_PRIVATE );
 			}
 			
-			$select = Db::i()->select( array( 'id', 'name', 'location_lat', 'location_long' ), 'core_clubs', $where );
-			if ( Member::loggedIn()->member_id )
+			$select = \IPS\Db::i()->select( array( 'id', 'name', 'location_lat', 'location_long' ), 'core_clubs', $where );
+			if ( \IPS\Member::loggedIn()->member_id )
 			{
-				$select->join( 'core_clubs_memberships', array( 'club_id=id AND member_id=?', Member::loggedIn()->member_id ) );
+				$select->join( 'core_clubs_memberships', array( 'club_id=id AND member_id=?', \IPS\Member::loggedIn()->member_id ) );
 			}
 			
 			foreach ( $select as $club )
 			{
 				$mapMarkers[ $club['id'] ] = array(
-					'lat'	=> floatval( $club['location_lat'] ),
-					'long'	=> floatval( $club['location_long'] ),
+					'lat'	=> \floatval( $club['location_lat'] ),
+					'long'	=> \floatval( $club['location_long'] ),
 					'title'	=> $club['name']
 				);
 			}
 		}
 
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->sidebar['contextual'] = Theme::i()->getTemplate('clubs')->myClubsSidebar( Club::clubs( Member::loggedIn(), 10, 'last_activity', TRUE ), $myClubsActivity, $myClubsInvites );
+			\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate('clubs')->myClubsSidebar( \IPS\Member\Club::clubs( \IPS\Member::loggedIn(), 10, 'last_activity', TRUE ), $myClubsActivity, $myClubsInvites );
 
 			/* Prime the cache */
-			if( count( $allClubs ) )
+			$allClubs = iterator_to_array( $allClubs );
+			
+			if( \count( $allClubs ) )
 			{
 				foreach( $allClubs as $clubId => $clubData )
 				{
-					if( !isset( $clubData->memberStatuses[ Member::loggedIn()->member_id ] ) )
+					if( !isset( $allClubs[ $clubId ]->memberStatuses[ \IPS\Member::loggedIn()->member_id ] ) )
 					{
-						$clubData->memberStatuses[ Member::loggedIn()->member_id ] = NULL;
+						$allClubs[ $clubId ]->memberStatuses[ \IPS\Member::loggedIn()->member_id ] = NULL;
 					}
 				}
 
-				foreach( Db::i()->select( '*', 'core_clubs_memberships', array( 'member_id=? AND ' . Db::i()->in( 'club_id', array_keys( $allClubs ) ), Member::loggedIn()->member_id ) ) as $clubMembership )
+				foreach( \IPS\Db::i()->select( '*', 'core_clubs_memberships', array( 'member_id=? AND ' . \IPS\Db::i()->in( 'club_id', array_keys( $allClubs ) ), \IPS\Member::loggedIn()->member_id ) ) as $clubMembership )
 				{
-					$allClubs[ $clubMembership['club_id'] ]->memberStatuses[ Member::loggedIn()->member_id ] = $clubMembership['status'];
+					$allClubs[ $clubMembership['club_id'] ]->memberStatuses[ \IPS\Member::loggedIn()->member_id ] = $clubMembership['status'];
 				}
 			}
 		}
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack('module__core_clubs');
-		Output::i()->output = Theme::i()->getTemplate('clubs')->directory( $featuredClubs, $allClubs, $pagination, $baseUrl, $sortOption, $myClubsActivity, $mapMarkers, $view, $mineOnly, $allSortOptions );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('module__core_clubs');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clubs')->directory( $featuredClubs, $allClubs, $pagination, $baseUrl, $sortOption, $myClubsActivity, $mapMarkers, $view, $mineOnly );
 	}
 	
 	/**
@@ -325,33 +260,23 @@ class directory extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function filters() : void
+	protected function filters()
 	{		
-		$fields = CustomField::fields();
+		$fields = \IPS\Member\Club\CustomField::roots();
 		
-		$form = new Form('filter', 'filter');
-
-		$form->add( new Text( 'club_filter_name', isset( Request::i()->name ) ? Request::i()->name : '' ) );
-
-		if ( Member::loggedIn()->member_id )
+		$form = new \IPS\Helpers\Form('filter', 'filter');
+		
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
-			$form->add( new Radio( 'club_filter_type', isset( Request::i()->filter ) ? Request::i()->filter : 'all', TRUE, array( 'options' => array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'club_filter_type', isset( \IPS\Request::i()->filter ) ? \IPS\Request::i()->filter : 'all', TRUE, array( 'options' => array(
 				'all'	=> 'all_clubs',
 				'mine'	=> 'my_clubs'
 			) ) ) );
 		}
-
-		if( Settings::i()->clubs_locations )
-		{
-			$form->add( new Address( 'club_filter_location', null, false, [
-				'requireFullAddress' => false,
-				'minimize' => true
-			] ) );
-		}
 		
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->clubs_paid_on )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->clubs_paid_on )
 		{
-			$form->add( new Radio( 'club_membership_fee', isset( Request::i()->type ) ? Request::i()->type : 'all', TRUE, array( 'options' => array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'club_membership_fee', isset( \IPS\Request::i()->type ) ? \IPS\Request::i()->type : 'all', TRUE, array( 'options' => array(
 				'all'	=> 'all_clubs',
 				'free'	=> 'club_membership_free',
 				'paid'	=> 'club_membership_paid'
@@ -367,7 +292,7 @@ class directory extends Controller
 				{
 					case 'Checkbox':
 					case 'YesNo':
-						$input = new CheckboxSet( 'field_' . $field->id, isset( Request::i()->$k ) ? Request::i()->$k : array( 1, 0 ), FALSE, array( 'options' => array(
+						$input = new \IPS\Helpers\Form\CheckboxSet( 'field_' . $field->id, isset( \IPS\Request::i()->$k ) ? \IPS\Request::i()->$k : array( 1, 0 ), FALSE, array( 'options' => array(
 							1			=> 'yes',
 							0			=> 'no',
 						) ) );
@@ -379,7 +304,7 @@ class directory extends Controller
 					case 'Radio':
 					case 'Select':
 						$options = json_decode( $field->extra, TRUE );
-						$input = new CheckboxSet( 'field_' . $field->id, isset( Request::i()->$k ) ? Request::i()->$k : array_keys( $options ), FALSE, array( 'options' => $options ) );
+						$input = new \IPS\Helpers\Form\CheckboxSet( 'field_' . $field->id, isset( \IPS\Request::i()->$k ) ? \IPS\Request::i()->$k : array_keys( $options ), FALSE, array( 'options' => $options ) );
 						$input->label = $field->_title;
 						$form->add( $input );
 						break;
@@ -389,25 +314,14 @@ class directory extends Controller
 		
 		if ( $values = $form->values() )
 		{
-			$url = Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' );
-
-			if ( ! empty ( $values['club_filter_name'] ) )
-			{
-				$url = $url->setQueryString( 'name', $values['club_filter_name'] );
-			}
-
-            if( !empty( $values['club_filter_location'] ) and $values['club_filter_location'] instanceof GeoLocation)
-            {
-                $values['club_filter_location']->getLatLong();
-                $url = $url->setQueryString( 'location', $values['club_filter_location']->lat . ',' . $values['club_filter_location']->long );
-            }
-
-			if ( Member::loggedIn()->member_id and $values['club_filter_type'] === 'mine' )
+			$url = \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' );
+			
+			if ( \IPS\Member::loggedIn()->member_id and $values['club_filter_type'] === 'mine' )
 			{
 				$url = $url->setQueryString( 'filter', 'mine' );
 			}
 			
-			if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->clubs_paid_on and $values['club_membership_fee'] !== 'all' )
+			if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->clubs_paid_on and $values['club_membership_fee'] !== 'all' )
 			{
 				$url = $url->setQueryString( 'type', $values['club_membership_fee'] );
 			}
@@ -420,7 +334,7 @@ class directory extends Controller
 					{
 						case 'Checkbox':
 						case 'YesNo':
-							if ( count( $values[ 'field_' . $field->id ] ) === 1 )
+							if ( \count( $values[ 'field_' . $field->id ] ) === 1 )
 							{
 								$url = $url->setQueryString( 'f' . $field->id, array_pop( $values[ 'field_' . $field->id ] ) );
 							}
@@ -430,7 +344,7 @@ class directory extends Controller
 						case 'Radio':
 						case 'Select':
 							$options = json_decode( $field->extra, TRUE );
-							if ( count( $values[ 'field_' . $field->id ] ) > 0 and count( $values[ 'field_' . $field->id ] ) < count( $options ) )
+							if ( \count( $values[ 'field_' . $field->id ] ) > 0 and \count( $values[ 'field_' . $field->id ] ) < \count( $options ) )
 							{
 								$url = $url->setQueryString( 'f' . $field->id, $values[ 'field_' . $field->id ] );
 							}
@@ -439,16 +353,16 @@ class directory extends Controller
 				}
 			}
 			
-			Output::i()->redirect( $url );
+			\IPS\Output::i()->redirect( $url );
 		}
 		
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+			\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 		}
 		else
 		{
-			Output::i()->output = $form;
+			\IPS\Output::i()->output = $form;
 		}
 	}
 	
@@ -457,12 +371,12 @@ class directory extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function create() : void
+	protected function create()
 	{
 		$availableTypes = array();
-		if ( Member::loggedIn()->member_id ) // Guests can't create any type of clubs
+		if ( \IPS\Member::loggedIn()->member_id ) // Guests can't create any type of clubs
 		{
-			foreach ( explode( ',', Member::loggedIn()->group['g_create_clubs'] ) as $type )
+			foreach ( explode( ',', \IPS\Member::loggedIn()->group['g_create_clubs'] ) as $type )
 			{
 				if ( $type !== '' )
 				{
@@ -472,32 +386,32 @@ class directory extends Controller
 		}
 		if ( !$availableTypes )
 		{
-			Output::i()->error( Member::loggedIn()->member_id ? 'no_module_permission' : 'no_module_permission_guest', '2C349/1', 403, '' );
+			\IPS\Output::i()->error( \IPS\Member::loggedIn()->member_id ? 'no_module_permission' : 'no_module_permission_guest', '2C349/1', 403, '' );
 		}
 		
-		if ( Member::loggedIn()->group['g_club_limit'] )
+		if ( \IPS\Member::loggedIn()->group['g_club_limit'] )
 		{
-			if ( Db::i()->select( 'COUNT(*)', 'core_clubs', array( 'owner=?', Member::loggedIn()->member_id ) )->first() >= Member::loggedIn()->group['g_club_limit'] )
+			if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs', array( 'owner=?', \IPS\Member::loggedIn()->member_id ) )->first() >= \IPS\Member::loggedIn()->group['g_club_limit'] )
 			{
-				Output::i()->error( Member::loggedIn()->language()->addToStack( 'too_many_clubs', FALSE, array( 'pluralize' => array( Member::loggedIn()->group['g_club_limit'] ) ) ), '2C349/3', 403, '' );
+				\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack( 'too_many_clubs', FALSE, array( 'pluralize' => array( \IPS\Member::loggedIn()->group['g_club_limit'] ) ) ), '2C349/3', 403, '' );
 			}
 		}
 		
-		$club = new Club;
+		$club = new \IPS\Member\Club;
 		if ( $form = $club->form( FALSE, TRUE, $availableTypes ) )
 		{
 			if( $values = $form->values() )
 			{
 				$club->processForm( $values, FALSE, TRUE, $availableTypes );
 
-				Output::i()->redirect( $club->url() );
+				\IPS\Output::i()->redirect( $club->url() );
 			}
 
-			$form->class = 'ipsForm--vertical ipsForm--clubs-directory';
+			$form->class = 'ipsForm_vertical';
 		}
 		else
 		{
-			if ( !$club->approved and Member::loggedIn()->modPermission('can_access_all_clubs') )
+			if ( !$club->approved and \IPS\Member::loggedIn()->modPermission('can_access_all_clubs') )
 			{
 				$club->approved = TRUE;
 				$club->save();
@@ -505,20 +419,20 @@ class directory extends Controller
 			
 			if( $club->approved )
 			{
-				Member::loggedIn()->achievementAction( 'core', 'NewClub', $club );
+				\IPS\Member::loggedIn()->achievementAction( 'core', 'NewClub', $club );
 			}
 			
-			Output::i()->redirect( $club->url() );
+			\IPS\Output::i()->redirect( $club->url() );
 		}
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('create_club');
-		if( Request::i()->isAjax() )
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('create_club');
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+			\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 		}
 		else
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'clubs' )->create( $form );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'clubs' )->create( $form );
 		}
 	}
 }

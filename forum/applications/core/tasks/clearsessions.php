@@ -11,24 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Session;
-use IPS\Session\Store;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * clearsessions Task
  */
-class clearsessions extends Task
+class _clearsessions extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -39,14 +31,14 @@ class clearsessions extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		$timeout = Session::sessionLifetime();
+		$timeout = \IPS\Session::sessionLifetime();
 
-		Db::i()->delete( 'core_sys_cp_sessions', array( 'session_running_time<?', ( time() - $timeout ) ) );
-		$class = Store::i();
+		\IPS\Db::i()->delete( 'core_sys_cp_sessions', array( 'session_running_time<?', ( time() - $timeout ) ) );
+		$class = \IPS\Session\Store::i();
 		$class::clearSessions( $timeout );
 
 		return NULL;

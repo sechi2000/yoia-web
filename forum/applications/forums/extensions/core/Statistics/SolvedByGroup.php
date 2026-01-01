@@ -11,61 +11,68 @@
 namespace IPS\forums\extensions\core\Statistics;
 
 use IPS\core\Statistics\Chart as ParentClass;
-use IPS\DateTime;
 use IPS\Db;
 use IPS\Helpers\Chart;
 use IPS\Helpers\Chart\Database as DbChart;
-use IPS\Helpers\Form\Select;
 use IPS\Http\Url;
+use IPS\DateTime as IPSDateTime;
 use IPS\Member;
+use IPS\Helpers\Form\Select;
 use IPS\Member\Group;
+
+use UnderflowException;
 use DateInterval;
+use Exception;
 
 use function defined;
 use function header;
-use function is_array;
 
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class SolvedByGroup extends ParentClass
+class _SolvedByGroup extends ParentClass
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'forums_stats_solved_groups';
+	public $controller = 'forums_stats_solved_groups';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
 	public function getChart( Url $url ): Chart
 	{
-		/* Determine minimum date - if there is nothing, set it to today */
-		$minimumDate = Db::i()->select( 'min(solved_date)', 'core_solved_index' )->first();
-		$minimumDate = $minimumDate ? DateTime::ts( $minimumDate ) : DateTime::create();
-
+		/* Determine minimum date */
+		$minimumDate = NULL;
+		
 		/* We can't retrieve any stats prior to the new tracking being implemented */
-		$oldestLog = Db::i()->select( 'MIN(time)', 'core_statistics', array( 'type=?', 'solved' ) )->first();
-		if( $oldestLog )
+		try
 		{
-			if( $oldestLog < $minimumDate->getTimestamp() )
+			$oldestLog = \IPS\Db::i()->select( 'MIN(time)', 'core_statistics', array( 'type=?', 'solved' ) )->first();
+		
+			if( !$minimumDate OR $oldestLog < $minimumDate->getTimestamp() )
 			{
-				$minimumDate = DateTime::ts( $oldestLog );
+				$minimumDate = \IPS\DateTime::ts( $oldestLog );
 			}
 		}
+		catch( \UnderflowException $e )
+		{
+			/* We have nothing tracked, set minimum date to today */
+			$minimumDate = \IPS\DateTime::create();
+		}
 		
-		$chart = new DbChart( $url, 'core_solved_index', 'solved_date', '', array(
+		$chart = new \IPS\Helpers\Chart\Database( $url, 'core_solved_index', 'solved_date', '', array( 
 				'isStacked' => FALSE,
 				'backgroundColor' 	=> '#ffffff',
 				'hAxis'				=> array( 'gridlines' => array( 'color' => '#f5f5f5' ) ),
@@ -76,7 +83,7 @@ class SolvedByGroup extends ParentClass
 			),
 			'LineChart',
 			'monthly',
-			array( 'start' => $minimumDate, 'end' => new DateTime ),
+			array( 'start' => ( new \IPS\DateTime )->sub( new \DateInterval('P90D') ), 'end' => new \IPS\DateTime ),
 			array(),
 			'solved' 
 		);
@@ -84,7 +91,7 @@ class SolvedByGroup extends ParentClass
 		
 		$chart->joins = array( array( 'forums_posts', array( 'comment_class=? and core_solved_index.comment_id=forums_posts.pid', 'IPS\forums\Topic\Post' ) ), array( 'core_members', array( "core_members.member_id=forums_posts.author_id" ) ) );
 		$chart->where = array( array( 'queued=?', 0 ) ); 
-		$chart->title = Member::loggedIn()->language()->addToStack( 'stats_topics_tab_groups' );
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack( 'stats_topics_tab_groups' );
 		$chart->availableTypes = array( 'LineChart', 'ColumnChart' );
 	
 		$chart->groupBy = 'member_group_id';
@@ -92,14 +99,14 @@ class SolvedByGroup extends ParentClass
 		
 		$chart->customFiltersForm = array(
 			'form' => array(
-				new Select( 'chart_groups', $customValues, FALSE, array( 'options' => $this->_getGroups(), 'zeroVal' => 'any', 'multiple' => TRUE ), NULL, NULL, NULL, 'chart_groups' )
+				new \IPS\Helpers\Form\Select( 'chart_groups', $customValues, FALSE, array( 'options' => $this->_getGroups(), 'zeroVal' => 'any', 'multiple' => TRUE ), NULL, NULL, NULL, 'chart_groups' )
 			),
 			'where' => function( $values )
 			{
-				$groups = is_array( $values['chart_groups'] ) ? array_values( $values['chart_groups'] ) : explode( ',', $values['chart_groups'] );
+				$groups = \is_array( $values['chart_groups'] ) ? array_values( $values['chart_groups'] ) : explode( ',', $values['chart_groups'] );
 				if ( count( $groups ) )
 				{
-					return Db::i()->in( 'member_group_id', $groups );
+					return \IPS\Db::i()->in( 'member_group_id', $groups );
 				}
 				else
 				{
@@ -110,19 +117,19 @@ class SolvedByGroup extends ParentClass
 			'series'  => function( $values )
 			{
 				$series = array();
-				$groups = array_filter( is_array( $values['chart_groups'] ) ? array_values( $values['chart_groups'] ) : explode( ',', $values['chart_groups'] ) );
+				$groups = array_filter( \is_array( $values['chart_groups'] ) ? array_values( $values['chart_groups'] ) : explode( ',', $values['chart_groups'] ) );
 				if ( count( $groups ) )
 				{
 					foreach( $groups as $id )
 					{
-						$series[] = array( Member::loggedIn()->language()->addToStack( 'core_group_' . $id ), 'number', 'COUNT(*)', FALSE, $id );
+						$series[] = array( \IPS\Member::loggedIn()->language()->addToStack( 'core_group_' . $id ), 'number', 'COUNT(*)', FALSE, $id );
 					}
 				}
 				else
 				{
 					foreach( $this->_getGroups() AS $id => $group )
 					{
-						$series[] = array( Member::loggedIn()->language()->addToStack( 'core_group_' . $id ), 'number', 'COUNT(*)', FALSE, $id );
+						$series[] = array( \IPS\Member::loggedIn()->language()->addToStack( 'core_group_' . $id ), 'number', 'COUNT(*)', FALSE, $id );
 					}
 				}
 				return $series;
@@ -132,7 +139,7 @@ class SolvedByGroup extends ParentClass
 				$series = array();
 				foreach( $this->_getGroups() AS $id => $group )
 				{
-					$series[] = array( Member::loggedIn()->language()->addToStack( 'core_group_' . $id ), 'number', 'COUNT(*)', FALSE, $id );
+					$series[] = array( \IPS\Member::loggedIn()->language()->addToStack( 'core_group_' . $id ), 'number', 'COUNT(*)', FALSE, $id );
 				}
 				return $series;
 			}
@@ -149,7 +156,7 @@ class SolvedByGroup extends ParentClass
 	protected function _getGroups(): array
 	{
 		$return = array();
-		foreach( Group::groups( TRUE, FALSE ) AS $group )
+		foreach( \IPS\Member\Group::groups( TRUE, FALSE ) AS $group )
 		{
 			$return[ $group->g_id ] = $group->name;
 		}

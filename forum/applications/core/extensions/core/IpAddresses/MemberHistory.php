@@ -11,38 +11,39 @@
 namespace IPS\core\extensions\core\IpAddresses;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Extensions\IpAddressesAbstract;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\History;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Lookup: Display name changes
  */
-class MemberHistory extends IpAddressesAbstract
+class _MemberHistory
 {
 	/**
 	 * Removes the logged IP address
 	 *
-	 * @param int $time
+	 * @param int $timestamp
 	 * @return void
 	 */
-	public function pruneIpAddresses( int $time ) : void
+	public function pruneIpAddresses(int $time)
 	{
-		Db::i()->update('core_member_history', [ 'log_ip_address' => '' ] , [ "log_ip_address != '' and log_date <?", $time ] );
+		\IPS\Db::i()->update('core_member_history', [ 'log_ip_address' => '' ] , [ "log_ip_address != '' and log_date <?", $time ] );
 	}
 	
+	/**
+	 * Supported in the ACP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInAcp()
+	{
+		return TRUE;
+	}
+
 	/**
 	 * Supported in the ModCP IP address lookup tool?
 	 *
@@ -54,31 +55,31 @@ class MemberHistory extends IpAddressesAbstract
 		return FALSE;
 	}
 
-	/**
+	/** 
 	 * Find Records by IP
 	 *
 	 * @param	string			$ip			The IP Address
-	 * @param	Url|null	$baseUrl	URL table will be displayed on or NULL to return a count
-	 * @return	string|int|null
+	 * @param	\IPS\Http\Url	$baseUrl	URL table will be displayed on or NULL to return a count
+	 * @return	\IPS\Helpers\Table|int|null
 	 */
-	public function findByIp( string $ip, ?Url $baseUrl = NULL ): string|int|null
+	public function findByIp( $ip, \IPS\Http\Url $baseUrl = NULL )
 	{
 		/* Return count */
 		if ( $baseUrl === NULL )
 		{
-			return Db::i()->select( 'COUNT(*)', 'core_member_history', array( "log_ip_address LIKE ?", $ip ) )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'core_member_history', array( "log_ip_address LIKE ?", $ip ) )->first();
 		}
 		
 		/* Init Table */
-		$table = new History( $baseUrl, array( array( 'log_ip_address LIKE ?', $ip ) ) );
+		$table = new \IPS\Member\History( $baseUrl, array( array( 'log_ip_address LIKE ?', $ip ) ) );
 		
 		/* Columns we need */
 		$table->include = array( 'log_member', 'log_data', 'log_date', 'log_ip_address' );
 		$table->mainColumn = 'log_date';
 
-		$table->tableTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
-		$table->rowsTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
-		$table->filters = [];
+		$table->tableTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
+		$table->rowsTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
+		$table->filters = NULL;
 				
 		/* Default sort options */
 		$table->sortBy = $table->sortBy ?: 'log_date';
@@ -102,11 +103,11 @@ class MemberHistory extends IpAddressesAbstract
 		 	...
 	 	);
 	 * @endcode
-	 * @param	Member	$member	The member
-	 * @return	array|Select
+	 * @param	\IPS\Member	$member	The member
+	 * @return	array
 	 */
-	public function findByMember( Member $member ) : array|Select
+	public function findByMember( $member )
 	{
-		return Db::i()->select( "log_ip_address AS ip, count(*) AS count, MIN(log_date) AS first, MAX(log_date) AS last", 'core_member_history', array( 'log_by=?', $member->member_id ), NULL, NULL, 'log_ip_address' )->setKeyField( 'ip' );
+		return \IPS\Db::i()->select( "log_ip_address AS ip, count(*) AS count, MIN(log_date) AS first, MAX(log_date) AS last", 'core_member_history', array( 'log_by=?', $member->member_id ), NULL, NULL, 'log_ip_address' )->setKeyField( 'ip' );
 	}	
 }

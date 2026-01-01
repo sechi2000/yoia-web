@@ -12,30 +12,16 @@
 namespace IPS\nexus\Gateway;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\nexus\Customer;
-use IPS\nexus\Gateway;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Transaction;
-use LogicException;
-use function defined;
-use const IPS\NEXUS_TEST_GATEWAYS;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Test Gateway
  */
-class Test extends Gateway
+class _Test extends \IPS\nexus\Gateway
 {
 	/* !Features */
 	
@@ -43,37 +29,18 @@ class Test extends Gateway
 	const SUPPORTS_PARTIAL_REFUNDS = TRUE;
 	
 	/* !Payment Gateway */
-
-	/**
-	 * Check the gateway can process this...
-	 *
-	 * @param	$amount            Money        The amount
-	 * @param	$billingAddress	GeoLocation|NULL	The billing address, which may be NULL if one if not provided
-	 * @param	$customer        Customer|null        The customer (Default NULL value is for backwards compatibility - it should always be provided.)
-	 * @param	array			$recurrings				Details about recurring costs
-	 * @return	bool
-	 */
-	public function checkValidity( Money $amount, ?GeoLocation $billingAddress = NULL, ?Customer $customer = NULL, array $recurrings = array() ) : bool
-	{
-		if( !NEXUS_TEST_GATEWAYS )
-		{
-			return false;
-		}
-
-		return parent::checkValidity( $amount, $billingAddress, $customer, $recurrings );
-	}
 	
 	/**
 	 * Payment Screen Fields
 	 *
-	 * @param	Invoice		$invoice	Invoice
-	 * @param	Money		$amount		The amount to pay now
-	 * @param Customer|null $member		The member the payment screen is for (if in the ACP charging to a member's card) or NULL for currently logged in member
-	 * @param array $recurrings	Details about recurring costs
-	 * @param string $type		'checkout' means the cusotmer is doing this on the normal checkout screen, 'admin' means the admin is doing this in the ACP, 'card' means the user is just adding a card
-	 * @return    array
+	 * @param	\IPS\nexus\Invoice		$invoice	Invoice
+	 * @param	\IPS\nexus\Money		$amount		The amount to pay now
+	 * @param	\IPS\nexus\Customer		$member		The member the payment screen is for (if in the ACP charging to a member's card) or NULL for currently logged in member
+	 * @param	array					$recurrings	Details about recurring costs
+	 * @param	bool					$type		'checkout' means the cusotmer is doing this on the normal checkout screen, 'admin' means the admin is doing this in the ACP, 'card' means the user is just adding a card
+	 * @return	array
 	 */
-	public function paymentScreen(Invoice $invoice, Money $amount, ?Customer $member = NULL, array $recurrings = array(), string $type = 'checkout' ): array
+	public function paymentScreen( \IPS\nexus\Invoice $invoice, \IPS\nexus\Money $amount, \IPS\nexus\Customer $member = NULL, $recurrings = array(), $type = 'checkout' )
 	{
 		return array();
 	}
@@ -81,11 +48,11 @@ class Test extends Gateway
 	/**
 	 * Capture
 	 *
-	 * @param	Transaction	$transaction	Transaction
-	 * @return    void
-	 * @throws	LogicException
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @return	void
+	 * @throws	\LogicException
 	 */
-	public function capture( Transaction $transaction ): void
+	public function capture( \IPS\nexus\Transaction $transaction )
 	{
 		
 	}
@@ -93,15 +60,14 @@ class Test extends Gateway
 	/**
 	 * Refund
 	 *
-	 * @param	Transaction	$transaction	Transaction to be refunded
-	 * @param mixed|NULL $amount			Amount to refund (NULL for full amount - always in same currency as transaction)
-	 * @param string|null $reason
-	 * @return    mixed                                    Gateway reference ID for refund, if applicable
-	 * @throws	Exception
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction to be refunded
+	 * @param	float|NULL				$amount			Amount to refund (NULL for full amount - always in same currency as transaction)
+	 * @return	mixed									Gateway reference ID for refund, if applicable
+	 * @throws	\Exception
  	 */
-	public function refund(Transaction $transaction, mixed $amount = NULL, ?string $reason = NULL): mixed
+	public function refund( \IPS\nexus\Transaction $transaction, $amount = NULL )
 	{
-		return null;
+		
 	}
 	
 	/* !ACP Configuration */
@@ -109,10 +75,10 @@ class Test extends Gateway
 	/**
 	 * Settings
 	 *
-	 * @param Form $form	The form
-	 * @return    void
+	 * @param	\IPS\Helpers\Form	$form	The form
+	 * @return	void
 	 */
-	public function settings( Form $form ): void
+	public function settings( &$form )
 	{
 		
 	}
@@ -120,11 +86,11 @@ class Test extends Gateway
 	/**
 	 * Test Settings
 	 *
-	 * @param array $settings	Settings
-	 * @return    array
-	 * @throws	InvalidArgumentException
+	 * @param	array	$settings	Settings
+	 * @return	array
+	 * @throws	\InvalidArgumentException
 	 */
-	public function testSettings(array $settings = array() ): array
+	public function testSettings( $settings )
 	{
 		return $settings;
 	}

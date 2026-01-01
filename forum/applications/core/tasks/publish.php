@@ -11,25 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content;
-use IPS\Db;
-use IPS\IPS;
-use IPS\Task;
-use IPS\Task\Exception;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0') . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * publish Task
  */
-class publish extends Task
+class _publish extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -39,35 +30,32 @@ class publish extends Task
 	 * If an error occurs which means the task could not finish running, throw an \IPS\Task\Exception - do not log an error as a normal log.
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
-	 * @return	string|null	Message to log or NULL
-	 * @throws	Exception
+	 * @return	mixed	Message to log or NULL
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		$types = array();
 
-		foreach ( Content::routedClasses( FALSE, FALSE, TRUE ) as $class )
+		foreach ( \IPS\Content::routedClasses( FALSE, FALSE, TRUE ) as $class )
 		{
-			if( IPS::classUsesTrait( $class, 'IPS\Content\FuturePublishing' ) )
+			if( is_subclass_of( $class, 'IPS\Content\FuturePublishing' ) )
 			{
 				$types[] = $class;
 			}
 		}
 
-		if( count( $types ) )
+		if( \count( $types ) )
 		{
 			foreach( $types as $class )
 			{
-				/* @var $databaseColumnMap array */
-				foreach( Db::i()->select( '*', $class::$databaseTable, array( $class::$databasePrefix . $class::$databaseColumnMap['is_future_entry'] . '=1 and ' . $class::$databasePrefix . $class::$databaseColumnMap['date'] . ' <= ' . time() ) ) as $row )
+				foreach( \IPS\Db::i()->select( '*', $class::$databaseTable, array( $class::$databasePrefix . $class::$databaseColumnMap['is_future_entry'] . '=1 and ' . $class::$databasePrefix . $class::$databaseColumnMap['date'] . ' <= ' . time() ) ) as $row )
 				{
 					$obj = $class::constructFromData( $row );
 					$obj->publish();
 				}
 			}
 		}
-
-		return NULL;
 	}
 	
 	/**

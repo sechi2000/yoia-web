@@ -11,52 +11,40 @@
 namespace IPS\core\modules\admin\activitystats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Email statistics
  */
-class emailstats extends Controller
+class _emailstats extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'emailstats_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'emailstats_manage' );
 
 		/* We can only view the stats if we have logging enabled */
-		if( Settings::i()->prune_log_emailstats == 0 )
+		if( \IPS\Settings::i()->prune_log_emailstats == 0 )
 		{
-			Output::i()->error( 'emaillogs_not_enabled', '1C395/1', 403, '' );
+			\IPS\Output::i()->error( 'emaillogs_not_enabled', '1C395/1', 403, '' );
 		}
 
 		parent::execute();
@@ -67,18 +55,20 @@ class emailstats extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$activeTab = $this->_getActiveTab();
-		$chart = Chart::loadFromExtension( 'core', ( $activeTab === 'emails' ) ? 'Emails' : 'EmailClicks' )->getChart( Url::internal( "app=core&module=activitystats&controller=emailstats&tab={$activeTab}" ) );
-		if ( Request::i()->isAjax() )
+
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', ( $activeTab === 'emails' ) ? 'Emails' : 'EmailClicks' )->getChart( \IPS\Http\Url::internal( "app=core&module=activitystats&controller=emailstats&tab={$activeTab}" ) );
+
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = (string) $chart;
+			\IPS\Output::i()->output = (string) $chart;
 		}
 		else
 		{	
-			Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_activitystats_emailstats');
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $this->_getAvailableTabs(), $activeTab, (string) $chart, Url::internal( "app=core&module=activitystats&controller=emailstats" ), 'tab', '', '' );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_activitystats_emailstats');
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $this->_getAvailableTabs(), $activeTab, (string) $chart, \IPS\Http\Url::internal( "app=core&module=activitystats&controller=emailstats" ), 'tab', '', 'ipsPad' );
 		}
 	}
 
@@ -87,10 +77,10 @@ class emailstats extends Controller
 	 *
 	 * @return string
 	 */
-	protected function _getActiveTab() : string
+	protected function _getActiveTab()
 	{
-		Request::i()->tab ??= 'emails';
-		return ( array_key_exists( Request::i()->tab, $this->_getAvailableTabs() ) ) ? Request::i()->tab : 'emails';
+		\IPS\Request::i()->tab ??= 'emails';
+		return ( array_key_exists( \IPS\Request::i()->tab, $this->_getAvailableTabs() ) ) ? \IPS\Request::i()->tab : 'emails';
 	}
 
 	/**
@@ -98,7 +88,7 @@ class emailstats extends Controller
 	 *
 	 * @return array
 	 */
-	protected function _getAvailableTabs() : array
+	protected function _getAvailableTabs()
 	{
 		return array(
 			'emails'	=> 'stats_emailstats_emails',

@@ -12,46 +12,35 @@
 namespace IPS\nexus\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db\Select;
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Select as FormSelect;
-use IPS\nexus\Money;
-use IPS\Theme;
-use LogicException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member filter extension
  */
-class TotalSpend extends MemberFilterAbstract
+class _TotalSpend
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param string $area Area to check (bulkmail, group_promotions, automatic_moderation)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'bulkmail' ) );
+		return \in_array( $area, array( 'bulkmail' ) );
 	}
 
 	/** 
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		return array( $this->_combine( 'nexus_bm_filters_total_spend', 'IPS\nexus\Form\Money', $criteria ) );
 	}
@@ -60,10 +49,10 @@ class TotalSpend extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return	array			False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array
+	public function save( $post )
 	{
 		$amounts = array();
 
@@ -78,10 +67,10 @@ class TotalSpend extends MemberFilterAbstract
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
-	 * @return    array|null    Where clause
+	 * @param	mixed				$data	The array returned from the save() method
+	 * @return	string|array|NULL	Where clause
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		if ( ( isset( $data['total_spend_operator'] ) and $data['total_spend_operator'] !== 'any' ) and isset( $data['total_spend_amounts'] ) )
 		{
@@ -111,13 +100,13 @@ class TotalSpend extends MemberFilterAbstract
 	 * Callback for member retrieval database query
 	 * Can be used to set joins
 	 *
-	 * @param array $data	The array returned from the save() method
-	 * @param	Select	$query	The query
+	 * @param	mixed			$data	The array returned from the save() method
+	 * @param	\IPS\Db\Query	$query	The query
 	 * @return	void
 	 */
-	public function queryCallback( array $data, Select $query ) : void
+	public function queryCallback( $data, &$query )
 	{
-		$currencies = Money::currencies();
+		$currencies = \IPS\nexus\Money::currencies();
 		$defaultCurrency = array_shift( $currencies );
 
 		if ( ( isset( $data['total_spend_operator'] ) and $data['total_spend_operator'] !== 'any' ) and isset( $data['total_spend_amounts'] ) )
@@ -130,11 +119,11 @@ class TotalSpend extends MemberFilterAbstract
 	 * Combine two fields
 	 *
 	 * @param	string		$name			Field name
-	 * @param	string		$field2Class	Classname for second field
-	 * @param	array		$criteria		Value returned from the save() method
-	 * @return	Custom
+	 * @param	bool		$field2Class	Classname for second field
+	 * @param	mixed		$criteria		Value returned from the save() method
+	 * @return	\IPS\Helpers\Form\Custom
 	 */
-	public function _combine( string $name, string $field2Class, array $criteria ) : Custom
+	public function _combine( $name, $field2Class, $criteria )
 	{
 		$validate = NULL;
 
@@ -150,13 +139,13 @@ class TotalSpend extends MemberFilterAbstract
 				)
 			);
 
-		$field1 = new FormSelect( $name . '_type', $criteria['total_spend_operator'] ?? '', FALSE, $options, NULL, NULL, NULL );
-		$field2 = new $field2Class( $name . '_unit', $criteria['total_spend_amounts'] ?? NULL, FALSE, array() );
+		$field1 = new \IPS\Helpers\Form\Select( $name . '_type', isset($criteria['total_spend_operator']) ? $criteria['total_spend_operator'] : '', FALSE, $options, NULL, NULL, NULL );
+		$field2 = new $field2Class( $name . '_unit', isset( $criteria['total_spend_amounts'] ) ? $criteria['total_spend_amounts'] : NULL, FALSE, array() );
 
-		return new Custom( $name, array( "gt", NULL ), FALSE, array(
+		return new \IPS\Helpers\Form\Custom( $name, array( "gt", NULL ), FALSE, array(
 			'getHtml'	=> function() use ( $name, $field1, $field2 )
 			{
-				return Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->combined( $name, $field1, $field2 );
+				return \IPS\Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->combined( $name, $field1, $field2 );
 			},
 			'formatValue'	=> function() use ( $field1, $field2 )
 			{

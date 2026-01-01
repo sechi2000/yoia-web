@@ -11,94 +11,77 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\Content\Controller;
-use IPS\core\DataLayer;
-use IPS\core\Warnings\Reason;
-use IPS\core\Warnings\Warning;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Table\Content;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member Warnings
  */
-class warnings extends Controller
+class _warnings extends \IPS\Content\Controller
 {
 	/**
 	 * [Content\Controller]	Class
 	 */
-	protected static string $contentModel = 'IPS\core\Warnings\Warning';
+	protected static $contentModel = 'IPS\core\Warnings\Warning';
 
+	/**
+	 * Rebuilt FURL
+	 */
+	protected $rebuiltUrl	= NULL;
+	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		parent::execute();
 		
-		if ( !Settings::i()->warn_on )
+		if ( !\IPS\Settings::i()->warn_on )
 		{
-			Output::i()->error( 'warning_system_disabled', '2C184/7', 403, '' );
+			\IPS\Output::i()->error( 'warning_system_disabled', '2C184/7', 403, '' );
 		}
 	}
 	
 	/**
 	 * View List
 	 *
-	 * @return	mixed
+	 * @return	void
 	 */
-	protected function manage() : mixed
+	protected function manage()
 	{
 		/* Load the member */
-		$member = Member::load( Request::i()->id );
+		$member = \IPS\Member::load( \IPS\Request::i()->id );
 		if ( !$member->member_id )
 		{
-			Output::i()->error( 'node_error', '2C135/A', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C135/A', 403, '' );
 		}
 		
 		/* Check permission */
-		if ( !( Settings::i()->warn_on AND ( Member::loggedIn()->modPermission('mod_see_warn') or ( Settings::i()->warn_show_own and Member::loggedIn()->member_id == $member->member_id ) ) ) )
+		if ( !( \IPS\Settings::i()->warn_on AND ( \IPS\Member::loggedIn()->modPermission('mod_see_warn') or ( \IPS\Settings::i()->warn_show_own and \IPS\Member::loggedIn()->member_id == $member->member_id ) ) ) )
 		{
-			Output::i()->error( 'no_module_permission', '2C135/9', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C135/9', 403, '' );
 		}
 		
-		$table = new Content( 'IPS\core\Warnings\Warning', Url::internal( "app=core&module=system&controller=warnings&id={$member->member_id}", 'front', 'warn_list', $member->members_seo_name ), array( array( 'wl_member=?', $member->member_id ) ) );
-		$table->rowsTemplate	  = array( Theme::i()->getTemplate( 'system', 'core', 'front' ), 'warningRow' );
+		$table = new \IPS\Helpers\Table\Content( 'IPS\core\Warnings\Warning', \IPS\Http\Url::internal( "app=core&module=system&controller=warnings&id={$member->member_id}", 'front', 'warn_list', $member->members_seo_name ), array( array( 'wl_member=?', $member->member_id ) ) );
+		$table->rowsTemplate	  = array( \IPS\Theme::i()->getTemplate( 'system', 'core', 'front' ), 'warningRow' );
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack('members_warnings', FALSE, array( 'sprintf' => array( $member->name ) ) );
-		Output::i()->breadcrumb[] = array( $member->url(), $member->name );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('members_warnings', FALSE, array( 'sprintf' => array( $member->name ) ) );
+		\IPS\Output::i()->breadcrumb[] = array( $member->url(), $member->name );
 		
-		if( !Request::i()->isAjax() )
+		if( !\IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'tables', 'core' )->container( (string) $table );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'tables', 'core' )->container( (string) $table );	
 		}
 		else
 		{
-			Output::i()->output = (string) $table;
+			\IPS\Output::i()->output = (string) $table;
 		}
-		return null;
+		
 	}
 	
 	/**
@@ -106,38 +89,31 @@ class warnings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function view() : void
+	protected function view()
 	{		
 		/* Load the member */
-		$member = Member::load( Request::i()->id );
+		$member = \IPS\Member::load( \IPS\Request::i()->id );
 		if ( !$member->member_id )
 		{
-			Output::i()->error( 'node_error', '2C135/4', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C135/4', 403, '' );
 		}
 		
 		/* Load it */
 		try
 		{
-			$warning = Warning::loadAndCheckPerms( Request::i()->w );
+			$warning = \IPS\core\Warnings\Warning::loadAndCheckPerms( \IPS\Request::i()->w );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C184/3', 404, '' );
-			return;
-		}
-
-		/* If the member viewing this is the member who was warned, log a data layer event */
-		if ( Member::loggedIn()->member_id === $warning->member and DataLayer::enabled( "analytics_full" ) )
-		{
-			DataLayer::i()->addEvent( 'warning_viewed', $warning->getDataLayerProperties() );
+			\IPS\Output::i()->error( 'node_error', '2C184/3', 404, '' );
 		}
 		
 		/* Show it */
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'view_warning_details' );
-		Output::i()->breadcrumb[] = array( $member->url(), $member->name );
-		Output::i()->breadcrumb[] = array( Url::internal( "app=core&module=system&controller=warnings&id={$member->member_id}", NULL, 'warn_list', $member->members_seo_name ), Member::loggedIn()->language()->addToStack('members_warnings', FALSE, array( 'sprintf' => array( $member->name ) ) ) );
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( 'view_warning_details' ) );
-		Output::i()->output = Theme::i()->getTemplate('modcp')->warnHovercard( $warning );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'view_warning_details' );
+		\IPS\Output::i()->breadcrumb[] = array( $member->url(), $member->name );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( "app=core&module=system&controller=warnings&id={$member->member_id}", NULL, 'warn_list', $member->members_seo_name ), \IPS\Member::loggedIn()->language()->addToStack('members_warnings', FALSE, array( 'sprintf' => array( $member->name ) ) ) );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( 'view_warning_details' ) );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('modcp')->warnHovercard( $warning );
 	}
 		
 	/**
@@ -145,32 +121,32 @@ class warnings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function warn() : void
+	protected function warn()
 	{
 		/* Load the member */
-		$member = Member::load( Request::i()->id );
+		$member = \IPS\Member::load( \IPS\Request::i()->id );
 		if ( !$member->member_id )
 		{
-			Output::i()->error( 'node_error', '2C135/2', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C135/2', 403, '' );
 		}
 		
 		/* Permission Check */
-		if ( !Member::loggedIn()->canWarn( $member ) )
+		if ( !\IPS\Member::loggedIn()->canWarn( $member ) )
 		{
-			Output::i()->error( 'no_module_permission', '2C184/6', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C184/6', 403, '' );
 		}
 
 		/* Build the form */
-		$form = Warning::create();
-		$form->class = 'ipsForm--vertical ipsForm--warn';
+		$form = \IPS\core\Warnings\Warning::create();
+		$form->class = 'ipsForm_vertical';
 		$form->attributes = array( 'data-controller' => 'core.front.modcp.warnForm', 'data-member' => $member->member_id );
-		$form->hiddenValues['ref'] = Request::i()->ref;
+		$form->hiddenValues['ref'] = \IPS\Request::i()->ref;
 		$form->hiddenValues['member'] = $member->member_id;
 		
 		/* Display */
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_modcp.js', 'core' ) );
-		$actions = Db::i()->select( '*', 'core_members_warn_actions', NULL, 'wa_points ASC' );
-		if ( count( $actions ) )
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_modcp.js', 'core' ) );
+		$actions = \IPS\Db::i()->select( '*', 'core_members_warn_actions', NULL, 'wa_points ASC' );
+		if ( \count( $actions ) )
 		{
 			$min = NULL;
 			foreach ( $actions as $a )
@@ -182,10 +158,10 @@ class warnings extends Controller
 				break;
 			}
 			
-			$form->addSidebar( Theme::i()->getTemplate( 'modcp' )->warnActions( $actions, $member, $min ) );
+			$form->addSidebar( \IPS\Theme::i()->getTemplate( 'modcp' )->warnActions( $actions, $member, $min ) );
 		}
-		Output::i()->title = Member::loggedIn()->language()->addToStack('warn_member', FALSE, array( 'sprintf' => array( $member->name ) ) );
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('warn_member', FALSE, array( 'sprintf' => array( $member->name ) ) );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/**
@@ -193,53 +169,47 @@ class warnings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function acknowledge() : void
+	protected function acknowledge()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Load the member */
-		$member = Member::load( Request::i()->id );
+		$member = \IPS\Member::load( \IPS\Request::i()->id );
 		if ( !$member->member_id )
 		{
-			Output::i()->error( 'node_error', '2C184/4', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2C184/4', 403, '' );
 		}
 		
 		/* Load it */
 		try
 		{
-			$warning = Warning::loadAndCheckPerms( Request::i()->w );
+			$warning = \IPS\core\Warnings\Warning::loadAndCheckPerms( \IPS\Request::i()->w );
 			
 			if ( $warning->member !== $member->member_id )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C184/5', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C184/5', 404, '' );
 		}
 				
 		/* Acknowledge it */
-		$alreadyAcknowledged = $warning->acknowledged;
 		$warning->acknowledged = TRUE;
 		$warning->save();
-		$member->members_bitoptions['unacknowledged_warnings'] = (bool) Db::i()->select( 'COUNT(*)', 'core_members_warn_logs', array( "wl_member=? AND wl_acknowledged=0", $member->member_id ), NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first();
+		/* @note SELECT_FROM_WRITE_SERVER: Avoid issue where warning may be in writer table, but not in reader */
+		$member->members_bitoptions['unacknowledged_warnings'] = (bool) \IPS\Db::i()->select( 'COUNT(*)', 'core_members_warn_logs', array( "wl_member=? AND wl_acknowledged=0", $member->member_id ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 		$member->save();
-
-		/* Data Layer */
-		if ( !$alreadyAcknowledged and DataLayer::enabled( "analytics_full" ) )
-		{
-			DataLayer::i()->addEvent( 'warning_acknowledged', $warning->getDataLayerProperties() );
-		}
 		
 		/* Redirect */
-		if ( $redirectTo = Request::i()->referrer() )
+		if ( $redirectTo = \IPS\Request::i()->referrer() )
 		{
-			Output::i()->redirect( $redirectTo );
+			\IPS\Output::i()->redirect( $redirectTo );
 		}
 		else
 		{
-			Output::i()->redirect( $warning->url() );
+			\IPS\Output::i()->redirect( $warning->url() );
 		}
 	}
 	
@@ -248,40 +218,39 @@ class warnings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
 		$class	= static::$contentModel;
 		try
 		{
-			/* @var Warning $class */
-			$item	= $class::loadAndCheckPerms( Request::i()->w );
-			$member	= Member::load( $item->member );
+			$item	= $class::loadAndCheckPerms( \IPS\Request::i()->w );
+			$member	= \IPS\Member::load( $item->member );
 			
 			if ( $item->canDelete() )
 			{
-				if ( isset( Request::i()->undo ) )
+				if ( isset( \IPS\Request::i()->undo ) )
 				{
-					Session::i()->csrfCheck();
-					if ( Request::i()->undo )
+					\IPS\Session::i()->csrfCheck();
+					if ( \IPS\Request::i()->undo )
 					{
 						$item->undo();
 					}
 					$item->delete();
-					Output::i()->redirect( $member->url(), 'warn_revoked' );
+					\IPS\Output::i()->redirect( $member->url(), 'warn_revoked' );
 				}
 				else
 				{
-					Output::i()->output = Theme::i()->getTemplate('modcp')->warningRevoke( $item );
+					\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('modcp')->warningRevoke( $item );
 				}
 			}
 			else
 			{
-				Output::i()->error( 'generic_error', '2C184/1', 403, '' );
+				\IPS\Output::i()->error( 'generic_error', '2C184/1', 403, '' );
 			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C184/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C184/2', 404, '' );
 		}
 	}
 	
@@ -290,12 +259,12 @@ class warnings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function reasonAjax() : void
+	protected function reasonAjax()
 	{
 		/* Check permission */
-		if ( ! ( Settings::i()->warn_on AND Member::loggedIn()->modPermission('mod_see_warn') ) )
+		if ( ! ( \IPS\Settings::i()->warn_on AND \IPS\Member::loggedIn()->modPermission('mod_see_warn') ) )
 		{
-			Output::i()->error( 'no_module_permission', '2C135/9', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C135/9', 403, '' );
 		}
 		
 		$remove = array(
@@ -304,9 +273,9 @@ class warnings extends Controller
 			'unlimited'	=> TRUE,
 		);
 		
-		if ( Request::i()->id == 'other' )
+		if ( \IPS\Request::i()->id == 'other' )
 		{
-			Output::i()->json( array(
+			\IPS\Output::i()->json( array(
 				'points'			=> 0,
 				'points_override'	=> TRUE,
 				'remove'			=> $remove,
@@ -319,19 +288,19 @@ class warnings extends Controller
 		
 		try
 		{	
-			$reason = Reason::load( Request::i()->id );
+			$reason = \IPS\core\Warnings\Reason::load( \IPS\Request::i()->id );
 			
 			/* Add in the remove properties */
 			if ( $reason->remove AND $reason->remove != -1 )
 			{
-				$date = DateTime::create();
+				$date = \IPS\DateTime::create();
 				if ( $reason->remove_unit == 'h' )
 				{
-					$date->add( new DateInterval( "PT{$reason->remove}H" ) );
+					$date->add( new \DateInterval( "PT{$reason->remove}H" ) );
 				}
 				else
 				{
-					$date->add( new DateInterval( "P{$reason->remove}D" ) );
+					$date->add( new \DateInterval( "P{$reason->remove}D" ) );
 				}
 				
 				$remove = array(
@@ -341,7 +310,7 @@ class warnings extends Controller
 				);
 			}
 						
-			Output::i()->json( array(
+			\IPS\Output::i()->json( array(
 				'points'			=> $reason->points,
 				'points_override'	=> $reason->points_override,
 				'remove'			=> $remove,
@@ -352,9 +321,9 @@ class warnings extends Controller
 			)	);
 		}
 		
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->json( array(
+			\IPS\Output::i()->json( array(
 				'points'			=> 0,
 				'points_override'	=> FALSE,
 				'remove'			=> $remove,
@@ -371,7 +340,7 @@ class warnings extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function actionAjax() : void
+	protected function actionAjax()
 	{
 		$actions = array(
 			'mq'	=> array(
@@ -391,17 +360,17 @@ class warnings extends Controller
 			),
 		);
 		
-		$member = Member::load( Request::i()->member );
+		$member = \IPS\Member::load( \IPS\Request::i()->member );
 		
 		/* Check permission */
-		if ( !( Settings::i()->warn_on AND ( Member::loggedIn()->modPermission('mod_see_warn') or ( Settings::i()->warn_show_own and Member::loggedIn()->member_id == $member->member_id ) ) ) )
+		if ( !( \IPS\Settings::i()->warn_on AND ( \IPS\Member::loggedIn()->modPermission('mod_see_warn') or ( \IPS\Settings::i()->warn_show_own and \IPS\Member::loggedIn()->member_id == $member->member_id ) ) ) )
 		{
-			Output::i()->error( 'no_module_permission', '2C135/9', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C135/9', 403, '' );
 		}
 		
 		try
 		{
-			$action = Db::i()->select( '*', 'core_members_warn_actions', array( 'wa_points<=?', ( $member->warn_level + (int) Request::i()->points ) ), 'wa_points DESC', 1 )->first();
+			$action = \IPS\Db::i()->select( '*', 'core_members_warn_actions', array( 'wa_points<=?', ( $member->warn_level + (int) \IPS\Request::i()->points ) ), 'wa_points DESC', 1 )->first();
 			foreach ( array( 'mq', 'rpa', 'suspend' ) as $k )
 			{
 				if ( $action[ 'wa_' . $k ] == -1 )
@@ -410,18 +379,18 @@ class warnings extends Controller
 				}
 				elseif ( $action[ 'wa_' . $k ] )
 				{
-					$date = DateTime::ts( time() )->add( new DateInterval( $action[ 'wa_' . $k . '_unit' ] == 'h' ? "PT{$action[ 'wa_' . $k ]}H" : "P{$action[ 'wa_' . $k ]}D" ) );
+					$date = \IPS\DateTime::ts( time() )->add( new \DateInterval( $action[ 'wa_' . $k . '_unit' ] == 'h' ? "PT{$action[ 'wa_' . $k ]}H" : "P{$action[ 'wa_' . $k ]}D" ) );
 					
 					$actions[ $k ]['date'] = $date->format( 'Y-m-d' );
 					$actions[ $k ]['time'] = $date->format( 'H:i' );
 				}
 			}
 		}
-		catch ( UnderflowException $e ) { }
+		catch ( \UnderflowException $e ) { }
 		
-		Output::i()->json( array(
+		\IPS\Output::i()->json( array(
 			'actions'	=> $actions,
-			'override'	=> isset( $action ) ? $action['wa_override'] : Member::loggedIn()->modPermission('warning_custom_noaction')
+			'override'	=> isset( $action ) ? $action['wa_override'] : \IPS\Member::loggedIn()->modPermission('warning_custom_noaction')
 		)	);
 	}
 }

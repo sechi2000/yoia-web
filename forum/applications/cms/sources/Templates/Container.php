@@ -12,68 +12,62 @@
 namespace IPS\cms\Templates;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Http\Url\Friendly;
-use IPS\Patterns\ActiveRecord;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Template Model
  */
-class Container extends ActiveRecord
+class _Container extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons = array();
+	protected static $multitons = array();
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'container_';
+	public static $databasePrefix = 'container_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Table
 	 */
-	public static ?string $databaseTable = 'cms_containers';
+	public static $databaseTable = 'cms_containers';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'container_key' );
+	protected static $databaseIdFields = array( 'container_key' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	Have fetched all?
 	 */
-	protected static bool $gotAll = FALSE;
+	protected static $gotAll = FALSE;
 	
 	/**
 	 * Return all containers
 	 *
 	 * @return	array
 	 */
-	public static function containers() : array
+	public static function containers()
 	{
 		if ( ! static::$gotAll )
 		{
-			foreach( Db::i()->select( '*', static::$databaseTable ) as $container )
+			foreach( \IPS\Db::i()->select( '*', static::$databaseTable ) as $container )
 			{
 				static::$multitons[ $container['container_id'] ] = static::constructFromData( $container );
 			}
@@ -90,7 +84,7 @@ class Container extends ActiveRecord
 	 * @param string $type		Type of container (template_block, page, etc)
 	 * @return array	of Container objects
 	 */
-	public static function getByType( string $type ) : array
+	public static function getByType( $type )
 	{
 		$return = array();
 		static::containers();
@@ -115,20 +109,18 @@ class Container extends ActiveRecord
 	 * Add a new container
 	 *
 	 * @param	array	$container	Template Data
-	 * @return	static
+	 * @return	object	\IPS\cms\Templates
 	 */
-	public static function add( array $container ) : static
+	public static function add( $container )
 	{
 		$newContainer = new static;
 		$newContainer->_new = TRUE;
-		$newContainer->name = $container['name'];
-		$newContainer->type = $container['type'];
 		$newContainer->save();
 	
 		/* Create a unique key */
 		if ( empty( $newContainer->key ) )
 		{
-			$newContainer->key = 'template__' . Friendly::seoTitle( $newContainer->name ) . '.' . $newContainer->id;
+			$newContainer->key = 'template__' . \IPS\Http\Url\Friendly::seoTitle( $newContainer->name ) . '.' . $newContainer->id;
 			$newContainer->save();
 		}
 		

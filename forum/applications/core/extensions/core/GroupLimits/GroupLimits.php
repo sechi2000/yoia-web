@@ -11,14 +11,9 @@
 namespace IPS\core\extensions\core\GroupLimits;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\GroupLimitsAbstract;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -28,20 +23,20 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * This extension is used to define which limit values "win" when a user has secondary groups defined
  *
  */
-class GroupLimits extends GroupLimitsAbstract
+class _GroupLimits
 {
 	/**
 	 * Get group limits by priority
 	 *
 	 * @return	array
 	 */
-	public function getLimits(): array
+	public function getLimits()
 	{
 		return array(
-			'exclude' 		=> array( 'g_id', 'g_icon', 'g_icon_width', 'prefix', 'suffix', 'g_promotion', 'g_bitoptions' ),
+			'exclude' 		=> array( 'g_id', 'g_icon', 'prefix', 'suffix', 'g_promotion', 'g_bitoptions' ),
 			'lessIsMore'	=> array( 'g_search_flood', 'g_pm_flood_mins' ),
 			'neg1IsBest'	=> array( 'g_attach_max', 'g_max_bgimg_upload', 'g_max_messages', 'g_pm_perday', 'g_pm_flood_mins', 'g_max_mass_pm', 'g_rep_max_positive' ),
-			'zeroIsBest'	=> array( 'g_displayname_unit', 'g_sig_unit', 'g_mod_preview', 'g_ppd_limit', 'g_ppd_unit', 'g_max_bgimg_upload', 'gbw_disable_prefixes', 'gbw_disable_tagging' ),
+			'zeroIsBest'	=> array( 'g_displayname_unit', 'g_sig_unit', 'g_mod_preview', 'g_ppd_limit', 'g_ppd_unit', 'gbw_no_status_update', 'g_max_bgimg_upload', 'gbw_disable_prefixes', 'gbw_disable_tagging' ),
 			'callback'		=> array(
 				'g_edit_cutoff'				=> array( $this, '_editCutoff' ),
 				'g_attach_per_post'			=> array( $this, '_attachMaxPerPost' ),
@@ -70,9 +65,9 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$b		Group B's values
 	 * @param	string	$k		The key we want to get the combined value for
 	 * @param	array	$member	Member data
-	 * @return	int
+	 * @return	mixed
 	 */
-	public function _hideOnlineList( array $a, array $b, string $k, array $member ) : int
+	public function _hideOnlineList( $a, $b, $k, $member )
 	{
 		/* If any group is forced, use that as priority */
 		if( $a[$k] == 1 OR $b[$k] == 1 )
@@ -98,9 +93,9 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$b		Group B's values
 	 * @param	string	$k		The key we want to get the combined value for
 	 * @param	array	$member	Member data
-	 * @return	int
+	 * @return	mixed
 	 */
-	public function _editCutoff( array $a, array $b, string $k, array $member ) : int
+	public function _editCutoff( $a, $b, $k, $member )
 	{
 		$cutoff	= array();
 
@@ -128,7 +123,7 @@ class GroupLimits extends GroupLimitsAbstract
 			}
 		}
 
-		return count( $cutoff ) ? max( $cutoff ) : 0;
+		return \count( $cutoff ) ? max( $cutoff ) : 0;
 	}
 
 	/**
@@ -138,9 +133,9 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$b		Group B's values
 	 * @param	string	$k		The key we want to get the combined value for
 	 * @param	array	$member	Member data
-	 * @return	int
+	 * @return	mixed
 	 */
-	public function _attachMaxPerPost( array $a, array $b, string $k, array $member ) : int
+	public function _attachMaxPerPost( $a, $b, $k, $member )
 	{
 		$maxAttachments	= array();
 
@@ -168,7 +163,7 @@ class GroupLimits extends GroupLimitsAbstract
 			}
 		}
 
-		return count( $maxAttachments ) ? max( $maxAttachments ) : 0;
+		return \count( $maxAttachments ) ? max( $maxAttachments ) : 0;
 	}
 
 	/**
@@ -178,9 +173,9 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$b		Group B's values
 	 * @param	string	$k		The key we want to get the combined value for
 	 * @param	array	$member	Member data
-	 * @return	int|string
+	 * @return	mixed
 	 */
-	public function _perAppSettings( array $a, array $b, string $k, array $member ) : int|string
+	public function _perAppSettings( $a, $b, $k, $member )
 	{
 		if ( $a[ $k ] == 1 or $b[ $k ] == 1 )
 		{
@@ -210,9 +205,9 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$b		Group B's values
 	 * @param	string	$k		The key we want to get the combined value for
 	 * @param	array	$member	Member data
-	 * @return	string|null
+	 * @return	mixed
 	 */
-	public function _signatureLimits( array $a, array $b, string $k, array $member ) : ?string
+	public function _signatureLimits( $a, $b, $k, $member )
 	{
 		/* No limits should win out */
 		if( !$a[ $k ] )
@@ -288,9 +283,9 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$b		Group B's values
 	 * @param	string	$k		The key we want to get the combined value for
 	 * @param	array	$member	Member data
-	 * @return	string|null
+	 * @return	mixed
 	 */
-	public function _photoVars( array $a, array $b, string $k, array $member ) : ?string
+	public function _photoVars( $a, $b, $k, $member )
 	{
 		/* No limits should win out */
 		if( !$a[ $k ] )
@@ -350,7 +345,7 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$member	Member data
 	 * @return	mixed
 	 */
-	public function _displayNameDate( array $a, array $b, string $k, array $member ) : mixed
+	public function _displayNameDate( $a, $b, $k, $member )
 	{
 		/* This is handled by g_dname_changes below */
 		return $a['g_dname_date'];
@@ -363,9 +358,9 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$b		Group B's values
 	 * @param	string	$k		The key we want to get the combined value for
 	 * @param	array	$member	Member data
-	 * @return	array
+	 * @return	mixed
 	 */
-	public function _displayNameChanges( array $a, array $b, string $k, array $member ) : array
+	public function _displayNameChanges( $a, $b, $k, $member )
 	{
 		$changes	= $b[ $k ];
 		/* Get the most generous date allowance */
@@ -438,7 +433,7 @@ class GroupLimits extends GroupLimitsAbstract
 					'g_dname_changes'	=> $changes
 				);
 			}
-			else if( $a[ $k ] )
+			else if( $a['g_dname_date'] AND $a[ $k ] )
 			{
 				$_oldCompare	= $a['g_dname_date'] / $a[ $k ];
 
@@ -451,8 +446,6 @@ class GroupLimits extends GroupLimitsAbstract
 				}
 			}
 		}
-
-		return [];
 	}
 	
 	/**
@@ -464,7 +457,7 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$member	Member data
 	 * @return	mixed
 	 */
-	public function _modPostUnitType( array $a, array $b, string $k, array $member ) : mixed
+	public function _modPostUnitType( $a, $b, $k, $member )
 	{
 		/* This is handled by g_mod_post_unit below */
 		return $a['gbw_mod_post_unit_type'];
@@ -479,7 +472,7 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$member	Member data
 	 * @return	mixed
 	 */
-	public function _modPostUnit( array $a, array $b, string $k, array $member ) : mixed
+	public function _modPostUnit( $a, $b, $k, $member )
 	{
 		/* Have we met the current requirements? */
 		if ( ( !$a['gbw_mod_post_unit_type'] and $a['g_mod_post_unit'] >= $member['member_posts'] ) or ( $a['gbw_mod_post_unit_type'] and time() >= ( $member['joined'] + ( $a['g_mod_post_unit'] * 3600 ) ) ) )
@@ -504,9 +497,9 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$b		Group B's values
 	 * @param	string	$k		The key we want to get the combined value for
 	 * @param	array	$member	Member data
-	 * @return	string
+	 * @return	mixed
 	 */
-	public function _clubNodes( array $a, array $b, string $k, array $member ) : string
+	public function _clubNodes( $a, $b, $k, $member )
 	{
 		if ( $a[$k] == '*' or $b[$k] == '*' )
 		{
@@ -526,9 +519,9 @@ class GroupLimits extends GroupLimitsAbstract
 	 * @param	array	$b		Group B's values
 	 * @param	string	$k		The key we want to get the combined value for
 	 * @param	array	$member	Member data
-	 * @return	string
+	 * @return	mixed
 	 */
-	public function _createClub( array $a, array $b, string $k, array $member ) : string
+	public function _createClub( $a, $b, $k, $member )
 	{
 		if ( $a[$k] == '*' or $b[$k] == '*' )
 		{

@@ -11,25 +11,16 @@
 namespace IPS\core\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Helpers\Form\KeyValue;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Url;
-use IPS\Theme;
-use LengthException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Key/Value input class for social profile links
  */
-class SocialProfiles extends KeyValue
+class _SocialProfiles extends \IPS\Helpers\Form\KeyValue
 {
 	/**
 	 * @brief	Default Options
@@ -41,7 +32,7 @@ class SocialProfiles extends KeyValue
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'key'		=> array(
 		),
 		'value'		=> array(
@@ -51,25 +42,25 @@ class SocialProfiles extends KeyValue
 	/**
 	 * @brief	Key Object
 	 */
-	public mixed $keyField = NULL;
+	public $keyField = NULL;
 	
 	/**
 	 * @brief	Value Object
 	 */
-	public mixed $valueField = NULL;
+	public $valueField = NULL;
 	
 	/**
 	 * Constructor
 	 * Creates the two date objects
 	 *
-	 * @param	string $name			Form helper name
-	 * @param mixed|null $defaultValue	Default value for the helper
-	 * @param bool|null $required		Helper is required (TRUE) or not (FALSE)
-	 * @param array $options		Options for the helper instance
+	 * @param	string		$name			Form helper name
+	 * @param	mixed		$defaultValue	Default value for the helper
+	 * @param	bool		$required		Helper is required (TRUE) or not (FALSE)
+	 * @param	array		$options		Options for the helper instance
+	 * @see		\IPS\Helpers\Form\Abstract::__construct
 	 * @return	void
-	 *@see		\IPS\Helpers\Form\Abstract::__construct
 	 */
-	public function __construct(string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array() )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array() )
 	{
 		$options = array_merge( $this->defaultOptions, $options );
 
@@ -77,20 +68,20 @@ class SocialProfiles extends KeyValue
 
 		parent::__construct( $name, $defaultValue, $required, $options );
 		
-		$this->keyField = new Url( "{$name}[key]", $defaultValue['key'] ?? NULL, FALSE, $options['key'] ?? array() );
-		$this->valueField = new Select( "{$name}[value]", $defaultValue['value'] ?? NULL, FALSE, $options['value'] ?? array() );
+		$this->keyField = new \IPS\Helpers\Form\Url( "{$name}[key]", isset( $defaultValue['key'] ) ? $defaultValue['key'] : NULL, FALSE, isset( $options['key'] ) ? $options['key'] : array() );
+		$this->valueField = new \IPS\Helpers\Form\Select( "{$name}[value]", isset( $defaultValue['value'] ) ? $defaultValue['value'] : NULL, FALSE, isset( $options['value'] ) ? $options['value'] : array() );
 	}
 
 	/**
 	 * Add social networks to the options array
 	 *
 	 * @note	Abstracted so third parties can extend as needed
-	 * @param array $options	Options array
+	 * @param	array 	$options	Options array
 	 * @return	array
 	 */
-	protected function addSocialNetworks( array $options ): array
+	protected function addSocialNetworks( $options )
 	{
-		$values = [
+		$values = array(
 			'facebook'		=> "siteprofilelink_facebook",
 			'youtube'		=> "siteprofilelink_youtube",
 			'x'				=> "siteprofilelink_x",
@@ -111,7 +102,7 @@ class SocialProfiles extends KeyValue
 			'twitch'		=> "siteprofilelink_twitch",
 			'bluesky'		=> "siteprofilelink_bluesky",
 			'tiktok'		=> "siteprofilelink_tiktok",
-		];
+		);
 
 		asort( $values );
 		$options['value']['options'] = $values;
@@ -122,9 +113,9 @@ class SocialProfiles extends KeyValue
 	/**
 	 * Format Value
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function formatValue(): array
+	public function formatValue()
 	{
 		return array(
 			'key'	=> $this->keyField->formatValue(),
@@ -137,19 +128,19 @@ class SocialProfiles extends KeyValue
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		return Theme::i()->getTemplate( 'forms', 'core', 'admin' )->socialProfiles( $this->keyField->html(), $this->valueField->html() );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'admin' )->socialProfiles( $this->keyField->html(), $this->valueField->html() );
 	}
 	
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
-	 * @throws	LengthException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\LengthException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		$this->keyField->validate();
 		$this->valueField->validate();
@@ -159,7 +150,5 @@ class SocialProfiles extends KeyValue
 			$validationCode = $this->customValidationCode;
 			$validationCode( $this->value );
 		}
-
-		return TRUE;
 	}
 }

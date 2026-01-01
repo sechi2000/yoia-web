@@ -11,55 +11,40 @@
 namespace IPS\core\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Achievements\Badge;
-use IPS\core\Achievements\Rank;
-use IPS\Db;
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\YesNo;
-use IPS\Member;
-use IPS\Theme;
-use LogicException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member filter: Achievements
  */
-class Achievements extends MemberFilterAbstract
+class _Achievements
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param string $area Area to check (bulkmail, group_promotions, automatic_moderation, passwordreset)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'bulkmail', 'group_promotions', 'automatic_moderation' ) );
+		return \in_array( $area, array( 'bulkmail', 'group_promotions', 'automatic_moderation' ) );
 	}
 
 	/**
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		/* Get our badges */
 		$badges['options'] = [];
 
-		foreach( Badge::roots() as $badge )
+		foreach( \IPS\core\Achievements\Badge::roots() as $badge )
 		{
 			$badges['options'][ $badge->id ] = $badge->_title;
 		}
@@ -69,7 +54,7 @@ class Achievements extends MemberFilterAbstract
 
 		if( isset( $criteria['achievement_badges'] ) )
 		{
-			if( ! count( array_diff( $_options, explode( ',', $criteria['achievement_badges'] ) ) ) )
+			if( ! \count( array_diff( $_options, explode( ',', $criteria['achievement_badges'] ) ) ) )
 			{
 				$criteria['achievement_badges'] = 'all';
 			}
@@ -78,7 +63,7 @@ class Achievements extends MemberFilterAbstract
 		/* Get our ranks */
 		$ranks['options'] = [];
 
-		foreach( Rank::roots() as $rank )
+		foreach( \IPS\core\Achievements\Rank::roots() as $rank )
 		{
 			$ranks['options'][ $rank->id ] = $rank->_title;
 		}
@@ -87,14 +72,14 @@ class Achievements extends MemberFilterAbstract
 		$_options = array_keys( $ranks['options'] );
 
 		$return = array(
-			new Custom( 'mf_points', array( 0 => $criteria['achievement_points_operator'] ?? NULL, 1 => $criteria['achievement_points_value'] ?? NULL ), FALSE, array(
+			new \IPS\Helpers\Form\Custom( 'mf_points', array( 0 => isset( $criteria['achievement_points_operator'] ) ? $criteria['achievement_points_operator'] : NULL, 1 => isset( $criteria['achievement_points_value'] ) ? $criteria['achievement_points_value'] : NULL ), FALSE, array(
 				'getHtml'	=> function( $element )
 				{
-					return Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", $element->value[0], $element->required, array(
-							'any'	=> Member::loggedIn()->language()->addToStack('any'),
-							'gt'	=> Member::loggedIn()->language()->addToStack('gt'),
-							'lt'	=> Member::loggedIn()->language()->addToStack('lt'),
-							'eq'	=> Member::loggedIn()->language()->addToStack('exactly'),
+					return \IPS\Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", $element->value[0], $element->required, array(
+							'any'	=> \IPS\Member::loggedIn()->language()->addToStack('any'),
+							'gt'	=> \IPS\Member::loggedIn()->language()->addToStack('gt'),
+							'lt'	=> \IPS\Member::loggedIn()->language()->addToStack('lt'),
+							'eq'	=> \IPS\Member::loggedIn()->language()->addToStack('exactly'),
 						),
 							FALSE,
 							NULL,
@@ -106,17 +91,17 @@ class Achievements extends MemberFilterAbstract
 								'eq'	=> array( 'elNumber_' . $element->name . '-qty' ),
 							) )
 						. ' '
-						. Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( "{$element->name}[1]", $element->value[1], $element->required, NULL, FALSE, NULL, NULL, NULL, 0, NULL, FALSE, NULL, array(), array(), array(), $element->name . '-qty' );
+						. \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( "{$element->name}[1]", $element->value[1], $element->required, NULL, FALSE, NULL, NULL, NULL, 0, NULL, FALSE, NULL, array(), array(), array(), $element->name . '-qty' );
 				}
 			), NULL, NULL, NULL, 'mp_points' )
 		);
 
-		if( count( $badges['options'] ) )
+		if( \count( $badges['options'] ) )
 		{
-			$return[] = new YesNo( 'mf_badges_choose', ( !empty( $criteria['achievement_badges'] ) AND $criteria['achievement_badges'] !== 'ignore' ), FALSE, array(
+			$return[] = new \IPS\Helpers\Form\YesNo( 'mf_badges_choose', ( !empty( $criteria['achievement_badges'] ) AND $criteria['achievement_badges'] !== 'ignore' ), FALSE, array(
 				'togglesOn' => [ 'mf_badges' ]
 			), NULL, NULL, NULL, 'mf_badges_choose' );
-			$return[] = new CheckboxSet( 'mf_badges', ( isset( $criteria['achievement_badges'] ) AND $criteria['achievement_badges'] != 'ignore' ) ? ( $criteria['achievement_badges'] === 'all' ? 'all' : explode( ',', $criteria['achievement_badges'] ) ) : [], FALSE, array(
+			$return[] = new \IPS\Helpers\Form\CheckboxSet( 'mf_badges', ( isset( $criteria['achievement_badges'] ) AND $criteria['achievement_badges'] != 'ignore' ) ? ( $criteria['achievement_badges'] === 'all' ? 'all' : explode( ',', $criteria['achievement_badges'] ) ) : [], FALSE, array(
 				'options'		=> $badges['options'],
 				'multiple'		=> TRUE,
 				'unlimited'		=> 'all',
@@ -125,12 +110,12 @@ class Achievements extends MemberFilterAbstract
 			), NULL, NULL, NULL, 'mf_badges' );
 		}
 
-		if( count( $ranks['options'] ) )
+		if( \count( $ranks['options'] ) )
 		{
-			$return[] = new YesNo( 'mf_ranks_choose', ( !empty( $criteria['achievement_ranks'] ) AND $criteria['achievement_ranks'] !== 'ignore' ), FALSE, array(
+			$return[] = new \IPS\Helpers\Form\YesNo( 'mf_ranks_choose', ( !empty( $criteria['achievement_ranks'] ) AND $criteria['achievement_ranks'] !== 'ignore' ), FALSE, array(
 				'togglesOn' => [ 'mf_ranks' ]
 			), NULL, NULL, NULL, 'mf_ranks_choose' );
-			$return[] = new CheckboxSet( 'mf_ranks', ( isset( $criteria['achievement_ranks'] ) AND $criteria['achievement_ranks'] !== 'ignore' ) ? ( $criteria['achievement_ranks'] === 'all' ? 'all' : explode( ',', $criteria['achievement_ranks'] ) ) : [], FALSE, array(
+			$return[] = new \IPS\Helpers\Form\CheckboxSet( 'mf_ranks', ( isset( $criteria['achievement_ranks'] ) AND $criteria['achievement_ranks'] !== 'ignore' ) ? ( $criteria['achievement_ranks'] === 'all' ? 'all' : explode( ',', $criteria['achievement_ranks'] ) ) : [], FALSE, array(
 				'options'		=> $ranks['options'],
 				'multiple'		=> TRUE,
 				'unlimited'		=> 'all',
@@ -146,10 +131,10 @@ class Achievements extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return	array			False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array
+	public function save( $post )
 	{
 		return array(
 			'achievement_points_operator' => $post['mf_points'][0],
@@ -162,10 +147,10 @@ class Achievements extends MemberFilterAbstract
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		$where = [];
 		if ( $data['achievement_points_operator'] and $data['achievement_points_value'] )
@@ -192,16 +177,16 @@ class Achievements extends MemberFilterAbstract
 			}
 			else
 			{
-				$badgeWhere = Db::i()->in( 'badge', explode( ',', $data['achievement_badges'] ) );
+				$badgeWhere = \IPS\Db::i()->in( 'badge', explode( ',', $data['achievement_badges'] ) );
 			}
 
-			$badgeSelect = Db::i()->select( 'member', 'core_member_badges', $badgeWhere, NULL, NULL, NULL, NULL, Db::SELECT_DISTINCT );
+			$badgeSelect = \IPS\Db::i()->select( 'member', 'core_member_badges', $badgeWhere, NULL, NULL, NULL, NULL, \IPS\Db::SELECT_DISTINCT );
 			$where[] = 'core_members.member_id IN(' . $badgeSelect . ')';
 		}
 
 		if ( $data['achievement_ranks'] != 'ignore' )
 		{
-			$ranks = Rank::getStore();
+			$ranks = \IPS\core\Achievements\Rank::getStore();
 			$rankWhere = [];
 
 			if( $data['achievement_ranks'] == 'all' )
@@ -247,25 +232,25 @@ class Achievements extends MemberFilterAbstract
 				}
 			}
 
-			if ( count( $rankWhere ) )
+			if ( \count( $rankWhere ) )
 			{
 				$where[] = '(' . implode( ' OR ', $rankWhere ) . ')';
 			}
 		}
 
-		return count( $where ) ? $where : NULL;
+		return \count( $where ) ? '(' . implode( ' AND ', $where ) . ')' : NULL;
 	}
 
 	/**
 	 * Determine if a member matches specified filters
 	 *
 	 * @note	This is only necessary if availableIn() includes group_promotions
-	 * @param	Member	$member		Member object to check
+	 * @param	\IPS\Member	$member		Member object to check
 	 * @param	array 		$filters	Previously defined filters
 	 * @param	object|NULL	$object		Calling class
 	 * @return	bool
 	 */
-	public function matches( Member $member, array $filters, ?object $object=NULL ) : bool
+	public function matches( \IPS\Member $member, $filters, $object=NULL )
 	{
 		if ( ( isset( $filters['achievement_points_operator'] ) and ( $filters['achievement_points_operator'] ) and $filters['achievement_points_operator'] != 'any' ) and ( isset( $filters['achievement_points_value'] ) ) )
 		{
@@ -273,10 +258,10 @@ class Achievements extends MemberFilterAbstract
 			switch ( $filters['achievement_points_operator'] )
 			{
 				case 'gt':
-					$pass = ( $member->achievements_points > (int) $filters['achievement_points_value'] );
+					$pass = (bool) ( $member->achievements_points > (int) $filters['achievement_points_value'] );
 					break;
 				case 'lt':
-					$pass = ( $member->achievements_points < (int) $filters['achievement_points_value'] );
+					$pass = (bool) ( $member->achievements_points < (int) $filters['achievement_points_value'] );
 					break;
 				case 'eq':
 					$pass = (bool) ( $member->achievements_points = (int) $filters['achievement_points_value'] );
@@ -293,7 +278,7 @@ class Achievements extends MemberFilterAbstract
 		/* Lets check badges */
 		if ( isset( $filters['achievement_badges'] ) and $filters['achievement_badges'] != 'ignore' )
 		{
-			if ( ! Db::i()->select( 'COUNT(*)', 'core_member_badges', [ 'member=? AND ' . Db::i()->in( 'badge', explode( ',', $filters['achievement_badges'] ) ), $member->member_id ] )->first() )
+			if ( ! \IPS\Db::i()->select( 'COUNT(*)', 'core_member_badges', [ 'member=? AND ' . \IPS\Db::i()->in( 'badge', explode( ',', $filters['achievement_badges'] ) ), $member->member_id ] )->first() )
 			{
 				/* Did not find a badge, so they failed the match */
 				return FALSE;
@@ -303,7 +288,7 @@ class Achievements extends MemberFilterAbstract
 		/* Let's check ranks */
 		if ( isset( $filters['achievement_ranks'] ) and $filters['achievement_ranks'] != 'ignore' )
 		{
-			$ranks = Rank::getStore();
+			$ranks = \IPS\core\Achievements\Rank::getStore();
 			$pass = FALSE;
 
 			if( $filters['achievement_ranks'] == 'all' )
@@ -337,7 +322,7 @@ class Achievements extends MemberFilterAbstract
 
 				if ( $minPoints and $maxPoints )
 				{
-					$pass = ( $member->achievements_points >= $minPoints AND $member->achievements_points <= ($maxPoints - 1) );
+					$pass = (bool) $member->achievements_points >= $minPoints AND $member->achievements_points <= ($maxPoints - 1);
 				}
 				elseif ( $minPoints )
 				{
@@ -363,10 +348,10 @@ class Achievements extends MemberFilterAbstract
 	/**
 	 * Return a lovely human description for this rule if used
 	 *
-	 * @param	array				$filters	The array returned from the save() method
+	 * @param	mixed				$filters	The array returned from the save() method
 	 * @return	string|NULL
 	 */
-	public function getDescription( array $filters ) : ?string
+	public function getDescription( $filters )
 	{
 		$message = [];
 		if ( ! empty( $filters['achievement_points_value'] ) and $filters['achievement_points_value'] > 0 )
@@ -374,41 +359,41 @@ class Achievements extends MemberFilterAbstract
 			switch ( $filters['achievement_points_operator'] )
 			{
 				case 'gt':
-					$message[] = Member::loggedIn()->language()->addToStack( 'member_filter_core_cheev_points_gt_desc', FALSE, array( 'sprintf' => array( $filters['achievement_points_value'] ) ) );
+					$message[] = \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_cheev_points_gt_desc', FALSE, array( 'sprintf' => array( $filters['achievement_points_value'] ) ) );
 				break;
 				case 'lt':
-					$message[] =  Member::loggedIn()->language()->addToStack( 'member_filter_core_cheev_points_lt_desc', FALSE, array( 'sprintf' => array( $filters['achievement_points_value'] ) ) );
+					$message[] =  \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_cheev_points_lt_desc', FALSE, array( 'sprintf' => array( $filters['achievement_points_value'] ) ) );
 				break;
 				case 'eq':
-					$message[] =  Member::loggedIn()->language()->addToStack( 'member_filter_core_cheev_points_eq_desc', FALSE, array( 'sprintf' => array( $filters['achievement_points_value'] ) ) );
+					$message[] =  \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_cheev_points_eq_desc', FALSE, array( 'sprintf' => array( $filters['achievement_points_value'] ) ) );
 				break;
 			}
 		}
 
 		if ( $filters['achievement_badges'] != 'ignore' )
 		{
-			$count = count( explode( ',', $filters['achievement_badges'] ) );
+			$count = \count( explode( ',', $filters['achievement_badges'] ) );
 			if( $count )
 			{
-				$message[] = Member::loggedIn()->language()->addToStack( 'member_filter_core_cheev_desc', FALSE, [
+				$message[] = \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_cheev_desc', FALSE, [
 					'sprintf' => [
-						Member::loggedIn()->language()->addToStack( 'recognize_badges_pluralize', FALSE, ['sprintf' => [$count], 'pluralize' => [$count]] )
+						\IPS\Member::loggedIn()->language()->addToStack( 'recognize_badges_pluralize', FALSE, ['sprintf' => [$count], 'pluralize' => [$count]] )
 					]] );
 			}
 		}
 
 		if ( $filters['achievement_ranks'] != 'ignore' )
 		{
-			$count = count( explode( ',', $filters['achievement_badges'] ) );
+			$count = \count( explode( ',', $filters['achievement_badges'] ) );
 			if ( $count )
 			{
-				$message[] = Member::loggedIn()->language()->addToStack( 'member_filter_core_cheev_desc', FALSE, [
+				$message[] = \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_cheev_desc', FALSE, [
 					'sprintf' => [
-						Member::loggedIn()->language()->addToStack( 'achievement_ranks_pluralize', FALSE, ['sprintf' => [$count], 'pluralize' => [$count]] )
+						\IPS\Member::loggedIn()->language()->addToStack( 'achievement_ranks_pluralize', FALSE, ['sprintf' => [$count], 'pluralize' => [$count]] )
 					]] );
 			}
 		}
 		
-		return count( $message ) ? implode( ', ', $message ) : NULL;
+		return \count( $message ) ? implode( ', ', $message ) : NULL;
 	}
 }

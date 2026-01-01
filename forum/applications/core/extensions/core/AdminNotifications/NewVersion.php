@@ -11,54 +11,43 @@
 namespace IPS\core\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\AdminNotification;
-use IPS\DateTime;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP Notification: New Version Available
  */
-class NewVersion extends AdminNotification
+class _NewVersion extends \IPS\core\AdminNotification
 {	
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'important';
+	public static $group = 'important';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 1;
+	public static $groupPriority = 1;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 1;
+	public static $itemPriority = 1;
 
 	/**
 	 * @brief	Temporarily store the upgrade data
 	 */
-	public ?array $_details = null;
+	public $_details;
 	
 	/**
 	 * Title for settings
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle(): string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_NewVersion';
 	}
@@ -66,12 +55,12 @@ class NewVersion extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member )
 	{
-		if ( CIC AND IPS::isManaged() )
+		if ( \IPS\CIC AND \IPS\IPS::isManaged() )
 		{
 			return FALSE;
 		}
@@ -82,9 +71,9 @@ class NewVersion extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional(): bool
+	public static function mayBeOptional()
 	{
 		return FALSE;
 	}
@@ -94,7 +83,7 @@ class NewVersion extends AdminNotification
 	 *
 	 * @return	bool
 	 */
-	public static function mayRecur(): bool
+	public static function mayRecur()
 	{
 		return FALSE;
 	}
@@ -102,11 +91,12 @@ class NewVersion extends AdminNotification
 	/**
 	 * Is this a security update?
 	 *
+	 * @return	bool
 	 */
 	public function __construct()
 	{
-		$this->_details = Application::load('core')->availableUpgrade( TRUE );
-		parent::__construct();
+		$this->_details = \IPS\Application::load('core')->availableUpgrade( TRUE );
+		return parent::__construct();
 	}
 	
 	/**
@@ -114,29 +104,29 @@ class NewVersion extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return ! empty( $this->_details['security'] ) ? Member::loggedIn()->language()->addToStack( 'dashboard_version_info_security', FALSE, array( 'sprintf' => array( $this->_details['version'] ) ) ) : Member::loggedIn()->language()->addToStack( 'dashboard_version_info', FALSE, array( 'sprintf' => array( $this->_details['version'] ) ) );
+		return ! empty( $this->_details['security'] ) ? \IPS\Member::loggedIn()->language()->addToStack( 'dashboard_version_info_security', FALSE, array( 'sprintf' => array( $this->_details['version'] ) ) ) : \IPS\Member::loggedIn()->language()->addToStack( 'dashboard_version_info', FALSE, array( 'sprintf' => array( $this->_details['version'] ) ) );
 	}
 	
 	/**
 	 * Notification Subtitle (no HTML)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function subtitle(): ?string
+	public function subtitle()
 	{
-		return Member::loggedIn()->language()->addToStack( 'regular_update', FALSE, array( 'sprintf' => array( DateTime::ts( $this->_details['released'] )->relative( DateTime::RELATIVE_FORMAT_LOWER ) ) ) );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'regular_update', FALSE, array( 'sprintf' => array( \IPS\DateTime::ts( $this->_details['released'] )->relative( \IPS\DateTime::RELATIVE_FORMAT_LOWER ) ) ) );
 	}
 	
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body()
 	{
-		return Theme::i()->getTemplate( 'notifications', 'core', 'global' )->newVersion( $this->_details );
+		return \IPS\Theme::i()->getTemplate( 'notifications', 'core', 'global' )->newVersion( $this->_details );
 	}
 	
 	/**
@@ -144,7 +134,7 @@ class NewVersion extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function severity(): string
+	public function severity()
 	{
 		return static::SEVERITY_CRITICAL;
 	}
@@ -154,7 +144,7 @@ class NewVersion extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function dismissible(): string
+	public function dismissible()
 	{
 		return static::DISMISSIBLE_TEMPORARY;
 	}
@@ -162,9 +152,9 @@ class NewVersion extends AdminNotification
 	/**
 	 * Style
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
-	public function style(): string
+	public function style()
 	{
 		return ! empty( $this->_details['security'] ) ? static::STYLE_ERROR : static::STYLE_INFORMATION;
 	}
@@ -172,11 +162,11 @@ class NewVersion extends AdminNotification
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url
+	 * @return	bool
 	 */
-	public function link(): Url
+	public function link()
 	{
-		return Url::internal( 'app=core&module=system&controller=upgrade&_new=1', 'admin' );
+		return \IPS\Http\Url::internal( 'app=core&module=system&controller=upgrade&_new=1', 'admin' );
 	}
 
 	/**
@@ -185,7 +175,7 @@ class NewVersion extends AdminNotification
 	 * @note	This is checked every time the notification shows. Should be lightweight.
 	 * @return	bool
 	 */
-	public function selfDismiss(): bool
+	public function selfDismiss()
 	{
 		return empty( $this->_details['version'] );
 	}

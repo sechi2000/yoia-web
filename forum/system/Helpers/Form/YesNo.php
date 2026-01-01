@@ -11,20 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Yes/No Radio Switches class for Form Builder
  */
-class YesNo extends Checkbox
+class _YesNo extends Checkbox
 {
 	/**
 	 * @brief	Default Options
@@ -37,7 +33,7 @@ class YesNo extends Checkbox
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'disabled'		=> FALSE,
 		'togglesOn'		=> array(),
 		'togglesOff'	=> array(),
@@ -50,9 +46,9 @@ class YesNo extends Checkbox
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		$checkboxName = preg_replace( '/^(.+?\[?.+?)(\])?$/', '$1_checkbox$2', $this->name );
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->checkbox( $checkboxName, $this->value, $this->options['disabled'], $this->options['togglesOn'], $this->options['togglesOff'], $this->options['label'], $this->name, $this->htmlId ?: preg_replace( "/[^a-zA-Z0-9\-_]/", "_", $this->name ), TRUE, $this->options['tooltip'] );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->checkbox( $checkboxName, $this->value, $this->options['disabled'], $this->options['togglesOn'], $this->options['togglesOff'], $this->options['label'], $this->name, $this->htmlId ?: preg_replace( "/[^a-zA-Z0-9\-_]/", "_", $this->name ), TRUE, $this->options['tooltip'] );
 	}
 }

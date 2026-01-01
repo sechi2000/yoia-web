@@ -11,42 +11,25 @@
 namespace IPS\core\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\Block;
-use IPS\Dispatcher;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Matrix;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\MFA\MFAHandler;
-use IPS\MFA\SecurityQuestions\Handler;
-use IPS\Output;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: MFA Block
  */
-class MFA extends Block
+class _MFA extends \IPS\core\MemberACPProfile\Block
 {
 	/**
 	 * Get output
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
-		if ( !Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'member_mfa' ) )
+		if ( !\IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'member_mfa' ) )
 		{
 			return '';
 		}
@@ -54,8 +37,8 @@ class MFA extends Block
 		$mfaEnabled = FALSE;
 		$configuredHandlers = array();
 		$hasSecurityQuestions = FALSE;
-		$showEditButton = ( Settings::i()->mfa_required_groups != '*' and !$this->member->inGroup( explode( ',', Settings::i()->mfa_required_groups ) ) );
-		foreach ( MFAHandler::handlers() as $key => $handler )
+		$showEditButton = ( \IPS\Settings::i()->mfa_required_groups != '*' and !$this->member->inGroup( explode( ',', \IPS\Settings::i()->mfa_required_groups ) ) );
+		foreach ( \IPS\MFA\MFAHandler::handlers() as $key => $handler )
 		{
 			if ( $handler->isEnabled() and $handler->memberCanUseHandler( $this->member ) )
 			{
@@ -63,7 +46,7 @@ class MFA extends Block
 				
 				if ( $handler->memberHasConfiguredHandler( $this->member ) )
 				{
-					if ( $handler instanceof Handler )
+					if ( $handler instanceof \IPS\MFA\SecurityQuestions\Handler )
 					{
 						$hasSecurityQuestions = TRUE;
 					}
@@ -73,7 +56,7 @@ class MFA extends Block
 					}
 				}
 				
-				if ( !$showEditButton and count( $handler->acpConfiguration( $this->member ) ) )
+				if ( !$showEditButton and \count( $handler->acpConfiguration( $this->member ) ) )
 				{
 					$showEditButton = TRUE;
 				}
@@ -82,7 +65,7 @@ class MFA extends Block
 		
 		if ( $mfaEnabled )
 		{
-			return (string) Theme::i()->getTemplate('memberprofile')->mfa( $this->member, $configuredHandlers, $hasSecurityQuestions, $showEditButton );
+			return \IPS\Theme::i()->getTemplate('memberprofile')->mfa( $this->member, $configuredHandlers, $hasSecurityQuestions, $showEditButton );
 		}
 		return '';
 	}
@@ -92,15 +75,15 @@ class MFA extends Block
 	 *
 	 * @return	string
 	 */
-	function edit(): string
+	function edit()
 	{
 		/* Check permission */
-		Dispatcher::i()->checkAcpPermission( 'member_mfa' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'member_mfa' );
 		
 		/* Get all the fields we'll need */
 		$fields = array();
 		$optOutToggles = array();
-		foreach ( MFAHandler::handlers() as $key => $handler )
+		foreach ( \IPS\MFA\MFAHandler::handlers() as $key => $handler )
 		{
 			if ( $handler->isEnabled() and $handler->memberCanUseHandler( $this->member ) )
 			{
@@ -113,14 +96,14 @@ class MFA extends Block
 		}
 		
 		/* Build form */
-		$form = new Form;
-		if ( Settings::i()->mfa_required_groups != '*' and !$this->member->inGroup( explode( ',', Settings::i()->mfa_required_groups ) ) )
+		$form = new \IPS\Helpers\Form;
+		if ( \IPS\Settings::i()->mfa_required_groups != '*' and !$this->member->inGroup( explode( ',', \IPS\Settings::i()->mfa_required_groups ) ) )
 		{
-			$form->add( new YesNo( 'mfa_opt_out_admin', $this->member->members_bitoptions['security_questions_opt_out'], FALSE, array( 'togglesOff' => $optOutToggles ) ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'mfa_opt_out_admin', $this->member->members_bitoptions['security_questions_opt_out'], FALSE, array( 'togglesOff' => $optOutToggles ) ) );
 		}
 		foreach ( $fields as $id => $field )
 		{
-			if ( $field instanceof Matrix )
+			if ( $field instanceof \IPS\Helpers\Form\Matrix )
 			{
 				$form->addMatrix( $field->id, $field );
 			}
@@ -152,7 +135,7 @@ class MFA extends Block
 					{
 						$this->member->members_bitoptions['security_questions_opt_out'] = TRUE;
 						
-						foreach ( MFAHandler::handlers() as $key => $handler )
+						foreach ( \IPS\MFA\MFAHandler::handlers() as $key => $handler )
 						{
 							if ( $handler->memberHasConfiguredHandler( $this->member ) )
 							{
@@ -174,7 +157,7 @@ class MFA extends Block
 			}
 			
 			/* Save each of the handlers */
-			foreach ( MFAHandler::handlers() as $key => $handler )
+			foreach ( \IPS\MFA\MFAHandler::handlers() as $key => $handler )
 			{
 				if ( $handler->isEnabled() and $handler->memberCanUseHandler( $this->member ) )
 				{
@@ -183,11 +166,11 @@ class MFA extends Block
 			}
 			
 			/* Log and Redirect */
-			Session::i()->log( 'acplog__members_edited_mfa', array( $this->member->name => FALSE ) );
-			Output::i()->redirect( Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member->member_id}" ), 'saved' );
+			\IPS\Session::i()->log( 'acplog__members_edited_mfa', array( $this->member->name => FALSE ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member->member_id}" ), 'saved' );
 		}
 		
 		/* Display */
-		return (string) $form;
+		return $form;
 	}
 }

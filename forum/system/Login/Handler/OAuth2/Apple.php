@@ -11,38 +11,23 @@
 namespace IPS\Login\Handler\OAuth2;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\File;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Login\Exception as LoginException;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Sign In With Apple Login Handler
  */
-class Apple extends OpenID
+class _Apple extends \IPS\Login\Handler\OAuth2\OpenID
 {
 	/**
 	 * Get title
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return 'login_handler_Apple';
 	}
@@ -52,7 +37,7 @@ class Apple extends OpenID
 	 *
 	 * @return	string
 	 */
-	protected function _authenticationType(): string
+	protected function _authenticationType()
 	{
 		return static::AUTHENTICATE_POST;
 	}
@@ -65,9 +50,9 @@ class Apple extends OpenID
 	 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{
-		Member::loggedIn()->language()->words['oauth_client_id'] = Member::loggedIn()->language()->addToStack('login_apple_services_id');
+		\IPS\Member::loggedIn()->language()->words['oauth_client_id'] = \IPS\Member::loggedIn()->language()->addToStack('login_apple_services_id');
 
 		$return = array();
 		$return[] = array( 'login_handler_apple_settings', 'login_handler_Apple_info' );
@@ -81,16 +66,16 @@ class Apple extends OpenID
 			{
 				$active = 'accountManagementSettings';
 			}
-			if ( !is_string( $v ) and !is_array( $v ) and $k !== 'client_secret' )
+			if ( !\is_string( $v ) and !\is_array( $v ) and $k !== 'client_secret' )
 			{
 				${$active}[ $k ] = $v;
 			}
 		}
 
-		$return['apple_team_id'] = new Text( 'apple_team_id', $this->settings['apple_team_id'] ?? NULL, NULL, array(), NULL, NULL, NULL, 'apple_team_id' );
-		$return['apple_key_id'] = new Text( 'apple_key_id', $this->settings['apple_key_id'] ?? NULL, NULL, array(), NULL, NULL, NULL, 'apple_key_id' );
-		$return['apple_key'] = new Upload( 'apple_key',  ( isset( $this->settings['apple_key'] ) and $this->settings['apple_key'] ) ? File::get( 'core_Login', $this->settings['apple_key'] ) : NULL, TRUE, array( 'storageExtension' => 'core_Login', 'allowedFileTypes' => ['p8'] ), NULL, NULL, NULL, 'apple_key' );
-
+		$return['apple_team_id'] = new \IPS\Helpers\Form\Text( 'apple_team_id', isset( $this->settings['apple_team_id'] ) ? $this->settings['apple_team_id'] : NULL, NULL, array(), NULL, NULL, NULL, 'apple_team_id' );
+		$return['apple_key_id'] = new \IPS\Helpers\Form\Text( 'apple_key_id', isset( $this->settings['apple_key_id'] ) ? $this->settings['apple_key_id'] : NULL, NULL, array(), NULL, NULL, NULL, 'apple_key_id' );
+		$return['apple_key'] = new \IPS\Helpers\Form\Upload( 'apple_key',  ( isset( $this->settings['apple_key'] ) and $this->settings['apple_key'] ) ? \IPS\File::get( 'core_Login', $this->settings['apple_key'] ) : NULL, TRUE, array( 'storageExtension' => 'core_Login', 'allowedFileTypes' => ['p8'] ), NULL, NULL, NULL, 'apple_key' );;
+		
 		$return[] = 'account_management_settings';
 		foreach ( $accountManagementSettings as $k => $v )
 		{
@@ -106,7 +91,7 @@ class Apple extends OpenID
 	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function acpFormSave( array &$values ): array
+	public function acpFormSave( &$values )
 	{
 		$return = parent::acpFormSave( $values );
 		$return['apple_key'] = (string) $return['apple_key'];
@@ -119,7 +104,7 @@ class Apple extends OpenID
 	 *
 	 * @return	string
 	 */
-	public function buttonColor(): string
+	public function buttonColor()
 	{
 		return '#000000';
 	}
@@ -127,9 +112,9 @@ class Apple extends OpenID
 	/**
 	 * Get the button icon
 	 *
-	 * @return	string|File
+	 * @return	string
 	 */
-	public function buttonIcon(): string|File
+	public function buttonIcon()
 	{
 		return 'apple';
 	}
@@ -139,7 +124,7 @@ class Apple extends OpenID
 	 *
 	 * @return	string
 	 */
-	public function buttonText(): string
+	public function buttonText()
 	{
 		return 'login_apple';
 	}
@@ -149,20 +134,20 @@ class Apple extends OpenID
 	 *
 	 * @return	string
 	 */
-	public function buttonClass(): string
+	public function buttonClass()
 	{
-		return 'ipsSocial--apple';
+		return 'ipsSocial_apple';
 	}
 	
 	/**
 	 * Get logo to display in information about logins with this method
 	 * Returns NULL for methods where it is not necessary to indicate the method, e..g Standard
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForDeviceInformation(): Url|string|null
+	public function logoForDeviceInformation()
 	{
-		return Theme::i()->resource( 'logos/login/Apple.png', 'core', 'interface' );
+		return \IPS\Theme::i()->resource( 'logos/login/Apple.png', 'core', 'interface' );
 	}
 	
 	/**
@@ -170,7 +155,7 @@ class Apple extends OpenID
 	 *
 	 * @return	string
 	 */
-	protected function grantType(): string
+	protected function grantType()
 	{
 		return 'authorization_code';
 	}
@@ -178,42 +163,46 @@ class Apple extends OpenID
 	/**
 	 * Get scopes to request
 	 *
-	 * @param array|null $additional	Any additional scopes to request
+	 * @param	array|NULL	$additional	Any additional scopes to request
 	 * @return	array
 	 */
-	protected function scopesToRequest( array $additional=NULL ): array
+	protected function scopesToRequest( $additional=NULL )
 	{
-		return array( 'name email' );
+		$return = array( 'name email' );
+
+		return $return;
 	}
 
 	/**
 	 * Authorization Endpoint
 	 *
-	 * @param	Login	$login	The login object
-	 * @return	Url
+	 * @param	\IPS\Login	$login	The login object
+	 * @return	\IPS\Http\Url
 	 */
-	protected function authorizationEndpoint( Login $login ): Url
+	protected function authorizationEndpoint( \IPS\Login $login )
 	{
-		return Url::external( 'https://appleid.apple.com/auth/authorize' )->setQueryString( 'response_mode', 'form_post' );
+		$return = \IPS\Http\Url::external( 'https://appleid.apple.com/auth/authorize' )->setQueryString( 'response_mode', 'form_post' );
+		
+		return $return;
 	}
 	
 	/**
 	 * Token Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function tokenEndpoint(): Url
+	protected function tokenEndpoint()
 	{
-		return Url::external( 'https://appleid.apple.com/auth/token' );
+		return \IPS\Http\Url::external( 'https://appleid.apple.com/auth/token' );
 	}
 
 	/**
 	 * Get authenticated user's identifier (may not be a number)
 	 *
-	 * @param string $accessToken	Access Token
-	 * @return	string|null
+	 * @param	string	$accessToken	Access Token
+	 * @return	string
 	 */
-	protected function authenticatedUserId( string $accessToken ): ?string
+	protected function authenticatedUserId( $accessToken )
 	{
 		$claims = $this->getClaimsfromIdToken( $this->_getIdToken( $accessToken ) );
 		
@@ -224,10 +213,10 @@ class Apple extends OpenID
 	 * Get authenticated user's username
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param string $accessToken	Access Token
+	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedUserName( string $accessToken ): ?string
+	protected function authenticatedUserName( $accessToken )
 	{
 		$name = NULL;
 		
@@ -248,10 +237,10 @@ class Apple extends OpenID
 	 * Get authenticated user's email address
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param string $accessToken	Access Token
+	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedEmail( string $accessToken ): ?string
+	protected function authenticatedEmail( $accessToken )
 	{
 		$claims = $this->getClaimsfromIdToken( $this->_getIdToken( $accessToken )  );
 		
@@ -262,9 +251,9 @@ class Apple extends OpenID
 	 * Client Secret
 	 *
 	 * @return	string | NULL
-	 * @throws    LoginException
+	 * @throws	\IPS\Login\Exception
 	 */
-	public function clientSecret(): ?string
+	public function clientSecret()
 	{
 		$key = NULL;
 		
@@ -272,9 +261,9 @@ class Apple extends OpenID
 		{
 			try
 			{
-				$key = File::get( 'core_Login', $this->settings['apple_key'] )->contents();
+				$key = \IPS\File::get( 'core_Login', $this->settings['apple_key'] )->contents();
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
 				return NULL;
 			}
@@ -306,7 +295,7 @@ class Apple extends OpenID
         
 		if ( !$pKey )
 		{
-           throw new LoginException( 'login_apple_invalid_key', LoginException::INTERNAL_ERROR );
+           throw new \IPS\Login\Exception( 'login_apple_invalid_key', \IPS\Login\Exception::INTERNAL_ERROR );
         }
 
         $payload = $this->baseURL64encode( json_encode( $header ) ) . '.' . $this->baseURL64encode( json_encode( $data ) );
@@ -315,7 +304,7 @@ class Apple extends OpenID
         $success = openssl_sign( $payload, $signature, $pKey, OPENSSL_ALGO_SHA256 );
         if ( !$success )
 		{
-			throw new LoginException( 'generic_error', LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		$rawSignature = $this->fromDER( $signature, 64 );
@@ -326,16 +315,16 @@ class Apple extends OpenID
 	/**
 	 * Syncing Options
 	 *
-	 * @param	Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
+	 * @param	\IPS\Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
 	 * @param	bool		$defaultOnly	If TRUE, only returns which options should be enabled by default for a new account
 	 * @return	array
 	 */
-	public function syncOptions( Member $member, bool $defaultOnly=FALSE ): array
+	public function syncOptions( \IPS\Member $member, $defaultOnly = FALSE )
 	{
 		$return = array();
 		$scopes = $this->authorizedScopes( $member );
 
-		if ( ( !isset( $this->settings['update_email_changes'] ) or $this->settings['update_email_changes'] === 'optional' ) and ( $scopes and in_array( 'email', $scopes ) ) )
+		if ( ( !isset( $this->settings['update_email_changes'] ) or $this->settings['update_email_changes'] === 'optional' ) and ( $scopes and \in_array( 'email', $scopes ) ) )
 		{
 			$return[] = 'email';
 		}
@@ -346,10 +335,10 @@ class Apple extends OpenID
 	/**
 	 * Process an ID Token
 	 *
-	 * @param string $iDToken 	ID Token
+	 * @param	array		$iDToken 	ID Token
 	 * @return	array
 	 */
-	protected function getClaimsfromIdToken ( string $iDToken ): array
+	protected function getClaimsfromIdToken ( $iDToken )
 	{
 		$claims = explode( '.', $iDToken )[1];
 		$claims = json_decode( base64_decode( $claims ), true );
@@ -364,15 +353,15 @@ class Apple extends OpenID
 	 * @param int    $partLength
 	 *
 	 * @return string
-	 * @throws    LoginException
+	 * @throws	\IPS\Login\Exception
 	 */
-	public static function fromDER( string $der, int $partLength ): string
+	public static function fromDER( string $der, int $partLength )
 	{
 		$hex = unpack( 'H*', $der )[1];
 		
 		if ( '30' !== mb_substr( $hex, 0, 2, '8bit' ) )
 		{ 
-			throw new LoginException( 'generic_error', LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		if ( '81' === mb_substr( $hex, 2, 2, '8bit' ) )
@@ -386,7 +375,7 @@ class Apple extends OpenID
 		
 		if ( '02' !== mb_substr( $hex, 0, 2, '8bit' ) )
 		{
-			throw new LoginException( 'generic_error', LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		$Rl = hexdec( mb_substr( $hex, 2, 2, '8bit' ) );
@@ -396,7 +385,7 @@ class Apple extends OpenID
 		
 		if ( '02' !== mb_substr( $hex, 0, 2, '8bit' ) )
 		{
-			throw new LoginException( 'generic_error', LoginException::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		$Sl = hexdec( mb_substr( $hex, 2, 2, '8bit' ) );
@@ -412,7 +401,7 @@ class Apple extends OpenID
 	 * @param string $data
 	 * @return string
 	 */
-	protected static function preparePositiveInteger( string $data ): string
+	protected static function preparePositiveInteger( string $data )
 	{
 		if ( mb_substr( $data, 0, 2, '8bit') > '7f' )
 		{
@@ -432,7 +421,7 @@ class Apple extends OpenID
 	 * @param string $data
 	 * @return string
 	 */
-	protected static function retrievePositiveInteger( string $data ): string
+	protected static function retrievePositiveInteger( string $data )
 	{
 		while ( '00' === mb_substr( $data, 0, 2, '8bit' ) && mb_substr( $data, 2, 2, '8bit' ) > '7f' )
 		{
@@ -448,7 +437,7 @@ class Apple extends OpenID
 	 * @param string $data
 	 * @return string
 	 */
-	protected function baseURL64encode( string $data ): string
+	protected function baseURL64encode( $data )
 	{
 		$encoded = strtr( base64_encode( $data ), '+/', '-_' );
 		
@@ -458,17 +447,17 @@ class Apple extends OpenID
 	/**
 	 * Delete files
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		if ( isset( $this->settings['apple_key'] ) )
 		{
 			try
 			{
-				File::get( 'core_Login',  $this->settings['apple_key'] )->delete();
+				\IPS\File::get( 'core_Login',  $this->settings['apple_key'] )->delete();
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 		}
 		
 		parent::delete();

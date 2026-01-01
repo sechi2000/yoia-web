@@ -12,83 +12,57 @@
 namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Member as FormMember;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Rating;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use const IPS\UPGRADE_LARGE_TABLE_SIZE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Content Comment Feed Widget
  */
-abstract class WidgetComment extends PermissionCache implements Customizable
+abstract class _WidgetComment extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Class
 	 */
-	protected static string $class;
+	protected static $class;
 
 	/**
 	 * @brief	Moderator permission to generate caches on [optional]
 	 */
-	protected array $moderatorPermissions	= array();
+	protected $moderatorPermissions	= array();
 	
 	/**
 	 * Skip the getItemsWithPermission check?
 	 */
-	protected static string $permissionCheck = 'read';
+	protected static $permissionCheck = 'read';
 
 	/**
 	 * Skip the getItemsWithPermission check?
 	 */
-	protected static bool $skipPermissions = FALSE;
+	protected static $skipPermissions = FALSE;
 
 	/**
 	 * Constructor
 	 *
-	 * @param String $uniqueKey				Unique key for this specific instance
+	 * @param	String				$uniqueKey				Unique key for this specific instance
 	 * @param	array				$configuration			Widget custom configuration
-	 * @param array|string|null $access					Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
-	 * @param string|null $orientation			Orientation (top, bottom, right, left)
-	 * @param string $layout
+	 * @param	null|string|array	$access					Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
+	 * @param	null|string			$orientation			Orientation (top, bottom, right, left)
 	 * @return	void
 	 */
-	public function __construct(string $uniqueKey, array $configuration, array|string $access=null, string $orientation=null, string $layout='table' )
+	public function __construct( $uniqueKey, array $configuration, $access=null, $orientation=null )
 	{
-		parent::__construct( $uniqueKey, $configuration, $access, $orientation, $layout );
+		parent::__construct( $uniqueKey, $configuration, $access, $orientation );
 
-		if( count( $this->moderatorPermissions ) )
+		if( \count( $this->moderatorPermissions ) )
 		{
 			$cacheKeyChecks	= array();
 
 			foreach( $this->moderatorPermissions as $permission )
 			{
-				$cacheKeyChecks[]	= Member::loggedIn()->modPermission( $permission );
+				$cacheKeyChecks[]	= \IPS\Member::loggedIn()->modPermission( $permission );
 			}
 
 			$this->cacheKey .= '_' . implode( '_', $cacheKeyChecks );
@@ -98,13 +72,13 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
 		$form = parent::configuration( $form );
-
+ 		
 		foreach( $this->formElements() as $element )
 		{
 			$form->add( $element );
@@ -118,37 +92,36 @@ abstract class WidgetComment extends PermissionCache implements Customizable
  	 *
  	 * @return array
  	 */
- 	protected function formElements(): array
+ 	protected function formElements()
  	{
-		 /* @var Comment $class */
 		/* Init */
 		$class		= static::$class;
 		$itemClass	= $class::$itemClass;
 		$return		= array();
 
  		/* Block title */ 		
-		$return['title'] = new Text( 'widget_feed_title', $this->configuration['widget_feed_title'] ?? Member::loggedIn()->language()->addToStack( $class::$title . '_pl' ) );
+		$return['title'] = new \IPS\Helpers\Form\Text( 'widget_feed_title', isset( $this->configuration['widget_feed_title'] ) ? $this->configuration['widget_feed_title'] : \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl' ) );
 		
 		/* Container */
 		if ( isset( $itemClass::$containerNodeClass ) )
 		{
-			$return['container'] = new Node( 'widget_feed_container_' . $itemClass::$title, $this->configuration['widget_feed_container'] ?? 0, FALSE, array(
+			$return['container'] = new \IPS\Helpers\Form\Node( 'widget_feed_container_' . $itemClass::$title, isset( $this->configuration['widget_feed_container'] ) ? $this->configuration['widget_feed_container'] : 0, FALSE, array(
 				'class'           => $itemClass::$containerNodeClass,
 				'zeroVal'         => 'all',
 				'permissionCheck' => 'view',
 				'multiple'        => TRUE,
 				'clubs'			  => TRUE
 			) );
-
-			/* Use permissions? */
-			if( in_array( 'IPS\Node\Permissions', class_implements( $itemClass::$containerNodeClass ) ) )
-			{
-				$return['permissions'] = new YesNo( 'widget_feed_use_perms', $this->configuration['widget_feed_use_perms'] ?? TRUE, FALSE );
-			}
+		}
+		
+		/* Use permissions? */
+		if ( \in_array( 'IPS\Content\Permissions', class_implements( $itemClass ) ) )
+		{
+			$return['permissions'] = new \IPS\Helpers\Form\YesNo( 'widget_feed_use_perms', isset( $this->configuration['widget_feed_use_perms'] ) ? $this->configuration['widget_feed_use_perms'] : TRUE, FALSE );
 		}
 		
 		/* Types */
-		if ( IPS::classUsesTrait( $itemClass, 'IPS\Content\Lockable' ) )
+		if ( \in_array( 'IPS\Content\Lockable', class_implements( $itemClass ) ) )
 		{
 			$types = array(
 				'any'    => 'mod_confirm_either',
@@ -156,9 +129,9 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 				'closed' => 'mod_confirm_lock'
 			);
 
-			$return['locked'] = new Radio( 'widget_feed_item_status_locked', $this->configuration['widget_feed_item_status_locked'] ?? 'any', FALSE, array( 'options' => $types ) );
+			$return['locked'] = new \IPS\Helpers\Form\Radio( 'widget_feed_item_status_locked', isset( $this->configuration['widget_feed_item_status_locked'] ) ? $this->configuration['widget_feed_item_status_locked'] : 'any', FALSE, array( 'options' => $types ) );
 		}
-		if ( IPS::classUsesTrait( $itemClass, 'IPS\Content\Pinnable' ) )
+		if ( \in_array( 'IPS\Content\Pinnable', class_implements( $itemClass ) ) )
 		{
 			$types = array(
 				'any'       => 'mod_confirm_either',
@@ -166,9 +139,9 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 				'notpinned' => 'mod_confirm_unpin'
 			);
 
-			$return['pinned'] = new Radio( 'widget_feed_item_status_pinned', $this->configuration['widget_feed_item_status_pinned'] ?? 'any', FALSE, array( 'options' => $types ) );
+			$return['pinned'] = new \IPS\Helpers\Form\Radio( 'widget_feed_item_status_pinned', isset( $this->configuration['widget_feed_item_status_pinned'] ) ? $this->configuration['widget_feed_item_status_pinned'] : 'any', FALSE, array( 'options' => $types ) );
 		}
-		if ( IPS::classUsesTrait( $itemClass, 'IPS\Content\Featurable' ) )
+		if ( \in_array( 'IPS\Content\Featurable', class_implements( $itemClass ) ) )
 		{
 			$types = array(
 				'any'         => 'mod_confirm_either',
@@ -176,9 +149,9 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 				'notfeatured' => 'mod_confirm_unfeature'
 			);
 
-			$return['featured'] = new Radio( 'widget_feed_item_status_featured', $this->configuration['widget_feed_item_status_featured'] ?? 'any', FALSE, array( 'options' => $types ) );
+			$return['featured'] = new \IPS\Helpers\Form\Radio( 'widget_feed_item_status_featured', isset( $this->configuration['widget_feed_item_status_featured'] ) ? $this->configuration['widget_feed_item_status_featured'] : 'any', FALSE, array( 'options' => $types ) );
 		}
-		if ( IPS::classUsesTrait( $class, 'IPS\Content\Hideable' ) )
+		if ( \in_array( 'IPS\Content\Hideable', class_implements( $class ) ) )
 		{
 			$types = array(
 				'any'         => 'mod_confirm_either',
@@ -186,9 +159,9 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 				'hidden'      => 'mod_confirm_hidden'
 			);
 	
-			$return['hidden'] = new Radio( 'widget_feed_comment_status_visible', $this->configuration['widget_feed_comment_status_visible'] ?? 'any', FALSE, array( 'options' => $types ) );
+			$return['hidden'] = new \IPS\Helpers\Form\Radio( 'widget_feed_comment_status_visible', isset( $this->configuration['widget_feed_comment_status_visible'] ) ? $this->configuration['widget_feed_comment_status_visible'] : 'any', FALSE, array( 'options' => $types ) );
 		}
-		if ( IPS::classUsesTrait( $itemClass, 'IPS\Content\Solvable' ) )
+		if ( \IPS\IPS::classUsesTrait( $itemClass, 'IPS\Content\Solvable' ) )
 		{
 			$types = array(
 				'any'       => 'solved_either',
@@ -196,51 +169,51 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 				'unsolved'  => 'solved_unsolved'
 			);
 	
-			$return['solved'] = new Radio( 'widget_feed_status_solved', $this->configuration['widget_feed_status_solved'] ?? 'any', FALSE, array( 'options' => $types ) );
+			$return['solved'] = new \IPS\Helpers\Form\Radio( 'widget_feed_status_solved', isset( $this->configuration['widget_feed_status_solved'] ) ? $this->configuration['widget_feed_status_solved'] : 'any', FALSE, array( 'options' => $types ) );
 		}
 		/* Author */
 		$author = NULL;
 		try
 		{
-			if ( isset( $this->configuration['widget_feed_item_author'] ) and is_array( $this->configuration['widget_feed_item_author'] ) )
+			if ( isset( $this->configuration['widget_feed_item_author'] ) and \is_array( $this->configuration['widget_feed_item_author'] ) )
 			{
 				foreach( $this->configuration['widget_feed_item_author']  as $id )
 				{
-					$author[ $id ] = Member::load( $id );
+					$author[ $id ] = \IPS\Member::load( $id );
 				}
 			}
 		}
-		catch( OutOfRangeException $ex ) { }
-		$return['author'] = new FormMember( 'widget_feed_item_author', $author, FALSE, array( 'multiple' => true ) );
+		catch( \OutOfRangeException $ex ) { }
+		$return['author'] = new \IPS\Helpers\Form\Member( 'widget_feed_item_author', $author, FALSE, array( 'multiple' => true ) );
 		
 		/* Minimum comments/reviews */
 		if ( isset( $class::$commentClass ) )
 		{
 			if ( $class::$firstCommentRequired )
 			{
-				$return['min_posts'] = new Number( 'widget_feed_item_min_posts', $this->configuration['widget_feed_item_min_posts'] ?? 0, FALSE, array( 'unlimitedLang' => 'any', 'unlimited' => 0 ) );
+				$return['min_posts'] = new \IPS\Helpers\Form\Number( 'widget_feed_item_min_posts', isset( $this->configuration['widget_feed_item_min_posts'] ) ? $this->configuration['widget_feed_item_min_posts'] : 0, FALSE, array( 'unlimitedLang' => 'any', 'unlimited' => 0 ) );
 			}
 			else
 			{
-				$return['min_comments'] = new Number( 'widget_feed_item_min_comments', $this->configuration['widget_feed_item_min_comments'] ?? 0, FALSE, array( 'unlimitedLang' => 'any', 'unlimited' => 0 ) );
+				$return['min_comments'] = new \IPS\Helpers\Form\Number( 'widget_feed_item_min_comments', isset( $this->configuration['widget_feed_item_min_comments'] ) ? $this->configuration['widget_feed_item_min_comments'] : 0, FALSE, array( 'unlimitedLang' => 'any', 'unlimited' => 0 ) );
 			}
 		}
 		if ( isset( $class::$reviewClass ) )
 		{
-			$return['min_reviews'] = new Number( 'widget_feed_item_min_reviews', $this->configuration['widget_feed_item_min_reviews'] ?? 0, FALSE, array( 'unlimitedLang' => 'any', 'unlimited' => 0 ) );
+			$return['min_reviews'] = new \IPS\Helpers\Form\Number( 'widget_feed_item_min_reviews', isset( $this->configuration['widget_feed_item_min_reviews'] ) ? $this->configuration['widget_feed_item_min_reviews'] : 0, FALSE, array( 'unlimitedLang' => 'any', 'unlimited' => 0 ) );
 		}
 		
 		/* Rating */
-		if ( IPS::classUsesTrait( $class, 'IPS\Content\Ratings' ) and isset( $class::$databaseColumnMap['rating_average'] )  )
+		if ( \in_array( 'IPS\Content\Ratings', class_implements( $class ) ) and isset( $class::$databaseColumnMap['rating_average'] ) )
 		{
-			$return['rating'] = new Rating( 'widget_feed_item_min_rating', $this->configuration['widget_feed_item_min_rating'] ?? 0, FALSE, array() );
+			$return['rating'] = new \IPS\Helpers\Form\Rating( 'widget_feed_item_min_rating', isset( $this->configuration['widget_feed_item_min_rating'] ) ? $this->configuration['widget_feed_item_min_rating'] : 0, FALSE, array() );
 		}
 
 		if ( isset( $class::$databaseColumnMap['date'] ) )
 		{
-			$return['date_restrict'] = new Select( 'widget_feed_comment_date', isset( $this->configuration['widget_feed_comment_date'] ) ? (int) $this->configuration['widget_feed_comment_date'] : 0, FALSE, array(
+			$return['date_restrict'] = new \IPS\Helpers\Form\Select( 'widget_feed_comment_date', isset( $this->configuration['widget_feed_comment_date'] ) ? (int) $this->configuration['widget_feed_comment_date'] : 0, FALSE, array(
 				'options' => array(
-					0	=> $class::databaseTableCount( TRUE ) > UPGRADE_LARGE_TABLE_SIZE ? 'search_year' : 'show_all',
+					0	=> $class::databaseTableCount( TRUE ) > \IPS\UPGRADE_LARGE_TABLE_SIZE ? 'search_year' : 'show_all',
 					1	=> 'today',
 					5	=> 'last_5_days',
 					7	=> 'last_7_days',
@@ -256,11 +229,10 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 		}
 
 		/* Number to show */
- 		$return['show'] = new Number( 'widget_feed_show', $this->configuration['widget_feed_show'] ?? 5, TRUE );
-		$return['offset'] = new Number( 'widget_feed_offset', $this->configuration['widget_feed_offset'] ?? 0, false );
+ 		$return['show'] = new \IPS\Helpers\Form\Number( 'widget_feed_show', isset( $this->configuration['widget_feed_show'] ) ? $this->configuration['widget_feed_show'] : 5, TRUE );
  		
  		/* Sort */
-		$return['sort'] = new Select( 'widget_feed_sort_dir', $this->configuration['widget_feed_sort_dir'] ?? 'desc', FALSE, array(
+		$return['sort'] = new \IPS\Helpers\Form\Select( 'widget_feed_sort_dir', isset( $this->configuration['widget_feed_sort_dir'] ) ? $this->configuration['widget_feed_sort_dir'] : 'desc', FALSE, array(
             'options' => array(
 	            'desc'   => 'descending',
 	            'asc'    => 'ascending'
@@ -269,11 +241,11 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 
 		/* Fix up some language strings */
 		$langs = array( 'widget_feed_item_status_locked', 'widget_feed_item_status_pinned', 'widget_feed_item_status_featured', 'widget_feed_comment_status_visible', 'widget_feed_item_author', 'widget_feed_item_min_posts', 'widget_feed_item_min_comments', 'widget_feed_item_min_reviews', 'widget_feed_item_min_rating' );
-		$words = Member::loggedIn()->language()->get( $langs );
+		$words = \IPS\Member::loggedIn()->language()->get( $langs );
 		
 		foreach( $langs as $lang )
 		{
-			Member::loggedIn()->language()->words[ $lang ] = sprintf( $words[ $lang ], Member::loggedIn()->language()->addToStack( $itemClass::$title ) );
+			\IPS\Member::loggedIn()->language()->words[ $lang ] = sprintf( $words[ $lang ], \IPS\Member::loggedIn()->language()->addToStack( $itemClass::$title ) );
 		}
 
 		return $return;
@@ -285,19 +257,18 @@ abstract class WidgetComment extends PermissionCache implements Customizable
  	 * @param	array	$values	Values from form
  	 * @return	array
  	 */
- 	public function preConfig( array $values ): array
+ 	public function preConfig( $values )
  	{
-		 /* @var Comment $class */
 	 	$class     = static::$class;
 		$itemClass = $class::$itemClass;
 	 	
- 		if ( is_array( $values[ 'widget_feed_container_' . $itemClass::$title ] ) )
+ 		if ( \is_array( $values[ 'widget_feed_container_' . $itemClass::$title ] ) )
  		{
 	 		$values['widget_feed_container'] = array_keys( $values[ 'widget_feed_container_' . $itemClass::$title ] );
-			unset( $values[ 'widget_feed_container_' . $itemClass::$title ] );
+			unset( $values[ 'widget_feed_container_' . $class::$title ] );
  		}
  		
- 		if ( is_array( $values['widget_feed_item_author'] ) )
+ 		if ( \is_array( $values['widget_feed_item_author'] ) )
  		{
 	 		$members = array();
 	 		foreach( $values['widget_feed_item_author'] as $member )
@@ -316,10 +287,8 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 	 *
 	 * @return	array
 	 */
-	protected function buildWhere(): array
+	protected function buildWhere()
 	{
-		/* @var array $databaseColumnMap */
-		/* @var Comment $class */
 		$class     = static::$class;
 		$itemClass = $class::$itemClass;
 		$where     = array();
@@ -353,17 +322,17 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 						$nodeIds[] = $id;
 					}
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					
 				}
 			}
 			
-			$where['item'][] = array( Db::i()->in( $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['container'], $nodeIds ) );
+			$where['item'][] = array( \IPS\Db::i()->in( $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['container'], $nodeIds ) );
 		}
 
 		/* Locked or open status */
-		if ( isset( $this->configuration['widget_feed_item_status_locked'] ) and IPS::classUsesTrait( $itemClass, 'IPS\Content\Lockable' ) )
+		if ( isset( $this->configuration['widget_feed_item_status_locked'] ) and \in_array( 'IPS\Content\Lockable', class_implements( $itemClass ) ) )
 		{
 			if ( $this->configuration['widget_feed_item_status_locked'] == 'closed' )
 			{
@@ -376,7 +345,7 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 		}
 
 		/* Featured or unfeatured */
-		if ( isset( $this->configuration['widget_feed_item_status_featured'] ) and IPS::classUsesTrait( $itemClass, 'IPS\Content\Featurable' ) )
+		if ( isset( $this->configuration['widget_feed_item_status_featured'] ) and \in_array( 'IPS\Content\Featurable', class_implements( $itemClass ) ) )
 		{
 			if ( $this->configuration['widget_feed_item_status_featured'] == 'notfeatured' )
 			{
@@ -399,7 +368,7 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 		}
 		
 		/* Pinned or unpinned */
-		if ( isset( $this->configuration['widget_feed_item_status_pinned'] ) and IPS::classUsesTrait( $itemClass, 'IPS\Content\Pinnable' ) )
+		if ( isset( $this->configuration['widget_feed_item_status_pinned'] ) and \in_array( 'IPS\Content\Pinnable', class_implements( $itemClass ) ) )
 		{
 			if ( $this->configuration['widget_feed_item_status_pinned'] == 'notpinned' )
 			{
@@ -412,45 +381,45 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 		}
 		
 		/* Author */
-		if ( isset( $this->configuration['widget_feed_item_author'] ) and is_array( $this->configuration['widget_feed_item_author'] ) and count( $this->configuration['widget_feed_item_author'] ) )
+		if ( isset( $this->configuration['widget_feed_item_author'] ) and \is_array( $this->configuration['widget_feed_item_author'] ) and \count( $this->configuration['widget_feed_item_author'] ) )
 		{
-			$where['item'][] = array( Db::i()->in( $itemClass::$databaseTable . '.' .  $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['author'], $this->configuration['widget_feed_item_author'] ) );
+			$where['item'][] = array( \IPS\Db::i()->in( $itemClass::$databaseTable . '.' .  $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['author'], $this->configuration['widget_feed_item_author'] ) );
 		}
 		
 		/* Min posts/comments/reviews */
-		if ( isset( $this->configuration['widget_feed_item_min_posts'] ) and $this->configuration['widget_feed_item_min_posts'] )
+		if ( isset( $this->configuration['widget_feed_item_min_posts'] ) and isset( $this->configuration['widget_feed_item_min_posts'] ) and isset( $this->configuration['widget_feed_item_min_posts'] ) )
 		{
 			$where['item'][] = array( $itemClass::$databaseTable . '.' .  $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['num_comments'] . '>?', (int) $this->configuration['widget_feed_item_min_posts'] );
 		}
-		if ( isset( $this->configuration['widget_feed_item_min_comments'] ) and $this->configuration['widget_feed_item_min_comments'] )
+		if ( isset( $this->configuration['widget_feed_item_min_comments'] ) and isset( $this->configuration['widget_feed_item_min_comments'] ) and $this->configuration['widget_feed_item_min_comments'] )
 		{
 			$where['item'][] = array( $itemClass::$databaseTable . '.' .  $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['num_comments'] . '>?', (int) $this->configuration['widget_feed_item_min_comments'] );
 		}
-		if ( isset( $this->configuration['widget_feed_item_min_reviews'] ) and $this->configuration['widget_feed_item_min_reviews'] )
+		if ( isset( $this->configuration['widget_feed_item_min_reviews'] ) and isset( $this->configuration['widget_feed_item_min_reviews'] ) and $this->configuration['widget_feed_item_min_reviews'] )
 		{
 			$where['item'][] = array( $itemClass::$databaseTable . '.' .  $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['num_reviews'] . '>?', (int) $this->configuration['widget_feed_item_min_reviews'] );
 		}
 		
 		/* Rating */
-		if ( isset( $this->configuration['widget_feed_item_min_rating'] ) and $this->configuration['widget_feed_item_min_rating'] )
+		if ( isset( $this->configuration['widget_feed_item_min_rating'] ) and isset( $this->configuration['widget_feed_item_min_rating'] ) and $this->configuration['widget_feed_item_min_rating'] )
 		{
 			$where['item'][] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['rating_average'] . '>?', (int) $this->configuration['widget_feed_item_min_rating'] );
 		}
 
 		/* Future */
-		if ( IPS::classUsesTrait( $itemClass, 'IPS\Content\FuturePublishing' ) )
+		if ( \in_array( 'IPS\Content\FuturePublishing', class_implements( $itemClass ) ) )
 		{
 			$where['item'][] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['is_future_entry'] . '=0' );
 		}
 		
 		/* Start date */
-		if ( isset( $this->configuration['widget_feed_comment_date'] ) and $this->configuration['widget_feed_comment_date'] > 0 )
+		if ( isset( $this->configuration['widget_feed_comment_date'] ) and isset( $this->configuration['widget_feed_comment_date'] ) and $this->configuration['widget_feed_comment_date'] > 0 )
 		{
-			$where[] = array( $class::$databaseTable . '.' .  $class::$databasePrefix . $class::$databaseColumnMap['date'] . '>?',  DateTime::create()->sub( new DateInterval( 'P' . $this->configuration['widget_feed_comment_date'] . 'D' ) )->getTimestamp() );
+			$where[] = array( $class::$databaseTable . '.' .  $class::$databasePrefix . $class::$databaseColumnMap['date'] . '>?',  \IPS\DateTime::create()->sub( new \DateInterval( 'P' . $this->configuration['widget_feed_comment_date'] . 'D' ) )->getTimestamp() );
 		}
-		else if ( $class::databaseTableCount( TRUE ) > UPGRADE_LARGE_TABLE_SIZE )
+		else if ( $class::databaseTableCount( TRUE ) > \IPS\UPGRADE_LARGE_TABLE_SIZE )
 		{
-			$where[] = array( $class::$databaseTable . '.' .  $class::$databasePrefix . $class::$databaseColumnMap['date'] . '>?',  DateTime::create()->sub( new DateInterval( 'P1Y' ) )->getTimestamp() );
+			$where[] = array( $class::$databaseTable . '.' .  $class::$databasePrefix . $class::$databaseColumnMap['date'] . '>?',  \IPS\DateTime::create()->sub( new \DateInterval( 'P1Y' ) )->getTimestamp() );
 		}
 
 		return $where;
@@ -461,43 +430,38 @@ abstract class WidgetComment extends PermissionCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
-		/* @var array $databaseColumnMap */
-		/* @var Comment $class */
 		$class = static::$class;
 
 		/* What visible status are we checking? */
-		$hidden	= Filter::FILTER_AUTOMATIC;
+		$hidden	= \IPS\Content\Hideable::FILTER_AUTOMATIC;
 
 		if( isset( $this->configuration['widget_feed_comment_status_visible'] ) )
 		{
 			switch( $this->configuration['widget_feed_comment_status_visible'] )
 			{
 				case 'visible':
-					$hidden	= Filter::FILTER_PUBLIC_ONLY;
+					$hidden	= \IPS\Content\Hideable::FILTER_PUBLIC_ONLY;
 				break;
 
 				case 'hidden':
-					$hidden	= Filter::FILTER_ONLY_HIDDEN;
+					$hidden	= \IPS\Content\Hideable::FILTER_ONLY_HIDDEN;
 				break;
 			}
 		}
 
-		$offset = $this->configuration['widget_feed_offset'] ?? 0;
-		$limit = ( isset( $this->configuration['widget_feed_show'] ) AND $this->configuration['widget_feed_show'] ) ? $this->configuration['widget_feed_show'] : 5;
-
 		$items = $class::getItemsWithPermission(
 			$this->buildWhere(),
 			( isset( $this->configuration['widget_feed_sort_on'] ) and isset( $this->configuration['widget_feed_sort_dir'] ) ) ? ( $class::$databasePrefix . $class::$databaseColumnMap['date'] . ' ' . $this->configuration['widget_feed_sort_dir'] ) : NULL,
-			[ $offset, $limit ],
+			( isset( $this->configuration['widget_feed_show'] ) AND $this->configuration['widget_feed_show'] ) ? $this->configuration['widget_feed_show'] : 5,
 			( !isset( $this->configuration['widget_feed_use_perms'] ) or $this->configuration['widget_feed_use_perms'] ) ? static::$permissionCheck : NULL,
 			$hidden
 		);
 
-		if ( count( $items ) )
+		if ( \count( $items ) )
 		{
-			return $this->output( $items, $this->configuration['widget_feed_title'] ?? Member::loggedIn()->language()->addToStack( $class::$title . '_pl' ) );
+			return $this->output( $items, isset( $this->configuration['widget_feed_title'] ) ? $this->configuration['widget_feed_title'] : \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl' ) );
 		}
 		else
 		{

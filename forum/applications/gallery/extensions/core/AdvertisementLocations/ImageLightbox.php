@@ -12,24 +12,16 @@
 namespace IPS\gallery\extensions\core\AdvertisementLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Advertisement;
-use IPS\Extensions\AdvertisementLocationsAbstract;
-use IPS\gallery\Image;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Advertisement locations extension
  */
-class ImageLightbox extends AdvertisementLocationsAbstract
+class _ImageLightbox
 {
 	/** 
 	 * Get the locations and the additional settings
@@ -37,9 +29,9 @@ class ImageLightbox extends AdvertisementLocationsAbstract
 	 * @param	array	$settings	Current setting values
 	 * @return	array	Array with two elements: 'locations' which should have keys as the location keys and values as the fields to toggle, and 'settings' which are additional fields to add to the form
 	 */
-	public function getSettings( array $settings ): array
+	public function getSettings( $settings )
 	{
-		return array( 'locations' => array( 'ad_image_lightbox' => array( 'IPS_gallery_Category' ) ), 'settings' => array() );
+		return array( 'locations' => array( 'ad_image_lightbox' => array() ), 'settings' => array() );
 	}
 
 	/** 
@@ -48,32 +40,8 @@ class ImageLightbox extends AdvertisementLocationsAbstract
 	 * @param	array	$values	Values from the form submission
 	 * @return	array 	Array of setting key => value to store
 	 */
-	public function parseSettings( array $values ): array
+	public function parseSettings( $values )
 	{
 		return array();
-	}
-
-	/**
-	 * Check if the advertisement can be displayed, based on settings
-	 *
-	 * @param Advertisement $advertisement
-	 * @param string $location
-	 * @return bool
-	 */
-	public function canShow( Advertisement $advertisement, string $location ) : bool
-	{
-		if( isset( $advertisement->_additional_settings['IPS_gallery_Category'] ) and is_array( $advertisement->_additional_settings['IPS_gallery_Category'] ) )
-		{
-			try
-			{
-				return in_array( Image::load( Request::i()->id )->category_id, $advertisement->_additional_settings['IPS_gallery_Category'] );
-			}
-			catch( OutOfRangeException )
-			{
-				return false;
-			}
-		}
-
-		return TRUE;
 	}
 }

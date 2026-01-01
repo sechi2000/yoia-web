@@ -11,33 +11,23 @@
 namespace IPS\core\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Extensions\DashboardAbstract;
-use IPS\Helpers\Chart;
-use IPS\Member;
-use IPS\Session\Store;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Dashboard extension: Online Users
  */
-class OnlineUsers extends DashboardAbstract
+class _OnlineUsers
 {
 	/**
 	* Can the current user view this dashboard item?
 	*
 	* @return	bool
 	*/
-	public function canView(): bool
+	public function canView()
 	{
 		return TRUE;
 	}
@@ -47,21 +37,21 @@ class OnlineUsers extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
 		/* Init Chart */
-		$chart = new Chart;
+		$chart = new \IPS\Helpers\Chart;
 		
 		/* Specify headers */
-		$chart->addHeader( Member::loggedIn()->language()->get('chart_app'), "string" );
-		$chart->addHeader( Member::loggedIn()->language()->get('chart_members'), "number" );
+		$chart->addHeader( \IPS\Member::loggedIn()->language()->get('chart_app'), "string" );
+		$chart->addHeader( \IPS\Member::loggedIn()->language()->get('chart_members'), "number" );
 		
 		/* Add Rows */
 		$online = array();
 		$seen   = array();
-		foreach( Store::i()->getOnlineUsers( Store::ONLINE_MEMBERS | Store::ONLINE_GUESTS, 'desc' ) as $row )
+		foreach( \IPS\Session\Store::i()->getOnlineUsers( \IPS\Session\Store::ONLINE_MEMBERS | \IPS\Session\Store::ONLINE_GUESTS, 'desc' ) as $row )
 		{
-			$key = ( $row['member_id'] ?: $row['id'] );
+			$key = ( $row['member_id'] ? $row['member_id'] : $row['id'] );
 			
 			if ( ! isset( $seen[ $key ] ) )
 			{
@@ -74,17 +64,17 @@ class OnlineUsers extends DashboardAbstract
 		foreach ( $online as $app => $data )
 		{
 			/* Only show if the application is still installed and enabled */
-			if( !Application::appIsEnabled( $app ) )
+			if( !\IPS\Application::appIsEnabled( $app ) )
 			{
 				continue;
 			}
 			
-			$total += count( $data );
-			$chart->addRow( array( Member::loggedIn()->language()->addToStack( "__app_" . $app), count( $data ) ) );
+			$total += \count( $data );
+			$chart->addRow( array( \IPS\Member::loggedIn()->language()->addToStack( "__app_" . $app), \count( $data ) ) );
 		}
 		
 		/* Output */
-		return Theme::i()->getTemplate( 'dashboard' )->onlineUsers( $online, $chart->render( 'PieChart', array(
+		return \IPS\Theme::i()->getTemplate( 'dashboard' )->onlineUsers( $online, $chart->render( 'PieChart', array( 
 			'backgroundColor' 	=> '#ffffff',
 			'pieHole' => 0.4,
 			'colors' => array( '#cc535f', '#d8624b', '#598acd', '#9a84d2', '#e4b555', '#8cb65e', '#44af94', '#4da5c8', '#acb2bb', '#676d76' ),

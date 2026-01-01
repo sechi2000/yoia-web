@@ -12,27 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\Session;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * LoginType for GraphQL API
  */
-class LoginType extends ObjectType
+class _LoginType extends ObjectType
 {
     /**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -52,14 +48,14 @@ class LoginType extends ObjectType
 						'type' => TypeRegistry::string(),
 						'description' => "Login name",
 						'resolve' => function ($login) {
-							return Member::loggedIn()->language()->get( $login->getTitle() );
+							return \IPS\Member::loggedIn()->language()->get( $login->getTitle() );
 						}
 					],
 					'text' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Login button text",
 						'resolve' => function ($login) {
-							return Member::loggedIn()->language()->get( $login->buttonText() );
+							return \IPS\Member::loggedIn()->language()->get( $login->buttonText() );
 						}
 					],
 					'icon' => [
@@ -80,8 +76,8 @@ class LoginType extends ObjectType
 						'type' => TypeRegistry::string(),
 						'description' => "URL to visit to authorize with this handler",
 						'resolve' => function ($login) {
-							$loginClass = new Login;
-							return (string) Url::internal( $loginClass->url )->setQueryString('csrfKey', Session::i()->csrfKey)->setQueryString('_processLogin', $login->_id);
+							$loginClass = new \IPS\Login;
+							return (string) \IPS\Http\Url::internal( $loginClass->url )->setQueryString('csrfKey', \IPS\Session::i()->csrfKey)->setQueryString('_processLogin', $login->_id);
 						}
 					]
 				];

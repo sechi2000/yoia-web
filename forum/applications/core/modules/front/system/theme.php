@@ -11,32 +11,23 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Theme Changer
  */
-class theme extends Controller
+class _theme extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		parent::execute();
 	}
@@ -46,20 +37,32 @@ class theme extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		if( Member::loggedIn()->member_id )
+		if( \IPS\Member::loggedIn()->member_id )
 		{
-			Member::loggedIn()->skin = (int) Request::i()->id;
-			Member::loggedIn()->save();
+			\IPS\Member::loggedIn()->skin = (int) \IPS\Request::i()->id;
+			\IPS\Member::loggedIn()->save();
 		}
 		else
 		{
-			Request::i()->setCookie( 'theme', (int) Request::i()->id );
+			\IPS\Request::i()->setCookie( 'theme', (int) \IPS\Request::i()->id );
 		}
 		
-		Output::i()->redirect( Request::i()->referrer() ?: Url::internal( '' ) );
+		/* Make sure VSE cookie is killed */
+		if ( isset( \IPS\Request::i()->cookie['vseThemeId'] ) )
+		{
+			\IPS\Request::i()->setCookie( 'vseThemeId', 0 );
+		}
+		
+		if ( \IPS\Member::loggedIn()->members_bitoptions['bw_using_skin_gen'] )
+		{
+			\IPS\Member::loggedIn()->members_bitoptions['bw_using_skin_gen'] = 0;
+			\IPS\Member::loggedIn()->save();
+		}
+		
+		\IPS\Output::i()->redirect( \IPS\Request::i()->referrer() ?: \IPS\Http\Url::internal( '' ) );
 	}
 }

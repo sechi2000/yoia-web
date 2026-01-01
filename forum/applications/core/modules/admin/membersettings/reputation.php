@@ -11,82 +11,46 @@
 namespace IPS\core\modules\admin\membersettings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Content\Reaction;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Timezone;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Image;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Controller;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * reputation
  */
-class reputation extends Controller
+class _reputation extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = '\IPS\Content\Reaction';
+	protected $nodeClass = '\IPS\Content\Reaction';
 	
 	/**
 	 * Title can contain HTML?
 	 */
-	public bool $_titleHtml = TRUE;
+	public $_titleHtml = TRUE;
 
 	/**
 	 * Show the "add" button in the page root rather than the table root
 	 */
-	protected bool $_addButtonInRoot = FALSE;
+	protected $_addButtonInRoot = FALSE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'reps_manage' );
-		parent::execute();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'reps_manage' );
+		return parent::execute();
 	}
 
 	/**
@@ -94,35 +58,35 @@ class reputation extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('reputation_title');
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('reputation_title');
 		
 		/* Init */
-		$activeTab = Request::i()->tab ?: NULL;
+		$activeTab = \IPS\Request::i()->tab ?: NULL;
 		$activeTabContents = '';
 		$tabs = array();
 		
 		/* Settings */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'reps_settings' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'reps_settings' ) )
 		{
 			$tabs['settings'] = 'reputation_settings';
 		}
 
 		/* Reactions */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'reactions_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'reactions_manage' ) )
 		{
 			$tabs['reactions'] = 'reactions';
 		}
 
 		/* Leaderboard */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'reps_settings' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'reps_settings' ) )
 		{
 			$tabs['leaderboard'] = 'reputation_leaderboard';
 		}
 		
 		/* Levels */		
-		if ( Settings::i()->reputation_enabled and Settings::i()->reputation_show_profile )
+		if ( \IPS\Settings::i()->reputation_enabled and \IPS\Settings::i()->reputation_show_profile )
 		{
 			$tabs['levels'] = 'reputation_levels';
 		}
@@ -130,37 +94,27 @@ class reputation extends Controller
 		/* Make sure we have a tab */
 		if ( empty( $tabs ) )
 		{
-			Output::i()->error( 'no_module_permission', '1C225/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '1C225/1', 403, '' );
 		}
 		elseif ( !$activeTab or !array_key_exists( $activeTab, $tabs ) )
 		{
 			$_tabs = array_keys( $tabs );
 			$activeTab = array_shift( $_tabs );
 		}
-
-		$blurbLangKey = $activeTab;
 		
 		/* Do it */
 		if ( $activeTab === 'reactions' )
 		{
-			Dispatcher::i()->checkAcpPermission( 'reactions_manage' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'reactions_manage' );
 			parent::manage();
-			$activeTabContents = Output::i()->output;
-			
-			if ( Bridge::i()->liveTopicsUnconverted() )
-			{
-				$blurbLangKey = 'reactions__locked__livetopics';
-				$message = Theme::i()->getTemplate( 'global', 'cloud' )->reactionsDisabledLivetopicsMessage();
-				Member::loggedIn()->language()->parseOutputForDisplay( $message );
-				Member::loggedIn()->language()->words['rep_' . $blurbLangKey . '_blurb' ] = $message . Member::loggedIn()->language()->addToStack( 'rep_reactions_blurb' );
-			}
+			$activeTabContents = \IPS\Theme::i()->getTemplate( 'global' )->paddedBlock( \IPS\Output::i()->output );
 		}
 		else if ( $activeTab === 'settings' )
 		{
-			Dispatcher::i()->checkAcpPermission( 'reps_settings' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'reps_settings' );
 		
 			/* Random for the "like" preview */
-			$maxMemberId =  Db::i()->select( 'MAX(member_id)', 'core_members' )->first();
+			$maxMemberId =  \IPS\Db::i()->select( 'MAX(member_id)', 'core_members' )->first();
 			$names = array();
 			foreach ( range( 1, ( $maxMemberId > 3 ) ? 3 : $maxMemberId ) as $i )
 			{
@@ -175,20 +129,20 @@ class reputation extends Controller
 					$where = array( array( 'member_id>=?', $randomMemberId ) );
 					if ( !empty( $names ) )
 					{
-						$where[] = Db::i()->in( 'member_id', array_keys( $names ), TRUE );
+						$where[] = \IPS\Db::i()->in( 'member_id', array_keys( $names ), TRUE );
 					}
 					
-					$member = Member::constructFromData( Db::i()->select( '*', 'core_members', $where, 'member_id ASC', 1 )->first() );
+					$member = \IPS\Member::constructFromData( \IPS\Db::i()->select( '*', 'core_members', $where, 'member_id ASC', 1 )->first() );
 					$names[ $member->member_id ] = '<a>' . htmlentities( $member->name, ENT_DISALLOWED, 'UTF-8', FALSE ) . '</a>';
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
 					break;
 				}
 			}
-			if ( count( $names ) == 3 )
+			if ( \count( $names ) == 3 )
 			{
-				$names[] = Member::loggedIn()->language()->addToStack( 'like_blurb_others', FALSE, array( 'pluralize' => array( 2 ) ) );
+				$names[] = \IPS\Member::loggedIn()->language()->addToStack( 'like_blurb_others', FALSE, array( 'pluralize' => array( 2 ) ) );
 			}
 			if ( empty( $names ) )
 			{
@@ -196,25 +150,26 @@ class reputation extends Controller
 			}
 			else
 			{
-				$blurb = Member::loggedIn()->language()->addToStack( 'like_blurb', FALSE, array( 'htmlsprintf' => array( Member::loggedIn()->language()->formatList( $names ) ), 'pluralize' => array( count( $names ) ) ) );
+				$blurb = \IPS\Member::loggedIn()->language()->addToStack( 'like_blurb', FALSE, array( 'htmlsprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $names ) ), 'pluralize' => array( \count( $names ) ) ) );
 			}
-
+			
 			/* Build Form */
-			$form = new Form();
-			$form->add( new YesNo( 'reputation_enabled', Settings::i()->reputation_enabled, FALSE, array( 'togglesOn' => array( 'reputation_point_types', 'reputation_protected_groups', 'reputation_can_self_vote', 'reputation_highlight', 'reputation_show_profile', 'overall_reaction_count' ) ) ) );
-			$form->add( new CheckboxSet( 'reputation_protected_groups', explode( ',', Settings::i()->reputation_protected_groups ), FALSE, array( 'options' => Group::groups( TRUE, FALSE ), 'parse' => 'normal', 'multiple' => TRUE ), NULL, NULL, NULL, 'reputation_protected_groups' ) );
-			$form->add( new YesNo( 'reputation_can_self_vote', Settings::i()->reputation_can_self_vote, FALSE, array(
-				'disabled' => Bridge::i()->liveTopicsUnconverted()
-			), NULL, NULL, NULL, 'reputation_can_self_vote' ) );
-			$form->add( new Number( 'reputation_highlight', Settings::i()->reputation_highlight, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('reputation_highlight_prefix'), Member::loggedIn()->language()->addToStack('reputation_highlight_suffix'), 'reputation_highlight' ) );
-			$form->add( new YesNo( 'reputation_show_profile', Settings::i()->reputation_show_profile, FALSE, array(), NULL, NULL, NULL, 'reputation_show_profile' ) );
-			$form->add( new Radio( 'reaction_count_display', Settings::i()->reaction_count_display, FALSE, array( 'options' => array( 'individual' => 'individual_reactions', 'count' => 'overall_reaction_count' ) ) ) );
+			$form = new \IPS\Helpers\Form();
+			$form->add( new \IPS\Helpers\Form\YesNo( 'reputation_enabled', \IPS\Settings::i()->reputation_enabled, FALSE, array( 'togglesOn' => array( 'reputation_point_types', 'reputation_protected_groups', 'reputation_can_self_vote', 'reputation_highlight', 'reputation_show_profile', 'overall_reaction_count' ) ) ) );
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'reputation_protected_groups', explode( ',', \IPS\Settings::i()->reputation_protected_groups ), FALSE, array( 'options' => \IPS\Member\Group::groups( TRUE, FALSE ), 'parse' => 'normal', 'multiple' => TRUE ), NULL, NULL, NULL, 'reputation_protected_groups' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'reputation_can_self_vote', \IPS\Settings::i()->reputation_can_self_vote, FALSE, array(), NULL, NULL, NULL, 'reputation_can_self_vote' ) );
+			$form->add( new \IPS\Helpers\Form\Number( 'reputation_highlight', \IPS\Settings::i()->reputation_highlight, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('reputation_highlight_prefix'), \IPS\Member::loggedIn()->language()->addToStack('reputation_highlight_suffix'), 'reputation_highlight' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'reputation_show_profile', \IPS\Settings::i()->reputation_show_profile, FALSE, array(), NULL, NULL, NULL, 'reputation_show_profile' ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'reaction_count_display', \IPS\Settings::i()->reaction_count_display, FALSE, array( 'options' => array( 'individual' => 'individual_reactions', 'count' => 'overall_reaction_count' ) ) ) );
 		
 			/* Save */
 			if ( $form->saveAsSettings() )
 			{
-				Session::i()->log( 'acplogs__rep_settings' );
-				Output::i()->redirect( Url::internal( 'app=core&module=membersettings&controller=reputation&tab=settings' ), 'saved' );
+				/* Clear guest page caches */
+				\IPS\Data\Cache::i()->clearAll();
+
+				\IPS\Session::i()->log( 'acplogs__rep_settings' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=reputation&tab=settings' ), 'saved' );
 			}
 			
 			/* Display */
@@ -222,24 +177,24 @@ class reputation extends Controller
 		}
 		else if ( $activeTab === 'leaderboard' )
 		{
-			Dispatcher::i()->checkAcpPermission( 'reps_settings' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'reps_settings' );
 			
 			/* Get available filters */
-			$topMemberFilters = Member::topMembersOptions();
+			$topMemberFilters = \IPS\Member::topMembersOptions();
 		
 			/* Build Form */
-			$form = new Form();
-			$form->add( new YesNo( 'reputation_leaderboard_on', Settings::i()->reputation_leaderboard_on, FALSE, array( 'togglesOn' => array( 'reputation_leaderboard_default_tab', 'form_header_leaderboard_tabs_leaderboard', 'reputation_show_days_won_trophy', 'reputation_timezone', 'form_header_leaderboard_tabs_members', 'reputation_top_members_overview', 'reputation_overview_max_members', 'reputation_top_members_filters', 'reputation_max_members', 'leaderboard_excluded_groups' ) ), NULL, NULL, NULL, 'reputation_leaderboard_on' ) );
-			$form->add( new Radio( 'reputation_leaderboard_default_tab', Settings::i()->reputation_leaderboard_default_tab, FALSE, array( 'options' => array( 'leaderboard' => 'leaderboard_tabs_leaderboard', 'history' => 'leaderboard_tabs_history', 'members' => 'leaderboard_tabs_members' ) ), NULL, NULL, NULL, 'reputation_leaderboard_default_tab' ) );
-			$form->add( new CheckboxSet( 'leaderboard_excluded_groups', explode( ',', Settings::i()->leaderboard_excluded_groups ), FALSE, array( 'options' => Group::groups( TRUE, FALSE ), 'parse' => 'normal', 'multiple' => TRUE ), NULL, NULL, NULL, 'leaderboard_excluded_groups' ) );
+			$form = new \IPS\Helpers\Form();
+			$form->add( new \IPS\Helpers\Form\YesNo( 'reputation_leaderboard_on', \IPS\Settings::i()->reputation_leaderboard_on, FALSE, array( 'togglesOn' => array( 'reputation_leaderboard_default_tab', 'form_header_leaderboard_tabs_leaderboard', 'reputation_show_days_won_trophy', 'reputation_timezone', 'form_header_leaderboard_tabs_members', 'reputation_top_members_overview', 'reputation_overview_max_members', 'reputation_top_members_filters', 'reputation_max_members', 'leaderboard_excluded_groups' ) ), NULL, NULL, NULL, 'reputation_leaderboard_on' ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'reputation_leaderboard_default_tab', \IPS\Settings::i()->reputation_leaderboard_default_tab, FALSE, array( 'options' => array( 'leaderboard' => 'leaderboard_tabs_leaderboard', 'history' => 'leaderboard_tabs_history', 'members' => 'leaderboard_tabs_members' ) ), NULL, NULL, NULL, 'reputation_leaderboard_default_tab' ) );
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'leaderboard_excluded_groups', explode( ',', \IPS\Settings::i()->leaderboard_excluded_groups ), FALSE, array( 'options' => \IPS\Member\Group::groups( TRUE, FALSE ), 'parse' => 'normal', 'multiple' => TRUE ), NULL, NULL, NULL, 'leaderboard_excluded_groups' ) );
 			$form->addHeader('leaderboard_tabs_leaderboard');
-			$form->add( new YesNo( 'reputation_show_days_won_trophy', Settings::i()->reputation_show_days_won_trophy, FALSE, array( 'togglesOn' => array() ), NULL, NULL, NULL, 'reputation_show_days_won_trophy' ) );
-			$form->add( new Timezone( 'reputation_timezone', Settings::i()->reputation_timezone, FALSE, array(), NULL, NULL, NULL, 'reputation_timezone' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'reputation_show_days_won_trophy', \IPS\Settings::i()->reputation_show_days_won_trophy, FALSE, array( 'togglesOn' => array() ), NULL, NULL, NULL, 'reputation_show_days_won_trophy' ) );
+			$form->add( new \IPS\Helpers\Form\Timezone( 'reputation_timezone', \IPS\Settings::i()->reputation_timezone, FALSE, array(), NULL, NULL, NULL, 'reputation_timezone' ) );
 			$form->addHeader('leaderboard_tabs_members');
-			$form->add( new CheckboxSet( 'reputation_top_members_overview', explode( ',', Settings::i()->reputation_top_members_overview ), FALSE, array( 'options' => $topMemberFilters ), NULL, NULL, NULL, 'reputation_max_members' ) );
-			$form->add( new Number( 'reputation_overview_max_members', Settings::i()->reputation_overview_max_members, FALSE, array( 'min' => 3, 'max' => 100 ), NULL, NULL, NULL, 'reputation_overview_max_members' ) );
-			$form->add( new CheckboxSet( 'reputation_top_members_filters', Settings::i()->reputation_top_members_filters == '*' ? array_keys( $topMemberFilters ) : explode( ',', Settings::i()->reputation_top_members_filters ), FALSE, array( 'options' => $topMemberFilters ), NULL, NULL, NULL, 'reputation_top_members_filters' ) );
-			$form->add( new Number( 'reputation_max_members', Settings::i()->reputation_max_members, FALSE, array( 'min' => 3, 'max' => '100' ), NULL, NULL, NULL, 'reputation_max_members' ) );
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'reputation_top_members_overview', explode( ',', \IPS\Settings::i()->reputation_top_members_overview ), FALSE, array( 'options' => $topMemberFilters ), NULL, NULL, NULL, 'reputation_max_members' ) );
+			$form->add( new \IPS\Helpers\Form\Number( 'reputation_overview_max_members', \IPS\Settings::i()->reputation_overview_max_members, FALSE, array( 'min' => 3, 'max' => 100 ), NULL, NULL, NULL, 'reputation_overview_max_members' ) );
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'reputation_top_members_filters', \IPS\Settings::i()->reputation_top_members_filters == '*' ? array_keys( $topMemberFilters ) : explode( ',', \IPS\Settings::i()->reputation_top_members_filters ), FALSE, array( 'options' => $topMemberFilters ), NULL, NULL, NULL, 'reputation_top_members_filters' ) );
+			$form->add( new \IPS\Helpers\Form\Number( 'reputation_max_members', \IPS\Settings::i()->reputation_max_members, FALSE, array( 'min' => 3, 'max' => '100' ), NULL, NULL, NULL, 'reputation_max_members' ) );
 			
 			/* Save */
 			if ( $values = $form->values() )
@@ -249,9 +204,12 @@ class reputation extends Controller
 				$values['leaderboard_excluded_groups'] = implode( ',', $values['leaderboard_excluded_groups'] );
 				$values['reputation_top_members_filters'] = $values['reputation_top_members_filters'] == array_keys( $topMemberFilters ) ? '*' : implode( ',', $values['reputation_top_members_filters'] );				
 				$form->saveAsSettings( $values );
+				
+				/* Clear guest page caches */
+				\IPS\Data\Cache::i()->clearAll();
 
-				Session::i()->log( 'acplogs__rep_settings' );
-				Output::i()->redirect( Url::internal( 'app=core&module=membersettings&controller=reputation&tab=leaderboard' ), 'saved' );
+				\IPS\Session::i()->log( 'acplogs__rep_settings' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=reputation&tab=leaderboard' ), 'saved' );
 			}
 			
 			/* Display */
@@ -260,12 +218,12 @@ class reputation extends Controller
 		else
 		{
 			/* Create the table */
-			$table = new TableDb( 'core_reputation_levels', Url::internal( 'app=core&module=membersettings&controller=reputation&tab=levels' ) );
+			$table = new \IPS\Helpers\Table\Db( 'core_reputation_levels', \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=reputation&tab=levels' ) );
 			$table->langPrefix = 'rep_';
 			
 			/* Columns */
 			$table->joins = array(
-				array( 'select' => 'w.word_custom', 'from' => array( 'core_sys_lang_words', 'w' ), 'where' => "w.word_key=CONCAT( 'core_reputation_level_', core_reputation_levels.level_id ) AND w.lang_id=" . Member::loggedIn()->language()->id )
+				array( 'select' => 'w.word_custom', 'from' => array( 'core_sys_lang_words', 'w' ), 'where' => "w.word_key=CONCAT( 'core_reputation_level_', core_reputation_levels.level_id ) AND w.lang_id=" . \IPS\Member::loggedIn()->language()->id )
 			);
 			$table->include = array( 'word_custom', 'level_image', 'level_points' );
 			$table->mainColumn = 'word_custom';
@@ -282,7 +240,7 @@ class reputation extends Controller
 				{
 					if ( $val )
 					{
-						return "<img src='" . File::get( "core_Theme", $val )->url . "' alt=''>";
+						return "<img src='" . \IPS\File::get( "core_Theme", $val )->url . "' alt=''>";
 					}
 					return '';
 				}
@@ -293,8 +251,8 @@ class reputation extends Controller
 				'add'	=> array(
 					'title'	=> 'add',
 					'icon'	=> 'plus',
-					'link'	=> Url::internal( 'app=core&module=membersettings&controller=reputation&do=levelForm' ),
-					'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('add') )
+					'link'	=> \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=reputation&do=levelForm' ),
+					'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('add') )
 				),
 			);
 			$table->rowButtons = function( $row )
@@ -303,13 +261,13 @@ class reputation extends Controller
 					'edit'	=> array(
 						'title'	=> 'edit',
 						'icon'	=> 'pencil',
-						'link'	=> Url::internal( 'app=core&module=membersettings&controller=reputation&do=levelForm&id=' ) . $row['level_id'],
-						'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit') )
+						'link'	=> \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=reputation&do=levelForm&id=' ) . $row['level_id'],
+						'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit') )
 					),
 					'delete'	=> array(
 						'title'	=> 'delete',
 						'icon'	=> 'times-circle',
-						'link'	=> Url::internal( 'app=core&module=membersettings&controller=reputation&do=deleteLevel&id=' ) . $row['level_id'],
+						'link'	=> \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=reputation&do=deleteLevel&id=' ) . $row['level_id'],
 						'data'	=> array( 'delete' => '' )
 					),
 				);
@@ -319,16 +277,16 @@ class reputation extends Controller
 			$activeTabContents = (string) $table;
 		}
 
-		$activeTabContents = Theme::i()->getTemplate( 'forms' )->blurb( 'rep_' . $blurbLangKey . '_blurb', TRUE, TRUE ) . $activeTabContents;
+		$activeTabContents = \IPS\Theme::i()->getTemplate( 'forms' )->blurb( 'rep_' . $activeTab . '_blurb', TRUE, TRUE ) . $activeTabContents;
 			
 		/* Display */
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $activeTabContents;
+			\IPS\Output::i()->output = $activeTabContents;
 		}
 		else
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'global' )->tabs( $tabs, $activeTab, $activeTabContents, Url::internal( "app=core&module=membersettings&controller=reputation" ) );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->tabs( $tabs, $activeTab, $activeTabContents, \IPS\Http\Url::internal( "app=core&module=membersettings&controller=reputation" ) );
 		}
 	}
 	
@@ -337,50 +295,50 @@ class reputation extends Controller
 	 *
 	 * @return	void
 	 */
-	public function levelForm() : void
+	public function levelForm()
 	{
-		/* Allow SVGs without the obscure hash removing the file extension */
-		File::$safeFileExtensions[] = 'svg';
-
 		$current = NULL;
-		if ( Request::i()->id )
+		if ( \IPS\Request::i()->id )
 		{
-			$current = Db::i()->select( '*', 'core_reputation_levels', array( 'level_id=?', Request::i()->id ) )->first();
+			$current = \IPS\Db::i()->select( '*', 'core_reputation_levels', array( 'level_id=?', \IPS\Request::i()->id ) )->first();
 		}
 	
-		$form = new Form();
+		$form = new \IPS\Helpers\Form();
 		
-		$form->add( new Translatable( 'rep_level_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $current ? "core_reputation_level_{$current['level_id']}" : NULL ) ) ) );
-		$form->add( new Upload( 'rep_level_image', ( $current and $current['level_image'] ) ? File::get( 'core_Theme', $current['level_image'] ) : NULL, FALSE, array( 'storageExtension' => 'core_Theme', 'allowedFileTypes' => array_merge( Image::supportedExtensions(), ['svg'] ), 'checkImage' => TRUE, 'obscure' => true ) ) );
-		$form->add( new Number( 'rep_level_points', $current ? $current['level_points'] : 0, TRUE, array( 'min' => NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'rep_level_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $current ? "core_reputation_level_{$current['level_id']}" : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'rep_level_image', ( $current and $current['level_image'] ) ? \IPS\File::get( 'core_Theme', $current['level_image'] ) : NULL, FALSE, array( 'storageExtension' => 'core_Theme' ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'rep_level_points', $current ? $current['level_points'] : 0, TRUE, array( 'min' => NULL ) ) );
 		
 		if ( $values = $form->values() )
 		{
 			$save = array(
-				'level_image' => ( $values['rep_level_image'] instanceof File ? (string) $values['rep_level_image'] : '' ),
+				'level_image'	=> $values['rep_level_image'] ? str_replace( \IPS\ROOT_PATH . '/uploads/', '', $values['rep_level_image'] ) : '',
 				'level_points'	=> $values['rep_level_points'],
 			);
 		
 			if ( $current )
 			{
-				Db::i()->update( 'core_reputation_levels', $save, array( 'level_id=?', $current['level_id'] ) );
+				\IPS\Db::i()->update( 'core_reputation_levels', $save, array( 'level_id=?', $current['level_id'] ) );
 				$id = $current['level_id'];
+				\IPS\Session::i()->log( 'acplogs__rep_edited', array( $save['level_points'] => FALSE ) );
 			}
 			else
 			{
-				$id = Db::i()->insert( 'core_reputation_levels', $save );
+				$id = \IPS\Db::i()->insert( 'core_reputation_levels', $save );
+				\IPS\Session::i()->log( 'acplogs__rep_edited', array( $save['level_points'] => FALSE ) );
 			}
-
-			Session::i()->log( 'acplogs__rep_edited', array( $save['level_points'] => FALSE ) );
 			
-			unset( Store::i()->reputationLevels );
+			unset( \IPS\Data\Store::i()->reputationLevels );
 
-			Lang::saveCustom( 'core', "core_reputation_level_{$id}", $values['rep_level_title'] );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			\IPS\Lang::saveCustom( 'core', "core_reputation_level_{$id}", $values['rep_level_title'] );
 			
-			Output::i()->redirect( Url::internal( 'app=core&module=membersettings&controller=reputation&tab=levels' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=reputation&tab=levels' ), 'saved' );
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( $current ? "core_reputation_level_{$current['level_id']}" : 'add', $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( $current ? "core_reputation_level_{$current['level_id']}" : 'add', $form, FALSE );
 	}
 	
 	/**
@@ -388,26 +346,29 @@ class reputation extends Controller
 	 *
 	 * @return	void
 	 */
-	public function deleteLevel() : void
+	public function deleteLevel()
 	{
-		Dispatcher::i()->checkAcpPermission( 'reps_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'reps_delete' );
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
 		try
 		{
-			$current = Db::i()->select( '*', 'core_reputation_levels', array( 'level_id=?', Request::i()->id ) )->first();
+			$current = \IPS\Db::i()->select( '*', 'core_reputation_levels', array( 'level_id=?', \IPS\Request::i()->id ) )->first();
 			
-			Session::i()->log( 'acplogs__rep_deleted', array( $current['level_points'] => FALSE ) );
-			Db::i()->delete( 'core_reputation_levels', array( 'level_id=?', Request::i()->id ) );
-			unset( Store::i()->reputationLevels );
+			\IPS\Session::i()->log( 'acplogs__rep_deleted', array( $current['level_points'] => FALSE ) );
+			\IPS\Db::i()->delete( 'core_reputation_levels', array( 'level_id=?', \IPS\Request::i()->id ) );
+			unset( \IPS\Data\Store::i()->reputationLevels );
 
-			Lang::deleteCustom( 'core', 'core_reputation_level_' . Request::i()->id );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			\IPS\Lang::deleteCustom( 'core', 'core_reputation_level_' . \IPS\Request::i()->id );
 		}
-		catch ( UnderflowException $e ) { }
+		catch ( \UnderflowException $e ) { }
 				
-		Output::i()->redirect( Url::internal( 'app=core&module=membersettings&controller=reputation&tab=levels' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=reputation&tab=levels' ) );
 	}
 	
 	/**
@@ -415,59 +376,59 @@ class reputation extends Controller
 	 *
 	 * @return void
 	 */
-	 public function rebuildLeaderboard() : void
+	 public function rebuildLeaderboard()
 	 {
-		if ( ! isset( Request::i()->process ) )
+		if ( ! isset( \IPS\Request::i()->process ) )
 		{
-			 Output::i()->title = Member::loggedIn()->language()->addToStack('reputation_leaderboard_rebuild_title');
-			 Output::i()->output = Theme::i()->getTemplate( 'settings' )->reputationLeaderboardRebuild();
+			 \IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('reputation_leaderboard_rebuild_title');
+			 \IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'settings' )->reputationLeaderboardRebuild();
 		}
 		else
 		{
-			Session::i()->csrfCheck();
-			Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
-			Db::i()->delete('core_reputation_leaderboard_history');
-			Session::i()->log( 'acplog__rebuilt_leaderboard' );
-			Output::i()->redirect( Url::internal( 'app=core&module=membersettings&controller=reputation&tab=leaderboard' ), 'reputation_leaderboard_rebuilding' );
+			\IPS\Session::i()->csrfCheck();
+			\IPS\Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
+			\IPS\Db::i()->delete('core_reputation_leaderboard_history');
+			\IPS\Session::i()->log( 'acplog__rebuilt_leaderboard' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=reputation&tab=leaderboard' ), 'reputation_leaderboard_rebuilding' );
 		}
 	 }
 	 
 	 /**
-	 * Function to execute after nodes are reordered. Do nothing by default but app can extend.
+	 * Function to execute after nodes are reordered. Do nothing by default but plugins can extend.
 	 *
 	 * @param	array	$order	The new ordering that was saved
 	 * @return	void
 	 */
-	protected function _afterReorder( array $order ) : void
+	protected function _afterReorder( $order )
 	{
-		unset( Store::i()->reactions );
+		unset( \IPS\Data\Store::i()->reactions );
 	}
-
+	
 	/**
 	 * Redirect after save
 	 *
-	 * @param Model|null $old A clone of the node as it was before or NULL if this is a creation
-	 * @param Model $new The node now
-	 * @param string $lastUsedTab The tab last used in the form
-	 * @return    void
+	 * @param	\IPS\Node\Model	$old			A clone of the node as it was before or NULL if this is a creation
+	 * @param	\IPS\Node\Model	$new			The node now
+	 * @param	string			$lastUsedTab	The tab last used in the form
+	 * @return	void
 	 */
-	protected function _afterSave( ?Model $old, Model $new, mixed $lastUsedTab = FALSE ): void
+	protected function _afterSave( ?\IPS\Node\Model $old, \IPS\Node\Model $new, $lastUsedTab = FALSE )
 	{
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array() );
+			\IPS\Output::i()->json( array() );
 		}
 		else
 		{
-			if( isset( Request::i()->save_and_reload ) )
+			if( isset( \IPS\Request::i()->save_and_reload ) )
 			{
-				$buttons = $new->getButtons($this->url, !($new instanceof $this->nodeClass));
+				$buttons = $new->getButtons( $this->url, !( $new instanceof $this->nodeClass ) );
 
-				Output::i()->redirect( ( $lastUsedTab ? $buttons['edit']['link']->setQueryString('activeTab', $lastUsedTab ) : $buttons['edit']['link'] ), 'saved' );
+				\IPS\Output::i()->redirect( ( $lastUsedTab ? $buttons['edit']['link']->setQueryString('activeTab', $lastUsedTab ) : $buttons['edit']['link'] ), 'saved' );
 			}
 			else
 			{
-				Output::i()->redirect( $this->url->setQueryString( array( 'root' => ( $new->parent() ? $new->parent()->_id : '' ), 'tab' => 'reactions' ) ), 'saved' );
+				\IPS\Output::i()->redirect( $this->url->setQueryString( array( 'root' => ( $new->parent() ? $new->parent()->_id : '' ), 'tab' => 'reactions' ) ), 'saved' );
 			}
 		}
 	}
@@ -477,35 +438,34 @@ class reputation extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
 		/* Get node */
-		/* @var Reaction $nodeClass */
 		$nodeClass = $this->nodeClass;
-		if ( Request::i()->subnode )
+		if ( \IPS\Request::i()->subnode )
 		{
 			$nodeClass = $nodeClass::$subnodeClass;
 		}
 		
 		try
 		{
-			$node = $nodeClass::load( Request::i()->id );
+			$node = $nodeClass::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2S101/J', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2S101/J', 404, '' );
 		}
 		 
 		/* Permission check */
 		if( !$node->canDelete() )
 		{
-			Output::i()->error( 'node_noperm_delete', '2S101/H', 403, '' );
+			\IPS\Output::i()->error( 'node_noperm_delete', '2S101/H', 403, '' );
 		}
 
 		/* Do we have any children or content? */
-		$form = new Form;
-		$form->add( new Radio( 'existing_reactions', NULL, TRUE, array( 'options' => array( 'change' => 'change_new_reaction', 'delete' => 'delete' ), 'toggles' => array( 'change' => array( 'new_reaction' ) ) ) ) );
-		$form->add( new Node( 'new_reaction', NULL, TRUE, array( 'class' => 'IPS\Content\Reaction', 'permissionCheck' => function( $row ) use ( $node ) {
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Radio( 'existing_reactions', NULL, TRUE, array( 'options' => array( 'change' => 'change_new_reaction', 'delete' => 'delete' ), 'toggles' => array( 'change' => array( 'new_reaction' ) ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'new_reaction', NULL, TRUE, array( 'class' => 'IPS\Content\Reaction', 'permissionCheck' => function( $row ) use ( $node ) {
 			if ( $row->_id == $node->_id )
 			{
 				return FALSE;
@@ -518,28 +478,28 @@ class reputation extends Controller
 		{
 			if ( $values['existing_reactions'] == 'change' AND array_key_exists( 'new_reaction', $values ) )
 			{
-				Db::i()->update( 'core_reputation_index', array( 'reaction' => $values['new_reaction']->_id ), array( "reaction=?", $node->_id ) );
+				\IPS\Db::i()->update( 'core_reputation_index', array( 'reaction' => $values['new_reaction']->_id ), array( "reaction=?", $node->_id ) );
 			}
 			else
 			{
-				Db::i()->delete( 'core_reputation_index', array( "reaction=?", $node->_id ) );
+				\IPS\Db::i()->delete( 'core_reputation_index', array( "reaction=?", $node->_id ) );
 			}
 			
 			/* Delete it */
-			Session::i()->log( 'acplog__node_deleted', array( $this->title => TRUE, $node->titleForLog() => FALSE ) );
+			\IPS\Session::i()->log( 'acplog__node_deleted', array( $this->title => TRUE, $node->titleForLog() => FALSE ) );
 			$node->delete();
 	
 			/* Boink */
-			if( Request::i()->isAjax() )
+			if( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->json( "OK" );
+				\IPS\Output::i()->json( "OK" );
 			}
 			else
 			{
-				Output::i()->redirect( $this->url->setQueryString( 'tab', 'reactions' )->setQueryString( array( 'root' => ( $node->parent() ? $node->parent()->_id : '' ) ) ), 'deleted' );
+				\IPS\Output::i()->redirect( $this->url->setQueryString( 'tab', 'reactions' )->setQueryString( array( 'root' => ( $node->parent() ? $node->parent()->_id : '' ) ) ), 'deleted' );
 			}
 		}
 		
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 }

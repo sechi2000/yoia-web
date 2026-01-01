@@ -12,81 +12,23 @@ namespace IPS\Dispatcher;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use DateInterval;
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Content\Search\SearchContent;
-use IPS\core\Alerts\Alert;
-use IPS\core\DataLayer;
-use IPS\core\IndexNow;
-use IPS\core\Rss;
-use IPS\Data\Cache;
-use IPS\Data\Cache\None;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Developer;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Http\Url\Internal;
-use IPS\Log;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Device;
-use IPS\MFA\MFAHandler;
-use IPS\Output;
-use IPS\Platform\Bridge;
 use IPS\Request;
-use IPS\Session\Front as Session;
-use IPS\Settings;
-use IPS\Sitemap;
-use IPS\Theme;
-use IPS\Widget;
-use IPS\Widget\Area;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function mb_substr;
-use function strstr;
-use const IPS\CACHING_LOG;
-use const IPS\CIC;
-use const IPS\ENFORCE_ACCESS;
-use const IPS\QUERY_LOG;
-use const IPS\REDIS_LOG;
-use const IPS\UPGRADING_PAGE;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front-end Dispatcher
  */
-class Front extends Standard
+class _Front extends \IPS\Dispatcher\Standard
 {
 	/**
 	 * Controller Location
 	 */
-	public string $controllerLocation = 'front';
-
-	/**
-	 * @brief Module
-	 */
-	protected ?string $_module = NULL;
-
-	/**
-	 * @brief Controller
-	 */
-	protected ?string $_controller = NULL;
+	public $controllerLocation = 'front';
 
 	/**
 	 * @var int|null $currentPage
@@ -97,26 +39,26 @@ class Front extends Standard
 	 * Init
 	 *
 	 * @return    void
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	public function init() : void
+	public function init()
 	{
 		/* Set up in progress? */
-		if ( isset( Settings::i()->setup_in_progress ) AND Settings::i()->setup_in_progress )
+		if ( isset( \IPS\Settings::i()->setup_in_progress ) AND \IPS\Settings::i()->setup_in_progress )
 		{
 			$protocol = '1.0';
-			if( isset( $_SERVER['SERVER_PROTOCOL'] ) and strstr( $_SERVER['SERVER_PROTOCOL'], '/1.0' ) !== false )
+			if( isset( $_SERVER['SERVER_PROTOCOL'] ) and \strstr( $_SERVER['SERVER_PROTOCOL'], '/1.0' ) !== false )
 			{
 				$protocol = '1.1';
 			}
 
 			/* Don't allow the setup in progress page to be cached, it will only be displayed for a very short period of time */
-			foreach( Output::getNoCacheHeaders() as $headerKey => $headerValue )
+			foreach( \IPS\Output::getNoCacheHeaders() as $headerKey => $headerValue )
 			{
 				header( "{$headerKey}: {$headerValue}" );
 			}
 			
-			if ( CIC and ! Session::loggedIn() and ! Session::i()->userAgent->bot )
+			if ( \IPS\CIC and ! \IPS\Session\Front::loggedIn() and ! \IPS\Session\Front::i()->userAgent->bot )
 			{
 				/* The software is unavailable, but the site is up so we do not want to affect our cloud downtime statistics and trigger monitoring alarms
 				   if we are not a search engine */
@@ -127,19 +69,25 @@ class Front extends Standard
 				header( "HTTP/{$protocol} 503 Service Unavailable" );
 				header( "Retry-After: 300"); #5 minutes
 			}
-					
-			require \IPS\ROOT_PATH . '/' . UPGRADING_PAGE;
+			/* show the default upgrading page if the custom one doesn#t exist */
+			if ( !file_exists( \IPS\ROOT_PATH . '/' . \IPS\UPGRADING_PAGE ) )
+			{
+				$path = ( \defined( 'CP_DIRECTORY' ) ) ? CP_DIRECTORY . '/upgrade/upgrading.html' : 'admin/upgrade/upgrading.html';
+				require \IPS\ROOT_PATH . '/' . $path;
+			}
+			else
+			{
+				require \IPS\ROOT_PATH . '/' . \IPS\UPGRADING_PAGE;
+			}
+
 			exit;
 		}
 
 		/* Sync stuff when in developer mode */
 		if ( \IPS\IN_DEV )
 		{
-			 Developer::sync();
+			 \IPS\Developer::sync();
 		}
-
-		/* Perform some legacy URL conversions - Need to do this before checking furl in case app name has changed */
-		static::convertLegacyParameters();
 		
 		/* Base CSS */
 		static::baseCss();
@@ -147,10 +95,13 @@ class Front extends Standard
 		/* Base JS */
 		static::baseJs();
 
+		/* Perform some legacy URL conversions - Need to do this before checking furl in case app name has changed */
+		static::convertLegacyParameters();
+
 		/* Get the current page, if any */
 		if ( isset( Request::i()->page ) and is_numeric( Request::i()->page ) )
 		{
-			$this->currentPage = Request::i()->page;
+			$this->currentPage = \IPS\Request::i()->page;
 		}
 		else if ( isset( Request::i()->url()->hiddenQueryString['page'] ) and is_numeric( Request::i()->url()->hiddenQueryString['page'] ) and $page = Request::i()->url()->hiddenQueryString['page'] )
 		{
@@ -162,49 +113,29 @@ class Front extends Standard
 		{
 			$this->checkUrl();
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			/* If we have the converter app, check for redirects */
-			if( Application::appIsEnabled('convert') )
-			{
-				$application = Application::load( 'convert' );
-				$application::checkRedirects();
-			}
-
 			/* Display a 404 */
-			$this->application = Application::load('core');
+			$this->application = \IPS\Application::load('core');
 			$this->setDefaultModule();
-			if ( Member::loggedIn()->isBanned() )
+			if ( \IPS\Member::loggedIn()->isBanned() )
 			{
-				Output::i()->sidebar = [];
-				Output::i()->bodyClasses[] = 'ipsLayout_minimal';
+				\IPS\Output::i()->sidebar = FALSE;
+				\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimal';
 			}
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'app.js' ) );
-			Output::i()->error( 'requested_route_404', '1S160/2', 404, '' );
-		}
-
-		/* Loader extension */
-		foreach( Application::allExtensions( 'core', 'Loader' ) as $loader )
-		{
-			foreach( $loader->js() as $js )
-			{
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, $js );
-			}
-			foreach( $loader->css() as $css )
-			{
-				Output::i()->cssFiles = array_merge( Output::i()->cssFiles, $css );
-			}
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'app.js' ) );
+			\IPS\Output::i()->error( 'requested_route_404', '1S160/2', 404, '' );
 		}
 
 		/* Check if we're a low quality (no search engine bot) user */
-		if ( ! Member::loggedIn()->member_id and \IPS\Session\Front::i()->userAgent->isLowValue() )
+		if ( ! \IPS\Member::loggedIn()->member_id and \IPS\Session\Front::i()->userAgent->isLowValue() )
 		{
 			/* We want to restrict the number of 301s low quality bots get */
 			foreach( [ 'findComment', 'findReview', 'getNewComment', 'getLastComment'] as $do )
 			{
-				if ( isset( Request::i()->do ) and Request::i()->do === $do ) // baby shark
+				if ( isset( \IPS\Request::i()->do ) and \IPS\Request::i()->do === $do ) // baby shark
 				{
-					unset( Request::i()->do );
+					unset( \IPS\Request::i()->do );
 				}
 			}
 		}
@@ -214,131 +145,126 @@ class Front extends Standard
 		{
 			parent::init();
 		}
-		catch ( DomainException $e )
+		catch ( \DomainException $e )
 		{
 			// If this is a "no permission", and they're validating - show the validating screen instead
-			if( $e->getCode() === 6 and Member::loggedIn()->member_id and Member::loggedIn()->members_bitoptions['validating'] )
+			if( $e->getCode() === 6 and \IPS\Member::loggedIn()->member_id and \IPS\Member::loggedIn()->members_bitoptions['validating'] )
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=register&do=validating', 'front', 'register' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=register&do=validating', 'front', 'register' ) );
 			}
 			// Otherwise show the error
 			else
 			{
-				Output::i()->error( $e->getMessage(), '2S100/' . $e->getCode(), $e->getCode() === 4 ? 403 : 404, '' );
-			}
-		}
-
-		/* Loader extension - check for redirects */
-		foreach( Application::allExtensions( 'core', 'Loader' ) as $loader )
-		{
-			/* First come first serve here */
-			if( $redirect = $loader->checkForRedirect() )
-			{
-				Output::i()->redirect( $redirect );
+				\IPS\Output::i()->error( $e->getMessage(), '2S100/' . $e->getCode(), $e->getCode() === 4 ? 403 : 404, '' );
 			}
 		}
 
 		$this->_setReferralCookie();
 		
 		/* Enable sidebar by default (controllers can turn it off if needed) */
-		Output::i()->sidebar['enabled'] = !Request::i()->isAjax();
+		\IPS\Output::i()->sidebar['enabled'] = ( \IPS\Request::i()->isAjax() ) ? FALSE : TRUE;
 		
 		/* Add in RSS Feeds */
-		foreach( Rss::getStore() AS $feed_id => $feed )
+		foreach( \IPS\core\Rss::getStore() AS $feed_id => $feed )
 		{
-			$feed = Rss::constructFromData( $feed );
+			$feed = \IPS\core\Rss::constructFromData( $feed );
 
-			if ( $feed->_enabled AND ( $feed->groups == '*' OR Member::loggedIn()->inGroup( $feed->groups ) ) )
+			if ( $feed->_enabled AND ( $feed->groups == '*' OR \IPS\Member::loggedIn()->inGroup( $feed->groups ) ) )
 			{
-				Output::i()->rssFeeds[ $feed->_title ] = $feed->url();
+				\IPS\Output::i()->rssFeeds[ $feed->_title ] = $feed->url();
 			}
 		}
 		
 		/* Are we online? */
-		if ( !Settings::i()->site_online and !Member::loggedIn()->group['g_access_offline'] and $this->controllerLocation == 'front' and !$this->application->allowOfflineAccess( $this->module, $this->controller, Request::i()->do ) )
+		if ( !\IPS\Settings::i()->site_online and !\IPS\Member::loggedIn()->group['g_access_offline'] and $this->controllerLocation == 'front' and !$this->application->allowOfflineAccess( $this->module, $this->controller, \IPS\Request::i()->do ) )
 		{
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->json( Member::loggedIn()->language()->addToStack( 'offline_unavailable', FALSE, array( 'sprintf' => array( Settings::i()->board_name ) ) ), 503 );
+				\IPS\Output::i()->json( \IPS\Member::loggedIn()->language()->addToStack( 'offline_unavailable', FALSE, array( 'sprintf' => array( \IPS\Settings::i()->board_name ) ) ), 503 );
 			}
 			
-			Output::i()->showOffline();
+			\IPS\Output::i()->showOffline();
 		}
 		
 		/* Member Ban? */
 
 		/* IP Ban check happens only the Login and Register Controller for guests */
 		$ipBanned = FALSE;
-		if( Member::loggedIn()->member_id OR in_array( $this->controller, array( 'register', 'login' ) ) )
+		if( \IPS\Member::loggedIn()->member_id OR \in_array( $this->controller, array( 'register', 'login' ) ) )
 		{
-			$ipBanned = Request::i()->ipAddressIsBanned();
+			$ipBanned = \IPS\Request::i()->ipAddressIsBanned();
 		}
 
-		if ( $ipBanned or $banEnd = Member::loggedIn()->isBanned() )
+		if ( $ipBanned or $banEnd = \IPS\Member::loggedIn()->isBanned() )
 		{
-			if ( !$ipBanned and !Member::loggedIn()->member_id )
+			if ( !$ipBanned and !\IPS\Member::loggedIn()->member_id )
 			{
 				if ( $this->notAllowedBannedPage() )
 				{
-					$url = Url::internal( 'app=core&module=system&controller=login', 'front', 'login' );
+					$url = \IPS\Http\Url::internal( 'app=core&module=system&controller=login', 'front', 'login' );
 					
-					if ( Request::i()->url() != Settings::i()->base_url AND !isset( Request::i()->_mfaLogin ) )
+					if ( \IPS\Request::i()->url() != \IPS\Settings::i()->base_url AND !isset( \IPS\Request::i()->_mfaLogin ) )
 					{
-						$url = $url->setQueryString( 'ref', base64_encode( Request::i()->url() ) );
+						$url = $url->setQueryString( 'ref', base64_encode( \IPS\Request::i()->url() ) );
 					}
-					else if ( isset( Request::i()->_mfaLogin ) )
+					else if ( isset( \IPS\Request::i()->_mfaLogin ) )
 					{
 						$url = $url->setQueryString( '_mfaLogin', 1 );
 					}
 					
-					Output::i()->redirect( $url );
+					\IPS\Output::i()->redirect( $url );
 				}
 			}
 			else
 			{
-				Output::i()->sidebar = [];
-				Output::i()->bodyClasses[] = 'ipsLayout_minimal';
-				if( !$this->application->allowBannedAccess( $this->module, $this->controller, Request::i()->do ?? null ) )
+				\IPS\Output::i()->sidebar = FALSE;
+				\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimal';
+				if( !\in_array( $this->controller, array( 'contact', 'warnings', 'privacy', 'guidelines', 'metatags' ) ) )
 				{
-					Output::i()->showBanned();
+					\IPS\Output::i()->showBanned();
 				}
 			}
 		}
 		
 		/* Do we need more info from the member or do they need to validate? */
-		if( Member::loggedIn()->member_id and !$this->application->skipDoMemberCheck( $this->module, $this->controller, Request::i()->do ?? null ) )
+
+		/* These controllers should always be accessible, no matter if the member is awaiting validation or needs to set up the email or name */
+		$legalControllers = array( 'privacy', 'contact', 'terms', 'embed', 'metatags', 'subscriptions', 'serviceworker', 'settings' );
+
+		/* Do we need more info from the member or do they need to validate? */
+		if( \IPS\Member::loggedIn()->member_id and $this->controller !== 'language' and $this->controller !== 'theme' and $this->controller !== 'ajax' and !\in_array( $this->controller, $legalControllers ) )
 		{
 			if ( $url = static::doMemberCheck() )
 			{
-				Output::i()->redirect( $url );
+				\IPS\Output::i()->redirect( $url );
 			}
 		}
 		
 		/* Permission Check */
 		try
 		{
-			if ( !Member::loggedIn()->canAccessModule( $this->module ) )
+			if ( !\IPS\Member::loggedIn()->canAccessModule( $this->module ) )
 			{
-				if ( !Member::loggedIn()->member_id and isset( Request::i()->_mfaLogin ) )
+				if ( !\IPS\Member::loggedIn()->member_id and isset( \IPS\Request::i()->_mfaLogin ) )
 				{
-					Output::i()->redirect( Url::internal( "app=core&module=system&controller=login", 'front', 'login' )->setQueryString( '_mfaLogin', 1 ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=system&controller=login", 'front', 'login' )->setQueryString( '_mfaLogin', 1 ) );
 				}
-				Output::i()->error( ( Member::loggedIn()->member_id ? 'no_module_permission' : 'no_module_permission_guest' ), '2S100/2', 403, 'no_module_permission_admin' );
+				\IPS\Output::i()->error( ( \IPS\Member::loggedIn()->member_id ? 'no_module_permission' : 'no_module_permission_guest' ), '2S100/2', 403, 'no_module_permission_admin' );
 			}
 		}
-		catch( InvalidArgumentException $e ) # invalid module
+		catch( \InvalidArgumentException $e ) # invalid module
 		{
-			Output::i()->error( 'requested_route_404', '2S160/5', 404, '' );
+			\IPS\Output::i()->error( 'requested_route_404', '2S160/5', 404, '' );
 		}
 
 		/* Set up isAnonymous variable for realtime */
-		Output::i()->jsVars['isAnonymous'] = Member::loggedIn()->isOnlineAnonymously();
+		\IPS\Output::i()->jsVars['isAnonymous'] = (bool) \IPS\Member::loggedIn()->isOnlineAnonymously();
 
 		/* Stuff for output */
-		if ( !Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
 			/* Base Navigation. We only add the module not the app as most apps don't have a global base (for example, in Nexus, you want "Store" or "Client Area" to be the base). Apps can override themselves in their controllers. */
-			foreach( Application::applications() as $directory => $application )
+			foreach( \IPS\Application::applications() as $directory => $application )
 			{
 				if( $application->default )
 				{
@@ -354,25 +280,25 @@ class Front extends Standard
 			
 			if ( $this->module->key != 'system' AND $this->application->directory != $defaultApplication )
 			{
-				Output::i()->breadcrumb['module'] = array( Url::internal( 'app=' . $this->application->directory . '&module=' . $this->module->key . '&controller=' . $this->module->default_controller, 'front', array_key_exists( $this->module->key, Url::furlDefinition() ) ?  $this->module->key : NULL ), $this->module->_title );
+				\IPS\Output::i()->breadcrumb['module'] = array( \IPS\Http\Url::internal( 'app=' . $this->application->directory . '&module=' . $this->module->key . '&controller=' . $this->module->default_controller, 'front', array_key_exists( $this->module->key, \IPS\Http\Url::furlDefinition() ) ?  $this->module->key : NULL ), $this->module->_title );
 			}
 
 			/* Figure out what the global search is */
 			foreach ( $this->application->extensions( 'core', 'ContentRouter' ) as $object )
 			{
-				if ( count( $object->classes ) === 1 )
+				if ( \count( $object->classes ) === 1 )
 				{
 					$classes = $object->classes;
 					foreach ( $classes as $class )
 					{
-						if ( SearchContent::isSearchable( $class ) and $this->module->key == $class::$module )
+						if ( is_subclass_of( $class, 'IPS\Content\Searchable' ) and $class::includeInSiteSearch() and $this->module->key == $class::$module )
 						{
 							$type = mb_strtolower( str_replace( '\\', '_', mb_substr( array_pop( $classes ), 4 ) ) );
 							
 							/* If not the default app, set default search option to current app */
 							if ( ! mb_stristr( $type, $defaultApplication ) )
 							{
-								Output::i()->defaultSearchOption = array( $type, "{$type}_pl" );
+								\IPS\Output::i()->defaultSearchOption = array( $type, "{$type}_pl" );
 							}
 							break;
 						}
@@ -380,8 +306,6 @@ class Front extends Standard
 				}
 			}
 		}
-
-		Widget\Request::reset();
 	}
 
 	/**
@@ -389,12 +313,12 @@ class Front extends Standard
 	 *
 	 * @return void
 	 */
-	protected function _setReferralCookie() : void
+	protected function _setReferralCookie()
 	{
 		/* Set a referral cookie */
-		if( Settings::i()->ref_on and isset( Request::i()->_rid ) )
+		if( \IPS\Settings::i()->ref_on and isset( \IPS\Request::i()->_rid ) )
 		{
-			Request::i()->setCookie( 'referred_by', intval( Request::i()->_rid ), DateTime::create()->add( new DateInterval( 'P1Y' ) ) );
+			\IPS\Request::i()->setCookie( 'referred_by', \intval( \IPS\Request::i()->_rid ), \IPS\DateTime::create()->add( new \DateInterval( 'P1Y' ) ) );
 		}
 	}
 
@@ -403,35 +327,35 @@ class Front extends Standard
 	  *
 	  * @return void
 	  */
-	protected function checkUrl() : void
+	protected function checkUrl()
 	{
 		/* Handle friendly URLs */
-		if ( Settings::i()->use_friendly_urls )
+		if ( \IPS\Settings::i()->use_friendly_urls )
 		{
-			$url = Request::i()->url();
+			$url = \IPS\Request::i()->url();
 
 			/* Redirect to the "correct" friendly URL if there is one */
-			if ( !Request::i()->isAjax() and mb_strtolower( $_SERVER['REQUEST_METHOD'] ) == 'get' and !ENFORCE_ACCESS )
+			if ( !\IPS\Request::i()->isAjax() and mb_strtolower( $_SERVER['REQUEST_METHOD'] ) == 'get' and !\IPS\ENFORCE_ACCESS )
 			{
 				$correctUrl = NULL;
 				
 				/* If it's already a friendly URL, we need to check the SEO title is valid. If it isn't, we redirect iof "Force Friendly URLs" is enabled */
-				if ( $url instanceof Friendly or ( $url instanceof Internal and Settings::i()->seo_r_on ) )
+				if ( $url instanceof \IPS\Http\Url\Friendly or ( $url instanceof \IPS\Http\Url\Internal and \IPS\Settings::i()->seo_r_on ) )
 				{
 					$correctUrl = $url->correctFriendlyUrl();
 				}
 				
 
-				if ( !( $correctUrl instanceof Url ) and $url instanceof Internal )
+				if ( !( $correctUrl instanceof \IPS\Http\Url ) and $url instanceof \IPS\Http\Url\Internal )
 				{
-					$pathFromBaseUrl = ltrim( mb_substr( $url->data[ Url::COMPONENT_PATH ], mb_strlen( Url::internal('')->data[ Url::COMPONENT_PATH ] ) ), '/' );
+					$pathFromBaseUrl = ltrim( mb_substr( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], mb_strlen( \IPS\Http\Url::internal('')->data[ \IPS\Http\Url::COMPONENT_PATH ] ) ), '/' );
 
 					/* If they are accessing "index.php/whatever", we want "index.php?/whatever */
-					if ( mb_strpos( $url->data[ Url::COMPONENT_PATH ], '/index.php/' ) !== FALSE )
+					if ( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], '/index.php/' ) !== FALSE )
 					{
 						if ( mb_substr( $pathFromBaseUrl, 0, 10 ) === 'index.php/' )
 						{
-							$correctUrl = Friendly::friendlyUrlFromComponent( 0, trim( mb_substr( $pathFromBaseUrl, 10 ), '/' ), $url->queryString );
+							$correctUrl = \IPS\Http\Url\Friendly::friendlyUrlFromComponent( 0, trim( mb_substr( $pathFromBaseUrl, 10 ), '/' ), $url->queryString );
 						}
 					}
 					else
@@ -442,24 +366,24 @@ class Front extends Standard
 				}
 
 				/* Redirect to the correct URL if we got one */
-				if ( $correctUrl instanceof Url )
+				if ( $correctUrl instanceof \IPS\Http\Url )
 				{
-					if( $correctUrl->seoPagination and in_array( 'page', array_keys( $url->hiddenQueryString ) ) )
+					if( $correctUrl->seoPagination and \in_array( 'page', array_keys( $url->hiddenQueryString ) ) )
 					{
 						$correctUrl = $correctUrl->setPage( 'page', $url->hiddenQueryString['page'] );
 					}
-					Output::i()->redirect( $correctUrl, NULL );
+					\IPS\Output::i()->redirect( $correctUrl, NULL, 301 );
 				}
 
 				/* Check pagination */
-				if ( $url instanceof Friendly and $url->seoPagination and in_array( 'page', array_keys( $url->queryString ) ) )
+				if ( $url instanceof \IPS\Http\Url\Friendly and $url->seoPagination and \in_array( 'page', array_keys( $url->queryString ) ) )
 				{
-					Output::i()->redirect( $url->setPage( 'page', (int) $url->queryString['page'] )->stripQueryString('page'), NULL );
+					\IPS\Output::i()->redirect( $url->setPage( 'page', (int) $url->queryString['page'] )->stripQueryString('page'), NULL, 301 );
 				}
 			}
 			
 			/* If the accessed URL is friendly, set the "real" query string properties */
-			if ( $url instanceof Friendly )
+			if ( $url instanceof \IPS\Http\Url\Friendly )
 			{
 				foreach ( ( $url->queryString + $url->hiddenQueryString ) as $k => $v )
 				{
@@ -473,25 +397,25 @@ class Front extends Standard
 					}
 					
 					/* If this is a POST request, and this key has already been populated, do not overwrite it as this allows form input to be ignored and the query string data used */
-					if ( Request::i()->requestMethod() == 'POST' and isset( Request::i()->$k ) )
+					if ( \IPS\Request::i()->requestMethod() == 'POST' and isset( \IPS\Request::i()->$k ) )
 					{
 						continue;
 					}
 					
-					Request::i()->$k = $v;
+					\IPS\Request::i()->$k = $v;
 				}
 			}
 			/* Otherwise if it's not a recognised URL, show a 404 */
-			elseif ( !( $url instanceof Internal ) or $url->base !== 'front' )
+			elseif ( !( $url instanceof \IPS\Http\Url\Internal ) or $url->base !== 'front' )
 			{
 				/* Call the parent first in case we need to redirect to https, and so the correct locale, etc. is set */
 				try
 				{
 					parent::init();
 				}
-				catch ( Exception $e ) { }
+				catch ( \Exception $e ) { }
 				
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
 	}
@@ -501,9 +425,9 @@ class Front extends Standard
 	 *
 	 * @return	bool
 	 */
-	protected function notAllowedBannedPage(): bool
+	protected function notAllowedBannedPage()
 	{
-		return !Member::loggedIn()->group['g_view_board'] and !$this->application->allowGuestAccess( $this->module, $this->controller, Request::i()->do );
+		return !\IPS\Member::loggedIn()->group['g_view_board'] and !$this->application->allowGuestAccess( $this->module, $this->controller, \IPS\Request::i()->do );
 	}
 
 	/**
@@ -511,11 +435,11 @@ class Front extends Standard
 	 *
 	 * @return	void
 	 */
-	public static function convertLegacyParameters() : void
+	public static function convertLegacyParameters()
 	{
-		foreach( Application::applications() as $directory => $application )
+		foreach( \IPS\Application::applications() as $directory => $application )
 		{
-			if ( $application->enabled )
+			if ( $application->_enabled )
 			{
 				if( method_exists( $application, 'convertLegacyParameters' ) )
 				{
@@ -530,43 +454,47 @@ class Front extends Standard
 	 *
 	 * @return	void
 	 */
-	public function finish() : void
+	public function finish()
 	{
-        Bridge::i()->frontDispatcherFinish();
-
 		/* Sidebar Widgets */
-		if( !Request::i()->isAjax() )
+		if( !\IPS\Request::i()->isAjax() )
 		{
-			/**
-			 * @var Area[] $widgets
-			 */
 			$widgets = array();
 			
-			if ( ! isset( Output::i()->sidebar['widgets'] ) OR ! is_array( Output::i()->sidebar['widgets'] ) )
+			if ( ! isset( \IPS\Output::i()->sidebar['widgets'] ) OR ! \is_array( \IPS\Output::i()->sidebar['widgets'] ) )
 			{
-				Output::i()->sidebar['widgets'] = array();
+				\IPS\Output::i()->sidebar['widgets'] = array();
 			}
 
 			try
 			{
-				$widgetConfig = Db::i()->select( '*', 'core_widget_areas', array( '(app=? AND module=? AND controller=?) OR (app=? AND module=? AND controller=?)', 'global', 'global', 'global', $this->application->directory, $this->module->key, $this->controller ) );
-				foreach( $widgetConfig as $row )
+				$widgetConfig = \IPS\Db::i()->select( '*', 'core_widget_areas', array( 'app=? AND module=? AND controller=?', $this->application->directory, $this->module->key, $this->controller ) );
+				foreach( $widgetConfig as $area )
 				{
-					if( $row['tree'] )
-					{
-						$widgets[$row['area']] = new Area( json_decode( $row['tree'], true ), $row['area'] );
-					}
-					elseif( $row['widgets'] )
-					{
-						$widgets[$row['area']] = Area::create( $row['area'], json_decode( $row['widgets'], true ) );
-					}
+					$widgets[ $area['area'] ] = json_decode( $area['widgets'], TRUE );
 				}
 			}
-			catch ( UnderflowException $e ) {}
-					
-			if ( count( $widgets ) )
+			catch ( \UnderflowException $e ) {}
+			
+			if ( \IPS\Output::i()->allowDefaultWidgets )
 			{
-				if ( ( Cache::i() instanceof None ) )
+				foreach( \IPS\Widget::appDefaults( $this->application ) as $widget )
+				{
+					/* If another app has already defined this area, don't overwrite it */
+					if ( isset( $widgets[ $widget['default_area'] ] ) )
+					{
+						continue;
+					}
+	
+					$widget['unique']	= $widget['key'];
+					
+					$widgets[ $widget['default_area'] ][] = $widget;
+				}
+			}
+					
+			if( \count( $widgets ) )
+			{
+				if ( ( \IPS\Data\Cache::i() instanceof \IPS\Data\Cache\None ) and ! \IPS\Theme::isUsingTemplateDiskCache() )
 				{
 					$templateLoad = array();
 					foreach ( $widgets as $areaKey => $area )
@@ -576,14 +504,14 @@ class Front extends Standard
 							if ( isset( $widget['app'] ) and $widget['app'] )
 							{
 								$templateLoad[] = array( $widget['app'], 'front', 'widgets' );
-								$templateLoad[] = 'template_' . Theme::i()->id . '_' . Theme::makeBuiltTemplateLookupHash( $widget['app'], 'front', 'widgets' ) . '_widgets';
+								$templateLoad[] = 'template_' . \IPS\Theme::i()->id . '_' . \IPS\Theme::makeBuiltTemplateLookupHash( $widget['app'], 'front', 'widgets' ) . '_widgets';
 							}
 						}
 					}
 	
-					if ( count( $templateLoad ) )
+					if( \count( $templateLoad ) )
 					{
-						Store::i()->loadIntoMemory( $templateLoad );
+						\IPS\Data\Store::i()->loadIntoMemory( $templateLoad );
 					}
 				}
 				
@@ -592,34 +520,33 @@ class Front extends Standard
 				$googleFonts = array();
 				foreach ( $widgets as $areaKey => $area )
 				{
-					Output::i()->sidebar['widgetareas'][$areaKey] = $area;
-					foreach ( $area->getAllWidgets() as $widget )
+					foreach ( $area as $widget )
 					{
 						try
 						{
-							$appOrPlugin = Application::load( $widget['app'] );
+							$appOrPlugin = isset( $widget['plugin'] ) ? \IPS\Plugin::load( $widget['plugin'] ) : \IPS\Application::load( $widget['app'] );
 
 							if( !$appOrPlugin->enabled )
 							{
 								continue;
 							}
 							
-							$_widget = Widget::load( $appOrPlugin, $widget['key'], ( ! empty($widget['unique'] ) ? $widget['unique'] : mt_rand() ), ( isset( $widget['configuration'] ) ) ? $widget['configuration'] : array(), ( $widget['restrict'] ?? null ), ( $areaKey == 'sidebar' ) ? 'vertical' : 'horizontal', $widget['layout'] );
-							if ( ( Cache::i() instanceof None ) and isset( $_widget->cacheKey ) )
+							$_widget = \IPS\Widget::load( $appOrPlugin, $widget['key'], ( ! empty($widget['unique'] ) ? $widget['unique'] : mt_rand() ), ( isset( $widget['configuration'] ) ) ? $widget['configuration'] : array(), ( isset( $widget['restrict'] ) ? $widget['restrict'] : null ), ( $areaKey == 'sidebar' ) ? 'vertical' : 'horizontal' );
+							if ( ( \IPS\Data\Cache::i() instanceof \IPS\Data\Cache\None ) and isset( $_widget->cacheKey ) )
 							{
 								$storeLoad[] = $_widget->cacheKey;
 							}
 
-							if( $_widget->isBuilderWidget() )
+							if ( \in_array( 'IPS\Widget\Builder', class_implements( $_widget ) ) )
 							{
 								if ( ! empty( $_widget->configuration['widget_adv__font'] ) and $_widget->configuration['widget_adv__font'] !== 'inherit' )
 								{
 									$font = $_widget->configuration['widget_adv__font'];
 
-									if ( mb_substr( $font, -6 ) === ' black' )
+									if ( \mb_substr( $font, -6 ) === ' black' )
 									{
 										$fontWeight = 900;
-										$font = mb_substr( $font, 0, -6 ) . ':400,900';
+										$font = \mb_substr( $font, 0, -6 ) . ':400,900';
 									}
 
 									$googleFonts[ $font ] = $font;
@@ -628,50 +555,44 @@ class Front extends Standard
 
 							$widgetObjects[ $areaKey ][] = $_widget;
 						}
-						catch ( Exception $e )
+						catch ( \Exception $e )
 						{
-							Log::log( $e, 'dispatcher' );
+							\IPS\Log::log( $e, 'dispatcher' );
 						}
 					}
 				}
 
-				if ( count( $googleFonts ) )
+				if ( \count( $googleFonts ) )
 				{
-					Output::i()->linkTags['googlefonts'] = array('rel' => 'stylesheet', 'href' => "https://fonts.googleapis.com/css?family=" . implode( "|", array_values( $googleFonts ) ) . "&display=swap");
+					\IPS\Output::i()->linkTags['googlefonts'] = array('rel' => 'stylesheet', 'href' => "https://fonts.googleapis.com/css?family=" . implode( "|", array_values( $googleFonts ) ) . "&display=swap");
 				}
 
-				if( ( Cache::i() instanceof None ) and count( $storeLoad ) )
+				if( ( \IPS\Data\Cache::i() instanceof \IPS\Data\Cache\None ) and \count( $storeLoad ) )
 				{
-					Store::i()->loadIntoMemory( $storeLoad );
+					\IPS\Data\Store::i()->loadIntoMemory( $storeLoad );
 				}
 				
 				foreach ( $widgetObjects as $areaKey => $_widgets )
 				{
 					foreach ( $_widgets as $_widget )
 					{
-						Output::i()->sidebar['widgets'][ $areaKey ][] = $_widget;
+						\IPS\Output::i()->sidebar['widgets'][ $areaKey ][] = $_widget;
 					}
 				}
 			}
 		}
 
-		/* Meta tags */
-		Output::i()->buildMetaTags();
+		/* Do things if we're actively using the easy theme editor */
+		\IPS\Theme::easyModePreOutput();
 
-		/* Data Attributes */
-		Output::i()->setBodyAttributes();
+		/* Meta tags */
+		\IPS\Output::i()->buildMetaTags();
 
 		/* Check MFA */
 		$this->checkMfa();
 
 		/* Check Alerts */
-		static::checkAlerts( $this );
-
-		/* Loader Extension */
-		foreach( Application::allExtensions( 'core', 'Loader' ) as $loader )
-		{
-			$loader->onFinish();
-		}
+		$this->checkAlerts();
 		
 		/* Finish */
 		parent::finish();
@@ -680,48 +601,47 @@ class Front extends Standard
 	/**
 	 * Check MFA to see if we need to supply a code. If the member elected to cancel, cancel (and redirect) here
 	 *
-	 * @param boolean $return Return any HTML (true) or add to Output (false)
+	 * @param	boolean	$return	Return any HTML (true) or add to Output (false)
 	 *
-	 * @return string|null
-	 * @throws Exception
+	 * @return void
 	 */
-	public function checkMfa( bool $return=FALSE ) : ?string
+	public function checkMfa( $return=FALSE )
 	{
 		/* MFA Login? */
-		if ( isset( Request::i()->_mfaLogin ) and isset( $_SESSION['processing2FA'] ) and $member = Member::load( $_SESSION['processing2FA']['memberId'] ) and $member->member_id )
+		if ( isset( \IPS\Request::i()->_mfaLogin ) and isset( $_SESSION['processing2FA'] ) and $member = \IPS\Member::load( $_SESSION['processing2FA']['memberId'] ) and $member->member_id )
 		{
-			$device = Device::loadOrCreate( $member, FALSE );
-			if ( $output = MFAHandler::accessToArea( 'core', $device->known ? 'AuthenticateFrontKnown' : 'AuthenticateFront', Request::i()->url(), $member ) )
+			$device = \IPS\Member\Device::loadOrCreate( $member, FALSE );
+			if ( $output = \IPS\MFA\MFAHandler::accessToArea( 'core', $device->known ? 'AuthenticateFrontKnown' : 'AuthenticateFront', \IPS\Request::i()->url(), $member ) )
 			{
 				/* Did we just cancel? */
-				if ( Request::i()->_mfaCancel and ( ! Member::loggedIn()->member_id or ( Member::loggedIn()->member_id === $member->member_id ) ) )
+				if ( \IPS\Request::i()->_mfaCancel and ( ! \IPS\Member::loggedIn()->member_id or ( \IPS\Member::loggedIn()->member_id === $member->member_id ) ) )
 				{
 					/* We don't need this until we re-enter the MFA flow again */
 					unset( $_SESSION['processing2FA'] );
 
 					/* Is MFA required for this member? */
-					$mfaRequired = Settings::i()->mfa_required_groups === '*' or $member->inGroup( explode( ',', Settings::i()->mfa_required_groups ) );
+					$mfaRequired = \IPS\Settings::i()->mfa_required_groups === '*' or $member->inGroup( explode( ',', \IPS\Settings::i()->mfa_required_groups ) );
 
 					/* Does this member require MFA upon login? */
-					$logout = ( Settings::i()->mfa_required_prompt === 'immediate' and $mfaRequired );
+					$logout = \IPS\Settings::i()->mfa_required_prompt === 'immediate' and $mfaRequired;
 
 					/* Can they see this page without MFA? */
-					if ( !$mfaRequired OR ( $logout and $this->application->allowGuestAccess( $this->module, $this->controller, Request::i()->do ) ) )
+					if ( !$mfaRequired OR ( $logout and $this->application->allowGuestAccess( $this->module, $this->controller, \IPS\Request::i()->do ) ) )
 					{
-						$redirectUrl = Request::i()->url()->stripQueryString([ '_mfaCancel', '_mfaLogin', '_fromLogin', 'csrfKey' ]);
+						$redirectUrl = \IPS\Request::i()->url()->stripQueryString([ '_mfaCancel', '_mfaLogin', '_fromLogin', 'csrfKey' ]);
 					}
 					else
 					{
-						$redirectUrl = Url::internal( '' );
+						$redirectUrl = \IPS\Http\Url::internal( '' );
 					}
 
 					if ( $logout )
 					{
-						Login::logout( $redirectUrl );
+						\IPS\Login::logout( $redirectUrl );
 						$redirectUrl = $redirectUrl->setQueryString( '_fromLogout', 1 );
 					}
 
-					Output::i()->redirect( $redirectUrl );
+					\IPS\Output::i()->redirect( $redirectUrl );
 				}
 
 				if ( $return )
@@ -729,84 +649,60 @@ class Front extends Standard
 					return $output;
 				}
 				
-				Output::i()->output .= $output;
+				\IPS\Output::i()->output .= $output;
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=login&do=mfa', 'front', 'login' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=login&do=mfa', 'front', 'login' ) );
 			}
 		}
-
-		return null;
 	}
 
 	/**
 	 *  Show a robots.txt file if configured to do so
 	 *
 	 * @param string $pathFromBaseUrl
-	 * @return void
 	 */
-	public function customResponse( string $pathFromBaseUrl ) : void
+	public function customResponse( string $pathFromBaseUrl )
 	{
 		if ( $pathFromBaseUrl === 'robots.txt' )
 		{
 			$this->robotsTxt();
 		}
-		else if ( $pathFromBaseUrl === 'ads.txt' )
-		{
-			$this->adsTxt();
-		}
-		else if ( IndexNow::i()->isEnabled() AND $pathFromBaseUrl === IndexNow::i()->getKeyFileName() )
+		else if ( \IPS\core\IndexNow::i()->isEnabled() AND $pathFromBaseUrl === \IPS\core\IndexNow::i()->getKeyFileName() )
 		{
 			$this->indexNow();
 		}
 	}
 
 	/**
-	 * Set the IndexNow key.
+	 * Return the IndexNow key.
 	 *
-	 * @return void
+	 * @return mixed
 	 */
-	protected function indexNow() : void
+	protected function indexNow()
 	{
-		Output::i()->sendOutput( IndexNow::i()->getKeyfileContent(), 200, 'text/plain' );
-	}
-
-	/**
-	 * Set the robots.txt files
-	 *
-	 * @return void
-	 */
-	protected function robotsTxt() : void
-	{
-		if ( Settings::i()->robots_txt == 'default' )
-		{
-			Output::i()->sendOutput( static::robotsTxtRules(), 200, 'text/plain' );
-		}
-		else if ( Settings::i()->robots_txt != 'off' )
-		{
-			Output::i()->sendOutput( Settings::i()->robots_txt, 200, 'text/plain' );
-		}
-		throw new OutOfRangeException;
+		\IPS\Output::i()->sendOutput( \IPS\core\IndexNow::i()->getKeyfileContent(), 200, 'text/plain' );
 	}
 
 	/**
 	 * Return the robots.txt files
 	 *
-	 * @return void
+	 * @return mixed
 	 */
-	protected function adsTxt() : void
+	protected function robotsTxt()
 	{
-		if ( (int) Settings::i()->ads_txt_enabled == 1 )
+		if ( \IPS\Settings::i()->robots_txt == 'default' )
 		{
-			Output::i()->sendOutput( Settings::i()->ads_txt, 200, 'text/plain' );
+			\IPS\Output::i()->sendOutput( static::robotsTxtRules(), 200, 'text/plain' );
 		}
-		elseif( (int) Settings::i()->ads_txt_enabled == 2 AND !empty( Settings::i()->ads_txt_redirect_url ) )
+		else if ( \IPS\Settings::i()->robots_txt != 'off' )
 		{
-			Output::i()->redirect( Url::external( Settings::i()->ads_txt_redirect_url ) );
+			\IPS\Output::i()->sendOutput( \IPS\Settings::i()->robots_txt, 200, 'text/plain' );
 		}
-		throw new OutOfRangeException;
+		throw new \OutOfRangeException;
 	}
+
 	/**
 	 * Return the text for the robots.txt file
 	 *
@@ -814,8 +710,8 @@ class Front extends Standard
 	 */
 	public static function robotsTxtRules(): string
 	{
-		$path = str_replace( '//', '/', '/' . trim( str_replace( 'robots.txt', '', Url::createFromString( Url::baseUrl() )->data[ Url::COMPONENT_PATH ] ), '/' ) . '/' );
-		$sitemapUrl = ( new Sitemap )->sitemapUrl;
+		$path = str_replace( '//', '/', '/' . trim( str_replace( 'robots.txt', '', \IPS\Http\Url::createFromString( \IPS\Http\Url::baseUrl() )->data[ \IPS\Http\Url::COMPONENT_PATH ] ), '/' ) . '/' );
+		$sitemapUrl = ( new \IPS\Sitemap )->sitemapUrl;
 		$content = <<<FILE
 # Rules for Invision Community (https://invisioncommunity.com)
 User-Agent: *
@@ -829,6 +725,7 @@ Disallow: {$path}online/
 Disallow: {$path}discover/
 Disallow: {$path}leaderboard/
 Disallow: {$path}search/
+Disallow: {$path}tags/
 Disallow: {$path}*?advancedSearchForm=
 Disallow: {$path}register/
 Disallow: {$path}lostpassword/
@@ -844,9 +741,6 @@ Disallow: {$path}*ref=
 Disallow: {$path}*?forumId*
 Disallow: {$path}*?&controller=embed
 
-# Block CDN endpoints
-Disallow: /cdn-cgi/
-
 # Sitemap URL
 Sitemap: {$sitemapUrl}
 FILE;
@@ -859,36 +753,39 @@ FILE;
 	 *
 	 * @return void
 	 */
-	protected static function baseJs() : void
+	protected static function baseJs()
 	{
 		parent::baseJs();
 
 		/* Stuff for output */
-		if ( !Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
-			Output::i()->globalControllers[] = 'core.front.core.app';
-			if ( DataLayer::enabled() )
+			\IPS\Output::i()->globalControllers[] = 'core.front.core.app';
+			if ( \IPS\Settings::i()->core_datalayer_enabled )
 			{
-				Output::i()->globalControllers[] = 'core.front.core.dataLayer';
+				\IPS\Output::i()->globalControllers[] = 'core.front.core.dataLayer';
 			}
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front.js' ) );
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_core.js', 'core', 'front' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front.js' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_core.js', 'core', 'front' ) );
 
-			if(Theme::i()->getLayoutValue( 'global_view_mode' ) == 'default' ){
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'static/ui/navigationMoreMenu.js', 'core', 'interface' ) );
+			if ( \IPS\Member::loggedIn()->members_bitoptions['bw_using_skin_gen'] AND ( isset( \IPS\Request::i()->cookie['vseThemeId'] ) AND \IPS\Request::i()->cookie['vseThemeId'] ) and \IPS\Member::loggedIn()->isAdmin() and \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'customization', 'theme_easy_editor' ) )
+			{
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_vse.js', 'core', 'front' ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'vse/vsedata.js', 'core', 'interface' ) );
+				\IPS\Output::i()->globalControllers[] = 'core.front.vse.window';
 			}
 
 			/* Can we edit widget layouts? */
-			if( Member::loggedIn()->modPermission('can_manage_sidebar') )
+			if( \IPS\Member::loggedIn()->modPermission('can_manage_sidebar') )
 			{
-				Output::i()->globalControllers[] = 'core.front.widgets.manager';
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_widgets.js', 'core', 'front' ) );
+				\IPS\Output::i()->globalControllers[] = 'core.front.widgets.manager';
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_widgets.js', 'core', 'front' ) );
 			}
 
 			/* Are we editing meta tags? */
-			if( isset( $_SESSION['live_meta_tags'] ) and $_SESSION['live_meta_tags'] and Member::loggedIn()->isAdmin() )
+			if( isset( $_SESSION['live_meta_tags'] ) and $_SESSION['live_meta_tags'] and \IPS\Member::loggedIn()->isAdmin() )
 			{
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_system.js', 'core', 'front' ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_system.js', 'core', 'front' ) );
 			}
 		}
 	}
@@ -898,29 +795,38 @@ FILE;
 	 *
 	 * @return	void
 	 */
-	public static function baseCss() : void
+	public static function baseCss()
 	{
 		parent::baseCss();
 
 		/* Stuff for output */
-		if ( !Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'core.css', 'core', 'front' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'core.css', 'core', 'front' ) );
+			if ( \IPS\Output::i()->responsive and \IPS\Theme::i()->settings['responsive'] )
+			{
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'core_responsive.css', 'core', 'front' ) );
+			}
+			
+			if ( \IPS\Member::loggedIn()->members_bitoptions['bw_using_skin_gen'] AND ( isset( \IPS\Request::i()->cookie['vseThemeId'] ) AND \IPS\Request::i()->cookie['vseThemeId'] ) and \IPS\Member::loggedIn()->isAdmin() and \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'customization', 'theme_easy_editor' ) )
+			{
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/vse.css', 'core', 'front' ) );
+			}
 
 			/* Are we editing meta tags? */
-			if( isset( $_SESSION['live_meta_tags'] ) and $_SESSION['live_meta_tags'] and Member::loggedIn()->isAdmin() )
+			if( isset( $_SESSION['live_meta_tags'] ) and $_SESSION['live_meta_tags'] and \IPS\Member::loggedIn()->isAdmin() )
 			{
-				Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/meta_tags.css', 'core', 'front' ) );
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/meta_tags.css', 'core', 'front' ) );
 			}
 			
 			/* Query log? */
-			if ( QUERY_LOG and ! defined('QUERY_LOG_TO_PATH') )
+			if ( \IPS\QUERY_LOG )
 			{
-				Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/query_log.css', 'core', 'front' ) );
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/query_log.css', 'core', 'front' ) );
 			}
-			if ( CACHING_LOG or REDIS_LOG )
+			if ( \IPS\CACHING_LOG or \IPS\REDIS_LOG )
 			{
-				Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/caching_log.css', 'core', 'front' ) );
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/caching_log.css', 'core', 'front' ) );
 			}
 		}
 	}
@@ -928,11 +834,11 @@ FILE;
 	/**
 	 * Do Member Check
 	 *
-	 * @return	Url|NULL
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	protected static function doMemberCheck(): ?Url
+	protected static function doMemberCheck(): ?\IPS\Http\Url
 	{
-		foreach( Application::applications() AS $app )
+		foreach( \IPS\Application::applications() AS $app )
 		{
 			if ( $url = $app->doMemberCheck() )
 			{
@@ -944,34 +850,28 @@ FILE;
 	}
 
 	/**
-	 * Check and process alerts for the logged-in member.
 	 *
-	 * @param Dispatcher $dispatcher The dispatcher instance controlling the current request.
-	 * 
+	 *
 	 * @return void
 	 */
-	public static function checkAlerts( Dispatcher $dispatcher ) : void
+	public function checkAlerts()
 	{
 		/* Don't get in the way of validating members */
-		if ( Member::loggedIn()->members_bitoptions['validating'] )
-		{
-			return;
-		}
-
-		/* If a member is forced to reset their password, let them */
-		if( Member::loggedIn()->members_bitoptions['password_reset_forced'] AND !Member::loggedIn()->members_pass_hash )
+		if ( \IPS\Member::loggedIn()->members_bitoptions['validating'] )
 		{
 			return;
 		}
 
 		/* Don't get in the way of the ModCP, registering, logging in, etc */
-		$ignoreControllers = [ 'modcp', 'register', 'login', 'redirect', 'cookies', 'lostpass' ];
-		if( !Request::i()->isAjax() and !in_array( $dispatcher->controller, $ignoreControllers ) AND $alert = Alert::getNextAlertForMember( Member::loggedIn() ) )
+		$ignoreControllers = [ 'modcp', 'register', 'login', 'redirect', 'cookie' ];
+		if( !\IPS\Request::i()->isAjax() and !\in_array( $this->controller, $ignoreControllers ) AND $alert = \IPS\core\Alerts\Alert::getNextAlertForMember( \IPS\Member::loggedIn() ) )
 		{
-			$alert->viewed( Member::loggedIn() );
+			$alert->viewed( \IPS\Member::loggedIn() );
 
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/alerts.css', 'core', 'front' ) );
-			Output::i()->alert = Theme::i()->getTemplate( 'alerts', 'core', 'front' )->alertModal( $alert );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/alerts.css', 'core', 'front' ) );
+			\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'alerts', 'core', 'front' )->alertModal( $alert, $url = base64_encode( \IPS\Request::i()->url() ) );
 		}
+
+		return;
 	}
 }

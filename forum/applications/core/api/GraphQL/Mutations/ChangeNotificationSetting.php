@@ -10,33 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Application;
-use IPS\core\api\GraphQL\Types\NotificationTypeType;
-use IPS\Db;
-use IPS\Member;
-use IPS\Notification;
-use function count;
-use function defined;
-use function in_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Change notification setting mutation for GraphQL API
  */
-class ChangeNotificationSetting
+class _ChangeNotificationSetting
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Change a notification setting";
+	public static $description = "Change a notification setting";
 
 	/*
 	 * Mutation arguments
@@ -55,47 +47,46 @@ class ChangeNotificationSetting
 
 	/**
 	 * Return the mutation return type
-	 *
-	 * @return NotificationTypeType
 	 */
-	public function type() : NotificationTypeType
+	public function type() 
 	{
 		return \IPS\core\Api\GraphQL\TypeRegistry::notificationType();
 	}
 
 	/**
-	 * Resolves this query
+	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
 	 * @return	array
 	 */
-	public function resolve( mixed $val, array $args ) : array
+	public function resolve($val, $args)
 	{
-		if( !Member::loggedIn()->member_id )
+		if( !\IPS\Member::loggedIn()->member_id )
 		{
-			throw new SafeException( 'NOT_LOGGED_IN', 'GQL/0003/1', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NOT_LOGGED_IN', 'GQL/0003/1', 403 );
 		}
 
 		$pieces = explode('_', $args['extension']);
 
-		if( count( $pieces ) !== 2 )
+		if( \count( $pieces ) !== 2 )
 		{
-			throw new SafeException( 'INVALID_EXTENSION', 'GQL/0003/1', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_EXTENSION', 'GQL/0003/1', 403 );
 		}
 
-		$extensions = Application::load( $pieces[0] )->extensions('core', 'Notifications');
+		$extensions = \IPS\Application::load( $pieces[0] )->extensions('core', 'Notifications');
 
 		if( !isset( $extensions[ $pieces[1] ] ) )
 		{
-			throw new SafeException( 'INVALID_EXTENSION', 'GQL/0003/1', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_EXTENSION', 'GQL/0003/1', 403 );
 		}
 
-		$extensionOptions = Notification::availableOptions( Member::loggedIn(), $extensions[ $pieces[1] ] );
+		$extensionOptions = \IPS\Notification::availableOptions( \IPS\Member::loggedIn(), $extensions[ $pieces[1] ] );
 
 		if( !isset( $extensionOptions[ $args['type'] ] ) || $extensionOptions[ $args['type'] ]['type'] !== 'standard' ) // Only standard types supported right now
 		{
-			throw new SafeException( 'INVALID_TYPE', 'GQL/0003/1', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_TYPE', 'GQL/0003/1', 403 );
 		}
 
 		$value = array();
@@ -107,7 +98,7 @@ class ChangeNotificationSetting
 			// If the mutation is trying to change a setting...
 			if( isset( $args[ $type ] ) )
 			{
-				if( $args[ $type ] === TRUE && $typeSettings['editable'] == TRUE && !in_array( $type, $extensionType['disabled'] ) )
+				if( $args[ $type ] === TRUE && $typeSettings['editable'] == TRUE && !\in_array( $type, $extensionType['disabled'] ) )
 				{
 					$value[ $type ] = $type;
 				}
@@ -127,8 +118,8 @@ class ChangeNotificationSetting
 
 		foreach ( $extensionType['notificationTypes'] as $notificationKey )
 		{
-			Db::i()->insert( 'core_notification_preferences', array(
-				'member_id'			=> Member::loggedIn()->member_id,
+			\IPS\Db::i()->insert( 'core_notification_preferences', array(
+				'member_id'			=> \IPS\Member::loggedIn()->member_id,
 				'notification_key'	=> $notificationKey,
 				'preference'		=> implode( ',', $value )
 			), TRUE );
@@ -145,8 +136,8 @@ class ChangeNotificationSetting
 			}
 
 			$option = $options[ $method ];
-			$methods[ $method ]['default'] = isset( $option['default'] ) && in_array( $method, $option['default'] );
-			$methods[ $method ]['disabled'] = isset( $option['disabled'] ) && in_array( $method, $option['disabled'] );
+			$methods[ $method ]['default'] = isset( $option['default'] ) && \in_array( $method, $option['default'] );
+			$methods[ $method ]['disabled'] = isset( $option['disabled'] ) && \in_array( $method, $option['disabled'] );
 			$methods[ $method ]['member'] = isset( $value[ $method ] );
 		}
 

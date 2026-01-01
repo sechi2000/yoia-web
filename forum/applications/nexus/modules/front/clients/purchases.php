@@ -12,91 +12,63 @@
 namespace IPS\nexus\modules\front\clients;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item\Renewal;
-use IPS\nexus\Purchase;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Purchases
  */
-class purchases extends Controller
+class _purchases extends \IPS\Dispatcher\Controller
 {
-	/**
-	 * @brief	Purchase object
-	 */
-	protected ?Purchase $purchase = NULL;
-
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		if ( !Member::loggedIn()->member_id )
+		if ( !\IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->error( 'no_module_permission_guest', '2X212/6', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission_guest', '2X212/6', 403, '' );
 		}
 		
 		/* Purchases breadcrumb */
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=nexus&module=clients&controller=purchases', 'front', 'clientspurchases' ), Member::loggedIn()->language()->addToStack('client_purchases') );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=purchases', 'front', 'clientspurchases' ), \IPS\Member::loggedIn()->language()->addToStack('client_purchases') );
 		
 		/* Load Purchase */
-		if ( isset( Request::i()->id ) )
+		if ( isset( \IPS\Request::i()->id ) )
 		{
 			try
 			{
-				$this->purchase = Purchase::load( Request::i()->id );
+				$this->purchase = \IPS\nexus\Purchase::load( \IPS\Request::i()->id );
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException $e )
 			{
-				Output::i()->error( 'node_error', '2X212/1', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2X212/1', 404, '' );
 			}
 			if ( !$this->purchase->canView() )
 			{
-				Output::i()->error( 'no_module_permission', '2X212/2', 403, '' );
+				\IPS\Output::i()->error( 'no_module_permission', '2X212/2', 403, '' );
 			}
 			
-			Output::i()->breadcrumb[] = array( $this->purchase->url(), $this->purchase->name );
-			Output::i()->title = $this->purchase->name;
+			\IPS\Output::i()->breadcrumb[] = array( $this->purchase->url(), $this->purchase->name );
+			\IPS\Output::i()->title = $this->purchase->name;
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('client_purchases');
-			if ( isset( Request::i()->do ) )
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('client_purchases');
+			if ( isset( \IPS\Request::i()->do ) )
 			{
-				Output::i()->error( 'node_error', '2X212/3', 403, '' );
+				\IPS\Output::i()->error( 'node_error', '2X212/3', 403, '' );
 			}
 		}
 		
 		/* Execute */
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'clients.css', 'nexus' ) );
-		Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'clients.css', 'nexus' ) );
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
 		parent::execute();
 	}
 
@@ -105,29 +77,30 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$where = array( array( 'ps_member=?', Member::loggedIn()->member_id ) );
+		$where = array( array( 'ps_member=?', \IPS\Member::loggedIn()->member_id ) );
 
-		$parentContacts = Customer::loggedIn()->parentContacts();
-		if ( count( $parentContacts ) )
+		$parentContacts = \IPS\nexus\Customer::loggedIn()->parentContacts();
+		if ( \count( $parentContacts ) )
 		{
+			$or = array();
 			foreach ( $parentContacts as $contact )
 			{
-				$where[0][0] .= ' OR ' . Db::i()->in( 'ps_id', $contact->purchaseIds() );
+				$where[0][0] .= ' OR ' . \IPS\Db::i()->in( 'ps_id', $contact->purchaseIds() );
 			}
 		}
 		$where[] = array( 'ps_show=1' );
 		
 		/* Get only the purchases from active applications */
-		$where[] = array( "ps_app IN('" . implode( "','", array_keys( Application::enabledApplications() ) ) . "')" );
+		$where[] = array( "ps_app IN('" . implode( "','", array_keys( \IPS\Application::enabledApplications() ) ) . "')" );
 
 		$purchases = array();
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', $where, 'ps_active DESC, ps_expire DESC, ps_start DESC' ), 'IPS\nexus\Purchase' ) as $purchase )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', $where, 'ps_active DESC, ps_expire DESC, ps_start DESC' ), 'IPS\nexus\Purchase' ) as $purchase )
 		{
 			$purchases[ $purchase->parent ][ $purchase->id ] = $purchase;
 		}
-		Output::i()->output = Theme::i()->getTemplate('clients')->purchases( $purchases );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->purchases( $purchases );
 	}
 	
 	/**
@@ -135,9 +108,9 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	public function view() : void
+	public function view()
 	{		
-		Output::i()->output = Theme::i()->getTemplate('clients')->purchase( $this->purchase );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->purchase( $this->purchase );
 	}
 	
 	/**
@@ -145,10 +118,23 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function extra() : void
+	protected function extra()
 	{
-		$this->purchase->clientAreaAction();
-		Output::i()->redirect( $this->purchase->url() );
+		if ( $output = $this->purchase->clientAreaAction() )
+		{
+			if ( \IPS\Request::i()->isAjax() )
+			{
+				\IPS\Output::i()->output = $output;
+			}
+			else
+			{
+				\IPS\Output::i()->output = $output;
+			}
+		}
+		else
+		{
+			\IPS\Output::i()->redirect( $this->purchase->url() );
+		}
 	}
 	
 	/**
@@ -156,20 +142,20 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function renew() : void
+	protected function renew()
 	{
 		$cycles = $this->purchase->canRenewUntil( NULL, TRUE );
 		if ( $cycles === FALSE )
 		{
-			Output::i()->error( 'you_cannot_renew', '2X212/4', 403, '' );
+			\IPS\Output::i()->error( 'you_cannot_renew', '2X212/4', 403, '' );
 		}
 		elseif ( $cycles === 1 )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 		}
-		elseif ( isset( Request::i()->cycles ) and Login::compareHashes( (string) Session::i()->csrfKey, (string) Request::i()->csrfKey ) )
+		elseif ( isset( \IPS\Request::i()->cycles ) and \IPS\Login::compareHashes( (string) \IPS\Session::i()->csrfKey, (string) \IPS\Request::i()->csrfKey ) )
 		{
-			$_cycles = intval( Request::i()->cycles );
+			$_cycles = \intval( \IPS\Request::i()->cycles );
 			if ( $_cycles >= 1 and ( $cycles === TRUE or $_cycles <= $cycles ) )
 			{
 				$cycles = $_cycles;
@@ -186,31 +172,31 @@ class purchases extends Controller
 			switch( $term['unit'] )
 			{
 				case 'd':
-					$suffix = Member::loggedIn()->language()->addToStack('days');
+					$suffix = \IPS\Member::loggedIn()->language()->addToStack('days');
 					break;
 				case 'm':
-					$suffix = Member::loggedIn()->language()->addToStack('months');
+					$suffix = \IPS\Member::loggedIn()->language()->addToStack('months');
 					break;
 				case 'y':
-					$suffix = Member::loggedIn()->language()->addToStack('years');
+					$suffix = \IPS\Member::loggedIn()->language()->addToStack('years');
 					break;
 			}
 		}
 		
-		$form = new Form( 'form', 'continue' );
-		$form->class = 'ipsForm--vertical ipsForm--renew';
-		$form->add( new Number( 'renew_for', 1, TRUE, array( 'min' => 1, 'max' => $cycles === TRUE ? NULL : $cycles ), NULL, NULL, $suffix ) );
+		$form = new \IPS\Helpers\Form( 'form', 'continue' );
+		$form->class = 'ipsForm_vertical';
+		$form->add( new \IPS\Helpers\Form\Number( 'renew_for', 1, TRUE, array( 'min' => 1, 'max' => $cycles === TRUE ? NULL : $cycles ), NULL, NULL, $suffix ) );
 		if( $values = $form->values() or $cycles === 1 )
 		{
 			if ( $pendingInvoice = $this->purchase->invoice_pending and $pendingInvoice->status === $pendingInvoice::STATUS_PENDING )
 			{
-				if ( count( $pendingInvoice->items ) === 1 )
+				if ( \count( $pendingInvoice->items ) === 1 )
 				{
 					foreach ( $pendingInvoice->items as $item )
 					{
-						if ( $item instanceof Renewal and $item->id === $this->purchase->id and $item->quantity === ( $cycles === 1 ? 1 : $values['renew_for'] ) )
+						if ( $item instanceof \IPS\nexus\Invoice\Item\Renewal and $item->id === $this->purchase->id and $item->quantity === ( $cycles === 1 ? 1 : $values['renew_for'] ) )
 						{
-							Output::i()->redirect( $pendingInvoice->checkoutUrl() );
+							\IPS\Output::i()->redirect( $pendingInvoice->checkoutUrl() );
 						}
 					}
 				}
@@ -220,19 +206,19 @@ class purchases extends Controller
 				$pendingInvoice->member->log( 'invoice', array( 'type' => 'status', 'new' => 'canc', 'id' => $pendingInvoice->id, 'title' => $pendingInvoice->title ) );
 			}
 						
-			$invoice = new Invoice;
-			$invoice->member = Customer::loggedIn();
+			$invoice = new \IPS\nexus\Invoice;
+			$invoice->member = \IPS\nexus\Customer::loggedIn();
 			$invoice->currency = $this->purchase->renewals->cost->currency;
-			$invoice->addItem( Renewal::create( $this->purchase, $cycles === 1 ? 1 : $values['renew_for'] ) );
+			$invoice->addItem( \IPS\nexus\Invoice\Item\Renewal::create( $this->purchase, $cycles === 1 ? 1 : $values['renew_for'] ) );
 			$invoice->save();
 			
 			$this->purchase->invoice_pending = $invoice;
 			$this->purchase->save();
 			
-			Output::i()->redirect( $invoice->checkoutUrl() );
+			\IPS\Output::i()->redirect( $invoice->checkoutUrl() );
 		}
 		
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/**
@@ -240,13 +226,13 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function cancel() : void
+	protected function cancel()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 						
 		if ( !$this->purchase->canCancel() )
 		{
-			Output::i()->error( 'you_cannot_cancel', '2X212/5', 403, '' );
+			\IPS\Output::i()->error( 'you_cannot_cancel', '2X212/5', 403, '' );
 		}
 		
 		$this->purchase->member->log( 'purchase', array( 'type' => 'info', 'id' => $this->purchase->id, 'name' => $this->purchase->name, 'info' => 'remove_renewals' ) );
@@ -254,7 +240,7 @@ class purchases extends Controller
 		/* If we have a pending renewal invoice, cancel it (as at this point, we need to reactivate instead) */
 		if ( $this->purchase->invoice_pending )
 		{
-			$this->purchase->invoice_pending->status = Invoice::STATUS_CANCELED; # The constant has a typo and it make me sad
+			$this->purchase->invoice_pending->status = \IPS\nexus\Invoice::STATUS_CANCELED; # The constant has a typo and it make me sad
 			$this->purchase->invoice_pending->save();
 			
 			$this->purchase->invoice_pending = NULL;
@@ -264,10 +250,10 @@ class purchases extends Controller
 		$this->purchase->can_reactivate = TRUE;
 		$this->purchase->save();
 		
-		if ( $ref = Request::i()->referrer( FALSE, TRUE ) )
+		if ( $ref = \IPS\Request::i()->referrer( FALSE, TRUE ) )
 		{
-			Output::i()->redirect( $ref );
+			\IPS\Output::i()->redirect( $ref );
 		}
-		Output::i()->redirect( $this->purchase->url() );
+		\IPS\Output::i()->redirect( $this->purchase->url() );
 	}
 }

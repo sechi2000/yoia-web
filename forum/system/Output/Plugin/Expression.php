@@ -11,25 +11,21 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Expression
  */
-class Expression
+class _Expression
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = TRUE;
+	public static $canBeUsedInCss = TRUE;
 	
 	/**
 	 * Run the plug-in
@@ -38,15 +34,15 @@ class Expression
 	 * @param	array		$options    Array of options
 	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options ): string
+	public static function runPlugin( $data, $options )
 	{
 		if( isset( $options['raw'] ) AND $options['raw'] )
 		{
-			return Theme::expandShortcuts( $data );
+			return \IPS\Theme::expandShortcuts( $data );
 		}
 		else
 		{
-			return '\IPS\Theme\Template::htmlspecialchars( ' . Theme::expandShortcuts( $data ) . ', ENT_QUOTES | ENT_DISALLOWED, \'UTF-8\', FALSE )';
+			return 'htmlspecialchars( ' . \IPS\Theme::expandShortcuts( $data ) . ', ENT_QUOTES | ENT_DISALLOWED, \'UTF-8\', FALSE )';
 		}
 	}
 }

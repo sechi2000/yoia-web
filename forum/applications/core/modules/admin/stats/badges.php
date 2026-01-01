@@ -12,55 +12,35 @@
 namespace IPS\core\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\core\Statistics\Chart;
-use IPS\core\Achievements\Badge;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\DateRange;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use Throwable;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * badges
  */
-class badges extends Controller
+class _badges extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
  	*/
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'overview_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'overview_manage' );
 		parent::execute();
 	}
 
@@ -69,14 +49,14 @@ class badges extends Controller
 	 *
 	 * @return void
 	 */
-	protected function showBadges() : void
+	protected function showBadges()
 	{
 		$where = [
-			[ 'datetime BETWEEN ? AND ?', Request::i()->badgeDateStart, Request::i()->badgeDateEnd ],
-			[ 'member_group_id=?', Request::i()->member_group_id ]
+			[ 'datetime BETWEEN ? AND ?', \IPS\Request::i()->badgeDateStart, \IPS\Request::i()->badgeDateEnd ],
+			[ 'member_group_id=?', \IPS\Request::i()->member_group_id ]
 		];
 
-		$query = Db::i()->select( 'badge, COUNT(*) as count', 'core_member_badges', $where, NULL, NULL, 'badge' )
+		$query = \IPS\Db::i()->select( 'badge, COUNT(*) as count', 'core_member_badges', $where, NULL, NULL, 'badge' )
 							 ->join( 'core_members', [ 'core_members.member_id=core_member_badges.member' ] );
 
 		$results = [];
@@ -84,13 +64,13 @@ class badges extends Controller
 		{
 			try
 			{
-				$row['badge'] = Badge::load( $row['badge'] );
+				$row['badge'] = \IPS\core\Achievements\Badge::load( $row['badge'] );
 				$results[] = $row;
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'achievements', 'core' )->statsBadgeModal( $results );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'achievements' )->statsBadgeModal( $results );
 	}
 	
 	/**
@@ -98,14 +78,14 @@ class badges extends Controller
 	 *
 	 * @return void
 	 */
-	protected function showMemberBadges() : void
+	protected function showMemberBadges()
 	{
 		$where = [
-			[ 'datetime BETWEEN ? AND ?', Request::i()->badgeDateStart, Request::i()->badgeDateEnd ],
-			[ 'member_id=?', Request::i()->member_id ]
+			[ 'datetime BETWEEN ? AND ?', \IPS\Request::i()->badgeDateStart, \IPS\Request::i()->badgeDateEnd ],
+			[ 'member_id=?', \IPS\Request::i()->member_id ]
 		];
 
-		$query = Db::i()->select( 'badge, datetime', 'core_member_badges', $where )
+		$query = \IPS\Db::i()->select( 'badge, datetime', 'core_member_badges', $where, NULL, NULL )
 							 ->join( 'core_members', [ 'core_members.member_id=core_member_badges.member' ] );
 
 		$results = [];
@@ -113,13 +93,13 @@ class badges extends Controller
 		{
 			try
 			{
-				$row['badge'] = Badge::load( $row['badge'] );
+				$row['badge'] = \IPS\core\Achievements\Badge::load( $row['badge'] );
 				$results[] = $row;
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'achievements', 'core' )->statsMemberBadgeModal( $results );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'achievements' )->statsMemberBadgeModal( $results );
 	}
 
 	/**
@@ -127,35 +107,34 @@ class badges extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$tabs = array(
 			'type' => 'stats_badges_by_badge',
 			'list' => 'stats_badges_by_group',
 			'member'	=> 'stats_badges_by_member',
 		);
-
-		Request::i()->tab ??= 'type';
-		$activeTab = ( array_key_exists( Request::i()->tab, $tabs ) ) ? Request::i()->tab : 'type';
+		\IPS\Request::i()->tab ??= 'type';
+		$activeTab = ( array_key_exists( \IPS\Request::i()->tab, $tabs ) ) ? \IPS\Request::i()->tab : 'type';
 
 		if ( $activeTab === 'type' )
 		{
-			$chart = Chart::loadFromExtension( 'core', 'Badges' )->getChart( Url::internal( 'app=core&module=stats&controller=badges&tab=' . $activeTab ) );
+			$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'Badges' )->getChart( \IPS\Http\Url::internal( 'app=core&module=stats&controller=badges&tab=' . $activeTab ) );
 		}
 		elseif ( $activeTab === 'member' )
 		{
 			$start		= NULL;
 			$end		= NULL;
 
-			$defaults = array( 'start' => DateTime::create()->setDate( date('Y'), date('m'), 1 ), 'end' => new DateTime );
+			$defaults = array( 'start' => \IPS\DateTime::create()->setDate( date('Y'), date('m'), 1 ), 'end' => new \IPS\DateTime );
 
-			if( isset( Request::i()->badgeDateStart ) AND isset( Request::i()->badgeDateEnd ) )
+			if( isset( \IPS\Request::i()->badgeDateStart ) AND isset( \IPS\Request::i()->badgeDateEnd ) )
 			{
-				$defaults = array( 'start' => DateTime::ts( (int) Request::i()->badgeDateStart ), 'end' => DateTime::ts( (int) Request::i()->badgeDateEnd ) );
+				$defaults = array( 'start' => \IPS\DateTime::ts( \IPS\Request::i()->badgeDateStart ), 'end' => \IPS\DateTime::ts( \IPS\Request::i()->badgeDateEnd ) );
 			}
 
-			$form = new Form( $activeTab, 'continue' );
-			$form->add( new DateRange( 'date', $defaults, TRUE ) );
+			$form = new \IPS\Helpers\Form( $activeTab, 'continue' );
+			$form->add( new \IPS\Helpers\Form\DateRange( 'date', $defaults, TRUE ) );
 
 			if( $values = $form->values() )
 			{
@@ -177,7 +156,7 @@ class badges extends Controller
 			}
 
 			/* Create the table */
-			$chart = new TableDb( 'core_member_badges', Url::internal( 'app=core&module=stats&controller=badges&type=member' ), [ 'datetime BETWEEN ? AND ?', $startTime, $endTime ] );
+			$chart = new \IPS\Helpers\Table\Db( 'core_member_badges', \IPS\Http\Url::internal( 'app=core&module=stats&controller=badges&type=member' ), [ 'datetime BETWEEN ? AND ?', $startTime, $endTime ] );
 			$chart->quickSearch = NULL;
 			$chart->selects = [ 'count(*) as count' ];
 			$chart->joins = [
@@ -193,34 +172,34 @@ class badges extends Controller
 			
 			/* Custom parsers */
 			$chart->parsers = array(
-				'member_id' => function( $val )
+				'member_id' => function( $val, $row )
 				{
-					$member = Member::load( $val );
-					return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
+					$member = \IPS\Member::load( $val );
+					return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
 				},
 				'count' => function( $val, $row ) use( $startTime, $endTime )
 				{
-					return Theme::i()->getTemplate( 'achievements', 'core' )->statsMemberBadgeCount( $val, $row['member_id'], $startTime, $endTime );
+					return \IPS\Theme::i()->getTemplate( 'achievements' )->statsMemberBadgeCount( $val, $row['member_id'], $startTime, $endTime );
 				}
 			);
 
-			$formHtml = $form->customTemplate( array( Theme::i()->getTemplate( 'stats' ), 'filtersFormTemplate' ) );
-			$chart = Theme::i()->getTemplate( 'achievements', 'core' )->statsBadgeWrapper( $formHtml, (string) $chart );
+			$formHtml = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'stats' ), 'filtersFormTemplate' ) );
+			$chart = \IPS\Theme::i()->getTemplate( 'achievements', 'core' )->statsBadgeWrapper( $formHtml, (string) $chart );
 		}
 		else
 		{
 			$start		= NULL;
 			$end		= NULL;
 
-			$defaults = array( 'start' => DateTime::create()->setDate( date('Y'), date('m'), 1 ), 'end' => new DateTime );
+			$defaults = array( 'start' => \IPS\DateTime::create()->setDate( date('Y'), date('m'), 1 ), 'end' => new \IPS\DateTime );
 
-			if( isset( Request::i()->badgeDateStart ) AND isset( Request::i()->badgeDateEnd ) )
+			if( isset( \IPS\Request::i()->badgeDateStart ) AND isset( \IPS\Request::i()->badgeDateEnd ) )
 			{
-				$defaults = array( 'start' => DateTime::ts( (int) Request::i()->badgeDateStart ), 'end' => DateTime::ts( (int) Request::i()->badgeDateEnd ) );
+				$defaults = array( 'start' => \IPS\DateTime::ts( \IPS\Request::i()->badgeDateStart ), 'end' => \IPS\DateTime::ts( \IPS\Request::i()->badgeDateEnd ) );
 			}
 
-			$form = new Form( $activeTab, 'continue' );
-			$form->add( new DateRange( 'date', $defaults, TRUE ) );
+			$form = new \IPS\Helpers\Form( $activeTab, 'continue' );
+			$form->add( new \IPS\Helpers\Form\DateRange( 'date', $defaults, TRUE ) );
 
 			if( $values = $form->values() )
 			{
@@ -242,7 +221,7 @@ class badges extends Controller
 			}
 
 			/* Create the table */
-			$chart = new TableDb( 'core_member_badges', Url::internal( 'app=core&module=stats&controller=badges&type=list' ), [ 'datetime BETWEEN ? AND ?', $startTime, $endTime ] );
+			$chart = new \IPS\Helpers\Table\Db( 'core_member_badges', \IPS\Http\Url::internal( 'app=core&module=stats&controller=badges&type=list' ), [ 'datetime BETWEEN ? AND ?', $startTime, $endTime ] );
 			$chart->quickSearch = NULL;
 			$chart->selects = [ 'count(*) as count' ];
 			$chart->joins = [
@@ -257,35 +236,35 @@ class badges extends Controller
 
 			/* Custom parsers */
 			$chart->parsers = array(
-				'member_group_id' => function( $val )
+				'member_group_id' => function( $val, $row )
 				{
 					try
 					{
-						return Group::load( $val )->formattedName;
+						return \IPS\Member\Group::load( $val )->formattedName;
 					}
-					catch ( Throwable $e )
+					catch ( \Throwable $e )
 					{
-						return Member::loggedIn()->language()->addToStack( 'unavailable' );
+						return \IPS\Member::loggedIn()->language()->addToStack( 'unavailable' );
 					}
 				},
 				'count' => function( $val, $row ) use( $startTime, $endTime )
 				{
-					return Theme::i()->getTemplate( 'achievements', 'core' )->statsBadgeCount( $val, $row['member_group_id'], $startTime, $endTime );
+					return \IPS\Theme::i()->getTemplate( 'achievements' )->statsBadgeCount( $val, $row['member_group_id'], $startTime, $endTime );
 				}
 			);
 
-			$formHtml = $form->customTemplate( array( Theme::i()->getTemplate( 'stats' ), 'filtersFormTemplate' ) );
-			$chart = Theme::i()->getTemplate( 'achievements', 'core' )->statsBadgeWrapper( $formHtml, (string) $chart );
+			$formHtml = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'stats' ), 'filtersFormTemplate' ) );
+			$chart = \IPS\Theme::i()->getTemplate( 'achievements', 'core' )->statsBadgeWrapper( $formHtml, (string) $chart );
 		}
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = (string)$chart;
+			\IPS\Output::i()->output = (string)$chart;
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack( 'menu__core_stats_badges' );
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string)$chart, Url::internal( "app=core&module=stats&controller=badges" ), 'tab', '', '' );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'menu__core_stats_badges' );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string)$chart, \IPS\Http\Url::internal( "app=core&module=stats&controller=badges" ), 'tab', '', 'ipsPad' );
 		}
 	}
 }

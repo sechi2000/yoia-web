@@ -12,37 +12,21 @@
 namespace IPS\forums\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Content\Api\ItemController;
-use IPS\Content\Item;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\forums\Forum;
-use IPS\forums\Topic;
-use IPS\forums\Topic\Post;
-use IPS\Member;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Topics API
  */
-class topics extends ItemController
+class _topics extends \IPS\Content\Api\ItemController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\forums\Topic';
+	protected $class = 'IPS\forums\Topic';
 	
 	/**
 	 * GET /forums/topics
@@ -63,18 +47,17 @@ class topics extends ItemController
 	 * @apiparam	string	sortDir			Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page			Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\forums\Topic>
-	 * @return PaginatedResponse<Topic>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\forums\Topic>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Init */
 		$where = array();
 		
 		/* Has best answer */
-		if ( isset( Request::i()->hasBestAnswer ) )
+		if ( isset( \IPS\Request::i()->hasBestAnswer ) )
 		{
-			if ( Request::i()->hasBestAnswer )
+			if ( \IPS\Request::i()->hasBestAnswer )
 			{
 				$where[] = array( "topic_answered_pid>0" );
 			}
@@ -85,15 +68,15 @@ class topics extends ItemController
 		}
 		
 		/* Archived */
-		if ( isset( Request::i()->archived ) )
+		if ( isset( \IPS\Request::i()->archived ) )
 		{
-			if ( Request::i()->archived )
+			if ( \IPS\Request::i()->archived )
 			{
-				$where[] = array( Db::i()->in( 'topic_archive_status', array( Topic::ARCHIVE_DONE, Topic::ARCHIVE_WORKING, Topic::ARCHIVE_RESTORE ) ) );
+				$where[] = array( \IPS\Db::i()->in( 'topic_archive_status', array( \IPS\forums\Topic::ARCHIVE_DONE, \IPS\forums\Topic::ARCHIVE_WORKING, \IPS\forums\Topic::ARCHIVE_RESTORE ) ) );
 			}
 			else
 			{
-				$where[] = array( Db::i()->in( 'topic_archive_status', array( Topic::ARCHIVE_NOT, Topic::ARCHIVE_EXCLUDE ) ) );
+				$where[] = array( \IPS\Db::i()->in( 'topic_archive_status', array( \IPS\forums\Topic::ARCHIVE_NOT, \IPS\forums\Topic::ARCHIVE_EXCLUDE ) ) );
 			}
 		}
 		
@@ -107,18 +90,17 @@ class topics extends ItemController
 	 *
 	 * @param		int		$id				ID Number
 	 * @throws		2F294/9	INVALID_ID		The topic ID does not exist
-	 * @apireturn		\IPS\forums\Topic
-	 * @return Response
+	 * @return		\IPS\forums\Topic
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{
 			return $this->_view( $id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2F294/9', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2F294/9', 404 );
 		}
 	}
 		
@@ -132,38 +114,37 @@ class topics extends ItemController
 	 * @apiparam	int		page		Page number
 	 * @apiparam	int		perPage		Number of results per page - defaults to 25
 	 * @throws		1F294/1	INVALID_ID	The topic ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		PaginatedResponse<IPS\forums\Topic\Post>
-	 * @return PaginatedResponse<Post>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\forums\Topic\Post>
 	 */
-	public function GETitem_posts( int $id ): PaginatedResponse
+	public function GETitem_posts( $id )
 	{
 		try
 		{
 			return $this->_comments( $id, 'IPS\forums\Topic\Post' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1F294/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1F294/1', 404 );
 		}
 	}
 	
 	/**
 	 * Create or update topic
 	 *
-	 * @param	Item	$item	The item
+	 * @param	\IPS\Content\Item	$item	The item
 	 * @param	string				$type	add or edit
-	 * @return	Item
+	 * @return	\IPS\Content\Item
 	 */
-	protected function _createOrUpdate( Item $item, string $type='add' ): Item
+	protected function _createOrUpdate( \IPS\Content\Item $item, $type='add' )
 	{
 		/* Open/Close time */
-		if ( Request::i()->open_time )
+		if ( \IPS\Request::i()->open_time )
 		{
-			$item->topic_open_time = ( new \DateTime( Request::i()->open_time ) )->getTimestamp();
+			$item->topic_open_time = ( new \DateTime( \IPS\Request::i()->open_time ) )->getTimestamp();
 		}
-		if ( Request::i()->close_time )
+		if ( \IPS\Request::i()->close_time )
 		{
-			$item->topic_close_time = ( new \DateTime( Request::i()->close_time ) )->getTimestamp();
+			$item->topic_close_time = ( new \DateTime( \IPS\Request::i()->close_time ) )->getTimestamp();
 		}
 
 		/* Do we have a poll to attach? */
@@ -203,23 +184,22 @@ class topics extends ItemController
 	 * @throws		1F294/4		NO_POST			No post was supplied
 	 * @throws		2F294/C		NO_PERMISSION	The authorized user does not have permission to create a topic in that forum
 	 * @throws		3F294/D		NO_ANON_PERMISSION	The topic is set for anonymous posting, but the author does not have permission to post anonymously
-	 * @apireturn		\IPS\forums\Topic
-	 * @return Response
+	 * @return		\IPS\forums\Topic
 	 */
-	public function POSTindex(): Response
+	public function POSTindex()
 	{
 		/* Get forum */
 		try
 		{
-			$forum = Forum::load( Request::i()->forum );
+			$forum = \IPS\forums\Forum::load( \IPS\Request::i()->forum );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_FORUM', '1F294/2', 400 );
+			throw new \IPS\Api\Exception( 'NO_FORUM', '1F294/2', 400 );
 		}
 		if ( !$forum->sub_can_post )
 		{
-			throw new Exception( 'NO_PERMISSION', '2F294/C', 403 );
+			throw new \IPS\Api\Exception( 'NO_PERMISSION', '2F294/C', 403 );
 		}
 		
 		/* Get author */
@@ -227,55 +207,55 @@ class topics extends ItemController
 		{
 			if ( !$forum->can( 'add', $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2F294/C', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2F294/C', 403 );
 			}
 			$author = $this->member;
 		}
 		else
 		{
-			if ( Request::i()->author )
+			if ( \IPS\Request::i()->author )
 			{
-				$author = Member::load( Request::i()->author );
+				$author = \IPS\Member::load( \IPS\Request::i()->author );
 				if ( !$author->member_id )
 				{
-					throw new Exception( 'NO_AUTHOR', '1F294/3', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1F294/3', 400 );
 				}
 			}
 			else
 			{
-				if ( (int) Request::i()->author === 0 )
+				if ( \IPS\Request::i()->author === 0 ) 
 				{
-					$author = new Member;
-					$author->name = Request::i()->author_name;
+					$author = new \IPS\Member;
+					$author->name = \IPS\Request::i()->author_name;
 				}
 				else 
 				{
-					throw new Exception( 'NO_AUTHOR', '1F294/3', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1F294/3', 400 );
 				}
 			}
 		}
 
 		/* Check anonymous posting */
-		if ( isset( Request::i()->anonymous ) and $author->member_id )
+		if ( isset( \IPS\Request::i()->anonymous ) and $author->member_id )
 		{
 			if ( ! $forum->canPostAnonymously( 0, $author ) )
 			{
-				throw new Exception( 'NO_ANON_PERMISSION', '3F294/D', 403 );
+				throw new \IPS\Api\Exception( 'NO_ANON_PERMISSION', '3F294/D', 403 );
 			}
 		}
 		
 		/* Check we have a title and a post */
-		if ( !Request::i()->title )
+		if ( !\IPS\Request::i()->title )
 		{
-			throw new Exception( 'NO_TITLE', '1F294/5', 400 );
+			throw new \IPS\Api\Exception( 'NO_TITLE', '1F294/5', 400 );
 		}
-		if ( !Request::i()->post )
+		if ( !\IPS\Request::i()->post )
 		{
-			throw new Exception( 'NO_POST', '1F294/4', 400 );
+			throw new \IPS\Api\Exception( 'NO_POST', '1F294/4', 400 );
 		}
 		
 		/* Do it */
-		return new Response( 201, $this->_create( $forum, $author )->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 201, $this->_create( $forum, $author )->apiOutput( $this->member ) );
 	}
 	
 	/**
@@ -308,53 +288,52 @@ class topics extends ItemController
 	 * @throws		1F294/8		NO_AUTHOR		The author ID does not exist
 	 * @throws		2F294/A		NO_PERMISSION	The authorized user does not have permission to edit the topic
 	 * @throws		1F294/E		INVALID_DATE	The date is invalid
-	 * @apireturn		\IPS\forums\Topic
-	 * @return Response
+	 * @return		\IPS\forums\Topic
 	 */
-	public function POSTitem( int $id ): Response
+	public function POSTitem( $id )
 	{
 		try
 		{
-			$topic = Topic::load( $id );
+			$topic = \IPS\forums\Topic::load( $id );
 			if ( $this->member and !$topic->can( 'read', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			if ( $this->member and !$topic->canEdit( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2F294/A', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2F294/A', 403 );
 			}
 			
 			/* New forum */
-			if ( isset( Request::i()->forum ) and Request::i()->forum != $topic->forum_id and ( !$this->member or $topic->canMove( $this->member ) ) )
+			if ( isset( \IPS\Request::i()->forum ) and \IPS\Request::i()->forum != $topic->forum_id and ( !$this->member or $topic->canMove( $this->member ) ) )
 			{
 				try
 				{
-					$newForum = Forum::load( Request::i()->forum );
+					$newForum = \IPS\forums\Forum::load( \IPS\Request::i()->forum );
 					if ( $this->member and !$newForum->can( 'add', $this->member ) )
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 					
 					$topic->move( $newForum );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					throw new Exception( 'NO_FORUM', '1F294/7', 400 );
+					throw new \IPS\Api\Exception( 'NO_FORUM', '1F294/7', 400 );
 				}
 			}
 			
 			/* New author */
-			if ( !$this->member and isset( Request::i()->author ) )
+			if ( !$this->member and isset( \IPS\Request::i()->author ) )
 			{				
 				/* Just renaming the guest */
-				if ( !$topic->starter_id and ( !isset( Request::i()->author ) or !Request::i()->author ) and isset( Request::i()->author_name ) )
+				if ( !$topic->starter_id and ( !isset( \IPS\Request::i()->author ) or !\IPS\Request::i()->author ) and isset( \IPS\Request::i()->author_name ) )
 				{
-					$topic->starter_name = Request::i()->author_name;
+					$topic->starter_name = \IPS\Request::i()->author_name;
 					
-					if ( $firstPost = $topic->comments( 1, 0, 'date', 'asc' ) )
+					if ( $firstPost = $this->comments( 1, 0, 'date', 'asc' ) )
 					{
-						$firstPost->author_name = Request::i()->author_name;
+						$firstPost->author_name = \IPS\Request::i()->author_name;
 					}
 				}
 				
@@ -363,31 +342,31 @@ class topics extends ItemController
 				{
 					try
 					{
-						$member = Member::load( Request::i()->author );
+						$member = \IPS\Member::load( \IPS\Request::i()->author );
 						if ( !$member->member_id )
 						{
-							throw new OutOfRangeException;
+							throw new \OutOfRangeException;
 						}
 						
 						$topic->changeAuthor( $member );
 					}
-					catch ( OutOfRangeException $e )
+					catch ( \OutOfRangeException $e )
 					{
-						throw new Exception( 'NO_AUTHOR', '1F294/8', 400 );
+						throw new \IPS\Api\Exception( 'NO_AUTHOR', '1F294/8', 400 );
 					}
 				}
 			}
 		
 			/* Do we have a date? */
-			if ( isset( Request::i()->date ) ) {
+			if ( isset( \IPS\Request::i()->date ) ) {
 
 				try  
 				{
-					$date = new DateTime( Request::i()->date );
+					$date = new \IPS\DateTime( \IPS\Request::i()->date );
 				}
 				catch( \Exception $e )
 				{
-					throw new Exception( 'INVALID_DATE', '1F294/E', 400 );
+					throw new \IPS\Api\Exception( 'INVALID_DATE', '1F294/E', 400 );
 				}
 
 				/* Do we have a first comment? */ 
@@ -395,7 +374,6 @@ class topics extends ItemController
 				{
 					try  
 					{
-						/* @var array $databaseColumnMap */
 						$commentClass = $topic::$commentClass;
 						$field = $commentClass::$databaseColumnMap['date'];
 
@@ -412,11 +390,11 @@ class topics extends ItemController
 		
 			/* Save and return */
 			$topic->save();
-			return new Response( 200, $topic->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $topic->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2F294/6', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2F294/6', 404 );
 		}
 	}
 	
@@ -427,26 +405,25 @@ class topics extends ItemController
 	 * @param		int			$id				ID Number
 	 * @throws		1F294/5		INVALID_ID		The topic ID does not exist
 	 * @throws		2F294/B		NO_PERMISSION	The authorized user does not have permission to delete the topic
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
 		try
 		{
-			$item = Topic::load( $id );
+			$item = \IPS\forums\Topic::load( $id );
 			if ( $this->member and !$item->canDelete( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2F294/B', 404 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2F294/B', 404 );
 			}
 			
 			$item->delete();
 			
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1F294/5', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1F294/5', 404 );
 		}
 	}
 }

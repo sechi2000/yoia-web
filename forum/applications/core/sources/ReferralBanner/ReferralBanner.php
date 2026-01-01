@@ -12,55 +12,41 @@
 namespace IPS\core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\Url as FormUrl;
-use IPS\Http\Url;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Referral Banner Node
  */
-class ReferralBanner extends Model
+class _ReferralBanner extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_referral_banners';
+	public static $databaseTable = 'core_referral_banners';
 
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'rb_';
+	public static $databasePrefix = 'rb_';
 
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'order';
+	public static $databaseColumnOrder = 'order';
 
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'referral_banners';
+	public static $nodeTitle = 'referral_banners';
 
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -78,7 +64,7 @@ class ReferralBanner extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'membersettings',
 		'all'		=> 'referrals_banners'
@@ -89,9 +75,9 @@ class ReferralBanner extends Model
 	 *
 	 * @return	string
 	 */
-	public function get__title(): string
+	public function get__title()
 	{
-		return Theme::i()->getTemplate( 'global', 'core', 'global' )->referralBanner( $this->url );
+		return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->referralBanner( $this->url );
 	}
 
 	/**
@@ -99,7 +85,7 @@ class ReferralBanner extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canCopy(): bool
+	public function canCopy()
 	{
 		return false;
 	}
@@ -107,12 +93,12 @@ class ReferralBanner extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
-		$form->add( new Radio( 'rb_upload', $this->id ? $this->upload : 1, TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'rb_upload', $this->id ? $this->upload : 1, TRUE, array(
 			'options'	=> array(
 				1			=> 'rb_upload_yes',
 				0			=> 'rb_upload_no'
@@ -123,19 +109,19 @@ class ReferralBanner extends Model
 			)
 		) ) );
 
-		$form->add( new Upload( 'rb_url_upload', $this->upload ? File::get( 'core_ReferralBanners', $this->url ) : NULL, NULL, array( 'storageExtension' => 'core_ReferralBanners' ), function( $val )
+		$form->add( new \IPS\Helpers\Form\Upload( 'rb_url_upload', $this->upload ? \IPS\File::get( 'core_ReferralBanners', $this->url ) : NULL, NULL, array( 'storageExtension' => 'core_ReferralBanners' ), function( $val )
 		{
-			if ( Request::i()->rb_upload and !$val )
+			if ( \IPS\Request::i()->rb_upload and !$val )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'rb_url_upload' ) );
 
-		$form->add( new FormUrl( 'rb_url_url', !$this->upload ? $this->url : NULL, NULL, array( 'allowedMimes' => 'image/*' ), function( $val )
+		$form->add( new \IPS\Helpers\Form\Url( 'rb_url_url', !$this->upload ? $this->url : NULL, NULL, array( 'allowedMimes' => 'image/*' ), function( $val )
 		{
-			if ( !Request::i()->rb_upload and !$val )
+			if ( !\IPS\Request::i()->rb_upload and !$val )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}
 		}, NULL, NULL, 'rb_url_url' ) );
 	}
@@ -146,7 +132,7 @@ class ReferralBanner extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if( isset( $values['rb_url_upload'] ) or isset( $values['rb_url_url'] ) )
 		{
@@ -168,17 +154,17 @@ class ReferralBanner extends Model
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		if ( $this->upload )
 		{
 			try
 			{
-				File::get( 'core_ReferralBanners', $this->url )->delete();
+				\IPS\File::get( 'core_ReferralBanners', $this->url )->delete();
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 
 		parent::delete();
@@ -187,18 +173,18 @@ class ReferralBanner extends Model
 	/**
 	 * Get URL
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url
 	 * @note	Any nodes that have URLs (e.g. forums, gallery categories) should override this
 	 */
-	function url(): Url|string|null
+	public function url()
 	{
 		if ( mb_substr( $this->url, 0, 4 ) == 'http')
 		{
-			return Url::external( $this->url );
+			return \IPS\Http\Url::external( $this->url );
 		}
 		else
 		{
-			return Url::internal( $this->url, 'none' );
+			return \IPS\Http\Url::internal( $this->url, 'none', NULL );
 		}
 	}
 

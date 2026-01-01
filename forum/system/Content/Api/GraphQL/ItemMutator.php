@@ -10,41 +10,18 @@
 
 namespace IPS\Content\Api\GraphQL;
 
-use DomainException;
-use IPS\Api\Exception;
-use IPS\Api\GraphQL\SafeException;
-use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Content\Search\Index;
-use IPS\Content\Search\SearchContent;
-use IPS\DateTime;
-use IPS\File;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Text\Parser;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function strlen;
-use function strpos;
-
+use \IPS\Api\GraphQL\TypeRegistry;
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base mutator class for Content Items
  */
-abstract class ItemMutator extends ContentMutator
+abstract class _ItemMutator extends ContentMutator
 {
     public function args(): array
     {
@@ -61,10 +38,10 @@ abstract class ItemMutator extends ContentMutator
 	/**
 	 * Mark as read
 	 *
-	 * @param	Item	$item			Item to mark as read
-	 * @return	Item
+	 * @param	\IPS\Content\Item	$item			Item to mark as read
+	 * @return	void
 	 */
-	protected function _markRead( Item $item ): Item
+	protected function _markRead( $item )
 	{
 		$item->markRead();
 		return $item;
@@ -73,21 +50,21 @@ abstract class ItemMutator extends ContentMutator
 	/**
 	 * Create
 	 *
-	 * @param array $itemData Item Data
-	 * @param Model|null $container Container
-	 * @param string|null $postKey Post key
-	 * @return    Item
+	 * @param	\IPS\Node\Model	$container			Container
+	 * @param	\IPS\Member		$author				Author
+	 * @param	string			$postKey			Post key
+	 * @return	\IPS\Content\Item
 	 */
-	protected function _create( array $itemData, Model|null $container = NULL, string|null $postKey = NULL ): Item
+	protected function _create( $itemData, \IPS\Node\Model $container = NULL, string $postKey = NULL )
 	{
 		$class = $this->class;
 		
 		/* Work out the date */
-		$date = DateTime::create();
+		$date = \IPS\DateTime::create();
 				
 		/* Create item */
-		$item = $class::createItem( Member::loggedIn(), Request::i()->ipAddress(), $date, $container );
-		$this->_createOrUpdate( $item, $itemData );
+		$item = $class::createItem( \IPS\Member::loggedIn(), \IPS\Request::i()->ipAddress(), $date, $container );
+		$this->_createOrUpdate( $item, $itemData, 'add' );
 		$item->save();
 		
 		/* Create post */
@@ -100,19 +77,19 @@ abstract class ItemMutator extends ContentMutator
 				{
 					$this->_addAttachmentsToContent( $postKey, $itemData['content'] );
 				}
-				catch ( DomainException $e )
+				catch ( \DomainException $e )
 				{
-					throw new SafeException( 'ATTACHMENTS_TOO_LARGE', '2S401/1', 403 );
+					throw new \IPS\Api\GraphQL\SafeException( 'ATTACHMENTS_TOO_LARGE', '2S401/1', 403 );
 				}
 			}
 			
-			$postContents = Parser::parseStatic( $itemData['content'], array( md5( $postKey . ':' ) ), Member::loggedIn(), $class::$application . '_' . IPS::mb_ucfirst( $class::$module ) );
+			$postContents = \IPS\Text\Parser::parseStatic( $itemData['content'], TRUE, md5( $postKey . ':' ), \IPS\Member::loggedIn(), $class::$application . '_' . mb_ucfirst( $class::$module ) );
 			
 			$commentClass = $item::$commentClass;
-			$post = $commentClass::create( $item, $postContents, TRUE, Member::loggedIn()->member_id ? NULL : Member::loggedIn()->real_name, NULL, Member::loggedIn(), $date );
+			$post = $commentClass::create( $item, $postContents, TRUE, \IPS\Member::loggedIn()->member_id ? NULL : \IPS\Member::loggedIn()->real_name, NULL, \IPS\Member::loggedIn(), $date );
 			$itemIdColumn = $item::$databaseColumnId;
 			$postIdColumn = $commentClass::$databaseColumnId;
-			File::claimAttachments( "{$postKey}:", $item->$itemIdColumn, $post->$postIdColumn );
+			\IPS\File::claimAttachments( "{$postKey}:", $item->$itemIdColumn, $post->$postIdColumn );
 			
 			if ( isset( $class::$databaseColumnMap['first_comment_id'] ) )
 			{
@@ -124,13 +101,13 @@ abstract class ItemMutator extends ContentMutator
 		}
 		
 		/* Index */
-		if( SearchContent::isSearchable( $item ) )
+		if ( $item instanceof \IPS\Content\Searchable )
 		{
-			Index::i()->index( $item );
+			\IPS\Content\Search\Index::i()->index( $item );
 		}
 
 		/* Mark it as read */
-		if( IPS::classUsesTrait( $item, 'IPS\Content\ReadMarkers' ) )
+		if( $item instanceof \IPS\Content\ReadMarkers )
 		{
 			$item->markRead();
 		}
@@ -139,7 +116,7 @@ abstract class ItemMutator extends ContentMutator
 		if ( !$item->hidden() )
 		{
 			$item->sendNotifications();
-			Member::loggedIn()->achievementAction( 'core', 'NewContentItem', $item );
+			\IPS\Member::loggedIn()->achievementAction( 'core', 'NewContentItem', $item );
 		}
 		elseif( $item->hidden() !== -1 )
 		{
@@ -153,13 +130,13 @@ abstract class ItemMutator extends ContentMutator
 	/**
 	 * Create or update item
 	 *
-	 * @param Item $item The item
-	 * @param array $itemData Item data
-	 * @param string $type add or edit
-	 * @param string|null $postKey Post key
-	 * @return    Item
+	 * @param	\IPS\Content\Item	$item		The item
+	 * @param	array				$itemData	Item data
+	 * @param	string				$type		add or edit
+	 * @param	string				$postKey	Post key
+	 * @return	\IPS\Content\Item
 	 */
-	protected function _createOrUpdate( Item $item, array $itemData=array(), string $type='add', string|null $postKey = NULL ): Item
+	protected function _createOrUpdate( \IPS\Content\Item $item, array $itemData=array(), $type='add', $postKey = NULL )
 	{
 		$class = $this->class;
 
@@ -171,21 +148,40 @@ abstract class ItemMutator extends ContentMutator
 		}
 		
 		/* Tags */
-		if ( ( isset( $itemData['prefix'] ) or isset( $itemData['tags'] ) ) and IPS::classUsesTrait( $item, 'IPS\Content\Taggable' ) )
+		if ( ( isset( $itemData['prefix'] ) or isset( $itemData['tags'] ) ) and \in_array( 'IPS\Content\Tags', class_implements( \get_class( $item ) ) ) )
 		{
-			if ( Member::loggedIn()->member_id && $item::canTag( NULL, $item->containerWrapper() ) )
-			{
-				$source = array_map( 'trim', array_unique( $class::definedTags() ) );
+			if ( \IPS\Member::loggedIn()->member_id && $item::canTag( NULL, $item->containerWrapper() ) )
+			{				
+				$source = array();
+
+				if( !\IPS\Settings::i()->tags_open_system )
+				{
+					/* And get the defined tags */
+					if( $class::definedTags( $item->containerWrapper() ) )
+					{
+						$source = array_map( 'trim', array_unique( array_merge( $source, $class::definedTags( $item->containerWrapper() ) ) ) );
+					}
+				}
 
 				/* Filter our provided tags and exclude any that are invalid */
 				$validTags = array_filter( array_map( 'trim', array_unique( $itemData['tags'] ) ), function($tag) use ($source) {
 					
-					if( !in_array($tag, $source) )
+					if( !\IPS\Settings::i()->tags_open_system && !\in_array($tag, $source) )
 					{
 						return FALSE;
 					}
 
-					if( strpos( $tag, '#' ) !== FALSE )
+					if( \IPS\Settings::i()->tags_len_min && \strlen($tag) < \IPS\Settings::i()->tags_len_min )
+					{
+						return FALSE;
+					}
+
+					if( \IPS\Settings::i()->tags_len_max && \strlen($tag) < \IPS\Settings::i()->tags_len_max )
+					{
+						return FALSE;
+					}
+
+					if( \strpos( $tag, '#' ) !== FALSE )
 					{
 						return FALSE;
 					}
@@ -193,14 +189,14 @@ abstract class ItemMutator extends ContentMutator
 					return TRUE;
 				});
 
-				if( Settings::i()->tags_min && count( $validTags ) < Settings::i()->tags_min )
+				if( \IPS\Settings::i()->tags_min && \count( $validTags ) < \IPS\Settings::i()->tags_min )
 				{
-					throw new SafeException( 'TOO_FEW_TAGS', 'GQL/0011/1', 400 );
+					throw new \IPS\Api\GraphQL\SafeException( 'TOO_FEW_TAGS', 'GQL/0011/1', 400 );
 				}
 
-				if( Settings::i()->tags_max && count( $validTags ) > Settings::i()->tags_max )
+				if( \IPS\Settings::i()->tags_max && \count( $validTags ) > \IPS\Settings::i()->tags_max )
 				{
-					throw new SafeException( 'TOO_MANY_TAGS', 'GQL/0011/2', 400 );
+					throw new \IPS\Api\GraphQL\SafeException( 'TOO_MANY_TAGS', 'GQL/0011/2', 400 );
 				}
 	
 				/* we need to save the item before we set the tags because setTags requires that the item exists */
@@ -215,15 +211,14 @@ abstract class ItemMutator extends ContentMutator
 		}
 		
 		/* Open/closed */
-		/* @var array $databaseColumnMap */
-		if ( isset( $itemData['state']['locked'] ) and IPS::classUsesTrait( $item, 'IPS\Content\Lockable' ) )
+		if ( isset( $itemData['state']['locked'] ) and \in_array( 'IPS\Content\Lockable', class_implements( \get_class( $item ) ) ) )
 		{
-			if ( Member::loggedIn()->member_id && ( $itemData['state']['locked'] and $item->canLock() ) or ( !$itemData['state']['locked'] and $item->canUnlock() ) )
+			if ( \IPS\Member::loggedIn()->member_id && ( $itemData['state']['locked'] and $item->canLock() ) or ( !$itemData['state']['locked'] and $item->canUnlock() ) )
 			{
 				if ( isset( $item::$databaseColumnMap['locked'] ) )
 				{
 					$lockedColumn = $item::$databaseColumnMap['locked'];
-					$item->$lockedColumn = intval( $itemData['state']['locked'] );
+					$item->$lockedColumn = \intval( $itemData['state']['locked'] );
 				}
 				else
 				{
@@ -234,9 +229,9 @@ abstract class ItemMutator extends ContentMutator
 		}
 		
 		/* Hidden */
-		if ( isset( $itemData['state']['hidden'] ) and IPS::classUsesTrait( $item, 'IPS\Content\Hideable' ) )
+		if ( isset( $itemData['state']['hidden'] ) and \in_array( 'IPS\Content\Hideable', class_implements( \get_class( $item ) ) ) )
 		{
-			if ( Member::loggedIn()->member_id && ( $itemData['state']['hidden'] and $item->canHide() ) or ( !$itemData['state']['hidden'] and $item->canUnhide() ) )
+			if ( \IPS\Member::loggedIn()->member_id && ( $itemData['state']['hidden'] and $item->canHide() ) or ( !$itemData['state']['hidden'] and $item->canUnhide() ) )
 			{
 				$idColumn = $item::$databaseColumnId;
 				if ( $itemData['state']['hidden'] )
@@ -283,27 +278,27 @@ abstract class ItemMutator extends ContentMutator
 		}
 		
 		/* Pinned */
-		if ( isset( $itemData['state']['pinned'] ) and IPS::classUsesTrait( $item, 'IPS\Content\Pinnable' ) )
+		if ( isset( $itemData['state']['pinned'] ) and \in_array( 'IPS\Content\Pinnable', class_implements( \get_class( $item ) ) ) )
 		{
-			if ( Member::loggedIn()->member_id && ( $itemData['state']['pinned'] and $item->canPin() ) or ( !$itemData['state']['pinned'] and $item->canUnpin() ) )
+			if ( \IPS\Member::loggedIn()->member_id && ( $itemData['state']['pinned'] and $item->canPin() ) or ( !$itemData['state']['pinned'] and $item->canUnpin() ) )
 			{
 				$pinnedColumn = $item::$databaseColumnMap['pinned'];
-				$item->$pinnedColumn = intval( $itemData['state']['pinned'] );
+				$item->$pinnedColumn = \intval( $itemData['state']['pinned'] );
 			}
 		}
 		
 		/* Featured */
-		if ( isset( $itemData['state']['featured'] ) and IPS::classUsesTrait( $item, 'IPS\Content\Featurable' ) )
+		if ( isset( $itemData['state']['featured'] ) and \in_array( 'IPS\Content\Featurable', class_implements( \get_class( $item ) ) ) )
 		{
-			if ( Member::loggedIn()->member_id && $item->canFeature() )
+			if ( \IPS\Member::loggedIn()->member_id && ( $itemData['state']['featured'] and $item->canFeature() ) or ( !$itemData['state']['featured'] and $item->canUnfeature() ) )
 			{
 				$featuredColumn = $item::$databaseColumnMap['featured'];
-				$item->$featuredColumn = intval( $itemData['state']['featured'] );
+				$item->$featuredColumn = \intval( $itemData['state']['featured'] );
 			}
 		}
 
 		/* Update first comment if required, and it's not a new item */
-		$field = $item::$databaseColumnMap['first_comment_id'] ?? NULL;
+		$field = isset( $item::$databaseColumnMap['first_comment_id'] ) ? $item::$databaseColumnMap['first_comment_id'] : NULL;
 		$commentClass = $item::$commentClass;
 		$contentField = $commentClass::$databaseColumnMap['content'];
 		if ( $item::$firstCommentRequired AND isset( $item->$field ) AND isset( $itemData[ $contentField ] ) AND $type == 'edit' )
@@ -315,31 +310,30 @@ abstract class ItemMutator extends ContentMutator
 				{
 					$this->_addAttachmentsToContent( $postKey, $itemData[ $contentField ] );
 				}
-				catch ( DomainException $e )
+				catch ( \DomainException $e )
 				{
-					throw new SafeException( 'ATTACHMENTS_TOO_LARGE', '2S401/2', 403 );
+					throw new \IPS\Api\GraphQL\SafeException( 'ATTACHMENTS_TOO_LARGE', '2S401/2', 403 );
 				}
 			}
 			
-			$content = Parser::parseStatic( $itemData[$contentField], array( $item->_id, $item->$field ), Member::loggedIn(), $item::$application . '_' . IPS::mb_ucfirst( $item::$module ) );
+			$content = \IPS\Text\Parser::parseStatic( $itemData[ $contentField ], TRUE, array( $item->_id, $item->$field ), \IPS\Member::loggedIn(), $item::$application . '_' . mb_ucfirst( $item::$module ) );
 
 			try
 			{
-				/* @var Comment $commentClass */
 				$comment = $commentClass::load( $item->$field );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				throw new Exception( 'NO_FIRST_POST', '1S377/1', 400 );
+				throw new \IPS\Api\Exception( 'NO_FIRST_POST', '1S377/1', 400 );
 			}
 
 			$comment->$contentField = $content;
 			$comment->save();
 
 			/* Update Search Index of the first item */
-			if( SearchContent::isSearchable( $item ) )
+			if ( $item instanceof \IPS\Content\Searchable )
 			{
-				Index::i()->index( $comment );
+				\IPS\Content\Search\Index::i()->index( $comment );
 			}
 		}
 		

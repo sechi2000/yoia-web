@@ -12,94 +12,76 @@
 namespace IPS\cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\cms\Media\Folder;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use OutOfRangeException;
-use RuntimeException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief Media Model
  */
-class Media extends Model
+class _Media extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'cms_media';
+	public static $databaseTable = 'cms_media';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'media_';
+	public static $databasePrefix = 'media_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array('media_full_path');
+	protected static $databaseIdFields = array('media_full_path');
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Parent Node ID Database Column
 	 */
-	public static string $parentNodeColumnId = 'parent';
+	public static $parentNodeColumnId = 'parent';
 	
 	/**
 	 * @brief	[Node] Parent Node Class
 	 */
-	public static string $parentNodeClass = 'IPS\cms\Media\Folder';
+	public static $parentNodeClass = 'IPS\cms\Media\Folder';
 	
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'filename';
+	public static $databaseColumnOrder = 'filename';
 
 	/**
 	 * @brief	[Node] Automatically set position for new nodes
 	 */
-	public static bool $automaticPositionDetermination = FALSE;
+	public static $automaticPositionDetermination = FALSE;
 	
 	/**
 	 * @brief	[Node] Show forms modally?
 	 */
-	public static bool $modalForms = TRUE;
+	public static $modalForms = TRUE;
 	
 	/**
 	 * @brief	[Node] Title
 	 */
-	public static string $nodeTitle = 'page';
+	public static $nodeTitle = 'page';
 
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -117,7 +99,7 @@ class Media extends Model
 	 'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 			'app'		=> 'cms',
 			'module'	=> 'pages',
 			'prefix' 	=> 'media_'
@@ -128,19 +110,10 @@ class Media extends Model
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->parent     = 0;
 		$this->full_path  = '';
-	}
-
-	/**
-	 * @return string
-	 */
-	public function get_file_icon() : string
-	{
-		$extension = strtolower( substr( $this->file_object, strrpos( $this->file_object, '.' ) + 1 ) );
-		return File::$fileIconMap[ $extension ] ?? '';
 	}
 	
 	/**
@@ -149,15 +122,15 @@ class Media extends Model
 	 * @param 	int 	$folderId	Folder ID to reset
 	 * @return	void
 	 */
-	public static function resetPath( int $folderId ) : void
+	public static function resetPath( $folderId )
 	{
 		try
 		{
-			$path = Folder::load( $folderId )->path;
+			$path = \IPS\cms\Media\Folder::load( $folderId )->path;
 		}
-		catch ( OutOfRangeException $ex )
+		catch ( \OutOfRangeException $ex )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 	
 		$children = static::getChildren( $folderId );
@@ -174,10 +147,10 @@ class Media extends Model
 	 * @param	INT 	$folderId		Folder ID to fetch children from
 	 * @return	array
 	 */
-	public static function getChildren( int $folderId=0 ) : array
+	public static function getChildren( $folderId=0 )
 	{
 		$children = array();
-		foreach( Db::i()->select( '*', static::$databaseTable, array( 'media_parent=?', intval( $folderId ) ), 'media_filename ASC' ) as $child )
+		foreach( \IPS\Db::i()->select( '*', static::$databaseTable, array( 'media_parent=?', \intval( $folderId ) ), 'media_filename ASC' ) as $child )
 		{
 			$children[ $child[ static::$databasePrefix . static::$databaseColumnId ] ] = static::load( $child[ static::$databasePrefix . static::$databaseColumnId ] );
 		}
@@ -191,7 +164,7 @@ class Media extends Model
 	 * @param	array	$ids	Array of IDs to remove
 	 * @return	void
 	 */
-	public static function deleteByFileIds( array $ids=array() ) : void
+	public static function deleteByFileIds( $ids=array() )
 	{
 		foreach( $ids as $id )
 		{
@@ -199,35 +172,42 @@ class Media extends Model
 			{
 				static::load( $id )->delete();
 			}
-			catch( Exception $ex ) { }
+			catch( \Exception $ex ) { }
 		}
 	}
 	
 	/**
 	 * Get URL
 	 *
-	 * @return Url|string|null object
+	 * @return \IPS\Http\Url object
 	 */
-	function url(): Url|string|null
+	public function url()
 	{
-		return (string)File::get( 'cms_Media', $this->file_object )->url;
+		if ( \IPS\Theme::designersModeEnabled() )
+		{
+			return \IPS\Settings::i()->base_url . 'themes/cms/media/' . $this->full_path;
+		}
+		else
+		{
+			return (string)\IPS\File::get( 'cms_Media', $this->file_object )->url;
+		}
 	}
 
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		try
 		{
 			if ( $this->file_object )
 			{
-				File::get( 'cms_Media', $this->file_object )->delete();
+				\IPS\File::get( 'cms_Media', $this->file_object )->delete();
 			}
 		}
-		catch( Exception $ex ) { }
+		catch( \Exception $ex ) { }
 
 		parent::delete();
 	}
@@ -235,11 +215,11 @@ class Media extends Model
 	/**
 	 * [Node] Get buttons to display in tree
 	 *
-	 * @param Url $url		Base URL
-	 * @param bool $subnode	Is this a subnode?
-	 * @return    array
+	 * @param	string	$url		Base URL
+	 * @param	bool	$subnode	Is this a subnode?
+	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ): array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = parent::getButtons( $url, $subnode );
 		$delete  = NULL;
@@ -261,10 +241,10 @@ class Media extends Model
 		}
 
 		$buttons['key'] = array(
-			'icon'	=> 'file-code',
+			'icon'	=> 'file-code-o',
 			'title'	=> 'cms_media_key',
-			'link'	=> Url::internal( 'app=cms&module=pages&controller=media&do=key&id=' . $this->id ),
-			'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('cms_media_key') )
+			'link'	=> \IPS\Http\Url::internal( 'app=cms&module=pages&controller=media&do=key&id=' . $this->id ),
+			'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('cms_media_key') )
 		);
 
 		if ( $this->is_image )
@@ -272,8 +252,8 @@ class Media extends Model
 			$buttons['preview'] = array(
 				'icon'	=> 'search',
 				'title'	=> 'cms_media_preview',
-				'link'	=> Url::internal( 'app=cms&module=pages&controller=media&do=preview&id=' . $this->id ),
-				'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('cms_media_preview') )
+				'link'	=> \IPS\Http\Url::internal( 'app=cms&module=pages&controller=media&do=preview&id=' . $this->id ),
+				'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('cms_media_preview') )
 			);
 		}
 
@@ -289,15 +269,15 @@ class Media extends Model
 	 * [Node] Add/Edit Form
 	 *
 	 * @note	This is not used currently. See \IPS\cms\modules\admin\media.php upload()
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		/* Build form */
-		$form->add( new Upload( 'media_filename', ( ( $this->filename ) ? File::get( 'cms_Media', $this->file_object ) : NULL ), FALSE, array( 'obscure' => FALSE, 'maxFileSize' => 5, 'storageExtension' => 'cms_Media', 'storageContainer' => 'pages_media' ), NULL, NULL, NULL, 'media_filename' ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'media_filename', ( ( $this->filename ) ? \IPS\File::get( 'cms_Media', $this->file_object ) : NULL ), FALSE, array( 'obscure' => FALSE, 'maxFileSize' => 5, 'storageExtension' => 'cms_Media', 'storageContainer' => 'pages_media' ), NULL, NULL, NULL, 'media_filename' ) );
 			
-		$form->add( new Node( 'media_parent', $this->parent ?: 0, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Node( 'media_parent', $this->parent ? $this->parent : 0, FALSE, array(
 			'class'    => '\IPS\cms\Media\Folder',
 			'zeroVal'  => 'node_no_parent'
 		) ) );
@@ -310,7 +290,7 @@ class Media extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( isset( $values['media_parent'] ) AND ( ! empty( $values['media_parent'] ) OR $values['media_parent'] === 0 ) )
 		{
@@ -335,7 +315,8 @@ class Media extends Model
 			$values['filename']        = $filename;
 			$values['filename_stored'] = $values['parent'] . '_' . $values['filename'];
 			$values['is_image']        = $values['media_filename']->isImage();
-			$values['file_object']     = (string) $values['media_filename'];
+
+			$values['file_object'] = (string) $values['media_filename'];
 
 			unset( $values['media_filename'] );
 		}
@@ -355,9 +336,9 @@ class Media extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
-		$this->setFullPath( ( $this->parent ? Folder::load( $this->parent )->path : '' ) );
+		$this->setFullPath( ( $this->parent ? \IPS\cms\Media\Folder::load( $this->parent )->path : '' ) );
 		$this->save();
 	}
 
@@ -366,7 +347,7 @@ class Media extends Model
 	 *
 	 * @return	string
 	 */
-	public function getSortableName() : string
+	public function getSortableName()
 	{
 		return $this->full_path;
 	}
@@ -377,10 +358,52 @@ class Media extends Model
 	 * @param	string	$path	Path to reset
 	 * @return	void
 	 */
-	public function setFullPath( string $path ) : void
+	public function setFullPath( $path )
 	{
 		$this->full_path = trim( $path . '/' . $this->filename, '/' );
 		$this->save();
+	}
+
+	/**
+	 * Write media to disk for designer's mode
+	 *
+	 * @return void
+	 */
+	public static function exportDesignersModeMedia()
+	{
+		/* Make sure our media folder exists */
+		if ( !is_dir( \IPS\ROOT_PATH . '/themes/cms/media' ) )
+		{
+			mkdir( \IPS\ROOT_PATH . '/themes/cms/media', \IPS\IPS_FOLDER_PERMISSION );
+			chmod( \IPS\ROOT_PATH . '/themes/cms/media', \IPS\IPS_FOLDER_PERMISSION );
+		}
+		
+		foreach( \IPS\Db::i()->select( '*', 'cms_media' ) as $media )
+		{
+			/* We could use recursive mode but it wouldn't correctly chmod the intermediate dirs */
+			$bits = explode( '/', "/themes/cms/media/" . $media['media_full_path'] );
+			$dir = '';
+
+			$filename = array_pop( $bits );
+
+			foreach( $bits as $part )
+			{
+				$dir .= $part . '/';
+
+				if ( ! is_dir( \IPS\ROOT_PATH . '/' . trim( $dir, '/' ) ) )
+				{
+					mkdir( \IPS\ROOT_PATH . '/' . trim( $dir, '/' ), \IPS\IPS_FOLDER_PERMISSION );
+					chmod( \IPS\ROOT_PATH . '/' . trim( $dir, '/' ), \IPS\IPS_FOLDER_PERMISSION );
+				}
+			}
+			
+			try
+			{
+				\file_put_contents( \IPS\ROOT_PATH . '/' . trim( $dir, '/' ) . '/' . $filename, \IPS\File::get( 'cms_Media', $media['media_file_object'] )->contents() );
+				@chmod( \IPS\ROOT_PATH . '/' . trim( $dir, '/' ) . '/' . $filename, \IPS\IPS_FILE_PERMISSION );
+			}
+			catch( \RuntimeException $e ) { }
+		}
 	}
 
 	/**
@@ -388,10 +411,10 @@ class Media extends Model
 	 *
 	 * @return void
 	 */
-	public static function removeEmptyFolders() : void
+	public static function removeEmptyFolders()
 	{
-		$folders    = iterator_to_array( Db::i()->select( 'DISTINCT(media_parent)', 'cms_media', array( 'media_parent > 0' ) ) );
-		$allFolders = iterator_to_array( Db::i()->select( '*', 'cms_media_folders' )->setKeyField( 'media_folder_id' ) );
+		$folders    = iterator_to_array( \IPS\Db::i()->select( 'DISTINCT(media_parent)', 'cms_media', array( 'media_parent > 0' ) ) );
+		$allFolders = iterator_to_array( \IPS\Db::i()->select( '*', 'cms_media_folders' )->setKeyField( 'media_folder_id' ) );
 
 		foreach( $folders as $id )
 		{
@@ -407,7 +430,7 @@ class Media extends Model
 						break;
 					}
 
-					if ( ! in_array( $currentParent, $folders ) )
+					if ( ! \in_array( $currentParent, $folders ) )
 					{
 						$folders[] = $currentParent;
 					}
@@ -417,7 +440,59 @@ class Media extends Model
 			}
 		}
 
-		Db::i()->delete( 'cms_media_folders', array( Db::i()->in( 'media_folder_id', array_values( $folders ), TRUE ) ) );
+		\IPS\Db::i()->delete( 'cms_media_folders', array( \IPS\Db::i()->in( 'media_folder_id', array_values( $folders ), TRUE ) ) );
+	}
+
+	/**
+	 * Import media from disk for designer's mode
+	 *
+	 * @return void
+	 */
+	public static function importDesignersModeMedia()
+	{
+		$path = \IPS\ROOT_PATH . '/themes/cms/media';
+		$seen = array();
+
+		if ( is_dir( $path ) )
+		{
+			static::importDesignersModeMediaRecurse( $seen, $path );
+		}
+
+		\IPS\Db::i()->delete( 'cms_media', array( \IPS\Db::i()->in( 'media_id', $seen, TRUE ) ) );
+		static::removeEmptyFolders();
+	}
+
+	/**
+	 * Import media from disk for designer's mode recursive method
+	 *
+	 * @param	array	$seen	Files we've seen already
+	 * @param	string	$path	Path to look in
+	 * @return void
+	 */
+	public static function importDesignersModeMediaRecurse( &$seen, $path )
+	{
+		if ( is_dir( $path ) )
+		{
+			foreach ( new \DirectoryIterator( $path ) as $dir )
+			{
+				if ( $dir->isDot() || mb_substr( $dir->getFilename(), 0, 1 ) === '.' )
+				{
+					continue;
+				}
+
+				if ( $dir->isDir() )
+				{
+					static::importDesignersModeMediaRecurse( $seen, $path . '/' . $dir->getFilename() );
+				}
+				else
+				{
+					$contents = \file_get_contents( $dir->getRealPath() );
+
+					/* Create */
+					$seen[] = static::createMedia( trim( str_replace( str_replace( '\\', '/', \IPS\ROOT_PATH ) . '/themes/cms/media', '', str_replace( '\\', '/', $dir->getRealPath() ) ), '/' ), $contents );
+				}
+			}
+		}
 	}
 
 	/**
@@ -425,49 +500,49 @@ class Media extends Model
 	 *
 	 * @param   string      $path       File path (/folder/file.txt)
 	 * @param   string      $contents   File contents
-	 * @return  int|null         ID of existing media or of new media
+	 * @return  int         ID of existing media or of new media
 	 */
-	public static function createMedia( string $path, string $contents ): ?int
+	public static function createMedia( $path, $contents )
 	{
 		try
 		{
 			$test = static::load( $path, 'media_full_path' );
 
-			$test->file_object = File::create( 'cms_Media', $test->filename_stored, $contents, 'pages_media', TRUE, NULL, FALSE );
+			$test->file_object = \IPS\File::create( 'cms_Media', $test->filename_stored, $contents, 'pages_media', TRUE, NULL, FALSE );
 			$test->save();
 
 			return $test->id;
 		}
-		catch( RuntimeException $ex )
+		catch( \RuntimeException $ex )
 		{
 			try
 			{
-				File::get( 'cms_Media', $path );
+				\IPS\File::get( 'cms_Media', $path );
 			}
-			catch( Exception $x )
+			catch( \Exception $x )
 			{
 				/* File doesn't exist already */
 				throw $ex;
 			}
 		}
-		catch( OutOfRangeException $ex )
+		catch( \OutOfRangeException $ex )
 		{
 			/* It doesn't exist */
 			$exploded = explode( '/', $path );
 			$filename = array_pop( $exploded );
 			$folderId = 0;
 
-			if ( count( $exploded ) )
+			if ( \count( $exploded ) )
 			{
 				$testDir = trim( implode( '/', $exploded ), '/' );
 				try
 				{
-					$test = Folder::load( $testDir, 'media_folder_path' );
+					$test = \IPS\cms\Media\Folder::load( $testDir, 'media_folder_path' );
 
 					/* Yep */
 					$folderId = $test->id;
 				}
-				catch( OutOfRangeException $ex )
+				catch( \OutOfRangeException $ex )
 				{
 					$testDir  = '';
 					foreach( $exploded as $dir )
@@ -476,12 +551,12 @@ class Media extends Model
 
 						try
 						{
-							$test     = Folder::load( $testDir, 'media_folder_path' );
+							$test     = \IPS\cms\Media\Folder::load( $testDir, 'media_folder_path' );
 							$folderId = $test->id;
 						}
-						catch( OutOfRangeException $ex )
+						catch( \OutOfRangeException $ex )
 						{
-							$folder = new Folder;
+							$folder = new \IPS\cms\Media\Folder;
 							$folder->parent = $folderId;
 							$folder->name   = $dir;
 							$folder->path   = $testDir;
@@ -492,19 +567,17 @@ class Media extends Model
 				}
 			}
 
-			$media = new Media;
+			$media = new \IPS\cms\Media;
 			$media->parent          = $folderId;
 			$media->filename        = $filename;
 			$media->added           = time();
 			$media->full_path       = $path;
 			$media->filename_stored = $folderId . '_' . $filename;
-			$media->file_object     = File::create( 'cms_Media', $media->filename_stored, $contents, 'pages_media', TRUE, NULL, FALSE );
+			$media->file_object     = \IPS\File::create( 'cms_Media', $media->filename_stored, $contents, 'pages_media', TRUE, NULL, FALSE );
 			$media->is_image        = $media->file_object->isImage();
 			$media->save();
 
 			return $media->id;
 		}
-
-		return null;
 	}
 }

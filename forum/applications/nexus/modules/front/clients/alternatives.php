@@ -12,173 +12,155 @@
 namespace IPS\nexus\modules\front\clients;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\Email;
-use IPS\Helpers\Form\Node;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\MFA\MFAHandler;
-use IPS\nexus\Customer;
-use IPS\nexus\Customer\AlternativeContact;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Alternative Contacts
  */
-class alternatives extends Controller
+class _alternatives extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		if ( !Member::loggedIn()->member_id )
+		if ( !\IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->error( 'no_module_permission_guest', '2X237/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission_guest', '2X237/1', 403, '' );
 		}
-
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'clients.css', 'nexus' ) );
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=nexus&module=clients&controller=alternatives', 'front', 'clientsalternatives' ), Member::loggedIn()->language()->addToStack('client_alternatives') );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('client_alternatives');
-		Output::i()->sidebar['enabled'] = FALSE;
-
-		if ( $output = MFAHandler::accessToArea( 'nexus', 'Alternatives', Url::internal( 'app=nexus&module=clients&controller=alternatives', 'front', 'clientsalternatives' ) ) )
+		
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'clients.css', 'nexus' ) );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=alternatives', 'front', 'clientsalternatives' ), \IPS\Member::loggedIn()->language()->addToStack('client_alternatives') );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('client_alternatives');
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		
+		if ( $output = \IPS\MFA\MFAHandler::accessToArea( 'nexus', 'Alternatives', \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=alternatives', 'front', 'clientsalternatives' ) ) )
 		{
-			Output::i()->output = Theme::i()->getTemplate('clients')->alternatives( TRUE ) . $output;
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->alternatives( TRUE ) . $output;
 			return;
 		}
-
+		
 		parent::execute();
 	}
-
+	
 	/**
 	 * View List
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		foreach ( Customer::loggedIn()->alternativeContacts() as $contact )
+		foreach ( \IPS\nexus\Customer::loggedIn()->alternativeContacts() as $contact )
 		{
 			$contact->alt_id;
 		}
-
-		Output::i()->output = Theme::i()->getTemplate('clients')->alternatives();
+		
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->alternatives();
 	}
-
+	
 	/**
 	 * Add/Edit
 	 *
 	 * @return	void
 	 */
-	protected function form() : void
+	protected function form()
 	{
 		$existing = NULL;
-		if ( isset( Request::i()->id ) )
+		if ( isset( \IPS\Request::i()->id ) )
 		{
 			try
 			{
-				$existing = AlternativeContact::constructFromData( Db::i()->select( '*', 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', Customer::loggedIn()->member_id, Request::i()->id ) )->first() );
+				$existing = \IPS\nexus\Customer\AlternativeContact::constructFromData( \IPS\Db::i()->select( '*', 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', \IPS\nexus\Customer::loggedIn()->member_id, \IPS\Request::i()->id ) )->first() );
 			}
-			catch ( UnderflowException ) {}
+			catch ( \UnderflowException $e ) {}
 		}
-
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--edit-alernatives';
+				
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical';
 		if ( !$existing )
 		{
-			$form->add( new Email( 'altcontact_email', NULL, TRUE, array(), function( $val )
+			$form->add( new \IPS\Helpers\Form\Email( 'altcontact_email', NULL, TRUE, array(), function( $val )
 			{
-				if( Member::loggedIn()->email == $val )
+				if( \IPS\Member::loggedIn()->email == $val )
 				{
-					throw new DomainException('altcontact_email_self');
+					throw new \DomainException('altcontact_email_self');
 				}
 
-				$member = Member::load( $val, 'email' );
+				$member = \IPS\Member::load( $val, 'email' );
 				if ( !$member->member_id )
 				{
-					throw new DomainException('altcontact_email_error');
+					throw new \DomainException('altcontact_email_error');
 				}
-
+				
 				try
 				{
-					Db::i()->select( '*', 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', Customer::loggedIn()->member_id, $member->member_id ) )->first();
-					throw new DomainException('altcontact_already_exists');
+					\IPS\Db::i()->select( '*', 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', \IPS\nexus\Customer::loggedIn()->member_id, $member->member_id ) )->first();
+					throw new \DomainException('altcontact_already_exists');
 				}
-				catch ( UnderflowException ) {}
+				catch ( \UnderflowException $e ) {}
 			} ) );
 		}
-		$form->add( new Node( 'altcontact_purchases', $existing ? iterator_to_array( $existing->purchases ) : NULL, FALSE, array( 'class' => 'IPS\nexus\Purchase', 'forceOwner' => Member::loggedIn(), 'multiple' => TRUE ) ) );
-		$form->add( new Checkbox( 'altcontact_billing', $existing ? $existing->billing : FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'altcontact_purchases', $existing ? iterator_to_array( $existing->purchases ) : NULL, FALSE, array( 'class' => 'IPS\nexus\Purchase', 'forceOwner' => \IPS\Member::loggedIn(), 'multiple' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Checkbox( 'altcontact_support', $existing ? $existing->support : FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Checkbox( 'altcontact_billing', $existing ? $existing->billing : FALSE ) );
 		if ( $values = $form->values() )
 		{
 			if ( $existing )
 			{
 				$altContact = $existing;
-				Customer::loggedIn()->log( 'alternative', array( 'type' => 'edit', 'alt_id' => $altContact->alt_id->member_id, 'alt_name' => $altContact->alt_id->name, 'purchases' => json_encode( $values['altcontact_purchases'] ?: array() ), 'billing' => $values['altcontact_billing'] ) );
+				\IPS\nexus\Customer::loggedIn()->log( 'alternative', array( 'type' => 'edit', 'alt_id' => $altContact->alt_id->member_id, 'alt_name' => $altContact->alt_id->name, 'purchases' => json_encode( $values['altcontact_purchases'] ? $values['altcontact_purchases'] : array() ), 'billing' => $values['altcontact_billing'], 'support' => $values['altcontact_support'] ) );
 			}
 			else
 			{
-				$altContact = new AlternativeContact;
-				$altContact->main_id = Customer::loggedIn();
-				$altContact->alt_id = Member::load( $values['altcontact_email'], 'email' );
-				Customer::loggedIn()->log( 'alternative', array( 'type' => 'add', 'alt_id' => $altContact->alt_id->member_id, 'alt_name' => $altContact->alt_id->name, 'purchases' => json_encode( $values['altcontact_purchases'] ?: array() ), 'billing' => $values['altcontact_billing'] ) );
+				$altContact = new \IPS\nexus\Customer\AlternativeContact;
+				$altContact->main_id = \IPS\nexus\Customer::loggedIn();
+				$altContact->alt_id = \IPS\Member::load( $values['altcontact_email'], 'email' );
+				\IPS\nexus\Customer::loggedIn()->log( 'alternative', array( 'type' => 'add', 'alt_id' => $altContact->alt_id->member_id, 'alt_name' => $altContact->alt_id->name, 'purchases' => json_encode( $values['altcontact_purchases'] ? $values['altcontact_purchases'] : array() ), 'billing' => $values['altcontact_billing'], 'support' => $values['altcontact_support'] ) );			
 			}
-			$altContact->purchases = $values['altcontact_purchases'] ?: array();
+			$altContact->purchases = $values['altcontact_purchases'] ? $values['altcontact_purchases'] : array();
 			$altContact->billing = $values['altcontact_billing'];
+			$altContact->support = $values['altcontact_support'];
 			$altContact->save();
-
-			Output::i()->redirect( Url::internal( 'app=nexus&module=clients&controller=alternatives', 'front', 'clientsalternatives' ) );
+			
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=alternatives', 'front', 'clientsalternatives' ) );
 		}
 
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->sendOutput( $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) ) );
+			\IPS\Output::i()->sendOutput( $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) ) );
 		}
 		else
 		{
-			Output::i()->output = $form;
-		}
+			\IPS\Output::i()->output = $form;	
+		}		
 	}
-
+	
 	/**
 	 * Delete
 	 *
 	 * @return	void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
-		Session::i()->csrfCheck();
-
+		\IPS\Session::i()->csrfCheck();
+		
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
-
+		\IPS\Request::i()->confirmedDelete();
+		
 		try
 		{
-			$contact = AlternativeContact::constructFromData( Db::i()->select( '*', 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', Customer::loggedIn()->member_id, Request::i()->id ) )->first() );
+			$contact = \IPS\nexus\Customer\AlternativeContact::constructFromData( \IPS\Db::i()->select( '*', 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', \IPS\nexus\Customer::loggedIn()->member_id, \IPS\Request::i()->id ) )->first() );
 			$contact->delete();
-			Customer::loggedIn()->log( 'alternative', array( 'type' => 'delete', 'alt_id' => $contact->alt_id->member_id, 'alt_name' => $contact->alt_id->name ) );
+			\IPS\nexus\Customer::loggedIn()->log( 'alternative', array( 'type' => 'delete', 'alt_id' => $contact->alt_id->member_id, 'alt_name' => $contact->alt_id->name ) );
 		}
-		catch (UnderflowException ) {}
-
-		Output::i()->redirect( Url::internal( 'app=nexus&module=clients&controller=alternatives', 'front', 'clientsalternatives' ) );
+		catch ( \UnderflowException $e ) {}
+		
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=alternatives', 'front', 'clientsalternatives' ) );
 	}
 }

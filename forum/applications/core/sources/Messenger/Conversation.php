@@ -12,77 +12,50 @@ namespace IPS\core\Messenger;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use DateInterval;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application\Module;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Content\Permissions;
 use IPS\core\Alerts\Alert;
-use IPS\core\DataLayer;
-use IPS\core\Reports\Report;
-use IPS\core\Warnings\Warning;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Member as FormMember;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Request;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_int;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Personal Conversation Model
  */
-class Conversation extends Item
+class _Conversation extends \IPS\Content\Item
 {
 	/* !\IPS\Patterns\ActiveRecord */
 	
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_message_topics';
+	public static $databaseTable = 'core_message_topics';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'mt_';
+	public static $databasePrefix = 'mt_';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	[Content\Item]	Include the ability to search this content item in global site searches
 	 */
-	public static bool $includeInSiteSearch = FALSE;
+	public static $includeInSiteSearch = FALSE;
 
 	/**
 	 * @brief	[Content\Item]	Include these items in trending content
 	 */
-	public static bool $includeInTrending = FALSE;
+	public static $includeInTrending = FALSE;
 
 	/**
 	 * @brief	[Content\Comment]	Icon
 	 */
-	public static string $icon = 'envelope';
+	public static $icon = 'envelope';
 
 	/**
 	 * Should IndexNow be skipped for this item? Can be used to prevent that Private Messages,
@@ -94,17 +67,17 @@ class Conversation extends Item
 	/**
 	 * @brief	Check posts per day limits? Useful for things that use the content system, but aren't necessarily content themselves.
 	 */
-	public static bool $checkPostsPerDay = FALSE;
+	public static $checkPostsPerDay = FALSE;
 	
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		parent::delete();
-		Db::i()->delete( 'core_message_topic_user_map', array( 'map_topic_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'core_message_topic_user_map', array( 'map_topic_id=?', $this->id ) );
 	}
 	
 	/* !\IPS\Content\Item */
@@ -112,12 +85,12 @@ class Conversation extends Item
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'personal_conversation';
+	public static $title = 'personal_conversation';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'title'				=> 'title',
 		'date'				=> array( 'date', 'start_time', 'last_post_time' ),
 		'author'			=> 'starter_id',
@@ -129,82 +102,49 @@ class Conversation extends Item
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'core';
+	public static $application = 'core';
 	
 	/**
 	 * @brief	Module
 	 */
-	public static string $module = 'messaging';
+	public static $module = 'messaging';
 	
 	/**
 	 * @brief	Language prefix for forms
 	 */
-	public static string $formLangPrefix = 'messenger_';
+	public static $formLangPrefix = 'messenger_';
 	
 	/**
 	 * @brief	Comment Class
 	 */
-	public static ?string $commentClass = 'IPS\core\Messenger\Message';
+	public static $commentClass = 'IPS\core\Messenger\Message';
 	
 	/**
 	 * @brief	[Content\Item]	First "comment" is part of the item?
 	 */
-	public static bool $firstCommentRequired = TRUE;
+	public static $firstCommentRequired = TRUE;
 	
 	/**
 	 * Should posting this increment the poster's post count?
 	 *
-	 * @param	Model|NULL	$container	Container
-	 * @return	bool
+	 * @param	\IPS\Node\Model|NULL	$container	Container
+	 * @return	void
 	 */
-	public static function incrementPostCount( ?Model $container = NULL ): bool
+	public static function incrementPostCount( \IPS\Node\Model $container = NULL )
 	{
 		return FALSE;
 	}
-
-	/**
-	 * Show/hide the "Compose New" button in the messenger
-	 * This differs from @see canCreate() because some groups may have a limit per day,
-	 * in which case we show the button, because it will tell them they have
-	 * reached their limit.
-	 * Other groups may have no permission at all, so we hide the button entirely.
-	 *
-	 * @param Member $member
-	 * @return bool
-	 */
-	public static function showComposeButton( Member $member ) : bool
-	{
-		return static::canCreate( $member ) and $member->group['g_pm_perday'] != 0;
-	}
-
+		
 	/**
 	 * Can a given member create this type of content?
 	 *
-	 * @param Member $member The member
-	 * @param Model|null $container Container (e.g. forum) ID, if appropriate
-	 * @param bool $showError If TRUE, rather than returning a boolean value, will display an error
-	 * @param Alert|null $alert	Is this a reply to an alert?
-	 * @return    bool
+	 * @param	\IPS\Member	$member		The member
+	 * @param	\IPS\Node\Model			$container	Container (e.g. forum) ID, if appropriate
+	 * @param	bool		$showError	If TRUE, rather than returning a boolean value, will display an error
+	 * @return	bool
 	 */
-	public static function canCreate( Member $member, ?Model $container=NULL, bool $showError=FALSE, Alert $alert = null ) : bool
+	public static function canCreate( \IPS\Member $member, \IPS\Node\Model $container=NULL, $showError=FALSE )
 	{
-		/* If this conversation is associated with an alert, skip the rest of the permission checks, the user should be able to reply */
-		if ( ( $alert and $alert instanceof Alert ) or isset( Request::i()->alert ) )
-		{
-			if( isset( Request::i()->alert ) )
-			{
-				$alert = Alert::load( Request::i()->alert );
-			}
-			try
-			{
-				if( $alert->forMember( Member::loggedIn() ) AND $alert->reply == Alert::REPLY_REQUIRED )
-				{
-					return TRUE;
-				}
-			}
-			catch ( OutOfRangeException $e ) {}
-		}
-		
 		/* Can we access the module? */
 		if ( !parent::canCreate( $member, $container, $showError ) )
 		{
@@ -216,34 +156,39 @@ class Conversation extends Item
 		{
 			if ( $showError )
 			{
-				Output::i()->error( 'no_module_permission_guest', '1C149/1', 403, '' );
+				\IPS\Output::i()->error( 'no_module_permission_guest', '1C149/1', 403, '' );
 			}
 			
 			return FALSE;
+		}
+
+		/* If this conversation is associated with an alert, skip the
+		rest of the permission checks, the user should be able to reply */
+		if ( isset( \IPS\Request::i()->alert ) )
+		{
+			try
+			{
+				$alert = \IPS\core\Alerts\Alert::load( \IPS\Request::i()->alert );
+
+				if( $alert->forMember( \IPS\Member::loggedIn() ) AND $alert->reply == Alert::REPLY_REQUIRED )
+				{
+					return TRUE;
+				}
+			}
+			catch ( \OutOfRangeException $e ) {}
 		}
 		
 		/* Have we exceeded our limit for the day/minute? */
 		if ( $member->group['g_pm_perday'] !== -1 )
 		{
-			/* Members that have a zero limit can never send */
-			if( $member->group['g_pm_perday'] == 0 )
-			{
-				if ( $showError )
-				{
-					Output::i()->error( $member->language()->addToStack( 'module_no_permission' ), '1C149/25', 429, '' );
-				}
-
-				return false;
-			}
-
-			$messagesSentToday = Db::i()->select( 'COUNT(*) AS count, MAX(mt_date) AS max', 'core_message_topics', array( 'mt_starter_id=? AND mt_date>?', $member->member_id, DateTime::create()->sub( new DateInterval( 'P1D' ) )->getTimeStamp() ) )->first();
+			$messagesSentToday = \IPS\Db::i()->select( 'COUNT(*) AS count, MAX(mt_date) AS max', 'core_message_topics', array( 'mt_starter_id=? AND mt_date>?', $member->member_id, \IPS\DateTime::create()->sub( new \DateInterval( 'P1D' ) )->getTimeStamp() ) )->first();
 			if ( $messagesSentToday['count'] >= $member->group['g_pm_perday'] )
 			{
-				$next = DateTime::ts( $messagesSentToday['max'] )->add( new DateInterval( 'P1D' ) );
+				$next = \IPS\DateTime::ts( $messagesSentToday['max'] )->add( new \DateInterval( 'P1D' ) );
 				
 				if ( $showError )
 				{
-					Output::i()->error( $member->language()->addToStack( 'err_too_many_pms_day', FALSE, array( 'pluralize' => array( $member->group['g_pm_perday'] ) ) ), '1C149/2', 429, '', array( 'Retry-After' => $next->format('r') ) );
+					\IPS\Output::i()->error( $member->language()->addToStack( 'err_too_many_pms_day', FALSE, array( 'pluralize' => array( $member->group['g_pm_perday'] ) ) ), '1C149/2', 429, '', array( 'Retry-After' => $next->format('r') ) );
 				}
 				
 				return FALSE;
@@ -251,12 +196,12 @@ class Conversation extends Item
 		}
 		if ( $member->group['g_pm_flood_mins'] !== -1 )
 		{
-			$messagesSentThisMinute = Db::i()->select( 'COUNT(*)', 'core_message_topics', array( 'mt_starter_id=? AND mt_date>?', $member->member_id, DateTime::create()->sub( new DateInterval( 'PT1M' ) )->getTimeStamp() ) )->first();
+			$messagesSentThisMinute = \IPS\Db::i()->select( 'COUNT(*)', 'core_message_topics', array( 'mt_starter_id=? AND mt_date>?', $member->member_id, \IPS\DateTime::create()->sub( new \DateInterval( 'PT1M' ) )->getTimeStamp() ) )->first();
 			if ( $messagesSentThisMinute >= $member->group['g_pm_flood_mins'] )
 			{
 				if ( $showError )
 				{
-					Output::i()->error( $member->language()->addToStack( 'err_too_many_pms_minute', FALSE, array( 'pluralize' => array( $member->group['g_pm_flood_mins'] ) ) ), '1C149/3', 429, '', array( 'Retry-After' => 3600 ) );
+					\IPS\Output::i()->error( $member->language()->addToStack( 'err_too_many_pms_minute', FALSE, array( 'pluralize' => array( $member->group['g_pm_flood_mins'] ) ) ), '1C149/3', 429, '', array( 'Retry-After' => 3600 ) );
 				}
 				
 				return FALSE;
@@ -266,12 +211,12 @@ class Conversation extends Item
 		/* Is our inbox full? */
 		if ( $member->group['g_max_messages'] !== -1 )
 		{
-			$messagesInInbox = Db::i()->select( 'COUNT(*)', 'core_message_topic_user_map', array( 'map_user_id=? AND map_user_active=1', $member->member_id ) )->first();
+			$messagesInInbox = \IPS\Db::i()->select( 'COUNT(*)', 'core_message_topic_user_map', array( 'map_user_id=? AND map_user_active=1', $member->member_id ) )->first();
 			if ( $messagesInInbox > $member->group['g_max_messages'] )
 			{
 				if ( $showError )
 				{
-					Output::i()->error( 'err_inbox_full', '1C149/4', 403, '' );
+					\IPS\Output::i()->error( 'err_inbox_full', '1C149/4', 403, '' );
 				}
 				
 				return FALSE;
@@ -284,22 +229,22 @@ class Conversation extends Item
 	/**
 	 * Can Merge?
 	 *
-	 * @param Member|null $member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canMerge( Member|null $member=null ): bool
+	public function canMerge( $member=NULL )
 	{
 		return FALSE;
 	}
-
+	
 	/**
 	 * Get elements for add/edit form
 	 *
-	 * @param Item|NULL $item The current item if editing or NULL if creating
-	 * @param Model|null $container Container (e.g. forum) ID, if appropriate
-	 * @return    array
+	 * @param	\IPS\Content\Item|NULL	$item		The current item if editing or NULL if creating
+	 * @param	int						$container	Container (e.g. forum) ID, if appropriate
+	 * @return	array
 	 */
-	public static function formElements( Item|null $item=NULL, Model|null $container=NULL ): array
+	public static function formElements( $item=NULL, \IPS\Node\Model  $container=NULL )
 	{
 		$return = array();
 		foreach ( parent::formElements( $item, $container ) as $k => $v )
@@ -310,9 +255,9 @@ class Conversation extends Item
  				{
  					$member	= NULL;
 
- 					if( Request::i()->to )
+ 					if( \IPS\Request::i()->to )
  					{
- 						$member = Member::load( Request::i()->to );
+ 						$member = \IPS\Member::load( \IPS\Request::i()->to );
 
  						if( !$member->member_id )
  						{
@@ -320,33 +265,45 @@ class Conversation extends Item
  						}
  					}
 
-					$return['to'] = new FormMember( 'messenger_to', $member, TRUE, array( 'disabled' => (bool)Request::i()->alert, 'multiple' => ( Member::loggedIn()->group['g_max_mass_pm'] == -1 ) ? NULL : Member::loggedIn()->group['g_max_mass_pm'] ), function ( $members )
+					$return['to'] = new \IPS\Helpers\Form\Member( 'messenger_to', $member, TRUE, array( 'disabled' => ( \IPS\Request::i()->alert ) ? TRUE : FALSE, 'multiple' => ( \IPS\Member::loggedIn()->group['g_max_mass_pm'] == -1 ) ? NULL : \IPS\Member::loggedIn()->group['g_max_mass_pm'] ), function ( $members )
 					{
-						if ( is_array( $members ) )
+						if ( \is_array( $members ) )
 						{
 							foreach ( $members as $m )
 							{
-								if ( !$m instanceof Member OR !static::memberCanReceiveNewMessage( $m, Member::loggedIn(), 'new' ) )
+								if ( !$m instanceof \IPS\Member OR !static::memberCanReceiveNewMessage( $m, \IPS\Member::loggedIn(), 'new' ) )
 								{
-									throw new InvalidArgumentException( Member::loggedIn()->language()->addToStack('meesnger_err_bad_recipient', FALSE, array( 'sprintf' => array( ( $m instanceof Member ) ? $m->name : $m ) ) ) );
+									throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack('meesnger_err_bad_recipient', FALSE, array( 'sprintf' => array( ( $m instanceof \IPS\Member ) ? $m->name : $m ) ) ) );
 								}
 							}
 						}
 						else
 						{
-							if ( !$members instanceof Member OR !$members->member_id OR !static::memberCanReceiveNewMessage( $members, Member::loggedIn(), 'new' ) )
+							if ( !$members instanceof \IPS\Member OR !$members->member_id OR !static::memberCanReceiveNewMessage( $members, \IPS\Member::loggedIn(), 'new' ) )
 							{
-								throw new InvalidArgumentException( Member::loggedIn()->language()->addToStack('meesnger_err_bad_recipient', FALSE, array( 'sprintf' => array( ( $members instanceof Member ) ? $members->name : $members ) ) ) );
+								throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack('meesnger_err_bad_recipient', FALSE, array( 'sprintf' => array( ( $members instanceof \IPS\Member ) ? $members->name : $members ) ) ) );
 							}
 						}
 					} );
+				}
+			}
+			else if ( $k == 'content' )
+			{
+				if( isset( \IPS\Request::i()->to ) and \IPS\Request::i()->to )
+				{
+					$v->options['autoSaveKey'] = 'newMessageTo-' . \IPS\Request::i()->to;
+				}
+				else
+				{
+					/* Ensure that the autosave doesn't populate the editor witha previous PM which may be sent by accident */
+					$v->options['autoSaveKey'] = 'newMessageTo-' . mt_rand();
 				}
 			}
 				
 			$return[ $k ] = $v;
 		}
 
-		if( Request::i()->alert )
+		if( \IPS\Request::i()->alert )
 		{
 			unset( $return['title'] );
 		}
@@ -358,13 +315,13 @@ class Conversation extends Item
 	/**
 	 * Check if a member can receive new messages
 	 *
-	 * @param	Member	$member	The member to check
-	 * @param	Member	$sender	The member sending the new message
+	 * @param	\IPS\Member	$member	The member to check
+	 * @param	\IPS\Member	$sender	The member sending the new message
 	 * @param	string		$type	Type of message to check (new, reply)
 	 
 	 * @return	bool
 	 */
-	public static function memberCanReceiveNewMessage( Member $member, Member $sender, string $type='new' ) : bool
+	public static function memberCanReceiveNewMessage( \IPS\Member $member, \IPS\Member $sender, $type='new' )
 	{
 		/* Messenger is hard disabled */
 		if ( $member->members_disable_pm == 2 )
@@ -378,7 +335,7 @@ class Conversation extends Item
 		}
 		
 		/* Group can not use messenger */
-		if ( !$member->canAccessModule( Module::get( 'core', 'messaging' ) ) )
+		if ( !$member->canAccessModule( \IPS\Application\Module::get( 'core', 'messaging' ) ) )
 		{
 			return FALSE;
 		}
@@ -394,26 +351,21 @@ class Conversation extends Item
 		{
 			return FALSE;
 		}
-
-		/* Extensions are last because all of the above needs to be honored */
-		if( $permCheck = Permissions::can( 'receive', new static, $member ) )
-		{
-			return ( $permCheck === Permissions::PERM_ALLOW );
-		}
-
+		
+		
 		return TRUE;
 	}
 	
 	/**
 	 * Process created object BEFORE the object has been created
 	 *
-	 * @param array $values	Values from form
+	 * @param	array	$values	Values from form
 	 * @return	void
 	 */
-	protected function processBeforeCreate( array $values ): void
+	protected function processBeforeCreate( $values )
 	{
 		$this->maps = array();
-		$this->to_count = ( $values['messenger_to'] instanceof Member ) ? 1 : count( $values['messenger_to'] );
+		$this->to_count = ( $values['messenger_to'] instanceof \IPS\Member ) ? 1 : \count( $values['messenger_to'] );
 
 		parent::processBeforeCreate( $values );
 	}
@@ -421,17 +373,17 @@ class Conversation extends Item
 	/**
 	 * Process created object AFTER the object has been created
 	 *
-	 * @param Comment|null $comment	The first comment
-	 * @param array $values		Values from form
+	 * @param	\IPS\Content\Comment|NULL	$comment	The first comment
+	 * @param	array						$values		Values from form
 	 * @return	void
 	 */
-	protected function processAfterCreate( ?Comment $comment, array $values ): void
+	protected function processAfterCreate( $comment, $values )
 	{
 		/* Set the first message ID */
 		$this->first_msg_id = $comment->id;
 		$this->save();
 		
-		if ( is_array( $values['messenger_to'] ) )
+		if ( \is_array( $values['messenger_to'] ) )
 		{
 			$members = array_map( function( $member )
 			{
@@ -455,13 +407,13 @@ class Conversation extends Item
 		$comment->sendNotifications();
 
 		/* If this came from an alert dismiss the alert */
-		if( Request::i()->alert )
+		if( \IPS\Request::i()->alert )
 		{
 			try
 			{
-				$alert = Alert::load( Request::i()->alert );
+				$alert = \IPS\core\Alerts\Alert::load( \IPS\Request::i()->alert );
 
-				if( $alert->forMember( Member::loggedIn() ) )
+				if( $alert->forMember( \IPS\Member::loggedIn() ) )
 				{
 					$alert->dismiss();
 
@@ -469,27 +421,19 @@ class Conversation extends Item
 					$this->save();
 				}
 			}
-			catch ( Exception $e ){}
+			catch ( \Exception $e ){}
 		}
 	}
-
-
-
+	
 	/**
 	 * Does a member have permission to access?
 	 *
-	 * @param Member|null $member The member to check for
-	 * @return    bool
+	 * @param	\IPS\Member	$member	The member to check for
+	 * @return	bool
 	 */
-	public function canView( ?Member $member=null ): bool
+	public function canView( $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
-
-		/* Extensions check */
-		if( $permCheck = Permissions::can( 'view', $this, $member ) )
-		{
-			return ( $permCheck === Permissions::PERM_ALLOW );
-		}
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Is the user part of the conversation? */
 		foreach ( $this->maps() as $map )
@@ -504,40 +448,40 @@ class Conversation extends Item
 		if ( $member->modPermission('can_view_reports') )
 		{
 			/* If we are coming directly from a report, and the Report ID is different from what is stored in session, then we need to unset it so it can be reset */
-			if ( isset( $_SESSION['report'] ) AND isset( Request::i()->_report ) AND Request::i()->_report != $_SESSION['report'] )
+			if ( isset( $_SESSION['report'] ) AND isset( \IPS\Request::i()->_report ) AND \IPS\Request::i()->_report != $_SESSION['report'] )
 			{
 				unset( $_SESSION['report'] );
 			}
 			
-			$report = $_SESSION['report'] ?? ( isset( Request::i()->_report ) ? Request::i()->_report : NULL );
+			$report = isset( $_SESSION['report'] ) ? $_SESSION['report'] : ( isset( \IPS\Request::i()->_report ) ? \IPS\Request::i()->_report : NULL );
 			if ( $report )
 			{
 				try
 				{
-					$report = Report::load( $report );
-					if ( $report->class == 'IPS\core\Messenger\Message' and in_array( $report->content_id, iterator_to_array( Db::i()->select( 'msg_id', 'core_message_posts', array( 'msg_topic_id=?', $this->id ) ) ) ) )
+					$report = \IPS\core\Reports\Report::load( $report );
+					if ( $report->class == 'IPS\core\Messenger\Message' and \in_array( $report->content_id, iterator_to_array( \IPS\Db::i()->select( 'msg_id', 'core_message_posts', array( 'msg_topic_id=?', $this->id ) ) ) ) )
 					{
 						$_SESSION['report'] = $report->id;
 						return TRUE;
 					}
 				}
-				catch ( OutOfRangeException $e ){ }
+				catch ( \OutOfRangeException $e ){ }
 			}
 		}
 		if ( $member->modPermission('mod_see_warn') )
 		{
 			/* If we are coming directly from a warning, and the Warning ID is different from what is stored in session, then we need to unset it so it can be reset */
-			if ( isset( $_SESSION['warning'] ) AND isset( Request::i()->_warning ) AND Request::i()->_warning != $_SESSION['warning'] )
+			if ( isset( $_SESSION['warning'] ) AND isset( \IPS\Request::i()->_warning ) AND \IPS\Request::i()->_warning != $_SESSION['warning'] )
 			{
 				unset( $_SESSION['warning'] );
 			}
 			
-			$warning = $_SESSION['warning'] ?? ( isset( Request::i()->_warning ) ? Request::i()->_warning : NULL );
+			$warning = isset( $_SESSION['warning'] ) ? $_SESSION['warning'] : ( isset( \IPS\Request::i()->_warning ) ? \IPS\Request::i()->_warning : NULL );
 			if ( $warning )
 			{
 				try
 				{
-					$warning = Warning::load( $warning );
+					$warning = \IPS\core\Warnings\Warning::load( $warning );
 					
 					if ( $warning->content_app == 'core' AND $warning->content_module == 'messaging-comment' AND $warning->content_id1 == $this->id )
 					{
@@ -545,7 +489,7 @@ class Conversation extends Item
 						return TRUE;
 					}
 				}
-				catch( OutOfRangeException $e ) { }
+				catch( \OutOfRangeException $e ) { }
 			}
 		}
 		
@@ -555,12 +499,12 @@ class Conversation extends Item
 	/**
 	 * Can delete?
 	 *
-	 * @param	Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canDelete( ?Member $member=NULL ): bool
+	public function canDelete( $member=NULL )
 	{
-		if( Member::loggedIn()->modPermission( 'can_view_reports' ) )
+		if( \IPS\Member::loggedIn()->modPermission( 'can_view_reports' ) )
 		{
 			return TRUE; // Moderators who can manage reported content can "delete" conversations
 		}
@@ -571,10 +515,10 @@ class Conversation extends Item
 	/**
 	 * Actions to show in comment multi-mod
 	 *
-	 * @param	Member|null	$member	Member (NULL for currently logged in member)
+	 * @param	\IPS\Member	$member	Member (NULL for currently logged in member)
 	 * @return	array
 	 */
-	public function commentMultimodActions( Member|null $member = NULL ): array
+	public function commentMultimodActions( \IPS\Member $member = NULL )
 	{
 		return array();
 	}
@@ -582,21 +526,21 @@ class Conversation extends Item
 	/**
 	 * @brief	Cached URLs
 	 */
-	protected mixed $_url = array();
+	protected $_url	= array();
 
 	/**
 	 * Get URL
 	 *
 	 * @param	string|NULL		$action		Action
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function url( string|null $action=NULL ): Url
+	public function url( $action=NULL )
 	{
-		$_key	= $action ? md5( $action ) : NULL;
+		$_key	= md5( $action );
 
 		if( !isset( $this->_url[ $_key ] ) )
 		{
-			$this->_url[ $_key ] = Url::internal( "app=core&module=messaging&controller=messenger&id={$this->id}", 'front', 'messenger_convo' );
+			$this->_url[ $_key ] = \IPS\Http\Url::internal( "app=core&module=messaging&controller=messenger&id={$this->id}", 'front', 'messenger_convo' );
 		
 			if ( $action )
 			{
@@ -614,9 +558,9 @@ class Conversation extends Item
 	 *
 	 * @return	int
 	 */
-	public function get_activeParticipants() : int
+	public function get_activeParticipants()
 	{
-		return count( array_filter( $this->maps(), function( $map )
+		return \count( array_filter( $this->maps, function( $map )
 		{
 			return $map['map_user_active'];
 		} ) );
@@ -625,47 +569,48 @@ class Conversation extends Item
 	/**
 	 * Get the map for the current member
 	 *
-	 * @return	array
+	 * @return	mixed
 	 */
-	public function get_map() : array
+	public function get_map()
 	{
 		$maps = $this->maps();
 		
 		/* From a report? */
-		if ( ( $_SESSION['report'] ?? ( isset( Request::i()->_report ) ? Request::i()->_report : NULL ) ) AND Member::loggedIn()->modPermission( 'can_view_reports' ) )
+		if ( ( isset( $_SESSION['report'] ) ? $_SESSION['report'] : ( isset( \IPS\Request::i()->_report ) ? \IPS\Request::i()->_report : NULL ) ) AND \IPS\Member::loggedIn()->modPermission( 'can_view_reports' ) )
 		{
 			return array();
 		}
 		
-		if ( isset( $maps[ Member::loggedIn()->member_id ] ) )
+		if ( isset( $maps[ \IPS\Member::loggedIn()->member_id ] ) )
 		{
-			return $maps[ Member::loggedIn()->member_id ];
+			return $maps[ \IPS\Member::loggedIn()->member_id ];
 		}
 		
-		throw new OutOfRangeException;
+		throw new \OutOfRangeException;
 	}
 	
 	/**
 	 * Get the most recent unread conversation and dismiss the popup
 	 *
 	 * @param	bool	$dismiss	Whether or not to dismiss the popup for future page loads
-	 * @return    Conversation|NULL
+	 * @return	\IPS\core\Messenger\Conversation|NULL
 	 */
-	public static function latestUnreadConversation( bool $dismiss = TRUE ) : ?Conversation
+	public static function latestUnreadConversation( $dismiss = TRUE )
 	{
 		$return = NULL;
-		$latestConversationMap = Db::i()->select( 'map_topic_id', 'core_message_topic_user_map', array( 'map_user_id=? AND map_user_active=1 AND map_has_unread=1 AND map_ignore_notification=0', Member::loggedIn()->member_id ), 'map_last_topic_reply DESC' );
+		$latestConversationMap = \IPS\Db::i()->select( 'map_topic_id', 'core_message_topic_user_map', array( 'map_user_id=? AND map_user_active=1 AND map_has_unread=1 AND map_ignore_notification=0', \IPS\Member::loggedIn()->member_id ), 'map_last_topic_reply DESC' );
 
 		try
 		{
 			$return = static::loadAndCheckPerms( $latestConversationMap->first() );
 		}
-		catch ( OutOfRangeException | UnderflowException $e ) { }
+		catch ( \OutOfRangeException $e ) { }
+		catch ( \UnderflowException $e ) { }
 		
 		if( $dismiss === TRUE )
 		{
-			Member::loggedIn()->msg_show_notification = FALSE;
-			Member::loggedIn()->save();
+			\IPS\Member::loggedIn()->msg_show_notification = FALSE;
+			\IPS\Member::loggedIn()->save();
 		}
 
 		return $return;
@@ -675,9 +620,9 @@ class Conversation extends Item
 	 * Get the most recent unread message and dismiss the popup
 	 *
 	 * @note	This is here and abstracted to account for database read/write separation where the conversation may be available, but not the message itself
-	 * @return    Message|NULL
+	 * @return	\IPS\core\Messenger\Message|NULL
 	 */
-	public static function latestUnreadMessage() : ?Message
+	public static function latestUnreadMessage()
 	{
 		/* Get the latest conversation, but don't dismiss the notification yet */
 		if( $conversation = static::latestUnreadConversation( FALSE ) )
@@ -686,8 +631,8 @@ class Conversation extends Item
 			if( $latestComment = $conversation->comments( 1, 0, 'date', 'desc' ) )
 			{
 				/* Ok we have what we need, NOW dismiss the notification */
-				Member::loggedIn()->msg_show_notification = FALSE;
-				Member::loggedIn()->save();
+				\IPS\Member::loggedIn()->msg_show_notification = FALSE;
+				\IPS\Member::loggedIn()->save();
 
 				return $latestComment;
 			}
@@ -699,15 +644,16 @@ class Conversation extends Item
 	/**
 	 * Recount the member's message counts
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public static function rebuildMessageCounts( Member $member ) : void
+	public static function rebuildMessageCounts( \IPS\Member $member )
 	{
-		$total = Db::i()->select( 'count(*)', 'core_message_topic_user_map', array( 'map_user_id=? AND map_user_active=1', $member->member_id ), NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first();
+		/* @note SELECT_FROM_WRITE_SERVER: Avoid issue where the new message rows are on the writer, but not the reader */
+		$total = \IPS\Db::i()->select( 'count(*)', 'core_message_topic_user_map', array( 'map_user_id=? AND map_user_active=1', $member->member_id ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 		$member->msg_count_total = $total;
 		
-		$new = Db::i()->select( 'count(*)', 'core_message_topic_user_map', array( 'map_user_id=? AND map_user_active=1 AND map_has_unread=1 AND map_ignore_notification=0 AND map_last_topic_reply>?', $member->member_id, $member->msg_count_reset ), NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first();
+		$new = \IPS\Db::i()->select( 'count(*)', 'core_message_topic_user_map', array( 'map_user_id=? AND map_user_active=1 AND map_has_unread=1 AND map_ignore_notification=0 AND map_last_topic_reply>?', $member->member_id, $member->msg_count_reset ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 		$member->msg_count_new = $new;
 		
 		$member->save();
@@ -716,7 +662,7 @@ class Conversation extends Item
 	/**
 	 * @brief	Maps cache
 	 */
-	public ?array $maps = NULL;
+	public $maps = NULL;
 	
 	/**
 	 * Get maps
@@ -724,11 +670,11 @@ class Conversation extends Item
 	 * @param 	boolean		$refresh 		Force maps to be refreshed?
 	 * @return	array
 	 */
-	public function maps( bool $refresh = FALSE ) : array
+	public function maps( $refresh = FALSE )
 	{
 		if ( $this->maps === NULL || $refresh === TRUE )
 		{
-			$this->maps = iterator_to_array( Db::i()->select( '*', 'core_message_topic_user_map', array( 'map_topic_id=?', $this->id ) )->setKeyField( 'map_user_id' ) );
+			$this->maps = iterator_to_array( \IPS\Db::i()->select( '*', 'core_message_topic_user_map', array( 'map_topic_id=?', $this->id ) )->setKeyField( 'map_user_id' ) );
 		}
 		return $this->maps;
 	}
@@ -736,19 +682,19 @@ class Conversation extends Item
 	/**
 	 * Grant a member access
 	 *
-	 * @param	Member|array	$members		The member(s) to grant access
-	 * @return	bool|array
+	 * @param	\IPS\Member|array	$members		The member(s) to grant access
+	 * @return	bool
 	 */
-	public function authorize( Member|array $members ) : bool|array
+	public function authorize( $members )
 	{
-		$members = is_array( $members ) ? $members : array( $members );
+		$members = \is_array( $members ) ? $members : array( $members );
 		
 		/* Go through each member */
 		foreach ( $members as $member )
 		{
-			if ( is_int( $member ) )
+			if ( \is_int( $member ) )
 			{
-				$member = Member::load( $member );
+				$member = \IPS\Member::load( $member );
 			}
 						
 			$done = FALSE;
@@ -760,7 +706,7 @@ class Conversation extends Item
 				{
 					$this->maps[ $member->member_id ]['map_user_active'] = TRUE;
 					$this->maps[ $member->member_id ]['map_user_banned'] = FALSE;
-					Db::i()->update( 'core_message_topic_user_map', array( 'map_user_active' => 1, 'map_user_banned' => 0 ), array( 'map_user_id=? AND map_topic_id=?', $member->member_id, $this->id ) );
+					\IPS\Db::i()->update( 'core_message_topic_user_map', array( 'map_user_active' => 1, 'map_user_banned' => 0 ), array( 'map_user_id=? AND map_topic_id=?', $member->member_id, $this->id ) );
 					$done = TRUE;
 					break;
 				}
@@ -777,14 +723,14 @@ class Conversation extends Item
 					'map_read_time'				=> ( $member->member_id == $this->starter_id ) ? time() : 0,
 					'map_user_active'			=> TRUE,
 					'map_user_banned'			=> FALSE,
-					'map_has_unread'			=> !( ( $member->member_id == $this->starter_id ) ),
+					'map_has_unread'			=> ( $member->member_id == $this->starter_id ) ? FALSE : TRUE,
 					'map_is_system'				=> FALSE,
 					'map_is_starter'			=> ( $member->member_id == $this->starter_id ),
 					'map_left_time'				=> 0,
 					'map_ignore_notification'	=> FALSE,
 					'map_last_topic_reply'		=> time(),
 				);
-				Db::i()->insert( 'core_message_topic_user_map', $this->maps[ $member->member_id ] );
+				\IPS\Db::i()->insert( 'core_message_topic_user_map', $this->maps[ $member->member_id ] );
 			}
 
 			if ( $member->members_bitoptions['show_pm_popup'] and $this->author()->member_id != $member->member_id )
@@ -808,18 +754,18 @@ class Conversation extends Item
 	/**
 	 * Remove a member access
 	 *
-	 * @param	Member|array	$members	The member(s) to remove access
+	 * @param	\IPS\Member|array	$members	The member(s) to remove access
 	 * @param	bool				$banned		User is being blocked by the conversation starter (as opposed to leaving voluntarily)?
-	 * @return	void
+	 * @return	bool
 	 */
-	public function deauthorize( Member|array $members, bool $banned=FALSE ) : void
+	public function deauthorize( $members, $banned=FALSE )
 	{
-		$members = is_array( $members ) ? $members : array( $members );
+		$members = \is_array( $members ) ? $members : array( $members );
 		foreach ( $members as $member )
 		{
 			unset( $this->maps[ $member->member_id ] );
-			Db::i()->update( 'core_message_topic_user_map', array( 'map_user_active' => 0, 'map_user_banned' => $banned ), array( 'map_user_id=? AND map_topic_id=?', $member->member_id, $this->id ) );
-			Db::i()->delete( 'core_notifications', array( 'notification_key=? AND item_id = ? AND `member`=?', 'new_private_message', $this->id, $member->member_id ) );
+			\IPS\Db::i()->update( 'core_message_topic_user_map', array( 'map_user_active' => 0, 'map_user_banned' => $banned ), array( 'map_user_id=? AND map_topic_id=?', $member->member_id, $this->id ) );
+			\IPS\Db::i()->delete( 'core_notifications', array( 'notification_key=? AND item_id = ? AND `member`=?', 'new_private_message', $this->id, $member->member_id ) );
 			static::rebuildMessageCounts( $member );
 		}
 		$this->rebuildParticipants();
@@ -830,7 +776,7 @@ class Conversation extends Item
 	 *
 	 * @return	void
 	 */
-	public function rebuildParticipants() : void
+	public function rebuildParticipants()
 	{
 		$activeParticipants = 0;
 		foreach ( $this->maps() as $map )
@@ -855,19 +801,19 @@ class Conversation extends Item
 	/**
 	 * @brief	Cache member data we've already looked up so we don't have to do it again
 	 */
-	public static array $participantMembers = array();
+	public static $participantMembers = array();
 	
 	/**
 	 * @brief	Particpant blurb
 	 */
-	public ?string $participantBlurb = NULL;
+	public $participantBlurb = NULL;
 	
 	/**
 	 * Get participant blurb
 	 *
 	 * @return	string
 	 */
-	public function participantBlurb() : string
+	public function participantBlurb()
 	{
 		if( $this->participantBlurb !== NULL )
 		{
@@ -882,9 +828,9 @@ class Conversation extends Item
 		{
 			if( isset( static::$participantMembers[ $memberId ] ) )
 			{
-				if ( $memberId === Member::loggedIn()->member_id )
+				if ( $memberId === \IPS\Member::loggedIn()->member_id )
 				{
-					$people[ $memberId ] = ( $memberId == $this->starter_id ) ? Member::loggedIn()->language()->addToStack('participant_you_upper') : Member::loggedIn()->language()->addToStack('participant_you_lower');
+					$people[ $memberId ] = ( $memberId == $this->starter_id ) ? \IPS\Member::loggedIn()->language()->addToStack('participant_you_upper') : \IPS\Member::loggedIn()->language()->addToStack('participant_you_lower');
 				}
 				else
 				{
@@ -895,13 +841,13 @@ class Conversation extends Item
 			}
 		}
 
-		if( count( $memberIds ) )
+		if( \count( $memberIds ) )
 		{
-			foreach( Db::i()->select( 'member_id, name', 'core_members', array( Db::i()->in( 'member_id', $memberIds ) ) ) as $member )
+			foreach( \IPS\Db::i()->select( 'member_id, name', 'core_members', array( \IPS\Db::i()->in( 'member_id', $memberIds ) ) ) as $member )
 			{
-				if ( $member['member_id'] === Member::loggedIn()->member_id )
+				if ( $member['member_id'] === \IPS\Member::loggedIn()->member_id )
 				{
-					$member['name'] = ( $member['member_id'] == $this->starter_id ) ? Member::loggedIn()->language()->addToStack('participant_you_upper') : Member::loggedIn()->language()->addToStack('participant_you_lower');
+					$member['name'] = ( $member['member_id'] == $this->starter_id ) ? \IPS\Member::loggedIn()->language()->addToStack('participant_you_upper') : \IPS\Member::loggedIn()->language()->addToStack('participant_you_lower');
 				}
 				$people[ $member['member_id'] ] = $member['name'];
 				static::$participantMembers[ $member['member_id'] ] = $member['name'];
@@ -914,15 +860,15 @@ class Conversation extends Item
 		array_unshift( $people, $starter );
 		unset( $starter );
 		
-		if ( count( $people ) == 1 )
+		if ( \count( $people ) == 1 )
 		{
 			$id   = key( $people );
 			$name = array_pop( $people );
-			$this->participantBlurb = Member::loggedIn()->member_id === $id ? Member::loggedIn()->language()->addToStack( 'participant_you_upper' ) : $name;
+			$this->participantBlurb = \IPS\Member::loggedIn()->member_id === $id ? \IPS\Member::loggedIn()->language()->addToStack( 'participant_you_upper' ) : $name;
 		}
-		elseif ( count( $people ) == 2 )
+		elseif ( \count( $people ) == 2 )
 		{
-			$this->participantBlurb = Member::loggedIn()->language()->addToStack( 'participant_two', FALSE, array( 'sprintf' => $people ) );
+			$this->participantBlurb = \IPS\Member::loggedIn()->language()->addToStack( 'participant_two', FALSE, array( 'sprintf' => $people ) );
 		}
 		else
 		{
@@ -943,10 +889,10 @@ class Conversation extends Item
 				$count++;
 			}
 
-			$sprintf[] = Member::loggedIn()->language()->formatList( $others );
-			$sprintf[] = count( $others );
+			$sprintf[] = \IPS\Member::loggedIn()->language()->formatList( $others );
+			$sprintf[] = \count( $others );
 			
-			$this->participantBlurb = Member::loggedIn()->language()->addToStack( 'participant_three_plus', FALSE, array( 'pluralize' => array( count( $others ) ), 'sprintf' => $sprintf ) );
+			$this->participantBlurb = \IPS\Member::loggedIn()->language()->addToStack( 'participant_three_plus', FALSE, array( 'pluralize' => array( \count( $others ) ), 'sprintf' => $sprintf ) );
 		}
 
 		return $this->participantBlurb;
@@ -956,102 +902,47 @@ class Conversation extends Item
 	 * Move a message to a different folder
 	 *
 	 * @param	string				$to			Folder name
-	 * @param	Member|null	$member	Member object, or null to use logged in member
+	 * @param	\IPS\Member|null	$member	Member object, or null to use logged in member
 	 * @return  void
-	 * @throws OutOfRangeException
+	 * @throws \OutOfRangeException
 	 */
-	public function moveConversation( string $to, ?Member $member=NULL ) : void
+	public function moveConversation( $to, $member=NULL )
 	{
-		$member = ( $member != NULL ) ? $member : Member::loggedIn();
+		$member = ( $member != NULL ) ? $member : \IPS\Member::loggedIn();
 		
-		if ( in_array( $to, array_merge( array( 'myconvo' ), array_keys( json_decode( $member->pconversation_filters, TRUE ) ) ) ) )
+		if ( \in_array( $to, array_merge( array( 'myconvo' ), array_keys( json_decode( $member->pconversation_filters, TRUE ) ) ) ) )
 		{
-			Db::i()->update( 'core_message_topic_user_map', array( 'map_folder_id' => $to ), array( 'map_user_id=? AND map_topic_id=?', $member->member_id, $this->id ) );
+			\IPS\Db::i()->update( 'core_message_topic_user_map', array( 'map_folder_id' => $to ), array( 'map_user_id=? AND map_topic_id=?', $member->member_id, $this->id ) );
 		}
 		else
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 	}
 
 	/**
 	 * Build form to create
 	 *
-	 * @param	Model|NULL	$container	Container (e.g. forum), if appropriate
-	 * @param	Item|NULL	$item		Content item, e.g. if editing
-	 * @return	Form
+	 * @param	\IPS\Node\Model|NULL	$container	Container (e.g. forum), if appropriate
+	 * @param	\IPS\Content\Item|NULL	$item		Content item, e.g. if editing
+	 * @return	\IPS\Helpers\Form
 	 */
-	protected static function buildCreateForm( Model $container=null, Item $item=NULL ): Form
+	protected static function buildCreateForm( \IPS\Node\Model $container=NULL, \IPS\Content\Item $item=NULL )
 	{
 		$form = parent::buildCreateForm( $container, $item );
 
 		try
 		{
-			$alert = Alert::load( Request::i()->alert );
+			$alert = \IPS\core\Alerts\Alert::load( \IPS\Request::i()->alert );
 
-			if( $alert->forMember( Member::loggedIn() ) )
+			if( $alert->forMember( \IPS\Member::loggedIn() ) )
 			{
 				$form->hiddenValues['alert'] = $alert->id;
 				$form->hiddenValues['messenger_title'] = $alert->title;
 			}
 		}
-		catch ( OutOfRangeException $e ) {}
+		catch ( \OutOfRangeException $e ) {}
 
 		return $form;
-	}
-
-	/**
-	 * Get output for API
-	 *
-	 * @param	Member|NULL				$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @return    array
-	 * @apiresponse	int							id				ID number
-	 * @apiresponse	string|null					title			Title ( if available )
-	 * @apiresponse	\IPS\Member					author			The member that created the item
-	 * @apiresponse	datetime					date			Date
-	 * @apiresponse	string						content			Content
-	 * @apiresponse	string						url				URL
-	 * @apiresponse [\IPS\Member]				participants	Active users in this conversation
-	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
-	{
-		$return = [
-			'id' => $this->id,
-			'title' => $this->mapped( 'title' ),
-			'author' => $this->author()->apiOutput( $authorizedMember ),
-			'date' => DateTime::ts( $this->mapped('date') )->rfc3339(),
-			'content' => $this->content(),
-			'url' => (string) $this->url(),
-			'participants' => []
-		];
-
-		foreach( $this->maps() as $map )
-		{
-			if( $map['map_user_active'] )
-			{
-				$return['participants'][] = Member::load( $map['map_user_id'] )->apiOutput( $authorizedMember );
-			}
-		}
-
-		return $return;
-	}
-
-	/**
-	 * @param Comment|null $comment
-	 * @param array $createOrEditValues=[]
-	 * @param bool $clearCache=false
-	 * @return array
-	 */
-	public function getDataLayerProperties ( ?Comment $comment = null, array $createOrEditValues = [], bool $clearCache=false ): array
-	{
-		$properties = parent::getDataLayerProperties( $comment, $createOrEditValues, $clearCache );
-		if ( isset( $properties['content_area'] ) )
-		{
-			$properties['content_area'] = Lang::load( Lang::defaultLanguage() )->addToStack( 'personal_conversations' );
-		}
-
-		$updates = DataLayer::i()->filterProperties([ 'message_recipient_count' => $this->activeParticipants ]);
-
-		return array_replace( $properties, $updates );
 	}
 }

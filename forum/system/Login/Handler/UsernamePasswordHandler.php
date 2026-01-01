@@ -12,16 +12,9 @@
 namespace IPS\Login\Handler;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Form\Select;
-use IPS\Login;
-use IPS\Login\Exception;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -35,9 +28,19 @@ trait UsernamePasswordHandler
 	 *
 	 * @return	int
 	 */
-	public function type(): int
+	public function type()
 	{
-		return Login::TYPE_USERNAME_PASSWORD;
+		return \IPS\Login::TYPE_USERNAME_PASSWORD;
+	}
+	
+	/**
+	 * Get auth type
+	 *
+	 * @return	int
+	 */
+	public function authType()
+	{
+		return $this->settings['auth_types'];
 	}
 		
 	/**
@@ -48,35 +51,35 @@ trait UsernamePasswordHandler
 	 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{
 		$id = $this->id ?: 'new';
 		return array(
-			'auth_types'	=> new Select( 'login_auth_types', $this->settings['auth_types'] ?? ( Login::AUTH_TYPE_EMAIL ), TRUE, array( 'options' => array(
-				Login::AUTH_TYPE_USERNAME + Login::AUTH_TYPE_EMAIL => 'username_or_email',
-				Login::AUTH_TYPE_EMAIL	=> 'email_address',
-				Login::AUTH_TYPE_USERNAME => 'username',
-			), 'toggles' => array( Login::AUTH_TYPE_USERNAME + Login::AUTH_TYPE_EMAIL => array( 'form_' . $id . '_login_auth_types_warning' ), Login::AUTH_TYPE_USERNAME => array( 'form_' . $id . '_login_auth_types_warning' ) ) ) )
+			'auth_types'	=> new \IPS\Helpers\Form\Select( 'login_auth_types', isset( $this->settings['auth_types'] ) ? $this->settings['auth_types'] : ( \IPS\Login::AUTH_TYPE_EMAIL ), TRUE, array( 'options' => array(
+				\IPS\Login::AUTH_TYPE_USERNAME + \IPS\Login::AUTH_TYPE_EMAIL => 'username_or_email',
+				\IPS\Login::AUTH_TYPE_EMAIL	=> 'email_address',
+				\IPS\Login::AUTH_TYPE_USERNAME => 'username',
+			), 'toggles' => array( \IPS\Login::AUTH_TYPE_USERNAME + \IPS\Login::AUTH_TYPE_EMAIL => array( 'form_' . $id . '_login_auth_types_warning' ), \IPS\Login::AUTH_TYPE_USERNAME => array( 'form_' . $id . '_login_auth_types_warning' ) ) ) )
 		);
 	}
 	
 	/**
 	 * Authenticate
 	 *
-	 * @param	Login	$login				The login object
-	 * @param string $usernameOrEmail		The username or email address provided by the user
-	 * @param object $password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
-	 * @return	Member
-	 * @throws	Exception
+	 * @param	\IPS\Login	$login				The login object
+	 * @param	string		$usernameOrEmail		The username or email address provided by the user
+	 * @param	object		$password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @return	\IPS\Member
+	 * @throws	\IPS\Login\Exception
 	 */
-	abstract public function authenticateUsernamePassword( Login $login, string $usernameOrEmail, object $password ): Member;
+	abstract public function authenticateUsernamePassword( \IPS\Login $login, $usernameOrEmail, $password );
 	
 	/**
 	 * Authenticate
 	 *
-	 * @param	Member	$member				The member
-	 * @param object $password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	\IPS\Member	$member				The member
+	 * @param	object		$password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	bool
 	 */
-	abstract public function authenticatePasswordForMember( Member $member, object $password ): bool;
+	abstract public function authenticatePasswordForMember( \IPS\Member $member, $password );
 }

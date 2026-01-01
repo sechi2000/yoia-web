@@ -11,50 +11,43 @@
 namespace IPS\GeoLocation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use IPS\GeoLocation\GeoCoder\Google;
-use IPS\GeoLocation\GeoCoder\Mapbox;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * GeoCoder abstract class
  */
-abstract class GeoCoder
+abstract class _GeoCoder
 {
 	/**
 	 * @brief	Cached GeoCoder instance
 	 */
-	protected static GeoCoder|null $instance = NULL;
+	protected static $instance = NULL;
 
 	/**
 	 * Return instance of GeoCoder
 	 *
-	 * @return	GeoCoder|null
-	 * @throws	BadMethodCallException
+	 * @return	\IPS\GeoCoder
+	 * @throws	\BadMethodCallException
 	 */
-	public static function i(): GeoCoder|null
+	public static function i()
 	{
 		if( static::$instance === NULL )
 		{
-			if ( Settings::i()->googlemaps and Settings::i()->google_maps_api_key )
+			if ( \IPS\Settings::i()->googlemaps and \IPS\Settings::i()->google_maps_api_key )
 			{
-				static::$instance = new Google();
+				static::$instance = new \IPS\GeoLocation\GeoCoder\Google();
 			}
-			elseif ( Settings::i()->mapbox and Settings::i()->mapbox_api_key )
+			elseif ( \IPS\Settings::i()->mapbox and \IPS\Settings::i()->mapbox_api_key )
 			{
-				static::$instance = new Mapbox();
+				static::$instance = new \IPS\GeoLocation\GeoCoder\Mapbox();
 			}
 			else
 			{
-				throw new BadMethodCallException;
+				throw new \BadMethodCallException;
 			}
 		}
 

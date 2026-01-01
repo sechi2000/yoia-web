@@ -12,19 +12,16 @@
 namespace IPS\core\setup\upg_105032;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.5.0 Beta 12 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Check if we need to send the notification about marketplace setup
@@ -33,16 +30,7 @@ class Upgrade
 	 */
 	public function step1()
 	{
+		// Marketplace Removed
 		return TRUE;
-	}
-
-	/**
-	 * Custom title for this step
-	 *
-	 * @return	string
-	 */
-	public function step1CustomTitle()
-	{
-		return "Checking Marketplace resources";
 	}
 }

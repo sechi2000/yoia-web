@@ -12,89 +12,52 @@
 namespace IPS\gallery\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Widget;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\YesNo;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * featuredAlbums Widget
  */
-class albums extends Widget
+class _albums extends \IPS\Content\Widget
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'albums';
+	public $key = 'albums';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'gallery';
+	public $app = 'gallery';
 		
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 	
 	/**
 	 * @brief Class
 	 */
-	protected static string $class = 'IPS\gallery\Album\Item';
+	protected static $class = 'IPS\gallery\Album\Item';
 
 	/**
 	 * @brief	Moderator permission to generate caches on [optional]
 	 */
-	protected array $moderatorPermissions	= array( 'can_view_hidden_content', 'can_view_hidden_gallery_album' );
+	protected $moderatorPermissions	= array( 'can_view_hidden_content', 'can_view_hidden_gallery_album' );
 
 	/**
 	 * Initialize widget
 	 *
 	 * @return	null
 	 */
-	public function init(): void
+	public function init()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'gallery', 'front' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'gallery.css', 'gallery', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'gallery', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'gallery.css', 'gallery', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'global.css', 'gallery', 'front' ) );
 		parent::init();
-	}
-
-	/**
-	 * Specify widget configuration
-	 *
-	 * @param Form|null $form Form object
-	 * @return    Form
-	 */
-	public function configuration( Form &$form=null ): Form
-	{
-		$form = parent::configuration( $form );
-
-		$form->add( new YesNo( 'widget_feed_album_empty', $this->configuration['widget_feed_album_empty'] ?? true, false ), 'widget_feed_author' );
-
-		return $form;
-	}
-
-	/**
-	 * Get where clause
-	 *
-	 * @return	array
-	 */
-	protected function buildWhere(): array
-	{
-		$where = parent::buildWhere();
-
-		/* We default to true to maintain previous behavior */
-		if( isset( $this->configuration['widget_feed_album_empty'] ) and !$this->configuration['widget_feed_album_empty'] )
-		{
-			$where[] = [ 'album_count_imgs>?', 0 ];
-		}
-
-		return $where;
 	}
 }

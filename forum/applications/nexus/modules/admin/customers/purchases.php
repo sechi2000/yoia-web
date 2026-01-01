@@ -12,78 +12,43 @@
 namespace IPS\nexus\modules\admin\customers;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use Exception;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\YesNo;
-use IPS\Member;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item\Renewal;
-use IPS\nexus\Money;
-use IPS\nexus\Package\CustomField;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Tax;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use function defined;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_NUMERIC;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Purchases
  */
-class purchases extends Controller
+class _purchases extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
-
-	/**
-	 * @var Purchase|null
-	 */
-	protected ?Purchase $purchase = null;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * View
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'purchases_view' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'purchases_view' );
 
 		try
 		{
-			$this->purchase = Purchase::load( Request::i()->id );
+			$this->purchase = \IPS\nexus\Purchase::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X195/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X195/2', 404, '' );
 		}
 
-		Output::i()->title = $this->purchase->name . " (#{$this->purchase->id})";
+		\IPS\Output::i()->title = $this->purchase->name . " (#{$this->purchase->id})";
 		
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'purchases.css', 'nexus', 'admin' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'purchases.css', 'nexus', 'admin' ) );
 		parent::execute();
 	}
 	
@@ -92,7 +57,7 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$this->view();
 	}
@@ -102,20 +67,20 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function view() : void
+	protected function view()
 	{
 		/* Popup view */
-		if ( Request::i()->isAjax() and isset( Request::i()->hovercard ) )
+		if ( \IPS\Request::i()->isAjax() and isset( \IPS\Request::i()->hovercard ) )
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'purchases' )->hovercard( $this->purchase );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'purchases' )->hovercard( $this->purchase );
 			return;
 		}
 		
 		/* Create children tree */
-		$children = Purchase::tree( $this->purchase->acpUrl(), array(), "p{$this->purchase->id}", $this->purchase, FALSE );
-		if ( Request::i()->isAjax() )
+		$children = \IPS\nexus\Purchase::tree( $this->purchase->acpUrl(), array(), "p{$this->purchase->id}", $this->purchase, FALSE );
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $children;
+			\IPS\Output::i()->output = $children;
 			return;
 		}
 		
@@ -125,12 +90,12 @@ class purchases extends Controller
 		{
 			try
 			{
-				if ( $displayValue = trim( CustomField::load( $k )->displayValue( $v, TRUE ) ) )
+				if ( $displayValue = trim( \IPS\nexus\Package\CustomField::load( $k )->displayValue( $v, TRUE ) ) )
 				{
 					$customFields[ $k ] = $displayValue;
 				}
 			}
-			catch ( OutOfRangeException ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 		
 		/* Get customer */
@@ -138,15 +103,15 @@ class purchases extends Controller
 		{
 			$customer = $this->purchase->member;
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			$customer = NULL;
 		}
 				
 		/* Display */
-		Output::i()->sidebar['actions'] = $this->purchase->buttons();
-		Output::i()->output = Theme::i()->getTemplate( 'purchases' )->view( $this->purchase, $customer, $children, $customFields );
-		Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_members.js', 'core' ) );
+		\IPS\Output::i()->sidebar['actions'] = $this->purchase->buttons();		
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'purchases' )->view( $this->purchase, $customer, $children, $customFields );
+		\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_members.js', 'core' ) );
 	}
 
 	/**
@@ -155,28 +120,28 @@ class purchases extends Controller
 	 * @note	This is lazy loaded after the purchase page is generated
 	 * @return	void
 	 */
-	protected function showInvoices() : void
+	protected function showInvoices()
 	{
 		/* Create associated invoices table */		
 		try
 		{
 			$originalInvoice = $this->purchase->original_invoice;
-			$invoices = Invoice::table( array( array( 'i_id=? OR ' . Db::i()->findInSet( 'i_renewal_ids', array( $this->purchase->id ) ), $originalInvoice->id ) ), $this->purchase->acpUrl()->setQueryString( 'do', 'showInvoices' ), "p.{$this->purchase->id}" );
+			$invoices = \IPS\nexus\Invoice::table( array( array( 'i_id=? OR ' . \IPS\Db::i()->findInSet( 'i_renewal_ids', array( $this->purchase->id ) ), $originalInvoice->id ) ), $this->purchase->acpUrl()->setQueryString( 'do', 'showInvoices' ), "p.{$this->purchase->id}" );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			$invoices = Invoice::table( array( array( Db::i()->findInSet( 'i_renewal_ids', array( $this->purchase->id ) ) ) ), $this->purchase->acpUrl()->setQueryString( 'do', 'showInvoices' ), "p.{$this->purchase->id}" );
+			$invoices = \IPS\nexus\Invoice::table( array( array( \IPS\Db::i()->findInSet( 'i_renewal_ids', array( $this->purchase->id ) ) ) ), $this->purchase->acpUrl()->setQueryString( 'do', 'showInvoices' ), "p.{$this->purchase->id}" );
 		}
 		$invoices->filters = array(
-			'paid'		=> array( 'i_status=?', Invoice::STATUS_PAID )
+			'paid'		=> array( 'i_status=?', \IPS\nexus\Invoice::STATUS_PAID )
 		);
 		$invoices->advancedSearch = array(
-			'i_status'	=> array( SEARCH_SELECT, array( 'options' => Invoice::statuses(), 'multiple' => TRUE ) ),
-			'i_total'	=> SEARCH_NUMERIC,
-			'i_date'	=> SEARCH_DATE_RANGE,
+			'i_status'	=> array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => \IPS\nexus\Invoice::statuses(), 'multiple' => TRUE ) ),
+			'i_total'	=> \IPS\Helpers\Table\SEARCH_NUMERIC,
+			'i_date'	=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
 		);
 
-		Output::i()->output = (string) $invoices;
+		\IPS\Output::i()->output = (string) $invoices;
 	}
 	
 	/**
@@ -184,14 +149,14 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function edit() : void
+	protected function edit()
 	{
-		Dispatcher::i()->checkAcpPermission( 'purchases_edit' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'purchases_edit' );
 		
 		/* Work stuff out */
 		$renewals = $this->purchase->renewals ?: NULL;
 		$groupedChildren = array();
-		if ( $renewals and Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_parent=? AND ps_grouped_renewals<>? AND ps_cancelled=0', $this->purchase->id, '' ) )->first() )
+		if ( $renewals and \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_parent=? AND ps_grouped_renewals<>? AND ps_cancelled=0', $this->purchase->id, '' ) )->first() )
 		{
 			$renewals = $this->purchase->renewals;
 			foreach ( $this->purchase->children() as $child )
@@ -208,23 +173,23 @@ class purchases extends Controller
 					{
 						if( $this->purchase->tax )
 						{
-							$tax = Tax::load( $this->purchase->tax );
+							$tax = \IPS\nexus\Tax::load( $this->purchase->tax );
 						}
 					}
-					catch( OutOfRangeException ){}
+					catch( \OutOfRangeException $e ){}
 
 					try
 					{
-						$childGroupedRenewalTerm = new RenewalTerm( new Money( $childGroupedRenewals['price'], $this->purchase->renewals->cost->currency ), new DateInterval( 'P' . $childGroupedRenewals['term'] . mb_strtoupper( $childGroupedRenewals['unit'] ) ), $tax );
-						$renewals = new RenewalTerm( $renewals->subtract( $childGroupedRenewalTerm ), $renewals->interval );
+						$childGroupedRenewalTerm = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $childGroupedRenewals['price'], $this->purchase->renewals->cost->currency ), new \DateInterval( 'P' . $childGroupedRenewals['term'] . mb_strtoupper( $childGroupedRenewals['unit'] ) ), $tax );
+						$renewals = new \IPS\nexus\Purchase\RenewalTerm( $renewals->subtract( $childGroupedRenewalTerm ), $renewals->interval );
 					}
-					catch ( Exception ) { }
+					catch ( \Exception $e ) { }
 				}
 			}
 		}
 				
 		/* Build form */
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$this->purchase->acpEdit( $form, $renewals );
 		
 		/* Handle submissions */
@@ -253,7 +218,7 @@ class purchases extends Controller
 		}
 		
 		/* Display */
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -261,21 +226,21 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function transfer() : void
+	protected function transfer()
 	{
-		Dispatcher::i()->checkAcpPermission( 'purchases_transfer' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'purchases_transfer' );
 		if ( $this->purchase->grouped_renewals )
 		{
-			Output::i()->error( 'not_with_grouped', '2X195/6', 403, '' );
+			\IPS\Output::i()->error( 'not_with_grouped', '2X195/6', 403, '' );
 		}
 		if ( $this->purchase->billing_agreement and !$this->purchase->billing_agreement->canceled )
 		{
-			Output::i()->error( 'not_with_billing_agreement', '2X195/G', 403, '' );
+			\IPS\Output::i()->error( 'not_with_billing_agreement', '2X195/G', 403, '' );
 		}
 		
 		/* Build form */
-		$form = new Form;
-		$form->add( new Form\Member( 'ps_member', NULL, TRUE ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Member( 'ps_member', NULL, TRUE ) );
 		
 		/* Handle submissions */
 		if ( $values = $form->values() )
@@ -286,9 +251,9 @@ class purchases extends Controller
 			{
 				$this->purchase->transfer( $values['ps_member'] );
 			}
-			catch ( DomainException $e )
+			catch ( \DomainException $e )
 			{
-				Output::i()->error( $e->getMessage(), '2X195/8', 403 );
+				\IPS\Output::i()->error( $e->getMessage(), '2X195/8', 403 );
 			}
 			
 			/* Log */
@@ -300,7 +265,7 @@ class purchases extends Controller
 		}
 		
 		/* Display */
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 		
 	/**
@@ -308,39 +273,39 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	public function renew() : void
+	public function renew()
 	{
-		Dispatcher::i()->checkAcpPermission( 'invoices_add', 'nexus', 'payments' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'invoices_add', 'nexus', 'payments' );
 		
 		if ( $this->purchase->grouped_renewals )
 		{
-			Output::i()->error( 'not_with_grouped', '2X195/7', 403, '' );
+			\IPS\Output::i()->error( 'not_with_grouped', '2X195/7', 403, '' );
 		}
 		if ( $this->purchase->billing_agreement and !$this->purchase->billing_agreement->canceled )
 		{
-			Output::i()->error( 'not_with_billing_agreement', '2X195/D', 403, '' );
+			\IPS\Output::i()->error( 'not_with_billing_agreement', '2X195/D', 403, '' );
 		}
 		
 		/* If this purchase has renewal term, we cannot generate a renewal invoice */
 		if ( !$this->purchase->renewals )
 		{
-			Output::i()->error( 'purchase_no_renew', '2X195/3', 403, '' );
+			\IPS\Output::i()->error( 'purchase_no_renew', '2X195/3', 403, '' );
 		}
 		
 		/* Build form */
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$cycles = $this->purchase->canRenewUntil( NULL, TRUE, TRUE );
-		$form->add( new Number( 'renew_cycles', 1, TRUE, array( 'min' => 1, 'max' => ( $cycles === TRUE ? NULL : $cycles ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'renew_cycles', 1, TRUE, array( 'min' => 1, 'max' => ( $cycles === TRUE ? NULL : $cycles ) ) ) );
 		
 		/* Handle submissions */
 		if ( $values = $form->values() )
 		{
 			/* Generate Invoice */
-			$invoice = new Invoice;
+			$invoice = new \IPS\nexus\Invoice;
 			$invoice->currency = $this->purchase->renewal_currency;
 			$invoice->member = $this->purchase->member;
 			$invoice->billaddress = $this->purchase->member->primaryBillingAddress();
-			$invoice->addItem( Renewal::create( $this->purchase, $values['renew_cycles'] ) );
+			$invoice->addItem( \IPS\nexus\Invoice\Item\Renewal::create( $this->purchase, $values['renew_cycles'] ) );
 			$invoice->save();
 			$invoice->sendNotification();
 			
@@ -349,26 +314,26 @@ class purchases extends Controller
 			$this->purchase->save();
 			
 			/* Take us to that invoice */
-			Output::i()->redirect( $invoice->acpUrl() );
+			\IPS\Output::i()->redirect( $invoice->acpUrl() );
 		}
 		
 		/* If this purchase already has an unpaid renewal invoice, display a warning */
 		if ( $this->purchase->invoice_pending )
 		{
 			/* Which will be a proper warning if that invoice is still pending */
-			if ( $this->purchase->invoice_pending->status === Invoice::STATUS_PENDING )
+			if ( $this->purchase->invoice_pending->status === \IPS\nexus\Invoice::STATUS_PENDING )
 			{
-				Output::i()->output .= Theme::i()->getTemplate( 'global', 'core' )->message( Member::loggedIn()->language()->addToStack('warn_renew_invoice_pending', FALSE, array( 'sprintf' => array( $this->purchase->invoice_pending->acpUrl() ) ) ), 'warning', NULL, FALSE, TRUE );
+				\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core' )->message( \IPS\Member::loggedIn()->language()->addToStack('warn_renew_invoice_pending', FALSE, array( 'sprintf' => array( $this->purchase->invoice_pending->acpUrl() ) ) ), 'warning', NULL, FALSE, TRUE );
 			}
 			/* Or just informational if it is canceled or expired */
-			elseif ( $this->purchase->invoice_pending->status !== Invoice::STATUS_PAID )
+			elseif ( $this->purchase->invoice_pending->status !== \IPS\nexus\Invoice::STATUS_PAID )
 			{
-				Output::i()->output .= Theme::i()->getTemplate( 'global', 'core' )->message( Member::loggedIn()->language()->addToStack('info_renew_invoice_pending', FALSE, array( 'sprintf' => array( $this->purchase->invoice_pending->acpUrl() ) ) ), 'information', NULL, FALSE, TRUE );
+				\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core' )->message( \IPS\Member::loggedIn()->language()->addToStack('info_renew_invoice_pending', FALSE, array( 'sprintf' => array( $this->purchase->invoice_pending->acpUrl() ) ) ), 'information', NULL, FALSE, TRUE );
 			}
 		}
 		
 		/* Display */
-		Output::i()->output .= $form;
+		\IPS\Output::i()->output .= $form;
 	}
 	
 	/**
@@ -376,15 +341,15 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function cancel() : void
+	protected function cancel()
 	{
-		Dispatcher::i()->checkAcpPermission( 'purchases_cancel' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'purchases_cancel' );
 		
 		$parent = $this->purchase->parent();
 		
 		if ( ( $this->purchase->billing_agreement and !$this->purchase->billing_agreement->canceled ) or ( $this->purchase->grouped_renewals and $parent->billing_agreement and !$parent->billing_agreement->canceled ) )
 		{
-			Output::i()->error( 'not_with_billing_agreement', '2X195/H', 403, '' );
+			\IPS\Output::i()->error( 'not_with_billing_agreement', '2X195/H', 403, '' );
 		}
 		
 		/* What options are available for cancelling? */
@@ -396,15 +361,15 @@ class purchases extends Controller
 		$options['cancel'] = 'cancel_type_cancel';
 		
 		/* Build form */
-		$form = new Form;
-		$form->add( new Radio( 'cancel_type', 'no_renew', FALSE, array(
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Radio( 'cancel_type', 'no_renew', FALSE, array(
 			'options'	=> $options,
 			'toggles'	=> array( 'cancel' => array( 'form_cancel_type_warning' ) )
 		) ) );
-		$form->add( new YesNo( 'ps_can_reactivate', FALSE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ps_can_reactivate', FALSE ) );
 		if ( $onCancelWarning = $this->purchase->onCancelWarning() )
 		{
-			Member::loggedIn()->language()->words['cancel_type_warning'] = $onCancelWarning;
+			\IPS\Member::loggedIn()->language()->words['cancel_type_warning'] = $onCancelWarning;
 		}
 		
 		/* Handle submissions */
@@ -444,7 +409,7 @@ class purchases extends Controller
 		}
 		
 		/* Display form */
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -452,22 +417,22 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function reactivate() : void
+	protected function reactivate()
 	{
-		Dispatcher::i()->checkAcpPermission( 'purchases_cancel' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'purchases_cancel' );
+		\IPS\Session::i()->csrfCheck();
 		
 		$error = NULL;
 		if ( !$this->purchase->canAcpReactivate( $error ) )
 		{
-			Output::i()->error( $error ?? 'can_not_reactivate', '2X195/K', 403, '' );
+			\IPS\Output::i()->error( $error ?? 'can_not_reactivate', '2X195/K', 403, '' );
 		}
 		
 		$parent = $this->purchase->parent();
 		
 		if ( ( $this->purchase->billing_agreement and !$this->purchase->billing_agreement->canceled ) or ( $this->purchase->grouped_renewals and $parent->billing_agreement and !$parent->billing_agreement->canceled ) )
 		{
-			Output::i()->error( 'not_with_billing_agreement', '2X195/I', 403, '' );
+			\IPS\Output::i()->error( 'not_with_billing_agreement', '2X195/I', 403, '' );
 		}
 		
 		/* If grouped, ungroup */
@@ -499,16 +464,16 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
-		Dispatcher::i()->checkAcpPermission( 'purchases_delete' );
-		Request::i()->confirmedDelete();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'purchases_delete' );
+		\IPS\Request::i()->confirmedDelete();
 
 		$parent = $this->purchase->parent();
 		
 		if ( ( $this->purchase->billing_agreement and !$this->purchase->billing_agreement->canceled ) or ( $this->purchase->grouped_renewals and $parent->billing_agreement and !$parent->billing_agreement->canceled ) )
 		{
-			Output::i()->error( 'not_with_billing_agreement', '2X195/J', 403, '' );
+			\IPS\Output::i()->error( 'not_with_billing_agreement', '2X195/J', 403, '' );
 		}
 		
 		if ( $this->purchase->grouped_renewals )
@@ -522,11 +487,11 @@ class purchases extends Controller
 		
 		if ( $parent )
 		{
-			Output::i()->redirect( $parent->acpUrl() );
+			\IPS\Output::i()->redirect( $parent->acpUrl() );
 		}
 		else
 		{
-			Output::i()->redirect( $this->purchase->member->acpUrl() );
+			\IPS\Output::i()->redirect( $this->purchase->member->acpUrl() );
 		}
 	}
 	
@@ -535,15 +500,15 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function extra() : void
+	protected function extra()
 	{
 		if ( $output = $this->purchase->acpAction() )
 		{
-			Output::i()->output = $output;
+			\IPS\Output::i()->output = $output;
 		}
 		else
 		{
-			Output::i()->redirect( $this->purchase->acpUrl() );
+			\IPS\Output::i()->redirect( $this->purchase->acpUrl() );
 		}
 	}
 	
@@ -552,14 +517,14 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function group() : void
+	protected function group()
 	{
-		Dispatcher::i()->checkAcpPermission( 'purchases_edit' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'purchases_edit' );
+		\IPS\Session::i()->csrfCheck();
 		
 		if ( $this->purchase->billing_agreement and !$this->purchase->billing_agreement->canceled )
 		{
-			Output::i()->error( 'not_with_billing_agreement', '2X195/E', 403, '' );
+			\IPS\Output::i()->error( 'not_with_billing_agreement', '2X195/E', 403, '' );
 		}
 		
 		try
@@ -567,9 +532,9 @@ class purchases extends Controller
 			$this->purchase->groupWithParent();
 			$this->purchase->member->log( 'purchase', array( 'type' => 'group', 'id' => $this->purchase->id, 'name' => $this->purchase->name ) );
 		}
-		catch ( LogicException $e )
+		catch ( \LogicException $e )
 		{
-			Output::i()->error( 'grouperr_' . $e->getMessage(), '1X195/4', 403, '' );
+			\IPS\Output::i()->error( 'grouperr_' . $e->getMessage(), '1X195/4', 403, '' );
 		}
 		$this->_redirect();
 	}
@@ -579,14 +544,14 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function ungroup() : void
+	protected function ungroup()
 	{
-		Dispatcher::i()->checkAcpPermission( 'purchases_edit' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'purchases_edit' );
+		\IPS\Session::i()->csrfCheck();
 		
 		if ( $this->purchase->billing_agreement and !$this->purchase->billing_agreement->canceled )
 		{
-			Output::i()->error( 'not_with_billing_agreement', '2X195/F', 403, '' );
+			\IPS\Output::i()->error( 'not_with_billing_agreement', '2X195/F', 403, '' );
 		}
 		
 		try
@@ -594,9 +559,9 @@ class purchases extends Controller
 			$this->purchase->ungroupFromParent();
 			$this->purchase->member->log( 'purchase', array( 'type' => 'ungroup', 'id' => $this->purchase->id, 'name' => $this->purchase->name ) );
 		}
-		catch ( LogicException )
+		catch ( \LogicException $e )
 		{
-			Output::i()->error( '', '1X195/5', 403, '' );
+			\IPS\Output::i()->error( '', '1X195/5', 403, '' );
 		}
 		$this->_redirect();
 	}
@@ -606,33 +571,37 @@ class purchases extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function _redirect() : void
+	protected function _redirect()
 	{
-		if ( isset( Request::i()->r ) )
+		if ( isset( \IPS\Request::i()->r ) )
 		{
-			switch ( mb_substr( Request::i()->r, 0, 1 ) )
+			switch ( mb_substr( \IPS\Request::i()->r, 0, 1 ) )
 			{
 				case 'p':
 					try
 					{
-						Output::i()->redirect( Purchase::load( $this->purchase->parent )->acpUrl() );
+						\IPS\Output::i()->redirect( \IPS\nexus\Purchase::load( $this->purchase->parent )->acpUrl() );
 					}
-					catch ( OutOfRangeException )
+					catch ( \OutOfRangeException $e )
 					{
-						Output::i()->redirect( $this->purchase->member->acpUrl() );
+						\IPS\Output::i()->redirect( $this->purchase->member->acpUrl() );
 					}
 					break;
 
 				case 'v':
-					Output::i()->redirect( $this->purchase->acpUrl() );
+					\IPS\Output::i()->redirect( $this->purchase->acpUrl() );
 					break;
 										
 				case 'c':
-					Output::i()->redirect( $this->purchase->member->acpUrl() );
+					\IPS\Output::i()->redirect( $this->purchase->member->acpUrl() );
+					break;
+					
+				case 's':
+					\IPS\Output::i()->redirect( \IPS\nexus\Support\Request::load( mb_substr( \IPS\Request::i()->r, 2 ) )->acpUrl() );
 					break;
 			}
 		}
 		
-		Output::i()->redirect( $this->purchase->acpUrl() );
+		\IPS\Output::i()->redirect( $this->purchase->acpUrl() );
 	}
 }

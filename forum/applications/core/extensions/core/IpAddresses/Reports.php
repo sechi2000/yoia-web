@@ -11,66 +11,75 @@
 namespace IPS\core\extensions\core\IpAddresses;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Reports\Report;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Extensions\IpAddressesAbstract;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Lookup: Reports
  */
-class Reports extends IpAddressesAbstract
+class _Reports
 {
 	/**
 	 * Removes the logged IP address
 	 *
-	 * @param int $time
+	 * @param int $timestamp
 	 * @return void
 	 */
-	public function pruneIpAddresses( int $time ) : void
+	public function pruneIpAddresses(int $time)
 	{
-		Db::i()->update('core_rc_reports', [ 'ip_address' => '' ] , [ 'date_reported <?', $time ] );
+		\IPS\Db::i()->update('core_rc_reports', [ 'ip_address' => '' ] , [ 'date_reported <?', $time ] );
+	}
+
+	/**
+	 * Supported in the ACP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInAcp()
+	{
+		return TRUE;
+	}
+
+	/**
+	 * Supported in the ModCP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInModCp(): bool
+	{
+		return TRUE;
 	}
 
 	/** 
 	 * Find Records by IP
 	 *
 	 * @param	string			$ip			The IP Address
-	 * @param	Url|null	$baseUrl	URL table will be displayed on or NULL to return a count
-	 * @return	string|int|null
+	 * @param	\IPS\Http\Url	$baseUrl	URL table will be displayed on or NULL to return a count
+	 * @return	\IPS\Helpers\Table|int|null
 	 */
-	public function findByIp( string $ip, ?Url $baseUrl = NULL ): string|int|null
+	public function findByIp( $ip, \IPS\Http\Url $baseUrl = NULL )
 	{
 		/* Return count */
 		if ( $baseUrl === NULL )
 		{
-			return Db::i()->select( 'COUNT(*)', 'core_rc_reports', array( "ip_address LIKE ?", $ip ) )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'core_rc_reports', array( "ip_address LIKE ?", $ip ) )->first();
 		}
 		
 		/* Init Table */
-		$table = new TableDb( 'core_rc_reports', $baseUrl, array( "ip_address LIKE ?", $ip ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_rc_reports', $baseUrl, array( "ip_address LIKE ?", $ip ) );
 				
 		/* Columns we need */
 		$table->include = array( 'report_by', 'report', 'date_reported', 'ip_address' );
 		$table->mainColumn = 'date_reported';
 		$table->langPrefix = 'report_';
 
-		$table->tableTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
-		$table->rowsTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
+		$table->tableTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
+		$table->rowsTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
 				
 		/* Default sort options */
 		$table->sortBy = $table->sortBy ?: 'date_reported';
@@ -80,21 +89,21 @@ class Reports extends IpAddressesAbstract
 		$table->parsers = array(
 			'report_by'			=> function( $val, $row )
 			{
-				$member = Member::load( $row['report_by'] );
-				return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
+				$member = \IPS\Member::load( $row['report_by'] );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
 			},
 			'date_reported'		=> function( $val, $row )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
 			'report'		=> function( $val, $row )
 			{
 				try
 				{
-					$report = Report::load( $row['rid'] );
-					return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $report->url(), TRUE, $report->mapped('title') );
+					$report = \IPS\core\Reports\Report::load( $row['rid'] );
+					return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $report->url(), TRUE, $report->mapped('title') );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					return "";
 				}
@@ -119,11 +128,11 @@ class Reports extends IpAddressesAbstract
 		 	...
 	 	);
 	 * @endcode
-	 * @param	Member	$member	The member
-	 * @return	array|Select
+	 * @param	\IPS\Member	$member	The member
+	 * @return	array
 	 */
-	public function findByMember( Member $member ) : array|Select
+	public function findByMember( $member )
 	{
-		return Db::i()->select( "ip_address AS ip, count(*) AS count, MIN(date_reported) AS first, MAX(date_reported) AS last", 'core_rc_reports', array( 'report_by=?', $member->member_id ), NULL, NULL, 'ip_address' )->setKeyField( 'ip' );
+		return \IPS\Db::i()->select( "ip_address AS ip, count(*) AS count, MIN(date_reported) AS first, MAX(date_reported) AS last", 'core_rc_reports', array( 'report_by=?', $member->member_id ), NULL, NULL, 'ip_address' )->setKeyField( 'ip' );
 	}	
 }

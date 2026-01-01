@@ -11,17 +11,13 @@
 namespace IPS\Http\Request;
  
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use RuntimeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Request Exception Class
  */
-class Exception extends RuntimeException { }
+class _Exception extends \RuntimeException { }

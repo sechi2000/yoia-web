@@ -11,50 +11,43 @@
 namespace IPS\cms\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\TextArea;
-use IPS\Widget\Builder;
-use IPS\Widget\StaticCache;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * pagebuildertext Widget
  */
-class pagebuildertext extends StaticCache implements Builder
+class _pagebuildertext extends \IPS\Widget\StaticCache implements \IPS\Widget\Builder
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'pagebuildertext';
+	public $key = 'pagebuildertext';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'cms';
-
+	public $app = 'cms';
+		
 	/**
-	 * @var bool
+	 * @brief	Plugin
 	 */
-	public bool $allowNoBox = true;
+	public $plugin = '';
 	
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
  		$form = parent::configuration( $form );
 
- 		$form->add( new TextArea( 'pagebuilder_text', ( $this->configuration['pagebuilder_text'] ?? '' ), FALSE, array( 'rows' => 10 ) ) );
+ 		$form->add( new \IPS\Helpers\Form\TextArea( 'pagebuilder_text', ( isset( $this->configuration['pagebuilder_text'] ) ? $this->configuration['pagebuilder_text'] : '' ), FALSE, array( 'rows' => 10 ) ) );
  		return $form;
  	} 
 
@@ -63,7 +56,7 @@ class pagebuildertext extends StaticCache implements Builder
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		if ( ! empty( $this->configuration['pagebuilder_text'] ) )
 		{

@@ -10,49 +10,33 @@
  */
 
 namespace IPS\Api\GraphQL;
-use GraphQL\Type\Definition\BooleanType;
-use GraphQL\Type\Definition\FloatType;
-use GraphQL\Type\Definition\IDType;
-use GraphQL\Type\Definition\IntType;
 use GraphQL\Type\Definition\NonNull;
 use GraphQL\Type\Definition\ListOfType;
 use GraphQL\Type\Definition\EnumType;
 use GraphQL\Type\Definition\InputObjectType;
-use GraphQL\Type\Definition\ScalarType;
-use GraphQL\Type\Definition\StringType;
 use GraphQL\Type\Definition\Type;
-use IPS\Api\GraphQL\Types\FollowType;
-use IPS\Api\GraphQL\Types\ImageType;
-use IPS\Api\GraphQL\Types\ItemStateType;
-use IPS\Api\GraphQL\Types\ModuleAccessType;
-use IPS\Api\GraphQL\Types\MutationType;
-use IPS\Api\GraphQL\Types\QueryType;
-use IPS\Api\GraphQL\Types\ReputationType;
-use IPS\Api\GraphQL\Types\RichTextType;
-use IPS\Api\GraphQL\Types\UrlType;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Type registry
  */
-class TypeRegistry
+class _TypeRegistry
 {
-	protected static ?QueryType $query = null;
-	protected static ?MutationType $mutation = null;
-	protected static ?ItemStateType $itemState = null;
-	protected static ?ImageType $image = null;
-	protected static ?ReputationType $reputation = null;
-	protected static ?RichTextType $richText = null;
-	protected static ?UrlType $url = null;
-	protected static ?FollowType $follow = null;
-	protected static ?ModuleAccessType $moduleAccess = null;
+	protected static $query;
+	protected static $mutation;
+	protected static $itemState;
+	protected static $image;
+	protected static $reputation;
+	protected static $richText;
+	protected static $url;
+	protected static $follow;
+	protected static $moduleAccess;
 
 	/**
 	 * Constructor
@@ -63,136 +47,134 @@ class TypeRegistry
 	}
 
 	/**
-	* @return QueryType
+	* @return \IPS\Api\GraphQL\Types\QueryType
 	*/
-	public static function query(): QueryType
+	public static function query(): \IPS\Api\GraphQL\Types\QueryType
 	{
-		return self::$query ?: (self::$query = new QueryType());
+		return self::$query ?: (self::$query = new \IPS\Api\GraphQL\Types\QueryType());
 	}
 
 	/**
-	* @return MutationType
+	* @return \IPS\Api\GraphQL\Types\MutationType
 	*/
-	public static function mutation(): MutationType
+	public static function mutation(): \IPS\Api\GraphQL\Types\MutationType
 	{
-		return self::$mutation ?: (self::$mutation = new MutationType());
+		return self::$mutation ?: (self::$mutation = new \IPS\Api\GraphQL\Types\MutationType());
 	}
 
 	/**
-	 * @return ItemStateType
+	 * @return \IPS\Api\GraphQL\Types\ItemStateType
 	 */
-	public static function itemState(): ItemStateType
+	public static function itemState(): \IPS\Api\GraphQL\Types\ItemStateType
 	{
-		return self::$itemState ?: (self::$itemState = new ItemStateType());
+		return self::$itemState ?: (self::$itemState = new \IPS\Api\GraphQL\Types\ItemStateType());
 	}
 	
 	/**
 	 * @return ImageType
 	 */
-	public static function image(): ImageType
+	public static function image(): \IPS\Api\GraphQL\Types\ImageType
 	{
-		return self::$image ?: (self::$image = new ImageType());
+		return self::$image ?: (self::$image = new \IPS\Api\GraphQL\Types\ImageType());
 	}
 	
 	/**
-	 * @return ReputationType
+	 * @return \IPS\Api\GraphQL\Types\ReputationType
 	 */
-	public static function reputation(): ReputationType
+	public static function reputation(): \IPS\Api\GraphQL\Types\ReputationType
 	{
-		return self::$reputation ?: (self::$reputation = new ReputationType());
+		return self::$reputation ?: (self::$reputation = new \IPS\Api\GraphQL\Types\ReputationType());
 	}
 	
 	/**
-	 * @return RichTextType
+	 * @return \IPS\Api\GraphQL\Types\RichTextType
 	 */
-	public static function richText(): RichTextType
+	public static function richText(): \IPS\Api\GraphQL\Types\RichTextType
 	{
-		return self::$richText ?: (self::$richText = new RichTextType());
+		return self::$richText ?: (self::$richText = new \IPS\Api\GraphQL\Types\RichTextType());
 	}
 
 	/**
-	 * @return UrlType
+	 * @return \IPS\Api\GraphQL\Types\UrlType
 	 */
-	public static function url(): UrlType
+	public static function url(): \IPS\Api\GraphQL\Types\UrlType
 	{
-		return self::$url ?: (self::$url = new UrlType());
+		return self::$url ?: (self::$url = new \IPS\Api\GraphQL\Types\UrlType());
 	}
 
 	/**
-	 * @return FollowType
+	 * @return \IPS\Api\GraphQL\Types\FollowType
 	 */
-	public static function follow(): FollowType
+	public static function follow(): \IPS\Api\GraphQL\Types\FollowType
 	{
-		return self::$follow ?: (self::$follow = new FollowType());
+		return self::$follow ?: (self::$follow = new \IPS\Api\GraphQL\Types\FollowType());
 	}
 
 	/**
-	 * @return ModuleAccessType
+	 * @return \IPS\Api\GraphQL\Types\ModuleAccessType
 	 */
-	public static function moduleAccess(): ModuleAccessType
+	public static function moduleAccess(): \IPS\Api\GraphQL\Types\ModuleAccessType
 	{
-		return self::$moduleAccess ?: (self::$moduleAccess = new ModuleAccessType());
+		return self::$moduleAccess ?: (self::$moduleAccess = new \IPS\Api\GraphQL\Types\ModuleAccessType());
 	}
 
 	/**
-	* @return ScalarType
+	* @return \GraphQL\Type\Definition\IDType
 	*/
-	public static function id(): IDType
+	public static function id(): \GraphQL\Type\Definition\IDType
 	{
 		return Type::id();
 	}
 
 	/**
-	* @return ScalarType
+	* @return \GraphQL\Type\Definition\StringType
 	*/
-	public static function string(): StringType
+	public static function string(): \GraphQL\Type\Definition\StringType
 	{
 		return Type::string();
 	}
 
 	/**
-	* @return ScalarType
+	* @return \GraphQL\Type\Definition\IntType
 	*/
-	public static function int(): IntType
+	public static function int(): \GraphQL\Type\Definition\IntType
 	{
 		return Type::int();
 	}
 
 	/**
-	* @return ScalarType
+	* @return \GraphQL\Type\Definition\FloatType
 	*/
-	public static function float(): FloatType
+	public static function float(): \GraphQL\Type\Definition\FloatType
 	{
 		return Type::float();
 	}
 
 	/**
-	* @return ScalarType
+	* @return \GraphQL\Type\Definition\BooleanType
 	*/
-	public static function boolean(): BooleanType
+	public static function boolean(): \GraphQL\Type\Definition\BooleanType
 	{
 		return Type::boolean();
 	}
 
 	/**
-	 * @param mixed $type
-	 * @return ListOfType
-	 */
-	public static function listOf( mixed $type): ListOfType
+	* @return \GraphQL\Type\Definition\ListOfType
+	*/
+	public static function listOf($type): \GraphQL\Type\Definition\ListOfType
 	{
 		return new ListOfType($type);
 	}
 
 	/**
-	 * @param array $config
-	 * @return EnumType
-	 */
-	public static function eNum( array $config): EnumType
+	* @return \GraphQL\Type\Definition\EnumType
+	*/
+	public static function eNum($config): \GraphQL\Type\Definition\EnumType
 	{
 		return new EnumType($config);
 	}
 
-	public static function inputObjectType( array $config): InputObjectType
+	public static function inputObjectType($config): \GraphQL\Type\Definition\InputObjectType
 	{
 		return new InputObjectType($config);
 	}
@@ -201,7 +183,7 @@ class TypeRegistry
 	* @param Type $type
 	* @return NonNull
 	*/
-	public static function nonNull( mixed $type): NonNull
+	public static function nonNull($type): \GraphQL\Type\Definition\NonNull
 	{
 		return new NonNull($type);
 	}

@@ -11,54 +11,36 @@
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Wizard;
-use IPS\Http\Url;
-use IPS\Member\Group;
-use IPS\Output;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancement: Google Maps
  */
-class GoogleMaps extends CommunityEnhancementsAbstract
+class _GoogleMaps
 {
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= FALSE;
+	public $ips	= FALSE;
 
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= TRUE;
+	public $hasOptions	= TRUE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "google_maps.png";
+	public $icon	= "google_maps.png";
 
 	/**
 	 * Constructor
@@ -67,7 +49,7 @@ class GoogleMaps extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		$this->enabled = ( Settings::i()->google_maps_api_key and ( Settings::i()->googlemaps or Settings::i()->googleplacesautocomplete ) );
+		$this->enabled = ( \IPS\Settings::i()->google_maps_api_key and ( \IPS\Settings::i()->googlemaps or \IPS\Settings::i()->googleplacesautocomplete ) );
 	}
 	
 	/**
@@ -75,42 +57,21 @@ class GoogleMaps extends CommunityEnhancementsAbstract
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
-		$wizard = new Wizard( array(
+		$wizard = new \IPS\Helpers\Wizard( array(
 			'google_maps_enable_apis'		=> function( $data )
 			{
-				$form = new Form( 'google_maps_enable_apis', 'continue' );
+				$form = new \IPS\Helpers\Form( 'google_maps_enable_apis', 'continue' );
 				$form->addHeader('google_maps_choose_features');
-				$form->add( new YesNo( 'googlemaps', $data['googlemaps'] ?? Settings::i()->googlemaps, FALSE, array( 'togglesOn' => array( 'googleApi_jsapi', 'googleApi_staticapi', 'googleApi_geocodeapi', 'google_maps_enable_apis_google_maps_static_use_embed', 'google_maps_groups', 'google_maps_zoom' ) ) ) );
-				$form->add( new YesNo( 'google_maps_static_use_embed', $data['google_maps_static_use_embed'] ?? Settings::i()->google_maps_static_use_embed, FALSE ) );
-
-				$groups = [];
-				foreach( Group::groups() as $g )
-				{
-					$groups[ $g->g_id ] = $g->name;
-				}
-
-				$form->add( new Select( 'google_maps_groups', Settings::i()->google_maps_groups == '*' ? '*' : explode( ",", Settings::i()->google_maps_groups ), true, array(
-					'options' => $groups,
-					'multiple' => true,
-					'noDefault' => true,
-					'unlimited' => '*',
-					'unlimitedLang' => 'google_maps_groups_all'
-				), null, null, null, 'google_maps_groups' ) );
-				$form->add( new Number( 'google_maps_zoom', Settings::i()->google_maps_zoom ?: -1, false, array(
-					'unlimited' => -1,
-					'unlimitedLang' => 'google_maps_zoom_auto',
-					'decimals' => 0,
-					'min' => 1,
-					'max' => 22
-				), null, null, null, 'google_maps_zoom' ) );
-				$form->add( new YesNo( 'googleplacesautocomplete', $data['googleplacesautocomplete'] ?? Settings::i()->googleplacesautocomplete, FALSE, array( 'togglesOn' => array( 'googleApi_places' ) ) ) );
+				$form->add( new \IPS\Helpers\Form\YesNo( 'googlemaps', isset( $data['googlemaps'] ) ? $data['googlemaps'] : \IPS\Settings::i()->googlemaps, FALSE, array( 'togglesOn' => array( 'googleApi_jsapi', 'googleApi_staticapi', 'googleApi_geocodeapi', 'google_maps_enable_apis_google_maps_static_use_embed' ) ) ) );
+				$form->add( new \IPS\Helpers\Form\YesNo( 'google_maps_static_use_embed', isset( $data['google_maps_static_use_embed'] ) ? $data['google_maps_static_use_embed'] : \IPS\Settings::i()->google_maps_static_use_embed, FALSE ) );
+				$form->add( new \IPS\Helpers\Form\YesNo( 'googleplacesautocomplete', isset( $data['googleplacesautocomplete'] ) ? $data['googleplacesautocomplete'] : \IPS\Settings::i()->googleplacesautocomplete, FALSE, array( 'togglesOn' => array( 'googleApi_places' ) ) ) );
 				$form->addHeader('google_maps_enable_apis');
 				$form->addMessage('google_maps_create_project_message');
 				foreach ( array( 'jsapi', 'staticapi', 'geocodeapi', 'places' ) as $k )
 				{
-					$form->addHtml( Theme::i()->getTemplate('applications')->enhancementsGoogleMapsApi( $k ) );
+					$form->addHtml( \IPS\Theme::i()->getTemplate('applications')->enhancementsGoogleMapsApi( $k ) );
 				}
 				
 				if ( $values = $form->values() )
@@ -121,8 +82,8 @@ class GoogleMaps extends CommunityEnhancementsAbstract
 					}
 					else
 					{
-						Settings::i()->changeValues( array( 'googlemaps' => 0, 'googleplacesautocomplete' => 0, 'google_maps_static_use_embed' => 0 ) );
-						Output::i()->redirect( Url::internal('app=core&module=applications&controller=enhancements'), 'saved' );
+						\IPS\Settings::i()->changeValues( array( 'googlemaps' => 0, 'googleplacesautocomplete' => 0, 'google_maps_static_use_embed' => 0 ) );
+						\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=applications&controller=enhancements'), 'saved' );
 					}
 				}
 				
@@ -130,19 +91,19 @@ class GoogleMaps extends CommunityEnhancementsAbstract
 			},
 			'google_maps_create_credentials'=> function( $data )
 			{
-				$websiteUrl = rtrim( Settings::i()->base_url, '/' ) . '/*';
+				$websiteUrl = rtrim( \IPS\Settings::i()->base_url, '/' ) . '/*';
 				
-				$form = new Form;
+				$form = new \IPS\Helpers\Form;
 				if ( $data['googlemaps'] )
 				{
 					$form->addHeader('google_maps_create_public_key_header');
 				}
 				$form->addMessage('google_maps_create_public_key_message');
-				$form->add( new Text( 'google_maps_api_key', Settings::i()->google_maps_api_key, TRUE, array(), function( $val )
+				$form->add( new \IPS\Helpers\Form\Text( 'google_maps_api_key', \IPS\Settings::i()->google_maps_api_key, TRUE, array(), function( $val )
 				{
 					try
 					{
-						$response = Url::external( 'https://maps.googleapis.com/maps/api/staticmap' )->setQueryString( array(
+						$response = \IPS\Http\Url::external( 'https://maps.googleapis.com/maps/api/staticmap' )->setQueryString( array(
 							'center'		=> '40.714224,-73.961452',
 							'zoom'		=> NULL,
 							'size'		=> "100x100",
@@ -151,40 +112,40 @@ class GoogleMaps extends CommunityEnhancementsAbstract
 							'key'		=> $val,
 						) )->request()->get();
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
-						throw new DomainException('google_maps_api_error');
+						throw new \DomainException('google_maps_api_error');
 					}
 					if ( $response->httpResponseCode != 200 )
 					{
-						throw new DomainException( $response ?: 'google_maps_api_key_invalid' );
+						throw new \DomainException( $response ?: 'google_maps_api_key_invalid' );
 					}
 				} ) );
-				$form->addHtml( Theme::i()->getTemplate('applications')->enhancementsGoogleMapsKeyRestrictions( TRUE, $websiteUrl, $data ) );
+				$form->addHtml( \IPS\Theme::i()->getTemplate('applications')->enhancementsGoogleMapsKeyRestrictions( TRUE, $websiteUrl, $data ) );
 				if ( $data['googlemaps'] )
 				{
 					$form->addHeader('google_maps_create_secret_key_header');
 					$form->addMessage('google_maps_create_secret_key_message');
-					$form->add( new Text( 'google_maps_api_key_secret', Settings::i()->google_maps_api_key_secret, TRUE, array(), function( $val )
+					$form->add( new \IPS\Helpers\Form\Text( 'google_maps_api_key_secret', \IPS\Settings::i()->google_maps_api_key_secret, TRUE, array(), function( $val )
 					{
 						try
 						{
-							$response = Url::external( "https://maps.googleapis.com/maps/api/geocode/json" )->setQueryString( array(
+							$response = \IPS\Http\Url::external( "https://maps.googleapis.com/maps/api/geocode/json" )->setQueryString( array(
 								'latlng'	=> '40.714224,-73.961452',
 								'sensor'	=> 'false',
 								'key'		=> $val
 							) )->request()->get()->decodeJson();
 						}
-						catch ( Exception $e )
+						catch ( \Exception $e )
 						{
-							throw new DomainException('google_maps_api_error');
+							throw new \DomainException('google_maps_api_error');
 						}
 						if ( !isset( $response['status'] ) or $response['status'] !== 'OK' )
 						{
-							throw new DomainException( ( isset( $response['error_message'] ) ) ? $response['error_message'] : 'google_maps_api_key_invalid' );
+							throw new \DomainException( ( isset( $response['error_message'] ) ) ? $response['error_message'] : 'google_maps_api_key_invalid' );
 						}
 					} ) );
-					$form->addHtml( Theme::i()->getTemplate('applications')->enhancementsGoogleMapsKeyRestrictions( FALSE, $websiteUrl, $data ) );
+					$form->addHtml( \IPS\Theme::i()->getTemplate('applications')->enhancementsGoogleMapsKeyRestrictions( FALSE, $websiteUrl, $data ) );
 				}
 				
 				if ( $values = $form->values() )
@@ -194,27 +155,25 @@ class GoogleMaps extends CommunityEnhancementsAbstract
 						'googleplacesautocomplete'		=> $data['googleplacesautocomplete'],
 						'google_maps_static_use_embed'  => $data['google_maps_static_use_embed'],
 						'google_maps_api_key'			=> $values['google_maps_api_key'],
-						'google_maps_api_key_secret'		=> $data['googlemaps'] ? $values['google_maps_api_key_secret'] : '',
-						'google_maps_groups'			=> ( $data['google_maps_groups'] == '*' ? '*' : implode( ",", $data['google_maps_groups'] ) ),
-						'google_maps_zoom'				=> ( $data['google_maps_zoom'] > -1 ? $data['google_maps_zoom'] : null )
+						'google_maps_api_key_secret'		=> $data['googlemaps'] ? $values['google_maps_api_key_secret'] : ''
 					) );
-					Session::i()->log( 'acplog__enhancements_edited', array( 'enhancements__core_GoogleMaps' => TRUE ) );
-					Output::i()->redirect( Url::internal('app=core&module=applications&controller=enhancements'), 'saved' );
+					\IPS\Session::i()->log( 'acplog__enhancements_edited', array( 'enhancements__core_GoogleMaps' => TRUE ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=applications&controller=enhancements'), 'saved' );
 				}
 				
 				return (string) $form;
 			},
-		), Url::internal('app=core&module=applications&controller=enhancements&do=edit&id=core_GoogleMaps') );
+		), \IPS\Http\Url::internal('app=core&module=applications&controller=enhancements&do=edit&id=core_GoogleMaps') );
 		
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'help'	=> array(
 				'title'		=> 'learn_more',
 				'icon'		=> 'question-circle',
-				'link'		=> Url::ips( 'docs/googlemaps' ),
+				'link'		=> \IPS\Http\Url::ips( 'docs/googlemaps' ),
 				'target'	=> '_blank'
 			),
 		);
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_GoogleMaps', $wizard );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_GoogleMaps', $wizard );
 	}
 	
 	/**
@@ -223,23 +182,23 @@ class GoogleMaps extends CommunityEnhancementsAbstract
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		/* If we're disabling, just disable */
 		if( !$enabled )
 		{
-			Settings::i()->changeValues( array( 'googlemaps' => 0, 'googleplacesautocomplete' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'googlemaps' => 0, 'googleplacesautocomplete' => 0 ) );
 		}
 
 		/* Otherwise if we already have an API key, just toggle on */
-		if( $enabled && Settings::i()->google_maps_api_key )
+		if( $enabled && \IPS\Settings::i()->google_maps_api_key )
 		{
-			Settings::i()->changeValues( array( 'googlemaps' => 1, 'googleplacesautocomplete' => 1, 'mapbox' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'googlemaps' => 1, 'googleplacesautocomplete' => 1, 'mapbox' => 0 ) );
 		}
 		else
 		{
 			/* Otherwise we need to let them enter an API key before we can enable.  Throwing an exception causes you to be redirected to the settings page. */
-			throw new DomainException;
+			throw new \DomainException;
 		}
 	}
 }

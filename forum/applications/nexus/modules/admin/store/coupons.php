@@ -12,49 +12,35 @@
 namespace IPS\nexus\modules\admin\store;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Helpers\Table\Custom;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Coupon;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * coupons
  */
-class coupons extends Controller
+class _coupons extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\nexus\Coupon';
+	protected $nodeClass = 'IPS\nexus\Coupon';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'coupons_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'coupons_manage' );
 		parent::execute();
 	}
 	
@@ -63,19 +49,19 @@ class coupons extends Controller
 	 *
 	 * @return	void
 	 */
-	public function viewUses() : void
+	public function viewUses()
 	{
 		try
 		{
-			$coupon = Coupon::load( Request::i()->id );
+			$coupon = \IPS\nexus\Coupon::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X234/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X234/1', 404, '' );
 		}
 		
 		$data = array();
-		$usedBy = $coupon->used_by ? json_decode( $coupon->used_by, TRUE ) : null;
+		$usedBy = json_decode( $coupon->used_by, TRUE );
 		if ( $usedBy )
 		{
 			foreach ( $usedBy as $member => $uses )
@@ -85,17 +71,17 @@ class coupons extends Controller
 		}
 
 				
-		$table = new Custom( $data, Url::internal("app=nexus&module=store&controller=coupons&do=viewUses&id={$coupon->id}") );
+		$table = new \IPS\Helpers\Table\Custom( $data, \IPS\Http\Url::internal("app=nexus&module=store&controller=coupons&do=viewUses&id={$coupon->id}") );
 		$table->parsers = array(
 			'coupon_customer'	=> function ( $val )
 			{
-				return is_numeric( $val ) ? Theme::i()->getTemplate('global')->userLink( Member::load( $val ) ) : $val;
+				return \is_numeric( $val ) ? \IPS\Theme::i()->getTemplate('global')->userLink( \IPS\Member::load( $val ) ) : $val;
 			}
 		);
 		$table->sortBy = 'coupon_uses';
 		$table->noSort = array( 'coupon_customer' );
 		
-		Output::i()->title = $coupon->code;
-		Output::i()->output = (string) $table;
+		\IPS\Output::i()->title = $coupon->code;
+		\IPS\Output::i()->output = (string) $table;
 	}
 }

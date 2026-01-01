@@ -11,31 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Content\Comment;
-use IPS\core\Reports\Report;
-use IPS\core\Reports\Rules;
-use IPS\Db;
-use IPS\Member;
-use IPS\Notification;
-use IPS\Settings;
-use IPS\Task;
-use OutofRangeException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * automaticmoderation Task
  */
-class automaticmoderation extends Task
+class _automaticmoderation extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -46,26 +31,26 @@ class automaticmoderation extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		if ( ! Settings::i()->automoderation_enabled )
+		if ( ! \IPS\Settings::i()->automoderation_enabled )
 		{
 			return NULL;
 		}
 
-		foreach( Db::i()->select( '*', 'core_automatic_moderation_pending', NULL, 'pending_added ASC', array( 0, 50 ) ) as $pending )
+		foreach( \IPS\Db::i()->select( '*', 'core_automatic_moderation_pending', NULL, 'pending_added ASC', array( 0, 50 ) ) as $pending )
 		{
 			/* Check report exists still */
 			try
 			{
-				$report = Report::load( $pending['pending_report_id'] );
+				$report = \IPS\core\Reports\Report::load( $pending['pending_report_id'] );
 			}
-			catch( OutofRangeException $e )
+			catch( \OutofRangeException $e )
 			{
 				/* Report is missing */
-				Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_report_id=?', $pending['pending_report_id'] ) );
+				\IPS\Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_report_id=?', $pending['pending_report_id'] ) );
 				continue;
 			}
 			
@@ -76,22 +61,22 @@ class automaticmoderation extends Task
 			{
 				$object = $className::load( $pending['pending_object_id'] );
 			}
-			catch( OutofRangeException $e )
+			catch( \OutofRangeException $e )
 			{
 				/* Object no longer exists */
-				Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_object_class=? and pending_object_id=?', $pending['pending_object_class'], $pending['pending_object_id'] ) );
+				\IPS\Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_object_class=? and pending_object_id=?', $pending['pending_object_class'], $pending['pending_object_id'] ) );
 				continue;
 			}
 			
 			/* Check rule exists still */
 			try
 			{
-				$rule = Rules::load( $pending['pending_rule_id'] );
+				$rule = \IPS\core\Reports\Rules::load( $pending['pending_rule_id'] );
 			}
-			catch( OutofRangeException $e )
+			catch( \OutofRangeException $e )
 			{
 				/* Rule no longer exists */
-				Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_rule_id=?', $pending['pending_rule_id'] ) );
+				\IPS\Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_rule_id=?', $pending['pending_rule_id'] ) );
 				continue;
 			}
 
@@ -99,30 +84,30 @@ class automaticmoderation extends Task
 			$hidden = FALSE;
 			try
 			{
-				if ( $object instanceof Comment )
+				if ( $object instanceof \IPS\Content\Comment )
 				{
 					$item = $object->item();
 					if ( $item and $item::$firstCommentRequired and $object->isFirst() )
 					{
 						/* Hide the item, not the object */
-						$item->hide( FALSE, Rules::getDefaultHideReason() );
+						$item->hide( FALSE, \IPS\core\Reports\Rules::getDefaultHideReason() );
 						$hidden = TRUE;
 					}
 				}
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 			
 			if ( $hidden === FALSE )
 			{
-				$object->hide( FALSE, Rules::getDefaultHideReason() );
+				$object->hide( FALSE, \IPS\core\Reports\Rules::getDefaultHideReason() );
 			}
 			
 			/* Remove from the pending queue */
-			Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_object_class=? and pending_object_id=?', $pending['pending_object_class'], $pending['pending_object_id'] ) );
+			\IPS\Db::i()->delete( 'core_automatic_moderation_pending', array( 'pending_object_class=? and pending_object_id=?', $pending['pending_object_class'], $pending['pending_object_id'] ) );
 			
 			/* Send notification to mods */
 			$moderators = array( 'm' => array(), 'g' => array() );
-			foreach ( Db::i()->select( '*', 'core_moderators' ) as $mod )
+			foreach ( \IPS\Db::i()->select( '*', 'core_moderators' ) as $mod )
 			{
 				$canView = FALSE;
 				if ( $mod['perms'] == '*' )
@@ -146,16 +131,16 @@ class automaticmoderation extends Task
 			
 			try
 			{
-				$latestReport = Db::i()->select( '*', 'core_rc_reports', array( 'rid=?', $report->id ), 'date_reported DESC' )->first();
-				$notification = new Notification( Application::load('core'), 'automatic_moderation', $report, array( $report, $latestReport, $object ) );
-				foreach ( Db::i()->select( '*', 'core_members', ( count( $moderators['m'] ) ? Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $member )
+				$latestReport = \IPS\Db::i()->select( '*', 'core_rc_reports', array( 'rid=?', $report->id ), 'date_reported DESC' )->first();
+				$notification = new \IPS\Notification( \IPS\Application::load('core'), 'automatic_moderation', $report, array( $report, $latestReport, $object ) );
+				foreach ( \IPS\Db::i()->select( '*', 'core_members', ( \count( $moderators['m'] ) ? \IPS\Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . \IPS\Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . \IPS\Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $member )
 				{
-					$notification->recipients->attach( Member::constructFromData( $member ) );
+					$notification->recipients->attach( \IPS\Member::constructFromData( $member ) );
 				}
 				
 				$notification->send();
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 		
 		return NULL;

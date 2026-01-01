@@ -11,47 +11,38 @@
 namespace IPS\core\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Registration Stats
  */
-class registrationstats extends Controller
+class _registrationstats extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * Manage Members
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Check permission */
-		Dispatcher::i()->checkAcpPermission( 'registrations_manage', 'core', 'stats' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'registrations_manage', 'core', 'stats' );
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_stats_registrationstats');
-		Output::i()->output = Chart::loadFromExtension( 'core', 'Registrations' )->getChart( Url::internal( 'app=core&module=stats&controller=registrationstats' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_stats_registrationstats');
+		\IPS\Output::i()->output = (string) \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'Registrations' )->getChart( \IPS\Http\Url::internal( 'app=core&module=stats&controller=registrationstats' ) );
 	}
 }

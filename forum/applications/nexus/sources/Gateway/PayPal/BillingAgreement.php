@@ -12,39 +12,24 @@
 namespace IPS\nexus\Gateway\PayPal;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\nexus\Customer\BillingAgreement as NexusBillingAgreement;
-use IPS\nexus\Money;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Transaction;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PayPal Billing Agreement
  */
-class BillingAgreement extends NexusBillingAgreement
+class _BillingAgreement extends \IPS\nexus\Customer\BillingAgreement
 {
 	/**
 	 * Get status
 	 *
 	 * @return	string	See STATUS_* constants
-	 * @throws    \IPS\nexus\Gateway\PayPal\Exception
+	 * @throws	\IPS\nexus\Gateway\PayPal\Exception
 	 */
-	public function status() : string
+	public function status()
 	{
 		$data = $this->_getData();
 
@@ -67,17 +52,15 @@ class BillingAgreement extends NexusBillingAgreement
 				return static::STATUS_CANCELED;
 				break;
 		}
-
-		return '';
 	}
 	
 	/**
 	 * Get term
 	 *
-	 * @return	RenewalTerm
-	 * @throws    \IPS\nexus\Gateway\PayPal\Exception
+	 * @return	\IPS\nexus\Purchase\RenewalTerm
+	 * @throws	\IPS\nexus\Gateway\PayPal\Exception
 	 */
-	public function term() : RenewalTerm
+	public function term()
 	{
 		$data = $this->_getData();
 		
@@ -86,9 +69,9 @@ class BillingAgreement extends NexusBillingAgreement
 			$plan = $this->method->api( "billing/plans/{$data['plan_id']}", NULL, 'get' );
 			$cycle = array_pop( $plan['billing_cycles'] );
 
-			return new RenewalTerm(
-				new Money( $cycle['pricing_scheme']['fixed_price']['value'], $cycle['pricing_scheme']['fixed_price']['currency_code'] ),
-				new DateInterval( 'P' . $cycle['frequency']['interval_count'] . mb_substr( $cycle['frequency']['interval_unit'], 0, 1 ) )
+			return new \IPS\nexus\Purchase\RenewalTerm(
+				new \IPS\nexus\Money( $cycle['pricing_scheme']['fixed_price']['value'], $cycle['pricing_scheme']['fixed_price']['currency_code'] ),
+				new \DateInterval( 'P' . $cycle['frequency']['interval_count'] . mb_substr( $cycle['frequency']['interval_unit'], 0, 1 ) )
 			);
 		}
 		else
@@ -99,9 +82,9 @@ class BillingAgreement extends NexusBillingAgreement
 				$amount += $data['plan']['payment_definitions'][0]['charge_models'][0]['amount']['value'];
 			}
 			
-			return new RenewalTerm(
-				new Money( $amount, $data['plan']['payment_definitions'][0]['amount']['currency'] ),
-				new DateInterval( 'P' . $data['plan']['payment_definitions'][0]['frequency_interval'] . mb_substr( $data['plan']['payment_definitions'][0]['frequency'], 0, 1 ) )
+			return new \IPS\nexus\Purchase\RenewalTerm(
+				new \IPS\nexus\Money( $amount, $data['plan']['payment_definitions'][0]['amount']['currency'] ),
+				new \DateInterval( 'P' . $data['plan']['payment_definitions'][0]['frequency_interval'] . mb_substr( $data['plan']['payment_definitions'][0]['frequency'], 0, 1 ) )
 			);
 		}
 	}
@@ -109,52 +92,54 @@ class BillingAgreement extends NexusBillingAgreement
 	/**
 	 * Get next payment date
 	 *
-	 * @return	DateTime
-	 * @throws    \IPS\nexus\Gateway\PayPal\Exception
+	 * @return	\IPS\DateTime
+	 * @throws	\IPS\nexus\Gateway\PayPal\Exception
 	 */
-	public function nextPaymentDate() : DateTime
+	public function nextPaymentDate()
 	{
 		$data = $this->_getData();
 		if ( isset( $data['billing_info'] ) )
 		{
-			return new DateTime( $data['billing_info']['next_billing_time'] );
+			return new \IPS\DateTime( $data['billing_info']['next_billing_time'] );
 		}
 		else
 		{		
-			return new DateTime( $data['agreement_details']['next_billing_date'] );
+			return new \IPS\DateTime( $data['agreement_details']['next_billing_date'] );
 		}
 	}
 
 	/**
 	 * Get latest unclaimed transaction (only gets transactions within the last 31 days which do not yet have a matching transaction)
 	 *
-	 * @return	Transaction
-	 * @throws    \IPS\nexus\Gateway\PayPal\Exception
-	 * @throws	OutOfRangeException
+	 * @return	\IPS\nexus\Transaction
+	 * @throws	\IPS\nexus\Gateway\PayPal\Exception
+	 * @throws	\OutOfRangeException
 	 * @throws  \IPS\Http\Url\Exception
 	 */
-	public function latestUnclaimedTransaction() : Transaction
+	public function latestUnclaimedTransaction()
 	{
 		$data = $this->_getData();
 		/* PayPal Subscriptions */
 		if ( isset( $data['plan_id'] ) )
 		{
-			$transactions = $this->method->api( "billing/subscriptions/{$this->gw_id}/transactions?start_time=" . DateTime::create()->sub( new DateInterval( 'P31D' ) )->rfc3339() . '&end_time=' . DateTime::create()->rfc3339(), NULL, 'get' );
+			$url = '';
+			$transactions = $this->method->api( "billing/subscriptions/{$this->gw_id}/transactions?start_time=" . \IPS\DateTime::create()->sub( new \DateInterval( 'P31D' ) )->rfc3339() . '&end_time=' . \IPS\DateTime::create()->rfc3339(), NULL, 'get' );
 			foreach ( array_reverse( $transactions['transactions'] ?? [] ) as $t )
 			{
 				if ( $t['status'] == 'COMPLETED' )
 				{
 					try
 					{
-						Db::i()->select( 't_id', 'nexus_transactions', [ 't_gw_id=? AND t_method=?', $t['id'], $this->method->id ], flags: Db::SELECT_FROM_WRITE_SERVER )->first();
+						/* @note SELECT_FROM_WRITE_SERVER transaction race condition */
+						\IPS\Db::i()->select( 't_id', 'nexus_transactions', [ 't_gw_id=? AND t_method=?', $t['id'], $this->method->id ], flags: \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 					}
-					catch ( UnderflowException )
+					catch ( \UnderflowException $e )
 					{
-						$transaction = new Transaction;
+						$transaction = new \IPS\nexus\Transaction;
 						$transaction->member = $this->member;
 						$transaction->method = $this->method;
-						$transaction->amount = new Money( $t['amount_with_breakdown']['gross_amount']['value'], $t['amount_with_breakdown']['gross_amount']['currency_code'] );
-						$transaction->date = new DateTime( $t['time'] );
+						$transaction->amount = new \IPS\nexus\Money( $t['amount_with_breakdown']['gross_amount']['value'], $t['amount_with_breakdown']['gross_amount']['currency_code'] );
+						$transaction->date = new \IPS\DateTime( $t['time'] );
 						$transaction->extra = array( 'automatic' => TRUE );
 						$transaction->gw_id = $t['id'];
 						$transaction->billing_agreement = $this;
@@ -174,15 +159,16 @@ class BillingAgreement extends NexusBillingAgreement
 				{
 					try
 					{
-						Db::i()->select( 't_id', 'nexus_transactions', [ 't_gw_id=? AND t_method=?', $t['transaction_id'], $this->method->id ], flags: Db::SELECT_FROM_WRITE_SERVER )->first();
+						/* @note SELECT_FROM_WRITE_SERVER transaction race condition */
+						\IPS\Db::i()->select( 't_id', 'nexus_transactions', [ 't_gw_id=? AND t_method=?', $t['transaction_id'], $this->method->id ], flags: \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 					}
-					catch ( UnderflowException )
+					catch ( \UnderflowException $e )
 					{
-						$transaction = new Transaction;
+						$transaction = new \IPS\nexus\Transaction;
 						$transaction->member = $this->member;
 						$transaction->method = $this->method;
-						$transaction->amount = new Money( $t['amount']['value'], $t['amount']['currency'] );
-						$transaction->date = new DateTime( $t['time_stamp'] );
+						$transaction->amount = new \IPS\nexus\Money( $t['amount']['value'], $t['amount']['currency'] );
+						$transaction->date = new \IPS\DateTime( $t['time_stamp'] );
 						$transaction->extra = array( 'automatic' => TRUE );
 						$transaction->gw_id = $t['transaction_id'];
 						$transaction->billing_agreement = $this;
@@ -192,16 +178,16 @@ class BillingAgreement extends NexusBillingAgreement
 			}
 		}
 
-		throw new OutOfRangeException( "{$this->id} ({$this->gw_id})\n{$url}\n\n" . print_r( $transactions, TRUE ) );
+		throw new \OutOfRangeException( "{$this->id} ({$this->gw_id})\n{$url}\n\n" . print_r( $transactions, TRUE ) );
 	}
 	
 	/**
 	 * Suspend
 	 *
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function doSuspend() : void
+	public function doSuspend()
 	{
 		$data = $this->_getData();
 		if ( isset( $data['plan_id'] ) )
@@ -218,9 +204,9 @@ class BillingAgreement extends NexusBillingAgreement
 	 * Reactivate
 	 *
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function doReactivate() : void
+	public function doReactivate()
 	{
 		$data = $this->_getData();
 		if ( isset( $data['plan_id'] ) )
@@ -237,9 +223,9 @@ class BillingAgreement extends NexusBillingAgreement
 	 * Cancel
 	 *
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function doCancel() : void
+	public function doCancel()
 	{
 		$data = $this->_getData();
 		if ( isset( $data['plan_id'] ) )
@@ -255,15 +241,15 @@ class BillingAgreement extends NexusBillingAgreement
 	/**
 	 * @brief	Cached data
 	 */
-	protected  ?array $_payPalData = NULL;
+	protected $_payPalData = NULL;
 	
 	/**
 	 * Get data
 	 *
 	 * @return	array
-	 * @throws    \IPS\nexus\Gateway\PayPal\Exception
+	 * @throws	\IPS\nexus\Gateway\PayPal\Exception
 	 */
-	public function _getData() : array
+	public function _getData()
 	{
 		if ( $this->_payPalData === NULL )
 		{
@@ -273,10 +259,10 @@ class BillingAgreement extends NexusBillingAgreement
 
 				if( !isset( $this->_payPalData['plan_id'] ) )
 				{
-					throw new RuntimeException;
+					throw new \RuntimeException;
 				}
 			}
-			catch ( Exception )
+			catch ( \Exception $e )
 			{
 				$this->_payPalData = $this->method->api( "payments/billing-agreements/{$this->gw_id}", NULL, 'get' );
 			}

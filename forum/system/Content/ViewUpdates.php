@@ -11,21 +11,9 @@
 namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Events\Event;
-use IPS\Redis;
-use function defined;
-use function get_called_class;
-use const IPS\CACHE_CONFIG;
-use const IPS\CACHE_METHOD;
-use const IPS\REDIS_CONFIG;
-use const IPS\REDIS_ENABLED;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -39,30 +27,28 @@ trait ViewUpdates
 	 *
 	 * @return	void
 	 */
-	public function updateViews(): void
+	public function updateViews()
 	{
 		$idColumn = static::$databaseColumnId;
-		$class = get_called_class();
+		$class = \get_called_class();
 		
 		$countUpdated = false;
-		if ( Redis::isEnabled() )
+		if ( \IPS\REDIS_ENABLED and \IPS\CACHE_METHOD == 'Redis' and ( \IPS\CACHE_CONFIG or \IPS\REDIS_CONFIG ) )
 		{
 			try
 			{
-				Redis::i()->zIncrBy( 'topic_views', 1, $class .'__' . $this->$idColumn );
+				\IPS\Redis::i()->zIncrBy( 'topic_views', 1, $class .'__' . $this->$idColumn );
 				$countUpdated = true;
 			}
-			catch( Exception $e ) {}
+			catch( \Exception $e ) {}
 		}
-
+		
 		if ( ! $countUpdated )
 		{
-			Db::i()->insert( 'core_view_updates', array(
+			\IPS\Db::i()->insert( 'core_view_updates', array(
 					'classname'	=> $class,
 					'id'		=> $this->$idColumn
 			) );
 		}
-
-		Event::fire( 'onItemView', $this );
 	}
 }

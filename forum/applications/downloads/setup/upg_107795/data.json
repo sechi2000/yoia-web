@@ -15,7 +15,7 @@
         "modules": false,
         "widgets": false,
         "customOptions": false,
-        "customRoutines": false
+        "customRoutines": true
     },
     "forceMainUpgrader": false,
     "forceManualDownloadNoCiC": false,

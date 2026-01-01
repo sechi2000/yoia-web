@@ -12,21 +12,16 @@
 namespace IPS\core\setup\upg_106144;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use function defined;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.6.9 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * ...
@@ -35,10 +30,10 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		if( CIC )
+		if( \IPS\CIC )
 		{
 			/* Set prune_member_history to empty string */
-			Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => "" ), array( Db::i()->in( 'conf_key', array( 'prune_member_history', 'prune_notifications' ) ) ) );
+			\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => "" ), array( \IPS\Db::i()->in( 'conf_key', array( 'prune_member_history', 'prune_notifications' ) ) ) );
 		}
 		
 		return TRUE;

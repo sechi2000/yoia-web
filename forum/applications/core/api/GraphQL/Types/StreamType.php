@@ -12,27 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Search\Query;
-use IPS\Content\Search\Results;
-use IPS\core\Stream;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * StreamType for GraphQL API
  */
-class StreamType extends ObjectType
+class _StreamType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -53,7 +49,7 @@ class StreamType extends ObjectType
 						'description' => "Stream title",
 						'resolve' => function ($stream) {
 							if( !$stream->title ) {
-								return Member::loggedIn()->language()->addToStack( "stream_title_{$stream->id}" );
+								return \IPS\Member::loggedIn()->language()->addToStack( "stream_title_{$stream->id}" );
 							}
 							return $stream->title;
 						}
@@ -62,7 +58,7 @@ class StreamType extends ObjectType
 						'type' => \IPS\core\api\GraphQL\TypeRegistry::member(),
 						'description' => "Stream owner, if applicable",
 						'resolve' => function ($stream) {
-							return ( $stream->member ) ? Member::load( $stream->member ) : null;
+							return ( $stream->member ) ? \IPS\Member::load( $stream->member ) : null;
 						}
 					],
 					'isDefault' => [
@@ -102,12 +98,11 @@ class StreamType extends ObjectType
 	/**
 	 * Resolve items
 	 *
-	 * @param 	Stream $stream
-	 * @param 	array $args 	Arguments passed from resolver
-	 * @param array $context
-	 * @return	Results
+	 * @param 	\IPS\core\Stream
+	 * @param 	array 	Arguments passed from resolver
+	 * @return	array
 	 */
-	protected static function items( Stream $stream, array $args, array $context ) : Results
+	protected static function items( $stream, $args, $context )
 	{
 		/* Clubs */
 		if( isset( $args['club'] ) )
@@ -125,7 +120,7 @@ class StreamType extends ObjectType
 		}
 
 		/* Build the query */
-		$query = $stream->query( Member::loggedIn() );
+		$query = $stream->query( \IPS\Member::loggedIn() );
 
 		// Get page
 		// We don't know the count at this stage, so figure out the page number from
@@ -142,7 +137,7 @@ class StreamType extends ObjectType
 		$query->setLimit( $limit )->setPage( $page );
 
 		/* Get the results */
-		$results = $query->search( NULL, NULL, ( $stream->include_comments ? Query::TAGS_MATCH_ITEMS_ONLY + Query::TERM_OR_TAGS : Query::TERM_OR_TAGS ) );
+		$results = $query->search( NULL, NULL, ( $stream->include_comments ? \IPS\Content\Search\Query::TAGS_MATCH_ITEMS_ONLY + \IPS\Content\Search\Query::TERM_OR_TAGS : \IPS\Content\Search\Query::TERM_OR_TAGS ) );
 		
 		/* Load data we need like the authors, etc */
 		$results->init();

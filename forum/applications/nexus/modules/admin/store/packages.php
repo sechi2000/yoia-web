@@ -12,79 +12,37 @@
 namespace IPS\nexus\modules\admin\store;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Email;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Matrix;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Money;
-use IPS\nexus\Package;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\LicenseKey\Standard;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\Node\Controller;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Task;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_object;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Packages
  */
-class packages extends Controller
+class _packages extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\nexus\Package\Group';
+	protected $nodeClass = 'IPS\nexus\Package\Group';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'packages_manage' );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_store.js', 'nexus', 'admin' ) );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__nexus_store_packages');
+		\IPS\Dispatcher::i()->checkAcpPermission( 'packages_manage' );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_store.js', 'nexus', 'admin' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__nexus_store_packages');
 		parent::execute();
 	}
 		
@@ -93,7 +51,7 @@ class packages extends Controller
 	 *
 	 * @return	array
 	 */
-	public function _getRootButtons(): array
+	public function _getRootButtons()
 	{
 		$buttons = parent::_getRootButtons();
 		
@@ -111,33 +69,31 @@ class packages extends Controller
 	 * @param	object	$node	Node returned from $nodeClass::load()
 	 * @return	NULL|string
 	 */
-	public function _getRowHtml( object $node ): ?string
+	public function _getRowHtml( $node )
 	{
-		if ( $node instanceof Package and Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_view' ) )
+		if ( $node instanceof \IPS\nexus\Package and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_view' ) )
 		{
-			$active = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=1', 'nexus', 'package', $node->_id ) )->first();
-			$expired = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=0', 'nexus', 'package', $node->_id ) )->first();
-			$canceled = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=1', 'nexus', 'package', $node->_id ) )->first();
+			$active = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=1', 'nexus', 'package', $node->_id ) )->first();
+			$expired = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=0', 'nexus', 'package', $node->_id ) )->first();
+			$canceled = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=1', 'nexus', 'package', $node->_id ) )->first();
 			
-			return Theme::i()->getTemplate( 'store', 'nexus' )->productRowHtml( $node, $active, $expired, $canceled );
+			return \IPS\Theme::i()->getTemplate( 'store', 'nexus' )->productRowHtml( $node, $active, $expired, $canceled );
 		}
-
-		return NULL;
 	}
 	
 	/**
 	 * Redirect after save
 	 *
-	 * @param	Model|null	$old			A clone of the node as it was before or NULL if this is a creation
-	 * @param	Model	$new			The node now
+	 * @param	\IPS\Node\Model	$old			A clone of the node as it was before or NULL if this is a creation
+	 * @param	\IPS\Node\Model	$new			The node now
 	 * @param	string			$lastUsedTab	The tab last used in the form
 	 * @return	void
 	 */
-	protected function _afterSave( ?Model $old, Model $new, mixed $lastUsedTab = FALSE ): void
+	protected function _afterSave( ?\IPS\Node\Model $old, \IPS\Node\Model $new, $lastUsedTab = FALSE )
 	{
-		if ( !( $new instanceof Package ) )
+		if ( !( $new instanceof \IPS\nexus\Package ) )
 		{
-			parent::_afterSave( $old, $new, $lastUsedTab );
+			return parent::_afterSave( $old, $new, $lastUsedTab );
 		}
 				
 		$changes = array();
@@ -153,28 +109,28 @@ class packages extends Controller
 		}
 
 		/* Clear cache */
-		unset( Store::i()->nexusPackagesWithReviews );
+		unset( \IPS\Data\Store::i()->nexusPackagesWithReviews );
 
 		/* If something has changed, see if anyone has purchased */
 		$purchases = 0;
 
-		if( count( $changes ) )
+		if( \count( $changes ) )
 		{
-			$purchases = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'nexus', 'package', $new->id ) )->first();
+			$purchases = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'nexus', 'package', $new->id ) )->first();
 		}		
 		
 		/* Only show this screen if the package has been purchased. Otherwise even just copying a package and saving asks if you want to update
 			existing purchases unnecessarily */
 		if ( !empty( $changes ) AND $purchases )
-		{
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'product_change_blurb', array(
-				'product_change_blurb_existing'	=> Url::internal( "app=nexus&module=store&controller=packages&do=updateExisting&id={$new->_id}" )->setQueryString( 'changes', json_encode( $changes ) )->csrf(),
+		{		
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'product_change_blurb', array(
+				'product_change_blurb_existing'	=> \IPS\Http\Url::internal( "app=nexus&module=store&controller=packages&do=updateExisting&id={$new->_id}" )->setQueryString( 'changes', json_encode( $changes ) )->csrf(),
 				'product_change_blurb_new'		=> $this->url->setQueryString( array( 'root' => ( $new->parent() ? $new->parent()->_id : '' ) ) ),
 			) );
 		}
 		else
 		{
-			parent::_afterSave( $old, $new, $lastUsedTab );
+			return parent::_afterSave( $old, $new, $lastUsedTab );
 		}
 	}
 	
@@ -183,40 +139,32 @@ class packages extends Controller
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
 		/* If &subnode=1 is not in the URL, we are deleting a group and not a package, so we don't need to check the package */
-		if( !Request::i()->subnode )
+		if( !\IPS\Request::i()->subnode )
 		{
-			parent::delete();
-			return;
+			return parent::delete();
 		}
 
 		/* Load package */
 		try
 		{
-			$package = Package::load( Request::i()->id );
+			$package = \IPS\nexus\Package::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			parent::delete();
-			return;
+			return parent::delete();
 		}
 		
 		/* Are there any purchases of this product? */
-		$active = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=1', 'nexus', 'package', $package->_id ) )->first();
-		$expiredRenewable = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=0 AND ps_renewals>0', 'nexus', 'package', $package->_id ) )->first();
-		$expredNonRenewable = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=0 AND ps_renewals=0', 'nexus', 'package', $package->_id ) )->first();
-		$canceledCanBeReactivated = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=1 AND ps_can_reactivate=1', 'nexus', 'package', $package->_id ) )->first();
-		$canceledCannotBeReactivated = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=1 AND ps_can_reactivate=0', 'nexus', 'package', $package->_id ) )->first();
+		$active = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=1', 'nexus', 'package', $package->_id ) )->first();
+		$expiredRenewable = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=0 AND ps_renewals>0', 'nexus', 'package', $package->_id ) )->first();
+		$expredNonRenewable = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=0 AND ps_renewals=0', 'nexus', 'package', $package->_id ) )->first();
+		$canceledCanBeReactivated = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=1 AND ps_can_reactivate=1', 'nexus', 'package', $package->_id ) )->first();
+		$canceledCannotBeReactivated = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=1 AND ps_can_reactivate=0', 'nexus', 'package', $package->_id ) )->first();
 		if ( $active or $expiredRenewable or $canceledCanBeReactivated )
-		{
-			/* If this is an ajax request, then we need to redirect so we can show the confirmation screen */
-			if( Request::i()->isAjax() OR ( isset( Request::i()->wasConfirmed ) AND Request::i()->wasConfirmed ) )
-			{
-				Output::i()->redirect( $this->url->setQueryString( array( 'do' => 'delete', 'subnode' => 1, 'id' => $package->id ) ) );
-			}
-
+		{			
 			$upgradeTo = FALSE;
 			$prices = json_decode( $package->base_price, TRUE );
 			if ( $package->renew_options )
@@ -237,12 +185,6 @@ class packages extends Controller
 			foreach ( $package->parent()->children() as $_package )
 			{
 				if ( $_package->id === $package->id )
-				{
-					continue;
-				}
-
-				/* We cannot upgrade to legacy packages */
-				if( $_package->locked )
 				{
 					continue;
 				}
@@ -274,13 +216,13 @@ class packages extends Controller
 				}
 			}
 			
-			Output::i()->title = $package->_title;
-			Output::i()->output = Theme::i()->getTemplate( 'store' )->productDeleteWarning( $package, $active, $expiredRenewable, $expredNonRenewable, $canceledCanBeReactivated, $canceledCannotBeReactivated, $upgradeTo );
+			\IPS\Output::i()->title = $package->_title;
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'store' )->productDeleteWarning( $package, $active, $expiredRenewable, $expredNonRenewable, $canceledCanBeReactivated, $canceledCannotBeReactivated, $upgradeTo );
 			return;
 		}
 		
 		/* If not, just handle the delete as normal */		
-		parent::delete();
+		return parent::delete();		
 	}
 	
 	/**
@@ -288,18 +230,18 @@ class packages extends Controller
 	 *
 	 * @return	void
 	 */
-	public function hide() : void
+	public function hide()
 	{	
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Load package */
 		try
 		{
-			$package = Package::load( Request::i()->id );
+			$package = \IPS\nexus\Package::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X249/3', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X249/3', 404, '' );
 		}
 		
 		/* Do it */
@@ -307,10 +249,10 @@ class packages extends Controller
 		$package->reg = FALSE;
 		$package->save();
 		
-		Session::i()->log( 'acplogs__nexus_package_hidden', array( 'nexus_package_' . $package->id => TRUE ) );
+		\IPS\Session::i()->log( 'acplogs__nexus_package_hidden', array( 'nexus_package_' . $package->id => TRUE ) );
 		
 		/* Redirect */
-		Output::i()->redirect( Url::internal( "app=nexus&module=store&controller=packages" )->setQueryString( array( 'root' => ( $package->parent() ? $package->parent()->_id : '' ) ) ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=nexus&module=store&controller=packages" )->setQueryString( array( 'root' => ( $package->parent() ? $package->parent()->_id : '' ) ) ) );
 	}
 	
 	/**
@@ -318,33 +260,33 @@ class packages extends Controller
 	 *
 	 * @return	void
 	 */
-	public function updateExisting() : void
+	public function updateExisting()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$package = Package::load( Request::i()->id );
+			$package = \IPS\nexus\Package::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X249/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X249/1', 404, '' );
 		}
 		
-		$changes = json_decode( Request::i()->changes, TRUE );
+		$changes = json_decode( \IPS\Request::i()->changes, TRUE );
 				
-		if ( !isset( Request::i()->processing ) )
+		if ( !isset( \IPS\Request::i()->processing ) )
 		{
 			if ( isset( $changes['renew_options'] ) )
 			{
-				Output::i()->bypassCsrfKeyCheck = TRUE;
-				$matrix = new Matrix( 'matrix', 'continue' );
+				\IPS\Output::i()->bypassCsrfKeyCheck = TRUE;
+				$matrix = new \IPS\Helpers\Form\Matrix( 'matrix', 'continue' );
 				$matrix->manageable = FALSE;
 				
-				$newOptions = array( '-' => Member::loggedIn()->language()->addToStack('do_not_change') );
+				$newOptions = array( '-' => \IPS\Member::loggedIn()->language()->addToStack('do_not_change') );
 				$existingRenewOptions = json_decode( $package->renew_options, TRUE );
 
-				if( !is_array( $existingRenewOptions ) )
+				if( !\is_array( $existingRenewOptions ) )
 				{
 					$existingRenewOptions = array();
 				}
@@ -354,27 +296,27 @@ class packages extends Controller
 					$costs = array();
 					foreach ( $newOption['cost'] as $data )
 					{
-						$costs[] = new Money( $data['amount'], $data['currency'] );
+						$costs[] = new \IPS\nexus\Money( $data['amount'], $data['currency'] );
 					}
 					
 					switch ( $newOption['unit'] )
 					{
 						case 'd':
-							$term = Member::loggedIn()->language()->addToStack('renew_days', FALSE, array( 'pluralize' => array( $newOption['term'] ) ) );
+							$term = \IPS\Member::loggedIn()->language()->addToStack('renew_days', FALSE, array( 'pluralize' => array( $newOption['term'] ) ) );
 							break;
 						case 'm':
-							$term = Member::loggedIn()->language()->addToStack('renew_months', FALSE, array( 'pluralize' => array( $newOption['term'] ) ) );
+							$term = \IPS\Member::loggedIn()->language()->addToStack('renew_months', FALSE, array( 'pluralize' => array( $newOption['term'] ) ) );
 							break;
 						case 'y':
-							$term = Member::loggedIn()->language()->addToStack('renew_years', FALSE, array( 'pluralize' => array( $newOption['term'] ) ) );
+							$term = \IPS\Member::loggedIn()->language()->addToStack('renew_years', FALSE, array( 'pluralize' => array( $newOption['term'] ) ) );
 							break;
 					}
 					
-					$newOptions[ "o{$k}" ] = Member::loggedIn()->language()->addToStack( 'renew_option', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( $costs, Member::loggedIn()->language()->get('or_list_format') ), $term ) ) );
+					$newOptions[ "o{$k}" ] = \IPS\Member::loggedIn()->language()->addToStack( 'renew_option', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $costs, \IPS\Member::loggedIn()->language()->get('or_list_format') ), $term ) ) );
 				}
-				$newOptions['z'] = Member::loggedIn()->language()->addToStack('remove_renewal_no_expire_leave');
-				$newOptions['y'] = Member::loggedIn()->language()->addToStack('remove_renewal_no_expire_reactivate');
-				$newOptions['x'] = Member::loggedIn()->language()->addToStack('remove_renewal_expire');
+				$newOptions['z'] = \IPS\Member::loggedIn()->language()->addToStack('remove_renewal_no_expire_leave');
+				$newOptions['y'] = \IPS\Member::loggedIn()->language()->addToStack('remove_renewal_no_expire_reactivate');
+				$newOptions['x'] = \IPS\Member::loggedIn()->language()->addToStack('remove_renewal_expire');
 				$matrix->columns = array(
 					'customers_currently_paying' => function( $key, $value, $data )
 					{
@@ -382,7 +324,7 @@ class packages extends Controller
 					},
 					'now_pay' => function( $key, $value, $data ) use ( $newOptions )
 					{
-						return new Select( $key, $data[1], TRUE, array( 'options' => $newOptions, 'noDefault' => TRUE ) );
+						return new \IPS\Helpers\Form\Select( $key, $data[1], TRUE, array( 'options' => $newOptions, 'noDefault' => TRUE ) );
 					},
 				);
 				
@@ -393,23 +335,23 @@ class packages extends Controller
 						$costs = array();
 						foreach ( $oldOption['cost'] as $data )
 						{
-							$costs[] = new Money( $data['amount'], $data['currency'] );
+							$costs[] = new \IPS\nexus\Money( $data['amount'], $data['currency'] );
 						}
 						
 						switch ( $oldOption['unit'] )
 						{
 							case 'd':
-								$term = Member::loggedIn()->language()->addToStack('renew_days', FALSE, array( 'pluralize' => array( $oldOption['term'] ) ) );
+								$term = \IPS\Member::loggedIn()->language()->addToStack('renew_days', FALSE, array( 'pluralize' => array( $oldOption['term'] ) ) );
 								break;
 							case 'm':
-								$term = Member::loggedIn()->language()->addToStack('renew_months', FALSE, array( 'pluralize' => array( $oldOption['term'] ) ) );
+								$term = \IPS\Member::loggedIn()->language()->addToStack('renew_months', FALSE, array( 'pluralize' => array( $oldOption['term'] ) ) );
 								break;
 							case 'y':
-								$term = Member::loggedIn()->language()->addToStack('renew_years', FALSE, array( 'pluralize' => array( $oldOption['term'] ) ) );
+								$term = \IPS\Member::loggedIn()->language()->addToStack('renew_years', FALSE, array( 'pluralize' => array( $oldOption['term'] ) ) );
 								break;
 						}
 						
-						$matrix->rows[ $k ] = array( Member::loggedIn()->language()->addToStack( 'renew_option', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( $costs, Member::loggedIn()->language()->get('or_list_format') ), $term ) ) ), "o{$k}" );
+						$matrix->rows[ $k ] = array( \IPS\Member::loggedIn()->language()->addToStack( 'renew_option', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $costs, \IPS\Member::loggedIn()->language()->get('or_list_format') ), $term ) ) ), "o{$k}" );
 					}
 				}
 				$matrix->rows['x'] = array( 'any_other_amount', '-' );
@@ -430,13 +372,13 @@ class packages extends Controller
 				}
 				else
 				{					
-					Output::i()->output .= $matrix;
+					\IPS\Output::i()->output .= $matrix;
 					return;
 				}
 			}
 		}
 				
-		if ( ( isset( $changes['tax'] ) or isset( $changes['renew_options'] ) ) and !isset( Request::i()->ba ) )
+		if ( ( isset( $changes['tax'] ) or isset( $changes['renew_options'] ) ) and !isset( \IPS\Request::i()->ba ) )
 		{
 			$needBaPrompt = FALSE;
 			$canChangeOptions = FALSE;
@@ -444,7 +386,7 @@ class packages extends Controller
 			{
 				foreach ( $changes['renew_options'] as $ro )
 				{
-					if ( !in_array( $ro['new'], array( '-', 'x', 'y', 'z' ) ) )
+					if ( !\in_array( $ro['new'], array( '-', 'x', 'y', 'z' ) ) )
 					{
 						$canChangeOptions = TRUE;
 						$needBaPrompt = TRUE;
@@ -457,17 +399,17 @@ class packages extends Controller
 				$needBaPrompt = TRUE;
 			}
 			
-			if ( $needBaPrompt and $withBillingAgreement = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_billing_agreement>0 AND ba_canceled=0', 'nexus', 'package', $package->id ) )->join( 'nexus_billing_agreements', 'ba_id=ps_billing_agreement' )->first() )
+			if ( $needBaPrompt and $withBillingAgreement = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_billing_agreement>0 AND ba_canceled=0', 'nexus', 'package', $package->id ) )->join( 'nexus_billing_agreements', 'ba_id=ps_billing_agreement' )->first() )
 			{
 				$options = array(
-					'change_renew_ba_skip'			=> Url::internal( "app=nexus&module=store&controller=packages&do=updateExisting" )->setQueryString( array(
-						'id'		=> Request::i()->id,
+					'change_renew_ba_skip'			=> \IPS\Http\Url::internal( "app=nexus&module=store&controller=packages&do=updateExisting" )->setQueryString( array(
+						'id'		=> \IPS\Request::i()->id,
 						'changes'	=> json_encode( $changes ),
 						'processing'=> 1,
 						'ba'		=> 0
 					) )->csrf(),
-					'change_renew_ba_cancel'		=> Url::internal( "app=nexus&module=store&controller=packages&do=updateExisting" )->setQueryString( array(
-						'id'		=> Request::i()->id,
+					'change_renew_ba_cancel'		=> \IPS\Http\Url::internal( "app=nexus&module=store&controller=packages&do=updateExisting" )->setQueryString( array(
+						'id'		=> \IPS\Request::i()->id,
 						'changes'	=> json_encode( $changes ),
 						'processing'=> 1,
 						'ba'		=> 1
@@ -475,44 +417,44 @@ class packages extends Controller
 				);
 				if ( $canChangeOptions )
 				{
-					$options['change_renew_ba_go_back'] = Url::internal( "app=nexus&module=store&controller=packages&do=updateExisting" )->setQueryString( array(
-						'id'		=> Request::i()->id,
-						'changes'	=> Request::i()->changes,
+					$options['change_renew_ba_go_back'] = \IPS\Http\Url::internal( "app=nexus&module=store&controller=packages&do=updateExisting" )->setQueryString( array(
+						'id'		=> \IPS\Request::i()->id,
+						'changes'	=> \IPS\Request::i()->changes,
 					) )->csrf();
 				}
-
-				Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'change_renew_ba_blurb', $options );
+				
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'change_renew_ba_blurb', $options );
 				return;
 			}			
 		}
 				
-		Output::i()->output = new MultipleRedirect(
-			Url::internal( "app=nexus&module=store&controller=packages&do=updateExisting&id=1&changes=secondary_group" )->setQueryString( array(
-				'id'		=> Request::i()->id,
+		\IPS\Output::i()->output = new \IPS\Helpers\MultipleRedirect(
+			\IPS\Http\Url::internal( "app=nexus&module=store&controller=packages&do=updateExisting&id=1&changes=secondary_group" )->setQueryString( array(
+				'id'		=> \IPS\Request::i()->id,
 				'changes'	=> json_encode( $changes ),
 				'processing'=> 1,
-				'ba'		=> isset( Request::i()->ba ) ? Request::i()->ba : 0
+				'ba'		=> isset( \IPS\Request::i()->ba ) ? \IPS\Request::i()->ba : 0
 			) )->csrf(),
 			function( $data ) use ( $package, $changes )
 			{
-				if( !is_array( $data ) )
+				if( !\is_array( $data ) )
 				{
 					$data['offset'] = 0;
 					$data['lastId'] = 0;
 				}
 
-				$select = Db::i()->select( '*', 'nexus_purchases', array( "ps_id>? and ps_app=? and ps_type=? and ps_item_id=?", $data['lastId'], 'nexus', 'package', $package->id ), 'ps_id', 1 );
+				$select = \IPS\Db::i()->select( '*', 'nexus_purchases', array( "ps_id>? and ps_app=? and ps_type=? and ps_item_id=?", $data['lastId'], 'nexus', 'package', $package->id ), 'ps_id', 1 );
 				
 				try
 				{
-					$purchase = Purchase::constructFromData( $select->first() );
-					$total = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( "ps_app=? and ps_type=? and ps_item_id=?", 'nexus', 'package', $package->id ) )->first();
+					$purchase = \IPS\nexus\Purchase::constructFromData( $select->first() );
+					$total = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( "ps_app=? and ps_type=? and ps_item_id=?", 'nexus', 'package', $package->id ) )->first();
 					
-					$package->updatePurchase( $purchase, $changes, Request::i()->ba );
+					$package->updatePurchase( $purchase, $changes, \IPS\Request::i()->ba );
 					
-					return array( [ 'offset' => ++$data['offset'], 'lastId' => $purchase->id ], Member::loggedIn()->language()->get('processing'), 100 / $total * $data['offset'] );
+					return array( [ 'offset' => ++$data['offset'], 'lastId' => $purchase->id ], \IPS\Member::loggedIn()->language()->get('processing'), 100 / $total * $data['offset'] );
 				}
-				catch ( UnderflowException )
+				catch ( \UnderflowException $e )
 				{
 					return NULL;
 				}
@@ -520,7 +462,7 @@ class packages extends Controller
 			},
 			function() use ( $package )
 			{
-				Output::i()->redirect( Url::internal( "app=nexus&module=store&controller=packages" )->setQueryString( array( 'root' => ( $package->parent() ? $package->parent()->_id : '' ) ) ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=nexus&module=store&controller=packages" )->setQueryString( array( 'root' => ( $package->parent() ? $package->parent()->_id : '' ) ) ) );
 			}
 		);
 	}
@@ -528,22 +470,23 @@ class packages extends Controller
 	/**
 	 * Build Product Options Table
 	 *
-	 * @return	void
+	 * @return	array
 	 */
-	public function productoptions() : void
+	public function productoptions()
 	{
-		Dispatcher::i()->checkAcpPermission( 'packages_edit' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'packages_edit' );
 		
-		if ( !Request::i()->fields or !Request::i()->package )
+		if ( !\IPS\Request::i()->fields or !\IPS\Request::i()->package )
 		{
-			Output::i()->sendOutput('');
+			\IPS\Output::i()->sendOutput('');
+			return;
 		}
 		
 		try
 		{
-			$package = Package::load( Request::i()->package );
+			$package = \IPS\nexus\Package::load( \IPS\Request::i()->package );
 		
-			$fields = iterator_to_array( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_package_fields', Db::i()->in( 'cf_id', explode( ',', Request::i()->fields ) ) ), 'IPS\nexus\Package\CustomField' ) );
+			$fields = iterator_to_array( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_package_fields', \IPS\Db::i()->in( 'cf_id', explode( ',', \IPS\Request::i()->fields ) ) ), 'IPS\nexus\Package\CustomField' ) );
 			$allTheOptions = array();
 			foreach ( $fields as $field )
 			{
@@ -568,13 +511,13 @@ class packages extends Controller
 				$rows[ json_encode( $options ) ] = $options;
 			}
 			
-			$existingValues = iterator_to_array( Db::i()->select( '*', 'nexus_product_options', array( 'opt_package=?', $package->id ) )->setKeyField( 'opt_values' ) );
+			$existingValues = iterator_to_array( \IPS\Db::i()->select( '*', 'nexus_product_options', array( 'opt_package=?', $package->id ) )->setKeyField( 'opt_values' ) );
 									
-			Output::i()->sendOutput( Theme::i()->getTemplate('store')->productOptionsTable( $fields, $rows, $existingValues, Request::i()->renews ) );
+			\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate('store')->productOptionsTable( $fields, $rows, $existingValues, \IPS\Request::i()->renews ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->sendOutput( $e->getMessage(), 500 );
+			\IPS\Output::i()->sendOutput( $e->getMessage(), 500 );
 		}
 	}
 	
@@ -584,9 +527,8 @@ class packages extends Controller
 	 * @param	array	$_	Array
 	 * @return	array
 	 */
-	protected function arraycartesian( array $_) : array
-	{
-	    if(count($_) == 0)
+	protected function arraycartesian($_) {
+	    if(\count($_) == 0)
 	        return array(array());
 		foreach($_ as $k=>$a) {
 	    	unset($_[$k]);
@@ -605,30 +547,30 @@ class packages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function viewPurchases() : void
+	protected function viewPurchases()
 	{
-		Dispatcher::i()->checkAcpPermission( 'purchases_view', 'nexus', 'customers' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'purchases_view', 'nexus', 'customers' );
 		
 		try
 		{
-			$package = Package::load( Request::i()->id );
+			$package = \IPS\nexus\Package::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X249/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X249/2', 404, '' );
 		}
 		
-		$table = new \IPS\Helpers\Table\Db( 'nexus_purchases', Url::internal( "app=nexus&module=store&controller=packages&do=viewPurchases&id={$package->id}" ), array( array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'nexus', 'package', $package->id ) ) );
+		$table = new \IPS\Helpers\Table\Db( 'nexus_purchases', \IPS\Http\Url::internal( "app=nexus&module=store&controller=packages&do=viewPurchases&id={$package->id}" ), array( array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'nexus', 'package', $package->id ) ) );
 		$table->include = array( 'ps_id', 'ps_member', 'purchase_status', 'ps_start', 'ps_expire', 'ps_renewals' );
 		$table->quickSearch = 'ps_id';
 		$table->advancedSearch = array(
-			'ps_member'	=> SEARCH_MEMBER,
-			'ps_start'	=> SEARCH_DATE_RANGE,
-			'ps_expire'	=> SEARCH_DATE_RANGE,
+			'ps_member'	=> \IPS\Helpers\Table\SEARCH_MEMBER,
+			'ps_start'	=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
+			'ps_expire'	=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
 		);
 		$table->noSort = array( 'purchase_status' );
 		
-		if ( $package->renew_options or Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=0', 'nexus', 'package', $package->_id ) )->first() )
+		if ( $package->renew_options or \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_active=0 AND ps_cancelled=0', 'nexus', 'package', $package->_id ) )->first() )
 		{
 			$table->filters = array( 'purchase_tab_active' => 'ps_active=1', 'purchase_tab_expired' => 'ps_active=0 AND ps_cancelled=0', 'purchase_tab_canceled' => 'ps_active=0 AND ps_cancelled=1' );
 		}
@@ -641,45 +583,45 @@ class packages extends Controller
 			'ps_member'	=> function( $val ) {
 				try
 				{
-					return Theme::i()->getTemplate('global', 'nexus')->userLink( Member::load( $val ) );
+					return \IPS\Theme::i()->getTemplate('global', 'nexus')->userLink( \IPS\Member::load( $val ) );
 				}
-				catch ( OutOfRangeException )
+				catch ( \OutOfRangeException $e )
 				{
-					return Member::loggedIn()->language()->addToStack('deleted_member');
+					return \IPS\Member::loggedIn()->language()->addToStack('deleted_member');
 				}
 			},
 			'purchase_status' => function( $val, $row ) {
-				$purchase = Purchase::constructFromData( $row );
+				$purchase = \IPS\nexus\Purchase::constructFromData( $row );
 				if ( $purchase->cancelled )
 				{
-					return Member::loggedIn()->language()->addToStack('purchase_canceled');
+					return \IPS\Member::loggedIn()->language()->addToStack('purchase_canceled');
 				}
 				elseif ( !$purchase->active )
 				{
-					return Member::loggedIn()->language()->addToStack('purchase_expired');
+					return \IPS\Member::loggedIn()->language()->addToStack('purchase_expired');
 				}
 				elseif ( $purchase->grace_period and ( $purchase->expire and $purchase->expire->getTimestamp() < time() ) )
 				{
-					return Member::loggedIn()->language()->addToStack('purchase_in_grace_period');
+					return \IPS\Member::loggedIn()->language()->addToStack('purchase_in_grace_period');
 				}
 				else
 				{
-					return Member::loggedIn()->language()->addToStack('purchase_active');
+					return \IPS\Member::loggedIn()->language()->addToStack('purchase_active');
 				}
 			},
 			'ps_start'	=> function( $val ) {
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
 			'ps_expire'	=> function( $val ) {
-				return $val ? DateTime::ts( $val ) : '--';
+				return $val ? \IPS\DateTime::ts( $val ) : '--';
 			},
 			'ps_renewals' => function( $val, $row ) {
-				$purchase = Purchase::constructFromData( $row );
-				return $purchase->grouped_renewals ? Member::loggedIn()->language()->addToStack('purchase_grouped') : ( (string) ( $purchase->renewals ?: '--' ) );
+				$purchase = \IPS\nexus\Purchase::constructFromData( $row );
+				return $purchase->grouped_renewals ? \IPS\Member::loggedIn()->language()->addToStack('purchase_grouped') : ( (string) ( $purchase->renewals ?: '--' ) );
 			}
 		);
 		$table->rowButtons = function( $row ) {
-			$purchase = Purchase::constructFromData( $row );
+			$purchase = \IPS\nexus\Purchase::constructFromData( $row );
 			return array_merge( array(
 				'view'	=> array(
 					'link'	=> $purchase->acpUrl()->setQueryString( 'popup', true ),
@@ -689,13 +631,13 @@ class packages extends Controller
 			), $purchase->buttons() );
 		};
 		
-		Output::i()->title = $package->_title;
-		Output::i()->output = $table;
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->title = $package->_title;
+		\IPS\Output::i()->output = $table;
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'cancel_purchases'	=> array(
 				'icon'	=> 'arrow-right',
 				'title'	=> 'mass_change_all_purchases',
-				'link'	=> Url::internal( "app=nexus&module=store&controller=packages" )->setQueryString( array( 'do' => 'massManagePurchases', 'id' => $package->_id ) ),
+				'link'	=> \IPS\Http\Url::internal( "app=nexus&module=store&controller=packages" )->setQueryString( array( 'do' => 'massManagePurchases', 'id' => $package->_id ) ),
 				'data'	=> array(
 					'ipsDialog'			=> TRUE,
 					'ipsDialog-title'	=> $package->_title
@@ -709,31 +651,31 @@ class packages extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function massManagePurchases() : void
+	protected function massManagePurchases()
 	{
 		try
 		{
-			$package = Package::load( Request::i()->id );
+			$package = \IPS\nexus\Package::load( \IPS\Request::i()->id );
 			if ( $package->deleteOrMoveQueued() )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X249/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X249/4', 404, '' );
 		}
 		
-		$form = new Form( 'form', 'go' );
+		$form = new \IPS\Helpers\Form( 'form', 'go' );
 		$form->addMessage('mass_change_purchases_explain');
 		
 		$options = array();
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_edit' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_edit' ) )
 		{
 			$options['change'] = 'mass_change_purchases_change';
 			$options['expire'] = 'mass_change_purchases_expire';
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_cancel' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_cancel' ) )
 		{
 			$options['cancel'] = 'mass_change_purchases_cancel';
 		}
@@ -756,31 +698,31 @@ class packages extends Controller
 			$renewFieldsDescriptions = array();
 			foreach ( $renewOptions as $k => $option )
 			{
-				$renewTermObject = new RenewalTerm( new Money( 0, '' ), new DateInterval( 'P' . $option['term'] . mb_strtoupper( $option['unit'] ) ) );
+				$renewTermObject = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( 0, '' ), new \DateInterval( 'P' . $option['term'] . mb_strtoupper( $option['unit'] ) ) );
 				
 				$costs = array();
 				foreach ( $option['cost'] as $cost )
 				{
-					$costs[] =  new Money( $cost['amount'], $cost['currency'] );
+					$costs[] =  new \IPS\nexus\Money( $cost['amount'], $cost['currency'] );
 				}
 				
-				$renewalOptions[ $k ] = sprintf( Member::loggedIn()->language()->get( 'renew_option'), implode( ' / ', $costs ), $renewTermObject->getTermUnit() );
+				$renewalOptions[ $k ] = sprintf( \IPS\Member::loggedIn()->language()->get( 'renew_option'), implode( ' / ', $costs ), $renewTermObject->getTermUnit() );
 			}
 			
 			if ( $renewalOptions )
 			{
-				$desciptions[ $siblingPackage->id ] = Member::loggedIn()->language()->formatList( $renewalOptions, Member::loggedIn()->language()->get('or_list_format') );
-				$renewFields[] = new Radio( 'renew_option_' . $siblingPackage->id, NULL, NULL, array( 'options' => $renewalOptions, 'descriptions' => $renewFieldsDescriptions, 'parse' => 'normal' ), NULL, NULL, NULL, 'renew_option_' . $siblingPackage->id );
-				Member::loggedIn()->language()->words['renew_option_' . $siblingPackage->id] = Member::loggedIn()->language()->addToStack( 'renewal_term', FALSE );
+				$desciptions[ $siblingPackage->id ] = \IPS\Member::loggedIn()->language()->formatList( $renewalOptions, \IPS\Member::loggedIn()->language()->get('or_list_format') );
+				$renewFields[] = new \IPS\Helpers\Form\Radio( 'renew_option_' . $siblingPackage->id, NULL, NULL, array( 'options' => $renewalOptions, 'descriptions' => $renewFieldsDescriptions, 'parse' => 'normal' ), NULL, NULL, NULL, 'renew_option_' . $siblingPackage->id );
+				\IPS\Member::loggedIn()->language()->words['renew_option_' . $siblingPackage->id] = \IPS\Member::loggedIn()->language()->addToStack( 'renewal_term', FALSE );
 				$toggles[ $siblingPackage->id ] = array( 'renew_option_' . $siblingPackage->id );
 			}
 			else
 			{
-				$desciptions[ $siblingPackage->id ] = Member::loggedIn()->language()->addToStack('mass_change_purchases_no_renewals');
+				$desciptions[ $siblingPackage->id ] = \IPS\Member::loggedIn()->language()->addToStack('mass_change_purchases_no_renewals');
 			}
 		}
 		
-		$form->add( new Radio( 'cancel_type', NULL, TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'cancel_type', NULL, TRUE, array(
 			'options'	=> $options,
 			'toggles'	=> array(
 				'change' => array( 'mass_change_purchases_to', 'mass_change_purchases_override' ),
@@ -791,17 +733,17 @@ class packages extends Controller
 		) ) );
 		if ( !$upgradeDowngradeOptions )
 		{
-			Member::loggedIn()->language()->words['mass_change_purchases_change_desc'] = Member::loggedIn()->language()->addToStack('cancel_type_change_no_siblings');
+			\IPS\Member::loggedIn()->language()->words['mass_change_purchases_change_desc'] = \IPS\Member::loggedIn()->language()->addToStack('cancel_type_change_no_siblings');
 		}
 		
-		$form->add( new Radio( 'mass_change_purchases_to', NULL, NULL, array( 'options' => $upgradeDowngradeOptions, 'descriptions' => $desciptions, 'toggles' => $toggles, 'parse' => 'normal' ), NULL, NULL, NULL, 'mass_change_purchases_to' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'mass_change_purchases_to', NULL, NULL, array( 'options' => $upgradeDowngradeOptions, 'descriptions' => $desciptions, 'toggles' => $toggles, 'parse' => 'normal' ), NULL, NULL, NULL, 'mass_change_purchases_to' ) );
 		foreach ( $renewFields as $field )
 		{
 			$form->add( $field );
 		}
-		$form->add( new YesNo( 'mass_change_purchases_override', TRUE, NULL, array(), NULL, NULL, NULL, 'mass_change_purchases_override' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'mass_change_purchases_override', TRUE, NULL, array(), NULL, NULL, NULL, 'mass_change_purchases_override' ) );
 
-		$form->add( new YesNo( 'ps_can_reactivate', NULL, FALSE, array(), NULL, NULL, NULL, 'ps_can_reactivate' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ps_can_reactivate', NULL, FALSE, array(), NULL, NULL, NULL, 'ps_can_reactivate' ) );
 		
 		if ( $values = $form->values() )
 		{
@@ -809,14 +751,14 @@ class packages extends Controller
 			// Note: Must cancel billing agreements when upgrading/downgrading purchases. Reflect that in the form
 			
 			$values['id'] = $package->_id;
-			$values['admin'] = Member::loggedIn()->member_id;
-			Task::queue( 'nexus', 'MassChangePurchases', $values );
+			$values['admin'] = \IPS\Member::loggedIn()->member_id;
+			\IPS\Task::queue( 'nexus', 'MassChangePurchases', $values );
 			
-			Output::i()->redirect( Url::internal( "app=nexus&module=store&controller=packages" )->setQueryString( array( 'root' => ( $package->parent() ? $package->parent()->_id : '' ) ) ), 'mass_change_purchases_confirm' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=nexus&module=store&controller=packages" )->setQueryString( array( 'root' => ( $package->parent() ? $package->parent()->_id : '' ) ) ), 'mass_change_purchases_confirm' );
 		}
 		
-		Output::i()->title = $package->_title;
-		Output::i()->output = $form;
+		\IPS\Output::i()->title = $package->_title;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -824,49 +766,49 @@ class packages extends Controller
 	 *
 	 * @return	void
 	 */
-	public function emailPreview() : void
+	public function emailPreview()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		$functionName = 'emailPreview_' . mt_rand();
-		Theme::makeProcessFunction( Request::i()->value, $functionName, '$purchase' );
+		\IPS\Theme::makeProcessFunction( \IPS\Request::i()->value, $functionName, '$purchase' );
 		
-		$dummyPurchase = new Purchase;
-		$dummyPurchase->name = Member::loggedIn()->language()->addToStack('p_email_preview_example');
-		$dummyPurchase->member = Member::loggedIn();
-		$dummyPurchase->expire = DateTime::create()->add( new DateInterval('P1M') );
-		$dummyPurchase->renewals = new RenewalTerm( new Money( 10, Customer::loggedIn()->defaultCurrency() ), new DateInterval('P1M') );
-		$dummyPurchase->custom_fields = array_fill( 0, Db::i()->select( 'MAX(cf_id)', 'nexus_package_fields' )->first(), Member::loggedIn()->language()->addToStack('p_email_preview_example') );
-		$dummyPurchase->licenseKey = new Standard;
+		$dummyPurchase = new \IPS\nexus\Purchase;
+		$dummyPurchase->name = \IPS\Member::loggedIn()->language()->addToStack('p_email_preview_example');
+		$dummyPurchase->member = \IPS\Member::loggedIn();
+		$dummyPurchase->expire = \IPS\DateTime::create()->add( new \DateInterval('P1M') );
+		$dummyPurchase->renewals = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( 10, \IPS\nexus\Customer::loggedIn()->defaultCurrency() ), new \DateInterval('P1M') );
+		$dummyPurchase->custom_fields = array_fill( 0, \IPS\Db::i()->select( 'MAX(cf_id)', 'nexus_package_fields' )->first(), \IPS\Member::loggedIn()->language()->addToStack('p_email_preview_example') );
+		$dummyPurchase->licenseKey = new \IPS\nexus\Purchase\LicenseKey\Standard;
 		$dummyPurchase->licenseKey->key = 'XXXX-XXXX-XXXX-XXXX';
 		
 		try
 		{
 			$themeFunction = 'IPS\\Theme\\'. $functionName;
-			$output = Email::buildFromContent( 'Test', $themeFunction( $dummyPurchase ), NULL, Email::TYPE_TRANSACTIONAL )->compileContent( 'html', Member::loggedIn() );
+			$output = \IPS\Email::buildFromContent( 'Test', $themeFunction( $dummyPurchase ), NULL, \IPS\Email::TYPE_TRANSACTIONAL )->compileContent( 'html', \IPS\Member::loggedIn() );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			$output = Theme::i()->getTemplate( 'global', 'core' )->message( $e->getMessage(), 'error', $e->getMessage(), TRUE, TRUE );
+			$output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->message( $e->getMessage(), 'error', $e->getMessage(), TRUE, TRUE );
 		}
-		Output::i()->sendOutput( $output );
+		\IPS\Output::i()->sendOutput( $output );
 	}
 
 	/**
 	 * Build the form to mass move content
 	 *
-	 * @param	Form	$form	The form helper object
+	 * @param	\IPS\Helpers\Form	$form	The form helper object
 	 * @param	mixed			$data		Data from the wizard helper
 	 * @param	string			$nodeClass	Node class
-	 * @param	Model	$node		Node we are working with
+	 * @param	\IPS\Node\Mode	$node		Node we are working with
 	 * @param	string			$contentItemClass	Content item class (if there is one)
-	 * @return Form
+	 * @return \IPS\Helpers\Form
 	 */
-	protected function _buildMassMoveForm(Form $form, mixed $data, string $nodeClass, Model $node, string $contentItemClass ): Form
+	protected function _buildMassMoveForm( $form, $data, $nodeClass, $node, $contentItemClass )
 	{
 		$form->addHeader('node_mass_move_delete_then');
-		$moveToClass = $data['moveToClass'] ?? $nodeClass;
-		$form->add( new Node( 'node_move_products', isset( $data['moveTo'] ) ? $moveToClass::load( $data['moveTo'] ) : 0, TRUE, array( 'class' => $nodeClass, 'disabledIds' => array( $node->_id ), 'disabledLang' => 'node_move_delete', 'zeroVal' => 'products_delete_content', 'subnodes' => FALSE ) ) );
+		$moveToClass = isset( $data['moveToClass'] ) ? $data['moveToClass'] : $nodeClass;
+		$form->add( new \IPS\Helpers\Form\Node( 'node_move_products', isset( $data['moveTo'] ) ? $moveToClass::load( $data['moveTo'] ) : 0, TRUE, array( 'class' => $nodeClass, 'disabledIds' => array( $node->_id ), 'disabledLang' => 'node_move_delete', 'zeroVal' => 'products_delete_content', 'subnodes' => FALSE ) ) );
 
 		return $form;
 	}
@@ -877,19 +819,19 @@ class packages extends Controller
 	 * @param	array			$values		Values from form submission
 	 * @param	mixed			$data		Data from the wizard helper
 	 * @param	string			$nodeClass	Node class
-	 * @param	Model	$node		Node we are working with
+	 * @param	\IPS\Node\Mode	$node		Node we are working with
 	 * @param	string			$contentItemClass	Content item class (if there is one)
 	 * @return	array	Wizard helper data
 	 */
-	protected function _processMassMoveForm(array $values, mixed $data, string $nodeClass, Model $node, string $contentItemClass ): array
+	protected function _processMassMoveForm( $values, $data, $nodeClass, $node, $contentItemClass )
 	{
 		$data['deleteWhenDone'] = FALSE;
-		$data['class'] = get_class( $node );
+		$data['class'] = \get_class( $node );
 		$data['id'] = $node->_id;
 		
-		if ( is_object( $values['node_move_products'] ) )
+		if ( \is_object( $values['node_move_products'] ) )
 		{
-			$data['moveToClass'] = get_class( $values['node_move_products'] );
+			$data['moveToClass'] = \get_class( $values['node_move_products'] );
 			$data['moveTo'] = $values['node_move_products']->_id;
 		}
 		else

@@ -11,23 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * pruneipaddresses Task
  */
-class pruneipaddresses extends Task
+class _pruneipaddresses extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -38,18 +31,17 @@ class pruneipaddresses extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws    Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		if ( Settings::i()->ip_address_prune < 1 )
+		if ( \IPS\Settings::i()->ip_address_prune < 1 )
 		{
 			return NULL;
 		}
-
-		$time = time() - ( 86400 * Settings::i()->ip_address_prune );
-		Member::pruneAllLoggedIpAddresses( $time );
-
+		$time = time() - ( 86400 * \IPS\Settings::i()->ip_address_prune );
+		\IPS\Member::pruneAllLoggedIpAddresses( $time );
+		
 		return NULL;
 	}
 	

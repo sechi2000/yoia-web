@@ -11,38 +11,34 @@
 namespace IPS\core\ProfileFields\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * API output for custom fields groups
  */
-class Field
+class _Field
 {
 	/**
 	 * @brief	Name
 	 */
-	protected string $name = '';
+	protected $name;
 	
 	/**
 	 * @brief	Value
 	 */
-	protected mixed $value = null;
+	protected $value;
 	
 	/**
 	 * Constructor
 	 *
 	 * @param	string	$name	Group name
-	 * @param	mixed	$value	Values
+	 * @param	array	$value	Values
 	 */
-	public function __construct( string $name, mixed $value )
+	public function __construct( $name, $value )
 	{
 		$this->name = $name;
 		$this->value = $value;
@@ -51,12 +47,12 @@ class Field
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	string		name	Field name
 	 * @apiresponse	string		value	Value
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array( 'name' => $this->name, 'value' => $this->value );
 	}

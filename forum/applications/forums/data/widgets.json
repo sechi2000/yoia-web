@@ -7,12 +7,17 @@
         "menu_style": "menu",
         "embeddable": true
     },
+    "hotTopics": {
+        "class": "\\IPS\\Widget\\PermissionCache",
+        "restrict": [],
+        "default_area": "",
+        "allow_reuse": false,
+        "menu_style": "menu",
+        "embeddable": true
+    },
     "topicFeed": {
         "class": "\\IPS\\Widget\\PermissionCache",
-        "restrict": [
-            "sidebar",
-            "cms"
-        ],
+        "restrict": [],
         "default_area": "",
         "allow_reuse": true,
         "menu_style": "modal",

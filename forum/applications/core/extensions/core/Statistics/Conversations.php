@@ -11,38 +11,31 @@
 namespace IPS\core\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Conversations extends \IPS\core\Statistics\Chart
+class _Conversations extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_messengerstats_pmstats';
+	public $controller = 'core_messengerstats_pmstats';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$chart = new Database( $url, 'core_message_posts', 'msg_date', '', array(
+		$chart = new \IPS\Helpers\Chart\Database( $url, 'core_message_posts', 'msg_date', '', array( 
 			'isStacked' => TRUE,
 			'backgroundColor' 	=> '#ffffff',
 			'colors'			=> array( '#10967e', '#ea7963' ),
@@ -51,9 +44,9 @@ class Conversations extends \IPS\core\Statistics\Chart
 			'areaOpacity'		=> 0.4
 		) );
 		$chart->setExtension( $this );
-		$chart->addSeries( Member::loggedIn()->language()->addToStack('new_conversations'), 'number', 'SUM(msg_is_first_post)' );
-		$chart->addSeries( Member::loggedIn()->language()->addToStack('mt_replies'), 'number', '( count(*) - SUM(msg_is_first_post) )' );
-		$chart->title = Member::loggedIn()->language()->addToStack('stats_messages_title');
+		$chart->addSeries( \IPS\Member::loggedIn()->language()->addToStack('new_conversations'), 'number', 'SUM(msg_is_first_post)' );
+		$chart->addSeries( \IPS\Member::loggedIn()->language()->addToStack('mt_replies'), 'number', '( count(*) - SUM(msg_is_first_post) )' );
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('stats_messages_title');
 		$chart->availableTypes = array( 'AreaChart', 'ColumnChart', 'BarChart' );
 		
 		return $chart;

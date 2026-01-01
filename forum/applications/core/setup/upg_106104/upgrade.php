@@ -12,25 +12,16 @@
 namespace IPS\core\setup\upg_106104;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Setup\Upgrade as UpgradeClass;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Request;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.6.0 Beta 3 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * ...
@@ -40,24 +31,24 @@ class Upgrade
 	public function step1()
 	{
 		/* If we don't have the column, continue */
-		if( !Db::i()->checkForColumn( 'core_members', 'badge_count' ) )
+		if( !\IPS\Db::i()->checkForColumn( 'core_members', 'badge_count' ) )
 		{
 			return TRUE;
 		}
 
-		$toRun = UpgradeClass::runManualQueries( array(
+		$toRun = \IPS\core\Setup\Upgrade::runManualQueries( array(
 			array(
 				'table' => 'core_members',
-				'query' => " ALTER TABLE " . Db::i()->prefix . "core_members DROP COLUMN `badge_count`"
+				'query' => " ALTER TABLE " . \IPS\Db::i()->prefix . "core_members DROP COLUMN `badge_count`"
 			)
 		) );
 
-		if ( count( $toRun ) )
+		if ( \count( $toRun ) )
 		{
-			UpgradeClass::adjustMultipleRedirect( array( 1 => 'core', 'extra' => array( '_upgradeStep' => 2 ) ) );
+			\IPS\core\Setup\Upgrade::adjustMultipleRedirect( array( 1 => 'core', 'extra' => array( '_upgradeStep' => 2 ) ) );
 
 			/* Queries to run manually */
-			return array( 'html' => Theme::i()->getTemplate( 'forms' )->queries( $toRun, Url::internal( 'controller=upgrade' )->setQueryString( array( 'key' => $_SESSION['uniqueKey'], 'mr_continue' => 1, 'mr' => Request::i()->mr ) ) ) );
+			return array( 'html' => \IPS\Theme::i()->getTemplate( 'forms' )->queries( $toRun, \IPS\Http\Url::internal( 'controller=upgrade' )->setQueryString( array( 'key' => $_SESSION['uniqueKey'], 'mr_continue' => 1, 'mr' => \IPS\Request::i()->mr ) ) ) );
 		}
 
 		return TRUE;

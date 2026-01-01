@@ -11,104 +11,49 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\cloud\extensions\core\AccountSettings\Expert;
-use IPS\Log;
-use IPS\Theme as SystemTheme;
-use IPS\Theme\Editor\Setting;
-use OutOfRangeException;
-use function defined;
-use function mb_substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Theme settings
  */
-class Theme
+class _Theme
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = TRUE;
+	public static $canBeUsedInCss = TRUE;
 	
 	/**
 	 * Run the plug-in
 	 *
 	 * @param	string 		$data	  The initial data from the tag
 	 * @param	array		$options    Array of options
-	 * @return	mixed	Code to eval
+	 * @return	string		Code to eval
 	 * @note	Using this plugin to call the sharer logos or favicon is deprecated and will be removed in a future version
 	 */
-	public static function runPlugin( string $data, array $options ): mixed
+	public static function runPlugin( $data, $options )
 	{
 		switch( $data )
 		{
 			case 'headerHtml':
-				return "\IPS\Theme::i()->getHeaderAndFooter( 'header' )";
-
+				return \IPS\Theme::i()->getHeaderAndFooter()['header'];
+			break;
 			case 'footerHtml':
-				return "\IPS\Theme::i()->getHeaderAndFooter( 'footer' )";
-
+				return \IPS\Theme::i()->getHeaderAndFooter()['footer'];
+			break;
 			case 'logo_front':
 				return "\IPS\Theme::i()->logo_front";
-
+			break;
 			case 'logo_height':
-				return ( isset( SystemTheme::i()->logo['front']['height'] ) ) ? '\IPS\Theme::i()->logo[\'front\'][\'height\']' : 100;
-
-			case 'custom_css_for_output':
-				return "\IPS\Theme::i()->getCustomCssForOutput()";
-
-			case 'custom_css_for_theme_editor_codebox':
-				return "\IPS\Theme::i()->getCustomCssForThemeEditorCodebox()";
-
-			case 'custom_css':
-				return "\IPS\Theme::i()->custom_css";
-
-			case "scheme":
-				return "\IPS\Theme::i()->getCurrentCSSScheme()";
-
-			case 'id':
-				return "\IPS\Theme::i()->id";
+				return ( isset( \IPS\Theme::i()->logo['front']['height'] ) ) ? '\IPS\Theme::i()->logo[\'front\'][\'height\']' : 100;
+			break;
 			default:
-				try
-				{
-					if ( mb_substr( $data, 0, 4 ) === 'css.' or mb_substr( $data, 0, 4 ) === 'var.' )
-					{
-						$variable = mb_substr( $data, 4 );
-						$cssVariables = SystemTheme::i()->getCssVariables();
-
-						if( array_key_exists( $variable, $cssVariables ) )
-						{
-							return "\IPS\Theme::i()->getParsedCssVariableFromKey( '{$variable}' )";
-						}
-						return '';
-					}
-					else if ( mb_substr( $data, 0, 5 ) === 'view.' )
-					{
-						$variable = mb_substr( $data, 5 );
-						return "\IPS\Theme::i()->getLayoutValue('{$variable}')";
-					}
-
-					/* If we are still here, this is legacy syntax; treat it as a variable */
-					$cssVariables = SystemTheme::i()->getCssVariables();
-					if( array_key_exists( $data, $cssVariables ) )
-					{
-						return "\IPS\Theme::i()->getParsedCssVariableFromKey( '{$data}' )";
-					}
-
-					return '';
-				}
-				catch( InvalidArgumentException $e )
-				{
-					Log::log( $e, 'template_error' );
-				}
-				return "";
+				return ( isset( \IPS\Theme::i()->settings[ $data ] ) ) ? "\IPS\Theme::i()->settings['{$data}']" : '';
+			break;
 		}
 	}
 }

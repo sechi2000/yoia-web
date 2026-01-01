@@ -11,52 +11,36 @@
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancement: Facebook Pixel
  */
-class FacebookPixel extends CommunityEnhancementsAbstract
+class _FacebookPixel
 {
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= FALSE;
+	public $ips	= FALSE;
 
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= TRUE;
+	public $hasOptions	= TRUE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "meta.png";
+	public $icon	= "meta.png";
 
 	/**
 	 * Constructor
@@ -65,7 +49,7 @@ class FacebookPixel extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		$this->enabled = ( Settings::i()->fb_pixel_enabled and Settings::i()->fb_pixel_id );
+		$this->enabled = ( \IPS\Settings::i()->fb_pixel_enabled and \IPS\Settings::i()->fb_pixel_id );
 	}
 	
 	/**
@@ -73,37 +57,37 @@ class FacebookPixel extends CommunityEnhancementsAbstract
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
 		$validation = function( $val ) {
-			if ( $val and !Request::i()->fb_pixel_id )
+			if ( $val and !\IPS\Request::i()->fb_pixel_id )
 			{
-				throw new DomainException('fb_pixel_id_req');
+				throw new \DomainException('fb_pixel_id_req');
 			}
 		};
 		
-		$form = new Form;
-		$form->add( new Text( 'fb_pixel_id', Settings::i()->fb_pixel_id ? Settings::i()->fb_pixel_id : '', FALSE ) );
-		$form->add( new YesNo( 'fb_pixel_enabled', Settings::i()->fb_pixel_enabled, FALSE, array(), $validation ) );
-		$form->add( new Number( 'fb_pixel_delay', Settings::i()->fb_pixel_delay, FALSE, array(), $validation, NULL, Member::loggedIn()->language()->addToStack('fb_pixel_delay_seconds') ) );
+		$form = new \IPS\Helpers\Form;		
+		$form->add( new \IPS\Helpers\Form\Text( 'fb_pixel_id', \IPS\Settings::i()->fb_pixel_id ? \IPS\Settings::i()->fb_pixel_id : '', FALSE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'fb_pixel_enabled', \IPS\Settings::i()->fb_pixel_enabled, FALSE, array(), $validation ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'fb_pixel_delay', \IPS\Settings::i()->fb_pixel_delay, FALSE, array(), $validation, NULL, \IPS\Member::loggedIn()->language()->addToStack('fb_pixel_delay_seconds') ) );
 		
 		if ( $form->values() )
 		{
 			$form->saveAsSettings();
-			Session::i()->log( 'acplog__enhancements_edited', array( 'enhancements__core_FacebookPixel' => TRUE ) );
-			Output::i()->inlineMessage	= Member::loggedIn()->language()->addToStack('saved');
+			\IPS\Session::i()->log( 'acplog__enhancements_edited', array( 'enhancements__core_FacebookPixel' => TRUE ) );
+			\IPS\Output::i()->inlineMessage	= \IPS\Member::loggedIn()->language()->addToStack('saved');
 		}
 		
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'help'	=> array(
 				'title'		=> 'learn_more',
 				'icon'		=> 'question-circle',
-				'link'		=> Url::ips( 'docs/facebookpixel' ),
+				'link'		=> \IPS\Http\Url::ips( 'docs/facebookpixel' ),
 				'target'	=> '_blank'
 			),
 		);
 		
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_FacebookPixel', $form );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_FacebookPixel', $form );
 	}
 	
 	/**
@@ -112,22 +96,22 @@ class FacebookPixel extends CommunityEnhancementsAbstract
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		if ( $enabled )
 		{
-			if ( Settings::i()->fb_pixel_id )
+			if ( \IPS\Settings::i()->fb_pixel_id )
 			{
-				Settings::i()->changeValues( array( 'fb_pixel_enabled' => 1 ) );
+				\IPS\Settings::i()->changeValues( array( 'fb_pixel_enabled' => 1 ) );
 			}
 			else
 			{
-				throw new DomainException;
+				throw new \DomainException;
 			}
 		}
 		else
 		{
-			Settings::i()->changeValues( array( 'fb_pixel_enabled' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'fb_pixel_enabled' => 0 ) );
 		}
 	}
 }

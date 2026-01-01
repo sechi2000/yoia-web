@@ -11,21 +11,16 @@
 namespace IPS\Ftp;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use SplFileInfo;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * FTP file information iterator
  */
-class FtpSplFileInfo extends SplFileInfo
+class _FtpSplFileInfo extends \SplFileInfo
 {
 	/**
 	 * @brief   Type: Unknown
@@ -50,26 +45,26 @@ class FtpSplFileInfo extends SplFileInfo
 	/**
 	 * @brief   Current item type
 	 */
-	protected int $type			= self::TYPE_DIRECTORY;
+	protected $type			= self::TYPE_DIRECTORY;
 
 	/**
 	 * @brief   Current directory
 	 */
-	protected mixed $directory	= '/';
+	protected $directory	= '/';
 
 	/**
 	 * @brief   Current filename
 	 */
-	protected mixed $filename		= '.';
+	protected $filename		= '.';
 
 	/**
 	 * Constructor: Create a new spl file info object
 	 *
 	 * @param   string  $file   Filename or directory name
-	 * @param int $type   The type of item passed
+	 * @param   string  $type   The type of item passed
 	 * @return  void
 	 */
-	public function __construct( string $file, int $type = self::TYPE_DIRECTORY )
+	public function __construct( $file, $type = self::TYPE_DIRECTORY )
 	{
 		$this->type = $type;
 
@@ -86,7 +81,7 @@ class FtpSplFileInfo extends SplFileInfo
 			$this->directory	= $tmp['directory'];
 		}
 
-		parent::__construct( $this->getPathname() );
+		return parent::__construct( $this->getPathname() );
 	}
 
 	/**
@@ -94,7 +89,7 @@ class FtpSplFileInfo extends SplFileInfo
 	 *
 	 * @return bool
 	 */
-	public function isDir(): bool
+	public function isDir()
 	{
 		return ( $this->type === self::TYPE_DIRECTORY );
 	}
@@ -104,7 +99,7 @@ class FtpSplFileInfo extends SplFileInfo
 	 *
 	 * @return bool
 	 */
-	public function isFile(): bool
+	public function isFile()
 	{
 		return ( $this->type === self::TYPE_FILE );
 	}
@@ -112,9 +107,9 @@ class FtpSplFileInfo extends SplFileInfo
 	/**
 	 * Return the type
 	 *
-	 * @return string|false
+	 * @return int
 	 */
-	public function getType(): string|false
+	public function getType()
 	{
 		return $this->type;
 	}
@@ -124,7 +119,7 @@ class FtpSplFileInfo extends SplFileInfo
 	 *
 	 * @return string
 	 */
-	public function getPath(): string
+	public function getPath()
 	{
 		return $this->directory;
 	}
@@ -134,7 +129,7 @@ class FtpSplFileInfo extends SplFileInfo
 	 *
 	 * @return string
 	 */
-	public function getFilename(): string
+	public function getFilename()
 	{
 		return $this->filename;
 	}
@@ -144,7 +139,7 @@ class FtpSplFileInfo extends SplFileInfo
 	 *
 	 * @return string
 	 */
-	public function getPathname(): string
+	public function getPathname()
 	{
 		if( $this->isDir() )
 		{
@@ -162,7 +157,7 @@ class FtpSplFileInfo extends SplFileInfo
 	 * @param	string	$file	The filename or directory name
 	 * @return	string
 	 */
-	public function getItemname( string $file ): string
+	public function getItemname( $file )
 	{
 		if( $this->directory === '/' AND $file === '.' )
 		{
@@ -178,7 +173,7 @@ class FtpSplFileInfo extends SplFileInfo
 	 * @param	mixed	$item	The item we are parsing, which could be a file or directory (or unknown)
 	 * @return	int
 	 */
-	public static function getTypeFromRaw( mixed $item ): int
+	public static function getTypeFromRaw( $item )
 	{
 		if( $item === '' )
 		{
@@ -204,20 +199,20 @@ class FtpSplFileInfo extends SplFileInfo
 	/**
 	 * Parse a raw list item to extract the needed information
 	 *
-	 * @param string $file	The item we are parsing, which could be a file or directory (or unknown)
+	 * @param	string	$file	The item we are parsing, which could be a file or directory (or unknown)
 	 * @return	array	( 'filename' => ..., 'directory' => ... )
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public static function parseFile( string $file = '/' ): array
+	public static function parseFile( $file = '/' )
 	{
 		if( mb_strpos( $file, '/' ) !== 0 )
 		{
-			throw new InvalidArgumentException( sprintf( 'File "%s" does not start with a /', $file ) );
+			throw new \InvalidArgumentException( sprintf( 'File "%s" does not start with a /', $file ) );
 		}
 
 		if( mb_strlen( $file ) < 2 )
 		{
-			throw new InvalidArgumentException( sprintf( 'File "%s" must contain at least two characters', $file ) );
+			throw new \InvalidArgumentException( sprintf( 'File "%s" must contain at least two characters', $file ) );
 		}
 
 		$pathBreak	= mb_strrpos( $file, '/' );
@@ -233,7 +228,7 @@ class FtpSplFileInfo extends SplFileInfo
 	 *
 	 * @return string
 	 */
-	public function __toString() : string
+	public function __toString()
 	{
 		return $this->getPathname();
 	}

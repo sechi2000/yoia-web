@@ -12,32 +12,29 @@
 namespace IPS\core\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Menu Header
  */
-class MenuHeader
+class _MenuHeader
 {
 	/**
 	 * @brief	The language string for the title
 	 */
-	protected ?string $title = null;
+	protected $title;
 	
 	/**
 	 * Constructor
 	 *
 	 * @param	string	$title		The language string for the title
+	 * @return	void
 	 */
-	public function __construct( string $title )
+	public function __construct( $title )
 	{
 		$this->title = $title;
 	}
@@ -47,7 +44,7 @@ class MenuHeader
 	 *
 	 * @return	bool
 	 */
-	public function canView(): bool
+	public function canView()
 	{
 		return TRUE;
 	}
@@ -57,30 +54,19 @@ class MenuHeader
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack( $this->title );
+		return \IPS\Member::loggedIn()->language()->addToStack( $this->title );
 	}
 		
 	/**
 	 * Children
 	 *
 	 * @param	bool	$noStore	If true, will skip datastore and get from DB (used for ACP preview)
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function children( bool $noStore=FALSE ): ?array
+	public function children( $noStore=FALSE )
 	{
 		return NULL;
-	}
-
-	/**
-	 * Is this item available for the specified type?
-	 *
-	 * @param string $type
-	 * @return bool
-	 */
-	public function isAvailableFor( string $type ): bool
-	{
-		return true;
 	}
 }

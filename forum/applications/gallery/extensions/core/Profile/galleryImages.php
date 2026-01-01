@@ -12,24 +12,33 @@
 namespace IPS\gallery\extensions\core\Profile;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Content\Filter;
-use IPS\Extensions\ProfileAbstract;
-use IPS\gallery\Image;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Profile extension: galleryImages
  */
-class galleryImages extends ProfileAbstract
+class _galleryImages
 {
+	/**
+	 * Member
+	 */
+	protected \IPS\Member $member;
+	
+	/**
+	 * Constructor
+	 *
+	 * @param	\IPS\Member	$member	Member whose profile we are viewing
+	 * @return	void
+	 */
+	public function __construct( \IPS\Member $member )
+	{
+		$this->member = $member;
+	}
+	
 	/**
 	 * Is there content to display?
 	 *
@@ -37,12 +46,7 @@ class galleryImages extends ProfileAbstract
 	 */
 	public function showTab(): bool
 	{
-		$where = [
-			[ 'image_member_id=?', $this->member->member_id ],
-			[ 'image_album_id=?', 0 ]
-		];
-		$items = Image::getItemsWithPermission( $where, null, 1, 'read', Filter::FILTER_AUTOMATIC, 0, null, false, false,false,true );
-		return $items > 0;
+		return TRUE;
 	}
 
 	/**
@@ -53,7 +57,7 @@ class galleryImages extends ProfileAbstract
 	public function render(): string
 	{
 		$table ="";
-		foreach ( Application::load( 'gallery' )->extensions( 'core', 'ContentRouter' ) as $ext )
+		foreach ( \IPS\Application::load( 'gallery' )->extensions( 'core', 'ContentRouter' ) as $ext )
 		{
 			$table = $ext->customTableHelper( 'IPS\gallery\Image', $this->member->url()->setQueryString( 'tab', 'node_gallery_galleryImages'), array( array( 'image_member_id=? and image_album_id=0', $this->member->member_id ) ) );
 		}

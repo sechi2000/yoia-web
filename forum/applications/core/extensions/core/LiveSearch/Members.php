@@ -11,40 +11,31 @@
 namespace IPS\core\extensions\core\LiveSearch;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Extensions\LiveSearchAbstract;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Members
  */
-class Members extends LiveSearchAbstract
+class _Members
 {
 	/**
 	 * @brief	Cutoff to start doing LIKE 'string%' instead of LIKE '%string%'
 	 */
-	protected static int $inlineSearchCutoff	= 1000000;
+	protected static $inlineSearchCutoff	= 1000000;
 
 	/**
 	 * Check we have access
 	 *
 	 * @return	bool
 	 */
-	public function hasAccess(): bool
+	public function hasAccess()
 	{
 		/* Check Permissions */
-		return Member::loggedIn()->hasAcpRestriction( "core","members" );
+		return \IPS\Member::loggedIn()->hasAcpRestriction( "core","members" );
 	}
 	
 	/**
@@ -53,7 +44,7 @@ class Members extends LiveSearchAbstract
 	 * @param	string	$searchTerm	Search Term
 	 * @return	array 	Array of results
 	 */
-	public function getResults( string $searchTerm ): array
+	public function getResults( $searchTerm )
 	{
 		/* Check we have access */
 		if( !$this->hasAccess() )
@@ -66,14 +57,14 @@ class Members extends LiveSearchAbstract
 		$searchTerm = mb_strtolower( $searchTerm );
 		
 		/* Perform the search */
-		$members = Db::i()->select( "*", 'core_members', Db::i()->like( array( 'name', 'email' ), $searchTerm, TRUE, TRUE, static::canPerformInlineSearch() ), NULL, 50 ); # Limit to 50 so it doesn't take too long to run
+		$members = \IPS\Db::i()->select( "*", 'core_members', \IPS\Db::i()->like( array( 'name', 'email' ), $searchTerm, TRUE, TRUE, static::canPerformInlineSearch() ), NULL, 50 ); # Limit to 50 so it doesn't take too long to run
 
 		/* Format results */
 		foreach ( $members as $member )
 		{
-			$member = Member::constructFromData( $member );
+			$member = \IPS\Member::constructFromData( $member );
 			
-			$results[] = Theme::i()->getTemplate('livesearch')->member( $member );
+			$results[] = \IPS\Theme::i()->getTemplate('livesearch')->member( $member );
 		}
 					
 		return $results;
@@ -84,9 +75,9 @@ class Members extends LiveSearchAbstract
 	 *
 	 * @return	bool
 	 */
-	public function isDefault(): bool
+	public function isDefault()
 	{
-		return Dispatcher::i()->application->directory == 'core' and Dispatcher::i()->module->key == 'members' and Dispatcher::i()->controller != 'groups';
+		return \IPS\Dispatcher::i()->application->directory == 'core' and \IPS\Dispatcher::i()->module->key == 'members' and \IPS\Dispatcher::i()->controller != 'groups';
 	}
 
 	/**
@@ -95,20 +86,20 @@ class Members extends LiveSearchAbstract
 	 * @note	If we have more than 1,000,000 member records we will do a LIKE 'string%' search instead of LIKE '%string%'
 	 * @return	bool
 	 */
-	public static function canPerformInlineSearch() : bool
+	public static function canPerformInlineSearch()
 	{
 		/* If the data store entry is present, read it first */
-		if( isset( Store::i()->safeInlineSearch ) )
+		if( isset( \IPS\Data\Store::i()->safeInlineSearch ) )
 		{
 			/* We are over the threshold, return FALSE now */
-			if( Store::i()->safeInlineSearch == false )
+			if( \IPS\Data\Store::i()->safeInlineSearch == false )
 			{
 				return FALSE;
 			}
 			else
 			{
 				/* If we haven't checked in 24 hours we should do so again */
-				if( Store::i()->safeInlineSearch > ( time() - ( 60 * 60 * 24 ) ) )
+				if( \IPS\Data\Store::i()->safeInlineSearch > ( time() - ( 60 * 60 * 24 ) ) )
 				{
 					return TRUE;
 				}
@@ -116,18 +107,18 @@ class Members extends LiveSearchAbstract
 		}
 
 		/* Get our member count */
-		$totalMembers = Db::i()->select( 'COUNT(*)', 'core_members' )->first();
+		$totalMembers = \IPS\Db::i()->select( 'COUNT(*)', 'core_members' )->first();
 
 		/* If we have more members than our cutoff, just set a flag as we don't need to recheck this periodically. The total will never materially dip to where we can start performing inline searches again, and worst case scenario the upgrader/support tool would clear the cache anyways. */
 		if( $totalMembers > static::$inlineSearchCutoff )
 		{
-			Store::i()->safeInlineSearch = false;
+			\IPS\Data\Store::i()->safeInlineSearch = false;
 			return FALSE;
 		}
 		else
 		{
 			/* Otherwise we store a timestamp so we can recheck periodically */
-			Store::i()->safeInlineSearch = time();
+			\IPS\Data\Store::i()->safeInlineSearch = time();
 			return TRUE;
 		}	
 	}

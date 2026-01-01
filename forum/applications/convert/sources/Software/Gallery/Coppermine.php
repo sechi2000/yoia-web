@@ -12,34 +12,23 @@
 namespace IPS\convert\Software\Gallery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\convert\Software;
-use IPS\Db;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task;
-use function defined;
-use function strtotime;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Coppermine Gallery Converter
  */
-class Coppermine extends Software
+class _Coppermine extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "Coppermine (phpBB 3.1.x/3.2.x)";
@@ -48,9 +37,9 @@ class Coppermine extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "coppermine";
@@ -59,9 +48,9 @@ class Coppermine extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertGalleryCategories'	=> array(
@@ -86,9 +75,9 @@ class Coppermine extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|NULL
+	 * @return	NULL|array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'phpbb' ) );
 	}
@@ -96,9 +85,9 @@ class Coppermine extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertGalleryAlbums',
@@ -109,17 +98,17 @@ class Coppermine extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Method name
-	 * @return    array|null
+	 * @param	string	$method	Method name
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
 		{
 			case 'convertGalleryAlbums':
 				$options = array();
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'gallery_categories' ), 'IPS\gallery\Category' ) AS $category )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'gallery_categories' ), 'IPS\gallery\Category' ) AS $category )
 				{
 					$options[$category->_id] = $category->_title;
 				}
@@ -140,8 +129,8 @@ class Coppermine extends Software
 					'field_default'		=> NULL,
 					'field_required'	=> TRUE,
 					'field_extra'		=> array(),
-					'field_hint'		=> Member::loggedIn()->language()->addToStack( 'convert_coppermine_filehint' ),
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack( 'convert_coppermine_filehint' ),
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				break;
 		}
@@ -152,19 +141,19 @@ class Coppermine extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
 
 		/* Caches */
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'gallery_images', 'class' => 'IPS\gallery\Image' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'gallery_images', 'class' => 'IPS\gallery\Image' ), 3, array( 'app', 'link', 'class' ) );
 
 		return array( "f_gallery_images_rebuild", "f_gallery_cat_recount", "f_gallery_album_recount", "f_gallery_image_recount", "f_image_tags_recount" );
 	}
@@ -174,7 +163,7 @@ class Coppermine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryCategories() : void
+	public function convertGalleryCategories()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -199,7 +188,7 @@ class Coppermine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryAlbums() : void
+	public function convertGalleryAlbums()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -209,7 +198,7 @@ class Coppermine extends Software
 		{
 			$info = array(
 				'album_id'					=> $row['aid'],
-				'album_owner_id'			=> $row['owner'] ?? NULL,
+				'album_owner_id'			=> isset( $row['owner'] ) ? $row['owner'] : NULL,
 				'album_category_id'			=> $row['category'],
 				'album_description'			=> $row['description'],
 				'album_position'			=> $row['pos'],
@@ -224,7 +213,7 @@ class Coppermine extends Software
 			{
 				$this->app->getLink( $row['category'], 'gallery_categories' );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				$category = $this->app->_session['more_info']['convertGalleryAlbums']['members_gallery_category'];
 				if ( $category == 0 )
@@ -243,7 +232,7 @@ class Coppermine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryImages() : void
+	public function convertGalleryImages()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -260,7 +249,7 @@ class Coppermine extends Software
 				'image_description'		=> $row['caption'],
 				'image_views'			=> $row['hits'],
 				'image_date'			=> $row['ctime'],
-				'image_updated'			=> strtotime( $row['mtime'] ),
+				'image_updated'			=> \strtotime( $row['mtime'] ),
 				'image_ipaddress'		=> $row['pic_raw_ip'],
 				'image_file_name'		=> $row['filename']
 			);
@@ -303,7 +292,7 @@ class Coppermine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryComments() : void
+	public function convertGalleryComments()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -318,7 +307,7 @@ class Coppermine extends Software
 				'comment_author_id'		=> $row['author_id'],
 				'comment_author_name'	=> $row['msg_author'],
 				'comment_ip_address'	=> $row['msg_raw_ip'],
-				'comment_post_date'		=> strtotime( $row['msg_date'] ),
+				'comment_post_date'		=> \strtotime( $row['msg_date'] ),
 			) );
 
 			$libraryClass->setLastKeyValue( $row['msg_id'] );

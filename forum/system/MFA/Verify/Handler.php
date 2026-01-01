@@ -14,70 +14,49 @@ namespace IPS\MFA\Verify;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use DomainException;
-use IPS\DateTime;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Address;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\MFA\MFAHandler;
-use IPS\MFA\Verify\Exception as VerifyException;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function count;
-use function in_array;
-use function strpos;
-use function substr;
+use IPS\MFA\verify\Exception;
 
 if( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
-class Handler extends MFAHandler
+class _Handler extends \IPS\MFA\MFAHandler
 {
 	/**
 	 * @brief	Key
 	 */
-	protected string $key = 'verify';
+	protected $key = 'verify';
 
 	/**
 	 * Handler is enabled
 	 *
 	 * @return    bool
 	 */
-	public function isEnabled(): bool
+	public function isEnabled()
 	{
-		return Settings::i()->verify_enabled;
+		return \IPS\Settings::i()->verify_enabled;
 	}
 
 	/**
 	 * Member *can* use this handler (even if they have not yet configured it)
 	 *
-	 * @param Member $member The member
+	 * @param \IPS\Member $member The member
 	 * @return    bool
 	 */
-	public function memberCanUseHandler( Member $member ): bool
+	public function memberCanUseHandler( \IPS\Member $member )
 	{
-		return Settings::i()->verify_groups == '*' or $member->inGroup( explode( ',', Settings::i()->verify_groups ) );
+		return \IPS\Settings::i()->verify_groups == '*' or $member->inGroup( explode( ',', \IPS\Settings::i()->verify_groups ) );
 	}
 
 	/**
 	 * Member has configured this handler
 	 *
-	 * @param Member $member The member
+	 * @param \IPS\Member $member The member
 	 * @return    bool
 	 */
-	public function memberHasConfiguredHandler( Member $member ): bool
+	public function memberHasConfiguredHandler( \IPS\Member $member )
 	{
 		return isset( $member->mfa_details['verify'] ) and $member->mfa_details['verify']['setup'];
 	}
@@ -85,17 +64,17 @@ class Handler extends MFAHandler
 	/**
 	 * Show a setup screen
 	 *
-	 * @param Member $member The member
+	 * @param \IPS\Member $member The member
 	 * @param bool $showingMultipleHandlers Set to TRUE if multiple options are being displayed
-	 * @param Url $url URL for page
+	 * @param \IPS\Http\Url $url URL for page
 	 * @return    string
 	 */
-	public function configurationScreen( Member $member, bool $showingMultipleHandlers, Url $url ): string
+	public function configurationScreen( \IPS\Member $member, $showingMultipleHandlers, \IPS\Http\Url $url )
 	{
 		$mfaDetails = $member->mfa_details;
 
 		/* Starting again? */
-		if ( isset( $mfaDetails['verify']['pendingId'] ) and isset( Request::i()->_new ) )
+		if ( isset( $mfaDetails['verify']['pendingId'] ) and isset( \IPS\Request::i()->_new ) )
 		{
 			unset( $mfaDetails['verify']['pendingId'] );
 			$member->mfa_details = $mfaDetails;
@@ -106,45 +85,45 @@ class Handler extends MFAHandler
 		if ( isset( $mfaDetails['verify'] ) and isset( $mfaDetails['verify']['pendingId'] ) and !isset( $_SESSION['verifyConfigureError'] ) )
 		{
 			/* Asking for a text or call instead? */
-			$availableMethods = explode( ',', Settings::i()->verify_setup );
-			if ( isset( Request::i()->verify_method ) and $mfaDetails['verify']['setupMethod'] == 'verify' and in_array( Request::i()->verify_method, $availableMethods ) )
+			$availableMethods = explode( ',', \IPS\Settings::i()->verify_setup );
+			if ( isset( \IPS\Request::i()->verify_method ) and $mfaDetails['verify']['setupMethod'] == 'verify' and \in_array( \IPS\Request::i()->verify_method, $availableMethods ) )
 			{
 				try
 				{
 					/* Verify with the API */
-					$response = static::_api( "Services/" . Settings::i()->verify_service_sid . "/VerificationCheck", 'post', array(
+					$response = static::_api( "Services/" . \IPS\Settings::i()->verify_service_sid . "/VerificationCheck", 'post', array(
 						'VerificationSid' => $mfaDetails['verify']['pendingId'],
-						'Code' => Request::i()->verify_auth_code
+						'Code' => \IPS\Request::i()->verify_auth_code
 					) );
 
 					if( $response['status'] == 'approved' )
 					{
 						/* Update details */
-						$mfaDetails['verify']['setupMethod'] = Request::i()->verify_method;
+						$mfaDetails['verify']['setupMethod'] = \IPS\Request::i()->verify_method;
 						$member->mfa_details = $mfaDetails;
 						$member->save();
 					}
 					else
 					{
-						throw new VerifyException( 'verify_mfa_invalid_code' );
+						throw new \IPS\MFA\Verify\Exception( 'verify_mfa_invalid_code' );
 					}
 				}
 				catch ( \Exception $e )
 				{
-					Log::log( $e, 'verify' );
+					\IPS\Log::log( $e, 'verify' );
 					$_SESSION['verifyAuthError'] = $e->getMessage();
 				}
 			}
 
 			/* Display */
-			return Theme::i()->getTemplate( 'login', 'core', 'global' )->verifyAuthenticate( $mfaDetails['verify']['setupMethod'], TRUE, $_SESSION['verifyAuthError'] ?? 'verify_error', TRUE, explode( ',', Settings::i()->verify_setup ), $url );
+			return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->verifyAuthenticate( $mfaDetails['verify']['setupMethod'], TRUE, $_SESSION['verifyAuthError'] ?? 'verify_error', TRUE, explode( ',', \IPS\Settings::i()->verify_setup ), $url );
 		}
 		else
 		{
 			/* If they have used their allowed attempts, make them wait */
-			if ( isset( $mfaDetails['verify'] ) and isset( $mfaDetails['verify']['changeAttempts'] ) and $mfaDetails['verify']['changeAttempts'] >= Settings::i()->verify_setup_tries )
+			if ( isset( $mfaDetails['verify'] ) and isset( $mfaDetails['verify']['changeAttempts'] ) and $mfaDetails['verify']['changeAttempts'] >= \IPS\Settings::i()->verify_setup_tries )
 			{
-				$lockEndTime = $mfaDetails['verify']['lastChangeAttempt'] + ( Settings::i()->verify_setup_lockout * 3600 );
+				$lockEndTime = $mfaDetails['verify']['lastChangeAttempt'] + ( \IPS\Settings::i()->verify_setup_lockout * 3600 );
 				if ( $lockEndTime < time() )
 				{
 					$mfaDetails['verify']['changeAttempts'] = 0;
@@ -153,35 +132,35 @@ class Handler extends MFAHandler
 				}
 				else
 				{
-					return Theme::i()->getTemplate( 'login', 'core', 'global' )->verifySetupLockout( $showingMultipleHandlers, DateTime::ts( $lockEndTime ) );
+					return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->verifySetupLockout( $showingMultipleHandlers, \IPS\DateTime::ts( $lockEndTime ) );
 				}
 			}
 
 			/* Otherwise show the form */
-			return Theme::i()->getTemplate( 'login', 'core', 'global' )->verifySetup( Request::i()->countryCode ?? Address::calculateDefaultCountry(), Request::i()->phoneNumber ?? '', $showingMultipleHandlers, explode( ',', Settings::i()->verify_setup ), $_SESSION['verifyConfigureError'] ?? NULL );
+			return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->verifySetup( \IPS\Request::i()->countryCode ?? \IPS\Helpers\Form\Address::calculateDefaultCountry(), \IPS\Request::i()->phoneNumber ?? '', $showingMultipleHandlers, explode( ',', \IPS\Settings::i()->verify_setup ), $_SESSION['verifyConfigureError'] ?? NULL );
 		}
 	}
 
 	/**
 	 * Submit configuration screen. Return TRUE if was accepted
 	 *
-	 * @param Member $member The member
+	 * @param \IPS\Member $member The member
 	 * @return    bool
 	 */
-	public function configurationScreenSubmit( Member $member ): bool
+	public function configurationScreenSubmit( \IPS\Member $member )
 	{
 		$mfaDetails = $member->mfa_details;
 
 		/* If we've enterred a code, verify it */
-		if ( isset( $mfaDetails['verify'] ) and isset( $mfaDetails['verify']['pendingId'] ) and isset( Request::i()->verify_auth_code ) )
+		if ( isset( $mfaDetails['verify'] ) and isset( $mfaDetails['verify']['pendingId'] ) and isset( \IPS\Request::i()->verify_auth_code ) )
 		{
 			$_SESSION['verifyAuthError'] = NULL;
 			try
 			{
 				/* Verify with the API */
-				$response = static::_api( "Services/" . Settings::i()->verify_service_sid . "/VerificationCheck", 'post', array(
+				$response = static::_api( "Services/" . \IPS\Settings::i()->verify_service_sid . "/VerificationCheck", 'post', array(
 					'VerificationSid' => $mfaDetails['verify']['pendingId'],
-					'Code' => Request::i()->verify_auth_code
+					'Code' => \IPS\Request::i()->verify_auth_code
 				) );
 
 				if( $response['status'] == 'approved' )
@@ -196,47 +175,47 @@ class Handler extends MFAHandler
 				}
 				else
 				{
-					throw new VerifyException( 'verify_mfa_invalid_code' );
+					throw new \IPS\MFA\Verify\Exception( 'verify_mfa_invalid_code' );
 				}
 			}
 			catch ( \Exception $e )
 			{
-				Log::log( $e, 'verify' );
+				\IPS\Log::log( $e, 'verify' );
 				$_SESSION['verifyAuthError'] = $e->getMessage();
 				return false;
 			}
 		}
 
 		/* Otherwise we need to generate an ID */
-		elseif ( Request::i()->phoneNumber )
+		elseif ( \IPS\Request::i()->phoneNumber )
 		{
 			/* Do we need to wait a while? */
-			if ( isset( $mfaDetails['verify'] ) and isset( $mfaDetails['verify']['changeAttempts'] ) and $mfaDetails['verify']['changeAttempts'] >= Settings::i()->verify_setup_tries )
+			if ( isset( $mfaDetails['verify'] ) and isset( $mfaDetails['verify']['changeAttempts'] ) and $mfaDetails['verify']['changeAttempts'] >= \IPS\Settings::i()->verify_setup_tries )
 			{
 				return false;
 			}
 
 			/* Reformat the phone number to E.164 */
-			$countryCode = substr( Request::i()->countryCode, strpos( Request::i()->countryCode, "-" ) + 1 );
-			$phoneNumber = "+" . $countryCode . Request::i()->phoneNumber;
+			$countryCode = \substr( \IPS\Request::i()->countryCode, \strpos( \IPS\Request::i()->countryCode, "-" ) + 1 );
+			$phoneNumber = "+" . $countryCode . \IPS\Request::i()->phoneNumber;
 
 			/* Call verify */
-			$availableMethods = explode( ',', Settings::i()->verify_setup );
-			$method = ( isset( Request::i()->method ) and in_array( Request::i()->method, $availableMethods ) ) ? Request::i()->method : array_shift( $availableMethods );
+			$availableMethods = explode( ',', \IPS\Settings::i()->verify_setup );
+			$method = ( isset( \IPS\Request::i()->method ) and \in_array( \IPS\Request::i()->method, $availableMethods ) ) ? \IPS\Request::i()->method : array_shift( $availableMethods );
 			$_SESSION['verifyConfigureError'] = NULL;
 
-			$channel = ( Request::i()->method == 'phone' ) ? 'call' : Request::i()->method;
+			$channel = ( \IPS\Request::i()->method == 'phone' ) ? 'call' : \IPS\Request::i()->method;
 
 			try
 			{
-				$response = static::_api( "Services/" . Settings::i()->verify_service_sid . "/Verifications", 'post', array(
+				$response = static::_api( "Services/" . \IPS\Settings::i()->verify_service_sid . "/Verifications", 'post', array(
 					'To' => $phoneNumber,
 					'Channel' => $channel
 				) );
 			}
 			catch ( \Exception $e )
 			{
-				Log::log( $e, 'verify' );
+				\IPS\Log::log( $e, 'verify' );
 				$_SESSION['verifyConfigureError'] = $e->getMessage();
 				return false;
 			}
@@ -269,17 +248,17 @@ class Handler extends MFAHandler
 	/**
 	 * Get the form for a member to authenticate
 	 *
-	 * @param Member $member The member
-	 * @param Url $url URL for page
+	 * @param \IPS\Member $member The member
+	 * @param \IPS\Http\Url $url URL for page
 	 * @return    string
 	 */
-	public function authenticationScreen( Member $member, Url $url ): string
+	public function authenticationScreen( \IPS\Member $member, \IPS\Http\Url $url )
 	{
 		$mfaDetails = $member->mfa_details;
-		$availableMethods = explode( ',', Settings::i()->verify_method );
+		$availableMethods = explode( ',', \IPS\Settings::i()->verify_method );
 
 		/* If we sent a code, but it was less than one minute ago, log a failure and reset */
-		if ( isset( $mfaDetails['verify']['sent'] ) and $mfaDetails['verify']['sent']['time'] < ( time() - 60 ) and !isset( Request::i()->verify_auth_code ) )
+		if ( isset( $mfaDetails['verify']['sent'] ) and $mfaDetails['verify']['sent']['time'] < ( time() - 60 ) and !isset( \IPS\Request::i()->verify_auth_code ) )
 		{
 			unset( $mfaDetails['verify']['sent'] );
 			$member->mfa_details = $mfaDetails;
@@ -288,14 +267,14 @@ class Handler extends MFAHandler
 		}
 
 		/* If text message is the only available option, or we have chosen that option, do that... */
-		$selectedMethod = Request::i()->verify_method ?? NULL;
+		$selectedMethod = \IPS\Request::i()->verify_method ?? NULL;
 		if( $selectedMethod === NULL )
 		{
-			if( isset( Request::i()->verify_auth_code ) and isset( $mfaDetails['verify']['sent'] ) )
+			if( isset( \IPS\Request::i()->verify_auth_code ) and isset( $mfaDetails['verify']['sent'] ) )
 			{
 				$selectedMethod = $mfaDetails['verify']['sent']['method'];
 			}
-			elseif( count( $availableMethods ) == 1 )
+			elseif( \count( $availableMethods ) == 1 )
 			{
 				$selectedMethod = $availableMethods[0];
 			}
@@ -307,7 +286,7 @@ class Handler extends MFAHandler
 			try
 			{
 				$channel = $selectedMethod == 'phone' ? 'call' : $selectedMethod;
-				$response = static::_api( "Services/" . Settings::i()->verify_service_sid . "/Verifications", 'post', array(
+				$response = static::_api( "Services/" . \IPS\Settings::i()->verify_service_sid . "/Verifications", 'post', array(
 					'To' => $mfaDetails['verify']['id'],
 					'Channel' => $channel
 				) );
@@ -319,22 +298,22 @@ class Handler extends MFAHandler
 			}
 			catch ( \Exception $e )
 			{
-				Log::log( $e, 'verify' );
-				return Theme::i()->getTemplate( 'login', 'core', 'global' )->verifyError( $e->getMessage() );
+				\IPS\Log::log( $e, 'verify' );
+				return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->verifyError( $e->getMessage() );
 			}
 		}
 
 		/* Show screen */
-		return Theme::i()->getTemplate( 'login', 'core', 'global' )->verifyAuthenticate( $selectedMethod ?: 'choose', ( isset( $mfaDetails['verify']['sent'] ) and $mfaDetails['verify']['sent']['method'] == $selectedMethod ), $_SESSION['verifyAuthError'] ?? 'verify_error', $mfaDetails['verify']['setup'] ?? FALSE, $availableMethods, $url );
+		return \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->verifyAuthenticate( $selectedMethod ?: 'choose', ( isset( $mfaDetails['verify']['sent'] ) and $mfaDetails['verify']['sent']['method'] == $selectedMethod ), $_SESSION['verifyAuthError'] ?? 'verify_error', $mfaDetails['verify']['setup'] ?? FALSE, $availableMethods, $url );
 	}
 
 	/**
 	 * Submit authentication screen. Return TRUE if was accepted
 	 *
-	 * @param Member $member The member
-	 * @return    bool
+	 * @param \IPS\Member $member The member
+	 * @return    string
 	 */
-	public function authenticationScreenSubmit( Member $member ): bool
+	public function authenticationScreenSubmit( \IPS\Member $member )
 	{
 		$mfaDetails = $member->mfa_details;
 
@@ -342,12 +321,12 @@ class Handler extends MFAHandler
 
 		try
 		{
-			if ( isset( Request::i()->verify_auth_code ) )
+			if ( isset( \IPS\Request::i()->verify_auth_code ) )
 			{
 				/* Verify with the API */
-				$response = static::_api( "Services/" . Settings::i()->verify_service_sid . "/VerificationCheck", 'post', array(
+				$response = static::_api( "Services/" . \IPS\Settings::i()->verify_service_sid . "/VerificationCheck", 'post', array(
 					'To' => $mfaDetails['verify']['id'],
-					'Code' => Request::i()->verify_auth_code
+					'Code' => \IPS\Request::i()->verify_auth_code
 				) );
 
 				if( $response['status'] == 'approved' )
@@ -359,7 +338,7 @@ class Handler extends MFAHandler
 				}
 				else
 				{
-					throw new VerifyException( 'verify_mfa_invalid_code' );
+					throw new \IPS\MFA\Verify\Exception( 'verify_mfa_invalid_code' );
 				}
 			}
 			else
@@ -369,7 +348,7 @@ class Handler extends MFAHandler
 		}
 		catch ( \Exception $e )
 		{
-			Log::log( $e, 'verify' );
+			\IPS\Log::log( $e, 'verify' );
 			$_SESSION['verifyAuthError'] = $e->getMessage();
 			return false;
 		}
@@ -379,16 +358,16 @@ class Handler extends MFAHandler
 	 * Toggle
 	 *
 	 * @param	bool	$enabled	On/Off
-	 * @return	void
+	 * @return	bool
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		if ( $enabled )
 		{
-			static::verifyApiKeys( Settings::i()->verify_sid, Settings::i()->verify_token );
+			static::verifyApiKeys( \IPS\Settings::i()->verify_sid, \IPS\Settings::i()->verify_token );
 		}
 
-		Settings::i()->changeValues( array( 'verify_enabled' => $enabled ) );
+		\IPS\Settings::i()->changeValues( array( 'verify_enabled' => $enabled ) );
 	}
 
 	/**
@@ -396,34 +375,34 @@ class Handler extends MFAHandler
 	 *
 	 * @return    string
 	 */
-	public function acpSettings(): string
+	public function acpSettings()
 	{
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 
-		$form->add( new Text( 'verify_sid', Settings::i()->verify_sid, TRUE, array(), NULL, NULL, Member::loggedIn()->language()->addToStack( 'verify_sid_suffix' ) ) );
-		$form->add( new Text( 'verify_token', Settings::i()->verify_token, TRUE ) );
-		$form->add( new CheckboxSet( 'verify_groups', Settings::i()->verify_groups == '*' ? '*' : explode( ',', Settings::i()->verify_groups ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Text( 'verify_sid', \IPS\Settings::i()->verify_sid, TRUE, array(), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack( 'verify_sid_suffix' ) ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'verify_token', \IPS\Settings::i()->verify_token, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'verify_groups', \IPS\Settings::i()->verify_groups == '*' ? '*' : explode( ',', \IPS\Settings::i()->verify_groups ), FALSE, array(
 			'multiple'		=> TRUE,
-			'options'		=> array_combine( array_keys( Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, Group::groups() ) ),
+			'options'		=> array_combine( array_keys( \IPS\Member\Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, \IPS\Member\Group::groups() ) ),
 			'unlimited'		=> '*',
 			'unlimitedLang'	=> 'everyone',
 			'impliedUnlimited' => TRUE
 		) ) );
 
 		$form->addHeader('verify_setup_header');
-		$form->add( new CheckboxSet( 'verify_setup', explode( ',', Settings::i()->verify_setup ), TRUE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'verify_setup', explode( ',', \IPS\Settings::i()->verify_setup ), TRUE, array( 'options' => array(
 			'sms'			=> 'verify_method_sms',
 			'phone'			=> 'verify_method_phone',
 			'whatsapp'		=> 'verify_method_whatsapp'
 		) ) ) );
-		$form->add( new Custom( 'verify_setup_protection', array( Settings::i()->verify_setup_tries, Settings::i()->verify_setup_lockout ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Custom( 'verify_setup_protection', array( \IPS\Settings::i()->verify_setup_tries, \IPS\Settings::i()->verify_setup_lockout ), FALSE, array(
 			'getHtml' => function( $field ) {
-				return Theme::i()->getTemplate('settings')->verifySetupProtection( $field->value );
+				return \IPS\Theme::i()->getTemplate('settings')->verifySetupProtection( $field->value );
 			}
 		) ) );
 
 		$form->addHeader('verify_authenticate_header');
-		$form->add( new CheckboxSet( 'verify_method', explode( ',', Settings::i()->verify_method ), TRUE, array(
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'verify_method', explode( ',', \IPS\Settings::i()->verify_method ), TRUE, array(
 			'options' => array(
 				'sms'			=> 'verify_method_sms',
 				'phone'			=> 'verify_method_phone',
@@ -438,11 +417,11 @@ class Handler extends MFAHandler
 				$data = static::verifyApiKeys( $values['verify_sid'], $values['verify_token'] );
 
 				/* If we do not have any services yet, create one */
-				if( !count( $data['services'] ) )
+				if( !\count( $data['services'] ) )
 				{
 					/* Temporarily set the tokens so that we can properly make the next call */
-					Settings::i()->verify_sid = $values['verify_sid'];
-					Settings::i()->verify_token = $values['verify_token'];
+					\IPS\Settings::i()->verify_sid = $values['verify_sid'];
+					\IPS\Settings::i()->verify_token = $values['verify_token'];
 					$service = static::_api( "Services", 'post', array(
 						'FriendlyName' => 'IPS MFA'
 					) );
@@ -462,10 +441,10 @@ class Handler extends MFAHandler
 				$values['verify_method'] = isset( $values['verify_method'] ) ? implode( ',', $values['verify_method'] ) : '';
 				$form->saveAsSettings( $values );
 
-				Session::i()->log( 'acplogs__mfa_handler_enabled', array( "mfa_verify_title" => TRUE ) );
-				Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=mfa' ), 'saved' );
+				\IPS\Session::i()->log( 'acplogs__mfa_handler_enabled', array( "mfa_verify_title" => TRUE ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=mfa' ), 'saved' );
 			}
-			catch( DomainException $e )
+			catch( \DomainException $e )
 			{
 				$form->error = $e->getMessage();
 			}
@@ -480,13 +459,13 @@ class Handler extends MFAHandler
 	 * @param	string	$sid	The Verify SID
 	 * @param   string  $token	The Verify Auth Token
 	 * @return	array
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
 	public static function verifyApiKeys( string $sid, string $token ) : array
 	{
 		try
 		{
-			$response = Url::external("https://verify.twilio.com/v2/Services" )
+			$response = \IPS\Http\Url::external("https://verify.twilio.com/v2/Services" )
 				->request()
 				->login( $sid, $token )
 				->get()
@@ -494,24 +473,24 @@ class Handler extends MFAHandler
 
 			if( !isset( $response['services'] ) )
 			{
-				throw new DomainException( $response['message'] );
+				throw new \DomainException( $response['message'] );
 			}
 
 			return $response;
 		}
 		catch ( \IPS\Http\Request\Exception $e )
 		{
-			throw new DomainException( $e->getMessage() );
+			throw new \DomainException( $e->getMessage() );
 		}
 	}
 
 	/**
 	 * If member has configured this handler, disable it
 	 *
-	 * @param Member $member The member
-	 * @return    void
+	 * @param \IPS\Member $member The member
+	 * @return    bool
 	 */
-	public function disableHandlerForMember( Member $member ): void
+	public function disableHandlerForMember( \IPS\Member $member )
 	{
 		$mfaDetails = $member->mfa_details;
 
@@ -533,23 +512,23 @@ class Handler extends MFAHandler
 	 * @param	string		$method		'get' or 'post'
 	 * @param	array|null	$data		Post data or additional query string parameters
 	 * @return	array
-	 * @throws VerifyException
+	 * @throws \IPS\MFA\Verify\Exception
 	 */
 	protected static function _api( string $endpoint, string $method='get', ?array $data=NULL ) : array
 	{
-		$url = Url::external("https://verify.twilio.com/v2/{$endpoint}" );
+		$url = \IPS\Http\Url::external("https://verify.twilio.com/v2/{$endpoint}" );
 
 		if ( $method == 'get' )
 		{
 			$response = $url->setQueryString( $data )
 				->request()
-				->login( Settings::i()->verify_sid, Settings::i()->verify_token )
+				->login( \IPS\Settings::i()->verify_sid, \IPS\Settings::i()->verify_token )
 				->get();
 		}
 		else
 		{
 			$response = $url->request()
-				->login( Settings::i()->verify_sid, Settings::i()->verify_token )
+				->login( \IPS\Settings::i()->verify_sid, \IPS\Settings::i()->verify_token )
 				->post( $data );
 
 		}
@@ -558,7 +537,7 @@ class Handler extends MFAHandler
 
 		if( isset( $response['code'] ) AND isset( $response['message'] ) )
 		{
-			throw new VerifyException( $response['message'], $response['code'] );
+			throw new \IPS\MFA\Verify\Exception( $response['message'], $response['code'] );
 		}
 
 		return $response;

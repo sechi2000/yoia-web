@@ -11,38 +11,18 @@
 
 namespace IPS\{app}\extensions\core\MemberACPProfileBlocks;
 
-use IPS\core\MemberACPProfile\Block;
-use function defined;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile Block
  */
-class {class} extends Block
+class _{class} extends \IPS\core\MemberACPProfile\Block
 {
-	/**
-	 * Optionally show this profile block on a tab outside of your application.
-	 * Example: to show on the main profile tab, set this to 'core_Main'.
-	 *
-	 * @var string
-	 */
-	public static string $displayTab = '';
-
-	/**
-	 * Used in conjunction with static::$displayTab.
-	 * If showing on a profile tab outside of your application,
-	 * set this to 'left' or 'main' to place it in the proper column.
-	 *
-	 * @var string
-	 */
-	public static string $displayColumn = '';
-
 	/**
 	 * Get output
 	 *

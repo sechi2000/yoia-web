@@ -11,35 +11,31 @@
 namespace IPS\Theme\System;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Theme\Dev\Template as DevTemplate;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Magic Template Class for BASIC mode
  */
-class Template extends DevTemplate
+class _Template extends \IPS\Theme\Dev\Template
 {
 	/**
 	 * @brief	Source Folder
 	 */
-	public ?string $sourceFolder = NULL;
+	public $sourceFolder = NULL;
 	
 	/**
 	 * Contructor
 	 *
-	 * @param string $app				Application Key
-	 * @param string $templateLocation	Template location (admin/public/etc.)
-	 * @param string $templateName		Template Name
+	 * @param	string	$app				Application Key
+	 * @param	string	$templateLocation	Template location (admin/public/etc.)
+	 * @param	string	$templateName		Template Name
 	 * @return	void
 	 */
-	public function __construct( string $app, string $templateLocation, string $templateName )
+	public function __construct( $app, $templateLocation, $templateName )
 	{
 		parent::__construct( $app, $templateLocation, $templateName );
 		$this->app = $app;

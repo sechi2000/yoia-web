@@ -12,32 +12,28 @@
 namespace IPS\nexus\setup\upg_106118;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.6.4 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * ...
 	 *
-	 * @return	bool|array	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
+	 * @return	array	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
 	 */
-	public function step1() : bool|array
+	public function step1()
 	{
 		
-		if( !Settings::i()->nexus_gift_vouchers )
+		if( !\IPS\Settings::i()->nexus_gift_vouchers )
 		{
-			Settings::i()->changeValues( array( 'nexus_gift_vouchers' => '{}' ) );
+			\IPS\Settings::i()->changeValues( array( 'nexus_gift_vouchers' => '{}' ) );
 		}
 
 		return TRUE;

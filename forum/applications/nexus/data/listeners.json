@@ -1,7 +1,0 @@
-{
-    "Nexus": {
-        "type": "MemberListenerType",
-        "classname": "IPS\\nexus\\listeners\\Nexus",
-        "extends": "IPS\\Member"
-    }
-}

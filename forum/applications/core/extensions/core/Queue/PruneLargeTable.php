@@ -11,23 +11,16 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class PruneLargeTable extends QueueAbstract
+class _PruneLargeTable
 {
 	/**
 	 * @brief	Number of rows to prune at once
@@ -38,13 +31,13 @@ class PruneLargeTable extends QueueAbstract
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		/* How many rows are there total, and how many will we be pruning? */
-		$data['total']		= Db::i()->select( 'COUNT(*)', $data['table'] )->first();
-		$data['count']		= Db::i()->select( 'COUNT(*)', $data['table'], $data['where'] )->first();
+		$data['total']		= \IPS\Db::i()->select( 'COUNT(*)', $data['table'] )->first();
+		$data['count']		= \IPS\Db::i()->select( 'COUNT(*)', $data['table'], $data['where'] )->first();
 		$data['pruned']		= 0;
 
 		return $data;
@@ -58,17 +51,19 @@ class PruneLargeTable extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
+		$offset = (int) $offset;
+
 		if( isset( $data['deleteJoin'] ) )
 		{
-			$select = Db::i()->select( $data['deleteJoin']['column'], $data['deleteJoin']['table'], $data['deleteJoin']['where'], $data['deleteJoin']['column'] . ' ASC', $offset + static::ROWS_TO_PRUNE );
+			$select = \IPS\Db::i()->select( $data['deleteJoin']['column'], $data['deleteJoin']['table'], $data['deleteJoin']['where'], $data['deleteJoin']['column'] . ' ASC', $offset + static::ROWS_TO_PRUNE );
 
-			$deleted = Db::i()->delete( $data['table'], $select, NULL, NULL, array( $data['deleteJoin']['outerColumn'], $data['deleteJoin']['column'] ), Db::i()->prefix . $data['table'] );
+			$deleted = \IPS\Db::i()->delete( $data['table'], $select, NULL, NULL, array( $data['deleteJoin']['outerColumn'], $data['deleteJoin']['column'] ), \IPS\Db::i()->prefix . $data['table'] );
 		}
 		else
 		{
-			$deleted = Db::i()->delete( $data['table'], $data['where'], $data['orderBy'] ?? NULL, static::ROWS_TO_PRUNE );
+			$deleted = \IPS\Db::i()->delete( $data['table'], $data['where'], $data['orderBy'] ?? NULL, static::ROWS_TO_PRUNE );
 		}
 
 		/* Are we done? */
@@ -88,11 +83,11 @@ class PruneLargeTable extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' => Member::loggedIn()->language()->addToStack( 'backgroundQueue_pruning_table', FALSE, array( 'sprintf' => Member::loggedIn()->language()->addToStack( 'prunetable_' . $data['setting'] ) ) ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['pruned'], 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'backgroundQueue_pruning_table', FALSE, array( 'sprintf' => \IPS\Member::loggedIn()->language()->addToStack( 'prunetable_' . $data['setting'] ) ) ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['pruned'], 2 ) ) : 100 );
 	}
 
 	/**
@@ -102,13 +97,12 @@ class PruneLargeTable extends QueueAbstract
 	 * @param	bool	$processed	Was anything processed or not? If preQueueData returns NULL, this will be FALSE.
 	 * @return	void
 	 */
-	public function postComplete( array $data, bool $processed = TRUE ) : void
+	public function postComplete( $data, $processed = TRUE )
 	{
 		/* If this was pruning follows, make sure to clear the follow count cache so it can rebuild */
-		$data = json_decode( $data['data'], true );
 		if( $data['setting'] == 'prune_follows' )
 		{
-			Db::i()->delete( 'core_follow_count_cache' );
+			\IPS\Db::i()->delete( 'core_follow_count_cache' );
 		}
 	}
 }

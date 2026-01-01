@@ -11,12 +11,9 @@
 namespace IPS\Helpers\Form\Captcha;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -31,12 +28,12 @@ interface CaptchaInterface
 	 *
 	 * @return	string
 	 */
-	public function getHtml(): string;
+	public function getHtml();
 
 	/**
 	 * Verify
 	 *
 	 * @return	bool|null	TRUE/FALSE indicate if the test passed or not. NULL indicates the test failed, but the captcha system will display an error so we don't have to.
 	 */
-	public function verify(): ?bool;
+	public function verify();
 }

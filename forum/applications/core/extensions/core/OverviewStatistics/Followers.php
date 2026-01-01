@@ -11,29 +11,21 @@
 namespace IPS\core\extensions\core\OverviewStatistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\OverviewStatisticsAbstract;
-use IPS\Theme;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Overview statistics extension: Followers
  */
-class Followers extends OverviewStatisticsAbstract
+class _Followers
 {
 	/**
 	 * @brief	Which statistics page (activity or user)
 	 */
-	public string $page	= 'user';
+	public $page	= 'user';
 
 	/**
 	 * Return the sub-block keys
@@ -41,7 +33,7 @@ class Followers extends OverviewStatisticsAbstract
 	 * @note This is designed to allow one class to support multiple blocks, for instance using the ContentRouter to generate blocks.
 	 * @return array
 	 */
-	public function getBlocks(): array
+	public function getBlocks()
 	{
 		return array( 'followers' );
 	}
@@ -52,7 +44,7 @@ class Followers extends OverviewStatisticsAbstract
 	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
 	 * @return	array
 	 */
-	public function getBlockDetails( string $subBlock = NULL ): array
+	public function getBlockDetails( $subBlock = NULL )
 	{
 		/* Description can be null and will not be shown if so */
 		return array( 'app' => 'core', 'title' => 'stats_overview_followers_users', 'description' => 'stats_overview_followers_users_desc', 'refresh' => 10 );
@@ -61,34 +53,18 @@ class Followers extends OverviewStatisticsAbstract
 	/** 
 	 * Return the block HTML to show
 	 *
-	 * @param	array|string|null	$dateRange	NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
-	 * @param	string|null	$subBlock	The subblock we are loading as returned by getBlocks()
+	 * @param	array|NULL	$dateRange	NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
+	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
 	 * @return	string
 	 */
-	public function getBlock( array|string $dateRange = null, string $subBlock = null ): string
+	public function getBlock( $dateRange = NULL, $subBlock = NULL )
 	{
-		$data = $this->getBlockNumbers( $dateRange, $subBlock );
-		return Theme::i()->getTemplate( 'stats' )->overviewComparisonCount( $data['statsreports_current_count'], $data['statsreports_previous_count'] );
-	}
-
-
-	/**
-	 * Get the block numbers
-	 *
-	 * @param array|string|null $dateRange String for a fixed time period in days, NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
-	 * @param string|NULL $subBlock The subblock we are loading as returned by getBlocks()
-	 *
-	 * @return array{statsreports_current_count: (number|null), statsreports_previous_count: (number|null)}
-	 */
-	public function getBlockNumbers( array|string $dateRange = NULL, string $subBlock=NULL ) : array
-	{
-
 		$where			= NULL;
 		$previousCount	= NULL;
 
 		if( $dateRange !== NULL )
 		{
-			if( is_array( $dateRange ) )
+			if( \is_array( $dateRange ) )
 			{
 				$where = array(
 					array( 'follow_added > ?', $dateRange['start']->getTimestamp() ),
@@ -97,20 +73,41 @@ class Followers extends OverviewStatisticsAbstract
 			}
 			else
 			{
-				$currentDate	= new DateTime;
-				$interval = static::getInterval( $dateRange );
+				$currentDate	= new \IPS\DateTime;
+				$interval		= NULL;
+
+				switch( $dateRange )
+				{
+					case '7':
+						$interval = new \DateInterval( 'P7D' );
+					break;
+
+					case '30':
+						$interval = new \DateInterval( 'P1M' );
+					break;
+
+					case '90':
+						$interval = new \DateInterval( 'P3M' );
+					break;
+
+					case '180':
+						$interval = new \DateInterval( 'P6M' );
+					break;
+
+					case '365':
+						$interval = new \DateInterval( 'P1Y' );
+					break;
+				}
+
 				$initialTimestamp = $currentDate->sub( $interval )->getTimestamp();
 				$where = array( array( 'follow_added > ?', $initialTimestamp ) );
 
-				$previousCount = Db::i()->select( 'COUNT(DISTINCT(follow_member_id))', 'core_follow', array( array( 'follow_added BETWEEN ? AND ?', $currentDate->sub( $interval )->getTimestamp(), $initialTimestamp ) ) )->first();
+				$previousCount = \IPS\Db::i()->select( 'COUNT(DISTINCT(follow_member_id))', 'core_follow', array( array( 'follow_added BETWEEN ? AND ?', $currentDate->sub( $interval )->getTimestamp(), $initialTimestamp ) ) )->first();
 			}
 		}
 
-		$count = Db::i()->select( 'COUNT(DISTINCT(follow_member_id))', 'core_follow', $where )->first();
+		$count = \IPS\Db::i()->select( 'COUNT(DISTINCT(follow_member_id))', 'core_follow', $where )->first();
 
-		return [
-			'statsreports_current_count' => $count,
-			'statsreports_previous_count' => $previousCount
-		];
+		return \IPS\Theme::i()->getTemplate( 'stats' )->overviewComparisonCount( $count, $previousCount );
 	}
 }

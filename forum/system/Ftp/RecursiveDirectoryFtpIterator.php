@@ -11,52 +11,46 @@
 namespace IPS\Ftp;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Ftp;
-use RecursiveIterator;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Recursive directory FTP iterator
  */
-class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveIterator
+class _RecursiveDirectoryFtpIterator extends \IPS\Ftp\FtpSplFileInfo implements \RecursiveIterator
 {
 	/**
 	 * @brief	Holds an array of iterable objects
 	 */
-	public ?array $contents		= NULL;
+	public $contents		= NULL;
 
 	/**
 	 * @brief	The FTP class holding our connection
 	 */
-	protected ?Ftp $ftpObject	= NULL;
+	protected $ftpObject	= NULL;
 
 	/**
 	 * @brief	Flag to store whether the iterator has been rewound
 	 */
-	protected bool $rewound		= FALSE;
+	protected $rewound		= FALSE;
 
 	/**
 	 * Constructor: Create a new recursive FTP directory iterator
 	 *
-	 * @param Ftp $ftp	The FTP object handle
-	 * @param string $file	The filename or directory
+	 * @param	\IPS\Ftp	$ftp	The FTP object handle
+	 * @param	string		$file	The filename or directory
 	 * @param	int			$type	The type of item passed
 	 * @return	void
-	 * @throws InvalidArgumentException
+	 * @throws \InvalidArgumentException
 	 */
-	public function __construct( Ftp $ftp, string $file, int $type = self::TYPE_DIRECTORY )
+	public function __construct( $ftp, $file, $type = self::TYPE_DIRECTORY )
 	{
 		$this->ftpObject	= $ftp;
 
-		parent::__construct( $file, $type );
+		return parent::__construct( $file, $type );
 	}
 
 	/**
@@ -64,9 +58,9 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 	 *
 	 * @return static
 	 */
-	public function getChildren(): RecursiveDirectoryFtpIterator|static
+	public function getChildren()
 	{
-		return new RecursiveDirectoryFtpIterator( $this->ftpObject, $this->current()->getPath() );
+		return new \IPS\Ftp\RecursiveDirectoryFtpIterator( $this->ftpObject, $this->current()->getPath() );
 	}
 
 	/**
@@ -74,7 +68,7 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 	 *
 	 * @return bool
 	 */
-	public function hasChildren(): bool
+	public function hasChildren()
 	{
 		return $this->current()->isDir();
 	}
@@ -84,7 +78,7 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 	 *
 	 * @return mixed
 	 */
-	public function current(): mixed
+	public function current()
 	{
 		return current( $this->contents );
 	}
@@ -94,7 +88,7 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 	 *
 	 * @return string
 	 */
-	public function key(): string
+	public function key()
 	{
 		return $this->current()->getPathname();
 	}
@@ -102,9 +96,9 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 	/**
 	 * Advance to the next item
 	 *
-	 * @return void
+	 * @return mixed
 	 */
-	public function next(): void
+	public function next()
 	{
 		next( $this->contents );
 	}
@@ -114,14 +108,14 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 	 *
 	 * @return void
 	 */
-	public function rewind() : void
+	public function rewind()
 	{
 		/* Change to the appropriate directory */
 		$this->ftpObject->chdir( $this->getPath() );
 
 		/* Fetch our names and the raw listing */
 		$names	= $this->ftpObject->ls( $this->getFilename() );
-		$types	= $this->ftpObject->rawList($this->getFilename());
+		$types	= $this->ftpObject->rawList( $this->getFilename() );
 
 		/* Reset our contents array */
 		$this->contents	= array();
@@ -134,7 +128,7 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 				continue;
 			}
 
-			$this->contents[]	= new RecursiveDirectoryFtpIterator( $this->ftpObject, $this->getItemname( $name ), static::getTypeFromRaw( $types[ $k ] ) );
+			$this->contents[]	= new \IPS\Ftp\RecursiveDirectoryFtpIterator( $this->ftpObject, $this->getItemname( $name ), static::getTypeFromRaw( $types[ $k ] ) );
 		}
 	}
 
@@ -143,7 +137,7 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 	 *
 	 * @return bool
 	 */
-	public function valid(): bool
+	public function valid()
 	{
 		if( !$this->rewound )
 		{
@@ -151,7 +145,7 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 			$this->rewound	= TRUE;
 		}
 
-		return ( $this->current() instanceof FtpSplFileInfo);
+		return ( $this->current() instanceof \IPS\Ftp\FtpSplFileInfo );
 	}
 
 	/**
@@ -159,7 +153,7 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 	 *
 	 * @return string
 	 */
-	public function getSubPath(): string
+	public function getSubPath()
 	{
 		return $this->getPath();
 	}
@@ -169,7 +163,7 @@ class RecursiveDirectoryFtpIterator extends FtpSplFileInfo implements RecursiveI
 	 *
 	 * @return string
 	 */
-	public function getSubPathname(): string
+	public function getSubPathname()
 	{
 		return $this->getPathname();
 	}

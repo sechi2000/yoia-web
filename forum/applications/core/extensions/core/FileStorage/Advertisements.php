@@ -11,34 +11,25 @@
 namespace IPS\core\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: Advertisements
  */
-class Advertisements extends FileStorageAbstract
+class _Advertisements
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
-		return Db::i()->select( 'COUNT(*)', 'core_advertisements', array( "ad_images!=?", '[]' ) )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'core_advertisements', array( "ad_images!=?", '[]' ) )->first();
 	}
 	
 	/**
@@ -47,23 +38,24 @@ class Advertisements extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	UnderflowException					When file record doesn't exist. Indicating there are no more files to move
-	 * @return	void
+	 * @throws	\UnderflowException					When file record doesn't exist. Indicating there are no more files to move
+	 * @return	void|int							An offset integer to use on the next cycle, or nothing
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-		$advertisement = Db::i()->select( '*', 'core_advertisements', array( "ad_images!=?", '[]' ), 'ad_id', array( $offset, 1 ) )->first();
+		$advertisement = \IPS\Db::i()->select( '*', 'core_advertisements', array( "ad_images!=?", '[]' ), 'ad_id', array( $offset, 1 ) )->first();
 
 		$advertisement['_images']	= json_decode( $advertisement['ad_images'], TRUE );
 
-		$files	= array();
-		if( count( $advertisement['_images'] ) )
+		if( \count( $advertisement['_images'] ) )
 		{
+			$files	= array();
+			
 			try
 			{
-				$files['large'] = (string) File::get( $oldConfiguration ?: 'core_Advertisements', $advertisement['_images']['large'] )->move( $storageConfiguration );
+				$files['large'] = (string) \IPS\File::get( $oldConfiguration ?: 'core_Advertisements', $advertisement['_images']['large'] )->move( $storageConfiguration );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				/* Any issues are logged */
 			}
@@ -72,9 +64,9 @@ class Advertisements extends FileStorageAbstract
 			{
 				try
 				{
-					$files['small'] = (string) File::get( $oldConfiguration ?: 'core_Advertisements', $advertisement['_images']['small'] )->move( $storageConfiguration );
+					$files['small'] = (string) \IPS\File::get( $oldConfiguration ?: 'core_Advertisements', $advertisement['_images']['small'] )->move( $storageConfiguration );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					/* Any issues are logged */
 				}
@@ -84,34 +76,68 @@ class Advertisements extends FileStorageAbstract
 			{
 				try
 				{
-					$files['medium'] = (string) File::get( $oldConfiguration ?: 'core_Advertisements', $advertisement['_images']['medium'] )->move( $storageConfiguration );
+					$files['medium'] = (string) \IPS\File::get( $oldConfiguration ?: 'core_Advertisements', $advertisement['_images']['medium'] )->move( $storageConfiguration );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					/* Any issues are logged */
 				}
 			}
 		}
 		
-		if ( count( $files ) )
+		if ( \count( $files ) )
 		{
-			Db::i()->update( 'core_advertisements', array( 'ad_images' => json_encode( $files ) ), array( 'ad_id=?', $advertisement['ad_id'] ) );
+			\IPS\Db::i()->update( 'core_advertisements', array( 'ad_images' => json_encode( $files ) ), array( 'ad_id=?', $advertisement['ad_id'] ) );
 		}
 	}
 	
 	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		$advertisement = \IPS\Db::i()->select( '*', 'core_advertisements', array( "ad_images!=?", '[]' ), 'ad_id', array( $offset, 1 ) )->first();
+
+		$advertisement['_images']	= json_decode( $advertisement['ad_images'], TRUE );
+	
+		try
+		{
+			$fixed = array();
+			foreach( array( 'large', 'small', 'medium' ) as $location )
+			{
+				if ( $new = \IPS\File::repairUrl( $advertisement['_images'][ $location ] ) )
+				{
+					$fixed[ $location ] = $new;
+				}
+			}
+			
+			if ( \count( $fixed ) )
+			{
+				\IPS\Db::i()->update( 'core_advertisements', array( 'ad_images' => json_encode( $fixed ) ), array( 'ad_id=?', $advertisement['ad_id'] ) );
+			}
+		}
+		catch( \Exception $e )
+		{
+			/* Any issues are logged and the \IPS\Db::i()->update not run as the exception is thrown */
+		}
+	}
+
+	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
-		foreach( Db::i()->select( '*', 'core_advertisements', array( "ad_images!=?", '[]' ), 'ad_id' ) as $advertisement )
+		foreach( \IPS\Db::i()->select( '*', 'core_advertisements', array( "ad_images!=?", '[]' ), 'ad_id' ) as $advertisement )
 		{
 			$advertisement['_images']	= json_decode( $advertisement['ad_images'], TRUE );
 
-			if( count( $advertisement['_images'] ) )
+			if( \count( $advertisement['_images'] ) )
 			{
 				if( $advertisement['_images']['large'] == (string) $file )
 				{
@@ -138,39 +164,39 @@ class Advertisements extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		foreach( Db::i()->select( '*', 'core_advertisements', "ad_images!='[]'" ) as $advertisement )
+		foreach( \IPS\Db::i()->select( '*', 'core_advertisements', "ad_images!='[]'" ) as $advertisement )
 		{
 			$advertisement['_images']	= json_decode( $advertisement['ad_images'], TRUE );
 
-			if( count( $advertisement['_images'] ) )
+			if( \count( $advertisement['_images'] ) )
 			{
 				if( $advertisement['_images']['large'] )
 				{
 					try
 					{
-						File::get( 'core_Advertisements', $advertisement['_images']['large'] )->delete();
+						\IPS\File::get( 'core_Advertisements', $advertisement['_images']['large'] )->delete();
 					}
-					catch( Exception $e ){}
+					catch( \Exception $e ){}
 				}
 
 				if( isset( $advertisement['_images']['small'] ) )
 				{
 					try
 					{
-						File::get( 'core_Advertisements', $advertisement['_images']['small'] )->delete();
+						\IPS\File::get( 'core_Advertisements', $advertisement['_images']['small'] )->delete();
 					}
-					catch( Exception $e ){}
+					catch( \Exception $e ){}
 				}
 
 				if( isset( $advertisement['_images']['medium'] ) )
 				{
 					try
 					{
-						File::get( 'core_Advertisements', $advertisement['_images']['medium'] )->delete();
+						\IPS\File::get( 'core_Advertisements', $advertisement['_images']['medium'] )->delete();
 					}
-					catch( Exception $e ){}
+					catch( \Exception $e ){}
 				}
 			}
 		}

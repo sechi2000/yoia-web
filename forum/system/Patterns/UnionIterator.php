@@ -11,67 +11,52 @@
 namespace IPS\Patterns;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Countable;
-use IPS\DateTime;
-use Iterator;
-use SplObjectStorage;
-use Traversable;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Union Iterator Pattern
  */
-class UnionIterator implements Iterator, Countable
+class _UnionIterator implements \Iterator, \Countable
 {
 	/**
 	 * @brief	Iterators
 	 */
-	protected SplObjectStorage $iterators;
+	protected $iterators;
 	
 	/**
 	 * @brief	Current lowest value
 	 */
-	protected string $currentIteratorKey;
+	protected $currentIteratorKey;
 	
 	/**
 	 * @brief	Order Direction
 	 */
-	protected string $orderDirection;
-
-	/**
-	 * @var mixed|null
-	 */
-	protected mixed $currentLowestValue = null;
+	protected $orderDirection;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param string $orderDirection	"asc" or "desc"
+	 * @param	string	$orderDirection	"asc" or "desc"
 	 * @return	void
 	 */
-	public function __construct( string $orderDirection )
+	public function __construct( $orderDirection )
 	{
-		$this->iterators = new SplObjectStorage;
+		$this->iterators = new \SplObjectStorage;
 		$this->orderDirection = $orderDirection;
 	}
 	
 	/**
 	 * Attach Iterator
 	 *
-	 * @param	Traversable	$iterator	Iterator
+	 * @param	\Traverable	$iterator	Iterator
 	 * @param	mixed		$key		The name of the property which contains the value used to compare positions
 	 * @return	void
 	 */
-	public function attachIterator( Traversable $iterator, mixed $key ) : void
+	public function attachIterator( \Traversable $iterator, $key )
 	{		
     	$this->iterators->attach( $iterator, $key );
 	}
@@ -81,7 +66,7 @@ class UnionIterator implements Iterator, Countable
 	 *
 	 * @return	void
 	 */
-	public function rewind() : void
+	public function rewind()
 	{		
     	foreach ( $this->iterators as $iterator )
     	{
@@ -96,7 +81,7 @@ class UnionIterator implements Iterator, Countable
 	 *
 	 * @return	array
 	 */
-	public function current(): array
+	public function current()
 	{
 		foreach ( $this->iterators as $k => $iterator )
 		{
@@ -107,8 +92,6 @@ class UnionIterator implements Iterator, Countable
 				return $return;
 			}
 		}
-
-		return array();
 	}
 	
 	/**
@@ -116,7 +99,7 @@ class UnionIterator implements Iterator, Countable
 	 *
 	 * @return	mixed
 	 */
-	public function key(): mixed
+	public function key()
 	{
 		return NULL;
 	}
@@ -126,7 +109,7 @@ class UnionIterator implements Iterator, Countable
 	 *
 	 * @return	void
 	 */
-	public function next() : void
+	public function next()
 	{
 		$this->currentIteratorKey = NULL;
 		$currentLowestValue = NULL;
@@ -138,7 +121,7 @@ class UnionIterator implements Iterator, Countable
 			{
 				$col = $this->iterators->getInfo();
 				$current = $iterator->current();
-				if ( is_array( $current ) )
+				if ( \is_array( $current ) )
 				{
 					$value = $current[ $col ];
 				}
@@ -147,7 +130,7 @@ class UnionIterator implements Iterator, Countable
 					$value = $current->$col;
 				}
 				
-				if ( $value instanceof DateTime )
+				if ( $value instanceof \IPS\DateTime )
 				{
 					$value = $value->getTimestamp();
 				}
@@ -166,7 +149,7 @@ class UnionIterator implements Iterator, Countable
 	 *
 	 * @return	bool
 	 */
-	public function valid(): bool
+	public function valid()
 	{
 		return $this->currentIteratorKey !== NULL;
 	}
@@ -174,14 +157,14 @@ class UnionIterator implements Iterator, Countable
 	/**
 	 * Get count
 	 *
-	 * @return	int
+	 * @return	void
 	 */
-	public function count(): int
+	public function count()
 	{		
 		$count = 0;
     	foreach ( $this->iterators as $iterator )
     	{
-	    	$count += count( $iterator );
+	    	$count += \count( $iterator );
     	}
     	return $count;
 	}

@@ -11,70 +11,55 @@
 namespace IPS\core\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Callback;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Settings;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class OnlineUsers extends \IPS\core\Statistics\Chart
+class _OnlineUsers extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_stats_onlineusers';
+	public $controller = 'core_stats_onlineusers';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
 		/* Determine minimum date */
 		$minimumDate = NULL;
 
-		if( Settings::i()->stats_online_users_prune )
+		if( \IPS\Settings::i()->stats_online_users_prune )
 		{
-			$minimumDate = DateTime::create()->sub( new DateInterval( 'P' . Settings::i()->stats_online_users_prune . 'D' ) );
+			$minimumDate = \IPS\DateTime::create()->sub( new \DateInterval( 'P' . \IPS\Settings::i()->stats_online_users_prune . 'D' ) );
 		}
 
 		/* We can't retrieve any stats prior to the new tracking being implemented */
 		try
 		{
-			$oldestLog = Db::i()->select( 'MIN(time)', 'core_statistics', array( 'type=?', 'online_users' ) )->first();
-			if ( is_null( $oldestLog ) )
-			{
-				throw new UnderflowException; // If there are no rows, MIN(time) will be null
-			}
+			$oldestLog = \IPS\Db::i()->select( 'MIN(time)', 'core_statistics', array( 'type=?', 'online_users' ) )->first();
+
 			if( !$minimumDate OR $oldestLog < $minimumDate->getTimestamp() )
 			{
-				$minimumDate = DateTime::ts( $oldestLog );
+				$minimumDate = \IPS\DateTime::ts( $oldestLog );
 			}
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			/* We have nothing tracked, set minimum date to today */
-			$minimumDate = DateTime::create();
+			$minimumDate = \IPS\DateTime::create();
 		}
 
-		$chart = new Callback(
+		$chart = new \IPS\Helpers\Chart\Callback( 
 			$url, 
 			array( $this, 'getResults' ),
 			'', 
@@ -88,16 +73,16 @@ class OnlineUsers extends \IPS\core\Statistics\Chart
 			), 
 			'AreaChart', 
 			'none',
-			array( 'start' => DateTime::ts( time() - ( 60 * 60 * 24 * 30 ) ), 'end' => DateTime::create() ),
+			array( 'start' => \IPS\DateTime::ts( time() - ( 60 * 60 * 24 * 30 ) ), 'end' => \IPS\DateTime::create() ),
 			'',
 			$minimumDate
 		);
 		$chart->setExtension( $this );
 
-		$chart->addSeries( Member::loggedIn()->language()->addToStack('members'), 'number' );
-		$chart->addSeries( Member::loggedIn()->language()->addToStack('guests'), 'number' );
+		$chart->addSeries( \IPS\Member::loggedIn()->language()->addToStack('members'), 'number' );
+		$chart->addSeries( \IPS\Member::loggedIn()->language()->addToStack('guests'), 'number' );
 
-		$chart->title = Member::loggedIn()->language()->addToStack('stats_onlineusers_title');
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('stats_onlineusers_title');
 		$chart->availableTypes	= array( 'AreaChart', 'ColumnChart', 'BarChart' );
 		$chart->showIntervals	= FALSE;
 		
@@ -107,10 +92,10 @@ class OnlineUsers extends \IPS\core\Statistics\Chart
 	/**
 	 * Fetch the results
 	 *
-	 * @param	Callback	$chart	Chart object
+	 * @param	\IPS\Helpers\Chart\Callback	$chart	Chart object
 	 * @return	array
 	 */
-	public function getResults( Callback $chart ) : array
+	public function getResults( $chart )
 	{
 		$where = array( array( 'type=?', 'online_users' ), array( "time>?", 0 ) );
 
@@ -125,25 +110,25 @@ class OnlineUsers extends \IPS\core\Statistics\Chart
 
 		$results = array();
 
-		foreach( Db::i()->select( '*', 'core_statistics', $where, 'time ASC' ) as $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_statistics', $where, 'time ASC' ) as $row )
 		{
 			if( !isset( $results[ $row['time'] ] ) )
 			{
 				$results[ $row['time'] ] = array( 
 					'time' => $row['time'], 
-					Member::loggedIn()->language()->get('members') => 0,
-					Member::loggedIn()->language()->get('guests') => 0
+					\IPS\Member::loggedIn()->language()->get('members') => 0,
+					\IPS\Member::loggedIn()->language()->get('guests') => 0
 				);
 			}
 
 			if( $row['value_4'] == 'members' )
 			{
-				$results[ $row['time'] ][ Member::loggedIn()->language()->get('members') ] = $row['value_1'];
+				$results[ $row['time'] ][ \IPS\Member::loggedIn()->language()->get('members') ] = $row['value_1'];
 			}
 
 			if( $row['value_4'] == 'guests' )
 			{
-				$results[ $row['time'] ][ Member::loggedIn()->language()->get('guests') ] = $row['value_1'];
+				$results[ $row['time'] ][ \IPS\Member::loggedIn()->language()->get('guests') ] = $row['value_1'];
 			}
 		}
 

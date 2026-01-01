@@ -12,30 +12,23 @@
 namespace IPS\convert\Software\Calendar;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\calendar\Date;
-use IPS\convert\Software;
-use IPS\Task;
-use function defined;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * MyBB Calendar Converter
  */
-class Mybb extends Software
+class _Mybb extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "MyBB 1.8.x";
@@ -44,9 +37,9 @@ class Mybb extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "mybb";
@@ -55,9 +48,9 @@ class Mybb extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertCalendarCalendars'	=> array(
@@ -74,9 +67,9 @@ class Mybb extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -84,9 +77,9 @@ class Mybb extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'mybb' ) );
 	}
@@ -94,13 +87,13 @@ class Mybb extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'calendar_events', 'class' => 'IPS\calendar\Event' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\calendar\Event' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'calendar_events', 'class' => 'IPS\calendar\Event' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\calendar\Event' ), 3, array( 'class' ) );
 		
 		return array( "f_rebuild_events", "f_recount_calendar" );
 	}
@@ -110,7 +103,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCalendarCalendars() : void
+	public function convertCalendarCalendars()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -133,7 +126,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCalendarEvents() : void
+	public function convertCalendarEvents()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -141,7 +134,7 @@ class Mybb extends Software
 		
 		foreach( $this->fetch( 'events', 'eid' ) AS $row )
 		{
-			$repeats	= unserialize( $row['repeats'] );
+			$repeats	= \unserialize( $row['repeats'] );
 			$recurring	= NULL;
 			
 			switch( $repeats['repeats'] )
@@ -209,8 +202,8 @@ class Mybb extends Software
 				'event_title'		=> $row['name'],
 				'event_content'		=> $row['description'],
 				'event_saved'		=> $row['dateline'],
-				'event_start_date'	=> Date::ts( $row['starttime'] ),
-				'event_end_date'	=> $row['endtime'] ? Date::ts( $row['endtime'] ) : NULL,
+				'event_start_date'	=> \IPS\calendar\Date::ts( $row['starttime'] ),
+				'event_end_date'	=> $row['endtime'] ? \IPS\calendar\Date::ts( $row['endtime'] ) : NULL,
 				'event_approved'	=> $row['visible'],
 				'event_recurring'	=> $recurring,
 			) );

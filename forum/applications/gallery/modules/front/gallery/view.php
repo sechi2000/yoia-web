@@ -12,100 +12,55 @@
 namespace IPS\gallery\modules\front\gallery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DateTimeInterface;
-use DomainException;
-use Exception;
-use IPS\Content\Controller;
-use IPS\Content\Item;
-use IPS\core\DataLayer;
-use IPS\core\FrontNavigation;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\gallery\Album;
-use IPS\gallery\Application;
-use IPS\gallery\Image;
-use IPS\gallery\Image\Table;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use IPS\Image as ImageClass;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output;
-use IPS\Redis;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function intval;
-use function strlen;
-use const IPS\CACHE_CONFIG;
-use const IPS\CACHE_METHOD;
-use const IPS\PHOTO_THUMBNAIL_SIZE;
-use const IPS\REDIS_CONFIG;
-use const IPS\REDIS_ENABLED;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * View image or movie
  */
-class view extends Controller
+class _view extends \IPS\Content\Controller
 {
 	/**
 	 * [Content\Controller]	Class
 	 */
-	protected static string $contentModel = 'IPS\gallery\Image';
-
-	/**
-	 * Image object
-	 */
-	protected ?Image $image = NULL;
+	protected static $contentModel = 'IPS\gallery\Image';
 
 	/**
 	 * Init
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		if ( Request::i()->do != 'embed' )
+		if ( \IPS\Request::i()->do != 'embed' )
 		{
 			try
 			{
-				$this->image = Image::load( Request::i()->id );
+				$this->image = \IPS\gallery\Image::load( \IPS\Request::i()->id );
 				
 				$this->image->container()->clubCheckRules();
 				
-				if ( !$this->image->canView( Member::loggedIn() ) )
+				if ( !$this->image->canView( \IPS\Member::loggedIn() ) )
 				{
-					Output::i()->error( $this->image->container()->errorMessage(), '2G188/1', 403, '' );
+					\IPS\Output::i()->error( $this->image->container()->errorMessage(), '2G188/1', 403, '' );
 				}				
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException $e )
 			{
-				Output::i()->error( 'node_error', '2G188/2', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2G188/2', 404, '' );
 			}
 		}
 
 		/* When preloading we don't want to update stuff */
-		if( isset( Request::i()->preload ) AND Request::i()->preload )
+		if( isset( \IPS\Request::i()->preload ) AND \IPS\Request::i()->preload )
 		{
 			$this->updateViewsAndMarkersOnAjax = FALSE;
 		}
 
-		Application::outputCss();
+		\IPS\gallery\Application::outputCss();
 
 		parent::execute();
 	}
@@ -113,35 +68,35 @@ class view extends Controller
 	/**
 	 * View Image
 	 *
-	 * @return	mixed
+	 * @return	void
 	 * @link	http://www.videojs.com/projects/mimes.html
 	 * @note	Only HTML5 and some flash-based video formats will work. MP4, webm and ogg are relatively safe bets but anything else isn't likely to play correctly.
 	 *	The above link will allow you to check what is supported in the browser you are using.
 	 * @note	As of RC1 we fall back to a generic 'embed' for non-standard formats for better upgrade compatibility...need to look into transcoding in the future
 	 */
-	protected function manage() : mixed
+	protected function manage()
 	{
 		/* Init */
 		parent::manage();
 
 		/* Check restrictions */
-		if( Settings::i()->gallery_detailed_bandwidth AND ( Member::loggedIn()->group['g_max_transfer'] OR Member::loggedIn()->group['g_max_views'] ) )
+		if( \IPS\Settings::i()->gallery_detailed_bandwidth AND ( \IPS\Member::loggedIn()->group['g_max_transfer'] OR \IPS\Member::loggedIn()->group['g_max_views'] ) )
 		{
-			$lastDay		= DateTime::create()->sub( new DateInterval( 'P1D' ) )->getTimestamp();
+			$lastDay		= \IPS\DateTime::create()->sub( new \DateInterval( 'P1D' ) )->getTimestamp();
 
-			if( Member::loggedIn()->group['g_max_views'] )
+			if( \IPS\Member::loggedIn()->group['g_max_views'] )
 			{
-				if( Db::i()->select( 'COUNT(*) as total', 'gallery_bandwidth', array( 'member_id=? AND bdate > ?', (int) Member::loggedIn()->member_id, $lastDay ) )->first() >= Member::loggedIn()->group['g_max_views'] )
+				if( \IPS\Db::i()->select( 'COUNT(*) as total', 'gallery_bandwidth', array( 'member_id=? AND bdate > ?', (int) \IPS\Member::loggedIn()->member_id, $lastDay ) )->first() >= \IPS\Member::loggedIn()->group['g_max_views'] )
 				{
-					Output::i()->error( 'maximum_daily_views', '1G188/7', 403, 'maximum_daily_views_admin' );
+					\IPS\Output::i()->error( 'maximum_daily_views', '1G188/7', 403, 'maximum_daily_views_admin' );
 				}
 			}
 
-			if( Member::loggedIn()->group['g_max_transfer'] )
+			if( \IPS\Member::loggedIn()->group['g_max_transfer'] )
 			{
-				if( Db::i()->select( 'SUM(bsize) as total', 'gallery_bandwidth', array( 'member_id=? AND bdate > ?', (int) Member::loggedIn()->member_id, $lastDay ) )->first() >= ( Member::loggedIn()->group['g_max_transfer'] * 1024 ) )
+				if( \IPS\Db::i()->select( 'SUM(bsize) as total', 'gallery_bandwidth', array( 'member_id=? AND bdate > ?', (int) \IPS\Member::loggedIn()->member_id, $lastDay ) )->first() >= ( \IPS\Member::loggedIn()->group['g_max_transfer'] * 1024 ) )
 				{
-					Output::i()->error( 'maximum_daily_transfer', '1G188/8', 403, 'maximum_daily_transfer_admin' );
+					\IPS\Output::i()->error( 'maximum_daily_transfer', '1G188/8', 403, 'maximum_daily_transfer_admin' );
 				}
 			}
 		}
@@ -149,35 +104,35 @@ class view extends Controller
 		/* Set some meta tags */
 		if( $this->image->media )
 		{
-			Output::i()->metaTags['og:video']		= File::get( 'gallery_Images', $this->image->original_file_name )->url;
-			Output::i()->metaTags['og:video:type']	= $this->image->file_type;
-			Output::i()->metaTags['og:type']		= 'video';
+			\IPS\Output::i()->metaTags['og:video']		= \IPS\File::get( 'gallery_Images', $this->image->original_file_name )->url;
+			\IPS\Output::i()->metaTags['og:video:type']	= $this->image->file_type;
+			\IPS\Output::i()->metaTags['og:type']		= 'video';
 
-			if( count( $this->image->tags() ) )
+			if( \count( $this->image->tags() ) )
 			{
-				Output::i()->metaTags['og:video:tag']	= $this->image->tags();
+				\IPS\Output::i()->metaTags['og:video:tag']	= $this->image->tags();
 			}
 
 			if( $this->image->masked_file_name )
 			{
-				Output::i()->metaTags['og:image']		= File::get( 'gallery_Images', $this->image->masked_file_name )->url;
+				\IPS\Output::i()->metaTags['og:image']		= \IPS\File::get( 'gallery_Images', $this->image->masked_file_name )->url;
 			}
 		}
 		else
 		{
-			Output::i()->metaTags['og:image']		= File::get( 'gallery_Images', $this->image->masked_file_name )->url;
-			Output::i()->metaTags['og:image:type']	= $this->image->file_type;
+			\IPS\Output::i()->metaTags['og:image']		= \IPS\File::get( 'gallery_Images', $this->image->masked_file_name )->url;
+			\IPS\Output::i()->metaTags['og:image:type']	= $this->image->file_type;
 
-			if( count( $this->image->tags() ) )
+			if( \count( $this->image->tags() ) )
 			{
-				Output::i()->metaTags['og:object:tag']	= $this->image->tags();
+				\IPS\Output::i()->metaTags['og:object:tag']	= $this->image->tags();
 			}
 		}
 
 		/* Prioritize the main image */
-		Output::i()->linkTags[]	= array(
+		\IPS\Output::i()->linkTags[]	= array(
 			'rel'	=> 'preload',
-			'href'	=> (string) File::get( 'gallery_Images', $this->image->masked_file_name ?: $this->image->original_file_name  )->url,
+			'href'	=> (string) \IPS\File::get( 'gallery_Images', $this->image->masked_file_name )->url,
 			'as'	=> $this->image->media ? 'video' : 'image',
 			'type'	=> $this->image->file_type
 		);
@@ -185,12 +140,12 @@ class view extends Controller
 		/* Sort out comments and reviews */
 		$tabs = $this->image->commentReviewTabs();
 		$_tabs = array_keys( $tabs );
-		$tab = isset( Request::i()->tab ) ? Request::i()->tab : array_shift( $_tabs );
-		$activeTabContents = $this->image->commentReviews( $tab, Request::i()->lightbox );
+		$tab = isset( \IPS\Request::i()->tab ) ? \IPS\Request::i()->tab : array_shift( $_tabs );
+		$activeTabContents = $this->image->commentReviews( $tab, \IPS\Request::i()->lightbox );
 
-		if ( count( $tabs ) > 1 )
+		if ( \count( $tabs ) > 1 )
 		{
-			$commentsAndReviews = count( $tabs ) ? Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $tab, $activeTabContents, Request::i()->lightbox ? $this->image->url()->setQueryString( 'lightbox', 1 ) : $this->image->url(), 'tab', FALSE, FALSE, Request::i()->lightbox ? 'ipsTabs--small ipsTabs--stretch' : '', forceURLUpdate: true ) : NULL;
+			$commentsAndReviews = \count( $tabs ) ? \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $tab, $activeTabContents, \IPS\Request::i()->lightbox ? $this->image->url()->setQueryString( 'lightbox', 1 ) : $this->image->url(), 'tab', FALSE, TRUE, \IPS\Request::i()->lightbox ? 'ipsTabs_small ipsTabs_stretch' : '' ) : NULL;
 		}
 		else
 		{
@@ -198,20 +153,20 @@ class view extends Controller
 		}
 
 		/* Set the session location */
-		Session::i()->setLocation( $this->image->url(), $this->image->onlineListPermissions(), 'loc_gallery_viewing_image', array( $this->image->caption => FALSE ) );
+		\IPS\Session::i()->setLocation( $this->image->url(), $this->image->onlineListPermissions(), 'loc_gallery_viewing_image', array( $this->image->caption => FALSE ) );
 
 		/* Store bandwidth log */
-		if( Settings::i()->gallery_detailed_bandwidth )
+		if( \IPS\Settings::i()->gallery_detailed_bandwidth )
 		{
 			/* Media items should get the file size of the original file instead of a thumbnail */
 			if( $this->image->media )
 			{
-				$displayedImage = File::get( 'gallery_Images', $this->image->original_file_name, $this->image->file_size );
+				$displayedImage = \IPS\File::get( 'gallery_Images', $this->image->original_file_name, $this->image->file_size );
 			}
 			/* Otherwise, fetch the thumbnails */
 			else
 			{
-				$displayedImage	= File::get( 'gallery_Images', $this->image->masked_file_name );
+				$displayedImage	= \IPS\File::get( 'gallery_Images', $this->image->masked_file_name );
 			}
 
 			/* Get filesize, but don't error out if there is a problem fetching it at this point */
@@ -219,13 +174,13 @@ class view extends Controller
 			{
 				$filesize = ( ( isset( $displayedImage ) AND $displayedImage->filesize() ) ? $displayedImage->filesize() : $this->image->file_size );
 			}
-			catch( Exception )
+			catch( \Exception $e )
 			{
 				$filesize = $this->image->file_size;
 			}
 
-			Db::i()->insert( 'gallery_bandwidth', array(
-				'member_id'		=> (int) Member::loggedIn()->member_id,
+			\IPS\Db::i()->insert( 'gallery_bandwidth', array(
+				'member_id'		=> (int) \IPS\Member::loggedIn()->member_id,
 				'bdate'			=> time(),
 				'bsize'			=> (int) $filesize,
 				'image_id'		=> $this->image->id
@@ -233,25 +188,25 @@ class view extends Controller
 		}
 
 		/* Add JSON-ld */
-		Output::i()->jsonLd['gallery']	= array(
-			'@context'		=> "https://schema.org",
+		\IPS\Output::i()->jsonLd['gallery']	= array(
+			'@context'		=> "http://schema.org",
 			'@type'			=> "MediaObject",
 			'@id'			=> (string) $this->image->url(),
 			'url'			=> (string) $this->image->url(),
 			'name'			=> $this->image->mapped('title'),
 			'description'	=> $this->image->truncated( TRUE, NULL ),
-			'dateCreated'	=> DateTime::ts( $this->image->date )->format( DateTimeInterface::ATOM ),
+			'dateCreated'	=> \IPS\DateTime::ts( $this->image->date )->format( \IPS\DateTime::ISO8601 ),
 			'fileFormat'	=> $this->image->file_type,
 			'keywords'		=> $this->image->tags(),
 			'author'		=> array(
 				'@type'		=> 'Person',
-				'name'		=> Member::load( $this->image->member_id )->name,
-				'image'		=> Member::load( $this->image->member_id )->get_photo( TRUE, TRUE )
+				'name'		=> \IPS\Member::load( $this->image->member_id )->name,
+				'image'		=> \IPS\Member::load( $this->image->member_id )->get_photo( TRUE, TRUE )
 			),
 			'interactionStatistic'	=> array(
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/ViewAction",
+					'interactionType'		=> "http://schema.org/ViewAction",
 					'userInteractionCount'	=> $this->image->views
 				)
 			)
@@ -260,35 +215,35 @@ class view extends Controller
 		/* Do we have a real author? */
 		if( $this->image->member_id )
 		{
-			Output::i()->jsonLd['gallery']['author']['url']	= (string) Member::load( $this->image->member_id )->url();
+			\IPS\Output::i()->jsonLd['gallery']['author']['url']	= (string) \IPS\Member::load( $this->image->member_id )->url();
 		}
 
 		if ( $this->image->container()->allow_comments AND $this->image->directContainer()->allow_comments )
 		{
-			Output::i()->jsonLd['gallery']['interactionStatistic'][] = array(
+			\IPS\Output::i()->jsonLd['gallery']['interactionStatistic'][] = array(
 				'@type'					=> 'InteractionCounter',
-				'interactionType'		=> "https://schema.org/CommentAction",
+				'interactionType'		=> "http://schema.org/CommentAction",
 				'userInteractionCount'	=> $this->image->mapped('num_comments')
 			);
 
-			Output::i()->jsonLd['gallery']['commentCount'] = $this->image->mapped('num_comments');
+			\IPS\Output::i()->jsonLd['gallery']['commentCount'] = $this->image->mapped('num_comments');
 		}
 
 		if ( $this->image->container()->allow_reviews AND $this->image->directContainer()->allow_reviews )
 		{
-			Output::i()->jsonLd['gallery']['interactionStatistic'][] = array(
+			\IPS\Output::i()->jsonLd['gallery']['interactionStatistic'][] = array(
 				'@type'					=> 'InteractionCounter',
-				'interactionType'		=> "https://schema.org/ReviewAction",
+				'interactionType'		=> "http://schema.org/ReviewAction",
 				'userInteractionCount'	=> $this->image->mapped('num_reviews')
 			);
 
 			if ( $this->image->averageReviewRating() )
 			{
-				Output::i()->jsonLd['gallery']['aggregateRating'] = array(
+				\IPS\Output::i()->jsonLd['gallery']['aggregateRating'] = array(
 					'@type'			=> 'AggregateRating',
 					'ratingValue'	=> $this->image->averageReviewRating(),
 					'reviewCount'	=> $this->image->reviews,
-					'bestRating'	=> Settings::i()->reviews_rating_out_of
+					'bestRating'	=> \IPS\Settings::i()->reviews_rating_out_of
 				);
 			}
 		}
@@ -297,122 +252,86 @@ class view extends Controller
 		{
 			if( $this->image->masked_file_name )
 			{
-				Output::i()->jsonLd['gallery']['thumbnail']	= (string) File::get( 'gallery_Images', $this->image->masked_file_name )->url;
-				Output::i()->jsonLd['gallery']['thumbnailUrl']	= (string) File::get( 'gallery_Images', $this->image->masked_file_name )->url;
+				\IPS\Output::i()->jsonLd['gallery']['thumbnail']	= (string) \IPS\File::get( 'gallery_Images', $this->image->masked_file_name )->url;
+				\IPS\Output::i()->jsonLd['gallery']['thumbnailUrl']	= (string) \IPS\File::get( 'gallery_Images', $this->image->masked_file_name )->url;
 			}
 
-			Output::i()->jsonLd['gallery']['contentSize'] = (string) File::get( 'gallery_Images', $this->image->original_file_name )->filesize();
+			\IPS\Output::i()->jsonLd['gallery']['contentSize'] = (string) \IPS\File::get( 'gallery_Images', $this->image->original_file_name )->filesize();
 		}
 		else
 		{
 			try
 			{
-				$largeFile	= File::get( 'gallery_Images', $this->image->masked_file_name );
+				$largeFile	= \IPS\File::get( 'gallery_Images', $this->image->masked_file_name );
 				$dimensions	= $this->image->_dimensions;
 
-				Output::i()->jsonLd['gallery']['artMedium']	= 'Digital';
-				Output::i()->jsonLd['gallery']['width'] 		= $dimensions['large'][0];
-				Output::i()->jsonLd['gallery']['height'] 		= $dimensions['large'][1];
-				Output::i()->jsonLd['gallery']['image']		= array(
+				\IPS\Output::i()->jsonLd['gallery']['artMedium']	= 'Digital';
+				\IPS\Output::i()->jsonLd['gallery']['width'] 		= $dimensions['large'][0];
+				\IPS\Output::i()->jsonLd['gallery']['height'] 		= $dimensions['large'][1];
+				\IPS\Output::i()->jsonLd['gallery']['image']		= array(
 					'@type'		=> 'ImageObject',
 					'url'		=> (string) $largeFile->url,
 					'caption'	=> $this->image->mapped('title'),
-					'thumbnail'	=> (string) File::get( 'gallery_Images', $this->image->small_file_name )->url,
+					'thumbnail'	=> (string) \IPS\File::get( 'gallery_Images', $this->image->small_file_name )->url,
 					'width'		=> $dimensions['large'][0],
 					'height'	=> $dimensions['large'][1],
 				);
 
-				if( is_array( $this->image->metadata ) AND count( $this->image->metadata ) )
+				if( \is_countable( $this->image->metadata ) AND \count( $this->image->metadata ) )
 				{
-					Output::i()->jsonLd['gallery']['image']['exifData'] = array();
+					\IPS\Output::i()->jsonLd['gallery']['image']['exifData'] = array();
 
 					foreach( $this->image->metadata as $k => $v )
 					{
-						Output::i()->jsonLd['gallery']['image']['exifData'][] = array(
+						\IPS\Output::i()->jsonLd['gallery']['image']['exifData'][] = array(
 							'@type'		=> 'PropertyValue',
 							'name'		=> $k, 
 							'value'		=> $v
 						);
 					}
 				}
-				Output::i()->jsonLd['gallery']['thumbnailUrl']	= (string) File::get( 'gallery_Images', $this->image->small_file_name )->url;
+				\IPS\Output::i()->jsonLd['gallery']['thumbnailUrl']	= (string) \IPS\File::get( 'gallery_Images', $this->image->small_file_name )->url;
 			}
 			/* File doesn't exist */
-			catch ( RuntimeException ){}
+			catch ( \RuntimeException $e ){}
 		}
 
 		/* Display */
-		if( Request::i()->isAjax() && isset( Request::i()->browse ) )
+		if( \IPS\Request::i()->isAjax() && isset( \IPS\Request::i()->browse ) )
 		{
-			/* Set navigation and title */
-			$this->_setBreadcrumbAndTitle( $this->image, FALSE );
-			Output::i()->buildMetaTags();
 			$return = array(
-				'title' => Output::i()->getTitle( Output::i()->title ),
-				'breadcrumb_top' => Theme::i()->getTemplate( 'global', 'core' )->breadcrumb( "top" ),
-				'breadcrumb_bottom' => Theme::i()->getTemplate( 'global', 'core' )->breadcrumb( "bottom" ),
-				'breadcrumb_mobile' => Theme::i()->getTemplate( 'global', 'core' )->breadcrumb( "mobile" ),
-				'breadcrumb_off_canvas' => Theme::i()->getTemplate( 'global', 'core' )->mobileFooterNav(),
-				'image' => Theme::i()->getTemplate( 'view' )->imageFrame( $this->image ),
-				'info' => Theme::i()->getTemplate( 'view' )->imageInfo( $this->image ),
-				'url' => $this->image->url(),
-				'id' => $this->image->id,
-				'images_prev' => [],
-				'images_next' => [],
-				'image_link_current' => Theme::i()->getTemplate( 'view' )->imageCarouselLink( $this->image )
+				'title' => htmlspecialchars( $this->image->mapped('title'), ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE ),
+				'image' => \IPS\Theme::i()->getTemplate( 'view' )->imageFrame( $this->image ),
+				'info' => \IPS\Theme::i()->getTemplate( 'view' )->imageInfo( $this->image )
 			);
-
-			/* Add the prev and next images to make sure the carousel stays updated */
-			if ( $this->image->hasPreviousOrNext() )
-			{
-				$prev = array_reverse( array_slice( $this->image->fetchNextOrPreviousImages( 9, 'ASC' ), 0, 4 ) );
-				$next = $this->image->fetchNextOrPreviousImages( 9, 'DESC' );
-				$counter = 1;
-				foreach ( $prev as $prevImage )
-				{
-					$return['images_prev'][] = [ 'id' => (int) $prevImage->id, 'content' => Theme::i()->getTemplate( 'view' )->imageCarouselLink( $prevImage ) ];
-					$counter++;
-				}
-
-				foreach ( $next as $nextImage )
-				{
-					$return['images_next'][] = [ 'id' => (int) $nextImage->id, 'content' => Theme::i()->getTemplate( 'view' )->imageCarouselLink( $nextImage ) ];
-					if ( $counter >= 10 )
-					{
-						break;
-					}
-				}
-			}
-
 
 			if( $this->image->directContainer()->allow_comments )
 			{
-				$return['comments'] = Theme::i()->getTemplate( 'view' )->imageComments( $this->image, $commentsAndReviews );
+				$return['comments'] = $commentsAndReviews;
 			}
 
 			/* Data Layer Properties */
-			if ( DataLayer::enabled() )
+			if ( \IPS\Settings::i()->core_datalayer_enabled )
 			{
 				$return['dataLayer'] = $this->image->getDataLayerProperties();
 			}
 
-			Output::i()->json( $return );
+			\IPS\Output::i()->json( $return );
 		}
 		/* Switching comments only */
-		elseif( Request::i()->isAjax() AND !isset( Request::i()->rating_submitted ) AND Request::i()->tab )
+		elseif( \IPS\Request::i()->isAjax() AND !isset( \IPS\Request::i()->rating_submitted ) AND \IPS\Request::i()->tab )
 		{
-			Output::i()->output = $activeTabContents;
+			\IPS\Output::i()->output = $activeTabContents;
+			return;
 		}
 		else
 		{
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_view.js', 'gallery' ) );
-			Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_browse.js', 'gallery' ) );
-			Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_global.js', 'gallery' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_view.js', 'gallery' ) );
+			\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_browse.js', 'gallery' ) );
+			\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_global.js', 'gallery' ) );
 
-			Output::i()->output = Theme::i()->getTemplate( 'view' )->image( $this->image, $commentsAndReviews );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'view' )->image( $this->image, $commentsAndReviews );
 		}
-
-		return null;
 	}
 
 	/**
@@ -420,11 +339,11 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function download() : void
+	protected function download()
 	{
-		if( $this->image->canDownloadOriginal() == Image::DOWNLOAD_ORIGINAL_NONE )
+		if( $this->image->canDownloadOriginal() == \IPS\gallery\Image::DOWNLOAD_ORIGINAL_NONE )
 		{
-			Output::i()->error( 'cannot_download_original_image', '2G188/E', 403, '' );
+			\IPS\Output::i()->error( 'cannot_download_original_image', '2G188/E', 403, '' );
 		}
 
 		try
@@ -436,9 +355,9 @@ class view extends Controller
 			{
 				switch( $this->image->canDownloadOriginal() )
 				{
-					case Image::DOWNLOAD_ORIGINAL_WATERMARKED:
+					case \IPS\gallery\Image::DOWNLOAD_ORIGINAL_WATERMARKED:
 						/* We need to watermark the original image on the fly in this case */
-						$file		= File::get( 'gallery_Images', $this->image->original_file_name );
+						$file		= \IPS\File::get( 'gallery_Images', $this->image->original_file_name );
 
 						if( $file->isImage() )
 						{
@@ -446,52 +365,52 @@ class view extends Controller
 						}
 					break;
 
-					case Image::DOWNLOAD_ORIGINAL_RAW:
-						$file		= File::get( 'gallery_Images', $this->image->original_file_name );
+					case \IPS\gallery\Image::DOWNLOAD_ORIGINAL_RAW:
+						$file		= \IPS\File::get( 'gallery_Images', $this->image->original_file_name );
 					break;
 				}
 
-				if( isset( $file ) AND $file->filesize() === false )
+				if( $file->filesize() === false )
 				{
-					throw new RuntimeException( 'DOES_NOT_EXIST' );
+					throw new \RuntimeException( 'DOES_NOT_EXIST' );
 				}
 			}
-			catch( RuntimeException )
+			catch( \RuntimeException $e )
 			{
-				Log::log( "Original image for {$this->image->id} is missing, falling back to masked image", 'gallery_image_missing' );
-				$file = File::get( 'gallery_Images', $this->image->masked_file_name );
+				\IPS\Log::log( "Original image for {$this->image->id} is missing, falling back to masked image", 'gallery_image_missing' );
+				$file = \IPS\File::get( 'gallery_Images', $this->image->masked_file_name );
 			}
 
-			$headers	= array_merge( Output::getCacheHeaders( time(), 360 ), array( "Content-Disposition" => Output::getContentDisposition( 'attachment', $file->originalFilename ), "X-Content-Type-Options" => "nosniff" ) );
+			$headers	= array_merge( \IPS\Output::getCacheHeaders( time(), 360 ), array( "Content-Disposition" => \IPS\Output::getContentDisposition( 'attachment', $file->originalFilename ), "X-Content-Type-Options" => "nosniff" ) );
 
 			/* Send headers and print file */
-			Output::i()->sendStatusCodeHeader( 200 );
-			Output::i()->sendHeader( "Content-type: " . File::getMimeType( $file->originalFilename ) . ";charset=UTF-8" );
+			\IPS\Output::i()->sendStatusCodeHeader( 200 );
+			\IPS\Output::i()->sendHeader( "Content-type: " . \IPS\File::getMimeType( $file->originalFilename ) . ";charset=UTF-8" );
 
 			foreach( $headers as $key => $header )
 			{
-				Output::i()->sendHeader( $key . ': ' . $header );
+				\IPS\Output::i()->sendHeader( $key . ': ' . $header );
 			}
 			
-			Output::i()->sendHeader( "Content-Security-Policy: default-src 'none'; sandbox" );
-			Output::i()->sendHeader( "X-Content-Security-Policy:  default-src 'none'; sandbox" );
-			Output::i()->sendHeader( "Cross-Origin-Opener-Policy: same-origin" );
+			\IPS\Output::i()->sendHeader( "Content-Security-Policy: default-src 'none'; sandbox" );
+			\IPS\Output::i()->sendHeader( "X-Content-Security-Policy:  default-src 'none'; sandbox" );
+			\IPS\Output::i()->sendHeader( "Cross-Origin-Opener-Policy: same-origin" );
 
 			if( $image !== NULL )
 			{
-				Output::i()->sendHeader( "Content-Length: " . strlen( (string) $image ) );
+				\IPS\Output::i()->sendHeader( "Content-Length: " . \strlen( (string) $image ) );
 				print (string) $image;
 			}
 			else
 			{
-				Output::i()->sendHeader( "Content-Length: " . $file->filesize() );
+				\IPS\Output::i()->sendHeader( "Content-Length: " . $file->filesize() );
 				$file->printFile();
 			}
 			exit;
 		}
-		catch ( UnderflowException )
+		catch ( \UnderflowException $e )
 		{
-			Output::i()->sendOutput( '', 404 );
+			\IPS\Output::i()->sendOutput( '', 404 );
 		}
 	}
 
@@ -501,36 +420,36 @@ class view extends Controller
 	 * @note	We preload the next/prev image in the lightbox and do not want those images marked as read when doing so. While this speeds up the loading to the end user, we still need to separately mark the image as read when it's pulled into view.
 	 * @return	void
 	 */
-	public function markread() : void
+	public function markread()
 	{
 		/* Run CSRF check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Mark image as read */
 		$this->image->markRead();
 
 		/* We also want to update the views */
 		$countUpdated = false;
-		if ( Redis::isEnabled() )
+		if ( \IPS\REDIS_ENABLED and \IPS\CACHE_METHOD == 'Redis' and ( \IPS\CACHE_CONFIG or \IPS\REDIS_CONFIG ) )
 		{
 			try
 			{
-				Redis::i()->zIncrBy( 'topic_views', 1, static::$contentModel .'__' . $this->image->id );
+				\IPS\Redis::i()->zIncrBy( 'topic_views', 1, static::$contentModel .'__' . $this->image->id );
 				$countUpdated = true;
 			}
-			catch( Exception ) {}
+			catch( \Exception $e ) {}
 		}
 		
 		if ( ! $countUpdated )
 		{
-			Db::i()->insert( 'core_view_updates', array(
+			\IPS\Db::i()->insert( 'core_view_updates', array(
 					'classname'	=> static::$contentModel,
 					'id'		=> $this->image->id
 			) );
 		}
 
 		/* And return an AJAX response */
-		Output::i()->json('OK');
+		\IPS\Output::i()->json('OK');
 	}
 
 	/**
@@ -538,13 +457,13 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function metadata() : void
+	protected function metadata()
 	{
 		/* Set navigation and title */
 		$this->_setBreadcrumbAndTitle( $this->image );
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack( 'gallery_metadata', FALSE, array( 'sprintf' => $this->image->caption ) );
-		Output::i()->output	= Theme::i()->getTemplate( 'view' )->metadata( $this->image );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack( 'gallery_metadata', FALSE, array( 'sprintf' => $this->image->caption ) );
+		\IPS\Output::i()->output	= \IPS\Theme::i()->getTemplate( 'view' )->metadata( $this->image );
 	}
 
 	/**
@@ -552,9 +471,9 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function cover() : void
+	protected function cover()
 	{
-		switch( Request::i()->set )
+		switch( \IPS\Request::i()->set )
 		{
 			case 'album':
 				$check = $this->image->canSetAsAlbumCover();
@@ -565,50 +484,49 @@ class view extends Controller
 			break;
 
 			case 'both':
-			default:
 				$check = ( $this->image->canSetAsAlbumCover() AND $this->image->canSetAsCategoryCover() );
 			break;
 		}
 
 		if ( !$check )
 		{
-			Output::i()->error( 'node_error', '2G188/5', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2G188/5', 403, '' );
 		}
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		$lang = '';
 
-		if( $this->image->canSetAsAlbumCover() && ( Request::i()->set == 'album' or Request::i()->set == 'both' ) )
+		if( $this->image->canSetAsAlbumCover() && ( \IPS\Request::i()->set == 'album' or \IPS\Request::i()->set == 'both' ) )
 		{
 			$this->image->directContainer()->cover_img_id	= $this->image->id;
 			$this->image->directContainer()->save();
 
-			$lang = Member::loggedIn()->language()->addToStack('set_as_album_done');
+			$lang = \IPS\Member::loggedIn()->language()->addToStack('set_as_album_done');
 		}
 
-		if( $this->image->canSetAsCategoryCover() && ( Request::i()->set == 'category' or Request::i()->set == 'both' ) )
+		if( $this->image->canSetAsCategoryCover() && ( \IPS\Request::i()->set == 'category' or \IPS\Request::i()->set == 'both' ) )
 		{
 			$this->image->container()->cover_img_id	= $this->image->id;
 			$this->image->container()->save();
 
 			if( $lang )
 			{
-				$lang = Member::loggedIn()->language()->addToStack('set_as_both_done');
+				$lang = \IPS\Member::loggedIn()->language()->addToStack('set_as_both_done');
 			}
 			else
 			{
-				$lang = Member::loggedIn()->language()->addToStack('set_as_category_done');
+				$lang = \IPS\Member::loggedIn()->language()->addToStack('set_as_category_done');
 			} 
 		}
 
 		/* Redirect back to image */
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array( 'message' => $lang ) );
+			\IPS\Output::i()->json( array( 'message' => $lang ) );
 		}
 		else
 		{
-			Output::i()->redirect( $this->image->url() );
+			\IPS\Output::i()->redirect( $this->image->url() );	
 		}		
 	}
 
@@ -617,29 +535,29 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function rotate() : void
+	protected function rotate()
 	{
 		/* Check permission */
 		if( !$this->image->canEdit() )
 		{
-			Output::i()->error( 'node_error', '2G188/3', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2G188/3', 403, '' );
 		}
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Determine angle to rotate */
-		if( Request::i()->direction == 'right' )
+		if( \IPS\Request::i()->direction == 'right' )
 		{
-			$angle = ( Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) ) ? 90 : -90;
+			$angle = ( \IPS\Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) ) ? 90 : -90;
 		}
 		else
 		{
-			$angle = ( Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) ) ? -90 : 90;
+			$angle = ( \IPS\Settings::i()->image_suite == 'imagemagick' and class_exists( 'Imagick', FALSE ) ) ? -90 : 90;
 		}
 
 		/* Rotate the image and rebuild thumbnails */
-		$file	= File::get( 'gallery_Images', $this->image->original_file_name );
-		$image	= ImageClass::create( $file->contents() );
+		$file	= \IPS\File::get( 'gallery_Images', $this->image->original_file_name );
+		$image	= \IPS\Image::create( $file->contents() );
 		$image->rotate( $angle );
 		$file->replace( (string) $image );
 		$this->image->buildThumbnails( $file );
@@ -647,18 +565,18 @@ class view extends Controller
 		$this->image->save();
 
 		/* Respond or redirect */
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array(
-				'src'		=> (string) File::get( 'gallery_Images', $this->image->masked_file_name )->url,
-				'message'	=> Member::loggedIn()->language()->addToStack('gallery_image_rotated'),
+			\IPS\Output::i()->json( array( 
+				'src'		=> (string) \IPS\File::get( 'gallery_Images', $this->image->masked_file_name )->url, 
+				'message'	=> \IPS\Member::loggedIn()->language()->addToStack('gallery_image_rotated'),
 				'width'		=> $this->image->_dimensions['large'][0],
 				'height'	=> $this->image->_dimensions['large'][1],
 			) );
 		}
 		else
 		{
-			Output::i()->redirect( $this->image->url() );
+			\IPS\Output::i()->redirect( $this->image->url() );
 		}
 	}
 
@@ -667,18 +585,18 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function changeAuthor() : void
+	public function changeAuthor()
 	{
 		/* Permission check */
 		if ( !$this->image->canChangeAuthor() )
 		{
-			Output::i()->error( 'no_module_permission', '2G188/6', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2G188/6', 403, '' );
 		}
 		
 		/* Build form */
-		$form = new Form;
-		$form->add( new Form\Member( 'author', NULL, TRUE ) );
-		$form->class .= 'ipsForm--vertical ipsForm--change-image-author';
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Member( 'author', NULL, TRUE ) );
+		$form->class .= 'ipsForm_vertical';
 
 		/* Handle submissions */
 		if ( $values = $form->values() )
@@ -686,11 +604,11 @@ class view extends Controller
 			$this->image->changeAuthor( $values['author'] );
 			$this->image->save();
 			
-			Output::i()->redirect( $this->image->url() );
+			\IPS\Output::i()->redirect( $this->image->url() );
 		}
 		
 		/* Display form */
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 
 	/**
@@ -698,42 +616,42 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function setAsPhoto() : void
+	public function setAsPhoto()
 	{
 		/* Permission check */
-		if ( !Member::loggedIn()->member_id )
+		if ( !\IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->error( 'no_module_permission', '2G188/9', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2G188/9', 403, '' );
 		}
 
 		/* Only images... */
 		if ( $this->image->media )
 		{
-			Output::i()->error( 'no_photo_for_media', '2G188/A', 403, '' );
+			\IPS\Output::i()->error( 'no_photo_for_media', '2G188/A', 403, '' );
 		}
 		
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Update profile photo */
-		$file	= File::get( 'gallery_Images', $this->image->masked_file_name );
-		$image	= ImageClass::create( $file->contents() );
-		$photo	= File::create( 'core_Profile', $file->filename, (string) $image );
+		$file	= \IPS\File::get( 'gallery_Images', $this->image->masked_file_name );
+		$image	= \IPS\Image::create( $file->contents() );
+		$photo	= \IPS\File::create( 'core_Profile', $file->filename, (string) $image );
 
-		Member::loggedIn()->pp_main_photo = (string) $photo;
-		Member::loggedIn()->pp_thumb_photo = (string) $photo->thumbnail( 'core_Profile', PHOTO_THUMBNAIL_SIZE, PHOTO_THUMBNAIL_SIZE );
-		Member::loggedIn()->pp_photo_type = "custom";
-		Member::loggedIn()->photo_last_update = time();
-		Member::loggedIn()->save();
-		Member::loggedIn()->logHistory( 'core', 'photo', array( 'action' => 'new', 'type' => 'gallery', 'id' => $this->image->id ) );
+		\IPS\Member::loggedIn()->pp_main_photo = (string) $photo;
+		\IPS\Member::loggedIn()->pp_thumb_photo = (string) $photo->thumbnail( 'core_Profile', \IPS\PHOTO_THUMBNAIL_SIZE, \IPS\PHOTO_THUMBNAIL_SIZE );
+		\IPS\Member::loggedIn()->pp_photo_type = "custom";
+		\IPS\Member::loggedIn()->photo_last_update = time();
+		\IPS\Member::loggedIn()->save();
+		\IPS\Member::loggedIn()->logHistory( 'core', 'photo', array( 'action' => 'new', 'type' => 'gallery', 'id' => $this->image->id ) );
 
 		/* Redirect back to image */
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array( 'message' => Member::loggedIn()->language()->addToStack('set_as_profile_photo') ) );
+			\IPS\Output::i()->json( array( 'message' => \IPS\Member::loggedIn()->language()->addToStack('set_as_profile_photo') ) );
 		}
 		else
 		{
-			Output::i()->redirect( $this->image->url() );
+			\IPS\Output::i()->redirect( $this->image->url() );	
 		}
 	}
 
@@ -741,9 +659,9 @@ class view extends Controller
 	 * Get the next image
 	 *
 	 * @param bool $return (bool)		Return image object or redirect?
-	 * @return Image|void
+	 * @return \IPS\gallery\Image|void
 	 */
-	protected function next( bool $return=FALSE ) : Image
+	protected function next( bool $return=FALSE )
 	{
 		$image = $this->image->nextItem() ? $this->image->nextItem() : $this->image->fetchFirstOrLast('first');
 
@@ -759,9 +677,9 @@ class view extends Controller
 	 * Get the previous image
 	 *
 	 * @param bool $return (bool)		Return image object or redirect?
-	 * @return Image|void
+	 * @return \IPS\gallery\Image|void
 	 */
-	protected function previous( bool $return=FALSE ) : Image
+	protected function previous( bool $return=FALSE )
 	{
 		$image = $this->image->prevItem() ? $this->image->prevItem() : $this->image->fetchFirstOrLast('last');
 
@@ -779,19 +697,18 @@ class view extends Controller
 	 * @return	void
 	 * @note	Overridden so we can show an album selector as well
 	 */
-	protected function move(): void
+	protected function move()
 	{
 		try
 		{
-			/* @var Item $class */
 			$class = static::$contentModel;
-			$item = $class::loadAndCheckPerms( Request::i()->id );
+			$item = $class::loadAndCheckPerms( \IPS\Request::i()->id );
 			if ( !$item->canMove() )
 			{
-				throw new DomainException;
+				throw new \DomainException;
 			}
 			
-			$form = Table::buildMoveForm( $item->container(), 'IPS\\gallery\\Image', array( 'where' => array( "album_owner_id=? OR " . Db::i()->in( 'album_submit_type', array( Album::AUTH_SUBMIT_PUBLIC, Album::AUTH_SUBMIT_GROUPS, Album::AUTH_SUBMIT_MEMBERS, Album::AUTH_SUBMIT_CLUB ) ), $item->author()->member_id ) ), $item->author() );
+			$form = \IPS\gallery\Image\Table::buildMoveForm( $item->container(), 'IPS\\gallery\\Image', array( 'where' => array( "album_owner_id=? OR " . \IPS\Db::i()->in( 'album_submit_type', array( \IPS\gallery\Album::AUTH_SUBMIT_PUBLIC, \IPS\gallery\Album::AUTH_SUBMIT_GROUPS, \IPS\gallery\Album::AUTH_SUBMIT_MEMBERS, \IPS\gallery\Album::AUTH_SUBMIT_CLUB ) ), $item->author()->member_id ) ), $item->author() );
 
 			if ( $values = $form->values() )
 			{
@@ -804,39 +721,39 @@ class view extends Controller
 						unset( $albumValues['move_to_category'] );
 						unset( $albumValues['move_to_album'] );
 						
-						$target = new Album;
+						$target = new \IPS\gallery\Album;
 						$target->saveForm( $target->formatFormValues( $albumValues ) );
 						$target->save();
 					}
 					else
 					{						
-						$target = ( Request::i()->move_to == 'category' ) ? $values['move_to_category'] : $values['move_to_album'];
+						$target = ( \IPS\Request::i()->move_to == 'category' ) ? $values['move_to_category'] : $values['move_to_album'];
 					}
 				}
 				else
 				{
-					$target = $values['move_to_category'] ?? $values['move_to_album'];
+					$target = isset( $values['move_to_category'] ) ? $values['move_to_category'] : $values['move_to_album'];
 				}
 
 				$item->move( $target, FALSE );
-				Output::i()->redirect( $item->url() );
+				\IPS\Output::i()->redirect( $item->url() );
 			}
-			Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+			\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 		}
-		catch ( Exception )
+		catch ( \Exception $e )
 		{
-			Output::i()->error( 'node_error', '2G188/B', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2G188/B', 403, '' );
 		}
 	}
 
 	/**
 	 * Set the breadcrumb and title
 	 *
-	 * @param	Item	$item	Content item
+	 * @param	\IPS\Content\Item	$item	Content item
 	 * @param	bool				$link	Link the content item element in the breadcrumb
 	 * @return	void
 	 */
-	protected function _setBreadcrumbAndTitle( Item $item, bool $link=TRUE ): void
+	protected function _setBreadcrumbAndTitle( $item, $link=TRUE )
 	{
 		$container	= NULL;
 		try
@@ -845,54 +762,54 @@ class view extends Controller
 			
 			if ( $club = $container->club() )
 			{
-				FrontNavigation::$clubTabActive = TRUE;
-				Output::i()->breadcrumb = array();
-				Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), Member::loggedIn()->language()->addToStack('module__core_clubs') );
-				Output::i()->breadcrumb[] = array( $club->url(), $club->name );
+				\IPS\core\FrontNavigation::$clubTabActive = TRUE;
+				\IPS\Output::i()->breadcrumb = array();
+				\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), \IPS\Member::loggedIn()->language()->addToStack('module__core_clubs') );
+				\IPS\Output::i()->breadcrumb[] = array( $club->url(), $club->name );
 				
-				if ( Settings::i()->clubs_header == 'sidebar' )
+				if ( \IPS\Settings::i()->clubs_header == 'sidebar' )
 				{
-					Output::i()->sidebar['contextual'] = Theme::i()->getTemplate( 'clubs', 'core' )->header( $club, $container, 'sidebar' );
+					\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->header( $club, $container, 'sidebar' );
 				}
 			}
 			else
 			{
 				foreach ( $container->parents() as $parent )
 				{
-					Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+					\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 				}
 			}
-			Output::i()->breadcrumb[] = array( $container->url(), $container->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $container->url(), $container->_title );
 		}
-		catch ( Exception ) { }
+		catch ( \Exception $e ) { }
 
 		/* Add album */
 		if( $this->image->album_id )
 		{
-			Output::i()->breadcrumb[] = array( $this->image->directContainer()->url(), $this->image->directContainer()->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $this->image->directContainer()->url(), $this->image->directContainer()->_title );
 		}
 
-		Output::i()->breadcrumb[] = array( $link ? $this->image->url() : NULL, $this->image->mapped('title') );
+		\IPS\Output::i()->breadcrumb[] = array( $link ? $this->image->url() : NULL, $this->image->mapped('title') );
 		
-		$title = ( isset( Request::i()->page ) and Request::i()->page > 1 ) ? Member::loggedIn()->language()->addToStack( 'title_with_page_number', FALSE, array( 'sprintf' => array( $this->image->mapped('title'), intval( Request::i()->page ) ) ) ) : $this->image->mapped('title');
-		Output::i()->title = $container ? ( $title . ' - ' . $container->_title ) : $title;
+		$title = ( isset( \IPS\Request::i()->page ) and \IPS\Request::i()->page > 1 ) ? \IPS\Member::loggedIn()->language()->addToStack( 'title_with_page_number', FALSE, array( 'sprintf' => array( $this->image->mapped('title'), \intval( \IPS\Request::i()->page ) ) ) ) : $this->image->mapped('title');
+		\IPS\Output::i()->title = $container ? ( $title . ' - ' . $container->_title ) : $title;
 	}
 
 	/**
 	 * Redirect to the URL or album/category on error
 	 *
-	 * @param Image|null $image
+	 * @param $image
 	 * @return void
 	 */
-	protected function redirectToUrl( ?Image $image=null ): void
+	protected function redirectToUrl( $image ): void
 	{
 		if ( $image )
 		{
 			$url = $image->url();
 
-			if ( Request::i()->url()->queryString )
+			if ( \IPS\Request::i()->url()->queryString )
 			{
-				foreach ( Request::i()->url()->queryString as $k => $v )
+				foreach ( \IPS\Request::i()->url()->queryString as $k => $v )
 				{
 					if ( !in_array( $k, array( 'id', 'do' ) ) )
 					{
@@ -901,12 +818,12 @@ class view extends Controller
 				}
 			}
 
-			Output::i()->redirect( $url );
+			\IPS\Output::i()->redirect( $url );
 		}
 		else
 		{
 			/* Go to the album or category */
-			Output::i()->redirect( $this->image->directContainer()->url() );
+			\IPS\Output::i()->redirect( $this->image->directContainer()->url() );
 		}
 	}
 
@@ -915,21 +832,21 @@ class view extends Controller
 	 *
 	 * @return	void
 	 */
-	public function toggleNSFW() : void
+	public function toggleNSFW()
 	{
 		/* Permission check */
-		if ( !Settings::i()->gallery_nsfw or !$this->image->canEdit() )
+		if ( !\IPS\Settings::i()->gallery_nsfw or !$this->image->canEdit() )
 		{
-			Output::i()->error( 'no_module_permission', '1G188/F', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '1G188/F', 403, '' );
 		}
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Update profile photo */
 		$this->image->nsfw = !$this->image->nsfw;
 		$this->image->save();
 
 		/* Redirect back to image */
-		Output::i()->redirect( $this->image->url(), $this->image->nsfw ? 'set_gallery_image_nsfw_off' : 'set_gallery_image_nsfw_on' );
+		\IPS\Output::i()->redirect( $this->image->url(), $this->image->nsfw ? 'set_gallery_image_nsfw_off' : 'set_gallery_image_nsfw_on' );
 	}
 }

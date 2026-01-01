@@ -11,28 +11,28 @@
 namespace IPS\core\extensions\core\IpAddresses;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Extensions\IpAddressesAbstract;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Lookup: Admin Logs
  */
-class AdminLogs extends IpAddressesAbstract
+class _AdminLogs
 {
+	/**
+	 * Supported in the ACP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInAcp()
+	{
+		return TRUE;
+	}
+
 	/**
 	 * Supported in the ModCP IP address lookup tool?
 	 *
@@ -44,31 +44,31 @@ class AdminLogs extends IpAddressesAbstract
 		return FALSE;
 	}
 
-	/**
+	/** 
 	 * Find Records by IP
 	 *
 	 * @param	string			$ip			The IP Address
-	 * @param	Url|null	$baseUrl	URL table will be displayed on or NULL to return a count
-	 * @return	string|int|null
+	 * @param	\IPS\Http\Url	$baseUrl	URL table will be displayed on or NULL to return a count
+	 * @return	\IPS\Helpers\Table|int|null
 	 */
-	public function findByIp( string $ip, ?Url $baseUrl = NULL ): string|int|null
+	public function findByIp( $ip, \IPS\Http\Url $baseUrl = NULL )
 	{
 		/* Return count */
 		if ( $baseUrl === NULL )
 		{
-			return Db::i()->select( 'COUNT(*)', 'core_admin_logs', array( "ip_address LIKE ?", $ip ) )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'core_admin_logs', array( "ip_address LIKE ?", $ip ) )->first();
 		}
 		
 		/* Init Table */
-		$table = new TableDb( 'core_admin_logs', $baseUrl, array( "ip_address LIKE ?", $ip ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_admin_logs', $baseUrl, array( "ip_address LIKE ?", $ip ) );
 				
 		/* Columns we need */
 		$table->include = array( 'member_id', 'action', 'ctime', 'ip_address' );
 		$table->mainColumn = 'ctime';
 		$table->langPrefix = 'acplogs_';
 
-		$table->tableTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
-		$table->rowsTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
+		$table->tableTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
+		$table->rowsTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
 				
 		/* Default sort options */
 		$table->sortBy = $table->sortBy ?: 'ctime';
@@ -78,12 +78,12 @@ class AdminLogs extends IpAddressesAbstract
 		$table->parsers = array(
 			'member_id'		=> function( $val, $row )
 			{
-				$member = Member::load( $val );
-				return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
+				$member = \IPS\Member::load( $val );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
 			},
 			'ctime'			=> function( $val, $row )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
 			'action'		=> function( $val, $row )
 			{
@@ -96,10 +96,10 @@ class AdminLogs extends IpAddressesAbstract
 					{
 						foreach ($note as $k => $v)
 						{
-							$params[] = $v ? Member::loggedIn()->language()->addToStack($k) : $k;
+							$params[] = $v ? \IPS\Member::loggedIn()->language()->addToStack($k) : $k;
 						}
 					}
-					return Member::loggedIn()->language()->addToStack( $langKey, FALSE, array( 'sprintf' => $params ) );
+					return \IPS\Member::loggedIn()->language()->addToStack( $langKey, FALSE, array( 'sprintf' => $params ) );
 				}
 				else
 				{
@@ -116,21 +116,21 @@ class AdminLogs extends IpAddressesAbstract
 	 * Find IPs by Member
 	 *
 	 * @code
-	 	* return array(
-	 		* '::1' => array(
-	 			* 'ip'		=> '::1'// string (IP Address)
-		 		* 'count'		=> ...	// int (number of times this member has used this IP)
-		 		* 'first'		=> ... 	// int (timestamp of first use)
-		 		* 'last'		=> ... 	// int (timestamp of most recent use)
-		 	* ),
-		 	* ...
-	 	* );
+	 	return array(
+	 		'::1' => array(
+	 			'ip'		=> '::1'// string (IP Address)
+		 		'count'		=> ...	// int (number of times this member has used this IP)
+		 		'first'		=> ... 	// int (timestamp of first use)
+		 		'last'		=> ... 	// int (timestamp of most recent use)
+		 	),
+		 	...
+	 	);
 	 * @endcode
-	 * @param	Member	$member	The member
-	 * @return    array|Select
+	 * @param	\IPS\Member	$member	The member
+	 * @return	array
 	 */
-	public function findByMember( Member $member ) : array|Select
+	public function findByMember( $member )
 	{
-		return Db::i()->select( "ip_address AS ip, count(*) AS count, MIN(ctime) AS first, MAX(ctime) AS last", 'core_admin_logs', array( 'member_id=?', $member->member_id ), NULL, NULL, 'ip_address' )->setKeyField( 'ip' );
+		return \IPS\Db::i()->select( "ip_address AS ip, count(*) AS count, MIN(ctime) AS first, MAX(ctime) AS last", 'core_admin_logs', array( 'member_id=?', $member->member_id ), NULL, NULL, 'ip_address' )->setKeyField( 'ip' );
 	}	
 }

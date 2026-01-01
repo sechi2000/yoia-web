@@ -11,33 +11,25 @@
 namespace IPS\core\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Extensions\DashboardAbstract;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Dashboard extension: Registrations
  */
-class Registrations extends DashboardAbstract
+class _Registrations
 {
 	/**
 	* Can the current user view this dashboard item?
 	*
 	* @return	bool
 	*/
-	public function canView(): bool
+	public function canView()
 	{
-		return Member::loggedIn()->hasAcpRestriction( 'core' , 'members', 'registrations_manage' );
+		return \IPS\Member::loggedIn()->hasAcpRestriction( 'core' , 'members', 'registrations_manage' );
 	}
 
 	/**
@@ -45,15 +37,14 @@ class Registrations extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
 		/* We can use the registration stats controller for this */
-		$chart = Chart::loadFromExtension( 'core', 'Registrations' )->getChart( Url::internal( 'app=core&module=stats&controller=registrationstats' ) );
+		/* Output */
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'Registrations' )->getChart( \IPS\Http\Url::internal( 'app=core&module=stats&controller=registrationstats' ) );
 		$chart->showFilterTabs = FALSE;
 		$chart->showIntervals = FALSE;
 		$chart->showDateRange = FALSE;
-		
-		/* Output */
-		return Theme::i()->getTemplate( 'dashboard' )->registrations( $chart );
+		return  \IPS\Theme::i()->getTemplate( 'dashboard' )->registrations( $chart );;
 	}
 }

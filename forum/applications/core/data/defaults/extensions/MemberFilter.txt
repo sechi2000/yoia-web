@@ -11,45 +11,36 @@
 
 namespace IPS\{app}\extensions\core\MemberFilter;
 
-use IPS\Db\Select;
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Member as MemberClass;
-use LogicException;
-use function defined;
-use function in_array;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member Filter Extension
  */
-class {class} extends MemberFilterAbstract
+class _{class}
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param	string	$area	Area to check (bulkmail, group_promotions, automatic_moderation, passwordreset)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area ): bool
 	{
-		return in_array( $area, array(
-		    {areas}
-		) );
+		return \in_array( $area, array( 'bulkmail', 'group_promotions' ) );
 	}
 
 	/** 
 	 * Get Setting Field
 	 *
-	 * @param	array	$criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria ): array
 	{
 		return array();
 	}
@@ -58,10 +49,10 @@ class {class} extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return	array|bool			False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ) : array|bool
+	public function save( $post )
 	{
 		return FALSE;
 	}
@@ -69,11 +60,38 @@ class {class} extends MemberFilterAbstract
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param	array				$data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		return NULL;
+	}
+	
+	/**
+	 * Callback for member retrieval database query
+	 * Can be used to set joins
+	 *
+	 * @param	mixed			$data	The array returned from the save() method
+	 * @param	\IPS\Db\Query	$query	The query
+	 * @return	void
+	 */
+	public function queryCallback( $data, &$query )
+	{
+		return NULL;
+	}
+
+	/**
+	 * Determine if a member matches specified filters
+	 *
+	 * @note	This is only necessary if availableIn() includes group_promotions
+	 * @param	\IPS\Member	$member		Member object to check
+	 * @param	array 		$filters	Previously defined filters
+	 * @param	object|NULL	$object		Calling class
+	 * @return	bool
+	 */
+	public function matches( \IPS\Member $member, $filters, $object=NULL ): bool
+	{
+		return TRUE;
 	}
 }

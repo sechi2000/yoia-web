@@ -12,39 +12,32 @@
 namespace IPS\nexus\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Text\Encrypt;
-use IPS\Theme;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Username & Password input class for Form Builder
  */
-class UserPass extends FormAbstract
+class _UserPass extends \IPS\Helpers\Form\FormAbstract
 {	
 	/** 
 	 * Get HTML
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		$value = is_array( $this->value ) ? $this->value : json_decode( Encrypt::fromTag( $this->value )->decrypt(), TRUE );
-		$defaultValue = is_array( $this->defaultValue ) ? $this->defaultValue : json_decode( Encrypt::fromTag( $this->defaultValue )->decrypt(), TRUE );
+		$value = \is_array( $this->value ) ? $this->value : json_decode( \IPS\Text\Encrypt::fromTag( $this->value )->decrypt(), TRUE );
+		$defaultValue = \is_array( $this->defaultValue ) ? $this->defaultValue : json_decode( \IPS\Text\Encrypt::fromTag( $this->defaultValue )->decrypt(), TRUE );
 		if ( isset( $value['pw'] ) and isset( $defaultValue['pw'] ) and $value['pw'] and $value['pw'] === $defaultValue['pw'] and !$this->error )
 		{
 			$value['pw'] = '********';
 		}
 		
-		return Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->usernamePassword( $this->name, $value );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->usernamePassword( $this->name, $value );
 	}
 	
 	/**
@@ -52,13 +45,13 @@ class UserPass extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$value = parent::getValue();
 		
 		if ( isset( $value['pw'] ) and $value['pw'] === '********' )
 		{
-			$defaultValue = is_array( $this->defaultValue ) ? $this->defaultValue : json_decode( Encrypt::fromTag( $this->defaultValue )->decrypt(), TRUE );
+			$defaultValue = \is_array( $this->defaultValue ) ? $this->defaultValue : json_decode( \IPS\Text\Encrypt::fromTag( $this->defaultValue )->decrypt(), TRUE );
 			$value['pw'] = $defaultValue['pw'];
 		}
 		
@@ -69,10 +62,10 @@ class UserPass extends FormAbstract
 	 * String Value
 	 *
 	 * @param	mixed	$value	The value
-	 * @return    string|int|null
+	 * @return	string
 	 */
-	public static function stringValue( mixed $value ): string|int|null
+	public static function stringValue( $value )
 	{
-		return Encrypt::fromPlaintext( json_encode( $value ) )->tag();
+		return \IPS\Text\Encrypt::fromPlaintext( json_encode( $value ) )->tag();
 	}
 }

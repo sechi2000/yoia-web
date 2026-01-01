@@ -12,42 +12,26 @@
 namespace IPS\cms\Media;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\cms\Media;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Request;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function func_get_args;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Folder Model
  */
-class Folder extends Model
+class _Folder extends \IPS\Node\Model
 {
 	/**
 	 * Munge different record types
 	 *
 	 * @return  array
 	 */
-	public static function munge() : array
+	public static function munge()
 	{
 		$rows = array();
-		$args = func_get_args();
+		$args = \func_get_args();
 	
 		foreach( $args as $arg )
 		{
@@ -65,73 +49,73 @@ class Folder extends Model
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'cms_media_folders';
+	public static $databaseTable = 'cms_media_folders';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'media_folder_';
+	public static $databasePrefix = 'media_folder_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array('media_folder_path');
+	protected static $databaseIdFields = array('media_folder_path');
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnParent = 'parent';
+	public static $databaseColumnParent = 'parent';
 	
 	/**
 	 * @brief	[Node] Parent ID Root Value
 	 * @note	This normally doesn't need changing though some legacy areas use -1 to indicate a root node
 	 */
-	public static int $databaseColumnParentRootValue = 0;
+	public static $databaseColumnParentRootValue = 0;
 	
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'path';
+	public static $databaseColumnOrder = 'path';
 
 	/**
 	 * @brief	[Node] Automatically set position for new nodes
 	 */
-	public static bool $automaticPositionDetermination = FALSE;
+	public static $automaticPositionDetermination = FALSE;
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'folder';
+	public static $nodeTitle = 'folder';
 	
 	/**
 	 * @brief	[Node] Subnode class
 	 */
-	public static ?string $subnodeClass = 'IPS\cms\Media';
+	public static $subnodeClass = 'IPS\cms\Media';
 	
 	/**
 	 * @brief	[Node] Show forms modally?
 	 */
-	public static bool $modalForms = TRUE;
+	public static $modalForms = TRUE;
 
 	/**
 	 * @brief	[Node] Restrictions
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
  		'app'		=> 'cms',
  		'module'	=> 'pages',
  		'all'		=> 'media_manage',
@@ -141,9 +125,9 @@ class Folder extends Model
 	/**
 	 * [Node] Get Title
 	 *
-	 * @return	string
+	 * @return	string|null
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		return $this->name;
 	}
@@ -153,7 +137,7 @@ class Folder extends Model
 	 *
 	 * @return	string
 	 */
-	public function getSortableName() : string
+	public function getSortableName()
 	{
 		return $this->name;
 	}
@@ -161,11 +145,11 @@ class Folder extends Model
 	/**
 	 * [Node] Get buttons to display in tree
 	 *
-	 * @param Url $url		Base URL
-	 * @param bool $subnode	Is this a subnode?
-	 * @return    array
+	 * @param	string	$url		Base URL
+	 * @param	bool	$subnode	Is this a subnode?
+	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ): array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = parent::getButtons( $url, $subnode );
 		$return  = array();
@@ -179,14 +163,14 @@ class Folder extends Model
 		{
 			$buttons['add']['icon']	 = 'folder-open';
 			$buttons['add']['title'] = 'cms_add_media_folder';
-			$buttons['add']['data']  = array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('cms_add_media_folder') );
+			$buttons['add']['data']  = array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('cms_add_media_folder') );
 			$buttons['add']['link']	 = $url->setQueryString( array( 'subnode' => 0, 'do' => 'form', 'parent' => $this->_id ) );
 			
 			$buttons['add_page'] = array(
 					'icon'	=> 'plus-circle',
 					'title'	=> 'cms_add_media',
 					'link'	=> $url->setQueryString( array( 'subnode' => 1, 'do' => 'add', 'parent' => $this->_id ) ),
-					'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('cms_add_media') )
+					'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('cms_add_media') )
 			);
 		}
 		
@@ -217,44 +201,42 @@ class Folder extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		/* Build form */
-		$form->add( new Text( 'media_folder_name', $this->id ? $this->name : '', TRUE, array( 'maxLength' => 64 ), function( $val )
+		$form->add( new \IPS\Helpers\Form\Text( 'media_folder_name', $this->id ? $this->name : '', TRUE, array( 'maxLength' => 64 ), function( $val )
 		{
 			try
 			{
-				$test = Folder::load( Friendly::seoTitle( $val ), 'media_folder_name' );
+				$test = \IPS\cms\Media\Folder::load( \IPS\Http\Url\Friendly::seoTitle( $val ), 'media_folder_name' );
 
-				if ( ! empty( Request::i()->id ) and $test->id != Request::i()->id )
+				if ( ! empty( \IPS\Request::i()->id ) and $test->id != \IPS\Request::i()->id )
 				{
-					throw new InvalidArgumentException('content_folder_name_in_use');
+					throw new \InvalidArgumentException('content_folder_name_in_use');
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 			}
 		} ) );
 		
-		$form->add( new Node( 'media_folder_parent', $this->parent ? $this->parent : 0, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Node( 'media_folder_parent', $this->parent ? $this->parent : 0, FALSE, array(
 				'class'         => '\IPS\cms\Media\Folder',
 				'zeroVal'         => 'node_no_parent',
 				'permissionCheck' => function( $node )
 				{
-					if ( ! isset( Request::i()->id ) )
+					if ( ! isset( \IPS\Request::i()->id ) )
 					{
 						return true;
 					}
 
-					if ( ! isset( Request::i()->parent ) )
+					if ( ! isset( \IPS\Request::i()->parent ) )
 					{
-						return $node->id != Request::i()->id;
+						return $node->id != \IPS\Request::i()->id;
 					}
-
-					return true;
 				}
 		) ) );
 	}
@@ -262,12 +244,12 @@ class Folder extends Model
 	/**
 	 * @brief	Original parent ID
 	 */
-	protected int $origParentId;
+	protected $origParentId;
 
 	/**
 	 * @brief	Original parent Name
 	 */
-	protected string $origName;
+	protected $origName;
 
 	/**
 	 * [Node] Format form values from add/edit form for save
@@ -275,15 +257,15 @@ class Folder extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( ! $this->id )
 		{
 			$this->save();
 		}
 		
-		$this->origParentId = (int) $this->parent;
-		$this->origName     = (string) $this->name;
+		$this->origParentId = $this->parent;
+		$this->origName     = $this->name;
 		
 		if ( isset( $values['media_folder_parent'] ) AND ( ! empty( $values['media_folder_parent'] ) OR $values['media_folder_parent'] === 0 ) )
 		{
@@ -293,7 +275,7 @@ class Folder extends Model
 		
 		if( isset( $values['media_folder_name'] ) )
 		{
-			$values['name'] = Friendly::seoTitle( $values['media_folder_name'] );
+			$values['name'] = \IPS\Http\Url\Friendly::seoTitle( $values['media_folder_name'] );
 			unset( $values['media_folder_name'] );
 		}
 
@@ -306,7 +288,7 @@ class Folder extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
 		if ( $this->origParentId !== $values['parent'] OR $this->origName !== $values['name'] )
 		{
@@ -320,7 +302,7 @@ class Folder extends Model
 	 * @param	boolean	$recursivelyCheck	Recursively reset up and down the tree
 	 * @return	void
 	 */
-	public function resetPath( bool $recursivelyCheck=true ) : void
+	public function resetPath( $recursivelyCheck=true )
 	{
 		$path = array();
 		
@@ -329,13 +311,13 @@ class Folder extends Model
 			$path[] = $obj->name;
 		}
 		
-		$this->path = ( count( $path ) ) ? implode( '/', $path ) . '/' . $this->name : $this->name;
+		$this->path = ( \count( $path ) ) ? implode( '/', $path ) . '/' . $this->name : $this->name;
 		
 		/* Save path update */
 		parent::save();
 		
 		/* Update media */
-		Media::resetPath( $this->id );
+		\IPS\cms\Media::resetPath( $this->id );
 		
 		if ( $recursivelyCheck === true )
 		{
@@ -359,7 +341,7 @@ class Folder extends Model
 	 * 
 	 * @return void
 	 */
-	protected function _recursivelyResetChildPaths() : void
+	protected function _recursivelyResetChildPaths()
 	{
 		foreach( $this->children( NULL, NULL, FALSE ) as $child )
 		{

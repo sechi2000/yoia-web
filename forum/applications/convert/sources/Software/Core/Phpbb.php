@@ -12,52 +12,23 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use DomainException;
-use Exception;
-use IPS\Application\Module;
-use IPS\Content\Search\Index;
-use IPS\convert\Login\HashCryptPrivate;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\core\Ignore;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use PasswordHash;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_null;
-use function is_numeric;
-use function strlen;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PhpBB Core Converter
  */
-class Phpbb extends Software
+class _Phpbb extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "phpBB (3.1.x/3.2.x/3.3.x)";
@@ -66,9 +37,9 @@ class Phpbb extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "phpbb";
@@ -77,9 +48,9 @@ class Phpbb extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertEmoticons'			=> array(
@@ -129,15 +100,15 @@ class Phpbb extends Software
 	/**
 	 * Allows software to add additional menu row options
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function extraMenuRows(): array
+	public function extraMenuRows()
 	{
 		$rows = array();
 		$rows['convertBanfilters2'] = array(
 			'step_title'		=> 'convert_banfilters',
 			'step_method'		=> 'convertBanfilters2',
-			'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_banfilters' ),
+			'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_banfilters' ),
 			'source_rows'		=> array( 'table' => static::canConvert()['convertBanfilters2']['table'], 'where' => static::canConvert()['convertBanfilters2']['where'] ),
 			'per_cycle'			=> 200,
 			'dependencies'		=> array( 'convertBanfilters' ),
@@ -150,13 +121,13 @@ class Phpbb extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
@@ -168,23 +139,25 @@ class Phpbb extends Software
 					$count += $this->db->select( 'COUNT(*)', 'banlist', array( "ban_userid=?", 0 ) )->first();
 					$count += $this->db->select( 'COUNT(*)', 'disallow' )->first();
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
 				return $count;
+				break;
 			
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 	
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -192,9 +165,9 @@ class Phpbb extends Software
 	/**
 	 * Returns a block of text, or a language string, that explains what the admin must do to start this conversion
 	 *
-	 * @return    string|null
+	 * @return	string
 	 */
-	public static function getPreConversionInformation(): ?string
+	public static function getPreConversionInformation()
 	{
 		return 'convert_phpbb_preconvert';
 	}
@@ -202,9 +175,9 @@ class Phpbb extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertEmoticons',
@@ -217,10 +190,10 @@ class Phpbb extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		switch( $method )
 		{
@@ -231,8 +204,8 @@ class Phpbb extends Software
 						'field_default'		=> NULL,
 						'field_required'	=> TRUE,
 						'field_extra'		=> array(),
-						'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_phpbb_emoticons'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_phpbb_emoticons'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					),
 					'keep_existing_emoticons'	=> array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Checkbox',
@@ -248,16 +221,16 @@ class Phpbb extends Software
 				$return['convertProfileFields'] = array();
 				
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
 				{
 					$options[$field->_id] = $field->_title;
 				}
 				
 				foreach( $this->db->select( '*', 'profile_fields' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["map_pfield_{$field['field_id']}"]		= $this->db->select( 'lang_name', 'profile_lang', array( "field_id=?", $field['field_id'] ) )->first();
-					Member::loggedIn()->language()->words["map_pfield_{$field['field_id']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['field_id']}"]		= $this->db->select( 'lang_name', 'profile_lang', array( "field_id=?", $field['field_id'] ) )->first();
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['field_id']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
 					
 					$return['convertProfileFields']["map_pfield_{$field['field_id']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -274,15 +247,15 @@ class Phpbb extends Software
 				
 				$options = array();
 				$options['none'] = 'None';
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[$group->g_id] = $group->name;
 				}
 				
 				foreach( $this->db->select( '*', 'groups' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['group_id']}"]			= $group['group_name'];
-					Member::loggedIn()->language()->words["map_group_{$group['group_id']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['group_id']}"]			= $group['group_name'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['group_id']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 					
 					$return['convertGroups']["map_group_{$group['group_id']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -304,10 +277,10 @@ class Phpbb extends Software
 
 					if( empty( $salt ) )
 					{
-						throw new UnderflowException();
+						throw new \UnderflowException();
 					}
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					/* We can only retain one type of photo */
 					$return['convertMembers']['photo_hash'] = array(
@@ -315,19 +288,19 @@ class Phpbb extends Software
 						'field_default'			=> NULL,
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(),
-						'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_phpbb_randstring'),
+						'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_phpbb_randstring'),
 					);
 				}
 				
 				/* Find out where the photos live */
-				Member::loggedIn()->language()->words['photo_location_desc'] = Member::loggedIn()->language()->addToStack( 'photo_location_nodb_desc' );
+				\IPS\Member::loggedIn()->language()->words['photo_location_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'photo_location_nodb_desc' );
 				$return['convertMembers']['photo_location'] = array(
 					'field_class'			=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
-					'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_phpbb_avatars'),
-					'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_phpbb_avatars'),
+					'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				
 				$return['convertMembers']['gallery_location'] = array(
@@ -335,8 +308,8 @@ class Phpbb extends Software
 					'field_default'			=> NULL,
 					'field_required'		=> FALSE,
 					'field_extra'			=> array(),
-					'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_phpbb_avatargallery'),
-					'field_validation'		=> function( $value ) { if ( $value AND !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_phpbb_avatargallery'),
+					'field_validation'		=> function( $value ) { if ( $value AND !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				
 				break;
@@ -348,29 +321,29 @@ class Phpbb extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 		
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
 		
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 		
 		return array( "f_search_index_rebuild", "f_clear_caches", "f_rebuild_pms", "f_signatures_rebuild" );
 	}
@@ -383,21 +356,18 @@ class Phpbb extends Software
 	 * @note	PHPBB does bbcode like '[b:lsu27ljs]Bold text here[/b:lsu27ljs]' so we need to strip these uids to parse properly
 	 * @return	string
 	 */
-	public static function stripUid( string $post, string $uid ) : string
+	public static function stripUid( $post, $uid )
 	{
 		return str_replace( ":" . $uid . "]", "]", $post );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		/* Convert newlines to <br> tags */
 		$post = nl2br( $post );
@@ -408,7 +378,7 @@ class Phpbb extends Software
 
 		foreach( $matches[0] as $k => $m )
 		{
-			$c = count( $codeboxes );
+			$c = \count( $codeboxes );
 			$codeboxes[ $c ] = $m;
 
 			$replacement = '__CODE_BOX_' . $c . '__';
@@ -463,7 +433,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertEmoticons() : void
+	public function convertEmoticons()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -493,7 +463,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfileFields() : void
+	public function convertProfileFields()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -505,7 +475,7 @@ class Phpbb extends Software
 			{
 				$name = $this->db->select( 'lang_name', 'profile_lang', array( "field_id=?", $row['field_id'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$name = $row['field_name'];
 			}
@@ -537,6 +507,11 @@ class Phpbb extends Software
 					$default = json_encode( $options );
 					break;
 				
+				case 'googleplus':
+				case 'string':
+					$type = 'Text';
+					break;
+				
 				case 'int':
 					$type = 'Number';
 					break;
@@ -548,9 +523,7 @@ class Phpbb extends Software
 				case 'url':
 					$type = 'Url';
 					break;
-
-				case 'googleplus':
-				case 'string':
+				
 				default:
 					$type = 'Text';
 					break;
@@ -583,7 +556,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -617,7 +590,7 @@ class Phpbb extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -631,22 +604,22 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'user_id' );
 
 		try
 		{
-			/* Try to auto-detect the salt */
+			/* Try to auto detect the salt */
 			$avatarSalt = $this->db->select( 'config_value', 'config', array( 'config_name=?', 'avatar_salt' ) )->first();
 
 			if( empty( $avatarSalt ) )
 			{
-				throw new UnderflowException();
+				throw new \UnderflowException();
 			}
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			$avatarSalt = rtrim( $this->app->_session['more_info']['convertMembers']['photo_hash'], '_' );
 		}
@@ -688,9 +661,9 @@ class Phpbb extends Software
 			/* Work out timezone - we don't really need to create an instance of \DateTimeZone here, however it helps check for invalid ones */
 			try
 			{
-				$timezone = new DateTimeZone( $row['user_timezone'] );
+				$timezone = new \DateTimeZone( $row['user_timezone'] );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				$timezone = 'UTC';
 			}
@@ -710,7 +683,7 @@ class Phpbb extends Software
 					$temp_ban = $ban['ban_end'];
 				}
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			/* Array of basic data */
 			$info = array(
@@ -732,7 +705,7 @@ class Phpbb extends Software
 				'last_activity'			=> $row['user_lastmark'],
 				'mgroup_others'			=> $groups,
 				'timezone'				=> $timezone,
-				'allow_admin_mails'		=> (bool)$row['user_allow_massemail'],
+				'allow_admin_mails'		=> ( $row['user_allow_massemail'] ) ? TRUE : FALSE,
 				'members_disable_pm'	=> ( $row['user_allow_pm'] ) ? 0 : 1,
 				'member_posts'			=> $row['user_posts'],
 				'member_last_post'		=> $row['user_lastpost_time'],
@@ -747,7 +720,7 @@ class Phpbb extends Software
 			if ( $row['user_avatar_type'] )
 			{
 				/* Is it numeric? Apparently phpBB doesn't clean up after itself. */
-				if ( is_numeric( $row['user_avatar_type'] ) )
+				if ( \is_numeric( $row['user_avatar_type'] ) )
 				{
 					switch( $row['user_avatar_type'] )
 					{
@@ -796,7 +769,7 @@ class Phpbb extends Software
 			{
 				$userfields = $this->db->select( '*', 'profile_fields_data', array( "user_id=?", $row['user_id'] ) )->first();
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			foreach( $this->db->select( '*', 'profile_fields' ) AS $field )
 			{
@@ -813,7 +786,7 @@ class Phpbb extends Software
 							/* phpBB stores the option incremented from 1 - however the options are stored incremented from 0. So if you select the first option, 1 is stored but profile_fields_lang actually has it as 0. I don't get it either. */
 							$pfields[ $field['field_id'] ] = $this->db->select( 'lang_value', 'profile_fields_lang', array( "field_id=? AND option_id=?", $field['field_id'], $userfields['pf_' . $field['field_name'] ] - 1 ) )->first();
 						}
-						catch( UnderflowException $e ) { }
+						catch( \UnderflowException $e ) { }
 					}
 					else
 					{
@@ -824,7 +797,7 @@ class Phpbb extends Software
 
 			/* PM Folders */
 			$pmFolders = iterator_to_array( $this->db->select( 'folder_name', 'privmsgs_folder', array( 'user_id=?', $row['user_id'] ) ) );
-			$info['pconversation_filters'] = count( $pmFolders ) ? $pmFolders : NULL;
+			$info['pconversation_filters'] = \count( $pmFolders ) ? $pmFolders : NULL;
 			
 			/* Finally */
 			$libraryClass->convertMember( $info, $pfields, $filename, $filepath );
@@ -847,9 +820,9 @@ class Phpbb extends Software
 				try
 				{
 					$log	= $this->db->select( '*', 'log', array( "log_id=?", $warn['log_id'] ) )->first();
-					$data	= @unserialize( $log['log_data'] );
+					$data	= @\unserialize( $log['log_data'] );
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					$log	= array( 'user_id' => 0 );
 					$data	= array( 0 => NULL );
@@ -861,7 +834,7 @@ class Phpbb extends Software
 						'wl_moderator'			=> $log['user_id'],
 						'wl_date'				=> $warn['warning_time'],
 						'wl_points'				=> 1,
-						'wl_note_member'		=> $data[0] ?? NULL,
+						'wl_note_member'		=> isset( $data[0] ) ? $data[0] : NULL,
 					) );
 
 				/* Add a member history record for this member */
@@ -885,7 +858,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertIgnoredUsers() : void
+	public function convertIgnoredUsers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -897,7 +870,7 @@ class Phpbb extends Software
 				'ignore_ignore_id'	=> $row['zebra_id'],
 			);
 			
-			foreach( Ignore::types() AS $type )
+			foreach( \IPS\core\Ignore::types() AS $type )
 			{
 				$info['ignore_' . $type] = 1;
 			}
@@ -911,7 +884,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfanityFilters() : void
+	public function convertProfanityFilters()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -935,7 +908,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertBanfilters() : void
+	public function convertBanfilters()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -954,7 +927,7 @@ class Phpbb extends Software
 			}
 			
 			/* If Type is null - skip */
-			if ( is_null( $type ) )
+			if ( \is_null( $type ) )
 			{
 				$libraryClass->setLastKeyValue( $row['ban_id'] );
 				continue;
@@ -977,7 +950,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertBanfilters2() : void
+	public function convertBanfilters2()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1001,7 +974,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1061,7 +1034,7 @@ class Phpbb extends Software
 					'map_user_id'			=> $to['user_id'],
 					'map_is_starter'		=> 0,
 					'map_last_topic_reply'	=> $row['message_time'],
-					'map_folder_id'			=> $to['folder_id'] > 0 and $this->_getPmFolder( $to['user_id'], $to['folder_id'] )
+					'map_folder_id'			=> ( $to['folder_id'] > 0 ) ? $this->_getPmFolder( $to['user_id'], $to['folder_id'] ) : FALSE
 				);
 			}
 			
@@ -1076,7 +1049,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1100,26 +1073,26 @@ class Phpbb extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
 		/* If we can't access profiles, don't bother trying to redirect */
-		if( !Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+		if( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 		{
 			return NULL;
 		}
 
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'memberlist.php' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'memberlist.php' ) !== FALSE )
 		{
 			try
 			{
-				$data = (string) $this->app->getLink( Request::i()->u, array( 'members', 'core_members' ) );
-				return Member::load( $data )->url();
+				$data = (string) $this->app->getLink( \IPS\Request::i()->u, array( 'members', 'core_members' ) );
+				return \IPS\Member::load( $data )->url();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
@@ -1131,12 +1104,12 @@ class Phpbb extends Software
 	/**
 	 * @brief	Lookup cache
 	 */
-	protected static array $pmFolders = array();
+	protected static $pmFolders = array();
 
 	/**
 	 * @brief	PhpBB Source Folders
 	 */
-	protected static ?array $phpBbFolders = NULL;
+	protected static $phpBbFolders = NULL;
 
 	/**
 	 * Get array key for the folder
@@ -1145,7 +1118,7 @@ class Phpbb extends Software
 	 * @param	string		$folderId		Folder Name
 	 * @return	boolean
 	 */
-	protected function _getPmFolder( int $user, string $folderId ) : bool
+	protected function _getPmFolder( $user, $folderId )
 	{
 		/* Check for cached folder info */
 		if( isset( static::$pmFolders[ $user ][ $folderId ] ) )
@@ -1164,19 +1137,19 @@ class Phpbb extends Software
 			/* Does the referenced folder exist in PhpBB? */
 			if( !isset( static::$phpBbFolders[ $folderId ] ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
-			$member = Member::load( $this->app->getLink( $user, 'core_members' ) );
+			$member = \IPS\Member::load( $this->app->getLink( (int) $user, 'core_members' ) );
 			$filters = json_decode( $member->pconversation_filters, TRUE );
 
 			/* No PM Folders or it's a guest */
 			if( $filters === NULL OR !$member->member_id )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			return static::$pmFolders[ $user ][ $folderId ] = FALSE;
 		}
@@ -1188,11 +1161,11 @@ class Phpbb extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
 		$password = html_entity_decode( $password );
 		$success = FALSE;
@@ -1202,31 +1175,31 @@ class Phpbb extends Software
 		if( preg_match( '/^\$2[ay]\$(0[4-9]|[1-2][0-9]|3[0-1])\$[a-zA-Z0-9.\/]{53}/', $hash ) )
 		{
 			require_once \IPS\ROOT_PATH . "/applications/convert/sources/Login/PasswordHash.php";
-			$ph = new PasswordHash( 8, TRUE );
-			$success = $ph->CheckPassword( $password, $member->conv_password );
+			$ph = new \PasswordHash( 8, TRUE );
+			$success = $ph->CheckPassword( $password, $member->conv_password ) ? TRUE : FALSE;
 		}
 
-		$hashLibrary = new HashCryptPrivate;
+		$hashLibrary = new \IPS\convert\Login\HashCryptPrivate;
 		if ( $success === FALSE )
 		{
 			/* phpBB3 */
 			$single_md5_pass = md5( $password );
 			$itoa64 = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
-			if ( strlen( $hash ) == 34 )
+			if ( \strlen( $hash ) == 34 )
 			{
-				$success = Login::compareHashes( $hash, $hashLibrary->hashCryptPrivate( $password, $hash, $itoa64 ) );
+				$success = ( \IPS\Login::compareHashes( $hash, $hashLibrary->hashCryptPrivate( $password, $hash, $itoa64 ) ) ) ? TRUE : FALSE;
 			}
 			else
 			{
-				$success = Login::compareHashes( $hash, $single_md5_pass );
+				$success = ( \IPS\Login::compareHashes( $hash, $single_md5_pass ) ) ? TRUE : FALSE;
 			}
 		}
 
 		/* phpBB2 */
 		if ( !$success )
 		{
-			$success = Login::compareHashes( $hash, $hashLibrary->hashCryptPrivate( $single_md5_pass, $hash, $itoa64 ) );
+			$success = ( \IPS\Login::compareHashes( $hash, $hashLibrary->hashCryptPrivate( $single_md5_pass, $hash, $itoa64 ) ) ) ? TRUE : FALSE ;
 		}
 
 		/* Fallback to password_verify(), this applies to PhpBB 3.3+ where Argon may be used */

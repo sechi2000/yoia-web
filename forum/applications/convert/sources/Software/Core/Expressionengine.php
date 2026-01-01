@@ -12,47 +12,23 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application\Module;
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function strlen;
-use function strtolower;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ExpressionEngine Core Converter
  */
-class Expressionengine extends Software
+class _Expressionengine extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		return "Expression Engine";
 	}
@@ -60,9 +36,9 @@ class Expressionengine extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		return 'expressionengine';
 	}
@@ -70,9 +46,9 @@ class Expressionengine extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertProfileFields'		=> array(
@@ -110,15 +86,15 @@ class Expressionengine extends Software
 	/**
 	 * Allows software to add additional menu row options
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function extraMenuRows(): array
+	public function extraMenuRows()
 	{
 		$rows = array();
 		$rows['convertPmAttachments'] = array(
 			'step_method'		=> 'convertPmAttachments',
 			'step_title'		=> 'convert_attachments',
-			'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_attachments' ),
+			'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_attachments' ),
 			'source_rows'		=> array( 'table' => static::canConvert()['convertPmAttachments']['table'], 'where' => static::canConvert()['convertPmAttachments']['where'] ),
 			'per_cycle'			=> 10,
 			'dependencies'		=> array( 'convertPrivateMessageReplies' ),
@@ -131,9 +107,9 @@ class Expressionengine extends Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -141,9 +117,9 @@ class Expressionengine extends Software
 	/**
 	 * Can we convert settings?
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function canConvertSettings(): bool
+	public static function canConvertSettings()
 	{
 		return FALSE;
 	}
@@ -151,9 +127,9 @@ class Expressionengine extends Software
 	/**
 	 * List of Conversion Methods that require more information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertAttachments',
@@ -165,15 +141,12 @@ class Expressionengine extends Software
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		return nl2br( $post );
 	}
@@ -181,10 +154,10 @@ class Expressionengine extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 
@@ -197,8 +170,8 @@ class Expressionengine extends Software
 						'field_default'			=> NULL,
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(),
-						'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_ee_sig_attach_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_ee_sig_attach_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;
@@ -206,16 +179,16 @@ class Expressionengine extends Software
 				$return['convertProfileFields'] = array();
 
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
 				{
 					$options[$field->_id] = $field->_title;
 				}
 
 				foreach( $this->db->select( '*', 'exp_member_fields' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["map_pfield_{$field['m_field_id']}"]			= $field['m_field_label'];
-					Member::loggedIn()->language()->words["map_pfield_{$field['m_field_id']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['m_field_id']}"]			= $field['m_field_label'];
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['m_field_id']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
 
 					$return['convertProfileFields']["map_pfield_{$field['m_field_id']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -232,15 +205,15 @@ class Expressionengine extends Software
 
 				$options = array();
 				$options['none'] = 'None';
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[$group->g_id] = $group->name;
 				}
 
 				foreach( $this->db->select( '*', 'exp_member_groups' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['group_id']}"]		= $group['group_title'];
-					Member::loggedIn()->language()->words["map_group_{$group['group_id']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['group_id']}"]		= $group['group_title'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['group_id']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 
 					$return['convertGroups']["map_group_{$group['group_id']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -259,33 +232,33 @@ class Expressionengine extends Software
 					'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 					'field_default'			=> 'avatars',
 					'field_required'		=> TRUE,
-					'field_extra'			=> array( 'options' => array( 'avatars' => Member::loggedIn()->language()->addToStack( 'avatars' ), 'profile_photos' => Member::loggedIn()->language()->addToStack( 'profile_photos' ) ) ),
+					'field_extra'			=> array( 'options' => array( 'avatars' => \IPS\Member::loggedIn()->language()->addToStack( 'avatars' ), 'profile_photos' => \IPS\Member::loggedIn()->language()->addToStack( 'profile_photos' ) ) ),
 					'field_hint'			=> NULL,
 				);
 
 				/* Find out where the photos live */
-				Member::loggedIn()->language()->words['photo_location_desc'] = Member::loggedIn()->language()->addToStack( 'photo_location_nodb_desc' );
+				\IPS\Member::loggedIn()->language()->words['photo_location_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'photo_location_nodb_desc' );
 				$return['convertMembers']['photo_location'] = array(
 					'field_class'			=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
-					'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_ee_avatar_path'),
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_ee_avatar_path'),
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 
 				foreach( array( 'url', 'location', 'occupation', 'bio' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["field_{$field}"]		= Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
-					Member::loggedIn()->language()->words["field_{$field}_desc"]	= Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}"]		= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
 					$return['convertMembers']["field_{$field}"] = array(
 						'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 						'field_default'			=> 'no_convert',
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'no_convert'			=> Member::loggedIn()->language()->addToStack( 'no_convert' ),
-								'create_field'			=> Member::loggedIn()->language()->addToStack( 'create_field' ),
+								'no_convert'			=> \IPS\Member::loggedIn()->language()->addToStack( 'no_convert' ),
+								'create_field'			=> \IPS\Member::loggedIn()->language()->addToStack( 'create_field' ),
 							),
 							'userSuppliedInput'		=> 'create_field'
 						),
@@ -300,8 +273,8 @@ class Expressionengine extends Software
 						'field_default'			=> NULL,
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(),
-						'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_ee_pm_attach_path'),
-						'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_ee_pm_attach_path'),
+						'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;
@@ -313,30 +286,30 @@ class Expressionengine extends Software
 	/**
 	 * Finish
 	 *
-	 * @return    array    Messages to display
+	 * @return	array	Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Non-Content Rebuilds */
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
 
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
 
 		return array( "f_search_index_rebuild", "f_clear_caches", "f_rebuild_pms", "f_signatures_rebuild", "f_rebuild_attachments" );
 	}
@@ -346,7 +319,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -384,14 +357,15 @@ class Expressionengine extends Software
 				{
 					$memberId = $this->app->getLink( $row['member_id'], 'core_members' );
 
-					$signature = Db::i()->select( 'signature', 'core_members', array( "member_id=?", $memberId ) )->first();
+					$signature = \IPS\Db::i()->select( 'signature', 'core_members', array( "member_id=?", $memberId ) )->first();
 
 					$signature .= '[attachment=' . $attachId . ':name]';
 
-					Db::i()->update( 'core_members', array( 'signature' => $signature ), array( "member_id=?", $memberId ) );
+					\IPS\Db::i()->update( 'core_members', array( 'signature' => $signature ), array( "member_id=?", $memberId ) );
 				}
 			}
-			catch( UnderflowException|OutOfRangeException $e ) {}
+			catch( \UnderflowException $e ) {}
+			catch( \OutOfRangeException $e ) {}
 
 			$libraryClass->setLastKeyValue( $row['member_id'] );
 		}
@@ -402,7 +376,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfileFields() : void
+	public function convertProfileFields()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -414,11 +388,11 @@ class Expressionengine extends Software
 			$info['pf_type']			= ucwords( $row['m_field_type'] );
 			$info['pf_name']			= $row['m_field_label'];
 			$info['pf_desc']			= $row['m_field_description'];
-			$info['pf_content'] 		= ( !in_array( $row['m_field_type'], array( 'textbox', 'textarea' ) ) ) ? explode( "\r", $row['field_choices'] ) : NULL;
+			$info['pf_content'] 		= ( !\in_array( $row['m_field_type'], array( 'textbox', 'textarea' ) ) ) ? explode( "\r", $row['field_choices'] ) : NULL;
 			$info['pf_not_null']		= $row['m_field_required'] == 'y' ? 1 : 0;
 			$info['pf_member_hide']		= $row['m_field_public'] == 'n' ? 'hide' : 'all';
 			$info['pf_max_input']		= $row['m_field_maxl'];
-			$info['pf_member_edit'] 	= ( in_array( $row['user_editable'], array( 'yes', 'once' ) ) ) ? 0 : 1;
+			$info['pf_member_edit'] 	= ( \in_array( $row['user_editable'], array( 'yes', 'once' ) ) ) ? 0 : 1;
 			$info['pf_position']		= $row['m_field_order'];
 			$info['pf_show_on_reg']		= $row['m_field_reg'] == 'y' ? 1 : 0;
 			$info['pf_input_format']	= NULL;
@@ -433,7 +407,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -460,7 +434,7 @@ class Expressionengine extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -474,7 +448,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -521,7 +495,7 @@ class Expressionengine extends Software
 					$profileFields[ str_replace( 'm_field_id_', '', $key ) ] = $value;
 				}
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$profileFields = array();
 			}
@@ -541,7 +515,7 @@ class Expressionengine extends Software
 					/* We don't actually need this, but we need to make sure the field was created */
 					$fieldId = $this->app->getLink( $pseudo, 'core_pfields_data' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$libraryClass->convertProfileField( array(
 						'pf_id'				=> $pseudo,
@@ -580,7 +554,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -636,7 +610,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -663,7 +637,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPmAttachments() : void
+	public function convertPmAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -687,7 +661,7 @@ class Expressionengine extends Software
 				'attach_file'		=> $row['attachment_name'],
 				'attach_date'		=> $row['attachment_date'],
 				'attach_member_id'	=> $row['sender_id'],
-				'attach_ext'		=> strtolower( trim( $row['attachment_extension'], '.' ) ),
+				'attach_ext'		=> \strtolower( trim( $row['attachment_extension'], '.' ) ),
 				'attach_filesize'	=> ( $row['attachment_size'] * 1000 ), //convert to kb
 			);
 
@@ -702,14 +676,15 @@ class Expressionengine extends Software
 				{
 					$pmId = $this->app->getLink( $row['message_id'], 'core_message_posts' );
 
-					$message = Db::i()->select( 'msg_post', 'core_message_posts', array( "msg_id=?", $pmId ) )->first();
+					$message = \IPS\Db::i()->select( 'msg_post', 'core_message_posts', array( "msg_id=?", $pmId ) )->first();
 
 					$message .= '[attachment=' . $attachId . ':name]';
 
-					Db::i()->update( 'core_message_posts', array( 'msg_post' => $message ), array( "msg_id=?", $pmId ) );
+					\IPS\Db::i()->update( 'core_message_posts', array( 'msg_post' => $message ), array( "msg_id=?", $pmId ) );
 				}
 			}
-			catch( UnderflowException|OutOfRangeException $e ) {}
+			catch( \UnderflowException $e ) {}
+			catch( \OutOfRangeException $e ) {}
 
 			$libraryClass->setLastKeyValue( $row['attachment_id'] );
 		}
@@ -718,26 +693,26 @@ class Expressionengine extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
 		/* If we can't access profiles, don't bother trying to redirect */
-		if( !Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+		if( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 		{
 			return NULL;
 		}
 
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( preg_match( '#/member/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/member/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			try
 			{
 				$data = (string) $this->app->getLink( (int) $matches[1], array( 'members', 'core_members' ) );
-				return Member::load( $data )->url();
+				return \IPS\Member::load( $data )->url();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
@@ -749,13 +724,13 @@ class Expressionengine extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
-		$length = strlen( $member->conv_password );
+		$length = \strlen( $member->conv_password );
 		$providedHash = FALSE;
 
 		switch( $length )
@@ -778,6 +753,6 @@ class Expressionengine extends Software
 			break;
 		}
 
-		return Login::compareHashes( $member->conv_password, $providedHash );
+		return ( \IPS\Login::compareHashes( $member->conv_password, $providedHash ) ) ? TRUE : FALSE;
 	}
 }

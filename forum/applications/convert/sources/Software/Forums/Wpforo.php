@@ -12,43 +12,23 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Wpforo as WpforoCore;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function stristr;
-use function strtotime;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * wpForo Forums Converter
  */
-class Wpforo extends Software
+class _Wpforo extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
 	 * @return    string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "wpForo (2.1.x)";
@@ -59,7 +39,7 @@ class Wpforo extends Software
 	 *
 	 * @return    string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "wpforo";
@@ -68,9 +48,9 @@ class Wpforo extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return    array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return [
 			'convertForumsForums' => [
@@ -97,7 +77,7 @@ class Wpforo extends Software
 	 *
 	 * @return    boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -105,9 +85,9 @@ class Wpforo extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return    array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'wpforo' ) );
 	}
@@ -117,45 +97,42 @@ class Wpforo extends Software
 	 *
 	 * @return    array        Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		/* Rebuild Leaderboard */
-		Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
-		Db::i()->delete( 'core_reputation_leaderboard_history' );
+		\IPS\Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
+		\IPS\Db::i()->delete( 'core_reputation_leaderboard_history' );
 
 		/* Caches */
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
 
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics", "f_topic_tags_recount" );
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix Post Data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string	$post	Post
+	 * @return	string	Fixed Post
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return WpforoCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Wpforo::fixPostData( $post );
 	}
 
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertForumsPosts'
@@ -165,10 +142,10 @@ class Wpforo extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = [];
 		switch( $method )
@@ -177,10 +154,10 @@ class Wpforo extends Software
 				/* Get our reactions to let the admin map them */
 				$options		= [];
 				$descriptions	= [];
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
 				{
 					$options[ $reaction->id ]		= $reaction->_icon->url;
-					$descriptions[ $reaction->id ]	= Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
+					$descriptions[ $reaction->id ]	= \IPS\Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
 				}
 
 				$return['convertForumsPosts'] = [
@@ -204,7 +181,7 @@ class Wpforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums() : void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'forumid' );
@@ -258,7 +235,7 @@ class Wpforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics() : void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'topicid' );
@@ -271,7 +248,7 @@ class Wpforo extends Software
 				'forum_id'				=> $row['forumid'],
 				'state'					=> ( $row['closed'] == 1 ) ? 'closed' : 'open',
 				'starter_id'			=> $row['userid'],
-				'start_date'			=> strtotime( $row['created'] ),
+				'start_date'			=> \strtotime( $row['created'] ),
 				'posts'                 => $row['posts'],
 				'views'					=> $row['views'],
 				'approved'				=> $row['private'] ? 0 : 1
@@ -327,7 +304,7 @@ class Wpforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts() : void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'postid' );
@@ -338,9 +315,9 @@ class Wpforo extends Software
 				'pid'				=> $row['postid'],
 				'topic_id'			=> $row['topicid'],
 				'post'				=> $row['body'],
-				'edit_time'			=> $row['modified'] != $row['created'] ? strtotime( $row['modified'] ) : null,
+				'edit_time'			=> $row['modified'] != $row['created'] ? \strtotime( $row['modified'] ) : null,
 				'author_id'			=> $row['userid'],
-				'post_date'			=> strtotime( $row['created'] ),
+				'post_date'			=> \strtotime( $row['created'] ),
 				'queued'			=> $row['private'] ? 1 : 0,
 			];
 
@@ -368,21 +345,21 @@ class Wpforo extends Software
 	/**
 	 * @brief   temporarily store post content
 	 */
-	protected array $_postContent = [];
+	protected $_postContent = [];
 
 	/**
 	 * Convert attachments
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'postid' );
 
 		foreach( $this->fetch( 'wpforo_posts', 'postid' ) AS $row )
 		{
-			if( !stristr( $row['body'], '[attach]' ) AND !stristr( $row['body'], 'wpforo-attached-file' ) )
+			if( !\stristr( $row['body'], '[attach]' ) AND !\stristr( $row['body'], 'wpforo-attached-file' ) )
 			{
 				$libraryClass->setLastKeyValue( $row['postid'] );
 				continue;
@@ -397,7 +374,7 @@ class Wpforo extends Software
 			$matches = [];
 			preg_match_all( '/\[attach\](\d+)\[\/attach\]/i', $row['body'], $matches );
 
-			if( count( $matches ) )
+			if( \count( $matches ) )
 			{
 				foreach( $matches[1] as $key => $id )
 				{
@@ -408,7 +385,7 @@ class Wpforo extends Software
 					$info = [
 						'attach_id'			=> $row['postid'],
 						'attach_file'		=> $sourceAttachment['filename'],
-						'attach_date'		=> strtotime( $row['created'] ),
+						'attach_date'		=> \strtotime( $row['created'] ),
 						'attach_member_id'	=> $sourceAttachment['userid'],
 						'attach_filesize'	=> $sourceAttachment['size'],
 					];
@@ -427,13 +404,14 @@ class Wpforo extends Software
 
 							if( !isset( $this->_postContent[ $pid ] ) )
 							{
-								$this->_postContent[ $pid ] = Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
+								$this->_postContent[ $pid ] = \IPS\Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
 							}
 
 							$this->_postContent[ $pid ] = str_replace( $matches[0][ $key ], '[attachment=' . $attachId . ':name]', $this->_postContent[ $pid ] );
 						}
 					}
-					catch( UnderflowException|OutOfRangeException $e ) {}
+					catch( \UnderflowException $e ) {}
+					catch( \OutOfRangeException $e ) {}
 				}
 			}
 
@@ -441,7 +419,7 @@ class Wpforo extends Software
 			$matches = [];
 			preg_match_all( '/\<div id\="wpfa\-[\d]+"(.+?)?>\<a class\="wpforo\-default\-attachment" href\="(.+?)"(.+?)?>\<i class\="(.+?)">\<\/i>(.+?)<\/a><\/div>/i', $row['body'], $matches );
 
-			if( count( $matches ) )
+			if( \count( $matches ) )
 			{
 				foreach( $matches[2] as $key => $url )
 				{
@@ -450,7 +428,7 @@ class Wpforo extends Software
 					$info = [
 						'attach_id'			=> $row['postid'],
 						'attach_file'		=> $filename,
-						'attach_date'		=> strtotime( $row['created'] ),
+						'attach_date'		=> \strtotime( $row['created'] ),
 						'attach_member_id'	=> $row['userid'],
 					];
 
@@ -468,13 +446,14 @@ class Wpforo extends Software
 
 							if( !isset( $this->_postContent[ $pid ] ) )
 							{
-								$this->_postContent[ $pid ] = Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
+								$this->_postContent[ $pid ] = \IPS\Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
 							}
 
 							$this->_postContent[ $pid ] = str_replace( $matches[0][ $key ], '[attachment=' . $attachId . ':name]', $this->_postContent[ $pid ] );
 						}
 					}
-					catch( UnderflowException|OutOfRangeException $e ) {}
+					catch( \UnderflowException $e ) {}
+					catch( \OutOfRangeException $e ) {}
 				}
 			}
 
@@ -484,28 +463,28 @@ class Wpforo extends Software
 		/* Do the updates */
 		foreach( $this->_postContent as $id => $content )
 		{
-			Db::i()->update( 'forums_posts', array( 'post' => $content ), array( 'pid=?', $id ) );
+			\IPS\Db::i()->update( 'forums_posts', array( 'post' => $content ), array( 'pid=?', $id ) );
 		}
 	}
 
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
-		$wpForoSlug = defined('WPFORO_SLUG') ? WPFORO_SLUG : 'community';
+		$url = \IPS\Request::i()->url();
+		$wpForoSlug = \defined('WPFORO_SLUG') ? WPFOROSLUG : 'community';
 
 		$matches = [];
-		if( preg_match( '#/' . $wpForoSlug . '/([a-z0-9-]+)/([a-z0-9-]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/' . $wpForoSlug . '/([a-z0-9-]+)/([a-z0-9-]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			$class	= '\IPS\forums\Topic';
 			$types	= [ 'topic_furl' ];
 			$oldId	= $matches[2];
 		}
-		elseif( preg_match( '#/' . $wpForoSlug . '/([a-z0-9-]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		elseif( preg_match( '#/' . $wpForoSlug . '/([a-z0-9-]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			$class	= '\IPS\forums\Forum';
 			$types	= [ 'forum_furl' ];
@@ -520,20 +499,20 @@ class Wpforo extends Software
 				{
 					$data = (string) $this->app->getLink( $oldId, $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( $oldId, $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				elseif( $item instanceof Model )
+				elseif( $item instanceof \IPS\Node\Model )
 				{
 					if( $item->can( 'view' ) )
 					{
@@ -541,7 +520,7 @@ class Wpforo extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

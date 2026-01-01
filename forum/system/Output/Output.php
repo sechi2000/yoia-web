@@ -12,152 +12,98 @@ namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use Exception;
-use IPS\Api\Exception as ApiException;
-use IPS\Application\Module;
-use IPS\Content\Controller;
-use IPS\cms\Pages\Page;
-use IPS\Content\Search\SearchContent;
-use IPS\core\AdminNotification;
-use IPS\core\Advertisement;
-use IPS\core\DataLayer;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Dispatcher\Front as DispatcherFront;
-use IPS\Helpers\Table\Content;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Http\Url\Internal;
-use IPS\Output\Javascript;
-use IPS\Output\System as SystemOutput;
-use IPS\Session\Front;
-use IPS\Widget\Area;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function array_merge;
-use function array_slice;
-use function count;
-use function defined;
-use function function_exists;
-use function get_called_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function json_encode;
-use function ob_start;
-use function stristr;
-use function strlen;
-use function strpos;
-use function strstr;
-use function substr;
-use const JSON_HEX_AMP;
-use const JSON_HEX_APOS;
-use const JSON_HEX_TAG;
-use const JSON_PRETTY_PRINT;
-use const JSON_UNESCAPED_SLASHES;
-use const LIVE_TOPICS_DEV;
+use function class_exists;
+use function time;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Output Class
  */
-class Output
+class _Output
 {
 	/**
 	 * @brief	HTTP Statuses
 	 * @see		<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html">RFC 2616</a>
 	 */
-	public static array $httpStatuses = array( 100 => 'Continue', 101 => 'Switching Protocols', 200 => 'OK', 201 => 'Created', 202 => 'Accepted', 203 => 'Non-Authoritative Information', 204 => 'No Content', 205 => 'Reset Content', 206 => 'Partial Content', 300 => 'Multiple Choices', 301 => 'Moved Permanently', 302 => 'Found', 303 => 'See Other', 304 => 'Not Modified', 305 => 'Use Proxy', 307 => 'Temporary Redirect', 400 => 'Bad Request', 401 => 'Unauthorized', 402 => 'Payment Required', 403 => 'Forbidden', 404 => 'Not Found', 405 => 'Method Not Allowed', 406 => 'Not Acceptable', 407 => 'Proxy Authentication Required', 408 => 'Request Timeout', 409 => 'Conflict', 410 => 'Gone', 411 => 'Length Required', 412 => 'Precondition Failed', 413 => 'Request Entity Too Large', 414 => 'Request-URI Too Long', 415 => 'Unsupported Media Type', 416 => 'Requested Range Not Satisfiable', 417 => 'Expectation Failed', 429 => 'Too Many Requests', 500 => 'Internal Server Error', 501 => 'Not Implemented', 502 => 'Bad Gateway', 503 => 'Service Unavailable', 504 => 'Gateway Timeout', 505 => 'HTTP Version Not Supported' );
+	public static $httpStatuses = array( 100 => 'Continue', 101 => 'Switching Protocols', 200 => 'OK', 201 => 'Created', 202 => 'Accepted', 203 => 'Non-Authoritative Information', 204 => 'No Content', 205 => 'Reset Content', 206 => 'Partial Content', 300 => 'Multiple Choices', 301 => 'Moved Permanently', 302 => 'Found', 303 => 'See Other', 304 => 'Not Modified', 305 => 'Use Proxy', 307 => 'Temporary Redirect', 400 => 'Bad Request', 401 => 'Unauthorized', 402 => 'Payment Required', 403 => 'Forbidden', 404 => 'Not Found', 405 => 'Method Not Allowed', 406 => 'Not Acceptable', 407 => 'Proxy Authentication Required', 408 => 'Request Timeout', 409 => 'Conflict', 410 => 'Gone', 411 => 'Length Required', 412 => 'Precondition Failed', 413 => 'Request Entity Too Large', 414 => 'Request-URI Too Long', 415 => 'Unsupported Media Type', 416 => 'Requested Range Not Satisfiable', 417 => 'Expectation Failed', 429 => 'Too Many Requests', 500 => 'Internal Server Error', 501 => 'Not Implemented', 502 => 'Bad Gateway', 503 => 'Service Unavailable', 504 => 'Gateway Timeout', 505 => 'HTTP Version Not Supported' );
 	
 	/**
 	 * @brief	Singleton Instance
 	 */
-	protected static ?Output $instance = NULL;
+	protected static $instance = NULL;
 	
 	/**
 	 * @brief	Global javascript bundles
 	 */
-	public static array $globalJavascript = array( 'admin.js', 'front.js', 'framework.js', 'library.js' );
+	public static $globalJavascript = array( 'admin.js', 'front.js', 'framework.js', 'library.js', 'map.js' );
 	
 	/**
 	 * @brief	Javascript map of file object URLs
 	 */
-	protected static ?array $javascriptObjects = null;
+	protected static $javascriptObjects = null;
 	
 	/**
 	 * @brief	File object classes
 	 */
-	protected static array $fileObjectClasses = array();
+	protected static $fileObjectClasses = array();
 	
 	/**
 	 * @brief	Meta tags for the current page
 	 */
-	public array $metaTags	= array();
+	public $metaTags	= array();
 
 	/**
 	 * @brief	Custom meta tags for the current page
 	 */
-	public array $customMetaTags	= array();
+	public $customMetaTags	= array();
 
 	/**
 	 * @brief	Automatic meta tags for the current page
 	 */
-	public array $autoMetaTags	= array();
+	public $autoMetaTags	= array();
 	
 	/**
 	 * @brief	Other `<link rel="">` tags
 	 */
-	public array $linkTags = array();
+	public $linkTags = array();
 	
 	/**
 	 * @brief	RSS feeds for the current page
 	 */
-	public array $rssFeeds = array();
+	public $rssFeeds = array();
 
 	/**
 	 * @brief	Custom meta tag page title
 	 */
-	public string $metaTagsTitle	= '';
+	public $metaTagsTitle	= '';
 
 	/**
 	 * @brief	Requested URL fragment for meta tag editing
 	 */
-	public string $metaTagsUrl	= '';
-
-	/**
-	 * @brief	Custom Header
-	 */
-	public ?string $customHeader = NULL;
-
-	/**
-	 * @brief	Custom Header
-	 */
-	public ?array $outputTemplate = NULL;
-	public string $headerMessage;
-
+	public $metaTagsUrl	= '';
+	
 	/**
 	 * Get instance
 	 *
-	 * @return    Output
+	 * @return	\IPS\Output
 	 */
-	public static function i() : static
+	public static function i()
 	{
 		if( static::$instance === NULL )
 		{
-			$classname = get_called_class();
+			$classname = \get_called_class();
 			static::$instance = new $classname;
 		}
 		
 		/* Inline Message */
 		if( $message = static::getInlineMessage() )
 		{
-			if( !Request::i()->isAjax() )
+			if( !\IPS\Request::i()->isAjax() )
 			{
 				static::$instance->inlineMessage = $message;
 				static::setInlineMessage();
@@ -170,134 +116,129 @@ class Output
 	/**
 	 * @brief	Additional HTTP Headers
 	 */
-	public array $httpHeaders = array(
+	public $httpHeaders = array(
 		'X-XSS-Protection' => '0',	// This is so when we post contents with scripts (which is possible in the editor, like when embedding a Twitter tweet) the broswer doesn't block it
 	);
 	
 	/**
 	 * @brief	Stored Page Title
 	 */
-	public string $title = '';
+	public $title = '';
 
 	/**
 	 * @brief	Default page title (may differ from $title if the meta tag editor was used)
 	 */
-	public string $defaultPageTitle = '';
+	public $defaultPageTitle = '';
 
 	/**
 	 * @brief	Should the title show in the header (ACP only)?
 	 */
-	public bool $showTitle = TRUE;
+	public $showTitle = TRUE;
 	
 	/**
 	 * @brief	Stored Content to output
 	 */
-	public string $output = '';
+	public $output = '';
 	
 	/**
 	 * @brief	URLs for CSS files to include
 	 */
-	public array $cssFiles = array();
+	public $cssFiles = array();
 	
 	/**
 	 * @brief	URLs for JS files to include
 	 */
-	public array $jsFiles = array();
+	public $jsFiles = array();
 	
 	/**
 	 * @brief	URLs for JS files to include with async="true"
 	 */
-	public array $jsFilesAsync = array();
+	public $jsFilesAsync = array();
 	
 	/**
 	 * @brief	Other variables to hand to the JavaScript
 	 */
-	public array $jsVars = array();
+	public $jsVars = array();
 	
 	/**
 	 * @brief	Other raw JS - this is included inside an existing `<script>` tag already, so you should omit wrapping tags
 	 */
-	public string $headJs = '';
+	public $headJs = '';
 
 	/**
 	 * @brief	Raw CSS to output, used to send custom CSS that may need to be dynamically generated at runtime
 	 */
-	public string $headCss = '';
+	public $headCss = '';
 
 	/**
 	 * @brief	Anything set in this property will be output right before `</body>` - useful for certain third party scripts that need to be output at end of page
 	 */
-	public string $endBodyCode = '';
+	public $endBodyCode = '';
 	
 	/**
 	 * @brief	Breadcrumb
 	 */
-	public array $breadcrumb = array();
+	public $breadcrumb = array();
 	
 	/**
 	 * @brief	Page is responsive?
 	 */
-	public bool $responsive = TRUE;
+	public $responsive = TRUE;
 	
 	/**
 	 * @brief	Sidebar
 	 */
-	public array $sidebar = array();
-
-	/**
-	 * @var string|null Any user alerts that should show on page load
-	 */
-	public string|null $alert = null;
+	public $sidebar = array();
 	
 	/**
 	 * @brief	Global controllers
 	 */
-	public array $globalControllers = array();
+	public $globalControllers = array();
 	
 	/**
 	 * @brief	Additional CSS classes to add to body tag
 	 */
-	public array $bodyClasses = array();
-
-	/**
-	 * @brief	Additional data attributes to add to body tag
-	 */
-	public array $bodyAttributes = array();
+	public $bodyClasses = array();
 	
 	/**
 	 * @brief	Elements that can be hidden from view
 	 */
-	public array $hiddenElements = array();
+	public $hiddenElements = array();
 	
 	/**
 	 * @brief	Inline message
 	 */
-	public string $inlineMessage = '';
+	public $inlineMessage = '';
 	
 	/**
 	 * @brief	Page Edit URL
 	 */
-	public ?Url $editUrl	= NULL;
+	public $editUrl	= NULL;
 	
 	/**
 	 * @brief	`<base target="">`
 	 */
-	public ?string $base	= NULL;
+	public $base	= NULL;
+	
+	/**
+	 * @brief	Allow default widgets with this output
+	 */
+	public $allowDefaultWidgets = TRUE;
 	
 	/**
 	 * @brief	Allow page caching. This can be set at any point during controller execution to override defaults
 	 */
-	public bool $pageCaching = TRUE;
+	public $pageCaching = TRUE;
 	
 	/**
 	 * @brief	pageName for data-pageName in the <body> tag
 	 */
-	public ?string $pageName = NULL;
+	public $pageName = NULL;
 
 	/**
 	 * @brief	Data which were loaded via the GraphQL framework, but which have to be immediately available, rather then via later AJAX requests
 	 */
-	public array $graphData = [];
+	public $graphData = [];
 
 	/**
 	 * @brief	A custom cache DateTime object set to UTC
@@ -311,17 +252,17 @@ class Output
 	 */
 	public function __construct()
 	{
-		if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation !== 'setup' )
+		if ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation !== 'setup' )
 		{
 			/* Additional security: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Opener-Policy */
 			$this->httpHeaders['Cross-Origin-Opener-Policy'] = "same-origin";
-
-			if ( Settings::i()->clickjackprevention == 'csp' )
+			
+			if ( \IPS\Settings::i()->clickjackprevention == 'csp' )
 			{
-				$this->httpHeaders['Content-Security-Policy'] = Settings::i()->csp_header;
-				$this->httpHeaders['X-Content-Security-Policy'] = Settings::i()->csp_header; // This is just for IE11
+				$this->httpHeaders['Content-Security-Policy'] = \IPS\Settings::i()->csp_header;
+				$this->httpHeaders['X-Content-Security-Policy'] = \IPS\Settings::i()->csp_header; // This is just for IE11
 			}
-			elseif ( Settings::i()->clickjackprevention != 'none' )
+			elseif ( \IPS\Settings::i()->clickjackprevention != 'none' )
 			{
 				$this->httpHeaders['X-Frame-Options'] = "sameorigin";
 				$this->httpHeaders['Content-Security-Policy'] = "frame-ancestors 'self'";
@@ -329,29 +270,11 @@ class Output
 			}
 
 			/* 2 = entire suite, 1 = ACP only */
-			if( Settings::i()->referrer_policy_header == 2 OR ( Settings::i()->referrer_policy_header == 1 AND Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'admin' ) )
+			if( \IPS\Settings::i()->referrer_policy_header == 2 OR ( \IPS\Settings::i()->referrer_policy_header == 1 AND \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'admin' ) )
 			{
 				$this->httpHeaders['Referrer-Policy'] = 'strict-origin-when-cross-origin';
 			}
-
-            if ( Application::appIsEnabled('cloud') )
-            {
-                $this->httpHeaders['Strict-Transport-Security'] = 'max-age=31536000';
-            }
 		}
-	}
-
-	/**
-	 * Add a css file to the output
-	 * 
-	 * @param string $file		Filename / Path
-	 * @param string|NULL $app	Application
-	 * @param string|NULL $location	Location
-	 * @return void
-	 */
-	public function addCssFiles( string $file, string $app=NULL, string $location=NULL ): void
-	{
-		$this->cssFiles = array_merge( $this->cssFiles, Theme::i()->css( $file, $app, $location ) );
 	}
 
 	/**
@@ -364,12 +287,12 @@ class Output
 	 * @li app.js (this is all models for a single application)
 	 * @li {location}_{section}.js (this is all controllers and templates for this section called ad-hoc when needed)
 	 *
-	 * @param string $file Filename
-	 * @param string|null $app Application
-	 * @param string|null $location Location (e.g. 'admin', 'front')
-	 * @return void
+	 * @param	string		$file		Filename
+	 * @param	string|null	$app		Application
+	 * @param	string|null	$location	Location (e.g. 'admin', 'front')
+	 * @return	array		URL to JS files
 	 */
-	public function addJsFiles( string $file, string $app=NULL, string $location=NULL ): void
+	public function addJsFiles( $file, $app=NULL, $location=NULL )
 	{
 		$this->jsFiles = array_merge( $this->jsFiles, $this->js( $file, $app, $location ) );
 	}
@@ -383,61 +306,79 @@ class Output
      * @li admin.js or front.js (these are controllers, templates and models which are used everywhere for that location)
 	 * @li app.js (this is all models for a single application)
 	 * @li {location}_{section}.js (this is all controllers and templates for this section called ad-hoc when needed)
-	 * @li {component}.js - Load a Web Component from the Web Component files; Must set $location to "components" when using this option
 	 *
-	 * @param string $file		Filename
-	 * @param string|null $app		Application
-	 * @param string|null $location	Location (e.g. 'admin', 'front')
+	 * @param	string		$file		Filename
+	 * @param	string|null	$app		Application
+	 * @param	string|null	$location	Location (e.g. 'admin', 'front')
 	 * @return	array		URL to JS files
 	 */
-	public function js( string $file, string $app=NULL, string $location=NULL ): array
+	public function js( $file, $app=NULL, $location=NULL )
 	{
 		$file = trim( $file, '/' );
-
-		/* Legacy code support. The following directories were moved to /static */
-		if ( ( $app === "core" or $app === null) and $location === "interface" and preg_match( "/^(?:codemirror|fontawesome)/", $file ) )
-		{
-			$file = "static/" . $file;
-		}
 			 
 		if ( $location === 'interface' AND mb_substr( $file, -3 ) === '.js' )
 		{
-			return array( rtrim( Url::baseUrl( Url::PROTOCOL_RELATIVE ), '/' ) . "/applications/{$app}/interface/{$file}?v=" . Javascript::javascriptCacheBustKey() );
+			return array( rtrim( \IPS\Http\Url::baseUrl( \IPS\Http\Url::PROTOCOL_RELATIVE ), '/' ) . "/applications/{$app}/interface/{$file}?v=" . ( \defined( '\IPS\CACHEBUST_KEY' ) ? \IPS\CACHEBUST_KEY : time() ) );
 		}
-		elseif (IN_DEV)
+		elseif ( \IPS\IN_DEV )
 		{
-			return Javascript::inDevJs( $file, $app, $location );
+			return \IPS\Output\Javascript::inDevJs( $file, $app, $location );
 		}
 		else
 		{
-			if ( class_exists( 'IPS\Dispatcher', FALSE ) and ( !Dispatcher::hasInstance() OR Dispatcher::i()->controllerLocation === 'setup' ) )
+			if ( class_exists( 'IPS\Dispatcher', FALSE ) and ( !\IPS\Dispatcher::hasInstance() OR \IPS\Dispatcher::i()->controllerLocation === 'setup' ) )
 			{
 				return array();
 			}
-
-			$fileObj = null;
-			if ( $location === 'components' )
+			
+			if ( $app === null OR $app === 'global' )
 			{
-				$fileName = "component_" . $file;
-				$fileObj = static::_getJavascriptFileObject( 'global', 'root', $fileName );
-			}
-			else if ( $app === null OR $app === 'global' )
-			{
-				if ( in_array( $file, static::$globalJavascript ) )
+				if ( \in_array( $file, static::$globalJavascript ) )
 				{
 					/* Global bundle (admin.js, front.js, library.js, framework.js, map.js) */
 					$fileObj = static::_getJavascriptFileObject( 'global', 'root', $file );
+
+					if ( $fileObj !== NULL )
+					{
+						return array( $fileObj->url->setQueryString( 'v', \IPS\Output\Javascript::javascriptCacheBustKey() ) );
+					}
+				}
+				
+				/* Languages JS file */
+				if ( mb_substr( $file, 0, 8 ) === 'js_lang_' )
+				{
+					$fileObj = static::_getJavascriptFileObject( 'global', 'root', $file );
+
+					if ( $fileObj !== NULL )
+					{
+						return array( $fileObj->url->setQueryString( 'v', \IPS\Output\Javascript::javascriptCacheBustKey() ) );
+					}
 				}
 			}
 			else
 			{
-				$app      = $app      ?: Request::i()->app;
-				$location = $location ?: Dispatcher::i()->controllerLocation;
-				
+				$app      = $app      ?: \IPS\Request::i()->app;
+				$location = $location ?: \IPS\Dispatcher::i()->controllerLocation;
+
+				/* plugin.js */
+				if ( $app === 'core' and $location === 'plugins' and $file === 'plugins.js' )
+				{
+					$pluginsJs = static::_getJavascriptFileObject( 'core', 'plugins', 'plugins.js' );
+					
+					if ( $pluginsJs !== NULL )
+					{
+						return array( $pluginsJs->url->setQueryString( 'v', \IPS\Output\Javascript::javascriptCacheBustKey() ) );
+					}
+				}
 				/* app.js - all models and ui */
-				if ( $file === 'app.js' )
+				else if ( $file === 'app.js' )
 				{
 					$fileObj = static::_getJavascriptFileObject( $app, $location, 'app.js' );
+					
+					if ( $fileObj !== NULL )
+					{
+						return array( $fileObj->url->setQueryString( 'v', \IPS\Output\Javascript::javascriptCacheBustKey() ) );
+					}
 				}
 				/* {location}_{section}.js */
 				else if ( mb_strstr( $file, '_') AND mb_substr( $file, -3 ) === '.js' )
@@ -447,14 +388,13 @@ class Output
 					if ( ( $location == 'front' OR $location == 'admin' OR $location == 'global' ) AND ! empty( $key ) )
 					{
 						$fileObj = static::_getJavascriptFileObject( $app, $location, $location . '_' . $key . '.js' );
+						
+						if ( $fileObj !== NULL )
+						{
+							return array( $fileObj->url->setQueryString( 'v', \IPS\Output\Javascript::javascriptCacheBustKey() ) );
+						}
 					}
 				}
-			}
-
-			if ( $fileObj !== NULL )
-			{
-				$fileObjUrl = Url::createFromString( ( $fileObj instanceof File ? $fileObj->url : $fileObj ) );
-				return array( $fileObjUrl->setQueryString( 'v', Javascript::javascriptCacheBustKey() ) );
 			}
 		}
 		
@@ -464,14 +404,14 @@ class Output
 	/**
 	 * Removes JS files from \IPS\File
 	 *
-	 * @param string|null $app		Application
-	 * @param string|null $location	Location (e.g. 'admin', 'front')
-	 * @param string|null $file		Filename
+	 * @param	string|null	$app		Application
+	 * @param	string|null	$location	Location (e.g. 'admin', 'front')
+	 * @param	string|null	$file		Filename
 	 * @return	void
 	 */
-	public static function clearJsFiles( string $app=null, string $location=null, string $file=null ) : void
+	public static function clearJsFiles( $app=null, $location=null, $file=null )
 	{
-		$javascriptObjects = ( isset( Store::i()->javascript_map ) ) ? Store::i()->javascript_map : array();
+		$javascriptObjects = ( isset( \IPS\Data\Store::i()->javascript_map ) ) ? \IPS\Data\Store::i()->javascript_map : array();
 			
 		if ( $location === null and $file === null )
 		{
@@ -479,20 +419,20 @@ class Output
 			{
 				try
 				{
-					File::getClass('core_Theme')->deleteContainer( 'javascript_global' );
-				} catch( Exception $e ) { }
+					\IPS\File::getClass('core_Theme')->deleteContainer( 'javascript_global' );
+				} catch( \Exception $e ) { }
 				
 				unset( $javascriptObjects['global'] );
 			}
 			
-			foreach(Application::applications() as $key => $data )
+			foreach( \IPS\Application::applications() as $key => $data )
 			{
 				if ( $app === null or $app === $key )
 				{
 					try
 					{
-						File::getClass('core_Theme')->deleteContainer( 'javascript_' . $key );
-					} catch( Exception $e ) { }
+						\IPS\File::getClass('core_Theme')->deleteContainer( 'javascript_' . $key );
+					} catch( \Exception $e ) { }
 					
 					unset( $javascriptObjects[ $key ] );
 				}
@@ -503,35 +443,29 @@ class Output
 		{
 			$key = md5( $app .'-' . $location . '-' . $file );
 			
-			if ( isset( $javascriptObjects[ $app ] ) and is_array( $javascriptObjects[ $app ] ) and in_array( $key, array_keys( $javascriptObjects[ $app ] ) ) )
+			if ( isset( $javascriptObjects[ $app ] ) and \is_array( $javascriptObjects[ $app ] ) and \in_array( $key, array_keys( $javascriptObjects[ $app ] ) ) )
 			{
 				if ( $javascriptObjects[ $app ][ $key ] !== NULL )
 				{
-					File::get( 'core_Theme', $javascriptObjects[ $app ][ $key ] )->delete();
+					\IPS\File::get( 'core_Theme', $javascriptObjects[ $app ][ $key ] )->delete();
 					
 					unset( $javascriptObjects[ $app ][ $key ] );
 				}
 			}
 		}
 
-		Settings::i()->changeValues( array( 'javascript_updated' => time() ) );
+		\IPS\Settings::i()->changeValues( array( 'javascript_updated' => time() ) );
 
-		Store::i()->javascript_map = $javascriptObjects;
-
-		/* Clear any JS languages */
-		foreach( Lang::getEnabledLanguages() as $lang )
-		{
-			Javascript::clearLanguage( $lang );
-		}
+		\IPS\Data\Store::i()->javascript_map = $javascriptObjects;
 	}
 
 	/**
 	 * Check page title and modify as needed
 	 *
-	 * @param string|null $title Page title
-	 * @return    string
+	 * @param	string	$title	Page title
+	 * @return	string
 	 */
-	public function getTitle( ?string $title ): string
+	public function getTitle( $title )
 	{
 		if( $this->metaTagsTitle )
 		{
@@ -542,9 +476,9 @@ class Output
 			$title = htmlspecialchars( $title, ENT_DISALLOWED, 'UTF-8', FALSE );
 		}
 		
-		if( !Settings::i()->site_online )
+		if( !\IPS\Settings::i()->site_online )
 		{
-			$title	= sprintf( Member::loggedIn()->language()->get( 'offline_title_wrap' ), $title );
+			$title	= sprintf( \IPS\Member::loggedIn()->language()->get( 'offline_title_wrap' ), $title );
 		}
 
 		return $title;
@@ -556,7 +490,7 @@ class Output
 	 * @param DateTime|bool $date
 	 * @return void
 	 */
-	public static function setCacheTime( DateTime|bool $date=false ): void
+	public static function setCacheTime( \IPS\DateTime|bool $date=false ): void
 	{
 		static::$cacheDate = $date;
 	}
@@ -576,7 +510,7 @@ class Output
 			return static::getNoCacheHeaders();
 		}
 
-		$expires = DateTime::ts( ( time() + $cacheSeconds ), TRUE );
+		$expires = \IPS\DateTime::ts( ( time() + $cacheSeconds ), TRUE );
 		if ( static::$cacheDate instanceof \DateTime )
 		{
 			$expires = static::$cacheDate;
@@ -591,8 +525,8 @@ class Output
 		if ( \IPS\CIC or \IPS\IN_DEV )
 		{
 			return array(
-				'Date'			=> DateTime::ts( time(), TRUE )->rfc1123(),
-				'Last-Modified'	=> DateTime::ts( $lastModified, TRUE )->rfc1123(),
+				'Date'			=> \IPS\DateTime::ts( time(), TRUE )->rfc1123(),
+				'Last-Modified'	=> \IPS\DateTime::ts( $lastModified, TRUE )->rfc1123(),
 				'Expires'		=> $expires->rfc1123(),
 				'Cache-Control'	=> implode( ', ', [
 					'max-age=0', 					// No cache for the browser [https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control#response_directives]
@@ -604,8 +538,8 @@ class Output
 		}
 
 		return array(
-			'Date'			=> DateTime::ts( time(), TRUE )->rfc1123(),
-			'Last-Modified'	=> DateTime::ts( $lastModified, TRUE )->rfc1123(),
+			'Date'			=> \IPS\DateTime::ts( time(), TRUE )->rfc1123(),
+			'Last-Modified'	=> \IPS\DateTime::ts( $lastModified, TRUE )->rfc1123(),
 			'Expires'		=> $expires->rfc1123(),
 			'Cache-Control'	=> 'no-cache="Set-Cookie", max-age=' . $cacheSeconds . ", public, s-maxage=" . $cacheSeconds . ", stale-while-revalidate, stale-if-error",
 		);
@@ -627,12 +561,12 @@ class Output
 	/**
 	 * Retrieve Content-disposition header. Formats filename according to requesting client.
 	 *
-	 * @param string $disposition	Disposition: attachment or inline
-	 * @param string|null $filename		Filename
+	 * @param	string		$disposition	Disposition: attachment or inline
+	 * @param	string		$filename		Filename
 	 * @return	string
 	 * @see		<a href='http://code.google.com/p/browsersec/wiki/Part2#Downloads_and_Content-Disposition'>Browser content-disposition handling</a>
 	 */
-	public static function getContentDisposition( string $disposition='attachment', string $filename=NULL ): string
+	public static function getContentDisposition( $disposition='attachment', $filename=NULL )
 	{
 		if( $filename === NULL )
 		{
@@ -641,12 +575,12 @@ class Output
 
 		$return	= $disposition . '; filename';
 
-		if ( !Dispatcher::hasInstance() )
+		if ( !\IPS\Dispatcher::hasInstance() )
 		{
-			Front::i();
+			\IPS\Session\Front::i();
 		}
 		
-		switch( Session::i()->userAgent->browser )
+		switch( \IPS\Session::i()->userAgent->browser )
 		{
 			case 'firefox':
 			case 'opera':
@@ -668,45 +602,35 @@ class Output
 
 		return $return;
 	}
-
+	
 	/**
 	 * Return a JS file object, recompiling it first if doesn't exist.
 	 *
-	 * @param string|null $app Application
-	 * @param string|null $location Location (e.g. 'admin', 'front')
-	 * @param string $file Filename
-	 * @return File|string|null URL to JS file object
+	 * @param	string|null	$app		Application
+	 * @param	string|null	$location	Location (e.g. 'admin', 'front')
+	 * @param	string		$file		Filename
+	 * @return	string|null					URL to JS file object
 	 */
-	protected static function _getJavascriptFileObject( ?string $app, ?string $location, string $file ): File|string|null
+	protected static function _getJavascriptFileObject( $app, $location, $file )
 	{
 		$key = md5( $app .'-' . $location . '-' . $file );
 
-		if( in_array( $app, IPS::$ipsApps ) OR $app === 'global' )
+		$javascriptObjects = ( isset( \IPS\Data\Store::i()->javascript_map ) ) ? \IPS\Data\Store::i()->javascript_map : array();
+
+		if ( isset( $javascriptObjects[ $app ] ) and \in_array( $key, array_keys( $javascriptObjects[ $app ] ) ) )
 		{
-			if ( file_exists( ROOT_PATH . '/static/js/' . $app . '/' . $location . '_' . $file ) )
+			if ( $javascriptObjects[ $app ][ $key ] === NULL )
 			{
-				return rtrim( Settings::i()->base_url, '/' ) . '/static/js/' . $app . '/' . $location . '_' . $file;
+				return NULL;
 			}
-
-			return null;
-		}
-		else
-		{
-			$javascriptObjects = ( isset( Store::i()->javascript_map ) ) ? Store::i()->javascript_map : array();
-
-			if ( isset( $javascriptObjects[ $app ] ) and in_array( $key, array_keys( $javascriptObjects[ $app ] ) ) )
+			else
 			{
-				if ( $javascriptObjects[ $app ][ $key ] === NULL )
-				{
-					return NULL;
-				}
-
-				return File::get( 'core_Theme', $javascriptObjects[ $app ][ $key ] );
+				return \IPS\File::get( 'core_Theme', $javascriptObjects[ $app ][ $key ] );
 			}
 		}
-
+		
 		/* We're setting up, do nothing to avoid compilation requests when tables are incomplete */
-		if ( ! isset( Settings::i()->setup_in_progress ) OR Settings::i()->setup_in_progress )
+		if ( ! isset( \IPS\Settings::i()->setup_in_progress ) OR \IPS\Settings::i()->setup_in_progress )
 		{
 			return NULL;
 		}
@@ -714,44 +638,34 @@ class Output
 		/* Still here? */
 		try
 		{
-			if ( Javascript::compile( $app, $location, $file ) === NULL )
+			if ( \IPS\Output\Javascript::compile( $app, $location, $file ) === NULL )
 			{
 				/* Rebuild already in progress */
 				return NULL;
 			}
 		}
-		catch( RuntimeException $e )
+		catch( \RuntimeException $e )
 		{
 			/* Possibly cannot write file - log but don't show an error as the user can't fix anyways */
-			Log::log( $e, 'javascript' );
+			\IPS\Log::log( $e, 'javascript' );
 
 			return NULL;
 		}
 
 		/* The map may have changed */
-		$javascriptObjects = ( isset( Store::i()->javascript_map ) ) ? Store::i()->javascript_map : array();
+		$javascriptObjects = ( isset( \IPS\Data\Store::i()->javascript_map ) ) ? \IPS\Data\Store::i()->javascript_map : array();
 		
 		/* Test again */
-		if ( isset( $javascriptObjects[ $app ] ) and in_array( $key, array_keys( $javascriptObjects[ $app ] ) ) )
+		if ( isset( $javascriptObjects[ $app ] ) and \in_array( $key, array_keys( $javascriptObjects[ $app ] ) ) and $javascriptObjects[ $app ][ $key ] )
 		{
-			if( in_array( $app, IPS::$ipsApps ) OR $app === 'global' )
-			{
-				if( isset( $javascriptObjects[ $app ][ $key ] ) )
-				{
-					return rtrim( Settings::i()->base_url, '/' ) . $javascriptObjects[ $app ][ $key ];
-				}
-			}
-			elseif( $javascriptObjects[ $app ][ $key ] )
-			{
-				return File::get( 'core_Theme', $javascriptObjects[ $app ][ $key ] );
-			}
+			return \IPS\File::get( 'core_Theme', $javascriptObjects[ $app ][ $key ] );
 		}
 		else
 		{
 			/* Still not there, set this map key to null to prevent repeat access attempts */
 			$javascriptObjects[ $app ][ $key ] = null;
 			
-			Store::i()->javascript_map = $javascriptObjects;
+			\IPS\Data\Store::i()->javascript_map = $javascriptObjects;
 		}
 		
 		return NULL;
@@ -760,91 +674,76 @@ class Output
 	/**
 	 * Display Error Screen
 	 *
-	 * @param string $message 			language key for error message
+	 * @param	string				$message 			language key for error message
 	 * @param	mixed				$code 				Error code
-	 * @param int $httpStatusCode 	HTTP Status Code
-	 * @param string|null $adminMessage 		language key for error message to show to admins
-	 * @param array $httpHeaders 		Additional HTTP Headers
-	 * @param string|null $extra 				Additional information (such backtrace or API error) which will be shown to admins
-	 * @param int|string|null $faultyAppOrHookId	The 3rd party application or the hook id, which caused this error, NULL if it was a core application
-	 * @return void
+	 * @param	int					$httpStatusCode 	HTTP Status Code
+	 * @param	string				$adminMessage 		language key for error message to show to admins
+	 * @param	array 				$httpHeaders 		Additional HTTP Headers
+	 * @param	string 				$extra 				Additional information (such backtrace or API error) which will be shown to admins
+	 * @param	int|string|NULL		$faultyAppOrHookId	The 3rd party application or the hook id, which caused this error, NULL if it was a core application
 	 */
-	public function error( string $message, mixed $code, int $httpStatusCode=500, string $adminMessage=NULL, array $httpHeaders=array(), string $extra=NULL, int|string $faultyAppOrHookId=NULL ) : void
+	public function error( $message, $code, $httpStatusCode=500, $adminMessage=NULL, $httpHeaders=array(), $extra=NULL, $faultyAppOrHookId=NULL )
 	{
-		/* Loader extension - check for custom error message */
-		foreach( Application::allExtensions( 'core', 'Loader' ) as $loader )
-		{
-			if( $customMessage = $loader->customError( $message, $code, $httpStatusCode ) )
-			{
-				$message = $customMessage;
-			}
-		}
-
 		/* When we log out, the user is taken back to the page they were just on. If this is producing a "no permission" error, redirect them to the index instead */
-		if ( isset( Request::i()->_fromLogout ) )
+		if ( isset( \IPS\Request::i()->_fromLogout ) )
 		{
 			// _fromLogout=1 indicates that they came from log out. To make sure that we don't cause an infinite redirect (which
 			// would happen if guests cannot view the index page) we need to change _fromLogout, but we can't unset it because _fromLogout={anything}
 			// will clear the autosave content on next load (by Javascript), which we need to do on log out for security reasons... so, _fromLogout=2
 			// is used here which will clear the autosave, but *not* redirect them again
-			if ( Request::i()->_fromLogout != 2 )
+			if ( \IPS\Request::i()->_fromLogout != 2 )
 			{
-				$this->redirect(Url::internal('')->stripQueryString()->setQueryString( '_fromLogout', 2 ));
+				$this->redirect( \IPS\Http\Url::internal('')->stripQueryString()->setQueryString( '_fromLogout', 2 ) );
 			}
 		}
 		
 		/* If we just logged in and we need to do MFA, do that */
-		if ( isset( Request::i()->_mfaLogin ) )
+		if ( isset( \IPS\Request::i()->_mfaLogin ) )
 		{
-			Output::i()->redirect( Url::internal( "app=core&module=system&controller=login", 'front', 'login' )->setQueryString( '_mfaLogin', 1 ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=system&controller=login", 'front', 'login' )->setQueryString( '_mfaLogin', 1 ) );
 		}
 
 		/* Do not show advertisements that shouldn't display on non-content pages on error pages */
-		if( Dispatcher::i()->dispatcherController )
+		if( \IPS\Dispatcher::i()->dispatcherController )
 		{
-			Dispatcher::i()->dispatcherController->isContentPage = FALSE;
+			\IPS\Dispatcher::i()->dispatcherController->isContentPage = FALSE;
 		}
 		
 		/* If we're in an external script, just show a simple message */
-		if ( !Dispatcher::hasInstance() )
+		if ( !\IPS\Dispatcher::hasInstance() )
 		{
-			Front::i();
+			\IPS\Session\Front::i();
 
-			$this->sendOutput(Member::loggedIn()->language()->get($message), $httpStatusCode, 'text/html', $httpHeaders, FALSE);
+			$this->sendOutput( \IPS\Member::loggedIn()->language()->get( $message ), $httpStatusCode, 'text/html', $httpHeaders, FALSE );
+			return;
 		}
 
 		/* Remove the page token */
-		unset( Output::i()->jsVars['page_token'] );
+		unset( \IPS\Output::i()->jsVars['page_token'] );
 		
 		/* Work out the title */
 		$title = "{$httpStatusCode}_error_title";
-		$title = Member::loggedIn()->language()->checkKeyExists( $title ) ? Member::loggedIn()->language()->addToStack( $title ) : Member::loggedIn()->language()->addToStack( 'error_title' );
+		$title = \IPS\Member::loggedIn()->language()->checkKeyExists( $title ) ? \IPS\Member::loggedIn()->language()->addToStack( $title ) : \IPS\Member::loggedIn()->language()->addToStack( 'error_title' );
 
 		/* If we're in setup, just display it */
-		if ( Dispatcher::i()->controllerLocation === 'setup' )
+		if ( \IPS\Dispatcher::i()->controllerLocation === 'setup' )
 		{
-			$this->sendOutput(Theme::i()->getTemplate('global', 'core')->globalTemplate($title, Theme::i()->getTemplate('global', 'core')->error($title, $message, $code, $extra)), $httpStatusCode, 'text/html', $httpHeaders, FALSE);
-		}
-
-		/* Are we in the API? Throw an exception */
-		if( Dispatcher::i()->controllerLocation === 'api' )
-		{
-			throw new ApiException( $message, $code, $httpStatusCode );
+			$this->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( $title, \IPS\Theme::i()->getTemplate( 'global', 'core' )->error( $title, $message, $code, $extra ) ), $httpStatusCode, 'text/html', $httpHeaders, FALSE );
 		}
 		
 		/* Are we an administrator logged in as a member? */
-		$member = Member::loggedIn();
+		$member = \IPS\Member::loggedIn();
 		if ( isset( $_SESSION['logged_in_as_key'] ) )
 		{
 			try
 			{
-				$_member = Member::load( $_SESSION['logged_in_from']['id'] );
+				$_member = \IPS\Member::load( $_SESSION['logged_in_from']['id'] );
 				if ( $_member->member_id == $_SESSION['logged_in_from']['id'] )
 				{
 					$member = $_member;
 				}
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 		
 		/* Which message are we showing? */
@@ -852,43 +751,43 @@ class Output
 		{
 			$message = $adminMessage;
 		}
-		else if ( Dispatcher::i()->dispatcherController instanceof Controller and mb_substr( $message, 0, 10 ) == 'node_error' )
+		else if ( \IPS\Dispatcher::i()->dispatcherController instanceof \IPS\Content\Controller and mb_substr( $message, 0, 10 ) == 'node_error' )
 		{
-			if ( Member::loggedIn()->language()->checkKeyExists( $httpStatusCode . '_' . Dispatcher::i()->application->directory . '_' . Dispatcher::i()->controller ) )
+			if ( \IPS\Member::loggedIn()->language()->checkKeyExists( $httpStatusCode . '_' . \IPS\Dispatcher::i()->application->directory . '_' . \IPS\Dispatcher::i()->controller ) )
 			{
-				$message = $httpStatusCode . '_' . Dispatcher::i()->application->directory . '_' . Dispatcher::i()->controller;
+				$message = $httpStatusCode . '_' . \IPS\Dispatcher::i()->application->directory . '_' . \IPS\Dispatcher::i()->controller;
 			}
 		}
 
-		if ( Member::loggedIn()->language()->checkKeyExists( $message ) )
+		if ( \IPS\Member::loggedIn()->language()->checkKeyExists( $message ) )
 		{
-			$message = Member::loggedIn()->language()->addToStack( $message );
+			$message = \IPS\Member::loggedIn()->language()->addToStack( $message );
 		}
 		
 		/* Replace language stack keys with actual content */
-		Member::loggedIn()->language()->parseOutputForDisplay( $message );
+		\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $message );
 								
 		/* Log */
-		$level = intval( substr( $code, 0, 1 ) );
-		if( !Session::i()->userAgent->bot )
+		$level = \intval( \substr( $code, 0, 1 ) );
+		if( !\IPS\Session::i()->userAgent->bot )
 		{
-			if( $code and Settings::i()->error_log_level and $level >= Settings::i()->error_log_level )
+			if( $code and \IPS\Settings::i()->error_log_level and $level >= \IPS\Settings::i()->error_log_level )
 			{
-				Db::i()->insert( 'core_error_logs', array(
-					'log_member'		=> Member::loggedIn()->member_id ?: 0,
+				\IPS\Db::i()->insert( 'core_error_logs', array(
+					'log_member'		=> \IPS\Member::loggedIn()->member_id ?: 0,
 					'log_date'			=> time(),
 					'log_error'			=> $message,
 					'log_error_code'	=> $code,
-					'log_ip_address'	=> Request::i()->ipAddress(),
+					'log_ip_address'	=> \IPS\Request::i()->ipAddress(),
 					'log_request_uri'	=> $_SERVER['REQUEST_URI'],
 					) );
 
-				AdminNotification::send( 'core', 'Error', NULL, TRUE, array( $code, $message ) );
+				\IPS\core\AdminNotification::send( 'core', 'Error', NULL, TRUE, array( $code, $message ) );
 			}
 		}
 			
 		/* If this is an AJAX request, send a JSON response */
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
 			$this->json( $message, $httpStatusCode );
 		}
@@ -899,34 +798,34 @@ class Output
 		/* Try to find the breaking hook */
 		if ( $faultyAppOrHookId )
 		{
-				$app = Application::load( $faultyAppOrHookId );
-				$faulty = Member::loggedIn()->language()->addToStack( 'faulty_app', FALSE, array( 'sprintf' => array( $app->_title, Url::internal( 'app=core&module=applications&controller=applications', 'admin' ) ) ) );
+			if ( \is_numeric( $faultyAppOrHookId ) )
+			{
+				$hookSource = \IPS\Db::i()->select( 'plugin', 'core_hooks', array( 'id=?', $faultyAppOrHookId ) )->first();
+				$plugin = \IPS\Plugin::load( $hookSource );
+				$faulty = \IPS\Member::loggedIn()->language()->addToStack( 'faulty_plugin', FALSE, array( 'sprintf' => array( $plugin->name, \IPS\Http\Url::internal('app=core&module=applications&controller=plugins', 'admin' ) ) ) );
+			}
+			else
+			{
+				$app = \IPS\Application::load( $faultyAppOrHookId );
+				$faulty = \IPS\Member::loggedIn()->language()->addToStack( 'faulty_app', FALSE, array( 'sprintf' => array( $app->_title, \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications', 'admin' ) ) ) );
+			}
 		}
 
 		/* Send output */
-		if ( Application::appIsEnabled( 'cms' ) and isset( Settings::i()->cms_error_page ) and Settings::i()->cms_error_page )
-		{
-			Page::errorPage( $title, $message, $code, $httpStatusCode, $httpHeaders );
-		}
-		else
-		{
-            Output::i()->setBodyAttributes();
-			Output::i()->sidebar['enabled'] = FALSE;
-			$this->sendOutput(Theme::i()->getTemplate('global', 'core')->globalTemplate($title, Theme::i()->getTemplate('global', 'core')->error($title, $message, $code, $extra, $member, $faulty, $httpStatusCode), array('app' => Dispatcher::i()->application ? Dispatcher::i()->application->directory : NULL, 'module' => Dispatcher::i()->module ? Dispatcher::i()->module->key : NULL, 'controller' => Dispatcher::i()->controller)), $httpStatusCode, 'text/html', $httpHeaders, FALSE );
-		}
-
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		$this->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( $title, \IPS\Theme::i()->getTemplate( 'global', 'core' )->error( $title, $message, $code, $extra, $member, $faulty, $httpStatusCode ), array( 'app' => \IPS\Dispatcher::i()->application ? \IPS\Dispatcher::i()->application->directory : NULL, 'module' => \IPS\Dispatcher::i()->module ? \IPS\Dispatcher::i()->module->key : NULL, 'controller' => \IPS\Dispatcher::i()->controller ) ), $httpStatusCode, 'text/html', $httpHeaders, FALSE, FALSE );
 	}
 
 	/**
 	 * Send a header.  This is abstracted in an effort to better isolate code for testing purposes.
 	 *
-	 * @param string $header	Text to send as a fully formatted header string
+	 * @param	string	$header	Text to send as a fully formatted header string
 	 * @return	void
 	 */
-	public function sendHeader( string $header ) : void
+	public function sendHeader( $header )
 	{
 		/* If we are running our test suite, we don't want to send browser headers */
-		if( ENFORCE_ACCESS AND mb_strtolower( php_sapi_name() ) == 'cli' )
+		if( \IPS\ENFORCE_ACCESS === true AND mb_strtolower( php_sapi_name() ) == 'cli' )
 		{
 			return;
 		}
@@ -937,13 +836,13 @@ class Output
 	/**
 	 * Send a header.  This is abstracted in an effort to better isolate code for testing purposes.
 	 *
-	 * @param int $httpStatusCode	HTTP Status Code
+	 * @param	int	$httpStatusCode	HTTP Status Code
 	 * @return	void
 	 */
-	public function sendStatusCodeHeader( int $httpStatusCode ) : void
+	public function sendStatusCodeHeader( $httpStatusCode )
 	{
 		/* Set HTTP status */
-		if( isset( $_SERVER['SERVER_PROTOCOL'] ) and strstr( $_SERVER['SERVER_PROTOCOL'], '/1.0' ) !== false )
+		if( isset( $_SERVER['SERVER_PROTOCOL'] ) and \strstr( $_SERVER['SERVER_PROTOCOL'], '/1.0' ) !== false )
 		{
 			$this->sendHeader( "HTTP/1.0 {$httpStatusCode} " . static::$httpStatuses[ $httpStatusCode ] );
 		}
@@ -973,7 +872,7 @@ class Output
 		{
 			return false;
 		}
-		else if ( static::$cacheDate instanceof DateTime )
+		else if ( static::$cacheDate instanceof \IPS\DateTime )
 		{
 			/* Or have we set a specific cache date and it's in the past? */
 			$cacheSeconds = static::$cacheDate->getTimestamp() - time();
@@ -984,7 +883,7 @@ class Output
 		}
 
 		/* Are we logged in? */
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
 			return false;
 		}
@@ -996,13 +895,13 @@ class Output
 		}
 
 		/* Do we have a noCache cookie set? */
-		if ( isset( Request::i()->cookie['noCache'] ) )
+		if ( isset( \IPS\Request::i()->cookie['noCache'] ) )
 		{
 			return false;
 		}
 
 		/* Do we have a CSRF key? */
-		if ( isset( Request::i()->csrfKey ) )
+		if ( isset( \IPS\Request::i()->csrfKey ) )
 		{
 			return false;
 		}
@@ -1018,7 +917,7 @@ class Output
 			return false;
 		}
 
-		if ( Dispatcher::hasInstance() and class_exists( 'IPS\Dispatcher', FALSE ) and Dispatcher::i()->controllerLocation !== 'front' )
+		if ( \IPS\Dispatcher::hasInstance() and class_exists( 'IPS\Dispatcher', FALSE ) and \IPS\Dispatcher::i()->controllerLocation !== 'front' )
 		{
 			return false;
 		}
@@ -1029,12 +928,7 @@ class Output
 	/**
 	 * @brief Flag to bypass CSRF IN_DEV check
 	 */
-	public bool $bypassCsrfKeyCheck	= FALSE;
-
-	/**
-	 * @var bool Flag to bypass datalayer in the page output
-	 */
-	public bool $bypassDataLayer = false;
+	public $bypassCsrfKeyCheck	= FALSE;
 
 	/**
 	 * Send output
@@ -1048,36 +942,31 @@ class Output
 	 * @param bool $parseFileObjects Should `<fileStore.xxx>` and `<___base_url___>` be replaced in the output?
 	 * @param bool $parseEmoji Should Emoji be parsed?
 	 * @return    void
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	public function sendOutput(string $output='', int $httpStatusCode=200, string $contentType='text/html', array $httpHeaders=array(), bool $cacheThisPage=TRUE, bool $pageIsCached=FALSE, bool $parseFileObjects=TRUE, bool $parseEmoji=TRUE ) : void
+	public function sendOutput( $output='', $httpStatusCode=200, $contentType='text/html', $httpHeaders=array(), $cacheThisPage=TRUE, $pageIsCached=FALSE, $parseFileObjects=TRUE, $parseEmoji=TRUE )
 	{
-		if( IN_DEV AND !$this->bypassCsrfKeyCheck AND mb_substr( $httpStatusCode, 0, 1 ) === '2' AND isset( $_GET['csrfKey'] ) AND $_GET['csrfKey'] AND !Request::i()->isAjax() AND ( !isset( $httpHeaders['Content-Disposition'] ) OR mb_strpos( $httpHeaders['Content-Disposition'], 'attachment' ) === FALSE ) )
+		if( \IPS\IN_DEV AND !$this->bypassCsrfKeyCheck AND mb_substr( $httpStatusCode, 0, 1 ) === '2' AND isset( $_GET['csrfKey'] ) AND $_GET['csrfKey'] AND !\IPS\Request::i()->isAjax() AND ( !isset( $httpHeaders['Content-Disposition'] ) OR mb_strpos( $httpHeaders['Content-Disposition'], 'attachment' ) === FALSE ) )
 		{
 			trigger_error( "An {$httpStatusCode} response is being sent however the CSRF key is present in the requested URL. CSRF keys should be sent via POST or the request should be redirected to a URL not containing a CSRF key once finished.", E_USER_ERROR );
+			exit;
 		}
 
-		if ( defined('LIVE_TOPICS_DEV') AND LIVE_TOPICS_DEV )
+		if ( \defined('LIVE_TOPICS_DEV') AND \LIVE_TOPICS_DEV )
 		{
 			$httpHeaders['Access-Control-Allow-Origin'] = '*';
 		}
 
-		/* If we have debug templates enabled, we might have bad comments in there */
-		if( DEBUG_TEMPLATES )
-		{
-			$output = $this->_stripBadDebugComments( $output );
-		}
-
 		/* Cache session Data Layer events */
-		if ( DataLayer::hasInstance() and !$this->bypassDataLayer and Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'front' and ( $httpStatusCode !== 200 OR Request::i()->isAjax() OR $contentType !== 'text/html' ) )
+		if ( !( $httpStatusCode === 200 AND !\IPS\Request::i()->isAjax() AND $contentType == 'text/html' ) )
 		{
-			DataLayer::i()->cache();
+			\IPS\core\DataLayer::i()->cache();
 		}
 
 		/* Replace language stack keys with actual content */
-		if ( Dispatcher::hasInstance() and !in_array( $contentType, array( 'text/javascript', 'text/css', 'application/json' ) ) and $output and !$pageIsCached )
+		if ( \IPS\Dispatcher::hasInstance() and !\in_array( $contentType, array( 'text/javascript', 'text/css', 'application/json' ) ) and $output and !$pageIsCached )
 		{
-			Member::loggedIn()->language()->parseOutputForDisplay( $output );
+			\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $output );
 		}
 		
 		/* Parse file storage URLs */
@@ -1086,110 +975,82 @@ class Output
 			$this->parseFileObjectUrls( $output );
 		}
 
+		/* Replace emoji */
+		if ( $output and $parseEmoji and \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation !== 'setup' )
+		{
+			$output = $this->replaceEmojiWithImages( $output );
+		}
+
 		/* Can we cache this page to a CDN? */
 		if( $cacheThisPage and $this->isCacheable( $contentType ) )
 		{
 			/* Add caching headers */
 			if( !isset( $httpHeaders['Cache-Control'] ) )
 			{
-				$httpHeaders += Output::getCacheHeaders( time(), CACHE_PAGE_TIMEOUT);
+				$httpHeaders += \IPS\Output::getCacheHeaders( time(), \IPS\CACHE_PAGE_TIMEOUT );
 			}
 		}
 		elseif( !isset( $httpHeaders['Cache-Control'] ) )
 		{
 			/* Send no-cache headers if we got to this point without any cache-control headers being set, or page caching is forced off */
-			$httpHeaders += Output::getNoCacheHeaders();
+			$httpHeaders += \IPS\Output::getNoCacheHeaders();
 		}
 
 		/* Include headers set in constructor, intentionally after guest caching. */
 		$httpHeaders = $this->httpHeaders + $httpHeaders;
 
 		/* We will only push resources (http/2) on the first visit, i.e. if the session cookie is not present yet */
-		$location = ( Dispatcher::hasInstance() ) ? IPS::mb_ucfirst( Dispatcher::i()->controllerLocation ) : 'Front';
+		$location = ( \IPS\Dispatcher::hasInstance() ) ? mb_ucfirst( \IPS\Dispatcher::i()->controllerLocation ) : 'Front';
 
-		if( isset( Request::i()->cookie['IPSSession' . $location ] ) AND Request::i()->cookie['IPSSession' . $location ] AND isset( $httpHeaders['Link'] ) )
+		if( isset( \IPS\Request::i()->cookie['IPSSession' . $location ] ) AND \IPS\Request::i()->cookie['IPSSession' . $location ] AND isset( $httpHeaders['Link'] ) )
 		{
 			unset( $httpHeaders['Link'] );
 		}
 		
 		/* Query Log (has to be done after parseOutputForDisplay because runs queries and after page caching so the log isn't misleading) */
-		if ( $output and ( QUERY_LOG or CACHING_LOG or REDIS_LOG) and in_array( $contentType, array( 'text/html', 'application/json' ) ) and ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation !== 'setup' ) )
+		if ( $output and ( \IPS\QUERY_LOG or \IPS\CACHING_LOG or \IPS\REDIS_LOG ) and \in_array( $contentType, array( 'text/html', 'application/json' ) ) and ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation !== 'setup' ) )
 		{
 			/* Close the session and run tasks now so we can see those queries */
 			session_write_close();
-			if ( Dispatcher::hasInstance() )
+			if ( \IPS\Dispatcher::hasInstance() )
 			{
-				Dispatcher::i()->__destruct();
+				\IPS\Dispatcher::i()->__destruct();
 			}
 			
 			/* And run */
-			$cachingLog = Cache::i()->log;
+			$cachingLog = \IPS\Data\Cache::i()->log;
 
 			try
 			{
-				if (REDIS_LOG)
+				if ( \IPS\REDIS_LOG )
 				{
-					$cachingLog =  $cachingLog + Redis::$log;
+					$cachingLog =  $cachingLog + \IPS\Redis::$log;
 					ksort( $cachingLog );
 				}
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 
-			$queryLog = Db::i()->log;
-			if (QUERY_LOG)
+			$queryLog = \IPS\Db::i()->log;
+			if ( \IPS\QUERY_LOG )
 			{
-				if ( defined('QUERY_LOG_TO_PATH') or defined('QUERY_LOG_TO_SCREEN') )
-				{
-					$queryLogHtml = SystemOutput::generateDbLogHtml( $queryLog );
-
-					if ( defined('QUERY_LOG_TO_SCREEN') )
-					{
-						@ob_end_clean();
-						@ob_start();
-
-						/* Rest of our HTTP headers */
-						foreach ( $httpHeaders as $key => $header )
-						{
-							$this->sendHeader( $key . ': ' . $header );
-						}
-
-						print $queryLogHtml;
-						exit();
-					}
-
-					@file_put_contents( QUERY_LOG_TO_PATH  . '/sql_' . microtime( true ) . '.txt', $queryLogHtml );
-				}
-				else
-				{
-					$output = str_replace( '<!--ipsQueryLog-->', Theme::i()->getTemplate( 'global', 'core', 'front' )->queryLog( $queryLog ), $output );
-				}
+				$output = str_replace( '<!--ipsQueryLog-->', \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->queryLog( $queryLog ), $output );
 			}
-			if ( CACHING_LOG or REDIS_LOG)
+			if ( \IPS\CACHING_LOG or \IPS\REDIS_LOG )
 			{
-				$output = str_replace( '<!--ipsCachingLog-->', Theme::i()->getTemplate( 'global', 'core', 'front' )->cachingLog( $cachingLog ), $output );
+				$output = str_replace( '<!--ipsCachingLog-->', \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->cachingLog( $cachingLog ), $output );
 			}
 		}
 
 		/* VLE language bits now parseOutputForDisplay has run */
-		if ( Lang::vleActive() )
+		if ( \IPS\Lang::vleActive() )
 		{
-			if ( str_contains( $output, "<!--ipsVleWords-->" ) )
-			{
-				$vleObj = json_encode( Member::loggedIn()->language()->vleForJson(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS );
-				$vleScriptContent = <<<JS
-
-window.ipsVle = window.ipsVle || {};
-Object.assign(window.ipsVle, $vleObj);
-JS;
-
-				$output = str_replace( '<!--ipsVleWords-->', $vleScriptContent, $output );
-			}
+			$output = str_replace( '<!--ipsVleWords-->', 'var ipsVle = ' . json_encode( \IPS\Member::loggedIn()->language()->vleForJson(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS ) . ';', $output );
 		}
 
 		/* Check for any autosave cookies */
-		if ( count( Request::i()->clearAutoSaveCookie ) )
+		if ( \count( \IPS\Request::i()->clearAutoSaveCookie ) )
 		{
-			Request::i()->setCookie( 'clearAutosave', implode( ',', Request::i()->clearAutoSaveCookie ), NULL, FALSE );
+			\IPS\Request::i()->setCookie( 'clearAutosave', implode( ',', \IPS\Request::i()->clearAutoSaveCookie ), NULL, FALSE );
 		}
 
 		/* Remove anything from the output buffer that should not be there as it can confuse content-length */
@@ -1208,9 +1069,9 @@ JS;
 		ob_start();
 		
 		/* Generated by a logged in user? */
-		if( Dispatcher::hasInstance() )
+		if( \IPS\Dispatcher::hasInstance() )
 		{
-			$this->sendHeader( "X-IPS-LoggedIn: " . ( ( Member::loggedIn()->member_id ) ? 1 : 0 ) );
+			$this->sendHeader( "X-IPS-LoggedIn: " . ( ( \IPS\Member::loggedIn()->member_id ) ? 1 : 0 ) );
 		}
 
 		/* We want to vary on the cookie so that browser caches are not used when changing themes or languages */
@@ -1223,14 +1084,14 @@ JS;
 			if( (bool) ini_get('zlib.output_compression') === false )
 			{
 				/* Try brotli first - support will be rare, but preferred if it is available */
-				if ( strpos( $_SERVER['HTTP_ACCEPT_ENCODING'], 'br' ) !== false and function_exists( 'brotli_compress' ) )
+				if ( \strpos( $_SERVER['HTTP_ACCEPT_ENCODING'], 'br' ) !== false and \function_exists( 'brotli_compress' ) )
 				{
 					$output = brotli_compress( $output );
 					$this->sendHeader( "Content-Encoding: br" ); // Tells the server we've alredy encoded so it doesn't need to
 					$vary[] = "Accept-Encoding"; // Tells proxy caches that the response varies depending upon encoding
 				}
 				/* If the browser supports gzip, gzip the content - we do this ourselves so that we can send Content-Length even with mod_gzip */
-				elseif ( strpos( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) !== false and function_exists( 'gzencode' ) )
+				elseif ( \strpos( $_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip' ) !== false and \function_exists( 'gzencode' ) )
 				{
 					$output = gzencode( $output ); // mod_gzip will encode pages, but we want to encode ourselves so that Content-Length is correct
 					$this->sendHeader( "Content-Encoding: gzip" ); // Tells the server we've alredy encoded so it doesn't need to
@@ -1239,7 +1100,7 @@ JS;
 			}
 		}
 		
-		if ( count( $vary ) )
+		if ( \count( $vary ) )
 		{
 			$this->sendHeader( "Vary: " . implode( ", ", $vary ) );
 		}
@@ -1248,7 +1109,7 @@ JS;
 		print $output;
 		
 		/* Update advertisement impression counts, if appropriate */
-		Advertisement::updateImpressions();
+		\IPS\core\Advertisement::updateImpressions();
 
 		/* Send headers */
 		$this->sendHeader( "Content-type: {$contentType};charset=UTF-8" );
@@ -1269,7 +1130,7 @@ JS;
 		$this->sendHeader( "Connection: close" );
 
 		/* If we are running our test suite, we don't want to output or exit, which will allow the test suite to capture the response */
-		if( ENFORCE_ACCESS AND mb_strtolower( php_sapi_name() ) == 'cli' )
+		if( \IPS\ENFORCE_ACCESS === true AND mb_strtolower( php_sapi_name() ) == 'cli' )
 		{
 			return;
 		}
@@ -1279,14 +1140,14 @@ JS;
 		@flush();
 
 		/* Log headers if we are set to do so */
-		if( DEV_LOG_HEADERS )
+		if( \IPS\DEV_LOG_HEADERS === TRUE )
 		{
 			$this->_logHeadersSent();
 		}
 
 		/* If using PHP-FPM, close the request so that __destruct tasks are run after data is flushed to the browser
 			@see http://www.php.net/manual/en/function.fastcgi-finish-request.php */
-		if( function_exists( 'fastcgi_finish_request' ) )
+		if( \function_exists( 'fastcgi_finish_request' ) )
 		{
 			fastcgi_finish_request();
 		}
@@ -1294,64 +1155,31 @@ JS;
 		exit;
 	}
 
-
-	/**
-	 * Should we reduce the number of links in the HTML for SEO purposes?
-	 *
-	 * @return bool
-	 */
-	public function reduceLinks(): bool
-	{
-		if ( ! Member::loggedIn()->member_id and Settings::i()->seo_reduce_links )
-		{
-			return true;
-		}
-
-		return false;
-	}
-
-	/**
-	 * Remove any comment tags that were inserted in the middle of an HTML tag
-	 *
-	 * @param string $output
-	 * @return string
-	 */
-	protected function _stripBadDebugComments( string $output ) : string
-	{
-		return preg_replace_callback(
-			'/<([^>]+?)<!--(.+?)-->/is',
-			function( $match ){
-				return "<" . $match[1];
-			},
-			$output
-		);
-	}
-
 	/**
 	 * Logs the headers that have been sent, if we are able to do so
 	 *
 	 * @return void
 	 */
-	protected function _logHeadersSent() : void
+	protected function _logHeadersSent()
 	{
 		$headers = NULL;
 
-		if( function_exists('headers_list') )
+		if( \function_exists('headers_list') )
 		{
 			$headers = headers_list();
 		}
-		elseif( function_exists('apache_response_headers') )
+		elseif( \function_exists('apache_response_headers') )
 		{
 			$headers = apache_response_headers();
 		}
-		elseif( function_exists('xdebug_get_headers') )
+		elseif( \function_exists('xdebug_get_headers') )
 		{
 			$headers = xdebug_get_headers();
 		}
 
 		if( $headers !== NULL )
 		{
-			Log::log( $headers, 'httpHeaders' );
+			\IPS\Log::log( $headers, 'httpHeaders' );
 		}
 	}
 
@@ -1360,7 +1188,7 @@ JS;
 	 *
 	 * @return array
 	 */
-	public function getPreloadUrls(): array
+	public function getPreloadUrls()
 	{
 		/* http/2 push resources */
 		$preload = array();
@@ -1368,73 +1196,66 @@ JS;
 		foreach( $this->linkTags as $tag )
 		{
 			/* We are only doing this for rel=preload, and the 'as' parameter is not optional. Preloading fonts currently does not work as expected in Chrome, resulting in the font file downloading twice, so we will skip fonts. */
-			if( is_array( $tag ) AND isset( $tag['rel'] ) AND $tag['rel'] == 'preload' AND isset( $tag['as'] ) AND $tag['as'] AND $tag['as'] != 'font' )
+			if( \is_array( $tag ) AND isset( $tag['rel'] ) AND $tag['rel'] == 'preload' AND isset( $tag['as'] ) AND $tag['as'] AND $tag['as'] != 'font' )
 			{
 				$preload[] = $tag['href'] . '; rel=preload; as=' .  $tag['as'];
 			}
 		}
 
-		$cssFilesToCheck = ( Dispatcher::hasInstance() AND Dispatcher::i()->controllerLocation == 'setup' ) ? Output::i()->cssFiles : array_merge( Output::i()->cssFiles, Theme::i()->css( 'custom.css', 'core', 'front' ) );
+		$cssFilesToCheck = ( \IPS\Dispatcher::hasInstance() AND \IPS\Dispatcher::i()->controllerLocation == 'setup' ) ? \IPS\Output::i()->cssFiles : array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'custom.css', 'core', 'front' ) );
 
 		foreach( array_unique( $cssFilesToCheck, SORT_STRING ) as $css )
 		{
-			$url = Url::external( $css )->setQueryString( 'v', CACHEBUST_KEY );
-			$preload[] = $url . '; rel=preload; as=style';
+			$url = \IPS\Http\Url::external( $css )->setQueryString( 'v', \IPS\CACHEBUST_KEY );
+			$preload[] = (string) $url . '; rel=preload; as=style';
 		}
 		
-		foreach(array_unique( array_filter( array_merge( Output::i()->jsFiles, Output::i()->jsFilesAsync ) ), SORT_STRING ) as $js )
+		foreach( array_unique( array_filter( array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->jsFilesAsync ) ), SORT_STRING ) as $js )
 		{
-			$url = Url::external( $js );
+			$url = \IPS\Http\Url::external( $js );
 
-			if( $url->data['host'] == parse_url( Settings::i()->base_url, PHP_URL_HOST ) )
+			if( $url->data['host'] == parse_url( \IPS\Settings::i()->base_url, PHP_URL_HOST ) )
 			{
-				$url = $url->setQueryString( 'v', CACHEBUST_KEY);
+				$url = $url->setQueryString( 'v', \IPS\CACHEBUST_KEY );
 			}
 
-			$preload[] = $url . '; rel=preload; as=script';
+			$preload[] = (string) $url . '; rel=preload; as=script';
 		}
 
 		/* Only include the first 30 entries if there are a lot */
-		return array_slice( $preload, 0, 30 );
+		return \array_slice( $preload, 0, 30 );
 	}
 	
 	/**
 	 * Send JSON output
 	 *
-	 * @param array|string $data	Data to be JSON-encoded
-	 * @param int $httpStatusCode		HTTP Status Code
+	 * @param	string|array	$data	Data to be JSON-encoded
+	 * @param	int				$httpStatusCode		HTTP Status Code
 	 * @return	void
 	 */
-	public function json( array|string $data, int $httpStatusCode=200 ) : void
+	public function json( $data, $httpStatusCode=200 )
 	{
-		Member::loggedIn()->language()->parseOutputForDisplay( $data );
-		$this->sendOutput(json_encode(Member::loggedIn()->language()->stripVLETags($data)), $httpStatusCode, 'application/json', $this->httpHeaders);
+		\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $data );
+		return $this->sendOutput( json_encode( \IPS\Member::loggedIn()->language()->stripVLETags( $data ) ), $httpStatusCode, 'application/json', $this->httpHeaders );
 	}
-
+	
 	/**
 	 * Redirect
 	 *
-	 * @param Url|string $url URL to redirect to
-	 * @param string|null $message Optional message to display
-	 * @param int $httpStatusCode HTTP Status Code
-	 * @param bool $forceScreen If TRUE, an intermediate screen will be shown
-	 * @return    void
-	 * @throws Exception
+	 * @param	\IPS\Http\Url	$url			URL to redirect to
+	 * @param	string			$message		Optional message to display
+	 * @param	int				$httpStatusCode	HTTP Status Code
+	 * @param	bool			$forceScreen	If TRUE, an intermediate screen will be shown
+	 * @return	void
 	 */
-	public function redirect( Url|string $url, ?string $message='', int $httpStatusCode=301, bool $forceScreen=FALSE ) : void
+	public function redirect( $url, $message='', $httpStatusCode=301, $forceScreen=FALSE )
 	{
-		/* We have to cache here instead of waiting for sendOutput because this method can close the session */
-		if ( DataLayer::hasInstance() and !$this->bypassDataLayer and Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'front' )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			DataLayer::i()->cache();
-		}
-
-		if( Request::i()->isAjax() and !Request::i()->bypassAjaxRedirect() )
-		{
-			if( !empty( $message ) )
+			if ( $message !== '' )
 			{
-				$message =  Member::loggedIn()->language()->checkKeyExists( $message ) ? Member::loggedIn()->language()->addToStack( $message ) : $message;
-				Member::loggedIn()->language()->parseOutputForDisplay( $message );
+				$message =  \IPS\Member::loggedIn()->language()->checkKeyExists( $message ) ? \IPS\Member::loggedIn()->language()->addToStack( $message ) : $message;
+				\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $message );
 			}
 
 			$this->json( array(
@@ -1442,20 +1263,20 @@ JS;
 					'message' => $message
 			)	);
 		}
-		elseif ( $forceScreen === TRUE or ( $message and !( $url instanceof Internal ) ) )
+		elseif ( $forceScreen === TRUE or ( $message and !( $url instanceof \IPS\Http\Url\Internal ) ) )
 		{
 			/* We cannot send a 3xx status code without a Location header, or some browsers (cough IE) will not actually redirect. We are showing
 				an intermediary page performing the redirect through a meta refresh tag, so a 200 status is appropriate in this case. */
 			$httpStatusCode = ( mb_substr( $httpStatusCode, 0, 1 ) == 3 ) ? 200 : $httpStatusCode;
 
-			$this->sendOutput(Theme::i()->getTemplate('global', 'core', 'global')->redirect($url, $message), $httpStatusCode);
+			$this->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->redirect( $url, $message ), $httpStatusCode );
 		}
 		else
 		{
 			if ( $message )
 			{
-				$message = Member::loggedIn()->language()->addToStack( $message );
-				Member::loggedIn()->language()->parseOutputForDisplay( $message );
+				$message = \IPS\Member::loggedIn()->language()->addToStack( $message );
+				\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $message );
 				static::setInlineMessage( $message );
 				session_write_close();
 			}
@@ -1466,21 +1287,21 @@ JS;
 			}
 
 			/* Send location and no-cache headers to prevent redirects from being cached */
-			$headers = array_merge( array( "Location" => (string) $url ), Output::getNoCacheHeaders() );
+			$headers = \array_merge( array( "Location" => (string) $url ), \IPS\Output::getNoCacheHeaders() );
 
-			$this->sendOutput('', $httpStatusCode, '', $headers);
+			$this->sendOutput( '', $httpStatusCode, '', $headers );
 		}
 	}
 	
 	/**
 	 * Replace the {{fileStore.xxxxxx}} urls to the actual URLs
 	 *
-	 * @param string|null $output		The compiled output
+	 * @param	string	$output		The compiled output
 	 * @return void
 	 */
-	public function parseFileObjectUrls( ?string &$output ) : void
+	public function parseFileObjectUrls( &$output )
 	{
-		if ( stristr( $output, '<fileStore.' ) )
+		if ( \stristr( $output, '<fileStore.' ) )
 		{
 			preg_match_all( '#<fileStore.([\d\w\_]+?)>#', $output, $matches, PREG_SET_ORDER );
 			
@@ -1492,9 +1313,9 @@ JS;
 					{
 						try
 						{
-							static::$fileObjectClasses[ $data[1] ] = File::getClass( $data[1], TRUE );
+							static::$fileObjectClasses[ $data[1] ] = \IPS\File::getClass( $data[1], TRUE );
 						}
-						catch ( RuntimeException $e )
+						catch ( \RuntimeException $e )
 						{
 							static::$fileObjectClasses[ $data[1] ] = NULL;
 						}
@@ -1509,130 +1330,78 @@ JS;
 		}
 		
 		/* ___base_url___ is a bit dramatic but it prevents accidental replacements with tags called base_url if a third party app or hook uses it */
-		$output = str_replace( '<___base_url___>', rtrim( Settings::i()->base_url, '/' ), $output );
+		$output = str_replace( '<___base_url___>', rtrim( \IPS\Settings::i()->base_url, '/' ), $output );
 	}
-
+	
 	/**
-	 * Show Offline
+	 * Replace emoji unicode with images
 	 *
-	 * @return	void
+	 * @param	string	$output		The output containing emojis as unicode
+	 * @return	string
 	 */
-	public function showOffline() : void
+	public function replaceEmojiWithImages( $output )
 	{
-		$this->bodyClasses[] = 'ipsLayout_minimal';
-		$this->bodyClasses[] = 'ipsLayout_minimalNoHome';
-		
-		$this->output = Theme::i()->getTemplate( 'system', 'core' )->offline( Settings::i()->site_offline_message );
-		$this->title  = Settings::i()->board_name;
-		
-		Output::i()->sidebar['enabled'] = FALSE;
-        Output::i()->setBodyAttributes();
-
-		DispatcherFront::i()->checkMfa();
-
-		/* Unset page token */
-		unset( Output::i()->jsVars['page_token'] );
-
-		$this->sendOutput(Theme::i()->getTemplate('global', 'core')->globalTemplate($this->title, $this->output, array('app' => Dispatcher::i()->application->directory, 'module' => Dispatcher::i()->module->key, 'controller' => Dispatcher::i()->controller)), 503);
-	}
-
-	/**
-	 * Show Banned
-	 *
-	 * @return	void
-	 */
-	public function showBanned() : void
-	{
-		$ipBanned = Request::i()->ipAddressIsBanned();
-		$banEnd = Member::loggedIn()->isBanned();
-
-		$message = 'member_banned';
-		if ( !$ipBanned and $banEnd instanceof DateTime)
+		if ( \IPS\Settings::i()->emoji_style == 'twemoji' )
 		{
-			$message = Member::loggedIn()->language()->addToStack( 'member_banned_temp', FALSE, array( 'htmlsprintf' => array( $banEnd->html() ) ) );
-		}
+			return preg_replace_callback( '/<span class="ipsEmoji">(.+?)<\/span>/', function( $matches ) {
+				$hex = bin2hex( mb_convert_encoding( $matches[1], 'UTF-32', 'UTF-8' ) );
+				$hexLength = \strlen( $hex ) / 8;
+			    $chunks = array();
+			    for ( $i = 0; $i < $hexLength; ++$i )
+			    {
+			        $tmp = \substr( $hex, $i * 8, 8 );
+			        		
+			        $copy = false;
+				    $len = \strlen( $tmp );
+				    $res = '';
+				    for ( $j = 0; $j < $len; ++$j )
+				    {
+				        $ch = $tmp[ $j ];
+				        if ( !$copy )
+				        {
+				            if ( $ch != '0' )
+				            {
+				                $copy = true;
+				            }
+				            else if ( ( $i + 1 ) == $len )
+				            {
+				                $res = '0';
+				            }
+				        }
+				        if ( $copy )
+				        {
+				            $res .= $ch;
+				        }
+				    }
+				    
+			        $chunks[ $i ] = $res;
+			    }
 
-		$member = Member::loggedIn();
-		$warnings = NULL;
-
-		if( $member->member_id )
-		{
-			try
-			{
-				$warningCount = Db::i()->select( 'COUNT(*)', 'core_members_warn_logs', array( 'wl_member = ?', $member->member_id ) )->first();
-
-				if( $warningCount )
+				$image = implode( '-', $chunks );
+				
+				if ( \strstr( $image, '200d' ) === FALSE or $image === '1f441-fe0f-200d-1f5e8-fe0f' )
 				{
-					$warnings = new Content( 'IPS\core\Warnings\Warning', Url::internal( "app=core&module=system&controller=warnings&id={$member->member_id}", 'front', 'warn_list', $member->members_seo_name ), array( array( 'wl_member=?', $member->member_id ) ) );
-					$warnings->rowsTemplate	  = array( Theme::i()->getTemplate( 'system', 'core', 'front' ), 'warningRow' );
+					$image = str_replace( '-fe0f', '', $image );
 				}
-			}
-			catch ( UnderflowException $e ){}
+				if ( \in_array( $image, array( '0031-20e3', '0030-20e3', '0032-20e3', '0034-20e3', '0035-20e3', '0036-20e3', '0037-20e3', '0038-20e3', '0033-20e3', '0039-20e3', '0023-20e3', '002a-20e3', '00a9', '00ae' ) ) )
+				{
+					$image = str_replace( '00', '', $image );
+				}
+			    
+				return '<img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/'  . $image . '.png" class="ipsEmoji" alt="' . $matches[1] . '">';
+			}, $output );
 		}
-
-		$this->bodyClasses[] = 'ipsLayout_minimal';
-		$this->bodyClasses[] = 'ipsLayout_minimalNoHome';
-
-		$this->output = Theme::i()->getTemplate( 'system', 'core' )->banned( $message, $warnings, $banEnd );
-		$this->title  = Settings::i()->board_name;
-
-		Output::i()->sidebar['enabled'] = FALSE;
-        Output::i()->setBodyAttributes();
-
-		/* Unset page token */
-		unset( Output::i()->jsVars['page_token'] );
-
-		$this->sendOutput(Theme::i()->getTemplate('global', 'core')->globalTemplate($this->title, $this->output, array('app' => Dispatcher::i()->application->directory, 'module' => Dispatcher::i()->module->key, 'controller' => Dispatcher::i()->controller)), 403, 'text/html', array(), FALSE);
+		return $output;
 	}
 
 	/**
-	 * Determines if the sidebar should be displayed on this page
-	 * Replaces the very long and confusing if statement in core_front_global_sidebar
+	 * Should we reduce the number of links in the HTML for SEO purposes?
 	 *
 	 * @return bool
 	 */
-	public function showSidebar() : bool
+	public function reduceLinks(): bool
 	{
-		/* If we are forcing the sidebar for ads, this is always true */
-		if( Settings::i()->ads_force_sidebar AND Advertisement::loadByLocation( 'ad_sidebar' ) )
-		{
-			return true;
-		}
-
-		/* Is the sidebar disabled? */
-		if( !isset( $this->sidebar['enabled'] ) or !$this->sidebar['enabled'] )
-		{
-			return false;
-		}
-
-		/* If we can manage widgets, this is always true */
-		if( Dispatcher::hasInstance() and Dispatcher::i()->application->canManageWidgets() )
-		{
-			return true;
-		}
-
-		/* Finally, check if we have content */
-		return $this->sidebarHasContent();
-	}
-
-	/**
-	 * Check if there is any content in the sidebar
-	 *
-	 * @return bool
-	 */
-	public function sidebarHasContent() : bool
-	{
-		if( isset( $this->sidebar['contextual'] ) and !empty( $this->sidebar['contextual'] ) )
-		{
-			return true;
-		}
-
-		if( isset( $this->sidebar['widgetareas']['sidebar'] ) and !empty( $this->sidebar['widgetareas']['sidebar'] ) )
-		{
-			return (bool) $this->sidebar['widgetareas']['sidebar']->totalVisibleWidgets();
-		}
-
-		if( isset( $this->sidebar['widgets']['sidebar'] ) and count( $this->sidebar['widgets']['sidebar'] ) )
+		if ( ! \IPS\Member::loggedIn()->member_id and \IPS\Settings::i()->seo_reduce_links )
 		{
 			return true;
 		}
@@ -1641,73 +1410,113 @@ JS;
 	}
 
 	/**
-	 * Load any areas that should be displayed on all pages
-	 * For example, the global footer is always loaded
+	 * Show Offline
 	 *
-	 * @return void
+	 * @return	void
 	 */
-	public function loadGlobalAreas() : void
+	public function showOffline()
 	{
-		foreach( Db::i()->select( '*', 'core_widget_areas', [ 'app=? and module=? and controller=?', 'global', 'global', 'global'] ) as $row )
-		{
-			if( in_array( $row['area'], Area::$reservedAreas ) )
-			{
-				if( $row['tree'] )
-				{
-					$area = new Area( json_decode( $row['tree'], true ), $row['area'] );
-				}
-				elseif( $row['widgets'] )
-				{
-					$area = Area::create( $row['area'], json_decode( $row['widgets'], true ) );
-				}
+		$this->bodyClasses[] = 'ipsLayout_minimal';
+		$this->bodyClasses[] = 'ipsLayout_minimalNoHome';
+		
+		$this->output = \IPS\Theme::i()->getTemplate( 'system', 'core' )->offline( \IPS\Settings::i()->site_offline_message );
+		$this->title  = \IPS\Settings::i()->board_name;
+		
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
 
-				if( isset( $area ) )
+		\IPS\Dispatcher\Front::i()->checkMfa();
+
+		/* Unset page token */
+		unset( \IPS\Output::i()->jsVars['page_token'] );
+
+		$this->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( $this->title, $this->output, array( 'app' => \IPS\Dispatcher::i()->application->directory, 'module' => \IPS\Dispatcher::i()->module->key, 'controller' => \IPS\Dispatcher::i()->controller ) ), 503 );
+	}
+
+	/**
+	 * Show Banned
+	 *
+	 * @return	void
+	 */
+	public function showBanned()
+	{
+		$ipBanned = \IPS\Request::i()->ipAddressIsBanned();
+		$banEnd = \IPS\Member::loggedIn()->isBanned();
+
+		$message = 'member_banned';
+		if ( !$ipBanned and $banEnd instanceof \IPS\DateTime )
+		{
+			$message = \IPS\Member::loggedIn()->language()->addToStack( 'member_banned_temp', FALSE, array( 'htmlsprintf' => array( $banEnd->html() ) ) );
+		}
+
+		$member = \IPS\Member::loggedIn();
+		$warnings = NULL;
+
+		if( $member->member_id )
+		{
+			try
+			{
+				$warningCount = \IPS\Db::i()->select( 'COUNT(*)', 'core_members_warn_logs', array( 'wl_member = ?', $member->member_id ) )->first();
+
+				if( $warningCount )
 				{
-					$this->sidebar['widgetareas'] = $this->sidebar['widgetareas'] ?? [];
-					$this->sidebar['widgetareas'][$area->id] = $area;
-					$this->sidebar['widgets'][$area->id] = [];
+					$warnings = new \IPS\Helpers\Table\Content( 'IPS\core\Warnings\Warning', \IPS\Http\Url::internal( "app=core&module=system&controller=warnings&id={$member->member_id}", 'front', 'warn_list', $member->members_seo_name ), array( array( 'wl_member=?', $member->member_id ) ) );
+					$warnings->rowsTemplate	  = array( \IPS\Theme::i()->getTemplate( 'system', 'core', 'front' ), 'warningRow' );
 				}
 			}
+			catch ( \UnderflowException $e ){}
 		}
+
+		$this->bodyClasses[] = 'ipsLayout_minimal';
+		$this->bodyClasses[] = 'ipsLayout_minimalNoHome';
+
+		$this->output = \IPS\Theme::i()->getTemplate( 'system', 'core' )->banned( $message, $warnings, $banEnd );
+		$this->title  = \IPS\Settings::i()->board_name;
+
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+
+		/* Unset page token */
+		unset( \IPS\Output::i()->jsVars['page_token'] );
+
+		$this->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( $this->title, $this->output, array( 'app' => \IPS\Dispatcher::i()->application->directory, 'module' => \IPS\Dispatcher::i()->module->key, 'controller' => \IPS\Dispatcher::i()->controller ) ), 403, 'text/html', array(), FALSE );
 	}
 
 	/**
 	 * Checks and rebuilds JS map if it is broken
 	 *
-	 * @param string $app	Application
+	 * @param	string	$app	Application
 	 * @return	void
 	 */
-	protected function _checkJavascriptMap( string $app ) : void
+	protected function _checkJavascriptMap( $app )
 	{
-		$javascriptObjects = ( isset( Store::i()->javascript_map ) ) ? Store::i()->javascript_map : array();
+		$javascriptObjects = ( isset( \IPS\Data\Store::i()->javascript_map ) ) ? \IPS\Data\Store::i()->javascript_map : array();
 
-		if ( ! is_array( $javascriptObjects ) OR ! count( $javascriptObjects ) OR ! isset( $javascriptObjects[ $app ] ) )
+		if ( ! \is_array( $javascriptObjects ) OR ! \count( $javascriptObjects ) OR ! isset( $javascriptObjects[ $app ] ) )
 		{
 			/* Map is broken or missing, recompile all JS */
-			Javascript::compile( $app );
+			\IPS\Output\Javascript::compile( $app );
 		}
 	}
 
 	/**
 	 * @brief	JSON-LD structured data
 	 */
-	public array $jsonLd	= array();
+	public $jsonLd	= array();
 
 	/**
 	 * Fetch meta tags for the current page.  Must be called before sendOutput() in order to reset title.
 	 *
 	 * @return	void
 	 */
-	public function buildMetaTags() : void
+	public function buildMetaTags()
 	{
 		/* Set basic ones */
-		$this->metaTags['og:site_name'] = Settings::i()->board_name;
-		$this->metaTags['og:locale'] = preg_replace( "/^([a-zA-Z0-9\-_]+?)(?:\..*?)$/", "$1", Member::loggedIn()->language()->short );
+		$this->metaTags['og:site_name'] = \IPS\Settings::i()->board_name;
+		$this->metaTags['og:locale'] = preg_replace( "/^([a-zA-Z0-9\-_]+?)(?:\..*?)$/", "$1", \IPS\Member::loggedIn()->language()->short );
 		
 		/* Add the site name to the title */
-		if( Settings::i()->board_name )
+		if( \IPS\Settings::i()->board_name )
 		{
-			$this->title .= ' - ' . Settings::i()->board_name;
+			$this->title .= ' - ' . \IPS\Settings::i()->board_name;
 		}
 
 		$this->defaultPageTitle	= $this->title;
@@ -1715,34 +1524,34 @@ JS;
 		/* Add Admin-specified ones */
 		if( !$this->metaTagsUrl )
 		{
-			$this->metaTagsUrl	= ( Request::i()->url() instanceof Friendly ) ? Request::i()->url()->friendlyUrlComponent : '';
+			$this->metaTagsUrl	= ( \IPS\Request::i()->url() instanceof \IPS\Http\Url\Friendly ) ? \IPS\Request::i()->url()->friendlyUrlComponent : '';
 
-			if ( isset( Store::i()->metaTags ) )
+			if ( isset( \IPS\Data\Store::i()->metaTags ) )
 			{
-				$rows = Store::i()->metaTags;
+				$rows = \IPS\Data\Store::i()->metaTags;
 			}
 			else
 			{
-				$rows = iterator_to_array( Db::i()->select( '*', 'core_seo_meta' ) );
-				Store::i()->metaTags = $rows;
+				$rows = iterator_to_array( \IPS\Db::i()->select( '*', 'core_seo_meta' ) );
+				\IPS\Data\Store::i()->metaTags = $rows;
 			}
 						
-			if( is_array( $rows ) )
+			if( \is_array( $rows ) )
 			{
 				/* We duplicate these so we can know what is generated automatically for the live meta tag editor */
 				$this->autoMetaTags = $this->metaTags;
 
-				$rootPath = Url::external( Settings::i()->base_url )->data['path'];
+				$rootPath = \IPS\Http\Url::external( \IPS\Settings::i()->base_url )->data['path'];
 
 				foreach ( $rows as $row )
 				{
-					if( strpos( $row['meta_url'], '*' ) !== FALSE )
+					if( \strpos( $row['meta_url'], '*' ) !== FALSE )
 					{
 						if( preg_match( "#^" . str_replace( '\*', '(.*)', trim( preg_quote( $row['meta_url'], '#' ), '/' ) ) . "$#i", trim( $this->metaTagsUrl, '/' ) ) )
 						{
 							$_tags	= json_decode( $row['meta_tags'], TRUE );
 		
-							if( is_array( $_tags ) )
+							if( \is_array( $_tags ) )
 							{
 								foreach( $_tags as $_tagName => $_tagContent )
 								{
@@ -1769,11 +1578,12 @@ JS;
 					}
 					else
 					{
-						if( trim( $row['meta_url'], '/' ) == trim( $this->metaTagsUrl, '/' ) and ( ( $row['meta_url'] == '/' and trim( Request::i()->url()->data['path'], '/' ) == trim( $rootPath, '/' ) ) or $row['meta_url'] !== '/' ) )
+						if( trim( $row['meta_url'], '/' ) == trim( $this->metaTagsUrl, '/' ) and ( ( $row['meta_url'] == '/' and rtrim( \IPS\Request::i()->url()->data['path'], '/' ) . '/' == rtrim( $rootPath, '/' ) . '/' ) or $row['meta_url'] !== '/' ) )
 						{
+
 							$_tags	= json_decode( $row['meta_tags'], TRUE );
 							
-							if ( is_array( $_tags ) )
+							if ( \is_array( $_tags ) )
 							{
 								foreach( $_tags as $_tagName => $_tagContent )
 								{
@@ -1802,11 +1612,11 @@ JS;
 			}
 		}
 		
-		$baseUrl = parse_url( Settings::i()->base_url );
+		$baseUrl = parse_url( \IPS\Settings::i()->base_url );	
 
 		foreach( $this->metaTags as $name => $value )
 		{
-			if ( ! is_array( $value ) )
+			if ( ! \is_array( $value ) )
 			{
 				$value = array( $value );
 			}
@@ -1831,26 +1641,26 @@ JS;
 		}
 
 		/* Automatically generate JSON-LD markup */
-		$mainSiteUrl = ( Settings::i()->site_site_elsewhere and Settings::i()->site_main_url ) ? Settings::i()->site_main_url : Settings::i()->base_url;
-		$mainSiteTitle = ( Settings::i()->site_site_elsewhere and Settings::i()->site_main_title ) ? Settings::i()->site_main_title : Settings::i()->board_name;
+		$mainSiteUrl = ( \IPS\Settings::i()->site_site_elsewhere and \IPS\Settings::i()->site_main_url ) ? \IPS\Settings::i()->site_main_url : \IPS\Settings::i()->base_url;
+		$mainSiteTitle = ( \IPS\Settings::i()->site_site_elsewhere and \IPS\Settings::i()->site_main_title ) ? \IPS\Settings::i()->site_main_title : \IPS\Settings::i()->board_name;
 		$jsonLd = array(
 			'website'		=> array(
-				'@context'	=> "https://www.schema.org",
-				'publisher' => Settings::i()->base_url . '#organization',
+				'@context'	=> "http://www.schema.org",
+				'publisher' => \IPS\Settings::i()->base_url . '#organization',
 				'@type'		=> "WebSite",
-				'@id' 		=> Settings::i()->base_url . '#website',
-	            'mainEntityOfPage' => Settings::i()->base_url,
-				'name'		=> Settings::i()->board_name,
-				'url'		=> Settings::i()->base_url,
+				'@id' 		=> \IPS\Settings::i()->base_url . '#website',
+	            'mainEntityOfPage' => \IPS\Settings::i()->base_url,
+				'name'		=> \IPS\Settings::i()->board_name,
+				'url'		=> \IPS\Settings::i()->base_url,
 				'potentialAction'	=> array(
 					'type'			=> "SearchAction",
 					'query-input'	=> "required name=query",
-					'target'		=> urldecode( (string) Url::internal( "app=core&module=search&controller=search", "front", "search" )->setQueryString( "q", "{query}" ) ),
+					'target'		=> urldecode( (string) \IPS\Http\Url::internal( "app=core&module=search&controller=search", "front", "search" )->setQueryString( "q", "{query}" ) ),
 				),
 				'inLanguage'		=> array()
 			),
 			'organization'	=> array(
-				'@context'	=> "https://www.schema.org",
+				'@context'	=> "http://www.schema.org",
 				'@type'		=> "Organization",
 				'@id' 		=> $mainSiteUrl . '#organization',
 	            'mainEntityOfPage' => $mainSiteUrl,
@@ -1859,16 +1669,16 @@ JS;
 			)
 		);
 
-		if( $logo = Theme::i()->logo_front )
+		if( $logo = \IPS\Theme::i()->logo_front )
 		{
 			$jsonLd['organization']['logo'] = array(
 				'@type' => 'ImageObject',
-	            '@id'   => Settings::i()->base_url . '#logo',
+	            '@id'   => \IPS\Settings::i()->base_url . '#logo',
 	            'url'   => (string) $logo
 			);
 		}
 
-		if( Settings::i()->site_social_profiles AND $links = json_decode( Settings::i()->site_social_profiles, TRUE ) AND count( $links ) )
+		if( \IPS\Settings::i()->site_social_profiles AND $links = json_decode( \IPS\Settings::i()->site_social_profiles, TRUE ) AND \count( $links ) )
 		{
 			if( !isset( $jsonLd['organization']['sameAs'] ) )
 			{
@@ -1881,7 +1691,7 @@ JS;
 			}
 		}
 
-		if( Settings::i()->site_address AND $address = GeoLocation::buildFromJson( Settings::i()->site_address ) )
+		if( \IPS\Settings::i()->site_address AND $address = \IPS\GeoLocation::buildFromJson( \IPS\Settings::i()->site_address ) )
 		{
 			if ( ! empty( $address->country ) )
 			{
@@ -1896,7 +1706,7 @@ JS;
 			}
 		}
 
-		foreach(Lang::getEnabledLanguages() as $language )
+		foreach( \IPS\Lang::getEnabledLanguages() as $language )
 		{
 			$jsonLd['website']['inLanguage'][] = array(
 				'@type'		=> "Language",
@@ -1906,7 +1716,7 @@ JS;
 		}
 
 		/* Add breadcrumbs */
-		if( count( $this->breadcrumb ) )
+		if( \count( $this->breadcrumb ) )
 		{
 
 			$position	= 1;
@@ -1931,22 +1741,22 @@ JS;
 				$position++;
 			}
 
-			if( count( $elements ) )
+			if( \count( $elements ) )
 			{
 				$jsonLd['breadcrumbs'] = [
-					'@context'	=> "https://schema.org",
+					'@context'	=> "http://schema.org",
 					'@type'		=> "BreadcrumbList",
 					'itemListElement'	=> $elements,
 				];
 			}
 		}
 
-		if( Member::loggedIn()->canUseContactUs() )
+		if( \IPS\Member::loggedIn()->canUseContactUs() )
 		{
 			$jsonLd['contact'] = array(
-				'@context'	=> "https://schema.org",
+				'@context'	=> "http://schema.org",
 				'@type'		=> "ContactPage",
-				'url'		=> urldecode( (string) Url::internal( "app=core&module=contact&controller=contact", "front", "contact" ) ),
+				'url'		=> urldecode( (string) \IPS\Http\Url::internal( "app=core&module=contact&controller=contact", "front", "contact" ) ),
 			);
 		}
 		
@@ -1954,84 +1764,44 @@ JS;
 	}
 
 	/**
-	 * Define the data attributes that will be applied to the body tag
-	 *
-	 * @return void
-	 */
-	public function setBodyAttributes() : void
-	{
-		if( !empty( $this->globalControllers ) )
-		{
-			$this->bodyAttributes['controller'] = implode( ",", $this->globalControllers );
-		}
-
-		if( $this->inlineMessage )
-		{
-			$this->bodyAttributes['message'] = $this->inlineMessage;
-		}
-
-		$this->bodyAttributes['pageApp'] = Dispatcher::i()->application->directory;
-		$this->bodyAttributes['pageLocation'] = 'front';
-
-        /* The module may not necessarily be set, in the event of an error (for example) */
-        if( isset( Dispatcher::i()->module ) )
-        {
-            $this->bodyAttributes['pageModule'] = Dispatcher::i()->module->key;
-        }
-
-        $this->bodyAttributes['pageController'] = Dispatcher::i()->controller;
-		if( isset( Request::i()->id ) )
-		{
-			$this->bodyAttributes['id'] = (int) Request::i()->id;
-		}
-
-		if( isset( Dispatcher::i()->dispatcherController ) and !Dispatcher::i()->dispatcherController->isContentPage )
-		{
-			$this->bodyAttributes['nocontent'] = '';
-		}
-
-		if( $this->pageName )
-		{
-			$this->bodyAttributes['pageName'] = $this->pageName;
-		}
-	}
-
-	/**
 	 * @brief	Global search menu options
 	 */
-	protected ?array $globalSearchMenuOptions	= NULL;
+	protected $globalSearchMenuOptions	= NULL;
 	
 	/**
 	 * @brief	Contextual search menu options
 	 */
-	public array $contextualSearchOptions = array();
+	public $contextualSearchOptions = array();
 	
 	/**
 	 * @brief	Default search option
 	 */
-	public array $defaultSearchOption	= array( 'all', 'search_everything' );
+	public $defaultSearchOption	= array( 'all', 'search_everything' );
 
 	/**
 	 * Retrieve options for search menu
 	 *
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function globalSearchMenuOptions(): ?array
+	public function globalSearchMenuOptions()
 	{
 		if( $this->globalSearchMenuOptions === NULL )
 		{
-			foreach( SearchContent::searchableClasses( Member::loggedIn() ) as $class )
+			foreach ( \IPS\Content::routedClasses( TRUE, FALSE, TRUE ) as $class )
 			{
-				if( in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+				if( is_subclass_of( $class, 'IPS\Content\Searchable' ) )
 				{
-					$type	= mb_strtolower( str_replace( '\\', '_', mb_substr( $class, 4 ) ) );
-					$this->globalSearchMenuOptions[ $type ] = $type . '_pl';
+					if ( $class::includeInSiteSearch() )
+					{
+						$type	= mb_strtolower( str_replace( '\\', '_', mb_substr( $class, 4 ) ) );
+						$this->globalSearchMenuOptions[ $type ] = $type . '_pl';
+					}
 				}
 			}
 		}
 		
 		/* This is also supported, but is not a content item class implementing \Searchable */
-		if ( Member::loggedIn()->canAccessModule( Module::get( 'core', 'members', 'front' ) ) )
+		if ( \IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members', 'front' ) ) )
 		{
 			$this->globalSearchMenuOptions['core_members'] = 'core_members_pl';
 		}
@@ -2042,13 +1812,13 @@ JS;
 	/**
 	 * Include a file and return the output
 	 *
-	 * @param string $path	Path or URL
+	 * @param	string	$path	Path or URL
 	 * @return	string
 	 */
-	public static function safeInclude( string $path ): string
+	public static function safeInclude( $path )
 	{
 		ob_start();
-		include( ROOT_PATH . DIRECTORY_SEPARATOR . $path );
+		include( \IPS\ROOT_PATH . DIRECTORY_SEPARATOR . $path );
 		$output = ob_get_contents();
 		ob_end_clean();
 
@@ -2058,17 +1828,17 @@ JS;
 	/**
 	 * Get any inline message
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	protected static function getInlineMessage(): ?string
+	protected static function getInlineMessage()
 	{
-		if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'front' and Front::loggedIn() ) # Don't attempt to initiate a full member object here
+		if ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation == 'front' and \IPS\Session\Front::loggedIn() ) # Don't attempt to initiate a full member object here
 		{
 			return ( ( isset( $_SESSION['inlineMessage'] ) and ! empty( $_SESSION['inlineMessage'] ) ) ? $_SESSION['inlineMessage'] : NULL );
 		}
-		else if ( isset( Request::i()->cookie['inlineMessage'] ) )
+		else if ( isset( \IPS\Request::i()->cookie['inlineMessage'] ) )
 		{
-			return Request::i()->cookie['inlineMessage'];
+			return \IPS\Request::i()->cookie['inlineMessage'];
 		}
 		
 		return NULL; 
@@ -2077,18 +1847,18 @@ JS;
 	/**
 	 * Set an inline message
 	 *
-	 * @param string|null $message	The message
+	 * @param	string	$message	The message
 	 * @return	void
 	 */
-	protected static function setInlineMessage( string $message=NULL ) : void
+	protected static function setInlineMessage( $message=NULL )
 	{
-		if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'front' and Front::loggedIn() ) # Don't attempt to initiate a full member object here
+		if ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation == 'front' and \IPS\Session\Front::loggedIn() ) # Don't attempt to initiate a full member object here
 		{
 			$_SESSION['inlineMessage'] = $message;
 		}
 		else
 		{
-			Request::i()->setCookie( 'inlineMessage', $message );
+			\IPS\Request::i()->setCookie( 'inlineMessage', $message );
 		}
 	}
 }

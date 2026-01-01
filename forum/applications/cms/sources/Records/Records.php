@@ -13,227 +13,119 @@ namespace IPS\cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use BadMethodCallException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Application\Module;
-use IPS\cms\Databases\Dispatcher;
-use IPS\cms\Pages\Page;
-use IPS\cms\Records\CommentTopicSync;
-use IPS\cms\Records\Revisions;
-use IPS\Content\Anonymous;
-use IPS\Content\Assignable;
 use IPS\Content\Comment;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Followable;
-use IPS\Content\FuturePublishing;
-use IPS\Content\Hideable;
-use IPS\Content\Item;
-use IPS\Content\ItemTopic;
-use IPS\Content\Lockable;
-use IPS\Content\MetaData;
-use IPS\Content\Featurable;
-use IPS\Content\Pinnable;
-use IPS\Content\Ratings;
-use IPS\Content\Reactable;
-use IPS\Content\Reaction;
-use IPS\Content\ReadMarkers;
-use IPS\Content\Reportable;
-use IPS\Content\Review;
-use IPS\Content\Shareable;
-use IPS\Content\Taggable;
-use IPS\Content\Statistics;
-use IPS\Content\ViewUpdates;
-use IPS\core\DataLayer;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Events\Event;
-use IPS\File;
-use IPS\forums\Topic;
-use IPS\forums\Topic\Post;
-use IPS\Helpers\CoverPhoto;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Date;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Table\Content as TableHelper;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function array_slice;
-use function count;
-use function defined;
-use function get_called_class;
-use function get_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_int;
-use function is_numeric;
-use function is_string;
-use function strtolower;
-use const IPS\ENFORCE_ACCESS;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief Records Model
- *
  */
-class Records extends Item implements
-	Embeddable,
-	Filter
+class _Records extends \IPS\Content\Item implements
+	\IPS\Content\Permissions,
+	\IPS\Content\Pinnable, \IPS\Content\Lockable, \IPS\Content\Hideable, \IPS\Content\Featurable,
+	\IPS\Content\Tags,
+	\IPS\Content\Followable,
+	\IPS\Content\Shareable,
+	\IPS\Content\ReadMarkers,
+	\IPS\Content\Ratings,
+	\IPS\Content\Searchable,
+	\IPS\Content\FuturePublishing,
+	\IPS\Content\Embeddable,
+	\IPS\Content\MetaData,
+	\IPS\Content\Anonymous
 {
-	use Reactable,
-		Reportable,
-		Pinnable,
-		Anonymous,
-		Followable,
-		FuturePublishing,
-		Lockable,
-		MetaData,
-		Ratings,
-		Shareable,
-		Taggable,
-		ReadMarkers,
-		Statistics,
-		Hideable,
-		Featurable,
-		ViewUpdates,
-		ItemTopic,
-		Assignable
-		{
-			FuturePublishing::onPublish as public _onPublish;
-			FuturePublishing::getMinimumPublishDate as public _getMinimumPublishDate;
-			FuturePublishing::allowPublishDateWhileEditing as public _allowPublishDateWhileEditing;
-			Hideable::logDelete as public _logDelete;
-			Hideable::onUnhide as public _onUnhide;
-			Ratings::canRate as public _canRate;
-		}
+	use \IPS\Content\Reactable, \IPS\Content\Reportable, \IPS\Content\Statistics, \IPS\Content\ViewUpdates;
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons = array();
+	protected static $multitons = array();
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = NULL;
+	public static $databaseTable = NULL;
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'primary_id_field';
+	public static $databaseColumnId = 'primary_id_field';
 
     /**
      * @brief	[ActiveRecord] Database ID Fields
      */
-    protected static array $databaseIdFields = array('record_static_furl', 'record_topicid');
+    protected static $databaseIdFields = array('record_static_furl', 'record_topicid');
     
     /**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = '';
+	public static $databasePrefix = '';
 
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'cms';
+	public static $application = 'cms';
 	
 	/**
 	 * @brief	Module
 	 */
-	public static string $module = 'records';
+	public static $module = 'records';
 	
 	/**
 	 * @brief	Node Class
 	 */
-	public static ?string $containerNodeClass = NULL;
+	public static $containerNodeClass = NULL;
 	
 	/**
 	 * @brief	[Content\Item]	Comment Class
 	 */
-	public static ?string $commentClass = NULL;
-
-	/**
-	 * @brief	[Content\Review] Review Class
-	 */
-	public static ?string $reviewClass = null;
+	public static $commentClass = NULL;
 	
 	/**
 	 * @brief	[Content\Item]	First "comment" is part of the item?
 	 */
-	public static bool $firstCommentRequired = FALSE;
+	public static $firstCommentRequired = FALSE;
 	
 	/**
 	 * @brief	[Content\Item]	Form field label prefix
 	 */
-	public static string $formLangPrefix = 'content_record_form_';
+	public static $formLangPrefix = 'content_record_form_';
 	
 	/**
 	 * @brief	[Records] Custom Database Id
 	 */
-	public static ?int $customDatabaseId = NULL;
+	public static $customDatabaseId = NULL;
 	
 	/**
 	 * @brief 	[Records] Database object
 	 */
-	protected static array $database = array();
+	protected static $database = array();
 	
 	/**
 	 * @brief 	[Records] Database object
 	 */
-	public static string $title = 'content_record_title';
+	public static $title = 'content_record_title';
 		
 	/**
 	 * @brief	[Records] Standard fields
 	 */
-	protected static array $standardFields = array( 'record_publish_date', 'record_expiry_date', 'record_allow_comments', 'record_comment_cutoff' );
-
-	/**
-	 * @brief	[CoverPhoto]	Storage extension
-	 */
-	public static string $coverPhotoStorageExtension = 'cms_Records';
-
-	/**
-	 * @brief	Use a default cover photo
-	 */
-	public static bool $coverPhotoDefault = false;
+	protected static $standardFields = array( 'record_publish_date', 'record_expiry_date', 'record_allow_comments', 'record_comment_cutoff' );
 
 	/**
 	 * The real definition of this happens in the magic autoloader inside the cms\Application class, but we need this one which contains all the "none database id related" fields for the Content Widget
 	 *
 	 * @var string[]
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'author'				=> 'member_id',
 		'container'				=> 'category_id',
 		'date'					=> 'record_saved',
@@ -262,51 +154,56 @@ class Records extends Item implements
 		'meta_data'				=> 'record_meta_data',
 		'author_name'			=> 'record_author_name',
 		'is_anon'				=> 'record_is_anon',
-		'last_comment_anon'		=> 'record_last_comment_anon',
-		'item_topicid'			=> 'record_topicid',
-		'cover_photo'			=> 'record_image',
-		'cover_photo_offset'	=> 'record_image_offset',
+		'last_comment_anon'		=> 'record_last_comment_anon'
 	);
 
 
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'file-text';
+	public static $icon = 'file-text';
 	
 	/**
 	 * @brief	Include In Sitemap (We do not want to include in Content sitemap, as we have a custom extension
 	 */
-	public static bool $includeInSitemap = FALSE;
+	public static $includeInSitemap = FALSE;
 	
 	/**
 	 * @brief	Prevent custom fields being fetched twice when loading/saving a form
 	 */
-	public static array|null $customFields = NULL;
+	public static $customFields = NULL;
+
+	/**
+	 * Whether or not to include in site search
+	 *
+	 * @return	bool
+	 */
+	public static function includeInSiteSearch()
+	{
+		return (bool) \IPS\cms\Databases::load( static::$customDatabaseId )->search;
+	}
 
 	/**
 	 * Most, if not all of these are the same for different events, so we can just have one method
 	 *
-	 * @param Comment|null $comment A comment item, leave null for these keys to be omitted
-	 * @param array $createOrEditValues =[]      Values from the create or edit form, if applicable.
-	 * @param bool  $clearCache=false
+	 * @param   IPS\Content\Comment $comment    A comment item, leave null for these keys to be omitted
 	 *
 	 * @return  array
 	 */
-	public function getDataLayerProperties( ?Comment $comment = null, array $createOrEditValues = [], bool $clearCache = false ): array
+	public function getDataLayerProperties( ?\IPS\Content\Comment $comment = null )
 	{
 		$commentIdColumn = $comment ? $comment::$databaseColumnId : null;
-		$index = "idx_" . ( $commentIdColumn ? ( $comment->$commentIdColumn ?: 0 ) : -1 );
-		if ( !$clearCache and isset( $this->_dataLayerProperties[$index] ) )
+		$index = $commentIdColumn ? ( $comment->$commentIdColumn ?: 0 ) : 0;
+		if ( isset( $this->_dataLayerProperties[$index] ) )
 		{
 			return $this->_dataLayerProperties[$index];
 		}
 
 		/* Set the content_type and comment_type to lower case for consistency */
-		$properties = parent::getDataLayerProperties( $comment, $createOrEditValues, $clearCache );
+		$properties = parent::getDataLayerProperties( $comment );
 		if ( isset( $properties['content_type'] ) )
 		{
-			$properties['content_type'] = strtolower( Lang::load( Lang::defaultLanguage() )->addToStack( static::$title ) );
+			$properties['content_type'] = \strtolower( \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->addToStack( static::$title ) );
 		}
 
 		$this->_dataLayerProperties[$index] = $properties;
@@ -316,11 +213,11 @@ class Records extends Item implements
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data Row from database table
-	 * @param bool $updateMultitonStoreIfExists Replace current object in multiton store if it already exists there?
-	 * @return Records
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): static
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
 		$obj = parent::constructFromData( $data, $updateMultitonStoreIfExists );
 
@@ -329,7 +226,7 @@ class Records extends Item implements
 		{
 			if ( $obj->_title )
 			{
-				$obj->record_dynamic_furl = Friendly::seoTitle( mb_substr( $obj->_title, 0, 255 ) );
+				$obj->record_dynamic_furl = \IPS\Http\Url\Friendly::seoTitle( mb_substr( $obj->_title, 0, 255 ) );
 				$obj->save();
 			}
 		}
@@ -347,46 +244,49 @@ class Records extends Item implements
 	 *
 	 * @return int
 	 */
-	public static function getCommentsPerPage(): int
+	public static function getCommentsPerPage()
 	{
-		if ( ! empty( Dispatcher::i()->recordId ) )
+		if ( static::database()->comments_perpage )
+		{
+			return static::database()->comments_perpage;
+		}
+		
+		if ( ! empty( \IPS\cms\Databases\Dispatcher::i()->recordId ) )
 		{
 			$class = 'IPS\cms\Records' . static::$customDatabaseId;
 			try
 			{
-				/* @var	$class	Records */
-				$record = $class::load( Dispatcher::i()->recordId );
+				$record = $class::load( \IPS\cms\Databases\Dispatcher::i()->recordId );
 				
-				if ( $record->_forum_record and $record->_forum_comments and Application::appIsEnabled('forums') )
+				if ( $record->_forum_record and $record->_forum_comments and \IPS\Application::appIsEnabled('forums') )
 				{
-					return Topic::getCommentsPerPage();
+					return \IPS\forums\Topic::getCommentsPerPage();
 				}
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				/* recordId is usually the record we're viewing, but this method is called on recordFeed widgets in horizontal mode which means recordId may not be __this__ record, so fail gracefully */
 				return static::database()->field_perpage;
 			}
 		}
-		else if( static::database()->forum_record and static::database()->forum_comments and Application::appIsEnabled('forums') )
+		else if( static::database()->forum_record and static::database()->forum_comments and \IPS\Application::appIsEnabled('forums') )
 		{
-			return Topic::getCommentsPerPage();
+			return \IPS\forums\Topic::getCommentsPerPage();
 		}
 
-		$databaseSetting = static::database()->comments_perpage;
-		return ( is_int( $databaseSetting ) and $databaseSetting > 0 ) ? $databaseSetting : static::database()->field_perpage;
+		return static::database()->field_perpage;
 	}
 
 	/**
 	 * Returns the database parent
 	 * 
-	 * @return Databases
+	 * @return \IPS\cms\Databases
 	 */
-	public static function database(): Databases
+	public static function database()
 	{
 		if ( ! isset( static::$database[ static::$customDatabaseId ] ) )
 		{
-			static::$database[ static::$customDatabaseId ] = Databases::load( static::$customDatabaseId );
+			static::$database[ static::$customDatabaseId ] = \IPS\cms\Databases::load( static::$customDatabaseId );
 		}
 		
 		return static::$database[ static::$customDatabaseId ];
@@ -395,19 +295,19 @@ class Records extends Item implements
 	/**
 	 * Load record based on a URL
 	 *
-	 * @param	Url	$url	URL to load from
-	 * @return	mixed
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
+	 * @param	\IPS\Http\Url	$url	URL to load from
+	 * @return	static
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadFromUrl( Url $url ): mixed
+	public static function loadFromUrl( \IPS\Http\Url $url )
 	{
 		/* First, make sure the PAGE matches */
-		$page = Page::loadFromUrl( $url );
+		$page = \IPS\cms\Pages\Page::loadFromUrl( $url );
 
 		if( $page->_id != static::database()->page_id )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		$qs = array_merge( $url->queryString, $url->hiddenQueryString );
@@ -421,7 +321,7 @@ class Records extends Item implements
 			{
 				return static::loadFromSlug( $path, FALSE );
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
 		return parent::loadFromUrl( $url );
@@ -429,57 +329,56 @@ class Records extends Item implements
 
 	/**
 	 * Load from slug
-	 *
-	 * @param string $slug Thing that lives in the garden and eats your plants
-	 * @param bool $redirectIfSeoTitleIsIncorrect If the SEO title is incorrect, this method may redirect... this stops that
-	 * @param integer|null $categoryId Optional category ID to restrict the look up in.
-	 * @return Records
-	 * @throws Exception
+	 * 
+	 * @param	string		$slug							Thing that lives in the garden and eats your plants
+	 * @param	bool		$redirectIfSeoTitleIsIncorrect	If the SEO title is incorrect, this method may redirect... this stops that
+	 * @param	integer		$categoryId						Optional category ID to restrict the look up in.
+	 * @return	\IPS\cms\Record
 	 */
-	public static function loadFromSlug( string $slug, bool $redirectIfSeoTitleIsIncorrect=TRUE, int $categoryId=NULL ): static
+	public static function loadFromSlug( $slug, $redirectIfSeoTitleIsIncorrect=TRUE, $categoryId=NULL )
 	{
 		$slug = trim( $slug, '/' );
 		
 		/* If the slug is an empty string, then there is nothing to try and load. */
 		if ( empty( $slug ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		/* Try the easiest option */
 		preg_match( '#-r(\d+?)$#', $slug, $matches );
 
-		if ( isset( $matches[1] ) AND is_numeric( $matches[1] ) )
+		if ( isset( $matches[1] ) AND \is_numeric( $matches[1] ) )
 		{
 			try
 			{
 				$record = static::load( $matches[1] );
 
 				/* Check to make sure the SEO title is correct */
-				if ( $redirectIfSeoTitleIsIncorrect and urldecode( str_replace( $matches[0], '', $slug ) ) !== $record->record_dynamic_furl and !Request::i()->isAjax() and mb_strtolower( $_SERVER['REQUEST_METHOD'] ) == 'get' and !ENFORCE_ACCESS )
+				if ( $redirectIfSeoTitleIsIncorrect and urldecode( str_replace( $matches[0], '', $slug ) ) !== $record->record_dynamic_furl and !\IPS\Request::i()->isAjax() and mb_strtolower( $_SERVER['REQUEST_METHOD'] ) == 'get' and !\IPS\ENFORCE_ACCESS )
 				{
 					$url = $record->url();
 
 					/* Don't correct the URL if the visitor cannot see the record */
 					if( !$record->canView() )
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 
 					/* Redirect to the embed form if necessary */
-					if( isset( Request::i()->do ) and Request::i()->do == 'embed' )
+					if( isset( \IPS\Request::i()->do ) and \IPS\Request::i()->do == 'embed' )
 					{
 						$url = $url->setQueryString( array( 'do' => "embed" ) );
 					}
 
-					Output::i()->redirect( $url );
+					\IPS\Output::i()->redirect( $url );
 				}
 
 				static::$multitons[ $record->primary_id_field ] = $record;
 
 				return static::$multitons[ $record->primary_id_field ];
 			}
-			catch( OutOfRangeException $ex ) { }
+			catch( \OutOfRangeException $ex ) { }
 		}
 
 		$where = array( array( '(? LIKE CONCAT( record_dynamic_furl, \'%\') OR LOWER(record_static_furl)=?)', $slug, mb_strtolower( $slug ) ) );
@@ -488,17 +387,17 @@ class Records extends Item implements
 			$where[] = array( 'category_id=?', $categoryId );
 		}
 		
-		foreach( Db::i()->select( '*', static::$databaseTable, $where ) as $record )
+		foreach( \IPS\Db::i()->select( '*', static::$databaseTable, $where ) as $record )
 		{
 			$pass = FALSE;
-
-			if ( $record['record_static_furl'] and mb_strtolower( $slug ) === mb_strtolower( $record['record_static_furl'] ) )
+			
+			if ( mb_strtolower( $slug ) === mb_strtolower( $record['record_static_furl'] ) )
 			{
 				$pass = TRUE;
 			}
 			else
 			{
-				if ( isset( $matches[1] ) AND is_numeric( $matches[1] ) AND $matches[1] == $record['primary_id_field'] )
+				if ( isset( $matches[1] ) AND \is_numeric( $matches[1] ) AND $matches[1] == $record['primary_id_field'] )
 				{
 					$pass = TRUE;
 				}
@@ -510,7 +409,7 @@ class Records extends Item implements
 				
 				if ( $redirectIfSeoTitleIsIncorrect AND $slug !== $record['record_static_furl'] )
 				{
-					Output::i()->redirect( static::$multitons[ $record['primary_id_field'] ]->url() );
+					\IPS\Output::i()->redirect( static::$multitons[ $record['primary_id_field'] ]->url() );
 				}
 			
 				return static::$multitons[ $record['primary_id_field'] ];
@@ -518,69 +417,67 @@ class Records extends Item implements
 		}
 		
 		/* Still here? Consistent with AR pattern */
-		throw new OutOfRangeException();
+		throw new \OutOfRangeException();	
 	}
 
 	/**
-	 * Load from slug history, so we can 301 to the correct record.
+	 * Load from slug history so we can 301 to the correct record.
 	 *
-	 * @param string $slug	Thing that lives in the garden and eats your plants
-	 * @return    static
-	 * @throws	OutOfRangeException
+	 * @param	string		$slug	Thing that lives in the garden and eats your plants
+	 * @return	\IPS\cms\Record
 	 */
-	public static function loadFromSlugHistory( string $slug ): static
+	public static function loadFromSlugHistory( $slug )
 	{
 		$slug = trim( $slug, '/' );
 
 		try
 		{
-			$row = Db::i()->select( '*', 'cms_url_store', array( 'store_type=? and store_path=?', 'record', $slug ) )->first();
+			$row = \IPS\Db::i()->select( '*', 'cms_url_store', array( 'store_type=? and store_path=?', 'record', $slug ) )->first();
+
 			return static::load( $row['store_current_id'] );
 		}
-		catch( UnderflowException ) { }
+		catch( \UnderflowException $ex ) { }
 
 		/* Still here? Consistent with AR pattern */
-		throw new OutOfRangeException();
+		throw new \OutOfRangeException();
 	}
 
 	/**
 	 * Indefinite Article
 	 *
-	 * @param Lang|null $lang The language to use, or NULL for the language of the currently logged in member
-	 * @param array $options
-	 * @return    string
+	 * @param	\IPS\Lang|NULL	$lang	The language to use, or NULL for the language of the currently logged in member
+	 * @return	string
 	 */
-	public function indefiniteArticle( ?Lang $lang = NULL, array $options=array() ): string
+	public function indefiniteArticle( \IPS\Lang $lang = NULL )
 	{
-		$lang = $lang ?: Member::loggedIn()->language();
-		return $lang->addToStack( 'content_db_lang_ia_' . static::$customDatabaseId, FALSE, $options );
+		$lang = $lang ?: \IPS\Member::loggedIn()->language();
+		return $lang->addToStack( 'content_db_lang_ia_' . static::$customDatabaseId, FALSE );
 	}
-
+	
 	/**
 	 * Indefinite Article
 	 *
-	 * @param array|null $containerData Container data
-	 * @param Lang|null $lang The language to use, or NULL for the language of the currently logged in member
-	 * @param array $options
-	 * @return    string
+	 * @param	array|null	$containerData	Container data
+	 * @param	\IPS\Lang|null	$lang		Language object
+	 * @return	string
 	 */
-	public static function _indefiniteArticle( ?array $containerData = NULL, ?Lang $lang = NULL, array $options=array() ): string
+	public static function _indefiniteArticle( array $containerData = NULL, \IPS\Lang $lang = NULL )
 	{
-		$lang = $lang ?: Member::loggedIn()->language();
-		return $lang->addToStack( 'content_db_lang_ia_' . static::$customDatabaseId, FALSE, $options );
+		$lang = $lang ?: \IPS\Member::loggedIn()->language();
+		return $lang->addToStack( 'content_db_lang_ia_' . static::$customDatabaseId, FALSE );
 	}
-
+	
 	/**
 	 * Definite Article
 	 *
-	 * @param Lang|null $lang The language to use, or NULL for the language of the currently logged in member
-	 * @param integer|boolean $count Number of items. If not FALSE, pluralized version of phrase will be used
-	 * @return    string
+	 * @param	\IPS\Lang|NULL	$lang	The language to use, or NULL for the language of the currently logged in member
+	 * @param	integer|boolean	$count	Number of items. If not false, pluralized version of phrase will be used.
+	 * @return	string
 	 */
-	public function definiteArticle( ?Lang $lang = NULL, int|bool $count = FALSE ): string
+	public function definiteArticle( \IPS\Lang $lang = NULL, $count = FALSE )
 	{
-		$lang = $lang ?: Member::loggedIn()->language();
-		if( $count === TRUE || ( is_int( $count ) && $count > 1 ) )
+		$lang = $lang ?: \IPS\Member::loggedIn()->language();
+		if( $count === TRUE || ( \is_int( $count ) && $count > 1 ) )
 		{
 			return $lang->addToStack( 'content_db_lang_pl_' . static::$customDatabaseId, FALSE );
 		}
@@ -589,20 +486,20 @@ class Records extends Item implements
 			return $lang->addToStack( 'content_db_lang_sl_' . static::$customDatabaseId, FALSE );
 		}
 	}
-
+	
 	/**
 	 * Definite Article
 	 *
-	 * @param array|null $containerData Basic data about the container. Only includes columns returned by container::basicDataColumns()
-	 * @param Lang|null $lang The language to use, or NULL for the language of the currently logged in member
-	 * @param array $options Options to pass to \IPS\Lang::addToStack
-	 * @param integer|boolean $count Number of items. If not false, pluralized version of phrase will be used.
-	 * @return    string
+	 * @param	array			$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	\IPS\Lang|NULL	$lang			The language to use, or NULL for the language of the currently logged in member
+	 * @param	array			$options		Options to pass to \IPS\Lang::addToStack
+	 * @param	integer|boolean	$count			Number of items. If not false, pluralized version of phrase will be used.
+	 * @return	string
 	 */
-	public static function _definiteArticle( ?array $containerData = NULL, ?Lang $lang = NULL, array $options = array(), int|bool $count = FALSE ): string
+	public static function _definiteArticle( array $containerData = NULL, \IPS\Lang $lang = NULL, $options = array(), $count = FALSE )
 	{
-		$lang = $lang ?: Member::loggedIn()->language();
-		if( $count === TRUE || ( is_int( $count ) && $count > 1 ) )
+		$lang = $lang ?: \IPS\Member::loggedIn()->language();
+		if( $count === TRUE || ( \is_int( $count ) && $count > 1 ) )
 		{
 			return $lang->addToStack( 'content_db_lang_pl_' . static::$customDatabaseId, FALSE, $options );
 		}
@@ -611,21 +508,18 @@ class Records extends Item implements
 			return $lang->addToStack( 'content_db_lang_sl_' . static::$customDatabaseId, FALSE, $options );
 		}
 	}
-
+	
 	/**
 	 * Get elements for add/edit form
 	 *
-	 * @param Item|null $item The current item if editing or NULL if creating
-	 * @param Model|null $container Container (e.g. forum), if appropriate
-	 * @return    array
-	 * @throws Exception
+	 * @param	\IPS\Content\Item|NULL	$item		The current item if editing or NULL if creating
+	 * @param	\IPS\Node\Model|NULL	$container	Container (e.g. forum), if appropriate
+	 * @return	array
 	 */
-	public static function formElements( ?Item $item=NULL, ?Model $container=NULL ): array
+	public static function formElements( $item=NULL, \IPS\Node\Model $container=NULL )
 	{
-		/* @var	$item Records */
-		/* @var	$fieldsClass	Fields */
 		$customValues = ( $item ) ? $item->fieldValues() : array();
-		$database     = Databases::load( static::$customDatabaseId );
+		$database     = \IPS\cms\Databases::load( static::$customDatabaseId );
 		$fieldsClass  = 'IPS\cms\Fields' .  static::$customDatabaseId;
 		$formElements = array();
 		$elements     = parent::formElements( $item, $container );
@@ -640,8 +534,8 @@ class Records extends Item implements
 		if ( isset( static::$customFields[ $database->field_title ] ) )
 		{
 			$formElements['title'] = static::$customFields[ $database->field_title ];
-			$formElements['title']->rowClasses[] = 'ipsFieldRow--primary';
-			$formElements['title']->rowClasses[] = 'ipsFieldRow--fullWidth';
+			$formElements['title']->rowClasses[] = 'ipsFieldRow_primary';
+			$formElements['title']->rowClasses[] = 'ipsFieldRow_fullWidth';
 		}
 
 		if ( isset( $elements['guest_name'] ) )
@@ -659,12 +553,12 @@ class Records extends Item implements
 			$formElements['captcha'] = $elements['captcha'];
 		}
 
-		if ( Member::loggedIn()->modPermission('can_content_edit_record_slugs') )
+		if ( \IPS\Member::loggedIn()->modPermission('can_content_edit_record_slugs') )
 		{
-			$formElements['record_static_furl_set'] = new YesNo( 'record_static_furl_set', ( ( $item AND $item->record_static_furl ) ? TRUE : FALSE ), FALSE, array(
+			$formElements['record_static_furl_set'] = new \IPS\Helpers\Form\YesNo( 'record_static_furl_set', ( ( $item AND $item->record_static_furl ) ? TRUE : FALSE ), FALSE, array(
 					'togglesOn' => array( 'record_static_furl' )
 			)  );
-			$formElements['record_static_furl'] = new Text( 'record_static_furl', ( ( $item AND $item->record_static_furl ) ? $item->record_static_furl : NULL ), FALSE, array(), function( $val ) use ( $database )
+			$formElements['record_static_furl'] = new \IPS\Helpers\Form\Text( 'record_static_furl', ( ( $item AND $item->record_static_furl ) ? $item->record_static_furl : NULL ), FALSE, array(), function( $val ) use ( $database )
             {
                 /* Make sure key is unique */
                 if ( empty( $val ) )
@@ -675,25 +569,24 @@ class Records extends Item implements
                 /* Make sure it does not match the dynamic URL format */
                 if ( preg_match( '#-r(\d+?)$#', $val ) )
                 {
-	                throw new InvalidArgumentException('content_record_slug_not_unique');
+	                throw new \InvalidArgumentException('content_record_slug_not_unique');
                 }
 
                 try
                 {
-                    $cat = intval( ( isset( Request::i()->content_record_form_container ) ) ? Request::i()->content_record_form_container : 0 );
+                    $cat = \intval( ( isset( \IPS\Request::i()->content_record_form_container ) ) ? \IPS\Request::i()->content_record_form_container : 0 );
                     $recordsClass = '\IPS\cms\Records' . $database->id;
-
-					/* @var	$recordsClass Records */
+					
 					if ( $recordsClass::isFurlCollision( $val ) )
 					{
-						 throw new InvalidArgumentException('content_record_slug_not_unique');
+						 throw new \InvalidArgumentException('content_record_slug_not_unique');
 					}
 					
                     /* Fetch record by static slug */
                     $record = $recordsClass::load( $val, 'record_static_furl' );
 
                     /* In the same category though? */
-                    if ( isset( Request::i()->id ) and $record->_id == Request::i()->id )
+                    if ( isset( \IPS\Request::i()->id ) and $record->_id == \IPS\Request::i()->id )
                     {
                         /* It's ok, it's us! */
                         return true;
@@ -701,17 +594,17 @@ class Records extends Item implements
 
                     if ( $cat === $record->category_id )
                     {
-                        throw new InvalidArgumentException('content_record_slug_not_unique');
+                        throw new \InvalidArgumentException('content_record_slug_not_unique');
                     }
                 }
-                catch ( OutOfRangeException $e )
+                catch ( \OutOfRangeException $e )
                 {
                     /* Slug is OK as load failed */
                     return true;
                 }
 
                 return true;
-            }, Member::loggedIn()->language()->addToStack('record_static_url_prefix', FALSE, array( 'sprintf' => array( Settings::i()->base_url ) ) ), NULL, 'record_static_furl' );
+            }, \IPS\Member::loggedIn()->language()->addToStack('record_static_url_prefix', FALSE, array( 'sprintf' => array( \IPS\Settings::i()->base_url ) ) ), NULL, 'record_static_furl' );
 		}
 		
 		if ( isset( $elements['tags'] ) )
@@ -736,21 +629,21 @@ class Records extends Item implements
 					$formElements['auto_follow'] = $elements['auto_follow'];
 				}
 
-				if ( Settings::i()->edit_log and $item )
+				if ( \IPS\Settings::i()->edit_log and $item )
 				{
-					if ( Settings::i()->edit_log == 2 )
+					if ( \IPS\Settings::i()->edit_log == 2 )
 					{
-						$formElements['record_edit_reason'] = new Text( 'record_edit_reason', $item->record_edit_reason, FALSE, array( 'maxLength' => 255 ) );
+						$formElements['record_edit_reason'] = new \IPS\Helpers\Form\Text( 'record_edit_reason', ( $item ) ? $item->record_edit_reason : NULL, FALSE, array( 'maxLength' => 255 ) );
 					}
-					if ( Member::loggedIn()->group['g_append_edit'] )
+					if ( \IPS\Member::loggedIn()->group['g_append_edit'] )
 					{
-						$formElements['record_edit_show'] = new Checkbox( 'record_edit_show', FALSE );
+						$formElements['record_edit_show'] = new \IPS\Helpers\Form\Checkbox( 'record_edit_show', FALSE );
 					}
 				}
 			}
 		}
 		
-		if ( isset( $elements['date'] ) AND $fieldsClass::fixedFieldFormShow( 'record_publish_date' ) AND ( Member::loggedIn()->modPermission( "can_future_publish_content" ) or Member::loggedIn()->modPermission( "can_future_publish_" . static::$title ) ) )
+		if ( isset( $elements['date'] ) AND $fieldsClass::fixedFieldFormShow( 'record_publish_date' ) AND ( \IPS\Member::loggedIn()->modPermission( "can_future_publish_content" ) or \IPS\Member::loggedIn()->modPermission( "can_future_publish_" . static::$title ) ) )
 		{
 			$formElements['record_publish_date'] = $elements['date'];
 		}
@@ -765,12 +658,12 @@ class Records extends Item implements
 				$dims = array( 'maxWidth' => $fixedFieldSettings['record_image']['image_dims'][0], 'maxHeight' => $fixedFieldSettings['record_image']['image_dims'][1] );
 			}
 
-			$formElements['record_image'] = new Upload( 'record_image', ( ( $item and $item->record_image ) ? File::get( 'cms_Records', $item->record_image ) : NULL ), FALSE, array( 'image' => $dims, 'storageExtension' => 'cms_Records', 'multiple' => false, 'allowStockPhotos' => true, 'canBeModerated' => TRUE ), NULL, NULL, NULL, 'record_image' );
+			$formElements['record_image'] = new \IPS\Helpers\Form\Upload( 'record_image', ( ( $item and $item->record_image ) ? \IPS\File::get( 'cms_Records', $item->record_image ) : NULL ), FALSE, array( 'image' => $dims, 'storageExtension' => 'cms_Records', 'multiple' => false, 'allowStockPhotos' => true, 'canBeModerated' => TRUE ), NULL, NULL, NULL, 'record_image' );
 		}
 
 		if ( $fieldsClass::fixedFieldFormShow( 'record_expiry_date' ) )
 		{
-			$formElements['record_expiry_date'] = new Date( 'record_expiry_date', ( ( $item AND $item->record_expiry_date ) ? DateTime::ts( $item->record_expiry_date ) : NULL ), FALSE, array(
+			$formElements['record_expiry_date'] = new \IPS\Helpers\Form\Date( 'record_expiry_date', ( ( $item AND $item->record_expiry_date ) ? \IPS\DateTime::ts( $item->record_expiry_date ) : NULL ), FALSE, array(
 					'time'          => true,
 					'unlimited'     => -1,
 					'unlimitedLang' => 'record_datetime_noval'
@@ -779,14 +672,14 @@ class Records extends Item implements
 
 		if ( $fieldsClass::fixedFieldFormShow( 'record_allow_comments' ) )
 		{
-			$formElements['record_allow_comments'] = new YesNo( 'record_allow_comments', ( ( $item ) ? $item->record_allow_comments : TRUE ), FALSE, array(
+			$formElements['record_allow_comments'] = new \IPS\Helpers\Form\YesNo( 'record_allow_comments', ( ( $item ) ? $item->record_allow_comments : TRUE ), FALSE, array(
 					'togglesOn' => array( 'record_comment_cutoff' )
 			)  );
 		}
 		
 		if ( $fieldsClass::fixedFieldFormShow( 'record_comment_cutoff' ) )
 		{
-			$formElements['record_comment_cutoff'] = new Date( 'record_comment_cutoff', ( ( $item AND $item->record_comment_cutoff ) ? DateTime::ts( $item->record_comment_cutoff ) : NULL ), FALSE, array(
+			$formElements['record_comment_cutoff'] = new \IPS\Helpers\Form\Date( 'record_comment_cutoff', ( ( $item AND $item->record_comment_cutoff ) ? \IPS\DateTime::ts( $item->record_comment_cutoff ) : NULL ), FALSE, array(
 					'time'          => true,
 					'unlimited'     => -1,
 					'unlimitedLang' => 'record_datetime_noval'
@@ -796,7 +689,7 @@ class Records extends Item implements
 		/* Post Anonymously */
 		if ( $container and $container->canPostAnonymously( $container::ANON_ITEMS ) )
 		{
-			$formElements['post_anonymously'] = new YesNo( 'post_anonymously', ( $item ) ? $item->isAnonymous() : FALSE , FALSE, array( 'label' => Member::loggedIn()->language()->addToStack( 'post_anonymously_suffix' ) ), NULL, NULL, NULL, 'post_anonymously' );
+			$formElements['post_anonymously'] = new \IPS\Helpers\Form\YesNo( 'post_anonymously', ( $item ) ? $item->isAnonymous() : FALSE , FALSE, array( 'label' => \IPS\Member::loggedIn()->language()->addToStack( 'post_anonymously_suffix' ) ), NULL, NULL, NULL, 'post_anonymously' );
 		}
 
 		if ( static::modPermission( 'lock', NULL, $container ) )
@@ -821,7 +714,7 @@ class Records extends Item implements
 			}
 		}
 		
-		$canHide = ( $item ) ? $item->canHide() : ( Member::loggedIn()->group['g_hide_own_posts'] == '1' or in_array( 'IPS\cms\Records' . $database->id, explode( ',', Member::loggedIn()->group['g_hide_own_posts'] ) ) );
+		$canHide = ( $item ) ? $item->canHide() : ( \IPS\Member::loggedIn()->group['g_hide_own_posts'] == '1' or \in_array( 'IPS\cms\Records' . $database->id, explode( ',', \IPS\Member::loggedIn()->group['g_hide_own_posts'] ) ) );
 		if ( static::modPermission( 'hide', NULL, $container ) or $canHide )
 		{
 			$options['hide'] = 'create_record_hidden';
@@ -833,15 +726,26 @@ class Records extends Item implements
 			}
 		}
 			
-		if ( Member::loggedIn()->modPermission('can_content_edit_meta_tags') )
+		if ( static::modPermission( 'feature', NULL, $container ) )
 		{
-			$formElements['record_meta_keywords'] = new TextArea( 'record_meta_keywords', $item ? $item->record_meta_keywords : '', FALSE );
-			$formElements['record_meta_description'] = new TextArea( 'record_meta_description', $item ? $item->record_meta_description : '', FALSE );
+			$options['feature'] = 'create_record_featured';
+			$toggles['feature'] = array( 'create_record_featured' );
+
+			if ( $item AND $item->record_featured === 1 )
+			{
+				$values[] = 'feature';
+			}
 		}
 		
-		if ( count( $options ) or count( $toggles ) )
+		if ( \IPS\Member::loggedIn()->modPermission('can_content_edit_meta_tags') )
 		{
-			$formElements['create_record_state'] = new CheckboxSet( 'create_record_state', $values, FALSE, array(
+			$formElements['record_meta_keywords'] = new \IPS\Helpers\Form\TextArea( 'record_meta_keywords', $item ? $item->record_meta_keywords : '', FALSE );
+			$formElements['record_meta_description'] = new \IPS\Helpers\Form\TextArea( 'record_meta_description', $item ? $item->record_meta_description : '', FALSE );
+		}
+		
+		if ( \count( $options ) or \count( $toggles ) )
+		{
+			$formElements['create_record_state'] = new \IPS\Helpers\Form\CheckboxSet( 'create_record_state', $values, FALSE, array(
 					'options' 	=> $options,
 					'toggles'	=> $toggles,
 					'multiple'	=> TRUE
@@ -854,23 +758,16 @@ class Records extends Item implements
 	/**
 	 * Total item \count(including children)
 	 *
-	 * @param	Model	$container			The container
+	 * @param	\IPS\Node\Model	$container			The container
 	 * @param	bool			$includeItems		If TRUE, items will be included (this should usually be true)
 	 * @param	bool			$includeComments	If TRUE, comments will be included
 	 * @param	bool			$includeReviews		If TRUE, reviews will be included
 	 * @param	int				$depth				Used to keep track of current depth to avoid going too deep
-	 * @return	int|NULL|string	When depth exceeds 10, will return "NULL" and initial call will return something like "100+"
-	 * @note	This method may return something like "100+" if it has lots of children to avoid exahusting memory. It is intended only for display use
+	 * @return	int
 	 * @note	This method includes counts of hidden and unapproved content items as well
 	 */
-	public static function contentCount( Model $container, bool $includeItems=TRUE, bool $includeComments=FALSE, bool $includeReviews=FALSE, int $depth=0 ): int|NULL|string
+	public static function contentCount( \IPS\Node\Model $container, $includeItems=TRUE, $includeComments=FALSE, $includeReviews=FALSE, $depth=0 )
 	{
-		/* Are we in too deep? */
-		if ( $depth > 10 )
-		{
-			return '+';
-		}
-
 		$count = $container->_items;
 
 		if ( static::canViewHiddenItems( NULL, $container ) )
@@ -889,19 +786,10 @@ class Records extends Item implements
 		}
 
 		/* Add Children */
-		$childDepth	= $depth++;
+		$childDepth	= ++$depth;
 		foreach ( $container->children() as $child )
 		{
-			$toAdd = static::contentCount( $child, $includeItems, $includeComments, $includeReviews, $childDepth );
-			if ( is_string( $toAdd ) )
-			{
-				return $count . '+';
-			}
-			else
-			{
-				$count += $toAdd;
-			}
-
+			$count += static::contentCount( $child, $includeItems, $includeComments, $includeReviews, $childDepth );
 		}
 		return $count;
 	}
@@ -909,27 +797,27 @@ class Records extends Item implements
 	/**
 	 * [brief] Display title
 	 */
-	protected string|null $displayTitle = NULL;
+	protected $displayTitle = NULL;
 
 	/**
 	 * [brief] Display content
 	 */
-	protected string|null $displayContent = NULL;
+	protected $displayContent = NULL;
 
 	/**
 	 * [brief] Record page
 	 */
-	protected string|null|Page $recordPage = NULL;
+	protected $recordPage = NULL;
 
 	/**
 	 * [brief] Custom Display Fields
 	 */
-	protected array $customDisplayFields = array();
+	protected $customDisplayFields = array();
 	
 	/**
 	 * [brief] Custom Fields Database Values
 	 */
-	protected mixed $customValueFields = NULL;
+	protected $customValueFields = NULL;
 	
 	/**
 	 * Process create/edit form
@@ -937,13 +825,12 @@ class Records extends Item implements
 	 * @param	array				$values	Values from form
 	 * @return	void
 	 */
-	public function processForm( array $values ): void
+	public function processForm( $values )
 	{
 		$isNew = $this->_new;
 		$fieldsClass  = 'IPS\cms\Fields' . static::$customDatabaseId;
-		$database     = Databases::load( static::$customDatabaseId );
+		$database     = \IPS\cms\Databases::load( static::$customDatabaseId );
 		$categoryClass = 'IPS\cms\Categories' . static::$customDatabaseId;
-		/* @var	$categoryClass Categories */
 		$container    = ( ! isset( $values['content_record_form_container'] ) ? $categoryClass::load( $this->category_id ) : $values['content_record_form_container'] );
 		$autoSaveKeys = [];
 		$imageUploads = [];
@@ -951,7 +838,7 @@ class Records extends Item implements
 		/* Store a revision */
 		if ( $database->revisions AND !$isNew )
 		{
-			$revision = new Revisions;
+			$revision = new \IPS\cms\Records\Revisions;
 			$revision->database_id = static::$customDatabaseId;
 			$revision->record_id   = $this->_id;
 			$revision->data        = $this->fieldValues( TRUE );
@@ -959,28 +846,28 @@ class Records extends Item implements
 			$revision->save();
 		}
 
-		if ( isset( Request::i()->postKey ) )
+		if ( isset( \IPS\Request::i()->postKey ) )
 		{
-			$this->post_key = Request::i()->postKey;
+			$this->post_key = \IPS\Request::i()->postKey;
 		}
 
 		if ( $isNew )
 		{
 			/* Peanut Butter Registering */
-			if ( !Member::loggedIn()->member_id and $container and !$container->can( 'add', Member::loggedIn(), FALSE ) )
+			if ( !\IPS\Member::loggedIn()->member_id and $container and !$container->can( 'add', \IPS\Member::loggedIn(), FALSE ) )
 			{
 				$this->record_approved = -3;
 			}
 			else
 			{
-				$this->record_approved = static::moderateNewItems( Member::loggedIn(), $container ) ? 0 : 1;
+				$this->record_approved = static::moderateNewItems( \IPS\Member::loggedIn(), $container ) ? 0 : 1;
 			}
 		}
 
 		/* Moderator actions */
 		if ( isset( $values['create_record_state'] ) )
 		{
-			if ( in_array( 'lock', $values['create_record_state'] ) )
+			if ( \in_array( 'lock', $values['create_record_state'] ) )
 			{
 				$this->record_locked = 1;
 			}
@@ -989,7 +876,7 @@ class Records extends Item implements
 				$this->record_locked = 0;
 			}
 	
-			if ( in_array( 'hide', $values['create_record_state'] ) )
+			if ( \in_array( 'hide', $values['create_record_state'] ) )
 			{
 				$this->record_approved = -1;
 			}
@@ -998,13 +885,22 @@ class Records extends Item implements
 				$this->record_approved = 1;
 			}
 	
-			if ( in_array( 'pin', $values['create_record_state'] ) )
+			if ( \in_array( 'pin', $values['create_record_state'] ) )
 			{
 				$this->record_pinned = 1;
 			}
 			else
 			{
 				$this->record_pinned = 0;
+			}
+	
+			if ( \in_array( 'feature', $values['create_record_state'] ) )
+			{
+				$this->record_featured = 1;
+			}
+			else
+			{
+				$this->record_featured = 0;
 			}
 		}
 	
@@ -1041,12 +937,12 @@ class Records extends Item implements
 			}
 
 			$this->record_edit_time        = time();
-			$this->record_edit_member_id   = Member::loggedIn()->member_id;
-			$this->record_edit_member_name = Member::loggedIn()->name;
+			$this->record_edit_member_id   = \IPS\Member::loggedIn()->member_id;
+			$this->record_edit_member_name = \IPS\Member::loggedIn()->name;
 
 			if ( isset( $values['record_edit_show'] ) )
 			{
-				$this->record_edit_show = Member::loggedIn()->group['g_append_edit'] ? $values['record_edit_show'] : TRUE;
+				$this->record_edit_show = \IPS\Member::loggedIn()->group['g_append_edit'] ? $values['record_edit_show'] : TRUE;
 			}
 		}
 
@@ -1059,17 +955,17 @@ class Records extends Item implements
 				{
 					try
 					{
-						File::get( 'cms_Records', $this->record_image )->delete();
+						\IPS\File::get( 'cms_Records', $this->record_image )->delete();
 					}
-					catch ( Exception $e ) { }
+					catch ( \Exception $e ) { }
 				}
 				if ( $this->record_image_thumb )
 				{
 					try
 					{
-						File::get( 'cms_Records', $this->record_image_thumb )->delete();
+						\IPS\File::get( 'cms_Records', $this->record_image_thumb )->delete();
 					}
-					catch ( Exception $e ) { }
+					catch ( \Exception $e ) { }
 				}
 					
 				$this->record_image = NULL;
@@ -1086,9 +982,9 @@ class Records extends Item implements
 					{
 						try
 						{
-							File::get( 'cms_Records', $this->record_image_thumb )->delete();
+							\IPS\File::get( 'cms_Records', $this->record_image_thumb )->delete();
 						}
-						catch ( Exception $e ) { }
+						catch ( \Exception $e ) { }
 					}
 					
 					$thumb = $values['record_image']->thumbnail( 'cms_Records', $fixedFieldSettings['record_image']['thumb_dims'][0], $fixedFieldSettings['record_image']['thumb_dims'][1] );
@@ -1109,7 +1005,7 @@ class Records extends Item implements
 			$this->record_locked = 1;
 		}
 		
-		if ( Member::loggedIn()->modPermission('can_content_edit_meta_tags') )
+		if ( \IPS\Member::loggedIn()->modPermission('can_content_edit_meta_tags') )
 		{
 			foreach( array( 'record_meta_keywords', 'record_meta_description' ) as $k )
 			{
@@ -1132,7 +1028,6 @@ class Records extends Item implements
 			}
 		}
 
-		/* @var	$fieldsClass Fields */
 		$fieldObjects = $fieldsClass::data( NULL, $container );
 		
 		if ( static::$customFields === NULL )
@@ -1148,14 +1043,14 @@ class Records extends Item implements
 			$seen[] = $fieldId;
 			$key = 'field_' . $fieldId;
 			
-			if ( !$isNew AND $this->$key )
+			if ( !$isNew )
 			{
 				$afterEditNotificationsExclude = array_merge_recursive( static::_getQuoteAndMentionIdsFromContent( $this->$key ) );
 			}
 			
-			if ( isset( $customValues[ $field->name ] ) and get_class( $field ) == 'IPS\Helpers\Form\Upload' )
+			if ( isset( $customValues[ $field->name ] ) and \get_class( $field ) == 'IPS\Helpers\Form\Upload' )
 			{
-				if ( is_array( $customValues[ $field->name ] ) )
+				if ( \is_array( $customValues[ $field->name ] ) )
 				{
 					$items = array();
 					foreach( $customValues[ $field->name ] as $obj )
@@ -1172,18 +1067,18 @@ class Records extends Item implements
 				}
 			}
 			/* If we're using decimals, then the database field is set to DECIMALS, so we cannot using stringValue() */
-			else if ( isset( $customValues[ $field->name ] ) and get_class( $field ) == 'IPS\Helpers\Form\Number' and ( isset( $field->options['decimals'] ) and $field->options['decimals'] > 0 ) )
+			else if ( isset( $customValues[ $field->name ] ) and \get_class( $field ) == 'IPS\Helpers\Form\Number' and ( isset( $field->options['decimals'] ) and $field->options['decimals'] > 0 ) )
 			{
 				$this->$key = ( $field->value === '' ) ? NULL : $field->value;
 			}
 			else
 			{
-				if ( get_class( $field ) == 'IPS\Helpers\Form\Editor' )
+				if ( \get_class( $field ) == 'IPS\Helpers\Form\Editor' )
 				{
 					$autoSaveKeys[] = $isNew ? "RecordField_new_{$fieldId}" : [ $this->_id, $fieldId, static::$customDatabaseId ];
 				}
 				
-				$this->$key = $field::stringValue($customValues[$field->name] ?? NULL);
+				$this->$key = $field::stringValue( isset( $customValues[ $field->name ] ) ? $customValues[ $field->name ] : NULL );
 			}
 		}
 
@@ -1192,7 +1087,7 @@ class Records extends Item implements
 		{
 			foreach ( $fieldObjects as $obj )
 			{
-				if ( !in_array( $obj->id, $seen ) )
+				if ( !\in_array( $obj->id, $seen ) )
 				{
 					/* We've not got a value for this as the field is hidden from us, so let us add the default value here */
 					$key        = 'field_' . $obj->id;
@@ -1202,21 +1097,21 @@ class Records extends Item implements
 		}
 
 		/* Other data */
-		if ( $isNew OR $database->_comment_bump & Databases::BUMP_ON_EDIT )
+		if ( $isNew OR $database->_comment_bump & \IPS\cms\Databases::BUMP_ON_EDIT )
 		{
 			$this->record_updated = time();
 		}
 
-		$this->record_allow_comments   = $values['record_allow_comments'] ?? (!$this->record_locked);
+		$this->record_allow_comments   = isset( $values['record_allow_comments'] ) ? $values['record_allow_comments'] : ( ! $this->record_locked );
 		
 		if ( isset( $values[ 'content_field_' . $database->field_title ] ) )
 		{
-			$this->record_dynamic_furl     = Friendly::seoTitle( $values[ 'content_field_' . $database->field_title ] );
+			$this->record_dynamic_furl     = \IPS\Http\Url\Friendly::seoTitle( $values[ 'content_field_' . $database->field_title ] );
 		}
 
 		if ( isset( $values['record_static_furl_set'] ) and $values['record_static_furl_set'] and isset( $values['record_static_furl'] ) and $values['record_static_furl'] )
 		{
-			$newFurl = Friendly::seoTitle( $values['record_static_furl'] );
+			$newFurl = \IPS\Http\Url\Friendly::seoTitle( $values['record_static_furl'] );
 
 			if ( $newFurl != $this->record_static_furl )
 			{
@@ -1244,7 +1139,7 @@ class Records extends Item implements
 		if ( $isNew )
 		{
 			/* Set the author ID on 'new' only */
-			$this->member_id = (int) ( static::$createWithMember ? static::$createWithMember->member_id : Member::loggedIn()->member_id );
+			$this->member_id = (int) ( static::$createWithMember ? static::$createWithMember->member_id : \IPS\Member::loggedIn()->member_id );
 		}
 		elseif ( !$sendFilterNotifications )
 		{
@@ -1267,7 +1162,7 @@ class Records extends Item implements
 		{
 			if ( $row->can( ( $isNew ? 'add' : 'edit' ) ) and $row->type == 'Editor' )
 			{
-				File::claimAttachments( 'RecordField_' . ( $isNew ? 'new' : $this->_id ) . '_' . $row->id, $this->primary_id_field, $id, static::$customDatabaseId );
+				\IPS\File::claimAttachments( 'RecordField_' . ( $isNew ? 'new' : $this->_id ) . '_' . $row->id, $this->primary_id_field, $id, static::$customDatabaseId );
 			}
 			
 			if ( $row->can( ( $isNew ? 'add' : 'edit' ) ) and $row->type == 'Upload' )
@@ -1278,7 +1173,7 @@ class Records extends Item implements
 					$dims = $row->extra['thumbsize'];
 					$field = 'field_' . $row->id;
 					$extra = $row->extra;
-					$thumbs = iterator_to_array( Db::i()->select( '*', 'cms_database_fields_thumbnails', array( array( 'thumb_field_id=?', $row->id ) ) )->setKeyField('thumb_original_location')->setValueField('thumb_location') );
+					$thumbs = iterator_to_array( \IPS\Db::i()->select( '*', 'cms_database_fields_thumbnails', array( array( 'thumb_field_id=?', $row->id ) ) )->setKeyField('thumb_original_location')->setValueField('thumb_location') );
 					
 					if ( $this->$field  )
 					{
@@ -1286,7 +1181,7 @@ class Records extends Item implements
 						{
 							try
 							{
-								$original = File::get( 'cms_Records', $img );
+								$original = \IPS\File::get( 'cms_Records', $img );
 								
 								try
 								{								
@@ -1294,16 +1189,16 @@ class Records extends Item implements
 									
 									if ( isset( $thumbs[ (string) $original ] ) )
 									{
-										Db::i()->delete( 'cms_database_fields_thumbnails', array( array( 'thumb_original_location=? and thumb_field_id=? and thumb_record_id=?', (string) $original, $row->id, $this->primary_id_field ) ) );
+										\IPS\Db::i()->delete( 'cms_database_fields_thumbnails', array( array( 'thumb_original_location=? and thumb_field_id=? and thumb_record_id=?', (string) $original, $row->id, $this->primary_id_field ) ) );
 										
 										try
 										{
-											File::get( 'cms_Records', $thumbs[ (string) $original ] )->delete();
+											\IPS\File::get( 'cms_Records', $thumbs[ (string) $original ] )->delete();
 										}
-										catch ( Exception $e ) { }
+										catch ( \Exception $e ) { }
 									}
 									
-									Db::i()->insert( 'cms_database_fields_thumbnails', array(
+									\IPS\Db::i()->insert( 'cms_database_fields_thumbnails', array(
 										'thumb_original_location' => (string) $original,
 										'thumb_location'		  => (string) $thumb,
 										'thumb_field_id'		  => $row->id,
@@ -1311,26 +1206,26 @@ class Records extends Item implements
 										'thumb_record_id'		  => $this->primary_id_field
 									) );
 								}
-								catch ( Exception $e ) { }
+								catch ( \Exception $e ) { }
 							}
-							catch ( Exception $e ) { }
+							catch ( \Exception $e ) { }
 						}
 				
 						/* Remove any thumbnails if the original has been removed */
-						$orphans = iterator_to_array( Db::i()->select( '*', 'cms_database_fields_thumbnails', array( array( 'thumb_record_id=?', $this->primary_id_field ), array( 'thumb_field_id=?', $row->id ), array( Db::i()->in( 'thumb_original_location', explode( ',', $this->$field ), TRUE ) ) ) ) );
+						$orphans = iterator_to_array( \IPS\Db::i()->select( '*', 'cms_database_fields_thumbnails', array( array( 'thumb_record_id=?', $this->primary_id_field ), array( 'thumb_field_id=?', $row->id ), array( \IPS\Db::i()->in( 'thumb_original_location', explode( ',', $this->$field ), TRUE ) ) ) ) );
 						
-						if ( count( $orphans ) )
+						if ( \count( $orphans ) )
 						{
 							foreach( $orphans as $thumb )
 							{
 								try
 								{
-									File::get( 'cms_Records', $thumb['thumb_location'] )->delete();
+									\IPS\File::get( 'cms_Records', $thumb['thumb_location'] )->delete();
 								}
-								catch ( Exception $e ) { }
+								catch ( \Exception $e ) { }
 							}
 							
-							Db::i()->delete( 'cms_database_fields_thumbnails', array( array( 'thumb_record_id=?', $this->primary_id_field ), array( 'thumb_field_id=?', $row->id ), array( Db::i()->in( 'thumb_original_location', explode( ',', $this->$field ), TRUE ) ) ) );
+							\IPS\Db::i()->delete( 'cms_database_fields_thumbnails', array( array( 'thumb_record_id=?', $this->primary_id_field ), array( 'thumb_field_id=?', $row->id ), array( \IPS\Db::i()->in( 'thumb_original_location', explode( ',', $this->$field ), TRUE ) ) ) );
 						}
 					}
 				}
@@ -1350,11 +1245,11 @@ class Records extends Item implements
 	 *
 	 * @return void
 	 */
-	public function storeUrl() : void
+	public function storeUrl()
 	{
 		if ( $this->record_static_furl )
 		{
-			Db::i()->insert( 'cms_url_store', array(
+			\IPS\Db::i()->insert( 'cms_url_store', array(
 				'store_path'       => $this->record_static_furl,
 			    'store_current_id' => $this->_id,
 			    'store_type'       => 'record'
@@ -1365,10 +1260,10 @@ class Records extends Item implements
 	/**
 	 * Stats for table view
 	 *
-	 * @param bool $includeFirstCommentInCommentCount	Determines whether the first comment should be inlcluded in the comment \count(e.g. For "posts", use TRUE. For "replies", use FALSE)
+	 * @param	bool	$includeFirstCommentInCommentCount	Determines whether the first comment should be inlcluded in the comment \count(e.g. For "posts", use TRUE. For "replies", use FALSE)
 	 * @return	array
 	 */
-	public function stats( bool $includeFirstCommentInCommentCount=TRUE ): array
+	public function stats( $includeFirstCommentInCommentCount=TRUE )
 	{
 		$return = array();
 
@@ -1377,7 +1272,10 @@ class Records extends Item implements
 			$return['comments'] = (int) $this->mapped('num_comments');
 		}
 
-		$return['num_views'] = (int) $this->mapped('views');
+		if ( \IPS\IPS::classUsesTrait( $this, 'IPS\Content\ViewUpdates' ) )
+		{
+			$return['num_views'] = (int) $this->mapped('views');
+		}
 
 		return $return;
 	}
@@ -1385,19 +1283,20 @@ class Records extends Item implements
 	/**
 	 * Get URL
 	 *
-	 * @param string|null $action Action
-	 * @return    Url
+	 * @param	string|NULL		$action		Action
+	 * @return	\IPS\Http\Url
+	 * @throws 	\LogicException
 	 */
-	public function url( ?string $action=NULL ): Url
+	public function url( $action=NULL )
 	{
 		if( $action == 'getPrefComment' )
 		{
-			$pref = Member::loggedIn()->linkPref() ?: Settings::i()->link_default;
+			$pref = \IPS\Member::loggedIn()->linkPref() ?: \IPS\Settings::i()->link_default;
 
 			switch( $pref )
 			{
 				case 'unread':
-					$action = Member::loggedIn()->member_id ? 'getNewComment' : NULL;
+					$action = \IPS\Member::loggedIn()->member_id ? 'getNewComment' : NULL;
 					break;
 
 				case 'last':
@@ -1409,7 +1308,7 @@ class Records extends Item implements
 					break;
 			}
 		}
-		elseif( !Member::loggedIn()->member_id AND $action == 'getNewComment' )
+		elseif( !\IPS\Member::loggedIn()->member_id AND $action == 'getNewComment' )
 		{
 			$action = NULL;
 		}
@@ -1419,17 +1318,17 @@ class Records extends Item implements
 			/* If we're coming through the database controller embedded in a page, $currentPage will be set. If we're coming in via elsewhere, we need to fetch the page */
 			try
 			{
-				$this->recordPage = Page::loadByDatabaseId( static::$customDatabaseId );
+				$this->recordPage = \IPS\cms\Pages\Page::loadByDatabaseId( static::$customDatabaseId );
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
-				if ( Page::$currentPage )
+				if ( \IPS\cms\Pages\Page::$currentPage )
 				{
-					$this->recordPage = Page::$currentPage;
+					$this->recordPage = \IPS\cms\Pages\Page::$currentPage;
 				}
 				else
 				{
-					throw new LogicException;
+					throw new \LogicException;
 				}
 			}
 		}
@@ -1438,17 +1337,16 @@ class Records extends Item implements
 		{
 			$pagePath   = $this->recordPage->full_path;
 			$class		= '\IPS\cms\Categories' . static::$customDatabaseId;
-			/* @var	$class Categories */
 			$catPath    = $class::load( $this->category_id )->full_path;
 			$recordSlug = ! $this->record_static_furl ? $this->record_dynamic_furl . '-r' . $this->primary_id_field : $this->record_static_furl;
 
 			if ( static::database()->use_categories )
 			{
-				$url = Url::internal( "app=cms&module=pages&controller=page&path=" . $pagePath . '/' . $catPath . '/' . $recordSlug, 'front', 'content_page_path', $recordSlug );
+				$url = \IPS\Http\Url::internal( "app=cms&module=pages&controller=page&path=" . $pagePath . '/' . $catPath . '/' . $recordSlug, 'front', 'content_page_path', $recordSlug );
 			}
 			else
 			{
-				$url = Url::internal( "app=cms&module=pages&controller=page&path=" . $pagePath . '/' . $recordSlug, 'front', 'content_page_path', $recordSlug );
+				$url = \IPS\Http\Url::internal( "app=cms&module=pages&controller=page&path=" . $pagePath . '/' . $recordSlug, 'front', 'content_page_path', $recordSlug );
 			}
 		}
 
@@ -1467,7 +1365,7 @@ class Records extends Item implements
 	 *
 	 * @return	array
 	 */
-	public static function basicDataColumns(): array
+	public static function basicDataColumns()
 	{
 		$return = parent::basicDataColumns();
 		$return[] = 'category_id';
@@ -1483,7 +1381,7 @@ class Records extends Item implements
 	 * @param	array	$items	Item data (will be an array containing values from basicDataColumns())
 	 * @return	array
 	 */
-	public static function searchResultExtraData( array $items ): array
+	public static function searchResultExtraData( $items )
 	{
 		$categoryIds = array();
 		
@@ -1495,9 +1393,9 @@ class Records extends Item implements
 			}
 		}
 		
-		if ( count( $categoryIds ) )
+		if ( \count( $categoryIds ) )
 		{
-			$categoryPaths = iterator_to_array( Db::i()->select( array( 'category_id', 'category_full_path' ), 'cms_database_categories', Db::i()->in( 'category_id', $categoryIds ) )->setKeyField('category_id')->setValueField('category_full_path') );
+			$categoryPaths = iterator_to_array( \IPS\Db::i()->select( array( 'category_id', 'category_full_path' ), 'cms_database_categories', \IPS\Db::i()->in( 'category_id', $categoryIds ) )->setKeyField('category_id')->setValueField('category_full_path') );
 			
 			$return = array();
 			foreach ( $items as $item )
@@ -1514,27 +1412,102 @@ class Records extends Item implements
 	}
 
 	/**
+	 * Get snippet HTML for search result display
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$authorData		Basic data about the author. Only includes columns returned by \IPS\Member::columnsForPhoto()
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	array		$reputationData	Array of people who have given reputation and the reputation they gave
+	 * @param	int|NULL	$reviewRating	If this is a review, the rating
+	 * @param	string		$view			'expanded' or 'condensed'
+	 * @return	callable
+	 */
+	public static function searchResultSnippet( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating, $view )
+	{
+		/* We want the custom template only for expanded view or if we have a record image */
+
+		if ( $view == 'expanded' OR ( $view == 'condensed' AND isset( $itemData['record_image'] ) ) )
+		{
+			$url = static::urlFromIndexData( $indexData, $itemData );
+			return \IPS\Theme::i()->getTemplate( 'global', 'cms', 'front' )->recordResultSnippet( $indexData, $itemData, $url, $view == 'condensed' );
+		}
+		else
+		{
+			return NULL;
+		}
+	}
+	
+	/**
+	 * Get URL from index data
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	string|NULL	$action			Action
+	 * @return	\IPS\Http\Url
+	 */
+	public static function urlFromIndexData( $indexData, $itemData, $action = NULL )
+	{
+		if( $action == 'getPrefComment' )
+		{
+			$pref = \IPS\Member::loggedIn()->linkPref() ?: \IPS\Settings::i()->link_default;
+
+			switch( $pref )
+			{
+				case 'unread':
+					$action = \IPS\Member::loggedIn()->member_id ? 'getNewComment' : NULL;
+					break;
+
+				case 'last':
+					$action = 'getLastComment';
+					break;
+
+				default:
+					$action = NULL;
+					break;
+			}
+		}
+		elseif( !\IPS\Member::loggedIn()->member_id AND $action == 'getNewComment' )
+		{
+			$action = NULL;
+		}
+
+		if ( static::$pagePath === NULL )
+		{
+			static::$pagePath = \IPS\Db::i()->select( array( 'page_full_path' ), 'cms_pages', array( 'page_id=?', static::database()->page_id ) )->first();
+		}
+		
+		$recordSlug = !$itemData['record_static_furl'] ? $itemData['record_dynamic_furl']  . '-r' . $itemData['primary_id_field'] : $itemData['record_static_furl'];
+		
+		if ( static::database()->use_categories )
+		{
+			$url = \IPS\Http\Url::internal( "app=cms&module=pages&controller=page&path=" . static::$pagePath . '/' . $itemData['extra'] . '/' . $recordSlug, 'front', 'content_page_path', $recordSlug );
+		}
+		else
+		{
+			$url = \IPS\Http\Url::internal( "app=cms&module=pages&controller=page&path=" . static::$pagePath . '/' . $recordSlug, 'front', 'content_page_path', $recordSlug );
+		}
+
+		if( $action )
+		{
+			$url = $url->setQueryString( 'do', $action );
+		}
+
+		return $url;
+	}
+
+	/**
 	 * Template helper method to fetch custom fields to display
 	 *
-	 * @param string $type       Type of display
+	 * @param   string  $type       Type of display
 	 * @return  array
 	 */
-	public function customFieldsForDisplay( string $type='display' ): array
+	public function customFieldsForDisplay( $type='display' )
 	{
 		if ( ! isset( $this->customDisplayFields['all'][ $type ] ) )
 		{
-            $this->customDisplayFields['all'][ $type ] = [];
 			$fieldsClass = '\IPS\cms\Fields' . static::$customDatabaseId;
-
-            /* @var	$fieldsClass Fields */
-            foreach( $fieldsClass::display( $this->fieldValues(), $type, $this->container(), 'key', $this ) as $k => $fieldValue )
-            {
-                /* We only show these if there is a value anyway */
-                if( $fieldValue )
-                {
-                    $this->customDisplayFields['all'][ $type ][ $k ] = $fieldValue;
-                }
-            }
+			$this->customDisplayFields['all'][ $type ] = $fieldsClass::display( $this->fieldValues(), $type, $this->container(), 'key', $this );
 		}
 
 		return $this->customDisplayFields['all'][ $type ];
@@ -1544,13 +1517,13 @@ class Records extends Item implements
 	 * Display a custom field by its key
 	 *
 	 * @param mixed      $key       Key to fetch
-	 * @param string $type      Type of display to fetch
+	 * @param string     $type      Type of display to fetch
 	 * @return mixed
 	 */
-	public function customFieldDisplayByKey( mixed $key, string $type='display' ): mixed
+	public function customFieldDisplayByKey( $key, $type='display' )
 	{
 		$fieldsClass = '\IPS\cms\Fields' . static::$customDatabaseId;
-		/* @var	$fieldsClass Fields */
+
 		if ( ! isset( $this->customDisplayFields[ $key ][ $type ] ) )
 		{
 			foreach ( $fieldsClass::roots( 'view' ) as $row )
@@ -1576,10 +1549,10 @@ class Records extends Item implements
 	/**
 	 * Get custom field_x keys and values
 	 *
-	 * @param boolean $allData	All data (true) or just custom field data (false)
+	 * @param	boolean	$allData	All data (true) or just custom field data (false)
 	 * @return	array
 	 */
-	public function fieldValues( bool $allData=FALSE ): array
+	public function fieldValues( $allData=FALSE )
 	{
 		$fields = array();
 		
@@ -1600,9 +1573,9 @@ class Records extends Item implements
 	 * @param	int|null	$limit				Number of attachments to fetch, or NULL for all
 	 * @param	bool		$ignorePermissions	If set to TRUE, permission to view the images will not be checked
 	 * @return	array|NULL
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function contentImages( int $limit = NULL, bool $ignorePermissions = FALSE ): array|null
+	public function contentImages( $limit = NULL, $ignorePermissions = FALSE )
 	{
 		$idColumn = static::$databaseColumnId;
 		$attachments = array();
@@ -1613,18 +1586,16 @@ class Records extends Item implements
 			$attachments[] = array( 'cms_Records' => $this->record_image );
 		}
 
-		$internal = Db::i()->select( 'attachment_id', 'core_attachments_map', array( '(location_key=? OR location_key=?) and id1=? and id3=?', 'cms_Records', 'cms_Records' . static::$customDatabaseId, $this->$idColumn, static::$customDatabaseId ) );
+		$internal = \IPS\Db::i()->select( 'attachment_id', 'core_attachments_map', array( '(location_key=? OR location_key=?) and id1=? and id3=?', 'cms_Records', 'cms_Records' . static::$customDatabaseId, $this->$idColumn, static::$customDatabaseId ) );
 		
 		/* Attachments */
-		foreach( Db::i()->select( '*', 'core_attachments', array( array( 'attach_id IN(?)', $internal ), array( 'attach_is_image=1' ) ), 'attach_id ASC', $limit ) as $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_attachments', array( array( 'attach_id IN(?)', $internal ), array( 'attach_is_image=1' ) ), 'attach_id ASC', $limit ) as $row )
 		{
 			$attachments[] = array( 'core_Attachment' => $row['attach_location'] );
 		}
 			
 		/* Any upload fields */
 		$categoryClass = 'IPS\cms\Categories' . static::$customDatabaseId;
-		/* @var	$categoryClass Categories */
-		/* @var	$fieldsClass Fields */
 		$container = $categoryClass::load( $this->category_id );
 		$fieldsClass  = 'IPS\cms\Fields' . static::$customDatabaseId;
 		$fieldValues = $this->fieldValues();
@@ -1633,22 +1604,22 @@ class Records extends Item implements
 		foreach( $customFields as $key => $field )
 		{
 			$fieldName = mb_substr( $field->name, 8 );
-			if ( get_class( $field ) == 'IPS\Helpers\Form\Upload' )
+			if ( \get_class( $field ) == 'IPS\Helpers\Form\Upload' )
 			{
-				if ( is_array( $fieldValues[ $fieldName ] ) )
+				if ( \is_array( $fieldValues[ $fieldName ] ) )
 				{
 					foreach( $fieldValues[ $fieldName ] as $fileName )
 					{
-						$obj = File::get( 'cms_Records', $fileName );
+						$obj = \IPS\File::get( 'cms_Records', $fileName );
 						if ( $obj->isImage() )
 						{
 							$attachments[] = array( 'cms_Records' => $fileName );
 						}
 					}
 				}
-				elseif( !empty( $fieldValues[ $fieldName ] ) )
+				else
 				{
-					$obj = File::get( 'cms_Records', $fieldValues[ $fieldName ] );
+					$obj = \IPS\File::get( 'cms_Records', $fieldValues[ $fieldName ] );
 					if ( $obj->isImage() )
 					{
 						$attachments[] = array( 'cms_Records' => $fieldValues[ $fieldName ] );
@@ -1657,7 +1628,7 @@ class Records extends Item implements
 			}
 		}
 		
-		return count( $attachments ) ? array_slice( $attachments, 0, $limit ) : NULL;
+		return \count( $attachments ) ? \array_slice( $attachments, 0, $limit ) : NULL;
 	}
 
 	/**
@@ -1665,7 +1636,7 @@ class Records extends Item implements
 	 *
 	 * @return  string
 	 */
-	public function get__post_key() : string
+	public function get__post_key()
 	{
 		return ! empty( $this->post_key ) ? $this->post_key : md5( mt_rand() );
 	}
@@ -1675,7 +1646,7 @@ class Records extends Item implements
 	 *
 	 * @return	string
 	 */
-	public function get__publishDate() : string
+	public function get__publishDate()
 	{
         return $this->record_publish_date ? $this->record_publish_date : $this->record_saved;
 	}
@@ -1683,9 +1654,9 @@ class Records extends Item implements
 	/**
 	 * Get the record id
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	public function get__id(): ?int
+	public function get__id()
 	{
 		return $this->primary_id_field;
 	}
@@ -1696,7 +1667,7 @@ class Records extends Item implements
 	 * @param	mixed	$key	Key
 	 * @return	mixed	Value from the datastore
 	 */
-	public function __get( mixed $key ) : mixed
+	public function __get( $key )
 	{
 		$val = parent::__get( $key );
 		
@@ -1708,7 +1679,7 @@ class Records extends Item implements
 				if ( $this->customValueFields === NULL )
 				{
 					$fieldsClass = '\IPS\cms\Fields' . static::$customDatabaseId;
-					/* @var	$fieldsClass Fields */
+					
 					foreach ( $fieldsClass::roots( 'view' ) as $row )
 					{
 						$field = 'field_' . $row->id; 
@@ -1729,12 +1700,12 @@ class Records extends Item implements
 	/**
 	 * Set value in data store
 	 *
+	 * @see		\IPS\Patterns\ActiveRecord::save
 	 * @param	mixed	$key	Key
 	 * @param	mixed	$value	Value
 	 * @return	void
-	 *@see		\IPS\Patterns\ActiveRecord::save
 	 */
-	public function __set( mixed $key, mixed $value ): void
+	public function __set( $key, $value )
 	{
 		if ( $key == 'field_' . static::database()->field_title )
 		{
@@ -1760,7 +1731,7 @@ class Records extends Item implements
 				if ( $this->customValueFields === NULL )
 				{
 					$fieldsClass = '\IPS\cms\Fields' . static::$customDatabaseId;
-					/* @var	$fieldsClass Fields */
+					
 					foreach ( $fieldsClass::roots( 'view' ) as $row )
 					{
 						$field = 'field_' . $row->id; 
@@ -1786,7 +1757,7 @@ class Records extends Item implements
 	 *
 	 * @return	string
 	 */
-	public function get__title(): string
+	public function get__title()
 	{
 		$field = 'field_' . static::database()->field_title;
 
@@ -1795,13 +1766,12 @@ class Records extends Item implements
 			if ( ! $this->displayTitle )
 			{
 				$class = '\IPS\cms\Fields' .  static::database()->id;
-				/* @var	$class Fields */
 				$this->displayTitle = $class::load( static::database()->field_title )->displayValue( $this->$field );
 			}
 
 			return $this->displayTitle;
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return $this->$field;
 		}
@@ -1810,9 +1780,9 @@ class Records extends Item implements
 	/**
 	 * Get the record content for display
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function get__content(): ?string
+	public function get__content()
 	{
 		$field = 'field_' . static::database()->field_content;
 
@@ -1821,13 +1791,13 @@ class Records extends Item implements
 			if ( ! $this->displayContent )
 			{
 				$class = '\IPS\cms\Fields' .  static::database()->id;
-				/* @var	$class Fields */
+
 				$this->displayContent = $class::load( static::database()->field_content )->displayValue( $this->$field );
 			}
 
 			return $this->displayContent;
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return $this->$field;
 		}
@@ -1838,7 +1808,7 @@ class Records extends Item implements
 	 *
 	 * @return	int
 	 */
-	public function get__forum_record() : int
+	public function get__forum_record()
 	{
 		if ( $this->container()->forum_override and static::database()->use_categories )
 		{
@@ -1853,7 +1823,7 @@ class Records extends Item implements
 	 *
 	 * @return	int
 	 */
-	public function get__forum_comments() : int
+	public function get__forum_comments()
 	{
 		if ( $this->container()->forum_override and static::database()->use_categories )
 		{
@@ -1868,7 +1838,7 @@ class Records extends Item implements
 	 *
 	 * @return	int
 	 */
-	public function get__forum_delete() : int
+	public function get__forum_delete()
 	{
 		if ( $this->container()->forum_override and static::database()->use_categories )
 		{
@@ -1882,7 +1852,7 @@ class Records extends Item implements
 	 * Return forum sync forum
 	 *
 	 * @return	int
-	 * @throws  UnderflowException
+	 * @throws  \UnderflowException
 	 */
 	public function get__forum_forum(): int
 	{
@@ -1890,7 +1860,7 @@ class Records extends Item implements
 		{
 			if( !$this->container()->forum_forum )
 			{
-				throw new UnderflowException('forum_sync_disabled');
+				throw new \UnderflowException('forum_sync_disabled');
 			}
 
 			return $this->container()->forum_forum;
@@ -1904,7 +1874,7 @@ class Records extends Item implements
 	 *
 	 * @return	int
 	 */
-	public function get__forum_prefix() : int
+	public function get__forum_prefix()
 	{
 		if ( $this->container()->forum_override and static::database()->use_categories )
 		{
@@ -1919,7 +1889,7 @@ class Records extends Item implements
 	 *
 	 * @return	int
 	 */
-	public function get__forum_suffix() : int
+	public function get__forum_suffix()
 	{
 		if ( $this->container()->forum_override and static::database()->use_categories )
 		{
@@ -1932,11 +1902,11 @@ class Records extends Item implements
 	/**
 	 * Return record image thumb
 	 *
-	 * @return	string
+	 * @return	int
 	 */
-	public function get__record_image_thumb() : string
+	public function get__record_image_thumb()
 	{
-		return $this->record_image_thumb ?: ( $this->record_image ?? '' );
+		return $this->record_image_thumb ?: $this->record_image;
 	}
 
 	/**
@@ -1944,9 +1914,9 @@ class Records extends Item implements
 	 *
 	 * @return	string|NULL
 	 */
-	public function editLine() : ?string
+	public function editLine()
 	{
-		if ( $this->record_edit_time and ( $this->record_edit_show or Member::loggedIn()->modPermission('can_view_editlog') ) and Settings::i()->edit_log )
+		if ( $this->record_edit_time and ( $this->record_edit_show or \IPS\Member::loggedIn()->modPermission('can_view_editlog') ) and \IPS\Settings::i()->edit_log )
 		{
 			return \IPS\cms\Theme::i()->getTemplate( static::database()->template_display, 'cms', 'database' )->recordEditLine( $this );
 		}
@@ -1956,10 +1926,10 @@ class Records extends Item implements
 	/**
 	 * Get mapped value
 	 *
-	 * @param string $key	date,content,ip_address,first
+	 * @param	string	$key	date,content,ip_address,first
 	 * @return	mixed
 	 */
-	public function mapped( string $key ): mixed
+	public function mapped( $key )
 	{
 		if ( $key === 'title' )
 		{
@@ -1978,7 +1948,7 @@ class Records extends Item implements
 		{
 			$field = static::$databaseColumnMap[ $key ];
 				
-			if ( is_array( $field ) )
+			if ( \is_array( $field ) )
 			{
 				$field = array_pop( $field );
 			}
@@ -1993,13 +1963,13 @@ class Records extends Item implements
 	 *
 	 * @return void
 	 */
-	public function save(): void
+	public function save()
 	{
 		$new = $this->_new;
 			
-		if ( $new OR static::database()->_comment_bump & Databases::BUMP_ON_EDIT )
+		if ( $new OR static::database()->_comment_bump & \IPS\cms\Databases::BUMP_ON_EDIT )
 		{
-			$member = Member::load( $this->member_id );
+			$member = \IPS\Member::load( $this->member_id );
 	
 			/* Set last comment as record so that category listing is correct */
 			if ( $this->record_saved > $this->record_last_comment )
@@ -2012,12 +1982,6 @@ class Records extends Item implements
 				$this->record_last_comment_by   = $this->member_id;
 				$this->record_last_comment_name = $member->name;
 			}
-		}
-
-		/* Did we change the title? Update the URL */
-		if( !$new and isset( $this->changed[ static::$databaseColumnMap['title'] ] ) and !isset( $this->changed['record_dynamic_furl'] ) )
-		{
-			$this->record_dynamic_furl = Friendly::seoTitle( $this->_title );
 		}
 	
 		parent::save();
@@ -2038,21 +2002,21 @@ class Records extends Item implements
 			}
 			
             $class = '\IPS\cms\Categories' . static::$customDatabaseId;
-			/* @var	$class Categories */
             $category = $class::load( $this->category_id );
             $category->setLastComment();
 			$category->setLastReview();
             $category->save();
         }
 	}
-	
+
 	/**
 	 * Resync last comment
 	 *
 	 * @param	Comment|null $comment The comment
+	 *
 	 * @return	void
 	 */
-	public function resyncLastComment( Comment $comment = NULL ): void
+	public function resyncLastComment( \IPS\Content\Comment $comment = NULL )
 	{
 		if ( $this->useForumComments() )
 		{
@@ -2068,16 +2032,15 @@ class Records extends Item implements
 	/**
 	 * Utility method to reset the last commenter of a record
 	 *
-	 * @param boolean $setCategory    Check and set the last commenter for a category
+	 * @param   boolean     $setCategory    Check and set the last commenter for a category
 	 * @return void
 	 */
-	public function resetLastComment( bool $setCategory=false ): void
+	public function resetLastComment( $setCategory=false )
 	{
 		$comment = $this->comments( 1, 0, 'date', 'desc', NULL, FALSE );
 
 		if ( $comment )
 		{
-			/* @var	$comment Records\Comment */
 			$this->record_last_comment      = $comment->mapped('date');
 			$this->record_last_comment_by   = $comment->author()->member_id;
 			$this->record_last_comment_name = $comment->author()->name;
@@ -2087,8 +2050,7 @@ class Records extends Item implements
 			if ( $setCategory and $this->category_id )
 			{
 				$class = '\IPS\cms\Categories' . static::$customDatabaseId;
-				/* @var	$class Categories */
-				$class::load( $this->category_id )->setLastComment( NULL );
+				$class::load( $this->category_id )->setLastComment( $comment );
 				$class::load( $this->category_id )->save();
 			}
 		}
@@ -2097,10 +2059,10 @@ class Records extends Item implements
 	/**
 	 * Resync the comments/unapproved comment counts
 	 *
-	 * @param string|null $commentClass	Override comment class to use
+	 * @param	string	$commentClass	Override comment class to use
 	 * @return void
 	 */
-	public function resyncCommentCounts( string $commentClass=NULL ): void
+	public function resyncCommentCounts( $commentClass=NULL )
 	{
 		if ( $this->useForumComments() )
 		{
@@ -2123,11 +2085,11 @@ class Records extends Item implements
 	/**
 	 * Are comments supported by this class?
 	 *
-	 * @param	Member|NULL		$member		The member to check for or NULL to not check permission
-	 * @param	Model|NULL	$container	The container to check in, or NULL for any container
+	 * @param	\IPS\Member|NULL		$member		The member to check for or NULL to not check permission
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check in, or NULL for any container
 	 * @return	bool
 	 */
-	public static function supportsComments( Member $member = NULL, Model $container = NULL ): bool
+	public static function supportsComments( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
 		return parent::supportsComments() and static::database()->options['comments'];
 	}
@@ -2135,30 +2097,30 @@ class Records extends Item implements
 	/**
 	 * Are reviews supported by this class?
 	 *
-	 * @param	Member|NULL		$member		The member to check for or NULL to not check permission
-	 * @param	Model|NULL	$container	The container to check in, or NULL for any container
+	 * @param	\IPS\Member|NULL		$member		The member to check for or NULL to not check permission
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check in, or NULL for any container
 	 * @return	bool
 	 */
-	public static function supportsReviews( Member $member = NULL, Model $container = NULL ): bool
+	public static function supportsReviews( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
 		return parent::supportsReviews() and static::database()->options['reviews'];
 	}
-
+	
 	/**
 	 * Ensure there aren't any collisions with page slugs
 	 *
-	 * @param string $slug
+	 * @param   string  $path   Path to check
 	 * @return  boolean
 	 */
-	static public function isFurlCollision( string $slug ): bool
+	static public function isFurlCollision( $slug )
 	{
 		try
 		{
-			Db::i()->select( 'page_id', 'cms_pages', array( 'page_seo_name=?', Friendly::seoTitle( $slug ) ) )->first();
+			\IPS\Db::i()->select( 'page_id', 'cms_pages', array( 'page_seo_name=?', \IPS\Http\Url\Friendly::seoTitle( $slug ) ) )->first();
 			
 			return TRUE;
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			return FALSE;
 		}
@@ -2171,32 +2133,31 @@ class Records extends Item implements
 	 *
 	 * @note The returned array is in the format of {field_id} => array( object, object... )
 	 *
-	 * @return array|bool
+	 * @return FALSE|array
 	 */
-	public function getReciprocalItems() : array|bool
+	public function getReciprocalItems()
 	{
 		/* Check to see if any fields are linking to this database in this easy to use method wot I writted myself */
-		if ( Databases::hasReciprocalLinking( static::database()->_id ) )
+		if ( \IPS\cms\Databases::hasReciprocalLinking( static::database()->_id ) )
 		{
 			$return = array();
 			/* Oh that's just lovely then. Lets be a good fellow and fetch the items then! */
-			foreach( Db::i()->select( '*', 'cms_database_fields_reciprocal_map', array( 'map_foreign_database_id=? and map_foreign_item_id=?', static::database()->_id, $this->primary_id_field ) ) as $record )
+			foreach( \IPS\Db::i()->select( '*', 'cms_database_fields_reciprocal_map', array( 'map_foreign_database_id=? and map_foreign_item_id=?', static::database()->_id, $this->primary_id_field ) ) as $record )
 			{
 				try
 				{
 					$recordClass = 'IPS\cms\Records' . $record['map_origin_database_id'];
-					/* @var	$recordClass Records */
                     $linkedRecord = $recordClass::load( $record['map_origin_item_id'] );
                     if( $linkedRecord->canView() )
                     {
                         $return[ $record['map_field_id'] ][] = $linkedRecord;
                     }
 				}
-				catch ( Exception $ex ) { }
+				catch ( \Exception $ex ) { }
 			}
 			
 			/* Has something gone all kinds of wonky? */
-			if ( ! count( $return ) )
+			if ( ! \count( $return ) )
 			{
 				return FALSE;
 			}
@@ -2214,42 +2175,30 @@ class Records extends Item implements
 	 *
 	 * @return boolean
 	 */
-	public function useForumComments(): bool
+	public function useForumComments()
 	{
 		try
 		{
-			return $this->_forum_record and $this->_forum_comments and $this->record_topicid and Application::appIsEnabled('forums');
+			return $this->_forum_record and $this->_forum_comments and $this->record_topicid and \IPS\Application::appIsEnabled('forums');
 		}
-		catch( Exception $e)
+		catch( \Exception $e)
 		{
 			return FALSE;
 		}
 
 	}
-
-	/**
-	 * Convert the record to a RecordTopicSynch object
-	 *
-	 * @return Records
-	 */
-	public function recordForTopicSynch() : Records
-	{
-		/* @var Records $class */
-		$class = 'IPS\cms\Records\RecordsTopicSync' . static::$customDatabaseId;
-		return $class::constructFromData( $this->_data );
-	}
-
+	
 	/**
 	 * Do Moderator Action
 	 *
-	 * @param string $action	The action
-	 * @param Member|NULL	$member	The member doing the action (NULL for currently logged in member)
-	 * @param string|null $reason	Reason (for hides)
-	 * @param bool $immediately Delete Immediately
+	 * @param	string				$action	The action
+	 * @param	\IPS\Member|NULL	$member	The member doing the action (NULL for currently logged in member)
+	 * @param	string|NULL			$reason	Reason (for hides)
+	 * @param	bool				$immediately	Delete Immediately
 	 * @return	void
-	 * @throws	OutOfRangeException|InvalidArgumentException|RuntimeException
+	 * @throws	\OutOfRangeException|\InvalidArgumentException|\RuntimeException
 	 */
-	public function modAction( string $action, ?Member $member = NULL, mixed $reason = NULL, bool $immediately=FALSE ): void
+	public function modAction( $action, \IPS\Member $member = NULL, $reason = NULL, $immediately = FALSE )
 	{
 		parent::modAction( $action, $member, $reason, $immediately );
 		
@@ -2266,11 +2215,11 @@ class Records extends Item implements
 	/**
 	 * Move
 	 *
-	 * @param	Model	$container	Container to move to
-	 * @param bool $keepLink	If TRUE, will keep a link in the source
+	 * @param	\IPS\Node\Model	$container	Container to move to
+	 * @param	bool			$keepLink	If TRUE, will keep a link in the source
 	 * @return	void
 	 */
-	public function move( Model $container, bool $keepLink=FALSE ): void
+	public function move( \IPS\Node\Model $container, $keepLink=FALSE )
 	{
 		parent::move( $container, $keepLink );
 
@@ -2283,20 +2232,20 @@ class Records extends Item implements
 	/**
 	 * Get comments
 	 *
-	 * @param int|null $limit The number to get (NULL to use static::getCommentsPerPage())
-	 * @param int|null $offset The number to start at (NULL to examine \IPS\Request::i()->page)
-	 * @param string $order The column to order by
-	 * @param string $orderDirection "asc" or "desc"
-	 * @param Member|null $member If specified, will only get comments by that member
-	 * @param bool|null $includeHiddenComments Include hidden comments or not? NULL to base of currently logged in member's permissions
-	 * @param DateTime|null $cutoff If an \IPS\DateTime object is provided, only comments posted AFTER that date will be included
-	 * @param mixed $extraWhereClause Additional where clause(s) (see \IPS\Db::build for details)
-	 * @param bool|null $bypassCache Used in cases where comments may have already been loaded i.e. splitting comments on an item.
-	 * @param bool $includeDeleted Include Deleted Comments
-	 * @param bool|null $canViewWarn TRUE to include Warning information, NULL to determine automatically based on moderator permissions.
-	 * @return    array|NULL|Comment    If $limit is 1, will return \IPS\Content\Comment or NULL for no results. For any other number, will return an array.
+	 * @param	int|NULL			$limit					The number to get (NULL to use static::getCommentsPerPage())
+	 * @param	int|NULL			$offset					The number to start at (NULL to examine \IPS\Request::i()->page)
+	 * @param	string				$order					The column to order by
+	 * @param	string				$orderDirection			"asc" or "desc"
+	 * @param	\IPS\Member|NULL	$member					If specified, will only get comments by that member
+	 * @param	bool|NULL			$includeHiddenComments	Include hidden comments or not? NULL to base of currently logged in member's permissions
+	 * @param	\IPS\DateTime|NULL	$cutoff					If an \IPS\DateTime object is provided, only comments posted AFTER that date will be included
+	 * @param	mixed				$extraWhereClause	Additional where clause(s) (see \IPS\Db::build for details)
+	 * @param	bool|NULL			$bypassCache			Used in cases where comments may have already been loaded i.e. splitting comments on an item.
+	 * @param	bool				$includeDeleted			Include deleted content.
+	 * @param	bool|NULL			$canViewWarn			TRUE to include Warning information, NULL to determine automatically based on moderator permissions.
+	 * @return	array|NULL|\IPS\Content\Comment	If $limit is 1, will return \IPS\Content\Comment or NULL for no results. For any other number, will return an array.
 	 */
-	public function comments( ?int $limit=NULL, ?int $offset=NULL, string $order='date', string $orderDirection='asc', ?Member $member=NULL, ?bool $includeHiddenComments=NULL, ?DateTime $cutoff=NULL, mixed $extraWhereClause=NULL, bool $bypassCache=FALSE, bool $includeDeleted=FALSE, ?bool $canViewWarn=NULL ): array|NULL|Comment
+	public function comments( $limit=NULL, $offset=NULL, $order='date', $orderDirection='asc', $member=NULL, $includeHiddenComments=NULL, $cutoff=NULL, $extraWhereClause=NULL, $bypassCache=FALSE, $includeDeleted=FALSE, $canViewWarn=NULL )
 	{
 		if ( $this->useForumComments() )
 		{
@@ -2305,7 +2254,7 @@ class Records extends Item implements
 			/* If we are pulling in ASC order we want to jump up by 1 to account for the first post, which is not a comment */
 			if( mb_strtolower( $orderDirection ) == 'asc' )
 			{
-				$_pageValue = ( Request::i()->page ? intval( Request::i()->page ) : 1 );
+				$_pageValue = ( \IPS\Request::i()->page ? \intval( \IPS\Request::i()->page ) : 1 );
 
 				if( $_pageValue < 1 )
 				{
@@ -2314,14 +2263,13 @@ class Records extends Item implements
 				
 				$offset = ( ( $_pageValue - 1 ) * static::getCommentsPerPage() ) + 1;
 			}
-
-			/* @var	$recordClass Records */
+			
 			return $recordClass::load( $this->record_topicid )->comments( $limit, $offset, $order, $orderDirection, $member, $includeHiddenComments, $cutoff, $extraWhereClause, $bypassCache, $includeDeleted, $canViewWarn );
 		}
 		else
 		{
 			/* Because this is a static property, it may have been overridden by a block on the same page. */
-			if ( get_called_class() != 'IPS\cms\Records\RecordsTopicSync' . static::$customDatabaseId )
+			if ( \get_called_class() != 'IPS\cms\Records\RecordsTopicSync' . static::$customDatabaseId )
 			{
 				static::$commentClass = 'IPS\cms\Records\Comment' . static::$customDatabaseId;
 			}
@@ -2334,7 +2282,7 @@ class Records extends Item implements
 			
 			if( $extraWhereClause !== NULL )
 			{
-				if ( !is_array( $extraWhereClause ) or !is_array( $extraWhereClause[0] ) )
+				if ( !\is_array( $extraWhereClause ) or !\is_array( $extraWhereClause[0] ) )
 				{
 					$extraWhereClause = array( $extraWhereClause );
 				}
@@ -2351,18 +2299,15 @@ class Records extends Item implements
 	 *
 	 * @return	int
 	 */
-	public function reviewPageCount(): int
+	public function reviewPageCount()
 	{
 		if ( $this->reviewPageCount === NULL )
 		{
-			/* @var Review $reviewClass */
-			/* @var array $databaseColumnMap */
 			$reviewClass = static::$reviewClass;
 			$idColumn = static::$databaseColumnId;
-			/* @var array $databaseColumnMap */
 			$where = array( array( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['item'] . '=?', $this->$idColumn ) );
 			$where[] = array( 'review_database_id=?', static::$customDatabaseId );
-			$count = $reviewClass::getItemsWithPermission( $where, NULL, NULL, 'read', Filter::FILTER_AUTOMATIC, 0, NULL, FALSE, FALSE, FALSE, TRUE );
+			$count = $reviewClass::getItemsWithPermission( $where, NULL, NULL, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, FALSE, FALSE, FALSE, TRUE );
 			$this->reviewPageCount = ceil( $count / static::$reviewsPerPage );
 
 			if( $this->reviewPageCount < 1 )
@@ -2376,20 +2321,19 @@ class Records extends Item implements
 	/**
 	 * Get reviews
 	 *
-	 * @param int|null $limit The number to get (NULL to use static::getCommentsPerPage())
-	 * @param int|null $offset The number to start at (NULL to examine \IPS\Request::i()->page)
-	 * @param string|null $order The column to order by (NULL to examine \IPS\Request::i()->sort)
-	 * @param string $orderDirection "asc" or "desc" (NULL to examine \IPS\Request::i()->sort)
-	 * @param Member|null $member If specified, will only get comments by that member
-	 * @param bool|null $includeHiddenReviews
-	 * @param DateTime|null $cutoff If an \IPS\DateTime object is provided, only comments posted AFTER that date will be included
-	 * @param mixed $extraWhereClause Additional where clause(s) (see \IPS\Db::build for details)
-	 * @param bool|null $bypassCache
-	 * @param bool $includeDeleted Include deleted content
-	 * @param bool|null $canViewWarn TRUE to include Warning information, NULL to determine automatically based on moderator permissions.
-	 * @return    array|NULL|Review    If $limit is 1, will return \IPS\Content\Comment or NULL for no results. For any other number, will return an array.
+	 * @param	int|NULL			$limit					The number to get (NULL to use static::getCommentsPerPage())
+	 * @param	int|NULL			$offset					The number to start at (NULL to examine \IPS\Request::i()->page)
+	 * @param	string				$order					The column to order by (NULL to examine \IPS\Request::i()->sort)
+	 * @param	string				$orderDirection			"asc" or "desc" (NULL to examine \IPS\Request::i()->sort)
+	 * @param	\IPS\Member|NULL	$member					If specified, will only get comments by that member
+	 * @param	bool|NULL			$includeHiddenReviews	Include hidden comments or not? NULL to base of currently logged in member's permissions
+	 * @param	\IPS\DateTime|NULL	$cutoff					If an \IPS\DateTime object is provided, only comments posted AFTER that date will be included
+	 * @param	mixed				$extraWhereClause		Additional where clause(s) (see \IPS\Db::build for details)
+	 * @param	bool				$includeDeleted			Include deleted content
+	 * @param	bool|NULL			$canViewWarn			TRUE to include Warning information, NULL to determine automatically based on moderator permissions.
+	 * @return	array|NULL|\IPS\Content\Comment	If $limit is 1, will return \IPS\Content\Comment or NULL for no results. For any other number, will return an array.
 	 */
-	public function reviews( ?int $limit=NULL, ?int $offset=NULL, ?string $order='date', string $orderDirection='asc', ?Member $member=NULL, ?bool $includeHiddenReviews=NULL, ?DateTime $cutoff=NULL, mixed $extraWhereClause=NULL, bool $bypassCache=FALSE, bool $includeDeleted=FALSE, ?bool $canViewWarn=NULL ): array|NULL|Review
+	public function reviews( $limit=NULL, $offset=NULL, $order=NULL, $orderDirection='desc', $member=NULL, $includeHiddenReviews=NULL, $cutoff=NULL, $extraWhereClause=NULL, $includeDeleted=FALSE, $canViewWarn=NULL )
 	{
 		$where = array( array( 'review_database_id=?', static::$customDatabaseId ) );
 
@@ -2401,17 +2345,17 @@ class Records extends Item implements
 	 *
 	 * @return	array
 	 */
-	public function commentReviewTabs(): array
+	public function commentReviewTabs()
 	{
 		$tabs = array();
 		if ( static::database()->options['reviews'] )
 		{
-			$tabs['reviews'] = Member::loggedIn()->language()->addToStack( 'cms_review_count', TRUE, array( 'pluralize' => array( $this->mapped('num_reviews') ) ) );
+			$tabs['reviews'] = \IPS\Member::loggedIn()->language()->addToStack( 'cms_review_count', TRUE, array( 'pluralize' => array( $this->mapped('num_reviews') ) ) );
 		}
 		if ( static::database()->options['comments'] )
 		{
 			$count = $this->mapped('num_comments');
-			if ( Application::appIsEnabled('forums') and $this->_forum_comments and $topic = $this->topic() )
+			if ( \IPS\Application::appIsEnabled('forums') and $this->_forum_comments and $topic = $this->topic() )
 			{
 				if ( $count != ( $topic->posts - 1 ) )
 				{
@@ -2422,7 +2366,7 @@ class Records extends Item implements
 				$count = ( $topic->posts - 1 ) > 0 ? $topic->posts - 1 : 0;
 			}
 			
-			$tabs['comments'] = Member::loggedIn()->language()->addToStack( 'cms_comment_count', TRUE, array( 'pluralize' => array( $count ) ) );
+			$tabs['comments'] = \IPS\Member::loggedIn()->language()->addToStack( 'cms_comment_count', TRUE, array( 'pluralize' => array( $count ) ) );
 		}
 
 		return $tabs;
@@ -2431,47 +2375,89 @@ class Records extends Item implements
 	/**
 	 * Get comment/review output
 	 *
-	 * @param string|null $tab Active tab
-	 * @return    string
+	 * @param	string	$tab	Active tab
+	 * @return	string
 	 */
-	public function commentReviews( string $tab=NULL ): string
+	public function commentReviews( $tab )
 	{
 		if ( $tab === 'reviews' )
 		{
-			return (string) \IPS\cms\Theme::i()->getTemplate( static::database()->template_display, 'cms', 'database' )->reviews( $this );
+			return \IPS\cms\Theme::i()->getTemplate( static::database()->template_display, 'cms', 'database' )->reviews( $this );
 		}
 		elseif( $tab === 'comments' )
 		{
-			return (string) \IPS\cms\Theme::i()->getTemplate( static::database()->template_display, 'cms', 'database' )->comments( $this );
+			return \IPS\cms\Theme::i()->getTemplate( static::database()->template_display, 'cms', 'database' )->comments( $this );
 		}
 
 		return '';
 	}
 
 	/**
+	 * Should new items be moderated?
+	 *
+	 * @param	\IPS\Member		$member							The member posting
+	 * @param	\IPS\Node\Model	$container						The container
+	 * @param	bool			$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @return	bool
+	 */
+	public static function moderateNewItems( \IPS\Member $member, \IPS\Node\Model $container = NULL, $considerPostBeforeRegistering = FALSE )
+	{
+		if ( static::database()->record_approve and !$member->group['g_avoid_q'] )
+		{
+			return !static::modPermission( 'approve', $member, $container );
+		}
+
+		return parent::moderateNewItems( $member, $container, $considerPostBeforeRegistering );
+	}
+
+	/**
+	 * Should new comments be moderated?
+	 *
+	 * @param	\IPS\Member	$member							The member posting
+	 * @param	bool		$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @return	bool
+	 */
+	public function moderateNewComments( \IPS\Member $member, $considerPostBeforeRegistering = FALSE )
+	{
+		return ( static::database()->options['comments_mod'] and !$member->group['g_avoid_q'] ) or parent::moderateNewComments( $member, $considerPostBeforeRegistering );
+	}
+
+	/**
+	 * Should new reviews be moderated?
+	 *
+	 * @param	\IPS\Member	$member							The member posting
+	 * @param	bool		$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @return	bool
+	 */
+	public function moderateNewReviews( \IPS\Member $member, $considerPostBeforeRegistering = FALSE )
+	{
+		return ( static::database()->options['reviews_mod'] and !$member->group['g_avoid_q'] ) or parent::moderateNewReviews( $member, $considerPostBeforeRegistering );
+	}
+
+	/**
 	 * @brief Skip topic creation, useful if the topic may already exist
 	 */
-	public static bool $skipTopicCreation = FALSE;
+	public static $skipTopicCreation = FALSE;
 
 	/**
 	 * @brief Are we creating a record? Ignore topic syncs until we are done if so.
 	 */
-	protected static bool $creatingRecord = FALSE;
+	protected static $creatingRecord = FALSE;
 
 	/**
 	 * @brief Store the member we are creating with if not the logged in member
 	 */
-	protected static ?Member $createWithMember = NULL;
+	protected static $createWithMember = NULL;
 
 	/**
 	 * Create from form
 	 *
-	 * @param array $values Values from form
-	 * @param Model|null $container Container (e.g. forum), if appropriate
-	 * @param bool $sendNotification TRUE to automatically send new content notifications (useful for items that may be uploaded in bulk)
-	 * @return    static
+	 * @param	array					$values				Values from form
+	 * @param	\IPS\Node\Model|NULL	$container			Container (e.g. forum), if appropriate
+	 * @param	bool					$sendNotification	Send Notification
+	 * @return	\IPS\cms\Records
 	 */
-	public static function createFromForm( array $values, Model $container = NULL, bool $sendNotification = TRUE ): static
+	public static function createFromForm( $values, \IPS\Node\Model $container = NULL, $sendNotification = TRUE )
 	{
 		if ( isset( $values['record_author_choice'] ) and $values['record_author_choice'] == 'notme' )
 		{
@@ -2482,23 +2468,52 @@ class Records extends Item implements
 		$record = parent::createFromForm( $values, $container, $sendNotification );
 		static::$creatingRecord = FALSE;
 
+		if ( !static::$skipTopicCreation and \IPS\Application::appIsEnabled('forums') and $record->_forum_record and $record->_forum_forum and ! $record->hidden() and ! $record->record_future_date )
+		{
+			try
+			{
+				$record->syncTopic();
+			}
+			catch( \Exception $ex ) { }
+		}
+
 		return $record;
 	}
 
 	/**
 	 * Create generic object
 	 *
-	 * @param Member $author The author
-	 * @param string|null $ipAddress The IP address
-	 * @param DateTime $time The time
-	 * @param Model|null $container Container (e.g. forum), if appropriate
-	 * @param bool|null $hidden Hidden? (NULL to work our automatically)
-	 * @return    static
+	 * @param	\IPS\Member				$author		The author
+	 * @param	string|NULL				$ipAddress	The IP address
+	 * @param	\IPS\DateTime			$time		The time
+	 * @param	\IPS\Node\Model|NULL	$container	Container (e.g. forum), if appropriate
+	 * @param	bool|NULL				$hidden		Hidden? (NULL to work our automatically)
+	 * @return	static
 	 */
-	public static function createItem( Member $author, ?string $ipAddress, DateTime $time, Model $container = NULL, bool $hidden=NULL ): static
+	public static function createItem( \IPS\Member $author, $ipAddress, \IPS\DateTime $time, \IPS\Node\Model $container = NULL, $hidden=NULL )
 	{
 		/* This is fired inside createFromForm, and we need to switch the author? */
 		return parent::createItem( static::$createWithMember !== NULL ? static::$createWithMember : $author, $ipAddress, $time, $container, $hidden );
+	}
+
+	/**
+	 * Process after the object has been edited on the front-end
+	 *
+	 * @param	array	$values		Values from form
+	 * @return	void
+	 */
+	public function processAfterEdit( $values )
+	{
+		if ( \IPS\Application::appIsEnabled('forums') and $this->_forum_record and $this->_forum_forum and ! $this->hidden() and ! $this->record_future_date )
+		{
+			try
+			{
+				$this->syncTopic();
+			}
+			catch( \Exception $ex ) { }
+		}
+
+		parent::processAfterEdit( $values );
 	}
 
 	/**
@@ -2507,10 +2522,10 @@ class Records extends Item implements
 	 * @param mixed $row
 	 * @return string
 	 */
-	public function processItemFieldData(Fields $row ): string
+	public function processItemFieldData( \IPS\cms\Fields $row ): string
 	{
 		$idColumn = static::$databaseColumnId;
-		Db::i()->delete( 'cms_database_fields_reciprocal_map', array('map_origin_database_id=? and map_field_id=? and map_origin_item_id=?', static::$customDatabaseId, $row->id, $this->_id) );
+		\IPS\Db::i()->delete( 'cms_database_fields_reciprocal_map', array('map_origin_database_id=? and map_field_id=? and map_origin_item_id=?', static::$customDatabaseId, $row->id, $this->_id) );
 
 		$field = 'field_' . $row->id;
 		$extra = $row->extra;
@@ -2520,7 +2535,7 @@ class Records extends Item implements
 			{
 				if ( $foreignId )
 				{
-					Db::i()->insert( 'cms_database_fields_reciprocal_map', array(
+					\IPS\Db::i()->insert( 'cms_database_fields_reciprocal_map', array(
 						'map_origin_database_id' => static::$customDatabaseId,
 						'map_foreign_database_id' => $extra['database'],
 						'map_origin_item_id' => $this->$idColumn,
@@ -2532,14 +2547,33 @@ class Records extends Item implements
 		}
 		return $field;
 	}
+
+	/**
+	 * Callback to execute when tags are edited
+	 *
+	 * @return	void
+	 */
+	protected function processAfterTagUpdate()
+	{
+		parent::processAfterTagUpdate();
+
+		if ( \IPS\Application::appIsEnabled('forums') and $this->_forum_record and $this->_forum_forum and ! $this->hidden() and ! $this->record_future_date )
+		{
+			try
+			{
+				$this->syncTopic();
+			}
+			catch( \Exception $ex ) { }
+		}
+	}
 	
 	/**
 	 * Process the comment form
 	 *
 	 * @param	array	$values		Array of `$form` values
-	 * @return  Comment
+	 * @return  \IPS\Content\Comment
 	 */
-	public function processCommentForm( array $values ): Comment
+	public function processCommentForm( $values )
 	{
 		if ( $this->useForumComments() )
 		{
@@ -2551,10 +2585,10 @@ class Records extends Item implements
 				{
 					$this->syncTopic();
 				}
-				catch( Exception $ex ) { }
+				catch( \Exception $ex ) { }
 				
 				/* Try again */
-				/** @var Topic $topic */
+				/** @var \IPS\forums\Topic $topic */
 				$topic = $this->topic( FALSE );
 				if ( ! $topic or $topic->isArchived() )
 				{
@@ -2563,7 +2597,7 @@ class Records extends Item implements
 			}
 			
 			$comment = $values[ static::$formLangPrefix . 'comment' . '_' . $this->_id ];
-			$post    = Post::create( $topic, $comment, false, ( $values['guest_name'] ?? null ) );
+			$post    = \IPS\forums\Topic\Post::create( $topic, $comment, FALSE, ( isset( $values['guest_name'] ) ? $values['guest_name'] : NULL ) );
 			
 			$commentClass = 'IPS\cms\Records\CommentTopicSync' . static::$customDatabaseId;
 
@@ -2571,11 +2605,11 @@ class Records extends Item implements
 			$autoSaveKey = 'reply-' . static::$application . '/' . static::$module  . '-' . $this->$idColumn;
 
 			/* First we have to update the attachment location key */
-			Db::i()->update( 'core_attachments_map', array( 'location_key' => 'forums_Forums' ), array( 'temp=?', md5( $autoSaveKey ) ) );
+			\IPS\Db::i()->update( 'core_attachments_map', array( 'location_key' => 'forums_Forums' ), array( 'temp=?', md5( $autoSaveKey ) ) );
 
 			/* Then "claim" the attachments */
 			$parameters = array_merge( array( $autoSaveKey ), $post->attachmentIds() );
-			File::claimAttachments( ...$parameters );
+			\IPS\File::claimAttachments( ...$parameters );
 			
 			$topic->markRead();
 			
@@ -2585,14 +2619,8 @@ class Records extends Item implements
 				$post->setAnonymous( $values[ 'post_anonymously' ] );
 				$this->syncRecordFromTopic( $topic );
 			}
-
-			/* @var	$commentClass Records\Comment */
-			$comment = $commentClass::load( $post->pid );
-
-			/* Fire the event here because we don't run the parent method */
-			Event::fire( 'onCreateOrEdit', $comment, array( $values, TRUE ) );
-
-			return $comment;
+			
+			return $commentClass::load( $post->pid );
 			
 		}
 		else
@@ -2602,36 +2630,120 @@ class Records extends Item implements
 	}
 	
 	/**
-	 * Syncing to run when publishing something previously pending publishing
+	 * Syncing to run when hiding
 	 *
-	 * @param	Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
 	 * @return	void
 	 */
-	public function onPublish( Member|false|null $member ) : void
+	public function onHide( $member )
 	{
-		$this->_onPublish( $member );
+		parent::onHide( $member );
+		if ( \IPS\Application::appIsEnabled('forums') and $topic = $this->topic() )
+		{
+			$topic->hide( $member );
+		}
+	}
+	
+	/**
+	 * Syncing to run when publishing something previously pending publishing
+	 *
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @return	void
+	 */
+	public function onPublish( $member )
+	{
+		parent::onPublish( $member );
 
 		/* If last topic/review columns are in the future, reset them or the content will indefinitely show as unread */
 		$this->record_last_review = ( $this->record_last_review > $this->record_publish_date ) ? $this->record_publish_date : $this->record_last_review;
 		$this->record_last_comment = ( $this->record_last_comment > $this->record_publish_date ) ? $this->record_publish_date : $this->record_last_comment;
 		$this->save();
+
+		if ( \IPS\Application::appIsEnabled('forums') )
+		{
+			if ( $topic = $this->topic() )
+			{
+				if ( $topic->hidden() )
+				{
+					$topic->unhide( $member );
+				}
+			}
+			else if ( $this->_forum_forum )
+			{
+				try
+				{
+					$this->syncTopic();
+				}
+				catch( \Exception $ex ) { }
+			}
+		}
+	}
+	
+	/**
+	 * Syncing to run when unpublishing an item (making it a future dated entry when it was already published)
+	 *
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @return	void
+	 */
+	public function onUnpublish( $member )
+	{
+		parent::onUnpublish( $member );
+		if ( \IPS\Application::appIsEnabled('forums') AND $topic = $this->topic() )
+		{
+			$topic->hide( $member );
+		}
 	}
 	
 	/**
 	 * Syncing to run when unhiding
 	 *
 	 * @param	bool					$approving	If true, is being approved for the first time
-	 * @param	Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
 	 * @return	void
 	 */
-	public function onUnhide( bool $approving, Member|bool|null $member ) : void
+	public function onUnhide( $approving, $member )
 	{
-		$this->_onUnhide( $approving, $member );
+		parent::onUnhide( $approving, $member );
 		
 		if ( $this->record_expiry_date )
 		{
 			$this->record_expiry_date = 0;
 			$this->save();
+		}
+		
+		if ( \IPS\Application::appIsEnabled('forums') )
+		{
+			if ( $topic = $this->topic() )
+			{ 
+				$topic->unhide( $member );
+			}
+			elseif ( $this->_forum_forum and ! $this->isFutureDate() )
+			{
+				try
+				{
+					$this->syncTopic();
+				}
+				catch( \Exception $ex ) { };
+			}
+		}
+	}
+
+	/**
+	 * Change Author
+	 *
+	 * @param	\IPS\Member	$newAuthor	The new author
+	 * @param	bool		$log		If TRUE, action will be logged to moderator log
+	 * @return	void
+	 */
+	public function changeAuthor( \IPS\Member $newAuthor, $log=TRUE )
+	{
+		parent::changeAuthor( $newAuthor, $log );
+
+		$topic = $this->topic();
+
+		if ( $topic )
+		{
+			$topic->changeAuthor( $newAuthor, $log );
 		}
 	}
 	
@@ -2639,20 +2751,20 @@ class Records extends Item implements
 	 * Get last comment author
 	 * Overloaded for the bump on edit shenanigans 
 	 *
-	 * @return	Member
-	 * @throws	BadMethodCallException
+	 * @return	\IPS\Member
+	 * @throws	\BadMethodCallException
 	 */
-	public function lastCommenter(): Member
+	public function lastCommenter()
 	{
-		if ( ( static::database()->_comment_bump & ( Databases::BUMP_ON_EDIT + Databases::BUMP_ON_COMMENT ) and $this->record_edit_time > 0 and $this->record_edit_time > $this->record_last_comment ) OR
-			 ( ( static::database()->_comment_bump & Databases::BUMP_ON_EDIT ) and !( static::database()->_comment_bump & ( Databases::BUMP_ON_EDIT + Databases::BUMP_ON_COMMENT ) ) and $this->record_edit_time > 0 ) )
+		if ( ( static::database()->_comment_bump & ( \IPS\cms\Databases::BUMP_ON_EDIT + \IPS\cms\Databases::BUMP_ON_COMMENT ) and $this->record_edit_time > 0 and $this->record_edit_time > $this->record_last_comment ) OR
+			 ( ( static::database()->_comment_bump & \IPS\cms\Databases::BUMP_ON_EDIT ) and !( static::database()->_comment_bump & ( \IPS\cms\Databases::BUMP_ON_EDIT + \IPS\cms\Databases::BUMP_ON_COMMENT ) ) and $this->record_edit_time > 0 ) )
 		{
 			try
 			{
-				$this->_lastCommenter = Member::load( $this->record_edit_member_id );
+				$this->_lastCommenter = \IPS\Member::load( $this->record_edit_member_id );
 				return $this->_lastCommenter;
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 		
 		return parent::lastCommenter();
@@ -2661,27 +2773,26 @@ class Records extends Item implements
 	/**
 	 * Is this topic linked to a record?
      *
-     * @param   Topic   $topic  Forums topic
+     * @param   \IPS\forums\Topic   $topic  Forums topic
 	 * @return boolean
 	 */
-	public static function topicIsLinked( Topic $topic ) : bool
+	public static function topicIsLinked( $topic )
 	{
-		return !((static::getLinkedRecord($topic) === NULL));
+		return ( static::getLinkedRecord( $topic ) === NULL ) ? FALSE : TRUE;
 	}
 
 	/**
 	 * @brief	Cached linked record checks to prevent duplicate queries
 	 */
-	protected static array $linkedRecordLookup = array();
+	protected static $linkedRecordLookup = array();
 	
 	/**
 	 * Is this topic linked to a record?
      *
-     * @param   Item   $topic  Forums topic
-	 * @return  Records|NULL
+     * @param   \IPS\forums\Topic   $topic  Forums topic
+	 * @return  \IPS\cms\Records|NULL
 	 */
-
-	public static function getLinkedRecord( Topic $topic ) : ?Records
+	public static function getLinkedRecord( $topic )
 	{
 		if( array_key_exists( $topic->tid, static::$linkedRecordLookup ) )
 		{
@@ -2690,14 +2801,13 @@ class Records extends Item implements
 
 		static::$linkedRecordLookup[ $topic->tid ] = NULL;
 
-		foreach( Databases::databases() as $database )
+		foreach( \IPS\cms\Databases::databases() as $database )
 		{
 			try
 			{
 				if ( $database->forum_record and $database->forum_forum == $topic->container()->_id )
 				{
 					$class = '\IPS\cms\Records' . $database->id;
-					/* @var	$class Records */
 					$record = $class::load( $topic->tid, 'record_topicid' );
 				
 					if ( $record->_forum_record )
@@ -2706,19 +2816,187 @@ class Records extends Item implements
 					}
 				}
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 		
 		return static::$linkedRecordLookup[ $topic->tid ];
+	}
+	
+	/**
+	 * Get Topic (checks member's permissions)
+	 *
+	 * @param	bool	$checkPerms		Should check if the member can read the topic?
+	 * @return	\IPS\forums\Topic|NULL
+	 */
+	public function topic( $checkPerms=TRUE )
+	{
+		if ( \IPS\Application::appIsEnabled('forums') and $this->_forum_record and $this->record_topicid )
+		{
+			try
+			{
+				return $checkPerms ? \IPS\forums\Topic::loadAndCheckPerms( $this->record_topicid ) : \IPS\forums\Topic::load( $this->record_topicid );
+			}
+			catch ( \OutOfRangeException $e )
+			{
+				return NULL;
+			}
+		}
+	
+		return NULL;
+	}
+
+	/**
+	 * Post this record as a forum topic
+	 *
+	 * @param	bool		$commentCheck	Check if comments need synced as well.
+	 * @return void
+	 */
+	public function syncTopic( $commentCheck = TRUE )
+	{
+		if ( ! \IPS\Application::appIsEnabled( 'forums' ) )
+		{
+			throw new \UnexpectedValueException('content_record_no_forum_app_for_topic');
+		}
+
+		/* If we're in the middle of creating a record, don't sync the topic yet */
+		if( static::$creatingRecord === TRUE )
+		{
+			return;
+		}
+
+		/* Fetch the forum */
+		try
+		{
+			$forum = \IPS\forums\Forum::load( $this->_forum_forum );
+		}
+		catch( \OutOfRangeException $ex )
+		{
+			throw new \UnexpectedValueException('content_record_bad_forum_for_topic');
+		}
+
+		/* Run a test for the record url, this call will throw an LogicException if the database isn't associated to a page */
+		try
+		{
+			$this->url();
+		}
+		catch ( \LogicException $e )
+		{
+			$idColumn = static::$databaseColumnId;
+
+			\IPS\Log::log( sprintf( "Record %s in database %s tried to sync the topic, but failed because it has no valid url", $this->$idColumn , static::$customDatabaseId), 'cms_topicsync' );
+			return;
+		}
+
+		/* Existing topic */
+		if ( $this->record_topicid )
+		{
+			/* Get */
+			try
+			{
+				$topic = \IPS\forums\Topic::load( $this->record_topicid );
+				if ( !$topic )
+				{
+					return;
+				}
+				/* Reset cache */
+				$this->displayTitle = NULL;
+				$topic->title = $this->_forum_prefix . $this->_title . $this->_forum_suffix;
+				if ( \IPS\Settings::i()->tags_enabled )
+				{
+					$topic->setTags( $this->prefix() ? array_merge( $this->tags(), array( 'prefix' => $this->prefix() ) ) : $this->tags() );
+				}
+				
+				if ( $this->hidden() )
+				{
+					$topic->hide( FALSE );
+				}
+				else if ( $topic->hidden() )
+				{
+					$topic->unhide( FALSE );
+				}
+
+				$topic->save();
+				$firstPost = $topic->comments( 1 );
+
+				if( !$firstPost )
+				{
+					return;
+				}
+				
+				$content = \IPS\Theme::i()->getTemplate( 'submit', 'cms', 'front' )->topic( $this );
+				\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $content );
+
+				$firstPost->post = $content;
+				$firstPost->save();
+				
+				/* Reindex to update search index */
+				\IPS\Content\Search\Index::i()->index( $firstPost );
+			}
+			catch ( \OutOfRangeException $e )
+			{
+				return;
+			}
+		}
+		/* New topic */
+		else
+		{
+			/* Create topic */
+			$topic = \IPS\forums\Topic::createItem( $this->author(), \IPS\Request::i()->ipAddress(), \IPS\DateTime::ts( $this->record_publish_date ? $this->record_publish_date : $this->record_saved ), \IPS\forums\Forum::load( $this->_forum_forum ), $this->hidden() );
+			$topic->title = $this->_forum_prefix . $this->_title . $this->_forum_suffix;
+			$topic->topic_archive_status = \IPS\forums\Topic::ARCHIVE_EXCLUDE;
+			$topic->save();
+
+			if ( \IPS\Settings::i()->tags_enabled )
+			{
+				$topic->setTags( $this->prefix() ? array_merge( $this->tags(), array( 'prefix' => $this->prefix() ) ) : $this->tags() );
+			}
+
+			/* Create post */
+			$content = \IPS\Theme::i()->getTemplate( 'submit', 'cms', 'front' )->topic( $this );
+			\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $content );
+
+			$post = \IPS\forums\Topic\Post::create( $topic, $content, TRUE, NULL, NULL, $this->author(), \IPS\DateTime::ts( $this->record_publish_date ? $this->record_publish_date : $this->record_saved ) );
+			$post->save();
+
+			$topic->topic_firstpost = $post->pid;
+			$topic->save();
+			
+			if( $this->isAnonymous() )
+			{
+				$topic->setAnonymous( TRUE, $this->author() );
+				$post->setAnonymous( TRUE, $this->author() );
+			}
+
+			$topic->markRead();
+
+			/* Send notifications */
+			if ( !$topic->isFutureDate() AND !$topic->hidden() )
+			{
+				$topic->sendNotifications();
+			}
+			
+			/* Update file */
+			$this->record_topicid = $topic->tid;
+			$this->save();
+			
+			/* Do any comments need moving over? */
+			if ( $commentCheck AND $this->useForumComments() AND (bool) \IPS\Db::i()->select( 'COUNT(*)', 'cms_database_comments', array( "comment_database_id=? AND comment_record_id=?", static::$customDatabaseId, $this->primary_id_field ) )->first() )
+			{
+				\IPS\Task::queue( 'cms', 'MoveSingleRecord', array( 'databaseId' => static::$customDatabaseId, 'recordId' => $this->primary_id_field, 'to' => 'forums' ), 3, array( 'databaseId', 'recordId', 'to' ) );
+			}
+			
+			/* Reindex to update search index */
+			\IPS\Content\Search\Index::i()->index( $post );
+		}
 	}
 
 	/**
 	 * Sync topic details to the record
 	 *
-	 * @param   Topic   $topic  Forums topic
+	 * @param   \IPS\forums\Topic   $topic  Forums topic
 	 * @return  void
 	 */
-	public function syncRecordFromTopic( Topic $topic ) : void
+	public function syncRecordFromTopic( $topic )
 	{
 		if ( $this->_forum_record and $this->_forum_forum and $this->_forum_comments )
 		{
@@ -2737,10 +3015,9 @@ class Records extends Item implements
 	 * 
 	 * @return array
 	 */
-	public function topicFields() : array
+	public function topicFields()
 	{
 		$fieldsClass = 'IPS\cms\Fields' . static::$customDatabaseId;
-		/* @var	$fieldsClass Fields */
 		$fieldData   = $fieldsClass::data( 'view', $this->container() );
 		$fieldValues = $fieldsClass::display( $this->fieldValues(), 'record', $this->container(), 'id' );
 
@@ -2760,7 +3037,7 @@ class Records extends Item implements
 			}
 		}
 
-		if ( ! count( $fields ) )
+		if ( ! \count( $fields ) )
 		{
 			$fields[ static::database()->field_content ] = $fieldValues['content'];
 		}
@@ -2771,7 +3048,7 @@ class Records extends Item implements
 	/**
 	 * @brief	Store the comment page count otherwise $topic->posts is reduced by 1 each time it is called
 	 */
-	protected ?int $recordCommentPageCount = NULL;
+	protected $recordCommentPageCount = NULL;
 	
 	/**
 	 * Get comment page count
@@ -2779,59 +3056,64 @@ class Records extends Item implements
 	 * @param	bool		$recache		TRUE to recache the value
 	 * @return	int
 	 */
-	public function commentPageCount( bool $recache=FALSE ): int
+	public function commentPageCount( $recache=FALSE )
 	{
 		if ( $this->recordCommentPageCount === NULL or $recache === TRUE )
 		{
-			if ( $this->useForumComments() )
-			{
-				try
-				{
-					$topic = $this->topic();
-
-					if ( $topic !== null )
-					{
-						/* Store the real count so it is not accidentally written as the actual value */
-						$realCount = $topic->posts;
-
-						/* If we are NOT featuring the first post in the topics, then we need to
-						compensate for the first post (which is actually the record) */
-						if ( !Member::loggedIn()->getLayoutValue( 'forum_topic_view_firstpost' ) )
-						{
-							$topic->posts = ( $topic->posts - 1 ) > 0 ? $topic->posts - 1 : 0;
-						}
-
-						/* Get our page count considering all of that */
-						$this->recordCommentPageCount = $topic->commentPageCount();
-
-						/* Reset the count back to the real count */
-						$topic->posts = $realCount;
-					}
-					else
-					{
-						$this->recordCommentPageCount = 1;
-					}
-				}
-				catch ( Exception $e ) {}
-			}
-			else
+			/* If the database has a custom per page set, use that. */
+			if ( static::database()->comments_perpage )
 			{
 				$this->recordCommentPageCount = parent::commentPageCount( $recache );
 			}
+			/* Otherwise do the normal stuff */
+			else
+			{
+				if ( $this->useForumComments() )
+				{
+					try
+					{
+						$topic = $this->topic();
+		
+						if( $topic !== NULL )
+						{
+							/* Store the real count so it is not accidentally written as the actual value */
+							$realCount = $topic->posts;
+							
+							/* Compensate for the first post (which is actually the record) */
+							$topic->posts = ( $topic->posts - 1 ) > 0 ? $topic->posts - 1 : 0;
+							
+							/* Get our page count considering all of that */
+							$this->recordCommentPageCount = $topic->commentPageCount();
+							
+							/* Reset the count back to the real count */
+							$topic->posts = $realCount;
+						}
+						else
+						{
+							$this->recordCommentPageCount = 1;
+						}
+					}
+					catch( \Exception $e ) { }
+				}
+				else
+				{
+					$this->recordCommentPageCount = parent::commentPageCount( $recache );
+				}
+			}
 		}
 		
-		return $this->recordCommentPageCount ?? 1;
+		return $this->recordCommentPageCount;
 	}
 
 	/**
 	 * Log for deletion later
 	 *
-	 * @param	Member|null 	$member	The member, NULL for currently logged in, or FALSE for no member
+	 * @param	\IPS\Member|NULL 	$member	The member, NULL for currently logged in, or FALSE for no member
 	 * @return	void
 	 */
-	public function logDelete( Member $member = NULL ) : void
+	public function logDelete( $member = NULL )
 	{
-		$this->_logDelete( $member );
+		parent::logDelete( $member );
 
 		if ( $topic = $this->topic() and $this->_forum_delete )
 		{
@@ -2842,9 +3124,9 @@ class Records extends Item implements
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		$topic        = $this->topic();
 		$commentClass = static::$commentClass;
@@ -2864,23 +3146,22 @@ class Records extends Item implements
 		{
 			try
 			{
-				File::get( 'cms_Records', $this->record_image )->delete();
+				\IPS\File::get( 'cms_Records', $this->record_image )->delete();
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 		}
 
 		if ( $this->record_image_thumb )
 		{
 			try
 			{
-				File::get( 'cms_Records', $this->record_image_thumb )->delete();
+				\IPS\File::get( 'cms_Records', $this->record_image_thumb )->delete();
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
 		/* Clean up any other uploaded files */
 		$fieldsClass = '\IPS\cms\Fields' . static::$customDatabaseId;
-		/* @var	$fieldsClass Fields */
 		foreach( $fieldsClass::roots( NULL ) as $id => $field )
 		{
 			if( $field->type == 'Upload' )
@@ -2891,25 +3172,25 @@ class Records extends Item implements
 				{
 					try
 					{
-						File::get( 'cms_Records', $this->$fieldName )->delete();
+						\IPS\File::get( 'cms_Records', $this->$fieldName )->delete();
 					}
-					catch( Exception $e ){}
+					catch( \Exception $e ){}
 				}
 
 				/* Delete thumbnails */
-				foreach( Db::i()->select( '*', 'cms_database_fields_thumbnails', array( array( 'thumb_field_id=? AND thumb_record_id=?', $field->id, $this->primary_id_field ) ) ) as $thumb )
+				foreach( \IPS\Db::i()->select( '*', 'cms_database_fields_thumbnails', array( array( 'thumb_field_id=? AND thumb_record_id=?', $field->id, $this->primary_id_field ) ) ) as $thumb )
 				{
 					try
 					{
-						File::get( 'cms_Records', $thumb['thumb_location'] )->delete();
+						\IPS\File::get( 'cms_Records', $thumb['thumb_location'] )->delete();
 					}
-					catch( Exception $e ){}
+					catch( \Exception $e ){}
 				}
 			}
 		}
 
 		/* Remove any reciprocal linking */
-		Db::i()->delete( 'cms_database_fields_reciprocal_map', array( 'map_origin_database_id=? and map_origin_item_id=?', static::database()->id, $this->_id ) );
+		\IPS\Db::i()->delete( 'cms_database_fields_reciprocal_map', array( 'map_origin_database_id=? and map_origin_item_id=?', static::database()->id, $this->_id ) );
 		
 		parent::delete();
 		
@@ -2922,12 +3203,12 @@ class Records extends Item implements
 	/**
 	 * Can view?
 	 *
-	 * @param	Member|NULL	$member	The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member	The member to check for or NULL for the currently logged in member
 	 * @return	bool
 	 */
-	public function canView( Member $member=null ): bool
+	public function canView( $member=NULL )
 	{
-		if( !parent::canView( $member ) )
+		if ( !parent::canView( $member ) )
 		{
 			return FALSE;
 		}
@@ -2935,23 +3216,23 @@ class Records extends Item implements
 		/* This prevents auto share and notifications being sent out */
 		try
 		{
-			$page = Page::loadByDatabaseId( static::database()->id );
+			$page = \IPS\cms\Pages\Page::loadByDatabaseId( static::database()->id );
 			if ( !$page->can( 'view', $member ) )
 			{
 				return FALSE;
 			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			/* If the database isn't assigned to a page they won't be able to view the record */
 			return FALSE;
 		}
 
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		if ( !$this->container()->can_view_others and !$member->modPermission( 'can_content_view_others_records' ) )
 		{
-			if ( $member !== $this->author() )
+			if ( $member != $this->author() )
 			{
 				return FALSE;
 			}
@@ -2961,35 +3242,17 @@ class Records extends Item implements
 	}
 
 	/**
-	 * Check if a specific action is available for this Content.
-	 * Default to TRUE, but used for overrides in individual Item/Comment classes.
-	 *
-	 * @param string $action
-	 * @param Member|null	$member
-	 * @return bool
-	 */
-	public function actionEnabled( string $action, ?Member $member=null ) : bool
-	{
-		if( $action == 'move' and !static::database()->use_categories )
-		{
-			return FALSE;
-		}
-
-		return parent::actionEnabled( $action, $member );
-	}
-
-	/**
 	 * Get the club of this record's container if there is one
 	 *
-	 * @return Club|null
+	 * @return \IPS\Member\Club|null
 	 */
-	public function get_club() : Club|null
+	public function get_club() : \IPS\Member\Club|null
 	{
 		static $club = false;
-		if ( $club !== null and !( $club instanceof Club ) )
+		if ( $club !== null and !( $club instanceof \IPS\Member\Club ) )
 		{
 			$club = null;
-			if ( $container = $this->container() and $container instanceof Categories )
+			if ( $container = $this->container() and $container instanceof \IPS\cms\Categories )
 			{
 				$club = $container->_club;
 			}
@@ -3001,10 +3264,10 @@ class Records extends Item implements
 	 * Could edit an item?
 	 * Useful to see if one can edit something even if the cut off has expired
 	 *
-	 * @param Member|null $member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function couldEdit( ?Member $member=NULL ): bool
+	public function couldEdit( $member=NULL )
 	{
 		$couldEdit = parent::couldEdit( $member );
 		if ( $couldEdit )
@@ -3013,8 +3276,8 @@ class Records extends Item implements
 		}
 		else
 		{
-			$member = $member ?: Member::loggedIn();
-			if ( ( ( static::database()->options['indefinite_own_edit'] AND $member->member_id === $this->member_id ) OR ( $member->member_id and static::database()->all_editable ) ) AND ! $this->locked() AND in_array( $this->hidden(), array(  0, 1 ) ) )
+			$member = $member ?: \IPS\Member::loggedIn();
+			if ( ( ( static::database()->options['indefinite_own_edit'] AND $member->member_id === $this->member_id ) OR ( $member->member_id and static::database()->all_editable ) ) AND ! $this->locked() AND \in_array( $this->hidden(), array(  0, 1 ) ) )
 			{
 				return TRUE;
 			}
@@ -3028,38 +3291,49 @@ class Records extends Item implements
 	/**
 	 * Can edit?
 	 *
-	 * @param	Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canEdit( ?Member $member=NULL ): bool
+	public function canEdit( $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
-		if ( ( ( static::database()->options['indefinite_own_edit'] AND $member->member_id === $this->member_id ) OR ( $member->member_id and static::database()->all_editable ) ) AND ! $this->locked() AND in_array( $this->hidden(), array(  0, 1 ) ) )
+		$member = $member ?: \IPS\Member::loggedIn();
+		if ( ( ( static::database()->options['indefinite_own_edit'] AND $member->member_id === $this->member_id ) OR ( $member->member_id and static::database()->all_editable ) ) AND ! $this->locked() AND \in_array( $this->hidden(), array(  0, 1 ) ) )
 		{
 			return TRUE;
 		}
 
-		return parent::canEdit( $member );
+		/* Am I a Moderator with edit permissions ?*/
+		if ( static::modPermission( 'edit', $member, $this->containerWrapper() ) )
+		{
+			return TRUE;
+		}
+		
+		if ( parent::canEdit( $member ) )
+		{
+			/* Test against specific perms for this category */
+			return $this->container()->can( 'edit', $member );
+		}
+
+		return FALSE;
 	}
 	
 	/**
 	 * Can edit title?
 	 *
-	 * @param Member|null $member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canEditTitle( ?Member $member=NULL ): bool
+	public function canEditTitle( $member=NULL )
 	{
 		if ( $this->canEdit( $member ) )
 		{
 			try
 			{
 				$class = '\IPS\cms\Fields' .  static::database()->id;
-				/* @var	$class Fields */
 				$field = $class::load( static::database()->field_title );
 				return $field->can( 'edit', $member );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return FALSE;
 			}
@@ -3068,39 +3342,79 @@ class Records extends Item implements
 	}
 
 	/**
+	 * Can move?
+	 *
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @return	bool
+	 */
+	public function canMove( $member=NULL )
+	{
+		if ( ! static::database()->use_categories )
+		{
+			return FALSE;
+		}
+		
+		return parent::canMove( $member );
+	}
+
+	/**
 	 * Can manage revisions?
 	 *
-	 * @param	Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
 	 * @return	bool
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function canManageRevisions( Member $member = null ): bool
+	public function canManageRevisions( \IPS\Member $member = NULL )
 	{
 		return static::database()->revisions and static::modPermission( 'content_revisions', $member );
 	}
 
 	/**
+	 * Can comment?
+	 *
+	 * @param	\IPS\Member\NULL	$member							The member (NULL for currently logged in member)
+	 * @param	bool				$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @return	bool
+	 */
+	public function canComment( $member=NULL, $considerPostBeforeRegistering = TRUE )
+	{
+		return ( static::database()->options['comments'] and parent::canComment( $member, $considerPostBeforeRegistering ) );
+	}
+
+	/**
+	 * Can review?
+	 *
+	 * @param	\IPS\Member\NULL	$member							The member (NULL for currently logged in member)
+	 * @param	bool				$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @return	bool
+	 */
+	public function canReview( $member=NULL, $considerPostBeforeRegistering = TRUE )
+	{
+		return ( static::database()->options['reviews'] and parent::canReview( $member, $considerPostBeforeRegistering ) );
+	}
+
+	/**
 	 * During canCreate() check, verify member can access the module too
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @note	The only reason this is abstracted at this time is because Pages creates dynamic 'modules' with its dynamic records class which do not exist
 	 * @return	bool
 	 */
-	protected static function _canAccessModule( Member $member ): bool
+	protected static function _canAccessModule( \IPS\Member $member )
 	{
 		/* Can we access the module */
-		return $member->canAccessModule( Module::get( static::$application, 'database', 'front' ) );
+		return $member->canAccessModule( \IPS\Application\Module::get( static::$application, 'database', 'front' ) );
 	}
 
 	/**
 	 * Can a given member create this type of content?
 	 *
-	 * @param Member $member		The member
-	 * @param Model|NULL	$container	Container (e.g. forum), if appropriate
-	 * @param bool $showError	If TRUE, rather than returning a boolean value, will display an error
+	 * @param	\IPS\Member	$member		The member
+	 * @param	\IPS\Node\Model|NULL	$container	Container (e.g. forum), if appropriate
+	 * @param	bool		$showError	If TRUE, rather than returning a boolean value, will display an error
 	 * @return	bool
 	 */
-	public static function canCreate( Member $member, Model $container=NULL, bool $showError=FALSE ): bool
+	public static function canCreate( \IPS\Member $member, \IPS\Node\Model $container=NULL, $showError=FALSE )
 	{
 		$return = parent::canCreate( $member, $container, $showError );
 
@@ -3111,12 +3425,11 @@ class Records extends Item implements
 			try
 			{
 				$class = '\IPS\cms\Fields' .  static::database()->id;
-				/* @var $class Fields */
 				$title = $class::load( static::database()->field_title );
 				$content = $class::load( static::database()->field_content );
 				$return = $title->can( 'add', $member ) and $content->can( 'add', $member );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				$return = FALSE;
 			}
@@ -3127,7 +3440,7 @@ class Records extends Item implements
 		if ( $showError and !$return )
 		{
 			$error = 'cms_no_title_content_permission';
-			Output::i()->error( $error, '2C137/3', 403 );
+			\IPS\Output::i()->error( $error, '2C137/3', 403 );
 		}
 
 		return (bool) $return;
@@ -3136,12 +3449,12 @@ class Records extends Item implements
 	/**
 	 * Already reviewed?
 	 *
-	 * @param	Member|NULL	$member	The member (NULL for currently logged in member)
+	 * @param	\IPS\Member\NULL	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function hasReviewed( ?Member $member=NULL ): bool
+	public function hasReviewed( $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Check cache */
 		if( isset( $this->_hasReviewed[ $member->member_id ] ) and $this->_hasReviewed[ $member->member_id ] !== NULL )
@@ -3153,14 +3466,12 @@ class Records extends Item implements
 		$idColumn    = static::$databaseColumnId;
 
 		$where = array();
-		/* @var Review $reviewClass */
-		/* @var array $databaseColumnMap */
 		$where[] = array( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['item'] . '=?', $this->$idColumn );
 		$where[] = array( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['author'] . '=?', $member->member_id );
 		$where[] = array( $reviewClass::$databasePrefix . 'database_id=?', static::$customDatabaseId );
 
 
-		if ( IPS::classUsesTrait( $reviewClass, 'IPS\Content\Hideable' ) )
+		if ( \in_array( 'IPS\Content\Hideable', class_implements( $reviewClass ) ) )
 		{
 			/* Exclude content pending deletion, as it will not be shown inline  */
 			if ( isset( $reviewClass::$databaseColumnMap['approved'] ) )
@@ -3173,11 +3484,25 @@ class Records extends Item implements
 			}
 		}
 
-		$this->_hasReviewed[ $member->member_id ] = Db::i()->select(
+		$this->_hasReviewed[ $member->member_id ] = \IPS\Db::i()->select(
 			'COUNT(*)', $reviewClass::$databaseTable, $where
 		)->first();
 
 		return $this->_hasReviewed[ $member->member_id ];
+	}
+
+	/* ! Rating */
+	
+	/**
+	 * Can Rate?
+	 *
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @return	bool
+	 * @throws	\BadMethodCallException
+	 */
+	public function canRate( \IPS\Member $member = NULL )
+	{
+		return parent::canRate( $member ) and ( $this->container()->allow_rating );
 	}
 	
 	/* ! Comments */
@@ -3186,7 +3511,7 @@ class Records extends Item implements
 	 *
 	 * @return	array
 	 */
-	public function commentFormElements(): array
+	public function commentFormElements()
 	{
 		return parent::commentFormElements();
 	}
@@ -3195,9 +3520,9 @@ class Records extends Item implements
 	 * Add a comment when the filtes changed. If they changed.
 	 *
 	 * @param   array   $values   Array of new form values
-	 * @return  Records\Comment|bool
+	 * @return  \IPS\cms\Records\Comment|bool
 	 */
-	public function addCommentWhenFiltersChanged( array $values ): bool|Records\Comment
+	public function addCommentWhenFiltersChanged( $values )
 	{
 		if ( ! $this->canComment() )
 		{
@@ -3209,8 +3534,6 @@ class Records extends Item implements
 		$categoryClass = 'IPS\cms\Categories' . static::$customDatabaseId;
 		$fieldsClass   = 'IPS\cms\Fields' . static::$customDatabaseId;
 		$newValues     = array();
-		/* @var	$fieldsClass Fields */
-		/* @var	$categoryClass Categories */
 		$fieldsFields  = $fieldsClass::fields( $values, 'edit', $this->category_id ?  $categoryClass::load( $this->category_id ) : NULL, $fieldsClass::FIELD_DISPLAY_COMMENTFORM );
 
 		foreach( $currentValues as $name => $data )
@@ -3230,12 +3553,12 @@ class Records extends Item implements
 
 		foreach( $fieldsFields as $key => $field )
 		{
-			$newValues[ 'field_' . $key ] = $field::stringValue( $values[$field->name] ?? NULL );
+			$newValues[ 'field_' . $key ] = $field::stringValue( isset( $values[ $field->name ] ) ? $values[  $field->name ] : NULL );
 		}
 
 		$diff = array_diff_assoc( $currentValues, $newValues );
 
-		if ( count( $diff ) )
+		if ( \count( $diff ) )
 		{
 			$show    = array();
 			$display = $fieldsClass::display( $newValues, NULL, NULL, 'id' );
@@ -3246,20 +3569,19 @@ class Records extends Item implements
 
 				if ( $display[ $id ] )
 				{
-					$show[ $name ] = sprintf( Member::loggedIn()->language()->get( 'cms_record_field_changed' ), Member::loggedIn()->language()->get( 'content_field_' . $id ), $display[ $id ] );
+					$show[ $name ] = sprintf( \IPS\Member::loggedIn()->language()->get( 'cms_record_field_changed' ), \IPS\Member::loggedIn()->language()->get( 'content_field_' . $id ), $display[ $id ] );
 				}
 			}
 
-			if ( count( $show ) )
+			if ( \count( $show ) )
 			{
 				$post = \IPS\cms\Theme::i()->getTemplate( static::database()->template_display, 'cms', 'database' )->filtersAddComment( $show );
-				Member::loggedIn()->language()->parseOutputForDisplay( $post );
-
-				/* @var	$commentClass CommentTopicSync */
+				\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $post );
+				
 				if ( $this->useForumComments() )
 				{
 					$topic = $this->topic();
-					$post  = Post::create( $topic, $post, false );
+					$post  = \IPS\forums\Topic\Post::create( $topic, $post, FALSE );
 					
 					$commentClass = 'IPS\cms\Records\CommentTopicSync' . static::$customDatabaseId;
 					
@@ -3278,14 +3600,56 @@ class Records extends Item implements
 		return TRUE;
 	}
 
+	/* ! Tags */
+	
+	/**
+	 * Can tag?
+	 *
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	bool
+	 */
+	public static function canTag( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
+	{
+		return parent::canTag( $member, $container ) and ( static::database()->tags_enabled );
+	}
+	
+	/**
+	 * Can use prefixes?
+	 *
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	bool
+	 */
+	public static function canPrefix( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
+	{
+		return parent::canPrefix( $member, $container ) and ( ! static::database()->tags_noprefixes );
+	}
+	
+	/**
+	 * Defined Tags
+	 *
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	array
+	 */
+	public static function definedTags( \IPS\Node\Model $container = NULL )
+	{
+		if ( static::database()->tags_predefined )
+		{
+			return explode( ',', static::database()->tags_predefined );
+		}
+	
+		return parent::definedTags( $container );
+	}
+
 	/**
 	 * Use a custom table helper when building content item tables
 	 *
-	 * @param TableHelper $table	Table object to modify
+	 * @param	\IPS\Helpers\Table	$table	Table object to modify
 	 * @param	string				$currentClass	Current class
-	 * @return    TableHelper
+	 * @return	\IPS\Helpers\Table
 	 */
-	public function reputationTableCallback( TableHelper $table, string $currentClass ): TableHelper
+	public function reputationTableCallback( $table, $currentClass )
 	{
 		return $table;
 	}
@@ -3295,18 +3659,17 @@ class Records extends Item implements
 	/**
 	 * @brief	Custom Field Notification Excludes
 	 */
-	protected array $_fieldNotificationExcludes = array();
+	protected $_fieldNotificationExcludes = array();
 	
 	/**
 	 * Set notification exclusions for custom field updates.
 	 *
-	 * @param	array	$exclude		Predetermined array of member IDs to exclude
+	 * @param	string	$exclude		Predetermined array of member IDs to exclude
 	 * @return	void
 	 */
-	public function setFieldQuoteAndMentionExcludes( array $exclude = array() ): void
+	public function setFieldQuoteAndMentionExcludes( array $exclude = array() )
 	{
 		$className = 'IPS\cms\Fields' . static::$customDatabaseId;
-		/* @var $className Fields */
 		foreach( $className::data() AS $field )
 		{
 			if ( $field->type == 'Editor' )
@@ -3336,15 +3699,14 @@ class Records extends Item implements
 	/**
 	 * Send quote and mention notifications
 	 *
-	 * @param array $exclude		An array of member IDs *not* to send notifications to
+	 * @param	array	$exclude		An array of member IDs *not* to send notifications to
 	 * @return	array	Member IDs sent to
 	 */
-	protected function sendQuoteAndMentionNotifications( array $exclude=array() ): array
+	protected function sendQuoteAndMentionNotifications( $exclude=array() )
 	{
 		$data = array( 'quotes' => array(), 'mentions' => array(), 'embeds' => array() );
 		
 		$className = 'IPS\cms\Fields' .  static::$customDatabaseId;
-		/* @var $className Fields */
 		foreach ( $className::data() as $field )
 		{
 			if ( $field->type == 'Editor' )
@@ -3356,7 +3718,7 @@ class Records extends Item implements
 				{
 					$_data[ $type ] = array_filter( $memberIds, function( $memberId ) use ( $field )
 					{
-						return $field->can( 'view', Member::load( $memberId ) );
+						return $field->can( 'view', \IPS\Member::load( $memberId ) );
 					} );
 				}
 				
@@ -3367,62 +3729,53 @@ class Records extends Item implements
 		return $this->_sendQuoteAndMentionNotifications( $data, $exclude );
 	}
 
-	/**
-	 * Review Rating submitted by member
-	 *
-	 * @param	Member|NULL		$member		The member to check for (NULL for currently logged in member)
-	 * @return	int|null
-	 * @throws	BadMethodCallException
-	 */
-	public function memberReviewRating( Member|null $member = NULL ): int|NULL
-	{
-		$member = $member ?: Member::loggedIn();
+    /**
+     * Get average review rating
+     *
+     * @return	int
+     */
+    public function averageReviewRating()
+    {
+        if( $this->_averageReviewRating !== NULL )
+        {
+            return $this->_averageReviewRating;
+        }
 
-		if( $this->memberReviewRatings === null )
-		{
-			/* @var Review $reviewClass */
-			$reviewClass = static::$reviewClass;
-			$idColumn = static::$databaseColumnId;
+        $reviewClass = static::$reviewClass;
+        $idColumn = static::$databaseColumnId;
 
-			/* @var $databaseColumnMap array */
-			$where = array();
-			$where[] = array( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['item'] . '=? AND review_database_id=?', $this->$idColumn, static::$customDatabaseId );
+        $where = array();
+        $where[] = array( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['item'] . '=? AND review_database_id=?', $this->$idColumn, static::$customDatabaseId );
+        if ( \in_array( 'IPS\Content\Hideable', class_implements( $reviewClass ) ) )
+        {
+            if ( isset( $reviewClass::$databaseColumnMap['approved'] ) )
+            {
+                $where[] = array( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['approved'] . '=?', 1 );
+            }
+            elseif ( isset( $reviewClass::$databaseColumnMap['hidden'] ) )
+            {
+                $where[] = array( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['hidden'] . '=?', 0 );
+            }
+        }
 
-			if ( IPS::classUsesTrait( $reviewClass, 'IPS\Content\Hideable' ) )
-			{
-				if ( isset( $reviewClass::$databaseColumnMap['approved'] ) )
-				{
-					$where[] = array( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['approved'] . '=?', 1 );
-				}
-				elseif ( isset( $reviewClass::$databaseColumnMap['hidden'] ) )
-				{
-					$where[] = array( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['hidden'] . '=?', 0 );
-				}
-			}
+        $this->_averageReviewRating = round( \IPS\Db::i()->select( 'AVG(' . $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['rating'] . ')', $reviewClass::$databaseTable, $where )->first(), 1 );
 
-			$this->memberReviewRatings = iterator_to_array( Db::i()->select( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['rating'] . ',' . $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['author'], $reviewClass::$databaseTable, $where )
-				->setKeyField( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['author'] )
-				->setValueField( $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['rating'] ) );
-
-			$this->_averageReviewRating = count( $this->memberReviewRatings ) ? array_sum( $this->memberReviewRatings ) / count( $this->memberReviewRatings ) : 0;
-		}
-
-		return $this->memberReviewRatings[ $member->member_id ] ?? null;
-	}
+        return $this->_averageReviewRating;
+    }
 
 	/**
 	 * If, when making a post, we should merge with an existing comment, this method returns the comment to merge with
 	 *
-	 * @return	Comment|NULL
+	 * @return	\IPS\Content\Comment|NULL
 	 */
-	public function mergeConcurrentComment(): ?Comment
+	public function mergeConcurrentComment()
 	{
 		$lastComment = parent::mergeConcurrentComment();
 
 		/* If we sync to the forums, make sure that the "last comment" is not actually the first post */
 		if( $this->record_topicid AND $lastComment !== NULL )
 		{
-			$firstComment = Topic::load( $this->record_topicid )->comments( 1, 0, 'date', 'asc' );
+			$firstComment = \IPS\forums\Topic::load( $this->record_topicid )->comments( 1, 0, 'date', 'asc' );
 
 			if( $firstComment->pid == $lastComment->pid )
 			{
@@ -3432,7 +3785,7 @@ class Records extends Item implements
 
 		return $lastComment;
 	}
-
+	
 	/**
 	 * Deletion log Permissions
 	 * Usually, this is the same as searchIndexPermissions. However, some applications may restrict searching but
@@ -3443,7 +3796,7 @@ class Records extends Item implements
 	 *	@li			Number prepended by "m" indicates a member
 	 *	@li			Number prepended by "s" indicates a social group
 	 */
-	public function deleteLogPermissions(): string
+	public function deleteLogPermissions()
 	{
 		if( ! $this->container()->can_view_others )
 		{
@@ -3466,15 +3819,32 @@ class Records extends Item implements
 		
 		try
 		{
-            /* We can't use $extension->searchIndexPermissions() here because it calls for deleteLogPermissions() which makes this get caught in a loop
-               looking at v4 code, it used to call parent::searchIndexPermissions() which no longer exists as it is not a class method, but the code did
-               this below */
-            return $this->container()->searchIndexPermissions();
+			return parent::searchIndexPermissions();
 		}
-		catch ( BadMethodCallException $e )
-        {
-            return '*';
-        }
+		catch ( \LogicException $e )
+		{
+			return NULL;
+		}
+	}
+	
+	/**
+	 * Search Index Permissions
+	 * If we don't have a page, we don't want to add this to the search index
+	 *
+	 * @return	string	Comma-delimited values or '*'
+	 * 	@li			Number indicates a group
+	 *	@li			Number prepended by "m" indicates a member
+	 *	@li			Number prepended by "s" indicates a social group
+	 */
+	public function searchIndexPermissions()
+	{
+		/* We don't want to index items in databases with search disabled */
+		if( ! static::database()->search )
+		{
+			return NULL;
+		}
+		
+		return $this->deleteLogPermissions();
 	}
 
 	/**
@@ -3485,7 +3855,7 @@ class Records extends Item implements
 	 *	@li			Number prepended by "m" indicates a member
 	 *	@li			Number prepended by "s" indicates a social group
 	 */
-	public function onlineListPermissions(): string
+	public function onlineListPermissions()
 	{
 		/* If search is disabled for this database, we want to use the page/category permissions
 		instead of falling back to searchIndexPermissions */
@@ -3500,8 +3870,8 @@ class Records extends Item implements
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @return    array
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @return	array
 	 * @apiresponse	int						id				ID number
 	 * @apiresponse	string					title			Title
 	 * @apiresponse	\IPS\cms\Categories		category		Category
@@ -3523,46 +3893,53 @@ class Records extends Item implements
 	 * @apiresponse	string					image			Record Image
 	 * @apiresponse	\IPS\forums\Topic		topic			The topic
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		/* You can have a database that is not embedded onto a page */
 		try
 		{
 			$url = (string) $this->url();
 		}
-		catch( LogicException $e )
+		catch( \LogicException $e )
 		{
 			$url = NULL;
+		}
+
+		/* Remove Lazyload from fields */
+		$fields = [];
+		foreach( $this->fieldValues() as $k => $v )
+		{
+			$fields[ $k ] = \is_string( $v ) ? \IPS\Text\Parser::removeLazyLoad( $v ) : $v;
 		}
 
 		$return = array(
 			'id'			=> $this->primary_id_field,
 			'title'			=> $this->_title,
 			'category'		=> $this->container() ? $this->container()->apiOutput() : null,
-			'fields'		=> $this->fieldValues(),
+			'fields'		=> $fields,
 			'author'		=> $this->author()->apiOutput( $authorizedMember ),
-			'date'			=> DateTime::ts( $this->record_saved )->rfc3339(),
-			'description'	=> $this->content(),
+			'date'			=> \IPS\DateTime::ts( $this->record_saved )->rfc3339(),
+			'description'	=> \IPS\Text\Parser::removeLazyLoad( $this->content() ),
 			'comments'		=> $this->record_comments,
 			'reviews'		=> $this->record_reviews,
 			'views'			=> $this->record_views,
 			'prefix'		=> $this->prefix(),
 			'tags'			=> $this->tags(),
-			'locked'		=> $this->locked(),
+			'locked'		=> (bool) $this->locked(),
 			'hidden'		=> (bool) $this->hidden(),
 			'pinned'		=> (bool) $this->mapped('pinned'),
 			'featured'		=> (bool) $this->mapped('featured'),
 			'url'			=> $url,
 			'rating'		=> $this->averageRating(),
-			'image'			=> $this->record_image ? (string) File::get( 'cms_Records', $this->record_image )->url : null,
+			'image'			=> $this->record_image ? (string) \IPS\File::get( 'cms_Records', $this->record_image )->url : null,
 			'topic'			=> $this->topicid ? $this->topic()->apiOutput( $authorizedMember ) : NULL,
 		);
 
-		if ( IPS::classUsesTrait( $this, 'IPS\Content\Reactable' ) )
+		if ( \IPS\IPS::classUsesTrait( $this, 'IPS\Content\Reactable' ) )
 		{
 			if ( $reactions = $this->reactions() )
 			{
-				$enabledReactions = Reaction::enabledReactions();
+				$enabledReactions = \IPS\Content\Reaction::enabledReactions();
 				$finalReactions = [];
 				foreach( $reactions as $memberId => $array )
 				{
@@ -3591,51 +3968,51 @@ class Records extends Item implements
 	/**
 	 * Get items with permission check
 	 *
-	 * @param array $where Where clause
-	 * @param string|null $order MySQL ORDER BY clause (NULL to order by date)
-	 * @param int|array|null $limit Limit clause
-	 * @param string|null $permissionKey A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index or NULL to ignore permissions
-	 * @param int|bool|null $includeHiddenItems Include hidden items? NULL to detect if currently logged in member has permission, -1 to return public content only, TRUE to return unapproved content and FALSE to only return unapproved content the viewing member submitted
-	 * @param int $queryFlags Select bitwise flags
-	 * @param Member|null $member The member (NULL to use currently logged in member)
-	 * @param bool $joinContainer If true, will join container data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinComments If true, will join comment data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinReviews If true, will join review data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $countOnly If true will return the count
-	 * @param array|null $joins Additional arbitrary joins for the query
-	 * @param bool|Model $skipPermission If you are getting records from a specific container, pass the container to reduce the number of permission checks necessary or pass TRUE to skip conatiner-based permission. You must still specify this in the $where clause
-	 * @param bool $joinTags If true, will join the tags table
-	 * @param bool $joinAuthor If true, will join the members table for the author
-	 * @param bool $joinLastCommenter If true, will join the members table for the last commenter
-	 * @param bool $showMovedLinks If true, moved item links are included in the results
-	 * @param array|null $location Array of item lat and long
-	 * @return    ActiveRecordIterator|int
+	 * @param	array		$where				Where clause
+	 * @param	string		$order				MySQL ORDER BY clause (NULL to order by date)
+	 * @param	int|array	$limit				Limit clause
+	 * @param	string|NULL	$permissionKey		A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index or NULL to ignore permissions
+	 * @param	mixed		$includeHiddenItems	Include hidden items? NULL to detect if currently logged in member has permission, -1 to return public content only, TRUE to return unapproved content and FALSE to only return unapproved content the viewing member submitted
+	 * @param	int			$queryFlags			Select bitwise flags
+	 * @param	\IPS\Member	$member				The member (NULL to use currently logged in member)
+	 * @param	bool		$joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinComments		If true, will join comment data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinReviews		If true, will join review data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$countOnly			If true will return the count
+	 * @param	array|null	$joins				Additional arbitrary joins for the query
+	 * @param	mixed		$skipPermission		If you are getting records from a specific container, pass the container to reduce the number of permission checks necessary or pass TRUE to skip conatiner-based permission. You must still specify this in the $where clause
+	 * @param	bool		$joinTags			If true, will join the tags table
+	 * @param	bool		$joinAuthor			If true, will join the members table for the author
+	 * @param	bool		$joinLastCommenter	If true, will join the members table for the last commenter
+	 * @param	bool		$showMovedLinks		If true, moved item links are included in the results
+	 * @param	array|null	$location			Array of item lat and long
+	 * @return	\IPS\Patterns\ActiveRecordIterator|int
 	 */
-	public static function getItemsWithPermission( array $where=array(), string $order=null, int|array|null $limit=10, ?string $permissionKey='read', int|bool|null $includeHiddenItems= Filter::FILTER_AUTOMATIC, int $queryFlags=0, Member $member=null, bool $joinContainer=FALSE, bool $joinComments=FALSE, bool $joinReviews=FALSE, bool $countOnly=FALSE, array|null $joins=null, bool|Model $skipPermission=FALSE, bool $joinTags=TRUE, bool $joinAuthor=TRUE, bool $joinLastCommenter=TRUE, bool $showMovedLinks=FALSE, array|null $location=null ): ActiveRecordIterator|int
+	public static function getItemsWithPermission( $where=array(), $order=NULL, $limit=10, $permissionKey='read', $includeHiddenItems=\IPS\Content\Hideable::FILTER_AUTOMATIC, $queryFlags=0, \IPS\Member $member=NULL, $joinContainer=FALSE, $joinComments=FALSE, $joinReviews=FALSE, $countOnly=FALSE, $joins=NULL, $skipPermission=FALSE, $joinTags=TRUE, $joinAuthor=TRUE, $joinLastCommenter=TRUE, $showMovedLinks=FALSE, $location=NULL )
 	{
 		$where = static::getItemsWithPermissionWhere( $where, $permissionKey, $member, $joinContainer, $skipPermission );
 		return parent::getItemsWithPermission( $where, $order, $limit, $permissionKey, $includeHiddenItems, $queryFlags, $member, $joinContainer, $joinComments, $joinReviews, $countOnly, $joins, $skipPermission, $joinTags, $joinAuthor, $joinLastCommenter, $showMovedLinks );
 	}
-
-	/**
+	
+		/**
 	 * WHERE clause for getItemsWithPermission
 	 *
-	 * @param array $where Current WHERE clause
-	 * @param string $permissionKey A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index
-	 * @param Member|null $member The member (NULL to use currently logged in member)
-	 * @param bool $joinContainer If true, will join container data (set to TRUE if your $where clause depends on this data)
-	 * @param bool|mixed $skipPermission If you are getting records from a specific container, pass the container to reduce the number of permission checks necessary or pass TRUE to skip container-based permission. You must still specify this in the $where clause
-	 * @return    array
+	 * @param	array		$where				Current WHERE clause
+	 * @param	string		$permissionKey		A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index
+	 * @param	\IPS\Member	$member				The member (NULL to use currently logged in member)
+	 * @param	bool		$joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
+	 * @param	mixed		$skipPermission		If you are getting records from a specific container, pass the container to reduce the number of permission checks necessary or pass TRUE to skip container-based permission. You must still specify this in the $where clause
+	 * @return	array
 	 */
-	public static function getItemsWithPermissionWhere( array $where, string $permissionKey, ?Member $member, bool &$joinContainer, mixed $skipPermission=FALSE ): array
+	public static function getItemsWithPermissionWhere( $where, $permissionKey, $member, &$joinContainer, $skipPermission=FALSE )
 	{
 		/* Don't show records from categories in which records only show to the poster */
-		if ( $skipPermission !== TRUE and in_array( $permissionKey, array( 'view', 'read' ) ) )
+		if ( $skipPermission !== TRUE and \in_array( $permissionKey, array( 'view', 'read' ) ) )
 		{
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
 			if ( !$member->modPermission( 'can_content_view_others_records' ) )
 			{
-				if ( $skipPermission instanceof Categories)
+				if ( $skipPermission instanceof \IPS\cms\Categories )
 				{
 					if ( !$skipPermission->can_view_others )
 					{
@@ -3660,7 +4037,7 @@ class Records extends Item implements
 	 *
 	 * @return	string
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		$databaseId = static::database()->_id;
 		return "record_id_{$databaseId}";
@@ -3671,7 +4048,7 @@ class Records extends Item implements
 	 *
 	 * @return	array
 	 */
-	public static function supportedMetaDataTypes(): array
+	public static function supportedMetaDataTypes()
 	{
 		return array( 'core_FeaturedComments', 'core_ContentMessages' );
 	}
@@ -3682,10 +4059,10 @@ class Records extends Item implements
 	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'cms', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'cms' )->embedRecord( $this, $this->url()->setQueryString( $params ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'cms', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'cms' )->embedRecord( $this, $this->url()->setQueryString( $params ) );
 	}
 
 	/**
@@ -3694,7 +4071,7 @@ class Records extends Item implements
 	 * @note Intentionally blank but can be overridden by child classes
 	 * @return array|NULL
 	 */
-	public function similarContentFilter(): ?array
+	public function similarContentFilter()
 	{
 		if( $this->record_topicid )
 		{
@@ -3727,15 +4104,15 @@ class Records extends Item implements
 	/**
 	 * Get the last modification date for the sitemap
 	 *
-	 * @return DateTime|null		timestamp of the last modification time for the sitemap
+	 * @return \IPS\DateTime|null		timestamp of the last modification time for the sitemap
 	 */
-	public function lastModificationDate(): DateTime|NULL
+	public function lastModificationDate()
 	{
 		$lastMod = parent::lastModificationDate();
 
 		if ( !$lastMod AND $this->record_updated )
 		{
-			$lastMod = DateTime::ts( $this->record_updated );
+			$lastMod = \IPS\DateTime::ts( $this->record_updated );
 		}
 
 		return $lastMod;
@@ -3744,140 +4121,18 @@ class Records extends Item implements
 	/**
 	 * Returns the earliest publish date for the new content item, we can have past items for records.
 	 *
-	 * @return DateTime|null
+	 * @return \IPS\DateTime|null
 	 */
-	protected static function getMinimumPublishDate(): ?DateTime
+	protected static function getMinimumPublishDate(): ?\IPS\DateTime
 	{
 		return NULL;
 	}
-	
+
 	/**
 	 * Can the publish date be changed while editing the item?
-	 * Formerly a properly, however classes cannot overload / redeclare properties from traits.
-	 *
-	 * @return bool
+	 * 
+	 * @var bool
 	 */
-	public static function allowPublishDateWhileEditing(): bool
-	{
-		return TRUE;
-	}
-
-	/**
-	 * Get the topic title
-	 *
-	 * @return string
-	 */
-	function getTopicTitle(): string
-	{
-		$title = '';
-
-		if ( $prefix = $this->container()->forum_prefix )
-		{
-			$title .= $prefix . ' ';
-		}
-		else if( $prefix = static::database()->forum_prefix )
-		{
-			$title .= $prefix . ' ';
-		}
-
-		$column = 'field_' . static::database()->field_title;
-		$title .= $this->$column;
-
-		if ( $suffix = $this->container()->forum_suffix )
-		{
-			$title .= ' ' . $suffix;
-		}
-		else if( $suffix = static::database()->forum_suffix )
-		{
-			$title .= ' ' . $suffix;
-		}
-
-		return $title;
-	}
-
-	/**
-	 * Get the topic content
-	 *
-	 * @return mixed
-	 */
-	function getTopicContent(): mixed
-	{
-		return Theme::i()->getTemplate( 'submit', 'cms', 'front' )->topic( $this );
-	}
-
-	/**
-	 * Return the Forum ID
-	 *
-	 * @return	int
-	 */
-	public function getForumId() : int
-	{
-		return ( $this->isTopicSyncEnabled() ) ? $this->_forum_forum : 0;
-	}
-
-	/**
-	 * Determine if the topic sync is enabled
-	 *
-	 * @return bool
-	 */
-	public function isTopicSyncEnabled() : bool
-	{
-		return $this->_forum_record and Application::appIsEnabled('forums');
-	}
-
-	/**
-	 * Container has assignable enabled
-	 *
-	 * @return    bool
-	 */
-	public function containerAllowsAssignable(): bool
-	{
-		return (bool) static::database()->options['assignments'];
-	}
-
-	/**
-	 * Do we have record image enabled here?
-	 * Just made this easier to figure out from inside templates
-	 *
-	 * @return bool
-	 */
-	public function showRecordImage() : bool
-	{
-		/* @var Fields $fieldClass */
-		$fieldClass = 'IPS\cms\Fields' . static::$customDatabaseId;
-		return $fieldClass::fixedFieldFormShow( 'record_image', 'perm_view' );
-	}
-
-	/**
-	 * Cover Photo
-	 *
-	 * @return	mixed
-	 */
-	public function coverPhoto(): mixed
-	{
-		$photo = parent::coverPhoto();
-		if( $photo instanceof CoverPhoto )
-		{
-			/* @var Fields $fieldClass */
-			$fieldClass = 'IPS\cms\Fields' . static::$customDatabaseId;
-			$photo->editable = ( $this->canEdit() and $fieldClass::fixedFieldFormShow( 'record_image' ) );
-		}
-
-		return $photo;
-	}
-
-	/**
-	 * Returns the CoverPhoto File Instance or NULL if there's none
-	 *
-	 * @return null|File
-	 */
-	public function coverPhotoFile(): ?File
-	{
-		if( !$this->showRecordImage() )
-		{
-			return null;
-		}
-
-		return parent::coverPhotoFile();
-	}
+	public static bool $allowPublishDateWhileEditing = TRUE;
+	
 }

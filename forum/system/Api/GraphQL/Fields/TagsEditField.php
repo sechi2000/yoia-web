@@ -12,28 +12,25 @@
 namespace IPS\Api\GraphQL\Fields;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\IPS;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * TagsEditField for GraphQL API
  */
-abstract class TagsEditField
+abstract class _TagsEditField
 {
 	/**
 	 * Get root type
 	 *
-	 * @param string $name
-	 * @return    array
+	 * @return	array
 	 */
-	 public static function getDefinition( string $name ): array
+	 public static function getDefinition($name): array
 	 {
 		return [
 			'type' => new ObjectType([
@@ -44,8 +41,7 @@ abstract class TagsEditField
 						'resolve' => function ($container, $args, $context) {
 							$contentClass = $container::$contentItemClass;
 
-							if( IPS::classUsesTrait( $contentClass, 'IPS\Content\Taggable' ) )
-							{
+							if( \in_array( 'IPS\Content\Tags', class_implements( $contentClass ) ) ){
 								return true;
 							}
 
@@ -56,7 +52,8 @@ abstract class TagsEditField
 						'type' => TypeRegistry::listOf( TypeRegistry::string() ),
 						'resolve' => function ($container, $args, $context) {
 							$contentClass = $container::$contentItemClass;
-							$tags = array_unique( $contentClass::definedTags() );
+							$tags = array_unique( $contentClass::definedTags( $container ) );
+
 							return $tags;
 						}
 					]

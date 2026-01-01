@@ -12,60 +12,41 @@
 namespace IPS\convert\Software\Gallery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Library;
-use IPS\convert\Software;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function stristr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invision Gallery Converter
  */
-class Invisioncommunity extends Software
+class _Invisioncommunity extends \IPS\convert\Software
 {
 	/**
 	 * @brief    Whether the versions of IPS4 match
 	 */
-	public static bool $versionMatch = FALSE;
+	public static $versionMatch = FALSE;
 
 	/**
 	 * @brief    Whether the database has been required
 	 */
-	public static bool $dbNeeded = FALSE;
+	public static $dbNeeded = FALSE;
 
 	/**
 	 * Constructor
 	 *
-	 * @param App $app The application to reference for database and other information.
+	 * @param \IPS\convert\App $app The application to reference for database and other information.
 	 * @param bool $needDB Establish a DB connection
 	 * @return    void
-	 * @throws    InvalidArgumentException
+	 * @throws    \InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB = TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB = TRUE )
 	{
 		/* Set filename obscuring flag */
-		Library::$obscureFilenames = FALSE;
+		\IPS\convert\Library::$obscureFilenames = FALSE;
 
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 
 		if ( $needDB )
 		{
@@ -76,7 +57,7 @@ class Invisioncommunity extends Software
 				$version = $this->db->select( 'app_version', 'core_applications', array( 'app_directory=?', 'core' ) )->first();
 
 				/* We're matching against the human version since the long version can change with patches */
-				if ( $version == Application::load( 'core' )->version )
+				if ( $version == \IPS\Application::load( 'core' )->version )
 				{
 					static::$versionMatch = TRUE;
 				}
@@ -86,6 +67,8 @@ class Invisioncommunity extends Software
 			/* Get parent sauce */
 			$this->parent = $this->app->_parent->getSource();
 		}
+
+		return $return;
 	}
 
 	/**
@@ -93,10 +76,10 @@ class Invisioncommunity extends Software
 	 *
 	 * @return    string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
-		return 'Invision Community (' . Application::load( 'core' )->version . ')';
+		return 'Invision Community (' . \IPS\Application::load( 'core' )->version . ')';
 	}
 
 	/**
@@ -104,7 +87,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return    string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "invisioncommunity";
@@ -113,9 +96,9 @@ class Invisioncommunity extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		if( !static::$versionMatch AND static::$dbNeeded )
 		{
@@ -161,9 +144,9 @@ class Invisioncommunity extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -171,9 +154,9 @@ class Invisioncommunity extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'invisioncommunity' ) );
 	}
@@ -181,9 +164,9 @@ class Invisioncommunity extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertAttachments',
@@ -194,10 +177,10 @@ class Invisioncommunity extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Method name
-	 * @return    array|null
+	 * @param	string	$method	Method name
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 
@@ -205,16 +188,16 @@ class Invisioncommunity extends Software
 		{
 			case 'convertAttachments':
 			case 'convertGalleryImages':
-				Member::loggedIn()->language()->words["upload_path"] = Member::loggedIn()->language()->addToStack( 'convert_invision_upload_input' );
-				Member::loggedIn()->language()->words["upload_path_desc"] = Member::loggedIn()->language()->addToStack( 'convert_invision_upload_input_desc' );
+				\IPS\Member::loggedIn()->language()->words["upload_path"] = \IPS\Member::loggedIn()->language()->addToStack( 'convert_invision_upload_input' );
+				\IPS\Member::loggedIn()->language()->words["upload_path_desc"] = \IPS\Member::loggedIn()->language()->addToStack( 'convert_invision_upload_input_desc' );
 				$return[ $method ] = array(
 					'upload_path'				=> array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Text',
-						'field_default'		=> $this->parent->app->_session['more_info']['convertEmoticons']['upload_path'] ?? NULL,
+						'field_default'		=> isset( $this->parent->app->_session['more_info']['convertEmoticons']['upload_path'] ) ? $this->parent->app->_session['more_info']['convertEmoticons']['upload_path'] : NULL,
 						'field_required'	=> TRUE,
 						'field_extra'		=> array(),
-						'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_invision_upload_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_invision_upload_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;
@@ -226,20 +209,20 @@ class Invisioncommunity extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'InvisionCommunityRebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'convert', 'InvisionCommunityRebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_reviews', 'class' => 'IPS\gallery\Image\Review' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildGalleryImages', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'InvisionCommunityRebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_comments', 'class' => 'IPS\gallery\Image\Comment' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'InvisionCommunityRebuildContent', array( 'app' => $this->app->app_id, 'link' => 'gallery_reviews', 'class' => 'IPS\gallery\Image\Review' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\gallery\Image' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Album', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\gallery\Category', 'count' => 0 ), 5, array( 'class' ) );
 
 		/* Caches */
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'gallery_images', 'class' => 'IPS\gallery\Image' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'gallery_images', 'class' => 'IPS\gallery\Image' ), 3, array( 'app', 'link', 'class' ) );
 
 		return array( "f_gallery_images_rebuild", "f_gallery_cat_recount", "f_gallery_album_recount", "f_gallery_image_recount", "f_image_tags_recount" );
 	}
@@ -249,7 +232,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'attach_id' );
@@ -260,7 +243,7 @@ class Invisioncommunity extends Software
 			{
 				$attachmentMap = $this->db->select( '*', 'core_attachments_map', array( 'attachment_id=? AND location_key=?', $row['attach_id'], 'gallery_Gallery' ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$libraryClass->setLastKeyValue( $row['attach_id'] );
 				continue;
@@ -291,7 +274,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryAlbums() : void
+	public function convertGalleryAlbums()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'album_id' );
@@ -336,7 +319,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryAlbumComments() : void
+	public function convertGalleryAlbumComments()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'comment_id' );
@@ -369,7 +352,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryAlbumReviews() : void
+	public function convertGalleryAlbumReviews()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'review_id' );
@@ -402,7 +385,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryCategories() : void
+	public function convertGalleryCategories()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'category_id' );
@@ -442,7 +425,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryComments() : void
+	public function convertGalleryComments()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'comment_id' );
@@ -475,7 +458,7 @@ class Invisioncommunity extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGalleryImages() : void
+	public function convertGalleryImages()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'image_id' );
@@ -525,19 +508,19 @@ class Invisioncommunity extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( !stristr( $url->data[ Url::COMPONENT_PATH ], 'ic-merge-' . $this->app->_parent->app_id ) )
+		if( !\stristr( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'ic-merge-' . $this->app->_parent->app_id ) )
 		{
 			return NULL;
 		}
 
 		/* account for non-mod_rewrite links */
-		$searchOn = stristr( $url->data[ Url::COMPONENT_PATH ], 'index.php' ) ? $url->data[ Url::COMPONENT_QUERY ] : $url->data[ Url::COMPONENT_PATH ];
+		$searchOn = \stristr( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'index.php' ) ? $url->data[ \IPS\Http\Url::COMPONENT_QUERY ] : $url->data[ \IPS\Http\Url::COMPONENT_PATH ];
 
 		if( preg_match( '#/(category|album|image)/([0-9]+)-(.+?)#i', $searchOn, $matches ) )
 		{
@@ -570,20 +553,20 @@ class Invisioncommunity extends Software
 				{
 					$data = (string) $this->app->getLink( $oldId, $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( $oldId, $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				elseif( $item instanceof Model )
+				elseif( $item instanceof \IPS\Node\Model )
 				{
 					if( $item->can( 'view' ) )
 					{
@@ -591,7 +574,7 @@ class Invisioncommunity extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

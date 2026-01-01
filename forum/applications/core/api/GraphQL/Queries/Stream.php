@@ -10,31 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\StreamType;
-use IPS\core\Stream as StreamClass;
-use IPS\Member;
-use OutOfRangeException;
-use function defined;
-use function intval;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Stream query for GraphQL API
  */
-class Stream
+class _Stream
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns an activity stream";
+	public static $description = "Returns an activity stream";
 
 	/*
 	 * Query arguments
@@ -49,7 +43,7 @@ class Stream
 	/**
 	 * Return the query return type
 	 */
-	public function type() : StreamType
+	public function type() 
 	{
 		return \IPS\core\api\GraphQL\TypeRegistry::stream();
 	}
@@ -57,34 +51,34 @@ class Stream
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @return	StreamClass|null
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\core\Stream
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : ?StreamClass
+	public function resolve($val, $args, $context)
 	{
-		if( isset( $args['id'] ) && intval( $args['id'] ) )
+		if( isset( $args['id'] ) && \intval( $args['id'] ) )
 		{
 			try
 			{
-				$stream = StreamClass::load( $args['id'] );
+				$stream = \IPS\core\Stream::load( $args['id'] );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				return NULL;
 			}
 
 			/* Suitable for guests? */
-			if ( !Member::loggedIn()->member_id and !( ( $stream->ownership == 'all' or $stream->ownership == 'custom' ) and $stream->read == 'all' and $stream->follow == 'all' and $stream->date_type != 'last_visit' ) )
+			if ( !\IPS\Member::loggedIn()->member_id and !( ( $stream->ownership == 'all' or $stream->ownership == 'custom' ) and $stream->read == 'all' and $stream->follow == 'all' and $stream->date_type != 'last_visit' ) )
 			{
-				throw new SafeException( 'INVALID_STREAM', 'GQL/0003/1', 403 );
+				throw new \IPS\Api\GraphQL\SafeException( 'INVALID_STREAM', 'GQL/0003/1', 403 );
 			}
 		}
 		else
 		{
 			/* Start with a blank stream */
-			$stream = StreamClass::allActivityStream();
+			$stream = \IPS\core\Stream::allActivityStream();
 		}
 
 		return $stream;

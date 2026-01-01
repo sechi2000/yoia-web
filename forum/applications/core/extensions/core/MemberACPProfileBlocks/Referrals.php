@@ -12,50 +12,36 @@
 namespace IPS\core\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\MemberACPProfile\Block;
-use IPS\Helpers\Table\Db;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Money;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function get_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile Block
  */
-class Referrals extends Block
+class _Referrals extends \IPS\core\MemberACPProfile\Block
 {
 	/**
 	 * Get output
 	 *
-	 * @param bool $edit
-	 * @return    string
+	 * @return	string
 	 */
-	public function output( bool $edit = FALSE ) : string
+	public function output( $edit = FALSE )
 	{
-		if( !Settings::i()->ref_on )
+		if( !\IPS\Settings::i()->ref_on )
 		{
 			return "";
 		}
 		
-		$url = $this->member->acpUrl()->setQueryString( array( 'do' => 'editBlock', 'block' => get_class( $this ) ) );
+		$url = $this->member->acpUrl()->setQueryString( array( 'do' => 'editBlock', 'block' => \get_class( $this ) ) );
 		$referCount = \IPS\Db::i()->select( 'COUNT(*)', 'core_referrals', array( 'referred_by=?', $this->member->member_id ) )->first();
-		$referrals = new Db( 'core_referrals', $url, array( 'referred_by=?', $this->member->member_id ) );
+		$referrals = new \IPS\Helpers\Table\Db( 'core_referrals', $url, array( 'referred_by=?', $this->member->member_id ) );
 		$referrals->langPrefix = 'ref_';
 		$referrals->include = array( 'member_id' );
 
-		if ( Application::appIsEnabled( 'nexus' ) )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) )
 		{
 			$referrals->include[] = 'amount';
 		}
@@ -65,51 +51,51 @@ class Referrals extends Block
 		{
 			try
 			{
-				return Theme::i()->getTemplate( 'global' )->userLink( Member::load( $v ) );
+				return \IPS\Theme::i()->getTemplate( 'global' )->userLink( \IPS\Member::load( $v ) );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				return Member::loggedIn()->language()->addToStack( 'deleted_member' );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'deleted_member' );
 			}
 		}, 'email' => function ($v, $row)
 		{
 			try
 			{
-				return htmlspecialchars( Member::load( $row[ 'member_id' ] )->email, ENT_DISALLOWED, 'UTF-8', FALSE );
+				return htmlspecialchars( \IPS\Member::load( $row[ 'member_id' ] )->email, ENT_DISALLOWED, 'UTF-8', FALSE );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				return Member::loggedIn()->language()->addToStack( 'deleted_member' );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'deleted_member' );
 			}
 		}, 'amount' => function ($v)
 		{
 			$return = array();
-			if ( !is_array( $v ) and !empty( $v ) )
+			if ( $v )
 			{
 				foreach ( json_decode( $v, TRUE ) as $currency => $amount )
 				{
-					$return[] = new Money( $amount, $currency );
+					$return[] = new \IPS\nexus\Money( $amount, $currency );
 				}
 			}
 			else
 			{
-				$return[] = new Money( 0, Customer::load( $this->member->member_id )->defaultCurrency() );
+				$return[] = new \IPS\nexus\Money( 0, \IPS\nexus\Customer::load( $this->member->member_id )->defaultCurrency() );
 			}
 			return implode( '<br>', $return );
 		} );
 
 		if( $edit )
 		{
-			return Theme::i()->getTemplate( 'members', 'core' )->referralPopup( $referrals );
+			return \IPS\Theme::i()->getTemplate( 'members', 'core' )->referralPopup( $referrals );
 		}
 		else
 		{
 			$referrals->include[] = 'email';
 			$referrals->limit = 2;
-			$referrals->tableTemplate = array( Theme::i()->getTemplate( 'members', 'core' ), 'referralsOverview' );
-			$referrals->rowsTemplate = array( Theme::i()->getTemplate( 'members', 'core' ), 'referralsOverviewRows' );
+			$referrals->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'members', 'core' ), 'referralsOverview' );
+			$referrals->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'members', 'core' ), 'referralsOverviewRows' );
 
-			return Theme::i()->getTemplate( 'members', 'core' )->referralsTable( $this->member, $referrals, Member::loggedIn()->language()->addToStack( 'num_refer_count', FALSE, array( 'pluralize' => array( $referCount ) ) ), 'referrers' );
+			return \IPS\Theme::i()->getTemplate( 'members', 'core' )->referralsTable( $this->member, $referrals, \IPS\Member::loggedIn()->language()->addToStack( 'num_refer_count', FALSE, array( 'pluralize' => array( $referCount ) ) ), 'referrers' );
 		}
 	}
 
@@ -118,7 +104,7 @@ class Referrals extends Block
 	 *
 	 * @return	string
 	 */
-	public function edit(): string
+	public function edit()
 	{
 		return $this->output( TRUE );
 	}

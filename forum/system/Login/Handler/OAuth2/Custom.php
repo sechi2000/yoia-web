@@ -12,53 +12,28 @@
 namespace IPS\Login\Handler\OAuth2;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\File;
-use IPS\Helpers\Form\Color;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Stack;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\Url as FormUrl;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Login;
-use IPS\Login\Exception;
-use IPS\Login\Handler\OAuth2;
-use IPS\Member;
-use IPS\Settings;
-use RuntimeException;
-use function defined;
-use function is_array;
-use function is_string;
-use const IPS\OAUTH_REQUIRES_HTTPS;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Custom OAuth 2 Login Handler
  */
-class Custom extends OAuth2
+class _Custom extends \IPS\Login\Handler\OAuth2
 {
 	/**
 	 * @brief	Can we have multiple instances of this handler?
 	 */
-	public static bool $allowMultiple = TRUE;
+	public static $allowMultiple = TRUE;
 	
 	/**
 	 * Get title
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return 'login_handler_custom_oauth';
 	}
@@ -71,13 +46,13 @@ class Custom extends OAuth2
 	 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{
 		$return = array();
 		
 		$return[] = array( 'login_handler_oauth_settings', 'login_handler_custom_oauth_info' );
 		
-		$return['grant_type'] = new Radio( 'oauth_custom_grant_type', $this->settings['grant_type'] ?? 'authorization_code', TRUE, array(
+		$return['grant_type'] = new \IPS\Helpers\Form\Radio( 'oauth_custom_grant_type', isset( $this->settings['grant_type'] ) ? $this->settings['grant_type'] : 'authorization_code', TRUE, array(
 			'options' => array(
 				'authorization_code'	=> 'client_grant_type_authorization_code',
 				'implicit'				=> 'client_grant_type_implicit',
@@ -98,59 +73,59 @@ class Custom extends OAuth2
 			{
 				$active = 'accountManagementSettings';
 			}
-			if ( !is_string( $v ) and !is_array( $v ) )
+			if ( !\is_string( $v ) and !\is_array( $v ) )
 			{
 				${$active}[ $k ] = $v;
 			}
 		}
 		
-		$return['authentication_type'] = new Radio( 'oauth_custom_authentication_type', $this->settings['authentication_type'] ?? static::AUTHENTICATE_HEADER, TRUE, array(
+		$return['authentication_type'] = new \IPS\Helpers\Form\Radio( 'oauth_custom_authentication_type', isset( $this->settings['authentication_type'] ) ? $this->settings['authentication_type'] : static::AUTHENTICATE_HEADER, TRUE, array(
 			'options' => array(
 				static::AUTHENTICATE_HEADER	=> 'oauth_custom_authentication_type_header',
 				static::AUTHENTICATE_POST	=> 'oauth_custom_authentication_type_post',
 			)
 		) );
 		
-		$return['scopes'] = new Stack( 'oauth_scopes_to_request', $this->settings['scopes'] ?? array(), FALSE, array() );
+		$return['scopes'] = new \IPS\Helpers\Form\Stack( 'oauth_scopes_to_request', isset( $this->settings['scopes'] ) ? $this->settings['scopes'] : array(), FALSE, array() );
 		
 		$authorizationEndpointValidation = function( $val )
 		{
-			if ( OAUTH_REQUIRES_HTTPS and $val and $val instanceof Url )
+			if ( \IPS\OAUTH_REQUIRES_HTTPS and $val and $val instanceof \IPS\Http\Url )
 			{
-				if ( $val->data[ Url::COMPONENT_SCHEME ] !== 'https' )
+				if ( $val->data[ \IPS\Http\Url::COMPONENT_SCHEME ] !== 'https' )
 				{
-					throw new DomainException('authorization_endpoint_https');
+					throw new \DomainException('authorization_endpoint_https');
 				}
-				if ( $val->data[ Url::COMPONENT_FRAGMENT ] )
+				if ( $val->data[ \IPS\Http\Url::COMPONENT_FRAGMENT ] )
 				{
-					throw new DomainException('authorization_endpoint_fragment');
+					throw new \DomainException('authorization_endpoint_fragment');
 				}
 			}
 		};
 
-		$return['authorization_endpoint'] = new FormUrl( 'oauth_authorization_endpoint', $this->settings['authorization_endpoint'] ?? NULL, NULL, array( 'placeholder' => 'https://example.com/oauth/authorize' ), $authorizationEndpointValidation, NULL, NULL, 'authorization_endpoint' );
-		$return['authorization_endpoint_secure'] = new FormUrl( 'oauth_authorization_endpoint_secure', ( isset( $this->settings['authorization_endpoint_secure'] ) AND $this->settings['authorization_endpoint_secure'] ) ? $this->settings['authorization_endpoint_secure'] : NULL, NULL, array( 'nullLang' => 'oauth_authorization_endpoint_same', 'placeholder' => 'https://example.com/oauth/authorize/?prompt=login' ), $authorizationEndpointValidation, NULL, NULL, 'authorization_endpoint_secure' );
-		$return['token_endpoint'] = new FormUrl( 'oauth_token_endpoint', $this->settings['token_endpoint'] ?? NULL, TRUE, array( 'placeholder' => 'https://www.example.com/oauth/token' ) );
-		$return['user_endpoint'] = new FormUrl( 'oauth_user_endpoint', $this->settings['user_endpoint'] ?? NULL, TRUE, array( 'placeholder' => 'https://www.example.com/oauth/me' ) );
-		$return['uid_field'] = new Text( 'oauth_custom_uid_field', $this->settings['uid_field'] ?? NULL, TRUE, array() );
-		$return['name_field'] = new Text( 'oauth_custom_name_field', $this->settings['name_field'] ?? NULL, FALSE, array(), NULL, NULL, NULL, 'login_real_name' );
-		$return['email_field'] = new Text( 'oauth_custom_email_field', $this->settings['email_field'] ?? NULL, FALSE, array(), NULL, NULL, NULL, 'login_real_email' );
-		$return['photo_field'] = new Text( 'oauth_custom_photo_field', $this->settings['photo_field'] ?? NULL );
-		if ( Settings::i()->allow_forgot_password == 'normal' or Settings::i()->allow_forgot_password == 'handler' )
+		$return['authorization_endpoint'] = new \IPS\Helpers\Form\Url( 'oauth_authorization_endpoint', isset( $this->settings['authorization_endpoint'] ) ? $this->settings['authorization_endpoint'] : NULL, NULL, array( 'placeholder' => 'https://example.com/oauth/authorize' ), $authorizationEndpointValidation, NULL, NULL, 'authorization_endpoint' );
+		$return['authorization_endpoint_secure'] = new \IPS\Helpers\Form\Url( 'oauth_authorization_endpoint_secure', ( isset( $this->settings['authorization_endpoint_secure'] ) AND $this->settings['authorization_endpoint_secure'] ) ? $this->settings['authorization_endpoint_secure'] : NULL, NULL, array( 'nullLang' => 'oauth_authorization_endpoint_same', 'placeholder' => 'https://example.com/oauth/authorize/?prompt=login' ), $authorizationEndpointValidation, NULL, NULL, 'authorization_endpoint_secure' );
+		$return['token_endpoint'] = new \IPS\Helpers\Form\Url( 'oauth_token_endpoint', isset( $this->settings['token_endpoint'] ) ? $this->settings['token_endpoint'] : NULL, TRUE, array( 'placeholder' => 'https://www.example.com/oauth/token' ) );
+		$return['user_endpoint'] = new \IPS\Helpers\Form\Url( 'oauth_user_endpoint', isset( $this->settings['user_endpoint'] ) ? $this->settings['user_endpoint'] : NULL, TRUE, array( 'placeholder' => 'https://www.example.com/oauth/me' ) );
+		$return['uid_field'] = new \IPS\Helpers\Form\Text( 'oauth_custom_uid_field', isset( $this->settings['uid_field'] ) ? $this->settings['uid_field'] : NULL, TRUE, array() );
+		$return['name_field'] = new \IPS\Helpers\Form\Text( 'oauth_custom_name_field', isset( $this->settings['name_field'] ) ? $this->settings['name_field'] : NULL, FALSE, array(), NULL, NULL, NULL, 'login_real_name' );
+		$return['email_field'] = new \IPS\Helpers\Form\Text( 'oauth_custom_email_field', isset( $this->settings['email_field'] ) ? $this->settings['email_field'] : NULL, FALSE, array(), NULL, NULL, NULL, 'login_real_email' );
+		$return['photo_field'] = new \IPS\Helpers\Form\Text( 'oauth_custom_photo_field', isset( $this->settings['photo_field'] ) ? $this->settings['photo_field'] : NULL );
+		if ( \IPS\Settings::i()->allow_forgot_password == 'normal' or \IPS\Settings::i()->allow_forgot_password == 'handler' )
 		{
-			$return['forgot_password_url'] = new FormUrl( 'handler_forgot_password_url', $this->settings['forgot_password_url'] ?? NULL, FALSE, array(), NULL, NULL, NULL, 'forgot_password_url' );
-			Member::loggedIn()->language()->words['handler_forgot_password_url_desc'] = Member::loggedIn()->language()->addToStack( Settings::i()->allow_forgot_password == 'normal' ? 'handler_forgot_password_url_desc_normal' : 'handler_forgot_password_url_deschandler' );
+			$return['forgot_password_url'] = new \IPS\Helpers\Form\Url( 'handler_forgot_password_url', isset( $this->settings['forgot_password_url'] ) ? $this->settings['forgot_password_url'] : NULL, FALSE, array(), NULL, NULL, NULL, 'forgot_password_url' );
+			\IPS\Member::loggedIn()->language()->words['handler_forgot_password_url_desc'] = \IPS\Member::loggedIn()->language()->addToStack( \IPS\Settings::i()->allow_forgot_password == 'normal' ? 'handler_forgot_password_url_desc_normal' : 'handler_forgot_password_url_deschandler' );
 		}
 		
 		$return[] = 'login_handler_oauth_ui';
-		$return['auth_types'] = new Select( 'oauth_custom_auth_types', $this->settings['auth_types'] ?? ( Login::AUTH_TYPE_USERNAME + Login::AUTH_TYPE_EMAIL ), TRUE, array( 'options' => array(
-			Login::AUTH_TYPE_USERNAME + Login::AUTH_TYPE_EMAIL => 'username_or_email',
-			Login::AUTH_TYPE_EMAIL	=> 'email_address',
-			Login::AUTH_TYPE_USERNAME => 'username',
+		$return['auth_types'] = new \IPS\Helpers\Form\Select( 'oauth_custom_auth_types', isset( $this->settings['auth_types'] ) ? $this->settings['auth_types'] : ( \IPS\Login::AUTH_TYPE_USERNAME + \IPS\Login::AUTH_TYPE_EMAIL ), TRUE, array( 'options' => array(
+			\IPS\Login::AUTH_TYPE_USERNAME + \IPS\Login::AUTH_TYPE_EMAIL => 'username_or_email',
+			\IPS\Login::AUTH_TYPE_EMAIL	=> 'email_address',
+			\IPS\Login::AUTH_TYPE_USERNAME => 'username',
 		) ), NULL, NULL, NULL, 'oauth_custom_auth_types' );
-		$return['button_color'] = new Color( 'oauth_custom_button_color', $this->settings['button_color'] ?? '#478F79', NULL, array(), NULL, NULL, NULL, 'button_color' );
-		$return['button_text'] = new Translatable( 'oauth_custom_button_text',  NULL, NULL, array( 'placeholder' => Member::loggedIn()->language()->addToStack('oauth_custom_button_text_custom_placeholder'), 'app' => 'core', 'key' => ( $this->id ? "core_custom_oauth_{$this->id}" : NULL ) ), NULL, NULL, NULL, 'button_text' );
-		$return['button_icon'] = new Upload( 'oauth_custom_button_icon',  ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? File::get( 'core_Login', $this->settings['button_icon'] ) : NULL, FALSE, array( 'storageExtension' => 'core_Login' ), NULL, NULL, NULL, 'button_icon' );
+		$return['button_color'] = new \IPS\Helpers\Form\Color( 'oauth_custom_button_color', isset( $this->settings['button_color'] ) ? $this->settings['button_color'] : '#478F79', NULL, array(), NULL, NULL, NULL, 'button_color' );		
+		$return['button_text'] = new \IPS\Helpers\Form\Translatable( 'oauth_custom_button_text',  NULL, NULL, array( 'placeholder' => \IPS\Member::loggedIn()->language()->addToStack('oauth_custom_button_text_custom_placeholder'), 'app' => 'core', 'key' => ( $this->id ? "core_custom_oauth_{$this->id}" : NULL ) ), NULL, NULL, NULL, 'button_text' );
+		$return['button_icon'] = new \IPS\Helpers\Form\Upload( 'oauth_custom_button_icon',  ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? \IPS\File::get( 'core_Login', $this->settings['button_icon'] ) : NULL, FALSE, array( 'storageExtension' => 'core_Login' ), NULL, NULL, NULL, 'button_icon' );
 		
 		$return[] = 'account_management_settings';
 		foreach ( $accountManagementSettings as $k => $v )
@@ -167,14 +142,13 @@ class Custom extends OAuth2
 	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function acpFormSave( array &$values ): array
+	public function acpFormSave( &$values )
 	{
 		$return = parent::acpFormSave( $values );
 		$return['button_icon'] = (string) $return['button_icon'];
 		$return['authorization_endpoint'] = (string) $return['authorization_endpoint'];
 		$return['token_endpoint'] = (string) $return['token_endpoint'];
 		$return['user_endpoint'] = (string) $return['user_endpoint'];
-		$return['oauth_authorization_endpoint'] = (string) $return['oauth_authorization_endpoint'];
 		return $return;
 	}
 	
@@ -184,7 +158,7 @@ class Custom extends OAuth2
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		$parent = parent::formatFormValues( $values );
 
@@ -194,7 +168,7 @@ class Custom extends OAuth2
 			{
 				$this->save();
 			}
-			Lang::saveCustom( 'core', "core_custom_oauth_{$this->id}", $values['oauth_custom_button_text'] );
+			\IPS\Lang::saveCustom( 'core', "core_custom_oauth_{$this->id}", $values['oauth_custom_button_text'] );
 			unset( $values['button_text'] );
 		}
 		
@@ -206,7 +180,7 @@ class Custom extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonColor(): string
+	public function buttonColor()
 	{
 		return $this->settings['button_color'];
 	}
@@ -214,30 +188,30 @@ class Custom extends OAuth2
 	/**
 	 * Get the button icon
 	 *
-	 * @return	string|File
+	 * @return	string
 	 */
-	public function buttonIcon(): string|File
+	public function buttonIcon()
 	{
-		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? File::get( 'core_Login', $this->settings['button_icon'] ) : '';
+		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? \IPS\File::get( 'core_Login', $this->settings['button_icon'] ) : NULL;
 	}
-
+	
 	/**
 	 * Get logo to display in information about logins with this method
 	 * Returns NULL for methods where it is not necessary to indicate the method, e..g Standard
 	 *
-	 * @return Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForDeviceInformation(): Url|string|null
+	public function logoForDeviceInformation()
 	{
-		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? File::get( 'core_Login', $this->settings['button_icon'] )->url : NULL;
+		return ( isset( $this->settings['button_icon'] ) and $this->settings['button_icon'] ) ? \IPS\File::get( 'core_Login', $this->settings['button_icon'] )->url : NULL;
 	}
-
+	
 	/**
 	 * Get logo to display in user cp sidebar
 	 *
-	 * @return Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function logoForUcp(): Url|string|null
+	public function logoForUcp()
 	{
 		return $this->logoForDeviceInformation();
 	}
@@ -247,7 +221,7 @@ class Custom extends OAuth2
 	 *
 	 * @return	string
 	 */
-	public function buttonText(): string
+	public function buttonText()
 	{
 		return "core_custom_oauth_{$this->id}";
 	}
@@ -257,9 +231,9 @@ class Custom extends OAuth2
 	 *
 	 * @return	string
 	 */
-	protected function grantType(): string
+	protected function grantType()
 	{
-		return $this->settings['grant_type'] ?? 'authorization_code';
+		return isset( $this->settings['grant_type'] ) ? $this->settings['grant_type'] : 'authorization_code';
 	}
 	
 	/**
@@ -267,18 +241,18 @@ class Custom extends OAuth2
 	 *
 	 * @return	string
 	 */
-	protected function _authenticationType(): string
+	protected function _authenticationType()
 	{
-		return $this->settings['authentication_type'] ?? static::AUTHENTICATE_HEADER;
+		return isset( $this->settings['authentication_type'] ) ? $this->settings['authentication_type'] : static::AUTHENTICATE_HEADER;
 	}
 	
 	/**
 	 * Get scopes to request
 	 *
-	 * @param array|null $additional	Any additional scopes to request
+	 * @param	array|NULL	$additional	Any additional scopes to request
 	 * @return	array
 	 */
-	protected function scopesToRequest( array $additional=NULL ): array
+	protected function scopesToRequest( $additional=NULL )
 	{
 		return $this->settings['scopes'];
 	}
@@ -286,36 +260,36 @@ class Custom extends OAuth2
 	/**
 	 * Authorization Endpoint
 	 *
-	 * @param	Login	$login	The login object
-	 * @return	Url
+	 * @param	\IPS\Login	$login	The login object
+	 * @return	\IPS\Http\Url
 	 */
-	protected function authorizationEndpoint( Login $login ): Url
+	protected function authorizationEndpoint( \IPS\Login $login )
 	{
-		if ( isset( $this->settings['authorization_endpoint_secure'] ) and $this->settings['authorization_endpoint_secure'] and ( $login->type === Login::LOGIN_ACP or $login->type === Login::LOGIN_REAUTHENTICATE ) )
+		if ( isset( $this->settings['authorization_endpoint_secure'] ) and $this->settings['authorization_endpoint_secure'] and ( $login->type === \IPS\Login::LOGIN_ACP or $login->type === \IPS\Login::LOGIN_REAUTHENTICATE ) )
 		{
-			return Url::external( $this->settings['authorization_endpoint_secure'] );
+			return \IPS\Http\Url::external( $this->settings['authorization_endpoint_secure'] );
 		}
 		
-		return Url::external( $this->settings['authorization_endpoint'] );
+		return \IPS\Http\Url::external( $this->settings['authorization_endpoint'] );
 	}
 	
 	/**
 	 * Token Endpoint
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function tokenEndpoint(): Url
+	protected function tokenEndpoint()
 	{
-		return Url::external( $this->settings['token_endpoint'] );
+		return \IPS\Http\Url::external( $this->settings['token_endpoint'] );
 	}
 	
 	/**
 	 * Get authenticated user's identifier (may not be a number)
 	 *
-	 * @param string $accessToken	Access Token
-	 * @return	string|null
+	 * @param	string	$accessToken	Access Token
+	 * @return	string
 	 */
-	protected function authenticatedUserId( string $accessToken ): ?string
+	protected function authenticatedUserId( $accessToken )
 	{		
 		if ( $userId = static::getValueFromArray( $this->_userData( $accessToken, $this->settings['uid_field'] ), $this->settings['uid_field'] ) )
 		{
@@ -331,7 +305,7 @@ class Custom extends OAuth2
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedUserName( string $accessToken ): ?string
+	protected function authenticatedUserName( $accessToken )
 	{
 		if ( isset( $this->settings['name_field'] ) and $this->settings['name_field'] and $username = static::getValueFromArray( $this->_userData( $accessToken, $this->settings['name_field'] ), $this->settings['name_field'] ) )
 		{
@@ -347,7 +321,7 @@ class Custom extends OAuth2
 	 * @param	string	$accessToken	Access Token
 	 * @return	string|NULL
 	 */
-	protected function authenticatedEmail( string $accessToken ): ?string
+	protected function authenticatedEmail( $accessToken )
 	{
 		if ( isset( $this->settings['email_field'] ) and $this->settings['email_field'] and $email = static::getValueFromArray( $this->_userData( $accessToken, $this->settings['email_field'] ), $this->settings['email_field'] ) )
 		{
@@ -360,24 +334,24 @@ class Custom extends OAuth2
 	 * Get user's profile photo
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
-	 * @return	Url|NULL
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	\IPS\Member	$member	Member
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfilePhoto( Member $member ): ?Url
+	public function userProfilePhoto( \IPS\Member $member )
 	{
 		if ( isset( $this->settings['photo_field'] ) and $this->settings['photo_field'] )
 		{
-			if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+			if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 			{
-				throw new Exception( "", Exception::INTERNAL_ERROR );
+				throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 						
 			if ( $photo = static::getValueFromArray( $this->_userData( $link['token_access_token'], $this->settings['photo_field'] ), $this->settings['photo_field'] ) )
 			{
-				return Url::external( $photo );
+				return \IPS\Http\Url::external( $photo );
 			}
 		}
 		
@@ -388,17 +362,17 @@ class Custom extends OAuth2
 	 * Get user's profile name
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfileName( Member $member ): ?string
+	public function userProfileName( \IPS\Member $member )
 	{
-		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) OR empty( $link['token_access_token'] ) )
+		if ( !( $link = $this->_link( $member ) ) or ( $link['token_expires'] and $link['token_expires'] < time() ) )
 		{
-			throw new Exception( "", Exception::INTERNAL_ERROR );
+			throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 		
 		return $this->authenticatedUserName( $link['token_access_token'] );
@@ -407,11 +381,11 @@ class Custom extends OAuth2
 	/**
 	 * Syncing Options
 	 *
-	 * @param	Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
+	 * @param	\IPS\Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
 	 * @param	bool		$defaultOnly	If TRUE, only returns which options should be enabled by default for a new account
 	 * @return	array
 	 */
-	public function syncOptions( Member $member, bool $defaultOnly=FALSE ): array
+	public function syncOptions( \IPS\Member $member, $defaultOnly = FALSE )
 	{
 		$return = array();
 		
@@ -436,21 +410,21 @@ class Custom extends OAuth2
 	/**
 	 * @brief	Cached user data
 	 */
-	protected array $_cachedUserData = array();
-
+	protected $_cachedUserData = array();
+	
 	/**
 	 * Get user data
 	 *
-	 * @param string $accessToken Access Token
-	 * @param string|null $expectedParam
-	 * @return array
+	 * @param	string	$accessToken	Access Token
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	protected function _userData( string $accessToken, ?string $expectedParam = NULL ) : array
+	protected function _userData( $accessToken, $expectedParam = NULL )
 	{
 		if ( !isset( $this->_cachedUserData[ $accessToken ] ) )
 		{
 			/* Try the most sensible way first */
-			$response = Url::external( $this->settings['user_endpoint'] )->request()
+			$response = \IPS\Http\Url::external( $this->settings['user_endpoint'] )->request()
 				->setHeaders( array(
 					'Authorization' => "Bearer {$accessToken}"
 				) )
@@ -463,7 +437,7 @@ class Custom extends OAuth2
 			{
 				if ( static::getValueFromArray( $response, $expectedParam ) === NULL )
 				{
-					$response = Url::external( $this->settings['user_endpoint'] )->setQueryString( 'access_token', $accessToken )->request()
+					$response = \IPS\Http\Url::external( $this->settings['user_endpoint'] )->setQueryString( 'access_token', $accessToken )->request()
 						->get()
 						->decodeJson();
 				}
@@ -472,8 +446,8 @@ class Custom extends OAuth2
 			/* Check for any errors */
 			if ( $response === NULL OR static::getValueFromArray( $response, $this->settings['uid_field'] ) === NULL )
 			{
-				Log::log( print_r( $response, TRUE ), 'oauth_custom' );
-				throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+				\IPS\Log::log( print_r( $response, TRUE ), 'oauth_custom' );
+				throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 
 			/* Set */						
@@ -485,11 +459,11 @@ class Custom extends OAuth2
 	/**
 	 * Get value from an array
 	 *
-	 * @param array $array	The array with the data
-	 * @param string $key	The key using[square][brackets]
+	 * @param	array	$array	The array with the data
+	 * @param	string	$key	The key using[square][brackets]
 	 * @return	mixed
 	 */
-	protected static function getValueFromArray( array $array, string $key ): mixed
+	protected static function getValueFromArray( $array, $key )
 	{
 		while ( $pos = mb_strpos( $key, '[' ) )
 		{
@@ -515,10 +489,10 @@ class Custom extends OAuth2
 	/**
 	 * Forgot Password URL
 	 *
-	 * @return	Url|NULL
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function forgotPasswordUrl(): ?Url
+	public function forgotPasswordUrl()
 	{
-		return ( isset( $this->settings['forgot_password_url'] ) and $this->settings['forgot_password_url'] ) ? Url::external( $this->settings['forgot_password_url'] ) : NULL;
+		return ( isset( $this->settings['forgot_password_url'] ) and $this->settings['forgot_password_url'] ) ? \IPS\Http\Url::external( $this->settings['forgot_password_url'] ) : NULL;
 	}
 }

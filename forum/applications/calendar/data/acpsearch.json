@@ -7,6 +7,13 @@
             "events"
         ]
     },
+    "app=calendar&module=calendars&controller=calendars&do=permissions": {
+        "lang_key": "menu__calendar_calendars_calendars",
+        "restriction": "calendars_manage",
+        "keywords": [
+            "calendar permissions"
+        ]
+    },
     "app=calendar&module=calendars&controller=calendars&searchResult=cal_comment_moderate": {
         "lang_key": "cal_comment_moderate",
         "restriction": "calendars_manage",
@@ -16,12 +23,51 @@
             "require approval"
         ]
     },
-    "app=calendar&module=calendars&controller=calendars&searchResult=form_new_cal_allow_comments": {
+    "app=calendar&module=calendars&controller=calendars&searchResult=form_1_cal_allow_comments": {
         "lang_key": "cal_allow_comments",
         "restriction": "calendars_manage",
         "keywords": [
             "allow comments",
             "comments"
+        ]
+    },
+    "app=calendar&module=calendars&controller=calendars&searchResult=form_1_cal_allow_reviews": {
+        "lang_key": "cal_allow_reviews",
+        "restriction": "calendars_manage",
+        "keywords": [
+            "allow reviews",
+            "reviews"
+        ]
+    },
+    "app=calendar&module=calendars&controller=calendars&searchResult=form_1_cal_color": {
+        "lang_key": "cal_color",
+        "restriction": "calendars_manage",
+        "keywords": [
+            "calendar color"
+        ]
+    },
+    "app=calendar&module=calendars&controller=calendars&searchResult=form_1_cal_moderate": {
+        "lang_key": "cal_moderate",
+        "restriction": "calendars_manage",
+        "keywords": [
+            "approve",
+            "approve event",
+            "event"
+        ]
+    },
+    "app=calendar&module=calendars&controller=calendars&searchResult=form_1_cal_title": {
+        "lang_key": "cal_title",
+        "restriction": "calendars_manage",
+        "keywords": [
+            "calendar name",
+            "calendar title"
+        ]
+    },
+    "app=calendar&module=calendars&controller=calendars&searchResult=form_new_cal_allow_comments": {
+        "lang_key": "cal_allow_comments",
+        "restriction": "calendars_manage",
+        "keywords": [
+            "allow comments"
         ]
     },
     "app=calendar&module=calendars&controller=calendars&searchResult=form_new_cal_allow_reviews": {
@@ -43,16 +89,15 @@
         "lang_key": "cal_moderate",
         "restriction": "calendars_manage",
         "keywords": [
-            "approve",
             "approve event",
-            "event"
+            "event approve",
+            "events"
         ]
     },
     "app=calendar&module=calendars&controller=calendars&searchResult=form_new_cal_title": {
         "lang_key": "cal_title",
         "restriction": "calendars_manage",
         "keywords": [
-            "calendar name",
             "calendar title"
         ]
     },
@@ -75,21 +120,21 @@
         ]
     },
     "app=calendar&module=calendars&controller=ical&do=add&searchResult=form_feed_calendar_id": {
-        "lang_key": "acpsearch__add_feed_calendar",
+        "lang_key": "feed_calendar_id",
         "restriction": "calendar_feeds_manage",
         "keywords": [
             "calendar"
         ]
     },
     "app=calendar&module=calendars&controller=ical&do=add&searchResult=form_feed_member_id": {
-        "lang_key": "acpsearch__add_feed_member",
+        "lang_key": "feed_member_id",
         "restriction": "calendar_feeds_manage",
         "keywords": [
             "member"
         ]
     },
     "app=calendar&module=calendars&controller=ical&do=add&searchResult=form_feed_title": {
-        "lang_key": "acpsearch__feed_title",
+        "lang_key": "feed_title",
         "restriction": "calendar_feeds_manage",
         "keywords": [
             "add icalendar",
@@ -106,7 +151,7 @@
         ]
     },
     "app=calendar&module=calendars&controller=ical&do=upload&searchResult=form_feed_calendar_id": {
-        "lang_key": "acpsearch__upload_feed_calendar",
+        "lang_key": "feed_calendar_id",
         "restriction": "calendar_feeds_manage",
         "keywords": [
             "calendar"
@@ -120,7 +165,7 @@
         ]
     },
     "app=calendar&module=calendars&controller=ical&do=upload&searchResult=form_feed_member_id": {
-        "lang_key": "acpsearch__upload_feed_member",
+        "lang_key": "feed_member_id",
         "restriction": "calendar_feeds_manage",
         "keywords": [
             "member"
@@ -189,17 +234,7 @@
         "lang_key": "menu__calendar_calendars_venues",
         "restriction": null,
         "keywords": [
-            "events",
-            "venue"
-        ]
-    },
-    "app=calendar&module=stats&controller=rsvp": {
-        "lang_key": "menu__calendar_stats_rsvp",
-        "restriction": "rsvp_manage",
-        "keywords": [
-            "calendar",
-            "rsvp",
-            "event"
+            "events"
         ]
     }
 }

@@ -11,27 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\File;
-use IPS\File\Amazon;
-use IPS\File\Backblaze;
-use IPS\Task;
-use IPS\Task\Exception;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * s3Delete Task
  */
-class s3Delete extends Task
+class _s3Delete extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -42,30 +31,30 @@ class s3Delete extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		try 
 		{
-			$s3 = Db::i()->select( '*', 'core_s3_deletions' )->first();
+			$s3 = \IPS\Db::i()->select( '*', 'core_s3_deletions' )->first();
 			
-			$obj = File::getClass('core_Theme');
+			$obj = \IPS\File::getClass('core_Theme');
 			
-			if ( !( $obj instanceof Amazon ) OR ( $obj instanceof Backblaze  ) )
+			if ( !( $obj instanceof \IPS\File\Amazon ) )
 			{
 				/* Class is not Amazon, so just stop here and truncate the table as there's nothing we can really do now. */
-				Db::i()->delete( 'core_s3_deletions' );
-				Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 's3Delete' ) );
+				\IPS\Db::i()->delete( 'core_s3_deletions' );
+				\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 's3Delete' ) );
 				return NULL;
 			}
 			
-			$keys = $obj->getContainerKeys( $s3['s3_container'], 101, '', ( $s3['s3_marker'] ?? '' ) );
+			$keys = $obj->getContainerKeys( $s3['s3_container'], 101, '', $s3['s3_marker'] );
 			
-			if ( count( $keys ) )
+			if ( \count( $keys ) )
 			{
 				/* Get the 51st key, which will be the marker for the next iteration if we have 51 keys, otherwise, make marker null so it's removed in the next iteration */
-				if ( count( $keys ) < 101 )
+				if ( \count( $keys ) < 101 )
 				{
 					$marker = NULL;
 				}
@@ -81,31 +70,31 @@ class s3Delete extends Task
 				{
 					if ( $time <= $s3['s3_added'] )
 					{
-						File::getClass('core_Theme')->deleteByKey( $key );
+						\IPS\File::getClass('core_Theme')->deleteByKey( $key );
 					}
 				}
 				
 				if ( $marker )
 				{
 					/* Update the marker, there may be more to go */
-					Db::i()->update( 'core_s3_deletions', array( 's3_marker' => $marker ), array( 's3_container=?', $s3['s3_container'] ) );
+					\IPS\Db::i()->update( 'core_s3_deletions', array( 's3_marker' => $marker ), array( 's3_container=?', $s3['s3_container'] ) );
 				}
 				else
 				{
 					/* Last batch, possible some keys not deleted if time didn't match */
-					Db::i()->delete( 'core_s3_deletions', array( 's3_container=?', $s3['s3_container'] ) );
+					\IPS\Db::i()->delete( 'core_s3_deletions', array( 's3_container=?', $s3['s3_container'] ) );
 				}
 			}
 			else
 			{
 				/* If no keys, delete container row from s3_deletions */
-				Db::i()->delete( 'core_s3_deletions', array( 's3_container=?', $s3['s3_container'] ) );
+				\IPS\Db::i()->delete( 'core_s3_deletions', array( 's3_container=?', $s3['s3_container'] ) );
 			}
 		}
-		catch( UnderflowException $ex )
+		catch( \UnderflowException $ex )
 		{
 			/* Nothing to do, so switch off the task */
-			Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 's3Delete' ) );
+			\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 's3Delete' ) );
 		}
 				
 		return NULL;

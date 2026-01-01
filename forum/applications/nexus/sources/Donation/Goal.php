@@ -12,83 +12,51 @@
 namespace IPS\nexus\Donation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Stack;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Lang;
-use IPS\nexus\Customer;
-use IPS\nexus\Money;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Widget;
-use Iterator;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Donation Goal Node
  */
-class Goal extends Model
+class _Goal extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_donate_goals';
+	public static $databaseTable = 'nexus_donate_goals';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'd_';
+	public static $databasePrefix = 'd_';
 		
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 		
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'donation_goals';
+	public static $nodeTitle = 'donation_goals';
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'nexus_donategoal_';
+	public static $titleLangPrefix = 'nexus_donategoal_';
 
 	/**
 	 * @brief	[Node] Description suffix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}_{$descriptionLangSuffix}" as the key
 	 */
-	public static ?string $descriptionLangSuffix = '_desc';
-
-	/**
-	 * @brief	Donating publicly
-	 */
-	const DONATE_PUBLIC = 1;
-
-	/**
-	 * @brief	Donating anonymously
-	 */
-	const DONATE_ANONYMOUS = 2;
+	public static $descriptionLangSuffix = '_desc';
 
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -106,7 +74,7 @@ class Goal extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'nexus',
 		'module'	=> 'payments',
 		'all'		=> 'donationgoals_manage'
@@ -115,13 +83,13 @@ class Goal extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
-		$form->add( new Translatable( 'd_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_donategoal_{$this->id}" : NULL ) ) );
-		$form->add( new Translatable( 'd_desc', NULL, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Translatable( 'd_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_donategoal_{$this->id}" : NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'd_desc', NULL, FALSE, array(
 			'app' => 'nexus',
 			'key' => $this->id ? "nexus_donategoal_{$this->id}_desc" : NULL,
 			'editor'	=> array(
@@ -132,27 +100,16 @@ class Goal extends Model
 			)
 		), NULL, NULL, NULL, 'd_desc_editor' ) );
 				
-		if ( count( Money::currencies() ) > 1 and !$this->current )
+		if ( \count( \IPS\nexus\Money::currencies() ) > 1 and !$this->current )
 		{
-			$form->add( new Radio( 'd_currency', $this->currency ?: Customer::loggedIn()->defaultCurrency(), TRUE, array(
-				'options' => array_combine( Money::currencies(), Money::currencies() ),
+			$form->add( new \IPS\Helpers\Form\Radio( 'd_currency', $this->currency ?: \IPS\nexus\Customer::loggedIn()->defaultCurrency(), TRUE, array(
+				'options' => array_combine( \IPS\nexus\Money::currencies(), \IPS\nexus\Money::currencies() ),
 			) ) );
 		}
-
-		foreach ( $this->donation_suggestions ? ( json_decode( $this->donation_suggestions, TRUE ) ?: array() ) : array() as $suggestion )
-		{
-			$amounts = array();
-			foreach ( $suggestion as $currency => $amount )
-			{
-				$amounts[ $currency ] = new Number( $amount, $currency );
-			}
-		}
-
-		$form->add( new Stack( 'd_suggestions', $this->suggestions ? json_decode( $this->suggestions, TRUE ) : array(), FALSE, array( 'stackFieldType' => 'IPS\Helpers\Form\Number', 'decimals' => 2 ) ) );
-		$form->add( new YesNo( 'd_suggestions_open', $this->id ? $this->suggestions_open : TRUE, FALSE ) );
-
-		$form->add( new Number( 'd_goal', $this->goal, FALSE, array( 'unlimited' => 0.0, 'unlimitedLang' => 'd_goal_none', 'decimals' => TRUE ) ) );
-		$form->add( new Number( 'd_current', $this->current, FALSE, array( 'decimals' => TRUE ) ) );
+				
+		$form->add( new \IPS\Helpers\Form\Number( 'd_goal', $this->goal, FALSE, array( 'unlimited' => (float) 0, 'unlimitedLang' => 'd_goal_none', 'decimals' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'd_current', $this->current, FALSE, array( 'decimals' => TRUE ) ) );
+		
 	}
 	
 	/**
@@ -161,21 +118,21 @@ class Goal extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( !$this->id )
 		{
-			$this->currency = Customer::loggedIn()->defaultCurrency();
+			$this->currency = \IPS\nexus\Customer::loggedIn()->defaultCurrency();
 			$this->save();
-			File::claimAttachments( 'nexus-new-donategoal', $this->id, NULL, 'donategoal', TRUE );
+			\IPS\File::claimAttachments( 'nexus-new-donategoal', $this->id, NULL, 'donategoal', TRUE );
 		}
 
 		if( isset( $values['d_name'] ) )
 		{
-			Lang::saveCustom( 'nexus', "nexus_donategoal_{$this->id}", $values['d_name'] );
+			\IPS\Lang::saveCustom( 'nexus', "nexus_donategoal_{$this->id}", $values['d_name'] );
 
 			/* Save the SEO name */
-			$this->name_seo = Friendly::seoTitle( $values[ 'd_name' ][ Lang::defaultLanguage() ] );
+			$this->name_seo = \IPS\Http\Url\Friendly::seoTitle( $values[ 'd_name' ][ \IPS\Lang::defaultLanguage() ] );
 			$this->save();
 
 			unset( $values['d_name'] );
@@ -183,16 +140,14 @@ class Goal extends Model
 
 		if( isset( $values['d_desc'] ) )
 		{
-			Lang::saveCustom( 'nexus', "nexus_donategoal_{$this->id}_desc", $values['d_desc'] );
+			\IPS\Lang::saveCustom( 'nexus', "nexus_donategoal_{$this->id}_desc", $values['d_desc'] );
 			unset( $values['d_desc'] );
 		}
 		
 		if ( !isset( $values['d_currency'] ) )
 		{
-			$values['d_currency'] = Customer::loggedIn()->defaultCurrency();
+			$values['d_currency'] = \IPS\nexus\Customer::loggedIn()->defaultCurrency();
 		}
-
-		$values['d_suggestions'] = json_encode( $values['d_suggestions'] );
 		
 		return $values;
 	}
@@ -200,21 +155,21 @@ class Goal extends Model
 	/**
 	 * [ActiveRecord] Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		parent::save();
-		Widget::deleteCaches( 'donations', 'nexus' );
+		\IPS\Widget::deleteCaches( 'donations', 'nexus' );
 		static::recountDonationGoals();
 	}
 	
 	/**
 	 * [ActiveRecord] Delete
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		parent::delete();
 		static::recountDonationGoals();
@@ -225,71 +180,38 @@ class Goal extends Model
 	 *
 	 * @return	void
 	 */
-	protected static function recountDonationGoals() : void
+	protected static function recountDonationGoals()
 	{
-		$count = count( static::roots() );
-		Settings::i()->changeValues( array( 'donation_goals' => $count ) );
+		$count = \count( static::roots() );
+		\IPS\Settings::i()->changeValues( array( 'donation_goals' => $count ) );
 	}
 
 	/**
 	 * @brief	Generated URL storage
 	 */
-	protected mixed $_url = NULL;
+	protected $_url;
 	
 	/**
 	 * Get URL
 	 *
-	 * @param string|null $action	Action
-	 * @return	Url
+	 * @param	string|null	$action	Action
+	 * @return	\IPS\Http\Url
 	 */
-	public function url( string $action=NULL ): Url
+	public function url( $action=NULL )
 	{
 		/* self-heal missing seo titles */
 		if( $this->name_seo === null )
 		{
-			$language = Lang::load( Lang::defaultLanguage() );
-			$this->name_seo = Friendly::seoTitle( $language->get( 'nexus_donategoal_' . $this->_id ) );
+			$language = \IPS\Lang::load( \IPS\Lang::defaultLanguage() );
+			$this->name_seo = \IPS\Http\Url\Friendly::seoTitle( $language->get( 'nexus_donategoal_' . $this->_id ) );
 			$this->save();
 		}
 
 		if( $this->_url === null )
 		{
-			$this->_url = Url::internal( 'app=nexus&module=clients&controller=donations&id=' . $this->_id, 'front', 'clientsdonate', array( $this->name_seo ) );
+			$this->_url = \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=donations&id=' . $this->_id, 'front', 'clientsdonate', array( $this->name_seo ) );
 		}
 
 		return $this->_url;
-	}
-
-	/**
-	 * Donors @param	int						$privacy		static::DONATE_PUBLIC + static::DONATE_ANONYMOUS
-	 * @param array|int|null $limit			LIMIT clause
-	 * @param bool $countOnly		Return only the count
-	 *
-	 * @return	Iterator|int
-	 *
-	 */
-	public function donors( int $privacy=3, array|int $limit=NULL, bool $countOnly=FALSE ): Iterator|int
-	{
-		$where= array();
-		$where[] = array( 'dl_goal=?', $this->id );
-
-		/* Public / Anonymous */
-		if ( !( $privacy & static::DONATE_PUBLIC ) )
-		{
-			$where[] = array( 'dl_anon=1' );
-		}
-		elseif ( !( $privacy & static::DONATE_ANONYMOUS ) )
-		{
-			$where[] = array( 'dl_anon=0' );
-		}
-
-		if ( $countOnly )
-		{
-			return (int) Db::i()->select( 'COUNT( DISTINCT nexus_donate_logs.dl_member ) as count', 'nexus_donate_logs', $where )->first();
-		}
-		else
-		{
-			return new ActiveRecordIterator( Db::i()->select( 'DISTINCT( core_members.member_id ), core_members.*', 'nexus_donate_logs', $where, NULL, $limit )->join( 'core_members', 'nexus_donate_logs.dl_member=core_members.member_id'), '\IPS\Member' );
-		}
 	}
 }

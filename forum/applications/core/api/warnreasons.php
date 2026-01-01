@@ -11,33 +11,21 @@
 namespace IPS\core\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\core\Warnings\Reason;
-use IPS\Lang;
-use IPS\Node\Api\NodeController;
-use IPS\Node\Model;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Warn Reasons API
  */
-class warnreasons extends NodeController
+class _warnreasons extends \IPS\Node\Api\NodeController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\core\Warnings\Reason';
+	protected $class = 'IPS\core\Warnings\Reason';
 
 	/**
 	 * GET /core/warnreasons
@@ -45,16 +33,15 @@ class warnreasons extends NodeController
 	 *
 	 * @apiparam	int		page			Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\core\Warnings\Reason>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\core\Warnings\Reason>
 	 * @throws		1C292/S	NO_PERMISSION	The current authorized user does not have permission to issue warnings and as such cannot view the list of warn reasons
-	 * @return PaginatedResponse<Reason>
 	 */
-	public function GETindex() : PaginatedResponse
+	public function GETindex()
 	{
 		/* Check permissions */
 		if( $this->member AND ( !$this->member->modPermission('mod_can_warn') OR !$this->member->modPermission('mod_see_warn') ) )
 		{
-			throw new Exception( 'NO_PERMISSION', '1C292/S', 403 );
+			throw new \IPS\Api\Exception( 'NO_PERMISSION', '1C292/S', 403 );
 		}
 
 		/* Return */
@@ -68,18 +55,17 @@ class warnreasons extends NodeController
 	 * @apiclientonly
 	 * @param		int		$id			ID Number
 	 * @throws		1C385/1	INVALID_ID	The warn reason does not exist
-	 * @apireturn		\IPS\core\Warnings\Reason
-	 * @return Response
+	 * @return		\IPS\core\Warnings\Reason
 	 */
-	public function GETitem( int $id ) : Response
+	public function GETitem( $id )
 	{
 		try
 		{
 			return $this->_view( $id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1C385/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1C385/1', 404 );
 		}
 	}
 
@@ -95,24 +81,23 @@ class warnreasons extends NodeController
 	 * @apiparam	bool		pointsAutoRemove	Whether or not to automatically remove points (defaults to false). If true, you must supply removePoints.
 	 * @apiparam	string|null		removePoints		Timeframe to remove points after as a date interval (e.g. P2D for 2 days or PT6H for 6 hours)
 	 * @apiparam	bool		removeOverride		Whether or not moderators can override the default points removal configuration
-	 * @apireturn		\IPS\core\Warnings\Reason
+	 * @return		\IPS\core\Warnings\Reason
 	 * @throws		1C385/2	INVALID_POINTS_EXPIRATION	Points were specified as automatically removing but the removal time period was not supplied or is invalid
 	 * @throws		1C385/4	NO_NAME		A name for the warn reason must be supplied
-	 * @return Response
 	 */
-	public function POSTindex() : Response
+	public function POSTindex()
 	{
-		if( !Request::i()->name )
+		if( !\IPS\Request::i()->name )
 		{
-			throw new Exception( 'NO_NAME', '1C385/4', 400 );
+			throw new \IPS\Api\Exception( 'NO_NAME', '1C385/4', 400 );
 		}
 
-		if( isset( Request::i()->pointsAutoRemove ) AND Request::i()->pointsAutoRemove AND ( !isset( Request::i()->removePoints ) OR !Request::i()->removePoints ) )
+		if( isset( \IPS\Request::i()->pointsAutoRemove ) AND \IPS\Request::i()->pointsAutoRemove AND ( !isset( \IPS\Request::i()->removePoints ) OR !\IPS\Request::i()->removePoints ) )
 		{
-			throw new Exception( 'INVALID_POINTS_EXPIRATION', '1C385/2', 400 );
+			throw new \IPS\Api\Exception( 'INVALID_POINTS_EXPIRATION', '1C385/2', 400 );
 		}
 
-		return new Response( 201, $this->_create()->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 201, $this->_create()->apiOutput( $this->member ) );
 	}
 
 	/**
@@ -128,22 +113,20 @@ class warnreasons extends NodeController
 	 * @apiparam	string|null		removePoints		Timeframe to remove points after as a date interval (e.g. P2D for 2 days or PT6H for 6 hours)
 	 * @apiparam	bool		removeOverride		Whether or not moderators can override the default points removal configuration
 	 * @param		int		$id			ID Number
-	 * @apireturn		\IPS\core\Warnings\Reason
+	 * @return		\IPS\core\Warnings\Reason
 	 * @throws		1C385/3	INVALID_POINTS_EXPIRATION	Points were specified as automatically removing but the removal time period was not supplied or is invalid
-	 * @return Response
 	 */
-	public function POSTitem( int $id ) : Response
+	public function POSTitem( $id )
 	{
-		if( isset( Request::i()->pointsAutoRemove ) AND Request::i()->pointsAutoRemove AND ( !isset( Request::i()->removePoints ) OR !Request::i()->removePoints ) )
+		if( isset( \IPS\Request::i()->pointsAutoRemove ) AND \IPS\Request::i()->pointsAutoRemove AND ( !isset( \IPS\Request::i()->removePoints ) OR !\IPS\Request::i()->removePoints ) )
 		{
-			throw new Exception( 'INVALID_POINTS_EXPIRATION', '1C385/3', 400 );
+			throw new \IPS\Api\Exception( 'INVALID_POINTS_EXPIRATION', '1C385/3', 400 );
 		}
 
-		/* @var Reason $class */
 		$class	= $this->class;
 		$reason	= $class::load( $id );
 
-		return new Response( 200, $this->_createOrUpdate( $reason )->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $this->_createOrUpdate( $reason )->apiOutput( $this->member ) );
 	}
 
 	/**
@@ -152,10 +135,9 @@ class warnreasons extends NodeController
 	 *
 	 * @apiclientonly
 	 * @param		int		$id			ID Number
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function DELETEitem( int $id ) : Response
+	public function DELETEitem( $id )
 	{
 		return $this->_delete( $id );
 	}
@@ -163,33 +145,33 @@ class warnreasons extends NodeController
 	/**
 	 * Create or update node
 	 *
-	 * @param	Model	$reason				The node
-	 * @return	Model
+	 * @param	\IPS\node\Model	$reason				The node
+	 * @return	\IPS\node\Model
 	 */
-	protected function _createOrUpdate( Model $reason ): Model
+	protected function _createOrUpdate( \IPS\Node\Model $reason )
 	{
-		if( Request::i()->name )
+		if( \IPS\Request::i()->name )
 		{
-			Lang::saveCustom( 'core', 'core_warn_reason_' . $reason->id, Request::i()->name );
+			\IPS\Lang::saveCustom( 'core', 'core_warn_reason_' . $reason->id, \IPS\Request::i()->name );
 		}
 
-		$reason->points				= (int) Request::i()->points;
-		$reason->points_override	= (bool) Request::i()->pointsOverride;
-		$reason->remove_override	= (bool) Request::i()->removeOverride;
-		$reason->notes				= Request::i()->notes;
+		$reason->points				= (int) \IPS\Request::i()->points;
+		$reason->points_override	= (bool) \IPS\Request::i()->pointsOverride;
+		$reason->remove_override	= (bool) \IPS\Request::i()->removeOverride;
+		$reason->notes				= \IPS\Request::i()->notes;
 
-		if( isset( Request::i()->pointsAutoRemove ) OR isset( Request::i()->removePoints ) )
+		if( isset( \IPS\Request::i()->pointsAutoRemove ) OR isset( \IPS\Request::i()->removePoints ) )
 		{
-			if( !Request::i()->pointsAutoRemove )
+			if( !\IPS\Request::i()->pointsAutoRemove )
 			{
 				$reason->remove	= -1;
 				$reason->remove_unit = NULL;
 			}
 			else
 			{
-				$reason->remove	= (int) str_ireplace( array( 'P', 'T', 'H' ), '', Request::i()->removePoints );
+				$reason->remove	= (int) str_ireplace( array( 'P', 'T', 'H' ), '', \IPS\Request::i()->removePoints );
 
-				if( mb_strpos( Request::i()->removePoints, 'PT' ) === 0 )
+				if( mb_strpos( \IPS\Request::i()->removePoints, 'PT' ) === 0 )
 				{
 					$reason->remove_unit = 'h';
 				}

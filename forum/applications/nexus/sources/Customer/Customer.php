@@ -12,60 +12,38 @@
 namespace IPS\nexus;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\GeoLocation;
-use IPS\Http\Url;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\nexus\Customer\CustomField;
-use IPS\nexus\Donation\Goal;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_called_class;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Customer Model
  */
-class Customer extends Member
+class _Customer extends \IPS\Member
 {
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	Cached logged in member
 	 */
-	public static ?Member $loggedInMember	= NULL;
+	public static $loggedInMember	= NULL;
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'member_id';
+	public static $databaseColumnId = 'member_id';
 
 	/**
 	 * Get logged in member
 	 *
-	 * @return	Member|null
+	 * @return	\IPS\Member
 	 */
-	public static function loggedIn(): ?static
+	public static function loggedIn()
 	{
 		/* If we haven't loaded the member yet, or if the session member has changed since we last loaded the member, reload and cache */
 		if( static::$loggedInMember === NULL )
@@ -82,14 +60,14 @@ class Customer extends Member
 	 * @param	int|string	$id					ID
 	 * @param	string		$idField			The database column that the $id parameter pertains to
 	 * @param	mixed		$extraWhereClause	Additional where clause(s)
-	 * @return	Select
+	 * @return	\IPS\Db\Select
 	 */
-	protected static function constructLoadQuery( int|string $id, string $idField, mixed $extraWhereClause ): Select
+	protected static function constructLoadQuery( $id, $idField, $extraWhereClause )
 	{
 		$where = array( array( 'core_members.' . $idField . '=?', $id ) );
 		if( $extraWhereClause !== NULL )
 		{
-			if ( !is_array( $extraWhereClause ) or !is_array( $extraWhereClause[0] ) )
+			if ( !\is_array( $extraWhereClause ) or !\is_array( $extraWhereClause[0] ) )
 			{
 				$extraWhereClause = array( $extraWhereClause );
 			}
@@ -102,20 +80,20 @@ class Customer extends Member
 	/**
 	 * Load Record
 	 *
-	 * @see        Db::build
-	 * @param	int|string|null	$id					ID
-	 * @param	string|null		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
+	 * @see		\IPS\Db::build
+	 * @param	int|string	$id					ID
+	 * @param	string		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
 	 * @param	mixed		$extraWhereClause	Additional where clause(s) (see \IPS\Db::build for details)
 	 * @return	static
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function load( int|string|null $id, string $idField=NULL, mixed $extraWhereClause=NULL ): static
+	public static function load( $id, $idField=NULL, $extraWhereClause=NULL )
 	{
 		/* Guests */
 		if( $id === NULL OR $id === 0 OR $id === '' )
 		{
-			$classname = get_called_class();
+			$classname = \get_called_class();
 			return new $classname;
 		}
 		
@@ -126,9 +104,9 @@ class Customer extends Member
 		}
 		
 		/* If we did, check it's valid */
-		elseif( !in_array( $idField, static::$databaseIdFields ) )
+		elseif( !\in_array( $idField, static::$databaseIdFields ) )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 				
 		/* Does that exist in the multiton store? */
@@ -145,9 +123,9 @@ class Customer extends Member
 			{
 				$row = static::constructLoadQuery( $id, $idField, $extraWhereClause )->first();
 			}
-			catch ( UnderflowException )
+			catch ( \UnderflowException $e )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
 			/* If it doesn't exist in the multiton store, set it */
@@ -164,11 +142,11 @@ class Customer extends Member
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    static
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): static
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
 		if ( isset( $data['_member_id'] ) )
 		{
@@ -190,7 +168,7 @@ class Customer extends Member
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->_data['cm_first_name'] = '';
 		$this->_data['cm_last_name'] = '';
@@ -202,7 +180,7 @@ class Customer extends Member
 	 *
 	 * @return	string
 	 */
-	public function get_cm_name(): string
+	public function get_cm_name()
 	{
 		return ( $this->cm_first_name or $this->cm_last_name ) ? "{$this->cm_first_name} {$this->cm_last_name}" : $this->name;
 	}
@@ -212,19 +190,19 @@ class Customer extends Member
 	 *
 	 * @return	array
 	 */
-	public function get_cm_credits(): array
+	public function get_cm_credits()
 	{
-		$amounts = ( $this->member_id AND isset( $this->_data['cm_credits'] ) ) ? json_decode( $this->_data['cm_credits'], TRUE ) : array();
+		$amounts = $this->member_id ? json_decode( $this->_data['cm_credits'], TRUE ) : array();
 		$return = array();
-		foreach (Money::currencies() as $currency )
+		foreach ( \IPS\nexus\Money::currencies() as $currency )
 		{
 			if ( isset( $amounts[ $currency ] ) )
 			{
-				$return[ $currency ] = new Money( $amounts[ $currency ], $currency );
+				$return[ $currency ] = new \IPS\nexus\Money( $amounts[ $currency ], $currency );
 			}
 			else
 			{
-				$return[ $currency ] = new Money( 0, $currency );
+				$return[ $currency ] = new \IPS\nexus\Money( 0, $currency );
 			}
 		}
 		return $return;
@@ -233,10 +211,10 @@ class Customer extends Member
 	/**
 	 * Set account credit
 	 *
-	 * @param array $amounts	Amounts
+	 * @param	array	$amounts	Amounts
 	 * @return	void
 	 */
-	public function set_cm_credits( array $amounts ) : void
+	public function set_cm_credits( $amounts )
 	{
 		$save = array();
 		foreach ( $amounts as $amount )
@@ -251,7 +229,7 @@ class Customer extends Member
 	 *
 	 * @return	array
 	 */
-	public function get_cm_profiles(): array
+	public function get_cm_profiles()
 	{
 		return ( isset( $this->_data['cm_profiles'] ) and $this->_data['cm_profiles'] ) ? json_decode( $this->_data['cm_profiles'], TRUE ) : array();
 	}
@@ -259,10 +237,10 @@ class Customer extends Member
 	/**
 	 * Set profiles
 	 *
-	 * @param array $profiles	Profiles
-	 * @return	void
+	 * @param	array	$profiles	Profiles
+	 * @return	array
 	 */
-	public function set_cm_profiles( array $profiles ) : void
+	public function set_cm_profiles( $profiles )
 	{
 		$this->_data['cm_profiles'] = json_encode( $profiles );
 	}
@@ -270,15 +248,15 @@ class Customer extends Member
 	/**
 	 * Get default currency
 	 *
-	 * @return	string
+	 * @return	void
 	 */
-	public function defaultCurrency() : string
+	public function defaultCurrency()
 	{
-		if ( $currencies = json_decode( Settings::i()->nexus_currency, TRUE ) )
+		if ( $currencies = json_decode( \IPS\Settings::i()->nexus_currency, TRUE ) )
 		{
 			foreach ( $currencies as $k => $v )
 			{
-				if ( in_array( $this->language()->id, $v ) )
+				if ( \in_array( $this->language()->id, $v ) )
 				{
 					return $k;
 				}
@@ -289,29 +267,29 @@ class Customer extends Member
 		}
 		else
 		{
-			return Settings::i()->nexus_currency;
+			return \IPS\Settings::i()->nexus_currency;
 		}
 	}
 
 	/**
 	 * @brief	Cache primary billing address in case the method is called multiple times
 	 */
-	protected GeoLocation|bool|null $primaryBillingAddress = false;
+	protected $primaryBillingAddress = FALSE;
 	
 	/**
 	 * Get primary billing address, if one exists
 	 *
-	 * @return	GeoLocation|NULL
+	 * @return	\IPS\GeoLocation|NULL
 	 */
-	public function primaryBillingAddress() : GeoLocation|null
+	public function primaryBillingAddress()
 	{
 		if( $this->primaryBillingAddress === FALSE )
 		{
 			try
 			{
-				$this->primaryBillingAddress = GeoLocation::buildFromJson( Db::i()->select( 'address', 'nexus_customer_addresses', array( '`member`=? AND primary_billing=1', $this->member_id ) )->first() );
+				$this->primaryBillingAddress = \IPS\GeoLocation::buildFromJson( \IPS\Db::i()->select( 'address', 'nexus_customer_addresses', array( '`member`=? AND primary_billing=1', $this->member_id ) )->first() );
 			}
-			catch ( UnderflowException )
+			catch ( \UnderflowException $e )
 			{
 				$this->primaryBillingAddress = NULL;
 			}
@@ -323,19 +301,19 @@ class Customer extends Member
 	/**
 	 * Estimated location
 	 *
-	 * @return	GeoLocation|NULL
+	 * @return	\IPS\GeoLocation|NULL
 	 */
-	public function estimatedLocation(): ?GeoLocation
+	public function estimatedLocation()
 	{
-		if ( $this->member_id === Customer::loggedIn()->member_id )
+		if ( $this->member_id === \IPS\nexus\Customer::loggedIn()->member_id )
 		{
-			if ( isset( Request::i()->cookie['location'] ) AND ( !Request::i()->cookie['location'] OR ( Request::i()->cookie['location'] AND $data = json_decode( Request::i()->cookie['location'], true ) AND array_key_exists( 'member_id', $data ) AND $data['member_id'] == $this->member_id ) ) )
+			if ( isset( \IPS\Request::i()->cookie['location'] ) AND ( !\IPS\Request::i()->cookie['location'] OR ( \IPS\Request::i()->cookie['location'] AND $data = json_decode( \IPS\Request::i()->cookie['location'], true ) AND array_key_exists( 'member_id', $data ) AND $data['member_id'] == $this->member_id ) ) )
 			{
 				$location = NULL;
 
-				if( Request::i()->cookie['location'] AND $data = json_decode( Request::i()->cookie['location'], true ) AND $data['member_id'] == $this->member_id )
+				if( \IPS\Request::i()->cookie['location'] AND $data = json_decode( \IPS\Request::i()->cookie['location'], true ) AND $data['member_id'] == $this->member_id )
 				{
-					$location = GeoLocation::buildFromJson( Request::i()->cookie['location'] );
+					$location = \IPS\GeoLocation::buildFromJson( \IPS\Request::i()->cookie['location'] );
 				}
 			}
 			else
@@ -345,32 +323,32 @@ class Customer extends Member
 				{
 					try
 					{
-						$location = GeoLocation::getRequesterLocation();
-						Request::i()->setCookie( 'location', $this->_addMemberToAddress( $location ) );
+						$location = \IPS\GeoLocation::getRequesterLocation();
+						\IPS\Request::i()->setCookie( 'location', $this->_addMemberToAddress( $location ) );
 					}
-					catch ( Exception )
+					catch ( \Exception $e )
 					{
 						if( isset( $_SERVER['HTTP_ACCEPT_LANGUAGE'] ) )
 						{
 							$languages = explode(',', $_SERVER['HTTP_ACCEPT_LANGUAGE'] );
 							$exploded = explode( '-', array_shift( $languages ) );
 
-							if ( in_array( mb_strtoupper( $exploded[1] ), GeoLocation::$countries ) )
+							if ( \in_array( mb_strtoupper( $exploded[1] ), \IPS\GeoLocation::$countries ) )
 							{
-								$location = new GeoLocation;
+								$location = new \IPS\GeoLocation;
 								$location->country = mb_strtoupper( $exploded[1] );
-								Request::i()->setCookie( 'location', $this->_addMemberToAddress( $location ) );
+								\IPS\Request::i()->setCookie( 'location', $this->_addMemberToAddress( $location ) );
 							}
 							else
 							{
 								$location = NULL;
-								Request::i()->setCookie( 'location', '' );
+								\IPS\Request::i()->setCookie( 'location', '' );
 							}
 						}
 						else
 						{
 							$location = NULL;
-							Request::i()->setCookie( 'location', '' );
+							\IPS\Request::i()->setCookie( 'location', '' );
 						}
 					}
 				}
@@ -387,10 +365,10 @@ class Customer extends Member
 	/**
 	 * Add the member ID to the address object so we can validate it on subsequent requests
 	 *
-	 * @param GeoLocation $location	Location object
+	 * @param	\IPS\GeoLocation	$location	Location object
 	 * @return	string
 	 */
-	protected function _addMemberToAddress( GeoLocation $location ): string
+	protected function _addMemberToAddress( $location )
 	{
 		return json_encode( array_merge( json_decode( json_encode( $location ), true ), array( 'member_id' => $this->member_id ) ) );
 	}
@@ -398,16 +376,16 @@ class Customer extends Member
 	/**
 	 * Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		$data = $this->_data;
 		
 		$customerTable = array();
 		foreach ( ( $this->_new ? $this->_data : $this->changed ) as $k => $v )
 		{
-			if ( ( mb_substr( $k, 0, 3 ) === 'cm_' and !in_array( $k, array( 'cm_credits', 'cm_return_group', 'cm_reg' ) ) ) or mb_substr( $k, 0, 6 ) === 'field_'  )
+			if ( ( mb_substr( $k, 0, 3 ) === 'cm_' and !\in_array( $k, array( 'cm_credits', 'cm_no_sev', 'cm_return_group', 'cm_reg' ) ) ) or mb_substr( $k, 0, 6 ) === 'field_'  )
 			{
 				$customerTable[ $k ] = $v;
 				unset( $this->_data[ $k ] );
@@ -419,62 +397,62 @@ class Customer extends Member
 		$data['member_id'] = $this->_data['member_id'];
 		$this->_data = $data;
 		
-		if ( count( $customerTable ) )
+		if ( \count( $customerTable ) )
 		{
 			$customerTable['member_id'] = $this->member_id;
-			Db::i()->insert( 'nexus_customers', $customerTable, TRUE );
+			\IPS\Db::i()->insert( 'nexus_customers', $customerTable, TRUE );
 		}
 	}
 	
 	/**
 	 * Log Action
 	 *
-	 * @param string $type	Log type
-	 * @param mixed|null $extra	Any extra data for the type
-	 * @param mixed|null $by		The member performing the action. NULL for currently logged in member or FALSE for no member
+	 * @param	string	$type	Log type
+	 * @param	mixed	$extra	Any extra data for the type
+	 * @param	mixed	$by		The member performing the action. NULL for currently logged in member or FALSE for no member
 	 * @return	void
 	 */
-	public function log( string $type, mixed $extra=NULL, mixed $by=NULL ) : void
+	public function log( $type, $extra=NULL, $by=NULL )
 	{
-		$this->logHistory( 'nexus', $type, $extra, $by );
+		$this->logHistory( 'nexus', $type, $extra, $by, TRUE );
 	}
-
+	
 	/**
 	 * Get total amount spent
 	 *
-	 * @return Money|string
+	 * @return	string
 	 */
-	public function totalSpent(): Money|string
+	public function totalSpent()
 	{
 		$return = array();
-		foreach (Db::i()->select( 't_currency, ( SUM(t_amount)-SUM(t_partial_refund) ) AS amount', 'nexus_transactions', array( 't_member=? AND ( t_status=? OR t_status=? )', $this->member_id, Transaction::STATUS_PAID, Transaction::STATUS_PART_REFUNDED ), NULL, NULL, 't_currency' ) as $amount )
+		foreach ( \IPS\Db::i()->select( 't_currency, ( SUM(t_amount)-SUM(t_partial_refund) ) AS amount', 'nexus_transactions', array( 't_member=? AND ( t_status=? OR t_status=? )', $this->member_id, \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_PART_REFUNDED ), NULL, NULL, 't_currency' ) as $amount )
 		{
-			$return[] = (string) new Money( $amount['amount'], $amount['t_currency'] );
+			$return[] = (string) new \IPS\nexus\Money( $amount['amount'], $amount['t_currency'] );
 		}
-		return count( $return ) ? implode( ' + ', $return ) : new Money( 0, $this->defaultCurrency() );
+		return \count( $return ) ? implode( ' + ', $return ) : new \IPS\nexus\Money( 0, $this->defaultCurrency() );
 	}
 	
 	/**
 	 * @brief	Number of previous purchases by package ID
 	 */
-	protected mixed $previousPurchasesCount = NULL;
+	protected $previousPurchasesCount;
 	
 	/**
 	 * Get number of previous purchases of a package ID (used to calculate loyalty discounts)
 	 *
-	 * @param int $packageID	Package ID
-	 * @param bool $activeOnly	Active only?
-	 * @return	int|array
+	 * @param	int		$packageID	Package ID
+	 * @param	bool	$activeOnly	Active only?
+	 * @return	array
 	 */
-	public function previousPurchasesCount( int $packageID, bool $activeOnly=FALSE ): int|array
+	public function previousPurchasesCount( $packageID, $activeOnly )
 	{
 		if ( $this->previousPurchasesCount === NULL )
 		{			
-			$this->previousPurchasesCount['all'] = iterator_to_array( Db::i()->select( 'ps_item_id, COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_member=?', 'nexus', 'package', $this->member_id ), NULL, NULL, 'ps_item_id' )->setKeyField('ps_item_id')->setValueField('COUNT(*)') );
-			$this->previousPurchasesCount['active'] = iterator_to_array( Db::i()->select( 'ps_item_id, COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_member=? AND ps_active=1', 'nexus', 'package', $this->member_id ), NULL, NULL, 'ps_item_id' )->setKeyField('ps_item_id')->setValueField('COUNT(*)') );
+			$this->previousPurchasesCount['all'] = iterator_to_array( \IPS\Db::i()->select( 'ps_item_id, COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_member=?', 'nexus', 'package', $this->member_id ), NULL, NULL, 'ps_item_id' )->setKeyField('ps_item_id')->setValueField('COUNT(*)') );
+			$this->previousPurchasesCount['active'] = iterator_to_array( \IPS\Db::i()->select( 'ps_item_id, COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_member=? AND ps_active=1', 'nexus', 'package', $this->member_id ), NULL, NULL, 'ps_item_id' )->setKeyField('ps_item_id')->setValueField('COUNT(*)') );
 		}
 				
-		return $this->previousPurchasesCount[$activeOnly ? 'active' : 'all'][$packageID] ?? 0;
+		return isset( $this->previousPurchasesCount[ $activeOnly ? 'active' : 'all' ][ $packageID ] ) ? $this->previousPurchasesCount[ $activeOnly ? 'active' : 'all' ][ $packageID ] : 0;
 	}
 	
 	/**
@@ -482,37 +460,37 @@ class Customer extends Member
 	 *
 	 * @return	array
 	 */
-	public function clientAreaLinks(): array
+	public function clientAreaLinks()
 	{
 		$return = array( 'invoices' );
-		if ( Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_member=? AND ps_show=1', $this->member_id ) ) )
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_member=? AND ps_show=1', $this->member_id ) ) )
 		{
 			$return[] = 'purchases';
 		}
 		
 		$return[] = 'addresses';
-		if ( count( Gateway::cardStorageGateways() ) )
+		if ( \count( \IPS\nexus\Gateway::cardStorageGateways() ) or \count( \IPS\nexus\Gateway::otherStoredPaymentMethodGateways() ) )
 		{
 			$return[] = 'cards';
 		}
-		if ( count( CustomField::roots() ) )
+		if ( \count( \IPS\nexus\Customer\CustomField::roots() ) )
 		{
 			$return[] = 'info';
 		}
 		
-		if ( Settings::i()->nexus_min_topup or count( json_decode( Settings::i()->nexus_payout, TRUE ) ) )
+		if ( \IPS\Settings::i()->nexus_min_topup or \count( json_decode( \IPS\Settings::i()->nexus_payout, TRUE ) ) )
 		{
 			$return[] = 'credit';
 		}
 		
 		$return[] = 'alternatives';
 		
-		if ( count( Goal::roots() ) )
+		if ( \count( \IPS\nexus\Donation\Goal::roots() ) )
 		{
 			$return[] = 'donations';
 		}
 		
-		if ( Settings::i()->ref_on )
+		if ( \IPS\Settings::i()->ref_on )
 		{
 			$return[] = 'referrals';
 		}
@@ -523,35 +501,35 @@ class Customer extends Member
 	/**
 	 * Alternative Contacts
 	 *
-	 * @param array $where	WHERE clause
-	 * @return	ActiveRecordIterator
+	 * @param	array	$where	WHERE clause
+	 * @return	\IPS\Patterns\ActiveRecordIterator
 	 */
-	public function alternativeContacts( array $where = array() ): ActiveRecordIterator
+	public function alternativeContacts( $where = array() )
 	{
-		$where = count( $where ) ? array( $where ) : $where;
+		$where = \count( $where ) ? array( $where ) : $where;
 		$where[] = array( 'main_id=?', $this->member_id );
-		return new ActiveRecordIterator( Db::i()->select( '*', 'nexus_alternate_contacts', $where )->setKeyField( 'alt_id' ), 'IPS\nexus\Customer\AlternativeContact' );
+		return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_alternate_contacts', $where )->setKeyField( 'alt_id' ), 'IPS\nexus\Customer\AlternativeContact' );
 	}
 	
 	/**
 	 * Parent Contacts
 	 *
-	 * @param array $where	WHERE clause
-	 * @return	ActiveRecordIterator
+	 * @param	array	$where	WHERE clause
+	 * @return	\IPS\Patterns\ActiveRecordIterator
 	 */
-	public function parentContacts( array $where = array() ): ActiveRecordIterator
+	public function parentContacts( $where = array() )
 	{
-		$where = count( $where ) ? array( $where ) : $where;
+		$where = \count( $where ) ? array( $where ) : $where;
 		$where[] = array( 'alt_id=?', $this->member_id );
-		return new ActiveRecordIterator( Db::i()->select( '*', 'nexus_alternate_contacts', $where )->setKeyField( 'main_id' ), 'IPS\nexus\Customer\AlternativeContact' );
+		return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_alternate_contacts', $where )->setKeyField( 'main_id' ), 'IPS\nexus\Customer\AlternativeContact' );
 	}
 	
 	/**
 	 * ACP Customer Page URL
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function acpUrl(): Url
+	public function acpUrl()
 	{
 		return parent::acpUrl()->setQueryString( 'tab', 'nexus_Main' );
 	}
@@ -559,24 +537,24 @@ class Customer extends Member
 	/**
 	 * ACP Customer Page URL
 	 *
-	 * @param	Number	$amount	 	Adjustment amount
-	 * @param string $currency	Currency code
-	 * @param bool $refund		Should the spend be reduced?
+	 * @param	\IPS\Math\Number	$amount	 	Adjustment amount
+	 * @param	string				$currency	Currency code
+	 * @param	bool				$refund		Should the spend be reduced?
 	 *
 	 * @return	void
 	 */
-	public function updateSpend( Number $amount, string $currency, bool $refund=FALSE ) : void
+	public function updateSpend( \IPS\Math\Number $amount, $currency, $refund=false )
 	{
 		try
 		{
-			$currentSpend = Db::i()->select( 'spend_amount', 'nexus_customer_spend', array( "spend_member_id=? AND spend_currency=?", $this->member_id, $currency ) )->first();
-			$newSpend = new Number( number_format( $currentSpend, Money::numberOfDecimalsForCurrency( $currency ), '.', '' ) );
+			$currentSpend = \IPS\Db::i()->select( 'spend_amount', 'nexus_customer_spend', array( "spend_member_id=? AND spend_currency=?", $this->member_id, $currency ) )->first();
+			$newSpend = new \IPS\Math\Number( number_format( $currentSpend, \IPS\nexus\Money::numberOfDecimalsForCurrency( $currency ), '.', '' ) );
 			$newSpend = ( $refund ) ? $newSpend->subtract( $amount ) : $newSpend->add( $amount );
-			Db::i()->replace( 'nexus_customer_spend', array( 'spend_member_id' => $this->member_id, 'spend_amount' => $newSpend, 'spend_currency' => $currency ) );
+			\IPS\Db::i()->replace( 'nexus_customer_spend', array( 'spend_member_id' => $this->member_id, 'spend_amount' => $newSpend, 'spend_currency' => $currency ) );
 		}
-		catch ( UnderflowException )
+		catch ( \UnderflowException $e )
 		{
-			Db::i()->insert( 'nexus_customer_spend', array( 'spend_member_id' => $this->member_id, 'spend_amount' => ( $refund ) ? $amount->multiply( new Number( "-1" ) ) : $amount, 'spend_currency' => $currency ), TRUE );
+			\IPS\Db::i()->insert( 'nexus_customer_spend', array( 'spend_member_id' => $this->member_id, 'spend_amount' => ( $refund ) ? $amount->multiply( new \IPS\Math\Number( "-1" ) ) : $amount, 'spend_currency' => $currency ), TRUE );
 		}
 	}
 
@@ -585,19 +563,19 @@ class Customer extends Member
 	 *
 	 * @return	void
 	 */
-	public function recountTotalSpend() : void
+	public function recountTotalSpend()
 	{
-		Db::i()->delete( 'nexus_customer_spend', array( 'spend_member_id=?', $this->member_id ) );
+		\IPS\Db::i()->delete( 'nexus_customer_spend', array( 'spend_member_id=?', $this->member_id ) );
 
 		$spend = array();
-		foreach (Db::i()->select( 't_currency, ( SUM(t_amount)-SUM(t_partial_refund) ) AS amount', 'nexus_transactions', array( 't_member=? AND ( t_status=? OR t_status=? )', $this->member_id, Transaction::STATUS_PAID, Transaction::STATUS_PART_REFUNDED ), NULL, NULL, 't_currency' ) as $amount )
+		foreach ( \IPS\Db::i()->select( 't_currency, ( SUM(t_amount)-SUM(t_partial_refund) ) AS amount', 'nexus_transactions', array( 't_member=? AND ( t_status=? OR t_status=? )', $this->member_id, \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_PART_REFUNDED ), NULL, NULL, 't_currency' ) as $amount )
 		{
 			$spend[] = array( 'spend_member_id' => $this->member_id, 'spend_amount' => $amount['amount'], 'spend_currency' => $amount['t_currency'] );
 		}
 
-		if( count( $spend ) )
+		if( \count( $spend ) )
 		{
-			Db::i()->insert( 'nexus_customer_spend', $spend );
+			\IPS\Db::i()->insert( 'nexus_customer_spend', $spend );
 		}
 	}
 }

@@ -12,76 +12,59 @@
 namespace IPS\blog\Entry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\blog\Blog;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Theme;
-use function defined;
-use function get_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Blog Category
  */
-class Category extends Model
+class _Category extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'blog_entry_categories';
+	public static $databaseTable = 'blog_entry_categories';
 
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'entry_category_';
+	public static $databasePrefix = 'entry_category_';
 
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'blog_entry_categories';
+	public static $nodeTitle = 'blog_entry_categories';
 
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
+	protected $_url	= NULL;
 
 	/**
 	 * Get URL
 	 *
-	 * @return Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function url(): Url|string|null
+	public function url()
 	{
-		$blog = Blog::load( $this->blog_id );
+		$blog = \IPS\blog\Blog::load( $this->blog_id );
 
 		if( $this->_url === NULL )
 		{
-			$this->_url = Url::internal( "app=blog&module=blogs&controller=view&id={$blog->id}&cat={$this->id}", 'front', 'blogs_blog_cat', array( $blog->seo_name, $this->seo_name ) );
+			$this->_url = \IPS\Http\Url::internal( "app=blog&module=blogs&controller=view&id={$blog->id}&cat={$this->id}", 'front', 'blogs_blog_cat', array( $blog->seo_name, $this->seo_name ) );
 		}
 
 		return $this->_url;
@@ -92,15 +75,15 @@ class Category extends Model
 	 *
 	 * @return	string
 	 */
-	public function link(): string
+	public function link()
 	{
-		return Theme::i()->getTemplate( 'global' )->categoryLink( $this );
+		return \IPS\Theme::i()->getTemplate( 'global' )->categoryLink( $this );
 	}
 
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	int			id			ID number
 	 * @apiresponse	string		name		Name
@@ -108,29 +91,31 @@ class Category extends Model
 	 * @apiresponse	string		class		Node class
 	 * @apiresponse	int			position	Node order
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
-		return array(
+		$return = array(
 			'id'		=> $this->id,
 			'name'		=> $this->name,
 			'url'		=> (string) $this->url(),
-			'class'		=> get_class( $this ),
+			'class'		=> \get_class( $this ),
 			'position'	=> $this->position
 		);
+
+		return $return;
 	}
 
 	/**
 	 * [ActiveRecord] Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		if( !$this->id )
 		{
-			$this->position = Db::i()->select( 'MAX(entry_category_position)', 'blog_entry_categories', array( 'entry_category_blog_id=?', $this->blog_id ))->first() + 1;
+			$this->position = \IPS\Db::i()->select( 'MAX(entry_category_position)', 'blog_entry_categories', array( 'entry_category_blog_id=?', $this->blog_id ))->first() + 1;
 		}
 
-		parent::save();
+		return parent::save();
 	}
 }

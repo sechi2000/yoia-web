@@ -11,63 +11,50 @@
 namespace IPS\core\modules\setup\upgrade;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\core\Setup\Upgrade;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use IPS\Xml\XMLReader;
-use OutOfRangeException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Upgrader: Applications
  */
-class applications extends Controller
+class _applications extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Show Form
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		$apps			= array();
 
-		/* If we are upgrading from a version older than v5, disable all 3rd party apps */
-		if( Application::load( 'core' )->long_version < 200000 )
+		/* Update old app keys or everything gets confused */
+		\IPS\Db::i()->update( 'core_applications', array( 'app_directory' => 'cms' ), array( 'app_directory=?', 'ccs' ) );
+		\IPS\Db::i()->update( 'core_applications', array( 'app_directory' => 'chat' ), array( 'app_directory=?', 'ipchat' ) );
+
+		/* We had a bug in an earlier beta where the version may not have updated properly, so we need to account for that but it has to happen before we load version files */
+		/* @todo We may want to remove those down the road as it should only affect users who have upgraded to early betas */
+		if( \IPS\Db::i()->checkForTable( 'core_widgets' ) AND !\IPS\Db::i()->checkForColumn( 'core_widgets', 'embeddable' ) )
 		{
-			Db::i()->update( 'core_applications', array( 'app_enabled' => 0, 'app_requires_manual_intervention' => 1 ), Db::i()->in( 'app_directory', IPS::$ipsApps, true ) );
+			\IPS\Db::i()->update( 'core_applications', array( 'app_version' => '4.0.0 Beta 1', 'app_long_version' => '100001' ) );
 		}
 
 		/* Clear any caches or else we might not see new versions */
-		if ( isset( Store::i()->applications ) )
+		if ( isset( \IPS\Data\Store::i()->applications ) )
 		{
-			unset( Store::i()->applications );
+			unset( \IPS\Data\Store::i()->applications );
 		}
-		if ( isset( Store::i()->modules ) )
+		if ( isset( \IPS\Data\Store::i()->modules ) )
 		{
-			unset( Store::i()->modules );
+			unset( \IPS\Data\Store::i()->modules );
 		}
 
-		foreach( Application::applications() as $app => $data )
+		foreach( \IPS\Application::applications() as $app => $data )
 		{
-			$path = Application::getRootPath( $app ) . '/applications/' . $app;
+			$path = \IPS\Application::getRootPath( $app ) . '/applications/' . $app;
 
 			if ( $app == 'chat' )
 			{
@@ -89,15 +76,15 @@ class applications extends Controller
 			}
 
 			/* Figure out of an upgrade is even available */
-			$currentVersion		= Application::load( $app )->long_version;
-			$availableVersion	= Application::getAvailableVersion( $app );
+			$currentVersion		= \IPS\Application::load( $app )->long_version;
+			$availableVersion	= \IPS\Application::getAvailableVersion( $app );
 
 			$name = $data->_title;
 
 			/* Get app name */
 			if ( file_exists( $path . '/data/lang.xml' ) )
 			{
-				$xml = XMLReader::safeOpen( $path . '/data/lang.xml' );
+				$xml = \IPS\Xml\XMLReader::safeOpen( $path . '/data/lang.xml' );
 				$xml->read();
 
 				$xml->read();
@@ -117,14 +104,14 @@ class applications extends Controller
 					'name'		=> $name,
 					'disabled'	=> ( !empty( $errors ) OR $availableVersion <= $currentVersion ),
 					'errors'	=> $errors,
-					'current'	=> Application::load( $app )->version,
-					'available'	=> Application::getAvailableVersion( $app, TRUE )
+					'current'	=> \IPS\Application::load( $app )->version,
+					'available'	=> \IPS\Application::getAvailableVersion( $app, TRUE )
 				);
 			}
 
 		}
 
-		if( count( $apps ) )
+		if( \count( $apps ) )
 		{
 			/* Make sure the core app is the first index */
 			if( isset( $apps['core'] ) )
@@ -135,8 +122,8 @@ class applications extends Controller
 			$_SESSION['apps'] = $apps;
 
 			$warnings = array();
-			$coreVersion = array_key_exists( 'core', $_SESSION['apps'] ) ? Application::getAvailableVersion( 'core' ) : Application::load( 'core' )->long_version;
-			foreach ( IPS::$ipsApps as $key )
+			$coreVersion = array_key_exists( 'core', $_SESSION['apps'] ) ? \IPS\Application::getAvailableVersion( 'core' ) : \IPS\Application::load( 'core' )->long_version;
+			foreach ( \IPS\IPS::$ipsApps as $key )
 			{
 				if ( $key == 'chat' )
 				{
@@ -145,35 +132,35 @@ class applications extends Controller
 
 				try
 				{
-					$appVersion = array_key_exists( $key, $_SESSION['apps'] ) ? Application::getAvailableVersion( $key ) : Application::load( $key )->long_version;
+					$appVersion = array_key_exists( $key, $_SESSION['apps'] ) ? \IPS\Application::getAvailableVersion( $key ) : \IPS\Application::load( $key )->long_version;
 					if ( $appVersion != $coreVersion )
 					{
 						$warnings[] = $key;
 					}
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* The application is not installed */
 					continue;
 				}
 			}
 
-			if ( count( $warnings ) )
+			if ( \count( $warnings ) )
 			{
-				Output::i()->redirect( Url::internal( "controller=applications&do=warning" )->setQueryString( array( 'key' => $_SESSION['uniqueKey'], 'warnings' => implode( ',', $warnings ) ) ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "controller=applications&do=warning" )->setQueryString( array( 'key' => $_SESSION['uniqueKey'], 'warnings' => implode( ',', $warnings ) ) ) );
 			}
 
-			Output::i()->redirect( Url::internal( "controller=customoptions" )->setQueryString( 'key', $_SESSION['uniqueKey'] ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "controller=customoptions" )->setQueryString( 'key', $_SESSION['uniqueKey'] ) );
 		}
 		else
 		{
-			$form	= Theme::i()->getTemplate( 'forms' )->noapps();
+			$form	= \IPS\Theme::i()->getTemplate( 'forms' )->noapps();
 
-			Upgrade::setUpgradingFlag( FALSE );
+			\IPS\core\Setup\Upgrade::setUpgradingFlag( FALSE );
 		}
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('applications');
-		Output::i()->output 	= Theme::i()->getTemplate( 'global' )->block( 'applications', $form );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('applications');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate( 'global' )->block( 'applications', $form );
 	}
 
 	/**
@@ -181,18 +168,18 @@ class applications extends Controller
 	 *
 	 * @return	void
 	 */
-	public function warning() : void
+	public function warning()
 	{
 		$apps = array();
-		foreach ( explode( ',', Request::i()->warnings ) as $key )
+		foreach ( explode( ',', \IPS\Request::i()->warnings ) as $key )
 		{
 			try
 			{
-				$name = Application::load( $key )->_title;
+				$name = \IPS\Application::load( $key )->_title;
 				$path = \IPS\ROOT_PATH . '/applications/' . $key;
 				if ( file_exists( $path . '/data/lang.xml' ) )
 				{
-					$xml = XMLReader::safeOpen( $path . '/data/lang.xml' );
+					$xml = \IPS\Xml\XMLReader::safeOpen( $path . '/data/lang.xml' );
 					$xml->read();
 
 					$xml->read();
@@ -207,10 +194,10 @@ class applications extends Controller
 				}
 				$apps[] = $name;
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack('applications');
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'applications', Theme::i()->getTemplate( 'global' )->appWarnings( $apps ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('applications');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'applications', \IPS\Theme::i()->getTemplate( 'global' )->appWarnings( $apps ) );
 	}
 }

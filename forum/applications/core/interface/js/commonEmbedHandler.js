@@ -74,12 +74,97 @@ window.ips.utils = {
 	},
 
 	/**
+	 * Extend an object with another object
+	 *
+	 * @param 	{object} 	originalObj 	Original object
+	 * @param	{object} 	newObj 			New object
+	 * @returns {void}
+	 */
+	extendObj: function (originalObj, newObj) {
+		for( var i in newObj ){
+			if( newObj.hasOwnProperty(i) ){
+				originalObj[i] = newObj[i];
+			}
+		}
+
+		return originalObj;
+	},
+
+	/**
+	 * Returns parsed information about a URL
+	 *
+	 * @param 	{string} 	url 	URL to parse
+	 * @returns {object}
+	 */
+	parseURL: function (url) {
+		var elem = document.createElement('a');
+		ips.utils.insertBefore( elem, document.body.firstChild );
+		elem.href = url;
+
+		var data = {
+			protocol: elem.protocol,
+			hostname: elem.hostname,
+			port: elem.port,
+			pathname: elem.pathname,
+			search: elem.search,
+			hash: elem.hash,
+			host: elem.host
+		};
+
+		elem.parentNode.removeChild( elem );
+		return data;
+	},
+
+	/**
+	 * Returns the document scroll offset
+	 *
+	 * @returns {object}
+	 */
+	getScrollOffset: function () {
+		var doc = document.documentElement;
+
+		return {
+			left: (window.pageXOffset || doc.scrollLeft) - (doc.clientLeft || 0),
+			top: (window.pageYOffset || doc.scrollTop)  - (doc.clientTop || 0)
+		};
+	},
+
+	/**
+	 * Returns the offset relative to the document for an element
+	 *
+	 * @param	{element} 	element 	Element to get the offset for
+	 * @returns {object}
+	 */
+	getOffset: function (element) {
+		var p = {
+			left: element.offsetLeft || 0,
+			top: element.offsetTop || 0
+		};
+
+		while (element = element.offsetParent) {
+			p.left += element.offsetLeft;
+			p.top += element.offsetTop;
+		}
+
+		return p;
+	},
+
+	/**
 	 * Returns the outer height of the element
 	 *
 	 * @returns {number}
 	 */
 	getObjHeight: function (elem) {
 		return elem.offsetHeight || 0;
+	},
+
+	/**
+	 * Returns the outer width of the element
+	 *
+	 * @returns {number}
+	 */
+	getObjWidth: function (elem) {
+		return elem.offsetWidth || 0;
 	},
 
 	/**
@@ -103,6 +188,30 @@ window.ips.utils = {
 		};
 
 		tick();
+	},
+
+	/**
+	 * Returns the document height
+	 *
+	 * @returns {number}
+	 */
+	getDocHeight: function () {
+		var D = document;
+
+		return Math.max(
+			D.body.scrollHeight, D.documentElement.scrollHeight,
+			D.body.offsetHeight, D.documentElement.offsetHeight,
+			D.body.clientHeight, D.documentElement.clientHeight
+		);
+	},
+
+	/**
+	 * Returns the viewport height
+	 *
+	 * @returns {number}
+	 */
+	getViewportHeight: function () {
+		return Math.max( document.documentElement.clientHeight, window.innerHeight || 0 );
 	},
 
 	/**

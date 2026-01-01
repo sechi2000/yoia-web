@@ -11,39 +11,37 @@
 namespace IPS\core\extensions\core\EditorLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Content;
-use IPS\core\Announcements\Announcement as AnnouncementClass;
-use IPS\Db;
-use IPS\Extensions\EditorLocationsAbstract;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Text\Parser;
-use LogicException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: Announcements
  */
-class Announcement extends EditorLocationsAbstract
+class _Announcement
 {
+	/**
+	 * Can we use HTML in this editor?
+	 *
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
+	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
+	 */
+	public function canUseHtml( $member, $field )
+	{
+		return NULL;
+	}
+	
 	/**
 	 * Can we use attachments in this editor?
 	 *
-	 * @param	Member					$member	The member
-	 * @param	Editor	$field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
 	 */
-	public function canAttach( Member $member, Editor $field ): ?bool
+	public function canAttach( $member, $field )
 	{
 		return NULL;
 	}
@@ -51,7 +49,7 @@ class Announcement extends EditorLocationsAbstract
 	/**
 	 * Permission check for attachments
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	int|null	$id1		Primary ID
 	 * @param	int|null	$id2		Secondary ID
 	 * @param	string|null	$id3		Arbitrary data
@@ -59,9 +57,9 @@ class Announcement extends EditorLocationsAbstract
 	 * @param	bool		$viewOnly	If true, just check if the user can see the attachment rather than download it
 	 * @return	bool
 	 */
-	public function attachmentPermissionCheck( Member $member, ?int $id1, ?int $id2, ?string $id3, array $attachment, bool $viewOnly=FALSE ): bool
+	public function attachmentPermissionCheck( $member, $id1, $id2, $id3, $attachment, $viewOnly=FALSE )
 	{
-		return AnnouncementClass::load( $id1 )->canView( $member );
+		return \IPS\core\Announcements\Announcement::load( $id1 )->canView( $member );
 	}
 	
 	/**
@@ -70,12 +68,25 @@ class Announcement extends EditorLocationsAbstract
 	 * @param	int|null	$id1	Primary ID
 	 * @param	int|null	$id2	Secondary ID
 	 * @param	string|null	$id3	Arbitrary data
-	 * @return    Content|Member|Model|Url|null
-	 * @throws	LogicException
+	 * @return	\IPS\Http\Url|\IPS\Content|\IPS\Node\Model
+	 * @throws	\LogicException
 	 */
-	public function attachmentLookup( int $id1=NULL, int $id2=NULL, string $id3=NULL ): Model|Content|Url|Member|null
+	public function attachmentLookup( $id1, $id2, $id3 )
 	{
-        return AnnouncementClass::load( $id1 );
+        return \IPS\core\Announcements\Announcement::load( $id1 );
+	}
+
+	/**
+	 * Rebuild attachment images in non-content item areas
+	 *
+	 * @param	int|null	$offset	Offset to start from
+	 * @param	int|null	$max	Maximum to parse
+	 * @return	int			Number completed
+	 * @note	This method is optional and will only be called if it exists
+	 */
+	public function rebuildAttachmentImages( $offset, $max )
+	{
+		return $this->performRebuild( $offset, $max, array( 'IPS\Text\Parser', 'rebuildAttachmentUrls' ) );
 	}
 
 	/**
@@ -86,10 +97,15 @@ class Announcement extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildContent( ?int $offset, ?int $max ): int
+	public function rebuildContent( $offset, $max )
 	{
 		return $this->performRebuild( $offset, $max, array( 'IPS\Text\LegacyParser', 'parseStatic' ) );
 	}
+
+	/**
+	 * @brief	Use the cached image URL instead of the original URL
+	 */
+	protected $proxyUrl	= FALSE;
 
 	/**
 	 * Rebuild content to add or remove image proxy
@@ -100,25 +116,31 @@ class Announcement extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildImageProxy( ?int $offset, ?int $max, bool $proxyUrl = FALSE ): int
+	public function rebuildImageProxy( $offset, $max, $proxyUrl = FALSE )
 	{
-		$callback = function( $value ) use ( $proxyUrl ) {
-			return Parser::removeImageProxy( $value, $proxyUrl );
-		};
-		return $this->performRebuild( $offset, $max, $callback );
+		$this->proxyUrl = $proxyUrl;
+		return $this->performRebuild( $offset, $max, 'parseImageProxy' );
 	}
+
+	/**
+	 * @brief	Store lazy loading status ( true = enabled )
+	 */
+	protected $_lazyLoadStatus = null;
 
 	/**
 	 * Rebuild content to add or remove lazy loading
 	 *
 	 * @param	int|null		$offset		Offset to start from
 	 * @param	int|null		$max		Maximum to parse
+	 * @param	bool			$status		Enable/Disable lazy loading
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildLazyLoad( ?int $offset, ?int $max ): int
+	public function rebuildLazyLoad( $offset, $max, $status=TRUE )
 	{
-		return $this->performRebuild( $offset, $max, [ 'IPS\Text\Parser', 'parseLazyLoad' ] );
+		$this->_lazyLoadStatus = $status;
+
+		return $this->performRebuild( $offset, $max, 'parseLazyLoad' );
 	}
 
 	/**
@@ -129,30 +151,33 @@ class Announcement extends EditorLocationsAbstract
 	 * @param	callable	$callback	Method to call to rebuild content
 	 * @return	int			Number completed
 	 */
-    protected function performRebuild( ?int $offset, ?int $max, callable $callback ): int
+    protected function performRebuild( $offset, $max, $callback )
     {
         $did	= 0;
 
-        foreach( Db::i()->select( '*', 'core_announcements', "announce_content IS NOT NULL", 'announce_id ASC', array( $offset, $max ) ) as $announcement )
+        foreach( \IPS\Db::i()->select( '*', 'core_announcements', "announce_content IS NOT NULL", 'announce_id ASC', array( $offset, $max ) ) as $announcement )
         {
             $did++;
-			$rebuilt = FALSE;
 
             /* Update */
             try
             {
-				if( is_array( $callback ) and $callback[1] === 'parseStatic' )
+				if( $callback == 'parseImageProxy' )
 				{
-				    $rebuilt = $callback( $announcement['announce_content'], Member::load( $announcement['announce_member_id'] ), FALSE, 'core_Announcement' );
+					$rebuilt = \IPS\Text\Parser::removeImageProxy( $announcement['announce_content'], $this->proxyUrl );
+				}
+				elseif( $callback == 'parseLazyLoad' )
+				{
+					$rebuilt = \IPS\Text\Parser::parseLazyLoad( $announcement['announce_content'], $this->_lazyLoadStatus );
 				}
 				else
 				{
-					$rebuilt = $callback( $announcement['announce_content'] );
+				  $rebuilt	= $callback( $announcement['announce_content'], \IPS\Member::load( $announcement['announce_member_id'] ), FALSE, 'core_Announcement' );
 				}
             }
-            catch( InvalidArgumentException $e )
+            catch( \InvalidArgumentException $e )
             {
-                if( is_array( $callback ) and $callback[1] == 'parseStatic' AND $e->getcode() == 103014 )
+                if( $callback[1] == 'parseStatic' AND $e->getcode() == 103014 )
                 {
                     $rebuilt	= preg_replace( "#\[/?([^\]]+?)\]#", '', $announcement['announce_content'] );
                 }
@@ -164,7 +189,7 @@ class Announcement extends EditorLocationsAbstract
 
             if( $rebuilt !== FALSE )
             {
-                Db::i()->update( 'core_announcements', array( 'announce_content' => $rebuilt ), array( 'announce_id=?', $announcement['announce_id'] ) );
+                \IPS\Db::i()->update( 'core_announcements', array( 'announce_content' => $rebuilt ), array( 'announce_id=?', $announcement['announce_id'] ) );
             }
         }
 
@@ -176,8 +201,8 @@ class Announcement extends EditorLocationsAbstract
 	 *
 	 * @return	int			Total Count
 	 */
-	public function contentCount(): int
+	public function contentCount()
 	{
-        return Db::i()->select( 'COUNT(*) as count', 'core_announcements', "announce_content IS NOT NULL" )->first();
+        return \IPS\Db::i()->select( 'COUNT(*) as count', 'core_announcements', "announce_content IS NOT NULL" )->first();
 	}
 }

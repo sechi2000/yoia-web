@@ -12,59 +12,37 @@
 namespace IPS\nexus\modules\front\clients;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\MFA\MFAHandler;
-use IPS\nexus\Customer;
-use IPS\nexus\Customer\BillingAgreement;
-use IPS\nexus\Gateway;
-use IPS\nexus\Gateway\PayPal\Exception;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Billing Agreements
  */
-class billingagreements extends Controller
+class _billingagreements extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		if ( !Member::loggedIn()->member_id )
+		if ( !\IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->error( 'no_module_permission_guest', '2X321/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission_guest', '2X321/1', 403, '' );
 		}
 		
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'clients.css', 'nexus' ) );
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=nexus&module=clients&controller=billingagreements', 'front', 'clientsbillingagreements' ), Member::loggedIn()->language()->addToStack('client_billing_agreements') );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('client_billing_agreements');
-		Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'clients.css', 'nexus' ) );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=billingagreements', 'front', 'clientsbillingagreements' ), \IPS\Member::loggedIn()->language()->addToStack('client_billing_agreements') );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('client_billing_agreements');
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
 		
-		if ( $output = MFAHandler::accessToArea( 'nexus', 'BillingAgreements', Url::internal( 'app=nexus&module=clients&controller=billingagreements', 'front', 'clientsbillingagreements' ) ) )
+		if ( $output = \IPS\MFA\MFAHandler::accessToArea( 'nexus', 'BillingAgreements', \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=billingagreements', 'front', 'clientsbillingagreements' ) ) )
 		{
-			Output::i()->output = Theme::i()->getTemplate('clients')->billingAgreements( array() ) . $output;
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->billingAgreements( array() ) . $output;
 			return;
 		}
 		
@@ -76,34 +54,29 @@ class billingagreements extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$billingAgreements = array();
 		
-		$where = array( 'ba_member=?', Member::loggedIn()->member_id );
-		$parentContacts = Customer::loggedIn()->parentContacts( array( 'billing=1' ) );
-		if ( count( $parentContacts ) )
+		$where = array( 'ba_member=?', \IPS\Member::loggedIn()->member_id );
+		$parentContacts = \IPS\nexus\Customer::loggedIn()->parentContacts( array( 'billing=1' ) );
+		if ( \count( $parentContacts ) )
 		{
+			$or = array();
 			foreach ( array_keys( iterator_to_array( $parentContacts ) ) as $id )
 			{
 				$where[0] .= ' OR ba_member=?';
 				$where[] = $id;
 			}
 		}
-
-		$where = [
-			$where,
-			[ Db::i()->in( 'ba_method', array_keys( Gateway::billingAgreementGateways() ) ) ]
-		];
 		
-		foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_billing_agreements', $where ), 'IPS\nexus\Customer\BillingAgreement' ) as $billingAgreement )
-		{
-			/* @var BillingAgreement $billingAgreement */
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_billing_agreements', $where ), 'IPS\nexus\Customer\BillingAgreement' ) as $billingAgreement )
+		{			
 			try
 			{
 				$status = $billingAgreement->status();
 			}
-			catch ( \Exception )
+			catch ( \Exception $e )
 			{
 				$status = NULL;
 			}
@@ -112,7 +85,7 @@ class billingagreements extends Controller
 			{
 				$term = $billingAgreement->term();
 			}
-			catch ( \Exception )
+			catch ( \Exception $e )
 			{
 				$term = NULL;
 			}
@@ -125,7 +98,7 @@ class billingagreements extends Controller
 			);
 		}
 		
-		Output::i()->output = Theme::i()->getTemplate('clients')->billingAgreements( $billingAgreements );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->billingAgreements( $billingAgreements );
 	}
 	
 	/**
@@ -133,48 +106,48 @@ class billingagreements extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function view() : void
+	protected function view()
 	{
 		/* Load Billing Agreement */
 		try
 		{
-			$billingAgreement = BillingAgreement::loadAndCheckPerms( Request::i()->id );
+			$billingAgreement = \IPS\nexus\Customer\BillingAgreement::loadAndCheckPerms( \IPS\Request::i()->id );
 			$billingAgreement->status(); // Just to make the API call so we can catch the error if there is one
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X320/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X320/4', 404, '' );
 		}
-		catch ( Exception $e )
+		catch ( \IPS\nexus\Gateway\PayPal\Exception $e )
 		{
-			Output::i()->error( 'billing_agreement_error', '4X321/5', 500, '', array(), $e->getName() );
+			\IPS\Output::i()->error( 'billing_agreement_error', '4X321/5', 500, '', array(), $e->getName() );
 		}
 		
 		/* Get associated purchases */
 		$purchases = array();
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', array( 'ps_billing_agreement=?', $billingAgreement->id ) ), 'IPS\nexus\Purchase' ) as $purchase )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', array( 'ps_billing_agreement=?', $billingAgreement->id ) ), 'IPS\nexus\Purchase' ) as $purchase )
 		{
 			$purchases[0][ $purchase->id ] = $purchase;
 		}
 		
 		/* Transactions */
-		$currentPage = isset( Request::i()->page ) ? intval( Request::i()->page ) : 1;
+		$currentPage = isset( \IPS\Request::i()->page ) ? \intval( \IPS\Request::i()->page ) : 1;
 		$perPage = 25;
-		$invoices = new ActiveRecordIterator(
-			Db::i()->select(
+		$invoices = new \IPS\Patterns\ActiveRecordIterator(
+			\IPS\Db::i()->select(
 				'*',
 				'nexus_invoices',
-				array( 'i_id IN(?)', Db::i()->select( 't_invoice', 'nexus_transactions', array( 't_billing_agreement=?', $billingAgreement->id ) ) ),
+				array( 'i_id IN(?)', \IPS\Db::i()->select( 't_invoice', 'nexus_transactions', array( 't_billing_agreement=?', $billingAgreement->id ) ) ),
 				'i_date DESC',
 				array( ( $currentPage - 1 ) * $perPage, $perPage )
 			),
 			'IPS\nexus\Invoice'
 		);
-		$invoicesCount = Db::i()->select( 'COUNT(*)', 'nexus_invoices', array( 'i_id IN(?)', Db::i()->select( 't_invoice', 'nexus_transactions', array( 't_billing_agreement=?', $billingAgreement->id ) ) ) )->first();
-		$pagination = Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $billingAgreement->url(), ceil( $invoicesCount / $perPage ), $currentPage, $perPage );
+		$invoicesCount = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_invoices', array( 'i_id IN(?)', \IPS\Db::i()->select( 't_invoice', 'nexus_transactions', array( 't_billing_agreement=?', $billingAgreement->id ) ) ) )->first();
+		$pagination = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $billingAgreement->url(), ceil( $invoicesCount / $perPage ), $currentPage, $perPage );
 		
-		Output::i()->breadcrumb[] = array( $billingAgreement->url(), $billingAgreement->gw_id );
-		Output::i()->output = Theme::i()->getTemplate('clients')->billingAgreement( $billingAgreement, $purchases, $invoices, $pagination );
+		\IPS\Output::i()->breadcrumb[] = array( $billingAgreement->url(), $billingAgreement->gw_id );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->billingAgreement( $billingAgreement, $purchases, $invoices, $pagination );
 	}
 	
 	/**
@@ -182,25 +155,25 @@ class billingagreements extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function act() : void
+	protected function act()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Check act */
-		$act = Request::i()->act;
-		if ( !in_array( $act, array( 'suspend', 'reactivate', 'cancel' ) ) )
+		$act = \IPS\Request::i()->act;
+		if ( !\in_array( $act, array( 'suspend', 'reactivate', 'cancel' ) ) )
 		{
-			Output::i()->error( 'node_error', '3X321/3', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '3X321/3', 403, '' );
 		}
 		
 		/* Load Billing Agreement */
 		try
 		{
-			$billingAgreement = BillingAgreement::loadAndCheckPerms( Request::i()->id );
+			$billingAgreement = \IPS\nexus\Customer\BillingAgreement::loadAndCheckPerms( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X321/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X321/2', 404, '' );
 		}
 		
 		/* Perform Action */
@@ -208,11 +181,11 @@ class billingagreements extends Controller
 		{
 			$billingAgreement->$act();
 			
-			Output::i()->redirect( $billingAgreement->url() );
+			\IPS\Output::i()->redirect( $billingAgreement->url() );
 		}
-		catch ( DomainException )
+		catch ( \DomainException $e )
 		{
-			Output::i()->error( 'billing_agreement_error_public', '3X321/4', 500, '' );
+			\IPS\Output::i()->error( 'billing_agreement_error_public', '3X321/4', 500, '' );
 		}
 	}
 }

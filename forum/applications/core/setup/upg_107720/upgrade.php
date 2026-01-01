@@ -12,24 +12,16 @@
 namespace IPS\core\setup\upg_107720;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\Http\Url;
-use IPS\Member\PrivacyAction;
-use IPS\Settings;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.7.14 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * ...
@@ -38,7 +30,7 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		PrivacyAction::resetDeletionAcpNotifications();
+		\IPS\Member\PrivacyAction::resetDeletionAcpNotifications();
 
 		return TRUE;
 	}
@@ -50,7 +42,7 @@ class Upgrade
 	 */
 	public function step2()
 	{
-		Settings::i()->changeValues( array( 'x_hashtag' => Settings::i()->twitter_hashtag ) );
+		\IPS\Settings::i()->changeValues( array( 'x_hashtag' => \IPS\Settings::i()->twitter_hashtag ) );
 
 		return TRUE;
 	}
@@ -62,7 +54,7 @@ class Upgrade
 	 */
 	public function step3()
 	{
-		if( Settings::i()->site_social_profiles AND $links = json_decode( Settings::i()->site_social_profiles, TRUE ) AND count( $links ) )
+		if( \IPS\Settings::i()->site_social_profiles AND $links = json_decode( \IPS\Settings::i()->site_social_profiles, TRUE ) AND \count( $links ) )
 		{
 			$newLinks = [];
 
@@ -72,7 +64,7 @@ class Upgrade
 				if( mb_strpos( $link['value'], 'twitter' ) !== FALSE )
 				{
 					$link = [
-						'key'   => (string) Url::external( $link['key'] )->setHost('x.com'),
+						'key'   => (string) \IPS\Http\Url::external( $link['key'] )->setHost('x.com'),
 						'value' => 'x'
 					];
 				}
@@ -80,9 +72,9 @@ class Upgrade
 				$newLinks[] = $link;
 			}
 
-			if( count( $newLinks ) )
+			if( \count( $newLinks ) )
 			{
-				Settings::i()->changeValues( array( 'site_social_profiles' => json_encode( $newLinks ) ) );
+				\IPS\Settings::i()->changeValues( array( 'site_social_profiles' => json_encode( $newLinks ) ) );
 			}
 		}
 
@@ -96,7 +88,7 @@ class Upgrade
 	 */
 	public function step4()
 	{
-		AdminNotification::remove( 'core', 'ConfigurationError', 'marketplaceSetup' );
+		\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'marketplaceSetup' );
 
 		return TRUE;
 	}

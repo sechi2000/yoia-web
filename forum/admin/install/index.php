@@ -8,9 +8,7 @@
  * @since		2 Apr 2013
  */
 
-use IPS\Dispatcher\Setup;
-
-define('READ_WRITE_SEPARATION', FALSE);
-define('REPORT_EXCEPTIONS', TRUE);
+\define('READ_WRITE_SEPARATION', FALSE);
+\define('REPORT_EXCEPTIONS', TRUE);
 require_once '../../init.php';
-Setup::i()->setLocation('install')->run();
+\IPS\Dispatcher\Setup::i()->setLocation('install')->run();

@@ -12,73 +12,46 @@
 namespace IPS\nexus\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\core\MemberACPProfile\TabbedBlock;
-use IPS\DateTime;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Table\Custom;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Gateway;
-use IPS\nexus\Money;
-use IPS\nexus\Purchase;
-use IPS\nexus\Subscription;
-use IPS\nexus\Transaction;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile Block
- *
- * @property Customer $member
  */
-class AccountInformation extends TabbedBlock
+class _AccountInformation extends \IPS\core\MemberACPProfile\TabbedBlock
 {
 	/**
 	 * Get Tab Names
 	 *
-	 * @return	array
+	 * @return	string
 	 */
-	public function tabs(): array
+	public function tabs()
 	{
 		$tabs = array(
 			'overview'	=> array(
-				'icon'		=> 'fa-solid fa-address-card',
+				'icon'		=> 'ellipsis-h',
 				'count'		=> 0
 			)
 		);
-		if ( count( Gateway::cardStorageGateways() ) )
+		if ( \count( \IPS\nexus\Gateway::cardStorageGateways() ) )
 		{
 			$tabs['cards'] = array(
-				'icon'		=> 'fa-solid fa-credit-card',
+				'icon'		=> 'credit-card',
 				'count'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customer_cards', array( 'card_member=?', $this->member->member_id ) )->first()
 			);
 		}
-		if ( count( Gateway::billingAgreementGateways() ) )
+		if ( \count( \IPS\nexus\Gateway::billingAgreementGateways() ) )
 		{
 			$tabs['paypal'] = array(
-				'icon'		=> 'fa-brands fa-paypal',
+				'icon'		=> 'paypal',
 				'count'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_billing_agreements', array( 'ba_member=? AND ba_canceled=0', $this->member->member_id ) )->first()
 			);
 		}
 		$tabs['alts'] = array(
-			'icon'		=> 'fa-solid fa-user',
+			'icon'		=> 'user',
 			'count'		=> \IPS\Db::i()->select( 'COUNT(*)', 'nexus_alternate_contacts', array( 'main_id=?', $this->member->member_id ) )->first()
 		);
 
@@ -88,44 +61,44 @@ class AccountInformation extends TabbedBlock
 	/**
 	 * Get output: OVERVIEW
 	 *
-	 * @return	mixed
+	 * @return	string
 	 */
-	protected function _overview(): mixed
+	protected function _overview()
 	{
 		/* Sparkline */
 		$sparkline = NULL;
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view_statistics' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_view_statistics' ) )
 		{
 			$rows = array();
-			$oneYearAgo = DateTime::create()->sub( new DateInterval( 'P1Y' ) );
+			$oneYearAgo = \IPS\DateTime::create()->sub( new \DateInterval( 'P1Y' ) );
 			$date = clone $oneYearAgo;
 			$endOfLastMonth = mktime( 23, 59, 59, date( 'n' ) - 1, date( 't' ), date( 'Y' ) );
 			while ( $date->getTimestamp() < $endOfLastMonth )
 			{
-				foreach ( Money::currencies() as $currency )
+				foreach ( \IPS\nexus\Money::currencies() as $currency )
 				{
 					$rows[$date->format( 'n Y' )][$currency] = 0;
 				}
-				$date->add( new DateInterval( 'P1M' ) );
+				$date->add( new \DateInterval( 'P1M' ) );
 			}
-			$sparkline = new Chart;
-			foreach ( \IPS\Db::i()->select( 'DATE_FORMAT( FROM_UNIXTIME(t_date), \'%c %Y\' ) AS time, SUM(t_amount)-SUM(t_partial_refund) AS amount, t_currency', 'nexus_transactions', array(array("t_member=? AND ( t_status=? OR t_status=? ) AND t_method>0 AND t_date>? AND t_date<?", $this->member->member_id, Transaction::STATUS_PAID, Transaction::STATUS_PART_REFUNDED, $oneYearAgo->getTimestamp(), time())), NULL, NULL, array('time', 't_currency') ) as $row )
+			$sparkline = new \IPS\Helpers\Chart;
+			foreach ( \IPS\Db::i()->select( 'DATE_FORMAT( FROM_UNIXTIME(t_date), \'%c %Y\' ) AS time, SUM(t_amount)-SUM(t_partial_refund) AS amount, t_currency', 'nexus_transactions', array(array("t_member=? AND ( t_status=? OR t_status=? ) AND t_method>0 AND t_date>? AND t_date<?", $this->member->member_id, \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_PART_REFUNDED, $oneYearAgo->getTimestamp(), time())), NULL, NULL, array('time', 't_currency') ) as $row )
 			{
 				if ( isset( $rows[$row['time']][$row['t_currency']] ) ) // Currency may no longer exist
 				{
 					$rows[$row['time']][$row['t_currency']] += $row['amount'];
 				}
 			}
-			$sparkline->addHeader( Member::loggedIn()->language()->addToStack( 'date' ), 'date' );
-			foreach ( Money::currencies() as $currency )
+			$sparkline->addHeader( \IPS\Member::loggedIn()->language()->addToStack( 'date' ), 'date' );
+			foreach ( \IPS\nexus\Money::currencies() as $currency )
 			{
 				$sparkline->addHeader( $currency, 'number' );
 			}
 			foreach ( $rows as $time => $row )
 			{
-				$datetime = new DateTime;
-				$datetime->setTime( 0, 0 );
+				$datetime = new \IPS\DateTime;
+				$datetime->setTime( 0, 0, 0 );
 				$exploded = explode( ' ', $time );
 				$datetime->setDate( $exploded[1], $exploded[0], 1 );
 
@@ -172,21 +145,20 @@ class AccountInformation extends TabbedBlock
 		$addressCount = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customer_addresses', array( '`member`=?', $this->member->member_id ) )->first();
 				
 		/* Display */
-		return Theme::i()->getTemplate( 'customers', 'nexus' )->accountInformationOverview( $this->member, $sparkline, $primaryBillingAddress, $addressCount );
+		return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->accountInformationOverview( $this->member, $sparkline, $primaryBillingAddress, $addressCount );
 	}
 	
 	/**
 	 * Get output: STORED PAYMENT METHODS
 	 *
 	 * @param	bool	$edit	Edit view?
-	 * @return	mixed
+	 * @return	string
 	 */
-	protected function _cards( bool $edit = FALSE ): mixed
+	protected function _cards( $edit = FALSE )
 	{
 		$cards = array();
-		foreach ( new ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_customer_cards', array( 'card_member=?', $this->member->member_id ), NULL, $edit ? NULL : 10 ), 'IPS\nexus\Customer\CreditCard' ) as $card )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_customer_cards', array( 'card_member=?', $this->member->member_id ), NULL, $edit ? NULL : 10 ), 'IPS\nexus\Customer\CreditCard' ) as $card )
 		{
-			/* @var Customer\CreditCard $card */
 			try
 			{
 				$cardData = $card->card;
@@ -195,21 +167,21 @@ class AccountInformation extends TabbedBlock
 					'card_type'		=> $cardData->type,
 					'card_member'	=> $card->member->member_id,
 					'card_number'	=> $cardData->lastFour ?: $cardData->number,
-					'card_expire'	=> ( !is_null( $cardData->expMonth ) AND !is_null( $cardData->expYear ) ) ? str_pad( $cardData->expMonth , 2, '0', STR_PAD_LEFT ). '/' . $cardData->expYear : NULL
+					'card_expire'	=> ( !\is_null( $cardData->expMonth ) AND !\is_null( $cardData->expYear ) ) ? str_pad( $cardData->expMonth , 2, '0', STR_PAD_LEFT ). '/' . $cardData->expYear : NULL
 				);
 			}
-			catch ( Exception ) { }
+			catch ( \Exception $e ) { }
 		}
-		$cards = new Custom( $cards, $this->member->acpUrl()->setQueryString( 'view', 'cards' ) );
+		$cards = new \IPS\Helpers\Table\Custom( $cards, $this->member->acpUrl()->setQueryString( 'view', 'cards' ) );
 		
-		if ( Gateway::cardStorageGateways( TRUE ) )
+		if ( \IPS\nexus\Gateway::cardStorageGateways( TRUE ) )
 		{
 			$cards->rootButtons = array(
 				'add'	=> array(
-					'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( 'do', 'addCard' ),
+					'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( 'do', 'addCard' ),
 					'title'	=> 'add',
 					'icon'	=> 'plus',
-					'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('add_card') )
+					'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('add_card') )
 				)
 			);
 		}
@@ -217,7 +189,7 @@ class AccountInformation extends TabbedBlock
 		{
 			return array(
 				'delete'	=> array(
-					'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'deleteCard', 'card_id' => $row['id'] ) ),
+					'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'deleteCard', 'card_id' => $row['id'] ) ),
 					'title'	=> 'delete',
 					'icon'	=> 'times-circle',
 					'data'	=> array( 'delete' => '' )
@@ -227,18 +199,18 @@ class AccountInformation extends TabbedBlock
 		
 		if ( $edit )
 		{
-			$cards->tableTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'cardsTable' );
-			$cards->rowsTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'cardsTableRows' );
+			$cards->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'cardsTable' );
+			$cards->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'cardsTableRows' );
 
-			return Theme::i()->getTemplate( 'customers', 'nexus' )->customerPopup( $cards );
+			return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->customerPopup( $cards );
 		}
 		else
 		{
-			$cards->tableTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'cardsOverview' );
-			$cards->rowsTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'cardsOverviewRows' );
+			$cards->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'cardsOverview' );
+			$cards->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'cardsOverviewRows' );
 			
 			$cardCount = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_customer_cards', array( 'card_member=?', $this->member->member_id ) )->first();
-			return Theme::i()->getTemplate( 'customers', 'nexus' )->accountInformationTablePreview( $this->member, $cards, Member::loggedIn()->language()->addToStack( 'num_credit_card', FALSE, array( 'pluralize' => array( $cardCount ) ) ), 'cards' );
+			return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->accountInformationTablePreview( $this->member, $cards, \IPS\Member::loggedIn()->language()->addToStack( 'num_credit_card', FALSE, array( 'pluralize' => array( $cardCount ) ) ), 'cards' );
 		}
 	}
 	
@@ -246,9 +218,9 @@ class AccountInformation extends TabbedBlock
 	 * Get output: BILLING AGREEMENTS
 	 *
 	 * @param	bool	$edit	Edit view?
-	 * @return	mixed
+	 * @return	string
 	 */
-	protected function _paypal( bool $edit = FALSE ): mixed
+	protected function _paypal( $edit = FALSE )
 	{
 		$billingAgreementCount = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_billing_agreements', array( 'ba_member=? AND ba_canceled=0', $this->member->member_id ) )->first();
 		$billingAgreements = array();
@@ -261,20 +233,20 @@ class AccountInformation extends TabbedBlock
 				'next_cycle'				=> $billingAgreement['ba_next_cycle'],
 			);
 		}
-		$billingAgreements = new Custom( $billingAgreements, $this->member->acpUrl()->setQueryString( 'view', 'billingagreements' ) );
+		$billingAgreements = new \IPS\Helpers\Table\Custom( $billingAgreements, $this->member->acpUrl()->setQueryString( 'view', 'billingagreements' ) );
 		$billingAgreements->parsers = array(
 			'started'	=> function( $val ) {
-				return $val ? DateTime::ts( $val )->relative() : null;
+				return $val ? \IPS\DateTime::ts( $val )->relative() : null;
 			},
 			'next_cycle'	=> function( $val ) {
-				return $val ? DateTime::ts( $val )->relative() : null;
+				return $val ? \IPS\DateTime::ts( $val )->relative() : null;
 			},
 		);
 		$billingAgreements->rowButtons = function( $row, $id )
 		{
 			return array(
 				'view'	=> array(
-					'link'	=> Url::internal("app=nexus&module=payments&controller=billingagreements&id={$id}"),
+					'link'	=> \IPS\Http\Url::internal("app=nexus&module=payments&controller=billingagreements&id={$id}"),
 					'title'	=> 'view',
 					'icon'	=> 'search',
 				)
@@ -284,14 +256,14 @@ class AccountInformation extends TabbedBlock
 		{
 			$billingAgreements->exclude = array( 'id', 'last_transaction_currency' );
 			$billingAgreements->langPrefix = 'ba_';
-			return Theme::i()->getTemplate( 'customers', 'nexus' )->customerPopup( $billingAgreements );
+			return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->customerPopup( $billingAgreements );
 		}
 		else
 		{
-			$billingAgreements->tableTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'billingAgreementsOverview' );
-			$billingAgreements->rowsTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'billingAgreementsOverviewRows' );
+			$billingAgreements->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'billingAgreementsOverview' );
+			$billingAgreements->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'billingAgreementsOverviewRows' );
 			
-			return Theme::i()->getTemplate( 'customers', 'nexus' )->accountInformationTablePreview( $this->member, $billingAgreements, Member::loggedIn()->language()->addToStack( 'num_billing_agreements', FALSE, array( 'pluralize' => array( $billingAgreementCount ) ) ), 'paypal' );
+			return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->accountInformationTablePreview( $this->member, $billingAgreements, \IPS\Member::loggedIn()->language()->addToStack( 'num_billing_agreements', FALSE, array( 'pluralize' => array( $billingAgreementCount ) ) ), 'paypal' );
 		}
 	}
 	
@@ -299,24 +271,24 @@ class AccountInformation extends TabbedBlock
 	 * Get output: ALTERNATE CONTACTS
 	 *
 	 * @param	bool	$edit	Edit view?
-	 * @return	mixed
+	 * @return	string
 	 */
-	protected function _alts( bool $edit = FALSE ): mixed
+	protected function _alts( $edit = FALSE )
 	{
 		$altContactCount = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_alternate_contacts', array( 'main_id=?', $this->member->member_id ) )->first();
-		$alternativeContacts = new Db( 'nexus_alternate_contacts', $this->member->acpUrl()->setQueryString( 'view', 'alternatives' ), array( 'main_id=?', $this->member->member_id ) );
+		$alternativeContacts = new \IPS\Helpers\Table\Db( 'nexus_alternate_contacts', $this->member->acpUrl()->setQueryString( 'view', 'alternatives' ), array( 'main_id=?', $this->member->member_id ) );
 		$alternativeContacts->langPrefix = 'altcontactTable_';
-		$alternativeContacts->include = array( 'alt_id', 'purchases', 'billing' );
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_edit_details' ) )
+		$alternativeContacts->include = array( 'alt_id', 'purchases', 'billing', 'support' );
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customers_edit_details' ) )
 		{
 			$alternativeContacts->parsers = array(
 				'alt_id'	=> function( $val )
 				{
-					return  Theme::i()->getTemplate( 'global', 'nexus' )->userLink( Customer::load( $val ) );
+					return  \IPS\Theme::i()->getTemplate( 'global', 'nexus' )->userLink( \IPS\nexus\Customer::load( $val ) );
 				},
 				'email'		=> function ( $val, $row )
 				{
-					return htmlspecialchars( Customer::load( $row['alt_id'] )->email, ENT_DISALLOWED, 'UTF-8', FALSE );
+					return htmlspecialchars( \IPS\nexus\Customer::load( $row['alt_id'] )->email, ENT_DISALLOWED, 'UTF-8', FALSE );
 				},
 				'purchases'	=> function( $val )
 				{
@@ -324,9 +296,9 @@ class AccountInformation extends TabbedBlock
 					{
 						try
 						{
-							return Theme::i()->getTemplate( 'purchases', 'nexus' )->link( Purchase::load( $id ) );
+							return \IPS\Theme::i()->getTemplate( 'purchases', 'nexus' )->link( \IPS\nexus\Purchase::load( $id ) );
 						}
-						catch ( OutOfRangeException )
+						catch ( \OutOfRangeException $e )
 						{
 							return '';
 						}
@@ -334,29 +306,33 @@ class AccountInformation extends TabbedBlock
 				},
 				'billing'	=> function( $val )
 				{
-					return $val ? "<i class='fa-solid fa-check'></i>" : "<i class='fa-solid fa-xmark'></i>";
+					return $val ? "<i class='fa fa-check'></i>" : "<i class='fa fa-times'></i>";
+				},
+				'support'	=> function( $val )
+				{
+					return $val ? "<i class='fa fa-check'></i>" : "<i class='fa fa-times'></i>";
 				}
 			);
 			
 			$alternativeContacts->rootButtons = array(
 				'add'	=> array(
-					'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( 'do', 'alternativeContactForm' ),
+					'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( 'do', 'alternativeContactForm' ),
 					'title'	=> 'add',
 					'icon'	=> 'plus',
-					'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('altcontact_add') )
+					'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('altcontact_add') )
 				)
 			);
 			$alternativeContacts->rowButtons = function( $row )
 			{
 				return array(
 					'edit'	=> array(
-						'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'alternativeContactForm', 'alt_id' => $row['alt_id'] ) ),
+						'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'alternativeContactForm', 'alt_id' => $row['alt_id'] ) ),
 						'title'	=> 'edit',
 						'icon'	=> 'pencil',
 						'data'	=> array( 'ipsDialog' => true )
 					),
 					'delete'	=> array(
-						'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'deleteAlternativeContact', 'alt_id' => $row['alt_id'] ) ),
+						'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'deleteAlternativeContact', 'alt_id' => $row['alt_id'] ) ),
 						'title'	=> 'delete',
 						'icon'	=> 'times-circle',
 						'data'	=> array( 'delete' => '' )
@@ -366,26 +342,25 @@ class AccountInformation extends TabbedBlock
 		}
 		if ( $edit )
 		{
-			return Theme::i()->getTemplate( 'customers', 'nexus' )->customerPopup( $alternativeContacts );
+			return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->customerPopup( $alternativeContacts );
 		}
 		else
 		{
 			$alternativeContacts->include[] = 'email';
 			$alternativeContacts->limit = 2;
-			$alternativeContacts->tableTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'altContactsOverview' );
-			$alternativeContacts->rowsTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'altContactsOverviewRows' );
+			$alternativeContacts->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'altContactsOverview' );
+			$alternativeContacts->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'altContactsOverviewRows' );
 			
-			return Theme::i()->getTemplate( 'customers', 'nexus' )->accountInformationTablePreview( $this->member, $alternativeContacts, Member::loggedIn()->language()->addToStack( 'num_alternate_contacts', FALSE, array( 'pluralize' => array( $altContactCount ) ) ), 'alts' );
+			return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->accountInformationTablePreview( $this->member, $alternativeContacts, \IPS\Member::loggedIn()->language()->addToStack( 'num_alternate_contacts', FALSE, array( 'pluralize' => array( $altContactCount ) ) ), 'alts' );
 		}
 	}
 
 	/**
 	 * Get output
 	 *
-	 * @param string $tab
-	 * @return    mixed
+	 * @return	string
 	 */
-	public function tabOutput( string $tab ): mixed
+	public function tabOutput( $tab )
 	{
 		$method = "_{$tab}";
 		return $this->$method();
@@ -396,11 +371,11 @@ class AccountInformation extends TabbedBlock
 	 *
 	 * @return	string
 	 */
-	public function edit(): string
+	public function edit()
 	{
-		if ( array_key_exists( Request::i()->type, $this->tabs() ) )
+		if ( array_key_exists( \IPS\Request::i()->type, $this->tabs() ) )
 		{
-			$method = "_" . Request::i()->type;
+			$method = "_" . \IPS\Request::i()->type;
 			return $this->$method( TRUE );
 		}
 		return parent::edit();
@@ -411,22 +386,22 @@ class AccountInformation extends TabbedBlock
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
 		$tabs = $this->tabs();
-		if ( !count( $tabs ) )
+		if ( !\count( $tabs ) )
 		{
 			return '';
 		} 
 		$tabKeys = array_keys( $tabs );
-		$activeTabKey = ( isset( Request::i()->block['nexus_AccountInformation'] ) and array_key_exists( Request::i()->block['nexus_AccountInformation'], $tabs ) ) ? Request::i()->block['nexus_AccountInformation'] : array_shift( $tabKeys );
+		$activeTabKey = ( isset( \IPS\Request::i()->block['nexus_AccountInformation'] ) and array_key_exists( \IPS\Request::i()->block['nexus_AccountInformation'], $tabs ) ) ? \IPS\Request::i()->block['nexus_AccountInformation'] : array_shift( $tabKeys );
 		
 		$activeSubscription = FALSE;
-		if ( Settings::i()->nexus_subs_enabled )
+		if ( \IPS\Settings::i()->nexus_subs_enabled )
 		{
-			$activeSubscription = Subscription::loadByMember( $this->member, TRUE );
+			$activeSubscription = \IPS\nexus\Subscription::loadActiveByMember( $this->member );
 		}
 		
-		return (string) Theme::i()->getTemplate( 'customers', 'nexus' )->accountInformation( $this->member, $tabs, $activeTabKey, $this->tabOutput( $activeTabKey ), $activeSubscription );
+		return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->accountInformation( $this->member, $tabs, $activeTabKey, $this->tabOutput( $activeTabKey ), $activeSubscription );
 	}
 }

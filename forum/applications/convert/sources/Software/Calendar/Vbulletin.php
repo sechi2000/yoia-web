@@ -12,31 +12,23 @@
 namespace IPS\convert\Software\Calendar;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\calendar\Date;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Vbulletin as VbulletinClass;
-use IPS\Task;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * vBulletin Calendar Converter
  */
-class Vbulletin extends Software
+class _Vbulletin extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "vBulletin Calendar (3.8.x/4.x)";
@@ -45,9 +37,9 @@ class Vbulletin extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "vbulletin";
@@ -56,9 +48,9 @@ class Vbulletin extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertCalendarCalendars'=> array(
@@ -75,9 +67,9 @@ class Vbulletin extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -85,9 +77,9 @@ class Vbulletin extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'vbulletin' ) );
 	}
@@ -95,29 +87,26 @@ class Vbulletin extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'calendar_events', 'class' => 'IPS\calendar\Event' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\calendar\Event' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'calendar_events', 'class' => 'IPS\calendar\Event' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\calendar\Event' ), 3, array( 'class' ) );
 		
 		return array( "f_rebuild_events", "f_recount_calendar" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix Post Data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string	$post	Post
+	 * @return	string	Fixed Posts
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return VbulletinClass::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Vbulletin::fixPostData( $post );
 	}
 
 	/**
@@ -125,7 +114,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCalendarCalendars() : void
+	public function convertCalendarCalendars()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -149,7 +138,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCalendarEvents() : void
+	public function convertCalendarEvents()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -250,8 +239,8 @@ class Vbulletin extends Software
 				'event_title'		=> $event['title'],
 				'event_content'		=> $event['event'],
 				'event_saved'		=> $event['dateline'],
-				'event_start_date'	=> Date::ts( $event['dateline_from'] ),
-				'event_end_date'	=> $event['dateline_to'] ? Date::ts( $event['dateline_to'] ) : NULL,
+				'event_start_date'	=> \IPS\calendar\Date::ts( $event['dateline_from'] ),
+				'event_end_date'	=> $event['dateline_to'] ? \IPS\calendar\Date::ts( $event['dateline_to'] ) : NULL,
 				'event_approved'	=> $event['visible'],
 				'event_recurring'	=> $recurring
 			);

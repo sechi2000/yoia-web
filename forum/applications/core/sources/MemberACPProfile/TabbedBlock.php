@@ -11,44 +11,36 @@
 namespace IPS\core\MemberACPProfile;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Http\Url;
-use IPS\Request;
-use IPS\Theme;
-use function count;
-use function defined;
-use function get_called_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Tabbed Block
  */
-abstract class TabbedBlock extends Block
+abstract class _TabbedBlock extends Block
 {
 	/**
 	 * Get Output
 	 *
 	 * @return	string
 	 */
-	public function output() : string
+	public function output()
 	{
 		$tabs = $this->tabs();
-		if ( !count( $tabs ) )
+		if ( !\count( $tabs ) )
 		{
 			return '';
 		} 
 		$tabKeys = array_keys( $tabs );
 		
-		$exploded = explode( '\\', get_called_class() );
+		$exploded = explode( '\\', \get_called_class() );
 		$tabParam = $exploded[1] . '_' . $exploded[5];
-		$activeTabKey = ( isset( Request::i()->block[$tabParam] ) and array_key_exists( Request::i()->block[$tabParam], $tabs ) ) ? Request::i()->block[$tabParam] : array_shift( $tabKeys );
+		$activeTabKey = ( isset( \IPS\Request::i()->block[$tabParam] ) and array_key_exists( \IPS\Request::i()->block[$tabParam], $tabs ) ) ? \IPS\Request::i()->block[$tabParam] : array_shift( $tabKeys );
 		
-		return Theme::i()->getTemplate('memberprofile')->tabbedBlock( $this->member, $tabParam, $this->blockTitle(), $tabs, $activeTabKey, $this->tabOutput( $activeTabKey ), $this->showEditLink() ? $this->editLink() : NULL );
+		return \IPS\Theme::i()->getTemplate('memberprofile')->tabbedBlock( $this->member, $tabParam, $this->blockTitle(), $tabs, $activeTabKey, $this->tabOutput( $activeTabKey ), $this->showEditLink() ? $this->editLink() : NULL );
 	}
 	
 	/**
@@ -56,7 +48,7 @@ abstract class TabbedBlock extends Block
 	 *
 	 * @return	bool
 	 */
-	protected function showEditLink() : bool
+	protected function showEditLink()
 	{
 		return false;
 	}
@@ -64,12 +56,12 @@ abstract class TabbedBlock extends Block
 	/**
 	 * Edit Link
 	 *
-	 * @return	Url
+	 * @return	bool
 	 */
-	protected function editLink() : Url
+	protected function editLink()
 	{
-		return Url::internal("app=core&module=members&controller=members&do=editBlock")->setQueryString( array(
-			'block'	=> get_called_class(),
+		return \IPS\Http\Url::internal("app=core&module=members&controller=members&do=editBlock")->setQueryString( array(
+			'block'	=> \get_called_class(),
 			'id'	=> $this->member->member_id
 		) );
 	}
@@ -77,9 +69,9 @@ abstract class TabbedBlock extends Block
 	/**
 	 * Get Block Title
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function blockTitle() : ?string
+	public function blockTitle()
 	{
 		return NULL;
 	}
@@ -87,15 +79,14 @@ abstract class TabbedBlock extends Block
 	/**
 	 * Get Tab Names
 	 *
-	 * @return	array
+	 * @return	string
 	 */
-	abstract public function tabs() : array;
+	abstract public function tabs();
 	
 	/**
 	 * Get output
 	 *
-	 * @param string $tab
-	 * @return    mixed
+	 * @return	string
 	 */
-	abstract public function tabOutput(string $tab ): mixed;
+	abstract public function tabOutput( $tab );
 }

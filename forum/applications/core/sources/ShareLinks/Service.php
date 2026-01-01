@@ -11,88 +11,66 @@
 namespace IPS\core\ShareLinks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Content;
-use IPS\Content\ShareServices;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Settings;
-use LogicException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Share Link Node
  */
-class Service extends Model
+class _Service extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_share_links';
+	public static $databaseTable = 'core_share_links';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'share_';
+	public static $databasePrefix = 'share_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'share_key' );
+	protected static $databaseIdFields = array( 'share_key' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'sharelinks';
+	public static $nodeTitle = 'sharelinks';
 	
 	/**
 	 * @brief	[Node] Show forms modally?
 	 */
-	public static bool $modalForms = TRUE;
+	public static $modalForms = TRUE;
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'settings',
 		'prefix'	=> 'sharelinks_',
@@ -103,7 +81,7 @@ class Service extends Model
 	 *
 	 * @return	void
 	 */
-	public static function resetRootResult() : void
+	public static function resetRootResult()
 	{
 		static::$rootsResult	= NULL;
 	}
@@ -111,14 +89,14 @@ class Service extends Model
 	/**
 	 * @brief	Cached sharelinks
 	 */
-	protected static ?array $cachedShareLinks = NULL;
+	protected static $cachedShareLinks = NULL;
 
 	/**
 	 * Fetch All Nodes
 	 *
 	 * @return	array
 	 */
-	public static function shareLinks() : array
+	public static function shareLinks()
 	{
 		if( static::$cachedShareLinks === NULL )
 		{
@@ -137,30 +115,30 @@ class Service extends Model
 	 *
 	 * @return	array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->shareLinks ) )
+		if ( !isset( \IPS\Data\Store::i()->shareLinks ) )
 		{
-			Store::i()->shareLinks = iterator_to_array( Db::i()->select( '*', static::$databaseTable, NULL, static::$databasePrefix . static::$databaseColumnOrder ) );
+			\IPS\Data\Store::i()->shareLinks = iterator_to_array( \IPS\Db::i()->select( '*', static::$databaseTable, NULL, static::$databasePrefix . static::$databaseColumnOrder ) );
 		}
 		
-		return Store::i()->shareLinks;
+		return \IPS\Data\Store::i()->shareLinks;
 	}
 	
 	/**
 	 * Fetch All Share Services
 	 *
-	 * @param Url $url	URL to the content [optional - if omitted, some services will figure out on their own]
+	 * @param	\IPS\Http\Url		$url	URL to the content [optional - if omitted, some services will figure out on their own]
 	 * @param	string				$title	Default text for the content, usually the title [optional - if omitted, some services will figure out on their own]
-	 * @param	Member|NULL	$member	Member the links will display to or NULL for currently logged in member
-	 * @param	Content|NULL	$item	Content item (or comment) to share
+	 * @param	\IPS\Member|NULL	$member	Member the links will display to or NULL for currently logged in member
+	 * @param	\IPS\Content|NULL	$item	Content item (or comment) to share
 	 * @return	array
 	 */
-	public static function getAllServices(Url $url, string $title, ?Member $member = NULL, ?Content $item = NULL ) : array
+	public static function getAllServices( \IPS\Http\Url $url, $title, \IPS\Member $member = NULL, \IPS\Content $item = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
-		if( Settings::i()->ref_on )
+		if( \IPS\Settings::i()->ref_on )
 		{
 			$url = $url->setQueryString( array( '_rid' => $member->member_id  ) );
 		}
@@ -174,31 +152,30 @@ class Service extends Model
 				{
 					$services[ $node->key ]	= $node->getService( $url, $title, $item );
 				}
-				catch ( LogicException $e ) { }
+				catch ( \LogicException $e ) { }
 			}
 		}
 		return $services;
 	}
-
+	
 	/**
 	 * Get \IPS\Content\ShareServices class
 	 *
-	 * @param Url $url URL to the content [optional - if omitted, some services will figure out on their own]
-	 * @param string $title Default text for the content, usually the title [optional - if omitted, some services will figure out on their own]
-	 * @param Content|null $item
-	 * @return    ShareServices
+	 * @param	\IPS\Http\Url	$url	URL to the content [optional - if omitted, some services will figure out on their own]
+	 * @param	string			$title	Default text for the content, usually the title [optional - if omitted, some services will figure out on their own]
+	 * @return	array
 	 */
-	public function getService( Url $url, string $title, ?Content $item ) : ShareServices
+	public function getService( \IPS\Http\Url $url, $title, $item )
 	{
 		try
 		{
-			$className = ShareServices::getClassByKey( $this->key );
+			$className = \IPS\Content\ShareServices::getClassByKey( $this->key );
 
 			return new $className( $url, $title, $item );
 		}
-		catch ( InvalidArgumentException $e )
+		catch ( \InvalidArgumentException $e )
 		{
-			throw new LogicException;
+			throw new \LogicException;
 		}
 	}
 
@@ -207,21 +184,21 @@ class Service extends Model
 	 * Example code explains return value
 	 *
 	 * @code
-	 	* array(
-	 		* array(
-	 			* 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
-	 			* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	 			* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	 			* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	 		* ),
-	 		* ...							// Additional buttons
-	 	* );
+	 	array(
+	 		array(
+	 			'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
+	 			'title'	=> 'foo',		// Language key to use for button's title parameter
+	 			'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	 			'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	 		),
+	 		...							// Additional buttons
+	 	);
 	 * @endcode
-	 * @param Url $url		Base URL
+	 * @param	string	$url		Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{		
 		$buttons = array();
 		
@@ -236,7 +213,7 @@ class Service extends Model
 				'icon'	=> 'pencil',
 				'title'	=> 'edit',
 				'link'	=> $url->setQueryString( array( 'do' => 'form', 'id' => $this->_id ) ),
-				'data'	=> ( static::$modalForms ? array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit') ) : array() ),
+				'data'	=> ( static::$modalForms ? array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit') ) : array() ),
 				'hotkey'=> 'e return'
 				);
 		}
@@ -247,19 +224,18 @@ class Service extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
-		$form->add( new Text( 'share_title', $this->title, TRUE ) );
-		$form->add( new CheckboxSet( 'share_groups', ( $this->groups != '*' ) ? explode( ",", $this->groups ) : $this->groups, FALSE, array( 'options' => Group::groups(), 'parse' => 'normal', 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'everyone', 'impliedUnlimited' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'share_title', $this->title, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'share_groups', ( $this->groups != '*' ) ? explode( ",", $this->groups ) : $this->groups, FALSE, array( 'options' => \IPS\Member\Group::groups(), 'parse' => 'normal', 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'everyone', 'impliedUnlimited' => TRUE ) ) );
 
 		/* Find the service and see if it has any additional settings... */
-		$services = ShareServices::services();
+		$services = \IPS\Content\ShareServices::services();
 		$className	= $services[ ucwords( $this->key ) ];
 
-		/* @var ShareServices $className */
 		$className::modifyForm( $form, $this );
 	}
 	
@@ -269,16 +245,16 @@ class Service extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
-		if( count( $values ) )
+		if( \count( $values ) )
 		{
 			if ( isset( $values[ 'share_autoshare_' . ucwords( $this->key ) ] ) )
 			{
 				$values['share_autoshare'] = $values[ 'share_autoshare_' . ucwords( $this->key ) ];
 				unset( $values[ 'share_autoshare_' . ucwords( $this->key ) ] );
 								
-				$loginHandlers = Login::getStore();
+				$loginHandlers = \IPS\Login::getStore();
 
 				foreach( $loginHandlers as $handler )
 				{
@@ -297,13 +273,13 @@ class Service extends Model
 			$settingsToUpdate = array();
 			foreach ( $values as $k => $v )
 			{
-				if( !in_array( $k, array( 'share_title', 'share_groups', 'share_autoshare' ) ) )
+				if( !\in_array( $k, array( 'share_title', 'share_groups', 'share_autoshare' ) ) )
 				{
-					if ( $v instanceof GeoLocation )
+					if ( $v instanceof \IPS\GeoLocation )
 					{
 						$v = json_encode( $v );
 					}
-					if ( is_array( $v ) )
+					if ( \is_array( $v ) )
 					{
 						$v = implode( ',', $v );
 					}
@@ -313,7 +289,7 @@ class Service extends Model
 				}
 			}
 
-			Settings::i()->changeValues( $settingsToUpdate );
+			\IPS\Settings::i()->changeValues( $settingsToUpdate );
 
 			/* Remove prefix */
 			$_values = $values;
@@ -339,7 +315,7 @@ class Service extends Model
 	 *
 	 * @return	string
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		if ( !$this->id )
 		{
@@ -355,9 +331,9 @@ class Service extends Model
 	 * @note	Return value NULL indicates the node cannot be enabled/disabled
 	 * @return	bool|null
 	 */
-	protected function get__enabled(): ?bool
+	protected function get__enabled()
 	{
-		return (bool)$this->enabled;
+		return ( $this->enabled ) ? TRUE : FALSE;
 	}
 
 	/**
@@ -366,7 +342,7 @@ class Service extends Model
 	 * @param	bool|int	$enabled	Whether to set it enabled or disabled
 	 * @return	void
 	 */
-	protected function set__enabled( bool|int $enabled ) : void
+	protected function set__enabled( $enabled )
 	{
 		$this->enabled	= $enabled;
 	}
@@ -376,7 +352,7 @@ class Service extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canAdd(): bool
+	public function canAdd()
 	{
 		return FALSE;
 	}
@@ -386,7 +362,7 @@ class Service extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canCopy(): bool
+	public function canCopy()
 	{
 		return FALSE;
 	}
@@ -396,7 +372,7 @@ class Service extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canManagePermissions(): bool
+	public function canManagePermissions()
 	{
 		return FALSE;
 	}
@@ -404,9 +380,9 @@ class Service extends Model
 	/**
 	 * [Node] Does the currently logged in user have permission to delete this node?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canDelete(): bool
+	public function canDelete()
 	{
 		return FALSE;
 	}
@@ -420,7 +396,7 @@ class Service extends Model
 	 * @param	mixed		$where	Where clause
 	 * @return	array
 	 */
-	public static function search( string $column, string $query, string $order=NULL, mixed $where=array() ): array
+	public static function search( $column, $query, $order=NULL, $where=array() )
 	{	
 		if ( $column === '_title' )
 		{
@@ -437,5 +413,5 @@ class Service extends Model
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'shareLinks' );
+	protected $caches = array( 'shareLinks' );
 }

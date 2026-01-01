@@ -12,35 +12,16 @@
 namespace IPS\nexus\Fraud\MaxMind;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\GeoLocation;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\nexus\CreditCard;
-use IPS\nexus\Transaction;
-use IPS\Request as RequestClass;
-use IPS\Settings;
-use function defined;
-use function function_exists;
-use function strpos;
-use function strrpos;
-use function strtolower;
-use function substr;
-use const IDNA_NONTRANSITIONAL_TO_ASCII;
-use const INTL_IDNA_VARIANT_UTS46;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * MaxMind Request
  */
-class Request
+class _Request
 {
 	/**
 	 * @brief	Maxmind User ID
@@ -65,14 +46,14 @@ class Request
 	 * @param	NULL|string	$maxmindId	MaxMind User ID (NULL to get from settings)
 	 * @return	void
 	 */
-	public function __construct( bool $session=TRUE, ?string $maxmindKey=NULL, ?string $maxmindId=NULL )
+	public function __construct( $session=TRUE, $maxmindKey=NULL, $maxmindId=NULL )
 	{
-		$this->licenseKey	= $maxmindKey ?: Settings::i()->maxmind_key;
-		$this->id	= $maxmindId ?: Settings::i()->maxmind_id;
+		$this->licenseKey	= $maxmindKey ?: \IPS\Settings::i()->maxmind_key;
+		$this->id	= $maxmindId ?: \IPS\Settings::i()->maxmind_id;
 
 		if ( $session )
 		{
-			$this->setIpAddress( RequestClass::i()->ipAddress() );
+			$this->setIpAddress( \IPS\Request::i()->ipAddress() );
 			
 			$this->data['sessionID'] = session_id();
 
@@ -94,7 +75,7 @@ class Request
 	 * @param	string	$ipAddress	IP Address
 	 * @return	void
 	 */
-	public function setIpAddress( string $ipAddress ) : void
+	public function setIpAddress( $ipAddress )
 	{
 		$this->data['device']['ip_address'] = $ipAddress;
 	}
@@ -102,18 +83,22 @@ class Request
 	/**
 	 * Set Transaction
 	 *
-	 * @param	Transaction	$transaction
+	 * @param	\IPS\nexus\Transaction	$transaction
 	 * @return	void
 	 */
-	public function setTransaction( Transaction $transaction ) : void
+	public function setTransaction( \IPS\nexus\Transaction $transaction )
 	{
 		$this->setMember( $transaction->member->member_id ? $transaction->member : $transaction->invoice->member );
 		
 		if ( $billingAddress = $transaction->invoice->billaddress )
 		{
-			$this->setBillingAddress( $billingAddress );
+			$this->setBillingAddress( $transaction->invoice->billaddress );
 		}
-
+		if ( $shippingAddress = $transaction->invoice->shipaddress )
+		{
+			$this->setShippingAddress( $transaction->invoice->shipaddress );
+		}
+		
 		$this->data['order']['amount']		= (string) $transaction->amount->amount;
 		$this->data['order']['currency']	= $transaction->amount->currency;
 	}
@@ -121,23 +106,37 @@ class Request
 	/**
 	 * Set Billing Address
 	 *
-	 * @param	GeoLocation	$billingAddress
+	 * @param	\IPS\GeoLocation	$billingAddress
 	 * @return	void
 	 */
-	public function setBillingAddress( GeoLocation $billingAddress ) : void
+	public function setBillingAddress( \IPS\GeoLocation $billingAddress )
 	{
 		$this->data['billing']['city']			= $billingAddress->city;
 		$this->data['billing']['postal']		= $billingAddress->postalCode;
 		$this->data['billing']['country']		= $billingAddress->country;
 	}
-
+	
+	/**
+	 * Set Shipping Address
+	 *
+	 * @param	\IPS\GeoLocation	$shippingAddress
+	 * @return	void
+	 */
+	public function setShippingAddress( \IPS\GeoLocation $shippingAddress )
+	{
+		$this->data['shipping']['address']		= implode( ', ', $shippingAddress->addressLines );
+		$this->data['shipping']['city']		= $shippingAddress->city;
+		$this->data['shipping']['postal']	= $shippingAddress->postalCode;
+		$this->data['shipping']['country']	= $shippingAddress->country;
+	}
+	
 	/**
 	 * Set Member
 	 *
-	 * @param	Member		$member
+	 * @param	\IPS\Member		$member
 	 * @return	void
 	 */
-	public function setMember( Member $member ) : void
+	public function setMember( \IPS\Member $member )
 	{
 		$this->_setEmailProperties( $member->email );
 		$this->data['account']['username_md5']	= md5( $member->name );
@@ -147,7 +146,7 @@ class Request
 	 * @brief	MaxMind common typo domains list
 	 * @see		https://github.com/maxmind/minfraud-api-php/blob/b08158b6c096bde8560b1b7fb8bb548c79f8d57b/src/MinFraud/Util.php#L18
 	 */
-	protected static array $typoDomains = [
+	protected static $typoDomains = [
         // gmail.com
         '35gmai.com' => 'gmail.com',
         '636gmail.com' => 'gmail.com',
@@ -167,23 +166,23 @@ class Request
 	 * @param	string	$email	The member's email address
 	 * @return	void
 	 */
-	protected function _setEmailProperties( string $email ) : void
+	protected function _setEmailProperties( $email )
 	{
-		$email	= trim( strtolower( $email ) );
-		$local	= substr( $email, 0, strrpos( $email, '@' ) );
-		$domain	= substr( $email, strrpos( $email, '@' ) + 1 );
+		$email	= trim( \strtolower( $email ) );
+		$local	= \substr( $email, 0, \strrpos( $email, '@' ) );
+		$domain	= \substr( $email, \strrpos( $email, '@' ) + 1 );
 
 		/* Trim the domain and remove trailing dots */
 		$domain	= rtrim( trim( $domain ), '.' );
 
 		/* Convert IDNs to ASCII */
-		if ( !function_exists('idn_to_ascii') )
+		if ( !\function_exists('idn_to_ascii') )
 		{
-			IPS::$PSR0Namespaces['TrueBV'] = \IPS\ROOT_PATH . "/system/3rd_party/php-punycode";
+			\IPS\IPS::$PSR0Namespaces['TrueBV'] = \IPS\ROOT_PATH . "/system/3rd_party/php-punycode";
 			require_once \IPS\ROOT_PATH . "/system/3rd_party/php-punycode/polyfill.php";
 		}
 
-		$asciiDomain	= idn_to_ascii( $domain, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46 );
+		$asciiDomain	= idn_to_ascii( $domain, \IDNA_NONTRANSITIONAL_TO_ASCII, \INTL_IDNA_VARIANT_UTS46 );
 
 		if( $asciiDomain !== FALSE )
 		{
@@ -191,14 +190,14 @@ class Request
 		}
 
 		/* Then address common typos */
-		$domain	= static::$typoDomains[$domain] ?? $domain;
+		$domain	= isset( static::$typoDomains[ $domain ] ) ? static::$typoDomains[ $domain ] : $domain;
 
 		/* Now remove email aliases from the local part */
 		$divider	= ( $domain === 'yahoo.com' ) ? '-' : '+';
 
-		if( $alias = strpos( $local, $divider ) )
+		if( $alias = \strpos( $local, $divider ) )
 		{
-			$local	= substr( $local, 0, $alias );
+			$local	= \substr( $local, 0, $alias );
 		}
 
 		$this->data['email']['domain']		= $domain;
@@ -211,7 +210,7 @@ class Request
 	 * @param	string	$phoneNumber
 	 * @return	void
 	 */
-	public function setPhone( string $phoneNumber ) : void
+	public function setPhone( $phoneNumber )
 	{
 		$this->data['billing']['phone_number']	= $phoneNumber;
 	}
@@ -219,12 +218,12 @@ class Request
 	/**
 	 * Set Credit Card
 	 *
-	 * @param	CreditCard|string	$card	The card number
+	 * @param	\IPS\nexus\CreditCard|string	$card	The card number
 	 * @return	void
 	 */
-	public function setCard( CreditCard|string $card ) : void
+	public function setCard( $card )
 	{
-		$cardNumber = ( $card instanceof CreditCard ) ? $card->number : $card;
+		$cardNumber = ( $card instanceof \IPS\nexus\CreditCard ) ? $card->number : $card;
 		$this->data['credit_card']['issuer_id_number'] = mb_substr( $cardNumber, 0, 6 );
 		$this->data['credit_card']['last_digits'] = mb_substr( $cardNumber, -4 );
 	}
@@ -235,7 +234,7 @@ class Request
 	 * @param	string	$type		Transaction Type
 	 * @return	void
 	 */
-	public function setTransactionType( string $type ) : void
+	public function setTransactionType( $type )
 	{
 		$this->data['event']['txn_type']		= $type;
 	}
@@ -246,7 +245,7 @@ class Request
 	 * @param	string	$code	AVS Code
 	 * @return	void
 	 */
-	public function setAVS( string $code ): void
+	public function setAVS( $code )
 	{
 		$this->data['credit_card']['avs_result'] = $code;
 	}
@@ -257,7 +256,7 @@ class Request
 	 * @param	bool	$result	CVV check result (boolean only - do not provide actual code)
 	 * @return	void
 	 */
-	public function setCVV( bool $result ) : void
+	public function setCVV( $result )
 	{
 		$this->data['credit_card']['cvv_result'] = $result ? 'Y' : 'N';
 	}
@@ -265,18 +264,18 @@ class Request
 	/**
 	 * Make Request
 	 *
-	 * @return    Response
-	 * @throws	Exception
+	 * @return	\IPS\nexus\Fraud\MaxMind\Response
+	 * @throws	\IPS\Http\Request\Exception
 	 */
-	public function request() : Response
+	public function request()
 	{		
-		$response = Url::external( 'https://minfraud.maxmind.com/minfraud/v2.0/insights' )->request()->login( $this->id, $this->licenseKey )->post( json_encode( $this->data ) );
+		$response = \IPS\Http\Url::external( 'https://minfraud.maxmind.com/minfraud/v2.0/insights' )->request()->login( $this->id, $this->licenseKey )->post( json_encode( $this->data ) );
 
 		if ( isset( $response->httpHeaders['Content-Type'] ) and preg_match( '/; charset=(.+?);$/', $response->httpHeaders['Content-Type'], $matches ) )
 		{
 			$response = mb_convert_encoding( $response, 'UTF-8', $matches[1] );
 		}
 
-		return new Response( (string) $response );
+		return new \IPS\nexus\Fraud\MaxMind\Response( (string) $response );
 	}
 }

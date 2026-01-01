@@ -11,58 +11,47 @@
 namespace IPS\core\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Settings;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Keywords extends \IPS\core\Statistics\Chart
+class _Keywords extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_activitystats_keywords';
+	public $controller = 'core_activitystats_keywords_time';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
 		/* Determine minimum date */
 		$minimumDate = NULL;
 
-		if( Settings::i()->stats_keywords_prune )
+		if( \IPS\Settings::i()->stats_keywords_prune )
 		{
-			$minimumDate = DateTime::create()->sub( new DateInterval( 'P' . Settings::i()->stats_keywords_prune . 'D' ) );
+			$minimumDate = \IPS\DateTime::create()->sub( new \DateInterval( 'P' . \IPS\Settings::i()->stats_keywords_prune . 'D' ) );
 		}
 
 		/* Draw a chart */
-		$options = json_decode( Settings::i()->stats_keywords, true );
+		$options = json_decode( \IPS\Settings::i()->stats_keywords, true );
 
-		if( !is_array( $options ) )
+		if( !\is_array( $options ) )
 		{
 			$options = array();
 		}
 
-		$chart = new Database(
+		$chart = new \IPS\Helpers\Chart\Database( 
 			$url, 
 			'core_statistics', 
 			'time', 
@@ -77,7 +66,7 @@ class Keywords extends \IPS\core\Statistics\Chart
 			), 
 			'LineChart', 
 			'daily', 
-			array( 'start' => DateTime::create()->sub( new DateInterval( 'P90D' ) ), 'end' => DateTime::ts( time() ) ),
+			array( 'start' => \IPS\DateTime::create()->sub( new \DateInterval( 'P90D' ) ), 'end' => \IPS\DateTime::ts( time() ) ),
 			array(),
 			'',
 			$minimumDate
@@ -86,7 +75,7 @@ class Keywords extends \IPS\core\Statistics\Chart
 		$chart->where	= array( array( 'type=?', 'keyword' ) );
 		$chart->groupBy	= 'value_4';
 
-		if ( is_array( $options ) )
+		if ( \is_array( $options ) )
 		{
 			foreach( $options as $k => $v )
 			{
@@ -94,7 +83,7 @@ class Keywords extends \IPS\core\Statistics\Chart
 			}
 		}
 
-		$chart->title = Member::loggedIn()->language()->addToStack('keyword_usage_chart');
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('keyword_usage_chart');
 		$chart->availableTypes = array( 'AreaChart', 'ColumnChart', 'BarChart' );
 		
 		return $chart;

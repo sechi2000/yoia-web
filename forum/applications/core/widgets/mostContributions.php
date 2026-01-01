@@ -11,66 +11,65 @@
 namespace IPS\core\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Translatable;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Widget\Customizable;
-use IPS\Widget\StaticCache;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * mostContributions Widget
  */
-class mostContributions extends StaticCache implements Customizable
+class _mostContributions extends \IPS\Widget\StaticCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'mostContributions';
+	public $key = 'mostContributions';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'core';
+	public $app = 'core';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
+	
+	/**
+	 * Initialise this widget
+	 *
+	 * @return void
+	 */ 
+	public function init()
+	{
+		parent::init();
+	}
 	
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
  		$form = parent::configuration( $form );
 
 		/* Block title */
-		$form->add( new Translatable( 'widget_feed_title', isset( $this->configuration['language_key'] ) ? NULL : Member::loggedIn()->language()->addToStack( 'block_mostContributions' ), FALSE, array( 'app' => 'core', 'key' => ( $this->configuration['language_key'] ?? NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'widget_feed_title', isset( $this->configuration['language_key'] ) ? NULL : \IPS\Member::loggedIn()->language()->addToStack( 'block_mostContributions' ), FALSE, array( 'app' => 'core', 'key' => ( isset( $this->configuration['language_key'] ) ? $this->configuration['language_key'] : NULL ) ) ) );
 
-		$form->add( new Number( 'number_to_show', $this->configuration['number_to_show'] ?? 5, TRUE, array( 'max' => 25 ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'number_to_show', isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 5, TRUE, array( 'max' => 25 ) ) );
 
 		/* What are we showing? */
 		$classes = array();
-		foreach ( Application::allExtensions( 'core', 'ContentRouter' ) as $contentRouter )
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter' ) as $contentRouter )
 		{
 			foreach ( $contentRouter->classes as $class )
 			{
 				$exploded = explode( '\\', $class );
-				if ( in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+				if ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
 				{
 					if ( $class::incrementPostCount() )
 					{
@@ -93,7 +92,7 @@ class mostContributions extends StaticCache implements Customizable
 						}
 					}
 				}
-				elseif ( in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
+				elseif ( \in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
 				{
 					if ( $class::incrementPostCount() )
 					{
@@ -121,7 +120,7 @@ class mostContributions extends StaticCache implements Customizable
 			}
 		}
 
-		$form->add( new Select( 'most_contributions_area', $this->configuration['most_contributions_area'] ?? "0", FALSE, array( 'options' => $options, 'multiple' => FALSE, 'unlimited' => '0', 'unlimitedLang' => "everything" ), NULL, NULL, NULL, 'most_contributions_area' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'most_contributions_area', isset( $this->configuration['most_contributions_area'] ) ? $this->configuration['most_contributions_area'] : "0", FALSE, array( 'options' => $options, 'multiple' => FALSE, 'unlimited' => '0', 'unlimitedLang' => "everything" ), NULL, NULL, NULL, 'most_contributions_area' ) );
 		return $form;
  	} 
  	
@@ -131,7 +130,7 @@ class mostContributions extends StaticCache implements Customizable
  	 * @param	array	$values	Values from form
  	 * @return	array
  	 */
- 	public function preConfig( array $values ): array
+ 	public function preConfig( $values )
  	{
 		if ( !isset( $this->configuration['language_key'] ) )
 		{
@@ -139,7 +138,7 @@ class mostContributions extends StaticCache implements Customizable
 		}
 		$values['language_key'] = $this->configuration['language_key'];
 
-		Lang::saveCustom( 'core', $this->configuration['language_key'], $values['widget_feed_title'] );
+		\IPS\Lang::saveCustom( 'core', $this->configuration['language_key'], $values['widget_feed_title'] );
 		unset( $values['widget_feed_title'] );
 
  		return $values;
@@ -150,15 +149,15 @@ class mostContributions extends StaticCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		$members = array();
-		$area = $this->configuration['most_contributions_area'] ?? NULL;
+		$area = isset( $this->configuration['most_contributions_area'] ) ? $this->configuration['most_contributions_area'] : NULL;
 
 		/* If we're showing everything that's easy just show the content count */
 		if( !$area )
 		{
-			$contributions = array( 'members' => new ActiveRecordIterator( Db::i()->select( '*', 'core_members', array( "member_posts > ?", 0 ), "member_posts DESC", array( 0,5 ) ), 'IPS\Member' ) );
+			$contributions = array( 'members' => new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', array( "member_posts > ?", 0 ), "member_posts DESC", array( 0,5 ) ), 'IPS\Member' ) );
 		}
 		/* A specific content type? That's more work */
 		else
@@ -166,14 +165,14 @@ class mostContributions extends StaticCache implements Customizable
 			$contributions = $area::mostContributions( $this->configuration['number_to_show'] );
 		}
 
-		if( !count( $contributions['members'] ) )
+		if( !\count( $contributions['members'] ) )
 		{
 			return "";
 		}
 
 		if ( isset( $this->configuration['language_key'] ) )
 		{
-			$title = Member::loggedIn()->language()->addToStack( $this->configuration['language_key'], FALSE, array( 'escape' => TRUE ) );
+			$title = \IPS\Member::loggedIn()->language()->addToStack( $this->configuration['language_key'], FALSE, array( 'escape' => TRUE ) );
 		}
 		elseif ( isset( $this->configuration['widget_feed_title'] ) )
 		{
@@ -181,7 +180,7 @@ class mostContributions extends StaticCache implements Customizable
 		}
 		else
 		{
-			$title = Member::loggedIn()->language()->addToStack( 'block_mostContributions' );
+			$title = \IPS\Member::loggedIn()->language()->addToStack( 'block_mostContributions' );
 		}
 
 		return $this->output( $contributions, $area, $title );
@@ -192,8 +191,8 @@ class mostContributions extends StaticCache implements Customizable
 	 *
 	 * @return void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		Lang::deleteCustom( 'core', $this->configuration['language_key'] );
+		\IPS\Lang::deleteCustom( 'core', $this->configuration['language_key'] );
 	}
 }

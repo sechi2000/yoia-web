@@ -12,37 +12,29 @@
 namespace IPS\downloads\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: FileField
  */
-class FileField extends FileStorageAbstract
+class _FileField
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
 		$count = 0;
 		
-		foreach( Db::i()->select( '*', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) ) AS $field )
+		foreach( \IPS\Db::i()->select( '*', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) ) AS $field )
 		{
-			$count += Db::i()->select( 'COUNT(*)', 'downloads_ccontent', array( "field_{$field['cf_id']}<>? OR field_{$field['cf_id']} IS NOT NULL", '' ) )->first();
+			$count += \IPS\Db::i()->select( 'COUNT(*)', 'downloads_ccontent', array( "field_{$field['cf_id']}<>? OR field_{$field['cf_id']} IS NOT NULL", '' ) )->first();
 		}
 		
 		return $count;
@@ -54,30 +46,30 @@ class FileField extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	Underflowexception				When file record doesn't exist. Indicating there are no more files to move
+	 * @throws	\Underflowexception				When file record doesn't exist. Indicating there are no more files to move
 	 * @return	void								FALSE when there are no more files to move
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-        if( !Db::i()->select( 'COUNT(*)', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) )->first() )
+        if( !\IPS\Db::i()->select( 'COUNT(*)', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) )->first() )
         {
-            throw new Underflowexception;
+            throw new \Underflowexception;
         }
 
-		foreach( Db::i()->select( '*', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) ) AS $field )
+		foreach( \IPS\Db::i()->select( '*', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) ) AS $field )
 		{
-			$cfield	= Db::i()->select( '*', 'downloads_ccontent', array( "field_{$field['cf_id']}<>? OR field_{$field['cf_id']} IS NOT NULL", '' ), 'file_id', array( $offset, 1 ) )->first();
+			$cfield	= \IPS\Db::i()->select( '*', 'downloads_ccontent', array( "field_{$field['cf_id']}<>? OR field_{$field['cf_id']} IS NOT NULL", '' ), 'file_id', array( $offset, 1 ) )->first();
 			
 			try
 			{
-				$file = File::get( $oldConfiguration ?: 'downloads_FileField', $cfield[ 'field_' . $field['cf_id'] ] )->move( $storageConfiguration );
+				$file = \IPS\File::get( $oldConfiguration ?: 'downloads_FileField', $cfield[ 'field_' . $field['cf_id'] ] )->move( $storageConfiguration );
 				
 				if ( (string) $file != $cfield[ 'field_' . $field['cf_id'] ] )
 				{
-					Db::i()->update( 'downloads_ccontent', array( "field_{$field['cf_id']}=?", (string) $file ), array( 'file_id=?', $cfield['file_id'] ) );
+					\IPS\Db::i()->update( 'downloads_ccontent', array( "field_{$field['cf_id']}=?", (string) $file ), array( 'file_id=?', $cfield['file_id'] ) );
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				/* Any issues are logged */
 			}
@@ -85,24 +77,48 @@ class FileField extends FileStorageAbstract
 	}
 	
 	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		if( !\IPS\Db::i()->select( 'COUNT(*)', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) )->first() )
+        {
+            throw new \Underflowexception;
+        }
+
+		foreach( \IPS\Db::i()->select( '*', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) ) AS $field )
+		{
+			$cfield	= \IPS\Db::i()->select( '*', 'downloads_ccontent', array( "field_{$field['cf_id']}<>? OR field_{$field['cf_id']} IS NOT NULL", '' ), 'file_id', array( $offset, 1 ) )->first();
+			
+			if ( $new = \IPS\File::repairUrl( $cfield[ 'field_' . $field['cf_id'] ] ) )
+			{
+				\IPS\Db::i()->update( 'downloads_ccontent', array( "field_{$field['cf_id']}" => $new ), array( 'file_id=?', $cfield['file_id'] ) );
+			}
+		}
+	}
+	
+	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
 		$valid = FALSE;
-		foreach( Db::i()->select( '*', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) ) AS $field )
+		foreach( \IPS\Db::i()->select( '*', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) ) AS $field )
 		{
 			try
 			{
-				Db::i()->select( '*', 'downloads_ccontent', array( "field_{$field['cf_id']}=?", (string) $file ) )->first();
+				\IPS\Db::i()->select( '*', 'downloads_ccontent', array( "field_{$field['cf_id']}=?", (string) $file ) )->first();
 				
 				$valid = TRUE;
 				break;
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 		}
 		
 		return $valid;
@@ -113,18 +129,18 @@ class FileField extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		foreach( Db::i()->select( '*', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) ) AS $field )
+		foreach( \IPS\Db::i()->select( '*', 'downloads_cfields', array( 'cf_type=?', 'Upload' ) ) AS $field )
 		{
 			try
 			{
-				foreach( Db::i()->select( '*', 'downloads_ccontent', array( "field_{$field['cf_id']}<>? OR field_{$field['cf_id']} IS NOT NULL", '' ) ) as $cfield )
+				foreach( \IPS\Db::i()->select( '*', 'downloads_ccontent', array( "field_{$field['cf_id']}<>? OR field_{$field['cf_id']} IS NOT NULL", '' ) ) as $cfield )
 				{
-					File::get( 'downloads_FileField', $cfield[ 'field_' . $field['cf_id'] ] )->delete();
+					\IPS\File::get( 'downloads_FileField', $cfield[ 'field_' . $field['cf_id'] ] )->delete();
 				}
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 		}
 	}
 }

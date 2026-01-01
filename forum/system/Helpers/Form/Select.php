@@ -11,26 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Member;
-use IPS\Request;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Select-box class for Form Builder
  */
-class Select extends FormAbstract
+class _Select extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -42,6 +32,7 @@ class Select extends FormAbstract
 	 		'class'				=> '',		// CSS class
 	 		'disabled'			=> FALSE,	// Disables input. Default is FALSE.
 	 		'parse'				=> 'lang',	// Sets how the values for options should be parsed. Acceptable values are "lang" (language keys), "normal" (htmlentities), "raw" (no parsing) or "image" (image URLs, only for Radio fields).  Default is "lang".
+	 		'gridspan'			=> 3,		// If 'parse' is set to 'image', this controls the gridspan to use when creating the option layout
 	 		'unlimited'			=> -1,			// If any value other than NULL is provided, an "Unlimited" checkbox will be displayed. If checked, the value specified will be sent.
 	 		'unlimitedLang'		=> 'unlimited',	// Language string to use for unlimited checkbox label
 	 		'unlimitedToggles'	=> array(...),	// Names of other input fields that should show/hide when the "Unlimited" checkbox is toggled.
@@ -54,13 +45,14 @@ class Select extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'options'			=> array(),
 		'toggles'			=> array(),
 		'multiple'			=> FALSE,
 		'class'				=> '',
 		'disabled'			=> FALSE,
 		'parse'				=> 'lang',
+		'gridspan'			=> 3,
 		'unlimited'			=> NULL,
 		'unlimitedLang'		=> 'all',
 		'unlimitedToggles'	=> array(),
@@ -71,31 +63,32 @@ class Select extends FormAbstract
 		'sort'				=> FALSE,
 		'impliedUnlimited'	=> FALSE,
 	);
-
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		/* Set the default value to the first option if one isn't provided */
-		if ( $defaultValue === NULL and ( !isset( $options['noDefault'] ) OR !$options['noDefault'] ) and is_array( $options['options'] ) )
+		if ( $defaultValue === NULL and ( !isset( $options['noDefault'] ) OR !$options['noDefault'] ) and \is_array( $options['options'] ) )
 		{
 			foreach ( $options['options'] as $k => $v )
 			{
-				if ( is_array( $v ) )
+				if ( \is_array( $v ) )
 				{
 					foreach ( $v as $_k => $_v )
 					{
-						if ( !isset( $options['disabled'] ) OR ( is_array( $options['disabled'] ) AND !in_array( $_k, $options['disabled'] ) ) )
+						if ( !isset( $options['disabled'] ) OR ( \is_array( $options['disabled'] ) AND !\in_array( $_k, $options['disabled'] ) ) )
 						{
 							$defaultValue = $_k;
 							break;
@@ -104,7 +97,7 @@ class Select extends FormAbstract
 				}
 				else
 				{
-					if ( !isset( $options['disabled'] ) OR ( is_array( $options['disabled'] ) AND !in_array( $k, $options['disabled'] ) ) )
+					if ( !isset( $options['disabled'] ) OR ( \is_array( $options['disabled'] ) AND !\in_array( $k, $options['disabled'] ) ) )
 					{
 						$defaultValue = $k;
 						break;
@@ -127,7 +120,7 @@ class Select extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		/* Add [] to the name if this is a multi-select */
 		$name = $this->name;
@@ -140,7 +133,7 @@ class Select extends FormAbstract
 		if ( $this->options['returnLabels'] and ( $this->options['unlimited'] === NULL or $this->value !== $this->options['unlimited'] ) )
 		{
 			$value = array();
-			if ( is_array( $this->value ) )
+			if ( \is_array( $this->value ) )
 			{
 				foreach ( $this->value as $v )
 				{
@@ -157,7 +150,7 @@ class Select extends FormAbstract
 			$value = $this->value;
 		}
 		
-		return Theme::i()->getTemplate( 'forms', 'core' )->select( $name, $value, $this->required, $this->parseOptions(), $this->options['multiple'], $this->options['class'], $this->options['disabled'], $this->options['toggles'], $this->htmlId, $this->options['unlimited'], $this->options['unlimitedLang'], $this->options['unlimitedToggles'], $this->options['unlimitedToggleOn'], $this->options['userSuppliedInput'], $this->options['sort'], $this->options['parse'] );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core' )->select( $name, $value, $this->required, $this->parseOptions(), $this->options['multiple'], $this->options['class'], $this->options['disabled'], $this->options['toggles'], $this->htmlId, $this->options['unlimited'], $this->options['unlimitedLang'], $this->options['unlimitedToggles'], $this->options['unlimitedToggleOn'], $this->options['userSuppliedInput'], $this->options['sort'], $this->options['parse'] );
 	}
 	
 	/**
@@ -165,7 +158,7 @@ class Select extends FormAbstract
 	 *
 	 * @return	array
 	 */
-	protected function parseOptions(): array
+	protected function parseOptions()
 	{
 		$options = $this->options['options'];
 		switch ( $this->options['parse'] )
@@ -173,16 +166,16 @@ class Select extends FormAbstract
 			case 'lang':
 				foreach ( $this->options['options'] as $k => $v )
 				{
-					if ( is_array( $v ) )
+					if ( \is_array( $v ) )
 					{
 						foreach ( $v as $x => $y )
 						{
-							$options[ $k ][ $x ] = Member::loggedIn()->language()->addToStack( $y );
+							$options[ $k ][ $x ] = \IPS\Member::loggedIn()->language()->addToStack( $y );
 						}
 					}
 					else
 					{
-						$options[ $k ] = Member::loggedIn()->language()->addToStack( $v );
+						$options[ $k ] = \IPS\Member::loggedIn()->language()->addToStack( $v );
 					}
 				}
 				break;
@@ -190,7 +183,7 @@ class Select extends FormAbstract
 			case 'normal':
 				foreach ( $this->options['options'] as $k => $v )
 				{
-					if ( is_array( $v ) )
+					if ( \is_array( $v ) )
 					{
 						foreach ( $v as $x => $y )
 						{
@@ -213,11 +206,11 @@ class Select extends FormAbstract
 	 *
 	 * @return	array
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		/* Unlimited? */
 		$unlimitedName = "{$this->name}_unlimited";
-		if ( $this->options['unlimited'] !== NULL and isset( Request::i()->$unlimitedName ) )
+		if ( $this->options['unlimited'] !== NULL and isset( \IPS\Request::i()->$unlimitedName ) )
 		{
 			return $this->options['unlimited'];
 		}
@@ -227,35 +220,21 @@ class Select extends FormAbstract
 
 		if( isset( $this->options['userSuppliedInput'] ) )
 		{
-			$name	= $this->options['userSuppliedInput'] . '_' . $this->name;
-			$userInputValue = mb_strpos( $name, '[' ) ? Request::i()->valueFromArray( $name ) : Request::i()->$name;
-			if( is_array( $userInputValue ) )
+			if( $value == $this->options['userSuppliedInput'] )
 			{
-				$userInputValue = $userInputValue[0];
-			}
-
-			if( is_array( $value ) )
-			{
-				if( in_array( $this->options['userSuppliedInput'], $value ) )
-				{
-					unset( $value[ array_search( $this->options['userSuppliedInput'], $value ) ] );
-					$value[] = $userInputValue;
-				}
-			}
-			elseif( $value == $this->options['userSuppliedInput'] )
-			{
-				$value = $userInputValue;
+				$name	= $this->options['userSuppliedInput'] . '_' . $this->name;
+				$value	= mb_strpos( $name, '[' ) ? \IPS\Request::i()->valueFromArray( $name ) : \IPS\Request::i()->$name;
 			}
 		}
 
-		if ( isset( $value ) AND is_array( $value ) AND $this->options['multiple'] AND in_array( '__EMPTY', $value ) )
+		if ( isset( $value ) AND \is_array( $value ) AND $this->options['multiple'] AND array_search( '__EMPTY', $value ) !== FALSE )
 		{
 			unset( $value[ array_search( '__EMPTY', $value ) ] );
 		}
 
 		if ( $this->options['returnLabels'] )
 		{
-			if ( is_array( $value ) )
+			if ( \is_array( $value ) )
 			{
 				$return = array();
 				foreach ( $value as $k => $v )
@@ -276,10 +255,10 @@ class Select extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		if( $this->options['userSuppliedInput'] )
 		{
@@ -301,7 +280,7 @@ class Select extends FormAbstract
 		}
 		foreach ( $this->options['options'] as $k => $v )
 		{		
-			if ( is_array( $v ) )
+			if ( \is_array( $v ) )
 			{
 				$acceptableValues = array_merge( $acceptableValues, $this->options['returnLabels']  ? $v : array_keys( $v ) );
 			}
@@ -311,10 +290,10 @@ class Select extends FormAbstract
 			}
 		}
 
-		$disabledValues = ( is_array( $this->options['disabled'] ) ) ? $this->options['disabled'] : ( $this->options['disabled'] ? array( $this->options['disabled'] ) : array() );
+		$disabledValues = ( \is_array( $this->options['disabled'] ) ) ? $this->options['disabled'] : ( $this->options['disabled'] ? array( $this->options['disabled'] ) : array() );
 		$acceptableValues = array_diff( $acceptableValues, $disabledValues );
 
-		$diff = array_diff( ( is_array( $this->value ) ? $this->value : array( $this->value ) ), $acceptableValues );
+		$diff = array_diff( ( \is_array( $this->value ) ? $this->value : array( $this->value ) ), $acceptableValues );
 		if ( !empty( $diff ) )
 		{
 			/* Is the entire thing disabled? If so, just return any default value set (if one has been set)*/
@@ -323,12 +302,12 @@ class Select extends FormAbstract
 				return $this->defaultValue;
 			}
 			
-			throw new OutOfRangeException( 'form_bad_value' );
+			throw new \OutOfRangeException( 'form_bad_value' );
 		}
 		
 		if ( $this->options['multiple'] and $this->required and empty( $this->value ) )
 		{
-			throw new DomainException( 'form_required' );
+			throw new \DomainException( 'form_required' );
 		}
 		
 		return TRUE;

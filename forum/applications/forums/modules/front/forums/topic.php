@@ -12,88 +12,44 @@
 namespace IPS\forums\modules\front\forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DateInterval;
-use DateTimeInterface;
-use Exception;
-use IPS\Application;
-use IPS\Content\Comment;
-use IPS\Content\Controller;
-use IPS\Content\Item;
-use IPS\Content\Reaction;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\forums\Forum;
-use IPS\forums\SavedAction;
-use IPS\forums\Topic as TopicClass;
-use IPS\forums\Topic\Post;
-use IPS\Helpers\Form;
-use IPS\IPS;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use Throwable;
-use function array_merge;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_numeric;
-use const IPS\LARGE_TOPIC_REPLIES;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Topic View
  */
-class topic extends Controller
+class _topic extends \IPS\Content\Controller
 {
 	/**
 	 * [Content\Controller]	Class
 	 */
-	protected static string $contentModel = 'IPS\forums\Topic';
+	protected static $contentModel = 'IPS\forums\Topic';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_topic.js', 'forums' ), Output::i()->js('front_helpful.js', 'core' ) );
-
-        if ( Application::appIsEnabled('cloud') )
-        {
-            Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_realtime.js', 'cloud', 'front' ) );
-        }
-        
+		\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_topic.js', 'forums' ) );
 		parent::execute();
 	}
 
 	/**
 	 * View Topic
 	 *
-	 * @return    mixed
-	 * @throws Exception
+	 * @return    \IPS\Content\Item
+	 * @throws \Exception
 	 */
-	protected function manage() : mixed
+	protected function manage()
 	{
 		/* Load topic */
 		$topic = parent::manage();
-		Member::loggedIn()->language()->words['submit_comment'] = Member::loggedIn()->language()->addToStack( 'submit_reply', FALSE );
+		\IPS\Member::loggedIn()->language()->words['submit_comment'] = \IPS\Member::loggedIn()->language()->addToStack( 'submit_reply', FALSE );
 
 		/* If it failed, it might be because we want a password */
 		if ( $topic === NULL )
@@ -101,30 +57,30 @@ class topic extends Controller
 			$forum = NULL;
 			try
 			{
-				$topic = TopicClass::load( Request::i()->id );
+				$topic = \IPS\forums\Topic::load( \IPS\Request::i()->id );
 				$forum = $topic->container();
 				if ( $forum->can('view') and !$forum->loggedInMemberHasPasswordAccess() )
 				{
-					Output::i()->redirect( $forum->url()->setQueryString( 'topic', Request::i()->id ) );
+					\IPS\Output::i()->redirect( $forum->url()->setQueryString( 'topic', \IPS\Request::i()->id ) );
 				}
 				
 				if ( !$topic->canView() )
 				{
-					if ( IPS::classUsesTrait( $topic, 'IPS\Content\Hideable' ) and $topic->hidden() )
+					if ( $topic instanceof \IPS\Content\Hideable and $topic->hidden() )
 					{
 						/* If the item is hidden we don't want to show the custom no permission error as the conditions may not apply */
-						Output::i()->error( 'node_error', '2F173/O', 404, '' );
+						\IPS\Output::i()->error( 'node_error', '2F173/O', 404, '' );
 					}
 					else
 					{
-						Output::i()->error(  $forum ? $forum->errorMessage() : 'node_error_no_perm', '2F173/H', 403, '' );
+						\IPS\Output::i()->error(  $forum ? $forum->errorMessage() : 'node_error_no_perm', '2F173/H', 403, '' );
 					}
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				/* Nope, just a generic no access error */
-				Output::i()->error( 'node_error', '2F173/1', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2F173/1', 404, '' );
 			}
 		}
 		
@@ -132,35 +88,35 @@ class topic extends Controller
 		
 		/* If there's only one forum and we're not in a club, and we're not in a sub-forum, we actually don't want the nav */
 		$theOnlyForum = NULL;
-		if ( count( Output::i()->breadcrumb ) AND !$topic->container()->club() AND ( ( $theOnlyForum = Forum::theOnlyForum() AND $theOnlyForum->_id == $topic->container()->_id ) or Forum::isSimpleView() ) )
+		if ( !$topic->container()->club() AND ( ( $theOnlyForum = \IPS\forums\Forum::theOnlyForum() AND $theOnlyForum->_id == $topic->container()->_id ) or \IPS\forums\Forum::isSimpleView() ) )
 		{
-			$topicBreadcrumb = array_pop( Output::i()->breadcrumb );
-			Output::i()->breadcrumb = isset( Output::i()->breadcrumb['module'] ) ? array( 'module' => Output::i()->breadcrumb['module'] ) : array();
-			Output::i()->breadcrumb[] = $topicBreadcrumb;
+			$topicBreadcrumb = array_pop( \IPS\Output::i()->breadcrumb );
+			\IPS\Output::i()->breadcrumb = isset( \IPS\Output::i()->breadcrumb['module'] ) ? array( 'module' => \IPS\Output::i()->breadcrumb['module'] ) : array();
+			\IPS\Output::i()->breadcrumb[] = $topicBreadcrumb;
 		}
 		
 		/* We need to shift the breadcrumb if we are in a sub-forum and we have $theOnlyForum */
 		if ( $theOnlyForum AND $theOnlyForum->_id != $topic->container()->_id )
 		{
-			array_shift( Output::i()->breadcrumb );
-			array_shift( Output::i()->breadcrumb );
-		}
-
-		/* Legacy findpost redirect */
-		if ( Request::i()->findpost )
-		{
-			Output::i()->redirect( $topic->url()->setQueryString( array( 'do' => 'findComment', 'comment' => Request::i()->findpost ) ), NULL, 301 );
-		}
-		elseif ( Request::i()->p )
-		{
-			Output::i()->redirect( $topic->url()->setQueryString( array( 'do' => 'findComment', 'comment' => Request::i()->p ) ), NULL, 301 );
-		}
-		elseif ( Request::i()->pid )
-		{
-			Output::i()->redirect( $topic->url()->setQueryString( array( 'do' => 'findComment', 'comment' => Request::i()->pid ) ), NULL, 301 );
+			array_shift( \IPS\Output::i()->breadcrumb );
+			array_shift( \IPS\Output::i()->breadcrumb );
 		}
 		
-		if ( Request::i()->view )
+		/* Legacy findpost redirect */
+		if ( \IPS\Request::i()->findpost )
+		{
+			\IPS\Output::i()->redirect( $topic->url()->setQueryString( array( 'do' => 'findComment', 'comment' => \IPS\Request::i()->findpost ) ), NULL, 301 );
+		}
+		elseif ( \IPS\Request::i()->p )
+		{
+			\IPS\Output::i()->redirect( $topic->url()->setQueryString( array( 'do' => 'findComment', 'comment' => \IPS\Request::i()->p ) ), NULL, 301 );
+		}
+		elseif ( \IPS\Request::i()->pid )
+		{
+			\IPS\Output::i()->redirect( $topic->url()->setQueryString( array( 'do' => 'findComment', 'comment' => \IPS\Request::i()->pid ) ), NULL, 301 );
+		}
+		
+		if ( \IPS\Request::i()->view )
 		{
 			$this->_doViewCheck();
 		}
@@ -180,13 +136,13 @@ class topic extends Controller
 		/* If this is an AJAX request fetch the comment form now. The HTML will be cached so calling here and then again in the template has no overhead
 			and this is necessary if you entered into a topic with &queued_posts=1, approve the posts, then try to reply. Otherwise, clicking into the
 			editor produces an error when the getUploader=1 call occurs, and submitting a reply results in an error. */
-		if ( Request::i()->isAjax() and ( !isset( Request::i()->preview ) OR !Request::i()->preview ) )
+		if ( \IPS\Request::i()->isAjax() and ( !isset( \IPS\Request::i()->preview ) OR !\IPS\Request::i()->preview ) )
 		{
 			$topic->commentForm();
 		}
 	
 		/* AJAX hover preview? */
-		if ( Request::i()->isAjax() and Request::i()->preview )
+		if ( \IPS\Request::i()->isAjax() and \IPS\Request::i()->preview )
 		{
 			$postClass = '\IPS\forums\Topic\Post';
 
@@ -197,47 +153,49 @@ class topic extends Controller
 			
 			/* If this topic was moved or merged, load that up in case someone loads the preview after that happens but before they reload the page */
 			$previewTopic = $topic;
-			if ( in_array( $topic->state, array( 'merged', 'link' ) ) )
+			if ( \in_array( $topic->state, array( 'merged', 'link' ) ) )
 			{
 				$movedTo = explode( '&', $topic->moved_to );
 				
 				try
 				{
-					$previewTopic = TopicClass::loadAndCheckPerms( $movedTo[0] );
+					$previewTopic = \IPS\forums\Topic::loadAndCheckPerms( $movedTo[0] );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* I can't help you */
-					Output::i()->error( 'node_error', '2F173/Q', 404, '' );
+					\IPS\Output::i()->error( 'node_error', '2F173/Q', 404, '' );
+					return;
 				}
 			}
 
 			$firstPost = $postClass::load( $previewTopic->topic_firstpost );
 			
-			$topicOverview = array( 'firstPost' => array( 'first_post', $firstPost ) );
+			$topicOverview = array( 'firstPost' => array( $previewTopic->isQuestion() ? 'question_mainTab' : 'first_post', $firstPost ) );
 
 			if ( $previewTopic->posts > 1 )
 			{
 				$latestPost = $previewTopic->comments( 1, 0, 'date', 'DESC' );
-				$topicOverview['latestPost'] = array('latest_post', $latestPost );
+				$topicOverview['latestPost'] = array( $previewTopic->isQuestion() ? 'latest_answer' : 'latest_post', $latestPost );
 			
 				$timeLastRead = $previewTopic->timeLastRead();
-				if ( $timeLastRead instanceof DateTime AND $previewTopic->unread() !== 0 )
+				if ( $timeLastRead instanceof \IPS\DateTime AND $previewTopic->unread() !== 0 )
 				{
 					$firstUnread = $previewTopic->comments( 1, NULL, 'date', 'asc', NULL, NULL, $timeLastRead );
-					if( $firstUnread instanceof Post AND $firstUnread->date !== $latestPost->date AND $firstUnread->date !== $firstPost->date )
+					if( $firstUnread instanceof \IPS\forums\Topic\Post AND $firstUnread->date !== $latestPost->date AND $firstUnread->date !== $firstPost->date )
 					{
 						$topicOverview['firstUnread'] = array( 'first_unread_post_hover', $previewTopic->comments( 1, NULL, 'date', 'asc', NULL, NULL, $timeLastRead ) );
 					}
 				}			
 			}
 
-			if ( $previewTopic->topic_answered_pid )
+			if ( $previewTopic->isQuestion() and $previewTopic->topic_answered_pid )
 			{
-				$topicOverview['bestAnswer'] = array( 'best_answer_post', Post::load( $previewTopic->topic_answered_pid ) );
+				$topicOverview['bestAnswer'] = array( 'best_answer_post', \IPS\forums\Topic\Post::load( $previewTopic->topic_answered_pid ) );
 			}
 
-			Output::i()->sendOutput( Theme::i()->getTemplate( 'forums' )->topicHover( $previewTopic, $topicOverview ) );
+			\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'forums' )->topicHover( $previewTopic, $topicOverview ) );
+			return;
 		}
 		
 		$topic->container()->setTheme();
@@ -249,92 +207,91 @@ class topic extends Controller
 		}
 				
 		/* How are we sorting posts? */
+		$question = NULL;
 		$offset = NULL;
 		$order = 'date';
 		$orderDirection = 'asc';
 		$where = NULL;
-		$firstPost = null;
-		$paginationKeys = array( 'sortby' );
-
-		if ( $topic->hasSummary() AND Request::i()->topicSummary )
+		if( \IPS\forums\Topic::modPermission( 'unhide', NULL, $topic->container() ) AND \IPS\Request::i()->queued_posts )
 		{
-			$pagesCount = 1;
-		}
-		else if( Request::i()->show == 'helpful' )
-		{
-			$where = [ '( topic_id=? AND ( new_topic=? OR pid IN(?) ) )', $topic->tid , 1, Db::i()->select( 'comment_id', 'core_solved_index', [ 'app=? and item_id=? and type=?', 'forums', $topic->tid, 'helpful' ] ) ];
-
-			$pagesCount = ceil( Db::i()->select( 'COUNT(*)', 'forums_posts', $where )->first() / $topic->getCommentsPerPage() );
-			$paginationKeys = array( 'queued_posts', 'sortby' );
-		}
-		else
-		{
-			$customPaginationWhere = array();
-			if( TopicClass::modPermission( 'unhide', NULL, $topic->container() ) AND Request::i()->queued_posts )
+			if ( $topic->isArchived() )
 			{
-				if ( $topic->isArchived() )
-				{
-					$where = 'archive_queued=1';
-				}
-				else
-				{
-					$where = 'queued=1';
-				}
-				array_unshift( $paginationKeys, 'queued_posts' );
-
-				$customPaginationWhere[] = array( 'topic_id=? AND queued=1', $topic->tid );
-			}
-			$customPaginationWhere = Bridge::i()->modifyTopicCommentFilter( $topic, $customPaginationWhere );
-			if ( !empty( $customPaginationWhere ) )
-			{
-				$customPaginationWhere[] = array( "topic_id=?", $topic->tid );
-				$authorCol = Post::$databasePrefix . Post::$databaseColumnMap['author'];
-				if ( $topic->canViewHiddenComments() )
-				{
-					$col = $topic::$databasePrefix . Post::$databaseColumnMap['hidden'];
-					$customPaginationWhere[] = array( "( {$col}=0 OR ( {$col}=1 AND ( {$authorCol}=" . Member::loggedIn()->member_id . " ) ) )" );
-				}
-				else
-				{
-					$col = Post::$databasePrefix . Post::$databaseColumnMap['hidden'];
-					$customPaginationWhere[] = array( "{$col}=0" );
-				}
-				$pagesCount = ceil( Db::i()->select( 'COUNT(*)', 'forums_posts', $customPaginationWhere )->first() / $topic->getCommentsPerPage() );
+				$where = 'archive_queued=1';
 			}
 			else
 			{
-				$pagesCount = $topic->commentPageCount();
+				$where = 'queued=1';
 			}
-		}
-
-		if ( Member::loggedIn()->getLayoutValue( 'forum_topic_view_firstpost' ) )
-		{
-			$firstPost = $topic->comments( 1, 0 );
-			$page = ( isset( Request::i()->page ) ) ? intval( Request::i()->page ) : 1;
-
-			if( $page < 1 )
+			
+			$queuedPagesCount = ceil( \IPS\Db::i()->select( 'COUNT(*)', 'forums_posts', array( 'topic_id=? AND queued=1', $topic->id ) )->first() / $topic->getCommentsPerPage() );
+			$pagination = ( $queuedPagesCount > 1 ) ? $topic->commentPagination( array( 'queued_posts', 'sortby' ), 'pagination', $queuedPagesCount ) : NULL;
+			
+			if ( $topic->isQuestion() )
 			{
-				$page = 1;
+				$question = $topic->comments( 1, 0 );
 			}
-
-			$offset	= ( ( $page - 1 ) * $topic::getCommentsPerPage() ) + 1;
-
-			$pagination = ( $topic->commentPageCount() > 1 ) ? $topic->commentPagination( array( 'sortby' ), 'pagination', $pagesCount ) : NULL;
 		}
 		else
 		{
-			$pagination = ( $pagesCount > 1 ) ? $topic->commentPagination( $paginationKeys, 'pagination', $pagesCount ) : NULL;
+			if ( $topic->isQuestion() )
+			{
+				$question	= $topic->comments( 1, 0 );
+				try
+				{
+					$question->warning = \IPS\core\Warnings\Warning::constructFromData( \IPS\Db::i()->select( '*', 'core_members_warn_logs', array( array( 'wl_content_app=? AND wl_content_module=? AND wl_content_id1=? AND wl_content_id2=?', 'forums', 'forums-comment', $question->topic_id, $question->pid ) ) )->first() );
+				}
+				catch ( \UnderflowException $e ) { }
+						
+				$page		= ( isset( \IPS\Request::i()->page ) ) ? \intval( \IPS\Request::i()->page ) : 1;
+
+				if( $page < 1 )
+				{
+					$page	= 1;
+				}
+
+				$offset		= ( ( $page - 1 ) * $topic::getCommentsPerPage() ) + 1;
+				
+				if ( ( !isset( \IPS\Request::i()->sortby ) or \IPS\Request::i()->sortby != 'date' ) )
+				{
+					if ( $topic->isArchived() )
+					{
+						$order = "archive_is_first desc, archive_bwoptions";
+						$orderDirection = 'desc';
+					}
+					else
+					{
+						$order = "new_topic DESC, post_bwoptions DESC, post_field_int DESC, post_date";
+						$orderDirection = 'ASC';
+					}
+				}
+			}
+			$pagination = ( $topic->commentPageCount() > 1 ) ? $topic->commentPagination( array( 'sortby' ) ) : NULL;
 		}
 
-		$where = Bridge::i()->modifyTopicCommentFilter( $topic, $where );
+		if ( isset( \IPS\Request::i()->ltqid ) and $liveTopic = $topic->getLiveTopic() )
+		{
+			try
+			{
+				$question = \IPS\cloud\LiveTopic\Question::load( \IPS\Request::i()->ltqid );
 
-		$comments = $topic->comments( NULL, $offset, $order, $orderDirection, NULL, NULL, NULL, $where, FALSE, ( isset( Request::i()->showDeleted ) ) );
+				if ( is_string( $where ) )
+				{
+					$_where[] = $where;
+					$where = $_where;
+				}
+
+				$where[] = array( 'pid=? OR pid IN(?)', $question->post_id, \IPS\Db::i()->select( 'post_id', 'cloud_livetopics_answer', [ 'question_id=?', $question->id ] ) );
+			}
+			catch( \OutOfRangeException ) { }
+		}
+
+		$comments = $topic->comments( NULL, $offset, $order, $orderDirection, NULL, NULL, NULL, $where, FALSE, ( isset( \IPS\Request::i()->showDeleted ) ) );
 		$current  = current( $comments );
 		reset( $comments );
 
-		if( !count( $comments ) and !Request::i()->show == 'helpful' and ! Member::loggedIn()->getLayoutValue( 'forum_topic_view_firstpost' ) )
+		if( ( !\count( $comments ) AND !$topic->isQuestion() ) OR ( $topic->isQuestion() AND empty( $question ) ) )
 		{
-			Output::i()->error( 'no_posts_returned', '2F173/L', 404, '' );
+			\IPS\Output::i()->error( 'no_posts_returned', '2F173/L', 404, '' );
 		}
 
 		/* Mark read */
@@ -365,44 +322,33 @@ class topic extends Controller
 			reset( $comments );
 		}
 
-		/* Preload the follow state of the viewing member and any community experts in this forum, this avoids multiple queries */
-		$viewerIsFollowingTheseExperts = [];
-		if ( Member::loggedIn()->member_id and $experts = $topic->container()->getExperts() )
-		{
-			$authorsInCommentsThatAreExperts = [];
-			foreach ( $comments as $comment )
-			{
-				if ( in_array( $comment->mapped('author'), $experts ) )
-				{
-					$authorsInCommentsThatAreExperts[] = $comment->mapped('author');
-				}
-			}
-
-			if ( count( $authorsInCommentsThatAreExperts ) )
-			{
-				/* Get the follow state of viewer to experts */
-				foreach( Member::loggedIn()->isFollowing( $authorsInCommentsThatAreExperts ) as $expertId => $following )
-				{
-					if( $following )
-					{
-						$viewerIsFollowingTheseExperts[] = $expertId;
-					}
-				}
-			}
-		}
-
 		/* A convenient hook point to do any further set up */
 		$this->finishManage( $topic );
 
+		$votes		= array();
+		$topicVotes = array();
+
+		/* Get post ratings for this user */
+		if ( $topic->isQuestion() && \IPS\Member::loggedIn()->member_id )
+		{
+			$votes		= $topic->answerVotes( \IPS\Member::loggedIn() );
+			$topicVotes	= $topic->votes();
+		}
+		
+		if ( $topic->isQuestion() )
+		{
+			\IPS\Member::loggedIn()->language()->words[ 'topic__comment_placeholder' ] = \IPS\Member::loggedIn()->language()->addToStack( 'question__comment_placeholder', FALSE );
+		}
+
 		/* Online User Location */
-		Session::i()->setLocation( $topic->url(), ( $topic->container()->password or !$topic->container()->can_view_others ) ? 0 : $topic->onlineListPermissions(), 'loc_forums_viewing_topic', array( $topic->title => FALSE ) );
+		\IPS\Session::i()->setLocation( $topic->url(), ( $topic->container()->password or !$topic->container()->can_view_others or $topic->container()->min_posts_view ) ? 0 : $topic->onlineListPermissions(), 'loc_forums_viewing_topic', array( $topic->title => FALSE ) );
 
 		/* Next unread */
 		try
 		{
 			$nextUnread	= $topic->containerHasUnread();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			$nextUnread	= NULL;
 		}
@@ -410,40 +356,49 @@ class topic extends Controller
 		/* Sidebar? */
 		if ( !$topic->isArchived() AND $topic->showSummaryOnDesktop() == 'sidebar' )
 		{
-			Output::i()->sidebar['contextual'] = Theme::i()->getTemplate( 'topics' )->activity( $topic, 'sidebar' );
+			\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate( 'topics' )->activity( $topic, 'sidebar' );
+		}
+
+		if ( $liveTopic = $topic->getLiveTopic() )
+		{
+			if ( ! isset( \IPS\Output::i()->sidebar['contextual'] ) )
+			{
+				\IPS\Output::i()->sidebar['contextual'] = '';
+			}
+
+			\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'livetopics', 'cloud' )->liveTopicSidebar( $liveTopic );
 		}
 
 		/* Add Json-LD */
-		$isQuestion = ( $topic->isSolved() );
+		$isQuestion = ( $topic->isQuestion() or $topic->isSolved() );
 
 		/* The purpose of QAPage is to provide data on the question and suggested answer (if avaiable), or all comments if there is no answer.
 		   However, a very large topic that has not been solved, is likely to confuse Google ("The QAPage type indicates that the page is focused on a specific question and its answer(s)"),
 		   so if the topic is very long, we will only show this metadata if the topic has been solved. */
-		/** @noinspection PhpUndefinedConstantInspection */
-		if ( $isQuestion and ( $topic->posts < LARGE_TOPIC_REPLIES or $topic->isSolved() ) )
+		if ( $isQuestion and ( $topic->posts < \IPS\LARGE_TOPIC_REPLIES or $topic->isSolved() ) )
 		{
-			Output::i()->jsonLd['topic'] = array(
-				'@context'		=> "https://schema.org",
+			\IPS\Output::i()->jsonLd['topic'] = array(
+				'@context'		=> "http://schema.org",
 				'@type'			=> 'QAPage',
 				'@id'			=> (string) $topic->url(),
 				'url'			=> (string) $topic->url(),
 				'mainEntity' => [
 					'@type'	=> "Question",
+					'answerCount'   => $topic->posts ? $topic->posts - 1 : 0,
 					'name'	=> $topic->title,
-					'text'  => $firstPost ? $firstPost->truncated( TRUE, NULL ) : $topic->comments( 1, 0 )->truncated( TRUE, NULL ),
-					'dateCreated' => DateTime::ts( $topic->start_date )->format( DateTimeInterface::ATOM ),
-					'answerCount' => ( ( $topic->posts > 1 ) ? ( $topic->posts - 1 ) : 0 ),
+					'text'  => $topic->comments( 1, 0 )->truncated( TRUE, NULL ),
+					'dateCreated' => \IPS\DateTime::ts( $topic->start_date )->format( \IPS\DateTime::ISO8601 ),
 					'author' => [
-						'@type' => 'Person',
-						'name' => $topic->author()->name,
-						'image'	=> $topic->author()->get_photo( TRUE, TRUE )
+						'@type'     => 'Person',
+						'name'      => $topic->author()->name,
+						'image'     => $topic->author()->get_photo( TRUE, TRUE )
 					]
 				]
 			);
 
 			if( $topic->author()->member_id )
 			{
-				Output::i()->jsonLd['topic']['mainEntity']['author']['url'] = (string) $topic->author()->url();
+				\IPS\Output::i()->jsonLd['topic']['mainEntity']['author']['url'] = (string) $topic->author()->url();
 			}
 
 			if( $topic->topic_answered_pid )
@@ -460,31 +415,36 @@ class topic extends Controller
 					$answer = $postClass::load( $topic->topic_answered_pid );
 					
 					/* Set up our column names */
-					/* @var $databaseColumnMap array */
 					$authorIdColumn = $answer::$databaseColumnMap['author'];
 					$dateColumn = $answer::$databaseColumnMap['date'];
 					
 					if ( $truncatedAnswer = $answer->truncated( TRUE, NULL ) )
 					{
-						Output::i()->jsonLd['topic']['mainEntity']['acceptedAnswer'] = array(
+						\IPS\Output::i()->jsonLd['topic']['mainEntity']['acceptedAnswer'] = array(
 							'@type'		=> 'Answer',
 							'text'		=> $truncatedAnswer,
 							'url'		=> (string) $answer->url(),
-							'dateCreated' => DateTime::ts( $answer->$dateColumn )->format( DateTimeInterface::ATOM ),
+							'dateCreated' => \IPS\DateTime::ts( $answer->$dateColumn )->format( \IPS\DateTime::ISO8601 ),
+							'upvoteCount' => ( $topic->isArchived() ) ? $answer->field_int : $answer->post_field_int,
 							'author'	=> array(
 								'@type'		=> 'Person',
-								'name'		=> Member::load( $answer->$authorIdColumn )->name,
-								'image'		=> Member::load( $answer->$authorIdColumn )->get_photo( TRUE, TRUE )
+								'name'		=> \IPS\Member::load( $answer->$authorIdColumn )->name,
+								'image'		=> \IPS\Member::load( $answer->$authorIdColumn )->get_photo( TRUE, TRUE )
 							),
 						);
+						
+						if( $topic->isQuestion() )
+						{
+							\IPS\Output::i()->jsonLd['topic']['mainEntity']['acceptedAnswer']['upvoteCount'] = ( $topic->isArchived() ) ? $answer->field_int : $answer->post_field_int;
+						}
 	
 						if( $answer->author_id )
 						{
-							Output::i()->jsonLd['topic']['mainEntity']['acceptedAnswer']['author']['url']	= (string) Member::load( $answer->$authorIdColumn )->url();
+							\IPS\Output::i()->jsonLd['topic']['mainEntity']['acceptedAnswer']['author']['url']	= (string) \IPS\Member::load( $answer->$authorIdColumn )->url();
 						}
 					}
 				}
-				catch( OutOfRangeException $e ){}
+				catch( \OutOfRangeException $e ){}
 			}
 			else if ( $topic->posts > 1 )
 			{
@@ -494,36 +454,36 @@ class topic extends Controller
 					$lastComment = $topic->comments( 1, 0, 'date', 'desc' );
 
 					/* Set up our column names */
-					/* @var $databaseColumnMap array */
 					$authorIdColumn = $lastComment::$databaseColumnMap['author'];
 					$dateColumn = $lastComment::$databaseColumnMap['date'];
 
-					Output::i()->jsonLd['topic']['mainEntity']['suggestedAnswer'] = array(
+					\IPS\Output::i()->jsonLd['topic']['mainEntity']['suggestedAnswer'] = array(
 						'@type'		=> 'Answer',
 						'text'		=> $lastComment->truncated( TRUE, NULL ),
 						'url'		=> (string) $lastComment->url(),
-						'dateCreated' => DateTime::ts( $lastComment->$dateColumn )->format( DateTime::ISO8601 ),
+						'dateCreated' => \IPS\DateTime::ts( $lastComment->$dateColumn )->format( \IPS\DateTime::ISO8601 ),
+						'upvoteCount' => ( $topic->isArchived() ) ? $lastComment->field_int : $lastComment->post_field_int,
 						'author'	=> array(
 						'@type'		=> 'Person',
-						'name'		=> Member::load( $lastComment->$authorIdColumn )->name,
-						'image'		=> Member::load( $lastComment->$authorIdColumn )->get_photo( TRUE, TRUE )
+						'name'		=> \IPS\Member::load( $lastComment->$authorIdColumn )->name,
+						'image'		=> \IPS\Member::load( $lastComment->$authorIdColumn )->get_photo( TRUE, TRUE )
 						),
 					);
 				}
-				catch( OutOfRangeException $e ){}
+				catch( \OutOfRangeException $e ){}
 			}
 		}
 		else
 		{
-			Output::i()->jsonLd['topic'] = array(
-				'@context'		=> "https://schema.org",
+			\IPS\Output::i()->jsonLd['topic'] = array(
+				'@context'		=> "http://schema.org",
 				'@type'			=> 'DiscussionForumPosting',
 				'@id'			=> (string) $topic->url(),
 				'isPartOf'		=> array(
-					'@id' => Settings::i()->base_url . '#website'
+					'@id' => \IPS\Settings::i()->base_url . '#website'
 				),
 				'publisher'		=> array(
-					'@id' => Settings::i()->base_url . '#organization'
+					'@id' => \IPS\Settings::i()->base_url . '#organization'
 				),
 				'url'			=> (string) $topic->url(),
 				'discussionUrl'	=> (string) $topic->url(),
@@ -541,11 +501,11 @@ class topic extends Controller
 		{
 			if ( $isQuestion )
 			{
-				Output::i()->jsonLd['topic']['mainEntity']['suggestedAnswer'] = [];
+				\IPS\Output::i()->jsonLd['topic']['mainEntity']['suggestedAnswer'] = [];
 			}
 			else
 			{
-				Output::i()->jsonLd['topic']['comment'] = [];
+				\IPS\Output::i()->jsonLd['topic']['comment'] = [];
 			}
 
 			$i = 0;
@@ -554,7 +514,6 @@ class topic extends Controller
 			{
 				/* Set up our column names */
 				$idColumn = $comment::$databaseColumnId;
-				/* @var array $databaseColumnMap */
 				$authorIdColumn = $comment::$databaseColumnMap['author'];
 				$dateColumn = $comment::$databaseColumnMap['date'];
 				
@@ -572,11 +531,7 @@ class topic extends Controller
 
 				if ( $truncatedComment = $comment->truncated( TRUE, NULL ) )
 				{
-					$url = $topic->url();
-					if( isset( Request::i()->page ) and is_numeric( Request::i()->page ) )
-					{
-						$url = $url->setPage( 'page', Request::i()->page );
-					}
+					$url = $topic->url()->setPage( 'page', \IPS\Request::i()->page );
 
 					$commentJson[$i] = array(
 						'@type' => $isQuestion ? 'Answer' : 'Comment',
@@ -584,20 +539,27 @@ class topic extends Controller
 						'url' => (string)$url->setFragment( 'comment-' . $comment->$idColumn ),
 						'author' => array(
 							'@type' => 'Person',
-							'name' => Member::load( $comment->$authorIdColumn )->name,
-							'image' => Member::load( $comment->$authorIdColumn )->get_photo( TRUE, TRUE )
+							'name' => \IPS\Member::load( $comment->$authorIdColumn )->name,
+							'image' => \IPS\Member::load( $comment->$authorIdColumn )->get_photo( TRUE, TRUE )
 						),
-						'dateCreated' => DateTime::ts( $comment->$dateColumn )->format( DateTimeInterface::ATOM ),
+						'dateCreated' => \IPS\DateTime::ts( $comment->$dateColumn )->format( \IPS\DateTime::ISO8601 ),
 
 						'text' => $truncatedComment,
 					);
 
 					if ( $comment->$authorIdColumn )
 					{
-						$commentJson[$i]['author']['url'] = (string)Member::load( $comment->$authorIdColumn )->url();
+						$commentJson[$i]['author']['url'] = (string)\IPS\Member::load( $comment->$authorIdColumn )->url();
 					}
 
-					$commentJson[$i]['upvoteCount'] = $comment->reactionCount();
+					if( $isQuestion )
+					{
+						$commentJson[$i]['upvoteCount'] = ( $topic->isArchived() ) ? $comment->field_int : $comment->post_field_int;
+					}
+					else
+					{
+						$commentJson[$i]['upvoteCount'] = $comment->reactionCount();
+					}
 
 					$i++;
 				}
@@ -605,106 +567,89 @@ class topic extends Controller
 
 			if ( $isQuestion )
 			{
-				Output::i()->jsonLd['topic']['mainEntity']['suggestedAnswer'] = $commentJson;
+				\IPS\Output::i()->jsonLd['topic']['mainEntity']['suggestedAnswer'] = $commentJson;
 			}
 			else
 			{
-				Output::i()->jsonLd['topic']['comment'] = $commentJson;
+				\IPS\Output::i()->jsonLd['topic']['comment'] = $commentJson;
 			}
 		}
 
 		/* Do we have a real author */
 		if( $topic->starter_id )
 		{
-			Output::i()->jsonLd['topic']['author']['url'] = (string) Member::load( $topic->starter_id )->url();
+			\IPS\Output::i()->jsonLd['topic']['author']['url'] = (string) \IPS\Member::load( $topic->starter_id )->url();
 
-			Output::i()->jsonLd['topic']['publisher']['member'] = array(
+			\IPS\Output::i()->jsonLd['topic']['publisher']['member'] = array(
 				'@type'		=> "Person",
-				'name'		=> Member::load( $topic->starter_id )->name,
-				'image'		=> (string) Member::load( $topic->starter_id )->get_photo( TRUE, TRUE ),
-				'url'		=> (string) Member::load( $topic->starter_id )->url(),
+				'name'		=> \IPS\Member::load( $topic->starter_id )->name,
+				'image'		=> (string) \IPS\Member::load( $topic->starter_id )->get_photo( TRUE, TRUE ),
+				'url'		=> (string) \IPS\Member::load( $topic->starter_id )->url(),
 			);
 		}
 
 		/* Enable caching for archived topics */
-		if( $topic->isArchived() AND !Member::loggedIn()->member_id )
+		if( $topic->isArchived() AND !\IPS\Member::loggedIn()->member_id )
 		{
 			/* We do not want to use the \IPS\CACHE_PRIVATE_TIMEOUT constant here, as we explicitly want to cache archived topics for longer times */
-			$httpHeaders = array( 'Expires'		=> DateTime::create()->add( new DateInterval( 'PT12H' ) )->rfc1123() ,
+			$httpHeaders = array( 'Expires'		=> \IPS\DateTime::create()->add( new \DateInterval( 'PT12H' ) )->rfc1123() ,
 								  'Cache-Control'	=> 'no-cache="Set-Cookie", max-age=' . ( 60 * 60 * 12 ) . ", s-maxage=" . ( 60 * 60 * 12 ) . ", public, stale-if-error, stale-while-revalidate" );
 
-			Output::i()->httpHeaders += $httpHeaders;
+			\IPS\Output::i()->httpHeaders += $httpHeaders;
 		}
 
-		/* $current might be null if the topic has no replies AND we are featuring the first post */
-		if( empty( $current ) and Member::loggedIn()->getLayoutValue( 'forum_topic_view_firstpost' ) )
-		{
-			$current = $firstPost;
-		}
-
-		/* Set og:image meta tags */
-		if( count( $file = $topic->imageAttachments(1 ) ) )
-		{
-			$object = File::get( 'core_Attachment', $file[0]['attach_location'] );
-			Output::i()->metaTags['og:image'] = (string) $object->url->setScheme( ( mb_substr( Settings::i()->base_url, 0, 5 ) === 'https' ) ? 'https' : 'http' );
-		}
-		
-		if( $current )
-		{
-			Output::i()->jsonLd['topic'] = array_merge_recursive( array(
-				'name'			=> $topic->mapped('title'),
-				'headline'		=> $topic->mapped('title'),
-				'text'			=> $current->truncated( TRUE, NULL ),
-				'dateCreated'	=> DateTime::ts( $topic->start_date )->format( DateTimeInterface::ATOM ),
-				'datePublished'	=> DateTime::ts( $topic->start_date )->format( DateTimeInterface::ATOM ),
-				'dateModified'	=> DateTime::ts( $topic->last_post )->format( DateTimeInterface::ATOM ),
-				'author'		=> array(
-					'@type'		=> 'Person',
-					'name'		=> Member::load( $topic->starter_id )->name,
-					'image'		=> Member::load( $topic->starter_id )->get_photo( TRUE, TRUE )
+		\IPS\Output::i()->jsonLd['topic'] = array_merge_recursive( array(
+			'name'			=> $topic->mapped('title'),
+			'headline'		=> $topic->mapped('title'),
+			'text'			=> $topic->isQuestion() ? $question->truncated( TRUE, NULL ) : $current->truncated( TRUE, NULL ),
+			'dateCreated'	=> \IPS\DateTime::ts( $topic->start_date )->format( \IPS\DateTime::ISO8601 ),
+			'datePublished'	=> \IPS\DateTime::ts( $topic->start_date )->format( \IPS\DateTime::ISO8601 ),
+			'dateModified'	=> \IPS\DateTime::ts( $topic->last_post )->format( \IPS\DateTime::ISO8601 ),
+			/* Image is required, but we don't have "topic images", so we'll use topic starter's profile photo for now */
+			'image'			=> (string) \IPS\Member::load( $topic->starter_id )->get_photo( TRUE, TRUE ),
+			'author'		=> array(
+				'@type'		=> 'Person',
+				'name'		=> \IPS\Member::load( $topic->starter_id )->name,
+				'image'		=> \IPS\Member::load( $topic->starter_id )->get_photo( TRUE, TRUE )
+			),
+			'interactionStatistic'	=> array(
+				array(
+					'@type'					=> 'InteractionCounter',
+					'interactionType'		=> "http://schema.org/ViewAction",
+					'userInteractionCount'	=> $topic->views
 				),
-				'interactionStatistic'	=> array(
-					array(
-						'@type'					=> 'InteractionCounter',
-						'interactionType'		=> "https://schema.org/ViewAction",
-						'userInteractionCount'	=> $topic->views
-					),
-					array(
-						'@type'					=> 'InteractionCounter',
-						'interactionType'		=> "https://schema.org/CommentAction",
-						'userInteractionCount'	=> $topic->posts - 1 // We subtract one to account for the "first post"
-					)
+				array(
+					'@type'					=> 'InteractionCounter',
+					'interactionType'		=> "http://schema.org/CommentAction",
+					'userInteractionCount'	=> $topic->posts - 1 // We subtract one to account for the "first post"
 				)
-			), Output::i()->jsonLd['topic'] );
-
-			if( isset( 	Output::i()->metaTags['og:image'] ) )
-			{
-				Output::i()->jsonLd['topic']['image'] = Output::i()->metaTags['og:image'];
-			}
-		}
+			)
+		), \IPS\Output::i()->jsonLd['topic'] );
 
 		if( !$topic->isArchived() )
 		{
-			Output::i()->jsonLd['topic']['interactionStatistic'][] = [
+			\IPS\Output::i()->jsonLd['topic']['interactionStatistic'][] = [
 				'@type'					=> 'InteractionCounter',
 				'interactionType'		=> "http://schema.org/FollowAction",
 				'userInteractionCount'	=> $topic->followersCount()
 			];
 		}
 
-		/* Noindex if helpful filter applied */
-		if( isset( Request::i()->show ) )
+		/* Add og:image meta tags */
+		if( count( $file = $topic->imageAttachments(1 ) ) )
 		{
-			Output::i()->metaTags['robots'] = 'noindex';
+			$object = \IPS\File::get( 'core_Attachment', $file[0]['attach_location'] );
+			\IPS\Output::i()->metaTags['og:image'] = (string) $object->url->setScheme( ( mb_substr( \IPS\Settings::i()->base_url, 0, 5 ) === 'https' ) ? 'https' : 'http' );
 		}
 
 		/* Set default search to this topic */
-		Output::i()->defaultSearchOption = array( 'forums_topic', 'forums_topic_el' );
+		\IPS\Output::i()->defaultSearchOption = array( 'forums_topic', 'forums_topic_el' );
 
 		/* Show topic */
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'topics.css', 'forums' ) );
-		Output::i()->output .= Theme::i()->getTemplate( 'topics' )->topic( $topic, $comments, $nextUnread, $pagination, $firstPost, $viewerIsFollowingTheseExperts );
-		return null;
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'topics.css', 'forums' ) );
+		\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'topics' )->topic( $topic, $comments, $question, $votes, $nextUnread, $pagination, $topicVotes );
+
+		return $topic;
 	}
 
 	/**
@@ -712,28 +657,27 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function _doViewCheck() : void
+	protected function _doViewCheck()
 	{
 		try
 		{
-			/* @var TopicClass $class */
 			$class	= static::$contentModel;
-			$topic	= $class::loadAndCheckPerms( Request::i()->id );
+			$topic	= $class::loadAndCheckPerms( \IPS\Request::i()->id );
 			
-			switch( Request::i()->view )
+			switch( \IPS\Request::i()->view )
 			{
 				case 'getnewpost':
-					Output::i()->redirect( $topic->url( 'getNewComment' ) );
+					\IPS\Output::i()->redirect( $topic->url( 'getNewComment' ) );
 				break;
 				
 				case 'getlastpost':
-					Output::i()->redirect( $topic->url( 'getLastComment' ) );
+					\IPS\Output::i()->redirect( $topic->url( 'getLastComment' ) );
 				break;
 			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2F173/F', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2F173/F', 403, '' );
 		}
 	}
 	
@@ -742,34 +686,38 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
 		try
 		{
-			/* @var TopicClass $class */
 			$class = static::$contentModel;
-			$topic = $class::loadAndCheckPerms( Request::i()->id );
+			$topic = $class::loadAndCheckPerms( \IPS\Request::i()->id );
 			$forum = $topic->container();
 			$forum->setTheme();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'no_module_permission', '2F173/D', 403, 'no_module_permission_guest' );
+			\IPS\Output::i()->error( 'no_module_permission', '2F173/D', 403, 'no_module_permission_guest' );
+		}
+		
+		if ( $forum->forums_bitoptions['bw_enable_answers'] )
+		{
+			\IPS\Member::loggedIn()->language()->words['topic_mainTab'] = \IPS\Member::loggedIn()->language()->addToStack( 'question_mainTab', FALSE );
 		}
 		
 		// We check if the form has been submitted to prevent the user loosing their content
-		if ( isset( Request::i()->form_submitted ) )
+		if ( isset( \IPS\Request::i()->form_submitted ) )
 		{
 			if ( ! $topic->couldEdit() )
 			{
-				Output::i()->error( 'edit_no_perm_err', '2F173/E', 403, '' );
+				\IPS\Output::i()->error( 'edit_no_perm_err', '2F173/E', 403, '' );
 			}
 		}
 		else
 		{
 			if ( ! $topic->canEdit() )
 			{
-				Output::i()->error( 'edit_no_perm_err', '2F173/E', 403, '' );
+				\IPS\Output::i()->error( 'edit_no_perm_err', '2F173/E', 403, '' );
 			}
 		}
 		
@@ -796,11 +744,9 @@ class topic extends Controller
 		{
 			if ( $topic->canEdit() )
 			{
-				/* @var $databaseColumnMap array */
 				$titleField = $topic::$databaseColumnMap['title'];
 				$oldTitle = $topic->$titleField;
-
-                $topic->processBeforeEdit( $values );
+				
 				$topic->processForm( $values );
 				$topic->save();
 				$topic->processAfterEdit( $values );
@@ -813,39 +759,39 @@ class topic extends Controller
 					$toLog[ $oldTitle ] = false; 
 				}
 				
-				Session::i()->modLog( 'modlog__item_edit', $toLog, $topic );
+				\IPS\Session::i()->modLog( 'modlog__item_edit', $toLog, $topic );
 
-				Output::i()->redirect( $topic->url() );
+				\IPS\Output::i()->redirect( $topic->url() );
 			}
 			else
 			{
-				$form->error = Member::loggedIn()->language()->addToStack('edit_no_perm_err');
+				$form->error = \IPS\Member::loggedIn()->language()->addToStack('edit_no_perm_err');
 			}
 		}
 
-		$formTemplate = $form->customTemplate( array( Theme::i()->getTemplate( 'submit', 'forums' ), 'createTopicForm' ), $forum, $hasModOptions, $topic );
+		$formTemplate = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'submit', 'forums' ), 'createTopicForm' ), $forum, $hasModOptions, $topic );
 
-		$title = 'edit_topic';
+		$title = $forum->forums_bitoptions['bw_enable_answers'] ? 'edit_question' : 'edit_topic';
 
-		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->output = Theme::i()->getTemplate( 'submit' )->createTopic( $formTemplate, $forum, $title );
-		Output::i()->title = Member::loggedIn()->language()->addToStack( $title );
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'submit' )->createTopic( $formTemplate, $forum, $title );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( $title );
 		
-		if ( !Forum::theOnlyForum() and ! Forum::isSimpleView() )
+		if ( !\IPS\forums\Forum::theOnlyForum() and ! \IPS\forums\Forum::isSimpleView() )
 		{
 			try
 			{
 				foreach( $forum->parents() AS $parent )
 				{
-					Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+					\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 				}
-				Output::i()->breadcrumb[] = array( $forum->url(), $forum->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $forum->url(), $forum->_title );
 			}
-			catch( Exception $e ) {}
+			catch( \Exception $e ) {}
 		}
 		
-		Output::i()->breadcrumb[] = array( $topic->url(), $topic->mapped('title') );
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( $title ) );
+		\IPS\Output::i()->breadcrumb[] = array( $topic->url(), $topic->mapped('title') );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( $title ) );
 	}
 
 	/**
@@ -853,33 +799,33 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	public function unarchive() : void
+	public function unarchive()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$topic = TopicClass::loadAndCheckPerms( Request::i()->id );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( \IPS\Request::i()->id );
 			if ( !$topic->canUnarchive() )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2F173/B', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2F173/B', 404, '' );
 		}
 		
-		$topic->topic_archive_status = TopicClass::ARCHIVE_RESTORE;
+		$topic->topic_archive_status = \IPS\forums\Topic::ARCHIVE_RESTORE;
 		$topic->save();
 		
 		/* Make sure the task is enabled */
-		Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'unarchive' ) );
+		\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'unarchive' ) );
 
 		/* Log */
-		Session::i()->modLog( 'modlog__unarchived_topic', array( $topic->url()->__toString() => FALSE, $topic->mapped( 'title' ) => FALSE ), $topic );
+		\IPS\Session::i()->modLog( 'modlog__unarchived_topic', array( $topic->url()->__toString() => FALSE, $topic->mapped( 'title' ) => FALSE ), $topic );
 		
-		Output::i()->redirect( $topic->url() );
+		\IPS\Output::i()->redirect( $topic->url() );
 	}
 
 	/**
@@ -887,30 +833,153 @@ class topic extends Controller
 	 *
 	 * @return void
 	 */
-	public function removeArchiveExclude() : void
+	public function removeArchiveExclude()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		try
 		{
-			$topic = TopicClass::loadAndCheckPerms( Request::i()->id );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( \IPS\Request::i()->id );
 			if ( !$topic->canRemoveArchiveExcludeFlag() )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2F173/P', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2F173/P', 404, '' );
 		}
 
-		$topic->topic_archive_status = TopicClass::ARCHIVE_NOT;
+		$topic->topic_archive_status = \IPS\forums\Topic::ARCHIVE_NOT;
 		$topic->save();
 
 		/* Log */
-		Session::i()->modLog( 'modlog__removed_archive_exclude_topic', array( $topic->url()->__toString() => FALSE, $topic->mapped( 'title' ) => FALSE ), $topic );
+		\IPS\Session::i()->modLog( 'modlog__removed_archive_exclude_topic', array( $topic->url()->__toString() => FALSE, $topic->mapped( 'title' ) => FALSE ), $topic );
 
-		Output::i()->redirect( $topic->url() );
+		\IPS\Output::i()->redirect( $topic->url() );
+	}
+	
+	/**
+	 * Rate Question
+	 *
+	 * @return	void
+	 */
+	public function rateQuestion()
+	{
+		/* CSRF Check */
+		\IPS\Session::i()->csrfCheck();
+		
+		/* Get the question */
+		try
+		{
+			$question = \IPS\forums\Topic::loadAndCheckPerms( \IPS\Request::i()->id );
+		}
+		catch ( \OutOfRangeException $e )
+		{
+			\IPS\Output::i()->error( 'node_error', '2F173/8', 404, '' );
+		}
+		
+		/* Voting up or down? */
+		$rating = \intval( \IPS\Request::i()->rating );
+		if ( $rating !== 1 and $rating !== -1 )
+		{
+			\IPS\Output::i()->error( 'form_bad_value', '2F173/A', 403, '' );
+		}
+		
+		/* Check we can cast this vote */
+		if ( !$question->canVote( $rating ) )
+		{
+			\IPS\Output::i()->error( 'no_module_permission', '2F173/9', 403, '' );
+		}
+		
+		/* If we have an existing vote, remove it first */
+		$ratings = $question->votes();
+		if ( isset( $ratings[ \IPS\Member::loggedIn()->member_id ] ) )
+		{
+			\IPS\Db::i()->delete( 'forums_question_ratings', array( 'topic=? AND `member`=?', $question->tid, \IPS\Member::loggedIn()->member_id ) );
+		}
+
+		/* Revoting for the same thing you already voted for should remove your vote - so don't insert if we voted for the same thing we did before */
+		if ( !isset( $ratings[ \IPS\Member::loggedIn()->member_id ] ) OR $ratings[ \IPS\Member::loggedIn()->member_id ] != $rating )
+		{
+			\IPS\Db::i()->insert( 'forums_question_ratings', array(
+				'topic'		=> $question->tid,
+				'forum'		=> $question->forum_id,
+				'member'	=> \IPS\Member::loggedIn()->member_id,
+				'rating'	=> $rating,
+				'date'		=> time()
+			), TRUE );
+		}
+		
+		/* Rebuild count */
+		/* @note SELECT_FROM_WRITE_SERVER race condition added in 2fe7e3e434068a6a845106fbefd08821d05e60e4 */
+		$question->question_rating = \IPS\Db::i()->select( 'SUM(rating)', 'forums_question_ratings', array( 'topic=?', $question->tid ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
+		$question->save();
+		
+		/* Redirect back */
+		\IPS\Output::i()->redirect( $question->url() );
+	}
+	
+	/**
+	 * Rate Answer
+	 *
+	 * @return	void
+	 */
+	public function rateAnswer()
+	{
+		\IPS\Session::i()->csrfCheck();
+		
+		try
+		{
+			$question = \IPS\forums\Topic::loadAndCheckPerms( \IPS\Request::i()->id );
+			$answer = \IPS\forums\Topic\Post::loadAndCheckPerms( \IPS\Request::i()->answer );
+		}
+		catch ( \Exception $e )
+		{
+			\IPS\Output::i()->error( 'node_error', '2F173/4', 404, '' );
+		}
+
+		$rating = \intval( \IPS\Request::i()->rating );
+
+		if ( !$answer->item()->can('read') or !$answer->canVote( $rating ) )
+		{
+			\IPS\Output::i()->error( 'no_module_permission', '2F173/5', 403, '' );
+		}
+
+		if ( $rating !== 1 and $rating !== -1 )
+		{
+			\IPS\Output::i()->error( 'form_bad_value', '2F173/6', 403, '' );
+		}
+
+		$ratings = $question->answerVotes( \IPS\Member::loggedIn() );
+
+		/* If we've already rated the answer, remove that first */
+		\IPS\Db::i()->delete( 'forums_answer_ratings', array( 'topic=? AND post=? AND `member`=?', $question->tid, $answer->pid, \IPS\Member::loggedIn()->member_id ) );
+
+		/* Revoting for the same thing you already voted for should remove your vote - so don't insert if we voted for the same thing we did before */
+		if ( !isset( $ratings[ $answer->pid ] ) OR $ratings[ $answer->pid ] != $rating )
+		{
+			\IPS\Db::i()->insert( 'forums_answer_ratings', array(
+				'post'		=> $answer->pid,
+				'topic'		=> $question->tid,
+				'member'	=> \IPS\Member::loggedIn()->member_id,
+				'rating'	=> $rating,
+				'date'		=> time()
+			), TRUE );
+		}
+
+		/* @note SELECT_FROM_WRITE_SERVER race condition added in 9f4aa84545f6f9838143253050520180dfce5ef2 */
+		$answer->post_field_int = (int) \IPS\Db::i()->select( 'SUM(rating)', 'forums_answer_ratings', array( 'post=?', $answer->pid ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
+		$answer->save();
+
+		if ( \IPS\Request::i()->isAjax() )
+		{
+			\IPS\Output::i()->json( array( 'votes' => $answer->post_field_int, 'canVoteUp' => $answer->canVote(1), 'canVoteDown' => $answer->canVote(-1) ) );
+		}
+		else
+		{
+			\IPS\Output::i()->redirect( $answer->url() );
+		}
 	}
 	
 	/**
@@ -918,39 +987,39 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	public function bestAnswer() : void
+	public function bestAnswer()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$topic = TopicClass::loadAndCheckPerms( Request::i()->id );
-			$post = Post::loadAndCheckPerms( Request::i()->answer );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( \IPS\Request::i()->id );
+			$post = \IPS\forums\Topic\Post::loadAndCheckPerms( \IPS\Request::i()->answer );
 			
 			if ( !$topic->canSetBestAnswer() )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
-			if ( $post->item() !== $topic )
+			if ( $post->item() != $topic )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2F173/7', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2F173/7', 404, '' );
 		}
 
 		$topic->toggleSolveComment( $post->pid, TRUE );
 		
 		/* Log */
-		if ( Member::loggedIn()->modPermission('can_set_best_answer') )
+		if ( \IPS\Member::loggedIn()->modPermission('can_set_best_answer') )
 		{
-			Session::i()->modLog( 'modlog__best_answer_set', array( $post->pid => FALSE ), $topic );
+			\IPS\Session::i()->modLog( 'modlog__best_answer_set', array( $post->pid => FALSE ), $topic );
 		}
 		
-		Output::i()->redirect( $post->url() );
+		\IPS\Output::i()->redirect( $post->url() );
 	}
 	
 	/**
@@ -958,42 +1027,42 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	public function unsetBestAnswer() : void
+	public function unsetBestAnswer()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$topic = TopicClass::loadAndCheckPerms( Request::i()->id );
-			$post = Post::loadAndCheckPerms( Request::i()->answer );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( \IPS\Request::i()->id );
+			$post = \IPS\forums\Topic\Post::loadAndCheckPerms( \IPS\Request::i()->answer );
 			
 			if ( !$topic->canSetBestAnswer() )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2F173/G', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2F173/G', 404, '' );
 		}
 
-		if ( $post->item() !== $topic )
+		if ( $post->item() != $topic )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		try
 		{
 			$topic->toggleSolveComment( $post->pid, FALSE );
 			
-			if ( Member::loggedIn()->modPermission('can_set_best_answer') )
+			if ( \IPS\Member::loggedIn()->modPermission('can_set_best_answer') )
 			{
-				Session::i()->modLog( 'modlog__best_answer_unset', array( $post->pid => FALSE ), $topic );
+				\IPS\Session::i()->modLog( 'modlog__best_answer_unset', array( $post->pid => FALSE ), $topic );
 			}
 		}
-		catch ( Exception $e ) {}
+		catch ( \Exception $e ) {}
 	
-		Output::i()->redirect( $post->url() );
+		\IPS\Output::i()->redirect( $post->url() );
 	}
 	
 	/**
@@ -1001,21 +1070,21 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	public function savedAction() : void
+	public function savedAction()
 	{
 		try
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			
-			$topic = TopicClass::loadAndCheckPerms( Request::i()->id );
-			$action = SavedAction::load( Request::i()->action );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( \IPS\Request::i()->id );
+			$action = \IPS\forums\SavedAction::load( \IPS\Request::i()->action );
 			$action->runOn( $topic );
 			
 			/* Log */
-			Session::i()->modLog( 'modlog__saved_action', array( 'forums_mmod_' . $action->mm_id => TRUE, $topic->url()->__toString() => FALSE, $topic->mapped( 'title' ) => FALSE ), $topic );
-			Output::i()->redirect( $topic->url() );
+			\IPS\Session::i()->modLog( 'modlog__saved_action', array( 'forums_mmod_' . $action->mm_id => TRUE, $topic->url()->__toString() => FALSE, $topic->mapped( 'title' ) => FALSE ), $topic );
+			\IPS\Output::i()->redirect( $topic->url() );
 		}
-		catch ( LogicException $e )
+		catch ( \LogicException $e )
 		{
 			
 		}
@@ -1026,27 +1095,27 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	public function markRead() : void
+	public function markRead()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$topic = TopicClass::load( Request::i()->id );
+			$topic = \IPS\forums\Topic::load( \IPS\Request::i()->id );
 			$topic->markRead();
 
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->json( "OK" );
+				\IPS\Output::i()->json( "OK" );
 			}
 			else
 			{
-				Output::i()->redirect( $topic->url() );
+				\IPS\Output::i()->redirect( $topic->url() );
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'no_module_permission', '2F173/C', 403, 'no_module_permission_guest' );
+			\IPS\Output::i()->error( 'no_module_permission', '2F173/C', 403, 'no_module_permission_guest' );
 		}
 	}
 	
@@ -1055,22 +1124,22 @@ class topic extends Controller
 	 *
 	 * @return void
 	 */
-	public function widgetPoll() : void
+	public function widgetPoll()
 	{
 		try
 		{
-			$topic = TopicClass::loadAndCheckPerms( Request::i()->id );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $ex )
+		catch( \OutOfRangeException $ex )
 		{
-			Output::i()->error( 'node_error', '2F173/N', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2F173/N', 403, '' );
 		}
 		
 		$poll  = $topic->getPoll();
-		$poll->displayTemplate = array( Theme::i()->getTemplate( 'widgets', 'forums', 'front' ), 'pollWidget' );
+		$poll->displayTemplate = array( \IPS\Theme::i()->getTemplate( 'widgets', 'forums', 'front' ), 'pollWidget' );
 		$poll->url = $topic->url();
 		
-		Output::i()->output .= Theme::i()->getTemplate( 'widgets', 'forums', 'front' )->poll( $topic, $poll );
+		\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'widgets', 'forums', 'front' )->poll( $topic, $poll );
 	}
 
 	/**
@@ -1078,55 +1147,146 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	public function ajaxShowComment() : void
+	public function ajaxShowComment()
 	{
 		try
 		{
-			if ( ! Request::i()->isAjax() )
+			if ( ! \IPS\Request::i()->isAjax() )
 			{
-				throw new BadMethodCallException();
+				throw new \BadMethodCallException();
 			}
 
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 
 			try
 			{
-				$topic = TopicClass::loadAndCheckPerms( Request::i()->id );
+				$topic = \IPS\forums\Topic::loadAndCheckPerms( \IPS\Request::i()->id );
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
-				Output::i()->error( 'node_error', '2F173/N', 403, '' );
+				\IPS\Output::i()->error( 'node_error', '2F173/N', 403, '' );
 			}
 
-			$comment = Post::load( Request::i()->showComment );
+			$comment = \IPS\forums\Topic\Post::load( \IPS\Request::i()->showComment );
 
 			if ( ! $comment->canView() )
 			{
-				throw new BadMethodCallException();
+				throw new \BadMethodCallException();
 			}
 
-			Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( Theme::i()->getTemplate( 'global', 'core' )->commentContainer( $topic, $comment ), 200, 'text/html' ) );
+			\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( \IPS\Theme::i()->getTemplate( 'global', 'core' )->commentContainer( $topic, $comment ), 200, 'text/html' ) );
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
-			
+			return '';
 		}
 	}
-	
+
+	/**
+	 * Find a Comment / Review (do=findComment/findReview)
+	 *
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
+	 * @return	void
+	 */
+	public function _find( $commentClass, $comment, $item )
+	{
+		/* For normal topics (i.e. not questions), we can handle this normally */
+		if ( !$item->isQuestion() )
+		{
+			return parent::_find( $commentClass, $comment, $item );
+		}
+
+		/* Otherwise we need to get the position ordered by votes... */
+		if ( $item->isArchived() )
+		{
+			$where = array( array( 'archive_topic_id=?', $item->tid ) );
+			if ( !$item->canViewHiddenComments() )
+			{
+				$hiddenWhereClause = "(archive_queued != -2 AND archive_queued != -1 AND archive_queued != 1)";
+
+				if ( \IPS\Member::loggedIn()->member_id )
+				{
+					$where[] = array( "( {$hiddenWhereClause} OR ( archive_queued=1 AND archive_author_id=" . \IPS\Member::loggedIn()->member_id . '))' );
+				}
+				else
+				{
+					$where[] = array( $hiddenWhereClause );
+				}
+			}
+			
+			/* Connect to the remote DB if needed */
+			if ( \IPS\CIC2 )
+			{
+				$storage = \IPS\Cicloud\getForumArchiveDb();
+			}
+			else
+			{
+				$storage = !\IPS\Settings::i()->archive_remote_sql_host ? \IPS\Db::i() : \IPS\Db::i( 'archive', array(
+					'sql_host'		=> \IPS\Settings::i()->archive_remote_sql_host,
+					'sql_user'		=> \IPS\Settings::i()->archive_remote_sql_user,
+					'sql_pass'		=> \IPS\Settings::i()->archive_remote_sql_pass,
+					'sql_database'	=> \IPS\Settings::i()->archive_remote_sql_database,
+					'sql_port'		=> \IPS\Settings::i()->archive_sql_port,
+					'sql_socket'	=> \IPS\Settings::i()->archive_sql_socket,
+					'sql_tbl_prefix'=> \IPS\Settings::i()->archive_sql_tbl_prefix,
+					'sql_utf8mb4'	=> isset( \IPS\Settings::i()->sql_utf8mb4 ) ? \IPS\Settings::i()->sql_utf8mb4 : FALSE
+				) );
+			}
+			
+			$answers = $storage->select( 'archive_id, @rownum := @rownum + 1 AS position', 'forums_archive_posts', $where, 'archive_is_first DESC, archive_bwoptions DESC, archive_field_int DESC, archive_content_date' )->join( array( '(SELECT @rownum := 0)', 'r' ), NULL, 'JOIN' );
+			$commentPosition = $storage->select( 'position', $answers, array( 'archive_id=?', $comment->id ) )->first() - 1;
+		}
+		else
+		{
+			$where = array( array( 'topic_id=?', $item->tid ) );
+			if ( !$item->canViewHiddenComments() )
+			{
+				$hiddenWhereClause = "(queued != -2 AND queued != -1 AND queued != 1)";
+
+				if ( \IPS\Member::loggedIn()->member_id )
+				{
+					$where[] = array( "( {$hiddenWhereClause} OR ( queued=1 AND author_id=" . \IPS\Member::loggedIn()->member_id . '))' );
+				}
+				else
+				{
+					$where[] = array( $hiddenWhereClause );
+				}
+			}
+
+			$answers = \IPS\Db::i()->select( 'pid, @rownum := @rownum + 1 AS position', 'forums_posts', $where, 'new_topic DESC, post_bwoptions DESC, post_field_int DESC, post_date' )->join( array( '(SELECT @rownum := 0)', 'r' ), NULL, 'JOIN' );
+			$commentPosition = \IPS\Db::i()->select( 'position', $answers, array( 'pid=?', $comment->pid ) )->first() - 1;
+		}
+
+		/* Now work out what page that makes it */
+		$url = $item->url();
+		$perPage = $item::getCommentsPerPage();
+		$page = ceil( $commentPosition / $perPage );
+		if ( $page != 1 )
+		{
+			$url = $url->setPage( 'page', $page );
+		}
+
+		/* And redirect */
+		$idField = $commentClass::$databaseColumnId;
+		\IPS\Output::i()->redirect( $url->setFragment( 'comment-' . $comment->$idField ) );
+	}
+
 	/**
 	 * Edit Comment/Review
 	 *
 	 * @param	string					$commentClass	The comment/review class
-	 * @param	Comment	$comment		The comment/review
-	 * @param	Item		$item			The item
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	protected function _edit( string $commentClass, Comment $comment, Item $item ) : void
+	protected function _edit( $commentClass, $comment, $item )
 	{
-		Member::loggedIn()->language()->words['edit_comment']		= Member::loggedIn()->language()->addToStack( 'edit_reply', FALSE );
+		\IPS\Member::loggedIn()->language()->words['edit_comment']		= \IPS\Member::loggedIn()->language()->addToStack( 'edit_reply', FALSE );
 
-		parent::_edit( $commentClass, $comment, $item );
+		return parent::_edit( $commentClass, $comment, $item );
 	}
 	
 	/**
@@ -1134,19 +1294,19 @@ class topic extends Controller
 	 *
 	 * @param	string	$method	Desired method
 	 * @param	array	$args	Arguments
+	 * @return	void
 	 */
-	public function __call( string $method, mixed $args )
+	public function __call( $method, $args )
 	{
 		$class = static::$contentModel;
 		
 		try
 		{
-			/* @var TopicClass $class */
-			$item = $class::load( Request::i()->id );
+			$item = $class::load( \IPS\Request::i()->id );
 			if ( !$item->canView() )
 			{
 				$forum = $item->container();
-				Output::i()->error( $forum ? $forum->errorMessage() : 'node_error_no_perm', '2F173/K', 403, '' );
+				\IPS\Output::i()->error( $forum ? $forum->errorMessage() : 'node_error_no_perm', '2F173/K', 403, '' );
 			}
 			
 			if ( $item->isArchived() )
@@ -1156,42 +1316,38 @@ class topic extends Controller
 			
 			return parent::__call( $method, $args );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			if ( isset( Request::i()->do ) AND Request::i()->do === 'findComment' AND isset( Request::i()->comment ) )
+			if ( isset( \IPS\Request::i()->do ) AND \IPS\Request::i()->do === 'findComment' AND isset( \IPS\Request::i()->comment ) )
 			{
 				try
 				{
-					/* @var Comment $commentClass */
 					$commentClass = $class::$commentClass;
-					$comment = $commentClass::load( Request::i()->comment );
-					$topic   = TopicClass::load( $comment->topic_id );
+					$comment = $commentClass::load( \IPS\Request::i()->comment );
+					$topic   = \IPS\forums\Topic::load( $comment->topic_id );
 					
-					Output::i()->redirect( $topic->url()->setQueryString( array( 'do' => 'findComment', 'comment' => Request::i()->comment ) ), NULL, 301 );
+					\IPS\Output::i()->redirect( $topic->url()->setQueryString( array( 'do' => 'findComment', 'comment' => \IPS\Request::i()->comment ) ), NULL, 301 );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					Output::i()->error( 'node_error', '2F173/M', 404, '' );
+					\IPS\Output::i()->error( 'node_error', '2F173/M', 404, '' );
 				}
 			}
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Log::log( $e, 'topic_call' );
-			Output::i()->error( 'node_error', '2F173/I', 404, '' );
+			\IPS\Log::log( $e, 'topic_call' );
+			\IPS\Output::i()->error( 'node_error', '2F173/I', 404, '' );
 		}
-		
-		return null;
 	}
-
+	
 	/**
 	 * Form for splitting
 	 *
-	 * @param Item $item The item
-	 * @param null $comment
-	 * @return    Form
+	 * @param	\IPS\Content\Item	$item	The item
+	 * @return	\IPS\Helpers\Form
 	 */
-	protected function _splitForm( Item $item, $comment = NULL  ) : Form
+	protected function _splitForm( \IPS\Content\Item $item, $comment = NULL  )
 	{
 		$form = parent::_splitForm( $item, $comment );
 
@@ -1201,79 +1357,5 @@ class topic extends Controller
 		}
 		
 		return $form;
-	}
-
-    protected function finishManage( Item $item ): void
-    {
-        Bridge::i()->topicsFinishManage( $item );
-    }
-
-    /**
-     * @return void
-     */
-    protected function splitQuestion(): void
-    {
-        Bridge::i()->topicsSplitQuestion( $this );
-    }
-
-	/**
-	 * @return void
-	 */
-    protected function getQuestionQuoteDataForEditor(): void
-    {
-        Bridge::i()->getQuestionQuoteDataForEditor();
-    }
-
-	/**
-	 * Find a Comment / Review (do=findComment/findReview)
-	 *
-	 * @param	string		$commentClass	The comment/review class
-	 * @param 	Comment 	$comment		The comment/review
-	 * @param 	Item 		$item			The item
-	 *
-	 * @return	void
-	 */
-	public function _find( string $commentClass, Comment $comment, Item $item ) : void
-	{
-		if ( Bridge::i()->featureIsEnabled( 'topic_summaries' ) )
-		{
-			$idField = $comment::$databaseColumnId;
-			Bridge::i()->trackPostRankingEvent( $comment->$idField, 'linked' );
-		}
-		parent::_find( $commentClass, $comment, $item );
-	}
-
-	/**
-	 * React to a comment/review
-	 *
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
-	 * @return	void
-	 * @throws	LogicException
-	 */
-	protected function _react( string $commentClass, Comment $comment, Item $item ): void
-	{
-		if ( Bridge::i()->featureIsEnabled( 'topic_summaries' ) )
-		{
-			try
-			{
-				Session::i()->csrfCheck();
-				Reaction::load( Request::i()->reaction ); // we do this to make sure the reaction exists; At this point in the core method the comment is reacted upon @todo consider making this part of the listener system
-				$idField = $comment::$databaseColumnId;
-				Bridge::i()->trackPostRankingEvent( $comment->$idField, 'reaction' );
-			}
-			catch ( Throwable ) {}
-		}
-		parent::_react( $commentClass, $comment, $item );
-	}
-
-	/**
-	 * Add or remove the post from the summary
-	 * @return void
-	 */
-	protected function addOrRemovePostFromSummary() : void
-	{
-		Bridge::i()->addOrRemovePostFromSummary();
 	}
 }

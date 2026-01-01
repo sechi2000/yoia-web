@@ -11,21 +11,16 @@
 namespace IPS\core\setup\upg_105015;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.5.0 Beta 2 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Update settings
@@ -34,10 +29,10 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		Settings::i()->changeValues( array( 'username_characters' => Settings::i()->username_characters ? ( '/^[' . str_replace( '\-', '-', preg_quote( Settings::i()->username_characters, '/' ) ) . ']*$/iu' ) : '/^(([\p{L}\p{M}\p{N}_\.\-,]+) ?)+$/u' ) );
+		\IPS\Settings::i()->changeValues( array( 'username_characters' => \IPS\Settings::i()->username_characters ? ( '/^[' . str_replace( '\-', '-', preg_quote( \IPS\Settings::i()->username_characters, '/' ) ) . ']*$/iu' ) : '/^(([\p{L}\p{M}\p{N}_\.\-,]+) ?)+$/u' ) );
 
 		/* Convert existing VSE themes to full custom themes as the VSE isn't compatible with the older version */
-		Db::i()->update( 'core_themes', array( 'set_by_skin_gen' => 0 ) );
+		\IPS\Db::i()->update( 'core_themes', array( 'set_by_skin_gen' => 0 ) );
 
 		return TRUE;
 	}

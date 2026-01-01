@@ -12,38 +12,36 @@
 namespace IPS\core\extensions\core\ContentRouter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application\Module;
-use IPS\Extensions\ContentRouterAbstract;
-use IPS\Member;
-use IPS\Member\Group;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Content Router extension: Clubs
  */
-class Clubs extends ContentRouterAbstract
+class _Clubs
 {
 	/**
-	 * @brief	Classes of embeddable content
+	 * @brief	Content Item Classes
 	 */
-	public array $embeddableContent = array();
-
+	public $classes = array();
+	
+	/**
+	 * @brief	Can be shown in similar content
+	 */
+	public $similarContent = FALSE;
+	
 	/**
 	 * Constructor
 	 *
-	 * @param	Member|Group|NULL	$memberOrGroup	If checking access, the member/group to check for, or NULL to not check access
+	 * @param	\IPS\Member|IPS\Member\Group|NULL	$memberOrGroup	If checking access, the member/group to check for, or NULL to not check access
 	 * @return	void
 	 */
-	public function __construct( Member|Group|null $memberOrGroup = NULL )
+	public function __construct( $memberOrGroup = NULL )
 	{
-		if ( $memberOrGroup === NULL or $memberOrGroup->canAccessModule( Module::get( 'core', 'clubs', 'front' ) ) )
+		if ( $memberOrGroup === NULL or $memberOrGroup->canAccessModule( \IPS\Application\Module::get( 'core', 'clubs', 'front' ) ) )
 		{
 			$this->embeddableContent[] = 'IPS\Member\Club';
 		}

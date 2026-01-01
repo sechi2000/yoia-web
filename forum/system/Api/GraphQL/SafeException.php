@@ -11,30 +11,28 @@
 namespace IPS\Api\GraphQL;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
-use Exception;
 use GraphQL\Error\ClientAware;
-use function defined;
 
 /**
  * API Exception
  */
-class SafeException extends Exception implements ClientAware
+class _SafeException extends \Exception implements ClientAware
 {
 	/**
 	 * @brief	Exception code
 	 */
-	public ?string $exceptionCode = null;
+	public $exceptionCode;
 	
 	/**
 	 * @brief	OAUth Error
 	 */
-	public ?string $oauthError = null;
+	public $oauthError;
 	
 	/**
 	 * Constructor
@@ -42,20 +40,21 @@ class SafeException extends Exception implements ClientAware
 	 * @param	string	$message	Error Message
 	 * @param	string	$code		Code
 	 * @param	int		$httpCode	HTTP Error code
+	 * @param	string	$oauthError	Error Message for OAuth
 	 * @return	void
 	 */
-	public function __construct( string $message, string $code, int $httpCode )
+	public function __construct( $message, $code, $httpCode )
 	{
 		$this->exceptionCode = $code;
-		parent::__construct( $message, $httpCode );
+		return parent::__construct( $message, $httpCode );
 	}
 
-	public function getCategory() : string
+	public function getCategory()
 	{
 		return 'clienterror';
 	}
 
-	public function isClientSafe() : bool
+	public function isClientSafe()
 	{
 		return true;
 	}

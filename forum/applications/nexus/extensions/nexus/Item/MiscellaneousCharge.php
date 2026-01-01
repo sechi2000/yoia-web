@@ -12,80 +12,81 @@
 namespace IPS\nexus\extensions\nexus\Item;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Member;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item\Charge;
-use IPS\nexus\Money;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Miscellaneous Charge
  */
-class MiscellaneousCharge extends Charge
+class _MiscellaneousCharge extends \IPS\nexus\Invoice\Item\Charge
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'nexus';
+	public static $application = 'nexus';
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $type = 'charge';
+	public static $type = 'charge';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'dollar-sign';
+	public static $icon = 'dollar';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'miscellaneous_charge';
+	public static $title = 'miscellaneous_charge';
 	
 	/**
 	 * Generate Invoice Form
 	 *
-	 * @param	Form	$form		The form
-	 * @param	Invoice	$invoice	The invoice
+	 * @param	\IPS\Helpers\Form	$form		The form
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
 	 * @return	void
 	 */
-	public static function form( Form $form, Invoice $invoice ) : void
+	public static function form( \IPS\Helpers\Form $form, \IPS\nexus\Invoice $invoice )
 	{
-		$form->add( new Text( 'item_name', NULL, TRUE ) );
-		$form->add( new Number( 'item_net_price', 0, TRUE, array( 'decimals' => TRUE, 'min' => NULL ), NULL, NULL, $invoice->currency ) );
-		$form->add( new Node( 'item_tax_rate', 0, FALSE, array( 'class' => 'IPS\nexus\Tax', 'zeroVal' => 'item_tax_rate_none' ) ) );
-		$form->add( new Node( 'item_paymethods', 0, FALSE, array( 'class' => 'IPS\nexus\Gateway', 'multiple' => TRUE, 'zeroVal' => 'all' ) ) );
-
-		$form->add( new YesNo( 'item_pay_other', FALSE, FALSE, array( 'togglesOn' => array( 'item_pay_to', 'item_commission', 'item_fee' ) ) ) );
-		$form->add( new Member( 'item_pay_to', FALSE, FALSE, array(), NULL, NULL, NULL, 'item_pay_to' ) );
-		$form->add( new Number( 'item_commission', FALSE, FALSE, array( 'min' => 0, 'max' => 100 ), NULL, NULL, '%', 'item_commission' ) );
-		$form->add( new Number( 'item_fee', FALSE, FALSE, array(), NULL, NULL, $invoice->currency, 'item_fee' ) );
-		$form->add( new Number( 'invoice_quantity', 1, FALSE, array( 'min' => 1 ) ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'item_name', NULL, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'item_net_price', 0, TRUE, array( 'decimals' => TRUE, 'min' => NULL ), NULL, NULL, $invoice->currency ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'item_tax_rate', 0, FALSE, array( 'class' => 'IPS\nexus\Tax', 'zeroVal' => 'item_tax_rate_none' ) ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'item_paymethods', 0, FALSE, array( 'class' => 'IPS\nexus\Gateway', 'multiple' => TRUE, 'zeroVal' => 'all' ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'item_physical', FALSE, FALSE, array( 'togglesOn' => array( 'item_weight', 'item_shipmethods' ) ) ) );
+		$form->add( new \IPS\nexus\Form\Weight( 'item_weight', NULL, FALSE, array(), NULL, NULL, NULL, 'item_weight' ) );
+		
+		$availableShippingMethods = array();
+		foreach ( \IPS\nexus\Shipping\FlatRate::roots() as $rate )
+		{
+			$availableShippingMethods[ $rate->_id ] = $rate->_title;
+		}
+		if ( \IPS\Settings::i()->easypost_api_key and \IPS\Settings::i()->easypost_show_rates )
+		{
+			$availableShippingMethods['easypost'] = 'enhancements__nexus_EasyPost';
+		}
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'item_shipmethods', '*', FALSE, array( 'options' => $availableShippingMethods, 'multiple' => TRUE, 'unlimited' => '*', 'impliedUnlimited' => TRUE ), NULL, NULL, NULL, 'item_shipmethods' ) );		
+		
+		$form->add( new \IPS\Helpers\Form\YesNo( 'item_pay_other', FALSE, FALSE, array( 'togglesOn' => array( 'item_pay_to', 'item_commission', 'item_fee' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Member( 'item_pay_to', FALSE, FALSE, array(), NULL, NULL, NULL, 'item_pay_to' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'item_commission', FALSE, FALSE, array( 'min' => 0, 'max' => 100 ), NULL, NULL, '%', 'item_commission' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'item_fee', FALSE, FALSE, array(), NULL, NULL, $invoice->currency, 'item_fee' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'invoice_quantity', 1, FALSE, array( 'min' => 1 ) ) );
 	}
 	
 	/**
 	 * Create From Form
 	 *
 	 * @param	array				$values		Values from form
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    MiscellaneousCharge
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	\IPS\nexus\extensions\nexus\Item\MiscellaneousCharge
 	 */
-	public static function createFromForm( array $values, Invoice $invoice ): MiscellaneousCharge
+	public static function createFromForm( array $values, \IPS\nexus\Invoice $invoice )
 	{
-		$obj = new static( $values['item_name'], new Money( $values['item_net_price'], $invoice->currency ) );
+		$obj = new static( $values['item_name'], new \IPS\nexus\Money( $values['item_net_price'], $invoice->currency ) );
 		$obj->quantity = $values['invoice_quantity'];
 		if ( $values['item_tax_rate'] )
 		{
@@ -95,11 +96,20 @@ class MiscellaneousCharge extends Charge
 		{
 			$obj->paymentMethodIds = array_keys( $values['item_paymethods'] );
 		}
+		if ( $values['item_physical'] )
+		{
+			$obj->physical = TRUE;
+			$obj->weight = $values['item_weight'];
+			if ( $values['item_shipmethods'] !== '*' )
+			{
+				$obj->shippingMethodIds = array_keys( $values['item_shipmethods'] );
+			}
+		}
 		if ( $values['item_pay_other'] )
 		{
 			$obj->payTo = $values['item_pay_to'];
 			$obj->commission = $values['item_commission'];
-			$obj->fee = new Money( $values['item_fee'], $invoice->currency );
+			$obj->fee = new \IPS\nexus\Money( $values['item_fee'], $invoice->currency );
 		}
 		return $obj;
 	}

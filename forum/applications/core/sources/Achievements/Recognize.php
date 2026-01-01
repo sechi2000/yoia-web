@@ -11,92 +11,77 @@
 namespace IPS\core\Achievements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use Exception;
-use IPS\Application;
-use IPS\Content;
-use IPS\Db;
-use IPS\Member;
-use IPS\Notification;
-use IPS\Patterns\ActiveRecord;
-use OutOfRangeException;
-use function defined;
-use function get_class;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Recognize
  */
-class Recognize extends ActiveRecord
+class _Recognize extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_member_recognize';
+	public static $databaseTable = 'core_member_recognize';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'r_';
+	public static $databasePrefix = 'r_';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons = array();
+	protected static $multitons = array();
 
 	/**
 	 * Get member object
 	 *
-	 * @return Member
+	 * @return \IPS\Member
 	 */
-	public function get__given_by(): Member
+	public function get__given_by(): \IPS\Member
 	{
-		return Member::load( $this->given_by );
+		return \IPS\Member::load( $this->given_by );
 	}
 
 	/**
 	 * Load a recognize row from the content item
 	 *
-	 * @param	Content						$content		Content item that has been rewarded
-	 * @return ActiveRecord
+	 * @param	\IPS\Content						$content		Content item that has been rewarded
+	 * @return \IPS\core\Achievements\Recognize
 	 */
-	public static function loadFromContent( Content $content ): ActiveRecord
+	public static function loadFromContent( $content ): \IPS\core\Achievements\Recognize
 	{
 		$idField = $content::$databaseColumnId;
 
 		/* Let any exceptions bubble up */
 		return static::constructFromData(
-			Db::i()->select( '*', 'core_member_recognize', [ 'r_content_class=? and r_content_id=?', get_class( $content ), $content->$idField ] )->first()
+			\IPS\Db::i()->select( '*', 'core_member_recognize', [ 'r_content_class=? and r_content_id=?', \get_class( $content ), $content->$idField ] )->first()
 		);
 	}
 
 	/**
 	 * Add a new recognize entry
 	 *
-	 * @param	Content						$content		Content item that is being rewarded
-	 * @param	Member							$member			Member to award
+	 * @param	\IPS\Content						$content		Content item that is being rewarded
+	 * @param	\IPS\Member							$member			Member to award
 	 * @param	int									$points			Number of points to add
-	 * @param Badge|NULL	$badge			Badge to assign (if any)
+	 * @param	\IPS\core\Achievements\Badge|NULL	$badge			Badge to assign (if any)
 	 * @param	string								$message		Custom message (if any)
-	 * @param	Member							$awardedBy		Awarded by
+	 * @param	\IPS\Member							$awardedBy		Awarded by
 	 * @param	bool								$showPublicly	Show this message to everyone
-	 * @return void
 	 */
-	public static function add( Content $content, Member $member, int $points, ?Badge $badge, string $message, Member $awardedBy, bool $showPublicly=FALSE ) : void
+	public static function add( $content, \IPS\Member $member, $points, $badge, $message, \IPS\Member $awardedBy, $showPublicly=FALSE )
 	{
 		$idField = $content::$databaseColumnId;
 		
 		/* Add to database */
 		$recognize = new static;
 		$recognize->member_id = $member->member_id;
-		$recognize->content_class = get_class( $content );
+		$recognize->content_class = \get_class( $content );
 		$recognize->content_id = $content->$idField;
 		$recognize->added = time();
 		$recognize->points = $points;
@@ -117,7 +102,7 @@ class Recognize extends ActiveRecord
 			$member->awardPoints( $points, 0, [], ['subject'], $recognize->id );
 		}
 
-		$notification = new Notification( Application::load( 'core' ), 'new_recognize', $member, [ $member, $recognize ], [ $recognize->id ] );
+		$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'new_recognize', $member, [ $member, $recognize ], [ $recognize->id ] );
 		$notification->recipients->attach( $member );
 		$notification->send();
 	}
@@ -125,9 +110,9 @@ class Recognize extends ActiveRecord
 	/**
 	 * Return the content object
 	 *
-	 * @return Content
+	 * @return \IPS\Content
 	 */
-	public function content(): Content
+	public function content()
 	{
 		$class = $this->content_class;
 		return $class::loadAndCheckPerms( $this->content_id );
@@ -136,32 +121,35 @@ class Recognize extends ActiveRecord
 	/**
 	 * Wrapper to get content.
 	 *
-	 * @return	Content|NULL
+	 * @return	\IPS\Content\Item|NULL
 	 * @note	This simply wraps content()
 	 */
-	public function contentWrapper() : Content|null
+	public function contentWrapper()
 	{
+		/* Get container, if valid */
+		$content = NULL;
+
 		try
 		{
-			return $this->content();
+			$content = $this->content();
 		}
-		catch( BadMethodCallException | OutOfRangeException ) { }
+		catch( \BadMethodCallException | \OutOfRangeException $e ) { }
 
-		return null;
+		return $content;
 	}
 	
 	/**
 	 * Return a badge, or null
 	 * 
-	 * @return NULL|Badge
+	 * @return NULL|\IPS\core\Achievements\Badge
 	 */
-	public function badge() : Badge|null
+	public function badge()
 	{
 		try
 		{
-			return Badge::load( $this->badge );
+			return \IPS\core\Achievements\Badge::load( $this->badge );
 		}
-		catch( OutOfRangeException ) { }
+		catch( \Exception $e ) { }
 		
 		return NULL;
 	}
@@ -169,15 +157,15 @@ class Recognize extends ActiveRecord
 	/**
 	 * Return a member or NULL if the member no longer exists
 	 * 
-	 * @return NULL|Member
+	 * @return NULL|\IPS\Member
 	 */
-	public function awardedBy() : Member|null
+	public function awardedBy()
 	{
 		try
 		{
-			return Member::load( $this->given_by );
+			return \IPS\Member::load( $this->given_by );
 		}
-		catch( OutOfRangeException ) { }
+		catch( \Exception $e ) { }
 		
 		return NULL;
 	}
@@ -187,26 +175,28 @@ class Recognize extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		try
 		{
+			$author = \IPS\Member::load( $this->member_id );
+
 			if ( $this->points )
 			{
 				/* Wade does it this way so I guess there's a reason. And let the reason be love */
-				Db::i()->update( 'core_members', "achievements_points = achievements_points - " . intval( $this->points ), [ 'member_id=?', $this->member_id ] );
-				Db::i()->delete( 'core_points_log', [ 'recognize=?', $this->id ] );
+				\IPS\Db::i()->update( 'core_members', "achievements_points = achievements_points - " . \intval( $this->points ), [ 'member_id=?', $this->member_id ] );
+				\IPS\Db::i()->delete( 'core_points_log', [ 'recognize=?', $this->id ] );
 			}
 
 			if ( $this->badge )
 			{
-				Db::i()->delete( 'core_member_badges', [ 'member=? and recognize=?', $this->member_id, $this->id ] );
+				\IPS\Db::i()->delete( 'core_member_badges', [ 'member=? and recognize=?', $this->member_id, $this->id ] );
 			}
 
 			/* Remove notifications */
-			Db::i()->delete( 'core_notifications', array( 'item_class=? and notification_key=? and item_id=? and extra=?', 'IPS\Member', 'new_recognize', $this->member_id, '[' . $this->id . ']' ) );
+			\IPS\Db::i()->delete( 'core_notifications', array( 'item_class=? and notification_key=? and item_id=? and extra=?', 'IPS\Member', 'new_recognize', $this->member_id, '[' . $this->id . ']' ) );
 		}
-		catch( Exception ) {}
+		catch( \Exception $e ) {}
 
 		parent::delete();
 	}

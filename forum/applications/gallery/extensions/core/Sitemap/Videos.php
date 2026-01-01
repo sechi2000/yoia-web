@@ -12,46 +12,28 @@
 namespace IPS\gallery\extensions\core\Sitemap;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Filter;
-use IPS\Content\Item;
-use IPS\core\extensions\core\Sitemap\Content;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\SitemapAbstract;
-use IPS\File;
-use IPS\gallery\Image;
-use IPS\Member;
-use IPS\Settings;
-use IPS\Sitemap;
-use UnderflowException;
-use function defined;
-use function intval;
-use function is_array;
-use const IPS\SITEMAP_MAX_PER_FILE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Support Videos in sitemaps
  */
-class Videos extends SitemapAbstract
+class _Videos
 {
 	/**
 	 * @brief	Recommended Settings
 	 */
-	public array $recommendedSettings = array();
+	public $recommendedSettings = array();
 
 	/**
 	 * Add settings for ACP configuration to the form
 	 *
 	 * @return	array
 	 */
-	public function settings(): array
+	public function settings()
 	{
 		return array();
 	}
@@ -61,9 +43,9 @@ class Videos extends SitemapAbstract
 	 *
 	 * @return	array
 	 */
-	public function getFilenames(): array
+	public function getFilenames()
 	{
-		$settings	= Settings::i()->sitemap_content_settings ? json_decode( Settings::i()->sitemap_content_settings, TRUE ) : array();
+		$settings	= \IPS\Settings::i()->sitemap_content_settings ? json_decode( \IPS\Settings::i()->sitemap_content_settings, TRUE ) : array();
 		$class		= 'IPS\\gallery\\Image';
 		$limit		= ( isset( $settings["sitemap_{$class::$title}_count"] ) ) ? $settings["sitemap_{$class::$title}_count"] : -1;
 
@@ -72,10 +54,10 @@ class Videos extends SitemapAbstract
 			return array();
 		}
 
-		$count	= Image::getItemsWithPermission( array( 'image_media=?', 1 ), NULL, 10, 'read', Filter::FILTER_AUTOMATIC, 0, new Member, FALSE, FALSE, FALSE, TRUE );
+		$count	= \IPS\gallery\Image::getItemsWithPermission( array( 'image_media=?', 1 ), NULL, 10, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, new \IPS\Member, FALSE, FALSE, FALSE, TRUE );
 		$files  = array();
 
-		$count = ceil( $count / SITEMAP_MAX_PER_FILE );
+		$count = ceil( $count / \IPS\SITEMAP_MAX_PER_FILE );
 		
 		for( $i=1; $i <= $count; $i++ )
 		{
@@ -89,21 +71,21 @@ class Videos extends SitemapAbstract
 	 * Generate the sitemap
 	 *
 	 * @param	string			$filename	The sitemap file to build (should be one returned from getFilenames())
-	 * @param	Sitemap	$sitemap	Sitemap object reference
-	 * @return	int|null
+	 * @param	\IPS\Sitemap	$sitemap	Sitemap object reference
+	 * @return	void
 	 */
-	public function generateSitemap( string $filename, Sitemap $sitemap ) : ?int
+	public function generateSitemap( $filename, $sitemap )
 	{
 		$entries	= array();
 		$lastId		= 0;
-		$settings	= Settings::i()->sitemap_content_settings ? json_decode( Settings::i()->sitemap_content_settings, TRUE ) : array();
+		$settings	= \IPS\Settings::i()->sitemap_content_settings ? json_decode( \IPS\Settings::i()->sitemap_content_settings, TRUE ) : array();
 		$class		= 'IPS\\gallery\\Image';
 
 		$exploded	= explode( '_', $filename );
 		$block		= (int) array_pop( $exploded );
-		$totalLimit	= ( isset( $settings["sitemap_{$class::$title}_count"] ) AND $settings["sitemap_{$class::$title}_count"] ) ? $settings["sitemap_{$class::$title}_count"] : Content::RECOMMENDED_ITEM_LIMIT;
-		$offset		= ( $block - 1 ) * SITEMAP_MAX_PER_FILE;
-		$limit		= SITEMAP_MAX_PER_FILE;
+		$totalLimit	= ( isset( $settings["sitemap_{$class::$title}_count"] ) AND $settings["sitemap_{$class::$title}_count"] ) ? $settings["sitemap_{$class::$title}_count"] : \IPS\core\extensions\core\Sitemap\Content::RECOMMENDED_ITEM_LIMIT;
+		$offset		= ( $block - 1 ) * \IPS\SITEMAP_MAX_PER_FILE;
+		$limit		= \IPS\SITEMAP_MAX_PER_FILE;
 		
 		if ( ! $totalLimit )
 		{
@@ -124,7 +106,7 @@ class Videos extends SitemapAbstract
 		/* Try to fetch the highest ID built in the last sitemap, if it exists */
 		try
 		{
-			$lastId = Db::i()->select( 'last_id', 'core_sitemap', array( array( 'sitemap=?', implode( '_', $exploded ) . '_' . ( $block - 1 ) ) ) )->first();
+			$lastId = \IPS\Db::i()->select( 'last_id', 'core_sitemap', array( array( 'sitemap=?', implode( '_', $exploded ) . '_' . ( $block - 1 ) ) ) )->first();
 
 			if( $lastId > 0 )
 			{
@@ -132,12 +114,12 @@ class Videos extends SitemapAbstract
 				$limitClause	= $limit;
 			}
 		}
-		catch( UnderflowException ){}
+		catch( \UnderflowException $e ){}
 
 		$idColumn = $class::$databaseColumnId;
-		foreach ( $class::getItemsWithPermission( $where, $class::$databasePrefix . $class::$databaseColumnId .' ASC', $limitClause, 'read', Filter::FILTER_PUBLIC_ONLY, Item::SELECT_IDS_FIRST, new Member, TRUE ) as $item )
+		foreach ( $class::getItemsWithPermission( $where, $class::$databasePrefix . $class::$databaseColumnId .' ASC', $limitClause, 'read', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY, \IPS\Content\Item::SELECT_IDS_FIRST, new \IPS\Member, TRUE ) as $item )
 		{
-			if( !$item->canView( new Member ) )
+			if( !$item->canView( new \IPS\Member ) )
 			{
 				continue;
 			}
@@ -148,16 +130,16 @@ class Videos extends SitemapAbstract
 			if ( isset( $item::$databaseColumnMap['last_comment'] ) )
 			{
 				$lastCommentField = $item::$databaseColumnMap['last_comment'];
-				if ( is_array( $lastCommentField ) )
+				if ( \is_array( $lastCommentField ) )
 				{
 					foreach ( $lastCommentField as $column )
 					{
-						$lastMod = DateTime::ts( $item->$column );
+						$lastMod = \IPS\DateTime::ts( $item->$column );
 					}
 				}
 				else
 				{
-					$lastMod = DateTime::ts( $item->$lastCommentField );
+					$lastMod = \IPS\DateTime::ts( $item->$lastCommentField );
 				}
 			}
 			
@@ -168,21 +150,21 @@ class Videos extends SitemapAbstract
 
 			/* Video sitemap data */
 			$data['video:video'] = array( 
-				'video:content_loc'	=> (string) File::get( 'gallery_Images', $item->original_file_name )->url->setScheme( ( mb_substr( Settings::i()->base_url, 0, 5 ) === 'https' ) ? 'https' : 'http' ),
+				'video:content_loc'	=> (string) \IPS\File::get( 'gallery_Images', $item->original_file_name )->url->setScheme( ( mb_substr( \IPS\Settings::i()->base_url, 0, 5 ) === 'https' ) ? 'https' : 'http' ),
 				'video:description'	=> $item->mapped('content'),
 				'video:title'		=> $item->mapped('title'),
 				'video:rating'		=> $item->mapped('rating_average'),
 				'video:view_count'	=> $item->mapped('views'),
-				'video:publication_date'	=> DateTime::ts( $item->date )->rfc3339(),
+				'video:publication_date'	=> \IPS\DateTime::ts( $item->date )->rfc3339(),
 				'video:uploader'	=> array( 0 => $item->author()->name, 'info' => (string) $item->author()->url() ),
 			);
 
 			if( $item->masked_file_name )
 			{
-				$data['video:video']['video:thumbnail_loc'] = (string) File::get( 'gallery_Images', $item->masked_file_name )->url->setScheme( ( mb_substr( Settings::i()->base_url, 0, 5 ) === 'https' ) ? 'https' : 'http' );
+				$data['video:video']['video:thumbnail_loc'] = (string) \IPS\File::get( 'gallery_Images', $item->masked_file_name )->url->setScheme( ( mb_substr( \IPS\Settings::i()->base_url, 0, 5 ) === 'https' ) ? 'https' : 'http' );
 			}
 		
-			$priority = ( $item->sitemapPriority() ?: ( intval($settings["sitemap_{$class::$title}_priority"] ?? Content::RECOMMENDED_ITEM_PRIORITY) ) );
+			$priority = ( $item->sitemapPriority() ?: ( \intval( isset( $settings["sitemap_{$class::$title}_priority"] ) ? $settings["sitemap_{$class::$title}_priority"] : \IPS\core\extensions\core\Sitemap\Content::RECOMMENDED_ITEM_PRIORITY ) ) );
 			if ( $priority !== -1 )
 			{
 				$data['priority'] = $priority;
@@ -193,18 +175,7 @@ class Videos extends SitemapAbstract
 			$lastId = $item->$idColumn;
 		}
 
-		$sitemap->buildSitemapFile( $filename, $entries, $lastId, array( 'video' => 'https://www.google.com/schemas/sitemap-video/1.1' ) );
+		$sitemap->buildSitemapFile( $filename, $entries, $lastId, array( 'video' => 'http://www.google.com/schemas/sitemap-video/1.1' ) );
 		return $lastId;
-	}
-
-	/**
-	 * Save settings for ACP configuration
-	 *
-	 * @param array $values Values
-	 * @return    void
-	 */
-	public function saveSettings( array $values ): void
-	{
-
 	}
 }

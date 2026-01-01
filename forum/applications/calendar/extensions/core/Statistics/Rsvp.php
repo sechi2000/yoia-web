@@ -11,38 +11,31 @@
 namespace IPS\calendar\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0') . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Rsvp extends Chart
+class _Rsvp extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'calendar_stats_rsvp';
+	public $controller = 'calendar_stats_rsvp';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
 	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): \IPS\Helpers\Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$chart	= new Database( $url, 'calendar_event_rsvp', 'rsvp_date', '', array(
+		$chart	= new \IPS\Helpers\Chart\Database( $url, 'calendar_event_rsvp', 'rsvp_date', '', array( 
 			'isStacked' => FALSE,
 			'backgroundColor' 	=> '#ffffff',
 			'hAxis'				=> array( 'gridlines' => array( 'color' => '#f5f5f5' ) ),
@@ -55,10 +48,10 @@ class Rsvp extends Chart
 		
 		foreach( array( 0,1,2 ) as $response )
 		{
-			$chart->addSeries( Member::loggedIn()->language()->addToStack('calendar_stats_rsvp_response_' . $response ), 'number', 'COUNT(*)', FALSE, $response );
+			$chart->addSeries( \IPS\Member::loggedIn()->language()->addToStack('calendar_stats_rsvp_response_' . $response ), 'number', 'COUNT(*)', FALSE, $response );
 		
 		}
-		$chart->title = Member::loggedIn()->language()->addToStack('calendar_stats_rsvp_title');
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('calendar_stats_rsvp_title');
 		$chart->availableTypes = array( 'AreaChart', 'ColumnChart', 'BarChart' );
 		
 		return $chart;

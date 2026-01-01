@@ -12,35 +12,22 @@
 namespace IPS\blog\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\blog\Entry\Category;
-use IPS\Db;
-use IPS\Node\Api\NodeController;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Blog Categories API
  */
-class entrycategories extends NodeController
+class _entrycategories extends \IPS\Node\Api\NodeController
 {
 
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\blog\Entry\Category';
+	protected $class = 'IPS\blog\Entry\Category';
 
 	/**
 	 * GET /blog/entrycategories
@@ -51,49 +38,47 @@ class entrycategories extends NodeController
 	 * @apiparam	string	sortDir	Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page	Page number
 	 * @apiparam	int		perPage	Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\blog\Entry\Category>
-	 * @return PaginatedResponse<Category>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\blog\Entry\Category>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = array();
 
-		/* @var Category $class */
 		$class = $this->class;
 
-		if ( isset( Request::i()->ids ) )
+		if ( isset( \IPS\Request::i()->ids ) )
 		{
 			$idField = $class::$databaseTable . '.' . $class::$databasePrefix . '.' . $class::$databaseColumnId;
-			$where[] = array( Db::i()->in( $idField, array_map( 'intval', explode( ',', Request::i()->ids ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( $idField, array_map( 'intval', explode( ',', \IPS\Request::i()->ids ) ) ) );
 		}
 
 		/* Blog */
-		if ( isset( Request::i()->blog ) )
+		if ( isset( \IPS\Request::i()->blog ) )
 		{
-			$where[] = array( 'entry_category_blog_id=?', intval( Request::i()->blog ) );
+			$where[] = array( 'entry_category_blog_id=?', \intval( \IPS\Request::i()->blog ) );
 		}
 
 		/* Sort */
-		if ( isset( Request::i()->sortBy ) and Request::i()->sortBy == 'position' )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'position' ) ) )
 		{
-			$sortBy = 'entry_category_' . Request::i()->sortBy;
+			$sortBy = 'entry_category_' . \IPS\Request::i()->sortBy;
 		}
 		else
 		{
 			$sortBy = 'entry_category_id';
 		}
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', 'blog_entry_categories', $where, "{$sortBy} {$sortDir}" ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			\IPS\Db::i()->select( '*', 'blog_entry_categories', $where, "{$sortBy} {$sortDir}" ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			'IPS\blog\Entry\Category',
-			Db::i()->select( 'COUNT(*)', 'blog_entry_categories', $where )->first(),
+			\IPS\Db::i()->select( 'COUNT(*)', 'blog_entry_categories', $where )->first(),
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 
@@ -102,10 +87,9 @@ class entrycategories extends NodeController
 	 * Get information about a specific entry category
 	 *
 	 * @param		int		$id			ID Number
-	 * @apireturn		\IPS\blog\Entry\Category
-	 * @return Response
+	 * @return		\IPS\blog\Entry\Category
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		return $this->_view( $id );
 	}
@@ -115,13 +99,11 @@ class entrycategories extends NodeController
 	 * Delete an entry category
 	 *
 	 * @param		int		$id			ID Number
-	 * @apireturn		void
+	 * @return		void
 	 * @throws		2B408/5	INVALID_ID		The category ID does not exist or the authorized user does not have permission to delete it
-	 * @return Response
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
-		/* @var Category $class */
 		$class = $this->class;
 
 		try
@@ -129,15 +111,15 @@ class entrycategories extends NodeController
 			$category = $class::load( $id );
 			if ( !$category->canDelete( $this->member ) )
 			{
-				throw new Exception( 'INVALID_ID', '2B408/5', 404 );
+				throw new \IPS\Api\Exception( 'INVALID_ID', '2B408/5', 404 );
 			}
 			$category->delete();
 
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2B408/6', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2B408/6', 404 );
 		}
 	}
 

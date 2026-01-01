@@ -10,244 +10,167 @@
 
 namespace IPS\Helpers\Chart;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DateTimeZone;
-use Exception;
-use IPS\core\Statistics\Chart as StatisticsChart;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Date;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\IPS;
 use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use Throwable;
-use UnderflowException;
-use function array_merge;
-use function defined;
-use function explode;
-use function file_get_contents;
-use function in_array;
-use function is_array;
-use function is_numeric;
-use function is_string;
-use function iterator_to_array;
-use function json_encode;
-use function mb_substr;
-use function var_export;
-use const IPS\TEMP_DIRECTORY;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Dynamic Chart Helper
  */
-abstract class Dynamic extends Chart
+abstract class _Dynamic extends \IPS\Helpers\Chart
 {
 	/**
 	 * @brief	URL
 	 */
-	public Url $url;
-
-	/**
-	 * @var Url|null
-	 */
-	public ?Url $baseURL = null;
+	public $url;
 
 	/**
 	 * @brief	$timescale (daily, weekly, monthly)
 	 */
-	public mixed $timescale = 'monthly';
+	public $timescale = 'monthly';
 
 	/**
 	 * @brief	Unique identifier for URLs
 	 */
-	public string $identifier	= '';
+	public $identifier	= '';
 	
 	/**
 	 * @brief	Start Date
 	 */
-	public mixed $start = NULL;
+	public $start;
 	
 	/**
 	 * @brief	End Date
 	 */
-	public mixed $end = NULL;
+	public $end;
 	
 	/**
 	 * @brief	Series
 	 */
-	protected array $series = array();
+	protected $series = array();
 	
 	/**
 	 * @brief	Title
 	 */
-	public ?string $title = NULL;
+	public $title;
 
 	/**
 	 * @brief	Description
 	 */
-	public ?string $description = NULL;
+	public $description;
 
 	/**
 	 * @brief	Google Chart Options
 	 */
-	public array $options = array();
+	public $options = array();
 	
 	/**
 	 * @brief	Type
 	 */
-	public mixed $type;
+	public $type;
 
 	/**
 	 * @brief	Search term
 	 */
-	public mixed $searchTerm = null;
+	public $searchTerm = null;
 	
 	/**
 	 * @brief	Available Types
 	 */
-	public array $availableTypes = array( 'AreaChart', 'LineChart', 'ColumnChart', 'BarChart', 'PieChart', 'Table' );
+	public $availableTypes = array( 'AreaChart', 'LineChart', 'ColumnChart', 'BarChart', 'PieChart', 'Table' );
 	
 	/**
 	 * @brief	Available Filters
 	 */
-	public array $availableFilters = array();
+	public $availableFilters = array();
 	
 	/**
 	 * @brief	Current Filters
 	 */
-	public array $currentFilters = array();
+	public $currentFilters = array();
 
 	/**
 	 * @brief	Plot zeros
 	 */
-	public bool $plotZeros = TRUE;
+	public $plotZeros = TRUE;
 	
 	/**
 	 * @brief	Value for number formatter
 	 */
-	public mixed $format = NULL;
+	public $format = NULL;
 
 	/**
 	 * @brief	Allow user to adjust interval (group by daily, monthly, etc.)
 	 */
-	public bool $showIntervals = TRUE;
+	public $showIntervals = TRUE;
 	
 	/**
 	 * @brief	Allow user to adjust date range
 	 */
-	public bool $showDateRange = TRUE;
+	public $showDateRange = TRUE;
 	
 	/**
 	 * @brief	Show save button
 	 */
-	public bool $showSave = TRUE;
+	public $showSave = TRUE;
 	
 	/**
 	 * @brief	If a warning about timezones needs to be shown
 	 */
-	public bool $timezoneError = FALSE;
+	public $timezoneError = FALSE;
 
 	/**
 	 * @brief	If we need to show a timezone warning, we usually include a link to learn more - set this to TRUE to hide the link
 	 */
-	public bool $hideTimezoneLink = FALSE;
+	public $hideTimezoneLink = FALSE;
 
 	/**
-	 * @brief	If set to an DateTime instance, minimum time will be checked against this value
+	 * @brief	If set to an \IPS\DateTime instance, minimum time will be checked against this value
 	 */
-	public ?DateTime $minimumDate = NULL;
+	public $minimumDate = NULL;
 
 	/**
 	 * @brief	Enable hourly filtering. USE WITH CAUTION.
 	 */
-	public bool $enableHourly	= FALSE;
+	public $enableHourly	= FALSE;
 
 	/**
 	 * @brief	Error(s) to show on chart UI
 	 */
-	public array $errors = array();
+	public $errors = array();
 	
 	/**
 	 * @brief	Saved custom filters
 	 */
-	public array $savedCustomFilters = array();
-
-	/**
-	 * @brief	Prefix passed to tables
-	 */
-	public string $tableLangPrefix = '';
-
-	/**
-	 * When downloading chart collections from the saved reports page, this indicates the type that the chart should load as by default
-	 *
-	 * @var string|null
-	 */
-	public static null|string $mergedChartType = null;
+	public $savedCustomFilters = array();
 		
 	/**
 	 * Constructor
 	 *
-	 * @param	Url	$url			The URL the chart will be displayed on
-	 * @param	string $title			Title
-	 * @param array $options		Options
-	 * @param string $defaultType	The default chart type
-	 * @param string $defaultTimescale	The default timescale to use
-	 * @param array $defaultTimes	The default start/end times to use
-	 * @param string $identifier		If there will be more than one chart per page, provide a unique identifier
-	 * @param DateTime|null $minimumDate	The earliest available date for this chart
+	 * @param	\IPS\Http\Url	$url			The URL the chart will be displayed on
+	 * @param	string			$title			Title
+	 * @param	array			$options		Options
+	 * @param	string			$defaultType	The default chart type
+	 * @param	string			$defaultTimescale	The default timescale to use
+	 * @param	array			$defaultTimes	The default start/end times to use
+	 * @param	string			$identifier		If there will be more than one chart per page, provide a unique identifier
+	 * @param	\IPS\DateTime|NULL	$minimumDate	The earliest available date for this chart
+	 * @see		<a href='https://google-developers.appspot.com/chart/interactive/docs/gallery'>Charts Gallery - Google Charts - Google Developers</a>
 	 * @return	void
-	 *@see		<a href='https://google-developers.appspot.com/chart/interactive/docs/gallery'>Charts Gallery - Google Charts - Google Developers</a>
 	 */
-	public function __construct( Url $url, string $title='', array $options=array(), string $defaultType='AreaChart', string $defaultTimescale='monthly', array $defaultTimes=array( 'start' => 0, 'end' => 0 ), string $identifier='', DateTime $minimumDate=null )
+	public function __construct( \IPS\Http\Url $url, $title='', $options=array(), $defaultType='AreaChart', $defaultTimescale='monthly', $defaultTimes=array( 'start' => 0, 'end' => 0 ), $identifier='', $minimumDate=NULL )
 	{
-
-		if ( isset( static::$mergedChartType ) )
-		{
-			$defaultType = static::$mergedChartType;
-		}
-
 		/* If we are deleting a chart, just do that now and redirect */
-		if( isset( Request::i()->deleteChart ) )
+		if( isset( \IPS\Request::i()->deleteChart ) )
 		{
-			Session::i()->csrfCheck();
-			$where = array( 'chart_id=? and (chart_member IS NULL OR chart_member=0 OR chart_member=?)', Request::i()->deleteChart, Member::loggedIn()->member_id );
-			try
-			{
-				$reportID = Db::i()->select( "chart_report_id", "core_saved_charts", $where )->first();
-			}
-			catch ( UnderflowException )
-			{
-				$reportID = null;
-			}
-			Db::i()->delete( 'core_saved_charts', $where );
-			$url = Request::i()->url()->stripQueryString( array( 'deleteChart', 'chartId', 'csrfKey', 'wasConfirmed' ) );
-			if ( isset( $reportID ) )
-			{
-				$url = $url->setQueryString( "report_id", $reportID );
-			}
-
-			if ( Request::i()->do === 'getChart' )
-			{
-				$url = $url->stripQueryString([ 'do' ]);
-			}
-
-			Output::i()->redirect( $url, 'chart_deleted' );
+			\IPS\Session::i()->csrfCheck();
+			\IPS\Db::i()->delete( 'core_saved_charts', array( 'chart_id=? and chart_member=?', \IPS\Request::i()->deleteChart, \IPS\Member::loggedIn()->member_id ) );
+			\IPS\Output::i()->redirect( \IPS\Request::i()->url()->stripQueryString( array( 'deleteChart', 'chartId', 'csrfKey' ) ), 'chart_deleted' );
 		}
 
 		if ( !isset( $options['chartArea'] ) )
@@ -258,22 +181,22 @@ abstract class Dynamic extends Chart
 			);
 		}
 
-		if( isset( Request::i()->chartId ) AND Request::i()->chartId != '_default' )
+		if( isset( \IPS\Request::i()->chartId ) AND \IPS\Request::i()->chartId != '_default' )
 		{
-			$url = $url->setQueryString( 'chartId', Request::i()->chartId );
+			$url = $url->setQueryString( 'chartId', \IPS\Request::i()->chartId );
 		}
 		
 		$this->baseURL		= $url;
 		$this->title		= $title;
 		$this->options		= $options;
 		$this->timescale	= $defaultTimescale;
-		$this->start		= $defaultTimes['start'] ?: DateTime::create()->sub( new DateInterval('P6M') );
-		$this->end			= $defaultTimes['end'] ?: DateTime::create();
+		$this->start		= $defaultTimes['start'] ?: \IPS\DateTime::create()->sub( new \DateInterval('P6M') );
+		$this->end			= $defaultTimes['end'] ?: \IPS\DateTime::create();
 		$this->minimumDate	= $minimumDate;
 
-		if ( isset( Request::i()->type[ $this->identifier ] ) and in_array( Request::i()->type[ $this->identifier ], $this->availableTypes ) )
+		if ( isset( \IPS\Request::i()->type[ $this->identifier ] ) and \in_array( \IPS\Request::i()->type[ $this->identifier ], $this->availableTypes ) )
 		{
-			$this->type = Request::i()->type[ $this->identifier ];
+			$this->type = \IPS\Request::i()->type[ $this->identifier ];
 			$url = $url->setQueryString( 'type', array( $this->identifier => $this->type ) );
 		}
 		else
@@ -282,18 +205,18 @@ abstract class Dynamic extends Chart
 		}
 
 		/* Are we searching? The chart controller should inspect this property if it supports searching to limit the series it adds. */
-		if( isset( $this->options['limitSearch'] ) AND isset( Request::i()->search[ $this->identifier ] ) )
+		if( isset( $this->options['limitSearch'] ) AND isset( \IPS\Request::i()->search[ $this->identifier ] ) )
 		{
-			$this->searchTerm = Request::i()->search[ $this->identifier ];
+			$this->searchTerm = \IPS\Request::i()->search[ $this->identifier ];
 		}
 
 		/* Change timescale */
-		if ( isset( Request::i()->timescale[ $this->identifier ] ) and in_array( Request::i()->timescale[ $this->identifier ], array( 'hourly', 'daily', 'weekly', 'monthly' ) ) )
+		if ( isset( \IPS\Request::i()->timescale[ $this->identifier ] ) and \in_array( \IPS\Request::i()->timescale[ $this->identifier ], array( 'hourly', 'daily', 'weekly', 'monthly' ) ) )
 		{
-			if( Request::i()->timescale[ $this->identifier ] != 'hourly' OR ( Request::i()->timescale[ $this->identifier ] == 'hourly' AND $this->enableHourly === TRUE ) )
+			if( \IPS\Request::i()->timescale[ $this->identifier ] != 'hourly' OR ( \IPS\Request::i()->timescale[ $this->identifier ] == 'hourly' AND $this->enableHourly === TRUE ) )
 			{
-				$this->timescale = Request::i()->timescale[ $this->identifier ];
-				$url = $url->setQueryString( 'timescale', array( $this->identifier => Request::i()->timescale[ $this->identifier ] ) );
+				$this->timescale = \IPS\Request::i()->timescale[ $this->identifier ];
+				$url = $url->setQueryString( 'timescale', array( $this->identifier => \IPS\Request::i()->timescale[ $this->identifier ] ) );
 			}
 		}
 
@@ -304,26 +227,26 @@ abstract class Dynamic extends Chart
 		}
 		else
 		{
-			$this->addHeader( Member::loggedIn()->language()->addToStack('date'), ( $this->timescale == 'none' OR $this->timescale == 'hourly' ) ? 'datetime' : 'date' );
+			$this->addHeader( \IPS\Member::loggedIn()->language()->addToStack('date'), ( $this->timescale == 'none' OR $this->timescale == 'hourly' ) ? 'datetime' : 'date' );
 		}
 
-		if ( isset( Request::i()->start[ $this->identifier ] ) )
+		if ( isset( \IPS\Request::i()->start[ $this->identifier ] ) )
 		{
 			try
 			{
 				$originalStart = $this->start;
 
-				if( !Request::i()->start[ $this->identifier ] )
+				if( !\IPS\Request::i()->start[ $this->identifier ] )
 				{
 					$this->start = 0;
 				}
-				elseif ( is_numeric( Request::i()->start[ $this->identifier ] ) )
+				elseif ( \is_numeric( \IPS\Request::i()->start[ $this->identifier ] ) )
 				{
-					$this->start = DateTime::ts( (int) Request::i()->start[ $this->identifier ] );
+					$this->start = \IPS\DateTime::ts( \IPS\Request::i()->start[ $this->identifier ] );
 				}
 				else
 				{
-					$this->start = new DateTime( Date::_convertDateFormat( Request::i()->start[ $this->identifier ] ), new DateTimeZone( Member::loggedIn()->timezone ) );
+					$this->start = new \IPS\DateTime( \IPS\Helpers\Form\Date::_convertDateFormat( \IPS\Request::i()->start[ $this->identifier ] ), new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) );
 				}
 
 				if( $this->minimumDate > $this->start )
@@ -341,24 +264,24 @@ abstract class Dynamic extends Chart
 					$url = $url->setQueryString( 'start', array( $this->identifier => $this->start->getTimestamp() ) );
 				}
 			}
-			catch ( Exception $e ) {}
+			catch ( \Exception $e ) {}
 		}
 
-		if ( isset( Request::i()->end[ $this->identifier ] ) )
+		if ( isset( \IPS\Request::i()->end[ $this->identifier ] ) )
 		{
 			try
 			{
-				if( !Request::i()->end[ $this->identifier ] )
+				if( !\IPS\Request::i()->end[ $this->identifier ] )
 				{
-					$this->end = DateTime::create();
+					$this->end = \IPS\DateTime::create();
 				}
-				elseif ( is_numeric( Request::i()->end[ $this->identifier ] ) )
+				elseif ( \is_numeric( \IPS\Request::i()->end[ $this->identifier ] ) )
 				{
-					$this->end = DateTime::ts( (int) Request::i()->end[ $this->identifier ] );
+					$this->end = \IPS\DateTime::ts( \IPS\Request::i()->end[ $this->identifier ] );
 				}
 				else
 				{
-					$this->end = new DateTime( Date::_convertDateFormat( Request::i()->end[ $this->identifier ] ), new DateTimeZone( Member::loggedIn()->timezone ) );
+					$this->end = new \IPS\DateTime( \IPS\Helpers\Form\Date::_convertDateFormat( \IPS\Request::i()->end[ $this->identifier ] ), new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) );
 				}
 
 				/* The end date should include items to the end of the day */
@@ -366,85 +289,86 @@ abstract class Dynamic extends Chart
 
 				$url = $url->setQueryString( 'end', array( $this->identifier => $this->end->getTimestamp() ) );
 			}
-			catch ( Exception $e ) {}
+			catch ( \Exception $e ) {}
 		}	
 		
-		if ( isset( Request::i()->filters[ $this->identifier ] ) )
+		if ( isset( \IPS\Request::i()->filters[ $this->identifier ] ) )
 		{
 			$url = $url->setQueryString( 'filters', '' );
 		}
 		
 		$this->url = $url;
 		
-		if ( Member::loggedIn()->timezone and in_array( Member::loggedIn()->timezone, DateTimeZone::listIdentifiers() ) )
+		if ( \IPS\Member::loggedIn()->timezone and \in_array( \IPS\Member::loggedIn()->timezone, \DateTimeZone::listIdentifiers() ) )
 		{
 			try
 			{
-				$r = Db::i()->query( "SELECT TIMEDIFF( NOW(), CONVERT_TZ( NOW(), @@session.time_zone, '" . Db::i()->escape_string( Member::loggedIn()->timezone ) . "' ) );" )->fetch_row();
+				$r = \IPS\Db::i()->query( "SELECT TIMEDIFF( NOW(), CONVERT_TZ( NOW(), @@session.time_zone, '" . \IPS\Db::i()->escape_string( \IPS\Member::loggedIn()->timezone ) . "' ) );" )->fetch_row();
 				if ( $r[0] === NULL )
 				{
 					$this->timezoneError = TRUE;
 				}
 			}
-			catch ( Db\Exception $e )
+			catch ( \IPS\Db\Exception $e )
 			{
 				$this->timezoneError = TRUE;
 			}
 		}
 
 		/* If we have requested a saved chart, load its filters */
-		if( isset( Request::i()->chartId ) AND is_numeric( Request::i()->chartId ) AND !isset( Request::i()->filters ) )
+		if( isset( \IPS\Request::i()->chartId ) AND \IPS\Request::i()->chartId != '_default' AND !isset( \IPS\Request::i()->filters ) )
 		{
 			foreach( $this->loadAvailableChartTabs() as $chart )
 			{
-				if( $chart['chart_id'] == Request::i()->chartId )
+				if( $chart['chart_id'] == \IPS\Request::i()->chartId )
 				{
 					$filters = array();
 					foreach( json_decode( $chart['chart_configuration'], true ) as $key => $value )
 					{
-						if ( mb_substr( $key, 0, 11 ) == 'customform_' )
+						if ( \mb_substr( $key, 0, 11 ) == 'customform_' )
 						{
-							$this->savedCustomFilters[ mb_substr( $key, 11 ) ] = $value;
+							$this->savedCustomFilters[ \mb_substr( $key, 11 ) ] = $value;
 						}
 						else
 						{
 							$filters[ $key ] = $value;
 						}
 					}
-					Request::i()->filters = array( $this->identifier => $filters );
+					\IPS\Request::i()->filters = array( $this->identifier => $filters );
 				}
 			}
 		}
 		
-		foreach( Request::i() as $key => $value )
+		foreach( \IPS\Request::i() as $key => $value )
 		{
-			if ( $value and mb_substr( $key, 0, 11 ) === 'customform_' )
+			if ( $value and \mb_substr( $key, 0, 11 ) === 'customform_' )
 			{
-				$name = mb_substr( preg_replace( '#' . $this->identifier . '#', '', $key ), 11 );
+				$name = \mb_substr( preg_replace( '#' . $this->identifier . '#', '', $key ), 11 );
 				
 				$this->savedCustomFilters[ $name ] = $value;
 			}
 		}
 	}
-
+	
 	/**
 	 * Compile Data for Output
 	 *
-	 * @return    void
+	 * @param	array	$data	The data
+	 * @return	void
 	 */
-	abstract public function compileForOutput() : void;
+	abstract public function compileForOutput();
 	
 	/**
 	 * Get the chart output
 	 *
 	 * @return string
 	 */
-	abstract public function getOutput(): string;
+	abstract public function getOutput();
 
 	/**
 	 * @brief	Form to save filters
 	 */
-	public ?Form $form	= NULL;
+	public $form	= NULL;
 
 	/**
 	 * HTML
@@ -456,8 +380,8 @@ abstract class Dynamic extends Chart
 		try
 		{
 			/* Generate a form so we can save our filters as a new saved chart */
-			$this->form	= new Form( 'form_' . $this->identifier );
-			$this->form->class = 'ipsForm--vertical ipsForm--chart-custom-filters';
+			$this->form	= new \IPS\Helpers\Form;
+			$this->form->class = 'ipsForm_vertical';
 
 			if ( $this->customFiltersForm )
 			{
@@ -471,165 +395,102 @@ abstract class Dynamic extends Chart
 			}
 
 			/* If we have a sub selector from a node form, add on the identifier and pass off to the form to show the ajax */
-			if ( isset( Request::i()->_nodeSelectName ) and Request::i()->_nodeSelectName )
+			if ( \IPS\Request::i()->_nodeSelectName )
 			{
-				Request::i()->_nodeSelectName = $this->identifier . Request::i()->_nodeSelectName;
+				\IPS\Request::i()->_nodeSelectName = $this->identifier . \IPS\Request::i()->_nodeSelectName;
 				return (string) $this->getCustomFiltersForm();
 			}
-
+			
 			/* We have an existing chart ID */
-			if( isset( Request::i()->chartId ) AND is_numeric( Request::i()->chartId ) )
+			if( isset( \IPS\Request::i()->chartId ) AND \IPS\Request::i()->chartId != '_default' )
 			{
 				$title = '';
 
-				foreach( $this->loadSavedCharts() as $chart )
+				foreach( $this->loadAvailableChartTabs() as $chart )
 				{
-					if( $chart['chart_id'] == Request::i()->chartId )
+					if( $chart['chart_id'] == \IPS\Request::i()->chartId )
 					{
 						$title = $chart['chart_title'];
 						break;
 					}
 				}
-
+				
 				$custom = array();
-				$chartFilters = ( isset( Request::i()->chartFilters ) and Request::i()->chartFilters ) ? Request::i()->chartFilters : array();
-				$this->timescale = ( isset( Request::i()->timescale ) and in_array( Request::i()->timescale[ $this->identifier ], ['hourly', 'daily', 'monthly', 'weekly'] ) ) ? Request::i()->timescale[ $this->identifier ] : $chart['chart_timescale'] ?? 'monthly';
-
-
-				foreach( Request::i() as $key => $value )
+				$chartFilters = ( isset( \IPS\Request::i()->chartFilters ) and \IPS\Request::i()->chartFilters ) ? \IPS\Request::i()->chartFilters : array();
+				$this->timescale = ( isset( \IPS\Request::i()->timescale ) and \IPS\Request::i()->timescale[ $this->identifier ] ) ? \IPS\Request::i()->timescale[ $this->identifier ] : $chart['chart_timescale'] ?? 'monthly';
+				
+				foreach( \IPS\Request::i() as $key => $value )
 				{
-					if ( mb_substr( $key, 0, 11 ) === 'customform_' )
+					if ( \mb_substr( $key, 0, 11 ) === 'customform_' )
 					{
 						$custom[ preg_replace( '#' . $this->identifier . '#', '', $key ) ] = $value;
 					}
 				}
-
-				$this->form->add( new Text( 'custom_chart_title', $title, TRUE ) );
+				
+				$this->form->add( new \IPS\Helpers\Form\Text( 'custom_chart_title', $title, TRUE ) );
 
 				if( $values = $this->form->values() )
 				{
-					Db::i()->update( 'core_saved_charts', array( 'chart_title' => $values['custom_chart_title'] ), array( 'chart_id=? AND chart_member=?', Request::i()->chartId, Member::loggedIn()->member_id ) );
+					\IPS\Db::i()->update( 'core_saved_charts', array( 'chart_title' => $values['custom_chart_title'] ), array( 'chart_id=? AND chart_member=?', \IPS\Request::i()->chartId, \IPS\Member::loggedIn()->member_id ) );
 
 					/* And then return the output we need */
-					Output::i()->json( array(
+					\IPS\Output::i()->json( array(
 						'title'		=> $values['custom_chart_title']
 					)	);
 				}
 
 				/* And we want to save our filter updates */
-				if( isset( Request::i()->saveFilters ) )
+				if( isset( \IPS\Request::i()->saveFilters ) )
 				{
-					Db::i()->update( 'core_saved_charts', array( 'chart_configuration'	=> json_encode( array_merge( $chartFilters, $custom ) ), 'chart_timescale' => Request::i()->timescale ?? $this->timescale ?? 'monthly' ), array( 'chart_id=? AND chart_member=?', Request::i()->chartId, Member::loggedIn()->member_id ) );
+					\IPS\Db::i()->update( 'core_saved_charts', array( 'chart_configuration'	=> json_encode( array_merge( $chartFilters, $custom ) ), 'chart_timescale' => \IPS\Request::i()->timescale ?? $this->timescale ?? 'monthly' ), array( 'chart_id=? AND chart_member=?', \IPS\Request::i()->chartId, \IPS\Member::loggedIn()->member_id ) );
 				}
 			}
 			/* We are not viewing a saved chart */
 			else
 			{
-				Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_stats.js', 'core' ) );
-				Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/statistics.css', 'core', 'admin' ) );
-				Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/reports.css', 'core', 'admin' ) );
-
-				$reports = iterator_to_array( Db::i()->select( "*", "core_reports", order: "report_title ASC" ) );
-				$reportOptions = [];
-				$defaultOption = false;
-				foreach( $reports as $row )
-				{
-					$defaultOption = $defaultOption ?: "report_" . $row["id"];
-					$reportOptions["report_" . $row['id']] = $row['report_title'];
-				}
-
-				$noTabs = (bool) $this->extension?->noTabs;
-				$this->form->add( new YesNo( "statsreports_show_all_members", $noTabs, false, ['disabled' => $noTabs] ) );
-				$globalTogglesOn = ['statsreports_report_select'];
-				if ( empty( $reports ) )
-				{
-					$globalTogglesOn[] = "statsreports_report_new_title";
-				}
-
-				$this->form->add( new YesNo( "statsreports_include_in_report", false, false, [ "togglesOn" => $globalTogglesOn ] ) );
-
-				// if there are saved reports, allow user to select one of them
-				if ( !empty( $reportOptions ) )
-				{
-					// todo an autocomplete field is probably a better UX when there could be dozens of reports saved
-					$this->form->add( new Select( "statsreports_report", $defaultOption, false, [
-						"unlimited"        => false,
-						"unlimitedLang"    => "statsreports_report_new",
-						"unlimitedToggles" => [
-							'statsreports_report_new_title'
-						],
-						"options"          => $reportOptions,
-					], id: 'statsreports_report_select' ) );
-				}
+				$this->form->add( new \IPS\Helpers\Form\Text( 'custom_chart_title', NULL, TRUE ) );
 				
-				$this->form->add( new Text( "statsreports_report_new_title", $this->title, null, id: "statsreports_report_new_title" ) );
-				$this->form->add( new Text( 'custom_chart_title', $this->title, true ) );
-
 				if( $values = $this->form->values() )
 				{
 					$custom = array();
-					foreach( Request::i() as $key => $value )
+					foreach( \IPS\Request::i() as $key => $value )
 					{
-						if ( mb_substr( $key, 0, 11 ) === 'customform_' )
+						if ( \mb_substr( $key, 0, 11 ) === 'customform_' )
 						{
 							$custom[ preg_replace( '#' . $this->identifier . '#', '', $key ) ] = $value;
 						}
 					}
-
-					$chartFilters = ( isset( Request::i()->chartFilters ) and Request::i()->chartFilters ) ? Request::i()->chartFilters : array();
-
-					// is it saved to a report?
-					$reportID = null;
-					if ( @$values['statsreports_include_in_report'] )
-					{
-						if ( isset( $values['statsreports_report'] ) and $values['statsreports_report'] )
-						{
-							$reportID = (int) explode( '_', $values['statsreports_report'], 2 )[1];
-						}
-						else
-						{
-							$title = $values['statsreports_report_new_title'];
-							$reportID = Db::i()->insert( "core_reports", [ "report_title" => $title] );
-						}
-					}
-
-					if ( $noTabs )
-					{
-						$values['statsreports_show_all_members'] = true;
-					}
-
-					$data =  array(
-						'chart_member'			=> @$values['statsreports_show_all_members'] ? 0 : Member::loggedIn()->member_id, // we make the member "0" when the show to all members option is enabled
-						'chart_controller'		=> $this->getController(),
-						'chart_configuration'	=> json_encode( array_merge( $chartFilters, $custom ) ),
-						'chart_timescale'		=> Request::i()->timescale ?? $this->timescale ?? 'monthly',
-						'chart_title'			=> $values['custom_chart_title'],
-						'chart_report_id'       => $reportID
-					);
-
+					
+					$chartFilters = ( isset( \IPS\Request::i()->chartFilters ) and \IPS\Request::i()->chartFilters ) ? \IPS\Request::i()->chartFilters : array();
+											
 					/* Store the new chart */
-					$id = Db::i()->insert( 'core_saved_charts', $data );
+					$id = \IPS\Db::i()->insert( 'core_saved_charts', array(
+						'chart_member'			=> \IPS\Member::loggedIn()->member_id,
+						'chart_controller'		=> \IPS\Request::i()->app . '_' . \IPS\Request::i()->module . '_' . \IPS\Request::i()->controller . ( \IPS\Request::i()->tab ? '_' . \IPS\Request::i()->tab : '' ),
+						'chart_configuration'	=> json_encode( array_merge( $chartFilters, $custom ) ),
+						'chart_timescale'		=> \IPS\Request::i()->timescale ?? $this->timescale ?? 'monthly',
+						'chart_title'			=> $values['custom_chart_title'],
+					) );
 
 					/* Set some input parameters */
 					$this->url					= $this->url->setQueryString( 'chartId', $id );
-					Request::i()->chartId	= $id;
-					Request::i()->filters	= array( $this->identifier => Request::i()->chartFilters );
+					\IPS\Request::i()->chartId	= $id;
+					\IPS\Request::i()->filters	= array( $this->identifier => \IPS\Request::i()->chartFilters );
 
-					$this->currentFilters		= Request::i()->filters;
-
-					if ( isset( Request::i()->filters[ $this->identifier ] ) )
+					$this->currentFilters		= \IPS\Request::i()->filters;
+					
+					if ( isset( \IPS\Request::i()->filters[ $this->identifier ] ) )
 					{
 						$this->url = $this->url->setQueryString( 'filters', array( $this->identifier => $this->currentFilters ) );
 					}
 
 					/* Reset form, since template looks for it and it should not be set for a saved chart */
-					$this->form	= new Form;
-					$this->form->class = 'ipsForm--vertical ipsForm--chart-title';
-					$this->form->add( new Text( 'custom_chart_title', $values['custom_chart_title'], TRUE ) );
+					$this->form	= new \IPS\Helpers\Form;
+					$this->form->class = 'ipsForm_vertical';
+					$this->form->add( new \IPS\Helpers\Form\Text( 'custom_chart_title', $values['custom_chart_title'], TRUE ) );
 
 					/* And then return the output we need */
-					Output::i()->json( array(
-						'reportURL' => ($data['chart_member'] and !$data['chart_report_id']) ? null : Url::internal( "app=core&module=overview&controller=mycharts&highlight={$id}" . ( $data['chart_report_id'] ? "&report_id={$data['chart_report_id']}" : "" ) ),
+					\IPS\Output::i()->json( array(
 						'tabHref'	=> $this->url->stripQueryString( 'filters' ),
 						'chartId'	=> $id,
 						'tabId'		=> md5( $this->url->acpQueryString() ),
@@ -645,27 +506,27 @@ abstract class Dynamic extends Chart
 			}
 			else
 			{
-				$output = Member::loggedIn()->language()->addToStack('chart_no_results');
+				$output = \IPS\Member::loggedIn()->language()->addToStack('chart_no_results');
 			}
 
 			/* Display */
-			if ( Request::i()->noheader )
+			if ( \IPS\Request::i()->noheader )
 			{
 				return $output;
 			}
 			else
 			{
-				$chartOutput = Theme::i()->getTemplate( 'global', 'core', 'global' )->dynamicChart( $this, $output );
-
+				$chartOutput = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->dynamicChart( $this, $output );
+				
 				/* If we're not showing filter tabs, just return here. */
 				if ( !$this->showFilterTabs )
 				{
 					return $chartOutput;
 				}
 
-				if( !Request::i()->isAjax() OR ( Request::i()->tab AND !Request::i()->chartId ) )
+				if( !\IPS\Request::i()->isAjax() OR ( \IPS\Request::i()->tab AND !\IPS\Request::i()->chartId ) )
 				{
-					return Theme::i()->getTemplate( 'global', 'core' )->tabs( $this->getChartTabs(), ( isset( Request::i()->chartId ) ) ? Request::i()->chartId : NULL, $chartOutput, $this->url, 'chartId', 'ipsTabs--small' );
+					return \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $this->getChartTabs(), ( isset( \IPS\Request::i()->chartId ) ) ? \IPS\Request::i()->chartId : NULL, $chartOutput, $this->url, 'chartId', 'ipsTabs_small ipsTabs_contained' );
 				}
 				else
 				{
@@ -673,51 +534,37 @@ abstract class Dynamic extends Chart
 				}
 			}
 		}
-		catch ( Exception|Throwable $e )
+		catch ( \Exception $e )
 		{
-			IPS::exceptionHandler( $e );
-			return '';
+			\IPS\IPS::exceptionHandler( $e );
+		}
+		catch ( \Throwable $e )
+		{
+			\IPS\IPS::exceptionHandler( $e );
 		}
 	}
-
-	/**
-	 * Get the "controller" to use when saving this chart
-	 *
-	 * @return string
-	 */
-	public function getController() : string
-	{
-		if ( is_string( $this->extension?->controller ) )
-		{
-			return $this->extension->controller;
-		}
-
-		return Request::i()->app . '_' . Request::i()->module . '_' . Request::i()->controller . ( Request::i()->tab ? '_' . Request::i()->tab : '' );
-	}
-
+	
 	/**
 	 * @brief	Show filter tabs
 	 */
-	public bool $showFilterTabs = TRUE;
+	public $showFilterTabs = TRUE;
 
 	/**
 	 * @brief	Cached tab data
 	 */
-	protected ?array $availableChartTabs	= NULL;
-
-	protected ?array $savedCharts = null;
-
+	protected $availableChartTabs	= NULL;
+	
 	/**
 	 * @Brief	Extension
 	 */
-	public ?StatisticsChart $extension = NULL;
+	public $extension = NULL;
 
 	/**
 	 * Retrieve tabs based on saved charts
 	 *
 	 * @return array
 	 */
-	protected function getChartTabs(): array
+	protected function getChartTabs()
 	{
 		$tabs	= array( '_default' => 'dynamic_chart_overview' );
 
@@ -732,65 +579,49 @@ abstract class Dynamic extends Chart
 	/**
 	 * Load and return available chart tabs
 	 *
-	 * @return array|null
+	 * @return array
 	 */
-	protected function loadAvailableChartTabs() : ?array
+	protected function loadAvailableChartTabs()
 	{
-		if ( $this->availableChartTabs === null )
+		if( $this->availableChartTabs === NULL )
 		{
-			if ( $this->extension?->noTabs )
+			if ( $this->extension !== NULL )
 			{
-				$this->availableChartTabs = [];
+				$this->availableChartTabs = iterator_to_array( \IPS\Db::i()->select( '*', 'core_saved_charts', array( 'chart_member=? AND chart_controller=?', \IPS\Member::loggedIn()->member_id, $this->extension->controller ) ) );
 			}
 			else
 			{
-				$this->availableChartTabs = iterator_to_array( Db::i()->select( '*', 'core_saved_charts', ['chart_member=? AND chart_controller=? AND chart_report_id IS NULL', Member::loggedIn()->member_id, $this->getController()] ) );
+				$this->availableChartTabs = iterator_to_array( \IPS\Db::i()->select( '*', 'core_saved_charts', array( 'chart_member=? AND chart_controller=?', \IPS\Member::loggedIn()->member_id, \IPS\Request::i()->app . '_' . \IPS\Request::i()->module . '_' . \IPS\Request::i()->controller . ( \IPS\Request::i()->tab ? '_' . \IPS\Request::i()->tab : '' ) ) ) );
 			}
 		}
 
 		return $this->availableChartTabs;
 	}
-
-
-	/**
-	 * Load and return available chart tabs
-	 *
-	 * @return array|null
-	 */
-	protected function loadSavedCharts() : ?array
-	{
-		if ( $this->savedCharts === null )
-		{
-			$this->savedCharts = iterator_to_array( Db::i()->select( '*', 'core_saved_charts', ['(chart_member=? OR chart_member=0 OR chart_member IS NULL) AND chart_controller=?', Member::loggedIn()->member_id, $this->getController()] ) );
-		}
-
-		return $this->savedCharts;
-	}
-
+	
 	/**
 	 * Set extension
 	 *
-	 * @param StatisticsChart $ext	Extension
+	 * @param	\IPS\core\Statistics\Chart	$ext	Extension
 	 * @return	void
 	 */
-	public function setExtension( StatisticsChart $ext ) : void
+	public function setExtension( \IPS\core\Statistics\Chart $ext )
 	{
 		$this->extension = $ext;
-
+		
 		$this->availableChartTabs = NULL;
 	}
-
+		
 	/**
 	 * Flip URL Filter
 	 *
-	 * @param string $filter	The Filter
-	 * @return	Url
+	 * @param	string	$filter	The Filter
+	 * @return	\IPS\Http\Url
 	 */
-	public function flipUrlFilter( string $filter ): Url
+	public function flipUrlFilter( $filter )
 	{
 		$filters = $this->currentFilters;
 		
-		if ( in_array( $filter, $filters ) )
+		if ( \in_array( $filter, $filters ) )
 		{
 			unset( $filters[ array_search( $filter, $filters ) ] );
 		}
@@ -807,14 +638,8 @@ abstract class Dynamic extends Chart
 	 *
 	 * @return array
 	 */
-	protected function initData(): array
+	protected function initData()
 	{
-		/* The JS can set this to "undefined" so let's make sure it's a valid value */
-		if ( !in_array( $this->timescale, ["none", "hourly", "daily", "monthly", "weekly"] ) )
-		{
-			$this->timescale = "monthly";
-		}
-
 		/* Init data */
 		$data = array();
 		if ( $this->start AND $this->timescale !== 'none' )
@@ -827,13 +652,13 @@ abstract class Dynamic extends Chart
 					case 'hourly':
 						$data[ $date->format( 'Y-n-j-h-i-s' ) ] = array();
 
-						$date->add( new DateInterval( 'PT1H' ) );
+						$date->add( new \DateInterval( 'PT1H' ) );
 						break;
 
 					case 'daily':
 						$data[ $date->format( 'Y-n-j' ) ] = array();
 
-						$date->add( new DateInterval( 'P1D' ) );
+						$date->add( new \DateInterval( 'P1D' ) );
 						break;
 						
 					case 'weekly':
@@ -841,13 +666,13 @@ abstract class Dynamic extends Chart
 							@see http://php.net/manual/en/function.date.php#106974 */
 						$data[ $date->format( 'o-W' ) ] = array();
 
-						$date->add( new DateInterval( 'P7D' ) );
+						$date->add( new \DateInterval( 'P7D' ) );
 						break;
 						
 					case 'monthly':
 						$data[ $date->format( 'Y-n' ) ] = array();
 
-						$date->add( new DateInterval( 'P1M' ) );
+						$date->add( new \DateInterval( 'P1M' ) );
 						break;
 				}
 			}
@@ -859,16 +684,16 @@ abstract class Dynamic extends Chart
 	/**
 	 * Custom filter form
 	 *
-	 * @return Form
+	 * @return \IPS\Helpers\Form
 	 */
-	public function getCustomFiltersForm(): Form
+	public function getCustomFiltersForm()
 	{
-		$customForm = new Form('filter_form', 'chart_customfilters_save');
-		$customForm->class = 'ipsForm--vertical ipsForm--custom-filter-form';
+		$customForm = new \IPS\Helpers\Form('filter_form', 'chart_customfilters_save');
+		$customForm->class = 'ipsForm_vertical';
 		
-		if ( isset( Request::i()->chartId ) and Request::i()->chartId != '_default' )
+		if ( isset( \IPS\Request::i()->chartId ) and \IPS\Request::i()->chartId != '_default' )
 		{
-			$customForm->hiddenValues['chartId'] = Request::i()->chartId;
+			$customForm->hiddenValues['chartId'] = \IPS\Request::i()->chartId;
 		}
 
 		foreach( $this->customFiltersForm['form'] as $field )
@@ -877,29 +702,26 @@ abstract class Dynamic extends Chart
 			{
 				$langKey = $field->name;
 				$field->name = $this->identifier . $field->name;
-				if( Member::loggedIn()->language()->checkKeyExists( $field->name ) )
-				{
-					Member::loggedIn()->language()->words[ $field->name ] = Member::loggedIn()->language()->get( $langKey );
-				}
+				\IPS\Member::loggedIn()->language()->words[ $field->name ] = \IPS\Member::loggedIn()->language()->get( $langKey );
 			}
 			$customForm->add( $field );
 		}
 		
 		return $customForm;
 	}
-
+	
 	/**
 	 * Download as CSV
 	 *
-	 * @param array|null $rawHeaders
-	 * @param array|null $rawRows
-	 * @param string|NULL $fileName File Name, or NULL to use the title defined by this object.
-	 * @return    void
+	 * @param	array|NULL	$headers		Headers, or NULL to use headers defined by this object.
+	 * @param	array|NULL	$rows		Rows, or NULL to use rows defined by this object.
+	 * @param	string|NULL	$fileName	File Name, or NULL to use the title defined by this object.
+	 * @return	void
 	 */
-	public function download( ?array $rawHeaders = NULL, ?array $rawRows = NULL, ?string $fileName = NULL ) : void
+	public function download( ?array $rawHeaders = NULL, ?array $rawRows = NULL, ?string $fileName = NULL )
 	{
 		/* Compile the data */
-		$file = tempnam( TEMP_DIRECTORY, 'IPS' );
+		$file = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
 		$fh = fopen( $file, 'w' );
 		
 		/* Set headers */
@@ -929,6 +751,7 @@ abstract class Dynamic extends Chart
 		fputcsv( $fh, $headers );
 		
 		/* Set Rows */
+		
 		if ( $rawRows === NULL )
 		{
 			$rawRows = $this->rows;
@@ -951,12 +774,12 @@ abstract class Dynamic extends Chart
 					case 'date':
 					case 'datetime':
 					case 'timeofday':
-						$save[] = ( new DateTime( $row[$i] ) )->fullYearLocaleDate();
+						$save[] = ( new \IPS\DateTime( $row[$i] ) )->fullYearLocaleDate();
 						break;
 					
 					/* Anything else can just save as-is */
 					default:
-						if ( is_array( $row[$i] ) )
+						if ( \is_array( $row[$i] ) )
 						{
 							/* GeoCharts use arrays so we need to use the value rather */
 							$save[] = $row[$i]['value'];
@@ -973,7 +796,7 @@ abstract class Dynamic extends Chart
 		}
 		
 		fclose( $fh );
-		$csv = file_get_contents( $file );
+		$csv = \file_get_contents( $file );
 		if ( $fileName )
 		{
 			$name = $fileName;
@@ -984,10 +807,10 @@ abstract class Dynamic extends Chart
 		}
 		else
 		{
-			$name = Output::i()->title;
+			$name = \IPS\Output::i()->title;
 		}
-		Member::loggedIn()->language()->parseOutputForDisplay( $name );
-		Member::loggedIn()->language()->parseOutputForDisplay( $csv );
-		Output::i()->sendOutput( $csv, 200, 'text/csv', array( 'Content-Disposition' => Output::getContentDisposition( 'attachment', "{$name}.csv" ) ), FALSE, FALSE, FALSE );
+		\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $name );
+		\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $csv );
+		\IPS\Output::i()->sendOutput( $csv, 200, 'text/csv', array( 'Content-Disposition' => \IPS\Output::getContentDisposition( 'attachment', "{$name}.csv" ) ), FALSE, FALSE, FALSE );
 	}
 }

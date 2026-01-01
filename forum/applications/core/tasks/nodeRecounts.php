@@ -5,35 +5,28 @@
  * @copyright	(c) Invision Power Services, Inc.
  * @license		https://www.invisioncommunity.com/legal/standards/
  * @package		Invision Community
- * @since		02 Oct 2024
+ * @since		13 Sep 2024
  */
 
 namespace IPS\core\tasks;
 
-use BadMethodCallException;
-use Exception;
-use IPS\Task;
-use IPS\Task\Exception as TaskException;
 use IPS\Data\Store;
 use IPS\Node\Model;
 use IPS\Redis;
-use OutOfRangeException;
-use RedisException;
 use function array_key_exists;
 use function is_array;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * nodeRecounts Task
  */
-class nodeRecounts extends Task
+class _nodeRecounts extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -44,28 +37,28 @@ class nodeRecounts extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	TaskException
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute(): mixed
 	{
 		$allKeys = [];
 		try
 		{
 			if( ! Redis::isEnabled() )
 			{
-				throw new BadMethodCallException;
+				throw new \BadMethodCallException;
 			}
 
 			$allKeys = Redis::i()->hGetAll('nodeSyncTimes');
 		}
-		catch( BadMethodCallException | RedisException )
+		catch( \BadMethodCallException | \RedisException )
 		{
 			try
 			{
 				$key = 'nodeSyncTimes';
 				$allKeys = Store::i()->$key;
 			}
-			catch( OutOfRangeException ){}
+			catch( \OutOfRangeException ){}
 		}
 
 		if ( ! is_array( $allKeys ) or ! count( $allKeys ))
@@ -92,7 +85,7 @@ class nodeRecounts extends Task
 				/* Recount items, comments, reviews and the last comment data */
 				$node->runScheduledRebuild();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				continue;
 			}
@@ -113,7 +106,7 @@ class nodeRecounts extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 		
 	}

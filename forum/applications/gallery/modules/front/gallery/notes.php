@@ -15,96 +15,80 @@
 namespace IPS\gallery\modules\front\gallery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\gallery\Image;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use OutOfRangeException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Store and retrieve image notes
  */
-class notes extends Controller
+class _notes extends \IPS\Dispatcher\Controller
 {
-	/**
-	 * @var Image|null
-	 */
-	protected ?Image $image = null;
-
 	/**
 	 * Determine what to show
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		try
 		{
-			$this->image = Image::load( Request::i()->imageId );
+			$this->image = \IPS\gallery\Image::load( \IPS\Request::i()->imageId );
 			
-			if ( !$this->image->canView( Member::loggedIn() ) )
+			if ( !$this->image->canView( \IPS\Member::loggedIn() ) )
 			{
-				Output::i()->error( 'node_error', '2G191/1', 403, '' );
+				\IPS\Output::i()->error( 'node_error', '2G191/1', 403, '' );
 			}
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2G191/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2G191/2', 404, '' );
 		}
 
 		$response	= NULL;
 
 		/* jQuery-Notes will send 'image' parameter which we can ignore */
-		$noteId		= Request::i()->id;
-		$position	= Request::i()->position;
-		$note		= strip_tags( Request::i()->note );
+		$noteId		= \IPS\Request::i()->id;
+		$position	= \IPS\Request::i()->position;
+		$note		= strip_tags( \IPS\Request::i()->note );
 
-		if( Request::i()->get )
+		if( \IPS\Request::i()->get )
 		{
 			$response	= $this->image->_notes;
 		}
-		else if( Request::i()->add )
+		else if( \IPS\Request::i()->add )
 		{
 			$response	= $this->_addNote( $position, $note );
 		}
-		else if( Request::i()->delete )
+		else if( \IPS\Request::i()->delete )
 		{
 			$response	= $this->_deleteNote( $noteId );
 		}
-		else if( Request::i()->edit )
+		else if( \IPS\Request::i()->edit )
 		{
 			$response	= $this->_editNote( $noteId, $position, $note );
 		}
 
-		Output::i()->json( $response );
+		\IPS\Output::i()->json( $response );
 	}
 
 	/**
 	 * Delete an image note
 	 *
-	 * @param int $id Note ID to delete
-	 * @return bool|string
+	 * @param	int		$id		Note ID to delete
+	 * @return	bool
 	 */
-	protected function _deleteNote( int $id ): bool|string
+	protected function _deleteNote( $id )
 	{
 		/* Check permission */
 		if( !$this->image->canEdit() )
 		{
-			Output::i()->error( 'notes_no_permission', '2G191/3', 403, '' );
+			\IPS\Output::i()->error( 'notes_no_permission', '2G191/3', 403, '' );
 		}
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		$notes	= $this->image->_notes;
 
@@ -127,23 +111,23 @@ class notes extends Controller
 	 * Add an image note
 	 *
 	 * @param	mixed	$position	Note position
-	 * @param string $note		Note text
-	 * @return	bool|array
+	 * @param	string	$note		Note text
+	 * @return	bool
 	 */
-	protected function _addNote( mixed $position, string $note ): array|bool
+	protected function _addNote( $position, $note )
 	{
 		/* Check permission */
 		if( !$this->image->canEdit() )
 		{
-			Output::i()->error( 'notes_no_permission', '2G191/4', 403, '' );
+			\IPS\Output::i()->error( 'notes_no_permission', '2G191/4', 403, '' );
 		}
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		$notes		= $this->image->_notes;
 		$position	= explode( ',', $position );
 
-		if( count( $position ) != 4 )
+		if( \count( $position ) != 4 )
 		{
 			return FALSE;
 		}
@@ -176,20 +160,20 @@ class notes extends Controller
 	/**
 	 * Edit an image note
 	 *
-	 * @param int $id Note ID to edit
-	 * @param mixed $position Note position
-	 * @param string $noteText
-	 * @return bool|string
+	 * @param	int		$id			Note ID to edit
+	 * @param	mixed	$position	Note position
+	 * @param	string	$note		Note text
+	 * @return	bool
 	 */
-	protected function _editNote(int $id, mixed $position='', string $noteText='' ): bool|string
+	protected function _editNote( $id, $position='', $noteText='' )
 	{
 		/* Check permission */
 		if( !$this->image->canEdit() )
 		{
-			Output::i()->error( 'notes_no_permission', '2G191/5', 403, '' );
+			\IPS\Output::i()->error( 'notes_no_permission', '2G191/5', 403, '' );
 		}
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		$notes		= $this->image->_notes;
 		$position	= explode( ',', $position );
@@ -205,7 +189,7 @@ class notes extends Controller
 					$notes[ $key ]['NOTE']		= trim( str_replace( "\n", ' ', str_replace( '  ', ' ', $noteText ) ) );
 				}
 
-				if( count( $position ) == 4 )
+				if( \count( $position ) == 4 )
 				{
 					$notes[ $key ]['LEFT'] 		= round( $position[0], 5 );
 					$notes[ $key ]['TOP']		= round( $position[1], 5 );

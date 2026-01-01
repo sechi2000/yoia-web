@@ -11,43 +11,34 @@
 namespace IPS\core\modules\admin\messengerstats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Messenger Stats
  */
-class pmstats extends Controller
+class _pmstats extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Manage Members
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Check permission */
-		Dispatcher::i()->checkAcpPermission( 'messages_manage', 'core', 'members' );
-
-		$chart = Chart::loadFromExtension( 'core', 'Conversations' )->getChart( Url::internal( 'app=core&module=messengerstats&controller=pmstats' ) );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_messengerstats_pmstats');
-		Output::i()->output = (string) $chart;
+		\IPS\Dispatcher::i()->checkAcpPermission( 'messages_manage', 'core', 'members' );
+		
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'Conversations' )->getChart( \IPS\Http\Url::internal( 'app=core&module=messengerstats&controller=pmstats' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_messengerstats_pmstats');
+		\IPS\Output::i()->output = (string) $chart;
 	}
 }

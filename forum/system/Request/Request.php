@@ -11,42 +11,26 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\Data\Store;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use IPS\Http\Url\Exception;
-use IPS\Http\Url\Internal;
-use IPS\Patterns\Singleton;
-use function defined;
-use function function_exists;
-use function in_array;
-use function intval;
-use function is_array;
-use function mb_strtolower;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * HTTP Request Class
  */
-class Request extends Singleton
+class _Request extends \IPS\Patterns\Singleton
 {
 	/**
 	 * @brief	Singleton Instance
 	 */
-	protected static ?Singleton $instance = NULL;
+	protected static $instance = NULL;
 	
 	/**
 	 * @brief	Cookie data
 	 */
-	public array $cookie = array();
+	public $cookie = array();
 	
 	/**
 	 * Constructor
@@ -70,13 +54,20 @@ class Request extends Singleton
 		array_walk_recursive( $_COOKIE, array( $this, 'clean' ) );
 
 		/* If we have a cookie prefix, we have to strip it first */
-		if( COOKIE_PREFIX !== NULL )
+		if( \IPS\COOKIE_PREFIX !== NULL )
 		{
 			foreach( $_COOKIE as $key => $value )
 			{
-				if( mb_strpos( $key, COOKIE_PREFIX) === 0 )
+				if( \IPS\COOKIE_PREFIX !== null )
 				{
-					$this->cookie[ preg_replace( "/^" . COOKIE_PREFIX . "(.+?)/", "$1", $key ) ]	= $value;
+					if( mb_strpos( $key, \IPS\COOKIE_PREFIX ) === 0 )
+					{
+						$this->cookie[ preg_replace( "/^" . \IPS\COOKIE_PREFIX . "(.+?)/", "$1", $key ) ]	= $value;
+					}
+				}
+				else
+				{
+					$this->cookie[ $key ]	= $value;
 				}
 			}
 		}
@@ -89,14 +80,14 @@ class Request extends Singleton
 	/**
 	 * Parse Incoming Data
 	 *
-	 * @param array $data	Data
+	 * @param	array	$data	Data
 	 * @return	void
 	 */
-	protected function parseIncomingRecursively( array $data ) : void
+	protected function parseIncomingRecursively( $data )
 	{
 		foreach( $data as $k => $v )
 		{
-			if ( is_array( $v ) )
+			if ( \is_array( $v ) )
 			{
 				array_walk_recursive( $v, array( $this, 'clean' ) );
 			}
@@ -117,7 +108,7 @@ class Request extends Singleton
 	 * @param	mixed	$k	Key
 	 * @return	void
 	 */
-	protected function clean( mixed &$v, mixed $k ) : void
+	protected function clean( &$v, $k )
 	{
 		/* Remove NULL bytes and the RTL control byte */
 		$v = str_replace( array( "\0", "\u202E" ), '', $v );
@@ -126,10 +117,10 @@ class Request extends Singleton
 	/**
 	 * Get value from array
 	 *
-	 * @param string $key	Key with square brackets (e.g. "foo[bar]")
+	 * @param	string	$key	Key with square brackets (e.g. "foo[bar]")
 	 * @return	mixed	Value
 	 */
-	public function valueFromArray( string $key ): mixed
+	public function valueFromArray( $key )
 	{
 		$array = $this->data;
 		
@@ -160,10 +151,9 @@ class Request extends Singleton
 	 * This can be used in place of passing strings as arguments to functions where it is
 	 * desirable to avoid the value being included in a backtrace if an error occurs.
 	 *
-	 * @param string $k
 	 * @return	object
 	 */
-	public function protect( string $k ): object
+	public function protect( $k )
 	{
 		return eval('return new class
 		{
@@ -179,19 +169,20 @@ class Request extends Singleton
 	 *
 	 * @return	bool
 	 */
-	public function isAjax(): bool
+	public function isAjax()
 	{
 		return ( isset( $_SERVER['HTTP_X_REQUESTED_WITH'] ) and $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest' );
 	}
 
 	/**
-	 * Should we bypass the ajax redirect system? By default ,ajax redirects send a JSON to the browser, and ips JS redirects the entire page
+	 * Is this request from the mobile app?
 	 *
-	 * @return bool
+	 * @deprecated 4.6.11 - Will be removed in future version
+	 * @return	bool
 	 */
-	public function bypassAjaxRedirect() : bool
+	public function isApp()
 	{
-		return boolval( isset( $_SERVER['HTTP_X_BYPASS_AJAX_REDIRECT'] ) and $_SERVER['HTTP_X_BYPASS_AJAX_REDIRECT'] );
+		return FALSE;
 	}
 
 	/**
@@ -200,7 +191,7 @@ class Request extends Singleton
 	 * @return	bool
 	 * @note	A common technique to check for SSL is to look for $_SERVER['SERVER_PORT'] == 443, however this is not a correct check. Nothing requires SSL to be on port 443, or http to be on port 80.
 	 */
-	public function isSecure(): bool
+	public function isSecure()
 	{
 		if( !empty( $_SERVER['HTTPS'] ) AND ( mb_strtolower( $_SERVER['HTTPS'] ) == 'on' or $_SERVER['HTTPS'] === '1' ) )
 		{
@@ -233,23 +224,23 @@ class Request extends Singleton
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url	= NULL;
+	protected $_url	= NULL;
 
 	/**
 	 * Get current URL
 	 *
-	 * @return Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	function url(): Url|string|null
+	public function url()
 	{
 		if( $this->_url === NULL )
 		{
 			$url = $this->isSecure() ? 'https' : 'http';
 			$url .= '://';
 			$ruleMatched = FALSE;
-
+			
 			/* Nginx uses HTTP_X_FORWARDED_SERVER. @see <a href='https://plone.lucidsolutions.co.nz/web/reverseproxyandcache/setting-nginx-http-x-forward-headers-for-reverse-proxy'>Nginx Reverse Proxy</a> */
-			if ( !CIC OR \IPS\IN_DEV ) // We may also need this for Ngrok testing
+			if ( !\IPS\CIC )
 			{
 				if ( !empty( $_SERVER['HTTP_X_FORWARDED_SERVER'] ) )
 				{
@@ -294,7 +285,7 @@ class Request extends Singleton
 			}
 			$url .= $_SERVER['QUERY_STRING'];
 
-			return $this->_url = Url::createFromString( $url, TRUE, TRUE );
+			return $this->_url = \IPS\Http\Url::createFromString( $url, TRUE, TRUE );
 		}
 
 		return $this->_url;
@@ -306,11 +297,11 @@ class Request extends Singleton
 	 *
 	 * @return	string
 	 */
-	public function ipAddress(): string
+	public function ipAddress()
 	{
 		$addrs = array();
 		
-		if ( Settings::i()->xforward_matching )
+		if ( \IPS\Settings::i()->xforward_matching )
 		{
 			if( isset( $_SERVER['HTTP_X_FORWARDED_FOR'] ) )
 			{
@@ -362,16 +353,16 @@ class Request extends Singleton
 	 *
 	 * @return	bool
 	 */
-	public function ipAddressIsBanned(): bool
+	public function ipAddressIsBanned()
 	{
-		if ( isset( Store::i()->bannedIpAddresses ) )
+		if ( isset( \IPS\Data\Store::i()->bannedIpAddresses ) )
 		{
-			$bannedIpAddresses = Store::i()->bannedIpAddresses;
+			$bannedIpAddresses = \IPS\Data\Store::i()->bannedIpAddresses;
 		}
 		else
 		{
-			$bannedIpAddresses = iterator_to_array( Db::i()->select( 'ban_content', 'core_banfilters', array( "ban_type=?", 'ip' ) ) );
-			Store::i()->bannedIpAddresses = $bannedIpAddresses;
+			$bannedIpAddresses = iterator_to_array( \IPS\Db::i()->select( 'ban_content', 'core_banfilters', array( "ban_type=?", 'ip' ) ) );
+			\IPS\Data\Store::i()->bannedIpAddresses = $bannedIpAddresses;
 		}
 		foreach ( $bannedIpAddresses as $ip )
 		{
@@ -389,14 +380,14 @@ class Request extends Singleton
 	 *
 	 * @return string
 	 */
-	public static function getCookiePath(): string
+	public static function getCookiePath()
 	{
-		if( COOKIE_PATH !== NULL )
+		if( \IPS\COOKIE_PATH !== NULL )
 		{
-			return COOKIE_PATH;
+			return \IPS\COOKIE_PATH;
 		}
 
-		$path = mb_substr( Settings::i()->base_url, mb_strpos( Settings::i()->base_url, ( !empty( $_SERVER['SERVER_NAME'] ) ) ? $_SERVER['SERVER_NAME'] : $_SERVER['HTTP_HOST'] ) + mb_strlen( ( !empty( $_SERVER['SERVER_NAME'] ) ) ? $_SERVER['SERVER_NAME'] : $_SERVER['HTTP_HOST'] ) );
+		$path = mb_substr( \IPS\Settings::i()->base_url, mb_strpos( \IPS\Settings::i()->base_url, ( !empty( $_SERVER['SERVER_NAME'] ) ) ? $_SERVER['SERVER_NAME'] : $_SERVER['HTTP_HOST'] ) + mb_strlen( ( !empty( $_SERVER['SERVER_NAME'] ) ) ? $_SERVER['SERVER_NAME'] : $_SERVER['HTTP_HOST'] ) );
 		$path = mb_substr( $path, mb_strpos( $path, '/' ) );
 		
 		return $path;
@@ -409,49 +400,49 @@ class Request extends Singleton
 	 */
 	public static function getEssentialCookies(): array
 	{
-		return Application::getEssentialCookieNames();
+		return \IPS\Application::getEssentialCookieNames();
 	}
 	
 	/**
 	 * Set a cookie
 	 *
-	 * @param string $name		Name
+	 * @param	string				$name		Name
 	 * @param	mixed				$value		Value
-	 * @param DateTime|null $expire		Expiration date, or NULL for on session end
-	 * @param bool $httpOnly	When TRUE the cookie will be made accessible only through the HTTP protocol
-	 * @param string|null $domain		Domain to set to. If NULL, will be detected automatically.
-	 * @param string|null $path		Path to set to. If NULL, will be detected automatically.
+	 * @param	\IPS\DateTime|null	$expire		Expiration date, or NULL for on session end
+	 * @param	bool				$httpOnly	When TRUE the cookie will be made accessible only through the HTTP protocol
+	 * @param	string|null			$domain		Domain to set to. If NULL, will be detected automatically.
+	 * @param	string|null			$path		Path to set to. If NULL, will be detected automatically.
 	 * @return	bool
 	 */
-	public function setCookie( string $name, mixed $value, DateTime $expire=NULL, bool $httpOnly=TRUE, string $domain=NULL, string $path=NULL ): bool
+	public function setCookie( $name, $value, $expire=NULL, $httpOnly=TRUE, $domain=NULL, $path=NULL )
 	{
 		/* Let's see if this is an optional cookie and if it is one, if the user wants them */
 		if( $this->skipCookie( $name ) )
 		{
-			Log::debug('skipping ' . $name, 'cookie' );
+			\IPS\Log::debug('skipping ' . $name, 'cookie' );
 			return FALSE;
 		}
 		
 		/* Work out the path and if cookies should be SSL only */
 		$sslOnly	= FALSE;
-		if( mb_substr( Settings::i()->base_url, 0, 5 ) == 'https' AND !COOKIE_BYPASS_SSLONLY )
+		if( mb_substr( \IPS\Settings::i()->base_url, 0, 5 ) == 'https' AND \IPS\COOKIE_BYPASS_SSLONLY !== TRUE )
 		{
 			$sslOnly	= TRUE;
 		}
 		$path = $path ?: static::getCookiePath();
 
 		/* Are we forcing a cookie domain? */
-		if( COOKIE_DOMAIN !== NULL AND $domain === NULL )
+		if( \IPS\COOKIE_DOMAIN !== NULL AND $domain === NULL )
 		{
-			$domain	= COOKIE_DOMAIN;
+			$domain	= \IPS\COOKIE_DOMAIN;
 		}
 		
 		$realName = $name;
 		
 		/* What about a prefix? */
-		if( COOKIE_PREFIX !== NULL )
+		if( \IPS\COOKIE_PREFIX !== NULL )
 		{
-			$name	= COOKIE_PREFIX . $name;
+			$name	= \IPS\COOKIE_PREFIX . $name;
 		}
 				
 		/* Set the cookie */
@@ -472,7 +463,7 @@ class Request extends Singleton
 	 */
 	protected function skipCookie( string $name ): bool
 	{
-		if( Dispatcher::hasInstance() AND Dispatcher::i()->controllerLocation === 'admin' )
+		if( \IPS\Dispatcher::hasInstance() AND \IPS\Dispatcher::i()->controllerLocation === 'admin' )
 		{
 			return FALSE;
 		}
@@ -489,10 +480,10 @@ class Request extends Singleton
 		/* Check wildcard cookies */
 		foreach( static::getEssentialCookies() as $c )
 		{
-			if ( str_ends_with($c, '*' ) )
+			if (str_ends_with($c, '*'))
 			{
 				$prefix = mb_substr($c, 0, -1);
-
+				
 				if( str_starts_with($name, $prefix ) )
 				{
 					return false;
@@ -500,25 +491,25 @@ class Request extends Singleton
 			}
 		}
 
-		return ( !Member::loggedIn()->optionalCookiesAllowed );
+		return ( !\IPS\Member::loggedIn()->optionalCookiesAllowed );
 	}
 
 	/**
 	 * @brief   Storage of cookie consent status
 	 */
-	protected ?bool $_cookieConsentEnabled = NULL;
+	protected $_cookieConsentEnabled = NULL;
 
 	/**
 	 * Check whether cookie consent is required
 	 *
-	 * @return bool|null
+	 * @return bool
 	 */
-	public function cookieConsentEnabled(): ?bool
+	public function cookieConsentEnabled():? bool
 	{
 		// See if cookie consent is enabled
-		if( Dispatcher::hasInstance() AND $this->_cookieConsentEnabled === NULL )
+		if( \IPS\Dispatcher::hasInstance() AND $this->_cookieConsentEnabled === NULL )
 		{
-			$this->_cookieConsentEnabled = ( Settings::i()->guest_terms_bar AND mb_strstr( Member::loggedIn()->language()->get('guest_terms_bar_text_value'),  '%4$s' ) );
+			$this->_cookieConsentEnabled = ( \IPS\Settings::i()->guest_terms_bar AND mb_strstr( \IPS\Member::loggedIn()->language()->get('guest_terms_bar_text_value'),  '%4$s' ) );
 		}
 
 		return $this->_cookieConsentEnabled;
@@ -529,7 +520,7 @@ class Request extends Singleton
 	 *
 	 * @return	void
 	 */
-	public function clearLoginCookies() : void
+	public function clearLoginCookies()
 	{
 		$this->setCookie( 'member_id', NULL );
 		$this->setCookie( 'login_key', NULL );
@@ -548,15 +539,15 @@ class Request extends Singleton
 	/**
 	 * @brief	Editor autosave keys to be cleared
 	 */
-	public array $clearAutoSaveCookie = array();
+	public $clearAutoSaveCookie = array();
 	
 	/**
 	 * Set cookie to clear autosave content from editor
 	 *
-	 * @param	$autoSaveKey    string    The editor's autosave key
+	 * @param	$autoSaveKey	string	The editor's autosave key
 	 * @return	void
 	 */
-	public function setClearAutosaveCookie( string $autoSaveKey ) : void
+	public function setClearAutosaveCookie( $autoSaveKey )
 	{
 		$this->clearAutoSaveCookie[ $autoSaveKey ] = $autoSaveKey;
 	}
@@ -576,29 +567,29 @@ class Request extends Singleton
 	 *
 	 * @return	void
 	 */
-	public static function floodCheck() : void
+	public static function floodCheck()
 	{
-		$groupFloodSeconds = Member::loggedIn()->group['g_search_flood'];
+		$groupFloodSeconds = \IPS\Member::loggedIn()->group['g_search_flood'];
 		
-		if ( Session::i()->userAgent->bot )
+		if ( \IPS\Session::i()->userAgent->bot )
 		{
 			/* Force a 30 second flood control so if guests have it switched off, or set very low, you do not get flooded by known bots */
-			$groupFloodSeconds = BOT_SEARCH_FLOOD_SECONDS;
+			$groupFloodSeconds = \IPS\BOT_SEARCH_FLOOD_SECONDS;
 		}
 		
 		/* Flood control */
 		if( $groupFloodSeconds )
 		{
-			$time = ( isset( Request::i()->cookie['lastSearch'] ) ) ? Request::i()->cookie['lastSearch'] : 0;
+			$time = ( isset( \IPS\Request::i()->cookie['lastSearch'] ) ) ? \IPS\Request::i()->cookie['lastSearch'] : 0;
 			
 			if( $time and ( time() - $time ) < $groupFloodSeconds )
 			{
 				$secondsToWait = $groupFloodSeconds - ( time() - $time );
-				Output::i()->error( Member::loggedIn()->language()->addToStack( 'search_flood_error', FALSE, array( 'pluralize' => array( $secondsToWait ) ) ), '1C205/3', 429, Member::loggedIn()->language()->addToStack( 'search_flood_error_admin', FALSE, array( 'pluralize' => array( $secondsToWait ) ) ), array( 'Retry-After' => DateTime::create()->add( new DateInterval( 'PT' . $secondsToWait . 'S' ) )->format('r') ) );
+				\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack( 'search_flood_error', FALSE, array( 'pluralize' => array( $secondsToWait ) ) ), '1C205/3', 429, \IPS\Member::loggedIn()->language()->addToStack( 'search_flood_error_admin', FALSE, array( 'pluralize' => array( $secondsToWait ) ) ), array( 'Retry-After' => \IPS\DateTime::create()->add( new \DateInterval( 'PT' . $secondsToWait . 'S' ) )->format('r') ) );
 			}
 	
-			$expire = new DateTime;
-			Request::i()->setCookie( 'lastSearch', time(), $expire->add( new DateInterval( 'PT' . intval( $groupFloodSeconds ) . 'S' ) ) );
+			$expire = new \IPS\DateTime;
+			\IPS\Request::i()->setCookie( 'lastSearch', time(), $expire->add( new \DateInterval( 'PT' . \intval( $groupFloodSeconds ) . 'S' ) ) );
 		}
 	}
 
@@ -608,9 +599,9 @@ class Request extends Singleton
 	 * @note	Possible values: cgi, cgi-fcgi, fpm-fcgi
 	 * @return	boolean
 	 */
-	public function isCgi(): bool
+	public function isCgi()
 	{
-		if ( substr( PHP_SAPI, 0, 3 ) == 'cgi' OR substr( PHP_SAPI, -3 ) == 'cgi' )
+		if ( \substr( PHP_SAPI, 0, 3 ) == 'cgi' OR \substr( PHP_SAPI, -3 ) == 'cgi' )
 		{
 			return true;
 		}
@@ -625,7 +616,7 @@ class Request extends Singleton
 	 */
 	public static function isCliEnvironment(): bool
 	{
-		return ( php_sapi_name() == 'cli' or ( defined( 'IS_CLI' ) and IS_CLI === true ) );
+		return php_sapi_name() == 'cli';
 	}
 
 	/**
@@ -635,63 +626,63 @@ class Request extends Singleton
 	 */
 	public function isZapier() : bool
 	{
-		return str_starts_with( Request::i()->userAgent(), 'IPS Zapier Integration' );
+		return str_starts_with( \IPS\Request::i()->userAgent(), 'IPS Zapier Integration' );
 	}
 	
 	/**
 	 * Confirmation check
 	 *
-	 * @param string $title		Lang string key for title
-	 * @param string $message	Lang string key for confirm message
-	 * @param string $submit		Lang string key for submit button
+	 * @param	string		$title		Lang string key for title
+	 * @param	string		$message	Lang string key for confirm message
+	 * @param	string		$submit		Lang string key for submit button
 	 * @param	string		$css		CSS classes for the message
 	 * @return	bool
 	 */
-	public function confirmedDelete( string $title = 'delete_confirm', string $message = 'delete_confirm_detail', string $submit = 'delete', string $css = 'ipsMessage ipsMessage_warning' ): bool
+	public function confirmedDelete( $title = 'delete_confirm', $message = 'delete_confirm_detail', $submit = 'delete', string $css = 'ipsMessage ipsMessage_warning' )
 	{
 		/* The confirmation dialogs will send form_submitted=1, as will displaying a form, so we check for this.
 			If the admin (or user) simply visited a delete URL directly, this would not be included in the request. */
-		if ( !isset( Request::i()->wasConfirmed ) )
+		if ( !isset( \IPS\Request::i()->wasConfirmed ) )
 		{
-			$form = new Form( 'form', $submit );
+			$form = new \IPS\Helpers\Form( 'form', $submit );
 			$form->hiddenValues['wasConfirmed']	= 1;
-			$form->class = 'ipsForm--vertical ipsForm--confirmation-check';
+			$form->class = 'ipsForm_vertical';
 
-			Output::i()->title	 = Member::loggedIn()->language()->addToStack( $title );
+			\IPS\Output::i()->title	 = \IPS\Member::loggedIn()->language()->addToStack( $title );
 
 			/* We call sendOutput() to show the form now */
-			if( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'front' )
+			if( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'front' )
 			{
-				Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->confirmDelete( $message, $form, $title );
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->confirmDelete( $message, $form, $title );
 			}
 			else
 			{
 				$form->addMessage( $message, $css);
-				Output::i()->output = $form;
+				\IPS\Output::i()->output = $form;
 			}
 
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core', 'front' )->genericBlock( $form, Output::i()->title ) );
+				\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->genericBlock( $form, \IPS\Output::i()->title ), 200, 'text/html' );
 			}
 			else
 			{
-				Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( Output::i()->title, Output::i()->output, array( 'app' => Dispatcher::i()->application->directory, 'module' => Dispatcher::i()->module->key, 'controller' => Dispatcher::i()->controller ) ) );
+				\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( \IPS\Output::i()->title, \IPS\Output::i()->output, array( 'app' => \IPS\Dispatcher::i()->application->directory, 'module' => \IPS\Dispatcher::i()->module->key, 'controller' => \IPS\Dispatcher::i()->controller ) ), 200, 'text/html' );
 			}
 		}
 
 		/* If we are here, just check the csrf key */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		return TRUE;
 	}
 	
 	/**
 	 * Old IPB escape-on-input routine
 	 *
-	 * @param object|string $val		The unescaped text (can be a string or an object that can be cast to a string)
+	 * @param	string|object	$val		The unescaped text (can be a string or an object that can be cast to a string)
 	 * @return	string			The IPB3-style escaped text
 	 */
-	public static function legacyEscape( object|string $val ): string
+	public static function legacyEscape( $val )
 	{
 		$val = (string) $val;
 		
@@ -717,9 +708,9 @@ class Request extends Singleton
 	 * @param	bool		$allowExternal	If set to TRUE, external URL's will be allowed and returned.
 	 * @param	bool		$onlyRequest	If set to TRUE, will only look for the "ref" request parameter. Useful if you need to look for HTTP_REFERER at a specific point in time.
 	 * @param	string|NULL	$base			If set, will only return URL's with this base.
-	 * @return	Url|NULL
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function referrer( bool $allowExternal=FALSE, bool $onlyRequest=FALSE, ?string $base = NULL ): ?Url
+	public function referrer( bool $allowExternal=FALSE, bool $onlyRequest=FALSE, ?string $base = NULL ): ?\IPS\Http\Url
 	{
 		/* Do we have a _ref request parameter? */
 		$ref = NULL;
@@ -739,9 +730,9 @@ class Request extends Singleton
 		{
 			try
 			{
-				$ref = Url::createFromString( $ref );
+				$ref = \IPS\Http\Url::createFromString( $ref );
 			}
-			catch( Exception $e )
+			catch( \IPS\Http\Url\Exception $e )
 			{
 				/* Failed to create? Nope. */
 				return NULL;
@@ -754,9 +745,9 @@ class Request extends Singleton
 			}
 			
 			/* Return if URL is internal and not an open redirect, or if we're allowing external referrer references */
-			if ( ( ( $ref instanceof Internal ) AND !$ref->openRedirect() ) OR $allowExternal )
+			if ( ( ( $ref instanceof \IPS\Http\Url\Internal ) AND !$ref->openRedirect() ) OR $allowExternal )
 			{
-				if ( $base !== NULL AND ( $ref instanceof Internal ) )
+				if ( $base !== NULL AND ( $ref instanceof \IPS\Http\Url\Internal ) )
 				{
 					if ( $ref->base === $base )
 					{
@@ -788,7 +779,7 @@ class Request extends Singleton
 	 *
 	 * @return	string|null
 	 */
-	public function authorizationHeader(): ?string
+	public function authorizationHeader()
 	{
 		/* Check if an API Key or Access Token has been passed as a parameter in the query string. Because of the
 			obvious security issues with this, we do not recommend it, but sometimes it is the only choice */
@@ -796,7 +787,7 @@ class Request extends Singleton
 		{
 			return 'Basic ' . base64_encode( $this->key . ':' );
 		}
-		if ( isset( $this->access_token ) and ( !OAUTH_REQUIRES_HTTPS or $this->isSecure() ) )
+		if ( isset( $this->access_token ) and ( !\IPS\OAUTH_REQUIRES_HTTPS or $this->isSecure() ) )
 		{
 			return 'Bearer ' . $this->access_token;
 		}
@@ -819,13 +810,13 @@ class Request extends Singleton
 		}
 		
 		/* ...if we didn't find anything there, try apache_request_headers() */
-		if ( function_exists('apache_request_headers') )
+		if ( \function_exists('apache_request_headers') )
 		{
 			$headers = @apache_request_headers();
 			$headerKeys = ['authorization', 'x-authorization'];
 			foreach ( $headers as $k => $v )
 			{
-				if ( in_array( mb_strtolower( $k ), $headerKeys ) )
+				if ( \in_array( \mb_strtolower( $k ), $headerKeys ) )
 				{
 					return $v;
 				}

@@ -1,15 +1,11 @@
 {
     "core": {
-        "AccountSettings": {
-            "Referrals": "IPS\\core\\extensions\\core\\AccountSettings\\Referrals"
-        },
         "AchievementAction": {
             "Comment": "IPS\\core\\extensions\\core\\AchievementAction\\Comment",
             "ContentPromotion": "IPS\\core\\extensions\\core\\AchievementAction\\ContentPromotion",
             "FollowContentItem": "IPS\\core\\extensions\\core\\AchievementAction\\FollowContentItem",
             "FollowMember": "IPS\\core\\extensions\\core\\AchievementAction\\FollowMember",
             "FollowNode": "IPS\\core\\extensions\\core\\AchievementAction\\FollowNode",
-            "Highlight": "IPS\\core\\extensions\\core\\AchievementAction\\Highlight",
             "JoinClub": "IPS\\core\\extensions\\core\\AchievementAction\\JoinClub",
             "NewClub": "IPS\\core\\extensions\\core\\AchievementAction\\NewClub",
             "NewContentItem": "IPS\\core\\extensions\\core\\AchievementAction\\NewContentItem",
@@ -23,16 +19,18 @@
             "AccountDeletion": "IPS\\core\\extensions\\core\\AdminNotifications\\AccountDeletion",
             "Bulletin": "IPS\\core\\extensions\\core\\AdminNotifications\\Bulletin",
             "ConfigurationError": "IPS\\core\\extensions\\core\\AdminNotifications\\ConfigurationError",
-            "Custom": "IPS\\core\\extensions\\core\\AdminNotifications\\Custom",
             "Error": "IPS\\core\\extensions\\core\\AdminNotifications\\Error",
             "License": "IPS\\core\\extensions\\core\\AdminNotifications\\License",
+            "ManualInterventionMessage": "IPS\\core\\extensions\\core\\AdminNotifications\\ManualInterventionMessage",
             "NewRegComplete": "IPS\\core\\extensions\\core\\AdminNotifications\\NewRegComplete",
             "NewRegValidate": "IPS\\core\\extensions\\core\\AdminNotifications\\NewRegValidate",
             "NewVersion": "IPS\\core\\extensions\\core\\AdminNotifications\\NewVersion",
             "PiiDataRequest": "IPS\\core\\extensions\\core\\AdminNotifications\\PiiDataRequest",
-            "Spammer": "IPS\\core\\extensions\\core\\AdminNotifications\\Spammer"
+            "Spammer": "IPS\\core\\extensions\\core\\AdminNotifications\\Spammer",
+            "VersionFive": "IPS\\core\\extensions\\core\\AdminNotifications\\VersionFive"
         },
         "Build": {
+            "ckeditor": "IPS\\core\\extensions\\core\\Build\\ckeditor",
             "codemirror": "IPS\\core\\extensions\\core\\Build\\codemirror"
         },
         "CommunityEnhancements": {
@@ -42,14 +40,12 @@
             "GoogleAnalytics": "IPS\\core\\extensions\\core\\CommunityEnhancements\\GoogleAnalytics",
             "GoogleMaps": "IPS\\core\\extensions\\core\\CommunityEnhancements\\GoogleMaps",
             "GoogleTagManager": "IPS\\core\\extensions\\core\\CommunityEnhancements\\GoogleTagManager",
-            "Iframely": "IPS\\core\\extensions\\core\\CommunityEnhancements\\Iframely",
             "IndexNow": "IPS\\core\\extensions\\core\\CommunityEnhancements\\IndexNow",
-            "Mailchimp": "IPS\\core\\extensions\\core\\CommunityEnhancements\\Mailchimp",
             "Mapbox": "IPS\\core\\extensions\\core\\CommunityEnhancements\\Mapbox",
             "Matomo": "IPS\\core\\extensions\\core\\CommunityEnhancements\\Matomo",
             "Pixabay": "IPS\\core\\extensions\\core\\CommunityEnhancements\\Pixabay",
             "Postmark": "IPS\\core\\extensions\\core\\CommunityEnhancements\\Postmark",
-            "SendGrid": "IPS\\core\\extensions\\core\\CommunityEnhancements\\SendGrid",
+            "Sendgrid": "IPS\\core\\extensions\\core\\CommunityEnhancements\\Sendgrid",
             "SpamMonitoring": "IPS\\core\\extensions\\core\\CommunityEnhancements\\SpamMonitoring",
             "Zapier": "IPS\\core\\extensions\\core\\CommunityEnhancements\\Zapier"
         },
@@ -58,10 +54,16 @@
             "RedirectForm": "IPS\\core\\extensions\\core\\ContactUs\\RedirectForm"
         },
         "ContentRouter": {
-            "Clubs": "IPS\\core\\extensions\\core\\ContentRouter\\Clubs"
+            "Clubs": "IPS\\core\\extensions\\core\\ContentRouter\\Clubs",
+            "Status": "IPS\\core\\extensions\\core\\ContentRouter\\Status"
+        },
+        "CreateMenu": {
+            "Announcement": "IPS\\core\\extensions\\core\\CreateMenu\\Announcement",
+            "Status": "IPS\\core\\extensions\\core\\CreateMenu\\Status"
         },
         "Dashboard": {
             "AdminNotes": "IPS\\core\\extensions\\core\\Dashboard\\AdminNotes",
+            "AwaitingValidation": "IPS\\core\\extensions\\core\\Dashboard\\AwaitingValidation",
             "BackgroundQueue": "IPS\\core\\extensions\\core\\Dashboard\\BackgroundQueue",
             "FailedLogins": "IPS\\core\\extensions\\core\\Dashboard\\FailedLogins",
             "LatestNews": "IPS\\core\\extensions\\core\\Dashboard\\LatestNews",
@@ -80,6 +82,7 @@
             "Contact": "IPS\\core\\extensions\\core\\EditorLocations\\Contact",
             "CustomField": "IPS\\core\\extensions\\core\\EditorLocations\\CustomField",
             "GuestSignupWidget": "IPS\\core\\extensions\\core\\EditorLocations\\GuestSignupWidget",
+            "Members": "IPS\\core\\extensions\\core\\EditorLocations\\Members",
             "Messaging": "IPS\\core\\extensions\\core\\EditorLocations\\Messaging",
             "Meta": "IPS\\core\\extensions\\core\\EditorLocations\\Meta",
             "Modcp": "IPS\\core\\extensions\\core\\EditorLocations\\Modcp",
@@ -100,7 +103,6 @@
             "Badges": "IPS\\core\\extensions\\core\\FileStorage\\Badges",
             "ClubField": "IPS\\core\\extensions\\core\\FileStorage\\ClubField",
             "Clubs": "IPS\\core\\extensions\\core\\FileStorage\\Clubs",
-            "CustomBadges": "IPS\\core\\extensions\\core\\FileStorage\\CustomBadges",
             "Emoticons": "IPS\\core\\extensions\\core\\FileStorage\\Emoticons",
             "Icons": "IPS\\core\\extensions\\core\\FileStorage\\Icons",
             "Imageproxycache": "IPS\\core\\extensions\\core\\FileStorage\\Imageproxycache",
@@ -111,25 +113,22 @@
             "Ranks": "IPS\\core\\extensions\\core\\FileStorage\\Ranks",
             "Reaction": "IPS\\core\\extensions\\core\\FileStorage\\Reaction",
             "ReferralBanners": "IPS\\core\\extensions\\core\\FileStorage\\ReferralBanners",
-            "Tags": "IPS\\core\\extensions\\core\\FileStorage\\Tags",
             "Theme": "IPS\\core\\extensions\\core\\FileStorage\\Theme"
         },
         "FrontNavigation": {
             "AllActivity": "IPS\\core\\extensions\\core\\FrontNavigation\\AllActivity",
             "Clubs": "IPS\\core\\extensions\\core\\FrontNavigation\\Clubs",
             "CustomItem": "IPS\\core\\extensions\\core\\FrontNavigation\\CustomItem",
-            "Featured": "IPS\\core\\extensions\\core\\FrontNavigation\\Featured",
             "Guidelines": "IPS\\core\\extensions\\core\\FrontNavigation\\Guidelines",
             "Leaderboard": "IPS\\core\\extensions\\core\\FrontNavigation\\Leaderboard",
             "Menu": "IPS\\core\\extensions\\core\\FrontNavigation\\Menu",
             "MenuButton": "IPS\\core\\extensions\\core\\FrontNavigation\\MenuButton",
             "MenuHeader": "IPS\\core\\extensions\\core\\FrontNavigation\\MenuHeader",
             "MenuSeparator": "IPS\\core\\extensions\\core\\FrontNavigation\\MenuSeparator",
-            "Node": "IPS\\core\\extensions\\core\\FrontNavigation\\Node",
             "OnlineUsers": "IPS\\core\\extensions\\core\\FrontNavigation\\OnlineUsers",
+            "Promoted": "IPS\\core\\extensions\\core\\FrontNavigation\\Promoted",
             "Search": "IPS\\core\\extensions\\core\\FrontNavigation\\Search",
             "StaffDirectory": "IPS\\core\\extensions\\core\\FrontNavigation\\StaffDirectory",
-            "Tags": "IPS\\core\\extensions\\core\\FrontNavigation\\Tags",
             "YourActivityStreams": "IPS\\core\\extensions\\core\\FrontNavigation\\YourActivityStreams",
             "YourActivityStreamsItem": "IPS\\core\\extensions\\core\\FrontNavigation\\YourActivityStreamsItem"
         },
@@ -165,15 +164,6 @@
             "Members": "IPS\\core\\extensions\\core\\LiveSearch\\Members",
             "Settings": "IPS\\core\\extensions\\core\\LiveSearch\\Settings"
         },
-        "MFAArea": {
-            "AuthenticateAdmin": "IPS\\core\\extensions\\core\\MFAArea\\AuthenticateAdmin",
-            "AuthenticateFront": "IPS\\core\\extensions\\core\\MFAArea\\AuthenticateFront",
-            "AuthenticateFrontKnown": "IPS\\core\\extensions\\core\\MFAArea\\AuthenticateFrontKnown",
-            "DeviceManagement": "IPS\\core\\extensions\\core\\MFAArea\\DeviceManagement",
-            "EmailChange": "IPS\\core\\extensions\\core\\MFAArea\\EmailChange",
-            "PasswordChange": "IPS\\core\\extensions\\core\\MFAArea\\PasswordChange",
-            "SecurityQuestions": "IPS\\core\\extensions\\core\\MFAArea\\SecurityQuestions"
-        },
         "MemberACPProfileBlocks": {
             "BasicInformation": "IPS\\core\\extensions\\core\\MemberACPProfileBlocks\\BasicInformation",
             "ContentStatistics": "IPS\\core\\extensions\\core\\MemberACPProfileBlocks\\ContentStatistics",
@@ -202,7 +192,6 @@
             "Banned": "IPS\\core\\extensions\\core\\MemberFilter\\Banned",
             "Bulkmail": "IPS\\core\\extensions\\core\\MemberFilter\\Bulkmail",
             "Content": "IPS\\core\\extensions\\core\\MemberFilter\\Content",
-            "Expert": "IPS\\core\\extensions\\core\\MemberFilter\\Expert",
             "Group": "IPS\\core\\extensions\\core\\MemberFilter\\Group",
             "Joined": "IPS\\core\\extensions\\core\\MemberFilter\\Joined",
             "Lastpost": "IPS\\core\\extensions\\core\\MemberFilter\\Lastpost",
@@ -217,25 +206,40 @@
             "Twofactor": "IPS\\core\\extensions\\core\\MemberFilter\\Twofactor",
             "Validating": "IPS\\core\\extensions\\core\\MemberFilter\\Validating"
         },
+        "MemberForm": {
+            "Preferences": "IPS\\core\\extensions\\core\\MemberForm\\Preferences"
+        },
         "MemberHistory": {
-            "Core": "IPS\\core\\extensions\\core\\MemberHistory\\Core",
-            "Mailchimp": "IPS\\core\\extensions\\core\\MemberHistory\\Mailchimp"
+            "Core": "IPS\\core\\extensions\\core\\MemberHistory\\Core"
         },
         "MemberRestrictions": {
             "Content": "IPS\\core\\extensions\\core\\MemberRestrictions\\Content",
+            "Statuses": "IPS\\core\\extensions\\core\\MemberRestrictions\\Statuses",
             "Tags": "IPS\\core\\extensions\\core\\MemberRestrictions\\Tags"
+        },
+        "MemberSync": {
+            "Authy": "IPS\\core\\extensions\\core\\MemberSync\\Authy",
+            "System": "IPS\\core\\extensions\\core\\MemberSync\\System"
         },
         "MetaData": {
             "ContentMessages": "IPS\\core\\extensions\\core\\MetaData\\ContentMessages",
             "FeaturedComments": "IPS\\core\\extensions\\core\\MetaData\\FeaturedComments",
             "ItemModeration": "IPS\\core\\extensions\\core\\MetaData\\ItemModeration"
         },
+        "MFAArea": {
+            "AuthenticateAdmin": "IPS\\core\\extensions\\core\\MFAArea\\AuthenticateAdmin",
+            "AuthenticateFront": "IPS\\core\\extensions\\core\\MFAArea\\AuthenticateFront",
+            "AuthenticateFrontKnown": "IPS\\core\\extensions\\core\\MFAArea\\AuthenticateFrontKnown",
+            "DeviceManagement": "IPS\\core\\extensions\\core\\MFAArea\\DeviceManagement",
+            "EmailChange": "IPS\\core\\extensions\\core\\MFAArea\\EmailChange",
+            "PasswordChange": "IPS\\core\\extensions\\core\\MFAArea\\PasswordChange",
+            "SecurityQuestions": "IPS\\core\\extensions\\core\\MFAArea\\SecurityQuestions"
+        },
         "ModCp": {
             "Alerts": "IPS\\core\\extensions\\core\\ModCp\\Alerts",
             "Announcements": "IPS\\core\\extensions\\core\\ModCp\\Announcements",
             "Content": "IPS\\core\\extensions\\core\\ModCp\\Content",
             "Deleted": "IPS\\core\\extensions\\core\\ModCp\\Deleted",
-            "Featured": "IPS\\core\\extensions\\core\\ModCp\\Featured",
             "IPTools": "IPS\\core\\extensions\\core\\ModCp\\IPTools",
             "Members": "IPS\\core\\extensions\\core\\ModCp\\Members",
             "Reports": "IPS\\core\\extensions\\core\\ModCp\\Reports",
@@ -297,18 +301,16 @@
             "ProfileFields": "IPS\\core\\extensions\\core\\ProfileSteps\\ProfileFields"
         },
         "Queue": {
-            "AutoFollowClubs": "IPS\\core\\extensions\\core\\Queue\\AutoFollowClubs",
             "BuildTimeToRank": "IPS\\core\\extensions\\core\\Queue\\BuildTimeToRank",
             "Bulkmail": "IPS\\core\\extensions\\core\\Queue\\Bulkmail",
-            "CleanupApprovalQueue": "IPS\\core\\extensions\\core\\Queue\\CleanupApprovalQueue",
             "CleanupOrigTables": "IPS\\core\\extensions\\core\\Queue\\CleanupOrigTables",
-            "ConvertOpenTags": "IPS\\core\\extensions\\core\\Queue\\ConvertOpenTags",
             "DeleteImageProxyFiles": "IPS\\core\\extensions\\core\\Queue\\DeleteImageProxyFiles",
             "DeleteMovedFiles": "IPS\\core\\extensions\\core\\Queue\\DeleteMovedFiles",
             "DeleteOrMoveContent": "IPS\\core\\extensions\\core\\Queue\\DeleteOrMoveContent",
             "DeleteOrphanedFiles": "IPS\\core\\extensions\\core\\Queue\\DeleteOrphanedFiles",
             "FileCleanup": "IPS\\core\\extensions\\core\\Queue\\FileCleanup",
             "FindOrphanedFiles": "IPS\\core\\extensions\\core\\Queue\\FindOrphanedFiles",
+            "FixDeletionLog": "IPS\\core\\extensions\\core\\Queue\\FixDeletionLog",
             "Follow": "IPS\\core\\extensions\\core\\Queue\\Follow",
             "ForcePasswordReset": "IPS\\core\\extensions\\core\\Queue\\ForcePasswordReset",
             "IndexNow": "IPS\\core\\extensions\\core\\Queue\\IndexNow",
@@ -317,13 +319,14 @@
             "MemberContent": "IPS\\core\\extensions\\core\\Queue\\MemberContent",
             "MoveFiles": "IPS\\core\\extensions\\core\\Queue\\MoveFiles",
             "MoveMembers": "IPS\\core\\extensions\\core\\Queue\\MoveMembers",
-            "PWANotifications": "IPS\\core\\extensions\\core\\Queue\\PWANotifications",
             "PruneLargeTable": "IPS\\core\\extensions\\core\\Queue\\PruneLargeTable",
             "PruneMembers": "IPS\\core\\extensions\\core\\Queue\\PruneMembers",
             "PrunePms": "IPS\\core\\extensions\\core\\Queue\\PrunePms",
+            "PWANotifications": "IPS\\core\\extensions\\core\\Queue\\PWANotifications",
             "RebuildAchievements": "IPS\\core\\extensions\\core\\Queue\\RebuildAchievements",
             "RebuildAttachmentThumbnails": "IPS\\core\\extensions\\core\\Queue\\RebuildAttachmentThumbnails",
             "RebuildContainerCounts": "IPS\\core\\extensions\\core\\Queue\\RebuildContainerCounts",
+            "RebuildContentImages": "IPS\\core\\extensions\\core\\Queue\\RebuildContentImages",
             "RebuildImageProxy": "IPS\\core\\extensions\\core\\Queue\\RebuildImageProxy",
             "RebuildImageProxyNonContent": "IPS\\core\\extensions\\core\\Queue\\RebuildImageProxyNonContent",
             "RebuildItemCounts": "IPS\\core\\extensions\\core\\Queue\\RebuildItemCounts",
@@ -331,6 +334,8 @@
             "RebuildKeywords": "IPS\\core\\extensions\\core\\Queue\\RebuildKeywords",
             "RebuildLazyLoad": "IPS\\core\\extensions\\core\\Queue\\RebuildLazyLoad",
             "RebuildLazyLoadNonContent": "IPS\\core\\extensions\\core\\Queue\\RebuildLazyLoadNonContent",
+            "RebuildNonContentImages": "IPS\\core\\extensions\\core\\Queue\\RebuildNonContentImages",
+            "RebuildNonContentPosts": "IPS\\core\\extensions\\core\\Queue\\RebuildNonContentPosts",
             "RebuildPosts": "IPS\\core\\extensions\\core\\Queue\\RebuildPosts",
             "RebuildReportIndexData": "IPS\\core\\extensions\\core\\Queue\\RebuildReportIndexData",
             "RebuildReputationIndex": "IPS\\core\\extensions\\core\\Queue\\RebuildReputationIndex",
@@ -340,12 +345,17 @@
             "RebuildUrlRels": "IPS\\core\\extensions\\core\\Queue\\RebuildUrlRels",
             "RecountMemberContent": "IPS\\core\\extensions\\core\\Queue\\RecountMemberContent",
             "RecountMemberReputation": "IPS\\core\\extensions\\core\\Queue\\RecountMemberReputation",
+            "RecountPollVotes": "IPS\\core\\extensions\\core\\Queue\\RecountPollVotes",
+            "RecountStarRatings": "IPS\\core\\extensions\\core\\Queue\\RecountStarRatings",
+            "RemoveLetterPhotos": "IPS\\core\\extensions\\core\\Queue\\RemoveLetterPhotos",
+            "RemoveOrphanedReputation": "IPS\\core\\extensions\\core\\Queue\\RemoveOrphanedReputation",
+            "RepairFileUrls": "IPS\\core\\extensions\\core\\Queue\\RepairFileUrls",
+            "RestoreBrokenAttachments": "IPS\\core\\extensions\\core\\Queue\\RestoreBrokenAttachments",
             "ResyncTopicContent": "IPS\\core\\extensions\\core\\Queue\\ResyncTopicContent",
             "UnsubMembers": "IPS\\core\\extensions\\core\\Queue\\UnsubMembers",
             "UpdateClubRenewals": "IPS\\core\\extensions\\core\\Queue\\UpdateClubRenewals",
             "UpdateMembers": "IPS\\core\\extensions\\core\\Queue\\UpdateMembers",
-            "UpdateTaggedItems": "IPS\\core\\extensions\\core\\Queue\\UpdateTaggedItems",
-            "UpdateWidgetAreas": "IPS\\core\\extensions\\core\\Queue\\UpdateWidgetAreas",
+            "UpdateMemberSeoNames": "IPS\\core\\extensions\\core\\Queue\\UpdateMemberSeoNames",
             "Upgrade46FeaturedContent": "IPS\\core\\extensions\\core\\Queue\\Upgrade46FeaturedContent",
             "WarnNotifications": "IPS\\core\\extensions\\core\\Queue\\WarnNotifications"
         },
@@ -370,7 +380,6 @@
             "RankProgression": "IPS\\core\\extensions\\core\\Statistics\\RankProgression",
             "Reactions": "IPS\\core\\extensions\\core\\Statistics\\Reactions",
             "ReactionsApp": "IPS\\core\\extensions\\core\\Statistics\\ReactionsApp",
-            "Registration": "IPS\\core\\extensions\\core\\Statistics\\Registration",
             "Registrations": "IPS\\core\\extensions\\core\\Statistics\\Registrations",
             "Reports": "IPS\\core\\extensions\\core\\Statistics\\Reports",
             "Search": "IPS\\core\\extensions\\core\\Statistics\\Search",

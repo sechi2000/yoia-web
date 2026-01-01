@@ -12,142 +12,82 @@
 namespace IPS\cms\Pages;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use ErrorException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Application\Module;
-use IPS\cms\Databases;
-use IPS\cms\extensions\core\FrontNavigation\Pages;
-use IPS\cms\Templates;
-use IPS\Content\Search\Index;
-use IPS\Content\ViewUpdates;
-use IPS\core\extensions\core\FrontNavigation\Menu;
-use IPS\core\FrontNavigation;
-use IPS\core\Feature;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Front;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Codemirror;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Node\Permissions;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use IPS\Widget\Area;
-use LogicException;
-use OutOfBoundsException;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_numeric;
-use function mb_substr;
-use function strstr;
-use const IPS\ROOT_PATH;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief Page Model
  */
-class Page extends Model implements Permissions
+class _Page extends \IPS\Node\Model implements \IPS\Node\Permissions
 {
-	use ViewUpdates;
-	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'frontNavigation', 'pageDefaults' );
+	protected $caches = array( 'frontNavigation' );
 
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'cms_pages';
+	public static $databaseTable = 'cms_pages';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'page_';
+	public static $databasePrefix = 'page_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array('page_seo_name', 'page_full_path');
+	protected static $databaseIdFields = array('page_seo_name', 'page_full_path');
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Parent Node ID Database Column
 	 */
-	public static string $parentNodeColumnId = 'folder_id';
+	public static $parentNodeColumnId = 'folder_id';
 	
 	/**
 	 * @brief	[Node] Parent Node Class
 	 */
-	public static string $parentNodeClass = 'IPS\cms\Pages\Folder';
+	public static $parentNodeClass = 'IPS\cms\Pages\Folder';
 	
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'seo_name';
+	public static $databaseColumnOrder = 'seo_name';
 
 	/**
 	 * @brief	[Node] Automatically set position for new nodes
 	 */
-	public static bool $automaticPositionDetermination = FALSE;
+	public static $automaticPositionDetermination = FALSE;
 	
 	/**
 	 * @brief	[Node] Show forms modally?
 	 */
-	public static bool $modalForms = TRUE;
+	public static $modalForms = TRUE;
 	
 	/**
 	 * @brief	[Node] Title
 	 */
-	public static string $nodeTitle = 'page';
+	public static $nodeTitle = 'page';
 
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -165,7 +105,7 @@ class Page extends Model implements Permissions
 	 'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 			'app'		=> 'cms',
 			'module'	=> 'pages',
 			'prefix' 	=> 'page_'
@@ -174,46 +114,56 @@ class Page extends Model implements Permissions
 	/**
 	 * @brief	[Node] App for permission index
 	 */
-	public static ?string $permApp = 'cms';
+	public static $permApp = 'cms';
 	
 	/**
 	 * @brief	[Node] Type for permission index
 	 */
-	public static ?string $permType = 'pages';
+	public static $permType = 'pages';
 	
 	/**
 	 * @brief	The map of permission columns
 	 */
-	public static array $permissionMap = array(
+	public static $permissionMap = array(
 			'view' => 'view'
 	);
 	
 	/**
 	 * @brief	[Node] Prefix string that is automatically prepended to permission matrix language strings
 	 */
-	public static string $permissionLangPrefix = 'perm_content_page_';
+	public static $permissionLangPrefix = 'perm_content_page_';
 	
 	/**
 	 * @brief	[Page] Loaded pages from paths
 	 */
-	protected static array $loadedPagesFromPath = array();
+	protected static $loadedPagesFromPath = array();
 	
 	/**
 	 * @brief	[Page] Currently loaded page
 	 */
-	public static ?Page $currentPage = NULL;
+	public static $currentPage = NULL;
 
 	/**
 	 * @brief	[Page] Default page
 	 */
-	public static array $defaultPage = array();
+	public static $defaultPage = array();
+
+	/**
+	 * @brief	Pre save flag
+	 */
+	const PRE_SAVE  = 1;
+	
+	/**
+	 * @brief	Post save flag
+	 */
+	const POST_SAVE = 2;
 
 	/**
 	 * Set Default Values
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->js_css_ids       = '';
 		$this->content          = '';
@@ -223,23 +173,22 @@ class Page extends Model implements Permissions
 		$this->full_path        = '';
 		$this->js_css_objects   = '';
 		$this->meta_index		= TRUE;
-		$this->ipb_wrapper		= true;
 	}
 
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}" as the key
 	 */
-	public static ?string $titleLangPrefix = 'cms_page_';
+	public static $titleLangPrefix = 'cms_page_';
 
 	/**
 	 * Load record based on a URL
 	 *
-	 * @param Url $url	URL to load from
-	 * @return    Page
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
+	 * @param	\IPS\Http\Url	$url	URL to load from
+	 * @return	\IPS\cms\Pages\Page
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadFromUrl(Url $url ): mixed
+	public static function loadFromUrl( \IPS\Http\Url $url )
 	{
 		$qs = array_merge( $url->hiddenQueryString, $url->queryString );
 
@@ -253,7 +202,7 @@ class Page extends Model implements Permissions
 			{
 				$return = static::load( $qs['path'], 'page_full_path' );
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
 				$return = static::loadFromPath( $qs['path'] );
 			}	
@@ -262,25 +211,25 @@ class Page extends Model implements Permissions
 			{
 				if ( !$return->can( 'view' ) )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 			}
 			return $return;
 		}
 	
-		throw new InvalidArgumentException;
+		throw new \InvalidArgumentException;
 	}
 	
 	/**
 	 * Get the page based on the database ID
 	 * 
 	 * @param int $databaseId
-	 * @return    static object
-	 * @throws  OutOfRangeException
+	 * @return	\IPS\cms\Pages\Page object
+	 * @throws  \OutOfRangeException
 	 */
-	public static function loadByDatabaseId( int $databaseId ) : static
+	public static function loadByDatabaseId( $databaseId )
 	{
-		return static::load( Databases::load( $databaseId )->page_id );
+		return static::load( \IPS\cms\Databases::load( $databaseId )->page_id );
 	}
 	
 	/**
@@ -289,9 +238,9 @@ class Page extends Model implements Permissions
 	 * @param 	int 	$folderId	Folder ID to reset
 	 * @return	void
 	 */
-	public static function resetPath( int $folderId ) : void
+	public static function resetPath( $folderId )
 	{
-		$path = $folderId ? Folder::load( $folderId )->path : '';
+		$path = $folderId ? \IPS\cms\Pages\Folder::load( $folderId )->path : '';
 	
 		$children = static::getChildren( $folderId );
 	
@@ -307,10 +256,10 @@ class Page extends Model implements Permissions
 	 * @param	INT 	$folderId		Folder ID to fetch children from
 	 * @return	array
 	 */
-	public static function getChildren( int $folderId=0 ) : array
+	public static function getChildren( $folderId=0 )
 	{
 		$children = array();
-		foreach( Db::i()->select( '*', static::$databaseTable, array( 'page_folder_id=?', $folderId ), 'page_seo_name ASC' ) as $child )
+		foreach( \IPS\Db::i()->select( '*', static::$databaseTable, array( 'page_folder_id=?', \intval( $folderId ) ), 'page_seo_name ASC' ) as $child )
 		{
 			$children[ $child[ static::$databasePrefix . static::$databaseColumnId ] ] = static::load( $child[ static::$databasePrefix . static::$databaseColumnId ] );
 		}
@@ -322,9 +271,9 @@ class Page extends Model implements Permissions
 	 * Returns a page object (or NULL) based on the path
 	 * 
 	 * @param	string	$path	Path /like/this/ok.html
-	 * @return	NULL|Page object
+	 * @return	NULL|\IPS\cms\Pages\Page object
 	 */
-	public static function loadFromPath( string $path ) : static|null
+	public static function loadFromPath( $path )
 	{
 		$path = trim( $path, '/' );
 		
@@ -337,7 +286,7 @@ class Page extends Model implements Permissions
 			{
 				static::$loadedPagesFromPath[ $path ] =  static::load( $path, 'page_full_path' );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				/* Nope - try a folder */
 				try
@@ -345,25 +294,24 @@ class Page extends Model implements Permissions
 					if ( $path )
 					{
 						$class  = static::$parentNodeClass;
-						/* @var $class Model */
 						$folder = $class::load( $path, 'folder_path' );
 						
-						static::$loadedPagesFromPath[ $path ] = static::getDefaultForMember( $folder->id );
+						static::$loadedPagesFromPath[ $path ] = static::getDefaultPage( $folder->id );
 					}
 					else
 					{
-						static::$loadedPagesFromPath[ $path ] = static::getDefaultForMember();
+						static::$loadedPagesFromPath[ $path ] = static::getDefaultPage( 0 );
 					}
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					/* May contain a database path */
-					if ( strstr( $path, '/' ) )
+					if ( \strstr( $path, '/' ) )
 					{
 						$bits = explode( '/', $path );
 						$pathsToTry = array();
 						
-						while( count( $bits ) )
+						while( \count( $bits ) )
 						{
 							$pathsToTry[] = implode( '/', $bits );
 							
@@ -372,12 +320,12 @@ class Page extends Model implements Permissions
 						
 						try
 						{
-							static::$loadedPagesFromPath[ $path ] = static::constructFromData( Db::i()->select( '*', 'cms_pages', Db::i()->in( 'page_full_path', $pathsToTry ), 'page_full_path DESC' )->first() );
+							static::$loadedPagesFromPath[ $path ] = static::constructFromData( \IPS\Db::i()->select( '*', 'cms_pages', \IPS\Db::i()->in( 'page_full_path', $pathsToTry ), 'page_full_path DESC' )->first() );
 						}
-						catch( UnderFlowException $e )
+						catch( \UnderFlowException $e )
 						{
 							/* Last chance saloon */
-							foreach( Db::i()->select( '*', 'cms_pages', array( '? LIKE CONCAT( page_full_path, \'%\')', $path ), 'page_full_path DESC' ) as $page )
+							foreach( \IPS\Db::i()->select( '*', 'cms_pages', array( '? LIKE CONCAT( page_full_path, \'%\')', $path ), 'page_full_path DESC' ) as $page )
 							{
 								if ( mb_stristr( $page['page_content'], '{database' ) )
 								{
@@ -396,7 +344,7 @@ class Page extends Model implements Permissions
 									/* Pass back recursively so we don't have to duplicate all of the checks again */
 									static::$loadedPagesFromPath[ $path ] = static::loadFromPath( $pathWithoutPage );
 								}
-								catch( OutOfRangeException $e ) {}
+								catch( \OutOfRangeException $e ) {}
 							}
 						}
 					}
@@ -406,7 +354,7 @@ class Page extends Model implements Permissions
 		
 		if ( static::$loadedPagesFromPath[ $path ] === NULL )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		return static::$loadedPagesFromPath[ $path ];
@@ -417,22 +365,22 @@ class Page extends Model implements Permissions
 	 *
 	 * @param	string		$slug			Thing that lives in the garden and eats your plants
 	 * @param	string|NULL	$queryString	Any query string to add to the end
-	 * @return    Url
+	 * @return	\IPS\Http\Url
 	 */
-	public static function getUrlFromHistory( string $slug, ?string $queryString=NULL ) : Url
+	public static function getUrlFromHistory( $slug, $queryString=NULL )
 	{
 		$slug = trim( $slug, '/' );
 		
 		try
 		{
-			$row = Db::i()->select( '*', 'cms_url_store', array( 'store_type=? and store_path=?', 'page', $slug ) )->first();
+			$row = \IPS\Db::i()->select( '*', 'cms_url_store', array( 'store_type=? and store_path=?', 'page', $slug ) )->first();
 
 			return static::load( $row['store_current_id'] )->url();
 		}
-		catch( UnderflowException $ex )
+		catch( \UnderflowException $ex )
 		{
 			/* Ok, perhaps this is a full URL with the page name at the beginning */
-			foreach( Db::i()->select( '*', 'cms_url_store', array( 'store_type=? and ? LIKE CONCAT( store_path, \'%\') OR store_path=?', 'page', $slug, $slug ) ) as $item )
+			foreach( \IPS\Db::i()->select( '*', 'cms_url_store', array( 'store_type=? and ? LIKE CONCAT( store_path, \'%\') OR store_path=?', 'page', $slug, $slug ) ) as $item )
 			{
 				$url = static::load( $item['store_current_id'] )->url();
 				$url = $url->setPath( '/' . trim( str_replace( $item['store_path'], trim( $url->data['path'], '/' ), $slug ), '/' ) );
@@ -444,11 +392,11 @@ class Page extends Model implements Permissions
 			}
 			
 			/* Still here? Ok, now we may have changed the folder name at some point, so lets look for that */
-			foreach( Db::i()->select( '*', 'cms_url_store', array( 'store_type=? and ? LIKE CONCAT( store_path, \'%\') OR store_path=?', 'folder', $slug, $slug ) ) as $item )
+			foreach( \IPS\Db::i()->select( '*', 'cms_url_store', array( 'store_type=? and ? LIKE CONCAT( store_path, \'%\') OR store_path=?', 'folder', $slug, $slug ) ) as $item )
 			{
 				try
 				{
-					$folder = Folder::load( $item['store_current_id'] );
+					$folder = \IPS\cms\Pages\Folder::load( $item['store_current_id'] );
 
 					/* Attempt to build the new path */
 					$newPath = str_replace( $item['store_path'], $folder->path, $slug );
@@ -458,13 +406,13 @@ class Page extends Model implements Permissions
 					{
 						return static::load( $newPath, 'page_full_path' )->url();
 					}
-					catch( OutOfRangeException $ex )
+					catch( \OutOfRangeException $ex )
 					{
 						/* This is not the path you are looking for */
 					}
 
 				}
-				catch( OutOfRangeException $ex )
+				catch( \OutOfRangeException $ex )
 				{
 					/* This also is not the path you are looking for */
 				}
@@ -472,204 +420,50 @@ class Page extends Model implements Permissions
 		}
 
 		/* Still here? Consistent with AR pattern */
-		throw new OutOfRangeException();
+		throw new \OutOfRangeException();
 	}
-
-    /**
-     * @brief   Constants for default page settings
-     */
-    const PAGE_NODEFAULT = 0;
-    const PAGE_DEFAULT = 1;
-    const PAGE_DEFAULT_OVERRIDE = 2;
 	
 	/**
 	 * Return the default page for this folder
 	 *
 	 * @param	INT 	$folderId		Folder ID to fetch children from
-	 * @return    static|null
+	 * @return	\IPS\cms\Pages\Page
 	 */
-	public static function getDefaultPage( int $folderId=0 ) : static|null
+	public static function getDefaultPage( $folderId=0 )
 	{
 		if ( ! isset( static::$defaultPage[ $folderId ] ) )
 		{
 			/* Try the easiest method first */
 			try
 			{
-				static::$defaultPage[ $folderId ] = Page::load( Db::i()->select( 'page_id', static::$databaseTable, array( 'page_default=? AND page_folder_id=?', static::PAGE_DEFAULT, $folderId ) )->first() );
+				static::$defaultPage[ $folderId ] = \IPS\cms\Pages\Page::load( \IPS\Db::i()->select( 'page_id', static::$databaseTable, array( 'page_default=? AND page_folder_id=?', 1, \intval( $folderId ) ) )->first() );
 			}
-			catch( Exception $ex )
+			catch( \Exception $ex )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
 			/* Got a page called index? */
 			if ( ! isset( static::$defaultPage[ $folderId ] ) )
 			{
-				foreach( static::getChildren( $folderId ) as $id => $obj )
+				$children = static::getChildren( $folderId );
+				foreach( $children as $id => $obj )
 				{
-					if ( mb_substr( $obj->seo_name, 0, 5 ) === 'index' )
+					if ( \mb_substr( $obj->seo_name, 0, 5 ) === 'index' )
 					{
 						return $obj;
 					}
 				}
+
+				reset( $children );
+
+				/* Just return the first, then */
+				static::$defaultPage[ $folderId ] = array_shift( $children );
 			}
 		}
 
 		return ( isset( static::$defaultPage[ $folderId ] ) ) ? static::$defaultPage[ $folderId ] : NULL;
 	}
-
-    /**
-     * Build a list of default pages for each group
-     *
-     * @return array
-     */
-    public static function loadDefaultsPerGroup() : array
-    {
-        try
-        {
-            return Store::i()->pageDefaults;
-        }
-        catch( OutOfRangeException ){}
-
-        $folderRoots = iterator_to_array(
-            Db::i()->select( 'folder_id', 'cms_folders' )
-        );
-        array_unshift( $folderRoots, 0 );
-
-        $defaults = [];
-
-        foreach( $folderRoots as $folderId )
-        {
-            $defaults[ $folderId ] = [];
-            foreach( Db::i()->select( 'page_id,page_group_defaults', static::$databaseTable, [ 'page_default=? and page_folder_id=?', static::PAGE_DEFAULT_OVERRIDE, $folderId ] ) as $row )
-            {
-                foreach( explode( ",", $row['page_group_defaults'] ) as $groupId )
-                {
-                    $defaults[ $folderId ][ $groupId ] = $row['page_id'];
-                }
-            }
-
-            try
-            {
-                $primaryDefault = static::getDefaultPage( $folderId );
-                foreach( Group::groups() as $group )
-                {
-                    if( !isset( $defaults[ $folderId ][ $group->g_id ] ) )
-                    {
-                        $defaults[ $folderId ][ $group->g_id ] = $primaryDefault->_id;
-                    }
-                }
-            }
-            catch( OutOfRangeException ){}
-        }
-
-        Store::i()->pageDefaults = $defaults;
-        return $defaults;
-    }
-
-    /**
-     * Load the default application for this member
-     *
-     * @param int $folderId
-     * @param Member|null $member
-     * @return static
-     */
-    public static function getDefaultForMember( int $folderId=0, ?Member $member=null ) : static
-    {
-        /* We're only going to use the primary group here */
-        $member = $member ?? Member::loggedIn();
-
-        $pageId = static::loadDefaultsPerGroup()[ $folderId ][ $member->member_group_id ] ?? null;
-        if( $pageId )
-        {
-            try
-            {
-                return static::load( $pageId );
-            }
-            catch( OutOfRangeException ){}
-        }
-
-        return static::getDefaultPage( $folderId );
-    }
-
-    /**
-     * Set the page as a default for specific groups
-     *
-     * @param array $groups
-     * @return void
-     */
-    public function setAsDefaultForGroups( array $groups ) : void
-    {
-        $currentDefaults = static::loadDefaultsPerGroup();
-        $newGroups = [];
-        $pagesToUpdate = [];
-        foreach( $groups as $group )
-        {
-            $groupId = ( $group instanceof Group ) ? $group->g_id : $group;
-            $currentPage = $currentDefaults[ $this->folder_id ][ $groupId ] ?? null;
-            if( $currentPage !== null and $currentPage != $this->id )
-            {
-                $pagesToUpdate[ $currentPage ] = [];
-                foreach( $currentDefaults[ $this->folder_id ] as $k => $v )
-                {
-                    if( $v == $currentPage and $k != $groupId )
-                    {
-                        $pagesToUpdate[ $currentPage ][] = $k;
-                    }
-                }
-            }
-
-            $newGroups[] = $groupId;
-        }
-
-        /* Did we make this the default for all the groups? */
-        if( count( $newGroups ) == count( Group::groups() ) )
-        {
-            $this->setAsDefault();
-        }
-        else
-        {
-            if( empty( $newGroups ) )
-            {
-                $this->default = static::PAGE_NODEFAULT;
-                $this->group_defaults = null;
-            }
-            else
-            {
-                $this->default = static::PAGE_DEFAULT_OVERRIDE;
-                $this->group_defaults = implode( ",", $newGroups );
-            }
-
-            $this->save();
-        }
-
-        /* Now  update any pages that need to be changed */
-        foreach( $pagesToUpdate as $pageId => $_values )
-        {
-            try
-            {
-                $page = static::load( $pageId );
-
-                /* If it's set as default 1, we can leave that alone */
-                if( $page->default == static::PAGE_DEFAULT_OVERRIDE )
-                {
-                    $groupsToUse = array_diff( $_values, $newGroups );
-                    if( empty( $groupsToUse ) )
-                    {
-                        $page->default = static::PAGE_NODEFAULT;
-                        $page->group_defaults = null;
-                    }
-                    else
-                    {
-                        $page->group_defaults = implode( ",", $groupsToUse );
-                    }
-
-                    $page->save();
-                }
-            }
-            catch( OutOfRangeException ){}
-        }
-    }
 	
 	/**
 	 * Delete compiled versions
@@ -677,9 +471,9 @@ class Page extends Model implements Permissions
 	 * @param 	int|array 	$ids	Integer ID or Array IDs to remove
 	 * @return void
 	 */
-	public static function deleteCompiled( int|array $ids ) : void
+	public static function deleteCompiled( $ids )
 	{
-		if ( is_numeric( $ids ) )
+		if ( \is_numeric( $ids ) )
 		{
 			$ids = array( $ids );
 		}
@@ -687,9 +481,9 @@ class Page extends Model implements Permissions
 		foreach( $ids as $id )
 		{
 			$functionName = 'content_pages_' .  $id;
-			if ( isset( Store::i()->$functionName ) )
+			if ( isset( \IPS\Data\Store::i()->$functionName ) )
 			{
-				unset( Store::i()->$functionName );
+				unset( \IPS\Data\Store::i()->$functionName );
 			}
 		}
 	}
@@ -697,24 +491,24 @@ class Page extends Model implements Permissions
 	/**
 	 * Removes all include objects from all pages
 	 *
-	 * @param   Url|string|null     $url     				The URL to find and remove
+	 * @param   boolean     $url     				The URL to find and remove
 	 * @param	NULL|int	$storageConfiguration	Delete the cached includes from an alternate storage configuration
 	 * @note	This method is called by \IPS\cms\extensions\core\FileStorage\Pages.php during a move, and in that process we want to remove resources
 	 	from the old storage configuration, not the new one (which is what happens when the configuration id is not passed in to \IPS\File and a move is in progress)
 	 * @return void
 	 */
-	static public function deleteCachedIncludes( Url|string|null $url=NULL, ?int $storageConfiguration=NULL ) : void
+	static public function deleteCachedIncludes( $url=NULL, $storageConfiguration=NULL )
 	{
 		/* Remove them all */
 		if ( $url === NULL )
 		{
             /* Remove from DB */
-            if ( Db::i()->checkForTable( 'cms_pages' ) )
+            if ( \IPS\Db::i()->checkForTable( 'cms_pages' ) )
             {
-                Db::i()->update( 'cms_pages', array( 'page_js_css_objects' => NULL ) );
+                \IPS\Db::i()->update( 'cms_pages', array( 'page_js_css_objects' => NULL ) );
             }
 			/* Remove from file system */
-			File::getClass( $storageConfiguration ?: 'cms_Pages' )->deleteContainer('page_objects');
+			\IPS\File::getClass( $storageConfiguration ?: 'cms_Pages' )->deleteContainer('page_objects');
 		}
 		else
 		{
@@ -722,9 +516,9 @@ class Page extends Model implements Permissions
 			$name = array_pop( $bits );
 
 			/* Remove selectively */
-			foreach( Db::i()->select( '*', 'cms_pages', array( "page_js_css_objects LIKE '%" . Db::i()->escape_string( $name ) . "%'" ) ) as $row )
+			foreach( \IPS\Db::i()->select( '*', 'cms_pages', array( "page_js_css_objects LIKE '%" . \IPS\Db::i()->escape_string( $name ) . "%'" ) ) as $row )
 			{
-				Db::i()->update( 'cms_pages', array( 'page_js_css_objects' => NULL ), array( 'page_id=?', $row['page_id'] ) );
+				\IPS\Db::i()->update( 'cms_pages', array( 'page_js_css_objects' => NULL ), array( 'page_id=?', $row['page_id'] ) );
 			}
 		}
 	}
@@ -739,221 +533,272 @@ class Page extends Model implements Permissions
 	 * @param	array	$httpHeaders	Additional HTTP Headers
 	 * @return  void
 	 */
-	static public function errorPage( string $title, string $message, mixed $code, int $httpStatusCode, array $httpHeaders=array() ) : void
+	static public function errorPage( $title, $message, $code, $httpStatusCode, $httpHeaders )
 	{
 		try
 		{
-			$page = static::load( Settings::i()->cms_error_page );
+			$page = static::load( \IPS\Settings::i()->cms_error_page );
 			$content = $page->getHtmlContent();
 			$content = str_replace( '{error_message}', $message, $content );
 			$content = str_replace( '{error_code}', $code, $content );
 			
 			/* Pages are compiled and cached, which we do not want for the error page as the {error_*} tags are saved with their text content */
 			$functionName = 'content_pages_' .  $page->id;
-			if ( isset( Store::i()->$functionName ) )
+			if ( isset( \IPS\Data\Store::i()->$functionName ) )
 			{
-				unset( Store::i()->$functionName );
+				unset( \IPS\Data\Store::i()->$functionName );
 			}
 			
 			$page->output( $title, $httpStatusCode, $httpHeaders, $content );
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
 			if( $httpStatusCode !== 200 )
 			{
 				/* Unset page token */
-				unset( Output::i()->jsVars['page_token'] );
+				unset( \IPS\Output::i()->jsVars['page_token'] );
 			}
-			Output::i()->sidebar['enabled'] = FALSE;
-			Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( $title, Theme::i()->getTemplate( 'global', 'core' )->error( $title, $message, $code, NULL, Member::loggedIn() ), Dispatcher::i()->getLocationData() ), $httpStatusCode, 'text/html', $httpHeaders, FALSE );
+			\IPS\Output::i()->sidebar['enabled'] = FALSE;
+			\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( $title, \IPS\Theme::i()->getTemplate( 'global', 'core' )->error( $title, $message, $code, NULL, \IPS\Member::loggedIn() ), \IPS\Dispatcher::i()->getLocationData() ), $httpStatusCode, 'text/html', $httpHeaders, FALSE, FALSE );
 		}
 	}
 
 	/**
 	 * Form elements
 	 *
-	 * @param	Page|null		$item	Page object or NULL
+	 * @param	object|null		$item	Page object or NULL
 	 * @return	array
 	 */
-	static public function formElements( ?Page $item=NULL ) : array
+	static public function formElements( $item=NULL )
 	{
-		$pageType = Request::i()->page_type ?? $item?->type;
 		$return   = array();
-		$return['tab_details'] = array( 'content_page_form_tab__details', NULL, NULL, 'ipsForm--horizontal' );
+		$pageType = isset( \IPS\Request::i()->page_type ) ? \IPS\Request::i()->page_type : ( $item ? $item->type : 'html' );
+		$return['tab_details'] = array( 'content_page_form_tab__details', NULL, NULL, 'ipsForm_horizontal' );
 
-		$return['page_name'] = new Translatable( 'page_name', NULL, TRUE, array( 'app' => 'cms', 'key' => ( $item and $item->id ) ? "cms_page_" . $item->id : NULL, 'maxLength' => 64 ), function( $val )
+		$return['page_name'] = new \IPS\Helpers\Form\Translatable( 'page_name', NULL, TRUE, array( 'app' => 'cms', 'key' => ( $item and $item->id ) ? "cms_page_" . $item->id : NULL, 'maxLength' => 64 ), function( $val )
 		{
 			if ( empty( $val ) )
 			{
-				throw new DomainException('form_required');
+				throw new \DomainException('form_required');
 			}		
 		}, NULL, NULL, 'page_name' );
 		
-		$return['page_seo_name'] = new Text( 'page_seo_name', $item ? $item->seo_name : '', FALSE, array( 'maxLength' => 255 ), function( $val ) use ( $item )
+		$return['page_seo_name'] = new \IPS\Helpers\Form\Text( 'page_seo_name', $item ? $item->seo_name : '', FALSE, array( 'maxLength' => 255 ), function( $val )
 		{
 			if ( empty( $val ) )
 			{
-				$val = Friendly::seoTitle( $val );
+				$val = \IPS\Http\Url\Friendly::seoTitle( $val );
 			}
 			
 			/* We cannot have a page name the same as a folder name in this folder */
 			try
 			{
-				$testFolder = Folder::load( $val, 'folder_name' );
+				$testFolder = \IPS\cms\Pages\Folder::load( $val, 'folder_name' );
 
 				/* Ok, we have a folder, but is it on the same tree as us ?*/
-				if ( intval( Request::i()->page_folder_id ) == $testFolder->parent_id )
+				if ( \intval( \IPS\Request::i()->page_folder_id ) == $testFolder->parent_id )
 				{
 					/* Yep, this will break designers' mode and may confuse the FURL engine so we cannot allow this */
-					throw new InvalidArgumentException('content_folder_name_furl_collision_pages');
+					throw new \InvalidArgumentException('content_folder_name_furl_collision_pages');
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 			}
 
 			/* If we hit here, we don't have an existing name so that's good */
-			if ( Page::isFurlCollision( $val ) )
+			if ( \IPS\cms\Pages\Page::isFurlCollision( $val ) )
 			{
-				throw new InvalidArgumentException('content_folder_name_furl_collision_pages_app');
+				throw new \InvalidArgumentException('content_folder_name_furl_collision_pages_app');
 			}
-
+				
 			try
 			{
-				$test = Db::i()->select( '*', 'cms_pages', [ 'page_seo_name=? and page_id <> ? and page_folder_id=?', $val, ( (int)$item?->_id ), Request::i()->page_folder_id ] )->first();
-				throw new InvalidArgumentException( 'content_page_file_name_in_use' );
+				$test = \IPS\cms\Pages\Page::load( $val, 'page_seo_name' );
+
+				if ( isset( \IPS\Request::i()->id ) )
+				{
+					if ( $test->id == \IPS\Request::i()->id )
+					{
+						/* Just us.. */
+						return TRUE;
+					}
+				}
+
+				/* Not us */
+				if ( \intval( \IPS\Request::i()->page_folder_id ) == $test->folder_id )
+				{
+					throw new \InvalidArgumentException( 'content_page_file_name_in_use' );
+				}
+
 			}
-			catch( UnderflowException )
+			catch ( \OutOfRangeException $e ) 
 			{
-				return true;
+				/* An exception means we don't have a match, so that is good */	
 			}
 		}, NULL, NULL, 'page_seo_name' );
 
-		$return['page_folder_id'] = new Node( 'page_folder_id', ( $item ? intval( $item->folder_id ) : ( ( isset( Request::i()->parent ) and Request::i()->parent ) ? Request::i()->parent : 0 ) ), FALSE, array(
+		$return['page_folder_id'] = new \IPS\Helpers\Form\Node( 'page_folder_id', ( $item ? \intval( $item->folder_id ) : ( ( isset( \IPS\Request::i()->parent ) and \IPS\Request::i()->parent ) ? \IPS\Request::i()->parent : 0 ) ), FALSE, array(
 				'class'         => 'IPS\cms\Pages\Folder',
 				'zeroVal'       => 'node_no_parent',
 				'subnodes'		=> false
 		), NULL, NULL, NULL, 'page_folder_id' );
+	
 
-		$return['page_ipb_wrapper'] = new YesNo( 'page_ipb_wrapper', ( $item AND $item->id ) ? $item->ipb_wrapper : 1, TRUE, array(
-				'togglesOff' => array( 'page_wrapper_template' )
+		$return['page_ipb_wrapper'] = new \IPS\Helpers\Form\YesNo( 'page_ipb_wrapper', $item AND $item->id ? $item->ipb_wrapper : 1, TRUE, array(
+				'togglesOn' => array( 'page_show_sidebar' ),
+		        'togglesOff' => array( 'page_wrapper_template' )
 		), NULL, NULL, NULL, 'page_ipb_wrapper' );
 
-		$wrapperTemplates = array( '_none_' => Member::loggedIn()->language()->addToStack('cms_page_wrapper_template_none') );
-		foreach( Templates::getTemplates( Templates::RETURN_PAGE + Templates::RETURN_DATABASE_AND_IN_DEV ) as $id => $obj )
+		$return['page_show_sidebar'] = new \IPS\Helpers\Form\YesNo( 'page_show_sidebar', $item ? $item->show_sidebar : TRUE, FALSE, array(), NULL, NULL, NULL, 'page_show_sidebar' );
+
+		$wrapperTemplates = array( '_none_' => \IPS\Member::loggedIn()->language()->addToStack('cms_page_wrapper_template_none') );
+		foreach( \IPS\cms\Templates::getTemplates( \IPS\cms\Templates::RETURN_PAGE + \IPS\cms\Templates::RETURN_DATABASE_AND_IN_DEV ) as $id => $obj )
 		{
-			/* @var Templates $obj */
 			if ( $obj->isSuitableForCustomWrapper() )
 			{
-				$wrapperTemplates[ Templates::readableGroupName( $obj->group ) ][ $obj->group . '__' . $obj->title . '__' . $obj->key ] = Templates::readableGroupName( $obj->title );
+				$wrapperTemplates[ \IPS\cms\Templates::readableGroupName( $obj->group ) ][ $obj->group . '__' . $obj->title . '__' . $obj->key ] = \IPS\cms\Templates::readableGroupName( $obj->title );
 			}
 		}
 
 		/* List of templates */
-		$return['page_wrapper_template'] = new Select( 'page_wrapper_template', ($item?->wrapper_template), null, array(
+		$return['page_wrapper_template'] = new \IPS\Helpers\Form\Select( 'page_wrapper_template', ( $item ? $item->wrapper_template : NULL ), FALSE, array(
 			         'options' => $wrapperTemplates
-		), null, NULL, Theme::i()->getTemplate( 'pages', 'cms', 'admin' )->previewTemplateLink(), 'page_wrapper_template' );
+		), NULL, NULL, \IPS\Theme::i()->getTemplate( 'pages', 'cms', 'admin' )->previewTemplateLink(), 'page_wrapper_template' );
 
-		if ( count( Theme::themes() ) > 1 )
+		if ( \count( \IPS\Theme::themes() ) > 1 )
 		{
 			$themes = array( 0 => 'cms_page_theme_id_default' );
-			foreach ( Theme::themes() as $theme )
+			foreach ( \IPS\Theme::themes() as $theme )
 			{
 				$themes[ $theme->id ] = $theme->_title;
 			}
 
-			$return['page_theme'] = new Select( 'page_theme', $item ? $item->theme : 0, FALSE, array( 'options' => $themes ), NULL, NULL, NULL, 'page_theme' );
+			$return['page_theme'] = new \IPS\Helpers\Form\Select( 'page_theme', $item ? $item->theme : 0, FALSE, array( 'options' => $themes ), NULL, NULL, NULL, 'page_theme' );
 		}
 
-		/* Only show this dropdown if we are editing an existing page that already has a wrapper */
-		if( $item and $item->template and $item->template != 'page_builder__single_column__page_page_builder_single_column' and $item->template != 'page_builder__single_column__page_builder_single_column' )
+		$builderTemplates = array();
+		foreach( \IPS\cms\Templates::getTemplates( \IPS\cms\Templates::RETURN_PAGE + \IPS\cms\Templates::RETURN_DATABASE_AND_IN_DEV ) as $id => $obj )
 		{
-			$builderTemplates = array( '' => Member::loggedIn()->language()->addToStack( 'cms_page_wrapper_template_none' ) );
-			foreach( Templates::getTemplates( Templates::RETURN_PAGE + Templates::RETURN_DATABASE_AND_IN_DEV ) as $id => $obj )
+			if ( $obj->isSuitableForBuilderWrapper() )
 			{
-				if ( $obj->isSuitableForBuilderWrapper() )
-				{
-					$builderTemplates[ Templates::readableGroupName( $obj->group ) ][ $obj->group . '__' . $obj->title . '__' . $obj->key ] = Templates::readableGroupName( $obj->title );
-				}
+				$builderTemplates[ \IPS\cms\Templates::readableGroupName( $obj->group ) ][ $obj->group . '__' . $obj->title . '__' . $obj->key ] = \IPS\cms\Templates::readableGroupName( $obj->title );
 			}
-
-			$return['page_template'] = new Select( 'page_template', $item->template, FALSE, array( 'options' => $builderTemplates ), NULL, NULL, NULL, 'page_template' );
 		}
+
+		$return['page_template'] = new \IPS\Helpers\Form\Select( 'page_template', ( $item and $item->template ) ? $item->template : FALSE, FALSE, array( 'options' => $builderTemplates ), NULL, NULL, NULL, 'page_template' );
 
 		/* Page CSS and JS */
-		$js  = Templates::getTemplates( Templates::RETURN_ONLY_JS + Templates::RETURN_DATABASE_ONLY );
-		$css = Templates::getTemplates( Templates::RETURN_ONLY_CSS + Templates::RETURN_DATABASE_ONLY );
+		$js  = \IPS\cms\Templates::getTemplates( \IPS\cms\Templates::RETURN_ONLY_JS + \IPS\cms\Templates::RETURN_DATABASE_ONLY );
+		$css = \IPS\cms\Templates::getTemplates( \IPS\cms\Templates::RETURN_ONLY_CSS + \IPS\cms\Templates::RETURN_DATABASE_ONLY );
 
-		if ( count( $js ) OR count( $css ) )
+		if ( \count( $js ) OR \count( $css ) )
 		{
-			$return['tab_js_css'] = array( 'content_page_form_tab__includes', NULL, NULL, 'ipsForm--horizontal ipsForm--page-includes' );
+			$return['tab_js_css'] = array( 'content_page_form_tab__includes', NULL, NULL, 'ipsForm_horizontal' );
 			$return['msg_js_css'] = array( 'cms_page_includes_message', 'ipsMessage ipsMessage_info ipsCmsIncludesMessage' );
 
-			if ( count( $js ) )
+			if ( \count( $js ) )
 			{
 				$jsincludes = array();
 				foreach( $js as $obj )
 				{
-					$jsincludes[ $obj->key ] = Templates::readableGroupName( $obj->group ) . '/' . Templates::readableGroupName( $obj->title );
+					$jsincludes[ $obj->key ] = \IPS\cms\Templates::readableGroupName( $obj->group ) . '/' . \IPS\cms\Templates::readableGroupName( $obj->title );
 				}
 				ksort( $jsincludes );
 
-				$return['page_includes_js'] = new CheckboxSet( 'page_includes_js', $item ? $item->js_includes : FALSE, FALSE, array( 'options' => $jsincludes, 'multiple' => true ), NULL, NULL, NULL, 'page_includes_js' );
+				$return['page_includes_js'] = new \IPS\Helpers\Form\CheckboxSet( 'page_includes_js', $item ? $item->js_includes : FALSE, FALSE, array( 'options' => $jsincludes, 'multiple' => true ), NULL, NULL, NULL, 'page_includes_js' );
 			}
 
-			if ( count( $css ) )
+			if ( \count( $css ) )
 			{
 				$cssincludes = array();
 				foreach( $css as $obj )
 				{
-					$cssincludes[ $obj->key ] = Templates::readableGroupName( $obj->group ) . '/' . Templates::readableGroupName( $obj->title );
+					$cssincludes[ $obj->key ] = \IPS\cms\Templates::readableGroupName( $obj->group ) . '/' . \IPS\cms\Templates::readableGroupName( $obj->title );
 				}
 				ksort( $cssincludes );
 				
-				$return['page_includes_css'] = new CheckboxSet( 'page_includes_css', $item ? $item->css_includes : FALSE, FALSE, array( 'options' => $cssincludes, 'multiple' => true ), NULL, NULL, NULL, 'page_includes_css' );
+				$return['page_includes_css'] = new \IPS\Helpers\Form\CheckboxSet( 'page_includes_css', $item ? $item->css_includes : FALSE, FALSE, array( 'options' => $cssincludes, 'multiple' => true ), NULL, NULL, NULL, 'page_includes_css' );
 			}
 		}
 
-		if ( $pageType == 'html' )
+		if ( $pageType === 'html' )
 		{
-			$return['tab_content'] = array( 'content_page_form_tab__content', NULL, NULL, 'ipsForm--vertical' );
-
-			$tagSource = Url::internal( "app=cms&module=pages&controller=ajax&do=loadTags" );
+			$return['tab_content'] = array( 'content_page_form_tab__content', NULL, NULL, 'ipsForm_vertical' );
+			
+			$tagSource = \IPS\Http\Url::internal( "app=cms&module=pages&controller=ajax&do=loadTags" );
 			if ( $item )
 			{
 				$tagSource = $tagSource->setQueryString( 'pageId', $item->id );
 			}
 
-			$return['page_content'] = new Codemirror( 'page_content', $item ? htmlentities( $item->content, ENT_DISALLOWED, 'UTF-8' ) : NULL, FALSE, array( 'tagSource' => $tagSource, 'height' => 600, 'codeMode' => true, 'codeModeAllowedLanguages' => [ 'txt', 'ipsphtml' ] ), function( $val )
+			$return['page_content'] = new \IPS\Helpers\Form\Codemirror( 'page_content', $item ? htmlentities( $item->content, ENT_DISALLOWED, 'UTF-8', TRUE ) : NULL, FALSE, array( 'tagSource' => $tagSource, 'height' => 600 ), function( $val )
 			{
 				/* Test */
 				try
 				{
-					Theme::checkTemplateSyntax( $val );
+					\IPS\Theme::checkTemplateSyntax( $val );
 				}
-				catch( LogicException $e )
+				catch( \LogicException $e )
 				{
-					throw new LogicException('cms_page_error_bad_syntax');
+					throw new \LogicException('cms_page_error_bad_syntax');
+				}
+				
+				/* New page? quick check to see if we added a DB tag, and if so, make sure it's not being used on another page. */
+				if ( ! isset( \IPS\Request::i()->id ) )
+				{
+					preg_match( '#{database="([^"]+?)"#', $val, $matches );
+					if ( isset( $matches[1] ) )
+					{
+						$database = NULL;
+
+						if ( \is_numeric( $matches[1] ) )
+						{
+							try
+							{
+								$database = \IPS\cms\Databases::load( \intval( $matches[1] ) );
+							}
+							catch( \OutOfRangeException $ex ){}
+						}
+
+						if( $database === NULL )
+						{
+							try
+							{
+								$database = \IPS\cms\Databases::load( $matches[1], 'database_key' );
+							}
+							catch( \OutOfRangeException $ex ){}
+						}
+
+						if( $database === NULL )
+						{
+							throw new \LogicException('cms_err_db_does_not_exist');
+						}
+						elseif( $database->page_id )
+						{
+							throw new \LogicException('cms_err_db_in_use_other_page');
+						}
+					}
 				}
 			}, NULL, NULL, 'page_content' );
 		}
 	
-		$return['tab_meta'] = array( 'content_page_form_tab__meta', NULL, NULL, 'ipsForm--horizontal ipsForm--page-meta' );
-		$return['page_title'] = new Text( 'page_title', $item ? $item->title : '', FALSE, array( 'maxLength' => 64 ), NULL, NULL, NULL, 'page_title' );
-		$return['page_meta_description'] = new TextArea( 'page_meta_description', $item ? $item->meta_description : '', FALSE, array(), NULL, NULL, NULL, 'page_meta_description' );
-		$return['page_meta_image'] = new Form\Upload( 'page_meta_image', ( $item AND $item->meta_image ) ? File::get( 'cms_PagesImages', $item->meta_image ) : null, false, [ 'storageExtension' => 'cms_PagesImages', 'image' => true, 'multiple' => false ], null, null, null, 'page_meta_image' );
+		$return['tab_meta'] = array( 'content_page_form_tab__meta', NULL, NULL, 'ipsForm_horizontal' );
+		$return['page_title'] = new \IPS\Helpers\Form\Text( 'page_title', $item ? $item->title : '', FALSE, array( 'maxLength' => 64 ), NULL, NULL, NULL, 'page_title' );
+		$return['page_meta_keywords'] = new \IPS\Helpers\Form\TextArea( 'page_meta_keywords', $item ? $item->meta_keywords : '', FALSE, array(), NULL, NULL, NULL, 'page_meta_keywords' );
+		$return['page_meta_description'] = new \IPS\Helpers\Form\TextArea( 'page_meta_description', $item ? $item->meta_description : '', FALSE, array(), NULL, NULL, NULL, 'page_meta_description' );
 
-		$disabledIndex = ( $item AND $item->id AND !$item->canView(new Member()));
+		$disabledIndex = ( $item AND $item->id AND !$item->canView(new \IPS\Member()));
 
-		$return['page_meta_index'] = new YesNo('page_meta_index', !$disabledIndex ? ( $item ? $item->meta_index : TRUE ) : FALSE , FALSE, array( 'disabled' => $disabledIndex), NULL, NULL, NULL, 'page_meta_index' );
+		$return['page_meta_index'] = new \IPS\Helpers\Form\YesNo('page_meta_index', !$disabledIndex ? ( $item ? $item->meta_index : TRUE ) : FALSE , FALSE, array( 'disabled' => $disabledIndex), NULL, NULL, NULL, 'page_meta_index' );
 
 		if( $disabledIndex )
 		{
-			Member::loggedIn()->language()->words['page_meta_index_desc'] = Member::loggedIn()->language()->addToStack('page_meta_index_desc_disabled');
+			\IPS\Member::loggedIn()->language()->words['page_meta_index_desc'] = \IPS\Member::loggedIn()->language()->addToStack('page_meta_index_desc_disabled');
 		}
 
-		Output::i()->globalControllers[]  = 'cms.admin.pages.form';
-		Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_pages.js', 'cms' ) );
+		\IPS\Output::i()->globalControllers[]  = 'cms.admin.pages.form';
+		\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_pages.js', 'cms' ) );
 		
 		return $return;
 	}
@@ -962,18 +807,19 @@ class Page extends Model implements Permissions
 	 * Create a new page from a form. Pretty much what the function says.
 	 * 
 	 * @param	array		 $values	Array of form values
-	 * @param	string|null	$pageType	Type of page. 'html' or 'builder'
-	 * @return    Page object
+	 * @param	string		 $pageType	Type of page. 'html', 'builder' or 'editor'
+	 * @return	\IPS\cms\Pages\Page object
 	 */
-	static public function createFromForm( array $values, ?string $pageType='builder' ) : static
+	static public function createFromForm( $values, $pageType=NULL )
 	{
 		$page = new self;
 		$page->type = $pageType;
+		$page->save();
 
-		$page->saveForm( $page->formatFormValues( $values ) );
+		$page->saveForm( $page->formatFormValues( $values ), $pageType );
 
 		/* Set permissions */
-		Db::i()->update( 'core_permission_index', array( 'perm_view' => '*' ), array( 'app=? and perm_type=? and perm_type_id=?', 'cms', 'pages', $page->id ) );
+		\IPS\Db::i()->update( 'core_permission_index', array( 'perm_view' => '*' ), array( 'app=? and perm_type=? and perm_type_id=?', 'cms', 'pages', $page->id ) );
 		
 		return $page;
 	}
@@ -985,7 +831,7 @@ class Page extends Model implements Permissions
 	 * @param   string  $path   Path to check
 	 * @return  boolean
 	 */
-	static public function isFurlCollision( string $path ) : bool
+	static public function isFurlCollision( $path )
 	{
 		$path   = trim( $path , '/');
 		$bits   = explode( '/', $path );
@@ -993,11 +839,6 @@ class Page extends Model implements Permissions
 		
 		/* Ensure we cannot have a structure that starts with core/interface as we have this partial URL blacklisted in \IPS\Text\Parser::safeIframeRegexp() */
 		if ( mb_substr( $path, 0, 15 ) == 'core/interface/' )
-		{
-			return TRUE;
-		}
-
-		if ( mb_substr( $path, 0, 7 ) == 'static/' )
 		{
 			return TRUE;
 		}
@@ -1011,12 +852,12 @@ class Page extends Model implements Permissions
 		/* What about system folders? */
 		try
 		{
-			$folder = Folder::load( Request::i()->page_folder_id );
-			$base = ROOT_PATH . '/' . $folder->path . '/';
+			$folder = \IPS\cms\Pages\Folder::load( \IPS\Request::i()->page_folder_id );
+			$base = \IPS\ROOT_PATH . '/' . $folder->path . '/';
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			$base = ROOT_PATH . '/';
+			$base = \IPS\ROOT_PATH . '/';
 		}
 
 		if( is_dir( $base . $path ) )
@@ -1024,21 +865,21 @@ class Page extends Model implements Permissions
 			return TRUE;
 		}
 
-		if( Request::i()->page_folder_id  )
+		if( \IPS\Request::i()->page_folder_id  )
 		{
 			return FALSE;
 		}
 
-		$defaultApplication = Db::i()->select( 'app_directory', 'core_applications', 'app_default=1' )->first();
+		$defaultApplication = \IPS\Db::i()->select( 'app_directory', 'core_applications', 'app_default=1' )->first();
 
-		foreach( Application::applications() as $key => $app )
+		foreach( \IPS\Application::applications() as $key => $app )
 		{
 			if ( $app->directory === 'cms' )
 			{
 				continue;
 			}
 
-			$furlDefinitionFile = ROOT_PATH . "/applications/{$app->directory}/data/furl.json";
+			$furlDefinitionFile = \IPS\ROOT_PATH . "/applications/{$app->directory}/data/furl.json";
 			if ( file_exists( $furlDefinitionFile ) )
 			{
 				$furlDefinition = json_decode( preg_replace( '/\/\*.+?\*\//s', '', file_get_contents( $furlDefinitionFile ) ), TRUE );
@@ -1072,14 +913,14 @@ class Page extends Model implements Permissions
 		/* Still here? Some apps use very loose matching, like calendar looks for {id}-{?} which may conflict with a page with a filename of 123-foo */
 		try
 		{
-			$url = Url::createFromString( Url::baseUrl() . $path );
+			$url = \IPS\Http\Url::createFromString( \IPS\Http\Url::baseUrl() . $path );
 		
-			if ( $url instanceof Friendly and $url->seoTemplate !== 'content_page_path' )
+			if ( $url and $url instanceof \IPS\Http\Url\Friendly and $url->seoTemplate !== 'content_page_path' )
 			{
 				return TRUE;
 			}
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
 			/* If we get an error, then it cannot be a legitimate link */
 		}
@@ -1092,10 +933,10 @@ class Page extends Model implements Permissions
 	 *
 	 * @return	void
 	 */
-	public static function deleteCompiledIncludes() : void
+	public static function deleteCompiledIncludes()
 	{
-		Db::i()->update( 'cms_pages', array( 'page_js_css_objects' => NULL ) );
-		Templates::deleteCompiledFiles();
+		\IPS\Db::i()->update( 'cms_pages', array( 'page_js_css_objects' => NULL ) );
+		\IPS\cms\Templates::deleteCompiledFiles();
 	}
 	
 	/**
@@ -1103,28 +944,30 @@ class Page extends Model implements Permissions
 	 *
 	 * @return void
 	 */
-	public static function buildPageUrlStore() : void
+	public static function buildPageUrlStore()
 	{
 		/* This fails because hooks are not installed when this is attempted to build via admin/install */
-		if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'setup' )
+		if ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'setup' )
 		{
 			return;
 		}
 		
 		/* This also fails if we're installing via ACP */
-		if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'admin' and isset( Request::i()->do ) and Request::i()->do == 'install' )
+		if ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'admin' and isset( \IPS\Request::i()->do ) and \IPS\Request::i()->do == 'install' )
 		{
 			return;
 		}
 		
 		$store = array();
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'cms_pages' ), 'IPS\cms\Pages\Page' ) as $page )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'cms_pages' ), 'IPS\cms\Pages\Page' ) as $page )
 		{
 			$perms = $page->permissions();
 			$store[ $page->id ] = array( 'url' => (string) $page->url(), 'perm' => $perms['perm_view'] );
 		}
 		
-		Store::i()->pages_page_urls = $store;
+		\IPS\Data\Store::i()->pages_page_urls = $store;
+
+		\IPS\Member::clearCreateMenu();
 	}
 	
 	/**
@@ -1132,14 +975,14 @@ class Page extends Model implements Permissions
 	 *
 	 * @return array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( ! isset( Store::i()->pages_page_urls ) )
+		if ( ! isset( \IPS\Data\Store::i()->pages_page_urls ) )
 		{
 			static::buildPageUrlStore();
 		}
 		
-		return Store::i()->pages_page_urls;
+		return \IPS\Data\Store::i()->pages_page_urls;
 	}
 
 	/**
@@ -1151,7 +994,7 @@ class Page extends Model implements Permissions
 	public static function getStrippedPagePath( string $path ): array
 	{
 		/* Have a bash at pagination as it's not like we've much else to do */
-		$stripped = Friendly::stripPageComponent( '/' . trim( $path, '/' ) . '/' );
+		$stripped = \IPS\Http\Url\Friendly::stripPageComponent( '/' . trim( $path, '/' ) . '/' );
 
 		if ( trim( $path, '/' ) != trim( $stripped, '/' ) )
 		{
@@ -1184,9 +1027,9 @@ class Page extends Model implements Permissions
 	 * @param string|array $value
 	 * @return void
 	 */
-	public function set__js_css_ids( array|string $value ) : void
+	public function set__js_css_ids( $value )
 	{
-		$this->_data['js_css_ids'] = ( is_array( $value ) ? json_encode( $value ) : $value );
+		$this->_data['js_css_ids'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
 	}
 
 	/**
@@ -1194,14 +1037,14 @@ class Page extends Model implements Permissions
 	 *
 	 * @return	array|null
 	 */
-	protected function get__js_css_ids() : array|null
+	protected function get__js_css_ids()
 	{
-		if ( $this->_data['js_css_ids'] !== NULL AND ! is_array( $this->_data['js_css_ids'] ) )
+		if ( ! \is_array( $this->_data['js_css_ids'] ) )
 		{
 			$this->_data['js_css_ids'] = json_decode( $this->_data['js_css_ids'], true );
 		}
 
-		return ( is_array( $this->_data['js_css_ids'] ) ) ? $this->_data['js_css_ids'] : array();
+		return ( \is_array( $this->_data['js_css_ids'] ) ) ? $this->_data['js_css_ids'] : array();
 	}
 
 	/**
@@ -1209,10 +1052,10 @@ class Page extends Model implements Permissions
 	 *
 	 * @return	array
 	 */
-	protected function get_js_includes() : array
+	protected function get_js_includes()
 	{
 		/* Makes sure js_css_ids is unpacked if required */
-		$foo = $this->_js_css_ids;
+		$this->_js_css_ids;
 
 		if ( isset( $this->_data['js_css_ids']['js'] ) )
 		{
@@ -1227,10 +1070,10 @@ class Page extends Model implements Permissions
 	 *
 	 * @return	array
 	 */
-	protected function get_css_includes() : array
+	protected function get_css_includes()
 	{
 		/* Makes sure js_css_ids is unpacked if required */
-		$foo = $this->_js_css_ids;
+		$this->_js_css_ids;
 
 		if ( isset( $this->_data['js_css_ids']['css'] ) )
 		{
@@ -1243,80 +1086,97 @@ class Page extends Model implements Permissions
 	/**
 	 *  Get JS/CSS Objects
 	 *
-	 * @return array|null
+	 * @return array
 	 */
-	public function getIncludes() : array|null
+	public function getIncludes()
 	{
 		$return = array( 'css' => NULL, 'js' => NULL );
+		
+		if ( \IPS\Theme::designersModeEnabled() )
+		{
+			foreach( array( 'js', 'css' ) as $thing )
+			{
+				$includeKey = $thing . '_includes';
+				if ( \count( $this->$includeKey ) )
+				{
+					/* Build a file object for each thing */
+					foreach( $this->$includeKey as $key )
+					{
+						try
+						{
+							$template = \IPS\cms\Templates::load( $key );
+							
+							$return[ $thing ][ $key ] = \IPS\Http\Url::createFromString( \IPS\Http\Url::baseUrl() . "/applications/cms/interface/developer/developer.php" )
+								->setQueryString( 'file', 'cms/' . $template->location . '/' . $template->group . '/' . $template->title );
+						}
+						catch( \OutOfRangeException $e )
+						{
+							continue;
+						}
+					}
+				}
+			}
+			
+			return $return;
+		}
 		
 		/* Empty? Lets take a look and see if we need to compile anything */
 		if ( empty( $this->_data['js_css_objects'] ) )
 		{
 			/* Lock it up to prevent a race condition */
-			if ( Theme::checkLock( "page_object_build" . $this->id ) )
+			if ( \IPS\Theme::checkLock( "page_object_build" . $this->id ) )
 			{
 				return NULL;
 			}
 
-			Theme::lock( "page_object_build" . $this->id );
+			\IPS\Theme::lock( "page_object_build" . $this->id );
 			
-			if ( count( $this->js_includes ) )
+			if ( \count( $this->js_includes ) )
 			{
 				/* Build a file object for each JS */
 				foreach( $this->js_includes as $key )
 				{
 					try
 					{
-						$template = Templates::load( $key );
-
-						/* If this is an empty file, don't bother loading it */
-						if( empty( $template->content ) )
-						{
-							continue;
-						}
-
+						$template = \IPS\cms\Templates::load( $key );
 						$object   = $template->_file_object;
 
 						$return['js'][ $key ] = $object;
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						continue;
 					}
 				}
 			}
 
-			if ( count( $this->css_includes ) )
+			if ( \count( $this->css_includes ) )
 			{
 				/* Build a file object for each JS */
 				foreach( $this->css_includes as $key )
 				{
 					try
 					{
-						$template = Templates::load( $key );
-
-						/* Skip if empty */
-						if( empty( $template->content ) )
-						{
-							continue;
-						}
-
+						$template = \IPS\cms\Templates::load( $key );
 						$object   = $template->_file_object;
 
 						$return['css'][ $key ] = $object;
 					}
-					catch( Exception $e )
+					catch( \Exception $e )
 					{
 						continue;
 					}
 				}
 			}
 			
-			/* Save this to prevent it looking for includes on every page refresh */
-			$this->js_css_objects = json_encode( $return );
-			$this->save();
+			if ( ! \IPS\Theme::designersModeEnabled() )
+			{
+				/* Save this to prevent it looking for includes on every page refresh */
+				$this->js_css_objects = json_encode( $return );
+				$this->save();
+			}
 			
-			Theme::unlock( "page_object_build" . $this->id );
+			\IPS\Theme::unlock( "page_object_build" . $this->id );
 		}
 		else
 		{
@@ -1325,11 +1185,11 @@ class Page extends Model implements Permissions
 
 		foreach( $return as $type => $data )
 		{
-			if ( is_array( $data ) )
+			if ( \is_array( $data ) )
 			{
 				foreach( $data as $key => $object )
 				{
-					$return[ $type ][ $key ] = (string) File::get( 'cms_Pages', $object )->url;
+					$return[ $type ][ $key ] = (string) \IPS\File::get( 'cms_Pages', $object )->url;
 				}
 			}
 		}
@@ -1342,7 +1202,7 @@ class Page extends Model implements Permissions
 	 *
 	 * @return string
 	 */
-	public function getContentType() : string
+	public function getContentType()
 	{
 		$map  = array(
 			'js'   => 'text/javascript',
@@ -1356,7 +1216,7 @@ class Page extends Model implements Permissions
 
 		$extension = mb_substr( $this->seo_name, ( mb_strrpos( $this->seo_name, '.' ) + 1 ) );
 
-		if ( in_array( $extension, array_keys( $map ) ) )
+		if ( \in_array( $extension, array_keys( $map ) ) )
 		{
 			return $map[ $extension ];
 		}
@@ -1369,7 +1229,7 @@ class Page extends Model implements Permissions
 	 * 
 	 * @return string	Title to use between <title> tags
 	 */
-	public function getHtmlTitle() : string
+	public function getHtmlTitle()
 	{
 		if ( $this->title )
 		{
@@ -1389,190 +1249,156 @@ class Page extends Model implements Permissions
 	 * 
 	 * @return	string	HTML to use on the page
 	 */
-	public function getHtmlContent() : string
+	public function getHtmlContent()
 	{
 		$functionName = 'content_pages_' .  $this->id;
-
-		if ( ! isset( Store::i()->$functionName ) )
+		
+		if ( \IPS\Theme::i()->designersModeEnabled() and file_exists( \IPS\ROOT_PATH . '/themes/cms/pages/' . $this->full_path ) )
 		{
-			Store::i()->$functionName = Theme::compileTemplate( $this->content, $functionName );
+			$contents = @file_get_contents( \IPS\ROOT_PATH . '/themes/cms/pages/' . $this->full_path );
+			$contents = preg_replace( '#^<ips:pages.+?/>(\r\n?|\n)#', '', $contents );
+			try
+			{
+				\IPS\Theme::runProcessFunction( \IPS\Theme::compileTemplate( $contents, $functionName, null, true ), $functionName );
+			}
+			catch( \Exception $e )
+			{
+				\IPS\Log::log( $e, 'pages_error' );
+				return '';
+			}
 		}
-
-		Theme::runProcessFunction( Store::i()->$functionName, $functionName );
-
+		else
+		{
+			if ( ! isset( \IPS\Data\Store::i()->$functionName ) )
+			{ 
+				\IPS\Data\Store::i()->$functionName = \IPS\Theme::compileTemplate( $this->content, $functionName, null, true );
+			}
+			
+			\IPS\Theme::runProcessFunction( \IPS\Data\Store::i()->$functionName, $functionName );
+		}
+		
 		$themeFunction = 'IPS\\Theme\\'. $functionName;
 		return $themeFunction();
 	}
 
 	/**
-	 * Get an array containing all the areas in this page
-	 *
-	 * @param 	string|null 		$area		The area to filter by; by default (null) it will get all areas
-	 *
-	 * @return Area[]		Returns an array mapping the widget areas to the widgets in that area
+	 * @brief	Cached widgets
 	 */
-	public function getAreasFromDatabase( ?string $area=null ) : array
-	{
-		$areas = array();
-
-		if( $this->_version !== null )
-		{
-			foreach( $this->_version->data['areas'] as $id => $tree )
-			{
-				$areas[ $id ] = new Area( $tree, $id );
-			}
-
-			return $areas;
-		}
-
-		$where = [ array( 'area_page_id=?', $this->id ) ];
-
-		if ( $area !== null )
-		{
-			$where[] = [ 'area_area=?', $area ];
-		}
-
-		foreach( Db::i()->select( '*', 'cms_page_widget_areas', $where ) as $row )
-		{
-			if( $row['area_tree'] )
-			{
-				$areas[$row['area_area']] = new Area( json_decode( $row['area_tree'], true ), $row['area_area'] );
-			}
-			elseif( $row['area_widgets'] )
-			{
-				$areas[$row['area_area']] = Area::create( $row['area_area'], json_decode( $row['area_widgets'], true ) );
-			}
-		}
-
-		return $areas;
-	}
+	protected $cachedWidgets = NULL;
 
 	/**
-	 * Save an area to the database and link it to the page
+	 * Return the blocks for this page
 	 *
-	 * @param Area $area
-	 * @param bool $backup	Should we store a copy?
-	 * @return void
+	 * @return	array
 	 */
-	public function saveArea( Area $area, bool $backup=true ) : void
+	public function getWidgets()
 	{
-		/* If we are viewing an old version, do nothing! These should be read-only */
-		if( $this->_version !== null )
+		if( $this->cachedWidgets !== NULL )
 		{
-			return;
+			return $this->cachedWidgets;
 		}
 
-		/* Create a backup before we do anything here */
-		if( $backup )
-		{
-			Revision::store( $this );
-		}
+		$this->cachedWidgets = array();
 
-		/* If we have no content, clear this out entirely */
-		if( !$area->hasWidgets() )
+		$widgets	= array();
+		$dbWidgets	= array();
+		$areas		= array();
+		
+		foreach( \IPS\Db::i()->select( '*', 'cms_page_widget_areas', array( 'area_page_id=?', $this->id ) ) as $k => $widgetMain )
 		{
-			Db::i()->delete( 'cms_page_widget_areas', [ 'area_area=? and area_page_id=?', $area->id, $this->id ] );
-			return;
-		}
+			$widgets[ $widgetMain['area_area'] ] = json_decode( $widgetMain['area_widgets'], TRUE );
+			$areas[ $widgetMain['area_area'] ]   = $widgetMain;
 
-		/* Store the widget configuration */
-		foreach( $area->getAllWidgets() as $widget )
-		{
-			if( isset( $widget['configuration'] ) AND !empty( $widget['configuration'] ) )
+			/* We need to execute database widgets first as this sets up the Database dispatcher correctly */
+			foreach( $widgets[ $widgetMain['area_area'] ] as $widget )
 			{
-				Db::i()->replace( 'core_widgets_config', [
-					'id' => $widget['unique'],
-					'data' => json_encode( $widget['configuration'] )
-				] );
-			}
-		}
-
-		/* Does the area exist? */
-		try
-		{
-			$row = Db::i()->select( '*', 'cms_page_widget_areas', [ 'area_area=? and area_page_id=?', $area->id, $this->id ] )->first();
-
-			Db::i()->update( 'cms_page_widget_areas', [
-				'area_tree' => json_encode( $area->toArray( true, false ) )
-			], ['area_area=? AND area_page_id=?', $area->id, $this->id ] );
-		}
-		catch( UnderflowException )
-		{
-			Db::i()->insert( 'cms_page_widget_areas', [
-				'area_page_id' => $this->id,
-				'area_area' => $area->id,
-				'area_orientation' => $area->orientation(),
-				'area_tree' => json_encode( $area->toArray( true, false ) )
-			]);
-		}
-	}
-
-	/**
-	 * Once widget ordering has ocurred, post process if required
-	 *
-	 * @return void
-	 */
-	public function postSaveArea() : void
-	{
-		/* Check for database changes and update mapping if required */
-		$databaseUsed = NULL;
-		foreach( $this->getAreasFromDatabase() as $item )
-		{
-			$widgetsToRemove = [];
-			foreach( $item->getAllWidgets() as $id => $pageBlock )
-			{
-				if( isset( $pageBlock['app'] ) and $pageBlock['app'] == 'cms' AND $pageBlock['key'] == 'Database' AND ! empty( $pageBlock['configuration']['database'] ) )
+				/* Do not attempt to re-parse database widgets if we already have */
+				if ( ! \IPS\cms\Databases\Dispatcher::i()->databaseId AND $widget['key'] === 'Database' )
 				{
-					if ( $databaseUsed === NULL )
+					$orientation = ( ( $widgetMain['area_area'] == 'sidebar' ) ? 'vertical' : ( ( $widgetMain['area_area'] === 'header' OR $widgetMain['area_area'] === 'footer' ) ? 'horizontal' : $widgetMain['area_orientation'] ) );
+					$dbWidgets[ $widget['unique'] ] = \IPS\Widget::load( \IPS\Application::load( $widget['app'] ), $widget['key'], $widget['unique'], ( isset( $widget['configuration'] ) ) ? $widget['configuration'] : array(), ( isset( $widget['restrict'] ) ? $widget['restrict'] : null ), $orientation );
+					$dbWidgets[ $widget['unique'] ]->render();
+				}
+			}
+		}
+		
+		if( \count( $widgets ) )
+		{
+			$googleFonts = array();
+			foreach ( $widgets as $areaKey => $area )
+			{
+				foreach ( $area as $widget )
+				{
+					try
 					{
-						$databaseUsed = $pageBlock['configuration']['database'];
+						if ( $widget['key'] == 'Database' and array_key_exists( $widget['unique'], $dbWidgets ) )
+						{
+							$_widget = $dbWidgets[ $widget['unique'] ];
+						}
+						else
+						{
+							$orientation = ( ( $areaKey == 'sidebar' ) ? 'vertical' : ( ( $areaKey === 'header' OR $areaKey === 'footer' ) ? 'horizontal' : $areas[ $areaKey ]['area_orientation'] ) );
+							
+							if ( isset( $widget['app'] ) and $widget['app'] )
+							{
+								$appOrPlugin = \IPS\Application::load( $widget['app'] );
+							}
+							else
+							{
+								$appOrPlugin = \IPS\Plugin::load( $widget['plugin'] );
+							}
+							
+							$_widget = \IPS\Widget::load( $appOrPlugin, $widget['key'], $widget['unique'], ( isset( $widget['configuration'] ) ) ? $widget['configuration'] : array(), ( isset( $widget['restrict'] ) ? $widget['restrict'] : null ), $orientation );
+							
+							if ( \in_array( 'IPS\Widget\Builder', class_implements( $_widget ) ) )
+							{
+								if ( ! empty( $_widget->configuration['widget_adv__font'] ) and $_widget->configuration['widget_adv__font'] !== 'inherit' )
+								{
+									$font = $_widget->configuration['widget_adv__font'];
+
+									if ( \mb_substr( $font, -6 ) === ' black' )
+									{
+										$fontWeight = 900;
+										$font = \mb_substr( $font, 0, -6 ) . ':400,900';
+									}
+
+									$googleFonts[ $font ] = $font;
+								}
+							}
+						}
+						
+						if ( \in_array( $areaKey, array('header', 'footer', 'sidebar' ) ) )
+						{
+							\IPS\Output::i()->sidebar['widgets'][ $areaKey ][] = $_widget;
+						}
+							
+						$this->cachedWidgets[ $areaKey ][] = $_widget;
 					}
-					else
+					catch ( \Exception $e )
 					{
-						/* Already got a database, so remove this one */
-						$widgetsToRemove[] = $pageBlock['unique'];
+						\IPS\Log::debug( $e, 'pages_widgets' );
 					}
 				}
 			}
-
-			if( count( $widgetsToRemove ) )
+			
+			if ( \count( $googleFonts ) )
 			{
-				foreach( $widgetsToRemove as $widgetId )
-				{
-					$item->removeWidget( $widgetId );
-				}
-				$this->saveArea( $item );
+				\IPS\Output::i()->linkTags['googlefonts'] = array('rel' => 'stylesheet', 'href' => "https://fonts.googleapis.com/css?family=" . implode( "|", array_values( $googleFonts ) ) . "&display=swap");
 			}
 		}
 
-		if ( $databaseUsed === NULL and $this->type === 'html' )
-		{
-			$databaseUsed = $this->getDatabaseIdFromHtml();
-		}
-
-		if ( $databaseUsed !== NULL )
-		{
-			$this->mapToDatabase( intval( $databaseUsed ) );
-		}
-		else
-		{
-			try
-			{
-				$this->removeDatabaseMap();
-			}
-			catch( LogicException $e ) { }
-		}
+		return $this->cachedWidgets;
 	}
-
+	
 	/**
 	 * [Node] Get buttons to display in tree
 	 * Example code explains return value
 	 * @endcode
-	 * @param Url $url		Base URL
-	 * @param bool $subnode	Is this a subnode?
-	 * @return    array
+	 * @param	string	$url		Base URL
+	 * @param	bool	$subnode	Is this a subnode?
+	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ): array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = parent::getButtons( $url, $subnode );
 		$return  = array();
@@ -1582,42 +1408,29 @@ class Page extends Model implements Permissions
 			unset( $buttons['add'] );
 		}
 		
-		if ( isset( $buttons['edit'] ) )
+		if ( $this->type === 'builder' and isset( $buttons['edit'] ) )
 		{
-			/* Builder pages open the page editor */
-			if( $this->type == 'builder' )
-			{
-				$return['builder'] = array(
+			$return['builder'] = array(
 					'icon'	   => 'magic',
 					'title'    => 'content_launch_page_builder',
 					'link'	   => $this->url()->setQueryString( array( '_blockManager' => 1 ) ),
 					'target'   => '_blank'
-				);
-			}
-
-			/* Is this a database page? We don't allow editing from here, use the database URL instead */
-			try
-			{
-				$db = Databases::load( $this->id, 'database_page_id' );
-				$buttons['edit']['link'] = Url::internal( "app=cms&module=databases&controller=databases&do=form&id=" . $db->id )->setFragment( 'form_header_content_database_form_options_page' );
-				$buttons['edit']['data'] = [];
-
-				if( isset( $buttons['permissions'] ) )
-				{
-					$buttons['permissions']['link'] = Url::internal( "app=cms&module=databases&controller=databases&do=permissions&id=" . $db->id );
-				}
-
-				/* Remove the delete button here; we don't want someone doing this by mistake */
-				if( isset( $buttons['delete'] ) )
-				{
-					unset( $buttons['delete'] );
-				}
-			}
-			catch( OutOfRangeException )
-			{
-				$buttons['edit']['title'] = Member::loggedIn()->language()->addToStack('content_edit_page');
-				$buttons['edit']['data']  = null;
-			}
+			);
+		}
+		else
+		{
+			$return['view'] = array(
+					'icon'	   => 'search',
+					'title'    => 'content_launch_page_view',
+					'link'	   => $this->url(),
+					'target'   => '_blank'
+			);
+		}
+		
+		if ( isset( $buttons['edit'] ) )
+		{
+			$buttons['edit']['title'] = \IPS\Member::loggedIn()->language()->addToStack('content_edit_page');
+			$buttons['edit']['data']  = null;
 		}
 	
 		/* Re-arrange */
@@ -1625,34 +1438,28 @@ class Page extends Model implements Permissions
 		{
 			$return['edit'] = $buttons['edit'];
 		}
-
-		if ( Member::loggedIn()->hasAcpRestriction( 'cms', 'pages', 'page_edit' ) )
+		
+		if ( isset( $buttons['edit_content'] ) )
 		{
-            $return['default'] = array(
-                'icon'	=> ( $this->default == static::PAGE_DEFAULT ) ? 'star' : 'regular fa-star',
-                'title'	=> 'content_default_page',
-                'link'	=> $url->setQueryString( array( 'id' => $this->id, 'subnode' => 1, 'do' => 'setAsDefault' ) ),
-                'data' => [ 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'content_default_page' ) ]
-            );
+			$return['edit_content'] = $buttons['edit_content'];
+		}
+		
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'cms', 'pages', 'page_edit' ) and !$this->default )
+		{
+			$return['default'] = array(
+				'icon'	=> $this->default ? 'star' : 'star-o',
+				'title'	=> 'content_default_page',
+				'link'	=> $url->setQueryString( array( 'id' => $this->id, 'subnode' => 1, 'do' => 'setAsDefault' ) )->csrf()
+			);
+		}
 
-			if( $this->type !== 'builder' )
-			{
-				$return['default_error'] = array(
-					'icon'	=> Settings::i()->cms_error_page == $this->id ? 'exclamation-circle' : 'exclamation',
-					'title'	=> Settings::i()->cms_error_page == $this->id ? 'content_remove_error_page' : 'content_default_error_page',
-					'link'	=> $url->setQueryString( array( 'id' => Settings::i()->cms_error_page ? 0 : $this->id, 'subnode' => 1, 'do' => 'toggleDefaultError' ) )->csrf()
-				);
-			}
-
-			/* Do we have at least one stored version? */
-			if( $previous = Revision::previousVersion( $this ) )
-			{
-				$return['history'] = array(
-					'icon' => 'history',
-					'title' => 'content_page_history',
-					'link' => $url->setQueryString( array( 'id' => $this->id, 'subnode' => 1, 'do' => 'history' ) )
-				);
-			}
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'cms', 'pages', 'page_edit' ) and $this->type !== 'builder' )
+		{
+			$return['default_error'] = array(
+				'icon'	=> \IPS\Settings::i()->cms_error_page == $this->id ? 'exclamation-circle' : 'exclamation',
+				'title'	=> \IPS\Settings::i()->cms_error_page == $this->id ? 'content_remove_error_page' : 'content_default_error_page',
+				'link'	=> $url->setQueryString( array( 'id' => \IPS\Settings::i()->cms_error_page ? 0 : $this->id, 'subnode' => 1, 'do' => 'toggleDefaultError' ) )->csrf()
+			);
 		}
 
 		$return['view'] = array(
@@ -1678,15 +1485,15 @@ class Page extends Model implements Permissions
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		/* Build form */
 		if ( ! $this->id )
 		{
-			$form->hiddenValues['page_type'] = $pageType = Request::i()->page_type;
+			$form->hiddenValues['page_type'] = $pageType = \IPS\Request::i()->page_type;
 		}
 		else
 		{
@@ -1698,7 +1505,17 @@ class Page extends Model implements Permissions
 
 		foreach( static::formElements( $this ) as $name => $field )
 		{
-			if ( is_array( $field ) )
+			if ( $pageType !== 'html' and \in_array( $name, array( 'page_ipb_wrapper', 'page_show_sidebar', 'page_wrapper_template' ) ) )
+			{
+				continue;
+			}
+
+			if ( $pageType === 'html' and \in_array( $name, array( 'page_template' ) ) )
+			{
+				continue;
+			}
+
+			if ( \is_array( $field ) )
 			{
 				if ( mb_substr( $name, 0, 4 ) === 'tab_' )
 				{
@@ -1717,11 +1534,11 @@ class Page extends Model implements Permissions
 
 		if ( ! $this->id )
 		{
-			$form->addTab( 'content_page_form_tab__menu', NULL, NULL, 'ipsForm--horizontal ipsForm--page-menu' );
+			$form->addTab( 'content_page_form_tab__menu', NULL, NULL, 'ipsForm_horizontal' );
 			$toggles    = array( 'menu_manager_access_type', 'menu_parent' );
 			$formFields = array();
 			
-			foreach( Pages::configuration( array() ) as $field )
+			foreach( \IPS\cms\extensions\core\FrontNavigation\Pages::configuration( array() ) as $field )
 			{
 				if ( $field->name !== 'menu_content_page' )
 				{
@@ -1729,17 +1546,14 @@ class Page extends Model implements Permissions
 					$formFields[ $field->name ] = $field;
 				}
 			}
-			$form->add( new YesNo( 'page_add_to_menu', FALSE, FALSE, array( 'togglesOn' => $toggles ) ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'page_add_to_menu', FALSE, FALSE, array( 'togglesOn' => $toggles ) ) );
 			
-			$roots = array( '' => '' );
-			foreach ( FrontNavigation::i()->roots() as $item )
+			$roots = array();
+			foreach ( \IPS\core\FrontNavigation::i()->roots( FALSE ) as $item )
 			{
-				if( $item instanceof Menu )
-				{
-					$roots[ $item->id ] = $item->title();
-				}
+				$roots[ $item->id ] = $item->title();
 			}
-			$form->add( new Select( 'menu_parent', '*', false, array( 'options' => $roots ), NULL, NULL, NULL, 'menu_parent' ) );
+			$form->add( new \IPS\Helpers\Form\Select( 'menu_parent', '*', NULL, array( 'options' => $roots ), NULL, NULL, NULL, 'menu_parent' ) );
 
 			
 			foreach( $formFields as $name => $field )
@@ -1748,26 +1562,26 @@ class Page extends Model implements Permissions
 			}
 			
 			$groups = array();
-			foreach ( Group::groups() as $group )
+			foreach ( \IPS\Member\Group::groups() as $group )
 			{
 				$groups[ $group->g_id ] = $group->name;
 			}
-			$form->add( new Radio( 'menu_manager_access_type', 0, TRUE, array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'menu_manager_access_type', 0, TRUE, array(
 				'options'	=> array( 0 => 'menu_manager_access_type_inherit', 1 => 'menu_manager_access_type_override' ),
 				'toggles'	=> array( 1 => array( 'menu_manager_access' ) )
 			), NULL, NULL, NULL, 'menu_manager_access_type' ) );
-			$form->add( new CheckboxSet( 'menu_manager_access', '*', NULL, array( 'multiple' => TRUE, 'options' => $groups, 'unlimited' => '*', 'unlimitedLang' => 'everyone', 'impliedUnlimited' => TRUE ), NULL, NULL, NULL, 'menu_manager_access' ) );
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'menu_manager_access', '*', NULL, array( 'multiple' => TRUE, 'options' => $groups, 'unlimited' => '*', 'unlimitedLang' => 'everyone', 'impliedUnlimited' => TRUE ), NULL, NULL, NULL, 'menu_manager_access' ) );
 		}
 
-		if( $pageType == 'builder' )
+		if ( $pageType === 'builder' )
 		{
 			if ( $this->id )
 			{
-				Output::i()->output .= Theme::i()->getTemplate( 'global', 'core', 'global' )->message( Member::loggedIn()->language()->addToStack('content_acp_page_builder_msg_edit', TRUE, array( 'sprintf' => array( $this->url() ) ) ), 'information', NULL, FALSE );
+				\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->message( \IPS\Member::loggedIn()->language()->addToStack('content_acp_page_builder_msg_edit', TRUE, array( 'sprintf' => array( $this->url() ) ) ), 'information', NULL, FALSE );
 			}
 			else
 			{
-				Output::i()->output .= Theme::i()->getTemplate( 'global', 'core', 'global' )->message( Member::loggedIn()->language()->addToStack('content_acp_page_builder_msg_new' ), 'information', NULL, FALSE );
+				\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->message( \IPS\Member::loggedIn()->language()->addToStack('content_acp_page_builder_msg_new' ), 'information', NULL, FALSE );
 			}
 		}
 
@@ -1776,7 +1590,7 @@ class Page extends Model implements Permissions
 			$form->canSaveAndReload = true;
 		}
 		
-		Output::i()->title  = $this->id ? Member::loggedIn()->language()->addToStack( 'content_editing_page', FALSE, array( 'sprintf' => array( $this->_title ) ) ) : Member::loggedIn()->language()->addToStack('content_add_page');
+		\IPS\Output::i()->title  = $this->id ? \IPS\Member::loggedIn()->language()->addToStack( 'content_editing_page', FALSE, array( 'sprintf' => array( $this->_title ) ) ) : \IPS\Member::loggedIn()->language()->addToStack('content_add_page');
 	}
 	
 	/**
@@ -1785,41 +1599,40 @@ class Page extends Model implements Permissions
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		$isNew = $this->_new;
 
 		if ( ! $this->id )
 		{
-			$this->type = Request::i()->page_type ?? 'builder';
+			$this->type = \IPS\Request::i()->page_type;
 			$this->save();
-		}
 
-		/* If this is not a new page, store the current page in the history before we make any changes */
-		if( !$isNew )
-		{
-			Revision::store( $this );
+			if ( $this->type === 'editor' )
+			{
+				\IPS\File::claimAttachments( 'page-content/pages-' . $this->id, $this->id );
+			}
 		}
 
 		if( isset( $values['page_name'] ) )
 		{
 			$_copied	= $values['page_name'];
-			$values['page_seo_name'] = empty( $values['page_seo_name'] ) ? ( is_array( $_copied ) ? array_shift( $_copied ) : $_copied ) : $values['page_seo_name'];
+			$values['page_seo_name'] = empty( $values['page_seo_name'] ) ? ( \is_array( $_copied ) ? array_shift( $_copied ) : $_copied ) : $values['page_seo_name'];
 
 			$bits = explode( '.', $values['page_seo_name'] );
 			foreach( $bits as $i => $v )
 			{
-				$bits[ $i ] = Friendly::seoTitle( $v );
+				$bits[ $i ] = \IPS\Http\Url\Friendly::seoTitle( $v );
 			}
 
 			$values['page_seo_name'] = implode( '.', $bits );
 
-			Lang::saveCustom( 'cms', "cms_page_" . $this->id, $values['page_name'] );
+			\IPS\Lang::saveCustom( 'cms', "cms_page_" . $this->id, $values['page_name'] );
 		}
 		
-		if ( isset( $values['page_folder_id'] ) AND !empty( $values['page_folder_id'] ) )
+		if ( isset( $values['page_folder_id'] ) AND ( ! empty( $values['page_folder_id'] ) OR $values['page_folder_id'] === 0 ) )
 		{
-			$values['page_folder_id'] = ( $values['page_folder_id'] instanceof Folder ) ? $values['page_folder_id']->id : 0;
+			$values['page_folder_id'] = ( $values['page_folder_id'] === 0 ) ? 0 : $values['page_folder_id']->id;
 		}
 
 		if ( isset( $values['page_includes_js'] ) OR isset( $values['page_includes_css'] ) )
@@ -1844,13 +1657,20 @@ class Page extends Model implements Permissions
 			unset( $values['page_includes_js'], $values['page_includes_css'] );
 		}
 
+		try
+		{
+			$this->processContent( static::PRE_SAVE );
+		}
+		catch( \LogicException $ex )
+		{
+			throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack('content_err_page_save_exception', FALSE, array( 'sprintf' => \IPS\Member::loggedIn()->language()->addToStack( $ex->getMessage() ) ) ) );
+		}
+
 		/* Page filename changed? */
 		if ( ! $isNew and $values['page_seo_name'] !== $this->seo_name )
 		{
 			$this->storeUrl();
 		}
-
-		$values['page_meta_image'] = ( isset( $values['page_meta_image'] ) and $values['page_meta_image'] instanceof File ) ? (string) $values['page_meta_image'] : null;
 
 		/* Menu stuffs */
 		if ( isset( $values['page_add_to_menu'] ) )
@@ -1868,22 +1688,22 @@ class Page extends Model implements Permissions
 					'app'			=> 'cms',
 					'extension'		=> 'Pages',
 					'config'		=> '',
-					'parent'		=> $values['menu_parent'] ?: 0,
+					'parent'		=> $values['menu_parent'],
 					'permissions'   => $permission
 				);
 				
 				try
 				{
-					$save['position'] = Db::i()->select( 'MAX(position)', 'core_menu', array( 'parent=?', Request::i()->parent ) )->first() + 1;
+					$save['position'] = \IPS\Db::i()->select( 'MAX(position)', 'core_menu', array( 'parent=?', \IPS\Request::i()->parent ) )->first() + 1;
 				}
-				catch ( UnderflowException $e )
+				catch ( \UnderflowException $e )
 				{
 					$save['position'] = 1;
 				}
 				
-				$id = Db::i()->insert( 'core_menu', $save );
+				$id = \IPS\Db::i()->insert( 'core_menu', $save );
 				
-				$values = Pages::parseConfiguration( $values, $id );
+				$values = \IPS\cms\extensions\core\FrontNavigation\Pages::parseConfiguration( $values, $id );
 				$config = array( 'menu_content_page' => $this->id );
 				
 				foreach( array( 'menu_title_page_type', 'menu_title_page' ) as $field )
@@ -1894,7 +1714,7 @@ class Page extends Model implements Permissions
 					}
 				}
 				
-				Db::i()->update( 'core_menu', array( 'config' => json_encode( $config ) ), array( 'id=?', $id ) );
+				\IPS\Db::i()->update( 'core_menu', array( 'config' => json_encode( $config ) ), array( 'id=?', $id ) );
 			}
 
 			unset( $values['page_add_to_menu'], $values['menu_title_page_type'], $values['menu_title_page'], $values['menu_parent'], $values['menu_manager_access'], $values['menu_manager_access_type'] );
@@ -1909,12 +1729,21 @@ class Page extends Model implements Permissions
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
-		$this->setFullPath( ( $this->folder_id ? Folder::load( $this->folder_id )->path : '' ) );
+		$this->setFullPath( ( $this->folder_id ? \IPS\cms\Pages\Folder::load( $this->folder_id )->path : '' ) );
 		$this->save();
+
+		try
+		{
+			$this->processContent( static::POST_SAVE );
+		}
+		catch( \LogicException $ex )
+		{
+			throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack('content_err_page_save_exception', FALSE, array( 'sprintf' => \IPS\Member::loggedIn()->language()->addToStack( $ex->getMessage() ) ) ) );
+		}
 		
-		Index::i()->index( $this->item() );
+		\IPS\Content\Search\Index::i()->index( $this->item() );
 	}
 
 	/**
@@ -1922,9 +1751,9 @@ class Page extends Model implements Permissions
 	 *
 	 * @return void
 	 */
-	public function storeUrl() : void
+	public function storeUrl()
 	{
-		Db::i()->insert( 'cms_url_store', array(
+		\IPS\Db::i()->insert( 'cms_url_store', array(
 			'store_path'       => $this->full_path,
 			'store_current_id' => $this->_id,
 			'store_type'       => 'page'
@@ -1932,43 +1761,17 @@ class Page extends Model implements Permissions
 	}
 
 	/**
-	 * Check permissions
+	 * Get the Database ID from the page
 	 *
-	 * @param	mixed								$permission						A key which has a value in static::$permissionMap['view'] matching a column ID in core_permission_index
-	 * @param Group|Member|null $member							The member or group to check (NULL for currently logged in member)
-	 * @param bool $considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
-	 * @return	bool
-	 * @throws	OutOfBoundsException	If $permission does not exist in static::$permissionMap
+	 * @return null|int
 	 */
-	public function can( mixed $permission, Group|Member $member=NULL, bool $considerPostBeforeRegistering = TRUE ): bool
-	{
-		/* If this is a database page, check the Database module permissions.
-		The Dispatcher thinks we are in the Pages module and so the permission check is done on the
-		wrong module. */
-		if( ( Dispatcher::hasInstance() AND Dispatcher::i()->controllerLocation == 'front' ) and $database = $this->getDatabase() )
-		{
-			$member = $member ?: Member::loggedIn();
-			if( !$member->canAccessModule( Module::get( 'cms', 'database' ) ) )
-			{
-				return false;
-			}
-		}
-
-		return parent::can( $permission, $member, $considerPostBeforeRegistering );
-	}
-
-	/**
-	 * Get the Database from the page
-	 *
-	 * @return null|Databases
-	 */
-	public function getDatabase() : Databases|null
+	public function getDatabase()
 	{
 		try
 		{
-			return Databases::load( $this->id, 'database_page_id' );
+			return \IPS\cms\Databases::load( $this->id, 'database_page_id' );
 		}
-		catch( OutOfRangeException $e ) { }
+		catch( \OutOfRangeException $e ) { }
 	
 		return null;
 	}
@@ -1976,31 +1779,31 @@ class Page extends Model implements Permissions
 	/**
 	 * Get the database ID from the page content
 	 *
-	 * @return  int|null
+	 * @return  int
 	 */
-	public function getDatabaseIdFromHtml() : int|null
+	public function getDatabaseIdFromHtml()
 	{
 		if ( $this->type !== 'html' )
 		{
-			throw new LogicException('cms_page_not_html');
+			throw new \LogicException('cms_page_not_html');
 		}
 
 		preg_match( '#{database="([^"]+?)"#', $this->content, $matches );
 
 		if ( isset( $matches[1] ) )
 		{
-			if ( is_numeric( $matches[1] ) )
+			if ( \is_numeric( $matches[1] ) )
 			{
-				return intval( $matches[1] );
+				return \intval( $matches[1] );
 			}
 			else
 			{
 				try
 				{
-					$database = Databases::load( $matches[1], 'database_key' );
+					$database = \IPS\cms\Databases::load( $matches[1], 'database_key' );
 					return $database->id;
 				}
-				catch( OutOfRangeException $ex )
+				catch( \OutOfRangeException $ex )
 				{
 					return NULL;
 				}
@@ -2013,25 +1816,25 @@ class Page extends Model implements Permissions
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 
 	/**
 	 * Get URL
 	 * 
-	 * @return Url|string|null object
+	 * @return \IPS\Http\Url object
 	 */
-	public function url(): Url|string|null
+	public function url()
 	{
 		if( $this->_url === NULL )
 		{
-			if ( Application::load('cms')->default AND $this->default == static::PAGE_DEFAULT AND ! $this->folder_id )
+			if ( \IPS\Application::load('cms')->default AND $this->default AND ! $this->folder_id )
 			{
 				/* No - that's easy */
-				$this->_url = Url::internal( '', 'front' );
+				$this->_url = \IPS\Http\Url::internal( '', 'front' );
 			}
 			else
 			{
-				$this->_url = Url::internal( 'app=cms&module=pages&controller=page&path=' . $this->full_path, 'front', 'content_page_path', array( $this->full_path ) );
+				$this->_url = \IPS\Http\Url::internal( 'app=cms&module=pages&controller=page&path=' . $this->full_path, 'front', 'content_page_path', array( $this->full_path ) );
 			}
 		}
 
@@ -2039,47 +1842,190 @@ class Page extends Model implements Permissions
 	}
 	
 	/**
+	 * Process the content to see if there are any tags and so on that need action
+	 * 
+	 * @param	integer		$flag		Pre or post save flag
+	 * @return 	void
+	 * @throws	\LogicException
+	 */
+	public function processContent( $flag )
+	{
+		if ( $this->type === 'html' )
+		{
+			$seen = array();
+			preg_match_all( '/\{([a-z]+?=([\'"]).+?\\2 ?+)}/', $this->content, $matches, PREG_SET_ORDER );
+			
+			/* Work out the plugin and the values to pass */
+			foreach( $matches as $index => $array )
+			{
+				preg_match_all( '/(.+?)='.$array[2].'(.+?)'.$array[2].'\s?/', $array[1], $submatches );
+				
+				$plugin  = array_shift( $submatches[1] );
+				$pluginClass = 'IPS\\Output\\Plugin\\' . mb_ucfirst( $plugin );
+				
+				$value   = array_shift( $submatches[2] );
+				$options = array();
+				
+				foreach ( $submatches[1] as $k => $v )
+				{
+					$options[ $v ] = $submatches[2][ $k ];
+				}
+
+				$seen[ mb_strtolower( $plugin ) ] = array( 'value' => $value, 'options' => $options );
+
+				/* Work out if this plugin belongs to an application, and if so, include it */
+				if( !class_exists( $pluginClass ) )
+				{
+					foreach ( \IPS\Application::applications() as $app )
+					{
+						if ( file_exists( \IPS\ROOT_PATH . "/applications/{$app->directory}/extensions/core/OutputPlugins/" . mb_ucfirst( $plugin ) . ".php" ) )
+						{
+							$pluginClass = 'IPS\\' . $app->directory . '\\extensions\\core\\OutputPlugins\\' . mb_ucfirst( $plugin );
+						}
+					}
+				}
+				
+				$method = ( $flag === static::PRE_SAVE ) ? 'preSaveProcess' : 'postSaveProcess';
+				
+				if ( method_exists( $pluginClass, $method ) )
+				{
+					try
+					{
+						$pluginClass::$method( $value, $options, $this );
+					}
+					catch( \Exception $ex )
+					{
+						throw new \LogicException( $ex->getMessage() );
+					}
+				}
+			}
+
+			/* Check to see if we're expecting a database to be here */
+			$database = $this->getDatabase();
+
+			if ( $database !== NULL )
+			{
+				/* We're expecting a database tag, is there one? */
+				if ( isset( $seen['database'] ) )
+				{
+					/* Yep, is it the same ID? */
+					if ( $seen['database']['value'] != $database->id AND $seen['database']['value'] != $database->key )
+					{
+						/* There's been a change.. */
+						try
+						{
+							$this->removeDatabaseMap();
+						}
+						catch( \LogicException $e ) { }
+
+						$this->mapToDatabase( \intval( $database->id ) );
+					}
+				}
+				else
+				{
+					/* Nope, not database tag spotted, now check widgets to be sure... */
+					$keep = FALSE;
+					foreach( \IPS\Db::i()->select( '*', 'cms_page_widget_areas', array( 'area_page_id=?', $this->id ) ) as $k => $widgetMain )
+					{
+						$widgets = json_decode( $widgetMain['area_widgets'], TRUE );
+
+						if ( \is_array( $widgets ) )
+						{
+							foreach( $widgets as $row )
+							{
+								if ( $row['key'] == 'Database' and $row['configuration']['database'] == $database->id )
+								{
+									$keep = TRUE;
+									break;
+								}
+							}
+						}
+					}
+
+					if ( ! $keep )
+					{
+						try
+						{
+							$this->removeDatabaseMap();
+						}
+						catch( \LogicException $e ) { }
+					}
+				}
+			}
+		}
+	}
+	
+	/**
 	 * Set Theme
 	 *
 	 * @return	void
 	 */
-	public function setTheme() : void
+	public function setTheme()
 	{
 		if ( $this->theme )
 		{
 			try
 			{
-				Theme::switchTheme( $this->theme );
+				\IPS\Theme::switchTheme( $this->theme );
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 	}
 
 	/**
-	 * @var Revision|null
-	 */
-	protected ?Revision $_version = null;
-
-	/**
-	 * View as a specific version
+	 * Once widget ordering has ocurred, post process if required
 	 *
-	 * @param int|null $version
 	 * @return void
 	 */
-	public function setVersion( ?int $version=null ) : void
+	public function postWidgetOrderSave()
 	{
-		/* Clear it first */
-		$this->_version = null;
+		/* Check for database changes and update mapping if required */
+		$databaseUsed = NULL;
 
-		try
+		foreach ( \IPS\Db::i()->select( '*', 'cms_page_widget_areas', array( 'area_page_id=?', $this->id ) ) as $item )
 		{
-			$this->_version = Revision::load( $version );
-			foreach( $this->_version->data['settings'] as $k => $v )
+			$pageBlocks   = json_decode( $item['area_widgets'], TRUE );
+			$resaveBlock  = NULL;
+			foreach( $pageBlocks as $id => $pageBlock )
 			{
-				$this->_data[ $k ] = $v;
+				if( isset( $pageBlock['app'] ) and $pageBlock['app'] == 'cms' AND $pageBlock['key'] == 'Database' AND ! empty( $pageBlock['configuration']['database'] ) )
+				{
+					if ( $databaseUsed === NULL )
+					{
+						$databaseUsed = $pageBlock['configuration']['database'];
+					}
+					else
+					{
+						/* Already got a database, so remove this one */
+						$resaveBlock = $pageBlocks;
+						unset( $resaveBlock[ $id ] );
+					}
+				}
+			}
+
+			if ( $resaveBlock !== NULL )
+			{
+				\IPS\Db::i()->update( 'cms_page_widget_areas', array( 'area_widgets' => json_encode( $resaveBlock ) ), array( 'area_page_id=? and area_area=?', $this->id, $item['area_area'] ) );
 			}
 		}
-		catch( OutOfRangeException ){}
+
+		if ( $databaseUsed === NULL and $this->type === 'html' )
+		{
+			$databaseUsed = $this->getDatabaseIdFromHtml();
+		}
+
+		if ( $databaseUsed !== NULL )
+		{
+			$this->mapToDatabase( \intval( $databaseUsed ) );
+		}
+		else
+		{
+			try
+			{
+				$this->removeDatabaseMap();
+			}
+			catch( \LogicException $e ) { }
+		}
 	}
 
 	/**
@@ -2087,19 +2033,19 @@ class Page extends Model implements Permissions
 	 *
 	 * @param   int $databaseId Page ID
 	 * @return  boolean
-	 * @throws  LogicException
+	 * @throws  \LogicException
 	 */
-	public function mapToDatabase( int $databaseId ) : bool
+	public function mapToDatabase( $databaseId )
 	{
 		/* Ensure this page has an ID (as in, $page->save() has not been called yet on a new page) */
 		if ( ! $this->id )
 		{
-			throw new LogicException('cms_err_page_id_is_empty');
+			throw new \LogicException('cms_err_page_id_is_empty');
 		}
 		try
 		{
 			/* is this page already in use */
-			$database = Databases::load( $this->id, 'database_page_id' );
+			$database = \IPS\cms\Databases::load( $this->id, 'database_page_id' );
 
 			if ( $database->id == $databaseId )
 			{
@@ -2109,18 +2055,18 @@ class Page extends Model implements Permissions
 			else
 			{
 				/* We're using another DB on this page */
-				throw new LogicException('cms_err_db_already_on_page' );
+				throw new \LogicException('cms_err_db_already_on_page' );
 			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			/* We didn't load a database based on this page, so make sure the database we want isn't being used elsewhere */
-			$database = Databases::load( $databaseId );
+			$database = \IPS\cms\Databases::load( $databaseId );
 
 			if ( $database->page_id > 0 )
 			{
 				/* We're using another DB on this page */
-				throw new LogicException('cms_err_db_in_use_other_page');
+				throw new \LogicException('cms_err_db_in_use_other_page');
 			}
 			else
 			{
@@ -2129,11 +2075,11 @@ class Page extends Model implements Permissions
 				$database->save();
 
 				/* Restore content in the search index */
-				Task::queue( 'core', 'RebuildSearchIndex', array( 'class' => 'IPS\cms\Records' . $database->id ) );
+				\IPS\Task::queue( 'core', 'RebuildSearchIndex', array( 'class' => 'IPS\cms\Records' . $database->id ) );
 				
 				/* Restore content in social promote table */
 				$class = 'IPS\cms\Records' . $database->id;
-				Feature::changeHiddenByClass( new $class, FALSE );
+				\IPS\core\Promote::changeHiddenByClass( new $class, FALSE );
 			}
 
 			return TRUE;
@@ -2145,60 +2091,62 @@ class Page extends Model implements Permissions
 	 *
 	 * @return void
 	 */
-	public function removeDatabaseMap() : void
+	public function removeDatabaseMap()
 	{
 		try
 		{
-			$database = Databases::load( $this->id, 'database_page_id' );
+			$database = \IPS\cms\Databases::load( $this->id, 'database_page_id' );
 			$database->page_id = 0;
 			$database->save();
 
 			/* Remove from search */
-			Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records' . $database->id );
+			\IPS\Content\Search\Index::i()->removeClassFromSearchIndex( 'IPS\cms\Records' . $database->id );
 			
 			/* Remove content in social promote table */
 			$class = 'IPS\cms\Records' . $database->id;
-			Feature::changeHiddenByClass( new $class, TRUE );
+			\IPS\core\Promote::changeHiddenByClass( new $class, TRUE );
 		}
-		catch( OutOfRangeException $ex )
+		catch( \OutOfRangeException $ex )
 		{
 			/* Page was never mapped */
-			throw new LogicException('cms_err_db_page_never_used');
+			throw new \LogicException('cms_err_db_page_never_used');
 		}
 	}
 
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		try
 		{
 			$this->removeDatabaseMap();
 		}
-		catch( LogicException $e )
+		catch( \LogicException $e )
 		{
 
 		}
 		
 		$delete = $this->getMenuItemIds();
 		
-		if ( count( $delete ) )
+		if ( \count( $delete ) )
 		{
-			Db::i()->delete( 'core_menu', Db::i()->in( 'id', $delete ) );
+			\IPS\Db::i()->delete( 'core_menu', \IPS\Db::i()->in( 'id', $delete ) );
 		}
 
 		/* Remove any widgets for this page */
-		Db::i()->delete( 'cms_page_widget_areas', array( 'area_page_id=?', $this->id ) );
-
-		/* Clear history */
-		Db::i()->delete( 'cms_page_revisions', array( 'revision_page_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'cms_page_widget_areas', array( 'area_page_id=?', $this->id ) );
 		
 		parent::delete();
 		
-		Index::i()->removeFromSearchIndex( $this->item() );
+		if ( $this->full_path and \IPS\Theme::designersModeEnabled() )
+		{
+			static::cleanUpDesignersModeFiles();
+		}
+		
+		\IPS\Content\Search\Index::i()->removeFromSearchIndex( $this->item() );
 	}
 	
 	/**
@@ -2206,10 +2154,10 @@ class Page extends Model implements Permissions
 	 *
 	 * @return array
 	 */
-	public function getMenuItemIds() : array
+	public function getMenuItemIds()
 	{
 		$items = array();
-		foreach( Db::i()->select( '*', 'core_menu', array( 'app=? AND extension=?', 'cms', 'Pages' ) ) as $item )
+		foreach( \IPS\Db::i()->select( '*', 'core_menu', array( 'app=? AND extension=?', 'cms', 'Pages' ) ) as $item )
 		{
 			$json = json_decode( $item['config'], TRUE );
 			
@@ -2231,30 +2179,29 @@ class Page extends Model implements Permissions
 	 * @param	array	$insert	Permission data to insert
 	 * @return  void
 	 */
-	public function setPermissions( array $insert ) : void
+	public function setPermissions( $insert )
 	{
 		parent::setPermissions( $insert );
 		static::buildPageUrlStore();
 		
 		/* Update perms if we have a child database */
-		/* EME: We no longer need this because the permissions are set from the database and not the other way around */
-		/*try
+		try
 		{
-			$database = Databases::load( $this->id, 'database_page_id' );
+			$database = \IPS\cms\Databases::load( $this->id, 'database_page_id' );
 
-			foreach( Db::i()->select( '*', 'cms_database_categories', array( 'category_database_id=?', $database->id ) ) as $cat )
+			foreach( \IPS\Db::i()->select( '*', 'cms_database_categories', array( 'category_database_id=?', $database->id ) ) as $cat )
 			{
 				$class    = '\IPS\cms\Categories' . $database->id;
 				$category = $class::constructFromData( $cat );
 
-				Index::i()->massUpdate( 'IPS\cms\Records' . $database->id, $category->_id, NULL, $category->readPermissionMergeWithPage() );
-				Index::i()->massUpdate( 'IPS\cms\Records\Comment' . $database->id, $category->_id, NULL, $category->readPermissionMergeWithPage() );
-				Index::i()->massUpdate( 'IPS\cms\Records\Review' . $database->id, $category->_id, NULL, $category->readPermissionMergeWithPage() );
+				\IPS\Content\Search\Index::i()->massUpdate( 'IPS\cms\Records' . $database->id, $category->_id, NULL, $category->readPermissionMergeWithPage() );
+				\IPS\Content\Search\Index::i()->massUpdate( 'IPS\cms\Records\Comment' . $database->id, $category->_id, NULL, $category->readPermissionMergeWithPage() );
+				\IPS\Content\Search\Index::i()->massUpdate( 'IPS\cms\Records\Review' . $database->id, $category->_id, NULL, $category->readPermissionMergeWithPage() );
 			}
 		}
-		catch( Exception $e ) { }*/
+		catch( \Exception $e ) { }
 		
-		Index::i()->index( $this->item() );
+		\IPS\Content\Search\Index::i()->index( $this->item() );
 	}
 
 	/**
@@ -2262,28 +2209,21 @@ class Page extends Model implements Permissions
 	 *
 	 * @return void
 	 */
-	public function save(): void
+	public function save()
 	{
-		/* If we are viewing an older version, don't allow any changes */
-		if( $this->_version !== null )
-		{
-			return;
-		}
-
 		if ( $this->id )
 		{
 			static::deleteCompiled( $this->id );
-		}
-
-		/* If this is not new and the folder changed, check defaults */
-		if( !$this->_new and isset( $this->changed['folder_id'] ) )
-		{
-			$this->checkDefaultPage();
 		}
 		
 		parent::save();
 		
 		static::buildPageUrlStore();
+		
+		if ( $this->full_path and \IPS\Theme::designersModeEnabled() )
+		{
+			static::exportDesignersMode( $this->id );
+		}
 	}
 		
 	/**
@@ -2291,9 +2231,9 @@ class Page extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	public function getSortableName() : string
+	public function getSortableName()
 	{
-		return $this->seo_name ?? '';
+		return $this->seo_name;
 	}
 
 	/**
@@ -2301,41 +2241,12 @@ class Page extends Model implements Permissions
 	 *
 	 * @return void
 	 */
-	public function setAsDefault() : void
+	public function setAsDefault()
 	{
-		Db::i()->update( 'cms_pages', array( 'page_default' => static::PAGE_NODEFAULT, 'page_group_defaults' => null ), array( 'page_folder_id=? and page_default=?', $this->folder_id, static::PAGE_DEFAULT ) );
-		Db::i()->update( 'cms_pages', array( 'page_default' => static::PAGE_DEFAULT, 'page_group_defaults' => null ), array( 'page_id=?', $this->id ) );
+		\IPS\Db::i()->update( 'cms_pages', array( 'page_default' => 0 ), array( 'page_folder_id=?', $this->folder_id ) );
+		\IPS\Db::i()->update( 'cms_pages', array( 'page_default' => 1 ), array( 'page_id=?', $this->id ) );
 		
 		static::buildPageUrlStore();
-
-        unset( Store::i()->pageDefaults );
-	}
-
-	/**
-	 * Make sure that we only have one default page per folder.
-	 * This is called only when the folder is changed.
-	 *
-	 * @return void
-	 */
-	protected function checkDefaultPage() : void
-	{
-		if( $this->default == static::PAGE_DEFAULT )
-		{
-			try
-			{
-				$currentDefault = Db::i()->select( 'page_id', 'cms_pages', [ 'page_default=? and page_folder_id=? and page_id <> ?', static::PAGE_DEFAULT, $this->folder_id, (int) $this->_id ] )->first();
-
-				/* If we found a different default page, remove the default from this one */
-				$this->default = static::PAGE_NODEFAULT;
-			}
-			catch( UnderflowException ){}
-		}
-        elseif( $this->default == static::PAGE_DEFAULT_OVERRIDE )
-        {
-            /* Group overrides are always removed when we move a page to another folder */
-            $this->default = static::PAGE_NODEFAULT;
-            $this->group_defaults = null;
-        }
 	}
 	
 	/**
@@ -2344,7 +2255,7 @@ class Page extends Model implements Permissions
 	 * @param	string	$path	Path to reset
 	 * @return	void
 	 */
-	public function setFullPath( string $path ) : void
+	public function setFullPath( $path )
 	{
 		$this->full_path = trim( $path . '/' . $this->seo_name, '/' );
 		$this->save();
@@ -2357,248 +2268,410 @@ class Page extends Model implements Permissions
 	 * @param	int|NULL	$httpStatusCode	HTTP Status Code
 	 * @param	array|NULL	$httpHeaders	Additional HTTP Headers
 	 * @param	string|NULL	$content		Optional content to use. Useful if dynamic replacements need to be made at runtime
-	 * @throws ErrorException
+	 * @throws \ErrorException
 	 * @return  void
 	 */
-	public function output( ?string $title=NULL, ?int $httpStatusCode=NULL, ?array $httpHeaders=NULL, ?string $content=NULL ) : void
+	public function output( $title=NULL, $httpStatusCode=NULL, $httpHeaders=NULL, $content=NULL )
 	{
 		$includes = $this->getIncludes();
 
-		if ( isset( $includes['js'] ) and is_array( $includes['js'] ) )
+		if ( isset( $includes['js'] ) and \is_array( $includes['js'] ) )
 		{
-			Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, array_values( $includes['js'] ) );
+			\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, array_values( $includes['js'] ) );
 		}
-
-		$this->setTheme();
-
-		/* This has to be done after setTheme(), otherwise \IPS\Theme::switchTheme() can wipe out CSS includes */
-		if ( isset( $includes['css'] ) and is_array( $includes['css'] ) )
-		{
-			Output::i()->cssFiles  = array_merge( Output::i()->cssFiles, array_values( $includes['css'] ) );
-		}
-
-		/* Meta tags */
-		$this->setMetaTags();
-
-		Output::i()->jsVars['pageID'] = $this->id;
 
 		/* Display */
-		if ( $this->ipb_wrapper or $this->type == 'builder' )
+		if ( $this->ipb_wrapper or $this->type === 'builder' )
 		{
+			$this->setTheme();
 			$nav = array();
-			Output::i()->title  = $this->getHtmlTitle();
 
-			/* Populate \IPS\Output::i()->sidebar['widgets'] sidebar/header/footer widgets */
-			foreach( $this->getAreasFromDatabase() as $area )
+			\IPS\Output::i()->title  = $this->getHtmlTitle();
+
+			/* This has to be done after setTheme(), otherwise \IPS\Theme::switchTheme() can wipe out CSS includes */
+			if ( isset( $includes['css'] ) and \is_array( $includes['css'] ) )
 			{
-				/* Make sure to set the global areas (header, sidebar, footer, global footer) */
-				if( in_array( $area->id, Area::$reservedAreas ) )
-				{
-					Output::i()->sidebar['widgetareas'] = Output::i()->sidebar['widgetareas'] ?? [];
-					Output::i()->sidebar['widgetareas'][$area->id] = $area;
-					Output::i()->sidebar['widgets'][$area->id] = [];
-				}
+				\IPS\Output::i()->cssFiles  = array_merge( \IPS\Output::i()->cssFiles, array_values( $includes['css'] ) );
 			}
 
-			/* Load the global areas */
-			Output::i()->loadGlobalAreas();
-
-			/* Make sure we initialize the main area */
-			Output::i()->sidebar['widgets']['col1'] = [];
-
-			Output::i()->output = Theme::i()->getTemplate( 'pages', 'cms' )->globalWrap( $nav, $this->getPageContent(), $this );
-
-			if ( isset( Settings::i()->cms_error_page ) and Settings::i()->cms_error_page and Settings::i()->cms_error_page == $this->id )
+			if ( $this->type === 'builder' )
 			{
-				Output::i()->sidebar['enabled'] = false;
+				list( $group, $name, $key ) = explode( '__', $this->template );
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('pages')->globalWrap( $nav, \IPS\cms\Theme::i()->getTemplate($group, 'cms', 'page')->$name( $this, $this->getWidgets() ), $this );
+			}
+			else
+			{
+				/* Populate \IPS\Output::i()->sidebar['widgets'] sidebar/header/footer widgets */
+				$this->getWidgets();
+
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'pages', 'cms' )->globalWrap( $nav, $content ?: $this->getHtmlContent(), $this );
 			}
 
+			/* Set the meta tags, but do not reset them if they are already set - articles can define custom meta tags and this code
+				overwrites the ones set by articles if we don't verify they aren't set first */
+			if ( $this->meta_keywords AND ( !isset( \IPS\Output::i()->metaTags['keywords'] ) OR !\IPS\Output::i()->metaTags['keywords'] ) )
+			{
+				\IPS\Output::i()->metaTags['keywords'] = $this->meta_keywords;
+			}
+
+			if ( $this->meta_description AND ( !isset( \IPS\Output::i()->metaTags['description'] ) OR !\IPS\Output::i()->metaTags['description'] ) )
+			{
+				\IPS\Output::i()->metaTags['description'] = $this->meta_description;
+				\IPS\Output::i()->metaTags['og:description'] = $this->meta_description;
+			}
+			
+			/* If this is a default page, we may be accessing this from the folder only. The isset() check is to ensure canonical
+				tags for more specific things (like databases) are not overridden. */
+			if ( !isset( \IPS\Output::i()->linkTags['canonical'] ) )
+			{
+				\IPS\Output::i()->linkTags['canonical'] = (string) $this->url();
+			}
+
+			if ( !isset( \IPS\Output::i()->metaTags['og:url'] ) )
+			{
+				\IPS\Output::i()->metaTags['og:url'] = (string) $this->url();
+			}
+
+			if ( !isset( \IPS\Output::i()->metaTags['og:title'] ) )
+			{
+				\IPS\Output::i()->metaTags['og:title'] = \IPS\Output::i()->title;
+			}
+
+			if ( !isset( \IPS\Output::i()->metaTags['og:type'] ) )
+			{
+				\IPS\Output::i()->metaTags['og:type'] = 'website';
+			}
+
+			if( !$this->meta_index )
+			{
+				\IPS\Output::i()->metaTags['robots'] = 'noindex';
+			}
+
+			/* Can only disable sidebar if HTML page */
+			if ( ! $this->show_sidebar and $this->type === 'html' )
+			{
+				\IPS\Output::i()->sidebar['enabled'] = false;
+			}
+
+			if ( isset( \IPS\Settings::i()->cms_error_page ) and \IPS\Settings::i()->cms_error_page and \IPS\Settings::i()->cms_error_page == $this->id )
+			{
+				\IPS\Output::i()->sidebar['enabled'] = false;
+			}
+
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'pages/page.css', 'cms', 'front' ) );
 			try
 			{
-				$database = Databases\Dispatcher::i()->databaseId ? Databases::load( Databases\Dispatcher::i()->databaseId ) : null;
+				$database = \IPS\cms\Databases\Dispatcher::i()->databaseId ? \IPS\cms\Databases::load( \IPS\cms\Databases\Dispatcher::i()->databaseId ) : null;
 				if ( !$database or !$database->allow_club_categories )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 			}
-			catch ( OutOfRangeException | OutOfBoundsException )
+			catch ( \OutOfRangeException|\OutOfBoundsException )
 			{
-				if ( !( Application::load( 'cms' )->default and !$this->folder_id and $this->default == static::PAGE_DEFAULT ) )
+				if ( !( \IPS\Application::load( 'cms' )->default and !$this->folder_id and $this->default ) )
 				{
-					Output::i()->breadcrumb['module'] = array( $this->url(), $this->_title );
+					\IPS\Output::i()->breadcrumb['module'] = array( $this->url(), $this->_title );
 				}
 			}
 			
-			Output::i()->pageName = $this->full_path;
+			\IPS\Output::i()->pageName = $this->full_path;
 
-			if ( isset( Settings::i()->cms_error_page ) and Settings::i()->cms_error_page and Settings::i()->cms_error_page == $this->id )
+			if ( isset( \IPS\Settings::i()->cms_error_page ) and \IPS\Settings::i()->cms_error_page and \IPS\Settings::i()->cms_error_page == $this->id )
 			{
 				/* Set the title */
-				Output::i()->title = ( $title ) ?: $this->getHtmlTitle();
-				Output::i()->output = $content ?: $this->getHtmlContent();
-				Member::loggedIn()->language()->parseOutputForDisplay( Output::i()->title );
+				\IPS\Output::i()->title = ( $title ) ? $title : $this->getHtmlTitle();
+				\IPS\Output::i()->output = $content ?: $this->getHtmlContent();
+				\IPS\Member::loggedIn()->language()->parseOutputForDisplay( \IPS\Output::i()->title );
 
 				/* Send straight to the output engine */
-				Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( Output::i()->title, Output::i()->output, array( 'app' => Dispatcher::i()->application->directory, 'module' => Dispatcher::i()->module->key, 'controller' => Dispatcher::i()->controller ) ), ( $httpStatusCode ?: 200 ), 'text/html', ( $httpHeaders ?: array() ) );
+				\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( \IPS\Output::i()->title, \IPS\Output::i()->output, array( 'app' => \IPS\Dispatcher::i()->application->directory, 'module' => \IPS\Dispatcher::i()->module->key, 'controller' => \IPS\Dispatcher::i()->controller ) ), ( $httpStatusCode ? $httpStatusCode : 200 ), 'text/html', ( $httpHeaders ? $httpHeaders : array() ) );
+			}
+			else
+			{
+				\IPS\Output::i()->allowDefaultWidgets = FALSE;
+				
+				/* Let the dispatcher finish off and show page */
+				return;
 			}
 		}
 		else
 		{
-			/* Global Meta tags */
-			Output::i()->buildMetaTags();
+			$this->setTheme();
+			
+			if ( isset( $includes['css'] ) and \is_array( $includes['css'] ) )
+			{
+				\IPS\Output::i()->cssFiles  = array_merge( \IPS\Output::i()->cssFiles, array_values( $includes['css'] ) );
+			}
+			
+			if ( $this->meta_keywords AND ( !isset( \IPS\Output::i()->metaTags['keywords'] ) OR !\IPS\Output::i()->metaTags['keywords'] ) )
+			{
+				\IPS\Output::i()->metaTags['keywords'] = $this->meta_keywords;
+			}
 
-			/* Set up the content */
-			$content = $content ?? $this->getPageContent();
-			//$content = Theme::i()->getTemplate( 'pages', 'cms' )->globalWrap( null, $content ?: $this->getPageContent(), $this );
-
+			if ( $this->meta_description AND ( !isset( \IPS\Output::i()->metaTags['description'] ) OR !\IPS\Output::i()->metaTags['description'] ) )
+			{
+				\IPS\Output::i()->metaTags['description'] = $this->meta_description;
+			}
+			
+			/* Meta tags */
+			\IPS\Output::i()->buildMetaTags();
+			
 			/* Ensure MFA pop up shows */
-			$content .= ( Front::i()->checkMfa( TRUE ) ?: '' );
-			if ( $this->wrapper_template and $this->wrapper_template !== '_none_' and ! Request::i()->isAjax() )
+			$mfa = \IPS\Dispatcher\Front::i()->checkMfa( TRUE );
+			$mfa = $mfa ?: '';
+			if ( $this->wrapper_template and $this->wrapper_template !== '_none_' and ! \IPS\Request::i()->isAjax() )
 			{
 				try
 				{
-					[ $group, $name, $key ] = explode( '__', $this->wrapper_template );
-					Output::i()->sendOutput( \IPS\cms\Theme::i()->getTemplate($group, 'cms', 'page')->$name( $content, $this->getHtmlTitle() ), 200, $this->getContentType() );
+					list( $group, $name, $key ) = explode( '__', $this->wrapper_template );
+					$content = $content ?: $this->getHtmlContent();
+					$content .= $mfa;
+					\IPS\Output::i()->sendOutput( \IPS\cms\Theme::i()->getTemplate($group, 'cms', 'page')->$name( $content, $this->getHtmlTitle() ), 200, $this->getContentType() );
 				}
-				catch( OutOfRangeException $e ){}
-			}
+				catch( \OutOfRangeException $e )
+				{
 
-			Output::i()->sidebar['enabled'] = false;
+				}
+			}
 
 			/* Set the title */
-			Output::i()->title = ( $title ) ?: $this->getHtmlTitle();
-			Member::loggedIn()->language()->parseOutputForDisplay( Output::i()->title );
+			\IPS\Output::i()->title = ( $title ) ? $title : $this->getHtmlTitle();
+			\IPS\Member::loggedIn()->language()->parseOutputForDisplay( \IPS\Output::i()->title );
 
 			/* Send straight to the output engine */
-			Output::i()->sendOutput( $content, ( $httpStatusCode ?: 200 ), $this->getContentType(), ( $httpHeaders ?: array() ) );
+			$content = $content ?: $this->getHtmlContent();
+			$content .= $mfa;
+			\IPS\Output::i()->sendOutput( $content, ( $httpStatusCode ? $httpStatusCode : 200 ), $this->getContentType(), ( $httpHeaders ? $httpHeaders : array() ) );
 		}
 	}
-
+	
 	/**
-	 * Build the page content from the widgets
+	 * Write HTML pages to disk for designer's mode
 	 *
-	 * @return string
+	 * @param	NULL|int	$pageId		Single page to export
+	 * @return void
 	 */
-	protected function getPageContent() : string
+	public static function exportDesignersMode( $pageId=NULL)
 	{
-		$content = '';
-		if( $this->_version !== null )
+		$where = array( array( 'page_type=?', 'html' ) );
+		$seen = array();
+		
+		if ( $pageId )
 		{
-			Output::i()->customHeader .= Theme::i()->getTemplate( 'pages', 'cms' )->revision( $this->_version );
+			$where[] = array( 'page_id=?', $pageId );
 		}
-
-		if( $this->type == 'html' )
+		
+		foreach( \IPS\Db::i()->select( '*', 'cms_pages', $where ) as $page )
 		{
-			return $content . $this->getHtmlContent();
-		}
+			/* We could use recursive mode but it wouldn't correctly chmod the intermediate dirs */
+			$bits = explode( '/', "/themes/cms/pages/" . $page['page_full_path'] );
+			$dir = '';
 
-		$widgets = [];
+			$filename = array_pop( $bits );
 
-		foreach( Db::i()->select( '*', 'cms_page_widget_areas', [ 'area_page_id=?', $this->id ] ) as $item )
-		{
-			/* If we don't have a template, skip any reserved areas, those would be picked up earlier */
-			if( !$this->template and in_array( $item['area_area'], Area::$reservedAreas ) )
+			foreach( $bits as $part )
 			{
-				continue;
-			}
+				$dir .= $part . '/';
 
-			$tree = $item['area_tree'] ? json_decode( $item['area_tree'], true ) : [];
-			if( $this->_version !== null )
-			{
-				if ( isset( $this->_version->data['areas'][ $item['area_area'] ] ) )
+				if ( ! is_dir( \IPS\ROOT_PATH . '/' . trim( $dir, '/' ) ) )
 				{
-					/* We have a previous version we want to show */
-					$tree = $this->_version->data['areas'][ $item['area_area'] ];
+					mkdir( \IPS\ROOT_PATH . '/' . trim( $dir, '/' ), \IPS\IPS_FOLDER_PERMISSION );
+					chmod( \IPS\ROOT_PATH . '/' . trim( $dir, '/' ), \IPS\IPS_FOLDER_PERMISSION );
 				}
 			}
-
-			if ( empty( $tree ) )
+			
+			$headers = array();
+			
+			foreach( array( 'page_seo_name', 'page_ipb_wrapper', 'page_title') as $field )
 			{
-				/* If the tree is empty, generate one from the database rows */
-				$area = Area::create( $item['area_area'], json_decode( $item['area_widgets'], true ) );
-				$this->saveArea( $area );
+				$headers[ $field ] = $field . '="' . str_replace( '"', '\\"', $page[ $field ] ) . '"';
 			}
-			else
+			
+			$header = "<ips:pages " . implode( " ", $headers ) . " />";
+			try
 			{
-				$area = new Area( $tree, $item['area_area'] );
+				\file_put_contents( \IPS\ROOT_PATH . '/' . trim( $dir, '/' ) . '/' . $filename, $header . "\n" . $page['page_content'] );
+				@chmod( \IPS\ROOT_PATH . '/' . trim( $dir, '/' ) . '/' . $filename, \IPS\IPS_FILE_PERMISSION );
 			}
-
-			$widgets[ $item['area_area'] ] = (string) $area;
+			catch( \RuntimeException $e ) { }
 		}
-
-		if( $this->template )
+		
+		/* Clear out any older designer mode files */
+		if ( ! $pageId )
 		{
-			[ $group, $name, $key ] = explode( '__', $this->template );
-			return \IPS\cms\Theme::i()->getTemplate( $group, 'cms', 'page' )->$name( $this, $widgets );
+			static::cleanUpDesignersModeFiles();
 		}
-
-		/* If we don't have a main area, just init with an empty area */
-		if( !array_key_exists( 'col1', $widgets ) )
-		{
-			$widgets['col1'] = new Area( [], 'col1' );
-		}
-
-		return $content . Theme::i()->getTemplate( 'pages', 'cms' )->mainArea( $this, $widgets );
 	}
-
+	
 	/**
-	 * Set meta tags for this page based on page properties
+	 * Remove any old designer mode files
 	 *
 	 * @return void
 	 */
-	protected function setMetaTags() : void
+	public static function cleanUpDesignersModeFiles()
 	{
-		/* Set the meta tags, but do not reset them if they are already set - articles can define custom meta tags and this code
-				overwrites the ones set by articles if we don't verify they aren't set first */
-		if ( $this->meta_description AND ( !isset( Output::i()->metaTags['description'] ) OR !Output::i()->metaTags['description'] ) )
+		$diskPaths = array();
+		static::getCurrentDesignersModeFilePaths( $diskPaths, \IPS\ROOT_PATH . "/themes/cms/pages/" );
+		
+		$databasePaths = array();
+		foreach( \IPS\Db::i()->select( '*', 'cms_pages', array( 'page_type=?', 'html' ) ) as $page )
 		{
-			Output::i()->metaTags['description'] = $this->meta_description;
-			Output::i()->metaTags['og:description'] = $this->meta_description;
+			$databasePaths[] = $page['page_full_path'];
 		}
-
-		if( $this->meta_image AND ( !isset( Output::i()->metaTags['og:image'] ) ) )
+		
+		if ( \count( $diskPaths ) )
 		{
-			try
+			foreach( $diskPaths as $path )
 			{
-				Output::i()->metaTags['og:image'] = (string) ( File::get( 'cms_PagesImages', $this->meta_image )->url );
+				if ( ! \in_array( $path, $databasePaths ) )
+				{
+					@unlink( \IPS\ROOT_PATH . "/themes/cms/pages/" . $path );
+				}
 			}
-			catch( Exception ){}
+		}
+	}
+	
+	/**
+	 * Get existing designer's mode page paths
+	 *
+	 * @param	array	$paths		Array of processed page paths
+	 * @param	string	$path		Path to look into
+	 * @return void
+	 */
+	public static function getCurrentDesignersModeFilePaths( &$paths, $path )
+	{
+		if ( is_dir( $path ) )
+		{
+			foreach ( new \DirectoryIterator( $path ) as $dir )
+			{
+				if ( $dir->isDot() || mb_substr( $dir->getFilename(), 0, 1 ) === '.' )
+				{
+					continue;
+				}
+
+				if ( $dir->isDir() )
+				{
+					static::getCurrentDesignersModeFilePaths( $paths, $dir->getRealPath() );
+				}
+				else
+				{
+					$paths[] = trim( str_replace( \IPS\ROOT_PATH . '/themes/cms/pages/', '', $dir->getRealPath() ), '/' );
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Import media from disk for designer's mode
+	 *
+	 * @return void
+	 */
+	public static function importDesignersMode()
+	{
+		$path = \IPS\ROOT_PATH . '/themes/cms/pages';
+		$seen = array();
+
+		/* Grab folder data */
+		if ( is_dir( $path ) )
+		{
+			static::importDesignersModeRecurse( $seen, $path );
 		}
 
-		/* If this is a default page, we may be accessing this from the folder only. The isset() check is to ensure canonical
-			tags for more specific things (like databases) are not overridden. */
-		if ( !isset( Output::i()->linkTags['canonical'] ) )
-		{
-			Output::i()->linkTags['canonical'] = (string) $this->url();
-		}
-
-		if ( !isset( Output::i()->metaTags['og:url'] ) )
-		{
-			Output::i()->metaTags['og:url'] = (string) $this->url();
-		}
-
-		if ( !isset( Output::i()->metaTags['og:title'] ) )
-		{
-			Output::i()->metaTags['og:title'] = Output::i()->title;
-		}
-
-		if ( !isset( Output::i()->metaTags['og:type'] ) )
-		{
-			Output::i()->metaTags['og:type'] = 'website';
-		}
-
-		if( !$this->meta_index )
-		{
-			Output::i()->metaTags['robots'] = 'noindex';
-		}
+		\IPS\Db::i()->delete( 'cms_pages', array( 'page_type=? and ' . \IPS\Db::i()->in( 'page_id', $seen, TRUE ), 'html' ) );
 	}
 
 	/**
+	 * Import media from disk for designer's mode recursive method
+	 *
+	 * @param	array	$seen		Array of processed page IDs
+	 * @param	string	$path		Path to look into
+	 * @return void
+	 */
+	public static function importDesignersModeRecurse( &$seen, $path )
+	{
+		if ( is_dir( $path ) )
+		{
+			foreach ( new \DirectoryIterator( $path ) as $dir )
+			{
+				if ( $dir->isDot() || mb_substr( $dir->getFilename(), 0, 1 ) === '.' )
+				{
+					continue;
+				}
+
+				if ( $dir->isDir() )
+				{
+					static::importDesignersModeRecurse( $seen, $dir->getRealPath() );
+				}
+				else
+				{
+					$folders = \IPS\cms\Pages\Folder::roots();
+					$contents = \file_get_contents( $dir->getRealPath() );
+					$params = array();
+					
+					/* Parse the header tag */
+					preg_match( '#^<ips:pages(.+?)/>(\r\n?|\n)#', $contents, $params );
+								
+					/* Strip it */
+					$contents = ( isset($params[0]) ) ? str_replace( $params[0], '', $contents ) : $contents;
+					
+					/* Get fields */
+					preg_match_all( '#([a-z\-_]+?)="(.+?)"#', $params[1], $data, PREG_SET_ORDER );
+					
+					$fields = array();
+					foreach( $data as $id => $matches )
+					{
+						$fields[ $data[ $id ][1] ] = $data[ $id ][2];
+					}
+					
+					/* Existing page, or a new one? */
+					$fullPath = trim( str_replace( str_replace( '\\', '/', \IPS\ROOT_PATH ) . '/themes/cms/pages', '', str_replace( '\\', '/', $dir->getRealPath() ) ), '/' );
+					$bits = explode( '/', $fullPath );
+					$fileName = array_pop( $bits );
+					$path = implode( '/', $bits );
+					
+					try
+					{
+						$page = \IPS\cms\Pages\Page::load( $fullPath, 'page_full_path' );
+						$page->content = $contents;
+						$page->save();
+					}
+					catch( \OutOfRangeException $e )
+					{
+						$folderId = 0;
+						foreach( $folders as $folder )
+						{
+							if ( $folder->path == $path )
+							{
+								$folderId = $folder->id;
+							}
+						}
+						/* Doesn't exist, so this is new */
+						$page = new \IPS\cms\Pages\Page;
+						$page->content     = $contents;
+						$page->full_path   = $fullPath;
+						$page->seo_name    = $fileName;
+						$page->type        = 'html';
+						$page->title	   = ( isset( $fields['page_title'] ) ) ? $fields['page_title'] : $fileName;
+						$page->ipb_wrapper = ( isset( $fields['page_ipb_wrapper'] ) ) ? $fields['page_ipb_wrapper'] : 1;
+						$page->folder_id   = $folderId;
+						$page->save();
+						
+						\IPS\Lang::saveCustom( 'cms', "cms_page_" . $page->id, $page->title );
+					}
+					
+					$seen[] = $page->id;
+				}
+			}
+		}
+	}
+	
+	/**
 	 * Get item
 	 *
-	 * @return	PageItem
+	 * @return	\IPS\cms\Pages\PageItem
 	 */
-	public function item(): PageItem
+	public function item()
 	{
 		$data = array();
 		foreach ( $this->_data as $k => $v )
@@ -2606,6 +2679,6 @@ class Page extends Model implements Permissions
 			$data[ 'page_' . $k ] = $v; 
 		}
 		
-		return PageItem::constructFromData( $data );
+		return \IPS\cms\Pages\PageItem::constructFromData( $data );
 	}
 }

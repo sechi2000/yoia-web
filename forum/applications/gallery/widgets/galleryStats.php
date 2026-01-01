@@ -12,50 +12,45 @@
 namespace IPS\gallery\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Filter;
-use IPS\Db;
-use IPS\gallery\Album\Item;
-use IPS\gallery\Image;
-use IPS\Output;
-use IPS\Theme;
-use IPS\Widget\PermissionCache;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Gallery statistics widget
  */
-class galleryStats extends PermissionCache
+class _galleryStats extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'galleryStats';
+	public $key = 'galleryStats';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'gallery';
+	public $app = 'gallery';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * @brief	Cache Expiration - 24h
 	 */
-	public int $cacheExpiration = 86400;
+	public $cacheExpiration = 86400;
 	
 	/**
 	 * Initialize widget
 	 *
-	 * @return	void
+	 * @return	null
 	 */
-	public function init(): void
+	public function init()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'gallery', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'gallery', 'front' ) );
 
 		parent::init();
 	}
@@ -65,26 +60,26 @@ class galleryStats extends PermissionCache
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		$stats = [];
 
-		$approxRows = Image::databaseTableCount( TRUE );
+		$approxRows = \IPS\gallery\Image::databaseTableCount( TRUE );
 
 		if ( $approxRows > 1000000 )
 		{
 			$stats['totalImages'] = $approxRows;
-			$stats['totalComments'] = (int) Db::i()->query( "SHOW TABLE STATUS LIKE '" . Db::i()->prefix . "gallery_comments';" )->fetch_assoc()['Rows'];
+			$stats['totalComments'] = (int) \IPS\Db::i()->query( "SHOW TABLE STATUS LIKE '" . \IPS\Db::i()->prefix . "gallery_comments';" )->fetch_assoc()['Rows'];
 		}
 		else
 		{
-			$stats = Db::i()->select( 'COUNT(*) AS totalImages, SUM(image_comments) AS totalComments', 'gallery_images', [ "image_approved=?", 1 ] )->first();
+			$stats = \IPS\Db::i()->select( 'COUNT(*) AS totalImages, SUM(image_comments) AS totalComments', 'gallery_images', [ "image_approved=?", 1 ] )->first();
 		}
 
-		$stats['totalAlbums'] = Item::databaseTableCount( TRUE );
+		$stats['totalAlbums'] = \IPS\gallery\Album\Item::databaseTableCount( TRUE );
 
 		$latestImage = NULL;
-		foreach ( Image::getItemsWithPermission( [], NULL, 1, 'read', Filter::FILTER_PUBLIC_ONLY ) as $latestImage )
+		foreach ( \IPS\gallery\Image::getItemsWithPermission( [], NULL, 1, 'read', \IPS\Content\Hideable::FILTER_PUBLIC_ONLY ) as $latestImage )
 		{
 			break;
 		}

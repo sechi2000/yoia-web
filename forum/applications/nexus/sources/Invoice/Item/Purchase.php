@@ -12,87 +12,59 @@
 namespace IPS\nexus\Invoice\Item;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Date;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Coupon;
-use IPS\nexus\Customer;
-use IPS\nexus\Form\RenewalTerm;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item;
-use IPS\nexus\Purchase as NexusPurchase;
-use IPS\nexus\Purchase\RenewalTerm as PurchaseRenewalTerm;
-use IPS\nexus\Tax;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invoice Item Class for Purchases
  */
-abstract class Purchase extends Item
+abstract class _Purchase extends \IPS\nexus\Invoice\Item
 {
 	/**
 	 * @brief	string	Act (new/charge)
 	 */
-	public static string $act = 'new';
+	public static $act = 'new';
 	
 	/**
 	 * @brief	Requires login to purchase?
 	 */
-	public static bool $requiresAccount = TRUE;
+	public static $requiresAccount = TRUE;
 		
 	/**
 	 * @brief	\DateInterval	Length granted by initial purchase before normal renewal term starts (or NULL to match renewal term)
 	 */
-	public ?DateInterval $initialInterval = null;
+	public $initialInterval;
 
 	/**
 	 * @brief	\IPS\nexus\Purchase\RenewalTerm	Renewal Term
 	 */
-	public ?PurchaseRenewalTerm $renewalTerm = null;
+	public $renewalTerm;
 	
 	/**
 	 * @brief	\IPS\DateTime	Expiry Date (only if the purchase needs to expire but not renew)
 	 */
-	public ?DateTime $expireDate = null;
+	public $expireDate;
 	
 	/**
 	 * @brief	\IPS\nexus\Purchase|int	The parent purchase or item ID
 	 */
-	public NexusPurchase|int|null $parent = NULL;
+	public $parent = NULL;
 	
 	/**
 	 * @brief	bool	Group with parent?
 	 */
-	public bool $groupWithParent = FALSE;
+	public $groupWithParent = FALSE;
 	
 	/**
 	 * Get Icon
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    string
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
 	 */
-	public static function getIcon( NexusPurchase $purchase ): string
+	public static function getIcon( \IPS\nexus\Purchase $purchase )
 	{
 		return static::$icon;
 	}
@@ -100,10 +72,10 @@ abstract class Purchase extends Item
 	/**
 	 * Get Title
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    string
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
 	 */
-	public static function getTypeTitle( NexusPurchase $purchase ): string
+	public static function getTypeTitle( \IPS\nexus\Purchase $purchase )
 	{
 		return static::$title;
 	}
@@ -111,10 +83,10 @@ abstract class Purchase extends Item
 	/**
 	 * Image
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return File|null
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return |IPS\File|NULL
 	 */
-	public static function purchaseImage( NexusPurchase $purchase ): File|null
+	public static function purchaseImage( \IPS\nexus\Purchase $purchase )
 	{
 		return NULL;
 	}
@@ -122,20 +94,20 @@ abstract class Purchase extends Item
 	/**
 	 * Get purchases made by a customer of this item
 	 *
-	 * @param	Customer	$customer			The customer
-	 * @param int|array|NULL $id					Item ID(s)
-	 * @param bool $includeInactive	Include expired purchases?
-	 * @param bool $includeCanceled	Include canceled purchases?
-	 * @return    ActiveRecordIterator
+	 * @param	\IPS\nexus\Customer	$customer			The customer
+	 * @param	int|array|NULL		$id					Item ID(s)
+	 * @param	bool				$includeInactive	Include expired purchases?
+	 * @param	bool				$includeCanceled	Include canceled purchases?
+	 * @return	\IPS\Patterns\ActiveRecordIterator
 	 */
-	public static function getPurchases(Customer $customer, int|array|null $id = NULL, bool $includeInactive = TRUE, bool $includeCanceled = FALSE ): ActiveRecordIterator
+	public static function getPurchases( \IPS\nexus\Customer $customer, $id = NULL, $includeInactive = TRUE, $includeCanceled = FALSE )
 	{
 		$where = array( array( 'ps_app=? AND ps_type=? AND ps_member=?', static::$application, static::$type, $customer->member_id ) );
 		if ( $id !== NULL )
 		{
-			if ( is_array( $id ) )
+			if ( \is_array( $id ) )
 			{
-				$where[] = array( Db::i()->in( 'ps_item_id', $id ) );
+				$where[] = array( \IPS\Db::i()->in( 'ps_item_id', $id ) );
 			}
 			else
 			{
@@ -151,16 +123,16 @@ abstract class Purchase extends Item
 			$where[] = array( 'ps_cancelled=0' );
 		}
 
-		return new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', $where ), 'IPS\nexus\Purchase' );
+		return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', $where ), 'IPS\nexus\Purchase' );
 	}
 	
 	/**
 	 * Get additional name info
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    array
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	array
 	 */
-	public static function getPurchaseNameInfo( NexusPurchase $purchase ): array
+	public static function getPurchaseNameInfo( \IPS\nexus\Purchase $purchase )
 	{
 		return array();
 	}
@@ -168,10 +140,10 @@ abstract class Purchase extends Item
 	/**
 	 * Get ACP Page HTML
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    string
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
 	 */
-	public static function acpPage( NexusPurchase $purchase ): string
+	public static function acpPage( \IPS\nexus\Purchase $purchase )
 	{
 		return '';
 	}
@@ -179,11 +151,11 @@ abstract class Purchase extends Item
 	/**
 	 * Get ACP Page Buttons
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @param	Url		$url		The page URL
-	 * @return    array
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @param	\IPS\Http\Url		$url		The page URL
+	 * @return	array
 	 */
-	public static function acpButtons( NexusPurchase $purchase, Url $url ): array
+	public static function acpButtons( \IPS\nexus\Purchase $purchase, \IPS\Http\Url $url )
 	{
 		return array();
 	}
@@ -191,51 +163,51 @@ abstract class Purchase extends Item
 	/**
 	 * ACP Action
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    string|null
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function acpAction( NexusPurchase $purchase ): string|null
+	public static function acpAction( \IPS\nexus\Purchase $purchase )
 	{
-		return null;
+		
 	}
 	
 	/** 
 	 * ACP Edit Form
 	 *
-	 * @param	NexusPurchase				$purchase	The purchase
-	 * @param	Form				$form	The form
-	 * @param PurchaseRenewalTerm|null $renewals	The renewal term
-	 * @return	void
+	 * @param	\IPS\nexus\Purchase				$purchase	The purchase
+	 * @param	\IPS\Helpers\Form				$form	The form
+	 * @param	\IPS\nexus\Purchase\RenewalTerm	$renewals	The renewal term
+	 * @return	string
 	 */
-	public static function acpEdit(NexusPurchase $purchase, Form $form, ?PurchaseRenewalTerm $renewals ) : void
+	public static function acpEdit( \IPS\nexus\Purchase $purchase, \IPS\Helpers\Form $form, $renewals )
 	{
-		$form->add( new Text( 'ps_name', $purchase->_name, TRUE, array( 'maxLength' => 128 ) ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'ps_name', $purchase->_name, TRUE, array( 'maxLength' => 128 ) ) );
 		
 		if ( !$purchase->grouped_renewals and ( !$purchase->billing_agreement or $purchase->billing_agreement->canceled ) )
 		{
-			$form->add( new Date( 'ps_expire', $purchase->expire ?: 0, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'does_not_expire', 'disabled' => !$purchase->canChangeExpireDate() ) ) );
+			$form->add( new \IPS\Helpers\Form\Date( 'ps_expire', $purchase->expire ?: 0, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'does_not_expire', 'disabled' => !$purchase->canChangeExpireDate() ) ) );
 		}
 		
 		if ( !$purchase->billing_agreement or $purchase->billing_agreement->canceled )
 		{
-			$form->add( new RenewalTerm( 'ps_renewals', $renewals, FALSE, array( 'lockTerm' => !$purchase->canChangeExpireDate() ) ) );
-			$form->add( new Interval( 'ps_grace_period', $purchase->grace_period / 86400, FALSE, array( 'valueAs' => Interval::DAYS, 'max' => Settings::i()->cm_invoice_expireafter ?: NULL, 'min' => NULL ), NULL, NULL, NULL ) );
+			$form->add( new \IPS\nexus\Form\RenewalTerm( 'ps_renewals', $renewals, FALSE, array( 'lockTerm' => !$purchase->canChangeExpireDate() ) ) );
+			$form->add( new \IPS\Helpers\Form\Interval( 'ps_grace_period', $purchase->grace_period / 86400, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'max' => \IPS\Settings::i()->cm_invoice_expireafter ?: NULL, 'min' => NULL ), NULL, NULL, NULL ) );
 		}
 		
 		if ( !$purchase->grouped_renewals )
 		{
-			$form->add( new Node( 'ps_parent', $purchase->parent(), FALSE, array( 'class' => 'IPS\nexus\Purchase', 'forceOwner' => $purchase->member, 'zeroVal' => 'no_parent', 'disabledIds' => array( $purchase->id ) ) ) );
+			$form->add( new \IPS\Helpers\Form\Node( 'ps_parent', $purchase->parent(), FALSE, array( 'class' => 'IPS\nexus\Purchase', 'forceOwner' => $purchase->member, 'zeroVal' => 'no_parent', 'disabledIds' => array( $purchase->id ) ) ) );
 		}
 	}
 	
 	/** 
 	 * ACP Edit Save
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
 	 * @param	array				$values		Values from form
-	 * @return    void
+	 * @return	string
 	 */
-	public static function acpEditSave( NexusPurchase $purchase, array $values ): void
+	public static function acpEditSave( \IPS\nexus\Purchase $purchase, array $values )
 	{
 		$purchase->name = $values['ps_name'];
 
@@ -246,10 +218,10 @@ abstract class Purchase extends Item
 		{
 			if( $purchase->tax )
 			{
-				$tax = Tax::load( $purchase->tax );
+				$tax = \IPS\nexus\Tax::load( $purchase->tax );
 			}
 		}
-		catch( OutOfRangeException ){}
+		catch( \OutOfRangeException $e ){}
 
 		if( $tax AND $values['ps_renewals'] )
 		{
@@ -279,51 +251,25 @@ abstract class Purchase extends Item
 			$purchase->save();
 		}
 	}
-
+	
 	/**
-	 * Additional elements that will be used to create coupons
-	 * Also used on the Commission Rules
+	 * Get Client Area Page HTML
 	 *
-	 * @param array|string|null $current	Current data
-	 * @return array
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
 	 */
-	public static function customFormElements( array|string|null $current =null ) : array
+	public static function clientAreaPage( \IPS\nexus\Purchase $purchase )
 	{
-		return [];
-	}
-
-	/**
-	 * Return an array of values that will be stored with the coupon
-	 * Note: If you have any additional fields that have been added to the form
-	 * but are NOT saved to the database, you MUST unset them from the values array
-	 *
-	 * @param array $values
-	 * @param mixed $object		The coupon or commission rule (or other object)
-	 * @return array|null
-	 */
-	public static function saveCustomForm( array &$values=array(), mixed $object = null ) : ?array
-	{
-		return null;
+		return '';
 	}
 	
 	/**
 	 * Get Client Area Page HTML
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    array
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
 	 */
-	public static function clientAreaPage( NexusPurchase $purchase ): array
-	{
-		return array();
-	}
-	
-	/**
-	 * Get Client Area Page HTML
-	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    void
-	 */
-	public static function clientAreaAction( NexusPurchase $purchase ): void
+	public static function clientAreaAction( \IPS\nexus\Purchase $purchase )
 	{
 		
 	}
@@ -331,10 +277,10 @@ abstract class Purchase extends Item
 	/**
 	 * Admin can change expire date / renewal term?
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    bool
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	bool
 	 */
-	public static function canChangeExpireDate( NexusPurchase $purchase ): bool
+	public static function canChangeExpireDate( \IPS\nexus\Purchase $purchase )
 	{
 		return TRUE;
 	}
@@ -342,10 +288,10 @@ abstract class Purchase extends Item
 	/**
 	 * Purchase can be renewed?
 	 *
-	 * @param	NexusPurchase $purchase	The purchase
-	 * @return    boolean
+	 * @param	\IPS\nexus\Purchase $purchase	The purchase
+	 * @return	boolean
 	 */
-	public static function canBeRenewed( NexusPurchase $purchase ): bool
+	public static function canBeRenewed( \IPS\nexus\Purchase $purchase )
 	{
 		return TRUE;
 	}
@@ -353,34 +299,56 @@ abstract class Purchase extends Item
 	/**
 	 * Purchase can be reactivated in the ACP?
 	 *
-	 * @param	NexusPurchase $purchase	The purchase
-	 * @param string|NULL $error		Error to show, passed by reference
-	 * @return    bool
+	 * @param	\IPS\nexus\Purchase $purchase	The purchase
+	 * @param	NULL				$error		Error to show, passed by reference
+	 * @return	bool
 	 */
-	public static function canAcpReactivate(NexusPurchase $purchase, string|null &$error=NULL ): bool
-	{
-		return TRUE;
-	}
-
-	/**
-	 * Can Renew Until
-	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @param	bool				$admin		If TRUE, is for ACP. If FALSE, is for front-end.
-	 * @return	DateTime|bool				TRUE means can renew as much as they like. FALSE means cannot renew at all. \IPS\DateTime means can renew until that date
-	 */
-	public static function canRenewUntil( NexusPurchase $purchase, bool $admin=FALSE ): DateTime|bool
+	public static function canAcpReactivate( \IPS\nexus\Purchase $purchase, &$error=NULL )
 	{
 		return TRUE;
 	}
 	
 	/**
+	 * Can Renew Until
+	 *
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @param	bool				$admin		If TRUE, is for ACP. If FALSE, is for front-end.
+	 * @return	\IPS\DateTime|bool	TRUE means can renew as much as they like. FALSE means cannot renew at all. \IPS\DateTime means can renew until that date
+	 */
+	public static function canRenewUntil( \IPS\nexus\Purchase $purchase, $admin )
+	{
+		return TRUE;
+	}
+	
+	/**
+	 * Get ACP Support View HTML
+	 *
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
+	 */
+	public static function acpSupportView( \IPS\nexus\Purchase $purchase )
+	{
+		return '';
+	}
+	
+	/**
+	 * Support Severity
+	 *
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	\IPS\nexus\Support\Severity|NULL
+	 */
+	public static function supportSeverity( \IPS\nexus\Purchase $purchase )
+	{
+		return NULL;
+	}
+	
+	/** 
 	 * Get renewal payment methods IDs
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    array|NULL
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	array|NULL
 	 */
-	public static function renewalPaymentMethodIds( NexusPurchase $purchase ): array|null
+	public static function renewalPaymentMethodIds( \IPS\nexus\Purchase $purchase )
 	{
 		return NULL;
 	}
@@ -388,11 +356,11 @@ abstract class Purchase extends Item
 	/**
 	 * On Purchase Generated
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public static function onPurchaseGenerated( NexusPurchase $purchase, Invoice $invoice ): void
+	public static function onPurchaseGenerated( \IPS\nexus\Purchase $purchase, \IPS\nexus\Invoice $invoice )
 	{
 		
 	}
@@ -400,11 +368,11 @@ abstract class Purchase extends Item
 	/**
 	 * On Renew (Renewal invoice paid. Is not called if expiry data is manually changed)
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @param int $cycles		Cycles
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @param	int					$cycles		Cycles
+	 * @return	void
 	 */
-	public static function onRenew(NexusPurchase $purchase, int $cycles = 1): void
+	public static function onRenew( \IPS\nexus\Purchase $purchase, $cycles )
 	{
 		
 	}
@@ -412,10 +380,10 @@ abstract class Purchase extends Item
 	/**
 	 * On Expiration Date Change
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onExpirationDateChange( NexusPurchase $purchase ): void
+	public static function onExpirationDateChange( \IPS\nexus\Purchase $purchase )
 	{
 		
 	}
@@ -424,10 +392,10 @@ abstract class Purchase extends Item
 	 * On expire soon
 	 * If returns TRUE, the normal expire warning email will not be sent
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    bool
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onExpireWarning( NexusPurchase $purchase ): bool
+	public static function onExpireWarning( \IPS\nexus\Purchase $purchase )
 	{
 		return FALSE;
 	}
@@ -435,10 +403,10 @@ abstract class Purchase extends Item
 	/**
 	 * On Purchase Expired
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onExpire( NexusPurchase $purchase ): void
+	public static function onExpire( \IPS\nexus\Purchase $purchase )
 	{
 		
 	}
@@ -446,21 +414,21 @@ abstract class Purchase extends Item
 	/**
 	 * On Purchase Canceled
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onCancel( NexusPurchase $purchase ): void
+	public static function onCancel( \IPS\nexus\Purchase $purchase )
 	{
 		
 	}
-
+	
 	/**
 	 * Warning to display to admin when cancelling a purchase
 	 *
-	 * @param NexusPurchase $purchase
-	 * @return    string|null
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	string
 	 */
-	public static function onCancelWarning( NexusPurchase $purchase ): string|null
+	public static function onCancelWarning( \IPS\nexus\Purchase $purchase )
 	{
 		return NULL;
 	}
@@ -468,10 +436,10 @@ abstract class Purchase extends Item
 	/**
 	 * On Purchase Deleted
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onDelete( NexusPurchase $purchase ): void
+	public static function onDelete( \IPS\nexus\Purchase $purchase )
 	{
 		
 	}
@@ -479,10 +447,10 @@ abstract class Purchase extends Item
 	/**
 	 * On Purchase Reactivated (renewed after being expired or reactivated after being canceled)
 	 *
-	 * @param	NexusPurchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onReactivate( NexusPurchase $purchase ): void
+	public static function onReactivate( \IPS\nexus\Purchase $purchase )
 	{
 		
 	}
@@ -490,11 +458,11 @@ abstract class Purchase extends Item
 	/**
 	 * On Transfer (is ran before transferring)
 	 *
-	 * @param	NexusPurchase	$purchase		The purchase
-	 * @param	Member			$newCustomer	New Customer
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase		The purchase
+	 * @param	\IPS\Member			$newCustomer	New Customer
+	 * @return	void
 	 */
-	public static function onTransfer( NexusPurchase $purchase, Member $newCustomer ): void
+	public static function onTransfer( \IPS\nexus\Purchase $purchase, \IPS\Member $newCustomer )
 	{
 		
 	}
@@ -503,19 +471,19 @@ abstract class Purchase extends Item
 	 * Requires Billing Address
 	 *
 	 * @return	bool
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function requiresBillingAddress(): bool
+	public function requiresBillingAddress()
 	{
-		return in_array( 'product', explode( ',', Settings::i()->nexus_require_billing ) );
+		return \in_array( 'product', explode( ',', \IPS\Settings::i()->nexus_require_billing ) );
 	}
 	
 	/**
 	 * Show Purchase Record?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function showPurchaseRecord(): bool
+	public function showPurchaseRecord()
 	{
 		return TRUE;
 	}
@@ -524,15 +492,15 @@ abstract class Purchase extends Item
 	 * Is this item the same as another item in the cart?
 	 * Used to decide when an item is added to the cart if we should just increase the quantity of this item instead  of creating a new item.
 	 *
-	 * @param Item $item	The other item
-	 * @return    bool
+	 * @param	\IPS\nexus\Invoice\Item		$item	The other item
+	 * @return	bool
 	 */
-	public function isSameAsOtherItem( Item $item ): bool
+	public function isSameAsOtherItem( $item )
 	{
 		// You can't compare DateInterval objects, it just throws an exception, so we have to
 		// manually figure out if the renewal terms have any differences
 		
-		if ( $item instanceof static )
+		if ( $item instanceof \IPS\nexus\Invoice\Item\Purchase )
 		{
 			if ( $item->renewalTerm xor $this->renewalTerm )
 			{
@@ -550,7 +518,7 @@ abstract class Purchase extends Item
 					{
 						return FALSE;
 					}
-					if ( $item->renewalTerm->cost != $this->renewalTerm->cost )
+					if ( $item->renewalTerm->cost != $item->renewalTerm->cost )
 					{
 						return FALSE;
 					}

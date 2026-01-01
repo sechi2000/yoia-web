@@ -12,22 +12,16 @@
 namespace IPS\core\setup\upg_107005;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\DataLayer;
-use IPS\core\DataLayer\Handler;
-use IPS\Data\Store;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.7.0 Beta 4 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * ...
@@ -37,9 +31,9 @@ class Upgrade
 	public function finish()
 	{
 		/* Remove cached configuration for Data Layer and Data Layer Handlers */
-		DataLayer::i()->clearCachedConfiguration();
-		$key = Handler::$handlerCacheKey;
-		unset( Store::i()->$key );
+		\IPS\core\DataLayer::i()->clearCachedConfiguration();
+		$key = \IPS\core\DataLayer\Handler::$handlerCacheKey;
+		unset( \IPS\Data\Store::i()->$key );
 
 		return TRUE;
 	}

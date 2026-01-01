@@ -10,14 +10,13 @@
  */
 
 namespace IPS\Api\GraphQL;
-use IPS\Api\GraphQL\Queries\ModuleAccess;
-use IPS\Application;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -25,20 +24,18 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * Core controller for GraphQL API
  * @todo maybe this shouldn't be a class since it only has a static method?
  */
-abstract class AppQueries
+abstract class _AppQueries
 {
 
 	/**
 	 * Get the supported query types in this app
 	 *
-	 * @param string|Application $app
-	 * @return    array
+	 * @return	array
 	 */
-	public static function queries( string|Application $app ): array
+	public static function queries($app): array
 	{
-		$app = ( $app instanceof Application ) ? $app  : Application::load( $app );
 		return [
-			'moduleAccess' => new ModuleAccess($app)
+			'moduleAccess' => new \IPS\Api\GraphQL\Queries\ModuleAccess($app)
 		];
 	}
 }

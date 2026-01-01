@@ -12,32 +12,23 @@
 namespace IPS\cms\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Pages\Page;
-use IPS\Db;
-use IPS\Db\Exception;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: CMS Pages
  */
-class Pages extends FileStorageAbstract
+class _Pages
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
 		return 1; # Number of steps needed to clear/move files
 	}
@@ -48,34 +39,48 @@ class Pages extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	Underflowexception				When file record doesn't exist. Indicating there are no more files to move
+	 * @throws	\Underflowexception				When file record doesn't exist. Indicating there are no more files to move
 	 * @return	void
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
 		/* Just remove page object data so it will rebuild on the next iteration */
-		Page::deleteCachedIncludes( NULL, $oldConfiguration );
+		\IPS\cms\Pages\Page::deleteCachedIncludes( NULL, $oldConfiguration );
 		
-		throw new UnderflowException;
+		throw new \UnderflowException;
+	}
+	
+	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		/* Just remove page object data so it will rebuild on the next iteration */
+		\IPS\cms\Pages\Page::deleteCachedIncludes();
+		
+		throw new \UnderflowException;
 	}
 
 
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
 		$bits = explode( '/', (string) $file );
 		$name = array_pop( $bits );
 
 		try
 		{
-			foreach( Db::i()->select( '*', 'cms_templates', array( "template_file_object LIKE '%" . Db::i()->escape_string( $name ) . "%'") ) as $template )
+			foreach( \IPS\Db::i()->select( '*', 'cms_templates', array( "template_file_object LIKE '%" . \IPS\Db::i()->escape_string( $name ) . "%'") ) as $template )
 			{
-				$fileObject = File::get( 'core_Theme', $template['template_file_object'] );
+				$fileObject = \IPS\File::get( 'core_Theme', $template['template_file_object'] );
 
 				if( $fileObject->url == (string) $file )
 				{
@@ -85,7 +90,7 @@ class Pages extends FileStorageAbstract
 			
 			return FALSE;
 		}
-		catch( Exception $e )
+		catch( \IPS\Db\Exception $e )
 		{
 			return FALSE;
 		}
@@ -96,8 +101,8 @@ class Pages extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		Page::deleteCachedIncludes();
+		\IPS\cms\Pages\Page::deleteCachedIncludes();
 	}
 }

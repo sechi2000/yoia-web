@@ -10,42 +10,12 @@
 
 namespace IPS;
 
+use IPS\Settings;
+
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DateInterval;
-use DOMElement;
-use DOMNode;
-use DOMText;
-use Exception;
-use IPS\core\AdminNotification;
-use IPS\core\Advertisement;
-use IPS\core\Feature;
-use IPS\Data\Store;
-use IPS\Email\Outgoing\Debug;
-use IPS\Email\Outgoing\Exception as EmailException;
-use IPS\Email\Outgoing\Postmark;
-use IPS\Email\Outgoing\SendGrid;
-use IPS\Email\Outgoing\Smtp;
-use IPS\Http\Url;
-use IPS\Http\Url\Internal;
-use IPS\Text\Parser;
-use IPS\Xml\DOMDocument;
-use LogicException;
-use ParseError;
-use UnderflowException;
-use function count;
-use function defined;
-use function function_exists;
-use function get_called_class;
-use function is_array;
-use function is_bool;
-use function is_string;
-use function str_starts_with;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -74,7 +44,7 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * A handy method for debugging is to output the compiled content:
  *	`echo $email->compileContent( 'html', $member );`
  */
-abstract class Email
+abstract class _Email
 {
 	/**
 	 * @brief	Transaction email (constant)
@@ -97,7 +67,7 @@ abstract class Email
 	/**
 	 * @brief	The number of emails that can be sent in one "go"
 	 */
-	const MAX_EMAILS_PER_GO = BULK_MAILS_PER_CYCLE;
+	const MAX_EMAILS_PER_GO = \IPS\BULK_MAILS_PER_CYCLE;
 
 	/**
 	 * @brief   Use the NoWrapper wrapper (basic HTML container)
@@ -113,8 +83,6 @@ abstract class Email
 	 * @brief   A wrapper has already been applied to the email content ( used in MergeAndSend() )
 	 */
 	const WRAPPER_APPLIED = 2;
-
-    const CLOUD_EMAIL_CLASS = 'IPS\cloud\Email';
 	
 	/* !Factory Constructors */
 	
@@ -124,7 +92,7 @@ abstract class Email
 	 * @param	string	$type	See TYPE_* constants
 	 * @return	string
 	 */
-	public static function classToUse( string $type ): string
+	public static function classToUse( $type )
 	{
 		foreach( static::outgoingHandlers() as $key => $class )
 		{
@@ -143,39 +111,30 @@ abstract class Email
 	/**
 	 * Available Outgoing Email Handlers, in order of preference
 	 *
-	 * @return array<string, class-string<\IPS\Email>>
+	 * @return string[]
 	 */
 	public static function outgoingHandlers(): array
 	{
-		$handlers = [
+		return [
 			'debug'     => 'IPS\Email\Outgoing\Debug',
 			'postmark'  => 'IPS\Email\Outgoing\Postmark',
 			'sendgrid'  => 'IPS\Email\Outgoing\SendGrid',
 			'smtp'      => 'IPS\Email\Outgoing\Smtp',
 			'php'       => 'IPS\Email\Outgoing\Php'
 		];
-
-		/* Extensions */
-		foreach ( Application::allExtensions( 'core', 'EmailHandler', FALSE ) as $key => $extension )
-		{
-			$handlers[ $extension::$handlerKey ] = $extension::class;
-		}
-
-		return $handlers;
 	}
 
-    /**
-     * Whether the IPS CIC email system is used. Only affects IPS Cloud Installs
-     *
-     * @param   string|null     $type       The type of email
-     *
-     * @return bool
-     */
-    public static function usingCicEmail( ?string $type = null ) : bool
-    {
-        $type = $type ?: static::TYPE_TRANSACTIONAL;
-	    return ( static::classToUse( $type ) === static::CLOUD_EMAIL_CLASS );
-    }
+	/**
+	 * Whether the IPS CIC email system is used. Only affects IPS Cloud Installs
+	 *
+	 * @param   string|null     $type       The type of email
+	 *
+	 * @return bool
+	 */
+	public static function usingCicEmail( ?string $type ) : bool
+	{
+		return false;
+	}
 
 	/**
 	 * Whether an email is registered as blocked by the current email platform (probably only implemented on cloud)
@@ -188,11 +147,9 @@ abstract class Email
 	public static function emailIsBlocked( string $email, ?string $type = null ) : bool
 	{
 		$type = $type ?: static::TYPE_TRANSACTIONAL;
-		if ( !is_subclass_of( get_called_class(), '\IPS\Email' ) )
+		if ( !is_subclass_of( \get_called_class(), '\IPS\Email' ) )
 		{
-			$class = static::classToUse( $type );
-			/* @var $class Email */
-			return $class::emailIsBlocked( $email, $type );
+			return static::classToUse( $type )::emailIsBlocked( $email, $type );
 		}
 		return false;
 	}
@@ -200,66 +157,62 @@ abstract class Email
 	/**
 	 * Factory
 	 *
-	 * @param string $type	See TYPE_* constants
-	 * @return    Email
+	 * @param	string	$type	See TYPE_* constants
+	 * @return	\IPS\Email
 	 */
-	protected static function factory(string $type ): Email
+	protected static function factory( $type )
 	{
 		$className = static::classToUse( $type );
-		return match ( $className )
+		switch ( $className )
 		{
-			'IPS\Email\Outgoing\Debug' => new Debug( EMAIL_DEBUG_PATH ),
-			'IPS\Email\Outgoing\Postmark'=> new Postmark( Settings::i()->postmark_server_api_key ),
-			'IPS\Email\Outgoing\SendGrid' => new SendGrid( Settings::i()->sendgrid_api_key ),
-			'IPS\Email\Outgoing\Smtp' => new Smtp( Settings::i()->smtp_protocol, Settings::i()->smtp_host, Settings::i()->smtp_port, Settings::i()->smtp_user, Settings::i()->smtp_pass ),
-			default => new $className,
-		};
+			case 'IPS\Email\Outgoing\Debug':
+				return new \IPS\Email\Outgoing\Debug( \IPS\EMAIL_DEBUG_PATH );
+			case 'IPS\Email\Outgoing\SendGrid':
+				return new \IPS\Email\Outgoing\SendGrid( \IPS\Settings::i()->sendgrid_api_key );
+			case 'IPS\Email\Outgoing\Postmark':
+				return new \IPS\Email\Outgoing\Postmark( \IPS\Settings::i()->postmark_server_api_key );
+			case 'IPS\Email\Outgoing\Smtp':
+				return new \IPS\Email\Outgoing\Smtp( \IPS\Settings::i()->smtp_protocol, \IPS\Settings::i()->smtp_host, \IPS\Settings::i()->smtp_port, \IPS\Settings::i()->smtp_user, \IPS\Settings::i()->smtp_pass );
+			default:
+				return new $className;
+		}
 	}
-
-	/**
-	 * Is Outgoing Handler usable?
-	 *
-	 * @param string $type Email type
-	 * @return bool
-	 */
-	abstract public static function isUsable( string $type ): bool;
 	
 	/**
 	 * @brief	Type
 	 */
-	protected string $type;
+	protected $type;
 	
 	/**
 	 * @brief	HTML Content
 	 */
-	protected ?string $htmlContent = NULL;
+	protected $htmlContent = NULL;
 		
 	/**
 	 * @brief	Plaintext Content
 	 */
-	protected ?string $plaintextContent = NULL;
-
-	public Lang $language;
+	protected $plaintextContent = NULL;
 	
 	/**
 	 * Initiate a new custom email based on raw email content.
 	 *
-	 * @param string $subject			    Subject
-	 * @param string $htmlContent		    HTML Version
-	 * @param string|null $plaintextContent	    Plaintext version. If not provided, one will be built automatically based off $htmlContent.
-	 * @param string|null $type				    See TYPE_* constants.
+	 * @param	string		$subject			    Subject
+	 * @param	string		$htmlContent		    HTML Version
+	 * @param	string|NULL	$plaintextContent	    Plaintext version. If not provided, one will be built automatically based off $htmlContent.
+	 * @param	string		$type				    See TYPE_* constants.
 	 * @param	int		    $useWrapper			    See WRAPPER_* constants.
-	 * @param string|null $emailKey			    Key used to identify the email, used for tracking purposes
-	 * @param bool $trackingEnabled	    TRUE by default, pass FALSE to explicitly disable log/view tracking. Useful with mergeAndSend()'s default behavior of rebuilding an already built email
-	 * @return    Email
+	 * @param	string		$emailKey			    Key used to identify the email, used for tracking purposes
+	 * @param	bool		$trackingEnabled	    TRUE by default, pass FALSE to explicitly disable log/view tracking. Useful with mergeAndSend()'s default behavior of rebuilding an already built email
+	 * @return	\IPS\Email
 	 */
-	public static function buildFromContent( string $subject, string $htmlContent='', string $plaintextContent=NULL, string $type = NULL, int $useWrapper= Email::WRAPPER_USE, string $emailKey=NULL, bool $trackingEnabled=TRUE ): Email
+	public static function buildFromContent( $subject, $htmlContent='', $plaintextContent=NULL, $type = NULL, $useWrapper=\IPS\Email::WRAPPER_USE, $emailKey=NULL, $trackingEnabled=TRUE )
 	{
 		if( !$type )
 		{
-			if(IN_DEV)
+			if( \IPS\IN_DEV )
 			{
 				trigger_error( "The email type must be specified when calling buildFromContent()", E_USER_ERROR );
+				exit;
 			}
 			else
 			{
@@ -267,9 +220,10 @@ abstract class Email
 			}
 		}
 
-		if( IN_DEV AND is_bool( $useWrapper ) )
+		if( \IPS\IN_DEV AND \is_bool( $useWrapper ) )
 		{
 			trigger_error( "The email wrapper must be passed a constant when calling buildFromContent()", E_USER_ERROR );
+			exit;
 		}
 
 		$email = static::factory( $type );
@@ -291,35 +245,36 @@ abstract class Email
 	/**
 	 * @brief	Template App
 	 */
-	protected ?string $templateApp;
+	protected $templateApp;
 	
 	/**
 	 * @brief	Template Key
 	 */
-	protected ?string $templateKey;
+	protected $templateKey;
 	
 	/**
 	 * @brief	Template Params
 	 */
-	protected mixed $templateParams;
+	protected $templateParams;
 
 	/**
 	 * Initiate new email using a template
 	 *
-	 * @param string $app					Application key
-	 * @param string $key					Email template key
-	 * @param array $parameters				Parameters for the template
-	 * @param string|null $type					See TYPE_* constants.
-	 * @param bool $useWrapper			If TRUE, the email will be wrapped in the default wrapper template
-	 * @return    Email
+	 * @param	string		$app					Application key
+	 * @param	string		$key					Email template key
+	 * @param	array 		$parameters				Parameters for the template
+	 * @param	string		$type					See TYPE_* constants.
+	 * @param	bool		$useWrapper			If TRUE, the email will be wrapped in the default wrapper template
+	 * @return	\IPS\Email
 	 */
-	public static function buildFromTemplate( string $app, string $key, array $parameters=array(), string $type = NULL, bool $useWrapper=TRUE ): Email
+	public static function buildFromTemplate( $app, $key, $parameters=array(), $type = NULL, $useWrapper=TRUE )
 	{
 		if( !$type )
 		{
-			if(IN_DEV)
+			if( \IPS\IN_DEV )
 			{
 				trigger_error( "The email type must be specified when calling buildFromTemplate()", E_USER_ERROR );
+				exit;
 			}
 			else
 			{
@@ -341,37 +296,37 @@ abstract class Email
 	/**
 	 * @brief	Subject
 	 */
-	protected ?string $subject = NULL;
+	protected $subject;
 	
 	/**
 	 * @brief	Should the default wrapper template be used?
 	 */
-	protected int $useWrapper = self::WRAPPER_USE;
+	protected $useWrapper = self::WRAPPER_USE;
 	
 	/**
 	 * @brief	Unsubscribe Template App
 	 */
-	protected ?string $unsubscribeApp = NULL;
+	protected $unsubscribeApp;
 	
 	/**
 	 * @brief	Unsubscribe Template Key
 	 */
-	protected ?string $unsubscribeKey = NULL;
+	protected $unsubscribeKey;
 	
 	/**
 	 * @brief	Unsubscribe Template Parameyers
 	 */
-	protected array $unsubscribeParams = array();
+	protected $unsubscribeParams = array();
 		
 	/**
 	 * Set the unsubscribe data
 	 *
-	 * @param string $app			App name
-	 * @param string $template		Template name
-	 * @param array $parameters		Parameters
-	 * @return    Email
+	 * @param	string	$app			App name
+	 * @param	string	$template		Template name
+	 * @param	array	$parameters		Parameters
+	 * @return	\IPS\Email
 	 */
-	public function setUnsubscribe( string $app, string $template, array $parameters = array() ): Email
+	public function setUnsubscribe( $app, $template, $parameters = array() )
 	{
 		$this->unsubscribeApp = $app;
 		$this->unsubscribeKey = $template;
@@ -382,29 +337,31 @@ abstract class Email
 	/**
 	 * @brief	Container information used for restricting ads
 	 */
-	protected ?array $advertisementParams = NULL;
+	protected $advertisementParams	= NULL;
 
 	/**
 	 * Specify a specific container to attempt to load an advertisement from
 	 *
-	 * @param string $className		Node class to restrict to
-	 * @param int $id				Node id to restrict to
-	 * @return void
+	 * @param	string	$className		Node class to restrict to
+	 * @param	int		$id				Node id to restrict to
+	 * @return	\IPS\Email
 	 */
-	public function setAdvertisementParameters( string $className, int $id ): void
+	public function setAdvertisementParameters( $className, $id )
 	{
 		$this->advertisementParams = array( 'className' => $className, 'id' => $id );
+
+		return $this;
 	}
 
 	/**
 	 * Return the advertisement HTML to embed into an email
 	 *
-	 * @param string $type	html (default) or plaintext
+	 * @param	string	$type	html (default) or plaintext
 	 * @return	string
 	 */
-	public function getAdvertisement( string $type='html' ): string
+	public function getAdvertisement( $type='html' )
 	{
-		if( $this->type !== static::TYPE_TRANSACTIONAL and $advertisement = Advertisement::loadForEmail( $this->advertisementParams ) )
+		if( $advertisement = \IPS\core\Advertisement::loadForEmail( $this->advertisementParams ) )
 		{
 			return $advertisement->toString( $type, $this );
 		}
@@ -417,18 +374,18 @@ abstract class Email
 	/**
 	 * @brief Flag if we have already added tracking tokens so we do not do it again
 	 */
-	public array $trackingCompleted = array( 'html' => FALSE, 'plaintext' => FALSE );
+	public $trackingCompleted = array( 'html' => FALSE, 'plaintext' => FALSE );
 		
 	/**
 	 * Compile the content which will actually be sent
 	 *
-	 * @param string $type		'html' or 'plaintext'
-	 * @param Member|null $member		If the email is going to a member, the member object. Ensures correct language is used and the email starts with "Hi {member}". NULL for no member, FALSE to use "Hi *|member_name|*" for mergeAndSend()
-	 * @param Lang|NULL			$language	If provided, will override the $member language
-	 * @param bool $logViews	If set to FALSE, will skip logging the email and including the view pixel
-	 * @return	string|null
+	 * @param	string					$type		'html' or 'plaintext'
+	 * @param	\IPS\Member|NULL|FALSE	$member		If the email is going to a member, the member object. Ensures correct language is used and the email starts with "Hi {member}". NULL for no member, FALSE to use "Hi *|member_name|*" for mergeAndSend()
+	 * @param	\IPS\Lang|NULL			$language	If provided, will override the $member language
+	 * @param	bool					$logViews	If set to FALSE, will skip logging the email and including the view pixel
+	 * @return	string
 	 */
-	public function compileContent( string $type, Member $member = NULL, Lang $language = NULL, bool $logViews = TRUE ): ?string
+	public function compileContent( $type, $member = NULL, \IPS\Lang $language = NULL, $logViews = TRUE )
 	{
 		/* Setting $language as a property is a bit confusing because the email doesn't *have* a language - it could
 			change for different recipients, but since the templates expect it as a property we set it here for
@@ -436,7 +393,7 @@ abstract class Email
 			something to read */
 		if ( $language === NULL )
 		{
-			$language = $member ? $member->language() : Lang::load( Lang::defaultLanguage() );
+			$language = $member ? $member->language() : \IPS\Lang::load( \IPS\Lang::defaultLanguage() );
 		}
 		$this->language = $language;
 		
@@ -467,17 +424,17 @@ abstract class Email
 
 			/* Get our picks */
 			$ourPicks = NULL;
-			if( Settings::i()->our_picks_in_email and $this->type !== 'transactional' )
+			if( \IPS\Settings::i()->promote_community_enabled and \IPS\Settings::i()->our_picks_in_email and $this->type !== 'transactional' )
 			{
-				$ourPicks = Feature::internalStream( 4, 'promote_added', 'desc', DateTime::create()->sub( new DateInterval( 'P1Y' ) ) );
+				$ourPicks = \IPS\core\Promote::internalStream( 4 );
 			}
 
 			/* Wrap */
-			$return = static::template( 'core', 'emailWrapper', $type, array( $subject, $member ?: new Member, $return, $unsubscribe, $member === FALSE, '', $this, $ourPicks ) );
+			$return = static::template( 'core', 'emailWrapper', $type, array( $subject, $member ?: new \IPS\Member, $return, $unsubscribe, $member === FALSE, '', $this, $ourPicks ) );
 		}
 		elseif( $this->useWrapper == static::WRAPPER_NONE )
 		{
-			$return = static::template( 'core', 'emailNoWrapper', $type, array( $subject, $member ?: new Member, $return, '', $member === FALSE, '', $this, NULL ) );
+			$return = static::template( 'core', 'emailNoWrapper', $type, array( $subject, $member ?: new \IPS\Member, $return, '', $member === FALSE, '', $this, NULL ) );
 		}
 
 		/* Parse language */
@@ -489,7 +446,7 @@ abstract class Email
 		/* Add the view tracking pixel and click tracking if appropriate */
 		if( $logViews === TRUE AND $this->trackingCompleted[ $type ] !== TRUE )
 		{
-			if( Settings::i()->prune_log_emailstats != 0 )
+			if( \IPS\Settings::i()->prune_log_emailstats != 0 )
 			{
 				/* Click tracking */
 				if( $type == 'plaintext' )
@@ -502,10 +459,10 @@ abstract class Email
 				}
 			}
 			
-			if( count( Advertisement::$advertisementIdsEmail ) )
+			if( \count( \IPS\core\Advertisement::$advertisementIdsEmail ) )
 			{
-				$imageUrl = (string) Url::external( rtrim( Settings::i()->base_url, '/' ) . '/applications/core/interface/email/views.php' )->setQueryString( 'ads', implode( ',', Advertisement::$advertisementIdsEmail ) );
-				$return = str_replace( '</body>', "<img width='1' height='1' src='{$imageUrl}' border='0' alt=''></body>", $return );
+				$imageUrl = (string) \IPS\Http\Url::external( rtrim( \IPS\Settings::i()->base_url, '/' ) . '/applications/core/interface/email/views.php' )->setQueryString( 'ads', implode( ',', \IPS\core\Advertisement::$advertisementIdsEmail ) );
+				$return = str_replace( '</body>', "<img width='1' height='1' src='{$imageUrl}' border='0'></body>", $return );
 			}
 
 			$this->trackingCompleted[ $type ] = TRUE;
@@ -518,16 +475,16 @@ abstract class Email
 	/**
 	 * Add click tracking to plain text emails
 	 *
-	 * @param string $content	The email content
+	 * @param	string	$content	The email content
 	 * @return	void
 	 */
-	protected function addPlaintextClickTracking( string &$content ) : void
+	protected function addPlaintextClickTracking( &$content )
 	{
-		$content = preg_replace_callback( '#(?:^|\s|\)|\(|\{|}|/>|>|]|\[|;|href=\S)((http|https|news|ftp)://(?:[^<>)\[\"\s]+|[a-zA-Z0-9/._\-!&\#;,%+?:=]+))#is', function ($matches) {
+		$content = preg_replace_callback( '#(?:^|\s|\)|\(|\{|\}|/>|>|\]|\[|;|href=\S)((http|https|news|ftp)://(?:[^<>\)\[\"\s]+|[a-zA-Z0-9/\._\-!&\#;,%\+\?:=]+))#is', function ($matches) {
             
-			$url = Url::internal( "app=core&module=system&controller=redirect", 'front' )->setQueryString( array(
+			$url = \IPS\Http\Url::internal( "app=core&module=system&controller=redirect", 'front' )->setQueryString( array(
 				'url'		=> trim( $matches[0] ),
-				'key'		=> hash_hmac( "sha256", trim( $matches[0] ), Settings::i()->site_secret_key . 'r' ),
+				'key'		=> hash_hmac( "sha256", trim( $matches[0] ), \IPS\Settings::i()->site_secret_key . 'r' ),
 				'email'		=> 1,
 				'type'		=> $this->templateKey
 			) );
@@ -539,12 +496,12 @@ abstract class Email
 	/**
 	 * Add click tracking to HTML emails
 	 *
-	 * @param string $content	The email content
+	 * @param	string	$content	The email content
 	 * @return	void
 	 */
-	protected function addHtmlClickTracking( string &$content ) : void
+	protected function addHtmlClickTracking( &$content )
 	{
-		$document = new DOMDocument( '1.0', 'UTF-8' );
+		$document = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
 		$document->loadHTML( $content );
 
 		/* Get document links */
@@ -563,15 +520,15 @@ abstract class Email
 	/**
 	 * Parse a DOM Element to add click tracking to a link
 	 *
-	 * @param DOMElement $element		Anchor tag element
-	 * @param string|null $templateKey	The key for the template, used for logging/tracking
+	 * @param	\DOMElement	$element		Anchor tag element
+	 * @param	string|null	$templateKey	The key for the template, used for logging/tracking
 	 * @return	void
 	 */
-	protected static function _parseElementForClickTracking( DOMElement $element, string $templateKey=NULL ) : void
+	protected static function _parseElementForClickTracking( $element, $templateKey=NULL )
 	{
 		/* Ignore any links that are mailto links */
-		$href = $element->getAttribute( 'href' );
-		if( str_starts_with( $href, 'mailto' ) )
+		$href = (string)$element->getAttribute( 'href' );
+		if( \str_starts_with( $href, 'mailto' ) )
 		{
 			return;
 		}
@@ -580,27 +537,27 @@ abstract class Email
 			so we need to ignore any exceptions and simply not adjust the link, which should be done manually instead */
 		try
 		{
-			$url = Url::internal( "app=core&module=system&controller=redirect", 'front' )->setQueryString( array(
+			$url = \IPS\Http\Url::internal( "app=core&module=system&controller=redirect", 'front' )->setQueryString( array(
 				'url'		=> $href,
-				'resource'	=> ( Request::i()->resource ) ? 1 : NULL,
-				'key'		=> hash_hmac( "sha256", $element->getAttribute('href'), Settings::i()->site_secret_key . 'r' ),
+				'resource'	=> ( \IPS\Request::i()->resource ) ? 1 : NULL,
+				'key'		=> hash_hmac( "sha256", (string) $element->getAttribute('href'), \IPS\Settings::i()->site_secret_key . 'r' ),
 				'email'		=> 1,
 				'type'		=> $templateKey
 			) );
 
 			$element->setAttribute( 'href', (string) $url );
 		}
-		catch(Url\Exception $e ){}
+		catch( \IPS\Http\Url\Exception $e ){}
 	}
 	
 	/**
 	 * Get subject
 	 *
-	 * @param Member|NULL	    $member		If the email is going to a member, the member object. Ensures correct language is used and the email starts with "Hi {member}". NULL for no member, FALSE to use "Hi *|member_name|*" for mergeAndSend()
-	 * @param Lang|NULL			$language	If provided, will override the $member language
-	 * @return	string|null
+	 * @param	\IPS\Member|NULL	    $member		If the email is going to a member, the member object. Ensures correct language is used and the email starts with "Hi {member}". NULL for no member, FALSE to use "Hi *|member_name|*" for mergeAndSend()
+	 * @param	\IPS\Lang|NULL			$language	If provided, will override the $member language
+	 * @return	string
 	 */
-	public function compileSubject( Member $member = NULL, Lang $language = NULL ): ?string
+	public function compileSubject( \IPS\Member $member = NULL, \IPS\Lang $language = NULL )
 	{
 		/* Setting $language as a property is a bit confusing because the email doesn't *have* a language - it could
 			change for different recipients, but since the templates expect it as a property we set it here for
@@ -608,7 +565,7 @@ abstract class Email
 			something to read */
 		if ( $language === NULL )
 		{
-			$language = $member ? $member->language( TRUE ) : Lang::load( Lang::defaultLanguage() );
+			$language = $member ? $member->language( TRUE ) : \IPS\Lang::load( \IPS\Lang::defaultLanguage() );
 		}
 		$this->language = $language;
 		
@@ -642,16 +599,16 @@ abstract class Email
 	 * Compile the raw email content
 	 *
 	 * @param	mixed		$to					The member or email address, or array of members or email addresses, to send to
-	 * @param mixed $cc					Addresses to CC (can also be email, member or array of either)
-	 * @param mixed $bcc				Addresses to BCC (can also be email, member or array of either)
-	 * @param string|null $fromEmail			The email address to send from. If NULL, default setting is used
-	 * @param string|null $fromName			The name the email should appear from. If NULL, default setting is used
-	 * @param array $additionalHeaders	Additional headers to send
-	 * @param string $eol				EOL character to use
-	 * @param int|null $lineLimit			Maximum line length
+	 * @param	mixed		$cc					Addresses to CC (can also be email, member or array of either)
+	 * @param	mixed		$bcc				Addresses to BCC (can also be email, member or array of either)
+	 * @param	NULL|string	$fromEmail			The email address to send from. If NULL, default setting is used
+	 * @param	NULL|string	$fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	array		$additionalHeaders	Additional headers to send
+	 * @param	string		$eol				EOL character to use
+	 * @param	int|NULL	$lineLimit			Maximum line length
 	 * @return	string
 	 */
-	public function compileFullEmail( mixed $to, mixed $cc=array(), mixed $bcc=array(), string $fromEmail = NULL, string $fromName = NULL, array $additionalHeaders = array(), string $eol = "\r\n", ?int $lineLimit = 998 ): string
+	public function compileFullEmail( $to, $cc=array(), $bcc=array(), $fromEmail = NULL, $fromName = NULL, $additionalHeaders = array(), $eol = "\r\n", $lineLimit = 998 )
 	{		
 		$boundary = "--==_mimepart_" . md5( mt_rand() );
 		
@@ -679,26 +636,26 @@ abstract class Email
 	/**
 	 * Compile the headers
 	 *
-	 * @param string $subject			The subject
+	 * @param	string		$subject			The subject
 	 * @param	mixed		$to					The member or email address, or array of members or email addresses, to send to
-	 * @param mixed $cc					Addresses to CC (can also be email, member or array of either)
-	 * @param mixed $bcc				Addresses to BCC (can also be email, member or array of either)
-	 * @param string|null $fromEmail			The email address to send from. If NULL, default setting is used
-	 * @param string|null $fromName			The name the email should appear from. If NULL, default setting is used
-	 * @param array $additionalHeaders	Additional headers to send
-	 * @param string $boundary			The boundary that will be used between parts
-	 * @return	string|array
+	 * @param	mixed		$cc					Addresses to CC (can also be email, member or array of either)
+	 * @param	mixed		$bcc				Addresses to BCC (can also be email, member or array of either)
+	 * @param	NULL|string	$fromEmail			The email address to send from. If NULL, default setting is used
+	 * @param	NULL|string	$fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	array		$additionalHeaders	Additional headers to send
+	 * @param	string		$boundary			The boundary that will be used between parts
+	 * @return	string
 	 */
-	public function _compileHeaders( string $subject, mixed $to, mixed $cc=array(), mixed $bcc=array(), string $fromEmail = NULL, string $fromName = NULL, array $additionalHeaders = array(), string $boundary = '' ): array|string
+	public function _compileHeaders( $subject, $to, $cc=array(), $bcc=array(), $fromEmail = NULL, $fromName = NULL, $additionalHeaders = array(), $boundary = '' )
 	{
 		/* Work out From details */
-		$fromEmail = $fromEmail ?: Settings::i()->email_out;
-		$fromName = $fromName ?: Settings::i()->board_name;
+		$fromEmail = $fromEmail ?: \IPS\Settings::i()->email_out;
+		$fromName = $fromName ?: \IPS\Settings::i()->board_name;
 		
 		/* Basic headers */
 		$headers = array(
 			'MIME-Version'		=> '1.0',
-			'To'				=> static::_parseRecipients($to, TRUE),
+			'To'				=> static::_parseRecipients( $to, TRUE ),
 			'From'				=> static::encodeHeader( $fromName, $fromEmail ),
 			'Subject'			=> static::encodeHeader( $subject ),
 			'Date'				=> date('r'),
@@ -712,11 +669,11 @@ abstract class Email
 		/* CC/BCC */
 		if ( $cc )
 		{
-			$headers['Cc'] = static::_parseRecipients($cc, TRUE);
+			$headers['Cc'] = static::_parseRecipients( $cc );
 		}
 		if ( $bcc )
 		{
-			$headers['Bcc'] = static::_parseRecipients($bcc, TRUE);
+			$headers['Bcc'] = static::_parseRecipients( $bcc );
 		}
 		
 		/* Precedence */
@@ -745,17 +702,18 @@ abstract class Email
 		/* Return */
 		return $headers;
 	}
-
+	
 	/**
 	 * Build the email message
 	 *
-	 * @param Member|null $member If the email is going to a member, the member object. Ensures correct language is used.
-	 * @param string $boundary The boundary used in the Content-Type header
-	 * @param string $eol EOL character to use
-	 * @param int|null $lineLimit Maximum line length
-	 * @return bool|string
+	 * @param	\IPS\Member|NULL	$member		If the email is going to a member, the member object. Ensures correct language is used.
+	 * @param	string				$boundary	The boundary used in the Content-Type header
+	 * @param	string				$eol		EOL character to use
+	 * @param	int|NULL			$lineLimit	Maximum line length
+	 * @return	bool
+	 * @throws	\IPS\Email\Outgoing\Exception
 	 */
-	protected function _compileMessage( ?Member $member, string $boundary, string $eol, ?int $lineLimit = 998 ): bool|string
+	protected function _compileMessage( ?\IPS\Member $member, $boundary, $eol, $lineLimit = 998 )
 	{
 		$return = '';
 		
@@ -787,71 +745,60 @@ abstract class Email
 	/**
 	 * @brief	Auto generated flag
 	 */
-	protected bool $autoSubmitted = TRUE;
+	protected $autoSubmitted = TRUE;
 
 	/**
 	 * Send the email
 	 * 
 	 * @param	mixed	$to					The member or email address, or array of members or email addresses, to send to
-	 * @param mixed $cc					Addresses to CC (can also be email, member or array of either)
-	 * @param mixed $bcc				Addresses to BCC (can also be email, member or array of either)
-	 * @param mixed|null $fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
-	 * @param mixed|null $fromName			The name the email should appear from. If NULL, default setting is used
-	 * @param array $additionalHeaders	Additional headers to send
-	 * @param boolean $autoSubmitted		The email was auto-generated (yes for notification, bulk mail, no for contact us form)
-	 * @param boolean $updateAds			TRUE to update ad impression count (by one), FALSE to skip (used for mergeAndSend where one ad is used many times)
-	 * @param boolean $returnException		TRUE to return an exception if the email fails to send, FALSE to return FALSE
-	 * @return    Exception|EmailException
+	 * @param	mixed	$cc					Addresses to CC (can also be email, member or array of either)
+	 * @param	mixed	$bcc				Addresses to BCC (can also be email, member or array of either)
+	 * @param	mixed	$fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
+	 * @param	mixed	$fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	array	$additionalHeaders	Additional headers to send
+	 * @param	boolean	$autoSubmitted		The email was auto-generated (yes for notification, bulk mail, no for contact us form)
+	 * @param	boolean	$updateAds			TRUE to update ad impression count (by one), FALSE to skip (used for mergeAndSend where one ad is used many times)
+	 * @return	bool
 	 */
-	public function send( mixed $to, mixed $cc=array(), mixed $bcc=array(), mixed $fromEmail = NULL, mixed $fromName = NULL, array $additionalHeaders = array(), bool $autoSubmitted = TRUE, bool $updateAds = TRUE, bool $returnException = FALSE ): bool|Exception|EmailException
+	public function send( $to, $cc=array(), $bcc=array(), $fromEmail = NULL, $fromName = NULL, $additionalHeaders = array(), $autoSubmitted = TRUE, $updateAds = TRUE )
 	{
 		/* Send the email */
 		try
 		{
-			/* Check we have recipients */
-			if ( !static::_parseRecipients($to, TRUE) )
-			{
-				/* If to has emails but the parsed recipients is empty, it indicates some recipients are invalid (which should be logged) */
-				if ( ( is_array( $to ) AND count( $to ) ) OR ( is_string( $to ) AND trim( $to ) ) )
-				{
-					throw new EmailException( 'email_recipients_blocked' );
-				}
-
-				return FALSE;
-			}
-
 			$this->autoSubmitted = $autoSubmitted;
-
+			
 			/* Send */			
 			$this->_send( $to, $cc, $bcc, $fromEmail, $fromName, $additionalHeaders );
+
 			/* Log the send if enabled */
 			$this->_trackStatistics();
 
 			/* Sent successfully, remove notification */
-			AdminNotification::remove( 'core', 'ConfigurationError', 'failedMail' );
-			Db::i()->update( 'core_mail_error_logs', [ 'mlog_notification_sent' => TRUE ], [ 'mlog_notification_sent=?', 0 ] );
+			\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', 'failedMail' );
+			\IPS\Db::i()->update( 'core_mail_error_logs', [ 'mlog_notification_sent' => TRUE ], [ 'mlog_notification_sent=?', 0 ] );
 
 			/* Update the ad impression count if appropriate */
 			if( $updateAds === TRUE )
 			{
-				Advertisement::updateEmailImpressions();
+				\IPS\core\Advertisement::updateEmailImpressions();
 			}
+			
 			/* Return */
 			return TRUE;
 		}
 		/* Handle errors */
-		catch( EmailException $e )
+		catch( \IPS\Email\Outgoing\Exception $e )
 		{
 			$subject = $this->compileSubject( static::_getMemberFromRecipients( $to ) );
 			$html = $this->compileContent( 'html', static::_getMemberFromRecipients( $to ) );
 			$plaintext = $this->compileContent( 'plaintext', static::_getMemberFromRecipients( $to ) );
-			$fromEmail = $fromEmail ?: Settings::i()->email_out;
-			$fromName = $fromName ?: Settings::i()->board_name;
+			$fromEmail = $fromEmail ?: \IPS\Settings::i()->email_out;
+			$fromName = $fromName ?: \IPS\Settings::i()->board_name;
 			$boundary = "--==_mimepart_" . md5( mt_rand() );
 
-			Db::i()->insert( 'core_mail_error_logs', array(
+			\IPS\Db::i()->insert( 'core_mail_error_logs', array(
 				'mlog_date'					=> time(),
-				'mlog_to'					=> static::_parseRecipients($to, TRUE),
+				'mlog_to'					=> static::_parseRecipients( $to, TRUE ),
 				'mlog_from'					=> $fromEmail,
 				'mlog_subject'				=> $subject,
 				'mlog_content'				=> $html ?: $plaintext,
@@ -860,18 +807,14 @@ abstract class Email
 				'mlog_smtp_log'				=> $this->getLog(),
 				'mlog_notification_sent' 	=> FALSE
 			) );
-
-			if( $returnException )
-			{
-				throw $e;
-			}
+			
 			/* Return */
 			return FALSE;
 		}
 		/* Catch any parse errors occurred when compiling an email */
-		catch( ParseError $e )
+		catch( \ParseError $e )
 		{
-			Log::log( $e, 'email_compile_failed' );
+			\IPS\Log::log( $e, 'email_compile_failed' );
 
 			return FALSE;
 		}
@@ -880,45 +823,45 @@ abstract class Email
 	/**
 	 * Track the number of emails sent
 	 *
-	 * @param int $number		Number of emails being sent
+	 * @param	int		$number		Number of emails being sent
 	 * @return	void
 	 */
-	protected function _trackStatistics( int $number=1 ) : void
+	protected function _trackStatistics( $number=1 )
 	{
-		if( Settings::i()->prune_log_emailstats == 0 )
+		if( \IPS\Settings::i()->prune_log_emailstats == 0 )
 		{
 			return;
 		}
 
 		/* If we have a row for "today" then update it, otherwise insert one */
-		$today = DateTime::create()->format( 'Y-m-d', $this->language );
+		$today = \IPS\DateTime::create()->format( 'Y-m-d', $this->language );
 
 		try
 		{
 			/* We only include the time column in the query so that the db index can be effectively used */
 			if( $this->templateKey === NULL )
 			{
-				$currentRow = Db::i()->select( '*', 'core_statistics', array( 'type=? AND time>? AND value_4=? AND extra_data IS NULL', 'emails_sent', 1, $today ) )->first();
+				$currentRow = \IPS\Db::i()->select( '*', 'core_statistics', array( 'type=? AND time>? AND value_4=? AND extra_data IS NULL', 'emails_sent', 1, $today ) )->first();
 			}
 			else
 			{
-				$currentRow = Db::i()->select( '*', 'core_statistics', array( 'type=? AND time>? AND value_4=? AND extra_data=?', 'emails_sent', 1, $today, $this->templateKey ) )->first();
+				$currentRow = \IPS\Db::i()->select( '*', 'core_statistics', array( 'type=? AND time>? AND value_4=? AND extra_data=?', 'emails_sent', 1, $today, $this->templateKey ) )->first();
 			}
 
-			Db::i()->update( 'core_statistics', "value_1=value_1+{$number}", array( 'id=?', $currentRow['id'] ) );
+			\IPS\Db::i()->update( 'core_statistics', "value_1=value_1+{$number}", array( 'id=?', $currentRow['id'] ) );
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
-			Db::i()->insert( 'core_statistics', array( 'type' => 'emails_sent', 'value_1' => $number, 'value_4' => $today, 'time' => time(), 'extra_data' => $this->templateKey ) );
+			\IPS\Db::i()->insert( 'core_statistics', array( 'type' => 'emails_sent', 'value_1' => $number, 'value_4' => $today, 'time' => time(), 'extra_data' => $this->templateKey ) );
 		}
 	}
 	
 	/**
 	 * Get full log if sending failed
 	 * 
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function getLog(): ?string
+	public function getLog()
 	{
 		return NULL;
 	}
@@ -927,27 +870,27 @@ abstract class Email
 	 * Send the email
 	 * 
 	 * @param	mixed	$to					The member or email address, or array of members or email addresses, to send to
-	 * @param mixed $cc					Addresses to CC (can also be email, member or array of either)
-	 * @param mixed $bcc				Addresses to BCC (can also be email, member or array of either)
-	 * @param mixed $fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
-	 * @param mixed $fromName			The name the email should appear from. If NULL, default setting is used
-	 * @param array $additionalHeaders	Additional headers to send
+	 * @param	mixed	$cc					Addresses to CC (can also be email, member or array of either)
+	 * @param	mixed	$bcc				Addresses to BCC (can also be email, member or array of either)
+	 * @param	mixed	$fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
+	 * @param	mixed	$fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	array	$additionalHeaders	Additional headers to send
 	 * @return	void
-	 * @throws    Email\Outgoing\Exception
+	 * @throws	\IPS\Email\Outgoing\Exception
 	 */
-	abstract public function _send( mixed $to, mixed $cc=array(), mixed $bcc=array(), mixed $fromEmail = NULL, mixed $fromName = NULL, array $additionalHeaders = array() ) : void;
+	abstract public function _send( $to, $cc=array(), $bcc=array(), $fromEmail = NULL, $fromName = NULL, $additionalHeaders = array() );
 	
 	/**
 	 * Merge and Send
 	 *
-	 * @param array $recipients			Array where the keys are the email addresses to send to and the values are an array of variables to replace
-	 * @param mixed|null $fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
-	 * @param mixed|null $fromName			The name the email should appear from. If NULL, default setting is used
-	 * @param array $additionalHeaders	Additional headers to send. Merge tags can be used like in content.
-	 * @param Lang|NULL	$language			The language the email content should be in
+	 * @param	array			$recipients			Array where the keys are the email addresses to send to and the values are an array of variables to replace
+	 * @param	mixed			$fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
+	 * @param	mixed			$fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	array			$additionalHeaders	Additional headers to send. Merge tags can be used like in content.
+	 * @param	\IPS\Lang|NULL	$language			The language the email content should be in
 	 * @return	int				Number of successful sends
 	 */
-	public function mergeAndSend( array $recipients, mixed $fromEmail = NULL, mixed $fromName = NULL, array $additionalHeaders = array(), Lang $language = NULL ): int
+	public function mergeAndSend( $recipients, $fromEmail = NULL, $fromName = NULL, $additionalHeaders = array(), \IPS\Lang $language = NULL )
 	{
 		$return = 0;
 
@@ -960,7 +903,7 @@ abstract class Email
 
 		foreach ( $recipients as $address => $vars )
 		{
-			$member = Member::load( $address, 'email' );
+			$member = \IPS\Member::load( $address, 'email' );
 
 			/* Before compiling our content, reset the "tracking completed flag", otherwise if it hasn't been done yet, the flag is set during the first loop and never reset (so tracking isn't performed) for subsequent loops */
 			$this->trackingCompleted = $trackingCompleted;
@@ -971,12 +914,9 @@ abstract class Email
 			
 			foreach ( $vars as $k => $v )
 			{
-				if( $v )
-				{
-					$language->parseEmail( $v );
-				}
+				$language->parseEmail( $v );
 
-				$htmlContent = str_replace( "*|{$k}|*", htmlspecialchars( $v, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8' ), $htmlContent );
+				$htmlContent = str_replace( "*|{$k}|*", htmlspecialchars( $v, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', TRUE ), $htmlContent );
 				$plaintextContent = str_replace( "*|{$k}|*", $v, $plaintextContent );
 				$subject = str_replace( "*|{$k}|*", $v, $subject );
 				
@@ -993,10 +933,10 @@ abstract class Email
 		}
 
 		/* Update ad impression count */
-		Advertisement::updateEmailImpressions( $return );
+		\IPS\core\Advertisement::updateEmailImpressions( $return );
 
 		/* Now restore the locale we started with */
-		Lang::restoreLocale( $currentLocale );
+		\IPS\Lang::restoreLocale( $currentLocale );
 		
 		return $return;
 	}
@@ -1006,25 +946,25 @@ abstract class Email
 	/**
 	 * Get template value
 	 *
-	 * @param string $app		App name
-	 * @param string $template	Template name
-	 * @param string $type		'html' or 'plaintext'
-	 * @param array $params		Parameters
+	 * @param	string	$app		App name
+	 * @param	string	$template	Template name
+	 * @param	string	$type		'html' or 'plaintext'
+	 * @param	array	$params		Parameters
 	 * @return	string
 	 */
-	public static function template( string $app, string $template, string $type, array $params ): string
+	public static function template( $app, $template, $type, $params )
 	{
-		if (IN_DEV)
+		if ( \IPS\IN_DEV )
 		{
 			$extension = $type === 'html' ? 'phtml' : 'txt';
 			
 			if ( mb_substr( $template, 0, 9 ) === 'digests__' )
 			{
-				$file = ROOT_PATH . "/applications/{$app}/dev/email/" . ( $type === 'html' ? 'html' : 'plain' ) . "/digests/" . mb_substr( $template, 9 ) . ".{$extension}";
+				$file = \IPS\ROOT_PATH . "/applications/{$app}/dev/email/" . ( $type === 'html' ? 'html' : 'plain' ) . "/digests/" . mb_substr( $template, 9 ) . ".{$extension}";
 			}
 			else
 			{
-				$file = ROOT_PATH . "/applications/{$app}/dev/email/{$template}.{$extension}";
+				$file = \IPS\ROOT_PATH . "/applications/{$app}/dev/email/{$template}.{$extension}";
 			}
 			
 			return static::devProcessTemplate( "email_{$type}_{$app}_{$template}", file_get_contents( $file ), $params, $type );
@@ -1033,16 +973,16 @@ abstract class Email
 		{
 			$key = md5( "{$app};{$template}" ) . "_email_{$type}";
 							
-			if ( !isset( Store::i()->$key ) )
+			if ( !isset( \IPS\Data\Store::i()->$key ) )
 			{
-				$templateData = Db::i()->select( '*', 'core_email_templates', array( "template_app=? AND template_name=?", $app, $template ), 'template_parent DESC' )->first();
-				Store::i()->$key = "namespace IPS\Theme;\n" . Theme::compileTemplate( $templateData['template_content_html'], "email_html_{$app}_{$template}", $templateData['template_data'], $type === 'html' ) . "\n" . Theme::compileTemplate( $templateData['template_content_plaintext'], "email_plaintext_{$app}_{$template}", $templateData['template_data'], $type === 'html' );
+				$templateData = \IPS\Db::i()->select( '*', 'core_email_templates', array( "template_app=? AND template_name=?", $app, $template ), 'template_parent DESC' )->first();				
+				\IPS\Data\Store::i()->$key = "namespace IPS\Theme;\n" . \IPS\Theme::compileTemplate( $templateData['template_content_html'], "email_html_{$app}_{$template}", $templateData['template_data'], $type === 'html' ) . "\n" . \IPS\Theme::compileTemplate( $templateData['template_content_plaintext'], "email_plaintext_{$app}_{$template}", $templateData['template_data'], $type === 'html' );
 			}
 						
 			$functionName = "IPS\\Theme\\email_{$type}_{$app}_{$template}";
-			if( !function_exists( $functionName ) )
+			if( !\function_exists( $functionName ) )
 			{
-				eval( Store::i()->$key );
+				eval( \IPS\Data\Store::i()->$key );
 			}
 							
 			return $functionName( ...$params );
@@ -1052,44 +992,44 @@ abstract class Email
 	/**
 	 * @brief	Temporary store needed in IN_DEV to remember what parameters a template has
 	 */
-	protected static string $matchesStore = '';
+	protected static $matchesStore = '';
 	
 	/**
 	 * IN_DEV - load and run template
 	 *
-	 * @param string $functionName		Function name to use
-	 * @param string $templateContents	Content to parse
-	 * @param array|null $params				Params
-	 * @param string $type				'html' or 'plaintext'
+	 * @param	string	$functionName		Function name to use
+	 * @param	string	$templateContents	Content to parse
+	 * @param	array	$params				Params
+	 * @param	string	$type				'html' or 'plaintext'
 	 * @return	string
 	 */
-	protected static function devProcessTemplate( string $functionName, string $templateContents, ?array $params, string $type ): string
+	protected static function devProcessTemplate( $functionName, $templateContents, $params, $type )
 	{
-		if( !function_exists( 'IPS\\Theme\\' . $functionName ) )
+		if( !\function_exists( 'IPS\\Theme\\' . $functionName ) )
 		{
 			preg_match( '/^<ips:template parameters="(.+?)?" \/>(\r\n?|\n)/', $templateContents, $matches );
 			if ( isset( $matches[0] ) )
 			{
-				static::$matchesStore = $matches[1] ?? '';
+				static::$matchesStore = isset( $matches[1] ) ? $matches[1] : '';
 				$templateContents = preg_replace( '/^<ips:template parameters="(.+?)?" \/>(\r\n?|\n)/', '', $templateContents );
 			}
 			else
 			{
 				/* Subjects do not contain the ips:template header, so we need a little magic */
-				if ( is_array( $params ) and count( $params ) )
+				if ( $params !== NULL and \is_array( $params ) and \count( $params ) )
 				{
 					/* Extract app and key from "email__{app}_{key}_subject" */
-					[ $app, $key ] = explode( '_', mb_substr( $functionName, 7, -( mb_strlen( $functionName ) - mb_strpos($functionName, '_subject' ) ) ), 2 );
+					list( $app, $key ) = explode( '_', mb_substr( $functionName, 7, -( mb_strlen( $functionName ) - mb_strpos($functionName, '_subject' ) ) ), 2 );
 					
 					if ( $app and $key )
 					{
 						 /* Doesn't matter if it's HTML or TXT here, we just want the param list */
 						$md5Key	  = md5( $app . ';' . $key ) . '_email_html';
-						$template = isset( Store::i()->$md5Key ) ? Store::i()->$md5Key : NULL;
+						$template = isset( \IPS\Data\Store::i()->$md5Key ) ? \IPS\Data\Store::i()->$md5Key : NULL;
 						
 						if ( $template )
 						{
-							preg_match( "#function\s+?([^(]+?)\((.+?)\)\s*?\{#", $template, $matches );
+							preg_match( "#function\s+?([^\(]+?)\((.+?)\)\s*?\{#", $template, $matches );
 							
 							if ( isset( $matches[2] ) )
 							{
@@ -1098,13 +1038,13 @@ abstract class Email
 						}
 						else
 						{
-							if (IN_DEV)
+							if ( \IPS\IN_DEV )
 							{
 								/* Try and get template file */
-								foreach( array( 'phtml', 'txt' ) AS $_type )
+								foreach( array( 'phtml', 'txt' ) AS $type )
 								{
 									/* We only need one */
-									if ( $file = @file_get_contents( ROOT_PATH . "/applications/{$app}/dev/email/{$key}.{$_type}" ) )
+									if ( $file = @file_get_contents( \IPS\ROOT_PATH . "/applications/{$app}/dev/email/{$key}.{$type}" ) )
 									{
 										break;
 									}
@@ -1113,11 +1053,11 @@ abstract class Email
 								if ( $file !== FALSE )
 								{
 									preg_match( '/^<ips:template parameters="(.+?)?" \/>(\r\n?|\n)/', $file, $matches );
-									static::$matchesStore = $matches[1] ?? '';
+									static::$matchesStore = isset( $matches[1] ) ? $matches[1] : '';
 								}
 								else
 								{
-									throw new BadMethodCallException( 'NO_EMAIL_TEMPLATE_FILE - ' . $app . '/' . $key . '.' . $type );
+									throw new \BadMethodCallException( 'NO_EMAIL_TEMPLATE_FILE - ' . $app . '/' . $key . '.' . $type );
 								}
 							}
 							else
@@ -1125,17 +1065,17 @@ abstract class Email
 								/* Grab the param list from the database */
 								try
 								{
-									$template = Db::i()->select( 'template_name, template_data', 'core_email_templates', array( 'template_app=? AND template_name=?', $app, $key ), 'template_parent DESC' )->first();
+									$template = \IPS\Db::i()->select( 'template_name, template_data', 'core_email_templates', array( 'template_app=? AND template_name=?', $app, $key ), 'template_parent DESC' )->first();
 									
 									if ( isset( $template['template_name'] ) )
 									{
 										static::$matchesStore = $template['template_data'];
 									}
 								}
-								catch( UnderflowException $e )
+								catch( \UnderflowException $e )
 								{
 									/* I can't really help you, sorry */
-									throw new LogicException;
+									throw new \LogicException;
 								}
 							}
 						}
@@ -1143,7 +1083,7 @@ abstract class Email
 				}
 			}
 			
-			Theme::makeProcessFunction( $templateContents, $functionName, static::$matchesStore, $type === 'html' );
+			\IPS\Theme::makeProcessFunction( $templateContents, $functionName, static::$matchesStore, $type === 'html' );
 		}
 
 		$function = 'IPS\\Theme\\'.$functionName;
@@ -1153,17 +1093,17 @@ abstract class Email
 	/**
 	 * Determine if we have a specific email template
 	 *
-	 * @param string $app	Application key
-	 * @param string $key	Email template key
+	 * @param	string		$app	Application key
+	 * @param	string		$key	Email template key
 	 * @return	bool
 	 */
-	public static function hasTemplate( string $app, string $key ): bool
+	public static function hasTemplate( $app, $key )
 	{
-		if(IN_DEV)
+		if( \IPS\IN_DEV )
 		{
 			foreach ( array( 'phtml', 'txt' ) as $type )
 			{
-				if( file_exists( ROOT_PATH . "/applications/{$app}/dev/email/{$key}.{$type}" ) )
+				if( file_exists( \IPS\ROOT_PATH . "/applications/{$app}/dev/email/{$key}.{$type}" ) )
 				{
 					return TRUE;
 				}
@@ -1175,7 +1115,7 @@ abstract class Email
 		{
 			/* See if we found anything from the store */
 			$storeKey = md5( $app . ';' . $key ) . '_email_html';
-			if ( isset( Store::i()->$storeKey ) )
+			if ( isset( \IPS\Data\Store::i()->$storeKey ) )
 			{
 				return TRUE;
 			}
@@ -1184,17 +1124,28 @@ abstract class Email
 				/* Check Database */
 				try
 				{
-					Db::i()->select( 'template_id', 'core_email_templates', array( 'template_app=? and template_name=?', $app, $key ) )->first();
+					\IPS\Db::i()->select( 'template_id', 'core_email_templates', array( 'template_app=? and template_name=?', $app, $key ) )->first();
 					return TRUE;
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					/* Nothing, it's OK to return false because there is not a separate row for plaintext */
 					return FALSE;
 				}
 			}
+
+			$storeKey = md5( $app . ';' . $key ) . '_email_plaintext';
+			return isset( \IPS\Data\Store::i()->$storeKey );
 		}
 	}
+
+	/**
+	 * Is this email class usable?
+	 *
+	 * @param string $type Email Type
+	 * @return  bool
+	 */
+	abstract public static function isUsable( string $type ): bool;
 	
 	/* !Utilities */
 	
@@ -1203,11 +1154,11 @@ abstract class Email
 	 * Does not use mb_encode_mimeheader ad that does not encode special characters such as :
 	 * so if the site name has a colon in it but no UTF-8 characters, emails will fail
 	 *
-	 * @param string|null $value
-	 * @param string|null $email	If this is an email address (for a From, To, etc. header) the email address to be appended un-encoded
+	 * @param	string	$value
+	 * @param	string	$email	If this is an email address (for a From, To, etc. header) the email address to be appended un-encoded
 	 * @return	string
 	 */
-	public static function encodeHeader( string $value = NULL, string $email = NULL ): string
+	public static function encodeHeader( $value = NULL, $email = NULL )
 	{
 		$return = '';
 		
@@ -1232,11 +1183,11 @@ abstract class Email
 	/**
 	 * Turn an HTML email into a plaintext email
 	 *
-	 * @param string $html 	HTML email
+	 * @param	string	$html 	HTML email
 	 * @return	string
 	 * @note	We might find that using HTML Purifier to retain links in parenthesis is useful.
 	 */
-	public static function buildPlaintextBody( string $html ): string
+	public static function buildPlaintextBody( $html )
 	{		
 		/* Add newlines as needed */
 		$html	= str_replace( "</p>", "</p>\n", $html );
@@ -1249,30 +1200,30 @@ abstract class Email
 	/**
 	 * Convert a member object, email address, or array of either into a string to use in a header
 	 *
-	 * @param array|string|Member $data		The member or email address, or array of members or email addresses, to send to
-	 * @param bool $emailOnly	If TRUE, will use email only rather than names too. Set to TRUE for the "To" header
+	 * @param	string|array|\IPS\Member	$data		The member or email address, or array of members or email addresses, to send to
+	 * @param	bool						$emailOnly	If TRUE, will use email only rather than names too. Set to TRUE for the "To" header
 	 *
 	 * @return	string
 	 * @see		<a href='http://www.faqs.org/rfcs/rfc2822.html'>RFC 2822</a>
 	 */
-	protected static function _parseRecipients( array|string|Member $data, bool $emailOnly ): string
+	protected static function _parseRecipients( $data, $emailOnly=FALSE )
 	{
 		$return = array();
 		
-		if ( !is_array( $data ) )
+		if ( !\is_array( $data ) )
 		{
 			$data = array( $data );
 		}
 		
 		foreach ( $data as $recipient )
 		{
-			if ( $recipient instanceof Member)
+			if ( $recipient instanceof \IPS\Member )
 			{
 				$return[] = $emailOnly ? $recipient->email : static::encodeHeader( $recipient->name, $recipient->email );
 			}
 			else
 			{
-				$return[] = $emailOnly ? $recipient : static::encodeHeader( NULL, $recipient );
+				$return[] = $emailOnly ? $recipient : static::encodeHeader( NULL, $recipient );;
 			}
 		}
 		
@@ -1282,40 +1233,40 @@ abstract class Email
 	/**
 	 * Convert a member object, email address, or array of either into a member object
 	 *
-	 * @param array|string|Member $data		The member or email address, or array of members or email addresses, to send to
-	 * @return    Member
+	 * @param	string|array|\IPS\Member	$data		The member or email address, or array of members or email addresses, to send to
+	 * @return	\IPS\Member
 	 */
-	protected function _getMemberFromRecipients(array|string|Member $data ): Member
+	protected function _getMemberFromRecipients( $data )
 	{
-		if ( is_array( $data ) )
+		if ( \is_array( $data ) )
 		{
 			$data = array_shift( $data );
 		}
 		
-		if ( $data instanceof Member)
+		if ( $data instanceof \IPS\Member )
 		{
 			return $data;
 		}
 		else
 		{
-			return Member::load( $data, 'email' );
+			return \IPS\Member::load( $data, 'email' );
 		}
 	}
 	
 	/**
 	 * Fix URLs before sending
 	 *
-	 * @param string $return	The content
-	 * @return	void
+	 * @param	string	$return	The content
+	 * @return	string
 	 */
-	protected static function parseFileObjectUrls( string &$return ) : void
+	protected static function parseFileObjectUrls( &$return )
 	{
 		/* Parse file URLs */
-		Output::i()->parseFileObjectUrls( $return );
+		\IPS\Output::i()->parseFileObjectUrls( $return );
 		
 		/* Fix any protocol-relative URLs */
 		$return = preg_replace_callback( "/\s+?(srcset|src)=(['\"])\/\/([^'\"]+?)(['\"])/ims", function( $matches ){
-			$baseUrl	= parse_url( Settings::i()->base_url );
+			$baseUrl	= parse_url( \IPS\Settings::i()->base_url );
 
 			/* Try to preserve http vs https */
 			if( isset( $baseUrl['scheme'] ) )
@@ -1336,30 +1287,33 @@ abstract class Email
 	/**
 	 * Makes HTML acceptable for use in emails
 	 *
-	 * @param string $text	The text
-	 * @param Lang $language	Language
-	 * @param int|null $truncate	NULL to not truncate, (int) to truncate to (int) chars
+	 * @param	string	$text	The text
+	 * @param	\IPS\Lang		$language	Language
+	 * @param	null|int		$truncate	NULL to not truncate, (int) to truncate to (int) chars
 	 * @return	string
 	 */
-	public static function staticParseTextForEmail( string $text, Lang $language, ?int $truncate=NULL ): string
+	public static function staticParseTextForEmail( $text, \IPS\Lang $language, $truncate=NULL )
 	{
 		static::parseFileObjectUrls( $text );
 	
-		if ( $truncate !== NULL and $truncate > 0 )
+		if ( $truncate !== NULL and \is_int( $truncate ) and $truncate > 0 )
 		{
-			return Parser::truncate( $text, TRUE, $truncate );
+			return \IPS\Text\Parser::truncate( $text, TRUE, $truncate );
 		}		
 		else
 		{
 			try
 			{
-				$document = new DOMDocument( '1.0', 'UTF-8' );
-				$document->loadHTML( DOMDocument::wrapHtml( $text ) );
+				/* Swap out lazy load stuff */
+				$text = \IPS\Text\Parser::removeLazyLoad( $text );
+	
+				$document = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
+				$document->loadHTML( \IPS\Xml\DOMDocument::wrapHtml( $text ) );
 				static::_parseNodeForEmail( $document, $language );
 	
 				return preg_replace( '/^<!DOCTYPE.+?>/', '', str_replace( array( '<html>', '</html>', '<head>', '</head>', '<body>', '</body>', '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' ), '', $document->saveHTML() ) );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return $text;
 			}
@@ -1369,19 +1323,13 @@ abstract class Email
 	/**
 	 * Makes HTML acceptable for use in emails
 	 *
-	 * @param string|null $text	The text
-	 * @param Lang|null $language	Language. If not provided, will use whatever is set in $this->language - provided for backwards compatibility with templates not sending one
-	 * @param int|null $truncate	NULL to not truncate, (int) to truncate to (int) chars
+	 * @param	string	$text	The text
+	 * @param	\IPS\Lang		$language	Language. If not provided, will use whatever is set in $this->language - provided for backwards compatibility with templates not sending one
+	 * @param	null|int		$truncate	NULL to not truncate, (int) to truncate to (int) chars
 	 * @return	string
 	 */
-	public function parseTextForEmail( ?string $text, Lang $language = NULL, int $truncate=NULL ): string
+	public function parseTextForEmail( $text, \IPS\Lang $language = NULL, $truncate=NULL )
 	{
-        /* Text might be null because Item::content() can return null */
-        if( $text === null )
-        {
-            return '';
-        }
-
 		if ( $language === NULL )
 		{
 			$language = $this->language;
@@ -1393,11 +1341,11 @@ abstract class Email
 	/**
 	 * Makes HTML acceptable for use in emails
 	 *
-	 * @param	DOMElement		$node		The DOM element
-	 * @param Lang $language	Language
-	 * @return	void
+	 * @param	\DOMElement		$node		The DOM element
+	 * @param	\IPS\Lang		$language	Language
+	 * @return	string
 	 */
-	protected static function _parseNodeForEmail( DOMNode &$node, Lang $language ) : void
+	protected static function _parseNodeForEmail( \DOMNode &$node, \IPS\Lang $language )
 	{
 		if ( $node->hasChildNodes() )
 		{
@@ -1416,7 +1364,7 @@ abstract class Email
 			}
 		}
 
-		if ( $node instanceof DOMElement )
+		if ( $node instanceof \DOMElement )
 		{					
 			static::_parseElementForEmail( $node, $language );
 		}
@@ -1425,11 +1373,11 @@ abstract class Email
 	/**
 	 * Makes HTML acceptable for use in emails: Parse Element
 	 *
-	 * @param	DOMElement		$node		The DOM element
-	 * @param Lang $language	Language
-	 * @return	void
+	 * @param	\DOMElement		$node		The DOM element
+	 * @param	\IPS\Lang		$language	Language
+	 * @return	string
 	 */
-	protected static function _parseElementForEmail( DOMElement &$node, Lang $language ) : void
+	protected static function _parseElementForEmail( \DOMElement &$node, \IPS\Lang $language )
 	{
 		$parent = $node->parentNode;
 		
@@ -1459,7 +1407,7 @@ abstract class Email
 	 *
 	 * @return	array
 	 */
-	protected static function _parseElementClassMap(): array
+	protected static function _parseElementClassMap()
 	{
 		return array(
 			'ipsQuote'			=> '_parseElementForEmailQuote',
@@ -1475,12 +1423,12 @@ abstract class Email
 	/**
 	 * Makes HTML acceptable for use in emails: Attachments
 	 *
-	 * @param	DOMElement	$node		The element
-	 * @param	DOMElement	$parent		The element's parent node
-	 * @param Lang $language	Language
-	 * @return	void
+	 * @param	\DOMElement	$node		The element
+	 * @param	\DOMElement	$parent		The element's parent node
+	 * @param	\IPS\Lang	$language	Language
+	 * @return	string
 	 */
-	protected static function _parseElementForEmailAttachment( DOMElement &$node, DOMNode $parent, Lang $language ) : void
+	protected static function _parseElementForEmailAttachment( \DOMElement &$node, \DOMNode $parent, \IPS\Lang $language )
 	{
 		if ( $node->getAttribute('href') )
 		{
@@ -1489,7 +1437,7 @@ abstract class Email
 			
 			if ( !isset( $parsed['scheme'] ) )
 			{
-				$baseUrl = parse_url( Settings::i()->base_url );
+				$baseUrl = parse_url( \IPS\Settings::i()->base_url );
 				$url = $baseUrl['scheme'] . '://' . str_replace( '//', '', $url );
 				$node->setAttribute( 'href', $url );
 			}
@@ -1499,12 +1447,12 @@ abstract class Email
 	/**
 	 * Makes HTML acceptable for use in emails: Quotes
 	 *
-	 * @param	DOMElement	$node		The element
-	 * @param	DOMElement	$parent		The element's parent node
-	 * @param Lang $language	Language
-	 * @return	void
+	 * @param	\DOMElement	$node		The element
+	 * @param	\DOMElement	$parent		The element's parent node
+	 * @param	\IPS\Lang	$language	Language
+	 * @return	string
 	 */
-	protected static function _parseElementForEmailQuote( DOMElement &$node, DOMNode $parent, Lang $language ) : void
+	protected static function _parseElementForEmailQuote( \DOMElement &$node, \DOMNode $parent, \IPS\Lang $language )
 	{
 		$cell = static::_createContainerTable( $parent, $node );
 		$cell->setAttribute( 'style', "font-family: 'Helvetica Neue', helvetica, sans-serif; line-height: 1.5; font-size: 14px; margin: 0;border: 1px solid #e0e0e0;border-left: 3px solid #adadad;position: relative;font-size: 13px;background: #fdfdfd" );
@@ -1513,7 +1461,7 @@ abstract class Email
 		{
 			$citation = static::_createContainerTable( $cell );
 			$citation->setAttribute( 'style', "font-family: 'Helvetica Neue', helvetica, sans-serif; line-height: 1.5; font-size: 14px; background: #f5f5f5;padding: 8px 15px;color: #000;font-weight: bold;font-size: 13px;display: block;" );
-			$citation->appendChild( new DOMText( $node->getAttribute('data-cite') ) );
+			$citation->appendChild( new \DOMText( $node->getAttribute('data-cite') ) );
 		}
 									
 		$containerCell = static::_createContainerTable( $cell );
@@ -1523,7 +1471,7 @@ abstract class Email
 		{
 			foreach ( $node->childNodes as $child )
 			{									
-				if ( $child instanceof DOMElement and $child->getAttribute('class') == 'ipsQuote_citation' )
+				if ( $child instanceof \DOMElement and $child->getAttribute('class') == 'ipsQuote_citation' )
 				{
 					$child->setAttribute( 'style', "font-family: 'Helvetica Neue', helvetica, sans-serif; line-height: 1.5; font-size: 14px; background: #f3f3f3; margin: 0px 0px 0px -15px; padding: 5px 15px; color: #222; font-weight: bold; font-size: 13px; display: block;" );
 				}
@@ -1538,16 +1486,16 @@ abstract class Email
 	/**
 	 * Makes HTML acceptable for use in emails: Code boxes
 	 *
-	 * @param	DOMElement	$node		The element
-	 * @param	DOMElement	$parent		The element's parent node
-	 * @param Lang $language	Language
-	 * @return	void
+	 * @param	\DOMElement	$node		The element
+	 * @param	\DOMElement	$parent		The element's parent node
+	 * @param	\IPS\Lang	$language	Language
+	 * @return	string
 	 */
-	protected static function _parseElementForEmailCode( DOMElement &$node, DOMNode $parent, Lang $language ) : void
+	protected static function _parseElementForEmailCode( \DOMElement &$node, \DOMNode $parent, \IPS\Lang $language )
 	{
 		$cell = static::_createContainerTable( $parent, $node );
 		$cell->setAttribute( 'style', "font-family: monospace; line-height: 1.5; font-size: 14px; background: #fafafa; padding: 0; border-left: 4px solid #e0e0e0;" );
-		$p = new DOMElement( 'pre' );
+		$p = new \DOMElement( 'pre' );
 		$cell->appendChild( $p );
 		$p->setAttribute( 'style', "font-family: monospace; line-height: 1.5; font-size: 14px; padding-left:15px" );
 
@@ -1565,47 +1513,47 @@ abstract class Email
 	/**
 	 * Makes HTML acceptable for use in emails: Spoilers
 	 *
-	 * @param	DOMElement	$node		The element
-	 * @param	DOMElement	$parent		The element's parent node
-	 * @param Lang $language	Language
-	 * @return	void
+	 * @param	\DOMElement	$node		The element
+	 * @param	\DOMElement	$parent		The element's parent node
+	 * @param	\IPS\Lang	$language	Language
+	 * @return	string
 	 */
-	protected static function _parseElementForEmailSpoiler( DOMElement &$node, DOMNode $parent, Lang $language ) : void
+	protected static function _parseElementForEmailSpoiler( \DOMElement &$node, \DOMNode $parent, \IPS\Lang $language )
 	{
 		$cell = static::_createContainerTable( $parent, $node );
 		$cell->setAttribute( 'style', "font-family: 'Helvetica Neue', helvetica, sans-serif; line-height: 1.5; font-size: 14px; margin: 0;padding: 10px;background: #363636;color: #d8d8d8;" );
-		$cell->appendChild( new DOMText( $language->addToStack('email_spoiler_line') ) );
+		$cell->appendChild( new \DOMText( $language->addToStack('email_spoiler_line') ) );
 		$parent->removeChild( $node );
 	}
 	
 	/**
 	 * Makes HTML acceptable for use in emails: Embedded Video
 	 *
-	 * @param	DOMElement	$node		The element
-	 * @param	DOMElement	$parent		The element's parent node
-	 * @param Lang $language	Language
-	 * @return	void
+	 * @param	\DOMElement	$node		The element
+	 * @param	\DOMElement	$parent		The element's parent node
+	 * @param	\IPS\Lang	$language	Language
+	 * @return	string
 	 */
-	protected static function _parseElementForEmailEmbed( DOMElement &$node, DOMNode $parent, Lang $language ) : void
+	protected static function _parseElementForEmailEmbed( \DOMElement &$node, \DOMNode $parent, \IPS\Lang $language )
 	{
 		$cell = static::_createContainerTable( $parent, $node );
 		$cell->setAttribute( 'style', "font-family: 'Helvetica Neue', helvetica, sans-serif; line-height: 1.5; font-size: 14px; padding: 10px; margin: 0;border: 1px solid #e0e0e0;border-left: 3px solid #adadad;position: relative;font-size: 13px;background: #fdfdfd" );
-		$cell->appendChild( new DOMText( $language->addToStack('email_video_line') ) );
+		$cell->appendChild( new \DOMText( $language->addToStack('email_video_line') ) );
 		$parent->removeChild( $node );
 	}
 	
 	/**
 	 * Makes HTML acceptable for use in emails: Image
 	 *
-	 * @param	DOMElement	$node		The element
-	 * @param	DOMNode	$parent		The element's parent node
-	 * @param Lang $language	Language
-	 * @return	void
+	 * @param	\DOMElement	$node		The element
+	 * @param	\DOMNode	$parent		The element's parent node
+	 * @param	\IPS\Lang	$language	Language
+	 * @return	string
 	 */
-	protected static function _parseElementForEmailImage( DOMElement &$node, DOMNode $parent, Lang $language ) : void
+	protected static function _parseElementForEmailImage( \DOMElement &$node, \DOMNode $parent, \IPS\Lang $language )
 	{
 		/* In this case, set max size to default of 1000x750 if display setting is 'unlimited' */
-		$maxImageDims	= Settings::i()->attachment_image_size !== '0x0' ? explode( 'x', Settings::i()->attachment_image_size ) : array( 1000, 750 );
+		$maxImageDims	= \IPS\Settings::i()->attachment_image_size !== '0x0' ? explode( 'x', \IPS\Settings::i()->attachment_image_size ) : array( 1000, 750 );
 
 		/* Set the max image height and width */
 		$node->setAttribute( 'style', "max-width:{$maxImageDims[0]}px;max-height:{$maxImageDims[1]}px;" . $node->getAttribute('style') ) ;
@@ -1614,29 +1562,29 @@ abstract class Email
 	/**
 	 * Makes HTML acceptable for use in emails: iFrame
 	 *
-	 * @param	DOMElement	$node		The element
-	 * @param	DOMElement	$parent		The element's parent node
-	 * @param Lang $language	Language
-	 * @return	void
+	 * @param	\DOMElement	$node		The element
+	 * @param	\DOMElement	$parent		The element's parent node
+	 * @param	\IPS\Lang	$language	Language
+	 * @return	string
 	 */
-	protected static function _parseElementForEmailIframe( DOMElement &$node, DOMNode $parent, Lang $language ) : void
+	protected static function _parseElementForEmailIframe( \DOMElement &$node, \DOMNode $parent, \IPS\Lang $language )
 	{
 		if ( $node->getAttribute('src') )
 		{
-			$url	= Url::createFromString( $node->getAttribute('src') );
+			$url	= \IPS\Http\Url::createFromString( $node->getAttribute('src') );
 			
 			/* If this is an external embed link, swap it for whatever is actually embedded */
-			if ( $url instanceof Internal and isset( $url->queryString['app'] ) and $url->queryString['app'] == 'core' and isset( $url->queryString['module'] ) and $url->queryString['module'] == 'system' and isset( $url->queryString['controller'] ) and $url->queryString['controller'] == 'embed' and isset( $url->queryString['url'] ) )
+			if ( $url instanceof \IPS\Http\Url\Internal and isset( $url->queryString['app'] ) and $url->queryString['app'] == 'core' and isset( $url->queryString['module'] ) and $url->queryString['module'] == 'system' and isset( $url->queryString['controller'] ) and $url->queryString['controller'] == 'embed' and isset( $url->queryString['url'] ) )
 			{
 				try
 				{
-					$url = new Url( $url->queryString['url'] );
+					$url = new \IPS\Http\Url( $url->queryString['url'] );
 				}
-				catch ( Exception $e ) { }
+				catch ( \Exception $e ) { }
 			}
 			
 			/* Same for internal embeds */
-			if ( $url instanceof Internal )
+			if ( $url instanceof \IPS\Http\Url\Internal )
 			{			
 				/* Strip "do" param, but only if it is set to "embed" */
 				if ( isset( $url->queryString['do'] ) AND $url->queryString['do'] == 'embed' )
@@ -1657,14 +1605,14 @@ abstract class Email
 			}
 
 			/* Create a link, and a paragraph, insert the paragraph into the document, then the link into the paragraph */
-			$a		= new DOMElement( 'a' );
-			$p		= new DOMElement( 'p' );
+			$a		= new \DOMElement( 'a' );
+			$p		= new \DOMElement( 'p' );
 
 			$parent->insertBefore( $p, $node );
 			$p->appendChild( $a );
 
 			$a->setAttribute( 'href', (string) $url );
-			$a->appendChild( new DOMText( (string) $url ) );
+			$a->appendChild( new \DOMText( (string) $url ) );
 
 			$parent->removeChild( $node );
 		}
@@ -1673,15 +1621,15 @@ abstract class Email
 	/**
 	 * Create container table as some email clients can't handle things if they're not in tables
 	 *
-	 * @param DOMNode $node		The node to put the table into
-	 * @param DOMNode|null $replace	If the table should replace an existing node, the node to be replaced
-	 * @return	DOMNode|DOMElement
+	 * @param	\DOMNode		$node		The node to put the table into
+	 * @param	\DOMNode|null	$replace	If the table should replace an existing node, the node to be replaced
+	 * @return	\DOMNode
 	 */
-	protected static function _createContainerTable( DOMNode $node, DOMNode $replace=NULL ): DOMNode|DOMElement
+	protected static function _createContainerTable( $node, $replace=NULL )
 	{
-		$table = new DOMElement( 'table' );
-		$row = new DOMElement( 'tr' );
-		$cell = new DOMElement( 'td' );
+		$table = new \DOMElement( 'table' );
+		$row = new \DOMElement( 'tr' );
+		$cell = new \DOMElement( 'td' );
 		
 		if ( $replace )
 		{
@@ -1707,17 +1655,17 @@ abstract class Email
 	/**
 	 * @brief	Store database counts
 	 */
-	protected static array $_failedMail = [];
+	protected static $_failedMail = [];
 
 	/**
 	 * Get number of failed emails
 	 *
-	 * @param DateTime|NULL		$cutoff
+	 * @param	\IPS\DateTime|NULL		$cutoff
 	 * @param 	bool					$cache				Whether to use a cached value
 	 * @param	bool					$includeNotified	Include logs that have already triggered a notification
 	 * @return	int
 	 */
-	public static function countFailedMail(DateTime $cutoff=NULL, bool $cache=TRUE, bool $includeNotified=FALSE ): int
+	public static function countFailedMail( \IPS\DateTime $cutoff=NULL, bool $cache=TRUE, bool $includeNotified=FALSE ): int
 	{
 		$key = $cutoff ? $cutoff->getTimestamp() : 'all';
 		if( isset( static::$_failedMail[ $key ] ) AND $cache )
@@ -1731,7 +1679,7 @@ abstract class Email
 			$where[] = [ 'mlog_date>?', $cutoff->getTimestamp() ];
 		}
 
-		static::$_failedMail[ $key ] = Db::i()->select( 'count(mlog_id)', 'core_mail_error_logs', $where )->first();
+		static::$_failedMail[ $key ] = \IPS\Db::i()->select( 'count(mlog_id)', 'core_mail_error_logs', $where )->first();
 		return static::$_failedMail[ $key ];
 	}
 

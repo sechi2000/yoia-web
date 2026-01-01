@@ -10,36 +10,33 @@
  */
 
 namespace IPS\calendar\api\GraphQL;
-use IPS\calendar\api\GraphQL\Queries\Calendar;
-use IPS\calendar\api\GraphQL\Queries\Calendars;
-use IPS\calendar\api\GraphQL\Queries\Event;
-use IPS\calendar\api\GraphQL\Queries\Events;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * Blog queries for GraphQL API
  */
-abstract class Query
+abstract class _Query
 {
     /**
      * Get the supported query types in this app
      *
      * @return	array
      */
-    public static function queries(): array
+    public static function queries()
     {
         return [
-            'calendar' => new Calendar(),
-            'calendars' => new Calendars(),
-            'events' => new Events(),
-            'event' => new Event(),
+            'calendar' => new \IPS\calendar\api\GraphQL\Queries\Calendar(),
+            'calendars' => new \IPS\calendar\api\GraphQL\Queries\Calendars(),
+            'events' => new \IPS\calendar\api\GraphQL\Queries\Events(),
+            'event' => new \IPS\calendar\api\GraphQL\Queries\Event(),
         ];
     }
 }

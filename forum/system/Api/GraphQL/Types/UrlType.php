@@ -12,25 +12,23 @@
 namespace IPS\Api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Http\Url;
-use function defined;
-use function in_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * URLType for GraphQL API
  */
-class UrlType extends ObjectType
+class _UrlType extends ObjectType
 {
     /**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -70,9 +68,9 @@ class UrlType extends ObjectType
 							}
 						])),
 						'resolve' => function ($url) {
-							if( !( $url instanceof Url ) )
+							if( !( $url instanceof \IPS\Http\Url ) )
 							{
-								$url = Url::createFromString( $url );
+								$url = \IPS\Http\Url::createFromString( $url );
 							}
 
 							$pieces = array();
@@ -91,13 +89,13 @@ class UrlType extends ObjectType
 				];
 			},
 			'resolveField' => function ($url, $args, $context, $info) {
-				if( !( $url instanceof Url ) )
+				if( !( $url instanceof \IPS\Http\Url ) )
 				{
-					$url = Url::createFromString( $url );
+					$url = \IPS\Http\Url::createFromString( $url );
 				}
 
 				$urlPieces = $url->hiddenQueryString;
-				if( in_array( $info->fieldName, array('app', 'module', 'controller') ) )
+				if( \in_array( $info->fieldName, array('app', 'module', 'controller') ) )
 				{
 					return $urlPieces[ $info->fieldName ];
 				}

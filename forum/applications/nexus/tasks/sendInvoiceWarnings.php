@@ -12,38 +12,16 @@
 namespace IPS\nexus\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Email;
-use IPS\Math\Number;
-use IPS\nexus\Customer;
-use IPS\nexus\Customer\BillingAgreement;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item\Renewal;
-use IPS\nexus\Money;
-use IPS\nexus\Purchase;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Task;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Send Invoice Warnings Task
  */
-class sendInvoiceWarnings extends Task
+class _sendInvoiceWarnings extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -53,21 +31,20 @@ class sendInvoiceWarnings extends Task
 	 * If an error occurs which means the task could not finish running, throw an \IPS\Task\Exception - do not log an error as a normal log.
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
-	 * @return	string|null	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @return	mixed	Message to log or NULL
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : string|null
+	public function execute()
 	{
-		if ( Settings::i()->cm_invoice_warning )
+		if ( \IPS\Settings::i()->cm_invoice_warning )
 		{
-			$normalCutoff = DateTime::create()->add( new DateInterval( 'PT' . Settings::i()->cm_invoice_generate . 'H' ) )->add( new DateInterval( 'PT' . Settings::i()->cm_invoice_warning . 'H' ) )->getTimestamp();
-			$billingAgreementCutoff = DateTime::create()->add( new DateInterval( 'PT' . Settings::i()->cm_invoice_warning . 'H' ) )->getTimestamp();
-			$select = Db::i()->select( '*', 'nexus_purchases', array( 'ps_renewals>0 AND ps_invoice_pending=0 AND ps_invoice_warning_sent=0 AND ps_active=1 AND ps_expire>0 AND ( ( ps_billing_agreement IS NULL AND ps_expire<? ) OR ( ps_billing_agreement IS NOT NULL AND ps_expire<? ) )', $normalCutoff, $billingAgreementCutoff ), 'ps_member', 50 );
+			$normalCutoff = \IPS\DateTime::create()->add( new \DateInterval( 'PT' . \IPS\Settings::i()->cm_invoice_generate . 'H' ) )->add( new \DateInterval( 'PT' . \IPS\Settings::i()->cm_invoice_warning . 'H' ) )->getTimestamp();
+			$billingAgreementCutoff = \IPS\DateTime::create()->add( new \DateInterval( 'PT' . \IPS\Settings::i()->cm_invoice_warning . 'H' ) )->getTimestamp();
+			$select = \IPS\Db::i()->select( '*', 'nexus_purchases', array( 'ps_renewals>0 AND ps_invoice_pending=0 AND ps_invoice_warning_sent=0 AND ps_active=1 AND ps_expire>0 AND ( ( ps_billing_agreement IS NULL AND ps_expire<? ) OR ( ps_billing_agreement IS NOT NULL AND ps_expire<? ) )', $normalCutoff, $billingAgreementCutoff ), 'ps_member', 50 );
 			
 			$groupedPurchases = array();
-			foreach ( new ActiveRecordIterator( $select, 'IPS\nexus\Purchase' ) as $purchase )
+			foreach ( new \IPS\Patterns\ActiveRecordIterator( $select, 'IPS\nexus\Purchase' ) as $purchase )
 			{
-				/* @var Purchase $purchase */
 				$agreementId = ( $purchase->billing_agreement AND !$purchase->billing_agreement->canceled ) ? $purchase->billing_agreement->id : 0;
 
 				if ( $purchase->onExpireWarning() )
@@ -84,7 +61,7 @@ class sendInvoiceWarnings extends Task
 			/* Loop */
 			foreach ( $groupedPurchases as $memberId => $_groupedPurchases )
 			{
-				$member = Customer::load( $memberId );
+				$member = \IPS\nexus\Customer::load( $memberId );
 				foreach ( $_groupedPurchases as $billingAgreementId => $__groupedPurchases )
 				{
 					foreach ( $__groupedPurchases as $currency => $purchases )
@@ -92,11 +69,11 @@ class sendInvoiceWarnings extends Task
 						$email = NULL;
 						
 						/* Create a temporary invoice (we're not going to save this) so that we know what the charges will be */
-						$invoice = new Invoice;
+						$invoice = new \IPS\nexus\Invoice;
 						$invoice->currency = $currency;
 						foreach ( $purchases as $purchase )
 						{
-							$invoice->addItem( Renewal::create( $purchase ) );
+							$invoice->addItem( \IPS\nexus\Invoice\Item\Renewal::create( $purchase ) );
 						}
 						$invoice->setDefaultTitle();
 						
@@ -106,7 +83,7 @@ class sendInvoiceWarnings extends Task
 						{
 							try
 							{
-								$billingAgreement = BillingAgreement::load( $billingAgreementId );
+								$billingAgreement = \IPS\nexus\Customer\BillingAgreement::load( $billingAgreementId );
 								
 								if ( $billingAgreement->status() == $billingAgreement::STATUS_CANCELED )
 								{
@@ -114,34 +91,35 @@ class sendInvoiceWarnings extends Task
 									$billingAgreement = NULL;
 								}
 							}
-							catch ( OutOfRangeException|DomainException ) { }
+							catch ( \OutOfRangeException $e ) { }
 							/* Billing agreement may have been cancelled, but not yet marked cancelled */
+							catch ( \DomainException $e ) { }
 						}
 						if ( $billingAgreement )					
 						{
-							$paymentDate = DateTime::create()->add( new DateInterval( 'PT' . Settings::i()->cm_invoice_warning . 'H' ) )->localeDate( $member );
-							$email = Email::buildFromTemplate( 'nexus', 'invoiceWarning', array( array(), NULL, $billingAgreement, $invoice, $invoice->summary(), $paymentDate ), Email::TYPE_TRANSACTIONAL );
+							$paymentDate = \IPS\DateTime::create()->add( new \DateInterval( 'PT' . \IPS\Settings::i()->cm_invoice_warning . 'H' ) )->localeDate( $member );
+							$email = \IPS\Email::buildFromTemplate( 'nexus', 'invoiceWarning', array( array(), NULL, $billingAgreement, $invoice, $invoice->summary( $member->language() ), $paymentDate ), \IPS\Email::TYPE_TRANSACTIONAL );
 						}
 						/* Otherwise check account credit and cards */
 						else
 						{
 							$cards = array();
-							foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_customer_cards', array( 'card_member=?', $member->member_id ) ), 'IPS\nexus\Customer\CreditCard' ) as $card )
+							foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_customer_cards', array( 'card_member=?', $member->member_id ) ), 'IPS\nexus\Customer\CreditCard' ) as $card )
 							{
 								try
 								{
 									$cardDetails = $card->card; // We're just checking this doesn't throw an exception
 									$cards[] = $card;
 								}
-								catch ( Exception ) { }
+								catch ( \Exception $e ) { }
 							}
 							$credits = $member->cm_credits;
-							$credit = isset( $credits[ $currency ] ) ? $credits[ $currency ]->amount : ( new Number( '0' ) );
+							$credit = isset( $credits[ $currency ] ) ? $credits[ $currency ]->amount : ( new \IPS\Math\Number( '0' ) );
 							
-							if ( count( $cards ) or $credit->isGreaterThanZero() )
+							if ( \count( $cards ) or $credit->isGreaterThanZero() )
 							{
-								$paymentDate = DateTime::create()->add( new DateInterval( 'PT' . Settings::i()->cm_invoice_warning . 'H' ) )->localeDate( $member );
-								$email = Email::buildFromTemplate( 'nexus', 'invoiceWarning', array( $cards, isset( $credits[ $currency ] ) ? $credits[ $currency ] : ( new Money( 0, $currency ) ), NULL, $invoice, $invoice->summary(), $paymentDate ), Email::TYPE_TRANSACTIONAL );
+								$paymentDate = \IPS\DateTime::create()->add( new \DateInterval( 'PT' . \IPS\Settings::i()->cm_invoice_warning . 'H' ) )->localeDate( $member );
+								$email = \IPS\Email::buildFromTemplate( 'nexus', 'invoiceWarning', array( $cards, isset( $credits[ $currency ] ) ? $credits[ $currency ] : ( new \IPS\nexus\Money( 0, $currency ) ), NULL, $invoice, $invoice->summary( $member->language() ), $paymentDate ), \IPS\Email::TYPE_TRANSACTIONAL );
 							}
 						}
 						
@@ -157,18 +135,16 @@ class sendInvoiceWarnings extends Task
 									},
 									iterator_to_array( $member->alternativeContacts( array( 'billing=1' ) ) )
 								),
-								( ( in_array( 'invoice_warn', explode( ',', Settings::i()->nexus_notify_copy_types ) ) AND Settings::i()->nexus_notify_copy_email ) ? explode( ',', Settings::i()->nexus_notify_copy_email ) : array() )
+								( ( \in_array( 'invoice_warn', explode( ',', \IPS\Settings::i()->nexus_notify_copy_types ) ) AND \IPS\Settings::i()->nexus_notify_copy_email ) ? explode( ',', \IPS\Settings::i()->nexus_notify_copy_email ) : array() )
 							);
 						}
 						
 						/* Update Purchases */											
-						Db::i()->update( 'nexus_purchases', array( 'ps_invoice_warning_sent' => 1 ), Db::i()->in( 'ps_id', array_keys( $purchases ) ) );
+						\IPS\Db::i()->update( 'nexus_purchases', array( 'ps_invoice_warning_sent' => 1 ), \IPS\Db::i()->in( 'ps_id', array_keys( $purchases ) ) );
 					}
 				}
 			}
-		}
-
-		return null;
+		}		
 	}
 	
 	/**
@@ -180,7 +156,7 @@ class sendInvoiceWarnings extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 		
 	}

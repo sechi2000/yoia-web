@@ -12,145 +12,74 @@
 namespace IPS\calendar;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DateInterval;
-use DatePeriod;
-use DateTimeZone;
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\calendar\Icalendar\ICSParser;
-use IPS\Content\Anonymous;
-use IPS\Content\Comment;
-use IPS\Content\EditHistory;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Followable;
-use IPS\Content\Hideable;
-use IPS\Content\Item;
-use IPS\Content\Lockable;
-use IPS\Content\MetaData;
-use IPS\Content\Featurable;
-use IPS\Content\Reactable;
-use IPS\Content\ReadMarkers;
-use IPS\Content\Reportable;
-use IPS\Content\Shareable;
-use IPS\Content\Statistics;
-use IPS\Content\ViewUpdates;
-use IPS\Content\Taggable;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\gallery\Album;
-use IPS\GeoLocation;
-use IPS\Helpers\Form\Address;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Notification;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function array_key_exists;
-use function array_slice;
-use function count;
-use function defined;
-use function get_called_class;
-use function in_array;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Calendar Event Model
  */
-class Event extends Item implements Embeddable,
-	Filter
+class _Event extends \IPS\Content\Item implements
+\IPS\Content\Permissions,
+\IPS\Content\Tags,
+\IPS\Content\Followable,
+\IPS\Content\ReadMarkers,
+\IPS\Content\Hideable, \IPS\Content\Featurable, \IPS\Content\Lockable,
+\IPS\Content\Shareable,
+\IPS\Content\Searchable,
+\IPS\Content\Embeddable,
+\IPS\Content\MetaData,
+\IPS\Content\EditHistory,
+\IPS\Content\Anonymous
 {
-	use	Reactable,
-		Reportable,
-		Anonymous,
-		Followable,
-		Lockable,
-		MetaData,
-		Shareable,
-		Taggable,
-		EditHistory,
-		ReadMarkers,
-		Hideable,
-		ViewUpdates,
-		Statistics,
-		Featurable
-		{
-			Followable::createNotification as public _createNotification;
-			Hideable::approvalQueueHtml as public _approvalQueueHtml;
-		}
+	use \IPS\Content\Reactable, \IPS\Content\Reportable, \IPS\Content\ViewUpdates, \IPS\Content\Statistics;
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'calendar';
+	public static $application = 'calendar';
 	
 	/**
 	 * @brief	Module
 	 */
-	public static string $module = 'calendar';
+	public static $module = 'calendar';
 	
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'calendar_events';
+	public static $databaseTable = 'calendar_events';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'event_';
+	public static $databasePrefix = 'event_';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 		
 	/**
 	 * @brief	Node Class
 	 */
-	public static ?string $containerNodeClass = 'IPS\calendar\Calendar';
+	public static $containerNodeClass = 'IPS\calendar\Calendar';
 	
 	/**
 	 * @brief	Comment Class
 	 */
-	public static ?string $commentClass = 'IPS\calendar\Event\Comment';
+	public static $commentClass = 'IPS\calendar\Event\Comment';
 	
 	/**
 	 * @brief	Review Class
 	 */
-	public static string $reviewClass = 'IPS\calendar\Event\Review';
+	public static $reviewClass = 'IPS\calendar\Event\Review';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'container'				=> 'calendar_id',
 		'author'				=> 'member_id',
 		'author_name'		=> 'author_name',
@@ -181,57 +110,58 @@ class Event extends Item implements Embeddable,
 		'edit_member_name'	=> 'edit_member_name',
 		'edit_reason'			=> 'edit_reason',
 		'is_anon'			=> 'is_anon',
+		'views'				=> 'views'
 	);
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'calendar_event';
+	public static $title = 'calendar_event';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'calendar';
+	public static $icon = 'calendar';
 	
 	/**
 	 * @brief	Form Lang Prefix
 	 */
-	public static string $formLangPrefix = 'event_';
+	public static $formLangPrefix = 'event_';
 	
 	/**
 	 * @brief	Cover Photo Storage Extension
 	 */
-	public static string $coverPhotoStorageExtension = 'calendar_Events';
+	public static $coverPhotoStorageExtension = 'calendar_Events';
 	
 	/**
 	 * @brief	Use a default cover photo
 	 */
-	public static bool $coverPhotoDefault = true;
+	public static $coverPhotoDefault = true;
 
 	/**
 	 * @brief	Cached date objects
 	 */
-	protected array $dateObjects	= array( 'start' => NULL, 'end' => NULL );
+	protected $dateObjects	= array( 'start' => NULL, 'end' => NULL );
 
 	/**
 	 * @brief	Cached venue
 	 */
-	protected ?Venue $venueObject = NULL;
+	protected $venueObject = NULL;
 
 	/**
 	 * @brief	Location Data Cache
 	 */
-	protected string|GeoLocation|null $locationData = NULL;
+	protected $locationData = NULL;
 
 	/**
 	 * @brief	Happening Cache
 	 */
-	protected mixed $happeningData = FALSE;
+	protected $happeningData = FALSE;
 	
 	/**
 	 * @brief	[Content]	Key for hide reasons
 	 */
-	public static ?string $hideLogKey = 'calendar-event';
+	public static $hideLogKey = 'calendar-event';
 
 	/**
 	 * @brief		RSVP statuses
@@ -247,18 +177,13 @@ class Event extends Item implements Embeddable,
 	 * @brief		RSVP statuses
 	 */
 	const RSVP_MAYBE	= 2;
-
-	/**
-	 * @brief		Left the event
-	 */
-	const RSVP_LEFT		= 3;
 	
 	/**
 	 * Columns needed to query for search result / stream view
 	 *
 	 * @return	array
 	 */
-	public static function basicDataColumns(): array
+	public static function basicDataColumns()
 	{
 		$return = parent::basicDataColumns();
 		$return[] = 'event_recurring';
@@ -271,13 +196,13 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Set the title
 	 *
-	 * @param string $title	Title
+	 * @param	string	$title	Title
 	 * @return	void
 	 */
-	public function set_title( string $title ) : void
+	public function set_title( $title )
 	{
 		$this->_data['title'] = $title;
-		$this->_data['title_seo'] = Friendly::seoTitle( $title );
+		$this->_data['title_seo'] = \IPS\Http\Url\Friendly::seoTitle( $title );
 	}
 
 	/**
@@ -285,15 +210,15 @@ class Event extends Item implements Embeddable,
 	 *
 	 * @return	string
 	 */
-	public function get_title_seo(): string
+	public function get_title_seo()
 	{
 		if ( !$this->_data['title_seo'] )
 		{
-			$this->title_seo	= Friendly::seoTitle( $this->title );
+			$this->title_seo	= \IPS\Http\Url\Friendly::seoTitle( $this->title );
 			$this->save();
 		}
 
-		return $this->_data['title_seo'] ?: Friendly::seoTitle( $this->title );
+		return $this->_data['title_seo'] ?: \IPS\Http\Url\Friendly::seoTitle( $this->title );
 	}
 
 	/**
@@ -301,20 +226,21 @@ class Event extends Item implements Embeddable,
 	 *
 	 * @return	string
 	 */
-	public function get__album(): string
+	public function get__album()
 	{
-		if ( Application::appIsEnabled( 'gallery' ) AND $this->album )
+		if ( \IPS\Application::appIsEnabled( 'gallery' ) AND $this->album )
 		{
 			try
 			{
-				$album = Album::loadAndCheckPerms( $this->album );
+				$album = \IPS\gallery\Album::loadAndCheckPerms( $this->album );
 
-				$gallery = Application::load( 'gallery' );
+				$gallery = \IPS\Application::load( 'gallery' );
 				$gallery::outputCss();
 
-				return (string) Theme::i()->getTemplate( 'browse', 'gallery', 'front' )->miniAlbum( $album );
+				return \IPS\Theme::i()->getTemplate( 'browse', 'gallery', 'front' )->miniAlbum( $album );
 			}
-			catch( OutOfRangeException | UnderflowException $e ){}
+			catch( \OutOfRangeException $e ){}
+			catch( \UnderflowException $e ){}
 		}
 
 		return '';
@@ -325,9 +251,9 @@ class Event extends Item implements Embeddable,
 	 *
 	 * @return	string
 	 */
-	public function get__recurring_text(): string
+	public function get__recurring_text()
 	{
-		$recurringData	= ICSParser::parseRrule( $this->recurring, 'UTC' );
+		$recurringData	= \IPS\calendar\Icalendar\ICSParser::parseRrule( $this->recurring, 'UTC' );
 
 		/* If the event does not repeat, just return */
 		if ( !$recurringData['event_repeat'] )
@@ -337,7 +263,7 @@ class Event extends Item implements Embeddable,
 
 		/* Hold parameters to sprintf() into the language string */
 		$params			= array( $this->_start_date->localeDate() );
-		$pluralize		= array( $this->_start_date->localeDate() <= ( new DateTime )->localeDate() ? 1 : 2 );
+		$pluralize		= array( $this->_start_date->localeDate() <= ( new \IPS\DateTime )->localeDate() ? 1 : 2 );
 
 		/* Figure out the basic language string */
 		$langString	= "recur_human_" . $recurringData['event_repeats'];
@@ -347,7 +273,7 @@ class Event extends Item implements Embeddable,
 			$langString		= $langString . '_multi';
 
 			/* Get repeater info */
-			$params[] = Member::loggedIn()->language()->addToStack( 'recur_human__x' . $recurringData['event_repeats'], FALSE, array( 'pluralize' => array( $recurringData['event_repeat_freq'] ) ) );
+			$params[] = \IPS\Member::loggedIn()->language()->addToStack( 'recur_human__x' . $recurringData['event_repeats'], FALSE, array( 'pluralize' => array( $recurringData['event_repeat_freq'] ) ) );
 		}
 		
 		/* If recurring weekly, take days into account */
@@ -355,7 +281,7 @@ class Event extends Item implements Embeddable,
 		{
 			$days	= array();
 
-			foreach(Date::getDayNames() as $day )
+			foreach( \IPS\calendar\Date::getDayNames() as $day )
 			{
 				if ( $recurringData['repeat_freq_on_' . $day['ical'] ] )
 				{
@@ -363,48 +289,48 @@ class Event extends Item implements Embeddable,
 				}
 			}
 
-			if ( count( $days ) )
+			if ( \count( $days ) )
 			{
 				$langString	= $langString . '_days';
-				$params[]	= Member::loggedIn()->language()->formatList( $days );
+				$params[]	= \IPS\Member::loggedIn()->language()->formatList( $days );
 			}
 		}
 
 		/* Finally, reflect the ending data */
 		if ( $recurringData['repeat_end_occurrences'] )
 		{
-			$params[]	= Member::loggedIn()->language()->addToStack( 'recur_human__occurrences', FALSE, array( 'pluralize' => array( $recurringData['repeat_end_occurrences'] ) ) );
+			$params[]	= \IPS\Member::loggedIn()->language()->addToStack( 'recur_human__occurrences', FALSE, array( 'pluralize' => array( $recurringData['repeat_end_occurrences'] ) ) );
 		}
 		elseif ( $recurringData['repeat_end_date'] )
 		{
-			$params[]	= Member::loggedIn()->language()->addToStack( 'recur_human__until', FALSE, array( 'sprintf' => array( $recurringData['repeat_end_date']->localeDate() ) ) );
+			$params[]	= \IPS\Member::loggedIn()->language()->addToStack( 'recur_human__until', FALSE, array( 'sprintf' => array( $recurringData['repeat_end_date']->localeDate() ) ) );
 		}
 		else
 		{
-			$params[]	= Member::loggedIn()->language()->addToStack('recur_human__forever');
+			$params[]	= \IPS\Member::loggedIn()->language()->addToStack('recur_human__forever');
 		}
 
-		return  Member::loggedIn()->language()->addToStack( $langString, FALSE, array( 'pluralize' => $pluralize, 'sprintf' => $params ) );
+		return  \IPS\Member::loggedIn()->language()->addToStack( $langString, FALSE, array( 'pluralize' => $pluralize, 'sprintf' => $params ) );
 	}
 
 	/**
 	 * @brief	Cached occurrences - this may or may not satisfy a query to nextOccurrence()
 	 */
-	protected array $parsedOccurrences = array();
+	protected $parsedOccurrences = array();
 
 	/**
 	 * @brief	Range of occurrences found already
 	 */
-	protected array $occurenceRangeChecked = array( 'start' => NULL, 'end' => NULL );
+	protected $occurenceRangeChecked = array( 'start' => NULL, 'end' => NULL );
 
 	/**
 	 * Find occurrences of an event within a supplied date range
 	 *
-	 * @param Date $startDate		Date to start from
-	 * @param Date $endDate		Date to end at
+	 * @param	\IPS\calendar\Date		$startDate		Date to start from
+	 * @param	\IPS\calendar\Date		$endDate		Date to end at
 	 * @return	array
 	 */
-	public function findOccurrences( Date $startDate, Date $endDate ): array
+	public function findOccurrences( $startDate, $endDate )
 	{
 		if ( !$this->recurring )
 		{
@@ -420,7 +346,7 @@ class Event extends Item implements Embeddable,
 		$this->occurenceRangeChecked = array( 'start' => $startDate->getTimestamp(), 'end' => $endDate->getTimestamp() );
 
 		/* Parse out our recurrence data */
-		$recurringData = ICSParser::parseRrule( $this->recurring, NULL, $this->_start_date );
+		$recurringData = \IPS\calendar\Icalendar\ICSParser::parseRrule( $this->recurring, NULL, $this->_start_date );
 		if ( !$recurringData['event_repeat'] )
 		{
 			return array();
@@ -440,7 +366,7 @@ class Event extends Item implements Embeddable,
 		}
 
 		/* Return the results we found after storing them */
-		$timezone = ( !empty( $this->timezone ) and in_array( DateTime::getFixedTimezone( $this->timezone ), DateTimeZone::listIdentifiers() ) ) ? new DateTimeZone( $this->timezone ) : NULL;
+		$timezone = ( !empty( $this->timezone ) and \in_array( \IPS\DateTime::getFixedTimezone( $this->timezone ), \DateTimeZone::listIdentifiers() ) ) ? new \DateTimeZone( $this->timezone ) : NULL;
 		$this->parsedOccurrences = static::_findOccurances( $this->_start_date, $this->_end_date, $startDate, $endDate, $recurringData, $timezone, $this->all_day );
 
 		return $this->parsedOccurrences;
@@ -449,13 +375,13 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Get new occurrence end date
 	 *
-	 * @param Date $eventStart Event start date
-	 * @param Date|null $eventEnd Event end date
-	 * @param Date $startDate New start date
-	 * @param Date|null $endDate Date to end at
-	 * @return Date|null
+	 * @param	\IPS\calendar\Date	$eventStart		Event start date
+	 * @param	\IPS\calendar\Date	$eventEnd		Event end date
+	 * @param	\IPS\calendar\Date	$startDate		New start date
+	 * @param	\IPS\calendar\Date	$endDate		Date to end at
+	 * @return	\IPS\calendar\Date
 	 */
-	protected static function _determineNewEndDate( Date $eventStart, ?Date $eventEnd, Date $startDate, ?Date $endDate ): ?Date
+	protected static function _determineNewEndDate( $eventStart, $eventEnd, $startDate, $endDate )
 	{
 		/* If there's no end date, there's nothing to do */
 		if ( !$eventEnd )
@@ -472,32 +398,31 @@ class Event extends Item implements Embeddable,
 			->setTimezone( $endDate->getTimezone() )
 			->setTime( $endDate->format('H'), $endDate->format( 'i' ), $endDate->format('s') );
 	}
-
+	
 	/**
 	 * Get occurances
 	 *
-	 * @param Date $eventStart Event start date
-	 * @param Date|null $eventEnd Event end date
-	 * @param Date $startDate Date to start from
-	 * @param Date|null $endDate Date to end at
-	 * @param array $recurringData Reccurance data
-	 * @param DateTimeZone|null $eventTimezone Event timezone
-	 * @param boolean $allDay All day event?
-	 * @return    array
-	 * @throws Exception
+	 * @param	\IPS\calendar\Date	$eventStart		Event start date
+	 * @param	\IPS\calendar\Date	$eventEnd		Event end date
+	 * @param	\IPS\calendar\Date	$startDate		Date to start from
+	 * @param	\IPS\calendar\Date	$endDate		Date to end at
+	 * @param	array				$recurringData	Reccurance data
+	 * @param	\DateTimeZone		$eventTimezone	Event timezone
+	 * @param 	boolean 			$allDay			All day event?
+	 * @return	array
 	 */
-	public static function _findOccurances( Date $eventStart, ?Date $eventEnd, Date $startDate, ?Date $endDate, array $recurringData, ?DateTimeZone $eventTimezone=NULL, bool $allDay=FALSE ): array
+	public static function _findOccurances( $eventStart, $eventEnd, $startDate, $endDate, $recurringData, ?\DateTimeZone $eventTimezone=NULL, bool $allDay=FALSE )
 	{
 		$keyword		= NULL;
 		$results 		= array();
 
 		/* Because we manipulate these values to create new dates later, clone them so we are not manipulating the original objects */
-		$startDate = ( clone $startDate )->sub( new DateInterval( 'PT24H' ) );
-		$endDate = ( clone $endDate )->add( new DateInterval( 'PT24H' ) );
+		$startDate = ( clone $startDate )->sub( new \DateInterval( 'PT24H' ) );
+		$endDate = ( clone $endDate )->add( new \DateInterval( 'PT24H' ) );
 
 		$endDateInformation = $endDate->getDateInformation( $endDate->getTimestamp() );
 
-		$endDate = Date::getDate( $endDateInformation['year'], $endDateInformation['mon'], $endDateInformation['mday'], $endDateInformation['hours'], $endDateInformation['minutes'], $endDateInformation['seconds'] );
+		$endDate = \IPS\calendar\Date::getDate( $endDateInformation['year'], $endDateInformation['mon'], $endDateInformation['mday'], $endDateInformation['hours'], $endDateInformation['minutes'], $endDateInformation['seconds'] );
 
 		switch ( $recurringData['event_repeats'] )
 		{
@@ -530,17 +455,17 @@ class Event extends Item implements Embeddable,
 					}
 				}
 
-				foreach (Date::getDayNames() as $key => $day )
+				foreach ( \IPS\calendar\Date::getDayNames() as $key => $day )
 				{
-					if ( $recurringData['repeat_freq_on_' . $day['ical'] ] )
+					if ( $recurringData['repeat_freq_on_' . $day['ical'] ] == TRUE )
 					{
 						$lookup = ( $key - $offset ) < 0 ? ( $key + $offset ) : ( $key - $offset );
-						$_repeatDays[] = Date::getDayNames()[ $lookup ]['english'];
+						$_repeatDays[] = \IPS\calendar\Date::getDayNames()[ $lookup ]['english'];
 					}
 				}
 
 				/* If not repeating only on specific days then we have a normal recurring event */
-				if ( !count($_repeatDays) )
+				if ( !\count($_repeatDays) )
 				{
 					$keyword	= 'weeks';
 				}
@@ -739,7 +664,7 @@ class Event extends Item implements Embeddable,
 					$method	= $diff->invert ? 'sub' : 'add';
 					$days	= $diff->days % $recurringData['event_repeat_freq'];
 
-					$date	= ( clone $startDate )->sub( new DateInterval( 'P' . $days . 'D' ) )
+					$date	= ( clone $startDate )->sub( new \DateInterval( 'P' . $days . 'D' ) )
 						->setTimezone( $date->getTimezone() )
 						->setTime( $date->format('H'), $date->format( 'i' ), $date->format('s') );
 
@@ -763,7 +688,7 @@ class Event extends Item implements Embeddable,
 						$difference	= $firstOccurrence['wday'] - $startDateInfo['wday'];
 						$method		= ( $difference > 0 ) ? 'add' : 'sub';
 						$date		= ( clone $startDate )
-							->$method( new DateInterval( 'P' . abs( $difference ) . 'D' ) )
+							->$method( new \DateInterval( 'P' . abs( $difference ) . 'D' ) )
 							->setTimezone( $date->getTimezone() )
 							->setTime( $date->format('H'), $date->format( 'i' ), $date->format('s') );
 
@@ -792,8 +717,8 @@ class Event extends Item implements Embeddable,
 					$dayOff	= $diff->days;
 					
 					/* If the time of day of the start of the viewed interval is earlier than the time of day of the original event, we need to add an extra day */
-					$startDateSeconds = ( (int)$startDate->format('H') * 3600 ) + ( (int)$startDate->format('i') * 60 ) + (int)$startDate->format('s');
-					$dateSeconds = ( (int)$date->format('H') * 3600 ) + ( (int)$date->format('i') * 60 ) + (int)$date->format('s');
+					$startDateSeconds = ( $startDate->format('H') * 3600 ) + ( $startDate->format('i') * 60 ) + $startDate->format('s');
+					$dateSeconds = ( $date->format('H') * 3600 ) + ( $date->format('i') * 60 ) + $date->format('s');
 					if ( $startDateSeconds < $dateSeconds )
 					{
 						$dayOff += 1;
@@ -801,7 +726,7 @@ class Event extends Item implements Embeddable,
 
 					$days	= $dayOff % ( $recurringData['event_repeat_freq'] * 7 );
 
-					$date	= ( clone $startDate )->sub( new DateInterval( 'P' . $days . 'D' ) )
+					$date	= ( clone $startDate )->sub( new \DateInterval( 'P' . $days . 'D' ) )
 						->setTimezone( $date->getTimezone() )
 						->setTime( $date->format('H'), $date->format('i'), $date->format('s') );
 
@@ -818,7 +743,7 @@ class Event extends Item implements Embeddable,
 						->setTimezone( $date->getTimezone() )
 						->setTime( $date->format('H'), $date->format( 'i' ), $date->format('s') )
 						->setDate( $startDate->format('Y'), $startDate->format('m'), $date->format('d') )
-						->sub( new DateInterval( 'P1M' ) );
+						->sub( new \DateInterval( 'P1M' ) );
 
 					$eDate		= static::_determineNewEndDate( $eventStart, $eventEnd, $date, $eDate );
 				}
@@ -833,7 +758,7 @@ class Event extends Item implements Embeddable,
 						->setTimezone( $date->getTimezone() )
 						->setTime( $date->format('H'), $date->format( 'i' ), $date->format('s') )
 						->setDate( $startDate->format('Y'), $date->format('m'), $date->format('d') )
-						->sub( new DateInterval( 'P1Y' ) );
+						->sub( new \DateInterval( 'P1Y' ) );
 
 					$eDate		= static::_determineNewEndDate( $eventStart, $eventEnd, $date, $eDate );
 				}
@@ -847,7 +772,7 @@ class Event extends Item implements Embeddable,
 				( $eDate !== NULL AND $date->mysqlDatetime( FALSE ) <= $startDate->mysqlDatetime( FALSE ) AND $eDate->mysqlDatetime( FALSE ) >= $endDate->mysqlDatetime( FALSE ) )
 			  )
 			{
-				$results[]	= array( 'startDate' => Date::getDate( $dateInformation['year'], $dateInformation['mon'], $dateInformation['mday'], $dateInformation['hours'], $dateInformation['minutes'], $dateInformation['seconds'] ), 'endDate' => $eDate );
+				$results[]	= array( 'startDate' => \IPS\calendar\Date::getDate( $dateInformation['year'], $dateInformation['mon'], $dateInformation['mday'], $dateInformation['hours'], $dateInformation['minutes'], $dateInformation['seconds'] ), 'endDate' => $eDate );
 			}
 
 			/* Do we have an occurrences limit? */
@@ -855,29 +780,29 @@ class Event extends Item implements Embeddable,
 			{
 				if ( $recurringData['repeat_end_occurrences'] )
 				{
-					$period = new DatePeriod( $date, new DateInterval( 'P' . $recurringData['event_repeat_freq'] . $intervalKeyword ), $recurringData['repeat_end_occurrences'], DatePeriod::EXCLUDE_START_DATE );
+					$period = new \DatePeriod( $date, new \DateInterval( 'P' . $recurringData['event_repeat_freq'] . $intervalKeyword ), $recurringData['repeat_end_occurrences'], \DatePeriod::EXCLUDE_START_DATE );
 				}
 				/* Do we have an end date for the recurrences? */
 				elseif ( $recurringData['repeat_end_date'] )
 				{
 					$endDateToUse = ( $endDate->mysqlDatetime( FALSE ) < $recurringData['repeat_end_date']->mysqlDatetime( FALSE ) ) ? $endDate : $recurringData['repeat_end_date'];
 
-					$period = new DatePeriod( $date, new DateInterval( 'P' . $recurringData['event_repeat_freq'] . $intervalKeyword ), $endDateToUse->add( new DateInterval( 'P' . $recurringData['event_repeat_freq'] . $intervalKeyword ) ), DatePeriod::EXCLUDE_START_DATE );
+					$period = new \DatePeriod( $date, new \DateInterval( 'P' . $recurringData['event_repeat_freq'] . $intervalKeyword ), $endDateToUse->add( new \DateInterval( 'P' . $recurringData['event_repeat_freq'] . $intervalKeyword ) ), \DatePeriod::EXCLUDE_START_DATE );
 				}
 				/* Recurs indefinitely... the most fun type... */
 				else
 				{
-					$period = new DatePeriod( $date, new DateInterval( 'P' . $recurringData['event_repeat_freq'] . $intervalKeyword ), $endDate, DatePeriod::EXCLUDE_START_DATE );
+					$period = new \DatePeriod( $date, new \DateInterval( 'P' . $recurringData['event_repeat_freq'] . $intervalKeyword ), $endDate, \DatePeriod::EXCLUDE_START_DATE );
 				}
 			}
 
 			/* Get our occurrences based on the period we are looping */
 			foreach ( $period as $dateOccurrence )
 			{
-				$dateOccurrence = Date::dateTimeToCalendarDate( $dateOccurrence );
+				$dateOccurrence = \IPS\calendar\Date::dateTimeToCalendarDate( $dateOccurrence );
 
 				$thisOccurrence = $dateOccurrence->getDateInformation( $dateOccurrence->getTimestamp() );
-				$dateOccurrence = Date::getDate( $thisOccurrence['year'], $thisOccurrence['mon'], $thisOccurrence['mday'], $thisOccurrence['hours'], $thisOccurrence['minutes'], $thisOccurrence['seconds'] );
+				$dateOccurrence = \IPS\calendar\Date::getDate( $thisOccurrence['year'], $thisOccurrence['mon'], $thisOccurrence['mday'], $thisOccurrence['hours'], $thisOccurrence['minutes'], $thisOccurrence['seconds'] );
 
 				$eDate		= static::_determineNewEndDate( $eventStart, $eventEnd, $dateOccurrence, $eDate );
 
@@ -897,11 +822,11 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Find the next occurrence of an event starting from a specified start point
 	 *
-	 * @param Date $date		Date to start from
-	 * @param string $type		Type of date to check against (startDate or endDate)
-	 * @return    Date|NULL
+	 * @param	\IPS\calendar\Date		$date		Date to start from
+	 * @param	string					$type		Type of date to check against (startDate or endDate)
+	 * @return	\IPS\calendar\Date|NULL
 	 */
-	public function nextOccurrence( Date $date, string $type='startDate' ): ?Date
+	public function nextOccurrence( $date, $type='startDate' )
 	{
 		/* If the event is not recurring, there is only one occurrence */
 		if ( !$this->recurring )
@@ -919,7 +844,7 @@ class Event extends Item implements Embeddable,
 		}
 
 		/* This is typically called after findOccurrences() using the same start date, so try the cached array first */
-		if ( count( $this->parsedOccurrences ) )
+		if ( \count( $this->parsedOccurrences ) )
 		{
 			foreach( $this->parsedOccurrences as $occurrence )
 			{
@@ -946,13 +871,13 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Determine if an event is within our range
 	 *
-	 * @param array $occurrence		Event occurrence instance
-	 * @param string $type		Type of date to check against (startDate or endDate)
-	 * @param Date $date			Date we are checking
+	 * @see	nextOccurrence()
+	 * @param	array				$occurrence		Event occurrence instance
+	 * @param	string					$type		Type of date to check against (startDate or endDate)
+	 * @param	\IPS\calendar\Date	$date			Date we are checking
 	 * @return	bool
-	 *@see	nextOccurrence()
 	 */
-	protected function _checkDateForOccurrence( array $occurrence, string $type, Date $date ): bool
+	protected function _checkDateForOccurrence( $occurrence, $type, $date )
 	{
 		/* If we're looking for an end date and we don't have one, return now */
 		if ( $type == 'endDate' AND empty( $occurrence['endDate'] ) )
@@ -988,10 +913,10 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Return the last occurrence of a recurring event
 	 *
-	 * @param string $type		Type of date to check against (startDate or endDate)
-	 * @return	Date|null
+	 * @param	string					$type		Type of date to check against (startDate or endDate)
+	 * @return	\IPS\calendar\Date
 	 */
-	public function lastOccurrence( string $type='startDate' ): ?Date
+	public function lastOccurrence( $type='startDate' )
 	{
 		/* If the event is not recurring, there is only one occurrence */
 		if ( !$this->recurring )
@@ -1000,7 +925,7 @@ class Event extends Item implements Embeddable,
 		}
 
 		/* This is typically called after findOccurrences() using the same start date, so try the cached array first */
-		if ( count( $this->parsedOccurrences ) )
+		if ( \count( $this->parsedOccurrences ) )
 		{
 			$last	= end( $this->parsedOccurrences );
 
@@ -1008,7 +933,7 @@ class Event extends Item implements Embeddable,
 		}
 
 		/* Get the occurrences over the next year then and try from there */
-		$date	= Date::getDate();
+		$date	= \IPS\calendar\Date::getDate();
 		foreach( $this->findOccurrences( $date, $date->adjust( "+2 years" ) ) as $occurrence )
 		{
 			if ( $occurrence[ $type ] AND $occurrence[ $type ]->mysqlDatetime( FALSE ) >= $date->mysqlDatetime( FALSE ) )
@@ -1017,7 +942,7 @@ class Event extends Item implements Embeddable,
 			}
 		}
 
-		$date	= Date::getDate();
+		$date	= \IPS\calendar\Date::getDate();
 		$occurrences	= $this->findOccurrences( $date->adjust( "-2 years" ), $date );
 		$occurrence		= array_pop( $occurrences );
 
@@ -1033,29 +958,29 @@ class Event extends Item implements Embeddable,
 	/**
 	 * @brief	RSVP attendees
 	 */
-	protected ?array $attendees = NULL;
+	protected $attendees	= NULL;
 
 	/**
 	 * Get the RSVP attendees
 	 *
-	 * @param int|null $type	Type of RSVP attendees to count, or NULL for all
-	 * @param int|null $limit	Maximum number of attendees to return, or NULL for all. Only available when $type is specified.
+	 * @param	int|NULL	$type	Type of RSVP attendees to count, or NULL for all
+	 * @param	int|NULL	$limit	Maximum number of attendees to return, or NULL for all. Only available when $type is specified.
 	 * @return	array
-	 * @throws	BadMethodCallException
-	 * @throws	InvalidArgumentException
+	 * @throws	\BadMethodCallException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function attendees( int $type=NULL, int $limit=NULL ): array
+	public function attendees( $type=NULL, $limit=NULL )
 	{
 		/* RSVP enabled? */
 		if ( !$this->rsvp )
 		{
-			throw new BadMethodCallException;
+			throw new \BadMethodCallException;
 		}
 
 		/* You can only limit results if retrieving a specific type */
 		if ( $type === NULL AND $limit !== NULL )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 
 		/* Do we already have attendee list cached? */
@@ -1064,9 +989,9 @@ class Event extends Item implements Embeddable,
 			/* Fetch RSVP data and pass to template */
 			$this->attendees	= array( 0 => array(), 1 => array(), 2 => array() );
 
-			foreach( Db::i()->select( '*', 'calendar_event_rsvp', array( "rsvp_event_id=?", $this->id ) )->join( 'core_members', 'calendar_event_rsvp.rsvp_member_id=core_members.member_id' ) as $attendee )
+			foreach( \IPS\Db::i()->select( '*', 'calendar_event_rsvp', array( "rsvp_event_id=?", $this->id ) )->join( 'core_members', 'calendar_event_rsvp.rsvp_member_id=core_members.member_id' ) as $attendee )
 			{
-				$this->attendees[ $attendee['rsvp_response'] ][ $attendee['rsvp_member_id'] ]	= Member::constructFromData( $attendee );
+				$this->attendees[ $attendee['rsvp_response'] ][ $attendee['rsvp_member_id'] ]	= \IPS\Member::constructFromData( $attendee );
 			}
 		}
 
@@ -1077,7 +1002,7 @@ class Event extends Item implements Embeddable,
 
 			if ( $limit !== NULL )
 			{
-				return array_slice( $results, 0, $limit );
+				return \array_slice( $results, 0, $limit, FALSE );
 			}
 			else
 			{
@@ -1091,34 +1016,34 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Get the RSVP attendee count
 	 *
-	 * @param int|null $type	Type of RSVP attendees to count, or NULL for all
+	 * @param	int|NULL	$type	Type of RSVP attendees to count, or NULL for all
 	 * @return	int
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function attendeeCount( int $type=NULL ): int
+	public function attendeeCount( $type=NULL )
 	{
 		$attendees	= $this->attendees( $type );
 
 		if ( $type !== NULL )
 		{
-			return count( $attendees );
+			return \count( $attendees );
 		}
 		else
 		{
-			return ( count( $attendees[0] ) + count( $attendees[1] ) + count( $attendees[2] ) );
+			return ( \count( $attendees[0] ) + \count( $attendees[1] ) + \count( $attendees[2] ) );
 		}
 	}
 
 	/**
 	 * Get the start date for display
 	 *
-	 * @return Date|null
+	 * @return	\IPS\calendar\Date
 	 */
-	public function get__start_date(): ?Date
+	public function get__start_date()
 	{		
 		if ( $this->dateObjects['start'] === NULL )
 		{
-			$this->dateObjects['start']	= Date::parseTime( $this->start_date, !$this->all_day);
+			$this->dateObjects['start']	= \IPS\calendar\Date::parseTime( $this->start_date, $this->all_day ? FALSE : TRUE );
 		}
 		
 		return $this->dateObjects['start'];
@@ -1127,13 +1052,13 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Get the end date for display
 	 *
-	 * @return	Date|NULL
+	 * @return	\IPS\calendar\Date|NULL
 	 */
-	public function get__end_date(): ?Date
+	public function get__end_date()
 	{
 		if ( $this->dateObjects['end'] === NULL AND $this->end_date )
 		{
-			$this->dateObjects['end']	= Date::parseTime( $this->end_date, !$this->all_day);
+			$this->dateObjects['end']	= \IPS\calendar\Date::parseTime( $this->end_date, $this->all_day ? FALSE : TRUE );
 		}
 
 		return $this->dateObjects['end'];
@@ -1146,7 +1071,7 @@ class Event extends Item implements Embeddable,
 	 */
 	public function get__livetopic_id(): ?\IPS\cloud\LiveTopic
 	{
-		if ( ! Application::appIsEnabled('cloud') )
+		if ( ! \IPS\Application::appIsEnabled('cloud') )
 		{
 			return NULL;
 		}
@@ -1155,7 +1080,7 @@ class Event extends Item implements Embeddable,
 		{
 			return \IPS\cloud\LiveTopic::load( $this->livetopic_id );
 		}
-		catch( Exception $e )
+		catch( \Exception )
 		{
 			return NULL;
 		}
@@ -1165,21 +1090,21 @@ class Event extends Item implements Embeddable,
 	 * Get a string with the event date/times in the timezone of the user who created the event
 	 * Used in outgoing emails
 	 *
-	 * @param	Lang	$language	The language to use
+	 * @param	\IPS\Lang	$language	The language to use
 	 * @return	string
 	 */
-	public function fixedDateTimeDescription( Lang $language ): string
+	public function fixedDateTimeDescription( \IPS\Lang $language )
 	{
 		/* Init */
 		$return = '';
 
 		try
 		{
-			$authorTimezone = new DateTimeZone( $this->author()->timezone );
+			$authorTimezone = new \DateTimeZone( $this->author()->timezone );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			$authorTimezone = new DateTimeZone('UTC');
+			$authorTimezone = new \DateTimeZone('UTC');
 		}
 		
 		/* Start */
@@ -1229,29 +1154,29 @@ class Event extends Item implements Embeddable,
 	/**
 	 * @brief	Cached URLs
 	 */
-	protected mixed $_url = array();
+	protected $_url	= array();
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlBase = 'app=calendar&module=calendar&controller=event&id=';
+	public static $urlBase = 'app=calendar&module=calendar&controller=event&id=';
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlTemplate = 'calendar_event';
+	public static $urlTemplate = 'calendar_event';
 	
 	/**
 	 * @brief	SEO Title Column
 	 */
-	public static string $seoTitleColumn = 'title_seo';
+	public static $seoTitleColumn = 'title_seo';
 	
 	/**
 	 * Get URL for last comment page
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function lastCommentPageUrl(): Url
+	public function lastCommentPageUrl()
 	{
 		return parent::lastCommentPageUrl()->setQueryString( 'tab', 'comments' );
 	}
@@ -1259,9 +1184,9 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Get URL for last review page
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function lastReviewPageUrl(): Url
+	public function lastReviewPageUrl()
 	{
 		return parent::lastCommentPageUrl()->setQueryString( 'tab', 'reviews' );
 	}
@@ -1269,33 +1194,35 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Get template for content tables
 	 *
-	 * @return	array
+	 * @return	callable
 	 */
-	public static function contentTableTemplate(): array
+	public static function contentTableTemplate()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'calendar.css', 'calendar', 'front' ) );
-		return array( Theme::i()->getTemplate( 'global', 'calendar', 'front' ), 'rows' );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'calendar.css', 'calendar', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'calendar_responsive.css', 'calendar', 'front' ) );
+		return array( \IPS\Theme::i()->getTemplate( 'global', 'calendar', 'front' ), 'rows' );
 	}
 
 	/**
 	 * HTML to manage an item's follows 
 	 *
-	 * @return	array
+	 * @return	callable
 	 */
-	public static function manageFollowRows(): array
+	public static function manageFollowRows()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'calendar.css', 'calendar' ) );
-		return array( Theme::i()->getTemplate( 'global', 'calendar', 'front' ), 'manageFollowRow' );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'calendar.css', 'calendar' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'calendar_responsive.css', 'calendar' ) );
+		return array( \IPS\Theme::i()->getTemplate( 'global', 'calendar', 'front' ), 'manageFollowRow' );
 	}
 	
 	/**
 	 * Are comments supported by this class?
 	 *
-	 * @param	Member|NULL		$member		The member to check for or NULL to not check permission
-	 * @param	Model|NULL	$container	The container to check in, or NULL for any container
+	 * @param	\IPS\Member|NULL		$member		The member to check for or NULL to not check permission
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check in, or NULL for any container
 	 * @return	bool
 	 */
-	public static function supportsComments( Member $member = NULL, Model $container = NULL ): bool
+	public static function supportsComments( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
 		if ( $container !== NULL )
 		{
@@ -1303,18 +1230,18 @@ class Event extends Item implements Embeddable,
 		}
 		else
 		{
-			return parent::supportsComments() and ( !$member or Calendar::countWhere( 'read', $member, array( 'cal_allow_comments=1' ) ) );
+			return parent::supportsComments() and ( !$member or \IPS\calendar\Calendar::countWhere( 'read', $member, array( 'cal_allow_comments=1' ) ) );
 		}
 	}
 	
 	/**
 	 * Are reviews supported by this class?
 	 *
-	 * @param	Member|NULL		$member		The member to check for or NULL to not check permission
-	 * @param	Model|NULL	$container	The container to check in, or NULL for any container
+	 * @param	\IPS\Member|NULL		$member		The member to check for or NULL to not check permission
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check in, or NULL for any container
 	 * @return	bool
 	 */
-	public static function supportsReviews( Member $member = NULL, Model $container = NULL ): bool
+	public static function supportsReviews( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
 		if ( $container !== NULL )
 		{
@@ -1322,7 +1249,7 @@ class Event extends Item implements Embeddable,
 		}
 		else
 		{
-			return parent::supportsReviews() and ( !$member or Calendar::countWhere( 'read', $member, array( 'cal_allow_reviews=1' ) ) );
+			return parent::supportsReviews() and ( !$member or \IPS\calendar\Calendar::countWhere( 'read', $member, array( 'cal_allow_reviews=1' ) ) );
 		}
 	}
 
@@ -1331,16 +1258,16 @@ class Event extends Item implements Embeddable,
 	 *
 	 * @return	array
 	 */
-	public function commentReviewTabs(): array
+	public function commentReviewTabs()
 	{
 		$tabs = array();
 		if ( $this->container()->allow_reviews )
 		{
-			$tabs['reviews'] = Member::loggedIn()->language()->addToStack( 'event_review_count', TRUE, array( 'pluralize' => array( $this->mapped('num_reviews') ) ) );
+			$tabs['reviews'] = \IPS\Member::loggedIn()->language()->addToStack( 'event_review_count', TRUE, array( 'pluralize' => array( $this->mapped('num_reviews') ) ) );
 		}
 		if ( $this->container()->allow_comments )
 		{
-			$tabs['comments'] = Member::loggedIn()->language()->addToStack( 'event_comment_count', TRUE, array( 'pluralize' => array( $this->mapped('num_comments') ) ) );
+			$tabs['comments'] = \IPS\Member::loggedIn()->language()->addToStack( 'event_comment_count', TRUE, array( 'pluralize' => array( $this->mapped('num_comments') ) ) );
 		}
 
 		return $tabs;
@@ -1349,30 +1276,74 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Get comment/review output
 	 *
-	 * @param	string|null	$tab	Active tab
-	 * @return	string|array
+	 * @param	string	$tab	Active tab
+	 * @return	string
 	 */
-	public function commentReviews( string $tab=NULL ): string|array
+	public function commentReviews( $tab )
 	{
 		if ( $tab === 'reviews' and $this->container()->allow_reviews )
 		{
-			return Theme::i()->getTemplate('view')->reviews( $this );
+			return \IPS\Theme::i()->getTemplate('view')->reviews( $this );
 		}
 		elseif ( $tab === 'comments' and $this->container()->allow_comments )
 		{
-			return Theme::i()->getTemplate('view')->comments( $this );
+			return \IPS\Theme::i()->getTemplate('view')->comments( $this );
 		}
 		
 		return '';
+	}
+	
+	/**
+	 * Should new items be moderated?
+	 *
+	 * @param	\IPS\Member		$member							The member posting
+	 * @param	\IPS\Node\Model	$container						The container
+	 * @param	bool			$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @return	bool
+	 */
+	public static function moderateNewItems( \IPS\Member $member, \IPS\Node\Model $container = NULL, $considerPostBeforeRegistering = FALSE )
+	{
+		if ( $container and $container->moderate and !$member->group['g_avoid_q'] )
+		{
+			return !static::modPermission( 'approve', $member, $container );
+		}
+		
+		return parent::moderateNewItems( $member, $container, $considerPostBeforeRegistering );
+	}
+	
+	/**
+	 * Should new comments be moderated?
+	 *
+	 * @param	\IPS\Member	$member							The member posting
+	 * @param	bool		$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @return	bool
+	 */
+	public function moderateNewComments( \IPS\Member $member, $considerPostBeforeRegistering = FALSE )
+	{
+		$commentClass = static::$commentClass;
+		return ( $this->container()->comment_moderate and !$member->group['g_avoid_q'] ) or parent::moderateNewComments( $member, $considerPostBeforeRegistering );
+	}
+	
+	/**
+	 * Should new reviews be moderated?
+	 *
+	 * @param	\IPS\Member	$member							The member posting
+	 * @param	bool		$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @return	bool
+	 */
+	public function moderateNewReviews( \IPS\Member $member, $considerPostBeforeRegistering = FALSE )
+	{
+		$reviewClass = static::$reviewClass;
+		return ( $this->container()->review_moderate and !$member->group['g_avoid_q'] ) or parent::moderateNewReviews( $member, $considerPostBeforeRegistering );
 	}
 
 	/**
 	 * Can view users who have RSVP'd?
 	 *
-	 * @param	Member|NULL	$member		The member to check or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member		The member to check or NULL for currently logged in member
 	 * @return	bool
 	 */
-	public function canViewRsvps( Member $member = null ): bool
+	public function canViewRsvps( \IPS\Member $member = NULL )
 	{
 		return $this->can( 'rsvp', $member );
 	}
@@ -1380,27 +1351,27 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Get elements for add/edit form
 	 *
-	 * @param Item|null $item		The current item if editing or NULL if creating
-	 * @param	Model|NULL	$container	Container (e.g. forum) ID, if appropriate
-	 * @param bool $isCopy		TRUE if we are copying $item rather than editing it
+	 * @param	\IPS\Content\Item|NULL	$item		The current item if editing or NULL if creating
+	 * @param	\IPS\Node\Model|NULL	$container	Container (e.g. forum) ID, if appropriate
+	 * @param	bool					$isCopy		TRUE if we are copying $item rather than editing it
 	 * @return	array
 	 */
-	public static function formElements( Item $item=NULL, Model $container=NULL, bool $isCopy=FALSE ): array
+	public static function formElements( $item=NULL, \IPS\Node\Model $container=NULL, $isCopy=FALSE )
 	{
 		$newDefault	= date( 'Y-m-d' );
 		$allDay		= FALSE;
 
-		if ( Request::i()->y AND Request::i()->m AND Request::i()->d )
+		if ( \IPS\Request::i()->y AND \IPS\Request::i()->m AND \IPS\Request::i()->d )
 		{
-			$newDefault	= (int) Request::i()->y . '-' . (int) Request::i()->m . '-' . (int) Request::i()->d;
+			$newDefault	= (int) \IPS\Request::i()->y . '-' . (int) \IPS\Request::i()->m . '-' . (int) \IPS\Request::i()->d;
 			$allDay		= TRUE;
 		}
 
 		/* Adjust start and end time/date object timezones if needed */
 		if ( $item )
 		{
-			$startDateObj	= Date::parseTime( $item->start_date, !$item->all_day);
-			$endDateObj		= $item->end_date ? Date::parseTime( $item->end_date, !$item->all_day) : NULL;
+			$startDateObj	= \IPS\calendar\Date::parseTime( $item->start_date, $item->all_day ? FALSE : TRUE );
+			$endDateObj		= $item->end_date ? \IPS\calendar\Date::parseTime( $item->end_date, $item->all_day ? FALSE : TRUE ) : NULL;
 
 			if ( $item->timezone AND !$item->all_day )
 			{
@@ -1423,11 +1394,11 @@ class Event extends Item implements Embeddable,
 					$timeZone = mb_substr( $timeZone, 0, 1 ) . '0' . mb_substr( $timeZone, 1, 1 ) . '45';
 				}
 
-				$startDateObj->setTimezone( new DateTimeZone( $timeZone ) );
+				$startDateObj->setTimezone( new \DateTimeZone( $timeZone ) );
 
 				if ( $endDateObj )
 				{
-					$endDateObj->setTimezone( new DateTimeZone( $timeZone ) );
+					$endDateObj->setTimezone( new \DateTimeZone( $timeZone ) );
 				}
 			}
 		}
@@ -1435,22 +1406,21 @@ class Event extends Item implements Embeddable,
 		/* We are using a custom template to provide an optimal experience for the user instead of a basic linear top-down form elements for the date fields */
 		$dateValues	= array(
 			'single_day'				=> $item ? ( !$item->end_date or ( $startDateObj->format('Y-m-d') === $endDateObj->format('Y-m-d') ) ) : TRUE,
-			'start_date'				=> $item ? $startDateObj : Date::parseTime( $newDefault ),
+			'start_date'				=> $item ? $startDateObj : \IPS\calendar\Date::parseTime( $newDefault ),
 			'end_date'					=> ( $item AND $item->end_date ) ? $endDateObj : NULL,
 			'all_day'					=> $item ? $item->all_day : $allDay,
 			'event_repeat'				=> $item ? $item->recurring : FALSE,
-			'event_timezone'			=> ( $item AND $item->timezone ) ? $item->timezone : ( Member::loggedIn()->timezone ?: 'GMT' ),
-			'start_time'				=> $item ? $startDateObj->format( 'H:i' ) : Date::parseTime( $newDefault )->format( 'H:i' ),
+			'event_timezone'			=> ( $item AND $item->timezone ) ? $item->timezone : ( \IPS\Member::loggedIn()->timezone ?: 'GMT' ),
+			'start_time'				=> $item ? $startDateObj->format( 'H:i' ) : \IPS\calendar\Date::parseTime( $newDefault )->format( 'H:i' ),
 			'end_time'					=> ( $item AND $item->end_date ) ? $endDateObj->format( 'H:i' ) : NULL,
 			'event_repeats'				=> NULL,		/* Daily, weekly, monthly, yearly */
 			'event_repeat_freq'			=> NULL,		/* Repeat every 1 day, 2 days, 3 days, etc. */
 			'repeat_end_occurrences'	=> NULL,		/* Ends after x occurrences */
 			'repeat_end_date'			=> NULL,		/* Ends on x date (which is separate from the event end date - e.g. jan 9 2014 3pm to jan 10 2014 3pm, repeat annually until jan 9 2019) */
-			'allow_recurring'			=> ( !$container->calendar_bitoptions['bw_disable_recurring'] )
 		);
 
 		/* If we're copying an event, reset the date & time fields */
-		if ( Request::i()->do === 'copy' )
+		if ( \IPS\Request::i()->do === 'copy' )
 		{
 			$dateValues['start_date'] = NULL;
 			$dateValues['start_time'] = NULL;
@@ -1458,24 +1428,24 @@ class Event extends Item implements Embeddable,
 			$dateValues['end_time'] = NULL;
 		}
 
-		foreach(Date::getDayNames() as $day )
+		foreach( \IPS\calendar\Date::getDayNames() as $day )
 		{
 			$dateValues['repeat_freq_on_' . $day['ical'] ]	= NULL;	/* If repeating weekly, this is the days of the week as checkboxes (e.g. repeat every wed, fri and sat) */
 		}
 
 		/* Figure out the recurrence data if we are editing */
-		if ( $item AND $item->recurring AND $dateValues['allow_recurring'] )
+		if ( $item AND $item->recurring )
 		{
 			try
 			{
-				$dateValues	= array_merge( $dateValues, ICSParser::parseRrule( $item->recurring, 'UTC' ) );
+				$dateValues	= array_merge( $dateValues, \IPS\calendar\Icalendar\ICSParser::parseRrule( $item->recurring, 'UTC' ) );
 			}
-			catch( InvalidArgumentException $e ){}
+			catch( \InvalidArgumentException $e ){}
 		}
 
-		$return['dates']		= new Custom( 'event_dates', $dateValues, FALSE, array( 'getHtml' => function( $element )
+		$return['dates']		= new \IPS\Helpers\Form\Custom( 'event_dates', $dateValues, FALSE, array( 'getHtml' => function( $element )
 		{
-			return Theme::i()->getTemplate( 'submit' )->datesForm( $element->name, $element->value, Date::getTimezones(), $element->error );
+			return \IPS\Theme::i()->getTemplate( 'submit' )->datesForm( $element->name, $element->value, \IPS\calendar\Date::getTimezones(), $element->error );
 		} ), function( $val )
 			{
 				/* Anything but Chrome, basically, falls back to a text input and submitter might submit 22.00 instead of 22:00 */
@@ -1502,11 +1472,11 @@ class Event extends Item implements Embeddable,
 
 				try
 				{
-					$start	= Date::createFromForm( $val['start_date'], ( ( !isset( $val['all_day'] ) OR !$val['all_day'] ) ? $val['start_time'] : '' ), ( isset( $val['all_day'] ) AND $val['all_day'] ) ? 'UTC' : $val['event_timezone'] );
+					$start	= \IPS\calendar\Date::createFromForm( $val['start_date'], ( ( !isset( $val['all_day'] ) OR !$val['all_day'] ) ? $val['start_time'] : NULL ), ( isset( $val['all_day'] ) AND $val['all_day'] ) ? 'UTC' : $val['event_timezone'] );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new DomainException( "invalid_start_date" );
+					throw new \DomainException( "invalid_start_date" );
 				}
 
 				$end	= null;
@@ -1519,11 +1489,11 @@ class Event extends Item implements Embeddable,
 						{
 							try
 							{
-								$end	= Date::createFromForm( $val['end_date'], ( ( !isset( $val['all_day'] ) OR !$val['all_day'] ) ? $val['end_time'] : NULL ), ( isset( $val['all_day'] ) AND $val['all_day'] ) ? 'UTC' : $val['event_timezone'] );
+								$end	= \IPS\calendar\Date::createFromForm( $val['end_date'], ( ( !isset( $val['all_day'] ) OR !$val['all_day'] ) ? $val['end_time'] : NULL ), ( isset( $val['all_day'] ) AND $val['all_day'] ) ? 'UTC' : $val['event_timezone'] );
 							}
-							catch( Exception $e )
+							catch( \Exception $e )
 							{
-								throw new DomainException( "invalid_end_date" );
+								throw new \DomainException( "invalid_end_date" );
 							}
 						}
 					}
@@ -1531,11 +1501,11 @@ class Event extends Item implements Embeddable,
 					{
 						try
 						{
-							$end = Date::createFromForm( $val['start_date'], ( ( !isset( $val['all_day'] ) OR !$val['all_day'] ) ? $val['end_time'] : NULL ), ( isset( $val['all_day'] ) AND $val['all_day'] ) ? 'UTC' : $val['event_timezone'] );
+							$end = \IPS\calendar\Date::createFromForm( $val['start_date'], ( ( !isset( $val['all_day'] ) OR !$val['all_day'] ) ? $val['end_time'] : NULL ), ( isset( $val['all_day'] ) AND $val['all_day'] ) ? 'UTC' : $val['event_timezone'] );
 						}
-						catch( Exception $e )
+						catch( \Exception $e )
 						{
-							throw new DomainException( "invalid_end_date" );
+							throw new \DomainException( "invalid_end_date" );
 						}
 					}
 				}
@@ -1543,32 +1513,32 @@ class Event extends Item implements Embeddable,
 				/* Check the dates */
 				if ( $start === NULL )
 				{
-					throw new DomainException( "invalid_start_date" );
+					throw new \DomainException( "invalid_start_date" );
 				}
 
 				try
 				{
-					Date::parseTime( $start->format( 'Y-m-d H:i' ) );
+					\IPS\calendar\Date::parseTime( $start->format( 'Y-m-d H:i' ), FALSE );
 				}
-				catch( InvalidArgumentException $e )
+				catch( \InvalidArgumentException $e )
 				{
-					throw new DomainException( "invalid_start_date" );
+					throw new \DomainException( "invalid_start_date" );
 				}
 
 				if ( $end )
 				{
 					if ( $end < $start )
 					{
-						throw new DomainException( 'end_date_before_start' );
+						throw new \DomainException( 'end_date_before_start' );
 					}
 
 					try
 					{
-						Date::parseTime( $end->format( 'Y-m-d H:i' ) );
+						\IPS\calendar\Date::parseTime( $end->format( 'Y-m-d H:i' ), FALSE );
 					}
-					catch( InvalidArgumentException $e )
+					catch( \InvalidArgumentException $e )
 					{
-						throw new DomainException( "invalid_end_date" );
+						throw new \DomainException( "invalid_end_date" );
 					}
 				}
 				
@@ -1583,28 +1553,28 @@ class Event extends Item implements Embeddable,
 						case 'daily':
 							if ( $dateDiff->d > 1 )
 							{
-								throw new DomainException( "invalid_recurrence" );
+								throw new \DomainException( "invalid_recurrence" );
 							}
 							break;
 			
 						case 'weekly':
 							if ( $dateDiff->d > 7 )
 							{
-								throw new DomainException( "invalid_recurrence" );
+								throw new \DomainException( "invalid_recurrence" );
 							}
 							break;
 			
 						case 'monthly':
 							if ( $dateDiff->m > 1 )
 							{
-								throw new DomainException( "invalid_recurrence" );
+								throw new \DomainException( "invalid_recurrence" );
 							}
 							break;
 			
 						case 'yearly':
 							if ( $dateDiff->y > 1 )
 							{
-								throw new DomainException( "invalid_recurrence" );
+								throw new \DomainException( "invalid_recurrence" );
 							}
 							break;
 					}
@@ -1613,10 +1583,10 @@ class Event extends Item implements Embeddable,
 			}, NULL, NULL, 'event_dates' );
 
 		/* Init */
-		if ( !$container and !Calendar::theOnlyNode() )
+		if ( !$container and !\IPS\calendar\Calendar::theOnlyNode() )
 		{
-			$return['calendar']	= new Node( static::$formLangPrefix . 'container', Request::i()->calendar ?? NULL, TRUE, array(
-				'url'					=> Url::internal( 'app=calendar&module=calendar&controller=submit', 'front', 'calendar_submit' ),
+			$return['calendar']	= new \IPS\Helpers\Form\Node( static::$formLangPrefix . 'container', $container ? $container->id : ( isset( \IPS\Request::i()->calendar ) ? \IPS\Request::i()->calendar : NULL ), TRUE, array(
+				'url'					=> \IPS\Http\Url::internal( 'app=calendar&module=calendar&controller=submit', 'front', 'calendar_submit' ),
 				'class'					=> 'IPS\calendar\Calendar',
 				'permissionCheck'		=> 'add',
 				'togglePerm'			=> 'askrsvp',
@@ -1628,47 +1598,42 @@ class Event extends Item implements Embeddable,
 		$return = array_merge( $return, parent::formElements( $item, $container ) );
 		
 		/* If we're copying we need to re-add the auto_follow form element (if comments and reviews are disabled, then we'll just remove it again below) */
-		if ( $item !== NULL and IPS::classUsesTrait( get_called_class(), Followable::class ) and Member::loggedIn()->member_id AND $isCopy )
+		if ( $item !== NULL and \in_array( 'IPS\Content\Followable', class_implements( \get_called_class() ) ) and \IPS\Member::loggedIn()->member_id AND $isCopy )
 		{
-			array_splice( $return, -1, 0, array( 'auto_follow' => new YesNo( static::$formLangPrefix . 'auto_follow', (bool) Member::loggedIn()->auto_follow['content'], FALSE, array( 'label' => Member::loggedIn()->language()->addToStack( static::$formLangPrefix . 'auto_follow_suffix' ) ), NULL, NULL, NULL, static::$formLangPrefix . 'auto_follow' ) ) );
+			array_splice( $return, -1, 0, array( 'auto_follow' => new \IPS\Helpers\Form\YesNo( static::$formLangPrefix . 'auto_follow', (bool) \IPS\Member::loggedIn()->auto_follow['content'], FALSE, array( 'label' => \IPS\Member::loggedIn()->language()->addToStack( static::$formLangPrefix . 'auto_follow_suffix' ) ), NULL, NULL, NULL, static::$formLangPrefix . 'auto_follow' ) ) );
 		}
 
 		/* Event description */
-		$return['description']	= new Editor( 'event_content', $item?->content, TRUE, array( 'app' => 'calendar', 'key' => 'Calendar', 'autoSaveKey' => ( $item === NULL )  ? 'calendar-event' : "calendar-event-{$item->id}", 'attachIds' => ( $item === NULL ? NULL : array( $item->id, NULL, 'description' ) ) ) );
+		$return['description']	= new \IPS\Helpers\Form\Editor( 'event_content', $item ? $item->content : NULL, TRUE, array( 'app' => 'calendar', 'key' => 'Calendar', 'autoSaveKey' => ( $item === NULL )  ? 'calendar-event' : "calendar-event-{$item->id}", 'attachIds' => ( $item === NULL ? NULL : array( $item->id, NULL, 'description' ) ) ) );
 
 		/* Edit Log Fields need to be under the editor */
+		$editReason = NULL;
 		if ( isset( $return['edit_reason']) )
 		{
 			$editReason = $return['edit_reason'];
 			unset( $return['edit_reason'] );
-			if( !$isCopy )
-			{
-				$return['edit_reason'] = $editReason;
-			}
-
+			$return['edit_reason'] = $editReason;
 		}
 
+		$logEdit = NULL;
 		if ( isset( $return['log_edit']) )
 		{
 			$logEdit = $return['log_edit'];
 			unset( $return['log_edit'] );
-			if( !$isCopy )
-			{
-				$return['log_edit'] = $logEdit;
-			}
+			$return['log_edit'] = $logEdit;
 		}
 
 		/* Cover photo and location */
-		$return['header']		= new Upload( 'event_cover_photo', ( $item AND $item->cover_photo ) ? File::get( 'calendar_Events', $item->cover_photo ) : NULL, FALSE, array( 'image' => TRUE, 'allowStockPhotos' => TRUE, 'storageExtension' => 'calendar_Events', 'canBeModerated' => TRUE, 'retainDeleted' => $isCopy ) );
+		$return['header']		= new \IPS\Helpers\Form\Upload( 'event_cover_photo', ( $item AND $item->cover_photo ) ? \IPS\File::get( 'calendar_Events', $item->cover_photo ) : NULL, FALSE, array( 'image' => TRUE, 'allowStockPhotos' => TRUE, 'storageExtension' => 'calendar_Events', 'canBeModerated' => TRUE, 'retainDeleted' => $isCopy ) );
 
-		$return['event_online'] = new YesNo( 'event_online', ( $item ) ? $item->online : FALSE, FALSE, array( 'togglesOff' => array( 'venue', 'event_location' ), 'togglesOn' => array( 'event_url' ) ) );
+		$return['event_online'] = new \IPS\Helpers\Form\YesNo( 'event_online', ( $item ) ? $item->online : FALSE, FALSE, array( 'togglesOff' => array( 'venue', 'event_location' ), 'togglesOn' => array( 'event_url' ) ) );
 
-		if ( Settings::i()->calendar_venues_enabled )
+		if ( \IPS\Settings::i()->calendar_venues_enabled )
 		{
-			$roots = Venue::roots();
+			$roots = \IPS\calendar\Venue::roots();
 
-			$return['venue']	= new Node( static::$formLangPrefix . 'venue', ( $item ) ? $item->venue ?: 0 : ( isset( Request::i()->venue ) ? Request::i()->venue : ( count( $roots ) ? NULL : 0 ) ), FALSE, array(
-				'url'					=> Url::internal( 'app=calendar&module=calendar&controller=submit', 'front', 'calendar_submit' ),
+			$return['venue']	= new \IPS\Helpers\Form\Node( static::$formLangPrefix . 'venue', ( $item ) ? $item->venue ?: 0 : ( isset( \IPS\Request::i()->venue ) ? \IPS\Request::i()->venue : ( \count( $roots ) ? NULL : 0 ) ), FALSE, array(
+				'url'					=> \IPS\Http\Url::internal( 'app=calendar&module=calendar&controller=submit', 'front', 'calendar_submit' ),
 				'class'					=> 'IPS\calendar\Venue',
 				'zeroVal' 				=> 'venues_not_listed',
 				'zeroValTogglesOn' 		=> array( 'event_location', 'event_new_venue' ),
@@ -1676,33 +1641,33 @@ class Event extends Item implements Embeddable,
 			), NULL,NULL, NULL, 'venue' );
 		}
 
-		$return['location']	= new Address( 'event_location', ( $item AND $item->location ) ? GeoLocation::buildFromJson( $item->location ) : NULL, FALSE, array( 'minimize' => !( ( $item and $item->location ) ), 'requireFullAddress' => FALSE, 'preselectCountry' => FALSE ), NULL, NULL, NULL, 'event_location' );
+		$return['location']	= new \IPS\Helpers\Form\Address( 'event_location', ( $item AND $item->location ) ? \IPS\GeoLocation::buildFromJson( $item->location ) : NULL, FALSE, array( 'minimize' => ( $item AND $item->location ) ? FALSE : TRUE, 'requireFullAddress' => FALSE, 'preselectCountry' => FALSE ), NULL, NULL, NULL, 'event_location' );
 
 		$return['url']	= new \IPS\Helpers\Form\Url( 'event_url', ( $item AND $item->url ) ? $item->url : NULL, FALSE, array(), NULL, NULL, NULL, 'event_url' );
 
 		/* Save location as a new venue? */
-		if ( Settings::i()->calendar_venues_enabled and Member::loggedIn()->hasAcpRestriction( 'calendar', 'calendars', 'venues_manage' ) )
+		if ( \IPS\Settings::i()->calendar_venues_enabled and \IPS\Member::loggedIn()->hasAcpRestriction( 'calendar', 'calendars', 'venues_manage' ) )
 		{
-			$return['save_new_venue'] = new YesNo( 'event_new_venue', NULL, FALSE, array( 'togglesOn' => array( 'venue_title', 'venue_description' ) ), NULL, NULL, NULL, 'event_new_venue' );
-			$return['venue_title'] = new Translatable( 'venue_title', NULL, TRUE, array( 'app' => 'calendar', 'key' => NULL ), NULL, NULL, NULL, 'venue_title' );
-			$return['venue_description'] = new Translatable( 'venue_description', NULL, FALSE, array( 'app' => 'calendar', 'key' => NULL, 'editor' => array( 'app' => 'calendar', 'key' => 'Venue', 'autoSaveKey' => "calendar-new-venue", 'attachIds' => NULL ) ), NULL, NULL, NULL, 'venue_description' );
+			$return['save_new_venue'] = new \IPS\Helpers\Form\YesNo( 'event_new_venue', NULL, FALSE, array( 'togglesOn' => array( 'venue_title', 'venue_description' ) ), NULL, NULL, NULL, 'event_new_venue' );
+			$return['venue_title'] = new \IPS\Helpers\Form\Translatable( 'venue_title', NULL, TRUE, array( 'app' => 'calendar', 'key' => NULL ), NULL, NULL, NULL, 'venue_title' );
+			$return['venue_description'] = new \IPS\Helpers\Form\Translatable( 'venue_description', NULL, FALSE, array( 'app' => 'calendar', 'key' => NULL, 'editor' => array( 'app' => 'calendar', 'key' => 'Venue', 'autoSaveKey' => "calendar-new-venue", 'attachIds' => NULL ) ), NULL, NULL, NULL, 'venue_description' );
 		}
 
 		/* Gallery album association */
-		if ( Application::appIsEnabled( 'gallery' ) )
+		if ( \IPS\Application::appIsEnabled( 'gallery' ) )
 		{
-			$return['album']	= new Node( 'event_album', ( $item AND $item->album ) ? $item->album : NULL, FALSE, array(
-				'url'					=> Url::internal( 'app=calendar&module=calendar&controller=submit', 'front', 'calendar_submit' ),
+			$return['album']	= new \IPS\Helpers\Form\Node( 'event_album', ( $item AND $item->album ) ? $item->album : NULL, FALSE, array( 
+				'url'					=> \IPS\Http\Url::internal( 'app=calendar&module=calendar&controller=submit', 'front', 'calendar_submit' ),
 				'class'					=> 'IPS\gallery\Album',
 				'permissionCheck'		=> 'add',
 			) );
 		}
 
 		/* Event - request RSVP */
-		if ( $container and $container->can( 'askrsvp', $item ? $item->author() : Member::loggedIn() ) )
+		if ( $container and $container->can( 'askrsvp', $item ? $item->author() : \IPS\Member::loggedIn() ) )
 		{
-			$return['rsvp']			= new YesNo( 'event_rsvp', $item?->rsvp, FALSE, array( 'togglesOn' => array( 'event_rsvp_limit' ) ), NULL, NULL, NULL, 'event_rsvp' );
-			$return['rsvplimit']	= new Number( 'event_rsvp_limit', $item ? $item->rsvp_limit : -1, FALSE, array( 'unlimited' => -1 ), NULL, NULL, NULL, 'event_rsvp_limit' );
+			$return['rsvp']			= new \IPS\Helpers\Form\YesNo( 'event_rsvp', $item ? $item->rsvp : NULL, FALSE, array( 'togglesOn' => array( 'event_rsvp_limit' ) ), NULL, NULL, NULL, 'event_rsvp' );
+			$return['rsvplimit']	= new \IPS\Helpers\Form\Number( 'event_rsvp_limit', $item ? $item->rsvp_limit : -1, FALSE, array( 'unlimited' => -1 ), NULL, NULL, NULL, 'event_rsvp_limit' );
 		}
 
 		/* If the calendar does not allow comments or reviews, disable the auto follow option */
@@ -1720,10 +1685,10 @@ class Event extends Item implements Embeddable,
 	 * @param	array	$values	Values from form
 	 * @return	void
 	 */
-	protected function processBeforeCreate( array $values ): void
+	protected function processBeforeCreate( $values )
 	{
 		/* Post key is very much needed because...bacon */
-		$this->post_key		= $values['post_key'] ?? md5(mt_rand());
+		$this->post_key		= isset( $values['post_key'] ) ? $values['post_key'] : md5( mt_rand() );
 
 		parent::processBeforeCreate( $values );
 	}
@@ -1734,7 +1699,7 @@ class Event extends Item implements Embeddable,
 	 * @param	array				$values	Values from form
 	 * @return	void
 	 */
-	public function processForm( array $values ): void
+	public function processForm( $values )
 	{		
 		/* Anything but Chrome, basically, falls back to a text input and submitter might submit 22.00 instead of 22:00 */
 		if ( isset( $values['event_dates']['start_time'] ) )
@@ -1762,19 +1727,12 @@ class Event extends Item implements Embeddable,
 		/* Calendar */
 		if ( isset( $values[ static::$formLangPrefix . 'container' ] ) )
 		{
-			$this->calendar_id		= ( $values[ static::$formLangPrefix . 'container' ] instanceof Model ) ? $values[ static::$formLangPrefix . 'container' ]->_id : intval( $values[ static::$formLangPrefix . 'container' ] );
+			$this->calendar_id		= ( $values[ static::$formLangPrefix . 'container' ] instanceof \IPS\Node\Model ) ? $values[ static::$formLangPrefix . 'container' ]->_id : \intval( $values[ static::$formLangPrefix . 'container' ] );
 		}
 		
 		/* Start and end dates */
-		$this->start_date	= Date::createFromForm( $values['event_dates']['start_date'], ( ( !isset( $values['event_dates']['all_day'] ) OR !$values['event_dates']['all_day'] ) ? $values['event_dates']['start_time'] : '' ), ( isset( $values['event_dates']['all_day'] ) AND $values['event_dates']['all_day'] ) ? 'UTC' : $values['event_dates']['event_timezone'] )->format( 'Y-m-d H:i' );
+		$this->start_date	= \IPS\calendar\Date::createFromForm( $values['event_dates']['start_date'], ( ( !isset( $values['event_dates']['all_day'] ) OR !$values['event_dates']['all_day'] ) ? $values['event_dates']['start_time'] : NULL ), ( isset( $values['event_dates']['all_day'] ) AND $values['event_dates']['all_day'] ) ? 'UTC' : $values['event_dates']['event_timezone'] )->format( 'Y-m-d H:i' );
 		$this->end_date		= null;
-
-		/* If the calendar does not allow recurring events, force the settings */
-		if( $this->container()->calendar_bitoptions['bw_disable_recurring'] )
-		{
-			$values['event_dates']['repeat_end'] = 'never';
-			$values['event_dates']['event_repeat'] = 0;
-		}
 
 		/* Clear clear fields for non-selected items */
 		switch( $values['event_dates']['repeat_end'] )
@@ -1796,17 +1754,17 @@ class Event extends Item implements Embeddable,
 			{
 				if ( !isset( $values['event_dates']['all_day'] ) OR !$values['event_dates']['all_day'] OR $values['event_dates']['end_date'] != $values['event_dates']['start_date'] )
 				{
-					$this->end_date	= Date::createFromForm( $values['event_dates']['end_date'], ( ( !isset( $values['event_dates']['all_day'] ) OR !$values['event_dates']['all_day'] ) ? $values['event_dates']['end_time'] : NULL ), ( isset( $values['event_dates']['all_day'] ) AND $values['event_dates']['all_day'] ) ? 'UTC' : $values['event_dates']['event_timezone'] )->format( 'Y-m-d H:i' );
+					$this->end_date	= \IPS\calendar\Date::createFromForm( $values['event_dates']['end_date'], ( ( !isset( $values['event_dates']['all_day'] ) OR !$values['event_dates']['all_day'] ) ? $values['event_dates']['end_time'] : NULL ), ( isset( $values['event_dates']['all_day'] ) AND $values['event_dates']['all_day'] ) ? 'UTC' : $values['event_dates']['event_timezone'] )->format( 'Y-m-d H:i' );
 				}
 			}
 			elseif ( ( !isset( $values['event_dates']['all_day'] ) OR !$values['event_dates']['all_day'] ) AND isset( $values['event_dates']['end_time'] ) AND $values['event_dates']['end_time'] != $values['event_dates']['start_time'] )
 			{
-				$this->end_date	= Date::createFromForm( $values['event_dates']['start_date'], $values['event_dates']['end_time'], ( isset( $values['event_dates']['all_day'] ) AND $values['event_dates']['all_day'] ) ? 'UTC' : $values['event_dates']['event_timezone'] )->format( 'Y-m-d H:i' );
+				$this->end_date	= \IPS\calendar\Date::createFromForm( $values['event_dates']['start_date'], $values['event_dates']['end_time'], ( isset( $values['event_dates']['all_day'] ) AND $values['event_dates']['all_day'] ) ? 'UTC' : $values['event_dates']['event_timezone'] )->format( 'Y-m-d H:i' );
 			}
 		}
 		elseif ( ( !isset( $values['event_dates']['all_day'] ) OR !$values['event_dates']['all_day'] ) AND isset( $values['event_dates']['end_time'] ) AND $values['event_dates']['end_time'] != $values['event_dates']['start_time'] )
 		{
-			$this->end_date	= Date::createFromForm( $values['event_dates']['start_date'], $values['event_dates']['end_time'], ( isset( $values['event_dates']['all_day'] ) AND $values['event_dates']['all_day'] ) ? 'UTC' : $values['event_dates']['event_timezone'] )->format( 'Y-m-d H:i' );
+			$this->end_date	= \IPS\calendar\Date::createFromForm( $values['event_dates']['start_date'], $values['event_dates']['end_time'], ( isset( $values['event_dates']['all_day'] ) AND $values['event_dates']['all_day'] ) ? 'UTC' : $values['event_dates']['event_timezone'] )->format( 'Y-m-d H:i' );
 		}
 
 		/* Store time zone information */
@@ -1819,12 +1777,12 @@ class Event extends Item implements Embeddable,
 		$this->all_day		= (int) ( isset( $values['event_dates']['all_day'] ) AND $values['event_dates']['all_day'] );
 
 		/* Need to set recurring values */
-		$this->recurring	= ICSParser::buildRrule( $values['event_dates'] );
+		$this->recurring	= \IPS\calendar\Icalendar\ICSParser::buildRrule( $values['event_dates'] );
 
 		/* Store the last recurrence date, if appropriate */
 		if ( $this->recurring )
 		{
-			$recurrenceRule = ICSParser::parseRrule( $this->recurring, 'UTC', $this->_start_date );
+			$recurrenceRule = \IPS\calendar\Icalendar\ICSParser::parseRrule( $this->recurring, 'UTC', $this->_start_date );
 
 			/* Wipe out invalid "recur on" values for weekly events */
 			if ( $this->end_date AND isset( $recurrenceRule['event_repeat'] ) AND $recurrenceRule['event_repeat'] AND $recurrenceRule['event_repeat_freq'] == 'weekly' )
@@ -1833,7 +1791,7 @@ class Event extends Item implements Embeddable,
 
 				if ( $dateDiff->d > 1 )
 				{
-					foreach(Date::getDayNames() as $day )
+					foreach( \IPS\calendar\Date::getDayNames() as $day )
 					{
 						if ( isset( $recurrenceRule['repeat_freq_on_' . $day['ical'] ] ) )
 						{
@@ -1870,7 +1828,7 @@ class Event extends Item implements Embeddable,
 					break;
 				}
 
-				$period = new DatePeriod( Date::parseTime( $this->start_date, !$this->all_day ), new DateInterval( 'P' . $recurrenceRule['event_repeat_freq'] . mb_strtoupper( mb_substr( $keyword, 0, 1 ) ) ), $recurrenceRule['repeat_end_occurrences'] );
+				$period = new \DatePeriod( \IPS\calendar\Date::parseTime( $this->start_date, $this->all_day ? FALSE : TRUE ), new \DateInterval( 'P' . $recurrenceRule['event_repeat_freq'] . mb_strtoupper( mb_substr( $keyword, 0, 1 ) ) ), $recurrenceRule['repeat_end_occurrences'] );
 
 				foreach( $period as $dateOccurrence )
 				{
@@ -1892,44 +1850,31 @@ class Event extends Item implements Embeddable,
 		$this->cover_photo	= ( $values['event_cover_photo'] !== NULL ) ? (string) $values['event_cover_photo'] : NULL;
 
 		/* Set location */
-		if( $values['event_location'] instanceof GeoLocation )
-		{
-			/* Make sure we have coordinates, we need to store them later */
-			if( !$values['event_location']->lat or !$values['event_location']->long )
-			{
-				try
-				{
-					$values['event_location']->getLatLong();
-				}
-				catch( BadMethodCallException ){}
-			}
-		}
-
 		$this->location		= ( $values['event_location'] !== NULL ) ? json_encode( $values['event_location'] ) : NULL;
 
-		if ( Settings::i()->calendar_venues_enabled )
+		if ( \IPS\Settings::i()->calendar_venues_enabled )
 		{
 			$this->venue = NULL;
 
-			if ( $values['event_venue'] instanceof Venue)
+			if ( $values['event_venue'] instanceof \IPS\calendar\Venue )
 			{
 				$this->venue = $values['event_venue']->_id;
 			}
-			elseif ( Member::loggedIn()->hasAcpRestriction( 'calendar', 'calendars', 'venues_manage' ) and $values['event_new_venue'] and $values['event_location'] )
+			elseif ( \IPS\Member::loggedIn()->hasAcpRestriction( 'calendar', 'calendars', 'venues_manage' ) and $values['event_new_venue'] and $values['event_location'] )
 			{
-				$venue = new Venue;
+				$venue = new \IPS\calendar\Venue;
 				$venue->address = json_encode( $values['event_location'] );
 				$venue->save();
 				
 				/* Node titles can contain HTML, but we should prevent this from user submissions as these go right into the language DB */
 				$values['venue_title'] = array_map( 'strip_tags', $values['venue_title'] );
 				
-				Lang::saveCustom( 'calendar', 'calendar_venue_' . $venue->id, $values['venue_title'] );
-				Lang::saveCustom( 'calendar', 'calendar_venue_' . $venue->id . '_desc', $values['venue_description'] );
-				$venue->title_seo	= Friendly::seoTitle( $values['venue_title'][ Lang::defaultLanguage() ] );
+				\IPS\Lang::saveCustom( 'calendar', 'calendar_venue_' . $venue->id, $values['venue_title'] );
+				\IPS\Lang::saveCustom( 'calendar', 'calendar_venue_' . $venue->id . '_desc', $values['venue_description'] );
+				$venue->title_seo	= \IPS\Http\Url\Friendly::seoTitle( $values['venue_title'][ \IPS\Lang::defaultLanguage() ] );
 
 				/* Set the order */
-				$order = Db::i()->select( array( "MAX( `venue_position` )" ), 'calendar_venues', array() )->first();
+				$order = \IPS\Db::i()->select( array( "MAX( `venue_position` )" ), 'calendar_venues', array() )->first();
 				$venue->position = $order + 1;
 
 				$venue->save();
@@ -1941,8 +1886,15 @@ class Event extends Item implements Embeddable,
 
 		}
 
+		if ( isset( $this->venue ) or isset( $this->location ) )
+		{
+			$location = json_decode( ( isset( $this->venue ) ) ? $this->venue()->address : $this->location, true );
+			$this->latitude = $location['lat'];
+			$this->longitude = $location['long'];
+		}
+
 		$this->online = $values['event_online'];
-		$this->url = $values['event_online'] ? $values['event_url'] : null;
+		$this->url = $values['event_url'];
 
 		/* Do we know the event type */
 		if( $this->online and $values['event_url'] )
@@ -1951,7 +1903,7 @@ class Event extends Item implements Embeddable,
 
 			$services = $this->onlineEventServices();
 
-			if( array_key_exists( $domain, $services ) )
+			if( \array_key_exists( $domain, $services ) )
 			{
 				$this->online_type = $services[$domain];
 			}
@@ -1959,19 +1911,10 @@ class Event extends Item implements Embeddable,
 			{
 				$this->online_type = NULL;
 			}
-
-			$this->location = null;
-		}
-
-		if ( isset( $this->venue ) or isset( $this->location ) )
-		{
-			$location = json_decode( ( isset( $this->venue ) ) ? $this->venue()->address : $this->location, true );
-			$this->latitude = $location['lat'];
-			$this->longitude = $location['long'];
 		}
 
 		/* Gallery album association */
-		if ( Application::appIsEnabled( 'gallery' ) AND $values['event_album'] instanceof Album )
+		if ( \IPS\Application::appIsEnabled( 'gallery' ) AND $values['event_album'] instanceof \IPS\gallery\Album )
 		{
 			$this->album		= $values['event_album']->_id;
 		}
@@ -1981,8 +1924,8 @@ class Event extends Item implements Embeddable,
 		}
 
 		/* RSVP options */
-		$this->rsvp			= $values['event_rsvp'] ?? FALSE;
-		$this->rsvp_limit	= $values['event_rsvp_limit'] ?? 0;
+		$this->rsvp			= isset( $values['event_rsvp'] ) ? $values['event_rsvp'] : FALSE;
+		$this->rsvp_limit	= isset( $values['event_rsvp_limit'] ) ? $values['event_rsvp_limit'] : 0;
 
 		unset( $values['save_new_venue'] );
 		unset( $values['venue_title'] );
@@ -1991,8 +1934,8 @@ class Event extends Item implements Embeddable,
 		/* Update event reminders */
 		if ( !$this->_new )
 		{
-			$ts = Date::parseTime( $this->start_date )->getTimestamp();
-			Db::i()->update( 'calendar_event_reminders', 'reminder_date = ' . $ts . ' - ( reminder_days_before * 86400 )', array( 'reminder_event_id=?', $this->id ) );
+			$ts = \IPS\calendar\Date::parseTime( $this->start_date )->getTimestamp();
+			\IPS\Db::i()->update( 'calendar_event_reminders', 'reminder_date = ' . $ts . ' - ( reminder_days_before * 86400 )', array( 'reminder_event_id=?', $this->id ) );
 		}
 
 		/* Get the normal stuff */
@@ -2002,18 +1945,16 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Process created object AFTER the object has been created
 	 *
-	 * @param	Comment|NULL	$comment	The first comment
+	 * @param	\IPS\Content\Comment|NULL	$comment	The first comment
 	 * @param	array						$values		Values from form
 	 * @return	void
 	 */
-	protected function processAfterCreate( ?Comment $comment, array $values ): void
+	protected function processAfterCreate( $comment, $values )
 	{
 		parent::processAfterCreate( $comment, $values );
 
 		/* And claim attachments */
-		File::claimAttachments( 'calendar-event', $this->id );
-		File::claimAttachments( 'calendar-new-venue', $this->id, translatable: true );
-		
+		\IPS\File::claimAttachments( 'calendar-event', $this->id );
 
 		/* And expire widget caches so an event for today will show in the upcoming events widget properly */
 		$this->expireWidgetCaches();
@@ -2022,10 +1963,10 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Process created object AFTER the object has been edited
 	 *
-	 * @param array $values		Values from form
+	 * @param	array						$values		Values from form
 	 * @return	void
 	 */
-	public function processAfterEdit( array $values ): void
+	public function processAfterEdit( $values )
 	{
 		parent::processAfterEdit( $values );
 
@@ -2035,27 +1976,26 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Create Notification
 	 *
-	 * @param	mixed		$extra		Additional data
-	 * @param	Comment|null	$comment
-	 * @return	Notification
+	 * @param	string|NULL		$extra		Additional data
+	 * @return	\IPS\Notification
 	 */
-	public function createNotification( mixed $extra=NULL, ?Comment $comment=null ): Notification
+	protected function createNotification( $extra=NULL )
 	{
 		// New content is sent with itself as the item as we deliberately do not group notifications about new content items. Unlike comments where you're going to read them all - you might scan the notifications list for topic titles you're interested in
-		return new Notification( Application::load( 'calendar' ), 'new_content', $this, array( $this ) );
+		return new \IPS\Notification( \IPS\Application::load( 'calendar' ), 'new_content', $this, array( $this ) );
 	}
 
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		parent::delete();
 
-		Db::i()->delete( 'calendar_event_rsvp', array( 'rsvp_event_id=?', $this->id ) );
-		Db::i()->delete( 'calendar_event_reminders', array( 'reminder_event_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'calendar_event_rsvp', array( 'rsvp_event_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'calendar_event_reminders', array( 'reminder_event_id=?', $this->id ) );
 
 		/* We should not delete maps for imported events, because we do not want to reimport them */
 		//\IPS\Db::i()->delete( 'calendar_import_map', array( 'import_event_id=?', $this->id ) );
@@ -2064,81 +2004,66 @@ class Event extends Item implements Embeddable,
 	}
 
 	/**
-	 * @var string|null
-	 */
-	protected ?string $_map = null;
-
-	/**
 	 * Return the map for the event, if location is specified
 	 *
-	 * @param int $width	Width
-	 * @param int $height	Height
+	 * @param	int		$width	Width
+	 * @param	int		$height	Height
 	 * @return	string
 	 * @note	\BadMethodCallException can be thrown if the google maps integration is shut off - don't show any error if that happens.
 	 */
-	public function map( int $width, int $height ): string
+	public function map( $width, $height )
 	{
-		if( $this->_map === null )
+		/* Show venue map */
+		if ( \IPS\Settings::i()->calendar_venues_enabled )
 		{
-			/* Show venue map */
-			if ( Settings::i()->calendar_venues_enabled )
-			{
-				if ( $this->venue )
-				{
-					try
-					{
-						$this->location = Venue::load( $this->venue )->address;
-					}
-					catch( OutOfRangeException $e ){}
-				}
-			}
-
-			/* No venue? Do we have a specific event location? */
-			if ( $this->location )
+			if ( $this->venue )
 			{
 				try
 				{
-					$this->_map = GeoLocation::buildFromJson( $this->location )->map()->render( $width, $height );
+					$this->location = \IPS\calendar\Venue::load( $this->venue )->address;
 				}
-				catch( BadMethodCallException $e ){}
-			}
-
-			/* Set to an empty string so we don't run through this multiple times */
-			if( $this->_map === null )
-			{
-				$this->_map = '';
+				catch( \OutOfRangeException $e ){}
 			}
 		}
 
-		return $this->_map;
+		/* No venue? Do we have a specific event location? */
+		if ( $this->location )
+		{
+			try
+			{
+				return \IPS\GeoLocation::buildFromJson( $this->location )->map()->render( $width, $height );
+			}
+			catch( \BadMethodCallException $e ){}
+		}
+
+		return '';
 	}
 
 	/**
 	 * Retrieve events to show based on a provided start and end date, optionally filtering by a supplied calendar
 	 *
-	 * @param Date $startDate Date to start from
-	 * @param Date|null $endDate Cut off date for events. NULL accepted as a possible value only if $formatEvents is set to FALSE.
-	 * @param array|Calendar|null $calendar Calendar to filter by
-	 * @param int|null $limit Maximum number of events to return (only supported when not formatting events)
-	 * @param bool $formatEvents Whether or not to format events into a structured array
-	 * @param Member|null $member The member (NULL to use currently logged in member)
-	 * @param Venue|null $venue The venue to filter by (if provided)
-	 * @param bool $skipPermissions Skip permission checks (used by REST API to fetch all events which are filtered on later)
-	 * @param array|null $location Array of item lat and long
-	 * @param int|null $online Online events?
-	 * @param array|null $where	Additional where clause
-	 * @return ActiveRecordIterator|array
-	 * @see        \IPS\Content\_Item::getItemsWithPermission()
+	 * @param	\IPS\calendar\Date					$startDate			Date to start from
+	 * @param	\IPS\calendar\Date|NULL				$endDate			Cut off date for events. NULL accepted as a possible value only if $formatEvents is set to FALSE.
+	 * @param	\IPS\calendar\Calendar|NULL|array	$calendar			Calendar to filter by
+	 * @param	int|null							$limit				Maximum number of events to return (only supported when not formatting events)
+	 * @param	bool								$formatEvents		Whether or not to format events into a structured array
+	 * @param	\IPS\Member							$member				The member (NULL to use currently logged in member)
+	 * @param	\IPS\calendar\Venue					$venue				The venue to filter by (if provided)
+	 * @param	bool								$skipPermissions	Skip permission checks (used by REST API to fetch all events which are filtered on later)
+	 * @param	array|null							$location			Array of item lat and long
+	 * @return	\IPS\Patterns\ActiveRecordIterator
+	 * @throws	\InvalidArgumentException
+	 * @see		\IPS\Content\_Item::getItemsWithPermission()
 	 */
-	public static function retrieveEvents( Date $startDate, Date $endDate=NULL, Calendar|array $calendar=NULL, int $limit=NULL, bool $formatEvents=TRUE, Member $member=NULL, Venue $venue=NULL, bool $skipPermissions=FALSE, array $location = NULL, ?int $online = NULL, ?array $where=null ): ActiveRecordIterator|array
+	public static function retrieveEvents ( $startDate, $endDate=NULL, $calendar=NULL, $limit=NULL, $formatEvents=TRUE, $member=NULL, $venue=NULL, $skipPermissions=FALSE, $location = NULL, $online = NULL )
 	{
-		$where	= is_array( $where ) ? $where : array();
+		$where	= array();
 
 		if ( $calendar !== NULL )
 		{
-			if ( is_array( $calendar ) )
+			if ( \is_array( $calendar ) )
 			{
-				$where[] = array( Db::i()->in( 'event_calendar_id', $calendar ) );
+				$where[] = array( \IPS\Db::i()->in( 'event_calendar_id', $calendar ) );
 			}
 			
 			else
@@ -2154,12 +2079,12 @@ class Event extends Item implements Embeddable,
 
 		if ( $endDate === NULL AND $formatEvents === TRUE )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 
 		if( $online !== NULL )
 		{
-			$where[] = array( '( event_online = ? )', $online );
+			$where[] = array( '( event_online = ? )', (int) $online );
 		}
 
 		if( $location )
@@ -2170,20 +2095,20 @@ class Event extends Item implements Embeddable,
 		/* Load member */
 		if ( $member === NULL AND $skipPermissions === FALSE )
 		{
-			$member = Member::loggedIn();
+			$member = \IPS\Member::loggedIn();
 		}
 
 		/* Get timezone adjusted versions of start/end time */
-		$startDateTimezone	= Date::parseTime( $startDate->mysqlDatetime(), TRUE );
-		$endDateTimezone	= ( $endDate !== NULL ) ? Date::parseTime( $endDate->mysqlDatetime() ) : NULL;
+		$startDateTimezone	= \IPS\calendar\Date::parseTime( $startDate->mysqlDatetime(), TRUE );
+		$endDateTimezone	= ( $endDate !== NULL ) ? \IPS\calendar\Date::parseTime( $endDate->mysqlDatetime() ) : NULL;
 
 		if ( $member->timezone )
 		{
-			$startDateTimezone->setTimezone( new DateTimeZone( 'UTC' ) );
+			$startDateTimezone->setTimezone( new \DateTimeZone( 'UTC' ) );
 
 			if ( $endDateTimezone !== NULL )
 			{
-				$endDateTimezone->setTimezone( new DateTimeZone( 'UTC' ) );
+				$endDateTimezone->setTimezone( new \DateTimeZone( 'UTC' ) );
 			}
 		}
 
@@ -2256,7 +2181,7 @@ class Event extends Item implements Embeddable,
 		}
 
 		/* Get the non-recurring events */
-		$events	= Event::getItemsWithPermission( array_merge( $where, $nonRecurring ), 'event_start_date ASC', NULL, ( $skipPermissions === TRUE ) ? NULL : 'view', ( $skipPermissions === TRUE ) ? Filter::FILTER_SHOW_HIDDEN : Filter::FILTER_AUTOMATIC, 0, $member, FALSE, FALSE, FALSE,FALSE, NULL, FALSE, TRUE, TRUE, TRUE, FALSE, $location );
+		$events	= \IPS\calendar\Event::getItemsWithPermission( array_merge( $where, $nonRecurring ), 'event_start_date ASC', NULL, ( $skipPermissions === TRUE ) ? NULL : 'view', ( $skipPermissions === TRUE ) ? \IPS\Content\Hideable::FILTER_SHOW_HIDDEN : \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, $member, FALSE, FALSE, FALSE,FALSE, NULL, FALSE, TRUE, TRUE, TRUE, FALSE, $location );
 		/* We need to make sure ranged events repeat each day that they occur on */
 		$formattedEvents	= array();
 
@@ -2287,61 +2212,56 @@ class Event extends Item implements Embeddable,
 			$formattedEvents	= iterator_to_array( $events );
 		}
 
-		/* Now get the recurring events....
-		If we only have one calendar, and it does not allow recurring events, we can skip this extra query */
-		if( !( $calendar instanceof Calendar ) or !$calendar->calendar_bitoptions['bw_disable_recurring'] )
+		/* Now get the recurring events.... */
+		$recurringEvents	= \IPS\calendar\Event::getItemsWithPermission( array_merge( $where, array( array( "event_recurring IS NOT NULL AND (event_recurring_end_date IS NULL OR DATE(event_recurring_end_date) >= '{$startDate->mysqlDatetime( FALSE )}')" ) ) ), 'event_start_date ASC', NULL, ( $skipPermissions === TRUE ) ? NULL : 'view', ( $skipPermissions === TRUE ) ? \IPS\Content\Hideable::FILTER_SHOW_HIDDEN : \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, $member, FALSE, FALSE, FALSE,FALSE, NULL, FALSE, TRUE, TRUE, TRUE, FALSE, $location );
+
+		/* Loop over any results */
+		foreach( $recurringEvents as $event )
 		{
-			$recurringEvents	= Event::getItemsWithPermission( array_merge( $where, array( array( "event_recurring IS NOT NULL AND (event_recurring_end_date IS NULL OR DATE(event_recurring_end_date) >= '{$startDate->mysqlDatetime( FALSE )}')" ) ) ), 'event_start_date ASC', NULL, ( $skipPermissions === TRUE ) ? NULL : 'view', ( $skipPermissions === TRUE ) ? Filter::FILTER_SHOW_HIDDEN : Filter::FILTER_AUTOMATIC, 0, $member, FALSE, FALSE, FALSE,FALSE, NULL, FALSE, TRUE, TRUE, TRUE, FALSE, $location );
+			/* Find occurrences within our date range (if any) */
+			$thisEndDate	= ( $endDate ? $endDate->setTime( 23, 59, 59 ) : $startDate->adjust( "+2 years" ) )->setTime( 23, 59, 59 );
+			$thisEndDate	= ( clone $thisEndDate )->adjust( "+1 day" );
+			$occurrences	= $event->findOccurrences( $startDate, $thisEndDate );
 
-			/* Loop over any results */
-			foreach( $recurringEvents as $event )
+			/* Do we have any? */
+			if ( \count( $occurrences ) )
 			{
-				/* @var Event $event */
-				/* Find occurrences within our date range (if any) */
-				$thisEndDate	= ( $endDate ? $endDate->setTime( 23, 59, 59 ) : $startDate->adjust( "+2 years" ) )->setTime( 23, 59, 59 );
-				$thisEndDate	= ( clone $thisEndDate )->adjust( "+1 day" );
-				$occurrences	= $event->findOccurrences( $startDate, $thisEndDate );
-
-				/* Do we have any? */
-				if ( count( $occurrences ) )
+				/* Are we formatting events? If so, place into the array as appropriate. */
+				if ( $formatEvents )
 				{
-					/* Are we formatting events? If so, place into the array as appropriate. */
-					if ( $formatEvents )
+					foreach( $occurrences as $occurrence )
 					{
-						foreach( $occurrences as $occurrence )
+						/* Is this a ranged repeating event? */
+						if ( $occurrence['endDate'] !== NULL )
 						{
-							/* Is this a ranged repeating event? */
-							if ( $occurrence['endDate'] !== NULL )
+							$date	= $occurrence['startDate'];
+							$eDate	= ( $thisEndDate->mysqlDatetime( FALSE ) < $occurrence['endDate']->mysqlDatetime( FALSE ) ) ? $thisEndDate : $occurrence['endDate'];
+
+							if ( $date->mysqlDatetime( FALSE ) < $eDate->mysqlDatetime( FALSE ) )
 							{
-								$date	= $occurrence['startDate'];
-								$eDate	= ( $thisEndDate->mysqlDatetime( FALSE ) < $occurrence['endDate']->mysqlDatetime( FALSE ) ) ? $thisEndDate : $occurrence['endDate'];
-
-								if ( $date->mysqlDatetime( FALSE ) < $eDate->mysqlDatetime( FALSE ) )
+								while( $date->mysqlDatetime( FALSE ) < $eDate->mysqlDatetime( FALSE ) )
 								{
-									while( $date->mysqlDatetime( FALSE ) < $eDate->mysqlDatetime( FALSE ) )
-									{
-										$formattedEvents[ $date->mysqlDatetime( FALSE ) ]['ranged'][ $event->id ]	= $event;
-										$date	= $date->adjust( '+1 day' );
-									}
+									$formattedEvents[ $date->mysqlDatetime( FALSE ) ]['ranged'][ $event->id ]	= $event;
+									$date	= $date->adjust( '+1 day' );
+								}
 
-									$formattedEvents[ $eDate->mysqlDatetime( FALSE ) ]['ranged'][ $event->id ]	= $event;
-								}
-								else
-								{
-									$formattedEvents[ $date->mysqlDatetime( FALSE ) ]['single'][ $event->id ]	= $event;
-								}
+								$formattedEvents[ $eDate->mysqlDatetime( FALSE ) ]['ranged'][ $event->id ]	= $event;
 							}
 							else
 							{
-								$formattedEvents[ $occurrence['startDate']->mysqlDatetime( FALSE ) ]['single'][ $event->id ]	= $event;
+								$formattedEvents[ $date->mysqlDatetime( FALSE ) ]['single'][ $event->id ]	= $event;
 							}
 						}
+						else
+						{
+							$formattedEvents[ $occurrence['startDate']->mysqlDatetime( FALSE ) ]['single'][ $event->id ]	= $event;
+						}
 					}
-					/* Otherwise we only want one instance of the event in our final array */
-					else
-					{
-						$formattedEvents[]	= $event;
-					}
+				}
+				/* Otherwise we only want one instance of the event in our final array */
+				else
+				{
+					$formattedEvents[]	= $event;
 				}
 			}
 		}
@@ -2373,7 +2293,7 @@ class Event extends Item implements Embeddable,
 			/* Limiting? */
 			if ( $limit !== NULL )
 			{
-				$formattedEvents	= array_slice( $formattedEvents, 0, $limit, TRUE );
+				$formattedEvents	= \array_slice( $formattedEvents, 0, $limit, TRUE );
 			}
 		}
 		/* Resort formatted events by time */
@@ -2415,15 +2335,14 @@ class Event extends Item implements Embeddable,
 	 * @note	Recurring events that never end will always return FALSE
 	 * @return	bool
 	 */
-	public function hasPassed(): bool
+	public function hasPassed()
 	{
 		// Get the end date. If none is available use the start date plus an hour so that online event join links show for a short while after the start
 		$lastOccurrence = $this->lastOccurrence( 'endDate' ) ?? $this->lastOccurrence( 'startDate' );
-		$intervalToTest = $this->all_day ? "P1D" : "PT1H";
 
 		$lastOccurrenceClone = clone $lastOccurrence;
-		$lastOccurrenceClone = $lastOccurrenceClone->add( new DateInterval( $intervalToTest ) );
-		if ( $lastOccurrenceClone < DateTime::ts( time() ) )
+		$lastOccurrenceClone = $lastOccurrenceClone->add( new \DateInterval("PT1H") );
+		if ( $lastOccurrenceClone < \IPS\DateTime::ts( time() ) )
 		{
 			return true;
 		}
@@ -2434,12 +2353,12 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Cover Photo
 	 *
-	 * @return	mixed
+	 * @return	\IPS\Helpers\CoverPhoto
 	 */
-	public function coverPhoto(): mixed
+	public function coverPhoto()
 	{
 		$photo = parent::coverPhoto();
-		$photo->overlay = Theme::i()->getTemplate('view', 'calendar', 'front')->coverPhotoOverlay($this);
+		$photo->overlay = \IPS\Theme::i()->getTemplate('view', 'calendar', 'front')->coverPhotoOverlay($this);
 		return $photo;
 	}
 
@@ -2447,13 +2366,13 @@ class Event extends Item implements Embeddable,
 	 * Get HTML for search result display
 	 *
 	 * @param	string|NULL	$ref	Referrer
-	 * @param Calendar $container	Container
+	 * @param	\IPS\calendar\Calendar	$container	Container
 	 * @param	string		$title	Title
-	 * @return	mixed
+	 * @return	callable
 	 */
-	public function approvalQueueHtml( ?string $ref, Calendar $container, string $title ): mixed
+	public function approvalQueueHtml( $ref, $container, $title )
 	{
-		return Theme::i()->getTemplate( 'modcp', 'calendar', 'front' )->approvalQueueItem( $this, $ref, $container, $title );
+		return \IPS\Theme::i()->getTemplate( 'modcp', 'calendar', 'front' )->approvalQueueItem( $this, $ref, $container, $title );
 	}
 	
 	/**
@@ -2461,13 +2380,15 @@ class Event extends Item implements Embeddable,
 	 *
 	 * @return	string
 	 */
-	public function eventBlurb(): string
+	public function eventBlurb()
 	{
+		$startDate = NULL;
+		$endDate = NULL;
 		$startTime = NULL;
 		$endTime = NULL;
 		
 		/* Start date */
-		if ( $startDate = $this->nextOccurrence( Date::getDate(), 'startDate' ) )
+		if ( $startDate = $this->nextOccurrence( \IPS\calendar\Date::getDate(), 'startDate' ) )
 		{
 			$endDate = $this->nextOccurrence( $startDate, 'endDate' );
 		}
@@ -2488,10 +2409,10 @@ class Event extends Item implements Embeddable,
 		}
 		
 		/* Put all that together */
-		$startDate = $startTime ? Member::loggedIn()->language()->addToStack( 'blurb_date_with_time', FALSE, array( 'sprintf' => array( $startDate->calendarDate(), $startTime ) ) ) : $startDate->calendarDate();
-		$endDate = $endDate ? ( $endTime ? Member::loggedIn()->language()->addToStack( 'blurb_date_with_time', FALSE, array( 'sprintf' => array( $endDate->calendarDate(), $endTime ) ) ) : $endDate->calendarDate() ) : NULL;
+		$startDate = $startTime ? \IPS\Member::loggedIn()->language()->addToStack( 'blurb_date_with_time', FALSE, array( 'sprintf' => array( $startDate->calendarDate(), $startTime ) ) ) : $startDate->calendarDate();
+		$endDate = $endDate ? ( $endTime ? \IPS\Member::loggedIn()->language()->addToStack( 'blurb_date_with_time', FALSE, array( 'sprintf' => array( $endDate->calendarDate(), $endTime ) ) ) : $endDate->calendarDate() ) : NULL;
 		$calendar = "<a href='{$this->container()->url()}'>{$this->container()->_title}</a>";
-		return $endDate ? Member::loggedIn()->language()->addToStack( 'blurb_start_and_end', FALSE, array( 'htmlsprintf' => array( $startDate, $endDate, $calendar ) ) ) : Member::loggedIn()->language()->addToStack( 'blurb_start_only', FALSE, array( 'htmlsprintf' => array( $startDate, $calendar ) ) );
+		return $endDate ? \IPS\Member::loggedIn()->language()->addToStack( 'blurb_start_and_end', FALSE, array( 'htmlsprintf' => array( $startDate, $endDate, $calendar ) ) ) : \IPS\Member::loggedIn()->language()->addToStack( 'blurb_start_only', FALSE, array( 'htmlsprintf' => array( $startDate, $calendar ) ) );
 	}
 	
 	/* !Embeddable */
@@ -2502,17 +2423,50 @@ class Event extends Item implements Embeddable,
 	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'calendar', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'calendar' )->embedEvent( $this, $this->url()->setQueryString( $params ), $this->embedImage() );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'calendar', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'calendar' )->embedEvent( $this, $this->url()->setQueryString( $params ), $this->embedImage() );
+	}
+	
+	/**
+	 * Get snippet HTML for search result display
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$authorData		Basic data about the author. Only includes columns returned by \IPS\Member::columnsForPhoto()
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	array		$reputationData	Array of people who have given reputation and the reputation they gave
+	 * @param	int|NULL	$reviewRating	If this is a review, the rating
+	 * @param	string		$view			'expanded' or 'condensed'
+	 * @return	callable
+	 */
+	public static function searchResultSnippet( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating, $view )
+	{
+		$startDate = \IPS\calendar\Date::parseTime( $itemData['event_start_date'], $itemData['event_all_day'] ? FALSE : TRUE );
+		$endDate = $itemData['event_end_date'] ? \IPS\calendar\Date::parseTime( $itemData['event_end_date'], $itemData['event_all_day'] ? FALSE : TRUE ) : NULL;
+		$nextOccurance = $startDate;
+		if ( $itemData['event_recurring'] )
+		{
+			$occurances = \IPS\calendar\Event::_findOccurances( $startDate, $endDate, $startDate->adjust( "-1 month" ), $startDate->adjust( "+2 years" ), \IPS\calendar\Icalendar\ICSParser::parseRrule( $itemData['event_recurring'] ), NULL, $itemData['event_all_day'] );
+			foreach( $occurances as $occurrence )
+			{
+				if ( $occurrence['startDate'] AND $occurrence['startDate']->mysqlDatetime( FALSE ) >= $startDate->mysqlDatetime( FALSE ) )
+				{
+					$nextOccurance = $occurrence['startDate'];
+					break;
+				}
+			}
+		}
+		
+		return \IPS\Theme::i()->getTemplate( 'global', 'calendar', 'front' )->searchResultEventSnippet( $indexData, $itemData, $nextOccurance, $startDate, $endDate, $itemData['event_all_day'], $view == 'condensed' );
 	}
 	
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @return    array
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @return	array
 	 * @apiresponse	int						id				ID number
 	 * @apiresponse	string					title			Title
 	 * @apiresponse	\IPS\calendar\Calendar	calendar		Calendar
@@ -2536,7 +2490,7 @@ class Event extends Item implements Embeddable,
 	 * @apiresponse	bool					featured		Event is featured
 	 * @apiresponse	string					url				URL
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'id'			=> $this->id,
@@ -2550,14 +2504,14 @@ class Event extends Item implements Embeddable,
 			'location'		=> $this->_location ? $this->_location->apiOutput( $authorizedMember ) : NULL,
 			'venue'			=> $this->venue() ? $this->venue()->apiOutput( $authorizedMember ) : NULL,
 			'author'		=> $this->author()->apiOutput( $authorizedMember ),
-			'postedDate'	=> DateTime::ts( $this->saved )->rfc3339(),
-			'description'	=> $this->content(),
+			'postedDate'	=> \IPS\DateTime::ts( $this->saved )->rfc3339(),
+			'description'	=> \IPS\Text\Parser::removeLazyLoad( $this->content() ),
 			'comments'		=> $this->comments,
 			'reviews'		=> $this->reviews,
 			'views'			=> $this->views,
 			'prefix'		=> $this->prefix(),
 			'tags'			=> $this->tags(),
-			'locked'		=> $this->locked(),
+			'locked'		=> (bool) $this->locked(),
 			'hidden'		=> (bool) $this->hidden(),
 			'featured'		=> (bool) $this->mapped('featured'),
 			'url'			=> (string) $this->url(),
@@ -2565,26 +2519,60 @@ class Event extends Item implements Embeddable,
 	}
 
 	/**
-	 * Check if a specific action is available for this Content.
-	 * Default to TRUE, but used for overrides in individual Item/Comment classes.
+	 * Can edit?
 	 *
-	 * @param string $action
-	 * @param Member|null	$member
-	 * @return bool
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @return	bool
 	 */
-	public function actionEnabled( string $action, ?Member $member=null ) : bool
+	public function canEdit( $member=NULL )
 	{
-		/* Check if past events can be edited */
-		if ( $action == 'edit' and $this->hasPassed() and Settings::i()->calendar_block_past_changes )
+		$member = $member ?: \IPS\Member::loggedIn();
+
+		/* If we normally can edit... */
+		if ( $canNormallyEdit = parent::canEdit( $member ) )
 		{
-			if ( static::modPermission( 'edit', $member, $this->containerWrapper() ) )
+			/* Verify the event is either not past, or we can edit past events */
+			if ( !$this->hasPassed() OR !\IPS\Settings::i()->calendar_block_past_changes )
 			{
-				return true;
+				return $canNormallyEdit;
 			}
-			return false;
+			elseif ( static::modPermission( 'edit', $member, $this->containerWrapper() ) )
+			{
+				return $canNormallyEdit;
+			}
+			else
+			{
+				return FALSE;
+			}
 		}
 
-		return parent::actionEnabled( $action, $member );
+		return FALSE;
+	}
+
+	/**
+	 * Can comment?
+	 *
+	 * @param	\IPS\Member\NULL	$member							The member (NULL for currently logged in member)
+	 * @param	bool				$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @return	bool
+	 */
+	public function canComment( $member=NULL, $considerPostBeforeRegistering = TRUE )
+	{
+		$member = $member ?: \IPS\Member::loggedIn();
+		return parent::canComment( $member, $considerPostBeforeRegistering ) and $this->container()->allow_comments;
+	}
+
+	/**
+	 * Can review?
+	 *
+	 * @param	\IPS\Member\NULL	$member							The member (NULL for currently logged in member)
+	 * @param	bool				$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @return	bool
+	 */
+	public function canReview( $member=NULL, $considerPostBeforeRegistering = TRUE )
+	{
+		$member = $member ?: \IPS\Member::loggedIn();
+		return parent::canReview( $member, $considerPostBeforeRegistering ) and $this->container()->allow_reviews;
 	}
 	
 	/**
@@ -2592,7 +2580,7 @@ class Event extends Item implements Embeddable,
 	 *
 	 * @return	string
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		return 'event_id';
 	}
@@ -2602,52 +2590,57 @@ class Event extends Item implements Embeddable,
 	 *
 	 * @return	bool
 	 */
-	public function canRemind(): bool
+	public function canRemind()
 	{
 		/* Does the event happen more than 1 day into the future? */
-		return ( ( $this->_start_date->getTimestamp() - 86400 ) > time() );
+		return (bool) ( ( $this->_start_date->getTimestamp() - 86400 ) > time() );
+	}
+
+	/* !Tags */
+
+	/**
+	 * Can tag?
+	 *
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	bool
+	 */
+	public static function canTag( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
+	{
+		return parent::canTag( $member, $container ) and ( $container === NULL or !$container->calendar_bitoptions['bw_disable_tagging'] );
 	}
 
 	/**
-	 * Return the existing reminder, if the member has one set
+	 * Can use prefixes?
 	 *
-	 * @param Member|null $member
-	 * @return array|null
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	bool
 	 */
-	public function getReminder( ?Member $member=null ) : ?array
+	public static function canPrefix( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
-		if( $member->member_id )
-		{
-			try
-			{
-				return Db::i()->select( '*', 'calendar_event_reminders', array( 'reminder_event_id=? and reminder_member_id=?', $this->id, (int) $member->member_id ) )->first();
-			}
-			catch( UnderflowException ){}
-		}
-
-		return null;
+		return parent::canPrefix( $member, $container ) and ( $container === NULL or !$container->calendar_bitoptions['bw_disable_prefixes'] );
 	}
 
 	/**
 	 * Venue
 	 *
-	 * @return	NULL|Venue
+	 * @return	NULL|\IPS\calendar\Venue
 	 */
-	public function venue(): ?Venue
+	public function venue()
 	{
-		if ( Settings::i()->calendar_venues_enabled and $this->venue )
+		if ( \IPS\Settings::i()->calendar_venues_enabled and $this->venue )
 		{
 			try
 			{
 				if ( !$this->venueObject )
 				{
-					$this->venueObject = Venue::load( $this->venue );
+					$this->venueObject = \IPS\calendar\Venue::load( $this->venue );
 				}
 
 				return $this->venueObject;
 			}
-			catch( OutOfRangeException $e ){}
+			catch( \OutOfRangeException $e ){}
 		}
 
 		return NULL;
@@ -2658,7 +2651,7 @@ class Event extends Item implements Embeddable,
 	 *
 	 * @return	array
 	 */
-	public static function supportedMetaDataTypes(): array
+	public static function supportedMetaDataTypes()
 	{
 		return array( 'core_FeaturedComments', 'core_ContentMessages' );
 	}
@@ -2666,19 +2659,19 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Get the real location, this method takes also the venue into account
 	 *
-	 * @return GeoLocation|bool|null
+	 * @return NULL|\IPS\GeoLocation
 	 */
-	public function get__location(): GeoLocation|bool|null
+	public function get__location()
 	{
 		if ( $this->locationData === NULL )
 		{
 			if ( $this->venue() )
 			{
-				$this->locationData = GeoLocation::buildFromjson( $this->venue()->address );
+				$this->locationData = \IPS\GeoLocation::buildFromjson( $this->venue()->address );
 			}
 			elseif ( $this->location )
 			{
-				$this->locationData = GeoLocation::buildFromjson( $this->location );
+				$this->locationData = \IPS\GeoLocation::buildFromjson( $this->location );
 			}
 			else
 			{
@@ -2695,9 +2688,9 @@ class Event extends Item implements Embeddable,
 	 * @param	int|null	$limit				Number of attachments to fetch, or NULL for all
 	 * @param	bool		$ignorePermissions	If set to TRUE, permission to view the images will not be checked
 	 * @return	array|NULL
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function contentImages( int $limit = NULL, bool $ignorePermissions = FALSE ): array|null
+	public function contentImages( $limit = NULL, $ignorePermissions = FALSE )
 	{
 		$attachments = parent::contentImages( $limit, $ignorePermissions ) ?: array();
 
@@ -2707,7 +2700,7 @@ class Event extends Item implements Embeddable,
 			$attachments[] = array( 'calendar_Events' => $this->cover_photo );
 		}
 
-		return count( $attachments ) ? array_slice( $attachments, 0, $limit ) : NULL;
+		return \count( $attachments ) ? \array_slice( $attachments, 0, $limit ) : NULL;
 	}
 
 	/**
@@ -2715,9 +2708,9 @@ class Event extends Item implements Embeddable,
 	 *
 	 * @return	array
 	 */
-	protected static function onlineEventServices(): array
+	protected static function onlineEventServices()
 	{
-		return array(
+		$services = array(
 			'eventbrite.com' 		=> 'eventbrite',
 			'on24.com' 				=> 'on24',
 			'zoom.com' 				=> 'zoom',
@@ -2734,6 +2727,8 @@ class Event extends Item implements Embeddable,
 			'vimeo.com'				=> 'vimeo',
 			'spotme.com'			=> 'spotme',
 		);
+
+		return $services;
 	}
 
 	/**
@@ -2741,21 +2736,21 @@ class Event extends Item implements Embeddable,
 	 *
 	 * @return	string|bool
 	 */
-	public function get__happening(): bool|string
+	public function get__happening()
 	{
 		if( !$this->happeningData )
 		{
-			$now = Date::getDate();
+			$now = \IPS\calendar\Date::ts( time() );
 
 			/* Non recurring and events with end date*/
 			if( !$this->recurring and $this->_start_date and $this->_end_date and ( ( $now > $this->_start_date ) and $now < $this->_end_date ) )
 			{
-				$this->happeningData = Member::loggedIn()->language()->get( 'event_happening_now' );
+				$this->happeningData = \IPS\Member::loggedIn()->language()->get( 'event_happening_now' );
 			}
 			/* recurring/no end date */
 			elseif( $this->nextOccurrence( $now ) and $now->format('Y-m-d') == $this->nextOccurrence( $now )->format('Y-m-d') )
 			{
-				$this->happeningData = Member::loggedIn()->language()->get( 'event_happening_today' );
+				$this->happeningData = \IPS\Member::loggedIn()->language()->get( 'event_happening_today' );
 			}
 			else
 			{
@@ -2769,52 +2764,12 @@ class Event extends Item implements Embeddable,
 	/**
 	 * Can the member copy the calendar event?
 	 * 
-	 * @param Member|null $member
+	 * @param \IPS\Member|NULL $member
 	 * @return bool
 	 */
-	public function canCopyEvent( Member $member = NULL ): bool
+	public function canCopyEvent( \IPS\Member $member = NULL ): bool
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		return $this->author()->member_id == $member->member_id and $this->container()->can( 'add', $member );
 	}
-
-	public static string $itemMenuCss = '';
-
-    /**
-     * Allow for individual classes to override and
-     * specify a primary image. Used for grid views, etc.
-     *
-     * @return File|null
-     */
-    public function primaryImage() : ?File
-    {
-        /* Cover photo first */
-        if( $coverPhoto = parent::primaryImage() )
-        {
-            return $coverPhoto;
-        }
-
-        /* Any images in the description? */
-        if( $contentImage = $this->contentImages(1) )
-        {
-            $attachType = key( $contentImage[0] );
-            try
-            {
-                return File::get( $attachType, $contentImage[0][ $attachType ] );
-            }
-            catch( Exception ){}
-        }
-
-        /* Do we have a linked album? */
-        if( $this->album and Application::appIsEnabled( 'gallery' ) )
-        {
-            try
-            {
-                return Album::load( $this->album )->primaryImage();
-            }
-            catch( OutOfRangeException ){}
-        }
-
-        return null;
-    }
 }

@@ -12,42 +12,32 @@
 namespace IPS\nexus\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\nexus\Customer;
-use OutOfRangeException;
-use function defined;
-use const IPS\REBUILD_QUICK;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class RecountTotalSpend extends QueueAbstract
+class _RecountTotalSpend
 {
 
 	/**
 	 * @brief	Number of records to process per cycle
 	 */
-	public int $perCycle = REBUILD_QUICK;
+	public $perCycle = \IPS\REBUILD_QUICK;
 
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
-		$data['count'] = (int) Db::i()->select( 'count(*)', 'nexus_customers' )->first();
+		$data['count'] = (int) \IPS\Db::i()->select( 'count(*)', 'nexus_customers' )->first();
 
 		if( $data['count'] == 0 )
 		{
@@ -67,22 +57,22 @@ class RecountTotalSpend extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$last	= null;
 
 		/* Loop over members to fix them */
-		foreach( Db::i()->select( '*', 'nexus_customers', array( 'member_id > ?', $offset ), 'member_id ASC', array( 0, $this->perCycle ) ) as $customer )
+		foreach( \IPS\Db::i()->select( '*', 'nexus_customers', array( 'member_id > ?', $offset ), 'member_id ASC', array( 0, $this->perCycle ) ) as $customer )
 		{
 			$last = $customer['member_id'];
 			$data['completed']++;
 
 			try
 			{
-				$customer = Customer::load( $customer['member_id'] );
+				$customer = \IPS\nexus\Customer::load( $customer['member_id'] );
 				$customer->recountTotalSpend();
 			}
-			catch( Exception ) { }
+			catch( \Exception $ex ) { }
 		}
 
 		if( $last === NULL )
@@ -99,10 +89,10 @@ class RecountTotalSpend extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' => Member::loggedIn()->language()->addToStack( 'recounting_total_spend' ), 'complete' => $data['count'] ? ( round(  100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'recounting_total_spend' ), 'complete' => $data['count'] ? ( round(  100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
 	}
 }

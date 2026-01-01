@@ -11,35 +11,26 @@
 namespace IPS\core\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: Login Methods
  */
-class Login extends FileStorageAbstract
+class _Login
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
 		$count = 0;
-		foreach ( Db::i()->select( '*', 'core_login_methods' ) as $method )
+		foreach ( \IPS\Db::i()->select( '*', 'core_login_methods' ) as $method )
 		{
 			$settings = json_decode( $method['login_settings'], TRUE );
 			if ( isset( $settings['button_icon'] ) and $settings['button_icon'] )
@@ -60,22 +51,22 @@ class Login extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	UnderflowException					When file record doesn't exist. Indicating there are no more files to move
-	 * @return	void							An offset integer to use on the next cycle, or nothing
+	 * @throws	\UnderflowException					When file record doesn't exist. Indicating there are no more files to move
+	 * @return	void|int							An offset integer to use on the next cycle, or nothing
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-		foreach ( Db::i()->select( '*', 'core_login_methods' ) as $method )
+		foreach ( \IPS\Db::i()->select( '*', 'core_login_methods' ) as $method )
 		{
 			$settings = json_decode( $method['login_settings'], TRUE );
 			if ( isset( $settings['button_icon'] ) and $settings['button_icon'] )
 			{
 				try
 				{
-					$settings['button_icon'] = (string) File::get( $oldConfiguration ?: 'core_Login', $settings['button_icon'] )->move( $storageConfiguration );
-					Db::i()->update( 'core_login_methods', array( 'login_settings' => json_encode( $settings ) ), array( 'login_id=?', $method['login_id'] ) );
+					$settings['button_icon'] = (string) \IPS\File::get( $oldConfiguration ?: 'core_Login', $settings['button_icon'] )->move( $storageConfiguration );
+					\IPS\Db::i()->update( 'core_login_methods', array( 'login_settings' => json_encode( $settings ) ), array( 'login_id=?', $method['login_id'] ) );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					/* Any issues are logged */
 				}
@@ -85,28 +76,28 @@ class Login extends FileStorageAbstract
 			{
 				try
 				{
-					$settings['apple_key'] = (string) File::get( $oldConfiguration ?: 'core_Login', $settings['apple_key'] )->move( $storageConfiguration );
-					Db::i()->update( 'core_login_methods', array( 'login_settings' => json_encode( $settings ) ), array( 'login_id=?', $method['login_id'] ) );
+					$settings['apple_key'] = (string) \IPS\File::get( $oldConfiguration ?: 'core_Login', $settings['apple_key'] )->move( $storageConfiguration );
+					\IPS\Db::i()->update( 'core_login_methods', array( 'login_settings' => json_encode( $settings ) ), array( 'login_id=?', $method['login_id'] ) );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					/* Any issues are logged */
 				}
 			}
 		}
-		unset( Store::i()->loginMethods );
-		throw new UnderflowException;
+		unset( \IPS\Data\Store::i()->loginMethods );
+		throw new \UnderflowException;
 	}
 
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
-		foreach ( Db::i()->select( '*', 'core_login_methods' ) as $method )
+		foreach ( \IPS\Db::i()->select( '*', 'core_login_methods' ) as $method )
 		{
 			$settings = json_decode( $method['login_settings'], TRUE );
 			if ( isset( $settings['button_icon'] ) and $settings['button_icon'] == (string) $file )
@@ -128,18 +119,18 @@ class Login extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		foreach ( Db::i()->select( '*', 'core_login_methods' ) as $method )
+		foreach ( \IPS\Db::i()->select( '*', 'core_login_methods' ) as $method )
 		{
 			$settings = json_decode( $method['login_settings'], TRUE );
 			if ( !empty( $settings['button_icon'] ) )
 			{
-				File::get( 'core_Login', $settings['button_icon'] )->delete();
+				\IPS\File::get( 'core_Login', $settings['button_icon'] )->delete();
 			}
 			if ( !empty( $settings['apple_key'] ) )
 			{
-				File::get( 'core_Login', $settings['apple_key'] )->delete();
+				\IPS\File::get( 'core_Login', $settings['apple_key'] )->delete();
 			}
 		}
 	}

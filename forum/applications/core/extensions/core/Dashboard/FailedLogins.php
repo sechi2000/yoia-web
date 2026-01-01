@@ -11,32 +11,25 @@
 namespace IPS\core\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\DashboardAbstract;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Dashboard extension: Failed Admin Logins
  */
-class FailedLogins extends DashboardAbstract
+class _FailedLogins
 {
 	/**
 	* Can the current user view this dashboard item?
 	*
 	* @return	bool
 	*/
-	public function canView(): bool
+	public function canView()
 	{
-		return Member::loggedIn()->hasAcpRestriction( 'core' , 'settings', 'login_manage' );
+		return \IPS\Member::loggedIn()->hasAcpRestriction( 'core' , 'settings', 'login_manage' );
 
 	}
 
@@ -45,9 +38,9 @@ class FailedLogins extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
-		$logins = Db::i()->select(
+		$logins = \IPS\Db::i()->select(
 			array( 'admin_id', 'admin_ip_address', 'admin_username', 'admin_time' ),
 			'core_admin_login_logs',
 			array( 'admin_success=?', FALSE ),
@@ -55,6 +48,6 @@ class FailedLogins extends DashboardAbstract
 			array( 0, 3 )
 		);
 
-		return Theme::i()->getTemplate( 'dashboard' )->failedLogins( $logins );
+		return \IPS\Theme::i()->getTemplate( 'dashboard' )->failedLogins( $logins );
 	}
 }

@@ -12,25 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\File;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * AttachmentType for GraphQL API
  */
-class AttachmentType extends ObjectType
+class _AttachmentType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -74,7 +72,7 @@ class AttachmentType extends ObjectType
 							if ( $attachment['attach_is_image'] )
 							{
 								return array(
-									'url'		=> (string) File::get( 'core_Attachment', $attachment['attach_location'] )->url,
+									'url'		=> (string) \IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->url,
 									'width'		=> $attachment['attach_img_width'],
 									'height'	=> $attachment['attach_img_height'],
 								);
@@ -91,7 +89,7 @@ class AttachmentType extends ObjectType
 								if ( $attachment['attach_thumb_location'] )
 								{
 									return array(
-										'url'		=> (string) File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->url,
+										'url'		=> (string) \IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->url,
 										'width'		=> $attachment['attach_thumb_width'],
 										'height'	=> $attachment['attach_thumb_height'],
 									);
@@ -99,7 +97,7 @@ class AttachmentType extends ObjectType
 								else
 								{
 									return array(
-										'url'		=> (string) File::get( 'core_Attachment', $attachment['attach_location'] )->url,
+										'url'		=> (string) \IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->url,
 										'width'		=> $attachment['attach_img_width'],
 										'height'	=> $attachment['attach_img_height'],
 									);
@@ -119,7 +117,7 @@ class AttachmentType extends ObjectType
 						'type' => \IPS\core\api\GraphQL\TypeRegistry::member(),
 						'description' => "Member who uploaded the attachment",
 						'resolve' => function ( $attachment ) {
-							return Member::load( $attachment['attach_member_id'] );
+							return \IPS\Member::load( $attachment['attach_member_id'] );
 						}
 					],
 				];

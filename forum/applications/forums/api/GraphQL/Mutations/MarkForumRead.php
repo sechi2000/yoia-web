@@ -10,31 +10,25 @@
  */
 
 namespace IPS\forums\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\forums\api\GraphQL\Types\ForumType;
-use IPS\forums\Forum;
-use IPS\Node\Api\GraphQL\NodeMutator;
-use OutOfRangeException;
-use function defined;
-use function intval;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Mark forum read mutation for GraphQL API
  */
-class MarkForumRead extends NodeMutator
+class _MarkForumRead extends \IPS\Node\Api\GraphQL\NodeMutator
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Mark a forum as read";
+	public static $description = "Mark a forum as read";
 
 	/*
 	 * Mutation arguments
@@ -48,10 +42,8 @@ class MarkForumRead extends NodeMutator
 
 	/**
 	 * Return the mutation return type
-	 *
-	 * @return ForumType
 	 */
-	public function type()  : ForumType
+	public function type() 
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::forum();
 	}
@@ -59,19 +51,20 @@ class MarkForumRead extends NodeMutator
 	/**
 	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @return	Forum
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\forums\Forum
 	 */
-	public function resolve( mixed $val, array $args ) : Forum
+	public function resolve($val, $args)
 	{
 		try 
 		{
-			$forum = Forum::loadAndCheckPerms( intval( $args['id'] ) );
+			$forum = \IPS\forums\Forum::loadAndCheckPerms( \intval( $args['id'] ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'INVALID_NODE', 'GQL/0004/2', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_NODE', 'GQL/0004/2', 403 );
 		}
 
 		$this->_markRead( $forum );

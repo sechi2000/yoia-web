@@ -12,27 +12,16 @@
 namespace IPS\calendar\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\calendar\Event;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Member;
-use IPS\Notification;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * eventreminders Task
  */
-class eventreminders extends Task
+class _eventreminders extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -43,15 +32,15 @@ class eventreminders extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		$reminderCount = Db::i()->select( 'count(*)', 'calendar_event_reminders', array() )->first();
+		$reminderCount = \IPS\Db::i()->select( 'count(*)', 'calendar_event_reminders', array() )->first();
 
 		if( $reminderCount == 0 )
 		{
-			Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'eventreminders' ) );
+			\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'eventreminders' ) );
 
 			/* Nothing to send */
 			return NULL;
@@ -60,7 +49,7 @@ class eventreminders extends Task
 		$this->runUntilTimeout( function()
 		{
 			/* Grab some reminders */
-			$reminders = Db::i()->select( '*', 'calendar_event_reminders', array( 'reminder_date <= ?', DateTime::create()->getTimestamp() ), 'reminder_date ASC', array( 0, 20 ), NULL, NULL, Db::SELECT_DISTINCT );
+			$reminders = \IPS\Db::i()->select( '*', 'calendar_event_reminders', array( 'reminder_date <= ?', \IPS\DateTime::create()->getTimestamp() ), 'reminder_date ASC', array( 0, 20 ), NULL, NULL, \IPS\Db::SELECT_DISTINCT );
 
 			if ( !$reminders->count() )
 			{
@@ -69,21 +58,19 @@ class eventreminders extends Task
 
 			foreach( $reminders as $reminder )
 			{
-				$event = Event::load( $reminder['reminder_event_id'] );
-				$member = Member::load( $reminder['reminder_member_id'] );
+				$event = \IPS\calendar\Event::load( $reminder['reminder_event_id'] );
+				$member = \IPS\Member::load( $reminder['reminder_member_id'] );
 				
 				if ( $event->canView( $member ) )
 				{
-				    $notification = new Notification( Application::load( 'calendar' ), 'event_reminder', $event, array( $event, $reminder['reminder_days_before'] ), array( 'daysToGo' => $reminder['reminder_days_before'] ) );
+				    $notification = new \IPS\Notification( \IPS\Application::load( 'calendar' ), 'event_reminder', $event, array( $event, $reminder['reminder_days_before'] ), array( 'daysToGo' => $reminder['reminder_days_before'] ) );
 				    $notification->recipients->attach( $member );
 				    $notification->send();
 				}
 				
 				/* Delete the reminder now it has sent */
-				Db::i()->delete( 'calendar_event_reminders', array( 'reminder_event_id=? AND reminder_member_id=?', $reminder['reminder_event_id'], $reminder['reminder_member_id'] ) );
+				\IPS\Db::i()->delete( 'calendar_event_reminders', array( 'reminder_event_id=? AND reminder_member_id=?', $reminder['reminder_event_id'], $reminder['reminder_member_id'] ) );
 			}
-
-			return null;
 		});
 
 		return NULL;

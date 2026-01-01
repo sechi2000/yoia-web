@@ -12,34 +12,26 @@
 namespace IPS\gallery\extensions\core\EditorMedia;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\EditorMediaAbstract;
-use IPS\File;
-use IPS\gallery\Image;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Media: Images
  */
-class Images extends EditorMediaAbstract
+class _Images
 {
 	/**
 	 * Get Counts
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	string		$postKey	The post key
 	 * @param	string|null	$search		The search term (or NULL for all)
-	 * @return	array|int		array( 'Title' => 0 )
+	 * @return	array		array( 'Title' => 0 )
 	 */
-	public function count( Member $member, string $postKey, string $search=NULL ): array|int
+	public function count( $member, $postKey, $search=NULL )
 	{		
 		$where = array(
 			array( "image_member_id=? AND image_approved=?", $member->member_id, 1 ),
@@ -48,14 +40,14 @@ class Images extends EditorMediaAbstract
 		if ( $search )
 		{
 			$albumIds = [];
-			foreach( Db::i()->select( 'album_id', 'gallery_albums', array( "album_owner_id=? AND album_name LIKE ( CONCAT( '%', ?, '%' ) )", $member->member_id, $search ), NULL, 250 ) as $album )
+			foreach( \IPS\Db::i()->select( 'album_id', 'gallery_albums', array( "album_owner_id=? AND album_name LIKE ( CONCAT( '%', ?, '%' ) )", $member->member_id, $search ), NULL, 250 ) as $album )
 			{
 				$albumIds[] = $album;
 			}
 
 			if ( count( $albumIds ) )
 			{
-				$where[] = array( "( image_caption LIKE ( CONCAT( '%', ?, '%' ) ) OR ( " . Db::i()->in( 'image_album_id', $albumIds ) . " ) )", $search );
+				$where[] = array( "( image_caption LIKE ( CONCAT( '%', ?, '%' ) ) OR ( " . \IPS\Db::i()->in( 'image_album_id', $albumIds ) . " ) )", $search );
 			}
 			else
 			{
@@ -63,20 +55,20 @@ class Images extends EditorMediaAbstract
 			}
 		}
 
-		return Db::i()->select( 'COUNT(*)', 'gallery_images', $where )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'gallery_images', $where )->first();
 	}
 	
 	/**
 	 * Get Files
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @param	string|null	$search	The search term (or NULL for all)
 	 * @param	string		$postKey	The post key
 	 * @param	int			$page	Page
 	 * @param	int			$limit	Number to get
 	 * @return	array		array( 'Title' => array( (IPS\File, \IPS\File, ... ), ... )
 	 */
-	public function get( Member $member, ?string $search, string $postKey, int $page, int $limit ): array
+	public function get( $member, $search, $postKey, $page, $limit )
 	{
 		$where = array(
 			array( "image_member_id=? AND image_approved=?", $member->member_id, 1 ),
@@ -85,14 +77,14 @@ class Images extends EditorMediaAbstract
 		if ( $search )
 		{
 			$albumIds = [];
-			foreach( Db::i()->select( 'album_id', 'gallery_albums', array( "album_owner_id=? AND album_name LIKE ( CONCAT( '%', ?, '%' ) )", $member->member_id, $search ), NULL, 250 ) as $album )
+			foreach( \IPS\Db::i()->select( 'album_id', 'gallery_albums', array( "album_owner_id=? AND album_name LIKE ( CONCAT( '%', ?, '%' ) )", $member->member_id, $search ), NULL, 250 ) as $album )
 			{
 				$albumIds[] = $album;
 			}
 
 			if ( count( $albumIds ) )
 			{
-				$where[] = array( "( image_caption LIKE ( CONCAT( '%', ?, '%' ) ) OR ( " . Db::i()->in( 'image_album_id', $albumIds ) . " ) )", $search );
+				$where[] = array( "( image_caption LIKE ( CONCAT( '%', ?, '%' ) ) OR ( " . \IPS\Db::i()->in( 'image_album_id', $albumIds ) . " ) )", $search );
 			}
 			else
 			{
@@ -101,11 +93,11 @@ class Images extends EditorMediaAbstract
 		}
 
 		$return = array();
-		foreach ( Db::i()->select( '*', 'gallery_images', $where, 'image_date DESC', array( ( $page - 1 ) * $limit, $limit ) ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'gallery_images', $where, 'image_date DESC', array( ( $page - 1 ) * $limit, $limit ) ) as $row )
 		{
-			$image = Image::load( $row['image_id'] );
+			$image = \IPS\gallery\Image::load( $row['image_id'] );
 			$fileName = $image->masked_file_name ?: $image->original_file_name;
-			$obj = File::get( 'gallery_Images', $fileName );
+			$obj = \IPS\File::get( 'gallery_Images', $fileName );
 			$obj->contextInfo = $image->caption;
 			$return[ (string) $image->url() ] = $obj;
 		}

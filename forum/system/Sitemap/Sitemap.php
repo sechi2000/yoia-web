@@ -11,25 +11,16 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\Http\Url;
-use XMLWriter;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Sitemap generator class
  */
-class Sitemap
+class _Sitemap
 {
 	/**
 	 * @brief	Maximum number of entries to include per file
@@ -40,22 +31,22 @@ class Sitemap
 	/**
 	 * @brief	Count options
 	 */
-	public static array $counts		= array( 0 => 0, 100 => 100, 500 => 500, 1000 => 1000, 5000 => 5000, 10000 => 10000 );
+	public static $counts		= array( 0 => 0, 100 => 100, 500 => 500, 1000 => 1000, 5000 => 5000, 10000 => 10000 );
 
 	/**
 	 * @brief	Priority options
 	 */
-	public static array $priorities	= array( '1.0' => '1.0', '0.9' => '0.9', '0.8' => '0.8', '0.7' => '0.7', '0.6' => '0.6', '0.5' => '0.5', '0.4' => '0.4', '0.3' => '0.3', '0.2' => '0.2', '0.1' => '0.1' );
+	public static $priorities	= array( '1.0' => '1.0', '0.9' => '0.9', '0.8' => '0.8', '0.7' => '0.7', '0.6' => '0.6', '0.5' => '0.5', '0.4' => '0.4', '0.3' => '0.3', '0.2' => '0.2', '0.1' => '0.1' );
 
 	/**
 	 * @brief	"Log" entries for this execution
 	 */
-	public array $log	= array();
+	public $log	= array();
 
 	/**
 	 * @brief	URL to our sitemap index file
 	 */
-	public string $sitemapUrl	= '';
+	public $sitemapUrl	= '';
 
 	/**
 	 * Constructor
@@ -65,23 +56,23 @@ class Sitemap
 	public function __construct()
 	{
 		/* Figure out the sitemap URL */
-		$this->sitemapUrl	= ( Settings::i()->sitemap_url ) ? rtrim( Settings::i()->sitemap_url, '/' ) : rtrim( Settings::i()->base_url, '/' ) . '/sitemap.php';
+		$this->sitemapUrl	= ( \IPS\Settings::i()->sitemap_url ) ? rtrim( \IPS\Settings::i()->sitemap_url, '/' ) : rtrim( \IPS\Settings::i()->base_url, '/' ) . '/sitemap.php';
 	}
 
 	/**
 	 * @brief	Store the sitemap files we can build
 	 */
-	protected ?array $sitemapFilesToBuild = NULL;
+	protected $sitemapFilesToBuild = NULL;
 
 	/**
 	 * Build the sitemap index file
 	 *
 	 * @return	bool
 	 */
-	public function buildNextSitemap(): bool
+	public function buildNextSitemap()
 	{
 		/* Get our extensions */
-		$extensions	= Application::allExtensions( 'core', 'Sitemap', new Member, 'core' );
+		$extensions	= \IPS\Application::allExtensions( 'core', 'Sitemap', new \IPS\Member, 'core' );
 		
 		/* If we haven't figured out which files we can/should build, do that first */
 		if( $this->sitemapFilesToBuild === NULL )
@@ -96,23 +87,23 @@ class Sitemap
 			}
 			
 			/* Delete any that aren't supported */
-			Db::i()->delete( 'core_sitemap', Db::i()->in( 'sitemap', $files, TRUE ) );
+			\IPS\Db::i()->delete( 'core_sitemap', \IPS\Db::i()->in( 'sitemap', $files, TRUE ) );
 
 			/* Now figure out which one hasn't run in the longest period of time. */
-			$sitemapsNotBuilt = array_diff( $files, iterator_to_array( Db::i()->select( 'sitemap', 'core_sitemap' ) ) );
-			if ( count( $sitemapsNotBuilt ) )
+			$sitemapsNotBuilt = array_diff( $files, iterator_to_array( \IPS\Db::i()->select( 'sitemap', 'core_sitemap' ) ) );
+			if ( \count( $sitemapsNotBuilt ) )
 			{
 				$this->sitemapFilesToBuild = $sitemapsNotBuilt;
 			}
 
-			foreach(Db::i()->select( 'sitemap', 'core_sitemap', array( 'updated < ?', ( new DateTime)->sub( new DateInterval( 'PT1H' ) )->getTimestamp() ), 'updated ASC' ) as $sitemapFile )
+			foreach( \IPS\Db::i()->select( 'sitemap', 'core_sitemap', array( 'updated < ?', ( new \IPS\DateTime )->sub( new \DateInterval( 'PT1H' ) )->getTimestamp() ), 'updated ASC' ) as $sitemapFile )
 			{
 				$this->sitemapFilesToBuild[] = $sitemapFile;
 			}
 		}
 
 		/* If there are no files to build, return now */
-		if( !count( $this->sitemapFilesToBuild ) )
+		if( !\count( $this->sitemapFilesToBuild ) )
 		{
 			return FALSE;
 		}
@@ -125,7 +116,7 @@ class Sitemap
 			/* Call the plugin to generate this sitemap file */
 			foreach( $extensions as $extension )
 			{
-				if( in_array( $toBuild, $extension->getFilenames() ) )
+				if( \in_array( $toBuild, $extension->getFilenames() ) )
 				{
 					$extension->generateSitemap( $toBuild, $this );
 				}
@@ -142,23 +133,23 @@ class Sitemap
 	/**
 	 * Build a sitemap file and store it
 	 *
-	 * @param string $filename	Filename
-	 * @param array $entries	The entries to add.  Each entry should be an array with at least the key 'url'. Optional keys 'lastmod', 'priority' and 'changefreq' are also supported.
-	 * @param int $lastId		The last ID we built. This is used for content items to allow us to more efficiently fetch the next batch of items to build.
-	 * @param array $namespaces	Array of additional namespaces to define
+	 * @param	string	$filename	Filename
+	 * @param	array	$entries	The entries to add.  Each entry should be an array with at least the key 'url'. Optional keys 'lastmod', 'priority' and 'changefreq' are also supported.
+	 * @param	int		$lastId		The last ID we built. This is used for content items to allow us to more efficiently fetch the next batch of items to build.
+	 * @param	array	$namespaces	Array of additional namespaces to define
 	 * @return	void
 	 */
-	public function buildSitemapFile( string $filename, array $entries, int $lastId=0, array $namespaces=array() ) : void
+	public function buildSitemapFile( $filename, $entries, $lastId=0, $namespaces=array() )
 	{
 		/* Start XML Document, set encoding, and create the namespaced index element */
-		$xmlWriter	= new XMLWriter();
+		$xmlWriter	= new \XMLWriter();
 		$xmlWriter->openMemory();
 		$xmlWriter->setIndent( TRUE );
 
 		$xmlWriter->startDocument( '1.0', 'UTF-8' );
 		$xmlWriter->startElementNS( NULL, 'urlset', "http://www.sitemaps.org/schemas/sitemap/0.9" );
 
-		if( count( $namespaces ) )
+		if( \count( $namespaces ) )
 		{
 			foreach( $namespaces as $prefix => $urn )
 			{
@@ -166,22 +157,22 @@ class Sitemap
 			}
 		}
 
-		$defaultLanguage = Lang::load( Lang::defaultLanguage() );
+		$defaultLanguage = \IPS\Lang::load( \IPS\Lang::defaultLanguage() );
 
-		if( count( $entries ) )
+		if( \count( $entries ) )
 		{
 			foreach( $entries as $entry )
 			{
 				$xmlWriter->startElement( 'url' );
 
 				$xmlWriter->startElement( 'loc' );
-				$xmlWriter->text( preg_replace( '/^' . preg_quote( Settings::i()->base_url, '/' ) . '/', '{base_url}', $entry['url'] ) );
+				$xmlWriter->text( preg_replace( '/^' . preg_quote( \IPS\Settings::i()->base_url, '/' ) . '/', '{base_url}', $entry['url'] ) );
 				$xmlWriter->endElement();
 
 				if( isset( $entry['lastmod'] ) AND $entry['lastmod'] )
 				{
 					$xmlWriter->startElement( 'lastmod' );
-					$xmlWriter->text( ( $entry['lastmod'] instanceof DateTime) ? $entry['lastmod']->format( 'c', $defaultLanguage ) : DateTime::ts( $entry['lastmod'] )->format( 'c', $defaultLanguage ) );
+					$xmlWriter->text( ( $entry['lastmod'] instanceof \IPS\DateTime ) ? $entry['lastmod']->format( 'c', $defaultLanguage ) : \IPS\DateTime::ts( $entry['lastmod'] )->format( 'c', $defaultLanguage ) );
 					$xmlWriter->endElement();
 				}
 
@@ -199,7 +190,7 @@ class Sitemap
 					$xmlWriter->endElement();
 				}
 
-				if( count( $namespaces ) )
+				if( \count( $namespaces ) )
 				{
 					foreach( $entry as $key => $value )
 					{
@@ -215,7 +206,7 @@ class Sitemap
 									$pieces = explode( ':', $k );
 									$xmlWriter->startElementNS( $pieces[0], $pieces[1], NULL );
 
-									if( is_array( $v ) )
+									if( \is_array( $v ) )
 									{
 										foreach( $v as $index => $value )
 										{
@@ -255,7 +246,7 @@ class Sitemap
 		}
 
 		/* Store */
-		Db::i()->replace( 'core_sitemap', array(
+		\IPS\Db::i()->replace( 'core_sitemap', array(
 			'sitemap'	=> $filename,
 			'data'		=> $content,
 			'updated'	=> time(),

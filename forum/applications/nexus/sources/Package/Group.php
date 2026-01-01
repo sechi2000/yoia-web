@@ -12,87 +12,66 @@
 namespace IPS\nexus\Package;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Stack;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Request;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function get_called_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Package Group
  */
-class Group extends Model
+class _Group extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_package_groups';
+	public static $databaseTable = 'nexus_package_groups';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'pg_';
+	public static $databasePrefix = 'pg_';
 	
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnParent = 'parent';
+	public static $databaseColumnParent = 'parent';
 		
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 		
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'product_groups';
+	public static $nodeTitle = 'product_groups';
 	
 	/**
 	 * @brief	[Node] Subnode class
 	 */
-	public static ?string $subnodeClass = 'IPS\nexus\Package';
+	public static $subnodeClass = 'IPS\nexus\Package';
 
 	/**
 	 * @brief	Content Item Class
 	 */
-	public static ?string $contentItemClass = 'IPS\nexus\Package\Item';
+	public static $contentItemClass = 'IPS\nexus\Package\Item';
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'nexus_pgroup_';
+	public static $titleLangPrefix = 'nexus_pgroup_';
 	
 	/**
 	 * @brief	[Node] Description suffix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}_{$descriptionLangSuffix}" as the key
 	 */
-	public static ?string $descriptionLangSuffix = '_desc';
+	public static $descriptionLangSuffix = '_desc';
 								
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -110,7 +89,7 @@ class Group extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'nexus',
 		'module'	=> 'store',
 		'prefix'	=> 'packages_',
@@ -120,17 +99,17 @@ class Group extends Model
 	 * Return only the root groups that have packages OR subcategories/groups
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
-	 * @param	array				$where				Additional WHERE clause
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	mixed				$where				Additional WHERE clause
 	 * @return	array
 	 */
-	public static function rootsWithViewablePackages( ?string $permissionCheck='view', ?Member $member=NULL, array $where=array() ) : array
+	public static function rootsWithViewablePackages( $permissionCheck='view', $member=NULL, $where=array() )
 	{
 		$roots = static::roots( $permissionCheck, $member, $where );
 
 		foreach( $roots as $index => $group )
 		{
-			if( !$group->hasSubgroups() AND !$group->hasPackages( NULL, array( array( "p_store=1 AND ( p_member_groups='*' OR " . Db::i()->findInSet( 'p_member_groups', Member::loggedIn()->groups ) . ' )' ) ) ) )
+			if( !$group->hasSubgroups() AND !$group->hasPackages( NULL, array( array( "p_store=1 AND ( p_member_groups='*' OR " . \IPS\Db::i()->findInSet( 'p_member_groups', \IPS\Member::loggedIn()->groups ) . ' )' ) ) ) )
 			{
 				unset( $roots[ $index ] );
 			}
@@ -142,12 +121,12 @@ class Group extends Model
 	/**
 	 * Load record based on a URL
 	 *
-	 * @param Url $url	URL to load from
+	 * @param	\IPS\Http\Url	$url	URL to load from
 	 * @return	static
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadFromUrl( Url $url ): static
+	public static function loadFromUrl( \IPS\Http\Url $url )
 	{
 		$qs = array_merge( $url->queryString, $url->hiddenQueryString );
 		
@@ -156,20 +135,20 @@ class Group extends Model
 			return static::load( $qs['cat'] );
 		}
 		
-		throw new InvalidArgumentException;
+		throw new \InvalidArgumentException;
 	}
 		
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$form->addHeader('pg_basic_settings');
-		$form->add( new Translatable( 'pg_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_pgroup_{$this->id}" : NULL ) ) );
-		$form->add( new Translatable( 'pg_desc', NULL, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Translatable( 'pg_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_pgroup_{$this->id}" : NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'pg_desc', NULL, FALSE, array(
 			'app'		=> 'nexus',
 			'key'		=> ( $this->id ? "nexus_pgroup_{$this->id}_desc" : NULL ),
 			'editor'	=> array(
@@ -180,18 +159,18 @@ class Group extends Model
 			)
 		) ) );
 
-		$class = get_called_class();
+		$class = \get_called_class();
 
-		$form->add( new Node( 'pg_parent', $this->id ? $this->parent : 0, TRUE, array( 'class' => 'IPS\nexus\Package\Group', 'subnodes' => FALSE, 'zeroVal' => 'no_parent', 'permissionCheck' => function( $node ) use ( $class )
+		$form->add( new \IPS\Helpers\Form\Node( 'pg_parent', $this->id ? $this->parent : 0, TRUE, array( 'class' => 'IPS\nexus\Package\Group', 'subnodes' => FALSE, 'zeroVal' => 'no_parent', 'permissionCheck' => function( $node ) use ( $class )
 		{
 			if( isset( $class::$subnodeClass ) AND $class::$subnodeClass AND $node instanceof $class::$subnodeClass )
 			{
 				return FALSE;
 			}
 
-			return !isset( Request::i()->id ) or ( $node->id != Request::i()->id and !$node->isChildOf( $node::load( Request::i()->id ) ) );
+			return !isset( \IPS\Request::i()->id ) or ( $node->id != \IPS\Request::i()->id and !$node->isChildOf( $node::load( \IPS\Request::i()->id ) ) );
 		} ) ) );
-		$form->add( new Upload( 'pg_image', $this->image ? File::get( 'nexus_PackageGroups', $this->image ) : NULL, FALSE, array( 'storageExtension' => 'nexus_PackageGroups', 'image' => TRUE, 'allowStockPhotos' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'pg_image', $this->image ? \IPS\File::get( 'nexus_PackageGroups', $this->image ) : NULL, FALSE, array( 'storageExtension' => 'nexus_PackageGroups', 'image' => TRUE, 'allowStockPhotos' => TRUE ) ) );
 		
 		$priceFilters = array();
 		if ( $this->price_filters )
@@ -206,8 +185,8 @@ class Group extends Model
 		}
 		
 		$form->addHeader('pg_filters_header');
-		$form->add( new Node( 'pg_filters', $this->filters ? explode( ',', $this->filters ) : [], FALSE, array( 'class' => 'IPS\nexus\Package\Filter', 'multiple' => TRUE ) ) );
-		$form->add( new Stack( 'pg_price_filters', $priceFilters, FALSE, array( 'stackFieldType' => 'IPS\nexus\Form\Money' ) ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'pg_filters', explode( ',', $this->filters ), FALSE, array( 'class' => 'IPS\nexus\Package\Filter', 'multiple' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Stack( 'pg_price_filters', $priceFilters, FALSE, array( 'stackFieldType' => 'IPS\nexus\Form\Money' ) ) );
 		
 	}
 	
@@ -217,7 +196,7 @@ class Group extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{		
 		if( isset( $values['pg_parent'] ) )
 		{
@@ -232,7 +211,7 @@ class Group extends Model
 		if ( !$this->id )
 		{
 			$this->save();
-			File::claimAttachments( 'nexus-new-group', $this->id, NULL, 'pgroup', TRUE );
+			\IPS\File::claimAttachments( 'nexus-new-group', $this->id, NULL, 'pgroup', TRUE );
 		}
 		elseif( isset( $values['pg_name'] ) OR isset( $values['pg_desc'] ) )
 		{
@@ -241,13 +220,13 @@ class Group extends Model
 		
 		if( isset( $values['pg_name'] ) )
 		{
-			Lang::saveCustom( 'nexus', "nexus_pgroup_{$this->id}", $values['pg_name'] );
+			\IPS\Lang::saveCustom( 'nexus', "nexus_pgroup_{$this->id}", $values['pg_name'] );
 			unset( $values['pg_name'] );
 		}
 
 		if( isset( $values['pg_desc'] ) )
 		{
-			Lang::saveCustom( 'nexus', "nexus_pgroup_{$this->id}_desc", $values['pg_desc'] );
+			\IPS\Lang::saveCustom( 'nexus', "nexus_pgroup_{$this->id}_desc", $values['pg_desc'] );
 			unset( $values['pg_desc'] );
 		}
 		
@@ -261,7 +240,7 @@ class Group extends Model
 				$priceFilters[ $currency ][] = $amount->amount->jsonSerialize();
 			}
 		}
-		$values['pg_price_filters'] = count( $priceFilters ) ? json_encode( $priceFilters ) : NULL;
+		$values['pg_price_filters'] = \count( $priceFilters ) ? json_encode( $priceFilters ) : NULL;
 
 		return $values;
 	}
@@ -269,18 +248,18 @@ class Group extends Model
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 
 	/**
 	 * Get URL
 	 *
-	 * @return    Url\Internal|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function url(): Url\Internal|string|null
+	public function url()
 	{
 		if( $this->_url === NULL )
 		{
-			$this->_url = Url::internal( "app=nexus&module=store&controller=store&cat={$this->id}", 'front', 'store_group', Friendly::seoTitle( Member::loggedIn()->language()->get( 'nexus_pgroup_' . $this->id ) ) );
+			$this->_url = \IPS\Http\Url::internal( "app=nexus&module=store&controller=store&cat={$this->id}", 'front', 'store_group', \IPS\Http\Url\Friendly::seoTitle( \IPS\Member::loggedIn()->language()->get( 'nexus_pgroup_' . $this->id ) ) );
 		}
 
 		return $this->_url;
@@ -292,30 +271,30 @@ class Group extends Model
 	 * @param	array		$indexData		Data from the search index
 	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
 	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
-	 * @return    Url
+	 * @return	\IPS\Http\Url
 	 */
-	public static function urlFromIndexData( array $indexData, array $itemData, ?array $containerData ): Url
+	public static function urlFromIndexData( $indexData, $itemData, $containerData )
 	{
-		return Url::internal( "app=nexus&module=store&controller=store&cat={$indexData['index_container_id']}", 'front', 'store_group', Member::loggedIn()->language()->addToStack( 'nexus_pgroup_' . $indexData['index_container_id'], FALSE, array( 'seotitle' => TRUE ) ) );
+		return \IPS\Http\Url::internal( "app=nexus&module=store&controller=store&cat={$indexData['index_container_id']}", 'front', 'store_group', \IPS\Member::loggedIn()->language()->addToStack( 'nexus_pgroup_' . $indexData['index_container_id'], FALSE, array( 'seotitle' => TRUE ) ) );
 	}
 	
 	/**
 	 * Get full image URL
 	 *
-	 * @return string|null
+	 * @return string
 	 */
-	public function get_image() : string|null
+	public function get_image()
 	{
-		return ( isset( $this->_data['image'] ) ) ? (string) File::get( 'nexus_PackageGroups', $this->_data['image'] )->url : NULL;
+		return ( isset( $this->_data['image'] ) ) ? (string) \IPS\File::get( 'nexus_PackageGroups', $this->_data['image'] )->url : NULL;
 	}
 	
 	/**
 	 * Does this group have subgroups?
 	 *
-	 * @param	array	$_where	Additional WHERE clause
+	 * @param	mixed	$_where	Additional WHERE clause
 	 * @return	bool
 	 */
-	public function hasSubgroups( array $_where=array() ) : bool
+	public function hasSubgroups( $_where=array() )
 	{
 		return ( $this->childrenCount( NULL, NULL, FALSE, $_where ) > 0 );
 	}
@@ -323,18 +302,18 @@ class Group extends Model
 	/**
 	 * Does this group have packages?
 	 *
-	 * @param	Member|NULL|FALSE	$member	The member to perform the permission check for, or NULL for currently logged in member, or FALSE for no permission check
-	 * @param	array					$_where			Additional WHERE clause
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member to perform the permission check for, or NULL for currently logged in member, or FALSE for no permission check
+	 * @param	mixed					$_where			Additional WHERE clause
 	 * @param	bool					$viewableOnly	Only check packages the member can view
 	 * @return	bool
 	 */
-	public function hasPackages( Member|null|bool $member=NULL, array $_where=array(), bool $viewableOnly=FALSE ) : bool
+	public function hasPackages( $member=NULL, $_where=array(), $viewableOnly=FALSE )
 	{
 		if( $viewableOnly === TRUE )
 		{
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
 
-			$_where[]	= array( "p_store=1 AND ( p_member_groups='*' OR " . Db::i()->findInSet( 'p_member_groups', $member->groups ) . ' )' );
+			$_where[]	= array( "p_store=1 AND ( p_member_groups='*' OR " . \IPS\Db::i()->findInSet( 'p_member_groups', $member->groups ) . ' )' );
 		}
 
 		return ( $this->childrenCount( $member === FALSE ? FALSE : 'view', $member, NULL, $_where ) > 0 );
@@ -343,21 +322,21 @@ class Group extends Model
 	/**
 	 * Get Filter Options
 	 *
-	 * @param	Lang	$language	The language to return options in
+	 * @param	\IPS\Lang	$language	The language to return options in
 	 * @return	array
 	 */
-	public function filters( Lang $language ) : array
+	public function filters( \IPS\Lang $language )
 	{
 		$return = array();
 		
 		if ( $this->filters )
 		{
-			foreach ( Db::i()->select( 'pfilter_id', 'nexus_package_filters', array( Db::i()->in( 'pfilter_id', explode( ',', $this->filters ) ) ), 'pfilter_order' ) as $filterId )
+			foreach ( \IPS\Db::i()->select( 'pfilter_id', 'nexus_package_filters', array( \IPS\Db::i()->in( 'pfilter_id', explode( ',', $this->filters ) ) ), 'pfilter_order' ) as $filterId )
 			{
 				$return[ $filterId ] = array();
 			}
 						
-			foreach ( Db::i()->select( '*', 'nexus_package_filters_values', array( array( Db::i()->in( 'pfv_filter', array_keys( $return ) ) ), array( 'pfv_lang=?', $language->id ) ), 'pfv_order' ) as $value )
+			foreach ( \IPS\Db::i()->select( '*', 'nexus_package_filters_values', array( array( \IPS\Db::i()->in( 'pfv_filter', array_keys( $return ) ) ), array( 'pfv_lang=?', $language->id ) ), 'pfv_order' ) as $value )
 			{
 				$return[ $value['pfv_filter'] ][ $value['pfv_value'] ] = $value['pfv_text'];
 			}
@@ -371,7 +350,7 @@ class Group extends Model
 	 *
 	 * @return	void
 	 */
-	public function __clone() : void
+	public function __clone()
 	{
 		if ( $this->skipCloneDuplication === TRUE )
 		{
@@ -379,30 +358,18 @@ class Group extends Model
 		}
 
 		$oldImage = $this->image;
-		$oldId = $this->id;
 
 		parent::__clone();
-
-		$attachmentsMap = [];
-		foreach( Db::i()->select( '*', 'core_attachments_map', [ 'location_key=? and id1=? and id3=?', 'nexus_Admin', $oldId, 'pgroup' ] ) as $attachment )
-		{
-			$attachment['id1'] = $this->id;
-			$attachmentsMap[] = $attachment;
-		}
-		if( count( $attachmentsMap ) )
-		{
-			Db::i()->insert( 'core_attachments_map', $attachmentsMap );
-		}
 
 		if ( $oldImage )
 		{
 			try
 			{
-				$icon = File::get( 'nexus_PackageGroups', $oldImage );
-				$newIcon = File::create( 'nexus_PackageGroups', $icon->originalFilename, $icon->contents() );
+				$icon = \IPS\File::get( 'nexus_PackageGroups', $oldImage );
+				$newIcon = \IPS\File::create( 'nexus_PackageGroups', $icon->originalFilename, $icon->contents() );
 				$this->image = (string) $newIcon;
 			}
-			catch ( Exception )
+			catch ( \Exception $e )
 			{
 				$this->pg_image = NULL;
 			}
@@ -416,7 +383,7 @@ class Group extends Model
 	 *
 	 * @return	bool
 	 */
-	public function deleteOrMoveQueued(): bool
+	public function deleteOrMoveQueued()
 	{
 		return FALSE;
 	}
@@ -426,21 +393,21 @@ class Group extends Model
 	 * Example code explains return value
 	 *
 	 * @code
-	* array(
-	* array(
-	* 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
-	* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	* ),
-	* ...							// Additional buttons
-	* );
+	array(
+	array(
+	'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
+	'title'	=> 'foo',		// Language key to use for button's title parameter
+	'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	),
+	...							// Additional buttons
+	);
 	 * @endcode
-	 * @param Url $url		Base URL
+	 * @param	string	$url		Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = parent::getButtons( $url, $subnode );
 
@@ -450,17 +417,5 @@ class Group extends Model
 		}
 
 		return $buttons;
-	}
-
-	/**
-	 * [ActiveRecord] Delete Record
-	 *
-	 * @return	void
-	 */
-	public function delete(): void
-	{
-		parent::delete();
-
-		File::unclaimAttachments( 'nexus_Admin', $this->id, null, 'pgroup' );
 	}
 }

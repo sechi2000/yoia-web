@@ -12,38 +12,23 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Punbb as PunbbCore;
-use IPS\Http\Url;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PunBB Forums Converter
  */
-class Punbb extends Software
+class _Punbb extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "PunBB (1.x)";
@@ -52,9 +37,9 @@ class Punbb extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "punbb";
@@ -63,9 +48,9 @@ class Punbb extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums'	=> array(
@@ -86,9 +71,9 @@ class Punbb extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -96,9 +81,9 @@ class Punbb extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'punbb' ) );
 	}
@@ -106,32 +91,29 @@ class Punbb extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 		
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return PunbbCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Punbb::fixPostData( $post );
 	}
 	
 	/**
@@ -139,9 +121,10 @@ class Punbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums(): void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
+		
 		$libraryClass::setKey( 'id' );
 		
 		foreach( $this->fetch( 'forums', 'id' ) AS $row )
@@ -151,7 +134,7 @@ class Punbb extends Software
 			{
 				$catId = $this->app->getLink( '1000' . $row['cat_id'], 'forums_forums' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				try
 				{
@@ -164,8 +147,17 @@ class Punbb extends Software
 						'position'		=> $category['disp_position']
 					) );
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
+			
+			/* They don't store the last poster ID. Makes me sad. */
+			$last_poster_id = 0;
+			try
+			{
+				/* Better hope they haven't changed their name */
+				$last_poster_id = $this->db->select( 'id', 'users', array( "username=?", $row['last_poster'] ) )->first();
+			}
+			catch( \UnderflowException $e ) {}
 			
 			$info = array(
 				'id'				=> $row['id'],
@@ -173,6 +165,9 @@ class Punbb extends Software
 				'description'		=> $row['forum_desc'],
 				'topics'			=> $row['num_topics'],
 				'posts'				=> $row['num_posts'],
+				'last_post'			=> $row['last_post'],
+				'last_poster_id'	=> $last_poster_id,
+				'last_poster_name'	=> $row['last_poster'],
 				'parent_id'			=> ( $row['parent_forum_id'] == 0 ) ? '1000' . $row['cat_id'] : $row['parent_forum_id'],
 				'position'			=> $row['disp_position'],
 				'redirect_url'		=> $row['redirect_url'],
@@ -189,7 +184,7 @@ class Punbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics(): void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -203,14 +198,14 @@ class Punbb extends Software
 			{
 				$last_poster_id = $this->db->select( 'id', 'users', array( "username=?", $row['last_poster'] ) )->first();
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			$starter_id = 0;
 			try
 			{
 				$starter_id = $this->db->select( 'id', 'users', array( "username=?", $row['poster'] ) )->first();
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			$moved_to = NULL;
 			if ( $row['moved_to'] )
@@ -220,7 +215,7 @@ class Punbb extends Software
 					$moved_to_forum = $this->db->select( 'forum_id', 'topics', array( "id=?", $row['moved_to'] ) )->first();
 					$moved_to = [ $row['moved_to'], $moved_to_forum ];
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 			
 			$info = array(
@@ -237,7 +232,7 @@ class Punbb extends Software
 				'last_poster_name'	=> $row['last_poster'],
 				'pinned'			=> ( $row['sticky'] OR $row['announcement'] ) ? 1 : 0,
 				'moved_to'			=> $moved_to,
-				'moved_on'			=> ( !is_null( $moved_to ) ) ? $row['posted'] : 0,
+				'moved_on'			=> ( !\is_null( $moved_to ) ) ? $row['posted'] : 0,
 			);
 			
 			$libraryClass->convertForumsTopic( $info );
@@ -269,7 +264,7 @@ class Punbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts(): void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -299,32 +294,32 @@ class Punbb extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'viewtopic.php' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'viewtopic.php' ) !== FALSE )
 		{
-			if( isset( Request::i()->pid ) )
+			if( isset( \IPS\Request::i()->pid ) )
 			{
 				$class	= '\IPS\forums\Topic\Post';
 				$types	= array( 'posts', 'forums_posts' );
-				$oldId	= Request::i()->pid;
+				$oldId	= \IPS\Request::i()->pid;
 			}
 			else
 			{
 				$class	= '\IPS\forums\Topic';
 				$types	= array( 'topics', 'forums_topics' );
-				$oldId	= Request::i()->id;
+				$oldId	= \IPS\Request::i()->id;
 			}
 		}
-		elseif( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'viewforum.php' ) !== FALSE )
+		elseif( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'viewforum.php' ) !== FALSE )
 		{
 			$class	= '\IPS\forums\Forum';
 			$types	= array( 'forums', 'forums_forums' );
-			$oldId	= Request::i()->id;
+			$oldId	= \IPS\Request::i()->id;
 		}
 
 		if( isset( $class ) )
@@ -335,20 +330,20 @@ class Punbb extends Software
 				{
 					$data = (string) $this->app->getLink( $oldId, $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( $oldId, $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				elseif( $item instanceof Model )
+				elseif( $item instanceof \IPS\Node\Model )
 				{
 					if( $item->can( 'view' ) )
 					{
@@ -356,7 +351,7 @@ class Punbb extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

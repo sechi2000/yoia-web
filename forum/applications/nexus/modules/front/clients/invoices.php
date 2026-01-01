@@ -12,128 +12,101 @@
 namespace IPS\nexus\modules\front\clients;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Events\Event;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Invoice;
-use IPS\nexus\Transaction;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invoices
  */
-class invoices extends Controller
+class _invoices extends \IPS\Dispatcher\Controller
 {
-	/**
-	 * @var Invoice|null
-	 */
-	protected ?Invoice $invoice = null;
-
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{	
 		/* Load Invoice */
-		if ( isset( Request::i()->id ) )
+		if ( isset( \IPS\Request::i()->id ) )
 		{
-			if ( isset( Request::i()->printout ) )
+			if ( isset( \IPS\Request::i()->printout ) )
 			{
-				Request::i()->do = 'printout';
+				\IPS\Request::i()->do = 'printout';
 			}
 			
-			if ( Member::loggedIn()->member_id )
+			if ( \IPS\Member::loggedIn()->member_id )
 			{
 				try
 				{
-					$this->invoice = Invoice::loadAndCheckPerms( Request::i()->id );
+					$this->invoice = \IPS\nexus\Invoice::loadAndCheckPerms( \IPS\Request::i()->id );
 				}
-				catch ( OutOfRangeException )
+				catch ( \OutOfRangeException $e )
 				{
-					Output::i()->error( 'node_error', '2X215/1', 404, '' );
+					\IPS\Output::i()->error( 'node_error', '2X215/1', 404, '' );
 				}
 			}
 			else
 			{
 				/* Prevent the vid key from being exposed in referrers */
-				Output::i()->sendHeader( "Referrer-Policy: origin" );
+				\IPS\Output::i()->sendHeader( "Referrer-Policy: origin" );
 
-				$key = isset( Request::i()->key ) ? Request::i()->key : ( isset( Request::i()->cookie['guestTransactionKey'] ) ? Request::i()->cookie['guestTransactionKey'] : NULL );
-				$this->invoice = Invoice::load( Request::i()->id );
+				$key = isset( \IPS\Request::i()->key ) ? \IPS\Request::i()->key : ( isset( \IPS\Request::i()->cookie['guestTransactionKey'] ) ? \IPS\Request::i()->cookie['guestTransactionKey'] : NULL );
+				$this->invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 
-				if( $this->invoice->member->member_id or !$key or !isset( $this->invoice->guest_data['guestTransactionKey'] ) or !Login::compareHashes( $key, $this->invoice->guest_data['guestTransactionKey'] ) )
+				if( $this->invoice->member->member_id or !$key or !isset( $this->invoice->guest_data['guestTransactionKey'] ) or !\IPS\Login::compareHashes( $key, $this->invoice->guest_data['guestTransactionKey'] ) )
 				{
-					Output::i()->error( 'no_module_permission_guest', '2X215/6', 404, '' );
+					\IPS\Output::i()->error( 'no_module_permission_guest', '2X215/6', 404, '' );
 				}
 
 				/* Do not cache this guest view invoice */
-				Output::setCacheTime( false );
+				\IPS\Output::setCacheTime( false );
 			}
 				
-			Output::i()->breadcrumb[] = array( Url::internal( 'app=nexus&module=clients&controller=invoices', 'front', 'clientsinvoices' ), Member::loggedIn()->language()->addToStack('client_invoices') );
-			Output::i()->breadcrumb[] = array( $this->invoice->url(), $this->invoice->title );
-			Output::i()->title = $this->invoice->title;
+			\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=invoices', 'front', 'clientsinvoices' ), \IPS\Member::loggedIn()->language()->addToStack('client_invoices') );
+			\IPS\Output::i()->breadcrumb[] = array( $this->invoice->url(), $this->invoice->title );
+			\IPS\Output::i()->title = $this->invoice->title;
 		}
 		else
 		{
-			if ( !Member::loggedIn()->member_id )
+			if ( !\IPS\Member::loggedIn()->member_id )
 			{
-				Output::i()->error( 'no_module_permission_guest', '2X215/3', 403, '' );
+				\IPS\Output::i()->error( 'no_module_permission_guest', '2X215/3', 403, '' );
 			}
 		
-			Output::i()->title = Member::loggedIn()->language()->addToStack('client_invoices');
-			if ( isset( Request::i()->do ) )
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('client_invoices');
+			if ( isset( \IPS\Request::i()->do ) )
 			{
-				Output::i()->error( 'node_error', '2X215/2', 403, '' );
+				\IPS\Output::i()->error( 'node_error', '2X215/2', 403, '' );
 			}
 		}
 		
 		/* Execute */
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'clients.css', 'nexus' ) );
-		Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'clients.css', 'nexus' ) );
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
 		parent::execute();
 	}
 	
 	/**
 	 * @brief Invoices Per Page
 	 */
-	protected static int $invoicesPerPage = 25;
+	protected static $invoicesPerPage = 25;
 
 	/**
 	 * View List
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{	
-		$where = array( 'i_member=?', Member::loggedIn()->member_id );
-		$parentContacts = Customer::loggedIn()->parentContacts( array( 'billing=1' ) );
-		if ( count( $parentContacts ) )
+		$where = array( 'i_member=?', \IPS\Member::loggedIn()->member_id );
+		$parentContacts = \IPS\nexus\Customer::loggedIn()->parentContacts( array( 'billing=1' ) );
+		if ( \count( $parentContacts ) )
 		{
+			$or = array();
 			foreach ( array_keys( iterator_to_array( $parentContacts ) ) as $id )
 			{
 				$where[0] .= ' OR i_member=?';
@@ -141,8 +114,8 @@ class invoices extends Controller
 			}
 		}
 		
-		$count = Db::i()->select( 'COUNT(*)', 'nexus_invoices', $where )->first();
-		$page = isset( Request::i()->page ) ? Request::i()->page : 1;
+		$count = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_invoices', $where )->first();
+		$page = isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1;
 		
 		if ( $page < 1 )
 		{
@@ -153,13 +126,13 @@ class invoices extends Controller
 		
 		if ( $page > $pages )
 		{
-			Output::i()->redirect( Url::internal( "app=nexus&module=clients&controller=invoices", 'front', 'clientsinvoices' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=nexus&module=clients&controller=invoices", 'front', 'clientsinvoices' ) );
 		}
 		
-		$pagination = Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( Url::internal( "app=nexus&module=clients&controller=invoices", 'front', 'clientsinvoices' ), $pages, $page, static::$invoicesPerPage );
+		$pagination = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( \IPS\Http\Url::internal( "app=nexus&module=clients&controller=invoices", 'front', 'clientsinvoices' ), $pages, $page, static::$invoicesPerPage );
 				
-		$invoices = new ActiveRecordIterator( Db::i()->select( '*', 'nexus_invoices', $where, 'i_date DESC', array( ( $page - 1 ) * static::$invoicesPerPage, static::$invoicesPerPage ) ), 'IPS\nexus\Invoice' );
-		Output::i()->output = Theme::i()->getTemplate('clients')->invoices( $invoices, $pagination );
+		$invoices = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_invoices', $where, 'i_date DESC', array( ( $page - 1 ) * static::$invoicesPerPage, static::$invoicesPerPage ) ), 'IPS\nexus\Invoice' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->invoices( $invoices, $pagination );
 	}
 	
 	/**
@@ -167,9 +140,10 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function view() : void
+	public function view()
 	{
-		Output::i()->output = Theme::i()->getTemplate('clients')->invoice( $this->invoice );
+		$shipments = $this->invoice->shipments();		
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->invoice( $this->invoice );
 	}
 	
 	/**
@@ -177,18 +151,18 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function poNumber() : void
+	public function poNumber()
 	{		
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--po-number ipsForm--noLabels';
-		$form->add( new Text( 'invoice_po_number', $this->invoice->po, FALSE, array( 'maxLength' => 255 ) ) );
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical ipsForm_noLabels';
+		$form->add( new \IPS\Helpers\Form\Text( 'invoice_po_number', $this->invoice->po, FALSE, array( 'maxLength' => 255 ) ) );
 		if ( $values = $form->values() )
 		{
 			$this->invoice->po = $values['invoice_po_number'];
 			$this->invoice->save();
-			Output::i()->redirect( $this->invoice->url() );
+			\IPS\Output::i()->redirect( $this->invoice->url() );
 		}
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );;
 	}
 	
 	/**
@@ -196,19 +170,19 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function notes() : void
+	public function notes()
 	{		
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--invoice-notes ipsForm--noLabels';
-		$form->add( new TextArea( 'invoice_notes', $this->invoice->notes ) );
-		Member::loggedIn()->language()->words['invoice_notes_desc'] = '';
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical ipsForm_noLabels';
+		$form->add( new \IPS\Helpers\Form\TextArea( 'invoice_notes', $this->invoice->notes ) );
+		\IPS\Member::loggedIn()->language()->words['invoice_notes_desc'] = '';
 		if ( $values = $form->values() )
 		{
 			$this->invoice->notes = $values['invoice_notes'];
 			$this->invoice->save();
-			Output::i()->redirect( $this->invoice->url() );
+			\IPS\Output::i()->redirect( $this->invoice->url() );
 		}
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );;
 	}
 	
 	/**
@@ -216,11 +190,11 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function printout() : void
+	public function printout()
 	{
-		$output = Theme::i()->getTemplate( 'invoices', 'nexus', 'global' )->printInvoice( $this->invoice, $this->invoice->summary(), $this->invoice->billaddress ?: $this->invoice->member->primaryBillingAddress() );
-		Output::i()->title = 'I' . $this->invoice->id;
-		Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $output ) );
+		$output = \IPS\Theme::i()->getTemplate( 'invoices', 'nexus', 'global' )->printInvoice( $this->invoice, $this->invoice->summary(), $this->invoice->billaddress ?: $this->invoice->member->primaryBillingAddress() );
+		\IPS\Output::i()->title = 'I' . $this->invoice->id;
+		\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $output ) );
 	}
 	
 	/**
@@ -228,45 +202,42 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function cancel() : void
+	public function cancel()
 	{
 		/* CSRF check */
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Can only cancel the invoice if it's pending and there are no processing transactions */
-		if ( $this->invoice->status !== Invoice::STATUS_PENDING or count( $this->invoice->transactions( [ Transaction::STATUS_HELD, Transaction::STATUS_REVIEW, Transaction::STATUS_GATEWAY_PENDING, Transaction::STATUS_DISPUTED ] ) ) )
+		if ( $this->invoice->status !== \IPS\nexus\Invoice::STATUS_PENDING or \count( $this->invoice->transactions( [ \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_REVIEW, \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING, \IPS\nexus\Transaction::STATUS_DISPUTED ] ) ) )
 		{
-			Output::i()->error( 'order_already_paid', '2X215/4', 403, '' );
+			\IPS\Output::i()->error( 'order_already_paid', '2X215/4', 403, '' );
 		}
 				        
         /* If they have already made a partial payment, refund it to their account credit */
-        foreach ( $this->invoice->transactions( array( Transaction::STATUS_PAID, Transaction::STATUS_PART_REFUNDED ) ) as $transaction )
+        foreach ( $this->invoice->transactions( array( \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_PART_REFUNDED ) ) as $transaction )
 		{
-			/* @var Transaction $transaction */
 			try
 			{
 				$transaction->refund( 'credit' );
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				Output::i()->error( 'order_cancel_error', '4C171/5', 500, $e->getMessage() );
+				\IPS\Output::i()->error( 'order_cancel_error', '4C171/5', 500, $e->getMessage() );
 			}
 		}
 		
 		/* Cancel the invoice */
-		$this->invoice->status = invoice::STATUS_CANCELED;
+		$this->invoice->status = \IPS\nexus\invoice::STATUS_CANCELED;
 		$this->invoice->save();
 		$this->invoice->member->log( 'invoice', array( 'type' => 'status', 'new' => 'canc', 'id' => $this->invoice->id, 'title' => $this->invoice->title ) );
 
 		/* Run any callbacks (for example, coupons get unmarked as being used) */
-        foreach ( $this->invoice->items as $item )
+        foreach ( $this->invoice->items as $k => $item )
         {
             $item->onInvoiceCancel( $this->invoice );
-
-			Event::fire( 'onInvoiceCancel', $item, array( $this->invoice ) );
         }
         
         /* Redirect */
-		Output::i()->redirect( $this->invoice->url() );
+		\IPS\Output::i()->redirect( $this->invoice->url() );
 	}
 }

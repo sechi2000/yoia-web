@@ -12,49 +12,30 @@
 namespace IPS\nexus\modules\admin\subscriptions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Purchase;
-use IPS\nexus\Subscription;
-use IPS\nexus\Subscription\Package;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_NODE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Subscribers
  */
-class subscribers extends Controller
+class _subscribers extends \IPS\Dispatcher\Controller
 {	
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'subscribers_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'subscribers_manage' );
 		parent::execute();
 	}
 	
@@ -63,18 +44,10 @@ class subscribers extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
-	{
-		/* If we came from the Subscription Plans page, we might have a
-		package ID passed in the URL */
-		$where = [];
-		if( isset( Request::i()->nexus_sub_package_id ) AND Request::i()->nexus_sub_package_id )
-		{
-			$where[] = array( 'sub_package_id=?', Request::i()->nexus_sub_package_id );
-		}
-
+	protected function manage()
+	{		
 		/* Create the table */
-		$table = new Db( 'nexus_member_subscriptions', Url::internal( 'app=nexus&module=subscriptions&controller=subscribers' ), $where );
+		$table = new \IPS\Helpers\Table\Db( 'nexus_member_subscriptions', \IPS\Http\Url::internal( 'app=nexus&module=subscriptions&controller=subscribers' ) );
 		$table->joins = array(
 			array(
 				'select'	=> 'core_members.*',
@@ -99,27 +72,26 @@ class subscribers extends Controller
 		$table->parsers = array(
 			'photo'	=> function( $val, $row )
 			{
-				return Theme::i()->getTemplate('customers')->rowPhoto( Member::constructFromData( $row ) );
+				return \IPS\Theme::i()->getTemplate('customers')->rowPhoto( \IPS\Member::constructFromData( $row ) );
 			},
 			'sub_member_id' => function( $val ) {
-				return Theme::i()->getTemplate('global', 'nexus')->userLink( Member::load( $val ) );
+				return \IPS\Theme::i()->getTemplate('global', 'nexus')->userLink( \IPS\Member::load( $val ) );
 			},
 			'sub_package_id' => function( $val ) {
 				try
 				{
-					return Theme::i()->getTemplate('subscription', 'nexus')->packageLink( Package::load( $val ) );
+					return \IPS\Theme::i()->getTemplate('subscription', 'nexus')->packageLink( \IPS\nexus\Subscription\Package::load( $val ) );
 				}
-				catch( OutOfRangeException ) { }
-				return '';
+				catch( \OutOfRangeException $e ) { }
 			},
 			'sub_start'	=> function( $val ) {
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
 			'sub_expire'	=> function( $val, $row ) {
-				return $val ? Subscription::constructFromData( $row )->_expire : '';
+				return $val ? \IPS\nexus\Subscription::constructFromData( $row )->_expire : '';
 			},
 			'sub_active'    => function( $val ) {
-				return Theme::i()->getTemplate('subscription', 'nexus')->status( $val );
+				return \IPS\Theme::i()->getTemplate('subscription', 'nexus')->status( $val );
 			}
 		);
 		
@@ -131,7 +103,7 @@ class subscribers extends Controller
 				$return['purchase']	= array(
 					'title'	=> 'nexus_subs_view_purchase',
 					'icon'	=> 'search',
-					'link'	=> Url::internal( "app=nexus&module=subscriptions&controller=subscribers&do=findPurchase&id=" . $row['sub_id'] )
+					'link'	=> \IPS\Http\Url::internal( "app=nexus&module=subscriptions&controller=subscribers&do=findPurchase&id=" . $row['sub_id'] )
 				);
 			}
 			
@@ -145,32 +117,32 @@ class subscribers extends Controller
 		);
 		
 		$table->advancedSearch = array(
-			'cm_first_name'		=> SEARCH_CONTAINS_TEXT,
-			'cm_last_name'		=> SEARCH_CONTAINS_TEXT,
-			'email'				=> SEARCH_CONTAINS_TEXT,
-			'name'				=> SEARCH_CONTAINS_TEXT,
-			'sub_expire'	 => SEARCH_DATE_RANGE,
-			'sub_start'	     => SEARCH_DATE_RANGE,
-			'sub_package_id' => array( SEARCH_NODE, array(
+			'cm_first_name'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'cm_last_name'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'email'				=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'name'				=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'sub_expire'	 => \IPS\Helpers\Table\SEARCH_DATE_RANGE,
+			'sub_start'	     => \IPS\Helpers\Table\SEARCH_DATE_RANGE,
+			'sub_package_id' => array( \IPS\Helpers\Table\SEARCH_NODE, array(
 				'class'				=> '\IPS\nexus\Subscription\Package',
 				'zeroVal'			=> 'any'
 			) ),
 		);
 		
 		/* Breadcrumb? */
-		if ( isset( Request::i()->nexus_sub_package_id ) )
+		if ( isset( \IPS\Request::i()->nexus_sub_package_id ) )
 		{
 			try
 			{
-				$package = Package::load( Request::i()->nexus_sub_package_id );
-				Output::i()->breadcrumb[] = array( Url::internal( "app=nexus&module=subscriptions&controller=subscriptions&id=" . $package->id ), $package->_title );
+				$package = \IPS\nexus\Subscription\Package::load( \IPS\Request::i()->nexus_sub_package_id );
+				\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( "app=nexus&module=subscriptions&controller=subscriptions&id=" . $package->id ), $package->_title );
 			}
-			catch( OutOfRangeException ) { }
+			catch( \OutOfRangeException $e ) { }
 		}
 		
 		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('r__subscribers');
-		Output::i()->output = (string) $table;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('r__subscribers');
+		\IPS\Output::i()->output = (string) $table;
 	}
 	
 	/**
@@ -178,17 +150,17 @@ class subscribers extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function findPurchase() : void
+	protected function findPurchase()
 	{
 		try
 		{
-			$sub = Subscription::load( Request::i()->id );
-			$purchase = Purchase::load( $sub->purchase_id );
-			Output::i()->redirect( $purchase->acpUrl() );
+			$sub = \IPS\nexus\Subscription::load( \IPS\Request::i()->id );
+			$purchase = \IPS\nexus\Purchase::load( $sub->purchase_id );
+			\IPS\Output::i()->redirect( $purchase->acpUrl() );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'nexus_sub_no_purchase', '2X378/2', 404, '' );
+			\IPS\Output::i()->error( 'nexus_sub_no_purchase', '2X378/2', 404, '' );
 		}
 	}
 	

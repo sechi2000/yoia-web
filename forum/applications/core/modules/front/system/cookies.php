@@ -10,34 +10,27 @@
 
 namespace IPS\core\modules\front\system;
 
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Http\Url\Exception;
-use IPS\Http\Url\Internal;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use function defined;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+
+use IPS\Helpers\Form\YesNo;
+use IPS\Output;
+
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Cookie Information Page
  */
-class cookies extends Controller
+class _cookies extends \IPS\Dispatcher\Controller
 {
-	public function execute(): void
+	public function execute()
 	{
 		parent::execute();
 
-		Output::setCacheTime( false );
+		\IPS\Output::setCacheTime( false );
 	}
 
 	/**
@@ -45,18 +38,17 @@ class cookies extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage(): void
+	protected function manage()
 	{
 		/* Set Session Location */
-		Session::i()->setLocation( Url::internal( 'app=core&module=system&controller=cookies', NULL, 'cookies' ), array(), 'loc_viewing_cookie_policy' );
-
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('cookies_about') );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('cookies_about');
-		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->metaTags['robots'] = 'noindex';
-		Output::i()->bodyClasses[] = 'ipsLayout_minimal';
-		Output::i()->output = Theme::i()->getTemplate( 'system' )->cookies();
-
+		\IPS\Session::i()->setLocation( \IPS\Http\Url::internal( 'app=core&module=system&controller=cookies', NULL, 'cookies' ), array(), 'loc_viewing_cookie_policy' );
+		
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack('cookies_about') );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('cookies_about');
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->metaTags['robots'] = 'noindex';
+		\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimal';
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->cookies();
 	}
 
 	/**
@@ -64,26 +56,26 @@ class cookies extends Controller
 	 *
 	 * @return void
 	 */
-	protected function cookieConsentToggle(): void
+	protected function cookieConsentToggle()
 	{
-		Session::i()->csrfCheck();
-		Member::loggedIn()->setAllowOptionalCookies( (bool) Request::i()->status );
-		if ( isset( Request::i()->ref ) )
+		\IPS\Session::i()->csrfCheck();
+		\IPS\Member::loggedIn()->setAllowOptionalCookies( (bool) \IPS\Request::i()->status );
+		if ( isset( \IPS\Request::i()->ref ) )
 		{
 			try
 			{
-				$url = Url::createFromString( base64_decode( Request::i()->ref ) );
+				$url = \IPS\Http\Url::createFromString( base64_decode( \IPS\Request::i()->ref ) );
 			}
-			catch( Exception $e )
+			catch( \IPS\Http\Url\Exception $e )
 			{
 				$url = NULL;
 			}
 
-			if ( $url instanceof Internal and !$url->openRedirect() )
+			if ( $url instanceof \IPS\Http\Url\Internal and !$url->openRedirect() )
 			{
-				Output::i()->redirect( $url );
+				\IPS\Output::i()->redirect( $url );
 			}
 		}
-		Output::i()->redirect( Url::internal('') );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal(''));
 	}
 }

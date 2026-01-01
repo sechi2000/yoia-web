@@ -12,32 +12,16 @@
 namespace IPS\Content\ShareServices;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\Content\ShareServices;
-use IPS\core\ShareLinks\Service;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Text;
-use IPS\IPS;
-use IPS\Login\Handler;
-use IPS\Member;
-use IPS\Settings;
-use IPS\Theme;
-use Throwable;
-use function defined;
-use function ord;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
- * Twitter share link
+ * X share link
  */
-class X extends ShareServices
+class _X extends \IPS\Content\ShareServices
 {
 	/**
 	 * Determine whether the logged in user has the ability to autoshare
@@ -46,10 +30,6 @@ class X extends ShareServices
 	 */
 	public static function canAutoshare(): bool
 	{
-		if ( $method = Handler::findMethod( 'IPS\Login\Handler\OAuth1\Twitter' ) and $method->canProcess( Member::loggedIn() ) )
-		{
-			return TRUE;
-		}
 		return FALSE;
 	}
 	
@@ -57,24 +37,24 @@ class X extends ShareServices
 	 * Publish text or a URL to this service
 	 *
 	 * @param	string	$content	Text to publish
-	 * @param	string|null	$url		[URL to publish]
+	 * @param	string	$url		[URL to publish]
 	 * @return	void
 	 */
-	public static function publish( string $content, string|null $url=null ): void
+	public static function publish( $content, $url=null )
 	{
-		throw new InvalidArgumentException( Member::loggedIn()->language()->addToStack('x_publish_no_user') );
+		throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack('x_publish_no_user') );
 	}
 
 	/**
 	 * Add any additional form elements to the configuration form. These must be setting keys that the service configuration form can save as a setting.
 	 *
-	 * @param	Form				$form		Configuration form for this service
-	 * @param	Service	$service	The service
+	 * @param	\IPS\Helpers\Form				$form		Configuration form for this service
+	 * @param	\IPS\core\ShareLinks\Service	$service	The service
 	 * @return	void
 	 */
-	public static function modifyForm( Form &$form, Service $service ): void
+	public static function modifyForm( \IPS\Helpers\Form &$form, $service )
 	{
-		$form->add( new Text( 'x_hashtag', Settings::i()->x_hashtag, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'x_hashtag', \IPS\Settings::i()->x_hashtag, FALSE ) );
 	}
 
 	/**
@@ -82,28 +62,31 @@ class X extends ShareServices
 	 *
 	 * @return	string
 	 */
-	public function __toString(): string
+	public function __toString()
 	{
 		try
 		{
 			$url = preg_replace_callback( "{[^0-9a-z_.!~*'();,/?:@&=+$#-]}i",
 				function ( $m )
 				{
-					return sprintf( '%%%02X', ord( $m[0] ) );
+					return sprintf( '%%%02X', \ord( $m[0] ) );
 				},
 				$this->url) ;
 
 			$title = $this->title ?: NULL;
-			if ( Settings::i()->x_hashtag !== '')
+			if ( \IPS\Settings::i()->x_hashtag !== '')
 			{
-				$title .= ' ' . Settings::i()->x_hashtag;
+				$title .= ' ' . \IPS\Settings::i()->x_hashtag;
 			}
-			return Theme::i()->getTemplate( 'sharelinks', 'core' )->x( urlencode( $url ), rawurlencode( $title ) );
+			return \IPS\Theme::i()->getTemplate( 'sharelinks', 'core' )->x( urlencode( $url ), rawurlencode( $title ) );
 		}
-		catch ( Exception | Throwable $e )
+		catch ( \Exception $e )
 		{
-			IPS::exceptionHandler( $e );
+			\IPS\IPS::exceptionHandler( $e );
 		}
-		return '';
+		catch ( \Throwable $e )
+		{
+			\IPS\IPS::exceptionHandler( $e );
+		}
 	}
 }

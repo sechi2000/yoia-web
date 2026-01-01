@@ -11,81 +11,26 @@
 namespace IPS\core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application as SystemApplication;
-use IPS\Application\Module;
-use IPS\Content;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Content\Reaction;
-use IPS\Content\Review;
-use IPS\core\Achievements\Badge;
-use IPS\core\Achievements\Rank;
-use IPS\core\Achievements\Rule;
-use IPS\core\Assignments\Assignment;
-use IPS\core\extensions\core\CommunityEnhancements\FacebookPixel;
-use IPS\core\extensions\core\CommunityEnhancements\Postmark;
-use IPS\core\extensions\core\CommunityEnhancements\SendGrid;
-use IPS\core\extensions\core\CommunityEnhancements\Zapier;
-use IPS\core\Followed\Follow;
-use IPS\core\Warnings\Warning;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\PrivacyAction;
-use IPS\MFA\MFAHandler;
-use IPS\Node\Model;
-use IPS\Notification;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function is_numeric;
-use function ltrim;
-use function var_export;
-use const IPS\CIC;
-use const IPS\DEMO_MODE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Core Application Class
  */
-class Application extends SystemApplication
+class _Application extends \IPS\Application
 {
 	/**
 	 * @brief	Cached advertisement count
 	 */
-	protected ?int $advertisements	= NULL;
+	protected $advertisements	= NULL;
 	
 	/**
 	 * @brief	Cached clubs pending approval count
 	 */
-	protected ?int $clubs = NULL;
+	protected $clubs = NULL;
 
 	/**
 	 * ACP Menu Numbers
@@ -93,7 +38,7 @@ class Application extends SystemApplication
 	 * @param	array	$queryString	Query String
 	 * @return	int
 	 */
-	public function acpMenuNumber( string $queryString ): int
+	public function acpMenuNumber( $queryString )
 	{
 		parse_str( $queryString, $queryString );
 		switch ( $queryString['controller'] )
@@ -101,23 +46,24 @@ class Application extends SystemApplication
 			case 'advertisements':
 				if( $this->advertisements === NULL )
 				{
-					$this->advertisements	= Db::i()->select( 'COUNT(*)', 'core_advertisements', array( 'ad_active=-1' ) )->first();
+					$this->advertisements	= \IPS\Db::i()->select( 'COUNT(*)', 'core_advertisements', array( 'ad_active=-1' ) )->first();
 				}
 				return $this->advertisements;
 			
 			case 'clubs':
 				if( $this->clubs === NULL )
 				{
-					$this->clubs	= Db::i()->select( 'COUNT(*)', 'core_clubs', array( 'approved=0' ) )->first();
+					$this->clubs	= \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs', array( 'approved=0' ) )->first();
 				}
 				return $this->clubs;
 
 			case 'privacy':
-				$where = ['action IN (?)', Db::i()->in('action', [ PrivacyAction::TYPE_REQUEST_DELETE, PrivacyAction::TYPE_REQUEST_PII] ) ];
-				return Db::i()->select( 'COUNT(*)', 'core_member_privacy_actions', $where)->first();
+				$where = ['action IN (?)', \IPS\Db::i()->in('action', [\IPS\Member\PrivacyAction::TYPE_REQUEST_DELETE, \IPS\Member\PrivacyAction::TYPE_REQUEST_PII] ) ];
+				return \IPS\Db::i()->select( 'COUNT(*)', 'core_member_privacy_actions', $where)->first();
 
 			case 'themes':
 			case 'applications':
+			case 'plugins':
 			case 'languages':
 				return $this->_getUpdateCount( $queryString['controller'] );
 		}
@@ -130,26 +76,26 @@ class Application extends SystemApplication
 	 *
 	 * @return array
 	 */
-	public function acpMenu(): array
+	public function acpMenu()
 	{
 		$menu = parent::acpMenu();
 		
-		if ( DEMO_MODE )
+		if ( \IPS\DEMO_MODE )
 		{
 			unset( $menu['support'] );
 		}
+		
+		if ( \IPS\Application::appIsEnabled( 'cloud' ) )
+		{
+			$menu['smartcommunity']['features'] = array(
+				'tab'			=> 'core',
+				'controller'	=> 'cloud',
+				'do'			=> '',
+				'restriction'	=> 'licensekey_manage'
+			);
+		}
 
 		return $menu;
-	}
-
-	/**
-	 * Which items should always be first in the ACP menu?
-	 * Example:  [ [ 'stats' => 'core_keystats' ] ]
-	 * @return array
-	 */
-	public function acpMenuItemsAlwayFirst(): array
-	{
-		return [ [ 'stats' => 'core_keystats' ] ];
 	}
 	
 	/**
@@ -157,14 +103,14 @@ class Application extends SystemApplication
 	 *
 	 * @return	NULL|array		Null for no badge, or an array of badge data (0 => CSS class type, 1 => language string, 2 => optional raw HTML to show instead of language string)
 	 */
-	public function get__badge(): ?array
+	public function get__badge()
 	{
 		$return = parent::get__badge();
 		
 		if ( $return )
 		{
 			$availableUpgrade = $this->availableUpgrade( TRUE, FALSE );
-			$return[2] = Theme::i()->getTemplate( 'global', 'core' )->updatebadge( $availableUpgrade['version'], Url::internal( 'app=core&module=system&controller=upgrade', 'admin' ), DateTime::ts( $availableUpgrade['released'] )->localeDate(), FALSE );
+			$return[2] = \IPS\Theme::i()->getTemplate( 'global', 'core' )->updatebadge( $availableUpgrade['version'], \IPS\Http\Url::internal( 'app=core&module=system&controller=upgrade', 'admin' ), (string) \IPS\DateTime::ts( $availableUpgrade['released'] )->localeDate(), FALSE );
 		}
 		
 		return $return;
@@ -174,9 +120,9 @@ class Application extends SystemApplication
 	 * [Node] Get Icon for tree
 	 *
 	 * @note	Return the class for the icon (e.g. 'globe')
-	 * @return    string
+	 * @return	string|null
 	 */
-	protected function get__icon(): string
+	protected function get__icon()
 	{
 		return 'cogs';
 	}
@@ -186,43 +132,43 @@ class Application extends SystemApplication
 	 *
 	 * @return	void
 	 */
-	public function installOther() : void
+	public function installOther()
 	{
 		/* Save installed domain to spam defense whitelist */
-		$domain = rtrim( str_replace( 'www.', '', parse_url( Settings::i()->base_url, PHP_URL_HOST ) ), '/' );
-		Db::i()->insert( 'core_spam_whitelist', array( 'whitelist_type' => 'domain', 'whitelist_content' => $domain, 'whitelist_date' => time(), 'whitelist_reason' => 'Invision Community Domain' ) );
+		$domain = rtrim( str_replace( 'www.', '', parse_url( \IPS\Settings::i()->base_url, PHP_URL_HOST ) ), '/' );
+		\IPS\Db::i()->insert( 'core_spam_whitelist', array( 'whitelist_type' => 'domain', 'whitelist_content' => $domain, 'whitelist_date' => time(), 'whitelist_reason' => 'Invision Community Domain' ) );
 
 		/* Generate VAPID keys for web push notifications */
 		try 
 		{
-			$vapid = Notification::generateVapidKeys();
-			Settings::i()->changeValues( array( 'vapid_public_key' => $vapid['publicKey'], 'vapid_private_key' => $vapid['privateKey'] ) );
+			$vapid = \IPS\Notification::generateVapidKeys();
+			\IPS\Settings::i()->changeValues( array( 'vapid_public_key' => $vapid['publicKey'], 'vapid_private_key' => $vapid['privateKey'] ) );
 		}
-		catch (Exception $ex)
+		catch (\Exception $ex)
 		{
-			Log::log( $ex, 'create_vapid_keys' );
+			\IPS\Log::log( $ex, 'create_vapid_keys' );
 		}
 
 		/* Install default ranks, rules and badges */
-		Rule::importXml( $this->getApplicationPath() . "/data/achievements/rules.xml" );
-		Rank::importXml( $this->getApplicationPath() . "/data/achievements/ranks.xml" );
-		Badge::importXml( $this->getApplicationPath() . "/data/achievements/badges.xml" );
+		\IPS\core\Achievements\Rule::importXml( $this->getApplicationPath() . "/data/achievements/rules.xml" );
+		\IPS\core\Achievements\Rank::importXml( $this->getApplicationPath() . "/data/achievements/ranks.xml" );
+		\IPS\core\Achievements\Badge::importXml( $this->getApplicationPath() . "/data/achievements/badges.xml" );
 	}
 	
 	/**
 	 * Can view page even when user is a guest when guests cannot access the site
 	 *
-	 * @param	Module	$module			The module
-	 * @param string $controller		The controller
-	 * @param string|null $do				To "do" parameter
+	 * @param	\IPS\Application\Module	$module			The module
+	 * @param	string					$controller		The controller
+	 * @param	string|NULL				$do				To "do" parameter
 	 * @return	bool
 	 */
-	public function allowGuestAccess(Module $module, string $controller, ?string $do ): bool
+	public function allowGuestAccess( \IPS\Application\Module $module, $controller, $do )
 	{
 		return (
 			$module->key == 'system'
 			and
-			in_array( $controller, array( 'login', 'register', 'lostpass', 'terms', 'ajax', 'privacy', 'editor',
+			\in_array( $controller, array( 'login', 'register', 'lostpass', 'terms', 'ajax', 'privacy', 'editor',
 				'language', 'theme', 'redirect', 'guidelines', 'announcement', 'metatags', 'serviceworker', 'offline', 'cookie' ) )
 		)
 		or
@@ -231,29 +177,30 @@ class Application extends SystemApplication
 		)
         or
         (
-            $module->key == 'discover' and in_array( $controller, array( 'rss', 'streams' ) )
-		)
+            $module->key == 'discover' and \in_array( $controller, array( 'rss', 'streams' ) )
+        )
 		or
 		(
 			$module->key == 'system' and $controller == 'metatags' and $do == 'manifest'
-		);
+		)
+		;
 	}
 	
 	/**
 	 * Can view page even when site is offline
 	 *
-	 * @param	Module	$module			The module
-	 * @param string $controller		The controller
-	 * @param string|null $do				To "do" parameter
+	 * @param	\IPS\Application\Module	$module			The module
+	 * @param	string					$controller		The controller
+	 * @param	string|NULL				$do				To "do" parameter
 	 * @return	bool
 	 */
-	public function allowOfflineAccess( Module $module, string $controller, ?string $do ): bool
+	public function allowOfflineAccess( \IPS\Application\Module $module, $controller, $do )
 	{
 		return (
 			$module->key == 'system'
 			and
 			(
-				in_array( $controller, array(
+				\in_array( $controller, array(
 					'login', // Because you can login when offline
 					'embed', // Because the offline message can contain embedded media
 					'lostpass',
@@ -275,44 +222,6 @@ class Application extends SystemApplication
 			or
 				in_array( $controller, ['terms', 'cookies'] )	// whitelist terms and cookies pages
 			)
-		);
-	}
-
-	/**
-	 * Can view page even when the member is IP banned
-	 *
-	 * @param Module $module
-	 * @param string $controller
-	 * @param string|null $do
-	 * @return bool
-	 */
-	public function allowBannedAccess( Module $module, string $controller, ?string $do ) : bool
-	{
-		return (
-				$module->key == 'system'
-				and
-				in_array( $controller, [ 'warnings', 'privacy', 'guidelines', 'metatags' ] )
-			)
-			or
-			(
-				$module->key == 'contact' and $controller == 'contact'
-			);
-	}
-
-	/**
-	 * Can view page even when the member is validating
-	 *
-	 * @param Module $module
-	 * @param string $controller
-	 * @param string|null $do
-	 * @return bool
-	 */
-	public function allowValidatingAccess( Module $module, string $controller, ?string $do ) : bool
-	{
-		return (
-			$module->key == 'system'
-			and
-			in_array( $controller, [ 'register', 'login', 'redirect', 'cookies' ] )
 		);
 	}
 	
@@ -339,7 +248,7 @@ class Application extends SystemApplication
 	 * @endcode
 	 * @return array
 	 */
-	public function defaultFrontNavigation(): array
+	public function defaultFrontNavigation()
 	{
 		$activityTabs = array(
 			array( 'key' => 'AllActivity' ),
@@ -350,17 +259,17 @@ class Application extends SystemApplication
 		{
 			try
 			{
-				Stream::load( $k );
+				\IPS\core\Stream::load( $k );
 				$activityTabs[] = array(
 					'key'		=> 'YourActivityStreamsItem',
 					'config'	=> array( 'menu_stream_id' => $k )
 				);
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
 		$activityTabs[] = array( 'key' => 'Search' );
-		$activityTabs[] = array( 'key' => 'Featured' );
+		$activityTabs[] = array( 'key' => 'Promoted' );
 		
 		return array(
 			'rootTabs'		=> array(),
@@ -382,62 +291,62 @@ class Application extends SystemApplication
 	 *
 	 * @return	void
 	 */
-	public function convertLegacyParameters() : void
+	public function convertLegacyParameters()
 	{
 		/* Convert &section= to &controller= */
-		if ( isset( Request::i()->section ) AND !isset( Request::i()->controller ) )
+		if ( isset( \IPS\Request::i()->section ) AND !isset( \IPS\Request::i()->controller ) )
 		{
-			Request::i()->controller = Request::i()->section;
+			\IPS\Request::i()->controller = \IPS\Request::i()->section;
 		}
 
 		/* Convert &showuser= */
-		if ( isset( Request::i()->showuser ) and is_numeric( Request::i()->showuser ) )
+		if ( isset( \IPS\Request::i()->showuser ) and \is_numeric( \IPS\Request::i()->showuser ) )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=members&controller=profile&id=' . Request::i()->showuser ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=members&controller=profile&id=' . \IPS\Request::i()->showuser ) );
 		}
 		
 		/* Redirect ?app=core&module=attach&section=attach&attach_rel_module=post&attach_id= */
-		if ( isset( Request::i()->app ) AND Request::i()->app == 'core' AND isset( Request::i()->controller ) AND Request::i()->controller == 'attach' AND isset( Request::i()->attach_id ) AND is_numeric( Request::i()->attach_id ) )
+		if ( isset( \IPS\Request::i()->app ) AND \IPS\Request::i()->app == 'core' AND isset( \IPS\Request::i()->controller ) AND \IPS\Request::i()->controller == 'attach' AND isset( \IPS\Request::i()->attach_id ) AND \is_numeric( \IPS\Request::i()->attach_id ) )
 		{
-			Output::i()->redirect( Url::internal( "applications/core/interface/file/attachment.php?id=" . Request::i()->attach_id, 'none' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "applications/core/interface/file/attachment.php?id=" . \IPS\Request::i()->attach_id, 'none' ) );
 		}
 
 		/* redirect vnc to new streams */
-		if( isset( Request::i()->app ) AND Request::i()->app == 'core' AND  isset( Request::i()->controller ) AND Request::i()->controller == 'vnc' )
+		if( isset( \IPS\Request::i()->app ) AND \IPS\Request::i()->app == 'core' AND  isset( \IPS\Request::i()->controller ) AND \IPS\Request::i()->controller == 'vnc' )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=discover&controller=streams' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=discover&controller=streams' ) );
 		}
 
 		/* redirect 4.0 activity page to streams */
-		if( isset( Request::i()->app ) AND Request::i()->app == 'core' AND isset( Request::i()->module ) AND (Request::i()->module == 'activity' ) AND isset( Request::i()->controller ) AND Request::i()->controller == 'activity' )
+		if( isset( \IPS\Request::i()->app ) AND \IPS\Request::i()->app == 'core' AND isset( \IPS\Request::i()->module ) AND (\IPS\Request::i()->module == 'activity' ) AND isset( \IPS\Request::i()->controller ) AND \IPS\Request::i()->controller == 'activity' )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=discover&controller=streams' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=discover&controller=streams' ) );
 		}
 
 		/* redirect old message link */
-		if( isset( Request::i()->app ) AND Request::i()->app == 'members' AND isset( Request::i()->module ) AND ( Request::i()->module == 'messaging' ) AND Request::i()->controller == 'view' AND isset( Request::i()->topicID ) )
+		if( isset( \IPS\Request::i()->app ) AND \IPS\Request::i()->app == 'members' AND isset( \IPS\Request::i()->module ) AND ( \IPS\Request::i()->module == 'messaging' ) AND \IPS\Request::i()->controller == 'view' AND isset( \IPS\Request::i()->topicID ) )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=messaging&controller=messenger&id=' . Request::i()->topicID, 'front', 'messenger_convo' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=messaging&controller=messenger&id=' . \IPS\Request::i()->topicID, 'front', 'messenger_convo' ) );
 		}
 
 		/* redirect old messenger link */
-		if( isset( Request::i()->app ) AND Request::i()->app == 'members' AND isset( Request::i()->module ) AND ( Request::i()->module == 'messaging' ) )
+		if( isset( \IPS\Request::i()->app ) AND \IPS\Request::i()->app == 'members' AND isset( \IPS\Request::i()->module ) AND ( \IPS\Request::i()->module == 'messaging' ) )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=messaging&controller=messenger', 'front', 'messaging' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=messaging&controller=messenger', 'front', 'messaging' ) );
 		}
 
 		/* redirect old messenger link */
-		if( isset( Request::i()->module ) AND Request::i()->module == 'global' AND isset( Request::i()->controller ) AND (Request::i()->controller == 'register' ) )
+		if( isset( \IPS\Request::i()->module ) AND \IPS\Request::i()->module == 'global' AND isset( \IPS\Request::i()->controller ) AND (\IPS\Request::i()->controller == 'register' ) )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=system&controller=register', 'front', 'register' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=register', 'front', 'register' ) );
 		}
 
 		/* redirect old reports */
-		if( isset( Request::i()->app ) AND Request::i()->app == 'core' AND
-			isset( Request::i()->module ) AND (Request::i()->module == 'reports' ) AND
-			isset( Request::i()->do ) AND ( Request::i()->do == 'show_report' )  )
+		if( isset( \IPS\Request::i()->app ) AND \IPS\Request::i()->app == 'core' AND
+			isset( \IPS\Request::i()->module ) AND (\IPS\Request::i()->module == 'reports' ) AND
+			isset( \IPS\Request::i()->do ) AND ( \IPS\Request::i()->do == 'show_report' )  )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=modcp&controller=modcp&tab=reports&action=view&id=' . Request::i()->rid , 'front', 'modcp_report' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=modcp&controller=modcp&tab=reports&action=view&id=' . \IPS\Request::i()->rid , 'front', 'modcp_report' ) );
 		}
 	}
 	
@@ -446,102 +355,102 @@ class Application extends SystemApplication
 	 *
 	 * @return array( title => language bit, description => language bit, privacyUrl => privacy policy URL )
 	 */
-	public function privacyPolicyThirdParties(): array
+	public function privacyPolicyThirdParties()
 	{
 		/* Apps can overload this */
 		$subprocessors = array();
 			
 		/* Analytics */
-		if ( Settings::i()->ga_enabled )
+		if ( \IPS\Settings::i()->ga_enabled )
 		{
 			$subprocessors[] = array(
-				'title' => Member::loggedIn()->language()->addToStack('enhancements__core_GoogleAnalytics'),
-				'description' => Member::loggedIn()->language()->addToStack('pp_desc_GoogleAnalytics'),
+				'title' => \IPS\Member::loggedIn()->language()->addToStack('enhancements__core_GoogleAnalytics'),
+				'description' => \IPS\Member::loggedIn()->language()->addToStack('pp_desc_GoogleAnalytics'),
 				'privacyUrl' => 'https://www.google.com/intl/en/policies/privacy/'
 			);
 		}
-		if ( Settings::i()->matomo_enabled )
+		if ( \IPS\Settings::i()->matomo_enabled )
 		{
 			$subprocessors[] = array(
-				'title' => Member::loggedIn()->language()->addToStack('analytics_provider_matomo'),
-				'description' => Member::loggedIn()->language()->addToStack('pp_desc_Matomo'),
+				'title' => \IPS\Member::loggedIn()->language()->addToStack('analytics_provider_matomo'),
+				'description' => \IPS\Member::loggedIn()->language()->addToStack('pp_desc_Matomo'),
 				'privacyUrl' => 'https://matomo.org/privacy-policy/'
 			);
 		}
 		
 		/* Facebook Pixel */
-		$fb = new FacebookPixel();
+		$fb = new \IPS\core\extensions\core\CommunityEnhancements\FacebookPixel();
 		if ( $fb->enabled )
 		{
 			$subprocessors[] = array(
-				'title' => Member::loggedIn()->language()->addToStack('enhancements__core_FacebookPixel'),
-				'description' => Member::loggedIn()->language()->addToStack('pp_desc_FacebookPixel'),
+				'title' => \IPS\Member::loggedIn()->language()->addToStack('enhancements__core_FacebookPixel'),
+				'description' => \IPS\Member::loggedIn()->language()->addToStack('pp_desc_FacebookPixel'),
 				'privacyUrl' => 'https://www.facebook.com/about/privacy/'
 			);
 		}
 		
 		/* IPS Spam defense */
-		if ( Settings::i()->spam_service_enabled )
+		if ( \IPS\Settings::i()->spam_service_enabled )
 		{
 			$subprocessors[] = array(
-				'title' => Member::loggedIn()->language()->addToStack('enhancements__core_SpamMonitoring'),
-				'description' => Member::loggedIn()->language()->addToStack('pp_desc_SpamMonitoring'),
+				'title' => \IPS\Member::loggedIn()->language()->addToStack('enhancements__core_SpamMonitoring'),
+				'description' => \IPS\Member::loggedIn()->language()->addToStack('pp_desc_SpamMonitoring'),
 				'privacyUrl' => 'https://invisioncommunity.com/legal/privacy'
+			);
+		}
+		
+		/* Send Grid */
+		$sendgrid = new \IPS\core\extensions\core\CommunityEnhancements\Sendgrid();
+		if ( $sendgrid->enabled )
+		{
+			$subprocessors[] = array(
+				'title' => \IPS\Member::loggedIn()->language()->addToStack('enhancements__core_Sendgrid'),
+				'description' => \IPS\Member::loggedIn()->language()->addToStack('pp_desc_SendGrid'),
+				'privacyUrl' => 'https://sendgrid.com/policies/privacy/'
 			);
 		}
 
 		/* Postmark */
-		$postmark = new Postmark();
+		$postmark = new \IPS\core\extensions\core\CommunityEnhancements\Postmark();
 		if ( $postmark->enabled )
 		{
 			$subprocessors[] = array(
-				'title' => Member::loggedIn()->language()->addToStack('enhancements__core_Postmark'),
-				'description' => Member::loggedIn()->language()->addToStack('pp_desc_Postmark'),
+				'title' => \IPS\Member::loggedIn()->language()->addToStack('enhancements__core_Postmark'),
+				'description' => \IPS\Member::loggedIn()->language()->addToStack('pp_desc_Postmark'),
 				'privacyUrl' => 'https://postmarkapp.com/privacy-policy'
 			);
 		}
-
-		/* Send Grid */
-		$sendgrid = new SendGrid();
-		if ( $sendgrid->enabled )
-		{
-			$subprocessors[] = [
-				'title' => Member::loggedIn()->language()->addToStack('enhancements__core_Sendgrid'),
-				'description' => Member::loggedIn()->language()->addToStack('pp_desc_SendGrid'),
-				'privacyUrl' => 'https://sendgrid.com/policies/privacy/'
-			];
-		}
 		
 		/* Captcha */
-		if ( Settings::i()->bot_antispam_type !== 'none' )
+		if ( \IPS\Settings::i()->bot_antispam_type !== 'none' )
 		{
-			switch ( Settings::i()->bot_antispam_type )
+			switch ( \IPS\Settings::i()->bot_antispam_type )
 			{
 				case 'recaptcha2':
 					$subprocessors[] = array(
-						'title' => Member::loggedIn()->language()->addToStack('captcha_type_recaptcha2'),
-						'description' => Member::loggedIn()->language()->addToStack('pp_desc_captcha'),
+						'title' => \IPS\Member::loggedIn()->language()->addToStack('captcha_type_recaptcha2'),
+						'description' => \IPS\Member::loggedIn()->language()->addToStack('pp_desc_captcha'),
 						'privacyUrl' => 'https://www.google.com/policies/privacy/'
 					);
 					break;
 				case 'invisible':
 					$subprocessors[] = array(
-						'title' => Member::loggedIn()->language()->addToStack('captcha_type_invisible'),
-						'description' => Member::loggedIn()->language()->addToStack('pp_desc_captcha'),
+						'title' => \IPS\Member::loggedIn()->language()->addToStack('captcha_type_invisible'),
+						'description' => \IPS\Member::loggedIn()->language()->addToStack('pp_desc_captcha'),
 						'privacyUrl' => 'https://www.google.com/policies/privacy/'
 					);
 					break;
 				case 'keycaptcha':
 					$subprocessors[] = array(
-						'title' => Member::loggedIn()->language()->addToStack('captcha_type_keycaptcha'),
-						'description' => Member::loggedIn()->language()->addToStack('pp_desc_captcha'),
+						'title' => \IPS\Member::loggedIn()->language()->addToStack('captcha_type_keycaptcha'),
+						'description' => \IPS\Member::loggedIn()->language()->addToStack('pp_desc_captcha'),
 						'privacyUrl' => 'https://www.keycaptcha.com'
 					);
 					break;
 				case 'hcaptcha':
 					$subprocessors[] = array(
-						'title' => Member::loggedIn()->language()->addToStack('captcha_type_hcaptcha'),
-						'description' => Member::loggedIn()->language()->addToStack('hcaptcha_privacy'),
+						'title' => \IPS\Member::loggedIn()->language()->addToStack('captcha_type_hcaptcha'),
+						'description' => \IPS\Member::loggedIn()->language()->addToStack('hcaptcha_privacy'),
 						'privacyUrl' => 'https://www.hcaptcha.com/privacy'
 					);
 			}
@@ -556,7 +465,7 @@ class Application extends SystemApplication
 	 *
 	 * @return	array
 	 */
-	public function uploadSettings(): array
+	public function uploadSettings()
 	{
 		/* Apps can overload this */
 		return array( 'email_logo' );
@@ -570,7 +479,7 @@ class Application extends SystemApplication
 	 * @param	string|null	$namePrefix		Name prefix
 	 * @return  array
 	 */
-	protected function _buildEmailTemplateFromInDev( string $path, object $file, ?string $namePrefix='' ): array
+	protected function _buildEmailTemplateFromInDev( $path, $file, $namePrefix='' )
 	{
 		$return = parent::_buildEmailTemplateFromInDev( $path, $file, $namePrefix );
 
@@ -592,30 +501,43 @@ class Application extends SystemApplication
 	protected function _getUpdateCount( string $type ): int
 	{
 		$key = "updatecount_{$type}";
-		if( isset( Store::i()->$key ) )
+		if( isset( \IPS\Data\Store::i()->$key ) )
 		{
-			return Store::i()->$key;
+			return \IPS\Data\Store::i()->$key;
 		}
 
 		$count = 0;
 		switch( $type )
 		{
 			case 'applications':
-				foreach( Application::applications() as $app )
+				foreach( \IPS\Application::applications() as $app )
 				{
-					if ( CIC AND IPS::isManaged() AND in_array( $app->directory, IPS::$ipsApps ) )
+					if ( \IPS\CIC AND \IPS\IPS::isManaged() AND \in_array( $app->directory, \IPS\IPS::$ipsApps ) )
 					{
 						continue;
 					}
 					
-					if( count( $app->availableUpgrade( TRUE ) ) )
+					if( \count( $app->availableUpgrade( TRUE ) ) )
 					{
 						$count++;
 					}
 				}
 				break;
+			case 'plugins':
+				foreach( \IPS\Plugin::plugins() as $plugin )
+				{
+					if( $plugin->update_check_data )
+					{
+						$data = json_decode( $plugin->update_check_data, TRUE );
+						if( !empty( $data['longversion'] ) AND $data['longversion'] > $plugin->version_long )
+						{
+							$count++;
+						}
+					}
+				}
+				break;
 			case 'languages':
-				foreach( Lang::languages() as $language )
+				foreach( \IPS\Lang::languages() as $language )
 				{
 					if( $language->update_data )
 					{
@@ -628,7 +550,7 @@ class Application extends SystemApplication
 				}
 				break;
 			case 'themes':
-				foreach( Theme::themes() as $theme )
+				foreach( \IPS\Theme::themes() as $theme )
 				{
 					if( $theme->update_data )
 					{
@@ -642,8 +564,8 @@ class Application extends SystemApplication
 				break;
 		}
 
-		Store::i()->$key = $count;
-		return (int) Store::i()->$key;
+		\IPS\Data\Store::i()->$key = $count;
+		return (int) \IPS\Data\Store::i()->$key;
 	}
 
 	/**
@@ -654,131 +576,110 @@ class Application extends SystemApplication
 	public function getWebhooks() : array
 	{
 		return array_merge(  [
-				'club_created' => Club::class,
-				'club_deleted' => Club::class,
-				'club_member_added' => ['club' => Club::class, 'member' => Member::class, 'status' => "string" ],
-				'club_member_removed' => ['club' => Club::class, 'member' => Member::class ],
-				'member_flagged_as_spammer' => Member::class,
-				'member_ban_state_changed' => ['member' => Member::class, 'value' => 'string'],
-				'ban_filter_added' => [ 'ban' => "array" ],
-				'ban_filter_removed' => [ 'ban' => "array" ],
-				'member_create' => Member::class,
-				'member_registration_complete' => Member::class,
-				'member_edited' => [ 'member' => Member::class, 'changes' => "array" ],
-				'member_delete' => Member::class,
-				'member_warned' => Warning::class,
-				'member_merged' => [ 'kept' => Member::class, 'removed' => Member::class],
-				'content_promoted' => Feature::class,
-				'content_reported' => Content::class,
-				'content_followed' => Follow::class,
-				'content_unfollowed' => Follow::class,
-				'content_marked_solved' => [ 'item' => Item::class, 'comment' => Comment::class , 'markedBy' => Member::class ],
-				'content_assigned' => Assignment::class,
-				'content_unassigned' => Assignment::class,
-				'content_reaction_added' => ['item' => Content::class, 'member' => Member::class, 'reaction' => Reaction::class],
-				'content_reaction_removed' => ['item' => Content::class, 'member' => Member::class, 'reaction' => Reaction::class],
+				'club_created' => \IPS\Member\Club::class,
+				'club_deleted' => \IPS\Member\Club::class,
+				'club_member_added' => ['club' => \IPS\Member\Club::class, 'member' => \IPS\Member::class, 'status' => "string" ],
+				'club_member_removed' => ['club' => \IPS\Member\Club::class, 'member' => \IPS\Member::class ],
+				'member_create' => \IPS\Member::class,
+				'member_registration_complete' => \IPS\Member::class,
+				'member_edited' => [ 'member' => \IPS\Member::class, 'changes' => "array" ],
+				'member_delete' => \IPS\Member::class,
+				'member_warned' => \IPS\core\Warnings\Warning::class,
+				'member_merged' => [ 'kept' => \IPS\Member::class, 'removed' => \IPS\Member::class],
+				'member_badge_awarded' => [ 'member' => \IPS\Member::class, 'badge' => \IPS\core\Achievements\Badge::class ],
+				'content_promoted' => \IPS\Content::class,
+				'content_marked_solved' => [ 'item' => \IPS\Content\Item::class, 'comment' => \IPS\Content\Comment::class , 'markedBy' => \IPS\Member::class ]
 		], parent::getWebhooks() );
-	}
-
-	/**
-	 * Do we run doMemberCheck for this controller?
-	 * @see Application::doMemberCheck()(
-	 *
-	 * @param Module $module
-	 * @param string $controller
-	 * @param string|null $do
-	 * @return bool
-	 */
-	public function skipDoMemberCheck( Module $module, string $controller, ?string $do ) : bool
-	{
-		return (
-				$module->key == 'system'
-				and
-				in_array( $controller, [ 'privacy', 'terms', 'embed', 'metatags', 'serviceworker', 'settings', 'language', 'theme', 'ajax', 'register', 'login', 'cookies', 'redirect', 'editor' ] )
-			) or (
-				$module->key == 'contact' and $controller == 'contact'
-			);
 	}
 	
 	/**
 	 * Do Member Check
 	 *
-	 * @return	Url|NULL
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function doMemberCheck(): ?Url
+	public function doMemberCheck(): ?\IPS\Http\Url
 	{
 		/* Need their name or email... */
-		if( ( Member::loggedIn()->real_name === '' or !Member::loggedIn()->email ) )
+		if( ( \IPS\Member::loggedIn()->real_name === '' or !\IPS\Member::loggedIn()->email ) and \IPS\Dispatcher::i()->controller !== 'register' and \IPS\Dispatcher::i()->controller !== 'login' and \IPS\Dispatcher::i()->controller !== 'cookies' )
 		{
-			return Url::internal( 'app=core&module=system&controller=register&do=complete' )->setQueryString( 'ref', base64_encode( Request::i()->url() ) );
+			return \IPS\Http\Url::internal( 'app=core&module=system&controller=register&do=complete' )->setQueryString( 'ref', base64_encode( \IPS\Request::i()->url() ) );
 		}
 		/* Need them to validate... */
 		elseif(
-			Member::loggedIn()->members_bitoptions['validating'] and !Dispatcher::i()->application->allowValidatingAccess( Dispatcher::i()->module, Dispatcher::i()->controller, Request::i()->do ?? null )
+			\IPS\Member::loggedIn()->members_bitoptions['validating'] and
+			\IPS\Dispatcher::i()->controller !== 'register' and
+			\IPS\Dispatcher::i()->controller !== 'login' and
+			\IPS\Dispatcher::i()->controller != 'redirect' and
+			\IPS\Dispatcher::i()->controller !== 'store' and
+			\IPS\Dispatcher::i()->controller !== 'checkout' and
+			\IPS\Dispatcher::i()->controller !== 'cookies'
 		)
 		{
-			return Url::internal( 'app=core&module=system&controller=register&do=validating', 'front', 'register' );
+			return \IPS\Http\Url::internal( 'app=core&module=system&controller=register&do=validating', 'front', 'register' );
 		}
 		/* Need them to reconfirm terms/privacy policy... */
-		elseif ( ( Member::loggedIn()->members_bitoptions['must_reaccept_privacy'] or Member::loggedIn()->members_bitoptions['must_reaccept_terms'] ) )
+		elseif ( ( \IPS\Member::loggedIn()->members_bitoptions['must_reaccept_privacy'] or \IPS\Member::loggedIn()->members_bitoptions['must_reaccept_terms'] ) and \IPS\Dispatcher::i()->controller !== 'register' and \IPS\Dispatcher::i()->controller !== 'ajax' )
 		{
-			return Url::internal( 'app=core&module=system&controller=register&do=reconfirm', 'front', 'register' )->setQueryString( 'ref', base64_encode( Request::i()->url() ) );
+			return \IPS\Http\Url::internal( 'app=core&module=system&controller=register&do=reconfirm', 'front', 'register' )->setQueryString( 'ref', base64_encode( \IPS\Request::i()->url() ) );
 		}
 		/* Have required profile actions that need completing */
 		else if (
-			Settings::i()->allow_reg AND
-			!Member::loggedIn()->members_bitoptions['profile_completed'] AND
-			Dispatcher::i()->controller != 'pixabay' AND
-			$completion = Member::loggedIn()->profileCompletion() AND
-			count( $completion['required'] )
+			\IPS\Settings::i()->allow_reg AND
+			!\IPS\Member::loggedIn()->members_bitoptions['profile_completed'] AND
+			!\in_array( \IPS\Dispatcher::i()->controller, array( 'register', 'login', 'redirect', 'ajax', 'settings', 'checkout', 'pixabay', 'editor', 'cookies' ) ) AND
+			$completion = \IPS\Member::loggedIn()->profileCompletion() AND
+			\count( $completion['required'] )
 		)
 		{
 			foreach( $completion['required'] AS $id => $completed )
 			{
 				if ( $completed === FALSE )
 				{
-					return Url::internal( "app=core&module=system&controller=register&do=finish&_new=1", 'front', 'register' )->setQueryString( 'ref', base64_encode( Request::i()->url() ) );
+					return \IPS\Http\Url::internal( "app=core&module=system&controller=register&do=finish&_new=1", 'front', 'register' )->setQueryString( 'ref', base64_encode( \IPS\Request::i()->url() ) );
 				}
 			}
 		}
 
 		/* Need to set up MFA... */
-		$haveAcceptableHandlers = FALSE;
-		$haveConfiguredHandler = FALSE;
-		foreach ( MFAHandler::handlers() as $key => $handler )
+		if ( !\in_array( \IPS\Dispatcher::i()->controller, array( 'register', 'login', 'redirect', 'ajax', 'settings', 'embed', 'cookies' ) ) )
 		{
-			if ( $handler->isEnabled() and $handler->memberCanUseHandler( Member::loggedIn() ) )
+			$haveAcceptableHandlers = FALSE;
+			$haveConfiguredHandler = FALSE;
+			foreach ( \IPS\MFA\MFAHandler::handlers() as $key => $handler )
 			{
-				$haveAcceptableHandlers = TRUE;
-				if ( $handler->memberHasConfiguredHandler( Member::loggedIn() ) )
+				if ( $handler->isEnabled() and $handler->memberCanUseHandler( \IPS\Member::loggedIn() ) )
 				{
-					$haveConfiguredHandler = TRUE;
-					break;
+					$haveAcceptableHandlers = TRUE;
+					if ( $handler->memberHasConfiguredHandler( \IPS\Member::loggedIn() ) )
+					{
+						$haveConfiguredHandler = TRUE;
+						break;
+					}
 				}
 			}
-		}
-
-		if ( !$haveConfiguredHandler and $haveAcceptableHandlers )
-		{
-			if ( Settings::i()->mfa_required_groups == '*' or Member::loggedIn()->inGroup( explode( ',', Settings::i()->mfa_required_groups ) ) )
+			
+			if ( !$haveConfiguredHandler and $haveAcceptableHandlers )
 			{
-				if ( Settings::i()->mfa_required_prompt === 'immediate' )
+				if ( \IPS\Settings::i()->mfa_required_groups == '*' or \IPS\Member::loggedIn()->inGroup( explode( ',', \IPS\Settings::i()->mfa_required_groups ) ) )
 				{
-					return Url::internal( 'app=core&module=system&controller=settings&do=initialMfa', 'front', 'settings' )->setQueryString( 'ref', base64_encode( Request::i()->url() ) );
+					if ( \IPS\Settings::i()->mfa_required_prompt === 'immediate' )
+					{
+						return \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&do=initialMfa', 'front', 'settings' )->setQueryString( 'ref', base64_encode( \IPS\Request::i()->url() ) );
+					}
 				}
-			}
-			elseif ( Settings::i()->mfa_optional_prompt === 'immediate' and !Member::loggedIn()->members_bitoptions['security_questions_opt_out'] )
-			{
-				return Url::internal( 'app=core&module=system&controller=settings&do=initialMfa', 'front', 'settings' )->setQueryString( 'ref', base64_encode( Request::i()->url() ) );
+				elseif ( \IPS\Settings::i()->mfa_optional_prompt === 'immediate' and !\IPS\Member::loggedIn()->members_bitoptions['security_questions_opt_out'] )
+				{
+					return \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&do=initialMfa', 'front', 'settings' )->setQueryString( 'ref', base64_encode( \IPS\Request::i()->url() ) );
+				}
 			}
 		}
 
 		/* Need to reset password */
-		if ( ( Dispatcher::i()->controller !== 'settings' AND ( !isset( Request::i()->area ) OR Request::i()->area !== 'password' ) ) AND ! ( Dispatcher::i()->controller == 'alerts' AND Request::i()->do == 'dismiss'  ) )
+		if ( ( \IPS\Dispatcher::i()->controller !== 'settings' AND ( !isset( \IPS\Request::i()->area ) OR \IPS\Request::i()->area !== 'password' ) ) AND !( \IPS\Dispatcher::i()->controller == 'alerts' AND \IPS\Request::i()->do == 'dismiss'  ) )
 		{
-			foreach( Login::methods() AS $method )
+			foreach( \IPS\Login::methods() AS $method )
 			{
-				if ( $url = $method->forcePasswordResetUrl( Member::loggedIn(), Request::i()->url() ) )
+				if ( $url = $method->forcePasswordResetUrl( \IPS\Member::loggedIn(), \IPS\Request::i()->url() ) )
 				{
 					return $url;
 				}
@@ -793,10 +694,10 @@ class Application extends SystemApplication
 	 *
 	 * @return	void
 	 */
-	public function installSettings() : void
+	public function installSettings()
 	{
 		/* It's enough if we run this only for the core app instead for each app which is upgraded */
-		Zapier::rebuildRESTApiPermissions();
+		\IPS\core\extensions\core\CommunityEnhancements\Zapier::rebuildRESTApiPermissions();
 		parent::installSettings();
 	}
 
@@ -808,24 +709,24 @@ class Application extends SystemApplication
 	 */
 	public function _getEssentialCookieNames(): array
 	{
-		$cookies = [ 'oauth_authorize', 'member_id', 'login_key', 'clearAutosave', 'lastSearch','device_key', 'IPSSessionFront', 'loggedIn', 'noCache', 'cookie_consent', 'cookie_consent_optional' ];
+		$cookies = [ 'oauth_authorize', 'member_id', 'login_key', 'clearAutosave', 'lastSearch','device_key', 'IPSSessionFront', 'loggedIn', 'noCache', 'hasJS', 'cookie_consent', 'cookie_consent_optional' ];
 
-		if( Settings::i()->guest_terms_bar )
+		if( \IPS\Settings::i()->guest_terms_bar )
 		{
 			$cookies[] = 'guestTermsDismissed';
 		}
 
-		if( count( Lang::getEnabledLanguages() ) > 1 )
+		if( count( \IPS\Lang::getEnabledLanguages() ) > 1 )
 		{
 			$cookies[] = 'language';
 		}
 
-		if( Settings::i()->ref_on )
+		if( \IPS\Settings::i()->ref_on )
 		{
 			$cookies[] = 'referred_by';
 		}
 
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
 			if( isset( $method->pkceSupported ) AND $method->pkceSupported === TRUE )
 			{
@@ -835,165 +736,5 @@ class Application extends SystemApplication
 		}
 
 		return $cookies;
-	}
-
-	/**
-	 * Retrieve additional form fields for adding an extension
-	 * This should return an array where the key is the tag in
-	 * the extension stub that will be replaced, and the value is
-	 * the form field
-	 *
-	 * @param string $extensionType
-	 * @param string $appKey The application creating the extension
-	 * @return array
-	 */
-	public function extensionHelper( string $extensionType, string $appKey ) : array
-	{
-		$return = [];
-		switch( $extensionType )
-		{
-			case 'AccountSettings':
-				$return[ '{tabKey}' ] = new Text( 'extension_tab_key', null, true );
-				break;
-
-			case 'MFAHandler':
-				$return[ '{key}' ] = new Text( 'extension_key', null, true );
-				break;
-
-			case 'ModCp':
-				$return[ '{tabKey}' ] = new Text( 'extension_tab_key', null, true );
-				$return[ '{manageType}' ] = new Select( 'extension_modcp_manage_type', 'other', true, [
-					'options' => [
-						'content' => "Content",
-						'members' => "Members",
-						'other' => "Other"
-					]
-				]);
-				break;
-
-			case 'AdminNotifications':
-				$return[ '{group}' ] = new Select( 'extension_acp_notify_group', 'other', true, [
-					'options' => [
-						'system' => 'System',
-						'members' => 'Members',
-						'important' => 'Important',
-						'commerce' => 'Commerce',
-						'other' => 'Other'
-					]
-				]);
-				$return[ '{priority}' ] = new Number( 'extension_acp_notify_priority', 3, true, [
-					'min' => 1,
-					'max' => 5
-				]);
-				$return[ '{severity}' ] = new Select( 'extension_acp_notify_severity', 'static::SEVERITY_NORMAL', true, [
-					'options' => [
-						'static::SEVERITY_OPTIONAL' => ucwords( AdminNotification::SEVERITY_OPTIONAL ),
-						'static::SEVERITY_NORMAL' => ucwords( AdminNotification::SEVERITY_NORMAL ),
-						'static::SEVERITY_DYNAMIC' => ucwords( AdminNotification::SEVERITY_DYNAMIC ),
-						'static::SEVERITY_HIGH' => ucwords( AdminNotification::SEVERITY_HIGH ),
-						'static::SEVERITY_CRITICAL' => ucwords( AdminNotification::SEVERITY_CRITICAL )
-					]
-				]);
-				break;
-
-			case 'ContentRouter':
-				$modules = [ '' => '' ];
-				foreach( SystemApplication::load( $appKey )->modules( 'front' ) as $key => $module )
-				{
-					$modules[ $key ] = $module->_title;
-				}
-				$return[ '{module}' ] = new Select( 'extension_module_name', null, true, [ 'options' => $modules ] );
-			/* Don't do a break statement here because we want the item field */
-
-			case 'UIItem':
-			case 'RssImport':
-				$return[ '{item}' ] = new Text( 'extension_item_class', null, true, [], function( $val ){
-					if( !is_subclass_of( $val, Item::class ) )
-					{
-						throw new DomainException( 'err_invalid_item_class' );
-					}
-				} );
-				break;
-
-			case 'UINode':
-				$return[ '{node}' ] = new Text( 'extension_node_class', null, true, [], function( $val ){
-					if( !is_subclass_of( $val, Model::class ) )
-					{
-						throw new DomainException( 'err_invalid_node_class' );
-					}
-				} );
-				break;
-
-			case 'UIComment':
-				$return[ '{comment}' ] = new Text( 'extension_comment_class', null, true, [], function( $val ){
-					if( !is_subclass_of( $val, Comment::class ) or is_subclass_of( $val, Review::class ) )
-					{
-						throw new DomainException( 'err_invalid_comment_class' );
-					}
-				} );
-				break;
-
-			case 'UIReview':
-				$return[ '{review}' ] = new Text( 'extension_review_class', null, true, [], function( $val ){
-					if( !is_subclass_of( $val, Review::class ) )
-					{
-						throw new DomainException( 'err_invalid_review_class' );
-					}
-				} );
-				break;
-
-			case 'Forms':
-				$return[ '{formType}' ] = new Select( 'extension_form_type', null, true, [
-					'options' => [
-						'Form::FORM_REGISTRATION' => 'extension_form_type__' . Form::FORM_REGISTRATION,
-						'Form::FORM_CHECKOUT' => 'extension_form_type__' . Form::FORM_CHECKOUT
-					]
-				]);
-				break;
-
-			case 'MemberFilter':
-				$return[ '{areas}' ] = new CheckboxSet( 'extension_mf_areas', null, true, [
-					'options' => [
-						"'bulkmail'" => 'extension_mf_areas__bulkmail',
-						"'group_promotions'" => 'extension_mf_areas__group_promotions',
-						"'automatic_moderation'" => 'extension_mf_areas__automatic_moderation',
-						"'passwordreset'" => 'extension_mf_areas__passwordreset',
-					],
-					'noDefault' => true
-				]);
-				break;
-
-			case 'OverviewStatistics':
-				$return[ '{statisticsPage}' ] = new Select( 'extension_statistics_page', null, true, [
-					'options' => [
-						'user' => 'User',
-						'activity' => 'Activity'
-					]
-				] );
-				break;
-		}
-
-		return $return;
-	}
-
-	/**
-	 * Process additional form fields that are added in Application::extensionHelper()
-	 *
-	 * @param string $extensionType
-	 * @param string $appKey
-	 * @param array $values
-	 * @return array
-	 */
-	public function extensionGenerate( string $extensionType, string $appKey, array $values ) : array
-	{
-		foreach( [ 'extension_item_class', 'extension_node_class', 'extension_comment_class', 'extension_review_class' ] as $field )
-		{
-			if( isset( $values[ $field ] ) and $values[ $field ] )
-			{
-				$values[ $field ] = ltrim( $values[ $field ], '\\' );
-			}
-		}
-
-		return parent::extensionGenerate( $extensionType, $appKey, $values );
 	}
 }

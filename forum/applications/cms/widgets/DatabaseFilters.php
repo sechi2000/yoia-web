@@ -12,129 +12,85 @@
 namespace IPS\cms\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\cms\Categories;
-use IPS\cms\Databases;
-use IPS\cms\Databases\Dispatcher;
-use IPS\cms\Fields;
-use IPS\DateTime;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\DateRange;
-use IPS\Helpers\Form\YesNo;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Widget;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * LatestArticles Widget
  */
-class DatabaseFilters extends Widget
+class _DatabaseFilters extends \IPS\Widget
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'DatabaseFilters';
+	public $key = 'DatabaseFilters';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'cms';
-
-
-    /**
-     * Can this widget be used on this page?
-     *
-     * @param string $app
-     * @param string $module
-     * @param string $controller
-     * @return bool
-     */
-    public function isExecutableByPage( string $app, string $module, string $controller ) : bool
-    {
-        /* This is only available on database pages. It's a little tricky to narrow it down further than the app,
-        as all the databases are piped through the page controller. */
-        return $app == 'cms';
-    }
+	public $app = 'cms';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Render a widget
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		/* Viewing or adding/editing a record */
-		if ( Dispatcher::i()->recordId or Request::i()->do == 'form' )
+		if ( \IPS\cms\Databases\Dispatcher::i()->recordId or \IPS\Request::i()->do == 'form' )
 		{
 			return '';
 		}
 
-		if ( ! Dispatcher::i()->databaseId )
+		if ( ! \IPS\cms\Databases\Dispatcher::i()->databaseId AND ! \IPS\cms\Databases\Dispatcher::i()->categoryId )
 		{
 			return '';
 		}
 		
 		try
 		{
-			$database = Databases::load( Dispatcher::i()->databaseId );
+			$database = \IPS\cms\Databases::load( \IPS\cms\Databases\Dispatcher::i()->databaseId );
 			$database->preLoadWords();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			return '';
 		}
-
-		$category = null;
-		if( isset( Dispatcher::i()->categoryId ) )
+		
+		try
 		{
-			try
-			{
-				/* @var Categories $categoryClass */
-				$categoryClass = "IPS\cms\Categories" . Dispatcher::i()->databaseId;
-				$category = $categoryClass::load( Dispatcher::i()->categoryId );
-			}
-			catch ( OutOfRangeException $e )
-			{
-				return '';
-			}
+			$categoryClass = "IPS\cms\Categories" . \IPS\cms\Databases\Dispatcher::i()->databaseId;
+			$category = $categoryClass::load( \IPS\cms\Databases\Dispatcher::i()->categoryId );
 		}
-		else
+		catch ( \OutOfRangeException $e )
 		{
-			/* Is this the category view? */
-			if( $database->display_settings['index']['type'] == 'categories' or isset( Request::i()->show ) )
-			{
-				return '';
-			}
+			return '';
 		}
 		
-		/* @var Fields $fieldClass */
+		if ( ! $database->use_categories AND $database->cat_index_type !== 0 )
+		{
+			return '';
+		}
+		   
 		$fieldClass = 'IPS\cms\Fields' . $database->id;
 		
 		$fields = array();
-		$cookie = $database->getFilterCookie( $category );
-		$cookieValues = ( !empty( $cookie ) ) ? array_combine( array_map( function( $k ) { return "field_" . $k; }, array_keys( $cookie ) ), $cookie ) : array();
+		$cookie = $category->getFilterCookie();
+		$cookieValues = ( $cookie !== NULL ) ? array_combine( array_map( function( $k ) { return "field_" . $k; }, array_keys( $cookie ) ), $cookie ) : array();
 		$databaseFields = $fieldClass::roots();
 		
 		$urlValues = array();
 		
-		foreach( Request::i() as $k => $v )
+		foreach( \IPS\Request::i() as $k => $v )
 		{
 			if( mb_strpos( $k, 'content_field_' ) !== FALSE )
 			{
@@ -148,11 +104,11 @@ class DatabaseFilters extends Widget
 				
 				if ( isset( $databaseFields[ $fieldId ] ) and $databaseFields[ $fieldId ]->type == 'Member' )
 				{
-					$urlValues[ str_replace( 'content_', '', $k ) ] = is_array( $v ) ? implode( '\n', $v ) : $v;
+					$urlValues[ str_replace( 'content_', '', $k ) ] = \is_array( $v ) ? implode( '\n', $v ) : $v;
 				}
 				else
 				{
-					$urlValues[ str_replace( 'content_', '', $k ) ] = is_array( $v ) ? implode( ',', $v ) : $v;
+					$urlValues[ str_replace( 'content_', '', $k ) ] = \is_array( $v ) ? implode( ',', $v ) : $v;
 				}
 			}
 		}
@@ -165,14 +121,14 @@ class DatabaseFilters extends Widget
 			if ( $field->type === 'Member' and isset( $cookieValues[ 'field_' . $field->id ] ) )
 			{
 				$members = array();
-				$memberArray = is_array( $cookieValues[ 'field_' . $field->id ] ) ? $cookieValues[ 'field_' . $field->id ] : explode( '\n', $cookieValues[ 'field_' . $field->id ] );
+				$memberArray = \is_array( $cookieValues[ 'field_' . $field->id ] ) ? $cookieValues[ 'field_' . $field->id ] : explode( '\n', $cookieValues[ 'field_' . $field->id ] );
 				foreach( $memberArray as $id )
 				{
 					try
 					{
-						$members[] = Member::load( $id );
+						$members[] = \IPS\Member::load( $id );
 					}
-					catch( Exception $e ) { }
+					catch( \Exception $e ) { }
 				}
 				
 				$cookieValues[ 'field_' . $field->id ] = $members;
@@ -180,32 +136,20 @@ class DatabaseFilters extends Widget
 		}
 		foreach( $fieldClass::fields( $cookieValues, 'view', $category, $fieldClass::FIELD_SKIP_TITLE_CONTENT | $fieldClass::FIELD_DISPLAY_FILTERS, NULL, FALSE  ) as $id => $field )
 		{
-			/* If this is a select field, remove "other" from the list */
-			if( $field instanceof Form\Select )
-			{
-				$options = $field->options;
-				if( $userSuppliedInput = $options['userSuppliedInput'] )
-				{
-					unset( $options['options'][ $userSuppliedInput ] );
-					$options['userSuppliedInput'] = null;
-				}
-				$field->options = $options;
-			}
-
 			/* Force a unique ID to prevent other areas using this same field htmlID */
 			$field->htmlId = $field->name .'_' . md5( uniqid() );
+			
 			$fields[ $id ] = $field;
 		}
 		
-		if ( count( $fields ) )
+		if ( \count( $fields ) )
 		{
-			$baseUrl = $category ? $category->url() : $database->page->url();
-			$form = new Form( 'category_filters', 'update', $baseUrl );
-			$form->class = 'ipsForm--vertical ipsForm--database-widget-filters'; 
-			if ( Request::i()->sortby )
+			$form = new \IPS\Helpers\Form( 'category_filters', 'update', $category->url() );
+			$form->class = 'ipsForm_vertical'; 
+			if ( \IPS\Request::i()->sortby )
 			{
-				$form->hiddenValues['sortby']		 = Request::i()->sortby;
-				$form->hiddenValues['sortdirection'] = isset( Request::i()->sortdirection ) ? Request::i()->sortdirection : 'desc';
+				$form->hiddenValues['sortby']		 = \IPS\Request::i()->sortby;
+				$form->hiddenValues['sortdirection'] = isset( \IPS\Request::i()->sortdirection ) ? \IPS\Request::i()->sortdirection : 'desc';
 			}
 			else
 			{
@@ -221,7 +165,7 @@ class DatabaseFilters extends Widget
 				$form->add( $field );
 			}
 			
-			if ( Member::loggedIn()->member_id )
+			if ( \IPS\Member::loggedIn()->member_id )
 			{
 				$iStarted = FALSE;
 				if ( isset( $cookie['cms_record_i_started'] ) and $cookie['cms_record_i_started'] )
@@ -230,24 +174,19 @@ class DatabaseFilters extends Widget
 				}
 				
 				/* Form submission takes preference over any previously stored cookie values */
-				if ( ( isset( Request::i()->cms_record_i_started ) and Request::i()->cms_record_i_started ) )
+				if ( ( isset( \IPS\Request::i()->cms_record_i_started ) and \IPS\Request::i()->cms_record_i_started ) )
 				{
 					$iStarted = TRUE;
 				}
 
-				$form->add( new Checkbox( 'cms_record_i_started', $iStarted, FALSE ) );
-
-				/* we need this language later (and in Widgets\DatabaseFilters which is executed just before output) */
-				Member::loggedIn()->language()->words['cms_record_i_started'] = Member::loggedIn()->language()->addToStack( 'cms_record_i_started_sprintf', FALSE, array( 'sprintf' => $database->recordWord() ) );
+				$form->add( new \IPS\Helpers\Form\Checkbox( 'cms_record_i_started', $iStarted, FALSE ) );
 			}
-
-			$field = new Checkbox( 'cms_widget_filters_remember', $cookie !== null, false );
-			$field->label = Member::loggedIn()->language()->addToStack( 'cms_widget_filters_remember_text' );
-			$form->add( $field );
+			
+			$form->add( new \IPS\Helpers\Form\Checkbox( 'cms_widget_filters_remember', ( $cookie !== NULL ) ? TRUE : FALSE, FALSE, array( 'label' => 'cms_widget_filters_remember_text') ) );
 
 			if ( $values = $form->values() )
 			{
-				$url    = $baseUrl->setQueryString( array( 'advanced_search_submitted' => 1 ) );
+				$url    = $category->url()->setQueryString( array( 'advanced_search_submitted' => 1 ) );
 				$cookie = array();
 				$params = array();
 				foreach( $values as $k => $v )
@@ -256,31 +195,31 @@ class DatabaseFilters extends Widget
 					{
 						$id = mb_substr( $k, 14 );
 						
-						if ( isset( $fields[ $id ] ) and $fields[ $id ] instanceof CheckboxSet )
+						if ( isset( $fields[ $id ] ) and $fields[ $id ] instanceof \IPS\Helpers\Form\CheckboxSet )
 						{
 							/* We need to reformat this a little */
 							$v = array_combine( $v, $v );
 						}
-						else if ( isset( $fields[ $id ] ) and $fields[ $id ] instanceof YesNo )
+						else if ( isset( $fields[ $id ] ) and $fields[ $id ] instanceof \IPS\Helpers\Form\YesNo )
 						{
 							/* The form class looks for {$name}_checkbox to determine the value */
 							$k = $k . '_checkbox';
 						}
-						else if ( isset( $fields[ $id ] ) and $fields[ $id ] instanceof DateRange )
+						else if ( isset( $fields[ $id ] ) and $fields[ $id ] instanceof \IPS\Helpers\Form\DateRange )
 						{
 							/* We need to reformat this a little */
-							$start = ( $v['start'] instanceof DateTime ) ? $v['start']->getTimestamp() : intval( $v['start'] );
-							$end   = ( $v['end'] instanceof DateTime )   ? $v['end']->getTimestamp()   : intval( $v['end'] );
+							$start = ( $v['start'] instanceof \IPS\DateTime ) ? $v['start']->getTimestamp() : \intval( $v['start'] );
+							$end   = ( $v['end'] instanceof \IPS\DateTime )   ? $v['end']->getTimestamp()   : \intval( $v['end'] );
 							$v = array( 'start' => $start, 'end' => $end );
 						}
-						else if ( isset( $fields[ $id ] ) and $fields[ $id ] instanceof Form\Member )
+						else if ( isset( $fields[ $id ] ) and $fields[ $id ] instanceof \IPS\Helpers\Form\Member )
 						{
 							$ids = array();
-							if ( is_array( $v ) )
+							if ( \is_array( $v ) )
 							{
 								foreach( $v as $member )
 								{
-									if ( $member instanceof Member )
+									if ( $member instanceof \IPS\Member )
 									{
 										$ids[] = $member->member_id;
 									}
@@ -288,7 +227,7 @@ class DatabaseFilters extends Widget
 								
 								$v = $ids;
 							}
-							else if ( $v instanceof Member )
+							else if ( $v instanceof \IPS\Member )
 							{
 								$v = $v->member_id;
 							}
@@ -305,13 +244,13 @@ class DatabaseFilters extends Widget
 					}
 				}
 				
-				if ( count( $form->hiddenValues ) )
+				if ( \count( $form->hiddenValues ) )
 				{
 					foreach( $form->hiddenValues as $k => $v )
 					{
 						if ( $k !== 'csrfKey' )
 						{
-							if ( !in_array( $k, array( 'sortby', 'sortdirection' ) ) )
+							if ( !\in_array( $k, array( 'sortby', 'sortdirection' ) ) )
 							{
 								$cookie[ $k ] = $v;
 							}
@@ -322,14 +261,14 @@ class DatabaseFilters extends Widget
 				
 				if ( $values['cms_widget_filters_remember'] )
 				{
-					$database->saveFilterCookie( $cookie, $category );
-					Output::i()->redirect( $baseUrl );
+					$category->saveFilterCookie( $cookie );
+					\IPS\Output::i()->redirect( $category->url() );
 				}
 				else
 				{
 					/* Remove the filter cookie */
-					$database->saveFilterCookie( false, $category );
-					Output::i()->redirect( $url->setQueryString( $params ) );
+					$category->saveFilterCookie( FALSE );
+					\IPS\Output::i()->redirect( $url->setQueryString( $params ) );
 				}
 			}
 

@@ -9,30 +9,22 @@
  * @since		27 May 2015
  */
 
-use IPS\cms\Databases;
-use IPS\Dispatcher\External;
-use IPS\Dispatcher\Front;
-use IPS\File;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-
-define('REPORT_EXCEPTIONS', TRUE);
+\define('REPORT_EXCEPTIONS', TRUE);
 require_once str_replace( 'applications/cms/interface/file/file.php', '', str_replace( '\\', '/', __FILE__ ) ) . 'init.php';
-External::i();
+\IPS\Dispatcher\External::i();
 
 try
 {
 	/* Load member */
-	$member = Member::loggedIn();
+	$member = \IPS\Member::loggedIn();
 	
 	/* Set up autoloader for CMS */
 
 	/* Init */
-	$databaseId  = intval( Request::i()->database );
-	$database    = Databases::load( $databaseId );
-	$recordId    = intval( Request::i()->record );
-	$fileName    = urldecode( Request::i()->file );
+	$databaseId  = \intval( \IPS\Request::i()->database );
+	$database    = \IPS\cms\Databases::load( $databaseId );
+	$recordId    = \intval( \IPS\Request::i()->record );
+	$fileName    = urldecode( \IPS\Request::i()->file );
 	$recordClass = '\IPS\cms\Records' . $databaseId;
 	$realFileName = NULL;
 
@@ -40,53 +32,53 @@ try
 	{
 		$record = $recordClass::load( $recordId );
 	}
-	catch(OutOfRangeException $ex )
+	catch( \OutOfRangeException $ex )
 	{
-		Output::i()->error( 'no_module_permission', '2T279/1', 403, '' );
+		\IPS\Output::i()->error( 'no_module_permission', '2T279/1', 403, '' );
 	}
 	
 	if ( ! $record->canView() )
 	{
-		Output::i()->error( 'no_module_permission', '2T279/2', 403, '' );
+		\IPS\Output::i()->error( 'no_module_permission', '2T279/2', 403, '' );
 	}
 
-	$realFileName = \IPS\Text\Encrypt::fromTag( Request::i()->fileKey )->decrypt();
+	$realFileName = \IPS\Text\Encrypt::fromTag( \IPS\Request::i()->fileKey )->decrypt();
 
 	if ( ! $realFileName )
 	{
-		Output::i()->error( 'no_module_permission', '2T279/4', 403, '' );
+		\IPS\Output::i()->error( 'no_module_permission', '2T279/4', 403, '' );
 	}
 
 	/* Get file and data */
 	try
 	{
-		$file = File::get( 'cms_Records', $realFileName );
+		$file = \IPS\File::get( 'cms_Records', $realFileName );
 	}
-	catch(Exception $ex )
+	catch( \Exception $ex )
 	{
-		Output::i()->error( 'no_module_permission', '2T279/3', 404, '' );
+		\IPS\Output::i()->error( 'no_module_permission', '2T279/3', 404, '' ); 
 	}
 		
-	$headers = array_merge( Output::getCacheHeaders( time(), 360 ), array( "Content-Disposition" => Output::getContentDisposition( 'attachment', Request::i()->file ), "X-Content-Type-Options" => "nosniff" ) );
+	$headers = array_merge( \IPS\Output::getCacheHeaders( time(), 360 ), array( "Content-Disposition" => \IPS\Output::getContentDisposition( 'attachment', \IPS\Request::i()->file ), "X-Content-Type-Options" => "nosniff" ) );
 	
 	/* Send headers and print file */
-	Output::i()->sendStatusCodeHeader( 200 );
-	Output::i()->sendHeader( "Content-type: " . File::getMimeType( Request::i()->file ) . ";charset=UTF-8" );
+	\IPS\Output::i()->sendStatusCodeHeader( 200 );
+	\IPS\Output::i()->sendHeader( "Content-type: " . \IPS\File::getMimeType( \IPS\Request::i()->file ) . ";charset=UTF-8" );
 
 	foreach( $headers as $key => $header )
 	{
-		Output::i()->sendHeader( $key . ': ' . $header );
+		\IPS\Output::i()->sendHeader( $key . ': ' . $header );
 	}
-	Output::i()->sendHeader( "Content-Length: " . $file->filesize() );
-	Output::i()->sendHeader( "Content-Security-Policy: default-src 'none'; sandbox" );
-	Output::i()->sendHeader( "X-Content-Security-Policy:  default-src 'none'; sandbox" );
-	Output::i()->sendHeader( "Cross-Origin-Opener-Policy: same-origin" );
+	\IPS\Output::i()->sendHeader( "Content-Length: " . $file->filesize() );
+	\IPS\Output::i()->sendHeader( "Content-Security-Policy: default-src 'none'; sandbox" );
+	\IPS\Output::i()->sendHeader( "X-Content-Security-Policy:  default-src 'none'; sandbox" );
+	\IPS\Output::i()->sendHeader( "Cross-Origin-Opener-Policy: same-origin" );
 
 	$file->printFile();
 	exit;
 }
-catch (UnderflowException $e )
+catch ( \UnderflowException $e )
 {
-	Front::i();
-	Output::i()->sendOutput( '', 404 );
+	\IPS\Dispatcher\Front::i();
+	\IPS\Output::i()->sendOutput( '', 404 );
 }

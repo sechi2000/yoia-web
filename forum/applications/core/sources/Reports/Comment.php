@@ -11,52 +11,46 @@
 namespace IPS\core\Reports;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Comment as ContentComment;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Report Comment Model
  */
-class Comment extends ContentComment
+class _Comment extends \IPS\Content\Comment
 {
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_rc_comments';
+	public static $databaseTable = 'core_rc_comments';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = '';
+	public static $databasePrefix = '';
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 		
 	/**
 	 * @brief	[Content\Comment]	Item Class
 	 */
-	public static string $itemClass = 'IPS\core\Reports\Report';
+	public static $itemClass = 'IPS\core\Reports\Report';
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'core';
+	public static $application = 'core';
 	
 	/**
 	 * @brief	[Content\Comment]	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'item'			=> 'rid',
 		'date'			=> 'comment_date',
 		'content'		=> 'comment',
@@ -68,15 +62,15 @@ class Comment extends ContentComment
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'report_comment';
+	public static $title = 'report_comment';
 
 	/**
 	 * Get mapped value
 	 *
-	 * @param string $key	date,content,ip_address,first
+	 * @param	string	$key	date,content,ip_address,first
 	 * @return	mixed
 	 */
-	public function mapped( string $key ): mixed
+	public function mapped( $key )
 	{
 		/* Get the reported content items title */
 		if ( $key === 'title' )
@@ -90,16 +84,16 @@ class Comment extends ContentComment
 	/**
 	 * Can view this entry
 	 *
-	 * @param Member|NULL $member		The member or NULL for currently logged in member.
+	 * @param	\IPS\Member|NULL	$member		The member or NULL for currently logged in member.
 	 * @return	bool
 	 */
-	public function canView( Member|null $member = null ): bool
+	public function canView( $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
-		$return = parent::canView( $member );
+		$return = parent::canView($member);
 
-		if( $return AND $this->item()->canView( $member ) )
+		if ( $return AND $member->modPermission('can_view_reports') )
 		{
 			return TRUE;
 		}
@@ -110,9 +104,9 @@ class Comment extends ContentComment
 	 * Get URL for doing stuff
 	 *
 	 * @param	string|NULL		$action		Action
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function url( ?string $action='find' ): Url
+	public function url( $action='find' )
 	{
 		$url = parent::url( $action );
 		$idColumn = static::$databaseColumnId;
@@ -127,5 +121,16 @@ class Comment extends ContentComment
 	/**
 	 * @brief	Value to set for the 'tab' parameter when redirecting to the comment (via _find())
 	 */
-	public static ?array $tabParameter	= array( 'activeTab' => 'comments' );
+	public static $tabParameter	= array( 'activeTab' => 'comments' );
+
+	/**
+	 * Can promote this comment/item?
+	 *
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @return	boolean
+	 */
+	public function canPromoteToSocialMedia( $member=NULL )
+	{
+		return FALSE;
+	}
 }

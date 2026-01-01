@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <javascript app="cms">
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/blocks" javascript_name="ips.blocks.form.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/blocks" javascript_name="ips.blocks.form.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -16,7 +16,7 @@
 			this.on( 'change', '#elSelect_block_template_use_how', this.toggle );
 			this.on( 'click', '[data-role=viewTemplate]', this.viewTemplate );
 			
-			$('#elTextarea_block_content').attr('loaded', 'false');
+			$('#elCodemirror_block_content-input').attr('loaded', 'false');
 		},
 		
 		/**
@@ -26,7 +26,17 @@
 		 * @returns {void}
 		 */
 		viewTemplate: function (e) {
-			var appOrPlugin = '&block_app=' + this.scope.find('input[name=block_plugin_app]').val();
+			var span = $( e.currentTarget );
+			
+			if ( !_.isUndefined( this.scope.find('input[name=block_plugin_app]').val() ) )
+			{
+				var appOrPlugin = '&block_app=' + this.scope.find('input[name=block_plugin_app]').val();
+			}
+			else
+			{
+				var appOrPlugin = '&block_plugin=' + this.scope.find('input[name=block_plugin_plugin]').val();
+			}
+			
 			var dialogRef = ips.ui.dialog.create({
 				title: this.scope.find('input[name=block_plugin]').val(),
 				url: '?app=cms&module=pages&controller=ajax&do=loadTemplate&show=modal&t_location=block' + appOrPlugin + '&block_key=' + this.scope.find('input[name=block_plugin]').val() + '&t_key=' + this.scope.find('#elSelect_block_template_id').val(),
@@ -46,9 +56,10 @@
 		toggle: function (e) {
 			var thisToggle = $( e.currentTarget );
 			
-			if ( thisToggle.val() === 'copy' && $('#elTextarea_block_content').attr('loaded') == 'false' )
+			if ( thisToggle.val() === 'copy' && $('#elCodemirror_block_content-input').attr('loaded') == 'false' )
 			{
 				var save = { 't_location': 'block', 't_key': this.scope.find('#elSelect_block_template_id').val(), 'block_key': this.scope.find('input[name=block_plugin]').val(), 'block_app': this.scope.find('input[name=block_plugin_app]').val() };
+				var self = this;
 				
 				ips.getAjax()( '?app=cms&module=pages&controller=ajax&do=loadTemplate&show=json&noencode=1', {
 					dataType: 'json',
@@ -57,65 +68,15 @@
 				} )
 					.done( function (response) {
 						/* Update codemirror */
-						let content = response.template_content;
-						$('#elTextarea_block_content')
-							.get(0).dispatchEvent(new CustomEvent('insertCode', {detail: {content}}));
+						$('#elCodemirror_block_content-input').data('CodeMirrorInstance').setValue( response.template_content );
 						$('input[name=template_params]').val( response.template_params );
-						$('#elTextarea_block_content').attr('loaded', 'true');
+						$('#elCodemirror_block_content-input').attr('loaded', 'true');
 					});
 			}
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="front" javascript_path="controllers/blocks" javascript_name="ips.blocks.navigation.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050"><![CDATA[/**
- * Invision Community
- * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
- *
- * ips.blocks.navigation.js
- *
- * Author: Esther Eisner
- */
-
-;(function ($, _, undefined) {
-
-    "use strict";
-
-    ips.controller.register('cms.front.blocks.navigation', {
-
-        initialize: function () {
-            this.on( 'click', 'details', this.loadNavigationItems );
-            let self = this;
-            $.each(self.scope.find('details[open]'), function(){
-                self.loadNavigationItems(null,this);
-            });
-        },
-
-        loadNavigationItems: function (e, details=null) {
-            if( details === null ){
-                details = $( e.target ).parents( 'details:first' );
-            }
-            var itemContainer = $( details ).find( '> [data-role="containerItems"]' );
-            var self = this;
-            if( !itemContainer.html().trim().length ){
-                ips.getAjax()( ips.getSetting( 'baseURL' ) + '?app=cms&module=pages&controller=ajax&do=loadItems',{
-                    data: {
-                        navType: $( self.scope ).attr( 'data-navType' ),
-                        navId: $( self.scope ).attr( 'data-navId' ),
-                        container: $( details ).data( 'container' )
-                    }
-                }).done( function(response){
-                    $( itemContainer ).html( response );
-                    if(!_.isUndefined(ips.getSetting('currentRecordId'))){
-                        $( itemContainer ).find('a[data-id="' + ips.getSetting('currentRecordId') + '"]')
-                            .attr('aria-current', 'page');
-                    }
-                });
-            }
-        }
-
-    });
-}(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/databases" javascript_name="ips.databases.download.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150">/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/databases" javascript_name="ips.databases.download.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -146,7 +107,7 @@
 			ips.ui.alert.show({
 				type: 'confirm',
 				message: ips.getString('cms_download_db_explain'),
-				icon: 'fa-solid fa-download',
+				icon: 'fa fa-download',
 				buttons: {
 					ok: ips.getString('cms_download_db'),
 					cancel: ips.getString('cancel')
@@ -160,7 +121,7 @@
 		}
 	});
 }(jQuery, _));</file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/databases" javascript_name="ips.databases.form.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/databases" javascript_name="ips.databases.form.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -236,7 +197,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="front" javascript_path="controllers/external" javascript_name="ips.external.communication.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="front" javascript_path="controllers/external" javascript_name="ips.external.communication.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -371,7 +332,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/fields" javascript_name="ips.fields.form.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000200"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/fields" javascript_name="ips.fields.form.js" javascript_type="controller" javascript_version="107827" javascript_position="1000200"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -384,84 +345,83 @@
 	ips.controller.register('cms.admin.fields.form', {
 		currentValue: null,
 		initialize: function () {
-			const fieldDefaultValue = document.querySelector('#elTextarea_field_default_value')
-			if (fieldDefaultValue) {
-				fieldDefaultValue.addEventListener( 'input', _.throttle(() => this.checkChange(), 50));
-				this.currentValue = fieldDefaultValue.value || '';
-				document.querySelectorAll('#field_default_update_existing').ipsHide();
+			$('#elTextarea_field_default_value').on( 'keypress', this.checkChange );
+			
+			if ( $('#field_default_update_existing').length )
+			{
+				this.currentValue = $('#elTextarea_field_default_value').val();
+				$('#field_default_update_existing').hide();
 			}
 
-			this.on('change', 'input[data-control="color"]', this.changeBadgeColor);
-			this.on('change', 'input[type="checkbox"][name*="color"]', this.changeBadgeColor);
-			this.elem.querySelector('form').addEventListener('ips:calculateToggles', e => {
-				const form = e.target;
-				if (!(form instanceof HTMLFormElement)) {
-					return;
-				}
-				const typeSelector = form.querySelector('select[name="field_type"]');
-				const showMapActive = typeSelector?.value?.toLowerCase() === 'address';
-				const mapEl = form.querySelectorAll('#field_show_map_listing,#field_show_map_display');
-				if (mapEl && !showMapActive) {
-					mapEl.forEach(el => e.detail.togglesOff.add(el));
-				}
+			this.on( 'change', '#check_field_display_listing', this.updateListingFields );
+			this.on( 'change', '#check_field_display_display', this.updateDisplayFields );
+			this.on( 'change', 'select[name="field_type"]', this.setup );
+			this.setup();
+		},
 
-				// for these, several of the listing/display format options don't apply
-				if (typeSelector?.value?.match(/^(youtube|spotify|soundcloud)$/i)) {
-					form
-						.querySelectorAll("#field_display_listing_json_badge, #field_display_listing_badge_bgcolor, #field_display_listing_badge_color, #field_display_display_json_badge, #field_display_display_badge_bgcolor, #field_display_display_badge_color")
-						.forEach(el => {
-							e.detail.togglesOff.add(el);
-							e.detail.togglesOn.delete(el);
-						});
-				} else {
-					form
-						.querySelectorAll("#media_display_listing_method, #media_display_display_method")
-						.forEach(el => {
-							e.detail.togglesOff.add(el);
-							e.detail.togglesOn.delete(el);
-						});
-				}
-
-				// field_truncate is an exception where there are two togglers; in this case we just target the "Show in listing template" one
-				const fieldTruncate = form.querySelector('#field_truncate');
-				if (fieldTruncate) {
-					if (form.querySelector('#check_field_display_listing') && !form.querySelector('#check_field_display_listing').checked) {
-						e.detail.togglesOff.add(fieldTruncate);
-						e.detail.togglesOn.delete(fieldTruncate);
-					}
-				}
-			})
+		setup: function(){
+			this.updateListingFields();
+			this.updateDisplayFields();
 		},
 		
 		/**
 		 * checkChange handler
 		 *
+		 * @param	{event} 	e 	Event object
 		 * @returns {void}
 		 */
-		checkChange() {
-			if (document.querySelector('#elTextarea_field_default_value').value !== this.currentValue) {
-				document.querySelector('#field_default_update_existing').ipsShow();
-			} else {
-				document.querySelector('#field_default_update_existing').ipsHide();
+		checkChange: function (e) {
+			
+			if ( $('#elTextarea_field_default_value').val() != this.currentValue )
+			{
+				$('#field_default_update_existing').show();
 			}
 		},
 
-		changeBadgeColor(e){
-			const colorPicker = e.target?.closest?.('.ipsFieldRow[id]').getAttribute('id');
+		updateListingFields: function(){
+			let fieldType = $( 'select[name="field_type"]' ).val();
+			if( $( '#check_field_display_listing' ).is( ':checked' ) ){
+				if( fieldType !== 'Text' && fieldType !== 'TextArea' ){
+					$( '#field_truncate' ).hide();
+				} else {
+					$( '#field_truncate' ).show();
+				}
+				if( fieldType !== 'Address' ){
+					$( '#field_show_map_listing' ).hide();
+				} else {
+					$( '#field_show_map_listing' ).show();
+				}
+				if( fieldType === 'Youtube' || fieldType === 'Spotify' || fieldType === 'Soundcloud' ){
+					$( '#field_display_listing_json_badge' ).hide();
+					$( '#media_display_listing_method' ).show();
+				}
+			} else {
+				$( '#field_truncate' ).hide();
+				$( '#field_show_map_listing' ).hide();
+				$( '#media_display_listing_method' ).hide();
+			}
+		},
 
-			const badge = `#elField_field_display_${colorPicker?.includes('listing') ? 'listing' : 'display'}_json_badge_badge_label`;
-			const color = (!colorPicker || document.querySelector(`#${colorPicker}_none`)?.checked) ?
-				'' : document.querySelector(`input[name="${colorPicker}"]`)?.value;
-
-			document
-				.querySelectorAll(`${badge} span`)
-				.forEach(
-					span => span.style[colorPicker?.includes('bgcolor') ? 'background' : 'color'] = color
-				);
+		updateDisplayFields: function(){
+			let fieldType = $( 'select[name="field_type"]' ).val();
+			if( $( '#check_field_display_display' ).is( ':checked' ) ){
+				if( fieldType !== 'Address' ){
+					$( '#field_show_map_display' ).hide();
+				} else {
+					$( '#field_show_map_display' ).show();
+				}
+				if( fieldType === 'Youtube' || fieldType === 'Spotify' || fieldType === 'Soundcloud' ){
+					$( '#field_display_display_json_badge' ).hide();
+					$( '#media_display_display_method' ).show();
+				}
+			} else {
+				$( '#field_show_map_display' ).hide();
+				$( '#media_display_display_method' ).hide();
+			}
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/media" javascript_name="ips.media.main.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000300"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/media" javascript_name="ips.media.main.js" javascript_type="controller" javascript_version="107827" javascript_position="1000300"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -512,8 +472,7 @@
 			
 			this.scope.find('[data-role="uploadButton"]').attr('href', this._uploadURL + '&media_parent=0' );
 			this.scope.find('[data-role="folderButton"]').attr('href', this._newFolderURL + '&media_parent=0' );
-			
-			this.scope.find('[data-role="fileListing"]').click();
+
 			this.resizePanels();
 		},
 
@@ -960,7 +919,7 @@
 				if( info.itemIsImage ){
 					info.itemPreview = $('<img/>').attr( 'src', selected.attr('data-url') ).attr('data-ipsLightbox', true );
 				} else {
-					info.itemPreview = '';
+					info.itemPreview = $('<div/>').addClass('ipsNoThumb');
 				}
 				// Update the easy info
 				_.each( info, function (value, key) {
@@ -974,7 +933,7 @@
 						elem.html( $('<a/>').attr('href', value).text( value ).attr('target', '_blank') );
 					}
 					else if( value === null ){
-						elem.html( $('<span/>').addClass('i-color_soft').text('Loading...') );
+						elem.html( $('<span/>').addClass('ipsType_light').text('Loading...') );
 					} else {
 						elem.text( value );
 					}
@@ -1095,12 +1054,13 @@
 		 */
 		_switchToTab: function (tab) {
 			if( tab == 'overview' ){
-				this.scope.find('#ipsTabs_mediaSidebar_overview').click();
+				this.scope.find('#elTab_overview').removeClass('ipsTabs_itemDisabled');
+				this.scope.find('#elTab_overview').click();
 			}
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/pages" javascript_name="ips.pages.embed.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000250"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/pages" javascript_name="ips.pages.embed.js" javascript_type="controller" javascript_version="107827" javascript_position="1000250"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1114,7 +1074,18 @@
 	ips.controller.register('cms.admin.pages.embed', {
 
 		initialize: function () {
-			this.on( 'change', '[type="checkbox"]', this.toggleInherit );
+			this.on( 'change', 'input[type="checkbox"]', this.toggleInherit );
+			this.on( 'mouseenter', 'textarea', this.mouseEnterTextarea );
+		},
+
+		/**
+		 * Event handler for mousing over the textareas - we'll select hem to make them easy to copy and paste
+		 *
+		 * @param 		{event} 	e 		Event object
+		 * @returns 	{void}
+		 */
+		mouseEnterTextarea: function (e) {
+			$( e.currentTarget ).select();
 		},
 
 		/**
@@ -1124,7 +1095,7 @@
 		 * @returns 	{void}
 		 */
 		toggleInherit: function (e) {
-			var toggle = this.scope.find('[type="checkbox"]');
+			var toggle = this.scope.find('input[type="checkbox"]');
 			var textbox = this.scope.find('[data-role="blockCode"]');
 
 			if( toggle.is(':checked') ){
@@ -1135,7 +1106,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/pages" javascript_name="ips.pages.form.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000250"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/pages" javascript_name="ips.pages.form.js" javascript_type="controller" javascript_version="107827" javascript_position="1000250"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1257,7 +1228,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="front" javascript_path="controllers/records" javascript_name="ips.records.form.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="front" javascript_path="controllers/records" javascript_name="ips.records.form.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1369,7 +1340,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="front" javascript_path="controllers/records" javascript_name="ips.records.revisions.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100">/**
+ <file javascript_app="cms" javascript_location="front" javascript_path="controllers/records" javascript_name="ips.records.revisions.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1384,7 +1355,7 @@
 		initialize: function () {
 			var self = this;
 
-			ips.loader.getStatic( ['applications/core/interface/static/codemirror/diff_match_patch.js','applications/core/interface/static/codemirror/codemirror.js'] ).then( function () {
+			ips.loader.get( ['core/interface/codemirror/diff_match_patch.js','core/interface/codemirror/codemirror.js'] ).then( function () {
 				self._initCodeMirror();
 			});
 		},
@@ -1424,7 +1395,7 @@
 		}
 	});
 }(jQuery, _));</file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.addForm.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050">/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.addForm.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1474,7 +1445,7 @@
 		}
 	});
 }(jQuery, _));</file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.conflict.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050">/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.conflict.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1509,22 +1480,22 @@
 			var id    = $( radio ).attr('name').replace( /conflict_/, '' );
 			
 			// Button disabled
-			if ( span.hasClass('ipsButton--disabled') ){
+			if ( span.hasClass('ipsButton_disabled') ){
 				return false;
 			}
 
 			// Undo selection 
-			else if ( span.hasClass('ipsButton--secondary') ){
+			else if ( span.hasClass('ipsButton_alternate') ){
 				radio.removeAttr('checked');
 				
-				span.removeClass('ipsButton--secondary')
-					   .addClass('ipsButton--primary')
+				span.removeClass('ipsButton_alternate')
+					   .addClass('ipsButton_primary')
 					   .find('strong')
 					   		.html( ips.getString('sc_use_this_version') );
 					   
-				$('input[type=radio][name=conflict_' + id + ']').closest('span.ipsButton[data-conflict-name=' + ( name == 'new' ? 'old' : 'new' ) +']').removeClass('ipsButton--disabled');
+				$('input[type=radio][name=conflict_' + id + ']').closest('span.ipsButton[data-conflict-name=' + ( name == 'new' ? 'old' : 'new' ) +']').removeClass('ipsButton_disabled');
 				
-				$('th span[data-conflict-id=' + id + '][data-conflict-name=' + name + ']').removeClass('ipsBadge ipsBadge--positive');
+				$('th span[data-conflict-id=' + id + '][data-conflict-name=' + name + ']').removeClass('ipsPos_left ipsBadge ipsBadge_positive');
 
 				ips.utils.anim.go( 'blindDown', this.scope.find('div[data-conflict-id=' + id + ']') );
 			}
@@ -1532,21 +1503,21 @@
 			else
 			{
 				radio.attr('checked', 'checked');
-				span.removeClass('ipsButton--primary')
-					   .addClass('ipsButton--secondary')
+				span.removeClass('ipsButton_primary')
+					   .addClass('ipsButton_alternate')
 					   .find('strong')
 					   		.html( ips.getString('sc_remove_selection') );
 						   
-				$('input[type=radio][name=conflict_' + id + ']').closest('span.ipsButton[data-conflict-name=' + ( name == 'new' ? 'old' : 'new' ) +']').addClass('ipsButton--disabled');
+				$('input[type=radio][name=conflict_' + id + ']').closest('span.ipsButton[data-conflict-name=' + ( name == 'new' ? 'old' : 'new' ) +']').addClass('ipsButton_disabled');
 				
-				$('th span[data-conflict-id=' + id + '][data-conflict-name=' + name + ']').addClass('ipsBadge ipsBadge--positive');
+				$('th span[data-conflict-id=' + id + '][data-conflict-name=' + name + ']').addClass('ipsPos_left ipsBadge ipsBadge_positive');
 				
 				ips.utils.anim.go( 'fadeOut', this.scope.find('div[data-conflict-id=' + id + ']') );
 			}
 		}
 	});
 }(jQuery, _));</file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.fileEditor.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.fileEditor.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1579,7 +1550,7 @@
 			this.on( 'tabChanged', this.changedTab );
 			this.on( 'click', '[data-action="closeTab"]', this.closeTab );
 			this.on( 'click', '[data-action="save"]', this.save );
-			this.on( 'click', '[data-action="revert"]:not( .ipsButton--disabled )', this.revert );
+			this.on( 'click', '[data-action="revert"]:not( .ipsButton_disabled )', this.revert );
 			this.on( 'savedFile.templates', this.updateFile );
 			this.on( 'revertedFile.templates', this.updateFile );
 			this.on( 'openDialog', this.openedDialog );
@@ -1601,7 +1572,7 @@
 			var self = this;
 
 			// Set element references
-			this._tabBar = this.scope.find('#elTemplateEditor_tabbar [role="tablist"]');
+			this._tabBar = this.scope.find('#elTemplateEditor_tabbar');
 			this._tabContent = this.scope.find('#elTemplateEditor_panels');
 
 			// Get the current height of the tab bar
@@ -1616,11 +1587,11 @@
 			this._editorPreferences['lines'] = ips.utils.db.get('templateEditor', 'lines');
 
 			if( this._editorPreferences['wrap'] ){
-				$('#elTemplateEditor_preferences_menu').find('[data-ipsMenuValue="wrap"]').attr("aria-selected", "true");
+				$('#elTemplateEditor_preferences_menu').find('[data-ipsMenuValue="wrap"]').addClass('ipsMenu_itemChecked');
 			}
 
 			if( this._editorPreferences['lines'] ){
-				$('#elTemplateEditor_preferences_menu').find('[data-ipsMenuValue="lines"]').attr("aria-selected", "true");
+				$('#elTemplateEditor_preferences_menu').find('[data-ipsMenuValue="lines"]').addClass('ipsMenu_itemChecked');
 			}			
 
 			// Initialize the initial content
@@ -1643,7 +1614,7 @@
 					original.remove();
 				}
 
-				ips.loader.getStatic( ['applications/core/interface/static/codemirror/diff_match_patch.js','applications/core/interface/static/codemirror/codemirror.js'] ).then( function () {
+				ips.loader.get( ['core/interface/codemirror/diff_match_patch.js','core/interface/codemirror/codemirror.js'] ).then( function () {
 					self._initCodeMirror( $( item ).attr('data-fileid'), $( item ).attr('data-type') );
 				});
 			});
@@ -1656,7 +1627,7 @@
 		 * @param	{object} 	data	Event data object
 		 * @returns {void}
 		 */
-		menuSelected: function (e, data = e.detail) {
+		menuSelected: function (e, data) {
 			if( data.originalEvent ){
 				data.originalEvent.preventDefault();
 			}
@@ -1683,10 +1654,10 @@
 			// Set the menu appropriately
 			if( toValue ){
 				$('#elTemplateEditor_preferences_menu')
-					.find('[data-ipsMenuValue="' + type + '"]').attr("aria-selected", "true");
+					.find('[data-ipsMenuValue="' + type + '"]').addClass('ipsMenu_itemChecked');
 			} else {
 				$('#elTemplateEditor_preferences_menu')
-					.find('[data-ipsMenuValue="' + type + '"]').removeAttr("aria-selected");
+					.find('[data-ipsMenuValue="' + type + '"]').removeClass('ipsMenu_itemChecked');
 			}
 
 			// Update controller variable
@@ -1872,12 +1843,10 @@
 						panel.prepend( headers );
 
 						// Set size
-						/*
 						var height = self._getTabContentHeight() - panel.find('.cTemplateMergeHeaders').outerHeight();
 						self._cmInstances[ key ].edit.setSize( null, height );
 						self._cmInstances[ key ].left.orig.setSize( null, height );
 						$( self._cmInstances[ key ].left.gap ).css( 'height', height );
-						*/
 												
 						// Add change handler
 						self._cmInstances[ key ].edit.on( 'change', function (doc, cm) {
@@ -2134,7 +2103,7 @@
 		 * @returns {void}
 		 */
 		closeTab: function (e) {
-			var tab = $( e.currentTarget ).closest('.ipsTabs__tab');
+			var tab = $( e.currentTarget ).closest('.ipsTabs_item');
 			this._doCloseTab( tab );
 		},
 
@@ -2151,7 +2120,7 @@
 			var self = this;
 			var tabParent = tab.closest('[data-fileid]');
 			var key = tabParent.attr('data-fileid');
-			var allTabs = this._tabBar.find('.ipsTabs__tab').closest('[data-fileid]');
+			var allTabs = this._tabBar.find('.ipsTabs_item').closest('[data-fileid]');
 			var newTab = null;
 
 			// Check if there's unsaved content
@@ -2171,7 +2140,7 @@
 			} 
 
 			// Is this tab active?
-			var active = (tab.attr('aria-selected') === 'true');
+			var active = tab.hasClass('ipsTabs_activeItem');
 
 			// Let the document know what we're up to
 			this.trigger( 'closedTab.templates', {
@@ -2191,7 +2160,7 @@
 			}
 
 			if( newTab ){
-				newTab.click();
+				newTab.find('> a').click();
 			}
 
 			// Close the tab
@@ -2243,19 +2212,19 @@
 				case 'original':
 				case 'inherit':
 					revert
-						.addClass('ipsButton--disabled')
+						.addClass('ipsButton_disabled')
 				break;
 				case 'custom':
 					revert
 						.html( ips.getString('skin_delete') )
-						.removeClass('ipsButton--disabled')
+						.removeClass('ipsButton_disabled')
 						.attr('data-actionType', 'delete')
 						.show();
 				break;
 				case 'changed':
 					revert
 						.html( ips.getString('skin_delete') )
-						.removeClass('ipsButton--disabled')
+						.removeClass('ipsButton_disabled')
 						.attr('data-actionType', 'delete')
 						.show();
 				break;
@@ -2265,9 +2234,9 @@
 			$('#elTemplateEditor_attributes').hide();
 			
 			if ( this._cmInstances[ key ] instanceof CodeMirror.MergeView ) {
-				$('[data-ipsmenuvalue="diff"]').attr("aria-selected", "true");
+				$('[data-ipsmenuvalue="diff"]').addClass('ipsMenu_itemChecked');
 			} else {
-				$('[data-ipsmenuvalue="diff"]').removeAttr("aria-selected");
+				$('[data-ipsmenuvalue="diff"]').removeClass('ipsMenu_itemChecked');
 			}
 		},
 
@@ -2284,7 +2253,7 @@
 			if( !this._tabBar.find('[data-fileid="' + data.meta.key + '"]').length ){
 				this._buildTab( data.meta );
 			} else {
-				this._tabBar.find('[data-fileid="' + data.meta.key + '"]').click();
+				this._tabBar.find('[data-fileid="' + data.meta.key + '"] > a').click();
 			}
 		},
 
@@ -2326,7 +2295,7 @@
 			this._recalculatePanelWrapper();
 
 			// Toggle the new tab
-			this._tabBar.find('[data-fileid="' + meta.key + '"]').click();
+			this._tabBar.find('[data-fileid="' + meta.key + '"] > a').click();
 
 			// Manually set the content area to loading since we aren't using ui.tabbar's load methods
 			this._tabContent.addClass('ipsLoading ipsTabs_loadingContent');
@@ -2360,9 +2329,9 @@
 		 */
 		_updateTabLabel: function( key, title )
 		{
-			var span = this._tabBar.find('[data-fileid="' + key + '"] span').clone();
+			var span = this._tabBar.find('[data-fileid="' + key + '"] > a span').clone();
 			
-			this._tabBar.find('[data-fileid="' + key + '"]').html( title ).append( span );
+			this._tabBar.find('[data-fileid="' + key + '"] > a').html( title ).append( span );
 		},
 		
 		/**
@@ -2402,7 +2371,7 @@
 				lineWrapping: this._editorPreferences['wrap'],
 				lineNumbers: this._editorPreferences['lines']
 			} );
-			//this._cmInstances[ key ].setSize( null, this._getTabContentHeight() );
+			this._cmInstances[ key ].setSize( null, this._getTabContentHeight() );
 
 			this._cmInstances[ key ].on( 'change', function (doc, cm) {
 				self._setChanged( true, key );
@@ -2439,8 +2408,6 @@
 		 * @returns {void}
 		 */
 		_recalculatePanelWrapper: function () {
-
-			/*
 			// Get height of the tab bar
 			var tabHeight = this._tabBar.outerHeight();
 
@@ -2452,7 +2419,7 @@
 
 			if ( this._tabContent.find('.cTemplateMergeHeaders').length )
 			{
-				// We are viewing a diff, so we need to account for this bar too
+				/* We are viewing a diff, so we need to account for this bar too */
 				contentHeight -= this._tabContent.find('.cTemplateMergeHeaders').outerHeight();
 			}
 
@@ -2463,7 +2430,6 @@
 			this._tabContent.find('.CodeMirror-merge-gap').css( { height: contentHeight + 'px' } );
 
 			this._currentHeight = tabHeight;
-			*/
 		},
 
 		/**
@@ -2477,7 +2443,7 @@
 				tabPanel: null
 			};
 
-			var tab = this._tabBar.find('[aria-selected="true"]').first();
+			var tab = this._tabBar.find('.ipsTabs_item.ipsTabs_activeItem').first().parent();
 
 			if( !tab.length ){
 				return toReturn;
@@ -2507,7 +2473,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.fileList.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.fileList.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -2526,6 +2492,7 @@
 		initialize: function () {
 			// Events started here			
 			this.on( 'click', '[data-action="openFile"]', this.openFile );
+			this.on( 'click', '[data-action="toggleBranch"]', this.toggleBranch );
 			this.on( 'modifiedFile.templates', this.refreshFileList );
 			
 			// Events coming from elsewhere
@@ -2536,6 +2503,9 @@
 			this.on( document, 'addedFile.templates', this.refreshFileList );
 			this.on( document, 'deletedFile.templates', this.refreshFileList );
 			
+			var debounce = _.debounce( _.bind( this.resizeFileList, this ), 100 );
+			this.on( window, 'resize', debounce );
+
 			// Other setup
 			this.setup();
 		},
@@ -2548,8 +2518,28 @@
 		setup: function () {
 			this._tabBar = this.scope.find('#elTemplateEditor_typeTabs');
 			this._tabContent = this.scope.find('#elTemplateEditor_fileList');
+			this.resizeFileList();
 		},
 
+		/**
+		 * Resizes the file list to full height
+		 *
+		 * @returns {void}
+		 */
+		resizeFileList: function () {
+			// Get height of parts we want to exclude
+			var fileListTop = this._tabContent.offset().top;
+			var infoHeight = $('#elTemplateEditor_info').height();
+			var newButtonHeight = this.scope.find('#elTemplateEditor_newButton').outerHeight();
+			var browserHeight = $( window ).height();
+
+			var fileListNewTop = browserHeight - fileListTop - infoHeight - newButtonHeight;
+
+			this._tabContent.css({
+				height: fileListNewTop + 'px'
+			});
+		},
+		
 		/**
 		 * Something has changed in the file list, so we refresh it and try and remember
 		 * the position we were at. If a new file ID is provided, we'll also select it.
@@ -2712,6 +2702,33 @@
 		},
 
 		/**
+		 * Event handler for clicking a branch in the listing.
+		 * Expends or collapses the branch
+		 *
+		 * @param	{event} 	e 	Event object
+		 * @returns {void}
+		 */
+		toggleBranch: function (e) {
+			e.preventDefault();
+			var branchTrigger = $( e.currentTarget );
+			var branchItem = branchTrigger.parent();
+
+			if( branchItem.hasClass('cTemplateList_inactiveBranch') ){
+				ips.utils.anim.go( 'fadeInDown', branchItem.find(' > ul') );
+
+				branchItem
+					.removeClass('cTemplateList_inactiveBranch')
+					.addClass('cTemplateList_activeBranch');
+			} else {
+				branchItem.find(' > ul').hide();
+
+				branchItem
+					.removeClass('cTemplateList_activeBranch')
+					.addClass('cTemplateList_inactiveBranch');
+			}
+		},
+
+		/**
 		 * Updates the ID of any element with the old ID
 		 *
 		 * @param	{event} 	e 		Event object
@@ -2788,10 +2805,10 @@
 		 * @returns {string}
 		 */
 		_currentType: function () {
-			if( this._tabBar.find('[data-type="template"]').attr('aria-selected') === "true" ){
+			if( this._tabBar.find('[data-type="template"]').hasClass('ipsTabs_activeItem') ){
 				return 'template';
 			}
-			if( this._tabBar.find('[data-type="js"]').attr('aria-selected') === "true" ){
+			if( this._tabBar.find('[data-type="js"]').hasClass('ipsTabs_activeItem') ){
 				return 'js';
 			} 
 			
@@ -2799,7 +2816,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.main.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050"><![CDATA[/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.main.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -2906,7 +2923,7 @@
 		 * @param	{object} 	data	Event data object
 		 * @returns {void}
 		 */
-		menuSelected: function (e, data = e.detail) {
+		menuSelected: function (e, data) {
 			if( data.originalEvent ){
 				data.originalEvent.preventDefault();
 			}			
@@ -2928,13 +2945,13 @@
 				this._textField.addClass('ipsField_loading');
 			}
 
-			var type = $('#elTemplateEditor_typeTabs').find('[aria-selected="true"]').attr('data-type');
+			var type = $('#elTemplateEditor_typeTabs').find('.ipsTabs_activeItem').attr('data-type');
 			var type = ( type == 'templates' ) ? 'template' : type; // Because it's fun to be inconsistent, the database 'type' is 'template' yet in templates we use 'templates' - thanks past Matt
 
 			$('#elTemplateEditor_fileList').find('li[data-type=' + type + ']').addClass('ipsHide');
 			
 			var filters = [];
-			$('#elTemplateFilterMenu_menu [aria-selected="true"]').each(function(){
+			$('#elTemplateFilterMenu_menu .ipsMenu_itemChecked').each(function(){
 				filters.push( $(this).attr('data-ipsMenuValue') );
 			});
 
@@ -2968,7 +2985,7 @@
 
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.variablesDialog.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050">/**
+ <file javascript_app="cms" javascript_location="admin" javascript_path="controllers/templates" javascript_name="ips.templates.variablesDialog.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -2979,10 +2996,31 @@
 ;( function($, _, undefined){
 	&quot;use strict&quot;;
 
+	const regex = /[^a-z0-9_]+|^[^a-z_]/gi;
+
 	ips.controller.register('cms.admin.templates.variablesDialog', {
 
 		initialize: function () {
+			this.on( 'blur', '[data-role=&quot;title&quot;]', this.checkTitle );
 			this.on( 'click', 'input[type=&quot;submit&quot;]', this.submitChange );
+		},
+
+		/**
+		 * Check the template title for spaces
+		 * @param e
+		 */
+		checkTitle: function (e) {
+				var elem = $( e.currentTarget );
+				var val = elem.val();
+
+				if ( val.match(regex) ) {
+					elem.val( val.replaceAll( regex, '' ) );
+					ips.ui.alert.show({
+						type: 'alert',
+						message: ips.getString('template_title_desc'),
+						icon: 'warn'
+					});
+				}
 		},
 
 		/**
@@ -3013,31 +3051,238 @@
 		}
 	});
 }(jQuery, _));</file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="templates" javascript_name="ips.templates.media.js" javascript_type="template" javascript_version="5001403" javascript_position="1000050"><![CDATA[ips.templates.set( 'templates.media.grid', "\
-	<ul class='ipsGrid ipsGrid--pages-media'>\
+ <file javascript_app="cms" javascript_location="front" javascript_path="mixins" javascript_name="ips.cms.builder.area.js" javascript_type="mixins" javascript_version="107827" javascript_position="1000050"><![CDATA[/**
+ * Invision Community
+ * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
+ *
+ * ips.cms.builder.area.js - Front-end mixin for tables 
+ *
+ * Author: Matt Mecham
+ */
+;( function($, _, undefined){
+	"use strict";
+
+	ips.controller.mixin('builder.area', 'core.front.widgets.area', true, function () {
+		
+		_pageID: null;
+		
+		/**
+		 * After init, init
+		 *
+		 * @returns {void}
+		 */
+		this.after('setup', function () {
+			if( ! $('.cWidgetContainer').length ) {
+				$('[data-action="openSidebar"]').hide();
+			}
+		});
+		
+		/**
+		 * Updates the ordering of widgets in this area
+		 *
+		 * @returns {void}
+		 */
+		this.updateOrdering = function (without) {
+			var body = $('body');
+			var order = this.scope.find('> ul').sortable('toArray', {
+				attribute: 'data-blockID'
+			});
+
+			order = ( without ) ? _.without( _.uniq( order ), without ) : _.uniq( order );
+
+			// Remove hidden blocks as these should not be stored
+			var self = this;
+			_.each( order, function( value, key )
+			{
+				if ( self.scope.find('li[data-blockID=' + value + ']').attr('data-hidden') == 'true' )
+				{
+					order = _.without( order, value );
+				}
+			} );
+
+			ips.getAjax()( ips.getSetting('baseURL') + 'index.php?app=cms&module=pages&controller=builder&do=saveOrder&orientation='  + this._orientation, {
+				method: 'POST',
+				data: {
+					order: order,
+					pageID: $('#elCmsPageWrap').attr('data-pageid'),
+					area: this._areaID,
+					exclude: _.isString(without) ? without : ''
+				}
+			})
+				.fail( function () {
+					ips.ui.alert.show( {
+						type: 'alert',
+						icon: 'warn',
+						message: ips.getString('sidebarError'),
+						callbacks: {}
+					});
+				});
+		};
+		
+	});
+}(jQuery, _));]]></file>
+ <file javascript_app="cms" javascript_location="front" javascript_path="mixins" javascript_name="ips.cms.builder.block.js" javascript_type="mixins" javascript_version="107827" javascript_position="1000050"><![CDATA[/**
+ * Invision Community
+ * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
+ *
+ * ips.cms.builder.block.js - Front-end mixin for CMS sidebar 
+ *
+ * Author: Matt Mecham
+ */
+;( function($, _, undefined){
+	"use strict";
+
+	ips.controller.mixin('builder.block', 'core.front.widgets.block', true, function () {
+		
+		/**
+		 * When the menu is opened, we need to load the form into it
+		 *
+		 * @returns {void}
+		 */
+		this.menuOpened = function (e, data) {
+			/* Don't override menus inside the block */
+			if ( ! this.scope.closest('[data-widgetArea]').hasClass('cWidgetContainer_managing') )
+			{
+				return;
+			}
+			
+			var body = $('body');
+			var area = this.scope.closest('[data-widgetArea]').attr('data-widgetArea');
+			var block = this._blockID;
+			var self = this;
+			var managerBlock = $('[data-role="availableBlocks"] [data-blockID="' + this._getBlockIDWithoutUniqueKey( this._blockID ) + '"]');
+			var menuStyle = managerBlock.attr('data-menuStyle');
+		
+			if ( menuStyle == 'modal' )
+			{
+				var dialogRef = ips.ui.dialog.create({
+					title: managerBlock.find('h4').html(),
+					url: ips.getSetting('baseURL') + 'index.php?app=cms&module=pages&controller=builder&do=getConfiguration&block=' + block + '&pageID=' + $('#elCmsPageWrap').attr('data-pageid') + '&pageArea=' + area,
+					forceReload: true,
+					remoteSubmit: true
+				});
+					
+				dialogRef.show();
+				Debug.log( dialogRef );
+				$('#' + dialogRef.dialogID ).css( "height", "1000px");
+				this._modalOpen = block;
+			}
+			else
+			{
+				data.menu.html( $('<div/>').addClass('ipsLoading').css({ height: '100px' }) );
+				
+				setTimeout( function () {
+					ips.getAjax()( ips.getSetting('baseURL') + 'index.php?app=cms&module=pages&controller=builder&do=getConfiguration', {
+						data: {
+							block: block,
+							pageID: $('#elCmsPageWrap').attr('data-pageid'),
+							pageArea: area
+						}
+					} )
+					.done( function (response) {
+						data.menu
+							.html( response )
+							.find('form')
+							.on( 'submit', _.bind( self._configurationForm, self, data.menu ) );
+
+						$( document ).trigger('contentChange', [ data.menu ] );
+					});
+				}, 1000);
+			}
+		};
+		
+		/**
+		 * Event handler/method that reloads the entire contents of this widget
+		 *
+		 * @returns {void}
+		 */
+		this.reloadContent = function () {
+			var self = this;
+
+			this._setLoading( true );
+
+			// Get content
+			if( this._ajaxObj && this._ajaxObj.abort ){
+				this._ajaxObj.abort();
+			}
+			
+			var body = $('body');
+			var url = ips.getSetting('baseURL') + 'index.php?app=cms&module=pages&controller=builder&do=getBlock&blockID=' + this._blockID + '&pageID=' + $('#elCmsPageWrap').attr('data-pageid') + '&orientation=' + this._orientation;
+
+			this._ajaxObj = ips.getAjax()( url )
+				.done( function (response) {
+					self.scope.hide().html( response );
+
+					ips.utils.anim.go('fadeIn', self.scope);
+
+					self.trigger('loadedWidget.widgets', {
+						blockID: self._blockID
+					});
+				})
+				.fail( function () {
+					self.scope.html('Error');
+				})
+				.always( function () {
+					self._setLoading( false );
+				});
+		};
+			
+	});
+}(jQuery, _));]]></file>
+ <file javascript_app="cms" javascript_location="front" javascript_path="mixins" javascript_name="ips.cms.comment.js" javascript_type="mixins" javascript_version="107827" javascript_position="1000050">/**
+ * Invision Community
+ * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
+ *
+ * ips.cms.comment.js - Front-end mixin for comments
+ *
+ * Author: Matt Mecham
+ */
+;( function($, _, undefined){
+	&quot;use strict&quot;;
+
+	ips.controller.mixin('comment', 'core.front.core.comment', true, function () {
+		/**
+		 * Switch off table loading after results are fetched
+		 *
+		 * @returns {void}
+		 */
+		this.after('saveEditCommentDone', function () {
+			this.scope
+				.find('[data-role=&quot;commentContent&quot;]')
+				.addClass('sm:ipsPadding_vertical:half')
+				.addClass('ipsPadding_vertical')
+				.addClass('ipsPadding_horizontal')
+				.removeClass('ipsPadding_bottom')
+		});
+	});
+}(jQuery, _));</file>
+ <file javascript_app="cms" javascript_location="admin" javascript_path="templates" javascript_name="ips.templates.media.js" javascript_type="template" javascript_version="107827" javascript_position="1000050"><![CDATA[ips.templates.set( 'templates.media.grid', "\
+	<ul class='ipsGrid' data-ipsGrid data-ipsGrid-minItemSize='100' data-ipsGrid-maxItemSize='200'>\
 		{{{contents}}}\
 	</ul>\
 ");
 
 ips.templates.set( 'templates.media.noItems', "\
-	<div class='i-text-align_center i-font-size_2 i-color_soft i-padding_4'>\
+	<div class='ipsType_center ipsType_large ipsType_light ipsPad_double'>\
 		{{#lang}}mediaEmptyFolder{{/lang}}\
 	</div>\
 ");
 
 ips.templates.set( 'templates.media.noSearchResults', "\
-	<div class='i-text-align_center i-font-size_2 i-color_soft i-padding_4'>\
+	<div class='ipsType_center ipsType_large ipsType_light ipsPad_double'>\
 		{{#lang}}mediaNoResults{{/lang}}\
 	</div>\
 ");]]></file>
- <file javascript_app="cms" javascript_location="admin" javascript_path="templates" javascript_name="ips.templates.templates.js" javascript_type="template" javascript_version="5001403" javascript_position="1000050"><![CDATA[/* TEMPLATE EDITOR TEMPLATES */
+ <file javascript_app="cms" javascript_location="admin" javascript_path="templates" javascript_name="ips.templates.templates.js" javascript_type="template" javascript_version="107827" javascript_position="1000050"><![CDATA[/* TEMPLATE EDITOR TEMPLATES */
 /* TEMPLATECEPTION */
 ips.templates.set('templates.editor.newTab', " \
-	<a href='#' class='ipsTabs__tab' id='ipsTabs_elTemplateEditor_tabbar_tab_{{fileid}}' role='tab' aria-controls='ipsTabs_elTemplateEditor_tabbar_tab_{{fileid}}_panel' aria-selected='false' data-fileid='{{fileid}}' data-location='{{location}}'>{{title}} <span data-action='closeTab'><i class='fa-solid fa-xmark'></i></span></a>\
+	<li data-fileid='{{fileid}}' data-location='{{location}}'>\
+		<a href='#' class='ipsTabs_item' id='{{id}}'>{{title}} <span data-action='closeTab'><i class='fa fa-times'></i></span></a>\
+	</li>\
 ");
 
 ips.templates.set('templates.editor.tabPanel', " \
-	<div class='ipsTabs__panel' id='ipsTabs_elTemplateEditor_tabbar_tab_{{fileid}}_panel' role='tabpanel' aria-labelledby='ipsTabs_elTemplateEditor_tabbar_tab_{{fileid}}' hidden data-fileid='{{fileid}}' data-location='{{location}}' data-type='{{type}}' data-group='{{group}}' data-name='{{name}}' data-type='{{type}}' data-itemID='{{id}}' data-inherited-value='{{inherited}}'>\
+	<div data-fileid='{{fileid}}' id='ipsTabs_elTemplateEditor_tabbar_tab_{{fileid}}_panel' class='ipsTabs_panel' style='display: none' data-location='{{location}}' data-type='{{type}}' data-group='{{group}}' data-name='{{name}}' data-type='{{type}}' data-itemID='{{id}}' data-inherited-value='{{inherited}}'>\
 		{{{content}}}\
 	</div>\
 ");
@@ -3051,20 +3296,20 @@ ips.templates.set('templates.editor.tabContent', " \
 ");
 
 ips.templates.set('templates.editor.unsaved', " \
-	<i class='fa-solid fa-circle'></i>\
+	<i class='fa fa-circle'></i>\
 ");
 
 ips.templates.set('templates.editor.saved', " \
-	<i class='fa-solid fa-xmark'></i>\
+	<i class='fa fa-times'></i>\
 ");
 
 ips.templates.set('templates.editor.pagesDiffHeaders', " \
-<div class='cTemplateMergeHeaders i-background_2'>\
+<div class='cTemplateMergeHeaders ipsAreaBackground_light'>\
 	<div class='cTemplateMergeHeader'>\
-		<div class='i-padding_2'><strong>{{#lang}}theme_diff_original_header{{/lang}}</strong> <span class='i-font-size_-1 i-color_soft'>{{#lang}}theme_diff_original_desc{{/lang}}</span></div>\
+		<div class='ipsPad_half'><strong>{{#lang}}theme_diff_original_header{{/lang}}</strong> <span class='ipsType_small ipsType_light'>{{#lang}}theme_diff_original_desc{{/lang}}</span></div>\
 	</div>\
-	<div class='cTemplateMergeHeader'>\
-		<div class='i-padding_2'><strong>{{#lang}}theme_diff_custom_header{{/lang}}</strong> <span class='i-font-size_-1 i-color_soft'>{{#lang}}theme_diff_custom_desc{{/lang}}</span></div>\
+	<div class='cTemplateMergeHeader ipsPos_right'>\
+		<div class='ipsPad_half'><strong>{{#lang}}theme_diff_custom_header{{/lang}}</strong> <span class='ipsType_small ipsType_light'>{{#lang}}theme_diff_custom_desc{{/lang}}</span></div>\
 	</div>\
 </div>\
 ");]]></file>
@@ -3080,7 +3325,8 @@ mustache
 Debug.js
 app.js</order>
  <order app="global" path="/dev/js//library//jquery">jquery.js
-jquery-migrate.js</order>
+jquery-migrate.js
+jquery.transform.js</order>
  <order app="global" path="/dev/js//library//linkify">linkify.min.js
 linkify-jquery.min.js</order>
 </javascript>

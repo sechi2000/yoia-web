@@ -11,71 +11,56 @@
 namespace IPS\core\Warnings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Warning Reason Node
  */
-class Reason extends Model
+class _Reason extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_members_warn_reasons';
+	public static $databaseTable = 'core_members_warn_reasons';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'wr_';
+	public static $databasePrefix = 'wr_';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'order';
+	public static $databaseColumnOrder = 'order';
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'warn_reasons';
+	public static $nodeTitle = 'warn_reasons';
 	
 	/**
 	 * @brief	[Node] Show forms modally?
 	 */
-	public static bool $modalForms = TRUE;
+	public static $modalForms = TRUE;
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'moderation',
 		'prefix'	=> 'reasons_',
@@ -84,30 +69,30 @@ class Reason extends Model
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'core_warn_reason_';
+	public static $titleLangPrefix = 'core_warn_reason_';
 
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
-		$form->add( new Translatable( 'wr_name', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? "core_warn_reason_{$this->id}" : NULL ) ) ) );
-		$form->add( new Number( 'wr_points', $this->id ? $this->points : 0, TRUE ) );
-		$form->add( new YesNo( 'wr_points_override', $this->id ? $this->points_override : TRUE ) );
-		$form->add( new Custom( 'wr_remove', $this->id ? array( $this->remove, $this->remove_unit ) : NULL, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Translatable( 'wr_name', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? "core_warn_reason_{$this->id}" : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'wr_points', $this->id ? $this->points : 0, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'wr_points_override', $this->id ? $this->points_override : TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'wr_remove', $this->id ? array( $this->remove, $this->remove_unit ) : NULL, FALSE, array(
 			'getHtml'	=> function( $element )
 			{
-				return Theme::i()->getTemplate( 'members' )->warningTime( $element->name, $element->value, 'after', 'never' );
+				return \IPS\Theme::i()->getTemplate( 'members' )->warningTime( $element->name, $element->value, 'after', 'never' );
 			}
 			, 'unlimited' => -1, 'unlimitedLang' => 'never'
 		) ) );
-		$form->add( new YesNo( 'wr_remove_override', $this->id ? $this->remove_override : TRUE ) );
-		$form->add( new Number( 'wr_cheev_point_reduction', $this->cheev_point_reduction ? $this->cheev_point_reduction : 0 ) );
-		$form->add( new YesNo( 'wr_cheev_override', $this->id ? $this->remove_override : TRUE ) );
-		$form->add( new Editor( 'wr_notes', $this->id ? $this->notes : NULL, FALSE, array( 'app' => 'core', 'key' => 'Modcp', 'autoSaveKey' => "warn-member-default", 'attachIds' => ( $this->id ? array( $this->id, NULL, 'warndefault' ) : NULL ), 'minimize' => 'warn_member_note_placeholder' ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'wr_remove_override', $this->id ? $this->remove_override : TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'wr_cheev_point_reduction', $this->cheev_point_reduction ? $this->cheev_point_reduction : 0 ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'wr_cheev_override', $this->id ? $this->remove_override : TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'wr_notes', $this->id ? $this->notes : NULL, FALSE, array( 'app' => 'core', 'key' => 'Modcp', 'autoSaveKey' => "warn-member-default", 'attachIds' => ( $this->id ? array( $this->id, NULL, 'warndefault' ) : NULL ), 'minimize' => 'warn_member_note_placeholder' ) ) );
 	}
 	
 	/**
@@ -116,7 +101,7 @@ class Reason extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if( isset( $values['wr_remove'] ) )
 		{
@@ -140,7 +125,7 @@ class Reason extends Model
 
 		if( isset( $values['wr_name'] ) )
 		{
-			Lang::saveCustom( 'core', "core_warn_reason_{$this->id}", $values['wr_name'] );
+			\IPS\Lang::saveCustom( 'core', "core_warn_reason_{$this->id}", $values['wr_name'] );
 			unset( $values['wr_name'] );
 		}
 
@@ -162,9 +147,9 @@ class Reason extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
-		File::claimAttachments( "warn-member-default", $this->id, NULL, 'warndefault' );
+		\IPS\File::claimAttachments( "warn-member-default", $this->id, NULL, 'warndefault' );
 	}
 	
 	/**
@@ -172,7 +157,7 @@ class Reason extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canAdd(): bool
+	public function canAdd()
 	{
 		return FALSE;
 	}
@@ -180,20 +165,19 @@ class Reason extends Model
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		File::unclaimAttachments( "warn-member-default", $this->id, NULL, 'warndefault' );
-		Db::i()->update( 'core_members_warn_logs', array( 'wl_reason' => 0 ), array( "wl_reason=?", $this->id ) );
-
-		parent::delete();
+		\IPS\File::unclaimAttachments( "warn-member-default", $this->id, NULL, 'warndefault' );
+		\IPS\Db::i()->update( 'core_members_warn_logs', array( 'wl_reason' => 0 ), array( "wl_reason=?", $this->id ) );
+		return parent::delete();
 	}
 
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	int						id					ID number
 	 * @apiresponse	string					name				Warn reason name
@@ -204,7 +188,7 @@ class Reason extends Model
 	 * @apiresponse	string|null				removePoints		Time frame as a date interval when points will automatically be removed, or null if points do not automatically remove
 	 * @apiresponse	bool					pointsAutoRemove	Whether points are automatically removed or not
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'id'				=> $this->id,
@@ -212,7 +196,7 @@ class Reason extends Model
 			'defaultNotes'		=> $this->notes,
 			'points'			=> (int) $this->points,
 			'pointsOverride'	=> (bool) $this->points_override,
-			'pointsAutoRemove'	=> !( $this->remove AND $this->remove == -1 ),
+			'pointsAutoRemove'	=> ( $this->remove AND $this->remove == -1 ) ? FALSE : TRUE,
 			'removePoints'		=> ( $this->remove AND $this->remove != -1 ) ? 'P' . ( ( $this->remove_unit == 'h' ) ? 'T' : '' ) . $this->remove . mb_strtoupper( $this->remove_unit ) : NULL,
 			'removeOverride'	=> (bool) $this->remove_override
 		);

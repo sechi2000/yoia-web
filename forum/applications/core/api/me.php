@@ -12,32 +12,25 @@
 namespace IPS\core\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Api\Response;
-use IPS\DateTime;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Me API
  */
-class me extends Controller
+class _me extends \IPS\Api\Controller
 {
 	/**
 	 * GET /core/me
 	 * Get basic information about the authorized user
 	 *
 	 * @apimemberonly
-	 * @apireturn	\IPS\Member
-	 * @return Response
+	 * @return	\IPS\Member
 	 */
-	public function GETindex(): Response
+	public function GETindex()
 	{
 		$output = $this->member->apiOutput( $this->member );
 		
@@ -46,10 +39,10 @@ class me extends Controller
 			$output['email'] 		= $this->member->email;
 		}
 		
-		$output['lastVisit'] 	= $this->member->last_visit ? DateTime::ts( $this->member->last_visit )->rfc3339() : NULL;
-		$output['lastPost'] 	= $this->member->member_last_post ? DateTime::ts( $this->member->member_last_post )->rfc3339() : NULL;
+		$output['lastVisit'] 	= $this->member->last_visit ? \IPS\DateTime::ts( $this->member->last_visit )->rfc3339() : NULL;
+		$output['lastPost'] 	= $this->member->member_last_post ? \IPS\DateTime::ts( $this->member->member_last_post )->rfc3339() : NULL;
 		
-		return new Response( 200, $output );
+		return new \IPS\Api\Response( 200, $output );
 	}
 	
 	/**
@@ -58,12 +51,11 @@ class me extends Controller
 	 *
 	 * @apimemberonly
 	 * @param		string		$path			Requested path
-	 * @apireturn	array
+	 * @return	array
 	 * @apiresponse	string	email	Email address
-	 * @return Response
 	 */
-	public function GETitem( string $path = '' ): Response
+	public function GETitem( $path )
 	{
-		return new Response( 200, array( 'email' => $this->member->email ) );
+		return new \IPS\Api\Response( 200, array( 'email' => $this->member->email ) );
 	}
 }

@@ -12,49 +12,35 @@
 namespace IPS\nexus\modules\admin\reports;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\core\Statistics\Chart;
-use IPS\Helpers\Chart\Dynamic;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Money;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Markets Report
  */
-class markets extends Controller
+class _markets extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'markets_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'markets_manage' );
 		parent::execute();
 	}
 
@@ -63,37 +49,37 @@ class markets extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$tabs['count'] = 'nexus_report_count';
-		foreach ( Money::currencies() as $currency )
+		foreach ( \IPS\nexus\Money::currencies() as $currency )
 		{
-			$tabs[ $currency ] = Member::loggedIn()->language()->addToStack( 'nexus_report_income', FALSE, array( 'sprintf' => array( $currency ) ) );
+			$tabs[ $currency ] = \IPS\Member::loggedIn()->language()->addToStack( 'nexus_report_income', FALSE, array( 'sprintf' => array( $currency ) ) );
 		}
-
-		Request::i()->tab ??= 'count';
-		$activeTab = ( array_key_exists( Request::i()->tab, $tabs ) ) ? Request::i()->tab : 'count';
-		$extension = Chart::loadFromExtension( 'nexus', 'Market' );
-		$chart = $extension->getChart( Url::internal( "app=nexus&module=reports&controller=markets&tab={$activeTab}" ) );
-
+		
+		\IPS\Request::i()->tab ??= 'count';
+		$activeTab = ( array_key_exists( \IPS\Request::i()->tab, $tabs ) ) ? \IPS\Request::i()->tab : 'count';
+		$extension = \IPS\core\Statistics\Chart::loadFromExtension( 'nexus', 'Market' );
+		$chart = $extension->getChart( \IPS\Http\Url::internal( "app=nexus&module=reports&controller=markets&tab={$activeTab}" ) );
+		
 		if ( $activeTab !== 'count' )
 		{
 			try
 			{
 				$extension->setCurrency( $chart, $activeTab );
 			}
-			catch( InvalidArgumentException ) {}
+			catch( \InvalidArgumentException ) {}
 		}
-
-		/* @var Dynamic $chart */
-		if ( Request::i()->isAjax() )
+		
+		
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = (string) $chart;
+			\IPS\Output::i()->output = (string) $chart;
 		}
 		else
 		{	
-			Output::i()->title = Member::loggedIn()->language()->addToStack('menu__nexus_reports_markets');
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string) $chart, Url::internal( "app=nexus&module=reports&controller=markets" ) );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__nexus_reports_markets');
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string) $chart, \IPS\Http\Url::internal( "app=nexus&module=reports&controller=markets" ) );
 		}
 	}
 }

@@ -11,37 +11,23 @@
 namespace IPS\core\modules\setup\upgrade;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Upgrader: Custom Upgrade Options
  */
-class customoptions extends Controller
+class _customoptions extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Show Form
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		$elements	= array();
 		
@@ -52,7 +38,7 @@ class customoptions extends Controller
 			At the same time we look for any pre-upgrade checks, which completely halt everything. */
 		foreach( $_SESSION['apps'] as $app => $upgrade )
 		{
-			$application	= Application::load( $app );
+			$application	= \IPS\Application::load( $app );
 			$steps			= $application->getUpgradeSteps( $application->long_version );
 
 			foreach( $steps as $step )
@@ -64,8 +50,8 @@ class customoptions extends Controller
 					
 					if( $output !== NULL )
 					{
-						Output::i()->title		= Member::loggedIn()->language()->addToStack('admin');
-						Output::i()->output 	= $output;
+						\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('admin');
+						\IPS\Output::i()->output 	= $output;
 						return;
 					}
 				}
@@ -93,27 +79,27 @@ class customoptions extends Controller
 		}
 
 		/* Do we need to disable any apps? */
-		if( isset( Request::i()->disable ) )
+		if( isset( \IPS\Request::i()->disable ) )
 		{
-			foreach( explode( ',', Request::i()->disable ) as $app )
+			foreach( explode( ',', \IPS\Request::i()->disable ) as $app )
 			{
-				Db::i()->update( 'core_applications', array( 'app_enabled' => 0 ), array( 'app_directory=?', $app ) );
+				\IPS\Db::i()->update( 'core_applications', array( 'app_enabled' => 0 ), array( 'app_directory=?', $app ) );
 			}
 
-			if ( isset( Store::i()->applications ) )
+			if ( isset( \IPS\Data\Store::i()->applications ) )
 			{
-				unset( Store::i()->applications );
+				unset( \IPS\Data\Store::i()->applications );
 			}
 		}
 
 		/* If there are no options, no need to show an empty/blank form */
-		if( !count( $elements ) )
+		if( !\count( $elements ) )
 		{
-			Output::i()->redirect( Url::internal( "controller=confirm" )->setQueryString( 'key', $_SESSION['uniqueKey'] ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "controller=confirm" )->setQueryString( 'key', $_SESSION['uniqueKey'] ) );
 		}
 
 		/* Otherwise, show the form */
-		$form = new Form( 'options', 'continue' );
+		$form = new \IPS\Helpers\Form( 'options', 'continue' );
 
 		foreach( $elements as $element )
 		{
@@ -134,10 +120,10 @@ class customoptions extends Controller
 				$_SESSION['upgrade_options'][ $app ][ $version ][ $key ] = $value;
 			}
 			
-			Output::i()->redirect( Url::internal( "controller=confirm" )->setQueryString( 'key', $_SESSION['uniqueKey'] ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "controller=confirm" )->setQueryString( 'key', $_SESSION['uniqueKey'] ) );
 		}
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('admin');
-		Output::i()->output 	= Theme::i()->getTemplate( 'global' )->block( 'admin', $form );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('admin');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate( 'global' )->block( 'admin', $form );
 	}
 }

@@ -12,93 +12,52 @@
 namespace IPS\blog\modules\front\blogs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\blog\Blog;
-use IPS\blog\Entry as EntryClass;
-use IPS\blog\Entry\Category;
-use IPS\Content\Controller;
-use IPS\Content\ReadMarkers;
-use IPS\core\FrontNavigation;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Wizard;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfBoundsException;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * View Blog Entry Controller
  */
-class entry extends Controller
+class _entry extends \IPS\Content\Controller
 {	
 	/**
 	 * [Content\Controller]	Class
 	 */
-	protected static string $contentModel = 'IPS\blog\Entry';
-
-	/**
-	 * Entry object
-	 */
-	protected ?EntryClass $entry = NULL;
-
+	protected static $contentModel = 'IPS\blog\Entry';
+	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		try
 		{
-			$this->entry = EntryClass::load( Request::i()->id );
+			$this->entry = \IPS\blog\Entry::load( \IPS\Request::i()->id );
 				
-			if ( !$this->entry->canView( Member::loggedIn() ) )
+			if ( !$this->entry->canView( \IPS\Member::loggedIn() ) )
 			{
-				Output::i()->error( 'node_error', '2B202/1', 403, '' );
+				\IPS\Output::i()->error( 'node_error', '2B202/1', 403, '' );
 			}
 
 			if( $this->entry->cover_photo )
 			{
-				Output::i()->metaTags['og:image'] = File::get( 'blog_Entries', $this->entry->cover_photo )->url;
+				\IPS\Output::i()->metaTags['og:image'] = \IPS\File::get( 'blog_Entries', $this->entry->cover_photo )->url;
 			}
 			elseif ( $this->entry->container()->cover_photo )
 			{
-				Output::i()->metaTags['og:image'] = File::get( 'blog_Blogs', $this->entry->container()->cover_photo )->url;
+				\IPS\Output::i()->metaTags['og:image'] = \IPS\File::get( 'blog_Blogs', $this->entry->container()->cover_photo )->url;
 			}
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			if ( !isset( Request::i()->do ) or Request::i()->do !== 'embed' )
+			if ( !isset( \IPS\Request::i()->do ) or \IPS\Request::i()->do !== 'embed' )
 			{
-				Output::i()->error( 'node_error', '2B202/2', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2B202/2', 404, '' );
 			}
 		}
 
@@ -108,9 +67,9 @@ class entry extends Controller
 	/**
 	 * Manage
 	 *
-	 * @return	mixed
+	 * @return	void
 	 */
-	protected function manage() : mixed
+	protected function manage()
 	{
 		parent::manage();
 		
@@ -122,7 +81,7 @@ class entry extends Controller
 		/* Prev */
 		try
 		{
-			$previous = Db::i()->select(
+			$previous = \IPS\Db::i()->select(
 				'*',
 				'blog_entries',
 				array( 'entry_blog_id=? AND entry_date<? AND entry_status=? AND entry_is_future_entry=0 AND entry_hidden=?', $this->entry->blog_id, $this->entry->date, "published", 1 ),
@@ -130,14 +89,14 @@ class entry extends Controller
 				,1
 			)->first();
 
-			$previous = EntryClass::constructFromData( $previous );
+			$previous = \IPS\blog\Entry::constructFromData( $previous );
 		}
-		catch ( UnderflowException ) {}
+		catch ( \UnderflowException $e ) {}
 
 		/* Next */
 		try
 		{
-			$next = Db::i()->select(
+			$next = \IPS\Db::i()->select(
 				'*',
 				'blog_entries',
 				array( 'entry_blog_id=? AND entry_date>? AND entry_status=? AND entry_is_future_entry=0 AND entry_hidden=?', $this->entry->blog_id, $this->entry->date, "published", 1 ),
@@ -145,49 +104,49 @@ class entry extends Controller
 				,1
 			)->first();
 
-			$next = EntryClass::constructFromData( $next );
+			$next = \IPS\blog\Entry::constructFromData( $next );
 		}
-		catch ( UnderflowException ) {}
+		catch ( \UnderflowException $e ) {}
 		
 		/* Online User Location */
 		if( !$this->entry->container()->social_group )
 		{
-			Session::i()->setLocation( $this->entry->url(), $this->entry->onlineListPermissions(), 'loc_blog_viewing_entry', array( $this->entry->name => FALSE ) );
+			\IPS\Session::i()->setLocation( $this->entry->url(), $this->entry->onlineListPermissions(), 'loc_blog_viewing_entry', array( $this->entry->name => FALSE ) );
 		}
 
 		/* Add JSON-ld output */
-		Output::i()->jsonLd['blog']	= array(
-			'@context'		=> "https://schema.org",
+		\IPS\Output::i()->jsonLd['blog']	= array(
+			'@context'		=> "http://schema.org",
 			'@type'			=> "Blog",
 			'url'			=> (string) $this->entry->container()->url(),
 			'name'			=> $this->entry->container()->_title,
-			'description'	=> Member::loggedIn()->language()->addToStack( Blog::$titleLangPrefix . $this->entry->container()->_id . Blog::$descriptionLangSuffix, TRUE, array( 'striptags' => TRUE, 'escape' => TRUE ) ),
+			'description'	=> \IPS\Member::loggedIn()->language()->addToStack( \IPS\blog\Blog::$titleLangPrefix . $this->entry->container()->_id . \IPS\blog\Blog::$descriptionLangSuffix, TRUE, array( 'striptags' => TRUE, 'escape' => TRUE ) ),
 			
 			'commentCount'	=> $this->entry->container()->_comments,
 			'interactionStatistic'	=> array(
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/ViewAction",
+					'interactionType'		=> "http://schema.org/ViewAction",
 					'userInteractionCount'	=> $this->entry->container()->num_views
 				),
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/FollowAction",
-					'userInteractionCount'	=> EntryClass::containerFollowerCount( $this->entry->container() )
+					'interactionType'		=> "http://schema.org/FollowAction",
+					'userInteractionCount'	=> \IPS\blog\Entry::containerFollowerCount( $this->entry->container() )
 				),
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/CommentAction",
+					'interactionType'		=> "http://schema.org/CommentAction",
 					'userInteractionCount'	=> $this->entry->container()->_comments
 				),
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/WriteAction",
+					'interactionType'		=> "http://schema.org/WriteAction",
 					'userInteractionCount'	=> $this->entry->container()->_items
 				)
 			),
 			'blogPost' => array(
-				'@context'		=> "https://schema.org",
+				'@context'		=> "http://schema.org",
 				'@type'			=> "BlogPosting",
 				'url'			=> (string) $this->entry->url(),
 				'mainEntityOfPage'	=> (string) $this->entry->url(),
@@ -195,37 +154,37 @@ class entry extends Controller
 				'headline'		=> $this->entry->mapped('title'),
 				'articleBody'	=> $this->entry->truncated( TRUE, NULL ),
 				'commentCount'	=> $this->entry->mapped('num_comments'),
-				'dateCreated'	=> DateTime::ts( $this->entry->date )->format( DateTime::ATOM ),
-				'datePublished'	=> DateTime::ts( $this->entry->publish_date )->format( DateTime::ATOM ),
+				'dateCreated'	=> \IPS\DateTime::ts( $this->entry->date )->format( \IPS\DateTime::ISO8601 ),
+				'datePublished'	=> \IPS\DateTime::ts( $this->entry->publish_date )->format( \IPS\DateTime::ISO8601 ),
 				'author'		=> array(
 					'@type'		=> 'Person',
-					'name'		=> Member::load( $this->entry->mapped('author') )->name,
-					'url'		=> (string) Member::load( $this->entry->mapped('author') )->url(),
-					'image'		=> Member::load( $this->entry->mapped('author') )->get_photo( TRUE, TRUE )
+					'name'		=> \IPS\Member::load( $this->entry->mapped('author') )->name,
+					'url'		=> (string) \IPS\Member::load( $this->entry->mapped('author') )->url(),
+					'image'		=> \IPS\Member::load( $this->entry->mapped('author') )->get_photo( TRUE, TRUE )
 				),
 				'publisher'		=> array(
-					'@id' => Settings::i()->base_url . '#organization',
+					'@id' => \IPS\Settings::i()->base_url . '#organization',
 					'member' => array(
 						'@type'		=> 'Person',
-						'name'		=> Member::load( $this->entry->mapped('author') )->name,
-						'url'		=> (string) Member::load( $this->entry->mapped('author') )->url(),
-						'image'		=> Member::load( $this->entry->mapped('author') )->get_photo( TRUE, TRUE )
+						'name'		=> \IPS\Member::load( $this->entry->mapped('author') )->name,
+						'url'		=> (string) \IPS\Member::load( $this->entry->mapped('author') )->url(),
+						'image'		=> \IPS\Member::load( $this->entry->mapped('author') )->get_photo( TRUE, TRUE )
 					)
 				),
 				'interactionStatistic'	=> array(
 					array(
 						'@type'					=> 'InteractionCounter',
-						'interactionType'		=> "https://schema.org/ViewAction",
+						'interactionType'		=> "http://schema.org/ViewAction",
 						'userInteractionCount'	=> $this->entry->views
 					),
 					array(
 						'@type'					=> 'InteractionCounter',
-						'interactionType'		=> "https://schema.org/FollowAction",
-						'userInteractionCount'	=> EntryClass::containerFollowerCount( $this->entry->container() )
+						'interactionType'		=> "http://schema.org/FollowAction",
+						'userInteractionCount'	=> \IPS\blog\Entry::containerFollowerCount( $this->entry->container() )
 					),
 					array(
 						'@type'					=> 'InteractionCounter',
-						'interactionType'		=> "https://schema.org/CommentAction",
+						'interactionType'		=> "http://schema.org/CommentAction",
 						'userInteractionCount'	=> $this->entry->mapped('num_comments')
 					)
 				)
@@ -234,32 +193,32 @@ class entry extends Controller
 
 		if( $this->entry->container()->coverPhoto()->file )
 		{
-			Output::i()->jsonLd['blog']['image'] = (string) $this->entry->container()->coverPhoto()->file->url;
+			\IPS\Output::i()->jsonLd['blog']['image'] = (string) $this->entry->container()->coverPhoto()->file->url;
 		}
 
 		if( $this->entry->container()->member_id )
 		{
-			Output::i()->jsonLd['blog']['author'] = array(
+			\IPS\Output::i()->jsonLd['blog']['author'] = array(
 				'@type'		=> 'Person',
-				'name'		=> Member::load( $this->entry->container()->member_id )->name,
-				'url'		=> (string) Member::load( $this->entry->container()->member_id )->url(),
-				'image'		=> Member::load( $this->entry->container()->member_id )->get_photo( TRUE, TRUE )
+				'name'		=> \IPS\Member::load( $this->entry->container()->member_id )->name,
+				'url'		=> (string) \IPS\Member::load( $this->entry->container()->member_id )->url(),
+				'image'		=> \IPS\Member::load( $this->entry->container()->member_id )->get_photo( TRUE, TRUE )
 			);
 		}
 
 		if( $this->entry->edit_time )
 		{
-			Output::i()->jsonLd['blog']['blogPost']['dateModified']	= DateTime::ts( $this->entry->edit_time )->format( DateTime::ATOM );
+			\IPS\Output::i()->jsonLd['blog']['blogPost']['dateModified']	= \IPS\DateTime::ts( $this->entry->edit_time )->format( \IPS\DateTime::ISO8601 );
 		}
 		else
 		{
-			Output::i()->jsonLd['blog']['blogPost']['dateModified']	= DateTime::ts( $this->entry->publish_date ?: $this->entry->date )->format( DateTime::ATOM );
+			\IPS\Output::i()->jsonLd['blog']['blogPost']['dateModified']	= \IPS\DateTime::ts( $this->entry->publish_date ?: $this->entry->date )->format( \IPS\DateTime::ISO8601 );
 		}
 
 		$file = NULL;
 		if( $this->entry->image )
 		{
-			$file = File::get( 'blog_Blogs', $this->entry->image );
+			$file = \IPS\File::get( 'blog_Blogs', $this->entry->image );
 		}
 		elseif( $this->entry->coverPhoto()->file )
 		{
@@ -276,36 +235,39 @@ class entry extends Controller
 			{
 				$dimensions = $file->getImageDimensions();
 
-				Output::i()->jsonLd['blog']['blogPost']['image'] = array(
+				\IPS\Output::i()->jsonLd['blog']['blogPost']['image'] = array(
 					'@type'		=> 'ImageObject',
 					'url'		=> (string) $file->url,
 					'width'		=> $dimensions[0],
 					'height'	=> $dimensions[1]
 				);
 			}
-			/* File does not exist or image is invalid */
-			catch( RuntimeException | InvalidArgumentException | DomainException ){}
+			/* File does not exist */
+			catch( \RuntimeException $e ) {}
+			/* Image is invalid */
+			catch( \InvalidArgumentException $e ){}
+			catch( \DomainException $e ) {}
 		}
 
 		/* Display */
-		if( Settings::i()->blog_enable_sidebar and $this->entry->container()->sidebar )
+		if( \IPS\Settings::i()->blog_enable_sidebar and $this->entry->container()->sidebar )
 		{
-			Output::i()->sidebar['contextual'] = Theme::i()->getTemplate('view')->blogSidebar( $this->entry->container()->sidebar );
+			\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate('view')->blogSidebar( $this->entry->container()->sidebar );
 		}
 
 		/* Breadcrumb */
-		Output::i()->breadcrumb = array();
+		\IPS\Output::i()->breadcrumb = array();
 		if ( $club = $this->entry->container()->club() )
 		{
-			FrontNavigation::$clubTabActive = TRUE;
-			Output::i()->breadcrumb = array();
-			Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), Member::loggedIn()->language()->addToStack('module__core_clubs') );
-			Output::i()->breadcrumb[] = array( $club->url(), $club->name );
+			\IPS\core\FrontNavigation::$clubTabActive = TRUE;
+			\IPS\Output::i()->breadcrumb = array();
+			\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), \IPS\Member::loggedIn()->language()->addToStack('module__core_clubs') );
+			\IPS\Output::i()->breadcrumb[] = array( $club->url(), $club->name );
 
 		}
 		else
 		{
-			Output::i()->breadcrumb['module'] = array( Url::internal( 'app=blog', 'front', 'blogs' ), Member::loggedIn()->language()->addToStack( '__app_blog' ) );
+			\IPS\Output::i()->breadcrumb['module'] = array( \IPS\Http\Url::internal( 'app=blog', 'front', 'blogs' ), \IPS\Member::loggedIn()->language()->addToStack( '__app_blog' ) );
 		}
 
 
@@ -313,31 +275,30 @@ class entry extends Controller
 		{
 			foreach( $this->entry->container()->category()->parents() as $parent )
 			{
-				Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 			}
-			Output::i()->breadcrumb[] = array( $this->entry->container()->category()->url(), $this->entry->container()->category()->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $this->entry->container()->category()->url(), $this->entry->container()->category()->_title );
 		} 
-		catch ( OutOfRangeException ) {}
+		catch ( \OutOfRangeException $e ) {}
 		
 		/* Set default search option */
-		Output::i()->defaultSearchOption = array( 'blog_entry', 'blog_entry_pl' );
+		\IPS\Output::i()->defaultSearchOption = array( 'blog_entry', 'blog_entry_pl' );
 
-		Output::i()->breadcrumb[] = array( $this->entry->container()->url(), $this->entry->container()->_title );
-		Output::i()->breadcrumb[] = array( NULL, $this->entry->name );
+		\IPS\Output::i()->breadcrumb[] = array( $this->entry->container()->url(), $this->entry->container()->_title );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, $this->entry->name );
 
-		Output::i()->output = Theme::i()->getTemplate( 'view' )->entry( $this->entry, $previous, $next );
-		return null;
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'view' )->entry( $this->entry, $previous, $next );
 	}
 
 	/**
 	 * Return the form for editing. Abstracted so controllers can define a custom template if desired.
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	string
 	 */
-	protected function getEditForm( Form $form ): string
+	protected function getEditForm( $form )
 	{
-		return $form->customTemplate( array( Theme::i()->getTemplate( 'submit', 'blog' ), 'submitFormTemplate' ) );
+		return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'submit', 'blog' ), 'submitFormTemplate' ) );
 	}
 	
 	/**
@@ -345,34 +306,34 @@ class entry extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function move(): void
+	protected function move()
 	{
 		try
 		{
-			$item = EntryClass::loadAndCheckPerms( Request::i()->id );
+			$item = \IPS\blog\Entry::loadAndCheckPerms( \IPS\Request::i()->id );
 			if ( !$item->canMove() )
 			{
-				throw new DomainException;
+				throw new \DomainException;
 			}
 
 			$container = $item->container();
 			
-			$wizard = new Wizard( array(
+			$wizard = new \IPS\Helpers\Wizard( array(
 				'blog'	=> function( $data ) use ( $container ) {
-					$data['item'] = Request::i()->id;
-					$item = EntryClass::loadAndCheckPerms( $data['item'] );
-					$form = new Form;
-					$form->class = 'ipsForm--vertical ipsForm--move-blog';
-					$form->add( new Node( 'move_to', NULL, TRUE, array(
-						'class'				=> get_class( $item->container() ),
+					$data['item'] = \IPS\Request::i()->id;
+					$item = \IPS\blog\Entry::loadAndCheckPerms( $data['item'] );
+					$form = new \IPS\Helpers\Form;
+					$form->class = 'ipsForm_vertical';
+					$form->add( new \IPS\Helpers\Form\Node( 'move_to', NULL, TRUE, array(
+						'class'				=> \get_class( $item->container() ),
 						'permissionCheck'	=> function( $node ) use ( $item )
 						{
 							try
 							{
 								/* If the item is in a club, only allow moving to other clubs that you moderate */
-								if ( IPS::classUsesTrait( $item->container(), 'IPS\Content\ClubContainer' ) and $item->container()->club()  )
+								if ( \IPS\IPS::classUsesTrait( $item->container(), 'IPS\Content\ClubContainer' ) and $item->container()->club()  )
 								{
-									return $item::modPermission( 'move', Member::loggedIn(), $node ) and $node->can( 'add' ) ;
+									return $item::modPermission( 'move', \IPS\Member::loggedIn(), $node ) and $node->can( 'add' ) ;
 								}
 								
 								if ( $node->can( 'add' ) )
@@ -380,7 +341,7 @@ class entry extends Controller
 									return true;
 								}
 							}
-							catch( OutOfBoundsException ) { }
+							catch( \OutOfBoundsException $e ) { }
 							
 							return false;
 						},
@@ -396,27 +357,27 @@ class entry extends Controller
 					return $form;
 				},
 				'category' => function( $data ) {
-					$item = EntryClass::loadAndCheckPerms( $data['item'] );
+					$item = \IPS\blog\Entry::loadAndCheckPerms( $data['item'] );
 					$newBlog = $data['blog'];
 					
-					$form = new Form;
+					$form = new \IPS\Helpers\Form;
 					
-					$categories = Category::roots( NULL, NULL, array( 'entry_category_blog_id=?', $newBlog->id ) );
+					$categories = \IPS\blog\Entry\Category::roots( NULL, NULL, array( 'entry_category_blog_id=?', $newBlog->id ) );
 					$choiceOptions = array( 0 => 'entry_category_choice_new' );
 					$choiceToggles = array( 0 => array( 'blog_entry_new_category' ) );
 			
-					if( count( $categories ) )
+					if( \count( $categories ) )
 					{
 						$choiceOptions[1] = 'entry_category_choice_existing';
 						$choiceToggles[1] = array( 'entry_category_id' );
 					}
 					
-					$form->add( new Radio( 'entry_category_choice', 0, FALSE, array(
+					$form->add( new \IPS\Helpers\Form\Radio( 'entry_category_choice', 0, FALSE, array(
 						'options' => $choiceOptions,
 						'toggles' => $choiceToggles
 					) ) );
 			
-					if( count( $categories ) )
+					if( \count( $categories ) )
 					{
 						$options = array();
 						foreach ( $categories as $category )
@@ -424,20 +385,20 @@ class entry extends Controller
 							$options[ $category->id ] = $category->name;
 						}
 			
-						$form->add( new Select( 'entry_category_id', NULL, FALSE, array( 'options' => $options, 'parse' => 'normal' ), NULL, NULL, NULL, "entry_category_id" ) );
+						$form->add( new \IPS\Helpers\Form\Select( 'entry_category_id', NULL, FALSE, array( 'options' => $options, 'parse' => 'normal' ), NULL, NULL, NULL, "entry_category_id" ) );
 					}
-					$form->add( new Text( 'blog_entry_new_category', NULL, TRUE, array(), NULL, NULL, NULL, "blog_entry_new_category" ) );
+					$form->add( new \IPS\Helpers\Form\Text( 'blog_entry_new_category', NULL, TRUE, array(), NULL, NULL, NULL, "blog_entry_new_category" ) );
 					$this->moderationAlertField( $form, $item );
 					
 					if ( $values = $form->values() )
 					{
 						if ( $data['blog'] === NULL OR !$data['blog']->can( 'add' ) )
 						{
-							Output::i()->error( 'node_move_invalid', '1S136/L', 403, '' );
+							\IPS\Output::i()->error( 'node_move_invalid', '1S136/L', 403, '' );
 						}
 		
 						/* If this item is read, we need to re-mark it as such after moving */
-						if( IPS::classUsesTrait( $item, ReadMarkers::class ) )
+						if( $item instanceof \IPS\Content\ReadMarkers )
 						{
 							$unread = $item->unread();
 						}
@@ -451,9 +412,9 @@ class entry extends Controller
 						}
 						else
 						{
-							$newCategory = new Category;
+							$newCategory = new \IPS\blog\Entry\Category;
 							$newCategory->name = $values['blog_entry_new_category'];
-							$newCategory->seo_name = Friendly::seoTitle( $values['blog_entry_new_category'] );
+							$newCategory->seo_name = \IPS\Http\Url\Friendly::seoTitle( $values['blog_entry_new_category'] );
 				
 							$newCategory->blog_id = $item->blog_id;
 							$newCategory->save();
@@ -464,7 +425,7 @@ class entry extends Controller
 						$item->save();
 		
 						/* Mark it as read */
-						if( IPS::classUsesTrait( $item, ReadMarkers::class ) and $unread == 0 )
+						if( $item instanceof \IPS\Content\ReadMarkers and $unread == 0 )
 						{
 							$item->markRead( NULL, NULL, NULL, TRUE );
 						}
@@ -474,9 +435,9 @@ class entry extends Controller
 							$this->sendModerationAlert($values, $item);
 						}
 		
-						Session::i()->modLog( 'modlog__action_move', array( $item::$title => TRUE, $item->url()->__toString() => FALSE, $item->mapped( 'title' ) ?: ( method_exists( $item, 'item' ) ? $item->item()->mapped( 'title' ) : NULL ) => FALSE ),  $item );
+						\IPS\Session::i()->modLog( 'modlog__action_move', array( $item::$title => TRUE, $item->url()->__toString() => FALSE, $item->mapped( 'title' ) ?: ( method_exists( $item, 'item' ) ? $item->item()->mapped( 'title' ) : NULL ) => FALSE ),  $item );
 		
-						Output::i()->redirect( $item->url() );
+						\IPS\Output::i()->redirect( $item->url() );
 					}
 					
 					return $form;
@@ -484,12 +445,12 @@ class entry extends Controller
 			), $item->url()->setQueryString( array( 'do' => 'move' ) ) );
 			
 			$this->_setBreadcrumbAndTitle( $item );
-			Output::i()->title = Member::loggedIn()->language()->addToStack( 'move_item', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( EntryClass::$title ) ) ) );
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->box( $wizard, array( 'i-padding_2' ) );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'move_item', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( \IPS\blog\Entry::$title ) ) ) );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->box( $wizard, array( 'ipsPad' ) ); 
 		}
-		catch ( Exception )
+		catch ( \Exception $e )
 		{
-			Output::i()->error( 'node_error', '2S136/D', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2S136/D', 403, '' );
 		}
 	}
 }

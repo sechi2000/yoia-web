@@ -11,52 +11,30 @@
 namespace IPS\core\modules\admin\customization;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Email;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Codemirror;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use IPS\Xml\SimpleXML;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Email template management
  */
-class emails extends Controller
+class _emails extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'emails_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'emails_manage' );
 		parent::execute();
 	}
 
@@ -65,13 +43,14 @@ class emails extends Controller
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		/* Create the table */
-		$table					= new \IPS\Helpers\Table\Db( 'core_email_templates', Url::internal( 'app=core&module=customization&controller=emails' ), array( array( "template_parent=?", 0 ) ) );
+		$table					= new \IPS\Helpers\Table\Db( 'core_email_templates', \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails' ), array( array( "template_parent=?", 0 ) ) );
 		$table->langPrefix		= 'emailtpl_';
 		$table->mainColumn		= 'template_name';
 		$table->include			= array( 'template_name', 'template_app' );
+		$table->quickSearch		= 'template_name';
 		$table->limit			= 100;
 
 		/* Primary Sort */
@@ -85,14 +64,14 @@ class emails extends Controller
 
 		$table->quickSearch = function( $val )
 		{
-			$matches = Member::loggedIn()->language()->searchCustom( 'emailtpl_', $val, TRUE );
-			if ( count( $matches ) )
+			$matches = \IPS\Member::loggedIn()->language()->searchCustom( 'emailtpl_', $val, TRUE );
+			if ( \count( $matches ) )
 			{
-				return '(' . Db::i()->in( '`template_name`', array_keys( $matches ) ) . " OR `template_name` LIKE '%{$val}%')";
+				return '(' . \IPS\Db::i()->in( '`template_name`', array_keys( $matches ) ) . " OR `template_name` LIKE '%{$val}%')";
 			}
 			else
 			{
-				return "`template_name` LIKE '%" . Db::i()->escape_string( $val ) . "%'";
+				return "`template_name` LIKE '%" . \IPS\Db::i()->escape_string( $val ) . "%'";
 			}
 		};
 
@@ -100,11 +79,11 @@ class emails extends Controller
 		$table->parsers			= array(
 			'template_name'	=> function( $val, $row )
 			{
-				return Member::loggedIn()->language()->addToStack( 'emailtpl_' . $val );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'emailtpl_' . $val );
 			},
 			'template_app'	=> function( $val, $row )
 			{
-				return Member::loggedIn()->language()->addToStack( '__app_' . $val );
+				return \IPS\Member::loggedIn()->language()->addToStack( '__app_' . $val );
 			}
 		);
 
@@ -116,7 +95,7 @@ class emails extends Controller
 			$return['edit'] = array(
 				'icon'		=> 'pencil',
 				'title'		=> 'edit',
-				'link'		=> Url::internal( 'app=core&module=customization&controller=emails&do=form&key=' ) . $row['template_key'],
+				'link'		=> \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails&do=form&key=' ) . $row['template_key'],
 			);
 
 			if( $row['template_edited'] )
@@ -124,14 +103,14 @@ class emails extends Controller
 				$return['revert'] = array(
 					'icon'		=> 'undo',
 					'title'		=> 'revert',
-					'link'		=> Url::internal( 'app=core&module=customization&controller=emails&do=revert&key=' . $row['template_key'] )->csrf(),
-					'data'		=> array( 'confirm' => '', 'confirmMessage' => Member::loggedIn()->language()->addToStack('email_revert_confirm') )
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails&do=revert&key=' . $row['template_key'] )->csrf(),
+					'data'		=> array( 'confirm' => '', 'confirmMessage' => \IPS\Member::loggedIn()->language()->addToStack('email_revert_confirm') )
 				);
 
 				$return['export'] = array(
 					'icon'		=> 'download',
 					'title'		=> 'download',
-					'link'		=> Url::internal( 'app=core&module=customization&controller=emails&do=export&key=' ) . $row['template_key'],
+					'link'		=> \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails&do=export&key=' ) . $row['template_key'],
 				);
 			}
 
@@ -139,24 +118,24 @@ class emails extends Controller
 		};
 
 		/* Buttons */
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 				'upload'	=> array(
 						'title'		=> 'upload_email_template',
 						'icon'		=> 'upload',
-						'link'		=> Url::internal( 'app=core&module=customization&controller=emails&do=import' ),
-						'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('upload_email_template') )
+						'link'		=> \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails&do=import' ),
+						'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('upload_email_template') )
                 ),
                 'preview' => array(
                     'title'		=> 'preview_email_wrapper',
                     'icon'		=> 'search',
-                    'link'		=> Url::internal( 'app=core&module=customization&controller=emails&do=preview' ),
-                    'data'		=> array( 'ipsDialog' => Url::internal( 'app=core&module=customization&controller=emails&do=preview' ), 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('preview_email_wrapper') )
+                    'link'		=> \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails&do=preview' ),
+                    'data'		=> array( 'ipsDialog' => \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails&do=preview' ), 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('preview_email_wrapper') )
                 ),
 		);
 
 		/* Display */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('emailtpl_header');
-		Output::i()->output	= (string) $table;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('emailtpl_header');
+		\IPS\Output::i()->output	= (string) $table;
 	}
 
 	/**
@@ -164,19 +143,19 @@ class emails extends Controller
 	 *
 	 * @return	void
 	 */
-	public function export() : void
+	public function export()
 	{
 		/* Get the template info */
 		try
 		{
-			$template	= Db::i()->select( '*', 'core_email_templates', array( 'template_parent>0 AND template_key=?', Request::i()->key ) )->first();
+			$template	= \IPS\Db::i()->select( '*', 'core_email_templates', array( 'template_parent>0 AND template_key=?', \IPS\Request::i()->key ) )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			Output::i()->error( 'email_template_not_found', '3S128/3', 403, '' );
+			\IPS\Output::i()->error( 'email_template_not_found', '3S128/3', 403, '' );
 		}
 
-		$xml = SimpleXML::create('emails');
+		$xml = \IPS\Xml\SimpleXML::create('emails');
 
 		$xml->addChild( 'template', array(
 			'template_app'					=> $template['template_app'],
@@ -189,7 +168,7 @@ class emails extends Controller
 
 		$name = addslashes( str_replace( array( ' ', '.', ',' ), '_', $template['template_name'] ) . '.xml' );
 
-		Output::i()->sendOutput( $xml->asXML(), 200, 'application/xml', array( 'Content-Disposition' => Output::getContentDisposition( 'attachment', $name ) ) );
+		\IPS\Output::i()->sendOutput( $xml->asXML(), 200, 'application/xml', array( 'Content-Disposition' => \IPS\Output::getContentDisposition( 'attachment', $name ) ) );
 	}
 
 	/**
@@ -197,27 +176,27 @@ class emails extends Controller
 	 *
 	 * @return	void
 	 */
-	public function import() : void
+	public function import()
 	{
-		$form = new Form( 'form', 'upload' );
+		$form = new \IPS\Helpers\Form( 'form', 'upload' );
 		
-		$form->add( new Upload( 'email_template_file', NULL, TRUE, array( 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'email_template_file', NULL, TRUE, array( 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ) ) );
 
 		if ( $values = $form->values() )
 		{
 			/* Open XML file */
 			try
 			{
-				$xml = SimpleXML::loadFile( $values['email_template_file'] );
+				$xml = \IPS\Xml\SimpleXML::loadFile( $values['email_template_file'] );
 
-				if( !count($xml->template) )
+				if( !\count($xml->template) )
 				{
-					Output::i()->error( 'email_template_badform', '1S128/4', 403, '' );
+					\IPS\Output::i()->error( 'email_template_badform', '1S128/4', 403, '' );
 				}
 			}
-			catch( InvalidArgumentException $e )
+			catch( \InvalidArgumentException $e )
 			{
-				Output::i()->error( 'email_template_badform', '1C373/1', 403, '' );
+				\IPS\Output::i()->error( 'email_template_badform', '1C373/1', 403, '' );
 			}
 
 			foreach( $xml->template as $template )
@@ -233,25 +212,25 @@ class emails extends Controller
 
 				try
 				{
-					$existing = Db::i()->select( '*', 'core_email_templates', array( 'template_parent=0 AND template_key=?', $update['template_key'] ) )->first();
+					$existing = \IPS\Db::i()->select( '*', 'core_email_templates', array( 'template_parent=0 AND template_key=?', $update['template_key'] ) )->first();
 				}
-				catch ( UnderflowException $e )
+				catch ( \UnderflowException $e )
 				{
-					Output::i()->error( Member::loggedIn()->language()->addToStack('email_template_noexist', FALSE, array( 'sprintf' => array( $update['template_name'] ) ) ), '1S128/5', 403, '' );
+					\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack('email_template_noexist', FALSE, array( 'sprintf' => array( $update['template_name'] ) ) ), '1S128/5', 403, '' );
 				}
 				
 				$update['template_parent']	= $existing['template_id'];
-				Db::i()->replace( 'core_email_templates', $update );
-				Db::i()->update( 'core_email_templates', array( 'template_edited' => 1 ), array( 'template_id=?', $existing['template_id'] ) );
+				\IPS\Db::i()->replace( 'core_email_templates', $update );
+				\IPS\Db::i()->update( 'core_email_templates', array( 'template_edited' => 1 ), array( 'template_id=?', $existing['template_id'] ) );
 			}
 			
 			/* Redirect */
-			Session::i()->log( 'acplogs__emailtemplate_updated' );
-			Output::i()->redirect( Url::internal( 'app=core&module=customization&controller=emails' ), 'email_template_uploaded' );
+			\IPS\Session::i()->log( 'acplogs__emailtemplate_updated' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails' ), 'email_template_uploaded' );
 		}
 
 		/* Display */
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( Member::loggedIn()->language()->addToStack('upload_email_template'), $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( \IPS\Member::loggedIn()->language()->addToStack('upload_email_template'), $form, FALSE );
 	}
 
 	/**
@@ -259,26 +238,26 @@ class emails extends Controller
 	 *
 	 * @return	void
 	 */
-	public function revert() : void
+	public function revert()
 	{
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
 		/* Get the template info for the log */
-		$template	= Db::i()->select( '*', 'core_email_templates', array( 'template_parent=0 AND template_key=?', Request::i()->key ) )->first();
+		$template	= \IPS\Db::i()->select( '*', 'core_email_templates', array( 'template_parent=0 AND template_key=?', \IPS\Request::i()->key ) )->first();
 
 		/* Revert any user-edited copies of the specified template */
-		Db::i()->delete( 'core_email_templates', array( 'template_parent>0 AND template_key=?', Request::i()->key ) );
+		\IPS\Db::i()->delete( 'core_email_templates', array( 'template_parent>0 AND template_key=?', \IPS\Request::i()->key ) );
 
 		/* Reset edited flag on parent */
-		Db::i()->update( 'core_email_templates', array( 'template_edited' => 0 ), array( 'template_id=?', $template['template_id'] ) );
+		\IPS\Db::i()->update( 'core_email_templates', array( 'template_edited' => 0 ), array( 'template_id=?', $template['template_id'] ) );
 
 		/* Rebuild template */
 		$this->_buildTemplate( $template );
 
 		/* Log and redirect */
-		Session::i()->log( 'acplog__emailtpl_reverted', array( $template['template_name'] => FALSE ) );
-		Output::i()->redirect( Url::internal( 'app=core&module=customization&controller=emails' ), 'reverted_emailtpl' );
+		\IPS\Session::i()->log( 'acplog__emailtpl_reverted', array( $template['template_name'] => FALSE ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails' ), 'reverted_emailtpl' );
 	}
 
 	/**
@@ -286,21 +265,21 @@ class emails extends Controller
 	 *
 	 * @return	void
 	 */
-	public function form() : void
+	public function form()
 	{
 		/* Get the template */
-		if( empty( Request::i()->key ) )
+		if( empty( \IPS\Request::i()->key ) )
 		{
-			Output::i()->error( 'emailtpl_nofind', '3S128/1', 403, '' );
+			\IPS\Output::i()->error( 'emailtpl_nofind', '3S128/1', 403, '' );
 		}
 		
 		try
 		{
-			$template = Db::i()->select( '*', 'core_email_templates', array( 'template_key=?', Request::i()->key ), 'template_parent DESC', 1 )->first();
+			$template = \IPS\Db::i()->select( '*', 'core_email_templates', array( 'template_key=?', \IPS\Request::i()->key ), 'template_parent DESC', 1 )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			Output::i()->error( 'emailtpl_nofind', '3S128/2', 403, '' );
+			\IPS\Output::i()->error( 'emailtpl_nofind', '3S128/2', 403, '' );
 		}
 
 		/* Figure out tags for form helpers */
@@ -315,10 +294,10 @@ class emails extends Controller
 		}
 
 		/* Start the form */
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--edit-email';
-		$form->add( new Codemirror( 'content_html', $template['template_content_html'], TRUE, array( 'tags' => $tags ) ) );
-		$form->add( new TextArea( 'content_plaintext', $template['template_content_plaintext'], FALSE, array( 'tags' => $tags, 'rows' => 14 ) ) );
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical';
+		$form->add( new \IPS\Helpers\Form\Codemirror( 'content_html', $template['template_content_html'], TRUE, array( 'tags' => $tags ) ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'content_plaintext', $template['template_content_plaintext'], FALSE, array( 'tags' => $tags, 'rows' => 14 ) ) );
 
 		/* Handle submissions */
 		if ( $values = $form->values() )
@@ -335,25 +314,25 @@ class emails extends Controller
 
 			if ( !empty($template['template_parent']) )
 			{
-				Db::i()->update( 'core_email_templates', $save, array( 'template_id=?', $template['template_id'] ) );
+				\IPS\Db::i()->update( 'core_email_templates', $save, array( 'template_id=?', $template['template_id'] ) );
 			}
 			else
 			{
-				Db::i()->insert( 'core_email_templates', $save );
-				Db::i()->update( 'core_email_templates', array( 'template_edited' => 1 ), array( 'template_id=?', $template['template_id'] ) );
+				\IPS\Db::i()->insert( 'core_email_templates', $save );
+				\IPS\Db::i()->update( 'core_email_templates', array( 'template_edited' => 1 ), array( 'template_id=?', $template['template_id'] ) );
 			}
 
 			$this->_buildTemplate( $save );
 
-			Session::i()->log( 'acplogs__emailtpl_edited', array( $template['template_name'] => FALSE ) );
+			\IPS\Session::i()->log( 'acplogs__emailtpl_edited', array( $template['template_name'] => FALSE ) );
 
-			Output::i()->redirect( Url::internal( 'app=core&module=customization&controller=emails' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails' ), 'saved' );
 		}
 
 		/* Output */
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('emailtpl_edit', FALSE, array('sprintf' => Member::loggedIn()->language()->addToStack( 'emailtpl_' . $template['template_name']) ) );
-		Output::i()->output	= $form->customTemplate( array( Theme::i()->getTemplate( 'customization', 'core', 'admin' ), 'email' ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('emailtpl_edit', FALSE, array('sprintf' => \IPS\Member::loggedIn()->language()->addToStack( 'emailtpl_' . $template['template_name']) ) );
+		\IPS\Output::i()->output	= $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'customization', 'core', 'admin' ), 'email' ) );;
 	}
 
 	/**
@@ -362,16 +341,16 @@ class emails extends Controller
 	 * @param	array 	$template	Template data from core_email_templates
 	 * @return	void
 	 */
-	protected function _buildTemplate( array $template ) : void
+	protected function _buildTemplate( $template )
 	{
-		$htmlFunction	= 'namespace IPS\Theme;' . "\n" . Theme::compileTemplate( $template['template_content_html'], "email_html_{$template['template_app']}_{$template['template_name']}", $template['template_data'] );
-		$ptFunction		= 'namespace IPS\Theme;' . "\n" . Theme::compileTemplate( $template['template_content_plaintext'], "email_plaintext_{$template['template_app']}_{$template['template_name']}", $template['template_data'] );
+		$htmlFunction	= 'namespace IPS\Theme;' . "\n" . \IPS\Theme::compileTemplate( $template['template_content_html'], "email_html_{$template['template_app']}_{$template['template_name']}", $template['template_data'] );
+		$ptFunction		= 'namespace IPS\Theme;' . "\n" . \IPS\Theme::compileTemplate( $template['template_content_plaintext'], "email_plaintext_{$template['template_app']}_{$template['template_name']}", $template['template_data'] );
 
 		$key	= $template['template_key'] . '_email_html';
-		Store::i()->$key = $htmlFunction;
+		\IPS\Data\Store::i()->$key = $htmlFunction;
 
 		$key	= $template['template_key'] . '_email_plaintext';
-		Store::i()->$key = $ptFunction;
+		\IPS\Data\Store::i()->$key = $ptFunction;
 	}
 
 	/**
@@ -379,10 +358,10 @@ class emails extends Controller
 	 *
 	 * @return	void
 	 */
-    public function preview() : void
+    public function preview()
     {
-        Output::i()->title		= Member::loggedIn()->language()->addToStack('emailtpl_edit');
-		Output::i()->output	= Theme::i()->getTemplate( 'customization', 'core', 'admin' )->emailFrame( Url::internal( 'app=core&module=customization&controller=emails&do=emailPreview' ) );
+        \IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('emailtpl_edit');
+		\IPS\Output::i()->output	= \IPS\Theme::i()->getTemplate( 'customization', 'core', 'admin' )->emailFrame( \IPS\Http\Url::internal( 'app=core&module=customization&controller=emails&do=emailPreview' ) );
     }
 
     /**
@@ -390,9 +369,9 @@ class emails extends Controller
 	 *
 	 * @return	void
 	 */
-    public function emailPreview() : void
+    public function emailPreview()
     {
-		$email = Email::buildFromContent( '', Member::loggedIn()->language()->addToStack( 'email_preview_content' ), NULL, Email::TYPE_TRANSACTIONAL );
-		Output::i()->sendOutput( $email->compileContent( 'html' ) );
+		$email = \IPS\Email::buildFromContent( '', \IPS\Member::loggedIn()->language()->addToStack( 'email_preview_content' ), NULL, \IPS\Email::TYPE_TRANSACTIONAL );
+		\IPS\Output::i()->sendOutput( $email->compileContent( 'html' ) );
     }
 }

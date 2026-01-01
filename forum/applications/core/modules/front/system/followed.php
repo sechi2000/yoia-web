@@ -11,48 +11,36 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content;
-use IPS\core\Followed\Table;
-use IPS\Dispatcher\Controller;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings as SettingsClass;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * My followed content
  */
-class followed extends Controller
+class _followed extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * My followed content
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Guests can't follow things */
-		if( !Member::loggedIn()->member_id )
+		if( !\IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->error( 'no_module_permission_guest', '2C266/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission_guest', '2C266/1', 403, '' );
 		}
 
 		/* Get the different types */
 		$types			= array();
 		
-		foreach ( Content::routedClasses( TRUE, FALSE, TRUE ) as $class )
+		foreach ( \IPS\Content::routedClasses( TRUE, FALSE, TRUE ) as $class )
 		{
-			if( IPS::classUsesTrait( $class, 'IPS\Content\Followable' ) )
+			if( is_subclass_of( $class, 'IPS\Content\Followable' ) )
 			{
 				$types[ $class::$application . '_' . $class::$module ][ mb_strtolower( str_replace( '\\', '_', mb_substr( $class, 4 ) ) ) ] = $class;
 
@@ -74,22 +62,17 @@ class followed extends Controller
 		/* Don't forget Members - add this on to the end so it never defaults UNLESS we only have apps that do not have followable content */
 		$types['core'] = array( 'core_member' => "\IPS\Member" );
 
-		if( SettingsClass::i()->tags_enabled )
-		{
-			$types['core']['core_tag'] = "IPS\Content\Tag";
-		}
-
 		/* What type are we looking at? */
 		$currentAppModule = NULL;
 		$currentType = NULL;
-		if ( isset( Request::i()->type ) )
+		if ( isset( \IPS\Request::i()->type ) )
 		{
 			foreach ( $types as $appModule => $_types )
 			{
-				if ( array_key_exists( Request::i()->type, $_types ) )
+				if ( array_key_exists( \IPS\Request::i()->type, $_types ) )
 				{
 					$currentAppModule = $appModule;
-					$currentType = Request::i()->type;
+					$currentType = \IPS\Request::i()->type;
 					break;
 				}
 			}
@@ -110,22 +93,26 @@ class followed extends Controller
 		
 		$currentClass = $types[ $currentAppModule ][ $currentType ];
 
-		$output = new Table( $currentClass, explode( '_', $currentType ) );
+		$output = new \IPS\core\Followed\Table( $currentClass, explode( '_', $currentType ) );
 		
 		/* If we've clicked from the tab section */
-		if ( Request::i()->isAjax() && Request::i()->change_section )
+		if ( \IPS\Request::i()->isAjax() && \IPS\Request::i()->change_section )
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'system' )->followedContentSection( $types, $currentAppModule, $currentType, $output );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->followedContentSection( $types, $currentAppModule, $currentType, $output );
 		}
 		else
 		{
+			/* Display */
+			if ( \IPS\Theme::i()->settings['responsive'] )
+			{
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/followedcontent_responsive.css' ) );
+			}
 
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/profiles.css' ) );
-			Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_system.js', 'core' ) );
-			Output::i()->title = Member::loggedIn()->language()->addToStack('menu_followed_content');
-			Output::i()->sidebar['enabled'] = FALSE;
-			Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('menu_followed_content') );
-			Output::i()->output = Theme::i()->getTemplate( 'system' )->followedContent( $types, $currentAppModule, $currentType, $output );
+			\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_system.js', 'core' ) );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu_followed_content');
+			\IPS\Output::i()->sidebar['enabled'] = FALSE;
+			\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack('menu_followed_content') );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->followedContent( $types, $currentAppModule, $currentType, $output );
 		}
 	}
 }

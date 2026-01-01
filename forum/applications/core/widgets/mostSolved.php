@@ -11,51 +11,53 @@
 namespace IPS\core\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Member;
-use IPS\Widget\Customizable;
-use IPS\Widget\StaticCache;
-use function array_slice;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * mostSolved Widget
  */
-class mostSolved extends StaticCache implements Customizable
+class _mostSolved extends \IPS\Widget\StaticCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'mostSolved';
+	public $key = 'mostSolved';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'core';
+	public $app = 'core';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
+	
+	/**
+	 * Initialise this widget
+	 *
+	 * @return void
+	 */ 
+	public function init()
+	{
+		parent::init();
+	}
 	
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
  		$form = parent::configuration( $form );
 
- 		$form->add( new Number( 'number_to_show', $this->configuration['number_to_show'] ?? 5, TRUE, array( 'max' => 25 ) ) );
+ 		$form->add( new \IPS\Helpers\Form\Number( 'number_to_show', isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 5, TRUE, array( 'max' => 25 ) ) );
  		return $form;
  	} 
 
@@ -64,14 +66,14 @@ class mostSolved extends StaticCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		/* How many? */
-		$limit = $this->configuration['number_to_show'] ?? 5;
+		$limit = isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 5;
 		
 		/* Work out who has got the most reputation this week... */
 		$topSolvedThisWeek = array();
-		foreach ( Db::i()->select( 'member_id', 'core_solved_index', array( 'member_id > 0 AND solved_date>? AND type=? AND hidden=0', DateTime::create()->sub( new DateInterval( 'P1W' ) )->getTimestamp(), 'solved' ) ) as $memberId )
+		foreach ( \IPS\Db::i()->select( 'member_id', 'core_solved_index', array( 'member_id > 0 AND solved_date>?', \IPS\DateTime::create()->sub( new \DateInterval( 'P1W' ) )->getTimestamp() ) ) as $memberId )
 		{
 			if ( !isset( $topSolvedThisWeek[ $memberId ] ) )
 			{
@@ -83,14 +85,14 @@ class mostSolved extends StaticCache implements Customizable
 			}
 		}
 		arsort( $topSolvedThisWeek );
-		$topSolvedThisWeek = array_slice( $topSolvedThisWeek, 0, $limit, TRUE );
+		$topSolvedThisWeek = \array_slice( $topSolvedThisWeek, 0, $limit, TRUE );
 		
 		/* Load their data */	
-		if( count( $topSolvedThisWeek ) )
+		if( \count( $topSolvedThisWeek ) )
 		{
-			foreach ( Db::i()->select( '*', 'core_members', Db::i()->in( 'member_id', array_keys( $topSolvedThisWeek ) ) ) as $member )
+			foreach ( \IPS\Db::i()->select( '*', 'core_members', \IPS\Db::i()->in( 'member_id', array_keys( $topSolvedThisWeek ) ) ) as $member )
 			{
-				Member::constructFromData( $member );
+				\IPS\Member::constructFromData( $member );
 			}
 		}
 		

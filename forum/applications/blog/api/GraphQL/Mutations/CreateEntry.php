@@ -10,37 +10,30 @@
  */
 
 namespace IPS\blog\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\blog\api\GraphQL\Types\EntryType;
-use IPS\blog\Blog;
-use IPS\blog\Entry;
-use IPS\Content\Api\GraphQL\ItemMutator;
-use IPS\Member;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * Create blog entry mutation for GraphQL API
  */
-class CreateEntry extends ItemMutator
+class _CreateEntry extends \IPS\Content\Api\GraphQL\ItemMutator
 {
     /**
      * Class
      */
-    protected string $class = Entry::class;
+    protected $class = \IPS\blog\Entry::class;
 
     /*
      * @brief 	Query description
      */
-    public static string $description = "Create a new blog entry";
+    public static $description = "Create a new blog entry";
 
     /*
      * Mutation arguments
@@ -55,7 +48,7 @@ class CreateEntry extends ItemMutator
     /**
      * Return the mutation return type
      */
-    public function type(): EntryType
+    public function type()
     {
         return \IPS\blog\api\GraphQL\TypeRegistry::entry();
     }
@@ -63,38 +56,37 @@ class CreateEntry extends ItemMutator
     /**
      * Resolves this mutation
      *
-     * @param 	mixed $val 	Value passed into this resolver
-     * @param 	array $args 	Arguments
-     * @param 	array $context 	Context values
-	 * @param   mixed $info
-     * @return	Entry
+     * @param 	mixed 	Value passed into this resolver
+     * @param 	array 	Arguments
+     * @param 	array 	Context values
+     * @return	\IPS\blog\Blog
      */
-    public function resolve( mixed $val, array $args, array $context, mixed $info ): Entry
+    public function resolve($val, $args, $context, $info)
     {
         /* Get blog */
         try
         {
-            $blog = Blog::loadAndCheckPerms( $args['blogID'] );
+            $blog = \IPS\blog\Blog::loadAndCheckPerms( $args['blogID'] );
         }
-        catch ( OutOfRangeException )
+        catch ( \OutOfRangeException $e )
         {
-            throw new SafeException( 'NO_BLOG', '1B300/1_graphql', 400 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_BLOG', '1B300/1_graphql', 400 );
         }
 
         /* Check permission */
-        if ( !$blog->can( 'add', Member::loggedIn() ) )
+        if ( !$blog->can( 'add', \IPS\Member::loggedIn() ) )
         {
-            throw new SafeException( 'NO_PERMISSION', '1B300/A_graphql', 403 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_PERMISSION', '1B300/A_graphql', 403 );
         }
 
         /* Check we have a title and a post */
         if ( !$args['title'] )
         {
-            throw new SafeException( 'NO_TITLE', '1B300/4_graphql', 400 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_TITLE', '1B300/4_graphql', 400 );
         }
         if ( !$args['content'] )
         {
-            throw new SafeException( 'NO_POST', '1B300/5_grapqhl', 400 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_POST', '1B300/5_grapqhl', 400 );
         }
 
 

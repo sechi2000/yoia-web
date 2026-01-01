@@ -12,71 +12,40 @@
 namespace IPS\core\extensions\core\ModCp;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Content;
-use IPS\core\DeletionLog\Table;
-use IPS\Db;
-use IPS\Extensions\ModCpAbstract;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Moderator Control Panel Extension: Deleted
  */
-class Deleted extends ModCpAbstract
+class _Deleted
 {
 	/**
 	 * Returns the primary tab key for the navigation bar
 	 *
 	 * @return	string|null
 	 */
-	public function getTab(): ?string
+	public function getTab()
 	{
-		if ( ! Member::loggedIn()->modPermission( 'can_manage_deleted_content' ) )
+		if ( ! \IPS\Member::loggedIn()->modPermission( 'can_manage_deleted_content' ) )
 		{
-			return null;
+			return NULL;
 		}
 		
 		return 'deleted';
 	}
-
-	/**
-	 * What do I manage?
-	 * Acceptable responses are: content, members, or other
-	 *
-	 * @return	string
-	 */
-	public function manageType() : string
-	{
-		return 'content';
-	}
-
+	
 	/**
 	 * Manage
 	 *
 	 * @return	void
 	 */
-	public function manage(): void
+	public function manage()
 	{
-		if ( isset( Request::i()->modaction ) AND in_array( Request::i()->modaction, array( 'restore', 'restore_as_hidden', 'delete' ) ) )
+		if ( isset( \IPS\Request::i()->modaction ) AND \in_array( \IPS\Request::i()->modaction, array( 'restore', 'restore_as_hidden', 'delete' ) ) )
 		{
 			$this->modaction();
 		}
@@ -84,45 +53,44 @@ class Deleted extends ModCpAbstract
 		/* Content Types to filter on */
 		$contentOptions = array();
 		$contentOptions['all'] = 'all';
-		foreach( Content::routedClasses() AS $class )
+		foreach( \IPS\Content::routedClasses() AS $class )
 		{
-			if ( IPS::classUsesTrait( $class, 'IPS\Content\Hideable' ) )
+			if ( \in_array( 'IPS\Content\Hideable', class_implements( $class ) ) )
 			{
 				$contentOptions[ $class ] = $class::$title;
 			}
 		}
 		
-		$table					= new Table( Url::internal( "app=core&module=modcp&controller=modcp&tab=deleted", 'front', 'modcp_deleted' ) );
+		$table					= new \IPS\core\DeletionLog\Table( \IPS\Http\Url::internal( "app=core&module=modcp&controller=modcp&tab=deleted", 'front', 'modcp_deleted' ) );
 		$table->sortOptions		= array( 'dellog_deleted_date', 'dellog_deleted_by' );
 		$table->advancedSearch	= array(
-			'dellog_content_class'	=> array( SEARCH_SELECT, array( 'options' => $contentOptions ) ),
-			'dellog_deleted_by'		=> SEARCH_MEMBER
+			'dellog_content_class'	=> array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => $contentOptions ) ),
+			'dellog_deleted_by'		=> \IPS\Helpers\Table\SEARCH_MEMBER
 		);
-		$table->tableTemplate	= array( Theme::i()->getTemplate( 'modcp', 'core', 'front' ), 'deletedTable' );
-		$table->rowsTemplate	= array( Theme::i()->getTemplate( 'modcp', 'core', 'front' ), 'deletedRows' );
+		$table->tableTemplate	= array( \IPS\Theme::i()->getTemplate( 'modcp', 'core', 'front' ), 'deletedTable' );
+		$table->rowsTemplate	= array( \IPS\Theme::i()->getTemplate( 'modcp', 'core', 'front' ), 'deletedRows' );
 		
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( 'modcp_deleted' ) );
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'modcp_deleted' );
-		Output::i()->output = Theme::i()->getTemplate( 'modcp' )->deletedContent( $table );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( 'modcp_deleted' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'modcp_deleted' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'modcp' )->deletedContent( $table );
 	}
-
+	
 	/**
 	 * Mod Action
 	 *
-	 * @return    void
-	 * @throws Exception
+	 * @return	void
 	 */
-	public function modaction(): void
+	public function modaction()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		$ids = array();
-		foreach( Request::i()->moderate AS $id => $status )
+		foreach( \IPS\Request::i()->moderate AS $id => $status )
 		{
 			$ids[] = $id;
 		}
 		
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_deletion_log', array( Db::i()->in( 'dellog_id', $ids ) ) ), 'IPS\core\DeletionLog' ) AS $log )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_deletion_log', array( \IPS\Db::i()->in( 'dellog_id', $ids ) ) ), 'IPS\core\DeletionLog' ) AS $log )
 		{
 			$class = $log->content_class;
 
@@ -130,7 +98,7 @@ class Deleted extends ModCpAbstract
 			{
 				$content = $class::load( $log->content_id );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				/* Content may have already been removed by a linked item. e.g. db records deleting topics */
 				continue;
@@ -138,10 +106,10 @@ class Deleted extends ModCpAbstract
 
 			if ( $log->canView() )
 			{
-				switch( Request::i()->modaction )
+				switch( \IPS\Request::i()->modaction )
 				{
 					case 'restore':
-						Session::i()->modLog( 'modlog__action_restore', array(
+						\IPS\Session::i()->modLog( 'modlog__action_restore', array(
 							$content::$title				=> FALSE,
 							$content->url()->__toString()	=> FALSE
 						) );
@@ -150,7 +118,7 @@ class Deleted extends ModCpAbstract
 						break;
 
 					case 'restore_as_hidden':
-						Session::i()->modLog( 'modlog__action_restore_hidden', array(
+						\IPS\Session::i()->modLog( 'modlog__action_restore_hidden', array(
 							$content::$title				=> FALSE,
 							$content->url()->__toString()	=> FALSE
 						) );
@@ -159,7 +127,7 @@ class Deleted extends ModCpAbstract
 						break;
 
 					case 'delete':
-						Session::i()->modLog( 'modlog__action_delete_perm', array(
+						\IPS\Session::i()->modLog( 'modlog__action_delete_perm', array(
 							$content::$title				=> FALSE,
 							$content->url()->__toString()	=> FALSE
 						) );
@@ -171,6 +139,6 @@ class Deleted extends ModCpAbstract
 			}
 		}
 		
-		Output::i()->redirect( Url::internal( "app=core&module=modcp&controller=modcp&tab=deleted", 'front', 'modcp_deleted' ), 'saved' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=modcp&controller=modcp&tab=deleted", 'front', 'modcp_deleted' ), 'saved' );
 	}
 }

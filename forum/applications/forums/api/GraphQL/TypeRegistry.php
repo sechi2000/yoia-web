@@ -10,15 +10,13 @@
  */
 
 namespace IPS\forums\api\GraphQL;
-use IPS\forums\api\GraphQL\Types\ForumType;
-use IPS\forums\api\GraphQL\Types\PostType;
-use IPS\forums\api\GraphQL\Types\TopicType;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -27,28 +25,35 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * so we'll generate singletons here.
  * @todo automate this somehow?
  */
-class TypeRegistry
+class _TypeRegistry
 {
     /**
      * Returns the forum instance
      *
-     * @var ForumType|null
+     * @var \IPS\forums\api\GraphQL\Types\ForumType
      */
-	protected static ?ForumType $forum = null;
+	protected static $forum;
 
     /**
      * Returns the post instance
      *
-     * @var PostType|null
+     * @var \IPS\forums\api\GraphQL\Types\PostType
      */
-    protected static ?PostType $post = null;
+    protected static $post;
 
     /**
      * Returns the topic instance
      *
-     * @var TopicType|null
+     * @var \IPS\forums\api\GraphQL\Types\TopicType
      */
-    protected static ?TopicType $topic = null;
+    protected static $topic;
+
+    /**
+     * Returns the vote instance
+     *
+     * @var \IPS\forums\api\GraphQL\Types\VoteType
+     */
+    protected static $vote;
 
 	/**
 	 * Constructor
@@ -61,24 +66,32 @@ class TypeRegistry
 	/**
 	 * @return ForumType
 	 */
-	public static function forum() : ForumType
+	public static function forum() : \IPS\forums\api\GraphQL\Types\ForumType
 	{
-		return self::$forum ?: (self::$forum = new ForumType());
+		return self::$forum ?: (self::$forum = new \IPS\forums\api\GraphQL\Types\ForumType());
 	}
 	
 	/**
 	 * @return PostType
 	 */
-	public static function post() : PostType
+	public static function post() : \IPS\forums\api\GraphQL\Types\PostType
     {
-        return self::$post ?: (self::$post = new PostType());
+        return self::$post ?: (self::$post = new \IPS\forums\api\GraphQL\Types\PostType());
     }
 
 	/**
 	 * @return TopicType
 	 */
-	public static function topic() : TopicType
+	public static function topic() : \IPS\forums\api\GraphQL\Types\TopicType
 	{
-		return self::$topic ?: (self::$topic = new TopicType());
+		return self::$topic ?: (self::$topic = new \IPS\forums\api\GraphQL\Types\TopicType());
+	}
+
+	/**
+	 * @return VoteType
+	 */
+	public static function vote() : \IPS\forums\api\GraphQL\Types\VoteType
+	{
+		return self::$vote ?: (self::$vote = new \IPS\forums\api\GraphQL\Types\VoteType());
 	}
 }

@@ -12,33 +12,26 @@
 namespace IPS\nexus;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use function defined;
-use function intval;
-use function strlen;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Credit card object
  */
-class CreditCard
+class _CreditCard
 {
 	/** 
 	 * @brief	Card Number
 	 */
-	public ?string $number = NULL;
+	public $number;
 	
 	/** 
 	 * @brief	Last 4 numbers
 	 */
-	public mixed $lastFour = NULL;
+	public $lastFour;
 	
 	/**
 	 * @brief	Type
@@ -51,27 +44,27 @@ class CreditCard
 	const TYPE_JCB = 'jcb';
 	const TYPE_PAYPAL = 'paypal';
 	const TYPE_VENMO = 'venmo';
-	public string $type = "";
+	public $type;
 	
 	/** 
 	 * @brief	Expire Month
 	 */
-	public mixed $expMonth = NULL;
+	public $expMonth;
 	
 	/** 
 	 * @brief	Expire Year
 	 */
-	public mixed $expYear = NULL;
+	public $expYear;
 	
 	/** 
 	 * @brief	Security Code
 	 */
-	public mixed $ccv = NULL;
+	public $ccv;
 	
 	/**
 	 * @brief	Save
 	 */
-	public bool $save = FALSE;
+	public $save;
 	
 	/**
 	 * Constructor
@@ -83,16 +76,16 @@ class CreditCard
 	/**
 	 * Create object
 	 *
-	 * @param string $cardNumber	Card Number
-	 * @param int|string $expMonth	Expire month
-	 * @param int|string $expYear	Expire year
-	 * @param int|string $ccv		Security Code
+	 * @param	string		$cardNumber	Card Number
+	 * @param	int|string	$expMonth	Expire month
+	 * @param	int|string	$expYear	Expire year
+	 * @param	int|string	$ccv		Security Code
 	 * @param	bool		$save		If the card should be saved
-	 * @return	static
-	 * @throws	InvalidArgumentException	Card number or expiry date is invalid
-	 * @throws	DomainException			Expire date is in the past
+	 * @return	void
+	 * @throws	\InvalidArgumentException	Card number or expiry date is invalid
+	 * @throws	\DomainException			Expire date is in the past
 	 */
-	public static function build(string $cardNumber, int|string $expMonth, int|string $expYear, int|string $ccv, bool $save=FALSE ) : static
+	public static function build( $cardNumber, $expMonth, $expYear, $ccv, $save=FALSE )
 	{
 		$obj = new static;
 		
@@ -125,7 +118,7 @@ class CreditCard
 		}
 		else
 		{
-			throw new InvalidArgumentException('card_number_invalid');
+			throw new \InvalidArgumentException('card_number_invalid');
 		}
 		$obj->lastFour = mb_substr( $cardNumber, -4 );
 		
@@ -136,27 +129,27 @@ class CreditCard
 		);
 		$sum = 0;
 		$flip = 0;
-		$cardNumberLength = strlen( $cardNumber );
+		$cardNumberLength = \strlen( $cardNumber );
 		for ($i = $cardNumberLength - 1; $i >= 0; $i--)
 		{
 			$sum += $sumTable[ $flip++ & 0x1 ][ $cardNumber[ $i ] ];
 		}
 		if( $sum % 10 !== 0 )
 		{
-			throw new InvalidArgumentException('card_number_invalid');
+			throw new \InvalidArgumentException('card_number_invalid');
 		}
 		
 		/* Check the expiry date */
-		$expMonth = intval( $expMonth );
+		$expMonth = \intval( $expMonth );
 		if ( $expMonth < 0 or $expMonth > 12 )
 		{
-			throw new InvalidArgumentException('card_month_invalid');
+			throw new \InvalidArgumentException('card_month_invalid');
 		}
 		$obj->expMonth = str_pad( $expMonth, 2, '0', STR_PAD_LEFT );
-		$obj->expYear = intval( $expYear );
+		$obj->expYear = \intval( $expYear );
 		if ( mktime( 23, 59, 59, $expMonth + 1, 0, $expYear ) < time() )
 		{
-			throw new DomainException;
+			throw new \DomainException;
 		}
 		
 		/* Check the security code */
@@ -165,12 +158,12 @@ class CreditCard
 		{
 			if ( mb_strlen( $ccv ) !== 4 )
 			{
-				throw new InvalidArgumentException('ccv_invalid_4');
+				throw new \InvalidArgumentException('ccv_invalid_4');
 			}
 		}
 		elseif ( mb_strlen( $ccv ) !== 3 )
 		{
-			throw new InvalidArgumentException('ccv_invalid_3');
+			throw new \InvalidArgumentException('ccv_invalid_3');
 		}
 		
 		/* Should it be saved? */

@@ -11,31 +11,21 @@
 namespace IPS\core\modules\admin\membersettings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Profile settings gateway
  */
-class profiles extends Controller
+class _profiles extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Call
@@ -45,53 +35,39 @@ class profiles extends Controller
 	public function __call( $method, $args )
 	{
 		/* Init */
-		$activeTab			= Request::i()->tab ?: 'profilefields';
+		$activeTab			= \IPS\Request::i()->tab ?: 'profilefields';
 		$activeTabContents	= '';
 		$tabs				= array();
 
 		/* Add a tab for fields and completion */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'profilefields_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'profilefields_manage' ) )
 		{
 			$tabs['profilefields']		= 'profile_fields';
 			$tabs['profilecompletion']	= 'profile_completion';
 		}
 
 		/* Add a tab for settings */
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'profiles_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'profiles_manage' ) )
 		{
 			$tabs['profilesettings']	= 'profile_settings';
 		}
 
-        /* Profile Photo Gallery */
-        if( Bridge::i()->featureIsEnabled( 'profile_gallery' ) and Member::loggedIn()->hasAcpRestriction( 'cloud', 'smartcommunity', 'smartcommunity_profilegallery' ) )
-        {
-            $tabs['profilegallery'] = 'profile_gallery';
-        }
-
 		/* Route */
-        if( $activeTab == 'profilegallery' )
-        {
-            $classname = 'IPS\cloud\modules\admin\profiles\photogallery';
-        }
-        else
-        {
-            $classname = 'IPS\core\modules\admin\membersettings\\' . $activeTab;
-        }
-
-        $class = new $classname;
-        $class->url = Url::internal("app=core&module=membersettings&controller=profiles&tab={$activeTab}");
+		$classname = 'IPS\core\modules\admin\membersettings\\' . $activeTab;
+		$class = new $classname;
+		$class->url = \IPS\Http\Url::internal("app=core&module=membersettings&controller=profiles&tab={$activeTab}");
 		$class->execute();
 		
-		$output = Output::i()->output;
+		$output = \IPS\Output::i()->output;
 				
-		if ( $method !== 'manage' or Request::i()->isAjax() )
+		if ( $method !== 'manage' or \IPS\Request::i()->isAjax() )
 		{
 			return;
 		}
-		Output::i()->output = '';
+		\IPS\Output::i()->output = '';
 				
 		/* Output */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('module__core_profile');
-		Output::i()->output .= Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, $output, Url::internal( "app=core&module=membersettings&controller=profiles" ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('module__core_profile');
+		\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, $output, \IPS\Http\Url::internal( "app=core&module=membersettings&controller=profiles" ) );
 	}
 }

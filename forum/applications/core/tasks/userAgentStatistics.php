@@ -11,25 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Http\Useragent;
-use IPS\Session\Store;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * User agent statistics task
  */
-class userAgentStatistics extends Task
+class _userAgentStatistics extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -40,28 +31,28 @@ class userAgentStatistics extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		$desktops	= 0;
 		$tablets	= 0;
 		$mobiles	= 0;
 		$consoles	= 0;
 
-		foreach( Store::i()->getOnlineUsers( Store::ONLINE_MEMBERS, 'desc', NULL, NULL, TRUE, TRUE ) as $row )
+		foreach( \IPS\Session\Store::i()->getOnlineUsers( \IPS\Session\Store::ONLINE_MEMBERS, 'desc', NULL, NULL, TRUE, TRUE ) as $row )
 		{
-			$userAgent = Useragent::parse( $row['browser'] );
+			$userAgent = \IPS\Http\Useragent::parse( $row['browser'] );
 
-			if( in_array( $userAgent->platform, array( 'iPhone', 'Windows Phone OS', 'BlackBerry', 'Android', 'Tizen' ) ) )
+			if( \in_array( $userAgent->platform, array( 'iPhone', 'Windows Phone OS', 'BlackBerry', 'Android', 'Tizen' ) ) )
 			{
 				$mobiles++;
 			}
-			elseif( in_array( $userAgent->platform, array( 'iPad / iPod Touch', 'Kindle', 'Kindle Fire', 'Playbook' ) ) )
+			elseif( \in_array( $userAgent->platform, array( 'iPad / iPod Touch', 'Kindle', 'Kindle Fire', 'Playbook' ) ) )
 			{
 				$tablets++;
 			}
-			elseif( in_array( $userAgent->platform, array( 'Nintendo 3DS', 'New Nintendo 3DS', 'Nintendo Wii', 'Nintendo WiiU', 'PlayStation 3', 'PlayStation 4', 'PlayStation Vita', 'Xbox 360', 'Xbox One' ) ) )
+			elseif( \in_array( $userAgent->platform, array( 'Nintendo 3DS', 'New Nintendo 3DS', 'Nintendo Wii', 'Nintendo WiiU', 'PlayStation 3', 'PlayStation 4', 'PlayStation Vita', 'Xbox 360', 'Xbox One' ) ) )
 			{
 				$consoles++;
 			}
@@ -71,7 +62,7 @@ class userAgentStatistics extends Task
 			}
 		}
 
-		Db::i()->insert( 'core_statistics', array(
+		\IPS\Db::i()->insert( 'core_statistics', array(
 			'type' 		=> 'devices', 
 			'value_1'	=> $mobiles,
 			'value_2'	=> $tablets,

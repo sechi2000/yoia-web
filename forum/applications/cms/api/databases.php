@@ -12,38 +12,30 @@
 namespace IPS\cms\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\cms\Databases as DatabasesClass;
-use IPS\Node\Api\NodeController;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Pages Databases API
  */
-class databases extends NodeController
+class _databases extends \IPS\Node\Api\NodeController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\cms\Databases';
+	protected $class = 'IPS\cms\Databases';
 
 	/**
 	 * GET /cms/databases
 	 * Get list of databases
 	 *
 	 * @apiclientonly
-	 * @apireturn		PaginatedResponse<IPS\cms\Databases>
-	 * @return PaginatedResponse<DatabasesClass>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\cms\Databases>
 	 */
-	public function GETindex() : PaginatedResponse
+	public function GETindex()
 	{
 		return $this->_list();
 	}
@@ -54,10 +46,9 @@ class databases extends NodeController
 	 *
 	 * @apiclientonly
 	 * @param		int		$id			ID Number
-	 * @apireturn		\IPS\cms\Databases
-	 * @return Response
+	 * @return		\IPS\cms\Databases
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		return $this->_view( $id );
 	}

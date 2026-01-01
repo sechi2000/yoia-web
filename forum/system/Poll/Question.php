@@ -11,33 +11,29 @@
 namespace IPS\Poll;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Poll Question
  */
-class Question
+class _Question
 {
 	/**
 	 * @brief	Data
 	 */
-	protected array $data;
+	protected $data;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param array $data	Data
+	 * @param	array	$data	Data
 	 * @return	void
 	 */
-	public function __construct( array $data )
+	public function __construct( $data )
 	{
 		$this->data = $data;
 	}
@@ -45,12 +41,12 @@ class Question
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	string	question	The question
 	 * @apiresponse	object	options		Each of the options and how many votes they have had
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'question'	=> $this->data['question'],

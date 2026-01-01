@@ -12,72 +12,36 @@
 namespace IPS\nexus\extensions\nexus\Item;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\nexus\Coupon;
-use IPS\nexus\Customer;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item\Purchase as ItemPurchase;
-use IPS\nexus\Money;
-use IPS\nexus\Package as PackageClass;
-use IPS\nexus\Package\CustomField;
-use IPS\nexus\Package\Group;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Tax;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Package
  */
-class Package extends ItemPurchase
+class _Package extends \IPS\nexus\Invoice\Item\Purchase
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'nexus';
+	public static $application = 'nexus';
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $type = 'package';
+	public static $type = 'package';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'box';
+	public static $icon = 'archive';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'product';
+	public static $title = 'product';
 	
 	/**
 	 * Get (can be used to override static properties like icon and title in an instance)
@@ -85,97 +49,76 @@ class Package extends ItemPurchase
 	 * @param	string	$k	Property
 	 * @return	mixed
 	 */
-	public function __get( string $k ) : mixed
+	public function __get( $k )
 	{
 		if ( $k === '_icon' or $k === '_title' )
 		{
 			try
 			{
-				$package = PackageClass::load( $this->id );
+				$package = \IPS\nexus\Package::load( $this->id );
 				return $k === '_icon' ? $package::$icon : $package::$title;
 			}
-			catch ( Exception ) { }
+			catch ( \Exception $e ) { }
 		}
 		return parent::__get( $k );
-	}
-
-	/**
-	 * @return bool
-	 */
-	public function canChangeQuantity() : bool
-	{
-		try
-		{
-			$package = PackageClass::load( $this->id );
-			if( !$package->subscription )
-			{
-				return true;
-			}
-
-			return false;
-		}
-		catch( OutOfRangeException )
-		{
-			return parent::canChangeQuantity();
-		}
 	}
 	
 	/**
 	 * Get Icon
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    string
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
 	 */
-	public static function getIcon( Purchase $purchase ): string
+	public static function getIcon( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			$class = PackageClass::load( $purchase->item_id );
+			$class = \IPS\nexus\Package::load( $purchase->item_id );
 			return $class::$icon;
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			return '';
+			return NULL;
 		}
 	}
 	
 	/**
 	 * Get Title
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    string
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
 	 */
-	public static function getTypeTitle( Purchase $purchase ): string
+	public static function getTypeTitle( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			$class = PackageClass::load( $purchase->item_id );
+			$class = \IPS\nexus\Package::load( $purchase->item_id );
 			return $class::$title;
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			return '';
+			return NULL;
 		}
 	}
 	
 	/**
 	 * Image
 	 *
-	 * @return File|null
+	 * @return |IPS\File|NULL
 	 */
-	public function image(): File|null
+	public function image()
 	{
 		try
 		{
-			$imageUrl = PackageClass::load( $this->id )->image;
+			$imageUrl = \IPS\nexus\Package::load( $this->id )->image;
 			if ( !$imageUrl )
 			{
 				return NULL;
 			}
 			
-			return File::get( 'nexus_Products', $imageUrl );
+			return \IPS\File::get( 'nexus_Products', $imageUrl );
 		}
-		catch ( Exception ) {}
+		catch ( \Exception $e ) {}
 		
 		return NULL;
 	}
@@ -183,22 +126,22 @@ class Package extends ItemPurchase
 	/**
 	 * Image
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return File|null
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return |IPS\File|NULL
 	 */
-	public static function purchaseImage( Purchase $purchase ): File|null
+	public static function purchaseImage( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{			
-			$imageUrl = PackageClass::load( $purchase->item_id )->image;
+			$imageUrl = \IPS\nexus\Package::load( $purchase->item_id )->image;
 			if ( !$imageUrl )
 			{
 				return NULL;
 			}
 			
-			return File::get( 'nexus_Products', $imageUrl );
+			return \IPS\File::get( 'nexus_Products', $imageUrl );
 		}
-		catch ( Exception )
+		catch ( \Exception $e )
 		{
 			return NULL;
 		}
@@ -207,17 +150,17 @@ class Package extends ItemPurchase
 	/**
 	 * Generate Invoice Form: First Step
 	 *
-	 * @param	Form	$form		The form
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\Helpers\Form	$form		The form
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public static function form( Form $form, Invoice $invoice ): void
+	public static function form( \IPS\Helpers\Form $form, \IPS\nexus\Invoice $invoice )
 	{	
-		$form->class = 'ipsForm--vertical ipsForm--package-selector';
-		$form->add( new Custom( 'invoice_products', array(), TRUE, array(
+		$form->class = 'ipsForm_vertical';
+		$form->add( new \IPS\Helpers\Form\Custom( 'invoice_products', array(), TRUE, array(
 			'rowHtml'	=> function( $field )
 			{
-				return Theme::i()->getTemplate('invoices')->packageSelector( $field->value );
+				return \IPS\Theme::i()->getTemplate('invoices')->packageSelector( $field->value );
 			}
 		) ) );
 	}
@@ -226,11 +169,11 @@ class Package extends ItemPurchase
 	 * Generate Invoice Form: Second Step
 	 *
 	 * @param	array				$values		Form values from previous step
-	 * @param	Form	$form		The form
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    bool
+	 * @param	\IPS\Helpers\Form	$form		The form
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	bool
 	 */
-	public static function formSecondStep( array $values, Form $form, Invoice $invoice ): bool
+	public static function formSecondStep( array $values, \IPS\Helpers\Form $form, \IPS\nexus\Invoice $invoice )
 	{
 		$displayForm = FALSE;
 		
@@ -240,29 +183,29 @@ class Package extends ItemPurchase
 		/* Now do the actual loop */
 		foreach ( array_filter( $values['invoice_products'] ) as $id => $qty )
 		{
-			$package = PackageClass::load( $id );
-			$customFields = new ActiveRecordIterator( Db::i()->select( '*', 'nexus_package_fields', Db::i()->findInSet( 'cf_packages', array( $package->id ) ) ), 'IPS\nexus\Package\CustomField' );
+			$package = \IPS\nexus\Package::load( $id );
+			$customFields = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_package_fields', \IPS\Db::i()->findInSet( 'cf_packages', array( $package->id ) ) ), 'IPS\nexus\Package\CustomField' );
 			$renewOptions = $package->renew_options ? json_decode( $package->renew_options, TRUE ) : array();
 
 			for ( $i = 0; $i < $qty; $i++ )
 			{							
-				if ( count( $customFields ) or count( $renewOptions ) > 1 or count( $package->associablePackages() ) or method_exists( $package, 'generateInvoiceForm' ) )
+				if ( \count( $customFields ) or \count( $renewOptions ) > 1 or \count( $package->associablePackages() ) or method_exists( $package, 'generateInvoiceForm' ) )
 				{
 					$displayForm = TRUE;
 					$form->addHeader( $package->_title );
 					
-					if ( count( $customFields ) )
+					if ( \count( $customFields ) )
 					{
-						foreach ( $customFields as $customField )
+						foreach ( $customFields as $field )
 						{
-							$field = $customField->buildHelper();
-							$field->label = $customField->_title;
-							$field->name .= '_' . $id . '_' . $i;
+							$field = $field->buildHelper();
+							$field->label = \IPS\Member::loggedIn()->language()->addToStack( $field->name );
+							$field->name = "{$field->name}_{$id}_{$i}";
 							$form->add( $field );
 						}
 					}
 					
-					if ( count( $renewOptions ) > 1 )
+					if ( \count( $renewOptions ) > 1 )
 					{
 						$options = array();
 						foreach ( $renewOptions as $k => $option )
@@ -270,29 +213,29 @@ class Package extends ItemPurchase
 							switch ( $option['unit'] )
 							{
 								case 'd':
-									$term = Member::loggedIn()->language()->addToStack('renew_days', FALSE, array( 'pluralize' => array( $option['term'] ) ) );
+									$term = \IPS\Member::loggedIn()->language()->addToStack('renew_days', FALSE, array( 'pluralize' => array( $option['term'] ) ) );
 									break;
 								case 'm':
-									$term = Member::loggedIn()->language()->addToStack('renew_months', FALSE, array( 'pluralize' => array( $option['term'] ) ) );
+									$term = \IPS\Member::loggedIn()->language()->addToStack('renew_months', FALSE, array( 'pluralize' => array( $option['term'] ) ) );
 									break;
 								case 'y':
-									$term = Member::loggedIn()->language()->addToStack('renew_years', FALSE, array( 'pluralize' => array( $option['term'] ) ) );
+									$term = \IPS\Member::loggedIn()->language()->addToStack('renew_years', FALSE, array( 'pluralize' => array( $option['term'] ) ) );
 									break;
 							}
 							
 							$options[ $k ] = 
-								Member::loggedIn()->language()->addToStack( 'renew_option', FALSE, array( 'sprintf' => array(
-								(string) new Money( $option['cost'][ $invoice->currency ]['amount'], $invoice->currency ),
+								\IPS\Member::loggedIn()->language()->addToStack( 'renew_option', FALSE, array( 'sprintf' => array(
+								(string) new \IPS\nexus\Money( $option['cost'][ $invoice->currency ]['amount'], $invoice->currency ),
 								$term
 							) ) );
 						}
 						
-						$field = new Radio( "renewal_term_{$id}_{$i}", NULL, TRUE, array( 'options' => $options ) );
-						$field->label = Member::loggedIn()->language()->addToStack('renewal_term');
+						$field = new \IPS\Helpers\Form\Radio( "renewal_term_{$id}_{$i}", NULL, TRUE, array( 'options' => $options ) );
+						$field->label = \IPS\Member::loggedIn()->language()->addToStack('renewal_term');
 						$form->add( $field );
 					}
 					
-					if ( count( $package->associablePackages() ) )
+					if ( \count( $package->associablePackages() ) )
 					{
 						$associableIds = array_keys( $package->associablePackages() );
 						$associableOptions = array();
@@ -303,11 +246,11 @@ class Package extends ItemPurchase
 						$selected = NULL;
 						foreach ( $justSelected as $k => $_qty )
 						{
-							if ( in_array( $k, $associableIds ) )
+							if ( \in_array( $k, $associableIds ) )
 							{
 								for ( $j = 0; $j < $_qty; $j++ )
 								{
-									$associableOptions['just_selected'][ "2.{$k}.{$j}" ] = PackageClass::load( $k )->_title;
+									$associableOptions['just_selected'][ "2.{$k}.{$j}" ] = \IPS\nexus\Package::load( $k )->_title;
 									if ( $j === $i )
 									{
 										$selected = "2.{$k}.{$j}";
@@ -315,16 +258,16 @@ class Package extends ItemPurchase
 								}
 							}
 						}
-						foreach ( $invoice->items as $index => $item )
+						foreach ( $invoice->items as $k => $item )
 						{
-							if ( in_array( $item->id, $associableIds ) )
+							if ( \in_array( $item->id, $associableIds ) )
 							{
 								for ( $j = 0; $j < $item->quantity; $j++ )
 								{
 									$name = $item->name;
-									if ( count( $item->details ) )
+									if ( \count( $item->details ) )
 									{
-										$customFields = CustomField::roots();
+										$customFields = \IPS\nexus\Package\CustomField::roots();
 										$stickyFields = array();
 										foreach ( $item->details as $k => $v )
 										{
@@ -333,28 +276,28 @@ class Package extends ItemPurchase
 												$stickyFields[] = $v;
 											}
 										}
-										if ( count( $stickyFields ) )
+										if ( \count( $stickyFields ) )
 										{
 											$name .= ' (' . implode( ' &middot; ', $stickyFields ) . ')';
 										}
 									}
-									$associableOptions['on_invoice']["0.{$index}"] = $name;
+									$associableOptions['on_invoice']["0.{$k}"] = $name;
 								}
 							}
 						}
-						foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', array( array( 'ps_member=? AND ps_app=? AND ps_type=?', $invoice->member->member_id, 'nexus', 'package' ), Db::i()->in( 'ps_item_id', $associableIds ) ), 'ps_start DESC' ), 'IPS\nexus\Purchase' ) as $purchase )
+						foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', array( array( 'ps_member=? AND ps_app=? AND ps_type=?', $invoice->member->member_id, 'nexus', 'package' ), \IPS\Db::i()->in( 'ps_item_id', $associableIds ) ), 'ps_start DESC' ), 'IPS\nexus\Purchase' ) as $purchase )
 						{
 							$name = $purchase->name;
 
 							if( $name == $purchase->_name )
 							{
-								$name .= ' (' . Member::loggedIn()->language()->addToStack( 'purchase_number', FALSE, array( 'sprintf' => array( $purchase->id ) ) ) . ')';
+								$name .= ' (' . \IPS\Member::loggedIn()->language()->addToStack( 'purchase_number', FALSE, array( 'sprintf' => array( $purchase->id ) ) ) . ')';
 							}
 
 							$associableOptions['existing_purchases'][ "1.{$purchase->id}" ] = $name;
 						}
-						$field = new Select( "associate_with_{$id}_{$i}", $selected, $package->force_assoc, array( 'options' => $associableOptions ) );
-						$field->label = Member::loggedIn()->language()->addToStack('associate_with');
+						$field = new \IPS\Helpers\Form\Select( "associate_with_{$id}_{$i}", $selected, $package->force_assoc, array( 'options' => $associableOptions ) );
+						$field->label = \IPS\Member::loggedIn()->language()->addToStack('associate_with');
 						$form->add( $field );
 					}
 					
@@ -373,15 +316,15 @@ class Package extends ItemPurchase
 	 * Create From Form
 	 *
 	 * @param	array				$values		Values from form
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    array|Package
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	array
 	 */
-	public static function createFromForm( array $values, Invoice $invoice ): array|static
+	public static function createFromForm( array $values, \IPS\nexus\Invoice $invoice )
 	{
 		/* Get the packages we want to add */
-		if ( isset( Request::i()->firstStep ) )
+		if ( isset( \IPS\Request::i()->firstStep ) )
 		{
-			$data = json_decode( Request::i()->firstStep, TRUE );
+			$data = json_decode( \IPS\Request::i()->firstStep, TRUE );
 			$data = $data['invoice_products'];
 		}
 		else
@@ -395,13 +338,13 @@ class Package extends ItemPurchase
 		foreach ( array_filter( $data ) as $id => $qty )
 		{
 			/* Load package */
-			$package = PackageClass::load( $id );
+			$package = \IPS\nexus\Package::load( $id );
 			
 			/* Get the number already on the invoice for the purposes of discounts */
 			$initialCount = 0;
 			foreach ( $invoice->items as $_item )
 			{
-				if ( $_item instanceof Package and $_item->id == $id )
+				if ( $_item instanceof \IPS\nexus\extensions\nexus\Item\Package and $_item->id == $id )
 				{
 					$initialCount += $_item->quantity;
 				}
@@ -418,9 +361,9 @@ class Package extends ItemPurchase
 					{
 						try
 						{
-							$field = CustomField::load( $matches[1] );
+							$field = \IPS\nexus\Package\CustomField::load( $matches[1] );
 							$class = $field->buildHelper();
-							if ( $class instanceof Upload )
+							if ( $class instanceof \IPS\Helpers\Form\Upload )
 							{
 								$details[ $field->id ] = (string) $v;
 							}
@@ -429,7 +372,7 @@ class Package extends ItemPurchase
 								$details[ $field->id ] = $class::stringValue( $v );
 							}
 						}
-						catch ( Exception ) { }
+						catch ( \Exception $e ) { }
 					}
 				}
 
@@ -442,22 +385,22 @@ class Package extends ItemPurchase
 				{
 					try
 					{
-						$chosenOption = Db::i()->select( '*', 'nexus_product_options', array( 'opt_package=? AND opt_values=?', $package->id, json_encode( $package->optionValues( $details ) ) ) )->first();
+						$chosenOption = \IPS\Db::i()->select( '*', 'nexus_product_options', array( 'opt_package=? AND opt_values=?', $package->id, json_encode( $package->optionValues( $details ) ) ) )->first();
 						$basePriceAdjustments = json_decode( $chosenOption['opt_base_price'], TRUE );
 						if ( isset( $basePrice->currency ) )
 						{
-							$price = $price->add( new Number( number_format( $basePriceAdjustments[ $basePrice->currency ], Money::numberOfDecimalsForCurrency( $basePrice->currency ), '.', '' ) ) );
+							$price = $price->add( new \IPS\Math\Number( number_format( $basePriceAdjustments[ $basePrice->currency ], \IPS\nexus\Money::numberOfDecimalsForCurrency( $basePrice->currency ), '.', '' ) ) );
 						}
 					}
-					catch ( UnderflowException ) {}
+					catch ( \UnderflowException $e ) {}
 				}
 				
 				/* Work out renewal term */
 				$renewalTerm = NULL;
 				$renewOptions = $package->renew_options ? json_decode( $package->renew_options, TRUE ) : array();
-				if ( count( $renewOptions ) )
+				if ( \count( $renewOptions ) )
 				{
-					if ( count( $renewOptions ) === 1 )
+					if ( \count( $renewOptions ) === 1 )
 					{
 						$chosenRenewOption = array_pop( $renewOptions );
 					}
@@ -466,7 +409,7 @@ class Package extends ItemPurchase
 						$chosenRenewOption = $renewOptions[ $values["renewal_term_{$id}_{$i}"] ];
 					}
 
-					$renewalPrice = new Money( $chosenRenewOption['cost'][ $invoice->currency ]['amount'], $invoice->currency );
+					$renewalPrice = new \IPS\nexus\Money( $chosenRenewOption['cost'][ $invoice->currency ]['amount'], $invoice->currency );
 					$renewalAmount = $renewalPrice->amount;
 
 					/* Adjustments based on custom fields */
@@ -475,11 +418,11 @@ class Package extends ItemPurchase
 						$renewalPriceAdjustments = json_decode( $chosenOption['opt_renew_price'], TRUE );
 						if ( isset( $renewalPrice->currency ) )
 						{
-							$renewalAmount = $renewalAmount->add( new Number( number_format( $renewalPriceAdjustments[ $renewalPrice->currency ], Money::numberOfDecimalsForCurrency( $renewalPrice->currency ), '.', '' ) ) );
+							$renewalAmount = $renewalAmount->add( new \IPS\Math\Number( number_format( $renewalPriceAdjustments[ $renewalPrice->currency ], \IPS\nexus\Money::numberOfDecimalsForCurrency( $renewalPrice->currency ), '.', '' ) ) );
 						}
 					}
 
-					$renewalTerm = new RenewalTerm( new Money( $renewalAmount, $invoice->currency ), new DateInterval( 'P' . $chosenRenewOption['term'] . mb_strtoupper( $chosenRenewOption['unit'] ) ), $package->tax ? Tax::load( $package->tax ) : NULL, FALSE,$package->grace_period ? new DateInterval( 'P' . $package->grace_period . 'D' ) : NULL );
+					$renewalTerm = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $renewalAmount, $invoice->currency ), new \DateInterval( 'P' . $chosenRenewOption['term'] . mb_strtoupper( $chosenRenewOption['unit'] ) ), $package->tax ? \IPS\nexus\Tax::load( $package->tax ) : NULL, FALSE,$package->grace_period ? new \DateInterval( 'P' . $package->grace_period . 'D' ) : NULL );
 
 					if ( $chosenRenewOption['add'] )
 					{
@@ -488,10 +431,22 @@ class Package extends ItemPurchase
 				}
 				
 				/* Create item */
-				$item = new static( Member::loggedIn()->language()->get( 'nexus_package_' . $package->id ), new Money( $price, $invoice->currency ) );
+				$item = new \IPS\nexus\extensions\nexus\Item\Package( \IPS\Member::loggedIn()->language()->get( 'nexus_package_' . $package->id ), new \IPS\nexus\Money( $price, $invoice->currency ) );
 				$item->renewalTerm = $renewalTerm;
 				$item->id = $package->id;
-				$item->tax = $package->tax ? Tax::load( $package->tax ) : NULL;
+				$item->tax = $package->tax ? \IPS\nexus\Tax::load( $package->tax ) : NULL;
+				if ( $package instanceof \IPS\nexus\Package\Product and $package->physical )
+				{
+					$item->physical = TRUE;
+					$item->weight = new \IPS\nexus\Shipping\Weight( $package->weight );
+					$item->length = new \IPS\nexus\Shipping\Length( $package->length );
+					$item->width = new \IPS\nexus\Shipping\Length( $package->width );
+					$item->height = new \IPS\nexus\Shipping\Length( $package->height );
+					if ( $package->shipping !== '*' )
+					{
+						$item->shippingMethodIds = explode( ',', $package->shipping );
+					}
+				}
 				if ( $package->methods and $package->methods != '*' )
 				{
 					$item->paymentMethodIds = explode( ',', $package->methods );
@@ -512,7 +467,7 @@ class Package extends ItemPurchase
 							$item->parent = (int) $exploded[1];
 							break;
 						case '1':
-							$item->parent = Purchase::load( $exploded[1] );
+							$item->parent = \IPS\nexus\Purchase::load( $exploded[1] );
 							break;
 						case '2':
 							$itemsToBeAssociated["{$id}.{$i}"] = "{$exploded[1]}.{$exploded[2]}";
@@ -577,16 +532,16 @@ class Package extends ItemPurchase
 	/**
 	 * Get additional name info
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    array
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	array
 	 */
-	public static function getPurchaseNameInfo( Purchase $purchase ): array
+	public static function getPurchaseNameInfo( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			return PackageClass::load( $purchase->item_id )->getPurchaseNameInfo( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->getPurchaseNameInfo( $purchase );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return array();
 		}
@@ -595,16 +550,15 @@ class Package extends ItemPurchase
 	/**
 	 * Get ACP Page HTML
 	 *
-	 * @param	Purchase	$purchase
-	 * @return    string
+	 * @return	string
 	 */
-	public static function acpPage( Purchase $purchase ): string
+	public static function acpPage( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			return PackageClass::load( $purchase->item_id )->acpPage( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->acpPage( $purchase );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return '';
 		}
@@ -613,17 +567,17 @@ class Package extends ItemPurchase
 	/**
 	 * Get ACP Page Buttons
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @param	Url		$url		The page URL
-	 * @return    array
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @param	\IPS\Http\Url		$url		The page URL
+	 * @return	array
 	 */
-	public static function acpButtons( Purchase $purchase, Url $url ): array
+	public static function acpButtons( \IPS\nexus\Purchase $purchase, \IPS\Http\Url $url )
 	{
 		try
 		{
-			return PackageClass::load( $purchase->item_id )->acpButtons( $purchase, $url );
+			return \IPS\nexus\Package::load( $purchase->item_id )->acpButtons( $purchase, $url );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return array();
 		}
@@ -632,196 +586,69 @@ class Package extends ItemPurchase
 	/**
 	 * ACP Action
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    string|null
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function acpAction( Purchase $purchase ): string|null
+	public static function acpAction( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			return PackageClass::load( $purchase->item_id )->acpAction( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->acpAction( $purchase );
 		}
-		catch ( OutOfRangeException )
-		{
-			return null;
-		}
+		catch ( \OutOfRangeException $e ) {}
 	}
 	
 	/** 
 	 * ACP Edit Form
 	 *
-	 * @param	Purchase				$purchase	The purchase
-	 * @param	Form				$form	The form
-	 * @param	RenewalTerm|null	$renewals	The renewal term
+	 * @param	\IPS\nexus\Purchase				$purchase	The purchase
+	 * @param	\IPS\Helpers\Form				$form	The form
+	 * @param	\IPS\nexus\Purchase\RenewalTerm	$renewals	The renewal term
 	 * @return	void
 	 */
-	public static function acpEdit( Purchase $purchase, Form $form, ?RenewalTerm $renewals ) : void
+	public static function acpEdit( \IPS\nexus\Purchase $purchase, \IPS\Helpers\Form $form, $renewals )
 	{
 		$form->addHeader('nexus_purchase_settings');
 		parent::acpEdit( $purchase, $form, $renewals );
 		
 		try
 		{
-			PackageClass::load( $purchase->item_id )->acpEdit( $purchase, $form, $renewals );
+			return \IPS\nexus\Package::load( $purchase->item_id )->acpEdit( $purchase, $form, $renewals );
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 	}
 	
 	/** 
 	 * ACP Edit Save
 	 *
-	 * @param	Purchase	$purchase	The purchase
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
 	 * @param	array				$values		Values from form
-	 * @return    void
+	 * @return	void
 	 */
-	public static function acpEditSave( Purchase $purchase, array $values ): void
+	public static function acpEditSave( \IPS\nexus\Purchase $purchase, array $values )
 	{
 		try
 		{
-			PackageClass::load( $purchase->item_id )->acpEditSave( $purchase, $values );
+			\IPS\nexus\Package::load( $purchase->item_id )->acpEditSave( $purchase, $values );
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 		
 		parent::acpEditSave( $purchase, $values );
-	}
-
-	/**
-	 * Additional elements that will be used to create coupons
-	 * Also used on the Commission Rules
-	 *
-	 * @param array|string|null $current	Current data
-	 * @return array
-	 */
-	public static function customFormElements( array|string|null $current =null ) : array
-	{
-		$products = null;
-		if( $current and $current !== '*' )
-		{
-			if( isset( $current[ static::$title ]['products'] ) and $current[ static::$title ]['products'] !== 0 )
-			{
-				foreach( $current[ static::$title ]['products'] as $id )
-				{
-					try
-					{
-						$products[] = PackageClass::load( $id );
-					}
-					catch( OutOfRangeException ){}
-				}
-			}
-		}
-
-		return [
-			new Node( 'c_nexus_package', $products ?? 0, FALSE, array(
-				'class' => Group::class,
-				'multiple' => true,
-				'zeroVal' => 'no_restriction',
-				'permissionCheck' => function( $node ){
-					return !( $node instanceof Group );
-				}
-			), null, null, null, 'c_nexus_package' )
-		];
-	}
-
-	/**
-	 * Build a list of language strings to show in an object description
-	 *
-	 * @param array|string|null $data
-	 * @return array
-	 */
-	public static function customFormDescription( array|string|null $data ) : array
-	{
-		$return = [];
-		if( isset( $data[ static::$title ]['products'] ) and is_array( $data[ static::$title ]['products'] ) )
-		{
-			foreach( $data[ static::$title ]['products'] as $packageId )
-			{
-				$return[] = Member::loggedIn()->language()->addToStack( 'nexus_package_' . $packageId );
-			}
-		}
-
-		return $return;
-	}
-
-	/**
-	 * Return an array of values that will be stored with the coupon
-	 * Note: If you have any additional fields that have been added to the form
-	 * but are NOT saved to the database, you MUST unset them from the values array
-	 *
-	 * @param array $values
-	 * @param mixed|null $object
-	 * @return array|null
-	 */
-	public static function saveCustomForm( array &$values=array(), mixed $object = null ) : ?array
-	{
-		if( !isset( $values['c_nexus_package'] ) )
-		{
-			return null;
-		}
-
-		if( array_key_exists( 'c_products', $values ) and !empty( $values['c_products'] ) and !in_array( static::$title, $values['c_products'] ) )
-		{
-			unset( $values['c_nexus_package'] );
-			return null;
-		}
-
-		if( is_array( $values['c_nexus_package'] ) )
-		{
-			$products = [];
-			foreach ( $values['c_nexus_package'] as $package )
-			{
-				$products[] = $package->id;
-			}
-		}
-		else
-		{
-			$products = 0;
-		}
-
-		unset( $values['c_nexus_package'] );
-		return $products ? array( 'products' => $products ) : null;
-	}
-
-	/**
-	 * Determines if the coupon can be applied to this item
-	 *
-	 * @param array|string $data
-	 * @param Invoice $invoice
-	 * @param Customer $customer
-	 * @return bool
-	 */
-	public function isValid( array|string $data, Invoice $invoice, Customer $customer ) : bool
-	{
-		if( $data === '*' )
-		{
-			return true;
-		}
-
-		if( isset( $data[ static::$title ]['products'] ) )
-		{
-			if( $data[ static::$title ]['products'] === 0 )
-			{
-				return true;
-			}
-
-			return in_array( $this->id, $data[ static::$title ]['products'] );
-		}
-
-		return false;
 	}
 	
 	/**
 	 * Get Client Area Page HTML
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    array    array( 'packageInfo' => '...', 'purchaseInfo' => '...' )
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	array	array( 'packageInfo' => '...', 'purchaseInfo' => '...' )
 	 */
-	public static function clientAreaPage( Purchase $purchase ): array
+	public static function clientAreaPage( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			return PackageClass::load( $purchase->item_id )->clientAreaPage( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->clientAreaPage( $purchase );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return array( 'packageInfo' => '', 'purchaseInfo' => '' );
 		}
@@ -830,29 +657,68 @@ class Package extends ItemPurchase
 	/**
 	 * Client Area Action
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string|NULL
 	 */
-	public static function clientAreaAction( Purchase $purchase ): void
+	public static function clientAreaAction( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			PackageClass::load( $purchase->item_id )->clientAreaAction( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->clientAreaAction( $purchase );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
+	}
+	
+	/**
+	 * Get ACP Support View HTML
+	 *
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
+	 */
+	public static function acpSupportView( \IPS\nexus\Purchase $purchase )
+	{
+		try
+		{
+			return \IPS\nexus\Package::load( $purchase->item_id )->acpSupportView( $purchase );
+		}
+		catch ( \OutOfRangeException $e )
+		{
+			return '';
+		}
+	}
+	
+	/**
+	 * Support Severity
+	 *
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	\IPS\nexus\Support\Severity|NULL
+	 */
+	public static function supportSeverity( \IPS\nexus\Purchase $purchase )
+	{
+		try
+		{
+			return \IPS\nexus\Package::load( $purchase->item_id )->supportSeverity( $purchase );
+		}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/** 
 	 * Get renewal payment methods IDs
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    array|NULL
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	array|NULL
 	 */
-	public static function renewalPaymentMethodIds( Purchase $purchase ): array|null
+	public static function renewalPaymentMethodIds( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			$package = PackageClass::load( $purchase->item_id );
+			$package = \IPS\nexus\Package::load( $purchase->item_id );
 			if ( $package->methods and $package->methods != '*' )
 			{
 				return explode( ',', $package->methods );
@@ -862,7 +728,7 @@ class Package extends ItemPurchase
 				return NULL;
 			}
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -871,33 +737,37 @@ class Package extends ItemPurchase
 	/**
 	 * On Paid
 	 *
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public function onPaid( Invoice $invoice ): void
+	public function onPaid( \IPS\nexus\Invoice $invoice )
 	{
 		try
 		{
-			$package = PackageClass::load( $this->id );
-			$package->onPaid( $invoice );
+			$package = \IPS\nexus\Package::load( $this->id );
+			$makeSureThisHappens = $package->onPaid( $invoice );
 			$invoice->member->achievementAction( 'nexus', 'Package', $package );
+			return $makeSureThisHappens;
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
 	 * On Unpaid description
 	 *
-	 * @param	Invoice	$invoice	The invoice
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
 	 * @return	array
 	 */
-	public function onUnpaidDescription( Invoice $invoice ) : array
+	public function onUnpaidDescription( \IPS\nexus\Invoice $invoice )
 	{
 		try
 		{
-			return PackageClass::load( $this->id )->onUnpaidDescription( $invoice );
+			return \IPS\nexus\Package::load( $this->id )->onUnpaidDescription( $invoice );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return array();
 		}
@@ -906,32 +776,38 @@ class Package extends ItemPurchase
 	/**
 	 * On Unpaid
 	 *
-	 * @param	Invoice	$invoice	The invoice
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
 	 * @param	string				$status		Status
-	 * @return    void
+	 * @return	void
 	 */
-	public function onUnpaid( Invoice $invoice, string $status ): void
+	public function onUnpaid( \IPS\nexus\Invoice $invoice, $status )
 	{
 		try
 		{
-			PackageClass::load( $this->id )->onUnpaid( $invoice, $status );
+			return \IPS\nexus\Package::load( $this->id )->onUnpaid( $invoice, $status );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
 	 * On Invoice Cancel (when unpaid)
 	 *
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public function onInvoiceCancel( Invoice $invoice ): void
+	public function onInvoiceCancel( \IPS\nexus\Invoice $invoice )
 	{
 		try
 		{
-			PackageClass::load( $this->id )->onInvoiceCancel( $invoice );
+			return \IPS\nexus\Package::load( $this->id )->onInvoiceCancel( $invoice );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
@@ -940,131 +816,146 @@ class Package extends ItemPurchase
 	 * is ran to check the items they are purchasing can be bought.
 	 * Is expected to throw a DomainException with an error message to display to the user if not valid
 	 *
-	 * @param	Member	$member	The new member
-	 * @return    void
-	 * @throws	DomainException
+	 * @param	\IPS\Member	$member	The new member
+	 * @return	void
+	 * @throws	\DomainException
 	 */
-	public function memberCanPurchase( Member $member ): void
+	public function memberCanPurchase( \IPS\Member $member )
 	{
 		try
 		{
-			PackageClass::load( $this->id )->memberCanPurchase( $member );
+			return \IPS\nexus\Package::load( $this->id )->memberCanPurchase( $member );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new DomainException;
+			return NULL;
 		}
 	}
 	
 	/**
 	 * On Purchase Generated
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public static function onPurchaseGenerated( Purchase $purchase, Invoice $invoice ): void
+	public static function onPurchaseGenerated( \IPS\nexus\Purchase $purchase, \IPS\nexus\Invoice $invoice )
 	{
 		try
 		{
-			PackageClass::load( $purchase->item_id )->onPurchaseGenerated( $purchase, $invoice );
+			return \IPS\nexus\Package::load( $purchase->item_id )->onPurchaseGenerated( $purchase, $invoice );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
 	 * On Renew (Renewal invoice paid. Is not called if expiry data is manually changed)
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @param int $cycles		Cycles
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @param	int					$cycles		Cycles
+	 * @return	void
 	 */
-	public static function onRenew(Purchase $purchase, int $cycles = 1): void
+	public static function onRenew( \IPS\nexus\Purchase $purchase, $cycles )
 	{
 		try
 		{
-			PackageClass::load( $purchase->item_id )->onRenew($purchase, $cycles);
+			return \IPS\nexus\Package::load( $purchase->item_id )->onRenew( $purchase, $cycles );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
 	 * On Expiration Date Change
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onExpirationDateChange( Purchase $purchase ): void
+	public static function onExpirationDateChange( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			PackageClass::load( $purchase->item_id )->onExpirationDateChange( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->onExpirationDateChange( $purchase );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
 	 * On expire soon
 	 * If returns TRUE, the normal expire warning email will not be sent
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    bool
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onExpireWarning( Purchase $purchase ): bool
+	public static function onExpireWarning( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			return PackageClass::load( $purchase->item_id )->onExpireWarning( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->onExpireWarning( $purchase );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			return FALSE;
+			return NULL;
 		}
 	}
 	
 	/**
 	 * On Purchase Expired
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onExpire( Purchase $purchase ): void
+	public static function onExpire( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			PackageClass::load( $purchase->item_id )->onExpire( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->onExpire( $purchase );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
 	 * On Purchase Canceled
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onCancel( Purchase $purchase ): void
+	public static function onCancel( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			PackageClass::load( $purchase->item_id )->onCancel( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->onCancel( $purchase );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
 	 * Warning to display to admin when cancelling a purchase
 	 *
-	 * @param	Purchase $purchase
-	 * @return    string|null
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	string
 	 */
-	public static function onCancelWarning( Purchase $purchase ): string|null
+	public static function onCancelWarning( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			return PackageClass::load( $purchase->item_id )->onCancelWarning( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->onCancelWarning( $purchase );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -1073,56 +964,65 @@ class Package extends ItemPurchase
 	/**
 	 * On Purchase Deleted
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onDelete( Purchase $purchase ): void
+	public static function onDelete( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			PackageClass::load( $purchase->item_id )->onDelete( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->onDelete( $purchase );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
 	 * On Purchase Reactivated (renewed after being expired or reactivated after being canceled)
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public static function onReactivate( Purchase $purchase ): void
+	public static function onReactivate( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			PackageClass::load( $purchase->item_id )->onReactivate( $purchase );
+			return \IPS\nexus\Package::load( $purchase->item_id )->onReactivate( $purchase );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
 	 * On Transfer (is ran before transferring)
 	 *
-	 * @param	Purchase	$purchase		The purchase
-	 * @param	Member			$newCustomer	New Customer
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase		The purchase
+	 * @param	\IPS\Member			$newCustomer	New Customer
+	 * @return	void
 	 */
-	public static function onTransfer( Purchase $purchase, Member $newCustomer ): void
+	public static function onTransfer( \IPS\nexus\Purchase $purchase, \IPS\Member $newCustomer )
 	{
 		try
 		{
-			PackageClass::load( $purchase->item_id )->onTransfer( $purchase, $newCustomer );
+			return \IPS\nexus\Package::load( $purchase->item_id )->onTransfer( $purchase, $newCustomer );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/**
 	 * Purchase can be renewed?
 	 *
-	 * @param	Purchase $purchase	The purchase
-	 * @return    boolean
+	 * @param	\IPS\nexus\Purchase $purchase	The purchase
+	 * @return	boolean
 	 */
-	public static function canBeRenewed( Purchase $purchase ): bool
+	public static function canBeRenewed( \IPS\nexus\Purchase $purchase )
 	{
 		return TRUE;
 	}
@@ -1130,17 +1030,17 @@ class Package extends ItemPurchase
 	/**
 	 * Can Renew Until
 	 *
-	 * @param	Purchase	$purchase	The purchase
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
 	 * @param	bool				$admin		If TRUE, is for ACP. If FALSE, is for front-end.
-	 * @return	DateTime|bool	TRUE means can renew as much as they like. FALSE means cannot renew at all. \IPS\DateTime means can renew until that date
+	 * @return	\IPS\DateTime|bool	TRUE means can renew as much as they like. FALSE means cannot renew at all. \IPS\DateTime means can renew until that date
 	 */
-	public static function canRenewUntil( Purchase $purchase, bool $admin = FALSE ) : DateTime|bool
+	public static function canRenewUntil( \IPS\nexus\Purchase $purchase, $admin )
 	{
 		try
 		{
-			return PackageClass::load( $purchase->item_id )->canRenewUntil( $purchase, $admin );
+			return \IPS\nexus\Package::load( $purchase->item_id )->canRenewUntil( $purchase, $admin );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}
@@ -1149,15 +1049,15 @@ class Package extends ItemPurchase
 	/**
 	 * Show Purchase Record?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function showPurchaseRecord(): bool
+	public function showPurchaseRecord()
 	{
 		try
 		{
-			return PackageClass::load( $this->id )->showPurchaseRecord();
+			return \IPS\nexus\Package::load( $this->id )->showPurchaseRecord();
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}

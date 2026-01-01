@@ -11,36 +11,29 @@
 namespace IPS\core\MemberACPProfile;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-use function get_called_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Main Tab
  */
-abstract class MainTab
+abstract class _MainTab
 {
 	/**
 	 * @brief	Member
 	 */
-	protected ?Member $member = null;
+	protected $member;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function __construct( Member $member )
+	public function __construct( \IPS\Member $member )
 	{
 		$this->member = $member;
 	}
@@ -50,7 +43,7 @@ abstract class MainTab
 	 *
 	 * @return	bool
 	 */
-	public function canView() : bool
+	public function canView()
 	{
 		/* Extensions can override */
 		return TRUE;
@@ -61,11 +54,11 @@ abstract class MainTab
 	 *
 	 * @return	string
 	 */
-	public static function title() : string
+	public static function title()
 	{
-		$class = get_called_class();
+		$class = \get_called_class();
 		$exploded = explode( '\\', $class );
-		return Member::loggedIn()->language()->addToStack( 'memberACPProfileTitle_' . $exploded[1] . '_' . $exploded[5] );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'memberACPProfileTitle_' . $exploded[1] . '_' . $exploded[5] );
 	}
 	
 	/**
@@ -73,7 +66,7 @@ abstract class MainTab
 	 *
 	 * @return	array
 	 */
-	public function leftColumnBlocks() : array
+	public function leftColumnBlocks()
 	{
 		return array();
 	}
@@ -83,7 +76,7 @@ abstract class MainTab
 	 *
 	 * @return	array
 	 */
-	public function mainColumnBlocks() : array
+	public function mainColumnBlocks()
 	{
 		return array();
 	}
@@ -93,54 +86,20 @@ abstract class MainTab
 	 *
 	 * @return	string
 	 */
-	public function output() : string
+	public function output()
 	{
-		$seenBlocks = array();
 		$leftColumnBlocks = array();
 		foreach ( $this->leftColumnBlocks() as $class )
 		{
-			$seenBlocks[] = $class;
 			$leftColumnBlocks[] = new $class( $this->member );
 		}
 		
 		$mainColumnBlocks = array();
 		foreach ( $this->mainColumnBlocks() as $class )
 		{
-			$seenBlocks[] = $class;
 			$mainColumnBlocks[] = new $class( $this->member );
 		}
-
-		$class = get_called_class();
-		$exploded = explode( '\\', $class );
-		$thisTab = $exploded[1] . '_' . $exploded[5];
-
-		/* Check other applications for possible blocks that should show on this tab */
-		foreach( Application::allExtensions( 'core', 'MemberACPProfileBlocks', TRUE, 'core', 'Main', FALSE ) AS $key => $ext )
-		{
-			/* If we are already displaying this class, skip it */
-			if( in_array( $ext, $seenBlocks ) )
-			{
-				continue;
-			}
-
-			if( isset( $ext::$displayTab ) AND $ext::$displayTab == $thisTab )
-			{
-				$class = new $ext( $this->member );
-				if( isset( $ext::$displayColumn ) )
-				{
-					switch( $ext::$displayColumn )
-					{
-						case 'left':
-							$leftColumnBlocks[] = $class;
-							break;
-						case 'main':
-							$mainColumnBlocks[] = $class;
-							break;
-					}
-				}
-			}
-		}
 				
-		return Theme::i()->getTemplate('memberprofile')->tabTemplate( $leftColumnBlocks, $mainColumnBlocks );
+		return \IPS\Theme::i()->getTemplate('memberprofile')->tabTemplate( $leftColumnBlocks, $mainColumnBlocks );
 	}
 }

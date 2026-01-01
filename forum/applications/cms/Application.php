@@ -11,39 +11,12 @@
  
 namespace IPS\cms;
 
-use Exception;
-use IPS\Application as SystemApplication;
-use IPS\cms\Blocks\Container;
-use IPS\cms\Pages\Page;
-use IPS\Content\Search\Index;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Request;
-use IPS\Widget;
-use IPS\Widget\Area;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use XMLWriter;
-use function file_put_contents;
-use function in_array;
-use function intval;
-use function is_numeric;
-use function substr;
-
-spl_autoload_register( function($class )
+spl_autoload_register( function( $class )
 {
-	if ( mb_substr( $class, 0, 15 ) === 'IPS\cms\Records' and is_numeric( mb_substr( $class, 15, 1 ) ) )
+	if ( mb_substr( $class, 0, 15 ) === 'IPS\cms\Records' and \is_numeric( mb_substr( $class, 15, 1 ) ) )
 	{
-		$databaseId   = intval( mb_substr( $class, 15 ) );
-		$databases    = Databases::databases();
+		$databaseId   = \intval( mb_substr( $class, 15 ) );
+		$databases    = \IPS\cms\Databases::databases();
 		
 		if ( ! isset( $databases[ $databaseId ] ) )
 		{
@@ -60,19 +33,19 @@ spl_autoload_register( function($class )
 		namespace IPS\cms;
 		class Records{$databaseId} extends Records
 		{
-			protected static array \$multitons = array();
-			protected static array \$multitonMap	= array();
-			public static ?int \$customDatabaseId = $databaseId;
-			public static ?string \$commentClass = 'IPS\cms\Records\Comment{$databaseId}';
-			public static ?string \$reviewClass = 'IPS\cms\Records\Review{$databaseId}';
-			public static ?string \$containerNodeClass = 'IPS\cms\Categories{$databaseId}';
-			public static ?string \$databaseTable = 'cms_custom_database_{$databaseId}';
-			public static string \$title = '{$titleLang}';
-			public static string \$module = 'records{$databaseId}';
-			public static bool \$includeInSearch = {$includeInSearch};
-			public static string \$contentType = '{$contentType}';
-			public static ?string \$hideLogKey = 'ccs-records{$databaseId}';
-			public static array \$databaseColumnMap = array(
+			protected static \$multitons = array();
+			protected static \$multitonMap	= array();
+			public static \$customDatabaseId = $databaseId;
+			public static \$commentClass = 'IPS\cms\Records\Comment{$databaseId}';
+			public static \$reviewClass = 'IPS\cms\Records\Review{$databaseId}';
+			public static \$containerNodeClass = 'IPS\cms\Categories{$databaseId}';
+			public static \$databaseTable = 'cms_custom_database_{$databaseId}';
+			public static \$title = '{$titleLang}';
+			public static \$module = 'records{$databaseId}';
+			public static \$includeInSearch = {$includeInSearch};
+			public static \$contentType = '{$contentType}';
+			public static \$hideLogKey = 'ccs-records{$databaseId}';
+			public static \$databaseColumnMap = array(
 				'author'				=> 'member_id',
 				'container'				=> 'category_id',
 				'date'					=> 'record_saved',
@@ -103,72 +76,57 @@ spl_autoload_register( function($class )
 				'meta_data'				=> 'record_meta_data',
 				'author_name'			=> 'record_author_name',
 				'is_anon'				=> 'record_is_anon',
-				'last_comment_anon'		=> 'record_last_comment_anon',
-				'item_topicid'			=> 'record_topicid',
-				'cover_photo'			=> 'record_image',
-				'cover_photo_offset'	=> 'record_image_offset',
-				'assigned'				=> 'record_assignment_id'
+				'last_comment_anon'		=> 'record_last_comment_anon'
 			);
-			public static string \$pagePath = '';
+			public static \$pagePath;
 		}
 PHP;
 		eval( $data );
 	}
 	
-	if ( mb_substr( $class, 0, 23 ) === 'IPS\cms\Records\Comment' and is_numeric( mb_substr( $class, 23, 1 ) ) )
+	if ( mb_substr( $class, 0, 23 ) === 'IPS\cms\Records\Comment' and \is_numeric( mb_substr( $class, 23, 1 ) ) )
 	{
-		$databaseId = intval( mb_substr( $class, 23 ) );
-		$databases	= Databases::databases();
-		
-		if ( ! isset( $databases[ $databaseId ] ) )
-		{
-			return false;
-		}
+		$databaseId = \intval( mb_substr( $class, 23 ) );
 	
 		$data = <<<PHP
 		namespace IPS\cms\Records;
 		class Comment{$databaseId} extends Comment
 		{ 
-			protected static array \$multitons = array();
-			protected static array \$multitonMap	= array();
-			public static ?int \$customDatabaseId = $databaseId;
-			public static ?string \$itemClass = 'IPS\cms\Records{$databaseId}';
-			public static string \$title     = 'content_record_comments_title_{$databaseId}';
-			public static ?string \$hideLogKey = 'ccs-records{$databaseId}-comments';
+			protected static \$multitons = array();
+			protected static \$multitonMap	= array();
+			public static \$customDatabaseId = $databaseId;
+			public static \$itemClass = 'IPS\cms\Records{$databaseId}';
+			public static \$title     = 'content_record_comments_title_{$databaseId}';
+			public static \$hideLogKey = 'ccs-records{$databaseId}-comments';
 		}
 PHP;
 		eval( $data );
 	}
 
-	if ( mb_substr( $class, 0, 22 ) === 'IPS\cms\Records\Review' and is_numeric( mb_substr( $class, 22, 1 ) ) )
+	if ( mb_substr( $class, 0, 22 ) === 'IPS\cms\Records\Review' and \is_numeric( mb_substr( $class, 22, 1 ) ) )
 	{
-		$databaseId = intval( mb_substr( $class, 22 ) );
-		$databases	= Databases::databases();
-		
-		if ( ! isset( $databases[ $databaseId ] ) )
-		{
-			return false;
-		}
+		$databaseId = \intval( mb_substr( $class, 22 ) );
 
 		$data = <<<PHP
 		namespace IPS\cms\Records;
 		class Review{$databaseId} extends Review
 		{
-			protected static array \$multitons = array();
-			protected static array \$multitonMap	= array();
-			public static ?int \$customDatabaseId = $databaseId;
-			public static ?string \$itemClass = 'IPS\cms\Records{$databaseId}';
-			public static string \$title     = 'content_record_reviews_title_{$databaseId}';
-			public static ?string \$hideLogKey = 'ccs-records{$databaseId}-reviews';
+			protected static \$multitons = array();
+			protected static \$multitonMap	= array();
+			public static \$customDatabaseId = $databaseId;
+			public static \$itemClass = 'IPS\cms\Records{$databaseId}';
+			public static \$title     = 'content_record_reviews_title_{$databaseId}';
+			public static \$hideLogKey = 'ccs-records{$databaseId}-reviews';
 		}
 PHP;
 		eval( $data );
 	}
 	
-	if ( mb_substr( $class, 0, 18 ) === 'IPS\cms\Categories' and is_numeric( mb_substr( $class, 18, 1 ) ) )
+	if ( mb_substr( $class, 0, 18 ) === 'IPS\cms\Categories' and \is_numeric( mb_substr( $class, 18, 1 ) ) )
 	{
-		$databaseId = intval( mb_substr( $class, 18 ) );
-		$databases	= Databases::databases();
+		$databaseId = \intval( mb_substr( $class, 18 ) );
+		
+		$databases = \IPS\cms\Databases::databases();
 		
 		if ( ! isset( $databases[ $databaseId ] ) )
 		{
@@ -176,26 +134,118 @@ PHP;
 		}
 		
 		$dbObject = $databases[ $databaseId ];
+		$useClubContainer = ($dbObject->use_categories and $dbObject->allow_club_categories) ? "\n\t\t\tuse \\IPS\\Content\\ClubContainer;" : '';
 		
 		$data = <<<PHP
 		namespace IPS\cms;
 		class Categories{$databaseId} extends Categories
 		{
-			use \IPS\Node\Statistics;
+			use \IPS\Node\Statistics;{$useClubContainer}
 			
-			protected static array \$multitons = array();
-			protected static array \$multitonMap	= array();
-			public static ?int \$customDatabaseId = $databaseId;
-			public static ?string \$contentItemClass = 'IPS\cms\Records{$databaseId}';
-			protected static ?array \$containerIds = NULL;
-			public static string \$modPerm = 'cms{$databaseId}';
-			public static ?string \$permType = 'categories_{$databaseId}';
-			public static string \$contentArea = '{$dbObject->_title}';
-			public static string \$containerType = '{$dbObject->key}_category';
+			protected static \$multitons = array();
+			protected static \$multitonMap	= array();
+			public static \$customDatabaseId = $databaseId;
+			public static \$contentItemClass = 'IPS\cms\Records{$databaseId}';
+			protected static \$containerIds = NULL;
+			public static \$modPerm = 'cms{$databaseId}';
+			public static \$permType = 'categories_{$databaseId}';
+			public static \$contentArea = '{$dbObject->_title}';
+			public static \$containerType = '{$dbObject->key}_category';
 			
-			public static function fullyQualifiedType(): string
+			public static function fullyQualifiedType()
 			{
 				return '{$dbObject->_title} ' . \IPS\Member::loggedIn()->language()->addToStack( static::\$nodeTitle . '_sg' );
+			}
+			
+			public static function clubAcpTitle()
+			{
+				return '{$dbObject->_title} ' . \IPS\Member::loggedIn()->language()->addToStack( static::\$nodeTitle );
+			}
+			
+			public function _saveClubForm( \IPS\Member\Club \$club, \$values )
+			{
+				\$class = static::class;
+				preg_match( '/\\\\\\\\\_?Categories(\\\\d*)(?:\$|\\\\\\\\)/', \$class, \$databaseIdMatches );
+				\$databaseId = \$databaseIdMatches[1];
+				\$this->database_id = (int) \$databaseId;
+				
+				if ( !\$this->id )
+				{
+					\$this->_updatePaths = TRUE;
+					\$this->save();
+				}
+				
+				\$this->name = \$values['club_node_name'];
+				\$clubIdColumn = \$this->clubIdColumn();
+				\$this->\$clubIdColumn = \$club->id;
+				\\IPS\\Lang::saveCustom( 'cms', 'content_cat_name_'.\$this->_id, \$this->name );
+				
+				\$this->furl_name = \\IPS\\Http\\Url\\Friendly::seoTitle( \$this->name );
+				\$this->_url = NULL;
+				if ( \\IPS\\cms\\Categories::furlNameIsTaken( \$this->furl_name, \$databaseId, \$this->_id ?: null ) )
+				{
+					\$this->furl_name = \$this->_id . '_' . \$this->furl_name;
+				}
+				
+				if ( \\is_numeric( \$this->furl_name ) )
+				{
+					\$this->furl_name = 'n_' . \$this->furl_name;
+				}
+				
+				\$values['club_node_public'] = \$this->isPublic();
+				if ( array_key_exists( 'page_can_view', \$values ) )
+				{
+					\$this->club_view_permission = implode( ',', \$values['page_can_view'] );
+					\$values['club_node_public'] = \intval( \\in_array( 'member', \$values['page_can_view'] ) or \\mb_strpos( '*', \$this->club_view_permission ) !== false );
+					unset( \$values['page_can_view'] );
+				}
+				
+				if ( array_key_exists( 'club_category_meta_index', \$values ) )
+				{
+					\$this->club_category_meta_index = (int) \$values['club_category_meta_index'];
+					unset( \$values['club_category_meta_index'] );
+				}
+				elseif( !\in_array( 'nonmember', explode( ',', \$this->club_view_permission ) ) )
+				{
+					\$this->club_category_meta_index = 0;
+				}
+				
+				\$this->save();
+				
+				\$this->setFullPath();
+			}
+			
+			public function clubForm( \\IPS\\Helpers\\Form \$form, \\IPS\\Member\\Club \$club ) : void
+			{
+				\$itemClass = static::\$contentItemClass;
+				\$form->add( new \\IPS\\Helpers\\Form\\Text( 'club_node_name', \$this->_id ? \$this->_title : \\IPS\\Member::loggedIn()->language()->addToStack( static::clubFrontTitle() ), TRUE, array( 'maxLength' => 255 ) ) );
+				\$form->add( new \\IPS\\Helpers\\Form\\TextArea( 'club_node_description', ( \$this->_id ? \$this->description : null ), false ) );
+				if ( \$club->type !== \\IPS\\Member\\Club::TYPE_PUBLIC )
+				{
+					\$defaults = array( 'member', 'moderator' );
+					\$current = \$this->club_view_permission;
+					\$current = \mb_strpos( '*', \$current ) !== false ? ['nonmember','member','moderator'] : array_filter( explode( ',', \$current ) );
+					if ( \$club->type !== \\IPS\\Member\\Club::TYPE_PRIVATE )
+					{
+						\$defaults[] = 'nonmember';
+					}
+					\$form->add( new \\IPS\\Helpers\\Form\\CheckboxSet( 'page_can_view', \$current, FALSE, array( 
+						'options' => array(
+							'nonmember'	=> 'club_page_nonmembers',
+							'member'	=> 'club_page_members',
+							'moderator'	=> 'club_page_moderators' 
+						),
+						'toggles' => array(
+							'nonmember' => array( 'club_category_meta_index' )
+						) 
+					) ) );
+				}
+		
+				/* Add the index setting if this page is shown to guests */
+				if ( \$club->type !== \\IPS\\Member\\Club::TYPE_PRIVATE AND \\IPS\\Member::loggedIn()->group['gbw_club_manage_indexing'] )
+				{
+					\$form->add( new \\IPS\\Helpers\\Form\\YesNo('club_category_meta_index', \$this->club_category_meta_index, FALSE, [], NULL, NULL, NULL, 'club_category_meta_index' ) );
+				}
 			}
 		}
 PHP;
@@ -205,26 +255,20 @@ PHP;
 	
 	if ( mb_substr( $class, 0, 32 ) === 'IPS\cms\Records\RecordsTopicSync' )
 	{
-		$databaseId = intval( mb_substr( $class, 32 ) );
-		$databases	= Databases::databases();
-		
-		if ( ! isset( $databases[ $databaseId ] ) )
-		{
-			return false;
-		}
+		$databaseId = \intval( mb_substr( $class, 32 ) );
 	
 		$data = <<<PHP
 		namespace IPS\cms\Records;
 		class RecordsTopicSync{$databaseId} extends \IPS\cms\Records{$databaseId}
 		{ 
-			protected static array \$multitons = array();
-	 		protected static array \$multitonMap	= array();
-			public static ?int \$customDatabaseId = $databaseId;
-			public static ?string \$databaseTable = 'cms_custom_database_{$databaseId}';
-			public static string \$databaseColumnId = 'record_topicid';
-			public static ?string \$commentClass = 'IPS\cms\Records\CommentTopicSync{$databaseId}';
+			protected static \$multitons = array();
+	 		protected static \$multitonMap	= array();
+			public static \$customDatabaseId = $databaseId;
+			public static \$databaseTable = 'cms_custom_database_{$databaseId}';
+			public static \$databaseColumnId = 'record_topicid';
+			public static \$commentClass = 'IPS\cms\Records\CommentTopicSync{$databaseId}';
 
-			public function useForumComments(): bool
+			public function useForumComments()
 			{
 				return false;
 			}
@@ -235,106 +279,65 @@ PHP;
 
 	if ( mb_substr( $class, 0, 32 ) === 'IPS\cms\Records\CommentTopicSync' )
 	{
-		$databaseId = intval( mb_substr( $class, 32 ) );
-		$databases	= Databases::databases();
-		
-		if ( ! isset( $databases[ $databaseId ] ) )
-		{
-			return false;
-		}
+		$databaseId = \intval( mb_substr( $class, 32 ) );
 
 		$data = <<<PHP
 		namespace IPS\cms\Records;
 		class CommentTopicSync{$databaseId} extends CommentTopicSync
 		{ 
-			protected static array \$multitons = array();
-			protected static array \$multitonMap	= array();
-			public static ?int \$customDatabaseId = $databaseId;
-			public static ?string \$itemClass = 'IPS\cms\Records\RecordsTopicSync{$databaseId}';
-			public static string \$title     = 'content_record_comments_title_{$databaseId}';
+			protected static \$multitons = array();
+			protected static \$multitonMap	= array();
+			public static \$customDatabaseId = $databaseId;
+			public static \$itemClass = 'IPS\cms\Records\RecordsTopicSync{$databaseId}';
+			public static \$title     = 'content_record_comments_title_{$databaseId}';
 		}
 PHP;
 		eval( $data );
 	}
 	
-	if ( mb_substr( $class, 0, 14 ) === 'IPS\cms\Fields' and is_numeric( mb_substr( $class, 14, 1 ) ) )
+	if ( mb_substr( $class, 0, 14 ) === 'IPS\cms\Fields' and \is_numeric( mb_substr( $class, 14, 1 ) ) )
 	{
-		$databaseId = intval( mb_substr( $class, 14 ) );
-		$databases	= Databases::databases();
-		
-		if ( ! isset( $databases[ $databaseId ] ) )
-		{
-			return false;
-		}
-		
-		eval( "namespace IPS\\cms; class Fields{$databaseId} extends Fields { public static ?int \$customDatabaseId = $databaseId; protected array \$caches = array( 'database_reciprocal_links', 'cms_fieldids_{$databaseId}' ); }" );
+		$databaseId = \intval( mb_substr( $class, 14 ) );
+		eval( "namespace IPS\\cms; class Fields{$databaseId} extends Fields { public static \$customDatabaseId = $databaseId; protected \$caches = array( 'database_reciprocal_links', 'cms_fieldids_{$databaseId}' ); }" );
 	}
 
-	if ( mb_substr( $class, 0, 47 ) === 'IPS\cms\extensions\core\EditorLocations\Records' and is_numeric( mb_substr( $class, 47, 1 ) ) )
+	if ( mb_substr( $class, 0, 47 ) === 'IPS\cms\extensions\core\EditorLocations\Records' and \is_numeric( mb_substr( $class, 47, 1 ) ) )
 	{
-		$databaseId = intval( mb_substr( $class, 47 ) );
-		$databases	= Databases::databases();
-		
-		if ( ! isset( $databases[ $databaseId ] ) )
-		{
-			return false;
-		}
-		
-		eval( "namespace IPS\\cms\\extensions\\core\\EditorLocations; class Records{$databaseId} extends \\IPS\\cms\\extensions\\core\\EditorLocations\\Records { public static ?int \$customDatabaseId = $databaseId; public static bool \$buttonLocation	= TRUE; }" );
-	}
-
-	if( mb_substr( $class, 0, 26 ) == 'IPS\cms\widgets\RecordFeed' )
-	{
-		$databaseId = intval( mb_substr( $class, 26 ) );
-		$databases	= Databases::databases();
-		
-		if ( ! isset( $databases[ $databaseId ] ) )
-		{
-			return false;
-		}
-		
-		$data = <<<PHP
-		namespace IPS\cms\widgets;
-		class RecordFeed{$databaseId} extends RecordFeed {
-			public static ?int \$customDatabaseId = $databaseId;
-		}
-PHP;
-		eval( $data );
-
-		//eval( "namespace IPS\\cms\\widgets; class RecordFeed{$databaseId} extends \\IPS\\cms\\widgets\\RecordFeed { public static ?int \$customDatabaseId = {$databaseId};  }" );
+		$databaseId = \intval( mb_substr( $class, 47 ) );
+		eval( "namespace IPS\\cms\\extensions\\core\\EditorLocations; class Records{$databaseId} extends \\IPS\\cms\\extensions\\core\\EditorLocations\\Records { public static \$customDatabaseId = $databaseId; public static \$buttonLocation	= TRUE; }" );
 	}
 } );
 
 /**
  * Content Application Class
  */
-class Application extends SystemApplication
+class _Application extends \IPS\Application
 {
 	/**
 	 * Returns the ACP Menu JSON for this application.
 	 *
 	 * @return array
 	 */
-	public function acpMenu(): array
+	public function acpMenu()
 	{
 		$menu = parent::acpMenu();
 		
-		if ( ! Db::i()->checkForTable('cms_databases') or ! Member::loggedIn()->hasAcpRestriction( 'cms', 'databases', 'databases_use' ) )
+		if ( ! \IPS\Db::i()->checkForTable('cms_databases') or ! \IPS\Member::loggedIn()->hasAcpRestriction( 'cms', 'databases', 'databases_use' ) )
 		{
 			return $menu;
 		}
 
 		/* Now add in the databases... */
-		foreach(Databases::acpMenu() as $database )
+		foreach( \IPS\cms\Databases::acpMenu() as $database )
 		{
 			$menu[ 'database_' . $database['id'] ][ 'records_' . $database['id'] ] = array(
 				'tab' 		  => 'cms',
 				'module_url'  => 'databases',
 				'controller'  => 'records',
-				'do' => "&database_id={$database['id']}",
+				'do' 		  => 'manage&database_id=' . $database['id'],
 				'restriction' => 'records_manage',
 				'restriction_module' => 'databases',
-				'menu_checks' => array( 'database_id' => $database['id'] ),
+				'menu_checks' => array( 'do' => 'manage', 'database_id' => $database['id'] ),
 				'menu_controller' => 'records_' . $database['id']
 			);
 
@@ -344,10 +347,10 @@ class Application extends SystemApplication
 					'tab' 		  => 'cms',
 					'module_url'  => 'databases',
 					'controller'  => 'categories',
-					'do' => "&database_id={$database['id']}",
+					'do' 		  => 'manage&database_id=' . $database['id'],
 					'restriction' => 'categories_manage',
 					'restriction_module' => 'databases',
-					'menu_checks' => array( 'database_id' => $database['id'] ),
+					'menu_checks' => array( 'do' => 'manage', 'database_id' => $database['id'] ),
 					'menu_controller' => 'categories_' . $database['id']
 				);
 			}
@@ -356,17 +359,17 @@ class Application extends SystemApplication
 				'tab' 		  => 'cms',
 				'module_url'  => 'databases',
 				'controller'  => 'fields',
-				'do' => "&database_id={$database['id']}",
+				'do' 		  => 'manage&database_id=' . $database['id'],
 				'restriction' => 'cms_fields_manage',
 				'restriction_module' => 'databases',
-				'menu_checks' => array( 'database_id' => $database['id'] ),
+				'menu_checks' => array( 'do' => 'manage', 'database_id' => $database['id'] ),
 				'menu_controller' => 'fields_' . $database['id']
 			);
 			
-			Member::loggedIn()->language()->words[ 'menu__cms_database_' . $database['id'] ]    = $database['title'];
-			Member::loggedIn()->language()->words[ 'menu__cms_database_' . $database['id'] . '_records_' . $database['id'] ]    = $database['record_name'];
-			Member::loggedIn()->language()->words[ 'menu__cms_database_' . $database['id'] . '_categories_' . $database['id'] ] = Member::loggedIn()->language()->addToStack('menu__cms_categories');
-			Member::loggedIn()->language()->words[ 'menu__cms_database_' . $database['id'] . '_fields_' . $database['id'] ]     = Member::loggedIn()->language()->addToStack('menu__cms_fields');
+			\IPS\Member::loggedIn()->language()->words[ 'menu__cms_database_' . $database['id'] ]    = $database['title'];
+			\IPS\Member::loggedIn()->language()->words[ 'menu__cms_database_' . $database['id'] . '_records_' . $database['id'] ]    = $database['record_name'];
+			\IPS\Member::loggedIn()->language()->words[ 'menu__cms_database_' . $database['id'] . '_categories_' . $database['id'] ] = \IPS\Member::loggedIn()->language()->addToStack('menu__cms_categories');
+			\IPS\Member::loggedIn()->language()->words[ 'menu__cms_database_' . $database['id'] . '_fields_' . $database['id'] ]     = \IPS\Member::loggedIn()->language()->addToStack('menu__cms_fields');
 		}
 
 		return $menu;
@@ -375,19 +378,19 @@ class Application extends SystemApplication
 	/**
 	 * Get Extensions
 	 *
-	 * @param string|SystemApplication $app		    The app key of the application which owns the extension
-	 * @param string $extension	    Extension Type
-	 * @param bool $construct	    Should an object be returned? (If false, just the classname will be returned)
-	 * @param bool|Group|Member|null $checkAccess	Check access permission for extension against supplied member/group (or logged in member, if TRUE)
+	 * @param	\IPS\Application|string		$app		    The app key of the application which owns the extension
+	 * @param	string						$extension	    Extension Type
+	 * @param	bool						$construct	    Should an object be returned? (If false, just the classname will be returned)
+	 * @param	\IPS\Member|bool			$checkAccess	Check access permission for extension against supplied member (or logged in member, if TRUE)
 	 * @return	array
 	 */
-	public function extensions( SystemApplication|string $app, string $extension, bool $construct=TRUE, bool|Group|Member|null $checkAccess = FALSE ): array
-	{
+	public function extensions( $app, $extension, $construct=TRUE, $checkAccess=FALSE )
+	{		
 		$classes = parent::extensions( $app, $extension, $construct, $checkAccess );
 
 		if ( $extension === 'EditorLocations' )
 		{
-			foreach( Databases::databases() as $obj )
+			foreach( \IPS\cms\Databases::databases() as $obj )
 			{
 				$classname = '\\IPS\\cms\\extensions\\core\\EditorLocations\\Records' . $obj->_id;
 
@@ -403,9 +406,9 @@ class Application extends SystemApplication
 				{
 					try
 					{
-						$classes[ 'Records' . $obj->_id ] = new $classname( $checkAccess === TRUE ? Member::loggedIn() : ( $checkAccess === FALSE ? NULL : $checkAccess ) );
+						$classes[ 'Records' . $obj->_id ] = new $classname( $checkAccess === TRUE ? \IPS\Member::loggedIn() : ( $checkAccess === FALSE ? NULL : $checkAccess ) );
 					}
-					catch( RuntimeException $e ){}
+					catch( \RuntimeException $e ){}
 				}
 			}
 		}
@@ -414,81 +417,20 @@ class Application extends SystemApplication
 	}
 
 	/**
-	 * Return all widgets available for the Page Editor
-	 *
-	 * @return array
-	 */
-	public function getAvailableWidgets() : array
-	{
-		$blocks = parent::getAvailableWidgets();
-
-		if( isset( $blocks['RecordFeed'] ) )
-		{
-			unset( $blocks['RecordFeed'] );
-
-			$widget = Db::i()->select( '*', 'core_widgets', [ 'app=? and `key`=?', 'cms', 'RecordFeed' ] )->first();
-
-			foreach( Databases::databases() as $db )
-			{
-				if( !$db->page_id )
-				{
-					continue;
-				}
-
-				try
-				{
-					$block = Widget::load( $this, 'RecordFeed' . $db->id, mt_rand(), array(), $widget['restrict'] );
-					$block->allowReuse = (boolean)$widget['allow_reuse'];
-					$block->menuStyle = $widget['menu_style'];
-					$block->allowCustomPadding = (bool)$widget['padding'];
-					$block->layouts = $block->getSupportedLayouts();
-					$blocks[] = $block;
-				}
-				catch ( Exception $e )
-				{
-					continue;
-				}
-			}
-		}
-
-		return $blocks;
-	}
-
-	/**
-	 * Can manage the widgets
-	 *
-	 * @param Member|null $member		Member we are checking against or NULL for currently logged on user
-	 * @return 	boolean
-	 */
-	public function canManageWidgets( Member $member=NULL ): bool
-	{
-		/* Are we viewing an older version of a page? */
-		if( Dispatcher::checkLocation( 'front', 'cms', 'pages', 'page' ) )
-		{
-			if( empty( Request::i()->do ) and isset( Request::i()->version ) )
-			{
-				return false;
-			}
-		}
-
-		return parent::canManageWidgets( $member );
-	}
-
-	/**
 	 * Developer sync items
 	 *
 	 * @param   int     $lastSync       Last time syncd
 	 * @return  boolean                 Updated (true), nothing updated(false)
 	 */
-	public function developerSync( int $lastSync ) : bool
+	public function developerSync( $lastSync )
 	{
 		$updated = false;
 
 		if ( $lastSync < filemtime( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/databaseschema.json" ) )
 		{
-			foreach( Databases::databases() as $key => $db )
+			foreach( \IPS\cms\Databases::databases() as $key => $db )
 			{
-				Databases::checkandFixDatabaseSchema( $db->_id );
+				\IPS\cms\Databases::checkandFixDatabaseSchema( $db->_id );
 
 				$updated = TRUE;
 			}
@@ -502,23 +444,23 @@ class Application extends SystemApplication
 	 *
 	 * @return void
 	 */
-	public function installOther() : void
+	public function installOther()
 	{
 		/* Install default database and page */
-		$database = new Databases;
+		$database = new \IPS\cms\Databases;
 		$database->key = 'articles';
 		$database->save();
 
 		/* Add in permissions */
 		$groups = array();
-		foreach( Db::i()->select( 'row_id', 'core_admin_permission_rows', array( 'row_id_type=?', 'group' ) ) as $row )
+		foreach( \IPS\Db::i()->select( 'row_id', 'core_admin_permission_rows', array( 'row_id_type=?', 'group' ) ) as $row )
 		{
 			$groups[] = $row;
 		}
 
 		$default = implode( ',', $groups );
 
-		Db::i()->insert( 'core_permission_index', array(
+		\IPS\Db::i()->insert( 'core_permission_index', array(
              'app'			=> 'cms',
              'perm_type'	=> 'databases',
              'perm_type_id'	=> $database->id,
@@ -531,30 +473,30 @@ class Application extends SystemApplication
         ) );
 
 		/* Needs to be added before createDatabase is called */
-		Lang::saveCustom( 'cms', "content_db_" . $database->id, "Articles" );
-		Lang::saveCustom( 'cms', "module__cms_records" . $database->id, "Articles" );
-		Lang::saveCustom( 'cms', "content_db_" . $database->id . '_desc', "Our website articles" );
-		Lang::saveCustom( 'cms', "content_db_lang_sl_" . $database->id, 'article' );
-		Lang::saveCustom( 'cms', "content_db_lang_pl_" . $database->id, 'articles' );
-		Lang::saveCustom( 'cms', "content_db_lang_su_" . $database->id, 'Article' );
-		Lang::saveCustom( 'cms', "content_db_lang_pu_" . $database->id, 'Articles' );
-		Lang::saveCustom( 'cms', "content_db_lang_ia_" . $database->id, 'an article' );
-		Lang::saveCustom( 'cms', "content_db_lang_sl_" . $database->id . '_pl', 'Articles' );
-		Lang::saveCustom( 'cms', "digest_area_cms_records" . $database->id, "Articles" );
-		Lang::saveCustom( 'cms', "cms_records" . $database->id . '_pl', 'Article' );
-		Lang::saveCustom( 'cms', 'cms_page_1', 'Articles' );
-		
+		\IPS\Lang::saveCustom( 'cms', "content_db_" . $database->id, "Articles" );
+		\IPS\Lang::saveCustom( 'cms', "module__cms_records" . $database->id, "Articles" );
+		\IPS\Lang::saveCustom( 'cms', "content_db_" . $database->id . '_desc', "Our website articles" );
+		\IPS\Lang::saveCustom( 'cms', "content_db_lang_sl_" . $database->id, 'article' );
+		\IPS\Lang::saveCustom( 'cms', "content_db_lang_pl_" . $database->id, 'articles' );
+		\IPS\Lang::saveCustom( 'cms', "content_db_lang_su_" . $database->id, 'Article' );
+		\IPS\Lang::saveCustom( 'cms', "content_db_lang_pu_" . $database->id, 'Articles' );
+		\IPS\Lang::saveCustom( 'cms', "content_db_lang_ia_" . $database->id, 'an article' );
+		\IPS\Lang::saveCustom( 'cms', "content_db_lang_sl_" . $database->id . '_pl', 'Articles' );
+		\IPS\Lang::saveCustom( 'cms', "cms_create_menu_records_" . $database->id, 'Article in Articles' );
+		\IPS\Lang::saveCustom( 'cms', "digest_area_cms_records" . $database->id, "Articles" );
+		\IPS\Lang::saveCustom( 'cms', "cms_records" . $database->id . '_pl', 'Article' );
+
 		try
 		{
-			Databases::createDatabase( $database );
+			\IPS\cms\Databases::createDatabase( $database );
 		}
-		catch ( Exception $ex )
+		catch ( \Exception $ex )
 		{
 			$database->delete();
 
-			Log::log( $ex, 'pages_create_db_error' );
+			\IPS\Log::log( $ex, 'pages_create_db_error' );
 
-			throw new LogicException( $ex->getMessage() );
+			throw new \LogicException( $ex->getMessage() );
 		}
 
 		$database->all_editable = 0;
@@ -572,11 +514,10 @@ class Application extends SystemApplication
 		
 		/* Create default record */
 		$item    = 'IPS\cms\Records' . $database->id;
-		/* @var $item Records */
+		$comment = 'IPS\cms\Records\Comment' . $database->id;
 		$container = 'IPS\cms\Categories' . $database->id;
-		/* @var $container Categories */
 		
-		$link = (string) Url::ips('docs/pages_docs');
+		$link = (string) \IPS\Http\Url::ips('docs/pages_docs');
 
 		$content = <<<HTML
 <p>Welcome to Pages!</p>
@@ -594,16 +535,16 @@ HTML;
 		$contentField = 'field_' . $database->field_content;
 		$category = $container::load( $database->_default_category );
 		
-		$member = Member::loggedIn()->member_id ? Member::loggedIn() : Member::load(1);
+		$member = \IPS\Member::loggedIn()->member_id ? \IPS\Member::loggedIn() : \IPS\Member::load(1);
 		
-		$record = $item::createItem( $member, Request::i()->ipAddress(), DateTime::ts( time() ), $category, FALSE );
+		$record = $item::createItem( $member, \IPS\Request::i()->ipAddress(), \IPS\DateTime::ts( time() ), $category, FALSE );
 		$record->$titleField = "Welcome to Pages";
 		$record->$contentField = $content;
 		$record->record_publish_date = time();
 		$record->record_saved = time();
 		$record->save();
 
-		Index::i()->index( $record );
+		\IPS\Content\Search\Index::i()->index( $record );
 		
 		$category->last_record_date = time();
 		$category->save();
@@ -615,22 +556,23 @@ HTML;
 			'page_seo_name'     => "articles.html",
 			'page_folder_id'    => 0,
 			'page_ipb_wrapper'  => 1,
+			'page_show_sidebar' => 1,
 			'page_type'         => 'builder',
 			'page_template'     => 'page_builder__single_column__page_page_builder_single_column'
 		);
 		
 		try
 		{
-			$page = Page::createFromForm( $pageValues );
+			$page = \IPS\cms\Pages\Page::createFromForm( $pageValues, 'html' );
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
-			Log::log( $ex, 'pages_create_page_error' );
+			\IPS\Log::log( $ex, 'pages_create_page_error' );
 		}
 		
 		$page->setAsDefault();
 		
-		Db::i()->replace( 'core_permission_index', array(
+		\IPS\Db::i()->replace( 'core_permission_index', array(
              'app'			=> 'cms',
              'perm_type'	=> 'pages',
              'perm_type_id'	=> $page->id,
@@ -640,16 +582,16 @@ HTML;
 		$database->page_id = $page->id;
 		$database->save();
 		
-		unset( Store::i()->pages_page_urls );
+		unset( \IPS\Data\Store::i()->pages_page_urls );
 		
 		$defaultWidgets = array();
-		$buttonUrl      = (string) Url::internal( 'applications/cms/interface/default/block_arrow.png', 'none' );
+		$buttonUrl      = (string) \IPS\Http\Url::internal( 'applications/cms/interface/default/block_arrow.png', 'none' );
 		$defaultContent = <<<HTML
 		<p>
 			<strong>Welcome to Pages!</strong>
 		</p>
 		<p>
-			To get started, make sure you are logged in and click then choose the "Manage Blocks" option in your user menu to expand the block manager.
+			To get started, make sure you are logged in and click the arrow on the left hand side <img src="{$buttonUrl}" alt="Block Manager"> to expand the block manager.
 			<br>
 			You can move, add and edit blocks without the need for complex coding!
 		</p>
@@ -670,12 +612,16 @@ HTML;
 			'unique'        => mt_rand(),
 			'configuration' => array( 'database' => $database->id )
 		);
-
-		$area = Area::create( 'col1', $defaultWidgets );
-		$page->saveArea( $area, false );
+		
+		\IPS\Db::i()->insert( 'cms_page_widget_areas', array(
+			'area_page_id'     => $page->id,
+			'area_widgets'     => json_encode( $defaultWidgets ),
+			'area_area'        => 'col1',
+			'area_orientation' => 'horizontal'
+		) );
 						
 		/* Add block container (custom)*/
-		$container = new Container;
+		$container = new \IPS\cms\Blocks\Container;
 		$container->parent_id = 0;
 		$container->name      = "Custom";
 		$container->type      = 'block';
@@ -683,54 +629,52 @@ HTML;
 		$container->save();
 
 		/* Add block container (plugins) */
-		$container = new Container;
+		$container = new \IPS\cms\Blocks\Container;
 		$container->parent_id = 0;
 		$container->name      = "Plugins";
 		$container->type      = 'block';
 		$container->key       = 'block_plugins';
 		$container->save();
 		
-		Templates::importXml( \IPS\ROOT_PATH . "/applications/cms/data/cms_theme.xml", NULL, NULL, FALSE );
+		\IPS\cms\Templates::importXml( \IPS\ROOT_PATH . "/applications/cms/data/cms_theme.xml", NULL, NULL, FALSE );
 	}
 
 	/**
 	 * Install the application's templates
 	 * Theme resources should be raw binary data everywhere (filesystem and DB) except in the theme XML download where they are base64 encoded.
 	 *
-	 * @param bool $update	If set to true, do not overwrite current theme setting values
-	 * @param int|null $offset Offset to begin import from
-	 * @param int|null $limit	Number of rows to import
+	 * @param	bool		$update	If set to true, do not overwrite current theme setting values
+	 * @param	int|null	$offset Offset to begin import from
+	 * @param	int|null	$limit	Number of rows to import	
 	 * @return	int			Rows inserted
 	 */
-	public function installTemplates( bool $update=FALSE, int $offset=null, int $limit=null ): int
+	public function installTemplates( $update=FALSE, $offset=null, $limit=null )
 	{
 		$inserted = parent::installTemplates( $update, $offset, $limit );
 		
 		if ( ( ! $inserted or ( $inserted < $limit ) ) AND $update )
 		{
-			Templates::importXml( \IPS\ROOT_PATH . "/applications/cms/data/cms_theme.xml", NULL, NULL, $update );
+			\IPS\cms\Templates::importXml( \IPS\ROOT_PATH . "/applications/cms/data/cms_theme.xml", NULL, NULL, $update );
 		}
-
-		return $inserted;
 	}
 
 	/**
 	 * Build skin templates for an app
 	 *
-	 * @return	array
-	 * @throws	RuntimeException
+	 * @return	void
+	 * @throws	\RuntimeException
 	 */
-	public function buildThemeTemplates() : array
+	public function buildThemeTemplates()
 	{
 		$return = parent::buildThemeTemplates();
 
 		foreach( array( 'database', 'block', 'page' ) as $location )
 		{
-			Theme::importFromFiles( $location );
+			\IPS\cms\Theme::importInDev( $location );
 		}
 
 		/* Build XML and write to app directory */
-		$xml = new XMLWriter;
+		$xml = new \XMLWriter;
 		$xml->openMemory();
 		$xml->setIndent( TRUE );
 		$xml->startDocument( '1.0', 'UTF-8' );
@@ -748,17 +692,17 @@ HTML;
 		$xml->endAttribute();
 
 		/* Templates */
-		foreach ( Db::i()->select( '*', 'cms_templates', array( 'template_master=1 and template_user_created=0 and template_user_edited=0' ), 'template_group, template_title' ) as $template )
+		foreach ( \IPS\Db::i()->select( '*', 'cms_templates', array( 'template_master=1 and template_user_created=0 and template_user_edited=0' ), 'template_group, template_title' ) as $template )
 		{
 			/* Initiate the <template> tag */
 			$xml->startElement('template');
 
 			foreach( $template as $k => $v )
 			{
-				if ( in_array( substr( $k, 9 ), array('key', 'title', 'desc', 'location', 'group', 'params', 'app', 'type' ) ) )
+				if ( \in_array( \substr( $k, 9 ), array('key', 'title', 'desc', 'location', 'group', 'params', 'app', 'type' ) ) )
 				{
 					$xml->startAttribute( $k );
-					$xml->text( (string) $v );
+					$xml->text( $v );
 					$xml->endAttribute();
 				}
 			}
@@ -783,11 +727,11 @@ HTML;
 		/* Write it */
 		if ( is_writable( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
 		{
-			file_put_contents( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data/cms_theme.xml', $xml->outputMemory() );
+			\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data/cms_theme.xml', $xml->outputMemory() );
 		}
 		else
 		{
-			throw new RuntimeException( Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
+			throw new \RuntimeException( \IPS\Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
 		}
 
 		return $return;
@@ -797,9 +741,9 @@ HTML;
 	 * [Node] Get Icon for tree
 	 *
 	 * @note	Return the class for the icon (e.g. 'globe')
-	 * @return    string
+	 * @return	string|null
 	 */
-	protected function get__icon(): string
+	protected function get__icon()
 	{
 		return 'folder-open';
 	}
@@ -827,16 +771,16 @@ HTML;
 	 * @endcode
 	 * @return array
 	 */
-	public function defaultFrontNavigation(): array
+	public function defaultFrontNavigation()
 	{
 		$browseTabs = array();
 		
 		try
 		{
-			$defaultPage = Page::getDefaultPage();
+			$defaultPage = \IPS\cms\Pages\Page::getDefaultPage();
 			$browseTabs[] = array( 'key' => 'Pages', 'config' => array( 'menu_content_page' => $defaultPage->id, 'menu_title_page_type' => 0 ) );
 		}
-		catch( OutOfRangeException $ex ) { }
+		catch( \OutOfRangeException $ex ) { }
 		
 		return array(
 			'rootTabs'		=> array(),
@@ -845,21 +789,4 @@ HTML;
 			'activityTabs'	=> array()
 		);
 	}
-
-	/**
-	 * Database check
-	 *
-	 * @return	array	Queries needed to correct database in the following format ( table => x, query = x );
-	 */
-	public function databaseCheck(): array
-	{
-		$response =	parent::databaseCheck();
-		foreach( Databases::databases() as $db )
-		{
-			Databases::checkandFixDatabaseSchema( $db->_id );
-		}
-		return $response;
-	}
-
-
 }

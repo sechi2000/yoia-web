@@ -11,78 +11,41 @@
 namespace IPS\core\modules\admin\promotion;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Dispatcher\Front;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Codemirror;
-use IPS\Helpers\Form\Matrix;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\Url as FormUrl;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Tree\Tree;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use IPS\Widget;
-use RuntimeException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function strpos;
-use const IPS\CIC;
-use const IPS\CIC2;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * SEO
  */
-class seo extends Controller
+class _seo extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * @brief	Active tab
 	 */
-	protected string $activeTab	= '';
+	protected $activeTab	= '';
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'seo_furls' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'seo_furls' );
 
 		/* Get tab content */
-		$this->activeTab = Request::i()->tab ?: 'urls';
+		$this->activeTab = \IPS\Request::i()->tab ?: 'urls';
 
-		Output::i()->sidebar['actions']['rebuildsitemap'] = array(
-			'link'	=> Url::internal( 'app=core&module=promotion&controller=seo&do=rebuildSitemap' )->csrf(),
+		\IPS\Output::i()->sidebar['actions']['rebuildsitemap'] = array(
+			'link'	=> \IPS\Http\Url::internal( 'app=core&module=promotion&controller=seo&do=rebuildSitemap' )->csrf(),
 			'title'	=> 'rebuild_sitemap',
 			'icon' => 'history'
 		);
@@ -95,34 +58,34 @@ class seo extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Work out output */
-		$methodFunction = '_manage' . IPS::mb_ucfirst( $this->activeTab );
+		$methodFunction = '_manage' . mb_ucfirst( $this->activeTab );
 		$activeTabContents = $this->$methodFunction();
 		
 		/* If this is an AJAX request, just return it */
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $activeTabContents;
+			\IPS\Output::i()->output = $activeTabContents;
 			return;
 		}
 		
 		/* Build tab list */
 		$tabs = array();
-		if ( !CIC AND Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'seo_furls' ) )
+		if ( !\IPS\CIC AND \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'seo_furls' ) )
 		{
 			$tabs['urls']		= 'seo_tab_furls';
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'seo_sitemap' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'seo_sitemap' ) )
 		{
 			$tabs['sitemap']	= 'seo_tab_sitemap';
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'seo_meta' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'seo_meta' ) )
 		{
 			$tabs['metatags']	= 'seo_tab_metatags';
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'seo_furls' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'seo_furls' ) )
 		{
 			$tabs['robotstxt']	= 'seo_tab_robotstxt';
 		}
@@ -130,39 +93,39 @@ class seo extends Controller
 		/* Display */
 		if ( $activeTabContents )
 		{			
-			Output::i()->title		= Member::loggedIn()->language()->addToStack('menu__core_promotion_seo');
-			Output::i()->output 	= Theme::i()->getTemplate( 'global' )->tabs( $tabs, $this->activeTab, $activeTabContents, Url::internal( "app=core&module=promotion&controller=seo" ) );
+			\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('menu__core_promotion_seo');
+			\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate( 'global' )->tabs( $tabs, $this->activeTab, $activeTabContents, \IPS\Http\Url::internal( "app=core&module=promotion&controller=seo" ) );
 		}
 	}
 
 	/**
 	 * Get setting to enable htaccess friendly URLs
 	 *
-	 * @param Form $form	Form to add the setting to
+	 * @param	\IPS\Form	$form	Form to add the setting to
 	 * @return	void
 	 */
-	public static function htaccessSetting( Form $form ) : void
+	public static function htaccessSetting( $form )
 	{
 		$isApache = mb_stripos( $_SERVER['SERVER_SOFTWARE'], 'apache' ) !== FALSE;
-		$form->add( new YesNo( 'htaccess_mod_rewrite', Settings::i()->htaccess_mod_rewrite, TRUE, array(), NULL, NULL, NULL, 'htaccess_mod_rewrite' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'htaccess_mod_rewrite', \IPS\Settings::i()->htaccess_mod_rewrite, TRUE, array(), NULL, NULL, NULL, 'htaccess_mod_rewrite' ) );
 		if ( !$isApache )
 		{
-			Member::loggedIn()->language()->words['htaccess_mod_rewrite_desc']		= Member::loggedIn()->language()->get('htaccess_mod_rewrite_desc_na');
+			\IPS\Member::loggedIn()->language()->words['htaccess_mod_rewrite_desc']		= \IPS\Member::loggedIn()->language()->get('htaccess_mod_rewrite_desc_na');
 		}
-		if ( ( !isset( Request::i()->htaccess_mod_rewrite ) and Settings::i()->htaccess_mod_rewrite ) or Request::i()->htaccess_mod_rewrite or Request::i()->htaccess_mod_rewrite_checkbox )
+		if ( ( !isset( \IPS\Request::i()->htaccess_mod_rewrite ) and \IPS\Settings::i()->htaccess_mod_rewrite ) or \IPS\Request::i()->htaccess_mod_rewrite or \IPS\Request::i()->htaccess_mod_rewrite_checkbox )
 		{
 			try
 			{
-				$furlDefinition = Url::furlDefinition();
-				$response = Url::external( Settings::i()->base_url . $furlDefinition['login']['friendly'] )->request( NULL, NULL, FALSE )->get();
-				if ( !in_array( mb_substr( $response->httpResponseCode, 0, 1 ), array( '2', '3' ) ) and ( Settings::i()->site_online OR $response->httpResponseCode != 503 ) )
+				$furlDefinition = \IPS\Http\Url::furlDefinition();
+				$response = \IPS\Http\Url::external( \IPS\Settings::i()->base_url . $furlDefinition['login']['friendly'] )->request( NULL, NULL, FALSE )->get();
+				if ( !\in_array( mb_substr( $response->httpResponseCode, 0, 1 ), array( '2', '3' ) ) and ( \IPS\Settings::i()->site_online OR $response->httpResponseCode != 503 ) )
 				{
-					Member::loggedIn()->language()->words['htaccess_mod_rewrite_warning']	= Member::loggedIn()->language()->get( $isApache ? 'htaccess_mod_rewrite_err' : 'htaccess_mod_rewrite_err_na' );
+					\IPS\Member::loggedIn()->language()->words['htaccess_mod_rewrite_warning']	= \IPS\Member::loggedIn()->language()->get( $isApache ? 'htaccess_mod_rewrite_err' : 'htaccess_mod_rewrite_err_na' );
 				}
 			}
 			catch( \IPS\Http\Request\Exception $e )
 			{
-				Member::loggedIn()->language()->words['htaccess_mod_rewrite_warning']	= Member::loggedIn()->language()->get( $isApache ? 'htaccess_mod_rewrite_err' : 'htaccess_mod_rewrite_err_na' );
+				\IPS\Member::loggedIn()->language()->words['htaccess_mod_rewrite_warning']	= \IPS\Member::loggedIn()->language()->get( $isApache ? 'htaccess_mod_rewrite_err' : 'htaccess_mod_rewrite_err_na' );
 			}
 		}
 	}
@@ -172,48 +135,48 @@ class seo extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _manageRobotstxt() : string
+	protected function _manageRobotstxt()
 	{
-		$value = Settings::i()->robots_txt;
-		if ( ! in_array( Settings::i()->robots_txt, ['off', 'default'] ) )
+		$value = \IPS\Settings::i()->robots_txt;
+		if ( ! \in_array( \IPS\Settings::i()->robots_txt, ['off', 'default'] ) )
 		{
 			$value = 'custom';
 		}
 
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 
-		if ( isset( Request::i()->_saved ) )
+		if ( isset( \IPS\Request::i()->_saved ) )
 		{
 			/* Do we have an existing robots.txt file in the community directory? */
-			$dir = trim( str_replace( 'admin/index.php', '', $_SERVER['PHP_SELF'] ), '/' );
+			$dir = trim( str_replace( \IPS\CP_DIRECTORY . '/index.php', '', $_SERVER['PHP_SELF'] ), '/' );
 
 			/* Oh, the community is in a directory, so we need the user to download the file and manually upload it to root */
 			if ( $dir )
 			{
-				$rootUrl = trim( str_replace( $dir, '', Url::baseUrl() ), '/' );
-				if ( Settings::i()->robots_txt === 'off' )
+				$rootUrl = trim( str_replace( $dir, '', (string) \IPS\Http\Url::baseUrl() ), '/' );
+				if ( \IPS\Settings::i()->robots_txt === 'off' )
 				{
-					$form->addMessage( Member::loggedIn()->language()->addToStack( 'use_robotstxt_warning_off', FALSE, ['sprintf' => [$rootUrl]] ), 'ipsMessage ipsMessage--warning' );
+					$form->addMessage( \IPS\Member::loggedIn()->language()->addToStack( 'use_robotstxt_warning_off', FALSE, ['sprintf' => [$rootUrl]] ), 'ipsMessage ipsMessage_warning' );
 				}
 				else
 				{
-					$form->addMessage( Member::loggedIn()->language()->addToStack( 'use_robotstxt_warning_download', FALSE, ['sprintf' => [$rootUrl]] ), 'ipsMessage ipsMessage--warning' );
+					$form->addMessage( \IPS\Member::loggedIn()->language()->addToStack( 'use_robotstxt_warning_download', FALSE, ['sprintf' => [$rootUrl]] ), 'ipsMessage ipsMessage_warning' );
 				}
 			}
-			else if ( ! CIC2 AND file_exists( \IPS\ROOT_PATH . '/robots.txt' ) )
+			else if ( ! \IPS\CIC2 AND file_exists( \IPS\ROOT_PATH . '/robots.txt' ) )
 			{
-				if ( Settings::i()->robots_txt === 'off' )
+				if ( \IPS\Settings::i()->robots_txt === 'off' )
 				{
-					$form->addMessage( Member::loggedIn()->language()->addToStack( 'use_robotstxt_warning_existing_off', FALSE, ['sprintf' => [ rtrim( Url::baseUrl(), '/' ) ] ] ), 'ipsMessage ipsMessage--warning' );
+					$form->addMessage( \IPS\Member::loggedIn()->language()->addToStack( 'use_robotstxt_warning_existing_off', FALSE, ['sprintf' => [ rtrim( \IPS\Http\Url::baseUrl(), '/' ) ] ] ), 'ipsMessage ipsMessage_warning' );
 				}
 				else
 				{
-					$form->addMessage( Member::loggedIn()->language()->addToStack( 'use_robotstxt_warning_existing_download', FALSE, ['sprintf' => [ rtrim( Url::baseUrl(), '/' ) ] ] ), 'ipsMessage ipsMessage--warning' );
+					$form->addMessage( \IPS\Member::loggedIn()->language()->addToStack( 'use_robotstxt_warning_existing_download', FALSE, ['sprintf' => [ rtrim( \IPS\Http\Url::baseUrl(), '/' ) ] ] ), 'ipsMessage ipsMessage_warning' );
 				}
 			}
 		}
 
-		$form->add( new Radio( 'use_robotstxt', $value, FALSE, [
+		$form->add( new \IPS\Helpers\Form\Radio( 'use_robotstxt', $value, FALSE, [
 			'options' => [
 				'off'     => 'use_robotstxt_off',
 				'default' => 'use_robotstxt_default',
@@ -224,9 +187,9 @@ class seo extends Controller
 			]
 		], NULL, NULL, NULL, 'use_robotstxt' ) );
 
-		$form->add( new Codemirror( 'use_robotstxt_custom_editor', ( $value === 'custom' ? Settings::i()->robots_txt  : '' ), FALSE, [], NULL, NULL, NULL, 'use_robotstxt_custom_editor' ) );
+		$form->add( new \IPS\Helpers\Form\Codemirror( 'use_robotstxt_custom_editor', ( $value === 'custom' ? \IPS\Settings::i()->robots_txt  : '' ), FALSE, [], NULL, NULL, NULL, 'use_robotstxt_custom_editor' ) );
 
-		$form->add( new YesNo( 'seo_reduce_links', Settings::i()->seo_reduce_links, TRUE, [], NULL, NULL, NULL, 'seo_reduce_links' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'seo_reduce_links', \IPS\Settings::i()->seo_reduce_links, TRUE, [], NULL, NULL, NULL, 'seo_reduce_links' ) );
 
 		/* Are we saving? */
 		if ( $values = $form->values() )
@@ -240,9 +203,9 @@ class seo extends Controller
 
 			$form->saveAsSettings( [ 'robots_txt' => $value, 'seo_reduce_links' => $values['seo_reduce_links'] ] );
 			
-			Session::i()->log( 'acplog__robotstxt_edited' );
+			\IPS\Session::i()->log( 'acplog__robotstxt_edited' );
 
-			Output::i()->redirect( Url::internal( "app=core&module=promotion&controller=seo&tab=robotstxt&_saved=1" ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=promotion&controller=seo&tab=robotstxt&_saved=1" ) );
 		}
 
 		return $form;
@@ -251,20 +214,19 @@ class seo extends Controller
 	/**
 	 * Downloads the robots.txt file
 	 *
-	 * @return void
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	protected function downloadRobotstxt() : void
+	protected function downloadRobotstxt()
 	{
-		if ( Settings::i()->robots_txt != 'off' )
+		if ( \IPS\Settings::i()->robots_txt != 'off' )
 		{
-			if ( Settings::i()->robots_txt == 'default' )
+			if ( \IPS\Settings::i()->robots_txt == 'default' )
 			{
-				Output::i()->sendOutput( Front::robotsTxtRules(), 200, 'application/x-robotstxt', array( 'Content-Disposition' => 'attachment; filename=robots.txt' ) );
+				\IPS\Output::i()->sendOutput( \IPS\Dispatcher\Front::robotsTxtRules(), 200, 'application/x-robotstxt', array( 'Content-Disposition' => 'attachment; filename=robots.txt' ) );
 			}
 			else
 			{
-				Output::i()->sendOutput( Settings::i()->robots_txt, 200, 'application/x-robotstxt', array( 'Content-Disposition' => 'attachment; filename=robots.txt' ) );
+				\IPS\Output::i()->sendOutput( \IPS\Settings::i()->robots_txt, 200, 'application/x-robotstxt', array( 'Content-Disposition' => 'attachment; filename=robots.txt' ) );
 			}
 		}
 	}
@@ -274,28 +236,32 @@ class seo extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _manageUrls() : string
+	protected function _manageUrls()
 	{
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 
-		$form->add( new YesNo( 'use_friendly_urls', Settings::i()->use_friendly_urls, TRUE, array( 'togglesOn' => array( 'htaccess_mod_rewrite', 'seo_r_on' ), 'togglesOff' => array( 'use_friendly_urls_warning' ) ), NULL, NULL, NULL, 'use_friendly_urls' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'use_friendly_urls', \IPS\Settings::i()->use_friendly_urls, TRUE, array( 'togglesOn' => array( 'htaccess_mod_rewrite', 'seo_r_on' ), 'togglesOff' => array( 'use_friendly_urls_warning' ) ), NULL, NULL, NULL, 'use_friendly_urls' ) );
 		
 		static::htaccessSetting( $form );
 
-		$form->add( new YesNo( 'seo_r_on', Settings::i()->seo_r_on, TRUE, array( 'togglesOff' => array( 'seo_r_on_warning' ) ), NULL, NULL, NULL, 'seo_r_on' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'seo_r_on', \IPS\Settings::i()->seo_r_on, TRUE, array( 'togglesOff' => array( 'seo_r_on_warning' ) ), NULL, NULL, NULL, 'seo_r_on' ) );
 		
 		/* Are we saving? */
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings();
+			\IPS\Member::clearCreateMenu();
 
 			/* Clear front navigation data store, otherwise it could still contain the non-rewrite furl for some items */
-			unset( Store::i()->frontNavigation );
+			unset( \IPS\Data\Store::i()->frontNavigation );
 
-			Session::i()->log( 'acplogs__seo_furl_settings' );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			\IPS\Session::i()->log( 'acplogs__seo_furl_settings' );
 			
 			/* Clear Sidebar Caches */
-			Widget::deleteCaches();
+			\IPS\Widget::deleteCaches();
 		}
 
 		return $form;
@@ -306,13 +272,14 @@ class seo extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _manageSitemap() : string
+	protected function _manageSitemap()
 	{
 		/* Init */
-		$form = new Form;
-		if( !CIC )
+		$form = new \IPS\Helpers\Form;
+		$form->addMessage( 'sitemap_blurb', 'ipsMessage ipsMessage_info' );
+		if( !\IPS\CIC )
 		{
-			$form->add( new FormUrl( 'sitemap_url', Settings::i()->sitemap_url ?: Settings::i()->base_url . 'sitemap.php', FALSE ) );
+			$form->add( new \IPS\Helpers\Form\Url( 'sitemap_url', \IPS\Settings::i()->sitemap_url ?: \IPS\Settings::i()->base_url . 'sitemap.php', FALSE ) );
 		}
 
 		/* Get extension settings */
@@ -320,7 +287,7 @@ class seo extends Controller
 		$extraSettings = array();
 		$toggles = array();
 		$recommendedSettings = array();
-		foreach ( Application::allExtensions( 'core', 'Sitemap', FALSE, 'core' ) as $extKey => $extension )
+		foreach ( \IPS\Application::allExtensions( 'core', 'Sitemap', FALSE, 'core' ) as $extKey => $extension )
 		{
 			$toggles[] = "form_header_sitemap_{$extKey}";
 			$recommendedSettings = array_merge( $recommendedSettings, $extension->recommendedSettings );
@@ -337,7 +304,7 @@ class seo extends Controller
 		}
 				
 		/* Build form */
-		$form->add( new YesNo( 'sitemap_configuration_info', $useRecommendedSettings, FALSE, array( 'togglesOff' => $toggles ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'sitemap_configuration_info', $useRecommendedSettings, FALSE, array( 'togglesOff' => $toggles ) ) );
 		foreach ( $extraSettings as $header => $settings )
 		{
 			$form->addHeader( 'sitemap_' . $header );
@@ -350,34 +317,30 @@ class seo extends Controller
 		/* Are we saving? */
 		if ( $values = $form->values() )
 		{
-			if ( $values['sitemap_configuration_info'] )
+			if( $values[ 'sitemap_configuration_info' ] )
 			{
 				$values = array_merge( $values, $recommendedSettings );
 			}
-			if(  isset( $values[ 'sitemap_url' ] ) and !( $values[ 'sitemap_url' ] instanceof Url ) )
-			{
-				throw new RuntimeException;
-			}
-
-			if( !CIC )
+			if( !\IPS\CIC )
 			{
 				try
 				{
+					if( !( $values[ 'sitemap_url' ] instanceof \IPS\Http\Url ) )
+					{
+						throw new \RuntimeException;
+					}
 					$response = $values[ 'sitemap_url' ]->setQueryString( 'testsettings', 1 )->request()->get();
 
 					if( $response->httpResponseCode != 200 or !mb_strpos( $values[ 'sitemap_url' ], 'sitemap.php' ) )
 					{
-						$form->error = Member::loggedIn()->language()->addToStack( 'invalid_sitemap_url' );
+						$form->error = \IPS\Member::loggedIn()->language()->addToStack( 'invalid_sitemap_url' );
 					}
-
 				}
-				catch( RuntimeException $e )
+				catch( \RuntimeException $e )
 				{
-					$form->error = Member::loggedIn()->language()->addToStack( 'invalid_sitemap_url' );
+					$form->error = \IPS\Member::loggedIn()->language()->addToStack( 'form_url_bad' );
 				}
 			}
-
-
 			if( !$form->error )
 			{
 				if( isset( $values[ 'sitemap_url' ] ) )
@@ -385,21 +348,26 @@ class seo extends Controller
 					$values['sitemap_url'] = (string) $values['sitemap_url'];
 				}
 
-				foreach( Application::allExtensions( 'core', 'Sitemap', FALSE, 'core' ) as $extKey => $extension )
-				{
-					$extension->saveSettings( $values );
-				}
 
-				if( !CIC )
+				foreach( \IPS\Application::allExtensions( 'core', 'Sitemap', FALSE, 'core' ) as $extKey => $extension )
+				{
+					if( method_exists( $extension, 'saveSettings' ) )
+					{
+						$extension->saveSettings( $values );
+					}
+				}
+				if( !\IPS\CIC )
 				{
 					$form->saveAsSettings( ['sitemap_url' => $values[ 'sitemap_url' ]] );
 				}
+				/* Clear guest page caches */
+				\IPS\Data\Cache::i()->clearAll();
 
-				Session::i()->log( 'acplogs__seo_sitemap_settings' );
+				\IPS\Session::i()->log( 'acplogs__seo_sitemap_settings' );
 			}
 		}
 
-		return Theme::i()->getTemplate( 'forms' )->blurb( 'sitemap_blurb', true, true ) . $form;
+		return $form;
 	}
 
 	/**
@@ -407,59 +375,59 @@ class seo extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _manageMetatags() : string
+	protected function _manageMetatags()
 	{
 		/* Are we deleting? */
-		if ( isset( Request::i()->delete ) )
+		if ( isset( \IPS\Request::i()->delete ) )
 		{
 			/* Make sure the user confirmed the deletion */
-			Request::i()->confirmedDelete();
+			\IPS\Request::i()->confirmedDelete();
 
-			if( isset( Request::i()->root ) )
+			if( isset( \IPS\Request::i()->root ) )
 			{
-				$meta	= Db::i()->select( '*', 'core_seo_meta', array( 'meta_id=?', (int) Request::i()->root ) )->first();
-				$tags	= array_diff_key( json_decode( $meta['meta_tags'], TRUE ), array( Request::i()->delete => 1 ) );
+				$meta	= \IPS\Db::i()->select( '*', 'core_seo_meta', array( 'meta_id=?', (int) \IPS\Request::i()->root ) )->first();
+				$tags	= array_diff_key( json_decode( $meta['meta_tags'], TRUE ), array( \IPS\Request::i()->delete => 1 ) );
 
-				Db::i()->update( 'core_seo_meta', array( 'meta_tags' => json_encode( $tags ) ), array( 'meta_id=?', (int) Request::i()->root ) );
+				\IPS\Db::i()->update( 'core_seo_meta', array( 'meta_tags' => json_encode( $tags ) ), array( 'meta_id=?', (int) \IPS\Request::i()->root ) );
 			}
 			else
 			{
-				Db::i()->delete( 'core_seo_meta', array( "meta_id=?", (int) Request::i()->delete ) );
+				\IPS\Db::i()->delete( 'core_seo_meta', array( "meta_id=?", (int) \IPS\Request::i()->delete ) );
 			}
 
-			unset( Store::i()->metaTags );
+			unset( \IPS\Data\Store::i()->metaTags );
 
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				return '';
+				return;
 			}
 		}
 
 		/* Show tree */
-		$url	= Url::internal( "app=core&module=promotion&controller=seo&tab=metatags" );
-		$output	= new Tree(
+		$url	= \IPS\Http\Url::internal( "app=core&module=promotion&controller=seo&tab=metatags" );
+		$output	= new \IPS\Helpers\Tree\Tree(
 			$url,
-			Member::loggedIn()->language()->addToStack('seo_tab_metatags'),
+			\IPS\Member::loggedIn()->language()->addToStack('seo_tab_metatags'),
 			/* Get Roots */
 			function() use ( $url )
 			{
 				$rows = array();
 
-				foreach ( Db::i()->select( '*', 'core_seo_meta' ) as $row )
+				foreach ( \IPS\Db::i()->select( '*', 'core_seo_meta' ) as $row )
 				{
-					$urlToDisplay = Theme::i()->getTemplate( 'promotion' )->metaTagUrl( trim( $row['meta_url'], '/' ) );
+					$urlToDisplay = \IPS\Theme::i()->getTemplate( 'promotion' )->metaTagUrl( trim( $row['meta_url'], '/' ) );
 
-					$rows[ $row['meta_url'] ] = Theme::i()->getTemplate( 'trees' )->row( $url, $row['meta_id'], $urlToDisplay, TRUE, array(
+					$rows[ $row['meta_url'] ] = \IPS\Theme::i()->getTemplate( 'trees' )->row( $url, $row['meta_id'], $urlToDisplay, TRUE, array(
 						'edit'	=> array(
 							'icon'		=> 'pencil',
 							'title'		=> 'seo_meta_manage',
-							'link'		=> Url::internal( "app=core&module=promotion&controller=seo&do=addMeta&id=" . $row['meta_id'] ),
+							'link'		=> \IPS\Http\Url::internal( "app=core&module=promotion&controller=seo&do=addMeta&id=" . $row['meta_id'] ),
 							'hotkey'	=> 'e'
 						),
 						'delete'	=> array(
 							'icon'		=> 'times-circle',
 							'title'		=> 'delete',
-							'link'		=> Url::internal( "app=core&module=promotion&controller=seo&tab=metatags&delete=" . $row['meta_id'] ),
+							'link'		=> \IPS\Http\Url::internal( "app=core&module=promotion&controller=seo&tab=metatags&delete=" . $row['meta_id'] ),
 							'data'		=> array( 'delete' => '' )
 						)
 					), "", NULL, NULL, FALSE, NULL, NULL, NULL, TRUE );
@@ -470,19 +438,19 @@ class seo extends Controller
 			/* Get Row */
 			function( $key, $root=FALSE ) use ( $url )
 			{
-				$meta	= Db::i()->select( '*', 'core_seo_meta', array( 'meta_id=?', $key ) )->first();
+				$meta	= \IPS\Db::i()->select( '*', 'core_seo_meta', array( 'meta_id=?', $key ) )->first();
 
-				return Theme::i()->getTemplate( 'trees' )->row( $url, $key, $meta['meta_url'], TRUE, array(
+				return \IPS\Theme::i()->getTemplate( 'trees' )->row( $url, $key, $meta['meta_url'], TRUE, array(
 					'edit'	=> array(
 						'icon'		=> 'pencil',
 						'title'		=> 'seo_meta_manage',
-						'link'		=> Url::internal( "app=core&module=promotion&controller=seo&do=addMeta&id=" . $key ),
+						'link'		=> \IPS\Http\Url::internal( "app=core&module=promotion&controller=seo&do=addMeta&id=" . $key ),
 						'hotkey'	=> 'e'
 					),
 					'delete'	=> array(
 						'icon'		=> 'times-circle',
 						'title'		=> 'delete',
-						'link'		=> Url::internal( "app=core&module=promotion&controller=seo&tab=metatags&delete=" . $key ),
+						'link'		=> \IPS\Http\Url::internal( "app=core&module=promotion&controller=seo&tab=metatags&delete=" . $key ),
 						'data'		=> array( 'delete' => '' )
 					)
 				), '', NULL, NULL, $root );
@@ -495,22 +463,22 @@ class seo extends Controller
 			/* Get Children */
 			function( $key ) use ( $url )
 			{
-				$meta	= Db::i()->select( '*', 'core_seo_meta', array( 'meta_id=?', $key ) )->first();
+				$meta	= \IPS\Db::i()->select( '*', 'core_seo_meta', array( 'meta_id=?', $key ) )->first();
 				$tags	= json_decode( $meta['meta_tags'], TRUE );
 				$rows	= array();
 
-				if( is_array( $tags ) )
+				if( \is_array( $tags ) )
 				{
 					foreach ( $tags as $name => $content )
 					{
-						$rows[] = Theme::i()->getTemplate( 'trees' )->row( $url, $meta['meta_id'] . '-' . $name, $name, FALSE, array(
+						$rows[] = \IPS\Theme::i()->getTemplate( 'trees' )->row( $url, $meta['meta_id'] . '-' . $name, $name, FALSE, array(
 							'delete'	=> array(
 								'icon'		=> 'times-circle',
 								'title'		=> 'delete',
-								'link'		=> Url::internal( $url . "&root={$key}&delete={$name}" ),
+								'link'		=> \IPS\Http\Url::internal( $url . "&root={$key}&delete={$name}" ),
 								'data'		=> array( 'delete' => '' )
 							)
-						), $content ?? Member::loggedIn()->language()->addToStack('meta_tag_acp_deleted') );
+						), $content ?? \IPS\Member::loggedIn()->language()->addToStack('meta_tag_acp_deleted') );
 					}
 				}
 
@@ -523,12 +491,12 @@ class seo extends Controller
 					'add'		=> array(
 						'icon'		=> 'plus',
 						'title'		=> 'seo_meta_add',
-						'link'		=> Url::internal( "app=core&module=promotion&controller=seo&do=addMeta" ),
+						'link'		=> \IPS\Http\Url::internal( "app=core&module=promotion&controller=seo&do=addMeta" ),
 					),
 					'launch'	=> array(
 						'icon'		=> 'magic',
 						'title'		=> 'metatag_live_editor',
-						'link'		=> Url::internal( "app=core&module=system&controller=metatags", "front" ),
+						'link'		=> \IPS\Http\Url::internal( "app=core&module=system&controller=metatags", "front" ),
 						'target'	=> '_blank'
 					),
 				);
@@ -539,9 +507,9 @@ class seo extends Controller
 		);
 
         /* Output or return */
-        if ( ! Request::i()->isAjax() )
+        if ( ! \IPS\Request::i()->isAjax() )
         {
-	        $output	= Theme::i()->getTemplate( 'forms' )->blurb( "what_is_a_metatag", TRUE, TRUE ) . $output;
+	        $output	= \IPS\Theme::i()->getTemplate( 'forms' )->blurb( "what_is_a_metatag", TRUE, TRUE ) . $output;
 	    }
 
 		return $output;
@@ -552,36 +520,36 @@ class seo extends Controller
 	 *
 	 * @return void
 	 */
-	public function addMeta() : void
+	public function addMeta()
 	{
 		$url	= NULL;
 		$tags	= array();
 		$title	= NULL;
 
 		/* If we have a URL, load up the existing tags for it as we are "editing" */
-		if( isset( Request::i()->id ) )
+		if( isset( \IPS\Request::i()->id ) )
 		{
-			$meta	= Db::i()->select( '*', 'core_seo_meta', array( 'meta_id=?', (int) Request::i()->id ) )->first();
+			$meta	= \IPS\Db::i()->select( '*', 'core_seo_meta', array( 'meta_id=?', (int) \IPS\Request::i()->id ) )->first();
 			$tags	= json_decode( $meta['meta_tags'], TRUE );
 			$url	= $meta['meta_url'];
 			$title	= $meta['meta_title'];
 		}
 
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--add-meta i-padding_3';
-		$form->add( new Text( 'metatag_url', $url, FALSE, array( 'placeholder' => 'profile/*' ), NULL, Settings::i()->base_url ) );
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical ipsPad';
+		$form->add( new \IPS\Helpers\Form\Text( 'metatag_url', $url, FALSE, array( 'placeholder' => 'profile/*' ), NULL, \IPS\Settings::i()->base_url ) );
 		$form->hiddenValues['original_url']	= $url;
 
-		$form->add( new Text( 'metatag_title', $title, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'metatag_title', $title, FALSE ) );
 
 		/* Now add the rows */
-		$matrix = new Matrix();
+		$matrix = new \IPS\Helpers\Form\Matrix();
 		$matrix->manageable = TRUE;
 		$matrix->langPrefix = 'metatags_';
 		$matrix->columns = array(
 			'name'		=> function( $key, $value, $data )
 			{
-				return new Select( $key,
+				return new \IPS\Helpers\Form\Select( $key,
 					$data ? $data['name'] : '',
 					TRUE,
 					array( 'options' => array( 'keywords' => 'meta_keywords', 'description' => 'meta_description', 'robots' => 'meta_robots', 'other' => 'meta_other' ), 'toggles' => array( 'other' => array( 'other_' . preg_replace( "/[^a-zA-Z0-9\-_]/", "_", $key ) ) ), 'userSuppliedInput' => 'other' ),
@@ -593,12 +561,12 @@ class seo extends Controller
 			},
 			'content'	=> function( $key, $value, $data )
 			{
-				return new TextArea( $key, $data ? $data['content'] : '', FALSE, array( 'nullLang' => 'meta_tag_null_acp_form' ) );
+				return new \IPS\Helpers\Form\TextArea( $key, $data ? $data['content'] : '', FALSE, array( 'nullLang' => 'meta_tag_null_acp_form' ) );
 			},
 		);
 		
 		/* Add rows */
-		if( count( $tags ) )
+		if( \count( $tags ) )
 		{
 			foreach( $tags as $tagName => $tagValue )
 			{
@@ -625,24 +593,27 @@ class seo extends Controller
 				$tags[ $data['name'] ]	= $data['content'];
 			}
 
-			Db::i()->delete( 'core_seo_meta', array( 'meta_url=?', $url ) );
-			Db::i()->delete( 'core_seo_meta', array( 'meta_url=?', Request::i()->original_url ) );
+			\IPS\Db::i()->delete( 'core_seo_meta', array( 'meta_url=?', $url ) );
+			\IPS\Db::i()->delete( 'core_seo_meta', array( 'meta_url=?', \IPS\Request::i()->original_url ) );
 
-			if( $title or count( $tags ) )
+			if( $title or \count( $tags ) )
 			{
-				Db::i()->insert( 'core_seo_meta', array( 'meta_url' => $url, 'meta_title' => $title, 'meta_tags' => json_encode( $tags ) ) );
+				\IPS\Db::i()->insert( 'core_seo_meta', array( 'meta_url' => $url, 'meta_title' => $title, 'meta_tags' => json_encode( $tags ) ) );
 			}
 
-			Session::i()->log( 'acplogs__seo_metatag_settings' );
+			\IPS\Session::i()->log( 'acplogs__seo_metatag_settings' );
 			
-			unset( Store::i()->metaTags );
+			unset( \IPS\Data\Store::i()->metaTags );
 
-			Output::i()->redirect( Url::internal( "app=core&module=promotion&controller=seo&tab=metatags" ) );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=promotion&controller=seo&tab=metatags" ) );
 		}
 
-		Output::i()->cssFiles	= array_merge( Output::i()->cssFiles, Theme::i()->css( 'promotion/meta.css', 'core', 'admin' ) );
-		Output::i()->title  = Member::loggedIn()->language()->addToStack('seo_meta_add');
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'seo_meta_add', $form );
+		\IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'promotion/meta.css', 'core', 'admin' ) );
+		\IPS\Output::i()->title  = \IPS\Member::loggedIn()->language()->addToStack('seo_meta_add');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'seo_meta_add', $form );
 	}
 	
 	/**
@@ -650,12 +621,12 @@ class seo extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function htaccess() : void
+	protected function htaccess()
 	{
-		$dir = str_replace( 'admin/index.php', '', $_SERVER['PHP_SELF'] );
+		$dir = str_replace( \IPS\CP_DIRECTORY . '/index.php', '', $_SERVER['PHP_SELF'] );
 		$path = $dir . 'index.php';
 
-		if( strpos( $dir, ' ' ) !== FALSE )
+		if( \strpos( $dir, ' ' ) !== FALSE )
 		{
 			$dir = '"' . $dir . '"';
 			$path = '"' . $path . '"';
@@ -675,26 +646,26 @@ RewriteRule . {$path} [L]
 </IfModule>
 FILE;
 
-		Output::i()->sendOutput( $htaccess, 200, 'application/x-htaccess', array( 'Content-Disposition' => 'attachment; filename=.htaccess' ) );
+		\IPS\Output::i()->sendOutput( $htaccess, 200, 'application/x-htaccess', array( 'Content-Disposition' => 'attachment; filename=.htaccess' ) );
 	}
 
 	/**
 	 * Trigger the sitemap rebuild
 	 */
-	protected function rebuildSitemap() : void
+	protected function rebuildSitemap()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		/* truncate sitemap */
-		Db::i()->delete( 'core_sitemap' );
+		\IPS\Db::i()->delete( 'core_sitemap' );
 
-		$extensions	= Application::allExtensions( 'core', 'Sitemap', new Member, 'core' );
+		$extensions	= \IPS\Application::allExtensions( 'core', 'Sitemap', new \IPS\Member, 'core' );
 		foreach ( $extensions as  $k => $extension )
 		{
-			Task::queue( 'core', 'RebuildSitemap', array( 'extensionKey' => $k ), 5 );
+			\IPS\Task::queue( 'core', 'RebuildSitemap', array( 'extensionKey' => $k ), 5 );
 		}
 
-		Output::i()->redirect( Url::internal( "app=core&module=promotion&controller=seo" ), 'rebuild_sitemap_initialized' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=promotion&controller=seo" ), 'rebuild_sitemap_initialized' );
 	}
 
 }

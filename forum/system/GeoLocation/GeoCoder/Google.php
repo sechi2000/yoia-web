@@ -11,53 +11,40 @@
 namespace IPS\GeoLocation\GeoCoder;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadFunctionCallException;
-use BadMethodCallException;
-use IPS\GeoLocation;
-use IPS\GeoLocation\GeoCoder;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Settings;
-use RuntimeException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Google GeoCoder class
  */
-class Google extends GeoCoder
+class _Google extends \IPS\GeoLocation\GeoCoder
 {
 	/**
 	 * Get by location string
 	 *
 	 * @param string $location
-	 * @return GeoLocation
-	 * @throws BadFunctionCallException
+	 * @return \IPS\GeoLocation
+	 * @throws \BadFunctionCallException
 	 */
-	public static function decodeLocation( string $location ): GeoLocation
+	public static function decodeLocation( string $location )
 	{
-		if ( Settings::i()->googlemaps AND Settings::i()->google_maps_api_key )
+		if ( \IPS\Settings::i()->googlemaps AND \IPS\Settings::i()->google_maps_api_key )
 		{
-			$data = Url::external( "https://maps.googleapis.com/maps/api/geocode/json" )->setQueryString( array(
+			$data = \IPS\Http\Url::external( "https://maps.googleapis.com/maps/api/geocode/json" )->setQueryString( array(
 				'address' => $location,
 				'sensor'	=> 'false',
-				'key'		=> Settings::i()->google_maps_api_key_secret ?: Settings::i()->google_maps_api_key
+				'key'		=> \IPS\Settings::i()->google_maps_api_key_secret ?: \IPS\Settings::i()->google_maps_api_key
 			) )->request()->get()->decodeJson();
 
-			$obj = new GeoLocation;
+			$obj = new \IPS\GeoLocation;
 
 			$_address	= '';
 
 			/* Make sure the response from Google is valid */
-			if( isset( $data['results'] ) AND is_array( $data['results'] ) AND count( $data['results'] ) )
+			if( isset( $data['results'] ) AND \is_array( $data['results'] ) AND \count( $data['results'] ) )
 			{
 				if( isset( $data['results'][0]['geometry'] ) AND $data['results'][0]['geometry']['location'] )
 				{
@@ -96,11 +83,6 @@ class Google extends GeoCoder
 						$obj->region	= $component['long_name'];
 					}
 
-					if( $component['types'][0] == 'administrative_area_level_2' )
-					{
-						$obj->county = $component['long_name'];
-					}
-
 					if( $component['types'][0] == 'locality' )
 					{
 						$obj->city	= $component['long_name'];
@@ -117,37 +99,37 @@ class Google extends GeoCoder
 		}
 		else
 		{
-			throw new BadFunctionCallException;
+			throw new \BadFunctionCallException;
 		}
 	}
 
 	/**
 	 * Get by latitude and longitude
 	 *
-	 * @param float $lat	Latitude
-	 * @param float $long	Longitude
-	 * @return	GeoLocation
-	 * @throws	BadFunctionCallException
-	 * @throws	Exception
+	 * @param	float	$lat	Latitude
+	 * @param	float	$long	Longitude
+	 * @return	\IPS\GeoLocation
+	 * @throws	\BadFunctionCallException
+	 * @throws	\IPS\Http\Request\Exception
 	 */
-	public static function decodeLatLong( float $lat, float $long ): GeoLocation
+	public static function decodeLatLong( $lat, $long )
 	{
-		if ( Settings::i()->googlemaps AND Settings::i()->google_maps_api_key )
+		if ( \IPS\Settings::i()->googlemaps AND \IPS\Settings::i()->google_maps_api_key )
 		{
-			$data = Url::external( "https://maps.googleapis.com/maps/api/geocode/json" )->setQueryString( array(
+			$data = \IPS\Http\Url::external( "https://maps.googleapis.com/maps/api/geocode/json" )->setQueryString( array(
 				'latlng'	=> "{$lat},{$long}",
 				'sensor'	=> 'false',
-				'key'		=> Settings::i()->google_maps_api_key_secret ?: Settings::i()->google_maps_api_key
+				'key'		=> \IPS\Settings::i()->google_maps_api_key_secret ?: \IPS\Settings::i()->google_maps_api_key
 			) )->request()->get()->decodeJson();
 			
-			$obj = new GeoLocation;
+			$obj = new \IPS\GeoLocation;
 			$obj->lat			= $lat;
 			$obj->long			= $long;
 
 			$_address	= '';
 
 			/* Make sure the response from Google is valid */
-			if( isset( $data['results'] ) AND is_array( $data['results'] ) AND count( $data['results'] ) )
+			if( isset( $data['results'] ) AND \is_array( $data['results'] ) AND \count( $data['results'] ) )
 			{
 				foreach( $data['results'][0]['address_components'] as $component )
 				{
@@ -175,11 +157,6 @@ class Google extends GeoCoder
 						$obj->region	= $component['long_name'];
 					}
 
-					if( $component['types'][0] == 'administrative_area_level_2' )
-					{
-						$obj->county = $component['long_name'];
-					}
-
 					if( $component['types'][0] == 'locality' )
 					{
 						$obj->city	= $component['long_name'];
@@ -196,36 +173,36 @@ class Google extends GeoCoder
 		}
 		else
 		{
-			throw new BadFunctionCallException;
+			throw new \BadFunctionCallException;
 		}
 	}
 
 	/**
 	 * Get the latitude and longitude for the current object. Address must be set.
 	 *
-	 * @param	GeoLocation	$geoLocation	Geolocation object
-	 * @param bool $setAddress		Whether or not to update the address information from the GeoCoder service
+	 * @param	\IPS\GeoLocation	$geoLocation	Geolocation object
+	 * @param	bool				$setAddress		Whether or not to update the address information from the GeoCoder service
 	 * @return	void
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function setLatLong(GeoLocation &$geoLocation, bool $setAddress=FALSE ) : void
+	public function setLatLong( \IPS\GeoLocation &$geoLocation, $setAddress = FALSE )
 	{
-		if ( Settings::i()->googlemaps AND Settings::i()->google_maps_api_key AND $geoLocation->toString() )
+		if ( \IPS\Settings::i()->googlemaps AND \IPS\Settings::i()->google_maps_api_key AND $geoLocation->toString() )
 		{
 			try
 			{
-				$data = Url::external( "https://maps.googleapis.com/maps/api/geocode/json" )->setQueryString( array(
+				$data = \IPS\Http\Url::external( "https://maps.googleapis.com/maps/api/geocode/json" )->setQueryString( array(
 					'address'	=> $geoLocation->toString(),
 					'sensor'	=> 'false',
-					'key'		=> Settings::i()->google_maps_api_key_secret ?: Settings::i()->google_maps_api_key
+					'key'		=> \IPS\Settings::i()->google_maps_api_key_secret ?: \IPS\Settings::i()->google_maps_api_key
 				) )->request()->get()->decodeJson();
 			}
-			catch( RuntimeException $e )
+			catch( \RuntimeException $e )
 			{
 				return;
 			}
 			
-			if ( !count( $data['results'] ) )
+			if ( !\count( $data['results'] ) )
 			{
 				return;
 			}
@@ -280,7 +257,7 @@ class Google extends GeoCoder
 		}
 		else
 		{
-			throw new BadFunctionCallException;
+			throw new \BadFunctionCallException;
 		}
 	}
 }

@@ -5,9 +5,6 @@ Invision Power Services, Inc. is grateful to the following projects, whose work
 has been used throughout Invision Community to add style, flair and functionality
 to our product.
 
-NULLING
-	Author: https://nullforums.net
-
 AES implementation in PHP
 	Description: Used by \IPS\Text\Encrypt to provide two-way text encryption for storing certain data.
 	Location: system/3rd_party/AES
@@ -18,9 +15,9 @@ AES implementation in PHP
 BaconQrCode
     Description: Used to generate QR Codes for Authenticator MFA.
     Location: system/3rd_party/BaconQrCode
-    Included version: 3.0.0
+    Included version: 2.0.7
     Website: https://github.com/Bacon/BaconQrCode
-    License: https://github.com/Bacon/BaconQrCode/blob/3.0.0/LICENSE - BSD 2-Clause
+    License: https://github.com/Bacon/BaconQrCode/blob/2.0.8/LICENSE - BSD 2-Clause
 
 Brick/math
 	Description: Arbitrary-precision arithmetic library
@@ -37,21 +34,28 @@ Browser Icons
 
 Clipboard
 	Description: Cross browser copy to clipboard functionality
-	Location: applications/core/interface/static/clipboard
+	Location: applications/core/interface/clipboard
 	Included version: 2.0.6
 	Website: clipboardjs.com
 	License: https://zenorocha.mit-license.org
 
+CKEditor
+	Description: Provides the editor functionality for submitting content.
+	Location: In development: applications/core/dev/ckeditor (built into applications/core/interface/ckeditor)
+	Included version: 4.21.0
+	Website: http://ckeditor.com
+	License: https://www.mozilla.org/en-US/MPL/1.1/
+
 Codemirror (with C-like, CSS, HTMLMixed, JavaScript, PHP, SQL and XML modes and merge, search, and searchcursor addons)
 	Description: Provides code editor for adding code to content, editing templates in the AdminCP, etc.
 	Location: In development: applications/core/dev/codemirror
-	Included version: 5.68.18
+	Included version: 5.49.2
 	Website: http://codemirror.net
 	License: http://codemirror.net/LICENSE
 
 Cropper
 	Description: Provides cropping functionality for profile photos
-	Location: applications/core/interface/static/cropper
+	Location: applications/core/interface/cropper
 	Included version: 1.5.9
 	Website: https://github.com/fengyuanchen/cropperjs
 	License: http://opensource.org/licenses/MIT
@@ -62,6 +66,13 @@ Devices Icon Pack
 	Website: https://www.iconfinder.com/iconsets/devices-42
 	License: Free for commercial use
 
+dotdotdot
+	Description: Javascript library for truncating long strings
+	Location: library/jquery/jquery.dotdotdot.min.js
+	Included version: 1.8.3
+	Website: https://dotdotdot.frebsite.nl/
+	License: Commercial license
+
 Enum
     Description: Dependency for BaconQrCode
     Location: system/3rd_party/DASPRiD
@@ -71,10 +82,10 @@ Enum
 
 FontAwesome
 	Description: General icons for UI
-	Location: applications/core/interface/static/fontawesome
-	Included version: 6.7.1
-	Website: https://fontawesome.com
-	License: https://fontawesome.com/license/free
+	Location: Font files in applications/core/interface/font and CSS in development in applications/core/dev/css/global/framework/fonts.css (mixed with other CSS and modified to use correct path to font files)
+	Included version: 4.7.0
+	Website: http://fortawesome.github.com/Font-Awesome
+	License: http://fortawesome.github.com/Font-Awesome/#license
 
 Google Charts
 	Description: Generates charts for statistics in the AdminCP
@@ -90,16 +101,10 @@ google-code-prettify
 
 google-diff-mode-patch
 	Description: Provides diff comparisons for CodeMirror
-	Location: applications/core/interface/static/codemirror/diff_match_patch.js
+	Location: applications/core/interface/codemirror/diff_match_patch.js
 	Included version: 19 November 2012
 	Website: https://code.google.com/p/google-diff-match-patch/
 	License: http://www.apache.org/licenses/LICENSE-2.0
-
-Google fonts
-	Description: Provides numerous font familes for the theme
-	Location: applications/core/interface/fonts
-	Website: https://fonts.google.com/
-	License: SIL Open Font License: Free for commercial use
 
 graphql-php
 	Description: PHP implementation of the GraphQL standard
@@ -135,18 +140,26 @@ IcoMoon
 	Website: https://icomoon.io/
 	License: http://creativecommons.org/licenses/by/4.0/
 
-IPLib
-	Description: IPv4 and IPv6 management library
-	Location: system/3rd_party/IPLib
-	Website: https://github.com/mlocati/ip-lib
-	License: http://opensource.org/licenses/MIT
-
 jQuery
 	Description: JavaScript Library
 	Location: In development: dev/js/library/jquery/jquery.js
-	Included version: 3.7.1
+	Included version: 3.7.0
 	Website: http://jquery.com
 	License: http://jquery.org/license
+
+jQuery dotdotdot
+	Description: On-the-fly truncating of text in elements
+	Location: dev/js/library/jquery/jquery.dotdotdot.min.js
+	Included version: 1.8.3
+	Website: http://dotdotdot.frebsite.nl
+	License: http://opensource.org/licenses/MIT
+
+jquery.hoverintent.js
+	Description: Hover library for jQuery used for main navigation
+	Location: dev/js/library/jquery/jquery.hoverintent.js
+	Included version: 1.8.1
+	Website: http://cherne.net/brian/resources/jquery.hoverIntent.html
+	License: http://opensource.org/licenses/MIT
 
 jQuery imagesLoaded plugin
 	Description: Plugin that can defer script execution until specified images have loaded
@@ -181,6 +194,13 @@ jQuery.rangyinputs.js
 	Location: applications/core/interface/jquery/jquery.rangyinputs.js
 	Included version: 1.2.0
 	Website: https://github.com/timdown/rangyinputs
+	License: http://opensource.org/licenses/MIT
+
+jQuery.transform.js
+	Description: adds support for CSS transforms to jQuery's animate(), used in ips.ui.dialog.js
+	Location: dev/js/library/jquery/jquery.transform.js
+	Included version: 1.0
+	Website: https://github.com/louisremi/jquery.transform.js
 	License: http://opensource.org/licenses/MIT
 
 jQuery UI
@@ -273,12 +293,6 @@ PHP Diff Implementation
 	Website: http://code.stephenmorley.org/php/diff-implementation/
 	License: http://creativecommons.org/publicdomain/zero/1.0/legalcode
 
-PHP Domain Parser
-	Description: Parses domain names with more accuracy than PHP (uses ICAAN lids)
-	Location: system/3rd_party/Pdp
-	Website: https://github.com/jeremykendall/php-domain-parser
-	License: http://opensource.org/licenses/mit-license.php
-
 php-punycode
 	Description: A library for Bootstring encoding of Unicode for Internationalized Domain Names in Applications (IDNA)
 	Location: system/3rd_party/php-punycode
@@ -321,9 +335,16 @@ Spectrum
 
 success.mp3 Notification Sound by RCP Tones
 	Description: "Success" sound used in ips.ui.uploader.js
-	Location: /applications/core/interface/static/sounds/success.mp3
+	Location: /applications/core/interface/sounds/success.mp3
 	Website: http://rcptones.com/dev_tones/
 	License: http://creativecommons.org/licenses/by/3.0/us/
+
+Twemoji
+	Description: Emoji images
+	Location: Served from CDN
+	Included version: 14.0.2
+	Website: http://twitter.github.io/twemoji/
+	License: https://github.com/twitter/twemoji/blob/gh-pages/LICENSE
 
 Underscore.js
 	Description: General-purpose functional JS library
@@ -358,4 +379,11 @@ XRegExp (with addons)
 	Location: In development: dev/js/library/xregexp/xregexp-all.js
 	Included Version: 3.2.0
 	Website: http://xregexp.com
+	License: http://mit-license.org
+
+Hammer.js
+	Description: Provides touch and gesture javascript event support
+	Location: dev/js/library/hammer
+	Included Version: 2.0.8
+	Website: http://hammerjs.github.io
 	License: http://mit-license.org

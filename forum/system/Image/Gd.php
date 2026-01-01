@@ -11,26 +11,16 @@
 namespace IPS\Image;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Image;
-use IPS\IPS;
-use IPS\Settings;
-use function defined;
-use function function_exists;
-use function intval;
-use function is_resource;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Image Class - GD
  */
-class Gd extends Image
+class _Gd extends \IPS\Image
 {	
 	/**
 	 * @brief	Image Resource
@@ -40,12 +30,12 @@ class Gd extends Image
 	/**
 	 * Constructor
 	 *
-	 * @param string|null $contents	Contents
-	 * @param bool $noImage	We are creating a new instance of the object internally and are not passing an image string
+	 * @param	string|NULL	$contents	Contents
+	 * @param	bool		$noImage	We are creating a new instance of the object internally and are not passing an image string
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( ?string $contents, bool $noImage=FALSE )
+	public function __construct( $contents, $noImage=FALSE )
 	{
 		/* If we are just creating an instance of the object without passing image contents as a string, return now */
 		if( $noImage === TRUE )
@@ -57,12 +47,12 @@ class Gd extends Image
 		$this->image = @imagecreatefromstring( $contents );
 		if ( $this->image === FALSE )
 		{
-			if ( $error = IPS::$lastError )
+			if ( $error = \IPS\IPS::$lastError )
 			{
-				throw new InvalidArgumentException( $error->getMessage(), $error->getCode() );
+				throw new \InvalidArgumentException( $error->getMessage(), $error->getCode() );
 			}
 
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 
 		/* Set width/height */
@@ -76,14 +66,14 @@ class Gd extends Image
 	/**
 	 * Create a new blank canvas image
 	 *
-	 * @param int $width	Width
-	 * @param int $height	Height
-	 * @param array $rgb	Color to use for bg
-	 * @return	Image
+	 * @param	int		$width	Width
+	 * @param	int		$height	Height
+	 * @param	array 	$rgb	Color to use for bg
+	 * @return	\IPS\Image
 	 */
-	public static function newImageCanvas( int $width, int $height, array $rgb ): Image
+	public static function newImageCanvas( $width, $height, $rgb )
 	{
-		$obj = new static(NULL, TRUE);
+		$obj = new static( NULL, TRUE );
 		$obj->type		= 'png';
 		$obj->width		= $width;
 		$obj->height	= $height;
@@ -97,19 +87,19 @@ class Gd extends Image
 	/**
 	 * Write text on our image
 	 *
-	 * @param string $text			Text
-	 * @param string $font			Path to font to use
-	 * @param int $size			Size of text
+	 * @param	string	$text			Text
+	 * @param	string	$font			Path to font to use
+	 * @param	int		$size			Size of text
 	 * @return	void
 	 * @note	Some latin characters have inherent left padding, so when we want to center a letter visually we need to account for this
 	 */
-	public function write( string $text, string $font, int $size ) : void
+	public function write( $text, $font, $size)
 	{
 		$fontColor = imagecolorallocate( $this->image, 255, 255, 255 );
 
 		$box = imagettfbbox( $size, 0, $font, $text );
-		$x   = intval( ( imagesx( $this->image ) - abs( max( $box[2], $box[4] ) ) ) / 2 ) - ( ( $box[0] > 0 ) ? ( $box[0] / 2.5 ) : 0 );
-		$y	 = intval( ( imagesy( $this->image ) + ( abs( $box[5] ) - abs( $box[1] ) ) ) / 2 );
+		$x   = \intval( ( imagesx( $this->image ) - abs( max( $box[2], $box[4] ) ) ) / 2 ) - ( ( $box[0] > 0 ) ? ( $box[0] / 2.5 ) : 0 );
+		$y	 = \intval( ( imagesy( $this->image ) + ( abs( $box[5] ) - abs( $box[1] ) ) ) / 2 );
 
 		imagettftext( $this->image, $size, 0, $x, $y, $fontColor, $font, $text );
 	}
@@ -121,7 +111,7 @@ class Gd extends Image
 	 */
 	public function __destruct()
 	{
-		if( is_resource( $this->image ) )
+		if( \is_resource( $this->image ) )
 		{
 			imagedestroy( $this->image );
 		}
@@ -148,27 +138,22 @@ class Gd extends Image
 			break;
 			
 			case 'jpeg':
-				$quality	= Settings::i()->image_jpg_quality ?: 85;
+				$quality	= \IPS\Settings::i()->image_jpg_quality ?: 85;
 
 				imagejpeg( $this->image, NULL, $quality );
 			break;
 			
 			case 'png':
-				$quality	= Settings::i()->image_png_quality_gd ?: NULL;
+				$quality	= \IPS\Settings::i()->image_png_quality_gd ?: NULL;
 
 				imagepng( $this->image, NULL, $quality );
 			break;
 
 			case 'webp':
-				$quality	= Settings::i()->image_jpg_quality ?: 85;
+				$quality	= \IPS\Settings::i()->image_jpg_quality ?: 85;
 
 				imagewebp( $this->image, NULL, $quality );
 			break;
-
-			case 'avif':
-				$quality = Settings::i()->image_jpg_quality ?: 85;
-				imageavif( $this->image, null, $quality );
-				break;
 
 		}
 		return ob_get_clean();
@@ -179,7 +164,7 @@ class Gd extends Image
 	 *
 	 * @return void
 	 */
-	protected function setAlpha() : void
+	protected function setAlpha()
 	{
 		/* Turn off alpha blending and turn on saving of alpha channel info (this requires turning off alpha blending) */
 		imagealphablending( $this->image, false );
@@ -189,40 +174,40 @@ class Gd extends Image
 	/**
 	 * Resize
 	 *
-	 * @param int $width			Width (in pixels)
-	 * @param int $height			Height (in pixels)
+	 * @param	int		$width			Width (in pixels)
+	 * @param	int		$height			Height (in pixels)
 	 * @return	void
 	 */
-	public function resize( int $width, int $height ) : void
+	public function resize( $width, $height )
 	{
-		$this->_manipulate($width, $height, FALSE);
+		return $this->_manipulate( $width, $height, FALSE );
 	}
 
 	/**
 	 * Crop to a given width and height (will attempt to downsize first)
 	 *
-	 * @param int $width			Width (in pixels)
-	 * @param int $height			Height (in pixels)
+	 * @param	int		$width			Width (in pixels)
+	 * @param	int		$height			Height (in pixels)
 	 * @return	void
 	 */
-	public function crop( int $width, int $height ) : void
+	public function crop( $width, $height )
 	{
-		$this->_manipulate($width, $height, TRUE);
+		return $this->_manipulate( $width, $height, TRUE );
 	}
 
 	/**
 	 * Resize and/or crop image
 	 *
-	 * @param int $width			Width (in pixels)
-	 * @param int $height			Height (in pixels)
-	 * @param bool $crop			Crop image to provided dimensions
+	 * @param	int		$width			Width (in pixels)
+	 * @param	int		$height			Height (in pixels)
+	 * @param	bool	$crop			Crop image to provided dimensions
 	 * @return	void
 	 */
-	public function _manipulate( int $width, int $height, bool $crop=FALSE ) : void
+	public function _manipulate( $width, $height, $crop=FALSE )
 	{
 		if ( $this->isAnimatedGif )
 		{
-			return;
+			return $this->image;
 		}
 			
 		/* Create a new canvas */
@@ -244,8 +229,6 @@ class Gd extends Image
 				}
 			break;
 
-			case 'avif':
-			case 'webp':
 			case 'png':
 			case 'jpg':
 				/* We need to fill the background as transparent. If we copy a watermark image here (resizing it down for instance) and it has
@@ -297,13 +280,13 @@ class Gd extends Image
 	/**
 	 * Crop at specific points
 	 *
-	 * @param int $point1X		x-point for top-left corner
-	 * @param int $point1Y		y-point for top-left corner
-	 * @param int $point2X		x-point for bottom-right corner
-	 * @param int $point2Y		y-point for bottom-right corner
+	 * @param	int		$point1X		x-point for top-left corner
+	 * @param	int		$point1Y		y-point for top-left corner
+	 * @param	int		$point2X		x-point for bottom-right corner
+	 * @param	int		$point2Y		y-point for bottom-right corner
 	 * @return	void
 	 */
-	public function cropToPoints( int $point1X, int $point1Y, int $point2X, int $point2Y ) : void
+	public function cropToPoints( $point1X, $point1Y, $point2X, $point2Y )
 	{
 		/* Create a new canvas */
 		$newImage = imagecreatetruecolor( ( $point2X - $point1X > 0 ) ? $point2X - $point1X : 0, ( $point2Y - $point1Y > 0 ) ? $point2Y - $point1Y : 0 );
@@ -349,12 +332,12 @@ class Gd extends Image
 	/**
 	 * Impose image
 	 *
-	 * @param Image $image	Image to impose
-	 * @param int $x		Location to impose to, x axis
-	 * @param int $y		Location to impose to, y axis
+	 * @param	\IPS\Image	$image	Image to impose
+	 * @param	int			$x		Location to impose to, x axis
+	 * @param	int			$y		Location to impose to, y axis
 	 * @return	void
 	 */
-	public function impose( Image $image, int $x=0, int $y=0 ) : void
+	public function impose( $image, $x=0, $y=0 )
 	{
 		/* Turn on alpha blending for both images */
 		imagealphablending( $this->image, true );
@@ -367,10 +350,10 @@ class Gd extends Image
 	/**
 	 * Rotate image
 	 *
-	 * @param int $angle	Angle of rotation
+	 * @param	int		$angle	Angle of rotation
 	 * @return	void
 	 */
-	public function rotate( int $angle ) : void
+	public function rotate( $angle )
 	{
 		$this->image	= imagerotate( $this->image, $angle, 0 );
 
@@ -378,28 +361,34 @@ class Gd extends Image
 		$this->width = imagesx( $this->image );
 		$this->height = imagesy( $this->image );
 	}
-
+	
 	/**
-	 * Flip this image vertically
+	 * Get Image Orientation
 	 *
-	 * @return void
+	 * @return	int|NULL
 	 */
-	public function flip(): void
+	public function getImageOrientation()
 	{
-		imageflip( $this->image, IMG_FLIP_HORIZONTAL );
-
-		/* Set width/height */
-		$this->width = imagesx( $this->image );
-		$this->height = imagesy( $this->image );
+		if ( static::exifSupported() )
+		{
+			$exif = $this->parseExif();
+			
+			if ( isset( $exif['IFD0.Orientation'] ) )
+			{
+				return $exif['IFD0.Orientation'];
+			}
+		}
+		
+		return NULL;
 	}
 	
 	/**
 	 * Set Image Orientation
 	 *
-	 * @param int $orientation	The orientation
+	 * @param	int		$orientation	The orientation
 	 * @return	void
 	 */
-	public function setImageOrientation( int $orientation ) : void
+	public function setImageOrientation( $orientation )
 	{
 		/* Note, GD does not require orientation to be set after rotation */
 	}
@@ -409,9 +398,9 @@ class Gd extends Image
 	 *
 	 * @return	bool
 	 */
-	public static function canWriteText(): bool
+	public static function canWriteText()
 	{
-		return function_exists( 'imagettfbbox' );
+		return (bool) \function_exists( 'imagettfbbox' );
 	}
 	
 	/**
@@ -419,18 +408,13 @@ class Gd extends Image
 	 *
 	 * @return	array
 	 */
-	public static function supportedExtensions(): array
+	public static function supportedExtensions()
 	{
 		$extensions = static::$imageExtensions;
 
-		if( isset( gd_info()['WebP Support'] ) and gd_info()['WebP Support'] )
+		if( isset( gd_info()['WebP Support'] ) and gd_info()['WebP Support'] and version_compare( PHP_VERSION, '7.3.0' ) >= 0 )
 		{
 			$extensions[] = 'webp';
-		}
-
-		if( isset( gd_info()['AVIF Support'] ) and gd_info()['AVIF Support'] )
-		{
-			$extensions[] = 'avif';
 		}
 
 		return $extensions;

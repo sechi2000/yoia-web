@@ -12,84 +12,31 @@
 namespace IPS\nexus\modules\admin\payments;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Email;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Helpers\Wizard;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Customer\Address;
-use IPS\nexus\Gateway;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item\Renewal;
-use IPS\nexus\Money;
-use IPS\nexus\Package\Group;
-use IPS\nexus\Purchase;
-use IPS\nexus\Tax;
-use IPS\nexus\Transaction;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-use const IPS\Helpers\Table\SEARCH_NUMERIC;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invoices
  */
-class invoices extends Controller
+class _invoices extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'invoices_manage' );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'invoice.css', 'nexus', 'admin' ) );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'invoices_manage' );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'invoice.css', 'nexus', 'admin' ) );
 		parent::execute();
 	}
 	
@@ -98,37 +45,38 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{		
 		/* Table */
-		$url = Url::internal( 'app=nexus&module=payments&controller=invoices' );
+		$url = \IPS\Http\Url::internal( 'app=nexus&module=payments&controller=invoices' );
 		$where = array();
 		$customer = NULL;
-		if ( isset( Request::i()->member ) )
+		if ( isset( \IPS\Request::i()->member ) )
 		{
 			try
 			{
-				$customer = Customer::load( Request::i()->member );
+				$customer = \IPS\nexus\Customer::load( \IPS\Request::i()->member );
 				$url = $url->setQueryString( 'member', $customer->member_id );
 				$where[] = array( 'i_member=?', $customer->member_id );
 			}
-			catch ( OutOfRangeException ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
-		$table = Invoice::table( $where, $url, 't' );
+		$table = \IPS\nexus\Invoice::table( $where, $url, 't' );
+
 		$table->advancedSearch = array(
-			'i_id'		=> SEARCH_CONTAINS_TEXT,
-			'i_title'	=> SEARCH_CONTAINS_TEXT,
-			'i_status'	=> array( SEARCH_SELECT, array( 'options' => Invoice::statuses(), 'multiple' => TRUE ) ),
-			'i_member'	=> SEARCH_MEMBER,
-			'i_total'	=> SEARCH_NUMERIC,
-			'i_date'	=> SEARCH_DATE_RANGE,
+			'i_id'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'i_title'	=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'i_status'	=> array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => \IPS\nexus\Invoice::statuses(), 'multiple' => TRUE ) ),
+			'i_member'	=> \IPS\Helpers\Table\SEARCH_MEMBER,
+			'i_total'	=> \IPS\Helpers\Table\SEARCH_NUMERIC,
+			'i_date'	=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
 		);
 		$table->quickSearch = 'i_id';
 		$table->filters		= array(
-			'istatus_paid'   => array( 'i_status=?', Invoice::STATUS_PAID ),
-			'istatus_pend' => array( 'i_status=?', Invoice::STATUS_PENDING ),
-			'istatus_expd'	 => array( 'i_status=?', Invoice::STATUS_EXPIRED ),
-			'istatus_canc'	 => array( 'i_status=?'  , Invoice::STATUS_CANCELED )
+			'istatus_paid'   => array( 'i_status=?', \IPS\nexus\Invoice::STATUS_PAID ),
+			'istatus_pend' => array( 'i_status=?', \IPS\nexus\Invoice::STATUS_PENDING ),
+			'istatus_expd'	 => array( 'i_status=?', \IPS\nexus\Invoice::STATUS_EXPIRED ),
+			'istatus_canc'	 => array( 'i_status=?'  , \IPS\nexus\Invoice::STATUS_CANCELED )
 		);
 		$table->mainColumn = 'i_title';
 		if ( $customer )
@@ -137,33 +85,33 @@ class invoices extends Controller
 		}
 				
 		/* Action Buttons */
-		if( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_add' ) )
+		if( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_add' ) )
 		{
-			$generateUrl = Url::internal( "app=nexus&module=payments&controller=invoices&do=generate&_new=1" );
+			$generateUrl = \IPS\Http\Url::internal( "app=nexus&module=payments&controller=invoices&do=generate&_new=1" );
 			
 			if ( $customer )
 			{
 				$generateUrl = $generateUrl->setQueryString( 'member', $customer->member_id );
 			}
 			
-			Output::i()->sidebar['actions'][] = array(
+			\IPS\Output::i()->sidebar['actions'][] = array(
 				'icon'	=> 'plus',
 				'title'	=> 'generate_invoice',
 				'link'	=> $generateUrl
 			);
 		}
-		if( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_settings' ) and !$customer )
+		if( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_settings' ) and !$customer )
 		{
-			Output::i()->sidebar['actions'][] = array(
+			\IPS\Output::i()->sidebar['actions'][] = array(
 				'icon'	=> 'cog',
 				'title'	=> 'invoice_settings',
-				'link'	=> Url::internal( "app=nexus&module=payments&controller=invoices&do=settings" )
+				'link'	=> \IPS\Http\Url::internal( "app=nexus&module=payments&controller=invoices&do=settings" )
 			);
 		}
 		
 		/* Display */
-		Output::i()->title = $customer ? Member::loggedIn()->language()->addToStack( 'members_invoices', FALSE, array( 'sprintf' => array( $customer->cm_name ) ) ) : Member::loggedIn()->language()->addToStack('menu__nexus_payments_invoices');
-		Output::i()->output = (string) $table;
+		\IPS\Output::i()->title = $customer ? \IPS\Member::loggedIn()->language()->addToStack( 'members_invoices', FALSE, array( 'sprintf' => array( $customer->cm_name ) ) ) : \IPS\Member::loggedIn()->language()->addToStack('menu__nexus_payments_invoices');
+		\IPS\Output::i()->output = (string) $table;
 	}
 	
 	/**
@@ -171,42 +119,94 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function view() : void
+	public function view()
 	{
 		/* Load Invoice */
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/3', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/3', 404, '' );
 		}
 				
 		/* Get transactions */
 		$transactions = NULL;
-		if( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' ) and ( !isset( Request::i()->table ) ) )
+		if( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' ) and ( !isset( \IPS\Request::i()->table ) ) )
 		{
-			$transactions = Transaction::table( array( array( 't_invoice=? and t_status<>?', $invoice->id, Transaction::STATUS_PENDING ) ), $invoice->acpUrl(), 'i' );
+			$transactions = \IPS\nexus\Transaction::table( array( array( 't_invoice=? and t_status<>?', $invoice->id, \IPS\nexus\Transaction::STATUS_PENDING ) ), $invoice->acpUrl(), 'i' );
 			$transactions->limit = 50;
-			$transactions->tableTemplate = array( Theme::i()->getTemplate('invoices'), 'transactionsTable' );
-			$transactions->rowsTemplate = array( Theme::i()->getTemplate('invoices'), 'transactionsTableRows' );
+			$transactions->tableTemplate = array( \IPS\Theme::i()->getTemplate('invoices'), 'transactionsTable' );
+			$transactions->rowsTemplate = array( \IPS\Theme::i()->getTemplate('invoices'), 'transactionsTableRows' );
 
 			foreach ( $transactions->include as $k => $v )
 			{
-				if ( in_array( $v, array( 't_member', 't_invoice' ) ) )
+				if ( \in_array( $v, array( 't_member', 't_invoice' ) ) )
 				{
 					unset( $transactions->include[ $k ] );
 				}
 			}
 		}
+		
+		/* Get shipments */
+		$shipments = NULL;
+		if( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'shiporders_manage' ) )
+		{
+			if ( \IPS\Db::i()->select( 'COUNT(*)', 'nexus_ship_orders', array( 'o_invoice=?', $invoice->id ) )->first() )
+			{
+				$shipments = new \IPS\Helpers\Table\Db( 'nexus_ship_orders', $invoice->acpUrl()->setQueryString( 'table', 'shipments' ), array( 'o_invoice=?', $invoice->id ) );
+				$shipments->sortBy = $shipments->sortBy ?: 'o_shipped_date';
+				$shipments->include = array( 'o_status', 'o_method', 'o_shipped_date' );
+				$shipments->limit = 50;
+				$shipments->tableTemplate = array( \IPS\Theme::i()->getTemplate('invoices'), 'shipmentsTable' );
+				$shipments->rowsTemplate = array( \IPS\Theme::i()->getTemplate('invoices'), 'shipmentsTableRows' );
+
+				$shipments->parsers = array(
+					'o_status'	=> function( $val )
+					{						
+						return \IPS\Theme::i()->getTemplate('shiporders')->status( $val );
+					},
+					'o_method'	=> function( $val, $row )
+					{
+						if ( $row['o_api_service'] )
+						{
+							return $row['o_api_service'];
+						}
+						
+						try
+						{
+							return \IPS\nexus\Shipping\FlatRate::load( $val )->_title;
+						}
+						catch ( \Exception $e )
+						{
+							return '';
+						}
+					},
+					'o_shipped_date'	=> function( $val )
+					{
+						return $val ? ( (string) \IPS\DateTime::ts( $val ) ) : \IPS\Member::loggedIn()->language()->addToStack('not_shipped_yet');
+					}
+				);
+				$shipments->rowButtons = function( $row )
+				{
+					return array_merge( array(
+						'view'	=> array(
+							'icon'	=> 'search',
+							'title'	=> 'shipment_view',
+							'link'	=> \IPS\Http\Url::internal( "app=nexus&module=payments&controller=shipping&do=view&id={$row['o_id']}" )
+						),
+					), \IPS\nexus\Shipping\Order::constructFromData( $row )->buttons( 'i' ) );
+				};
+			}
+		}
 
 		/* Add Buttons */
-		Output::i()->sidebar['actions'] = $invoice->buttons( 'v' );
+		\IPS\Output::i()->sidebar['actions'] = $invoice->buttons( 'v' );
 		
 		/* Output */
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'invoice_number', FALSE, array( 'sprintf' => array( $invoice->id ) ) );
-		Output::i()->output = Theme::i()->getTemplate( 'invoices' )->view( $invoice, $invoice->summary(), $transactions );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'invoice_number', FALSE, array( 'sprintf' => array( $invoice->id ) ) );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'invoices' )->view( $invoice, $invoice->summary(), $transactions, (string) $shipments );
 	}
 	
 	/**
@@ -214,43 +214,43 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function paid() : void
+	public function paid()
 	{
-		Dispatcher::i()->checkAcpPermission( 'invoices_edit' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'invoices_edit' );
+		\IPS\Session::i()->csrfCheck();
 				
 		/* Load Invoice */
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/6', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/6', 404, '' );
 		}
 		
 		/* Do we have a billing address? */
 		if ( !$invoice->billaddress AND $invoice->hasItemsRequiringBillingAddress() )
 		{
-			Output::i()->error( 'err_no_billaddress', '2X190/I', 403 );
+			\IPS\Output::i()->error( 'err_no_billaddress', '2X190/I', 403 );
 		}
 		
 		/* Any pending transactions? */
-		if ( !isset( Request::i()->override ) and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' ) )
+		if ( !isset( \IPS\Request::i()->override ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_manage' ) )
 		{
-			$pendingTransactions = $invoice->transactions( array( Transaction::STATUS_WAITING, Transaction::STATUS_HELD, Transaction::STATUS_REVIEW, Transaction::STATUS_GATEWAY_PENDING ) );
-			if ( count( $pendingTransactions ) )
+			$pendingTransactions = $invoice->transactions( array( \IPS\nexus\Transaction::STATUS_WAITING, \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_REVIEW, \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING ) );
+			if ( \count( $pendingTransactions ) )
 			{
 				$transUrl = $invoice->acpUrl();
-				if ( count( $pendingTransactions ) === 1 )
+				if ( \count( $pendingTransactions ) === 1 )
 				{
 					foreach ( $pendingTransactions as $transaction )
 					{
 						$transUrl = $transaction->acpUrl();
 					}
 				}
-
-				Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'invoice_paid_trans', array(
+				
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('global', 'core', 'global')->decision( 'invoice_paid_trans', array(
 					'invoice_paid_trans_view'	=> $transUrl,
 					'invoice_paid_trans_ovrd'	=> $invoice->acpUrl()->setQueryString( array( 'do' => 'paid', 'override' => 1 ) )->csrf()
 				) );
@@ -261,13 +261,13 @@ class invoices extends Controller
 		/* Log (do this first so the log appears in the correct order) */
 		$invoice->member->log( 'invoice', array(
 			'type'	=> 'status',
-			'new'	=> Invoice::STATUS_PAID,
+			'new'	=> \IPS\nexus\Invoice::STATUS_PAID,
 			'id'	=> $invoice->id,
 			'title' => $invoice->title
 		) );
 		
 		/* Send Email */
-		Email::buildFromTemplate( 'nexus', 'invoiceMarkedPaid', array( $invoice, $invoice->summary() ), Email::TYPE_TRANSACTIONAL )
+		\IPS\Email::buildFromTemplate( 'nexus', 'invoiceMarkedPaid', array( $invoice, $invoice->summary( $invoice->member->language() ) ), \IPS\Email::TYPE_TRANSACTIONAL )
 			->send(
 				$invoice->member,
 				array_map(
@@ -277,11 +277,11 @@ class invoices extends Controller
 					},
 					iterator_to_array( $invoice->member->alternativeContacts( array( 'billing=1' ) ) )
 				),
-				( ( in_array( 'new_invoice', explode( ',', Settings::i()->nexus_notify_copy_types ) ) AND Settings::i()->nexus_notify_copy_email ) ? explode( ',', Settings::i()->nexus_notify_copy_email ) : array() )
+				( ( \in_array( 'new_invoice', explode( ',', \IPS\Settings::i()->nexus_notify_copy_types ) ) AND \IPS\Settings::i()->nexus_notify_copy_email ) ? explode( ',', \IPS\Settings::i()->nexus_notify_copy_email ) : array() )
 			);
 		
 		/* Do it */
-		$invoice->markPaid( Member::loggedIn() );
+		$invoice->markPaid( \IPS\Member::loggedIn() );
 		
 		/* Redirect */
 		$this->_redirect( $invoice );
@@ -292,40 +292,40 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function card() : void
+	public function card()
 	{
-		Dispatcher::i()->checkAcpPermission( 'chargetocard' );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'customer.css', 'nexus', 'admin' ) );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'chargetocard' );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'customer.css', 'nexus', 'admin' ) );
 
 		/* Load Invoice */
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/8', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/8', 404, '' );
 		}
 		
 		/* Get gateways */
-		$gateways = Gateway::manualChargeGateways( $invoice->member );
+		$gateways = \IPS\nexus\Gateway::manualChargeGateways( $invoice->member );
 		
 		/* Can we do this? */
-		if ( $invoice->status !== Invoice::STATUS_PENDING or !count( $gateways ) )
+		if ( $invoice->status !== \IPS\nexus\Invoice::STATUS_PENDING or !\count( $gateways ) )
 		{
-			Output::i()->error( 'invoice_status_err', '2X190/9', 403, '' );
+			\IPS\Output::i()->error( 'invoice_status_err', '2X190/9', 403, '' );
 		}
 
 		$self = $this;
 		/* Wizard */
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'invoice_charge_to_card' );
-		Output::i()->output = (string) new Wizard(
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'invoice_charge_to_card' );
+		\IPS\Output::i()->output = (string) new \IPS\Helpers\Wizard(
 			array(
 				't_amount'		=> function( $data ) use ( $invoice )
 				{					
 					$amountToPay = $invoice->amountToPay()->amount;
-					$form = new Form( 'amount', 'continue' );
-					$form->add( new Number( 't_amount', $amountToPay, TRUE, array( 'min' => 0.01, 'max' => (string) $amountToPay, 'decimals' => TRUE ), NULL, NULL, $invoice->currency ) );
+					$form = new \IPS\Helpers\Form( 'amount', 'continue' );
+					$form->add( new \IPS\Helpers\Form\Number( 't_amount', $amountToPay, TRUE, array( 'min' => 0.01, 'max' => (string) $amountToPay, 'decimals' => TRUE ), NULL, NULL, $invoice->currency ) );
 					if ( $values = $form->values() )
 					{
 						return $values;
@@ -334,7 +334,7 @@ class invoices extends Controller
 				},
 				'checkout_pay'	=> function( $data ) use ( $invoice, $gateways, $self )
 				{
-					$amountToPay = new Money( $data['t_amount'], $invoice->currency );
+					$amountToPay = new \IPS\nexus\Money( $data['t_amount'], $invoice->currency );
 					
 					/* Get elements */
 					$elements = array();
@@ -358,14 +358,14 @@ class invoices extends Controller
 					}
 					
 					/* Build form */
-					$form = new Form( 'charge', 'invoice_charge_to_card' );
-					if ( isset( Request::i()->previousTransactions ) )
+					$form = new \IPS\Helpers\Form( 'charge', 'invoice_charge_to_card' );
+					if ( isset( \IPS\Request::i()->previousTransactions ) )
 					{
-						$form->hiddenValues['previousTransactions'] = Request::i()->previousTransactions;
+						$form->hiddenValues['previousTransactions'] = \IPS\Request::i()->previousTransactions;
 					}
 					else
 					{
-						if ( $previousTransactions = $invoice->transactions() and count( $previousTransactions ) )
+						if ( $previousTransactions = $invoice->transactions() and \count( $previousTransactions ) )
 						{
 							$previousTransactionIds = array();
 							foreach ( $previousTransactions as $previousTransaction )
@@ -375,9 +375,9 @@ class invoices extends Controller
 							$form->hiddenValues['previousTransactions'] = implode( ',', $previousTransactionIds );
 						}
 					}
-					if ( count( $gateways ) > 1 )
+					if ( \count( $gateways ) > 1 )
 					{
-						$form->add( new Radio( 'payment_method', NULL, TRUE, array( 'options' => $paymentMethodOptions, 'toggles' => $paymentMethodsToggles ) ) );
+						$form->add( new \IPS\Helpers\Form\Radio( 'payment_method', NULL, TRUE, array( 'options' => $paymentMethodOptions, 'toggles' => $paymentMethodsToggles ) ) );
 					}
 					foreach ( $elements as $element )
 					{
@@ -387,7 +387,7 @@ class invoices extends Controller
 					/* Handle submissions */
 					if ( $values = $form->values() )
 					{
-						if ( count( $gateways ) === 1 )
+						if ( \count( $gateways ) === 1 )
 						{
 							$gateway = array_pop( $gateways );
 						}
@@ -396,19 +396,19 @@ class invoices extends Controller
 							$gateway = $gateways[ $values['payment_method'] ];
 						}
 						
-						$transaction = new Transaction;
+						$transaction = new \IPS\nexus\Transaction;
 						$transaction->member = $invoice->member;
 						$transaction->invoice = $invoice;
 						$transaction->method = $gateway;
 						$transaction->amount = $amountToPay;						
 						$transaction->currency = $invoice->currency;
-						$transaction->ip = Request::i()->ipAddress();
-						$transaction->extra = array( 'admin' => Member::loggedIn()->member_id );
+						$transaction->ip = \IPS\Request::i()->ipAddress();
+						$transaction->extra = array( 'admin' => \IPS\Member::loggedIn()->member_id );
 						
 						try
 						{
 							$auth = $gateway->auth( $transaction, $values, NULL, array(), 'manual' );
-							if ( is_array( $auth ) )
+							if ( \is_array( $auth ) )
 							{
 								return $this->_webhookRedirector( $invoice, $auth );
 							}
@@ -420,7 +420,7 @@ class invoices extends Controller
 							
 							$transaction->member->log( 'transaction', array(
 								'type'			=> 'paid',
-								'status'		=> Transaction::STATUS_PAID,
+								'status'		=> \IPS\nexus\Transaction::STATUS_PAID,
 								'id'			=> $transaction->id,
 								'invoice_id'	=> $invoice->id,
 								'invoice_title'	=> $invoice->title,
@@ -432,7 +432,7 @@ class invoices extends Controller
 							
 							$self->_redirect( $invoice );
 						}
-						catch ( Exception $e )
+						catch ( \Exception $e )
 						{
 							$form->error = $e->getMessage();
 							return $form;
@@ -440,7 +440,7 @@ class invoices extends Controller
 					}
 					
 					/* Display form */
-					Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_gateways.js', 'nexus', 'global' ) );
+					\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_gateways.js', 'nexus', 'global' ) );
 					return $form;
 				}
 
@@ -454,24 +454,24 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function credit() : void
+	public function credit()
 	{
-		Dispatcher::i()->checkAcpPermission( 'invoices_edit' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'invoices_edit' );
 		
 		/* Load Invoice */
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/A', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/A', 404, '' );
 		}
 				
 		/* Can we do this? */
-		if ( $invoice->status !== Invoice::STATUS_PENDING )
+		if ( $invoice->status !== \IPS\nexus\Invoice::STATUS_PENDING )
 		{
-			Output::i()->error( 'invoice_status_err', '2X190/B', 403, '' );
+			\IPS\Output::i()->error( 'invoice_status_err', '2X190/B', 403, '' );
 		}
 		
 		/* How much can we do? */
@@ -481,18 +481,18 @@ class invoices extends Controller
 		$maxCanCharge = ( $credit->compare( $amountToPay ) === -1 ) ? $credit : $amountToPay;
 
 		/* Build Form */
-		$form = new Form( 'amount', 'invoice_charge_to_credit' );
-		$form->add( new Number( 't_amount', $maxCanCharge, TRUE, array( 'min' => 0.01, 'max' => (string) $maxCanCharge, 'decimals' => TRUE ), NULL, NULL, $invoice->currency ) );
+		$form = new \IPS\Helpers\Form( 'amount', 'invoice_charge_to_credit' );
+		$form->add( new \IPS\Helpers\Form\Number( 't_amount', $maxCanCharge, TRUE, array( 'min' => 0.01, 'max' => (string) $maxCanCharge, 'decimals' => TRUE ), NULL, NULL, $invoice->currency ) );
 		
 		/* Handle submissions */
 		if ( $values = $form->values() )
 		{			
-			$transaction = new Transaction;
+			$transaction = new \IPS\nexus\Transaction;
 			$transaction->member = $invoice->member;
 			$transaction->invoice = $invoice;
-			$transaction->amount = new Money( $values['t_amount'], $invoice->currency );
-			$transaction->ip = Request::i()->ipAddress();
-			$transaction->extra = array( 'admin' => Member::loggedIn()->member_id );
+			$transaction->amount = new \IPS\nexus\Money( $values['t_amount'], $invoice->currency );
+			$transaction->ip = \IPS\Request::i()->ipAddress();
+			$transaction->extra = array( 'admin' => \IPS\Member::loggedIn()->member_id );
 			$transaction->save();
 			$transaction->approve( NULL );
 			$transaction->sendNotification();
@@ -503,7 +503,7 @@ class invoices extends Controller
 			
 			$invoice->member->log( 'transaction', array(
 				'type'			=> 'paid',
-				'status'		=> Transaction::STATUS_PAID,
+				'status'		=> \IPS\nexus\Transaction::STATUS_PAID,
 				'id'			=> $transaction->id,
 				'invoice_id'	=> $invoice->id,
 				'invoice_title'	=> $invoice->title,
@@ -513,8 +513,8 @@ class invoices extends Controller
 		}
 		
 		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'invoice_charge_to_credit' );
-		Output::i()->output = $form;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'invoice_charge_to_credit' );
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -522,29 +522,29 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function resend() : void
+	public function resend()
 	{
-		Dispatcher::i()->checkAcpPermission( 'invoices_resend' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'invoices_resend' );
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Load Invoice */
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/C', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/C', 404, '' );
 		}
 		
 		/* Update */
-		$invoice->date = new DateTime;
-		$invoice->status = Invoice::STATUS_PENDING;
+		$invoice->date = new \IPS\DateTime;
+		$invoice->status = \IPS\nexus\Invoice::STATUS_PENDING;
 		$invoice->save();
 		
 		/* Send email */
 		$emailSent = FALSE;
-		if ( isset( Request::i()->prompt ) and Request::i()->prompt )
+		if ( isset( \IPS\Request::i()->prompt ) and \IPS\Request::i()->prompt )
 		{
 			$emailSent = TRUE;
 			$invoice->sendNotification();
@@ -562,22 +562,22 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function printout() : void
+	public function printout()
 	{
 		/* Load */
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/D', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/D', 404, '' );
 		}
 		
 		/* Get output */
-		$output = Theme::i()->getTemplate( 'invoices', 'nexus', 'global' )->printInvoice( $invoice, $invoice->summary(), $invoice->billaddress ?: $invoice->member->primaryBillingAddress() );
-		Output::i()->title = 'I' . $invoice->id;
-		Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core', 'front' )->blankTemplate( $output ) );
+		$output = \IPS\Theme::i()->getTemplate( 'invoices', 'nexus', 'global' )->printInvoice( $invoice, $invoice->summary(), $invoice->billaddress ?: $invoice->member->primaryBillingAddress() );
+		\IPS\Output::i()->title = 'I' . $invoice->id;
+		\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->blankTemplate( $output ) );
 	}
 	
 	/**
@@ -585,33 +585,32 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function unpaid() : void
+	public function unpaid()
 	{
-		Dispatcher::i()->checkAcpPermission( 'invoices_edit' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'invoices_edit' );
 		
 		/* Load Invoice */
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/7', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/7', 404, '' );
 		}
 						
 		/* Get paid transactions */
-		$transactions = $invoice->transactions( array( Transaction::STATUS_PAID, Transaction::STATUS_PART_REFUNDED ) );
+		$transactions = $invoice->transactions( array( \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_PART_REFUNDED ) );
 		
 		/* Build form */
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		
 		/* Ask what we want to do with the transactions */
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_refund' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_refund' ) )
 		{
 			foreach ( $transactions as $transaction )
 			{
 				/* What refund options are available? */
-				/* @var Gateway $method */
 				$method = $transaction->method;
 				$refundMethods = array();
 				$refundMethodToggles = array( 'none' => array( $transaction->id . '_refund_reverse_credit' ) );
@@ -637,86 +636,85 @@ class invoices extends Controller
 				$refundMethods['none'] = 'refund_method_none';
 				
 				/* How do we want to refund? */
-				$field = new Radio( $transaction->id . '_refund_method', 'none', TRUE, array( 'options' => $refundMethods, 'toggles' => $refundMethodToggles ) );
-				$field->label = count( $transactions ) === 1 ? Member::loggedIn()->language()->addToStack( 'refund_method' ) : Member::loggedIn()->language()->addToStack( 'trans_refund_method', FALSE, array( 'sprintf' => array( $transaction->id ) ) );
+				$field = new \IPS\Helpers\Form\Radio( $transaction->id . '_refund_method', 'none', TRUE, array( 'options' => $refundMethods, 'toggles' => $refundMethodToggles ) );
+				$field->label = \count( $transactions ) === 1 ? \IPS\Member::loggedIn()->language()->addToStack( 'refund_method' ) : \IPS\Member::loggedIn()->language()->addToStack( 'trans_refund_method', FALSE, array( 'sprintf' => array( $transaction->id ) ) );
 				$form->add( $field );
 				if ( $refundReasons )
 				{
-					$field = new Radio( $transaction->id . '_refund_reason', NULL, FALSE, array( 'options' => $refundReasons ), NULL, NULL, NULL, $transaction->id . '_refund_reason' );
-					$field->label = count( $transactions ) === 1 ? Member::loggedIn()->language()->addToStack( 'refund_reason' ) : Member::loggedIn()->language()->addToStack( 'trans_refund_reason', FALSE, array( 'sprintf' => array( $transaction->id ) ) );
+					$field = new \IPS\Helpers\Form\Radio( $transaction->id . '_refund_reason', NULL, FALSE, array( 'options' => $refundReasons ), NULL, NULL, NULL, $transaction->id . '_refund_reason' );
+					$field->label = \count( $transactions ) === 1 ? \IPS\Member::loggedIn()->language()->addToStack( 'refund_reason' ) : \IPS\Member::loggedIn()->language()->addToStack( 'trans_refund_reason', FALSE, array( 'sprintf' => array( $transaction->id ) ) );
 					$form->add( $field );
 				}
 				
 				/* Partial refund? */
 				if ( $method and $method::SUPPORTS_REFUNDS and $method::SUPPORTS_PARTIAL_REFUNDS )
 				{
-					$field = new Number( $transaction->id . '_refund_amount', 0, TRUE, array(
+					$field = new \IPS\Helpers\Form\Number( $transaction->id . '_refund_amount', 0, TRUE, array(
 						'unlimited' => 0,
 						'unlimitedLang'	=> (
 							$transaction->partial_refund->amount->isGreaterThanZero()
-								? Member::loggedIn()->language()->addToStack( 'refund_full_remaining', FALSE, array( 'sprintf' => array(
-									new Money( $transaction->amount->amount->subtract( $transaction->partial_refund->amount ), $transaction->currency ) )
+								? \IPS\Member::loggedIn()->language()->addToStack( 'refund_full_remaining', FALSE, array( 'sprintf' => array(
+									new \IPS\nexus\Money( $transaction->amount->amount->subtract( $transaction->partial_refund->amount ), $transaction->currency ) )
 								) )
-								: Member::loggedIn()->language()->addToStack( 'refund_full', FALSE, array( 'sprintf' => array( $transaction->amount ) ) )
+								: \IPS\Member::loggedIn()->language()->addToStack( 'refund_full', FALSE, array( 'sprintf' => array( $transaction->amount ) ) )
 						),
 						'max'			=> (string) $transaction->amount->amount->subtract( $transaction->partial_refund->amount ),
 						'decimals' 		=> TRUE
 					), NULL, NULL, $transaction->amount->currency, $transaction->id . '_refund_amount' );
-					$field->label = Member::loggedIn()->language()->addToStack( 'refund_amount' );
+					$field->label = \IPS\Member::loggedIn()->language()->addToStack( 'refund_amount' );
 					$form->add( $field );
 					if ( $transaction->credit->amount->isGreaterThanZero() )
 					{
-						Member::loggedIn()->language()->words[ $transaction->id . '_refund_amount_desc' ] = sprintf( Member::loggedIn()->language()->get('refund_amount_descwarn'), $transaction->credit );
+						\IPS\Member::loggedIn()->language()->words[ $transaction->id . '_refund_amount_desc' ] = sprintf( \IPS\Member::loggedIn()->language()->get('refund_amount_descwarn'), $transaction->credit );
 					}
 				}
 				if ( $transaction->credit->amount->compare( $transaction->amount->amount ) === -1 )
 				{
-					$field = new Number( $transaction->id . '_refund_credit_amount', 0, TRUE, array(
+					$field = new \IPS\Helpers\Form\Number( $transaction->id . '_refund_credit_amount', 0, TRUE, array(
 						'unlimited'		=> 0,
 						'unlimitedLang'	=> (
 							$transaction->credit->amount->isGreaterThanZero()
-								? Member::loggedIn()->language()->addToStack( 'refund_full_remaining', FALSE, array( 'sprintf' => array(
-									new Money( $transaction->amount->amount->subtract( $transaction->credit->amount ), $transaction->currency ) )
+								? \IPS\Member::loggedIn()->language()->addToStack( 'refund_full_remaining', FALSE, array( 'sprintf' => array(
+									new \IPS\nexus\Money( $transaction->amount->amount->subtract( $transaction->credit->amount ), $transaction->currency ) )
 								) )
-								: Member::loggedIn()->language()->addToStack( 'refund_full', FALSE, array( 'sprintf' => array( $transaction->amount ) ) )
+								: \IPS\Member::loggedIn()->language()->addToStack( 'refund_full', FALSE, array( 'sprintf' => array( $transaction->amount ) ) )
 						),
 						'max'			=> (string) $transaction->amount->amount->subtract( $transaction->credit->amount ),
 						'decimals' 		=> TRUE
 					), NULL, NULL, $transaction->amount->currency, $transaction->id . '_refund_credit_amount' );
-					$field->label = Member::loggedIn()->language()->addToStack( 'refund_credit_amount' );
+					$field->label = \IPS\Member::loggedIn()->language()->addToStack( 'refund_credit_amount' );
 					$form->add( $field );
 					
 					if ( $transaction->partial_refund->amount->isGreaterThanZero() )
 					{
-						Member::loggedIn()->language()->words[ $transaction->id . '_refund_credit_amount_desc' ] = sprintf( Member::loggedIn()->language()->get('refund_credit_amount_descwarn'), $transaction->partial_refund );
+						\IPS\Member::loggedIn()->language()->words[ $transaction->id . '_refund_credit_amount_desc' ] = sprintf( \IPS\Member::loggedIn()->language()->get('refund_credit_amount_descwarn'), $transaction->partial_refund );
 					}
 				}
 				
 				/* Reverse credit? */
 				if ( $transaction->credit->amount->isGreaterThanZero() )
 				{
-					$field = new YesNo( $transaction->id . '_refund_reverse_credit', TRUE, TRUE, array( 'togglesOn' => array( "form_{$transaction->id}_refund_reverse_credit_warning" ) ), NULL, NULL, NULL, $transaction->id . '_refund_reverse_credit' );
-					$field->label = Member::loggedIn()->language()->addToStack( 'refund_reverse_credit', FALSE, array( 'sprintf' => array( $transaction->credit ) ) );
-					Member::loggedIn()->language()->words[ $transaction->id . '_refund_reverse_credit_desc' ] = Member::loggedIn()->language()->addToStack( 'refund_reverse_credit_desc' );
+					$field = new \IPS\Helpers\Form\YesNo( $transaction->id . '_refund_reverse_credit', TRUE, TRUE, array( 'togglesOn' => array( "form_{$transaction->id}_refund_reverse_credit_warning" ) ), NULL, NULL, NULL, $transaction->id . '_refund_reverse_credit' );
+					$field->label = \IPS\Member::loggedIn()->language()->addToStack( 'refund_reverse_credit', FALSE, array( 'sprintf' => array( $transaction->credit ) ) );
+					\IPS\Member::loggedIn()->language()->words[ $transaction->id . '_refund_reverse_credit_desc' ] = \IPS\Member::loggedIn()->language()->addToStack( 'refund_reverse_credit_desc' );
 					$form->add( $field );
 					
 					$credits = $transaction->member->cm_credits;
 					if ( $credits[ $transaction->amount->currency ]->amount->compare( $transaction->credit->amount ) === -1 )
 					{
-						Member::loggedIn()->language()->words[ $transaction->id . '_refund_reverse_credit_warning' ] = Member::loggedIn()->language()->addToStack( 'account_credit_remove_neg' );
+						\IPS\Member::loggedIn()->language()->words[ $transaction->id . '_refund_reverse_credit_warning' ] = \IPS\Member::loggedIn()->language()->addToStack( 'account_credit_remove_neg' );
 					}
 				}
 				
 				/* Billing Agreement? */
-				/* @var Customer\BillingAgreement $billingAgreement */
 				if ( $billingAgreement = $transaction->billing_agreement AND $billingAgreement->status() !== $billingAgreement::STATUS_CANCELED )
 				{
-					$field = new YesNo( $transaction->id . '_refund_cancel_billing_agreement', TRUE, NULL, array( 'togglesOff' => array( "form_{$transaction->id}_refund_cancel_billing_agreement_warning" ) ) );
-					$field->label = Member::loggedIn()->language()->addToStack( 'refund_cancel_billing_agreement' );
-					Member::loggedIn()->language()->words[ $transaction->id . '_refund_cancel_billing_agreement_desc' ] = Member::loggedIn()->language()->addToStack( 'refund_cancel_billing_agreement_desc' );
-					if ( !Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( 't_billing_agreement=? AND t_id<?', $billingAgreement->id, $transaction->id ) )->first() )
+					$field = new \IPS\Helpers\Form\YesNo( $transaction->id . '_refund_cancel_billing_agreement', TRUE, NULL, array( 'togglesOff' => array( "form_{$transaction->id}_refund_cancel_billing_agreement_warning" ) ) );
+					$field->label = \IPS\Member::loggedIn()->language()->addToStack( 'refund_cancel_billing_agreement' );
+					\IPS\Member::loggedIn()->language()->words[ $transaction->id . '_refund_cancel_billing_agreement_desc' ] = \IPS\Member::loggedIn()->language()->addToStack( 'refund_cancel_billing_agreement_desc' );
+					if ( !\IPS\Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( 't_billing_agreement=? AND t_id<?', $billingAgreement->id, $transaction->id ) )->first() )
 					{
-						Member::loggedIn()->language()->words[ $transaction->id . '_refund_cancel_billing_agreement_warning' ] = Member::loggedIn()->language()->addToStack( 'refund_cancel_billing_agreement_warning' );
+						\IPS\Member::loggedIn()->language()->words[ $transaction->id . '_refund_cancel_billing_agreement_warning' ] = \IPS\Member::loggedIn()->language()->addToStack( 'refund_cancel_billing_agreement_warning' );
 					}
 					
 					$form->add( $field );
@@ -725,38 +723,38 @@ class invoices extends Controller
 		}
 		
 		/* Do we want to mark the invoice as pending or canceled? */
-		if ( $invoice->status === Invoice::STATUS_PAID )
+		if ( $invoice->status === \IPS\nexus\Invoice::STATUS_PAID )
 		{
 			$statusOptions = array();
 			if ( !$invoice->total->amount->isZero() )
 			{
-				$statusOptions[ Invoice::STATUS_PENDING ] = 'refund_invoice_pending';
+				$statusOptions[ \IPS\nexus\Invoice::STATUS_PENDING ] = 'refund_invoice_pending';
 			}
-			if ( Settings::i()->cm_invoice_expireafter )
+			if ( \IPS\Settings::i()->cm_invoice_expireafter )
 			{
-				$statusOptions[ Invoice::STATUS_EXPIRED ] = 'refund_invoice_expired';
+				$statusOptions[ \IPS\nexus\Invoice::STATUS_EXPIRED ] = 'refund_invoice_expired';
 			}
-			$statusOptions[ Invoice::STATUS_CANCELED ] = 'refund_invoice_canceled';
-			$field = new Radio( 'refund_invoice_status', Invoice::STATUS_CANCELED, TRUE, array( 'options' => $statusOptions ) );
-			$field->warningBox = Theme::i()->getTemplate('invoices')->unpaidConsequences( $invoice );
+			$statusOptions[ \IPS\nexus\Invoice::STATUS_CANCELED ] = 'refund_invoice_canceled';
+			$field = new \IPS\Helpers\Form\Radio( 'refund_invoice_status', \IPS\nexus\Invoice::STATUS_CANCELED, TRUE, array( 'options' => $statusOptions ) );
+			$field->warningBox = \IPS\Theme::i()->getTemplate('invoices')->unpaidConsequences( $invoice );
 			$form->add( $field );
 		}
 		else
 		{
 			$statusOptions = array();
-			if ( Settings::i()->cm_invoice_expireafter )
+			if ( \IPS\Settings::i()->cm_invoice_expireafter )
 			{
-				$statusOptions[ Invoice::STATUS_EXPIRED ] = 'invoice_status_expd';
+				$statusOptions[ \IPS\nexus\Invoice::STATUS_EXPIRED ] = 'invoice_status_expd';
 			}
-			$statusOptions[ Invoice::STATUS_CANCELED ] = 'invoice_status_canc';
-			$form->add( new Radio( 'refund_invoice_status', Invoice::STATUS_CANCELED, TRUE, array( 'options' => $statusOptions ) ) );
+			$statusOptions[ \IPS\nexus\Invoice::STATUS_CANCELED ] = 'invoice_status_canc';
+			$form->add( new \IPS\Helpers\Form\Radio( 'refund_invoice_status', \IPS\nexus\Invoice::STATUS_CANCELED, TRUE, array( 'options' => $statusOptions ) ) );
 		}
 
 		/* Handle submissions */
 		if ( $values = $form->values() )
 		{
 			/* Refund transactions */
-			if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_refund' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'transactions_refund' ) )
 			{
 				foreach ( $transactions as $transaction )
 				{
@@ -769,9 +767,9 @@ class invoices extends Controller
 							{
 								$transaction->billing_agreement->cancel();
 							}
-							catch ( Exception $e )
+							catch ( \Exception $e )
 							{
-								Output::i()->error( 'billing_agreement_cancel_error', '3X190/G', 500, '', array(), $e->getMessage() );
+								\IPS\Output::i()->error( 'billing_agreement_cancel_error', '3X190/G', 500, '', array(), $e->getMessage() );
 							}
 						}
 					}
@@ -796,13 +794,13 @@ class invoices extends Controller
 						
 						$transaction->refund( $values[ $transaction->id . '_refund_method' ], $amount, isset( $values[ $transaction->id . '_refund_reason' ] ) ? $values[ $transaction->id . '_refund_reason' ] : NULL );
 					}
-					catch ( LogicException $e )
+					catch ( \LogicException $e )
 					{
-						Output::i()->error( $e->getMessage(), '1X190/1', 500, '' );
+						\IPS\Output::i()->error( $e->getMessage(), '1X190/1', 500, '' );
 					}
-					catch ( RuntimeException )
+					catch ( \RuntimeException $e )
 					{
-						Output::i()->error( 'refund_failed', '3X190/2', 500, '' );
+						\IPS\Output::i()->error( 'refund_failed', '3X190/2', 500, '' );
 					}
 				}
 			}
@@ -816,14 +814,14 @@ class invoices extends Controller
 			) );
 			
 			/* Change invoice status */
-			$invoice->markUnpaid( $values['refund_invoice_status'], Member::loggedIn() );
+			$invoice->markUnpaid( $values['refund_invoice_status'], \IPS\Member::loggedIn() );
 			
 			/* Boink */
 			$this->_redirect( $invoice );
 		}
 		
 		/* Display */
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -831,26 +829,26 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function poNumber() : void
+	public function poNumber()
 	{
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/4', 404, '' );
 		}
 		
-		$form = new Form;
-		$form->add( new Text( 'invoice_po_number', $invoice->po, FALSE, array( 'maxLength' => 255 ) ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Text( 'invoice_po_number', $invoice->po, FALSE, array( 'maxLength' => 255 ) ) );
 		if ( $values = $form->values() )
 		{
 			$invoice->po = $values['invoice_po_number'];
 			$invoice->save();
 			$this->_redirect( $invoice );
 		}
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -858,26 +856,26 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function notes() : void
+	public function notes()
 	{
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/5', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/5', 404, '' );
 		}
 		
-		$form = new Form;
-		$form->add( new TextArea( 'invoice_notes', $invoice->notes ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\TextArea( 'invoice_notes', $invoice->notes ) );
 		if ( $values = $form->values() )
 		{
 			$invoice->notes = $values['invoice_notes'];
 			$invoice->save();
 			$this->_redirect( $invoice );
 		}
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -885,21 +883,21 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		Dispatcher::i()->checkAcpPermission( 'invoices_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'invoices_delete' );
 		
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 		
 		/* Load Transaction */
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/E', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/E', 404, '' );
 		}
 				
 		/* Log it */
@@ -913,7 +911,7 @@ class invoices extends Controller
 		$invoice->delete();
 		
 		/* Redirect */
-		Output::i()->redirect( Url::internal('app=nexus&module=payments&controller=invoices')->getSafeUrlFromFilters() );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=nexus&module=payments&controller=invoices')->getSafeUrlFromFilters() );
 	}
 	
 	/**
@@ -921,44 +919,44 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function generate() : void
+	public function generate()
 	{
 		/* Init */
-		Dispatcher::i()->checkAcpPermission( 'invoices_add' );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_store.js', 'nexus', 'admin' ) );
-		$url = Url::internal("app=nexus&module=payments&controller=invoices&do=generate");
-		if ( isset( Request::i()->member ) )
+		\IPS\Dispatcher::i()->checkAcpPermission( 'invoices_add' );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_store.js', 'nexus', 'admin' ) );
+		$url = \IPS\Http\Url::internal("app=nexus&module=payments&controller=invoices&do=generate");
+		if ( isset( \IPS\Request::i()->member ) )
 		{
-			$url = $url->setQueryString( 'member', Request::i()->member );
+			$url = $url->setQueryString( 'member', \IPS\Request::i()->member );
 		}
 		
 		/* Are we editing an invoice? */
 		$invoice = NULL;
-		if ( isset( Request::i()->id ) )
+		if ( isset( \IPS\Request::i()->id ) )
 		{
 			try
 			{
-				$invoice = Invoice::load( Request::i()->id );
+				$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 				
-				if ( $invoice->status === Invoice::STATUS_PAID )
+				if ( $invoice->status === \IPS\nexus\Invoice::STATUS_PAID )
 				{
-					Output::i()->error( 'cannot_edit_paid_invoice', '2X190/F', 403, '' );
+					\IPS\Output::i()->error( 'cannot_edit_paid_invoice', '2X190/F', 403, '' );
 				}
 				
-				$url = $url->setQueryString( 'id', Request::i()->id );
+				$url = $url->setQueryString( 'id', \IPS\Request::i()->id );
 			}
-			catch ( OutOfRangeException ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
-		Output::i()->title = $invoice ? Member::loggedIn()->language()->addToStack( 'invoice_number', FALSE, array( 'sprintf' => array( $invoice->id ) ) ) : Member::loggedIn()->language()->addToStack('generate_invoice');
+		\IPS\Output::i()->title = $invoice ? \IPS\Member::loggedIn()->language()->addToStack( 'invoice_number', FALSE, array( 'sprintf' => array( $invoice->id ) ) ) : \IPS\Member::loggedIn()->language()->addToStack('generate_invoice');
 			
 		/* Select Customer */	
 		$steps = array();
-		if ( !isset( Request::i()->member ) and ( !$invoice or !$invoice->member->member_id ) )
+		if ( !isset( \IPS\Request::i()->member ) and ( !$invoice or !$invoice->member->member_id ) )
 		{
 			$steps['invoice_generate_member'] = function( $data )
 			{
-				$form = new Form('customer', 'continue');
-				$form->add( new Form\Member( 'invoice_generate_member', NULL, TRUE ) );
+				$form = new \IPS\Helpers\Form('customer', 'continue');
+				$form->add( new \IPS\Helpers\Form\Member( 'invoice_generate_member', NULL, TRUE ) );
 				if ( $values = $form->values() )
 				{
 					return array( 'member' => $values['invoice_generate_member']->member_id );
@@ -970,31 +968,31 @@ class invoices extends Controller
 		/* Select Addresses */
 		$steps['invoice_generate_settings'] = function( $data ) use ( $invoice )
 		{
-			$customer = $invoice ? $invoice->member : ( Customer::load( isset( Request::i()->member ) ? Request::i()->member : $data['member'] ) );
+			$customer = $invoice ? $invoice->member : ( \IPS\nexus\Customer::load( isset( \IPS\Request::i()->member ) ? \IPS\Request::i()->member : $data['member'] ) );
 			
-			$form = new Form('settings', 'continue');
+			$form = new \IPS\Helpers\Form('settings', 'continue');
 			
 			$form->addHeader( 'invoice_settings' );
-			$currencies = Money::currencies();
-			if ( count( $currencies ) > 1 )
+			$currencies = \IPS\nexus\Money::currencies();
+			if ( \count( $currencies ) > 1 )
 			{
-				$form->add( new Radio( 'currency', $invoice ? $invoice->currency : $customer->defaultCurrency(), TRUE, array( 'options' => array_combine( $currencies, $currencies ) ) ) );
+				$form->add( new \IPS\Helpers\Form\Radio( 'currency', $invoice ? $invoice->currency : $customer->defaultCurrency(), TRUE, array( 'options' => array_combine( $currencies, $currencies ) ) ) );
 			}
 			$statusOptions = array();
-			$statusOptions[ Invoice::STATUS_PAID ] = 'invoice_status_paid';
-			$statusOptions[ Invoice::STATUS_PENDING ] = 'invoice_status_pend';
-			if ( Settings::i()->cm_invoice_expireafter )
+			$statusOptions[ \IPS\nexus\Invoice::STATUS_PAID ] = 'invoice_status_paid';
+			$statusOptions[ \IPS\nexus\Invoice::STATUS_PENDING ] = 'invoice_status_pend';
+			if ( \IPS\Settings::i()->cm_invoice_expireafter )
 			{
-				$statusOptions[ Invoice::STATUS_EXPIRED ] = 'invoice_status_expd';
+				$statusOptions[ \IPS\nexus\Invoice::STATUS_EXPIRED ] = 'invoice_status_expd';
 			}
-			$statusOptions[ Invoice::STATUS_CANCELED ] = 'invoice_status_canc';
-			$form->add( new Radio( 'invoice_status', $invoice ? $invoice->status : Invoice::STATUS_PENDING, TRUE, array( 'options' => $statusOptions ) ) );
-			$form->add( new Text( 'invoice_title', $invoice?->title, FALSE ) );
-			$form->add( new Text( 'invoice_po_number', $invoice?->po_number, FALSE, array( 'maxLength' => 255 ) ) );
-			$form->add( new TextArea( 'invoice_notes', $invoice?->notes) );
+			$statusOptions[ \IPS\nexus\Invoice::STATUS_CANCELED ] = 'invoice_status_canc';
+			$form->add( new \IPS\Helpers\Form\Radio( 'invoice_status', $invoice ? $invoice->status : \IPS\nexus\Invoice::STATUS_PENDING, TRUE, array( 'options' => $statusOptions ) ) );					
+			$form->add( new \IPS\Helpers\Form\Text( 'invoice_title', $invoice ? $invoice->title : NULL, FALSE ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'invoice_po_number', $invoice ? $invoice->po_number : NULL, FALSE, array( 'maxLength' => 255 ) ) );
+			$form->add( new \IPS\Helpers\Form\TextArea( 'invoice_notes', $invoice ? $invoice->notes : NULL ) );
 			
 			$needTaxStatus = NULL;
-			foreach ( Tax::roots() as $tax )
+			foreach ( \IPS\nexus\Tax::roots() as $tax )
 			{
 				if ( $tax->type === 'eu' )
 				{
@@ -1010,51 +1008,68 @@ class invoices extends Controller
 			$addressHelperOptions = ( $needTaxStatus === 'eu' ) ? array( 'vat' => TRUE ) : array();
 			
 			$form->addHeader( 'invoice_generate_addresses' );
-			$addresses = Db::i()->select( '*', 'nexus_customer_addresses', array( '`member`=?', $customer->member_id ) );
-			if ( count( $addresses ) )
+			$addresses = \IPS\Db::i()->select( '*', 'nexus_customer_addresses', array( '`member`=?', $customer->member_id ) );
+			if ( \count( $addresses ) )
 			{
 				$primaryBillingAddressId = NULL;
 				$chosenBillingAddressId = 0;
+				$primaryShippingAddressId = 'x';
+				$chosenShippingAddressid = 0;
 				$options = array();
-				foreach ( new ActiveRecordIterator( $addresses, 'IPS\nexus\Customer\Address' ) as $address )
+				foreach ( new \IPS\Patterns\ActiveRecordIterator( $addresses, 'IPS\nexus\Customer\Address' ) as $address )
 				{
-					$options[ $address->id ] = $address->address->toString('<br>') . ( ( isset( $address->address->business ) and $address->address->business and isset( $address->address->vat ) and $address->address->vat ) ? ( '<br>' . Member::loggedIn()->language()->addToStack('cm_checkout_vat_number') . ': ' . Theme::i()->getTemplate( 'global', 'nexus' )->vatNumber( $address->address->vat ) ) : '' );
+					$options[ $address->id ] = $address->address->toString('<br>') . ( ( isset( $address->address->business ) and $address->address->business and isset( $address->address->vat ) and $address->address->vat ) ? ( '<br>' . \IPS\Member::loggedIn()->language()->addToStack('cm_checkout_vat_number') . ': ' . \IPS\Theme::i()->getTemplate( 'global', 'nexus' )->vatNumber( $address->address->vat ) ) : '' );
 					if ( $address->primary_billing )
 					{
 						$primaryBillingAddressId = $address->id;
+					}
+					if ( $address->primary_shipping )
+					{
+						$primaryShippingAddressId = $address->id;
 					}
 					
 					if ( $invoice and $invoice->billaddress and $invoice->billaddress == $address->address )
 					{
 						$chosenBillingAddressId = $address->id;
 					}
+					if ( $invoice and $invoice->shipaddress and $invoice->shipaddress == $address->address )
+					{
+						$chosenShippingAddressid = $address->id;
+					}
 				}
-				$options[0] = Member::loggedIn()->language()->addToStack('other');
+				$options[0] = \IPS\Member::loggedIn()->language()->addToStack('other');
 				
-				$form->add( new Radio( 'billing_address', ( $invoice and $invoice->billaddress ) ? $chosenBillingAddressId : $primaryBillingAddressId, TRUE, array( 'options' => $options, 'toggles' => array( 0 => array( 'new_billing_address' ) ), 'parse' => 'raw' ) ) );
-				$newAddress = new $addressHelperClass( 'new_billing_address', $invoice?->billaddress, FALSE, $addressHelperOptions, NULL, NULL, NULL, 'new_billing_address' );
+				$form->add( new \IPS\Helpers\Form\Radio( 'billing_address', ( $invoice and $invoice->billaddress ) ? $chosenBillingAddressId : $primaryBillingAddressId, TRUE, array( 'options' => $options, 'toggles' => array( 0 => array( 'new_billing_address' ) ), 'parse' => 'raw' ) ) );
+				$newAddress = new $addressHelperClass( 'new_billing_address', $invoice ? $invoice->billaddress : NULL, FALSE, $addressHelperOptions, NULL, NULL, NULL, 'new_billing_address' );
+				$newAddress->label = ' ';
+				$form->add( $newAddress );
+				
+				$form->add( new \IPS\Helpers\Form\Radio( 'shipping_address', ( $invoice and $invoice->shipaddress ) ? $chosenShippingAddressid : ( ( $primaryShippingAddressId == $primaryBillingAddressId ) ? 'x' : $primaryShippingAddressId ), TRUE, array( 'options' => array( 'x' => \IPS\Member::loggedIn()->language()->addToStack('same_as_billing_address') ) + $options, 'toggles' => array( 0 => array( 'new_shipping_address' ) ), 'parse' => 'raw' ) ) );
+				$newAddress = new $addressHelperClass( 'new_shipping_address', $invoice ? $invoice->shipaddress : NULL, FALSE, array(), NULL, NULL, NULL, 'new_shipping_address' );
 				$newAddress->label = ' ';
 				$form->add( $newAddress );
 			}
 			else
 			{
-				$form->add( new $addressHelperClass( 'new_billing_address', $invoice?->billaddress, FALSE, $addressHelperOptions, function($val ) {
-					if ( Request::i()->invoice_status === Invoice::STATUS_PAID and !$val )
+				$form->add( new $addressHelperClass( 'new_billing_address', $invoice ? $invoice->billaddress : NULL, FALSE, $addressHelperOptions, function( $val ) {
+					if ( \IPS\Request::i()->invoice_status === \IPS\nexus\Invoice::STATUS_PAID and !$val )
 					{
-						throw new DomainException('billing_address_req');
+						throw new \DomainException('billing_address_req');
 					}
 				} ) );
+				$form->add( new \IPS\Helpers\Form\Radio( 'shipping_address', ( $invoice and $invoice->shipaddress and $invoice->shipaddress != $invoice->billaddress ) ? '1' : 'x', FALSE, array( 'options' => array( 'x' => 'same_as_billing_address', '1' => 'other' ), 'toggles' => array( '1' => array( 'new_shipping_address' ) ) ) ) );
+				$form->add( new $addressHelperClass( 'new_shipping_address', $invoice ? $invoice->billaddress : NULL, FALSE, array(), NULL, NULL, NULL, 'new_shipping_address' ) );
 			}
 			
 			if ( $values = $form->values() )
 			{
-				if ( count( $addresses ) and $values['billing_address'] )
+				if ( \count( $addresses ) and $values['billing_address'] )
 				{
-					$data['billaddress'] = Address::load( $values['billing_address'] )->address;
+					$data['billaddress'] = \IPS\nexus\Customer\Address::load( $values['billing_address'] )->address;
 				}
 				else
 				{
-					if( $values['new_billing_address'] === NULL OR empty( $values['new_billing_address']->addressLines ) or !$values['new_billing_address']->city or !$values['new_billing_address']->country or ( !$values['new_billing_address']->region and array_key_exists( $values['new_billing_address']->country, GeoLocation::$states ) ) or !$values['new_billing_address']->postalCode )
+					if( $values['new_billing_address'] === NULL OR empty( $values['new_billing_address']->addressLines ) or !$values['new_billing_address']->city or !$values['new_billing_address']->country or ( !$values['new_billing_address']->region and array_key_exists( $values['new_billing_address']->country, \IPS\GeoLocation::$states ) ) or !$values['new_billing_address']->postalCode )
 					{
 						$data['billaddress'] = NULL;
 					}
@@ -1064,7 +1079,27 @@ class invoices extends Controller
 					}
 				}
 
-				$data['currency'] = $values['currency'] ?? $customer->defaultCurrency();
+				if ( \count( $addresses ) and $values['shipping_address'] and $values['shipping_address'] !== 'x' )
+				{
+					$data['shipaddress'] = \IPS\nexus\Customer\Address::load( $values['shipping_address'] )->address;
+				}
+				elseif ( $values['shipping_address'] === 'x' )
+				{
+					$data['shipaddress'] = $data['billaddress'];
+				}
+				else
+				{
+					if( $values['new_shipping_address'] === NULL OR empty( $values['new_shipping_address']->addressLines ) or !$values['new_shipping_address']->city or !$values['new_shipping_address']->country or ( !$values['new_shipping_address']->region and array_key_exists( $values['new_shipping_address']->country, \IPS\GeoLocation::$states ) ) or !$values['new_shipping_address']->postalCode )
+					{
+						$data['shipaddress'] = NULL;
+					}
+					else
+					{
+						$data['shipaddress'] = $values['new_shipping_address'];
+					}
+				}
+								
+				$data['currency'] = isset( $values['currency'] ) ? $values['currency'] : $customer->defaultCurrency();
 				$data['status'] = $values['invoice_status'];
 				$data['title'] = $values['invoice_title'];
 				$data['po_number'] = $values['invoice_po_number'];
@@ -1086,17 +1121,21 @@ class invoices extends Controller
 		{
 			if ( !$invoice )
 			{
-				$invoice = new Invoice;
-				$invoice->member = Customer::load( isset( Request::i()->member ) ? Request::i()->member : $data['member'] );
+				$invoice = new \IPS\nexus\Invoice;
+				$invoice->member = \IPS\Member::load( isset( \IPS\Request::i()->member ) ? \IPS\Request::i()->member : $data['member'] );
 			}
 			$invoice->currency = $data['currency'];
 			if ( $data['billaddress'] )
 			{
 				$invoice->billaddress = $data['billaddress'];
 			}
+			if ( $data['shipaddress'] )
+			{ 	
+				$invoice->shipaddress = $data['shipaddress'];
+			}
 			$invoice->items = isset( $data['items'] ) ? json_encode( $data['items'] ) : json_encode( array() );			
 																		
-			if ( isset( Request::i()->continue ) )
+			if ( isset( \IPS\Request::i()->continue ) )
 			{
 				$invoice->recalculateTotal();
 
@@ -1113,14 +1152,14 @@ class invoices extends Controller
 					$invoice->notes = $data['notes'];
 				}
 				
-				if ( $data['status'] === Invoice::STATUS_PAID )
+				if ( $data['status'] === \IPS\nexus\Invoice::STATUS_PAID )
 				{
-					$invoice->status = Invoice::STATUS_PENDING;
+					$invoice->status = \IPS\nexus\Invoice::STATUS_PENDING;
 					$invoice->save();
 					
 					$invoice->member->log( 'invoice', array(
 						'type'	=> 'status',
-						'new'	=> Invoice::STATUS_PAID,
+						'new'	=> \IPS\nexus\Invoice::STATUS_PAID,
 						'id'	=> $invoice->id,
 						'title' => $invoice->title
 					) );
@@ -1133,76 +1172,76 @@ class invoices extends Controller
 				}
 
 				/* Now that we have an ID, do we need to update purchase rows? */
-				if ( isset( $data['update_purchase_invoice_pending'] ) and is_array( $data['update_purchase_invoice_pending'] ) )
+				if ( isset( $data['update_purchase_invoice_pending'] ) and \is_array( $data['update_purchase_invoice_pending'] ) )
 				{
 					foreach( $data['update_purchase_invoice_pending'] as $id )
 					{
 						try
 						{
-							$purchase = Purchase::load( $id );
+							$purchase = \IPS\nexus\Purchase::load( $id );
 							$purchase->invoice_pending = $invoice;
 							$purchase->save();
 						}
-						catch( Exception ) {}
+						catch( \Exception $e ) {}
 					}
 				}
 
-				if ( $data['status'] !== Invoice::STATUS_CANCELED )
+				if ( $data['status'] !== \IPS\nexus\Invoice::STATUS_CANCELED )
 				{
 					$invoice->sendNotification();
 				}
 
-				Output::i()->redirect( $invoice->acpUrl() );
+				\IPS\Output::i()->redirect( $invoice->acpUrl() );
 			}
-			elseif ( isset( Request::i()->remove ) )
+			elseif ( isset( \IPS\Request::i()->remove ) )
 			{
-				unset( $data['items'][ Request::i()->remove ] );
+				unset( $data['items'][ \IPS\Request::i()->remove ] );
 				$_SESSION[ 'wizard-' . md5( $url ) . '-data' ] = $data;
-				Output::i()->redirect( $url );
+				\IPS\Output::i()->redirect( $url );
 			}
-			elseif ( isset( Request::i()->addRenewal ) )
+			elseif ( isset( \IPS\Request::i()->addRenewal ) )
 			{
-				$form = new Form;
-				$form->add( new Node( 'purchases_to_renew', NULL, TRUE, array( 'class' => 'IPS\nexus\Purchase', 'forceOwner' => $invoice->member, 'multiple' => TRUE, 'permissionCheck' => function( $purchase )
+				$form = new \IPS\Helpers\Form;
+				$form->add( new \IPS\Helpers\Form\Node( 'purchases_to_renew', NULL, TRUE, array( 'class' => 'IPS\nexus\Purchase', 'forceOwner' => $invoice->member, 'multiple' => TRUE, 'permissionCheck' => function( $purchase )
 				{
 					return (bool) $purchase->renewals;
 				} ) ) );
-				$form->add( new Number( 'renew_cycles', 1, TRUE, array( 'min' => 1 ) ) );
+				$form->add( new \IPS\Helpers\Form\Number( 'renew_cycles', 1, TRUE, array( 'min' => 1 ) ) );
 				if ( $values = $form->values() )
 				{
 					foreach ( $values['purchases_to_renew'] as $purchase )
 					{
-						$invoice->addItem( Renewal::create( $purchase, $values['renew_cycles'] ) );
+						$invoice->addItem( \IPS\nexus\Invoice\Item\Renewal::create( $purchase, $values['renew_cycles'] ) );
 						$data['update_purchase_invoice_pending'][] = $purchase->id;
 					}
 					$data['items'] = $invoice->items->getArrayCopy();
 					$_SESSION[ 'wizard-' . md5( $url ) . '-data' ] = $data;
-					Output::i()->redirect( $url );
+					\IPS\Output::i()->redirect( $url );
 				}
 				return $form;
 			}
 						
-			$itemTypes = Application::allExtensions( 'nexus', 'Item', TRUE, NULL, NULL, FALSE );
-			if ( isset( Request::i()->add ) and isset( $itemTypes[ Request::i()->add ] ) )
+			$itemTypes = \IPS\Application::allExtensions( 'nexus', 'Item', TRUE, NULL, NULL, FALSE );
+			if ( isset( \IPS\Request::i()->add ) and isset( $itemTypes[ \IPS\Request::i()->add ] ) )
 			{
-				$class = $itemTypes[ Request::i()->add ];
+				$class = $itemTypes[ \IPS\Request::i()->add ];
 				
-				$formUrl = $url->setQueryString( 'add', Request::i()->add );
-				$form = new Form( 'add', 'invoice_add_item', $formUrl );
+				$formUrl = $url->setQueryString( 'add', \IPS\Request::i()->add );				
+				$form = new \IPS\Helpers\Form( 'add', 'invoice_add_item', $formUrl );
 				if ( method_exists( $class, 'formSecondStep' ) )
 				{
 					$form->ajaxOutput = TRUE;
 				}
 				$class::form( $form, $invoice );
-				if ( $values = $form->values() or ( method_exists( $class, 'formSecondStep' ) and isset( Request::i()->firstStep ) ) )
+				if ( $values = $form->values() or ( method_exists( $class, 'formSecondStep' ) and isset( \IPS\Request::i()->firstStep ) ) )
 				{
 					if ( method_exists( $class, 'formSecondStep' ) )
 					{
-						$firstStepValues = isset( Request::i()->firstStep ) ? urldecode( Request::i()->firstStep ) : json_encode( array_map( function( $val )
+						$firstStepValues = isset( \IPS\Request::i()->firstStep ) ? urldecode( \IPS\Request::i()->firstStep ) : json_encode( array_map( function( $val )
 						{
-							return ( $val instanceof Model ) ? $val->_id : $val;
+							return ( $val instanceof \IPS\Node\Model ) ? $val->_id : $val;
 						}, $values ) );						
-						$secondStepForm = new Form( 'add2', 'invoice_add_item', $formUrl->setQueryString( 'firstStep', $firstStepValues ) );
+						$secondStepForm = new \IPS\Helpers\Form( 'add2', 'invoice_add_item', $formUrl->setQueryString( 'firstStep', $firstStepValues ) );
 						$secondStepForm->ajaxOutput = TRUE;
 						$secondStepForm->hiddenValues['firstStep'] = $firstStepValues;
 						if ( $class::formSecondStep( json_decode( $firstStepValues, TRUE ), $secondStepForm, $invoice ) )
@@ -1210,7 +1249,7 @@ class invoices extends Controller
 							if ( $secondStepValues = $secondStepForm->values() )
 							{
 								$item = $class::createFromForm( $secondStepValues, $invoice );
-								if( is_array( $item ) )
+								if( \is_array( $item ) )
 								{
 									foreach ( $item as $i )
 									{
@@ -1223,22 +1262,23 @@ class invoices extends Controller
 								}
 								$data['items'] = $invoice->items->getArrayCopy();
 								$_SESSION[ 'wizard-' . md5( $url ) . '-data' ] = $data;
-								Output::i()->redirect( $url );
+								\IPS\Output::i()->redirect( $url );
+								return;
 							}
 							
-							if ( Request::i()->isAjax() )
+							if ( \IPS\Request::i()->isAjax() )
 							{
-								Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $secondStepForm ) );
+								\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $secondStepForm ), 200, 'text/html' );
 							}
 							else
 							{
-								Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( Output::i()->title, $secondStepForm, array( 'app' => Dispatcher::i()->application->directory, 'module' => Dispatcher::i()->module->key, 'controller' => Dispatcher::i()->controller ) ) );
+								\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( \IPS\Output::i()->title, $secondStepForm, array( 'app' => \IPS\Dispatcher::i()->application->directory, 'module' => \IPS\Dispatcher::i()->module->key, 'controller' => \IPS\Dispatcher::i()->controller ) ), 200, 'text/html' );
 							}
 						}
 					}
 
 					$item = $class::createFromForm( $values, $invoice );
-					if( is_array( $item ) )
+					if( \is_array( $item ) )
 					{
 						foreach ( $item as $i )
 						{
@@ -1252,25 +1292,26 @@ class invoices extends Controller
 
 					$data['items'] = $invoice->items->getArrayCopy();
 					$_SESSION[ 'wizard-' . md5( $url ) . '-data' ] = $data;					
-					Output::i()->redirect( $url );
+					\IPS\Output::i()->redirect( $url );
 				}
 				
-				if ( Request::i()->isAjax() )
+				if ( \IPS\Request::i()->isAjax() )
 				{
-					Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $form ) );
+					\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $form ), 200, 'text/html' );
 				}
 				else
 				{
-					Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( Output::i()->title, $form, array( 'app' => Dispatcher::i()->application->directory, 'module' => Dispatcher::i()->module->key, 'controller' => Dispatcher::i()->controller ) ) );
+					\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->globalTemplate( \IPS\Output::i()->title, $form, array( 'app' => \IPS\Dispatcher::i()->application->directory, 'module' => \IPS\Dispatcher::i()->module->key, 'controller' => \IPS\Dispatcher::i()->controller ) ), 200, 'text/html' );
 				}
+				return;
 			}
 			
-			return Theme::i()->getTemplate('invoices')->generate( $invoice->summary(), $itemTypes, $url );
+			return \IPS\Theme::i()->getTemplate('invoices')->generate( $invoice->summary(), $itemTypes, $url );					
 			
 		};
 		
 		/* Display */
-		Output::i()->output = new Wizard( $steps, $url, ( !isset( Request::i()->add ) and !isset( Request::i()->addRenewal ) ) );
+		\IPS\Output::i()->output = new \IPS\Helpers\Wizard( $steps, $url, ( !isset( \IPS\Request::i()->add ) and !isset( \IPS\Request::i()->addRenewal ) ) );
 	}
 	
 	/**
@@ -1278,24 +1319,24 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function productTree() : void
+	public function productTree()
 	{
-		Dispatcher::i()->checkAcpPermission( 'invoices_add' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'invoices_add' );
 		
 		$output = '';
-		foreach( Group::load( Request::i()->id )->children() as $child )
+		foreach( \IPS\nexus\Package\Group::load( \IPS\Request::i()->id )->children() as $child )
 		{
-			if ( $child instanceof Group )
+			if ( $child instanceof \IPS\nexus\Package\Group )
 			{
-				$output .= Theme::i()->getTemplate('invoices')->packageSelectorGroup( $child );
+				$output .= \IPS\Theme::i()->getTemplate('invoices')->packageSelectorGroup( $child );
 			}
 			else
 			{
-				$output .= Theme::i()->getTemplate('invoices')->packageSelectorProduct( $child );
+				$output .= \IPS\Theme::i()->getTemplate('invoices')->packageSelectorProduct( $child );
 			}
 		}
 		
-		Output::i()->json( $output );
+		\IPS\Output::i()->json( $output );
 	}
 	
 	/**
@@ -1303,32 +1344,32 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function settings() : void
+	protected function settings()
 	{
-		Dispatcher::i()->checkAcpPermission( 'invoices_settings' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'invoices_settings' );
 
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->addheader('invoice_flow');
 		$form->addMessage('invoice_flow_visualise');
-		$form->add( new Interval( 'cm_invoice_generate', Settings::i()->cm_invoice_generate, FALSE, array( 'valueAs' => Interval::HOURS, 'min' => 1 ), NULL, NULL, Member::loggedIn()->language()->addToStack('cm_invoice_generate_suffix') ) );
-		$form->add( new Interval( 'cm_invoice_warning', Settings::i()->cm_invoice_warning, FALSE, array( 'valueAs' => Interval::HOURS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, NULL, Member::loggedIn()->language()->addToStack('cm_invoice_warning_suffix') ) );
-		$form->add( new Interval( 'cm_invoice_expireafter', Settings::i()->cm_invoice_expireafter, FALSE, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0 ), NULL, NULL, NULL ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'cm_invoice_generate', \IPS\Settings::i()->cm_invoice_generate, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::HOURS, 'min' => 1 ), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('cm_invoice_generate_suffix') ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'cm_invoice_warning', \IPS\Settings::i()->cm_invoice_warning, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::HOURS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('cm_invoice_warning_suffix') ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'cm_invoice_expireafter', \IPS\Settings::i()->cm_invoice_expireafter, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0 ), NULL, NULL, NULL ) );
 		$form->addHeader('invoice_layout');
 		$form->addMessage('invoice_layout_blurb');
-		$form->add( new Editor( 'nexus_invoice_header', Settings::i()->nexus_invoice_header, FALSE, array( 'app' => 'nexus', 'key' => 'Admin', 'autoSaveKey'	=> 'nexus-invoice-header', 'attachIds' => array( NULL, NULL, 'invoice-header' ), 'minimize' => 'nexus_invoice_header_placeholder'  ) ) );
-		$form->add( new Editor( 'nexus_invoice_footer', Settings::i()->nexus_invoice_footer, FALSE, array( 'app' => 'nexus', 'key' => 'Admin', 'autoSaveKey'	=> 'nexus-invoice-footer', 'attachIds' => array( NULL, NULL, 'invoice-footer' ), 'minimize' => 'nexus_invoice_footer_placeholder'  ) ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'nexus_invoice_header', \IPS\Settings::i()->nexus_invoice_header, FALSE, array( 'app' => 'nexus', 'key' => 'Admin', 'autoSaveKey'	=> 'nexus-invoice-header', 'attachIds' => array( NULL, NULL, 'invoice-header' ), 'minimize' => 'nexus_invoice_header_placeholder'  ) ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'nexus_invoice_footer', \IPS\Settings::i()->nexus_invoice_footer, FALSE, array( 'app' => 'nexus', 'key' => 'Admin', 'autoSaveKey'	=> 'nexus-invoice-footer', 'attachIds' => array( NULL, NULL, 'invoice-footer' ), 'minimize' => 'nexus_invoice_footer_placeholder'  ) ) );
 		
 		if ( $values = $form->values() )
 		{
-			Db::i()->update( 'core_tasks', array( 'enabled' => (int) (bool) $values['cm_invoice_expireafter'] ), "`key`='expireInvoices'" );
+			\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => (int) (bool) $values['cm_invoice_expireafter'] ), "`key`='expireInvoices'" );
 			
 			$form->saveAsSettings();
-			Session::i()->log( 'acplogs__invoice_settings' );
-			Output::i()->redirect( Url::internal('app=nexus&module=payments&controller=invoices&do=settings'), 'saved' );
+			\IPS\Session::i()->log( 'acplogs__invoice_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=nexus&module=payments&controller=invoices&do=settings'), 'saved' );
 		}
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('invoice_settings');
-		Output::i()->output = $form;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('invoice_settings');
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -1336,70 +1377,70 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function track() : void
+	protected function track()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$invoice = Invoice::load( Request::i()->id );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->id );
 			
-			if ( Request::i()->track )
+			if ( \IPS\Request::i()->track )
 			{
-				Db::i()->insert( 'nexus_invoice_tracker', array(
-					'member_id'		=> Member::loggedIn()->member_id,
+				\IPS\Db::i()->insert( 'nexus_invoice_tracker', array(
+					'member_id'		=> \IPS\Member::loggedIn()->member_id,
 					'invoice_id'		=> $invoice->id
 				), TRUE );
 			}
 			else
 			{
-				Db::i()->delete( 'nexus_invoice_tracker', array( 'member_id=? AND invoice_id=?', Member::loggedIn()->member_id, $invoice->id ) );
+				\IPS\Db::i()->delete( 'nexus_invoice_tracker', array( 'member_id=? AND invoice_id=?', \IPS\Member::loggedIn()->member_id, $invoice->id ) );
 			}
 			
 			$this->_redirect( $invoice );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/G', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/G', 404, '' );
 		}
 	}
 	
 	/**
 	 * Redirect
 	 *
-	 * @param	Invoice	$invoice	The invoice
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
 	 * @return	void
 	 */
-	protected function _redirect( Invoice $invoice ) : void
+	protected function _redirect( \IPS\nexus\Invoice $invoice )
 	{
-		if ( isset( Request::i()->r ) )
+		if ( isset( \IPS\Request::i()->r ) )
 		{
-			switch ( mb_substr( Request::i()->r, 0, 1 ) )
+			switch ( mb_substr( \IPS\Request::i()->r, 0, 1 ) )
 			{
 				case 'v':
-					Output::i()->redirect( $invoice->acpUrl() );
+					\IPS\Output::i()->redirect( $invoice->acpUrl() );
 					break;
 				
 				case 'p':
 					try
 					{
-						Output::i()->redirect( Purchase::load( mb_substr( Request::i()->r, 2 ) )->acpUrl() );
+						\IPS\Output::i()->redirect( \IPS\nexus\Purchase::load( mb_substr( \IPS\Request::i()->r, 2 ) )->acpUrl() );
 						break;
 					}
-					catch ( OutOfRangeException ) {}
+					catch ( \OutOfRangeException $e ) {}
 				
 				case 'c':
-					Output::i()->redirect( $invoice->member->acpUrl() );
+					\IPS\Output::i()->redirect( $invoice->member->acpUrl() );
 					break;
 				
 				case 't':
-					Output::i()->redirect( Url::internal('app=nexus&module=payments&controller=invoices') );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=nexus&module=payments&controller=invoices') );
 					break;
 					
 			}
 		}
 		
-		Output::i()->redirect( $invoice->acpUrl() );
+		\IPS\Output::i()->redirect( $invoice->acpUrl() );
 	}
 	
 	/**
@@ -1407,49 +1448,49 @@ class invoices extends Controller
 	 *
 	 * @return	void
 	 */
-	public function webhook() : void
+	public function webhook()
 	{
 		/* Load the invoice */
 		try
 		{
-			$invoice = Invoice::load( Request::i()->invoice );
+			$invoice = \IPS\nexus\Invoice::load( \IPS\Request::i()->invoice );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X190/J', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X190/J', 404, '' );
 		}
 		
 		/* Have we decided to give up waiting and just show a pending screen? */
-		if ( isset( Request::i()->pending ) )
+		if ( isset( \IPS\Request::i()->pending ) )
 		{
-			Output::i()->error( 'webhook_not_received', '2X190/K', 404 );
+			\IPS\Output::i()->error( 'webhook_not_received', '2X190/K', 404 );
 		}
 		
 		/* Nope - show a redirector */
-		Output::i()->output = $this->_webhookRedirector( $invoice, isset( Request::i()->exclude ) ? explode( ',', Request::i()->exclude ) : array() );
+		\IPS\Output::i()->output = $this->_webhookRedirector( $invoice, isset( \IPS\Request::i()->exclude ) ? explode( ',', \IPS\Request::i()->exclude ) : array() );
 	}
 	
 	/**
 	 * Get a redirector that points to do=webhook
 	 *
-	 * @param	Invoice	$invoice	The invoice
-	 * @param array $exclude	Transaction IDs to exclude
-	 * @return	MultipleRedirect
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @param	array				$exclude	Transaction IDs to exclude
+	 * @return	\IPS\Helpers\MultipleRedirect
 	 */
-	protected function _webhookRedirector( Invoice $invoice, array $exclude ): MultipleRedirect
+	protected function _webhookRedirector( \IPS\nexus\Invoice $invoice, $exclude )
 	{
 		$self = $this;
-		return new MultipleRedirect(
-			Url::internal('app=nexus&module=payments&controller=invoices')->setQueryString( array( 'do' => 'webhook', 'invoice' => $invoice->id, 'exclude' => implode( ',', $exclude ) ) ),
+		return new \IPS\Helpers\MultipleRedirect(
+			\IPS\Http\Url::internal('app=nexus&module=payments&controller=invoices')->setQueryString( array( 'do' => 'webhook', 'invoice' => $invoice->id, 'exclude' => implode( ',', $exclude ) ) ),
 			function( $data ) use ( $self, $invoice, $exclude ) {	
 				if ( $data === NULL )
 				{
-					return array( time(), Member::loggedIn()->language()->addToStack('processing_the_payment') );
+					return array( time(), \IPS\Member::loggedIn()->language()->addToStack('processing_the_payment') );
 				}
 				else
 				{
 					/* Do we have any transactions yet? */
-					foreach ( $invoice->transactions( array( Transaction::STATUS_PAID, Transaction::STATUS_HELD, Transaction::STATUS_REFUSED ), $exclude ? array( array( Db::i()->in( 't_id', $exclude, TRUE ) ) ) : array() ) as $transaction )
+					foreach ( $invoice->transactions( array( \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_REFUSED ), $exclude ? array( array( \IPS\Db::i()->in( 't_id', $exclude, TRUE ) ) ) : array() ) as $transaction )
 					{
 						$self->_redirect( $invoice );
 					}
@@ -1462,12 +1503,12 @@ class invoices extends Controller
 					else
 					{
 						sleep(5);
-						return array( $data, Member::loggedIn()->language()->addToStack('processing_the_payment') );
+						return array( $data, \IPS\Member::loggedIn()->language()->addToStack('processing_the_payment') );
 					}
 				}
 			},
 			function() use( $invoice ) {
-				Output::i()->redirect( Url::internal('app=nexus&module=payments&controller=invoices')->setQueryString( array( 'do' => 'webhook', 'invoice' => $invoice->id, 'pending' => 1 ) ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=nexus&module=payments&controller=invoices')->setQueryString( array( 'do' => 'webhook', 'invoice' => $invoice->id, 'pending' => 1 ) ) );
 			}
 		);
 	}

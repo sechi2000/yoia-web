@@ -12,61 +12,30 @@
 namespace IPS\core\modules\admin\settings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Data\Store;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Color;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Image;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use function count;
-use function defined;
-use function mb_strstr;
-use function strlen;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * webapp
  */
-class webapp extends Controller
+class _webapp extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'webapp_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'webapp_manage' );
 		parent::execute();
 	}
 
@@ -75,78 +44,75 @@ class webapp extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 
 		$form->addTab( 'webapp_tab_icons' );
 
 		/* Homescreen icons - we accept one upload and create the images we need */
-		$homeScreen = Settings::i()->icons_homescreen ? json_decode( Settings::i()->icons_homescreen, TRUE ) :[];
-		$form->add( new Upload( 'icons_homescreen', ( isset( $homeScreen['original'] ) ) ? File::get( 'core_Icons', $homeScreen['original'] ) : NULL, FALSE, array( 'image' => true, 'storageExtension' => 'core_Icons', 'allowedFileTypes' => array( 'png' ) ) ) );
+		$homeScreen = json_decode( \IPS\Settings::i()->icons_homescreen, TRUE ) ?? array();
+		$form->add( new \IPS\Helpers\Form\Upload( 'icons_homescreen', ( isset( $homeScreen['original'] ) ) ? \IPS\File::get( 'core_Icons', $homeScreen['original'] ) : NULL, FALSE, array( 'image' => true, 'storageExtension' => 'core_Icons' ) ) );
 
-		$homeScreenMaskable = Settings::i()->icons_homescreen_maskable ? json_decode( Settings::i()->icons_homescreen_maskable, TRUE ) : array();
-		$form->add( new Upload( 'icons_homescreen_maskable', ( isset( $homeScreenMaskable['original'] ) ) ? File::get( 'core_Icons', $homeScreenMaskable['original'] ) : NULL, FALSE, array( 'image' => true, 'storageExtension' => 'core_Icons', 'allowedFileTypes' => array( 'png' ) ) ) );
+		$homeScreenMaskable = json_decode( \IPS\Settings::i()->icons_homescreen_maskable, TRUE ) ?? array();
+		$form->add( new \IPS\Helpers\Form\Upload( 'icons_homescreen_maskable', ( isset( $homeScreenMaskable['original'] ) ) ? \IPS\File::get( 'core_Icons', $homeScreenMaskable['original'] ) : NULL, FALSE, array( 'image' => true, 'storageExtension' => 'core_Icons', 'allowedFileTypes' => ['png', 'webp' ] ) ) );
 
 		/* Apple startup screen logo - we accept one upload and create the images we need */
-		$apple = Settings::i()->icons_apple_startup ? json_decode( Settings::i()->icons_apple_startup, TRUE ) : array();
-		$form->add( new Upload( 'icons_apple_startup', ( isset( $apple['original'] ) ) ? File::get( 'core_Icons', $apple['original'] ) : NULL, FALSE, array( 'image' => true, 'storageExtension' => 'core_Icons', 'allowedFileTypes' => array( 'png' ) ) ) );
+		$apple = json_decode( \IPS\Settings::i()->icons_apple_startup, TRUE ) ?? array();
+		$form->add( new \IPS\Helpers\Form\Upload( 'icons_apple_startup', ( isset( $apple['original'] ) ) ? \IPS\File::get( 'core_Icons', $apple['original'] ) : NULL, FALSE, array( 'image' => true, 'storageExtension' => 'core_Icons' ) ) );
 
 		/* Safari pinned tabs icon and highlight color */
-		$form->add( new Upload( 'icons_mask_icon', Settings::i()->icons_mask_icon ? File::get( 'core_Icons', Settings::i()->icons_mask_icon ) : NULL, FALSE, array( 'allowedFileTypes' => array( 'svg' ), 'storageExtension' => 'core_Icons', 'obscure' => FALSE ) ) );
-		$form->add( new Color( 'icons_mask_color', Settings::i()->icons_mask_color, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'icons_mask_icon', \IPS\Settings::i()->icons_mask_icon ? \IPS\File::get( 'core_Icons', \IPS\Settings::i()->icons_mask_icon ) : NULL, FALSE, array( 'allowedFileTypes' => array( 'svg' ), 'storageExtension' => 'core_Icons', 'obscure' => FALSE ) ) );
+		$form->add( new \IPS\Helpers\Form\Color( 'icons_mask_color', \IPS\Settings::i()->icons_mask_color, FALSE ) );
 
 		$form->addTab( 'webapp_tab_manifest' );
 
 		/* And finally, additional manifest and livetile details */
-		$manifestDetails = Settings::i()->manifest_details ? json_decode( Settings::i()->manifest_details, TRUE ) : [];
-		if ( isset( $manifestDetails['cache_key'] ) )
-		{
-			unset( $manifestDetails['cache_key'] );
-		}
+		$manifestDetails = json_decode( \IPS\Settings::i()->manifest_details, TRUE );
 
-		$form->add( new YesNo( 'configure_manifest', count( $manifestDetails ) > 0, FALSE, array(
-			'togglesOn'	=> array( 'manifest_shortname', 'manifest_fullname', 'manifest_description', 'manifest_defaultapp', 'manifest_themecolor', 'manifest_bgcolor', 'manifest_custom_url_toggle' ),
+		$form->add( new \IPS\Helpers\Form\YesNo( 'configure_manifest', \count( $manifestDetails ) > 0, FALSE, array(
+			'togglesOn'	=> array( 'manifest_shortname', 'manifest_fullname', 'manifest_description', 'manifest_defaultapp', 'manifest_themecolor', 'manifest_bgcolor', 'manifest_display', 'manifest_custom_url_toggle' ),
 		) ) );
 
-		$form->add( new Text( 'manifest_shortname', ( isset( $manifestDetails['short_name'] ) ) ? $manifestDetails['short_name'] : '', FALSE, array(), NULL, NULL, NULL, 'manifest_shortname' ) );
-		$form->add( new Text( 'manifest_fullname', ( isset( $manifestDetails['name'] ) ) ? $manifestDetails['name'] : '', FALSE, array(), NULL, NULL, NULL, 'manifest_fullname' ) );
-		$form->add( new TextArea( 'manifest_description', ( isset( $manifestDetails['description'] ) ) ? $manifestDetails['description'] : '', FALSE, array(), NULL, NULL, NULL, 'manifest_description' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'manifest_shortname', ( isset( $manifestDetails['short_name'] ) ) ? $manifestDetails['short_name'] : '', FALSE, array(), NULL, NULL, NULL, 'manifest_shortname' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'manifest_fullname', ( isset( $manifestDetails['name'] ) ) ? $manifestDetails['name'] : '', FALSE, array(), NULL, NULL, NULL, 'manifest_fullname' ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'manifest_description', ( isset( $manifestDetails['description'] ) ) ? $manifestDetails['description'] : '', FALSE, array(), NULL, NULL, NULL, 'manifest_description' ) );
 
 		$formStartUrl = '';
 		if( isset( $manifestDetails['start_url'] ) )
 		{
-			$formStartUrl = str_replace( 'index.php?/', '', Friendly::fixComponentPath( $manifestDetails['start_url'] ) );
+			$formStartUrl = str_replace( 'index.php?/', '', \IPS\Http\Url\Friendly::fixComponentPath( $manifestDetails['start_url'] ) );
 		}
 
-		$form->add( new YesNo( 'manifest_custom_url_toggle', ( isset( $manifestDetails['start_url'] ) and !empty( $formStartUrl ) ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\YesNo( 'manifest_custom_url_toggle', ( isset( $manifestDetails['start_url'] ) and empty( $formStartUrl ) ? FALSE : TRUE ), FALSE, array(
 			'togglesOn'	=> array( 'manifest_short_url' ),
 		), NULL, NULL, NULL, 'manifest_custom_url_toggle' ) );
 
-		$form->add( new Text( 'manifest_short_url', $formStartUrl, FALSE, array(), function( $val )
+		$form->add( new \IPS\Helpers\Form\Text( 'manifest_short_url', $formStartUrl, FALSE, array(), function( $val )
 		{
-			if ( $val and Request::i()->manifest_custom_url_toggle_checkbox )
+			if ( $val and \IPS\Request::i()->manifest_custom_url_toggle_checkbox )
 			{
 				if ( mb_substr( $val, -1 ) !== '/' )
 				{
 					$val .= '/';
 				}
 
-				$response = Url::external( Url::baseUrl() . ( Settings::i()->htaccess_mod_rewrite ? $val : 'index.php?/' . $val ) )->request( NULL, NULL, FALSE )->get();
-				if ( $response->httpResponseCode != 200 and $response->httpResponseCode != 303 and ( Settings::i()->site_online OR $response->httpResponseCode != 503 ) )
+				$response = \IPS\Http\Url::external( \IPS\Http\Url::baseUrl() . ( \IPS\Settings::i()->htaccess_mod_rewrite ? $val : 'index.php?/' . $val ) )->request( NULL, NULL, FALSE )->get();
+				if ( $response->httpResponseCode != 200 and $response->httpResponseCode != 303 and ( \IPS\Settings::i()->site_online OR $response->httpResponseCode != 503 ) )
 				{
-					throw new LogicException( 'pwa_start_url_incorrect' );
+					throw new \LogicException( 'pwa_start_url_incorrect' );
 				}
 			}
-		}, Url::baseUrl() . ( !Settings::i()->htaccess_mod_rewrite ? 'index.php?/' : '' ), NULL, 'manifest_short_url' ) );
+		}, \IPS\Http\Url::baseUrl() . ( !\IPS\Settings::i()->htaccess_mod_rewrite ? 'index.php?/' : '' ), NULL, 'manifest_short_url' ) );
 
-		$form->add( new Color( 'manifest_themecolor', ( isset( $manifestDetails['theme_color'] ) ) ? $manifestDetails['theme_color'] : NULL, FALSE, array( 'allowNoneLanguage' => 'manifest_themecolor_none', 'allowNone' => true ), NULL, NULL, NULL, 'manifest_themecolor' ) );
-		$form->add( new Color( 'manifest_bgcolor', ( isset( $manifestDetails['background_color'] ) ) ? $manifestDetails['background_color'] : NULL, FALSE, array(), NULL, NULL, NULL, 'manifest_bgcolor' ) );
+		$form->add( new \IPS\Helpers\Form\Color( 'manifest_themecolor', ( isset( $manifestDetails['theme_color'] ) ) ? $manifestDetails['theme_color'] : NULL, FALSE, array(), NULL, NULL, NULL, 'manifest_themecolor' ) );
+		$form->add( new \IPS\Helpers\Form\Color( 'manifest_bgcolor', ( isset( $manifestDetails['background_color'] ) ) ? $manifestDetails['background_color'] : NULL, FALSE, array(), NULL, NULL, NULL, 'manifest_bgcolor' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'manifest_display', ( isset( $manifestDetails['display'] ) ) ? $manifestDetails['display'] : 'standalone', FALSE, array( 'options' => array( 'fullscreen' => 'manifest_fullscreen', 'standalone' => 'manifest_standalone', 'minimal-ui' => 'manifest_minimalui', 'browser' => 'manifest_browser' ) ), NULL, NULL, NULL, 'manifest_display' ) );
 
 		if( $values = $form->values() )
 		{
-			$path = Url::createFromString( Url::baseUrl() )->data[ Url::COMPONENT_PATH ];
-			$startUrl = !empty( $path ) ? $path : '/';
+			$path = \IPS\Http\Url::createFromString( \IPS\Http\Url::baseUrl() )->data[ \IPS\Http\Url::COMPONENT_PATH ];
+			$startUrl = $path ?? '';
 
 			if ( $values['manifest_custom_url_toggle'] !== FALSE and ! empty( $values['manifest_short_url'] ) )
 			{
@@ -154,7 +120,7 @@ class webapp extends Controller
 
 				if( !empty( $path ) )
 				{
-					$startUrl = '/' . trim( $path . ( !Settings::i()->htaccess_mod_rewrite ? 'index.php?/' : '' ) . ltrim( $values['manifest_short_url'], '/' ), '/' ) . '/';
+					$startUrl = '/' . trim( $path . ( !\IPS\Settings::i()->htaccess_mod_rewrite ? 'index.php?/' : '' ) . ltrim( $values['manifest_short_url'], '/' ), '/' ) . '/';
 				}
 			}
 
@@ -193,34 +159,38 @@ class webapp extends Controller
 				$values['manifest_details']['description']		= $values['manifest_description'];
 				$values['manifest_details']['theme_color']		= $values['manifest_themecolor'];
 				$values['manifest_details']['background_color']	= $values['manifest_bgcolor'];
+				$values['manifest_details']['display']			= $values['manifest_display'];
 			}
 
-			unset( $values['configure_manifest'], $values['manifest_shortname'], $values['manifest_fullname'], $values['manifest_description'], $values['manifest_bgcolor'], $values['manifest_themecolor'], $values['manifest_custom_url_toggle'], $values['manifest_short_url'] );
+			unset( $values['configure_manifest'], $values['manifest_shortname'], $values['manifest_fullname'], $values['manifest_description'], $values['manifest_display'], $values['manifest_bgcolor'], $values['manifest_themecolor'], $values['manifest_custom_url_toggle'], $values['manifest_short_url'] );
 
 			$values['manifest_details'] = json_encode( array_merge( $values['manifest_details'], [ 'cache_key' => time() ] ) );
 
 			/* Save the settings */
 			$form->saveAsSettings( $values );
 
-			/* Clear manifest data store */
-			unset( Store::i()->manifest );
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
+
+			/* Clear manifest and ie browser data stores */
+			unset( \IPS\Data\Store::i()->manifest, \IPS\Data\Store::i()->iebrowserconfig );
 
 			/* And log */
-			Session::i()->log( 'acplogs__webapp' );
+			\IPS\Session::i()->log( 'acplogs__webapp' );
 
 			/* And Redirect */
 			if( $rebuildStartScreen === TRUE )
 			{
-				Output::i()->redirect( $this->url->setQueryString( 'do', 'buildStartupScreenImages' ), 'saved' );
+				\IPS\Output::i()->redirect( $this->url->setQueryString( 'do', 'buildStartupScreenImages' ), 'saved' );
 			}
 			else
 			{
-				Output::i()->redirect( $this->url, 'saved' );
+				\IPS\Output::i()->redirect( $this->url, 'saved' );
 			}
 		}
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('menu__core_settings_webapp');
-		Output::i()->output	.= Theme::i()->getTemplate( 'global' )->block( 'menu__core_settings_webapp', $form );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('menu__core_settings_webapp');
+		\IPS\Output::i()->output	.= \IPS\Theme::i()->getTemplate( 'global' )->block( 'menu__core_settings_webapp', $form );
 	}
 
 	/**
@@ -231,7 +201,7 @@ class webapp extends Controller
 	 * @param	array	$homeScreenMaskable	Existing values, if any
 	 * @return	array
 	 */
-	public static function processApplicationIcon( array $values, array $homeScreen = array(), array $homeScreenMaskable = array() ) : array
+	public static function processApplicationIcon( $values, $homeScreen = array(), $homeScreenMaskable = array() )
 	{
 		if( ( isset( $values['icons_homescreen'] ) AND $values['icons_homescreen'] ) or ( isset( $values['icons_homescreen_maskable' ] ) AND $values['icons_homescreen_maskable'] ) )
 		{
@@ -241,8 +211,28 @@ class webapp extends Controller
 				if( isset( $values[ $type ] ) AND $values[ $type ] )
 				{
 					$sizes = array(
+						'android-chrome-36x36' => array(36, 36),
+						'android-chrome-48x48' => array(48, 48),
+						'android-chrome-72x72' => array(72, 72),
+						'android-chrome-96x96' => array(96, 96),
+						'android-chrome-144x144' => array(144, 144),
 						'android-chrome-192x192' => array(192, 192),
+						'android-chrome-256x256' => array(256, 256),
+						'android-chrome-384x384' => array(384, 384),
 						'android-chrome-512x512' => array(512, 512),
+						'msapplication-square70x70logo' => array(128, 128),
+						'msapplication-TileImage' => array(144, 144),
+						'msapplication-square150x150logo' => array(270, 270),
+						'msapplication-wide310x150logo' => array(558, 558),
+						'msapplication-square310x310logo' => array(558, 270),
+						'apple-touch-icon-57x57' => array(57, 57),
+						'apple-touch-icon-60x60' => array(60, 60),
+						'apple-touch-icon-72x72' => array(72, 72),
+						'apple-touch-icon-76x76' => array(76, 76),
+						'apple-touch-icon-114x114' => array(114, 114),
+						'apple-touch-icon-120x120' => array(120, 120),
+						'apple-touch-icon-144x144' => array(144, 144),
+						'apple-touch-icon-152x152' => array(152, 152),
 						'apple-touch-icon-180x180' => array(180, 180),
 					);
 
@@ -254,14 +244,14 @@ class webapp extends Controller
 						{
 							$filename .= "-masked";
 
-							if ( ! mb_strstr( $filename, 'android-chrome' ) )
+							if ( ! \mb_strstr( $filename, 'android-chrome' ) )
 							{
 								continue;
 							}
 						}
 						try
 						{
-							$image = Image::create( $values[ $type ]->contents() );
+							$image = \IPS\Image::create( $values[ $type ]->contents() );
 
 							if ( $image::exifSupported() )
 							{
@@ -271,12 +261,12 @@ class webapp extends Controller
 							$image->crop( $_sizes[0], $_sizes[1] );
 
 							$setting[$filename] = array(
-								'url' => (string)File::create( 'core_Icons', $filename . '.png', (string)$image, NULL, TRUE, NULL, FALSE ),
+								'url' => (string)\IPS\File::create( 'core_Icons', $filename . '.png', (string)$image, NULL, TRUE, NULL, FALSE ),
 								'width' => $image->width,
 								'height' => $image->height
 							);
 						}
-						catch ( Exception $e )
+						catch ( \Exception $e )
 						{
 						}
 					}
@@ -293,18 +283,18 @@ class webapp extends Controller
 			{
 				try
 				{
-					File::get( 'core_Icons', ( $key == 'original' ) ? $image : $image['url'] )->delete();
+					\IPS\File::get( 'core_Icons', ( $key == 'original' ) ? $image : $image['url'] )->delete();
 				}
-				catch( Exception $e ){}
+				catch( \Exception $e ){}
 			}
 
 			foreach( $homeScreenMaskable as $key => $image )
 			{
 				try
 				{
-					File::get( 'core_Icons', ( $key == 'original' ) ? $image : $image['url'] )->delete();
+					\IPS\File::get( 'core_Icons', ( $key == 'original' ) ? $image : $image['url'] )->delete();
 				}
-				catch( Exception $e ){}
+				catch( \Exception $e ){}
 			}
 
 			$values['icons_homescreen'] = '';
@@ -325,18 +315,11 @@ class webapp extends Controller
 	 * @param	array	$apple		Existing values, if any
 	 * @return	array
 	 */
-	public static function processAppleStartupScreen( array $values, array $apple = array() ) : array
+	public static function processAppleStartupScreen( $values, $apple = array() )
 	{
 		if( $values['icons_apple_startup'] )
 		{
-			if( empty( $apple['original'] ) or (string) $values['icons_apple_startup'] != $apple['original'] )
-			{
-				$values['icons_apple_startup'] = json_encode( array( 'original' => (string) $values['icons_apple_startup'] ) );
-			}
-			else
-			{
-				$values['icons_apple_startup'] = json_encode( $apple );
-			}
+			$values['icons_apple_startup'] = json_encode( array( 'original' => (string) $values['icons_apple_startup'] ) );
 		}
 		else
 		{
@@ -345,9 +328,9 @@ class webapp extends Controller
 			{
 				try
 				{
-					File::get( 'core_Icons', ( $key == 'original' ) ? $image : $image['url'] )->delete();
+					\IPS\File::get( 'core_Icons', ( $key == 'original' ) ? $image : $image['url'] )->delete();
 				}
-				catch( Exception $e ){}
+				catch( \Exception $e ){}
 			}
 
 			$values['icons_apple_startup'] = '';
@@ -359,70 +342,75 @@ class webapp extends Controller
 	/**
 	 * Process Apple startup screen images
 	 *
-	 * @return	array|null
+	 * @param	array	$values		Values from form submission
+	 * @param	array	$apple		Existing values, if any
+	 * @return	array
 	 */
-	public function buildStartupScreenImages() : ?array
+	public function buildStartupScreenImages()
 	{
 		$self = $this;
 
-		$multiRedirect = new MultipleRedirect(
+		$multiRedirect = new \IPS\Helpers\MultipleRedirect(
 			$this->url->setQueryString('do', 'buildStartupScreenImages'),
 			function( $data )
 			{
 				/* Get the necessary data */
-				$manifestDetails	= json_decode( Settings::i()->manifest_details, TRUE );
-				$setting			= json_decode( Settings::i()->icons_apple_startup, TRUE ) ?? array();
+				$manifestDetails	= json_decode( \IPS\Settings::i()->manifest_details, TRUE );
+				$setting			= json_decode( \IPS\Settings::i()->icons_apple_startup, TRUE ) ?? array();
 
 				if( isset( $setting['original'] ) )
 				{
 					$sizes = array(
-						// iPhone 12, 12 Pro, 13, 13 Pro, 14
-						'apple-startup-1170x2532'			=> array( 390, 844, 3, 'portrait' ),
-						// iPhone 12 Pro Max, 13 Pro Max, 14 Plus
-						'apple-startup-1284x2778'			=> array( 428, 926, 3, 'portrait' ),
-						// iPhone 14 Pro, iPhone 15, iPhone 15 Pro, iPhone 16
-						'apple-startup-1179x2556'			=> array( 393, 852, 3, 'portrait' ),
-						// iPhone 15 Plus, iPhone 15 Pro Max, iPhone 16 Plus
-						'apple-startup-1290x2796'			=> array( 430, 932, 3, 'portrait' ),
-						// iPhone 16 Pro
-						'apple-startup-1206x2622'			=> array( 402, 874, 3, 'portrait' ),
-						// iPhone 16 Pro Max
-						'apple-startup-1320x2868'			=> array( 440, 956, 3, 'portrait' ),
-						// iPad Air 13" + iPad Pro 12.9"
-						'apple-startup-2048x2732'			=> array( 1024, 1366, 2, 'portrait' ),
+						'apple-startup-1136x640'			=> array( 320, 568, 2, 'landscape' ),
+						'apple-startup-2436x1125'			=> array( 375, 812, 3, 'landscape' ),
+						'apple-startup-1792x828'			=> array( 414, 896, 2, 'landscape' ),
+						'apple-startup-828x1792'			=> array( 414, 896, 2, 'portrait' ),
+						'apple-startup-1334x750'			=> array( 375, 667, 2, 'landscape' ),
+						'apple-startup-1242x2688'			=> array( 414, 896, 3, 'portrait' ),
+						'apple-startup-2208x1242'			=> array( 414, 736, 3, 'landscape' ),
+						'apple-startup-1125x2436'			=> array( 375, 812, 3, 'portrait' ),
+						'apple-startup-1242x2208'			=> array( 414, 736, 3, 'portrait' ),
 						'apple-startup-2732x2048'			=> array( 1024, 1366, 2, 'landscape' ),
-						// iPad Air 4+ (11" displays)
-						'apple-startup-1640x2360'			=> array( 820, 1180, 2, 'portrait' ),
-						'apple-startup-2360x1640'			=> array( 820, 1180, 2, 'landscape' ),
-						// iPad Pro 11" (1st to 4th gen)
-						'apple-startup-1668x2388'			=> array( 834, 1194, 2, 'portrait' ),
-						'apple-startup-2388x1668'			=> array( 834, 1194, 2, 'landscape' ),
-						// iPad Pro 10.5" and 11" (1st & 2nd gen)
-						'apple-startup-1668x2224'			=> array( 834, 1112, 2, 'portrait' ),
+						'apple-startup-2688x1242'			=> array( 414, 896, 3, 'landscape' ),
 						'apple-startup-2224x1668'			=> array( 834, 1112, 2, 'landscape' ),
-						// iPad Mini 6 and 7
-						'apple-startup-1488x2266'			=> array( 430, 932, 2, 'portrait' ),
-						'apple-startup-2266x1488'			=> array( 430, 932, 2, 'landscape' ),
+						'apple-startup-750x1334'			=> array( 375, 667, 2, 'portrait' ),
+						'apple-startup-2048x2732'			=> array( 1024, 1366, 2, 'portrait' ),
+						'apple-startup-2388x1668'			=> array( 834, 1194, 2, 'landscape' ),
+						'apple-startup-1668x2224'			=> array( 834, 1112, 2, 'portrait' ),
+						'apple-startup-640x1136'			=> array( 320, 568, 2, 'portrait' ),
+						'apple-startup-1668x2388'			=> array( 834, 1194, 2, 'portrait' ),
+						'apple-startup-2048x1536'			=> array( 768, 1024, 2, 'landscape' ),
+						'apple-startup-1536x2048'			=> array( 768, 1024, 2, 'portrait' ),
+						'apple-startup-2360x1640'			=> array( 1180, 820, 2, 'landscape' ),
+						'apple-startup-1640x2360'			=> array( 1180, 820, 2, 'portrait' ),
+						'apple-startup-2160x1620'			=> array( 1080, 810, 2, 'landscape' ),
+						'apple-startup-1620x2160'			=> array( 1080, 810, 2, 'portrait' ),
+						'apple-startup-2778x1284'			=> array( 428, 926, 3, 'landscape' ),
+						'apple-startup-1284x2778'			=> array( 428, 926, 3, 'portrait' ),
+						'apple-startup-2532x1170'			=> array( 390, 844, 3, 'landscape' ),
+						'apple-startup-1170x2532'			=> array( 390, 844, 3, 'portrait' ),
+						'apple-startup-2340x1080'			=> array( 360, 780, 3, 'landscape' ),
+						'apple-startup-1080x2340'			=> array( 360, 780, 3, 'portrait' ),
 					);
 
-					$file = File::get( 'core_Icons', $setting['original'] );
+					$file = \IPS\File::get( 'core_Icons', $setting['original'] );
 					$originalContents = $file->contents();
 
 					$backgroundColor = ( isset( $manifestDetails['background_color'] ) ) ? str_replace( '#', '', $manifestDetails['background_color'] ) : 'FFFFFF';
 
 					$rgb = array();
 
-					if ( strlen( $backgroundColor ) == 3 )
+					if ( \strlen( $backgroundColor ) == 3 )
 					{
-						$rgb[] = hexdec( substr( $backgroundColor, 0, 1 ) . substr( $backgroundColor, 0, 1 ) ); // R
-						$rgb[] = hexdec( substr( $backgroundColor, 1, 1 ) . substr( $backgroundColor, 1, 1 ) ); // G
-						$rgb[] = hexdec( substr( $backgroundColor, 2, 1 ) . substr( $backgroundColor, 2, 1 ) ); // B
+						$rgb[] = hexdec( \substr( $backgroundColor, 0, 1 ) . \substr( $backgroundColor, 0, 1 ) ); // R
+						$rgb[] = hexdec( \substr( $backgroundColor, 1, 1 ) . \substr( $backgroundColor, 1, 1 ) ); // G
+						$rgb[] = hexdec( \substr( $backgroundColor, 2, 1 ) . \substr( $backgroundColor, 2, 1 ) ); // B
 					}
 					else
 					{
-						$rgb[] = hexdec( substr( $backgroundColor, 0, 2 ) ); // R
-						$rgb[] = hexdec( substr( $backgroundColor, 2, 2 ) ); // G
-						$rgb[] = hexdec( substr( $backgroundColor, 4, 2 ) ); // B
+						$rgb[] = hexdec( \substr( $backgroundColor, 0, 2 ) ); // R
+						$rgb[] = hexdec( \substr( $backgroundColor, 2, 2 ) ); // G
+						$rgb[] = hexdec( \substr( $backgroundColor, 4, 2 ) ); // B
 					}
 
 					$did = 0;
@@ -441,8 +429,8 @@ class webapp extends Controller
 							$width = ( $_sizes[3] == 'landscape' ) ? $_sizes[1] * $_sizes[2] : $_sizes[0] * $_sizes[2];
 							$height = ( $_sizes[3] == 'portrait' ) ? $_sizes[1] * $_sizes[2] : $_sizes[0] * $_sizes[2];
 
-							$logoImage	= Image::create( $originalContents );
-							$canvas		= Image::newImageCanvas( $width, $height, $rgb );
+							$logoImage	= \IPS\Image::create( $originalContents );
+							$canvas		= \IPS\Image::newImageCanvas( $width, $height, $rgb );
 
 							$logoImage->resizeToMax( $width - static::MINIMUM_STARTUP_IMAGE_PADDING, $height - static::MINIMUM_STARTUP_IMAGE_PADDING );
 
@@ -457,44 +445,43 @@ class webapp extends Controller
 							}
 
 							$setting[ $filename ] = array(
-								'url' 			=> (string) File::create( 'core_Icons', $filename . '.png', (string) $canvas, NULL, TRUE, NULL, FALSE ),
+								'url' 			=> (string) \IPS\File::create( 'core_Icons', $filename . '.png', (string) $canvas, NULL, TRUE, NULL, FALSE ),
 								'width'			=> $canvas->width,
 								'height'		=> $canvas->height,
 								'density'		=> $_sizes[2],
 								'orientation'	=> $_sizes[3],
 							);
 						}
-						catch ( Exception $e )
+						catch ( \Exception $e )
 						{
-							Log::log( $e, 'apple-startup-image' );
+							\IPS\Log::log( $e, 'apple-startup-image' );
 						}
 
 						break;
 					}
 
 					/* Are we done? */
-					if( $did == count( $sizes ) )
+					if( $did == \count( $sizes ) )
 					{
 						return NULL;
 					}
 
-					Settings::i()->changeValues( array( 'icons_apple_startup' => json_encode( $setting ) ) );
+					\IPS\Settings::i()->changeValues( array( 'icons_apple_startup' => json_encode( $setting ) ) );
 				}
 
-				return array( $data, Member::loggedIn()->language()->addToStack('build_start_images_title'), ( $did ) ? round( ( 100 / count( $sizes ) * $did ), 2 ) : 0 );
+				return array( $data, \IPS\Member::loggedIn()->language()->addToStack('build_start_images_title'), ( $did ) ? round( ( 100 / \count( $sizes ) * $did ), 2 ) : 0 );
 			},
 			function() use( $self )
 			{
-				$manifest = json_decode( Settings::i()->manifest_details, TRUE );
+				$manifest = json_decode( \IPS\Settings::i()->manifest_details, TRUE );
 				$manifest['cache_key'] = time();
 
-				Settings::i()->changeValues( [ 'manifest_details' => json_encode( $manifest ) ] );
-				Output::i()->redirect( $self->url, 'completed' );
+				\IPS\Settings::i()->changeValues( [ 'manifest_details' => json_encode( $manifest ) ] );
+				\IPS\Output::i()->redirect( $self->url, 'completed' );
 			}
 		);
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack('build_start_images_title');
-		Output::i()->output = $multiRedirect;
-		return null;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('build_start_images_title');
+		\IPS\Output::i()->output = $multiRedirect;
 	}
 }

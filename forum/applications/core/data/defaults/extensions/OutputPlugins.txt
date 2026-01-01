@@ -11,20 +11,17 @@
 
 namespace IPS\{app}\extensions\core\OutputPlugins;
 
-use IPS\Extensions\OutputPluginsAbstract;
-use function defined;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin
  */
-class {class} extends OutputPluginsAbstract
+class _{class}
 {
 	/**
 	 * @brief	Can be used when compiling CSS
@@ -38,8 +35,7 @@ class {class} extends OutputPluginsAbstract
 	 * @param	array		$options    Array of options
 	 * @return	array|string		string with code to eval or  array( 'pre' => Code to eval before 'return', 'return' => Code to eval to return desired value )
 	 */
-	public static function runPlugin( string $data, array $options ): string|array
+	public static function runPlugin( $data, $options )
 	{
-	    return '';
 	}
 }

@@ -11,76 +11,28 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\cms\Blocks\Block;
-use IPS\cms\widgets\Blocks;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use IPS\Widget;
-use IPS\Widget\Area;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function explode;
-use function in_array;
-use function json_encode;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Sidebar Widgets
  */
-class widgets extends Controller
+class _widgets extends \IPS\Dispatcher\Controller
 {
-	/**
-	 * The widget class to use for configuration
-	 *
-	 * @var string
-	 */
-	protected string $widgetClass = Widget::class;
-
-	protected string $pageApp = '';
-	protected string $pageModule = '';
-	protected string $pageController = '';
-
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		/* Check Permissions */
-		if ( ! Member::loggedIn()->modPermission('can_manage_sidebar') )
+		if ( ! \IPS\Member::loggedIn()->modPermission('can_manage_sidebar') )
 		{
-			Output::i()->error( 'no_permission_manage_sidebar', '2S172/1', 403, '' );
-		}
-
-		$this->pageApp = Request::i()->pageApp ?? '';
-		$this->pageModule = Request::i()->pageModule ?? '';
-		$this->pageController = Request::i()->pageController ?? '';
-		if( isset( Request::i()->pageArea ) AND Request::i()->pageArea == Area::AREA_GLOBAL_FOOTER )
-		{
-			/* Re-assign values to global */
-			$this->pageApp = 'global';
-			$this->pageModule = 'global';
-			$this->pageController = 'global';
-			$this->widgetClass = Widget::class;
+			\IPS\Output::i()->error( 'no_permission_manage_sidebar', '2S172/1', 403, '' );
 		}
 		
 		parent::execute();
@@ -91,82 +43,56 @@ class widgets extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function getBlockList() : void
+	protected function getBlockList()
 	{
-		if( Application::appIsEnabled( 'cms' ) )
+		$availableBlocks = array();
+		
+		foreach ( \IPS\Db::i()->select( "*", 'core_widgets' ) as $widget )
 		{
-			/* Initialize with Pages as the first in the list */
-			$availableBlocks = [
-				'cms' => []
-			];
-		}else
-		{
-			$availableBlocks = [];
-		}
-
-		$favoriteIds = json_decode( Settings::i()->favorite_blocks, true );
-		$favorites = [];
-		$customBlocks = [];
-
-		/* Loop through applications and get all available blocks */
-		foreach( Application::enabledApplications() as $application )
-		{
-			if( !$application->canAccess() )
+			try
 			{
-				continue;
-			}
+				$appOrPlugin = isset( $widget['plugin'] ) ? \IPS\Plugin::load( $widget['plugin'] ) : \IPS\Application::load( $widget['app'] );
 
-			foreach( $application->getAvailableWidgets() as $block )
-			{
-				/* @var Widget $block */
-				if ( !$block->isExecutableByApp( array( $this->pageApp, Area::AREA_SIDEBAR ) ) )
+				if ( isset( $widget['plugin'] ) )
 				{
-					continue;
-				}
-
-                if( !$block->isExecutableByPage( $this->pageApp, $this->pageModule, $this->pageController ) )
-                {
-                    continue;
-                }
-
-				/* Is this widget hidden from the block list? */
-				if( !$block::$showInBlockList )
-				{
-					continue;
-				}
-
-				if ( in_array( $block->key, $favoriteIds ) )
-				{
-					$favorites[$block->key] = $block;
-				}
-
-				if ( $block instanceof Blocks )
-				{
-					foreach ( new ActiveRecordIterator( Db::i()->select( "*", "cms_blocks" ), Block::class ) as $customBlock )
+					if ( !$appOrPlugin->enabled )
 					{
-						$title = $customBlock->_title;
-						Member::loggedIn()->language()->parseOutputForDisplay( $title );
-						$customBlocks[$title] = [$block, $customBlock];
-						if ( in_array( $block->key . ":" . $title, $favoriteIds ) )
-						{
-							$favorites[$block->key . ":" . $title] = [$block, $customBlock];
-						}
+						continue;
+					}
+				}
+				else
+				{
+					if ( !\IPS\Application::appIsEnabled( $appOrPlugin->directory ) or !\IPS\Application::load( $appOrPlugin->directory )->canAccess() )
+					{
+						continue;
 					}
 				}
 
-				$availableBlocks[ $application->directory ][] = $block;
+				$block = \IPS\Widget::load( $appOrPlugin, $widget['key'], mt_rand(), array(), $widget['restrict'], null );
+				$block->allowReuse = (boolean) $widget['allow_reuse'];
+				$block->menuStyle  = $widget['menu_style'];
+				
+				if ( ! $block->isExecutableByApp( array( \IPS\Request::i()->pageApp, 'sidebar' ) ) )
+				{
+					throw new \OutOfRangeException;
+				}
+			}
+			catch( \Exception $e )
+			{
+				continue;
+			}
+			
+			if( isset( $widget['app'] ) )
+			{
+				$availableBlocks['apps'][ $widget['app'] ][] = $block;
+			}
+			else
+			{
+				$availableBlocks['plugin'][ $widget['plugin'] ][] = $block;
 			}
 		}
 
-		$favoritesSorted = [];
-		foreach ( $favoriteIds as $id )
-		{
-			if ( isset( $favorites[$id] ) )
-			{
-				$favoritesSorted[$id] = $favorites[$id];
-			}
-		}
-		Output::i()->output = Theme::i()->getTemplate( 'widgets' )->blockList( $availableBlocks, $favoritesSorted, $customBlocks );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'widgets' )->blockList( $availableBlocks );
 	}
 	
 	/**
@@ -174,78 +100,54 @@ class widgets extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function getBlock() : void
+	protected function getBlock()
 	{		
-		$key = explode( "_", Request::i()->blockID );
-		$area = null;
-		$areaBlocks = null;
+		$key = $block = explode( "_", \IPS\Request::i()->blockID );
 
-		/* @var Widget $widgetClass */
-		$widgetClass = $this->widgetClass;
-
-		foreach( $this->getAreasFromDatabase() as $item )
+		if ( isset( \IPS\Request::i()->pageApp ) )
 		{
-			$blocks = $item->getAllWidgets();
-			if( Request::i()->pageArea == $item->id )
-			{
-				$area = $item;
-				$areaBlocks = $blocks;
-			}
-
-			foreach( $blocks as $block )
-			{
-				if( isset( $block['key'] ) AND $block['key'] == $key[2] AND $block['unique'] == $key[3] )
-				{
-					$config = ( isset( $block['configuration'] ) AND !empty( $block['configuration'] ) ) ? $block['configuration'] : $widgetClass::getConfiguration( $key[3] );
-					$widget = Widget::load( Application::load( $block['app'] ), $block['key'], $block['unique'], $config, null, Request::i()->orientation, Request::i()->layout ?: '' );
-					$widget->neverCache = true;
-					break;
-				}
-			}
-		}
-
-		if ( !isset( $widget ) )
-		{
-			$config = json_decode( Request::i()->defaultConfiguration ?: '""', true  );
-			$config = is_array( $config ) ? $config : ( ( isset( $key[3] ) and $key[3] )  ? $widgetClass::getConfiguration( $key[3] ) : array() );
-			$widget = Widget::load( Application::load( $key[1] ), $key[2], ( $key[3] ?? '' ), $config, null, Request::i()->orientation );
-
-			// it's possible we want to save it
 			try
 			{
-				if ( Request::i()->createIfDoesNotExist and Request::i()->pageArea and is_array( $areaBlocks ) )
+				foreach ( json_decode( \IPS\Db::i()->select( 'widgets', 'core_widget_areas', array( 'app=? AND module=? AND controller=? AND area=?', \IPS\Request::i()->pageApp, \IPS\Request::i()->pageModule, \IPS\Request::i()->pageController, \IPS\Request::i()->pageArea ) )->first(), TRUE ) as $k => $block )
 				{
-					Session::i()->csrfCheck();
-					$newBlock = [
-						'app' => $key[1],
-						'key' => $key[2],
-						'unique' => $key[3],
-						'configuration' => $config
-					];
-					$areaBlocks[] = $newBlock;
-
-					if( $area === null )
+					switch( $key[0] )
 					{
-						$area = Area::create( Request::i()->pageArea, $areaBlocks );
-					}
-					else
-					{
-						$area->addWidget( $newBlock );
-					}
+						case 'app':
 
-					$this->saveArea( $area );
-					Widget::deleteCaches();
+							if( ( isset( $block['app'] ) and $block['app'] == $key[1] ) AND $block['key'] == $key[2] AND $block['unique'] == $key[3] )
+							{
+								$widget = \IPS\Widget::load( \IPS\Application::load( $block['app'] ), $block['key'], $block['unique'], $block['configuration'], null, \IPS\Request::i()->orientation );
+								break 2;
+							}
+							break;
+						
+						case 'plugin':
+							if( ( isset( $block['plugin'] ) and $block['plugin'] == $key[1] ) AND $block['key'] == $key[2] AND $block['unique'] == $key[3] )
+							{
+								$widget = \IPS\Widget::load( \IPS\Plugin::load( $block['plugin'] ), $block['key'], $block['unique'], $block['configuration'], null, \IPS\Request::i()->orientation );
+								break 2;
+							}
+							break;
+					}
 				}
 			}
-			catch ( OutOfRangeException ) {}
+			catch ( \OutOfRangeException $e ) { }
+			catch ( \UnderflowException $e ) { }
+		}
+		
+		if ( !isset( $widget ) )
+		{
+			try
+			{
+				$widget = \IPS\Widget::load( ( $key[0] == 'plugin' ) ? \IPS\Plugin::load( $key[1] ) : \IPS\Application::load( $key[1] ), $key[2], $key[3], array(), null, \IPS\Request::i()->orientation );
+			}
+			catch( \OutOfRangeException $e )
+			{
+				$widget = '';
+			}
 		}
 
-		$output = (string) $widget;
-		Output::i()->output = ( $output ) ?:  Theme::i()->getTemplate( 'widgets', 'core', 'front' )->blankWidget( $widget );
-		if( Request::i()->isAjax() )
-		{
-			Output::i()->sendOutput( Output::i()->output );
-		}
+		\IPS\Output::i()->json( array( 'html' => (string) $widget, 'devices' => ( isset( $widget->configuration['devices_to_show'] ) ) ? $widget->configuration['devices_to_show'] : array('Phone', 'Tablet', 'Desktop') ) );
 	}
 	
 	/**
@@ -253,63 +155,67 @@ class widgets extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function getConfiguration() : void
+	protected function getConfiguration()
 	{
-		$key = explode( "_", Request::i()->block );
-
-		/* @var Widget $widgetClass */
-		$widgetClass = $this->widgetClass;
+		$key	= explode( "_", \IPS\Request::i()->block );
+		$blocks	= array();
 
 		try
 		{
-			$widgetMaster = Db::i()->select( '*', 'core_widgets', array( '`key`=? AND `app`=?', $key[2], $key[1] ) )->first();
+			$where = ( $key[0] ) == 'app' ? '`key`=? AND `app`=?' : '`key`=? AND `plugin`=?';
+			$widgetMaster = \IPS\Db::i()->select( '*', 'core_widgets', array( $where, $key[2], $key[1] ) )->first();
+
+			$blocks = \IPS\Db::i()->select( '*', 'core_widget_areas', array( 'app=? AND module=? AND controller=? AND area=?', \IPS\Request::i()->pageApp, \IPS\Request::i()->pageModule, \IPS\Request::i()->pageController, \IPS\Request::i()->pageArea ) )->first();
+			$blocks	= json_decode( $blocks['widgets'], TRUE );
 		}
-		catch ( UnderflowException $e ){}
-
-		$blocks = [];
-
-		/* @var Area $currentArea */
-		$currentArea = $this->getAreasFromDatabase()[ Request::i()->pageArea ] ?? null;
-		if( $currentArea !== null )
+		catch ( \UnderflowException $e )
 		{
-			$blocks = $currentArea->getAllWidgets();
+			switch( $key[0] )
+			{
+				case 'app':
+					$blocks = array( array( 'app' => $key[1], 'key' => $key[2], 'unique' => $key[3], 'configuration' => array() ) );
+					break;
+						
+				case 'plugin':
+					$blocks = array( array( 'plugin' => $key[1], 'key' => $key[2], 'unique' => $key[3], 'configuration' => array() ) );
+					break;
+			}
 		}
-
+		
 		$widget	= NULL;
-		$requestedBlock = $key[3] ?? '';
+
 		if( !empty( $blocks ) )
 		{
 			foreach ( $blocks as $k => $block )
 			{
-				if ( $requestedBlock and (string) $k !== $requestedBlock )
+				switch( $key[0] )
 				{
-					continue;
-				}
-
-				if ( $block['key'] == $key[2] AND $block['unique'] == $key[3] )
-				{
-					$config = ( isset( $block['configuration'] ) AND !empty( $block['configuration'] ) ) ? $block['configuration'] : $widgetClass::getConfiguration( $key[3] );
-					$widget = Widget::load( Application::load( $block['app'] ), $block['key'], $block['unique'], $config ?? [] );
-					$widget->menuStyle = $widgetMaster['menu_style'] ?? 'menu';
-
-					if ( isset( $widgetMaster ) and $widgetMaster['layouts'] === '*' and $widget->isCustomizableWidget() )
-					{
-						$widget->layouts = Area::$allowedWrapBehaviors;
-					}
-					else if ( !empty( $widgetMaster['layouts'] ) )
-					{
-						$widget->layouts = array_intersect( Area::$allowedWrapBehaviors, explode( ',', $widgetMaster['layouts'] ) );
-					}
-					else
-					{
-						$widget->layouts = isset( $widgetMaster['default_layout'] ) ? [ $widgetMaster['default_layout'] ] : ['wrap'];
-					}
+					case 'app':
+						if( ( isset( $block['app'] ) AND $block['app'] == $key[1] ) AND $block['key'] == $key[2] AND $block['unique'] == $key[3] )
+						{
+							$widget = \IPS\Widget::load( \IPS\Application::load( $block['app'] ), $block['key'], $block['unique'], $block['configuration'] );
+						}
+						break;
+					
+					case 'plugin':
+						if( ( isset( $block['plugin'] ) AND $block['plugin'] == $key[1] ) AND $block['key'] == $key[2] AND $block['unique'] == $key[3] )
+						{
+							$widget = \IPS\Widget::load( \IPS\Plugin::load( $block['plugin'] ), $block['key'], $block['unique'], $block['configuration'] );
+						}
+						break;
 				}
 
 				if( $widget !== NULL AND method_exists( $widget, 'configuration' ) )
 				{
-					$form = new Form( 'form', 'saveSettings' );
-					if ( $widget->configuration( $form ) !== NULL )
+					if ( \IPS\Request::i()->isAjax() )
+					{
+						\IPS\Output::i()->jsFiles = array();
+					}
+					
+					$widget->menuStyle = $widgetMaster['menu_style'];
+					$form = new \IPS\Helpers\Form( 'form', 'saveSettings' );
+
+					if ( $configurationForm = $widget->configuration( $form ) )
 					{
 						if ( $values = $form->values() )
 						{
@@ -317,23 +223,31 @@ class widgets extends Controller
 							{
 								$values = $widget->preConfig( $values );
 							}
-
+							
 							/* Special advanced builder stuff */
-							if( $widget->isBuilderWidget() )
+							if ( \in_array( 'IPS\Widget\Builder', class_implements( $widget ) ) )
 							{
 								if( isset( $values['widget_adv__background_custom_image'] ) and $values['widget_adv__background_custom_image'] )
 								{
 									$values['widget_adv__background_custom_image'] = (string) $values['widget_adv__background_custom_image'];
 								}
 							}
+							
+							if( isset( $values['show_on_all_devices'] ) and $values['show_on_all_devices'] )
+							{
+								$values['devices_to_show'] = array( 'Phone', 'Tablet', 'Desktop' );
+							}
+
+							unset( $values['show_on_all_devices'] );
 
 							$blocks[ $k ]['configuration'] = $values;
-							$actualArea = $currentArea->addWidget( $blocks[ $k ] );
-							$this->saveArea( $currentArea );
-							Output::i()->json( [ 'blocks' => $blocks[$k], 'areaClasses'  => $actualArea->classes() ] );
+							\IPS\Db::i()->insert( 'core_widget_areas', array( 'app' => \IPS\Request::i()->pageApp, 'module' => \IPS\Request::i()->pageModule, 'controller' => \IPS\Request::i()->pageController, 'area' => \IPS\Request::i()->pageArea, 'widgets' => json_encode( $blocks ) ), TRUE );
+							\IPS\Widget::deleteCaches( $block['key'], ( isset( $block['app'] ) ) ? $block['app'] : NULL, ( isset( $block['plugin'] ) ) ? $block['plugin'] : NULL );
+							\IPS\Output::i()->json( 'OK' );
 						}
-
-						Output::i()->output = $widget->configuration()->customTemplate( array( Theme::i()->getTemplate( 'widgets', 'core' ), 'formTemplate' ), $widget );
+						
+						\IPS\Member::loggedIn()->language()->words['widget_adv__custom_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'widget_adv__custom__desc', FALSE, array( 'sprintf' => array( \IPS\Request::i()->block ) ) );
+						\IPS\Output::i()->output = $configurationForm->customTemplate( array( \IPS\Theme::i()->getTemplate( 'widgets', 'core' ), 'formTemplate' ), $widget );
 					}
 				}
 			}
@@ -345,30 +259,43 @@ class widgets extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function saveOrder() : void
+	protected function saveOrder()
 	{
-		$newOrder = array();
-		$seen     = array();
-		$widgets = array();
-
-		Session::i()->csrfCheck();
-
-		$currentConfig = $this->getAreasFromDatabase()[ Request::i()->area ] ?? null;
-		if( $currentConfig )
+		if( !\in_array( \IPS\Request::i()->area, array( 'sidebar', 'header', 'footer' ) ) )
 		{
-			$widgets = $currentConfig->getAllWidgets();
+			\IPS\Output::i()->error( 'invalid_widget_area', '3S172/2', 403, '' );
 		}
 
-		/* Loop over the new order and merge in current blocks so we don't lose config */
-		if ( isset ( Request::i()->order ) )
+		\IPS\Session::i()->csrfCheck();
+		
+		$newOrder = array();
+		$seen     = array();
+		
+		try
 		{
-			foreach ( Request::i()->order as $block )
+			$currentConfig = \IPS\Db::i()->select( '*', 'core_widget_areas', array( 'app=? AND module=? AND controller=? AND area=?', \IPS\Request::i()->pageApp, \IPS\Request::i()->pageModule, \IPS\Request::i()->pageController, \IPS\Request::i()->area ) )->first();
+			$widgets = json_decode( $currentConfig['widgets'], TRUE );
+			if( !is_countable(  $widgets ) )
+			{
+				throw new \UnderflowException;
+			}
+		}
+		catch ( \UnderflowException $e )
+		{
+			$widgets = array();
+		}
+	
+		/* Loop over the new order and merge in current blocks so we don't lose config */
+		if ( isset ( \IPS\Request::i()->order ) )
+		{
+			foreach ( \IPS\Request::i()->order as $block )
 			{
 				$block = explode( "_", $block );
+				
 				$added = FALSE;
 				foreach( $widgets as $widget )
 				{
-					if ( $widget['key'] == $block[2] and $widget['unique'] == $block[3] )
+					if ( $widget['key'] == $block[2] AND $widget['unique'] == $block[3] )
 					{
 						$seen[]     = $widget['unique'];
 						$newOrder[] = $widget;
@@ -376,18 +303,26 @@ class widgets extends Controller
 						break;
 					}
 				}
-
 				if( !$added )
 				{
-					/* @var Widget $widgetClass */
-					$widgetClass = $this->widgetClass;
+					$newBlock = array();
+					
+					if ( $block[0] == 'app' )
+					{
+						$newBlock['app'] = $block[1];
+					}
+					else
+					{
+						$newBlock['plugin'] = $block[1];
+					}
+					
+					$newBlock['key'] 		= $block[2];
+					$newBlock['unique']		= $block[3];
+					$newBlock['configuration']	= array();
+					
+					/* Make sure this widget doesn't have configuration in another area */
+					$newBlock['configuration'] = \IPS\Widget::getConfiguration( $newBlock['unique'] );
 
-					$newBlock = [
-						'app' => $block[1],
-						'key' => $block[2],
-						'unique' => $block[3],
-						'configuration' => $widgetClass::getConfiguration( $block[3] )
-					];
 					$seen[]     = $block[3];
 					$newOrder[] = $newBlock;
 				}
@@ -395,248 +330,23 @@ class widgets extends Controller
 		}
 
 		/* Anything to update? */
-		if ( count( $widgets ) > count( $newOrder ) )
+		if ( \count( $widgets ) > \count( $newOrder ) )
 		{
 			/* No items left in area, or one has been removed */
 			foreach( $widgets as $widget )
 			{
 				/* If we haven't seen this widget, it's been removed, so add to trash */
-				if ( ! in_array( $widget['unique'], $seen ) )
+				if ( ! \in_array( $widget['unique'], $seen ) )
 				{
-					Widget::trash( $widget['unique'], $widget );
+					\IPS\Widget::trash( $widget['unique'], $widget );
 				}
 			}
-		}
-
-		/* Check core_widget_areas to ensure that the block wasn't added there */
-		if ( isset( Request::i()->exclude ) and ! empty( Request::i()->exclude ) )
-		{
-			$bits = explode( "_", Request::i()->exclude );
-			$this->_checkAndDeleteFromCoreWidgets( $bits[3], $seen );
 		}
 
 		/* Expire Caches so up to date information displays */
-		Widget::deleteCaches();
+		\IPS\Widget::deleteCaches();
 
-		/* Overwrite the entire area */
-		$newArea = Area::create( Request::i()->area, $newOrder );
-		$this->saveArea( $newArea );
-	}
-
-	/**
-	 * Remove the block from the page area
-	 *
-	 * @return void
-	 */
-	protected function removeBlock() : void
-	{
-		Session::i()->csrfCheck();
-		try
-		{
-			$uniques = [];
-			foreach ( Request::i()->blockIDs as $blockID )
-			{
-				$key = explode( '_', $blockID );
-				$uniques[] = $key[3];
-			}
-
-			/* For deletion, only remove the blocks in the area. When moving a block from one area to another, the remove block call is separate */
-			foreach ( $this->getAreasFromDatabase( Request::i()->area ?: null ) as $widgetArea )
-			{
-				foreach( $uniques as $unique )
-				{
-					$widgetArea->removeWidget( $unique );
-
-					Db::i()->delete( 'core_widgets_config', [ 'id=?', $unique ] );
-				}
-
-				$this->saveArea( $widgetArea );
-			}
-		}
-		catch ( OutOfRangeException ) {}
-
-		Output::i()->json( [ 'message' => 'deleted' ], 201 );
-	}
-
-
-
-	/**
-	 * @return void
-	 */
-	protected function saveWidgetTree() : void
-	{
-		/* First, load all the widgets in the page. It is possible they moved a widget from one area to another in the same page, so we need to copy the configuration from those areas */
-		$existingWidgets = [];
-		foreach ( $this->getAreasFromDatabase() as $row )
-		{
-			$existingWidgets = array_merge( $existingWidgets, $row->getAllWidgets() );
-		}
-
-		/* Clean the tree, sometimes there are duplicates */
-		$tree = Area::cleanTreeData( json_decode( Request::i()->tree, true ) );
-
-		/* Create a new area */
-		$area = new Area( $tree, Request::i()->pageArea );
-		$currentWidgets = $area->getAllWidgets();
-
-		/* The tree data does not contain block configuration, so we put that back in */
-		foreach ( $existingWidgets as $existing )
-		{
-			if ( $area->replaceWidget( $existing ) )
-			{
-				$currentWidgets[$existing['unique']] = $existing;
-			}
-		}
-
-		$this->saveArea( $area );
-		$output = [
-			'message' => 'saved',
-			'area_tree' => $area->toArray(),
-		];
-
-		if ( defined( 'PAGEBUILDER_DEV' ) and \PAGEBUILDER_DEV )
-		{
-			$output['area_tree'] = $area->toArray();
-			$output['currentWidgets'] = $currentWidgets;
-			$output['existingWidgets'] = $existingWidgets;
-		}
-
-		Output::i()->json( $output, 201 );
-	}
-
-	/**
-	 * Get an array containing all the areas in this page
-	 *
-	 * @param 	string|null 		$area		The area to filter by; by default (null) it will get all areas	 *
-	 * @return Area[]		Returns an array mapping the widget areas to the widgets in that area
-	 */
-	public function getAreasFromDatabase( ?string $area=null ) : array
-	{
-		return Area::getAreasFromDatabase( $this->pageApp, $this->pageModule, $this->pageController, $area );
-	}
-
-	/**
-	 * Save an area to the database and link it to the page
-	 *
-	 * @param Area $area
-	 * @return void
-	 */
-	public function saveArea( Area $area ) : void
-	{
-		$pageApp = Request::i()->pageApp;
-		$pageModule = Request::i()->pageModule;
-		$pageController = Request::i()->pageController;
-		if ( $area->id == 'globalfooter' )
-		{
-			/* Re-assign values to global */
-			$pageApp = 'global';
-			$pageModule = 'global';
-			$pageController = 'global';
-		}
-
-		/* Stop Pages widgets from being stored here */
-		if ( $pageApp === 'cms' )
-		{
-			/* Log it */
-			Log::log( 'Pages widget wants be stored in core_widget_areas: ' . json_encode( $area->toArray( true, false ) ), 'page_builder' );
-			return;
-		}
-
-		/* If we have no content, clear this out entirely */
-		if( !$area->hasWidgets() )
-		{
-			Db::i()->delete( 'core_widget_areas', ['area=? AND app=? and module=? and controller=?', $area->id, $pageApp, $pageModule, $pageController ] );
-			return;
-		}
-
-		/* Store the widget configuration */
-		foreach( $area->getAllWidgets() as $widget )
-		{
-			if( isset( $widget['configuration'] ) AND !empty( $widget['configuration'] ) )
-			{
-				Db::i()->replace( 'core_widgets_config', [
-					'id' => $widget['unique'],
-					'data' => json_encode( $widget['configuration'] )
-				] );
-			}
-		}
-
-		/* Does the area exist? */
-		try
-		{
-			$row = Db::i()->select( '*', 'core_widget_areas', [ 'area=? and app=? and module=? and controller=?', $area->id, $pageApp, $pageModule, $pageController ] )->first();
-
-			Db::i()->update( 'core_widget_areas', [
-				'tree' => json_encode( $area->toArray( true, false ) )
-			], ['area=? AND app=? and module=? and controller=?', $area->id, $pageApp, $pageModule, $pageController ] );
-		}
-		catch( UnderflowException )
-		{
-			Db::i()->insert( 'core_widget_areas', [
-				'app' => $pageApp,
-				'module' => $pageModule,
-				'controller' => $pageController,
-				'area' => $area->id,
-				'widgets' => '[]',
-				'tree' => json_encode( $area->toArray( true, false ) )
-			]);
-		}
-
-		/* Clear caches */
-		Widget::deleteCaches( null, $pageApp == 'global' ?: null );
-	}
-
-	/**
-	 * Sometimes the widgets end up in the core table. We haven't really found out why this happens. It happens very rarely.
-	 * It may be that the CMS JS mixin doesn't load so the core ajax URLs are used (system/widgets.php) and not the cms widget (page/builder.php).
-	 * This method ensures that any widgets in the core table are removed
-	 *
-	 * @param string $uniqueId	The unique key of the widget (eg: wzsj1233)
-	 * @param array $widgets	Current widgets (eg from core_widget_areas.widgets (json decoded))
-	 * @return	bool				True if something removed, false if not
-	 */
-	protected function _checkAndDeleteFromCoreWidgets( string $uniqueId, array $widgets ): bool
-	{
-		/* Placeholder function so that we can override this in the CMS builder */
-		return false;
-	}
-
-	/**
-	 * @return void
-	 */
-	protected function addFavorite()
-	{
-		if ( !isset( Request::i()->blockID ) )
-		{
-			Output::i()->json( [ "message" => "expected block id" ], 400 );
-		}
-
-		$favorites = json_decode( Settings::i()->favorite_blocks, true );
-		if ( !in_array( Request::i()->blockID, $favorites ) )
-		{
-			$favorites[] = Request::i()->blockID;
-		}
-		Settings::i()->changeValues( [ "favorite_blocks" => json_encode( $favorites ) ] );
-		Output::i()->json( [ "favorites" => $favorites ], 201 );
-	}
-
-
-
-	/**
-	 * @return void
-	 */
-	protected function removeFavorite()
-	{
-		if ( !isset( Request::i()->blockID ) )
-		{
-			Output::i()->json( [ "message" => "expected block id" ], 400 );
-		}
-
-		$favorites = json_decode( Settings::i()->favorite_blocks, true );
-		$favorites = array_filter( $favorites, function ($val) {
-			return $val !== Request::i()->blockID;
-		});
-		Settings::i()->changeValues( [ "favorite_blocks" => json_encode( $favorites ) ] );
-		Output::i()->json( [ "favorites" => $favorites ], 201 );
+		/* Save to database */
+		\IPS\Db::i()->replace( 'core_widget_areas', array( 'app' => \IPS\Request::i()->pageApp, 'module' => \IPS\Request::i()->pageModule, 'controller' => \IPS\Request::i()->pageController, 'widgets' => json_encode( $newOrder ), 'area' => \IPS\Request::i()->area ) );
 	}
 }

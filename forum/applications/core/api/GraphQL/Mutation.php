@@ -10,48 +10,39 @@
  */
 
 namespace IPS\core\api\GraphQL;
-use IPS\core\api\GraphQL\Mutations\ChangeNotificationSetting;
-use IPS\core\api\GraphQL\Mutations\DeleteAttachment;
-use IPS\core\api\GraphQL\Mutations\Follow;
-use IPS\core\api\GraphQL\Mutations\IgnoreUser;
-use IPS\core\api\GraphQL\Mutations\MarkNotificationRead;
-use IPS\core\api\GraphQL\Mutations\Messenger\AddConversationUser;
-use IPS\core\api\GraphQL\Mutations\Messenger\LeaveConversation;
-use IPS\core\api\GraphQL\Mutations\Messenger\RemoveConversationUser;
-use IPS\core\api\GraphQL\Mutations\Unfollow;
-use IPS\core\api\GraphQL\Mutations\UploadAttachment;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Core mutationss GraphQL API
  */
-abstract class Mutation
+abstract class _Mutation
 {
 	/**
 	 * Get the supported query types in this app
 	 *
 	 * @return	array
 	 */
-	public static function mutations() : array
+	public static function mutations()
 	{
 		return [
-			'follow' => new Follow(),
-			'unfollow' => new Unfollow(),
-			'markNotificationRead' => new MarkNotificationRead(),
-			'uploadAttachment' => new UploadAttachment(),
-			'deleteAttachment' => new DeleteAttachment(),
-			'ignoreMember' => new IgnoreUser(),
-			'changeNotificationSetting' => new ChangeNotificationSetting(),
-			'leaveConversation' => new LeaveConversation(),
-			'removeConversationUser' => new RemoveConversationUser(),
-			'addConversationUser' => new AddConversationUser(),
+			'follow' => new \IPS\core\api\GraphQL\Mutations\Follow(),
+			'unfollow' => new \IPS\core\api\GraphQL\Mutations\Unfollow(),
+			'markNotificationRead' => new \IPS\core\api\GraphQL\Mutations\MarkNotificationRead(),
+			'uploadAttachment' => new \IPS\core\api\GraphQL\Mutations\UploadAttachment(),
+			'deleteAttachment' => new \IPS\core\api\GraphQL\Mutations\DeleteAttachment(),
+			'ignoreMember' => new \IPS\core\api\GraphQL\Mutations\IgnoreUser(),
+			'changeNotificationSetting' => new \IPS\core\api\GraphQL\Mutations\ChangeNotificationSetting(),
+			'leaveConversation' => new \IPS\core\api\GraphQL\Mutations\Messenger\LeaveConversation(),
+			'removeConversationUser' => new \IPS\core\api\GraphQL\Mutations\Messenger\RemoveConversationUser(),
+			'addConversationUser' => new \IPS\core\api\GraphQL\Mutations\Messenger\AddConversationUser(),
 		];
 	}
 }

@@ -10,33 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Mutations\Messenger;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Application;
-use IPS\Application\Module;
-use IPS\core\api\GraphQL\Types\MessengerConversationType;
-use IPS\core\Messenger\Conversation;
-use IPS\Member;
-use IPS\Notification;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Add user to conversation mutation for GraphQL API
  */
-class AddConversationUser
+class _AddConversationUser
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Add a user to a PM conversation";
+	public static $description = "Add a user to a PM conversation";
 
 	/*
 	 * Mutation arguments
@@ -52,7 +44,7 @@ class AddConversationUser
 	/**
 	 * Return the mutation return type
 	 */
-	public function type() : MessengerConversationType
+	public function type() 
 	{
 		return \IPS\core\Api\GraphQL\TypeRegistry::messengerConversation();
 	}
@@ -60,37 +52,38 @@ class AddConversationUser
 	/**
 	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @return	Conversation
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\forums\Forum
 	 */
-	public function resolve( mixed $val, array $args ) : Conversation
+	public function resolve($val, $args)
 	{
-		if( !Member::loggedIn()->member_id )
+		if( !\IPS\Member::loggedIn()->member_id )
 		{
-			throw new SafeException( 'NOT_LOGGED_IN', 'GQL/0003/1', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NOT_LOGGED_IN', 'GQL/0003/1', 403 );
 		}
 
 		try
 		{
-			$conversation = Conversation::loadAndCheckPerms( $args['id'] );
+			$conversation = \IPS\core\Messenger\Conversation::loadAndCheckPerms( $args['id'] );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'NO_MESSAGE', '1F294/2_graphql', 400 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_MESSAGE', '1F294/2_graphql', 400 );
 		}
 
 		// Fetch our new member
-		$member = Member::load( $args['memberId'] );
+		$member = \IPS\Member::load( $args['memberId'] );
 		
 		if( !$member->member_id ){
-			throw new SafeException( 'INVALID_MEMBER', '1F294/2_graphql', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_MEMBER', '1F294/2_graphql', 403 );
 		}
 
 		// Check member limit
-		if ( Member::loggedIn()->group['g_max_mass_pm'] !== -1 AND $conversation->to_count + 1 > Member::loggedIn()->group['g_max_mass_pm'] )
+		if ( \IPS\Member::loggedIn()->group['g_max_mass_pm'] !== -1 AND $conversation->to_count + 1 > \IPS\Member::loggedIn()->group['g_max_mass_pm'] )
 		{
-			throw new SafeException( 'TOO_MANY_RECIPIENTS', '1F294/2', 400 );
+			throw new \IPS\Api\GraphQL\SafeException( 'TOO_MANY_RECIPIENTS', '1F294/2', 400 );
 		}
 
 		$maps = $conversation->maps( TRUE );
@@ -98,12 +91,12 @@ class AddConversationUser
 		// Authorize the member
 		if ( array_key_exists( $member->member_id, $maps ) and !$maps[ $member->member_id ]['map_user_active'] AND !$maps[ $member->member_id ]['map_user_banned'] )
 		{
-			throw new SafeException( 'MEMBER_LEFT', '1F294/2', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'MEMBER_LEFT', '1F294/2', 403 );
 		}
 			
 		if ( !$this->memberCanReceiveNewMessage( $member ) )
 		{
-			throw new SafeException( 'BAD_RECIPIENT', '1F294/2', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'BAD_RECIPIENT', '1F294/2', 403 );
 		}
 
 		//echo 'here';
@@ -111,7 +104,7 @@ class AddConversationUser
 		$conversation->authorize( $member );
 		$conversation->maps(TRUE); // Need to rebuild participant maps here to reflect this change
 
-		$notification = new Notification( Application::load('core'), 'private_message_added', $conversation, array( $conversation, Member::loggedIn() ) );
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'private_message_added', $conversation, array( $conversation, \IPS\Member::loggedIn() ) );
 		$notification->recipients->attach( $member );
 		$notification->send();
 
@@ -121,10 +114,10 @@ class AddConversationUser
 	/**
 	 * Can the member recieve new messages?
 	 *
-	 * @param 	Member $member 	The member to check
-	 * @return	bool
+	 * @param 	\IPS\Member 	The member to check
+	 * @return	boolean
 	 */
-	public function memberCanReceiveNewMessage( Member $member ) : bool
+	public function memberCanReceiveNewMessage( $member )
 	{
 		if ( $member->members_disable_pm )
 		{
@@ -132,19 +125,19 @@ class AddConversationUser
 		}
 		
 		/* Group can not use messenger */
-		if ( !$member->canAccessModule( Module::get( 'core', 'messaging', 'front' ) ) )
+		if ( !$member->canAccessModule( \IPS\Application\Module::get( 'core', 'messaging', 'front' ) ) )
 		{
 			return FALSE;
 		}
 		
 		/* Inbox is full */
-		if ( ( $member->group['g_max_messages'] > 0 AND $member->msg_count_total >= $member->group['g_max_messages'] ) and !Member::loggedIn()->group['gbw_pm_override_inbox_full'] )
+		if ( ( $member->group['g_max_messages'] > 0 AND $member->msg_count_total >= $member->group['g_max_messages'] ) and !\IPS\Member::loggedIn()->group['gbw_pm_override_inbox_full'] )
 		{
 			return FALSE;
 		}
 		
 		/* Is being ignored */
-		if ( $member->isIgnoring( Member::loggedIn(), 'messages' ) )
+		if ( $member->isIgnoring( \IPS\Member::loggedIn(), 'messages' ) )
 		{
 			return FALSE;
 		}

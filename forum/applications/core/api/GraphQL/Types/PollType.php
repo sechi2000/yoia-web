@@ -12,28 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Poll;
-use function defined;
-use function intval;
-use function is_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PollType for GraphQL API
  */
-class PollType extends ObjectType
+class _PollType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -74,7 +69,7 @@ class PollType extends ObjectType
 						'type' => TypeRegistry::int(),
 						'description' => "Timestamp of when this poll will close (NULL if no close date set)",
 						'resolve' => function ($poll) {
-							if( $poll->poll_close_date instanceof DateTime )
+							if( $poll->poll_close_date instanceof \IPS\DateTime )
 							{
 								return $poll->poll_close_date->getTimestamp();
 							}
@@ -141,11 +136,10 @@ class PollType extends ObjectType
 	/**
 	 * Resolve poll questions field
 	 *
-	 * @param 	Poll $poll
+	 * @param 	\IPS\Poll
 	 * @return	array
 	 */
-	protected static function getQuestions ( Poll $poll ) : array
-	{
+	protected static function getQuestions ($poll) {
 		$questions = array();
 
 		foreach ( $poll->choices as $idx => $choice )
@@ -167,7 +161,7 @@ class PollType extends ObjectType
 			// Get the voters for each choice in advance here, but we won't load the member 
 			// until questions -> choices -> voters is resolved in PollQuestionType
 			$voters = array();
-			$query = Db::i()->select( '*', 'core_voters', array( 'poll=?', $poll->pid ) );
+			$query = \IPS\Db::i()->select( '*', 'core_voters', array( 'poll=?', $poll->pid ) );
 
 			foreach( $query as $voter )
 			{
@@ -176,16 +170,16 @@ class PollType extends ObjectType
 					$voteData = json_decode( $voter['member_choices'] );
 					foreach( $voteData as $questionIdx => $answer )
 					{
-						if( is_array( $answer ) )
+						if( \is_array( $answer ) )
 						{
 							foreach( $answer as $_answer )
 							{
-								$questions[ $questionIdx ]['voters'][ intval( $_answer ) ][] = $voter['member_id'];
+								$questions[ $questionIdx ]['voters'][ \intval( $_answer ) ][] = $voter['member_id'];
 							}		
 						}
 						else
 						{
-							$questions[ $questionIdx ]['voters'][ intval( $answer ) ][] = $voter['member_id'];
+							$questions[ $questionIdx ]['voters'][ \intval( $answer ) ][] = $voter['member_id'];
 						}
 					}
 				}

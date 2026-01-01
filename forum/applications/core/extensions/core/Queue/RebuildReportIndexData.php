@@ -11,55 +11,42 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Content\Item;
-use IPS\Db;
-use IPS\Db\Exception as DbException;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Task\Queue\OutOfRangeException as QueueException;
-use OutOfRangeException;
-use function defined;
-use const IPS\REBUILD_QUICK;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Rebuild Item Counts (comments, etc)
  */
-class RebuildReportIndexData extends QueueAbstract
+class _RebuildReportIndexData
 {
 	/**
 	 * @brief Number of content items to index per cycle
 	 */
-	public int $index	= REBUILD_QUICK;
+	public $index	= \IPS\REBUILD_QUICK;
 	
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		try
 		{			
-			$data['count']		= Db::i()->select( 'MAX(id)', 'core_rc_index' )->first();
-			$data['realCount']	= Db::i()->select( 'COUNT(*)', 'core_rc_index' )->first();
+			$data['count']		= \IPS\Db::i()->select( 'MAX(id)', 'core_rc_index' )->first();
+			$data['realCount']	= \IPS\Db::i()->select( 'COUNT(*)', 'core_rc_index' )->first();
 		}
-		catch( DbException $ex )
+		catch( \IPS\Db\Exception $ex )
 		{
 			return NULL;
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		if( $data['count'] == 0 )
@@ -78,20 +65,20 @@ class RebuildReportIndexData extends QueueAbstract
 	 * @param	mixed						$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int							$offset	Offset
 	 * @return	int							New offset
-	 * @throws	QueueException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$last = NULL;
 
 		try
 		{
-			foreach( Db::i()->select( '*', 'core_rc_index', array( 'id > ?',  $offset ), 'id ASC', array( 0, $this->index ) ) as $report )
+			foreach( \IPS\Db::i()->select( '*', 'core_rc_index', array( 'id > ?',  $offset ), 'id ASC', array( 0, $this->index ) ) as $report )
 			{
 				$last = $report['id'];
 				$classname = $report['class'];
 				$exploded = explode( '\\', $classname );
-				if ( ! class_exists( $classname ) or ! Application::appIsEnabled( $exploded[1] ) )
+				if ( ! class_exists( $classname ) or ! \IPS\Application::appIsEnabled( $exploded[1] ) )
 				{
 					continue;
 				}
@@ -103,7 +90,7 @@ class RebuildReportIndexData extends QueueAbstract
 					$nodeId = 0;
 					$item = null;
 					
-					if ( $content instanceof Item )
+					if ( $content instanceof \IPS\Content\Item )
 					{
 						$item = $content;
 					}
@@ -119,7 +106,7 @@ class RebuildReportIndexData extends QueueAbstract
 						$nodeId = $node->_id;
 					}
 					
-					Db::i()->update( 'core_rc_index', [
+					\IPS\Db::i()->update( 'core_rc_index', [
 						'item_id' => $itemId,
 						'node_id' => $nodeId
 					],
@@ -127,20 +114,20 @@ class RebuildReportIndexData extends QueueAbstract
 						'id=?', $report['id']
 					] );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					continue;
 				}
 			}
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
-			throw new QueueException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		if( $last === NULL )
 		{
-			throw new QueueException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 		
 		return $last;
@@ -153,9 +140,9 @@ class RebuildReportIndexData extends QueueAbstract
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' => Member::loggedIn()->language()->addToStack('rebuilding_report_index_data'), 'complete' => $data['realCount'] ? ( round( 100 / $data['realCount'] * $data['indexed'], 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('rebuilding_report_index_data'), 'complete' => $data['realCount'] ? ( round( 100 / $data['realCount'] * $data['indexed'], 2 ) ) : 100 );
 	}
 
 }

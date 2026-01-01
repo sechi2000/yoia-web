@@ -12,20 +12,16 @@
 namespace IPS\core\setup\upg_107011;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.7.0 Beta 9 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * ...
@@ -35,7 +31,7 @@ class Upgrade
 	public function step1()
 	{
 		/* Ensure that simple editing mode is not on for all existing Invision Community customers */
-		Settings::i()->changeValues( [ 'theme_editing_advanced_mode' => 1 ] );
+		\IPS\Settings::i()->changeValues( [ 'theme_editing_advanced_mode' => 1 ] );
 
 		return TRUE;
 	}

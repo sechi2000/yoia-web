@@ -12,33 +12,28 @@
 namespace IPS\{app}\extensions\core\ContactUs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\ContactUsAbstract;
-use IPS\Helpers\Form;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Contact Us extension
  */
-class {class} extends ContactUsAbstract
+class _{class}
 {
 	/**
 	 * Process Form
 	 *
-	 * @param	Form            		$form	    The form
+	 * @param	\IPS\Helpers\Form		$form	    The form
 	 * @param	array                   $formFields Additional Configuration Formfields
 	 * @param	array                   $options    Type Radio Form Options
 	 * @param	array                   $toggles    Type Radio Form Toggles
 	 * @param	array                   $disabled   Type Radio Form Disabled Options
 	 * @return	void
 	 */
-	public function process( Form &$form, array &$formFields, array &$options, array &$toggles, array &$disabled  ) : void
+	public function process( &$form, &$formFields, &$options, &$toggles, &$disabled  )
 	{
 
 	}
@@ -46,10 +41,10 @@ class {class} extends ContactUsAbstract
 	/**
 	 * Allows extensions to do something before the form is shown... e.g. add your own custom fields, or redirect the page
 	 *
-	 * @param	Form		$form	    The form
+	 * @param	\IPS\Helpers\Form		$form	    The form
      * @return	void
      */
-	public function runBeforeFormOutput( Form $form ) : void
+	public function runBeforeFormOutput( &$form )
 	{
 
 	}
@@ -58,9 +53,9 @@ class {class} extends ContactUsAbstract
 	 * Handle the Form
 	 *
 	 * @param	array                   $values     Values from form
-	 * @return	bool
+	 * @return	void
 	 */
-	public function handleForm( array $values ) : bool
+	public function handleForm( array $values )
 	{
         return FALSE;
 	}

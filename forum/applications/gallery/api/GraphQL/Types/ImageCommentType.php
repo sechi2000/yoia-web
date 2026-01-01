@@ -11,44 +11,53 @@
 
 namespace IPS\gallery\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
-use IPS\Content\Api\GraphQL\CommentType;
-use IPS\gallery\api\GraphQL\TypeRegistry;
-use function defined;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ImageCommentType for GraphQL API
  */
-class ImageCommentType extends CommentType
+class _ImageCommentType extends \IPS\Content\Api\GraphQL\CommentType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $commentClass	= '\IPS\gallery\Image\Comment';
+	protected static $commentClass	= '\IPS\gallery\Image\Comment';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'gallery_ImageComment';
+	protected static $typeName = 'gallery_ImageComment';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'An image comment';
+	protected static $typeDescription = 'An image comment';
 
 	/**
 	 * Get the item type that goes with this item type
 	 *
 	 * @return	ObjectType
 	 */
-	public static function getItemType(): ObjectType
+	public static function getItemType()
 	{
-		return TypeRegistry::image();
+		return \IPS\gallery\api\GraphQL\TypeRegistry::image();
+	}
+
+	/**
+	 * Return the fields available in this type
+	 *
+	 * @return	array
+	 */
+	public function fields()
+	{
+		$defaultFields = parent::fields();
+		return $defaultFields;
 	}
 }

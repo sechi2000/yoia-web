@@ -6,11 +6,8 @@
  * @license		https://www.invisioncommunity.com/legal/standards/
  * @package		Invision Community
  * @since		18 Feb 2013
- */
-
-use IPS\Dispatcher\Front;
-
-define('REPORT_EXCEPTIONS', TRUE);
+ */ 
+\define('REPORT_EXCEPTIONS', TRUE);
 $_SERVER['SCRIPT_FILENAME']	= __FILE__;
 require_once 'init.php';
-Front::i()->run();
+\IPS\Dispatcher\Front::i()->run();

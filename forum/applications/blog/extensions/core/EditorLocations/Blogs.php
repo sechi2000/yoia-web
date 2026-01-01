@@ -12,43 +12,36 @@
 namespace IPS\blog\extensions\core\EditorLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\blog\Blog;
-use IPS\blog\Entry\Comment;
-use IPS\Content;
-use IPS\Db;
-use IPS\Extensions\EditorLocationsAbstract;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Text\Parser;
-use LogicException;
-use RuntimeException;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: Blogs
  */
-class Blogs extends EditorLocationsAbstract
+class _Blogs
 {
+	/**
+	 * Can we use HTML in this editor?
+	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
+	 */
+	public function canUseHtml( $member )
+	{
+		return NULL;
+	}
+	
 	/**
 	 * Can we use attachments in this editor?
 	 *
-	 * @param Member $member	The member
-	 * @param Editor $field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
 	 */
-	public function canAttach( Member $member, Editor $field ): ?bool
+	public function canAttach( $member, $field )
 	{
 		return NULL;
 	}
@@ -57,11 +50,11 @@ class Blogs extends EditorLocationsAbstract
 	 * Can whatever is posted in this editor be moderated?
 	 * If this returns TRUE, we must ensure the content is ran through word, link and image filters
 	 *
-	 * @param Member $member	The member
-	 * @param Editor $field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool
 	 */
-	public function canBeModerated( Member $member, Editor $field ): bool
+	public function canBeModerated( $member, $field )
 	{
 		if ( preg_match( '/^blogs\-(?:new-blog|blog|new-blog-sidebar|new-blog-group\d+)$/', $field->options['autoSaveKey'] ) )
 		{
@@ -87,77 +80,88 @@ class Blogs extends EditorLocationsAbstract
 		{
 			if ( \IPS\IN_DEV )
 			{
-				throw new RuntimeException( 'Unknown canBeModerated: ' . $field->options['autoSaveKey'] );
+				throw new \RuntimeException( 'Unknown canBeModerated: ' . $field->options['autoSaveKey'] );
 			}
-
-			return parent::canBeModerated( $member, $field );
+			return FALSE;
 		}
 	}
 	
 	/**
 	 * Permission check for attachments
 	 *
-	 * @param Member $member		The member
-	 * @param int|null $id1		Primary ID
-	 * @param int|null $id2		Secondary ID
-	 * @param string|null $id3		Arbitrary data
-	 * @param array $attachment	The attachment data
-	 * @param bool $viewOnly	If true, just check if the user can see the attachment rather than download it
+	 * @param	\IPS\Member	$member		The member
+	 * @param	int|null	$id1		Primary ID
+	 * @param	int|null	$id2		Secondary ID
+	 * @param	string|null	$id3		Arbitrary data
+	 * @param	array		$attachment	The attachment data
+	 * @param	bool		$viewOnly	If true, just check if the user can see the attachment rather than download it
 	 * @return	bool
 	 */
-	public function attachmentPermissionCheck( Member $member, ?int $id1, ?int $id2, ?string $id3, array $attachment, bool $viewOnly=FALSE ): bool
+	public function attachmentPermissionCheck( $member, $id1, $id2, $id3, $attachment, $viewOnly=FALSE )
 	{
 		/* The attachment is attached to a comment */
 		if ( $id2 )
 		{
-			return Comment::load( $id2 )->canView( $member );
+			return \IPS\blog\Entry\Comment::load( $id2 )->canView( $member );
 		}
 		else
 		{
-			return Blog::load( $id1 )->can( 'view', $member );
+			return \IPS\blog\Blog::load( $id1 )->can( 'view', $member );
 		}
 	}
 	
 	/**
 	 * Attachment lookup
 	 *
-	 * @param int|null $id1	Primary ID
-	 * @param int|null $id2	Secondary ID
-	 * @param string|null $id3	Arbitrary data
-	 * @return    Content|Member|Model|Url|null
-	 * @throws	LogicException
+	 * @param	int|null	$id1	Primary ID
+	 * @param	int|null	$id2	Secondary ID
+	 * @param	string|null	$id3	Arbitrary data
+	 * @return	\IPS\blog\Blog
+	 * @throws	\LogicException
 	 */
-	public function attachmentLookup( ?int $id1=null, ?int $id2=null, ?string $id3=null ): Model|Content|Url|Member|null
+	public function attachmentLookup( $id1, $id2, $id3 )
 	{
-		try
-		{/* The attachment is attached to a comment */
-			if( $id2 )
-			{
-				return Comment::load( $id2 );
-			}
-			else
-			{
-				return Blog::load( $id1 );
-			}
-		}
-		catch( Exception $e )
+		/* The attachment is attached to a comment */
+		if ( $id2 )
 		{
-			throw new LogicException( );
+			return \IPS\blog\Entry\Comment::load( $id2 );
 		}
+		else
+		{
+			return \IPS\blog\Blog::load( $id1 );
+		}
+	}
+
+	/**
+	 * Rebuild attachment images in non-content item areas
+	 *
+	 * @param	int|null	$offset	Offset to start from
+	 * @param	int|null	$max	Maximum to parse
+	 * @return	int			Number completed
+	 * @note	This method is optional and will only be called if it exists
+	 */
+	public function rebuildAttachmentImages( $offset, $max )
+	{
+		return $this->performRebuild( $offset, $max, array( 'IPS\Text\Parser', 'rebuildAttachmentUrls' ) );
 	}
 
 	/**
 	 * Rebuild content post-upgrade
 	 *
-	 * @param int|null $offset	Offset to start from
-	 * @param int|null $max	Maximum to parse
+	 * @param	int|null	$offset	Offset to start from
+	 * @param	int|null	$max	Maximum to parse
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildContent( ?int $offset, ?int $max ): int
+	public function rebuildContent( $offset, $max )
 	{
 		return $this->performRebuild( $offset, $max, array( 'IPS\Text\LegacyParser', 'parseStatic' ) );
 	}
+
+	/**
+	 * @brief	Use the cached image URL instead of the original URL
+	 */
+	protected $proxyUrl	= FALSE;
 
 	/**
 	 * Rebuild content to add or remove image proxy
@@ -168,55 +172,68 @@ class Blogs extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildImageProxy( ?int $offset, ?int $max, bool $proxyUrl = FALSE ): int
+	public function rebuildImageProxy( $offset, $max, $proxyUrl = FALSE )
 	{
-		$callback = function( $value ) use ( $proxyUrl ) {
-			return Parser::removeImageProxy( $value, $proxyUrl );
-		};
-		return $this->performRebuild( $offset, $max, $callback );
+		$this->proxyUrl = $proxyUrl;
+		return $this->performRebuild( $offset, $max, 'parseImageProxy' );
 	}
+
+	/**
+	 * @brief	Store lazy loading status ( true = enabled )
+	 */
+	protected $_lazyLoadStatus = null;
 
 	/**
 	 * Rebuild content to add or remove lazy loading
 	 *
 	 * @param	int|null		$offset		Offset to start from
 	 * @param	int|null		$max		Maximum to parse
+	 * @param	bool			$status		Enable/Disable lazy loading
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildLazyLoad( ?int $offset, ?int $max ): int
+	public function rebuildLazyLoad( $offset, $max, $status=TRUE )
 	{
-		return $this->performRebuild( $offset, $max, [ 'IPS\Text\Parser', 'parseLazyLoad' ] );
+		$this->_lazyLoadStatus = $status;
+
+		return $this->performRebuild( $offset, $max, 'parseLazyLoad' );
 	}
 
 	/**
 	 * Perform rebuild - abstracted as the call for rebuildContent() and rebuildAttachmentImages() is nearly identical
 	 *
-	 * @param int|null $offset		Offset to start from
-	 * @param int|null $max		Maximum to parse
-	 * @param callable $callback	Method to call to rebuild content
+	 * @param	int|null	$offset		Offset to start from
+	 * @param	int|null	$max		Maximum to parse
+	 * @param	callable	$callback	Method to call to rebuild content
 	 * @return	int			Number completed
 	 */
-	protected function performRebuild( ?int $offset, ?int $max, callable $callback ): int
+	protected function performRebuild( $offset, $max, $callback )
 	{
 		$did	= 0;
 
 		/* Language bits */
-		foreach( Db::i()->select( '*', 'core_sys_lang_words', "word_key LIKE 'blogs_blog_%_desc'", 'word_id ASC', array( $offset, $max ) ) as $word )
+		foreach( \IPS\Db::i()->select( '*', 'core_sys_lang_words', "word_key LIKE 'blogs_blog_%_desc'", 'word_id ASC', array( $offset, $max ) ) as $word )
 		{
 			$did++;
-			$rebuilt = FALSE;
 			
 			try
 			{
-				if( !empty( $word['word_custom'] ) )
+				if( $callback == 'parseImageProxy' )
+				{
+					$rebuilt = \IPS\Text\Parser::removeImageProxy( $word['word_custom'], $this->proxyUrl );
+				}
+				elseif( $callback == 'parseLazyLoad' )
+				{
+					$rebuilt = \IPS\Text\Parser::parseLazyLoad( $word['word_custom'], $this->_lazyLoadStatus );
+				}
+				else
 				{
 					$rebuilt = $callback( $word['word_custom'] );
 				}
 			}
-			catch( InvalidArgumentException $e )
+			catch( \InvalidArgumentException $e )
 			{
-				if( is_array( $callback ) and $callback[1] == 'parseStatic' AND $e->getcode() == 103014 )
+				if( $callback[1] == 'parseStatic' AND $e->getcode() == 103014 )
 				{
 					$rebuilt	= preg_replace( "#\[/?([^\]]+?)\]#", '', $word['word_custom'] );
 				}
@@ -228,7 +245,7 @@ class Blogs extends EditorLocationsAbstract
 
 			if( $rebuilt !== FALSE )
 			{
-				Db::i()->update( 'core_sys_lang_words', array( 'word_custom' => $rebuilt ), 'word_id=' . $word['word_id'] );
+				\IPS\Db::i()->update( 'core_sys_lang_words', array( 'word_custom' => $rebuilt ), 'word_id=' . $word['word_id'] );
 			}
 		}
 
@@ -240,8 +257,8 @@ class Blogs extends EditorLocationsAbstract
 	 *
 	 * @return	int			Total Count
 	 */
-	public function contentCount(): int
+	public function contentCount()
 	{
-		return Db::i()->select( 'COUNT(*) as count', 'core_sys_lang_words', "word_key LIKE 'blogs_blog_%_desc'" )->first();
+		return \IPS\Db::i()->select( 'COUNT(*) as count', 'core_sys_lang_words', "word_key LIKE 'blogs_blog_%_desc'" )->first();
 	}
 }

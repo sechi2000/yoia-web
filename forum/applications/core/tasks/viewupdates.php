@@ -11,38 +11,17 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\IPS;
-use IPS\Db;
-use IPS\Db\Exception;
-use IPS\Log;
-use IPS\Platform\Bridge;
-use IPS\Redis;
-use IPS\Task;
-use OutOfRangeException;
-use Throwable;
-use UnderflowException;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * view_updates Task
  */
-class viewupdates extends Task
+class _viewupdates extends \IPS\Task
 {
-	/**
-	 * @breif Stored data to send to Cloud in one go
-	 */
-	protected array $_sendToCloud = [];
-
 	/**
 	 * Execute
 	 *
@@ -52,16 +31,17 @@ class viewupdates extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		$this->runUntilTimeout(function(){
 			$hasCount = FALSE;
 
 			try
 			{
-				$database = Db::i()->select( 'classname, id, count(*) AS count', 'core_view_updates', NULL, NULL, 20, array( 'classname', 'id' ), NULL, Db::SELECT_FROM_WRITE_SERVER );
+				/* @note SELECT_FROM_WRITE_SERVER added in 72724569ca77f6686f6be0861ce673f793a862e8 to avoid a race condition that caused high view counts */
+				$database = \IPS\Db::i()->select( 'classname, id, count(*) AS count', 'core_view_updates', NULL, NULL, 20, array( 'classname', 'id' ), NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER );
 				
 				/* Database results first */
 				foreach( $database as $row )
@@ -72,42 +52,39 @@ class viewupdates extends Task
 					{
 						$this->update( $row['classname'], $row['id'], $row['count'] );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
-						Db::i()->delete( 'core_view_updates', array( 'classname=?', $row['classname'] ) );
+						\IPS\Db::i()->delete( 'core_view_updates', array( 'classname=?', $row['classname'] ) );
 					}
 					
-					Db::i()->delete( 'core_view_updates', array( 'classname=? AND id=?', $row['classname'], $row['id'] ) );
+					\IPS\Db::i()->delete( 'core_view_updates', array( 'classname=? AND id=?', $row['classname'], $row['id'] ) );
 				}
 			}
-			catch ( UnderflowException $e ) { }
-
-			/* Now do cloud */
-			Bridge::i()->viewTask( $this->_sendToCloud );
-
+			catch ( \UnderflowException $e ) { }
+			
 			/* Now try redis */
-			if ( Redis::isEnabled() )
+			if ( \IPS\REDIS_ENABLED and \IPS\CACHE_METHOD == 'Redis' and ( \IPS\CACHE_CONFIG or \IPS\REDIS_CONFIG ) )
 			{
 				try
 				{
-					$redis = Redis::i()->zRevRangeByScore( 'topic_views', '+inf', '-inf', array('withscores' => TRUE, 'limit' => array( 0, 20 ) ) );
+					$redis = \IPS\Redis::i()->zRevRangeByScore( 'topic_views', '+inf', '-inf', array('withscores' => TRUE, 'limit' => array( 0, 20 ) ) );
 
-					if( is_array( $redis ) and count( $redis ) )
+					if( \is_array( $redis ) AND \count( $redis ) )
 					{
 						foreach ( $redis as $data => $count )
 						{
 							$hasCount = TRUE;
 
-							[ $class, $id ] = explode( '__', $data );
+							list( $class, $id ) = explode( '__', $data );
 
 							try
 							{
-								$this->update( $class, $id, intval( $count ) );
+								$this->update( $class, $id, \intval( $count ) );
 							}
-							catch ( OutOfRangeException $e ) {}
+							catch ( \OutOfRangeException $e ) {}
 						}
 
-						Redis::i()->zRem( 'topic_views', ...array_keys( $redis ) );
+						\IPS\Redis::i()->zRem( 'topic_views', ...array_keys( $redis ) );
 					}
 				}
 				catch( \Exception $e ) { }
@@ -115,9 +92,9 @@ class viewupdates extends Task
 				/* Now try advert impressions */
 				try
 				{
-					$redis = Redis::i()->zRevRangeByScore( 'advert_impressions', '+inf', '-inf', array('withscores' => TRUE, 'limit' => array( 0, 20 ) ) );
+					$redis = \IPS\Redis::i()->zRevRangeByScore( 'advert_impressions', '+inf', '-inf', array('withscores' => TRUE, 'limit' => array( 0, 20 ) ) );
 
-					if( is_array( $redis ) )
+					if( \is_array( $redis ) )
 					{
 						$updates = [];
 						foreach ( $redis as $id => $count )
@@ -125,12 +102,12 @@ class viewupdates extends Task
 							$hasCount = TRUE;
 							$updates[ $count ][] = $id;
 
-							Redis::i()->zRem( 'advert_impressions', $id );
+							\IPS\Redis::i()->zRem( 'advert_impressions', $id );
 						}
 
 						foreach ( $updates as $incrementBy => $ids )
 						{
-							Db::i()->update( 'core_advertisements', "ad_impressions=ad_impressions+" . $incrementBy, [ Db::i()->in( 'ad_id', $ids ) ] );
+							\IPS\Db::i()->update( 'core_advertisements', "ad_impressions=ad_impressions+" . $incrementBy, [ \IPS\Db::i()->in( 'ad_id', $ids ) ] );
 						}
 					}
 				}
@@ -147,8 +124,6 @@ class viewupdates extends Task
 				return FALSE;
 			}
 		});
-
-		return null;
 	}
 	
 	/**
@@ -157,70 +132,26 @@ class viewupdates extends Task
 	 * @param	string	$class  Class to update
 	 * @param	int		$id		ID of item
 	 * @param	int		$count	Count to update
-	 * @throws OutOfRangeException	When table to update no longer exists
+	 * @throws \OutOfRangeException	When table to update no longer exists
 	 */
-	protected function update( string $class, int $id, int $count ) : void
+	protected function update( $class, $id, $count )
 	{
-
-		if ( class_exists( $class ) and IPS::classUsesTrait( $class, 'IPS\Content\ViewUpdates' ) AND isset( $class::$databaseColumnMap['views'] ) )
+		if ( class_exists( $class ) and \IPS\IPS::classUsesTrait( $class, 'IPS\Content\ViewUpdates' ) AND isset( $class::$databaseColumnMap['views'] ) )
 		{
 			try
 			{
-				$item = $class::load( $id );
-				$title = '';
-				/* If we specify a title specifically for analytics, use that always. */
-				if ( method_exists( $item, 'titleForAnalytics' ) )
-				{
-					$title = $item->titleForAnalytics();
-				}
-				/* Otherwise use titleForLog for Nodes */
-				else if ( in_array( 'IPS\Node\Model', class_parents( $item ) ) )
-				{
-					$title = $item->titleForLog();
-				}
-				/* Or the defined title column for content items. */
-				else if ( in_array( 'IPS\Content\Item', class_parents( $item ) ) )
-				{
-					$title = $item->mapped('title');
-				}
-	
-				$url = '';
-				if ( method_exists( $item, 'url' ) )
-				{
-					$url = $item->url();
-				}
-	
-				$this->_sendToCloud[] = [
-					'contentClass'	=> $class,
-					'contentId'		=> $id,
-					'views'			=> $count,
-					'title'			=> $title,
-					'url'			=> (string) $url
-				];
-			}
-            catch( OutOfRangeException )
-            {
-                /* Intentionally do nothing for an OutOfRangeException */
-            }
-			catch( Throwable $e )
-			{
-				Log::log( $e, 'views' );
-			}
-			
-			try
-			{
-				Db::i()->update(
+				\IPS\Db::i()->update(
 					$class::$databaseTable,
 					"`{$class::$databasePrefix}{$class::$databaseColumnMap['views']}`=`{$class::$databasePrefix}{$class::$databaseColumnMap['views']}`+{$count}",
 					array( "{$class::$databasePrefix}{$class::$databaseColumnId}=?", $id )
 				);
 			}
-			catch( Exception $e )
+			catch( \IPS\Db\Exception $e )
 			{
 				/* Table to update no longer exists */
 				if( $e->getCode() == 1146 )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 
 				throw $e;

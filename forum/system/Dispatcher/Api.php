@@ -11,77 +11,51 @@
 namespace IPS\Dispatcher;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use IPS\Api\Exception as ApiException;
-use IPS\Api\Key;
-use IPS\Api\OAuthClient;
-use IPS\Application;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Exception;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use const IPS\OAUTH_REQUIRES_HTTPS;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	API Dispatcher
  */
-class Api extends Dispatcher
+class _Api extends \IPS\Dispatcher
 {
 	/**
 	 * @brief Controller Location
 	 */
-	public string $controllerLocation = 'api';
+	public $controllerLocation = 'api';
 	
 	/**
 	 * @brief Path
 	 */
-	public ?string $path = NULL;
+	public $path = NULL;
 	
 	/**
 	 * @brief Raw API Key
 	 */
-	public ?string $rawApiKey = NULL;
+	public $rawApiKey = NULL;
 	
 	/**
 	 * @brief Raw Access Token
 	 */
-	public ?string $rawAccessToken = NULL;
+	public $rawAccessToken = NULL;
 	
 	/**
 	 * @brief API Key Object
 	 */
-	public ?Key $apiKey = NULL;
+	public $apiKey = NULL;
 	
 	/**
 	 * @brief Access Token Details
 	 */
-	public ?array $accessToken = NULL;
+	public $accessToken = NULL;
 	
 	/**
 	 * @brief Language
 	 */
-	public ?Lang $language = NULL;
+	public $language = NULL;
 
 	/**
 	 * Can the Response be cached?
@@ -94,9 +68,9 @@ class Api extends Dispatcher
 	 * Init
 	 *
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function init() : void
+	public function init()
 	{
 		try
 		{
@@ -113,7 +87,7 @@ class Api extends Dispatcher
 				$this->_setAccessToken();
 				if ( !$this->accessToken['scope'] or !json_decode( $this->accessToken['scope'] ) )
 				{
-					throw new ApiException( 'NO_SCOPES', '3S290/B', 401, 'insufficient_scope' );
+					throw new \IPS\Api\Exception( 'NO_SCOPES', '3S290/B', 401, 'insufficient_scope' );
 				}
 			}
 			elseif ( $this->rawApiKey )
@@ -122,32 +96,32 @@ class Api extends Dispatcher
 			}
 			else
 			{
-				throw new ApiException( 'NO_API_KEY', '2S290/6', 401 );
+				throw new \IPS\Api\Exception( 'NO_API_KEY', '2S290/6', 401 );
 			}
 			
 			/* Set other data */
 			$this->_setLanguage();
 
 			/* We don't want to cache any output for Zapier Requests */
-			if( Request::i()->isZapier() )
+			if( \IPS\Request::i()->isZapier() )
 			{
 				$this->cacheResponse = FALSE;
 			}
 
 		}
-		catch ( ApiException $e )
+		catch ( \IPS\Api\Exception $e )
 		{
 			/* Build response */
 			$response = json_encode( array( 'errorCode' => $e->exceptionCode, 'errorMessage' => $e->getMessage() ), JSON_PRETTY_PRINT );
 			
 			/* Do we need to log this? */
-			if ( $this->rawApiKey !== 'test' and in_array( $e->exceptionCode, array( '2S290/8', '2S290/B', '3S290/7', '3S290/9' ) ) )
+			if ( $this->rawApiKey !== 'test' and \in_array( $e->exceptionCode, array( '2S290/8', '2S290/B', '3S290/7', '3S290/9' ) ) )
 			{
-				$this->_log( (array)$response, $e->getCode(), in_array($e->exceptionCode, array('3S290/7', '3S290/9', '3S290/B')));
+				$this->_log( $response, $e->getCode(), \in_array( $e->exceptionCode, array( '3S290/7', '3S290/9', '3S290/B' ) ) );
 			}
 			
 			/* Output */
-			$this->_respond($response, $e->getCode(), $e->oauthError);
+			$this->_respond( $response, $e->getCode(), $e->oauthError );
 		}
 	}
 	
@@ -156,23 +130,23 @@ class Api extends Dispatcher
 	 *
 	 * @return	void
 	 */
-	protected function _setPath() : void
+	protected function _setPath()
 	{
 		/* Decode URL */
-		if ( Settings::i()->use_friendly_urls and Settings::i()->htaccess_mod_rewrite and mb_substr( Request::i()->url()->data[ Url::COMPONENT_PATH ], -14 ) !== '/api/index.php' )
+		if ( \IPS\Settings::i()->use_friendly_urls and \IPS\Settings::i()->htaccess_mod_rewrite and mb_substr( \IPS\Request::i()->url()->data[ \IPS\Http\Url::COMPONENT_PATH ], -14 ) !== '/api/index.php' )
 		{
 			/* We are using Mod Rewrite URL's, so look in the path */
-			$this->path = mb_substr( Request::i()->url()->data[ Url::COMPONENT_PATH ], mb_strpos( Request::i()->url()->data[ Url::COMPONENT_PATH ], '/api/' ) + 5 );
+			$this->path = mb_substr( \IPS\Request::i()->url()->data[ \IPS\Http\Url::COMPONENT_PATH ], mb_strpos( \IPS\Request::i()->url()->data[ \IPS\Http\Url::COMPONENT_PATH ], '/api/' ) + 5 );
 			
 			/* nginx won't convert the 'fake' query string to $_GET params, so do this now */
-			if ( ! empty( Request::i()->url()->data[ Url::COMPONENT_QUERY ] ) )
+			if ( ! empty( \IPS\Request::i()->url()->data[ \IPS\Http\Url::COMPONENT_QUERY ] ) )
 			{
-				parse_str( Request::i()->url()->data[ Url::COMPONENT_QUERY ], $params );
+				parse_str( \IPS\Request::i()->url()->data[ \IPS\Http\Url::COMPONENT_QUERY ], $params );
 				foreach ( $params as $k => $v )
 				{
-					if ( ! isset( Request::i()->$k ) )
+					if ( ! isset( \IPS\Request::i()->$k ) )
 					{
-						Request::i()->$k = $v;
+						\IPS\Request::i()->$k = $v;
 					}
 				}
 			}
@@ -180,7 +154,7 @@ class Api extends Dispatcher
 		else
 		{
 			/* Otherwise we are not, so we need the query string instead, which is actually easier */
-			$this->path = Request::i()->url()->data[ Url::COMPONENT_QUERY ];
+			$this->path = \IPS\Request::i()->url()->data[ \IPS\Http\Url::COMPONENT_QUERY ];
 
 			/* However, if we passed any actual query string arguments, we need to strip those */
 			if( mb_strpos( $this->path, '&' ) )
@@ -196,11 +170,11 @@ class Api extends Dispatcher
 	 * @note	OAuth requires Access Tokens only be transmitted over TLS, so if the request isn't secure, we ignore OAuth credentials
 	 * @return	void
 	 */
-	public function _setRawCredentials() : void
+	public function _setRawCredentials()
 	{
-		if ( $authorizationHeader = Request::i()->authorizationHeader() )
+		if ( $authorizationHeader = \IPS\Request::i()->authorizationHeader() )
 		{
-			if ( mb_substr( $authorizationHeader, 0, 7 ) === 'Bearer ' and ( !OAUTH_REQUIRES_HTTPS or Request::i()->isSecure() ) )
+			if ( mb_substr( $authorizationHeader, 0, 7 ) === 'Bearer ' and ( !\IPS\OAUTH_REQUIRES_HTTPS or \IPS\Request::i()->isSecure() ) )
 			{
 				$this->rawAccessToken = mb_substr( $authorizationHeader, 7 );
 			}
@@ -219,39 +193,39 @@ class Api extends Dispatcher
 	 * Check the IP Address isn't banned
 	 *
 	 * @return	void
-	 * @throws    ApiException
+	 * @throws	\IPS\Api\Exception
 	 */
-	protected function _checkIpAddressIsAllowed() : void
+	protected function _checkIpAddressIsAllowed()
 	{
 		/* Check the IP address is banned */
-		if ( Request::i()->ipAddressIsBanned() )
+		if ( \IPS\Request::i()->ipAddressIsBanned() )
 		{
-			throw new ApiException( 'IP_ADDRESS_BANNED', '1S290/A', 403 );
+			throw new \IPS\Api\Exception( 'IP_ADDRESS_BANNED', '1S290/A', 403 );
 		}
 		
 		/* If we have tried to access the API with a bad key more than 10 times, ban the IP address */
-		if ( Db::i()->select( 'COUNT(*)', 'core_api_logs', array( 'ip_address=? AND is_bad_key=1', Request::i()->ipAddress() ) )->first() > 10 )
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_api_logs', array( 'ip_address=? AND is_bad_key=1', \IPS\Request::i()->ipAddress() ) )->first() > 10 )
 		{
 			/* Remove the flag from these logs so that if the admin unbans the IP we aren't immediately banned again */
-			Db::i()->update( 'core_api_logs', array( 'is_bad_key' => 0 ), array( 'ip_address=?', Request::i()->ipAddress() ) );
+			\IPS\Db::i()->update( 'core_api_logs', array( 'is_bad_key' => 0 ), array( 'ip_address=?', \IPS\Request::i()->ipAddress() ) );
 			
 			/* Then insert the ban... */
-			Db::i()->insert( 'core_banfilters', array(
+			\IPS\Db::i()->insert( 'core_banfilters', array(
 				'ban_type'		=> 'ip',
-				'ban_content'	=> Request::i()->ipAddress(),
+				'ban_content'	=> \IPS\Request::i()->ipAddress(),
 				'ban_date'		=> time(),
 				'ban_reason'	=> 'API',
 			) );
-			unset( Store::i()->bannedIpAddresses );
+			unset( \IPS\Data\Store::i()->bannedIpAddresses );
 			
 			/* And throw an error */
-			throw new ApiException( 'IP_ADDRESS_BANNED', '1S290/C', 403 );
+			throw new \IPS\Api\Exception( 'IP_ADDRESS_BANNED', '1S290/C', 403 );
 		}
 		
 		/* If we have tried to access the API with a bad key more than once in the last 5 minutes, throw an error to prevent brute-forcing */
-		if ( Db::i()->select( 'COUNT(*)', 'core_api_logs', array( 'ip_address=? AND is_bad_key=1 AND date>?', Request::i()->ipAddress(), DateTime::create()->sub( new DateInterval( 'PT5M' ) )->getTimestamp() ) )->first() > 1 )
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_api_logs', array( 'ip_address=? AND is_bad_key=1 AND date>?', \IPS\Request::i()->ipAddress(), \IPS\DateTime::create()->sub( new \DateInterval( 'PT5M' ) )->getTimestamp() ) )->first() > 1 )
 		{
-			throw new ApiException( 'TOO_MANY_REQUESTS_WITH_BAD_KEY', '1S290/D', 429 );
+			throw new \IPS\Api\Exception( 'TOO_MANY_REQUESTS_WITH_BAD_KEY', '1S290/D', 429 );
 		}
 	}
 	
@@ -260,20 +234,20 @@ class Api extends Dispatcher
 	 *
 	 * @return	void
 	 */
-	public function _setApiKey() : void
+	public function _setApiKey()
 	{
 		try
 		{
-			$this->apiKey = Key::load( $this->rawApiKey );
+			$this->apiKey = \IPS\Api\Key::load( $this->rawApiKey );
 			
-			if ( $this->apiKey->allowed_ips and !in_array( Request::i()->ipAddress(), explode( ',', $this->apiKey->allowed_ips ) ) )
+			if ( $this->apiKey->allowed_ips and !\in_array( \IPS\Request::i()->ipAddress(), explode( ',', $this->apiKey->allowed_ips ) ) )
 			{
-				throw new ApiException( 'IP_ADDRESS_NOT_ALLOWED', '2S290/8', 403 );
+				throw new \IPS\Api\Exception( 'IP_ADDRESS_NOT_ALLOWED', '2S290/8', 403 );
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new ApiException( 'INVALID_API_KEY', '3S290/7', 401 );
+			throw new \IPS\Api\Exception( 'INVALID_API_KEY', '3S290/7', 401 );
 		}
 	}
 	
@@ -282,15 +256,15 @@ class Api extends Dispatcher
 	 *
 	 * @return	void
 	 */
-	public function _setAccessToken() : void
+	public function _setAccessToken()
 	{
 		try
 		{
-			$this->accessToken = OAuthClient::accessTokenDetails( $this->rawAccessToken );
+			$this->accessToken = \IPS\Api\OAuthClient::accessTokenDetails( $this->rawAccessToken );
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			throw new ApiException( 'INVALID_ACCESS_TOKEN', '3S290/9', 401, 'invalid_token' );
+			throw new \IPS\Api\Exception( 'INVALID_ACCESS_TOKEN', '3S290/9', 401, 'invalid_token' );
 		}
 	}
 	
@@ -299,24 +273,24 @@ class Api extends Dispatcher
 	 *
 	 * @return	Lang
 	 */
-	public function _setLanguage() : Lang
+	public function _setLanguage()
 	{
 		try
 		{
 			if ( isset( $_SERVER['HTTP_X_IPS_LANGUAGE'] ) )
 			{
-				$this->language = Lang::load( intval( $_SERVER['HTTP_X_IPS_LANGUAGE'] ) );
+				$this->language = \IPS\Lang::load( \intval( $_SERVER['HTTP_X_IPS_LANGUAGE'] ) );
 			}
 			else
 			{
-				$this->language = Lang::load( Lang::defaultLanguage() );
+				$this->language = \IPS\Lang::load( \IPS\Lang::defaultLanguage() );
 			}
 
 			return $this->language;
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new ApiException( 'INVALID_LANGUAGE', '2S290/9', 400, 'invalid_request' );
+			throw new \IPS\Api\Exception( 'INVALID_LANGUAGE', '2S290/9', 400, 'invalid_request' );
 		}
 	}
 	
@@ -325,7 +299,7 @@ class Api extends Dispatcher
 	 *
 	 * @return	void
 	 */
-	public function run() : void
+	public function run()
 	{
 		$shouldLog = FALSE;
 		try
@@ -335,35 +309,35 @@ class Api extends Dispatcher
 			$app = array_shift( $pathBits );
 			if ( !preg_match( '/^[a-z0-9]+$/', $app ) )
 			{
-				throw new ApiException( 'INVALID_APP', '3S290/3', 400 );
+				throw new \IPS\Api\Exception( 'INVALID_APP', '3S290/3', 400 );
 			}
 			$controller = array_shift( $pathBits );
 			if ( !preg_match( '/^[a-z0-9]+$/', $controller ) )
 			{
-				throw new ApiException( 'INVALID_CONTROLLER', '3S290/4', 400 );
+				throw new \IPS\Api\Exception( 'INVALID_CONTROLLER', '3S290/4', 400 );
 			}
 			
 			/* Load the app */
 			try
 			{
-				$app = Application::load( $app );
+				$app = \IPS\Application::load( $app );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				throw new ApiException( 'INVALID_APP', '2S290/1', 404 );
+				throw new \IPS\Api\Exception( 'INVALID_APP', '2S290/1', 404 );
 			}
 				
 			/* Check it's enabled */
 			if ( !$app->enabled )
 			{
-				throw new ApiException( 'APP_DISABLED', '1S290/2', 503 );
+				throw new \IPS\Api\Exception( 'APP_DISABLED', '1S290/2', 503 );
 			}
 			
 			/* Get the controller */
 			$class = 'IPS\\' . $app->directory . '\\api\\' . $controller;
 			if ( !class_exists( $class ) )
 			{
-				throw new ApiException( 'INVALID_CONTROLLER', '2S290/5', 404 );
+				throw new \IPS\Api\Exception( 'INVALID_CONTROLLER', '2S290/5', 404 );
 			}
 			
 			/* Run it */
@@ -377,55 +351,55 @@ class Api extends Dispatcher
 			$output = $response->getOutput();
 			$this->language->parseOutputForDisplay( $output );
 
-			$this->_respond(json_encode($output, JSON_PRETTY_PRINT), $response->httpCode, NULL, $shouldLog);
+			$this->_respond( json_encode( $output, JSON_PRETTY_PRINT ), $response->httpCode, NULL, $shouldLog, TRUE );
 		}
-		catch ( ApiException $e )
+		catch ( \IPS\Api\Exception $e )
 		{
-			$this->_respond(json_encode(array('errorCode' => $e->exceptionCode, 'errorMessage' => $e->getMessage()), JSON_PRETTY_PRINT), $e->getCode(), $e->oauthError, $shouldLog);
+			$this->_respond( json_encode( array( 'errorCode' => $e->exceptionCode, 'errorMessage' => $e->getMessage() ), JSON_PRETTY_PRINT ), $e->getCode(), $e->oauthError, $shouldLog );
 		}
 		catch ( \Exception $e )
 		{
-			Log::log( $e, 'api' );
+			\IPS\Log::log( $e, 'api' );
 			
-			$this->_respond(json_encode(array('errorCode' => 'EX' . $e->getCode(), 'errorMessage' => \IPS\IN_DEV ? $e->getMessage() : 'UNKNOWN_ERROR'), JSON_PRETTY_PRINT), 500);
+			$this->_respond( json_encode( array( 'errorCode' => 'EX' . $e->getCode(), 'errorMessage' => \IPS\IN_DEV ? $e->getMessage() : 'UNKNOWN_ERROR' ), JSON_PRETTY_PRINT ), 500 );
 		}
 	}
 
 	/**
 	 * @brief	Parameters to mask in logs per the controller
 	 */
-	protected ?array $parametersToMask = NULL;
+	protected $parametersToMask = NULL;
 	
 	/**
 	 * Log
 	 *
-	 * @param array|string $response			Response to output
-	 * @param int $httpResponseCode	HTTP Response Code
-	 * @param bool $isBadKey			Was the ley invalid?
+	 * @param	array	$response			Response to output
+	 * @param	int		$httpResponseCode	HTTP Response Code
+	 * @param	bool	$isBadKey			Was the ley invalid?
 	 * @return	void
 	 */
-	protected function _log( array|string $response, int $httpResponseCode, bool $isBadKey=FALSE ) : void
+	protected function _log( $response, $httpResponseCode, $isBadKey=FALSE )
 	{
 		try
 		{
 			$_requestData = $_REQUEST;
 
-			if( $this->parametersToMask AND count( $this->parametersToMask ) )
+			if( $this->parametersToMask AND \count( $this->parametersToMask ) )
 			{
 				foreach( $_requestData as $k => $v )
 				{
-					if( in_array( $k, $this->parametersToMask ) )
+					if( \in_array( $k, $this->parametersToMask ) )
 					{
 						$_requestData[ $k ] = '******';
 					}
 				}
 			}
 
-			Db::i()->insert( 'core_api_logs', array(
+			\IPS\Db::i()->insert( 'core_api_logs', array(
 				'endpoint'			=> $this->path,
 				'method'			=> $_SERVER['REQUEST_METHOD'],
 				'api_key'			=> $this->rawApiKey,
-				'ip_address'		=> Request::i()->ipAddress(),
+				'ip_address'		=> \IPS\Request::i()->ipAddress(),
 				'request_data'		=> json_encode( $_requestData, JSON_PRETTY_PRINT ),
 				'response_code'		=> $httpResponseCode,
 				'response_output'	=> $response,
@@ -436,21 +410,21 @@ class Api extends Dispatcher
 				'access_token'		=> $this->rawAccessToken,
 			) );
 		}
-		catch ( Exception $e ) {}
+		catch ( \IPS\Db\Exception $e ) {}
 	}
 	
 	/**
 	 * Output response
 	 *
-	 * @param string $response			Response to output
-	 * @param int $httpResponseCode	HTTP Response Code
-	 * @param string|null $oauthError			OAuth error
-	 * @param bool $log				Whether or not to log the response
+	 * @param	string		$response			Response to output
+	 * @param	int			$httpResponseCode	HTTP Response Code
+	 * @param	NULL|string	$oauthError			OAuth error
+	 * @param	bool		$log				Whether or not to log the response
 	 * @return	void
 	 */
-	protected function _respond( string $response, int $httpResponseCode, string $oauthError=NULL, bool $log=FALSE ) : void
+	protected function _respond( $response, $httpResponseCode, $oauthError=NULL, $log=FALSE )
 	{
-		$headers = $this->canBeCached() ? Output::getCacheHeaders( time(), 60 ) : Output::getNoCacheHeaders();
+		$headers = $this->canBeCached() ? \IPS\Output::getCacheHeaders( time(), 60 ) : \IPS\Output::getNoCacheHeaders();
 
 		if ( $this->rawAccessToken and $oauthError )
 		{
@@ -459,10 +433,10 @@ class Api extends Dispatcher
 		
 		if ( $log )
 		{
-			$this->_log($response, $httpResponseCode);
+			$this->_log( $response, $httpResponseCode );
 		}
 		
-		Output::i()->sendOutput( $response, $httpResponseCode, 'application/json', $headers );
+		\IPS\Output::i()->sendOutput( $response, $httpResponseCode, 'application/json', $headers );
 	}
 
 	/**

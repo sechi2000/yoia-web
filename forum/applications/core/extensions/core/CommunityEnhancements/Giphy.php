@@ -12,51 +12,36 @@
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancement
  */
-class Giphy extends CommunityEnhancementsAbstract
+class _Giphy
 {
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= FALSE;
+	public $ips	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= TRUE;
+	public $hasOptions	= TRUE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "giphy.png";
+	public $icon	= "giphy.png";
 
 	/**
 	 * Constructor
@@ -65,7 +50,7 @@ class Giphy extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		$this->enabled = ( Settings::i()->giphy_enabled );
+		$this->enabled = ( \IPS\Settings::i()->giphy_enabled );
 	}
 
 	/**
@@ -73,54 +58,64 @@ class Giphy extends CommunityEnhancementsAbstract
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 
-		$form->add( new Text( 'giphy_apikey', Settings::i()->giphy_apikey ? Settings::i()->giphy_apikey : '', FALSE, array(), NULL, NULL, NULL, 'giphy_apikey' ) );
-		$form->add( new Select( 'giphy_rating', Settings::i()->giphy_rating ? Settings::i()->giphy_rating : 'x', FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Text( 'giphy_apikey', \IPS\Settings::i()->giphy_apikey ? \IPS\Settings::i()->giphy_apikey : '', FALSE, array(), NULL, NULL, NULL, 'giphy_apikey' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'giphy_rating', \IPS\Settings::i()->giphy_rating ? \IPS\Settings::i()->giphy_rating : 'x', FALSE, array(
 			'options' => array(
-				'x' => Member::loggedIn()->language()->addToStack('giphy_rating_x'),
-				'r' => Member::loggedIn()->language()->addToStack('giphy_rating_r'),
-				'pg-13' => Member::loggedIn()->language()->addToStack('giphy_rating_pg-13'),
-				'pg' => Member::loggedIn()->language()->addToStack('giphy_rating_pg'),
-				'g' => Member::loggedIn()->language()->addToStack('giphy_rating_g'),
-				'y' => Member::loggedIn()->language()->addToStack('giphy_rating_y'),
+				'x' => \IPS\Member::loggedIn()->language()->addToStack('giphy_rating_x'),
+				'r' => \IPS\Member::loggedIn()->language()->addToStack('giphy_rating_r'),
+				'pg-13' => \IPS\Member::loggedIn()->language()->addToStack('giphy_rating_pg-13'),
+				'pg' => \IPS\Member::loggedIn()->language()->addToStack('giphy_rating_pg'),
+				'g' => \IPS\Member::loggedIn()->language()->addToStack('giphy_rating_g'),
+				'y' => \IPS\Member::loggedIn()->language()->addToStack('giphy_rating_y'),
 			)
-		), NULL, NULL, Member::loggedIn()->language()->addToStack('giphy_rating_suffix') ) );
+		), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('giphy_rating_suffix') ) );
 
 		if ( $values = $form->values() )
 		{
 			try
 			{
 				/* Enable giphy automatically on the first submit of the form and add it automatically to all toolbars */
-				if ( ! Settings::i()->giphy_enabled AND Settings::i()->giphy_apikey != '' )
+				if ( ! \IPS\Settings::i()->giphy_enabled AND \IPS\Settings::i()->giphy_apikey != '' )
 				{
 					$values['giphy_enabled'] = 1;
+
+					$toolbars = json_decode( \IPS\Settings::i()->ckeditor_toolbars, TRUE );
+					foreach ( array( 'desktop', 'tablet', 'phone' ) as $device )
+					{
+						if ( !\in_array( 'ipsgiphy', $toolbars[$device][0]['items'] ) )
+						{
+							$toolbars[$device][0]['items'][] = 'ipsgiphy';
+						}
+					}
+					$values['ckeditor_toolbars'] = json_encode( $toolbars );
 				}
 				
 				unset( $values['giphy_custom_apikey'] );
 				
 				$form->saveAsSettings( $values );
 
-				Output::i()->inlineMessage	= Member::loggedIn()->language()->addToStack('saved');
+				\IPS\Output::i()->inlineMessage	= \IPS\Member::loggedIn()->language()->addToStack('saved');
 			}
-			catch ( LogicException $e )
+			catch ( \LogicException $e )
 			{
 				$form->error = $e->getMessage();
 			}
 		}
 
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'help'	=> array(
 				'title'		=> 'help',
 				'icon'		=> 'question-circle',
-				'link'		=> Url::ips( 'docs/giphy' ),
+				'link'		=> \IPS\Http\Url::ips( 'docs/giphy' ),
 				'target'	=> '_blank'
 			),
 		);
 
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_Giphy', $form );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_Giphy', $form );
 	}
 
 	/**
@@ -128,24 +123,24 @@ class Giphy extends CommunityEnhancementsAbstract
 	 *
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		if ( $enabled )
 		{
-			if ( Settings::i()->giphy_apikey )
+			if ( \IPS\Settings::i()->giphy_apikey )
 			{
-				Settings::i()->changeValues( array( 'giphy_enabled' => 1 ) );
+				\IPS\Settings::i()->changeValues( array( 'giphy_enabled' => 1 ) );
 			}
 			else
 			{
-				throw new DomainException;
+				throw new \DomainException;
 			}
 		}
 		else
 		{
-			Settings::i()->changeValues( array( 'giphy_enabled' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'giphy_enabled' => 0 ) );
 		}
 	}
 }

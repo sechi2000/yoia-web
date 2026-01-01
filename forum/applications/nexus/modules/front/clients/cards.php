@@ -12,55 +12,37 @@
 namespace IPS\nexus\modules\front\clients;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\MFA\MFAHandler;
-use IPS\nexus\Customer;
-use IPS\nexus\Customer\CreditCard;
-use IPS\nexus\Gateway;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use function defined;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Cards
  */
-class cards extends Controller
+class _cards extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		if ( !Member::loggedIn()->member_id )
+		if ( !\IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->error( 'no_module_permission_guest', '2X236/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission_guest', '2X236/1', 403, '' );
 		}
 		
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'clients.css', 'nexus' ) );
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=nexus&module=clients&controller=cards', 'front', 'clientscards' ), Member::loggedIn()->language()->addToStack('client_cards') );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('client_cards');
-		Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'clients.css', 'nexus' ) );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=cards', 'front', 'clientscards' ), \IPS\Member::loggedIn()->language()->addToStack('client_cards') );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('client_cards');
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
 		
-		if ( $output = MFAHandler::accessToArea( 'nexus', 'Cards', Url::internal( 'app=nexus&module=clients&controller=cards', 'front', 'clientscards' ) ) )
+		if ( $output = \IPS\MFA\MFAHandler::accessToArea( 'nexus', 'Cards', \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=cards', 'front', 'clientscards' ) ) )
 		{
-			Output::i()->output = Theme::i()->getTemplate('clients')->cards( array() ) . $output;
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->cards( array() ) . $output;
 			return;
 		}
 		
@@ -72,13 +54,10 @@ class cards extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$cards = array();
-		foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_customer_cards', array(
-			array( 'card_member=?', Customer::loggedIn()->member_id ),
-			array( Db::i()->in( 'card_method', array_keys( Gateway::cardStorageGateways() ) ) )
-		) ), 'IPS\nexus\Customer\CreditCard' ) as $card )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_customer_cards', array( 'card_member=?', \IPS\nexus\Customer::loggedIn()->member_id ) ), 'IPS\nexus\Customer\CreditCard' ) as $card )
 		{
 			try
 			{
@@ -87,13 +66,13 @@ class cards extends Controller
 					'id'				=> $card->id,
 					'card_type'			=> $cardData->type,
 					'card_number'		=> $cardData->lastFour ?: $cardData->number,
-					'card_expire'		=> ( !is_null( $cardData->expMonth ) AND !is_null( $cardData->expYear ) ) ? str_pad( $cardData->expMonth , 2, '0', STR_PAD_LEFT ). '/' . $cardData->expYear : NULL
+					'card_expire'		=> ( !\is_null( $cardData->expMonth ) AND !\is_null( $cardData->expYear ) ) ? str_pad( $cardData->expMonth , 2, '0', STR_PAD_LEFT ). '/' . $cardData->expYear : NULL
 				);
 			}
-			catch ( Exception ) { }
+			catch ( \Exception $e ) { }
 		}
 				
-		Output::i()->output = Theme::i()->getTemplate('clients')->cards( $cards );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('clients')->cards( $cards );
 	}
 	
 	/**
@@ -101,19 +80,19 @@ class cards extends Controller
 	 *
 	 * @return	void
 	 */
-	public function add() : void
+	public function add()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'checkout.css', 'nexus' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_gateways.js', 'nexus', 'global' ) );
-		$form = CreditCard::create( Customer::loggedIn(), FALSE );
-		if ( $form instanceof CreditCard )
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'checkout.css', 'nexus' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_gateways.js', 'nexus', 'global' ) );
+		$form = \IPS\nexus\Customer\CreditCard::create( \IPS\nexus\Customer::loggedIn(), FALSE );
+		if ( $form instanceof \IPS\nexus\Customer\CreditCard )
 		{
-			Customer::loggedIn()->log( 'card', array( 'type' => 'add', 'number' => $form->card->lastFour ) );
-			Output::i()->redirect( Url::internal( 'app=nexus&module=clients&controller=cards', 'front', 'clientscards' ) );
+			\IPS\nexus\Customer::loggedIn()->log( 'card', array( 'type' => 'add', 'number' => $form->card->lastFour ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=cards', 'front', 'clientscards' ) );
 		}
 		else
 		{
-			Output::i()->output = $form;
+			\IPS\Output::i()->output = $form;
 		}
 	}
 	
@@ -122,26 +101,26 @@ class cards extends Controller
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 		
 		try
 		{
-			$card = CreditCard::load( Request::i()->id );
-			if ( $card->member->member_id === Customer::loggedIn()->member_id )
+			$card = \IPS\nexus\Customer\CreditCard::load( \IPS\Request::i()->id );
+			if ( $card->member->member_id === \IPS\nexus\Customer::loggedIn()->member_id )
 			{
 				$cardData = $card->card;
 
 				$card->delete(); 
-				Customer::loggedIn()->log( 'card', array( 'type' => 'delete', 'number' => $cardData->lastFour ) );
+				\IPS\nexus\Customer::loggedIn()->log( 'card', array( 'type' => 'delete', 'number' => $cardData->lastFour ) );
 			}
 		}
-		catch ( Exception ) { }
+		catch ( \Exception $e ) { }
 		
-		Output::i()->redirect( Url::internal( 'app=nexus&module=clients&controller=cards', 'front', 'clientscards' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=clients&controller=cards', 'front', 'clientscards' ) );
 	}
 }

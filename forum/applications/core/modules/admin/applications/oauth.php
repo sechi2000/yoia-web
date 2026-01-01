@@ -12,70 +12,41 @@
 namespace IPS\core\modules\admin\applications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Api\OAuthClient;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Helpers\Table\Custom;
-use IPS\Http\Url;
-use IPS\Http\UserAgent;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Device;
-use IPS\Node\Controller;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use const IPS\CIC;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-use const IPS\OAUTH_REQUIRES_HTTPS;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * OAuth Clients
  */
-class oauth extends Controller
+class _oauth extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\Api\OAuthClient';
+	protected $nodeClass = 'IPS\Api\OAuthClient';
 	
 	/**
 	 * Show the "add" button in the page root rather than the table root
 	 */
-	protected bool $_addButtonInRoot = FALSE;
+	protected $_addButtonInRoot = FALSE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'oauth_manage' );
-		parent::execute();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'oauth_manage' );
+		return parent::execute();
 	}
 	
 	/**
@@ -83,23 +54,23 @@ class oauth extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		if ( OAUTH_REQUIRES_HTTPS and mb_substr( Settings::i()->base_url, 0, 8 ) !== 'https://' )
+		if ( \IPS\OAUTH_REQUIRES_HTTPS and mb_substr( \IPS\Settings::i()->base_url, 0, 8 ) !== 'https://' )
 		{
 			try
 			{
-				$response = Url::external( 'https://' . mb_substr( Settings::i()->base_url, 7 ) )->request()->get();
+				$response = \IPS\Http\Url::external( 'https://' . mb_substr( \IPS\Settings::i()->base_url, 7 ) )->request()->get();
 			}
 			catch ( \IPS\Http\Request\Exception $e )
 			{
-				Output::i()->output = Theme::i()->getTemplate( 'forms' )->blurb( CIC ? 'oauth_https_warning_cic' : 'oauth_https_warning', TRUE, TRUE );
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'forms' )->blurb( \IPS\CIC ? 'oauth_https_warning_cic' : 'oauth_https_warning', TRUE, TRUE );
 				return;
 			}
 		}
 		
-		Output::i()->output = Theme::i()->getTemplate( 'forms', 'core' )->blurb( 'oauth_clients_blurb', TRUE, TRUE );
-		parent::manage();
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'forms', 'core' )->blurb( 'oauth_clients_blurb', TRUE, TRUE );
+		return parent::manage();
 	}
 	
 	/**
@@ -107,38 +78,38 @@ class oauth extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function view() : void
+	protected function view()
 	{
 		try
 		{
-			$client = OAuthClient::load( Request::i()->client_id );
+			$client = \IPS\Api\OAuthClient::load( \IPS\Request::i()->client_id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C362/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C362/1', 404, '' );
 		}
 		
 		if ( $client->type === 'mobile' )
 		{
-			Output::i()->redirect( Url::internal( "app=core&module=mobile&controller=mobile" ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=mobile&controller=mobile" ) );
 		}
 		
 		$secret = NULL;
-		if ( isset( Request::i()->newSecret ) and Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'oauth_secrets' ) )
+		if ( isset( \IPS\Request::i()->newSecret ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'oauth_secrets' ) )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			
-			$secret = Login::generateRandomString( 48 );
+			$secret = \IPS\Login::generateRandomString( 48 );
 			$client->client_secret = password_hash( $secret, PASSWORD_DEFAULT );
 			$client->brute_force = NULL;
 			$client->save();
 			
-			Session::i()->log( 'acplogs__oauth_new_secret', array( 'core_oauth_client_' . $client->client_id => TRUE ) );
-			Output::i()->bypassCsrfKeyCheck = TRUE;
+			\IPS\Session::i()->log( 'acplogs__oauth_new_secret', array( 'core_oauth_client_' . $client->client_id => TRUE ) );
+			\IPS\Output::i()->bypassCsrfKeyCheck = TRUE;
 		}
 		
-		Output::i()->sidebar['actions'] = $client->getButtons( Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$client->client_id}" ) );
-		unset( Output::i()->sidebar['actions']['view'] );
+		\IPS\Output::i()->sidebar['actions'] = $client->getButtons( \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$client->client_id}" ) );
+		unset( \IPS\Output::i()->sidebar['actions']['view'] );
 		
 		$bruteForce = NULL;
 		if ( $client->brute_force and $bruteForce = json_decode( $client->brute_force, TRUE ) )
@@ -152,31 +123,31 @@ class oauth extends Controller
 				);
 			}
 			
-			$bruteForce = new Custom( $data, Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$client->client_id}" ) );
+			$bruteForce = new \IPS\Helpers\Table\Custom( $data, \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$client->client_id}" ) );
 			$bruteForce->langPrefix = 'oauth_brute_force_';
 			$bruteForce->rowButtons = function( $row ) use ( $client ) {
 				$return = array();
 				$return['ban'] = array(
 					'icon'	=> 'ban',
 					'title'	=> 'oauth_brute_force_ban',
-					'link'	=>  Url::internal( "app=core&module=applications&controller=oauth&do=bfRemove&ban=1&client_id={$client->client_id}" )->setQueryString( 'ip', $row['ip_address'] )->csrf()
+					'link'	=>  \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=bfRemove&ban=1&client_id={$client->client_id}" )->setQueryString( 'ip', $row['ip_address'] )->csrf()
 				);
 				if ( $row['fails'] >= 3 )
 				{
 					$return['unlock'] = array(
 						'icon'	=> 'unlock',
 						'title'	=> 'oauth_brute_force_unlock',
-						'link'	=>  Url::internal( "app=core&module=applications&controller=oauth&do=bfRemove&client_id={$client->client_id}" )->setQueryString( 'ip', $row['ip_address'] )->csrf()
+						'link'	=>  \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=bfRemove&client_id={$client->client_id}" )->setQueryString( 'ip', $row['ip_address'] )->csrf()
 					);
 				}
 				return $return;
 			};
 		}
 		
-		Output::i()->title = $client->_title;
-		Output::i()->output = Theme::i()->getTemplate('api')->oauthSecret( $client, $secret, $bruteForce );
-		Output::i()->breadcrumb[] = array( Url::internal( "app=core&module=applications&controller=api&tab=oauth" ), 'oauth_clients' );
-		Output::i()->breadcrumb[] = array( NULL, $client->_title );
+		\IPS\Output::i()->title = $client->_title;
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('api')->oauthSecret( $client, $secret, $bruteForce );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( "app=core&module=applications&controller=api&tab=oauth" ), 'oauth_clients' );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, $client->_title );
 	}
 	
 	/**
@@ -184,41 +155,41 @@ class oauth extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function bfRemove() : void
+	protected function bfRemove()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$client = OAuthClient::load( Request::i()->client_id );
+			$client = \IPS\Api\OAuthClient::load( \IPS\Request::i()->client_id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C362/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C362/4', 404, '' );
 		}
 		
-		if ( Request::i()->ip and Request::i()->ban )
+		if ( \IPS\Request::i()->ip and \IPS\Request::i()->ban )
 		{
-			Db::i()->insert( 'core_banfilters', array(
+			\IPS\Db::i()->insert( 'core_banfilters', array(
 				'ban_type'		=> 'ip',
-				'ban_content'	=> Request::i()->ip,
+				'ban_content'	=> \IPS\Request::i()->ip,
 				'ban_date'		=> time(),
 				'ban_reason'	=> 'OAuth',
 			) );
-			unset( Store::i()->bannedIpAddresses );
-			Session::i()->log( 'acplog__ban_created', array( 'ban_filter_ip_select' => TRUE, Request::i()->ip => FALSE ) );
+			unset( \IPS\Data\Store::i()->bannedIpAddresses );
+			\IPS\Session::i()->log( 'acplog__ban_created', array( 'ban_filter_ip_select' => TRUE, \IPS\Request::i()->ip => FALSE ) );
 		}
 		else
 		{
-			Session::i()->log( 'acplogs__oauth_unlock_ip', array( Request::i()->ip => FALSE, 'core_oauth_client_' . $client->client_id => TRUE ) );
+			\IPS\Session::i()->log( 'acplogs__oauth_unlock_ip', array( \IPS\Request::i()->ip => FALSE, 'core_oauth_client_' . $client->client_id => TRUE ) );
 		}
 		
 		$bruteForce = json_decode( $client->brute_force, TRUE );
-		unset( $bruteForce[ Request::i()->ip ] );
+		unset( $bruteForce[ \IPS\Request::i()->ip ] );
 		$client->brute_force = json_encode( $bruteForce );
 		$client->save();
 		
-		Output::i()->redirect( Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$client->client_id}" ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$client->client_id}" ) );
 	}
 	
 	/**
@@ -226,42 +197,42 @@ class oauth extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function tokens() : void
+	protected function tokens()
 	{
-		Dispatcher::i()->checkAcpPermission( 'oauth_tokens' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'oauth_tokens' );
 		
 		$client = NULL;
 		$member = NULL;
 		try
 		{
-			if ( isset( Request::i()->client_id ) )
+			if ( isset( \IPS\Request::i()->client_id ) )
 			{
-				$client = OAuthClient::load( Request::i()->client_id );
-				$baseUrl = Url::internal( "app=core&module=applications&controller=oauth&do=tokens&client_id={$client->client_id}" );
+				$client = \IPS\Api\OAuthClient::load( \IPS\Request::i()->client_id );
+				$baseUrl = \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=tokens&client_id={$client->client_id}" );
 			}
 			else
 			{
-				$member = Member::load( Request::i()->member_id );
+				$member = \IPS\Member::load( \IPS\Request::i()->member_id );
 				if ( !$member->member_id )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
-				$baseUrl = Url::internal( "app=core&module=applications&controller=oauth&do=tokens&member_id={$member->member_id}" );
+				$baseUrl = \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=tokens&member_id={$member->member_id}" );
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C362/3', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C362/3', 404, '' );
 		}
 		
 		if ( $client )
 		{
 			$columns = array(
 				'access_token_expires'	=> (bool) $client->access_token_length,
-				'refresh_token_expires'	=> ( $client->use_refresh_tokens and $client->refresh_token_length ),
-				'scope'					=> ( $client->scopes and json_decode( $client->scopes ) ),
-				'auth_user_agent'		=> ( in_array( 'authorization_code', explode( ',', $client->grant_types ) ) or in_array( 'implicit', explode( ',', $client->grant_types ) ) ),
-				'issue_user_agent'		=> ( in_array( 'authorization_code', explode( ',', $client->grant_types ) ) or in_array( 'password', explode( ',', $client->grant_types ) ) or in_array( 'client_credentials', explode( ',', $client->grant_types ) ) ),
+				'refresh_token_expires'	=> (bool) ( $client->use_refresh_tokens and $client->refresh_token_length ),
+				'scope'					=> (bool) ( $client->scopes and json_decode( $client->scopes ) ),
+				'auth_user_agent'		=> ( \in_array( 'authorization_code', explode( ',', $client->grant_types ) ) or \in_array( 'implicit', explode( ',', $client->grant_types ) ) ),
+				'issue_user_agent'		=> ( \in_array( 'authorization_code', explode( ',', $client->grant_types ) ) or \in_array( 'password', explode( ',', $client->grant_types ) ) or \in_array( 'client_credentials', explode( ',', $client->grant_types ) ) ),
 			);
 		}
 		else
@@ -275,7 +246,7 @@ class oauth extends Controller
 			);
 			
 			$count = 0;
-			foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'core_oauth_clients', array( Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) ), 'IPS\Api\OAuthClient' ) as $_client )
+			foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_oauth_clients', array( \IPS\Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) ), 'IPS\Api\OAuthClient' ) as $_client )
 			{
 				$count++;
 				if ( $_client->access_token_length )
@@ -290,11 +261,11 @@ class oauth extends Controller
 				{
 					$columns['scope'] = TRUE;
 				}
-				if ( in_array( 'authorization_code', explode( ',', $_client->grant_types ) ) or in_array( 'implicit', explode( ',', $_client->grant_types ) ) )
+				if ( \in_array( 'authorization_code', explode( ',', $_client->grant_types ) ) or \in_array( 'implicit', explode( ',', $_client->grant_types ) ) )
 				{
 					$columns['auth_user_agent'] = TRUE;
 				}
-				if ( in_array( 'authorization_code', explode( ',', $_client->grant_types ) ) or in_array( 'password', explode( ',', $_client->grant_types ) ) or in_array( 'client_credentials', explode( ',', $_client->grant_types ) ) )
+				if ( \in_array( 'authorization_code', explode( ',', $_client->grant_types ) ) or \in_array( 'password', explode( ',', $_client->grant_types ) ) or \in_array( 'client_credentials', explode( ',', $_client->grant_types ) ) )
 				{
 					$columns['issue_user_agent'] = TRUE;
 				}
@@ -308,7 +279,7 @@ class oauth extends Controller
 		if ( $client )
 		{
 			$table->include[] = 'member_id';
-			$table->advancedSearch['member_id'] = SEARCH_MEMBER;
+			$table->advancedSearch['member_id'] = \IPS\Helpers\Table\SEARCH_MEMBER;
 		}
 		elseif ( $count > 1 )
 		{
@@ -316,16 +287,16 @@ class oauth extends Controller
 		}
 		$table->include[] = 'issued';
 		$table->include[] = 'status';
-		$table->advancedSearch['issued'] = SEARCH_DATE_RANGE;
+		$table->advancedSearch['issued'] = \IPS\Helpers\Table\SEARCH_DATE_RANGE;
 		if ( $columns['access_token_expires'] )
 		{
 			$table->include[] = 'access_token_expires';
-			$table->advancedSearch['access_token_expires'] = SEARCH_DATE_RANGE;
+			$table->advancedSearch['access_token_expires'] = \IPS\Helpers\Table\SEARCH_DATE_RANGE;
 		}
 		if ( $columns['refresh_token_expires'] )
 		{
 			$table->include[] = 'refresh_token_expires';
-			$table->advancedSearch['refresh_token_expires'] = SEARCH_DATE_RANGE;
+			$table->advancedSearch['refresh_token_expires'] = \IPS\Helpers\Table\SEARCH_DATE_RANGE;
 		}
 		if ( $columns['scope'] )
 		{
@@ -345,10 +316,10 @@ class oauth extends Controller
 			'client_id'		=> function( $val ) {
 				try
 				{
-					$client = OAuthClient::load( $val );
-					return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$client->client_id}" ), FALSE, $client->_title, FALSE );
+					$client = \IPS\Api\OAuthClient::load( $val );
+					return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$client->client_id}" ), FALSE, $client->_title, FALSE );
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
 					return '';
 				}
@@ -356,44 +327,44 @@ class oauth extends Controller
 			'member_id'		=> function( $val ) {
 				if ( $val )
 				{
-					$member = Member::load( $val );
+					$member = \IPS\Member::load( $val );
 					if ( $member->member_id )
 					{
-						return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . Theme::i()->getTemplate( 'global', 'core' )->userLink( $member, 'tiny' );
+						return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . \IPS\Theme::i()->getTemplate( 'global', 'core' )->userLink( $member, 'tiny' );
 					}
 					else
 					{
-						return Member::loggedIn()->language()->addToStack('deleted_member');
+						return \IPS\Member::loggedIn()->language()->addToStack('deleted_member');
 					}
 				}
 				else
 				{
-					return Member::loggedIn()->language()->addToStack('oauth_client_credentials');
+					return \IPS\Member::loggedIn()->language()->addToStack('oauth_client_credentials');
 				}
 			},
 			'issued'		=> function( $val ) {
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
 			'access_token_expires' => function( $val ) {
 				if ( $val )
 				{
-					return DateTime::ts( $val );
+					return \IPS\DateTime::ts( $val );
 				}
 				else
 				{
-					return Member::loggedIn()->language()->addToStack('never');
+					return \IPS\Member::loggedIn()->language()->addToStack('never');
 				}
 			},
 			'refresh_token_expires' => function( $val, $row ) {
-				if ( OAuthClient::load( $row['client_id'] )->use_refresh_tokens )
+				if ( \IPS\Api\OAuthClient::load( $row['client_id'] )->use_refresh_tokens )
 				{
 					if ( $val )
 					{
-						return DateTime::ts( $val );
+						return \IPS\DateTime::ts( $val );
 					}
 					else
 					{
-						return Member::loggedIn()->language()->addToStack('never');
+						return \IPS\Member::loggedIn()->language()->addToStack('never');
 					}
 				}
 				else
@@ -402,7 +373,7 @@ class oauth extends Controller
 				}
 			},
 			'status'		=> function( $val, $row ) {
-				return Theme::i()->getTemplate('api')->oauthStatus( $row, OAuthClient::load( $row['client_id'] )->use_refresh_tokens );
+				return \IPS\Theme::i()->getTemplate('api')->oauthStatus( $row, \IPS\Api\OAuthClient::load( $row['client_id'] )->use_refresh_tokens );
 			},
 			'scope'		=> function( $val ) {
 				if ( $val )
@@ -420,16 +391,16 @@ class oauth extends Controller
 				{
 					try
 					{
-						$device = Device::load( $row['device_key'] );
-						return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( Url::internal( "app=core&module=members&controller=devices&do=device&key={$row['device_key']}&member={$row['member_id']}" ), FALSE, (string) UserAgent::parse( $val ), FALSE );
+						$device = \IPS\Member\Device::load( $row['device_key'] );
+						return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( \IPS\Http\Url::internal( "app=core&module=members&controller=devices&do=device&key={$row['device_key']}&member={$row['member_id']}" ), FALSE, (string) \IPS\Http\UserAgent::parse( $val ), FALSE );
 					}
-					catch ( OutOfRangeException $e ) { }
+					catch ( \OutOfRangeException $e ) { }
 				}
-				return (string) UserAgent::parse( $val );
+				return (string) \IPS\Http\UserAgent::parse( $val );
 			},
 			'issue_user_agent' => function( $val )
 			{
-				return  Theme::i()->getTemplate( 'api', 'core', 'admin' )->clientDetails( $val );
+				return  \IPS\Theme::i()->getTemplate( 'api', 'core', 'admin' )->clientDetails( $val );
 
 			}
 		);
@@ -440,13 +411,13 @@ class oauth extends Controller
 				$return['revoke'] = array(
 					'icon' => 'times-circle',
 					'title' => 'oauth_app_revoke',
-					'link' => Url::internal( "app=core&module=applications&controller=oauth&do=revokeToken&client_id={$row['client_id']}&member_id={$row['member_id']}&token={$row['access_token']}" )->setQueryString( 'r', $client ? 'c' : 'm' )->csrf(),
-					'data' => array( 'confirm' => '', 'confirmMessage' => Member::loggedIn()->language()->addToStack( 'oauth_app_revoke_title' ) )
+					'link' => \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=revokeToken&client_id={$row['client_id']}&member_id={$row['member_id']}&token={$row['access_token']}" )->setQueryString( 'r', $client ? 'c' : 'm' )->csrf(),
+					'data' => array( 'confirm' => '', 'confirmMessage' => \IPS\Member::loggedIn()->language()->addToStack( 'oauth_app_revoke_title' ) )
 				);
 			}
 			return $return;
 		};
-		$revokeAllLink = $client ? Url::internal( "app=core&module=applications&controller=oauth&do=revokeAllTokens&client_id={$client->client_id}" )->csrf() : Url::internal( "app=core&module=applications&controller=oauth&do=revokeAllTokens&member_id={$member->member_id}" )->csrf();
+		$revokeAllLink = $client ? \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=revokeAllTokens&client_id={$client->client_id}" )->csrf() : \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=revokeAllTokens&member_id={$member->member_id}" )->csrf();
 		$table->rootButtons = array(
 			'revoke'	=> array(
 				'icon'		=> 'times-circle',
@@ -456,31 +427,31 @@ class oauth extends Controller
 			)
 		);
 		
-		Output::i()->output = $table;
+		\IPS\Output::i()->output = $table;
 		if ( $client )
 		{
-			Output::i()->title = $client->_title;
+			\IPS\Output::i()->title = $client->_title;
 			if ( $client->type !== 'mobile' )
 			{
-				Output::i()->breadcrumb[] = array( Url::internal( "app=core&module=applications&controller=api&tab=oauth" ), 'oauth_clients' );
+				\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( "app=core&module=applications&controller=api&tab=oauth" ), 'oauth_clients' );
 			}
-			Output::i()->breadcrumb[] = array( Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$client->client_id}" ), $client->_title );
-			Output::i()->breadcrumb[] = array( NULL, 'oauth_view_authorizations' );
+			\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$client->client_id}" ), $client->_title );
+			\IPS\Output::i()->breadcrumb[] = array( NULL, 'oauth_view_authorizations' );
 		}
 		else
 		{
-			Output::i()->title = $member->name;
-			Output::i()->breadcrumb[] = array( Url::internal( "app=core&module=members&controller=members&do=view&id={$member->member_id}" ), $member->name );
+			\IPS\Output::i()->title = $member->name;
+			\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( "app=core&module=members&controller=members&do=view&id={$member->member_id}" ), $member->name );
 			
 			if ( $count > 1 )
 			{
-				Output::i()->breadcrumb[] = array( NULL, 'oauth_member_authorizations' );
+				\IPS\Output::i()->breadcrumb[] = array( NULL, 'oauth_member_authorizations' );
 			}
 			else
 			{
-				foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'core_oauth_clients', array( Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) ), 'IPS\Api\OAuthClient' ) as $_client )
+				foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_oauth_clients', array( \IPS\Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) ), 'IPS\Api\OAuthClient' ) as $_client )
 				{
-					Output::i()->breadcrumb[] = array( NULL, $_client->_title );
+					\IPS\Output::i()->breadcrumb[] = array( NULL, $_client->_title );
 					break;
 				}
 			}
@@ -493,25 +464,25 @@ class oauth extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function revokeToken() : void
+	protected function revokeToken()
 	{
-		Dispatcher::i()->checkAcpPermission( 'oauth_tokens' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'oauth_tokens' );
+		\IPS\Session::i()->csrfCheck();
 		
-		Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'client_id=? AND access_token=?', Request::i()->client_id, Request::i()->token ) );
-		Session::i()->log( 'acplogs__oauth_revoke_token', array( 'core_oauth_client_' . Request::i()->client_id => TRUE ) );
+		\IPS\Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'client_id=? AND access_token=?', \IPS\Request::i()->client_id, \IPS\Request::i()->token ) );
+		\IPS\Session::i()->log( 'acplogs__oauth_revoke_token', array( 'core_oauth_client_' . \IPS\Request::i()->client_id => TRUE ) );
 		
-		if ( Request::i()->r === 'c' )
+		if ( \IPS\Request::i()->r === 'c' )
 		{
-			Output::i()->redirect( Url::internal( "app=core&module=applications&controller=oauth&do=tokens" )->setQueryString( 'client_id', Request::i()->client_id ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=tokens" )->setQueryString( 'client_id', \IPS\Request::i()->client_id ) );
 		}
-		elseif ( Request::i()->r === 'p' )
+		elseif ( \IPS\Request::i()->r === 'p' )
 		{
-			Output::i()->redirect( Url::internal( "app=core&module=members&controller=members&do=view" )->setQueryString( 'id', Request::i()->member_id ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=members&controller=members&do=view" )->setQueryString( 'id', \IPS\Request::i()->member_id ) );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( "app=core&module=applications&controller=oauth&do=tokens" )->setQueryString( 'member_id', Request::i()->member_id ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=tokens" )->setQueryString( 'member_id', \IPS\Request::i()->member_id ) );
 		}
 	}
 	
@@ -520,52 +491,52 @@ class oauth extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function revokeAllTokens() : void
+	protected function revokeAllTokens()
 	{
-		Dispatcher::i()->checkAcpPermission( 'oauth_tokens' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'oauth_tokens' );
+		\IPS\Session::i()->csrfCheck();
 		
-		if ( Request::i()->member_id )
+		if ( \IPS\Request::i()->member_id )
 		{
-			Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'member_id=?', Request::i()->member_id ) );
-			Session::i()->log( 'acplogs__oauth_revoke_member', array( Member::load( Request::i()->member_id )->name => FALSE ) );
-			Output::i()->redirect( Url::internal( "app=core&module=applications&controller=oauth&do=tokens" )->setQueryString( 'member_id', Request::i()->member_id ) );
+			\IPS\Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'member_id=?', \IPS\Request::i()->member_id ) );
+			\IPS\Session::i()->log( 'acplogs__oauth_revoke_member', array( \IPS\Member::load( \IPS\Request::i()->member_id )->name => FALSE ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=tokens" )->setQueryString( 'member_id', \IPS\Request::i()->member_id ) );
 		}
 		else
 		{					
-			Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'client_id=?', Request::i()->client_id ) );
-			Session::i()->log( 'acplogs__oauth_revoke_client', array( 'core_oauth_client_' . Request::i()->client_id => TRUE ) );
-			Output::i()->redirect( Url::internal( "app=core&module=applications&controller=oauth&do=tokens" )->setQueryString( 'client_id', Request::i()->client_id ) );
+			\IPS\Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'client_id=?', \IPS\Request::i()->client_id ) );
+			\IPS\Session::i()->log( 'acplogs__oauth_revoke_client', array( 'core_oauth_client_' . \IPS\Request::i()->client_id => TRUE ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=tokens" )->setQueryString( 'client_id', \IPS\Request::i()->client_id ) );
 		}
 	}
 
-	protected function form() : void
+	protected function form()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/api.css', 'core', 'admin' ) );
-		parent::form();
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/api.css', 'core', 'admin' ) );
+		return parent::form();
 	}
 	/**
 	 * Redirect after save
 	 *
-	 * @param	Model|null	$old			A clone of the node as it was before or NULL if this is a creation
-	 * @param	Model	$new			The node now
+	 * @param	\IPS\Node\Model	$old			A clone of the node as it was before or NULL if this is a creation
+	 * @param	\IPS\Node\Model	$new			The node now
 	 * @param	string			$lastUsedTab	The tab last used in the form
-	 * @return void
+	 * @return	void
 	 */
-	protected function _afterSave( ?Model $old, Model $new, mixed $lastUsedTab = FALSE ): void
+	protected function _afterSave( ?\IPS\Node\Model $old, \IPS\Node\Model $new, $lastUsedTab = FALSE )
 	{
 		if ( $new->_clientSecret )
 		{
-			Output::i()->title = $new->_title;
-			Output::i()->breadcrumb[] = array( Url::internal( "app=core&module=applications&controller=api&tab=oauth" ), 'oauth_clients' );
-			Output::i()->breadcrumb[] = array( NULL, $new->_title );
-			Output::i()->output = Theme::i()->getTemplate('api')->oauthSecret( $new, $new->_clientSecret, NULL );
-			Output::i()->sidebar['actions'] = $new->getButtons(Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$new->client_id}" ));
-			unset( Output::i()->sidebar['actions']['view'] );
+			\IPS\Output::i()->title = $new->_title;
+			\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( "app=core&module=applications&controller=api&tab=oauth" ), 'oauth_clients' );
+			\IPS\Output::i()->breadcrumb[] = array( NULL, $new->_title );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('api')->oauthSecret( $new, $new->_clientSecret, NULL );
+			\IPS\Output::i()->sidebar['actions'] = $new->getButtons( \IPS\Http\Url::internal( "app=core&module=applications&controller=oauth&do=view&client_id={$new->client_id}" ) );
+			unset( \IPS\Output::i()->sidebar['actions']['view'] );
 		}
 		else
 		{
-			parent::_afterSave( $old, $new, $lastUsedTab );
+			return parent::_afterSave( $old, $new, $lastUsedTab );
 		}
 	}
 }

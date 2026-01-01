@@ -10,21 +10,19 @@
 
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\UnionType;
-use IPS\core\api\GraphQL\TypeRegistry;
-use IPS\Member;
-use function defined;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Search result union type
  */
-class SearchResultType extends UnionType
+class _SearchResultType extends UnionType
 {
 	public function __construct()
 	{
@@ -32,17 +30,17 @@ class SearchResultType extends UnionType
 			'name' => 'core_SearchResult',
 			'description' => 'A union type that returns either a member, or a content search result',
 			'types' => [
-				TypeRegistry::member(),
-				TypeRegistry::contentSearchResult()
+				\IPS\core\api\GraphQL\TypeRegistry::member(),
+				\IPS\core\api\GraphQL\TypeRegistry::contentSearchResult()
 			],
 			'resolveType' => function ($result) {
-				if ( $result instanceof Member )
+				if ( $result instanceof \IPS\Member )
 				{
-					return TypeRegistry::member();
+					return \IPS\core\api\GraphQL\TypeRegistry::member();
 				}
 				else
 				{
-					return TypeRegistry::contentSearchResult();
+					return \IPS\core\api\GraphQL\TypeRegistry::contentSearchResult();
 				}
 			}
 		];

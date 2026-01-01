@@ -11,41 +11,36 @@
 namespace IPS\core\extensions\core\EditorLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Content;
-use IPS\Db;
-use IPS\Extensions\EditorLocationsAbstract;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Settings;
-use IPS\Text\LegacyParser;
-use IPS\Text\Parser;
-use LogicException;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: Signatures
  */
-class Signatures extends EditorLocationsAbstract
+class _Signatures
 {
+	/**
+	 * Can we use HTML in this editor?
+	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
+	 */
+	public function canUseHtml( $member )
+	{
+		return NULL;
+	}
+	
 	/**
 	 * Can we use attachments in this editor?
 	 *
-	 * @param	Member					$member	The member
-	 * @param	Editor	$field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
 	 */
-	public function canAttach( Member $member, Editor $field ): ?bool
+	public function canAttach( $member, $field )
 	{
 		return NULL;
 	}
@@ -53,7 +48,7 @@ class Signatures extends EditorLocationsAbstract
 	/**
 	 * Permission check for attachments
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	int|null	$id1		Primary ID
 	 * @param	int|null	$id2		Secondary ID
 	 * @param	string|null	$id3		Arbitrary data
@@ -61,9 +56,9 @@ class Signatures extends EditorLocationsAbstract
 	 * @param	bool		$viewOnly	If true, just check if the user can see the attachment rather than download it
 	 * @return	bool
 	 */
-	public function attachmentPermissionCheck( Member $member, ?int $id1, ?int $id2, ?string $id3, array $attachment, bool $viewOnly=FALSE ): bool
+	public function attachmentPermissionCheck( $member, $id1, $id2, $id3, $attachment, $viewOnly=FALSE )
 	{
-		return (bool) Settings::i()->signatures_enabled;
+		return (bool) \IPS\Settings::i()->signatures_enabled;
 	}
 	
 	/**
@@ -72,12 +67,25 @@ class Signatures extends EditorLocationsAbstract
 	 * @param	int|null	$id1	Primary ID
 	 * @param	int|null	$id2	Secondary ID
 	 * @param	string|null	$id3	Arbitrary data
-	 * @return    Content|Member|Model|Url|null
-	 * @throws	LogicException
+	 * @return	\IPS\Http\Url|\IPS\Content|\IPS\Node\Model
+	 * @throws	\LogicException
 	 */
-	public function attachmentLookup( int $id1=NULL, int $id2=NULL, string $id3=NULL ): Model|Content|Url|Member|null
+	public function attachmentLookup( $id1, $id2, $id3 )
 	{
-		return Member::load( $id1 );
+		return \IPS\Member::load( $id1 );
+	}
+
+	/**
+	 * Rebuild attachment images in non-content item areas
+	 *
+	 * @param	int|null	$offset	Offset to start from
+	 * @param	int|null	$max	Maximum to parse
+	 * @return	int			Number completed
+	 * @note	This method is optional and will only be called if it exists
+	 */
+	public function rebuildAttachmentImages( $offset, $max )
+	{
+		return $this->performRebuild( $offset, $max, 'rebuildAttachmentUrls' );
 	}
 
 	/**
@@ -88,10 +96,15 @@ class Signatures extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildContent( ?int $offset, ?int $max ): int
+	public function rebuildContent( $offset, $max )
 	{
-		return $this->performRebuild( $offset, $max, [ '\IPS\Text\LegacyParser', 'parseStatic' ] );
+		return $this->performRebuild( $offset, $max, 'parseStatic' );
 	}
+
+	/**
+	 * @brief	Use the cached image URL instead of the original URL
+	 */
+	protected $proxyUrl	= FALSE;
 
 	/**
 	 * Rebuild content to add or remove image proxy
@@ -102,25 +115,31 @@ class Signatures extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildImageProxy( ?int $offset, ?int $max, bool $proxyUrl = FALSE ): int
+	public function rebuildImageProxy( $offset, $max, $proxyUrl = FALSE )
 	{
-		$callback = function( $value ) use ( $proxyUrl ) {
-			return Parser::removeImageProxy( $value, $proxyUrl );
-		};
-		return $this->performRebuild( $offset, $max, $callback );
+		$this->proxyUrl = $proxyUrl;
+		return $this->performRebuild( $offset, $max, 'parseImageProxy' );
 	}
+
+	/**
+	 * @brief	Store lazy loading status ( true = enabled )
+	 */
+	protected $_lazyLoadStatus = null;
 
 	/**
 	 * Rebuild content to add or remove lazy loading
 	 *
 	 * @param	int|null		$offset		Offset to start from
 	 * @param	int|null		$max		Maximum to parse
+	 * @param	bool			$status		Enable/Disable lazy loading
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildLazyLoad( ?int $offset, ?int $max ): int
+	public function rebuildLazyLoad( $offset, $max, $status=TRUE )
 	{
-		return $this->performRebuild( $offset, $max, [ 'IPS\Text\Parser', 'parseLazyLoad' ] );
+		$this->_lazyLoadStatus = $status;
+
+		return $this->performRebuild( $offset, $max, 'parseLazyLoad' );
 	}
 
 	/**
@@ -131,30 +150,38 @@ class Signatures extends EditorLocationsAbstract
 	 * @param	callable	$callback	Method to call to rebuild content
 	 * @return	int			Number completed
 	 */
-	protected function performRebuild( ?int $offset, ?int $max, callable $callback ): int
+	protected function performRebuild( $offset, $max, $callback )
 	{
 		$did	 = 0;
 		$rebuilt = FALSE;
 		
-		foreach( Db::i()->select( '*', 'core_members', "signature IS NOT NULL AND signature != ''", 'member_id ASC', array( $offset, $max ) ) as $member )
+		foreach( \IPS\Db::i()->select( '*', 'core_members', "signature IS NOT NULL AND signature != ''", 'member_id ASC', array( $offset, $max ) ) as $member )
 		{
 			$did++;
 
 			/* Update */
 			try
 			{
-				if( is_array( $callback ) and $callback[1] == 'parseStatic' )
+				if( $callback == 'rebuildAttachmentUrls' )
 				{
-					$rebuilt = LegacyParser::parseStatic( $member['signature'], Member::load( $member['member_id'] ), FALSE, 'core_Signatures', $member['member_id'] );
+					$rebuilt = \IPS\Text\Parser::rebuildAttachmentUrls( $member['signature'], \IPS\Member::load( $member['member_id'] ) );
 				}
-				else
+				elseif( $callback == 'parseLazyLoad' )
 				{
-					$rebuilt = $callback( $member['signature'] );
+					$rebuilt = \IPS\Text\Parser::parseLazyLoad( $member['signature'], $this->_lazyLoadStatus );
+				}
+				elseif( $callback == 'parseStatic' )
+				{
+					$rebuilt = \IPS\Text\LegacyParser::parseStatic( $member['signature'], \IPS\Member::load( $member['member_id'] ), FALSE, 'core_Signatures', $member['member_id'] );
+				}
+				elseif( $callback == 'parseImageProxy' )
+				{
+					$rebuilt = \IPS\Text\Parser::removeImageProxy( $member['signature'], $this->proxyUrl );
 				}
 			}
-			catch( InvalidArgumentException $e )
+			catch( \InvalidArgumentException $e )
 			{
-				if( is_array( $callback ) and $callback[1] == 'parseStatic' AND $e->getcode() == 103014 )
+				if( $callback == 'parseStatic' AND $e->getcode() == 103014 )
 				{
 					$rebuilt	= preg_replace( "#\[/?([^\]]+?)\]#", '', $member['signature'] );
 				}
@@ -166,7 +193,7 @@ class Signatures extends EditorLocationsAbstract
 
 			if( $rebuilt !== FALSE )
 			{
-				Db::i()->update( 'core_members', array( 'signature' => $rebuilt ), array( 'member_id=?', $member['member_id'] ) );
+				\IPS\Db::i()->update( 'core_members', array( 'signature' => $rebuilt ), array( 'member_id=?', $member['member_id'] ) );
 			}
 		}
 		
@@ -178,8 +205,8 @@ class Signatures extends EditorLocationsAbstract
 	 *
 	 * @return	int			Total Count
 	 */
-	public function contentCount(): int
+	public function contentCount()
 	{
-		return Db::i()->select( 'COUNT(*) as count', 'core_members', "signature IS NOT NULL AND signature != ''" )->first();
+		return \IPS\Db::i()->select( 'COUNT(*) as count', 'core_members', "signature IS NOT NULL AND signature != ''" )->first();
 	}
 }

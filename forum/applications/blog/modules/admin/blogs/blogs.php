@@ -12,42 +12,35 @@
 namespace IPS\blog\modules\admin\blogs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Node\Controller;
-use IPS\Output;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * groupBlogs
  */
-class blogs extends Controller
+class _blogs extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = '\IPS\blog\Category';
+	protected $nodeClass = '\IPS\blog\Category';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'blogs_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'blogs_manage' );
 		parent::execute();
 	}
 
@@ -56,16 +49,16 @@ class blogs extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		parent::manage();
 
 		/* Root buttons */
-		Output::i()->sidebar['actions']['add'] = array(
+		\IPS\Output::i()->sidebar['actions']['add'] = array(
 			'primary'	=> true,
 			'icon'		=> 'plus',
 			'title'		=> 'blog_create_category',
-			'link'		=> Url::internal( 'app=blog&module=blogs&controller=blogs&do=form' ),
+			'link'		=> \IPS\Http\Url::internal( 'app=blog&module=blogs&controller=blogs&do=form' ),
 			'data'		=> array()
 		);
 	}

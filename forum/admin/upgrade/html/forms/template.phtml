@@ -15,14 +15,14 @@
 		<input type="hidden" name="plupload" value="{expression="md5( mt_rand() )"}">
 	{{endif}}
 	{{if $error}}
-		<div class="ipsMessage ipsMessage--error ipsMessage--form">
+		<div class="ipsMessage ipsMessage_error">
 			{$error}
 		</div>
 	{{endif}}
-	<ul class='ipsForm ipsForm--admin-upgrade ipsForm--vertical'>
+	<ul class='ipsForm ipsForm_vertical'>
 		{expression="array_pop( $tabs )" raw="true"}
 		<li class='ipsFieldRow'>
-			<div class='ipsFieldRow__content'>
+			<div class='ipsFieldRow_content'>
 				{expression="implode( '', $actionButtons)" raw="true"}
 			</div>
 		</li>

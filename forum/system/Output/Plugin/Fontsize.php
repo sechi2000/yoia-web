@@ -11,26 +11,21 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Font size
- * @note this is still required as the ACP relies on this
  */
-class Fontsize
+class _Fontsize
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = TRUE;
+	public static $canBeUsedInCss = TRUE;
 	
 	/**
 	 * Run the plug-in
@@ -39,35 +34,21 @@ class Fontsize
 	 * @param	array		$options    Array of options
 	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options ): string
+	public static function runPlugin( $data, $options )
 	{
 		$number = 14;
-
-		/* Create the array for the ACP based on v4 font-sizes @todo review this! */
-		$sizes = [
-			'font_base' => 16,
-			'font_large' => 18,
-			'font_medium' => 14,
-			'font_small' => 13,
-			'font_x_large' => 20,
-			'font_x_small' => 12,
-			'font_2x_large' => 24,
-			'font_3x_large' => 30,
-			'font_4x_large' => 36,
-			'font_size' => 100,
-		];
 
 		// Is this a theme setting or a number?
 		if( preg_match('/^[0-9]+?$/', $data ) )
 		{
-			$number = intval( $data );
+			$number = \intval( $data );
 		} 
-		else if ( isset( $sizes[ 'font_' . $data ] ) )
+		else if ( isset( \IPS\Theme::i()->settings[ 'font_' . $data ] ) ) 
 		{
-			$number = $sizes[ 'font_' . $data ];
+			$number = \IPS\Theme::i()->settings[ 'font_' . $data ];
 		}
 
-		$scale = $sizes['font_size'];
+		$scale = isset( \IPS\Theme::i()->settings['font_size'] ) ? \intval( \IPS\Theme::i()->settings['font_size'] ) : 100;
 
 		// Should we be scaling?
 		if( $scale !== 100 && ( !isset( $options['scale'] ) || $options['scale'] !== false ) )

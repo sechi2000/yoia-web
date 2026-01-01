@@ -12,66 +12,38 @@
 namespace IPS\nexus\modules\front\store;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\Content\Controller;
-use IPS\core\Facebook\Pixel;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Money;
-use IPS\nexus\Package;
-use IPS\nexus\Package\CustomField;
-use IPS\nexus\Package\Item;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Tax;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfBoundsException;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * View product
  */
-class product extends Controller
+class _product extends \IPS\Content\Controller
 {
 	/**
 	 * [Content\Controller]	Class
 	 */
-	protected static string $contentModel = 'IPS\nexus\Package\Item';
+	protected static $contentModel = 'IPS\nexus\Package\Item';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_store.js', 'nexus', 'front' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'store.css', 'nexus' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_store.js', 'nexus', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'store.css', 'nexus' ) );
 
-		Output::setCacheTime( false );
+		if ( \IPS\Theme::i()->settings['responsive'] )
+		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'store_responsive.css', 'nexus', 'front' ) );
+		}
+
+		\IPS\Output::setCacheTime( false );
 		
 		parent::execute();
 	}
@@ -79,24 +51,24 @@ class product extends Controller
 	/**
 	 * View
 	 *
-	 * @return	mixed
+	 * @return	void
 	 */
-	protected function manage() : mixed
+	protected function manage()
 	{
 		/* Init */
 		if ( !isset( $_SESSION['cart'] ) )
 		{
 			$_SESSION['cart'] = array();
 		}
-		$memberCurrency = ( ( isset( Request::i()->cookie['currency'] ) and in_array( Request::i()->cookie['currency'], Money::currencies() ) ) ? Request::i()->cookie['currency'] : Customer::loggedIn()->defaultCurrency() );
+		$memberCurrency = ( ( isset( \IPS\Request::i()->cookie['currency'] ) and \in_array( \IPS\Request::i()->cookie['currency'], \IPS\nexus\Money::currencies() ) ) ? \IPS\Request::i()->cookie['currency'] : \IPS\nexus\Customer::loggedIn()->defaultCurrency() );
 		
 		/* Load Package */
 		$item = parent::manage();
 		if ( !$item )
 		{
-			Output::i()->error( 'node_error', '2X240/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X240/1', 404, '' );
 		}
-		$package = Package::load( $item->id );
+		$package = \IPS\nexus\Package::load( $item->id );
 		
 		/* Do we have any in the cart already (this will affect stock level)? */
 		$inCart = array();
@@ -119,25 +91,100 @@ class product extends Controller
 		}
 						
 		/* Showing just the form to purchase, or full product page? */
-		if ( Request::i()->purchase )
+		if ( \IPS\Request::i()->purchase )
 		{
-			Output::i()->output = Theme::i()->getTemplate('store')->purchaseForm( $package, $item, $this->_getForm( $package, $inCart, TRUE ) );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('store')->purchaseForm( $package, $item, $this->_getForm( $package, $inCart, TRUE ) );	
 		}
 		
 		/* No - show the full page */
 		else
 		{
+			/* We need to create a dummy item so we can work out ship times/prices */
+			$itemDataForShipping = NULL;
+			if ( $package->physical )
+			{
+				try
+				{
+					$itemDataForShipping = $package->createItemForCart( $package->price() );
+				}
+				catch ( \OutOfBoundsException $e ) { }
+			}
+			
+			/* If physical, get available shipping methods */
+			$shippingMethods = array();
+			$locationType = 'none';
+			if ( $package->physical )
+			{
+				/* Where are we shipping to? */
+				$shipAddress = NULL;
+				if ( \IPS\Member::loggedIn()->member_id and $primaryBillingAddress = \IPS\nexus\Customer::loggedIn()->primaryBillingAddress() )
+				{
+					$shipAddress = $primaryBillingAddress;
+					$locationType = 'address';
+				}
+				if ( !$shipAddress )
+				{
+					try
+					{
+						$shipAddress = \IPS\GeoLocation::getRequesterLocation();
+						$locationType = 'geo';
+					}
+					catch ( \Exception $e ) { }
+				}
+				
+				/* Standard */
+				$where = NULL;
+				if ( $package->shipping != '*' )
+				{
+					$where = \IPS\Db::i()->in( 's_id', explode( ',', $package->shipping ) );
+				}
+				foreach ( \IPS\nexus\Shipping\FlatRate::roots( NULL, NULL, $where ) as $rate )
+				{
+					if ( ( $shipAddress and $rate->isAvailable( $shipAddress, array( $itemDataForShipping ), $memberCurrency ) ) or ( $rate->locations === '*' ) )
+					{	
+						$shippingMethods[] = $rate;
+					}
+				}
+				
+				/* Easypost */
+				if ( $shipAddress and \IPS\Settings::i()->easypost_api_key and \IPS\Settings::i()->easypost_show_rates and ( $package->shipping == '*' or \in_array( 'easypost', explode( ',', $package->shipping ) ) ) )
+				{
+					try
+					{
+						$fromAddress = \IPS\GeoLocation::buildFromJson( \IPS\Settings::i()->easypost_address ?: \IPS\Settings::i()->site_address );
+						
+						$length = new \IPS\nexus\Shipping\Length( $package->length );
+						$width = new \IPS\nexus\Shipping\Length( $package->width );
+						$height = new \IPS\nexus\Shipping\Length( $package->height );
+						$weight = new \IPS\nexus\Shipping\Weight( $package->weight );
+						
+						$easyPost = \IPS\nexus\Shipping\EasyPostRate::getRates( $length->float('in'), $width->float('in'), $height->float('in'), $weight->float('oz'), \IPS\nexus\Customer::loggedIn(), $shipAddress, $memberCurrency );
+						if ( isset( $easyPost['rates'] ) )
+						{
+							foreach ( $easyPost['rates'] as $rate )
+							{
+								if ( $rate['currency'] === $memberCurrency )
+								{
+									$shippingMethods[] = new \IPS\nexus\Shipping\EasyPostRate( $rate );
+								}
+							}
+						}
+					}
+					catch ( \IPS\Http\Request\Exception $e ) { }
+				}
+			}
+						
 			/* Do we have renewal terms? */
 			$renewalTerm = NULL;
 			$renewOptions = $package->renew_options ? json_decode( $package->renew_options, TRUE ) : array();
 			$initialTerm = NULL;
-			if ( count( $renewOptions ) )
+			if ( \count( $renewOptions ) )
 			{
 				$renewalTerm = TRUE;
-				if ( count( $renewOptions ) === 1 )
+				if ( \count( $renewOptions ) === 1 )
 				{
 					$renewalTerm = array_pop( $renewOptions );
-					$renewalTerm = new RenewalTerm( new Money( $renewalTerm['cost'][ $memberCurrency ]['amount'], $memberCurrency ), new DateInterval( 'P' . $renewalTerm['term'] . mb_strtoupper( $renewalTerm['unit'] ) ), $package->tax ? Tax::load( $package->tax ) : NULL, $renewalTerm['add'] );
+					$renewalTerm = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $renewalTerm['cost'][ $memberCurrency ]['amount'], $memberCurrency ), new \DateInterval( 'P' . $renewalTerm['term'] . mb_strtoupper( $renewalTerm['unit'] ) ), $package->tax ? \IPS\nexus\Tax::load( $package->tax ) : NULL, $renewalTerm['add'] );
 				}
 				if ( $package->initial_term )
 				{
@@ -145,13 +192,13 @@ class product extends Controller
 					switch( mb_substr( $package->initial_term, -1 ) )
 					{
 						case 'D':
-							$initialTerm = Member::loggedIn()->language()->pluralize( Member::loggedIn()->language()->get('renew_days'), array( $term ) );
+							$initialTerm = \IPS\Member::loggedIn()->language()->pluralize( \IPS\Member::loggedIn()->language()->get('renew_days'), array( $term ) );
 							break;
 						case 'M':
-							$initialTerm = Member::loggedIn()->language()->pluralize( Member::loggedIn()->language()->get('renew_months'), array( $term ) );
+							$initialTerm = \IPS\Member::loggedIn()->language()->pluralize( \IPS\Member::loggedIn()->language()->get('renew_months'), array( $term ) );
 							break;
 						case 'Y':
-							$initialTerm = Member::loggedIn()->language()->pluralize( Member::loggedIn()->language()->get('renew_years'), array( $term ) );
+							$initialTerm = \IPS\Member::loggedIn()->language()->pluralize( \IPS\Member::loggedIn()->language()->get('renew_years'), array( $term ) );
 							break;
 					}
 				}
@@ -159,29 +206,29 @@ class product extends Controller
 			
 			/* Display */
 			$formKey = "package_{$package->id}_submitted";
-			if ( Request::i()->isAjax() and isset( Request::i()->$formKey ) )
+			if ( \IPS\Request::i()->isAjax() and isset( \IPS\Request::i()->$formKey ) )
 			{
-				Output::i()->sendOutput( $this->_getForm( $package, $inCart, TRUE ), 500 );
+				\IPS\Output::i()->sendOutput( $this->_getForm( $package, $inCart, TRUE ), 500 );
 			}
 			else
 			{
 				/* Set default search */
-				Output::i()->defaultSearchOption = array( 'nexus_package_item', "nexus_package_item_el" );
+				\IPS\Output::i()->defaultSearchOption = array( 'nexus_package_item', "nexus_package_item_el" );		
 				
-				Output::i()->output = Theme::i()->getTemplate('store')->package( $package, $item, $this->_getForm( $package, $inCart, TRUE ), array_sum( $inCart ), $renewalTerm, $initialTerm );
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('store')->package( $package, $item, $this->_getForm( $package, $inCart, TRUE ), array_sum( $inCart ), $shippingMethods, $itemDataForShipping, $locationType, $renewalTerm, $initialTerm );	
 			}
 
 			try
 			{
 				$price = $package->price();
 			}
-			catch( OutOfBoundsException )
+			catch( \OutOfBoundsException $e )
 			{
 				$price = NULL;
 			}
 
 			/* Facebook Pixel */
-			Pixel::i()->ViewContent = array(
+			\IPS\core\Facebook\Pixel::i()->ViewContent = array(
 				'content_ids' => array( $package->id ),
 				'content_type' => 'product'
 			);
@@ -189,8 +236,8 @@ class product extends Controller
 			/* A product MUST have an offer, so if there's no price (i.e. due to currency configuration) don't even output */
 			if( $price !== NULL )
 			{
-				Output::i()->jsonLd['package']	= array(
-					'@context'		=> "https://schema.org",
+				\IPS\Output::i()->jsonLd['package']	= array(
+					'@context'		=> "http://schema.org",
 					'@type'			=> "Product",
 					'name'			=> $package->_title,
 					'description'	=> $item->truncated( TRUE, NULL ),
@@ -203,70 +250,80 @@ class product extends Controller
 										'priceCurrency'	=> $price->currency,
 										'seller'		=> array(
 															'@type'		=> 'Organization',
-															'name'		=> Settings::i()->board_name
+															'name'		=> \IPS\Settings::i()->board_name
 														),
 									),
 				);
 
 				/* Stock status */
-				if( $package->stockLevel() === 0 )
+				if( $package->physical )
 				{
-					Output::i()->jsonLd['package']['offers']['availability'] = 'https://schema.org/OutOfStock';
-				}
-				else
-				{
-					Output::i()->jsonLd['package']['offers']['availability'] = 'https://schema.org/InStock';
+					if( $package->stockLevel() === 0 )
+					{
+						\IPS\Output::i()->jsonLd['package']['offers']['availability'] = 'http://schema.org/OutOfStock';
+					}
+					else
+					{
+						\IPS\Output::i()->jsonLd['package']['offers']['availability'] = 'http://schema.org/InStock';
+					}
 				}
 
 				if( $package->image )
 				{
-					Output::i()->jsonLd['package']['image'] = (string) $package->image;
-					Output::i()->metaTags['og:image'] = (string)$package->image;
+					\IPS\Output::i()->jsonLd['package']['image'] = (string) $package->image;
+					\IPS\Output::i()->metaTags['og:image'] = (string)$package->image;
 				}
 
 				if( $package->reviewable AND $item->averageReviewRating() )
 				{
-					Output::i()->jsonLd['package']['aggregateRating'] = array(
+					\IPS\Output::i()->jsonLd['package']['aggregateRating'] = array(
 						'@type'			=> 'AggregateRating',
 						'ratingValue'	=> $item->averageReviewRating(),
 						'ratingCount'	=> $item->reviews
 					);
 				}
+
+				if( isset( $length ) )
+				{
+					\IPS\Output::i()->jsonLd['package']['depth'] = array( '@type' => 'Distance', 'name' => $length->string() );
+					\IPS\Output::i()->jsonLd['package']['width'] = array( '@type' => 'Distance', 'name' => $width->string() );
+					\IPS\Output::i()->jsonLd['package']['height'] = array( '@type' => 'Distance', 'name' => $height->string() );
+					\IPS\Output::i()->jsonLd['package']['weight'] = array( '@type' => 'QuantitativeValue', 'name' => $weight->string() );
+				}
 			}
-		}
-		return null;
+		}		
 	}
 
 	/**
 	 * Get form
 	 *
-	 * @param	Package	$package	The package
+	 * @param	\IPS\nexus\Package	$package	The package
 	 * @param	array				$inCart		The number in the cart already for each of the field combinations
 	 * @param	bool				$verticalForm	Whether to output a vertical form (true) or not
 	 * @return	string
 	 */
-	protected function _getForm( Package $package, array $inCart, bool $verticalForm = FALSE ) : string
+	protected function _getForm( \IPS\nexus\Package $package, $inCart, $verticalForm = FALSE )
 	{
 		/* Is this a subscription package that we've already bought? */
 		if ( $package->subscription )
 		{
 			try
 			{
-				$purchase = Purchase::constructFromData( Db::i()->select( '*', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_cancelled=0 AND ps_member=?', 'nexus', 'package', $package->id, Member::loggedIn()->member_id ) )->first() );
-				return Theme::i()->getTemplate( 'store', 'nexus' )->subscriptionPurchase( $purchase );
+				$purchase = \IPS\nexus\Purchase::constructFromData( \IPS\Db::i()->select( '*', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_cancelled=0 AND ps_member=?', 'nexus', 'package', $package->id, \IPS\Member::loggedIn()->member_id ) )->first() );
+				return \IPS\Theme::i()->getTemplate( 'store', 'nexus' )->subscriptionPurchase( $purchase );
 			}
-			catch ( UnderflowException ) {}
+			catch ( \UnderflowException $e ) {}
 		}
 		
 		/* Get member's currency */
-		$memberCurrency = ( ( isset( Request::i()->cookie['currency'] ) and in_array( Request::i()->cookie['currency'], Money::currencies() ) ) ? Request::i()->cookie['currency'] : Customer::loggedIn()->defaultCurrency() );
+		$memberCurrency = ( ( isset( \IPS\Request::i()->cookie['currency'] ) and \in_array( \IPS\Request::i()->cookie['currency'], \IPS\nexus\Money::currencies() ) ) ? \IPS\Request::i()->cookie['currency'] : \IPS\nexus\Customer::loggedIn()->defaultCurrency() );
 				
 		/* Init form */		
-		$form = new Form( "package_{$package->id}", 'add_to_cart' );
+		$form = new \IPS\Helpers\Form( "package_{$package->id}", 'add_to_cart' );
 
 		if ( $verticalForm )
 		{
-			$form->class = 'ipsForm--vertical ipsForm--add-to-cart';
+			$form->class = 'ipsForm_vertical';
 		}
 		
 		/* Package-dependant fields */
@@ -276,7 +333,7 @@ class product extends Controller
 		if ( $package->stock != -1 and $package->stock != -2 and ( $package->stock - array_sum( $inCart ) ) <= 0 )
 		{
 			$form->actionButtons = array();
-			$form->addButton( 'out_of_stock', 'submit', NULL, 'ipsButton ipsButton--primary', array( 'disabled' => 'disabled' ) );
+			$form->addButton( 'out_of_stock', 'submit', NULL, 'ipsButton ipsButton_primary', array( 'disabled' => 'disabled' ) );
 		}
 		
 		/* And is it available for our currency */
@@ -286,28 +343,28 @@ class product extends Controller
 			{
 				$price = $package->price();
 			}
-			catch ( OutOfBoundsException )
+			catch ( \OutOfBoundsException $e )
 			{
 				$form->actionButtons = array();
-				$form->addButton( 'currently_unavailable', 'submit', NULL, 'ipsButton ipsButton--primary', array( 'disabled' => 'disabled' ) );
+				$form->addButton( 'currently_unavailable', 'submit', NULL, 'ipsButton ipsButton_primary', array( 'disabled' => 'disabled' ) );
 			}
 		}
 
 		/* Associate */
-		if ( count( $package->associablePackages() ) )
+		if ( \count( $package->associablePackages() ) )
 		{
 			$associableIds = array_keys( $package->associablePackages() );
 			$associableOptions = array();
 			foreach ( $_SESSION['cart'] as $k => $item )
 			{
-				if ( in_array( $item->id, $associableIds ) )
+				if ( \in_array( $item->id, $associableIds ) )
 				{
 					for ( $i = 0; $i < $item->quantity; $i++ )
 					{
 						$name = $item->name;
-						if ( count( $item->details ) )
+						if ( \count( $item->details ) )
 						{
-							$customFields = CustomField::roots();
+							$customFields = \IPS\nexus\Package\CustomField::roots();
 							$stickyFields = array();
 							foreach ( $item->details as $_k => $v )
 							{
@@ -316,7 +373,7 @@ class product extends Controller
 									$stickyFields[] = $v;
 								}
 							}
-							if ( count( $stickyFields ) )
+							if ( \count( $stickyFields ) )
 							{
 								$name .= ' (' . implode( ' &middot; ', $stickyFields ) . ')';
 							}
@@ -325,7 +382,7 @@ class product extends Controller
 					}
 				}
 			}
-			foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', array( array( 'ps_member=? AND ps_app=? AND ps_type=?', Customer::loggedIn()->member_id, 'nexus', 'package' ), Db::i()->in( 'ps_item_id', $associableIds ) ) ), 'IPS\nexus\Purchase' ) as $purchase )
+			foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', array( array( 'ps_member=? AND ps_app=? AND ps_type=?', \IPS\nexus\Customer::loggedIn()->member_id, 'nexus', 'package' ), \IPS\Db::i()->in( 'ps_item_id', $associableIds ) ) ), 'IPS\nexus\Purchase' ) as $purchase )
 			{
 				$associableOptions['existing_purchases']["1.{$purchase->id}"] = $purchase->name;
 			}
@@ -336,24 +393,24 @@ class product extends Controller
 				{
 					array_unshift( $associableOptions, 'do_not_associate' );
 				}
-				$form->add( new Select( 'associate_with', NULL, $package->force_assoc, array( 'options' => $associableOptions ) ) );
+				$form->add( new \IPS\Helpers\Form\Select( 'associate_with', NULL, $package->force_assoc, array( 'options' => $associableOptions ) ) );
 			}
 			elseif ( $package->force_assoc )
 			{
-				return Member::loggedIn()->language()->addToStack("nexus_package_{$package->id}_assoc");
+				return \IPS\Member::loggedIn()->language()->addToStack("nexus_package_{$package->id}_assoc");
 			}
 		}
 		
 		/* Renewal options */
 		$renewOptions = $package->renew_options ? json_decode( $package->renew_options, TRUE ) : array();
-		if ( count( $renewOptions ) > 1 )
+		if ( \count( $renewOptions ) > 1 )
 		{
 			$sortedRenewOptions = array();
 			foreach ( $renewOptions as $k => $option )
 			{
-				if ( isset( $option['cost'][ $memberCurrency ] ) )
+				if ( isset( $renewOptions[ $k ]['cost'][ $memberCurrency ] ) )
 				{
-					$sortedRenewOptions[ $k ] = new RenewalTerm( new Money( $option['cost'][ $memberCurrency ]['amount'], $memberCurrency ), new DateInterval( 'P' . $option['term'] . mb_strtoupper( $option['unit'] ) ), $package->tax ? Tax::load( $package->tax ) : NULL, $option['add'], $package->grace_period ? new DateInterval( 'P' . $package->grace_period . 'D' ) : NULL );
+					$sortedRenewOptions[ $k ] = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $option['cost'][ $memberCurrency ]['amount'], $memberCurrency ), new \DateInterval( 'P' . $option['term'] . mb_strtoupper( $option['unit'] ) ), $package->tax ? \IPS\nexus\Tax::load( $package->tax ) : NULL, $option['add'], $package->grace_period ? new \DateInterval( 'P' . $package->grace_period . 'D' ) : NULL );
 				}
 			}
 			uasort( $sortedRenewOptions, function( $a, $b ) {
@@ -365,7 +422,7 @@ class product extends Controller
 			foreach ( $sortedRenewOptions as $k => $term )
 			{
 				$saving = NULL;
-				if ( Settings::i()->nexus_show_renew_option_savings != 'none' )
+				if ( \IPS\Settings::i()->nexus_show_renew_option_savings != 'none' )
 				{
 					if ( $first === NULL )
 					{
@@ -373,19 +430,19 @@ class product extends Controller
 					}
 					else
 					{
-						$saving = $term->diff( $first, Settings::i()->nexus_show_renew_option_savings == 'percent' );
+						$saving = $term->diff( $first, \IPS\Settings::i()->nexus_show_renew_option_savings == 'percent' );
 					}
 				}
 				
-				if ( $saving and ( ( Settings::i()->nexus_show_renew_option_savings == 'percent' and $saving->isGreaterThanZero() ) or ( Settings::i()->nexus_show_renew_option_savings == 'amount' and $saving->amount->isGreaterThanZero() ) ) )
+				if ( $saving and ( ( \IPS\Settings::i()->nexus_show_renew_option_savings == 'percent' and $saving->isGreaterThanZero() ) or ( \IPS\Settings::i()->nexus_show_renew_option_savings == 'amount' and $saving->amount->isGreaterThanZero() ) ) )
 				{
-					if ( Settings::i()->nexus_show_renew_option_savings == 'percent' )
+					if ( \IPS\Settings::i()->nexus_show_renew_option_savings == 'percent' )
 					{
-						$options[ $k ] = Member::loggedIn()->language()->addToStack( 'renewal_amount_with_pc_saving', FALSE, array( 'sprintf' => array( $term->toDisplay(), $saving->round(1) ) ) );
+						$options[ $k ] = \IPS\Member::loggedIn()->language()->addToStack( 'renewal_amount_with_pc_saving', FALSE, array( 'sprintf' => array( $term->toDisplay(), $saving->round(1) ) ) );
 					}
 					else
 					{
-						$options[ $k ] = Member::loggedIn()->language()->addToStack( 'renewal_amount_with_cost_saving', FALSE, array( 'sprintf' => array( $term->toDisplay(), $saving ) ) );
+						$options[ $k ] = \IPS\Member::loggedIn()->language()->addToStack( 'renewal_amount_with_cost_saving', FALSE, array( 'sprintf' => array( $term->toDisplay(), $saving ) ) );
 					}
 				}
 				else
@@ -396,15 +453,14 @@ class product extends Controller
 			
 			ksort( $options );
 
-			$form->add( new Radio( 'renewal_term', NULL, TRUE, array( 'options' => $options ) ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'renewal_term', NULL, TRUE, array( 'options' => $options ) ) );
 		}
 				
 		/* Custom Fields */
-		$customFields = CustomField::roots( NULL, NULL, array( array( 'cf_purchase=1' ), array( Db::i()->findInSet( 'cf_packages', array( $package->id ) ) ) ) );
+		$customFields = \IPS\nexus\Package\CustomField::roots( NULL, NULL, array( array( 'cf_purchase=1' ), array( \IPS\Db::i()->findInSet( 'cf_packages', array( $package->id ) ) ) ) );
 		foreach ( $customFields as $field )
 		{
-			/* @var CustomField $field */
-			if( Request::i()->isAjax() && isset( Request::i()->stockCheck ) )
+			if( \IPS\Request::i()->isAjax() && isset( \IPS\Request::i()->stockCheck ) )
 			{
 				$field->required = FALSE; // Otherwise a required text field (for example) can block the price changing when a different radio (for example) value is selected
 			}
@@ -413,12 +469,12 @@ class product extends Controller
 		}
 		
 		/* Is this the validation for the additional page? */
-		if ( Request::i()->isAjax() and isset( Request::i()->additionalPageCheck ) )
+		if ( \IPS\Request::i()->isAjax() and isset( \IPS\Request::i()->additionalPageCheck ) )
 		{
 			if ( $additionalPage = $package->storeAdditionalPage( $_POST ) )
 			{
-				Output::i()->httpHeaders['X-IPS-FormNoSubmit'] = "true";
-				Output::i()->json( $additionalPage );
+				\IPS\Output::i()->httpHeaders['X-IPS-FormNoSubmit'] = "true";
+				\IPS\Output::i()->json( $additionalPage );
 			}
 		}
 		
@@ -433,7 +489,7 @@ class product extends Controller
 				if ( isset( $values[ 'nexus_pfield_' . $field->id ] ) )
 				{
 					$class = $field->buildHelper();
-					if ( $class instanceof Upload )
+					if ( $class instanceof \IPS\Helpers\Form\Upload )
 					{
 						$details[ $field->id ] = (string) $values[ 'nexus_pfield_' . $field->id ];
 					}
@@ -442,10 +498,10 @@ class product extends Controller
 						$details[ $field->id ] = $class::stringValue( $values[ 'nexus_pfield_' . $field->id ] );
 					}
 					
-					if ( !isset( Request::i()->stockCheck ) and $field->type === 'Editor' )
+					if ( !isset( \IPS\Request::i()->stockCheck ) and $field->type === 'Editor' )
 					{
-						$uploadId = Db::i()->insert( 'nexus_cart_uploads', array(
-							'session_id'	=> Session::i()->id,
+						$uploadId = \IPS\Db::i()->insert( 'nexus_cart_uploads', array(
+							'session_id'	=> \IPS\Session::i()->id,
 							'time'			=> time()
 						) );
 						$field->claimAttachments( $uploadId, 'cart' );
@@ -456,18 +512,18 @@ class product extends Controller
 			$optionValues = $package->optionValues( $details );
 						
 			/* Stock check */
-			$quantity = $values['quantity'] ?? 1;
+			$quantity = isset( $values['quantity'] ) ? $values['quantity'] : 1;
 			try
 			{
 				$data = $package->optionValuesStockAndPrice( $optionValues, TRUE );
 			}
-			catch ( UnderflowException )
+			catch ( \UnderflowException $e )
 			{
-				Output::i()->error( 'product_options_price_error', '3X240/2', 500, 'product_options_price_error_admin' );
+				\IPS\Output::i()->error( 'product_options_price_error', '3X240/2', 500, 'product_options_price_error_admin' );
 			}
 			$inCartForThisFieldCombination = isset( $inCart[ json_encode( $optionValues ) ] ) ? $inCart[ json_encode( $optionValues ) ] : 0;
 			
-			if ( Request::i()->isAjax() && isset( Request::i()->stockCheck ) )
+			if ( \IPS\Request::i()->isAjax() && isset( \IPS\Request::i()->stockCheck ) )
 			{
 				/* Stock */
 				if ( $data['stock'] == -1 )
@@ -480,8 +536,8 @@ class product extends Controller
 				else
 				{					
 					$return = array(
-						'stock'	=> Member::loggedIn()->language()->addToStack( 'x_in_stock', FALSE, array( 'pluralize' => array( $data['stock'] - $inCartForThisFieldCombination ) ) ),
-						'okay'	=> ( $data['stock'] - $inCartForThisFieldCombination > 0 ),
+						'stock'	=> \IPS\Member::loggedIn()->language()->addToStack( 'x_in_stock', FALSE, array( 'pluralize' => array( $data['stock'] - $inCartForThisFieldCombination ) ) ),
+						'okay'	=> ( $data['stock'] - $inCartForThisFieldCombination > 0 ) ? true : false,
 					);
 				}
 							
@@ -493,36 +549,36 @@ class product extends Controller
 				$renewOptions = $package->renew_options ? json_decode( $package->renew_options, TRUE ) : array();
 				if ( !empty( $renewOptions ) )
 				{
-					$term = ( isset( Request::i()->renewal_term ) and isset( $renewOptions[ Request::i()->renewal_term ] ) ) ? $renewOptions[ Request::i()->renewal_term ] : array_shift( $renewOptions );
+					$term = ( isset( \IPS\Request::i()->renewal_term ) and isset( $renewOptions[ \IPS\Request::i()->renewal_term ] ) ) ? $renewOptions[ \IPS\Request::i()->renewal_term ] : array_shift( $renewOptions );
 
 					switch( $term['unit'] )
 					{
 						case 'd':
-							$initialTerm = Member::loggedIn()->language()->pluralize( Member::loggedIn()->language()->get('renew_days'), array( $term['term'] ) );
+							$initialTerm = \IPS\Member::loggedIn()->language()->pluralize( \IPS\Member::loggedIn()->language()->get('renew_days'), array( $term['term'] ) );
 							break;
 						case 'm':
-							$initialTerm = Member::loggedIn()->language()->pluralize( Member::loggedIn()->language()->get('renew_months'), array( $term['term'] ) );
+							$initialTerm = \IPS\Member::loggedIn()->language()->pluralize( \IPS\Member::loggedIn()->language()->get('renew_months'), array( $term['term'] ) );
 							break;
 						case 'y':
-							$initialTerm = Member::loggedIn()->language()->pluralize( Member::loggedIn()->language()->get('renew_years'), array( $term['term'] ) );
+							$initialTerm = \IPS\Member::loggedIn()->language()->pluralize( \IPS\Member::loggedIn()->language()->get('renew_years'), array( $term['term'] ) );
 							break;
 					}
 
-					$return['initialTerm'] = sprintf( Member::loggedIn()->language()->get('package_initial_term_title'), $initialTerm );
+					$return['initialTerm'] = sprintf( \IPS\Member::loggedIn()->language()->get('package_initial_term_title'), $initialTerm );
 
 					if ( $term['add'] )
 					{
-						$data['price']->amount = $data['price']->amount->add( new Number( number_format( $term['cost'][ $memberCurrency ]['amount'], Money::numberOfDecimalsForCurrency( $memberCurrency ), '.', '' ) ) );
-						$normalPrice->amount = $normalPrice->amount->add( new Number( number_format( $term['cost'][ $memberCurrency ]['amount'], Money::numberOfDecimalsForCurrency( $memberCurrency ), '.', '' ) ) );
+						$data['price']->amount = $data['price']->amount->add( new \IPS\Math\Number( number_format( $term['cost'][ $memberCurrency ]['amount'], \IPS\nexus\Money::numberOfDecimalsForCurrency( $memberCurrency ), '.', '' ) ) );
+						$normalPrice->amount = $normalPrice->amount->add( new \IPS\Math\Number( number_format( $term['cost'][ $memberCurrency ]['amount'], \IPS\nexus\Money::numberOfDecimalsForCurrency( $memberCurrency ), '.', '' ) ) );
 					}
 					
-					$return['renewal'] = ( new RenewalTerm(
-						new Money(
-							( new Number( number_format( $term['cost'][ $memberCurrency ]['amount'], Money::numberOfDecimalsForCurrency( $memberCurrency ), '.', '' ) ) )
-								->add( ( new Number( number_format( $_data['renewalAdjustment'], Money::numberOfDecimalsForCurrency( $memberCurrency ), '.', '' ) ) ) )
+					$return['renewal'] = ( new \IPS\nexus\Purchase\RenewalTerm(
+						new \IPS\nexus\Money(
+							( new \IPS\Math\Number( number_format( $term['cost'][ $memberCurrency ]['amount'], \IPS\nexus\Money::numberOfDecimalsForCurrency( $memberCurrency ), '.', '' ) ) )
+								->add( ( new \IPS\Math\Number( number_format( $_data['renewalAdjustment'], \IPS\nexus\Money::numberOfDecimalsForCurrency( $memberCurrency ), '.', '' ) ) ) )
 						, $memberCurrency ),
-						new DateInterval( 'P' . $term['term'] . mb_strtoupper( $term['unit'] ) ),
-						$package->tax ? Tax::load( $package->tax ) : NULL, $term['add']
+						new \DateInterval( 'P' . $term['term'] . mb_strtoupper( $term['unit'] ) ),
+						$package->tax ? \IPS\nexus\Tax::load( $package->tax ) : NULL, $term['add']
 					) )->toDisplay();
 				}
 				else
@@ -531,40 +587,40 @@ class product extends Controller
 				}
 				
 				/* Include tax? */
-				if ( Settings::i()->nexus_show_tax and $package->tax )
+				if ( \IPS\Settings::i()->nexus_show_tax and $package->tax )
 				{
 					try
 					{
-						$taxRate = new Number( Tax::load( $package->tax )->rate( Customer::loggedIn()->estimatedLocation() ) );
+						$taxRate = new \IPS\Math\Number( \IPS\nexus\Tax::load( $package->tax )->rate( \IPS\nexus\Customer::loggedIn()->estimatedLocation() ) );
 						
 						$data['price']->amount = $data['price']->amount->add( $data['price']->amount->multiply( $taxRate ) );
 						$normalPrice->amount = $normalPrice->amount->add( $normalPrice->amount->multiply( $taxRate ) );
 					}
-					catch ( OutOfRangeException ) { }
+					catch ( \OutOfRangeException $e ) { }
 				}
 				
 				/* Format and return */
 				if ( $data['price']->amount->compare( $normalPrice->amount ) !== 0 )
 				{
-					$return['price'] = Theme::i()->getTemplate( 'store', 'nexus' )->priceDiscounted( $normalPrice, $data['price'], FALSE, FALSE, NULL );
+					$return['price'] = \IPS\Theme::i()->getTemplate( 'store', 'nexus' )->priceDiscounted( $normalPrice, $data['price'], FALSE, FALSE, NULL );
 				}
 				else
 				{
-					$return['price'] = Theme::i()->getTemplate( 'store', 'nexus' )->price( $data['price'], FALSE, FALSE, NULL );
+					$return['price'] = \IPS\Theme::i()->getTemplate( 'store', 'nexus' )->price( $data['price'], FALSE, FALSE, NULL );
 				}
-				Output::i()->json( $return );
+				\IPS\Output::i()->json( $return );
 			}
 			elseif ( $data['stock'] != -1 and ( $data['stock'] - $inCartForThisFieldCombination ) < $quantity )
 			{
-				$form->error = Member::loggedIn()->language()->addToStack( 'not_enough_in_stock', FALSE, array( 'sprintf' => array( $data['stock'] - $inCartForThisFieldCombination ) ) );
+				$form->error = \IPS\Member::loggedIn()->language()->addToStack( 'not_enough_in_stock', FALSE, array( 'sprintf' => array( $data['stock'] - $inCartForThisFieldCombination ) ) );
 				return (string) $form;
 			}
 			
-			if ( ( !isset( Request::i()->additionalPageCheck ) or !Request::i()->isAjax() ) and $additionalPage = $package->storeAdditionalPage( $_POST ) )
+			if ( ( !isset( \IPS\Request::i()->additionalPageCheck ) or !\IPS\Request::i()->isAjax() ) and $additionalPage = $package->storeAdditionalPage( $_POST ) )
 			{
-				if ( Request::i()->isAjax() )
+				if ( \IPS\Request::i()->isAjax() )
 				{
-					Output::i()->json( array( 'dialog' => $additionalPage ) );
+					\IPS\Output::i()->json( array( 'dialog' => $additionalPage ) );
 				}
 				else
 				{
@@ -574,9 +630,9 @@ class product extends Controller
 						
 			/* Work out renewal term */
 			$renewalTerm = NULL;
-			if ( count( $renewOptions ) )
+			if ( \count( $renewOptions ) )
 			{
-				if ( count( $renewOptions ) === 1 )
+				if ( \count( $renewOptions ) === 1 )
 				{
 					$chosenRenewOption = array_pop( $renewOptions );
 				}
@@ -585,7 +641,7 @@ class product extends Controller
 					$chosenRenewOption = $renewOptions[ $values['renewal_term'] ];
 				}
 				
-				$renewalTerm = new RenewalTerm( new Money( ( new Number( number_format( $chosenRenewOption['cost'][ $memberCurrency ]['amount'], 2, '.', '' ) ) )->add( new Number( number_format( $data['renewalAdjustment'], 2, '.', '' ) ) ), $memberCurrency ), new DateInterval( 'P' . $chosenRenewOption['term'] . mb_strtoupper( $chosenRenewOption['unit'] ) ), $package->tax ? Tax::load( $package->tax ) : NULL, $chosenRenewOption['add'], $package->grace_period ? new DateInterval( 'P' . $package->grace_period . 'D' ) : NULL );
+				$renewalTerm = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( ( new \IPS\Math\Number( number_format( $chosenRenewOption['cost'][ $memberCurrency ]['amount'], 2, '.', '' ) ) )->add( new \IPS\Math\Number( number_format( $data['renewalAdjustment'], 2, '.', '' ) ) ), $memberCurrency ), new \DateInterval( 'P' . $chosenRenewOption['term'] . mb_strtoupper( $chosenRenewOption['unit'] ) ), $package->tax ? \IPS\nexus\Tax::load( $package->tax ) : NULL, $chosenRenewOption['add'], $package->grace_period ? new \DateInterval( 'P' . $package->grace_period . 'D' ) : NULL );
 			}
 			
 			/* Associations */
@@ -595,7 +651,7 @@ class product extends Controller
 				$exploded = explode( '.', $values['associate_with'] );
 				if ( $exploded[0] )
 				{
-					$parent = Purchase::load( $exploded[1] );
+					$parent = \IPS\nexus\Purchase::load( $exploded[1] );
 				}
 				else
 				{
@@ -605,20 +661,20 @@ class product extends Controller
 			
 			/* Actually add to cart */
 			$cartId = $package->addItemsToCartData( $details, $quantity, $renewalTerm, $parent, $values );
-			Db::i()->update( 'nexus_cart_uploads', array( 'item_id' => $cartId ), Db::i()->in( 'id', $editorUploadIds ) );
+			\IPS\Db::i()->update( 'nexus_cart_uploads', array( 'item_id' => $cartId ), \IPS\Db::i()->in( 'id', $editorUploadIds ) );
 
 			/* Redirect or AJAX */
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
 				/* Upselling? */
-				$upsell = Item::getItemsWithPermission( array( array( 'p_upsell=1' ), array( Db::i()->findInSet( 'p_associable', array( $package->id ) ) ) ), 'p_position' );
+				$upsell = \IPS\nexus\Package\Item::getItemsWithPermission( array( array( 'p_upsell=1' ), array( \IPS\Db::i()->findInSet( 'p_associable', array( $package->id ) ) ) ), 'p_position' );
 				
 				/* Send */
-				Output::i()->json( array( 'dialog' => Theme::i()->getTemplate('store')->cartReview( $package, $quantity, $upsell ), 'cart' => Theme::i()->getTemplate('store')->cartHeader(), 'css' => Output::i()->cssFiles ) );
+				\IPS\Output::i()->json( array( 'dialog' => \IPS\Theme::i()->getTemplate('store')->cartReview( $package, $quantity, $upsell ), 'cart' => \IPS\Theme::i()->getTemplate('store')->cartHeader(), 'css' => \IPS\Output::i()->cssFiles ) );
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=nexus&module=store&controller=cart&added=' . $package->id, 'front', 'store_cart' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=store&controller=cart&added=' . $package->id, 'front', 'store_cart' ) );	
 			}			
 		}
 		

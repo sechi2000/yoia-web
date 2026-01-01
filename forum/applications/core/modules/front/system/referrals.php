@@ -12,22 +12,9 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Http\Url\Exception;
-use IPS\Http\Url\Internal;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -36,33 +23,33 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  *
  * Deprecated controller maintained for backwards compatibility with old referral links
  */
-class referrals extends Controller
+class _referrals extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Handle Referral
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Request::i()->setCookie( 'referred_by', intval( Request::i()->id ), DateTime::create()->add( new DateInterval( 'P1Y' ) ) );
+		\IPS\Request::i()->setCookie( 'referred_by', \intval( \IPS\Request::i()->id ), \IPS\DateTime::create()->add( new \DateInterval( 'P1Y' ) ) );
 
 		try
 		{
-			$target = Request::i()->direct ? Url::createFromString( base64_decode( Request::i()->direct ) ) : Url::baseUrl();
+			$target = \IPS\Request::i()->direct ? \IPS\Http\Url::createFromString( base64_decode( \IPS\Request::i()->direct ) ) : \IPS\Http\Url::baseUrl();
 		}
-		catch( Exception $e )
+		catch( \IPS\Http\Url\Exception $e )
 		{
 			$target = NULL;
 		}
 
-		if ( $target instanceof Internal )
+		if ( $target instanceof \IPS\Http\Url\Internal )
 		{
-			Output::i()->redirect( $target );
+			\IPS\Output::i()->redirect( $target );
 		}
 		else
 		{
-			Output::i()->redirect( Settings::i()->base_url );
+			\IPS\Output::i()->redirect( \IPS\Settings::i()->base_url );
 		}
 	}
 }

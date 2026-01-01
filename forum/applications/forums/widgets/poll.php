@@ -12,48 +12,43 @@
 namespace IPS\forums\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\forums\Topic;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Item;
-use IPS\Theme;
-use IPS\Widget;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * poll Widget
  */
-class poll extends Widget
+class _poll extends \IPS\Widget
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'poll';
+	public $key = 'poll';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'forums';
+	public $app = 'forums';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
 		$form = parent::configuration( $form );
 
- 		$form->add( new Item( 'widget_poll_tid', ( $this->configuration['widget_poll_tid'] ?? NULL ), TRUE, array(
+ 		$form->add( new \IPS\Helpers\Form\Item( 'widget_poll_tid', ( isset( $this->configuration['widget_poll_tid'] ) ? $this->configuration['widget_poll_tid'] : NULL ), TRUE, array(
 		    'class'     => '\IPS\forums\Topic',
 		    'maxItems'  => 1,
 		    'where'     => array( array( '(poll_state<>0 AND poll_state IS NOT NULL)' ) )
@@ -65,7 +60,7 @@ class poll extends Widget
 				if ( $poll === NULL )
 				{
 				    /* poll_state is set to something other than 0 or NULL, but the poll doesn't exist, so let the user know. */
-				    throw new DomainException( 'poll_widget_no_poll' );
+				    throw new \DomainException( 'poll_widget_no_poll' );
 				}
 			}
 	    } ) );
@@ -79,7 +74,7 @@ class poll extends Widget
  	 * @param	array	$values	Values from form
  	 * @return	array
  	 */
- 	public function preConfig( array $values ): array
+ 	public function preConfig( $values )
  	{
 	    $item = array_pop( $values['widget_poll_tid'] );
 	    $values['widget_poll_tid'] = $item->tid;
@@ -91,7 +86,7 @@ class poll extends Widget
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		if ( empty( $this->configuration['widget_poll_tid'] ) )
 		{
@@ -100,12 +95,12 @@ class poll extends Widget
 
 		try
 		{
-			$topic = Topic::loadAndCheckPerms( $this->configuration['widget_poll_tid'] );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( $this->configuration['widget_poll_tid'] );
 			$poll  = $topic->getPoll();
 			
 			if ( $poll )
 			{
-				$poll->displayTemplate = array( Theme::i()->getTemplate( 'widgets', 'forums', 'front' ), 'pollWidget' );
+				$poll->displayTemplate = array( \IPS\Theme::i()->getTemplate( 'widgets', 'forums', 'front' ), 'pollWidget' );
 				$poll->url = $topic->url();
 	
 				return $this->output( $topic, $poll );
@@ -115,7 +110,7 @@ class poll extends Widget
 				return '';
 			}
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
 			return '';
 		}

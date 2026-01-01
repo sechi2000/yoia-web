@@ -11,53 +11,45 @@
 namespace IPS\core\modules\admin\applications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * api
  */
-class apiKeys extends Controller
+class _apiKeys extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\Api\Key';
+	protected $nodeClass = 'IPS\Api\Key';
 	
 	/**
 	 * Description can contain HTML?
 	 */
-	public bool $_descriptionHtml = TRUE;
+	public $_descriptionHtml = TRUE;
 	
 	/**
 	 * Show the "add" button in the page root rather than the table root
 	 */
-	protected bool $_addButtonInRoot = FALSE;
+	protected $_addButtonInRoot = FALSE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'api_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'api_manage' );
 		parent::execute();
 	}
 	
@@ -66,12 +58,9 @@ class apiKeys extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		if ( ( new Bridge )->core_admin_applications_apiKeys() )
-		{
-			Output::i()->output .= Theme::i()->getTemplate( 'forms', 'core' )->blurb( 'api_keys_blurb', true, true );
-			parent::manage();
-		}
+		\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'forms', 'core' )->blurb( 'api_keys_blurb', TRUE, TRUE );
+		return parent::manage();
 	}
 }

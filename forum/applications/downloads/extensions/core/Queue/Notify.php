@@ -12,37 +12,24 @@
 namespace IPS\downloads\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Content;
-use IPS\Db;
-use IPS\downloads\File;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Notification;
-use IPS\Task\Queue\OutOfRangeException;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class Notify extends QueueAbstract
+class _Notify
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		return $data;
 	}
@@ -53,33 +40,33 @@ class Notify extends QueueAbstract
 	 * @param	mixed						$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int							$offset	Offset
 	 * @return	int							New offset
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ): int
+	public function run( $data, $offset )
 	{
 		try
 		{
-			$file = File::load( $data['file'] );
+			$file = \IPS\downloads\File::load( $data['file'] );
 		}
 		catch( \OutOfRangeException $e )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		$notifyIds = array();
 
-		$recipients = iterator_to_array( Db::i()->select( 'downloads_files_notify.*', 'downloads_files_notify', array( 'notify_file_id=?', $data['file'] ), 'notify_id ASC', array( $offset, Content::NOTIFICATIONS_PER_BATCH ) ) );
+		$recipients = iterator_to_array( \IPS\Db::i()->select( 'downloads_files_notify.*', 'downloads_files_notify', array( 'notify_file_id=?', $data['file'] ), 'notify_id ASC', array( $offset, \IPS\Downloads\File::NOTIFICATIONS_PER_BATCH ) ) );
 
-		if( !count( $recipients ) )
+		if( !\count( $recipients ) )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
-		$notification = new Notification( Application::load( 'downloads' ), 'new_file_version', $file, array( $file ) );
+		$notification = new \IPS\Notification( \IPS\Application::load( 'downloads' ), 'new_file_version', $file, array( $file ) );
 
 		foreach( $recipients AS $recipient )
 		{
-			$recipientMember = Member::load( $recipient['notify_member_id'] );
+			$recipientMember = \IPS\Member::load( $recipient['notify_member_id'] );
 			if ( $file->container()->can( 'view', $recipientMember ) )
 			{
 				$notifyIds[] = $recipient['notify_id'];
@@ -87,10 +74,10 @@ class Notify extends QueueAbstract
 			}
 		}
 
-		Db::i()->update( 'downloads_files_notify', array( 'notify_sent' => time() ), Db::i()->in( 'notify_id', $notifyIds ) );
+		\IPS\Db::i()->update( 'downloads_files_notify', array( 'notify_sent' => time() ), \IPS\Db::i()->in( 'notify_id', $notifyIds ) );
 		$notification->send();
 
-		return $offset + Content::NOTIFICATIONS_PER_BATCH;
+		return $offset + \IPS\downloads\File::NOTIFICATIONS_PER_BATCH;
 	}
 	
 	/**
@@ -101,19 +88,19 @@ class Notify extends QueueAbstract
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
 	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		try
 		{
-			$file = File::load( $data['file'] );
+			$file = \IPS\downloads\File::load( $data['file'] );
 		}
 		catch( \OutOfRangeException $e )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		$complete			= $data['notifyCount'] ? round( 100 / $data['notifyCount'] * $offset, 2 ) : 100;
 
-		return array( 'text' => Member::loggedIn()->language()->addToStack('backgroundQueue_new_version', FALSE, array( 'htmlsprintf' => array( Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $file->url(), TRUE, $file->name, FALSE ) ) ) ), 'complete' => $complete );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('backgroundQueue_new_version', FALSE, array( 'htmlsprintf' => array( \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $file->url(), TRUE, $file->name, FALSE ) ) ) ), 'complete' => $complete );
 	}
 }

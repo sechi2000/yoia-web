@@ -8,10 +8,7 @@
  * @since		15 Apr 2014
  */
 
-use IPS\Application;
-use IPS\Output;
-
-define('REPORT_EXCEPTIONS', TRUE);
+\define('REPORT_EXCEPTIONS', TRUE);
 require_once str_replace( 'applications/core/interface/versions/versions.php', '', str_replace( '\\', '/', __FILE__ ) ) . 'init.php';
 
 /**
@@ -41,13 +38,13 @@ class versions
 	public function get()
 	{
 		$apps = array();
-		foreach (Application::applications() as $key => $application )
+		foreach (\IPS\Application::applications() as $key => $application )
 		{
 			$apps[$key]['human'] = $application->version;
 			$apps[$key]['long'] = $application->long_version; 
 		}
 
-		Output::i()->sendOutput( json_encode( $apps ), 200, 'application/json', array(), FALSE );
+		\IPS\Output::i()->sendOutput( json_encode( $apps ), 200, 'application/json', array(), FALSE );
 	}
 }
 

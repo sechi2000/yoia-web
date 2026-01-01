@@ -12,44 +12,30 @@
 namespace IPS\convert\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\forums\Topic\ArchivedPost;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task\Queue\OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class RebuildFirstPostIds extends QueueAbstract
+class _RebuildFirstPostIds
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data	Data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		try
 		{
-			$data['count'] = Db::i()->select( 'count(tid)', 'forums_topics' )->first();
+			$data['count'] = \IPS\Db::i()->select( 'count(tid)', 'forums_topics' )->first();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			throw new \OutOfRangeException;
 		}
@@ -70,13 +56,13 @@ class RebuildFirstPostIds extends QueueAbstract
 	 * @param	mixed						$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int							$offset	Offset
 	 * @return	int							New offset
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
-		if ( !class_exists( 'IPS\forums\Topic' ) OR !Application::appisEnabled( 'forums' ) )
+		if ( !class_exists( 'IPS\forums\Topic' ) OR !\IPS\Application::appisEnabled( 'forums' ) )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		$last = NULL;
@@ -86,14 +72,14 @@ class RebuildFirstPostIds extends QueueAbstract
 		$firstPostIds				= array();
 		$firstPostArchivedIds		= array();
 
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'forums_topics', array( "tid>?", $offset ), "tid ASC", array( 0, REBUILD_SLOW ) ), 'IPS\forums\Topic' ) AS $topic )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'forums_topics', array( "tid>?", $offset ), "tid ASC", array( 0, \IPS\REBUILD_SLOW ) ), 'IPS\forums\Topic' ) AS $topic )
 		{
-			if ( !$topic->isArchived() )
+			if ( $topic->isArchived() == FALSE )
 			{
 				try
 				{
 					/* Set first post */
-					$topic->topic_firstpost = Db::i()->select( 'pid', 'forums_posts', array( 'topic_id=?', $topic->tid ), 'post_date ASC', 1 )->first();
+					$topic->topic_firstpost = \IPS\Db::i()->select( 'pid', 'forums_posts', array( 'topic_id=?', $topic->tid ), 'post_date ASC', 1 )->first();
 					$topic->save();
 
 					/* Reset new_topic value for topic */
@@ -101,14 +87,14 @@ class RebuildFirstPostIds extends QueueAbstract
 					$firstPostIds[]		= $topic->topic_firstpost;
 				}
 				/* Underflow exception may occur if the topic doesn't have any posts for an unknown reason */
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 			else
 			{
 				try
 				{
 					/* Set first post */
-					$topic->topic_firstpost = ArchivedPost::db()->select( 'archive_id', 'forums_archive_posts', array( "archive_topic_id=?", $topic->tid ), "archive_content_date ASC", 1 )->first();
+					$topic->topic_firstpost = \IPS\forums\Topic\ArchivedPost::db()->select( 'archive_id', 'forums_archive_posts', array( "archive_topic_id=?", $topic->tid ), "archive_content_date ASC", 1 )->first();
 					$topic->save();
 
 					/* Reset new_topic value for topic */
@@ -116,7 +102,7 @@ class RebuildFirstPostIds extends QueueAbstract
 					$firstPostArchivedIds[]		= $topic->topic_firstpost;
 				}
 				/* Underflow exception may occur if the topic doesn't have any posts for an unknown reason */
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 
 			$last = $topic->tid;
@@ -124,29 +110,29 @@ class RebuildFirstPostIds extends QueueAbstract
 		}
 
 		/* Reset flags as needed */
-		if( count( $topicIdsToReset ) )
+		if( \count( $topicIdsToReset ) )
 		{
-			Db::i()->update( 'forums_posts', array( 'new_topic' => 0 ), array( 'topic_id IN(' . implode( ',', $topicIdsToReset ) . ')' ) );
+			\IPS\Db::i()->update( 'forums_posts', array( 'new_topic' => 0 ), array( 'topic_id IN(' . implode( ',', $topicIdsToReset ) . ')' ) );
 		}
 
-		if( count( $firstPostIds ) )
+		if( \count( $firstPostIds ) )
 		{
-			Db::i()->update( 'forums_posts', array( 'new_topic' => 1 ), array( 'pid IN(' . implode( ',', $firstPostIds ) . ')' ) );
+			\IPS\Db::i()->update( 'forums_posts', array( 'new_topic' => 1 ), array( 'pid IN(' . implode( ',', $firstPostIds ) . ')' ) );
 		}
 
-		if( count( $archivedTopicIdsToReset ) )
+		if( \count( $archivedTopicIdsToReset ) )
 		{
-			ArchivedPost::db()->update( 'forums_archive_posts', array( 'archive_is_first' => 0 ), array( 'archive_topic_id IN(' . implode( ',', $archivedTopicIdsToReset ) . ')' ) );
+			\IPS\forums\Topic\ArchivedPost::db()->update( 'forums_archive_posts', array( 'archive_is_first' => 0 ), array( 'archive_topic_id IN(' . implode( ',', $archivedTopicIdsToReset ) . ')' ) );
 		}
 
-		if( count( $firstPostArchivedIds ) )
+		if( \count( $firstPostArchivedIds ) )
 		{
-			ArchivedPost::db()->update( 'forums_archive_posts', array( 'archive_is_first' => 1 ), array( 'archive_id IN(' . implode( ',', $firstPostArchivedIds ) . ')' ) );
+			\IPS\forums\Topic\ArchivedPost::db()->update( 'forums_archive_posts', array( 'archive_is_first' => 1 ), array( 'archive_id IN(' . implode( ',', $firstPostArchivedIds ) . ')' ) );
 		}
 
 		if( $last === NULL )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		return $last;
@@ -159,8 +145,8 @@ class RebuildFirstPostIds extends QueueAbstract
 	 * @param	int						$offset	Offset
 	 * @return	array	Text explaining task and percentage complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' =>  Member::loggedIn()->language()->addToStack('queue_rebuilding_new_topic_flag'), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
+		return array( 'text' =>  \IPS\Member::loggedIn()->language()->addToStack('queue_rebuilding_new_topic_flag'), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
 	}
 }

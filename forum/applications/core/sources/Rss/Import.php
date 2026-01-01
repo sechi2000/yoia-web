@@ -12,75 +12,36 @@
 namespace IPS\core\Rss;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use ErrorException;
-use IPS\Application;
-use IPS\Content;
-use IPS\Content\Search\Index;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Member as FormMember;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Password;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Url as FormUrl;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Http\Url\Exception as UrlException;
-use IPS\Image;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Settings;
-use IPS\Text\DOMParser;
-use IPS\Text\Parser;
-use IPS\Theme;
-use IPS\Xml\Atom;
-use IPS\Xml\DOMDocument;
-use IPS\Xml\Rss;
-use IPS\Xml\Rss1;
-use RuntimeException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Feed Import Node
  */
-class Import extends Model
+class _Import extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_rss_import';
+	public static $databaseTable = 'core_rss_import';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'rss_import_';
+	public static $databasePrefix = 'rss_import_';
 				
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'rss_import';
+	public static $nodeTitle = 'rss_import';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -98,7 +59,7 @@ class Import extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'applications',
 		'prefix'	=> 'rss_'
@@ -110,7 +71,7 @@ class Import extends Model
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->settings = array();
 	}
@@ -120,11 +81,11 @@ class Import extends Model
 	 *
 	 * @return	string
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		if ( $this->class == 'IPS\\blog\\Entry' )
 		{
-			return Member::loggedIn()->language()->addToStack( 'blogs_blog_' . $this->node_id );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'blogs_blog_' . $this->node_id );
 		}
 
 		return $this->title;
@@ -133,9 +94,9 @@ class Import extends Model
 	/**
 	 * [Node] Get description
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	protected function get__description(): ?string
+	protected function get__description()
 	{
 		return $this->url;
 	}
@@ -146,7 +107,7 @@ class Import extends Model
 	 * @note	Return value NULL indicates the node cannot be enabled/disabled
 	 * @return	bool|null
 	 */
-	protected function get__enabled(): ?bool
+	protected function get__enabled()
 	{
 		return $this->enabled;
 	}
@@ -157,11 +118,11 @@ class Import extends Model
 	 * @param	bool|int	$enabled	Whether to set it enabled or disabled
 	 * @return	void
 	 */
-	protected function set__enabled( int|bool $enabled ) : void
+	protected function set__enabled( $enabled )
 	{
 		if ( $enabled )
 		{
-			Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'rssimport' ) );
+			\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'rssimport' ) );
 		}
 		$this->enabled = $enabled;
 	}
@@ -171,7 +132,7 @@ class Import extends Model
 	 *
 	 * @return	string
 	 */
-	protected function get__icon(): mixed
+	protected function get__icon()
 	{
 		return $this->_application->_icon;
 	}
@@ -179,9 +140,9 @@ class Import extends Model
 	/**
 	 * Get the class for this RSS entry
 	 *
-	 * @return Content
+	 * @return \IPS\Content
 	 */
-	public function get__class() : Content
+	public function get__class()
 	{
 		$class = $this->class;
 		return new $class;
@@ -190,20 +151,20 @@ class Import extends Model
 	/**
 	 * Get the application for this RSS entry
 	 *
-	 * @return Application
+	 * @return \IPS\Application
 	 */
-	public function get__application() : Application
+	public function get__application()
 	{
 		$class = $this->_class;
-		return Application::load( $class::$application );
+		return \IPS\Application::load( $class::$application );
 	}
 
 	/**
 	 * Get the URL for where this imports into
 	 *
-	 * @return Url|Null
+	 * @return \IPS\Http\Url|Null
 	 */
-	public function get__importedIntoUrl() : ?Url
+	public function get__importedIntoUrl()
 	{
 		try
 		{
@@ -220,11 +181,11 @@ class Import extends Model
 	/**
 	 * Get the extension for this RSS entry
 	 *
-	 * @return object
+	 * @return \IPS\Application
 	 */
-	public function get__extension() : object
+	public function get__extension()
 	{
-		$classname = Application::getExtensionClass( $this->_application->directory, 'RssImport', 'RssImport' );
+		$classname = 'IPS\\' . $this->_application->directory . '\extensions\core\RssImport\RssImport';
 		return new $classname;
 	}
 
@@ -234,9 +195,9 @@ class Import extends Model
 	 * @param string|array $value	Value
 	 * @return void
 	 */
-	public function set_settings( array|string $value ) : void
+	public function set_settings( $value )
 	{
-		$this->_data['settings'] = ( is_array( $value ) ? json_encode( $value ) : $value );
+		$this->_data['settings'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
 	}
 
 	/**
@@ -244,9 +205,9 @@ class Import extends Model
 	 *
 	 * @return array
 	 */
-	public function get_settings() : array
+	public function get_settings()
 	{
-		return ( is_array( $this->_data['settings'] ) ) ? $this->_data['settings'] : json_decode( $this->_data['settings'], TRUE );
+		return ( \is_array( $this->_data['settings'] ) ) ? $this->_data['settings'] : json_decode( $this->_data['settings'], TRUE );
 	}
 	
 	/**
@@ -254,25 +215,25 @@ class Import extends Model
 	 * Example code explains return value
 	 *
 	 * @code
-	 	* array(
-	 		* array(
-	 			* 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
-	 			* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	 			* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	 			* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	 		* ),
-	 		* ...							// Additional buttons
-	 	* );
+	 	array(
+	 		array(
+	 			'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
+	 			'title'	=> 'foo',		// Language key to use for button's title parameter
+	 			'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	 			'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	 		),
+	 		...							// Additional buttons
+	 	);
 	 * @endcode
-	 * @param Url $url		Base URL
+	 * @param	string	$url		Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = parent::getButtons( $url, $subnode );
 		
-		if ( Member::loggedIn()->hasAcpRestriction('rss_run') )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction('rss_run') )
 		{
 			$buttons = array_merge( array( 'run' => array(
 				'icon'	=> 'refresh',
@@ -287,31 +248,31 @@ class Import extends Model
 	/**
 	 * [Node] Edit Form (add form is a Wizard in core/modules/admin/applications/rss.php)
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$class = $this->_class;
 
 		$form->addHeader('rss_import_url');
-		$form->add( new FormUrl( 'rss_import_url', $this->url, TRUE ) );
-		$form->add( new Text( 'rss_import_auth_user', $this->auth_user ) );
-		$form->add( new Password( 'rss_import_auth_pass', $this->auth_pass ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'rss_import_url', $this->url, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'rss_import_auth_user', $this->auth_user ) );
+		$form->add( new \IPS\Helpers\Form\Password( 'rss_import_auth_pass', $this->auth_pass ) );
 		$form->addHeader('rss_import_details');
-		$form->add( new Node( 'rss_import_node_id', $this->node_id, TRUE, $this->_extension->nodeSelectorOptions( $this ) ) );
-		$form->add( new FormMember( 'rss_import_member', Member::load( $this->member ), TRUE ) );
-		$form->add( new Text( 'rss_import_showlink', $this->showlink ) );
-		$form->add( new Radio( 'rss_import_enclosures', $this->enclosures, FALSE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Node( 'rss_import_node_id', $this->node_id, TRUE, $this->_extension->nodeSelectorOptions( $this ) ) );
+		$form->add( new \IPS\Helpers\Form\Member( 'rss_import_member', \IPS\Member::load( $this->member ), TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'rss_import_showlink', $this->showlink ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'rss_import_enclosures', $this->enclosures, FALSE, array( 'options' => array(
 			'import'	=> "rss_import_enclosures_import",
 			'hotlink'	=> "rss_import_enclosures_hotlink",
 			'ignore'	=> "rss_import_enclosures_ignore",
 		) ) ) );
-		$form->add( new Text( 'rss_import_topic_pre', $this->topic_pre, FALSE, array( 'trim' => FALSE ) ) );
-		$form->add( new YesNo( 'rss_import_auto_follow', $this->auto_follow, FALSE, array(), NULL, NULL, NULL, 'rss_import_auto_follow' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'rss_import_topic_pre', $this->topic_pre, FALSE, array( 'trim' => FALSE ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'rss_import_auto_follow', $this->auto_follow, FALSE, array(), NULL, NULL, NULL, 'rss_import_auto_follow' ) );
 		$this->_extension->form( $form, $this );
 
-		Member::loggedIn()->language()->words['rss_import_auto_follow'] = Member::loggedIn()->language()->addToStack( 'rss_import_auto_follow_lang', FALSE, array( 'sprintf' => array( $class::_definiteArticle() ) ) );
+		\IPS\Member::loggedIn()->language()->words['rss_import_auto_follow'] = \IPS\Member::loggedIn()->language()->addToStack( 'rss_import_auto_follow_lang', FALSE, array( 'sprintf' => array( $class::_definiteArticle() ) ) );
 	}
 	
 	/**
@@ -320,7 +281,7 @@ class Import extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if( isset( $values['rss_import_url'] ) )
 		{
@@ -337,22 +298,26 @@ class Import extends Model
 				
 				if ( $response->httpResponseCode == 401 )
 				{
-					throw new DomainException( Member::loggedIn()->language()->addToStack( 'rss_import_auth' ) );
+					throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'rss_import_auth' ) );
 				}
 				
 				$response = $response->decodeXml();
-				if ( !( $response instanceof Rss ) and !( $response instanceof Atom ) )
+				if ( !( $response instanceof \IPS\Xml\Rss ) and !( $response instanceof \IPS\Xml\Atom ) )
 				{
-					throw new DomainException( Member::loggedIn()->language()->addToStack( 'rss_import_invalid' ) );
+					throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'rss_import_invalid' ) );
 				}
 			}
-			catch ( Exception $e )
+			catch ( \IPS\Http\Request\Exception $e )
 			{
-				throw new DomainException( Member::loggedIn()->language()->addToStack( 'form_url_bad' ) );
+				throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'form_url_bad' ) );
 			}
-			catch( RuntimeException | ErrorException $e )
+			catch( \RuntimeException $e )
 			{
-				throw new DomainException( Member::loggedIn()->language()->addToStack( 'rss_import_invalid' ) );
+				throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'rss_import_invalid' ) );
+			}
+			catch ( \ErrorException $e )
+			{
+				throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'rss_import_invalid' ) );
 			}
 
 			$values['title'] = (string) $response->channel->title;
@@ -409,7 +374,7 @@ class Import extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
 		$this->run();
 	}
@@ -418,19 +383,19 @@ class Import extends Model
 	 * Run Import
 	 *
 	 * @return	void
-	 * @throws    UrlException
+	 * @throws	\IPS\Http\Url\Exception
 	 */
-	public function run() : void
+	public function run()
 	{
 		/* Skip this if the member is restricted from posting */
-		if( Member::load( $this->member )->restrict_post or Member::load( $this->member )->members_bitoptions['unacknowledged_warnings'] )
+		if( \IPS\Member::load( $this->member )->restrict_post or \IPS\Member::load( $this->member )->members_bitoptions['unacknowledged_warnings'] )
 		{
 			return;
 		}
 
-		$previouslyImportedGuids = iterator_to_array( Db::i()->select( 'rss_imported_guid', 'core_rss_imported', array( 'rss_imported_import_id=?', $this->id ) ) );
+		$previouslyImportedGuids = iterator_to_array( \IPS\Db::i()->select( 'rss_imported_guid', 'core_rss_imported', array( 'rss_imported_import_id=?', $this->id ) ) );
 		
-		$request = Url::external( $this->url )->request();
+		$request = \IPS\Http\Url::external( $this->url )->request();
 		if ( $this->auth_user or $this->auth_pass )
 		{
 			$request = $request->login( $this->auth_user, $this->auth_pass );
@@ -440,7 +405,7 @@ class Import extends Model
 		$class = $this->_class;
 		$containerClass = $class::$containerNodeClass;
 		$container = $containerClass::load( $this->node_id );
-		$member = Member::load( $this->member );
+		$member = \IPS\Member::load( $this->member );
 
 		$i = 0;
 		/* Enclosures can cause a lot more processing time so we need to import less */
@@ -449,21 +414,21 @@ class Import extends Model
 		$inserts = array();
 		$request = $request->decodeXml();
 
-		if( !( $request instanceof Rss1 ) AND !( $request instanceof Rss ) AND !( $request instanceof Atom ) )
+		if( !( $request instanceof \IPS\Xml\Rss1 ) AND !( $request instanceof \IPS\Xml\Rss ) AND !( $request instanceof \IPS\Xml\Atom ) )
 		{
-			throw new RuntimeException( 'rss_import_invalid' );
+			throw new \RuntimeException( 'rss_import_invalid' );
 		}
 		
 		$post = NULL;
 		foreach ( $request->articles( $this->id ) as $guid => $article )
 		{
-			if ( !in_array( $guid, $previouslyImportedGuids ) )
+			if ( !\in_array( $guid, $previouslyImportedGuids ) )
 			{
 				/* Don't post future date content - this breaks things like marking as read */
-				$timeNow = DateTime::create();
+				$timeNow = \IPS\DateTime::create();
 				if( $article['date'] > $timeNow )
 				{
-					$article['date'] = DateTime::create();
+					$article['date'] = \IPS\DateTime::create();
 				}
 
 				$article['guid'] = $guid;
@@ -473,18 +438,18 @@ class Import extends Model
 				{
 					$rel = array();
 
-					if( Settings::i()->posts_add_nofollow )
+					if( \IPS\Settings::i()->posts_add_nofollow )
 					{
 						$rel['nofollow'] = 'nofollow';
 					}
 
-					if( Settings::i()->links_external )
+					if( \IPS\Settings::i()->links_external )
 					{
 						$rel['external'] = 'external';
 					}
 
 					$linkRelPart = '';
-					if ( count( $rel ) )
+					if ( \count( $rel ) )
 					{
 						$linkRelPart = 'rel="' .  implode( ' ', $rel ) . '"';
 					}
@@ -493,31 +458,31 @@ class Import extends Model
 				}
 
 				/* Parse the article body now, in case we need to add attachments to it later */
-				$articleContent = Parser::parseStatic( $article['content'] . $readMoreLink, NULL, $member, $this->_extension->fileStorage, TRUE );
+				$articleContent = \IPS\Text\Parser::parseStatic( $article['content'] . $readMoreLink, TRUE, NULL, $member, $this->_extension->fileStorage, TRUE, !(bool) $member->group['g_dohtml'] );
 
 				$imageHtml = '';
 				if ( $this->enclosures != 'ignore' and isset( $article['enclosure'] ) and isset( $article['enclosure']['url'] ) and isset( $article['enclosure']['length'] ) and isset( $article['enclosure']['type'] ) )
 				{
 					/* Limit imports to around 2mb otherwise timeouts and memory issues can occur when processing with GD */
-					if ( mb_substr( $article['enclosure']['type'], 0, 6 ) == 'image/' and ( $this->enclosures == 'hotlink' or $article['enclosure']['length'] <= 1572864 or Settings::i()->image_suite == 'imagemagick' ) )
+					if ( mb_substr( $article['enclosure']['type'], 0, 6 ) == 'image/' and ( $this->enclosures == 'hotlink' or $article['enclosure']['length'] <= 1572864 or \IPS\Settings::i()->image_suite == 'imagemagick' ) )
 					{
 						/* Are we remotely linking to the image? */
 						if( $this->enclosures == 'hotlink' and !$this->_enclosureEmbedded( $article['enclosure']['url'], $articleContent ) )
 						{
 							$imageName = basename( parse_url( $article['enclosure']['url'], PHP_URL_PATH ) );
-							$imageHtml = Theme::i()->getTemplate( 'editor', 'core', 'global' )->linkedImage( $article['enclosure']['url'], $imageName ?: 'image' );
+							$imageHtml = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->linkedImage( $article['enclosure']['url'], $imageName ?: 'image' );
 						}
 						elseif( $this->enclosures == 'import' )
 						{
 							try
 							{
-								$response = Url::external( $article['enclosure']['url'] )->request()->get();
+								$response = \IPS\Http\Url::external( $article['enclosure']['url'] )->request()->get();
 
 								$match = FALSE;
 								$contentType = ( isset( $response->httpHeaders['Content-Type'] ) ) ? $response->httpHeaders['Content-Type'] : ( ( isset( $response->httpHeaders['content-type'] ) ) ? $response->httpHeaders['content-type'] : NULL );
 								if ( $contentType )
 								{
-									foreach ( Image::$imageMimes as $mime )
+									foreach ( \IPS\Image::$imageMimes as $mime )
 									{
 										if ( preg_match( '/^' . str_replace( '~~', '.+', preg_quote( str_replace( '*', '~~', $mime ), '/' ) ) . '$/i', $contentType ) )
 										{
@@ -531,7 +496,7 @@ class Import extends Model
 								if ( $match )
 								{
 									$processAttachment = TRUE;
-									Image::$exifEnabled = FALSE;
+									\IPS\Image::$exifEnabled = FALSE;
 									if ( method_exists( $this->_extension, 'processEnclosure' ) )
 									{
 										if ( $this->_extension->processEnclosure( $this, $response, $article ) !== FALSE )
@@ -544,12 +509,12 @@ class Import extends Model
 									{
 										try
 										{
-											$image = Image::create( $response );
+											$image = \IPS\Image::create( $response );
 											$maxImageSizes = NULL;
 
-											if ( Settings::i()->attachment_resample_size )
+											if ( \IPS\Settings::i()->attachment_resample_size )
 											{
-												$maxImageSizes = explode( 'x', Settings::i()->attachment_resample_size );
+												$maxImageSizes = explode( 'x', \IPS\Settings::i()->attachment_resample_size );
 
 												/* If the dimensions were 0x0 then correct... */
 												if ( !$maxImageSizes[0] or !$maxImageSizes[1] )
@@ -562,28 +527,21 @@ class Import extends Model
 												$image->resizeToMax( $maxImageSizes[0], $maxImageSizes[1] );
 											}
 
-											$newFile = File::create( 'core_Attachment', 'rssImage-' . $guid . '.' . $image->type, (string)$image );
+											$newFile = \IPS\File::create( 'core_Attachment', 'rssImage-' . $guid . '.' . $image->type, (string)$image );
 											$attachment = $newFile->makeAttachment( md5( $guid . ':' . session_id() ), $member );
 											$article['attachment'] = $attachment;
 
 											/* If the image is already in the body of the article, replace it with our embed instead */
 											if( !$this->_enclosureReplace( $article['enclosure']['url'], $attachment, $articleContent ) )
 											{
-												$imageHtml = Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedImage(
-													$attachment['attach_location'],
-													$attachment['attach_thumb_location'] ?: $attachment['attach_location'],
-													$attachment['attach_file'],
-													$attachment['attach_id'],
-													$attachment['attach_thumb_location'] ? $attachment['attach_thumb_width'] : $attachment['attach_img_width'],
-													$attachment['attach_thumb_location'] ? $attachment['attach_thumb_height'] : $attachment['attach_img_height'],
-												);
+												$imageHtml = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedImage( $attachment['attach_location'], $attachment['attach_thumb_location'] ? $attachment['attach_thumb_location'] : $attachment['attach_location'], $attachment['attach_file'], $attachment['attach_id'], $attachment['attach_thumb_location'] ? $attachment['attach_img_width'] : $attachment['attach_location'] );
 											}
 										}
 										catch ( \Exception $e ){}
 									}
 								}
 							}
-							catch ( Exception $e )
+							catch ( \IPS\Http\Request\Exception $e )
 							{
 							}
 						}
@@ -593,31 +551,42 @@ class Import extends Model
 				$content = $imageHtml . $articleContent;
 				$item = $this->_extension->create( $this, $article, $container, $content );
 				$idColumn = $class::$databaseColumnId;
-				$followArea = mb_strtolower( mb_substr( get_class( $class ), mb_strrpos( get_class( $class ), '\\' ) + 1 ) );
+				$followArea = mb_strtolower( mb_substr( \get_class( $class ), mb_strrpos( \get_class( $class ), '\\' ) + 1 ) );
 
 				if ( $item )
 				{
-					Db::i()->insert( 'core_rss_imported', array(
+					\IPS\Db::i()->insert( 'core_rss_imported', array(
 						'rss_imported_guid' => $guid,
 						'rss_imported_content_id' => $item->$idColumn,
 						'rss_imported_import_id' => $this->id
 					), TRUE );
 
-					if ( $this->auto_follow and IPS::classUsesTrait( $item, Content\Followable::class ) )
+					if ( $this->auto_follow )
 					{
-                        $item->follow( 'immediate', true, $member );
+						\IPS\Db::i()->insert( 'core_follow', array(
+							'follow_id' => md5( $class::$application . ';' . $followArea . ';' . $item->$idColumn . ';' . $member->member_id ),
+							'follow_app' => $class::$application,
+							'follow_area' => $followArea,
+							'follow_rel_id' => $item->$idColumn,
+							'follow_member_id' => $member->member_id,
+							'follow_is_anon' => 0,
+							'follow_added' => time(),
+							'follow_notify_do' => 1,
+							'follow_notify_freq' => 'immediate',
+							'follow_visible' => 1,
+						) );
 					}
 
 					/* Re-index to pick up any changes to hidden, etc */
-					if( Content\Search\SearchContent::isSearchable( $item ) )
+					if ( $item instanceof \IPS\Content\Searchable )
 					{
-						Index::i()->index( $item );
+						\IPS\Content\Search\Index::i()->index( $item );
 					}
 				}
 				else
 				{
 					/* Something went wrong, but log the guid so it doesn't get stuck in a loop forever */
-					Db::i()->insert( 'core_rss_imported', array(
+					\IPS\Db::i()->insert( 'core_rss_imported', array(
 						'rss_imported_guid' => $guid,
 						'rss_imported_content_id' => 0,
 						'rss_imported_import_id' => $this->id
@@ -648,11 +617,11 @@ class Import extends Model
 	 * @param	string	$content	Body of article
 	 * @return	bool
 	 */
-	protected function _enclosureReplace( string $url, array $attachment, string &$content ) : bool
+	protected function _enclosureReplace( $url, $attachment, &$content )
 	{
 		/* Load source */
-		$source = new DOMDocument( '1.0', 'UTF-8' );
-		$source->loadHTML( DOMDocument::wrapHtml( $content ) );
+		$source = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
+		$source->loadHTML( \IPS\Xml\DOMDocument::wrapHtml( $content ) );
 		
 		/* Look for the image URL and replace it with the attachment if found */
 		$replaced = FALSE;
@@ -666,24 +635,26 @@ class Import extends Model
 				$replaced = true;
 				
 				$element->setAttribute( 'data-fileid', $attachment['attach_id'] );
-				$element->setAttribute( $srcAttribute, '{fileStore.core_Attachment}/' . ( $attachment['attach_thumb_location'] ?: $attachment['attach_location'] ) );
+				$element->setAttribute( $srcAttribute, '{fileStore.core_Attachment}/' . ( $attachment['attach_thumb_location'] ? $attachment['attach_thumb_location'] : $attachment['attach_location'] ) );
 			}
 		}
 
 		if( $replaced )
 		{
-			$content = DOMParser::getDocumentBodyContents( $source );
-			$content = Parser::replaceFileStoreTags( $content );
+			$content = \IPS\Text\DOMParser::getDocumentBodyContents( $source );
+			$content = \IPS\Text\Parser::replaceFileStoreTags( $content );
 
 			/* Set lazy loading and wrapping link on the content */
-			if( $rebuilt = Parser::rebuildAttachmentUrls( $content ) )
+			if( $rebuilt = \IPS\Text\Parser::rebuildAttachmentUrls( $content ) )
 			{
 				$content = $rebuilt;
 			}
 
+			$content = \IPS\Text\Parser::parseLazyLoad( $content, \IPS\Settings::i()->lazy_load_enabled );
+
 			/* And then finally, we need to reparse to make sure our replacement tags are in place */
-			$source = new DOMDocument( '1.0', 'UTF-8' );
-			$source->loadHTML( DOMDocument::wrapHtml( $content ) );
+			$source = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
+			$source->loadHTML( \IPS\Xml\DOMDocument::wrapHtml( $content ) );
 
 			$tags = array( 'a', 'img' );
 
@@ -697,7 +668,7 @@ class Import extends Model
 					{
 						if ( $element->hasAttribute( $attribute ) )
 						{				
-							if ( preg_match( '#^(https?:)?//(' . preg_quote( rtrim( str_replace( array( 'http://', 'https://' ), '', Settings::i()->base_url ), '/' ), '#' ) . ')/(.+?)$#', $element->getAttribute( $attribute ), $matches ) )
+							if ( preg_match( '#^(https?:)?//(' . preg_quote( rtrim( str_replace( array( 'http://', 'https://' ), '', \IPS\Settings::i()->base_url ), '/' ), '#' ) . ')/(.+?)$#', $element->getAttribute( $attribute ), $matches ) )
 							{
 								$element->setAttribute( $attribute, '%7B___base_url___%7D/' . $matches[3] );
 							}
@@ -707,9 +678,9 @@ class Import extends Model
 					{
 						if ( $element->hasAttribute( $attribute ) )
 						{
-							if ( mb_strpos( $element->getAttribute( $attribute ), Settings::i()->base_url ) )
+							if ( mb_strpos( $element->getAttribute( $attribute ), \IPS\Settings::i()->base_url ) )
 							{
-								$element->setAttribute( $attribute, str_replace( Settings::i()->base_url, '%7B___base_url___%7D/', $element->getAttribute( $attribute ) ) );
+								$element->setAttribute( $attribute, str_replace( \IPS\Settings::i()->base_url, '%7B___base_url___%7D/', $element->getAttribute( $attribute ) ) );
 							}
 						}
 					}
@@ -717,7 +688,7 @@ class Import extends Model
 			}
 
 
-			$content = DOMParser::getDocumentBodyContents( $source );
+			$content = \IPS\Text\DOMParser::getDocumentBodyContents( $source );
 
 			/* Replace file storage tags */
 			$content = preg_replace( '/&lt;fileStore\.([\d\w\_]+?)&gt;/i', '<fileStore.$1>', $content );
@@ -734,11 +705,11 @@ class Import extends Model
 	 * @param	string	$content	Body of article
 	 * @return	bool
 	 */
-	protected function _enclosureEmbedded( string $url, string $content ) : bool
+	protected function _enclosureEmbedded( $url, $content )
 	{
 		/* Load source */
-		$source = new DOMDocument( '1.0', 'UTF-8' );
-		$source->loadHTML( DOMDocument::wrapHtml( $content ) );
+		$source = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
+		$source->loadHTML( \IPS\Xml\DOMDocument::wrapHtml( $content ) );
 		
 		/* Look for the image URL */
 		$contentImages = $source->getElementsByTagName( 'img' );
@@ -756,12 +727,12 @@ class Import extends Model
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		Db::i()->delete( 'core_rss_imported', array( "rss_imported_import_id=?", $this->id ) );
-		parent::delete();
+		\IPS\Db::i()->delete( 'core_rss_imported', array( "rss_imported_import_id=?", $this->id ) );		
+		return parent::delete();
 	}
 
 	/**
@@ -773,7 +744,7 @@ class Import extends Model
 	 * @param	mixed		$where	Where clause
 	 * @return	array
 	 */
-	public static function search( string $column, string $query, string $order=NULL, mixed $where=array() ): array
+	public static function search( $column, $query, $order=NULL, $where=array() )
 	{	
 		if ( $column === '_title' )
 		{

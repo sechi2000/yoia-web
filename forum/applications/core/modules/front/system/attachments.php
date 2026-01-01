@@ -11,51 +11,34 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\Attachments\Table;
-use IPS\core\extensions\core\EditorMedia\Attachment;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * My Attachments Controller
  */
-class attachments extends Controller
+class _attachments extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Manage
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		/* Logged in and can upload only */
-		if ( !Member::loggedIn()->member_id or Member::loggedIn()->group['g_attach_max'] == 0 )
+		if ( !\IPS\Member::loggedIn()->member_id or \IPS\Member::loggedIn()->group['g_attach_max'] == 0 )
 		{
-			Output::i()->error( 'no_module_permission', '2C229/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C229/1', 403, '' );
 		}
 		
 		/* Build Table */
-		$table = new Table( 'core_attachments', Url::internal( 'app=core&module=system&controller=attachments', 'front', 'attachments' ), array( array( 'attach_member_id=?', Member::loggedIn()->member_id ) ) );
+		$table = new \IPS\core\Attachments\Table( 'core_attachments', \IPS\Http\Url::internal( 'app=core&module=system&controller=attachments', 'front', 'attachments' ), array( array( 'attach_member_id=?', \IPS\Member::loggedIn()->member_id ) ) );
 		$table->include = array( 'attach_id', 'attach_location', 'attach_date', 'attach_file', 'attach_filesize', 'attach_is_image', 'attach_content', 'attach_hits', 'attach_security_key' );
-		$table->rowsTemplate = array( Theme::i()->getTemplate('myAttachments'), 'rows' );
+		$table->rowsTemplate = array( \IPS\Theme::i()->getTemplate('myAttachments'), 'rows' );
 		$table->joins = array();
 		
 		/* Sort */
@@ -71,13 +54,13 @@ class attachments extends Controller
 		$self = $this;
 		$table->parsers = array( 'attach_content' => function( $val, $row ) use ( $self )
 		{
-			return Attachment::getLocations( $row['attach_id'] );
+			return \IPS\core\extensions\core\EditorMedia\Attachment::getLocations( $row['attach_id'] );
 		} );
 			
 		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('my_attachments');
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('my_attachments') );
-		Output::i()->output = Theme::i()->getTemplate('myAttachments')->template( (string) $table, Db::i()->select( 'SUM(attach_filesize)', 'core_attachments', array( 'attach_member_id=?', Member::loggedIn()->member_id ) )->first(), Db::i()->select( 'COUNT(*)', 'core_attachments', array( 'attach_member_id=?', Member::loggedIn()->member_id ) )->first() );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('my_attachments');
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack('my_attachments') );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('myAttachments')->template( (string) $table, \IPS\Db::i()->select( 'SUM(attach_filesize)', 'core_attachments', array( 'attach_member_id=?', \IPS\Member::loggedIn()->member_id ) )->first(), \IPS\Db::i()->select( 'COUNT(*)', 'core_attachments', array( 'attach_member_id=?', \IPS\Member::loggedIn()->member_id ) )->first() );
 	}
 
 	/**
@@ -85,50 +68,50 @@ class attachments extends Controller
 	 *
 	 * @return void
 	 */
-	protected function rotate() : void
+	protected function rotate()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Get attachment to make sure it's valid */
 		try
 		{
-			$attachment = Db::i()->select( '*', 'core_attachments', [ 'attach_id=? and attach_is_image=?', Request::i()->id, 1 ] )
+			$attachment = \IPS\Db::i()->select( '*', 'core_attachments', [ 'attach_id=? and attach_is_image=?', \IPS\Request::i()->id, 1 ] )
 				->join( 'core_attachments_map', 'core_attachments.attach_id=core_attachments_map.attachment_id' )
 				->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
-			Output::i()->json( array( 'error' => 'node_error' ) );
+			\IPS\Output::i()->json( array( 'error' => 'node_error' ) );
 		}
 
 		/* Check Permission */
 		$exploded = explode( '_', $attachment['location_key'] );
 		try
 		{
-			$extensions = Application::load( $exploded[0] )->extensions( 'core', 'EditorLocations' );
+			$extensions = \IPS\Application::load( $exploded[0] )->extensions( 'core', 'EditorLocations' );
 			if ( isset( $extensions[ $exploded[1] ] ) )
 			{
 				$attachmentItem = $extensions[ $exploded[1] ]->attachmentLookup( $attachment[ 'id1' ], $attachment[ 'id2' ], $attachment[ 'id3' ] );
 			}
 		}
-		catch ( OutOfRangeException | LogicException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->json( array( 'error' => 'no_permission' ) );
+			\IPS\Output::i()->json( array( 'error' => 'no_permission' ) );
 		}
 
 		/* If we have permission to edit the post, we're going to save the rotation angle */
-		if( $attachmentItem instanceof \IPS\Content and ( $attachmentItem->author()->member_id == Member::loggedIn()->member_id OR $attachmentItem->canEdit() ) )
+		if( $attachmentItem->author()->member_id == \IPS\Member::loggedIn()->member_id OR $attachmentItem->canEdit() )
 		{
 			$baseRotation = $attachment['attach_img_rotate'];
 			$temp = false;
 		}
 		else
 		{
-			$baseRotation = Request::i()->current ?? 0;
+			$baseRotation = \IPS\Request::i()->current ?? 0;
 			$temp = true;
 		}
 
-		$angle = Request::i()->direction == 'right' ? 90 : -90;
+		$angle = \IPS\Request::i()->direction == 'right' ? 90 : -90;
 		$rotation = $baseRotation + $angle;
 
 		/* Make sure we don't rotate to some stupid number */
@@ -144,21 +127,21 @@ class attachments extends Controller
 		/* Store the angle for the future */
 		if( !$temp )
 		{
-			Db::i()->update( 'core_attachments', [ 'attach_img_rotate' => $rotation ], [ 'attach_id=?', $attachment[ 'attach_id' ] ] );
+			\IPS\Db::i()->update( 'core_attachments', [ 'attach_img_rotate' => $rotation ], [ 'attach_id=?', $attachment[ 'attach_id' ] ] );
 		}
 
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( [
+			\IPS\Output::i()->json( [
 				'rotate' => $rotation,
-				'message'	=> Member::loggedIn()->language()->addToStack('gallery_image_rotated'),
-				'fileId'    => Request::i()->id,
+				'message'	=> \IPS\Member::loggedIn()->language()->addToStack('gallery_image_rotated'),
+				'fileId'    => \IPS\Request::i()->id,
 				'saved' 	=> $temp ? 0 : 1
 			] );
 		}
 		else
 		{
-			Output::i()->redirect( $attachmentItem->url() );
+			\IPS\Output::i()->redirect( $attachmentItem->url() );
 		}
 	}
 }

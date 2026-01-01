@@ -11,27 +11,21 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Http\Url as HttpUrl;
-use function defined;
-use function in_array;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - URL
  */
-class Url
+class _Url
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = TRUE;
+	public static $canBeUsedInCss = TRUE;
 	
 	/**
 	 * Run the plug-in
@@ -40,7 +34,7 @@ class Url
 	 * @param	array		$options    Array of options
 	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options ): string
+	public static function runPlugin( $data, $options )
 	{
 		$csrf = '';
 		
@@ -49,7 +43,7 @@ class Url
 			$csrf = ' . "&csrfKey=" . \IPS\Session::i()->csrfKey';
 		}
 		
-		$location = ( in_array( 'base', array_keys( $options ) ) ) ? '"' . $options['base'] . '"' : 'null';
+		$location = ( \in_array( 'base', array_keys( $options ) ) ) ? '"' . $options['base'] . '"' : 'null';
 		
 		if ( !isset( $options['seoTemplate'] ) )
 		{
@@ -66,7 +60,7 @@ class Url
 		
 		if ( !isset( $options['protocol'] ) )
 		{
-			$options['protocol'] = HttpUrl::PROTOCOL_AUTOMATIC;
+			$options['protocol'] = \IPS\Http\Url::PROTOCOL_AUTOMATIC;
 		}
 		
 		$fragment = "";
@@ -80,7 +74,7 @@ class Url
 		if ( isset( $options['ref'] ) )
 		{
 			/* Is this a variable or other dynamic thing? */
-			if ( in_array( substr( $options['ref'], 0, 1 ), array( '(', '$', '\\' ) ) )
+			if ( \in_array( \substr( $options['ref'], 0, 1 ), array( '(', '$', '\\' ) ) )
 			{
 				$ref = "->addRef(";
 				$ref .= $options['ref'];

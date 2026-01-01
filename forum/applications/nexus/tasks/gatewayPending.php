@@ -12,25 +12,16 @@
 namespace IPS\nexus\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\nexus\Gateway\Paypal;
-use IPS\nexus\Transaction;
-use IPS\Task;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * gatewayPending Task
  */
-class gatewayPending extends Task
+class _gatewayPending extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -40,13 +31,25 @@ class gatewayPending extends Task
 	 * If an error occurs which means the task could not finish running, throw an \IPS\Task\Exception - do not log an error as a normal log.
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
-	 * @return	string|null	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @return	mixed	Message to log or NULL
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : string|null
+	public function execute()
 	{
-		$transactions = Db::i()->select( '*', 'nexus_transactions', array( 't_status=?', Transaction::STATUS_GATEWAY_PENDING ), 't_id ASC', 20 ); // We deliberately don't run until exhaustion here because we want to wait and try again later if it fails
-		if ( !count( $transactions ) )
+		$paypalGateways = [];
+		foreach( \IPS\nexus\Gateway::roots( null ) as $gateway )
+		{
+			if( $gateway instanceof \IPS\nexus\Gateway\PayPal )
+			{
+				$paypalGateways[] = $gateway->_id;
+			}
+		}
+
+		$transactions = \IPS\Db::i()->select( '*', 'nexus_transactions', array(
+			array( 't_status=?', \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING ),
+			array( \IPS\Db::i()->in( 't_method', $paypalGateways ) )
+			), 't_id ASC', 20 ); // We deliberately don't run until exhaustion here because we want to wait and try again later if it fails
+		if ( !\count( $transactions ) )
 		{
 			$this->enabled = FALSE;
 			$this->save();
@@ -56,21 +59,20 @@ class gatewayPending extends Task
 			foreach ( $transactions as $transaction )
 			{
 				/* Get it */
-				$transaction = Transaction::constructFromData( $transaction );
+				$transaction = \IPS\nexus\Transaction::constructFromData( $transaction );
 
-				/* @var Transaction $transaction */
-				if ( $transaction->method instanceof Paypal )
+				if ( $transaction->method instanceof \IPS\nexus\Gateway\Paypal )
 				{
 					/* Try to capture it */
 					try
 					{
 						$transaction->capture();
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
 						if ( $e->getMessage() === 'FAIL' or $e->getMessage() === 'RFND' or $transaction->date->getTimestamp() < ( time() - ( 86400 * 5 ) ) )
 						{
-							$status = $e->getMessage() === 'RFND' ? Transaction::STATUS_REFUNDED : Transaction::STATUS_REFUSED;
+							$status = $e->getMessage() === 'RFND' ? \IPS\nexus\Transaction::STATUS_REFUNDED : \IPS\nexus\Transaction::STATUS_REFUSED;
 
 							$transaction->status = $status;
 							$transaction->save();
@@ -80,7 +82,7 @@ class gatewayPending extends Task
 								'id'		=> $transaction->id
 							), FALSE );
 
-							if ( $status === Transaction::STATUS_REFUNDED )
+							if ( $status === \IPS\nexus\Transaction::STATUS_REFUNDED )
 							{
 								$transaction->sendNotification();
 							}
@@ -92,9 +94,9 @@ class gatewayPending extends Task
 					$fraudResult = $transaction->fraud_blocked ? $transaction->fraud_blocked->action : NULL;
 					if ( $fraudResult )
 					{
-						$transaction->executeFraudAction( $fraudResult );
+						$transaction->executeFraudAction( $fraudResult, TRUE );
 					}
-					if ( !$fraudResult or $fraudResult === Transaction::STATUS_PAID )
+					if ( !$fraudResult or $fraudResult === \IPS\nexus\Transaction::STATUS_PAID )
 					{
 						$transaction->approve();
 					}
@@ -104,8 +106,6 @@ class gatewayPending extends Task
 				}
 			}
 		}
-
-		return null;
 	}
 
 	/**
@@ -117,7 +117,7 @@ class gatewayPending extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 
 	}

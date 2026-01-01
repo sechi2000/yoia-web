@@ -12,33 +12,28 @@
 namespace IPS\nexus\setup\upg_107661;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.7.9 Beta 2 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Step 1 - Check PayPal payout settings
 	 *
 	 * @return	bool|array 	If returns TRUE, upgrader will proceed to next step. If it returns any other value, it will set this as the value of the 'extra' GET parameter and rerun this step (useful for loops)
 	 */
-	public function step1() : bool|array
+	public function step1()
 	{
-		$settings = json_decode( Settings::i()->nexus_payout, TRUE );
+		$settings = json_decode( \IPS\Settings::i()->nexus_payout, TRUE );
 		if( isset( $settings['PayPal'] ) AND isset( $settings['PayPal']['api_signature'] ) AND !isset( $settings['PayPal']['client_id'] ) )
 		{
-			AdminNotification::send( 'nexus', 'ConfigurationError', "poPayPal", FALSE );
+			\IPS\core\AdminNotification::send( 'nexus', 'ConfigurationError', "poPayPal", FALSE );
 		}
 
 		return TRUE;

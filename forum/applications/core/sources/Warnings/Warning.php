@@ -11,131 +11,85 @@
 namespace IPS\core\Warnings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Api\Webhook;
-use IPS\Application;
-use IPS\Content;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\core\DataLayer;
-use IPS\core\Messenger\Conversation;
-use IPS\core\Messenger\Message;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Email;
-use IPS\File;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Date;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Select;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Notification;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function intval;
-use function is_numeric;
-use const IPS\NOTIFICATION_BACKGROUND_THRESHOLD;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Warning Model
  */
-class Warning extends Item
+class _Warning extends \IPS\Content\Item
 {
 	/* !\IPS\Patterns\ActiveRecord */
-	protected static array|bool $_bypassDataLayerEvents = true;
 	
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_members_warn_logs';
+	public static $databaseTable = 'core_members_warn_logs';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'wl_';
+	public static $databasePrefix = 'wl_';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'warning';
+	public static $title = 'warning';
 
 	/**
-	 * @return DateInterval|null
+	 * @return \DateInterval|null
 	 */
-	public function get_mq_interval() : ?DateInterval
+	public function get_mq_interval()
 	{
 		if( $this->mq != -1 )
 		{
 			try
 			{
-				return new DateInterval( $this->mq );
+				return new \DateInterval( $this->mq );
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 		}
 
 		return null;
 	}
 
 	/**
-	 * @return DateInterval|null
+	 * @return \DateInterval|null
 	 */
-	public function get_rpa_interval() : ?DateInterval
+	public function get_rpa_interval()
 	{
 		if( $this->rpa != -1 )
 		{
 			try
 			{
-				return new DateInterval( $this->rpa );
+				return new \DateInterval( $this->rpa );
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 		}
 
 		return null;
 	}
 
 	/**
-	 * @return DateInterval|null
+	 * @return \DateInterval|null
 	 */
-	public function get_suspend_interval() : ?DateInterval
+	public function get_suspend_interval()
 	{
 		if( $this->suspend != -1 )
 		{
 			try
 			{
-				return new DateInterval( $this->suspend );
+				return new \DateInterval( $this->suspend );
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 		}
 
 		return null;
@@ -144,10 +98,10 @@ class Warning extends Item
 	/**
 	 * Should posting this increment the poster's post count?
 	 *
-	 * @param	Model|NULL	$container	Container
-	 * @return	bool
+	 * @param	\IPS\Node\Model|NULL	$container	Container
+	 * @return	void
 	 */
-	public static function incrementPostCount( ?Model $container = NULL ): bool
+	public static function incrementPostCount( \IPS\Node\Model $container = NULL )
 	{
 		return FALSE;
 	}
@@ -155,12 +109,12 @@ class Warning extends Item
 	/**
 	 * Load record based on a URL
 	 *
-	 * @param	Url	$url	URL to load from
+	 * @param	\IPS\Http\Url	$url	URL to load from
 	 * @return	static
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadFromUrl( Url $url ): static
+	public static function loadFromUrl( \IPS\Http\Url $url )
 	{
 		return static::load( $url->hiddenQueryString['w'] );
 	}
@@ -170,9 +124,9 @@ class Warning extends Item
 	 *
 	 * @return	void
 	 */
-	public function undo() : void
+	public function undo()
 	{
-		$member = Member::load( $this->member );
+		$member = \IPS\Member::load( $this->member );
 		
 		/* Take off the points */
 		if ( ( !$this->expire_date or $this->expire_date == -1 ) or $this->expire_date > time() )
@@ -192,11 +146,11 @@ class Warning extends Item
 			{
 				try
 				{
-					$latest = Db::i()->select( '*', 'core_members_warn_logs', array( "wl_member=? AND wl_{$w}<>0 AND wl_id !=?", $member->member_id, $this->id ), 'wl_date DESC' )->first();
+					$latest = \IPS\Db::i()->select( '*', 'core_members_warn_logs', array( "wl_member=? AND wl_{$w}<>0 AND wl_id !=?", $member->member_id, $this->id ), 'wl_date DESC' )->first();
 					$member->$m = $latest[ 'wl_' . $w ];
 					$consequences[ $m ] = $latest['wl_id'];
 				}
-				catch ( UnderflowException $e )
+				catch ( \UnderflowException $e )
 				{
 					$member->$m = 0;
 					$consequences[ $m ] = 0;
@@ -220,16 +174,16 @@ class Warning extends Item
 	/**
 	 * Delete warning
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{		
 		/* Unaknowledged Warnings? */
-		$member = Member::load( $this->member );
+		$member = \IPS\Member::load( $this->member );
 		
-		if ( Settings::i()->warnings_acknowledge )
+		if ( \IPS\Settings::i()->warnings_acknowledge )
 		{
-			$count = Db::i()->select( 'COUNT(*)', 'core_members_warn_logs', array( "wl_member=? AND wl_id<>? AND wl_acknowledged=0", $member->member_id, $this->id ) )->first();
+			$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_members_warn_logs', array( "wl_member=? AND wl_id<>? AND wl_acknowledged=0", $member->member_id, $this->id ) )->first();
 			$member->members_bitoptions['unacknowledged_warnings'] = (bool) $count;
 		}
 		else
@@ -247,18 +201,18 @@ class Warning extends Item
 	 *
 	 * @return	void
 	 */
-	protected function unclaimAttachments(): void
+	protected function unclaimAttachments()
 	{
-		File::unclaimAttachments( 'core_Modcp', $this->id, NULL, 'member' );
-		File::unclaimAttachments( 'core_Modcp', $this->id, NULL, 'mod' );
+		\IPS\File::unclaimAttachments( 'core_Modcp', $this->id, NULL, 'member' );
+		\IPS\File::unclaimAttachments( 'core_Modcp', $this->id, NULL, 'mod' );
 	}
 	
 	/**
 	 * Get Content for Warning
 	 *
-	 * @return	Content|NULL
+	 * @return	\IPS\Content|NULL
 	 */
-	public function contentObject(): ?Content
+	public function content()
 	{		
 		if ( $this->content_app and $this->content_module )
 		{
@@ -268,14 +222,14 @@ class Warning extends Item
 				{
 					if ( $this->content_id2 )
 					{
-						return Message::load( $this->content_id2 );
+						return \IPS\core\Messenger\Message::load( $this->content_id2 );
 					}
 					else
 					{
-						return Conversation::load( $this->content_id2 );
+						return \IPS\core\Messenger\Conversation::load( $this->content_id2 );
 					}
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					return NULL;
 				}
@@ -284,7 +238,7 @@ class Warning extends Item
 			{
 				try
 				{
-					$extensions = Application::load( $this->content_app )->extensions( 'core', 'ContentRouter' );
+					$extensions = \IPS\Application::load( $this->content_app )->extensions( 'core', 'ContentRouter' );
 					foreach ( $extensions as $ext )
 					{
 						foreach ( $ext->classes as $class )
@@ -295,7 +249,7 @@ class Warning extends Item
 								{
 									return $class::load( $this->content_id1 );
 								}
-								catch ( OutOfRangeException $e )
+								catch ( \OutOfRangeException $e )
 								{
 									return NULL;
 								}
@@ -306,7 +260,7 @@ class Warning extends Item
 								{
 									return $commentClass::load( $this->content_id2 );
 								}
-								catch ( OutOfRangeException $e )
+								catch ( \OutOfRangeException $e )
 								{
 									return NULL;
 								}
@@ -317,7 +271,7 @@ class Warning extends Item
 								{
 									return $reviewClass::load( $this->content_id2 );
 								}
-								catch ( OutOfRangeException $e )
+								catch ( \OutOfRangeException $e )
 								{
 									return NULL;
 								}
@@ -325,7 +279,7 @@ class Warning extends Item
 						}
 					}
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					return NULL;
 				}
@@ -340,12 +294,12 @@ class Warning extends Item
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'core';
+	public static $application = 'core';
 		
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'date'		=> 'date',
 		'author'	=> 'moderator',
 	);
@@ -353,30 +307,29 @@ class Warning extends Item
 	/**
 	 * @brief	Language prefix for forms
 	 */
-	public static string $formLangPrefix = 'warn_';
+	public static $formLangPrefix = 'warn_';
 	
 	/**
 	 * Get elements for add/edit form
 	 *
-	 * @param Item|null $item		The current item if editing or NULL if creating
-	 * @param	Model|null						$container	Container (e.g. forum) ID, if appropriate
+	 * @param	\IPS\Content\Item|NULL	$item		The current item if editing or NULL if creating
+	 * @param	int						$container	Container (e.g. forum) ID, if appropriate
 	 * @return	array
 	 */
-	public static function formElements( ?Item $item=NULL, ?Model $container=NULL ): array
+	public static function formElements( $item=NULL, \IPS\Node\Model $container=NULL )
 	{
 		/* Get the reasons */
 		$reasons = array();
-        $roots = Reason::roots();
+        $roots = \IPS\core\Warnings\Reason::roots();
 		foreach ( $roots as $reason )
 		{
 			$reasons[ $reason->_id ] = $reason->_title;
 		}
-		if ( Member::loggedIn()->modPermission('warnings_enable_other') )
+		if ( \IPS\Member::loggedIn()->modPermission('warnings_enable_other') )
 		{
 			$reasons['other'] = 'core_warn_reason_other';
 		}
-
-		$first = null;
+		
 		foreach( $roots AS $root )
 		{
 			$first = $root;
@@ -384,66 +337,66 @@ class Warning extends Item
 		}
 
 		/* Build the form */
-		$elements[] = new Select( 'warn_reason', NULL, !empty( $reasons ), array( 'options' => $reasons ) );
-		$elements[] = new Number( 'warn_points', 0, FALSE, array( 'valueToggles' => array( 'warn_remove' ), 'disabled' => ( $first and !$first->points_override ) ) );
-		$elements[] = new Date( 'warn_remove', -1, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'never' ), NULL, NULL, NULL, 'warn_remove' );
-		$elements[] = new Number( 'warn_cheeve_point_reduction', $first?->cheev_point_reduction, FALSE, array( 'disabled' => ( !$first?->cheev_override ) ) );
-		$elements[] = new Editor( 'warn_member_note', NULL, FALSE, array( 'app' => 'core', 'key' => 'Modcp', 'autoSaveKey' => "warn-member-" . Request::i()->id, 'attachIds' => ( $item === NULL ? NULL : array( $item->id, NULL, 'member' ) ), 'minimize' => 'warn_member_note_placeholder' ) );
-		$elements[] = new Editor( 'warn_mod_note', NULL, FALSE, array( 'app' => 'core', 'key' => 'Modcp', 'autoSaveKey' => "warn-mod-" . Request::i()->id, 'attachIds' => ( $item === NULL ? NULL : array( $item->id, NULL, 'mod' ) ), 'minimize' => 'warn_mod_note_placeholder' ) );
-		$elements[] = new CheckboxSet( 'warn_punishment', array(), FALSE, array(
+		$elements[] = new \IPS\Helpers\Form\Select( 'warn_reason', NULL, TRUE, array( 'options' => $reasons ) );
+		$elements[] = new \IPS\Helpers\Form\Number( 'warn_points', 0, FALSE, array( 'valueToggles' => array( 'warn_remove' ), 'disabled' => ( !$first->points_override ) ) );
+		$elements[] = new \IPS\Helpers\Form\Date( 'warn_remove', -1, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'never' ), NULL, NULL, NULL, 'warn_remove' );
+		$elements[] = new \IPS\Helpers\Form\Number( 'warn_cheeve_point_reduction', $first->cheev_point_reduction, FALSE, array( 'disabled' => ( !$first->cheev_override ) ) );
+		$elements[] = new \IPS\Helpers\Form\Editor( 'warn_member_note', NULL, FALSE, array( 'app' => 'core', 'key' => 'Modcp', 'autoSaveKey' => "warn-member-" . \IPS\Request::i()->id, 'attachIds' => ( $item === NULL ? NULL : array( $item->id, NULL, 'member' ) ), 'minimize' => 'warn_member_note_placeholder' ) );
+		$elements[] = new \IPS\Helpers\Form\Editor( 'warn_mod_note', NULL, FALSE, array( 'app' => 'core', 'key' => 'Modcp', 'autoSaveKey' => "warn-mod-" . \IPS\Request::i()->id, 'attachIds' => ( $item === NULL ? NULL : array( $item->id, NULL, 'mod' ) ), 'minimize' => 'warn_mod_note_placeholder' ) );
+		$elements[] = new \IPS\Helpers\Form\CheckboxSet( 'warn_punishment', array(), FALSE, array(
 			'options' 	=> array( 'mq' => 'warn_mq', 'rpa' => 'warn_rpa', 'suspend' => 'warn_suspend' ),
-			'toggles'	=> array( 'mq' => array( 'warn_mq' ), 'rpa' => array( 'warn_rpa' ), 'suspend' => array( 'warn_suspend' ) ),
+			'toggles'	=> array( 'mq' => array( 'form_warn_mq' ), 'rpa' => array( 'form_warn_rpa' ), 'suspend' => array( 'form_warn_suspend' ) ),
 		) );
-		$elements[] = new Date( 'warn_mq', -1, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'indefinitely' ), function( $val )
+		$elements[] = new \IPS\Helpers\Form\Date( 'warn_mq', -1, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'indefinitely' ), function( $val )
 			{
 				if( $val )
 				{
-					$now = new DateTime;
+					$now = new \IPS\DateTime;
 	
 					if( $val !== -1 and $val->getTimestamp() < $now->getTimestamp() )
 					{
-						throw new DomainException( 'error_date_not_future' );
+						throw new \DomainException( 'error_date_not_future' );
 					}
 				}
 				
-			}, Member::loggedIn()->language()->addToStack('until'), NULL, 'warn_mq' );
+			}, \IPS\Member::loggedIn()->language()->addToStack('until'), NULL, NULL, 'warn_mq' );
 		
-		$elements[] = new Date( 'warn_rpa', -1, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'indefinitely' ), function( $val )
+		$elements[] = new \IPS\Helpers\Form\Date( 'warn_rpa', -1, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'indefinitely' ), function( $val )
 			{
 				if( $val )
 				{
-					$now = new DateTime;
+					$now = new \IPS\DateTime;
 					
 					if( $val !== -1 and $val->getTimestamp() < $now->getTimestamp() )
 					{
-						throw new DomainException( 'error_date_not_future' );
+						throw new \DomainException( 'error_date_not_future' );
 					}
 				}
 				
-			}, Member::loggedIn()->language()->addToStack('until'), NULL, 'warn_rpa' );
+			}, \IPS\Member::loggedIn()->language()->addToStack('until'), NULL, NULL, 'warn_rpa' );
 		
-		$elements[] = new Date( 'warn_suspend', -1, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'indefinitely' ), function( $val )
+		$elements[] = new \IPS\Helpers\Form\Date( 'warn_suspend', -1, FALSE, array( 'time' => TRUE, 'unlimited' => -1, 'unlimitedLang' => 'indefinitely' ), function( $val )
 			{
 				if( $val )
 				{
-					$now = new DateTime;
+					$now = new \IPS\DateTime;
 					
 					if( $val !== -1 and $val->getTimestamp() < $now->getTimestamp() )
 					{
-						throw new DomainException( 'error_date_not_future' );
+						throw new \DomainException( 'error_date_not_future' );
 					}
 				}
 				
-			}, Member::loggedIn()->language()->addToStack('until'), NULL, 'warn_suspend' );
+			}, \IPS\Member::loggedIn()->language()->addToStack('until'), NULL, NULL, 'warn_suspend' );
 
-		$member = Member::load( Request::i()->id );
+		$member = \IPS\Member::load( \IPS\Request::i()->id );
 
 		if( $member->temp_ban OR $member->mod_posts OR $member->restrict_post )
 		{
-			$elements[] = Member::loggedIn()->language()->addToStack('member_existing_penalties', TRUE, array( 'sprintf' => $member->name ) );
+			$elements[] = \IPS\Member::loggedIn()->language()->addToStack('member_existing_penalties', TRUE, array( 'sprintf' => $member->name ) );
 		}
 
-		Member::loggedIn()->language()->words['warn_cheeve_point_reduction_desc'] = Member::loggedIn()->language()->addToStack( 'warn_cheeve_point_reduction__desc', FALSE, [ 'sprintf' => [ $member->name, $member->achievements_points, $member->name ] ] );
+		\IPS\Member::loggedIn()->language()->words['warn_cheeve_point_reduction_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'warn_cheeve_point_reduction__desc', FALSE, [ 'sprintf' => [ $member->name, $member->achievements_points, $member->name ] ] );
 		
 		/* Return */
 		return $elements;
@@ -452,20 +405,20 @@ class Warning extends Item
 	/**
 	 * Process created object BEFORE the object has been created
 	 *
-	 * @param array $values	Values from form
+	 * @param	array				$values	Values from form
 	 * @return	void
 	 */
-	protected function processBeforeCreate( array $values ): void
+	protected function processBeforeCreate( $values )
 	{		
-		$this->member = Request::i()->member;
+		$this->member = \IPS\Request::i()->member;
 
 		/* Permission Check */
-		if ( !Member::loggedIn()->canWarn( Member::load( $this->member ) ) )
+		if ( !\IPS\Member::loggedIn()->canWarn( \IPS\Member::load( $this->member ) ) )
 		{
-			Output::i()->error( 'no_module_permission', '2C150/3', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C150/3', 403, '' );
 		}
 
-		$values = $this->processWarning($values, Member::loggedIn());
+		$values = $this->processWarning( $values, \IPS\Member::loggedIn() );
 
 		parent::processBeforeCreate( $values );
 	}
@@ -473,16 +426,16 @@ class Warning extends Item
 	/**
 	 * Process created object AFTER the object has been created
 	 *
-	 * @param	Comment|NULL	$comment	The first comment
+	 * @param	\IPS\Content\Comment|NULL	$comment	The first comment
 	 * @param	array						$values		Values from form
 	 * @return	void
 	 */
-	protected function processAfterCreate( ?Comment $comment, array $values ): void
+	protected function processAfterCreate( $comment, $values )
 	{
-		File::claimAttachments( "warn-member-{$this->member}", $this->id, NULL, 'member' );
-		File::claimAttachments( "warn-mod-{$this->member}", $this->id, NULL, 'mod' );
+		\IPS\File::claimAttachments( "warn-member-{$this->member}", $this->id, NULL, 'member' );
+		\IPS\File::claimAttachments( "warn-mod-{$this->member}", $this->id, NULL, 'mod' );
 		
-		$member = Member::load( $this->member );
+		$member = \IPS\Member::load( $this->member );
 		if ( $this->points )
 		{
 			$member->warn_level += $this->points;
@@ -495,7 +448,7 @@ class Warning extends Item
 				$consequences[ $v ] = $this->$k;
 				if ( $this->$k != -1 )
 				{
-					$member->$v = DateTime::create()->add( new DateInterval( $this->$k ) )->getTimestamp();
+					$member->$v = \IPS\DateTime::create()->add( new \DateInterval( $this->$k ) )->getTimestamp();
 				}
 				else
 				{
@@ -524,70 +477,34 @@ class Warning extends Item
 			$consequences['cheev_point_reduction'] = $this->cheev_point_reduction;
 		}
 
-		$member->members_bitoptions['unacknowledged_warnings'] = (bool) Settings::i()->warnings_acknowledge;
+		$member->members_bitoptions['unacknowledged_warnings'] = (bool) \IPS\Settings::i()->warnings_acknowledge;
 		$member->save();
 		$member->logHistory( 'core', 'warning', array( 'wid' => $this->id, 'points' => $this->points, 'reason' => $this->reason, 'consequences' => $consequences ) );
 
-		/* Data Layer */
-		if ( DataLayer::enabled( 'analytics_full' ) )
-		{
-			DataLayer::i()->addEvent( 'warning_created', $this->getDataLayerProperties() );
-		}
-
 		/* Moderator log */
-		Session::i()->modLog( 'modlog__action_warn_user', array( $member->name => FALSE ) );
+		\IPS\Session::i()->modLog( 'modlog__action_warn_user', array( $member->name => FALSE ) );
 
 		/* Webhook */
-		Webhook::fire( 'member_warned', $this );
+		\IPS\Api\Webhook::fire( 'member_warned', $this );
 		parent::processAfterCreate( $comment, $values );
-	}
-
-	/**
-	 * @param Comment|null $comment
-	 * @param array $createOrEditValues
-	 * @param bool $clearCache=false
-	 * @return array
-	 */
-	public function getDataLayerProperties( ?Comment $comment = null, array $createOrEditValues = [], bool $clearCache=false ): array
-	{
-		if ( $comment !== null )
-		{
-			return parent::getDataLayerProperties( $comment, $createOrEditValues, $clearCache );
-		}
-
-		static $properties = null;
-		if ( $clearCache or $properties === null )
-		{
-			$lang = Lang::load( Lang::defaultLanguage() );
-			$reasonString = $lang->addToStack( ( $this->reason and $lang->checkKeyExists( Reason::$titleLangPrefix . $this->reason ) ) ? ( Reason::$titleLangPrefix . $this->reason ) : 'core_warn_reason_other' );
-			$lang->parseOutputForDisplay( $reasonString );
-			$properties = DataLayer::i()->filterProperties([
-				'warn_reason'    => $reasonString,
-				'warn_reason_id' => $this->reason,
-				'warn_points'    => $this->points,
-				'warn_member_id' => DataLayer::i()->getSsoId( $this->member ),
-				'warn_mod_id'    => DataLayer::i()->getSsoId( $this->moderator ),
-            ]);
-		}
-		return $properties;
 	}
 
 	/**
 	 * Process the warning values
 	 *
-	 * @param array $values	Values from form submission
-	 * @param Member $member	Moderator to process warning under
-	 * @param bool $reset	Reset points based on reason
+	 * @param	array 		$values	Values from form submission
+	 * @param	\IPS\Member	$member	Moderator to process warning under
+	 * @param	bool		$reset	Reset points based on reason
 	 * @return	array
 	 */
-	public function processWarning (array $values, Member $member, bool $reset=FALSE ): array
+	public function processWarning( $values, $member, $reset=FALSE )
 	{
 		/* Work out points and expiry date */
 		$this->expire_date = NULL;
 		$this->points = $values['warn_points'];
-		if ( is_numeric( $values['warn_reason'] ) )
+		if ( \is_numeric( $values['warn_reason'] ) )
 		{
-			$reason = Reason::load( $values['warn_reason'] );
+			$reason = \IPS\core\Warnings\Reason::load( $values['warn_reason'] );
 			if ( !$reason->points_override OR ( !$this->points AND $reset ) )
 			{
 				$this->points = $reason->points;
@@ -602,14 +519,14 @@ class Warning extends Item
 				{
 					if ( $reason->remove and $reason->remove != -1 )
 					{
-						$expire = DateTime::create();
+						$expire = \IPS\DateTime::create();
 						if ( $reason->remove_unit == 'h' )
 						{
-							$expire->add( new DateInterval( "PT{$reason->remove}H" ) );
+							$expire->add( new \DateInterval( "PT{$reason->remove}H" ) );
 						}
 						else
 						{
-							$expire->add( new DateInterval( "P{$reason->remove}D" ) );
+							$expire->add( new \DateInterval( "P{$reason->remove}D" ) );
 						}
 						$this->expire_date = $expire->getTimestamp();
 					}
@@ -621,7 +538,7 @@ class Warning extends Item
 			}
 			else
 			{
-				if ( $values['warn_remove'] instanceof DateTime )
+				if ( $values['warn_remove'] instanceof \IPS\DateTime )
 				{
 					$this->expire_date = $values['warn_remove']->getTimestamp();
 				}
@@ -646,7 +563,7 @@ class Warning extends Item
 		{
 			$this->reason = 0;
 			
-			if ( $values['warn_remove'] instanceof DateTime )
+			if ( $values['warn_remove'] instanceof \IPS\DateTime )
 			{
 				$this->expire_date = $values['warn_remove']->getTimestamp();
 			}
@@ -663,12 +580,12 @@ class Warning extends Item
 		/* If we can't override the action, change it back */
 		try
 		{
-			$action = Db::i()->select( '*', 'core_members_warn_actions', array( 'wa_points<=?', ( Member::load( $this->member )->warn_level + $this->points ) ), 'wa_points DESC', 1 )->first();
+			$action = \IPS\Db::i()->select( '*', 'core_members_warn_actions', array( 'wa_points<=?', ( \IPS\Member::load( $this->member )->warn_level + $this->points ) ), 'wa_points DESC', 1 )->first();
 			if ( !$action['wa_override'] )
 			{
 				foreach ( array( 'mq', 'rpa', 'suspend' ) as $k )
 				{
-					if( !in_array( $k, $values['warn_punishment'] ) )
+					if( !\in_array( $k, $values['warn_punishment'] ) )
 					{
 						$values['warn_punishment'][] = $k;
 					}
@@ -679,7 +596,7 @@ class Warning extends Item
 					}
 					elseif ( $action[ 'wa_' . $k ] )
 					{
-						$values[ 'warn_' . $k ] = DateTime::create()->add( new DateInterval( $action[ 'wa_' . $k . '_unit' ] == 'h' ? "PT{$action[ 'wa_' . $k ]}H" : "P{$action[ 'wa_' . $k ]}D" ) );
+						$values[ 'warn_' . $k ] = \IPS\DateTime::create()->add( new \DateInterval( $action[ 'wa_' . $k . '_unit' ] == 'h' ? "PT{$action[ 'wa_' . $k ]}H" : "P{$action[ 'wa_' . $k ]}D" ) );
 					}
 					else
 					{
@@ -688,7 +605,7 @@ class Warning extends Item
 				}
 			}
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			if ( !$member->modPermission('warning_custom_noaction') )
 			{
@@ -704,7 +621,7 @@ class Warning extends Item
 		{
 			if ( $values['warn_' . $p ] === NULL )
 			{
-				Output::i()->error( 'no_warning_action_time', '1C150/2', 403, '' );
+				\IPS\Output::i()->error( 'no_warning_action_time', '1C150/2', 403, '' );
 			}
 		}
 		
@@ -713,15 +630,15 @@ class Warning extends Item
 		$this->note_mods = $values['warn_mod_note'];
 		
 		/* Set acknowledged */
-		$this->acknowledged = !Settings::i()->warnings_acknowledge;
+		$this->acknowledged = !\IPS\Settings::i()->warnings_acknowledge;
 		
 		/* Construct referrer */
-		$ref = Request::i()->ref ? json_decode( base64_decode( Request::i()->ref ), TRUE ) : NULL;
-		$this->content_app	= $ref['app'] ?? NULL;
-		$this->content_module	= $ref['module'] ?? NULL;
-		$this->content_id1	= $ref['id_1'] ?? NULL;
-		$this->content_id2	= $ref['id_2'] ?? NULL;
-		if ( $content = $this->contentObject() and !$content->canView() )
+		$ref = \IPS\Request::i()->ref ? json_decode( base64_decode( \IPS\Request::i()->ref ), TRUE ) : NULL;
+		$this->content_app	= isset( $ref['app'] ) ? $ref['app'] : NULL;
+		$this->content_module	= isset( $ref['module'] ) ? $ref['module'] : NULL;
+		$this->content_id1	= isset( $ref['id_1'] ) ? $ref['id_1'] : NULL;
+		$this->content_id2	= isset( $ref['id_2'] ) ? $ref['id_2'] : NULL;
+		if ( $content = $this->content() and !$content->canView() )
 		{
 			$this->content_app = NULL;
 			$this->content_module = NULL;
@@ -730,19 +647,19 @@ class Warning extends Item
 		}
 		
 		/* Work out the timeframes for the penalties */
-		if ( count( $values['warn_punishment'] ) )
+		if ( \count( $values['warn_punishment'] ) )
 		{
 			foreach ( array( 'mq', 'rpa', 'suspend' ) as $f )
 			{
-				if ( !in_array( $f, $values['warn_punishment'] ) OR $values['warn_' . $f ] === 0 )
+				if ( !\in_array( $f, $values['warn_punishment'] ) OR $values['warn_' . $f ] === 0 )
 				{
 					continue;
 				}
 				
-				if ( $values[ 'warn_' . $f ] instanceof DateTime )
+				if ( $values[ 'warn_' . $f ] instanceof \IPS\DateTime )
 				{
-					$difference = DateTime::create()->setTimezone( $values[ 'warn_' . $f ]->getTimezone() )->diff( $values[ 'warn_' . $f ] );
-
+					$difference = \IPS\DateTime::create()->setTimezone( $values[ 'warn_' . $f ]->getTimezone() )->diff( $values[ 'warn_' . $f ] );
+					
 					/**
 					 * Due to a bug in PHP 8.0, DateTime::diff() can return -1 for the hour, and an extra day. We need to look for this specifically and set hour to 23, and reduce days by 1. This bug is fixed in 8.1, so this should be removed when that version is required.
 					 * @see <a href='https://bugs.php.net/bug.php?id=66545'>#66545</a>
@@ -755,7 +672,7 @@ class Warning extends Item
 							$difference->d = $difference->d - 1;
 						}
 					}
-
+					
 					$period = 'P';
 					foreach ( array( 'y' => 'Y', 'm' => 'M', 'd' => 'D' ) as $k => $v )
 					{
@@ -794,10 +711,10 @@ class Warning extends Item
 	 *
 	 * @return	array
 	 */
-	public function getModerators() : array
+	public function getModerators()
 	{
 		$moderators = array( 'm' => array(), 'g' => array() );
-		foreach ( Db::i()->select( '*', 'core_moderators' ) as $mod )
+		foreach ( \IPS\Db::i()->select( '*', 'core_moderators' ) as $mod )
 		{
 			$canView = FALSE;
 			
@@ -828,19 +745,19 @@ class Warning extends Item
 	/**
 	 * Build and return the WHERE statements for warning notifications
 	 *
-	 * @param array $moderators Moderator data
+	 * @param   array   $moderators Moderator data
 	 * @return  array
 	 */
-	public function buildNotificationsWhere( array $moderators ): array
+	public function buildNotificationsWhere( $moderators )
 	{
 		$where = array();
 		if ( !empty( $moderators['m'] ) )
 		{
-			$where[] = Db::i()->in( 'member_id', $moderators['m'] );
+			$where[] = \IPS\Db::i()->in( 'member_id', $moderators['m'] );
 		}
 
-		$where[] = Db::i()->in( 'member_group_id', $moderators['g'] );
-		$where[] = Db::i()->findInSet( 'mgroup_others', $moderators['g'] );
+		$where[] = \IPS\Db::i()->in( 'member_group_id', $moderators['g'] );
+		$where[] = \IPS\Db::i()->findInSet( 'mgroup_others', $moderators['g'] );
 
 		/* Don't annoy the acting moderator with a notification for the warning they /just/ issued */
 		return array(
@@ -856,12 +773,12 @@ class Warning extends Item
 	/**
 	 * Get notification count
 	 *
-	 * @param array $moderators	Moderator data
+	 * @param	array 	$moderators	Moderator data
 	 * @return	int
 	 */
-	public function notificationsCount( array $moderators ): int
+	public function notificationsCount( $moderators )
 	{
-		return Db::i()->select(
+		return \IPS\Db::i()->select(
 			'COUNT(*)',
 			'core_members',
 			$this->buildNotificationsWhere( $moderators )
@@ -873,35 +790,35 @@ class Warning extends Item
 	 *
 	 * @return	void
 	 */
-	public function sendNotifications(): void
+	public function sendNotifications()
 	{
 		/* Queue if there's lots, or just send them */
-		if ( $this->notificationsCount( $this->getModerators() ) > NOTIFICATION_BACKGROUND_THRESHOLD )
+		if ( $this->notificationsCount( $this->getModerators() ) > \IPS\NOTIFICATION_BACKGROUND_THRESHOLD )
 		{
-			Task::queue( 'core', 'WarnNotifications', array( 'class' => get_class( $this ), 'item' => $this->id, 'sentTo' => array() ), 1 );
+			\IPS\Task::queue( 'core', 'WarnNotifications', array( 'class' => \get_class( $this ), 'item' => $this->id, 'sentTo' => array() ), 1 );
 		}
 		else
 		{
 			$this->sendNotificationsBatch();
 		}
 
-		Email::buildFromTemplate( 'core', 'warning', array( $this ), Email::TYPE_TRANSACTIONAL )->send( Member::load( $this->member ) );
+		\IPS\Email::buildFromTemplate( 'core', 'warning', array( $this ), \IPS\Email::TYPE_TRANSACTIONAL )->send( \IPS\Member::load( $this->member ) );
 	}
 
 	/**
 	 * Send notifications batch
 	 *
-	 * @param int $offset		Current offset
-	 * @param array $sentTo		Members who have already received a notification and how - e.g. array( 1 => array( 'inline', 'email' )
-	 * @param string|null $extra		Additional data
+	 * @param	int				$offset		Current offset
+	 * @param	array			$sentTo		Members who have already received a notification and how - e.g. array( 1 => array( 'inline', 'email' )
+	 * @param	string|NULL		$extra		Additional data
 	 * @return	int|null		New offset or NULL if complete
 	 */
-	public function sendNotificationsBatch( int $offset=0, array &$sentTo=array(), string $extra=null ): ?int
+	public function sendNotificationsBatch( $offset=0, &$sentTo=array(), $extra=NULL )
 	{
 		$moderators	= $this->getModerators();
-		$notification = new Notification( Application::load('core'), 'warning_mods', $this, array( $this ) );
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'warning_mods', $this, array( $this ) );
 
-		$members = Db::i()->select(
+		$members = \IPS\Db::i()->select(
 			'*',
 			'core_members',
 			$this->buildNotificationsWhere( $moderators ),
@@ -910,8 +827,8 @@ class Warning extends Item
 		);
 		foreach ( $members as $member )
 		{
-			Log::debug( "Sent notification to {$member['name']}", 'warn_fix' );
-			$notification->recipients->attach( Member::constructFromData( $member ) );
+			\IPS\Log::debug( "Sent notification to {$member['name']}", 'warn_fix' );
+			$notification->recipients->attach( \IPS\Member::constructFromData( $member ) );
 		}
 
 		$sentTo = $notification->send( $sentTo );
@@ -928,21 +845,21 @@ class Warning extends Item
 	/**
 	 * @brief	Cached URLs
 	 */
-	protected mixed $_url = array();
+	protected $_url	= array();
 
 	/**
 	 * Get URL
 	 *
 	 * @param	string|NULL		$action		Action
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function url( string|null $action=NULL ): Url
+	public function url( $action=NULL )
 	{
-		$_key	= $action ? md5( $action ) : NULL;
+		$_key	= md5( $action );
 
 		if( !isset( $this->_url[ $_key ] ) )
 		{
-			$this->_url[ $_key ] = Url::internal( "app=core&module=system&controller=warnings&id={$this->member}&w={$this->id}", 'front', 'warn_view', Member::load( $this->member )->members_seo_name );
+			$this->_url[ $_key ] = \IPS\Http\Url::internal( "app=core&module=system&controller=warnings&id={$this->member}&w={$this->id}", 'front', 'warn_view', \IPS\Member::load( $this->member )->members_seo_name );
 		
 			if ( $action )
 			{
@@ -956,14 +873,14 @@ class Warning extends Item
 	/**
 	 * Get mapped value
 	 *
-	 * @param string $key	date,content,ip_address,first
+	 * @param	string	$key	date,content,ip_address,first
 	 * @return	mixed
 	 */
-	public function mapped( string $key ): mixed
+	public function mapped( $key )
 	{
 		if ( $key === 'title' )
 		{
-			return Member::loggedIn()->language()->addToStack( "core_warn_reason_{$this->reason}" );
+			return \IPS\Member::loggedIn()->language()->addToStack( "core_warn_reason_{$this->reason}" );
 		}
 		return parent::mapped( $key );
 	}
@@ -973,18 +890,18 @@ class Warning extends Item
 	/**
 	 * Can give warning?
 	 *
-	 * @param	Member	$member		The member
-	 * @param	Model|NULL	$container	Container (e.g. forum), if appropriate
-	 * @param bool $showError	If TRUE, rather than returning a boolean value, will display an error
+	 * @param	\IPS\Member	$member		The member
+	 * @param	\IPS\Node\Model|NULL	$container	Container (e.g. forum), if appropriate
+	 * @param	bool		$showError	If TRUE, rather than returning a boolean value, will display an error
 	 * @return	bool
 	 * @note	If we can't see warnings, we can't issue them either
 	 */
-	public static function canCreate( Member $member, Model $container=null, bool $showError=FALSE ): bool
+	public static function canCreate( \IPS\Member $member, \IPS\Node\Model $container=NULL, $showError=FALSE )
 	{
 		$return = $member->modPermission('mod_can_warn') && $member->modPermission('mod_see_warn');
 		if ( !$return and $showError )
 		{
-			Output::i()->error( 'no_module_permission', '2C150/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2C150/1', 403, '' );
 		}
 		
 		return $return;
@@ -993,31 +910,31 @@ class Warning extends Item
 	/**
 	 * Does a member have permission to access?
 	 *
-	 * @param Member|null $member	The member to check for
+	 * @param	\IPS\Member	$member	The member to check for
 	 * @return	bool
 	 */
-	public function canView( Member $member=null ): bool
+	public function canView( $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		return $member->modPermission('mod_see_warn') or $this->member === $member->member_id;
 	}
 	
 	/**
 	 * Does a member have permission to view the details of the warning?
 	 *
-	 * @param Member|null $member	The member to check for
+	 * @param	\IPS\Member	$member	The member to check for
 	 * @return	bool
 	 */
-	public function canViewDetails( Member $member=null ): bool
+	public function canViewDetails( $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 				
 		if ( $member->modPermission('mod_see_warn') )
 		{
 			return TRUE;
 		}
 		
-		if ( Settings::i()->warn_show_own and $this->member === $member->member_id )
+		if ( \IPS\Settings::i()->warn_show_own and $this->member === $member->member_id )
 		{
 			return TRUE;
 		}
@@ -1028,24 +945,24 @@ class Warning extends Item
 	/**
 	 * Can acknowledge?
 	 *
-	 * @param Member|null $member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canAcknowledge( Member $member=NULL ): bool
+	public function canAcknowledge( $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
-		return intval($this->member) === intval($member->member_id);
+		$member = $member ?: \IPS\Member::loggedIn();
+		return \intval($this->member) === \intval($member->member_id);
 	}
 				
 	/**
 	 * Can delete?
 	 *
-	 * @param Member|null $member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canDelete( Member $member=NULL ): bool
+	public function canDelete( $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		return ( $member->modPermission('mod_revoke_warn') and $member->modPermission('mod_see_warn') );
 	}
 	
@@ -1054,16 +971,16 @@ class Warning extends Item
 	/**
 	 * @brief	Enable table hover URL
 	 */
-	public ?bool $tableHoverUrl = TRUE;
+	public $tableHoverUrl = TRUE;
 	
 	/**
 	 * Icon for table view
 	 *
 	 * @return	array
 	 */
-	public function tableIcon(): array
+	public function tableIcon()
 	{
-		return Theme::i()->getTemplate( 'modcp', 'core', 'front' )->warningRowPoints( $this->points );
+		return \IPS\Theme::i()->getTemplate( 'modcp', 'core', 'front' )->warningRowPoints( $this->points );
 	}
 		
 	/**
@@ -1071,7 +988,7 @@ class Warning extends Item
 	 *
 	 * @return	string
 	 */
-	public function tableDescription(): string
+	public function tableDescription()
 	{
 		return $this->note_mods;
 	}
@@ -1079,8 +996,8 @@ class Warning extends Item
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @return    array
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @return	array
 	 * @apiresponse	int						id				ID number
 	 * @apiresponse	\IPS\Member				member			Member who was warned
 	 * @apiresponse	\IPS\Member				moderator		Moderator who performed the warning
@@ -1098,24 +1015,24 @@ class Warning extends Item
 	 * @apiresponse	bool					suspendPermanent		Member is permanently on suspension
 	 * @apiresponse	string|NULL				suspend			DateTimeInterval (from date) when the member will be unsuspended or null
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		$response = array(
 			'id'				=> $this->id,
-			'member'			=> Member::load( $this->member )->apiOutput( $authorizedMember ),
-			'moderator'			=> Member::load( $this->moderator )->apiOutput( $authorizedMember ),
+			'member'			=> \IPS\Member::load( $this->member )->apiOutput( $authorizedMember ),
+			'moderator'			=> \IPS\Member::load( $this->moderator )->apiOutput( $authorizedMember ),
 			'points'			=> $this->points,
-			'reason'			=> $this->reason ? Reason::load( $this->reason )->apiOutput() : NULL,
-			'expiration'		=> ( $this->expire_date == -1 ) ? $this->expire_date : DateTime::ts( $this->expire_date )->rfc3339(),
-			'date'				=> DateTime::ts( $this->date )->rfc3339(),
-			'acknowledged'		=> $this->acknowledged,
+			'reason'			=> $this->reason ? \IPS\core\Warnings\Reason::load( $this->reason )->apiOutput() : NULL,
+			'expiration'		=> ( $this->expire_date == -1 ) ? $this->expire_date : \IPS\DateTime::ts( $this->expire_date )->rfc3339(),
+			'date'				=> \IPS\DateTime::ts( $this->date )->rfc3339(),
+			'acknowledged'		=> (bool) $this->acknowledged,
 			'memberNotes'		=> $this->note_member,
 			'modQueue'			=> ( $this->mq != -1 ) ? $this->mq : null,
 			'restrictPosts'		=> ( $this->rpa != -1 ) ? $this->rpa : null,
 			'suspend'			=> ( $this->suspend != -1 ) ? $this->suspend : null,
-			'modQueuePermanent'	=> $this->mq == -1,
-			'restrictPostsPermanent'	=> $this->restrictPosts == -1,
-			'suspendPermanent'	=> $this->suspend == -1,
+			'modQueuePermanent'	=> ( $this->mq == -1 ) ? true : false,
+			'restrictPostsPermanent'	=> ( $this->restrictPosts == -1 ) ? true : false,
+			'suspendPermanent'	=> ( $this->suspend == -1 ) ? true : false,
 		);
 
 		if( $authorizedMember === NULL )

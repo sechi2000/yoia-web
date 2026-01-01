@@ -11,43 +11,30 @@
 namespace IPS\nexus\extensions\core\MemberExportPersonalInformation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\MemberExportPiiAbstract;
-use IPS\GeoLocation;
-use IPS\Member;
-use IPS\nexus\Customer as NexusCustomer;
-use IPS\nexus\Customer\CustomField;
-use IPS\Patterns\ActiveRecordIterator;
-use OutOfRangeException;
-use function defined;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Export Personal Information
  */
-class Customer extends MemberExportPiiAbstract
+class _Customer
 {
 	/**
 	 * Return data
-	 * @param	Member		$member		The member
+	 * @param	\IPS\Member		$member		The member
 	 *
 	 * @return	array
 	 */
-	public function getData( Member $member ): array
+	public function getData( \IPS\Member $member )
 	{
 		$return = array();
 		
 		try
 		{
-			$customer = NexusCustomer::load( $member->member_id );
+			$customer = \IPS\nexus\Customer::load( $member->member_id );
 			
 			/* Name and addresses */
 			$return['customer'] = array(
@@ -55,13 +42,13 @@ class Customer extends MemberExportPiiAbstract
 				'last_name'  => $customer->cm_last_name
 			);
 			
-			foreach( Db::i()->select( '*', 'nexus_customer_addresses', array( '`member`=?', $member->member_id ) ) as $address )
+			foreach( \IPS\Db::i()->select( '*', 'nexus_customer_addresses', array( '`member`=?', $member->member_id ) ) as $address )
 			{
-				$return['addresses'][] = GeoLocation::buildFromJson( $address['address'] )->toString( "," );
+				$return['addresses'][] = \IPS\GeoLocation::buildFromJson( $address['address'] )->toString( "," );
 			}
 			
 			/* Customer custom fields */
-			foreach ( CustomField::roots() as $field )
+			foreach ( \IPS\nexus\Customer\CustomField::roots() as $field )
 			{
 				$column = $field->column;
 				if ( $column )
@@ -71,7 +58,7 @@ class Customer extends MemberExportPiiAbstract
 			}
 			
 			/* Credit cards */
-			foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_customer_cards', array( 'card_member=?', $member->member_id ) ), 'IPS\nexus\Customer\CreditCard' ) as $card )
+			foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_customer_cards', array( 'card_member=?', $member->member_id ) ), 'IPS\nexus\Customer\CreditCard' ) as $card )
 			{
 				try
 				{
@@ -79,13 +66,13 @@ class Customer extends MemberExportPiiAbstract
 					$return['credit_cards'][ $card->id ] = array(
 						'card_type'		=> $cardData->type,
 						'card_number'	=> $cardData->lastFour,
-						'card_expire'	=> ( !is_null( $cardData->expMonth ) AND !is_null( $cardData->expYear ) ) ? str_pad( $cardData->expMonth , 2, '0', STR_PAD_LEFT ). '/' . $cardData->expYear : NULL
+						'card_expire'	=> ( !\is_null( $cardData->expMonth ) AND !\is_null( $cardData->expYear ) ) ? str_pad( $cardData->expMonth , 2, '0', STR_PAD_LEFT ). '/' . $cardData->expYear : NULL
 					);
 				}
-				catch ( Exception ) {}
+				catch ( \Exception $e ) {}
 			}
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $ex )
 		{
 			
 		}

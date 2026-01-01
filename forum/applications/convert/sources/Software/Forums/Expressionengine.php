@@ -12,42 +12,23 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Expressionengine as ExpressionEngineCore;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function strtolower;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ExpressionEngine Forums Converter
  */
-class Expressionengine extends Software
+class _Expressionengine extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "ExpressionEngine";
@@ -56,9 +37,9 @@ class Expressionengine extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "expressionengine";
@@ -67,9 +48,9 @@ class Expressionengine extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums' => array(
@@ -99,15 +80,15 @@ class Expressionengine extends Software
 	/**
 	 * Allows software to add additional menu row options
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function extraMenuRows(): array
+	public function extraMenuRows()
 	{
 		$rows = array();
 		$rows['convertOtherPosts'] = array(
 			'step_title'		=> 'convert_forums_posts',
 			'step_method'		=> 'convertOtherPosts',
-			'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'forums_posts' ),
+			'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'forums_posts' ),
 			'source_rows'		=> array( 'table' => static::canConvert()['convertOtherPosts']['table'], 'where' => static::canConvert()['convertOtherPosts']['where'] ),
 			'per_cycle'			=> 200,
 			'dependencies'		=> array( 'convertForumsPosts' ),
@@ -121,9 +102,9 @@ class Expressionengine extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -131,9 +112,9 @@ class Expressionengine extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'expressionengine' ) );
 	}
@@ -141,9 +122,9 @@ class Expressionengine extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertAttachments'
@@ -153,10 +134,10 @@ class Expressionengine extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -168,8 +149,8 @@ class Expressionengine extends Software
 						'field_default'			=> NULL,
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(),
-						'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_ee_forum_at_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_ee_forum_at_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;
@@ -181,32 +162,29 @@ class Expressionengine extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics" );
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return ExpressionEngineCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Expressionengine::fixPostData( $post );
 	}
 
 	/**
@@ -214,9 +192,10 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums() : void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
+
 		$libraryClass::setKey( 'forum_id' );
 
 		foreach( $this->fetch( 'exp_forums', 'forum_id' ) AS $row )
@@ -227,8 +206,12 @@ class Expressionengine extends Software
 				'description'		=> $row['forum_description'],
 				'topics'			=> $row['forum_total_topics'],
 				'posts'				=> $row['forum_total_posts'],
+				'last_post'			=> $row['forum_last_post_date'],
+				'last_poster_id'	=> $row['forum_last_post_author_id'],
+				'last_poster_name'	=> $row['forum_last_post_author'],
 				'parent_id'			=> ( $row['forum_parent'] == 0 ) ? -1 : $row['forum_parent'],
 				'position'			=> $row['forum_order'],
+				'last_title'		=> $row['forum_last_post_title'],
 				'allow_poll'		=> 1,
 				'inc_postcount'		=> 1,
 				'sub_can_post'		=> 1,
@@ -245,7 +228,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics() : void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -264,7 +247,7 @@ class Expressionengine extends Software
 
 				$pollData	= $this->db->select( '*', 'exp_forum_polls', array( 'topic_id=?', $row['topic_id'] ) )->first();
 
-				foreach( unserialize( $pollData['poll_answers'] ) as $value )
+				foreach( \unserialize( $pollData['poll_answers'] ) as $value )
 				{
 					$choices[ $index ] = $value['answer'];
 					$votes[ $index ] = $value['votes'];
@@ -318,7 +301,7 @@ class Expressionengine extends Software
 					$lastPoster = $this->db->select( 'screen_name', 'exp_members', array( 'member_id=?', $row['last_post_author_id'] ) )->first();
 				}
 			}
-			catch( UnderflowException $e ) { }
+			catch( \UnderflowException $e ) { }
 
 			$info = array(
 				'tid'				=> $row['topic_id'],
@@ -349,7 +332,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts() : void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -366,7 +349,7 @@ class Expressionengine extends Software
 					$editName = $this->db->select( 'screen_name', 'exp_members', array( 'member_id=?', $row['topic_edit_author'] ) )->first();
 				}
 			}
-			catch( UnderflowException $e ) { }
+			catch( \UnderflowException $e ) { }
 
 			$info = array(
 				'pid'			=> 't' . $row['topic_id'],
@@ -391,7 +374,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertOtherPosts() : void
+	public function convertOtherPosts()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -408,7 +391,7 @@ class Expressionengine extends Software
 					$editName = $this->db->select( 'screen_name', 'exp_members', array( 'member_id=?', $row['post_edit_author'] ) )->first();
 				}
 			}
-			catch( UnderflowException $e ) { }
+			catch( \UnderflowException $e ) { }
 
 			$info = array(
 				'pid'			=> $row['post_id'],
@@ -433,7 +416,7 @@ class Expressionengine extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -454,7 +437,7 @@ class Expressionengine extends Software
 				'attach_date'		=> $row['attachment_date'],
 				'attach_member_id'	=> $row['member_id'],
 				'attach_hits'		=> $row['hits'],
-				'attach_ext'		=> strtolower( trim( $row['extension'], '.' ) ),
+				'attach_ext'		=> \strtolower( trim( $row['extension'], '.' ) ),
 				'attach_filesize'	=> ( $row['filesize'] * 1000 ), //convert to kb
 			);
 
@@ -470,13 +453,13 @@ class Expressionengine extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( preg_match( '#/(viewforum|viewthread|viewreply)/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/(viewforum|viewthread|viewreply)/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			switch( $matches[1] )
 			{
@@ -508,20 +491,20 @@ class Expressionengine extends Software
 				{
 					$data = (string) $this->app->getLink( (int) $matches[2], $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( (int) $matches[2], $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				elseif( $item instanceof Model )
+				elseif( $item instanceof \IPS\Node\Model )
 				{
 					if( $item->can( 'view' ) )
 					{
@@ -529,7 +512,7 @@ class Expressionengine extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

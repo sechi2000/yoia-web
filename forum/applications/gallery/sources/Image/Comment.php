@@ -12,83 +12,53 @@
 namespace IPS\gallery\Image;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Anonymous;
-use IPS\Content\Comment as ContentComment;
-use IPS\Content\EditHistory;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Hideable;
-use IPS\Content\Featurable;
-use IPS\Content\Reactable;
-use IPS\Content\Reportable;
-use IPS\Content\Shareable;
-use IPS\gallery\Album;
-use IPS\gallery\Image;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Image Comment Model
  */
-class Comment extends ContentComment implements Embeddable,
-	Filter
+class _Comment extends \IPS\Content\Comment implements \IPS\Content\EditHistory, \IPS\Content\Hideable, \IPS\Content\Searchable, \IPS\Content\Embeddable, \IPS\Content\Anonymous
 {
-	use	Reactable,
-		Reportable,
-		Anonymous,
-		Shareable,
-		EditHistory,
-		Featurable,
-		Hideable {
-			Hideable::onHide as public _onHide;
-			Hideable::onUnhide as public _onUnhide;
-	}
+	use \IPS\Content\Reactable, \IPS\Content\Reportable;
 
 	/**
 	 * @brief	[Content\Comment]	Form Template
 	 */
-	public static array $formTemplate = array( array( 'forms', 'gallery', 'front' ), 'commentTemplate' );
+	public static $formTemplate = array( array( 'forms', 'gallery', 'front' ), 'commentTemplate' );
 
 	/**
 	 * @brief	[Content\Comment]	Comment Template
 	 */
-	public static array $commentTemplate = array( array( 'global', 'gallery', 'front' ), 'commentContainer' );
+	public static $commentTemplate = array( array( 'global', 'gallery', 'front' ), 'commentContainer' );
 
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[Content\Comment]	Item Class
 	 */
-	public static ?string $itemClass = 'IPS\gallery\Image';
+	public static $itemClass = 'IPS\gallery\Image';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'gallery_comments';
+	public static $databaseTable = 'gallery_comments';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'comment_';
+	public static $databasePrefix = 'comment_';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'item'				=> 'img_id',
 		'author'			=> 'author_id',
 		'author_name'		=> 'author_name',
@@ -105,57 +75,57 @@ class Comment extends ContentComment implements Embeddable,
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'gallery';
+	public static $application = 'gallery';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'gallery_image_comment';
+	public static $title = 'gallery_image_comment';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'camera';
+	public static $icon = 'camera';
 	
 	/**
 	 * @brief	[Content]	Key for hide reasons
 	 */
-	public static ?string $hideLogKey = 'gallery-images';
-
+	public static $hideLogKey = 'gallery-images';
+	
 	/**
 	 * Get items with permission check
 	 *
-	 * @param array $where Where clause
-	 * @param string|null $order MySQL ORDER BY clause (NULL to order by date)
-	 * @param int|array|null $limit Limit clause
-	 * @param string|null $permissionKey A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index
-	 * @param mixed $includeHiddenComments
-	 * @param int $queryFlags Select bitwise flags
-	 * @param Member|null $member The member (NULL to use currently logged in member)
-	 * @param bool $joinContainer If true, will join container data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinComments If true, will join comment data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinReviews If true, will join review data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $countOnly If true will return the count
-	 * @param array|null $joins Additional arbitrary joins for the query
-	 * @return    array|NULL|Comment        If $limit is 1, will return \IPS\Content\Comment or NULL for no results. For any other number, will return an array.
+	 * @param	array		$where				Where clause
+	 * @param	string		$order				MySQL ORDER BY clause (NULL to order by date)
+	 * @param	int|array	$limit				Limit clause
+	 * @param	string		$permissionKey		A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index
+	 * @param	mixed		$includeHiddenItems	Include hidden comments? NULL to detect if currently logged in member has permission, -1 to return public content only, TRUE to return unapproved content and FALSE to only return unapproved content the viewing member submitted
+	 * @param	int			$queryFlags			Select bitwise flags
+	 * @param	\IPS\Member	$member				The member (NULL to use currently logged in member)
+	 * @param	bool		$joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinComments		If true, will join comment data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinReviews		If true, will join review data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$countOnly				If true will return the count
+	 * @param	array|null	$joins					Additional arbitrary joins for the query
+	 * @return	array|NULL|\IPS\Content\Comment		If $limit is 1, will return \IPS\Content\Comment or NULL for no results. For any other number, will return an array.
 	 */
-	public static function getItemsWithPermission( array $where=array(), string $order= null, int|array|null $limit=10, string|null $permissionKey='read', mixed $includeHiddenComments= Filter::FILTER_AUTOMATIC, int $queryFlags=0, Member|null $member= null, bool $joinContainer=FALSE, bool $joinComments=FALSE, bool $joinReviews=FALSE, bool $countOnly=FALSE, array|null $joins= null ): mixed
+	public static function getItemsWithPermission( $where=array(), $order=NULL, $limit=10, $permissionKey='read', $includeHiddenItems=\IPS\Content\Hideable::FILTER_AUTOMATIC, $queryFlags=0, \IPS\Member $member=NULL, $joinContainer=FALSE, $joinComments=FALSE, $joinReviews=FALSE, $countOnly=FALSE, $joins=NULL )
 	{
-		if( $itemsWhere = Image::getItemsWithPermissionWhere( $where, $member, $joins ) AND count( $itemsWhere ) )
+		if( $itemsWhere = \IPS\gallery\Image::getItemsWithPermissionWhere( $where, $member, $joins ) AND \count( $itemsWhere ) )
 		{
 			$where[] = $itemsWhere;
 		}
 		
-		return parent::getItemsWithPermission( $where, $order, $limit, $permissionKey, $includeHiddenComments, $queryFlags, $member, $joinContainer, $joinComments, $joinReviews, $countOnly, $joins );
+		return parent::getItemsWithPermission( $where, $order, $limit, $permissionKey, $includeHiddenItems, $queryFlags, $member, $joinContainer, $joinComments, $joinReviews, $countOnly, $joins );
 	}
 	
 	/**
 	 * Get URL for doing stuff
 	 *
 	 * @param	string|NULL		$action		Action
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function url( ?string $action='find' ): Url
+	public function url( $action='find' )
 	{
 		return parent::url( $action )->setQueryString( 'tab', 'comments' );
 	}
@@ -165,7 +135,7 @@ class Comment extends ContentComment implements Embeddable,
 	 *
 	 * @return	void
 	 */
-	public function postCreate(): void
+	public function postCreate()
 	{
 		parent::postCreate();
 
@@ -174,22 +144,19 @@ class Comment extends ContentComment implements Embeddable,
 		if( $item->album_id )
 		{
 			$album = $item->directContainer();
+			$album->setLastComment( $this, $item );
 
 			/* We need to increment the counters here because the parent method will increment
 			the category but not the album */
-			if( !$item->approvedButHidden() )
+			if ( !$item->hidden() and ! $item->approvedButHidden() and !$item->isFutureDate() )
 			{
-				if( $this->hidden() == 0 and !$item->hidden() )
-				{
-					$album->_comments = ( $album->_comments + 1 );
-				}
-				elseif( $this->hidden() == 1 )
-				{
-					$album->_unapprovedComments = ( $album->_unapprovedComments >= 0 ) ? ( $album->_unapprovedComments + 1 ) : 1;
-				}
+				$album->_comments = ( $album->_comments + 1 );
+			}
+			elseif ( !$item->approvedButHidden() AND $this->hidden() == 1 )
+			{
+				$album->_unapprovedComments = ( $album->_unapprovedComments >= 0 ) ? ( $album->_unapprovedComments + 1 ) : 0;
 			}
 
-			$album->setLastComment( $this, $item );
 			$album->save();
 		}
 	}
@@ -197,12 +164,12 @@ class Comment extends ContentComment implements Embeddable,
 	/**
 	 * Syncing to run when hiding
 	 *
-	 * @param	Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
 	 * @return	void
 	 */
-	public function onHide( Member|null|bool $member ): void
+	public function onHide( $member )
 	{
-		$this->_onHide( $member );
+		parent::onHide( $member );
 
 		$item = $this->item();
 		if( $item->album_id )
@@ -218,12 +185,12 @@ class Comment extends ContentComment implements Embeddable,
 	 * Syncing to run when unhiding
 	 *
 	 * @param	bool					$approving	If true, is being approved for the first time
-	 * @param	Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
 	 * @return	void
 	 */
-	public function onUnhide( bool $approving, Member|null|bool $member ): void
+	public function onUnhide( $approving, $member )
 	{
-		$this->_onUnhide( $approving, $member );
+		parent::onUnhide( $approving, $member );
 
 		$item = $this->item();
 		if( $item->album_id )
@@ -238,13 +205,32 @@ class Comment extends ContentComment implements Embeddable,
 			$album->save();
 		}
 	}
+
+	/**
+	 * Get snippet HTML for search result display
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$authorData		Basic data about the author. Only includes columns returned by \IPS\Member::columnsForPhoto()
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	array		$reputationData	Array of people who have given reputation and the reputation they gave
+	 * @param	int|NULL	$reviewRating	If this is a review, the rating
+	 * @param	string		$view			'expanded' or 'condensed'
+	 * @return	callable
+	 */
+	public static function searchResultSnippet( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating, $view )
+	{
+		$url = \IPS\Http\Url::internal( \IPS\gallery\Image::$urlBase . $indexData['index_item_id'], 'front', \IPS\gallery\Image::$urlTemplate, \IPS\Http\Url\Friendly::seoTitle( $indexData['index_title'] ?: $itemData[ \IPS\gallery\Image::$databasePrefix . \IPS\gallery\Image::$databaseColumnMap['title'] ] ) );
+				
+		return \IPS\Theme::i()->getTemplate( 'global', 'gallery', 'front' )->searchResultCommentSnippet( $indexData, $itemData, $itemData['image_small_file_name'], $url, $reviewRating, $view == 'condensed' );
+	}
 	
 	/**
 	 * Reaction Type
 	 *
 	 * @return	string
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		return 'comment_id';
 	}
@@ -255,9 +241,9 @@ class Comment extends ContentComment implements Embeddable,
 	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'gallery', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'gallery' )->embedImageComment( $this, $this->item(), $this->url()->setQueryString( $params ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'gallery', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'gallery' )->embedImageComment( $this, $this->item(), $this->url()->setQueryString( $params ) );
 	}
 }

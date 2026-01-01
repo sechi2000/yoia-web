@@ -12,26 +12,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\core\Rss\Import;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Task;
-use IPS\Task\Exception;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * rssimport Task
  */
-class rssimport extends Task
+class _rssimport extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -42,27 +32,27 @@ class rssimport extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return    mixed    Message to log or NULL
-	 * @throws    Exception
+	 * @throws    \IPS\Task\Exception
 	 * @throws \Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		$timeCheck = new DateTime;
-		$timeCheck->sub( new DateInterval( 'PT10M' ) );
+		$timeCheck = new \IPS\DateTime;
+		$timeCheck->sub( new \DateInterval( 'PT10M' ) );
 
 		$this->runUntilTimeout(function() use ( $timeCheck ) {
 			try
 			{
-				$feed = Import::constructFromData( Db::i()->select( '*', 'core_rss_import', array( 'rss_import_enabled=1 AND rss_import_last_import<?', $timeCheck->getTimestamp() ), 'rss_import_last_import ASC', 1 )->first() );
+				$feed = \IPS\core\Rss\Import::constructFromData( \IPS\Db::i()->select( '*', 'core_rss_import', array( 'rss_import_enabled=1 AND rss_import_last_import<?', $timeCheck->getTimestamp() ), 'rss_import_last_import ASC', 1 )->first() );
 				$feed->run();
 			}
 			/* There's nothing more left to process */
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				/* Check to see if there are any feeds.. If no feed, we can disable the task */
-				if( !Db::i()->select( 'count(rss_import_id)', 'core_rss_import', array( 'rss_import_enabled=1' ), NULL, 1 )->first() )
+				if( !\IPS\Db::i()->select( 'count(rss_import_id)', 'core_rss_import', array( 'rss_import_enabled=1' ), NULL, 1 )->first() )
 				{
-					Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'rssimport' ) );
+					\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 0 ), array( '`key`=?', 'rssimport' ) );
 				}
 
 				/* No further processing needed */
@@ -72,19 +62,17 @@ class rssimport extends Task
 			catch ( \Exception $e )
 			{
 				/* If there is an error, we need to log it but the error should not prevent other feeds from importing */
-				if ( isset( $feed ) AND ( $feed instanceof Import ) )
+				if ( isset( $feed ) AND ( $feed instanceof \IPS\core\Rss\Import ) )
 				{
 					$feed->last_import = time();
 					$feed->save();
 				}
-				throw new Exception( $this, $e->getMessage() );
+				throw new \IPS\Task\Exception( $this, $e->getMessage() );
 			}
 
 			/* Run again to see if there's anything left */
 			return TRUE;
 		});
-
-		return null;
 	}
 	
 	/**

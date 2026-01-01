@@ -11,18 +11,9 @@
 namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Achievements\Recognize;
-use IPS\Member;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0') . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -35,22 +26,11 @@ trait Recognizable
 	/**
 	 * Can this member "unrecognize" the content author?
 	 *
-	 * @param	Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	boolean
 	 */
-	public function canRemoveRecognize( ?Member $member=NULL ): bool
+	public function canRemoveRecognize( ?\IPS\Member $member=NULL ): bool
 	{
-		/* Extensions go first */
-		if( $permCheck = Permissions::can( 'unrecognize', $this, $member ) )
-		{
-			return ( $permCheck === Permissions::PERM_ALLOW );
-		}
-
-		if( !$this->actionEnabled( 'unrecognize', $member ) )
-		{
-			return false;
-		}
-
 		/* Already recognized? (First quick check when built from item::comments() */
 		$isRecognized = FALSE;
 		if ( isset( $this->recognized ) and $this->recognized )
@@ -59,14 +39,18 @@ trait Recognizable
 		}
 
 		/* Not there, try loading from content */
-		if ( ! $isRecognized and ( !isset( $this->recognized ) or $this->recognized !== false ) )
+		if ( ! $isRecognized )
 		{
 			try
 			{
-				Recognize::loadFromContent( $this );
+				$recognize = \IPS\core\Achievements\Recognize::loadFromContent( $this );
 				$isRecognized = TRUE;
 			}
-			catch ( OutOfRangeException | UnderflowException ){}
+			catch ( \Exception $e )
+			{
+				/* An error, or it doesn't exist */
+				$isRecognized = FALSE;
+			}
 		}
 
 		if ( ! $isRecognized )
@@ -74,7 +58,7 @@ trait Recognizable
 			return FALSE;
 		}
 
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Moderator check */
 		return $this->canModerateRecognized( $member );
@@ -83,35 +67,24 @@ trait Recognizable
 	/**
 	 * Can this member "recognize" the content author?
 	 *
-	 * @param	Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	boolean
 	 */
-	public function canRecognize( ?Member $member=NULL ): bool
+	public function canRecognize( ?\IPS\Member $member=NULL ): bool
 	{
-		/* Extensions go first */
-		if( $permCheck = Permissions::can( 'recognize', $this, $member ) )
-		{
-			return ( $permCheck === Permissions::PERM_ALLOW );
-		}
-
-		if( !$this->actionEnabled( 'recognize', $member ) )
-		{
-			return false;
-		}
-
 		/* Are achievements enabled? */
-		if ( !Settings::i()->achievements_enabled )
+		if ( !\IPS\Settings::i()->achievements_enabled )
 		{
 			return FALSE;
 		}
-
+		
 		/* Already recognized? */
-		if ( $this->recognized )
+		if ( isset( $this->recognized ) )
 		{
 			return FALSE;
 		}
 
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Moderator check */
 		if ( ! $this->canModerateRecognized( $member ) )
@@ -136,12 +109,12 @@ trait Recognizable
 	/**
 	 * Check to see if we have moderator permissions
 	 *
-	 * @param Member|null $member
+	 * @param $member
 	 * @return bool
 	 */
-	public function canModerateRecognized( ?Member $member ): bool
+	protected function canModerateRecognized( $member )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Moderator check */
 		if ( ! $member->modPermission('can_recognize_content') )
@@ -149,7 +122,7 @@ trait Recognizable
 			return FALSE;
 		}
 
-		if ( ! $member->modPermission('can_recognize_content') AND ! count( $member->modPermission('can_recognize_content_options') ) )
+		if ( $member->modPermission('can_recognize_content') != '*' AND ! \count( $member->modPermission('can_recognize_content_options') ) )
 		{
 			return FALSE;
 		}
@@ -160,13 +133,13 @@ trait Recognizable
 	/**
 	 * Should we show this recognized data?
 	 *
-	 * @param Member|null $viewing
+	 * @param \IPS\Member|null $viewing
 	 * @return bool
 	 */
-	public function showRecognized( ?Member $viewing=NULL ): bool
+	public function showRecognized( ?\IPS\Member $viewing=NULL ): bool
 	{
-		$viewing = $viewing ?: Member::loggedIn();
-		if ( isset( $this->recognized ) and $this->recognized )
+		$viewing = $viewing ?: \IPS\Member::loggedIn();
+		if ( isset( $this->recognized ) )
 		{
 			if ( $this->recognized->public or ( ( $viewing->member_id == $this->recognized->member_id ) OR ( $viewing->modPermission('can_recognize_content') ) ) )
 			{
@@ -181,9 +154,9 @@ trait Recognizable
 	 *
 	 * @return void
 	 */
-	public function removeRecognize(): void
+	public function removeRecognize()
 	{
-		Recognize::loadFromContent( $this )->delete();
+		\IPS\core\Achievements\Recognize::loadFromContent( $this )->delete();
 	}
 
 	/**
@@ -193,44 +166,39 @@ trait Recognizable
 	 */
 	public function recognizedBlurb(): array
 	{
-		if( !isset( $this->recognized ) or $this->recognized === false )
-		{
-			return [];
-		}
-
 		$return = [ 'message' => NULL ];
-		$return['main'] = Member::loggedIn()->language()->addToStack( 'recognize_blurb_main', FALSE, [ 'htmlsprintf' => [ Member::loggedIn()->language()->addToStack( $this::$title . '_lc' ), $this->recognized->_given_by->link() ] ] );
+		$return['main'] = \IPS\Member::loggedIn()->language()->addToStack( 'recognize_blurb_main', FALSE, [ 'htmlsprintf' => [ \IPS\Member::loggedIn()->language()->addToStack( $this::$title . '_lc' ), $this->recognized->_given_by->link() ] ] );
 		if ( $this->recognized->badge and $this->recognized->points )
 		{
-			if ( $this->author()->member_id === Member::loggedIn()->member_id )
+			if ( $this->author()->member_id === \IPS\Member::loggedIn()->member_id )
 			{
-				$return['awards'] = Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_points_and_badge', FALSE, ['htmlsprintf' => [$this->recognized->badge()->_title, $this->recognized->points]] );
+				$return['awards'] = \IPS\Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_points_and_badge', FALSE, ['htmlsprintf' => [$this->recognized->badge()->_title, $this->recognized->points]] );
 			}
 			else
 			{
-				$return['awards'] = Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_points_and_badge_third', FALSE, ['htmlsprintf' => [$this->author()->name, $this->recognized->badge()->_title, $this->recognized->points]] );
+				$return['awards'] = \IPS\Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_points_and_badge_third', FALSE, ['htmlsprintf' => [$this->author()->name, $this->recognized->badge()->_title, $this->recognized->points]] );
 			}
 		}
 		else if ( $this->recognized->points )
 		{
-			if ( $this->author()->member_id === Member::loggedIn()->member_id )
+			if ( $this->author()->member_id === \IPS\Member::loggedIn()->member_id )
 			{
-				$return['awards'] = Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_points', FALSE, [ 'sprintf' => [ $this->recognized->points ] ] );
+				$return['awards'] = \IPS\Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_points', FALSE, [ 'sprintf' => [ $this->recognized->points ] ] );
 			}
 			else
 			{
-				$return['awards'] = Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_points_third', FALSE, [ 'sprintf' => [ $this->author()->name, $this->recognized->points ] ] );
+				$return['awards'] = \IPS\Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_points_third', FALSE, [ 'sprintf' => [ $this->author()->name, $this->recognized->points ] ] );
 			}
 		}
 		else if ( $this->recognized->badge )
 		{
-			if ( $this->author()->member_id === Member::loggedIn()->member_id )
+			if ( $this->author()->member_id === \IPS\Member::loggedIn()->member_id )
 			{
-				$return['awards'] = Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_badge', FALSE, [ 'htmlsprintf' => [ $this->recognized->badge()->_title ] ] );
+				$return['awards'] = \IPS\Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_badge', FALSE, [ 'htmlsprintf' => [ $this->recognized->badge()->_title ] ] );
 			}
 			else
 			{
-				$return['awards'] = Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_badge_third', FALSE, [ 'htmlsprintf' => [ $this->author()->name, $this->recognized->badge()->_title ] ] );
+				$return['awards'] = \IPS\Member::loggedIn()->language()->addToStack( 'recognize_blurb_awarded_badge_third', FALSE, [ 'htmlsprintf' => [ $this->author()->name, $this->recognized->badge()->_title ] ] );
 			}
 		}
 

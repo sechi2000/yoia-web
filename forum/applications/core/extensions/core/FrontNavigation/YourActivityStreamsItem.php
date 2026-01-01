@@ -12,56 +12,40 @@
 namespace IPS\core\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\FrontNavigation\FrontNavigationAbstract;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Translatable;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Custom Item
  */
-class YourActivityStreamsItem extends FrontNavigationAbstract
+class _YourActivityStreamsItem extends \IPS\core\FrontNavigation\FrontNavigationAbstract
 {
 	/**
-	 * @var string Default icon
+	 * @brief	The ID number
 	 */
-	public string $defaultIcon = '\f4fd';
+	public	$id;
 	
 	/**
 	 * @brief	The stream ID
 	 */
-	protected ?int	$streamId = null;
-
+	protected	$streamId;
+	
 	/**
 	 * Constructor
 	 *
-	 * @param array $configuration The configuration
-	 * @param int $id The ID number
-	 * @param string|null $permissions The permissions (* or comma-delimited list of groups)
-	 * @param string $menuTypes The menu types (either * or json string)
-	 * @param array|null $icon Array of icon data or null
+	 * @param	array	$configuration	The configuration
+	 * @param	int		$id				The ID number
+	 * @param	string	$permissions	The permissions (* or comma-delimited list of groups)
+	 * @return	void
 	 */
-	public function __construct( array $configuration, int $id, string|null $permissions, string $menuTypes, array|null $icon )
+	public function __construct( $configuration, $id, $permissions )
 	{
-		parent::__construct( $configuration, $id, $permissions, $menuTypes, $icon );
+		parent::__construct( $configuration, $id, $permissions );
 		
-		if ( count( $configuration ) and isset( $configuration['menu_stream_id'] ) )
+		if ( \count( $configuration ) and isset( $configuration['menu_stream_id'] ) )
 		{
 			$this->streamId = $configuration['menu_stream_id'];
 		}
@@ -70,43 +54,25 @@ class YourActivityStreamsItem extends FrontNavigationAbstract
 			$this->streamId = $id;
 		}
 	}
-
-	/**
-	 * Return the default icon
-	 *
-	 * @return string
-	 */
-	public function getDefaultIcon(): string
-	{
-		return match ( $this->streamId )
-		{
-			1 => '\f1ea', //unread
-			2 => '\f2bd', //started
-			3 => '\e494', //followed content
-			4 => '\f0c0', //followed member
-			5 => '\f0ae', // posted
-			default => parent::getDefaultIcon()
-		};
-	}
-
+	
 	/**
 	 * Get Type Title which will display in the AdminCP Menu Manager
 	 *
 	 * @return	string
 	 */
-	public static function typeTitle(): string
+	public static function typeTitle()
 	{
-		return Member::loggedIn()->language()->addToStack('activity_stream_single');
+		return \IPS\Member::loggedIn()->language()->addToStack('activity_stream_single');
 	}
 	
 	/**
 	 * Can access?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canAccessContent(): bool
+	public function canAccessContent()
 	{
-		if ( ! Member::loggedIn()->member_id and $this->streamId and $this->streamId <= 5 )
+		if ( ! \IPS\Member::loggedIn()->member_id and $this->streamId and $this->streamId <= 5 )
 		{
 			return FALSE;
 		}
@@ -117,9 +83,9 @@ class YourActivityStreamsItem extends FrontNavigationAbstract
 	/**
 	 * Allow multiple instances?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function allowMultiple(): bool
+	public static function allowMultiple()
 	{
 		return TRUE;
 	}
@@ -128,21 +94,21 @@ class YourActivityStreamsItem extends FrontNavigationAbstract
 	 * Get configuration fields
 	 *
 	 * @param	array	$existingConfiguration	The existing configuration, if editing an existing item
-	 * @param int|null $id						The ID number of the existing item, if editing
-	 * @return    array
+	 * @param	int		$id						The ID number of the existing item, if editing
+	 * @return	array
 	 */
-	public static function configuration(array $existingConfiguration, ?int $id = NULL ): array
+	public static function configuration( $existingConfiguration, $id = NULL )
 	{
 		$globalStreams = array();
-		foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'core_streams', '`member` IS NULL' ), 'IPS\core\Stream' ) as $stream )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_streams', '`member` IS NULL' ), 'IPS\core\Stream' ) as $stream )
 		{
 			$globalStreams[ $stream->id ] = $stream->_title;
 		}
 				
 		return array(
-			new Select( 'menu_stream_id', $existingConfiguration['menu_stream_id'] ?? NULL, NULL, array( 'options' => $globalStreams ), NULL, NULL, NULL, 'menu_stream_id' ),
-			new Radio( 'menu_title_type', $existingConfiguration['menu_title_type'] ?? 0, NULL, array( 'options' => array( 0 => 'menu_title_type_stream', 1 => 'menu_title_type_custom' ), 'toggles' => array( 1 => array( 'menu_stream_title' ) ) ), NULL, NULL, NULL, 'menu_title_type' ),
-			new Translatable( 'menu_stream_title', NULL, NULL, array( 'app' => 'core', 'key' => $id ? "menu_stream_title_{$id}" : NULL ), NULL, NULL, NULL, 'menu_stream_title' ),
+			new \IPS\Helpers\Form\Select( 'menu_stream_id', isset( $existingConfiguration['menu_stream_id'] ) ? $existingConfiguration['menu_stream_id'] : NULL, NULL, array( 'options' => $globalStreams ), NULL, NULL, NULL, 'menu_stream_id' ),
+			new \IPS\Helpers\Form\Radio( 'menu_title_type', isset( $existingConfiguration['menu_title_type'] ) ? $existingConfiguration['menu_title_type'] : 0, NULL, array( 'options' => array( 0 => 'menu_title_type_stream', 1 => 'menu_title_type_custom' ), 'toggles' => array( 1 => array( 'menu_stream_title' ) ) ), NULL, NULL, NULL, 'menu_title_type' ),
+			new \IPS\Helpers\Form\Translatable( 'menu_stream_title', NULL, NULL, array( 'app' => 'core', 'key' => $id ? "menu_stream_title_{$id}" : NULL ), NULL, NULL, NULL, 'menu_stream_title' ),
 		);
 	}
 	
@@ -151,17 +117,17 @@ class YourActivityStreamsItem extends FrontNavigationAbstract
 	 *
 	 * @param	array	$configuration	The values received from the form
 	 * @param	int		$id				The ID number of the existing item, if editing
-	 * @return    array
+	 * @return	array
 	 */
-	public static function parseConfiguration( array $configuration, int $id ): array
+	public static function parseConfiguration( $configuration, $id )
 	{
 		if ( $configuration['menu_title_type'] )
 		{
-			Lang::saveCustom( 'core', "menu_stream_title_{$id}", $configuration['menu_stream_title'] );
+			\IPS\Lang::saveCustom( 'core', "menu_stream_title_{$id}", $configuration['menu_stream_title'] );
 		}
 		else
 		{
-			Lang::deleteCustom( 'core', "menu_stream_title_{$id}" );
+			\IPS\Lang::deleteCustom( 'core', "menu_stream_title_{$id}" );
 		}
 		
 		unset( $configuration['menu_stream_title'] );
@@ -172,9 +138,9 @@ class YourActivityStreamsItem extends FrontNavigationAbstract
 	/**
 	 * Get Title
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
 		if ( ! empty( $this->configuration['title'] ) )
 		{
@@ -182,18 +148,18 @@ class YourActivityStreamsItem extends FrontNavigationAbstract
 		}
 		else if ( isset( $this->configuration['menu_title_type'] ) and $this->configuration['menu_title_type'] )
 		{
-			return Member::loggedIn()->language()->addToStack( "menu_stream_title_{$this->id}" );
+			return \IPS\Member::loggedIn()->language()->addToStack( "menu_stream_title_{$this->id}" );
 		}
 		
-		return Member::loggedIn()->language()->addToStack( "stream_title_{$this->streamId}" );
+		return \IPS\Member::loggedIn()->language()->addToStack( "stream_title_{$this->streamId}" );
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|string|null
+	public function link()
 	{
 		switch ( $this->streamId )
 		{
@@ -217,15 +183,15 @@ class YourActivityStreamsItem extends FrontNavigationAbstract
 				break;
 		}
 		
-		return Url::internal( "app=core&module=discover&controller=streams&id={$this->streamId}", 'front', $furlKey );
+		return \IPS\Http\Url::internal( "app=core&module=discover&controller=streams&id={$this->streamId}", 'front', $furlKey );
 	}
 
 	/**
 	 * Get Attributes
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function attributes(): string
+	public function attributes()
 	{
 		return "data-streamid='{$this->id}'";
 	}
@@ -233,10 +199,21 @@ class YourActivityStreamsItem extends FrontNavigationAbstract
 	/**
 	 * Is Active?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function active(): bool
+	public function active()
 	{
-		return Dispatcher::i()->application->directory === 'core' and Dispatcher::i()->module->key === 'discover' and Request::i()->id == $this->streamId;
+		return \IPS\Dispatcher::i()->application->directory === 'core' and \IPS\Dispatcher::i()->module->key === 'discover' and \IPS\Request::i()->id == $this->streamId;
+	}
+	
+	/**
+	 * Children
+	 *
+	 * @param	bool	$noStore	If true, will skip datastore and get from DB (used for ACP preview)
+	 * @return	array
+	 */
+	public function children( $noStore=FALSE )
+	{
+		return NULL;
 	}
 }

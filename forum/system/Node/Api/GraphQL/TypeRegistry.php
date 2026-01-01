@@ -10,21 +10,21 @@
  */
 
 namespace IPS\Node\Api\GraphQL;
-use function defined;
+use GraphQL\Type\Definition\Type;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * \IPS\Node base types
  */
-class TypeRegistry
+class _TypeRegistry
 {
-	protected static ?NodeType $node = NULL;
+	protected static $node;
 
 	/**
 	 * Constructor
@@ -35,10 +35,10 @@ class TypeRegistry
 	}
 	
 	/**
-	 * @return NodeType
+	 * @return CommentType
 	 */
-	public static function node() : NodeType
+	public static function node()
 	{
-		return self::$node ?: (self::$node = new NodeType());
+		return self::$node ?: (self::$node = new \IPS\Node\Api\GraphQL\NodeType());
 	}
 }

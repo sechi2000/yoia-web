@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Record View
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -13,97 +12,58 @@
 namespace IPS\cms\modules\front\database;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DateTimeInterface;
-use DomainException;
-use Exception;
-use IPS\cms\Categories;
-use IPS\cms\Databases;
-use IPS\cms\Databases\Dispatcher;
-use IPS\cms\Fields;
-use IPS\cms\Pages\Page;
-use IPS\cms\Records;
-use IPS\cms\Records\Revisions;
-use IPS\Content\Comment;
-use IPS\Content\Controller;
-use IPS\Content\Item;
-use IPS\DateTime;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Output\UI\UiExtension;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use function count;
-use function defined;
-use function get_class;
-use const IPS\THUMBNAIL_SIZE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Record View
  */
-class record extends Controller
+class _record extends \IPS\Content\Controller
 {
 	/**
 	 * [Content\Controller]	Class
 	 */
-	protected static string $contentModel = '';
+	protected static $contentModel = NULL;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param Url|null $url		The base URL for this controller or NULL to calculate automatically
+	 * @param	\IPS\Http\Url|NULL	$url		The base URL for this controller or NULL to calculate automatically
 	 * @return	void
 	 */
-	public function __construct( Url $url=NULL )
+	public function __construct( $url=NULL )
 	{
-		static::$contentModel = 'IPS\cms\Records' . Dispatcher::i()->databaseId;
+		static::$contentModel = 'IPS\cms\Records' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
 		
-		parent::__construct( Dispatcher::i()->url );
+		parent::__construct( \IPS\cms\Databases\Dispatcher::i()->url );
 	}
 	
 	/**
 	 * View Record
 	 *
-	 * @return	mixed
+	 * @return	void
 	 */
-	protected function manage() : mixed
+	protected function manage()
 	{
 		/* Load record */
-		/** @var Records $record */
 		try
 		{
 			$record = parent::manage();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
-			Output::i()->error( 'node_error', '2T252/1', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2T252/1', 403, '' );
 		}
 		
 		if ( $record === NULL )
 		{
-			Output::i()->error( 'node_error', '2T252/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2T252/2', 404, '' );
 		}
 
-		if ( Request::i()->view )
+		if ( \IPS\Request::i()->view )
 		{
 			$this->_doViewCheck();
 		}
@@ -111,29 +71,26 @@ class record extends Controller
 		/* Sort out comments and reviews */
 		$tabs  = $record->commentReviewTabs();
 		$_tabs = array_keys( $tabs );
-		$tab   = isset( Request::i()->tab ) ? Request::i()->tab : array_shift( $_tabs );
+		$tab   = isset( \IPS\Request::i()->tab ) ? \IPS\Request::i()->tab : array_shift( $_tabs );
 		$activeTabContents = $record->commentReviews( $tab );
-		$comments = count( $tabs ) ? \IPS\cms\Theme::i()->getTemplate( $record->container()->_template_display, 'cms', 'database' )->commentsAndReviewsTabs( Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $tab, $activeTabContents, $record->url(), 'tab', FALSE, FALSE ), md5( $record->url() ) ) : NULL;
+		$comments = \count( $tabs ) ? \IPS\cms\Theme::i()->getTemplate( $record->container()->_template_display, 'cms', 'database' )->commentsAndReviewsTabs( \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $tab, $activeTabContents, $record->url(), 'tab', FALSE, TRUE ), md5( $record->url() ) ) : NULL;
 
-		if ( Request::i()->isAjax() and !isset( Request::i()->rating_submitted ) and ( isset( Request::i()->page ) OR isset( Request::i()->tab ) ) and $activeTabContents )
+		if ( \IPS\Request::i()->isAjax() and !isset( \IPS\Request::i()->rating_submitted ) and ( isset( \IPS\Request::i()->page ) OR isset( \IPS\Request::i()->tab ) ) and $activeTabContents )
 		{
-			Output::i()->sendOutput( $activeTabContents );
+			\IPS\Output::i()->sendOutput( $activeTabContents, 200, 'text/html' );
 		}
 
-		/* @var Categories $class */
 		$class = '\IPS\cms\Categories' . $record::$customDatabaseId;
 		$category = $class::load( $record->category_id );
-
-		$fieldsClass  = '\\IPS\\cms\\Fields'  . $record::$customDatabaseId;
-		/* @var Fields $fieldsClass */
-		$updateFields = $fieldsClass::fields( $record->fieldValues(), 'edit', $record->container(), $fieldsClass::FIELD_DISPLAY_COMMENTFORM, $record );
+		$FieldsClass  = '\\IPS\\cms\\Fields'  . $record::$customDatabaseId;
+		$updateFields = $FieldsClass::fields( $record->fieldValues(), 'edit', $record->container(), $FieldsClass::FIELD_DISPLAY_COMMENTFORM, $record );
 		$form         = null;
 		
 		/* We need edit permission to change the record */
-		if ( count( $updateFields ) and $record->canEdit() )
+		if ( \count( $updateFields ) and $record->canEdit() )
 		{
-			$form = new Form( 'update_record', 'update', $record->url()->setQueryString( array( 'd' => $record::$customDatabaseId ) ) );
-			$form->class = 'ipsForm--vertical ipsForm--manage-record';
+			$form = new \IPS\Helpers\Form( 'update_record', 'update', $record->url()->setQueryString( array( 'd' => $record::$customDatabaseId ) ) );
+			$form->class = 'ipsForm_vertical';
 
 			$hasAdditionalFields = false;
 			foreach( $updateFields as $id => $field )
@@ -148,13 +105,11 @@ class record extends Controller
 			/* The comment is only added for fields that are NOT the title/content. So don't show this checkbox if the only field available is one of those. */
 			if( $hasAdditionalFields AND $record->canComment() )
 			{
-				$form->add( new Checkbox( 'record_display_field_change', TRUE, FALSE ) );
+				$form->add( new \IPS\Helpers\Form\Checkbox( 'record_display_field_change', TRUE, FALSE ) );
 			}
 			
 			if ( $values = $form->values() )
 			{
-                $record->processBeforeEdit( $values );
-
 				/* Custom fields */
 				$customValues = array();
 				$fieldsClass  = 'IPS\cms\Fields' . $record::$customDatabaseId;
@@ -167,12 +122,12 @@ class record extends Controller
 					}
 				}
 
-				if ( count( $customValues ) )
+				if ( \count( $customValues ) )
 				{
 					/* Store a revision before we change any values */
 					if ( $record::database()->revisions )
 					{
-						$revision = new Revisions;
+						$revision = new \IPS\cms\Records\Revisions;
 						$revision->database_id = $record::$customDatabaseId;
 						$revision->record_id   = $record->_id;
 						$revision->data        = $record->fieldValues( TRUE );
@@ -189,10 +144,10 @@ class record extends Controller
 						$record->setFieldQuoteAndMentionExcludes();
 					}
 
-					foreach( $fieldsClass::fields( $customValues, 'edit', $record->category_id ? $category : NULL, $fieldsClass::FIELD_DISPLAY_COMMENTFORM ) as $key => $field )
+					foreach( $fieldsClass::fields( $customValues, 'edit', $record->category_id ? $category : NULL, $FieldsClass::FIELD_DISPLAY_COMMENTFORM ) as $key => $field )
 					{
 						$key = 'field_' . $key;
-						$record->$key = $field::stringValue($values[$field->name] ?? NULL);
+						$record->$key = $field::stringValue( isset( $values[ $field->name ] ) ? $values[ $field->name ] : NULL );
 					}
 					
 					/* Send custom field update notifications */
@@ -213,64 +168,64 @@ class record extends Controller
 							$record->processItemFieldData( $row );
 						}
 					}
-					Output::i()->redirect( $record->url() );
+					\IPS\Output::i()->redirect( $record->url() );
 				}
 			}
 		}
-
+		
 		if ( $record->record_meta_keywords )
 		{
-			Output::i()->metaTags['keywords'] = $record->record_meta_keywords;
+			\IPS\Output::i()->metaTags['keywords'] = $record->record_meta_keywords;
 		}
 		
 		if ( $record->record_meta_description )
 		{
-			Output::i()->metaTags['description'] = $record->record_meta_description;
-			Output::i()->metaTags['og:description'] = $record->record_meta_description;
+			\IPS\Output::i()->metaTags['description'] = $record->record_meta_description;
+			\IPS\Output::i()->metaTags['og:description'] = $record->record_meta_description;
 		}
 
 		/* Set record URL as canonical tag */
-		if ( $record::database()->canonical_flag == 1 and ( isset( Request::i()->page ) and Request::i()->page > 1 ) )
+		if ( $record::database()->canonical_flag == 1 and ( isset( \IPS\Request::i()->page ) and \IPS\Request::i()->page > 1 ) )
 		{
-			Output::i()->linkTags['canonical'] = $record->url()->setPage( 'page', Request::i()->page );
+			\IPS\Output::i()->linkTags['canonical'] = $record->url()->setPage( 'page', \IPS\Request::i()->page );
 		}
 		else
 		{
-			Output::i()->linkTags['canonical'] = $record->url();
+			\IPS\Output::i()->linkTags['canonical'] = $record->url();
 		}
 
 		/* Update location */
 		if( $record->database()->use_categories )
 		{
-			Session::i()->setLocation( $record->url(), $record->onlineListPermissions(), 'loc_cms_viewing_db_record', array( $record->_title => FALSE, 'content_db_' . $record->database()->id => TRUE ,'content_cat_name_' . $category->id => TRUE ) );
+			\IPS\Session::i()->setLocation( $record->url(), $record->onlineListPermissions(), 'loc_cms_viewing_db_record', array( $record->_title => FALSE, 'content_db_' . $record->database()->id => TRUE ,'content_cat_name_' . $category->id => TRUE ) );
 		}
 		else
 		{
-			Session::i()->setLocation( $record->url(), $record->onlineListPermissions(), 'loc_cms_viewing_db_record_no_cats', array( $record->_title => FALSE, 'content_db_' . $record->database()->id => TRUE ) );
+			\IPS\Session::i()->setLocation( $record->url(), $record->onlineListPermissions(), 'loc_cms_viewing_db_record_no_cats', array( $record->_title => FALSE, 'content_db_' . $record->database()->id => TRUE ) );
 		}
 
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'records/record.css', 'cms', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'records/record.css', 'cms', 'front' ) );
 
 		/* Next unread */
 		try
 		{
 			$nextUnread	= $record->containerHasUnread();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			$nextUnread	= NULL;
 		}
 		
 		if ( $record->record_image )
 		{
-			Output::i()->metaTags['og:image'] = (string) File::get( 'cms_Records', $record->record_image )->url;
+			\IPS\Output::i()->metaTags['og:image'] = (string) \IPS\File::get( 'cms_Records', $record->record_image )->url;
 		}
 
 		/* Add Json-LD */
 		$jsonLdText = $record->truncated( TRUE, NULL );
 
-		Output::i()->jsonLd['article']	= array(
-			'@context'		=> "https://schema.org",
+		\IPS\Output::i()->jsonLd['article']	= array(
+			'@context'		=> "http://schema.org",
 			'@type'			=> "Article",
 			'url'			=> (string) $record->url(),
 			'discussionUrl'	=> (string) $record->url(),
@@ -279,33 +234,33 @@ class record extends Controller
 			'headline'		=> $record->_title,
 			'text'			=> $jsonLdText,
 			'articleBody'	=> $jsonLdText,
-			'dateCreated'	=> DateTime::ts( $record->record_saved )->format( DateTimeInterface::ATOM ),
-			'datePublished'	=> DateTime::ts( $record->record_publish_date ?: $record->record_saved )->format( DateTimeInterface::ATOM ),
-			'dateModified'	=> DateTime::ts( $record->record_edit_time ?: ( $record->record_publish_date ?: $record->record_saved ) )->format( DateTimeInterface::ATOM ),
+			'dateCreated'	=> \IPS\DateTime::ts( $record->record_saved )->format( \IPS\DateTime::ISO8601 ),
+			'datePublished'	=> \IPS\DateTime::ts( $record->record_publish_date ?: $record->record_saved )->format( \IPS\DateTime::ISO8601 ),
+			'dateModified'	=> \IPS\DateTime::ts( $record->record_edit_time ?: ( $record->record_publish_date ?: $record->record_saved ) )->format( \IPS\DateTime::ISO8601 ),
 			'pageStart'		=> 1,
 			'pageEnd'		=> $record->commentPageCount(),
 			'author'		=> array(
 				'@type'		=> 'Person',
-				'name'		=> (string) Member::load( $record->member_id )->name,
-				'image'		=> (string) Member::load( $record->member_id )->get_photo( TRUE, TRUE )
+				'name'		=> (string) \IPS\Member::load( $record->member_id )->name,
+				'image'		=> (string) \IPS\Member::load( $record->member_id )->get_photo( TRUE, TRUE )
 			),
 			'publisher'		=> array(
-				'@id' => Settings::i()->base_url . '#organization',
+				'@id' => \IPS\Settings::i()->base_url . '#organization',
 				'member'	=> array(
 					'@type'		=> "Person",
-					'name'		=> Member::load( $record->member_id )->name,
-					'image'		=> (string) Member::load( $record->member_id )->get_photo( TRUE, TRUE ),
+					'name'		=> \IPS\Member::load( $record->member_id )->name,
+					'image'		=> (string) \IPS\Member::load( $record->member_id )->get_photo( TRUE, TRUE ),
 				)
 			),
 			'interactionStatistic'	=> array(
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/ViewAction",
+					'interactionType'		=> "http://schema.org/ViewAction",
 					'userInteractionCount'	=> $record->record_views
 				),
 				array(
 					'@type'					=> 'InteractionCounter',
-					'interactionType'		=> "https://schema.org/FollowAction",
+					'interactionType'		=> "http://schema.org/FollowAction",
 					'userInteractionCount'	=> $record::containerFollowerCount( $record->container() )
 				),
 			),
@@ -314,23 +269,24 @@ class record extends Controller
 		/* Do we have a real author? */
 		if( $record->member_id )
 		{
-			Output::i()->jsonLd['article']['author']['url']	= (string) Member::load( $record->member_id )->url();
-			Output::i()->jsonLd['article']['publisher']['member']['url'] = (string) Member::load( $record->member_id )->url();
+			\IPS\Output::i()->jsonLd['article']['author']['url']	= (string) \IPS\Member::load( $record->member_id )->url();
+			\IPS\Output::i()->jsonLd['article']['publisher']['member']['url'] = (string) \IPS\Member::load( $record->member_id )->url();
 		}
 
 		$logo = NULL;
-		if( !empty( Theme::i()->logo['front']['url'] ) )
+		if( \IPS\Theme::i()->logo['front'] )
 		{
 			try
 			{
-				$logo = Theme::i()->logo['front']['url'];
+				$logo = \IPS\File::get( 'core_Theme', \IPS\Theme::i()->logo['front']['url'] )->url;
 			}
 				/* File doesn't exist */
-			catch ( RuntimeException | DomainException $e ){}
+			catch ( \RuntimeException $e ){}
+			catch ( \DomainException $e ){}
 		}
-		Output::i()->jsonLd['article']['publisher']['logo'] = array(
+		\IPS\Output::i()->jsonLd['article']['publisher']['logo'] = array(
 			'@type'		=> 'ImageObject',
-			'url'		=> $logo ? (string) $logo : (string) Member::load( $record->member_id )->get_photo( TRUE, TRUE ),
+			'url'		=> $logo ? (string) $logo : (string) \IPS\Member::load( $record->member_id )->get_photo( TRUE, TRUE ),
 		);
 
 		/* Image is required */
@@ -338,23 +294,24 @@ class record extends Controller
 		{
 			try
 			{
-				$imageObj	= File::get( 'cms_Records', $record->record_image );
+				$imageObj	= \IPS\File::get( 'cms_Records', $record->record_image );
 
-				Output::i()->jsonLd['article']['image'] = array(
+				\IPS\Output::i()->jsonLd['article']['image'] = array(
 					'@type'		=> 'ImageObject',
 					'url'		=> (string) $imageObj->url
 				);
 			}
 			/* File doesn't exist */
-			catch ( RuntimeException | DomainException $e ){}
+			catch ( \RuntimeException $e ){}
+			catch ( \DomainException $e ){}
 		}
 		else
 		{
-			$photoVars = explode( 'x', THUMBNAIL_SIZE );
+			$photoVars = explode( 'x', \IPS\THUMBNAIL_SIZE );
 			
-			Output::i()->jsonLd['article']['image'] = array(
+			\IPS\Output::i()->jsonLd['article']['image'] = array(
 				'@type'		=> 'ImageObject',
-				'url'		=> Member::load( $record->member_id )->get_photo( TRUE, TRUE ),
+				'url'		=> \IPS\Member::load( $record->member_id )->get_photo( TRUE, TRUE ),
 				'width'		=> $photoVars[0],
 				'height'	=> $photoVars[1]
 			);
@@ -362,19 +319,19 @@ class record extends Controller
 
 		if( $record::database()->options['reviews'] or $record->container()->allow_rating )
 		{
-			Output::i()->jsonLd['article']['interactionStatistic'][]	= array(
+			\IPS\Output::i()->jsonLd['article']['interactionStatistic'][]	= array(
 				'@type'					=> 'InteractionCounter',
-				'interactionType'		=> "https://schema.org/ReviewAction",
+				'interactionType'		=> "http://schema.org/ReviewAction",
 				'userInteractionCount'	=> $record->record_reviews
 			);
 		}
 
 		if( $record::database()->options['comments'] )
 		{
-			Output::i()->jsonLd['article']['commentCount'] = $record->record_comments;
-			Output::i()->jsonLd['article']['interactionStatistic'][]	= array(
+			\IPS\Output::i()->jsonLd['article']['commentCount'] = $record->record_comments;
+			\IPS\Output::i()->jsonLd['article']['interactionStatistic'][]	= array(
 				'@type'					=> 'InteractionCounter',
-				'interactionType'		=> "https://schema.org/CommentAction",
+				'interactionType'		=> "http://schema.org/CommentAction",
 				'userInteractionCount'	=> $record->record_comments
 			);
 		}
@@ -383,48 +340,47 @@ class record extends Controller
 		/* Set default search to this record */
 		if ( ! $record::database()->search )
 		{
-			Output::i()->defaultSearchOption = array( 'all', 'search_everything' );
+			\IPS\Output::i()->defaultSearchOption = array( 'all', 'search_everything' );
 		}
 		else
 		{
-			$type = mb_strtolower( str_replace( '\\', '_', mb_substr( get_class( $record ), 4 ) ) );
-			Output::i()->defaultSearchOption = array( $type, "{$type}_pl" );
+			$type = mb_strtolower( str_replace( '\\', '_', mb_substr( \get_class( $record ), 4 ) ) );
+			\IPS\Output::i()->defaultSearchOption = array( $type, "{$type}_pl" );
 			
-			Output::i()->contextualSearchOptions = array();
-			Output::i()->contextualSearchOptions[ Member::loggedIn()->language()->addToStack( 'search_contextual_item', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( $record::$title ) ) ) ) ] = array( 'type' => $type, 'item' => $record->_id );
+			\IPS\Output::i()->contextualSearchOptions = array();
+			\IPS\Output::i()->contextualSearchOptions[ \IPS\Member::loggedIn()->language()->addToStack( 'search_contextual_item', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $record::$title ) ) ) ) ] = array( 'type' => $type, 'item' => $record->_id );
 	
 			try
 			{
 				$container = $record->container();
-				Output::i()->contextualSearchOptions[ Member::loggedIn()->language()->addToStack( 'search_contextual_item_categories' ) ] = array( 'type' => mb_strtolower( str_replace( '\\', '_', mb_substr( get_class( $record ), 4 ) ) ), 'nodes' => $container->_id );
+				\IPS\Output::i()->contextualSearchOptions[ \IPS\Member::loggedIn()->language()->addToStack( 'search_contextual_item_categories' ) ] = array( 'type' => mb_strtolower( str_replace( '\\', '_', mb_substr( \get_class( $record ), 4 ) ) ), 'nodes' => $container->_id );
 			}
-			catch ( BadMethodCallException $e ) { }
+			catch ( \BadMethodCallException $e ) { }
 		}
 
-		Dispatcher::i()->output .= \IPS\cms\Theme::i()->getTemplate( $record->container()->_template_display, 'cms', 'database' )->record( $record, $comments, $form, $nextUnread );
-		return null;
+		\IPS\cms\Databases\Dispatcher::i()->output .= \IPS\cms\Theme::i()->getTemplate( $record->container()->_template_display, 'cms', 'database' )->record( $record, $comments, $form, $nextUnread );
 	}
 
 	/**
 	 * Set the breadcrumb and title
 	 *
-	 * @param Item $item	Content item
-	 * @param bool $link	Link the content item element in the breadcrumb
+	 * @param	\IPS\Content\Item	$item	Content item
+	 * @param	bool				$link	Link the content item element in the breadcrumb
 	 * @return	void
 	 */
-	protected function _setBreadcrumbAndTitle( Item $item, bool $link=TRUE ): void
+	protected function _setBreadcrumbAndTitle( $item, $link=TRUE )
 	{
-		$database = Databases::load( Dispatcher::i()->databaseId );
+		$database = \IPS\cms\Databases::load( \IPS\cms\Databases\Dispatcher::i()->databaseId );
 		if ( $database->use_categories )
 		{
 			parent::_setBreadcrumbAndTitle( $item, $link );
 		}
 		else
 		{
-			Output::i()->breadcrumb[] = array( $link ? $item->url() : NULL, $item->mapped('title') );
+			\IPS\Output::i()->breadcrumb[] = array( $link ? $item->url() : NULL, $item->mapped('title') );
 
-			$title = ( isset( Request::i()->page ) and Request::i()->page > 1 ) ? Member::loggedIn()->language()->addToStack( 'title_with_page_number', FALSE, array( 'sprintf' => array( $item->mapped('title') . ' - ' . $database->pageTitle(), Request::i()->page ) ) ) : $item->mapped('title') . ' - ' . $database->pageTitle();
-			Output::i()->title = $title;
+			$title = ( isset( \IPS\Request::i()->page ) and \IPS\Request::i()->page > 1 ) ? \IPS\Member::loggedIn()->language()->addToStack( 'title_with_page_number', FALSE, array( 'sprintf' => array( $item->mapped('title') . ' - ' . $database->pageTitle(), \IPS\Request::i()->page ) ) ) : $item->mapped('title') . ' - ' . $database->pageTitle();
+			\IPS\Output::i()->title = $title;
 		}
 	}
 
@@ -433,28 +389,27 @@ class record extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function _doViewCheck() : void
+	protected function _doViewCheck()
 	{
 		try
 		{
-			/* @var Item $class */
 			$class	= static::$contentModel;
-			$topic	= $class::loadAndCheckPerms( Request::i()->id );
+			$topic	= $class::loadAndCheckPerms( \IPS\Request::i()->id );
 			
-			switch( Request::i()->view )
+			switch( \IPS\Request::i()->view )
 			{
 				case 'getnewpost':
-					Output::i()->redirect( $topic->url( 'getNewComment' ) );
+					\IPS\Output::i()->redirect( $topic->url( 'getNewComment' ) );
 				break;
 				
 				case 'getlastpost':
-					Output::i()->redirect( $topic->url( 'getLastComment' ) );
+					\IPS\Output::i()->redirect( $topic->url( 'getLastComment' ) );
 				break;
 			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2F173/F', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2F173/F', 403, '' );
 		}
 	}
 	
@@ -463,31 +418,30 @@ class record extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function revisions() : void
+	protected function revisions()
 	{
-		/* @var Records $recordClass */
-		$recordClass  = '\IPS\cms\Records' . Dispatcher::i()->databaseId;
+		$recordClass  = '\IPS\cms\Records' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
 		
 		try
 		{
-			$record   = $recordClass::loadAndCheckPerms( Request::i()->id );
+			$record   = $recordClass::loadAndCheckPerms( \IPS\Request::i()->id );
 			$category = $record->container();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'module_no_permission', '2T252/4', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T252/4', 403, '' );
 		}
 		
 		if ( ! $record->canManageRevisions() )
 		{
-			Output::i()->error( 'module_no_permission', '2T252/5', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T252/5', 403, '' );
 		}
 
-		$title = Member::loggedIn()->language()->addToStack('content_revision_record_title', FALSE, array( 'sprintf' => array( $record->_title ) ) );
+		$title = \IPS\Member::loggedIn()->language()->addToStack('content_revision_record_title', FALSE, array( 'sprintf' => array( $record->_title ) ) );
 		
-		$table = new Db( 'cms_database_revisions', $record->url('revisions'), array( 'revision_database_id=? and revision_record_id=?', $record::$customDatabaseId, $record->_id ) );
-		$table->tableTemplate = array( Theme::i()->getTemplate( 'revisions', 'cms', 'front' ), 'table' );
-		$table->rowsTemplate  = array( Theme::i()->getTemplate( 'revisions', 'cms', 'front' ), 'rows' );
+		$table = new \IPS\Helpers\Table\Db( 'cms_database_revisions', $record->url('revisions'), array( 'revision_database_id=? and revision_record_id=?', $record::$customDatabaseId, $record->_id ) );
+		$table->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'revisions', 'cms', 'front' ), 'table' );
+		$table->rowsTemplate  = array( \IPS\Theme::i()->getTemplate( 'revisions', 'cms', 'front' ), 'rows' );
 		$table->title = $title;
 		$table->include = array( 'revision_id', 'revision_date', 'revision_data', 'revision_member_id' );
 		$table->mainColumn = 'revision_date';
@@ -498,29 +452,29 @@ class record extends Controller
 		$table->parsers = array(
 				'revision_member_id' => function( $val )
 				{
-					return Member::load( $val );
+					return \IPS\Member::load( $val );
 				},
 				'revision_date' => function( $val )
 				{
-					return DateTime::ts( $val )->relative();
+					return \IPS\DateTime::ts( $val )->relative();
 				},
 				'revision_data' => function( $val, $row ) use ( $record )
 				{
-					return Revisions::load( $row['revision_id'] )->getDiffHtmlTables( $record::$customDatabaseId, $record, true );
+					return \IPS\cms\Records\Revisions::load( $row['revision_id'] )->getDiffHtmlTables( $record::$customDatabaseId, $record, true );
 				}
 		);
 
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/diff.css', 'core', 'admin' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'codemirror/diff_match_patch.js', 'core', 'interface' ) );
-		Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_records.js', 'cms' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'codemirror/codemirror.js', 'core', 'interface' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'codemirror/codemirror.css', 'core', 'interface' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'records/record.css', 'cms', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/diff.css', 'core', 'admin' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'codemirror/diff_match_patch.js', 'core', 'interface' ) );
+		\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_records.js', 'cms' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'codemirror/codemirror.js', 'core', 'interface' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'codemirror/codemirror.css', 'core', 'interface' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'records/record.css', 'cms', 'front' ) );
 		
 		/* Output */
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $table ) );
+			\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $table ), 200, 'text/html' );
 		}
 		else
 		{
@@ -528,16 +482,16 @@ class record extends Controller
 			{
 				foreach( $category->parents() AS $parent )
 				{
-					Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+					\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 				}
-				Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
 			}
-			catch( Exception $e ) {}
+			catch( \Exception $e ) {}
 			
-			Output::i()->breadcrumb[] = array( $record->url(), $record->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $record->url(), $record->_title );
 			
-			Output::i()->title   					= $title;
-			Dispatcher::i()->output .= (string) $table;
+			\IPS\Output::i()->title   					= $title;
+			\IPS\cms\Databases\Dispatcher::i()->output .= (string) $table;
 		}
 	}
 	
@@ -546,49 +500,48 @@ class record extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function revisionDelete() : void
+	protected function revisionDelete()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
-		/* @var Records $recordClass */
-		$recordClass  = '\IPS\cms\Records' . Dispatcher::i()->databaseId;
+		$recordClass  = '\IPS\cms\Records' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
 	
 		try
 		{
-			$record   = $recordClass::loadAndCheckPerms( Request::i()->id );
+			$record   = $recordClass::loadAndCheckPerms( \IPS\Request::i()->id );
 			$category = $record->container();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'module_no_permission', '2T252/6', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T252/6', 403, '' );
 		}
 	
 		try
 		{
-			$revision = Revisions::load( Request::i()->revision_id );
+			$revision = \IPS\cms\Records\Revisions::load( \IPS\Request::i()->revision_id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'module_no_permission', '2T252/7', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T252/7', 403, '' );
 		}
 	
 		if ( ! $record->canManageRevisions() )
 		{
-			Output::i()->error( 'module_no_permission', '2T252/8', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T252/8', 403, '' );
 		}
 		
 		$revision->delete();
 		
-		if ( isset( Request::i()->ajax ) )
+		if ( isset( \IPS\Request::i()->ajax ) )
 		{
-			Output::i()->redirect( $record->url() );
+			\IPS\Output::i()->redirect( $record->url() );
 		}
 		else
 		{
-			Output::i()->redirect( $record->url('revisions') );
+			\IPS\Output::i()->redirect( $record->url('revisions') );
 		}
 	}
 	
@@ -597,51 +550,48 @@ class record extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function revisionView() : void
+	protected function revisionView()
 	{
-		/* @var Records $recordClass */
-		$recordClass  = '\IPS\cms\Records' . Dispatcher::i()->databaseId;
+		$recordClass  = '\IPS\cms\Records' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
 	
 		try
 		{
-			$record   = $recordClass::loadAndCheckPerms( Request::i()->id );
+			$record   = $recordClass::loadAndCheckPerms( \IPS\Request::i()->id );
 			$category = $record->container();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'module_no_permission', '2T252/9', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T252/9', 403, '' );
 		}
 		
 		try
 		{
-			$revision = Revisions::load( Request::i()->revision_id );
+			$revision = \IPS\cms\Records\Revisions::load( \IPS\Request::i()->revision_id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'module_no_permission', '2T252/A', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T252/A', 403, '' );
 		}
 	
 		if ( ! $record->canManageRevisions() )
 		{
-			Output::i()->error( 'module_no_permission', '2T252/B', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T252/B', 403, '' );
 		}
 
-		$title        = Member::loggedIn()->language()->addToStack('content_revision_record_title', FALSE, array( 'sprintf' => array( $record->_title ) ) );
-
-		/* @var Fields $fieldsClass */
+		$title        = \IPS\Member::loggedIn()->language()->addToStack('content_revision_record_title', FALSE, array( 'sprintf' => array( $record->_title ) ) );
 		$fieldsClass  = 'IPS\cms\Fields' .  $record::$customDatabaseId;
 		$customFields = $fieldsClass::data( 'view', $category );
 		$conflicts    = array();
-		$form         = new Form( 'form', 'content_revision_restore' );
+		$form         = new \IPS\Helpers\Form( 'form', 'content_revision_restore' );
 
 		/* Add a "cancel" button that will take you back to the previous page */
-		array_unshift( $form->actionButtons, Theme::i()->getTemplate( 'forms', 'core', 'global' )->button( 'cancel', 'link', $record->url()->setQueryString( array( 'do' => 'revisions', 'd' => $record::$customDatabaseId ) ), 'ipsButton ipsButton--text', array( 'tabindex' => '3', 'accesskey' => 'c' ) ) );
+		array_unshift( $form->actionButtons, \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->button( 'cancel', 'link', $record->url()->setQueryString( array( 'do' => 'revisions', 'd' => $record::$customDatabaseId ) ), 'ipsButton ipsButton_link', array( 'tabindex' => '3', 'accesskey' => 'c' ) ) );
 
 		/* Build up our data set */
 		$conflicts = $revision->getDiffHtmlTables( $record::$customDatabaseId, $record, true );
 
 		/* If there is only one change, then clicking restore naturally means to revert that single change, so we don't need a form */
-		if( count( $conflicts ) === 1 )
+		if( \count( $conflicts ) === 1 )
 		{
 			foreach( $conflicts as $conflict )
 			{
@@ -653,7 +603,7 @@ class record extends Controller
 		{
 			foreach( $conflicts as $conflict )
 			{
-				$form->add( new Radio( 'conflict_' . $conflict['field']->id, 'no', false, array( 'options' => array( 'old' => '', 'new' => '' ) ) ) );
+				$form->add( new \IPS\Helpers\Form\Radio( 'conflict_' . $conflict['field']->id, 'no', false, array( 'options' => array( 'old' => '', 'new' => '' ) ) ) );
 			}
 		}
 
@@ -668,12 +618,12 @@ class record extends Controller
 					$record->$key = $revision->get( $key );
 				}
 				
-				Session::i()->modLog( 'modlog__content_revision_restored', array( $record->_title => FALSE, $revision->id => FALSE ) );
+				\IPS\Session::i()->modLog( 'modlog__content_revision_restored', array( $record->_title => FALSE, $revision->id => FALSE ) );
 				
 				$record->save();
 				$revision->delete();
 				
-				Output::i()->redirect( $record->url(), 'content_revision_restored' );
+				\IPS\Output::i()->redirect( $record->url(), 'content_revision_restored' );
 			}
 		}
 		
@@ -681,24 +631,24 @@ class record extends Controller
 		{
 			foreach( $category->parents() AS $parent )
 			{
-				Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 			}
-			Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
 		}
-		catch( Exception $e ) {}
+		catch( \Exception $e ) {}
 		
-		Output::i()->breadcrumb[] = array( $record->url(), $record->_title );
-		Output::i()->breadcrumb[] = array( $record->url()->setQueryString( array( 'do' => 'revisions', 'd' => $record::$customDatabaseId ) ), $title );
+		\IPS\Output::i()->breadcrumb[] = array( $record->url(), $record->_title );
+		\IPS\Output::i()->breadcrumb[] = array( $record->url()->setQueryString( array( 'do' => 'revisions', 'd' => $record::$customDatabaseId ) ), $title );
 			
-		Output::i()->title   = $title;
+		\IPS\Output::i()->title   = $title;
 		
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/diff.css', 'core', 'admin' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'codemirror/diff_match_patch.js', 'core', 'interface' ) );
-		Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_records.js', 'cms' ) );
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'codemirror/codemirror.js', 'core', 'interface' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'codemirror/codemirror.css', 'core', 'interface' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/diff.css', 'core', 'admin' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'codemirror/diff_match_patch.js', 'core', 'interface' ) );
+		\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_records.js', 'cms' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'codemirror/codemirror.js', 'core', 'interface' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'codemirror/codemirror.css', 'core', 'interface' ) );
 			
-		Dispatcher::i()->output   = $form->customTemplate( array( Theme::i()->getTemplate( 'revisions', 'cms' ), 'view' ), $record, $revision, $conflicts );
+		\IPS\cms\Databases\Dispatcher::i()->output   = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'revisions', 'cms' ), 'view' ), $record, $revision, $conflicts );
 	}
 	
 	/**
@@ -706,61 +656,53 @@ class record extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function edit() : void
+	protected function edit()
 	{
-		Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_records.js', 'cms' ) );
-
-		/* @var Records $recordClass */
-		$recordClass  = '\IPS\cms\Records' . Dispatcher::i()->databaseId;
-		$fieldsClass  = '\IPS\cms\Fields' . Dispatcher::i()->databaseId;
-		$database     = Databases::load( Dispatcher::i()->databaseId );
+		\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_records.js', 'cms' ) );
+		
+		$recordClass  = '\IPS\cms\Records' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
+		$fieldsClass  = '\IPS\cms\Fields' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
+		$database     = \IPS\cms\Databases::load( \IPS\cms\Databases\Dispatcher::i()->databaseId );
 		try
 		{
-			$record       = $recordClass::loadAndCheckPerms( Request::i()->id );
+			$record       = $recordClass::loadAndCheckPerms( \IPS\Request::i()->id );
 			$category     = $record->container();
 				
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'module_no_permission', '2T252/C', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T252/C', 403, '' );
 		}
 		
-		$title        = Member::loggedIn()->language()->addToStack( 'content_record_form_edit_record', FALSE, array( 'sprintf' => array( $record->_title ) ) );
+		$title        = \IPS\Member::loggedIn()->language()->addToStack( 'content_record_form_edit_record', FALSE, array( 'sprintf' => array( $record->_title ) ) );
 		$formElements = $recordClass::formElements( $record, $category );
 
 		// We check if the form has been submitted to prevent the user loosing their content
-		if ( isset( Request::i()->form_submitted ) )
+		if ( isset( \IPS\Request::i()->form_submitted ) )
 		{
 			if ( ! $record->couldEdit() )
 			{
-				Output::i()->error( 'module_no_permission', '2T252/G', 403, '' );
+				\IPS\Output::i()->error( 'module_no_permission', '2T252/G', 403, '' );
 			}
 		}
 		else
 		{
 			if ( ! $record->canEdit() )
 			{
-				Output::i()->error( 'module_no_permission', '2T252/D', 403, '' );
+				\IPS\Output::i()->error( 'module_no_permission', '2T252/D', 403, '' );
 			}
 		}
 		
-		$form = new Form( 'form', isset( Member::loggedIn()->language()->words[ $recordClass::$formLangPrefix . '_save' ] ) ? $recordClass::$formLangPrefix . '_save' : 'save' );
-		$form->class = 'ipsForm--vertical ipsForm--edit-record';
+		$form = new \IPS\Helpers\Form( 'form', isset( \IPS\Member::loggedIn()->language()->words[ $recordClass::$formLangPrefix . '_save' ] ) ? $recordClass::$formLangPrefix . '_save' : 'save' );
+		$form->class = 'ipsForm_vertical';
 			
 		foreach( $formElements as $name => $field )
 		{
 			$form->add( $field );
 		}
-
-		/* Now loop through and add all the elements to the form */
-		foreach( UiExtension::i()->run( $record, 'formElements', array( $record->container() ) ) as $element )
-		{
-			$form->add( $element );
-		}
 		
 		$hasModOptions = FALSE;
-
-		/* @var Fields $fieldsClass */
+		
 		if ( $recordClass::modPermission( 'lock', NULL, $category ) or
 			 $recordClass::modPermission( 'pin', NULL, $category ) or 
 			 $record->canHide() or 
@@ -768,14 +710,13 @@ class record extends Controller
 			 $fieldsClass::fixedFieldFormShow( 'record_allow_comments' ) or
 			 $fieldsClass::fixedFieldFormShow( 'record_expiry_date' ) or
 			 $fieldsClass::fixedFieldFormShow( 'record_comment_cutoff' ) or
-			 Member::loggedIn()->modPermission('can_content_edit_meta_tags') )
+			 \IPS\Member::loggedIn()->modPermission('can_content_edit_meta_tags') )
 		{
 			$hasModOptions = TRUE;
 		}
 		
 		if ( $values = $form->values() )
 		{
-            $record->processBeforeEdit( $values );
 			$record->processForm( $values );
 			$record->processAfterEdit( $values );
 
@@ -783,7 +724,7 @@ class record extends Controller
 			{
 				$column = $recordClass::$databaseColumnMap['date'];
 
-				if ( $values[ $recordClass::$formLangPrefix . 'date' ] instanceof DateTime )
+				if ( $values[ $recordClass::$formLangPrefix . 'date' ] instanceof \IPS\DateTime )
 				{
 					$record->$column = $values[ $recordClass::$formLangPrefix . 'date' ]->getTimestamp();
 				}
@@ -791,14 +732,16 @@ class record extends Controller
 
 			$record->save();
 
-			Session::i()->modLog( 'modlog__item_edit', array( $record::$title => FALSE, $record->url()->__toString() => FALSE, $record::$title => TRUE, $record->mapped( 'title' ) => FALSE ), $record );
+			\IPS\Session::i()->modLog( 'modlog__item_edit', array( $record::$title => FALSE, $record->url()->__toString() => FALSE, $record::$title => TRUE, $record->mapped( 'title' ) => FALSE ), $record );
 
-			Output::i()->redirect( $record->url() );
+			\IPS\Output::i()->redirect( $record->url() );
 		}
 		
-		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->title = Member::loggedIn()->language()->addToStack( $title );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'records/form.css', 'cms', 'front' ) );
+		\IPS\Output::i()->allowDefaultWidgets = FALSE;
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\cms\Pages\Page::$currentPage->getWidgets();
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( $title );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'records/form.css', 'cms', 'front' ) );
 		
 		try
 		{
@@ -806,18 +749,17 @@ class record extends Controller
 			{
 				foreach( $category->parents() AS $parent )
 				{
-					Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+					\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 				}
-				Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
 			}
 		}
-		catch( Exception $e ) {}
+		catch( \Exception $e ) {}
 		
-		Output::i()->breadcrumb[] = array( $record->url(), $record->mapped('title') );
+		\IPS\Output::i()->breadcrumb[] = array( $record->url(), $record->mapped('title') );
 
 		$this->showClubHeader();
-		Dispatcher::i()->output = $form->customTemplate( array( \IPS\cms\Theme::i()->getTemplate( $database->template_form, 'cms', 'database' ), 'recordForm' ), NULL, $category, $database, Page::$currentPage, $title, $hasModOptions );
-
+		\IPS\cms\Databases\Dispatcher::i()->output .= $form->customTemplate( array( \IPS\cms\Theme::i()->getTemplate( $database->template_form, 'cms', 'database' ), 'recordForm' ), NULL, $category, $database, \IPS\cms\Pages\Page::$currentPage, $title, $hasModOptions );
 	}
 	
 	/**
@@ -825,39 +767,38 @@ class record extends Controller
 	 *
 	 * @return	void
 	 */
-	public function markRead() : void
+	public function markRead()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
 			$record = $this->_getRecord();
 			$record->markRead();
-			Output::i()->redirect( $record->url() );
+			\IPS\Output::i()->redirect( $record->url() );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'module_no_permission', '2F173/C', 403, 'module_no_permission_guest' );
+			\IPS\Output::i()->error( 'module_no_permission', '2F173/C', 403, 'module_no_permission_guest' );
 		}
 	}
 	
 	/**
 	 * Return a record based on query string 'id' param
 	 * 
-	 * @return Records
+	 * @return \IPS\cms\Records
 	 */
-	public function _getRecord(): Records
+	public function _getRecord()
 	{
-		/* @var Records $recordClass */
-		$recordClass  = '\IPS\cms\Records' . Dispatcher::i()->databaseId;
+		$recordClass  = '\IPS\cms\Records' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
 
 		try
 		{
-			$record = $recordClass::loadAndCheckPerms( Request::i()->id );
+			$record = $recordClass::loadAndCheckPerms( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'module_no_permission', '2T252/E', 403, '' );
+			\IPS\Output::i()->error( 'module_no_permission', '2T252/E', 403, '' );
 		}
 		
 		return $record;
@@ -868,158 +809,157 @@ class record extends Controller
 	/**
 	 * Hide Comment/Review
 	 *
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function _hide( string $commentClass, Comment $comment, Item $item  ): void
+	public function _hide( $commentClass, $comment, $item  )
 	{
-		$this->_doSomething( '_hide', $commentClass, $comment, $item );
+		return $this->_doSomething( '_hide', $commentClass, $comment, $item );
 	}
 	
 	/**
 	 * Unhide Comment/Review
 	 *
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function _unhide( string $commentClass, Comment $comment, Item $item ): void
+	public function _unhide( $commentClass, $comment, $item  )
 	{
-		$this->_doSomething( '_unhide', $commentClass, $comment, $item );
+		return $this->_doSomething( '_unhide', $commentClass, $comment, $item );
 	}
 	
 	/**
 	 * Split Comment
 	 *
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
-	 * @return    void
-	 * @throws	LogicException
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
+	 * @return	void
+	 * @throws	\LogicException
 	 */
-	protected function _split( string $commentClass, Comment $comment, Item $item ): void
+	protected function _split( $commentClass, $comment, $item )
 	{
-		$this->_doSomething( '_split', $commentClass, $comment, $item );
+		return $this->_doSomething( '_split', $commentClass, $comment, $item );
 	}
 	
 	/**
 	 * Edit Comment/Review
 	 *
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	protected function _edit( string $commentClass, Comment $comment, Item $item ) : void
+	protected function _edit( $commentClass, $comment, $item )
 	{
-		$this->_doSomething( '_edit', $commentClass, $comment, $item );
+		return $this->_doSomething( '_edit', $commentClass, $comment, $item );
 	}
 	
 	/**
 	 * Report Comment/Review
 	 *
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	protected function _report( string $commentClass, Comment $comment, Item $item ) : void
+	protected function _report( $commentClass, $comment, $item )
 	{
-		$this->_doSomething( '_report', $commentClass, $comment, $item );
+		return $this->_doSomething( '_report', $commentClass, $comment, $item );
 	}
 	
 	/**
 	 * Edit Log
 	 *
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function _editlog( string $commentClass, Comment $comment, Item $item ) : void
+	public function _editlog( $commentClass, $comment, $item )
 	{
-		$this->_doSomething( '_editlog', $commentClass, $comment, $item );
+		return $this->_doSomething( '_editlog', $commentClass, $comment, $item );
 	}
 	
 	/**
 	 * Delete Comment/Review
 	 *
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	protected function _delete( string $commentClass, Comment $comment, Item $item ) : void
+	protected function _delete( $commentClass, $comment, $item )
 	{
-		$this->_doSomething( '_delete', $commentClass, $comment, $item );
+		return $this->_doSomething( '_delete', $commentClass, $comment, $item );
 	}
 	
 	/**
 	 * Rep Comment/Review
 	 *
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	protected function _react( string $commentClass, Comment $comment, Item $item ): void
+	protected function _react( $commentClass, $comment, $item )
 	{
-		$this->_doSomething( '_react', $commentClass, $comment, $item );
+		return $this->_doSomething( '_react', $commentClass, $comment, $item );
 	}
 	
 	/**
 	 * Show Comment/Review Rep
 	 *
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	protected function _showReactions( string $commentClass, Comment $comment, Item $item ): void
+	protected function _showReactions( $commentClass, $comment, $item )
 	{
-		$this->_doSomething( '_showReactions', $commentClass, $comment, $item );
+		return $this->_doSomething( '_showReactions', $commentClass, $comment, $item );
 	}
 	
 	/**
-	 * Do something that needs to be overridden from the Content controller
+	 * Do something that needs to be overriden from the Content controller
 	 *
-	 * @param string $method			The method name
-	 * @param string $commentClass	The comment/review class
-	 * @param Comment $comment		The comment/review
-	 * @param Item $item			The item
+	 * @param	string					$method			The method name
+	 * @param	string					$commentClass	The comment/review class
+	 * @param	\IPS\Content\Comment	$comment		The comment/review
+	 * @param	\IPS\Content\Item		$item			The item
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	protected function _doSomething( string $method, string $commentClass, Comment $comment, Item $item ) : void
+	protected function _doSomething( $method, $commentClass, $comment, $item )
 	{
 		$record = $this->_getRecord();
 
-		if ( $record->useForumComments() AND isset( Request::i()->comment) )
+		if ( $record->useForumComments() AND isset( \IPS\Request::i()->comment) )
 		{
-			/* @var Records\CommentTopicSync $commentClass */
 			$commentClass = 'IPS\cms\Records\CommentTopicSync' . $record::$customDatabaseId;
-			$comment      = $commentClass::load( Request::i()->comment );
+			$comment      = $commentClass::load( \IPS\Request::i()->comment );
 			$item         = $record;
 		}
 
 		try
 		{
-			parent::$method( $commentClass, $comment, $item );
+			return parent::$method( $commentClass, $comment, $item );
 		}
-		catch( LogicException $e )
+		catch( \LogicException $e )
 		{
-			Output::i()->error( 'node_error', '2T252/F', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2T252/F', 403, '' );
 		}
 	}
 
@@ -1028,30 +968,30 @@ class record extends Controller
 	 *
 	 * @return void
 	 */
-	protected function showClubHeader() : void
+	protected function showClubHeader()
 	{
 		$record = $this->_getRecord();
 		if ( $record and $club = $record->club )
 		{
 			$category = $record->container();
 
-			Output::i()->sidebar['contextual'] = '';
+			\IPS\Output::i()->sidebar['contextual'] = '';
 
 			/* Club info in sidebar */
-			if ( Settings::i()->clubs_header == 'sidebar' )
+			if ( \IPS\Settings::i()->clubs_header == 'sidebar' )
 			{
-				Output::i()->sidebar['enabled'] = true;
-				Output::i()->sidebar['contextual'] .= Theme::i()->getTemplate( 'clubs', 'core', 'front' )->header( $club, $category, 'sidebar' );
+				\IPS\Output::i()->sidebar['enabled'] = true;
+				\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'clubs', 'core', 'front' )->header( $club, $category, 'sidebar' );
 			}
 			else
 			{
-				Dispatcher::i()->output .= Theme::i()->getTemplate( 'clubs', 'core', 'front' )->header( $club, $record->container(), 'full' );
+				\IPS\cms\Databases\Dispatcher::i()->output .= \IPS\Theme::i()->getTemplate( 'clubs', 'core', 'front' )->header( $club, $record->container(), 'full' );
 			}
 
-			if( ( GeoLocation::enabled() and Settings::i()->clubs_locations AND $location = $club->location() ) )
+			if( ( \IPS\GeoLocation::enabled() and \IPS\Settings::i()->clubs_locations AND $location = $club->location() ) )
 			{
-				Output::i()->sidebar['enabled'] = true;
-				Output::i()->sidebar['contextual'] .= Theme::i()->getTemplate( 'clubs', 'core', 'front' )->clubLocationBox( $club, $location );
+				\IPS\Output::i()->sidebar['enabled'] = true;
+				\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'clubs', 'core', 'front' )->clubLocationBox( $club, $location );
 			}
 		}
 	}

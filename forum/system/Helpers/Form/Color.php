@@ -11,28 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Application;
-use const IPS\ROOT_PATH;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function array_merge;
-use function defined;
-use function file_get_contents;
-use function json_decode;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Color input class for Form Builder
  */
-class Color extends FormAbstract
+class _Color extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -41,17 +29,13 @@ class Color extends FormAbstract
 	 		'disabled'		=> FALSE,		// Disables input. Default is FALSE.
 	 		'swatches'		=> FALSE		// Shows colour swatches
 	 		'rgba'			=> FALSE		// Show RGBA mode
-	 		'allowNone'		=> FALSE		// Allow user to select no colour
-	 		'allowNoneLanguage' => 'colorpicker_use_none'	// Language string for "Use no colour"
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'disabled'	=> FALSE,
 		'swatches'  => FALSE,
-		'rgba'		=> FALSE,
-		'allowNone' => FALSE,
-		'allowNoneLanguage' => 'colorpicker_use_none',
+		'rgba'		=> FALSE
 	);
 	
 	/** 
@@ -59,39 +43,33 @@ class Color extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		$swatches = NULL;
-
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->color( $this->name, $this->value, $this->required, $this->options['disabled'], $this->options['swatches'], $this->options['rgba'], $this->options['allowNone'], $this->options['allowNoneLanguage'] );
+				
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->color( $this->name, $this->value, $this->required, $this->options['disabled'], $this->options['swatches'], $this->options['rgba'] );
 	}
 	
 	/**
 	 * Format Value
 	 *
-	 * @return    mixed
+	 * @return	string
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
-		$doNotUseName = $this->name . '_none';
 		$manualName = $this->name . '_manual';
 
-		if ( isset( Request::i()->$doNotUseName ) and Request::i()->$doNotUseName )
-		{
-			return null;
-		}
-
 		/* If a manual value has been supplied, use that instead */
-		if ( isset( Request::i()->$manualName ) )
+		if ( isset( \IPS\Request::i()->$manualName ) )
 		{
-			$value = Request::i()->$manualName;
+			$value = \IPS\Request::i()->$manualName;
 		}
 		else
 		{
 			$value = $this->value;
 		}
 
-		if ( ! $this->options['rgba'] and ( $value and mb_substr( $value, 0, 1 ) !== '#' ) )
+		if ( ! $this->options['rgba'] and mb_substr( $value, 0, 1 ) !== '#' )
 		{
 			$value = '#' . $value;
 		}
@@ -102,10 +80,10 @@ class Color extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		parent::validate();
 
@@ -122,35 +100,15 @@ class Color extends FormAbstract
 		{
 			if ( ! $rgbaPass and ! $namePass and ! $hexPass ) 
 			{
-				throw new InvalidArgumentException('form_color_bad_rgba');
+				throw new \InvalidArgumentException('form_color_bad_rgba');
 			}
 		}
 		else
 		{
 			if ( ! $namePass and ! $hexPass ) 
 			{
-				throw new InvalidArgumentException('form_color_bad');
+				throw new \InvalidArgumentException('form_color_bad');
 			}
-		}
-
-		return TRUE;
-	}
-
-	public static function loadJS() : void
-	{
-		static $loaded = false;
-		if ( $loaded === FALSE )
-		{
-			$dir = Application::load( 'core' )->directory;
-			$manifest = json_decode( file_get_contents( ROOT_PATH . "/applications/{$dir}/data/iroManifest.json" ), true );
-			foreach( $manifest as $key => $module )
-			{
-				if ( @$module['isEntry'] and isset( $module['file'] ) )
-				{
-					Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'static/iro/' . $module['file'], 'core', 'interface' ) );
-				}
-			}
-			$loaded = true;
 		}
 	}
 }

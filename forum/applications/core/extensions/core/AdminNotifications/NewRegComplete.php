@@ -11,48 +11,38 @@
 namespace IPS\core\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Member;
-use IPS\Theme;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP Notification: New Registration Complete
  */
-class NewRegComplete extends AdminNotification
+class _NewRegComplete extends \IPS\core\AdminNotification
 {	
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'members';
+	public static $group = 'members';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 3;
+	public static $groupPriority = 3;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 4;
+	public static $itemPriority = 4;
 	
 	/**
 	 * Title for settings
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle(): string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_NewRegComplete';
 	}
@@ -60,10 +50,10 @@ class NewRegComplete extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member )
 	{
 		return $member->hasAcpRestriction( 'core', 'members' );
 	}
@@ -71,9 +61,9 @@ class NewRegComplete extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional(): bool
+	public static function mayBeOptional()
 	{
 		return TRUE;
 	}
@@ -83,7 +73,7 @@ class NewRegComplete extends AdminNotification
 	 *
 	 * @return	bool
 	 */
-	public static function defaultValue() : bool
+	public static function defaultValue()
 	{
 		return FALSE;
 	}
@@ -93,7 +83,7 @@ class NewRegComplete extends AdminNotification
 	 *
 	 * @return	bool
 	 */
-	public static function mayRecur(): bool
+	public static function mayRecur()
 	{
 		return FALSE;
 	}
@@ -101,10 +91,10 @@ class NewRegComplete extends AdminNotification
 	/**
 	 * WHERE clause to use against core_acp_notifications_preferences for fetching members to email
 	 *
-	 * @param mixed $extraForEmail		Any additional information specific to this instance which is used for the email but not saved
-	 * @return    array
+	 * @param	mixed		$extraForEmail		Any additional information specific to this instance which is used for the email but not saved
+	 * @return	bool
 	 */
-	public function emailWhereClause( mixed $extraForEmail ): array
+	public function emailWhereClause( $extraForEmail )
 	{
 		/* Most notifications only send one email until the admin has "dealt" with it, but since this
 			type of notification cannot be "dealt" with, we need to send an email every time rather
@@ -115,15 +105,15 @@ class NewRegComplete extends AdminNotification
 	/**
 	 * Get the date/time that we need to use for the cutoff
 	 *
-	 * @return	DateTime|NULL
+	 * @return	\IPS\DateTime|NULL
 	 */
-	public function cutoff() : ?DateTime
+	public function cutoff()
 	{
 		try
 		{
-			return DateTime::ts( Db::i()->select( 'time', 'core_acp_notifcations_dismissals', array( 'notification=? AND `member`=?', $this->id, Member::loggedIn()->member_id ) )->first() );
+			return \IPS\DateTime::ts( \IPS\Db::i()->select( 'time', 'core_acp_notifcations_dismissals', array( 'notification=? AND `member`=?', $this->id, \IPS\Member::loggedIn()->member_id ) )->first() );
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return NULL;
 		}
@@ -134,25 +124,25 @@ class NewRegComplete extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack( 'acp_notification_NewRegComplete_title' );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'acp_notification_NewRegComplete_title' );
 	}
 	
 	/**
 	 * Notification Subtitle (no HTML)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function subtitle(): ?string
+	public function subtitle()
 	{
 		if ( $cutoff = $this->cutoff() )
 		{
 			try
 			{
-				return Member::loggedIn()->language()->addToStack( 'member_joined_latest', FALSE, array( 'sprintf' => array( DateTime::ts( Db::i()->select( 'joined', 'core_members', array( 'joined>?', $cutoff->getTimestamp() ), 'joined desc' )->first() )->relative( DateTime::RELATIVE_FORMAT_LOWER ) ) ) );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'member_joined_latest', FALSE, array( 'sprintf' => array( \IPS\DateTime::ts( \IPS\Db::i()->select( 'joined', 'core_members', array( 'joined>?', $cutoff->getTimestamp() ), 'joined desc' )->first() )->relative( \IPS\DateTime::RELATIVE_FORMAT_LOWER ) ) ) );
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				return NULL;
 			}
@@ -166,9 +156,9 @@ class NewRegComplete extends AdminNotification
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body()
 	{
 		$limit = 12;
 		$users = array();
@@ -178,10 +168,10 @@ class NewRegComplete extends AdminNotification
 		{
 			$where[] = array( 'joined>?', $cutoff->getTimestamp() );
 		}	
-		$more = Db::i()->select( 'COUNT(*)', 'core_members', $where )->first() - $limit + 1;
+		$more = \IPS\Db::i()->select( 'COUNT(*)', 'core_members', $where )->first() - $limit + 1;	
 		
 		foreach (
-			Db::i()->select(
+			\IPS\Db::i()->select(
 				'*',
 				'core_members',
 				$where,
@@ -190,12 +180,12 @@ class NewRegComplete extends AdminNotification
 			) as $user
 		)
 		{
-			$users[ $user['member_id'] ] = Member::constructFromData( $user );
+			$users[ $user['member_id'] ] = \IPS\Member::constructFromData( $user );
 		}
 				
-		if ( count( $users ) )
+		if ( \count( $users ) )
 		{
-			return Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->newMember( $users, $this, $more );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->newMember( $users, $this, $more );
 		}
 		else
 		{
@@ -208,7 +198,7 @@ class NewRegComplete extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function severity(): string
+	public function severity()
 	{
 		return static::SEVERITY_OPTIONAL;
 	}
@@ -218,7 +208,7 @@ class NewRegComplete extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function dismissible(): string
+	public function dismissible()
 	{
 		return static::DISMISSIBLE_UNTIL_RECUR;
 	}

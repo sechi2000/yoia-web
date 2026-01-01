@@ -12,89 +12,67 @@
 namespace IPS\downloads\extensions\nexus\Item;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\DateTime;
-use IPS\downloads\File as DownloadsFile;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use IPS\nexus\Customer;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Tax;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File
  */
-class File extends \IPS\nexus\Invoice\Item\Purchase
+class _File extends \IPS\nexus\Invoice\Item\Purchase
 {
 	/**
 	 * @brief	Application
-	 *
 	 */
-	public static string $application = 'downloads';
+	public static $application = 'downloads';
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $type = 'file';
+	public static $type = 'file';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'download';
+	public static $icon = 'download';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'file';
+	public static $title = 'file';
 	
 	/**
 	 * Image
 	 *
-	 * @return \IPS\File|null
+	 * @return |IPS\File|NULL
 	 */
-	public function image(): \IPS\File|null
+	public function image()
 	{
 		try
 		{
-			return DownloadsFile::load( $this->id )->primary_screenshot;
+			return \IPS\downloads\File::load( $this->id )->primary_screenshot;
 		}
-		catch ( Exception  )
+		catch ( \Exception $e )
 		{
 			return NULL;
 		}
 	}
-
+	
 	/**
 	 * Image
 	 *
-	 * @param Purchase $purchase The purchase
-	 * @return \IPS\File|null
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return |IPS\File|NULL
 	 */
-	public static function purchaseImage( Purchase $purchase ): \IPS\File|null
+	public static function purchaseImage( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{			
-			return DownloadsFile::load( $purchase->item_id )->primary_screenshot;
+			return \IPS\downloads\File::load( $purchase->item_id )->primary_screenshot;
 		}
-		catch ( Exception  )
+		catch ( \Exception $e )
 		{
 			return NULL;
 		}
@@ -103,27 +81,27 @@ class File extends \IPS\nexus\Invoice\Item\Purchase
 	/**
 	 * Client Area Action
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
 	 */
-	public static function clientAreaAction( Purchase $purchase ): void
+	public static function clientAreaAction( \IPS\nexus\Purchase $purchase )
 	{
-		if( Request::i()->act == 'reactivate' AND $purchase->can_reactivate )
+		if( \IPS\Request::i()->act == 'reactivate' AND $purchase->can_reactivate )
 		{
 			/* Cannot renew, do not set renewal periods */
-			$file = DownloadsFile::load( $purchase->item_id );
+			$file = \IPS\downloads\File::load( $purchase->item_id );
 			if( !$file->container()->can( 'download', $purchase->member ) )
 			{
-				parent::clientAreaAction( $purchase );
+				return parent::clientAreaAction( $purchase );
 			}
 
 			try
 			{
-				$file = DownloadsFile::load( $purchase->item_id );
+				$file = \IPS\downloads\File::load( $purchase->item_id );
 			}
-			catch ( OutOfRangeException  )
+			catch ( \OutOfRangeException $e )
 			{
-				parent::clientAreaAction( $purchase );
+				return parent::clientAreaAction( $purchase );
 			}
 			$renewalCosts = json_decode( $file->renewal_price, TRUE );
 
@@ -133,12 +111,12 @@ class File extends \IPS\nexus\Invoice\Item\Purchase
 				$currency = $purchase->original_invoice->currency;
 				if( !isset( $renewalCosts[ $currency ] ) )
 				{
-					throw new OutOfRangeException;
+					throw \OutOfRangeException();
 				}
 			}
-			catch( OutOfRangeException  )
+			catch( \OutOfRangeException $e )
 			{
-				$currency = Customer::loggedIn()->defaultCurrency();
+				$currency = \IPS\nexus\Customer::loggedIn()->defaultCurrency();
 			}
 
 			$tax = NULL;
@@ -146,14 +124,14 @@ class File extends \IPS\nexus\Invoice\Item\Purchase
 			{
 				try
 				{
-					$tax = Tax::load( $purchase->tax );
+					$tax = \IPS\nexus\Tax::load( $purchase->tax );
 				}
-				catch ( Exception  ) { }
+				catch ( \Exception $e ) { }
 			}
 
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 
-			$purchase->renewals = new RenewalTerm( new Money( $renewalCosts[ $currency ]['amount'], $currency ), new DateInterval( 'P' . $file->renewal_term . mb_strtoupper( $file->renewal_units ) ), $tax );
+			$purchase->renewals = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $renewalCosts[ $currency ]['amount'], $currency ), new \DateInterval( 'P' . $file->renewal_term . mb_strtoupper( $file->renewal_units ) ), $tax );
 			$purchase->cancelled = FALSE;
 			$purchase->save();
 
@@ -162,11 +140,11 @@ class File extends \IPS\nexus\Invoice\Item\Purchase
 			if ( !$purchase->active and $cycles = $purchase->canRenewUntil( NULL, TRUE ) AND $cycles !== FALSE )
 			{
 				$url = $cycles === 1 ? $purchase->url()->setQueryString( 'do', 'renew' )->csrf() : $purchase->url()->setQueryString( 'do', 'renew' );
-				Output::i()->redirect( $url );
+				\IPS\Output::i()->redirect( $url );
 			}
 			else
 			{
-				Output::i()->redirect( $purchase->url() );
+				\IPS\Output::i()->redirect( $purchase->url() );
 			}
 		}
 	}
@@ -174,116 +152,58 @@ class File extends \IPS\nexus\Invoice\Item\Purchase
 	/**
 	 * Get Client Area Page HTML
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    array    array( 'packageInfo' => '...', 'purchaseInfo' => '...' )
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	array	array( 'packageInfo' => '...', 'purchaseInfo' => '...' )
 	 */
-	public static function clientAreaPage( Purchase $purchase ): array
+	public static function clientAreaPage( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			$file = DownloadsFile::load( $purchase->item_id );
+			$file = \IPS\downloads\File::load( $purchase->item_id );
 
 			/* Reactivate */
 			$reactivateUrl = NULL;
 			if ( $file->container()->can( 'download', $purchase->member ) and !$purchase->renewals and $file->renewal_term and $file->renewal_units and $file->renewal_price and $purchase->can_reactivate and ( !$purchase->billing_agreement or $purchase->billing_agreement->canceled ) )
 			{
-				$reactivateUrl = Url::internal( "app=nexus&module=clients&controller=purchases&id={$purchase->id}&do=extra&act=reactivate", 'front', 'clientspurchaseextra', Url::seoTitle( $purchase->name ) )->csrf();
+				$reactivateUrl = \IPS\Http\Url::internal( "app=nexus&module=clients&controller=purchases&id={$purchase->id}&do=extra&act=reactivate", 'front', 'clientspurchaseextra', \IPS\Http\Url::seoTitle( $purchase->name ) )->csrf();
 			}
 			
-			return array( 'packageInfo' => Theme::i()->getTemplate( 'nexus', 'downloads' )->fileInfo( $file ), 'purchaseInfo' => Theme::i()->getTemplate( 'nexus', 'downloads' )->filePurchaseInfo( $file, $reactivateUrl ) );
+			return array( 'packageInfo' => \IPS\Theme::i()->getTemplate( 'nexus', 'downloads' )->fileInfo( $file ), 'purchaseInfo' => \IPS\Theme::i()->getTemplate( 'nexus', 'downloads' )->filePurchaseInfo( $file, $reactivateUrl ) );
 		}
-		catch ( OutOfRangeException  ) { }
+		catch ( \OutOfRangeException $e ) { }
 		
-		return [];
+		return NULL;
 	}
 	
 	/**
 	 * Get ACP Page HTML
 	 *
-	 * @param Purchase $purchase
-	 * @return    string
+	 * @return	string
 	 */
-	public static function acpPage( Purchase $purchase ): string
+	public static function acpPage( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			$file = DownloadsFile::load( $purchase->item_id );
-			return (string) Theme::i()->getTemplate( 'nexus', 'downloads' )->fileInfo( $file );
+			$file = \IPS\downloads\File::load( $purchase->item_id );
+			return \IPS\Theme::i()->getTemplate( 'nexus', 'downloads' )->fileInfo( $file );
 		}
-		catch ( OutOfRangeException  ) { }
+		catch ( \OutOfRangeException $e ) { }
 		
-		return "";
-	}
-
-	/**
-	 * Generate Invoice Form
-	 *
-	 * @param	Form	$form		The form
-	 * @param	Invoice	$invoice	The invoice
-	 * @return	void
-	 */
-	public static function form( Form $form, Invoice $invoice ) : void
-	{
-		$form->add( new Form\Item( 'downloads_file', null, true, [
-			'class' => DownloadsFile::class,
-			'maxItems' => 1,
-			'where' => [
-				[ 'file_cost is not null' ],
-				[ 'file_open=?', 1 ],
-				[ 'file_submitter != ?', $invoice->member->member_id ]
-			],
-			'itemTemplate' => [ Theme::i()->getTemplate( 'nexus', 'downloads' ), 'itemResultTemplate' ]
-		] ) );
-	}
-
-	/**
-	 * Create From Form
-	 *
-	 * @param	array				$values	Values from form
-	 * @param	Invoice	$invoice	The invoice
-	 * @return	static
-	 */
-	public static function createFromForm( array $values, Invoice $invoice ): static
-	{
-		$file = array_shift( $values['downloads_file'] );
-		$price = $file->price( $invoice->member );
-		$item = new static( $file->name, $price );
-		$item->id = $file->id;
-
-		try
-		{
-			$item->tax = Settings::i()->item_nexus_tas ? Tax::load( Settings::i()->idm_nexus_tax ) : null;
-		}
-		catch( OutOfRangeException ){}
-
-		if ( Settings::i()->idm_nexus_gateways )
-		{
-			$item->paymentMethodIds = explode( ',', Settings::i()->idm_nexus_gateways );
-		}
-
-		$item->renewalTerm = $file->renewalTerm( $invoice->member );
-		$item->payTo = $file->author();
-		$item->commission = Settings::i()->idm_nexus_percent;
-		if ( $fees = json_decode( Settings::i()->idm_nexus_transfee, TRUE ) and isset( $fees[ $price->currency ] ) )
-		{
-			$item->fee = new Money( $fees[ $price->currency ]['amount'], $price->currency );
-		}
-
-		return $item;
+		return NULL;
 	}
 	
 	/**
 	 * URL
 	 *
-	 * @return Url|string|null
+	 * @return |IPS\Http\Url|NULL
 	 */
-	function url(): Url|string|null
+	public function url()
 	{
 		try
 		{
-			return DownloadsFile::load( $this->id )->url();
+			return \IPS\downloads\File::load( $this->id )->url();
 		}
-		catch ( OutOfRangeException  )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -292,9 +212,9 @@ class File extends \IPS\nexus\Invoice\Item\Purchase
 	/**
 	 * ACP URL
 	 *
-	 * @return Url|null
+	 * @return |IPS\Http\Url|NULL
 	 */
-	public function acpUrl(): Url|null
+	public function acpUrl()
 	{
 		return $this->url();
 	}
@@ -302,14 +222,14 @@ class File extends \IPS\nexus\Invoice\Item\Purchase
 	/** 
 	 * Get renewal payment methods IDs
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    array|NULL
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	array|NULL
 	 */
-	public static function renewalPaymentMethodIds( Purchase $purchase ): array|null
+	public static function renewalPaymentMethodIds( \IPS\nexus\Purchase $purchase )
 	{
-		if ( Settings::i()->idm_nexus_gateways )
+		if ( \IPS\Settings::i()->idm_nexus_gateways )
 		{
-			return explode( ',', Settings::i()->idm_nexus_gateways );
+			return explode( ',', \IPS\Settings::i()->idm_nexus_gateways );
 		}
 		else
 		{
@@ -320,14 +240,14 @@ class File extends \IPS\nexus\Invoice\Item\Purchase
 	/**
 	 * Purchase can be renewed?
 	 *
-	 * @param	Purchase $purchase	The purchase
-	 * @return    boolean
+	 * @param	\IPS\nexus\Purchase $purchase	The purchase
+	 * @return	boolean
 	 */
-	public static function canBeRenewed( Purchase $purchase ): bool
+	public static function canBeRenewed( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			$file = DownloadsFile::load( $purchase->item_id );
+			$file = \IPS\downloads\File::load( $purchase->item_id );
 
 			/* File is viewable and basic download permission check is good */
 			if( $file->canView( $purchase->member ) AND $file->container()->can( 'download', $purchase->member ) )
@@ -335,7 +255,7 @@ class File extends \IPS\nexus\Invoice\Item\Purchase
 				return TRUE;
 			}
 		}
-		catch ( OutOfRangeException  ) {}
+		catch ( \OutOfRangeException $e ) {}
 
 		return FALSE;
 	}
@@ -343,11 +263,11 @@ class File extends \IPS\nexus\Invoice\Item\Purchase
 	/**
 	 * Can Renew Until
 	 *
-	 * @param	Purchase	$purchase	The purchase
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
 	 * @param	bool					$admin		If TRUE, is for ACP. If FALSE, is for front-end.
-	 * @return	DateTime|bool				TRUE means can renew as much as they like. FALSE means cannot renew at all. \IPS\DateTime means can renew until that date
+	 * @return	\IPS\DateTime|bool				TRUE means can renew as much as they like. FALSE means cannot renew at all. \IPS\DateTime means can renew until that date
 	 */
-	public static function canRenewUntil( Purchase $purchase, bool $admin=FALSE ): DateTime|bool
+	public static function canRenewUntil( \IPS\nexus\Purchase $purchase, $admin )
 	{
 		if( $admin )
 		{

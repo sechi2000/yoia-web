@@ -11,24 +11,21 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Truncate
  */
-class Wordbreak
+class _Wordbreak
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = TRUE;
+	public static $canBeUsedInCss = TRUE;
 	
 	/**
 	 * Run the plug-in
@@ -38,7 +35,7 @@ class Wordbreak
 	 * @param	array		$options    Array of options
 	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options ): string
+	public static function runPlugin( $data, $options )
 	{
 		return "htmlspecialchars( {$data}, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', FALSE )";
 	}

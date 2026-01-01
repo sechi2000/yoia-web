@@ -12,24 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IgnoreOptionType for GraphQL API
  */
-class IgnoreOptionType extends ObjectType
+class _IgnoreOptionType extends ObjectType
 {
     /**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -63,7 +62,7 @@ class IgnoreOptionType extends ObjectType
 						'type' => TypeRegistry::string(),
 						'description' => "The language string for this ignore type",
 						'resolve' => function ($ignore) {
-							return Member::loggedIn()->language()->addToStack( 'ignore_' . $ignore['type'] );
+							return \IPS\Member::loggedIn()->language()->addToStack( 'ignore_' . $ignore['type'] );
 						}
 					]
 				];

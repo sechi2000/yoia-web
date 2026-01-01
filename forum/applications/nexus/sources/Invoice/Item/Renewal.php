@@ -12,87 +12,63 @@
 namespace IPS\nexus\Invoice\Item;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\Application;
-use IPS\DateTime;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Coupon;
-use IPS\nexus\Customer;
-use IPS\nexus\Invoice;
-use IPS\nexus\Invoice\Item;
-use IPS\nexus\Money;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Transaction;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invoice Item Class for Renewals
  */
-class Renewal extends Item
+class _Renewal extends \IPS\nexus\Invoice\Item
 {
 	/**
 	 * @brief	Act (new/charge)
 	 */
-	public static string $act = 'renewal';
+	public static $act = 'renewal';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'arrows-rotate';
+	public static $icon = 'refresh';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'renewal';
+	public static $title = 'renewal';
 	
 	/**
 	 * @brief	Requires login to purchase?
 	 */
-	public static bool $requiresAccount = TRUE;
+	public static $requiresAccount = TRUE;
 	
 	/**
 	 * @brief	New expiry date (NULL will cause automatic calculation)
 	 */
-	public mixed $expire = NULL;
-
-	/**
-	 * @brief	Expiry date (NULL will cause automatic calculation)
-	 */
-	public mixed $expireDate = NULL;
+	public $expire = NULL;
 	
 	/**
 	 * Create
 	 *
-	 * @param	Purchase	$purchase	The purchase to renew
-	 * @param int $cycles		The number of cycles to renew for
-	 * @return    static
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase to renew
+	 * @param	int					$cycles		The number of cycles to renew for
+	 * @return	void
 	 */
-	public static function create( Purchase $purchase, int $cycles = 1 ): static
+	public static function create( \IPS\nexus\Purchase $purchase, $cycles = 1 )
 	{
 		$obj = new static( sprintf( $purchase->member->language()->get('renew_title'), $purchase->name ), $purchase->renewals->cost );
 		$obj->tax = $purchase->renewals->tax;
 		$obj->quantity = $cycles;
 		$obj::$application = $purchase->app;
-		$obj::$type = $purchase->type;
+		$obj->type = $purchase->type;
 		$obj->id = $purchase->id;
 		
 		if ( $purchase->pay_to )
 		{
 			$obj->payTo = $purchase->pay_to;
-			$obj->commission = $purchase->commission ?? 0;
-			$obj->fee = $purchase->fee ?? 0;
+			$obj->commission = $purchase->commission;
+			$obj->fee = $purchase->fee;
 		}
 		
 		if ( $renewalPaymentMethodIds = $purchase->renewalPaymentMethodIds() )
@@ -102,75 +78,23 @@ class Renewal extends Item
 		
 		return $obj;
 	}
-
-	/**
-	 * Used to override the static property, if necessary
-	 *
-	 * @return bool
-	 */
-	public function canUseAccountCredit() : bool
-	{
-		/* Account credits can only be used for renewals if the original item
-		is allowed to use credit */
-		if( $extension = $this->getPurchaseExtension() )
-		{
-			return $extension->canUseAccountCredit();
-		}
-
-		return static::$canUseAccountCredit;
-	}
-
-	/**
-	 * Used to override the static property, if necessary
-	 *
-	 * @return bool
-	 */
-	public function canUseCoupons() : bool
-	{
-		/* Coupons can only be used on renewals for packages that allow coupons */
-		if( $extension = $this->getPurchaseExtension() )
-		{
-			return $extension->canUseCoupons();
-		}
-
-		return static::$canUseCoupons;
-	}
-
-	/**
-	 * Determines if the coupon can be applied to this item
-	 *
-	 * @param array|string $data
-	 * @param Invoice $invoice
-	 * @param Customer $customer
-	 * @return bool
-	 */
-	public function isValid( array|string $data, Invoice $invoice, Customer $customer ) : bool
-	{
-		/* Coupons can only be used on renewals for packages that allow coupons */
-		if( $extension = $this->getPurchaseExtension() )
-		{
-			return $extension->isValid( $data, $invoice, $customer );
-		}
-
-		return false;
-	}
 	
 	/**
 	 * On Paid
 	 *
-	 * @param	Invoice	$invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public function onPaid( Invoice $invoice ): void
+	public function onPaid( \IPS\nexus\Invoice $invoice )
 	{
-		$purchase = Purchase::load( $this->id );
+		$purchase = \IPS\nexus\Purchase::load( $this->id );
 		
 		if ( $purchase->renewals and $interval = $purchase->renewals->interval and !$purchase->cancelled and $expire = $purchase->expire )
 		{			
 			$_expire = clone $expire;
-			if ( $_expire->add( new DateInterval( 'PT' . $purchase->grace_period . 'S' ) )->getTimestamp() < time() )
+			if ( $_expire->add( new \DateInterval( 'PT' . $purchase->grace_period . 'S' ) )->getTimestamp() < time() )
 			{				
-				$expire = new DateTime;
+				$expire = new \IPS\DateTime;
 			}
 			for ( $i=0; $i<$this->quantity; $i++ )
 			{
@@ -181,7 +105,7 @@ class Renewal extends Item
 			$purchase->invoice_pending = NULL;
 			
 			$billingAgreement = NULL;
-			foreach ( $invoice->transactions( array( Transaction::STATUS_PAID, Transaction::STATUS_PART_REFUNDED ), array( array( 't_billing_agreement IS NOT NULL' ) ) ) as $transaction )
+			foreach ( $invoice->transactions( array( \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_PART_REFUNDED ), array( array( 't_billing_agreement IS NOT NULL' ) ) ) as $transaction )
 			{
 				$billingAgreement = $transaction->billing_agreement;
 			}
@@ -191,7 +115,7 @@ class Renewal extends Item
 			}
 			
 			$purchase->save();
-			$purchase->onRenew($this->quantity);
+			$purchase->onRenew( $this->quantity );
 			
 			$purchase->member->log( 'purchase', array( 'type' => 'renew', 'id' => $purchase->id, 'name' => $purchase->name, 'invoice_id' => $invoice->id, 'invoice_title' => $invoice->title ) );
 		}		
@@ -200,18 +124,18 @@ class Renewal extends Item
 	/**
 	 * On Unpaid description
 	 *
-	 * @param	Invoice	$invoice	The invoice
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
 	 * @return	array
 	 */
-	public function onUnpaidDescription( Invoice $invoice ): array
+	public function onUnpaidDescription( \IPS\nexus\Invoice $invoice )
 	{
 		$return = parent::onUnpaidDescription( $invoice );
 		
 		try
 		{
-			$purchase = Purchase::load( $this->id );
+			$purchase = \IPS\nexus\Purchase::load( $this->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return $return;
 		}
@@ -223,7 +147,7 @@ class Renewal extends Item
 				$expire->sub( $interval );
 			}
 			
-			$return[] = Member::loggedIn()->language()->addToStack( 'renewal_unpaid', FALSE, array( 'sprintf' => array( $purchase->name, $purchase->id, $expire->localeDate() ) ) );
+			$return[] = \IPS\Member::loggedIn()->language()->addToStack( 'renewal_unpaid', FALSE, array( 'sprintf' => array( $purchase->name, $purchase->id, $expire->localeDate() ) ) );
 		}
 		
 		return $return;
@@ -232,17 +156,17 @@ class Renewal extends Item
 	/**
 	 * On Unpaid
 	 *
-	 * @param	Invoice	$invoice	The invoice
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
 	 * @param	string				$status		Status
-	 * @return    void
+	 * @return	void
 	 */
-	public function onUnpaid( Invoice $invoice, string $status ): void
+	public function onUnpaid( \IPS\nexus\Invoice $invoice, $status )
 	{
 		try
 		{
-			$purchase = Purchase::load( $this->id );
+			$purchase = \IPS\nexus\Purchase::load( $this->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return;
 		}
@@ -264,15 +188,15 @@ class Renewal extends Item
 	/**
 	 * Client Area URL
 	 *
-	 * @return Url|string|null
+	 * @return |IPS\Http\Url|NULL
 	 */
-	function url(): Url|string|null
+	public function url()
 	{
 		try
 		{
-			return Purchase::load( $this->id )->url();
+			return \IPS\nexus\Purchase::load( $this->id )->url();
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -281,15 +205,15 @@ class Renewal extends Item
 	/**
 	 * ACP URL
 	 *
-	 * @return Url|null
+	 * @return |IPS\Http\Url|NULL
 	 */
-	public function acpUrl(): Url|null
+	public function acpUrl()
 	{
 		try
 		{
-			return Purchase::load( $this->id )->acpUrl();
+			return \IPS\nexus\Purchase::load( $this->id )->acpUrl();
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -298,15 +222,15 @@ class Renewal extends Item
 	/**
 	 * Image
 	 *
-	 * @return File|null
+	 * @return |IPS\File|NULL
 	 */
-	public function image(): File|null
+	public function image()
 	{
 		try
 		{
-			return Purchase::load( $this->id )->image();
+			return \IPS\nexus\Purchase::load( $this->id )->image();
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -315,44 +239,17 @@ class Renewal extends Item
 	/**
 	 * Utility method to get the purchase. Useful if we are unsure if the purchase exists, or has been removed due to a refund of the original transaction.
 	 *
-	 * @return	Purchase|NULL
+	 * @return	\IPS\nexus\Purchase|NULL
 	 */
-	public function getPurchase() : Purchase|null
+	public function getPurchase()
 	{
 		try
 		{
-			return Purchase::load( $this->id );
+			return \IPS\nexus\Purchase::load( $this->id );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
-	}
-
-	public function getPurchaseExtension() : Item|null
-	{
-		if( $purchase = $this->getPurchase() )
-		{
-			/* Copy the code to load the extension. It's a protected method and I don't really want to
-			expose it */
-			try
-			{
-				foreach ( Application::load( $purchase->app )->extensions( 'nexus', 'Item', FALSE ) as $ext )
-				{
-					if ( $ext::$type == $purchase->type )
-					{
-						$price = new Money( "0", $purchase->member->defaultCurrency() );
-						if( $purchase->renewals instanceof RenewalTerm )
-						{
-							$price = $purchase->renewals->cost;
-						}
-						return new $ext( $purchase->name, $price );
-					}
-				}
-			}
-			catch( Exception ){}
-		}
-
-		return null;
 	}
 }

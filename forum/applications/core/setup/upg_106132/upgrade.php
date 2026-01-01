@@ -12,20 +12,16 @@
 namespace IPS\core\setup\upg_106132;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.6.6 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Remove test bulletin
@@ -34,7 +30,7 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		AdminNotification::remove( 'core', 'Bulletin', '1' );
+		\IPS\core\AdminNotification::remove( 'core', 'Bulletin', '1' );
 
 		return TRUE;
 	}

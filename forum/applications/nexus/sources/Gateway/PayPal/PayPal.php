@@ -12,78 +12,32 @@
 namespace IPS\nexus\Gateway;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use InvalidArgumentException;
-use IPS\core\AdminNotification;
-use IPS\DateTime;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Device;
-use IPS\nexus\Customer;
-use IPS\nexus\Customer\Address;
-use IPS\nexus\extensions\nexus\Item\CouponDiscount;
-use IPS\nexus\extensions\nexus\Item\Donation;
-use IPS\nexus\Fraud\MaxMind\Request;
-use IPS\nexus\Gateway;
-use IPS\nexus\Gateway\PayPal\CreditCard;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Tax;
-use IPS\nexus\Transaction;
-use IPS\Output;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use RuntimeException;
-use UnexpectedValueException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_numeric;
-use function sprintf;
-use const IPS\LONG_REQUEST_TIMEOUT;
-use const IPS\NEXUS_TEST_GATEWAYS;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PayPal Gateway
  */
-class PayPal extends Gateway
+class _PayPal extends \IPS\nexus\Gateway
 {
 	/* !Features */
 	
 	const SUPPORTS_REFUNDS = TRUE;
 	const SUPPORTS_PARTIAL_REFUNDS = TRUE;
-
+	
 	/**
 	 * Check the gateway can process this...
 	 *
-	 * @param	$amount            Money        The amount
-	 * @param	$billingAddress	GeoLocation|NULL	The billing address, which may be NULL if one if not provided
-	 * @param	$customer        Customer|null        The customer (Default NULL value is for backwards compatibility - it should always be provided.)
+	 * @param	$amount			\IPS\nexus\Money		The amount
+	 * @param	$billingAddress	\IPS\GeoLocation|NULL	The billing address, which may be NULL if one if not provided
+	 * @param	$customer		\IPS\nexus\Customer		The customer (Default NULL value is for backwards compatibility - it should always be provided.)
 	 * @param	array			$recurrings				Details about recurring costs
 	 * @return	bool
 	 */
-	public function checkValidity(Money $amount, ?GeoLocation $billingAddress = NULL, ?Customer $customer = NULL, array $recurrings = array() ) : bool
+	public function checkValidity( \IPS\nexus\Money $amount, \IPS\GeoLocation $billingAddress = NULL, \IPS\nexus\Customer $customer = NULL, $recurrings = array() )
 	{		
 		$settings = json_decode( $this->settings, TRUE );
 
@@ -259,12 +213,12 @@ class PayPal extends Gateway
 	 *
 	 * @return	string|null
 	 */
-	protected function get__description(): ?string
+	protected function get__description()
 	{
 		$settings = json_decode( $this->settings, TRUE );
 		if( isset( $settings['type'] ) and $settings['type'] === 'card' )
 		{
-			return Member::loggedIn()->language()->addToStack( 'gateway_deprecated', FALSE, array( 'sprintf' => 'PayPal Credit Card' ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'gateway_deprecated', FALSE, array( 'sprintf' => 'PayPal Credit Card' ) );
 		}
 
 		return null;
@@ -273,10 +227,10 @@ class PayPal extends Gateway
 	/**
 	 * Can store cards?
 	 *
-	 * @param bool $adminCreatableOnly	If TRUE, will only return gateways where the admin (opposed to the user) can create a new option
-	 * @return    bool
+	 * @param	bool	$adminCreatableOnly	If TRUE, will only return gateways where the admin (opposed to the user) can create a new option
+	 * @return	bool
 	 */
-	public function canStoreCards(bool $adminCreatableOnly = FALSE ): bool
+	public function canStoreCards( $adminCreatableOnly = FALSE )
 	{
 		$settings = json_decode( $this->settings, TRUE );
 		return ( isset( $settings['type'] ) and $settings['type'] === 'card' and isset( $settings['vault'] ) and $settings['vault'] );
@@ -285,10 +239,10 @@ class PayPal extends Gateway
 	/**
 	 * Admin can manually charge using this gateway?
 	 *
-	 * @param	Customer	$customer	The customer we're wanting to charge
-	 * @return    bool
+	 * @param	\IPS\nexus\Customer	$customer	The customer we're wanting to charge
+	 * @return	bool
 	 */
-	public function canAdminCharge( Customer $customer ): bool
+	public function canAdminCharge( \IPS\nexus\Customer $customer )
 	{
 		$settings = json_decode( $this->settings, TRUE );
 		return ( isset( $settings['type'] ) and $settings['type'] === 'card' );
@@ -297,12 +251,12 @@ class PayPal extends Gateway
 	/**
 	 * Supports billing agreements?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function billingAgreements(): bool
+	public function billingAgreements()
 	{
 		$settings = json_decode( $this->settings, TRUE );
-		return ( ( isset( $settings['type'] ) and $settings['type'] === 'paypal' ) or !isset( $settings['type'] ) ) and ( isset( $settings['billing_agreements'] ) and in_array( $settings['billing_agreements'], array( 'required', 'optional' ) ) );
+		return ( ( isset( $settings['type'] ) and $settings['type'] === 'paypal' ) or !isset( $settings['type'] ) ) and ( isset( $settings['billing_agreements'] ) and \in_array( $settings['billing_agreements'], array( 'required', 'optional' ) ) );
 	}
 		
 	/* !Payment Gateway */
@@ -310,14 +264,14 @@ class PayPal extends Gateway
 	/**
 	 * Payment Screen Fields
 	 *
-	 * @param	Invoice		$invoice	Invoice
-	 * @param	Money		$amount		The amount to pay now
-	 * @param Customer|null $member		The member the payment screen is for (if in the ACP charging to a member's card) or NULL for currently logged in member
-	 * @param array $recurrings	Details about recurring costs
-	 * @param string $type		'checkout' means the cusotmer is doing this on the normal checkout screen, 'admin' means the admin is doing this in the ACP, 'card' means the user is just adding a card
-	 * @return    array
+	 * @param	\IPS\nexus\Invoice		$invoice	Invoice
+	 * @param	\IPS\nexus\Money		$amount		The amount to pay now
+	 * @param	\IPS\nexus\Customer		$member		The member the payment screen is for (if in the ACP charging to a member's card) or NULL for currently logged in member
+	 * @param	array					$recurrings	Details about recurring costs
+	 * @param	bool					$type		'checkout' means the cusotmer is doing this on the normal checkout screen, 'admin' means the admin is doing this in the ACP, 'card' means the user is just adding a card
+	 * @return	array
 	 */
-	public function paymentScreen(Invoice $invoice, Money $amount, ?Customer $member = NULL, array $recurrings = array(), string $type = 'checkout' ): array
+	public function paymentScreen( \IPS\nexus\Invoice $invoice, \IPS\nexus\Money $amount, \IPS\nexus\Customer $member = NULL, $recurrings = array(), $type = 'checkout' )
 	{
 		$settings = json_decode( $this->settings, TRUE );
 
@@ -331,7 +285,7 @@ class PayPal extends Gateway
 		}
 		elseif ( isset( $settings['billing_agreements'] ) and $settings['billing_agreements'] == 'optional' and static::_canProcessRecurringsAsBillingAgreement( $recurrings ) and $invoice->billaddress )
 		{
-			return array( 'billing_agreement' => new Checkbox( 'paypal_billing_agreement', TRUE, FALSE ) );
+			return array( 'billing_agreement' => new \IPS\Helpers\Form\Checkbox( 'paypal_billing_agreement', TRUE, FALSE ) );
 		}
 		return array();
 	}
@@ -339,15 +293,15 @@ class PayPal extends Gateway
 	/**
 	 * Authorize
 	 *
-	 * @param	Transaction					$transaction	Transaction
-	 * @param array|Customer\CreditCard $values			Values from form OR a stored card object if this gateway supports them
-	 * @param	Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made
+	 * @param	\IPS\nexus\Transaction					$transaction	Transaction
+	 * @param	array|\IPS\nexus\Customer\CreditCard	$values			Values from form OR a stored card object if this gateway supports them
+	 * @param	\IPS\nexus\Fraud\MaxMind\Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made	
 	 * @param	array									$recurrings		Details about recurring costs
-	 * @param string|NULL $source			'checkout' if the customer is doing this at a normal checkout, 'renewal' is an automatically generated renewal invoice, 'manual' is admin manually charging. NULL is unknown
-	 * @return    array|DateTime|NULL                        Auth is valid until or NULL to indicate auth is good forever
-	 * @throws	LogicException							Message will be displayed to user
+	 * @param	string|NULL								$source			'checkout' if the customer is doing this at a normal checkout, 'renewal' is an automatically generated renewal invoice, 'manual' is admin manually charging. NULL is unknown
+	 * @return	\IPS\DateTime|NULL						Auth is valid until or NULL to indicate auth is good forever
+	 * @throws	\LogicException							Message will be displayed to user
 	 */
-	public function auth(Transaction $transaction, array|Customer\CreditCard $values, Request $maxMind = NULL, array $recurrings = array(), ?string $source = NULL ): DateTime|array|null
+	public function auth( \IPS\nexus\Transaction $transaction, $values, \IPS\nexus\Fraud\MaxMind\Request $maxMind = NULL, $recurrings = array(), $source = NULL )
 	{
 		/* We need a transaction ID */
 		$transaction->save();
@@ -357,7 +311,7 @@ class PayPal extends Gateway
 
 		if ( isset( $settings['type'] ) and $settings['type'] === 'card' )
 		{
-			return $this->_cardAuth( is_array( $values ) ? $values[ $this->id . '_card' ] : $values, $transaction, $maxMind );
+			return $this->_cardAuth( \is_array( $values ) ? $values[ $this->id . '_card' ] : $values, $transaction, $maxMind );
 		}
 		else
 		{
@@ -379,17 +333,17 @@ class PayPal extends Gateway
 	/**
 	 * Authorize Card Payment
 	 *
-	 * @param	\IPS\nexus\CreditCard|Customer\CreditCard $card	The card to charge
-	 * @param	Transaction					$transaction	Transaction
-	 * @param	Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made
+	 * @param	\IPS\nexus\CreditCard|\IPS\nexus\Customer\CreditCard	$card	The card to charge
+	 * @param	\IPS\nexus\Transaction					$transaction	Transaction
+	 * @param	\IPS\nexus\Fraud\MaxMind\Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made
 	 * @param	string|NULL								$source			'checkout' if the customer is doing this at a normal checkout, 'renewal' is an automatically generated renewal invoice, 'manual' is admin manually charging. NULL is unknown
-	 * @return	DateTime|NULL		Auth is valid until or NULL to indicate auth is good forever
-	 * @throws	LogicException			Message will be displayed to user
+	 * @return	\IPS\DateTime|NULL		Auth is valid until or NULL to indicate auth is good forever
+	 * @throws	\LogicException			Message will be displayed to user
 	 */
-	protected function _cardAuth( \IPS\nexus\CreditCard|Customer\CreditCard $card, Transaction $transaction, ?Request $maxMind = NULL, ?string $source = NULL ) : DateTime|null
+	protected function _cardAuth( $card, \IPS\nexus\Transaction $transaction, \IPS\nexus\Fraud\MaxMind\Request $maxMind = NULL, ?string $source = NULL )
 	{
 		/* Stored Card */
-		if ( $card instanceof Customer\CreditCard)
+		if ( $card instanceof \IPS\nexus\Customer\CreditCard )
 		{
 			$payer = array(
 				'payment_method'		=> 'credit_card',
@@ -408,8 +362,8 @@ class PayPal extends Gateway
 			if ( $card->save and !$transaction->member->member_id )
 			{
 				$transaction->member = $transaction->invoice->createAccountForGuest();
-				Session::i()->setMember( $transaction->member );
-				Device::loadOrCreate( $transaction->member, FALSE )->updateAfterAuthentication( NULL );
+				\IPS\Session::i()->setMember( $transaction->member );
+				\IPS\Member\Device::loadOrCreate( $transaction->member, FALSE )->updateAfterAuthentication( NULL );
 			}
 
 			if ( $maxMind )
@@ -440,8 +394,8 @@ class PayPal extends Gateway
 						'credit_card'		=> array(
 							'number'			=> $card->number,
 							'type'				=> $cardType,
-							'expire_month'		=> intval( $card->expMonth ),
-							'expire_year'		=> intval( $card->expYear ),
+							'expire_month'		=> \intval( $card->expMonth ),
+							'expire_year'		=> \intval( $card->expYear ),
 							'cvv2'				=> $card->ccv,
 							'first_name'		=> $this->_getFirstName( $transaction ),
 							'last_name'			=> $this->_getLastName( $transaction ),
@@ -460,12 +414,12 @@ class PayPal extends Gateway
 				'payer'			=> $payer,
 				'transactions'	=> array( $this->_getTransactions( $transaction ) ),
 				'redirect_urls'	=> array(
-					'return_url'	=> Settings::i()->base_url . 'applications/nexus/interface/gateways/paypal.php?nexusTransactionId=' . $transaction->id,
+					'return_url'	=> \IPS\Settings::i()->base_url . 'applications/nexus/interface/gateways/paypal.php?nexusTransactionId=' . $transaction->id,
 					'cancel_url'	=> (string) $transaction->invoice->checkoutUrl(),
 				)
 			) );
 		}
-		catch( PayPal\Exception $e )
+		catch( \IPS\nexus\Gateway\PayPal\Exception $e )
 		{
 			$this->processException( $transaction, $e );
 			throw $e;
@@ -479,59 +433,52 @@ class PayPal extends Gateway
 		{			
 			try
 			{
-				$storedCard = new CreditCard;
+				$storedCard = new \IPS\nexus\Gateway\PayPal\CreditCard;
 				$storedCard->member = $transaction->member;
 				$storedCard->method = $this;
 				$storedCard->card = $card;
 				$storedCard->save();
 			}
-			catch ( \Exception ) {  /* If there's any issue with saving (which may happen for a duplicate card) we can just carry on since we already auth'd */ }
+			catch ( \Exception $e ) {  /* If there's any issue with saving (which may happen for a duplicate card) we can just carry on since we already auth'd */ }
 		}
 		
 		/* And return */
-		return DateTime::ts( strtotime( $response['transactions'][0]['related_resources'][0]['authorization']['valid_until'] ) );
+		return \IPS\DateTime::ts( strtotime( $response['transactions'][0]['related_resources'][0]['authorization']['valid_until'] ) );
 	}
 	
 	/**
 	 * Authorize PayPal Payment
 	 *
-	 * @param	Transaction					$transaction	Transaction
-	 * @param	Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made
-	 * @return	DateTime|NULL		Auth is valid until or NULL to indicate auth is good forever
-	 * @throws	LogicException			Message will be displayed to user
+	 * @param	\IPS\nexus\Transaction					$transaction	Transaction
+	 * @param	\IPS\nexus\Fraud\MaxMind\Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made	
+	 * @return	\IPS\DateTime|NULL		Auth is valid until or NULL to indicate auth is good forever
+	 * @throws	\LogicException			Message will be displayed to user
 	 */
-	protected function _paypalAuth( Transaction $transaction, ?Request $maxMind = NULL ) : DateTime|null
+	protected function _paypalAuth( \IPS\nexus\Transaction $transaction, \IPS\nexus\Fraud\MaxMind\Request $maxMind = NULL )
 	{
 		/* Send the request */
 		try
 		{
-			$intent = [
-				'intent' => 'AUTHORIZE',
+			$response = $this->api( 'checkout/orders', array(
+				'intent'		=> 'AUTHORIZE',
 				'purchase_units' => $this->_getPurchaseUnits( $transaction ),
-				'payment_source' => [
-					'paypal' => [
-						'experience_context' => [
-							'return_url' => Settings::i()->base_url . 'applications/nexus/interface/gateways/paypal.php?nexusTransactionId=' . $transaction->id,
-							'cancel_url' => (string)$transaction->invoice->checkoutUrl(),
-						],
+				'payment_source' => array(
+					'paypal' => array(
+						'experience_context' => array(
+							'return_url'	=> \IPS\Settings::i()->base_url . 'applications/nexus/interface/gateways/paypal.php?nexusTransactionId=' . $transaction->id,
+							'cancel_url'	=> (string) $transaction->invoice->checkoutUrl(),
+						),
 						'email_address' => $transaction->member->email,
-						'address' => ( $transaction->invoice->billaddress instanceof GeoLocation ) ? $this->_getAddress( $transaction->invoice->billaddress, $transaction->member ) : null,
-					]
-				]
-			];
-
-			try
-			{
-				$intent['payment_source']['paypal']['name'] = [
-					'given_name' => $this->_getFirstName( $transaction ),
-					'surname' => $this->_getLastName( $transaction )
-				];
-			}
-			catch( UnexpectedValueException ){}
-
-			$response = $this->api( 'checkout/orders', $intent, 'POST', true, null, md5( $transaction->invoice->checkoutUrl() . ';' . $transaction->id ), 2 );
+						'name' => array(
+							'given_name' => $this->_getFirstName( $transaction ),
+							'surname' => $this->_getLastName( $transaction )
+						),
+						'address' => ( $transaction->invoice->billaddress instanceof \IPS\GeoLocation ) ? $this->_getAddress( $transaction->invoice->billaddress, $transaction->member ) : NULL,
+					)
+				)
+			), 'POST', true, null, md5( (string) $transaction->invoice->checkoutUrl() . ';' . $transaction->id ), 2 );
 		}
-		catch( PayPal\Exception $e )
+		catch( \IPS\nexus\Gateway\PayPal\Exception $e )
 		{
 			$this->processException( $transaction, $e );
 			throw $e;
@@ -546,24 +493,24 @@ class PayPal extends Gateway
 		{
 			if ( $link['rel'] === 'payer-action' )
 			{
-				Output::i()->redirect( Url::external( $link['href'] ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::external( $link['href'] ) );
 			}
 		}
 
-		throw new RuntimeException;
+		throw new \RuntimeException;
 	}
 	
 	/**
 	 * Authorize Billing Agreement
 	 *
-	 * @param	Transaction					$transaction	Transaction
-	 * @param	Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made
-	 * @param	RenewalTerm			$term			Renewal Term
+	 * @param	\IPS\nexus\Transaction					$transaction	Transaction
+	 * @param	\IPS\nexus\Fraud\MaxMind\Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made	
+	 * @param	\IPS\nexus\Purchase\RenewalTerm			$term			Renewal Term
 	 * @param	array									$items			Items
-	 * @return	DateTime|NULL		Auth is valid until or NULL to indicate auth is good forever
-	 * @throws	LogicException			Message will be displayed to user
+	 * @return	\IPS\DateTime|NULL		Auth is valid until or NULL to indicate auth is good forever
+	 * @throws	\LogicException			Message will be displayed to user
 	 */
-	protected function _billingAgreementAuth(Transaction $transaction, ?Request $maxMind, RenewalTerm $term, array $items ) : DateTime|null
+	protected function _billingAgreementAuth( \IPS\nexus\Transaction $transaction, ?\IPS\nexus\Fraud\MaxMind\Request $maxMind, \IPS\nexus\Purchase\RenewalTerm $term, $items )
 	{
 		$settings = json_decode( $this->settings, TRUE );
 		
@@ -574,7 +521,7 @@ class PayPal extends Gateway
 		{
 			$titles[] = ( $item->name . ( $item->quantity > 1 ? " x{$item->quantity}" : '' ) );
 
-			if( isset( $item->initialInterval ) AND $item->initialInterval instanceof DateInterval )
+			if( isset( $item->initialInterval ) AND $item->initialInterval instanceof \DateInterval )
 			{
 				$initialTerm = $item->initialInterval;
 			}
@@ -600,9 +547,9 @@ class PayPal extends Gateway
 		$renewalAmountIncludingTax = $term->cost->amount->multiply( new \IPS\Math\Number( number_format( $term->tax ? ( ( 1 + $term->tax->rate( $transaction->invoice->billaddress ) ) ) : 1, 4, '.', '' ) ) );
 
 		/* If we have an initial term that is different from the renewal, start with that */
-		if( $initialTerm instanceof DateInterval OR $transaction->amount->amount->compare( $renewalAmountIncludingTax ) !== 0 )
+		if( $initialTerm instanceof \DateInterval OR $transaction->amount->amount->compare( $renewalAmountIncludingTax ) !== 0 )
 		{
-			$intervalToUse = $initialTerm instanceof DateInterval ? $initialTerm : $term->interval;
+			$intervalToUse = $initialTerm instanceof \DateInterval ? $initialTerm : $term->interval;
 			$billingCycles[] = array(
 				'pricing_scheme'	=> array(
 					'fixed_price'		=> array(
@@ -623,7 +570,7 @@ class PayPal extends Gateway
 			'pricing_scheme'	=> array(
 				'fixed_price'		=> array(
 					'currency_code'		=> $term->cost->currency,
-					'value'				=> ( new Money( $renewalAmountIncludingTax, $term->cost->currency ) )->amountAsString()
+					'value'				=> ( new \IPS\nexus\Money( $renewalAmountIncludingTax, $term->cost->currency ) )->amountAsString()
 				),
 			),
 			'frequency'			=> static::_getFrequencyFromInterval( $term->interval ),
@@ -640,7 +587,7 @@ class PayPal extends Gateway
 			'billing_cycles'			=> $billingCycles,
 			'payment_preferences'		=> array(
 				'auto_bill_outstanding'		=> FALSE,
-				'payment_failure_threshold'	=> intval( $settings['billing_agreement_allowed_fails'] )
+				'payment_failure_threshold'	=> \intval( $settings['billing_agreement_allowed_fails'] )
 			),
 			'taxes'						=> array(
 				'percentage'				=> $term->tax ? ( $term->tax->rate( $transaction->invoice->billaddress ) * 100 ) : '0',
@@ -652,14 +599,18 @@ class PayPal extends Gateway
 		$plan = $this->api( 'billing/plans', $planDetails );
 		
 		/* Create a subscription */
-		$planData = array(
+		$subscription = $this->api( 'billing/subscriptions', array(
 			'plan_id'				=> $plan['id'],
 			'quantity'				=> '1',
 			'subscriber'			=> array(
+				'name'					=> array(
+					'given_name'				=> $this->_getFirstName( $transaction ),
+					'surname'				=> $this->_getLastName( $transaction )
+				),
 				'email_address'			=> $transaction->member->email,
 			),
 			'application_context'	=> array(
-				'brand_name'			=> Settings::i()->board_name,
+				'brand_name'			=> \IPS\Settings::i()->board_name,
 				'locale'				=> $transaction->member->language()->bcp47(),
 				'shipping_preference'	=> 'NO_SHIPPING',
 				'user_action'			=> 'SUBSCRIBE_NOW',
@@ -669,43 +620,42 @@ class PayPal extends Gateway
 					'category'				=> 'CUSTOMER_PRESENT_RECURRING_FIRST',
 				),
 				'cancel_url'			=> (string) $transaction->invoice->checkoutUrl(),
-				'return_url'			=> Settings::i()->base_url . 'applications/nexus/interface/gateways/paypal.php?subscription=1&nexusTransactionId=' . $transaction->id,
+				'return_url'			=> \IPS\Settings::i()->base_url . 'applications/nexus/interface/gateways/paypal.php?subscription=1&nexusTransactionId=' . $transaction->id,
 			)
-		);
+		) );
 
-		if( $transaction->invoice->hasItemsRequiringBillingAddress() )
-		{
-			try
-			{
-				$planData['subscriber']['name'] = array(
-					'given_name' => $this->_getFirstName( $transaction ),
-					'surname' => $this->_getLastName( $transaction )
-				);
-			}
-			catch( UnexpectedValueException ){}
-		}
+		/* PayPal sometimes does not include the subscription ID in the webhook. This causes a race condition
+		and we can't properly link the transaction. So let's create the Billing Agreement record now. */
+		$billingAgreement = new \IPS\nexus\Gateway\PayPal\BillingAgreement;
+		$billingAgreement->gw_id = $subscription['id'];
+		$billingAgreement->method = $transaction->method;
+		$billingAgreement->member = $transaction->member;
+		$billingAgreement->started = \IPS\DateTime::create();
+		$billingAgreement->next_cycle = \IPS\DateTime::create()->add( $term->interval );
+		$billingAgreement->save();
 
-		$subscription = $this->api( 'billing/subscriptions', $planData );
+		$transaction->billing_agreement = $billingAgreement;
+		$transaction->save();
 		
 		/* Redirect */
 		foreach ( $subscription['links'] as $link )
 		{
 			if ( $link['rel'] === 'approve' )
 			{
-				Output::i()->redirect( Url::external( $link['href'] ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::external( $link['href'] ) );
 			}
 		}
-		throw new RuntimeException;
+		throw new \RuntimeException;
 	}
 	
 	/**
 	 * Void
 	 *
-	 * @param	Transaction	$transaction	Transaction
-	 * @return    mixed
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @return	void
 	 * @throws	\Exception
 	 */
-	public function void( Transaction $transaction ): mixed
+	public function void( \IPS\nexus\Transaction $transaction )
 	{
 		/* If this is the initial transaction for a billing agreement which hasn't
 			been processed yet, cancel the billing agreement. If it's a subscription it may still be the first payment */
@@ -715,9 +665,9 @@ class PayPal extends Gateway
 		}
 
 		/* If the transaction is not in a 'hold' state, it cannot be voided and must be refunded instead */
-		if( !in_array( $transaction->status, array( $transaction::STATUS_HELD, $transaction::STATUS_REVIEW ) ) || !$transaction->auth )
+		if( !\in_array( $transaction->status, array( $transaction::STATUS_HELD, $transaction::STATUS_REVIEW ) ) || !$transaction->auth )
 		{
-			return $this->refund($transaction );
+			return $this->refund( $transaction );
 		}
 		
 		/* Try to find the authorization ID */
@@ -737,11 +687,11 @@ class PayPal extends Gateway
 
 				if ( !$authId )
 				{
-					throw new RuntimeException;
+					throw new \RuntimeException;
 				}
 			}
 			/* Let's try the gateway id as the auth id */
-			catch (PayPal\Exception )
+			catch ( \IPS\nexus\Gateway\PayPal\Exception $e )
 			{
 				$authId = $transaction->gw_id;
 			}
@@ -753,9 +703,9 @@ class PayPal extends Gateway
 			{
 				try
 				{
-					return $this->refund($transaction );
+					return $this->refund( $transaction );
 				}
-				catch (PayPal\Exception ){}
+				catch ( \IPS\nexus\Gateway\PayPal\Exception $e ){}
 			}
 		}
 		
@@ -766,11 +716,11 @@ class PayPal extends Gateway
 	/**
 	 * Capture
 	 *
-	 * @param	Transaction	$transaction	Transaction
-	 * @return    void
-	 * @throws	LogicException
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @return	bool
+	 * @throws	\LogicException
 	 */
-	public function capture( Transaction $transaction ): void
+	public function capture( \IPS\nexus\Transaction $transaction )
 	{
 		/* If this is for a billing agreement, it should have automatically been captured - all we need to do is check its status, and if
 			it has been captured, record the ID - otherwise return an error explaining what's going on.
@@ -782,7 +732,7 @@ class PayPal extends Gateway
 			/* Subscriptions API */
 			if( $data = $billingAgreement->_getData() AND isset( $data['plan_id'] ) )
 			{
-				$transactions = $this->api( "billing/subscriptions/{$transaction->billing_agreement->gw_id}/transactions?start_time=" . DateTime::ts( $transaction->date->getTimestamp() - 86400 )->rfc3339() . '&end_time=' . DateTime::ts( time() )->rfc3339(), NULL, 'get' );
+				$transactions = $this->api( "billing/subscriptions/{$transaction->billing_agreement->gw_id}/transactions?start_time=" . \IPS\DateTime::ts( $transaction->date->getTimestamp() - 86400 )->rfc3339() . '&end_time=' . \IPS\DateTime::ts( time() )->rfc3339(), NULL, 'get' );
 				foreach ( $transactions['transactions'] as $t )
 				{
 					if ( ( !$transaction->gw_id or $transaction->gw_id == $t['id'] ) and $transaction->amount->currency == $t['amount_with_breakdown']['gross_amount']['currency_code'] and $transaction->amount->amountAsString() == $t['amount_with_breakdown']['gross_amount']['value'] )
@@ -791,7 +741,7 @@ class PayPal extends Gateway
 						{
 							$transaction->gw_id = $t['id'];
 							$transaction->save();
-							return;
+							return TRUE;
 						}
 						elseif ( $t['status'] == 'REFUNDED' )
 						{
@@ -816,7 +766,7 @@ class PayPal extends Gateway
 						{
 							$transaction->gw_id = $t['transaction_id'];
 							$transaction->save();
-							return;
+							return TRUE;
 						}
 						elseif ( $t['status'] == 'Refunded' )
 						{
@@ -829,7 +779,7 @@ class PayPal extends Gateway
 					}
 				}
 			}
-			throw new RuntimeException( $response );
+			throw new \RuntimeException( $response );
 		}
 
 		/* Try to find the authorization ID */
@@ -847,7 +797,7 @@ class PayPal extends Gateway
 			
 			if ( !$authId )
 			{
-				throw new RuntimeException;
+				throw new \RuntimeException;
 			}
 		}
 		else
@@ -858,9 +808,9 @@ class PayPal extends Gateway
 				try
 				{
 					$sale = $this->api( "payments/authorizations/{$authId}", NULL, 'get', TRUE, NULL, NULL, 2 );
-					return; // "Sales" came from Billing Agreements and have already been captured
+					return TRUE; // "Sales" came from Billing Agreements and have already been captured
 				}
-				catch (PayPal\Exception ){}
+				catch ( \IPS\nexus\Gateway\PayPal\Exception $e ){}
 			}
 		}
 		
@@ -871,32 +821,33 @@ class PayPal extends Gateway
 			$transaction->gw_id = $response['id']; // We now set the gateway ID to the capture ID
 			$transaction->save();
 		}
-		catch (PayPal\Exception $e )
+		catch ( \IPS\nexus\Gateway\PayPal\Exception $e )
 		{
 			if ( $e->getName() == 'ORDER_ALREADY_AUTHORIZED' )
 			{
-				return;
+				return TRUE;
 			}
 			throw $e;
 		}
+
+		return TRUE;
 	}
 		
 	/**
 	 * Refund
 	 *
-	 * @param	Transaction	$transaction	Transaction to be refunded
-	 * @param mixed|NULL $amount			Amount to refund (NULL for full amount - always in same currency as transaction)
-	 * @param string|null $reason
-	 * @return    mixed                                    Gateway reference ID for refund, if applicable
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction to be refunded
+	 * @param	float|NULL				$amount			Amount to refund (NULL for full amount - always in same currency as transaction)
+	 * @return	mixed									Gateway reference ID for refund, if applicable
 	 * @throws	\Exception
  	 */
-	public function refund(Transaction $transaction, mixed $amount = NULL, ?string $reason = NULL): mixed
+	public function refund( \IPS\nexus\Transaction $transaction, $amount = NULL )
 	{
 		/* The capture ID is *normally* the gateway transaction ID */
 		$captureId = $transaction->gw_id;
 
 		/* Refund Amount */
-		$amount = $amount ? new Money( $amount, $transaction->currency ) : $transaction->amount;
+		$amount = $amount ? new \IPS\nexus\Money( $amount, $transaction->currency ) : $transaction->amount;
 
 		/* If it's a billing agreement and the gateway ID isn't prefixed with an I, it's likely to be a subscription */
 		if( $transaction->billing_agreement AND $transaction->gw_id AND mb_substr( $transaction->billing_agreement->gw_id, 0, 2 ) !== 'I-' )
@@ -910,7 +861,7 @@ class PayPal extends Gateway
 		/* But if it starts with I- (or is a blank but known to be a billing agreement payment) - that's a billing agreement */
 		elseif ( ( $transaction->billing_agreement and !$transaction->gw_id ) or ( mb_substr( $transaction->gw_id, 0, 2 ) === 'I-' ) )
 		{
-			$transactions = $this->api( "payments/billing-agreements/{$transaction->billing_agreement->gw_id}/transactions?start_date=" . $transaction->date->sub( new DateInterval('P1D') )->format('Y-m-d') . '&end_date=' . $transaction->date->format('Y-m-d'), NULL, 'get' );
+			$transactions = $this->api( "payments/billing-agreements/{$transaction->billing_agreement->gw_id}/transactions?start_date=" . $transaction->date->sub( new \DateInterval('P1D') )->format('Y-m-d') . '&end_date=' . $transaction->date->format('Y-m-d'), NULL, 'get' );
 			foreach ( $transactions['agreement_transaction_list'] as $t )
 			{
 				if ( $t['status'] == 'Completed' )
@@ -951,12 +902,12 @@ class PayPal extends Gateway
 	/**
 	 * Extra data to show on the ACP transaction page
 	 *
-	 * @param	Transaction	$transaction	Transaction
-	 * @return    string
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @return	string
  	 */
-	public function extraData( Transaction $transaction ): string
+	public function extraData( \IPS\nexus\Transaction $transaction )
 	{
-		return Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->paypalStatus( $transaction );
+		return \IPS\Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->paypalStatus( $transaction );
 	}
 	
 	/* !ACP Configuration */
@@ -964,20 +915,20 @@ class PayPal extends Gateway
 	/**
 	 * Settings
 	 *
-	 * @param Form $form	The form
-	 * @return    void
+	 * @param	\IPS\Helpers\Form	$form	The form
+	 * @return	void
 	 */
-	public function settings( Form $form ): void
+	public function settings( &$form )
 	{
 		$settings = json_decode( $this->settings, TRUE );
 
 		if ( isset( $settings['type'] ) and $settings['type'] === 'card' )
 		{
-			$form->addMessage( Member::loggedIn()->language()->addToStack( 'gateway_deprecated', FALSE, array( 'sprintf' => 'PayPal Credit Card' ) ), 'ipsMessage ipsMessage_warning' );
-			$form->add( new Radio( 'paypal_type', $settings['type'], TRUE, array( 'options' => array( 'paypal' => 'paypal_type_paypal', 'card' => 'paypal_type_card' ), 'toggles' => array( 'paypal' => array( 'paypal_billing_agreements' ), 'card' => array( 'paypal_vault' ) ) ) ) );
+			$form->addMessage( \IPS\Member::loggedIn()->language()->addToStack( 'gateway_deprecated', FALSE, array( 'sprintf' => 'PayPal Credit Card' ) ), 'ipsMessage ipsMessage_warning' );
+			$form->add( new \IPS\Helpers\Form\Radio( 'paypal_type', $settings['type'], TRUE, array( 'options' => array( 'paypal' => 'paypal_type_paypal', 'card' => 'paypal_type_card' ), 'toggles' => array( 'paypal' => array( 'paypal_billing_agreements' ), 'card' => array( 'paypal_vault' ) ) ) ) );
 		}
 
-		$form->add( new Radio( 'paypal_billing_agreements', ( $this->id AND isset( $settings['billing_agreements'] ) ) ? (string) $settings['billing_agreements'] : '', FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'paypal_billing_agreements', ( $this->id AND isset( $settings['billing_agreements'] ) ) ? (string) $settings['billing_agreements'] : '', FALSE, array(
 			'options' => array(
 				'required'	=> 'paypal_billing_agreements_req',
 				'optional'	=> 'paypal_billing_agreements_opt',
@@ -990,32 +941,32 @@ class PayPal extends Gateway
 		), function( $val ) {
 			if ( $val )
 			{
-				if ( Url::internal('')->data['scheme'] !== 'https' )
+				if ( \IPS\Http\Url::internal('')->data['scheme'] !== 'https' )
 				{
-					throw new DomainException('paypal_billing_agreements_https');
+					throw new \DomainException('paypal_billing_agreements_https');
 				}
 			}
 		}, NULL, NULL, 'paypal_billing_agreements' ) );
 		
-		$form->add( new Number( 'paypal_billing_agreement_allowed_fails', ( $this->id AND isset( $settings['billing_agreement_allowed_fails'] ) ) ? $settings['billing_agreement_allowed_fails'] : 0, FALSE, array( 'unlimited' => 0, 'min' => 1 ), NULL, Member::loggedIn()->language()->addToStack('paypal_billing_agreement_allowed_fails_prefix'), Member::loggedIn()->language()->addToStack('paypal_billing_agreement_allowed_fails_suffix'), 'paypal_billing_agreement_allowed_fails' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'paypal_billing_agreement_allowed_fails', ( $this->id AND isset( $settings['billing_agreement_allowed_fails'] ) ) ? $settings['billing_agreement_allowed_fails'] : 0, FALSE, array( 'unlimited' => 0, 'min' => 1 ), NULL, \IPS\Member::loggedIn()->language()->addToStack('paypal_billing_agreement_allowed_fails_prefix'), \IPS\Member::loggedIn()->language()->addToStack('paypal_billing_agreement_allowed_fails_suffix'), 'paypal_billing_agreement_allowed_fails' ) );
 
 		if ( isset( $settings['type'] ) and $settings['type'] === 'card' )
 		{
-			$form->add( new YesNo( 'paypal_vault', ( $this->id and isset( $settings['vault'] ) ) ? $settings['vault'] : TRUE, FALSE, array(), NULL, NULL, NULL, 'paypal_vault' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'paypal_vault', ( $this->id and isset( $settings['vault'] ) ) ? $settings['vault'] : TRUE, FALSE, array(), NULL, NULL, NULL, 'paypal_vault' ) );
 		}
 
-		$form->add( new Text( 'paypal_client_id', $settings['client_id'], TRUE ) );
-		$form->add( new Text( 'paypal_secret', $settings['secret'], TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'paypal_client_id', $settings['client_id'], TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'paypal_secret', $settings['secret'], TRUE ) );
 	}
 	
 	/**
 	 * Test Settings
 	 *
-	 * @param array $settings	Settings
-	 * @return    array
-	 * @throws	InvalidArgumentException
+	 * @param	array	$settings	Settings
+	 * @return	array
+	 * @throws	\InvalidArgumentException
 	 */
-	public function testSettings( array $settings = array() ): array
+	public function testSettings( $settings )
 	{
 		try
 		{
@@ -1025,7 +976,7 @@ class PayPal extends Gateway
 			
 			if ( isset( $settings['billing_agreements'] ) and $settings['billing_agreements'] )
 			{			
-				$correctWebhookUrl = Settings::i()->base_url . 'applications/nexus/interface/gateways/paypal-webhook.php';
+				$correctWebhookUrl = \IPS\Settings::i()->base_url . 'applications/nexus/interface/gateways/paypal-webhook.php';
 				$webhookId = NULL;
 				$webhooks = $this->api( 'notifications/webhooks', NULL, 'get', TRUE, $settings );
 				foreach ( $webhooks['webhooks'] as $webhook )
@@ -1057,32 +1008,32 @@ class PayPal extends Gateway
 				$settings['webhook_id'] = $webhookId;
 			}
 			
-			AdminNotification::remove( 'nexus', 'ConfigurationError', "pm{$this->id}" );
+			\IPS\core\AdminNotification::remove( 'nexus', 'ConfigurationError', "pm{$this->id}" );
 		}
 		catch ( \Exception $e )
 		{
-			throw new InvalidArgumentException( $e->getMessage() ?: Member::loggedIn()->language()->addToStack('paypal_connection_error'), $e->getCode() );
+			throw new \InvalidArgumentException( $e->getMessage() ?: \IPS\Member::loggedIn()->language()->addToStack('paypal_connection_error'), $e->getCode() );
 		}
 				
 		return $settings;
 	}
 	
 	/* !Utility Methods */
-
+	
 	/**
 	 * Send API Request
 	 *
-	 * @param string $uri The API to request (e.g. "payments/payment")
-	 * @param array|null $data The data to send
-	 * @param string $method Method (get/post)
-	 * @param bool $expectResponse
-	 * @param array|NULL $settings Settings (NULL for saved setting)
-	 * @param string|Null $requestId
-	 * @param int|Null $version API Version
-	 * @return    array|null
-	 * @throws Exception
+	 * @param	string		$uri			The API to request (e.g. "payments/payment")
+	 * @param	array		$data		The data to send
+	 * @param	string		$method		Method (get/post)
+	 * @param	array|NULL	$settings	Settings (NULL for saved setting)
+	 * @param   string|Null $requestId
+	 * @param	int|Null 	$version	API Version
+	 * @return	array|null
+	 * @throws	\IPS\Http|Exception
+	 * @throws	\IPS\nexus\Gateway\PayPal\Exception
 	 */
-	public function api( string $uri, ?array $data=NULL, string $method='post', bool $expectResponse=TRUE, ?array $settings=NULL, ?string $requestId=NULL, ?int $version=NULL ) : array|null
+	public function api( $uri, $data=NULL, $method='post', $expectResponse=TRUE, $settings=NULL, $requestId=NULL, $version=NULL )
 	{
 		if ( !$settings )
 		{
@@ -1100,8 +1051,8 @@ class PayPal extends Gateway
 		/* Some API calls (e.g. for billing agreements) still use v1 for the REST APIs */
 		$version = $version ?: 1;
 		
-		$response = Url::external( 'https://' . ( NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api-m.paypal.com' ) . '/v' . $version . '/' . $uri )
-			->request( LONG_REQUEST_TIMEOUT )
+		$response = \IPS\Http\Url::external( 'https://' . ( \IPS\NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api-m.paypal.com' ) . '/v' . $version . '/' . $uri )
+			->request( \IPS\LONG_REQUEST_TIMEOUT )
 			->forceTls()
 			->setHeaders( array(
 				'Content-Type'					=> 'application/json',
@@ -1113,10 +1064,10 @@ class PayPal extends Gateway
 					
 		if ( mb_substr( $response->httpResponseCode, 0, 1 ) !== '2' )
 		{
-			throw new PayPal\Exception( $response, mb_substr( $uri, -7 ) === '/refund' );
+			throw new \IPS\nexus\Gateway\PayPal\Exception( $response, mb_substr( $uri, -7 ) === '/refund' );
 		}
 		
-		if ( in_array( $method, array( 'delete', 'patch' ) ) or $response->httpResponseCode == 204 )
+		if ( \in_array( $method, array( 'delete', 'patch' ) ) or $response->httpResponseCode == 204 )
 		{
 			return NULL;
 		}
@@ -1131,14 +1082,14 @@ class PayPal extends Gateway
 	 *
 	 * @param	array|NULL	$settings	Settings (NULL for saved setting)
 	 * @return	array
-	 * @throws	Exception
-	 * @throws	UnexpectedValueException
+	 * @throws	\IPS\Http\Request\Exception
+	 * @throws	\UnexpectedValueException
 	 */
-	protected function getNewToken( ?array $settings = NULL ) : array
+	protected function getNewToken( $settings = NULL )
 	{
 		$settings = $settings ?: json_decode( $this->settings, TRUE );
 				
-		$response = Url::external( 'https://' . ( NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api-m.paypal.com' ) . '/v1/oauth2/token' )
+		$response = \IPS\Http\Url::external( 'https://' . ( \IPS\NEXUS_TEST_GATEWAYS ? 'api-m.sandbox.paypal.com' : 'api-m.paypal.com' ) . '/v1/oauth2/token' )
 			->request()
 			->forceTls()
 			->setHeaders( array(
@@ -1151,7 +1102,7 @@ class PayPal extends Gateway
 			
 		if ( !isset( $response['access_token'] ) )
 		{
-			throw new UnexpectedValueException( $response['error_description'] ?? $response );
+			throw new \UnexpectedValueException( isset( $response['error_description'] ) ? $response['error_description'] : $response );
 		}
 
 		return $response;
@@ -1160,26 +1111,26 @@ class PayPal extends Gateway
 	/**
 	 * Handle the PayPal exception and mark the transaction as failed
 	 *
-	 * @param Transaction $transaction
+	 * @param \IPS\nexus\Transaction $transaction
 	 * @param \Exception $e
 	 * @return void
 	 */
-	public function processException(Transaction $transaction, \Exception $e ) : void
+	public function processException( \IPS\nexus\Transaction $transaction, \Exception $e )
 	{
 		/* Make sure it's a PayPal exception only. The interface might send us a different exception type */
-		if( ! ( $e instanceof PayPal\Exception) )
+		if( ! ( $e instanceof \IPS\nexus\Gateway\PayPal\Exception ) )
 		{
 			return;
 		}
 
 		/* Mark the transaction as failed */
-		$transaction->status = Transaction::STATUS_REFUSED;
+		$transaction->status = \IPS\nexus\Transaction::STATUS_REFUSED;
 
 		$details = json_decode( $e->extraLogData(), true );
 
 		/* Log the error message to the transaction history */
 		$extra = $transaction->extra;
-		$extra['history'][] = array( 's' => Transaction::STATUS_REFUSED, 'on' => time(), 'noteRaw' => ( $details['details'][0]['description'] ?? $e->getMessage() ) );
+		$extra['history'][] = array( 's' => \IPS\nexus\Transaction::STATUS_REFUSED, 'on' => time(), 'noteRaw' => ( $details['details'][0]['description'] ?? $e->getMessage() ) );
 
 		if( isset( $details['processor_response'] ) )
 		{
@@ -1187,7 +1138,7 @@ class PayPal extends Gateway
 
 			// log this failure to the customer history
 			$responseCode = $details['processor_response']['response_code'];
-			if( is_numeric( $responseCode ) )
+			if( \is_numeric( $responseCode ) )
 			{
 				$responseCode = (int) $responseCode;
 			}
@@ -1195,7 +1146,7 @@ class PayPal extends Gateway
 			{
 				$failureReason = $transaction->member->language()->get( 'processor_response_code__' . $responseCode );
 				$transaction->member->logHistory( 'nexus', 'custom', array(
-					'message' => sprintf( $transaction->member->language()->get( 'history_payment_rejected' ), $failureReason )
+					'message' => \sprintf( $transaction->member->language()->get( 'history_payment_rejected' ), $failureReason )
 				) );
 			}
 		}
@@ -1203,24 +1154,24 @@ class PayPal extends Gateway
 		$transaction->extra = $extra;
 		$transaction->save();
 	}
-
+	
 	/**
 	 * Get address for PayPal
 	 *
-	 * @param GeoLocation $address
-	 * @param Customer $customer
-	 * @param string $paymentType
-	 * @return    array
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @param 	\IPS\nexus\Customer		$customer
+	 * @param 	string					$paymentType
+	 * @return	array
 	 */
-	protected function _getAddress( GeoLocation $address, Customer $customer, string $paymentType='paypal' ) : array
+	protected function _getAddress( \IPS\GeoLocation $address, \IPS\nexus\Customer $customer, $paymentType='paypal' )
 	{
 		/* PayPal requires short codes for states */
 		$state = $address->region;
-		if ( isset( Address::$stateCodes[ $address->country ] ) )
+		if ( isset( \IPS\nexus\Customer\Address::$stateCodes[ $address->country ] ) )
 		{
-			if ( !array_key_exists( $state, Address::$stateCodes[ $address->country ] ) )
+			if ( !array_key_exists( $state, \IPS\nexus\Customer\Address::$stateCodes[ $address->country ] ) )
 			{
-				$_state = array_search( $address->region, Address::$stateCodes[ $address->country ] );
+				$_state = array_search( $address->region, \IPS\nexus\Customer\Address::$stateCodes[ $address->country ] );
 				if ( $_state !== FALSE )
 				{
 					$state = $_state;
@@ -1233,7 +1184,7 @@ class PayPal extends Gateway
 			/* Construct */
 			$address = array(
 				'line1'				=> $address->addressLines[0],
-				'line2'				=> $address->addressLines[1] ?? '',
+				'line2'				=> isset( $address->addressLines[1] ) ? $address->addressLines[1] : '',
 				'city'				=> $address->city,
 				'country_code'		=> $address->country,
 				'postal_code'		=> $address->postalCode,
@@ -1251,7 +1202,7 @@ class PayPal extends Gateway
 			/* Construct */
 			$address = array(
 				'address_line_1'	=> $address->addressLines[0],
-				'address_line_2'	=> $address->addressLines[1] ?? '',
+				'address_line_2'	=> isset( $address->addressLines[1] ) ? $address->addressLines[1] : '',
 				'admin_area_2'		=> $address->city,
 				'country_code'		=> $address->country,
 				'postal_code'		=> $address->postalCode,
@@ -1267,52 +1218,36 @@ class PayPal extends Gateway
 		/* Return */
 		return $address;
 	}
-
+	
 	/**
 	 * Get first name for PayPal
 	 *
-	 * @param	Transaction	$transaction	Transaction
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
 	 * @return	string
-	 * @throws  UnexpectedValueException
 	 */
-	protected function _getFirstName( Transaction $transaction ) : string
+	protected function _getFirstName( \IPS\nexus\Transaction $transaction )
 	{
-		$name = $transaction->invoice->member->member_id ? $transaction->invoice->member->cm_first_name : $transaction->invoice->guest_data['member']['cm_first_name'];
-
-		if( empty( $name ) )
-		{
-			throw new UnexpectedValueException;
-		}
-
-		return $name;
+		return $transaction->invoice->member->member_id ? $transaction->invoice->member->cm_first_name : $transaction->invoice->guest_data['member']['cm_first_name'];
 	}
-
+	
 	/**
 	 * Get last name for PayPal
 	 *
-	 * @param	Transaction	$transaction	Transaction
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
 	 * @return	string
-	 * @throws  UnexpectedValueException
 	 */
-	protected function _getLastName( Transaction $transaction ) : string
+	protected function _getLastName( \IPS\nexus\Transaction $transaction )
 	{
-		$name = $transaction->invoice->member->member_id ? $transaction->invoice->member->cm_last_name : $transaction->invoice->guest_data['member']['cm_last_name'];
-
-		if( empty( $name ) )
-		{
-			throw new UnexpectedValueException;
-		}
-
-		return $name;
+		return $transaction->invoice->member->member_id ? $transaction->invoice->member->cm_last_name : $transaction->invoice->guest_data['member']['cm_last_name'];
 	}
 
 	/**
 	 * Get transaction data for PayPal
 	 *
-	 * @param	Transaction	$transaction	Transaction
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
 	 * @return	array
 	 */
-	protected function _getPurchaseUnits( Transaction $transaction ) : array
+	protected function _getPurchaseUnits( \IPS\nexus\Transaction $transaction )
 	{
 		/* Init */
 		$payPalTransactionData = array(
@@ -1320,7 +1255,7 @@ class PayPal extends Gateway
 				'currency_code'	=> $transaction->amount->currency,
 				'value'		=> $transaction->amount->amountAsString(),
 			),
-			'custom_id'=> Settings::i()->site_secret_key . '-' . $transaction->id,
+			'custom_id'=> \IPS\Settings::i()->site_secret_key . '-' . $transaction->id,
 			'invoice_id' => $transaction->invoice->id,
 			'items' => array()
 		);
@@ -1330,8 +1265,9 @@ class PayPal extends Gateway
 		{
 			$summary = $transaction->invoice->summary();
 
-			/* Tax */
+			/* Shipping / Tax */
 			$payPalTransactionData['amount']['breakdown'] = array(
+				'shipping'		=> array( 'currency_code' => $summary['shippingTotal']->currency, 'value' => $summary['shippingTotal']->amountAsString() ),
 				'item_total'	=> array( 'currency_code' => $summary['subtotal']->currency, 'value' => $summary['subtotal']->amountAsString() ),
 				'tax_total'		=> array( 'currency_code' => $summary['taxTotal']->currency, 'value' => $summary['taxTotal']->amountAsString() ),
 				'discount'		=> array( 'currency_code' => $summary['discount']->currency, 'value' => $summary['discount']->amountAsString() )
@@ -1341,13 +1277,17 @@ class PayPal extends Gateway
 			$itemTotal = new \IPS\Math\Number( '0' );
 			foreach ( $summary['items'] as $item )
 			{
-				if( $item instanceof CouponDiscount )
+				if( $item instanceof \IPS\nexus\extensions\nexus\Item\CouponDiscount )
 				{
 					continue;
 				}
 
 				$itemCategory = 'DIGITAL_GOODS';
-				if( $item instanceof Donation )
+				if( $item->physical )
+				{
+					$itemCategory = 'PHYSICAL_GOODS';
+				}
+				elseif( $item instanceof \IPS\nexus\extensions\nexus\Item\Donation )
 				{
 					$itemCategory = 'DONATION';
 				}
@@ -1363,21 +1303,24 @@ class PayPal extends Gateway
 				);
 				$itemTotal = $itemTotal->add( $item->price->amount->multiply( new \IPS\Math\Number("{$item->quantity}") ) );
 
-				if( $item->tax instanceof Tax )
-				{
-					$tax = new Money( $item->price->amount->multiply( $item->taxRate( $transaction->member->estimatedLocation() ) ), $transaction->amount->currency );
-					$itemData['tax'] = array(
-						'currency_code' => $transaction->amount->currency,
-						'value' => $tax->amountAsString()
-					);
-				}
-
 				$payPalTransactionData['items'][] = $itemData;
 			}
 
 			/* PayPal requires that the item total be equal to the pre-discounted amounts. The summary uses the invoice total, which is not accepted. */
-			$itemTotal = new Money( $itemTotal, $transaction->amount->currency );
+			$itemTotal = new \IPS\nexus\Money( $itemTotal, $transaction->amount->currency );
 			$payPalTransactionData['amount']['breakdown']['item_total']['value'] = $itemTotal->amountAsString();
+
+			/* Shipping Address */
+			if ( $transaction->invoice->shipaddress )
+			{
+				$payPalTransactionData['shipping'] = array(
+					'address' => $this->_getAddress( $transaction->invoice->shipaddress, $transaction->member ),
+					'name' => array(
+						'full_name' => $this->_getFirstName( $transaction ) . ' ' . $this->_getLastName( $transaction )
+					),
+					'type' => 'SHIPPING'
+				);
+			}
 		}
 		/* Otherwise just use a generic description */
 		else
@@ -1391,10 +1334,10 @@ class PayPal extends Gateway
 	/**
 	 * Get transaction data for PayPal
 	 *
-	 * @param	Transaction	$transaction	Transaction
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
 	 * @return	array
 	 */
-	protected function _getTransactions( Transaction $transaction ) : array
+	protected function _getTransactions( \IPS\nexus\Transaction $transaction )
 	{
 		/* Init */
 		$payPalTransactionData = array(
@@ -1402,7 +1345,7 @@ class PayPal extends Gateway
 				'currency'	=> $transaction->amount->currency,
 				'total'		=> $transaction->amount->amountAsString(),
 			),
-			'invoice_number'=> Settings::i()->site_secret_key . '-' . $transaction->id,
+			'invoice_number'=> \IPS\Settings::i()->site_secret_key . '-' . $transaction->id,
 		);
 		
 		/* If we're paying the whole invoice, we can add item data... */
@@ -1410,8 +1353,9 @@ class PayPal extends Gateway
 		{
 			$summary = $transaction->invoice->summary();
 			
-			/* Tax */
+			/* Shipping / Tax */
 			$payPalTransactionData['amount']['details'] = array(
+				'shipping'	=> $summary['shippingTotal']->amountAsString(),
 				'subtotal'	=> $summary['subtotal']->amountAsString(),
 				'tax'		=> $summary['taxTotal']->amountAsString(),
 			);
@@ -1425,6 +1369,15 @@ class PayPal extends Gateway
 					'name'		=> mb_strlen( $item->name ) > 127 ? mb_substr( $item->name, 0, 124 ) . '...' : $item->name,
 					'price'		=> $item->price->amountAsString(),
 					'currency'	=> $transaction->amount->currency,
+				);
+			}
+
+			/* Shipping Address */
+			if ( $transaction->invoice->shipaddress )
+			{
+				$payPalTransactionData['item_list']['shipping_address'] = array_merge(
+					array( 'recipient_name'	=> $this->_getFirstName( $transaction ) . ' ' . $this->_getLastName( $transaction ) ),
+					$this->_getAddress( $transaction->invoice->shipaddress, $transaction->invoice->member, 'card' )
 				);
 			}
 		}
@@ -1443,14 +1396,14 @@ class PayPal extends Gateway
 	 * @param	array				$recurrings				Details about recurring costs
 	 * @return	bool
 	 */
-	protected static function _canProcessRecurringsAsBillingAgreement( array $recurrings ) : bool
+	protected static function _canProcessRecurringsAsBillingAgreement( array $recurrings )
 	{
-		if( count( $recurrings ) == 1 )
+		if( \count( $recurrings ) == 1 )
 		{
 			$recurrance = array_pop( $recurrings );
 
 			/* If we only have one item, we're fine */
-			if( count( $recurrance['items'] ) == 1 )
+			if( \count( $recurrance['items'] ) == 1 )
 			{
 				return true;
 			}
@@ -1459,7 +1412,7 @@ class PayPal extends Gateway
 			$initialTermFrequency = null;
 			foreach( $recurrance['items'] as $item )
 			{
-				if( isset( $item->initialInterval ) AND $item->initialInterval instanceof DateInterval )
+				if( isset( $item->initialInterval ) AND $item->initialInterval instanceof \DateInterval )
 				{
 					$thisTermFrequency = static::_getFrequencyFromInterval( $item->initialInterval );
 					if( $initialTermFrequency !== null AND ( $thisTermFrequency['interval_unit'] != $initialTermFrequency['interval_unit'] OR $thisTermFrequency['interval_count'] != $initialTermFrequency['interval_count'] ) )
@@ -1483,10 +1436,10 @@ class PayPal extends Gateway
 	/**
 	 * Get the billing cycle frequency based on the DateInterval
 	 *
-	 * @param DateInterval $term
+	 * @param \DateInterval $term
 	 * @return array|null
 	 */
-	protected static function _getFrequencyFromInterval( DateInterval $term ) : array|null
+	protected static function _getFrequencyFromInterval( \DateInterval $term )
 	{
 		if( $term->y )
 		{

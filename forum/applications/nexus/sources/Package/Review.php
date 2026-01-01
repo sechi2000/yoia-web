@@ -12,78 +12,53 @@
 namespace IPS\nexus\Package;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\Content\EditHistory;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Hideable;
-use IPS\Content\Reportable;
-use IPS\Content\Review as ContentReview;
-use IPS\Content\Shareable;
-use IPS\core\Approval;
-use IPS\nexus\Customer;
-use IPS\nexus\Money;
-use IPS\nexus\Package;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Tax;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function get_called_class;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Package Review
  */
-class Review extends ContentReview implements Embeddable,
-	Filter
+class _Review extends \IPS\Content\Review implements \IPS\Content\EditHistory, \IPS\Content\Hideable, \IPS\Content\Embeddable
 {
-	use Reportable, Shareable, EditHistory, Hideable;
+	use \IPS\Content\Reportable;
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[Content\Comment]	Item Class
 	 */
-	public static ?string $itemClass = 'IPS\nexus\Package\Item';
+	public static $itemClass = 'IPS\nexus\Package\Item';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_reviews';
+	public static $databaseTable = 'nexus_reviews';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'review_';
+	public static $databasePrefix = 'review_';
 
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'product_reviews';
+	public static $title = 'product_reviews';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'box';
+	public static $icon = 'archive';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'item'				=> 'product',
 		'author'			=> 'author_id',
 		'author_name'		=> 'author_name',
@@ -106,36 +81,36 @@ class Review extends ContentReview implements Embeddable,
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'nexus';
+	public static $application = 'nexus';
 	
 	/**
 	 * @brief	Module
 	 */
-	public static string $module = 'store';
+	public static $module = 'store';
 	
 	/**
 	 * @brief	[Content]	Key for hide reasons
 	 */
-	public static ?string $hideLogKey = 'nexus-products';
+	public static $hideLogKey = 'nexus-products';
 	
 	/**
 	 * @brief	[Content\Item]	First "comment" is part of the item?
 	 */
-	public static bool $firstCommentRequired = FALSE;
+	public static $firstCommentRequired = FALSE;
 	
 	/**
 	 * @brief	Include In Sitemap
 	 */
-	public static bool $includeInSitemap = FALSE;
+	public static $includeInSitemap = FALSE;
 	
 	/**
 	 * Get content for header in content tables
 	 *
 	 * @return	callable
 	 */
-	public function contentTableHeader(): string
+	public function contentTableHeader()
 	{
-		return (string) Theme::i()->getTemplate( 'global', static::$application )->commentTableHeader( $this, Package::load( $this->item()->id ), $this->item() );
+		return \IPS\Theme::i()->getTemplate( 'global', static::$application )->commentTableHeader( $this, \IPS\nexus\Package::load( $this->item()->id ), $this->item() );
 	}
 
 	/**
@@ -144,26 +119,26 @@ class Review extends ContentReview implements Embeddable,
 	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		$memberCurrency = ( ( isset( Request::i()->cookie['currency'] ) and in_array( Request::i()->cookie['currency'], Money::currencies() ) ) ? Request::i()->cookie['currency'] : Customer::loggedIn()->defaultCurrency() );
-		$package = Package::load( $this->id );
+		$memberCurrency = ( ( isset( \IPS\Request::i()->cookie['currency'] ) and \in_array( \IPS\Request::i()->cookie['currency'], \IPS\nexus\Money::currencies() ) ) ? \IPS\Request::i()->cookie['currency'] : \IPS\nexus\Customer::loggedIn()->defaultCurrency() );
+		$package = \IPS\nexus\Package::load( $this->id );
 
 		/* Do we have renewal terms? */
 		$renewalTerm = NULL;
 		$renewOptions = $package->renew_options ? json_decode( $package->renew_options, TRUE ) : array();
-		if ( count( $renewOptions ) )
+		if ( \count( $renewOptions ) )
 		{
 			$renewalTerm = TRUE;
-			if ( count( $renewOptions ) === 1 )
+			if ( \count( $renewOptions ) === 1 )
 			{
 				$renewalTerm = array_pop( $renewOptions );
-				$renewalTerm = new RenewalTerm( new Money( $renewalTerm['cost'][ $memberCurrency ]['amount'], $memberCurrency ), new DateInterval( 'P' . $renewalTerm['term'] . mb_strtoupper( $renewalTerm['unit'] ) ), $package->tax ? Tax::load( $package->tax ) : NULL, $renewalTerm['add'] );
+				$renewalTerm = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $renewalTerm['cost'][ $memberCurrency ]['amount'], $memberCurrency ), new \DateInterval( 'P' . $renewalTerm['term'] . mb_strtoupper( $renewalTerm['unit'] ) ), $package->tax ? \IPS\nexus\Tax::load( $package->tax ) : NULL, $renewalTerm['add'] );
 			}
 		}
 
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'nexus', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'nexus' )->embedProductReview( $this, $this->item(), $renewalTerm, $this->url()->setQueryString( $params ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'nexus', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'nexus' )->embedProductReview( $this, $this->item(), $renewalTerm, $this->url()->setQueryString( $params ) );
 	}
 	
 	/**
@@ -171,7 +146,7 @@ class Review extends ContentReview implements Embeddable,
 	 *
 	 * @return	void
 	 */
-	public function postCreate(): void
+	public function postCreate()
 	{
 		parent::postCreate();
 		
@@ -180,15 +155,15 @@ class Review extends ContentReview implements Embeddable,
 		{
 			try
 			{
-				Approval::loadFromContent( get_called_class(), $this->id );
+				\IPS\core\Approval::loadFromContent( \get_called_class(), $this->id );
 			}
-			catch( OutOfRangeException )
+			catch( \OutOfRangeException $e )
 			{
 				/* No reason found - see if product requires approval of reviews */
 				if ( $this->item()->review_moderate )
 				{
-					$log = new Approval;
-					$log->content_class	= get_called_class();
+					$log = new \IPS\core\Approval;
+					$log->content_class	= \get_called_class();
 					$log->content_id	= $this->id;
 					$log->held_reason	= 'item';
 					$log->save();

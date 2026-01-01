@@ -11,35 +11,31 @@
 namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-use IPS\IPS;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Moderator Permissions Interface for Content Models
  */
-class ModeratorPermissions
+class _ModeratorPermissions
 {
 	/**
 	 * @brief	Actions
 	 */
-	public array $actions = array();
+	public $actions = array();
 	
 	/**
 	 * @brief	Comment Actions
 	 */
-	public array $commentActions = array();
+	public $commentActions = array();
 	
 	/**
 	 * @brief	Review Actions
 	 */
-	public array $reviewActions = array();
+	public $reviewActions = array();
 	
 	/**
 	 * Constructor
@@ -49,13 +45,18 @@ class ModeratorPermissions
 	public function __construct()
 	{
 		$class = static::$class;
-		if ( IPS::classUsesTrait( $class, 'IPS\Content\Pinnable' ) )
+		if ( \in_array( 'IPS\Content\Pinnable', class_implements( $class ) ) )
 		{
 			$this->actions[] = 'pin';
 			$this->actions[] = 'unpin';
 		}
+		if ( \in_array( 'IPS\Content\Featurable', class_implements( $class ) ) )
+		{
+			$this->actions[] = 'feature';
+			$this->actions[] = 'unfeature';
+		}
 		$this->actions[] = 'edit';
-		if ( IPS::classUsesTrait( $class, 'IPS\Content\Hideable' ) )
+		if ( \in_array( 'IPS\Content\Hideable', class_implements( $class ) ) )
 		{
 			$this->actions[] = 'hide';
 			$this->actions[] = 'unhide';
@@ -65,29 +66,29 @@ class ModeratorPermissions
 		{
 			$this->actions[] = 'move';
 		}
-		if ( IPS::classUsesTrait( $class, 'IPS\Content\Lockable' ) )
+		if ( \in_array( 'IPS\Content\Lockable', class_implements( $class ) ) )
 		{
 			$this->actions[] = 'lock';
 			$this->actions[] = 'unlock';
 			$this->actions[] = 'reply_to_locked';
 		}
 		$this->actions[] = 'delete';
-		if ( IPS::classUsesTrait( $class, 'IPS\Content\MetaData' ) AND $class::supportedMetaDataTypes() )
+		if ( \in_array( 'IPS\Content\MetaData', class_implements( $class ) ) AND $class::supportedMetaDataTypes() )
 		{
-			if ( in_array( 'core_FeaturedComments', $class::supportedMetaDataTypes() ) )
+			if ( \in_array( 'core_FeaturedComments', $class::supportedMetaDataTypes() ) )
 			{
 				$this->actions[] = 'feature_comments';
 				$this->actions[] = 'unfeature_comments';
 			}
 			
-			if ( in_array( 'core_ContentMessages', $class::supportedMetaDataTypes() ) )
+			if ( \in_array( 'core_ContentMessages', $class::supportedMetaDataTypes() ) )
 			{
 				$this->actions[] = 'add_item_message';
 				$this->actions[] = 'edit_item_message';
 				$this->actions[] = 'delete_item_message';
 			}
 			
-			if ( in_array( 'core_ItemModeration', $class::supportedMetaDataTypes() ) )
+			if ( \in_array( 'core_ItemModeration', $class::supportedMetaDataTypes() ) )
 			{
 				$this->actions[] = 'toggle_item_moderation';
 			}
@@ -96,7 +97,7 @@ class ModeratorPermissions
 		if ( isset( $class::$commentClass ) )
 		{
 			$this->commentActions = array( 'edit' );
-			if ( IPS::classUsesTrait( $class::$commentClass, 'IPS\Content\Hideable' ) )
+			if ( \in_array( 'IPS\Content\Hideable', class_implements( $class::$commentClass ) ) )
 			{
 				$this->commentActions[] = 'hide';
 				$this->commentActions[] = 'unhide';
@@ -108,7 +109,7 @@ class ModeratorPermissions
 		if ( isset( $class::$reviewClass ) )
 		{
 			$this->reviewActions = array( 'edit' );
-			if ( IPS::classUsesTrait( $class::$reviewClass, 'IPS\Content\Hideable' ) )
+			if ( \in_array( 'IPS\Content\Hideable', class_implements( $class::$reviewClass ) ) )
 			{
 				$this->reviewActions[] = 'hide';
 				$this->reviewActions[] = 'unhide';
@@ -136,17 +137,14 @@ class ModeratorPermissions
 	 * @endcode
 	 * @return	array
 	 */
-	public function getPermissions( array $toggles ): array
+	public function getPermissions( $toggles )
 	{
 		$class = static::$class;
+		$containerNodeClass = $class::$containerNodeClass;
 		
 		$return = array();
-
-		if( isset( $class::$containerNodeClass ) )
-		{
-			$containerNodeClass = $class::$containerNodeClass;
-			$return[ $containerNodeClass::$modPerm ] = array( 'Node', array( 'class' => $containerNodeClass, 'zeroVal' => 'all', 'multiple' => TRUE ) );
-		}
+		
+		$return[ $containerNodeClass::$modPerm ] = array( 'Node', array( 'class' => $containerNodeClass, 'zeroVal' => 'all', 'multiple' => TRUE ) );
 		
 		foreach ( $this->actions as $k )
 		{

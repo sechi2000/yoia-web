@@ -12,62 +12,31 @@
 namespace IPS\nexus\modules\admin\payments;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\core\AdminNotification;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Transaction;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use function defined;
-use function in_array;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-use const IPS\Helpers\Table\SEARCH_NODE;
-use const IPS\Helpers\Table\SEARCH_NUMERIC;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Transactions
  */
-class transactions extends Controller
+class _transactions extends \IPS\Dispatcher\Controller
 {	
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'transactions_manage' );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'transaction.css', 'nexus', 'admin' ) );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'transactions_manage' );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'transaction.css', 'nexus', 'admin' ) );
 		parent::execute();
 	}
 	
@@ -76,30 +45,30 @@ class transactions extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Create Table */
-		$table = Transaction::table( array( array( 't_status<>?', Transaction::STATUS_PENDING ) ), Url::internal( 'app=nexus&module=payments&controller=transactions' ), 't' );
+		$table = \IPS\nexus\Transaction::table( array( array( 't_status<>?', \IPS\nexus\Transaction::STATUS_PENDING ) ), \IPS\Http\Url::internal( 'app=nexus&module=payments&controller=transactions' ), 't' );
 		$table->filters = array(
-			'trans_attention_required'	=> array( Db::i()->in( 't_status', array( Transaction::STATUS_HELD, Transaction::STATUS_WAITING, Transaction::STATUS_REVIEW, Transaction::STATUS_DISPUTED ) ) ),
+			'trans_attention_required'	=> array( \IPS\Db::i()->in( 't_status', array( \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_WAITING, \IPS\nexus\Transaction::STATUS_REVIEW, \IPS\nexus\Transaction::STATUS_DISPUTED ) ) ),
 		);
 		$table->advancedSearch = array(
-			't_id'		=> SEARCH_CONTAINS_TEXT,
-			't_status'	=> array( SEARCH_SELECT, array( 'options' => Transaction::statuses(), 'multiple' => TRUE ) ),
-			't_member'	=> SEARCH_MEMBER,
-			't_amount'	=> SEARCH_NUMERIC,
-			't_method'	=> array( SEARCH_NODE, array( 'class' => '\IPS\nexus\Gateway' ) ),
-			't_date'	=> SEARCH_DATE_RANGE,
+			't_id'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			't_status'	=> array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => \IPS\nexus\Transaction::statuses(), 'multiple' => TRUE ) ),
+			't_member'	=> \IPS\Helpers\Table\SEARCH_MEMBER,
+			't_amount'	=> \IPS\Helpers\Table\SEARCH_NUMERIC,
+			't_method'	=> array( \IPS\Helpers\Table\SEARCH_NODE, array( 'class' => '\IPS\nexus\Gateway' ) ),
+			't_date'	=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
 		);
 		$table->quickSearch = 't_id';
 		
 		/* Display */
-		if ( isset( Request::i()->attn ) and Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( '( t_status=? OR t_status=? OR t_status=? )', Transaction::STATUS_HELD, Transaction::STATUS_REVIEW, Transaction::STATUS_DISPUTED ) ) )
+		if ( isset( \IPS\Request::i()->attn ) and \IPS\Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( '( t_status=? OR t_status=? OR t_status=? )', \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_REVIEW, \IPS\nexus\Transaction::STATUS_DISPUTED ) ) )
 		{
 			$table->filter = 'trans_attention_required';
 		}
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('menu__nexus_payments_transactions');
-		Output::i()->output	= (string) $table;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('menu__nexus_payments_transactions');
+		\IPS\Output::i()->output	= (string) $table;
 	}
 	
 	/**
@@ -107,21 +76,21 @@ class transactions extends Controller
 	 *
 	 * @return	void
 	 */
-	public function view() : void
+	public function view()
 	{
 		/* Load Transaction */
 		try
 		{
-			$transaction = Transaction::load( Request::i()->id );
+			$transaction = \IPS\nexus\Transaction::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X186/8', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X186/8', 404, '' );
 		}
 				
 		/* Output */
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'transaction_number', FALSE, array( 'sprintf' => array( $transaction->id ) ) );
-		Output::i()->output = Theme::i()->getTemplate( 'transactions' )->view( $transaction );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'transaction_number', FALSE, array( 'sprintf' => array( $transaction->id ) ) );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'transactions' )->view( $transaction );
 	}
 	
 	/**
@@ -129,27 +98,26 @@ class transactions extends Controller
 	 *
 	 * @return	void
 	 */
-	public function approve() : void
+	public function approve()
 	{
-		Dispatcher::i()->checkAcpPermission( 'transactions_edit' );
-		Session::i()->csrfCheck();
-
+		\IPS\Dispatcher::i()->checkAcpPermission( 'transactions_edit' );
+		\IPS\Session::i()->csrfCheck();
+		
 		/* Load Transaction */
 		try
 		{
-			$transaction = Transaction::load( Request::i()->id );
+			$transaction = \IPS\nexus\Transaction::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X186/9', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X186/9', 404, '' );
 		}
-
 		$method = $transaction->method;
 
 		/* Can we approve it? */
-		if ( !$method or !in_array( $transaction->status, array( Transaction::STATUS_WAITING, Transaction::STATUS_HELD, Transaction::STATUS_REVIEW, Transaction::STATUS_GATEWAY_PENDING, Transaction::STATUS_DISPUTED ) ) )
+		if ( !$method or !\in_array( $transaction->status, array( \IPS\nexus\Transaction::STATUS_WAITING, \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_REVIEW, \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING, \IPS\nexus\Transaction::STATUS_DISPUTED ) ) )
 		{
-			Output::i()->error( 'transaction_status_err', '2X186/A', 403, '' );
+			\IPS\Output::i()->error( 'transaction_status_err', '2X186/A', 403, '' );
 		}
 		
 		/* Log it */
@@ -157,7 +125,7 @@ class transactions extends Controller
 		{
 			$transaction->member->log( 'transaction', array(
 				'type'		=> 'status',
-				'status'	=> Transaction::STATUS_PAID,
+				'status'	=> \IPS\nexus\Transaction::STATUS_PAID,
 				'id'		=> $transaction->id
 			) );
 		}
@@ -165,29 +133,28 @@ class transactions extends Controller
 		/* Do it */
 		try
 		{
-			if ( $transaction->status !== Transaction::STATUS_DISPUTED )
+			if ( $transaction->status !== \IPS\nexus\Transaction::STATUS_DISPUTED )
 			{
 				$transaction->capture();
 			}
-
-			$transaction->approve( Member::loggedIn() );
+			$transaction->approve( \IPS\Member::loggedIn() );
 		}
-		catch ( LogicException $e )
+		catch ( \LogicException $e )
 		{
-			Output::i()->error( $e->getMessage(), '3X186/2', 500, '' );
+			\IPS\Output::i()->error( $e->getMessage(), '3X186/2', 500, '' );
 		}
-		catch ( RuntimeException )
+		catch ( \RuntimeException $e )
 		{
-			Output::i()->error( 'transaction_capture_err', '3X186/3', 500, '' );
+			\IPS\Output::i()->error( 'transaction_capture_err', '3X186/3', 500, '' );
 		}
 		
 		/* Send Email */
 		$transaction->sendNotification();
 				
 		/* Redirect */
-		if ( Request::i()->isAjax() and Request::i()->queueStatus )
+		if ( \IPS\Request::i()->isAjax() and \IPS\Request::i()->queueStatus )
 		{
-			Output::i()->json( array( 'message' => Member::loggedIn()->language()->addToStack('tstatus_okay_set'), 'queue' => \IPS\nexus\extensions\core\AdminNotifications\Transaction::queueHtml( Request::i()->queueStatus ) ) );
+			\IPS\Output::i()->json( array( 'message' => \IPS\Member::loggedIn()->language()->addToStack('tstatus_okay_set'), 'queue' => \IPS\nexus\extensions\core\AdminNotifications\Transaction::queueHtml( \IPS\Request::i()->queueStatus ) ) );
 		}
 		else
 		{
@@ -200,32 +167,33 @@ class transactions extends Controller
 	 *
 	 * @return	void
 	 */
-	public function review() : void
+	public function review()
 	{
-		Dispatcher::i()->checkAcpPermission( 'transactions_edit' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'transactions_edit' );
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Load Transaction */
 		try
 		{
-			$transaction = Transaction::load( Request::i()->id );
+			$transaction = \IPS\nexus\Transaction::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X186/C', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X186/C', 404, '' );
 		}
-
+		$method = $transaction->method;
+		
 		/* Can we flag it? */
-		if ( !in_array( $transaction->status, array( Transaction::STATUS_WAITING, Transaction::STATUS_HELD ) ) )
+		if ( !\in_array( $transaction->status, array( \IPS\nexus\Transaction::STATUS_WAITING, \IPS\nexus\Transaction::STATUS_HELD ) ) )
 		{
-			Output::i()->error( 'transaction_status_err', '2X186/B', 403, '' );
+			\IPS\Output::i()->error( 'transaction_status_err', '2X186/B', 403, '' );
 		}
 		
 		/* Set it */
 		$extra = $transaction->extra;
-		$extra['history'][] = array( 's' => Transaction::STATUS_REVIEW, 'on' => time(), 'by' => Member::loggedIn()->member_id );
+		$extra['history'][] = array( 's' => \IPS\nexus\Transaction::STATUS_REVIEW, 'on' => time(), 'by' => \IPS\Member::loggedIn()->member_id );
 		$transaction->extra = $extra;
-		$transaction->status = Transaction::STATUS_REVIEW;
+		$transaction->status = \IPS\nexus\Transaction::STATUS_REVIEW;
 		$transaction->save();
 		
 		/* Log it */
@@ -233,18 +201,59 @@ class transactions extends Controller
 		{
 			$transaction->member->log( 'transaction', array(
 				'type'		=> 'status',
-				'status'	=> Transaction::STATUS_REVIEW,
+				'status'	=> \IPS\nexus\Transaction::STATUS_REVIEW,
 				'id'		=> $transaction->id
 			) );
 		}
 		
 		/* Notification */
-		AdminNotification::send( 'nexus', 'Transaction', Transaction::STATUS_REVIEW, TRUE, $transaction );
+		\IPS\core\AdminNotification::send( 'nexus', 'Transaction', \IPS\nexus\Transaction::STATUS_REVIEW, TRUE, $transaction );
+		
+		/* Create a support request? */
+		if ( \IPS\Settings::i()->nexus_revw_sa != -1 )
+		{
+			$extraData = array();
+			if ( $transaction->member->member_id )
+			{
+				$extraData['member'] = $transaction->member->member_id;
+			}
+			else
+			{
+				$extraData['email'] = $transaction->invoice->guest_data['member']['email'];
+			}
+			
+			$createUrl = \IPS\Http\Url::internal('app=nexus&module=support&controller=requests&do=create');
+			$key = md5( $createUrl );
+			
+			if ( \IPS\Settings::i()->nexus_revw_sa )
+			{
+				$extraData['stock_action'] = \IPS\Settings::i()->nexus_revw_sa;
+				$_SESSION["wizard-{$key}-data"] = $extraData;
+				$_SESSION["wizard-{$key}-step"] = 'request_details';
+			}
+			else
+			{
+				$_SESSION["wizard-{$key}-data"] = $extraData;
+				if ( \count( \IPS\nexus\Support\StockAction::roots() ) )
+				{
+					$_SESSION["wizard-{$key}-step"] = 'stock_action';
+				}
+				else
+				{
+					$_SESSION["wizard-{$key}-step"] = 'request_details';
+				}
+			}
+			
+			$_SESSION["wizard-{$key}-data"]['transaction'] = $transaction->id;
+			$_SESSION["wizard-{$key}-data"]['ref'] = isset( \IPS\Request::i()->r ) ? \IPS\Request::i()->r : 'v';
+			
+			\IPS\Output::i()->redirect( $createUrl );
+		}
 		
 		/* Redirect */
-		if ( Request::i()->isAjax() and Request::i()->queueStatus )
+		if ( \IPS\Request::i()->isAjax() and \IPS\Request::i()->queueStatus )
 		{
-			Output::i()->json( array( 'message' => Member::loggedIn()->language()->addToStack('tstatus_revw_set'), 'queue' => \IPS\nexus\extensions\core\AdminNotifications\Transaction::queueHtml( Request::i()->queueStatus ) ) );
+			\IPS\Output::i()->json( array( 'message' => \IPS\Member::loggedIn()->language()->addToStack('tstatus_revw_set'), 'queue' => \IPS\nexus\extensions\core\AdminNotifications\Transaction::queueHtml( \IPS\Request::i()->queueStatus ) ) );
 		}
 		else
 		{
@@ -257,37 +266,38 @@ class transactions extends Controller
 	 *
 	 * @return	void
 	 */
-	public function void() : void
+	public function void()
 	{
-		Dispatcher::i()->checkAcpPermission( 'transactions_edit' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'transactions_edit' );
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Load Transaction */
 		try
 		{
-			$transaction = Transaction::load( Request::i()->id );
+			$transaction = \IPS\nexus\Transaction::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X186/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X186/4', 404, '' );
 		}
-
+		$method = $transaction->method;
+		
 		/* Can we void it? */
-		if ( !in_array( $transaction->status, array( Transaction::STATUS_WAITING, Transaction::STATUS_GATEWAY_PENDING ) ) and ( !$transaction->auth or !in_array( $transaction->status, array( Transaction::STATUS_HELD, Transaction::STATUS_REVIEW ) ) ) )
+		if ( !\in_array( $transaction->status, array( \IPS\nexus\Transaction::STATUS_WAITING, \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING ) ) and ( !$transaction->auth or !\in_array( $transaction->status, array( \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_REVIEW ) ) ) )
 		{
-			Output::i()->error( 'transaction_status_err', '2X186/5', 403, '' );
+			\IPS\Output::i()->error( 'transaction_status_err', '2X186/5', 403, '' );
 		}
 		
 		/* Void it */
 		try
 		{
-			$transaction->void();
+			$transaction->void( $transaction );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			if ( !isset( Request::i()->override ) )
+			if ( !isset( \IPS\Request::i()->override ) )
 			{
-				Output::i()->error( Member::loggedIn()->language()->addToStack( 'transaction_void_err', FALSE, array( 'sprintf' => array( $transaction->acpUrl()->setQueryString( array( 'do' => 'void', 'override' => 1 ) ) ) ) ), '3X186/6', 500, '', array(), $e->getMessage() );
+				\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack( 'transaction_void_err', FALSE, array( 'sprintf' => array( $transaction->acpUrl()->setQueryString( array( 'do' => 'void', 'override' => 1 ) ) ) ) ), '3X186/6', 500, '', array(), $e->getMessage() );
 			}
 		}
 		
@@ -295,9 +305,9 @@ class transactions extends Controller
 		$transaction->sendNotification();
 		
 		/* Redirect */
-		if ( Request::i()->isAjax() and Request::i()->queueStatus )
+		if ( \IPS\Request::i()->isAjax() and \IPS\Request::i()->queueStatus )
 		{
-			Output::i()->json( array( 'message' => Member::loggedIn()->language()->addToStack('tstatus_fail_set'), 'queue' => \IPS\nexus\extensions\core\AdminNotifications\Transaction::queueHtml( Request::i()->queueStatus ) ) );
+			\IPS\Output::i()->json( array( 'message' => \IPS\Member::loggedIn()->language()->addToStack('tstatus_fail_set'), 'queue' => \IPS\nexus\extensions\core\AdminNotifications\Transaction::queueHtml( \IPS\Request::i()->queueStatus ) ) );
 		}
 		else
 		{
@@ -310,25 +320,25 @@ class transactions extends Controller
 	 *
 	 * @return	void
 	 */
-	public function refund() : void
+	public function refund()
 	{
-		Dispatcher::i()->checkAcpPermission( 'transactions_refund' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'transactions_refund' );
 		
 		/* Load Transaction */
 		try
 		{
-			$transaction = Transaction::load( Request::i()->id );
+			$transaction = \IPS\nexus\Transaction::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X186/D', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X186/D', 404, '' );
 		}
 		$method = $transaction->method;
 		
 		/* Can we refund it? */
-		if ( !in_array( $transaction->status, array( Transaction::STATUS_PAID, Transaction::STATUS_HELD, Transaction::STATUS_REVIEW, Transaction::STATUS_PART_REFUNDED, Transaction::STATUS_DISPUTED ) ) )
+		if ( !\in_array( $transaction->status, array( \IPS\nexus\Transaction::STATUS_PAID, \IPS\nexus\Transaction::STATUS_HELD, \IPS\nexus\Transaction::STATUS_REVIEW, \IPS\nexus\Transaction::STATUS_PART_REFUNDED, \IPS\nexus\Transaction::STATUS_DISPUTED ) ) )
 		{
-			Output::i()->error( 'transaction_status_err', '2X186/E', 403, '' );
+			\IPS\Output::i()->error( 'transaction_status_err', '2X186/E', 403, '' );
 		}
 		
 		/* What are the refund methods? */
@@ -356,22 +366,22 @@ class transactions extends Controller
 		$refundMethods['none'] = 'refund_method_none';
 		
 		/* Build form */
-		$form = new Form;
-		$form->add( new Radio( 'refund_method', ( $method and $method::SUPPORTS_REFUNDS ) ? 'gateway' : 'credit', TRUE, array( 'options' => $refundMethods, 'toggles' => $refundMethodToggles ) ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Radio( 'refund_method', ( $method and $method::SUPPORTS_REFUNDS ) ? 'gateway' : 'credit', TRUE, array( 'options' => $refundMethods, 'toggles' => $refundMethodToggles ) ) );
 		if ( $refundReasons )
 		{
-			$form->add( new Radio( 'refund_reason', NULL, FALSE, array( 'options' => $refundReasons ), NULL, NULL, NULL, 'refund_reason' ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'refund_reason', NULL, FALSE, array( 'options' => $refundReasons ), NULL, NULL, NULL, 'refund_reason' ) );
 		}
 		if ( $method and $method::SUPPORTS_REFUNDS and $method::SUPPORTS_PARTIAL_REFUNDS )
 		{
-			$form->add( new Number( 'refund_amount', 0, TRUE, array(
+			$form->add( new \IPS\Helpers\Form\Number( 'refund_amount', 0, TRUE, array(
 				'unlimited'		=> 0,
 				'unlimitedLang'	=> (
 					$transaction->partial_refund->amount->isGreaterThanZero()
-						? Member::loggedIn()->language()->addToStack( 'refund_full_remaining', FALSE, array( 'sprintf' => array(
-							new Money( $transaction->amount->amount->subtract( $transaction->partial_refund->amount ), $transaction->currency ) )
+						? \IPS\Member::loggedIn()->language()->addToStack( 'refund_full_remaining', FALSE, array( 'sprintf' => array(
+							new \IPS\nexus\Money( $transaction->amount->amount->subtract( $transaction->partial_refund->amount ), $transaction->currency ) )
 						) )
-						: Member::loggedIn()->language()->addToStack( 'refund_full', FALSE, array( 'sprintf' => array( $transaction->amount ) ) )
+						: \IPS\Member::loggedIn()->language()->addToStack( 'refund_full', FALSE, array( 'sprintf' => array( $transaction->amount ) ) )
 				),
 				'max'			=> (string) $transaction->amount->amount->subtract( $transaction->partial_refund->amount ),
 				'decimals' 		=> TRUE
@@ -379,19 +389,19 @@ class transactions extends Controller
 			
 			if ( $transaction->credit->amount->isGreaterThanZero() )
 			{
-				Member::loggedIn()->language()->words['refund_amount_desc'] = sprintf( Member::loggedIn()->language()->get('refund_amount_descwarn'), $transaction->credit );
+				\IPS\Member::loggedIn()->language()->words['refund_amount_desc'] = sprintf( \IPS\Member::loggedIn()->language()->get('refund_amount_descwarn'), $transaction->credit );
 			}
 		}
 		if ( $transaction->credit->amount->compare( $transaction->amount->amount ) === -1 )
 		{
-			$form->add( new Number( 'refund_credit_amount', 0, TRUE, array(
+			$form->add( new \IPS\Helpers\Form\Number( 'refund_credit_amount', 0, TRUE, array(
 				'unlimited'		=> 0,
 				'unlimitedLang'	=> (
 					$transaction->credit->amount->isGreaterThanZero()
-						? Member::loggedIn()->language()->addToStack( 'refund_full_remaining', FALSE, array( 'sprintf' => array(
-							new Money( $transaction->amount->amount->subtract( $transaction->credit->amount ), $transaction->currency ) )
+						? \IPS\Member::loggedIn()->language()->addToStack( 'refund_full_remaining', FALSE, array( 'sprintf' => array(
+							new \IPS\nexus\Money( $transaction->amount->amount->subtract( $transaction->credit->amount ), $transaction->currency ) )
 						) )
-						: Member::loggedIn()->language()->addToStack( 'refund_full', FALSE, array( 'sprintf' => array( $transaction->amount ) ) )
+						: \IPS\Member::loggedIn()->language()->addToStack( 'refund_full', FALSE, array( 'sprintf' => array( $transaction->amount ) ) )
 				),
 				'max'			=> (string) $transaction->amount->amount->subtract( $transaction->credit->amount ),
 				'decimals' 		=> TRUE
@@ -399,43 +409,43 @@ class transactions extends Controller
 			
 			if ( $transaction->partial_refund->amount->isGreaterThanZero() )
 			{
-				Member::loggedIn()->language()->words['refund_credit_amount_desc'] = sprintf( Member::loggedIn()->language()->get('refund_credit_amount_descwarn'), $transaction->partial_refund );
+				\IPS\Member::loggedIn()->language()->words['refund_credit_amount_desc'] = sprintf( \IPS\Member::loggedIn()->language()->get('refund_credit_amount_descwarn'), $transaction->partial_refund );
 			}
 		}
 		if ( $transaction->credit->amount->isGreaterThanZero() )
 		{
-			$form->add( new YesNo( 'refund_reverse_credit', TRUE, TRUE, array( 'togglesOn' => array( 'form_refund_reverse_credit_warning' ) ), NULL, NULL, NULL, 'refund_reverse_credit' ) );
-			Member::loggedIn()->language()->words['refund_reverse_credit'] = sprintf( Member::loggedIn()->language()->get( 'refund_reverse_credit' ), $transaction->credit );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'refund_reverse_credit', TRUE, TRUE, array( 'togglesOn' => array( 'form_refund_reverse_credit_warning' ) ), NULL, NULL, NULL, 'refund_reverse_credit' ) );
+			\IPS\Member::loggedIn()->language()->words['refund_reverse_credit'] = sprintf( \IPS\Member::loggedIn()->language()->get( 'refund_reverse_credit' ), $transaction->credit );
 			
 			$credits = $transaction->member->cm_credits;
 			if ( $credits[ $transaction->amount->currency ]->amount->compare( $transaction->credit->amount ) === -1 )
 			{
-				Member::loggedIn()->language()->words['refund_reverse_credit_warning'] = Member::loggedIn()->language()->addToStack( 'account_credit_remove_neg' );
+				\IPS\Member::loggedIn()->language()->words['refund_reverse_credit_warning'] = \IPS\Member::loggedIn()->language()->addToStack( 'account_credit_remove_neg' );
 			}
 		}
-		if ( $transaction->invoice !== NULL and $transaction->invoice->status === Invoice::STATUS_PAID )
+		if ( $transaction->invoice !== NULL and $transaction->invoice->status === \IPS\nexus\Invoice::STATUS_PAID )
 		{
-			$field = new Radio( 'refund_invoice_status', Invoice::STATUS_PENDING, TRUE, array(
+			$field = new \IPS\Helpers\Form\Radio( 'refund_invoice_status', \IPS\nexus\Invoice::STATUS_PENDING, TRUE, array(
 				'options' => array(
-					Invoice::STATUS_PAID	=> 'refund_invoice_paid',
-					Invoice::STATUS_PENDING	=> 'refund_invoice_pending',
-					Invoice::STATUS_CANCELED	=> 'refund_invoice_canceled',
+					\IPS\nexus\Invoice::STATUS_PAID	=> 'refund_invoice_paid',
+					\IPS\nexus\Invoice::STATUS_PENDING	=> 'refund_invoice_pending',
+					\IPS\nexus\Invoice::STATUS_CANCELED	=> 'refund_invoice_canceled',
 				),
 				'toggles'	=> array(
-					Invoice::STATUS_PENDING	=> array( 'form_refund_invoice_status_warning' ),
-					Invoice::STATUS_CANCELED	=> array( 'form_refund_invoice_status_warning' )
+					\IPS\nexus\Invoice::STATUS_PENDING	=> array( 'form_refund_invoice_status_warning' ),
+					\IPS\nexus\Invoice::STATUS_CANCELED	=> array( 'form_refund_invoice_status_warning' )
 				)
 			) );
-			$field->warningBox = Theme::i()->getTemplate('invoices')->unpaidConsequences( $transaction->invoice );
+			$field->warningBox = \IPS\Theme::i()->getTemplate('invoices')->unpaidConsequences( $transaction->invoice );
 			$form->add( $field );
 		}
 		if ( $billingAgreement = $transaction->billing_agreement )
 		{
-			$form->add( new YesNo( 'refund_cancel_billing_agreement', TRUE, NULL, array( 'togglesOff' => array( 'form_refund_cancel_billing_agreement_warning' ) ) ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'refund_cancel_billing_agreement', TRUE, NULL, array( 'togglesOff' => array( 'form_refund_cancel_billing_agreement_warning' ) ) ) );
 			
-			if ( Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( 't_billing_agreement=? AND t_id<?', $billingAgreement->id, $transaction->id ) )->first() )
+			if ( \IPS\Db::i()->select( 'COUNT(*)', 'nexus_transactions', array( 't_billing_agreement=? AND t_id<?', $billingAgreement->id, $transaction->id ) )->first() )
 			{
-				unset( Member::loggedIn()->language()->words['refund_cancel_billing_agreement_warning'] );
+				unset( \IPS\Member::loggedIn()->language()->words['refund_cancel_billing_agreement_warning'] );
 			}
 		}
 		
@@ -451,9 +461,9 @@ class transactions extends Controller
 					{
 						$transaction->billing_agreement->cancel();
 					}
-					catch ( Exception $e )
+					catch ( \Exception $e )
 					{
-						Output::i()->error( 'billing_agreement_cancel_error', '3X186/G', 500, '', array(), $e->getMessage() );
+						\IPS\Output::i()->error( 'billing_agreement_cancel_error', '3X186/G', 500, '', array(), $e->getMessage() );
 					}
 				}
 			}
@@ -477,21 +487,21 @@ class transactions extends Controller
 					$amount = $values['refund_credit_amount'];
 				}
 								
-				$transaction->refund( $values['refund_method'], $amount, $values['refund_reason'] ?? NULL);
+				$transaction->refund( $values['refund_method'], $amount, isset( $values['refund_reason'] ) ? $values['refund_reason'] : NULL );
 			}
-			catch ( LogicException $e )
+			catch ( \LogicException $e )
 			{
-				Output::i()->error( $e->getMessage(), '1X186/1', 500, '' );
+				\IPS\Output::i()->error( $e->getMessage(), '1X186/1', 500, '' );
 			}
-			catch ( RuntimeException )
+			catch ( \RuntimeException $e )
 			{
-				Output::i()->error( 'refund_failed', '3X186/7', 500, '' );
+				\IPS\Output::i()->error( 'refund_failed', '3X186/7', 500, '' );
 			}
 			
 			/* Handle invoice */
 			if( $transaction->invoice !== NULL )
 			{
-				if ( isset( $values['refund_invoice_status'] ) and $values['refund_invoice_status'] !== Invoice::STATUS_PAID )
+				if ( isset( $values['refund_invoice_status'] ) and $values['refund_invoice_status'] !== \IPS\nexus\Invoice::STATUS_PAID )
 				{
 					$transaction->invoice->markUnpaid( $values['refund_invoice_status'] );
 
@@ -514,8 +524,8 @@ class transactions extends Controller
 			$this->_redirect( $transaction );
 		}
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'transaction_refund_title', FALSE, array( 'sprintf' => array( $transaction->amount ) ) );
-		Output::i()->output = $form;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'transaction_refund_title', FALSE, array( 'sprintf' => array( $transaction->amount ) ) );
+		\IPS\Output::i()->output = $form;		
 	}
 	
 	/**
@@ -523,21 +533,21 @@ class transactions extends Controller
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		Dispatcher::i()->checkAcpPermission( 'transactions_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'transactions_delete' );
 		
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 		
 		/* Load Transaction */
 		try
 		{
-			$transaction = Transaction::load( Request::i()->id );
+			$transaction = \IPS\nexus\Transaction::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2X186/F', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2X186/F', 404, '' );
 		}
 		
 		/* Delete */
@@ -555,50 +565,50 @@ class transactions extends Controller
 				) );
 			}
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			// If the member no longer exists, we just won't log it
 		}
 		
 		/* Redirect */
-		Output::i()->redirect( Url::internal('app=nexus&module=payments&controller=transactions')->getSafeUrlFromFilters());
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=nexus&module=payments&controller=transactions')->getSafeUrlFromFilters());
 	}
 	
 	
 	/**
 	 * Redirect
 	 *
-	 * @param	Transaction	$transaction	The transaction
+	 * @param	\IPS\nexus\Transaction	$transaction	The transaction
 	 * @return	void
 	 */
-	protected function _redirect( Transaction $transaction ) : void
+	protected function _redirect( \IPS\nexus\Transaction $transaction )
 	{
-		if ( isset( Request::i()->r ) )
+		if ( isset( \IPS\Request::i()->r ) )
 		{
-			switch ( Request::i()->r )
+			switch ( \IPS\Request::i()->r )
 			{
 				case 'v':
-					Output::i()->redirect( $transaction->acpUrl()->getSafeUrlFromFilters() );
+					\IPS\Output::i()->redirect( $transaction->acpUrl()->getSafeUrlFromFilters() );
 					break;
 					
 				case 'i':
-					Output::i()->redirect( $transaction->invoice->acpUrl()->getSafeUrlFromFilters() );
+					\IPS\Output::i()->redirect( $transaction->invoice->acpUrl()->getSafeUrlFromFilters() );
 					break;
 				
 				case 'c':
-					Output::i()->redirect( $transaction->member->acpUrl()->getSafeUrlFromFilters());
+					\IPS\Output::i()->redirect( $transaction->member->acpUrl()->getSafeUrlFromFilters());
 					break;
 				
 				case 't':
-					Output::i()->redirect( Url::internal('app=nexus&module=payments&controller=transactions')->getSafeUrlFromFilters() );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=nexus&module=payments&controller=transactions')->getSafeUrlFromFilters() );
 					break;
 					
 				case 'n':
-					Output::i()->redirect( Url::internal('app=core&module=overview&controller=notifications')->getSafeUrlFromFilters());
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=overview&controller=notifications')->getSafeUrlFromFilters());
 					break;
 			}
 		}
 		
-		Output::i()->redirect( $transaction->acpUrl()->getSafeUrlFromFilters());
+		\IPS\Output::i()->redirect( $transaction->acpUrl()->getSafeUrlFromFilters());
 	}
 }

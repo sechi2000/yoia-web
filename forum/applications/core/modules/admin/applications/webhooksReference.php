@@ -12,38 +12,30 @@
 namespace IPS\core\modules\admin\applications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Webhook;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * webhooks
  */
-class webhooksReference extends Controller
+class _webhooksReference extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'webhooks_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'webhooks_manage' );
 		parent::execute();
 	}
 
@@ -52,11 +44,11 @@ class webhooksReference extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$webhooks = Webhook::getAvailableWebhooks();
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/api.css', 'core', 'admin' ) );
-		Output::i()->output = Theme::i()->getTemplate( 'api' )->webhooks( $webhooks );
+		$webhooks = \IPS\Api\Webhook::getAvailableWebhooks();
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/api.css', 'core', 'admin' ) );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'api' )->webhooks( $webhooks );
 
 
 

@@ -11,38 +11,35 @@
 namespace IPS\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * API Response
  */
-class Response
+class _Response
 {
 	/**
 	 * @brief	HTTP Response Code
 	 */
-	public int $httpCode;
+	public $httpCode;
 	
 	/**
 	 * @brief	Data
 	 */
-	protected mixed $data = null;
+	protected $data;
 
 	/**
 	 * Constructor
 	 *
 	 * @param	int		$httpCode	HTTP Response code
-	 * @param	mixed	$data		Data to return
+	 * @param	array	$data		Data to return
 	 * @return	void
 	 */
-	public function __construct( int $httpCode, mixed $data )
+	public function __construct( $httpCode, $data )
 	{
 		$this->httpCode = $httpCode;
 		$this->data = $data;
@@ -51,9 +48,9 @@ class Response
 	/**
 	 * Data to output
 	 *
-	 * @return	mixed
+	 * @return	string
 	 */
-	public function getOutput() : mixed
+	public function getOutput()
 	{
 		return $this->data;
 	}

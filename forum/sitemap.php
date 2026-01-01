@@ -12,11 +12,7 @@
  * Path to your IP.Board directory with a trailing /
  * Leave blank if you have not moved sitemap.php
  */
-
-use IPS\Dispatcher\External;
-use IPS\Request;
-
-define('REPORT_EXCEPTIONS', TRUE);
+\define('REPORT_EXCEPTIONS', TRUE);
 $_SERVER['SCRIPT_FILENAME']	= __FILE__;
 $path	= '';
 
@@ -26,9 +22,9 @@ $_GET['controller']	= 'sitemap';
 
 require_once $path . 'init.php';
 
-if ( Request::i()->testsettings )
+if ( \IPS\Request::i()->testsettings )
 {
     exit;
 }
 
-External::i()->run();
+\IPS\Dispatcher\External::i()->run();

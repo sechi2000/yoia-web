@@ -12,21 +12,16 @@
 namespace IPS\core\setup\upg_105029;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\File;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.5.0 Beta 10 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * ...
@@ -36,31 +31,31 @@ class Upgrade
 	public function step1()
 	{
 		/* If we're using s3 as a file container for theme resources, lets remove any folders that still exist when the theme does not. */
-		if ( get_class( File::getClass('core_Theme') ) == 'IPS\File\Amazon' )
+		if ( get_class( \IPS\File::getClass('core_Theme') ) == 'IPS\File\Amazon' )
 		{
 			/* We need to schedule a little clean up */
-			$keys = File::getClass('core_Theme')->getContainerKeys( 'css_built_', 100, '/' );
+			$keys = \IPS\File::getClass('core_Theme')->getContainerKeys( 'css_built_', 100, '/' );
 			
 			foreach( $keys as $dir )
 			{
 				$id = str_replace( 'css_built_', '', $dir );
 				
-				if ( $id > 0 and ! in_array( $id, array_keys( Theme::themes() ) ) )
+				if ( $id > 0 and ! in_array( $id, array_keys( \IPS\Theme::themes() ) ) )
 				{
-					File::getClass('core_Theme')->deleteContainer( $dir );
+					\IPS\File::getClass('core_Theme')->deleteContainer( $dir );
 				}
 			}
 			
 			/* We need to schedule a little clean up */
-			$keys = File::getClass('core_Theme')->getContainerKeys( 'set_resources_', 100, '/' );
+			$keys = \IPS\File::getClass('core_Theme')->getContainerKeys( 'set_resources_', 100, '/' );
 			
 			foreach( $keys as $dir )
 			{
 				$id = str_replace( 'set_resources_', '', $dir );
 				
-				if ( $id > 0 and ! in_array( $id, array_keys( Theme::themes() ) ) )
+				if ( $id > 0 and ! in_array( $id, array_keys( \IPS\Theme::themes() ) ) )
 				{
-					File::getClass('core_Theme')->deleteContainer( $dir );
+					\IPS\File::getClass('core_Theme')->deleteContainer( $dir );
 				}
 			}
 		}

@@ -12,49 +12,47 @@
 namespace IPS\calendar\api\GraphQL\Types;
 
 use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\_TypeRegistry;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\calendar\Event;
-use IPS\Content\Api\GraphQL\ItemType;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0').' 403 Forbidden' );
+	header( ( isset( $_SERVER[ 'SERVER_PROTOCOL' ] ) ? $_SERVER[ 'SERVER_PROTOCOL' ] : 'HTTP/1.0' ).' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Entry for GraphQL API
  */
-class EventType extends ItemType
+class _EventType extends \IPS\Content\Api\GraphQL\ItemType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $itemClass = Event::class;
+	protected static $itemClass = \IPS\calendar\Event::class;
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'calendar_Event';
+	protected static $typeName = 'calendar_Event';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'A calendar event';
+	protected static $typeDescription = 'A calendar event';
 
 	/*
 	 * @brief 	Follow data passed in to FollowType resolver
 	 */
-	protected static array $followData = array( 'app' => 'calendar', 'area' => 'event' );
+	protected static $followData = array( 'app' => 'calendar', 'area' => 'event' );
 
 	/**
 	 * Get the comment type that goes with this item type
 	 *
 	 * @return    ObjectType
 	 */
-	protected static function getCommentType(): ObjectType
+	protected static function getCommentType()
 	{
 		return \IPS\calendar\api\GraphQL\TypeRegistry::comment();
 	}
@@ -64,7 +62,7 @@ class EventType extends ItemType
 	 *
 	 * @return    array
 	 */
-	public function fields(): array
+	public function fields()
 	{
 		// Extend our fields with image-specific stuff
 		$defaultFields = parent::fields();

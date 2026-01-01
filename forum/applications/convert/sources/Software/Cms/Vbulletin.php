@@ -12,50 +12,33 @@
 namespace IPS\convert\Software\Cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use IPS\cms\Databases;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Vbulletin as VbulletinClass;
-use IPS\convert\Software\Exception;
-use IPS\Db;
-use IPS\Member;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * vBulletin Pages Converter
  */
-class Vbulletin extends Software
+class _Vbulletin extends \IPS\convert\Software
 {
 	/**
 	 * @brief	The schematic for vB3 and vB4 is similar enough that we can make specific concessions in a single converter for either version.
 	 */
-	protected static ?bool $isLegacy				= NULL;
+	protected static $isLegacy				= NULL;
 
 	/**
 	 * @brief	Cached article content type
 	 */
-	protected static mixed $_articleContentType	= NULL;
+	protected static $_articleContentType	= NULL;
 
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "vBulletin CMS (4.x only)";
@@ -64,9 +47,9 @@ class Vbulletin extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "vbulletin";
@@ -75,14 +58,14 @@ class Vbulletin extends Software
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 
 		/* Is this vB3 or vB4? */
 		try
@@ -99,13 +82,13 @@ class Vbulletin extends Software
 			}
 
 			/* If this is vB4, what is the content type ID for the cms? */
-			if ( static::$_articleContentType === NULL AND ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) AND $needDB )
+			if ( static::$_articleContentType === NULL AND ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) AND $needDB )
 			{
 				try
 				{
 					static::$_articleContentType = $this->db->select( 'contenttypeid', 'contenttype', array( "class=?", 'Article' ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					static::$_articleContentType = 24; # default
 				}
@@ -113,16 +96,19 @@ class Vbulletin extends Software
 
 		}
 		catch( \Exception $e ) {}
+
+
+		return $return;
 	}
 	
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
-		return array(
+		$return = array(
 			'convertCmsBlocks'				=> array(
 				'table'								=> 'cms_widget',
 				'where'								=> NULL,
@@ -148,18 +134,20 @@ class Vbulletin extends Software
  				'where'								=> array( "contenttypeid=?", static::$_articleContentType )
 		 			)
 		);
+		
+		return $return;
 	}
 
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
@@ -167,7 +155,7 @@ class Vbulletin extends Software
 				try
 				{
 					$blocksWeCanConvert = array();
-					foreach( $this->db->select( 'widgettypeid', 'cms_widgettype', array( Db::i()->in( 'class', array( 'Rss', 'Static' ) ) ) ) AS $typeid )
+					foreach( $this->db->select( 'widgettypeid', 'cms_widgettype', array( \IPS\Db::i()->in( 'class', array( 'Rss', 'Static' ) ) ) ) AS $typeid )
 					{
 						$blocksWeCanConvert[] = $typeid;
 					}
@@ -175,24 +163,26 @@ class Vbulletin extends Software
 				}
 				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 			
 			case 'page':
 			case 'database':
 				return 1;
-
+				break;
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -200,25 +190,22 @@ class Vbulletin extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'vbulletin' ) );
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix Post Data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string	$post	Post
+	 * @return	string	Fixed Posts
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return VbulletinClass::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Vbulletin::fixPostData( $post );
 	}
 
 	/**
@@ -227,7 +214,7 @@ class Vbulletin extends Software
 	 * @param	string	$key	The setting key
 	 * @return	mixed
 	 */
-	protected function _setting( string $key ) : mixed
+	protected function _setting( $key )
 	{
 		if ( isset( $this->settingsCache[$key] ) )
 		{
@@ -247,7 +234,7 @@ class Vbulletin extends Software
 				$this->settingsCache[$key] = $setting['defaultvalue'];
 			}
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			/* If we failed to find it, we probably will fail again on later attempts */
 			$this->settingsCache[$key] = NULL;
@@ -261,7 +248,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsBlocks() : void
+	public function convertCmsBlocks()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -270,7 +257,7 @@ class Vbulletin extends Software
 		/* We CAN bring over some blocks, like static widgets */
 		$blocksWeCanConvert = array();
 		$rssTypeId			= NULL;
-		foreach( $this->db->select( 'widgettypeid, class', 'cms_widgettype', array( Db::i()->in( 'class', array( 'Rss', 'Static' ) ) ) ) AS $type )
+		foreach( $this->db->select( 'widgettypeid, class', 'cms_widgettype', array( \IPS\Db::i()->in( 'class', array( 'Rss', 'Static' ) ) ) ) AS $type )
 		{
 			if ( $type['class'] == 'Rss' )
 			{
@@ -279,7 +266,7 @@ class Vbulletin extends Software
 			$blocksWeCanConvert[] = $type['widgettypeid'];
 		}
 		
-		foreach( $this->fetch( 'cms_widget', 'widgetid', array( Db::i()->in( 'widgettypeid', $blocksWeCanConvert ) ) ) AS $block )
+		foreach( $this->fetch( 'cms_widget', 'widgetid', array( \IPS\Db::i()->in( 'widgettypeid', $blocksWeCanConvert ) ) ) AS $block )
 		{
 			$config = array();
 
@@ -320,14 +307,14 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsPages() : void
+	public function convertCmsPages()
 	{
 		$this->getLibrary()->convertCmsPage( array(
 			'page_id'		=> 1,
 			'page_name'		=> 'vBulletin Articles',
 		) );
 		
-		throw new Exception;
+		throw new \IPS\convert\Software\Exception;
 	}
 	
 	/**
@@ -335,7 +322,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsDatabases() : void
+	public function convertCmsDatabases()
 	{
 		$convertedForums = FALSE;
 		try
@@ -344,7 +331,7 @@ class Vbulletin extends Software
 			
 			$convertedForums = TRUE;
 		}
-		catch( OutOfRangeException $e ) {}
+		catch( \OutOfRangeException $e ) {}
 		$this->getLibrary()->convertCmsDatabase( array(
 			'database_id'				=> 1,
 			'database_name'				=> 'vBulletin Articles',
@@ -388,7 +375,7 @@ class Vbulletin extends Software
 			)
 		) );
 		
-		throw new Exception;
+		throw new \IPS\convert\Software\Exception;
 	}
 
 	/**
@@ -396,7 +383,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsDatabaseCategories() : void
+	public function convertCmsDatabaseCategories()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -422,7 +409,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsDatabaseRecords() : void
+	public function convertCmsDatabaseRecords()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'contentid' );
@@ -436,7 +423,7 @@ class Vbulletin extends Software
 				$node		= $this->db->select( '*', 'cms_node', array( "contenttypeid=? AND contentid=?", static::$_articleContentType, $row['contentid'] ) )->first();
 				$nodeinfo	= $this->db->select( '*', 'cms_nodeinfo', array( "nodeid=?", $node['nodeid'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$libraryClass->setLastKeyValue( $row['contentid'] );
 				continue;
@@ -445,7 +432,7 @@ class Vbulletin extends Software
 
 			$categories	= iterator_to_array( $this->db->select( 'categoryid', 'cms_nodecategory', array( "nodeid=?", $node['nodeid'] ) ) );
 
-			if( !count( $categories ) )
+			if( !\count( $categories ) )
 			{
 				/* Create one */
 				try
@@ -453,7 +440,7 @@ class Vbulletin extends Software
 					$this->app->getLink( '__orphan__', 'cms_database_categories' );
 					$categories = array( '__orphan__' );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					$libraryClass->convertCmsDatabaseCategory( array(
 						'category_id' => '__orphan__',
@@ -504,7 +491,7 @@ class Vbulletin extends Software
 			{
 				$database = $this->app->getLink( 1, 'cms_databases' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				/* Cannot find it, we can't convert tags */
 				$libraryClass->setLastKeyValue( $row['contentid'] );
@@ -512,7 +499,7 @@ class Vbulletin extends Software
 
 			/* Convert extra unassigned categories as tags */
 			$convertedTags = array();
-			if( count( $categories ) )
+			if( \count( $categories ) )
 			{
 				foreach( $categories as $key )
 				{
@@ -578,21 +565,21 @@ class Vbulletin extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
-		foreach( Db::i()->select( 'ipb_id', 'convert_link', array( 'type=? AND app=?', 'cms_databases', $this->app->app_id ) ) as $database )
+		foreach( \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( 'type=? AND app=?', 'cms_databases', $this->app->app_id ) ) as $database )
 		{
-			Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\cms\Categories' . $database, 'count' => 0 ), 5, array( 'class' ) );
-			Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\cms\Records'. $database ), 3, array( 'class' ) );
-			Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'cms_custom_database_' . $database, 'class' => 'IPS\cms\Records' . $database ), 3, array( 'app', 'link', 'class' ) );
+			\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\cms\Categories' . $database, 'count' => 0 ), 5, array( 'class' ) );
+			\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\cms\Records'. $database ), 3, array( 'class' ) );
+			\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'cms_custom_database_' . $database, 'class' => 'IPS\cms\Records' . $database ), 3, array( 'app', 'link', 'class' ) );
 
 			try
 			{
-				Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'cms_custom_database_' . $database, 'class' => 'IPS\cms\Records' . $database ), 2, array( 'app', 'link', 'class' ) );
+				\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'cms_custom_database_' . $database, 'class' => 'IPS\cms\Records' . $database ), 2, array( 'app', 'link', 'class' ) );
 			}
-			catch ( OutOfRangeException $e ) {}
+			catch ( \OutOfRangeException $e ) {}
 		}
 
 		return array( "f_recount_cms_categories", "f_rebuild_cms_tags" );
@@ -603,7 +590,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -612,7 +599,7 @@ class Vbulletin extends Software
 		$where			= NULL;
 		$column			= NULL;
 
-		if ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) )
+		if ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) )
 		{
 			$where			= array( "contenttypeid=?", static::$_articleContentType );
 			$column			= 'contentid';
@@ -625,17 +612,17 @@ class Vbulletin extends Software
  			{
 				$vbRecordId = $this->db->select( 'contentid', 'cms_node', array( "nodeid=? AND contenttypeid=?", $attachment[ $column ], static::$_articleContentType ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				/* Log this so that it's easier to diagnose */
-				$this->app->log( 'attachment_vbcms_missing_parent', __METHOD__, App::LOG_WARNING, $attachment['attachmentid'] );
+				$this->app->log( 'attachment_vbcms_missing_parent', __METHOD__, \IPS\convert\App::LOG_WARNING, $attachment['attachmentid'] );
 
 				/* If the record is missing, there isn't much we can do. */
 				$libraryClass->setLastKeyValue( $attachment['attachmentid'] );
 				continue;
 			}
 
-			if ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) )
+			if ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) )
 			{
 				$filedata = $this->db->select( '*', 'filedata', array( "filedataid=?", $attachment['filedataid'] ) )->first();
 			}
@@ -674,7 +661,7 @@ class Vbulletin extends Software
 			$dbName = "cms_custom_database_" . $dbId;
 
 			/* Get the database object */
-			$ipsDb = Databases::load( $dbId );
+			$ipsDb = \IPS\cms\Databases::load( $dbId );
 
 			$map = array(
 				'id1'		=> $vbRecordId,
@@ -689,15 +676,15 @@ class Vbulletin extends Software
 			{
 				$recordId = $this->app->getLink( $vbRecordId, 'cms_custom_database_' . $dbId );
 
-				$post = Db::i()->select( 'field_' . $ipsDb->field_content, $dbName, array( "primary_id_field=?", $recordId ) )->first();
+				$post = \IPS\Db::i()->select( 'field_' . $ipsDb->field_content, $dbName, array( "primary_id_field=?", $recordId ) )->first();
 
 				if ( preg_match( "/\[ATTACH([^\]]+?)?\]" . $attachment['attachmentid'] . "\[\/ATTACH\]/i", $post ) )
 				{
 					$post = preg_replace( "/\[ATTACH([^\]]+?)?\]" . $attachment['attachmentid'] . "\[\/ATTACH\]/i", '[attachment=' . $attach_id . ':name]', $post );
-					Db::i()->update( $dbName, array( 'field_' . $ipsDb->field_content => $post ), array( "primary_id_field=?", $recordId ) );
+					\IPS\Db::i()->update( $dbName, array( 'field_' . $ipsDb->field_content => $post ), array( "primary_id_field=?", $recordId ) );
 				}
 			}
-			catch( OutOfRangeException $e ) { }
+			catch( \OutOfRangeException $e ) { }
 
 			$libraryClass->setLastKeyValue( $attachment['attachmentid'] );
 		}
@@ -706,9 +693,9 @@ class Vbulletin extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array( 'convertAttachments' );
 	}
@@ -716,10 +703,10 @@ class Vbulletin extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -732,13 +719,13 @@ class Vbulletin extends Software
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'database'				=> Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
-								'file_system'			=> Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
+								'database'				=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
+								'file_system'			=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
 							),
 							'userSuppliedInput'	=> 'file_system',
 						),
 						'field_hint'			=> NULL,
-						'field_validation'	=> function( $value ) { if ( $value != 'database' AND !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_validation'	=> function( $value ) { if ( $value != 'database' AND !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;

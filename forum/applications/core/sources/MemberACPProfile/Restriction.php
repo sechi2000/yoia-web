@@ -11,34 +11,29 @@
 namespace IPS\core\MemberACPProfile;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Form;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member Restrictions Extension Base
  */
-class Restriction
+class _Restriction
 {
 	/**
 	 * @brief	Member
 	 */
-	protected ?Member $member = null;
+	protected $member;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	void
 	 */
-	public function __construct( Member $member )
+	public function __construct( \IPS\Member $member )
 	{
 		$this->member = $member;
 	}
@@ -48,7 +43,7 @@ class Restriction
 	 *
 	 * @return	bool
 	 */
-	public function enabled() : bool
+	public function enabled()
 	{
 		return TRUE;
 	}
@@ -56,10 +51,10 @@ class Restriction
 	/**
 	 * Modify Edit Restrictions form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form $form ): void
+	public function form( \IPS\Helpers\Form $form )
 	{
 
 	}
@@ -68,11 +63,11 @@ class Restriction
 	 * Save Form
 	 *
 	 * @param	array	$values	Values from form
-	 * @return	array
+	 * @return	void
 	 */
-	public function save( array $values ) : array
+	public function save( $values )
 	{
-		return $values;
+		
 	}
 	
 	/**
@@ -80,7 +75,7 @@ class Restriction
 	 *
 	 * @return	array
 	 */
-	public function activeRestrictions() : array
+	public function activeRestrictions()
 	{
 		return array();
 	}

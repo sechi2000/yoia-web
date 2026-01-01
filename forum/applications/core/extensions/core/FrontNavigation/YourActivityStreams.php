@@ -11,71 +11,53 @@
 namespace IPS\core\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application\Module;
-use IPS\core\FrontNavigation\FrontNavigationAbstract;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Your Activity Streams
  */
-class YourActivityStreams extends FrontNavigationAbstract
+class _YourActivityStreams extends \IPS\core\FrontNavigation\FrontNavigationAbstract
 {
-	/**
-	 * @var string Default icon
-	 */
-	public string $defaultIcon = '\f0ae';
-
 	/**
 	 * Get Type Title which will display in the AdminCP Menu Manager
 	 *
 	 * @return	string
 	 */
-	public static function typeTitle(): string
+	public static function typeTitle()
 	{
-		return Member::loggedIn()->language()->addToStack('your_activity_streams_acp');
+		return \IPS\Member::loggedIn()->language()->addToStack('your_activity_streams_acp');
 	}
 		
 	/**
 	 * Can the currently logged in user access the content this item links to?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canAccessContent(): bool
+	public function canAccessContent()
 	{
-		return Member::loggedIn()->canAccessModule( Module::get( 'core', 'discover' ) ) and count( $this->children() );
+		return \IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'discover' ) ) and \count( $this->children() );
 	}
 	
 	/**
 	 * Get Title
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack('your_activity_streams');
+		return \IPS\Member::loggedIn()->language()->addToStack('your_activity_streams');
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|string|null
+	public function link()
 	{
 		return NULL;
 	}
@@ -83,11 +65,11 @@ class YourActivityStreams extends FrontNavigationAbstract
 	/**
 	 * Is Active?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function active(): bool
+	public function active()
 	{
-		return ( Dispatcher::i()->application->directory === 'core' and Dispatcher::i()->module->key === 'discover' and ( isset( Request::i()->id ) or ( isset( Request::i()->do ) and Request::i()->do == 'create' ) ) );
+		return ( \IPS\Dispatcher::i()->application->directory === 'core' and \IPS\Dispatcher::i()->module->key === 'discover' and ( isset( \IPS\Request::i()->id ) or ( isset( \IPS\Request::i()->do ) and \IPS\Request::i()->do == 'create' ) ) );
 	}
 	
 	/**
@@ -95,55 +77,61 @@ class YourActivityStreams extends FrontNavigationAbstract
 	 *
 	 * @return	array
 	 */
-	protected static array $children = array();
+	protected static $children = array();
 	
 	/**
 	 * Items
 	 *
-	 * @param	Member|null	$member	Member or NULL for currently logged in member
+	 * @param	\IPS\Member|null	$member	Member or NULL for currently logged in member
 	 * @return	array
 	 */
-	public static function items( ?Member $member = NULL ) : array
+	public static function items( \IPS\Member $member = NULL )
 	{	
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		if ( !isset( static::$children[ $member->member_id ] ) )
 		{
 			static::$children[ $member->member_id ] = array();
 			
-			if ( !isset( Store::i()->globalStreamIds ) )
+			if ( !isset( \IPS\Data\Store::i()->globalStreamIds ) )
 			{
 				$globalStreamIds = array();
-				foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'core_streams', '`member` IS NULL', 'position ASC' ), 'IPS\core\Stream' ) as $stream )
+				foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_streams', '`member` IS NULL', 'position ASC' ), 'IPS\core\Stream' ) as $stream )
 				{
 					$globalStreamIds[ $stream->id ] = ( $stream->ownership == 'all' and $stream->read == 'all' and $stream->follow == 'all' and $stream->date_type != 'last_visit' );
 				}
 				
-				Store::i()->globalStreamIds = $globalStreamIds;
+				\IPS\Data\Store::i()->globalStreamIds = $globalStreamIds;
 			}
 					
-			$globalStreamIdsToShow = array_keys( !$member->member_id ? array_filter( Store::i()->globalStreamIds ) : Store::i()->globalStreamIds );
+			$globalStreamIdsToShow = array_keys( !$member->member_id ? array_filter( \IPS\Data\Store::i()->globalStreamIds ) : \IPS\Data\Store::i()->globalStreamIds );
 			
-			if ( count( $globalStreamIdsToShow ) )
-			{				
+			if ( \count( $globalStreamIdsToShow ) )
+			{
+				if ( $member->member_id )
+				{
+					static::$children[ $member->member_id ][] = new MenuHeader('default_streams');
+				}
+				
 				foreach ( $globalStreamIdsToShow as $id )
 				{
-					static::$children[ $member->member_id ][] = new YourActivityStreamsItem( array(), $id, '*', '*', null );
+					static::$children[ $member->member_id ][] = new YourActivityStreamsItem( array(), $id, '*' );
 				}
 			}
 			
 			if ( $member->member_id )
 			{
-				if ( $member->member_streams and $streams = json_decode( $member->member_streams, TRUE ) and count( $streams['streams'] ) )
+				if ( $member->member_streams and $streams = json_decode( $member->member_streams, TRUE ) and \count( $streams['streams'] ) )
 				{
-					static::$children[ $member->member_id ][] = new MenuSeparator;
+					static::$children[ $member->member_id ][] = new MenuHeader('custom_streams');
 					foreach ( $streams['streams'] as $id => $title )
 					{
-						static::$children[ $member->member_id ][] = new YourActivityStreamsItem( array( 'title' => $title ), $id, '*', '*', null );
+						static::$children[ $member->member_id ][] = new YourActivityStreamsItem( array( 'title' => $title ), $id, '*' );
 					}
 				}
-				static::$children[ $member->member_id ][] = new MenuButton( 'create_new_stream', Url::internal( "app=core&module=discover&controller=streams&do=create", 'front', 'discover_all' ) );
-
+				
+				static::$children[ $member->member_id ][] = new MenuSeparator;
+				static::$children[ $member->member_id ][] = new MenuButton( 'create_new_stream', \IPS\Http\Url::internal( "app=core&module=discover&controller=streams&do=create", 'front', 'discover_all' ) );
 			}
 		}
 		
@@ -154,9 +142,9 @@ class YourActivityStreams extends FrontNavigationAbstract
 	 * Children
 	 *
 	 * @param	bool	$noStore	If true, will skip datastore and get from DB (used for ACP preview)
-	 * @return    array|null
+	 * @return	array
 	 */
-	public function children( bool $noStore=FALSE ): array|null
+	public function children( $noStore=FALSE )
 	{	
 		return static::items();		
 	}

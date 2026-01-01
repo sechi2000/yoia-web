@@ -11,26 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DateTimeZone;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * leaderboard Task
  */
-class leaderboard extends Task
+class _leaderboard extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -41,39 +31,39 @@ class leaderboard extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		/* Get the most recent update */
-		$date = Db::i()->select( 'MAX(leader_date)', 'core_reputation_leaderboard_history' )->first();
-		$timezone = new DateTimeZone( Settings::i()->reputation_timezone );
+		$date = \IPS\Db::i()->select( 'MAX(leader_date)', 'core_reputation_leaderboard_history' )->first();
+		$timezone = new \DateTimeZone( \IPS\Settings::i()->reputation_timezone );
 		
 		if ( $date )
 		{
 			/* Only go back 10 days max */
 			if ( $date < ( time() - 864000 ) )
 			{
-				$startDate = DateTime::ts( time(), true )->setTimezone( $timezone )->sub( new DateInterval('P10D') )->setTime( 0, 0, 1 );
+				$startDate = \IPS\DateTime::ts( time(), true )->setTimezone( $timezone )->sub( new \DateInterval('P10D') )->setTime( 0, 0, 1 );
 			}
 			else
 			{
-				$startDate = DateTime::ts( $date, true )->setTimezone( $timezone )->setTime( 0, 0, 1 );
+				$startDate = \IPS\DateTime::ts( $date, true )->setTimezone( $timezone )->setTime( 0, 0, 1 );
 			}
 		}
 		else
 		{
-			$startDate = new DateTime( 'yesterday midnight', $timezone );
+			$startDate = new \IPS\DateTime( 'yesterday midnight', $timezone );
 
 			/* Do we need to run this task at all? If we don't have any records in core_reputation_index we can skip this task */
-			$existing = Db::i()->select( 'count(*)', 'core_reputation_index' )->first();
+			$existing = \IPS\Db::i()->select( 'count(*)', 'core_reputation_index' )->first();
 			if ( !$existing )
 			{
 				return NULL;
 			}
 		}
 		
-		$yesterdayEnd = new DateTime( 'today midnight', $timezone );
+		$yesterdayEnd = new \IPS\DateTime( 'today midnight', $timezone );
 		
 		$diff = $startDate->diff( $yesterdayEnd );
 		$difference = $diff->days > 0 ? $diff->days + 1 : 1;
@@ -85,20 +75,20 @@ class leaderboard extends Task
 			
 			/* As this can run multiple times, and the unique constraint is member_id, position, it is possible to end up with multiple members with the same positon */
 			$date = $startDate->setTime( 12, 0 )->getTimeStamp();
-			Db::i()->delete( 'core_reputation_leaderboard_history', array( 'leader_date BETWEEN ? and ?', $date - 4, $date ) );
+			\IPS\Db::i()->delete( 'core_reputation_leaderboard_history', array( 'leader_date BETWEEN ? and ?', $date - 4, $date ) );
 
 			$where = array();
 			$where[] = array( 'member_received > 0 AND rep_date BETWEEN ? and ?', $startDate->setTime( 0, 0, 1 )->getTimeStamp(), $startDate->setTime( 23, 59, 59 )->getTimeStamp() );
-			$where[] = Db::i()->in( 'member_group_id', explode( ',', Settings::i()->leaderboard_excluded_groups ), TRUE );
+			$where[] = \IPS\Db::i()->in( 'member_group_id', explode( ',', \IPS\Settings::i()->leaderboard_excluded_groups ), TRUE );
 			
-			foreach( Db::i()->select( 'core_reputation_index.member_received as themember, SUM(rep_rating) as rep', 'core_reputation_index', $where, 'rep DESC, themember ASC', 4, 'themember' )->join( 'core_members', 'core_members.member_id=core_reputation_index.member_received' )->setKeyField('themember')->setValueField('rep') as $member => $rep )
+			foreach( \IPS\Db::i()->select( 'core_reputation_index.member_received as themember, SUM(rep_rating) as rep', 'core_reputation_index', $where, 'rep DESC, themember ASC', 4, 'themember' )->join( 'core_members', 'core_members.member_id=core_reputation_index.member_received' )->setKeyField('themember')->setValueField('rep') as $member => $rep )
 			{
 				if ( $member and $rep )
 				{
 					$date = $startDate->setTime( 12, 0 )->getTimeStamp();
 					$position++;
 				
-					Db::i()->replace( 'core_reputation_leaderboard_history', array(
+					\IPS\Db::i()->replace( 'core_reputation_leaderboard_history', array(
 						'leader_date' 	   => $date,
 						'leader_member_id' => $member,
 						'leader_position'  => $position,
@@ -120,7 +110,7 @@ class leaderboard extends Task
 				{
 					$position++;
 					
-					Db::i()->replace( 'core_reputation_leaderboard_history', array(
+					\IPS\Db::i()->replace( 'core_reputation_leaderboard_history', array(
 						'leader_date' 	   => $date - $position,
 						'leader_member_id' => 0,
 						'leader_position'  => $position,
@@ -129,10 +119,8 @@ class leaderboard extends Task
 				}
 			}
 			
-			$startDate = $startDate->add( new DateInterval('P1D') )->setTime( 0, 0, 1 );
+			$startDate = $startDate->add( new \DateInterval('P1D') )->setTime( 0, 0, 1 );
 		}
-
-		return null;
 	}
 	
 	/**

@@ -11,62 +11,53 @@
 
 namespace IPS\forums\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
-use IPS\Api\GraphQL\SafeException;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\DateTime;
-use IPS\forums\Forum;
-use IPS\Login;
-use IPS\Member;
-use IPS\Node\Api\GraphQL\NodeType;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecordIterator;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ForumType for GraphQL API
  */
-class ForumType extends NodeType
+class _ForumType extends \IPS\Node\Api\GraphQL\NodeType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $nodeClass	= '\IPS\forums\Forum';
+	protected static $nodeClass	= '\IPS\forums\Forum';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'forums_Forum';
+	protected static $typeName = 'forums_Forum';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'A forum';
+	protected static $typeDescription = 'A forum';
 
 	/*
 	 * @brief 	Follow data passed in to FollowType resolver
 	 */
-	protected static array $followData = array('app' => 'forums', 'area' => 'forum');
+	protected static $followData = array('app' => 'forums', 'area' => 'forum');
 
 	/**
 	 * Return the fields available in this type
 	 *
 	 * @return	array
 	 */
-	public function fields(): array
+	public function fields()
 	{
 		$defaultFields = parent::fields();
 		$forumFields = array(
 			'solvedEnabled' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($forum) {
-					return ( $forum->forums_bitoptions['bw_solved_set_by_member'] || $forum->forums_bitoptions['bw_solved_set_by_moderator'] );
+					return ( $forum->forums_bitoptions['bw_enable_answers_member'] || $forum->forums_bitoptions['bw_enable_answers_moderator'] );
 				}
 			],
 			'lastPostAuthor' => [
@@ -108,7 +99,7 @@ class ForumType extends NodeType
 			'passwordRequired' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($forum) {
-					if( $forum->password === NULL || Member::loggedIn()->inGroup( explode( ',', $forum->password_override ) ) )
+					if( $forum->password === NULL || \IPS\Member::loggedIn()->inGroup( explode( ',', $forum->password_override ) ) )
 					{
 						return FALSE;
 					}
@@ -138,7 +129,7 @@ class ForumType extends NodeType
 	 *
 	 * @return	ObjectType
 	 */
-	public static function getItemType(): ObjectType
+	public static function getItemType()
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::topic();
 	}
@@ -146,34 +137,34 @@ class ForumType extends NodeType
 	/**
 	 * Check for a password before returning items
 	 *
-	 * @param Model $forum
-	 * @param array $args    Arguments passed to this resolver
-	 * @return    int|ActiveRecordIterator
+	 * @param 	\IPS\forums\Forum
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	array
 	 */
-	protected static function items( Model $forum, array $args): int|ActiveRecordIterator
+	protected static function items($forum, $args)
 	{
 		// If there's no password or our group is excluded, just continue
-		if( $forum->password === NULL || Member::loggedIn()->inGroup( explode( ',', $forum->password_override ) ) )
+		if( $forum->password === NULL || \IPS\Member::loggedIn()->inGroup( explode( ',', $forum->password_override ) ) )
 		{
-			return parent::items( $forum, $args );
+			return parent::items($forum, $args);
 		}
 
-		if( !isset( $args['password'] ) || !Login::compareHashes( md5( $forum->password ), md5( $args['password'] ) ) )
+		if( !isset( $args['password'] ) || !\IPS\Login::compareHashes( md5( $forum->password ), md5( $args['password'] ) ) )
 		{
-			throw new SafeException( 'INCORRECT_PASSWORD', 'GQL/0002/1', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INCORRECT_PASSWORD', 'GQL/0002/1', 403 );
 		}
 		
-		return parent::items( $forum, $args );
+		return parent::items($forum, $args);
 	}
 
 	/**
 	 * Resolve last post author field
 	 *
-	 * @param 	Forum $forum
-	 * @param 	array $args 	Arguments passed to this resolver
-	 * @return	Member|null
+	 * @param 	\IPS\forums\Forum
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	array
 	 */
-	protected static function lastPostAuthor( Forum $forum, array $args) : Member|null
+	protected static function lastPostAuthor($forum, $args)
 	{
 		$lastComment = $forum->lastPost();
 
@@ -188,11 +179,11 @@ class ForumType extends NodeType
 	/**
 	 * Resolve last post date field
 	 *
-	 * @param Forum $forum
-	 * @param array $args    Arguments passed to this resolver
-	 * @return int|DateTime|null
+	 * @param 	\IPS\forums\Forum
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	array
 	 */
-	protected static function lastPostDate( Forum $forum, array $args ) : int|DateTime|null
+	protected static function lastPostDate($forum, $args)
 	{
 		$lastComment = $forum->lastPost();
 

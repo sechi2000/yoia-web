@@ -11,35 +11,30 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use function defined;
-use function floatval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Filesize
  */
-class Filesize
+class _Filesize
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = FALSE;
+	public static $canBeUsedInCss = FALSE;
 	
 	/**
 	 * Run the plug-in
 	 *
 	 * @param	string 		$data	  The initial data from the tag
 	 * @param	array		$options    Array of options
-	 * @return	string		array( 'pre' => Code to eval before 'return', 'return' => Code to eval to return desired value )
+	 * @return	array		array( 'pre' => Code to eval before 'return', 'return' => Code to eval to return desired value )
 	 */
-	public static function runPlugin( string $data, array $options ): string
+	public static function runPlugin( $data, $options )
 	{
 		return '\IPS\Output\Plugin\Filesize::humanReadableFilesize( ' . $data . ( ( isset( $options['decimal'] ) and $options['decimal'] ) ? ', TRUE' : '' ) . ' )';
 	}
@@ -47,15 +42,15 @@ class Filesize
 	/**
 	 * Get human readable filesize (to 2SF)
 	 *
-	 * @param	int|null		$sizeInBytes	Size in bytes
+	 * @param	int		$sizeInBytes	Size in bytes
 	 * @param	bool	$decimal		If TRUE, will calculate based on decimal figures rather than binary
 	 * @param	bool	$json			If TRUE, will format for json
 	 * @param	bool	$get			If TRUE, will get the language string rather than add to stack
 	 * @return	string
 	 */
-	public static function humanReadableFilesize( ?int $sizeInBytes, bool $decimal=FALSE, bool $json=FALSE, bool $get=FALSE ) : string
+	public static function humanReadableFilesize( $sizeInBytes, $decimal=FALSE, $json=FALSE, $get=FALSE )
 	{
-		$sizeInBytes = floatval( $sizeInBytes );
+		$sizeInBytes = \floatval( $sizeInBytes );
 		
 		foreach ( array( 'Y' => 80, 'Z' => 70, 'E' => 60, 'P' => 50, 'T' => 40, 'G' => 30, 'M' => 20, 'k' => 10 ) as $sig => $pow )
 		{
@@ -64,7 +59,7 @@ class Filesize
 			{
 				if ( $get )
 				{
-					return sprintf( Member::loggedIn()->language()->get( 'filesize_' . $sig ), round( ( $sizeInBytes / $raised ), 2 ) );
+					return sprintf( \IPS\Member::loggedIn()->language()->get( 'filesize_' . $sig ), round( ( $sizeInBytes / $raised ), 2 ) );
 				}
 				else
 				{
@@ -75,14 +70,14 @@ class Filesize
 						$format['json'] = TRUE;
 					}
 	
-					return Member::loggedIn()->language()->addToStack( 'filesize_' . $sig, FALSE, $format );
+					return \IPS\Member::loggedIn()->language()->addToStack( 'filesize_' . $sig, FALSE, $format );
 				}
 			}
 		}
 		
 		if ( $get )
 		{
-			return sprintf( Member::loggedIn()->language()->get( 'filesize_b' ), $sizeInBytes );
+			return sprintf( \IPS\Member::loggedIn()->language()->get( 'filesize_b' ), $sizeInBytes );
 		}
 		else
 		{
@@ -93,7 +88,7 @@ class Filesize
 				$format['json'] = TRUE;
 			}
 			
-			return Member::loggedIn()->language()->addToStack( 'filesize_b', FALSE, $format );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'filesize_b', FALSE, $format );
 		}
 	}
 }

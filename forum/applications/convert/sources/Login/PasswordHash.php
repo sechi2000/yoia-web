@@ -1,9 +1,9 @@
 <?php
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -59,7 +59,7 @@ class PasswordHash
 		$this->portable_hashes = $portable_hashes;
 
 		$this->random_state = microtime();
-		if (function_exists('getmypid'))
+		if (\function_exists('getmypid'))
 			$this->random_state .= getmypid();
 	}
 
@@ -95,15 +95,15 @@ class PasswordHash
 		$output = '';
 		$i = 0;
 		do {
-			$value = ord($input[$i++]);
+			$value = \ord($input[$i++]);
 			$output .= $this->itoa64[$value & 0x3f];
 			if ($i < $count)
-				$value |= ord($input[$i]) << 8;
+				$value |= \ord($input[$i]) << 8;
 			$output .= $this->itoa64[($value >> 6) & 0x3f];
 			if ($i++ >= $count)
 				break;
 			if ($i < $count)
-				$value |= ord($input[$i]) << 16;
+				$value |= \ord($input[$i]) << 16;
 			$output .= $this->itoa64[($value >> 12) & 0x3f];
 			if ($i++ >= $count)
 				break;
@@ -174,13 +174,13 @@ class PasswordHash
 		$itoa64 = './ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 		$output = '$2a$';
-		$output .= chr(ord('0') + $this->iteration_count_log2 / 10);
-		$output .= chr(ord('0') + $this->iteration_count_log2 % 10);
+		$output .= \chr(\ord('0') + $this->iteration_count_log2 / 10);
+		$output .= \chr(\ord('0') + $this->iteration_count_log2 % 10);
 		$output .= '$';
 
 		$i = 0;
 		do {
-			$c1 = ord($input[$i++]);
+			$c1 = \ord($input[$i++]);
 			$output .= $itoa64[$c1 >> 2];
 			$c1 = ($c1 & 0x03) << 4;
 			if ($i >= 16) {
@@ -188,12 +188,12 @@ class PasswordHash
 				break;
 			}
 
-			$c2 = ord($input[$i++]);
+			$c2 = \ord($input[$i++]);
 			$c1 |= $c2 >> 4;
 			$output .= $itoa64[$c1];
 			$c1 = ($c2 & 0x0f) << 2;
 
-			$c2 = ord($input[$i++]);
+			$c2 = \ord($input[$i++]);
 			$c1 |= $c2 >> 6;
 			$output .= $itoa64[$c1];
 			$output .= $itoa64[$c2 & 0x3f];

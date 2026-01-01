@@ -10,21 +10,19 @@
 
 namespace IPS\Content\Api\GraphQL;
 use GraphQL\Type\Definition\UnionType;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use function defined;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base mutator class for Content Items
  */
-class ContentType extends UnionType
+class _ContentType extends UnionType
 {
 	public function __construct()
 	{
@@ -32,19 +30,18 @@ class ContentType extends UnionType
 			'name' => 'core_Content',
 			'description' => 'A union type that returns a CommentType, ItemType or @todo ReviewType depending on the object passed to it',
 			'types' => [
-				TypeRegistry::comment(),
-				TypeRegistry::item()
+				\IPS\Content\Api\GraphQL\TypeRegistry::comment(),
+				\IPS\Content\Api\GraphQL\TypeRegistry::item()
 			],
 			'resolveType' => function ($content) {
-				if ( $content instanceof Comment )
+				if ( $content instanceof \IPS\Content\Comment )
 				{
-					return TypeRegistry::comment();
+					return \IPS\Content\Api\GraphQL\TypeRegistry::comment();
 				}
-				elseif( $content instanceof Item )
+				elseif( $content instanceof \IPS\Content\Item )
 				{
-					return TypeRegistry::item();
+					return \IPS\Content\Api\GraphQL\TypeRegistry::item();
 				}
-				return null;
 			}
 		];
 

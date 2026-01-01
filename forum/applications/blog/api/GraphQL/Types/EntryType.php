@@ -11,50 +11,48 @@
 
 namespace IPS\blog\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
-use IPS\blog\api\GraphQL\TypeRegistry;
-use IPS\blog\Entry;
-use IPS\Content\Api\GraphQL\ItemType;
-use function defined;
+use IPS\Api\GraphQL\_TypeRegistry;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * Entry for GraphQL API
  */
-class EntryType extends ItemType
+class _EntryType extends \IPS\Content\Api\GraphQL\ItemType
 {
     /*
      * @brief 	The item classname we use for this type
      */
-    protected static string $itemClass	= Entry::class;
+    protected static $itemClass	= \IPS\blog\Entry::class;
 
     /*
      * @brief 	GraphQL type name
      */
-    protected static string $typeName = 'blog_Entry';
+    protected static $typeName = 'blog_Entry';
 
     /*
      * @brief 	GraphQL type description
      */
-    protected static string $typeDescription = 'A blog entry';
+    protected static $typeDescription = 'A blog entry';
 
     /*
      * @brief 	Follow data passed in to FollowType resolver
      */
-    protected static array $followData = array('app' => 'blogs', 'area' => 'entry');
+    protected static $followData = array('app' => 'blogs', 'area' => 'entry');
 
     /**
      * Get the comment type that goes with this item type
      *
      * @return	ObjectType
      */
-    protected static function getCommentType(): ObjectType
-	{
-        return TypeRegistry::comment();
+    protected static function getCommentType()
+    {
+        return \IPS\blog\api\GraphQL\TypeRegistry::comment();
     }
 }

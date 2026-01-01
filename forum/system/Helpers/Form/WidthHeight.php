@@ -11,22 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Image;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Width/Height input class for Form Builder
  */
-class WidthHeight extends FormAbstract
+class _WidthHeight extends FormAbstract
 {	
 	/**
 	 * @brief	Default Options
@@ -39,26 +33,27 @@ class WidthHeight extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'unlimited'			=> NULL,
 		'unlimitedLang'		=> 'unlimited',
 		'image'				=> NULL,
 		'resizableDiv'		=> TRUE,
 	);
-
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		parent::__construct( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
 		
@@ -66,7 +61,7 @@ class WidthHeight extends FormAbstract
 		{
 			if ( $this->options['image'] !== NULL )
 			{
-				$image = Image::create( $this->options['image']->contents() );
+				$image = \IPS\Image::create( $this->options['image']->contents() );
 				$this->value = array( $image->width, $image->height );
 			}
 			else
@@ -81,9 +76,9 @@ class WidthHeight extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->widthheight( $this->name, $this->value[0], $this->value[1], $this->options['unlimited'], $this->options['unlimitedLang'], $this->options['image'] ?: NULL, $this->options['resizableDiv'] );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->widthheight( $this->name, $this->value[0], $this->value[1], $this->options['unlimited'], $this->options['unlimitedLang'], $this->options['image'] ? $this->options['image'] : NULL, $this->options['resizableDiv'] );
 	}
 	
 	/**
@@ -91,14 +86,14 @@ class WidthHeight extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$name = $this->name;
-		$value = Request::i()->$name;
+		$value = \IPS\Request::i()->$name;
 		if ( $this->options['unlimited'] !== NULL and isset( $value['unlimited'] ) )
 		{
 			return $this->options['unlimited'];
 		}
-		return Request::i()->$name;
+		return \IPS\Request::i()->$name;
 	}
 }

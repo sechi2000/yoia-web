@@ -3,7 +3,7 @@
 <table width='100%' cellpadding='0' cellspacing='0' border='0'>
 	<tr>
 		<td dir='{dir}' width='40' valign='top' class='hidePhone' style='width: 0; max-height: 0; overflow: hidden; float: left;'>
-			<img src='{$content->author()->get_photo( true, true )}' width='40' height='40' style='border-radius: 6px; vertical-align: middle;'>
+			<img src='{$content->author()->get_photo( true, true )}' width='40' height='40' style='border: 1px solid #777777; vertical-align: middle;'>
 		</td>
 		<td dir='{dir}' width='30' valign='top' class='hidePhone' style='width: 0; max-height: 0; overflow: hidden; float: left;'>
 			<br />
@@ -20,7 +20,7 @@
 			<table width='100%' cellpadding='5' cellspacing='0' border='0'>
 				{{if $container = $content->containerWrapper()}}
 					<tr>
-						<td dir='{dir}' style="font-family: 'Helvetica Neue', helvetica, sans-serif; line-height: 1.5; font-size: 14px; color: #5e7a98">
+						<td dir='{dir}' style="font-family: 'Helvetica Neue', helvetica, sans-serif; line-height: 1.5; font-size: 14px; color: #8d8d8d">
 							{$email->language->addToStack("email_posted_in", FALSE, array( 'sprintf' => array( $container->getTitleForLanguage( $email->language ) ) ) )}
 						</td>
 					</tr>

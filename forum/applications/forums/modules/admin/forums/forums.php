@@ -12,59 +12,36 @@
 namespace IPS\forums\modules\admin\forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\forums\Forum;
-use IPS\Member;
-use IPS\Node\Controller;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * forums
  */
-class forums extends Controller
+class _forums extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\forums\Forum';
+	protected $nodeClass = 'IPS\forums\Forum';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'forums_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'forums_manage' );
 		parent::execute();
-	}
-
-	/**
-	 * Determines if the node can be a root-level
-	 *
-	 * @param Model $node
-	 * @return bool
-	 */
-	public function _canBeRoot( Model $node ) : bool
-	{
-		/* Only allow categories to be root level */
-		return $node instanceof Forum and !$node->sub_can_post;
 	}
 	
 	/**
@@ -72,29 +49,77 @@ class forums extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function permissions() : void
+	protected function permissions()
 	{
 		try
 		{
-			$forum = Forum::load( Request::i()->id );
-
-			if ( $forum->password and !$forum->can_view_others )
+			$forum = \IPS\forums\Forum::load( \IPS\Request::i()->id );
+			
+			if ( $forum->min_posts_view )
 			{
-				Member::loggedIn()->language()->words['perm_forum_perm__read'] = Member::loggedIn()->language()->addToStack( 'perm_forum_perm__read2_pass', FALSE );
-			}
-			elseif ( !$forum->can_view_others )
-			{
-				Member::loggedIn()->language()->words['perm_forum_perm__read'] = Member::loggedIn()->language()->addToStack( 'perm_forum_perm__read2', FALSE );
-			}
-			elseif ( $forum->password )
-			{
-				Member::loggedIn()->language()->words['perm_forum_perm__read'] = Member::loggedIn()->language()->addToStack( 'perm_forum_perm__read_pass', FALSE );
+				\IPS\Member::loggedIn()->language()->words['perm_forum_perm__view'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__view_rest', FALSE, array( 'pluralize' => array( $forum->min_posts_view ) ) );
 			}
 			
+			if ( $forum->forums_bitoptions['bw_enable_answers'] )
+			{
+				if ( $forum->password and !$forum->can_view_others )
+				{
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__read'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__read2_qa_pass', FALSE );
+				}
+				elseif ( !$forum->can_view_others )
+				{
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__read'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__read2_qa', FALSE );
+				}
+				elseif ( $forum->password )
+				{
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__read'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__read_qa_pass', FALSE );
+				}
+				else
+				{
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__read'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__read_qa', FALSE );
+				}
+			}
+			else
+			{
+				if ( $forum->password and !$forum->can_view_others )
+				{
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__read'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__read2_pass', FALSE );
+				}
+				elseif ( !$forum->can_view_others )
+				{
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__read'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__read2', FALSE );
+				}
+				elseif ( $forum->password )
+				{
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__read'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__read_pass', FALSE );
+				}
+			}
+			
+			if ( $forum->forums_bitoptions['bw_enable_answers'] )
+			{
+				if ( $forum->min_posts_post )
+				{
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__add'] = \IPS\Member::loggedIn()->language()->addToStack('perm_forum_perm__add_qa_rest', FALSE, array( 'pluralize' => array( $forum->min_posts_post ) ) );
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__reply'] = \IPS\Member::loggedIn()->language()->addToStack('perm_forum_perm__reply_qa_rest', FALSE, array( 'pluralize' => array( $forum->min_posts_post ) ) );
+				}
+				else
+				{
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__add'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__add_qa', FALSE, array( 'pluralize' => array( $forum->min_posts_post ) ) );
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__reply'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__reply_qa', FALSE, array( 'pluralize' => array( $forum->min_posts_post ) ) );
+				}
+			}
+			else
+			{
+				if ( $forum->min_posts_post )
+				{
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__add'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__add_rest', FALSE, array( 'pluralize' => array( $forum->min_posts_post ) ) );
+					\IPS\Member::loggedIn()->language()->words['perm_forum_perm__reply'] = \IPS\Member::loggedIn()->language()->addToStack( 'perm_forum_perm__reply_rest', FALSE, array( 'pluralize' => array( $forum->min_posts_post ) ) );
+				}
+			}
 		}
-		catch ( OutOfRangeException $e ) {}
+		catch ( \OutOfRangeException $e ) {}
 		
-		parent::permissions();
+		return parent::permissions();
 	}
 
 	/**
@@ -102,51 +127,17 @@ class forums extends Controller
 	 *
 	 * @return void
 	 */
-	protected function form() : void
+	protected function form()
 	{
 		parent::form();
 
-		if ( Request::i()->id )
+		if ( \IPS\Request::i()->id )
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('edit_forum') . ': ' . Output::i()->title;
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('edit_forum') . ': ' . \IPS\Output::i()->title;
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('add_forum');
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('add_forum');
 		}
-	}
-
-	/**
-	 * Delete
-	 *
-	 * @return	void
-	 */
-	protected function delete(): void
-	{
-		/* Load forum and verify that it is not used for comments */
-		/** @var Forum $nodeClass */
-		$nodeClass = $this->nodeClass;
-		if ( Request::i()->subnode )
-		{
-			$nodeClass = $nodeClass::$subnodeClass;
-		}
-
-		try
-		{
-			$node = $nodeClass::load( Request::i()->id );
-		}
-		catch (OutOfRangeException $e )
-		{
-			Output::i()->error( 'node_error', '2S101/J', 404, '' );
-		}
-
-		/* Is any downloads category synced with this forum? */
-		if ( $dbCategory = $node->isUsedByADownloadsCategory() )
-		{
-			Member::loggedIn()->language()->words['downloads_forum_used'] = sprintf( Member::loggedIn()->language()->get('downloads_forum_used'), $dbCategory->_title );
-			Output::i()->error( 'downloads_forum_used', '1D372/1', 403, '' );
-		}
-
-		parent::delete();
 	}
 }

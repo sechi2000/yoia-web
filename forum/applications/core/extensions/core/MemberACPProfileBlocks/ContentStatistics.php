@@ -11,43 +11,33 @@
 namespace IPS\core\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\core\MemberACPProfile\TabbedBlock;
-use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Content Statistics
  */
-class ContentStatistics extends TabbedBlock
+class _ContentStatistics extends \IPS\core\MemberACPProfile\TabbedBlock
 {
 	/**
 	 * @brief	Percentages
 	 */
-	protected array $percentages = array();
+	protected $percentages = array();
 	
 	/**
 	 * @brief	Raw Counts
 	 */
-	protected array $rawCounts = array();
+	protected $rawCounts = array();
 	
 	/**
 	 * Get Block Title
 	 *
 	 * @return	string
 	 */
-	public function blockTitle() : string
+	public function blockTitle()
 	{
 		return 'content_statistics';
 	}
@@ -55,21 +45,21 @@ class ContentStatistics extends TabbedBlock
 	/**
 	 * Constructor
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function __construct( Member $member )
+	public function __construct( \IPS\Member $member )
 	{
 		parent::__construct( $member );
 		
 		$classes = array();
-		foreach ( Application::allExtensions( 'core', 'ContentRouter' ) as $contentRouter )
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter' ) as $contentRouter )
 		{
 			foreach ( $contentRouter->classes as $class )
 			{
 				$include = FALSE;
 				$exploded = explode( '\\', $class );
-				if ( in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+				if ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
 				{
 					if ( $class::incrementPostCount() )
 					{
@@ -95,7 +85,7 @@ class ContentStatistics extends TabbedBlock
 						}
 					}
 				}
-				elseif ( in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
+				elseif ( \in_array( 'IPS\Content\Comment', class_parents( $class ) ) )
 				{
 					if ( $class::incrementPostCount() )
 					{
@@ -157,9 +147,9 @@ class ContentStatistics extends TabbedBlock
 	/**
 	 * Get Tab Names
 	 *
-	 * @return	array
+	 * @return	string
 	 */
-	public function tabs(): array
+	public function tabs()
 	{
 		$return = array();
 		
@@ -168,7 +158,7 @@ class ContentStatistics extends TabbedBlock
 			$return['breakdown'] = 'content_count_breakdown';
 		}
 		
-		foreach ( Application::allExtensions( 'core', 'MemberACPProfileContentTab', TRUE, NULL, NULL, FALSE ) as $class )
+		foreach ( \IPS\Application::allExtensions( 'core', 'MemberACPProfileContentTab', TRUE, NULL, NULL, FALSE ) as $class )
 		{
 			try
 			{
@@ -176,7 +166,7 @@ class ContentStatistics extends TabbedBlock
 				$exploded = explode( '\\', $class );
 				$return[ $exploded[1] . '_' . $exploded[5] ] = 'content_stats__' . $exploded[1] . '_' . $exploded[5];
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 				
 		return $return;
@@ -185,26 +175,25 @@ class ContentStatistics extends TabbedBlock
 	/**
 	 * Get output
 	 *
-	 * @param string $tab
-	 * @return    mixed
+	 * @return	string
 	 */
-	public function tabOutput(string $tab ): mixed
+	public function tabOutput( $tab )
 	{
 		if ( $tab == 'breakdown' )
 		{
-			return Theme::i()->getTemplate('memberprofile')->contentBreakdown( $this->member, $this->percentages, $this->rawCounts );
+			return \IPS\Theme::i()->getTemplate('memberprofile')->contentBreakdown( $this->member, $this->percentages, $this->rawCounts );
 		}
 		else
 		{
 			$exploded = explode( '_', $tab );
-			try
+			$class = 'IPS\\' . $exploded[0] . '\\extensions\\core\\MemberACPProfileContentTab\\' . $exploded[1];
+			
+			if ( class_exists( $class ) )
 			{
-				$class = Application::getExtensionClass( $exploded[0], 'MemberACPProfileContentTab', $exploded[1] );
 				$ext = new $class( $this->member );
 				return $ext->output();
 			}
-			catch( OutOfRangeException ){}
-
+			
 			return '';
 		}
 	}

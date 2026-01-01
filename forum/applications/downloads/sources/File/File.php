@@ -13,162 +13,80 @@ namespace IPS\downloads;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use BadMethodCallException;
-use CachingIterator;
-use DateInterval;
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Api\Webhook;
-use IPS\Application;
-use IPS\Content\Anonymous;
-use IPS\Content\Comment;
-use IPS\Content\EditHistory;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Followable;
-use IPS\Content\Hideable;
-use IPS\Content\Item;
-use IPS\Content\ItemTopic;
-use IPS\Content\Lockable;
-use IPS\Content\MetaData;
-use IPS\Content\Featurable;
-use IPS\Content\Pinnable;
-use IPS\Content\Reactable;
-use IPS\Content\ReadMarkers;
-use IPS\Content\Reportable;
-use IPS\Content\Shareable;
-use IPS\Content\Statistics;
-use IPS\Content\ViewUpdates;
-use IPS\Content\Taggable;
-use IPS\DateTime;
 use IPS\Db;
-use IPS\Db\Select;
-use IPS\downloads\extensions\nexus\Item\File as FileNexusItem;
-use IPS\downloads\File\PendingVersion;
-use IPS\Events\Event;
-use IPS\File as SystemFile;
-use IPS\File\Iterator;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Menu;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\nexus\Customer;
-use IPS\nexus\Form\Money as FormMoney;
-use IPS\nexus\Form\RenewalTerm;
-use IPS\nexus\Money;
-use IPS\nexus\Package;
-use IPS\nexus\Purchase\RenewalTerm as PurchaseRenewalTerm;
-use IPS\nexus\Tax;
-use IPS\Node\Model;
-use IPS\Notification;
-use IPS\Output;
-use IPS\Output\Plugin\Filesize;
-use IPS\Output\UI\UiExtension;
 use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfBoundsException;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function array_slice;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_string;
-use const IPS\NOTIFICATION_BACKGROUND_THRESHOLD;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Model
  */
-class File extends Item implements Embeddable,
-Filter
+class _File extends \IPS\Content\Item implements
+\IPS\Content\Permissions,
+\IPS\Content\Tags,
+\IPS\Content\Followable,
+\IPS\Content\ReadMarkers,
+\IPS\Content\Hideable, \IPS\Content\Featurable, \IPS\Content\Pinnable, \IPS\Content\Lockable,
+\IPS\Content\Shareable,
+\IPS\Content\Searchable,
+\IPS\Content\Embeddable,
+\IPS\Content\MetaData,
+\IPS\Content\EditHistory,
+\IPS\Content\Anonymous
 {
-	use Reactable,
-		Reportable,
-		Pinnable,
-		Anonymous,
-		Followable,
-		Lockable,
-		ItemTopic,
-		MetaData,
-		Shareable,
-		Taggable,
-		EditHistory,
-		ReadMarkers,
-		Hideable,
-		Statistics,
-		ViewUpdates,
-		Featurable
-		{
-			Hideable::unhide as public _unhide;
-			Hideable::sendApprovedNotification as public _sendApprovedNotification;
-			Hideable::logDelete as public _logDelete;
-			ItemTopic::syncTopic as public _syncTopic;
-		}
+	use \IPS\Content\Reactable, \IPS\Content\Reportable, \IPS\Content\Statistics, \IPS\Content\ViewUpdates, \IPS\Content\ItemTopic
+	{
+		\IPS\Content\ItemTopic::changeAuthor as topicChangeAuthor;
+	}
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'downloads';
+	public static $application = 'downloads';
 	
 	/**
 	 * @brief	Module
 	 */
-	public static string $module = 'downloads';
+	public static $module = 'downloads';
 	
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'downloads_files';
+	public static $databaseTable = 'downloads_files';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'file_';
+	public static $databasePrefix = 'file_';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	Node Class
 	 */
-	public static ?string $containerNodeClass = 'IPS\downloads\Category';
+	public static $containerNodeClass = 'IPS\downloads\Category';
 	
 	/**
 	 * @brief	Comment Class
 	 */
-	public static ?string $commentClass = 'IPS\downloads\File\Comment';
+	public static $commentClass = 'IPS\downloads\File\Comment';
 	
 	/**
 	 * @brief	Review Class
 	 */
-	public static string $reviewClass = 'IPS\downloads\File\Review';
+	public static $reviewClass = 'IPS\downloads\File\Review';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'container'				=> 'cat',
 		'author'				=> 'submitter',
 		'author_name'			=> 'author_name',
@@ -199,36 +117,35 @@ Filter
 		'edit_show'				=> 'append_edit',
 		'edit_reason'			=> 'edit_reason',
 		'is_anon'				=> 'is_anon',
-		'last_comment_anon'		=> 'last_comment_anon',
-		'item_topicid'			=> 'topicid'
+		'last_comment_anon'		=> 'last_comment_anon'
 	);
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'downloads_file';
+	public static $title = 'downloads_file';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'download';
+	public static $icon = 'download';
 	
 	/**
 	 * @brief	Form Lang Prefix
 	 */
-	public static string $formLangPrefix = 'file_';
+	public static $formLangPrefix = 'file_';
 	
 	/**
 	 * @brief	[Content]	Key for hide reasons
 	 */
-	public static ?string $hideLogKey = 'downloads-file';
+	public static $hideLogKey = 'downloads-file';
 	
 	/**
 	 * Columns needed to query for search result / stream view
 	 *
 	 * @return	array
 	 */
-	public static function basicDataColumns(): array
+	public static function basicDataColumns()
 	{
 		$return = parent::basicDataColumns();
 		$return[] = 'file_primary_screenshot';
@@ -245,7 +162,7 @@ Filter
 	 * @param	array	$items	Item data (will be an array containing values from basicDataColumns())
 	 * @return	array
 	 */
-	public static function searchResultExtraData( array $items ): array
+	public static function searchResultExtraData( $items )
 	{
 		$screenshotIds = array();
 		foreach ( $items as $itemData )
@@ -256,9 +173,9 @@ Filter
 			}
 		}
 		
-		if ( count( $screenshotIds ) )
+		if ( \count( $screenshotIds ) )
 		{
-			return iterator_to_array( Db::i()->select( array( 'record_file_id', 'record_location', 'record_thumb' ), 'downloads_files_records', Db::i()->in( 'record_id', $screenshotIds ) )->setKeyField( 'record_file_id' ) );
+			return iterator_to_array( \IPS\Db::i()->select( array( 'record_file_id', 'record_location', 'record_thumb' ), 'downloads_files_records', \IPS\Db::i()->in( 'record_id', $screenshotIds ) )->setKeyField( 'record_file_id' ) );
 		}
 		
 		return array();
@@ -267,13 +184,13 @@ Filter
 	/**
 	 * Set name
 	 *
-	 * @param string $name	Name
+	 * @param	string	$name	Name
 	 * @return	void
 	 */
-	public function set_name( string $name ) : void
+	public function set_name( $name )
 	{
 		$this->_data['name'] = $name;
-		$this->_data['name_furl'] = Friendly::seoTitle( $name );
+		$this->_data['name_furl'] = \IPS\Http\Url\Friendly::seoTitle( $name );
 	}
 
 	/**
@@ -281,15 +198,15 @@ Filter
 	 *
 	 * @return	string
 	 */
-	public function get_name_furl(): string
+	public function get_name_furl()
 	{
 		if( !$this->_data['name_furl'] )
 		{
-			$this->name_furl	= Friendly::seoTitle( $this->name );
+			$this->name_furl	= \IPS\Http\Url\Friendly::seoTitle( $this->name );
 			$this->save();
 		}
 
-		return $this->_data['name_furl'] ?: Friendly::seoTitle( $this->name );
+		return $this->_data['name_furl'] ?: \IPS\Http\Url\Friendly::seoTitle( $this->name );
 	}
 
 	/**
@@ -297,7 +214,7 @@ Filter
 	 *
 	 * @return	int|null
 	 */
-	public function get__primary_screenshot(): ?int
+	public function get__primary_screenshot()
 	{
 		return ( isset( $this->_data['primary_screenshot'] ) ) ? $this->_data['primary_screenshot'] : NULL;
 	}
@@ -305,29 +222,29 @@ Filter
 	/**
 	 * @brief	Cached URLs
 	 */
-	protected mixed $_url = array();
+	protected $_url	= array();
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlBase = 'app=downloads&module=downloads&controller=view&id=';
+	public static $urlBase = 'app=downloads&module=downloads&controller=view&id=';
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlTemplate = 'downloads_file';
+	public static $urlTemplate = 'downloads_file';
 	
 	/**
 	 * @brief	SEO Title Column
 	 */
-	public static string $seoTitleColumn = 'name_furl';
+	public static $seoTitleColumn = 'name_furl';
 	
 	/**
 	 * Get URL for last comment page
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function lastCommentPageUrl(): Url
+	public function lastCommentPageUrl()
 	{
 		return parent::lastCommentPageUrl()->setQueryString( 'tab', 'comments' );
 	}
@@ -335,9 +252,9 @@ Filter
 	/**
 	 * Get URL for last review page
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function lastReviewPageUrl(): Url
+	public function lastReviewPageUrl()
 	{
 		return parent::lastReviewPageUrl()->setQueryString( 'tab', 'reviews' );
 	}
@@ -345,39 +262,39 @@ Filter
 	/**
 	 * Get template for content tables
 	 *
-	 * @return	array
+	 * @return	callable
 	 */
-	public static function contentTableTemplate(): array
+	public static function contentTableTemplate()
 	{
 		/* Load our CSS */
 		\IPS\downloads\Application::outputCss();
-		return array( Theme::i()->getTemplate( 'browse', 'downloads', 'front' ), 'rows' );
+		return array( \IPS\Theme::i()->getTemplate( 'browse', 'downloads', 'front' ), 'rows' );
 	}
 
 	/**
 	 * HTML to manage an item's follows 
 	 *
-	 * @return	array
+	 * @return	callable
 	 */
-	public static function manageFollowRows(): array
+	public static function manageFollowRows()
 	{		
-		return array( Theme::i()->getTemplate( 'global', 'downloads', 'front' ), 'manageFollowRow' );
+		return array( \IPS\Theme::i()->getTemplate( 'global', 'downloads', 'front' ), 'manageFollowRow' );
 	}
 
 	/**
 	 * Files
 	 */
-	protected array $_files = array();
+	protected $_files = array();
 
 	/**
 	 * Get files
 	 *
-	 * @param int|null $version		If provided, will get the file records for a specific previous version (downloads_filebackup.b_id)
-	 * @param bool $includeLinks	If true, will include linked files
-	 * @param bool $pendingVersion	Only include files from a pending new version
-	 * @return	Iterator
+	 * @param	int|NULL	$version		If provided, will get the file records for a specific previous version (downloads_filebackup.b_id)
+	 * @param	bool		$includeLinks	If true, will include linked files
+	 * @param	bool		$pendingVersion	Only include files from a pending new version
+	 * @return	\IPS\File\Iterator
 	 */
-	public function files( int $version=NULL, bool $includeLinks=TRUE, bool $pendingVersion=FALSE ): Iterator
+	public function files( $version=NULL, $includeLinks=TRUE, $pendingVersion=FALSE )
 	{
 		if( isset( $this->_files[ (int) $version ] ) )
 		{
@@ -389,10 +306,10 @@ Filter
 		{
 			try
 			{
-				$backup = Db::i()->select( 'b_records', 'downloads_filebackup', array( 'b_id=?', $version ) )->first();
-				$where[] = Db::i()->in( 'record_id', explode( ',', $backup ) );
+				$backup = \IPS\Db::i()->select( 'b_records', 'downloads_filebackup', array( 'b_id=?', $version ) )->first();
+				$where[] = \IPS\Db::i()->in( 'record_id', explode( ',', $backup ) );
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				/* Default to current version if the previous version does not exist */
 				$where[] = array( 'record_backup=0' );
@@ -406,8 +323,8 @@ Filter
 		/* Exclude future versions */
 		$where[] = array( 'record_hidden=?', $pendingVersion );
 						
-		$iterator = Db::i()->select( '*', 'downloads_files_records', $where )->setKeyField( 'record_id' );
-		$iterator = new Iterator( $iterator, 'downloads_Files', 'record_location', FALSE, 'record_realname', 'record_size' );
+		$iterator = \IPS\Db::i()->select( '*', 'downloads_files_records', $where )->setKeyField( 'record_id' );
+		$iterator = new \IPS\File\Iterator( $iterator, 'downloads_Files', 'record_location', FALSE, 'record_realname', 'record_size' );
 
 		$this->_files[ (int) $version ]	= $iterator;
 		return $this->_files[ (int) $version ];
@@ -416,18 +333,18 @@ Filter
 	/**
 	 * Total filesize
 	 */
-	protected ?int $_filesize = NULL;
+	protected $_filesize = NULL;
 		
 	/**
 	 * Get Total filesize
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	public function filesize(): ?int
+	public function filesize()
 	{
 		if ( $this->_filesize === NULL )
 		{
-			$this->_filesize = Db::i()->select( 'SUM(record_size)', 'downloads_files_records', array( 'record_file_id=? AND record_type=? AND record_backup=0', $this->id, 'upload' ) )->first();
+			$this->_filesize = \IPS\Db::i()->select( 'SUM(record_size)', 'downloads_files_records', array( 'record_file_id=? AND record_type=? AND record_backup=0', $this->id, 'upload' ) )->first();
 		}
 		
 		return $this->_filesize;
@@ -438,9 +355,9 @@ Filter
 	 *
 	 * @return	bool
 	 */
-	public function isPaid(): bool
+	public function isPaid()
 	{
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->idm_nexus_on )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->idm_nexus_on )
 		{
 			if ( $this->nexus )
 			{
@@ -450,7 +367,7 @@ Filter
 			if ( $this->cost )
 			{
 				$costs = json_decode( $this->cost, TRUE );
-				if ( is_array( $costs ) )
+				if ( \is_array( $costs ) )
 				{
 					foreach ( $costs as $currency => $data )
 					{
@@ -476,7 +393,7 @@ Filter
 	 * @param	bool	$checkPaid	Check if the file is a paid file
 	 * @return	bool
 	 */
-	public function isPurchasable( bool $checkPaid = TRUE ): bool
+	public function isPurchasable( $checkPaid = TRUE )
 	{
 		/* If it's not a paid file, then it's not purchasable */
 		if ( $checkPaid and !$this->isPaid() )
@@ -490,18 +407,18 @@ Filter
 	/**
 	 * Can enable purchases?
 	 *
-	 * @param	Member|NULL	$member	Member to check, or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member	Member to check, or NULL for currently logged in member
 	 * @return	bool
 	 */
-	public function canEnablePurchases( ?Member $member = NULL ): bool
+	public function canEnablePurchases( \IPS\Member $member = NULL )
 	{
 		if ( !$this->isPaid() )
 		{
 			return FALSE;
 		}
 		
-		$member = $member ?: Member::loggedIn();
-		if( !$member->modPermission('can_make_purchasable') )
+		$member = $member ?: \IPS\Member::loggedIn();
+		if( !(bool) $member->modPermission('can_make_purchasable') )
 		{
 			return FALSE;
 		}
@@ -516,12 +433,12 @@ Filter
 			{
 				try
 				{
-					Package::load( $productId );
+					\IPS\nexus\Package::load( $productId );
 
 					$hasProduct = true;
 					break;
 				}
-				catch ( OutOfRangeException $e ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 
 			if( !$hasProduct )
@@ -536,72 +453,78 @@ Filter
 	/**
 	 * Can disable purchases?
 	 *
-	 * @param	Member|NULL	$member	Member to check, or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member	Member to check, or NULL for currently logged in member
 	 * @return	bool
 	 */
-	public function canDisablePurchases( ?Member $member = NULL ): bool
+	public function canDisablePurchases( \IPS\Member $member = NULL )
 	{
 		if ( !$this->isPaid() )
 		{
 			return FALSE;
 		}
 		
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		return (bool) $member->modPermission('can_make_unpurchasable');
 	}
 	
 	/**
 	 * Get Price
 	 *
-	 * @param Customer|null $customer
-	 * @return	Money|NULL
+	 * @return	\IPS\nexus\Money|NULL
 	 */
-	public function price( ?Customer $customer=null ): ?Money
+	public function price()
 	{
-		return static::_price( $this->cost, $this->nexus, $customer );
+		return static::_price( $this->cost, $this->nexus );
 	}
-
+	
 	/**
 	 * Get Price
 	 *
-	 * @param string|null $cost The cost
-	 * @param string|null $nexusPackageIds Comma-delimited list of associated package IDs
-	 * @param Customer|null $customer
-	 * @return    Money|NULL
+	 * @param	float	$cost				The cost
+	 * @param	string	$nexusPackageIds	Comma-delimited list of associated package IDs
+	 * @return	\IPS\nexus\Money|NULL
+	 * @throws	\OutOfRangeException		If the file does not have a price in the desired currency
 	 */
-	public static function _price( ?string $cost, ?string $nexusPackageIds, ?Customer $customer=null ): ?Money
+	public static function _price( $cost, $nexusPackageIds )
 	{
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->idm_nexus_on )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->idm_nexus_on )
 		{
 			if ( $nexusPackageIds )
 			{
 				$packages = explode( ',', $nexusPackageIds );
 				try
 				{
-					return Package::lowestPriceToDisplay( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_packages', Db::i()->in( 'p_id', $packages ) ), 'IPS\nexus\Package' ), null, true );
+					if ( \count( $packages ) === 1 )
+					{
+						return \IPS\nexus\Package::load( $nexusPackageIds )->priceToDisplay();
+					}
+					else
+					{
+						return \IPS\nexus\Package::lowestPriceToDisplay( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_packages', \IPS\Db::i()->in( 'p_id', $packages ) ), 'IPS\nexus\Package' ) );
+					}
 				}
-				catch ( OutOfRangeException | OutOfBoundsException $e ) { }
+				catch ( \OutOfRangeException $e ) { }
+				catch ( \OutOfBoundsException $e ) { }
 
 				return NULL;
 			}
 			
 			if ( $cost )
 			{
-				$customer = $customer ?: Customer::loggedIn();
-				$currency = ( isset( Request::i()->cookie['currency'] ) and in_array( Request::i()->cookie['currency'], Money::currencies() ) ) ? Request::i()->cookie['currency'] : $customer->defaultCurrency();
+				$currency = ( isset( \IPS\Request::i()->cookie['currency'] ) and \in_array( \IPS\Request::i()->cookie['currency'], \IPS\nexus\Money::currencies() ) ) ? \IPS\Request::i()->cookie['currency'] : \IPS\nexus\Customer::loggedIn()->defaultCurrency();
 				
 				/* If $cost is an empty JSON array, the conditional will evaluate false thus resulting in [] being passed to \IPS\nexus\Money (which will fail). */
 				$costs = json_decode( $cost, TRUE );
-				if ( is_array( $costs ) )
+				if ( \is_array( $costs ) )
 				{
 					if ( isset( $costs[ $currency ]['amount'] ) and $costs[ $currency ]['amount'] )
 					{
-						return new Money( $costs[ $currency ]['amount'], $currency );
+						return new \IPS\nexus\Money( $costs[ $currency ]['amount'], $currency );
 					}
 				}
 				else
 				{
-					return new Money( $cost, $currency );
+					return new \IPS\nexus\Money( $cost, $currency );
 				}
 			}
 		}
@@ -612,20 +535,20 @@ Filter
 	/**
 	 * @brief	Number of purchases
 	 */
-	protected static ?array $purchaseCounts = NULL;
+	protected static $purchaseCounts;
 	
 	/**
 	 * Get number of purchases
 	 *
-	 * @return	int|null
+	 * @return	array
 	 */
-	public function purchaseCount(): ?int
+	public function purchaseCount()
 	{
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->idm_nexus_on AND !$this->nexus )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->idm_nexus_on AND !$this->nexus )
 		{
 			if ( static::$purchaseCounts === NULL )
 			{
-				static::$purchaseCounts = iterator_to_array( Db::i()->select( 'COUNT(*) AS count, ps_item_id', 'nexus_purchases', array( array( 'ps_app=? AND ps_type=?', 'downloads', 'file' ), Db::i()->in( 'ps_item_id', array_keys( static::$multitons ) ) ), NULL, NULL, 'ps_item_id' )->setKeyField('ps_item_id')->setValueField('count') );
+				static::$purchaseCounts = iterator_to_array( \IPS\Db::i()->select( 'COUNT(*) AS count, ps_item_id', 'nexus_purchases', array( array( 'ps_app=? AND ps_type=?', 'downloads', 'file' ), \IPS\Db::i()->in( 'ps_item_id', array_keys( static::$multitons ) ) ), NULL, NULL, 'ps_item_id' )->setKeyField('ps_item_id')->setValueField('count') );
 				foreach ( array_keys( static::$multitons ) as $k )
 				{
 					if ( !isset( static::$purchaseCounts[ $k ] ) )
@@ -637,7 +560,7 @@ Filter
 			
 			if ( !isset( static::$purchaseCounts[ $this->id ] ) )
 			{
-				static::$purchaseCounts[ $this->id ] = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'downloads', 'file', $this->id ) )->first();
+				static::$purchaseCounts[ $this->id ] = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'downloads', 'file', $this->id ) )->first();
 			}
 			
 			return static::$purchaseCounts[ $this->id ];
@@ -649,25 +572,23 @@ Filter
 	/**
 	 * Get Renewal Term
 	 *
-	 * @param Customer|null	$customer
-	 * @return    PurchaseRenewalTerm|NULL
+	 * @return	\IPS\nexus\Purchase\RenewalTerm|NULL
 	 */
-	public function renewalTerm( ?Customer $customer = null ): ?PurchaseRenewalTerm
+	public function renewalTerm()
 	{
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->idm_nexus_on and $this->renewal_term )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->idm_nexus_on and $this->renewal_term )
 		{
-			$customer = $customer ?: Customer::loggedIn();
 			$renewalPrice = json_decode( $this->renewal_price, TRUE );
-			$renewalPrice = is_array( $renewalPrice ) ? $renewalPrice[ $customer->defaultCurrency() ] : array( 'currency' => $customer->defaultCurrency(), 'amount' => $renewalPrice );
+			$renewalPrice = \is_array( $renewalPrice ) ? $renewalPrice[ \IPS\nexus\Customer::loggedIn()->defaultCurrency() ] : array( 'currency' => \IPS\nexus\Customer::loggedIn()->defaultCurrency(), 'amount' => $renewalPrice );
 			
 			$tax = NULL;
 			try
 			{
-				$tax = Settings::i()->idm_nexus_tax ? Tax::load( Settings::i()->idm_nexus_tax ) : NULL;
+				$tax = \IPS\Settings::i()->idm_nexus_tax ? \IPS\nexus\Tax::load( \IPS\Settings::i()->idm_nexus_tax ) : NULL;
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 			
-			return new PurchaseRenewalTerm( new Money( $renewalPrice['amount'], $renewalPrice['currency'] ), new DateInterval( "P{$this->renewal_term}" . mb_strtoupper( $this->renewal_units ) ), $tax );
+			return new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $renewalPrice['amount'], $renewalPrice['currency'] ), new \DateInterval( "P{$this->renewal_term}" . mb_strtoupper( $this->renewal_units ) ), $tax );
 		}
 		
 		return NULL;
@@ -676,17 +597,17 @@ Filter
 	/**
 	 * @brief	Cache of normal screenshots
 	 */
-	protected ?CachingIterator $_screenshotsNormal = NULL;
+	protected $_screenshotsNormal = NULL;
 
 	/**
 	 * @brief	Cache of thumbnails
 	 */
-	protected ?CachingIterator $_screenshotsThumbs = NULL;
+	protected $_screenshotsThumbs = NULL;
 
 	/**
 	 * @brief	Cache of original screenshot images
 	 */
-	protected ?CachingIterator $_screenshotsOriginal = NULL;
+	protected $_screenshotsOriginal = NULL;
 	
 	/**
 	 * Get screenshots
@@ -695,9 +616,9 @@ Filter
 	 * @param	bool		$includeLinks	If true, will include linked files
 	 * @param	int|NULL	$version		If provided, will get the file records for a specific previous version (downloads_filebackup.b_id)
 	 * @param 	bool		$pendingVersion	Only show screenshots from new pending version
-	 * @return	CachingIterator
+	 * @return	\IPS\File\Iterator
 	 */
-	public function screenshots( int $type=0, bool $includeLinks=TRUE, ?int $version = NULL, bool $pendingVersion=FALSE ) : CachingIterator
+	public function screenshots( $type=0, $includeLinks=TRUE, $version = NULL, $pendingVersion=FALSE )
 	{
 		$fileSizeField = null;
 		switch ( $type )
@@ -729,7 +650,7 @@ Filter
 				$property	= "_screenshotsOriginal";
 				break;
 			default:
-				throw new InvalidArgumentException;
+				throw new \InvalidArgumentException;
 		}
 		
 		$where = array( array( 'record_file_id=?', $this->id ) );
@@ -745,8 +666,8 @@ Filter
 		
 		if ( $version !== NULL )
 		{
-			$backup = Db::i()->select( 'b_records', 'downloads_filebackup', array( 'b_id=?', $version ) )->first();
-			$where[] = Db::i()->in( 'record_id', explode( ',', $backup ) );
+			$backup = \IPS\Db::i()->select( 'b_records', 'downloads_filebackup', array( 'b_id=?', $version ) )->first();
+			$where[] = \IPS\Db::i()->in( 'record_id', explode( ',', $backup ) );
 		}
 		else
 		{
@@ -756,9 +677,9 @@ Filter
 		/* Ignore future versions */
 		$where[] = array( 'record_hidden=?', $pendingVersion );
 
-		$iterator = Db::i()->select( 'record_id, record_location, record_thumb, record_no_watermark, record_default, record_type, record_realname, record_size', 'downloads_files_records', $where, 'record_time DESC' )->setKeyField( 'record_id' );
-		$iterator = new Iterator( $iterator, 'downloads_Screenshots', $valueField, FALSE, 'record_realname', $fileSizeField );
-		$iterator = new CachingIterator( $iterator, CachingIterator::FULL_CACHE );
+		$iterator = \IPS\Db::i()->select( 'record_id, record_location, record_thumb, record_no_watermark, record_default, record_type, record_realname, record_size', 'downloads_files_records', $where, 'record_time DESC' )->setKeyField( 'record_id' );
+		$iterator = new \IPS\File\Iterator( $iterator, 'downloads_Screenshots', $valueField, FALSE, 'record_realname', $fileSizeField );
+		$iterator = new \CachingIterator( $iterator, \CachingIterator::FULL_CACHE );
 
 		/* Do not cache if loading pending version data */
 		if( $pendingVersion === TRUE )
@@ -776,9 +697,9 @@ Filter
 	 * @param	int|null	$limit				Number of attachments to fetch, or NULL for all
 	 * @param	bool		$ignorePermissions	If set to TRUE, permission to view the images will not be checked
 	 * @return	array|NULL
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function contentImages( ?int $limit = NULL, bool $ignorePermissions = FALSE ): array|null
+	public function contentImages( $limit = NULL, $ignorePermissions = FALSE )
 	{
 		$count = 0;
 		$images = array();
@@ -800,20 +721,20 @@ Filter
 			$images = array_merge( $images, $contentImages );
 		}
 
-		return count( $images ) ? array_slice( $images, 0, $limit ) : NULL;
+		return \count( $images ) ? \array_slice( $images, 0, $limit ) : NULL;
 	}
 	
 	/**
 	 * @brief Cached primary screenshot
 	 */
-	protected SystemFile|bool|null $_primaryScreenshot	= FALSE;
+	protected $_primaryScreenshot	= FALSE;
 
 	/**
 	 * Get primary screenshot
 	 *
-	 * @return	SystemFile|bool|null
+	 * @return	\IPS\File|NULL
 	 */
-	public function get_primary_screenshot(): SystemFile|bool|null
+	public function get_primary_screenshot()
 	{
 		if( $this->_primaryScreenshot !== FALSE )
 		{
@@ -849,14 +770,14 @@ Filter
 	/**
 	 * @brief Cached primary screenshot thumb
 	 */
-	protected mixed $_primaryScreenshotThumb	= FALSE;
+	protected $_primaryScreenshotThumb	= FALSE;
 
 	/**
 	 * Get primary screenshot thumbnail
 	 *
-	 * @return SystemFile|bool|null
+	 * @return \IPS\File|NULL
 	 */
-	public function get_primary_screenshot_thumb(): SystemFile|bool|null
+	public function get_primary_screenshot_thumb()
 	{
 		if( $this->_primaryScreenshotThumb !== FALSE )
 		{
@@ -888,34 +809,35 @@ Filter
 	/**
 	 * @brief	Custom Field Cache
 	 */
-	protected ?array $_customFields = NULL;
+	protected $_customFields = NULL;
 	
 	/**
 	 * @brief	Field Data Cache
 	 */
-	protected ?array $_fieldData = NULL;
+	protected $_fieldData = NULL;
 	
 	/**
 	 * Get custom field values
 	 *
-	 * @param bool $topic	Are we returning the custom fields for the topic? If so we need to apply the display formatting.
+	 * @param	bool	$topic	Are we returning the custom fields for the topic? If so we need to apply the display formatting.
 	 * @return	array
 	 */
-	public function customFields( bool $topic=FALSE ): array
+	public function customFields( $topic = FALSE )
 	{
 		$return = array();
 		$fields = $this->container()->cfields;
+		$guest = new \IPS\Member;
 
 		if( $topic === TRUE AND $this->_fieldData === NULL )
 		{
-			$this->_fieldData	= iterator_to_array( Db::i()->select( '*', 'downloads_cfields', array( 'cf_topic=?', 1 ) )->setKeyField( 'cf_id' ) );
+			$this->_fieldData	= iterator_to_array( \IPS\Db::i()->select( '*', 'downloads_cfields', array( 'cf_topic=?', 1 ) )->setKeyField( 'cf_id' ) );
 		}
 
 		try
 		{
 			if ( $this->_customFields === NULL )
 			{
-				$this->_customFields = Db::i()->select( '*', 'downloads_ccontent', array( 'file_id=?', $this->id ) )->first();
+				$this->_customFields = \IPS\Db::i()->select( '*', 'downloads_ccontent', array( 'file_id=?', $this->id ) )->first();
 			}
 			
 			foreach ( $this->_customFields as $k => $v )
@@ -932,17 +854,25 @@ Filter
 				{
 					if( $topic === TRUE )
 					{
-						$thisField = Field::constructFromData( $this->_fieldData[ $fieldId ] );
-						$return[ $k ] = $thisField->formatValue( $v, $this );
+						$thisField = \IPS\downloads\Field::constructFromData( $this->_fieldData[ $fieldId ] );
+
+						if( isset( $this->_fieldData[ $fieldId ] ) )
+						{
+							$v	= str_replace( '{content}', htmlspecialchars( $v, ENT_DISALLOWED, 'UTF-8', FALSE ), $thisField->displayValue( $v ) );
+							$v	= str_replace( '{member_id}', \IPS\Member::loggedIn()->member_id, $v );
+							$v	= str_replace( '{title}', \IPS\Member::loggedIn()->language()->addToStack( 'downloads_field_' . $fieldId ), $v );
+						}
+						else
+						{
+							$v	= htmlspecialchars( $v, ENT_DISALLOWED, 'UTF-8', FALSE );
+						}
 					}
-					else
-					{
-						$return[ $k ] = $v;
-					}
+
+					$return[ $k ] = $v;
 				}
 			}
 		}
-		catch( UnderflowException $e ){}
+		catch( \UnderflowException $e ){}
 		
 		return $return;
 	}
@@ -952,50 +882,93 @@ Filter
 	 *
 	 * @return	array
 	 */
-	public function commentReviewTabs(): array
+	public function commentReviewTabs()
 	{
 		$tabs = array();
 		if ( $this->container()->bitoptions['reviews'] )
 		{
-			$tabs['reviews'] = Member::loggedIn()->language()->addToStack( 'file_review_count', TRUE, array( 'pluralize' => array( $this->mapped('num_reviews') ) ) );
+			$tabs['reviews'] = \IPS\Member::loggedIn()->language()->addToStack( 'file_review_count', TRUE, array( 'pluralize' => array( $this->mapped('num_reviews') ) ) );
 		}
 		if ( $this->container()->bitoptions['comments'] )
 		{
-			$tabs['comments'] = Member::loggedIn()->language()->addToStack( 'file_comment_count', TRUE, array( 'pluralize' => array( $this->mapped('num_comments') ) ) );
+			$tabs['comments'] = \IPS\Member::loggedIn()->language()->addToStack( 'file_comment_count', TRUE, array( 'pluralize' => array( $this->mapped('num_comments') ) ) );
 		}
 				
 		return $tabs;
 	}
-
+	
 	/**
 	 * Get comment/review output
 	 *
-	 * @param string|null $tab Active tab
-	 * @return    string
+	 * @param	string	$tab	Active tab
+	 * @return	string
 	 */
-	public function commentReviews( ?string $tab=NULL ): string
+	public function commentReviews( $tab )
 	{
 		if ( $tab === 'reviews' )
 		{
-			return (string) Theme::i()->getTemplate('view')->reviews( $this );
+			return \IPS\Theme::i()->getTemplate('view')->reviews( $this );
 		}
 		elseif( $tab === 'comments' )
 		{
-			return (string) Theme::i()->getTemplate('view')->comments( $this );
+			return \IPS\Theme::i()->getTemplate('view')->comments( $this );
 		}
 		
 		return '';
 	}
 	
 	/**
-	 * Can view?
+	 * Should new items be moderated?
 	 *
-	 * @param	Member|NULL	$member	The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Member		$member							The member posting
+	 * @param	\IPS\Node\Model	$container						The container
+	 * @param	bool			$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
 	 * @return	bool
 	 */
-	public function canView( ?Member $member=null ): bool
+	public static function moderateNewItems( \IPS\Member $member, \IPS\Node\Model $container = NULL, $considerPostBeforeRegistering = FALSE )
 	{
-		$member = $member ?: Member::loggedIn();
+		if ( $container and $container->bitoptions['moderation'] and !$member->group['g_avoid_q'] )
+		{
+			return !static::modPermission( 'approve', $member, $container );
+		}
+		
+		return parent::moderateNewItems( $member, $container, $considerPostBeforeRegistering );
+	}
+	
+	/**
+	 * Should new comments be moderated?
+	 *
+	 * @param	\IPS\Member	$member							The member posting
+	 * @param	bool		$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @return	bool
+	 */
+	public function moderateNewComments( \IPS\Member $member, $considerPostBeforeRegistering = FALSE )
+	{
+		$commentClass = static::$commentClass;
+		return ( $this->container()->bitoptions['comment_moderation'] and !$member->group['g_avoid_q'] ) or parent::moderateNewComments( $member, $considerPostBeforeRegistering );
+	}
+	
+	/**
+	 * Should new reviews be moderated?
+	 *
+	 * @param	\IPS\Member	$member							The member posting
+	 * @param	bool		$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @return	bool
+	 */
+	public function moderateNewReviews( \IPS\Member $member, $considerPostBeforeRegistering = FALSE )
+	{
+		return ( $this->container()->bitoptions['reviews_mod'] and !$member->group['g_avoid_q'] ) or parent::moderateNewReviews( $member, $considerPostBeforeRegistering );
+	}
+	
+	/**
+	 * Can view?
+	 *
+	 * @param	\IPS\Member|NULL	$member	The member to check for or NULL for the currently logged in member
+	 * @return	bool
+	 */
+	public function canView( $member=NULL )
+	{
+		$member = $member ?: \IPS\Member::loggedIn();
 		if ( !$this->container()->open and !$member->isAdmin() )
 		{
 			return FALSE;
@@ -1007,12 +980,12 @@ Filter
 	 * Can edit?
 	 * Authors can always edit their own files
 	 *
-	 * @param	Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canEdit( ?Member $member=NULL ): bool
+	public function canEdit( $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		if ( !$member->member_id )
 		{
@@ -1021,33 +994,33 @@ Filter
 
 		return ( $member->member_id == $this->author()->member_id ) or parent::canEdit( $member );
 	}
-
+	
 	/**
 	 * Get items with permisison check
 	 *
-	 * @param array $where Where clause
-	 * @param string|null $order MySQL ORDER BY clause (NULL to order by date)
-	 * @param int|array|null $limit Limit clause
-	 * @param string|null $permissionKey A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index or NULL to ignore permissions
-	 * @param int|bool|null $includeHiddenItems Include hidden items? NULL to detect if currently logged in member has permission, -1 to return public content only, TRUE to return unapproved content and FALSE to only return unapproved content the viewing member submitted
-	 * @param int $queryFlags Select bitwise flags
-	 * @param Member|null $member The member (NULL to use currently logged in member)
-	 * @param bool $joinContainer If true, will join container data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinComments If true, will join comment data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinReviews If true, will join review data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $countOnly If true will return the count
-	 * @param array|null $joins Additional arbitrary joins for the query
-	 * @param bool|Model $skipPermission If you are getting records from a specific container, pass the container to reduce the number of permission checks necessary or pass TRUE to skip conatiner-based permission. You must still specify this in the $where clause
-	 * @param bool $joinTags If true, will join the tags table
-	 * @param bool $joinAuthor If true, will join the members table for the author
-	 * @param bool $joinLastCommenter If true, will join the members table for the last commenter
-	 * @param bool $showMovedLinks If true, moved item links are included in the results
-	 * @param array|null $location Array of item lat and long
-	 * @return    ActiveRecordIterator|int
+	 * @param	array		$where				Where clause
+	 * @param	string		$order				MySQL ORDER BY clause (NULL to order by date)
+	 * @param	int|array	$limit				Limit clause
+	 * @param	string|NULL	$permissionKey		A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index or NULL to ignore permissions
+	 * @param	mixed		$includeHiddenItems	Include hidden items? NULL to detect if currently logged in member has permission, -1 to return public content only, TRUE to return unapproved content and FALSE to only return unapproved content the viewing member submitted
+	 * @param	int			$queryFlags			Select bitwise flags
+	 * @param	\IPS\Member	$member				The member (NULL to use currently logged in member)
+	 * @param	bool		$joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinComments		If true, will join comment data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinReviews		If true, will join review data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$countOnly			If true will return the count
+	 * @param	array|null	$joins				Additional arbitrary joins for the query
+	 * @param	mixed		$skipPermission		If you are getting records from a specific container, pass the container to reduce the number of permission checks necessary or pass TRUE to skip conatiner-based permission. You must still specify this in the $where clause
+	 * @param	bool		$joinTags			If true, will join the tags table
+	 * @param	bool		$joinAuthor			If true, will join the members table for the author
+	 * @param	bool		$joinLastCommenter	If true, will join the members table for the last commenter
+	 * @param	bool		$showMovedLinks		If true, moved item links are included in the results
+	 * @param	array|null	$location			Array of item lat and long
+	 * @return	\IPS\Patterns\ActiveRecordIterator|int
 	 */
-	public static function getItemsWithPermission( array $where=array(), string $order=null, int|array|null $limit=10, ?string $permissionKey='read', int|bool|null $includeHiddenItems= Filter::FILTER_AUTOMATIC, int $queryFlags=0, Member $member=null, bool $joinContainer=FALSE, bool $joinComments=FALSE, bool $joinReviews=FALSE, bool $countOnly=FALSE, array|null $joins=null, bool|Model $skipPermission=FALSE, bool $joinTags=TRUE, bool $joinAuthor=TRUE, bool $joinLastCommenter=TRUE, bool $showMovedLinks=FALSE, array|null $location=null ): ActiveRecordIterator|int
+	public static function getItemsWithPermission( $where=array(), $order=NULL, $limit=10, $permissionKey='read', $includeHiddenItems=\IPS\Content\Hideable::FILTER_AUTOMATIC, $queryFlags=0, \IPS\Member $member=NULL, $joinContainer=FALSE, $joinComments=FALSE, $joinReviews=FALSE, $countOnly=FALSE, $joins=NULL, $skipPermission=FALSE, $joinTags=TRUE, $joinAuthor=TRUE, $joinLastCommenter=TRUE, $showMovedLinks=FALSE, $location=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		if ( !$member->isAdmin() )
 		{
 			$where[] = array( 'downloads_categories.copen=1' );
@@ -1060,18 +1033,18 @@ Filter
 	/**
 	 * Can a given member create this type of content?
 	 *
-	 * @param	Member	$member		The member
-	 * @param	Model|NULL	$container	Container (e.g. forum), if appropriate
-	 * @param bool $showError	If TRUE, rather than returning a boolean value, will display an error
+	 * @param	\IPS\Member	$member		The member
+	 * @param	\IPS\Node\Model|NULL	$container	Container (e.g. forum), if appropriate
+	 * @param	bool		$showError	If TRUE, rather than returning a boolean value, will display an error
 	 * @return	bool
 	 */
-	public static function canCreate( Member $member, ?Model $container=null, bool $showError=FALSE ) : bool
+	public static function canCreate( \IPS\Member $member, \IPS\Node\Model $container=NULL, $showError=FALSE )
 	{
 		if ( $member->idm_block_submissions )
 		{
 			if ( $showError )
 			{
-				Output::i()->error( 'err_submissions_blocked', '1D168/1', 403, '' );
+				\IPS\Output::i()->error( 'err_submissions_blocked', '1D168/1', 403, '' );
 			}
 			
 			return FALSE;
@@ -1079,79 +1052,81 @@ Filter
 
 		return parent::canCreate( $member, $container, $showError );
 	}
-
+	
 	/**
-	 * Check if a specific action is available for this Content.
-	 * Default to TRUE, but used for overrides in individual Item/Comment classes.
+	 * Can review?
 	 *
-	 * @param string $action
-	 * @param Member|null	$member
-	 * @return bool
+	 * @param	\IPS\Member\NULL	$member							The member (NULL for currently logged in member)
+	 * @param	bool				$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @return	bool
 	 */
-	public function actionEnabled( string $action, ?Member $member=null ) : bool
+	public function canReview( $member=NULL, $considerPostBeforeRegistering = TRUE )
 	{
-		if( $action == 'review' and $this->mustDownloadBeforeReview( $member ) )
-		{
-			return false;
-		}
-
-		return parent::actionEnabled( $action, $member );
+		return parent::canReview( $member, $considerPostBeforeRegistering ) and !$this->mustDownloadBeforeReview( $member );
 	}
 	
 	/**
 	 * Member has to download before they can review?
 	 *
-	 * @param	Member|NULL	$member		The member (NULL for currently logged in member)
+	 * @param	\IPS\Member\NULL	$member		The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function mustDownloadBeforeReview( ?Member $member = NULL ): bool
+	public function mustDownloadBeforeReview( \IPS\Member $member = NULL )
 	{
 		if ( $this->container()->bitoptions['reviews_download'] )
 		{
 			try
 			{
-				Db::i()->select( '*', 'downloads_downloads', array( 'dfid=? AND dmid=?', $this->id, $member ? $member->member_id : Member::loggedIn()->member_id ) )->first();
+				\IPS\Db::i()->select( '*', 'downloads_downloads', array( 'dfid=? AND dmid=?', $this->id, $member ? $member->member_id : \IPS\Member::loggedIn()->member_id ) )->first();
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				return TRUE;
 			}
 		}
 		return FALSE;
 	}
+	
+	/**
+	 * Can change author?
+	 *
+	 * @param	\IPS\Member\NULL	$member	The member (NULL for currently logged in member)
+	 * @return	bool
+	 */
+	public function canChangeAuthor( \IPS\Member $member = NULL )
+	{
+		return static::modPermission( 'edit', $member, $this->container() );
+	}
 
 	/**
 	 * Change Author
 	 *
-	 * @param	Member	$newAuthor	The new author
-	 * @param bool $log		If TRUE, action will be logged to moderator log
+	 * @param	\IPS\Member	$newAuthor	The new author
+	 * @param	bool		$log		If TRUE, action will be logged to moderator log
 	 * @return	void
 	 */
-	public function changeAuthor( Member $newAuthor, bool $log=TRUE ): void
+	public function changeAuthor( \IPS\Member $newAuthor, $log=TRUE )
 	{
-		if ( Application::appIsEnabled( 'nexus' ) )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) )
 		{
-			Db::i()->update( 'nexus_purchases', array( 'ps_pay_to' => $newAuthor->member_id ), array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'downloads', 'file', $this->id ) );
+			\IPS\Db::i()->update( 'nexus_purchases', array( 'ps_pay_to' => $newAuthor->member_id ), array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'downloads', 'file', $this->id ) );
 		}
-
-		/* Update any pending versions */
-		Db::i()->update( 'downloads_files_pending', array( 'pending_member_id' => $newAuthor->member_id ), array( 'pending_file_id=?', $this->id ) );
-
-		parent::changeAuthor( $newAuthor, $log );
+		
+		$this->topicChangeAuthor( $newAuthor, $log );
 	}
 	
 	/**
 	 * @brief	Can download?
 	 */
-	protected ?bool $canDownload = NULL;
+	protected $canDownload = NULL;
 	
 	/**
 	 * Can the member download this file?
 	 *
-	 * @param	Member|NULL	$member		The member to check or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member		The member to check or NULL for currently logged in member
 	 * @return	bool
 	 */
-	public function canDownload( ?Member $member = NULL ): bool
+	public function canDownload( \IPS\Member $member = NULL )
 	{
 		if ( $this->canDownload === NULL )
 		{
@@ -1160,7 +1135,7 @@ Filter
 				$this->downloadCheck( NULL, $member );
 				$this->canDownload = TRUE;
 			}
-			catch ( DomainException $e )
+			catch ( \DomainException $e )
 			{
 				$this->canDownload = FALSE;
 			}
@@ -1172,17 +1147,17 @@ Filter
 	/**
 	 * @brief	Requires download confirmation? Used to determine if CSRF key should be included in download URL.
 	 */
-	protected ?bool $requiresDownloadConfirmation = NULL;
+	protected $requiresDownloadConfirmation = NULL;
 	
 	/**
 	 * Can the member download this file?
 	 *
-	 * @param	Member|NULL	$member		The member to check or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member		The member to check or NULL for currently logged in member
 	 * @return	bool
 	 */
-	public function requiresDownloadConfirmation( ?Member $member = NULL ): bool
+	public function requiresDownloadConfirmation( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		if ( $this->requiresDownloadConfirmation === NULL )
 		{
@@ -1190,15 +1165,15 @@ Filter
 
 			$category = $this->container();
 			
-			if( $category->message('disclaimer') and in_array( $category->disclaimer_location, [ 'download', 'both' ] ) )
+			if( $category->message('disclaimer') and \in_array( $category->disclaimer_location, [ 'download', 'both' ] ) )
 			{
 				$this->requiresDownloadConfirmation = TRUE;
 			}
 
-			$version = Request::i()->changelog ?? Request::i()->version ?? NULL;
-			$files = $this->files($version);
+			$version = \IPS\Request::i()->changelog ?? \IPS\Request::i()->version ?? NULL;
+			$files = $this->files( $version );
 
-			if( count( $files ) > 1 AND !isset( Request::i()->r ) )
+			if( \count( $files ) > 1 AND !isset( \IPS\Request::i()->r ) )
 			{
 				$this->requiresDownloadConfirmation = TRUE;
 			}
@@ -1215,10 +1190,10 @@ Filter
 	/**
 	 * Can the member buy this file?
 	 *
-	 * @param	Member|NULL	$member		The member to check or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member		The member to check or NULL for currently logged in member
 	 * @return	bool
 	 */
-	public function canBuy( ?Member $member = NULL ): bool
+	public function canBuy( \IPS\Member $member = NULL )
 	{
 		/* Is this a paid file? */
 		if ( !$this->isPaid() )
@@ -1227,11 +1202,11 @@ Filter
 		}
 		
 		/* Init */
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		$restrictions = json_decode( $member->group['idm_restrictions'], TRUE );
 
         /* File author */
-        if( $member === $this->author() )
+        if( $member == $this->author() )
         {
             return FALSE;
         }
@@ -1240,7 +1215,7 @@ Filter
 		if ( !$this->container()->can( 'download', $member ) )
 		{
 			/* Hold on - if we're a guest and buying means we'll have to register which will put us in a group with permission, we can continue */
-			if ( $member->member_id or !$this->container()->can( 'download', Group::load( Settings::i()->member_group ) ) )
+			if ( $member->member_id or !$this->container()->can( 'download', \IPS\Member\Group::load( \IPS\Settings::i()->member_group ) ) )
 			{
 				return FALSE;
 			}
@@ -1267,19 +1242,19 @@ Filter
 			{
 				try
 				{
-					$package = Package::load( $productId );
+					$package = \IPS\nexus\Package::load( $productId );
 
 					try
 					{
 						/* The method does not return anything, but throws an exception if we cannot buy */
 						$package->memberCanPurchase( $member );
 					}
-					catch ( DomainException $e )
+					catch ( \DomainException $e )
 					{
 						return FALSE;
 					}
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					return FALSE;
 				}
@@ -1292,21 +1267,21 @@ Filter
 	/**
 	 * Purchases that can be renewed
 	 *
-	 * @param	Member|NULL	$member		The member to check or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member		The member to check or NULL for currently logged in member
 	 * @return	array
 	 */
-	public function purchasesToRenew( ?Member $member = NULL ): array
+	public function purchasesToRenew( \IPS\Member $member = NULL )
 	{
 		/** return an empty array if we don't have commerce */
-		if ( !Application::appIsEnabled( 'nexus' ) )
+		if ( !\IPS\Application::appIsEnabled( 'nexus' ) )
 		{
 			return array();
 		}
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		$return = array();
 
-		foreach ( FileNexusItem::getPurchases( Customer::load( $member->member_id ), $this->id ) as $purchase )
+		foreach ( \IPS\downloads\extensions\nexus\Item\File::getPurchases( \IPS\nexus\Customer::load( $member->member_id ), $this->id ) as $purchase )
 		{
 			if ( !$purchase->active and $purchase->canRenewUntil() !== FALSE )
 			{
@@ -1320,25 +1295,25 @@ Filter
 	 * Download check
 	 *
 	 * @param	array|NULL			$record		Specific record to download
-	 * @param	Member|NULL	$member		The member to check or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member		The member to check or NULL for currently logged in member
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function downloadCheck( ?array $record = NULL, ?Member $member = NULL ) : void
+	public function downloadCheck( array $record = NULL, \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
-		$restrictions = $member->group['idm_restrictions'] ? json_decode( $member->group['idm_restrictions'], TRUE ) : [];
+		$member = $member ?: \IPS\Member::loggedIn();
+		$restrictions = json_decode( $member->group['idm_restrictions'], TRUE );
 		
 		/* Basic permission check */
 		if ( !$this->container()->can( 'download', $member ) )
 		{
-			throw new DomainException( $this->container()->message('npd') ?: 'download_no_perm' );
+			throw new \DomainException( $this->container()->message('npd') ?: 'download_no_perm' );
 		}
 
 		/* If the file is hidden and this isn't a moderator, they can't access regardless of 'view' permission */
 		if ( $this->hidden() and !static::canViewHiddenItems( $member, $this->containerWrapper() ) and ( $this->hidden() !== 1 or $this->author()->member_id !== $member->member_id ) )
 		{
-			throw new DomainException( $this->container()->message('npd') ?: 'download_no_perm' );
+			throw new \DomainException( $this->container()->message('npd') ?: 'download_no_perm' );
 		}
 		
 		/* Paid? */
@@ -1347,23 +1322,23 @@ Filter
 			/* Guests can't download paid files */
 			if ( !$member->member_id )
 			{
-				throw new DomainException( $this->container()->message('npd') ?: 'download_no_perm' );
+				throw new \DomainException( $this->container()->message('npd') ?: 'download_no_perm' );
 			}
 
 			if ( !$member->group['idm_bypass_paid'] and $member->member_id != $this->author()->member_id )
 			{
 				if ( $this->cost )
 				{
-					if ( !count( FileNexusItem::getPurchases( Customer::load( $member->member_id ), $this->id, FALSE ) ) )
+					if ( !\count( \IPS\downloads\extensions\nexus\Item\File::getPurchases( \IPS\nexus\Customer::load( $member->member_id ), $this->id, FALSE ) ) )
 					{
-						throw new DomainException( 'file_not_purchased' );
+						throw new \DomainException( 'file_not_purchased' );
 					}
 				}
 				elseif ( $this->nexus )
 				{
-					if ( !count( \IPS\nexus\extensions\nexus\Item\Package::getPurchases( Customer::load( $member->member_id ), explode( ',', $this->nexus ), FALSE ) ) )
+					if ( !\count( \IPS\nexus\extensions\nexus\Item\Package::getPurchases( \IPS\nexus\Customer::load( $member->member_id ), explode( ',', $this->nexus ), FALSE ) ) )
 					{
-						throw new DomainException( 'file_not_purchased' );
+						throw new \DomainException( 'file_not_purchased' );
 					}
 				}
 			}
@@ -1379,7 +1354,7 @@ Filter
 		/* Minimum posts */
 		if ( $member->member_id and isset( $restrictions['min_posts'] ) and $restrictions['min_posts'] and $restrictions['min_posts'] > $member->member_posts )
 		{
-			throw new DomainException( $member->language()->addToStack( 'download_min_posts', FALSE, array( 'pluralize' => array( $restrictions['min_posts'] ) ) ) );
+			throw new \DomainException( $member->language()->addToStack( 'download_min_posts', FALSE, array( 'pluralize' => array( $restrictions['min_posts'] ) ) ) );
 		}
 		
 		/* Simultaneous downloads */
@@ -1387,7 +1362,7 @@ Filter
 		{
 			if ( $this->getCurrentDownloadSessions( $member ) >= $restrictions['limit_sim'] )
 			{
-				throw new DomainException( $member->language()->addToStack( 'max_simultaneous_downloads', FALSE, array( 'pluralize' => array( $restrictions['limit_sim'] ) ) ) );
+				throw new \DomainException( $member->language()->addToStack( 'max_simultaneous_downloads', FALSE, array( 'pluralize' => array( $restrictions['limit_sim'] ) ) ) );
 			}
 		}
 				
@@ -1406,35 +1381,35 @@ Filter
 		}
 		
 		/* Bandwidth & Download limits */
-		$logWhere = $member->member_id ? array( 'dmid=?', $member->member_id ) : array( 'dip=?', Request::i()->ipAddress() );
+		$logWhere = $member->member_id ? array( 'dmid=?', $member->member_id ) : array( 'dip=?', \IPS\Request::i()->ipAddress() );
 		foreach ( array( 'daily' => 'P1D', 'weekly' => 'P1W', 'monthly' => 'P1M' ) as $k => $interval )
 		{
-			$timePeriodWhere = array( $logWhere, array( 'dtime>?', DateTime::create()->sub( new DateInterval( $interval ) )->getTimestamp() ) );
+			$timePeriodWhere = array( $logWhere, array( 'dtime>?', \IPS\DateTime::create()->sub( new \DateInterval( $interval ) )->getTimestamp() ) );
 			
 			/* Bandwidth */
 			if ( isset( $restrictions[ $k . '_bw' ] ) AND $restrictions[ $k . '_bw' ] )
 			{
-				$usedThisPeriod = Db::i()->select( 'SUM(dsize)', 'downloads_downloads', $timePeriodWhere )->first();
+				$usedThisPeriod = \IPS\Db::i()->select( 'SUM(dsize)', 'downloads_downloads', $timePeriodWhere )->first();
 				if ( ( $record['record_size'] + $usedThisPeriod ) > ( $restrictions[ $k . '_bw' ] * 1024 ) )
 				{
 					if ( $record['record_size'] > ( $restrictions[ $k . '_bw' ] * 1024 ) )
 					{
-						throw new DomainException( $member->language()->addToStack( 'bandwidth_limit_' . $k . '_never', FALSE, array( 'sprintf' => array( Filesize::humanReadableFilesize( $restrictions[ $k . '_bw' ] * 1024 ), Filesize::humanReadableFilesize( $record['record_size'] ) ) ) ) );
+						throw new \DomainException( $member->language()->addToStack( 'bandwidth_limit_' . $k . '_never', FALSE, array( 'sprintf' => array( \IPS\Output\Plugin\Filesize::humanReadableFilesize( $restrictions[ $k . '_bw' ] * 1024 ), \IPS\Output\Plugin\Filesize::humanReadableFilesize( $record['record_size'] ) ) ) ) );
 					}
 					else
 					{
-						$date = new DateTime;
-						foreach ( Db::i()->select( '*', 'downloads_downloads', $timePeriodWhere, 'dtime ASC' ) as $log )
+						$date = new \IPS\DateTime;
+						foreach ( \IPS\Db::i()->select( '*', 'downloads_downloads', $timePeriodWhere, 'dtime ASC' ) as $log )
 						{
 							$usedThisPeriod -= $log['dsize'];
 							if ( ( $record['record_size'] + $usedThisPeriod ) < ( $restrictions[ $k . '_bw' ] * 1024 ) )
 							{
-								$date = DateTime::ts( $log['dtime'] );
+								$date = \IPS\DateTime::ts( $log['dtime'] );
 								break;
 							}
 						}
 												
-						throw new DomainException( $member->language()->addToStack( 'bandwidth_limit_' . $k, FALSE, array( 'sprintf' => array( Filesize::humanReadableFilesize( $restrictions[ $k . '_bw' ] * 1024 ), (string) $date->add( new DateInterval( $interval ) ) ) ) ) );
+						throw new \DomainException( $member->language()->addToStack( 'bandwidth_limit_' . $k, FALSE, array( 'sprintf' => array( \IPS\Output\Plugin\Filesize::humanReadableFilesize( $restrictions[ $k . '_bw' ] * 1024 ), (string) $date->add( new \DateInterval( $interval ) ) ) ) ) );
 					}
 				}
 			}
@@ -1444,16 +1419,16 @@ Filter
 			{
 				try
 				{
-					$downloadsThisPeriod = Db::i()->select( 'COUNT(*)', 'downloads_downloads', $timePeriodWhere )->first();
+					$downloadsThisPeriod = \IPS\Db::i()->select( 'COUNT(*)', 'downloads_downloads', $timePeriodWhere )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					$downloadsThisPeriod = 0;
 				}
 
 				if( $downloadsThisPeriod >= $restrictions[ $k . '_dl' ] )
 				{
-					throw new DomainException( $member->language()->addToStack( 'download_limit_' . $k, FALSE, array( 'pluralize' => array( $restrictions[ $k . '_dl' ] ), 'sprintf' => array( (string) DateTime::ts( Db::i()->select( 'dtime', 'downloads_downloads', $timePeriodWhere, 'dtime ASC', array( 0, 1 ) )->first() )->add( new DateInterval( $interval ) ) ) ) ) );
+					throw new \DomainException( $member->language()->addToStack( 'download_limit_' . $k, FALSE, array( 'pluralize' => array( $restrictions[ $k . '_dl' ] ), 'sprintf' => array( (string) \IPS\DateTime::ts( \IPS\Db::i()->select( 'dtime', 'downloads_downloads', $timePeriodWhere, 'dtime ASC', array( 0, 1 ) )->first() )->add( new \DateInterval( $interval ) ) ) ) ) );
 				}
 			}
 		}
@@ -1462,19 +1437,19 @@ Filter
 	/**
 	 * @brief Cached number of current download sessions
 	 */
-	protected array $_currentDownloadSessions = array();
+	protected $_currentDownloadSessions = array();
 
 	/**
 	 * Get the current number of download sessions
 	 *
-	 * @param Member $member		Member to check
+	 * @param	\IPS\Member		$member		Member to check
 	 * @return int
 	 */
-	public function getCurrentDownloadSessions( Member $member ): int
+	public function getCurrentDownloadSessions( $member )
 	{
 		if( !array_key_exists( $member->member_id, $this->_currentDownloadSessions ) )
 		{
-			$this->_currentDownloadSessions[ $member->member_id ] = Db::i()->select( 'COUNT(*)', 'downloads_sessions', array( array( 'dsess_start > ?', time() - ( 60 * 15 ) ), $member->member_id ? array( 'dsess_mid=?', $member->member_id ) : array( 'dsess_ip=?', Request::i()->ipAddress() ) ) )->first();
+			$this->_currentDownloadSessions[ $member->member_id ] = \IPS\Db::i()->select( 'COUNT(*)', 'downloads_sessions', array( array( 'dsess_start > ?', time() - ( 60 * 15 ) ), $member->member_id ? array( 'dsess_mid=?', $member->member_id ) : array( 'dsess_ip=?', \IPS\Request::i()->ipAddress() ) ) )->first();
 		}
 
 		return $this->_currentDownloadSessions[ $member->member_id ];
@@ -1483,35 +1458,34 @@ Filter
 	/**
 	 * Can view downloaders?
 	 *
-	 * @param	Member|NULL	$member		The member to check or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member		The member to check or NULL for currently logged in member
 	 * @return	bool
 	 */
-	public function canViewDownloaders( ?Member $member = null ): bool
+	public function canViewDownloaders( \IPS\Member $member = NULL )
 	{
 		if ( $this->container()->log === 0 )
 		{
 			return FALSE;
 		}
 		
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		if ( $member->member_id == $this->author()->member_id and $this->container()->bitoptions['submitter_log'] )
 		{
 			return TRUE;
 		}
 				
-		return (bool) $member->group['idm_view_downloads'];
+		return $member->group['idm_view_downloads'];
 	}
 
 	/**
 	 * Get elements for add/edit form
 	 *
-	 * @param Item|null $item The current item if editing or NULL if creating
-	 * @param Model|null $container Container (e.g. forum) ID, if appropriate
-	 * @param string $bulkKey If we are submitting multiple files at once, a key that is used to differentiate between which fields are for which files
-	 * @return    array
-	 * @throws Exception
+	 * @param	\IPS\Content\Item|NULL	$item		The current item if editing or NULL if creating
+	 * @param	\IPS\Node\Model|NULL 	$container	Container (e.g. forum) ID, if appropriate
+	 * @param	string|NULL				$bulkKey	If we are submitting multiple files at once, a key that is used to differentiate between which fields are for which files
+	 * @return	array
 	 */
-	public static function formElements( ?Item $item=NULL, ?Model $container=NULL, string $bulkKey = '' ): array
+	public static function formElements( $item=NULL, \IPS\Node\Model $container=NULL, $bulkKey = '' )
 	{
 		/* Init */
 		$return = [];
@@ -1522,7 +1496,7 @@ Filter
 		}
 
 		/* Description */
-		$return['description'] = new Editor( "{$bulkKey}file_desc", $item?->desc, TRUE, array( 'app' => 'downloads', 'key' => 'Downloads', 'autoSaveKey' => ( $item ? "downloads-file-{$item->id}" : "{$bulkKey}downloads-new-file" ), 'attachIds' => ( $item === NULL ? NULL : array( $item->id, NULL, 'desc' ) ) ), '\IPS\Helpers\Form::floodCheck' );
+		$return['description'] = new \IPS\Helpers\Form\Editor( "{$bulkKey}file_desc", $item ? $item->desc : NULL, TRUE, array( 'app' => 'downloads', 'key' => 'Downloads', 'autoSaveKey' => ( $item ? "downloads-file-{$item->id}" : "{$bulkKey}downloads-new-file" ), 'attachIds' => ( $item === NULL ? NULL : array( $item->id, NULL, 'desc' ) ) ), '\IPS\Helpers\Form::floodCheck' );
 
 		/* Edit Log Fields need to be under the editor */
 		$editReason = NULL;
@@ -1545,30 +1519,30 @@ Filter
 		if ( $item )
 		{
 			$screenshotOptions = array();
-			foreach ( Db::i()->select( '*', 'downloads_files_records', array( 'record_file_id=? AND record_type=? AND record_backup=0', $item->id, 'ssupload' ) ) as $ss )
+			foreach ( \IPS\Db::i()->select( '*', 'downloads_files_records', array( 'record_file_id=? AND record_type=? AND record_backup=0', $item->id, 'ssupload' ) ) as $ss )
 			{
-				$screenshotOptions[ $ss['record_id'] ] = SystemFile::get( 'downloads_Screenshots', $ss['record_location'] )->url;
+				$screenshotOptions[ $ss['record_id'] ] = \IPS\File::get( 'downloads_Screenshots', $ss['record_location'] )->url;
 			}
 
-			if ( count( $screenshotOptions ) > 1 )
+			if ( \count( $screenshotOptions ) > 1 )
 			{
-				$return['primary_screenshot'] = new Radio( "{$bulkKey}file_primary_screenshot", $item->_primary_screenshot, FALSE, array( 'options' => $screenshotOptions, 'parse' => 'image' ) );
+				$return['primary_screenshot'] = new \IPS\Helpers\Form\Radio( "{$bulkKey}file_primary_screenshot", $item->_primary_screenshot, FALSE, array( 'options' => $screenshotOptions, 'parse' => 'image' ) );
 			}
 		}
 		
 		/* Nexus Integration */
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->idm_nexus_on and Member::loggedIn()->group['idm_add_paid'] )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->idm_nexus_on and \IPS\Member::loggedIn()->group['idm_add_paid'] )
 		{
 			$options = array(
 				'free'		=> 'file_free',
 				'paid'		=> 'file_paid',
 			);
-			if ( Member::loggedIn()->isAdmin() AND count( Package::roots() ) > 0 )
+			if ( \IPS\Member::loggedIn()->isAdmin() AND \count( \IPS\nexus\Package::roots() ) > 0 )
 			{
 				$options['nexus'] = 'file_associate_nexus';
 			}
 			
-			$return['file_cost_type'] = new Radio( "{$bulkKey}file_cost_type", $item ? ( $item->cost ? 'paid' : ( $item->nexus ? 'nexus' : 'free' ) ) : 'free', TRUE, array(
+			$return['file_cost_type'] = new \IPS\Helpers\Form\Radio( "{$bulkKey}file_cost_type", $item ? ( $item->cost ? 'paid' : ( $item->nexus ? 'nexus' : 'free' ) ) : 'free', TRUE, array(
 				'options'	=> $options,
 				'toggles'	=> array(
 					'paid'		=> array( "{$bulkKey}file_cost", "{$bulkKey}file_renewals" ),
@@ -1578,119 +1552,116 @@ Filter
 			
 			$commissionBlurb = NULL;
 			$fees = NULL;
-			if ( $_fees = json_decode( Settings::i()->idm_nexus_transfee, TRUE ) )
+			if ( $_fees = json_decode( \IPS\Settings::i()->idm_nexus_transfee, TRUE ) )
 			{
 				$fees = array();
 				foreach ( $_fees as $fee )
 				{
-					$fees[] = (string) ( new Money( $fee['amount'], $fee['currency'] ) );
+					$fees[] = (string) ( new \IPS\nexus\Money( $fee['amount'], $fee['currency'] ) );
 				}
-				$fees = Member::loggedIn()->language()->formatList( $fees, Member::loggedIn()->language()->get('or_list_format') );
+				$fees = \IPS\Member::loggedIn()->language()->formatList( $fees, \IPS\Member::loggedIn()->language()->get('or_list_format') );
 			}
-			if ( Settings::i()->idm_nexus_percent and $fees )
+			if ( \IPS\Settings::i()->idm_nexus_percent and $fees )
 			{
-				$commissionBlurb = Member::loggedIn()->language()->addToStack( 'file_cost_desc_both', FALSE, array( 'sprintf' => array( Settings::i()->idm_nexus_percent, $fees ) ) );
+				$commissionBlurb = \IPS\Member::loggedIn()->language()->addToStack( 'file_cost_desc_both', FALSE, array( 'sprintf' => array( \IPS\Settings::i()->idm_nexus_percent, $fees ) ) );
 			}
-			elseif ( Settings::i()->idm_nexus_percent )
+			elseif ( \IPS\Settings::i()->idm_nexus_percent )
 			{
-				$commissionBlurb = Member::loggedIn()->language()->addToStack('file_cost_desc_percent', FALSE, array( 'sprintf' => Settings::i()->idm_nexus_percent ) );
+				$commissionBlurb = \IPS\Member::loggedIn()->language()->addToStack('file_cost_desc_percent', FALSE, array( 'sprintf' => \IPS\Settings::i()->idm_nexus_percent ) );
 			}
 			elseif ( $fees )
 			{
-				$commissionBlurb = Member::loggedIn()->language()->addToStack('file_cost_desc_fee', FALSE, array( 'sprintf' => $fees ) );
+				$commissionBlurb = \IPS\Member::loggedIn()->language()->addToStack('file_cost_desc_fee', FALSE, array( 'sprintf' => $fees ) );
 			}
 
-			$minimums = json_decode( Settings::i()->idm_nexus_mincost, true );
+			$minimums = json_decode( \IPS\Settings::i()->idm_nexus_mincost, true );
 			$minCosts = [];
 			foreach( $minimums as $currency => $cost )
 			{
-				if( ( new Number( $cost['amount'] ) )->isGreaterThanZero() )
+				if( ( new \IPS\Math\Number( $minimums[ $currency ]['amount'] ) )->isGreaterThanZero() )
 				{
-					$minCosts[] = (string) ( new Money( $cost['amount'], $currency ) );
+					$minCosts[] = (string) ( new \IPS\nexus\Money( $minimums[ $currency ]['amount'], $currency ) );
 				}
 			}
 
-			if( count( $minCosts ) )
+			if( \count( $minCosts ) )
 			{
-				$commissionBlurb .= Member::loggedIn()->language()->addToStack('file_cost_desc_minimum', FALSE, array( 'sprintf' => Member::loggedIn()->language()->formatList( $minCosts ) ) );
+				$commissionBlurb .= \IPS\Member::loggedIn()->language()->addToStack('file_cost_desc_minimum', FALSE, array( 'sprintf' => \IPS\Member::loggedIn()->language()->formatList( $minCosts ) ) );
 			}
 			
-			Member::loggedIn()->language()->words['file_cost_desc'] = $commissionBlurb;
+			\IPS\Member::loggedIn()->language()->words['file_cost_desc'] = $commissionBlurb;
 
-			$return['file_cost'] = new FormMoney( "{$bulkKey}file_cost", ( $item and $item->cost )? json_decode( $item->cost, TRUE ) : array(), NULL, array(), function( $val ) use ( $minimums, $bulkKey ) {
+			$return['file_cost'] = new \IPS\nexus\Form\Money( "{$bulkKey}file_cost", $item ? json_decode( $item->cost, TRUE ) : array(), NULL, array(), function( $val ) use ( $minimums, $bulkKey ) {
 				foreach( $val as $currency => $money )
 				{
-					if( isset( $minimums[ $currency ]['amount'] ) AND $money->amount->compare( new Number( $minimums[ $currency ]['amount'] ) ) === -1 )
+					if( isset( $minimums[ $currency ]['amount'] ) AND $money->amount->compare( new \IPS\Math\Number( $minimums[ $currency ]['amount'] ) ) === -1 )
 					{
-						throw new DomainException('file_cost_too_low');
+						throw new \DomainException('file_cost_too_low');
 					}
 				}
 			}, NULL, NULL, "{$bulkKey}file_cost" );
-			$return['file_renewals']  = new Radio( "{$bulkKey}file_renewals", $item ? ( $item->renewal_term ? 1 : 0 ) : 0, TRUE, array(
+			$return['file_renewals']  = new \IPS\Helpers\Form\Radio( "{$bulkKey}file_renewals", $item ? ( $item->renewal_term ? 1 : 0 ) : 0, TRUE, array(
 				'options'	=> array( 0 => 'file_renewals_off', 1 => 'file_renewals_on' ),
 				'toggles'	=> array( 1 => array( "{$bulkKey}file_renewal_term" ) )
 			), NULL, NULL, NULL, "{$bulkKey}file_renewals" );
-			Member::loggedIn()->language()->words['file_renewal_term_desc'] = $commissionBlurb;
+			\IPS\Member::loggedIn()->language()->words['file_renewal_term_desc'] = $commissionBlurb;
 			$renewTermForEdit = NULL;
 			if ( $item and $item->renewal_term )
 			{
 				$renewPrices = array();
 				foreach ( json_decode( $item->renewal_price, TRUE ) as $currency => $data )
 				{
-					$renewPrices[ $currency ] = new Money( $data['amount'], $currency );
+					$renewPrices[ $currency ] = new \IPS\nexus\Money( $data['amount'], $currency );
 				}
-				$renewTermForEdit = new PurchaseRenewalTerm( $renewPrices, new DateInterval( 'P' . $item->renewal_term . mb_strtoupper( $item->renewal_units ) ) );
+				$renewTermForEdit = new \IPS\nexus\Purchase\RenewalTerm( $renewPrices, new \DateInterval( 'P' . $item->renewal_term . mb_strtoupper( $item->renewal_units ) ) );
 			}
-			$return['file_renewal_term'] = new RenewalTerm( "{$bulkKey}file_renewal_term", $renewTermForEdit, NULL, array( 'allCurrencies' => TRUE ), NULL, NULL, NULL, "{$bulkKey}file_renewal_term" );
+			$return['file_renewal_term'] = new \IPS\nexus\Form\RenewalTerm( "{$bulkKey}file_renewal_term", $renewTermForEdit, NULL, array( 'allCurrencies' => TRUE ), NULL, NULL, NULL, "{$bulkKey}file_renewal_term" );
 
-			if ( Member::loggedIn()->isAdmin() AND count( Package::roots() ) > 0 )
+			if ( \IPS\Member::loggedIn()->isAdmin() AND \count( \IPS\nexus\Package::roots() ) > 0 )
 			{
-				$return['file_nexus'] = new Node( "{$bulkKey}file_nexus", $item ? $item->nexus : array(), FALSE, array( 'class' => '\IPS\nexus\Package', 'multiple' => TRUE ), NULL, NULL, NULL, "{$bulkKey}file_nexus" );
+				$return['file_nexus'] = new \IPS\Helpers\Form\Node( "{$bulkKey}file_nexus", $item ? $item->nexus : array(), FALSE, array( 'class' => '\IPS\nexus\Package', 'multiple' => TRUE ), NULL, NULL, NULL, "{$bulkKey}file_nexus" );
 			}
 		}
 		
 		/* Custom Fields */
 		$customFieldValues = $item ? $item->customFields() : array();
-		if( $container )
+		foreach ( $container->cfields as $k => $field )
 		{
-			foreach ( $container->cfields as $k => $field )
+			/* Does the user have permission to enter data into this field? */
+			$perm = $item ? 'edit' : 'add';
+			if( !$field->can( $perm ) )
 			{
-				/* Does the user have permission to enter data into this field? */
-				$perm = $item ? 'edit' : 'add';
-				if( !$field->can( $perm ) )
-				{
-					continue;
-				}
-
-				$_id = $field->id;
-				$field->id = "{$bulkKey}{$field->id}";
-				if ( $field->type === 'Editor' )
-				{
-					if ( $field->allow_attachments AND $item )
-					{
-						$attachIds = array( $item->id, $_id, 'fields' );
-						$field::$editorOptions = array_merge( $field::$editorOptions, array( 'attachIds' => $attachIds ) );
-					}
-				}
-				$helper = $field->buildHelper( $customFieldValues["field_{$k}"] ?? NULL, NULL, $item );
-				$helper->label = Member::loggedIn()->language()->addToStack( 'downloads_field_' . $_id );
-				$field->id = $_id;
-				if ( $field->type === 'Editor' )
-				{
-					if ( $field->allow_attachments AND !$item )
-					{
-						$field::$editorOptions = array_merge( $field::$editorOptions, array( 'attachIds' => NULL ) );
-					}
-				}
-				$return[] = $helper;
+				continue;
 			}
+
+			$_id = $field->id;
+			$field->id = "{$bulkKey}{$field->id}";
+			if ( $field->type === 'Editor' )
+			{
+				if ( $field->allow_attachments AND $item )
+				{
+					$attachIds = array( $item->id, $_id, 'fields' );
+					$field::$editorOptions = array_merge( $field::$editorOptions, array( 'attachIds' => $attachIds ) );
+				}
+			}
+			$helper = $field->buildHelper( isset( $customFieldValues[ "field_{$k}" ] ) ? $customFieldValues[ "field_{$k}" ] : NULL, NULL, $item );
+			$helper->label = \IPS\Member::loggedIn()->language()->addToStack( 'downloads_field_' . $_id );
+			$field->id = $_id;
+			if ( $field->type === 'Editor' )
+			{
+				if ( $field->allow_attachments AND !$item )
+				{
+					$field::$editorOptions = array_merge( $field::$editorOptions, array( 'attachIds' => NULL ) );
+				}
+			}
+			$return[] = $helper;
 		}
 
 		if( $item )
 		{
-			$return['versioning']	= new Custom( "{$bulkKey}file_versioning_info", NULL, FALSE, array( 'getHtml' => function( $element ) use ( $item )
+			$return['versioning']	= new \IPS\Helpers\Form\Custom( "{$bulkKey}file_versioning_info", NULL, FALSE, array( 'getHtml' => function( $element ) use ( $item )
 			{
-				return Theme::i()->getTemplate( 'submit' )->editDetailsInfo( $item );
+				return \IPS\Theme::i()->getTemplate( 'submit' )->editDetailsInfo( $item );
 			} ) );
 		}
 		
@@ -1703,7 +1674,7 @@ Filter
 	 * @param	array				$values	Values from form
 	 * @return	void
 	 */
-	public function processForm( array $values ): void
+	public function processForm( $values )
 	{
 		$new = $this->_new;
 
@@ -1715,8 +1686,8 @@ Filter
 		}
 		$this->desc	= $values['file_desc'];
 		
-		$imageUploads = $values['files'] ?? [];
-		$editorLookups = $new ? [ ( $values['_bulkKey'] ?? '' ) . 'downloads-new-file'] : [ [ $this->id, NULL, 'desc' ] ];
+		$imageUploads = isset( $values['files'] ) ? $values['files'] : [];
+		$editorLookups = $new ? [ ( isset( $values['_bulkKey'] ) ? $values['_bulkKey'] : '' ) . 'downloads-new-file'] : [ [ $this->id, NULL, 'desc' ] ];
 		if ( isset( $values['screenshots'] ) and $values['screenshots'] )
 		{
 			$imageUploads = array_merge( $imageUploads, $values['screenshots'] );
@@ -1729,9 +1700,9 @@ Filter
 			}
 
 			$helper = $field->buildHelper( NULL, NULL, $new ? NULL : $this );
-			if ( $helper instanceof Upload )
+			if ( $helper instanceof \IPS\Helpers\Form\Upload )
 			{
-				if ( is_array( $values["downloads_field_{$field->id}"] ) )
+				if ( \is_array( $values["downloads_field_{$field->id}"] ) )
 				{
 					$imageUploads = array_merge( $imageUploads, $values["downloads_field_{$field->id}"] );
 				}
@@ -1740,9 +1711,9 @@ Filter
 					$imageUploads[] = $values["downloads_field_{$field->id}"];
 				}
 			}
-			elseif ( $helper instanceof Editor )
+			elseif ( $helper instanceof \IPS\Helpers\Form\Editor )
 			{
-				$editorLookups[] = $new ? md5( 'IPS\downloads\Field-' . ( $values['_bulkKey'] ?? '' ) . $field->id . '-new' ) : [ $this->id, $field->id, 'fields' ];
+				$editorLookups[] = $new ? md5( 'IPS\downloads\Field-' . ( isset( $values['_bulkKey'] ) ? $values['_bulkKey'] : '' ) . $field->id . '-new' ) : [ $this->id, $field->id, 'fields' ];
 			}
 		}
 		$sendFilterNotifications = $this->checkProfanityFilters( FALSE, !$new, NULL, NULL, 'downloads_Downloads', $editorLookups, $imageUploads );
@@ -1757,7 +1728,7 @@ Filter
 			$this->primary_screenshot	= (int) $values['file_primary_screenshot'];
 		}
 		
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->idm_nexus_on and Member::loggedIn()->group['idm_add_paid'] )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->idm_nexus_on and \IPS\Member::loggedIn()->group['idm_add_paid'] )
 		{
 			switch ( $values['file_cost_type'] )
 			{
@@ -1806,8 +1777,8 @@ Filter
 				continue;
 			}
 
-			$helper	 = $field->buildHelper( NULL, NULL, $new ? NULL : $this );
-			if ( $helper instanceof Upload )
+			$helper							 = $field->buildHelper( NULL, NULL, $new ? NULL : $this );
+			if ( $helper instanceof \IPS\Helpers\Form\Upload )
 			{
 				$cfields[ "field_{$field->id}" ] = (string) $values[ "downloads_field_{$field->id}" ];
 			}
@@ -1816,7 +1787,7 @@ Filter
 				$cfields[ "field_{$field->id}" ] = $helper::stringValue( $values[ "downloads_field_{$field->id}" ] );
 			}
 			
-			if ( $helper instanceof Editor )
+			if ( $helper instanceof \IPS\Helpers\Form\Editor )
 			{
 				$field->claimAttachments( $this->id, 'fields' );
 			}
@@ -1824,7 +1795,7 @@ Filter
 		
 		if ( !empty( $cfields ) )
 		{
-			Db::i()->insert( 'downloads_ccontent', array_merge( array( 'file_id' => $this->id, 'updated' => time() ), $cfields ), TRUE );
+			\IPS\Db::i()->insert( 'downloads_ccontent', array_merge( array( 'file_id' => $this->id, 'updated' => time() ), $cfields ), TRUE );
 		}
 		
 		/* Update Category */
@@ -1838,7 +1809,7 @@ Filter
 	 * @param	array	$values	Values from form
 	 * @return	void
 	 */
-	protected function processBeforeCreate( array $values ): void
+	protected function processBeforeCreate( $values )
 	{
 		/* Set version */
 		$this->version = ( isset( $values['file_version'] ) ) ? $values['file_version'] : NULL;
@@ -1846,9 +1817,9 @@ Filter
 		/* Try to set the primary screenshot */
 		try
 		{
-			$this->primary_screenshot = Db::i()->select( 'record_id', 'downloads_files_records', array( 'record_post_key=? AND ( record_type=? or record_type=? ) AND record_backup=0', $values['postKey'], 'ssupload', 'sslink' ), 'record_default DESC, record_id ASC' )->first();
+			$this->primary_screenshot = \IPS\Db::i()->select( 'record_id', 'downloads_files_records', array( 'record_post_key=? AND ( record_type=? or record_type=? ) AND record_backup=0', $values['postKey'], 'ssupload', 'sslink' ), 'record_default DESC, record_id ASC' )->first();
 		}
-		catch ( Exception $e ) { }
+		catch ( \Exception $e ) { }
 
 		parent::processBeforeCreate( $values );
 	}
@@ -1856,20 +1827,20 @@ Filter
 	/**
 	 * Process created object AFTER the object has been created
 	 *
-	 * @param	Comment|NULL	$comment	The first comment
+	 * @param	\IPS\Content\Comment|NULL	$comment	The first comment
 	 * @param	array						$values		Values from form
 	 * @return	void
 	 */
-	protected function processAfterCreate( ?Comment $comment, array $values ): void
+	protected function processAfterCreate( $comment, $values )
 	{
-		SystemFile::claimAttachments( 'downloads-new-file', $this->id, NULL, 'desc' );
+		\IPS\File::claimAttachments( 'downloads-new-file', $this->id, NULL, 'desc' );
 		
 		if ( $this->_primary_screenshot )
 		{
-			Db::i()->update( 'downloads_files_records', array( 'record_default' => 1 ), array( 'record_id=?', $this->_primary_screenshot ) );
+			\IPS\Db::i()->update( 'downloads_files_records', array( 'record_default' => 1 ), array( 'record_id=?', $this->_primary_screenshot ) );
 		}
-		Db::i()->update( 'downloads_files_records', array( 'record_file_id' => $this->id, 'record_post_key' => NULL ), array( 'record_post_key=?', $values['postKey'] ) );
-		$this->size = (int) Db::i()->select( 'SUM(record_size)', 'downloads_files_records', array( 'record_file_id=? AND record_type=? AND record_backup=0', $this->id, 'upload' ) )->first();
+		\IPS\Db::i()->update( 'downloads_files_records', array( 'record_file_id' => $this->id, 'record_post_key' => NULL ), array( 'record_post_key=?', $values['postKey'] ) );
+		$this->size = (int) \IPS\Db::i()->select( 'SUM(record_size)', 'downloads_files_records', array( 'record_file_id=? AND record_type=? AND record_backup=0', $this->id, 'upload' ) )->first();
 		$this->save();
 		
 		parent::processAfterCreate( $comment, $values );
@@ -1878,29 +1849,29 @@ Filter
 	/**
 	 * Process after the object has been edited on the front-end
 	 *
-	 * @param array $values		Values from form
+	 * @param	array	$values		Values from form
 	 * @return	void
 	 */
-	public function processAfterEdit( array $values ): void
+	public function processAfterEdit( $values )
 	{
 		parent::processAfterEdit( $values );
 
-		Request::i()->setClearAutosaveCookie( 'downloads-file-' . $this->id );
+		\IPS\Request::i()->setClearAutosaveCookie( 'downloads-file-' . $this->id );
 		foreach ( $this->container()->cfields as $field )
 		{
-			Request::i()->setClearAutosaveCookie( md5( 'IPS\downloads\Field-' . $field->id . '-' . $this->id ) );
+			\IPS\Request::i()->setClearAutosaveCookie( md5( 'IPS\downloads\Field-' . $field->id . '-' . $this->id ) );
 		}
 	}
 
 	/**
 	 * Log for deletion later
 	 *
-	 * @param	Member|false|null 	$member	The member, NULL for currently logged in, or FALSE for no member
+	 * @param	\IPS\Member|NULL 	$member	The member, NULL for currently logged in, or FALSE for no member
 	 * @return	void
 	 */
-	public function logDelete( Member|false|null $member = NULL ) : void
+	public function logDelete( $member = NULL )
 	{
-		$this->_logDelete( $member );
+		parent::logDelete( $member );
 
 		if ( $topic = $this->topic() and $this->container()->bitoptions['topic_delete'] )
 		{
@@ -1909,75 +1880,75 @@ Filter
 
 		if ( $this->hasPendingVersion() )
 		{
-			PendingVersion::load( $this->id, 'pending_file_id' )->delete();
+			\IPS\downloads\File\PendingVersion::load( $this->id, 'pending_file_id' )->delete();
 		}
 	}
 	
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		if ( $topic = $this->topic() and $this->container()->bitoptions['topic_delete'] )
 		{
 			$topic->delete();
 		}
 		
-		if ( Application::appIsEnabled( 'nexus' ) )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) )
 		{
-			Db::i()->update( 'nexus_purchases', array( 'ps_cancelled' => TRUE, 'ps_can_reactivate' => FALSE ), array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'downloads', 'file', $this->id ) );
+			\IPS\Db::i()->update( 'nexus_purchases', array( 'ps_cancelled' => TRUE, 'ps_can_reactivate' => FALSE ), array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'downloads', 'file', $this->id ) );
 		}
 		
 		parent::delete();
 				
-		foreach ( new Iterator( Db::i()->select( 'record_location', 'downloads_files_records', array( 'record_file_id=? AND record_type=?', $this->id, 'upload' ) ), 'downloads_Files' ) as $file )
+		foreach ( new \IPS\File\Iterator( \IPS\Db::i()->select( 'record_location', 'downloads_files_records', array( 'record_file_id=? AND record_type=?', $this->id, 'upload' ) ), 'downloads_Files' ) as $file )
 		{
 			try
 			{
 				$file->delete();
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
-		foreach ( new Iterator( Db::i()->select( 'record_location', 'downloads_files_records', array( 'record_file_id=? AND record_type=?', $this->id, 'ssupload' ) ), 'downloads_Screenshots' ) as $file )
+		foreach ( new \IPS\File\Iterator( \IPS\Db::i()->select( 'record_location', 'downloads_files_records', array( 'record_file_id=? AND record_type=?', $this->id, 'ssupload' ) ), 'downloads_Screenshots' ) as $file )
 		{
 			try
 			{
 				$file->delete();
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
-		foreach ( new Iterator( Db::i()->select( 'record_thumb', 'downloads_files_records', array( 'record_file_id=? AND record_type=? AND record_thumb IS NOT NULL', $this->id, 'ssupload' ) ), 'downloads_Screenshots' ) as $file )
+		foreach ( new \IPS\File\Iterator( \IPS\Db::i()->select( 'record_thumb', 'downloads_files_records', array( 'record_file_id=? AND record_type=? AND record_thumb IS NOT NULL', $this->id, 'ssupload' ) ), 'downloads_Screenshots' ) as $file )
 		{
 			try
 			{
 				$file->delete();
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
-		foreach ( new Iterator( Db::i()->select( 'record_no_watermark', 'downloads_files_records', array( 'record_file_id=? AND record_type=? AND record_no_watermark IS NOT NULL', $this->id, 'ssupload' ) ), 'downloads_Screenshots' ) as $file )
+		foreach ( new \IPS\File\Iterator( \IPS\Db::i()->select( 'record_no_watermark', 'downloads_files_records', array( 'record_file_id=? AND record_type=? AND record_no_watermark IS NOT NULL', $this->id, 'ssupload' ) ), 'downloads_Screenshots' ) as $file )
 		{
 			try
 			{
 				$file->delete();
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 		
-		Db::i()->delete( 'downloads_ccontent', array( 'file_id=?', $this->id ) );
-		Db::i()->delete( 'downloads_downloads', array( 'dfid=?', $this->id ) );
-		Db::i()->delete( 'downloads_filebackup', array( 'b_fileid=?', $this->id ) );
-		Db::i()->delete( 'downloads_files_records', array( 'record_file_id=?', $this->id ) );
-		Db::i()->delete( 'downloads_files_notify', array( 'notify_file_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'downloads_ccontent', array( 'file_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'downloads_downloads', array( 'dfid=?', $this->id ) );
+		\IPS\Db::i()->delete( 'downloads_filebackup', array( 'b_fileid=?', $this->id ) );
+		\IPS\Db::i()->delete( 'downloads_files_records', array( 'record_file_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'downloads_files_notify', array( 'notify_file_id=?', $this->id ) );
 
 		/* Delete pending version */
 		if( $this->hasPendingVersion() )
 		{
-			PendingVersion::load($this->id, 'pending_file_id' )->delete();
+			\IPS\downloads\File\PendingVersion::load($this->id, 'pending_file_id' )->delete();
 		}
 
 		/* Update Category */
@@ -1988,59 +1959,58 @@ Filter
 	/**
 	 * Delete Records
 	 *
-	 * @param array|int|null $ids Must be INT if url and handler are provided
-	 * @param string|null $url Record location
-	 * @param string|null $handler File storage handler key
-	 * @return void
+	 * @param 	int|array		$ids		Must be INT if url and handler are provided
+	 * @param 	string			$url		Record location
+	 * @param	string			$handler	File storage handler key
 	 */
-	public function deleteRecords( array|int|null $ids, ?string $url=NULL, ?string $handler=NULL ) : void
+	public function deleteRecords( $ids, string $url=NULL, string $handler=NULL )
 	{
 		if( $ids AND $handler AND $url )
 		{
 			try
 			{
-				if( !Db::i()->select( 'COUNT(record_id)', 'downloads_files_records', array( 'record_id<>? AND record_location=?', $ids, $url ) )->first() )
+				if( !\IPS\Db::i()->select( 'COUNT(record_id)', 'downloads_files_records', array( 'record_id<>? AND record_location=?', $ids, $url ) )->first() )
 				{
-					SystemFile::get( $handler, $url )->delete();
+					\IPS\File::get( $handler, $url )->delete();
 				}
 			}
-			catch ( Exception $e ) { }
-			Db::i()->delete( 'downloads_files_records', array( 'record_id=? AND record_location=?', $ids, $url ) );
+			catch ( \Exception $e ) { }
+			\IPS\Db::i()->delete( 'downloads_files_records', array( 'record_id=? AND record_location=?', $ids, $url ) );
 		}
 		else
 		{
-			if( $ids !== NULL AND !is_array( $ids ) )
+			if( $ids !== NULL AND !\is_array( $ids ) )
 			{
 				$ids = array( $ids );
 			}
 
-			Db::i()->delete( 'downloads_files_records', array( Db::i()->in( 'record_id', $ids ) ) );
+			\IPS\Db::i()->delete( 'downloads_files_records', array( \IPS\Db::i()->in( 'record_id', $ids ) ) );
 		}
 	}
 
 	/**
 	 * URL Blacklist Check
 	 *
-	 * @param array|null|string $val	URLs to check
+	 * @param	array	$val	URLs to check
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public static function blacklistCheck( array|null|string $val ) : void
+	public static function blacklistCheck( $val )
 	{
-		if ( is_array( $val ) )
+		if ( \is_array( $val ) )
 		{
-			foreach ( explode( ',', Settings::i()->idm_link_blacklist ) as $blackListedDomain )
+			foreach ( explode( ',', \IPS\Settings::i()->idm_link_blacklist ) as $blackListedDomain )
 			{
 				foreach ( array_filter( $val ) as $url )
 				{
-					if ( is_string( $url ) )
+					if ( \is_string( $url ) )
 					{
-						$url = Url::external( $url );
+						$url = \IPS\Http\Url::external( $url );
 					}
 					
 					if ( mb_substr( $url->data['host'], -mb_strlen( $blackListedDomain ) ) == $blackListedDomain )
 					{
-						throw new DomainException( Member::loggedIn()->language()->addToStack( 'err_url_file_blacklist', FALSE, array( 'sprintf' => $blackListedDomain ) ) );
+						throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'err_url_file_blacklist', FALSE, array( 'sprintf' => $blackListedDomain ) ) );
 					}
 				}
 			}
@@ -2050,11 +2020,11 @@ Filter
 	/**
 	 * Are comments supported by this class?
 	 *
-	 * @param	Member|NULL		$member		The member to check for or NULL to not check permission
-	 * @param	Model|NULL	$container	The container to check in, or NULL for any container
+	 * @param	\IPS\Member|NULL		$member		The member to check for or NULL to not check permission
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check in, or NULL for any container
 	 * @return	bool
 	 */
-	public static function supportsComments( ?Member $member = NULL, ?Model $container = NULL ): bool
+	public static function supportsComments( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
 		if( $container !== NULL )
 		{
@@ -2062,18 +2032,18 @@ Filter
 		}
 		else
 		{
-			return parent::supportsComments() and ( !$member or Category::countWhere( 'read', $member, array( 'cbitoptions & 4' ) ) );
+			return parent::supportsComments() and ( !$member or \IPS\downloads\Category::countWhere( 'read', $member, array( 'cbitoptions & 4' ) ) );
 		}
 	}
 	
 	/**
 	 * Are reviews supported by this class?
 	 *
-	 * @param	Member|NULL		$member		The member to check for or NULL to not check permission
-	 * @param	Model|NULL	$container	The container to check in, or NULL for any container
+	 * @param	\IPS\Member|NULL		$member		The member to check for or NULL to not check permission
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check in, or NULL for any container
 	 * @return	bool
 	 */
-	public static function supportsReviews( ?Member $member = NULL, ?Model $container = NULL ): bool
+	public static function supportsReviews( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
 		if( $container !== NULL )
 		{
@@ -2081,7 +2051,7 @@ Filter
 		}
 		else
 		{
-			return parent::supportsReviews() and ( !$member or Category::countWhere( 'read', $member, array( 'cbitoptions & 256' ) ) );
+			return parent::supportsReviews() and ( !$member or \IPS\downloads\Category::countWhere( 'read', $member, array( 'cbitoptions & 256' ) ) );
 		}
 	}
 	
@@ -2090,17 +2060,17 @@ Filter
 	 *
 	 * @return	void
 	 */
-	public function saveVersion() : void
+	public function saveVersion()
 	{
 		/* Move the old details into a backup record */
-		$b_id = Db::i()->insert( 'downloads_filebackup', array(
+		$b_id = \IPS\Db::i()->insert( 'downloads_filebackup', array(
 			'b_fileid'		=> $this->id,
 			'b_filetitle'	=> $this->name,
 			'b_filedesc'	=> $this->desc,
 			'b_hidden'		=> FALSE,
 			'b_backup'		=> $this->published,
 			'b_updated'		=> time(),
-			'b_records'		=> implode( ',', iterator_to_array( Db::i()->select( 'record_id', 'downloads_files_records', array( 'record_file_id=? AND record_backup=0 AND record_hidden=0', $this->id ) ) ) ),
+			'b_records'		=> implode( ',', iterator_to_array( \IPS\Db::i()->select( 'record_id', 'downloads_files_records', array( 'record_file_id=? AND record_backup=0 AND record_hidden=0', $this->id ) ) ) ),
 			'b_version'		=> $this->version,
 			'b_changelog'	=> $this->changelog,
 		) );
@@ -2109,7 +2079,7 @@ Filter
 		$locations = array();
 		$thumbs = array();
 		$watermarks = array();
-		foreach( Db::i()->select( '*', 'downloads_files_records', array( 'record_file_id=? AND record_backup=0 AND record_hidden=0', $this->id ) ) as $file )
+		foreach( \IPS\Db::i()->select( '*', 'downloads_files_records', array( 'record_file_id=? AND record_backup=0 AND record_hidden=0', $this->id ) ) as $file )
 		{
 			$locations[] = $file['record_location'];
 			
@@ -2125,30 +2095,30 @@ Filter
 		}
 		
 		/* Update the attachment map for this version (NULL means the current version, anything else means previous version). */
-		SystemFile::claimAttachments( "downloads-{$this->id}-changelog", $this->id, $b_id, 'changelog' );
+		\IPS\File::claimAttachments( "downloads-{$this->id}-changelog", $this->id, $b_id, 'changelog' );
 		
 		/* Set the old records to be backups */
-		Db::i()->update( 'downloads_files_records', array( 'record_backup' => TRUE ), array( 'record_file_id=? AND record_backup=0 AND record_hidden=0', $this->id ) );
+		\IPS\Db::i()->update( 'downloads_files_records', array( 'record_backup' => TRUE ), array( 'record_file_id=? AND record_backup=0 AND record_hidden=0', $this->id ) );
 						
 		/* Delete any old versions we no longer keep */
 		$category = $this->container();
 		if ( $category->versioning !== NULL )
 		{
-			$count = Db::i()->select( 'COUNT(*)', 'downloads_filebackup', array( 'b_fileid=?', $this->id ) )->first();
+			$count = \IPS\Db::i()->select( 'COUNT(*)', 'downloads_filebackup', array( 'b_fileid=?', $this->id ) )->first();
 			if ( ( $count - $category->versioning + 1 ) > 0 )
 			{
-				foreach ( Db::i()->select( '*', 'downloads_filebackup', array( 'b_fileid=?', $this->id ), 'b_backup ASC', $count - $category->versioning + 1 ) as $backUp )
+				foreach ( \IPS\Db::i()->select( '*', 'downloads_filebackup', array( 'b_fileid=?', $this->id ), 'b_backup ASC', $count - $category->versioning + 1 ) as $backUp )
 				{
-					foreach ( Db::i()->select( '*', 'downloads_files_records', Db::i()->in( 'record_id', explode( ',', $backUp['b_records'] ) ) ) as $k => $file )
+					foreach ( \IPS\Db::i()->select( '*', 'downloads_files_records', \IPS\Db::i()->in( 'record_id', explode( ',', $backUp['b_records'] ) ) ) as $k => $file )
 					{
 						try
 						{
-							if ( !in_array( $file['record_location'], $locations ) )
+							if ( !\in_array( $file['record_location'], $locations ) )
 							{
-								SystemFile::get( $file['record_type'] == 'upload' ? 'downloads_Files' : 'downloads_Screenshots', $file['record_location'] )->delete();
+								$file = \IPS\File::get( $file['record_type'] == 'upload' ? 'downloads_Files' : 'downloads_Screenshots', $file['record_location'] )->delete();
 							}
 						}
-						catch ( Exception $e ) { }
+						catch ( \Exception $e ) { }
 
 						if( $file['record_type'] == 'ssupload' )
 						{
@@ -2156,57 +2126,99 @@ Filter
 							{
 								try
 								{
-									if ( !in_array( $file['record_thumb'], $thumbs ) )
+									if ( !\in_array( $file['record_thumb'], $thumbs ) )
 									{
-										SystemFile::get( 'downloads_Screenshots', $file['record_thumb'] )->delete();
+										$file = \IPS\File::get( 'downloads_Screenshots', $file['record_thumb'] )->delete();
 									}
 								}
-								catch ( Exception $e ) { }
+								catch ( \Exception $e ) { }
 							}
 
 							if( $file['record_no_watermark'] )
 							{
 								try
 								{
-									if ( !in_array( $file['record_no_watermark'], $watermarks ) )
+									if ( !\in_array( $file['record_no_watermark'], $watermarks ) )
 									{
-										SystemFile::get( 'downloads_Screenshots', $file['record_no_watermark'] )->delete();
+										$file = \IPS\File::get( 'downloads_Screenshots', $file['record_no_watermark'] )->delete();
 									}
 								}
-								catch ( Exception $e ) { }
+								catch ( \Exception $e ) { }
 							}
 						}
 					}
 					
-					Db::i()->delete( 'downloads_files_records', Db::i()->in( 'record_id', explode( ',', $backUp['b_records'] ) ) );
-					Db::i()->delete( 'downloads_filebackup', array( 'b_id=?', $backUp['b_id'] ) );
+					\IPS\Db::i()->delete( 'downloads_files_records', \IPS\Db::i()->in( 'record_id', explode( ',', $backUp['b_records'] ) ) );
+					\IPS\Db::i()->delete( 'downloads_filebackup', array( 'b_id=?', $backUp['b_id'] ) );
 				}
 			}
 		}
 
 	}
+		
+	/* !Tags */
+	
+	/**
+	 * Can tag?
+	 *
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	bool
+	 */
+	public static function canTag( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
+	{
+		return parent::canTag( $member, $container ) and ( $container === NULL or !$container->tags_disabled );
+	}
+	
+	/**
+	 * Can use prefixes?
+	 *
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	bool
+	 */
+	public static function canPrefix( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
+	{
+		return parent::canPrefix( $member, $container ) and ( $container === NULL or !$container->tags_noprefixes );
+	}
+	
+	/**
+	 * Defined Tags
+	 *
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	array
+	 */
+	public static function definedTags( \IPS\Node\Model $container = NULL )
+	{
+		if ( $container and $container->tags_predefined )
+		{
+			return explode( ',', $container->tags_predefined );
+		}
+		
+		return parent::definedTags( $container );
+	}
 	
 	/* !Followers */
-
+	
 	/**
 	 * Users to receive immediate notifications (bulk)
 	 *
-	 * @param Category $category The category the files were posted in.
-	 * @param Member|null $member The member posting the files or NULL for currently logged in member.
-	 * @param array|int|null $limit LIMIT clause
-	 * @param bool $countOnly Only return the count
-	 * @return Select|int
+	 * @param	\IPS\downloads\Category	$category	The category the files were posted in.
+	 * @param	\IPS\Member|NULL		$member		The member posting the files or NULL for currently logged in member.
+	 * @param	int|array				$limit		LIMIT clause
+	 * @param	bool					$countOnly	Only return the count
+	 * @return	\IPS\Db\Select
 	 */
-	public static function _notificationRecipients( Category $category, Member $member=NULL, array|int|null $limit=array( 0, 25 ), bool $countOnly=FALSE ): Select|int
+	public static function _notificationRecipients( $category, $member=NULL, $limit=array( 0, 25 ), $countOnly=FALSE )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Do we only want the count? */
 		if( $countOnly )
 		{
 			$count	= 0;
-			$count	+= $member->followersCount( 3, array( 'immediate' ) );
-			$count	+= static::containerFollowerCount( $category, 3, array( 'immediate' ) );
+			$count	+= $member->followersCount( 3, array( 'immediate' ), NULL );
+			$count	+= static::containerFollowerCount( $category, 3, array( 'immediate' ), NULL );
 
 			return $count;
 		}
@@ -2220,7 +2232,7 @@ Filter
 				$memberFollowers
 			);
 
-			return Db::i()->union( $unions, 'follow_added', $limit );
+			return \IPS\Db::i()->union( $unions, 'follow_added', $limit );
 		}
 		else
 		{
@@ -2231,25 +2243,25 @@ Filter
 	/**
 	 * Send Notifications (bulk)
 	 *
-	 * @param Category $category	The category the files were posted in.
-	 * @param	Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
+	 * @param	\IPS\downloads\Category	$category	The category the files were posted in.
+	 * @param	\IPS\Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
 	 * @return	void
 	 */
-	public static function _sendNotifications( Category $category, ?Member $member=NULL ) : void
+	public static function _sendNotifications( $category, $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		try
 		{
-			$count = static::_notificationRecipients($category, $member, NULL, TRUE);
+			$count = static::_notificationRecipients( $category, $member, NULL, TRUE );
 		}
-		catch( BadMethodCallException $e )
+		catch( \BadMethodCallException $e )
 		{
 			return;
 		}
 		
 		$categoryIdColumn	= $category::$databaseColumnId;
 		
-		if ( $count > NOTIFICATION_BACKGROUND_THRESHOLD )
+		if ( $count > \IPS\NOTIFICATION_BACKGROUND_THRESHOLD )
 		{
 			$queueData = array(
 				'followerCount'		=> $count,
@@ -2257,7 +2269,7 @@ Filter
 				'member_id'			=> $member->member_id
 			);
 			
-			Task::queue( 'downloads', 'Follow', $queueData, 2 );
+			\IPS\Task::queue( 'downloads', 'Follow', $queueData, 2 );
 		}
 		else
 		{
@@ -2268,16 +2280,16 @@ Filter
 	/**
 	 * Send Unapproved Notification (bulk)(
 	 *
-	 * @param Category $category	The category the files were posted too.
-	 * @param Member|null $member		The member posting the images, or NULL for currently logged in member.
+	 * @param	\IPS\downloads\Category	$category	The category the files were posted too.
+	 * @param	\IPS\Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
 	 * @return	void
 	 */
-	public static function _sendUnapprovedNotifications( Category $category, ?Member $member=NULL ) : void
+	public static function _sendUnapprovedNotifications( $category, $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		$moderators = array( 'g' => array(), 'm' => array() );
-		foreach( Db::i()->select( '*', 'core_moderators' ) AS $mod )
+		foreach( \IPS\Db::i()->select( '*', 'core_moderators' ) AS $mod )
 		{
 			$canView = FALSE;
 			if ( $mod['perms'] == '*' )
@@ -2303,10 +2315,10 @@ Filter
 			}
 		}
 		
-		$notification = new Notification( Application::load('core'), 'unapproved_content_bulk', $category, array( $category, $member, $category::$contentItemClass ), array( $member->member_id ) );
-		foreach ( Db::i()->select( '*', 'core_members', ( count( $moderators['m'] ) ? Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $moderator )
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'unapproved_content_bulk', $category, array( $category, $member, $category::$contentItemClass ), array( $member->member_id ) );
+		foreach ( \IPS\Db::i()->select( '*', 'core_members', ( \count( $moderators['m'] ) ? \IPS\Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . \IPS\Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . \IPS\Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $moderator )
 		{
-			$notification->recipients->attach( Member::constructFromData( $moderator ) );
+			$notification->recipients->attach( \IPS\Member::constructFromData( $moderator ) );
 		}
 		$notification->send();
 	}
@@ -2314,43 +2326,43 @@ Filter
 	/**
 	 * Send Notification Batch (bulk)
 	 *
-	 * @param Category $category	The category the files were posted too.
-	 * @param	Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
-	 * @param int $offset		Offset
+	 * @param	\IPS\downloads\Category	$category	The category the files were posted too.
+	 * @param	\IPS\Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
+	 * @param	int						$offset		Offset
 	 * @return	int|NULL				New Offset or NULL if complete
 	 */
-	public static function _sendNotificationsBatch( Category $category, Member $member=NULL, int $offset=0 ): ?int
+	public static function _sendNotificationsBatch( $category, $member=NULL, $offset=0 )
 	{
 		/* Check notification initiator spam status */
-		if( ( $member instanceof Member ) AND $member->members_bitoptions['bw_is_spammer'] )
+		if( ( $member instanceof \IPS\Member ) AND $member->members_bitoptions['bw_is_spammer'] )
 		{
 			/* Initiator is flagged as spammer, don't send notifications */
 			return NULL;
 		}
 
-		$member				= $member ?: Member::loggedIn();
+		$member				= $member ?: \IPS\Member::loggedIn();
 		
 		$followIds = array();
-		$followers = iterator_to_array( static::_notificationRecipients($category, $member, array($offset, static::NOTIFICATIONS_PER_BATCH)) );
+		$followers = iterator_to_array( static::_notificationRecipients( $category, $member, array( $offset, static::NOTIFICATIONS_PER_BATCH ) ) );
 
-		if( !count( $followers ) )
+		if( !\count( $followers ) )
 		{
 			return NULL;
 		}
 
-		$notification = new Notification( Application::load( 'core' ), 'new_content_bulk', $category, array( $category, $member, $category::$contentItemClass ), array( $member->member_id ) );
+		$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'new_content_bulk', $category, array( $category, $member, $category::$contentItemClass ), array( $member->member_id ) );
 		
 		foreach( $followers AS $follower )
 		{
-			$followMember = Member::load( $follower['follow_member_id'] );
-			if ( $followMember !== $member and $category->can( 'view', $followMember ) )
+			$followMember = \IPS\Member::load( $follower['follow_member_id'] );
+			if ( $followMember != $member and $category->can( 'view', $followMember ) )
 			{
 				$followIds[] = $follower['follow_id'];
 				$notification->recipients->attach( $followMember );
 			}
 		}
 		
-		Db::i()->update( 'core_follow', array( 'follow_notify_sent' => time() ), Db::i()->in( 'follow_id', $followIds ) );
+		\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_sent' => time() ), \IPS\Db::i()->in( 'follow_id', $followIds ) );
 		$notification->send();
 		
 		return $offset + static::NOTIFICATIONS_PER_BATCH;
@@ -2359,22 +2371,22 @@ Filter
 	/**
 	 * @brief	Is first time approval
 	 */
-	protected bool $firstTimeApproval = FALSE;
+	protected $firstTimeApproval = FALSE;
 	
 	/**
 	 * Unhide
 	 *
-	 * @param Member|null $member	The member doing the action (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member doing the action (NULL for currently logged in member)
 	 * @return	void
 	 */
-	public function unhide( ?Member $member=NULL ) : void
+	public function unhide( $member=NULL )
 	{
 		if ( $this->hidden() === 1 )
 		{
 			$this->firstTimeApproval = TRUE;
 		}
 		
-		$this->_unhide( $member );
+		parent::unhide( $member );
 	}
 	
 	/**
@@ -2382,7 +2394,7 @@ Filter
 	 *
 	 * @return	void
 	 */
-	public function sendApprovedNotification() : void
+	public function sendApprovedNotification()
 	{
 		if ( $this->firstTimeApproval )
 		{
@@ -2400,42 +2412,35 @@ Filter
 	 *
 	 * @return	void
 	 */
-	public function sendUpdateNotifications() : void
+	public function sendUpdateNotifications()
 	{		
-		$count = Db::i()->select( 'count(*)', 'downloads_files_notify', array( 'notify_file_id=?', $this->id ) )->first();
+		$count = \IPS\Db::i()->select( 'count(*)', 'downloads_files_notify', array( 'notify_file_id=?', $this->id ) )->first();
 
 		if ( $count )
 		{
 			$idColumn = static::$databaseColumnId;
-			Task::queue( 'downloads', 'Notify', array( 'file' => $this->$idColumn, 'notifyCount' => $count ), 2 );
+			\IPS\Task::queue( 'downloads', 'Notify', array( 'file' => $this->$idColumn, 'notifyCount' => $count ), 2 );
 		}
 	}
 
 	/**
 	 * Syncing when uploading a new version.
 	 *
-	 * @param array $values	Values from the form
+	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function processAfterNewVersion( array $values ) : void
+	public function processAfterNewVersion( $values )
 	{
 		/* This method is mainly used to ensure a topic linked to a file download stays updated when uploading a new version (like when editing it normally),
-			however it also accepts the values from the form so authors can overload and manipulate the data from it. */
-		if ( Application::appIsEnabled('forums') AND $this->topic() )
+			however it also accepts the values from the form so hook authors can overload and manipulate the data from it. */
+		if ( \IPS\Application::appIsEnabled('forums') AND $this->topic() )
 		{
 			/* And we need to make sure the "cached" values for primary screenshot and thumbnail are cleared so the updated topic always has the latest */
 			$this->_primaryScreenshot = FALSE;
 			$this->_primaryScreenshotThumb = FALSE;
 			$this->syncTopic();
 		}
-
-		/* Call UI extensions */
-		$this->ui( 'formPostSave', array( $values ) );
-
-		/* Fire event for listeners */
-		Event::fire( 'onCreateOrEdit', $this, array( $values ) );
-
-		Webhook::fire( 'downloads_new_version', array( $this ) );
+		\IPS\Api\Webhook::fire( 'downloads_new_version', array( $this ) );
 	}
 	
 	/* !Embeddable */
@@ -2443,9 +2448,9 @@ Filter
 	/**
 	 * Get image for embed
 	 *
-	 * @return    SystemFile|NULL
+	 * @return	\IPS\File|NULL
 	 */
-	public function embedImage(): ?SystemFile
+	public function embedImage()
 	{
 		return $this->primary_screenshot_thumb ?: NULL;
 	}
@@ -2456,25 +2461,50 @@ Filter
 	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'downloads', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'downloads' )->embedFile( $this, $this->url()->setQueryString( $params ), $this->embedImage() );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'downloads', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'downloads' )->embedFile( $this, $this->url()->setQueryString( $params ), $this->embedImage() );
+	}
+
+	/**
+	 * Get snippet HTML for search result display
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$authorData		Basic data about the author. Only includes columns returned by \IPS\Member::columnsForPhoto()
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	array		$reputationData	Array of people who have given reputation and the reputation they gave
+	 * @param	int|NULL	$reviewRating	If this is a review, the rating
+	 * @param	string		$view			'expanded' or 'condensed'
+	 * @return	callable
+	 */
+	public static function searchResultSnippet( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating, $view )
+	{
+		$screenshot = NULL;
+		if ( isset( $itemData['extra'] ) )
+		{
+			$screenshot = isset( $itemData['extra']['record_thumb'] ) ? $itemData['extra']['record_thumb'] : $itemData['extra']['record_location'];
+		}
+		$url = \IPS\Http\Url::internal( static::$urlBase . $indexData['index_item_id'], 'front', static::$urlTemplate, \IPS\Http\Url\Friendly::seoTitle( $indexData['index_title'] ?: $itemData[ static::$databasePrefix . static::$databaseColumnMap['title'] ] ) );
+		
+		$price = static::_price( $itemData['file_cost'], $itemData['file_nexus'] );
+		
+		return \IPS\Theme::i()->getTemplate( 'global', 'downloads', 'front' )->searchResultFileSnippet( $indexData, $itemData, $screenshot, $url, $price, $view == 'condensed' );
 	}
 
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @param	array|null	$backup	If provided, will output for a particular version - provide row from downloads_filebackup
-	 * @return    array
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	array	$backup	If provided, will output for a particular version - provide row from downloads_filebackup
+	 * @return	array
 	 * @apiresponse	int							id						ID number
 	 * @apiresponse	string						title					Title
 	 * @apiresponse	\IPS\downloads\Category		category				Category
 	 * @apiresponse	\IPS\Member					author					Author
 	 * @apiresponse	datetime					date					When the file was created
 	 * @apiresponse	datetime					updated					When the file was last updated
-	 * @apiresponse	datetime					published				When the file was published
 	 * @apiresponse	string						description				Description
 	 * @apiresponse	string						version					Current version number
 	 * @apiresponse	string						changelog				Description of what changed between this version and the previous one
@@ -2504,9 +2534,9 @@ Filter
 	 * @apiresponse	int							purchases				Number of purchases
 	 * @apiresponse array						renewalTerm				File renewal term
 	 * @apiresponse	bool						hasPendingVersion		Whether file has a new version pending. Will be NULL for client requests where the authorized member cannot upload new versions.
-	 * @apiresponse	[\IPS\downloads\Field]		customFields			Custom field values for this file
+	 * @apiresponse	[\IPS\downloads\Field]		customFields        	Custom field values for this file
 	 */
-	public function apiOutput( ?Member $authorizedMember = NULL, ?array $backup=NULL ) : array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL, $backup=NULL )
 	{
 		/* Figure out custom fields if any */
 		$fields = array();
@@ -2515,8 +2545,8 @@ Filter
 			$fieldValues = Db::i()->select( '*', 'downloads_ccontent', [ 'file_id=?', $this->id ] )->first();
 
 			foreach( new ActiveRecordIterator(
-						 Db::i()->select( '*', 'downloads_cfields', null, 'cf_position' ),
-						 Field::class
+				Db::i()->select( '*', 'downloads_cfields', null, 'cf_position' ),
+				Field::class
 					 ) as $field )
 			{
 				if( !$authorizedMember or $field->canView( $authorizedMember ) )
@@ -2525,17 +2555,17 @@ Filter
 				}
 			}
 		}
-		catch( UnderflowException $e ) { }
+		catch( \UnderflowException $e ) { }
 
-		return array(
+
+		$return = array(
 			'id'						=> $this->id,
 			'title'						=> $backup ? $backup['b_filetitle'] : $this->name,
 			'category'					=> $this->container()->apiOutput( $authorizedMember ),
 			'author'					=> $this->author()->apiOutput( $authorizedMember ),
-			'date'						=> DateTime::ts( $backup ? $backup['b_backup'] :  $this->submitted )->rfc3339(),
-			'updated'					=> DateTime::ts( $this->updated )->rfc3339(),
-			'published'					=> DateTime::ts( $this->published )->rfc3339(),
-			'description'				=> $backup ? $backup['b_filedesc'] : $this->content(),
+			'date'						=> \IPS\DateTime::ts( $backup ? $backup['b_backup'] :  $this->submitted )->rfc3339(),
+			'updated'					=> \IPS\DateTime::ts( $this->updated )->rfc3339(),
+			'description'				=> $backup ? $backup['b_filedesc'] : \IPS\Text\Parser::removeLazyLoad( $this->content() ),
 			'version'					=> $backup ? $backup['b_version'] : $this->version,
 			'changelog'					=> $backup ? $backup['b_changelog'] : $this->changelog,
 			'screenshots'				=> array_values( array_map( function( $file ) use ( $authorizedMember ) {
@@ -2552,7 +2582,7 @@ Filter
 			'views'						=> $this->views,
 			'prefix'					=> $this->prefix(),
 			'tags'						=> $this->tags(),
-			'locked'					=> $this->locked(),
+			'locked'					=> (bool) $this->locked(),
 			'hidden'					=> (bool) $this->hidden(),
 			'pinned'					=> (bool) $this->mapped('pinned'),
 			'featured'					=> (bool) $this->mapped('featured'),
@@ -2561,15 +2591,17 @@ Filter
 			'isPaid'					=> $this->isPaid(),
 			'isPurchasable'				=> $this->isPurchasable(),
 			'prices'					=> ( $this->isPaid() and $this->cost ) ? array_map( function( $price ) { return $price['amount']; }, json_decode( $this->cost, TRUE ) ) : NULL,
-			'canDownload'				=> $authorizedMember ? $this->canDownload( $authorizedMember ) : NULL,
-			'canBuy'					=> $authorizedMember ? $this->canBuy( $authorizedMember ) : NULL,
-			'canReview'					=> $authorizedMember ? ( $this->canReview( $authorizedMember ) AND !$this->hasReviewed( $authorizedMember ) ) : NULL,
+			'canDownload'				=> $authorizedMember ? (bool) $this->canDownload( $authorizedMember ) : NULL,
+			'canBuy'					=> $authorizedMember ? (bool) $this->canBuy( $authorizedMember ) : NULL,
+			'canReview'					=> (bool) $authorizedMember ? ( $this->canReview( $authorizedMember ) AND !$this->hasReviewed( $authorizedMember ) ) : NULL,
 			'rating'					=> $this->averageReviewRating(),
 			'purchases'					=> $this->purchaseCount(),
 			'renewalTerm'				=> $this->isPaid() ? $this->renewalTerm() : NULL,
 			'hasPendingVersion'			=> ( !$authorizedMember OR $this->canEdit( $authorizedMember ) ) ? $this->hasPendingVersion() : NULL,
 			'customFields'				=> $fields
 		);
+
+		return $return;
 	}
 
 	/**
@@ -2577,17 +2609,17 @@ Filter
 	 *
 	 * @return	string|NULL
 	 */
-	public function downloadTeaser(): ?string
+	public function downloadTeaser()
 	{
 		/* If we're a guest and log in, can we download? */
-		if ( !Member::loggedIn()->member_id )
+		if ( !\IPS\Member::loggedIn()->member_id )
 		{
-			$testUser = new Member;
-			$testUser->member_group_id = Settings::i()->member_group;
+			$testUser = new \IPS\Member;
+			$testUser->member_group_id = \IPS\Settings::i()->member_group;
 			$this->canDownload = NULL;
 			if ( $this->canDownload( $testUser ) )
 			{
-				return Theme::i()->getTemplate( 'view', 'downloads', 'front' )->downloadTeaser();
+				return \IPS\Theme::i()->getTemplate( 'view', 'downloads', 'front' )->downloadTeaser();
 			}
 		}
 
@@ -2601,7 +2633,7 @@ Filter
 	 *
 	 * @return	string
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		return 'file_id';
 	}
@@ -2611,7 +2643,7 @@ Filter
 	 *
 	 * @return	array
 	 */
-	public static function supportedMetaDataTypes(): array
+	public static function supportedMetaDataTypes()
 	{
 		return array( 'core_FeaturedComments', 'core_ContentMessages' );
 	}
@@ -2622,7 +2654,7 @@ Filter
 	 * @note Intentionally blank but can be overridden by child classes
 	 * @return array|NULL
 	 */
-	public function similarContentFilter(): ?array
+	public function similarContentFilter()
 	{
 		if( $this->topicid )
 		{
@@ -2640,11 +2672,11 @@ Filter
 	 * @note Most content types do not support this, and those that do will need to override this method to return the appropriate info
 	 * @return array
 	 */
-	public function getAttachmentInfo(): array
+	public function getAttachmentInfo()
 	{
 		return array(
-			'size' => Filesize::humanReadableFilesize( $this->size, FALSE, TRUE ),
-			'downloads' => Member::loggedIn()->language()->formatNumber( $this->downloads )
+			'size' => \IPS\Output\Plugin\Filesize::humanReadableFilesize( $this->size, FALSE, TRUE ),
+			'downloads' => \IPS\Member::loggedIn()->language()->formatNumber( $this->downloads )
 		);
 	}
 
@@ -2653,23 +2685,9 @@ Filter
 	 *
 	 * @return string
 	 */
-	function getTopicTitle(): string
+	function getTopicTitle()
 	{
-		$title = '';
-
-		if( $prefix = $this->container()->_topic_prefix )
-		{
-			$title .= $prefix . ' ';
-		}
-
-		$title .= $this->name;
-
-		if( $suffix = $this->container()->_topic_suffix )
-		{
-			$title .= ' ' . $suffix;
-		}
-
-		return $title;
+		return $this->container()->_topic_prefix . $this->name . $this->container()->_topic_suffix;
 	}
 
 	/**
@@ -2677,142 +2695,27 @@ Filter
 	 *
 	 * @return mixed
 	 */
-	function getTopicContent(): mixed
+	function getTopicContent()
 	{
-		return Theme::i()->getTemplate( 'submit', 'downloads', 'front' )->topic( $this );
-	}
-
-	/**
-	 * Create/Update Topic
-	 *
-	 * @return	void
-	 */
-	public function syncTopic(): void
-	{
-		/* Run the parent so that we are sure everything is properly synched */
-		$this->_syncTopic();
-
-		/* Stop here if we're not including screenshots */
-		if( !$this->container()->bitoptions['topic_screenshot'] )
-		{
-			return;
-		}
-
-		if( $screenshot = $this->primary_screenshot_thumb )
-		{
-			/* Now we need to copy the primary screenshot as an attachment to the first post */
-			$topic = $this->topic( false );
-			if( $topic === null )
-			{
-				return;
-			}
-
-			/* Delete any existing attachments */
-			$delete = [];
-			foreach( Db::i()->select( '*', 'core_attachments_map', [ 'location_key=? and id1=? and id2=?', 'forums_Forums', $topic->tid, $topic->topic_firstpost ] )
-				->join( 'core_attachments', 'attachment_id=attach_id' ) as $row )
-			{
-				try
-				{
-					/* Due to an older bug in 5.0.0 B9, attachment files can match the exact filename of a downloads record, so we won't want to delete if there's a match there */
-					$existsAlready = Db::i()->select( '*', 'downloads_files_records', [ 'record_location=? or record_thumb=?', $row['attach_location'], $row['attach_location'] ] )->first();
-				}
-				catch( UnderflowException )
-				{
-					$existsAlready = false;
-				}
-
-				if ( $existsAlready === false )
-				{
-					/* Nothing found so proceed */
-					try
-					{
-
-						SystemFile::get( 'forums_Forums', $row['attach_location'] )->delete();
-					}
-					catch( Exception ){}
-				}
-
-				$delete[] = $row['attach_id'];
-			}
-
-			if( count( $delete ) )
-			{
-				Db::i()->delete( 'core_attachments_map', Db::i()->in( 'attachment_id', $delete ) );
-				Db::i()->delete( 'core_attachments', Db::i()->in( 'attach_id', $delete ) );
-			}
-
-			$content = $topic->firstComment()->content();
-
-			try
-			{
-				/* Copy the screenshot and generate an attachment */
-				/* @var SystemFile $screenshot */
-				$uploadSettings = json_decode( Settings::i()->upload_settings, true );
-				$copy = $screenshot->copy( $uploadSettings['filestorage__core_Attachment'] );
-
-				$attachment = $copy->makeAttachment( md5( uniqid() ), $topic->author() );
-
-				Db::i()->insert( 'core_attachments_map', [
-					'attachment_id' => $attachment['attach_id'],
-					'location_key' => 'forums_Forums',
-					'id1' => $topic->tid,
-					'id2' => $topic->topic_firstpost
-				] );
-
-				/* Now append to the post content */
-				$dimensions = $copy->getImageDimensions();
-
-				$attachment = Theme::i()->getTemplate( 'editor', 'core', 'global' )->attachedImage( (string) $copy, (string) $copy, $this->name, $attachment['attach_id'], $dimensions[0], $dimensions[1], $this->name );
-				$content .= $attachment;
-			}
-			catch( RuntimeException ){}
-
-			$firstComment = $topic->firstComment();
-			$contentField = $firstComment::$databaseColumnMap['content'];
-
-			$topic->firstComment()->$contentField = $content;
-			$topic->firstComment()->save();
-		}
-	}
-
-	/**
-	 * Return the Forum ID
-	 *
-	 * @return	int
-	 */
-	public function getForumId() : int
-	{
-		return (int) $this->container()->forum_id;
-	}
-
-	/**
-	 * Determine if the topic sync is enabled
-	 *
-	 * @return bool
-	 */
-	public function isTopicSyncEnabled() : bool
-	{
-		return (bool) $this->container()->forum_id;
+		return \IPS\Theme::i()->getTemplate( 'submit', 'downloads', 'front' )->topic( $this );
 	}
 
 	/**
 	 * Subscribed?
 	 *
-	 * @param Member|null $member
 	 * @return bool
 	 */
-	function subscribed( ?Member $member = NULL ): bool
+	function subscribed( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		try
 		{
-			Db::i()->select( '*', 'downloads_files_notify', array( 'notify_member_id=? and notify_file_id=?', $member->member_id, $this->id ) )->first();
+			\IPS\Db::i()->select( '*', 'downloads_files_notify', array( 'notify_member_id=? and notify_file_id=?', $member->member_id, $this->id ) )->first();
 
 			return TRUE;
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return FALSE;
 		}
@@ -2821,7 +2724,7 @@ Filter
 	/**
 	 * @brief	Cache for pending version check
 	 */
-	protected ?bool $_pendingVersion = NULL;
+	protected $_pendingVersion = NULL;
 
 	/**
 	 * Check whether file has a pending new version
@@ -2837,10 +2740,10 @@ Filter
 
 		try
 		{
-			Db::i()->select( 'pending_id', 'downloads_files_pending', array( 'pending_file_id=?', $this->id ) )->first();
+			\IPS\Db::i()->select( 'pending_id', 'downloads_files_pending', array( 'pending_file_id=?', $this->id ) )->first();
 			$this->_pendingVersion = TRUE;
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			$this->_pendingVersion = FALSE;
 		}
@@ -2851,51 +2754,47 @@ Filter
 	/**
 	 * Add form elements to 'new version' form
 	 *
-	 * @param	Form		$form
+	 * @param	\IPS\Helpers\Form		$form
 	 * @return	void
 	 */
-	public function newVersionFormElements( Form &$form ) : void
+	public function newVersionFormElements( \IPS\Helpers\Form &$form )
 	{
-		/* UI Extension for new version. You can check Request::i()->do to see which form you're working with. */
-		foreach( UiExtension::i()->run( $this, 'formElements', array( $this->container() ) ) as $element )
-		{
-			$form->add( $element );
-		}
+
 	}
 
 
 	/**
 	 * Do Moderator Action
 	 *
-	 * @param string $action	The action
-	 * @param	Member|NULL	$member	The member doing the action (NULL for currently logged in member)
-	 * @param string|null $reason	Reason (for hides)
-	 * @param bool $immediately	Delete immediately
+	 * @param	string				$action	The action
+	 * @param	\IPS\Member|NULL	$member	The member doing the action (NULL for currently logged in member)
+	 * @param	string|NULL			$reason	Reason (for hides)
+	 * @param	bool				$immediately	Delete immediately
 	 * @return	void
-	 * @throws	OutOfRangeException|InvalidArgumentException|RuntimeException
+	 * @throws	\OutOfRangeException|\InvalidArgumentException|\RuntimeException
 	 */
-	public function modAction( string $action, Member $member = NULL, mixed $reason = NULL, bool $immediately=FALSE ): void
+	public function modAction( $action, \IPS\Member $member = NULL, $reason = NULL, $immediately = FALSE )
 	{
 		if ( $action == 'delete' )
 		{
 			/* Delete pending version */
 			if( $this->hasPendingVersion() )
 			{
-				PendingVersion::load($this->id, 'pending_file_id' )->delete();
+				\IPS\downloads\File\PendingVersion::load($this->id, 'pending_file_id' )->delete();
 				$this->_pendingVersion = FALSE;
 			}
 		}
 
-		parent::modAction( $action, $member, $reason, $immediately );
+		return parent::modAction( $action, $member, $reason, $immediately );
 	}
 
 	/**
 	 * Can the member delete the pending version
 	 * 
-	 * @param Member|null $member
+	 * @param \IPS\Member|NULL $member
 	 * @return bool
 	 */
-	public function canDeletePendingVersion( Member $member = NULL): bool
+	public function canDeletePendingVersion( \IPS\Member $member = NULL): bool
 	{
 		if( !$this->hasPendingVersion() )
 		{
@@ -2908,44 +2807,5 @@ Filter
 		}
 
 		return FALSE;
-	}
-
-	public static string $itemMenuCss = '';
-
-	/**
-	 * @param Member|NULL $member
-	 * @return Menu
-	 */
-	public function menu( Member $member = NULL ): Menu
-	{
-		$menu = parent::menu( $member );
-
-		if( !$this->hasPendingVersion() AND $this->canEdit( $member ) )
-		{
-			$menu->add( new Menu\Link( url: $this->url()->setQueryString( array( 'do' => 'newVersion' ) ), languageString: Member::loggedIn()->language()->addToStack( 'upload_new_version'), icon: "fa-solid fa-upload" ) );
-		}
-
-		if( $this->isPurchasable() AND $this->canDisablePurchases( $member ) )
-		{
-			$menu->add( new Menu\Link( url: $this->url()->setQueryString( array( 'do' => 'purchaseStatus' , 'value' => 0 ) )->csrf(), languageString: Member::loggedIn()->language()->addToStack( 'disable_purchases'), icon: "fa-solid fa-circle-xmark" ) );
-		}
-
-		if( !$this->isPurchasable() AND $this->canEnablePurchases() )
-		{
-			$menu->add( new Menu\Link( url: $this->url()->setQueryString( array( 'do' => 'purchaseStatus' , 'value' => 1 ) )->csrf(), languageString: Member::loggedIn()->language()->addToStack( 'enable_purchases'), icon: "fa-solid fa-circle-check" ) );
-		}
-
-		return $menu;
-	}
-
-	/**
-	 * Allow for individual classes to override and
-	 * specify a primary image. Used for grid views, etc.
-	 *
-	 * @return SystemFile|null
-	 */
-	public function primaryImage() : ?SystemFile
-	{
-		return $this->primary_screenshot_thumb ?? parent::primaryImage();
 	}
 }

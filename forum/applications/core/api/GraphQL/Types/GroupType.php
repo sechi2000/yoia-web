@@ -12,27 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Db;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * GroupType for GraphQL API
  */
-class GroupType extends ObjectType
+class _GroupType extends ObjectType
 {
     /**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -44,7 +40,7 @@ class GroupType extends ObjectType
 					'id' => [
 						'type' => TypeRegistry::int(),
 						'description' => "Group ID",
-						'resolve' => function ($group) {
+						'resolve' => function ($group, $args, $context, $info) {
 							return $group->g_id;
 						}
 					],
@@ -54,12 +50,12 @@ class GroupType extends ObjectType
 							'values' => ['GUEST', 'MEMBER', 'ADMIN']
 						]),
 						'description' => "Is this a guest, member or admin group?",
-						'resolve' => function ($group) {
-							if( $group->g_id == Settings::i()->guest_group )
+						'resolve' => function ($group, $args, $context, $info) {
+							if( $group->g_id == \IPS\Settings::i()->guest_group )
 							{
 								return 'GUEST';
 							}
-							elseif( isset( Member::administrators()['g'][ $group->g_id ] ) )
+							elseif( isset( \IPS\Member::administrators()['g'][ $group->g_id ] ) )
 							{
 								return 'ADMIN';
 							}
@@ -78,21 +74,21 @@ class GroupType extends ObjectType
 								'defaultValue' => FALSE
 							]
 						],
-						'resolve' => function ($group, $args) {
+						'resolve' => function ($group, $args, $context, $info) {
 							return ( $args['formatted'] ) ? $group->get_formattedName() : $group->name;
 						}
 					],
 					'canAccessSite' => [
 						'type' => TypeRegistry::boolean(),
 						'description' => "Can users in this group access the site?",
-						'resolve' => function ($group) {
+						'resolve' => function ($group, $args, $context, $info) {
 							return $group->g_view_board;
 						}
 					],
 					'canAccessOffline' => [
 						'type' => TypeRegistry::boolean(),
 						'description' => "Can users in this group access the site when it's offline?",
-						'resolve' => function ($group) {
+						'resolve' => function ($group, $args, $context, $info) {
 							return $group->g_access_offline;
 						}
 					],
@@ -100,14 +96,14 @@ class GroupType extends ObjectType
 						'type' => TypeRegistry::boolean(),
 						'description' => "Can users in this group tag content (if enabled)?",
 						'resolve' => function ($group) {
-							return ( !$group->g_id || !Settings::i()->tags_enabled ) ? FALSE : !( $group->g_bitoptions['gbw_disable_tagging'] );
+							return !$group->g_id || !\IPS\Settings::i()->tags_enabled ? FALSE : !( $group->g_bitoptions['gbw_disable_tagging'] );
 						}
 					],
 					'maxMessengerRecipients' => [
 						'type' => TypeRegistry::int(),
 						'description' => "Maximum number of recipients to a PM sent by a member in this group",
 						'resolve' => function ($group) {
-							return Member::loggedIn()->group['g_max_mass_pm'];
+							return \IPS\Member::loggedIn()->group['g_max_mass_pm'];
 						}
 					],
 					'members' => [
@@ -123,7 +119,7 @@ class GroupType extends ObjectType
 								'defaultValue' => 25
 							]
 						],
-						'resolve' => function ($group, $args) {
+						'resolve' => function ($group, $args, $context, $info) {
 							/* If we don't allow filtering by this group, don't return the members in it */
 							if( $group->g_bitoptions['gbw_hide_group'] )
 							{
@@ -132,7 +128,7 @@ class GroupType extends ObjectType
 
 							$offset = max( $args['offset'], 0 );
 							$limit = min( $args['limit'], 50 );
-							return new ActiveRecordIterator( Db::i()->select( '*', 'core_members', array('member_group_id=?', $group->g_id), NULL, array( $offset, $limit ) ), 'IPS\Member' );
+							return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', array('member_group_id=?', $group->g_id), NULL, array( $offset, $limit ) ), 'IPS\Member' );
 						}
 					]
 				];

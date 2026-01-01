@@ -7,26 +7,7 @@
  * @package		Invision Community
  * @since		29 Apr 2017
  */
-
-use IPS\Api\OAuthClient;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\External;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Login\Handler\OAuth2\InitException;
-use IPS\Member;
-use IPS\Member\Device;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Session\Front;
-use IPS\Settings;
-use IPS\Theme;
-use const IPS\DEBUG_OAUTH_REDIRECTS;
-use const IPS\OAUTH_REQUIRES_HTTPS;
-
-define('REPORT_EXCEPTIONS', TRUE);
+\define('REPORT_EXCEPTIONS', TRUE);
 require '../../init.php';
 
 class oAuthServerAuthorizationRequest
@@ -88,43 +69,43 @@ class oAuthServerAuthorizationRequest
 		/* Get the client */
 		try
 		{
-			$obj->client = OAuthClient::load( $clientId );
+			$obj->client = \IPS\Api\OAuthClient::load( $clientId );
 			if ( !$obj->client->enabled )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
-		catch (OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new InitException('oauth_err_invalid_client');
+			throw new \IPS\Login\Handler\OAuth2\InitException('oauth_err_invalid_client');
 		}
 		
 		/* Set the Redirect URI */
 		$allowedRedirectUris = json_decode( $obj->client->redirect_uris );
 
-		if( defined('\IPS\DEBUG_OAUTH_REDIRECTS') )
+		if( \defined('\IPS\DEBUG_OAUTH_REDIRECTS') )
 		{
-			$allowedRedirectUris = array_merge( $allowedRedirectUris, DEBUG_OAUTH_REDIRECTS );
+			$allowedRedirectUris = array_merge( $allowedRedirectUris, \IPS\DEBUG_OAUTH_REDIRECTS );
 		}
 
 		if ( $redirectUri )
 		{
-			if ( !in_array( $redirectUri, $allowedRedirectUris ) )
+			if ( !\in_array( $redirectUri, $allowedRedirectUris ) )
 			{
-				throw new InitException('oauth_err_invalid_redirect_uri');
+				throw new \IPS\Login\Handler\OAuth2\InitException('oauth_err_invalid_redirect_uri');
 			}
 			else
 			{
-				$obj->redirectUri = Url::external( $redirectUri );
+				$obj->redirectUri = \IPS\Http\Url::external( $redirectUri );
 			}
 		}
-		elseif ( count( $allowedRedirectUris ) === 1 )
+		elseif ( \count( $allowedRedirectUris ) === 1 )
 		{
-			$obj->redirectUri = Url::external( array_shift( $allowedRedirectUris ) );
+			$obj->redirectUri = \IPS\Http\Url::external( array_shift( $allowedRedirectUris ) );
 		}
 		else
 		{
-			throw new InitException('oauth_err_invalid_redirect_uri');
+			throw new \IPS\Login\Handler\OAuth2\InitException('oauth_err_invalid_redirect_uri');
 		}
 		$obj->providedRedirectUri = $redirectUri;
 		
@@ -168,14 +149,14 @@ class oAuthServerAuthorizationRequest
 	{
 		if ( $responseType === 'code' )
 		{
-			if ( !in_array( 'authorization_code', explode( ',', $this->client->grant_types ) ) )
+			if ( !\in_array( 'authorization_code', explode( ',', $this->client->grant_types ) ) )
 			{
 				throw new \IPS\Login\Handler\OAuth2\Exception('unsupported_response_type');
 			}
 		}
 		elseif ( $responseType === 'token' )
 		{
-			if ( !in_array( 'implicit', explode( ',', $this->client->grant_types ) ) )
+			if ( !\in_array( 'implicit', explode( ',', $this->client->grant_types ) ) )
 			{
 				throw new \IPS\Login\Handler\OAuth2\Exception('unsupported_response_type');
 			}
@@ -211,24 +192,24 @@ class oAuthServerAuthorizationRequest
 	/**
 	 * Get URL to redirect the user back to the client after successful authorization
 	 *
-	 * @param	Member	$member					The member
+	 * @param	\IPS\Member	$member					The member
 	 * @param	array		$scopes					The authorized scopes
 	 * @return	void
 	 */
-	public function authorized( Member $member, $scopes )
+	public function authorized( \IPS\Member $member, $scopes )
 	{
 		$scopes = $this->client->choose_scopes ? $scopes : $this->scope;
-		$device = Device::loadOrCreate( $member );
+		$device = \IPS\Member\Device::loadOrCreate( $member );
 		
 		if ( $this->responseType === 'code' )
 		{
 			do
 			{
-				$authorizationCode = Login::generateRandomString( 64 );
+				$authorizationCode = \IPS\Login::generateRandomString( 64 );
 			}
-			while ( Db::i()->select( 'COUNT(*)', 'core_oauth_server_authorization_codes', array( 'client_id=? AND code=?', $this->client->client_id, $authorizationCode ) )->first() );
+			while ( \IPS\Db::i()->select( 'COUNT(*)', 'core_oauth_server_authorization_codes', array( 'client_id=? AND code=?', $this->client->client_id, $authorizationCode ) )->first() );
 			
-			Db::i()->insert( 'core_oauth_server_authorization_codes', array(
+			\IPS\Db::i()->insert( 'core_oauth_server_authorization_codes', array(
 				'client_id'				=> $this->client->client_id,
 				'redirect_uri'			=> $this->providedRedirectUri ?: NULL,
 				'member_id'				=> $member->member_id,
@@ -289,27 +270,27 @@ class oAuthServerAuthorizationRequest
 	public function promptRequired( $requestedPromptType )
 	{
 		/* If we're not logged in, we definitely do, unless we cancelled */
-		if ( !Member::loggedIn()->member_id and ( !isset( Request::i()->allow ) or Request::i()->allow ) )
+		if ( !\IPS\Member::loggedIn()->member_id and ( !isset( \IPS\Request::i()->allow ) or \IPS\Request::i()->allow ) )
 		{
 			return TRUE;
 		}
 		
 		/* If we're banned or validating, we'll show those screens instead */
-		if ( Member::loggedIn()->isBanned() or Member::loggedIn()->members_bitoptions['validating'] )
+		if ( \IPS\Member::loggedIn()->isBanned() or \IPS\Member::loggedIn()->members_bitoptions['validating'] )
 		{
 			return TRUE;
 		}
 
 		/* If our account is incomplete (e.g. no name or no email), show that screen instead */
-		if( Member::loggedIn()->member_id and !( Member::loggedIn()->real_name and Member::loggedIn()->email ) )
+		if( \IPS\Member::loggedIn()->member_id and !( \IPS\Member::loggedIn()->real_name and \IPS\Member::loggedIn()->email ) )
 		{
 			return TRUE;
 		}
 		
 		/* Have we gone through it already? */
-		if ( isset( Request::i()->allow ) and Login::compareHashes( (string) Session::i()->csrfKey, (string) Request::i()->csrfKey ) )
+		if ( isset( \IPS\Request::i()->allow ) and \IPS\Login::compareHashes( (string) \IPS\Session::i()->csrfKey, (string) \IPS\Request::i()->csrfKey ) )
 		{
-			if ( !Request::i()->allow )
+			if ( !\IPS\Request::i()->allow )
 			{
 				throw new \IPS\Login\Handler\OAuth2\Exception('access_denied');
 			}
@@ -317,7 +298,7 @@ class oAuthServerAuthorizationRequest
 		}
 		
 		/* Does the client require it? */
-		if ( !in_array( $this->client->prompt, array( 'none', 'automatic' ) ) )
+		if ( !\in_array( $this->client->prompt, array( 'none', 'automatic' ) ) )
 		{
 			return TRUE;
 		}
@@ -335,10 +316,10 @@ class oAuthServerAuthorizationRequest
 		}
 		
 		/* Do we already have an access token with these scopes? */
-		$accessToken = $this->client->getAccessToken( Member::loggedIn(), $this->scope );
+		$accessToken = $this->client->getAccessToken( \IPS\Member::loggedIn(), $this->scope );
 		if ( $accessToken )
 		{
-			Request::i()->grantedScope = $accessToken['scope'] ? array_combine( json_decode( $accessToken['scope'], TRUE ), array_fill( 0, count( json_decode( $accessToken['scope'], TRUE ) ), TRUE ) ) : array();
+			\IPS\Request::i()->grantedScope = $accessToken['scope'] ? array_combine( json_decode( $accessToken['scope'], TRUE ), array_fill( 0, \count( json_decode( $accessToken['scope'], TRUE ) ), TRUE ) ) : array();
 			return FALSE;
 		}
 				
@@ -356,26 +337,26 @@ class oAuthServerAuthorizationRequest
 	public function prompt( $requestedPromptType, $loggedIn )
 	{
 		/* If we're banned or validating, we'll show those screens instead */
-		if ( Member::loggedIn()->member_id and Member::loggedIn()->isBanned() )
+		if ( \IPS\Member::loggedIn()->member_id and \IPS\Member::loggedIn()->isBanned() )
 		{
-			Output::i()->showBanned();
+			\IPS\Output::i()->showBanned();
 			exit;
 		}
-		elseif ( Member::loggedIn()->members_bitoptions['validating'] )
+		elseif ( \IPS\Member::loggedIn()->members_bitoptions['validating'] )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=system&controller=register&do=validating', 'front', 'register' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=register&do=validating', 'front', 'register' ) );
 		}
 		
 		/* We mustn't have the redirect_uri in the URL when displaying the page as this needs to be handled securely (it will
 			probably include a client-issued CSRF key) and if we use it in the URL, any third party scripts that may be being
 			used on the community (tracking or advertisements, for example) will have access to it - this also makes the URI
 			a bit cleaner */
-		if ( isset( Request::i()->client_id ) )
+		if ( isset( \IPS\Request::i()->client_id ) )
 		{
 			$key = md5( uniqid() );
-			Request::i()->setCookie( 'oauth_authorize', $key );
+			\IPS\Request::i()->setCookie( 'oauth_authorize', $key );
 			
-			Db::i()->insert( 'core_oauth_authorize_prompts', array(
+			\IPS\Db::i()->insert( 'core_oauth_authorize_prompts', array(
 				'session_id'			=> $key,
 				'client_id'				=> $this->client->client_id,
 				'response_type'			=> $this->responseType,
@@ -384,24 +365,24 @@ class oAuthServerAuthorizationRequest
 				'state'					=> $this->state,
 				'timestamp'				=> time(),
 				'logged_in'				=> FALSE,
-				'prompt'				=> in_array( $requestedPromptType, array( 'login', 'reauthorize' ) ) ? $requestedPromptType : NULL,
+				'prompt'				=> \in_array( $requestedPromptType, array( 'login', 'reauthorize' ) ) ? $requestedPromptType : NULL,
 				'code_challenge'		=> $this->codeChallenge,
 				'code_challenge_method'	=> $this->codeChallengeMethod
 			), TRUE );
 			
-			$url = Url::internal( 'oauth/authorize/', 'interface' );
-			if ( isset( Request::i()->_processLogin ) ) // This is if they clicked a social sign in button on the registration form throwing them back to here
+			$url = \IPS\Http\Url::internal( 'oauth/authorize/', 'interface' );
+			if ( isset( \IPS\Request::i()->_processLogin ) ) // This is if they clicked a social sign in button on the registration form throwing them back to here
 			{
 				$url = $url->setQueryString( array(
-					'_processLogin'	=> Request::i()->_processLogin,
-					'csrfKey'		=> Request::i()->csrfKey,
+					'_processLogin'	=> \IPS\Request::i()->_processLogin,
+					'csrfKey'		=> \IPS\Request::i()->csrfKey,
 				) );
 			}
-			Output::i()->redirect( $url );
+			\IPS\Output::i()->redirect( $url );
 		}
 		
 		/* Construct the URL for this page */
-		$url = Url::internal( 'oauth/authorize/', 'interface' );
+		$url = \IPS\Http\Url::internal( 'oauth/authorize/', 'interface' );
 		
 		/* Get the scope definitions */
 		$scopes = array();
@@ -412,9 +393,9 @@ class oAuthServerAuthorizationRequest
 		}
 				
 		/* Do we need them to login? */
-		if ( !Member::loggedIn()->member_id or ( ( $this->client->prompt === 'login' or $requestedPromptType === 'login' ) and !$loggedIn ) )
+		if ( !\IPS\Member::loggedIn()->member_id or ( ( $this->client->prompt === 'login' or $requestedPromptType === 'login' ) and !$loggedIn ) )
 		{
-			$login = new Login( $url );
+			$login = new \IPS\Login( $url );
 
 			$member = NULL;
 			$error = NULL;
@@ -422,16 +403,16 @@ class oAuthServerAuthorizationRequest
 			{
 				if ( $success = $login->authenticate() )
 				{
-					Db::i()->update( 'core_oauth_authorize_prompts', array( 'logged_in' => TRUE, 'prompt' => NULL ), array( 'session_id=?', Request::i()->cookie['oauth_authorize'] ) );
+					\IPS\Db::i()->update( 'core_oauth_authorize_prompts', array( 'logged_in' => TRUE, 'prompt' => NULL ), array( 'session_id=?', \IPS\Request::i()->cookie['oauth_authorize'] ) );
 					
 					if ( $success->mfa() )
 					{
 						$_SESSION['processing2FA'] = array( 'memberId' => $success->member->member_id, 'anonymous' => $success->anonymous, 'remember' => $success->rememberMe, 'destination' => (string) $url, 'handler' => $success->handler->id );
-						Output::i()->redirect( Url::internal( "app=core&module=system&controller=login", 'front', 'login' )->setQueryString( '_mfaLogin', 1 ) );
+						\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=system&controller=login", 'front', 'login' )->setQueryString( '_mfaLogin', 1 ) );
 					}
 					$success->process();
 					
-					Output::i()->redirect( $url );
+					\IPS\Output::i()->redirect( $url );
 				}
 			}
 			catch ( \IPS\Login\Exception $e )
@@ -442,7 +423,7 @@ class oAuthServerAuthorizationRequest
 					$e->handler = $e->handler->id;
 					$_SESSION['linkAccounts'] = json_encode( $e );
 					
-					Output::i()->redirect( Url::internal( 'app=core&module=system&controller=login&do=link', 'front', 'login' )->setQueryString( 'ref', base64_encode( $url ) ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=login&do=link', 'front', 'login' )->setQueryString( 'ref', base64_encode( $url ) ) );
 				}
 				
 				$error = $e->getMessage();
@@ -450,37 +431,37 @@ class oAuthServerAuthorizationRequest
 			
 			if ( $member === NULL )
 			{
-				Output::i()->output = Theme::i()->getTemplate( 'login', 'core', 'global' )->oauthLogin( $url, $this->client, $scopes, $login, $error );
-				Dispatcher::i()->finish();
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->oauthLogin( $url, $this->client, $scopes, $login, $error );
+				\IPS\Dispatcher::i()->finish();	
 			}
 		}
 		/* If we're logged in but the account is incomplete (e.g. social registration with hitherto unset name/email), redirect to complete registration first */
-		elseif ( Member::loggedIn()->member_id and !( Member::loggedIn()->real_name and Member::loggedIn()->email ) )
+		elseif ( \IPS\Member::loggedIn()->member_id and !( \IPS\Member::loggedIn()->real_name and \IPS\Member::loggedIn()->email ) )
 		{
-			$url = Url::internal( 'oauth/authorize/', 'interface' );
-			Output::i()->redirect( Url::internal( 'app=core&module=system&controller=register&do=complete', 'front', 'register' )->addRef( $url )->setQueryString( 'oauth', 1 ) );
+			$url = \IPS\Http\Url::internal( 'oauth/authorize/', 'interface' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=register&do=complete', 'front', 'register' )->addRef( $url )->setQueryString( 'oauth', 1 ) );
 		}
 
 		/* Still here? Show an authorization screen */
-		Output::i()->output = Theme::i()->getTemplate( 'login', 'core', 'global' )->oauthAuthorize( $url, $this->client, $scopes );
-		Dispatcher::i()->finish();
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'login', 'core', 'global' )->oauthAuthorize( $url, $this->client, $scopes );
+		\IPS\Dispatcher::i()->finish();			
 	}
 }
 
 /* Init */
-Front::i();
-External::i();
-Output::i()->bodyClasses[] = 'ipsLayout_minimal';
-Output::i()->bodyClasses[] = 'ipsLayout_minimalNoHome';
-Output::i()->title = Member::loggedIn()->language()->addToStack( 'oauth_authorize', FALSE, array( 'sprintf' => array( Settings::i()->board_name ) ) );
-Output::i()->httpHeaders['X-Frame-Options'] = 'DENY';
-Output::i()->httpHeaders['Cross-Origin-Opener-Policy'] = 'same-origin';
-Output::setCacheTime( false );
+\IPS\Session\Front::i();
+\IPS\Dispatcher\External::i();
+\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimal';
+\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimalNoHome';
+\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'oauth_authorize', FALSE, array( 'sprintf' => array( \IPS\Settings::i()->board_name ) ) );
+\IPS\Output::i()->httpHeaders['X-Frame-Options'] = 'DENY';
+\IPS\Output::i()->httpHeaders['Cross-Origin-Opener-Policy'] = 'same-origin';
+\IPS\Output::setCacheTime( false );
 
 /* Check we are not banned */
-if ( Request::i()->ipAddressIsBanned() or ( Member::loggedIn()->member_id and Member::loggedIn()->isBanned() ) )
+if ( \IPS\Request::i()->ipAddressIsBanned() or ( \IPS\Member::loggedIn()->member_id and \IPS\Member::loggedIn()->isBanned() ) )
 {
-	Output::i()->showBanned();
+	\IPS\Output::i()->showBanned();
 }
 
 /* Handle the OAuth request */
@@ -488,11 +469,11 @@ try
 {
 	/* Get our params */
 	$loggedIn = FALSE;
-	if ( !isset( Request::i()->client_id ) and isset( Request::i()->cookie['oauth_authorize'] ) )
+	if ( !isset( \IPS\Request::i()->client_id ) and isset( \IPS\Request::i()->cookie['oauth_authorize'] ) )
 	{
 		try
 		{
-			$row = Db::i()->select( '*', 'core_oauth_authorize_prompts', array( 'session_id=?', Request::i()->cookie['oauth_authorize'] ) )->first();
+			$row = \IPS\Db::i()->select( '*', 'core_oauth_authorize_prompts', array( 'session_id=?', \IPS\Request::i()->cookie['oauth_authorize'] ) )->first();
 			$clientId = $row['client_id'];
 			$responseType = $row['response_type'];
 			$redirectUri = $row['redirect_uri'];
@@ -503,35 +484,35 @@ try
 			$codeChallenge = $row['code_challenge'];
 			$codeChallengeMethod = $row['code_challenge_method'];
 			
-			if ( isset( Request::i()->prompt ) and in_array( Request::i()->prompt, array( 'login', 'reauthorize' ) ) )
+			if ( isset( \IPS\Request::i()->prompt ) and \in_array( \IPS\Request::i()->prompt, array( 'login', 'reauthorize' ) ) )
 			{
-				Db::i()->update( 'core_oauth_authorize_prompts', array( 'prompt' => Request::i()->prompt ), array( 'session_id=?', Request::i()->cookie['oauth_authorize'] ) );
-				$prompt = Request::i()->prompt;
+				\IPS\Db::i()->update( 'core_oauth_authorize_prompts', array( 'prompt' => \IPS\Request::i()->prompt ), array( 'session_id=?', \IPS\Request::i()->cookie['oauth_authorize'] ) );
+				$prompt = \IPS\Request::i()->prompt;
 			}
 		}
-		catch (UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			throw new InitException('oauth_err_invalid_client');
+			throw new \IPS\Login\Handler\OAuth2\InitException('oauth_err_invalid_client');
 		}
 	}
 	else
 	{
-		$clientId = Request::i()->client_id;
-		$responseType = Request::i()->response_type;
-		$redirectUri = Request::i()->redirect_uri;
-		$scope = Request::i()->scope;
-		$state = Request::i()->state;
-		$prompt = Request::i()->prompt;
-		$codeChallenge = isset( Request::i()->code_challenge ) ? Request::i()->code_challenge : NULL;
-		$codeChallengeMethod = ( isset( Request::i()->code_challenge_method ) and in_array( Request::i()->code_challenge_method, array( 'plain', 'S256' ) ) ) ? Request::i()->code_challenge_method : NULL;
+		$clientId = \IPS\Request::i()->client_id;
+		$responseType = \IPS\Request::i()->response_type;
+		$redirectUri = \IPS\Request::i()->redirect_uri;
+		$scope = \IPS\Request::i()->scope;
+		$state = \IPS\Request::i()->state;
+		$prompt = \IPS\Request::i()->prompt;
+		$codeChallenge = isset( \IPS\Request::i()->code_challenge ) ? \IPS\Request::i()->code_challenge : NULL;
+		$codeChallengeMethod = ( isset( \IPS\Request::i()->code_challenge_method ) and \in_array( \IPS\Request::i()->code_challenge_method, array( 'plain', 'S256' ) ) ) ? \IPS\Request::i()->code_challenge_method : NULL;
 	}
 	
 	/* Have we asked to register? */
-	if ( isset( Request::i()->register ) )
+	if ( isset( \IPS\Request::i()->register ) )
 	{
 		/* The authorize prompt data will probably expire before we're done, so put the referal URL (for after registration)
 			to the full URL which will initiate a new prompt. But don't delete the current prompt data in case the user hits back */
-		$url = Url::internal( 'oauth/authorize/', 'interface' )->setQueryString( array(
+		$url = \IPS\Http\Url::internal( 'oauth/authorize/', 'interface' )->setQueryString( array(
 			'client_id'			=> $clientId,
 			'response_type'		=> $responseType,
 			'redirect_uri'		=> $redirectUri,
@@ -539,7 +520,7 @@ try
 			'state'				=> $state,
 			'prompt'			=> ( $prompt === 'login' ) ? 'reauthorize' : $prompt, // We never need to log in immediately after registering, that's confusing
 		) );
-		Output::i()->redirect( Url::internal( 'app=core&module=system&controller=register', 'front', 'register' )->addRef( (string) $url )->setQueryString( 'oauth', 1 ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=register', 'front', 'register' )->addRef( (string) $url )->setQueryString( 'oauth', 1 ) );
 		exit;
 	}
 	
@@ -548,13 +529,13 @@ try
 	$request->validate();
 	
 	/* If site is offline, return temporarily_unavailable */
-	if ( ( isset( Settings::i()->setup_in_progress ) AND Settings::i()->setup_in_progress ) or !Settings::i()->site_online )
+	if ( ( isset( \IPS\Settings::i()->setup_in_progress ) AND \IPS\Settings::i()->setup_in_progress ) or !\IPS\Settings::i()->site_online )
 	{
 		throw new \IPS\Login\Handler\OAuth2\Exception('temporarily_unavailable');
 	}
 	
 	/* HTTPs only */
-	if ( OAUTH_REQUIRES_HTTPS and !Request::i()->isSecure() )
+	if ( \IPS\OAUTH_REQUIRES_HTTPS and !\IPS\Request::i()->isSecure() )
 	{
 		throw new \IPS\Login\Handler\OAuth2\Exception( 'invalid_request', "request must be made with https" );
 	}
@@ -574,16 +555,16 @@ try
 	}
 		
 	/* Still here? Go ahead */
-	if ( isset( Request::i()->cookie['oauth_authorize'] ) )
+	if ( isset( \IPS\Request::i()->cookie['oauth_authorize'] ) )
 	{
-		Db::i()->delete( 'core_oauth_authorize_prompts', array( 'session_id=?', Request::i()->cookie['oauth_authorize'] ) );
-		Request::i()->setCookie( 'oauth_authorize', NULL );
+		\IPS\Db::i()->delete( 'core_oauth_authorize_prompts', array( 'session_id=?', \IPS\Request::i()->cookie['oauth_authorize'] ) );
+		\IPS\Request::i()->setCookie( 'oauth_authorize', NULL );
 	}
-	Output::i()->redirect( $request->authorized( Member::loggedIn(), isset( Request::i()->grantedScope ) ? array_keys( Request::i()->grantedScope ) : array() ), NULL, 302 );
+	\IPS\Output::i()->redirect( $request->authorized( \IPS\Member::loggedIn(), isset( \IPS\Request::i()->grantedScope ) ? array_keys( \IPS\Request::i()->grantedScope ) : array() ), NULL, 302 );
 }
-catch ( InitException $e )
+catch ( \IPS\Login\Handler\OAuth2\InitException $e )
 {
-	Output::i()->error( $e->getMessage(), '2S361/2', 403 );
+	\IPS\Output::i()->error( $e->getMessage(), '2S361/2', 403 );
 }
 catch ( \IPS\Login\Handler\OAuth2\Exception $e )
 {
@@ -592,9 +573,9 @@ catch ( \IPS\Login\Handler\OAuth2\Exception $e )
 	{
 		$response['error_description'] = $e->description;
 	}
-	Output::i()->redirect( $request->redirect( $response ), NULL, 302 );
+	\IPS\Output::i()->redirect( $request->redirect( $response ), NULL, 302 );
 }
 catch ( Exception $e )
 {
-	Output::i()->redirect( $request->redirect( array( 'error' => 'server_error', 'error_description' => $e->getMessage() ) ), NULL, 302 );
+	\IPS\Output::i()->redirect( $request->redirect( array( 'error' => 'server_error', 'error_description' => $e->getMessage() ) ), NULL, 302 );
 }

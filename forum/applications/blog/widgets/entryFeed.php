@@ -12,42 +12,43 @@
 namespace IPS\blog\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Widget;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Blog Entry Feed Widget
  */
-class entryFeed extends Widget
+class _entryFeed extends \IPS\Content\Widget
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'entryFeed';
+	public $key = 'entryFeed';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'blog';
+	public $app = 'blog';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 	
 	/**
 	 * Class
 	 */
-	protected static string $class = 'IPS\blog\Entry';
+	protected static $class = 'IPS\blog\Entry';
 	
 	/**
 	 * Get where clause
 	 *
 	 * @return	array
 	 */
-	protected function buildWhere(): array
+	protected function buildWhere()
 	{
 		$where = parent::buildWhere();
 		$where[] = array( 'entry_status!=?', 'draft' );

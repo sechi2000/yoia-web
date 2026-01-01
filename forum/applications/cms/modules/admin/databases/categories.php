@@ -1,6 +1,4 @@
 <?php
-
-
 /**
  * @brief		Fields Model
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -14,65 +12,54 @@
 namespace IPS\cms\modules\admin\databases;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Databases;
-use IPS\Dispatcher;
-use IPS\Member;
-use IPS\Node\Controller;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Request;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * categories
  */
-class categories extends Controller
+class _categories extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = '\IPS\cms\Categories';
+	protected $nodeClass = '\IPS\cms\Categories';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'databases_use' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'databases_use' );
 
 		/* This controller can not be accessed without a database ID */
-		if( !Request::i()->database_id )
+		if( !\IPS\Request::i()->database_id )
 		{
-			Output::i()->error( 'node_error', '2S390/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2S390/1', 404, '' );
 		}
 
-		$this->url = $this->url->setQueryString( array( 'database_id' => Request::i()->database_id ) );
+		$this->url = $this->url->setQueryString( array( 'database_id' => \IPS\Request::i()->database_id ) );
 		
 		/* Assign the correct nodeClass so contentItem is specified */
-		$this->nodeClass = '\IPS\cms\Categories' . Request::i()->database_id;
+		$this->nodeClass = '\IPS\cms\Categories' . \IPS\Request::i()->database_id;
 		
-		Dispatcher::i()->checkAcpPermission( 'categories_manage' );
-
-		/* @var Model $nodeClass */
+		\IPS\Dispatcher::i()->checkAcpPermission( 'categories_manage' );
+		
 		$nodeClass = $this->nodeClass;
 
-		$childLang = Member::loggedIn()->language()->addToStack( $nodeClass::$nodeTitle . '_add_child' );
-		$nodeClass::$nodeTitle = Member::loggedIn()->language()->addToStack('content_cat_db_title', FALSE, array( 'sprintf' => array( Databases::load( Request::i()->database_id )->_title ) ) );
-		Member::loggedIn()->language()->words[ $nodeClass::$nodeTitle . '_add_child' ] = $childLang;
+		$childLang = \IPS\Member::loggedIn()->language()->addToStack( $nodeClass::$nodeTitle . '_add_child' );
+		$nodeClass::$nodeTitle = \IPS\Member::loggedIn()->language()->addToStack('content_cat_db_title', FALSE, array( 'sprintf' => array( \IPS\cms\Databases::load( \IPS\Request::i()->database_id )->_title ) ) );
+		\IPS\Member::loggedIn()->language()->words[ $nodeClass::$nodeTitle . '_add_child' ] = $childLang;
 		parent::execute();
 	}
 	
@@ -81,15 +68,14 @@ class categories extends Controller
 	 *
 	 * @return	array
 	 */
-	public function _getRoots(): array
+	public function _getRoots()
 	{
-		/* @var Model $nodeClass */
 		$nodeClass = $this->nodeClass;
 		$rows = array();
 	
 		foreach( $nodeClass::roots( NULL ) as $node )
 		{
-			if ( $node->database_id == Request::i()->database_id )
+			if ( $node->database_id == \IPS\Request::i()->database_id )
 			{
 				$rows[ $node->_id ] = $this->_getRow( $node );
 			}
@@ -105,9 +91,8 @@ class categories extends Controller
 	 * @return	void
 	 * @note	Pages needs to readjust category_full_path values when a category is moved to a different category
 	 */
-	protected function _afterReorder( array $order ) : void
+	protected function _afterReorder( $order )
 	{
-		/* @var Model $categoryClass */
 		$categoryClass = $this->nodeClass;
 
 		foreach( $order as $parent => $nodes )
@@ -118,6 +103,6 @@ class categories extends Controller
 			}
 		}
 
-		parent::_afterReorder( $order );
+		return parent::_afterReorder( $order );
 	}
 }

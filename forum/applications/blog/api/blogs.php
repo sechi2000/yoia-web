@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Blog Blogs API
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -13,35 +12,22 @@
 namespace IPS\blog\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\blog\Blog;
-use IPS\Db;
-use IPS\Node\Api\NodeController;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Blog Blogs API
  */
-class blogs extends NodeController
+class _blogs extends \IPS\Node\Api\NodeController
 {
 
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\blog\Blog';
+	protected $class = 'IPS\blog\Blog';
 
 	/**
 	 * GET /blog/blogs
@@ -56,32 +42,31 @@ class blogs extends NodeController
 	 * @apiparam	string	sortDir	Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page	Page number
 	 * @apiparam	int		perPage	Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<\IPS\blog\Blog>
-	 * @return		PaginatedResponse<Blog>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\blog\Entry>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = $this->_globalWhere();
 
 		/* Owners */
-		if ( isset( Request::i()->owners ) and isset( Request::i()->groups ) )
+		if ( isset( \IPS\Request::i()->owners ) and isset( \IPS\Request::i()->groups ) )
 		{
-			$where[] = array( '( ' . Db::i()->in( 'blog_member_id', array_filter( explode( ',', Request::i()->owners ) ) ) . ' OR ' . Db::i()->findInSet( 'blog_groupblog_ids', array_filter( explode( ',', Request::i()->groups ) ) ) . ' )' );
+			$where[] = array( '( ' . \IPS\Db::i()->in( 'blog_member_id', array_filter( explode( ',', \IPS\Request::i()->owners ) ) ) . ' OR ' . \IPS\Db::i()->findInSet( 'blog_groupblog_ids', array_filter( explode( ',', \IPS\Request::i()->groups ) ) ) . ' )' );
 		}
-		elseif ( isset( Request::i()->owners ) )
+		elseif ( isset( \IPS\Request::i()->owners ) )
 		{
-			$where[] = array( '( ' . Db::i()->in( 'blog_member_id', array_filter( explode( ',', Request::i()->owners ) ) ) . ' OR blog_groupblog_ids<>? )', '' );
+			$where[] = array( '( ' . \IPS\Db::i()->in( 'blog_member_id', array_filter( explode( ',', \IPS\Request::i()->owners ) ) ) . ' OR blog_groupblog_ids<>? )', '' );
 		}
-		elseif ( isset( Request::i()->groups ) )
+		elseif ( isset( \IPS\Request::i()->groups ) )
 		{
-			$where[] = array( '( blog_member_id>0 OR ' . Db::i()->findInSet( 'blog_groupblog_ids', array_filter( explode( ',', Request::i()->groups ) ) ) . ' )' );
+			$where[] = array( '( blog_member_id>0 OR ' . \IPS\Db::i()->findInSet( 'blog_groupblog_ids', array_filter( explode( ',', \IPS\Request::i()->groups ) ) ) . ' )' );
 		}
 		
 		/* Pinned */
-		if ( isset( Request::i()->pinned ) )
+		if ( isset( \IPS\Request::i()->pinned ) )
 		{
-			$where[] = array( 'blog_pinned=?', intval( Request::i()->pinned ) );
+			$where[] = array( 'blog_pinned=?', \intval( \IPS\Request::i()->pinned ) );
 		}
 		
 		/* Permission */
@@ -91,25 +76,25 @@ class blogs extends NodeController
 		}
 	
 		/* Sort */
-		if ( isset( Request::i()->sortBy ) and in_array( Request::i()->sortBy, array( 'count_entries', 'last_edate' ) ) )
+		if ( isset( \IPS\Request::i()->sortBy ) and \in_array( \IPS\Request::i()->sortBy, array( 'count_entries', 'last_edate' ) ) )
 		{
-			$sortBy = 'blog_' . Request::i()->sortBy;
+			$sortBy = 'blog_' . \IPS\Request::i()->sortBy;
 		}
 		else
 		{
 			$sortBy = 'blog_id';
 		}
-		$sortDir = ( isset( Request::i()->sortDir ) and in_array( mb_strtolower( Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? Request::i()->sortDir : 'asc';
+		$sortDir = ( isset( \IPS\Request::i()->sortDir ) and \in_array( mb_strtolower( \IPS\Request::i()->sortDir ), array( 'asc', 'desc' ) ) ) ? \IPS\Request::i()->sortDir : 'asc';
 		
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
-			Db::i()->select( '*', 'blog_blogs', $where, "{$sortBy} {$sortDir}" ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			\IPS\Db::i()->select( '*', 'blog_blogs', $where, "{$sortBy} {$sortDir}" ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			'IPS\blog\Blog',
-			Db::i()->select( 'COUNT(*)', 'blog_blogs', $where )->first(),
+			\IPS\Db::i()->select( 'COUNT(*)', 'blog_blogs', $where )->first(),
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 	
@@ -119,10 +104,9 @@ class blogs extends NodeController
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		2B302/1	INVALID_ID	The blog ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\blog\Blog
-	 * @return Response
+	 * @return		\IPS\blog\Blog
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		return $this->_view( $id );
 	}
@@ -132,30 +116,28 @@ class blogs extends NodeController
 	 * Delete a blog
 	 *
 	 * @param		int		$id			ID Number
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 * @throws		2B302/2	INVALID_ID		The blog ID does not exist or the authorized user does not have permission to view it
 	 * @throws		2B302/3	NO_PERMISSION	The authorized user does not have permission to delete the blog
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
-		/* @var Blog $class */
 		$class = $this->class;
 		
 		try
 		{
 			$blog = $this->member ? $class::loadAndCheckPerms( $id ) : $class::load( $id );
-			if ( !$blog->canDelete() )
+			if ( !$blog->canDelete( $this->member ) )
 			{
-				throw new Exception( 'INVALID_ID', '2B302/3', 404 );
+				throw new \IPS\Api\Exception( 'INVALID_ID', '2B302/3', 404 );
 			}
 			$blog->delete();
 
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2B302/2', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2B302/2', 404 );
 		}
 	}
 }

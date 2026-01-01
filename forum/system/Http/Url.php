@@ -11,47 +11,9 @@
 namespace IPS\Http;
  
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPLib\Factory;
-use IPLib\Range\Type;
-use IPS\Application;
-use IPS\cms\Pages\Page;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\Http\Request\Curl;
-use IPS\Http\Url\Exception as UrlException;
-use IPS\Http\Url\Friendly;
-use IPS\Http\Url\Internal;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Request;
-use IPS\Settings;
-use OutOfRangeException;
-use RuntimeException;
-use TrueBV\Exception\OutOfBoundsException;
-use TrueBV\Punycode;
-use function count;
-use function curl_version;
-use function defined;
-use function dns_get_record;
-use function filter_var;
-use function gethostbyname;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_string;
-use function ltrim;
-use function preg_replace;
-use function trim;
-use function version_compare;
-use const DNS_AAAA;
-use const FILTER_VALIDATE_IP;
-use const IPS\DEFAULT_REQUEST_TIMEOUT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -63,9 +25,8 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * are not URLs or URNs) with the extra provision that we allow protocol-relative URLs
  *
  * @see	<a href="https://www.ietf.org/rfc/rfc3986.txt">RFC 3986</a>
- * @method csrf() Url
  */
-class Url
+class _Url
 {
 	/**
 	 * @brief	Automatically determine the protocol
@@ -147,90 +108,99 @@ class Url
 	/**
 	 * Build Internal URL
 	 *
-	 * @param string $queryString	The query string
-	 * @param string|null $base			Key for the URL base. If NULL, defaults to current controller location
-	 * @param string|null $seoTemplate	The key for making this a friendly URL
-	 * @param array|string $seoTitles		The title(s) needed for the friendly URL
-	 * @param int $protocol		Protocol (one of the PROTOCOL_* constants)
-	 * @return	Internal|Url
+	 * @param	string			$queryString	The query string
+	 * @param	string|null		$base			Key for the URL base. If NULL, defaults to current controller location
+	 * @param	string			$seoTemplate	The key for making this a friendly URL
+	 * @param	string|array	$seoTitles		The title(s) needed for the friendly URL
+	 * @param	int				$protocol		Protocol (one of the PROTOCOL_* constants)
+	 * @return	\IPS\Http\Url\Internal
 	 */
-	public static function internal( string $queryString, string $base=NULL, string $seoTemplate=NULL, array|string $seoTitles=array(), int $protocol = 0 ): Url|Internal
+	public static function internal( $queryString, $base=NULL, $seoTemplate=NULL, $seoTitles=array(), $protocol = 0 )
 	{
 		/* If we don't have a base, assume the template location */
 		if ( !$base )
 		{
-			$base = Dispatcher::hasInstance() ? Dispatcher::i()->controllerLocation : 'front';
-		}
-
-		if( $base === 'setup' )
-		{
-			return new static(( Request::i()->isSecure()  ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . ( $_SERVER['QUERY_STRING'] ? rtrim( mb_substr( $_SERVER['REQUEST_URI'], 0, -mb_strlen( $_SERVER['QUERY_STRING'] ) ), '?' ) : $_SERVER['REQUEST_URI'] ) . '?' . $queryString);
+			if ( \IPS\Dispatcher::hasInstance() )
+			{
+				if ( \IPS\Dispatcher::i()->controllerLocation === 'setup' )
+				{
+					return new static( ( \IPS\Request::i()->isSecure()  ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . ( $_SERVER['QUERY_STRING'] ? rtrim( mb_substr( $_SERVER['REQUEST_URI'], 0, -mb_strlen( $_SERVER['QUERY_STRING'] ) ), '?' ) : $_SERVER['REQUEST_URI'] ) . '?' . $queryString );
+				}
+				else
+				{
+					$base = \IPS\Dispatcher::i()->controllerLocation;
+				}
+			}
+			else
+			{
+				$base = 'front';
+			}
 		}
 		
 		/* Front-End Friendly */
-		if ( $base === 'front' and $seoTemplate and Settings::i()->use_friendly_urls )
+		if ( $base === 'front' and $seoTemplate and \IPS\Settings::i()->use_friendly_urls )
 		{
-			return Friendly::friendlyUrlFromQueryString( $queryString, $seoTemplate, $seoTitles, $protocol );
+			return \IPS\Http\Url\Friendly::friendlyUrlFromQueryString( $queryString, $seoTemplate, $seoTitles, $protocol );
 		}
 		/* Front-End not friendly */
 		elseif ( $base === 'front' )
 		{
-			return Internal::createInternalFromComponents( 'front', $protocol, $queryString ? 'index.php' : '', $queryString );
+			return \IPS\Http\Url\Internal::createInternalFromComponents( 'front', $protocol, $queryString ? 'index.php' : '', $queryString );
 		}
 		/* Admin */
 		elseif ( $base === 'admin' or $base === 'admin_redirect' )
 		{
-			return Internal::createInternalFromComponents(
+			return \IPS\Http\Url\Internal::createInternalFromComponents(
 				'admin',
 				$protocol,
-				'admin/',
-				static::convertQueryAsStringToArray($queryString)
+				\IPS\CP_DIRECTORY . '/',
+				static::convertQueryAsStringToArray( $queryString )
 			);
 		}
 		/* None */
 		else
-		{
-			return static::createFromString(static::baseUrl($protocol) . $queryString, FALSE);
+		{		
+			return static::createFromString( static::baseUrl( $protocol ) . $queryString, FALSE ); 
 		}
 	}
 	
 	/**
 	 * Build External URL
 	 *
-	 * @param string $url
-	 * @return    Url
-	 * @throws	InvalidArgumentException
+	 * @param	string			$url
+	 * @return	\IPS\Http\Url
+	 * @throws	\InvalidArgumentException
 	 */
-	public static function external( string $url ): Url
+	public static function external( $url )
 	{
-		return new static($url, TRUE);
+		return new static( $url, TRUE );
 	}
 	
 	/**
 	 * Build IPS-External URL
 	 *
-	 * @param string $url
-	 * @return    Url
+	 * @param	string			$url
+	 * @return	\IPS\Http\Url
 	 */
-	final public static function ips( string $url ): Url
+	final public static function ips( $url )
 	{			
-		return new static("https://remoteservices.invisionpower.com/{$url}/?version=" . Application::getAvailableVersion('core'));
+		return new static( "https://remoteservices.invisionpower.com/{$url}/?version=" . \IPS\Application::getAvailableVersion('core') );
 	}
 	
 	/**
 	 * Create from components - all arguments should be UNENCODED
 	 *
-	 * @param string $host		Host
-	 * @param string|null $scheme		Scheme (NULL for protocol-relative)
-	 * @param string|null $path		Path
-	 * @param array|string|null $query		Query
-	 * @param int|null $port		Port
-	 * @param string|null $username	Username
-	 * @param string|null $password	Password
-	 * @param string|null $fragment	Fragment
-	 * @return    Url
+	 * @param	string				$host		Host
+	 * @param	string|NULL			$scheme		Scheme (NULL for protocol-relative)
+	 * @param	string|NULL			$path		Path
+	 * @param	string|array|NULL	$query		Query
+	 * @param	int|NULL			$port		Port
+	 * @param	string|NULL			$username	Username
+	 * @param	string|NULL			$password	Password
+	 * @param	string|NULL			$fragment	Fragment
+	 * @return	\IPS\Http\Url
 	 */
-	public static function createFromComponents( string $host, string $scheme = NULL, string $path = NULL, array|string $query = NULL, int $port = NULL, string $username = NULL, string $password = NULL, string $fragment = NULL ): Url
+	public static function createFromComponents( $host, $scheme = NULL, $path = NULL, $query = NULL, $port = NULL, $username = NULL, $password = NULL, $fragment = NULL )
 	{
 		$obj = new static('');
 		
@@ -241,16 +211,16 @@ class Url
 		$obj->data[ static::COMPONENT_PASSWORD ] = $password;
 		$obj->data[ static::COMPONENT_PATH ] = $path;
 		$obj->data[ static::COMPONENT_FRAGMENT ] = $fragment;
-
-		if ( is_array( $query ) )
+		
+		if ( \is_array( $query ) )
 		{
-			$obj->data[ static::COMPONENT_QUERY ] = static::convertQueryAsArrayToString($query);
+			$obj->data[ static::COMPONENT_QUERY ] = static::convertQueryAsArrayToString( $query );
 			$obj->queryString = $query;
 		}
-		elseif ( is_string( $query ) )
+		elseif ( \is_string( $query ) )
 		{
 			$obj->data[ static::COMPONENT_QUERY ] = $query;
-			$obj->queryString = static::convertQueryAsStringToArray($query);
+			$obj->queryString = static::convertQueryAsStringToArray( $query );
 		}
 						
 		$obj->reconstructUrlFromData();
@@ -263,19 +233,19 @@ class Url
 	 * This method is somewhat performance-intensive and should only be used either for creating friendly URLs, or if it is not known
 	 * if the URL will be internal or external. If you know the URL will be external, use new \IPS\Http\Url( ... )
 	 *
-	 * @param string $url				A valid URL as per our definition (see phpDoc on class)
-	 * @param bool $couldBeFriendly	If the URL is known to not be friendly, FALSE can be passed here to save the performance implication of checking the URL
-	 * @param bool $autoEncode			If true, any invalid components will be automatically encoded rather than an exception thrown - useful if the entire link is user-provided
-	 * @return    Url
-	 * @throws    UrlException
+	 * @param	string	$url				A valid URL as per our definition (see phpDoc on class)
+	 * @param	bool	$couldBeFriendly	If the URL is known to not be friendly, FALSE can be passed here to save the performance implication of checking the URL
+	 * @param	bool	$autoEncode			If true, any invalid components will be automatically encoded rather than an exception thrown - useful if the entire link is user-provided
+	 * @return	\IPS\Http\Url
+	 * @throws	\IPS\Http\Url\Exception
 	 */
-	public static function createFromString(string $url, bool $couldBeFriendly=TRUE, bool $autoEncode=FALSE ): Url
+	public static function createFromString( $url, $couldBeFriendly=TRUE, $autoEncode=FALSE )
 	{
 		/* Decode it */
-		$components = static::componentsFromUrlString($url, $autoEncode);
+		$components = static::componentsFromUrlString( $url, $autoEncode );
 		
 		/* Is it internal? */
-		$baseUrlComponents = static::componentsFromUrlString(static::baseUrl());
+		$baseUrlComponents = static::componentsFromUrlString( static::baseUrl() );
 
 		if ( $components[ static::COMPONENT_HOST ] === $baseUrlComponents[ static::COMPONENT_HOST ] and
 			$components[ static::COMPONENT_USERNAME ] === $baseUrlComponents[ static::COMPONENT_USERNAME ] and
@@ -287,93 +257,40 @@ class Url
 			$pathFromBaseUrl = mb_substr( $components[ static::COMPONENT_PATH ], mb_strlen( $baseUrlComponents[ static::COMPONENT_PATH ] ) );
 			
 			/* Admin */
-			if ( preg_match( '/^' . preg_quote( 'admin', '/' ) . '($|\/)/', $pathFromBaseUrl ) )
+			if ( preg_match( '/^' . preg_quote( \IPS\CP_DIRECTORY, '/' ) . '($|\/)/', $pathFromBaseUrl ) )
 			{
-				$return = Internal::createInternalFromComponents( 'admin', $components[ static::COMPONENT_SCHEME ], $pathFromBaseUrl, $components[ static::COMPONENT_QUERY ], $components[ static::COMPONENT_FRAGMENT ] );
+				return \IPS\Http\Url\Internal::createInternalFromComponents( 'admin', $components[ static::COMPONENT_SCHEME ], $pathFromBaseUrl, $components[ static::COMPONENT_QUERY ], $components[ static::COMPONENT_FRAGMENT ] );
 			}
 			/* Front-End: Not friendly or unrewritten friendly */
 			elseif ( !$pathFromBaseUrl or $pathFromBaseUrl === 'index.php' )
 			{
-				$queryString = Url::convertQueryAsArrayToString( $components[ static::COMPONENT_QUERY ] );
+				$queryString = \IPS\Http\Url::convertQueryAsArrayToString( $components[ static::COMPONENT_QUERY ] );
 				$potentialFurl = trim( mb_substr( $queryString, 0, mb_strpos( $queryString, '&' ) ?: NULL ), '/' );
-				if ( !$pathFromBaseUrl or !( $couldBeFriendly and $return = Friendly::createFriendlyUrlFromComponents( $components, $potentialFurl ) ) )
+				if ( $couldBeFriendly and $return = \IPS\Http\Url\Friendly::createFriendlyUrlFromComponents( $components, $potentialFurl ) )
 				{
-					$return = Internal::createInternalFromComponents( 'front', $components[ static::COMPONENT_SCHEME ], $pathFromBaseUrl, $components[ static::COMPONENT_QUERY ], $components[ static::COMPONENT_FRAGMENT ] );
+					return $return;
+				}
+				else
+				{
+					return \IPS\Http\Url\Internal::createInternalFromComponents( 'front', $components[ static::COMPONENT_SCHEME ], $pathFromBaseUrl, $components[ static::COMPONENT_QUERY ], $components[ static::COMPONENT_FRAGMENT ] );
 				}
 			}
 			/* Front-End: Rewritten friendly */
-			elseif (  !( $couldBeFriendly and $return = Friendly::createFriendlyUrlFromComponents( $components, rtrim( mb_substr( $components[ static::COMPONENT_PATH ], mb_strlen( $baseUrlComponents[ static::COMPONENT_PATH ] ) ), '/' ) ) ) )
+			elseif ( $couldBeFriendly and $return = \IPS\Http\Url\Friendly::createFriendlyUrlFromComponents( $components, rtrim( mb_substr( $components[ static::COMPONENT_PATH ], mb_strlen( $baseUrlComponents[ static::COMPONENT_PATH ] ) ), '/' ) ) )
 			{
-				$return = Internal::createInternalFromComponents( 'none', $components[ static::COMPONENT_SCHEME ], $pathFromBaseUrl, $components[ static::COMPONENT_QUERY ], $components[ static::COMPONENT_FRAGMENT ] );
+				return $return;
+			}
+			/* Other */
+			else
+			{
+				return \IPS\Http\Url\Internal::createInternalFromComponents( 'none', $components[ static::COMPONENT_SCHEME ], $pathFromBaseUrl, $components[ static::COMPONENT_QUERY ], $components[ static::COMPONENT_FRAGMENT ] );
 			}
 		}
 		/* Nope, external */
 		else
 		{
-			$return = Url::createFromComponents( $components['host'], $components['scheme'], $components['path'], $components['query'], $components['port'], $components['user'], $components['pass'], $components['fragment'] );
+			return \IPS\Http\Url::createFromComponents( $components['host'], $components['scheme'], $components['path'], $components['query'], $components['port'], $components['user'], $components['pass'], $components['fragment'] );
 		}
-
-		/* If we are in setup, stop here */
-		if( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'setup' )
-		{
-			return $return;
-		}
-
-		/* If the normal handling doesn't recognise it as an internal URL and we
-			have a gateway file, check that */
-		if ( Application::appIsEnabled( 'cms' ) and !( $return instanceof Internal ) and Settings::i()->cms_root_page_url )
-		{
-			/* Decode it */
-			$components = static::componentsFromUrlString( $url, $autoEncode );
-
-			/* Is it underneath the gateway? */
-			$gatewayUrlComponents = static::componentsFromUrlString( Settings::i()->cms_root_page_url  );
-			if ( $components[ static::COMPONENT_HOST ] === $gatewayUrlComponents[ static::COMPONENT_HOST ] and
-				$components[ static::COMPONENT_USERNAME ] === $gatewayUrlComponents[ static::COMPONENT_USERNAME ] and
-				$components[ static::COMPONENT_PASSWORD ] === $gatewayUrlComponents[ static::COMPONENT_PASSWORD ] and
-				$components[ static::COMPONENT_PORT ] === $gatewayUrlComponents[ static::COMPONENT_PORT ] and
-				mb_substr( $components[ static::COMPONENT_PATH ], 0, mb_strlen( $gatewayUrlComponents[ static::COMPONENT_PATH ] ) ) === $gatewayUrlComponents[ static::COMPONENT_PATH ]
-			)
-			{
-				$pathFromGatewayUrl = mb_substr( $components[ static::COMPONENT_PATH ], mb_strlen( $gatewayUrlComponents[ static::COMPONENT_PATH ] ) );
-				$fallback = FALSE;
-				if ( !$pathFromGatewayUrl or $pathFromGatewayUrl === 'index.php' )
-				{
-					if ( !$pathFromGatewayUrl )
-					{
-						$fallback = TRUE;
-					}
-					$queryString = Url::convertQueryAsArrayToString( $components[ static::COMPONENT_QUERY ] );
-					$pathFromGatewayUrl = trim( mb_substr( $queryString, 0, mb_strpos( $queryString, '&' ) ?: NULL ), '/' );
-				}
-
-				/* Try to find a page */
-				$page = NULL;
-				try
-				{
-					$page = Page::loadFromPath( $pathFromGatewayUrl );
-					$return = Friendly::createFromComponents( $components[ static::COMPONENT_HOST ], $components[ static::COMPONENT_SCHEME ], $components[ static::COMPONENT_PATH ], $components[ static::COMPONENT_QUERY ], $components[ static::COMPONENT_PORT ], $components[ static::COMPONENT_USERNAME ], $components[ static::COMPONENT_PASSWORD ], $components[ static::COMPONENT_FRAGMENT ] )
-						->setFriendlyUrlData( 'content_page_path', array( $pathFromGatewayUrl ), array( 'path' => $pathFromGatewayUrl ), $pathFromGatewayUrl );
-				}
-					/* Couldn't find one? Don't accept responsibility, unless there was no $pathFromGatewayUrl and this is the gateway URL */
-				catch ( OutOfRangeException $e )
-				{
-					if ( $fallback and (string) $return->stripQueryString() === Settings::i()->cms_root_page_url )
-					{
-						try
-						{
-							$page = Page::loadFromPath( '' );
-							$return = Friendly::createFromComponents( $components[ static::COMPONENT_HOST ], $components[ static::COMPONENT_SCHEME ], $components[ static::COMPONENT_PATH ], $components[ static::COMPONENT_QUERY ], $components[ static::COMPONENT_PORT ], $components[ static::COMPONENT_USERNAME ], $components[ static::COMPONENT_PASSWORD ], $components[ static::COMPONENT_FRAGMENT ] )
-								->setFriendlyUrlData( 'content_page_path', array( '' ), array( 'path' => '' ) );
-						}
-						catch (OutOfRangeException $e ) { }
-					}
-				}
-			}
-		}
-
-		/* Return */
-		return $return;
 	}
 		
 	/* !Instance */
@@ -381,12 +298,12 @@ class Url
 	/**
 	 * @brief	URL, with all components appropriately encoded
 	 */
-	public ?string $url = NULL;
+	protected $url = NULL;
 	
 	/**
 	 * @brief	All the different components, decoded
 	 */
-	public array $data = array(
+	public $data = array(
 		self::COMPONENT_SCHEME => NULL,
 		self::COMPONENT_HOST => NULL,
 		self::COMPONENT_PORT => NULL,
@@ -400,20 +317,20 @@ class Url
 	/**
 	 * @brief	Query string as decoded array
 	 */
-	public mixed $queryString = array();
+	public $queryString = array();
 
 	/**
 	 * @brief	Hidden Query String Parameters
 	 */
-	public array $hiddenQueryString = array();
+	public $hiddenQueryString = array();
 		
 	/**
 	 * Constructor
 	 *
-	 * @param string|null $url		A valid URL as per our definition (see phpDoc on class) or NULL if being called by createFromComponents()
-	 * @param bool $autoEncode	If true, any invalid components will be automatically encoded rather than an exception thrown - useful if the entire link is user-provided
+	 * @param	string|NULL	$url		A valid URL as per our definition (see phpDoc on class) or NULL if being called by createFromComponents()
+	 * @param	bool		$autoEncode	If true, any invalid components will be automatically encoded rather than an exception thrown - useful if the entire link is user-provided
 	 * @return	void
-	 * @throws    UrlException
+	 * @throws	\IPS\Http\Url\Exception
 	 *	@li	INVALID_URL			The URL did not start with // to indicate relative protocol or contain ://
 	 *	@li	INVALID_SCHEME		The scheme was invalid
 	 *	@li	INVALID_USERNAME	The username was invalid
@@ -423,7 +340,7 @@ class Url
 	 *	@li	INVALID_QUERY		The query was invalid
 	 *	@li	INVALID_FRAGMENT	The fragment was invalid
 	 */
-	public function __construct( string $url = NULL, bool $autoEncode=FALSE )
+	public function __construct( $url = NULL, $autoEncode = FALSE )
 	{
 		if ( $url )
 		{
@@ -431,19 +348,19 @@ class Url
 			$this->url = $url;
 			
 			/* Set the components */
-			$this->data = static::componentsFromUrlString($url, $autoEncode);
+			$this->data = static::componentsFromUrlString( $url, $autoEncode );
 			$this->queryString = $this->data['query'];
-			$this->data['query'] = static::convertQueryAsArrayToString($this->queryString);
+			$this->data['query'] = static::convertQueryAsArrayToString( $this->queryString );
 		}
 	}
 	
 	/**
 	 * Adjust scheme
 	 *
-	 * @param string|null $scheme	Scheme (NULL for protocol-relative)
-	 * @return    Url
+	 * @param	string|NULL		$scheme	Scheme (NULL for protocol-relative)
+	 * @return	\IPS\Http\Url
 	 */
-	public function setScheme( ?string $scheme ): Url
+	public function setScheme( $scheme )
 	{
 		$obj = clone $this;
 		$obj->data[ static::COMPONENT_SCHEME ] = $scheme;
@@ -454,10 +371,10 @@ class Url
 	/**
 	 * Adjust host
 	 *
-	 * @param string $host	Host
-	 * @return    Url
+	 * @param	string	$host	Host
+	 * @return	\IPS\Http\Url
 	 */
-	public function setHost( string $host ): Url
+	public function setHost( $host )
 	{
 		$obj = clone $this;
 		$obj->data[ static::COMPONENT_HOST ] = $host;
@@ -468,10 +385,10 @@ class Url
 	/**
 	 * Adjust path
 	 *
-	 * @param string|null $path Path
-	 * @return    Url
+	 * @param	string|NULL	$path Path
+	 * @return	\IPS\Http\Url
 	 */
-	public function setPath( ?string $path ): Url
+	public function setPath( $path )
 	{
 		$obj = clone $this;
 		$obj->data[ static::COMPONENT_PATH ] = $path;
@@ -482,15 +399,15 @@ class Url
 	/**
 	 * Adjust Query String
 	 *
-	 * @param array|string $keyOrArray	Key, or array of key/value pairs
-	 * @param array|string|null $value		Value, or NULL if $key is an array
-	 * @return    Url
+	 * @param	string|array	$keyOrArray	Key, or array of key/value pairs
+	 * @param	string|null		$value		Value, or NULL if $key is an array
+	 * @return	\IPS\Http\Url
 	 */
-	public function setQueryString( array|string $keyOrArray, array|string|null $value=NULL ): Url
+	public function setQueryString( $keyOrArray, $value=NULL )
 	{
 		$newQueryArray = $this->queryString;
 		
-		if ( is_array( $keyOrArray ) )
+		if ( \is_array( $keyOrArray ) )
 		{
 			foreach ( $keyOrArray as $k => $v )
 			{
@@ -517,7 +434,7 @@ class Url
 		}
 		
 		$obj = clone $this;
-		$obj->data[ static::COMPONENT_QUERY ] = static::convertQueryAsArrayToString($newQueryArray);
+		$obj->data[ static::COMPONENT_QUERY ] = static::convertQueryAsArrayToString( $newQueryArray );
 		$obj->queryString = $newQueryArray;
 		$obj->reconstructUrlFromData();
 		return $obj;
@@ -528,7 +445,7 @@ class Url
 	 *
 	 * @return	void
 	 */
-	protected function reconstructUrlFromData() : void
+	protected function reconstructUrlFromData()
 	{
 		/* Scheme */
 		$scheme = '';
@@ -560,7 +477,7 @@ class Url
 		$port = '';
 		if ( $this->data[ static::COMPONENT_PORT ] )
 		{
-			$port = ':' . intval( $this->data[ static::COMPONENT_PORT ] );
+			$port = ':' . \intval( $this->data[ static::COMPONENT_PORT ] );
 		}
 		
 		/* Path */
@@ -579,7 +496,7 @@ class Url
 				$path = '/';
 			}
 			
-			$queryString = '?' . static::convertQueryAsArrayToString($this->queryString, TRUE);
+			$queryString = '?' . static::convertQueryAsArrayToString( $this->queryString, TRUE ); 
 		}
 		
 		/* Fragment */
@@ -596,16 +513,16 @@ class Url
 	/**
 	 * Strip Query String
 	 *
-	 * @param array|string|null $keys	The key(s) to strip - if omitted, entire query string is wiped
-	 * @return    Url
+	 * @param	string|array	$keys	The key(s) to strip - if omitted, entire query string is wiped
+	 * @return	\IPS\Http\Url
 	 */
-	public function stripQueryString( array|string $keys=NULL ): Url
+	public function stripQueryString( $keys=NULL )
 	{
 		$newQueryArray = array();
 
 		if( $keys !== NULL )
 		{
-			if( !is_array( $keys ) )
+			if( !\is_array( $keys ) )
 			{
 				$keys = array( $keys => $keys );
 			}
@@ -619,22 +536,21 @@ class Url
 	/**
 	 * Adjust Fragment
 	 *
-	 * @param string $fragment	Fragment
-	 * @return    Url
+	 * @param	string	$fragment	Fragment
+	 * @return	\IPS\Http\Url
 	 */
-	public function setFragment( string $fragment ): Url
+	public function setFragment( $fragment )
 	{
 		return static::createFromComponents( $this->data[ static::COMPONENT_HOST ], $this->data[ static::COMPONENT_SCHEME ], $this->data[ static::COMPONENT_PATH ], $this->data[ static::COMPONENT_QUERY ], $this->data[ static::COMPONENT_PORT ], $this->data[ static::COMPONENT_USERNAME ], $this->data[ static::COMPONENT_PASSWORD ], $fragment );
 	}
-
+	
 	/**
 	 * Make safe for ACP
 	 *
-	 * @param bool $resource
-	 * @return    Url
-	 * @deprecated    No longer needed as of 4.5, ACP URLs no longer have the session ID in the URL
+	 * @deprecated	No longer needed as of 4.5, ACP URLs no longer have the session ID in the URL
+	 * @return	\IPS\Http\Url
 	 */
-	public function makeSafeForAcp( bool $resource=FALSE ) : Url
+	public function makeSafeForAcp( $resource=FALSE )
 	{
 		return $this;
 		
@@ -646,223 +562,50 @@ class Url
 	}
 
 	/**
-	 * Make a HTTP Request to a resource that we cannot trust, so we need to check more carefully
-	 * We want to avoid any SSRF vulnerabilities, so we only allow certain protocols and ensure we're not loading from a private network
-	 * @note https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
-	 *
-	 * This method ensures the following:
-	 *
-	 * The requested scheme is either http or https only (no ftp, file, etc)
-	 * Redirects are not followed (so a site cannot try and redirect to a private network IP)
-	 * That the port is either 80 or 443
-	 * That IPv6 ranges are not allowed '[::]'
-	 * That hex/binary/oct domain names are not allowed
-	 * That common localhost and internal domains/IPs are not used
-	 * That the IP address is not a private or local network IP
-	 * That the host isn't the same as the current domain
-	 *
-	 * @param int $timeout Timeout
-	 * @param int|null $bytesToGet Number of bytes to get. null means get everything you greedy piggie
-	 * @return    Curl
-	 */
-	public function requestUntrusted( int $timeout=2, int|null $bytesToGet=50000 ): Curl
-	{
-		$allowedProtocols = array( 'http', 'https' );
-		$allowedContentTypes = array( 'text/html' );
-
-		/* We need a scheme */
-		if ( ! isset( $this->data['scheme'] ) )
-		{
-			throw new RuntimeException( 'NO_SCHEME' );
-		}
-
-		/* We only allow port 80 and 443 */
-		if ( isset( $this->data['port'] ) and ! in_array( $this->data['port'], [ 80, 443 ] ) )
-		{
-			throw new RuntimeException( 'INVALID_PORT' );
-		}
-
-		/* To avoid security issues from using file:// telnet:// etc. We reject everything that is not a http(s)? scheme */
-		if( $this->data['scheme'] AND !in_array( $this->data['scheme'], $allowedProtocols ) OR ! preg_match( "#^http(s)?://#", (string) $this ) )
-		{
-			throw new RuntimeException( mb_strtoupper( $this->data['scheme'] ) . '_SCHEME_NOT_PERMITTED' );
-		}
-
-		/* Disallow things like http://[::]:port and http://[0:0:0:0:0:ffff:127.0.0.1] */
-		if ( strpos( $this->data['host'], '[' ) !== FALSE )
-		{
-			throw new RuntimeException( 'INVALID_IPV6_HOST' );
-		}
-
-		/* Block hex/decimal/octal/binary hostnames as a precaution. */
-		if(
-			mb_substr( ltrim( $this->data['host'] ), 0, 2 ) == '0x' OR 															// Hex
-			preg_replace( "/[01\.]/", '', trim( $this->data['host'] ) ) === '' OR												// Binary
-			( mb_substr( ltrim( $this->data['host'] ), 0, 1 ) == '0' AND mb_strpos( $this->data['host'], '.' ) === FALSE ) OR	// Octal
-			preg_replace( "/[0-9]/", '', trim( $this->data['host'] ) ) === ''													// Decimal
-		)
-		{
-			throw new RuntimeException( 'HEX|BINARY|OCTAL|DECIMAL_HOST_NAMES_NOT_PERMITTED' );
-		}
-		
-		/* Check for obvious internal domains and IP addresses */
-		if ( in_array( $this->data['host'], [
-			'localhost',
-			'instance-data',   # aws
-			'169.254.169.254', # aws, google, azure
-			'192.0.0.192', # oracle
-			'100.100.100.200', #Alibaba
-			'metadata.google.internal', # google
-			'metadata' #google
-		] ) )
-		{
-			throw new RuntimeException( 'HOST_NOT_PERMITTED' );
-		}
-
-		$ip = null;
-		if ( filter_var( $this->data['host'], FILTER_VALIDATE_IP ) !== false )
-		{
-			/* The host is actually an IPv4 or IPv6, so there's no need to do any DNS look-ups */
-			$ip = $this->data['host'];
-
-			if ( static::isPrivateIp( $ip ) )
-			{
-				throw new RuntimeException( 'LOCAL_AND_PRIVATE_NETWORKS_NOT_PERMITTED' );
-			}
-		}
-		else if ( $ips = @gethostbynamel( $this->data['host'] ) )
-		{
-			/*
-			 *  Let's try to see if it's an IPv4 address. Loop through them all to ensure we are not subject to a validation attack
-			 * (@link https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html#application-layer_1)
-			 */
-			foreach ( $ips as $possibleIp )
-			{
-				if ( static::isPrivateIp( $possibleIp ) )
-				{
-					throw new RuntimeException( 'LOCAL_AND_PRIVATE_NETWORKS_NOT_PERMITTED' );
-				}
-
-				$ip = $possibleIp;
-			}
-		}
-		else if ( $ips = @dns_get_record( $this->data['host'], DNS_AAAA ) )
-		{
-			foreach ( $ips as $possibleIp )
-			{
-				if ( static::isPrivateIp( $possibleIp['ipv6'] ) )
-				{
-					throw new RuntimeException( 'LOCAL_AND_PRIVATE_NETWORKS_NOT_PERMITTED' );
-				}
-
-				$ip = $possibleIp['ipv6'];
-			}
-		}
-
-		/* We really need an IP address */
-		if ( ! $ip )
-		{
-			throw new RuntimeException( 'COULD_NOT_RESOLVE_HOST' );
-		}
-
-		/* Don't allow attempts to load files on the current domain */
-		$baseUrlHostname = static::internal('')->data['host'];
-		if ( preg_match( "#\." . preg_quote( $baseUrlHostname ) . "$#", '.' . $this->data['host'] ) or preg_match( "#\." . preg_quote( $this->data['host'] ) . "$#", '.' . $baseUrlHostname ) )
-		{
-			throw new RuntimeException( 'SAME_DOMAIN_NOT_PERMITTED' );
-		}
-
-		/* Set a timeout */
-		if( $timeout === null )
-		{
-			$timeout = DEFAULT_REQUEST_TIMEOUT;
-		}
-
-		/* Use cURL - We require 7.36 or higher because older versions can't handle chunked encoding properly */
-		$version = curl_version();
-		if( version_compare( $version['version'], '7.36', '>=' ) )
-		{
-			$requestObj	= new Curl( $this, $timeout, '1.1', true, $allowedProtocols, $allowedContentTypes, true, $bytesToGet );
-		}
-
-		if( !isset( $requestObj ) )
-		{
-			throw new RuntimeException( 'CURL_NOT_AVAILABLE' );
-		}
-
-		/* Set a default user-agent (some services, e.g. spotify, block requests without one but it's good to do so anyway) */
-		$requestObj->setHeaders( array( 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36' ) );
-		$requestObj->setHeaders( array( 'Accept-Language' => $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? Lang::load( Lang::defaultLanguage() )->bcp47() ) );
-
-		/* Return */
-		return $requestObj;
-	}
-
-	/**
-	 * Check and IP to see if it is a private network
-	 * @throws RuntimeException
-	 * @param string $ip
-	 * @return bool
-	 */
-	protected static function isPrivateIp( string $ip ): bool
-	{
-		/* Use a robust IP library to check ipv4 and ipv6 ip addresses [https://github.com/mlocati/ip-lib] */
-		IPS::$PSR0Namespaces['IPLib'] = \IPS\ROOT_PATH .'/system/3rd_party/IpLib';
-		$address = Factory::parseAddressString( $ip );
-
-		if ( ! $address )
-		{
-			throw new RuntimeException( 'COULD_NOT_PARSE_IP' );
-		}
-
-		if ( $address->getRangeType() !== Type::T_PUBLIC )
-		{
-			return true;
-		}
-
-		return false;
-	}
-
-	/**
 	 * Make a HTTP Request
 	 *
-	 * @param int|null $timeout				Timeout
-	 * @param string|null $httpVersion			HTTP Version
-	 * @param bool|int $followRedirects		Automatically follow redirects? If a number is provided, will follow up to that number of redirects
-	 * @param array|null $allowedProtocols		Protocols allowed (if NULL we default to array( 'http', 'https', 'ftp', 'scp', 'sftp', 'ftps' ))
-	 * @return    Curl
+	 * @param	int|null	$timeout				Timeout
+	 * @param	string		$httpVersion			HTTP Version
+	 * @param	bool|int	$followRedirects		Automatically follow redirects? If a number is provided, will follow up to that number of redirects
+	 * @param	array|null	$allowedProtocols		Protocols allowed (if NULL we default to array( 'http', 'https', 'ftp', 'scp', 'sftp', 'ftps' ))
+	 * @return	\IPS\Http\Request
 	 */
-	public function request( int $timeout=null, string $httpVersion=null, bool|int $followRedirects=5, array $allowedProtocols=NULL ): Curl
+	public function request( $timeout=null, $httpVersion=null, $followRedirects=5, $allowedProtocols=NULL )
 	{
 		$allowedProtocols = $allowedProtocols ?: array( 'http', 'https', 'ftp', 'scp', 'sftp', 'ftps' );
 
 		/* Check the scheme is valid. Some areas accept user-submitted information to create a Url object. To avoid
 			security issues from using file:// telnet:// etc. We reject everything not used by the suite here */
-		if( isset( $this->data['scheme'] ) AND !in_array( $this->data['scheme'], $allowedProtocols ) )
+		if( isset( $this->data['scheme'] ) AND !\in_array( $this->data['scheme'], $allowedProtocols ) )
 		{
-			throw new RuntimeException( mb_strtoupper( $this->data['scheme'] ) . '_SCHEME_NOT_PERMITTED' );
+			throw new \RuntimeException( mb_strtoupper( $this->data['scheme'] ) . '_SCHEME_NOT_PERMITTED' );
 		}
 		
 		/* Set a timeout */
 		if( $timeout === null )
 		{
-			$timeout = DEFAULT_REQUEST_TIMEOUT;
+			$timeout = \IPS\DEFAULT_REQUEST_TIMEOUT;
 		}
 
-		/* Use cURL - We require 7.36 or higher because older versions can't handle chunked encoding properly */
-		$version = curl_version();
-		if( version_compare( $version['version'], '7.36', '>=' ) )
+		/* Use cURL if we can. BYPASS_CURL constant can be set to TRUE to force us to fallback to Sockets */
+		if ( \function_exists( 'curl_init' ) and \function_exists( 'curl_exec' ) and \IPS\BYPASS_CURL === false )
 		{
-			$requestObj	= new Curl( $this, $timeout, $httpVersion, $followRedirects, $allowedProtocols );
+			/* We require 7.36 or higher because older versions can't handle chunked encoding properly - FORCE_CURL constant can be set to override this and use it anyway */
+			$version = curl_version();
+			if( \IPS\FORCE_CURL or version_compare( $version['version'], '7.36', '>=' ) )
+			{
+				$requestObj	= new \IPS\Http\Request\Curl( $this, $timeout, $httpVersion, $followRedirects, $allowedProtocols );
+			}
 		}
 
+		/* Fallback to Sockets if we can't use cURL */
 		if( !isset( $requestObj ) )
 		{
-			throw new RuntimeException( 'CURL_NOT_AVAILABLE' );
+			$requestObj = new \IPS\Http\Request\Sockets($this, $timeout, $httpVersion, $followRedirects, $allowedProtocols);
 		}
 
 		/* Set a default user-agent (some services, e.g. spotify, block requests without one but it's good to do so anyway) */
-		$requestObj->setHeaders( array( 'User-Agent' => 'Invision Community 5' ) );
+		$requestObj->setHeaders( array( 'User-Agent' => 'Invision Community 4' ) );
 		
 		/* Return */
 		return $requestObj;
@@ -871,21 +614,21 @@ class Url
 	/**
 	 * Import as file
 	 *
-	 * @param string $storageExtension	The extension which specified the storage location to use
-	 * @return	File
-	 * @throws	RuntimeException
+	 * @param	string	$storageExtension	The extension which specified the storage location to use
+	 * @return	\IPS\File
+	 * @throws	\RuntimeException
 	 */
-	public function import( string $storageExtension ): File
+	public function import( $storageExtension )
 	{
 		$response = $this->request()->get();
 
 		/* We should not attempt to "import" 404, 403, 500, etc. responses */
 		if( (int) $response->httpResponseCode !== 200 )
 		{
-			throw new RuntimeException( "COULD_NOT_IMPORT" );
+			throw new \RuntimeException( "COULD_NOT_IMPORT" );
 		}
 
-		return File::create( $storageExtension, basename( $this->data[ static::COMPONENT_PATH ] ), (string) $response );
+		return \IPS\File::create( $storageExtension, basename( $this->data[ static::COMPONENT_PATH ] ), (string) $response );
 	}
 			
 	/**
@@ -903,7 +646,7 @@ class Url
 	/**
 	 * @brief	Allowed characters for the different components, everything apart from schemes and ports can also contain percent-encoded characters
 	 */
-	protected static array $allowedCharacters = array(
+	protected static $allowedCharacters = array(
 		/* A scheme must is allowed to contain letters, digits, plus ("+"), period ("."), or hyphen ("-"). */
 		self::COMPONENT_SCHEME => 'A-Za-z0-9\+\.\-',
 		/* A username is allowed to contain Unreserved Characters and Subcomponent Delimiters */
@@ -933,17 +676,17 @@ class Url
 	/**
 	 * Validate a component
 	 *
-	 * @param string $component	One of the COMPONENT_* constants
-	 * @param string $value		The value
+	 * @param	string	$component	One of the COMPONENT_* constants
+	 * @param	string	$value		The value
 	 * @return	bool
 	 */
-	public static function validateComponent( string $component, string $value ): bool
+	public static function validateComponent( $component, $value )
 	{
 		/* Get the allowed characters */
 		$allowedCharacters = static::$allowedCharacters[ $component ];
 		
 		/* These ones can also include percent-encoded characters and non-latin characters */
-		if ( !in_array( $component, array( static::COMPONENT_SCHEME, static::COMPONENT_PORT ) ) )
+		if ( !\in_array( $component, array( static::COMPONENT_SCHEME, static::COMPONENT_PORT ) ) )
 		{
 			$regex = '(' . '(%[A-Fa-z0-9]{2})|' . '[' . $allowedCharacters . ']\X*' . ')*';
 		}
@@ -965,17 +708,17 @@ class Url
 	/**
 	 * Percent-Encode a component
 	 *
-	 * @param string $component			One of the COMPONENT_* constants
-	 * @param string $value				The value
+	 * @param	string			$component			One of the COMPONENT_* constants
+	 * @param	string			$value				The value
 	 * @return	string
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public static function encodeComponent( string $component, string $value ): string
+	public static function encodeComponent( $component, $value )
 	{
 		/* These ones cannot be percent-encoded */
-		if ( in_array( $component, array( static::COMPONENT_SCHEME, static::COMPONENT_PORT ) ) )
+		if ( \in_array( $component, array( static::COMPONENT_SCHEME, static::COMPONENT_PORT ) ) )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 				
 		/* Get the allowed characters */
@@ -992,7 +735,7 @@ class Url
 			a Google+ profile - when that hits PHP, it will convert it to a space, making the URL invalid.
 			There is no downside to percent-encoding any particular character even if it doesn't technically
 			need to be, so to avoid this issue, we'll just encode it */
-		if ( in_array( $component, array( static::COMPONENT_QUERY, static::COMPONENT_QUERY_KEY, static::COMPONENT_QUERY_VALUE ) ) )
+		if ( \in_array( $component, array( static::COMPONENT_QUERY, static::COMPONENT_QUERY_KEY, static::COMPONENT_QUERY_VALUE ) ) )
 		{
 			$return = str_replace( '+', '%2B', $return );
 		}
@@ -1006,10 +749,10 @@ class Url
 	 *
 	 * @param	string	$component	One of the COMPONENT_* constants
 	 * @param	string	$value		The value
-	 * @return	string
-	 * @throws	InvalidArgumentException
+	 * @return	bool
+	 * @throws	\InvalidArgumentException
 	 */
-	public static function decodeComponent( string $component, string $value ): string
+	public static function decodeComponent( $component, $value )
 	{
 		return rawurldecode( $value );
 	}
@@ -1019,13 +762,13 @@ class Url
 	/**
 	 * Return the base URL
 	 *
-	 * @param mixed $protocol		Protocol (one of the PROTOCOL_* constants)
+	 * @param	bool			$protocol		Protocol (one of the PROTOCOL_* constants)
 	 * @return	string
 	 */
-	public static function baseUrl( mixed $protocol = 0 ): string
+	public static function baseUrl( $protocol = 0 )
 	{
 		/* Get the base URL */
-		$url = Settings::i()->base_url;
+		$url = \IPS\Settings::i()->base_url;
 		
 		/* Adjust the protocol */
 		if ( $protocol )
@@ -1063,9 +806,9 @@ class Url
 	 * Add a referrer to the URL
 	 *
 	 * @param	string	$url		The URL.
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function addRef( string $url ): Url
+	public function addRef( string $url ): \IPS\Http\Url
 	{
 		return $this->setQueryString( 'ref', base64_encode( $url ) );
 	}
@@ -1073,15 +816,15 @@ class Url
 	/**
 	 * @brief Punycode object
 	 */
-	protected static ?Punycode $punycode = NULL;
+	protected static $punycode = NULL;
 	
 	/**
 	 * Convert a full URL into it's components
 	 *
-	 * @param string|null $url		A valid URL as per our definition (see phpDoc on class) or NULL if being called by createFromComponents()
-	 * @param bool $autoEncode		If true, any invalid components will be automatically encoded rather than an exception thrown - useful if the entire link is user-provided
+	 * @param	string|NULL	$url		A valid URL as per our definition (see phpDoc on class) or NULL if being called by createFromComponents()
+	 * @param	bool	$autoEncode		If true, any invalid components will be automatically encoded rather than an exception thrown - useful if the entire link is user-provided
 	 * @return	array
-	 * @throws    UrlException
+	 * @throws	\IPS\Http\Url\Exception
 	 *	@li	INVALID_URL			The URL did not start with // to indicate relative protocol or contain ://
 	 *	@li	INVALID_SCHEME		The scheme was invalid
 	 *	@li	INVALID_USERNAME	The username was invalid
@@ -1091,7 +834,7 @@ class Url
 	 *	@li	INVALID_QUERY		The query was invalid
 	 *	@li	INVALID_FRAGMENT	The fragment was invalid
 	 */
-	protected static function componentsFromUrlString( ?string $url, bool $autoEncode=FALSE ): array
+	protected static function componentsFromUrlString( $url, $autoEncode = FALSE )
 	{
 		/* Init */
 		$return = array(
@@ -1118,7 +861,7 @@ class Url
 				}
 				else
 				{
-					throw new UrlException('INVALID_URL');
+					throw new \IPS\Http\Url\Exception('INVALID_URL');
 				}
 			}
 			else
@@ -1138,7 +881,7 @@ class Url
 				}
 				else
 				{
-					throw new UrlException('INVALID_SCHEME');
+					throw new \IPS\Http\Url\Exception('INVALID_SCHEME');
 				}
 			}
 			
@@ -1189,7 +932,7 @@ class Url
 				}
 				else
 				{
-					throw new UrlException('INVALID_USERNAME');
+					throw new \IPS\Http\Url\Exception('INVALID_USERNAME');
 				}
 			}
 			else
@@ -1208,7 +951,7 @@ class Url
 					}
 					else
 					{
-						throw new UrlException('INVALID_PASSWORD');
+						throw new \IPS\Http\Url\Exception('INVALID_PASSWORD');
 					}
 				}
 				else
@@ -1221,7 +964,7 @@ class Url
 		/* If the authority ends in a : followed by a number, that's the port */
 		if ( preg_match( '/:(\d*)$/', $authority, $matches ) )
 		{
-			$return[ static::COMPONENT_PORT ] = intval( $matches[1] );
+			$return[ static::COMPONENT_PORT ] = \intval( $matches[1] );
 			$authority = mb_substr( $authority, 0, -mb_strlen( $matches[0] ) );
 		}
 		
@@ -1230,20 +973,20 @@ class Url
 		{
 			if ( static::$punycode === NULL )
 			{
-				IPS::$PSR0Namespaces['TrueBV'] = \IPS\ROOT_PATH . "/system/3rd_party/php-punycode";
-				static::$punycode = new Punycode();
+				\IPS\IPS::$PSR0Namespaces['TrueBV'] = \IPS\ROOT_PATH . "/system/3rd_party/php-punycode";
+				static::$punycode = new \TrueBV\Punycode();
 			}
 
 			try
 			{
 				$authority = static::$punycode->encode( $authority );
 			}
-			catch( OutOfBoundsException $e )
+			catch( \TrueBV\Exception\OutOfBoundsException $e )
 			{
 				/* If we are not auto-encoding, through an exception, otherwise we can just fix it */
 				if( !$autoEncode )
 				{
-					throw new UrlException('INVALID_HOST');
+					throw new \IPS\Http\Url\Exception('INVALID_HOST');
 				}
 			}
 		}
@@ -1257,7 +1000,7 @@ class Url
 			}
 			else
 			{
-				throw new UrlException('INVALID_HOST');
+				throw new \IPS\Http\Url\Exception('INVALID_HOST');
 			}
 		}
 		else
@@ -1281,7 +1024,7 @@ class Url
 			}
 			else
 			{
-				throw new UrlException('INVALID_PATH');
+				throw new \IPS\Http\Url\Exception('INVALID_PATH');
 			}
 		}
 		else
@@ -1309,12 +1052,12 @@ class Url
 				}
 				else
 				{
-					throw new UrlException('INVALID_QUERY');
+					throw new \IPS\Http\Url\Exception('INVALID_QUERY');
 				}
 			}
 			else
 			{
-				$return[ static::COMPONENT_QUERY ] = static::convertQueryAsStringToArray($matches[1], TRUE);
+				$return[ static::COMPONENT_QUERY ] = static::convertQueryAsStringToArray( $matches[1], TRUE );
 			}
 			$url = mb_substr( $url, mb_strlen( $matches[1] ) );
 		}
@@ -1331,7 +1074,7 @@ class Url
 				}
 				else
 				{
-					throw new UrlException('INVALID_FRAGMENT');
+					throw new \IPS\Http\Url\Exception('INVALID_FRAGMENT');
 				}
 			}
 			else
@@ -1347,11 +1090,11 @@ class Url
 	/**
 	 * Convert an array of query parameters to a query string
 	 *
-	 * @param array $query	The query as an array (e.g. [ 'foo'=>'bar', 'moo'=>'baz' ])
-	 * @param bool $encode	If true, will encode for output
+	 * @param	array	$query	The query as an array (e.g. [ 'foo'=>'bar', 'moo'=>'baz' ])
+	 * @param	bool	$encode	If true, will encode for output
 	 * @return	string
 	 */
-	public static function convertQueryAsArrayToString( array $query, bool $encode=FALSE ): string
+	public static function convertQueryAsArrayToString( $query, $encode = FALSE )
 	{
 		$return = array();
 		foreach ( $query as $k => $v )
@@ -1361,9 +1104,9 @@ class Url
 				$k = static::encodeComponent( static::COMPONENT_QUERY_KEY, $k );
 			}
 			
-			if ( is_array( $v ) )
+			if ( \is_array( $v ) )
 			{
-				$return[] = static::squashQueryStringArray($k, $v);
+				$return[] = static::squashQueryStringArray( $k, $v );
 			}
 			elseif ( $v !== NULL )
 			{
@@ -1384,12 +1127,12 @@ class Url
 	/**
 	 * Convert an array within an array of query parameters to a query string
 	 *
-	 * @param string $key	The key for this query string parameter
-	 * @param array $value	The query as an array (e.g. [ 'foo'=>'bar', 'moo'=>'baz' ])
-	 * @param bool $encode	If true, will encode for output
+	 * @param	string	$key	The key for this query string parameter
+	 * @param	array	$value	The query as an array (e.g. [ 'foo'=>'bar', 'moo'=>'baz' ])
+	 * @param	bool	$encode	If true, will encode for output
 	 * @return	string
 	 */
-	protected static function squashQueryStringArray( string $key, array $value, bool $encode=FALSE ): string
+	protected static function squashQueryStringArray( $key, $value, $encode = FALSE )
 	{
 		$return = array();
 		foreach ( $value as $k => $v )
@@ -1399,9 +1142,9 @@ class Url
 				$k = static::encodeComponent( static::COMPONENT_QUERY_KEY, $k );
 			}
 			
-			if ( is_array( $v ) )
+			if ( \is_array( $v ) )
 			{
-				$return[] = static::squashQueryStringArray("{$key}[{$k}]", $v, $encode);
+				$return[] = static::squashQueryStringArray( "{$key}[{$k}]", $v, $encode );
 			}
 			else
 			{
@@ -1413,17 +1156,17 @@ class Url
 				$return[] = "{$key}[{$k}]={$v}";
 			}
 		}
-		return count( $return ) ? implode( '&', $return ) : '';
+		return \count( $return ) ? implode( '&', $return ) : '';
 	}
 		
 	/**
 	 * Convert a query string to an array of query parameters
 	 *
-	 * @param	string|null	$query	The query string as a string (e.g. "foo=bar&moo=baz")
-	 * @param bool $decode	If true, will decode
+	 * @param	array	$query	The query string as a string (e.g. "foo=bar&moo=baz")
+	 * @param	bool	$decode	If true, will decode
 	 * @return	array
 	 */
-	protected static function convertQueryAsStringToArray( ?string $query, bool $decode=FALSE ): array
+	protected static function convertQueryAsStringToArray( $query, $decode=FALSE )
 	{
 		$return = array();
 		
@@ -1450,7 +1193,7 @@ class Url
 					}
 					else
 					{
-						$return[ $keyAndValue[0] ] = $keyAndValue[1];
+						$return[ $keyAndValue[0] ] = (string) $keyAndValue[1];
 					}
 				}
 				else
@@ -1466,13 +1209,13 @@ class Url
 	/**
 	 * Utility function used by convertQueryAsStringToArray()
 	 *
-	 * @param array $return			The current $return value being worked on, passed by reference
-	 * @param string $mainKey		The main key, for example, if parsing "foo[x][y]=bar", the value will be "foo"
-	 * @param string $subKeyNames	The sub keys in square brackets, for example, if parsing "foo[x][y]=bar", the value will be "[x][y]"
-	 * @param string $value			The value, for example, if parsing "foo[x][y]=bar", the value will be "bar"
+	 * @param	array	$return			The current $return value being worked on, passed by reference
+	 * @param	string	$mainKey		The main key, for example, if parsing "foo[x][y]=bar", the value will be "foo"
+	 * @param	string	$subKeyNames	The sub keys in square brackets, for example, if parsing "foo[x][y]=bar", the value will be "[x][y]"
+	 * @param	string	$value			The value, for example, if parsing "foo[x][y]=bar", the value will be "bar"
 	 * @return	void
 	 */
-	protected static function _pushQueryStringPartIntoArray( array &$return, string $mainKey, string $subKeyNames, string $value ) : void
+	protected static function _pushQueryStringPartIntoArray( &$return, $mainKey, $subKeyNames, $value )
 	{
 		preg_match_all( '/\[([^\]]*)\]/', $subKeyNames, $matches );
 		
@@ -1481,7 +1224,7 @@ class Url
 	        $return[ $mainKey ] = array();
 	    }
 	    
-	    if ( is_array( $return[ $mainKey ] ) )
+	    if ( \is_array( $return[ $mainKey ] ) )
 	    {
 		    $workingArray =& $return[ $mainKey ];
 	    }
@@ -1496,7 +1239,7 @@ class Url
 			if ( $k === '' )
 			{
 				$workingArray[] = array();
-				$workingArray =& $workingArray[ count( $workingArray ) - 1 ];
+				$workingArray =& $workingArray[ \count( $workingArray ) - 1 ];
 			}
 			elseif ( !isset( $workingArray[ $k ] ) )
 			{
@@ -1518,24 +1261,24 @@ class Url
 	/**
 	 * Get FURL Definition
 	 *
-	 * @param bool $revert	If TRUE, ignores all customisations and reloads from json
+	 * @param	bool	$revert	If TRUE, ignores all customisations and reloads from json
 	 * @return	array
 	 */
-	public static function furlDefinition( bool $revert=FALSE ): array
+	public static function furlDefinition( $revert=FALSE )
 	{
-		return Friendly::furlDefinition( $revert );
+		return \IPS\Http\Url\Friendly::furlDefinition( $revert );
 	}
 
 	/**
 	 * Convert a value into an "SEO Title" for friendly URLs
 	 *
-	 * @param string $value	Value
+	 * @param	string	$value	Value
 	 * @return	string
 	 * @note	Many places require an SEO title, so we always need to return something, so when no valid title is available we return a dash
 	 */
-	public static function seoTitle( string $value ): string
+	public static function seoTitle( $value )
 	{
-		return Friendly::seoTitle( $value );
+		return \IPS\Http\Url\Friendly::seoTitle( $value );
 	}
 
 	/**
@@ -1550,13 +1293,13 @@ class Url
 
 		foreach( array_merge( ['filter', 'sortby', 'sortdirection'], $additionalParams ) as $param )
 		{
-			if ( isset( Request::i()->$param ) )
+			if ( isset( \IPS\Request::i()->$param ) )
 			{
-				$extraUrlParams[ $param ] = Request::i()->$param;
+				$extraUrlParams[ $param ] = \IPS\Request::i()->$param;
 			}
 		}
 
-		if ( count( $extraUrlParams ) )
+		if ( \count( $extraUrlParams ) )
 		{
 			return $this->setQueryString( $extraUrlParams );
 		}

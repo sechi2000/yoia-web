@@ -12,39 +12,16 @@
 namespace IPS\nexus;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\DateTime;
-use IPS\Email;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecord;
-use IPS\Request;
-use IPS\Task\Queue\OutOfRangeException;
-use IPS\Theme;
-use function defined;
-use function get_called_class;
-use function strlen;
-use function substr;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-use const IPS\Helpers\Table\SEARCH_NUMERIC;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Payout Model
- *
- * @property Customer $member
  */
-abstract class Payout extends ActiveRecord
+abstract class _Payout extends \IPS\Patterns\ActiveRecord
 {	
 	const STATUS_COMPLETE = 'done';
 	const STATUS_PENDING  = 'pend';
@@ -54,35 +31,28 @@ abstract class Payout extends ActiveRecord
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_payouts';
+	public static $databaseTable = 'nexus_payouts';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'po_';
+	public static $databasePrefix = 'po_';
 	
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    static
-	 * @throws OutOfRangeException
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): static
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
-		$classname = Gateway::payoutGateways()[ $data['po_gateway'] ];
-
-		/* If the classname doesn't exist, then we can't load this */
-		if( !$classname )
-		{
-			throw new OutOfRangeException;
-		}
+		$classname = \IPS\nexus\Gateway::payoutGateways()[ $data['po_gateway'] ];
 		
 		/* Initiate an object */
 		$obj = new $classname;
@@ -93,7 +63,7 @@ abstract class Payout extends ActiveRecord
 		{
 			if( static::$databasePrefix AND mb_strpos( $k, static::$databasePrefix ) === 0 )
 			{
-				$k = substr( $k, strlen( static::$databasePrefix ) );
+				$k = \substr( $k, \strlen( static::$databasePrefix ) );
 			}
 
 			$obj->_data[ $k ] = $v;
@@ -109,68 +79,69 @@ abstract class Payout extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
-		$this->date = new DateTime;
+		$this->date = new \IPS\DateTime;
 		$this->status = static::STATUS_PENDING;
+		$this->gateway = preg_replace( '/.+?\\\([A-Z]+?)\\\Payout$/i', '$1', \get_called_class() );
 	}
 	
 	/**
 	 * @brief	Requires manual approval?
 	 */
-	public static bool $requiresApproval = FALSE;
+	public static $requiresApproval = FALSE;
 	
 	/**
 	 * Get payouts table
 	 *
 	 * @param	array			$where	Where clause
-	 * @param	Url	$url	URL to display table on
-	 * @return	Db
+	 * @param	\IPS\Http\Url	$ref	URL to display table on
+	 * @return	\IPS\Helpers\Table\Db
 	 */
-	public static function table( array $where, Url $url ) : Db
+	public static function table( $where, \IPS\Http\Url $url )
 	{
-		$table = new Db( 'nexus_payouts', $url, $where );
+		$table = new \IPS\Helpers\Table\Db( 'nexus_payouts', $url, $where );
 		$table->include = array( 'po_status', 'po_id', 'po_gateway', 'po_member', 'po_amount', 'po_date' );
 		$table->parsers = array(
 			'po_status'	=> function( $val )
 			{
-				return Theme::i()->getTemplate( 'payouts', 'nexus' )->status( $val );
+				return \IPS\Theme::i()->getTemplate( 'payouts', 'nexus' )->status( $val );
 			},
-			'po_member'	=> function ( $val )
+			'po_member'	=> function ( $val, $row )
 			{
-				return Theme::i()->getTemplate('global')->userLink( Member::load( $val ) );
+				return \IPS\Theme::i()->getTemplate('global')->userLink( \IPS\Member::load( $val ) );
 			},
 			'po_amount'	=> function( $val, $row )
 			{
-				return (string) new Money( $val, $row['po_currency'] );
+				return (string) new \IPS\nexus\Money( $val, $row['po_currency'] );
 			},
 			'po_date'	=> function( $val )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			}
 		);
 		$table->filters = array(
 			'postatus_pend'	=> array( 'po_status=?', 'pend' ),
 		);
 		$table->advancedSearch = array(
-			'po_status'	=> array( SEARCH_SELECT, array( 'options' => array(
-				Payout::STATUS_COMPLETE	=> 'postatus_' . Payout::STATUS_COMPLETE,
-				Payout::STATUS_PENDING	=> 'postatus_' . Payout::STATUS_PENDING,
-				Payout::STATUS_CANCELED	=> 'postatus_' . Payout::STATUS_CANCELED,
+			'po_status'	=> array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => array(
+				\IPS\nexus\Payout::STATUS_COMPLETE	=> 'postatus_' . \IPS\nexus\Payout::STATUS_COMPLETE,
+				\IPS\nexus\Payout::STATUS_PENDING	=> 'postatus_' . \IPS\nexus\Payout::STATUS_PENDING,
+				\IPS\nexus\Payout::STATUS_CANCELED	=> 'postatus_' . \IPS\nexus\Payout::STATUS_CANCELED,
 			), 'multiple' => TRUE ) ),
-			'po_member'	=> SEARCH_MEMBER,
-			'po_amount'	=> SEARCH_NUMERIC,
-			'po_date'	=> SEARCH_DATE_RANGE,
+			'po_member'	=> \IPS\Helpers\Table\SEARCH_MEMBER,
+			'po_amount'	=> \IPS\Helpers\Table\SEARCH_NUMERIC,
+			'po_date'	=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
 		);
 		$table->rowButtons = function( $row )
 		{
 			return array_merge( array(
 				'view'	=> array(
 					'icon'	=> 'search',
-					'link'	=> Url::internal( "app=nexus&module=payments&controller=payouts&do=view&id={$row['po_id']}" ),
+					'link'	=> \IPS\Http\Url::internal( "app=nexus&module=payments&controller=payouts&do=view&id={$row['po_id']}" ),
 					'title'	=> 'view',
 				),
-			), Payout::constructFromData( $row )->buttons( 't' ) );
+			), \IPS\nexus\Payout::constructFromData( $row )->buttons( 't' ) );
 		};
 		$table->sortBy = $table->sortBy ?: 'po_date';
 		
@@ -180,20 +151,20 @@ abstract class Payout extends ActiveRecord
 	/**
 	 * Get amount
 	 *
-	 * @return    Money
+	 * @return	\IPS\nexus\Money
 	 */
-	public function get_amount() : Money
+	public function get_amount()
 	{		
-		return new Money( $this->_data['amount'], $this->_data['currency'] );
+		return new \IPS\nexus\Money( $this->_data['amount'], $this->_data['currency'] );
 	}
 	
 	/**
 	 * Set amount
 	 *
-	 * @param Money $amount	The total
+	 * @param	\IPS\nexus\Money	$amount	The total
 	 * @return	void
 	 */
-	public function set_amount(Money $amount ) : void
+	public function set_amount( \IPS\nexus\Money $amount )
 	{
 		$this->_data['amount'] = $amount->amount;
 		$this->_data['currency'] = $amount->currency;
@@ -202,20 +173,20 @@ abstract class Payout extends ActiveRecord
 	/**
 	 * Get member
 	 *
-	 * @return	Customer
+	 * @return	\IPS\Member
 	 */
-	public function get_member() : Customer
+	public function get_member()
 	{
-		return Customer::load( $this->_data['member'] );
+		return \IPS\nexus\Customer::load( $this->_data['member'] );
 	}
 	
 	/**
 	 * Set member
 	 *
-	 * @param	Member $member
+	 * @param	\IPS\Member
 	 * @return	void
 	 */
-	public function set_member( Member $member ) : void
+	public function set_member( \IPS\Member $member )
 	{
 		$this->_data['member'] = $member->member_id;
 	}
@@ -223,20 +194,20 @@ abstract class Payout extends ActiveRecord
 	/**
 	 * Get date
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_date() : DateTime
+	public function get_date()
 	{
-		return DateTime::ts( $this->_data['date'] );
+		return \IPS\DateTime::ts( $this->_data['date'] );
 	}
 	
 	/**
 	 * Set date
 	 *
-	 * @param	DateTime	$date	The invoice date
+	 * @param	\IPS\DateTime	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_date( DateTime $date ) : void
+	public function set_date( \IPS\DateTime $date )
 	{
 		$this->_data['date'] = $date->getTimestamp();
 	}
@@ -244,20 +215,20 @@ abstract class Payout extends ActiveRecord
 	/**
 	 * Get completed date
 	 *
-	 * @return	DateTime|NULL
+	 * @return	\IPS\DateTime|NULL
 	 */
-	public function get_completed() : DateTime|null
+	public function get_completed()
 	{
-		return $this->_data['completed'] ? DateTime::ts( $this->_data['completed'] ) : NULL;
+		return $this->_data['completed'] ? \IPS\DateTime::ts( $this->_data['completed'] ) : NULL;
 	}
 	
 	/**
 	 * Set completed date
 	 *
-	 * @param	DateTime	$date	The invoice date
+	 * @param	\IPS\DateTime	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_completed( DateTime $date ) : void
+	public function set_completed( \IPS\DateTime $date )
 	{
 		$this->_data['completed'] = $date->getTimestamp();
 	}
@@ -265,20 +236,20 @@ abstract class Payout extends ActiveRecord
 	/**
 	 * Get approving member
 	 *
-	 * @return	Customer|null
+	 * @return	\IPS\Member
 	 */
-	public function get_processed_by() : Customer|null
+	public function get_processed_by()
 	{
-		return $this->_data['processed_by'] ? Customer::load( $this->_data['processed_by'] ) : NULL;
+		return $this->_data['processed_by'] ? \IPS\nexus\Customer::load( $this->_data['processed_by'] ) : NULL;
 	}
 	
 	/**
 	 * Set approving member
 	 *
-	 * @param	Member $member
+	 * @param	\IPS\Member
 	 * @return	void
 	 */
-	public function set_processed_by( Member $member ) : void
+	public function set_processed_by( \IPS\Member $member )
 	{
 		$this->_data['processed_by'] = $member->member_id;
 	}
@@ -289,15 +260,14 @@ abstract class Payout extends ActiveRecord
 	 * @param	string	$ref	Referer
 	 * @return	array
 	 */
-	public function buttons( string $ref='v' ) : array
+	public function buttons( $ref='v' )
 	{
-		/* @var Url\Internal $url */
-		$url = $this->acpUrl()->setQueryString( array( 'r' => $ref, 'filter' => Request::i()->filter ) );
+		$url = $this->acpUrl()->setQueryString( array( 'r' => $ref, 'filter' => \IPS\Request::i()->filter ) );
 		$return = array();
 		
 		if ( $this->status === static::STATUS_PENDING )
 		{
-			if( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_process' ) )
+			if( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_process' ) )
 			{
 				$return['approve'] = array(
 					'title'		=> 'approve',
@@ -306,7 +276,7 @@ abstract class Payout extends ActiveRecord
 					'data'		=> array( 'confirm' => '' )
 				);
 			}
-			if( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_cancel' ) )
+			if( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_cancel' ) )
 			{
 				$return['cancel'] = array(
 					'title'		=> 'cancel',
@@ -314,20 +284,20 @@ abstract class Payout extends ActiveRecord
 					'link'		=> $url->setQueryString( 'do', 'cancel' )->csrf(),
 					'data'		=> array(
 						'confirm'			=> '',
-						'confirmMessage'	=> Member::loggedIn()->language()->addToStack('payout_cancel_confirm'),
+						'confirmMessage'	=> \IPS\Member::loggedIn()->language()->addToStack('payout_cancel_confirm'),
 						'confirmType'		=> 'verify',
 						'confirmIcon'		=> 'question',
 						'confirmButtons'	=> json_encode( array(
-							'yes'				=>	Member::loggedIn()->language()->addToStack('yes'),
-							'no'				=>	Member::loggedIn()->language()->addToStack('no'),
-							'cancel'			=>	Member::loggedIn()->language()->addToStack('cancel'),
+							'yes'				=>	\IPS\Member::loggedIn()->language()->addToStack('yes'),
+							'no'				=>	\IPS\Member::loggedIn()->language()->addToStack('no'),
+							'cancel'			=>	\IPS\Member::loggedIn()->language()->addToStack('cancel'),
 						) )
 					)
 				);
 			}
 		}
 		
-		if( Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_delete' ) )
+		if( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'payouts_delete' ) )
 		{
 			$return['delete'] = array(
 				'title'		=> 'delete',
@@ -343,21 +313,11 @@ abstract class Payout extends ActiveRecord
 	/**
 	 * ACP URL
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function acpUrl() : Url
+	public function acpUrl()
 	{
-		return Url::internal( "app=nexus&module=payments&controller=payouts&do=view&id={$this->id}", 'admin' );
-	}
-
-	/**
-	 * Extra HTML to display when the admin view the Payout in the ACP
-	 *
-	 * @return string
-	 */
-	public function acpHtml() : string
-	{
-		return "";
+		return \IPS\Http\Url::internal( "app=nexus&module=payments&controller=payouts&do=view&id={$this->id}", 'admin' );
 	}
 
 	/**
@@ -367,76 +327,20 @@ abstract class Payout extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function markCompleted() : void
+	public function markCompleted()
 	{
 		$this->status = static::STATUS_COMPLETE;
-		$this->completed = new DateTime;
+		$this->completed = new \IPS\DateTime;
 		$this->save();
 
 		/* Notify member */
-		Email::buildFromTemplate( 'nexus', 'payoutComplete', array( $this ), Email::TYPE_TRANSACTIONAL )->send( $this->member );
+		\IPS\Email::buildFromTemplate( 'nexus', 'payoutComplete', array( $this ), \IPS\Email::TYPE_TRANSACTIONAL )->send( $this->member );
 	}
-
-	/**
-	 * Save Changed Columns
-	 *
-	 * @return    void
-	 */
-	public function save(): void
-	{
-		if( $this->_new )
-		{
-			/* Find the gateway key based on the class we called */
-			$class = get_called_class();
-			foreach( Gateway::payoutGateways() as $k => $v )
-			{
-				if( $v == $class )
-				{
-					$this->gateway = $k;
-					break;
-				}
-			}
-		}
-
-		parent::save();
-	}
-
-	/**
-	 * ACP Settings
-	 *
-	 * @return	array
-	 */
-	abstract public static function settings() : array;
-
-	/**
-	 * Payout Form
-	 *
-	 * @return	array
-	 */
-	abstract public static function form() :array;
-
-	/**
-	 * Get data and validate
-	 *
-	 * @param	array	$values	Values from form
-	 * @return	mixed
-	 * @throws	DomainException
-	 */
-	abstract public function getData( array $values ) : mixed;
-
-	/**
-	 * Process the payout
-	 * Return the new status for this payout record
-	 *
-	 * @return	string
-	 * @throws	Exception
-	 */
-	abstract public function process() : string;
 	
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse			int						id				ID number
 	 * @apiresponse			string					status			Status: 'done' = Payment sent; 'pend' = Pending; 'canc' = Canceled
@@ -448,7 +352,7 @@ abstract class Payout extends ActiveRecord
 	 * @clientapiresponse	string					gatewayId		Any ID number provided by the gateway to identify the transaction on their end
 	 * @apiresponse			\IPS\nexus\Customer		customer		Customer
 	 */
-	public function apiOutput( ?Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'id'				=> $this->id,
@@ -458,7 +362,7 @@ abstract class Payout extends ActiveRecord
 			'gateway'			=> $this->gateway,
 			'data'				=> $this->data,
 			'requestedDate'		=> $this->date->rfc3339(),
-			'completedDate'		=> $this->completed?->rfc3339(),
+			'completedDate'		=> $this->completed ? $this->completed->rfc3339() : null,
 			'gatewayId'			=> $this->gw_id,
 		);
 	}

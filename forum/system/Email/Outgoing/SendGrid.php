@@ -10,34 +10,19 @@
 
 namespace IPS\Email\Outgoing;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Advertisement;
-use IPS\core\extensions\core\CommunityEnhancements\SendGrid as SendGridIntegration;
-use IPS\Db;
-use IPS\Email;
-use IPS\Http\Request\Exception as RequestException;
-use IPS\Email\Outgoing\Exception as EmailException;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
 use IPS\Settings;
-use RuntimeException;
-use function count;
-use function defined;
-use function is_array;
-use const IPS\LONG_REQUEST_TIMEOUT;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * SendGrid Email Class
  */
-class SendGrid extends Email
+class _SendGrid extends \IPS\Email
 {
 	/* !Configuration */
 	
@@ -49,15 +34,15 @@ class SendGrid extends Email
 	/**
 	 * @brief	API Key
 	 */
-	protected string $apiKey;
+	protected $apiKey;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param string $apiKey	API Key
+	 * @param	string	$apiKey	API Key
 	 * @return	void
 	 */
-	public function __construct( string $apiKey )
+	public function __construct( $apiKey )
 	{
 		$this->apiKey = $apiKey;
 	}
@@ -66,15 +51,15 @@ class SendGrid extends Email
 	 * Send the email
 	 * 
 	 * @param	mixed	$to					The member or email address, or array of members or email addresses, to send to
-	 * @param mixed $cc					Addresses to CC (can also be email, member or array of either)
-	 * @param mixed $bcc				Addresses to BCC (can also be email, member or array of either)
-	 * @param mixed $fromEmail			The email address to send from. If NULL, default setting is used
-	 * @param mixed $fromName			The name the email should appear from. If NULL, default setting is used
-	 * @param array $additionalHeaders	The name the email should appear from. If NULL, default setting is used
+	 * @param	mixed	$cc					Addresses to CC (can also be email, member or array of either)
+	 * @param	mixed	$bcc				Addresses to BCC (can also be email, member or array of either)
+	 * @param	mixed	$fromEmail			The email address to send from. If NULL, default setting is used
+	 * @param	mixed	$fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	array	$additionalHeaders	The name the email should appear from. If NULL, default setting is used
 	 * @return	void
-	 * @throws    EmailException
+	 * @throws	\IPS\Email\Outgoing\Exception
 	 */
-	public function _send( mixed $to, mixed $cc=array(), mixed $bcc=array(), mixed $fromEmail = NULL, mixed $fromName = NULL, array $additionalHeaders = array() ) : void
+	public function _send( $to, $cc=array(), $bcc=array(), $fromEmail = NULL, $fromName = NULL, $additionalHeaders = array() )
 	{
 		/* Initiate the request */
 		$request = $this->_initRequest( $fromEmail, $fromName );
@@ -95,11 +80,11 @@ class SendGrid extends Email
 		/* Add the recipients */
 		foreach ( array( 'to', 'cc', 'bcc' ) as $type )
 		{
-			if ( is_array( $$type ) )
+			if ( \is_array( $$type ) )
 			{
 				foreach ( $$type as $recipient )
 				{
-					if ( $recipient instanceof Member )
+					if ( $recipient instanceof \IPS\Member )
 					{
 						$request['personalizations'][0][ $type ][] = array( 'email' => $recipient->email, 'name' => $recipient->name );
 					}
@@ -112,7 +97,7 @@ class SendGrid extends Email
 			elseif ( $$type )
 			{
 				$recipient = $$type;
-				if ( $recipient instanceof Member )
+				if ( $recipient instanceof \IPS\Member )
 				{
 					$request['personalizations'][0][ $type ][] = array( 'email' => $recipient->email, 'name' => $recipient->name );
 				}
@@ -130,7 +115,7 @@ class SendGrid extends Email
 		$response = $this->_api( 'mail/send', $request );
 		if ( isset( $response['errors'] ) )
 		{
-			throw new EmailException( $response['errors'][0]['message'] );
+			throw new \IPS\Email\Outgoing\Exception( $response['errors'][0]['message'] );
 		}
 	}
 
@@ -142,12 +127,12 @@ class SendGrid extends Email
 	 */
 	public static function isUsable( string $type ): bool
 	{
-		if( ( new SendGridIntegration() )->enabled )
+		if( ( new \IPS\core\extensions\core\CommunityEnhancements\Sendgrid() )->enabled )
 		{
 			return match( true )
 			{
-				( $type == Email::TYPE_TRANSACTIONAL OR $type == Email::TYPE_LIST ) AND Settings::i()->sendgrid_use_for == 2 => true,
-				$type == Email::TYPE_BULK AND (int) Settings::i()->sendgrid_use_for > 0 => true,
+				( $type == \IPS\Email::TYPE_TRANSACTIONAL OR $type == \IPS\Email::TYPE_LIST ) AND Settings::i()->sendgrid_use_for == 2 => true,
+				$type == \IPS\Email::TYPE_BULK AND (int) Settings::i()->sendgrid_use_for > 0 => true,
 				default => false
 			};
 		}
@@ -158,22 +143,22 @@ class SendGrid extends Email
 	/**
 	 * Merge and Send
 	 *
-	 * @param array $recipients			Array where the keys are the email addresses to send to and the values are an array of variables to replace
-	 * @param mixed $fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
-	 * @param mixed $fromName			The name the email should appear from. If NULL, default setting is used
-	 * @param array $additionalHeaders	Additional headers to send. Merge tags can be used like in content.
-	 * @param	Lang|NULL	$language			The language the email content should be in
+	 * @param	array			$recipients			Array where the keys are the email addresses to send to and the values are an array of variables to replace
+	 * @param	mixed			$fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
+	 * @param	mixed			$fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	array			$additionalHeaders	Additional headers to send. Merge tags can be used like in content.
+	 * @param	\IPS\Lang|NULL	$language			The language the email content should be in
 	 * @return	int				Number of successful sends
 	 */
-	public function mergeAndSend( array $recipients, mixed $fromEmail = NULL, mixed $fromName = NULL, array $additionalHeaders = array(), Lang $language = NULL ): int
+	public function mergeAndSend( $recipients, $fromEmail = NULL, $fromName = NULL, $additionalHeaders = array(), \IPS\Lang $language = NULL )
 	{
 		/* Initiate the request */
 		$request = $this->_initRequest( $fromEmail, $fromName );
 		
 		/* Add the subject and content */
 		$subject = $this->compileSubject( NULL, $language );
-		$htmlContent = $this->compileContent( 'html', null, $language );
-		$plaintextContent = preg_replace( '/\*\|(.+?)\|\*/', '*|$1_plain|*', $this->compileContent( 'plaintext', null, $language ) );
+		$htmlContent = $this->compileContent( 'html', FALSE, $language );
+		$plaintextContent = preg_replace( '/\*\|(.+?)\|\*/', '*|$1_plain|*', $this->compileContent( 'plaintext', FALSE, $language ) );
 		$request['subject'] = preg_replace( '/\*\|(.+?)\|\*/', '*|$1_plain|*', $subject );
 		$request['content'] = array(
 			array(
@@ -197,7 +182,7 @@ class SendGrid extends Email
 			{
 				$language->parseEmail( $v );
 				$finalSubstitutions["*|{$k}_plain|*"] = $v;
-				$finalSubstitutions["*|{$k}|*"] = htmlspecialchars( $v, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8' );
+				$finalSubstitutions["*|{$k}|*"] = htmlspecialchars( $v, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8', TRUE );
 			} 
 			
 			$request['personalizations'][] = array(
@@ -210,16 +195,16 @@ class SendGrid extends Email
 		$request = $this->_modifyRequestDataWithHeaders( $request, $additionalHeaders );
 
 		/* Log emails sent */
-		$this->_trackStatistics( count( $addresses ) );
+		$this->_trackStatistics( \count( $addresses ) );
 		
 		/* Send */
 		try
 		{
 			$response = $this->_api( 'mail/send', $request );
 		}
-		catch(RequestException $e )
+		catch( \IPS\Email\Outgoing\Exception $e )
 		{
-			Db::i()->insert( 'core_mail_error_logs', array(
+			\IPS\Db::i()->insert( 'core_mail_error_logs', array(
 				'mlog_date'			=> time(),
 				'mlog_to'			=> json_encode( $addresses ),
 				'mlog_from'			=> $fromEmail ?: Settings::i()->email_out,
@@ -236,8 +221,8 @@ class SendGrid extends Email
 		$errorcount = 0;
 		if ( isset( $response['errors'] ) )
 		{
-			$errorcount = count( $response['errors'] );
-			Db::i()->insert( 'core_mail_error_logs', array(
+			$errorcount = \count( $response['errors'] );
+			\IPS\Db::i()->insert( 'core_mail_error_logs', array(
 				'mlog_date'			=> time(),
 				'mlog_to'			=> json_encode( $addresses ),
 				'mlog_from'			=> $fromEmail ?: Settings::i()->email_out,
@@ -249,10 +234,10 @@ class SendGrid extends Email
 			) );
 		}
 
-		$successCount = ( count( $recipients ) - $errorcount );
+		$successCount = ( \count( $recipients ) - $errorcount );
 
 		/* Update ad impression count */
-		Advertisement::updateEmailImpressions( $successCount );
+		\IPS\core\Advertisement::updateEmailImpressions( $successCount );
 
 		return $successCount;
 	}
@@ -260,11 +245,11 @@ class SendGrid extends Email
 	/**
 	 * Create a request
 	 *
-	 * @param mixed $fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
-	 * @param mixed $fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	mixed			$fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
+	 * @param	mixed			$fromName			The name the email should appear from. If NULL, default setting is used
 	 * @return	array
 	 */
-	protected function _initRequest( mixed $fromEmail = NULL, mixed $fromName = NULL ): array
+	protected function _initRequest( $fromEmail = NULL, $fromName = NULL )
 	{
 		$request = array(
 			'personalizations'	=> array(),
@@ -274,8 +259,8 @@ class SendGrid extends Email
 			),
 			'tracking_settings'	=> array(
 				'click_tracking'	=> array(
-					'enable'			=> false,
-					'enable_text'		=> false,
+					'enable'			=> (bool) Settings::i()->sendgrid_click_tracking,
+					'enable_text'		=> (bool) Settings::i()->sendgrid_click_tracking,
 				),
 				'open_tracking'	=> array(
 					'enable'			=> (bool) Settings::i()->sendgrid_click_tracking,
@@ -294,12 +279,12 @@ class SendGrid extends Email
 	/**
 	 * Modify the request data that will be sent to the SparkPost API with header data
 	 * 
-	 * @param array $request			SparkPost API request data
-	 * @param array $additionalHeaders	Additional headers to send
-	 * @param array $allowedTags		The tags that we want to parse
+	 * @param	array	$request			SparkPost API request data
+	 * @param	array	$additionalHeaders	Additional headers to send
+	 * @param	array	$allowedTags		The tags that we want to parse
 	 * @return	array
 	 */
-	protected function _modifyRequestDataWithHeaders( array $request, array $additionalHeaders = array(), array $allowedTags = array() ): array
+	protected function _modifyRequestDataWithHeaders( $request, $additionalHeaders = array(), $allowedTags = array() )
 	{
 		/* Do we have a Reply-To? */
 		if ( isset( $additionalHeaders['Reply-To'] ) )
@@ -312,7 +297,7 @@ class SendGrid extends Email
 			
 				if ( $matches[1] )
 				{		
-					if ( preg_match( '/^=\?UTF-8\?B\?(.+?)\?=$/i', trim( $matches[1] ), $_matches ) )
+					if ( preg_match( '/^\=\?UTF\-8\?B\?(.+?)\?\=$/i', trim( $matches[1] ), $_matches ) )
 					{
 						$request['reply_to']['name'] = base64_decode( $_matches[1] );
 					}
@@ -334,7 +319,7 @@ class SendGrid extends Email
 		unset( $additionalHeaders['To'] );
 		unset( $additionalHeaders['CC'] );
 		unset( $additionalHeaders['BCC'] );
-		if ( count( $additionalHeaders ) )
+		if ( \count( $additionalHeaders ) )
 		{
 			$request['headers'] = $additionalHeaders;
 		}
@@ -346,15 +331,15 @@ class SendGrid extends Email
 	/**
 	 * Make API call
 	 *
-	 * @param string $method	Method
-	 * @param array|null $args	Arguments
-	 * @return    array|null
-	 *@throws  Exception   Indicates an invalid JSON response or HTTP error
+	 * @param	string	$method	Method
+	 * @param	array	$args	Arguments
+	 * @throws  \IPS\Email\Outgoing\Exception   Indicates an invalid JSON response or HTTP error
+	 * @return	array|null
 	 */
-	protected function _api(string $method, array $args=NULL ): ?array
+	protected function _api( $method, $args=NULL )
 	{
-		$request = Url::external( 'https://api.sendgrid.com/v3/' . $method )
-			->request( LONG_REQUEST_TIMEOUT )
+		$request = \IPS\Http\Url::external( 'https://api.sendgrid.com/v3/' . $method )
+			->request( \IPS\LONG_REQUEST_TIMEOUT )
 			->setHeaders( array( 'Content-Type' => 'application/json', 'Authorization' => "Bearer {$this->apiKey}" ) );
 
 		try
@@ -380,29 +365,34 @@ class SendGrid extends Email
 			
 			return $response;
 		}
-		catch ( Exception | RuntimeException $e )
+		catch ( \IPS\Http\Request\Exception $e )
 		{
-			throw new Exception($e->getMessage(), $e->getCode() );
+			throw new \IPS\Email\Outgoing\Exception( $e->getMessage(), $e->getCode() );
+		}
+		/* Capture json decoding errors */
+		catch ( \RuntimeException $e )
+		{
+			throw new \IPS\Email\Outgoing\Exception( $e->getMessage(), $e->getCode() );
 		}
 	}
 
 	/**
 	 * Get API key scopes
 	 *
-	 * @return array|null
+	 * @return	array
 	 */
-	public function scopes(): ?array
+	public function scopes()
 	{
 		return $this->_api( 'scopes' );
 	}
 
-    /**
-     * Parse/Save email form settings
-     *
-     * @param   array   $values settings array
-     * @return  array
-     */
-    public static function processSettings( array $values ): array
+	/**
+	 * Parse/Save email form settings
+	 *
+	 * @param   array   $values settings array
+	 * @return  array
+	 */
+	public static function processSettings( array $values ): array
 	{
 		if ( isset( $values['mail_method'] ) and $values['mail_method'] != 'sendgrid' and Settings::i()->sendgrid_use_for == 2 )
 		{

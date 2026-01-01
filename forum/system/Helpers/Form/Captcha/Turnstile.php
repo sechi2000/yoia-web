@@ -10,13 +10,10 @@
 
 namespace IPS\Helpers\Form\Captcha;
 
-use ErrorException;
-use InvalidArgumentException;
 use IPS\Http\Request\Exception;
 use IPS\Http\Url;
 use IPS\Log;
 use IPS\Member;
-use IPS\Platform\Bridge;
 use IPS\Request;
 use IPS\Settings;
 use IPS\Theme;
@@ -33,7 +30,7 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * Cloudflare Turnstile
  */
-class Turnstile implements CaptchaInterface
+class _Turnstile implements CaptchaInterface
 {
 	/**
 	 *  Does this CAPTCHA service support being added in a modal?
@@ -52,15 +49,7 @@ class Turnstile implements CaptchaInterface
 	 */
 	public function getHtml(): string
 	{
-		try
-		{
-			return Theme::i()->getTemplate( 'forms', 'core', 'global' )->captchaTurnstile( Bridge::i()->getTurnstileCredentials()['site_key'], preg_replace( '/^(.+?)\..*$/', '$1', Member::loggedIn()->language()->short ) );
-		}
-		catch( ErrorException $e )
-		{
-			Log::log( $e->getMessage(), 'turnstile' );
-			return '';
-		}
+		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->captchaTurnstile( $this->getTurnstileCredentials()['site_key'], preg_replace( '/^(.+?)\..*$/', '$1', Member::loggedIn()->language()->short ) );
 	}
 
 	/**
@@ -73,7 +62,7 @@ class Turnstile implements CaptchaInterface
 		try
 		{
 			$response = Url::external( 'https://challenges.cloudflare.com/turnstile/v0/siteverify' )->request(5)->post( [
-				'secret'		=> Bridge::i()->getTurnstileCredentials()['secret_key'],
+				'secret'		=> $this->getTurnstileCredentials()['secret_key'],
 				'response'		=> trim( Request::i()->__get('cf-turnstile-response') ),
 				'remoteip'		=> Request::i()->ipAddress(),
 			] )->decodeJson();
@@ -97,5 +86,18 @@ class Turnstile implements CaptchaInterface
 				throw $e;
 			}
 		}
+	}
+
+	/**
+	 * Get Turnstile credentials
+	 *
+	 * @return array
+	 */
+	public function getTurnstileCredentials(): array
+	{
+		return [
+			'site_key' => Settings::i()->turnstile_site_key,
+			'secret_key' => Settings::i()->turnstile_secret_key
+		];
 	}
 }

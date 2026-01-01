@@ -11,43 +11,33 @@
 namespace IPS\nexus\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\Block;
-use IPS\Db;
-use IPS\nexus\Customer;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Customer Statistics Block
  */
-class ParentAccounts extends Block
+class _ParentAccounts extends \IPS\core\MemberACPProfile\Block
 {
 	/**
 	 * Get output
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
 		$parents = array();
-		foreach ( Db::i()->select( 'main_id', 'nexus_alternate_contacts', array( 'alt_id=?', $this->member->member_id ) ) as $row )
+		foreach ( \IPS\Db::i()->select( 'main_id', 'nexus_alternate_contacts', array( 'alt_id=?', $this->member->member_id ) ) as $row )
 		{
-			$parents[] = Customer::load( $row );
+			$parents[] = \IPS\nexus\Customer::load( $row );
 		}
 		
-		if ( count( $parents ) )
+		if ( \count( $parents ) )
 		{
-			return (string) Theme::i()->getTemplate( 'customers', 'nexus' )->parentAccounts( $parents );
+			return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->parentAccounts( $parents );
 		}
-
-		return '';
 	}
 }

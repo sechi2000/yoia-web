@@ -11,28 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Login;
-use IPS\Member;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use PasswordStrength;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Password input class for Form Builder
  */
-class Password extends Text
+class _Password extends Text
 {
 	/**
 	 * @brief	Default Options
@@ -49,7 +37,7 @@ class Password extends Text
 	 	);
 	 * @endcode
 	 */
-	public array $childDefaultOptions = array(
+	public $childDefaultOptions = array(
 		'protect'			=> FALSE,
 		'validateFor'		=> NULL,
 		'confirm'			=> NULL,
@@ -67,11 +55,11 @@ class Password extends Text
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		if ( $this->options['protect'] )
 		{
-			return Request::i()->protect( $this->name );
+			return \IPS\Request::i()->protect( $this->name );
 		}
 		
 		$value = parent::getValue();	
@@ -86,35 +74,35 @@ class Password extends Text
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		parent::validate();
 		
 		/* Password length */
 		if ( mb_strlen( $this->value ) < 3 AND ( $this->required OR (string) $this->value ) )
 		{
-			throw new InvalidArgumentException( 'err_password_length' );
+			throw new \InvalidArgumentException( 'err_password_length' );
 		}
 
 		if ( $this->options['enforceMaxLimit'] and mb_strlen( $this->value ) > 72 )
 		{
-			throw new InvalidArgumentException( 'err_password_toolong' );
+			throw new \InvalidArgumentException( 'err_password_toolong' );
 		}
 
 		/* Does the password meet the minimum required strength? */
 		if ( $this->options['checkStrength'] === TRUE )
 		{
-			$this->options['minimumStrength'] = ( $this->options['minimumStrength'] ) ?: Settings::i()->password_strength_option;
+			$this->options['minimumStrength'] = ( $this->options['minimumStrength'] ) ?: \IPS\Settings::i()->password_strength_option;
 
 			require_once \IPS\ROOT_PATH . "/system/3rd_party/phpass/phpass.php";
-			$phpass = new PasswordStrength();
+			$phpass = new \PasswordStrength();
 
 			$score		= NULL;
 
-			if( $this->options['strengthMember'] AND $this->options['strengthMember'] instanceof Member )
+			if( $this->options['strengthMember'] AND $this->options['strengthMember'] instanceof \IPS\Member )
 			{
 				if( (string) $this->value == $this->options['strengthMember']->name OR (string) $this->value == $this->options['strengthMember']->email )
 				{
@@ -122,25 +110,25 @@ class Password extends Text
 				}
 			}
 			
-			if( count( $this->options['strengthRequest'] ) )
+			if( \count( $this->options['strengthRequest'] ) )
 			{
 				foreach( $this->options['strengthRequest'] as $requestKey )
 				{
-					if( isset( Request::i()->$requestKey ) AND (string) $this->value == Request::i()->$requestKey )
+					if( isset( \IPS\Request::i()->$requestKey ) AND (string) $this->value == \IPS\Request::i()->$requestKey )
 					{
 						$score		= $phpass::STRENGTH_VERY_WEAK;
 					}
 				}
 			}
 
-			if( $score === NULL AND $this->options['showMeter'] and Settings::i()->password_strength_meter_enforce )
+			if( $score === NULL AND $this->options['showMeter'] and \IPS\Settings::i()->password_strength_meter_enforce )
 			{
 				$score = $phpass->classify( (string) $this->value );
 			}
 
-			if ( $this->options['showMeter'] and Settings::i()->password_strength_meter_enforce and $score < $this->options['minimumStrength'] )
+			if ( $this->options['showMeter'] and \IPS\Settings::i()->password_strength_meter_enforce and $score < $this->options['minimumStrength'] )
 			{
-				throw new InvalidArgumentException( Member::loggedIn()->language()->addToStack('err_password_strength', FALSE, array( 'sprintf' => Member::loggedIn()->language()->addToStack( 'strength_' . Settings::i()->password_strength_option ) ) ) );
+				throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack('err_password_strength', FALSE, array( 'sprintf' => \IPS\Member::loggedIn()->language()->addToStack( 'strength_' . \IPS\Settings::i()->password_strength_option ) ) ) );
 			}
 		}
 
@@ -149,7 +137,7 @@ class Password extends Text
 		{
 			$valid = FALSE;
 			
-			$login = new Login();
+			$login = new \IPS\Login();
 			foreach ( $login->usernamePasswordMethods() as $method )
 			{
 				if ( $method->authenticatePasswordForMember( $this->options['validateFor'], $this->value ) )
@@ -161,7 +149,7 @@ class Password extends Text
 			
 			if ( !$valid )
 			{
-				throw new InvalidArgumentException( Member::loggedIn()->language()->addToStack( 'login_err_bad_password', FALSE ) );
+				throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack( 'login_err_bad_password', FALSE, array( 'pluralize' => array( $method->authType() ) ) ) );
 			}
 		}
 		
@@ -169,13 +157,11 @@ class Password extends Text
 		if ( $this->options['confirm'] !== NULL )
 		{
 			$confirmKey = $this->options['confirm'];
-			if ( (string) $this->value !== (string) Request::i()->$confirmKey )
+			if ( (string) $this->value !== (string) \IPS\Request::i()->$confirmKey )
 			{
-				throw new InvalidArgumentException( 'form_password_confirm' );
+				throw new \InvalidArgumentException( 'form_password_confirm' );
 			}
 		}
-
-		return TRUE;
 	}
 
 	/**
@@ -186,11 +172,11 @@ class Password extends Text
 	 *	@li	PCRE and ECMAScript regex are not 100% compatible (though the instances this present a problem are admittedly rare)
 	 *	@li	You cannot specify modifiers with the pattern attribute, which we need to support on the PHP side
 	 */
-	public function html(): string
+	public function html()
 	{
 		/* 10/19/15 - adding htmlspecialchars around value if autocomplete is enabled so that html tag characters can be used (e.g. for members) */
 		/* This value is decoded by the JS widget before use. */
-		if( $this->options['autocomplete'] and !empty( $this->value ) and is_array( $this->value ) )
+		if( $this->options['autocomplete'] and !empty( $this->value ) and \is_array( $this->value ) )
 		{
 			foreach( $this->value as $key => $value )
 			{
@@ -198,6 +184,6 @@ class Password extends Text
 			}
 		}
 		
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->text( $this->name, $this->formType, ( $this->value and $this->value === $this->defaultValue and !$this->error ) ? '********' : $this->value, $this->required, $this->options['maxLength'], $this->options['size'], $this->options['disabled'], $this->options['autocomplete'], $this->options['placeholder'], NULL, $this->options['nullLang'], $this->htmlId, $this->options['showMeter'], $this->options['htmlAutocomplete'], $this->options['strengthMember'], $this->options['strengthRequest'] );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->text( $this->name, $this->formType, ( $this->value and $this->value === $this->defaultValue and !$this->error ) ? '********' : $this->value, $this->required, $this->options['maxLength'], $this->options['size'], $this->options['disabled'], $this->options['autocomplete'], $this->options['placeholder'], NULL, $this->options['nullLang'], $this->htmlId, $this->options['showMeter'], $this->options['htmlAutocomplete'], $this->options['strengthMember'], $this->options['strengthRequest'] );
 	}
 }

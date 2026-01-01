@@ -12,29 +12,16 @@
 namespace IPS\core\setup\upg_107000;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Content\Search\Index;
-use IPS\Db;
-use IPS\Db\Exception;
-use IPS\IPS;
-use IPS\Settings;
-use function call_user_func_array;
-use function defined;
-use function in_array;
-use function IPS\Cicloud\install;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.7.0 Beta 1 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Install the platform app for platform clients if it's not there which it won't be, probably.
@@ -43,7 +30,7 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		if ( CIC and ! in_array( 'cloud', array_keys( Application::applications() ) ) )
+		if ( \IPS\CIC and ! \in_array( 'cloud', array_keys( \IPS\Application::applications() ) ) )
 		{
 			/* Load in our CiC functions */
 			if ( isset( $_SERVER['IPS_CLOUD2'] ) AND isset( $_SERVER['IPS_CLOUD2_ID'] ) AND file_exists( "/var/www/sitefiles/{$_SERVER['IPS_CLOUD2_ID']}/applications/cloud/sources/functions.php" ) )
@@ -56,7 +43,7 @@ class Upgrade
 				@require_once( __DIR__ . '/applications/cloud/sources/functions.php' );
 			}
 
-			install();
+			\IPS\Cicloud\install();
 		}
 
 		return TRUE;
@@ -69,7 +56,7 @@ class Upgrade
 	 */
 	public function step2()
 	{
-		Db::i()->insert( 'core_sys_conf_settings', array( 'conf_app' => 'core', 'conf_key' => 'searchlog_exclude_groups', 'conf_value' => json_encode( array( Settings::i()->guest_group ) ) ), TRUE );
+		\IPS\Db::i()->insert( 'core_sys_conf_settings', array( 'conf_app' => 'core', 'conf_key' => 'searchlog_exclude_groups', 'conf_value' => json_encode( array( \IPS\Settings::i()->guest_group ) ) ), TRUE );
 		return TRUE;
 	}
 	
@@ -80,9 +67,9 @@ class Upgrade
 	public function step3()
 	{
 		/* Disable third party addons to prevent errors during upgrade */
-		foreach( Application::enabledApplications() as $app )
+		foreach( \IPS\Application::enabledApplications() as $app )
 		{
-			if( !in_array( $app->directory, IPS::$ipsApps ) )
+			if( !\in_array( $app->directory, \IPS\IPS::$ipsApps ) )
 			{
 				$app->enabled = false;
 				$app->save();
@@ -90,7 +77,7 @@ class Upgrade
 		}
 
 		/* Truncate index, as we have to rebuild index to get the solved flag populated */
-		Index::i()->prune();
+		\IPS\Content\Search\Index::i()->prune();
 		
 		$json = <<<EOF
 		[
@@ -120,9 +107,9 @@ EOF;
 		{
 			try
 			{
-				$run = call_user_func_array( array( Db::i(), $query['method'] ), $query['params'] );
+				$run = \call_user_func_array( array( \IPS\Db::i(), $query['method'] ), $query['params'] );
 			}
-			catch( Exception $e )
+			catch( \IPS\Db\Exception $e )
 			{
 				if( !in_array( $e->getCode(), array( 1007, 1008, 1050, 1060, 1061, 1062, 1091, 1051 ) ) )
 				{
@@ -131,7 +118,7 @@ EOF;
 			}
 		}
 		
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 
 		return TRUE;
 	}

@@ -11,39 +11,32 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Theme;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Template
  */
-class Template
+class _Template
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = FALSE;
-
+	public static $canBeUsedInCss = FALSE;
+	
 	/**
 	 * Run the plug-in
 	 *
-	 * @param string $data The initial data from the tag
-	 * @param array $options Array of options
-	 * @param string|null $functionName
-	 * @param string $calledClass
-	 * @return array|string Code to eval
+	 * @param	string 		$data	  The initial data from the tag
+	 * @param	array		$options    Array of options
+	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options, ?string $functionName=NULL, string $calledClass='IPS\Theme' ): array|string
+	public static function runPlugin( $data, $options, $functionName=NULL, $calledClass='IPS\Theme' )
 	{
-		$params = ( in_array( 'params', array_keys( $options ) ) ) ? $options['params'] : '';
+		$params = ( \in_array( 'params', array_keys( $options ) ) ) ? $options['params'] : '';
 		if( mb_strpos( $data, '$' ) === 0 )
 		{
 			$data = '{' . $data . '}';
@@ -70,7 +63,7 @@ class Template
 			
 			if ( isset( $options['if'] ) )
 			{
-				$it['pre']  = "if ( " . Theme::expandShortcuts( $options['if'] ) . " ):\n";
+				$it['pre']  = "if ( " . \IPS\Theme::expandShortcuts( $options['if'] ) . " ):\n";
 				$it['post'] = "\nendif;";
 			}
 			

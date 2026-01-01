@@ -12,55 +12,45 @@
 namespace IPS\downloads\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Content\Widget;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Output;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Files Entry Feed Widget
  */
-class fileFeed extends Widget
+class _fileFeed extends \IPS\Content\Widget
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'fileFeed';
+	public $key = 'fileFeed';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'downloads';
+	public $app = 'downloads';
 		
 	/**
 	 * @brief	Plugin
 	 */
-	public string $plugin = '';
+	public $plugin = '';
 	
 	/**
 	 * Class
 	 */
-	protected static string $class = 'IPS\downloads\File';
+	protected static $class = 'IPS\downloads\File';
 
 	/**
 	* Init the widget
 	*
 	* @return	void
 	*/
-	public function init(): void
+	public function init()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'downloads', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'downloads', 'front' ) );
 		\IPS\downloads\Application::outputCss();
 		parent::init();
 	}
@@ -68,14 +58,14 @@ class fileFeed extends Widget
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
 		$form = parent::configuration( $form );
 
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->idm_nexus_on )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->idm_nexus_on )
 		{
 			$options = array(
 				'free'		=> 'file_free',
@@ -83,7 +73,7 @@ class fileFeed extends Widget
 				'any'		=> 'any'
 			);
 
-			$form->add( new Radio( 'file_cost_type', $this->configuration['file_cost_type'] ?? 'any', TRUE, array( 'options'	=> $options ) ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'file_cost_type', isset( $this->configuration['file_cost_type'] ) ? $this->configuration['file_cost_type'] : 'any', TRUE, array( 'options'	=> $options ) ) );
 		}
 
 		return $form;
@@ -94,11 +84,11 @@ class fileFeed extends Widget
 	 *
 	 * @return	array
 	 */
-	protected function buildWhere(): array
+	protected function buildWhere()
 	{
 		$where = parent::buildWhere();
 
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->idm_nexus_on )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->idm_nexus_on )
 		{
 			if( isset( $this->configuration['file_cost_type'] ) )
 			{

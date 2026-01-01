@@ -11,26 +11,9 @@
 namespace IPS\Helpers;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\DateTime;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use LengthException;
-use LogicException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_bool;
-use function is_null;
-use function is_numeric;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -55,30 +38,30 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 	) );
  * @endcode
  */
-class Chart
+class _Chart
 {
 	/**
 	 * @brief	Headers
 	 * @see		addHeader();
 	 */
-	public array $headers = array();
+	public $headers = array();
 	
 	/**
 	 * @brief	Rows
 	 * @see		addHeader();
 	 */
-	public array $rows = array();
+	public $rows = array();
 	
 	/**
 	 * @brief	Google Charts will assume numbers can be negative, which can produce graphs showing negative data points if no data is provided. The default baheviour is to set the minimum value to 0. Change this property if the chart should be able to show negative number values.
 	 */
-	public bool $numbersCanBeNegative = FALSE;
+	public $numbersCanBeNegative = FALSE;
 
 	/**
 	 * Add Header
 	 *
-	 * @param string $label	Label
-	 * @param string $type	Type of value
+	 * @param	string	$label	Label
+	 * @param	string	$type	Type of value
 	 *	@li	string
 	 *	@li	number
 	 *	@li	boolean
@@ -87,7 +70,7 @@ class Chart
 	 *	@li	timeofday
 	 * @return	void
 	 */
-	public function addHeader( string $label, string $type ) : void
+	public function addHeader( $label, $type )
 	{
 		$this->headers[] = array( 'label' => $label, 'type' => $type );
 	}
@@ -95,55 +78,55 @@ class Chart
 	/**
 	 * Add Row
 	 *
-	 * @param array $values	Values, in the order that headers were added
+	 * @param	array	$values	Values, in the order that headers were added
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function addRow( array $values ) : void
+	public function addRow( $values )
 	{
-		if ( count( $values ) !== count( $this->headers ) )
+		if ( \count( $values ) !== \count( $this->headers ) )
 		{
-			throw new LengthException('COLUMN_COUNT_MISMATCH');
+			throw new \LengthException('COLUMN_COUNT_MISMATCH');
 		}
 		
 		$i = 0;
 		$values = array_values( $values );
 		foreach ( $this->headers as $data )
 		{
-			$value = is_array( $values[ $i ] ) ? $values[ $i ]['value'] : $values[ $i ];
+			$value = \is_array( $values[ $i ] ) ? $values[ $i ]['value'] : $values[ $i ];
 			
 			switch ( $data['type'] )
 			{
 				case 'string':
-					if ( !is_string( $value ) )
+					if ( !\is_string( $value ) )
 					{
-						throw new InvalidArgumentException( "VALUE_{$i}_NOT_STRING" );
+						throw new \InvalidArgumentException( "VALUE_{$i}_NOT_STRING" );
 					}
 					break;
 				
 				case 'number':
-					if ( !is_numeric( $value ) and !is_null( $value ) )
+					if ( !\is_numeric( $value ) and !\is_null( $value ) )
 					{
-						throw new InvalidArgumentException( "VALUE_{$i}_NOT_NUMBER" );
+						throw new \InvalidArgumentException( "VALUE_{$i}_NOT_NUMBER" );
 					}
 					break;
 					
 				case 'bool':
-					if ( !is_bool( $value ) )
+					if ( !\is_bool( $value ) )
 					{
-						throw new InvalidArgumentException( "VALUE_{$i}_NOT_BOOL" );
+						throw new \InvalidArgumentException( "VALUE_{$i}_NOT_BOOL" );
 					}
 					break;
 					
 				case 'date':
 				case 'datetime':
 				case 'timeofday':
-					if ( !( $value instanceof DateTime ) )
+					if ( !( $value instanceof \IPS\DateTime ) )
 					{
-						throw new InvalidArgumentException( "VALUE_{$i}_NOT_DATETIME" );
+						throw new \InvalidArgumentException( "VALUE_{$i}_NOT_DATETIME" );
 					}
 					
-					if ( is_array( $values[ $i ] ) )
+					if ( \is_array( $values[ $i ] ) )
 					{
 						$values[ $i ]['value'] = $value->rfc3339();
 					}
@@ -162,25 +145,25 @@ class Chart
 	/**
 	 * Render
 	 *
-	 * @param	string $type		Type
-	 * @param array $options	Options
-	 * @param string|null $format		Value for number formatter
+	 * @param	string	$type		Type
+	 * @param	array	$options	Options
+	 * @param	string	$format		Value for number formatter
+	 * @see		<a href='https://google-developers.appspot.com/chart/interactive/docs/gallery'>Charts Gallery - Google Charts - Google Developers</a>
 	 * @return	string
-	 *@see		<a href='https://google-developers.appspot.com/chart/interactive/docs/gallery'>Charts Gallery - Google Charts - Google Developers</a>
 	 */
-	public function render( string $type, array $options=array(), string $format=NULL ): string
+	public function render( $type, $options=array(), $format=NULL )
 	{
-		if ( !Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
-			Output::i()->jsFiles[] = 'https://www.gstatic.com/charts/loader.js';
-			Output::i()->headJs .= "google.charts.load( '47', { 'packages':['corechart'] } );";
+			\IPS\Output::i()->jsFiles[] = 'https://www.gstatic.com/charts/loader.js';
+			\IPS\Output::i()->headJs .= "google.charts.load( '47', { 'packages':['corechart'] } );";
 		}
 		
-		if ( !$this->numbersCanBeNegative and in_array( $type, array( 'LineChart', 'ColumnChart' ) ) and !isset( $options['vAxis']['viewWindow']['min'] ) )
+		if ( !$this->numbersCanBeNegative and \in_array( $type, array( 'LineChart', 'ColumnChart' ) ) and !isset( $options['vAxis']['viewWindow']['min'] ) )
 		{
 			$options['vAxis']['viewWindow']['min'] = 0;
 		}
 				
-		return Theme::i()->getTemplate( 'global', 'core', 'global' )->chart( $this, $type, json_encode( $options ), $format );
+		return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->chart( $this, $type, json_encode( $options ), $format );
 	}
 }

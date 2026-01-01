@@ -8,8 +8,6 @@
  * @since		18 Feb 2013
  */
 
-use IPS\Dispatcher\Admin;
-
-define('REPORT_EXCEPTIONS', TRUE);
+\define('REPORT_EXCEPTIONS', TRUE);
 require_once '../init.php';
-Admin::i()->run();
+\IPS\Dispatcher\Admin::i()->run();

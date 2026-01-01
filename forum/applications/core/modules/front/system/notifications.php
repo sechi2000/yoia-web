@@ -12,64 +12,35 @@ namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use Exception;
-use IPS\Api\Webhook;
-use IPS\Application;
-use IPS\Content;
-use IPS\Content\Item;
-use IPS\core\DataLayer;
-use IPS\core\Followed\Follow;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Events\Event;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Checkbox;
-use IPS\Helpers\Form\Radio;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Device;
-use IPS\Node\Model;
-use IPS\Notification;
-use IPS\Notification\Table;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
 use function md5;
-use const IPS\REBUILD_QUICK;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Notification Settings Controller
  */
-class notifications extends Controller
+class _notifications extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 */
-	protected function _checkLoggedIn() : void
+	protected function _checkLoggedIn()
 	{
-		if ( !Member::loggedIn()->member_id )
+		if ( !\IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->error( 'no_module_permission_guest', '2C154/2', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission_guest', '2C154/2', 403, '' );
 		}
 		
-		Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_system.js', 'core' ) );
-		Output::i()->cssFiles	= array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/notification_settings.css' ) );
+		\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_system.js', 'core' ) );
+		\IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/notification_settings.css' ) );
+		if ( \IPS\Theme::i()->settings['responsive'] )
+        {
+            \IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/notification_settings_responsive.css' ) );
+        }
 	}
 	
 	/**
@@ -77,30 +48,30 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$this->_checkLoggedIn();
 
 		/* Init table */
-		$urlObject	= Url::internal( 'app=core&module=system&controller=notifications', 'front', 'notifications' );
-		$table = new Table( $urlObject );
-		$table->setMember( Member::loggedIn() );
+		$urlObject	= \IPS\Http\Url::internal( 'app=core&module=system&controller=notifications', 'front', 'notifications' );
+		$table = new \IPS\Notification\Table( $urlObject );
+		$table->setMember( \IPS\Member::loggedIn() );		
 		
 		$notifications = $table->getRows();
 	
-		Db::i()->update( 'core_notifications', array( 'read_time' => time() ), array( '`member`=?', Member::loggedIn()->member_id ) );
-		Member::loggedIn()->recountNotifications();
+		\IPS\Db::i()->update( 'core_notifications', array( 'read_time' => time() ), array( '`member`=?', \IPS\Member::loggedIn()->member_id ) );
+		\IPS\Member::loggedIn()->recountNotifications();
 		
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array( 'data' => Theme::i()->getTemplate( 'system' )->notificationsAjax( $notifications ) ) );
+			\IPS\Output::i()->json( array( 'data' => \IPS\Theme::i()->getTemplate( 'system' )->notificationsAjax( $notifications ) ) );
 		}
 		else
 		{
-			Output::i()->metaTags['robots'] = 'noindex';
-			Output::i()->title = Member::loggedIn()->language()->addToStack('notifications');
-			Output::i()->breadcrumb[] = array( NULL, Output::i()->title );
-			Output::i()->output = (string) $table;
+			\IPS\Output::i()->metaTags['robots'] = 'noindex';
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('notifications');
+			\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Output::i()->title );
+			\IPS\Output::i()->output = (string) $table;
 		}
 	}
 	
@@ -109,73 +80,42 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function subscribeToPush() : void
+	protected function subscribeToPush()
 	{
 		$this->_checkLoggedIn();
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		if ( isset( Request::i()->subscription ) AND $subscription = json_decode( Request::i()->subscription, TRUE ) )
+		if ( isset( \IPS\Request::i()->subscription ) AND $subscription = json_decode( \IPS\Request::i()->subscription, TRUE ) )
 		{
-			$device = Device::loadOrCreate( Member::loggedIn(), FALSE );
+			$device = \IPS\Member\Device::loadOrCreate( \IPS\Member::loggedIn(), FALSE );
 			/* If a subscription already exists, then just return */
 			try
 			{
-				Db::i()->select( '*', 'core_notifications_pwa_keys', array( "`member`=? AND p256dh=? AND auth=?", Member::loggedIn()->member_id, $subscription['keys']['p256dh'], $subscription['keys']['auth'] ) )->first();
+				\IPS\Db::i()->select( '*', 'core_notifications_pwa_keys', array( "`member`=? AND p256dh=? AND auth=?", \IPS\Member::loggedIn()->member_id, $subscription['keys']['p256dh'], $subscription['keys']['auth'] ) )->first();
 				
 				/* Make sure encoding and device is up to date, though since it's needed for encryption transfer. */
-				Db::i()->update( 'core_notifications_pwa_keys', array(
-					'encoding'		=> Request::i()->encoding,
+				\IPS\Db::i()->update( 'core_notifications_pwa_keys', array(
+					'encoding'		=> \IPS\Request::i()->encoding,
 					'device'		=> $device->device_key
-				), array( "`member`=? AND p256dh=? AND auth=?", Member::loggedIn()->member_id, $subscription['keys']['p256dh'], $subscription['keys']['auth'] ) );
+				), array( "`member`=? AND p256dh=? AND auth=?", \IPS\Member::loggedIn()->member_id, $subscription['keys']['p256dh'], $subscription['keys']['auth'] ) );
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
-				Db::i()->insert( 'core_notifications_pwa_keys', array(
-					'member'		=> Member::loggedIn()->member_id,
+				\IPS\Db::i()->insert( 'core_notifications_pwa_keys', array(
+					'member'		=> \IPS\Member::loggedIn()->member_id,
 					'endpoint'		=> $subscription['endpoint'],
 					'p256dh'		=> $subscription['keys']['p256dh'],
 					'auth'			=> $subscription['keys']['auth'],
-					'encoding'		=> Request::i()->encoding,
+					'encoding'		=> \IPS\Request::i()->encoding,
 					'device'		=> $device->device_key
 				) );
-
-				/* The expectation is to receive some push notifications, so let's add them to follower_content, new_content and new_comment and they can be removed manually if the user doesn't want them */
-				$notificationTypes = array( 'follower_content', 'new_content', 'new_comment' );
-
-				foreach ( $notificationTypes as $notificationKey )
-				{
-					try
-					{
-						/* See if we have a row in preferences already */
-						$currentRow = Db::i()->select( '*', 'core_notification_preferences', array( 'member_id=? AND notification_key=?', Member::loggedIn()->member_id, $notificationKey ) )->first();
-
-						/* Does this row have a preference of push? */
-						$prefs = explode( ',', $currentRow['preference'] );
-
-						if ( !in_array( 'push', $prefs ) )
-						{
-							$prefs[] = 'push';
-						}
-						Db::i()->update( 'core_notification_preferences', [
-							'preference' => implode( ',', $prefs ),
-						], array( 'member_id=? AND notification_key=?', Member::loggedIn()->member_id, $notificationKey ) );
-					}
-					catch( UnderflowException $e )
-					{
-						Db::i()->insert( 'core_notification_preferences', [
-							'member_id' => Member::loggedIn()->member_id,
-							'notification_key' => $notificationKey,
-							'preference' => implode( ',', [ 'inline', 'push' ] )
-						], true );
-					}
-				}
 			}
 			
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 		else
 		{
-			Output::i()->error( 'invalid_push_subscription', '2C154/H', 403, '' );
+			\IPS\Output::i()->error( 'invalid_push_subscription', '2C154/H', 403, '' );
 		}
 	}
 
@@ -184,26 +124,26 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function verifySubscription() : void
+	protected function verifySubscription()
 	{
 		$this->_checkLoggedIn();
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		if ( isset( Request::i()->key ) )
+		if ( isset( \IPS\Request::i()->key ) )
 		{
 			/* See if a subscription already exists */
 			try
 			{
-				Db::i()->select( '*', 'core_notifications_pwa_keys', array( "`member`=? AND p256dh=?", Member::loggedIn()->member_id, Request::i()->key ) )->first();
-				Output::i()->json( 'OK' );
+				\IPS\Db::i()->select( '*', 'core_notifications_pwa_keys', array( "`member`=? AND p256dh=?", \IPS\Member::loggedIn()->member_id, \IPS\Request::i()->key ) )->first();
+				\IPS\Output::i()->json( 'OK' );
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				// Just let it return the error below
 			}
 		}
 
-		Output::i()->error( 'invalid_push_subscription', '2C154/I', 403, '' );
+		\IPS\Output::i()->error( 'invalid_push_subscription', '2C154/I', 403, '' );			
 	}
 	
 	/**
@@ -211,28 +151,28 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function options() : void
+	protected function options()
 	{
 		/* Check we're logged in */
 		$this->_checkLoggedIn();
 		
 		/* Init breadcrumb */
-		$extensions = Application::allExtensions( 'core', 'Notifications' );
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=system&controller=notifications', 'front', 'notifications' ), Member::loggedIn()->language()->addToStack('notifications') );
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=system&controller=notifications&do=options', 'front', 'notifications_options' ), Member::loggedIn()->language()->addToStack('options') );
+		$extensions = \IPS\Application::allExtensions( 'core', 'Notifications' );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=system&controller=notifications', 'front', 'notifications' ), \IPS\Member::loggedIn()->language()->addToStack('notifications') );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=system&controller=notifications&do=options', 'front', 'notifications_options' ), \IPS\Member::loggedIn()->language()->addToStack('options') );
 
 		/* Are we viewing a particular type? */
-		if ( isset( Request::i()->type ) and array_key_exists( Request::i()->type, $extensions ) )
+		if ( isset( \IPS\Request::i()->type ) and array_key_exists( \IPS\Request::i()->type, $extensions ) )
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack( "notifications__" . Request::i()->type );
-			Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( "notifications__" . Request::i()->type ) );
-			$this->_optionsType( Request::i()->type, $extensions[ Request::i()->type ] );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( "notifications__" . \IPS\Request::i()->type );
+			\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( "notifications__" . \IPS\Request::i()->type ) );
+			return $this->_optionsType( \IPS\Request::i()->type, $extensions[ \IPS\Request::i()->type ] );
 		}
 				
 		/* Nope, viewing the index */
 		else
 		{			
-			$this->_optionsIndex( $extensions );
+			return $this->_optionsIndex( $extensions );
 		}
 	}
 	
@@ -242,11 +182,11 @@ class notifications extends Controller
 	 * @param	array	$extensions	The extensions
 	 * @return	void
 	 */
-	protected function _optionsIndex( array $extensions ) : void
+	protected function _optionsIndex( $extensions )
 	{		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('notification_options');
-		Output::i()->output = Theme::i()->getTemplate('system')->notificationSettingsIndex( Notification::membersOptionCategories( Member::loggedIn(), $extensions ) );
-		Output::i()->globalControllers[] = 'core.front.system.notificationSettings';
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('notification_options');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('system')->notificationSettingsIndex( \IPS\Notification::membersOptionCategories( \IPS\Member::loggedIn(), $extensions ) );
+		\IPS\Output::i()->globalControllers[] = 'core.front.system.notificationSettings';
 	}
 	
 	/**
@@ -256,35 +196,34 @@ class notifications extends Controller
 	 * @param	object	$extension		The extension
 	 * @return	void
 	 */
-	protected function _optionsType( string $extensionKey, object $extension ) : void
+	protected function _optionsType( $extensionKey, $extension )
 	{
-		$form = Notification::membersTypeForm( Member::loggedIn(), $extension );
+		$form = \IPS\Notification::membersTypeForm( \IPS\Member::loggedIn(), $extension );
 		if ( $form === TRUE )
 		{
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				$categories = Notification::membersOptionCategories( Member::loggedIn(), array( $extensionKey => $extension ) );
-				Output::i()->sendOutput( Theme::i()->getTemplate('system')->notificationSettingsIndexRowDetails( $extensionKey, $categories[ $extensionKey ] ), 200, 'text/html', Output::i()->httpHeaders );
+				$categories = \IPS\Notification::membersOptionCategories( \IPS\Member::loggedIn(), array( $extensionKey => $extension ) );
+				\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate('system')->notificationSettingsIndexRowDetails( $extensionKey, $categories[ $extensionKey ] ), 200, 'text/html', \IPS\Output::i()->httpHeaders );	
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=system&controller=notifications&do=options', 'front', 'notifications_options' ), 'saved' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=notifications&do=options', 'front', 'notifications_options' ), 'saved' );
 			}
 		}
 		elseif ( $form )
 		{
-			$form->class = 'ipsForm--vertical ipsForm--notification-options';
+			$form->class = 'ipsForm_vertical';
 		}
 		
-		if ( Request::i()->isAjax() and ! isset( Request::i()->fromFollowButton ) )
+		if ( \IPS\Request::i()->isAjax() )
 		{
 			$form->actionButtons = array();
-			Output::i()->sendOutput( Theme::i()->getTemplate('system')->notificationSettingsType( Member::loggedIn()->language()->addToStack("notifications__{$extensionKey}"), $form, TRUE ), 200, 'text/html', Output::i()->httpHeaders );
+			\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate('system')->notificationSettingsType( \IPS\Member::loggedIn()->language()->addToStack("notifications__{$extensionKey}"), $form, TRUE ), 200, 'text/html', \IPS\Output::i()->httpHeaders );	
 		}
 		else
 		{
-			/* If it's not ajax, or come via the follow button, then we want to show the form with the save button */
-			Output::i()->output = Theme::i()->getTemplate('system')->notificationSettingsType( Member::loggedIn()->language()->addToStack("notifications__{$extensionKey}"), $form, FALSE );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('system')->notificationSettingsType( \IPS\Member::loggedIn()->language()->addToStack("notifications__{$extensionKey}"), $form, FALSE );
 		}
 	}
 	
@@ -293,14 +232,14 @@ class notifications extends Controller
 	 *
 	 * @return void
 	 */
-	protected function disable() : void
+	protected function disable()
 	{
 		$this->_checkLoggedIn();
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		foreach ( Application::allExtensions( 'core', 'Notifications' ) as $extension )
+		foreach ( \IPS\Application::allExtensions( 'core', 'Notifications' ) as $extension )
 		{
-			$options = Notification::availableOptions( Member::loggedIn(), $extension );
+			$options = \IPS\Notification::availableOptions( \IPS\Member::loggedIn(), $extension );
 			foreach ( $options as $option )
 			{
 				if ( $option['type'] === 'standard' )
@@ -308,7 +247,7 @@ class notifications extends Controller
 					$value = array();
 					foreach ( $option['options'] as $k => $optionDetails )
 					{
-						if ( ( $optionDetails['editable'] and $k !== Request::i()->type and $optionDetails['value'] ) or ( !$optionDetails['editable'] and $optionDetails['value'] ) )
+						if ( ( $optionDetails['editable'] and $k !== \IPS\Request::i()->type and $optionDetails['value'] ) or ( !$optionDetails['editable'] and $optionDetails['value'] ) )
 						{
 							$value[] = $k;
 						}
@@ -316,33 +255,36 @@ class notifications extends Controller
 					
 					foreach ( $option['notificationTypes'] as $notificationKey )
 					{
-						Db::i()->insert( 'core_notification_preferences', array(
-							'member_id'			=> Member::loggedIn()->member_id,
+						\IPS\Db::i()->insert( 'core_notification_preferences', array(
+							'member_id'			=> \IPS\Member::loggedIn()->member_id,
 							'notification_key'	=> $notificationKey,
 							'preference'		=> implode( ',', $value )
 						), TRUE );
 					}
 				}
 			}
-
-			$extension::disableExtra( Member::loggedIn(), Request::i()->type );
+			
+			if ( method_exists( $extension, 'disableExtra' ) )
+			{
+				$extension::disableExtra( \IPS\Member::loggedIn(), \IPS\Request::i()->type );
+			}
 		}
 
-		if ( Request::i()->type === 'push' )
+		if ( \IPS\Request::i()->type === 'push' )
 		{
-			Member::loggedIn()->clearPwaAuths();
+			\IPS\Member::loggedIn()->clearPwaAuths();
 		}
 
 		/* Digests */
-		Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'none'), array( 'follow_member_id=? AND follow_notify_freq IN(?,?)', Member::loggedIn()->member_id, "daily", "weekly" ) );
+		\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'none'), array( 'follow_member_id=? AND follow_notify_freq IN(?,?)', \IPS\Member::loggedIn()->member_id, "daily", "weekly" ) );
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'ok' );
+			\IPS\Output::i()->json( 'ok' );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=system&controller=notifications&do=options', 'front', 'notifications_options' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=notifications&do=options', 'front', 'notifications_options' ) );
 		}
 	}
 	
@@ -351,90 +293,121 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function follow() : void
+	protected function follow()
 	{
 		$this->_checkLoggedIn();
 
 		try
 		{
-			$application = Application::load( Request::i()->follow_app );
+			$application = \IPS\Application::load( \IPS\Request::i()->follow_app );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'error_no_app', '3C154/F', 404, '' );
+			\IPS\Output::i()->error( 'error_no_app', '3C154/F', 404, '' );
 		}
 
 		/* Get class */
-        $class = Follow::getClassToFollow( Request::i()->follow_app, Request::i()->follow_area );
+		$class = NULL;
+		foreach ( $application->extensions( 'core', 'ContentRouter' ) as $ext )
+		{
+			foreach ( $ext->classes as $classname )
+			{
+				if ( $classname == 'IPS\\' . \IPS\Request::i()->follow_app . '\\' . mb_ucfirst( \IPS\Request::i()->follow_area ) )
+				{
+					$class = $classname;
+					break;
+				}
+				if ( isset( $classname::$containerNodeClass ) and $classname::$containerNodeClass == 'IPS\\' . \IPS\Request::i()->follow_app . '\\' . mb_ucfirst( \IPS\Request::i()->follow_area ) )
+				{
+					$class = $classname::$containerNodeClass;
+					break;
+				}
+				if( isset( $classname::$containerFollowClasses ) )
+				{
+					foreach( $classname::$containerFollowClasses as $followClass )
+					{
+						if( $followClass == 'IPS\\' . \IPS\Request::i()->follow_app . '\\' . mb_ucfirst( \IPS\Request::i()->follow_area ) )
+						{
+							$class = $followClass;
+							break;
+						}
+					}
+				}
+			}
+		}
 		
-		if( Request::i()->follow_app == 'core' and Request::i()->follow_area == 'member' )
+		if( \IPS\Request::i()->follow_app == 'core' and \IPS\Request::i()->follow_area == 'member' )
 		{
 			/* You can't follow yourself */
-			if( Request::i()->follow_id == Member::loggedIn()->member_id )
+			if( \IPS\Request::i()->follow_id == \IPS\Member::loggedIn()->member_id )
 			{
-				Output::i()->error( 'cant_follow_self', '3C154/7', 403, '' );
+				\IPS\Output::i()->error( 'cant_follow_self', '3C154/7', 403, '' );
 			}
 			
 			/* Following disabled */
-			$member = Member::load( Request::i()->follow_id );
+			$member = \IPS\Member::load( \IPS\Request::i()->follow_id );
 
 			if( !$member->member_id )
 			{
-				Output::i()->error( 'cant_follow_member', '3C154/9', 403, '' );
+				\IPS\Output::i()->error( 'cant_follow_member', '3C154/9', 403, '' );
 			}
 
-			if( $member->members_bitoptions['pp_setting_moderate_followers'] and !Member::loggedIn()->following( 'core', 'member', $member->member_id ) )
+			if( $member->members_bitoptions['pp_setting_moderate_followers'] and !\IPS\Member::loggedIn()->following( 'core', 'member', $member->member_id ) )
 			{
-				Output::i()->error( 'cant_follow_member', '3C154/8', 403, '' );
+				\IPS\Output::i()->error( 'cant_follow_member', '3C154/8', 403, '' );
 			}
+				
+			$class = 'IPS\\Member';
+		}
+		
+		if( \IPS\Request::i()->follow_app == 'core' and \IPS\Request::i()->follow_area == 'club' )
+		{
+			$class = 'IPS\Member\Club';
 		}
 		
 		if ( !$class )
 		{
-			Output::i()->error( 'node_error', '2C154/3', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C154/3', 404, '' );
 		}
 		
 		/* Get thing */
 		$thing = NULL;
 		try
 		{
-			if ( in_array( 'IPS\Node\Model', class_parents( $class ) ) )
+			if ( \in_array( 'IPS\Node\Model', class_parents( $class ) ) )
 			{
-				/* @var Model $class */
-				$thing = $class::loadAndCheckPerms( (int) Request::i()->follow_id );
-				Output::i()->title = Member::loggedIn()->language()->addToStack( 'follow_thing', FALSE, array( 'sprintf' => array( $thing->_title ) ) );
+				$thing = $class::loadAndCheckPerms( (int) \IPS\Request::i()->follow_id );
+				\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'follow_thing', FALSE, array( 'sprintf' => array( $thing->_title ) ) );
 
 				/* Set navigation */
 				try
 				{
 					foreach ( $thing->parents() as $parent )
 					{
-						Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+						\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 					}
-					Output::i()->breadcrumb[] = array( NULL, $thing->_title );
+					\IPS\Output::i()->breadcrumb[] = array( NULL, $thing->_title );
 				}
-				catch ( Exception $e ) { }
+				catch ( \Exception $e ) { }
 			}
 			elseif ( $class == 'IPS\Member\Club' )
 			{
-                /* @var Club $class */
-				$thing = $class::loadAndCheckPerms( (int) Request::i()->follow_id );
-				Output::i()->title = Member::loggedIn()->language()->addToStack( 'follow_thing', FALSE, array( 'sprintf' => array( $thing->_title ) ) );
-				Output::i()->breadcrumb = array(
-					array( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), Member::loggedIn()->language()->addToStack('module__core_clubs') ),
+				$thing = $class::loadAndCheckPerms( (int) \IPS\Request::i()->follow_id );
+				\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'follow_thing', FALSE, array( 'sprintf' => array( $thing->_title ) ) );
+				\IPS\Output::i()->breadcrumb = array(
+					array( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), \IPS\Member::loggedIn()->language()->addToStack('module__core_clubs') ),
 					array( $thing->url(), $thing->name )
 				);
 			}
 			elseif ( $class != "IPS\Member" )
 			{	
-				if( !IPS::classUsesTrait( $class, 'IPS\Content\Followable' ) )
+				if( !is_subclass_of( $class, "\IPS\Content\Followable" ) )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
-
-				/* @var Item $class */
-				$thing = $class::loadAndCheckPerms( (int) Request::i()->follow_id );
-				Output::i()->title = Member::loggedIn()->language()->addToStack( 'follow_thing', FALSE, array( 'sprintf' => array( $thing->mapped('title') ) ) );
+					
+				$thing = $class::loadAndCheckPerms( (int) \IPS\Request::i()->follow_id );
+				\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'follow_thing', FALSE, array( 'sprintf' => array( $thing->mapped('title') ) ) );
 
 				/* Set navigation */
 				$container = NULL;
@@ -443,36 +416,36 @@ class notifications extends Controller
 					$container = $thing->container();
 					foreach ( $container->parents() as $parent )
 					{
-						Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+						\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 					}
-					Output::i()->breadcrumb[] = array( $container->url(), $container->_title );
+					\IPS\Output::i()->breadcrumb[] = array( $container->url(), $container->_title );
 				}
-				catch ( Exception $e ) { }
+				catch ( \Exception $e ) { }
 				
 				/* Set meta tags */
-				Output::i()->breadcrumb[] = array( NULL, $thing->mapped('title') );
+				\IPS\Output::i()->breadcrumb[] = array( NULL, $thing->mapped('title') );
 			}
 			else 
 			{
-				$thing = $class::load( (int) Request::i()->follow_id );
+				$thing = $class::load( (int) \IPS\Request::i()->follow_id );				
 				
-				Output::i()->title = Member::loggedIn()->language()->addToStack('follow_thing', FALSE, array( 'sprintf' => array( $thing->name ) ) );
+				\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('follow_thing', FALSE, array( 'sprintf' => array( $thing->name ) ) );
 
 				/* Set navigation */
-				Output::i()->breadcrumb[] = array( NULL, $thing->name );
+				\IPS\Output::i()->breadcrumb[] = array( NULL, $thing->name );
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C154/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C154/4', 404, '' );
 		}
 		
 		/* Do we follow it? */
 		try
 		{
-			$current = Db::i()->select( '*', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=? AND follow_member_id=?', Request::i()->follow_app, Request::i()->follow_area, Request::i()->follow_id, Member::loggedIn()->member_id ) )->first();
+			$current = \IPS\Db::i()->select( '*', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=? AND follow_member_id=?', \IPS\Request::i()->follow_app, \IPS\Request::i()->follow_area, \IPS\Request::i()->follow_id, \IPS\Member::loggedIn()->member_id ) )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			$current = FALSE;
 		}
@@ -482,7 +455,7 @@ class notifications extends Controller
 		{
 			$type = 'follower_content';
 		}
-		elseif ( $class == 'IPS\Member\Club' or in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+		elseif ( $class == 'IPS\Member\Club' or \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
 		{
 			$type = 'new_comment';
 		}
@@ -490,61 +463,57 @@ class notifications extends Controller
 		{
 			$type = 'new_content';
 		}
-		$notificationConfiguration = Member::loggedIn()->notificationsConfiguration();
-		$notificationConfiguration = $notificationConfiguration[$type] ?? array();
+		$notificationConfiguration = \IPS\Member::loggedIn()->notificationsConfiguration();
+		$notificationConfiguration = isset( $notificationConfiguration[ $type ] ) ? $notificationConfiguration[ $type ] : array();
 		$lang = 'follow_type_immediate';
-		if ( in_array( 'email', $notificationConfiguration ) and in_array( 'inline', $notificationConfiguration ) )
+		if ( \in_array( 'email', $notificationConfiguration ) and \in_array( 'inline', $notificationConfiguration ) )
 		{
 			$lang = 'follow_type_immediate_inline_email';
 		}
-		elseif ( in_array( 'email', $notificationConfiguration ) )
+		elseif ( \in_array( 'email', $notificationConfiguration ) )
 		{
 			$lang = 'follow_type_immediate_email';
 		}
 		
 		if ( $class == "IPS\Member" )
 		{
-			Member::loggedIn()->language()->words[ $lang ] = Member::loggedIn()->language()->addToStack( $lang . '_member', FALSE, array( 'sprintf' => array( $thing->name ) ) );
+			\IPS\Member::loggedIn()->language()->words[ $lang ] = \IPS\Member::loggedIn()->language()->addToStack( $lang . '_member', FALSE, array( 'sprintf' => array( $thing->name ) ) );
 		}
 		
 		if ( empty( $notificationConfiguration ) )
 		{
-			Member::loggedIn()->language()->words[ $lang . '_desc' ] = Member::loggedIn()->language()->addToStack( 'follow_type_immediate_none', FALSE ) . ' <a href="' .  Url::internal( 'app=core&module=system&controller=notifications&do=options&type=core_Content', 'front', 'notifications_options' ) . '">' . Member::loggedIn()->language()->addToStack( 'notification_options', FALSE ) . '</a>';
+			\IPS\Member::loggedIn()->language()->words[ $lang . '_desc' ] = \IPS\Member::loggedIn()->language()->addToStack( 'follow_type_immediate_none', FALSE ) . ' <a href="' .  \IPS\Http\Url::internal( 'app=core&module=system&controller=notifications&do=options&type=core_Content', 'front', 'notifications_options' ) . '">' . \IPS\Member::loggedIn()->language()->addToStack( 'notification_options', FALSE ) . '</a>';
 		}
 		else
 		{
-			Member::loggedIn()->language()->words[ $lang . '_desc' ] = '<a href="' .  Url::internal( 'app=core&module=system&controller=notifications&do=options&type=core_Content', 'front', 'notifications_options' ) . '">' . Member::loggedIn()->language()->addToStack( 'follow_type_immediate_change', FALSE ) . '</a>';
+			\IPS\Member::loggedIn()->language()->words[ $lang . '_desc' ] = '<a href="' .  \IPS\Http\Url::internal( 'app=core&module=system&controller=notifications&do=options&type=core_Content', 'front', 'notifications_options' ) . '">' . \IPS\Member::loggedIn()->language()->addToStack( 'follow_type_immediate_change', FALSE ) . '</a>';
 		}
 			
 		/* Build form */
-		$form = new Form( 'follow', ( $current ) ? 'update_follow' : 'follow', NULL, array(
-			'data-followApp' 	=> Request::i()->follow_app,
-			'data-followArea' 	=> Request::i()->follow_area,
-			'data-followID' 	=> Request::i()->follow_id
+		$form = new \IPS\Helpers\Form( 'follow', ( $current ) ? 'update_follow' : 'follow', NULL, array(
+			'data-followApp' 	=> \IPS\Request::i()->follow_app,
+			'data-followArea' 	=> \IPS\Request::i()->follow_area,
+			'data-followID' 	=> \IPS\Request::i()->follow_id
 		) );
 
-		$form->class = 'ipsForm--vertical ipsForm--notifications-follow';
+		$form->class = 'ipsForm_vertical';
 		
 		$options = array();
-
-		if( $class != "IPS\Content\Tag" )
-		{
-			$options['immediate'] = $lang;
-		}
+		$options['immediate'] = $lang;
 		
 		if ( $class != "IPS\Member" )
 		{
 			if ( $class != "IPS\Member\Club" )
 			{
-				$options['daily']	= Member::loggedIn()->language()->addToStack('follow_type_daily');
-				$options['weekly']	= Member::loggedIn()->language()->addToStack('follow_type_weekly');
+				$options['daily']	= \IPS\Member::loggedIn()->language()->addToStack('follow_type_daily');
+				$options['weekly']	= \IPS\Member::loggedIn()->language()->addToStack('follow_type_weekly');
 			}
-			$options['none']	= Member::loggedIn()->language()->addToStack('follow_type_no_notification');
+			$options['none']	= \IPS\Member::loggedIn()->language()->addToStack('follow_type_no_notification');
 		}
 		
-		if ( count( $options ) > 1 )
+		if ( \count( $options ) > 1 )
 		{
-			$form->add( new Radio( 'follow_type', $current ? $current['follow_notify_freq'] : NULL, TRUE, array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'follow_type', $current ? $current['follow_notify_freq'] : NULL, TRUE, array(
 				'options'	=> $options,
 				'disabled'	=> empty( $notificationConfiguration ) ? array( 'immediate' ) : array()
 			) ) );
@@ -553,76 +522,138 @@ class notifications extends Controller
 		{
 			foreach ( $options as $k => $v )
 			{
-				$form->hiddenValues[ 'follow_type' ] = $k;
+				$form->hiddenValues[ $k ] = $v;
 				if ( empty( $notificationConfiguration ) )
 				{
 					$type = $type == 'follower_content' ? 'core_Content' : $type;
-					$form->addMessage( Member::loggedIn()->language()->addToStack( 'follow_type_no_config' ) . ' <a href="' .  Url::internal( 'app=core&module=system&controller=notifications&do=options&type=' . $type, 'front', 'notifications_options' ) . '">' . Member::loggedIn()->language()->addToStack( 'notification_options', FALSE ) . '</a>', ' ', FALSE );
+					$form->addMessage( \IPS\Member::loggedIn()->language()->addToStack( 'follow_type_no_config' ) . ' <a href="' .  \IPS\Http\Url::internal( 'app=core&module=system&controller=notifications&do=options&type=' . $type, 'front', 'notifications_options' ) . '">' . \IPS\Member::loggedIn()->language()->addToStack( 'notification_options', FALSE ) . '</a>', 'ipsPadding:none', FALSE );
 				}
 				else
 				{
-					$form->addMessage( Member::loggedIn()->language()->addToStack( $v ) . '<br>' . Member::loggedIn()->language()->addToStack( $lang  . '_desc' ), ' ', FALSE );
+					$form->addMessage( \IPS\Member::loggedIn()->language()->addToStack( $v ) . '<br>' . \IPS\Member::loggedIn()->language()->addToStack( $lang  . '_desc' ), 'ipsPadding:none', FALSE );
 				}
 			}
 		}
-		$form->add( new Checkbox( 'follow_public', $current ? !$current['follow_is_anon'] : TRUE, FALSE, array(
-			'label' => ( $class != "IPS\Member" ) ? Member::loggedIn()->language()->addToStack( 'follow_public' ) : Member::loggedIn()->language()->addToStack('follow_public_member', FALSE, array( 'sprintf' => array( $thing->name ) ) )
+		$form->add( new \IPS\Helpers\Form\Checkbox( 'follow_public', $current ? !$current['follow_is_anon'] : TRUE, FALSE, array(
+			'label' => ( $class != "IPS\Member" ) ? \IPS\Member::loggedIn()->language()->addToStack( 'follow_public' ) : \IPS\Member::loggedIn()->language()->addToStack('follow_public_member', FALSE, array( 'sprintf' => array( $thing->name ) ) )
 		) ) );
 		if ( $current )
 		{
-			$unfollowUrl = Url::internal( "app=core&module=system&controller=notifications&do=unfollow&id={$current['follow_id']}&follow_app={$current['follow_app']}&follow_area={$current['follow_area']}" )->csrf();
+			$unfollowUrl = \IPS\Http\Url::internal( "app=core&module=system&controller=notifications&do=unfollow&id={$current['follow_id']}&follow_app={$current['follow_app']}&follow_area={$current['follow_area']}" )->csrf();
 			if ( method_exists( $thing, 'url' ) AND $thing->url() )
 			{
 				$unfollowUrl = $unfollowUrl->addRef( (string) $thing->url() );
 			}
-			$form->addButton( 'unfollow', 'link', $unfollowUrl, 'ipsButton ipsButton--text ipsButton--icon', array('data-action' => 'unfollow') );
+			$form->addButton( 'unfollow', 'link', $unfollowUrl, 'ipsButton ipsButton_link ipsPos_left ipsButton_narrow', array('data-action' => 'unfollow') );
 		}
 		
 		/* Handle submissions */
 		if ( $values = $form->values() )
 		{
-            $class = Follow::getClassToFollow( Request::i()->follow_app, Request::i()->follow_area );
-            try
-            {
-				$useDataLayer = Member::loggedIn()->member_id and DataLayer::enabled( 'analytics_full' );
-				$alreadyFollowing = $useDataLayer ? Db::i()->select( 'count(*)', 'core_follow', [
-					'follow_app=? AND follow_area=? AND follow_rel_id=? AND follow_member_id=?', Request::i()->follow_app, Request::i()->follow_area, Request::i()->follow_id, Member::loggedIn()->member_id
-				] )->first() : false;
-                $thing = $class::load( Request::i()->follow_id );
-                $thing->follow( $values['follow_type'], $values['follow_public'] );
-
-				if ( $useDataLayer and !$alreadyFollowing )
-				{
-					DataLayer::i()->addEvent( 'follow', [
-						'follow_app' => Request::i()->follow_app,
-						'follow_area' => Request::i()->follow_area,
-						'follow_id' => Request::i()->follow_id
-					]);
-				}
-            }
-            catch( OutOfRangeException ){}
-			
-			/* Boink */
-			if ( Request::i()->isAjax() )
+			/* Insert */
+			$save = array(
+				'follow_id'			=> md5( \IPS\Request::i()->follow_app . ';' . \IPS\Request::i()->follow_area . ';' . \IPS\Request::i()->follow_id . ';' .  \IPS\Member::loggedIn()->member_id ),
+				'follow_app'			=> \IPS\Request::i()->follow_app,
+				'follow_area'			=> \IPS\Request::i()->follow_area,
+				'follow_rel_id'		=> \IPS\Request::i()->follow_id,
+				'follow_member_id'	=> \IPS\Member::loggedIn()->member_id,
+				'follow_is_anon'		=> !$values['follow_public'],
+				'follow_added'		=> time(),
+				'follow_notify_do'	=> ( isset( $values['follow_type'] ) AND $values['follow_type'] == 'none' ) ? 0 : 1,
+				'follow_notify_meta'	=> '',
+				'follow_notify_freq'	=> ( $class == "IPS\Member" ) ? 'immediate' : $values['follow_type'],
+				'follow_notify_sent'	=> 0,
+				'follow_visible'		=> 1,
+			);
+			if ( $current )
 			{
-				Output::i()->json( 'ok' );
+				\IPS\Db::i()->update( 'core_follow', $save, array( 'follow_id=?', $current['follow_id'] ) );
 			}
 			else
 			{
-				Output::i()->redirect( $thing->url() );
+				\IPS\Db::i()->insert( 'core_follow', $save );
+			}
+			
+			/* Remove cached */
+			\IPS\Db::i()->delete( 'core_follow_count_cache', array( 'id=? AND class=?', \IPS\Request::i()->follow_id, 'IPS\\' . \IPS\Request::i()->follow_app . '\\' . mb_ucfirst( \IPS\Request::i()->follow_area ) ) );
+			
+			/* Also follow all nodes if following club */
+			if( $class == "IPS\Member\Club"  )
+			{
+				foreach ( $thing->nodes() as $node )
+				{
+					$itemClass = $node['node_class']::$contentItemClass;
+					$followApp = $itemClass::$application;
+					$followArea = mb_strtolower( mb_substr( $node['node_class'], mb_strrpos( $node['node_class'], '\\' ) + 1 ) );
+					
+					$save = array(
+						'follow_id'				=> md5( $followApp . ';' . $followArea . ';' . $node['node_id'] . ';' .  \IPS\Member::loggedIn()->member_id ),
+						'follow_app'			=> $followApp,
+						'follow_area'			=> $followArea,
+						'follow_rel_id'			=> $node['node_id'],
+						'follow_member_id'		=> \IPS\Member::loggedIn()->member_id,
+						'follow_is_anon'		=> !$values['follow_public'],
+						'follow_added'			=> time(),
+						'follow_notify_do'		=> ( isset( $values['follow_type'] ) AND $values['follow_type'] == 'none' ) ? 0 : 1,
+						'follow_notify_meta'	=> '',
+						'follow_notify_freq'	=> $values['follow_type'],
+						'follow_notify_sent'	=> 0,
+						'follow_visible'		=> 1,
+					);
+					\IPS\Db::i()->insert( 'core_follow', $save, TRUE );
+				}
+			}
+			
+			/* Send notification if following member */
+			if( $class == "IPS\Member"  )
+			{
+				if( $values['follow_public'] )
+				{
+					/* Give points */
+					$receiver = \IPS\Member::load( \IPS\Request::i()->follow_id );
+					$receiver->achievementAction( 'core', 'FollowMember', [
+						'giver' => \IPS\Member::loggedIn()
+					] );
+
+					$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'member_follow', \IPS\Member::loggedIn(), array( \IPS\Member::loggedIn() ) );
+					$notification->recipients->attach( $thing );
+					$notification->send();
+				}
+			}
+			else if ( \in_array( 'IPS\Node\Model', class_parents( $class ) ) )
+			{
+				\IPS\Member::loggedIn()->achievementAction( 'core', 'FollowNode', $class::load( \IPS\Request::i()->follow_id ) );
+			}
+			else if ( \in_array( 'IPS\Content\Item', class_parents( $class ) ) )
+			{
+				$item = $class::load( \IPS\Request::i()->follow_id );
+				\IPS\Member::loggedIn()->achievementAction( 'core', 'FollowContentItem', [
+					'item' => $item,
+					'author' => $item->author()
+				] );
+			}
+			
+			/* Boink */
+			if ( \IPS\Request::i()->isAjax() )
+			{
+				\IPS\Output::i()->json( 'ok' );
+			}
+			else
+			{
+				\IPS\Output::i()->redirect( $thing->url() );
 			}
 		}
 
 		/* Display */
-		$output = $form->customTemplate( array( Theme::i()->getTemplate( 'system', 'core' ), 'followForm' ) );
+		$output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'system', 'core' ), 'followForm' ) );
 
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->sendOutput( $output );
+			\IPS\Output::i()->sendOutput( $output, 200, 'text/html' );
 		}
 		else
 		{
-			Output::i()->output = $output;
+			\IPS\Output::i()->output = $output;
 		}		
 	}
 	
@@ -631,49 +662,55 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function unfollow() : void
+	protected function unfollow()
 	{
 		$this->_checkLoggedIn();
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-            $follow = Follow::load( Request::i()->id );
-            if( $follow->member_id != Member::loggedIn()->member_id )
-            {
-                throw new OutOfRangeException;
-            }
+			$follow = \IPS\Db::i()->select( '*', 'core_follow', array( 'follow_id=? AND follow_member_id=?', \IPS\Request::i()->id, \IPS\Member::loggedIn()->member_id ) )->first();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \UnderflowException $e )
 		{
-			Output::i()->error( 'cant_find_unfollow', '2C154/D', 404, '' );
+			\IPS\Output::i()->error( 'cant_find_unfollow', '2C154/D', 404, '' );
+		}
+		
+		\IPS\Db::i()->delete( 'core_follow', array( 'follow_id=? AND follow_member_id=?', \IPS\Request::i()->id, \IPS\Member::loggedIn()->member_id ) );
+		\IPS\Db::i()->delete( 'core_follow_count_cache', array( 'id=? AND class=?', $follow['follow_rel_id'], 'IPS\\' . \IPS\Request::i()->follow_app . '\\' . mb_ucfirst( \IPS\Request::i()->follow_area ) ) );
+		
+		/* If we are unfollowing a club, unfollow all of its nodes */		
+		if( \IPS\Request::i()->follow_app == 'core' and \IPS\Request::i()->follow_area == 'club' )
+		{
+			$class = 'IPS\\Member\Club';
+
+			/* Get thing */
+			$thing = NULL;
+
+			try
+			{
+				$thing = $class::loadAndCheckPerms( (int) $follow['follow_rel_id'] );
+
+				foreach ( $thing->nodes() as $node )
+				{
+					$itemClass = $node['node_class']::$contentItemClass;
+					$followApp = $itemClass::$application;
+					$followArea = mb_strtolower( mb_substr( $node['node_class'], mb_strrpos( $node['node_class'], '\\' ) + 1 ) );
+					
+					\IPS\Db::i()->delete( 'core_follow', array( 'follow_id=? AND follow_member_id=?', md5( $followApp . ';' . $followArea . ';' . $node['node_id'] . ';' .  \IPS\Member::loggedIn()->member_id ), \IPS\Member::loggedIn()->member_id ) );
+				}
+			}
+			catch ( \OutOfRangeException $e ) {}
 		}
 
-        /* We call the unfollow on the object, not on the follow record.
-        This is so that we can handle object-specific actions (e.g. unfollow a club unfollow club nodes)
-        It's a bit circular, but we'll live. */
-        if( $item = $follow->_item )
-        {
-            $item->unfollow( Member::loggedIn(), $follow->id );
-
-	        if ( DataLayer::enabled( 'analytics_full' ) )
-	        {
-		        DataLayer::i()->addEvent( 'unfollow', [
-			        'follow_app' => $follow->app,
-			        'follow_area' => $follow->area,
-			        'follow_id' => $follow->rel_id,
-		        ]);
-	        }
-        }
-
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'ok' );
+			\IPS\Output::i()->json( 'ok' );
 		}
 		else
 		{
-			Output::i()->redirect( Request::i()->referrer() ?: Url::internal( '' ) );
+			\IPS\Output::i()->redirect( \IPS\Request::i()->referrer() ?: \IPS\Http\Url::internal( '' ) );
 		}
 	}
 	
@@ -682,43 +719,34 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function followers() : void
+	protected function followers()
 	{
 		$perPage	= 50;
-		$thisPage	= isset( Request::i()->followerPage ) ? Request::i()->followerPage : 1;
+		$thisPage	= isset( \IPS\Request::i()->followerPage ) ? \IPS\Request::i()->followerPage : 1;
 		$thisPage	= ( $thisPage > 0 ) ? $thisPage : 1;
 
-		if( !Member::loggedIn()->group['g_view_followers'] )
+		if( !\IPS\Request::i()->follow_app OR !\IPS\Request::i()->follow_area )
 		{
-			Output::i()->error( 'module_no_permission', '2C154/16', 403 );
-		}
-
-		if( !Request::i()->follow_app OR !Request::i()->follow_area )
-		{
-			Output::i()->error( 'node_error', '2C154/E', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C154/E', 404, '' );
 		}
 				
 		/* Get class */
-		if( Request::i()->follow_app == 'core' and Request::i()->follow_area == 'member' )
+		if( \IPS\Request::i()->follow_app == 'core' and \IPS\Request::i()->follow_area == 'member' )
 		{
 			$class = 'IPS\Member';
 		}
-		else if( Request::i()->follow_app == 'core' and Request::i()->follow_area == 'club' )
+		else if( \IPS\Request::i()->follow_app == 'core' and \IPS\Request::i()->follow_area == 'club' )
 		{
 			$class = 'IPS\Member\Club';
 		}
-		elseif( Request::i()->follow_app == 'core' and Request::i()->follow_area == 'tag' )
-		{
-			$class = 'IPS\Content\Tag';
-		}
 		else
 		{
-			$class = 'IPS\\' . Request::i()->follow_app . '\\' . IPS::mb_ucfirst( Request::i()->follow_area );
+			$class = 'IPS\\' . \IPS\Request::i()->follow_app . '\\' . mb_ucfirst( \IPS\Request::i()->follow_area );
 		}
 		
-		if ( !class_exists( $class ) or !array_key_exists( Request::i()->follow_app, Application::applications() ) )
+		if ( !class_exists( $class ) or !array_key_exists( \IPS\Request::i()->follow_app, \IPS\Application::applications() ) )
 		{
-			Output::i()->error( 'node_error', '2C154/5', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C154/5', 404, '' );
 		}
 		
 		/* Get thing */
@@ -726,70 +754,69 @@ class notifications extends Controller
 		$anonymous = 0;
 		try
 		{
-			if ( $class == "IPS\Member\Club" or $class == 'IPS\Content\Tag' )
-			{
-				$thing = $class::loadAndCheckPerms( (int) Request::i()->follow_id );
-				$followers = $thing->followers( Content::FOLLOW_PUBLIC, array( 'none', 'immediate', 'daily', 'weekly' ), NULL, array( ( $thisPage - 1 ) * $perPage, $perPage ), 'name' );
-				$followersCount = $thing->followersCount();
-				$anonymous = $thing->followersCount( Content::FOLLOW_ANONYMOUS );
-				$title = $thing->_title;
-			}
-			elseif ( in_array( 'IPS\Node\Model', class_parents( $class ) ) )
+			if ( \in_array( 'IPS\Node\Model', class_parents( $class ) ) )
 			{
 				$classname = $class::$contentItemClass;
 				$containerClass = $class;
-				$thing = $containerClass::loadAndCheckPerms( (int) Request::i()->follow_id );
-				$followers = $classname::containerFollowers( $thing, Content::FOLLOW_PUBLIC, array( 'none', 'immediate', 'daily', 'weekly' ), NULL, array( ( $thisPage - 1 ) * $perPage, $perPage ), 'name' );
+				$thing = $containerClass::loadAndCheckPerms( (int) \IPS\Request::i()->follow_id );
+				$followers = $classname::containerFollowers( $thing, $classname::FOLLOW_PUBLIC, array( 'none', 'immediate', 'daily', 'weekly' ), NULL, array( ( $thisPage - 1 ) * $perPage, $perPage ), 'name' );
 				$followersCount = $classname::containerFollowerCount( $thing );
-				$anonymous = $classname::containerFollowerCount( $thing, Content::FOLLOW_ANONYMOUS );
+				$anonymous = $classname::containerFollowerCount( $thing, $classname::FOLLOW_ANONYMOUS );
+				$title = $thing->_title;
+			}
+			else if ( $class == "IPS\Member\Club" )
+			{
+				$thing = $class::loadAndCheckPerms( (int) \IPS\Request::i()->follow_id );
+				$followers = $thing->followers( $class::FOLLOW_PUBLIC, array( 'none', 'immediate', 'daily', 'weekly' ), NULL, array( ( $thisPage - 1 ) * $perPage, $perPage ), 'name' );
+				$followersCount = $thing->followersCount();
+				$anonymous = $thing->followersCount( $class::FOLLOW_ANONYMOUS );
 				$title = $thing->_title;
 			}
 			else if ( $class != "IPS\Member" )
 			{
-				/* @var Item $thing */
-				$thing = $class::loadAndCheckPerms( (int) Request::i()->follow_id );
-				$followers = $thing->followers( Content::FOLLOW_PUBLIC, array( 'none', 'immediate', 'daily', 'weekly' ), NULL, array( ( $thisPage - 1 ) * $perPage, $perPage ), 'name' );
+				$thing = $class::loadAndCheckPerms( (int) \IPS\Request::i()->follow_id );
+				$followers = $thing->followers( $class::FOLLOW_PUBLIC, array( 'none', 'immediate', 'daily', 'weekly' ), NULL, array( ( $thisPage - 1 ) * $perPage, $perPage ), 'name' );
 				$followersCount = $thing->followersCount();
-				$anonymous = $thing->followersCount( Content::FOLLOW_ANONYMOUS );
+				$anonymous = $thing->followersCount( $class::FOLLOW_ANONYMOUS );
 				$title = $thing->mapped('title');
 			}
 			else
 			{
-				$thing = $class::load( (int) Request::i()->follow_id );
-				$followers = $thing->followers( Content::FOLLOW_PUBLIC, array( 'none', 'immediate', 'daily', 'weekly' ), NULL, array( ( $thisPage - 1 ) * $perPage, $perPage ), 'name' );
+				$thing = $class::load( (int) \IPS\Request::i()->follow_id );
+				$followers = $thing->followers( $class::FOLLOW_PUBLIC, array( 'none', 'immediate', 'daily', 'weekly' ), NULL, array( ( $thisPage - 1 ) * $perPage, $perPage ), 'name' );
 				$followersCount = $thing->followersCount();
-				$anonymous = $thing->followersCount( Content::FOLLOW_ANONYMOUS );
+				$anonymous = $thing->followersCount( $class::FOLLOW_ANONYMOUS );
 				$title = $thing->name;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C154/6', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C154/6', 404, '' );
 		}
 
 		/* Display */
-		if ( Request::i()->isAjax() and isset( Request::i()->_infScroll ) )
+		if ( \IPS\Request::i()->isAjax() and isset( \IPS\Request::i()->_infScroll ) )
 		{
-			Output::i()->sendOutput(  Theme::i()->getTemplate( 'system' )->followersRows( $followers ) );
+			\IPS\Output::i()->sendOutput(  \IPS\Theme::i()->getTemplate( 'system' )->followersRows( $followers ) );
 		}
 		else
 		{
-			$url = Url::internal( "app=core&module=system&controller=notifications&do=followers&follow_app=". Request::i()->follow_app ."&follow_area=". Request::i()->follow_area ."&follow_id=" . Request::i()->follow_id . "&_infScroll=1" );
-			$removeAllUrl = Url::internal( "app=core&module=system&controller=notifications&do=removeFollowers&follow_app=". Request::i()->follow_app ."&follow_area=". Request::i()->follow_area ."&follow_id=" . Request::i()->follow_id )->csrf();
+			$url = \IPS\Http\Url::internal( "app=core&module=system&controller=notifications&do=followers&follow_app=". \IPS\Request::i()->follow_app ."&follow_area=". \IPS\Request::i()->follow_area ."&follow_id=" . \IPS\Request::i()->follow_id . "&_infScroll=1" );
+			$removeAllUrl = \IPS\Http\Url::internal( "app=core&module=system&controller=notifications&do=removeFollowers&follow_app=". \IPS\Request::i()->follow_app ."&follow_area=". \IPS\Request::i()->follow_area ."&follow_id=" . \IPS\Request::i()->follow_id )->csrf();
 			if ( method_exists( $thing, 'url' ) AND $thing->url() )
 			{
 				$removeAllUrl = $removeAllUrl->addRef( (string) $thing->url() );
 			}
 
-			$pagination = Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $url, ceil( $followersCount / $perPage ), $thisPage, $perPage, FALSE, 'followerPage' );
+			$pagination = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $url, ceil( $followersCount / $perPage ), $thisPage, $perPage, FALSE, 'followerPage' );
 			
 			/* Instruct bots not to index this page */
-			Output::i()->metaTags['robots']	= 'noindex';
+			\IPS\Output::i()->metaTags['robots']	= 'noindex';
 
-			Output::i()->title = Member::loggedIn()->language()->addToStack('item_followers', FALSE, array( 'sprintf' => array( $title ) ) );
-			Output::i()->breadcrumb[] = array( $thing->url(), $title );
-			Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('who_follows_this') );
-			Output::i()->output = Theme::i()->getTemplate( 'system' )->followers( $url, $pagination, $followers, $anonymous, $removeAllUrl );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('item_followers', FALSE, array( 'sprintf' => array( $title ) ) );
+			\IPS\Output::i()->breadcrumb[] = array( $thing->url(), $title );
+			\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack('who_follows_this') );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->followers( $url, $pagination, $followers, $anonymous, $removeAllUrl );
 		}
 	}
 	
@@ -800,107 +827,133 @@ class notifications extends Controller
 	 *
 	 * @return void
 	 */
-	protected function unfollowFromEmail() : void
+	protected function unfollowFromEmail()
 	{		
 		/* Logged in? */
-		if ( Member::loggedIn()->member_id and ! isset( Request::i()->listunsubscribe ) )
+		if ( \IPS\Member::loggedIn()->member_id and ! isset( \IPS\Request::i()->listunsubscribe ) )
 		{
 			/* Go to the normal page */
-			Output::i()->redirect( Url::internal( "app=core&module=system&controller=notifications&do=follow&follow_app=". Request::i()->follow_app ."&follow_area=". Request::i()->follow_area ."&follow_id=" . Request::i()->follow_id ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=system&controller=notifications&do=follow&follow_app=". \IPS\Request::i()->follow_app ."&follow_area=". \IPS\Request::i()->follow_area ."&follow_id=" . \IPS\Request::i()->follow_id ) );
 		}
 		
-		if ( ! empty( Request::i()->gkey ) )
+		if ( ! empty( \IPS\Request::i()->gkey ) )
 		{
-			[ $followKey, $memberKey ] = explode( '-', Request::i()->gkey );
+			[ $followKey, $memberKey ] = explode( '-', \IPS\Request::i()->gkey );
 			/* Do we follow it? */
 			try
 			{
-				$current = Db::i()->select( '*', 'core_follow', array( 'MD5( CONCAT_WS( \';\', follow_app, follow_area, follow_rel_id, follow_member_id, follow_added ) )=?', $followKey ) )->first();
-
+				$current = \IPS\Db::i()->select( '*', 'core_follow', array( 'MD5( CONCAT_WS( \';\', follow_app, follow_area, follow_rel_id, follow_member_id, follow_added ) )=?', $followKey ) )->first();
+				
 				/* Already no subs? */
 				if ( $current['follow_notify_freq'] === 'none' )
 				{
-					Output::i()->error( 'follow_guest_not_notified', '2C154/C', 404, '' );
+					\IPS\Output::i()->error( 'follow_guest_not_notified', '2C154/C', 404, '' );
 				}
 				
-				$member = Member::load( $current['follow_member_id'] );
+				$member = \IPS\Member::load( $current['follow_member_id'] );
 				
 				if ( md5( $member->email . ';' . $member->ip_address . ';' . $member->joined->getTimestamp() ) != $memberKey )
 				{
-					throw new Exception;
+					throw new \Exception;
 				}
 				
-				if( !array_key_exists( Request::i()->follow_app, Application::applications() ) )
+				if( !array_key_exists( \IPS\Request::i()->follow_app, \IPS\Application::applications() ) )
 				{
-					throw new Exception;
+					throw new \Exception;
 				}
-
-                $class = Follow::getClassToFollow( Request::i()->follow_app, Request::i()->follow_area );
+				
+				/* Get class */
+				if( \IPS\Request::i()->follow_app == 'core' and \IPS\Request::i()->follow_area == 'member' )
+				{
+					$class = 'IPS\\Member';
+				}
+				elseif( \IPS\Request::i()->follow_app == 'core' and \IPS\Request::i()->follow_area == 'club' )
+				{
+					$class = 'IPS\\Member\Club';
+				}
+				else
+				{
+					$class = 'IPS\\' . \IPS\Request::i()->follow_app . '\\' . mb_ucfirst( \IPS\Request::i()->follow_area );
+					
+					if( !is_subclass_of( $class, "\IPS\Content\Followable" ) )
+					{
+						throw new \Exception;
+					}
+				}
 				if ( !class_exists( $class ) )
 				{
-					throw new Exception;
+					throw new \Exception;
 				}
 				
 				/* Get thing */
 				$thing = NULL;
 				
-				if ( in_array( 'IPS\Node\Model', class_parents( $class ) ) )
+				if ( \in_array( 'IPS\Node\Model', class_parents( $class ) ) )
 				{
 					$classname = $class::$contentItemClass;
-
-					/* @var Model $containerClass */
 					$containerClass = $class;
-					$thing = $containerClass::load( (int) Request::i()->follow_id );
+					$thing = $containerClass::load( (int) \IPS\Request::i()->follow_id );
 					$title = $thing->_title;
 				}
 				else if ( $class == "IPS\Member\Club" )
 				{
-					$thing = $class::load( (int) Request::i()->follow_id );
+					$thing = $class::load( (int) \IPS\Request::i()->follow_id );
 					$title = $thing->_title;
 				}
 				else if ( $class != "IPS\Member" )
 				{
-					$thing = $class::load( (int) Request::i()->follow_id );
+					$thing = $class::load( (int) \IPS\Request::i()->follow_id );
 					$title = $thing->mapped('title');
 				}
 				else
 				{
-					$thing = $class::load( (int) Request::i()->follow_id );
+					$thing = $class::load( (int) \IPS\Request::i()->follow_id );
 					$title = $thing->name;
 				}
 				
 				/* Grab a count */
-				$count = Db::i()->select( 'COUNT(*)', 'core_follow', array( 'follow_member_id=? and follow_notify_freq != ?', $member->member_id, 'none' ) )->first();
+				$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_follow', array( 'follow_member_id=? and follow_notify_freq != ?', $member->member_id, 'none' ) )->first();
 
-				if ( isset( Request::i()->listunsubscribe ) and Request::i()->requestMethod() == 'POST' )
+				if ( isset( \IPS\Request::i()->listunsubscribe ) and \IPS\Request::i()->requestMethod() == 'POST' )
 				{
-					/* Unsubscribe them now as it's come from clicking the list-unsubscribe header in the email which
-					   contains List-Unsubscribe-Post:List-Unsubscribe=One-Click which sends via POST to prevent links being crawled and activated */
-                    $thing->follow( 'none', !$current['follow_is_anon'], $member );
+					\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'none' ), array( 'follow_id=? AND follow_member_id=?', $current['follow_id'], $member->member_id ) );
+
+					/* Unfollow club areas */
+					if ( $class == "IPS\Member\Club"  )
+					{
+						foreach ( $thing->nodes() as $node )
+						{
+							$itemClass = $node['node_class']::$contentItemClass;
+							$followApp = $itemClass::$application;
+							$followArea = mb_strtolower( mb_substr( $node['node_class'], mb_strrpos( $node['node_class'], '\\' ) + 1 ) );
+
+							\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'none' ), array( 'follow_id=? AND follow_member_id=?', md5( $followApp . ';' . $followArea . ';' . $node['node_id'] . ';' .  $member->member_id ), $member->member_id ) );
+						}
+					}
 
 					/* Done */
-					Output::i()->output = Member::loggedIn()->language()->addToStack('unsubscribed');
+					\IPS\Output::i()->output = \IPS\Member::loggedIn()->language()->addToStack('unsubscribed');
 					return;
 				}
 
-				$form = new Form( 'unfollowFromEmail', 'update_follow' );
-				$form->class = 'ipsForm--vertical ipsForm--notifications-unfollow-email';
+				$form = new \IPS\Helpers\Form( 'unfollowFromEmail', 'update_follow' );
+				$form->class = 'ipsForm_vertical';
 				
 				if ( $count == 1 )
 				{
-					$form->add( new Checkbox( 'guest_unfollow_single', 'single', FALSE, array( 'disabled' => true ) ) );
-					Member::loggedIn()->language()->words['guest_unfollow_single'] = Member::loggedIn()->language()->addToStack('follow_guest_unfollow_thing', FALSE, array( 'sprintf' => array( $title ) ) );
+					$form->add( new \IPS\Helpers\Form\Checkbox( 'guest_unfollow_single', 'single', FALSE, array( 'disabled' => true ) ) );
+					\IPS\Member::loggedIn()->language()->words['guest_unfollow_single'] = \IPS\Member::loggedIn()->language()->addToStack('follow_guest_unfollow_thing', FALSE, array( 'sprintf' => array( $title ) ) );
 				}
 				else
 				{
-					$form->add( new Radio( 'guest_unfollow_choice', 'single', FALSE, array(
+					$form->add( new \IPS\Helpers\Form\Radio( 'guest_unfollow_choice', 'single', FALSE, array(
 						'options'      => array(
-							'single'   => Member::loggedIn()->language()->addToStack('follow_guest_unfollow_thing', FALSE, array( 'sprintf' => array( $title ) ) ),
-							'all'	   => Member::loggedIn()->language()->addToStack('follow_guest_unfollow_all', FALSE, array( 'pluralize' => array( $count ) ) ),
+							'single'   => \IPS\Member::loggedIn()->language()->addToStack('follow_guest_unfollow_thing', FALSE, array( 'sprintf' => array( $title ) ) ),
+							'all'	   => \IPS\Member::loggedIn()->language()->addToStack('follow_guest_unfollow_all', FALSE, array( 'pluralize' => array( $count ) ) ),
 						),
 						'descriptions' => array(
-							'single' => Member::loggedIn()->language()->addToStack('follow_guest_unfollow_thing_desc'),
-							'all'	 => Member::loggedIn()->language()->addToStack('follow_guest_unfollow_all_desc', FALSE, array( 'sprintf' => array( base64_encode( Url::internal( "app=core&module=system&controller=followed" ) ) ) ) )
+							'single' => \IPS\Member::loggedIn()->language()->addToStack('follow_guest_unfollow_thing_desc'),
+							'all'	 => \IPS\Member::loggedIn()->language()->addToStack('follow_guest_unfollow_all_desc', FALSE, array( 'sprintf' => array( base64_encode( \IPS\Http\Url::internal( "app=core&module=system&controller=followed" ) ) ) ) )
 						)
 					) ) );
 				}
@@ -909,22 +962,35 @@ class notifications extends Controller
 				{
 					if ( $values['guest_unfollow_choice'] == 'single' or isset( $values['guest_unfollow_single'] ) )
 					{
-                        $thing->follow( 'none', !$current['follow_is_anon'], $member );
+						\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'none' ), array( 'follow_id=? AND follow_member_id=?', $current['follow_id'], $member->member_id ) );
+						
+						/* Unfollow club areas */
+						if ( $class == "IPS\Member\Club"  )
+						{
+							foreach ( $thing->nodes() as $node )
+							{
+								$itemClass = $node['node_class']::$contentItemClass;
+								$followApp = $itemClass::$application;
+								$followArea = mb_strtolower( mb_substr( $node['node_class'], mb_strrpos( $node['node_class'], '\\' ) + 1 ) );
+								
+								\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'none' ), array( 'follow_id=? AND follow_member_id=?', md5( $followApp . ';' . $followArea . ';' . $node['node_id'] . ';' .  $member->member_id ), $member->member_id ) );
+							}
+						}
 					}
 					else
 					{
-						Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'none' ), array( 'follow_member_id=?', $member->member_id ) );
+						\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_freq' => 'none' ), array( 'follow_member_id=?', $member->member_id ) );
 					}
 				}
 				
-				Output::i()->sidebar['enabled'] = FALSE;
-				Output::i()->bodyClasses[] = 'ipsLayout_minimal';
-				Output::i()->output = Theme::i()->getTemplate( 'system' )->unfollowFromEmail( $title, $member, $form, ! isset( Request::i()->guest_unfollow_choice ) ? FALSE : Request::i()->guest_unfollow_choice );
-				Output::i()->title = Member::loggedIn()->language()->addToStack('follow_guest_unfollow_thing', FALSE, array( 'sprintf' => array( $title ) ) );
+				\IPS\Output::i()->sidebar['enabled'] = FALSE;
+				\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimal';
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->unfollowFromEmail( $title, $member, $form, ! isset( \IPS\Request::i()->guest_unfollow_choice ) ? FALSE : \IPS\Request::i()->guest_unfollow_choice );
+				\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('follow_guest_unfollow_thing', FALSE, array( 'sprintf' => array( $title ) ) );
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				Output::i()->error( 'follow_guest_key_not_found', '2C154/B', 404, '' );
+				\IPS\Output::i()->error( 'follow_guest_key_not_found', '2C154/B', 404, '' );
 			}
 		}
 	}
@@ -934,84 +1000,79 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function button() : void
+	protected function button()
 	{
 		/* Get class */
-		if( Request::i()->follow_app == 'core' and Request::i()->follow_area == 'member' )
+		if( \IPS\Request::i()->follow_app == 'core' and \IPS\Request::i()->follow_area == 'member' )
 		{
 			$class = 'IPS\\Member';
 		}
-		elseif( Request::i()->follow_app == 'core' and Request::i()->follow_area == 'club' )
+		elseif( \IPS\Request::i()->follow_app == 'core' and \IPS\Request::i()->follow_area == 'club' )
 		{
 			$class = 'IPS\\Member\Club';
 		}
-		elseif( Request::i()->follow_app == 'core' and Request::i()->follow_area == 'tag' )
-		{
-			$class = 'IPS\Content\Tag';
-		}
 		else
 		{
-			$class = 'IPS\\' . Request::i()->follow_app . '\\' . IPS::mb_ucfirst( Request::i()->follow_area );
+			$class = 'IPS\\' . \IPS\Request::i()->follow_app . '\\' . mb_ucfirst( \IPS\Request::i()->follow_area );
 		}
 		
-		if ( !class_exists( $class ) or !array_key_exists( Request::i()->follow_app, Application::applications() ) )
+		if ( !class_exists( $class ) or !array_key_exists( \IPS\Request::i()->follow_app, \IPS\Application::applications() ) )
 		{
-			Output::i()->error( 'node_error', '2C154/5', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C154/5', 404, '' );
 		}
 		
 		/* Get thing */
 		$thing = NULL;
 		try
 		{
-			if ( in_array( 'IPS\Node\Model', class_parents( $class ) ) and $class != 'IPS\Content\Tag' )
+			if ( \in_array( 'IPS\Node\Model', class_parents( $class ) ) )
 			{
 				$classname = $class::$contentItemClass;
 				$containerClass = $class;
-				$thing = $containerClass::loadAndCheckPerms( (int) Request::i()->follow_id );
+				$thing = $containerClass::loadAndCheckPerms( (int) \IPS\Request::i()->follow_id );
 				$count = $classname::containerFollowerCount( $thing );
 			}
 			else if ( $class != "IPS\Member" )
 			{
-				$thing = $class::loadAndCheckPerms( (int) Request::i()->follow_id );
+				$thing = $class::loadAndCheckPerms( (int) \IPS\Request::i()->follow_id );
 				$count = $thing->followersCount();
 			}
 			else
 			{
-				if( !IPS::classUsesTrait( $class, 'IPS\Content\Followable' ) AND $class != "IPS\Member" )
+				if( !is_subclass_of( $class, "\IPS\Content\Followable" ) AND $class != "IPS\Member" )
 				{
-					Output::i()->error( 'node_error', '2C154/J', 404, '' );
+					\IPS\Output::i()->error( 'node_error', '2C154/J', 404, '' );
 				}
 					
-				$thing = $class::load( (int) Request::i()->follow_id );
+				$thing = $class::load( (int) \IPS\Request::i()->follow_id );
 				$count = $thing->followersCount();
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C154/6', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C154/6', 404, '' );
 		}
 
-		if ( Request::i()->follow_area == 'member' && ( !isset( Request::i()->button_type ) || Request::i()->button_type === 'search' ) )
+		if ( \IPS\Request::i()->follow_area == 'member' && ( !isset( \IPS\Request::i()->button_type ) || \IPS\Request::i()->button_type === 'search' ) )
 		{
-			$size = isset( Request::i()->button_size ) ? Request::i()->button_size : 'normal';
-			if ( isset( Request::i()->button_type ) && Request::i()->button_type === 'search' )
+			if ( isset( \IPS\Request::i()->button_type ) && \IPS\Request::i()->button_type === 'search' )
 			{
-				Output::i()->sendOutput( Theme::i()->getTemplate( 'profile' )->memberSearchFollowButton( Request::i()->follow_app, Request::i()->follow_area, Request::i()->follow_id, $count, $size ) );
+				\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'profile' )->memberSearchFollowButton( \IPS\Request::i()->follow_app, \IPS\Request::i()->follow_area, \IPS\Request::i()->follow_id, $count ) );
 			}
 			else
 			{
-				Output::i()->sendOutput( Theme::i()->getTemplate( 'profile' )->memberFollowButton( Request::i()->follow_app, Request::i()->follow_area, Request::i()->follow_id, $count, $size ) );
+				\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'profile' )->memberFollowButton( \IPS\Request::i()->follow_app, \IPS\Request::i()->follow_area, \IPS\Request::i()->follow_id, $count ) );	
 			}			
 		}
 		else
 		{
-			if ( Request::i()->button_type == 'manage' )
+			if ( \IPS\Request::i()->button_type == 'manage' )
 			{
-				Output::i()->sendOutput( Theme::i()->getTemplate( 'system' )->manageFollowButton( Request::i()->follow_app, Request::i()->follow_area, Request::i()->follow_id ) );
+				\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'system' )->manageFollowButton( \IPS\Request::i()->follow_app, \IPS\Request::i()->follow_area, \IPS\Request::i()->follow_id ) );
 			}
 			else
 			{
-				Output::i()->sendOutput( Theme::i()->getTemplate( 'global' )->followButton( Request::i()->follow_app, Request::i()->follow_area, Request::i()->follow_id, $count ) );
+				\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global' )->followButton( \IPS\Request::i()->follow_app, \IPS\Request::i()->follow_area, \IPS\Request::i()->follow_id, $count ) );	
 			}			
 		}
 	}
@@ -1021,38 +1082,38 @@ class notifications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function removeFollowers() : void
+	protected function removeFollowers()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		if ( !Member::loggedIn()->modPermission('can_remove_followers') )
+		if ( !\IPS\Member::loggedIn()->modPermission('can_remove_followers') )
 		{
-			Output::i()->error( 'cant_remove_followers', '2C154/A', 403, 'cant_remove_followers_admin' );
+			\IPS\Output::i()->error( 'cant_remove_followers', '2C154/A', 403, 'cant_remove_followers_admin' );
 		}
 
-		Db::i()->delete( 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=?', Request::i()->follow_app, Request::i()->follow_area, Request::i()->follow_id ) );
-        Db::i()->delete( 'core_follow_count_cache', array( 'id=? AND class=?', Request::i()->follow_id, 'IPS\\' . Request::i()->follow_app . '\\' . IPS::mb_ucfirst( Request::i()->follow_area ) ) );
+		\IPS\Db::i()->delete( 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=?', \IPS\Request::i()->follow_app, \IPS\Request::i()->follow_area, \IPS\Request::i()->follow_id ) );
+        \IPS\Db::i()->delete( 'core_follow_count_cache', array( 'id=? AND class=?', \IPS\Request::i()->follow_id, 'IPS\\' . \IPS\Request::i()->follow_app . '\\' . mb_ucfirst( \IPS\Request::i()->follow_area ) ) );
         
-        if( Request::i()->follow_area == 'club' )
+        if( \IPS\Request::i()->follow_area == 'club' )
 		{
 			try
 			{
-				$club = Club::load( Request::i()->follow_id );
+				$club = \IPS\Member\Club::load( \IPS\Request::i()->follow_id );
 				foreach ( $club->nodes() as $node )
 				{
 					$itemClass = $node['node_class']::$contentItemClass;
 					$followApp = $itemClass::$application;
 					$followArea = mb_strtolower( mb_substr( $node['node_class'], mb_strrpos( $node['node_class'], '\\' ) + 1 ) );
 					
-					Db::i()->delete( 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=?', $followApp, $followArea, $node['node_id'] ) );
+					\IPS\Db::i()->delete( 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=?', $followApp, $followArea, $node['node_id'] ) );
 				}
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 
-		Session::i()->modLog( 'modlog__item_follow_removed', array( Request::i()->follow_app => FALSE, Request::i()->follow_area=> FALSE, Request::i()->follow_id => FALSE ) );
+		\IPS\Session::i()->modLog( 'modlog__item_follow_removed', array( \IPS\Request::i()->follow_app => FALSE, \IPS\Request::i()->follow_area=> FALSE, \IPS\Request::i()->follow_id => FALSE ) );
 		
-		Output::i()->redirect( Request::i()->referrer() ?: Url::internal( '' ), 'followers_removed' );
+		\IPS\Output::i()->redirect( \IPS\Request::i()->referrer() ?: \IPS\Http\Url::internal( '' ), 'followers_removed' );
 	}
 
 	/**
@@ -1060,39 +1121,33 @@ class notifications extends Controller
 	 *
 	 * @return void
 	 */
-	protected function fetchNotification() : void
+	protected function fetchNotification()
 	{
 		/* Got the ID? */
-		if( !Request::i()->id )
+		if( !\IPS\Request::i()->id )
 		{
-			Output::i()->json( array( 'error' => 'missing_id' ), 404 );
+			\IPS\Output::i()->json( array( 'error' => 'missing_id' ), 404 );
 		}
 
 		/* Got the notification? */
 		try
 		{
-			$notification = Db::i()->select( '*', 'core_notifications_pwa_queue', array( 'id=?', Request::i()->id ) )->first();
+			$notification = \IPS\Db::i()->select( '*', 'core_notifications_pwa_queue', array( 'id=?', \IPS\Request::i()->id ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
-			Output::i()->json( array( 'error' => 'not_found' ), 404 );
+			\IPS\Output::i()->json( array( 'error' => 'not_found' ), 404 );
 		}
 
+		/* Is this our notification? */
 		$data = json_decode( $notification['notification_data'], true );
 
-		if ( ! is_array( $data ) )
+		if( !isset( $data['member'] ) OR $data['member'] != \IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->json( array( 'error' => 'invalid_data' ), 400 );
-		}
-
-		$data['unreadCount'] = Member::loggedIn()->notification_cnt;
-
-		if( !isset( $data['member'] ) OR $data['member'] != Member::loggedIn()->member_id )
-		{
-			Output::i()->json( array( 'error' => 'no_permission' ), 403 );
+			\IPS\Output::i()->json( array( 'error' => 'no_permission' ), 403 );
 		}
 
 		/* Send the data */
-		Output::i()->json( $data );
+		\IPS\Output::i()->json( $data );
 	}
 }

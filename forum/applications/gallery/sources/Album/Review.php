@@ -12,64 +12,43 @@
 namespace IPS\gallery\Album;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use IPS\Content\EditHistory;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Hideable;
-use IPS\Content\Reactable;
-use IPS\Content\Reportable;
-use IPS\Content\Review as ContentReview;
-use IPS\Content\Shareable;
-use IPS\Http\Url;
-use IPS\Http\Url\Exception;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Album Review Model
  */
-class Review extends ContentReview implements Embeddable,
-	Filter
+class _Review extends \IPS\Content\Review implements \IPS\Content\EditHistory, \IPS\Content\Hideable, \IPS\Content\Searchable, \IPS\Content\Embeddable
 {
-	use	Reactable,
-		Reportable,
-		Shareable,
-		EditHistory,
-		Hideable;
+	use \IPS\Content\Reactable, \IPS\Content\Reportable;
 
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	[Content\Comment]	Item Class
 	 */
-	public static ?string $itemClass = 'IPS\gallery\Album\Item';
+	public static $itemClass = 'IPS\gallery\Album\Item';
 
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'gallery_album_reviews';
+	public static $databaseTable = 'gallery_album_reviews';
 
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'review_';
+	public static $databasePrefix = 'review_';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'item'				=> 'album_id',
 		'author'			=> 'author',
 		'author_name'		=> 'author_name',
@@ -90,32 +69,32 @@ class Review extends ContentReview implements Embeddable,
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'gallery';
+	public static $application = 'gallery';
 
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'gallery_album_review';
+	public static $title = 'gallery_album_review';
 
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'images';
+	public static $icon = 'camera';
 
 	/**
 	 * @brief	[Content]	Key for hide reasons
 	 */
-	public static ?string $hideLogKey = 'gallery-album-review';
+	public static $hideLogKey = 'gallery-album-review';
 
 	/**
 	 * Get URL for doing stuff
 	 *
 	 * @param	string|NULL		$action		Action
-	 * @return	Url
-	 * @throws	BadMethodCallException
-	 * @throws	Exception
+	 * @return	\IPS\Http\Url
+	 * @throws	\BadMethodCallException
+	 * @throws	\IPS\Http\Url\Exception
 	 */
-	public function url( ?string $action='find' ): Url
+	public function url( $action='find' )
 	{
 		return parent::url( $action )->setQueryString( 'tab', 'reviews' );
 	}
@@ -125,7 +104,7 @@ class Review extends ContentReview implements Embeddable,
 	 *
 	 * @return	void
 	 */
-	public function postCreate(): void
+	public function postCreate()
 	{
 		parent::postCreate();
 
@@ -134,11 +113,33 @@ class Review extends ContentReview implements Embeddable,
 	}
 
 	/**
+	 * Get snippet HTML for search result display
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$authorData		Basic data about the author. Only includes columns returned by \IPS\Member::columnsForPhoto()
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	array		$reputationData	Array of people who have given reputation and the reputation they gave
+	 * @param	int|NULL	$reviewRating	If this is a review, the rating
+	 * @param	string		$view			'expanded' or 'condensed'
+	 * @return	callable
+	 */
+	public static function searchResultSnippet( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating, $view )
+	{
+		return \IPS\gallery\Album\Comment::searchResultSnippet( $indexData, $authorData, $itemData, $containerData, $reputationData, $reviewRating, $view );
+	}
+
+	/**
+	 * @brief	A classname applied to the search result block
+	 */
+	public static $searchResultClassName = 'cGalleryAlbumSearchResult';
+
+	/**
 	 * Reaction Type
 	 *
 	 * @return	string
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		return 'album_review';
 	}
@@ -149,10 +150,10 @@ class Review extends ContentReview implements Embeddable,
 	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'gallery', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'gallery' )->embedAlbumReview( $this, $this->item(), $this->url()->setQueryString( $params ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'gallery', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'gallery' )->embedAlbumReview( $this, $this->item(), $this->url()->setQueryString( $params ) );
 	}
 
 	/**
@@ -162,7 +163,7 @@ class Review extends ContentReview implements Embeddable,
 	 * @note	By default we will return NULL and the container check will execute against Node::$contentItemClass, however
 	 *	in some situations we may need to override this (i.e. for Gallery Albums)
 	 */
-	protected static function getContainerModPermissionClass(): ?string
+	protected static function getContainerModPermissionClass()
 	{
 		return 'IPS\gallery\Album\Item';
 	}

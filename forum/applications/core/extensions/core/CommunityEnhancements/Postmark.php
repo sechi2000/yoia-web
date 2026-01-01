@@ -1,80 +1,74 @@
 <?php
-/**
- * @brief		Community Enhancements
- * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
- * @copyright	(c) Invision Power Services, Inc.
- * @license		https://www.invisioncommunity.com/legal/standards/
- * @package		Invision Community
 
- * @since		23 Jan 2025
+/**
+ * @brief           Integrations: Postmark
+ * @author          <a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
+ * @copyright       (c) Invision Power Services, Inc.
+ * @license         https://www.invisioncommunity.com/legal/standards/
+ * @package         Invision Community
+ * @since           19 November 2024
  */
 
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Email\Outgoing\Postmark as PostmarkHandler;
+use IPS\Email\Outgoing\Postmark;
 use IPS\Helpers\Form;
 use IPS\Helpers\Form\Password;
 use IPS\Helpers\Form\YesNo;
 use IPS\Http\Url;
-use IPS\Member as Member;
+use IPS\Member;
 use IPS\Output;
-use IPS\Theme;
 use IPS\Session;
 use IPS\Settings;
-use LogicException;
-use function defined;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
- * Community Enhancement
+ * Integrations: Postmark
  */
-class Postmark extends CommunityEnhancementsAbstract
+class _Postmark
 {
 	/**
-	 * @brief	Enhancement is enabled?
+	 * @brief    IPS-provided enhancement?
 	 */
-	public bool $enabled	= FALSE;
+	public $ips = FALSE;
 
 	/**
-	 * @brief	IPS-provided enhancement?
+	 * @brief    Enhancement is enabled?
 	 */
-	public bool $ips	= FALSE;
+	public $enabled = FALSE;
 
 	/**
-	 * @brief	Enhancement has configuration options?
+	 * @brief    Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= TRUE;
+	public $hasOptions = TRUE;
 
 	/**
-	 * @brief	Icon data
+	 * @brief    Icon data
 	 */
-	public string $icon	= "postmark.png";
-	
+	public $icon = "postmark.png";
+
 	/**
 	 * Constructor
 	 *
-	 * @return	void
+	 * @return    void
 	 */
 	public function __construct()
 	{
 		$this->enabled = !empty( Settings::i()->postmark_server_api_key );
 	}
-	
+
 	/**
 	 * Edit
 	 *
-	 * @return	void
+	 * @return    void
 	 */
-	public function edit() : void
+	public function edit()
 	{
 		$form = new Form;
 		$form->addHeader('postmark_settings');
@@ -83,7 +77,7 @@ class Postmark extends CommunityEnhancementsAbstract
 
 		if( !empty( Settings::i()->postmark_server_api_key ) )
 		{
-			$postmark = new PostmarkHandler( Settings::i()->postmark_server_api_key );
+			$postmark = new Postmark( Settings::i()->postmark_server_api_key );
 			$currentSetting = json_decode( Settings::i()->postmark_streams, TRUE );
 			$streams = $descriptions = [];
 			foreach( $postmark->api('message-streams')['MessageStreams'] as $stream )
@@ -133,15 +127,15 @@ class Postmark extends CommunityEnhancementsAbstract
 
 		Output::i()->output = $form;
 	}
-	
+
 	/**
 	 * Enable/Disable
 	 *
-	 * @param	$enabled	bool	Enable/Disable
-	 * @return	void
-	 * @throws	DomainException
+	 * @param    $enabled    bool    Enable/Disable
+	 * @return    void
+	 * @throws    \DomainException
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		/* If we're disabling, just disable */
 		if ( !$enabled )
@@ -151,25 +145,26 @@ class Postmark extends CommunityEnhancementsAbstract
 		else
 		{
 			/* We need an API key. */
-			throw new DomainException;
+			throw new \DomainException;
 		}
 	}
-	
+
 	/**
 	 * Test Settings
 	 *
-	 * @return	void
-	 * @throws	DomainException
+	 * @param       array $values Form values
+	 * @return    void
+	 * @throws    \LogicException
 	 */
-	protected function testSettings( array $values ) : void
+	protected function testSettings( $values )
 	{
 		/* Test Postmark settings */
-		$postmark = new PostmarkHandler( $values['postmark_server_api_key'] );
+		$postmark = new Postmark( $values['postmark_server_api_key'] );
 		$server = $postmark->api('server');
 
 		if( $server === null OR !empty( $server['ErrorCode'] ) )
 		{
-			throw new DomainException( Member::loggedIn()->language()->addToStack( 'postmark_api_error', false, [ 'sprintf' => [ (string) $server['ErrorCode'], $server['Message'] ] ] ) );
+			throw new \DomainException( Member::loggedIn()->language()->addToStack( 'postmark_api_error', false, [ 'sprintf' => [ (string) $server['ErrorCode'], $server['Message'] ] ] ) );
 		}
 	}
 }

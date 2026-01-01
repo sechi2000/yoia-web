@@ -11,96 +11,78 @@
 namespace IPS\Member;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Settings;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Group promotion node model
  */
-class GroupPromotion extends Model
+class _GroupPromotion extends \IPS\Node\Model
 {
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_group_promotions';
+	public static $databaseTable = 'core_group_promotions';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'promote_';
+	public static $databasePrefix = 'promote_';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 		
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'grouppromotions';
+	public static $nodeTitle = 'grouppromotions';
 	
 	/**
 	 * @brief	[Node] Sortable
 	 */
-	public static bool $nodeSortable = TRUE;
+	public static $nodeSortable = TRUE;
 	
 	/**
 	 * @brief	[Node] Positon Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'g_promotion_';
+	public static $titleLangPrefix = 'g_promotion_';
 	
 	/**
 	 * @brief	[Node] Enabled/Disabled Column
 	 */
-	public static ?string $databaseColumnEnabledDisabled = 'enabled';
+	public static $databaseColumnEnabledDisabled = 'enabled';
 	
 	/**
 	 * Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$form->addHeader( 'generic_gp_details' );
-		$form->add( new Translatable( 'promote_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? 'g_promotion_' . $this->id : NULL ) ) ) );
-		$form->add( new YesNo( 'promote_enabled', $this->id ? $this->enabled : 1, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'promote_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? 'g_promotion_' . $this->id : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'promote_enabled', $this->id ? $this->enabled : 1, TRUE ) );
 
 		/* Loop over our member filters */
 		$form->addHeader( 'generic_gp_filters' );
@@ -111,9 +93,9 @@ class GroupPromotion extends Model
 		/* We take an extra step with groups to disable invalid options */
 		$options['core_Group']['disabled_groups']	= $this->getDisabledGroups();
 
-		foreach ( Application::allExtensions( 'core', 'MemberFilter', TRUE, 'core' ) as $key => $extension )
+		foreach ( \IPS\Application::allExtensions( 'core', 'MemberFilter', TRUE, 'core' ) as $key => $extension )
 		{
-			if( $extension->availableIn( 'group_promotions' ) )
+			if( method_exists( $extension, 'getSettingField' ) AND $extension->availableIn( 'group_promotions' ) AND method_exists( $extension, 'matches' ) )
 			{
 				/* See if we need a new form header - one per app */
 				$_key		= explode( '_', $key );
@@ -135,17 +117,17 @@ class GroupPromotion extends Model
 		}
 
 		$form->addHeader( 'generic_gp_actions' );
-		$groups		= array_combine( array_keys( Group::groups( TRUE, FALSE ) ), array_map( function($_group ) { return (string) $_group; }, Group::groups( TRUE, FALSE ) ) );
+		$groups		= array_combine( array_keys( \IPS\Member\Group::groups( TRUE, FALSE ) ), array_map( function( $_group ) { return (string) $_group; }, \IPS\Member\Group::groups( TRUE, FALSE ) ) );
 		$primary	= array( 0 => 'do_not_change_group' ) + $groups;
 
 		/* And then allow the admin to choose which groups to promote to */
-		$form->add( new Radio( 'promote_group_primary', $this->id ? $this->_actions['primary_group'] : 0, FALSE,
+		$form->add( new \IPS\Helpers\Form\Radio( 'promote_group_primary', $this->id ? $this->_actions['primary_group'] : 0, FALSE, 
 							array( 'options' => $primary ) ) );
 
-		$form->add( new CheckboxSet( 'promote_group_secondary', $this->id ? $this->_actions['secondary_group'] : array(), FALSE,
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'promote_group_secondary', $this->id ? $this->_actions['secondary_group'] : array(), FALSE,
 							array( 'options' => $groups, 'multiple' => true ) ) );
 
-		$form->add( new CheckboxSet( 'demote_group_secondary', $this->id ? $this->_actions['secondary_remove'] : array(), FALSE,
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'demote_group_secondary', $this->id ? $this->_actions['secondary_remove'] : array(), FALSE,
 							array( 'options' => $groups, 'multiple' => true ) ) );
 	}
 
@@ -154,11 +136,11 @@ class GroupPromotion extends Model
 	 *
 	 * @return array
 	 */
-	protected function getDisabledGroups(): array
+	protected function getDisabledGroups()
 	{
-		$return = array( Settings::i()->guest_group );
+		$return = array( \IPS\Settings::i()->guest_group );
 
-		foreach(Group::groups() as $group )
+		foreach( \IPS\Member\Group::groups() as $group )
 		{
 			if( $group->g_promote_exclude )
 			{
@@ -175,7 +157,7 @@ class GroupPromotion extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( !$this->id )
 		{
@@ -183,15 +165,15 @@ class GroupPromotion extends Model
 		}
 		
 		/* Save the title */
-		Lang::saveCustom( 'core', 'g_promotion_' . $this->id, $values['promote_title'] );
+		\IPS\Lang::saveCustom( 'core', 'g_promotion_' . $this->id, $values['promote_title'] );
 
 		/* Json-encode the rules */
 		$_options	= array();
 
 		/* Loop over bulk mail extensions to format the options */
-		foreach ( Application::allExtensions( 'core', 'MemberFilter', TRUE, 'core' ) as $key => $extension )
+		foreach ( \IPS\Application::allExtensions( 'core', 'MemberFilter', TRUE, 'core' ) as $key => $extension )
 		{
-			if( $extension->availableIn( 'group_promotions' ) )
+			if( method_exists( $extension, 'save' ) AND $extension->availableIn( 'group_promotions' ) )
 			{
 				/* Grab our fields and add to the form */
 				$_value		= $extension->save( $values );
@@ -215,7 +197,7 @@ class GroupPromotion extends Model
 		/* Now we have to remove any fields that aren't valid... */
 		foreach( $values as $k => $v )
 		{
-			if( !in_array( $k, array( 'promote_enabled', 'promote_filters', 'promote_actions', 'promote_position' ) ) )
+			if( !\in_array( $k, array( 'promote_enabled', 'promote_filters', 'promote_actions', 'promote_position' ) ) )
 			{
 				unset( $values[ $k ] );
 			}
@@ -229,7 +211,7 @@ class GroupPromotion extends Model
 	 *
 	 * @return array
 	 */
-	public function get__filters(): array
+	public function get__filters()
 	{
 		return json_decode( $this->filters, TRUE );
 	}
@@ -239,7 +221,7 @@ class GroupPromotion extends Model
 	 *
 	 * @return array
 	 */
-	public function get__actions(): array
+	public function get__actions()
 	{
 		return json_decode( $this->actions, TRUE );
 	}
@@ -248,14 +230,14 @@ class GroupPromotion extends Model
 	 * Fetch All Root Nodes
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	mixed				$where				Additional WHERE clause
 	 * @param	array|NULL			$limit				Limit/offset to use, or NULL for no limit (default)
 	 * @return	array
 	 */
-	public static function roots( ?string $permissionCheck='view', Member $member=NULL, mixed $where=array(), array $limit=NULL ): array
+	public static function roots( $permissionCheck='view', $member=NULL, $where=array(), $limit=NULL )
 	{
-		if ( !count( $where ) )
+		if ( !\count( $where ) )
 		{
 			$return = array();
 			foreach( static::getStore() AS $node )
@@ -277,49 +259,49 @@ class GroupPromotion extends Model
 	 * @return	array
 	 * @note	Note that all records are returned, even disabled promotion rules. Enable status needs to be checked in userland code when appropriate.
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->group_promotions ) )
+		if ( !isset( \IPS\Data\Store::i()->group_promotions ) )
 		{
-			Store::i()->group_promotions = iterator_to_array( Db::i()->select( '*', static::$databaseTable, NULL, "promote_position ASC" )->setKeyField( 'promote_id' ) );
+			\IPS\Data\Store::i()->group_promotions = iterator_to_array( \IPS\Db::i()->select( '*', static::$databaseTable, NULL, "promote_position ASC" )->setKeyField( 'promote_id' ) );
 		}
 		
-		return Store::i()->group_promotions;
+		return \IPS\Data\Store::i()->group_promotions;
 	}
 
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'group_promotions' );
+	protected $caches = array( 'group_promotions' );
 
 	/**
 	 * @brief	[ActiveRecord] Attempt to load from cache
 	 * @note	If this is set to TRUE you MUST define a getStore() method to return the objects from cache
 	 */
-	protected static bool $loadFromCache = TRUE;
+	protected static $loadFromCache = TRUE;
 
 	/**
 	 * @brief	Cache extensions so we only need to load them once
 	 */
-	protected static ?array $extensions = NULL;
+	protected static $extensions = NULL;
 
 	/**
 	 * @brief	Flag to indicate whether or not to check secondary groups
 	 */
-	public bool $memberFilterCheckSecondaryGroups	= FALSE;
+	public $memberFilterCheckSecondaryGroups	= FALSE;
 
 	/**
 	 * Check if a member matches the rule
 	 *
-	 * @param	Member		$member	Member to check
+	 * @param	\IPS\Member		$member	Member to check
 	 * @return	bool
 	 */
-	public function matches( Member $member ): bool
+	public function matches( \IPS\Member $member )
 	{
 		if( static::$extensions === NULL )
 		{
-			static::$extensions = Application::allExtensions( 'core', 'MemberFilter', TRUE, 'core' );
+			static::$extensions = \IPS\Application::allExtensions( 'core', 'MemberFilter', TRUE, 'core' );
 		}
 
 		/* Did we check any matches? - It's possible that some rules are available */
@@ -350,7 +332,7 @@ class GroupPromotion extends Model
 	 *
 	 * @return	string|NULL
 	 */
-	public function get__description(): ?string
+	public function get__description()
 	{
 		$action = $this->_actions;
 		$showWarning = FALSE;
@@ -359,22 +341,22 @@ class GroupPromotion extends Model
 		{
 			try
 			{
-				$group = Group::load( $action['primary_group'] );
+				$group = \IPS\Member\Group::load( $action['primary_group'] );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				$showWarning = TRUE;
 			}
 		}
-		if ( count( $action['secondary_group'] )  )
+		if ( \count( $action['secondary_group'] )  )
 		{
 			foreach ( $action['secondary_group'] as $key => $group )
 			{
 				try
 				{
-					$group = Group::load( $group );
+					$group = \IPS\Member\Group::load( $group );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					$showWarning = TRUE;
 				}
@@ -383,9 +365,7 @@ class GroupPromotion extends Model
 
 		if ( $showWarning )
 		{
-			return Member::loggedIn()->language()->addToStack( 'grouppromotion_warning' );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'grouppromotion_warning' );
 		}
-
-		return NULL;
 	}
 }

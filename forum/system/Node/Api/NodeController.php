@@ -11,46 +11,30 @@
 namespace IPS\Node\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Db;
-use IPS\IPS;
-use IPS\Node\Model;
-use IPS\Node\Permissions;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base API endpoint for Nodes
  */
-class NodeController extends Controller
+class _NodeController extends \IPS\Api\Controller
 {
 	/**
 	 * List
 	 *
 	 * @param	array	$where	Extra WHERE clause
-	 * @return	PaginatedResponse
+	 * @return	\IPS\Api\PaginatedResponse
 	 */
-	protected function _list( array $where = array() ) : PaginatedResponse
+	protected function _list( $where = array() )
 	{
 		$class = $this->class;
-
-		/* @var array $permissionMap */
-		if ( $this->member and in_array( 'IPS\Node\Permissions', class_implements( $class ) ) )
+		
+		if ( $this->member and \in_array( 'IPS\Node\Permissions', class_implements( $class ) ) )
 		{
-			$where[] = array( '(' . Db::i()->findInSet( 'core_permission_index.perm_' . $class::$permissionMap['view'], $this->member->permissionArray() ) . ' OR ' . 'core_permission_index.perm_' . $class::$permissionMap['view'] . '=? )', '*' );
+			$where[] = array( '(' . \IPS\Db::i()->findInSet( 'core_permission_index.perm_' . $class::$permissionMap['view'], $this->member->permissionArray() ) . ' OR ' . 'core_permission_index.perm_' . $class::$permissionMap['view'] . '=? )', '*' );
 			if ( $class::$databaseColumnEnabledDisabled )
 			{
 				$where[] = array( $class::$databasePrefix . $class::$databaseColumnEnabledDisabled . '=1' );
@@ -58,28 +42,28 @@ class NodeController extends Controller
 		}
 
 		/* Exclude clubs? */
-		if ( IPS::classUsesTrait( $class, 'IPS\Content\ClubContainer' ) AND isset( Request::i()->clubs ) AND !Request::i()->clubs )
+		if ( \IPS\IPS::classUsesTrait( $class, 'IPS\Content\ClubContainer' ) AND isset( \IPS\Request::i()->clubs ) AND !\IPS\Request::i()->clubs )
 		{
 			$where[] = array( $class::$databasePrefix . $class::clubIdColumn() . ' IS NULL' );
 		}
 		
-		$select = Db::i()->select( '*', $class::$databaseTable, $where, $class::$databaseColumnOrder ? $class::$databasePrefix . $class::$databaseColumnOrder . " asc" : NULL );
+		$select = \IPS\Db::i()->select( '*', $class::$databaseTable, $where, $class::$databaseColumnOrder ? $class::$databasePrefix . $class::$databaseColumnOrder . " asc" : NULL );
 
 		/* Return permissions */
-		if ( in_array( 'IPS\Node\Permissions', class_implements( $class ) ) )
+		if ( \in_array( 'IPS\Node\Permissions', class_implements( $class ) ) )
 		{
 			$select->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . $class::$databaseTable . "." . $class::$databasePrefix . $class::$databaseColumnId, $class::$permApp, $class::$permType ) );
 		}
 
 		/* Return */
-		return new PaginatedResponse(
+		return new \IPS\Api\PaginatedResponse(
 			200,
 			$select,
-			isset( Request::i()->page ) ? Request::i()->page : 1,
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
 			$class,
 			NULL,
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 
@@ -87,19 +71,19 @@ class NodeController extends Controller
 	 * View
 	 *
 	 * @param	int	$id	ID Number
-	 * @return	Response
+	 * @return	\IPS\Api\Response
 	 */
-	protected function _view( int $id ) : Response
+	protected function _view( $id )
 	{
 		$class = $this->class;
 		
 		$node = $class::load( $id );
 		if ( $this->member and !$node->can( 'view', $this->member ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
-		return new Response( 200, $node->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $node->apiOutput( $this->member ) );
 	}
 
 	/**
@@ -110,9 +94,9 @@ class NodeController extends Controller
 	 * @throws	1S359/1	INVALID_ID		The node ID does not exist
 	 * @throws	1S359/2	INVALID_TARGET	The target node cannot be deleted because the new parent node does not exist
 	 * @throws	1S359/3	HAS_CHILDREN	The target node cannot be deleted because it has children (pass deleteChildrenOrMove in the request to specify how to handle the children)
-	 * @return	Response
+	 * @return	\IPS\Api\Response
 	 */
-	protected function _delete( int $id, ?int $deleteChildrenOrMove = NULL ) : Response
+	protected function _delete( $id, $deleteChildrenOrMove = NULL )
 	{
 		$class = $this->class;
 
@@ -134,15 +118,15 @@ class NodeController extends Controller
 						$target = $class::load( $deleteChildrenOrMove );
 						$node->deleteOrMoveFormSubmit( array( 'node_move_children' => TRUE, 'node_destination' => $target->_id, 'node_move_content' => $target ) );
 					}
-					catch ( OutOfRangeException $e )
+					catch ( \OutOfRangeException $e )
 					{
-						throw new Exception( 'INVALID_TARGET', '1S359/2', 404 );
+						throw new \IPS\Api\Exception( 'INVALID_TARGET', '1S359/2', 404 );
 					}
 				}
 				/* Or return an exception if no action was set */
 				if ( !$deleteChildrenOrMove )
 				{
-					throw new Exception( 'HAS_CHILDREN', '1S359/3', 404 );
+					throw new \IPS\Api\Exception( 'HAS_CHILDREN', '1S359/3', 404 );
 				}
 			}
 			else
@@ -150,25 +134,25 @@ class NodeController extends Controller
 				$node->delete();
 			}
 
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1S359/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1S359/1', 404 );
 		}
 	}
 
 	/**
 	 * Create or update node
 	 *
-	 * @param	Model	$node				The node
-	 * @return	Model
+	 * @param	\IPS\node\Model	$node				The node
+	 * @return	\IPS\node\Model
 	 */
-	protected function _createOrUpdate( Model $node ): Model
+	protected function _createOrUpdate( \IPS\Node\Model $node )
 	{
 		$node->save();
 
-		if( $node instanceof Permissions AND isset( Request::i()->permissions ) AND Request::i()->permissions )
+		if( $node instanceof \IPS\Node\Permissions AND isset( \IPS\Request::i()->permissions ) AND \IPS\Request::i()->permissions )
 		{
 			$insert = array(
 				'app'			=> $node::$permApp,
@@ -178,9 +162,9 @@ class NodeController extends Controller
 
 			foreach( $node::$permissionMap as $key => $field )
 			{
-				if( isset( Request::i()->permissions[ $key ] ) )
+				if( isset( \IPS\Request::i()->permissions[ $key ] ) )
 				{
-					$insert[ 'perm_' . $field ] = is_array( Request::i()->permissions[ $key ] ) ? implode( ',', Request::i()->permissions[ $key ] ) : Request::i()->permissions[ $key ];
+					$insert[ 'perm_' . $field ] = \is_array( \IPS\Request::i()->permissions[ $key ] ) ? implode( ',', \IPS\Request::i()->permissions[ $key ] ) : \IPS\Request::i()->permissions[ $key ];
 				}
 			}
 
@@ -194,9 +178,9 @@ class NodeController extends Controller
 	/**
 	 * Create
 	 *
-	 * @return	Model
+	 * @return	\IPS\Content\Node
 	 */
-	protected function _create() : Model
+	protected function _create()
 	{
 		$class = $this->class;
 
@@ -206,13 +190,14 @@ class NodeController extends Controller
 		if( isset( $node::$databaseColumnOrder ) AND $node::$automaticPositionDetermination === TRUE )
 		{
 			$orderColumn = $node::$databaseColumnOrder;
-			$node->$orderColumn = Db::i()->select( 'MAX(' . $node::$databasePrefix . $orderColumn . ')', $node::$databaseTable  )->first() + 1;
+			$node->$orderColumn = \IPS\Db::i()->select( 'MAX(' . $node::$databasePrefix . $orderColumn . ')', $node::$databaseTable  )->first() + 1;
 		}
 
 		$node->save();
+		$node = $this->_createOrUpdate( $node );
 
 		/* Output */
-		return $this->_createOrUpdate( $node );
+		return $node;
 	}
 
 	/**
@@ -228,9 +213,9 @@ class NodeController extends Controller
 		$where = $where ?: [];
 		$idField = $class::$databaseTable . '.' . $class::$databasePrefix . '.' . $class::$databaseColumnId;
 
-		if ( isset( Request::i()->ids ) )
+		if ( isset( \IPS\Request::i()->ids ) )
 		{
-			$where[] = array( Db::i()->in( $idField, array_map( 'intval', explode(',', Request::i()->ids ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( $idField, array_map( 'intval', explode(',', \IPS\Request::i()->ids ) ) ) );
 		}
 
 		return $where;

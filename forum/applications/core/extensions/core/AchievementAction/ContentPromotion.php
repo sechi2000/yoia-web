@@ -10,58 +10,40 @@
 namespace IPS\core\extensions\core\AchievementAction;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\core\Achievements\Actions\ContentAchievementActionAbstract;
-use IPS\core\Achievements\Rule;
-use IPS\core\Feature;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecord;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement Action Extension
  */
-class ContentPromotion extends ContentAchievementActionAbstract
+class _ContentPromotion extends \IPS\core\Achievements\Actions\AbstractContentAchievementAction
 {	
 	/**
 	 * Get filter form elements
 	 *
 	 * @param	array|NULL		$filters	Current filter values (if editing)
-	 * @param	Url	$url		The URL the form is being shown on
+	 * @param	\IPS\Http\Url	$url		The URL the form is being shown on
 	 * @return	array
 	 */
-	public function filters( ?array $filters, Url $url ): array
+	public function filters( ?array $filters, \IPS\Http\Url $url ): array
 	{
 		$return = parent::filters( $filters, $url );
 
-		$promoFilter = new CheckboxSet( 'achievement_filter_ContentPromotion_promotype', ( $filters and isset( $filters['promotype'] ) and $filters['promotype'] ) ? $filters['promotype'] : 0, FALSE, [
+		$promoFilter = new \IPS\Helpers\Form\CheckboxSet( 'achievement_filter_ContentPromotion_promotype', ( $filters and isset( $filters['promotype'] ) and $filters['promotype'] ) ? $filters['promotype'] : 0, FALSE, [
 			'options' => [
+				'promote' => 'achievement_filter_ContentPromotion_promotype_promote',
 				'feature' => 'achievement_filter_ContentPromotion_promotype_feature',
 				'recommend' => 'achievement_filter_ContentPromotion_promotype_recommend'
 			]
-		], NULL, Member::loggedIn()->language()->addToStack( 'achievement_subfilter_ContentPromotion_promotype_prefix' ) );
+		], NULL, \IPS\Member::loggedIn()->language()->addToStack( 'achievement_subfilter_ContentPromotion_promotype_prefix' ) );
 		$return['promotype'] = $promoFilter;
 
 		if ( isset( $return['milestone'] ) )
 		{
-			$return['milestone']->suffix = Member::loggedIn()->language()->addToStack('achievement_filter_ContentPromotion_nth_suffix');
+			$return['milestone']->suffix = \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_ContentPromotion_nth_suffix');
 		}
 
 		return $return;
@@ -90,19 +72,19 @@ class ContentPromotion extends ContentAchievementActionAbstract
 	 * calls that BEFORE making its change in the database (or there is read/write separation), you will need to add
 	 * 1 to the value being considered for milestones
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	array		$filters	The value returned by formatFilterValues()
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	bool
 	 */
-	public function filtersMatch( Member $subject, array $filters, mixed $extra = NULL ): bool
+	public function filtersMatch( \IPS\Member $subject, array $filters, $extra = NULL ): bool
 	{
 		if ( !parent::filtersMatch( $subject, $filters, $extra['content'] ) )
 		{
 			return FALSE;
 		}
 
-		if ( isset( $filters['promotype'] ) and ! in_array( $extra['promotype'], $filters['promotype'] ) )
+		if ( isset( $filters['promotype'] ) and ! \in_array( $extra['promotype'], $filters['promotype'] ) )
 		{
 			return FALSE;
 		}
@@ -120,15 +102,15 @@ class ContentPromotion extends ContentAchievementActionAbstract
 	
 	/**
 	 * Get identifier to prevent the member being awarded points for the same action twice
-	 * Must be unique within this domain, must not exceed 32 chars.
+	 * Must be unique within of this domain, must not exceed 32 chars.
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	string
 	 */
-	public function identifier( Member $subject, mixed $extra = NULL ): string
+	public function identifier( \IPS\Member $subject, $extra = NULL ): string
 	{
-		return get_class( $extra['content'] ) . ':' . $extra['content']->{$extra['content']::$databaseColumnId} . ':' . $extra['promotype'];
+		return \get_class( $extra['content'] ) . ':' . $extra['content']->{$extra['content']::$databaseColumnId} . ':' . $extra['promotype'];
 	}
 	
 	/**
@@ -142,36 +124,35 @@ class ContentPromotion extends ContentAchievementActionAbstract
 	{
 		$exploded = explode( ':', $identifier );
 
-		$contentLink = Member::loggedIn()->language()->addToStack('modcp_deleted');
+		$contentLink = \IPS\Member::loggedIn()->language()->addToStack('modcp_deleted');
 		try
 		{
-			/* @var ActiveRecord $class */
 			$class = $exploded[0];
 			$content = $class::load( $exploded[1] );
-			$contentLink = Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $content->url(), TRUE, $content->mapped('title'), FALSE );
-			$promoType = Member::loggedIn()->language()->addToStack( 'achievement_filter_ContentPromotion_promotype_' . $exploded[2] );
+			$contentLink = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $content->url(), TRUE, $content->mapped('title'), FALSE );
+			$promoType = \IPS\Member::loggedIn()->language()->addToStack( 'achievement_filter_ContentPromotion_promotype_' . $exploded[2] );
 		}
-		catch ( OutOfRangeException $e ) {  }
+		catch ( \OutOfRangeException $e ) {  }
 
-		return Member::loggedIn()->language()->addToStack( 'AchievementAction__ContentPromotion_log_subject', FALSE, [ 'sprintf' => [ $promoType ], 'htmlsprintf' => [ $contentLink ] ] );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__ContentPromotion_log_subject', FALSE, [ 'sprintf' => [ $promoType ], 'htmlsprintf' => [ $contentLink ] ] );
 	}
 	
 	/**
 	 * Get "description" for rule
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	public function ruleDescription( Rule $rule ): ?string
+	public function ruleDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		$conditions = [];
 		if ( isset( $rule->filters['milestone'] ) )
 		{
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
 				'htmlsprintf' => [
-					Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'milestone', Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
+					\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'milestone', \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
 				],
-				'sprintf' => Member::loggedIn()->language()->addToStack('AchievementAction__ContentPromotion_title_generic')
+				'sprintf' => \IPS\Member::loggedIn()->language()->addToStack('AchievementAction__ContentPromotion_title_generic')
 			] );
 		}
 		if ( isset( $rule->filters['promotype'] ) )
@@ -181,19 +162,19 @@ class ContentPromotion extends ContentAchievementActionAbstract
 			{
 				try
 				{
-					$promoTypes[] = Member::loggedIn()->language()->addToStack( 'achievement_filter_ContentPromotion_promotype_' . $type );
+					$promoTypes[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievement_filter_ContentPromotion_promotype_' . $type );
 				}
-				catch ( OutOfRangeException $e ) {}
+				catch ( \OutOfRangeException $e ) {}
 			}
 			if ( $promoTypes )
 			{
-				$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_type', FALSE, [
+				$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_type', FALSE, [
 					'htmlsprintf' => [
-						Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'other',
-							count( $promoTypes ) === 1 ? $promoTypes[0] : Member::loggedIn()->language()->addToStack( 'AchievementAction__ContentPromotion_types', FALSE, [ 'sprintf' => [
-								count( $promoTypes ),
+						\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'other',
+							\count( $promoTypes ) === 1 ? $promoTypes[0] : \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__ContentPromotion_types', FALSE, [ 'sprintf' => [
+								\count( $promoTypes ),
 							] ] ),
-							count( $promoTypes ) === 1 ? NULL : $promoTypes
+							\count( $promoTypes ) === 1 ? NULL : $promoTypes
 						)
 					],
 				] );
@@ -203,13 +184,9 @@ class ContentPromotion extends ContentAchievementActionAbstract
 		{
 			$conditions[] = $nodeCondition;
 		}
-		if( $questCondition = $this->_questFilterDescription( $rule ) )
-		{
-			$conditions[] = $questCondition;
-		}
 
-		return Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescription(
-			Member::loggedIn()->language()->addToStack( 'AchievementAction__ContentPromotion_title' ),
+		return \IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescription(
+			\IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__ContentPromotion_title' ),
 			$conditions
 		);
 	}
@@ -219,7 +196,7 @@ class ContentPromotion extends ContentAchievementActionAbstract
 	 *
 	 * @return	array
 	 */
-	static public function rebuildData(): array
+	static public function rebuildData()
 	{
 		return [ [
 			'table' => 'core_content_meta',
@@ -228,7 +205,13 @@ class ContentPromotion extends ContentAchievementActionAbstract
 			'where' => [ ['meta_type=?', 'core_FeaturedComments'] ],
 		],
 		[
-			'table' => 'core_content_promote',
+			'table' => 'core_content_featured',
+			'pkey'  => 'feature_id',
+			'date'  => 'feature_date',
+			'where' => [],
+		],
+		[
+			'table' => 'core_social_promote',
 			'pkey'  => 'promote_id',
 			'date'  => 'promote_added',
 			'where' => [],
@@ -242,7 +225,7 @@ class ContentPromotion extends ContentAchievementActionAbstract
 	 * @param array		$data	Data collected when starting rebuild [table, pkey...]
 	 * @return void
 	 */
-	public static function rebuildRow( array $row, array $data ) : void
+	public static function rebuildRow( $row, $data )
 	{
 		switch ( $data['table'] )
 		{
@@ -255,13 +238,28 @@ class ContentPromotion extends ContentAchievementActionAbstract
 					'promotype' => 'recommend'
 				]  );
 				break;
-			case 'core_content_promote':
-				$promote = Feature::load( $row['promote_id'] );
-				if( $author = $promote->object()->author() )
+			case 'core_content_featured':
+				$class = $row['feature_content_class'];
+				$item = $class::load( $row['feature_content_id'] );
+				$item->author()->achievementAction( 'core', 'ContentPromotion', [
+					'content' => $item,
+					'promotype' => 'feature'
+				] );
+				break;
+			case 'core_social_promote':
+				$promote = \IPS\core\Promote::load( $row['promote_id'] );
+				if( method_exists( $promote->object(), 'author' ) )
 				{
-					$author->achievementAction( 'core', 'ContentPromotion', [
-						'content' => $promote->object(),
-						'promotype' => 'promote'
+					$promote->object()->author()->achievementAction( 'core', 'ContentPromotion', [
+					'content' => $promote->object(),
+					'promotype' => 'promote'
+					] );
+				}
+				else if( method_exists( $promote->object(), 'owner' ) )
+				{
+					$promote->object()->owner()->achievementAction( 'core', 'ContentPromotion', [
+					'content' => $promote->object(),
+					'promotype' => 'promote'
 					] );
 				}
 
@@ -272,20 +270,18 @@ class ContentPromotion extends ContentAchievementActionAbstract
 	/**
 	 * Get the data based on the things.
 	 *
-	 * @param string $select
-	 * @param array $filters
-	 * @param string $type
-	 * @param Member|null $subject
-	 * @param int|null $lastId
-	 * @param DateTime|null $time
-	 * @param string|null $order
-	 * @param int|null $limit
-	 * @return Select
+	 * @param $select
+	 * @param $filters
+	 * @param $type
+	 * @param null $subject
+	 * @param null $time
+	 * @param null|boolean $order
+	 * @param null $limit
+	 * @return \IPS\Db\Select
+	 * @throws \InvalidArgumentException
 	 */
-	protected function getQuery( string $select, array $filters, string $type, ?Member $subject=NULL, ?int $lastId=NULL, ?DateTime $time=NULL, ?string $order=NULL, ?int $limit=NULL ) : Select
+	protected function getQuery( $select, $filters, $type, $subject=NULL, $lastId=NULL, $time=NULL, $order=NULL, $limit=NULL )
 	{
-		$where = [];
-		$subWhere = [];
 		if( isset( $filters['type'] ) )
 		{
 			$itemClass = $filters['type'];
@@ -337,13 +333,51 @@ class ContentPromotion extends ContentAchievementActionAbstract
 
 				if ( isset( $filters[ 'nodes_' . str_replace( '\\', '-', $itemClass ) ] ) )
 				{
-					$subWhere[] = [ Db::i()->in( $itemClass::$databaseColumnId, $filters[ 'nodes_' . str_replace( '\\', '-', $itemClass ) ] ) ];
+					$subWhere[] = [ \IPS\Db::i()->in( $itemClass::$databaseColumnId, $filters[ 'nodes_' . str_replace( '\\', '-', $itemClass ) ] ) ];
 				}
 
-				$where[] = [ 'meta_item_id IN(?)', Db::i()->select( $itemClass::$databaseColumnId, $itemClass::$databasePrefix . $itemClass::$databaseTable, $subWhere ) ];
+				$where[] = [ 'meta_item_id IN(?)', \IPS\Db::i()->select( $itemClass::$databaseColumnId, $itemClass::$databasePrefix . $itemClass::$databaseTable, $subWhere ) ];
 			}
 
-			return Db::i()->select( $select, 'core_content_meta', $where );
+			return \IPS\Db::i()->select( $select, 'core_content_meta', $where );
+		}
+		else if ( $type === 'feature' )
+		{
+			if ( $subject )
+			{
+				$where = [
+					['feature_content_author=?', $subject->member_id],
+				];
+			}
+
+			if ( $time )
+			{
+				$where[] = [ 'feature_date >= ' . $time->getTimestamp() ];
+			}
+
+			if ( $lastId )
+			{
+				$where[] = [ 'feature_id > ' . $lastId ];
+			}
+
+			if ( $order )
+			{
+				$order = 'feature_id ASC';
+			}
+
+			if ( isset( $filters['type'] ) )
+			{
+				$where[] = [ 'feature_content_class=?', $filters['type'] ];
+
+				if ( isset( $filters[ 'nodes_' . str_replace( '\\', '-', $itemClass ) ] ) )
+				{
+					$subWhere[] = [ \IPS\Db::i()->in( $itemClass::$databaseColumnId, $filters[ 'nodes_' . str_replace( '\\', '-', $itemClass ) ] ) ];
+				}
+
+				$where[] = [ 'feature_content_id IN(?)', \IPS\Db::i()->select( $itemClass::$databaseColumnId, $itemClass::$databasePrefix . $itemClass::$databaseTable, $subWhere ) ];
+			}
+
+			return \IPS\Db::i()->select( $select, 'core_content_featured', $where );
 		}
 		else if ( $type === 'promote' )
 		{
@@ -375,15 +409,15 @@ class ContentPromotion extends ContentAchievementActionAbstract
 
 				if ( isset( $filters[ 'nodes_' . str_replace( '\\', '-', $itemClass ) ] ) )
 				{
-					$subWhere[] = [ Db::i()->in( $itemClass::$databaseColumnId, $filters[ 'nodes_' . str_replace( '\\', '-', $itemClass ) ] ) ];
+					$subWhere[] = [ \IPS\Db::i()->in( $itemClass::$databaseColumnId, $filters[ 'nodes_' . str_replace( '\\', '-', $itemClass ) ] ) ];
 				}
 
-				$where[] = [ 'promote_class_id IN(?)', Db::i()->select( $itemClass::$databaseColumnId, $itemClass::$databasePrefix . $itemClass::$databaseTable, $subWhere ) ];
+				$where[] = [ 'promote_class_id IN(?)', \IPS\Db::i()->select( $itemClass::$databaseColumnId, $itemClass::$databasePrefix . $itemClass::$databaseTable, $subWhere ) ];
 			}
 
-			return Db::i()->select( $select, 'core_content_promote', $where, $order, $limit );
+			return \IPS\Db::i()->select( $select, 'core_social_promote', $where, $order, $limit );
 		}
 
-		throw new InvalidArgumentException;
+		throw new \InvalidArgumentException;
 	}
 }

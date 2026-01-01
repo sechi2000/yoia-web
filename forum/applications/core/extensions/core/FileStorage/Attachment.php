@@ -11,33 +11,25 @@
 namespace IPS\core\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: Attachment
  */
-class Attachment extends FileStorageAbstract
+class _Attachment
 {
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
-		return (int) Db::i()->select( 'MAX(attach_id)', 'core_attachments' )->first();
+		return \IPS\Db::i()->select( 'MAX(attach_id)', 'core_attachments' )->first();
 	}
 	
 	/**
@@ -46,49 +38,51 @@ class Attachment extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	UnderflowException					When file record doesn't exist. Indicating there are no more files to move
-	 * @return	void
+	 * @throws	\UnderflowException					When file record doesn't exist. Indicating there are no more files to move
+	 * @return	void|int							An offset integer to use on the next cycle, or nothing
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-		$attachment = Db::i()->select( '*', 'core_attachments', null, 'attach_id', array( $offset, 1 ) )->first();
+		$attachment = \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_id > ?', $offset ), 'attach_id', array( 0, 1 ) )->first();
 
 		try
 		{
-			$file = File::get( $oldConfiguration ?: 'core_Attachment', $attachment['attach_location'] )->move( $storageConfiguration );
+			$file = \IPS\File::get( $oldConfiguration ?: 'core_Attachment', $attachment['attach_location'] )->move( $storageConfiguration );
 	
 			$thumb = NULL;
 			if ( $attachment['attach_thumb_location'] )
 			{
-				$thumb = File::get( $oldConfiguration ?: 'core_Attachment', $attachment['attach_thumb_location'] )->move( $storageConfiguration );
+				$thumb = \IPS\File::get( $oldConfiguration ?: 'core_Attachment', $attachment['attach_thumb_location'] )->move( $storageConfiguration );
 			}
 			
 			if ( (string) $file != $attachment['attach_location'] or (string) $thumb != $attachment['attach_thumb_location'] )
 			{
-				Db::i()->update( 'core_attachments', array( 'attach_location' => (string) $file, 'attach_thumb_location' => (string) $thumb ), array( 'attach_id=?', $attachment['attach_id'] ) );
+				\IPS\Db::i()->update( 'core_attachments', array( 'attach_location' => (string) $file, 'attach_thumb_location' => (string) $thumb ), array( 'attach_id=?', $attachment['attach_id'] ) );
 			}
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			/* Any issues are logged and the \IPS\Db::i()->update not run as the exception is thrown */
 		}
+		
+		return $attachment['attach_id'];
 	}
 
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
 		try
 		{
-			$attachment	= Db::i()->select( '*', 'core_attachments', array( 'attach_location=? OR attach_thumb_location=?', (string) $file, (string) $file ) )->first();
+			$attachment	= \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_location=? OR attach_thumb_location=?', (string) $file, (string) $file ) )->first();
 
 			return TRUE;
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return FALSE;
 		}
@@ -99,15 +93,49 @@ class Attachment extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		foreach( Db::i()->select( '*', 'core_attachments', 'attach_location IS NOT NULL' ) as $attachment )
+		foreach( \IPS\Db::i()->select( '*', 'core_attachments', 'attach_location IS NOT NULL' ) as $attachment )
 		{
 			try
 			{
-				File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
+				\IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
 			}
-			catch( Exception $e ){}
+			catch( \Exception $e ){}
 		}
+	}
+	
+	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		$attachment = \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_id > ?', $offset ), 'attach_id', array( 0, 1 ) )->first();
+
+		try
+		{
+			$fixed = array();
+			foreach( array( 'attach_location', 'attach_thumb_location' ) as $location )
+			{
+				if ( $new = \IPS\File::repairUrl( $attachment[ $location ] ) )
+				{
+					$fixed[ $location ] = $new;
+				}
+			}
+			
+			if ( \count( $fixed ) )
+			{
+				\IPS\Db::i()->update( 'core_attachments', $fixed, array( 'attach_id=?', $attachment['attach_id'] ) );
+			}
+		}
+		catch( \Exception $e )
+		{
+			/* Any issues are logged and the \IPS\Db::i()->update not run as the exception is thrown */
+		}
+		
+		return $attachment['attach_id'];
 	}
 }

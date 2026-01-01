@@ -10,85 +10,77 @@
 
 namespace IPS\Email\Outgoing;
 
-use IPS\Email;
 use IPS\Helpers\Form\Number;
 use IPS\Helpers\Form\Password;
 use IPS\Helpers\Form\Select;
 use IPS\Helpers\Form\Text;
 use IPS\Login;
 use IPS\Http\Url;
-use IPS\Request;
 use IPS\Settings;
-use function defined;
-use function intval;
-use function stream_socket_enable_crypto;
-use const IPS\DEFAULT_REQUEST_TIMEOUT;
-use const IPS\VERY_LONG_REQUEST_TIMEOUT;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	SMTP Email Class
  */
-class Smtp extends Email
+class _SMTP extends \IPS\Email
 {
 	/**
 	 * @brief	SMTP Protocol ("tls", "ssl" or "plain")
 	 */
-	protected string $smtpProtocol;
+	protected $smtpProtocol;
 	
 	/**
 	 * @brief	SMTP Host
 	 */
-	protected string $smtpHost;
+	protected $smtpHost;
 	
 	/**
 	 * @brief	SMTP Port
 	 */
-	protected int $smtpPort;
+	protected $smtpPort;
 	
 	/**
 	 * @brief	SMTP Username
 	 */
-	protected string $smtpUser;
+	protected $smtpUser;
 	
 	/**
 	 * @brief	SMTP Password
 	 */
-	protected string $smtpPass;
+	protected $smtpPass;
 	
 	/**
 	 * @brief	SMTP Connections
 	 */
-	protected static array $smtp = array();
+	protected static $smtp = array();
 	
 	/**
 	 * @brief	Connection Key
 	 */
-	protected string $connectionKey;
+	protected $connectionKey;
 	
 	/**
 	 * @brief	Log
 	 */
-	protected string $log = '';
+	protected $log = '';
 	
 	/**
 	 * Constructor
 	 *
-	 * @param string $smtpProtocol	Protocol to use
-	 * @param string $smtpHost		Hostname to connect to
-	 * @param int $smtpPort		Port to connect to
-	 * @param string $smtpUser		Username
-	 * @param string $smtpPass		Password
+	 * @param	string	$smtpProtocol	Protocol to use
+	 * @param	string	$smtpHost		Hostname to connect to
+	 * @param	int		$smtpPort		Port to connect to
+	 * @param	string	$smtpUser		Username
+	 * @param	string	$smtpPass		Password
 	 * @return	void
 	 */
-	public function __construct( string $smtpProtocol, string $smtpHost, int $smtpPort, string $smtpUser, string $smtpPass )
+	public function __construct( $smtpProtocol, $smtpHost, $smtpPort, $smtpUser, $smtpPass )
 	{
 		$this->smtpProtocol = $smtpProtocol;
 		$this->smtpHost = $smtpHost;
@@ -101,10 +93,10 @@ class Smtp extends Email
 	/**
 	 * Connect to server
 	 *
-	 * @param bool $checkSsl	If set to FALSE, will skip peer certificate verification for TLS connections
+	 * @param	bool	$checkSsl	If set to FALSE, will skip peer certificate verification for TLS connections
 	 * @return void
 	 */
-	public function connect( bool $checkSsl=TRUE ) : void
+	public function connect( $checkSsl=TRUE )
 	{
 		/* Do we already have a connection? */
 		if( array_key_exists( $this->connectionKey, static::$smtp ) )
@@ -113,10 +105,10 @@ class Smtp extends Email
 		}
 
 		/* Connect */
-		$connection = @fsockopen( ( ( $this->smtpProtocol == 'ssl' ) ? 'ssl://' : '' ) . $this->smtpHost, $this->smtpPort, $errno, $errstr, Request::isCliEnvironment() ? VERY_LONG_REQUEST_TIMEOUT : DEFAULT_REQUEST_TIMEOUT );
+		$connection = @fsockopen( ( ( $this->smtpProtocol == 'ssl' ) ? 'ssl://' : '' ) . $this->smtpHost, $this->smtpPort, $errno, $errstr, \IPS\Request::isCliEnvironment() ? \IPS\VERY_LONG_REQUEST_TIMEOUT : \IPS\DEFAULT_REQUEST_TIMEOUT );
 		if ( !$connection )
 		{
-			throw new Exception( $errstr ?? '', $errno ?? 0 );
+			throw new \IPS\Email\Outgoing\Exception( $errstr, $errno );
 		}
 		static::$smtp[ $this->connectionKey ] = $connection;
 		register_shutdown_function(function( $object ){
@@ -130,7 +122,7 @@ class Smtp extends Email
 		$responseCode	= mb_substr( $announce, 0, 3 );
 		if ( $responseCode != 220 )
 		{
-			throw new Exception( 'smtpmail_fsock_error_initial', 0, NULL, array( $responseCode ) );
+			throw new \IPS\Email\Outgoing\Exception( 'smtpmail_fsock_error_initial', 0, NULL, array( $responseCode ) );
 		}
 
 		/* HELO/EHLO */
@@ -140,7 +132,7 @@ class Smtp extends Email
 			$helo = 'EHLO';
 			$responseCode = $this->_sendCommand( 'EHLO ' . $ehloFqdn, 250 );
 		}
-		catch (Exception $e )
+		catch ( \IPS\Email\Outgoing\Exception $e )
 		{
 			$helo = 'HELO';
 			$responseCode = $this->_sendCommand( 'HELO ' . $ehloFqdn, 250 );
@@ -154,8 +146,8 @@ class Smtp extends Email
 				@stream_context_set_option( static::$smtp[ $this->connectionKey ], 'ssl', 'verify_peer', false );
 			}
 			
-			$this->_sendCommand('STARTTLS', 220);
-			if ( !@stream_socket_enable_crypto( static::$smtp[ $this->connectionKey ], TRUE, STREAM_CRYPTO_METHOD_SSLv23_CLIENT ) )
+			$this->_sendCommand( 'STARTTLS', 220 );
+			if ( !@\stream_socket_enable_crypto( static::$smtp[ $this->connectionKey ], TRUE, STREAM_CRYPTO_METHOD_SSLv23_CLIENT ) )
 			{
 				if ( $checkSsl )
 				{
@@ -165,7 +157,7 @@ class Smtp extends Email
 				else
 				{
 					/* If it still failed on the second connection attempt, throw the exception */
-					throw new Exception( 'smtpmail_tls_failed' );
+					throw new \IPS\Email\Outgoing\Exception( 'smtpmail_tls_failed' );
 				}
 			}
 
@@ -176,9 +168,9 @@ class Smtp extends Email
 		/* Authenticate */
 		if ( $this->smtpUser )
 		{
-			$responseCode = $this->_sendCommand('AUTH LOGIN', 334);
-			$responseCode = $this->_sendCommand(base64_encode($this->smtpUser), 334);
-			$responseCode = $this->_sendCommand(base64_encode($this->smtpPass), 235);
+			$responseCode = $this->_sendCommand( 'AUTH LOGIN', 334 );
+			$responseCode = $this->_sendCommand( base64_encode( $this->smtpUser ), 334 );
+			$responseCode = $this->_sendCommand( base64_encode( $this->smtpPass ), 235 );
 		}
 	}
 		
@@ -186,15 +178,15 @@ class Smtp extends Email
 	 * Send the email
 	 * 
 	 * @param	mixed	$to					The member or email address, or array of members or email addresses, to send to
-	 * @param mixed $cc					Addresses to CC (can also be email, member or array of either)
-	 * @param mixed $bcc				Addresses to BCC (can also be email, member or array of either)
-	 * @param mixed $fromEmail			The email address to send from. If NULL, default setting is used
-	 * @param mixed $fromName			The name the email should appear from. If NULL, default setting is used
-	 * @param array $additionalHeaders	Additional headers to send
+	 * @param	mixed	$cc					Addresses to CC (can also be email, member or array of either)
+	 * @param	mixed	$bcc				Addresses to BCC (can also be email, member or array of either)
+	 * @param	mixed	$fromEmail			The email address to send from. If NULL, default setting is used
+	 * @param	mixed	$fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	array	$additionalHeaders	Additional headers to send
 	 * @return	void
-	 * @throws    Exception
+	 * @throws	\IPS\Email\Outgoing\Exception
 	 */
-	public function _send( mixed $to, mixed $cc=array(), mixed $bcc=array(), mixed $fromEmail = NULL, mixed $fromName = NULL, array $additionalHeaders = array() ) : void
+	public function _send( $to, $cc=array(), $bcc=array(), $fromEmail = NULL, $fromName = NULL, $additionalHeaders = array() )
 	{
 		/* Get the from email */
 		$fromEmail = $fromEmail ?: Settings::i()->email_out;
@@ -211,11 +203,11 @@ class Smtp extends Email
 		}
 		$recipientsForSmtp = array_unique( array_map( 'trim', $recipientsForSmtp ) );
 
-		if( empty( $additionalHeaders['Message-ID'] ) )
+		if( empty( $additonalHeaders['Message-ID'] ) )
 		{
 			$additionalHeaders['Message-ID'] = $this->generateMessageId();
 		}
-
+		
 		/* Send */
 		$this->_sendCompiled( $fromEmail, $recipientsForSmtp, $this->compileFullEmail( $to, $cc, array(), $fromEmail, $fromName, $additionalHeaders ) );
 	}
@@ -223,37 +215,37 @@ class Smtp extends Email
 	/**
 	 * Send an email
 	 * 
-	 * @param string $fromEmail			The email address to send from
-	 * @param array $toEmails			Array of email addresses to send to
-	 * @param string $email				The full email (with headers, etc.) except the Bcc header
+	 * @param	string	$fromEmail			The email address to send from
+	 * @param	array	$toEmails			Array of email addresses to send to
+	 * @param	string	$email				The full email (with headers, etc.) except the Bcc header
 	 * @return	void
-	 * @throws    Exception
+	 * @throws	\IPS\Email\Outgoing\Exception
 	 */
-	public function _sendCompiled( string $fromEmail, array $toEmails, string $email ) : void
+	public function _sendCompiled( $fromEmail, $toEmails, $email )
 	{
 		$this->connect();
 		
-		$this->_sendCommand("MAIL FROM:<{$fromEmail}>", 250);
+		$this->_sendCommand( "MAIL FROM:<{$fromEmail}>", 250 );
 		
 		foreach ( $toEmails as $toEmail )
 		{
-			$this->_sendCommand("RCPT TO:<{$toEmail}>", 250 );
+			$this->_sendCommand( "RCPT TO:<{$toEmail}>", 250, TRUE );
 		}
 				
-		$this->_sendCommand('DATA', 354);
-		$this->_sendCommand($email . "\r\n.", 250);
+		$this->_sendCommand( 'DATA', 354 );
+		$this->_sendCommand( $email . "\r\n.", 250 );
 	}
 	
 	/**
 	 * Send SMTP Command
 	 *
-	 * @param string $command			The command
-	 * @param int|null $expectedResponse	The expected response code. Will throw an exception if different.
-	 * @param bool $resetOnFailure		If the command fails, issue a RSET (reset) command
+	 * @param	string		$command			The command
+	 * @param	int|NULL	$expectedResponse	The expected response code. Will throw an exception if different.
+	 * @param	bool		$resetOnFailure		If the command fails, issue a RSET (reset) command
 	 * @return	string	Response
-	 * @throws    Exception
+	 * @throws	\IPS\Email\Outgoing\Exception
 	 */
-	protected function _sendCommand( string $command, ?int $expectedResponse=NULL, bool $resetOnFailure = TRUE): string
+	protected function _sendCommand( $command, $expectedResponse=NULL, $resetOnFailure=FALSE )
 	{
 		/* Log */
 		$this->log .= "> {$command}\r\n";
@@ -265,15 +257,15 @@ class Smtp extends Email
 		$response = $this->_getResponse();
 		
 		/* Get response code */
-		$code = intval( mb_substr( $response, 0, 3 ) );
+		$code = \intval( mb_substr( $response, 0, 3 ) );
 		if ( $expectedResponse !== NULL and $code !== $expectedResponse )
 		{
 			if( $resetOnFailure === TRUE )
 			{
-				$this->_sendCommand('RSET');
+				$this->_sendCommand( 'RSET' );
 			}
 
-			throw new Exception( $response, $code );
+			throw new \IPS\Email\Outgoing\Exception( $response, $code );
 		}
 		
 		/* Return */
@@ -285,7 +277,7 @@ class Smtp extends Email
 	 *
 	 * @return	string	Response
 	 */
-	protected function _getResponse(): string
+	protected function _getResponse()
 	{
 		/* Read */
 		$response = '';
@@ -312,7 +304,7 @@ class Smtp extends Email
 	 */
 	public function generateMessageId(): string
 	{
-		$randomString = base_convert( microtime() . '.' . Login::generateRandomString(), 10, 36 );
+		$randomString = base_convert( microtime(false ) . '.' . Login::generateRandomString(), 10, 36 );
 
 		return '<' . $randomString . '@' . Url::internal('')->data[ Url::COMPONENT_HOST ] . '>';
 	}
@@ -322,7 +314,7 @@ class Smtp extends Email
 	 *
 	 * @return string
 	 */
-	public function getLog(): string
+	public function getLog()
 	{
 		return $this->log;
 	}

@@ -12,47 +12,61 @@
 namespace IPS\gallery\extensions\core\EditorLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content;
-use IPS\Extensions\EditorLocationsAbstract;
-use IPS\gallery\Image;
-use IPS\gallery\Image\Comment;
-use IPS\gallery\Image\Review;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use LogicException;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: Images
  */
-class Images extends EditorLocationsAbstract
+class _Images
 {
+	/**
+	 * Can we use HTML in this editor?
+	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
+	 */
+	public function canUseHtml( $member )
+	{
+		return NULL;
+	}
+	
 	/**
 	 * Can we use attachments in this editor?
 	 *
-	 * @param	Member					$member	The member
-	 * @param	Editor	$field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
 	 */
-	public function canAttach( Member $member, Editor $field ): ?bool
+	public function canAttach( $member, $field )
 	{
+		return FALSE;
+	}
+	
+	/**
+	 * Can whatever is posted in this editor be moderated?
+	 * If this returns TRUE, we must ensure the content is ran through word, link and image filters
+	 *
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
+	 * @return	bool
+	 */
+	public function canBeModerated( $member, $field )
+	{
+		if ( \IPS\IN_DEV )
+		{
+			throw new \RuntimeException( 'Unknown canBeModerated: ' . $field->options['autoSaveKey'] );
+		}
 		return FALSE;
 	}
 
 	/**
 	 * Permission check for attachments
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	int|null	$id1		Primary ID
 	 * @param	int|null	$id2		Secondary ID
 	 * @param	string|null	$id3		Arbitrary data
@@ -60,14 +74,14 @@ class Images extends EditorLocationsAbstract
 	 * @param	bool		$viewOnly	If true, just check if the user can see the attachment rather than download it
 	 * @return	bool
 	 */
-	public function attachmentPermissionCheck( Member $member, ?int $id1, ?int $id2, ?string $id3, array $attachment, bool $viewOnly=FALSE ): bool
+	public function attachmentPermissionCheck( $member, $id1, $id2, $id3, $attachment, $viewOnly=FALSE )
 	{
 		try
 		{
-			$image = Image::load( $id1 );
+			$image = \IPS\gallery\Image::load( $id1 );
 			return $image->canView( $member );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}
@@ -79,25 +93,25 @@ class Images extends EditorLocationsAbstract
 	 * @param	int|null	$id1	Primary ID
 	 * @param	int|null	$id2	Secondary ID
 	 * @param	string|null	$id3	Arbitrary data
-	 * @return	Url|Content|Model|Member|null
-	 * @throws	LogicException
+	 * @return	\IPS\Http\Url|\IPS\Content|\IPS\Node\Model
+	 * @throws	\LogicException
 	 */
-	public function attachmentLookup( int $id1=NULL, int $id2=NULL, string $id3=NULL ): Model|Content|Url|Member|null
+	public function attachmentLookup( $id1, $id2, $id3 )
 	{
 		if ( $id2 )
 		{
 			if ( $id3 === 'review' )
 			{
-				return Review::load( $id2 );
+				return \IPS\gallery\Image\Review::load( $id2 );
 			}
 			else
 			{
-				return Comment::load( $id2 );
+				return \IPS\gallery\Image\Comment::load( $id2 );
 			}
 		}
 		else
 		{
-			return Image::load( $id1 );
+			return \IPS\gallery\Image::load( $id1 );
 		}
 	}
 

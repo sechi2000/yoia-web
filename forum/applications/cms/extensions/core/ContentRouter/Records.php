@@ -12,40 +12,38 @@
 namespace IPS\cms\extensions\core\ContentRouter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\cms\Databases;
-use IPS\Extensions\ContentRouterAbstract;
-use IPS\Member;
-use IPS\Member\Group;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Content Router extension: Records
  */
-class Records extends ContentRouterAbstract
+class _Records
 {
+	/**
+	 * @brief	Content Item Classes
+	 */
+	public $classes = array();
+	
 	/**
 	 * @brief	Can be shown in similar content
 	 */
-	public bool $similarContent = TRUE;
-
+	public $similarContent = TRUE;
+	
 	/**
 	 * Constructor
 	 *
-	 * @param Member|Group|null $member If checking access, the member/group to check for, or NULL to not check access
+	 * @param	\IPS\Member|IPS\Member\Group|NULL	$member		If checking access, the member/group to check for, or NULL to not check access
+	 * @return	void
 	 */
-	public function __construct( Member|Group $member = NULL )
+	public function __construct( $member = NULL )
 	{
 		try
 		{
-			foreach ( Databases::databases() as $id => $database )
+			foreach ( \IPS\cms\Databases::databases() as $id => $database )
 			{
 				if( $database->page_id )
 				{
@@ -56,6 +54,6 @@ class Records extends ContentRouterAbstract
 				}
 			}
 		}
-		catch ( Exception $e ) {} // If you have not upgraded pages but it is installed, this throws an error
+		catch ( \Exception $e ) {} // If you have not upgraded pages but it is installed, this throws an error
 	}
 }

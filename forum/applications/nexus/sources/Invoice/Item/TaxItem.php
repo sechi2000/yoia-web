@@ -12,31 +12,26 @@
 namespace IPS\nexus\Invoice\Item;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use IPS\nexus\Tax;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Tax Item
  */
-class TaxItem
+class _TaxItem
 {
 	/**
 	 * @brief	Class ID
 	 */
-	protected int $class;
+	protected $class;
 
 	/**
 	 * @brief	Data
 	 */
-	protected array $data;
+	protected $data;
 	
 	/**
 	 * Constructor
@@ -45,7 +40,7 @@ class TaxItem
 	 * @param	array	$data	Data
 	 * @return	void
 	 */
-	public function __construct( int $class, array $data )
+	public function __construct( $class, $data )
 	{
 		$this->class = $class;
 		$this->data = $data;
@@ -54,16 +49,16 @@ class TaxItem
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	\IPS\nexus\Tax		class 	The tax class
 	 * @apiresponse	float				rate	The rate (for example 0.2 means 20%)
 	 * @apiresponse	\IPS\nexus\Money	amount	Amount to pay
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
-			'class'		=> Tax::load( $this->class )->apiOutput( $authorizedMember ),
+			'class'		=> \IPS\nexus\Tax::load( $this->class )->apiOutput( $authorizedMember ),
 			'rate'		=> $this->data['rate'],
 			'amount'	=> $this->data['amount']
 		);

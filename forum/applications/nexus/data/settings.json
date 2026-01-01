@@ -30,7 +30,47 @@
         "report": "bool"
     },
     {
+        "key": "customer_fields",
+        "default": "0",
+        "report": "bool"
+    },
+    {
         "key": "donation_goals",
+        "default": "0",
+        "report": "bool"
+    },
+    {
+        "key": "easypost_address",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "easypost_api_key",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "easypost_delivery_adjustment",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "easypost_phone",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "easypost_price_adjustment",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "easypost_show_rates",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "easypost_tax",
         "default": "0",
         "report": "bool"
     },
@@ -100,6 +140,31 @@
         "report": "bool"
     },
     {
+        "key": "nexus_autoresolve_applicable",
+        "default": "3",
+        "report": "full"
+    },
+    {
+        "key": "nexus_autoresolve_days",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "nexus_autoresolve_departments",
+        "default": "*",
+        "report": "bool"
+    },
+    {
+        "key": "nexus_autoresolve_notify",
+        "default": "24",
+        "report": "full"
+    },
+    {
+        "key": "nexus_autoresolve_status",
+        "default": "4",
+        "report": "full"
+    },
+    {
         "key": "nexus_checkreg_captcha",
         "default": "0",
         "report": "full"
@@ -123,6 +188,11 @@
         "key": "nexus_currency",
         "default": "USD",
         "report": "none"
+    },
+    {
+        "key": "nexus_donate_loggedin",
+        "default": "0",
+        "report": "full"
     },
     {
         "key": "nexus_gift_vouchers",
@@ -215,9 +285,24 @@
         "report": "full"
     },
     {
+        "key": "nexus_reg_group",
+        "default": "0",
+        "report": "bool"
+    },
+    {
         "key": "nexus_require_billing",
         "default": "product,giftvoucher,donation,other,subscriptions",
         "report": "bool"
+    },
+    {
+        "key": "nexus_revw_sa",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "nexus_severities",
+        "default": "1",
+        "report": "full"
     },
     {
         "key": "nexus_show_renew_option_savings",
@@ -232,6 +317,21 @@
     {
         "key": "nexus_show_tax",
         "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "nexus_sout_autoreply",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "nexus_sout_chrome",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "nexus_sout_from",
+        "default": "staff",
         "report": "full"
     },
     {
@@ -285,6 +385,11 @@
         "report": "full"
     },
     {
+        "key": "nexus_support_satisfaction",
+        "default": "1",
+        "report": "full"
+    },
+    {
         "key": "nexus_tac",
         "default": "none",
         "report": "full"
@@ -293,5 +398,10 @@
         "key": "nexus_tac_link",
         "default": "",
         "report": "bool"
+    },
+    {
+        "key": "reply_request_resolved",
+        "default": "reopen",
+        "report": "full"
     }
 ]

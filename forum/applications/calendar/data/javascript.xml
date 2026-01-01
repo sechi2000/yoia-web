@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <javascript app="calendar">
- <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/browse" javascript_name="ips.browse.main.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000250"><![CDATA[/**
+ <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/browse" javascript_name="ips.browse.main.js" javascript_type="controller" javascript_version="107827" javascript_position="1000250"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -14,7 +14,7 @@
 	ips.controller.register('calendar.front.browse.main', {
 
 		_ajaxObj: null,
-
+		
 		initialize: function () {
 			this.on( 'click', '[data-action="changeView"]', this.changeView );
 			this.on( window, 'historychange:calendarView', this.stateChange );
@@ -26,7 +26,7 @@
 		 *
 		 * @returns {void}
 		 */
-		setup () {
+		setup: function () {
 			ips.utils.history.replaceState( { controller: 'calendarView' }, 'calendarView', window.location.href );
 		},
 
@@ -36,13 +36,12 @@
 		 * @param 	{Event} 	e 	Event object
 		 * @returns {void}
 		 */
-		changeView(e) {
+		changeView: function (e) {
 			e.preventDefault();
 
 			// Load the url via ajax instead
-			const title = $( e.currentTarget ).attr('title');
-			const url = $( e.currentTarget ).attr('href');
-
+			var title = $( e.currentTarget ).attr('title');
+			var url = $( e.currentTarget ).attr('href');
 
 			ips.utils.history.pushState( { controller: 'calendarView' }, 'calendarView', url );
 			document.title = title
@@ -54,7 +53,7 @@
 		 * @param 	{event} 	e 	Event object
 		 * @returns {void}
 		 */
-		stateChange () {
+		stateChange: function () {
 			const data = ips.utils.history.getState('calendarView') || {}, url = window.location.href
 
 			if (data.controller !== 'calendarView') {
@@ -68,23 +67,21 @@
 		},
 
 		/**
-		 * Loads a new view
+		 * Loads a new view 
 		 *
 		 * @param 	{string} 	url 	URL to load
-		 *
 		 * @returns {void}
 		 */
-		_updateView (url) {
+		_updateView: function (url) {
 			if( this._ajaxObj && _.isFunction( this._ajaxObj.abort ) ){
 				this._ajaxObj.abort();
 			}
 
 			this._setLoading( true );
 
-			this._ajaxObj = ips.getAjax()(
-				url, {
+			this._ajaxObj = ips.getAjax()( url, {
 				showLoading: true
-			})
+			} )
 				.done(response => {
 					this.scope.html( response );
 
@@ -101,7 +98,7 @@
 		 * @param 	{boolean} 	state 		Enable the loading state?
 		 * @returns {void}
 		 */
-		_setLoading(state) {
+		_setLoading: function (state) {
 			if( state ){
 				this.scope.animate( { opacity: "0.6" }, 'fast' );
 			} else {
@@ -110,7 +107,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/browse" javascript_name="ips.browse.monthView.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000250"><![CDATA[/**
+ <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/browse" javascript_name="ips.browse.monthView.js" javascript_type="controller" javascript_version="107827" javascript_position="1000250"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -229,7 +226,67 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/overview" javascript_name="ips.overview.eventList.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000300"><![CDATA[/**
+ <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/overview" javascript_name="ips.overview.carousel.js" javascript_type="controller" javascript_version="107827" javascript_position="1000300"><![CDATA[/**
+ * Invision Community
+ * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
+ *
+ * Author: Ehren Harber
+ */
+;( function($, _, undefined){
+	"use strict";
+
+	ips.controller.register('calendar.front.overview.carousel', {
+
+		initialize: function () {
+			this.on('mouseenter', this.stopTimer);
+            this.on('mouseleave', this.startTimer);
+			this.on('click', '.cFeaturedEvents__dots', this.dotClick);
+			this.setup();
+		},
+
+		setup: function () {
+			this._scroller = this.scope[0].querySelector('.cFeaturedEvents__scroller');
+			this._dotContainer = this.scope[0].querySelector('.cFeaturedEvents__dots');
+			this.scrollPercentage();
+			this.startTimer();
+		},
+
+		scrollPercentage: function() {
+			this._scroller.addEventListener('scroll', e => {
+				let percentage = Math.floor(100 * this._scroller.scrollLeft / (this._scroller.scrollWidth-this._scroller.clientWidth));
+				this._dotContainer.style.setProperty('--percentage', percentage);
+			}, {
+				passive: true,
+			});
+		},
+
+		autoPlay: function(){
+			let currentScroll = this._scroller.scrollLeft,
+				carouselChildWidth = this._scroller.firstElementChild.offsetWidth;
+			if ((currentScroll >= this._scroller.scrollWidth - this._scroller.clientWidth)){
+				this._scroller.scrollLeft = 0;
+			} else {
+				this._scroller.scrollLeft = currentScroll + carouselChildWidth;
+			}
+			this.startTimer();
+		},
+
+		dotClick: function(ev){
+			let slide = this.scope[0].querySelector(`.cFeaturedEvents__scroller [data-item='${ev.target.dataset.carouselDot}']`);
+			slide.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+		},
+
+        stopTimer: function () {
+            clearInterval(this._timer);
+        },
+
+        startTimer: function () {
+            this._timer = setTimeout(this.autoPlay.bind(this), 5000);
+        }
+
+	});
+}(jQuery, _));]]></file>
+ <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/overview" javascript_name="ips.overview.eventList.js" javascript_type="controller" javascript_version="107827" javascript_position="1000300"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -324,16 +381,16 @@ var PER_PAGE = 16;
         },
 
         removePlaceholders: function () {
-            this.scope.find('.ipsData__item--loading').remove();
+            this.scope.find('.event--loading').remove();
         },
 
         checkMoreButton: function (count) {
             if( _.isNumber( count ) && count < PER_PAGE ){
-                this.scope.find('[data-action="loadMore"]').attr('hidden', true);
-                this.scope.find('[data-role="noMoreResults"]').removeAttr('hidden');
+                this.scope.find('[data-action="loadMore"]').hide();
+                this.scope.find('[data-role="noMoreResults"]').show();
             } else {
-                this.scope.find('[data-action="loadMore"]').removeAttr('hidden');
-                this.scope.find('[data-role="noMoreResults"]').attr('hidden', true);
+                this.scope.find('[data-action="loadMore"]').show();
+                this.scope.find('[data-role="noMoreResults"]').hide();
             }
         },
 
@@ -347,7 +404,7 @@ var PER_PAGE = 16;
         }
     });
 }(jQuery, _));]]></file>
- <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/overview" javascript_name="ips.overview.nearMe.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000300"><![CDATA[/**
+ <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/overview" javascript_name="ips.overview.nearMe.js" javascript_type="controller" javascript_version="107827" javascript_position="1000300"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -440,7 +497,7 @@ var PER_PAGE = 16;
         },
 
         /**
-         * Handles use current location checkbox
+         * Handles use current location checkbox 
          */
         useCurrentLocation: function() {
 
@@ -543,7 +600,7 @@ var PER_PAGE = 16;
                                 long: Number(marker.long)
                             });
                         }
-
+                
                         for ( let marker of Object.values(markers) ) {
                             let mapMarker = new window.google.maps.Marker({
                                 position: {lat: marker.lat, lng: marker.long},
@@ -711,7 +768,7 @@ var PER_PAGE = 16;
         }
     });
 }(jQuery, _));]]></file>
- <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/overview" javascript_name="ips.overview.search.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000300"><![CDATA[/**
+ <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/overview" javascript_name="ips.overview.search.js" javascript_type="controller" javascript_version="107827" javascript_position="1000300"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -723,7 +780,7 @@ var PER_PAGE = 16;
     "use strict";
 
     ips.controller.register('calendar.front.overview.search', {
-        initialize() {
+        initialize: function () {
             this.on('click', '[data-action="useMyLocation"]', this.useMyLocation);
             this.on('click', '[data-action="cancelLocation"]', this.cancelLocation);
             this.on('submit', this.doSearch);
@@ -741,13 +798,13 @@ var PER_PAGE = 16;
          *
          * @returns {void}
          */
-        setup() {
+        setup: function () {
 
             // Other setup
             this._gotCoords = false;
             this._offset = 0;
             this._limit = 20;
-            this._currentSort = $('body').find('#elSortMenu_menu [aria-selected="true"]').attr('data-ipsMenuValue');
+            this._currentSort = $('body').find('#elSortMenu_menu .ipsMenu_itemChecked').attr('data-ipsMenuValue');
             this._baseURL = this.scope.attr('action');
             this._initialURL = window.location.href;
             this._cancelledLookup = false;
@@ -779,17 +836,18 @@ var PER_PAGE = 16;
 			}
         },
 
-        setupGoogle(){
-            this._mapReady = true;
-            Debug.log( this._resultsContainer.find('[data-eventid]') );
-            Debug.log( this._mapContainer.attr('data-markers') );
+        setupGoogle: function(){
+            var self = this;
+            self._mapReady = true;
+            Debug.log( self._resultsContainer.find('[data-eventid]') );
+            Debug.log( self._mapContainer.attr('data-markers') );
 
-            if( this._resultsContainer.find('[data-eventid]').length && this._mapContainer.attr('data-markers') ){
+            if( self._resultsContainer.find('[data-eventid]').length && self._mapContainer.attr('data-markers') ){
                 Debug.log('here');
                 try {
-                    var markers = JSON.parse( this._mapContainer.attr('data-markers') );
+                    var markers = JSON.parse( self._mapContainer.attr('data-markers') );
                     Debug.log( markers );
-                    this._updateGoogleMap( markers );
+                    self._updateGoogleMap( markers );
                 } catch (err) {
                     Debug.log("Invalid marker JSON");
                     Debug.log(err);
@@ -797,24 +855,21 @@ var PER_PAGE = 16;
             }
         },
 
-        setupMapbox() {
-            $('head').append`
-<link rel='stylesheet' type='text/css' media='all' href='https://api.mapbox.com/mapbox.js/v3.3.1/mapbox.css'>
-<link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v1.0.0/MarkerCluster.css' rel='stylesheet' />
-<link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v1.0.0/MarkerCluster.Default.css' rel='stylesheet' />
-<link rel='stylesheet' type='text/css' media='all' href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' />`;
+        setupMapbox: function(){
+            var self = this;
+            $('head').append( "<link rel='stylesheet' type='text/css' media='all' href='https://api.mapbox.com/mapbox.js/v3.3.1/mapbox.css'><link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v1.0.0/MarkerCluster.css' rel='stylesheet' /><link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v1.0.0/MarkerCluster.Default.css' rel='stylesheet' /><link rel='stylesheet' type='text/css' media='all' href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' />" );
 
-            ips.loader.get( [ 'https://api.mapbox.com/mapbox.js/v3.3.1/mapbox.js' ] ).then(() => {
+            ips.loader.get( [ 'https://api.mapbox.com/mapbox.js/v3.3.1/mapbox.js' ] ).then( function () {
                 ips.loader.get( [ 'https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v1.0.0/leaflet.markercluster.js',
-                    'https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js' ] ).then(() => {
+                    'https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js' ] ).then( function () {
 
-                    this._mapReady = true;
+                    self._mapReady = true;
                     
-                    if( this._resultsContainer.find('[data-eventid]').length && this._mapContainer.attr('data-markers') ){
+                    if( self._resultsContainer.find('[data-eventid]').length && self._mapContainer.attr('data-markers') ){
 
                         try {
-                            const markers = JSON.parse( this._mapContainer.attr('data-markers') );
-                            this._updateMapboxMap( markers );
+                            var markers = JSON.parse( self._mapContainer.attr('data-markers') );
+                            self._updateMapboxMap( markers );
                         } catch (err) {
                             Debug.log("Invalid marker JSON");
                             Debug.log(err);
@@ -824,34 +879,33 @@ var PER_PAGE = 16;
             });
         },
 
-        getInitialLocation() {
+        getInitialLocation: function () {
             if ( ips.utils.geolocation.getGeolocationIsAllowed() ) {
                 
-                ips.utils.geolocation.getCurrentPosition()
-                    .then( coords => {
-                        this.setCoords( coords.latitude, coords.longitude );
-                    })
+                ips.utils.geolocation.getCurrentPosition().then( coords => {
+                    this.setCoords( coords.latitude, coords.longitude );
+                })
 
                 // Update useMyLocation link
                 this.setSearchToLocation();
-                this._locationLink.attr('hidden', true);
-                this._cancelLocationLink.removeAttr('hidden');
+                this._locationLink.hide();
+                this._cancelLocationLink.show();
             }
         },
 
-        setCoords(lat, long) {
+        setCoords: function (lat, long) {
             this.scope.prepend("<input type='hidden' name='lat' value='" + lat + "'>");
             this.scope.prepend("<input type='hidden' name='lon' value='" + long + "'>");
             this._gotCoords = true;
         },
 
-        clearCoords() {
+        clearCoords: function () {
             this.scope.find( 'input[name="lat"]' ).remove();
             this.scope.find( 'input[name="lon"]' ).remove();
             this._gotCoords = false;
         },
 
-        moreNearMe(e) {
+        moreNearMe: function (e) {
             e.preventDefault();
 
             // Get the lat/long from the link
@@ -869,16 +923,18 @@ var PER_PAGE = 16;
             });
         },
 
-        moreExhibitions(e) {
+        moreExhibitions: function (e) {
             e.preventDefault();
+
+            var self = this;
 
             this.cancelLocation();
             this.scope.find('[name="date[start]"]').val('');
             this.scope.find('[name="date[end]"]').val('');
             this.scope.find('[name="show"]').val('exhibitions');
 
-            $("html, body").animate({ scrollTop: "300px" },  () => {
-                this.doSearch();
+            $("html, body").animate({ scrollTop: "300px" }, function () {
+                self.doSearch();
             });
         },
 
@@ -888,7 +944,7 @@ var PER_PAGE = 16;
          * @param 		{Event} 	[e] 		Event object
          * @returns 	{void}
          */
-        doSearch (e) {
+        doSearch: function (e) {
             e?.preventDefault()
             const url = this._getUrlFromData();
 
@@ -901,28 +957,29 @@ var PER_PAGE = 16;
         /**
          * Build placeholder elements from a template
          *
-         * @param 		{number} 	[count] 		Number to build (10 default)
+         * @param 		{number} 	count 		Number to build (10 default)
          * @returns 	{string}
          */
-        getPlaceholders(count) {
-            let events = '';
-            count = typeof count === 'number' ? 10 : count;
+        getPlaceholders: function (count) {
+            var events = [];
 
-            for (let i = 0; i < count; i++) {
-                events += ips.templates.render('eventLoading');
+            if( _.isUndefined( count ) ){
+                count = 10;
             }
 
-            return events;
+            for( var i = 0; i < count; i++ ){
+                events.push( ips.templates.render('eventLoading') );
+            }
+
+            return events.join('');
         },
 
         /**
          * Main state change event handler that responds to URL changes
          *
-         * @param 		{event} 	e 		Event object
-         * @param 		{object} 	data 	Event data object
          * @returns 	{void}
          */
-        stateChange() {
+        stateChange: function () {
             if (!('calendarSearch' in ips.utils.history.getState()) && this._initialURL !== window.location.href) {
                 return;
             }
@@ -944,14 +1001,14 @@ var PER_PAGE = 16;
         /**
          * Builds a search URL based on on the form values
          *
-         * @param 		{Event} 	e 		Event object
+         * @param 		{event} 	e 		Event object
          * @param 		{object} 	data 	Event data object
          * @returns 	{string}
          */
-        changeSort(e, data = e.detail) {
+        changeSort: function (e, data) {
             e.preventDefault();
             this._currentSort = data.selectedItemID;
-            const title = $(data.menuElem).find('[data-ipsMenuValue="' + this._currentSort + '"]').text();
+            var title = data.menuElem.find('[data-ipsMenuValue="' + this._currentSort + '"]').text();
             $('body').find('[data-role="searchOrder"]').text( title );
             this.doSearch();
         },
@@ -959,11 +1016,13 @@ var PER_PAGE = 16;
         /**
          * Builds a search URL based on on the form values
          *
+         * @param 		{event} 	e 		Event object
+         * @param 		{object} 	data 	Event data object
          * @returns 	{string}
          */
-        _getUrlFromData() {
-            const formData = this.scope.serializeArray();
-            const params = [];
+        _getUrlFromData: function () {
+            var formData = this.scope.serializeArray();
+            var params = [];
 
             _.each( formData, function (item){
                 if( $.trim( item.value ) !== '' ){
@@ -971,10 +1030,11 @@ var PER_PAGE = 16;
                 }
             });
 
+            // @todo sort
             params.push("sortBy=" + this._currentSort);
 
-			if (this._baseURL.match(/\?/)) {
-				if (!this._baseURL.endsWith('?')) {
+			if( this._baseURL.match(/\?/) ) {
+				if( this._baseURL.slice(-1) != '?' ){
 					this._baseURL += '&';
 				}
 			} else {
@@ -988,60 +1048,64 @@ var PER_PAGE = 16;
          * Handles performing a new search
          *
          * @param 		{string} 	url 		URL to request
-         * @returns 	{Promise<void>}
+         * @returns 	{void}
          */
-        async _loadResults(url) {
+        _loadResults: function (url) {
+            var self = this;
+
             // Do we need to hide the overview stuff?
-            if (this._page.length) {
+            if( this._page.length ){
                 this._page.find('[data-role="eventsOverview"]').hide();
                 this._page.find('[data-role="searchResultsWrapper"]').show();
             }
 
             this._resultsContainer.removeClass('ipsHide').html( this.getPlaceholders(6) );
-			if (ips.getSetting('mapProvider') !== 'none') {
+			if( ips.getSetting('mapProvider') !== 'none') {
 				this._mapContainer.addClass('cEvents__searchMap--loading').show();
 			}
             this._currentUrl = url;
 
-            const response = await ips.fetch( url );
-            if (response.count) {
-                this._resultsContainer.html( response.content );
-                this._noResults.addClass('ipsHide');
-                this._updateMap( _.extend( {}, this._markers, response.markers ) );
+            ips.getAjax()( url )
+                .done( function (response){
+                    if( response.count ){
+                        self._resultsContainer.html( response.content );
+                        self._noResults.addClass('ipsHide');
+                        self._updateMap( _.extend( {}, self._markers, response.markers ) );
 
-                if( response.totalCount > ( response.count + this._offset ) ){
-                    this._loadMore.show();
-                    this._noMore.hide();
-                } else {
-                    this._loadMore.hide();
-                    this._noMore.hide();
-                }
-            } else {
-                this._resultsContainer.html('').addClass('ipsHide');
-                this._noResults.removeClass('ipsHide');
-                this._loadMore.hide();
-                this._noMore.hide();
-                this._mapContainer.hide();
-            }
+                        if( response.totalCount > ( response.count + self._offset ) ){
+                            self._loadMore.show();
+                            self._noMore.hide();
+                        } else {
+                            self._loadMore.hide();
+                            self._noMore.hide();
+                        }
+                    } else {
+                        self._resultsContainer.html('').addClass('ipsHide');
+                        self._noResults.removeClass('ipsHide');
+                        self._loadMore.hide();
+                        self._noMore.hide();
+                        self._mapContainer.hide();
+                    }
 
-            if (response.virtual || !response.markerCount) {
-                this._mapContainer.hide();
-            }
+                    if( response.virtual ){
+                        self._mapContainer.hide();
+                    }
 
-            $( document ).trigger('contentChange', [ this._resultsContainer ]);
+                    $( document ).trigger('contentChange', [ self._resultsContainer ]);
+                });
         },
 
-        _updateMap(markers){
-            if (ips.getSetting( 'mapProvider' ) === 'google') {
+        _updateMap: function ( markers ){
+            if( ips.getSetting( 'mapProvider' ) === 'google' ){
                 this._updateGoogleMap( markers );
-            } else if (ips.getSetting( 'mapProvider' ) === 'mapbox') {
+            } else if( ips.getSetting( 'mapProvider' ) === 'mapbox' ) {
                 this._updateMapboxMap( markers );
             } else {
 				this._mapContainer.hide(); // we really don't need it.
 			}
         },
 
-        _updateGoogleMap(markers){
+        _updateGoogleMap: function (markers){
 
             if( !this._map ){
                 this._map = new window.google.maps.Map( document.querySelector( '[data-role="searchResultsMap"]' ) );
@@ -1058,7 +1122,7 @@ var PER_PAGE = 16;
                 this._mapMarkers = [];
             }
 
-            const bounds = new google.maps.LatLngBounds();
+            var bounds = new google.maps.LatLngBounds();
             for ( let marker of Object.values(markers) ) {
                 let mapMarker = new window.google.maps.Marker({
                     position: {lat: marker.lat, lng: marker.long},
@@ -1067,7 +1131,7 @@ var PER_PAGE = 16;
                 });
                 this._mapMarkers.push( mapMarker );
 
-                const coords = new google.maps.LatLng(marker.lat, marker.long);
+                var coords = new google.maps.LatLng( marker.lat, marker.long );
                 if( !( bounds.contains( coords ) ) ){
                     bounds.extend( coords );
                 }
@@ -1083,8 +1147,8 @@ var PER_PAGE = 16;
             this._mapContainer.show();
         },
 
-        _updateMapboxMap(markers) {
-            if (!this._map) {
+        _updateMapboxMap: function (markers) {
+            if( !this._map ){
                 L.mapbox.accessToken = ips.getSetting('mapApiKey');
                 this._map = L.mapbox
                     .map( this._mapContainer.get(0) )
@@ -1096,6 +1160,16 @@ var PER_PAGE = 16;
                 this._map.dragging = false;
                 this._map.zoomControl = false;
 
+                // Reposition zoom control
+                /*L.control.zoom({
+                    position: 'bottomright'
+                }).addTo(this._map);
+
+                // Add and position fullscreen control
+                this._map.addControl(new L.Control.Fullscreen({
+                    position: 'bottomleft'
+                }));*/
+
                 this._markersGroup = new L.featureGroup([]);
                 this._markersGroup.addTo( this._map );
             }
@@ -1103,13 +1177,14 @@ var PER_PAGE = 16;
             this._mapContainer.removeClass('cEvents__searchMap--loading');
             this._markersGroup.clearLayers(); // Remove all existing markers
 
-            for (let id in markers) {
-                const marker = L.marker([markers[id].lat, markers[id].long], {
+            for( var id in markers ){
+                var marker = L.marker([markers[id].lat, markers[id].long], {
                     title: markers[id].title,
                     draggable: false,
                     eventId: parseInt(id)
                 });
 
+                //self._map.addLayer( marker );
                 this._markersGroup.addLayer( marker );
 
                 // Build info popup for this marker
@@ -1120,14 +1195,14 @@ var PER_PAGE = 16;
             this._map.fitBounds(this._markersGroup.getBounds(), { maxZoom: 5 });
         },
 
-        _markerClick(e) {
-            const targetEvent = e.target.options.eventId;
+        _markerClick: function (e, data) {
+            var targetEvent = e.target.options.eventId;
 
             // Find that event in our listing
-            const eventBlock = this._resultsContainer.find('[data-eventId="' + targetEvent + '"]');
+            var eventBlock = this._resultsContainer.find('[data-eventId="' + targetEvent + '"]');
 
             // Get position
-            const topPos = eventBlock.offset().top;
+            var topPos = eventBlock.offset().top;
 
             // Scroll to it
             $('html, body').animate({ scrollTop: topPos }, function () {
@@ -1142,50 +1217,55 @@ var PER_PAGE = 16;
         /**
          * Handles loading more results into the current search
          *
-         * @param 		{Event} 	e 		Event object
-         * @returns 	{Promise<void>}
+         * @param 		{event} 	e 		Event object
+         * @returns 	{void}
          */
-        async loadMore(e) {
+        loadMore: function (e) {
             e.preventDefault();
 
-            const placeholders = this.getPlaceholders(2);
+            var placeholders = this.getPlaceholders(2);
             this._resultsContainer.append( placeholders );
             this._loadMore.prop('disabled', true);
 
-            const currentCount = this._resultsContainer.find('[data-eventid]').length;
+            var self = this;
+            var currentCount = this._resultsContainer.find('[data-eventid]').length;
 
-            const response = await ips.fetch( this._currentUrl + "&offset=" + currentCount + "&limit=" + this._limit);
+            ips.getAjax()( this._currentUrl + "&offset=" + currentCount + "&limit=" + this._limit)
+                .done( function (response) {
+                    self._resultsContainer.find('.event--loading').remove();
+                    self._resultsContainer.append( response.content );
+                    self._updateMap( response.markers );
+                    self._loadMore.prop('disabled', false);
 
-            this._resultsContainer.find('.ipsData__item--loading').remove();
-            this._resultsContainer.append( response.content );
-            this._updateMap( response.markers );
-            this._loadMore.prop('disabled', false);
+                    if( self._resultsContainer.find('[data-eventid]').length >= response.totalCount ){
+                        self._loadMore.hide();
+                        self._noMore.show();
+                    } else {
+                        self._loadMore.show();
+                        self._noMore.hide();
+                    }
 
-            if (this._resultsContainer.find('[data-eventid]').length >= response.totalCount) {
-                this._loadMore.hide();
-                this._noMore.show();
-            } else {
-                this._loadMore.show();
-                this._noMore.hide();
-            }
-
-            $( document ).trigger('contentChange', [ this._resultsContainer ]);
+                    $( document ).trigger('contentChange', [ self._resultsContainer ]);
+                });
         },
 
         /**
          * Remove current location as the search term
          *
-         * @param 		{Event} 	[e] 		Event object
+         * @param 		{event} 	e 		Event object
          * @returns 	{void}
          */
-        cancelLocation(e) {
-            e?.preventDefault()
-            ips.utils.geolocation.setGeolocationIsAllowed(ips.utils.geolocation.permissions.DENIED);
+        cancelLocation: function (e) {
+            if( e ){
+                e.preventDefault();
+            }
+
+            let geolocation = ips.utils.geolocation.setGeolocationIsAllowed( ips.utils.geolocation.permissions.DENIED );
 
             this._cancelledLookup = true;
             this._searchBox.val( this._previousValue ).attr('placeholder', this._originalPlaceholder).prop('disabled', false).removeClass('ipsField_loading');
-            this._locationLink.removeAttr('hidden');
-            this._cancelLocationLink.attr('hidden', true);
+            this._locationLink.show();
+            this._cancelLocationLink.hide();
 
             this.scope.find('[name="searchNearLocation"]').remove();
         },
@@ -1193,79 +1273,77 @@ var PER_PAGE = 16;
         /**
          * Fetch current location and use it as the current search param
          *
-         * @param 		{Event} 	e 		Event object
+         * @param 		{event} 	e 		Event object
          * @returns 	{void}
          */
-        useMyLocation(e) {
+        useMyLocation: function (e) {
             e.preventDefault();
 
-            this._cancelledLookup = false;
-            this._searchBox.val('').attr('placeholder', ips.getString('event_finding_location')).prop('disabled', true).addClass('ipsField_loading');
-            this._locationLink.attr('hidden', true);
-            this._cancelLocationLink.removeAttr('hidden');
+            var self = this;
 
-            const afterCoords = () => {
-                if( this._cancelledLookup ){
-                    this._cancelledLookup = false;
+            self._cancelledLookup = false;
+            self._searchBox.val('').attr('placeholder', ips.getString('event_finding_location')).prop('disabled', true).addClass('ipsField_loading');
+            self._locationLink.hide();
+            self._cancelLocationLink.show();
+
+            var afterCoords = function () {
+                if( self._cancelledLookup ){
+                    self._cancelledLookup = false;
                     return;
                 }
 
-                this.setSearchToLocation();
-                this._cancelledLookup = false;
+                self.setSearchToLocation();
+                self._cancelledLookup = false;
             };
 
-            if( this._gotCoords ){
+            if( self._gotCoords ){
                 afterCoords()
             } else {
-                ips.utils.geolocation.getCurrentPosition()
-                    .then(coords => {
-                        this.setCoords(coords.latitude, coords.longitude);
-                        this.setSearchToLocation();
-                    });
+                ips.utils.geolocation.getCurrentPosition().then( coords  => {
+                    self.setCoords(coords.latitude, coords.longitude);
+                    this.setSearchToLocation();
+                });
             }
         },
         
-        setSearchToLocation() {
+        setSearchToLocation: function () {
             this._searchBox.val('').attr('placeholder', ips.getString('event_your_current_location')).prop('disabled', true).removeClass('ipsField_loading');
             this.scope.prepend("<input type='hidden' name='searchNearLocation' value='1'>");
         },
 
         /**
-         * Cancel searching and show the overview page again
+         * Cancal searching and show the overview page again
          *
          * @param 		{Event} 	e 		Event object
          * @returns 	{void}
          */
-        backToOverview(e) {
-            if (!this._page.length) {
+        backToOverview: function (e) {
+            if( !this._page.length ){
                 return;
             }
 
             e.preventDefault();
 
-            ips.utils.history.replaceState(
-                {
-                    controller: 'calendar.front.overview.search',
-                    url: this._initialURL
-                },
-                'calendarSearch',
-                this._initialURL
-            );
+            ips.utils.history.replaceState( {
+                controller: 'calendar.front.overview.search',
+                url: this._initialURL
+            }, 'calendarSearch', this._initialURL );
         },
 
         /**
          * Hide the search results panel
          *
+         * @param 		{event} 	e 		Event object
          * @returns 	{void}
          */
-        hideResults() {
+        hideResults: function (e) {
             this._page.find('[data-role="eventsOverview"]').show();
             this._page.find('[data-role="searchResultsWrapper"]').hide();
         }
     });
 }(jQuery, _));
 ]]></file>
- <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.dates.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.dates.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1293,6 +1371,8 @@ var PER_PAGE = 16;
 			this.on( 'click', '#elRecurRemove', this.disableRecurring );
 			this.on( 'change', 'input[name="event_dates[start_date]"]', this.setEndDateOnStartChange );
 			this.on( 'change', '#event_end_date', this.setHasFocusedEventOnEndChange );
+
+			$( window ).on( 'resize', _.bind( this._resizeEndGrid, this ) );
 
 			this.on( 'click', '[data-action="updateRepeat"]', this.finishRepeat );
 
@@ -1486,6 +1566,7 @@ var PER_PAGE = 16;
 		 */
 		finishRepeat: function () {
 			this._updateSummary();
+			$('#elRecurEdit_menu').trigger('closeMenu');
 		},
 
 		/**
@@ -1497,6 +1578,9 @@ var PER_PAGE = 16;
 			this._updateSummary();
 			this.toggleFields();
 			this.updateTimezone();
+
+			// Make Event End cell as big as Event Start cell
+			this._resizeEndGrid();
 		},
 
 		/**
@@ -1563,6 +1647,9 @@ var PER_PAGE = 16;
 			_.each( toggles, function (val, key) {
 				self.scope.find( '#' + key ).toggle( val );
 			});
+
+			// Manual check for ful;-width start date
+			this.scope.find('#elDateGrid_start').toggleClass('ipsGrid_span5', this.scope.find('#elDateGrid_end').is(':visible') );
 		},
 
 		/**
@@ -1585,8 +1672,12 @@ var PER_PAGE = 16;
 		 * @returns 	{void}
 		 */
 		updateTimezone: function (e) {
+			if( e ){
+				e.preventDefault();
+			}
+
 			// Update displayed timezone
-			this.scope.find('[data-role="timezone_display"]').text( $('#event_timezone option:selected').data('abbreviated') );
+			this.scope.find('[data-role="timezone_display"]').text( $('#event_timezone option:selected').data('abbreviated') ).trigger('closeMenu');
 		},
 
 		/**
@@ -1597,7 +1688,28 @@ var PER_PAGE = 16;
 		 * @returns 	{void}
 		 */
 		disableRecurring: function (e) {
+			if( e )
+			{
+				e.preventDefault();
+			}
+
+			this.scope.find('#elRepeatCb').prop( 'checked', false  );
 			this._updateSummary();
+		},
+
+		/**
+		 * Finalize our recurring options
+		 *
+		 * @param 		{event} 	e 		Event object
+		 * @param 		{object} 	data 	Event data object
+		 * @returns 	{void}
+		 */
+		finishRepeatConfiguration: function (e, data) {
+			e.preventDefault();
+
+			// Copy the summary from the menu to the main display and close the menu
+			this.scope.find('[data-role="recur_summary_final"]').text( this.scope.find('[data-role="recur_summary"]').text() );
+			this.scope.find('#elRecurEdit').trigger('closeMenu');
 		},
 
 		/**
@@ -1616,7 +1728,7 @@ var PER_PAGE = 16;
 				this.scope.find('#elRepeatRow_hidden').hide();
 				this.scope.find('#elRepeatRow_shown').show();
 			} else {
-				summary.html( "<em class='i-color_soft'>" + ips.getString('doesnt_repeat') + "</em>" );
+				summary.html( "<em class='ipsType_light'>" + ips.getString('doesnt_repeat') + "</em>" );
 				this.scope.find('#elRepeatRow_hidden').show();
 				this.scope.find('#elRepeatRow_shown').hide();
 			}
@@ -1686,7 +1798,7 @@ var PER_PAGE = 16;
 		 */
 		_getTime: function (time) {
 			if( !time ){
-				return "<em class='i-color_soft i-font-weight_normal i-opacity_4'>" + ips.getString('select_time') + "</em>";
+				return "<em class='ipsType_light ipsType_unbold ipsFaded'>" + ips.getString('select_time') + "</em>";
 			}
 
 			var date = new Date('1970-01-01T' + time + 'Z');
@@ -1784,10 +1896,27 @@ var PER_PAGE = 16;
 			}
 
 			return ips.getString( 'week_string', { week: weekString, days: dayString } );
+		},
+
+		/**
+		 * Resizes the "Event End" grid box to be the same height as the start box
+		 *
+		 * @returns 	{void}
+		 */
+		_resizeEndGrid: function () {
+			var height = 'auto';
+
+			if( !ips.utils.responsive.enabled() || !ips.utils.responsive.currentIs('phone') ){
+				height = this.scope.find('#elDateGrid_start').outerHeight() + 'px';
+			}
+
+			this.scope.find('#elDateGrid_end').css({
+				height: height
+			});
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/venue" javascript_name="ips.venue.main.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000200"><![CDATA[/**
+ <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/venue" javascript_name="ips.venue.main.js" javascript_type="controller" javascript_version="107827" javascript_position="1000200"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1801,7 +1930,7 @@ var PER_PAGE = 16;
 
 		_ajaxObj: null,
 		
-		initialize() {
+		initialize: function () {
 			this.on( 'click', '[data-action="changeView"]', this.changeView );
 			this.on( window, 'historychange:venueView', this.stateChange );
 			this.setup();
@@ -1812,7 +1941,7 @@ var PER_PAGE = 16;
 		 *
 		 * @returns {void}
 		 */
-		setup() {
+		setup: function () {
 			ips.utils.history.pushState( { controller: 'venueView' }, 'venueView', window.location.href );
 		},
 
@@ -1820,13 +1949,11 @@ var PER_PAGE = 16;
 		 * Changes the calendar view dynamically
 		 *
 		 * @param 	{Event} 	e 	Event object
-		 *
 		 * @returns {void}
 		 */
-		changeView(e) {
+		changeView: function (e) {
 			e.preventDefault();
 
-			// Load the url via ajax instead
 			ips.utils.history.pushState({ controller: 'venueView' }, 'venueView', $( e.currentTarget ).attr('href'));
 			document.title = $( e.currentTarget ).attr('title');
 		},
@@ -1834,9 +1961,10 @@ var PER_PAGE = 16;
 		/**
 		 * Event handler for history state changes
 		 *
+		 * @param 	{event} 	e 	Event object
 		 * @returns {void}
 		 */
-		stateChange() {
+		stateChange: function () {
 			const data = ips.utils.history.getState('venueView') || {},
 				url = window.location.href
 
@@ -1845,19 +1973,18 @@ var PER_PAGE = 16;
 			}
 
 			// Track page view
-			ips.utils.analytics.trackPageView(url);
+			ips.utils.analytics.trackPageView( url );
 
-			this._updateView(url)
+			this._updateView( url )
 		},
 
 		/**
 		 * Loads a new view 
 		 *
 		 * @param 	{string} 	url 	URL to load
-		 *
 		 * @returns {void}
 		 */
-		_updateView(url) {
+		_updateView: function (url) {
 			if (this._ajaxObj && _.isFunction( this._ajaxObj.abort ) ){
 				this._ajaxObj.abort();
 			}
@@ -1881,20 +2008,18 @@ var PER_PAGE = 16;
 		 * Toggles the loading state on the view
 		 *
 		 * @param 	{boolean} 	state 		Enable the loading state?
-		 *
 		 * @returns {void}
 		 */
-		_setLoading(state) {
-			this.scope.animate(
-				{
-					opacity: state ? "0.6" : "1"
-				},
-				"fast"
-			);
+		_setLoading: function (state) {
+			if( state ){
+				this.scope.animate( { opacity: "0.6" }, 'fast' );
+			} else {
+				this.scope.animate( { opacity: "1" }, 'fast' );
+			}
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.reminderButton.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150"><![CDATA[/**
+ <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.reminderButton.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -1935,7 +2060,7 @@ var PER_PAGE = 16;
 		 */
 		_reloadButton: function () {
 			// Show button as loading
-			this._button.addClass('i-opacity_3');
+			this._button.addClass('ipsFaded ipsFaded_more');
 			
 			var self = this;
 			var pos = ips.utils.position.getElemPosition( this._button );
@@ -1969,7 +2094,7 @@ var PER_PAGE = 16;
 					$( document ).trigger( 'contentChange', [ self.scope ] );
 				})
 				.fail( function () {
-					self._button.removeClass('i-opacity_3');
+					self._button.removeClass('ipsFaded ipsFaded_more');
 				})
 				.always( function () {
 					self.scope.find('.ipsLoading').remove();
@@ -1977,7 +2102,7 @@ var PER_PAGE = 16;
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.reminderForm.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150">/**
+ <file javascript_app="calendar" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.reminderForm.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -2087,35 +2212,32 @@ var PER_PAGE = 16;
 	});
 }(jQuery, _));
 </file>
- <file javascript_app="calendar" javascript_location="front" javascript_path="templates" javascript_name="ips.calendar.templates.js" javascript_type="framework" javascript_version="5001403" javascript_position="1000050"><![CDATA[/**
+ <file javascript_app="calendar" javascript_location="front" javascript_path="templates" javascript_name="ips.calendar.templates.js" javascript_type="framework" javascript_version="107827" javascript_position="1000050"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  */
 
 /* REMINDER BUTTON LOADING */
 ips.templates.set('calendar.reminder.loading', " \
-<div class='ipsLoading ipsLoading--tiny'></div>\
+<div class='ipsLoading ipsLoading_tiny'></div>\
 ");]]></file>
- <file javascript_app="calendar" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.overview.js" javascript_type="template" javascript_version="5001403" javascript_position="1000050"><![CDATA[ips.templates.set("eventLoading", `
-	<li class='ipsData__item ipsData__item--loading'>
-		<div class="ipsData__image" aria-hidden="true"></div>
-		<div class="ipsData__content">
-			<div class="ipsData__main">
-				<div class="ipsData__title"></div>
-				<div class="ipsData__desc"></div>
-			</div>
-		</div>
-	</li>
-`);
+ <file javascript_app="calendar" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.overview.js" javascript_type="template" javascript_version="107827" javascript_position="1000050"><![CDATA[ips.templates.set("eventLoading", "\
+	<li class='ipsBox ipsBox--child event event--withImage event--loading'>\
+		<div class='cEvents__skeleton cEvents__skeleton--eventImage'></div>\
+		<div class='cEvents__details'>\
+			<div class='cEvents__skeleton cEvents__skeleton--eventDate'></div>\
+			<div class='cEvents__skeleton cEvents__skeleton--eventTitle'></div>\
+			<div class='cEvents__skeleton cEvents__skeleton--eventBlurb'></div>\
+		</div>\
+	</li>\
+");
 
-ips.templates.set("nearMe", `
-	<i-data>
-		<ul class='ipsData ipsData--grid ipsData--events-list ipsEventList ipsEventList--nearMe'>
-			<li class="ipsData__item ipsEventsNearMe__map"><div class='cEvents__skeleton cEvents__skeleton--map' id='map'></div></li>
-			{{{events}}}
-		</ul>
-	</i-data>
-`);]]></file>
+ips.templates.set("nearMe", "\
+	<ul class='eventList nearMe__events'>\
+		<li class='nearMe__map cEvents__skeleton cEvents__skeleton--map' id='map'></li>\
+		{{{events}}}\
+	</ul>\
+");]]></file>
  <order app="global" path="/dev/js//framework/">templates
 common/ips.loader.js
 common/ui
@@ -2128,7 +2250,8 @@ mustache
 Debug.js
 app.js</order>
  <order app="global" path="/dev/js//library//jquery">jquery.js
-jquery-migrate.js</order>
+jquery-migrate.js
+jquery.transform.js</order>
  <order app="global" path="/dev/js//library//linkify">linkify.min.js
 linkify-jquery.min.js</order>
 </javascript>

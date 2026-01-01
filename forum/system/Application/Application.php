@@ -11,167 +11,103 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DirectoryIterator;
-use DomainException;
-use ErrorException;
-use FilesystemIterator;
-use InvalidArgumentException;
-use IPS\Application\Module;
-use IPS\cms\Templates;
-use IPS\Content\Search\Index;
-use IPS\core\extensions\core\CommunityEnhancements\Zapier;
-use IPS\core\FrontNavigation;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db\Exception;
-use Exception as PHPException;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Member\Club;
-use IPS\Member\Group;
-use IPS\Member\ProfileStep;
-use IPS\Node\Model;
-use IPS\Output\Javascript;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Platform\Bridge;
-use IPS\Theme\CustomTemplate;
-use IPS\Theme\Editor\Category;
-use IPS\Theme\Editor\Setting;
-use IPS\Widget\Polymorphic;
-use IPS\Xml\SimpleXML;
-use OutOfRangeException;
-use OverflowException;
-use RecursiveArrayIterator;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
-use RuntimeException;
-use UnderFlowException;
-use UnexpectedValueException;
-use XMLReader;
-use XMLWriter;
-use function class_exists;
-use function count;
-use function defined;
-use function file_exists;
-use function file_get_contents;
-use function file_put_contents;
-use function floatval;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_string;
-use function json_decode;
-use function preg_match;
-use function str_replace;
-use function strlen;
-use function strtoupper;
-use function substr;
-use function unlink;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Abstract class that applications extend and use to handle application data
  */
-class Application extends Model
+class _Application extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	Have fetched all?
 	 */
-	protected static bool $gotAll	= FALSE;
+	protected static $gotAll	= FALSE;
 
 	/**
 	 * @brief	Defined versions
 	 */
-	protected ?array $definedVersions	= NULL;
+	protected $definedVersions	= NULL;
 
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = '__app_';
+	public static $titleLangPrefix = '__app_';
 
 	/**
 	 * @brief	Defined theme locations for the theme system
 	 */
-	public array $themeLocations = array('admin', 'front', 'global');
+	public $themeLocations = array('admin', 'front', 'global');
 
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'updatecount_applications', 'applications', 'extensions' );
+	protected $caches = array( 'updatecount_applications' );
 
 	/**
 	 * Set default
 	 *
 	 * @return void
 	 */
-	public function setAsDefault() : void
+	public function setAsDefault()
 	{
 		/* Update any FURL customizations */
-		if ( Settings::i()->furl_configuration )
+		if ( \IPS\Settings::i()->furl_configuration )
 		{
-			$furlCustomizations = json_decode( Settings::i()->furl_configuration, TRUE );
+			$furlCustomizations = json_decode( \IPS\Settings::i()->furl_configuration, TRUE );
 
 			try
 			{
 				/* Add the top-level directory to all the FURLs for the old default app */
-				$previousDefaultApp = Application::constructFromData( Db::i()->select( '*', 'core_applications', 'app_default=1' )->first() );
+				$previousDefaultApp = static::constructFromData( \IPS\Db::i()->select( '*', 'core_applications', 'app_default=1' )->first() );
 				if( file_exists( $previousDefaultApp->getApplicationPath()  . "/data/furl.json" ) )
 				{
-					$oldDefaultAppDefinition = json_decode( preg_replace( '/\/\*.+?\*\//s', '', file_get_contents( $previousDefaultApp->getApplicationPath() . "/data/furl.json" ) ), TRUE );
+					$oldDefaultAppDefinition = json_decode( preg_replace( '/\/\*.+?\*\//s', '', \file_get_contents( $previousDefaultApp->getApplicationPath() . "/data/furl.json" ) ), TRUE );
 					if ( $oldDefaultAppDefinition['topLevel'] )
 					{
 						foreach ( $oldDefaultAppDefinition['pages'] as $k => $data )
 						{
 							if ( isset( $furlCustomizations[ $k ] ) )
 							{
-								$furlCustomizations[ $k ] = Friendly::buildFurlDefinition( $furlCustomizations[ $k ]['friendly'], $furlCustomizations[ $k ]['real'], $oldDefaultAppDefinition['topLevel'], FALSE, $furlCustomizations[$k]['alias'] ?? NULL, $furlCustomizations[$k]['custom'] ?? FALSE, $furlCustomizations[$k]['verify'] ?? NULL );
+								$furlCustomizations[ $k ] = \IPS\Http\Url\Friendly::buildFurlDefinition( $furlCustomizations[ $k ]['friendly'], $furlCustomizations[ $k ]['real'], $oldDefaultAppDefinition['topLevel'], FALSE, isset( $furlCustomizations[ $k ]['alias'] ) ? $furlCustomizations[ $k ]['alias'] : NULL, isset( $furlCustomizations[ $k ]['custom'] ) ? $furlCustomizations[ $k ]['custom'] : FALSE, isset( $furlCustomizations[ $k ]['verify'] ) ? $furlCustomizations[ $k ]['verify'] : NULL );
 							}
 						}
 					}
 				}
 			}
-			catch ( UnderflowException $e ){}
+			catch ( \UnderflowException $e ){}
 
 
 			/* And remove it from the new */
 			if( file_exists( $this->getApplicationPath() . "/data/furl.json" ) )
 			{
-				$newDefaultAppDefinition = json_decode( preg_replace( '/\/\*.+?\*\//s', '', file_get_contents( $this->getApplicationPath() . "/data/furl.json" ) ), TRUE );
+				$newDefaultAppDefinition = json_decode( preg_replace( '/\/\*.+?\*\//s', '', \file_get_contents( $this->getApplicationPath() . "/data/furl.json" ) ), TRUE );
 				if ( $newDefaultAppDefinition['topLevel'] )
 				{
 					foreach ( $newDefaultAppDefinition['pages'] as $k => $data )
 					{
 						if ( isset( $furlCustomizations[ $k ] ) )
 						{
-							$furlCustomizations[ $k ] = Friendly::buildFurlDefinition( rtrim( preg_replace( '/^' . preg_quote( $newDefaultAppDefinition['topLevel'], '/' ) . '\/?/', '', $furlCustomizations[ $k ]['friendly'] ), '/' ), $furlCustomizations[ $k ]['real'], $newDefaultAppDefinition['topLevel'], TRUE, $furlCustomizations[$k]['alias'] ?? NULL, $furlCustomizations[$k]['custom'] ?? FALSE, $furlCustomizations[$k]['verify'] ?? NULL );
+							$furlCustomizations[ $k ] = \IPS\Http\Url\Friendly::buildFurlDefinition( rtrim( preg_replace( '/^' . preg_quote( $newDefaultAppDefinition['topLevel'], '/' ) . '\/?/', '', $furlCustomizations[ $k ]['friendly'] ), '/' ), $furlCustomizations[ $k ]['real'], $newDefaultAppDefinition['topLevel'], TRUE, isset( $furlCustomizations[ $k ]['alias'] ) ? $furlCustomizations[ $k ]['alias'] : NULL, isset( $furlCustomizations[ $k ]['custom'] ) ? $furlCustomizations[ $k ]['custom'] : FALSE, isset( $furlCustomizations[ $k ]['verify'] ) ? $furlCustomizations[ $k ]['verify'] : NULL );
 						}
 					}
 				}
 			}
 
 			/* Save the new FURL customisation */
-			Settings::i()->changeValues( array( 'furl_configuration' => json_encode( $furlCustomizations ) ) );
+			\IPS\Settings::i()->changeValues( array( 'furl_configuration' => json_encode( $furlCustomizations ) ) );
 		}
 
-		foreach(Application::applications() as $directory => $application )
+		foreach( \IPS\Application::applications() as $directory => $application )
 		{
 			if( $application->default )
 			{
@@ -183,18 +119,22 @@ class Application extends Model
 		static::addMetaPrefix( $this );
 
 		/* Actually update the database */
-		Db::i()->update( 'core_applications', array( 'app_default' => 0 ) );
-		Db::i()->update( 'core_applications', array( 'app_default' => 1 ), array( 'app_id=?', $this->id ) );
+		\IPS\Db::i()->update( 'core_applications', array( 'app_default' => 0 ) );
+		\IPS\Db::i()->update( 'core_applications', array( 'app_default' => 1 ), array( 'app_id=?', $this->id ) );
 
 		/* Clear cached data */
-		unset( Store::i()->applications );
-		unset( Store::i()->furl_configuration );
+		unset( \IPS\Data\Store::i()->applications );
+		unset( \IPS\Data\Store::i()->furl_configuration );
+		\IPS\Member::clearCreateMenu();
+
+		/* Clear guest page caches */
+		\IPS\Data\Cache::i()->clearAll();
 	}
 
 	/**
 	 * Get Applications
 	 *
-	 * @return	array<Application>
+	 * @return	array<\IPS\Application>
 	 */
 	public static function applications(): array
 	{
@@ -204,31 +144,17 @@ class Application extends Model
 
 			foreach ( static::getStore() as $row )
 			{
-				if( $row['app_requires_manual_intervention'] and !in_array( $row['app_directory'], IPS::$ipsApps ) )
-				{
-					continue;
-				}
-
 				try
 				{
 					static::$multitons[ $row['app_directory'] ] = static::constructFromData( $row );
 				}
-				catch( UnexpectedValueException $e )
+				catch( \UnexpectedValueException $e )
 				{
 					if ( mb_stristr( $e->getMessage(), 'Missing:' ) )
 					{
 						/* Ignore this, the app is in the table, but not 4.0 compatible */
 						continue;
 					}
-				}
-				catch( PHPException $e )
-				{
-					if( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'setup' )
-					{
-						continue;
-					}
-
-					throw $e;
 				}
 			}
 
@@ -243,20 +169,20 @@ class Application extends Model
 	 *
 	 * @return	array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->applications ) )
+		if ( !isset( \IPS\Data\Store::i()->applications ) )
 		{
-			Store::i()->applications = iterator_to_array( Db::i()->select( '*', 'core_applications', NULL, 'app_position' ) );
+			\IPS\Data\Store::i()->applications = iterator_to_array( \IPS\Db::i()->select( '*', 'core_applications', NULL, 'app_position' ) );
 		}
 
-		return Store::i()->applications;
+		return \IPS\Data\Store::i()->applications;
 	}
 
 	/**
 	 * Get enabled applications
 	 *
-	 * @return	array<Application>
+	 * @return	array<\IPS\Application>
 	 */
 	public static function enabledApplications(): array
 	{
@@ -277,17 +203,12 @@ class Application extends Model
 	/**
 	 * Does an application exist and is it enabled? Note: does not check if offline for a particular member
 	 *
+	 * @see		\IPS\Application::canAccess()
 	 * @param	string	$key	Application key
 	 * @return	bool
-		  *@see        Application::canAccess
 	 */
-	public static function appIsEnabled( string $key ): bool
+	public static function appIsEnabled( $key )
 	{
-		if ( Dispatcher::hasInstance() AND Dispatcher::i()->controllerLocation === 'setup' and Dispatcher::i()->setupLocation == 'install' )
-		{
-			return FALSE;
-		}
-
 		$applications = static::applications();
 
 		if ( !array_key_exists( $key, $applications ) )
@@ -301,24 +222,17 @@ class Application extends Model
 	/**
 	 * Load Record
 	 *
-	 * @see     Db::build
-	 * @param	int|string|null	$id					ID
-	 * @param	string|null		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
+	 * @see		\IPS\Db::build
+	 * @param	int|string	$id					ID
+	 * @param	string		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
 	 * @param	mixed		$extraWhereClause	Additional where clause(s) (see \IPS\Db::build for details)
-	 * @return	ActiveRecord|static
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
+	 * @return	static
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function load( int|string|null $id, string $idField=NULL, mixed $extraWhereClause=NULL ): ActiveRecord|static
+	public static function load( $id, $idField=NULL, $extraWhereClause=NULL )
 	{
-		$applications = static::applications(); // Load all applications so we can grab the data from the cache
-
-		/* Make sure that the app key is in the list. If the app needs manual intervention, we do NOT want to try to load it. */
-		if( !array_key_exists( $id, $applications ) )
-		{
-			throw new OutOfRangeException;
-		}
-
+		static::applications(); // Load all applications so we can grab the data from the cache
 		return parent::load( $id, $idField, $extraWhereClause );
 	}
 
@@ -326,63 +240,85 @@ class Application extends Model
 	 * Fetch All Root Nodes
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	mixed				$where				Additional WHERE clause
 	 * @param	array|NULL			$limit				Limit/offset to use, or NULL for no limit (default)
 	 * @note	This is overridden to prevent UnexpectedValue exceptions when there is an old application record in core_applications without an Application.php file
 	 * @return	array
 	 */
-	public static function roots( ?string $permissionCheck='view', Member $member=NULL, mixed $where=array(), array $limit=NULL ): array
+	public static function roots( $permissionCheck='view', $member=NULL, $where=array(), $limit=NULL )
 	{
 		return static::applications();
 	}
 
 	/**
-	 * @var array
-	 */
-	protected static array $_loadedExtensions = [];
-
-	/**
 	 * Get all extensions
 	 *
-	 * @param string|Application $app				The app key of the application which owns the extension
-	 * @param string $extension			Extension Type
-	 * @param bool|Group|Member|null $checkAccess		Check access permission for application against supplied member/group (or logged in member, if TRUE) before including extension
-	 * @param string|null $firstApp			If specified, the application with this key will be returned first
-	 * @param string|null $firstExtensionKey	If specified, the extension with this key will be returned first
-	 * @param bool $construct			Should an object be returned? (If false, just the classname will be returned)
+	 * @param	\IPS\Application|string					$app				The app key of the application which owns the extension
+	 * @param	string									$extension			Extension Type
+	 * @param	\IPS\Member|\IPS\Member\Group|bool		$checkAccess		Check access permission for application against supplied member/group (or logged in member, if TRUE) before including extension
+	 * @param	string|NULL								$firstApp			If specified, the application with this key will be returned first
+	 * @param	string|NULL								$firstExtensionKey	If specified, the extension with this key will be returned first
+	 * @param	bool									$construct			Should an object be returned? (If false, just the classname will be returned)
 	 * @return	array
 	 */
-	public static function allExtensions( Application|string $app, string $extension, bool|Group|Member|null $checkAccess=TRUE, string $firstApp=NULL, string $firstExtensionKey=NULL, bool $construct=TRUE ): array
+	public static function allExtensions( $app, $extension, $checkAccess=TRUE, $firstApp=NULL, $firstExtensionKey=NULL, $construct=TRUE )
 	{
-		try
-		{
-			$allExtensions = Store::i()->extensions;
-		}
-		catch( OutOfRangeException )
-		{
-			$allExtensions = [];
-		}
+		$extensions = array();
 
-		/* If we don't have this in the data store, build it */
-		if( !array_key_exists( $extension, $allExtensions ) )
+		/* Get applications */
+		$apps = static::applications();
+
+		if ( $firstApp !== NULL )
 		{
-			$allExtensions[ $extension ] = [];
+			$apps = static::$multitons;
 
-			/* Get applications */
-			$apps = static::applications();
-
-			if ( $firstApp !== NULL )
+			usort( $apps, function( $a, $b ) use ( $firstApp )
 			{
-				$apps = static::$multitons;
-
-				usort( $apps, function( $a, $b ) use ( $firstApp )
+				if ( $a->directory === $firstApp )
 				{
-					if ( $a->directory === $firstApp )
+					return -1;
+				}
+				if ( $b->directory === $firstApp )
+				{
+					return 1;
+				}
+				return 0;
+			} );
+		}
+
+		/* Get extensions */
+		foreach ( $apps as $application )
+		{
+			if ( !static::appIsEnabled( $application->directory ) )
+			{
+				continue;
+			}
+
+			if( $checkAccess !== FALSE )
+			{
+				if( !$application->canAccess( $checkAccess === TRUE ? NULL : $checkAccess ) )
+				{
+					continue;
+				}
+			}
+
+			$_extensions = array();
+
+			foreach ( $application->extensions( $app, $extension, $construct, $checkAccess ) as $key => $class )
+			{
+				$_extensions[ $application->directory . '_' . $key ] = $class;
+			}
+
+			if ( $firstExtensionKey !== NULL AND array_key_exists( $application->directory . '_' . $firstExtensionKey, $_extensions ) )
+			{
+				uksort( $_extensions, function( $a, $b ) use ( $application, $firstExtensionKey )
+				{
+					if ( $a === $application->directory . '_' . $firstExtensionKey )
 					{
 						return -1;
 					}
-					if ( $b->directory === $firstApp )
+					if ( $b === $application->directory . '_' . $firstExtensionKey )
 					{
 						return 1;
 					}
@@ -390,120 +326,22 @@ class Application extends Model
 				} );
 			}
 
-			/* Get extensions */
-			foreach ( $apps as $application )
-			{
-				/* Skip third party apps if recovery mode is enabled */
-				if( RECOVERY_MODE and !in_array( $application->directory, IPS::$ipsApps ) )
-				{
-					continue;
-				}
-
-				if ( !static::appIsEnabled( $application->directory ) )
-				{
-					continue;
-				}
-
-				if( $checkAccess !== FALSE )
-				{
-					if( !$application->canAccess( $checkAccess === TRUE ? NULL : $checkAccess ) )
-					{
-						continue;
-					}
-				}
-
-				$appExtensions = array();
-
-				/* Don't build classes or check access here, we just want the list of classnames. We'll handle the rest later. */
-				foreach ( $application->extensions( $app, $extension, false, false ) as $key => $class )
-				{
-					$appExtensions[ $application->directory . '_' . $key ] = $class;
-				}
-
-				if ( $firstExtensionKey !== NULL AND array_key_exists( $application->directory . '_' . $firstExtensionKey, $appExtensions ) )
-				{
-					uksort( $appExtensions, function( $a, $b ) use ( $application, $firstExtensionKey )
-					{
-						if ( $a === $application->directory . '_' . $firstExtensionKey )
-						{
-							return -1;
-						}
-						if ( $b === $application->directory . '_' . $firstExtensionKey )
-						{
-							return 1;
-						}
-						return 0;
-					} );
-				}
-
-				$allExtensions[ $extension ] = array_merge( $allExtensions[ $extension ], $appExtensions );
-			}
-
-			/* Store for next time */
-			Store::i()->extensions = $allExtensions;
+			$extensions = array_merge( $extensions, $_extensions );
 		}
 
-		/* If we are building, send back new classnames */
-		if( $construct )
-		{
-			$return = [];
-			foreach( $allExtensions[ $extension ] as $key => $classname )
-			{
-				if( $obj = static::constructExtensionClass( $classname, $checkAccess ) )
-				{
-					$return[ $key ] = $obj;
-				}
-			}
-			return $return;
-		}
-
-		return $allExtensions[ $extension ];
-	}
-
-	/**
-	 * Constructs the extension class from the cache
-	 *
-	 * @param string|array $classname
-	 * @param bool|Group|Member|null $checkAccess
-	 * @return mixed
-	 */
-	protected static function constructExtensionClass( string|array $classname, bool|Group|Member|null $checkAccess=true ) : mixed
-	{
-		$classToUse = ( is_array( $classname ) and isset( $classname['generate'] ) ) ? $classname['generate'] : $classname;
-		try
-		{
-			$obj = new $classToUse( $checkAccess === TRUE ? Member::loggedIn() : ( $checkAccess === FALSE ? NULL : $checkAccess ) );
-			if( is_array( $classname ) )
-			{
-				$obj->class = $classname['class'];
-				if ( Dispatcher::hasInstance()  )
-				{
-					$language = Member::loggedIn()->language();
-				}
-				else
-				{
-					$language = Lang::load( Lang::defaultLanguage() );
-				}
-
-				$language->words[ 'ipAddresses__core_Content_' . str_replace( '\\', '_', mb_substr( $classname['class'], 4 ) ) ] = $language->addToStack( ( ( isset( $classname['class']::$archiveTitle ) ) ? $classname['class']::$archiveTitle : $classname['class']::$title ) . '_pl', FALSE );
-			}
-
-			return $obj;
-		}
-		catch( RuntimeException | OutOfRangeException $e ){}
-
-		return null;
+		/* Return */
+		return $extensions;
 	}
 
 	/**
 	 * Retrieve a list of applications that contain a specific type of extension
 	 *
-	 * @param string|Application $app				The app key of the application which owns the extension
-	 * @param string $extension			Extension Type
-	 * @param bool|Member $checkAccess		Check access permission for application against supplied member (or logged in member, if TRUE) before including extension
+	 * @param	\IPS\Application|string		$app				The app key of the application which owns the extension
+	 * @param	string						$extension			Extension Type
+	 * @param	\IPS\Member|bool			$checkAccess		Check access permission for application against supplied member (or logged in member, if TRUE) before including extension
 	 * @return	array
 	 */
-	public static function appsWithExtension( Application|string $app, string $extension, bool|Member $checkAccess=TRUE ): array
+	public static function appsWithExtension( $app, $extension, $checkAccess=TRUE )
 	{
 		$_apps	= array();
 
@@ -521,7 +359,7 @@ class Application extends Model
 					}
 				}
 
-				if( count( $application->extensions( $app, $extension ) ) )
+				if( \count( $application->extensions( $app, $extension ) ) )
 				{
 					$_apps[ $application->directory ] = $application;
 				}
@@ -532,49 +370,14 @@ class Application extends Model
 	}
 
 	/**
-	 * Build a path to an extension class, making sure it's valid first
-	 *
-	 * @param Application|string $app
-	 * @param string $extensionType
-	 * @param string $extensionKey
-	 * @param string $extensionApp
-	 * @return string
-	 * @throws OutOfRangeException
-	 */
-	public static function getExtensionClass( Application|string $app, string $extensionType, string $extensionKey, string $extensionApp='core' ) : string
-	{
-		$app = ( $app instanceof Application ) ? $app->directory : $app;
-		if( !static::appIsEnabled( $app ) )
-		{
-			throw new OutOfRangeException;
-		}
-
-		if( RECOVERY_MODE and !in_array( $app, IPS::$ipsApps ) )
-		{
-			throw new OutOfRangeException;
-		}
-
-		$extensionsJson = static::getRootPath( $app ) . "/applications/{$app}/data/extensions.json";
-		if( file_exists( $extensionsJson ) and $content = json_decode( file_get_contents( $extensionsJson ), true ) )
-		{
-			if( isset( $content[ $extensionApp ][ $extensionType ][ $extensionKey ] ) )
-			{
-				return $content[ $extensionApp ][ $extensionType ][ $extensionKey ];
-			}
-		}
-
-		throw new OutOfRangeException;
-	}
-
-	/**
 	 * Get available version for an application
 	 * Used by the installer/upgrader
 	 *
-	 * @param string $appKey	The application key
-	 * @param bool $human	Return the human-readable version instead
-	 * @return	int|string|null
+	 * @param	string		$appKey	The application key
+	 * @param	bool		$human	Return the human-readable version instead
+	 * @return	int|null
 	 */
-	public static function getAvailableVersion( string $appKey, bool $human = FALSE ): int|string|null
+	public static function getAvailableVersion( $appKey, $human=FALSE )
 	{
 		$versionsJson = static::getRootPath( $appKey ) . "/applications/{$appKey}/data/versions.json";
 
@@ -595,9 +398,9 @@ class Application extends Model
 	/**
 	 * Get all defined versions for an application
 	 *
-	 * @return array|null
+	 * @return	array
 	 */
-	public function getAllVersions(): ?array
+	public function getAllVersions()
 	{
 		if( $this->definedVersions !== NULL )
 		{
@@ -619,16 +422,16 @@ class Application extends Model
 	/**
 	 * Return the human version of an INT long version
 	 *
-	 * @param int $longVersion	Long version (10001)
+	 * @param 	int 	$longVersion	Long version (10001)
 	 * @return	string|false			Long Version (1.1.1 Beta 1)
 	 */
-	public function getHumanVersion( int $longVersion ): bool|string
+	public function getHumanVersion( $longVersion )
 	{
 		$this->getAllVersions();
 
 		if ( isset( $this->definedVersions[ $longVersion ] ) )
 		{
-			return $this->definedVersions[ $longVersion ];
+			return $this->definedVersions[ (int) $longVersion ];
 		}
 
 		return false;
@@ -637,26 +440,27 @@ class Application extends Model
 	/**
 	 * The available version we can upgrade to
 	 *
-	 * @param bool $latestOnly				If TRUE, will return the latest version only
-	 * @param bool $skipSameHumanVersion	If TRUE, will not include any versions with the same "human" version number as the current version
+	 * @param	bool	$latestOnly				If TRUE, will return the latest version only
+	 * @param	bool	$skipSameHumanVersion	If TRUE, will not include any versions with the same "human" version number as the current version
 	 * @return	array
 	 */
-	public function availableUpgrade( bool $latestOnly, bool $skipSameHumanVersion=TRUE ): array
+	public function availableUpgrade( $latestOnly=FALSE, $skipSameHumanVersion=TRUE )
 	{
 		$update = array();
 
 		if( ( $versions = json_decode( $this->update_version, TRUE ) ) AND is_iterable( $versions ) )
 		{
-			if ( is_array( $versions ) and !isset( $versions[0] ) and isset( $versions['longversion'] ) )
+			if ( \is_array( $versions ) and !isset( $versions[0] ) and isset( $versions['longversion'] ) )
 			{
 				$versions = array( $versions );
 			}
 
+			$update = array();
 			foreach ( $versions as $data )
 			{
 				if( !empty( $data['longversion'] ) and $data['longversion'] > $this->long_version and ( !$skipSameHumanVersion or $data['version'] != $this->version ) )
 				{
-					if( $data['released'] AND ( (int) $data['released'] != $data['released'] OR strlen($data['released']) != 10 ) )
+					if( $data['released'] AND ( (int) $data['released'] != $data['released'] OR \strlen($data['released']) != 10 ) )
 					{
 						$data['released']	= strtotime( $data['released'] );
 					}
@@ -679,12 +483,12 @@ class Application extends Model
 	 *
 	 * @return	int|null
 	 */
-	public function newFeature(): ?int
+	public function newFeature()
 	{
 		if( $this->update_version )
 		{
 			$versions = json_decode( $this->update_version, TRUE );
-			if ( is_array( $versions ) and !isset( $versions[0] ) and isset( $versions['longversion'] ) )
+			if ( \is_array( $versions ) and !isset( $versions[0] ) and isset( $versions['longversion'] ) )
 			{
 				$versions = array( $versions );
 			}
@@ -710,9 +514,9 @@ class Application extends Model
 	 *
 	 * @return	bool
 	 */
-	public function missingSecurityPatches(): bool
+	public function missingSecurityPatches()
 	{
-		$updates = $this->availableUpgrade( FALSE );
+		$updates = $this->availableUpgrade();
 		if( !empty( $updates ) )
 		{
 			foreach( $updates as $update )
@@ -730,69 +534,69 @@ class Application extends Model
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_applications';
+	public static $databaseTable = 'core_applications';
 
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'app_';
+	public static $databasePrefix = 'app_';
 
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'directory';
+	public static $databaseColumnId = 'directory';
 
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'app_id' );
+	protected static $databaseIdFields = array( 'app_id' );
 
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 
 	/**
 	 * @brief	[Node] Subnode class
 	 */
-	public static ?string $subnodeClass = 'IPS\Application\Module';
+	public static $subnodeClass = 'IPS\Application\Module';
 
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'applications_and_modules';
+	public static $nodeTitle = 'applications_and_modules';
 
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 
 	/**
 	 * @brief	[Node] ACP Restrictions
 	 */
-	protected static ?array $restrictions = array( 'app' => 'core', 'module' => 'applications', 'prefix' => 'app_' );
+	protected static $restrictions = array( 'app' => 'core', 'module' => 'applications', 'prefix' => 'app_' );
 
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    static
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): static
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
 		/* Load class */
 		if( !file_exists( static::getRootPath( $data['app_directory'] ) . '/applications/' . $data['app_directory'] . '/Application.php' ) )
 		{
 			/* If you are upgrading and you have an application "123flashchat" this causes a PHP error, so just die out now */
-			if( !in_array( mb_strtolower( mb_substr( $data['app_directory'], 0, 1 ) ), range( 'a', 'z' ) ) )
+			if( !\in_array( mb_strtolower( mb_substr( $data['app_directory'], 0, 1 ) ), range( 'a', 'z' ) ) )
 			{
-				throw new UnexpectedValueException( "Missing: " . '/applications/' . $data['app_directory'] . '/Application.php' );
+				throw new \UnexpectedValueException( "Missing: " . '/applications/' . $data['app_directory'] . '/Application.php' );
 			}
 
-			if( !Dispatcher::hasInstance() OR Dispatcher::i()->controllerLocation !== 'setup' )
+			if( !\IPS\Dispatcher::hasInstance() OR \IPS\Dispatcher::i()->controllerLocation !== 'setup' )
 			{
-				throw new UnexpectedValueException( "Missing: " . '/applications/' . $data['app_directory'] . '/Application.php' );
+				throw new \UnexpectedValueException( "Missing: " . '/applications/' . $data['app_directory'] . '/Application.php' );
 			}
 			else
 			{
@@ -821,14 +625,13 @@ EOF;
 		/* Import data */
 		if ( static::$databasePrefix )
 		{
-			$databasePrefixLength = strlen( static::$databasePrefix );
+			$databasePrefixLength = \strlen( static::$databasePrefix );
 		}
-
 		foreach ( $data as $k => $v )
 		{
 			if( static::$databasePrefix )
 			{
-				$k = substr( $k, $databasePrefixLength );
+				$k = \substr( $k, $databasePrefixLength );
 			}
 
 			$obj->_data[ $k ] = $v;
@@ -842,26 +645,26 @@ EOF;
 	/**
 	 * @brief	Modules Store
 	 */
-	protected ?array $modules = NULL;
+	protected $modules = NULL;
 
 	/**
 	 * Get Modules
 	 *
-	 * @param	string|null	$location	Location (e.g. "admin" or "front")
+	 * @see		static::$modules
+	 * @param	string	$location	Location (e.g. "admin" or "front")
 	 * @return	array
-	 *@see		static::$modules
 	 */
-	public function modules( string $location=NULL ): array
+	public function modules( $location=NULL )
 	{
 		/* Don't have an instance? */
 		if( $this->modules === NULL )
 		{
-			$modules = Module::modules();
+			$modules = \IPS\Application\Module::modules();
 			$this->modules = array_key_exists( $this->directory, $modules ) ? $modules[ $this->directory ] : array();
 		}
 
 		/* Return */
-		return $this->modules[$location] ?? array();
+		return isset( $this->modules[ $location ] ) ? $this->modules[ $location ] : array();
 	}
 
 	/**
@@ -869,7 +672,7 @@ EOF;
 	 *
 	 * @return array
 	 */
-	public function acpMenu(): array
+	public function acpMenu()
 	{
 		return json_decode( file_get_contents( $this->getApplicationPath() . "/data/acpmenu.json" ), TRUE );
 	}
@@ -877,142 +680,58 @@ EOF;
 	/**
 	 * ACP Menu Numbers
 	 *
-	 * @param string $queryString	Query String
+	 * @param	array	$queryString	Query String
 	 * @return	int
 	 */
-	public function acpMenuNumber( string $queryString ): int
+	public function acpMenuNumber( $queryString )
 	{
 		return 0;
 	}
 
 	/**
-	 * Which items should always be first in the ACP menu?
-	 * Example:  [ [ 'stats' => 'core_keystats' ] ]
- 	 * @return array
-	 */
-	public function acpMenuItemsAlwayFirst(): array
-	{
-		return [];
-	}
-
-	/**
 	 * Get Extensions
 	 *
-	 * @param string|Application $app		    The app key of the application which owns the extension
-	 * @param string $extension	    Extension Type
-	 * @param bool $construct	    Should an object be returned? (If false, just the classname will be returned)
-	 * @param bool|Group|Member|null $checkAccess	Check access permission for extension against supplied member/group (or logged in member, if TRUE)
+	 * @param	\IPS\Application|string					$app		    The app key of the application which owns the extension
+	 * @param	string									$extension	    Extension Type
+	 * @param	bool									$construct	    Should an object be returned? (If false, just the classname will be returned)
+	 * @param	\IPS\Member|\IPS\Member\Group|bool		$checkAccess	Check access permission for extension against supplied member/group (or logged in member, if TRUE)
 	 * @return	array
 	 */
-	public function extensions( Application|string $app, string $extension, bool $construct=TRUE, bool|Group|Member|null $checkAccess = FALSE ): array
+	public function extensions( $app, $extension, $construct=TRUE, $checkAccess=FALSE )
 	{
-		if( !isset( static::$_loadedExtensions[ $this->directory ][ $extension ] ) )
+		$app = ( \is_string( $app ) ? $app : $app->directory );
+
+		$classes = array();
+		$jsonFile = $this->getApplicationPath() . "/data/extensions.json";
+
+		/* New extensions.json based approach */
+		if ( file_exists( $jsonFile ) and $json = @json_decode( \file_get_contents( $jsonFile ), TRUE ) )
 		{
-			$app = ( is_string( $app ) ? $app : $app->directory );
-			$classes = array();
-			$jsonFile = $this->getApplicationPath() . "/data/extensions.json";
-
-			/* New extensions.json based approach */
-			if ( file_exists( $jsonFile ) and $json = @json_decode( file_get_contents( $jsonFile ), TRUE ) )
+			if ( isset( $json[ $app ] ) and isset( $json[ $app ][ $extension ] ) )
 			{
-				if ( isset( $json[ $app ] ) and isset( $json[ $app ][ $extension ] ) )
+				foreach ( $json[ $app ][ $extension ] as $name => $classname )
 				{
-					foreach ( $json[ $app ][ $extension ] as $name => $classname )
+					if ( method_exists( $classname, 'generate' ) )
 					{
-						if( !class_exists( $classname ) )
-						{
-							/* Switching between branches confuses extensions */
-							continue;
-						}
-
-						if ( method_exists( $classname, 'generate' ) )
-						{
-							$generated = $classname::generate();
-							//$classes = array_merge( $classes, $generated );
-							foreach( $generated as $k => $v )
-							{
-								$classes[ $k ] = [
-									'generate' => $v::class,
-									'class' => $v->class
-								];
-							}
-						}
-						else
-						{
-							$classes[ $name ] = $classname;
-						}
+						$classes = array_merge( $classes, $classname::generate() );
 					}
-				}
-			}
-
-			if( !array_key_exists( $app, static::$_loadedExtensions ) )
-			{
-				static::$_loadedExtensions[ $this->directory ] = [];
-			}
-
-			static::$_loadedExtensions[ $this->directory ][ $extension ] = $classes;
-		}
-
-		if( $construct )
-		{
-			$return = [];
-			foreach( static::$_loadedExtensions[ $this->directory ][ $extension ] as $name => $classname )
-			{
-				if( $obj = static::constructExtensionClass( $classname, $checkAccess ) )
-				{
-					$return[ $name ] = $obj;
-				}
-			}
-			return $return;
-		}
-
-		return static::$_loadedExtensions[ $this->directory ][ $extension ];
-	}
-
-	/**
-	 * Get All listeners for this application
-	 *
-	 * @return	array
-	 */
-	public function listeners(): array
-	{
-		$listeners = array();
-		$jsonFile = $this->getApplicationPath() . "/data/listeners.json";
-		$directory = $this->getApplicationPath() . "/listeners";
-
-		if ( file_exists( $jsonFile ) and $json = @json_decode( file_get_contents( $jsonFile ), TRUE ) )
-		{
-			foreach( $json as $filename => $data )
-			{
-				if( file_exists( $directory . '/' . $filename . '.php' ) )
-				{
-					if( class_exists( $data['classname'] ) )
+					elseif ( !$construct )
 					{
-						$listeners[] = $data['classname'];
+						$classes[ $name ] = $classname;
+					}
+					else
+					{
+						try
+						{
+							$classes[ $name ] = new $classname( $checkAccess === TRUE ? \IPS\Member::loggedIn() : ( $checkAccess === FALSE ? NULL : $checkAccess ) );
+						}
+						catch( \RuntimeException | \OutOfRangeException $e ){}
 					}
 				}
 			}
 		}
 
-		return $listeners;
-	}
-
-	/**
-	 * Get all listeners for all applications
-	 *
-	 * @return array
-	 */
-	public static function allListeners() : array
-	{
-		$listeners = array();
-		foreach( static::applications() as $app )
-		{
-			if( static::appIsEnabled( $app->directory ) )
-			{
-				$listeners = array_merge( $listeners, $app->listeners() );
-			}
-		}
-		return $listeners;
+		return $classes;
 	}
 
 	/**
@@ -1020,28 +739,18 @@ EOF;
 	 *
 	 * @return	string
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		$key = "__app_{$this->directory}";
-		return Member::loggedIn()->language()->addToStack( $key );
-	}
-
-	/**
-	 * Public applicaiton description
-	 *
-	 * @return string
-	 */
-	protected function get_description (): string
-	{
-		return  Member::loggedIn()->language()->checkKeyExists( '__app_' . $this->directory . '_description') ? Member::loggedIn()->language()->addToStack('__app_' . $this->directory . '_description') : '';
+		return \IPS\Member::loggedIn()->language()->addToStack( $key );
 	}
 
 	/**
 	 * [Node] Get Node Icon
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	protected function get__icon(): string
+	protected function get__icon()
 	{
 		return 'cubes';
 	}
@@ -1049,13 +758,13 @@ EOF;
 	/**
 	 * [Node] Does this node have children?
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param bool $subnodes			Include subnodes?
-	 * @param array $_where				Additional WHERE clause
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	bool				$subnodes			Include subnodes?
+	 * @param	array				$_where				Additional WHERE clause
 	 * @return	bool
 	 */
-	public function hasChildren( ?string $permissionCheck='view', Member $member=NULL, bool $subnodes=TRUE, array $_where=array() ): bool
+	public function hasChildren( $permissionCheck='view', $member=NULL, $subnodes=TRUE, $_where=array() )
 	{
 		return $subnodes;
 	}
@@ -1063,17 +772,11 @@ EOF;
 	/**
 	 * [Node] Does the currently logged in user have permission to delete this node?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canDelete(): bool
+	public function canDelete()
 	{
-		/* First-party apps cannot be deleted */
-		if( in_array( $this->directory, IPS::$ipsApps ) )
-		{
-			return FALSE;
-		}
-
-		if( NO_WRITES or !static::restrictionCheck( 'delete' ) )
+		if( \IPS\NO_WRITES or !static::restrictionCheck( 'delete' ) )
 		{
 			return FALSE;
 		}
@@ -1091,18 +794,18 @@ EOF;
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 
 	/**
 	 * Get URL
 	 *
-	 * @return    Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function url(): Url|string|null
+	public function url()
 	{
 		if( $this->_url === NULL )
 		{
-			$this->_url = Url::internal( "app={$this->directory}" );
+			$this->_url = \IPS\Http\Url::internal( "app={$this->directory}" );
 		}
 
 		return $this->_url;
@@ -1113,30 +816,30 @@ EOF;
 	 * Example code explains return value
 	 *
 	 * @code
-	 	* array(
-	 		* array(
-	 			* 'icon'	=>	array(
-	 				* 'icon.png'			// Path to icon
-	 				* 'core'				// Application icon belongs to
-	 			* ),
-	 			* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	 			* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	 			* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	 		* ),
-	 		* ...							// Additional buttons
-	 	* );
+	 	array(
+	 		array(
+	 			'icon'	=>	array(
+	 				'icon.png'			// Path to icon
+	 				'core'				// Application icon belongs to
+	 			),
+	 			'title'	=> 'foo',		// Language key to use for button's title parameter
+	 			'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	 			'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	 		),
+	 		...							// Additional buttons
+	 	);
 	 * @endcode
-	 * @param Url $url Base URL
+	 * @param	string	$url	Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		/* Get normal buttons */
 		$buttons	= parent::getButtons( $url );
 		$edit = NULL;
 		$uninstall = NULL;
-		if( IN_DEV and isset( $buttons['edit'] ) )
+		if( \IPS\IN_DEV and isset( $buttons['edit'] ) )
 		{
 			$edit = $buttons['edit'];
 		}
@@ -1145,19 +848,19 @@ EOF;
 		if( isset( $buttons['delete'] ) )
 		{
 			$buttons['delete']['title']	= 'uninstall';
-			$buttons['delete']['data']	= array( 'delete' => '', 'delete-warning' => Member::loggedIn()->language()->addToStack( IN_DEV ? 'app_files_indev_uninstall' : 'app_files_delete_uninstall') );
+			$buttons['delete']['data']	= array( 'delete' => '', 'delete-warning' => \IPS\Member::loggedIn()->language()->addToStack( \IPS\IN_DEV ? 'app_files_indev_uninstall' : 'app_files_delete_uninstall') );
 
 			$uninstall = $buttons['delete'];
 			unset( $buttons['delete'] );
 		}
 
 		/* Default */
-		if( $this->enabled AND count( $this->modules( 'front' ) ) )
+		if( $this->enabled AND \count( $this->modules( 'front' ) ) )
 		{
 			$buttons['default']	= array(
-				'icon'		=> $this->default ? 'star' : 'regular fa-star',
+				'icon'		=> $this->default ? 'star' : 'star-o',
 				'title'		=> 'make_default_app',
-				'link'		=> Url::internal( "app=core&module=applications&controller=applications&appKey={$this->_id}&do=setAsDefault" )->csrf(),
+				'link'		=> \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&appKey={$this->_id}&do=setAsDefault" )->csrf(),
 			);
 		}
 
@@ -1167,8 +870,8 @@ EOF;
 			$buttons['offline']	= array(
 				'icon'	=> 'lock',
 				'title'	=> 'permissions',
-				'link'	=> Url::internal( "app=core&module=applications&controller=applications&id={$this->_id}&do=permissions" ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-forceReload' => 'true', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('permissions') )
+				'link'	=> \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&id={$this->_id}&do=permissions" ),
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-forceReload' => 'true', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('permissions') )
 			);
 		}
 
@@ -1176,18 +879,18 @@ EOF;
 		$buttons['details']	= array(
 			'icon'	=> 'search',
 			'title'	=> 'app_view_details',
-			'link'	=> Url::internal( "app=core&module=applications&controller=applications&do=details&id={$this->_id}" ),
-			'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('app_view_details') )
+			'link'	=> \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&do=details&id={$this->_id}" ),
+			'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('app_view_details') )
 		);
 
 		/* Upgrade */
-		if( !$this->protected AND !DEMO_MODE AND IPS::canManageResources() AND IPS::checkThirdParty() )
+		if( !$this->protected AND !\IPS\DEMO_MODE AND \IPS\IPS::canManageResources() )
 		{
 			$buttons['upgrade']	= array(
 				'icon'	=> 'upload',
 				'title'	=> 'upload_new_version',
-				'link'	=> Url::internal( "app=core&module=applications&controller=applications&appKey={$this->_id}&do=upload" ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('upload_new_version') )
+				'link'	=> \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&appKey={$this->_id}&do=upload" ),
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('upload_new_version') )
 			);
 		}
 
@@ -1199,7 +902,7 @@ EOF;
 
 			if ( $this->default )
 			{
-				$buttons['delete']['data'] = array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('uninstall') );
+				$buttons['delete']['data'] = array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('uninstall') );
 			}
 
 			if ( !isset( $buttons['delete']['data'] ) )
@@ -1210,37 +913,37 @@ EOF;
 		}
 
 		/* Developer */
-		if(IN_DEV)
+		if( \IPS\IN_DEV )
 		{
 			if ( $edit )
 			{
 				$buttons['edit'] = $edit;
 			}
 
-			$buttons['compilejs'] = array(
-				'icon'	=> 'cog',
-				'title'	=> 'app_compile_js',
-				'link'	=> Url::internal( "app=core&module=applications&controller=applications&appKey={$this->_id}&do=compilejs" )->csrf()
-			);
+            $buttons['compilejs'] = array(
+                'icon'	=> 'cog',
+                'title'	=> 'app_compile_js',
+                'link'	=> \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&appKey={$this->_id}&do=compilejs" )->csrf()
+            );
 
-			$buttons['build'] = array(
-				'icon' => 'cog',
-				'title' => 'app_build',
-				'link' => Url::internal("app=core&module=applications&controller=applications&appKey={$this->_id}&do=build"),
-				'data' => array('ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('app_build'), 'ipsDialog-size' => 'wide', 'ipsDialog-destructOnClose' => true)
-			);
+            $buttons['build'] = array(
+                'icon' => 'cog',
+                'title' => 'app_build',
+                'link' => \IPS\Http\Url::internal("app=core&module=applications&controller=applications&appKey={$this->_id}&do=build"),
+                'data' => array('ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('app_build'))
+            );
 
-			$buttons['export'] = array(
-				'icon' => 'download',
-				'title' => 'download',
-				'link' => Url::internal("app=core&module=applications&controller=applications&appKey={$this->_id}&do=download"),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('download'), 'ipsDialog-size' => 'wide', 'ipsDialog-destructOnClose' => true )
-			);
+            $buttons['export'] = array(
+                'icon' => 'download',
+                'title' => 'download',
+                'link' => \IPS\Http\Url::internal("app=core&module=applications&controller=applications&appKey={$this->_id}&do=download"),
+                'data' => array('ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('download'), 'ipsDialog-remoteVerify' => 'false')
+            );
 
 			$buttons['developer']	= array(
 				'icon'	=> 'cogs',
 				'title'	=> 'developer_mode',
-				'link'	=> Url::internal( "app=core&module=developer&appKey={$this->_id}" ),
+				'link'	=> \IPS\Http\Url::internal( "app=core&module=applications&controller=developer&appKey={$this->_id}" ),
 			);
 		}
 
@@ -1262,49 +965,49 @@ EOF;
 	 * @note	Return value NULL indicates the node cannot be enabled/disabled
 	 * @return	bool|null
 	 */
-	protected function get__enabled(): ?bool
+	protected function get__enabled()
 	{
 		if ( $this->directory == 'core' )
 		{
 			return TRUE;
 		}
 
-		return $this->enabled and ( !in_array( $this->directory, IPS::$ipsApps ) or $this->version == Application::load('core')->version );
+		return $this->enabled and ( !\in_array( $this->directory, \IPS\IPS::$ipsApps ) or $this->version == \IPS\Application::load('core')->version );
 	}
 
 	/**
 	 * [Node] Set whether or not this node is enabled
 	 *
-	 * @param bool|int $enabled	Whether to set it enabled or disabled
+	 * @param	bool|int	$enabled	Whether to set it enabled or disabled
 	 * @return	void
 	 */
-	protected function set__enabled( bool|int $enabled ) : void
+	protected function set__enabled( $enabled )
 	{
-		if (NO_WRITES)
+		if ( \IPS\NO_WRITES )
 	    {
-			throw new RuntimeException;
+			throw new \RuntimeException;
 	    }
 
 		$this->enabled = $enabled;
 		$this->save();
-
-		/* Clear caches so that FURLs, etc will be picked up */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Plugin\Hook::writeDataFile();
 
         /* Clear templates to rebuild automatically */
-        Theme::deleteCompiledTemplate();
+        \IPS\Theme::deleteCompiledTemplate();
+
+		/* Invalidate disk templates */
+		\IPS\Theme::resetAllCacheKeys();
 
 		/* Enable queue task in case there are pending items */
 		if( $this->enabled )
 		{
-			$queueTask = Task::load( 'queue', 'key' );
+			$queueTask = \IPS\Task::load( 'queue', 'key' );
 			$queueTask->enabled = TRUE;
 			$queueTask->save();
 		}
 
 		/* Update other app specific task statuses */
-		Db::i()->update( 'core_tasks', array( 'enabled' => (int) $this->enabled ), array( 'app=?', $this->directory ) );
+		\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => (int) $this->enabled ), array( 'app=?', $this->directory ) );
 	}
 
 	/**
@@ -1313,14 +1016,14 @@ EOF;
 	 * @note	Return value NULL indicates the node cannot be enabled/disabled
 	 * @return	bool|null
 	 */
-	protected function get__locked(): ?bool
+	protected function get__locked()
 	{
 		if ( $this->directory == 'core' )
 		{
 			return TRUE;
 		}
 
-		if ( !$this->_enabled and in_array( $this->directory, IPS::$ipsApps ) and $this->version != Application::load('core')->version )
+		if ( !$this->_enabled and \in_array( $this->directory, \IPS\IPS::$ipsApps ) and $this->version != \IPS\Application::load('core')->version )
 		{
 			return TRUE;
 		}
@@ -1336,9 +1039,9 @@ EOF;
 	/**
 	 * [Node] Lang string for the tooltip when this is locked
 	 *
-	 * @return string|null
+	 * @return string
 	 */
-	protected function get__lockedLang(): ?string
+	protected function get__lockedLang()
 	{
 		return $this->requires_manual_intervention ? 'invalid_php8_customization' : null;
 	}
@@ -1348,26 +1051,20 @@ EOF;
 	 *
 	 * @return	string|null
 	 */
-	protected function get__description(): ?string
+	protected function get__description()
 	{
-		/* Don't do this at all if we have no data */
-		if( $this->_disabledMessage OR ( !in_array( $this->directory, IPS::$ipsApps )  AND ( $this->author != '' OR $this->website != '' ) ) )
-		{
-			return Theme::i()->getTemplate( 'applications', 'core' )->appRowDescription( $this );
-		}
-
-		return null;
+		return \IPS\Theme::i()->getTemplate( 'applications', 'core' )->appRowDescription( $this );
 	}
 
 	/**
 	 * Get the Application State Description ( Offline , Offline for specific groups or all )
-	 * @return string|null
+	 * @return mixed
 	 */
-	public function get__disabledMessage(): ?string
+	public function get__disabledMessage()
 	{
-		if ( $this->_locked and $this->directory != 'core' AND in_array( $this->directory, IPS::$ipsApps ) )
+		if ( $this->_locked and $this->directory != 'core' AND \in_array( $this->directory, \IPS\IPS::$ipsApps ) )
 		{
-			return Member::loggedIn()->language()->addToStack('app_force_disabled');
+			return \IPS\Member::loggedIn()->language()->addToStack('app_force_disabled');
 		}
 		elseif ( $this->disabled_groups )
 		{
@@ -1378,35 +1075,33 @@ EOF;
 				{
 					try
 					{
-						$groups[] = Group::load( $groupId )->name;
+						$groups[] = \IPS\Member\Group::load( $groupId )->name;
 					}
-					catch ( OutOfRangeException $e ) { }
+					catch ( \OutOfRangeException $e ) { }
 				}
 			}
 
 			if ( empty( $groups ) )
 			{
-				return Member::loggedIn()->language()->addToStack('app_offline_to_all');
+				return \IPS\Member::loggedIn()->language()->addToStack('app_offline_to_all');
 			}
 			else
 			{
-				return Member::loggedIn()->language()->addToStack( 'app_offline_to_groups', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( $groups ) ) ) );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'app_offline_to_groups', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $groups ) ) ) );
 			}
 		}
-
-		return NULL;
 	}
 
 	/**
 	 * Get the authors website
 	 *
-	 * @return Url|null
+	 * @return \IPS\Http\Url|null
 	 */
-	public function website(): ?Url
+	public function website()
 	{
 		if ( $this->_data['website'] )
 		{
-			return Url::createFromString( $this->_data['website'] );
+			return \IPS\Http\Url::createFromString( $this->_data['website'] );
 		}
 		return NULL;
 	}
@@ -1416,19 +1111,19 @@ EOF;
 	 *
 	 * @return	NULL|array		Null for no badge, or an array of badge data (0 => CSS class type, 1 => language string, 2 => optional raw HTML to show instead of language string)
 	 */
-	public function get__badge(): ?array
+	public function get__badge()
 	{
-		if ( CIC AND IPS::isManaged() AND in_array( $this->directory, IPS::$ipsApps ) )
+		if ( \IPS\CIC AND \IPS\IPS::isManaged() AND \in_array( $this->directory, \IPS\IPS::$ipsApps ) )
 		{
 			return NULL;
 		}
 
-		if ( $availableUpgrade = $this->availableUpgrade(TRUE) )
+		if ( $availableUpgrade = $this->availableUpgrade( TRUE ) )
 		{
 			return array(
 				0	=> 'new',
 				1	=> '',
-				2	=> Theme::i()->getTemplate( 'global', 'core' )->updatebadge( $availableUpgrade['version'], $availableUpgrade['updateurl'] ?? '', DateTime::ts( $availableUpgrade['released'] )->localeDate() )
+				2	=> \IPS\Theme::i()->getTemplate( 'global', 'core' )->updatebadge( $availableUpgrade['version'], isset( $availableUpgrade['updateurl'] ) ? $availableUpgrade['updateurl'] : '', (string) \IPS\DateTime::ts( $availableUpgrade['released'] )->localeDate() )
 			);
 		}
 
@@ -1441,7 +1136,7 @@ EOF;
 	 * @return	bool
 	 * @note	Modules are added via the developer center and should not be added by a regular admin via the standard node controller
 	 */
-	public function canAdd(): bool
+	public function canAdd()
 	{
 		return false;
 	}
@@ -1452,9 +1147,9 @@ EOF;
 	 * @return	bool
 	 * @note	If IN_DEV is on, the admin can create a new application
 	 */
-	public static function canAddRoot(): bool
+	public static function canAddRoot()
 	{
-		return IN_DEV;
+		return ( \IPS\IN_DEV ) ? true : false;
 	}
 
 	/**
@@ -1463,7 +1158,7 @@ EOF;
 	 * @return	bool
 	 * @note	We don't allow permissions to be set for applications - they are handled by modules and by the enabled/disabled mode
 	 */
-	public function canManagePermissions(): bool
+	public function canManagePermissions()
 	{
 		return false;
 	}
@@ -1471,88 +1166,87 @@ EOF;
 	/**
 	 * Add or edit an application
 	 *
-	 * @param Form $form	Form object we can add our fields to
+	 * @param	\IPS\Helpers\Form	$form	Form object we can add our fields to
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		if ( !$this->directory )
 		{
-			$form->add( new Text( 'app_title', NULL, FALSE, array( 'app' => 'core', 'key' => ( !$this->directory ) ? NULL : "__app_{$this->directory}" ) ) );
-			$form->add( new Helpers\Form\Text( 'app_description', $this->description, TRUE ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'app_title', NULL, FALSE, array( 'app' => 'core', 'key' => ( !$this->directory ) ? NULL : "__app_{$this->directory}" ) ) );
 		}
-		$form->add( new Text( 'app_directory', $this->directory, TRUE, array( 'disabled' => (bool)$this->id, 'regex' => '/^[a-zA-Z][a-zA-Z0-9]+$/', 'maxLength' => 80 ) ) );
-		$form->add( new Text( 'app_author', $this->author ) );
-		$form->add( new Helpers\Form\Url( 'app_website', $this->website ) );
-		$form->add( new Helpers\Form\Url( 'app_update_check', $this->update_check ) );
-		$form->add( new YesNo( 'app_protected', $this->protected, FALSE ) );
-		$form->add( new YesNo( 'app_hide_tab', !$this->hide_tab, FALSE ) );
+
+		$form->add( new \IPS\Helpers\Form\Text( 'app_directory', $this->directory, TRUE, array( 'disabled' => $this->id ? TRUE : FALSE, 'regex' => '/^[a-zA-Z][a-zA-Z0-9]+$/', 'maxLength' => 80 ) ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'app_author', $this->author ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'app_website', $this->website ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'app_update_check', $this->update_check ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'app_protected', $this->protected, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'app_hide_tab', !$this->hide_tab, FALSE ) );
 	}
 
 	/**
 	 * [Node] Format form values from add/edit form for save
 	 *
-	 * @param array $values	Values from the form
+	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		/* New application stuff */
 		if ( !$this->id )
 		{
 			/* Check dir is writable */
-			if( !is_writable( ROOT_PATH . '/applications/' ) )
+			if( !is_writable( \IPS\ROOT_PATH . '/applications/' ) )
 			{
-				Output::i()->error( 'app_dir_not_write', '4S134/2', 403, '' );
+				\IPS\Output::i()->error( 'app_dir_not_write', '4S134/2', 403, '' );
 			}
 
 			/* Check key isn't in use */
 			$values['app_directory'] = mb_strtolower( $values['app_directory'] );
 			try
 			{
-				$test = Application::load( $values['app_directory'] );
-				Output::i()->error( 'app_error_key_used', '1S134/1', 403, '' );
+				$test = \IPS\Application::load( $values['app_directory'] );
+				\IPS\Output::i()->error( 'app_error_key_used', '1S134/1', 403, '' );
 			}
-			catch ( OutOfRangeException $e ) { }
-
-            /* Make sure we encode any quotes, etc. in the description */
-            $values['app_description'] = str_replace( '"', "\\\"", $values['app_description'] );
+			catch ( \OutOfRangeException $e ) { }
 
 			/* Attempt to create the basic directory structure for the developer */
-			if( is_writable( ROOT_PATH . '/applications/' ) )
+			if( is_writable( \IPS\ROOT_PATH . '/applications/' ) )
 			{
 				/* If we can make the root dir, we can create the subfolders */
-				if( @mkdir( ROOT_PATH . '/applications/' . $values['app_directory'] ) )
+				if( @mkdir( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] ) )
 				{
-					@chmod( ROOT_PATH . '/applications/' . $values['app_directory'], FOLDER_PERMISSION_NO_WRITE);
+					@chmod( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'], \IPS\FOLDER_PERMISSION_NO_WRITE );
 
 					/* Create directories */
-					foreach ( array( 'data', 'dev', 'dev/css', 'dev/editor', 'dev/email', 'dev/html', 'dev/resources', 'dev/js', 'extensions', 'extensions/core', 'interface', 'listeners', 'modules', 'modules/admin', 'modules/front', 'setup', '/setup/upg_working', 'sources', 'tasks' ) as $f )
+					foreach ( array( 'data', 'dev', 'dev/css', 'dev/email', 'dev/html', 'dev/resources', 'dev/js', 'extensions', 'extensions/core', 'hooks', 'interface', 'modules', 'modules/admin', 'modules/front', 'setup', '/setup/upg_working', 'sources', 'tasks' ) as $f )
 					{
-						@mkdir( ROOT_PATH . '/applications/' . $values['app_directory'] . '/' . $f );
-						@chmod( ROOT_PATH . '/applications/' . $values['app_directory'] . '/' . $f, FOLDER_PERMISSION_NO_WRITE);
-						file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/' . $f . '/index.html', '' );
+						@mkdir( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/' . $f );
+						@chmod( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/' . $f, \IPS\FOLDER_PERMISSION_NO_WRITE );
+						\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/' . $f . '/index.html', '' );
 					}
 
 					/* Create files */
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/schema.json', '[]' );
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/settings.json', '[]' );
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/tasks.json', '[]' );
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/acpmenu.json', '[]' );
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/modules.json', '[]' );
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/widgets.json', '[]' );
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/acpsearch.json', '{}' );
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/versions.json', json_encode( array() ) );
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/dev/lang.php', '<?' . "php\n\n\$lang = array(\n\t'__app_{$values['app_directory']}'\t=> \"{$values['app_title']}\",\n\t'__app_{$values['app_directory']}_description'\t=> \"{$values['app_description']}\"\n);\n" );
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/dev/jslang.php', '<?' . "php\n\n\$lang = array(\n\n);\n" );
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/Application.php', str_replace(
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/schema.json', '[]' );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/settings.json', '[]' );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/tasks.json', '[]' );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/themesettings.json', '[]' );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/acpmenu.json', '[]' );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/modules.json', '[]' );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/widgets.json', '[]' );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/acpsearch.json', '{}' );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/hooks.json', '[]' );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/versions.json', json_encode( array() ) );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/dev/lang.php', '<?' . "php\n\n\$lang = array(\n\t'__app_{$values['app_directory']}'\t=> \"{$values['app_title']}\"\n);\n" );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/dev/jslang.php', '<?' . "php\n\n\$lang = array(\n\n);\n" );
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/Application.php', str_replace(
 						array(
 							'{app}',
 							'{website}',
 							'{author}',
 							'{year}',
 							'{subpackage}',
-							'{date}',
+							'{date}'
 						),
 						array(
 							$values['app_directory'],
@@ -1562,18 +1256,17 @@ EOF;
 							$values['app_title'],
 							date( 'd M Y' ),
 						),
-						file_get_contents( ROOT_PATH . "/applications/core/data/defaults/Application.txt" ),
+						file_get_contents( \IPS\ROOT_PATH . "/applications/core/data/defaults/Application.txt" )
 					) );
 
-					@file_put_contents( ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/application.json', json_encode( array(
+					@\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $values['app_directory'] . '/data/application.json', json_encode( array(
 						'application_title'	=> $values['app_title'],
 						'app_author'		=> $values['app_author'],
 						'app_directory'		=> $values['app_directory'],
 						'app_protected'		=> $values['app_protected'],
 						'app_website'		=> $values['app_website'],
 						'app_update_check'	=> $values['app_update_check'],
-						'app_hide_tab'		=> $values['app_hide_tab'],
-						'app_description' => $values['app_description'],
+						'app_hide_tab'		=> $values['app_hide_tab']
 					) ) );
 				}
 			}
@@ -1590,33 +1283,30 @@ EOF;
 			unset( $values['app_title'] );
 		}
 
-		if( isset( $values['app_description'] ) )
-		{
-			unset( $values['app_description'] );
-		}
-
 		return $values;
 	}
 
 	/**
 	 * [Node] Perform actions after saving the form
 	 *
-	 * @param array $values	Values from the form
+	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
-		unset( Store::i()->applications );
-		Settings::i()->clearCache();
+		/* Clear out member's cached "Create Menu" contents */
+		\IPS\Member::clearCreateMenu();
+		unset( \IPS\Data\Store::i()->applications );
+		\IPS\Settings::i()->clearCache();
 	}
 
 	/**
 	 * Install database changes from the schema.json file
 	 *
-	 * @param bool $skipInserts	Skip inserts
-	 * @throws PHPException
+	 * @param	bool	$skipInserts	Skip inserts
+	 * @throws \Exception
 	 */
-	public function installDatabaseSchema( bool $skipInserts=FALSE ) : void
+	public function installDatabaseSchema( $skipInserts=FALSE )
 	{
 		if( file_exists( $this->getApplicationPath() . "/data/schema.json" ) )
 		{
@@ -1625,24 +1315,24 @@ EOF;
 			foreach( $schema as $table => $definition )
 			{
 				/* Look for missing tables first */
-				if( !Db::i()->checkForTable( $table ) )
+				if( !\IPS\Db::i()->checkForTable( $table ) )
 				{
-					Db::i()->createTable( $definition );
+					\IPS\Db::i()->createTable( $definition );
 				}
 				else
 				{
 					/* If the table exists, look for missing columns */
-					if( is_array( $definition['columns'] ) AND count( $definition['columns'] ) )
+					if( \is_array( $definition['columns'] ) AND \count( $definition['columns'] ) )
 					{
 						/* Get the table definition first */
-						$tableDefinition = Db::i()->getTableDefinition( $table );
+						$tableDefinition = \IPS\Db::i()->getTableDefinition( $table );
 
 						foreach( $definition['columns'] as $column )
 						{
 							/* Column does not exist in the table definition?  Add it then. */
 							if( empty($tableDefinition['columns'][ $column['name'] ]) )
 							{
-								Db::i()->addColumn( $table, $column );
+								\IPS\Db::i()->addColumn( $table, $column );
 							}
 						}
 					}
@@ -1652,11 +1342,11 @@ EOF;
 				{
 					foreach ( $definition['inserts'] as $insertData )
 					{
-						$adminName = Member::loggedIn()->name;
+						$adminName = \IPS\Member::loggedIn()->name;
 						try
 						{
-							Db::i()->insert( $definition['name'], array_map( function($column ) use( $adminName ) {
-	                              if( !is_string( $column ) )
+							\IPS\Db::i()->insert( $definition['name'], array_map( function( $column ) use( $adminName ) {
+	                              if( !\is_string( $column ) )
 	                              {
 	                                  return $column;
 	                              }
@@ -1667,7 +1357,7 @@ EOF;
 	                              return $column;
 	                          }, $insertData ) );
 						}
-						catch( Exception $e )
+						catch( \IPS\Db\Exception $e )
 						{}
 					}
 				}
@@ -1685,21 +1375,21 @@ EOF;
 				if ( $instruction['method'] === 'addColumn' )
 				{
 					/* Check to see if it exists first */
-					$tableDefinition = Db::i()->getTableDefinition( $instruction['params'][0] );
+					$tableDefinition = \IPS\Db::i()->getTableDefinition( $instruction['params'][0] );
 
 					if ( ! empty( $tableDefinition['columns'][ $instruction['params'][1]['name'] ] ) )
 					{
 						/* Run an alter instead */
-						Db::i()->changeColumn( $instruction['params'][0], $instruction['params'][1]['name'], $instruction['params'][1] );
+						\IPS\Db::i()->changeColumn( $instruction['params'][0], $instruction['params'][1]['name'], $instruction['params'][1] );
 						continue;
 					}
 				}
 
 				try
 				{
-					if( isset( $instruction['params'][1] ) and is_array( $instruction['params'][1] ) )
+					if( isset( $instruction['params'][1] ) and \is_array( $instruction['params'][1] ) )
 					{
-						$groups	= array_filter( iterator_to_array( Db::i()->select( 'g_id', 'core_groups' ) ), function($groupId ) {
+						$groups	= array_filter( iterator_to_array( \IPS\Db::i()->select( 'g_id', 'core_groups' ) ), function( $groupId ) {
 							if( $groupId == 2 )
 							{
 								return FALSE;
@@ -1719,9 +1409,9 @@ EOF;
 
 					$method = $instruction['method'];
 					$params = $instruction['params'];
-					Db::i()->$method( ...$params );
+					\IPS\Db::i()->$method( ...$params );
 				}
-				catch( PHPException $e )
+				catch( \Exception $e )
 				{
 					if( $instruction['method'] == 'insert' )
 					{
@@ -1737,10 +1427,10 @@ EOF;
 	/**
 	 * Install database changes from an upgrade schema file
 	 *
-	 * @param int $version		Version to execute database updates from
-	 * @param int $lastJsonIndex	JSON index to begin from
-	 * @param int $limit			Limit updates
-	 * @param bool $return			Check table size first and return queries for larger tables instead of running automatically
+	 * @param	int		$version		Version to execute database updates from
+	 * @param	int		$lastJsonIndex	JSON index to begin from
+	 * @param	int		$limit			Limit updates
+	 * @param	bool	$return			Check table size first and return queries for larger tables instead of running automatically
 	 * @return	array					Returns an array: ( count: count of queries run, queriesToRun: array of queries to run)
 	 * @note	We ignore some database errors that shouldn't prevent us from continuing.
 	 * @li	1007: Can't create database because it already exists
@@ -1752,7 +1442,7 @@ EOF;
 	 * @li	1062: Can't add a row as PKEY already exists
 	 * @li	1091: Can't drop key or column because it does not exist
 	 */
-	public function installDatabaseUpdates( int $version=0, int $lastJsonIndex=0, int $limit=50, bool $return=FALSE ): array
+	public function installDatabaseUpdates( $version=0, $lastJsonIndex=0, $limit=50, $return=FALSE )
 	{
 		$toReturn    = array();
 		$count  = 0;
@@ -1774,12 +1464,7 @@ EOF;
 		{
 			$schema	= json_decode( file_get_contents( $this->getApplicationPath() . "/setup/upg_{$version}/queries.json" ), TRUE );
 
-			if( is_array( $schema ) )
-			{
-				ksort($schema, SORT_NUMERIC);
-			}
-
-			$schema = static::parseQueriesJson( $schema );
+			ksort($schema, SORT_NUMERIC);
 
 			foreach( $schema as $jsonIndex => $instruction['params'] )
 			{
@@ -1802,10 +1487,9 @@ EOF;
 				$count++;
 
 				/* Get the table name, we need it */
-				/* @var $instruction array */
 				$_table	= $instruction['params']['params'][0];
 
-				if ( !is_string( $_table ) )
+				if ( !\is_string( $_table ) )
 				{
 					$_table	= $instruction['params']['params'][0]['name'];
 				}
@@ -1815,18 +1499,20 @@ EOF;
 				{
 					if(
 						/* Only run manually if we need to */
+						\IPS\Db::i()->recommendManualQuery( $_table ) AND
 						/* And if it's not a drop table, insert or rename table query */
-						!in_array( $instruction['params']['method'], array( 'dropTable', 'insert', 'renameTable' ) ) AND
+						!\in_array( $instruction['params']['method'], array( 'dropTable', 'insert', 'renameTable' ) ) AND
 						/* ANNNNNDDD only if the method is not delete or there's a where clause, i.e. a truncate table statement does not run manually */
 						( $instruction['params']['method'] != 'delete' OR isset( $instructions['params']['params'][1] ) )
-						AND Db::i()->recommendManualQuery( $_table )
 						)
 					{
-						Log::debug( "Big table " . $_table . ", storing query to run manually", 'upgrade' );
+						\IPS\Log::debug( "Big table " . $_table . ", storing query to run manually", 'upgrade' );
+
+						\IPS\Db::i()->returnQuery = TRUE;
 
 						$method = $instruction['params']['method'];
 						$params = $instruction['params']['params'];
-						$query = Db::i()->returnQuery( $method, $params );
+						$query = \IPS\Db::i()->$method( ...$params );
 
 						if( $query )
 						{
@@ -1834,11 +1520,11 @@ EOF;
 
 							if ( $instruction['params']['method'] == 'renameTable' )
 							{
-								Db::i()->cachedTableData[ $instruction['params']['params'][1] ] = Db::i()->cachedTableData[ $_table ];
+								\IPS\Db::i()->cachedTableData[ $instruction['params']['params'][1] ] = \IPS\Db::i()->cachedTableData[ $_table ];
 
 								foreach( $toReturn as $k => $v )
 								{
-									$toReturn[ $k ]	= preg_replace( "/\`" . Db::i()->prefix . $_table . "\`/", "`" . Db::i()->prefix . $instruction['params']['params'][1] . "`", $v );
+									$toReturn[ $k ]	= preg_replace( "/\`" . \IPS\Db::i()->prefix . $_table . "\`/", "`" . \IPS\Db::i()->prefix . $instruction['params']['params'][1] . "`", $v );
 								}
 							}
 
@@ -1851,14 +1537,14 @@ EOF;
 				{
 					$method = $instruction['params']['method'];
 					$params = $instruction['params']['params'];
-					Db::i()->$method( ...$params );
+					\IPS\Db::i()->$method( ...$params );
 				}
-				catch( Exception $e )
+				catch( \IPS\Db\Exception $e )
 				{
-					Log::log( "Error (" . $e->getCode() . ") " . $e->getMessage() . ": " . $instruction['params']['method'] . ' ' . json_encode( $instruction['params']['params'] ), 'upgrade_error' );
+					\IPS\Log::log( "Error (" . $e->getCode() . ") " . $e->getMessage() . ": " . $instruction['params']['method'] . ' ' . json_encode( $instruction['params']['params'] ), 'upgrade_error' );
 
 					/* If the issue is with a create table other than exists, we should just throw it */
-					if ( $instruction['params']['method'] == 'createTable' and ! in_array( $e->getCode(), array( 1007, 1050 ) ) )
+					if ( $instruction['params']['method'] == 'createTable' and ! \in_array( $e->getCode(), array( 1007, 1050 ) ) )
 					{
 						throw $e;
 					}
@@ -1868,18 +1554,21 @@ EOF;
 					{
 						if ( $instruction['params']['method'] == 'changeColumn' )
 						{
-							if ( Db::i()->checkForTable( $instruction['params']['params'][0] ) )
+							if ( \IPS\Db::i()->checkForTable( $instruction['params']['params'][0] ) )
 							{
 								/* Does the column exist already? */
-								if ( Db::i()->checkForColumn( $instruction['params']['params'][0], $instruction['params']['params'][2]['name'] ) )
+								if ( \IPS\Db::i()->checkForColumn( $instruction['params']['params'][0], $instruction['params']['params'][2]['name'] ) )
 								{
 									/* Just make sure it's up to date */
-									Db::i()->changeColumn( $instruction['params']['params'][0], $instruction['params']['params'][2]['name'], $instruction['params']['params'][2] );
+									\IPS\Db::i()->changeColumn( $instruction['params']['params'][0], $instruction['params']['params'][2]['name'], $instruction['params']['params'][2] );
+									continue;
 								}
 								else
 								{
 									/* The table exists, so lets just add the column */
-									Db::i()->addColumn( $instruction['params']['params'][0], $instruction['params']['params'][2] );
+									\IPS\Db::i()->addColumn( $instruction['params']['params'][0], $instruction['params']['params'][2] );
+
+									continue;
 								}
 							}
 						}
@@ -1891,7 +1580,7 @@ EOF;
 					{
 						if ( $instruction['params']['method'] == 'renameTable' )
 						{
-							if ( Db::i()->checkForTable( $instruction['params']['params'][1] ) )
+							if ( \IPS\Db::i()->checkForTable( $instruction['params']['params'][1] ) )
 							{
 								/* The table we are renaming to *does* exist */
 								continue;
@@ -1905,15 +1594,15 @@ EOF;
 					{
 						if ( $instruction['params']['method'] == 'changeColumn' and ! $instruction['params']['params'][2]['allow_null'] )
 						{
-							$currentDefintion = Db::i()->getTableDefinition( $instruction['params']['params'][0] );
+							$currentDefintion = \IPS\Db::i()->getTableDefinition( $instruction['params']['params'][0] );
 							$column = $instruction['params']['params'][2]['name'];
 
 							if ( isset( $currentDefintion['columns'][ $column ] ) AND $currentDefintion['columns'][ $column ]['allow_null'] )
 							{
-								Db::i()->update( $instruction['params']['params'][0], array( $column => '' ), array( $column . ' IS NULL' ) );
+								\IPS\Db::i()->update( $instruction['params']['params'][0], array( $column => '' ), array( $column . ' IS NULL' ) );
 
 								/* Just make sure it's up to date */
-								Db::i()->changeColumn( $instruction['params']['params'][0], $instruction['params']['params'][1], $instruction['params']['params'][2] );
+								\IPS\Db::i()->changeColumn( $instruction['params']['params'][0], $instruction['params']['params'][1], $instruction['params']['params'][2] );
 
 								continue;
 							}
@@ -1922,7 +1611,7 @@ EOF;
 						throw $e;
 					}
 					/* If the error isn't important we should ignore it */
-					else if( !in_array( $e->getCode(), array( 1007, 1008, 1050, 1060, 1061, 1062, 1091, 1051 ) ) )
+					else if( !\in_array( $e->getCode(), array( 1007, 1008, 1050, 1060, 1061, 1062, 1091, 1051 ) ) )
 					{
 						throw $e;
 					}
@@ -1934,150 +1623,18 @@ EOF;
 	}
 
 	/**
-	 * Scan the queries file and consolidate similar queries
-	 *
-	 * @param array $schema
-	 * @return array
-	 */
-	public static function parseQueriesJson( array $schema ) : array
-	{
-		$addQueries = [];
-		$changeQueries = [];
-		$dropQueries = [];
-		$renameQueries = [];
-		$otherQueries = [];
-		foreach( $schema as $query )
-		{
-			switch( $query['method'] )
-			{
-				case 'addColumn':
-				case 'addIndex':
-					$table = $query['params'][0];
-
-					if( !isset( $addQueries[ $table ] ) )
-					{
-						$addQueries[ $table ] = [ 'columns' => [], 'indexes' => [] ];
-					}
-					if( $query['method'] == 'addColumn' )
-					{
-						$addQueries[ $table ]['columns'][] = $query['params'][1];
-					}
-					else
-					{
-						$addQueries[ $table ]['indexes'][] = $query['params'][1];
-					}
-					break;
-
-				case 'changeColumn':
-					$table = $query['params'][0];
-
-					if( !isset( $changeQueries[ $table ] ) )
-					{
-						$changeQueries[ $table ] = [ 'columns' => [] ];
-					}
-					$changeQueries[ $table ]['columns'][ $query['params'][1] ] = $query['params'][2];
-					break;
-
-				case 'dropColumn':
-					$table = $query['params'][0];
-					if( !isset( $dropQueries[ $table ] ) )
-					{
-						$dropQueries[ $table ] = [];
-					}
-					$columns = is_array( $query['params'][1] ) ? $query['params'][1] : array( $query['params'][1] );
-					$dropQueries[ $table ] = array_merge( $dropQueries[ $table ], $columns );
-					break;
-
-				case 'renameTable':
-					/* We will run all renames first, so update the query definitions to use the
-					new table name */
-					$oldTableName = $query['params'][0];
-					$newTableName = $query['params'][1];
-					if( isset( $addQueries[ $oldTableName ] ) )
-					{
-						if( isset( $addQueries[ $newTableName ] ) )
-						{
-							$addQueries[ $newTableName ] = array_merge( $addQueries[ $newTableName ], $addQueries[ $oldTableName ] );
-						}
-						else
-						{
-							$addQueries[ $newTableName ] = $addQueries[ $oldTableName ];
-						}
-
-						unset( $addQueries[ $oldTableName ] );
-					}
-					$renameQueries[ $oldTableName ] = $query;
-					break;
-
-				default:
-					$otherQueries[] = $query;
-					break;
-			}
-		}
-
-		/* Now rebuild the schema file, putting the renames first */
-		$return = [];
-		foreach( $renameQueries as $query )
-		{
-			$return[] = $query;
-		}
-
-		/* move on to the add queries */
-		foreach( $addQueries as $table => $query )
-		{
-			$return[] = [
-				'method' => 'addColumnsAndIndexes',
-				'params' => [
-					$table,
-					$query['columns'],
-					$query['indexes']
-				]
-			];
-		}
-
-		foreach( $changeQueries as $table => $query )
-		{
-			$return[] = [
-				'method' => 'changeColumnsAndIndexes',
-				'params' => [
-					$table,
-					$query['columns']
-				]
-			];
-		}
-
-		foreach( $dropQueries as $table => $query )
-		{
-			$return[] = [
-				'method' => 'dropColumn',
-				'params' => [
-					$table,
-					$query
-				]
-			];
-		}
-
-		/* Whatever is left - do this last because we might have insert/update statements */
-		foreach( $otherQueries as $query )
-		{
-			$return[] = $query;
-		}
-
-		return $return;
-	}
-
-	/**
 	 * Rebuild common data during an install or upgrade. This is a shortcut method which
 	 * * Installs module data from JSON file
 	 * * Installs task data from JSON file
 	 * * Installs setting data from JSON file
 	 * * Installs ACP live search keywords from JSON file
+	 * * Installs hooks from JSON file
 	 * * Updates latest version in the database
 	 *
-	 * @param bool $skipMember		Skip clearing member cache clearing
+	 * @param	bool	$skipMember		Skip clearing member cache clearing
 	 * @return void
 	 */
-	public function installJsonData( bool $skipMember=FALSE ) : void
+	public function installJsonData( $skipMember=FALSE )
 	{
 		/* Rebuild modules */
 		$this->installModules();
@@ -2094,20 +1651,28 @@ EOF;
 		/* Rebuild search keywords */
 		$this->installSearchKeywords();
 
+		/* Rebuild hooks */
+		$this->installHooks();
+
 		/* Update app version data */
 		$versions		= $this->getAllVersions();
 		$longVersions	= array_keys( $versions );
 		$humanVersions	= array_values( $versions );
 
-		if( count($versions) )
+		if( \count($versions) )
 		{
 			$latestLVersion	= array_pop( $longVersions );
 			$latestHVersion	= array_pop( $humanVersions );
 
-			Db::i()->update( 'core_applications', array( 'app_version' => $latestHVersion, 'app_long_version' => $latestLVersion ), array( 'app_directory=?', $this->directory ) );
+			\IPS\Db::i()->update( 'core_applications', array( 'app_version' => $latestHVersion, 'app_long_version' => $latestLVersion ), array( 'app_directory=?', $this->directory ) );
 		}
 
-		unset( Store::i()->applications );
+		unset( \IPS\Data\Store::i()->applications );
+
+		if( !$skipMember )
+		{
+			\IPS\Member::clearCreateMenu();
+		}
 	}
 
 	/**
@@ -2116,7 +1681,7 @@ EOF;
 	 * @note	A module's "default" status will not be adjusted during upgrades - if there is already a module flagged as default, it will remain the default.
 	 * @return	void
 	 */
-	public function installModules() : void
+	public function installModules()
 	{
 		if( file_exists( $this->getApplicationPath() . "/data/modules.json" ) )
 		{
@@ -2124,7 +1689,7 @@ EOF;
 			$moduleStore	= array();
 			$hasDefault		= FALSE;
 
-			foreach (Db::i()->select( '*', 'core_modules', array( 'sys_module_application=?', $this->directory ) ) as $row )
+			foreach ( \IPS\Db::i()->select( '*', 'core_modules', array( 'sys_module_application=?', $this->directory ) ) as $row )
 			{
 				if( $row['sys_module_default'] )
 				{
@@ -2149,29 +1714,22 @@ EOF;
 				{
 					$position++;
 
-					$module = null;
 					if ( !isset( $currentModules[ $area ][ $key ] ) )
 					{
-						$module = new Module;
+						$module = new \IPS\Application\Module;
+					}
+					elseif ( $currentModules[ $area ][ $key ] != $data )
+					{
+						$module = \IPS\Application\Module::constructFromData( $moduleStore[ $area ][ $key ] );
 					}
 					else
-					{
-						if ( $currentModules[ $area ][ $key ] != $data )
-						{
-							$module = Module::constructFromData( $moduleStore[ $area ][ $key ] );
-						}
-
-						unset( $moduleStore[ $area ][ $key ] );
-					}
-
-					if( $module === null )
 					{
 						continue;
 					}
 
 					$module->application = $this->directory;
 					$module->key = $key;
-					$module->protected = intval( $data['protected'] );
+					$module->protected = \intval( $data['protected'] );
 					$module->visible = TRUE;
 					$module->position = $position;
 					$module->area = $area;
@@ -2183,21 +1741,7 @@ EOF;
 						$module->default = ( isset( $data['default'] ) and $data['default'] );
 					}
 
-					if( !IN_DEV )
-					{
-						$module->_skipClearingMenuCache = TRUE;
-					}
-
-					$module->save();
-				}
-			}
-
-			/* If we have anything left in the old data store, remove it */
-			foreach( $moduleStore as $area => $modules )
-			{
-				foreach( $modules as $module )
-				{
-					Module::constructFromData( $module )->delete();
+					$module->save( TRUE );
 				}
 			}
 		}
@@ -2208,66 +1752,63 @@ EOF;
 	 *
 	 * @return	void
 	 */
-	public function installTasks() : void
+	public function installTasks()
 	{
 		if( file_exists( $this->getApplicationPath() . "/data/tasks.json" ) )
 		{
 			$taskJson = json_decode( file_get_contents( $this->getApplicationPath() . "/data/tasks.json" ), TRUE );
-			foreach (  $taskJson as $key => $frequency )
+			foreach ( $taskJson as $key => $frequency )
 			{
-				Db::i()->replace( 'core_tasks', array(
+				\IPS\Db::i()->replace( 'core_tasks', array(
 					'app'		=> $this->directory,
 					'key'		=> $key,
 					'frequency'	=> $frequency,
-					'next_run'	=> DateTime::create()->add( new DateInterval( $frequency ) )->getTimestamp()
+					'next_run'	=> \IPS\DateTime::create()->add( new \DateInterval( $frequency ) )->getTimestamp()
 				) );
 			}
 
 			/* Delete any tasks that are no longer present */
-			Db::i()->delete( 'core_tasks', [
-				[ 'app=?', $this->directory ],
-				[ Db::i()->in( '`key`', array_keys( $taskJson ), true ) ]
-			]);
+			\IPS\Db::i()->delete( 'core_tasks', [ [ 'app=?', $this->directory ], [ \IPS\Db::i()->in( '`key`', array_keys( $taskJson ), true ) ] ] );
 		}
 	}
 
 	/**
 	 * Install the application's extension data where required
 	 *
-	 * @param bool $newInstall	TRUE if the community is being installed for the first time (opposed to an app being added)
+	 * @param	bool	$newInstall	TRUE if the community is being installed for the first time (opposed to an app being added)
 	 * @return	void
 	 */
-	public function installExtensions( bool $newInstall=FALSE ) : void
+	public function installExtensions( $newInstall=FALSE )
 	{
 		/* File storage */
-		$settings = json_decode( Settings::i()->upload_settings, TRUE );
+		$settings = json_decode( \IPS\Settings::i()->upload_settings, TRUE );
 
 		try
 		{
 			/* Only check for Amazon when installing an app via the Admin CP on Community in the Cloud. The CiC Installer will handle brand new installs. */
-			if ( CIC AND !$newInstall )
+			if ( \IPS\CIC AND !$newInstall )
 			{
-				$fileSystem = Db::i()->select( '*', 'core_file_storage', array( 'method=?', 'Cloud' ), 'id ASC' )->first();
+				$fileSystem = \IPS\Db::i()->select( '*', 'core_file_storage', array( 'method=?', 'Cloud' ), 'id ASC' )->first();
 			}
 			else
 			{
-				$fileSystem = Db::i()->select( '*', 'core_file_storage', array( 'method=?', 'FileSystem' ), 'id ASC' )->first();
+				$fileSystem = \IPS\Db::i()->select( '*', 'core_file_storage', array( 'method=?', 'FileSystem' ), 'id ASC' )->first();
 			}
 		}
-		catch( UnderflowException $ex )
+		catch( \UnderflowException $ex )
 		{
-			$fileSystem = Db::i()->select( '*', 'core_file_storage', NULL, 'id ASC' )->first();
+			$fileSystem = \IPS\Db::i()->select( '*', 'core_file_storage', NULL, 'id ASC' )->first();
 		}
 
-		foreach($this->extensions('core', 'FileStorage') as $key => $path )
+		foreach( $this->extensions( 'core', 'FileStorage' ) as $key => $path )
 		{
 			$settings[ 'filestorage__' . $this->directory . '_' . $key ] = $fileSystem['id'];
 		}
 
-		Settings::i()->changeValues( array( 'upload_settings' => json_encode( $settings ) ) );
+		\IPS\Settings::i()->changeValues( array( 'upload_settings' => json_encode( $settings ) ) );
 
 		$inserts = array();
-		foreach($this->extensions('core', 'Notifications') as $key => $class )
+		foreach( $this->extensions( 'core', 'Notifications' ) as $key => $class )
 		{
 			if ( method_exists( $class, 'getConfiguration' ) )
 			{
@@ -2284,9 +1825,9 @@ EOF;
 			}
 		}
 
-		if( count( $inserts ) )
+		if( \count( $inserts ) )
 		{
-			Db::i()->insert( 'core_notification_defaults', $inserts );
+			\IPS\Db::i()->insert( 'core_notification_defaults', $inserts );
 		}
 
 		/* Install Menu items */
@@ -2303,18 +1844,10 @@ EOF;
 						$config['app'] = $this->directory;
 					}
 
-					FrontNavigation::insertMenuItem( NULL, $config, Db::i()->select( 'MAX(position)', 'core_menu' )->first() );
+					\IPS\core\FrontNavigation::insertMenuItem( NULL, $config, \IPS\Db::i()->select( 'MAX(position)', 'core_menu' )->first() );
 				}
 			}
-
-			/* Remove any invalid core_menu rows */
-			$current = array_keys( $this->extensions( 'core', 'FrontNavigation', false ) );
-			Db::i()->delete( 'core_menu', [
-				[ 'app=?', $this->directory ],
-				[ Db::i()->in( 'extension', $current, true ) ]
-			] );
-
-			unset( Store::i()->frontNavigation );
+			unset( \IPS\Data\Store::i()->frontNavigation );
 		}
 	}
 
@@ -2323,11 +1856,11 @@ EOF;
 	 *
 	 * @return	void
 	 */
-	public function installSettings() : void
+	public function installSettings()
 	{
 		if( file_exists( $this->getApplicationPath() . "/data/settings.json" ) )
 		{
-			$currentData = iterator_to_array( Db::i()->select( array( 'conf_key', 'conf_default', 'conf_report' ), 'core_sys_conf_settings', [ 'conf_app=?', $this->directory ] )->setKeyField('conf_key') );
+			$currentData = iterator_to_array( \IPS\Db::i()->select( array( 'conf_key', 'conf_default', 'conf_report' ), 'core_sys_conf_settings' )->setKeyField('conf_key') );
 
 			$insert	= array();
 			$update	= array();
@@ -2337,67 +1870,44 @@ EOF;
 				$report = ( isset( $setting['report'] ) and $setting['report'] != 'none' ) ? $setting['report'] : NULL;
 				if ( ! array_key_exists( $setting['key'], $currentData ) )
 				{
-					/* Is this a legacy setting? */
-					try
-					{
-						$settingRow = Db::i()->select( '*', 'core_sys_conf_settings', [ 'conf_key=? and conf_app is null', $setting['key'] ] )->first();
-						$update[]	= array( array( 'conf_default' => $setting['default'], 'conf_report' => $report, 'conf_app' => $this->directory ), array( 'conf_key=?', $setting['key'] ) );
-					}
-					catch( UnderflowException )
-					{
-						$insert[]	= array( 'conf_key' => $setting['key'], 'conf_value' => $setting['default'], 'conf_default' => $setting['default'], 'conf_app' => $this->directory, 'conf_report' => $report );
-					}
+					$insert[]	= array( 'conf_key' => $setting['key'], 'conf_value' => $setting['default'], 'conf_default' => $setting['default'], 'conf_app' => $this->directory, 'conf_report' => $report );
 				}
-				else
+				elseif ( $currentData[ $setting['key'] ]['conf_default'] != $setting['default'] or $currentData[ $setting['key'] ]['conf_report'] != $report )
 				{
-					if ( $currentData[ $setting['key'] ]['conf_default'] != $setting['default'] or $currentData[ $setting['key'] ]['conf_report'] != $report )
-					{
-						$update[]	= array( array( 'conf_default' => $setting['default'], 'conf_report' => $report ), array( 'conf_key=?', $setting['key'] ) );
-					}
-
-					unset( $currentData[ $setting['key'] ] );
+					$update[]	= array( array( 'conf_default' => $setting['default'], 'conf_report' => $report ), array( 'conf_key=?', $setting['key'] ) );
 				}
 			}
 
 			if ( !empty( $insert ) )
 			{
-				Db::i()->insert( 'core_sys_conf_settings', $insert, TRUE );
+				\IPS\Db::i()->insert( 'core_sys_conf_settings', $insert, TRUE );
 			}
 
 			foreach ( $update as $data )
 			{
-				Db::i()->update( 'core_sys_conf_settings', $data[0], $data[1] );
+				\IPS\Db::i()->update( 'core_sys_conf_settings', $data[0], $data[1] );
 			}
 
-			/* If there's anything left, delete it */
-			if( count( $currentData ) )
-			{
-				Db::i()->delete( 'core_sys_conf_settings', [
-					[ 'conf_app=?', $this->directory ],
-					[ Db::i()->in( 'conf_key', array_keys( $currentData ) ) ]
-				]);
-			}
-
-			Settings::i()->clearCache();
+			\IPS\Settings::i()->clearCache();
 		}
 	}
 
 	/**
 	 * Install the application's language strings
 	 *
-	 * @param int|null $offset Offset to begin import from
-	 * @param int|null $limit	Number of rows to import
+	 * @param	int|null		$offset Offset to begin import from
+	 * @param	int|null		$limit	Number of rows to import
 	 * @return	int				Rows inserted
 	 */
-	public function installLanguages( int $offset=null, int $limit=null ): int
+	public function installLanguages( $offset=null, $limit=null )
 	{
-		$languages	= array_keys( Lang::languages() );
+		$languages	= array_keys( \IPS\Lang::languages() );
 		$inserted	= 0;
 
 		$current = array();
 		foreach( $languages as $languageId )
 		{
-			foreach(iterator_to_array( Db::i()->select( 'word_key, word_default, word_js', 'core_sys_lang_words', array( 'word_app=? AND lang_id=?', $this->directory, $languageId ) ) ) as $word )
+			foreach( iterator_to_array( \IPS\Db::i()->select( 'word_key, word_default, word_js', 'core_sys_lang_words', array( 'word_app=? AND lang_id=?', $this->directory, $languageId ) ) ) as $word )
 			{
 				$current[ $languageId ][ $word['word_key'] . '-.-' . $word['word_js'] ] = $word['word_default'];
 			}
@@ -2427,16 +1937,16 @@ EOF;
 				}
 			}
 
-			if ( count( $inserts ) )
+			if ( \count( $inserts ) )
 			{
-				Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
+				\IPS\Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
 			}
 		}
 
 		if( file_exists( $this->getApplicationPath() . "/data/lang.xml" ) )
 		{
 			/* Open XML file */
-			$xml = Xml\XMLReader::safeOpen( $this->getApplicationPath() . "/data/lang.xml" );
+			$xml = \IPS\Xml\XMLReader::safeOpen( $this->getApplicationPath() . "/data/lang.xml" );
 			$xml->read();
 
 			/* Get the version */
@@ -2467,7 +1977,7 @@ EOF;
 			/* Start looping through each word */
 			while ( $xml->read() )
 			{
-				if( $xml->name != 'word' OR $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->name != 'word' OR $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -2512,9 +2022,9 @@ EOF;
 
 				if ( $done OR $i % $batchSize === 0 )
 				{
-					if ( count( $inserts ) )
+					if ( \count( $inserts ) )
 					{
-						Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
+						\IPS\Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
 						$inserts = array();
 					}
 					$batchesDone++;
@@ -2528,9 +2038,9 @@ EOF;
 				$xml->next();
 			}
 
-			if ( count( $inserts ) )
+			if ( \count( $inserts ) )
 			{
-				Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
+				\IPS\Db::i()->insert( 'core_sys_lang_words', $inserts, TRUE );
 			}
 		}
 
@@ -2542,21 +2052,21 @@ EOF;
 	 *
 	 * @return	void
 	 */
-	public function installEmailTemplates() : void
+	public function installEmailTemplates()
 	{
 		if( file_exists( $this->getApplicationPath() . "/data/emails.xml" ) )
 		{
 			/* First, delete any existing non-customized email templates for this app */
-			Db::i()->delete( 'core_email_templates', array( 'template_app=? AND template_parent=0', $this->directory ) );
+			\IPS\Db::i()->delete( 'core_email_templates', array( 'template_app=? AND template_parent=0', $this->directory ) );
 
 			/* Open XML file */
-			$xml = Xml\XMLReader::safeOpen( $this->getApplicationPath() . "/data/emails.xml" );
+			$xml = \IPS\Xml\XMLReader::safeOpen( $this->getApplicationPath() . "/data/emails.xml" );
 			$xml->read();
 
 			/* Start looping through each word */
 			while ( $xml->read() and $xml->name == 'template' )
 			{
-				if( $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -2565,12 +2075,12 @@ EOF;
 					'template_parent'	=> 0,
 					'template_app'		=> $this->directory,
 					'template_edited'	=> 0,
-					'template_pinned'	=> 0,
+					'template_pinned'	=> 0
 				);
 
 				while ( $xml->read() and $xml->name != 'template' )
 				{
-					if( $xml->nodeType != XMLReader::ELEMENT )
+					if( $xml->nodeType != \XMLReader::ELEMENT )
 					{
 						continue;
 					}
@@ -2600,207 +2110,208 @@ EOF;
 					}
 				}
 
-				Db::i()->replace( 'core_email_templates', $insert );
+				\IPS\Db::i()->replace( 'core_email_templates', $insert );
 			}
 
 			/* Now re-associate customized email templates */
-			foreach(Db::i()->select( '*', 'core_email_templates', array( 'template_app=? AND template_parent>0', $this->directory ) ) as $template )
+			foreach( \IPS\Db::i()->select( '*', 'core_email_templates', array( 'template_app=? AND template_parent>0', $this->directory ) ) as $template )
 			{
 				/* Find the real parent now */
 				try
 				{
-					$parent = Db::i()->select( '*', 'core_email_templates', array( 'template_app=? and template_name=? and template_parent=0', $template['template_app'], $template['template_name'] ) )->first();
+					$parent = \IPS\Db::i()->select( '*', 'core_email_templates', array( 'template_app=? and template_name=? and template_parent=0', $template['template_app'], $template['template_name'] ) )->first();
 
 					/* And now update this template */
-					Db::i()->update( 'core_email_templates', array( 'template_parent' => $parent['template_id'], 'template_data' => $parent['template_data'] ), array( 'template_id=?', $template['template_id'] ) );
-					Db::i()->update( 'core_email_templates', array( 'template_edited' => 1 ), array( 'template_id=?', $parent['template_id'] ) );
+					\IPS\Db::i()->update( 'core_email_templates', array( 'template_parent' => $parent['template_id'], 'template_data' => $parent['template_data'] ), array( 'template_id=?', $template['template_id'] ) );
+					\IPS\Db::i()->update( 'core_email_templates', array( 'template_edited' => 1 ), array( 'template_id=?', $parent['template_id'] ) );
 				}
-				catch( UnderflowException $ex ) { }
+				catch( \UnderflowException $ex ) { }
 			}
 
-			Cache::i()->clearAll();
-			Store::i()->clearAll();
+			\IPS\Data\Cache::i()->clearAll();
+			\IPS\Data\Store::i()->clearAll();
 		}
 	}
 
 	/**
 	 * Install the application's skin templates, CSS files and resources
 	 *
-	 * @param bool $update		If set to true, do not overwrite current theme setting values
+	 * @param	bool	$update		If set to true, do not overwrite current theme setting values
 	 * @return	void
 	 */
-	public function installSkins( bool $update=FALSE ) : void
+	public function installSkins( $update=FALSE )
 	{
 		/* Clear old caches */
-		Cache::i()->clearAll();
-		Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
 
 		/* Install the stuff */
-		$this->installThemeEditorSettings();
+		$this->installThemeSettings( $update );
 		$this->clearTemplates();
-		$this->installTemplates($update);
-		$this->installCustomTemplates();
+		$this->installTemplates( $update );
 	}
 
 	/**
-	 * Install the application's theme editor settings
+	 * Install the application's theme settings
 	 *
+	 * @param	bool	$update		If set to true, do not overwrite current theme setting values
 	 * @return	void
 	 */
-	public function installThemeEditorSettings() : void
+	public function installThemeSettings( $update=FALSE )
 	{
-		/* Get current categories and settings */
-		$currentCategories = iterator_to_array(
-			Db::i()->select( '*', 'core_theme_editor_categories' )
-				->setKeyField( 'cat_key' ),
-		);
-
-		$currentSettings = iterator_to_array(
-			Db::i()->select( '*', 'core_theme_editor_settings', [ 'setting_app=?', $this->directory ] )
-				->setKeyField( 'setting_key' ),
-		);
-
-		if ( file_exists( $this->getApplicationPath() . "/data/themeeditor.json" ) )
+		if ( file_exists( $this->getApplicationPath() . "/data/themesettings.json" ) )
 		{
-			/* Start with editor categories */
-			$maxPosition = (int) Db::i()->select( 'max(cat_position)', 'core_theme_editor_categories', [ 'cat_parent=?', 0 ] )->first();
-
-			$json = json_decode( file_get_contents( $this->getApplicationPath() . "/data/themeeditor.json" ), true );
-			if( isset( $json['categories'] ) )
+			unset( \IPS\Data\Store::i()->themes );
+			try
 			{
-				foreach( $json['categories'] as $key => $category )
+				$defaultThemeId = \IPS\Theme::load('default', 'set_key')->id;
+			}
+			catch( \Exception $ex )
+			{
+				$defaultThemeId = \IPS\Theme::defaultTheme();
+			}
+
+			$currentSettings	= iterator_to_array( \IPS\Db::i()->select( '*', 'core_theme_settings_fields', array( 'sc_set_id=? AND sc_app=?', $defaultThemeId, $this->directory ) )->setKeyField('sc_key') );
+			$json				= json_decode( file_get_contents( $this->getApplicationPath() . "/data/themesettings.json" ), TRUE );
+
+			/* Add */
+			foreach( $json as $key => $data)
+			{
+				$insertedSetting = FALSE;
+
+				if ( ! isset( $currentSettings[ $data['sc_key'] ] ) )
 				{
-					/* If we are using a parent category, get the ID */
-					if( isset( $category['cat_parent'] ) )
+					$insertedSetting = TRUE;
+
+					$currentId = \IPS\Db::i()->insert( 'core_theme_settings_fields', array(
+						'sc_set_id'		 => $defaultThemeId,
+						'sc_key'		 => $data['sc_key'],
+						'sc_tab_key'	 => $data['sc_tab_key'],
+						'sc_type'		 => $data['sc_type'],
+						'sc_multiple'	 => $data['sc_multiple'],
+						'sc_default'	 => $data['sc_default'],
+						'sc_content'	 => $data['sc_content'],
+						'sc_show_in_vse' => ( isset( $data['sc_show_in_vse'] ) ) ? $data['sc_show_in_vse'] : 0,
+						'sc_updated'	 => time(),
+						'sc_app'		 => $this->directory,
+						'sc_title'		 => $data['sc_title'],
+						'sc_order'		 => $data['sc_order'],
+						'sc_condition'	 => $data['sc_condition'],
+					) );
+
+					$currentSettings[ $data['sc_key'] ] = $data;
+				}
+				else
+				{
+					/* Update */
+					\IPS\Db::i()->update( 'core_theme_settings_fields', array(
+						'sc_tab_key'	 => $data['sc_tab_key'],
+						'sc_type'		 => $data['sc_type'],
+						'sc_multiple'	 => $data['sc_multiple'],
+						'sc_default'	 => $data['sc_default'],
+						'sc_show_in_vse' => ( isset( $data['sc_show_in_vse'] ) ) ? $data['sc_show_in_vse'] : 0,
+						'sc_content'	 => $data['sc_content'],
+						'sc_title'		 => $data['sc_title'],
+						'sc_order'		 => $data['sc_order'],
+						'sc_condition'	 => $data['sc_condition'],
+					), array( 'sc_set_id=? AND sc_key=? AND sc_app=?', $defaultThemeId, $data['sc_key'], $this->directory ) );
+
+					$currentId = $currentSettings[ $data['sc_key'] ]['sc_id'];
+				}
+
+				/* Are we updating the value? */
+				if( $update === FALSE OR $insertedSetting === TRUE )
+				{
+					\IPS\Db::i()->delete('core_theme_settings_values', array('sv_id=?', $currentId ) );
+					\IPS\Db::i()->insert('core_theme_settings_values', array( 'sv_id' => $currentId, 'sv_value' => (string)$data['sc_default'] ) );
+				}
+			}
+
+			if ( $update )
+			{
+				$defaultCurrentSettings = $currentSettings;
+				foreach( \IPS\Theme::themes() as $theme )
+				{
+					/* If we are using the stock default theme, then use the setting values from the JSON as the base */
+					if ( $theme->id == $defaultThemeId )
 					{
-						$category['cat_parent'] = $currentCategories[ $category['cat_parent' ] ]['cat_id'] ?? 0;
+						$currentSettings = $defaultCurrentSettings;
+					}
+					else
+					{
+						$currentSettings = iterator_to_array( \IPS\Db::i()->select( '*', 'core_theme_settings_fields', array( 'sc_set_id=?', $theme->id ) )->setKeyField('sc_key') );
 					}
 
-					$category['cat_app'] = $this->directory;
+					$added           = FALSE;
+					$save            = json_decode( $theme->template_settings, TRUE );
 
-					/* Restructure the icon data */
-					$category['cat_icon'] = json_encode( Category::buildIconData( $category['cat_icon'] ) );
-
-					if( !isset( $currentCategories[ $key ] ) )
+					/* Add */
+					foreach( $json as $key => $data )
 					{
-						/* If we have a parent category, figure out the next position */
-						if( isset( $category['cat_parent'] ) and $category['cat_parent'] )
+						if ( ! isset( $currentSettings[ $data['sc_key'] ] ) )
 						{
-							$category['cat_position'] = (int) Db::i()->select( 'max(cat_position)', 'core_theme_editor_categories', [ 'cat_parent=?', $category['cat_parent'] ] )->first() + 1;
+							$added = TRUE;
+							$save[ $data['sc_key'] ] = $data['sc_default'];
+
+							\IPS\Db::i()->insert( 'core_theme_settings_fields', array(
+								'sc_set_id'		 => $theme->id,
+								'sc_key'		 => $data['sc_key'],
+								'sc_tab_key'	 => $data['sc_tab_key'],
+								'sc_type'		 => $data['sc_type'],
+								'sc_multiple'	 => $data['sc_multiple'],
+								'sc_default'	 => $data['sc_default'],
+								'sc_content'	 => $data['sc_content'],
+								'sc_show_in_vse' => ( isset( $data['sc_show_in_vse'] ) ) ? $data['sc_show_in_vse'] : 0,
+								'sc_updated'	 => time(),
+								'sc_app'		 => $this->directory,
+								'sc_title'		 => $data['sc_title'],
+								'sc_order'		 => $data['sc_order'],
+								'sc_condition'	 => $data['sc_condition'],
+							) );
 						}
 						else
 						{
-							$maxPosition++;
-							$category['cat_position'] = $maxPosition;
-						}
+							/* Update */
+							\IPS\Db::i()->update( 'core_theme_settings_fields', array(
+								'sc_type'		 => $data['sc_type'],
+								'sc_multiple'	 => $data['sc_multiple'],
+								'sc_default'	 => $data['sc_default'],
+								'sc_show_in_vse' => ( isset( $data['sc_show_in_vse'] ) ) ? $data['sc_show_in_vse'] : 0,
+								'sc_content'	 => $data['sc_content'],
+								'sc_title'		 => $data['sc_title'],
+								'sc_condition'	 => $data['sc_condition'],
+							), array( 'sc_set_id=? AND sc_key=?', $theme->id, $data['sc_key'] ) );
 
-						$categoryId = Db::i()->insert( 'core_theme_editor_categories', $category );
-					}
-					else
-					{
-						$categoryId = $currentCategories[ $key ]['cat_id'];
-						Db::i()->update( 'core_theme_editor_categories', $category, [ 'cat_key=?', $key ] );
-					}
+							$currentId = $currentSettings[ $data['sc_key'] ]['sc_id'];
 
-					$category['cat_id'] = $categoryId;
-					$currentCategories[ $key ] = $category;
-				}
-			}
-
-			/* Move on to settings */
-			if( isset( $json['settings'] ) )
-			{
-				foreach( $json['settings'] as $key => $setting )
-				{
-					/* Set the category */
-					$categoryId = $currentCategories[ $setting['cat'] ]['cat_id'];
-
-					$data = [];
-					$default = $setting['default'] ?? "";
-					switch( $setting['type'] )
-					{
-						case 'select':
-							$data['options'] = $setting['options'];
-							break;
-
-						case 'range':
-							$data['min'] = $setting['min'] ?? 0;
-							$data['max'] = $setting['max'];
-							if( isset( $setting['step'] ) )
+							try
 							{
-								$data['step'] = $setting['step'];
+								$currentValue = \IPS\Db::i()->select( 'sv_value', 'core_theme_settings_values', array( array( 'sv_id=?', $currentId ) ) )->first();
 							}
-							break;
+							catch( \UnderFlowException $ex )
+							{
+								$currentValue = $currentSettings[ $data['sc_key'] ]['sc_default'];
+							}
 
-						case 'color':
-							$default = [
-								'light' => $setting['light_default'],
-								'dark' => $setting['dark_default']
-							];
-							break;
+							/* Are we using the existing default? If so, update it */
+							if ( ( $data['sc_default'] != $currentSettings[ $data['sc_key'] ]['sc_default'] ) and ( $currentValue == $defaultCurrentSettings[ $data['sc_key'] ]['sc_default'] ) )
+							{
+								$added = TRUE;
+								$save[ $data['sc_key'] ] = $data['sc_default'];
+
+								\IPS\Db::i()->delete('core_theme_settings_values', array('sv_id=?', $currentId ) );
+								\IPS\Db::i()->insert('core_theme_settings_values', array( 'sv_id' => $currentId, 'sv_value' => (string)$data['sc_default'] ) );
+							}
+						}
 					}
 
-					if( !isset( $currentSettings[ $key ] ) )
+					if ( $added )
 					{
-						$position = (int) Db::i()->select( 'max(setting_position)', 'core_theme_editor_settings', [ 'setting_category_id=?', $categoryId ] )->first();
-
-						$insert = [
-							'setting_name' => $setting['name'],
-							'setting_desc' => $setting['desc'],
-							'setting_key' => $key,
-							'setting_type' => $setting['type'],
-							'setting_data' => ( count( $data ) ? json_encode( $data ) : null ),
-							'setting_default' => ( is_array( $default ) ? json_encode( $default ) : $default ),
-							'setting_category_id' => $categoryId,
-							'setting_position' => ( $position + 1 ),
-							'setting_app' => $this->directory,
-							'setting_refresh' => (int) ( $setting['refresh'] ?? 0 )
-						];
-
-						$settingId = Db::i()->insert( 'core_theme_editor_settings', $insert );
-						$insert['setting_id'] = $settingId;
-						$currentSettings[ $key ] = $insert;
-					}
-					else
-					{
-						$settingId = $currentSettings[ $key ]['setting_id'];
-						Db::i()->update( 'core_theme_editor_settings', [
-							'setting_name' => $setting['name'],
-							'setting_desc' => $setting['desc'],
-							'setting_type' => $setting['type'],
-							'setting_data' => ( count( $data ) ? json_encode( $data ) : null ),
-							'setting_default' => ( is_array( $default ) ? json_encode( $default ) : $default ),
-							'setting_category_id' => $categoryId,
-							'setting_refresh' => (int) ( $setting['refresh'] ?? 0 )
-						], [ 'setting_key=?', $key ] );
+						$theme->template_settings = json_encode( $save );
+						$theme->save();
 					}
 				}
 			}
-		}
-
-		/* Clear out any categories/settings that were removed */
-		foreach( new ActiveRecordIterator(
-			Db::i()->select( '*', 'core_theme_editor_settings', [
-				[ 'setting_app=?', $this->directory ],
-				[ 'setting_set_id=?', 0 ],
-				[ Db::i()->in( 'setting_key', array_keys( $currentSettings ), true ) ]
-			] ),
-			Setting::class
-				 ) as $setting )
-		{
-			$setting->delete();
-		}
-
-		foreach( new ActiveRecordIterator(
-			Db::i()->select( '*', 'core_theme_editor_categories', [
-				[ 'cat_app=?', $this->directory ],
-				[ 'cat_set_id=?', 0 ],
-				[ Db::i()->in( 'cat_key', array_keys( $currentCategories ), true ) ]
-			]),
-			Category::class
-				 ) as $cat )
-		{
-			$cat->delete();
 		}
 	}
 
@@ -2809,15 +2320,16 @@ EOF;
 	 *
 	 * @return	void
 	 */
-	public function clearTemplates() : void
+	public function clearTemplates()
 	{
 		if( file_exists( $this->getApplicationPath() . "/data/theme.xml" ) )
 		{
-			unset( Store::i()->themes );
-			Theme::removeTemplates( $this->directory );
-			Theme::removeCss( $this->directory );
-			Theme::clearFiles( Theme::CSS );
-			Theme::removeResources( $this->directory );
+			unset( \IPS\Data\Store::i()->themes );
+			\IPS\Theme::removeTemplates( $this->directory );
+			\IPS\Theme::removeCss( $this->directory );
+			\IPS\Theme::clearFiles( \IPS\Theme::CSS );
+			\IPS\Theme::removeResources( $this->directory );
+			\IPS\Theme::resetAllCacheKeys();
 		}
 	}
 
@@ -2825,20 +2337,28 @@ EOF;
 	 * Install the application's templates
 	 * Theme resources should be raw binary data everywhere (filesystem and DB) except in the theme XML download where they are base64 encoded.
 	 *
-	 * @param bool $update	If set to true, do not overwrite current theme setting values
-	 * @param int|null $offset Offset to begin import from
-	 * @param int|null $limit	Number of rows to import
+	 * @param	bool		$update	If set to true, do not overwrite current theme setting values
+	 * @param	int|null	$offset Offset to begin import from
+	 * @param	int|null	$limit	Number of rows to import
 	 * @return	int			Rows inserted
 	 */
-	public function installTemplates( bool $update=FALSE, int $offset=null, int $limit=null ): int
+	public function installTemplates( $update=FALSE, $offset=null, $limit=null )
 	{
 		$i			= 0;
 		$inserted	= 0;
-		$class = '\IPS\Theme';
+
+		if ( \IPS\Dispatcher::hasInstance() AND class_exists( '\IPS\Dispatcher', FALSE ) and \IPS\Dispatcher::i()->controllerLocation === 'setup' )
+		{
+			$class = '\IPS\Theme';
+		}
+		else
+		{
+			$class = ( \IPS\Theme::designersModeEnabled() ) ? '\IPS\Theme\Advanced\Theme'  : '\IPS\Theme';
+		}
 
 		if( file_exists( $this->getApplicationPath() . "/data/theme.xml" ) )
 		{
-			unset( Store::i()->themes );
+			unset( \IPS\Data\Store::i()->themes );
 
 			/* Try to prevent timeouts to the extent possible */
 			$cutOff			= null;
@@ -2855,12 +2375,12 @@ EOF;
 			}
 
 			/* Open XML file */
-			$xml = Xml\XMLReader::safeOpen( $this->getApplicationPath() . "/data/theme.xml" );
+			$xml = \IPS\Xml\XMLReader::safeOpen( $this->getApplicationPath() . "/data/theme.xml" );
 			$xml->read();
 
 			while( $xml->read() )
 			{
-				if( $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -2899,7 +2419,7 @@ EOF;
 					{
 						$class::addTemplate( $template );
 					}
-					catch( OverflowException $e )
+					catch( \OverflowException $e )
 					{
 						if ( ! $update )
 						{
@@ -2922,7 +2442,7 @@ EOF;
 					{
 						$class::addCss( $css );
 					}
-					catch( OverflowException $e )
+					catch( \OverflowException $e )
 					{
 						if( ! $update )
 						{
@@ -2953,35 +2473,19 @@ EOF;
 		return $inserted;
 	}
 
-	public function installCustomTemplates( int $offset=null, int $limit=null ) : int
-	{
-		$imported = 0;
-		if( file_exists( $this->getApplicationPath() . '/data/customtemplates.json' ) )
-		{
-			$imported = CustomTemplate::importFromFile( $this->getApplicationPath() . '/data/customtemplates.json', $this->directory, $offset, $limit );
-		}
-
-		/* Rebuild theme hook points */
-		Theme::rebuildHookPointFlags( $this->directory );
-
-		return $imported;
-	}
-
 	/**
 	 * Install the application's javascript
 	 *
-	 * @param int|null $offset Offset to begin import from
-	 * @param int|null $limit	Number of rows to import
+	 * @param	int|null	$offset Offset to begin import from
+	 * @param	int|null	$limit	Number of rows to import
 	 * @return	int			Rows inserted
 	 */
-	public function installJavascript( int $offset=null, int $limit=null ): int
+	public function installJavascript( $offset=null, $limit=null )
 	{
 		if( file_exists( $this->getApplicationPath() . "/data/javascript.xml" ) )
 		{
-			return Javascript::importXml( $this->getApplicationPath() . "/data/javascript.xml", $offset, $limit );
+			return \IPS\Output\Javascript::importXml( $this->getApplicationPath() . "/data/javascript.xml", $offset, $limit );
 		}
-
-		return 0;
 	}
 
 	/**
@@ -2989,11 +2493,11 @@ EOF;
 	 *
 	 * @return	void
 	 */
-	public function installSearchKeywords() : void
+	public function installSearchKeywords()
 	{
 		if( file_exists( $this->getApplicationPath() . "/data/acpsearch.json" ) )
 		{
-			Db::i()->delete( 'core_acp_search_index', array( 'app=?', $this->directory ) );
+			\IPS\Db::i()->delete( 'core_acp_search_index', array( 'app=?', $this->directory ) );
 
 			$inserts	= array();
 			$maxInserts	= 50;
@@ -3007,21 +2511,58 @@ EOF;
 						'keyword'		=> $word,
 						'app'			=> $this->directory,
 						'lang_key'		=> $data['lang_key'],
-						'restriction'	=> $data['restriction'] ?: NULL,
-						'callback'		=> $data['callback'] ?? null
+						'restriction'	=> $data['restriction'] ?: NULL
 					);
 
-					if( count( $inserts ) >= $maxInserts )
+					if( \count( $inserts ) >= $maxInserts )
 					{
-						Db::i()->insert( 'core_acp_search_index', $inserts );
+						\IPS\Db::i()->insert( 'core_acp_search_index', $inserts );
 						$inserts = array();
 					}
 				}
 			}
 
-			if( count( $inserts ) )
+			if( \count( $inserts ) )
 			{
-				Db::i()->insert( 'core_acp_search_index', $inserts );
+				\IPS\Db::i()->insert( 'core_acp_search_index', $inserts );
+			}
+		}
+	}
+
+	/**
+	 * Install hooks
+	 *
+	 * @return	void
+	 */
+	public function installHooks()
+	{
+		if( file_exists( $this->getApplicationPath() . "/data/hooks.json" ) )
+		{
+			\IPS\Db::i()->delete( 'core_hooks', array( 'app=?', $this->directory ) );
+
+			$inserts = array();
+			$templatesToRecompile = array();
+			foreach( json_decode( file_get_contents( $this->getApplicationPath() . "/data/hooks.json" ), TRUE ) as $filename => $data )
+			{
+				\IPS\Db::i()->insert( 'core_hooks', array(
+					'app'			=> $this->directory,
+					'type'			=> $data['type'],
+					'class'			=> $data['class'],
+					'filename'		=> $filename
+				) );
+
+				if ( $data['type'] === 'S' )
+				{
+					$templatesToRecompile[ $data['class'] ] = $data['class'];
+				}
+			}
+
+			\IPS\Plugin\Hook::writeDataFile();
+
+			foreach ( $templatesToRecompile as $k )
+			{
+				$exploded = explode( '_', $k );
+				\IPS\Theme::deleteCompiledTemplate( $exploded[1], $exploded[2], $exploded[3] );
 			}
 		}
 	}
@@ -3031,11 +2572,11 @@ EOF;
 	 *
 	 * @return	void
 	 */
-	public function installWidgets() : void
+	public function installWidgets()
 	{
 		if( file_exists( $this->getApplicationPath() . "/data/widgets.json" ) )
 		{
-			Db::i()->delete( 'core_widgets', array( 'app=?', $this->directory ) );
+			\IPS\Db::i()->delete( 'core_widgets', array( 'app=?', $this->directory ) );
 
 			$inserts = array();
 			foreach ( json_decode( file_get_contents( $this->getApplicationPath() . "/data/widgets.json" ), TRUE ) as $key => $json )
@@ -3045,20 +2586,17 @@ EOF;
 							'key'		   => $key,
 							'class'		   => $json['class'],
 							'restrict'     => json_encode( $json['restrict'] ),
-							'allow_reuse'  => ( $json['allow_reuse'] ?? 0 ),
-							'menu_style'   => ( $json['menu_style'] ?? 'menu' ),
-							'embeddable'   => ( $json['embeddable'] ?? 0 ),
-						    'layouts'	   => ( $json['layouts'] ?? null ),
-							'padding'	   => ( $json['padding'] ?? 0 ),
-							'default_layout' => ( $json['default_layout'] ?? null ),
-							'searchterms' => $json['searchterms'] ?? null,
+							'default_area' => ( isset( $json['default_area'] ) ? $json['default_area'] : NULL ),
+							'allow_reuse'  => ( isset( $json['allow_reuse'] ) ? $json['allow_reuse'] : 0 ),
+							'menu_style'   => ( isset( $json['menu_style'] ) ? $json['menu_style'] : 'menu' ),
+							'embeddable'   => ( isset( $json['embeddable'] ) ? $json['embeddable'] : 0 ),
 						);
 			}
 
-			if( count( $inserts ) )
+			if( \count( $inserts ) )
 			{
-				Db::i()->insert( 'core_widgets', $inserts, TRUE );
-				unset( Store::i()->widgets );
+				\IPS\Db::i()->insert( 'core_widgets', $inserts, TRUE );
+				unset( \IPS\Data\Store::i()->widgets );
 			}
 		}
 	}
@@ -3097,7 +2635,7 @@ EOF;
 	 * @endcode
 	 * @return array
 	 */
-	public function defaultFrontNavigation(): array
+	public function defaultFrontNavigation()
 	{
 		return array(
 			'rootTabs'		=> array(),
@@ -3112,13 +2650,13 @@ EOF;
 	 *
 	 * @return	array	Queries needed to correct database in the following format ( table => x, query = x );
 	 */
-	public function databaseCheck(): array
+	public function databaseCheck()
 	{
-		$db = Db::i();
+		$db = \IPS\Db::i();
 		$changesToMake = array();
 
 		/* If member IDs are getting near the legacy mediumint limit, we need to increase it. */
-		$maxMemberId = Db::i()->select( 'max(member_id)', 'core_members' )->first();
+		$maxMemberId = \IPS\Db::i()->select( 'max(member_id)', 'core_members' )->first();
 		$enableBigInt = ( $maxMemberId > 8288607 );
 
 		/* Loop the tables in the schema */
@@ -3131,9 +2669,9 @@ EOF;
 			/* Get our local definition of this table */
 			try
 			{
-				$localDefinition	= Db::i()->getTableDefinition( $tableName, FALSE, TRUE );
+				$localDefinition	= \IPS\Db::i()->getTableDefinition( $tableName, FALSE, TRUE );
 				$originalDefinition = $localDefinition; #Store this before it is normalised and engine stripped
-				$localDefinition	= Db::i()->normalizeDefinition( $localDefinition );
+				$localDefinition	= \IPS\Db::i()->normalizeDefinition( $localDefinition );
 
 				if( isset( $tableDefinition['reporting'] ) )
 				{
@@ -3147,17 +2685,17 @@ EOF;
 
 				/* Now we have to add the correct colation for text columns to our compare definition to flag any columns that don't have the correct charset/collation */
 				$tableDefinition['columns'] = array_map( function( $column ){
-					if( in_array( mb_strtoupper( $column['type'] ), array( 'CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'ENUM', 'SET' ) ) )
+					if( \in_array( mb_strtoupper( $column['type'] ), array( 'CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'ENUM', 'SET' ) ) )
 					{
-						$column['collation'] = Db::i()->collation;
+						$column['collation'] = \IPS\Db::i()->collation;
 					}
 
 					return $column;
 				}, $tableDefinition['columns'] );
 
 				/* And store our definition */
-				$compareDefinition	= Db::i()->normalizeDefinition( $tableDefinition );
-				$tableDefinition	= Db::i()->updateDefinitionIndexLengths( $tableDefinition );
+				$compareDefinition	= \IPS\Db::i()->normalizeDefinition( $tableDefinition );
+				$tableDefinition	= \IPS\Db::i()->updateDefinitionIndexLengths( $tableDefinition );
 
 				if( isset( $compareDefinition['comment'] ) AND !$compareDefinition['comment'] )
 				{
@@ -3175,7 +2713,6 @@ EOF;
 					$dropped = array();
 
 					/* Loop the columns */
-					/* @var $tableDefinition array */
 					foreach ( $tableDefinition['columns'] as $columnName => $columnData )
 					{
 						/* If it doesn't exist in the local database, create it */
@@ -3241,10 +2778,9 @@ EOF;
 									foreach( $indexData['columns'] as $indexColumn )
 									{
 										/* If the column we are about to adjust is included in this index, see if it needs adjusting */
-										if( $indexColumn == $columnName AND !in_array( $indexName, $dropped ) )
+										if( $indexColumn == $columnName AND !\in_array( $indexName, $dropped ) )
 										{
 											$thisIndex = $db->updateDefinitionIndexLengths( $tableDefinition );
-											/* @var $thisIndex array */
 
 											if( !isset( $thisIndex['indexes'][ $indexName ] ) )
 											{
@@ -3272,7 +2808,7 @@ EOF;
 									$defaultValue = "''";
 
 									/* Default value */
-									if( isset( $columnData['default'] ) and !in_array( strtoupper( $columnData['type'] ), array( 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'BLOB', 'MEDIUMBLOB', 'BIGBLOB', 'LONGBLOB' ) ) )
+									if( isset( $columnData['default'] ) and !\in_array( \strtoupper( $columnData['type'] ), array( 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'BLOB', 'MEDIUMBLOB', 'BIGBLOB', 'LONGBLOB' ) ) )
 									{
 										if( $columnData['type'] == 'BIT' )
 										{
@@ -3280,7 +2816,7 @@ EOF;
 										}
 										else
 										{
-											$defaultValue = in_array( $columnData['type'], array( 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'INTEGER', 'BIGINT', 'REAL', 'DOUBLE', 'FLOAT', 'DECIMAL', 'NUMERIC' ) ) ? floatval( $columnData['default'] ) : ( ! in_array( $columnData['default'], array( 'CURRENT_TIMESTAMP', 'BIT' ) ) ? '\'' . $db->escape_string( $columnData['default'] ) . '\'' : $columnData['default'] );
+											$defaultValue = \in_array( $columnData['type'], array( 'TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'INTEGER', 'BIGINT', 'REAL', 'DOUBLE', 'FLOAT', 'DECIMAL', 'NUMERIC' ) ) ? \floatval( $columnData['default'] ) : ( ! \in_array( $columnData['default'], array( 'CURRENT_TIMESTAMP', 'BIT' ) ) ? '\'' . $db->escape_string( $columnData['default'] ) . '\'' : $columnData['default'] );
 										}
 									}
 
@@ -3289,7 +2825,7 @@ EOF;
 
 								$tableChanges[] = "CHANGE COLUMN `{$db->escape_string( $columnName )}` {$db->compileColumnDefinition( $columnData )}";
 
-								if( count( $indexesToAdd ) )
+								if( \count( $indexesToAdd ) )
 								{
 									$tableChanges = array_merge( $tableChanges, $indexesToAdd );
 								}
@@ -3300,7 +2836,7 @@ EOF;
 					/* Loop the index */
 					foreach ( $compareDefinition['indexes'] as $indexName => $indexData )
 					{
-						if( in_array( $indexName, $dropped ) )
+						if( \in_array( $indexName, $dropped ) )
 						{
 							continue;
 						}
@@ -3350,7 +2886,7 @@ EOF;
 
 							/* Still here? Go ahead */
 							$dropIndexQuery = "DROP INDEX `{$db->escape_string( $indexName )}`";
-							if ( !in_array( $dropIndexQuery, $tableChanges ) ) // We skip the primary key as it can cause errors related to auto-increment
+							if ( !\in_array( $dropIndexQuery, $tableChanges ) ) // We skip the primary key as it can cause errors related to auto-increment
 							{
 								$tableChanges[] = $dropIndexQuery;
 							}
@@ -3358,7 +2894,7 @@ EOF;
 					}
 				}
 
-				if( count( $tableChanges ) )
+				if( \count( $tableChanges ) )
 				{
 					if( $needIgnore )
 					{
@@ -3375,7 +2911,7 @@ EOF;
 				}
 
 				/* InnoDB FullText indexes must be added one at a time */
-				if( count( $innoDbFullTextIndexes ) )
+				if( \count( $innoDbFullTextIndexes ) )
 				{
 					foreach( $innoDbFullTextIndexes as $newIndex )
 					{
@@ -3384,7 +2920,7 @@ EOF;
 				}
 			}
 			/* If the table doesn't exist, create it */
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				$changesToMake[] = array( 'table' => $tableName, 'query' => $db->_createTableQuery( $tableDefinition ) );
 			}
@@ -3399,7 +2935,7 @@ EOF;
 				{
 					/* Add column */
 					case 'addColumn':
-						$localDefinition = Db::i()->getTableDefinition( $query['params'][0] );
+						$localDefinition = \IPS\Db::i()->getTableDefinition( $query['params'][0] );
 						if ( !isset( $localDefinition['columns'][ $query['params'][1]['name'] ] ) )
 						{
 							$changesToMake[] = array( 'table' => $query['params'][0], 'query' => "ALTER TABLE `{$db->prefix}{$query['params'][0]}` ADD COLUMN {$db->compileColumnDefinition( $query['params'][1] )}" );
@@ -3425,19 +2961,19 @@ EOF;
 	 * Create a new version number and move current working version
 	 * code into it
 	 *
-	 * @param int $long	The "long" version number (e.g. 100000)
-	 * @param string $human	The "human" version number (e.g. "1.0.0")
+	 * @param	int		$long	The "long" version number (e.g. 100000)
+	 * @param	string	$human	The "human" version number (e.g. "1.0.0")
 	 * @return	void
 	 */
-	public function assignNewVersion( int $long, string $human ) : void
+	public function assignNewVersion( $long, $human )
 	{
 		/* Add to versions.json */
-		$json = json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->directory}/data/versions.json" ), TRUE );
+		$json = json_decode( \file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/versions.json" ), TRUE );
 		$json[ $long ] = $human;
-		static::writeJson( ROOT_PATH . "/applications/{$this->directory}/data/versions.json", $json );
+		static::writeJson( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/versions.json", $json );
 
 		/* Do stuff */
-		$setupDir = ROOT_PATH . "/applications/{$this->directory}/setup";
+		$setupDir = \IPS\ROOT_PATH . "/applications/{$this->directory}/setup";
 		$workingDir = $setupDir . "/upg_working";
 		if ( file_exists( $workingDir ) )
 		{
@@ -3447,7 +2983,7 @@ EOF;
 			{
 				$write = array();
 				$i = 0;
-				foreach ( json_decode( file_get_contents( $queriesJsonFile ), TRUE ) as $query )
+				foreach ( json_decode( \file_get_contents( $queriesJsonFile ), TRUE ) as $query )
 				{
 					$write[ ++$i ] = $query;
 				}
@@ -3473,7 +3009,7 @@ EOF;
 						),
 						$contents
 					);
-					file_put_contents( $file, $contents );
+					\file_put_contents( $file, $contents );
 				}
 			};
 
@@ -3486,7 +3022,7 @@ EOF;
 		}
 
 		/* Update core_dev */
-		Db::i()->update( 'core_dev', array(
+		\IPS\Db::i()->update( 'core_dev', array(
 			'working_version'	=> $long,
 		), array( 'app_key=? AND working_version=?', $this->directory, 'working' ) );
 	}
@@ -3495,44 +3031,41 @@ EOF;
 	 * Build application for release
 	 *
 	 * @return	void
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public function build() : void
+	public function build()
 	{
-		/* Set the building flag */
-		Data\Store::i()->buildingApp = time();
-
 		/* Use full upgrader? */
 		$forceFullUpgrade = FALSE;
 
 		/* Write the application data to the application.json file */
 		$applicationData	= array(
-			'application_title'	=> Member::loggedIn()->language()->get('__app_' . $this->directory ),
+			'application_title'	=> \IPS\Member::loggedIn()->language()->get('__app_' . $this->directory ),
 			'app_author'		=> $this->author,
 			'app_directory'		=> $this->directory,
 			'app_protected'		=> $this->protected,
 			'app_website'		=> $this->website,
 			'app_update_check'	=> $this->update_check,
-			'app_hide_tab'		=> $this->hide_tab,
+			'app_hide_tab'		=> $this->hide_tab
 		);
 
-		Application::writeJson( ROOT_PATH . '/applications/' . $this->directory . '/data/application.json', $applicationData );
+		\IPS\Application::writeJson( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data/application.json', $applicationData );
 
 		/* Update app version data */
 		$versions		= $this->getAllVersions();
 		$longVersions	= array_keys( $versions );
 		$humanVersions	= array_values( $versions );
-		if( count($versions) )
+		if( \count($versions) )
 		{
 			$latestLVersion	= array_pop( $longVersions );
 			$latestHVersion	= array_pop( $humanVersions );
 
-			Db::i()->update( 'core_applications', array( 'app_version' => $latestHVersion, 'app_long_version' => $latestLVersion ), array( 'app_directory=?', $this->directory ) );
+			\IPS\Db::i()->update( 'core_applications', array( 'app_version' => $latestHVersion, 'app_long_version' => $latestLVersion ), array( 'app_directory=?', $this->directory ) );
 
 			$this->long_version = $latestLVersion;
 			$this->version		= $latestHVersion;
 		}
-		$setupDir = ROOT_PATH . '/applications/' . $this->directory . '/setup/upg_' . $this->long_version;
+		$setupDir = \IPS\ROOT_PATH . '/applications/' . $this->directory . '/setup/upg_' . $this->long_version;
 		if ( !is_dir( $setupDir ) )
 		{
 			mkdir( $setupDir );
@@ -3541,7 +3074,7 @@ EOF;
 		/* Take care of languages for this app */
 		$languageChanges = $this->buildLanguages();
 		$langChangesFile = $setupDir . '/lang.json';
-		if ( count( array_filter( $languageChanges['normal'] ) ) or count( array_filter( $languageChanges['js'] ) ) )
+		if ( \count( array_filter( $languageChanges['normal'] ) ) or \count( array_filter( $languageChanges['js'] ) ) )
 		{
 			if ( file_exists( $langChangesFile ) )
 			{
@@ -3550,13 +3083,13 @@ EOF;
 				$languageChanges['js'] = $this->_combineChanges( $languageChanges['js'], $previousLangChanges['js'] );
 			}
 
-			if ( count( array_filter( $languageChanges['normal'] ) ) or count( array_filter( $languageChanges['js'] ) ) )
+			if ( \count( array_filter( $languageChanges['normal'] ) ) or \count( array_filter( $languageChanges['js'] ) ) )
 			{
-				file_put_contents( $langChangesFile, json_encode( $languageChanges, JSON_PRETTY_PRINT ) );
+				\file_put_contents( $langChangesFile, json_encode( $languageChanges, JSON_PRETTY_PRINT ) );
 			}
-			elseif ( file_exists( $langChangesFile ) )
+			elseif ( \file_exists( $langChangesFile ) )
 			{
-				unlink( $langChangesFile );
+				\unlink( $langChangesFile );
 			}
 		}
 		$this->installLanguages();
@@ -3564,7 +3097,7 @@ EOF;
 		/* Take care of skins for this app */
 		$themeChanges = $this->buildThemeTemplates();
 		$themeChangesFile = $setupDir . '/theme.json';
-		if ( count( array_filter( $themeChanges['html'] ) ) or count( array_filter( $themeChanges['css'] ) ) or count( array_filter( $themeChanges['resources'] ) ) )
+		if ( \count( array_filter( $themeChanges['html'] ) ) or \count( array_filter( $themeChanges['css'] ) ) or \count( array_filter( $themeChanges['resources'] ) ) )
 		{
 			if ( file_exists( $themeChangesFile ) )
 			{
@@ -3574,104 +3107,41 @@ EOF;
 				$themeChanges['resources'] = $this->_combineChanges( $themeChanges['resources'], $previousThemeChanges['resources'] );
 			}
 
-			if ( count( array_filter( $themeChanges['html'] ) ) or count( array_filter( $themeChanges['css'] ) ) or count( array_filter( $themeChanges['resources'] ) ) )
+			if ( \count( array_filter( $themeChanges['html'] ) ) or \count( array_filter( $themeChanges['css'] ) ) or \count( array_filter( $themeChanges['resources'] ) ) )
 			{
-				file_put_contents( $themeChangesFile, json_encode( $themeChanges, JSON_PRETTY_PRINT ) );
+				\file_put_contents( $themeChangesFile, json_encode( $themeChanges, JSON_PRETTY_PRINT ) );
 			}
-			elseif ( file_exists( $themeChangesFile ) )
+			elseif ( \file_exists( $themeChangesFile ) )
 			{
-				unlink( $themeChangesFile );
-			}
-		}
-
-		/* Custom Templates */
-		$customTemplateChanges = $this->buildCustomTemplates();
-		$customTemplatesChangesFile = $setupDir . '/customtemplates.json';
-		if( count( $customTemplateChanges ) )
-		{
-			if( file_exists( $customTemplatesChangesFile ) )
-			{
-				$previousChanges = json_decode( file_get_contents( $customTemplatesChangesFile ), true );
-				$customTemplateChanges  = $this->_combineChanges( $customTemplateChanges, $previousChanges );
-			}
-
-			if( count( array_filter( $customTemplateChanges ) ) )
-			{
-				file_put_contents( $customTemplatesChangesFile, json_encode( $customTemplateChanges, JSON_PRETTY_PRINT ) );
-			}
-			elseif( file_exists( $customTemplatesChangesFile ) )
-			{
-				unlink( $customTemplatesChangesFile );
-			}
-		}
-
-		/* Theme Editor Settings */
-		$editorChanges = $this->buildThemeEditorSettings();
-		$editorChangesFile = $setupDir . '/themeeditor.json';
-		if( count( array_filter( $editorChanges['categories'] ) ) or count( array_filter( $editorChanges['settings'] ) ) )
-		{
-			if ( file_exists( $editorChangesFile ) )
-			{
-				$previousEditorChanges = json_decode( file_get_contents( $editorChangesFile ), TRUE );
-				$editorChanges['categories'] = $this->_combineChanges( $editorChanges['categories'] ?? [], $previousEditorChanges['categories'] ?? [] );
-				$editorChanges['settings'] = $this->_combineChanges( $editorChanges['settings'] ?? [], $previousEditorChanges['settings'] ?? [] );
-			}
-
-			if( count( array_filter( $editorChanges['categories'] ) ) or count( array_filter( $editorChanges['settings'] ) ) )
-			{
-				file_put_contents( $editorChangesFile, json_encode( $editorChanges, JSON_PRETTY_PRINT ) );
-			}
-			elseif ( file_exists( $editorChangesFile ) )
-			{
-				unlink( $editorChangesFile );
+				\unlink( $themeChangesFile );
 			}
 		}
 
 		/* Take care of emails for this app */
 		$emailTemplateChanges = $this->buildEmailTemplates();
 		$emailTemplateChangesFile = $setupDir . '/emailTemplates.json';
-		if ( count( array_filter( $emailTemplateChanges ) ) )
+		if ( \count( array_filter( $emailTemplateChanges ) ) )
 		{
 			if ( file_exists( $emailTemplateChangesFile ) )
 			{
 				$emailTemplateChanges = $this->_combineChanges( $emailTemplateChanges, json_decode( file_get_contents( $emailTemplateChangesFile ), TRUE ) );
 			}
 
-			if ( count( array_filter( $emailTemplateChanges ) ) )
+			if ( \count( array_filter( $emailTemplateChanges ) ) )
 			{
-				file_put_contents( $emailTemplateChangesFile, json_encode( $emailTemplateChanges, JSON_PRETTY_PRINT ) );
+				\file_put_contents( $emailTemplateChangesFile, json_encode( $emailTemplateChanges, JSON_PRETTY_PRINT ) );
 			}
-			elseif ( file_exists( $emailTemplateChangesFile ) )
+			elseif ( \file_exists( $emailTemplateChangesFile ) )
 			{
-				unlink( $emailTemplateChangesFile );
+				\unlink( $emailTemplateChangesFile );
 			}
 		}
 		$this->installEmailTemplates();
 
-		/* Editor Plugins */
-		$editorPluginChanges = $this->buildEditorPlugins();
-		$editorPluginChangesFile = $setupDir . '/editor.json';
-		if ( count( array_filter( $editorPluginChanges ) ) )
-		{
-			if ( file_exists( $editorPluginChangesFile ) )
-			{
-				$editorPluginChanges = $this->_combineChanges( $editorPluginChanges, json_decode( file_get_contents( $editorPluginChangesFile ), TRUE ) );
-			}
-
-			if ( count( array_filter( $editorPluginChanges ) ) )
-			{
-				file_put_contents( $editorPluginChangesFile, json_encode( $editorPluginChanges, JSON_PRETTY_PRINT ) );
-			}
-			elseif ( file_exists( $editorPluginChangesFile ) )
-			{
-				unlink( $editorPluginChangesFile );
-			}
-		}
-
 		/* Take care of javascript for this app */
 		$jsChanges = $this->buildJavascript();
 		$jsChangesFile = $setupDir . '/javascript.json';
-		if ( count( array_filter( $jsChanges['files'] ) ) or count( array_filter( $jsChanges['orders'] ) ) )
+		if ( \count( array_filter( $jsChanges['files'] ) ) or \count( array_filter( $jsChanges['orders'] ) ) )
 		{
 			if ( file_exists( $jsChangesFile ) )
 			{
@@ -3680,17 +3150,17 @@ EOF;
 				$jsChanges['orders'] = $this->_combineChanges( $jsChanges['orders'], $previousJsChanges['orders'] );
 			}
 
-			if ( count( array_filter( $jsChanges['files'] ) ) or count( array_filter( $jsChanges['orders'] ) ) )
+			if ( \count( array_filter( $jsChanges['files'] ) ) or \count( array_filter( $jsChanges['orders'] ) ) )
 			{
-				file_put_contents( $jsChangesFile, json_encode( $jsChanges, JSON_PRETTY_PRINT ) );
+				\file_put_contents( $jsChangesFile, json_encode( $jsChanges, JSON_PRETTY_PRINT ) );
 			}
-			elseif ( file_exists( $jsChangesFile ) )
+			elseif ( \file_exists( $jsChangesFile ) )
 			{
-				unlink( $jsChangesFile );
+				\unlink( $jsChangesFile );
 			}
 
 			/* Force full upgrade if global JS has changed */
-			foreach( new RecursiveIteratorIterator( new RecursiveArrayIterator( $jsChanges ) ) as $k => $v )
+			foreach( new \RecursiveIteratorIterator( new \RecursiveArrayIterator( $jsChanges ) ) as $k => $v )
 			{
 				if( mb_substr( $v, 0, 6 ) === 'global' )
 				{
@@ -3701,96 +3171,70 @@ EOF;
 		}
 		$this->installJavascript();
 
-		/* If this is a first party app, compile immediately */
-		if( in_array( $this->directory, IPS::$ipsApps ) )
-		{
-			Javascript::compile( $this->directory );
-
-			if ( $this->directory == 'core' )
-			{
-				/* We also need to compile global */
-				Javascript::compile( 'global' );
-			}
-
-			Theme::compileStatic( $this->directory );
-		}
+		/* Take care of hooks for this app */
+		$this->buildHooks();
 
 		/* And custom build routines */
-		foreach($this->extensions('core', 'Build') as $builder )
+		foreach( $this->extensions( 'core', 'Build' ) as $builder )
 		{
 			$builder->build();
 		}
 
 		/* Write a build.xml file with the current json data so we know what has changed next time we build */
 		$jsonChanges = $this->buildJsonData();
-		foreach ( array( 'modules', 'tasks', 'settings', 'widgets', 'acpSearchKeywords', 'themeeditor' ) as $k )
+		foreach ( array( 'modules', 'tasks', 'settings', 'widgets', 'acpSearchKeywords', 'hooks', 'themeSettings' ) as $k )
 		{
-			if ( isset( $jsonChanges[ $k ] ) )
+			if ( isset( $jsonChanges[ $k ] ) and ( $jsonChanges[ $k ]['added'] or $jsonChanges[ $k ]['edited'] or $jsonChanges[ $k ]['removed'] ) )
 			{
 				$changesFile = "{$setupDir}/{$k}.json";
 
-				/* Do we have changes? Rework this to handle the nested editor categories/settings */
-				if( $k == 'themeeditor' )
+				if ( file_exists( $changesFile ) )
 				{
-					if ( file_exists( $changesFile ) )
-					{
-						$jsonChanges[ $k ]['categories'] = $this->_combineChanges( $jsonChanges[ $k ]['categories'], json_decode( file_get_contents( $changesFile ), TRUE )['categories'] );
-						$jsonChanges[ $k ]['settings'] = $this->_combineChanges( $jsonChanges[ $k ]['settings'], json_decode( file_get_contents( $changesFile ), TRUE )['settings'] );
-					}
-
-					$newChanges = ( $jsonChanges[ $k ]['categories']['added'] or $jsonChanges[ $k ]['categories']['edited'] or $jsonChanges[ $k ]['categories']['removed'] or $jsonChanges[ $k ]['settings']['added'] or $jsonChanges[ $k ]['settings']['edited'] or $jsonChanges[ $k ]['settings']['removed'] );
-				}
-				else
-				{
-					if ( file_exists( $changesFile ) )
-					{
-						$jsonChanges[ $k ] = $this->_combineChanges( $jsonChanges[ $k ], json_decode( file_get_contents( $changesFile ), TRUE ) );
-					}
-
-					$newChanges = ( $jsonChanges[ $k ]['added'] or $jsonChanges[ $k ]['edited'] or $jsonChanges[ $k ]['removed'] );
+					$jsonChanges[ $k ] = $this->_combineChanges( $jsonChanges[ $k ], json_decode( file_get_contents( $changesFile ), TRUE ) );
 				}
 
-				if( $newChanges )
+				if ( $jsonChanges[ $k ]['added'] or $jsonChanges[ $k ]['edited'] or $jsonChanges[ $k ]['removed'] )
 				{
-					file_put_contents( $changesFile, json_encode( $jsonChanges[ $k ], JSON_PRETTY_PRINT ) );
+					\file_put_contents( $changesFile, json_encode( $jsonChanges[ $k ], JSON_PRETTY_PRINT ) );
 				}
-				elseif ( file_exists( $changesFile ) )
+				elseif ( \file_exists( $changesFile ) )
 				{
-					unlink( $changesFile );
+					\unlink( $changesFile );
 				}
 			}
 		}
 
 		/* Included CMS Templates */
-		if( file_exists( ROOT_PATH . '/applications/' . $this->directory . '/dev/cmsTemplates.json' ) )
+		if( file_exists( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/dev/cmsTemplates.json' ) )
 		{
-			$pagesTemplates = json_decode( file_get_contents( ROOT_PATH . '/applications/' . $this->directory . '/dev/cmsTemplates.json' ), TRUE );
-			$xml = Templates::exportAsXml( $pagesTemplates );
+			$pagesTemplates = json_decode( file_get_contents( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/dev/cmsTemplates.json' ), TRUE );
+			$xml = \IPS\cms\Templates::exportAsXml( $pagesTemplates );
 
 			if( $xml )
 			{
-				if ( is_writable( ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
+				if ( is_writable( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
 				{
-					file_put_contents( ROOT_PATH . '/applications/' . $this->directory . '/data/cmsTemplates.xml', $xml->outputMemory() );
+					\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data/cmsTemplates.xml', $xml->outputMemory() );
 				}
 				else
 				{
-					throw new RuntimeException( Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
+					throw new \RuntimeException( \IPS\Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
 				}
 			}
 		}
 
 		/* Write the version data file */
-		file_put_contents( $setupDir . '/data.json', json_encode( array(
+		\file_put_contents( $setupDir . '/data.json', json_encode( array(
 			'id'					=> $this->long_version,
 			'name'					=> $this->version,
 			'steps'					=> array(
 				'queries'				=> file_exists( $setupDir . "/queries.json" ),
 				'lang'					=> file_exists( $langChangesFile ),
 				'theme'					=> file_exists( $themeChangesFile ),
-				'themeeditor'			=> file_exists( $setupDir . "/themeeditor.json" ),
+				'themeSettings'			=> file_exists( $setupDir . "/themeSettings.json" ),
 				'javascript'			=> file_exists( $jsChangesFile ),
 				'emailTemplates'		=> file_exists( $emailTemplateChangesFile ),
+				'hooks'					=> file_exists( $setupDir . "/hooks.json" ),
 				'acpSearchKeywords'		=> file_exists( $setupDir . "/acpSearchKeywords.json" ),
 				'settings'				=> file_exists( $setupDir . "/settings.json" ),
 				'tasks'					=> file_exists( $setupDir . "/tasks.json" ),
@@ -3803,45 +3247,23 @@ EOF;
 			'forceManualDownloadNoCiC'	=> FALSE,
 			'forceManualDownloadCiC'		=> FALSE,
 		), JSON_PRETTY_PRINT ) );
-
-		foreach($this->extensions('core', 'Build') as $builder )
-		{
-			$builder->finish();
-		}
-
-		unset( Data\Store::i()->buildingApp );
-	}
-
-	/**
-	 * Are we currently building?
-	 *
-	 * @return bool
-	 */
-	public static function areWeBuilding(): bool
-	{
-		if ( isset( Data\Store::i()->buildingApp ) )
-		{
-			return Data\Store::i()->buildingApp > ( time() - ( 5 * 60 ) );
-		}
-
-		return false;
 	}
 
 	/**
 	 * Combine information about changes when rebuilding a version after it was already built once before
 	 *
-	 * @param array $newChanges			The changes detected in this build
-	 * @param array $previousChanges		The changes detected in the previous build
-	 * @param bool $keysOnly			Set to TRUE if the changes is just a list of keys, or FALSE if they're key/values
+	 * @param	array	$newChanges			The changes detected in this build
+	 * @param	array	$previousChanges		The changes detected in the previous build
+	 * @param	bool	$keysOnly			Set to TRUE if the changes is just a list of keys, or FALSE if they're key/values
 	 * @return	array
 	 */
-	protected function _combineChanges( array $newChanges, array $previousChanges, bool $keysOnly=TRUE ): array
+	protected function _combineChanges( $newChanges, $previousChanges, $keysOnly=TRUE )
 	{
 		if ( $keysOnly )
 		{
 			foreach ( $newChanges['added'] as $v )
 			{
-				if ( in_array( $v, $previousChanges['removed'] ) )
+				if ( \in_array( $v, $previousChanges['removed'] ) )
 				{
 					unset( $previousChanges['removed'][ array_search( $v, $previousChanges['removed'] ) ] );
 				}
@@ -3852,23 +3274,23 @@ EOF;
 			}
 			foreach ( $newChanges['edited'] as $v )
 			{
-				if ( !in_array( $v, $previousChanges['added'] ) and !in_array( $v, $previousChanges['edited'] ) )
+				if ( !\in_array( $v, $previousChanges['added'] ) )
 				{
 					$previousChanges['edited'][] = $v;
 				}
 			}
 			foreach ( $newChanges['removed'] as $v )
 			{
-				if ( in_array( $v, $previousChanges['added'] ) )
+				if ( \in_array( $v, $previousChanges['added'] ) )
 				{
 					unset( $previousChanges['added'][ array_search( $v, $previousChanges['added'] ) ] );
 				}
-				elseif ( in_array( $v, $previousChanges['edited'] ) )
+				elseif ( \in_array( $v, $previousChanges['edited'] ) )
 				{
 					unset( $previousChanges['edited'][ array_search( $v, $previousChanges['edited'] ) ] );
 					$previousChanges['removed'][] = $v;
 				}
-				elseif ( !in_array( $v, $previousChanges['removed'] ) )
+				elseif ( !\in_array( $v, $previousChanges['removed'] ) )
 				{
 					$previousChanges['removed'][] = $v;
 				}
@@ -3912,41 +3334,32 @@ EOF;
 			}
 		}
 
-		/* Make sure we have all the sections defined */
-		foreach( array( 'added', 'edited', 'removed' ) as $type )
-		{
-			if( !isset( $previousChanges[ $type ] ) )
-			{
-				$previousChanges[ $type ] = [];
-			}
-		}
-
 		return $previousChanges;
 	}
 
 	/**
 	 * Build skin templates for an app
 	 *
-	 * @return	void|array
-	 * @throws	RuntimeException
+	 * @return	void
+	 * @throws	\RuntimeException
 	 */
 	public function buildThemeTemplates()
 	{
 		/* Delete compiled items */
-		Theme::deleteCompiledTemplate( $this->directory );
-		Theme::deleteCompiledCss( $this->directory );
-		Theme::removeResources( $this->directory );
+		\IPS\Theme::deleteCompiledTemplate( $this->directory );
+		\IPS\Theme::deleteCompiledCss( $this->directory );
+		\IPS\Theme::removeResources( $this->directory );
 
-		Theme::i()->importDevHtml( $this->directory, 0 );
-		Theme::i()->importDevCss( $this->directory, 0 );
+		\IPS\Theme::i()->importDevHtml( $this->directory, 0 );
+		\IPS\Theme::i()->importDevCss( $this->directory, 0 );
 
 		/* Get current XML file for calculating differences */
 		$return = array( 'html' => array( 'added' => array(), 'edited' => array(), 'removed' => array() ), 'css' => array( 'added' => array(), 'edited' => array(), 'removed' => array() ), 'resources' => array( 'added' => array(), 'edited' => array(), 'removed' => array() ) );
 		$current = array( 'html' => array(), 'css' => array(), 'resources' => array() );
-		$currentFile = ROOT_PATH . "/applications/{$this->directory}/data/theme.xml";
+		$currentFile = \IPS\ROOT_PATH . "/applications/{$this->directory}/data/theme.xml";
 		if ( file_exists( $currentFile ) )
 		{
-			$xml = SimpleXML::loadFile( $currentFile );
+			$xml = \IPS\Xml\SimpleXML::loadFile( $currentFile );
 			foreach ( $xml->template as $html )
 			{
 				$attributes = iterator_to_array( $html->attributes() );
@@ -3973,7 +3386,7 @@ EOF;
 		}
 
 		/* Build XML and write to app directory */
-		$xml = new XMLWriter;
+		$xml = new \XMLWriter;
 		$xml->openMemory();
 		$xml->setIndent( TRUE );
 		$xml->startDocument( '1.0', 'UTF-8' );
@@ -3990,15 +3403,55 @@ EOF;
 		$xml->text( "https://www.invisioncommunity.com" );
 		$xml->endAttribute();
 
+		/* Skin settings */
+		foreach (
+			\IPS\Db::i()->select(
+				'core_theme_settings_fields.*',
+				'core_theme_settings_fields',
+				array( 'sc_set_id=? AND sc_app=?', 1, $this->directory ),
+				'sc_key ASC'
+			)
+			as $row
+		)
+		{
+			/* Initiate the <fields> tag */
+			$xml->startElement('field');
+
+			unset( $row['sc_id'], $row['sc_set_id'] );
+
+			foreach( $row as $k => $v )
+			{
+				if ( $k != 'sc_content' )
+				{
+					$xml->startAttribute( $k );
+					$xml->text( $v );
+					$xml->endAttribute();
+				}
+			}
+
+			/* Write value */
+			if ( preg_match( '/<|>|&/', $row['sc_content'] ) )
+			{
+				$xml->writeCData( str_replace( ']]>', ']]]]><![CDATA[>', $row['sc_content'] ) );
+			}
+			else
+			{
+				$xml->text( $row['sc_content'] );
+			}
+
+			/* Close the <fields> tag */
+			$xml->endElement();
+		}
+
 		/* Templates */
-		foreach (Db::i()->select( '*', 'core_theme_templates', array( 'template_set_id=? AND template_app=?', 0, $this->directory ), 'template_group, template_name, template_location' ) as $template )
+		foreach ( \IPS\Db::i()->select( '*', 'core_theme_templates', array( 'template_set_id=? AND template_user_added=? AND template_app=?', 0, 0 , $this->directory ), 'template_group, template_name, template_location' ) as $template )
 		{
 			/* Initiate the <template> tag */
 			$xml->startElement('template');
 			$attributes = array();
 			foreach( $template as $k => $v )
 			{
-				if ( in_array( substr( $k, 9 ), array('app', 'location', 'group', 'name', 'data' ) ) )
+				if ( \in_array( \substr( $k, 9 ), array('app', 'location', 'group', 'name', 'data' ) ) )
 				{
 					$attributes[ $k ] = $v;
 					$xml->startAttribute( $k );
@@ -4008,7 +3461,7 @@ EOF;
 			}
 
 			/* Write value */
-			if ( preg_match( '/[<>&]/', $template['template_content'] ) )
+			if ( preg_match( '/<|>|&/', $template['template_content'] ) )
 			{
 				$xml->writeCData( str_replace( ']]>', ']]]]><![CDATA[>', $template['template_content'] ) );
 			}
@@ -4034,13 +3487,13 @@ EOF;
 		}
 
 		/* Css */
-		foreach (Db::i()->select( '*', 'core_theme_css', array( 'css_set_id=? AND css_app=?', 0 , $this->directory ), 'css_path, css_name, css_location' ) as $css )
+		foreach ( \IPS\Db::i()->select( '*', 'core_theme_css', array( 'css_set_id=? AND css_added_to=? AND css_app=?', 0, 0 , $this->directory ), 'css_path, css_name, css_location' ) as $css )
 		{
 			$xml->startElement('css');
 			$attributes = array();
 			foreach( $css as $k => $v )
 			{
-				if ( in_array( substr( $k, 4 ), array('app', 'location', 'path', 'name', 'attributes' ) ) )
+				if ( \in_array( \substr( $k, 4 ), array('app', 'location', 'path', 'name', 'attributes' ) ) )
 				{
 					$attributes[ $k ] = $v;
 					$xml->startAttribute( $k );
@@ -4050,7 +3503,7 @@ EOF;
 			}
 
 			/* Write value */
-			if ( preg_match( '/[<>&]/', $css['css_content'] ) )
+			if ( preg_match( '/<|>|&/', $css['css_content'] ) )
 			{
 				$xml->writeCData( str_replace( ']]>', ']]]]><![CDATA[>', $css['css_content'] ) );
 			}
@@ -4119,13 +3572,13 @@ EOF;
 		$xml->endDocument();
 
 		/* Write it */
-		if ( is_writable( ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
+		if ( is_writable( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
 		{
-			file_put_contents( ROOT_PATH . '/applications/' . $this->directory . '/data/theme.xml', $xml->outputMemory() );
+			\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data/theme.xml', $xml->outputMemory() );
 		}
 		else
 		{
-			throw new RuntimeException( Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
+			throw new \RuntimeException( \IPS\Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
 		}
 
 		/* Return */
@@ -4136,211 +3589,22 @@ EOF;
 	}
 
 	/**
-	 * Build custom templates into a JSON file
-	 *
-	 * @return array|array[]
-	 */
-	public function buildCustomTemplates() : array
-	{
-		$return = array(
-			'added' => array(), 'edited' => array(), 'removed' => array()
-		);
-
-		/* Read in the current file */
-		$current = [];
-		$file = ROOT_PATH . "/applications/" . $this->directory . "/data/customtemplates.json";
-		if( file_exists( $file ) )
-		{
-			$current = json_decode( file_get_contents( $file ), true );
-		}
-
-		/* Custom templates */
-		$json = [];
-		foreach( Db::i()->select( '*', 'core_theme_templates_custom', array( 'template_app=?', $this->directory ) ) as $template )
-		{
-			$templateData = [
-				'hookpoint' => $template['template_hookpoint'],
-				'type' => $template['template_hookpoint_type'],
-				'key' => $template['template_key'],
-				'version' => $template['template_version'],
-				'content' => $template['template_content']
-			];
-			$json[ $template['template_name'] ] = $templateData;
-
-			if( !array_key_exists( $template['template_name'], $current ) )
-			{
-				$return['added'][] = $template['template_name'];
-			}
-			else
-			{
-				$currentTemplate = $current[ $template['template_name'] ];
-				if( json_encode( $currentTemplate ) == json_encode( $templateData ) )
-				{
-					$return['edited'][] = $template['template_name'];
-				}
-				unset( $current[ $template['template_name']] );
-			}
-		}
-
-		/* Whatever is left was deleted */
-		if( count( $current ) )
-		{
-			$return['removed'] = array_keys( $current );
-		}
-
-		static::writeJson( $file, $json );
-
-		return $return;
-	}
-
-	/**
-	 * Build theme editor settings for an application
-	 *
-	 * @return array|array[]
-	 */
-	public function buildThemeEditorSettings() : array
-	{
-		$return = array(
-			'categories' => array( 'added' => array(), 'edited' => array(), 'removed' => array() ),
-			'settings' => array( 'added' => array(), 'edited' => array(), 'removed' => array() )
-		);
-
-		$current = array( 'categories' => array(), 'settings' => array() );
-
-		/* Read in the current file */
-		$file = ROOT_PATH . "/applications/" . $this->directory . "/data/themeeditor.json";
-		if( file_exists( $file ) )
-		{
-			$current = json_decode( file_get_contents( $file ), true );
-		}
-
-		$lang = Lang::load( Lang::defaultLanguage() );
-		$json = [];
-		$mapping = [];
-
-		foreach( Db::i()->select( '*', 'core_theme_editor_categories', [ 'cat_app=? and cat_set_id=?', $this->directory, 0 ], 'cat_parent,cat_position' ) as $row )
-		{
-			$mapping[ $row['cat_id'] ] = $row['cat_key'];
-			$categoryData = [
-				'cat_name' => $row['cat_name'],
-				'cat_key' => $row['cat_key'],
-				'cat_icon' => Category::constructFromData( $row )->icon()
-			];
-
-			if( $row['cat_parent'] and isset( $mapping[ $row['cat_parent'] ] ) )
-			{
-				$categoryData['cat_parent'] = $mapping[ $row['cat_parent'] ];
-			}
-
-			if( !isset( $current['categories'] ) or !array_key_exists( $row['cat_key'], $current['categories'] ) )
-			{
-				$return['categories']['added'][] = $row['cat_key'];
-			}
-			else
-			{
-				$currentData = $current['categories'][ $row['cat_key'] ];
-				if( json_encode( $currentData ) !== json_encode( $categoryData ) )
-				{
-					$return['categories']['edited'][] = $row['cat_key'];
-				}
-
-				unset( $current['categories'][ $row['cat_key'] ] );
-			}
-
-			$json['categories'][ $row['cat_key'] ] = $categoryData;
-		}
-
-		/* Whatever is left was deleted */
-		if( isset( $current['categories'] ) and count( $current['categories'] ) )
-		{
-			$return['categories']['removed'] = array_keys( $current['categories'] );
-		}
-
-		foreach(
-			Db::i()->select( '*', 'core_theme_editor_settings', [ 'setting_app=? and setting_set_id=?', $this->directory, 0 ], 'setting_position' )
-				->join( 'core_theme_editor_categories', 'setting_category_id=core_theme_editor_categories.cat_id' ) as $row )
-		{
-			$settingData = [
-				'key' => $row['setting_key'],
-				'type' => $row['setting_type'],
-				'name' => $row['setting_name'],
-				'desc' => $row['setting_desc'],
-				'refresh' => (bool) $row['setting_refresh']
-			];
-
-			$_data = $row['setting_data'] ? json_decode( $row['setting_data'], true ) : [];
-			switch( $row['setting_type'] )
-			{
-				case Setting::SETTING_SELECT:
-					$settingData['options'] = $_data['options'];
-					break;
-
-				case Setting::SETTING_NUMBER:
-					foreach( $_data as $k => $v )
-					{
-						$settingData[$k] = $v;
-					}
-					break;
-
-				case Setting::SETTING_COLOR:
-					$default = json_decode( $row['setting_default'], true );
-					$settingData['light_default'] = $default['light'];
-					$settingData['dark_default'] = $default['dark'];
-					break;
-			}
-
-			if( $row['setting_type'] != Setting::SETTING_COLOR )
-			{
-				$settingData['default'] = $row['setting_default'];
-			}
-
-			$settingData['cat'] = $row['cat_key'];
-
-			if( !isset( $current['settings'] ) or !array_key_exists( $row['setting_key'], $current['settings'] ) )
-			{
-				$return['settings']['added'][] = $row['setting_key'];
-			}
-			else
-			{
-				$currentData = $current['settings'][ $row['setting_key'] ];
-				if( json_encode( $currentData ) !== json_encode( $settingData ) )
-				{
-					$return['settings']['edited'][] = $row['setting_key'];
-				}
-
-				unset( $current['settings'][ $row['setting_key'] ] );
-			}
-
-			$json['settings'][ $row['setting_key'] ] = $settingData;
-		}
-
-		if( isset( $current['settings'] ) and count( $current['settings'] ) )
-		{
-			$return['settings']['removed'] = array_keys( $current['settings'] );
-		}
-
-		static::writeJson( $file, $json );
-
-		return $return;
-	}
-
-	/**
 	 * Build Resources ready for non IN_DEV use
 	 *
 	 * @return	array
 	 */
-	protected function _buildThemeResources(): array
+	protected function _buildThemeResources()
 	{
 		$resources = array();
-		$path	= ROOT_PATH . "/applications/" . $this->directory . "/dev/resources/";
+		$path	= \IPS\ROOT_PATH . "/applications/" . $this->directory . "/dev/resources/";
 
-		Theme::i()->importDevResources( $this->directory, 0 );
+		\IPS\Theme::i()->importDevResources( $this->directory, 0 );
 
 		if ( is_dir( $path ) )
 		{
-			foreach( new DirectoryIterator( $path ) as $location )
+			foreach( new \DirectoryIterator( $path ) as $location )
 			{
-				if ( $location->isDot() || substr( $location->getFilename(), 0, 1 ) === '.' )
+				if ( $location->isDot() || \substr( $location->getFilename(), 0, 1 ) === '.' )
 				{
 					continue;
 				}
@@ -4359,18 +3623,18 @@ EOF;
 	 * Build Resources ready for non IN_DEV use (Iterable)
 	 * Theme resources should be raw binary data everywhere (filesystem and DB) except in the theme XML download where they are base64 encoded.
 	 *
-	 * @param string $location	Location Folder Name
-	 * @param string $path		Path
-	 * @param array $resources	Array of resources to append to
+	 * @param	string	$location	Location Folder Name
+	 * @param	string	$path		Path
+	 * @param	array	$resources	Array of resources to append to
 	 * @return	array
 	 */
-	protected function _buildResourcesRecursive( string $location, string $path='/', array $resources=array() ): array
+	protected function _buildResourcesRecursive( $location, $path='/', $resources=array() )
 	{
-		$root = ROOT_PATH . "/applications/{$this->directory}/dev/resources/{$location}";
+		$root = \IPS\ROOT_PATH . "/applications/{$this->directory}/dev/resources/{$location}";
 
-		foreach( new DirectoryIterator( $root . $path ) as $file )
+		foreach( new \DirectoryIterator( $root . $path ) as $file )
 		{
-			if ( $file->isDot() || substr( $file->getFilename(), 0, 1 ) === '.' || $file == 'index.html' )
+			if ( $file->isDot() || \substr( $file->getFilename(), 0, 1 ) === '.' || $file == 'index.html' )
 			{
 				continue;
 			}
@@ -4386,7 +3650,7 @@ EOF;
 					'resource_location'	=> $location,
 					'resource_path'		=> $path,
 					'resource_name'		=> $file->getFilename(),
-					'resource_data'		=> file_get_contents( $root . $path . $file->getFilename() ),
+					'resource_data'		=> \file_get_contents( $root . $path . $file->getFilename() ),
 					'resource_added'	=> time()
 				);
 			}
@@ -4399,20 +3663,20 @@ EOF;
 	 * Build languages for an app
 	 *
 	 * @return	array
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public function buildLanguages(): array
+	public function buildLanguages()
 	{
 		$return = array( 'normal' => array( 'added' => array(), 'edited' => array(), 'removed' => array() ), 'js' => array( 'added' => array(), 'edited' => array(), 'removed' => array() ) );
 
 		/* Start with current XML file */
-		$currentFile = ROOT_PATH . "/applications/{$this->directory}/data/lang.xml";
+		$currentFile = \IPS\ROOT_PATH . "/applications/{$this->directory}/data/lang.xml";
 
 		$current = array( '0' => array(), '1' => array() );
 
 		if ( file_exists( $currentFile ) )
 		{
-			foreach ( SimpleXML::loadFile( $currentFile )->app->word as $word )
+			foreach ( \IPS\Xml\SimpleXML::loadFile( $currentFile )->app->word as $word )
 			{
 				$attributes = iterator_to_array( $word->attributes() );
 				$current[ (string) $attributes['js'] ][ (string) $attributes['key'] ] = (string) $word;
@@ -4420,7 +3684,7 @@ EOF;
 		}
 
 		/* Create the lang.xml file */
-		$xml = new XMLWriter;
+		$xml = new \XMLWriter;
 		$xml->openMemory();
 		$xml->setIndent( TRUE );
 		$xml->startDocument( '1.0', 'UTF-8' );
@@ -4442,7 +3706,9 @@ EOF;
 		$xml->endAttribute();
 
 		/* Import the language files */
-		$lang = Lang::readLangFiles( $this->directory );
+		$lang	= array();
+
+		require \IPS\ROOT_PATH . "/applications/{$this->directory}/dev/lang.php";
 		foreach ( $lang as $k => $v )
 		{
 			/* Start */
@@ -4482,7 +3748,7 @@ EOF;
 			{
 				$return['normal']['added'][] = $k;
 			}
-			elseif ( $current['0'][ $k ] != $v )
+			elseif ( isset( $current['0'][ $k ] ) AND $current['0'][ $k ] != $v )
 			{
 				$return['normal']['edited'][] = $k;
 			}
@@ -4493,7 +3759,9 @@ EOF;
 			}
 		}
 
-		$lang = Lang::readLangFiles( $this->directory, true );
+		$lang	= array();
+
+		require \IPS\ROOT_PATH . "/applications/{$this->directory}/dev/jslang.php";
 		foreach ( $lang as $k => $v )
 		{
 			/* Start */
@@ -4510,7 +3778,7 @@ EOF;
 			$xml->endAttribute();
 
 			/* Write value */
-			if ( preg_match( '/[<>&]/', $v ) )
+			if ( preg_match( '/<|>|&/', $v ) )
 			{
 				$xml->writeCData( str_replace( ']]>', ']]]]><![CDATA[>', $v ) );
 			}
@@ -4533,7 +3801,7 @@ EOF;
 			{
 				$return['js']['added'][] = $k;
 			}
-			elseif ( $current['1'][ $k ] != $v )
+			elseif ( isset( $current['1'][ $k ] ) AND $current['1'][ $k ] != $v )
 			{
 				$return['js']['edited'][] = $k;
 			}
@@ -4547,13 +3815,13 @@ EOF;
 		$xml->endDocument();
 
 		/* Write it */
-		if ( is_writable( ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
+		if ( is_writable( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
 		{
-			file_put_contents( ROOT_PATH . '/applications/' . $this->directory . '/data/lang.xml', $xml->outputMemory() );
+			\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data/lang.xml', $xml->outputMemory() );
 		}
 		else
 		{
-			throw new RuntimeException( Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
+			throw new \RuntimeException( \IPS\Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
 		}
 
 		/* Return */
@@ -4565,23 +3833,23 @@ EOF;
 	/**
 	 * Build email templates for an app
 	 *
-	 * @return	array
-	 * @throws	RuntimeException
+	 * @return	void
+	 * @throws	\RuntimeException
 	 */
-	public function buildEmailTemplates(): array
+	public function buildEmailTemplates()
 	{
 		/* Get current XML file for calculating differences */
 		$return = array( 'added' => array(), 'edited' => array(), 'removed' => array() );
 		$current = array();
-		$currentFile = ROOT_PATH . "/applications/{$this->directory}/data/emails.xml";
+		$currentFile = \IPS\ROOT_PATH . "/applications/{$this->directory}/data/emails.xml";
 		if ( file_exists( $currentFile ) )
 		{
-			$xml = SimpleXML::loadFile( $currentFile );
+			$xml = \IPS\Xml\SimpleXML::loadFile( $currentFile );
 			foreach ( $xml->template as $template )
 			{
 				$attributes = iterator_to_array( $template->attributes() );
 
-				$current[ (string) $template->template_name ] = array(
+				$current[ (string) (string) $template->template_name ] = array(
 					'params'		=> (string) $template->template_data,
 					'html'		=> (string) $template->template_content_html,
 					'plaintext'	=> (string) $template->template_content_plaintext,
@@ -4591,7 +3859,7 @@ EOF;
 		}
 
 		/* Where are we looking? */
-		$path = ROOT_PATH . "/applications/{$this->directory}/dev/email";
+		$path = \IPS\ROOT_PATH . "/applications/{$this->directory}/dev/email";
 
 		/* We create an array and store the templates temporarily so we can merge plaintext and HTML together */
 		$templates		= array();
@@ -4600,15 +3868,15 @@ EOF;
 		/* Loop over files in the directory */
 		if ( is_dir( $path ) )
 		{
-			foreach( new DirectoryIterator( $path ) as $location )
+			foreach( new \DirectoryIterator( $path ) as $location )
 			{
 				if ( $location->isDir() and mb_substr( $location, 0, 1 ) !== '.' and ( $location->getFilename() === 'plain' or $location->getFilename() === 'html' ) )
 				{
-					foreach( new DirectoryIterator( $path . '/' . $location->getFilename() ) as $sublocation )
+					foreach( new \DirectoryIterator( $path . '/' . $location->getFilename() ) as $sublocation )
 					{
 						if ( $sublocation->isDir() and mb_substr( $sublocation, 0, 1 ) !== '.' )
 						{
-							foreach( new DirectoryIterator( $path . '/' . $location->getFilename() . '/' . $sublocation->getFilename() ) as $file )
+							foreach( new \DirectoryIterator( $path . '/' . $location->getFilename() . '/' . $sublocation->getFilename() ) as $file )
 							{
 								if ( $file->isDot() or !$file->isFile() or mb_substr( $file, 0, 1 ) === '.' or $file->getFilename() === 'index.html' )
 								{
@@ -4628,7 +3896,7 @@ EOF;
 
 								/* Delete the template in the store */
 								$key = $templates[ $data['template_name'] ]['template_key'] . '_email_' . $type;
-								unset( Store::i()->$key );
+								unset( \IPS\Data\Store::i()->$key );
 
 								/* Remember our templates */
 								$templateKeys[]	= $data['template_key'];
@@ -4657,7 +3925,7 @@ EOF;
 
 					/* Delete the template in the store */
 					$key = $templates[ $data['template_name'] ]['template_key'] . '_email_' . $type;
-					unset( Store::i()->$key );
+					unset( \IPS\Data\Store::i()->$key );
 
 					/* Remember our templates */
 					$templateKeys[]	= $data['template_key'];
@@ -4666,29 +3934,29 @@ EOF;
 		}
 
 		/* Clear out invalid templates */
-		Db::i()->delete( 'core_email_templates', array( "template_app=? AND template_key NOT IN('" . implode( "','", $templateKeys ) . "')", $this->directory ) );
+		\IPS\Db::i()->delete( 'core_email_templates', array( "template_app=? AND template_key NOT IN('" . implode( "','", $templateKeys ) . "')", $this->directory ) );
 
 		/* If we have any templates, put them in the database */
-		if( count($templates) )
+		if( \count($templates) )
 		{
 			foreach( $templates as $template )
 			{
-				Db::i()->insert( 'core_email_templates', $template, TRUE );
+				\IPS\Db::i()->insert( 'core_email_templates', $template, TRUE );
 			}
 
 			/* Build the executable copies */
 			$this->parseEmailTemplates();
 		}
 
-		$xml = SimpleXML::create('emails');
+		$xml = \IPS\Xml\SimpleXML::create('emails');
 
 		/* Templates */
-		foreach (Db::i()->select( '*', 'core_email_templates', array( 'template_parent=? AND template_app=?', 0, $this->directory ), 'template_key ASC' ) as $template )
+		foreach ( \IPS\Db::i()->select( '*', 'core_email_templates', array( 'template_parent=? AND template_app=?', 0, $this->directory ), 'template_key ASC' ) as $template )
 		{
 			$forXml = array();
 			foreach( $template as $k => $v )
 			{
-				if ( in_array( substr( $k, 9 ), array('app', 'name', 'content_html', 'data', 'content_plaintext', 'pinned' ) ) )
+				if ( \in_array( \substr( $k, 9 ), array('app', 'name', 'content_html', 'data', 'content_plaintext', 'pinned' ) ) )
 				{
 					$forXml[ $k ] = $v;
 				}
@@ -4715,13 +3983,13 @@ EOF;
 		}
 
 		/* Write it */
-		if ( is_writable( ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
+		if ( is_writable( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
 		{
-			file_put_contents( ROOT_PATH . '/applications/' . $this->directory . '/data/emails.xml', $xml->asXML() );
+			\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data/emails.xml', $xml->asXML() );
 		}
 		else
 		{
-			throw new RuntimeException( Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
+			throw new \RuntimeException( \IPS\Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
 		}
 
 		/* Return */
@@ -4732,12 +4000,12 @@ EOF;
 	/**
 	 * Imports an IN_DEV email template into the database
 	 *
-	 * @param string $path			Path to file
-	 * @param object $file			DirectoryIterator File Object
-	 * @param string|null $namePrefix		Name prefix
+	 * @param	string		$path			Path to file
+	 * @param	object		$file			DirectoryIterator File Object
+	 * @param	string|null	$namePrefix		Name prefix
 	 * @return  array
 	 */
-	protected function _buildEmailTemplateFromInDev( string $path, object $file, ?string $namePrefix='' ): array
+	protected function _buildEmailTemplateFromInDev( $path, $file, $namePrefix='' )
 	{
 		/* Get the content */
 		$html	= file_get_contents( $path . '/' . $file->getFilename() );
@@ -4760,119 +4028,13 @@ EOF;
 		$name	= $namePrefix . str_replace( '.' . $extension, '', $file->getFilename() );
 		$type	= ( $extension === 'txt' ) ? "plaintext" : "html";
 
-		return array(
+		$return = array(
 			'template_app'				=> $this->directory,
 			'template_name'				=> $name,
 			'template_data'				=> ( isset( $params[1] ) ) ? $params[1] : '',
 			'template_content_' . $type	=> $html,
 			'template_key'				=> md5( $this->directory . ';' . $name ),
 		);
-	}
-
-	/**
-	 * Build editor plugins for an app
-	 *
-	 * @return	array
-	 * @throws	RuntimeException
-	 */
-	public function buildEditorPlugins(): array
-	{
-		/* Get current XML file for calculating differences */
-		$return = array( 'added' => array(), 'edited' => array(), 'removed' => array() );
-		$current = array();
-		$currentFile = ROOT_PATH . "/applications/{$this->directory}/data/editor.xml";
-		if ( file_exists( $currentFile ) )
-		{
-			$xml = SimpleXML::loadFile( $currentFile );
-			foreach( $xml->plugin as $plugin )
-			{
-				$attributes = iterator_to_array( $plugin->attributes() );
-				$current[ (string) $attributes['name'] ] = (string) $plugin;
-			}
-		}
-
-		/* Where are we looking? */
-		$path = ROOT_PATH . "/applications/{$this->directory}/dev/editor";
-
-		/* Loop over files in the directory */
-		$plugins = [];
-		if ( is_dir( $path ) )
-		{
-			foreach( new DirectoryIterator( $path ) as $file )
-			{
-				if( $file->isDir() or $file->isDot() or $file->getFilename() == 'js' )
-				{
-					continue;
-				}
-
-				$components = explode( '.', $file->getFilename() );
-				$extension = array_pop( $components );
-				if( $extension != 'js' )
-				{
-					continue;
-				}
-
-				$name = $file->getFilename();
-				$contents = file_get_contents( $path . '/' . $name );
-				if( mb_strtolower( mb_substr( PHP_OS, 0, 3 ) ) === 'win' )
-				{
-					$contents = str_replace( "\r\n", "\n", $contents );
-				}
-
-				if( !isset( $current[ $name ] ) )
-				{
-					$return['added'][] = $name;
-				}
-				else
-				{
-					if( $current[ $name ] != $contents )
-					{
-						$return['edited'][] = $name;
-					}
-
-					unset( $current[ $name ] );
-				}
-
-				$plugins[ $name ] = $contents;
-			}
-		}
-
-		if( count( $current ) )
-		{
-			$return['removed'] = array_keys( $current );
-		}
-
-		/* Now write the XML */
-		if( count( $plugins ) )
-		{
-			$xml = new XMLWriter;
-			$xml->openMemory();
-			$xml->setIndent( TRUE );
-			$xml->startDocument( '1.0', 'UTF-8' );
-			$xml->startElement( 'plugins' );
-
-			foreach( $plugins as $name => $contents )
-			{
-				$xml->startElement( 'plugin' );
-				$xml->startAttribute( 'name' );
-				$xml->text( $name );
-				$xml->endAttribute();
-				$xml->writeCdata( $contents );
-				$xml->endElement();
-			}
-
-			$xml->endElement();
-			$xml->endDocument();
-
-			if ( is_writable( ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
-			{
-				file_put_contents( ROOT_PATH . '/applications/' . $this->directory . '/data/editor.xml', $xml->outputMemory() );
-			}
-			else
-			{
-				throw new RuntimeException( Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
-			}
-		}
 
 		return $return;
 	}
@@ -4881,17 +4043,17 @@ EOF;
 	 * Build javascript for this app
 	 *
 	 * @return	array
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public function buildJavascript(): array
+	public function buildJavascript()
 	{
 		/* Get current XML file for calculating differences */
 		$return = array( 'files' => array( 'added' => array(), 'edited' => array(), 'removed' => array() ), 'orders' =>  array( 'added' => array(), 'edited' => array(), 'removed' => array() ) );
-		$currentFile = ROOT_PATH . "/applications/{$this->directory}/data/javascript.xml";
+		$currentFile = \IPS\ROOT_PATH . "/applications/{$this->directory}/data/javascript.xml";
 		$current = array( 'files' => array(), 'orders' => array() );
 		if ( file_exists( $currentFile ) )
 		{
-			$xml = SimpleXML::loadFile( $currentFile );
+			$xml = \IPS\Xml\SimpleXML::loadFile( $currentFile );
 			foreach ( $xml->file as $javascript )
 			{
 				$attributes = iterator_to_array( $javascript->attributes() );
@@ -4907,21 +4069,21 @@ EOF;
 		}
 
 		/* Remove existing file object maps */
-		$map = isset( Store::i()->javascript_map ) ? Store::i()->javascript_map : array();
+		$map = isset( \IPS\Data\Store::i()->javascript_map ) ? \IPS\Data\Store::i()->javascript_map : array();
 		$map[ $this->directory ] = array();
 
-		Store::i()->javascript_map = $map;
+		\IPS\Data\Store::i()->javascript_map = $map;
 
-		$xml = Javascript::createXml( $this->directory, $current, $return );
+		$xml = \IPS\Output\Javascript::createXml( $this->directory, $current, $return );
 
 		/* Write it */
-		if ( is_writable( ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
+		if ( is_writable( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data' ) )
 		{
-			file_put_contents( ROOT_PATH . '/applications/' . $this->directory . '/data/javascript.xml', $xml->outputMemory() );
+			\file_put_contents( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data/javascript.xml', $xml->outputMemory() );
 		}
 		else
 		{
-			throw new RuntimeException( Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
+			throw new \RuntimeException( \IPS\Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
 		}
 
 		/* Return */
@@ -4929,24 +4091,53 @@ EOF;
 	}
 
 	/**
+	 * Build hooks for an app
+	 *
+	 * @return	void
+	 * @throws	\RuntimeException
+	 */
+	public function buildHooks()
+	{
+		/* Build data */
+		$data = array();
+		foreach ( \IPS\Db::i()->select( '*', 'core_hooks', array( 'app=?', $this->directory ) ) as $hook )
+		{
+			$data[ $hook['filename'] ] = array(
+				'type'		=> $hook['type'],
+				'class'		=> $hook['class'],
+			);
+		}
+
+		/* Write it */
+		try
+		{
+			\IPS\Application::writeJson( \IPS\ROOT_PATH . '/applications/' . $this->directory . '/data/hooks.json', $data );
+		}
+		catch ( \RuntimeException $e )
+		{
+			throw new \RuntimeException( \IPS\Member::loggedIn()->language()->addToStack('dev_could_not_write_data') );
+		}
+	}
+
+	/**
 	 * Build extensions.json file for an app
 	 *
 	 * @return	array
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function buildExtensionsJson(): array
+	public function buildExtensionsJson()
 	{
 		$json = array();
-		$appsMainExtensionDir = new DirectoryIterator( ROOT_PATH . "/applications/{$this->directory}/extensions/" );
+		$appsMainExtensionDir = new \DirectoryIterator( \IPS\ROOT_PATH . "/applications/{$this->directory}/extensions/" );
 		foreach ( $appsMainExtensionDir as $appDir )
 		{
 			if ( $appDir->isDir() and !$appDir->isDot() )
 			{
-				foreach ( new DirectoryIterator( $appDir->getPathname() ) as $extensionDir )
+				foreach ( new \DirectoryIterator( $appDir->getPathname() ) as $extensionDir )
 				{
 					if ( $extensionDir->isDir() and !$extensionDir->isDot() )
 					{
-						foreach ( new DirectoryIterator( $extensionDir->getPathname() ) as $extensionFile )
+						foreach ( new \DirectoryIterator( $extensionDir->getPathname() ) as $extensionFile )
 						{
 							if ( !$extensionFile->isDir() and !$extensionFile->isDot() and mb_substr( $extensionFile, -4 ) === '.php' AND mb_substr( $extensionFile, 0, 2 ) != '._' )
 							{
@@ -4965,7 +4156,7 @@ EOF;
 										continue;
 									}
 								}
-								catch( ErrorException $e )
+								catch( \ErrorException $e )
 								{
 									continue;
 								}
@@ -4977,19 +4168,17 @@ EOF;
 				}
 			}
 		}
-		$this->sortForJson( $json );
-
 		return $json;
 	}
 
 	/**
 	 * Write a build.xml file with the current json data so we know what has changed between builds
 	 *
-	 * @return	array
+	 * @return	void
 	 */
-	public function buildJsonData(): array
+	public function buildJsonData()
 	{
-		$file = ROOT_PATH . "/applications/{$this->directory}/data/build.xml";
+		$file = \IPS\ROOT_PATH . "/applications/{$this->directory}/data/build.xml";
 
 		/* Get current XML file for calculating differences */
 		$return = array(
@@ -4998,10 +4187,8 @@ EOF;
 			'settings'			=> array( 'added' => array(), 'edited' => array(), 'removed' => array() ),
 			'widgets'			=> array( 'added' => array(), 'edited' => array(), 'removed' => array() ),
 			'acpSearchKeywords'	=> array( 'added' => array(), 'edited' => array(), 'removed' => array() ),
-			'themeeditor'		=> array(
-				'categories' 		=> array( 'added' => array(), 'edited' => array(), 'removed' => array() ),
-				'settings'			=> array( 'added' => array(), 'edited' => array(), 'removed' => array() )
-			)
+			'hooks'				=> array( 'added' => array(), 'edited' => array(), 'removed' => array() ),
+			'themeSettings' 		=> array( 'added' => array(), 'edited' => array(), 'removed' => array() )
 		);
 		$current = array(
 			'modules'			=> array(),
@@ -5009,12 +4196,12 @@ EOF;
 			'settings'			=> array(),
 			'widgets'			=> array(),
 			'acpSearchKeywords'	=> array(),
-			'themeeditor'		=> array( 'categories' => array(), 'settings' => array() )
+			'hooks'				=> array(),
+			'themeSettings'		=> array()
 		);
-
 		if ( file_exists( $file ) )
 		{
-			$xml = SimpleXML::loadFile( $file );
+			$xml = \IPS\Xml\SimpleXML::loadFile( $file );
 			foreach ( $xml->module as $module )
 			{
 				$attributes = iterator_to_array( $module->attributes() );
@@ -5040,20 +4227,20 @@ EOF;
 				$attributes = iterator_to_array( $searchKeyword->attributes() );
 				$current['acpSearchKeywords'][ (string) $attributes['key'] ] = (string) $searchKeyword;
 			}
-			foreach( $xml->themeeditorcategory as $themeEditorCategory )
+			foreach ( $xml->hook as $hook )
 			{
-				$attributes = iterator_to_array( $themeEditorCategory->attributes() );
-				$current['themeeditor']['categories'][ (string) $attributes['key'] ] = (string) $themeEditorCategory;
+				$attributes = iterator_to_array( $hook->attributes() );
+				$current['hooks'][ (string) $attributes['key'] ] = (string) $hook;
 			}
-			foreach( $xml->themeeditorsetting as $themeEditorSetting )
+			foreach ( $xml->themesetting as $themeSetting )
 			{
-				$attributes = iterator_to_array( $themeEditorSetting->attributes() );
-				$current['themeeditor']['settings'][ (string) $attributes['key'] ] = (string) $themeEditorSetting;
+				$attributes = iterator_to_array( $themeSetting->attributes() );
+				$current['themeSettings'][ (string) $attributes['key'] ] = (string) $themeSetting;
 			}
 		}
 
 		/* Build XML and write to app directory */
-		$xml = new XMLWriter;
+		$xml = new \XMLWriter;
 		$xml->openMemory();
 		$xml->setIndent( TRUE );
 		$xml->startDocument( '1.0', 'UTF-8' );
@@ -5062,9 +4249,9 @@ EOF;
 		$xml->startElement('build');
 
 		/* Modules */
-		if( file_exists( ROOT_PATH . "/applications/{$this->directory}/data/modules.json" ) )
+		if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/modules.json" ) )
 		{
-			foreach(json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->directory}/data/modules.json" ), TRUE ) as $area => $modules )
+			foreach( json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/modules.json" ), TRUE ) as $area => $modules )
 			{
 				foreach ( $modules as $moduleKey => $moduleData )
 				{
@@ -5091,9 +4278,9 @@ EOF;
 		}
 
 		/* Tasks */
-		if( file_exists( ROOT_PATH . "/applications/{$this->directory}/data/tasks.json" ) )
+		if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/tasks.json" ) )
 		{
-			foreach(json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->directory}/data/tasks.json" ), TRUE ) as $taskKey => $taskFrequency )
+			foreach( json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/tasks.json" ), TRUE ) as $taskKey => $taskFrequency )
 			{
 				$xml->startElement('task');
 				$xml->startAttribute('frequency');
@@ -5115,9 +4302,9 @@ EOF;
 		}
 
 		/* Settings */
-		if( file_exists( ROOT_PATH . "/applications/{$this->directory}/data/settings.json" ) )
+		if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/settings.json" ) )
 		{
-			foreach(json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->directory}/data/settings.json" ), TRUE ) as $setting )
+			foreach( json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/settings.json" ), TRUE ) as $setting )
 			{
 				$val = json_encode( $setting );
 
@@ -5141,9 +4328,9 @@ EOF;
 		}
 
 		/* Widgets */
-		if( file_exists( ROOT_PATH . "/applications/{$this->directory}/data/widgets.json" ) )
+		if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/widgets.json" ) )
 		{
-			foreach(json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->directory}/data/widgets.json" ), TRUE ) as $widgetKey => $widgetData )
+			foreach( json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/widgets.json" ), TRUE ) as $widgetKey => $widgetData )
 			{
 				$val = json_encode( $widgetData );
 
@@ -5167,9 +4354,9 @@ EOF;
 		}
 
 		/* ACP Search Keywords */
-		if( file_exists( ROOT_PATH . "/applications/{$this->directory}/data/acpsearch.json" ) )
+		if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/acpsearch.json" ) )
 		{
-			foreach(json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->directory}/data/acpsearch.json" ), TRUE ) as $searchUrl => $searchData )
+			foreach( json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/acpsearch.json" ), TRUE ) as $searchUrl => $searchData )
 			{
 				$val = json_encode( $searchData );
 
@@ -5192,36 +4379,55 @@ EOF;
 			}
 		}
 
-		/* Theme Editor Settings */
-		if( file_exists( ROOT_PATH . "/applications/{$this->directory}/data/themeeditor.json" ) )
+		/* Hooks */
+		if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/hooks.json" ) )
 		{
-			$json = json_decode( file_get_contents( ROOT_PATH . "/applications/{$this->directory}/data/themeeditor.json" ), true );
-			foreach( array( 'categories', 'settings' ) as $group )
+			foreach( json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/hooks.json" ), TRUE ) as $hookKey => $hookData )
 			{
-				if( isset( $json[ $group ] ) )
+				$val = json_encode( $hookData );
+
+				$xml->startElement('hook');
+				$xml->startAttribute('key');
+				$xml->text( $hookKey );
+				$xml->endAttribute();
+				$xml->writeCData( str_replace( ']]>', ']]]]><![CDATA[>', $val ) );
+				$xml->endElement();
+
+				if ( !isset( $current['hooks'][ $hookKey ] ) )
 				{
-					foreach( $json[ $group ] as $key => $data )
-					{
-						$val = json_encode( $data );
-
-						$xml->startElement('themeeditor' . ( $group == 'settings' ? 'setting' : 'category' ) );
-						$xml->startAttribute('key');
-						$xml->text( $key );
-						$xml->endAttribute();
-						$xml->writeCData( str_replace( ']]>', ']]]]><![CDATA[>', $val ) );
-						$xml->endElement();
-
-						if ( !isset( $current['themeeditor'][ $group ][ $key ] ) )
-						{
-							$return['themeeditor'][ $group ]['added'][] = $key;
-						}
-						elseif ( $current['themeeditor'][ $group ][ $key ] != $val )
-						{
-							$return['themeeditor'][ $group ]['edited'][] = $key;
-						}
-						unset( $current['themeeditor'][ $group ][ $key ] );
-					}
+					$return['hooks']['added'][] = $hookKey;
 				}
+				elseif ( $current['hooks'][ $hookKey ] != $val )
+				{
+					$return['hooks']['edited'][] = $hookKey;
+				}
+				unset( $current['hooks'][ $hookKey ] );
+			}
+		}
+
+		/* Master Theme Settings */
+		if( file_exists( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/themesettings.json" ) )
+		{
+			foreach( json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$this->directory}/data/themesettings.json" ), TRUE ) as $themeSetting )
+			{
+				$val = json_encode( $themeSetting );
+
+				$xml->startElement('themesetting');
+				$xml->startAttribute('key');
+				$xml->text( $themeSetting['sc_key'] );
+				$xml->endAttribute();
+				$xml->writeCData( str_replace( ']]>', ']]]]><![CDATA[>', $val ) );
+				$xml->endElement();
+
+				if ( !isset( $current['themeSettings'][ $themeSetting['sc_key'] ] ) )
+				{
+					$return['themeSettings']['added'][] = $themeSetting['sc_key'];
+				}
+				elseif ( $current['themeSettings'][ $themeSetting['sc_key'] ] != $val )
+				{
+					$return['themeSettings']['edited'][] = $themeSetting['sc_key'];
+				}
+				unset( $current['themeSettings'][ $themeSetting['sc_key'] ] );
 			}
 		}
 
@@ -5229,7 +4435,7 @@ EOF;
 		$xml->endDocument();
 
 		/* Write it */
-		file_put_contents( $file, $xml->outputMemory() );
+		\file_put_contents( $file, $xml->outputMemory() );
 
 		/* Return */
 		$return['modules']['removed'] = array_keys( $current['modules'] );
@@ -5237,8 +4443,8 @@ EOF;
 		$return['settings']['removed'] = array_keys( $current['settings'] );
 		$return['widgets']['removed'] = array_keys( $current['widgets'] );
 		$return['acpSearchKeywords']['removed'] = array_keys( $current['acpSearchKeywords'] );
-		$return['themeeditor']['categories']['removed'] = array_keys( $current['themeeditor']['categories'] );
-		$return['themeeditor']['settings']['removed'] = array_keys( $current['themeeditor']['settings'] );
+		$return['hooks']['removed'] = array_keys( $current['hooks'] );
+		$return['themeSettings']['removed'] = array_keys( $current['themeSettings'] );
 		return $return;
 	}
 
@@ -5247,43 +4453,43 @@ EOF;
 	 *
 	 * @return	void
 	 */
-	public function parseEmailTemplates() : void
+	public function parseEmailTemplates()
 	{
-		foreach(Db::i()->select( '*','core_email_templates', NULL, 'template_parent DESC' ) as $template )
+		foreach( \IPS\Db::i()->select( '*','core_email_templates', NULL, 'template_parent DESC' ) as $template )
 		{
 			/* Rebuild built copies */
-			$htmlFunction	= 'namespace IPS\Theme;' . "\n" . Theme::compileTemplate( $template['template_content_html'], "email_html_{$template['template_app']}_{$template['template_name']}", $template['template_data'] );
-			$ptFunction		= 'namespace IPS\Theme;' . "\n" . Theme::compileTemplate( $template['template_content_plaintext'], "email_plaintext_{$template['template_app']}_{$template['template_name']}", $template['template_data'] );
+			$htmlFunction	= 'namespace IPS\Theme;' . "\n" . \IPS\Theme::compileTemplate( $template['template_content_html'], "email_html_{$template['template_app']}_{$template['template_name']}", $template['template_data'] );
+			$ptFunction		= 'namespace IPS\Theme;' . "\n" . \IPS\Theme::compileTemplate( $template['template_content_plaintext'], "email_plaintext_{$template['template_app']}_{$template['template_name']}", $template['template_data'] );
 
 			$key	= $template['template_key'] . '_email_html';
-			Store::i()->$key = $htmlFunction;
+			\IPS\Data\Store::i()->$key = $htmlFunction;
 
 			$key	= $template['template_key'] . '_email_plaintext';
-			Store::i()->$key = $ptFunction;
+			\IPS\Data\Store::i()->$key = $ptFunction;
 		}
 	}
 
 	/**
 	 * Write JSON file
 	 *
-	 * @param string $file	Filepath
-	 * @param array $data	Data to write
+	 * @param	string	$file	Filepath
+	 * @param	array	$data	Data to write
 	 * @return	void
-	 * @throws	RuntimeException	Could not write
+	 * @throws	\RuntimeException	Could not write
 	 */
-	public static function writeJson( string $file, array $data ) : void
+	public static function writeJson( $file, $data )
 	{
 		$json = json_encode( $data, JSON_PRETTY_PRINT );
 
 		/* No idea why, but for some people blank structures have line breaks in them and for some people they don't
 			which unecessarily makes version control think things have changed - so let's make it the same for everyone */
-		$json = preg_replace( '/\[\s*]/', '[]', $json );
-		$json = preg_replace( '/\{\s*}/', '{}', $json );
+		$json = preg_replace( '/\[\s*\]/', '[]', $json );
+		$json = preg_replace( '/\{\s*\}/', '{}', $json );
 
 		/* Write it */
-		if( file_put_contents( $file, $json ) === FALSE )
+		if( \file_put_contents( $file, $json ) === FALSE )
 		{
-			throw new RuntimeException;
+			throw new \RuntimeException;
 		}
 		@chmod( $file, 0777 );
 	}
@@ -5291,10 +4497,10 @@ EOF;
 	/**
 	 * Can the user access this application?
 	 *
-	 * @param Group|Member|null $memberOrGroup		Member/group we are checking against or NULL for currently logged on user
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$memberOrGroup		Member/group we are checking against or NULL for currently logged on user
 	 * @return	bool
 	 */
-	public function canAccess( Group|Member $memberOrGroup=NULL ): bool
+	public function canAccess( $memberOrGroup=NULL )
 	{
 		/* If it's not enabled, we can't */
 		if( !$this->enabled )
@@ -5303,7 +4509,7 @@ EOF;
 		}
 
 		/* If we are in the AdminCP, and we have permission to manage applications, then we have access */
-		if( Dispatcher::hasInstance() AND Dispatcher::i()->controllerLocation === 'admin' AND ( !$memberOrGroup AND Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'app_manage' ) ) )
+		if( \IPS\Dispatcher::hasInstance() AND \IPS\Dispatcher::i()->controllerLocation === 'admin' AND ( !$memberOrGroup AND \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'app_manage' ) ) )
 		{
 			return TRUE;
 		}
@@ -5321,19 +4527,19 @@ EOF;
 		}
 
 		/* Check member */
-		if ( $memberOrGroup instanceof Group )
+		if ( $memberOrGroup instanceof \IPS\Member\Group )
 		{
 			$memberGroups = array( $memberOrGroup->g_id );
 		}
 		else
 		{
-			$member	= ( $memberOrGroup === NULL ) ? Member::loggedIn() : $memberOrGroup;
+			$member	= ( $memberOrGroup === NULL ) ? \IPS\Member::loggedIn() : $memberOrGroup;
 			$memberGroups = array_merge( array( $member->member_group_id ), array_filter( explode( ',', $member->mgroup_others ) ) );
 		}
 		$accessGroups	= explode( ',', $this->disabled_groups );
 
 		/* Are we in an allowed group? */
-		if( count( array_intersect( $accessGroups, $memberGroups ) ) )
+		if( \count( array_intersect( $accessGroups, $memberGroups ) ) )
 		{
 			return TRUE;
 		}
@@ -5344,101 +4550,61 @@ EOF;
 	/**
 	 * Can manage the widgets
 	 *
-	 * @param Member|null $member		Member we are checking against or NULL for currently logged on user
+	 * @param	\IPS\Member|NULL	$member		Member we are checking against or NULL for currently logged on user
 	 * @return 	boolean
 	 */
-	public function canManageWidgets( Member $member=NULL ): bool
+	public function canManageWidgets( $member=NULL )
 	{
 		/* Check member */
-		$member	= ( $member === NULL ) ? Member::loggedIn() : $member;
+		$member	= ( $member === NULL ) ? \IPS\Member::loggedIn() : $member;
 
 		return $member->modPermission('can_manage_sidebar');
 	}
 
 	/**
-	 * Return all widgets available for the Page Editor
+	 * Save Changes
 	 *
-	 * @return array
+	 * @param	bool	$skipMember		Skip clearing member cache clearing
+	 * @return	void
 	 */
-	public function getAvailableWidgets() : array
+	public function save( $skipMember=FALSE )
 	{
-		$blocks = [];
-		foreach( Db::i()->select( '*', 'core_widgets', [ 'app=?', $this->directory ] ) as $widget )
-		{
-			try
-			{
-				$block = Widget::load( $this, $widget['key'], mt_rand(), array(), $widget['restrict'] );
-				$block->allowReuse = (boolean) $widget['allow_reuse'];
-				$block->menuStyle  = $widget['menu_style'];
-				$block->allowCustomPadding = (bool) $widget['padding'];
-				$block->layouts = $block->getSupportedLayouts();
-				$blocks[ $widget['key'] ] = $block;
-			}
-			catch( PHPException $e )
-			{
-				continue;
-			}
-		}
-
-		return $blocks;
-	}
-
-	/**
-	 * @var array|null Prevent multiple queries for valid widget keys
-	 */
-	private ?array $validWidgetKeys = null;
-
-	/**
-	 * Return a list of all valid widget keys for this application
-	 *
-	 * @return array
-	 */
-	public function getValidWidgetKeys() : array
-	{
-		if ( $this->validWidgetKeys === null )
-		{
-			$this->validWidgetKeys = [];
-			foreach ( Db::i()->select( '*', 'core_widgets', ['app=?', $this->directory] ) as $widget )
-			{
-				$class = 'IPS\\' . $this->directory . '\\widgets\\' . $widget['key'];
-				$this->validWidgetKeys[] = $widget['key'];
-				if ( in_array( Polymorphic::class, class_implements( $class ) ) )
-				{
-					/* @var Polymorphic $class */
-					$this->validWidgetKeys = array_merge( $this->validWidgetKeys, $class::getWidgetKeys() );
-				}
-			}
-		}
-		return $this->validWidgetKeys;
+		parent::save();
+		static::postToggleEnable( $skipMember );
 	}
 
 	/**
 	 * Cleanup after saving
 	 *
-	 * @param bool $skipMember		Skip clearing member cache clearing
+	 * @param	bool	$skipMember		Skip clearing member cache clearing
 	 * @return	void
 	 * @note	This is abstracted so it can be called externally, i.e. by the support tool
 	 */
-	public static function postToggleEnable( bool $skipMember ) : void
+	public static function postToggleEnable( $skipMember=FALSE )
 	{
-		unset( Store::i()->applications );
-		unset( Store::i()->frontNavigation );
-		unset( Store::i()->acpNotifications );
-		unset( Store::i()->acpNotificationIds );
-		unset( Store::i()->furl_configuration );
-		Zapier::rebuildRESTApiPermissions();
+		unset( \IPS\Data\Store::i()->applications );
+		unset( \IPS\Data\Store::i()->frontNavigation );
+		unset( \IPS\Data\Store::i()->acpNotifications );
+		unset( \IPS\Data\Store::i()->acpNotificationIds );
+		unset( \IPS\Data\Store::i()->furl_configuration );
+
+		/* Clear out member's cached "Create Menu" contents */
+		if( !$skipMember )
+		{
+			\IPS\Member::clearCreateMenu();
+		}
 	}
 
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		/* Get our uninstall callback script(s) if present. They are stored in an array so that we only create one object per extension, instead of one each time we loop. */
 		$uninstallExtensions	= array();
-		foreach($this->extensions('core', 'Uninstall' ) as $extension )
+		foreach( $this->extensions( 'core', 'Uninstall', TRUE ) as $extension )
 		{
 			$uninstallExtensions[]	= $extension;
 		}
@@ -5446,60 +4612,74 @@ EOF;
 		/* Call preUninstall() so that application may perform any necessary cleanup before other data is removed (i.e. database tables) */
 		foreach( $uninstallExtensions as $extension )
 		{
-			$extension->preUninstall( $this->directory );
+			if( method_exists( $extension, 'preUninstall' ) )
+			{
+				$extension->preUninstall( $this->directory );
+			}
 		}
 
 		/* Call onOtherUninstall so that other applications may perform any necessary cleanup */
 		foreach( static::allExtensions( 'core', 'Uninstall', FALSE ) as $extension )
 		{
-			$extension->onOtherUninstall( $this->directory );
+			if( method_exists( $extension, 'onOtherUninstall' ) )
+			{
+				$extension->onOtherUninstall( $this->directory );
+			}
+		}
+
+		$templatesToRecompile = array();
+
+		/* Note any templates that will need recompiling */
+		foreach ( \IPS\Db::i()->select( 'class', 'core_hooks', array( 'app=? AND type=?', $this->directory, 'S' ) ) as $class )
+		{
+			$templatesToRecompile[ $class ] = $class;
 		}
 
 		/* Delete profile steps */
-		ProfileStep::deleteByApplication( $this );
+		\IPS\Member\ProfileStep::deleteByApplication( $this );
 
 		/* Delete menu items */
-		FrontNavigation::deleteByApplication( $this );
+		\IPS\core\FrontNavigation::deleteByApplication( $this );
 
 		/* Delete club node maps */
-		Club::deleteByApplication( $this );
+		\IPS\Member\Club::deleteByApplication( $this );
 
 		/* Delete data from shared tables */
-		Index::i()->removeApplicationContent( $this );
-		Db::i()->delete( 'core_permission_index', array( 'app=? AND perm_type=? AND perm_type_id IN(?)', 'core', 'module', Db::i()->select( 'sys_module_id', 'core_modules', array( 'sys_module_application=?', $this->directory ) ) ) );
-		Db::i()->delete( 'core_modules', array( 'sys_module_application=?', $this->directory ) );
-		Db::i()->delete( 'core_dev', array( 'app_key=?', $this->directory ) );
-		Db::i()->delete( 'core_item_markers', array( 'item_app=?', $this->directory ) );
-		Db::i()->delete( 'core_reputation_index', array( 'app=?', $this->directory ) );
-		Db::i()->delete( 'core_permission_index', array( 'app=?', $this->directory ) );
-		Db::i()->delete( 'core_upgrade_history', array( 'upgrade_app=?', $this->directory ) );
-		Db::i()->delete( 'core_admin_logs', array( 'appcomponent=?', $this->directory ) );
-		Db::i()->delete( 'core_sys_conf_settings', array( 'conf_app=?', $this->directory ) );
-		Db::i()->delete( 'core_queue', array( 'app=?', $this->directory ) );
-		Db::i()->delete( 'core_follow', array( 'follow_app=?', $this->directory ) );
-		Db::i()->delete( 'core_follow_count_cache', array( "class LIKE CONCAT( ?, '%' )", "IPS\\\\{$this->directory}" ) );
-		Db::i()->delete( 'core_item_statistics_cache', array( "cache_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$this->directory}" ) );
-		Db::i()->delete( 'core_view_updates', array( "classname LIKE CONCAT( ?, '%' )", "IPS\\\\{$this->directory}" ) );
-		Db::i()->delete( 'core_moderator_logs', array( 'appcomponent=?', $this->directory ) );
-		Db::i()->delete( 'core_member_history', array( 'log_app=?', $this->directory ) );
-		Db::i()->delete( 'core_acp_notifications', array( 'app=?', $this->directory ) );
-		Db::i()->delete( 'core_solved_index', array( 'app=?', $this->directory ) );
-		Db::i()->delete( 'core_notifications', array( 'notification_app=?', $this->directory ) );
-		Db::i()->delete( 'core_javascript', array( 'javascript_app=?', $this->directory ) );
-		Db::i()->delete( 'core_theme_templates_custom', array( 'template_app=?', $this->directory ) );
+		\IPS\Content\Search\Index::i()->removeApplicationContent( $this );
+		\IPS\Db::i()->delete( 'core_permission_index', array( 'app=? AND perm_type=? AND perm_type_id IN(?)', 'core', 'module', \IPS\Db::i()->select( 'sys_module_id', 'core_modules', array( 'sys_module_application=?', $this->directory ) ) ) );
+		\IPS\Db::i()->delete( 'core_modules', array( 'sys_module_application=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_dev', array( 'app_key=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_hooks', array( 'app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_item_markers', array( 'item_app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_reputation_index', array( 'app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_permission_index', array( 'app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_upgrade_history', array( 'upgrade_app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_admin_logs', array( 'appcomponent=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_sys_conf_settings', array( 'conf_app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_queue', array( 'app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_follow', array( 'follow_app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_follow_count_cache', array( "class LIKE CONCAT( ?, '%' )", "IPS\\\\{$this->directory}" ) );
+		\IPS\Db::i()->delete( 'core_item_statistics_cache', array( "cache_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$this->directory}" ) );
+		\IPS\Db::i()->delete( 'core_view_updates', array( "classname LIKE CONCAT( ?, '%' )", "IPS\\\\{$this->directory}" ) );
+		\IPS\Db::i()->delete( 'core_moderator_logs', array( 'appcomponent=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_member_history', array( 'log_app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_acp_notifications', array( 'app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_solved_index', array( 'app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_notifications', array( 'notification_app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_javascript', array( 'javascript_app=?', $this->directory ) );
 
-		$rulesToDelete = iterator_to_array( Db::i()->select( 'id', 'core_achievements_rules', [ "action LIKE CONCAT( ?, '_%' )", $this->directory ] ) );
-		Db::i()->delete( 'core_achievements_rules', Db::i()->in( 'id', $rulesToDelete ) );
-		Db::i()->delete( 'core_achievements_log_milestones', Db::i()->in( 'milestone_rule', $rulesToDelete ) );
+		$rulesToDelete = iterator_to_array( \IPS\Db::i()->select( 'id', 'core_achievements_rules', [ "action LIKE CONCAT( ?, '_%' )", $this->directory ] ) );
+		\IPS\Db::i()->delete( 'core_achievements_rules', \IPS\Db::i()->in( 'id', $rulesToDelete ) );
+		\IPS\Db::i()->delete( 'core_achievements_log_milestones', \IPS\Db::i()->in( 'milestone_rule', $rulesToDelete ) );
 
-		foreach($this->extensions('core', 'AdminNotifications', FALSE) AS $adminNotificationExtension )
+		foreach( $this->extensions( 'core', 'AdminNotifications', FALSE ) AS $adminNotificationExtension )
 		{
 			$exploded = explode( '\\', $adminNotificationExtension );
-			Db::i()->delete( 'core_acp_notifications_preferences', array( 'type=?', "{$this->directory}_{$exploded[5]}" ) );
+			\IPS\Db::i()->delete( 'core_acp_notifications_preferences', array( 'type=?', "{$this->directory}_{$exploded[5]}" ) );
 		}
 
 		$classes = array();
-		foreach($this->extensions('core', 'ContentRouter') AS $contentRouter )
+		foreach( $this->extensions( 'core', 'ContentRouter' ) AS $contentRouter )
 		{
 			foreach ( $contentRouter->classes as $class )
 			{
@@ -5517,43 +4697,40 @@ EOF;
 			}
 		}
 
-		if( count( $classes ) )
+		if( \count( $classes ) )
 		{
 			$queueWhere = array();
 			$queueWhere[] = array( 'app=?', 'core' );
-			$queueWhere[] = array( Db::i()->in( '`key`', array( 'rebuildPosts', 'RebuildReputationIndex' ) ) );
+			$queueWhere[] = array( \IPS\Db::i()->in( '`key`', array( 'rebuildPosts', 'RebuildReputationIndex' ) ) );
 
-			foreach (Db::i()->select( '*', 'core_queue', $queueWhere ) as $queue )
+			foreach ( \IPS\Db::i()->select( '*', 'core_queue', $queueWhere ) as $queue )
 			{
 				$queue['data'] = json_decode( $queue['data'], TRUE );
-				if( in_array( $queue['data']['class'], $classes ) )
+				if( \in_array( $queue['data']['class'], $classes ) )
 				{
-					Db::i()->delete( 'core_queue', array( 'id=?', $queue['id'] ) );
+					\IPS\Db::i()->delete( 'core_queue', array( 'id=?', $queue['id'] ) );
 				}
 			}
 
-			Db::i()->delete( 'core_notifications', Db::i()->in( 'item_class', $classes ) );
-
-			/* Approval Queue */
-			Db::i()->delete( 'core_approval_queue', Db::i()->in( 'approval_content_class', $classes ) );
+			\IPS\Db::i()->delete( 'core_notifications', \IPS\Db::i()->in( 'item_class', $classes ) );
 
 			/* Delete Deletion Log Records */
-			Db::i()->delete( 'core_deletion_log', Db::i()->in( 'dellog_content_class', $classes ) );
+			\IPS\Db::i()->delete( 'core_deletion_log', \IPS\Db::i()->in( 'dellog_content_class', $classes ) );
 
 			/* Delete Promoted Content from this app */
-			Db::i()->delete( 'core_content_promote', Db::i()->in( 'promote_class', $classes ) );
+			\IPS\Db::i()->delete( 'core_social_promote', \IPS\Db::i()->in( 'promote_class', $classes ) );
 
 			/* Delete ratings from this app */
-			Db::i()->delete( 'core_ratings', Db::i()->in( 'class', $classes ) );
+			\IPS\Db::i()->delete( 'core_ratings', \IPS\Db::i()->in( 'class', $classes ) );
 
 			/* Delete merge redirects */
-			Db::i()->delete( 'core_item_redirect', Db::i()->in( 'redirect_class', $classes ) );
+			\IPS\Db::i()->delete( 'core_item_redirect', \IPS\Db::i()->in( 'redirect_class', $classes ) );
 
 			/* Delete member map */
-			Db::i()->delete( 'core_item_member_map', Db::i()->in( 'map_class', $classes ) );
+			\IPS\Db::i()->delete( 'core_item_member_map', \IPS\Db::i()->in( 'map_class', $classes ) );
 
 			/* Delete RSS Imports */
-			foreach(new ActiveRecordIterator( Db::i()->select( '*', 'core_rss_import', Db::i()->in( 'rss_import_class', $classes ) ), 'IPS\core\Rss\Import' ) as $import )
+			foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_rss_import', \IPS\Db::i()->in( 'rss_import_class', $classes ) ), 'IPS\core\Rss\Import' ) as $import )
 			{
 				$import->delete();
 			}
@@ -5568,54 +4745,51 @@ EOF;
 				}
 			}
 
-			if ( count( $softDeleteKeys ) )
+			if ( \count( $softDeleteKeys ) )
 			{
-				Db::i()->delete( 'core_soft_delete_log', Db::i()->in( 'sdl_obj_key', $softDeleteKeys ) );
+				\IPS\Db::i()->delete( 'core_soft_delete_log', \IPS\Db::i()->in( 'sdl_obj_key', $softDeleteKeys ) );
 			}
 
 			/* Delete PBR Data */
-			Db::i()->delete( 'core_post_before_registering', Db::i()->in( 'class', $classes ) );
+			\IPS\Db::i()->delete( 'core_post_before_registering', \IPS\Db::i()->in( 'class', $classes ) );
 
 			/* Delete Anonymous Data */
-			Db::i()->delete( 'core_anonymous_posts', Db::i()->in( 'anonymous_object_class', $classes ) );
+			\IPS\Db::i()->delete( 'core_anonymous_posts', \IPS\Db::i()->in( 'anonymous_object_class', $classes ) );
 
 			/* Delete Polls */
-			Db::i()->delete( 'core_voters', array( 'poll in (?)', Db::i()->select( 'pid', 'core_polls', Db::i()->in( 'poll_item_class', $classes ) ) ) );
-			Db::i()->delete( 'core_polls', Db::i()->in( 'poll_item_class', $classes ) );
-
-			/* Assignments */
-			Db::i()->delete( 'core_assignments', Db::i()->in( 'assign_item_class', $classes ) );
+			\IPS\Db::i()->delete( 'core_voters', array( 'poll in (?)', \IPS\Db::i()->select( 'pid', 'core_polls', \IPS\Db::i()->in( 'poll_item_class', $classes ) ) ) );
+			\IPS\Db::i()->delete( 'core_polls', \IPS\Db::i()->in( 'poll_item_class', $classes ) );
 		}
 
 		/* Delete attachment maps - if the attachment is unused, the regular cleanup task will remove the file later */
 		$extensions = array();
 
-		foreach($this->extensions('core', 'EditorLocations', FALSE) AS $key => $extension )
+		foreach( $this->extensions( 'core', 'EditorLocations', FALSE ) AS $key => $extension )
 		{
 			$extensions[] = $this->directory . '_' . $key;
 		}
 
-		Db::i()->delete( 'core_attachments_map', array( Db::i()->in( 'location_key', $extensions ) ) );
+		\IPS\Db::i()->delete( 'core_attachments_map', array( \IPS\Db::i()->in( 'location_key', $extensions ) ) );
 
 		/* Cleanup some caches */
-		Settings::i()->clearCache();
-		unset( Store::i()->acpNotifications );
-		unset( Store::i()->acpNotificationIds );
+		\IPS\Settings::i()->clearCache();
+		unset( \IPS\Data\Store::i()->acpNotifications );
+		unset( \IPS\Data\Store::i()->acpNotificationIds );
 
 		/* Delete tasks and task logs */
-		Db::i()->delete( 'core_tasks_log', array( 'task IN(?)', Db::i()->select( 'id', 'core_tasks', array( 'app=?', $this->directory ) ) ) );
-		Db::i()->delete( 'core_tasks', array( 'app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_tasks_log', array( 'task IN(?)', \IPS\Db::i()->select( 'id', 'core_tasks', array( 'app=?', $this->directory ) ) ) );
+		\IPS\Db::i()->delete( 'core_tasks', array( 'app=?', $this->directory ) );
 
 		/* Delete reports */
-		Db::i()->delete( 'core_rc_reports', array( 'rid IN(?)', Db::i()->select('id', 'core_rc_index', Db::i()->in( 'class', $classes ) ) ) );
-		Db::i()->delete( 'core_rc_comments', array( 'rid IN(?)', Db::i()->select('id', 'core_rc_index', Db::i()->in( 'class', $classes ) ) ) );
-		Db::i()->delete( 'core_rc_index', Db::i()->in('class', $classes) );
+		\IPS\Db::i()->delete( 'core_rc_reports', array( 'rid IN(?)', \IPS\Db::i()->select('id', 'core_rc_index', \IPS\Db::i()->in( 'class', $classes ) ) ) );
+		\IPS\Db::i()->delete( 'core_rc_comments', array( 'rid IN(?)', \IPS\Db::i()->select('id', 'core_rc_index', \IPS\Db::i()->in( 'class', $classes ) ) ) );
+		\IPS\Db::i()->delete( 'core_rc_index', \IPS\Db::i()->in('class', $classes) );
 
 		/* Delete language strings */
-		Db::i()->delete( 'core_sys_lang_words', array( 'word_app=?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_sys_lang_words', array( 'word_app=?', $this->directory ) );
 
 		/* Delete email templates */
-		$emailTemplates	= Db::i()->select( '*', 'core_email_templates', array( 'template_app=?', $this->directory ) );
+		$emailTemplates	= \IPS\Db::i()->select( '*', 'core_email_templates', array( 'template_app=?', $this->directory ) );
 
 		if( $emailTemplates->count() )
 		{
@@ -5624,52 +4798,64 @@ EOF;
 				if( $template['template_content_html'] )
 				{
 					$k = $template['template_key'] . '_email_html';
-					unset( Store::i()->$k );
+					unset( \IPS\Data\Store::i()->$k );
 				}
 
 				if( $template['template_content_plaintext'] )
 				{
 					$k = $template['template_key'] . '_email_plaintext';
-					unset( Store::i()->$k );
+					unset( \IPS\Data\Store::i()->$k );
 				}
 			}
 
-			Db::i()->delete( 'core_email_templates', array( 'template_app=?', $this->directory ) );
+			\IPS\Db::i()->delete( 'core_email_templates', array( 'template_app=?', $this->directory ) );
 		}
 
 		/* Delete skin template/CSS/etc. */
-		Theme::removeTemplates( $this->directory, NULL, NULL, NULL, TRUE );
-		Theme::removeCss( $this->directory, NULL, NULL, NULL, TRUE );
-		Theme::removeResources( $this->directory, NULL, NULL, NULL, TRUE );
-		Theme::removeEditorSettings( $this->directory );
+		\IPS\Theme::removeTemplates( $this->directory, NULL, NULL, NULL, TRUE );
+		\IPS\Theme::removeCss( $this->directory, NULL, NULL, NULL, TRUE );
+		\IPS\Theme::removeResources( $this->directory, NULL, NULL, NULL, TRUE );
 
-		unset( Store::i()->themes );
+		/* Invalidate disk templates */
+		\IPS\Theme::resetAllCacheKeys();
+
+		/* Delete theme settings */
+		$valueIds = iterator_to_array( \IPS\Db::i()->select( 'sc_id', 'core_theme_settings_fields', array( array( 'sc_app=?', $this->directory ) ) ) );
+
+		\IPS\Db::i()->delete( 'core_theme_settings_fields', array( 'sc_app=?', $this->directory ) );
+
+		if ( \count( $valueIds ) )
+		{
+			\IPS\Db::i()->delete( 'core_theme_settings_values', \IPS\Db::i()->in('sv_id', $valueIds ) );
+		}
+
+		unset( \IPS\Data\Store::i()->themes );
 
 		/* Delete any stored files */
-		foreach($this->extensions('core', 'FileStorage' ) as $extension )
+		foreach( $this->extensions( 'core', 'FileStorage', TRUE ) as $extension )
 		{
 			try
 			{
 				$extension->delete();
 			}
-			catch( PHPException $e ){}
+			catch( \Exception $e ){}
 		}
 
 		/* Delete any upload settings */
 		foreach( $this->uploadSettings() as $setting )
 		{
-			if( Settings::i()->$setting )
+			if( \IPS\Settings::i()->$setting )
 			{
 				try
 				{
-					File::get( 'core_Theme', Settings::i()->$setting )->delete();
+					\IPS\File::get( 'core_Theme', \IPS\Settings::i()->$setting )->delete();
 				}
-				catch( PHPException $e ){}
+				catch( \Exception $e ){}
 			}
 		}
 
 		$notificationTypes = array();
-		foreach($this->extensions('core', 'Notifications') as $key => $class )
+		foreach( $this->extensions( 'core', 'Notifications' ) as $key => $class )
 		{
 			if ( method_exists( $class, 'getConfiguration' ) )
 			{
@@ -5682,10 +4868,10 @@ EOF;
 			}
 		}
 
-		if( count( $notificationTypes ) )
+		if( \count( $notificationTypes ) )
 		{
-			Db::i()->delete( 'core_notification_defaults', "notification_key IN('" . implode( "','", $notificationTypes ) . "')");
-			Db::i()->delete( 'core_notification_preferences', "notification_key IN('" . implode( "','", $notificationTypes ) . "')");
+			\IPS\Db::i()->delete( 'core_notification_defaults', "notification_key IN('" . implode( "','", $notificationTypes ) . "')");
+			\IPS\Db::i()->delete( 'core_notification_preferences', "notification_key IN('" . implode( "','", $notificationTypes ) . "')");
 		}
 
 		/* Delete database tables */
@@ -5693,15 +4879,15 @@ EOF;
 		{
 			$schema	= @json_decode( file_get_contents( $this->getApplicationPath() . "/data/schema.json" ), TRUE );
 
-			if( is_array( $schema ) AND count( $schema ) )
+			if( \is_array( $schema ) AND \count( $schema ) )
 			{
 				foreach( $schema as $tableName => $definition )
 				{
 					try
 					{
-						Db::i()->dropTable( $tableName, TRUE );
+						\IPS\Db::i()->dropTable( $tableName, TRUE );
 					}
-					catch( Exception $e )
+					catch( \IPS\Db\Exception $e )
 					{
 						/* Ignore "Cannot drop table because it does not exist" */
 						if( $e->getCode() <> 1051 )
@@ -5727,9 +4913,9 @@ EOF;
 					case 'addColumn':
 						try
 						{
-							Db::i()->dropColumn( $instruction['params'][0], $instruction['params'][1]['name'] );
+							\IPS\Db::i()->dropColumn( $instruction['params'][0], $instruction['params'][1]['name'] );
 						}
-						catch( Exception $e )
+						catch( \IPS\Db\Exception $e )
 						{
 							/* Ignore "Cannot drop key because it does not exist" */
 							if( $e->getCode() <> 1091 )
@@ -5742,9 +4928,9 @@ EOF;
 					case 'addIndex':
 						try
 						{
-							Db::i()->dropIndex( $instruction['params'][0], $instruction['params'][1]['name'] );
+							\IPS\Db::i()->dropIndex( $instruction['params'][0], $instruction['params'][1]['name'] );
 						}
-						catch( Exception $e )
+						catch( \IPS\Db\Exception $e )
 						{
 							/* Ignore "Cannot drop key because it does not exist" */
 							if( $e->getCode() <> 1091 )
@@ -5758,11 +4944,11 @@ EOF;
 		}
 
 		/* delete widgets */
-		Db::i()->delete( 'core_widgets', array( 'app = ?', $this->directory ) );
-		Db::i()->delete( 'core_widget_areas', array( 'app = ?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_widgets', array( 'app = ?', $this->directory ) );
+		\IPS\Db::i()->delete( 'core_widget_areas', array( 'app = ?', $this->directory ) );
 
 		/* clean up widget areas table */
-		foreach (Db::i()->select( '*', 'core_widget_areas' ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'core_widget_areas' ) as $row )
 		{
 			$data = json_decode( $row['widgets'], true );
 
@@ -5774,12 +4960,12 @@ EOF;
 				}
 			}
 
-			Db::i()->update( 'core_widget_areas', array( 'widgets' => json_encode( $data ) ), array( 'id=?', $row['id'] ) );
+			\IPS\Db::i()->update( 'core_widget_areas', array( 'widgets' => json_encode( $data ) ), array( 'id=?', $row['id'] ) );
 		}
 
 		/* Clean up widget trash table */
 		$trash = array();
-		foreach(Db::i()->select( '*', 'core_widget_trash' ) AS $garbage )
+		foreach( \IPS\Db::i()->select( '*', 'core_widget_trash' ) AS $garbage )
 		{
 			$data = json_decode( $garbage['data'], TRUE );
 
@@ -5789,18 +4975,21 @@ EOF;
 			}
 		}
 
-		Db::i()->delete( 'core_widget_trash', Db::i()->in( 'id', $trash ) );
+		\IPS\Db::i()->delete( 'core_widget_trash', \IPS\Db::i()->in( 'id', $trash ) );
 
 		/* Call postUninstall() so that application may perform any necessary cleanup after other data is removed */
 		foreach( $uninstallExtensions as $extension )
 		{
-			$extension->postUninstall( $this->directory );
+			if( method_exists( $extension, 'postUninstall' ) )
+			{
+				$extension->postUninstall( $this->directory );
+			}
 		}
 
 		/* Clean up FURL Definitions */
 		if ( file_exists( $this->getApplicationPath() . "/data/furl.json" ) )
 		{
-			$current = json_decode( Db::i()->select( 'conf_value', 'core_sys_conf_settings', array( "conf_key=?", 'furl_configuration' ) )->first(), true );
+			$current = json_decode( \IPS\Db::i()->select( 'conf_value', 'core_sys_conf_settings', array( "conf_key=?", 'furl_configuration' ) )->first(), true );
 			$default = json_decode( preg_replace( '/\/\*.+?\*\//s', '', @file_get_contents( $this->getApplicationPath() . "/data/furl.json" ) ), true );
 
 			if ( isset( $default['pages'] ) and $current !== NULL )
@@ -5813,29 +5002,40 @@ EOF;
 					}
 				}
 
-				Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => json_encode( $current ) ), array( "conf_key=?", 'furl_configuration' ) );
+				\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => json_encode( $current ) ), array( "conf_key=?", 'furl_configuration' ) );
 			}
 		}
 
 		/* Delete from DB */
-		File::unclaimAttachments( 'core_Admin', $this->id, NULL, 'appdisabled' );
+		\IPS\File::unclaimAttachments( 'core_Admin', $this->id, NULL, 'appdisabled' );
 		parent::delete();
 
-		/* Clear out data store for updated values */
-		unset( Store::i()->modules );
-		unset( Store::i()->applications );
-		unset( Store::i()->widgets );
-		unset( Store::i()->furl_configuration );
+		/* Rebuild hooks file */
+		\IPS\Plugin\Hook::writeDataFile();
+		foreach ( $templatesToRecompile as $k )
+		{
+			$exploded = explode( '_', $k );
+			\IPS\Theme::deleteCompiledTemplate( $exploded[1], $exploded[2], $exploded[3] );
+		}
 
-		Settings::i()->clearCache();
+		/* Clear out member's cached "Create Menu" contents */
+		\IPS\Member::clearCreateMenu();
+
+		/* Clear out data store for updated values */
+		unset( \IPS\Data\Store::i()->modules );
+		unset( \IPS\Data\Store::i()->applications );
+		unset( \IPS\Data\Store::i()->widgets );
+		unset( \IPS\Data\Store::i()->furl_configuration );
+
+		\IPS\Settings::i()->clearCache();
 
 		/* Remove the files and folders, if possible (if not IN_DEV and not in DEMO_MODE and not on platform) */
-		if ( !CIC2 AND !IN_DEV AND !DEMO_MODE AND file_exists( ROOT_PATH . '/applications/' . $this->directory ) )
+		if ( !\IPS\CIC2 AND !\IPS\IN_DEV AND !\IPS\DEMO_MODE AND file_exists( \IPS\ROOT_PATH . '/applications/' . $this->directory ) )
 		{
 			try
 			{
-				$iterator = new RecursiveDirectoryIterator( ROOT_PATH . '/applications/' . $this->directory, FilesystemIterator::SKIP_DOTS );
-				foreach ( new RecursiveIteratorIterator( $iterator, RecursiveIteratorIterator::CHILD_FIRST ) as $file )
+				$iterator = new \RecursiveDirectoryIterator( \IPS\ROOT_PATH . '/applications/' . $this->directory, \FilesystemIterator::SKIP_DOTS );
+				foreach ( new \RecursiveIteratorIterator( $iterator, \RecursiveIteratorIterator::CHILD_FIRST ) as $file )
 				{
 					if ( $file->isDir() )
 					{
@@ -5846,24 +5046,22 @@ EOF;
 						@unlink( $file->getPathname() );
 					}
 				}
-				$dir = ROOT_PATH . '/applications/' . $this->directory;
+				$dir = \IPS\ROOT_PATH . '/applications/' . $this->directory;
 				$handle = opendir( $dir );
 				closedir ( $handle );
 				@rmdir( $dir );
 			}
-			catch( UnexpectedValueException $e ){}
+			catch( \UnexpectedValueException $e ){}
 		}
-
-		Bridge::i()->applicationDeleted( $this );
 	}
 
 	/**
 	 * Return an array of version upgrade folders this application contains
 	 *
-	 * @param int $start	If provided, only upgrade steps above this version will be returned
+	 * @param	int		$start	If provided, only upgrade steps above this version will be returned
 	 * @return	array
 	 */
-	public function getUpgradeSteps( int $start=0 ): array
+	public function getUpgradeSteps( $start=0 )
 	{
 		$path	= $this->getApplicationPath() . "/setup";
 
@@ -5874,13 +5072,13 @@ EOF;
 
 		$versions	= array();
 
-		foreach( new DirectoryIterator( $path ) as $file )
+		foreach( new \DirectoryIterator( $path ) as $file )
 		{
 			if( $file->isDir() AND !$file->isDot() )
 			{
 				if( mb_substr( $file->getFilename(), 0, 4 ) == 'upg_' )
 				{
-					$_version	= intval( mb_substr( $file->getFilename(), 4 ) );
+					$_version	= \intval( mb_substr( $file->getFilename(), 4 ) );
 
 					if( $_version > $start )
 					{
@@ -5899,12 +5097,12 @@ EOF;
 	/**
 	 * Can view page even when user is a guest when guests cannot access the site
 	 *
-	 * @param	Module	$module			The module
-	 * @param string $controller		The controller
-	 * @param string|null $do				To "do" parameter
+	 * @param	\IPS\Application\Module	$module			The module
+	 * @param	string					$controller		The controller
+	 * @param	string|NULL				$do				To "do" parameter
 	 * @return	bool
 	 */
-	public function allowGuestAccess( Module $module, string $controller, ?string $do ): bool
+	public function allowGuestAccess( \IPS\Application\Module $module, $controller, $do )
 	{
 		return FALSE;
 	}
@@ -5912,52 +5110,12 @@ EOF;
 	/**
 	 * Can view page even when site is offline
 	 *
-	 * @param	Module	$module			The module
-	 * @param string $controller		The controller
-	 * @param string|null $do				To "do" parameter
+	 * @param	\IPS\Application\Module	$module			The module
+	 * @param	string					$controller		The controller
+	 * @param	string|NULL				$do				To "do" parameter
 	 * @return	bool
 	 */
-	public function allowOfflineAccess( Module $module, string $controller, ?string $do ): bool
-	{
-		return FALSE;
-	}
-
-	/**
-	 * Can view page even when the member is IP banned
-	 *
-	 * @param Module $module
-	 * @param string $controller
-	 * @param string|null $do
-	 * @return bool
-	 */
-	public function allowBannedAccess( Module $module, string $controller, ?string $do ) : bool
-	{
-		return FALSE;
-	}
-
-	/**
-	 * Can view page even when the member is validating
-	 *
-	 * @param Module $module
-	 * @param string $controller
-	 * @param string|null $do
-	 * @return bool
-	 */
-	public function allowValidatingAccess( Module $module, string $controller, ?string $do ) : bool
-	{
-		return FALSE;
-	}
-
-	/**
-	 * Do we run doMemberCheck for this controller?
-	 * @see Application::doMemberCheck()
-	 *
-	 * @param Module $module
-	 * @param string $controller
-	 * @param string|null $do
-	 * @return bool
-	 */
-	public function skipDoMemberCheck( Module $module, string $controller, ?string $do ) : bool
+	public function allowOfflineAccess( \IPS\Application\Module $module, $controller, $do )
 	{
 		return FALSE;
 	}
@@ -5967,9 +5125,9 @@ EOF;
 	 *
 	 * @return	bool
 	 */
-	public function canEdit(): bool
+	public function canEdit()
 	{
-		return ( Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'app_manage' ) );
+		return ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'app_manage' ) );
 	}
 
 	/**
@@ -5977,7 +5135,7 @@ EOF;
 	 *
 	 * @return array( title => language bit, description => language bit, privacyUrl => privacy policy URL )
 	 */
-	public function privacyPolicyThirdParties(): array
+	public function privacyPolicyThirdParties()
 	{
 		/* Apps can overload this */
 		return array();
@@ -5988,7 +5146,7 @@ EOF;
 	 *
 	 * @return	array
 	 */
-	public function uploadSettings(): array
+	public function uploadSettings()
 	{
 		/* Apps can overload this */
 		return array();
@@ -5997,18 +5155,18 @@ EOF;
 	/**
 	 * Search
 	 *
-	 * @param string $column	Column to search
-	 * @param string $query	Search query
-	 * @param string|null $order	Column to order by
-	 * @param mixed $where	Where clause
+	 * @param	string		$column	Column to search
+	 * @param	string		$query	Search query
+	 * @param	string|null	$order	Column to order by
+	 * @param	mixed		$where	Where clause
 	 * @return	array
 	 */
-	public static function search( string $column, string $query, string $order=NULL, mixed $where=array() ): array
+	public static function search( $column, $query, $order=NULL, $where=array() )
 	{
 		if ( $column === '_title' )
 		{
 			$return = array();
-			foreach(Member::loggedIn()->language()->words as $k => $v )
+			foreach( \IPS\Member::loggedIn()->language()->words as $k => $v )
 			{
 				if ( preg_match( '/^__app_([a-z]*)$/', $k, $matches ) and mb_strpos( mb_strtolower( $v ), mb_strtolower( $query ) ) !== FALSE )
 				{
@@ -6017,7 +5175,7 @@ EOF;
 						$application = static::load( $matches[1] );
 						$return[ $application->_id ] = $application;
 					}
-					catch ( OutOfRangeException $e ) { }
+					catch ( \OutOfRangeException $e ) { }
 				}
 			}
 			return $return;
@@ -6030,27 +5188,27 @@ EOF;
 	 *
 	 * @param Application $application
 	 */
-	public static function removeMetaPrefix( Application $application ) : void
+	public static function removeMetaPrefix( \IPS\Application $application )
 	{
 		$metaWhere = array();
 		$prefix = '';
-		$oldDefaultAppDefinition = ( file_exists( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) ) ? json_decode( preg_replace( '/\/\*.+?\*\//s', '', file_get_contents( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) ), TRUE ) : array();
+		$oldDefaultAppDefinition = ( file_exists( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) ) ? json_decode( preg_replace( '/\/\*.+?\*\//s', '', \file_get_contents( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) ), TRUE ) : array();
 		if ( isset( $oldDefaultAppDefinition['topLevel'] ) and $oldDefaultAppDefinition['topLevel'] )
 		{
 			$prefix = $oldDefaultAppDefinition['topLevel']  .'/';
-			$metaWhere[] = Db::i()->like( 'meta_url', $oldDefaultAppDefinition['topLevel'] . '/' );
+			$metaWhere[] = \IPS\Db::i()->like( 'meta_url', $oldDefaultAppDefinition['topLevel'] . '/' );
 
 			/* Replace the root */
-			Db::i()->update( 'core_seo_meta', array( 'meta_url' =>  '' ), array( 'meta_url=?', $oldDefaultAppDefinition['topLevel'] ) );
+			\IPS\Db::i()->update( 'core_seo_meta', array( 'meta_url' =>  '' ), array( 'meta_url=?', $oldDefaultAppDefinition['topLevel'] ) );
 		}
 
-		$rows = iterator_to_array( Db::i()->select( '*', 'core_seo_meta', $metaWhere )->setKeyField('meta_id') );
+		$rows = iterator_to_array( \IPS\Db::i()->select( '*', 'core_seo_meta', $metaWhere )->setKeyField('meta_id') );
 
 		foreach( $rows as $id => $row )
 		{
 			/* The old urls need now the new prefix */
 			$newUrl = str_replace( $prefix, '', $row['meta_url'] );
-			Db::i()->update( 'core_seo_meta', array( 'meta_url' =>  $newUrl ), array( 'meta_id=?', $id ) );
+			\IPS\Db::i()->update( 'core_seo_meta', array( 'meta_url' =>  $newUrl ), array( 'meta_id=?', $id ) );
 		}
 	}
 
@@ -6059,10 +5217,10 @@ EOF;
 	 *
 	 * @param Application $application
 	 */
-	public static function addMetaPrefix( Application $application ) : void
+	public static function addMetaPrefix( \IPS\Application $application )
 	{
 		$metaWhere = array();
-		$oldDefaultAppDefinition = ( file_exists( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) ) ? json_decode( preg_replace( '/\/\*.+?\*\//s', '', file_get_contents( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) ), TRUE ) : array();
+		$oldDefaultAppDefinition = ( file_exists( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) ) ? json_decode( preg_replace( '/\/\*.+?\*\//s', '', \file_get_contents( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) ), TRUE ) : array();
 		if ( isset( $oldDefaultAppDefinition['topLevel'] ) and $oldDefaultAppDefinition['topLevel'] )
 		{
 			$prefix = $oldDefaultAppDefinition['topLevel']  .'/';
@@ -6072,23 +5230,25 @@ EOF;
 			$prefix = "";
 		}
 
-		foreach (Application::applications() as $app )
+		$existingTopLevels = [];
+		foreach ( \IPS\Application::applications() as $app )
 		{
 			/* If it has a furl.json file... */
 			if (  $application->directory != $app->directory AND file_exists( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) )
 			{
 				/* Open it up */
-				$data = json_decode( preg_replace( '/\/\*.+?\*\//s', '', file_get_contents( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) ), TRUE );
+				$data = json_decode( preg_replace( '/\/\*.+?\*\//s', '', \file_get_contents( static::getRootPath( $application->directory ) . "/applications/{$application->directory}/data/furl.json" ) ), TRUE );
+				$existingTopLevels[] = $data['topLevel'];
 			}
 		}
 
-		$rows = iterator_to_array( Db::i()->select( '*', 'core_seo_meta', $metaWhere )->setKeyField('meta_id') );
+		$rows = iterator_to_array( \IPS\Db::i()->select( '*', 'core_seo_meta', $metaWhere )->setKeyField('meta_id') );
 
 		foreach( $rows as $id => $row )
 		{
 			/* The old urls need now the new prefix */
 			$newUrl = $prefix . $row['meta_url'];
-			Db::i()->update( 'core_seo_meta', array( 'meta_url' =>  $newUrl ), array( 'meta_id=?', $id ) );
+			\IPS\Db::i()->update( 'core_seo_meta', array( 'meta_url' =>  $newUrl ), array( 'meta_id=?', $id ) );
 		}
 	}
 
@@ -6105,18 +5265,18 @@ EOF;
 	/**
 	 * Get Root Path
 	 *
-	 * @param	string|null	$appKey		Application to check if it's an IPS app or third party, or NULL to not check.
+	 * @param	string	$appKey		Application to check if it's an IPS app or third party, or NULL to not check.
 	 * @return	string
 	 */
 	public static function getRootPath( ?string $appKey = NULL ): string
 	{
-		if ( $appKey AND in_array( $appKey, IPS::$ipsApps ) )
+		if ( $appKey AND \in_array( $appKey, \IPS\IPS::$ipsApps ) )
 		{
-			return ROOT_PATH;
+			return \IPS\ROOT_PATH;
 		}
 		else
 		{
-			return SITE_FILES_PATH;
+			return \IPS\SITE_FILES_PATH;
 		}
 	}
 
@@ -6131,7 +5291,7 @@ EOF;
 		$classes = [];
 		$hooks = [];
 
-		foreach ($this->extensions('core', 'ContentRouter') as $router )
+		foreach ( $this->extensions( 'core', 'ContentRouter' ) as $router )
 		{
 			foreach ( $router->classes as $class )
 			{
@@ -6155,57 +5315,43 @@ EOF;
 
 		foreach( $classes as $class )
 		{
-			$key = str_replace( '\\', '', substr( $class, 3 ) );
+			$key = str_replace( '\\', '', \substr( $class, 3 ) );
 			$hooks[$key .'_create'] = $class;
-			$hooks[$key .'_edit'] = $class;
 			$hooks[$key .'_delete'] = $class;
-			$hooks[$key .'_modaction'] = ['action' => 'The performed action ( pin, unpin, feature, unfeature, hide, unhide, move, lock, unlock, delete, publish, restore, restoreAsHidden )', 'item' => $class];
-			Member::loggedIn()->language()->words[ 'webhook_' . $key .'_create' ]     = Member::loggedIn()->language()->addToStack('webhook_contentitem_created', FALSE, ['sprintf' => [ $class::_indefiniteArticle() ]]);
-			Member::loggedIn()->language()->words[ 'webhook_' . $key .'_edit' ]     = Member::loggedIn()->language()->addToStack('webhook_contentitem_edited', FALSE, ['sprintf' => [ $class::_indefiniteArticle() ]]);
-			Member::loggedIn()->language()->words[ 'webhook_' . $key .'_delete' ]     = Member::loggedIn()->language()->addToStack('webhook_contentitem_deleted', FALSE, ['sprintf' => [ $class::_indefiniteArticle() ]]);
-			Member::loggedIn()->language()->words[ 'webhook_' . $key .'_modaction' ]     = Member::loggedIn()->language()->addToStack('webhook_contentitem_modaction', FALSE, ['sprintf' => [ $class::_indefiniteArticle() ]]);
+			\IPS\Member::loggedIn()->language()->words[ 'webhook_' . $key .'_create' ]     = \IPS\Member::loggedIn()->language()->addToStack('webhook_contentitem_created', FALSE, ['sprintf' => [ $class::_indefiniteArticle() ]]);
+			\IPS\Member::loggedIn()->language()->words[ 'webhook_' . $key .'_delete' ]     = \IPS\Member::loggedIn()->language()->addToStack('webhook_contentitem_deleted', FALSE, ['sprintf' => [ $class::_indefiniteArticle() ]]);
 		}
 		return $hooks;
 	}
 
 	/**
-	 * Get all possible layout values for this page and app
-	 *
-	 * @return array
-	 */
-	public function getThemeLayoutOptionsForThisPage(): array
-	{
-		return [];
-	}
-
-	/**
 	 * Do Member Check
 	 *
-	 * @return    Url|NULL
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function doMemberCheck(): ?Url
+	public function doMemberCheck(): ?\IPS\Http\Url
 	{
 		return NULL;
 	}
 
 	/**
 	 * Returns a list of all essential cookies which are set by all the installed apps
-	 * To return a list of own cookies, use the @return string[]
-	 * @see Application::_getEssentialCookieNames method.
+	 * To return a list of own cookies, use the @see \IPS\Application::_getEssentialCookieNames() method.
 	 *
+	 * @return string[]
 	 */
 	public final static function getEssentialCookieNames(): array
 	{
-		if ( !isset( Store::i()->essentialCookieNames ) )
+		if ( !isset( \IPS\Data\Store::i()->essentialCookieNames ) )
 		{
 			$names = [];
 			foreach( static::applications() as $app )
 			{
 				$names = array_merge( $names, $app->_getEssentialCookieNames() );
 			}
-			Store::i()->essentialCookieNames = $names;
+			\IPS\Data\Store::i()->essentialCookieNames = $names;
 		}
-		return Store::i()->essentialCookieNames;
+		return \IPS\Data\Store::i()->essentialCookieNames;
 	}
 
 	/**
@@ -6217,108 +5363,5 @@ EOF;
 	public function _getEssentialCookieNames(): array
 	{
 		return [];
-	}
-
-	/**
-	 * Recursively sort array for JSON output
-	 *
-	 * @param array $array
-	 * @return    void
-	 */
-	function sortForJson( array &$array ) : void
-	{
-		foreach ( $array as &$value )
-		{
-			if ( is_array( $value ) )
-			{
-				$this->sortForJson( $value );
-			}
-		}
-		ksort($array);
-	}
-
-	/**
-	 * Clear out the current editor JS bundles.
-	 * This will force them to be regenerated the next time
-	 * the editor is loaded.
-	 *
-	 * @return void
-	 */
-	public static function resetEditorPlugins() : void
-	{
-		if( isset( Store::i()->editorPluginJs ) )
-		{
-			try
-			{
-				File::get( 'core_Theme', Store::i()->editorPluginJs )->delete();
-			}
-			catch( PHPException ){}
-			unset( Store::i()->editorPluginJs );
-		}
-	}
-
-	/**
-	 * Retrieve additional form fields for adding an extension
-	 * This should return an array where the key is the tag in
-	 * the extension stub that will be replaced, and the value is
-	 * the form field
-	 *
-	 * @param string $extensionType
-	 * @param string $appKey	The application creating the extension
-	 * @return array
-	 */
-	public function extensionHelper( string $extensionType, string $appKey ) : array
-	{
-		return [];
-	}
-
-	/**
-	 * Process additional form fields that are added in Application::extensionHelper()
-	 *
-	 * @param string $extensionType
-	 * @param string $appKey
-	 * @param array $values
-	 * @return array
-	 */
-	public function extensionGenerate( string $extensionType, string $appKey, array $values ) : array
-	{
-		return $values;
-	}
-
-	/**
-	 * Output CSS files
-	 *
-	 * @return void
-	 */
-	public static function outputCss() : void
-	{
-		/* Each application can define any CSS that must be loaded when the app is called */
-	}
-
-	/**
-	 * Get output for API
-	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @return	array
-	 * @apiresponse	string		name			Application Name
-	 * @apiresponse	string		directory		Directory
-	 * @apiresponse	string		website			URL to the application website
-	 * @apiresponse	string		url				URL
-	 * @apiresponse	string		author			Author of the application
-	 * @apiresponse	string		version			Installed Version
-	 * @apiresponse	string		description		Application Description
-	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
-	{
-		$return = [
-			'name'			=> $this->_title,
-			'directory'		=> $this->directory,
-			'website' => 	$this->website,
-			'author' => $this->author,
-			'version' => $this->version,
-			'description' => $this->description,
-		];
-
-		return $return;
 	}
 }

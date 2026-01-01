@@ -12,76 +12,30 @@
 namespace IPS\cms\modules\admin\pages;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Diff;
-use DirectoryIterator;
-use DomainException;
-use Exception;
-use IPS\Application;
-use IPS\cms\Blocks\Block;
-use IPS\cms\Databases;
-use IPS\cms\Templates as TemplatesClass;
-use IPS\cms\Templates\Container;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Http\Url\Internal;
-use IPS\Login;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use IPS\Widget;
-use OutOfRangeException;
-use Throwable;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function mb_substr;
-use function str_replace;
-use function strip_tags;
-use function substr;
-use function ucwords;
-use const IPS\TEMP_DIRECTORY;
-use const IPS\ROOT_PATH;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * templates
  */
-class templates extends Controller
+class _templates extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'template_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'template_manage' );
 		parent::execute();
 	}
 	
@@ -90,106 +44,14 @@ class templates extends Controller
 	 * 
 	 * @return void
 	 */
-	public function importInDev() : void
+	public function importInDev()
 	{
-		/* Get master keys for mapping */
-		$groups = [
-			'' => 'cms_template_no_import'
-		];
-		foreach( Databases::$templateGroups as $key => $group )
-		{
-			$groups[ $group ] = Member::loggedIn()->language()->addToStack( 'cms_new_db_template_group_' . $key );
-		}
+		\IPS\Session::i()->csrfCheck();
+		
+		\IPS\cms\Theme::importInDev('database');
+		\IPS\cms\Theme::importInDev('page');
 
-		/* Build a list of all custom directories */
-		$masterTemplates = iterator_to_array(
-			Db::i()->select( 'template_group', 'cms_templates', [ 'template_location=? and template_master=?', 'database', 1 ] )
-		);
-		$databaseTemplates = [];
-		foreach( new DirectoryIterator( ROOT_PATH . "/applications/cms/dev/html/database" ) as $file )
-		{
-			if( $file->isDot() )
-			{
-				continue;
-			}
-
-			if( $file->isDir() and !in_array( $file->getFilename(), $masterTemplates ) )
-			{
-				$databaseTemplates[] = $file->getFilename();
-			}
-		}
-
-		$masterWrappers = iterator_to_array(
-			Db::i()->select( 'template_title', 'cms_templates', [ 'template_location=? and template_master=? and template_group=?', 'page', 1, 'custom_wrappers' ] )
-		);
-		$customWrappers = [];
-		foreach( new DirectoryIterator( ROOT_PATH . "/applications/cms/dev/html/page/custom_wrappers" ) as $file )
-		{
-			if( $file->isDir() or $file->isDot() or mb_substr( $file->getFilename(), 0, 1 ) === '.' or $file->getFilename() == 'index.html' )
-			{
-				continue;
-			}
-
-			$extension = strtolower( mb_substr( $file->getFilename(), mb_strrpos( $file->getFilename(), '.' ) + 1 ) );
-			if( $extension == 'phtml' and !in_array( mb_substr( $file->getFilename(), 0, mb_strrpos( $file->getFilename(), '.' ) ), $masterWrappers ) )
-			{
-				$customWrappers[ $file->getFilename() ] = $file->getFilename();
-			}
-		}
-
-		if( !count( $databaseTemplates ) and !count( $customWrappers ) )
-		{
-			Output::i()->error( 'err_no_dev_templates', '3T285/4' );
-		}
-
-		$form = new Form( 'form', 'continue' );
-		if( count( $databaseTemplates ) )
-		{
-			$form->addHeader( 'content_import_db' );
-			$form->addMessage( 'content_import_dev_templates_info', 'ipsMessage ipsMessage--info' );
-			foreach( $databaseTemplates as $template )
-			{
-				$key = str_replace( ' ', '_', $template );
-				$field = new Select( $key, null, false, [
-					'options' => $groups
-				] );
-				$field->label = ucwords( str_replace( '_', ' ', $template ) );
-				$form->add( $field );
-			}
-		}
-
-		if( count( $customWrappers ) )
-		{
-			$form->addHeader( 'content_import_wrappers' );
-			$form->add( new CheckboxSet( 'cms_import_wrappers', null, false, [
-				'options' => $customWrappers,
-				'noDefault' => true
-			] ) );
-		}
-
-		if( $values = $form->values() )
-		{
-			foreach( $databaseTemplates as $templateGroup )
-			{
-				$key = str_replace( ' ', '_', $templateGroup );
-				if( isset( $values[ $key ] ) and $values[ $key ] )
-				{
-					\IPS\cms\Theme::importDatabaseTemplate( $templateGroup, $values[ $key ] );
-				}
-			}
-
-			if( isset( $values['cms_import_wrappers'] ) )
-			{
-				foreach( $values['cms_import_wrappers'] as $wrapperName )
-				{
-					\IPS\cms\Theme::importPageWrapper( $wrapperName );
-				}
-			}
-
-			Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates' ), 'completed' );
-		}
-
-		Output::i()->output = (string) $form;
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates' ), 'completed' );
 	}
 
 	/**
@@ -197,32 +59,32 @@ class templates extends Controller
 	 *
 	 * @return void
 	 */
-	public function import() : void
+	public function import()
 	{
-		$form = new Form( 'form', 'next' );
+		$form = new \IPS\Helpers\Form( 'form', 'next' );
 
-		$form->add( new Upload( 'cms_templates_import', NULL, FALSE, array( 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ), NULL, NULL, NULL, 'cms_templates_import' ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'cms_templates_import', NULL, FALSE, array( 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ), NULL, NULL, NULL, 'cms_templates_import' ) );
 
 		if ( $values = $form->values() )
 		{
 			if ( $values['cms_templates_import'] )
 			{
 				/* Move it to a temporary location */
-				$tempFile = tempnam( TEMP_DIRECTORY, 'IPS' );
+				$tempFile = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
 				move_uploaded_file( $values['cms_templates_import'], $tempFile );
 
-				Session::i()->log( 'acplogs__cms_imported_templates' );
+				\IPS\Session::i()->log( 'acplogs__cms_imported_templates' );
 
 				/* Initate a redirector */
-				Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates&do=importProcess' )->csrf()->setQueryString( array( 'file' => $tempFile, 'key' => md5_file( $tempFile ) ) ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates&do=importProcess' )->csrf()->setQueryString( array( 'file' => $tempFile, 'key' => md5_file( $tempFile ) ) ) );
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates&do=manage' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates&do=manage' ) );
 			}
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'admin' )->block( 'cms_templates_import_title', $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'admin' )->block( 'cms_templates_import_title', $form, FALSE );
 	}
 
 	/**
@@ -230,33 +92,33 @@ class templates extends Controller
 	 *
 	 * @return	void
 	 */
-	public function importProcess() : void
+	public function importProcess()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		if ( !file_exists( Request::i()->file ) or md5_file( Request::i()->file ) !== Request::i()->key )
+		if ( !file_exists( \IPS\Request::i()->file ) or md5_file( \IPS\Request::i()->file ) !== \IPS\Request::i()->key )
 		{
-			Output::i()->error( 'generic_error', '3T285/3', 403, '' );
+			\IPS\Output::i()->error( 'generic_error', '3T285/3', 403, '' );
 		}
 
 		$result = NULL;
 		try
 		{
-			$result = TemplatesClass::importUserTemplateXml( Request::i()->file );
+			$result = \IPS\cms\Templates::importUserTemplateXml( \IPS\Request::i()->file );
 		}
-		catch( Throwable $e )
+		catch( \Throwable $e )
 		{
-			@unlink( Request::i()->file );
+			@unlink( \IPS\Request::i()->file );
 		}
 
 		/* Done */
-		if ( $result instanceof Internal )
+		if ( $result instanceof \IPS\Http\Url\Internal )
 		{
-			Output::i()->redirect( $result );
+			\IPS\Output::i()->redirect( $result );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates&do=manage' ), 'cms_templates_imported' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates&do=manage' ), 'cms_templates_imported' );
 		}
 	}
 
@@ -265,61 +127,65 @@ class templates extends Controller
 	 *
 	 * @return void
 	 */
-	public function conflicts() : void
+	public function conflicts()
 	{
-		$key         = Request::i()->key;
-		$form        = new Form( 'form', 'theme_conflict_save' );
+		$key         = \IPS\Request::i()->key;
+		$form        = new \IPS\Helpers\Form( 'form', 'theme_conflict_save' );
 		$conflicts   = array();
 
 		/* If this is part of plugin/app installation, set relevant form data */
-		if( Request::i()->application )
+		if( \IPS\Request::i()->application OR \IPS\Request::i()->plugin )
 		{
-			if( Request::i()->application )
+			if( \IPS\Request::i()->application )
 			{
-				$form->hiddenValues['application'] = Request::i()->application;
+				$form->hiddenValues['application'] = \IPS\Request::i()->application;
+			}
+			elseif( \IPS\Request::i()->plugin )
+			{
+				$form->hiddenValues['plugin'] = \IPS\Request::i()->plugin;
 			}
 
-			if( Request::i()->lang )
+			if( \IPS\Request::i()->lang )
 			{
-				$form->hiddenValues['lang'] = Request::i()->lang;
+				$form->hiddenValues['lang'] = \IPS\Request::i()->lang;
 			}
 		}
 
 		/* Get conflict data */
-		foreach( Db::i()->select( '*', 'cms_template_conflicts', array( 'conflict_key=?', $key ) )->setKeyField( 'conflict_id' ) as $cid => $data )
+		foreach( \IPS\Db::i()->select( '*', 'cms_template_conflicts', array( 'conflict_key=?', $key ) )->setKeyField( 'conflict_id' ) as $cid => $data )
 		{
 			$conflicts[ $cid ] = $data;
 		}
 
-		require_once ROOT_PATH . "/system/3rd_party/Diff/class.Diff.php";
+		require_once \IPS\ROOT_PATH . "/system/3rd_party/Diff/class.Diff.php";
 
 		foreach( $conflicts as $cid => $data )
 		{
 			try
 			{
-				$template = TemplatesClass::load( $data['conflict_item_id'], 'template_id' );
+				$template = \IPS\cms\Templates::load( $data['conflict_item_id'], 'template_id' );
 
-				if ( !Login::compareHashes( md5( $data['conflict_content'] ), md5( $template->content ) ) )
+				if ( !\IPS\Login::compareHashes( md5( $data['conflict_content'] ), md5( $template->content ) ) )
 				{
 					if ( mb_strlen( $data['conflict_content'] ) <= 10000 )
 					{
-						$conflicts[ $cid ]['diff'] = Diff::toTable( Diff::compare( $template->content, $data['conflict_content'] ) );
+						$conflicts[ $cid ]['diff'] = \Diff::toTable( \Diff::compare( $template->content, $data['conflict_content'] ) );
 						$conflicts[ $cid ]['large'] = false;
 					}
 					else
 					{
-						$conflicts[ $cid ]['diff'] = Theme::i()->getTemplate( 'customization', 'core' )->templateConflictLarge( $template->content, $data['conflict_content'], 'html' );
+						$conflicts[ $cid ]['diff'] = \IPS\Theme::i()->getTemplate( 'customization', 'core' )->templateConflictLarge( $template->content, $data['conflict_content'], 'html' );
 						$conflicts[ $cid ]['large'] = true;
 					}
 
-					$form->add( new Radio( 'conflict_' . $data['conflict_id'], 'old', false, array('options' => array('old' => '', 'new' => '')) ) );
+					$form->add( new \IPS\Helpers\Form\Radio( 'conflict_' . $data['conflict_id'], 'old', false, array('options' => array('old' => '', 'new' => '')) ) );
 				}
 				else
 				{
 					unset( $conflicts[ $cid ] );
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				unset( $conflicts[ $cid ] );
 			}
@@ -333,30 +199,30 @@ class templates extends Controller
 
 			foreach( $values as $k => $v )
 			{
-				if ( substr( $k, 0, 9 ) == 'conflict_' )
+				if ( \substr( $k, 0, 9 ) == 'conflict_' )
 				{
 					if ( $v == 'new' )
 					{
-						$conflictIds[ (int) substr( $k, 9 ) ] = $v;
+						$conflictIds[ (int) \substr( $k, 9 ) ] = $v;
 					}
 				}
 			}
 
-			if ( count( $conflictIds ) )
+			if ( \count( $conflictIds ) )
 			{
 				/* Get conflict data */
-				foreach( Db::i()->select( '*', 'cms_template_conflicts', Db::i()->in( 'conflict_id', array_keys( $conflictIds ) ) )->setKeyField( 'conflict_id' ) as $cid => $data )
+				foreach( \IPS\Db::i()->select( '*', 'cms_template_conflicts', \IPS\Db::i()->in( 'conflict_id', array_keys( $conflictIds ) ) )->setKeyField( 'conflict_id' ) as $cid => $data )
 				{
 					$conflicts[ $data['conflict_item_id'] ] = $data;
 				}
 			}
 
-			if ( count( $conflicts ) )
+			if ( \count( $conflicts ) )
 			{
-				$templates = iterator_to_array( Db::i()->select(
+				$templates = iterator_to_array( \IPS\Db::i()->select(
 					'*',
 					'cms_templates',
-					array( Db::i()->in( 'template_id', array_keys( $conflicts ) ) )
+					array( \IPS\Db::i()->in( 'template_id', array_keys( $conflicts ) ) )
 				)->setKeyField( 'template_id' ) );
 			}
 
@@ -366,46 +232,50 @@ class templates extends Controller
 				{
 					try
 					{
-						$templateObj = TemplatesClass::load( $template['template_id'], 'template_id' );
+						$templateObj = \IPS\cms\Templates::load( $template['template_id'], 'template_id' );
 						$templateObj->params = $conflicts[ $template['template_id'] ]['conflict_data'];
 						$templateObj->content = $conflicts[ $template['template_id'] ]['conflict_content'];
 						$templateObj->user_edited = (int) $templateObj->isDifferentFromMaster();
 						$templateObj->save();
 					}
-					catch( Exception $e ) { }
+					catch( \Exception $e ) { }
 				}
 			}
 
 			/* Clear out conflicts for this theme set */
-			Db::i()->delete( 'cms_template_conflicts', array('conflict_key=?', Request::i()->key ) );
+			\IPS\Db::i()->delete( 'cms_template_conflicts', array('conflict_key=?', \IPS\Request::i()->key ) );
 
 			$lang = NULL;
 			if( !empty( $values['lang'] ) )
 			{
 				$lang = $values['lang'] == 'updated' ? 'application_now_updated' : 'application_now_installed';
 			}
-			
-			elseif( !empty( $values['application'] ) )
+
+			if( !empty( $values['application'] ) )
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=applications&controller=applications' ), $lang );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications' ), $lang );
+			}
+			elseif( !empty( $values['plugin'] ) )
+			{
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=applications&controller=plugins' ), 'plugin_now_installed' );
 			}
 
-			Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates&do=manage' ), 'completed' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates&do=manage' ), 'completed' );
 		}
 
-		if ( count( $conflicts ) )
+		if ( \count( $conflicts ) )
 		{
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/diff.css', 'core', 'admin' ) );
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'codemirror/codemirror.js', 'core', 'interface' ) );
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'codemirror/codemirror.css', 'core', 'interface' ) );
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'customization/themes.css', 'core', 'admin' ) );
-			Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_templates.js', 'cms', 'admin' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/diff.css', 'core', 'admin' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'codemirror/codemirror.js', 'core', 'interface' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'codemirror/codemirror.css', 'core', 'interface' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'customization/themes.css', 'core', 'admin' ) );
+			\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_templates.js', 'core', 'admin' ) );
 
-			Output::i()->output   = $form->customTemplate( array( Theme::i()->getTemplate( 'templates', 'cms' ), 'templateConflict' ), $conflicts );
+			\IPS\Output::i()->output   = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'templates', 'cms' ), 'templateConflict' ), $conflicts );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates&do=manage' ), 'completed' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates&do=manage' ), 'completed' );
 		}
 	}
 
@@ -414,28 +284,28 @@ class templates extends Controller
 	 *
 	 * @return void
 	 */
-	public function export() : void
+	public function export()
 	{
-		$form = TemplatesClass::exportForm();
+		$form = \IPS\cms\Templates::exportForm();
 
 		if ( $values = $form->values() )
 		{
-			$xml = TemplatesClass::exportAsXml( $values );
+			$xml = \IPS\cms\Templates::exportAsXml( $values );
 
 			if( $xml === NULL )
 			{
-				Output::i()->error( 'cms_no_templates_selected', '1T285/1', 403, '' );
+				\IPS\Output::i()->error( 'cms_no_templates_selected', '1T285/1', 403, '' );
 			}
 
-			Session::i()->log( 'acplogs__cms_exported_templates' );
+			\IPS\Session::i()->log( 'acplogs__cms_exported_templates' );
 
-			Output::i()->sendOutput( $xml->outputMemory(), 200, 'application/xml', array( 'Content-Disposition' => Output::getContentDisposition( 'attachment', "pages_templates.xml" ) ) );
+			\IPS\Output::i()->sendOutput( $xml->outputMemory(), 200, 'application/xml', array( 'Content-Disposition' => \IPS\Output::getContentDisposition( 'attachment', "pages_templates.xml" ) ) );
 		}
 		
-		Output::i()->breadcrumb[] = array( Url::internal( "app=cms&module=pages&controller=templates" ), Member::loggedIn()->language()->addToStack( 'menu__cms_pages_templates' ) );
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('cms_templates_export_title') );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('cms_templates_export_title');
-		Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'admin' )->block( 'cms_templates_export_title', $form, FALSE );
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( "app=cms&module=pages&controller=templates" ), \IPS\Member::loggedIn()->language()->addToStack( 'menu__cms_pages_templates' ) );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack('cms_templates_export_title') );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('cms_templates_export_title');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'admin' )->block( 'cms_templates_export_title', $form, FALSE );
 	}
 
 	/**
@@ -443,110 +313,118 @@ class templates extends Controller
 	 * 
 	 * @return void
 	 */
-	public function manage() : void
+	public function manage()
 	{
-		Dispatcher::i()->checkAcpPermission( 'template_add_edit' );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__cms_pages_templates');
+		\IPS\Dispatcher::i()->checkAcpPermission( 'template_add_edit' );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__cms_pages_templates');
 
-		$request = array(
-			't_location' => ( isset( Request::i()->t_location ) ) ? Request::i()->t_location : NULL,
-			't_group'    => ( isset( Request::i()->t_group ) ) ? Request::i()->t_group : NULL,
-			't_key'      => ( isset( Request::i()->t_key ) ) ? Request::i()->t_key : NULL,
-			't_type'     => ( isset( Request::i()->t_type ) ) ? Request::i()->t_type : 'templates',
-		);
-
-		switch ( $request['t_type'] )
+		if ( \IPS\Theme::designersModeEnabled() )
 		{
-			default:
-			case 'template':
-				$flag = TemplatesClass::RETURN_ONLY_TEMPLATE;
-				break;
-			case 'js':
-				$flag = TemplatesClass::RETURN_ONLY_JS;
-				break;
-			case 'css':
-				$flag = TemplatesClass::RETURN_ONLY_CSS;
-				break;
+			$link = \IPS\Http\Url::internal( 'app=core&module=customization&controller=themes&do=designersmode' );
+			\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->message( \IPS\Member::loggedIn()->language()->addToStack( 'cms_theme_designer_mode_warning', FALSE, array( 'sprintf' => array( $link ) ) ), 'information', NULL, FALSE );
 		}
-
-		$templates = TemplatesClass::buildTree( TemplatesClass::getTemplates( $flag + TemplatesClass::RETURN_DATABASE_ONLY ) );
-
-		$current = NULL;
-
-		if ( !empty( $request['t_key'] ) )
+		else
 		{
-			try
-			{
-				$current = TemplatesClass::load( $request['t_key'] );
-			}
-			catch ( OutOfRangeException $ex )
-			{
+			$request = array(
+				't_location' => ( isset( \IPS\Request::i()->t_location ) ) ? \IPS\Request::i()->t_location : NULL,
+				't_group'    => ( isset( \IPS\Request::i()->t_group ) ) ? \IPS\Request::i()->t_group : NULL,
+				't_key'      => ( isset( \IPS\Request::i()->t_key ) ) ? \IPS\Request::i()->t_key : NULL,
+				't_type'     => ( isset( \IPS\Request::i()->t_type ) ) ? \IPS\Request::i()->t_type : 'templates',
+			);
 
-			}
-		}
-
-		/* Load first block */
-		if ( $current === NULL )
-		{
-			foreach ( $templates as $type => $_templates )
+			switch ( $request['t_type'] )
 			{
-				if ( $_templates )
+				default:
+				case 'template':
+					$flag = \IPS\cms\Templates::RETURN_ONLY_TEMPLATE;
+					break;
+				case 'js':
+					$flag = \IPS\cms\Templates::RETURN_ONLY_JS;
+					break;
+				case 'css':
+					$flag = \IPS\cms\Templates::RETURN_ONLY_CSS;
+					break;
+			}
+
+			$templates = \IPS\cms\Templates::buildTree( \IPS\cms\Templates::getTemplates( $flag + \IPS\cms\Templates::RETURN_DATABASE_ONLY ) );
+
+			$current = NULL;
+
+			if ( !empty( $request['t_key'] ) )
+			{
+				try
 				{
-					$test = key( $_templates );
+					$current = \IPS\cms\Templates::load( $request['t_key'] );
+				}
+				catch ( \OutOfRangeException $ex )
+				{
 
-					try
+				}
+			}
+
+			/* Load first block */
+			if ( $current === NULL )
+			{
+				foreach ( $templates as $type => $_templates )
+				{
+					if ( $_templates )
 					{
-						$current = TemplatesClass::load( $test );
-					}
-					catch ( OutofRangeException $e )
-					{
-						foreach ( $_templates as $location => $group )
+						$test = key( $_templates );
+
+						try
 						{
-							foreach ( $group as $name => $template )
+							$current = \IPS\cms\Templates::load( $test );
+						}
+						catch ( \OutofRangeException $e )
+						{
+							foreach ( $_templates as $location => $group )
 							{
-								$current = $template;
-								break 3;
+								foreach ( $group as $name => $template )
+								{
+									$current = $template;
+									break 3;
+								}
 							}
 						}
 					}
 				}
 			}
-		}
 
-		/* Display */
-		Output::i()->responsive = FALSE;
+			/* Display */
+			\IPS\Output::i()->responsive = FALSE;
 
-		/* A button */
-		if ( \IPS\IN_DEV )
-		{
-			Output::i()->sidebar['actions']['add'] = array(
-				'icon'  => 'cog',
-				'title' => 'content_import_dev_templates',
-				'link'  => Url::internal( "app=cms&module=pages&controller=templates&do=importInDev" ),
-				'data'  => [ 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'content_import_dev_templates' ) ]
+			/* A button */
+			if ( \IPS\IN_DEV )
+			{
+				\IPS\Output::i()->sidebar['actions']['add'] = array(
+					'icon'  => 'cog',
+					'title' => 'content_import_dev_templates',
+					'link'  => \IPS\Http\Url::internal( "app=cms&module=pages&controller=templates&do=importInDev" )->csrf(),
+					'data'  => array()
+				);
+			}
+
+			\IPS\Output::i()->sidebar['actions']['download'] = array(
+				'icon'  => 'download',
+				'title' => 'cms_templates_export_title',
+				'link'  => \IPS\Http\Url::internal( "app=cms&module=pages&controller=templates&do=export" ),
 			);
+
+			\IPS\Output::i()->sidebar['actions']['upload'] = array(
+				'icon'  => 'upload',
+				'title' => 'cms_templates_import_title',
+				'link'  => \IPS\Http\Url::internal( "app=cms&module=pages&controller=templates&do=import" ),
+				'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('cms_templates_import_title') )
+			);
+
+			\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'codemirror/diff_match_patch.js', 'core', 'interface' ) );
+			\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'codemirror/codemirror.js', 'core', 'interface' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'codemirror/codemirror.css', 'core', 'interface' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'templates/templates.css', 'cms', 'admin' ) );
+			\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_templates.js', 'cms' ) );
+
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'templates' )->templates( $templates, $current, $request );
 		}
-
-		Output::i()->sidebar['actions']['download'] = array(
-			'icon'  => 'download',
-			'title' => 'cms_templates_export_title',
-			'link'  => Url::internal( "app=cms&module=pages&controller=templates&do=export" ),
-		);
-
-		Output::i()->sidebar['actions']['upload'] = array(
-			'icon'  => 'upload',
-			'title' => 'cms_templates_import_title',
-			'link'  => Url::internal( "app=cms&module=pages&controller=templates&do=import" ),
-			'data'  => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('cms_templates_import_title') )
-		);
-
-		Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'codemirror/diff_match_patch.js', 'core', 'interface' ) );
-		Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'codemirror/codemirror.js', 'core', 'interface' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'codemirror/codemirror.css', 'core', 'interface' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'templates/templates.css', 'cms', 'admin' ) );
-		Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_templates.js', 'cms', 'admin' ) );
-
-		Output::i()->output = Theme::i()->getTemplate( 'templates' )->templates( $templates, $current, $request );
 	}
 	
 	/**
@@ -554,45 +432,45 @@ class templates extends Controller
 	 *
 	 * @return	void
 	 */
-	public function addContainer() : void
+	public function addContainer()
 	{
 		/* Check permission */
-		Dispatcher::i()->checkAcpPermission( 'template_add' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'template_add' );
 	
-		$type = Request::i()->type;
+		$type = \IPS\Request::i()->type;
 	
 		/* Build form */
-		$form = new Form();
+		$form = new \IPS\Helpers\Form();
 	
-		$form->add( new Text( 'container_name', NULL, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'container_name', NULL, TRUE ) );
 		$form->hiddenValues['type'] = $type;
 	
 		if ( $values = $form->values() )
 		{
-			$type = Request::i()->type;
+			$type = \IPS\Request::i()->type;
 				
-			$newContainer = Container::add( array(
+			$newContainer = \IPS\cms\Templates\Container::add( array(
 					'name' => $values['container_name'],
 					'type' => 'template_' . $type
 			) );
 
-			Session::i()->log( 'acplogs__cms_template_container', array( $newContainer->title => false ) );
+			\IPS\Session::i()->log( 'acplogs__cms_template_container', array( $container->title => false ) );
 	
-			if( Request::i()->isAjax() )
+			if( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->json( array(
+				\IPS\Output::i()->json( array(
 					'id'   => $newContainer->id,
 					'name' => $newContainer->title,
 				) );
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates' ), 'saved' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates' ), 'saved' );
 			}
 		}
 	
 		/* Display */
-		Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->block( 'content_template_add_container_' . $type, $form, FALSE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->block( 'content_template_add_container_' . $type, $form, FALSE );
 	}
 	
 	/**
@@ -601,84 +479,84 @@ class templates extends Controller
 	 *
 	 * @return	void
 	 */
-	public function addTemplate() : void
+	public function addTemplate()
 	{
 		/* Check permission */
-		Dispatcher::i()->checkAcpPermission( 'template_add_edit' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'template_add_edit' );
 		
-		$type = Request::i()->type;
+		$type = \IPS\Request::i()->type;
 		
 		/* Build form */
-		$form = new Form();
+		$form = new \IPS\Helpers\Form();
 		$form->hiddenValues['type'] = $type;
 		
-		$form->add( new Text( 'template_title', NULL, TRUE, array( 'regex' => '/^([A-Z_][A-Z0-9_]+?)$/i' ), function ( $val ) {
+		$form->add( new \IPS\Helpers\Form\Text( 'template_title', NULL, TRUE, array( 'regex' => '/^([A-Z_][A-Z0-9_]+?)$/i' ), function ( $val ) {
 			/* PHP Keywords cannot be used as template names - so make sure the full template name is not in the list */
 			$keywords = array( 'abstract', 'and', 'array', 'as', 'break', 'callable', 'case', 'catch', 'class', 'clone', 'const', 'continue', 'declare', 'default', 'die', 'do', 'echo', 'else', 'elseif', 'empty', 'enddeclare', 'endfor', 'endforeach', 'endif', 'endswitch', 'endwhile', 'eval', 'exit', 'extends', 'final', 'for', 'foreach', 'function', 'global', 'goto', 'if', 'implements', 'include', 'include_once', 'instanceof', 'insteadof', 'interface', 'isset', 'list', 'namespace', 'new', 'or', 'print', 'private', 'protected', 'public', 'require', 'require_once', 'return', 'static', 'switch', 'throw', 'trait', 'try', 'unset', 'use', 'var', 'while', 'xor' );
 			
-			if ( in_array( $val, $keywords ) )
+			if ( \in_array( $val, $keywords ) )
 			{
-				throw new DomainException( Member::loggedIn()->language()->addToStack( 'template_reserved_word', FALSE, array( 'htmlsprintf' => array( Member::loggedIn()->language()->formatList( $keywords ) ) ) ) );
+				throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'template_reserved_word', FALSE, array( 'htmlsprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $keywords ) ) ) ) );
 			}
 
 			try
 			{
-				$count = Db::i()->select( 'COUNT(*)', 'cms_templates', array( "LOWER(template_group)=?", mb_strtolower( str_replace( ' ', '_', $val ) )  ) )->first();
+				$count = \IPS\Db::i()->select( 'COUNT(*)', 'cms_templates', array( "LOWER(template_title)=?", mb_strtolower( str_replace( ' ', '_', $val ) )  ) )->first();
 				
 				if ( $count )
 				{
-					throw new DomainException( 'cms_template_title_exists' );
+					throw new \DomainException( 'cms_template_title_exists' );
 				}
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 		} ) );
 
 		/* Very specific */
 		if ( $type === 'database' )
 		{
 			$groups = array(); /* I was sorely tempted to put 'Radiohead', 'Beatles' in there */
-			foreach( Databases::$templateGroups as $key => $group )
+			foreach( \IPS\cms\Databases::$templateGroups as $key => $group )
 			{
-				$groups[ $key ] = Member::loggedIn()->language()->addToStack( 'cms_new_db_template_group_' . $key );
+				$groups[ $key ] = \IPS\Member::loggedIn()->language()->addToStack( 'cms_new_db_template_group_' . $key );
 			}
 
-			$form->add( new Select( 'database_template_type', NULL, FALSE, array(
+			$form->add( new \IPS\Helpers\Form\Select( 'database_template_type', NULL, FALSE, array(
 				'options' => $groups
 			) ) );
 
-			$databases = array( 0 => Member::loggedIn()->language()->addToStack('cms_new_db_assign_to_db_none' ) );
-			foreach( Databases::databases() as $obj )
+			$databases = array( 0 => \IPS\Member::loggedIn()->language()->addToStack('cms_new_db_assign_to_db_none' ) );
+			foreach( \IPS\cms\Databases::databases() as $obj )
 			{
 				$databases[ $obj->id ] = $obj->_title;
 			}
 
-			$form->add( new Select( 'database_assign_to', NULL, FALSE, array(
+			$form->add( new \IPS\Helpers\Form\Select( 'database_assign_to', NULL, FALSE, array(
 				'options' => $databases
 			) ) );
 		}
 		else if ( $type === 'block' )
 		{
 			$plugins = array();
-			foreach ( Db::i()->select( "*", 'core_widgets', array( 'embeddable=1') ) as $widget )
+			foreach ( \IPS\Db::i()->select( "*", 'core_widgets', array( 'embeddable=1') ) as $widget )
 			{
 				/* Skip disabled applications */
-				if ( !in_array( $widget['app'], array_keys( Application::enabledApplications() ) ) )
+				if ( !\in_array( $widget['app'], array_keys( \IPS\Application::enabledApplications() ) ) )
 				{
 					continue;
 				}
 
 				try
 				{
-					$plugins[ Application::load( $widget['app'] )->_title ][ $widget['app'] . '__' . $widget['key'] ] = Member::loggedIn()->language()->addToStack( 'block_' . $widget['key'] );
+					$plugins[ \IPS\Application::load( $widget['app'] )->_title ][ $widget['app'] . '__' . $widget['key'] ] = \IPS\Member::loggedIn()->language()->addToStack( 'block_' . $widget['key'] );
 				}
-				catch ( OutOfRangeException $e ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 			
-			$form->add( new Select( 'block_template_plugin_import', NULL, FALSE, array(
+			$form->add( new \IPS\Helpers\Form\Select( 'block_template_plugin_import', NULL, FALSE, array(
 					'options' => $plugins
 			) ) );
 		
-			$form->add( new Node( 'block_template_theme_import', NULL, TRUE, array(
+			$form->add( new \IPS\Helpers\Form\Node( 'block_template_theme_import', NULL, TRUE, array(
 				'class' => '\IPS\Theme'
 			) ) );
 		}
@@ -701,7 +579,7 @@ class templates extends Controller
 				break;
 			}
 
-			$templates = \IPS\cms\Theme::i()->getAllTemplates( array(), array(), array(), $flag | Theme::RETURN_ALL_NO_CONTENT );
+			$templates = \IPS\cms\Theme::i()->getRawTemplates( array(), array(), array(), $flag | \IPS\cms\Theme::RETURN_ALL_NO_CONTENT );
 
 			$groups = array();
 
@@ -709,70 +587,70 @@ class templates extends Controller
 			{
 				foreach( $templates['cms'][ $type ] as $group => $data )
 				{
-					$groups[ $group ] = TemplatesClass::readableGroupName( $group );
+					$groups[ $group ] = \IPS\cms\Templates::readableGroupName( $group );
 				}
 			}
 
-			if ( ! count( $groups ) )
+			if ( ! \count( $groups ) )
 			{
-				$groups[ $type ] = TemplatesClass::readableGroupName( $type );
+				$groups[ $type ] = \IPS\cms\Templates::readableGroupName( $type );
 			}
 
-			$form->add( new Radio( 'theme_template_group_type', 'existing', FALSE, array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'theme_template_group_type', 'existing', FALSE, array(
 				            'options'  => array( 'existing' => 'theme_template_group_o_existing',
 				                                 'new'	    => 'theme_template_group_o_new' ),
 				            'toggles'  => array( 'existing' => array( 'group_existing' ),
 				                                 'new'      => array( 'group_new' ) )
 			            ) ) );
 
-			$form->add( new Text( 'template_group_new', NULL, FALSE, array( 'regex' => '/^([a-z_][a-z0-9_]+?)?$/' ), function( $val ) {
+			$form->add( new \IPS\Helpers\Form\Text( 'template_group_new', NULL, FALSE, array( 'regex' => '/^([a-z_][a-z0-9_]+?)?$/' ), function( $val ) {
 				/* PHP Keywords cannot be used as template names - so make sure the full template name is not in the list */
 				$keywords = array( 'abstract', 'and', 'array', 'as', 'break', 'callable', 'case', 'catch', 'class', 'clone', 'const', 'continue', 'declare', 'default', 'die', 'do', 'echo', 'else', 'elseif', 'empty', 'enddeclare', 'endfor', 'endforeach', 'endif', 'endswitch', 'endwhile', 'eval', 'exit', 'extends', 'final', 'for', 'foreach', 'function', 'global', 'goto', 'if', 'implements', 'include', 'include_once', 'instanceof', 'insteadof', 'interface', 'isset', 'list', 'namespace', 'new', 'or', 'print', 'private', 'protected', 'public', 'require', 'require_once', 'return', 'static', 'switch', 'throw', 'trait', 'try', 'unset', 'use', 'var', 'while', 'xor' );
 
-				if ( in_array( $val, $keywords ) )
+				if ( \in_array( $val, $keywords ) )
 				{
-					throw new DomainException( Member::loggedIn()->language()->addToStack( 'template_reserved_word', FALSE, array( 'htmlsprintf' => array( Member::loggedIn()->language()->formatList( $keywords ) ) ) ) );
+					throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'template_reserved_word', FALSE, array( 'htmlsprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $keywords ) ) ) ) );
 				}
 
 				try
 				{
-					$count = Db::i()->select( 'COUNT(*)', 'cms_templates', array( "LOWER(template_group)=?", mb_strtolower( str_replace( ' ', '_', $val ) )  ) )->first();
+					$count = \IPS\Db::i()->select( 'COUNT(*)', 'cms_templates', array( "LOWER(template_group)=?", mb_strtolower( str_replace( ' ', '_', $val ) )  ) )->first();
 	
 					if ( $count )
 					{
-						throw new DomainException( 'cms_template_group_exists' );
+						throw new \DomainException( 'cms_template_group_exists' );
 					}
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}, NULL, NULL, 'group_new' ) );
-			$form->add( new Select( 'template_group_existing', NULL, FALSE, array( 'options' => $groups ), NULL, NULL, NULL, 'group_existing' ) );
+			$form->add( new \IPS\Helpers\Form\Select( 'template_group_existing', NULL, FALSE, array( 'options' => $groups ), NULL, NULL, NULL, 'group_existing' ) );
 		}
 
-		if ( ! Request::i()->isAjax() AND $type !== 'database' )
+		if ( ! \IPS\Request::i()->isAjax() AND $type !== 'database' )
 		{
-			$form->add( new TextArea( 'template_content', NULL ) );
+			$form->add( new \IPS\Helpers\Form\TextArea( 'template_content', NULL ) );
 		}
 	
 		if ( $values = $form->values() )
 		{
-			$type = Request::i()->type;
+			$type = \IPS\Request::i()->type;
 
 			if ( $type == 'database' )
 			{
 				/* We need to copy templates */
-				$group     = Databases::$templateGroups[ $values['database_template_type' ] ];
-				$templates = iterator_to_array( Db::i()->select( '*', 'cms_templates', array( 'template_location=? AND template_group=? AND template_user_edited=0 AND template_user_created=0', 'database', $group ) ) );
+				$group     = \IPS\cms\Databases::$templateGroups[ $values['database_template_type' ] ];
+				$templates = iterator_to_array( \IPS\Db::i()->select( '*', 'cms_templates', array( 'template_location=? AND template_group=? AND template_user_edited=0 AND template_user_created=0', 'database', $group ) ) );
 
 				foreach( $templates as $template )
 				{
 					unset( $template['template_id'] );
 					$template['template_original_group'] = $template['template_group'];
-					$template['template_group'] = str_replace( '-', '_', Friendly::seoTitle( $values['template_title'] ) );
+					$template['template_group'] = str_replace( '-', '_', \IPS\Http\Url\Friendly::seoTitle( $values['template_title'] ) );
 
 					$save = array();
 					foreach( $template as $k => $v )
 					{
-						$k = mb_substr( $k, 9 );
+						$k = \mb_substr( $k, 9 );
 						$save[ $k ] = $v;
 					}
 
@@ -801,7 +679,7 @@ class templates extends Controller
 								{
 									$options['group'] = $template['template_group'];
 
-									$replace = '{template="' . $value . '" app="' . $options['app'] . '" location="' . $options['location'] . '" group="' . $options['group'] . '" params="' . ($options['params'] ?? NULL) . '"}';
+									$replace = '{template="' . $value . '" app="' . $options['app'] . '" location="' . $options['location'] . '" group="' . $options['group'] . '" params="' . ( isset($options['params']) ? $options['params'] : NULL ) . '"}';
 
 									$save['content'] = str_replace( $matches[$index][0], $replace, $save['content'] );
 								}
@@ -809,32 +687,26 @@ class templates extends Controller
 						}
 					}
 
-					$newTemplate = TemplatesClass::add( $save );
+					$newTemplate = \IPS\cms\Templates::add( $save );
 				}
 
 				if ( $values['database_assign_to'] )
 				{
 					try
 					{
-						$db   = Databases::load( $values['database_assign_to'] );
-						$displaySettings = $db->display_settings;
-						if( !isset( $displaySettings[ $values['database_template_type'] ] ) )
-						{
-							$displaySettings[ $values['database_template_type'] ] = [];
-						}
-						$displaySettings[ $values['database_template_type'] ]['layout'] = 'custom';
-						$displaySettings[ $values['database_template_type'] ]['template'] = $template['template_group'];
-						$db->display_settings = $displaySettings;
+						$db   = \IPS\cms\Databases::load( $values['database_assign_to'] );
+						$key  = 'template_' . $values['database_template_type'];
+						$db->$key = $template['template_group'];
 						$db->save();
 					}
-					catch( OutOfRangeException $ex ) { }
+					catch( \OutOfRangeException $ex ) { }
 				}
 			}
 			else if ( $type === 'block' )
 			{
 				$save = array(
-					'title'	   => str_replace( '-', '_', Friendly::seoTitle( $values['template_title'] ) ),
-					//'params'   => isset( $values['template_params'] ) ? $values['template_params'] : null,
+					'title'	   => str_replace( '-', '_', \IPS\Http\Url\Friendly::seoTitle( $values['template_title'] ) ),
+					'params'   => isset( $values['template_params'] ) ? $values['template_params'] : null,
 					'location' => $type
 				);
 
@@ -842,18 +714,18 @@ class templates extends Controller
 				list( $widgetApp, $widgetKey ) = explode( '__', $values['block_template_plugin_import'] );
 
 				/* Find it from the normal template system */
-				$plugin = Widget::load( Application::load( $widgetApp ), $widgetKey, mt_rand(), array() );
+				$plugin = \IPS\Widget::load( \IPS\Application::load( $widgetApp ), $widgetKey, mt_rand(), array() );
 
 				$location = $plugin->getTemplateLocation();
 
-				$theme = ( \IPS\IN_DEV ) ? Theme::master() : $values['block_template_theme_import'];
-				$templateBits  = $theme->getAllTemplates( $location['app'], $location['location'], $location['group'], Theme::RETURN_ALL );
+				$theme = ( \IPS\IN_DEV ) ? \IPS\Theme::master() : $values['block_template_theme_import'];
+				$templateBits  = $theme->getRawTemplates( $location['app'], $location['location'], $location['group'], \IPS\Theme::RETURN_ALL );
 				$templateBit   = $templateBits[ $location['app'] ][ $location['location'] ][ $location['group'] ][ $location['name'] ];
 
 				$save['content'] = $templateBit['template_content'];
 				$save['params']  = $templateBit['template_data'];
 				$save['group']   = $widgetKey;
-				$newTemplate = TemplatesClass::add( $save );
+				$newTemplate = \IPS\cms\Templates::add( $save );
 			}
 			else
 			{
@@ -862,8 +734,8 @@ class templates extends Controller
 				/* Page, css, js */
 				if ( $type == 'js' or $type == 'css' )
 				{
-					$fileExt = ( $type == 'js' ) ? '.js' : '.css';
-					if ( ! preg_match( '#' . preg_quote( $fileExt, '#' ) . '$#', $values['template_title'] ) )
+					$fileExt = ( $type == 'js' ) ? '.js' : ( $type == 'css' ? '.css' : NULL );
+					if ( $fileExt AND ! preg_match( '#' . preg_quote( $fileExt, '#' ) . '$#', $values['template_title'] ) )
 					{
 						$values['template_title'] .= $fileExt;
 					}
@@ -888,31 +760,18 @@ class templates extends Controller
 				{
 					$save['content'] = $values['template_content'];
 				}
-				elseif( $type == 'page' )
-				{
-					$templateBits = \IPS\cms\Theme::i()->getAllTemplates( 'cms', 'page', 'custom_wrappers', Theme::RETURN_ALL );
-					foreach( $templateBits['cms']['page']['custom_wrappers'] as $_template )
-					{
-						/* Use the first master wrapper that we find */
-						if( !$_template['template_user_created'] )
-						{
-							$save['content'] = $_template['template_content'];
-							break;
-						}
-					}
-				}
 
 				$save['location'] = $type;
 
-				$newTemplate = TemplatesClass::add( $save );
+				$newTemplate = \IPS\cms\Templates::add( $save );
 			}
 
-			Session::i()->log( 'acplogs__cms_template_add', array( $newTemplate->title => false ) );
+			\IPS\Session::i()->log( 'acplogs__cms_template_add', array( $newTemplate->title => false ) );
 
 			/* Done */
-			if( Request::i()->isAjax() )
+			if( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->json( array(
+				\IPS\Output::i()->json( array(
 					'id'		=> $newTemplate->id,
 					'title'		=> $newTemplate->title,
 					'params'	=> $newTemplate->params,
@@ -923,14 +782,14 @@ class templates extends Controller
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates' )->setQueryString( ['id' => $newTemplate->id, 't_location' => $newTemplate->location, 't_type' => $type ] ), 'saved' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates' )->setQueryString( ['id' => $newTemplate->id, 't_location' => $newTemplate->location, 't_type' => $type ] ), 'saved' );
 			}
 		}
 	
 		/* Display */
-		$title = strip_tags( Member::loggedIn()->language()->get( 'content_template_add_template_' . $type ) );
-		Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->block( $title, $form, FALSE );
-		Output::i()->title  = $title;
+		$title = \strip_tags( \IPS\Member::loggedIn()->language()->get( 'content_template_add_template_' . $type ) );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->block( $title, $form, FALSE );
+		\IPS\Output::i()->title  = $title;
 	}
 	
 	/**
@@ -939,55 +798,58 @@ class templates extends Controller
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
 		/* Check permission */
-		Dispatcher::i()->checkAcpPermission( 'template_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'template_delete' );
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 
-		$key    = Request::i()->t_key;
+		$key    = \IPS\Request::i()->t_key;
 		$return = array(
 			'template_content' => NULL,
 			'template_id' 	   => NULL
 		);
 
-		$originalTemplate = TemplatesClass::load( $key );
+		$originalTemplate = \IPS\cms\Templates::load( $key );
 		
 		try
 		{
-			TemplatesClass::load( $key )->delete();
+			\IPS\cms\Templates::load( $key )->delete();
 			
 			/* Now reload */
 			try
 			{
-				$template = TemplatesClass::load( $key );
+				$template = \IPS\cms\Templates::load( $key );
 				
 				$return['template_location'] = $template->location;
 				$return['template_content']  = $template->content;
 				$return['template_id']		 = $template->id;
 				$return['InheritedValue']    = ( $template->user_added ) ? 'custom' : ( $template->user_edited ? 'changed' : 0 );
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
 				
 			}
 		}
-		catch( OutOfRangeException $ex )
+		catch( \OutOfRangeException $ex )
 		{
-			Output::i()->error( 'node_error', '3T285/4', 500, '' );
+			\IPS\Output::i()->error( 'node_error', '3T285/4', 500, '' );
 		}
 
-		Session::i()->log( 'acplogs__cms_template_delete', array( $originalTemplate->title => false ) );
+		/* Clear guest page caches */
+		\IPS\Data\Cache::i()->clearAll();
 
-		if( Request::i()->isAjax() )
+		\IPS\Session::i()->log( 'acplogs__cms_template_delete', array( $originalTemplate->title => false ) );
+
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( $return );
+			\IPS\Output::i()->json( $return );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates' ), 'completed' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates' ), 'completed' );
 		}
 	}
 	
@@ -996,20 +858,20 @@ class templates extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function diffTemplate() : void
+	protected function diffTemplate()
 	{
-		$customVersion = Db::i()->select( '*', 'cms_templates', array( 'template_id=?', (int) Request::i()->t_item_id ) )->first();
+		$customVersion = \IPS\Db::i()->select( '*', 'cms_templates', array( 'template_id=?', (int) \IPS\Request::i()->t_item_id ) )->first();
 		
 		try 
 		{
-			$original = Db::i()->select( 'template_content', 'cms_templates', array( 'template_location=? and template_group=? and template_title=? and template_master=1', $customVersion['template_location'], $customVersion['template_original_group'], $customVersion['template_title'] ) )->first();
+			$original = \IPS\Db::i()->select( 'template_content', 'cms_templates', array( 'template_location=? and template_group=? and template_title=? and template_master=1', $customVersion['template_location'], $customVersion['template_original_group'], $customVersion['template_title'] ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			$original = FALSE;
 		}
 		
-		Output::i()->json( $original );
+		\IPS\Output::i()->json( $original );
 	}
 	
 	/**
@@ -1017,32 +879,31 @@ class templates extends Controller
 	 * 
 	 * @return void
 	 */
-	public function save() : void
+	public function save()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		$key = Request::i()->t_key;
+		$key = \IPS\Request::i()->t_key;
 		
 		$contentKey = 'editor_' . $key;
 
-		$content     = Request::i()->$contentKey;
-		$description = Request::i()->t_description;
-		$variables   = isset( Request::i()->t_variables ) ? Request::i()->t_variables : '';
+		$content     = \IPS\Request::i()->$contentKey;
+		$description = \IPS\Request::i()->t_description;
+		$variables   = isset( \IPS\Request::i()->t_variables ) ? \IPS\Request::i()->t_variables : '';
 		
 		try
 		{
-			$obj = TemplatesClass::load( $key );
+			$obj = \IPS\cms\Templates::load( $key );
 
 			if ( $obj->master )
 			{
 				/* Do not edit a master bit directly, but overload it */
-				$clone = new TemplatesClass;
+				$clone = new \IPS\cms\Templates;
 				$clone->key = $obj->key;
-				$clone->title = Request::i()->t_name;
+				$clone->title = \IPS\Request::i()->t_name;
 				$clone->content = $content;
-				$clone->location = Request::i()->t_location;
-				$clone->group = empty( Request::i()->t_group ) ? null : Request::i()->t_group;
-				$clone->original_group = $obj->original_group;
+				$clone->location = \IPS\Request::i()->t_location;
+				$clone->group = empty( \IPS\Request::i()->t_group ) ? null : \IPS\Request::i()->t_group;
 				$clone->params = $variables;
 				$clone->container = $obj->container;
 				$clone->position = $obj->position;
@@ -1052,9 +913,9 @@ class templates extends Controller
 			}
 			else
 			{
-				$obj->location = Request::i()->t_location;
-				$obj->group = empty( Request::i()->t_group ) ? null : Request::i()->t_group;
-				$obj->title = Request::i()->t_name;
+				$obj->location = \IPS\Request::i()->t_location;
+				$obj->group = empty( \IPS\Request::i()->t_group ) ? null : \IPS\Request::i()->t_group;
+				$obj->title = \IPS\Request::i()->t_name;
 				$obj->params = $variables;
 				$obj->content = $content;
 				$obj->user_edited = 1;
@@ -1072,58 +933,62 @@ class templates extends Controller
 				't_key'       => $key
 			);
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
-			Output::i()->json( array( 'msg' => $ex->getMessage() ) );
+			\IPS\Output::i()->json( array( 'msg' => $ex->getMessage() ) );
 		}
 		
-		if ( isset( Request::i()->t_type ) and Request::i()->t_type !== 'js' )
+		if ( isset( \IPS\Request::i()->t_type ) and \IPS\Request::i()->t_type !== 'js' )
 		{
 			/* Test */
 			try
 			{
-				Theme::checkTemplateSyntax( $content, $variables );
+				\IPS\Theme::checkTemplateSyntax( $content, $variables );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
-				Output::i()->json( array( 'msg' => Member::loggedIn()->language()->get('cms_page_error_bad_syntax') ) );
+				\IPS\Output::i()->json( array( 'msg' => \IPS\Member::loggedIn()->language()->get('cms_page_error_bad_syntax') ) );
 			}
 		}
 
 		/* reload to return new item Id */
-		$obj = TemplatesClass::load( $key );
+		$obj = \IPS\cms\Templates::load( $key );
+
+		/* Clear guest page caches */
+		\IPS\Data\Cache::i()->clearAll();
 		
 		/* Clear block caches */
-		Block::deleteCompiled();
+		\IPS\cms\Blocks\Block::deleteCompiled();
 
-		Session::i()->log( 'acplogs__cms_template_save', array( Request::i()->t_name => false ) );
+		\IPS\Session::i()->log( 'acplogs__cms_template_save', array( \IPS\Request::i()->t_name => false ) );
 		
-		if(  Request::i()->isAjax() )
+		if(  \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array( 'template_id' => $obj->id, 'template_title' => $obj->title, 'template_container' => $obj->container, 'template_user_added' => $obj->user_created ) );
+			\IPS\Output::i()->json( array( 'template_id' => $obj->id, 'template_title' => $obj->title, 'template_container' => $obj->container, 'template_user_added' => $obj->user_created ) );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates&' . implode( '&', $url ) ), 'completed' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates&' . implode( '&', $url ) ), 'completed' );
 		}
 	}
+	
 		
 	/**
 	 * Display template options for a database template group
 	 *
-	 * @return void
+	 * @return string
 	 */
-	public function databaseTemplateGroupOptions(): void
+	public function databaseTemplateGroupOptions()
 	{
-		$form = new Form();
+		$form = new \IPS\Helpers\Form();
 		
 		$databases = array();
-		foreach( Db::i()->select( '*', 'cms_databases', array( "database_display_settings like concat( '%',?,'%')", "\"template\":\"" . Request::i()->group ) ) as $database )
+		foreach( \IPS\Db::i()->select( '*', 'cms_databases', array( 'database_template_featured=? or database_template_listing=? or database_template_display=? or database_template_categories=? or database_template_form=?', \IPS\Request::i()->group, \IPS\Request::i()->group, \IPS\Request::i()->group, \IPS\Request::i()->group, \IPS\Request::i()->group ) ) as $database )
 		{
-			$databases[ $database['database_id'] ] = Databases::constructFromData( $database );
+			$databases[ $database['database_id'] ] = \IPS\cms\Databases::constructFromData( $database );
 		}
 		
-		if ( count( $databases ) )
+		if ( \count( $databases ) )
 		{
 			$names = array();
 			foreach( $databases as $db )
@@ -1131,75 +996,66 @@ class templates extends Controller
 				$names[] = $db->_title;
 			}
 			
-			$form->addMessage( Member::loggedIn()->language()->addToStack( 'cms_database_template_used_in', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( $names ) ) ) ), 'ipsMessage ipsMessage--info' );
+			$form->addMessage( \IPS\Member::loggedIn()->language()->addToStack( 'cms_database_template_used_in', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $names ) ) ) ), 'ipsMessage ipsMessage_info' );
 		}
 		
-		$form->add( new Text( 'cms_database_group_name', Request::i()->group, NULL, array( 'regex' => '/^([a-z_][a-z0-9_]+?)?$/' ), function( $val ) {
+		$form->add( new \IPS\Helpers\Form\Text( 'cms_database_group_name', \IPS\Request::i()->group, NULL, array( 'regex' => '/^([a-z_][a-z0-9_]+?)?$/' ), function( $val ) {
 			/* PHP Keywords cannot be used as template names - so make sure the full template name is not in the list */
 			$keywords = array( 'abstract', 'and', 'array', 'as', 'break', 'callable', 'case', 'catch', 'class', 'clone', 'const', 'continue', 'declare', 'default', 'die', 'do', 'echo', 'else', 'elseif', 'empty', 'enddeclare', 'endfor', 'endforeach', 'endif', 'endswitch', 'endwhile', 'eval', 'exit', 'extends', 'final', 'for', 'foreach', 'function', 'global', 'goto', 'if', 'implements', 'include', 'include_once', 'instanceof', 'insteadof', 'interface', 'isset', 'list', 'namespace', 'new', 'or', 'print', 'private', 'protected', 'public', 'require', 'require_once', 'return', 'static', 'switch', 'throw', 'trait', 'try', 'unset', 'use', 'var', 'while', 'xor' );
 			
-			if ( in_array( $val, $keywords ) )
+			if ( \in_array( $val, $keywords ) )
 			{
-				throw new DomainException( Member::loggedIn()->language()->addToStack( 'template_reserved_word', FALSE, array( 'htmlsprintf' => array( Member::loggedIn()->language()->formatList( $keywords ) ) ) ) );
+				throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'template_reserved_word', FALSE, array( 'htmlsprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $keywords ) ) ) ) );
 			}
 			
-			if ( mb_strtolower( str_replace( ' ', '_', $val ) ) != mb_strtolower( str_replace( ' ', '_', Request::i()->group ) ) )
+			if ( mb_strtolower( str_replace( ' ', '_', $val ) ) != mb_strtolower( str_replace( ' ', '_', \IPS\Request::i()->group ) ) )
 			{
-				$count = Db::i()->select( 'COUNT(*)', 'cms_templates', array( "LOWER(template_group)=?", mb_strtolower( str_replace( ' ', '_', $val ) ) ) )->first();
+				$count = \IPS\Db::i()->select( 'COUNT(*)', 'cms_templates', array( "LOWER(template_group)=?", mb_strtolower( str_replace( ' ', '_', $val ) ) ) )->first();
 				if ( $count )
 				{
-					throw new DomainException( 'cms_template_group_exists' );
+					throw new \DomainException( 'cms_template_group_exists' );
 				}
 			}
 		} ) );
-		$form->addButton( "delete", "link", Url::internal( 'app=cms&module=pages&controller=templates&do=deleteTemplateGroup&group=' . Request::i()->group . '&t_location=' . Request::i()->t_location )->csrf(), 'ipsButton ipsButton--negative', array( 'data-confirm' => 'true' ) );
+		$form->addButton( "delete", "link", \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates&do=deleteTemplateGroup&group=' . \IPS\Request::i()->group . '&t_location=' . \IPS\Request::i()->t_location )->csrf(), 'ipsButton ipsButton_negative', array( 'data-confirm' => 'true' ) );
 		
 		if ( $values = $form->values() )
 		{
 			$new = str_replace( ' ', '_', mb_strtolower( $values['cms_database_group_name'] ) );
 
-			if ( $new != Request::i()->group )
+			if ( $new != \IPS\Request::i()->group )
 			{
-				Db::i()->update( 'cms_templates', array( 'template_group' => $new ), array( 'template_location=? and template_group=?', 'database', Request::i()->group ) );
-
-				foreach( Databases::databases() as $db )
+				\IPS\Db::i()->update( 'cms_templates', array( 'template_group' => $new ), array( 'template_location=? and template_group=?', 'database', \IPS\Request::i()->group ) );
+				
+				foreach( \IPS\cms\Templates::$databaseDefaults as $field => $template )
 				{
-					$displaySettings = $db->display_settings;
-					foreach( TemplatesClass::$databaseDefaults as $field => $template )
-					{
-						if( isset( $displaySettings[ $field ] ) and $displaySettings[ $field ]['template'] == Request::i()->group )
-						{
-							$displaySettings[ $field ]['template'] = mb_strtolower( $new );
-						}
-					}
-					$db->display_settings = $displaySettings;
-					$db->save();
+					\IPS\Db::i()->update( 'cms_databases', array( 'database_template_' . $field => mb_strtolower( $new ) ), array( 'database_template_' . $field . ' =?', \IPS\Request::i()->group ) );
 				}
 
-				unset( Store::i()->cms_databases );
+				unset( \IPS\Data\Store::i()->cms_databases );
 
-				$this->findAndUpdateTemplates( $new, Request::i()->group );
+				$this->findAndUpdateTemplates( $new, \IPS\Request::i()->group );
 			}
 			
-			Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates' . ( isset( Request::i()->t_location ) ? '&t_location=' . Request::i()->t_location : '' ) ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates' . ( isset( \IPS\Request::i()->t_location ) ? '&t_location=' . \IPS\Request::i()->t_location : '' ) ), 'saved' );
 		}
 		
 		/* Display */
-		Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->block( Member::loggedIn()->language()->addToStack('cms_template_database_options'), $form, FALSE, '', NULL, TRUE );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->block( \IPS\Member::loggedIn()->language()->addToStack('cms_template_database_options'), $form, FALSE, '', NULL, TRUE );
 	}
 
 	/**
 	 * Find templates referencing a template and update them
 	 *
-	 * @param string $new	New template group name
-	 * @param string $old	Old template group name
+	 * @param	string	$new	New template group name
+	 * @param	string	$old	Old template group name
 	 * @return	void
 	 */
-	protected function findAndUpdateTemplates( string $new, string $old ) : void
+	protected function findAndUpdateTemplates( $new, $old )
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		foreach( Db::i()->select( '*', 'cms_templates', array( 'template_content LIKE ?', '%' . $old . '%' ) ) as $template )
+		foreach( \IPS\Db::i()->select( '*', 'cms_templates', array( 'template_content LIKE ?', '%' . $old . '%' ) ) as $template )
 		{
 			/* Make sure template tags call the correct group */
 			if ( mb_stristr( $template['template_content'], '{template' ) )
@@ -1224,9 +1080,9 @@ class templates extends Controller
 
 						if ( isset( $options['app'] ) and $options['app'] == 'cms' and isset( $options['location'] ) and $options['location'] == 'database' and isset( $options['group'] ) and $options['group'] == mb_strtolower( $old ) )
 						{
-							$replace = '{template="' . $value . '" app="' . $options['app'] . '" location="' . $options['location'] . '" group="' . mb_strtolower( $new ) . '" params="' . ($options['params'] ?? NULL) . '"}';
+							$replace = '{template="' . $value . '" app="' . $options['app'] . '" location="' . $options['location'] . '" group="' . mb_strtolower( $new ) . '" params="' . ( isset( $options['params'] ) ? $options['params'] : NULL ) . '"}';
 
-							Db::i()->update( 'cms_templates', array( 'template_content' => str_replace( $matches[$index][0], $replace, $template['template_content'] ) ), array( 'template_id=?', $template['template_id'] ) );
+							\IPS\Db::i()->update( 'cms_templates', array( 'template_content' => str_replace( $matches[$index][0], $replace, $template['template_content'] ) ), array( 'template_id=?', $template['template_id'] ) );
 						}
 					}
 				}
@@ -1239,46 +1095,21 @@ class templates extends Controller
 	 *
 	 * @return void
 	 */
-	public function deleteTemplateGroup() : void
+	public function deleteTemplateGroup()
 	{
-		Session::i()->csrfCheck();
-
-		foreach( Databases::databases() as $db )
+		\IPS\Session::i()->csrfCheck();
+		
+		foreach( \IPS\cms\Templates::$databaseDefaults as $field => $template )
 		{
-			$displaySettings = $db->display_settings;
-			foreach( TemplatesClass::$databaseDefaults as $field => $template )
-			{
-				if( isset( $displaySettings[ $field ]['template'] ) and $displaySettings[ $field ]['template'] == Request::i()->group )
-				{
-					switch( $field )
-					{
-						case 'index':
-							$displaySettings[ $field ]['layout'] = 'featured';
-							$displaySettings[ $field ]['template'] = null;
-							break;
-						case 'listing':
-						case 'categories':
-							$displaySettings[ $field ]['layout'] = 'table';
-							$displaySettings[ $field ]['template'] = null;
-							break;
-						case 'display':
-						case 'form':
-							$displaySettings[ $field ]['layout'] = 'custom';
-							$displaySettings[ $field ]['template'] = $template;
-							break;
-					}
-				}
-			}
-			$db->display_settings = $displaySettings;
-			$db->save();
+			\IPS\Db::i()->update( 'cms_databases', array( 'database_template_' . $field => $template ), array( 'database_template_' . $field . ' =?', \IPS\Request::i()->group ) );
 		}
 	
-		Db::i()->delete( 'cms_templates', array( 'template_location=? and template_group=?', 'database', Request::i()->group ) );
+		\IPS\Db::i()->delete( 'cms_templates', array( 'template_location=? and template_group=?', 'database', \IPS\Request::i()->group ) );
 		
-		unset( Store::i()->cms_databases );
+		unset( \IPS\Data\Store::i()->cms_databases );
 
-		Session::i()->log( 'acplogs__cms_template_group_delete', array( Request::i()->group => false ) );
+		\IPS\Session::i()->log( 'acplogs__cms_template_group_delete', array( \IPS\Request::i()->group => false ) );
 		
-		Output::i()->redirect( Url::internal( 'app=cms&module=pages&controller=templates' . ( isset( Request::i()->t_location ) ? '&t_location=' . Request::i()->t_location : '' ) ), 'deleted' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=cms&module=pages&controller=templates' . ( isset( \IPS\Request::i()->t_location ) ? '&t_location=' . \IPS\Request::i()->t_location : '' ) ), 'deleted' );
 	}
 }

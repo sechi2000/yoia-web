@@ -12,58 +12,40 @@
 namespace IPS\downloads\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\downloads\Field;
-use IPS\downloads\File;
-use IPS\Helpers\Table\Db as Table;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Session;
-use IPS\Theme;
-use function count;
-use function defined;
-use function file_get_contents;
-use const IPS\Helpers\Table\SEARCH_BOOL;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-use const IPS\Helpers\Table\SEARCH_NUMERIC;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-use const IPS\TEMP_DIRECTORY;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * topdownloads
  */
-class topdownloads extends Controller
+class _topdownloads extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
+
+	/**
+	 * @brief	Number of results per page
+	 */
+	const PER_PAGE = 25;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'topdownloads_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'topdownloads_manage' );
 		parent::execute();
 	}
 
@@ -72,151 +54,104 @@ class topdownloads extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$table = new Table( 'downloads_files', Url::internal( 'app=downloads&module=stats&controller=topdownloads' ) );
-		$table->langPrefix = 'downloads_';
-		$customFields = Field::roots();
+		$where = array();
 
-		/* Joins */
-		$joinSelect = array();
-		foreach( $customFields as $field )
+		if ( isset( \IPS\Request::i()->form ) )
 		{
-			$joinSelect[] = 'downloads_ccontent.field_' . $field->id;
-		}
+			$form = new \IPS\Helpers\Form( 'form', 'go' );
 
-		/* Columns */
-		if( count( $customFields ) )
-		{
-			$table->joins = array(
-				array( 'select' => implode(',', $joinSelect), 'from' => 'downloads_ccontent', 'where' => "downloads_ccontent.file_id=downloads_files.file_id" )
+			$default = array(
+				'start' => \IPS\Request::i()->start ? \IPS\DateTime::ts( \IPS\Request::i()->start ) : NULL,
+				'end' => \IPS\Request::i()->end ? \IPS\DateTime::ts( \IPS\Request::i()->end ) : NULL
 			);
+
+			$form->add( new \IPS\Helpers\Form\DateRange( 'stats_date_range', $default, FALSE, array( 'start' => array( 'max' => \IPS\DateTime::ts( time() )->setTime( 0, 0, 0 ), 'time' => FALSE ), 'end' => array( 'max' => \IPS\DateTime::ts( time() )->setTime( 23, 59, 59 ), 'time' => FALSE ) ) ) );
+
+			if ( !$values = $form->values() )
+			{
+				\IPS\Output::i()->output = $form;
+				return;
+			}
 		}
 
-		$table->include = array( 'file_name', 'file_downloads' );
-		$table->advancedSearch = array(
-			'file_downloads' => SEARCH_NUMERIC
+		/* Figure out start and end parameters for links */
+		$params = array(
+			'start' => !empty( $values['stats_date_range']['start'] ) ? $values['stats_date_range']['start']->getTimestamp() : \IPS\Request::i()->start,
+			'end' => !empty( $values['stats_date_range']['end'] ) ? $values['stats_date_range']['end']->getTimestamp() : \IPS\Request::i()->end
 		);
 
-		/* Add our custom fields */
-		foreach ( $customFields as $field )
+		if ( $params['start'] )
 		{
-			$customField = 'field_' . $field->id;
-			switch ( $field->type )
-			{
-				case 'Checkbox':
-				case 'YesNo':
-					$table->advancedSearch[ $customField ] = SEARCH_BOOL;
-					break;
-
-				case 'Upload':
-				case 'Color':
-				case 'Password':
-					/* These fields make no sense to be searchable */
-					break;
-
-				case 'CheckboxSet':
-				case 'Select':
-				case 'Radio':
-					$options = array();
-					foreach ( json_decode( $field->content ) as $option )
-					{
-						$options[ $option ] = $option;
-					}
-					$table->advancedSearch[ $customField ] = array( SEARCH_SELECT, array( 'options' => array_merge(["" => "Any"], $options ), 'multiple' => $field->multiple ) );
-					break;
-
-				case 'Date':
-					$table->advancedSearch[ $customField ] = SEARCH_DATE_RANGE;
-					break;
-
-				case 'Member':
-					$table->advancedSearch[ $customField ] = array( SEARCH_MEMBER, array( 'multiple' => $field->multiple ) );
-					break;
-
-				case 'Number':
-				case 'Rating':
-					$table->advancedSearch[ $customField ] = SEARCH_NUMERIC;
-					break;
-
-				default:
-					$table->advancedSearch[ $customField ] = SEARCH_CONTAINS_TEXT;
-					break;
-			}
+			$where[] = array( 'dtime>?', $params['start'] );
 		}
 
-		$table->mainColumn = 'file_name';
-		$table->quickSearch = 'file_name';
+		if ( $params['end'] )
+		{
+			$where[] = array( 'dtime<?', $params['end'] );
+		}
 
-		$table->sortBy = $table->sortBy ?: 'file_downloads';
-		$table->sortDirection = $table->sortDirection ?: 'desc';
+		$page = isset( \IPS\Request::i()->page ) ? \intval( \IPS\Request::i()->page ) : 1;
 
-		/* Parsers */
-		$table->parsers = array(
-			'file_name' => function( $val, $row ) {
-				$file = File::constructFromData( $row );
-				return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $file->url(), TRUE, $file->name );
-			}
+		if ( $page < 1 )
+		{
+			$page = 1;
+		}
+
+		try
+		{
+			$total = \IPS\Db::i()->select( 'COUNT(DISTINCT(dfid))', 'downloads_downloads', $where )->first();
+		}
+		catch ( \UnderflowException $e )
+		{
+			$total = 0;
+		}
+
+		/* Add date range selector */
+		\IPS\Output::i()->sidebar['actions'] = array(
+			'settings' => array(
+				'title' => 'stats_date_range',
+				'icon' => 'calendar',
+				'link' => \IPS\Http\Url::internal( 'app=downloads&module=stats&controller=topdownloads&form=1' )->setQueryString( $params ),
+				'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack( 'stats_date_range' ) )
+			)
 		);
 
-		Output::i()->sidebar['actions']['download'] = [
-			'icon' => 'download',
-			'title' => 'download',
-			'link' => Url::internal( "app=downloads&module=stats&controller=topdownloads&do=download" )->csrf()
-		];
-
-		/* Display */
-		Output::i()->output = (string) $table;
-		Output::i()->title  = Member::loggedIn()->language()->addToStack('menu__downloads_stats_topdownloads');
-	}
-
-	/**
-	 * @return void
-	 */
-	protected function download() : void
-	{
-		Session::i()->csrfCheck();
-
-		$headers = [ 'file_name' => 'File', 'file_downloads' => 'Downloads' ];
-
-		$customFields = Field::roots();
-		$customFieldNames = array();
-		foreach ( $customFields as $field )
+		if ( $total > 0 )
 		{
-			$headers['field_' . $field->id] = Member::loggedIn()->language()->get( 'downloads_field_' . $field->id );
-		}
-
-		$tmpFile = tempnam( TEMP_DIRECTORY, 'IPS' );
-		$fh = fopen( $tmpFile, 'w' );
-
-		fputcsv($fh, $headers);
-
-		$files = Db::i()->select('*', 'downloads_files', null, 'file_downloads desc' )->join('downloads_ccontent', 'downloads_ccontent.file_id=downloads_files.file_id');
-		foreach ( $files as $file )
-		{
-			$row = [];
-			foreach ( $headers as $key => $header )
+			$select = iterator_to_array( \IPS\Db::i()->select( 'dfid, count(*) as downloads', 'downloads_downloads', $where, 'downloads DESC', array( ( $page - 1 ) * static::PER_PAGE, static::PER_PAGE ), 'dfid' )->join( 'downloads_files', 'downloads_files.file_id=downloads_downloads.dfid' ) );
+			$files = iterator_to_array( \IPS\Db::i()->select( '*', 'downloads_files', \IPS\Db::i()->in( 'file_id', array_column( $select, 'dfid' ) ) )->setKeyField( 'file_id' ) );
+			$downloads = array();
+			if ( \count( $select ) )
 			{
-				if( isset( $file[ $key ] ) )
+				foreach ( $select as $row )
 				{
-					$row[] = $file[ $key ];
+					$file = \IPS\downloads\File::constructFromData( $files[ $row['dfid'] ] );
+					$downloads[] = array(
+						'dfid'      => $row['dfid'],
+						'downloads' => $row['downloads'],
+						'file'      => \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $file->url(), TRUE, $file->name )
+					);
 				}
-				else
-				{
-					$row[] = '';
-				}
-
 			}
 
-			fputcsv($fh, $row);
+			$pagination = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination(
+				\IPS\Http\Url::internal( 'app=downloads&module=stats&controller=topdownloads' )->setQueryString( $params ),
+				ceil( $total / static::PER_PAGE ),
+				$page,
+				static::PER_PAGE,
+				FALSE
+			);
+
+			\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core' )->message( \IPS\Member::loggedIn()->language()->addToStack( 'stats_include_hidden_content' ), 'info' );
+			\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'stats' )->topDownloadsTable( $downloads, $pagination );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'menu__downloads_stats_topdownloads' );
 		}
-
-		fclose( $fh );
-		$csv = file_get_contents( $tmpFile );
-		$name = 'topdownloads_' . date('Y-m-d');
-
-		Member::loggedIn()->language()->parseOutputForDisplay( $name );
-		Member::loggedIn()->language()->parseOutputForDisplay( $csv );
-		Output::i()->sendOutput( $csv, 200, 'text/csv', array( 'Content-Disposition' => Output::getContentDisposition( 'attachment', "{$name}.csv" ) ), FALSE, FALSE, FALSE );
+		else
+		{
+			/* Return the no results message */
+			\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'global', 'core' )->block( \IPS\Member::loggedIn()->language()->addToStack( 'menu__downloads_stats_topdownloads' ), \IPS\Member::loggedIn()->language()->addToStack( 'no_results' ), FALSE, 'ipsPad', NULL, TRUE );
+		}
 	}
 }

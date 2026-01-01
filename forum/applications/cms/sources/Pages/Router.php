@@ -12,48 +12,37 @@
 namespace IPS\cms\Pages;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\cms\Categories;
-use IPS\cms\Records;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Patterns\ActiveRecord;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief Page Model
  */
-class Router extends ActiveRecord
+class _Router extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * Load Pages Thing based on a URL.
 	 * The URL is sometimes complex to figure out, so this will help
 	 *
-	 * @param	Url	$url	URL to load from
-	 * @return    mixed
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
+	 * @param	\IPS\Http\Url	$url	URL to load from
+	 * @return	\IPS\cms\Pages\Page
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadFromUrl( Url $url ): mixed
+	public static function loadFromUrl( \IPS\Http\Url $url )
 	{
 		if ( ! isset( $url->queryString['path'] ) )
 		{
-			throw new OutOfRangeException();
+			throw new \OutOfRangeException();
 		}
 		
 		$path = $url->queryString['path'];
 		
 		/* First, we need a page */
-		$page = Page::loadFromPath( $path );
+		$page = \IPS\cms\Pages\Page::loadFromPath( $path );
 		
 		/* What do we have left? */
 		$whatsLeft = trim( preg_replace( '#' . $page->full_path . '#', '', $path, 1 ), '/' );
@@ -61,23 +50,23 @@ class Router extends ActiveRecord
 		if ( $whatsLeft )
 		{
 			/* Check databases */
-			$databases = iterator_to_array( Db::i()->select( '*', 'cms_databases', array( 'database_page_id > 0' ) ) );
+			$databases = iterator_to_array( \IPS\Db::i()->select( '*', 'cms_databases', array( 'database_page_id > 0' ) ) );
 			foreach( $databases as $db )
 			{
 				$classToTry = 'IPS\cms\Records' . $db['database_id'];
-				/* @var $classToTry Records */
 				try
 				{
-					return $classToTry::loadFromSlug( $whatsLeft, FALSE, FALSE );
+					$record = $classToTry::loadFromSlug( $whatsLeft, FALSE, FALSE );
+					
+					return $record;
 				}
-				catch( Exception $ex ) { }
+				catch( \Exception $ex ) { }
 			}
 			
 			/* Check categories */
 			foreach( $databases as $db )
 			{
 				$classToTry = 'IPS\cms\Categories' . $db['database_id'];
-				/* @var $classToTry Categories */
 				try
 				{
 					$category = $classToTry::loadFromPath( $whatsLeft );
@@ -87,7 +76,7 @@ class Router extends ActiveRecord
 						return $category;
 					}
 				}
-				catch( Exception $ex ) { }
+				catch( \Exception $ex ) { }
 			}
 		}
 		else
@@ -97,6 +86,6 @@ class Router extends ActiveRecord
 		}
 		
 		/* No idea, sorry */
-		throw new InvalidArgumentException;
+		throw new \InvalidArgumentException;
 	}
 }

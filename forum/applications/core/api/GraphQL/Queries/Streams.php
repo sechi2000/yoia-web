@@ -10,31 +10,26 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use GraphQL\Type\Definition\ListOfType;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\StreamType;
-use IPS\Db;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Streams query for GraphQL API
  */
-class Streams
+class _Streams
 {
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns a list of user's activity streams";
+	public static $description = "Returns a list of user's activity streams";
 
 	/*
 	 * @brief 	Query arguments
@@ -46,10 +41,8 @@ class Streams
 
 	/**
 	 * Return the query return type
-	 *
-	 * @return ListOfType<StreamType>
 	 */
-	public function type() : ListOfType
+	public function type() 
 	{
 		return TypeRegistry::listOf( \IPS\core\api\GraphQL\TypeRegistry::stream() );
 	}
@@ -57,26 +50,26 @@ class Streams
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
 	 * @return	array
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : array
+	public function resolve($val, $args, $context)
 	{
 		$streams = array();
 
-		foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'core_streams', '`member` IS NULL', 'position ASC' ), 'IPS\core\Stream' ) as $stream )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_streams', '`member` IS NULL', 'position ASC' ), 'IPS\core\Stream' ) as $stream )
 		{
-			if( Member::loggedIn()->member_id || ( !Member::loggedIn()->member_id && ( $stream->ownership == 'all' and $stream->read == 'all' and $stream->follow == 'all' and $stream->date_type != 'last_visit' ) ) )
+			if( \IPS\Member::loggedIn()->member_id || ( !\IPS\Member::loggedIn()->member_id && ( $stream->ownership == 'all' and $stream->read == 'all' and $stream->follow == 'all' and $stream->date_type != 'last_visit' ) ) )
 			{
 				$streams[ $stream->id ] = $stream;
 			}
 		}
 
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
-			foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'core_streams', array( '`member`=?', Member::loggedIn()->member_id ), 'position ASC' ), 'IPS\core\Stream' ) as $stream )
+			foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_streams', array( '`member`=?', \IPS\Member::loggedIn()->member_id ), 'position ASC' ), 'IPS\core\Stream' ) as $stream )
 			{
 				$streams[ $stream->id ] = $stream;
 			}

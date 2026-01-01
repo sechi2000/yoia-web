@@ -11,63 +11,52 @@
 namespace IPS\core\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Member;
-use IPS\Member\Group as GroupClass;
-use LogicException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member filter: Member group
  */
-class Group extends MemberFilterAbstract
+class _Group
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param	string	$area	Area to check (bulkmail, group_promotions, automatic_moderation, passwordreset)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'bulkmail', 'group_promotions', 'automatic_moderation', 'passwordreset' ) );
+		return \in_array( $area, array( 'bulkmail', 'group_promotions', 'automatic_moderation', 'passwordreset' ) );
 	}
 
 	/**
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		/* Get our options */
-		$criteria['options'] = array_combine( array_keys( GroupClass::groups( TRUE, FALSE ) ), array_map( function( $_group ) { return (string) $_group; }, GroupClass::groups( TRUE, FALSE ) ) );
+		$criteria['options'] = array_combine( array_keys( \IPS\Member\Group::groups( TRUE, FALSE ) ), array_map( function( $_group ) { return (string) $_group; }, \IPS\Member\Group::groups( TRUE, FALSE ) ) );
 
 		/* If all *available* options are selected, we want to choose 'all' for consistency on create vs edit */
 		$_options = array_keys( $criteria['options'] );
 
 		if( isset( $criteria['groups'] ) )
 		{
-			if( !count( array_diff($_options,explode( ',', $criteria['groups'] ) ) ) )
+			if( !\count( array_diff($_options,explode( ',', $criteria['groups'] ) ) ) )
 			{
 				$criteria['groups'] = 'all';
 			}
 		}
 				
 		return array(
-			new CheckboxSet( 'bmf_members_groups', ( isset( $criteria['groups'] ) AND $criteria['groups'] != 'all' ) ? explode( ',', $criteria['groups'] ) : 'all', FALSE, array(
+			new \IPS\Helpers\Form\CheckboxSet( 'bmf_members_groups', ( isset( $criteria['groups'] ) AND $criteria['groups'] != 'all' ) ? explode( ',', $criteria['groups'] ) : 'all', FALSE, array( 
 				'options'		=> $criteria['options'],
 				'multiple'		=> TRUE, 
 				'unlimited'		=> 'all', 
@@ -80,10 +69,10 @@ class Group extends MemberFilterAbstract
 	/**
 	 * Return a lovely human description for this rule if used
 	 *
-	 * @param	array				$data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	string|NULL
 	 */
-	public function getDescription( array $data ) : ?string
+	public function getDescription( $data )
 	{
 		if ( $data['groups'] )
 		{
@@ -95,17 +84,17 @@ class Group extends MemberFilterAbstract
 				/* Uses datastore so not as bad as it looks mkay */
 				try
 				{
-					$humanGroups[] = GroupClass::load( $gid )->name;
+					$humanGroups[] = \IPS\Member\Group::load( $gid )->name;
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					continue;
 				}
 			}
 			
-			if ( count( $humanGroups ) )
+			if ( \count( $humanGroups ) )
 			{
-				return Member::loggedIn()->language()->addToStack( 'member_filter_core_group_desc', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( $humanGroups ) ) ) );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_group_desc', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $humanGroups ) ) ) );
 			}
 		}
 		
@@ -116,10 +105,10 @@ class Group extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return    array|bool            False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array|bool
+	public function save( $post )
 	{
 		return ( empty( $post['bmf_members_groups'] ) OR $post['bmf_members_groups'] == 'all' ) ? array( 'groups' => NULL ) : array( 'groups' => implode( ',', $post['bmf_members_groups'] ) );
 	}
@@ -127,10 +116,10 @@ class Group extends MemberFilterAbstract
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		if ( $data['groups'] )
 		{
@@ -142,7 +131,7 @@ class Group extends MemberFilterAbstract
 				$_set[]	= "FIND_IN_SET(" . $_group . ",mgroup_others)";
 			}
 
-			if( count($_set) )
+			if( \count($_set) )
 			{
 				return array( "( member_group_id IN(" . $data['groups'] . ") OR " . implode( ' OR ', $_set ) . ' )' );
 			}
@@ -155,12 +144,12 @@ class Group extends MemberFilterAbstract
 	 * Determine if a member matches specified filters
 	 *
 	 * @note	This is only necessary if availableIn() includes group_promotions
-	 * @param	Member	$member		Member object to check
+	 * @param	\IPS\Member	$member		Member object to check
 	 * @param	array 		$filters	Previously defined filters
 	 * @param	object|NULL	$object		Calling class
 	 * @return	bool
 	 */
-	public function matches( Member $member, array $filters, ?object $object=NULL ) : bool
+	public function matches( \IPS\Member $member, $filters, $object=NULL )
 	{
 		/* If we aren't filtering by this, then any member matches */
 		if( !isset( $filters['groups'] ) OR !$filters['groups'] )
@@ -174,11 +163,11 @@ class Group extends MemberFilterAbstract
 		if( $object === NULL OR !isset( $object->memberFilterCheckSecondaryGroups ) OR $object->memberFilterCheckSecondaryGroups === TRUE )
 		{
 			/* This checks secondary groups */
-			return (bool) count( array_intersect( $_groups, $member->groups ) );
+			return (bool) \count( array_intersect( $_groups, $member->groups ) );
 		}
 		else
 		{
-			return in_array( $member->member_group_id, $_groups );
+			return \in_array( $member->member_group_id, $_groups );
 		}
 	}
 }

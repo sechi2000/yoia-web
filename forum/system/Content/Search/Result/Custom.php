@@ -11,48 +11,42 @@
 namespace IPS\Content\Search\Result;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Search\Result;
-use IPS\DateTime;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Search Result not from Index
  */
-class Custom extends Result
+class _Custom extends \IPS\Content\Search\Result
 {
 	/**
 	 * @brief	HTML
 	 */
-	protected string $html;
+	protected $html;
 	
 	/**
 	 * @brief	Image
 	 */
-	protected string|null $image;
+	protected $image;
 
 	/**
 	 * @brief	Data used for merging multiple extra items
 	 */
-	protected array $mergeData;
+	protected $mergeData;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	DateTime	$time	The time for this result
+	 * @param	\IPS\DateTime	$time	The time for this result
 	 * @param	string			$html	HTML to display
 	 * @param	string|NULL		$image	HTML for image to display
 	 * @param	string|NULL		$mergeData	Data for merging
 	 * @return	void
 	 */
-	public function __construct( DateTime $time, string $html, string|null $image = NULL, string|null $mergeData = NULL )
+	public function __construct( \IPS\DateTime $time, $html, $image = NULL, $mergeData = NULL )
 	{
 		$this->createdDate = $time;
 		$this->lastUpdatedDate = $time;
@@ -68,7 +62,7 @@ class Custom extends Result
 	 * @param	string|NULL		$mergeData	Data for merging
 	 * @return	void
 	 */
-	public function mergeInData( string $html, string|null $mergeData = NULL ): void
+	public function mergeInData( $html, $mergeData = NULL )
 	{
 		$this->html = $html;
 		$this->mergeData[] = $mergeData;
@@ -79,7 +73,7 @@ class Custom extends Result
 	 *
 	 * @return	array
 	 */
-	public function getMergeData(): array
+	public function getMergeData()
 	{
 		return $this->mergeData ?: array();
 	}
@@ -90,8 +84,8 @@ class Custom extends Result
 	 * @param	string	$view	The view to use (expanded or condensed)
 	 * @return	string
 	 */
-	public function html( string $view = 'expanded' ): string
+	public function html( $view = 'expanded' )
 	{
-		return Theme::i()->getTemplate( 'streams', 'core' )->extraItem( $this->createdDate, $this->image, $this->html, $view );
+		return \IPS\Theme::i()->getTemplate( 'streams', 'core' )->extraItem( $this->createdDate, $this->image, $this->html, $view );
 	}
 }

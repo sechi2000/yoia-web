@@ -10,31 +10,19 @@
 namespace IPS\core\extensions\core\AchievementAction;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\Achievements\Actions\ContentAchievementActionAbstract;
-use IPS\core\Achievements\Rule;
-use IPS\Db;
-use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function class_exists;
-use function defined;
-use function get_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement Action Extension
  */
-class Comment extends ContentAchievementActionAbstract
+class _Comment extends \IPS\core\Achievements\Actions\AbstractContentAchievementAction
 {	
-	protected static bool $includeItems = FALSE;
-	protected static bool $includeReviews = FALSE;
+	protected static $includeItems = FALSE;
+	protected static $includeReviews = FALSE;
 	
 	/**
 	 * Work out if the filters applies for a given action
@@ -43,12 +31,12 @@ class Comment extends ContentAchievementActionAbstract
 	 * calls that BEFORE making its change in the database (or there is read/write separation), you will need to add
 	 * 1 to the value being considered for milestones
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	array		$filters	The value returned by formatFilterValues()
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	bool
 	 */
-	public function filtersMatch( Member $subject, array $filters, mixed $extra = NULL ): bool
+	public function filtersMatch( \IPS\Member $subject, array $filters, $extra = NULL ): bool
 	{
 		if ( !parent::filtersMatch( $subject, $filters, $extra ) )
 		{
@@ -64,9 +52,8 @@ class Comment extends ContentAchievementActionAbstract
 			{
 				$item = $extra->item();
 
-				if ( isset( $filters[ 'nodes_' . str_replace( '\\', '-', get_class( $item ) ) ] ) )
+				if ( isset( $filters[ 'nodes_' . str_replace( '\\', '-', \get_class( $item ) ) ] ) )
 				{
-					/* @var array $databaseColumnMap */
 					$class = $filters['type'];
 					$where = [ [ $class::$databasePrefix . $class::$databaseColumnMap['author'] . '=?', $subject->member_id ] ];
 
@@ -84,9 +71,9 @@ class Comment extends ContentAchievementActionAbstract
 						$where[] = [ $class::$databasePrefix . $class::$databaseColumnMap['hidden'] . '=?', 0 ];
 					}
 
-					$where[] = [ Db::i()->in( $item::$databaseTable . '.' . $item::$databasePrefix . $item::$databaseColumnMap['container'] , $filters[ 'nodes_' . str_replace( '\\', '-', get_class( $item ) ) ] ) ];
+					$where[] = [ \IPS\Db::i()->in( $item::$databaseTable . '.' . $item::$databasePrefix . $item::$databaseColumnMap['container'] , $filters[ 'nodes_' . str_replace( '\\', '-', \get_class( $item ) ) ] ) ];
 					
-					$count += Db::i()->select( 'COUNT(*)', $class::$databaseTable, $where )
+					$count += \IPS\Db::i()->select( 'COUNT(*)', $class::$databaseTable, $where )
 						      ->join( $item::$databaseTable, $item::$databasePrefix . $item::$databaseColumnId . '=' . $class::$databasePrefix . $class::$databaseColumnMap['item'] )
 						      ->first();
 				}
@@ -142,55 +129,9 @@ class Comment extends ContentAchievementActionAbstract
 	 * @param	array|NULL	$filters	Current filter values
 	 * @return	array
 	 */
-	public function awardOther( mixed $extra = NULL, ?array $filters = NULL ): array
+	public function awardOther( $extra = NULL, ?array $filters = NULL ): array
 	{
 		return [ $extra->item()->author() ];
-	}
-
-	/**
-	 * Determines if the member has already completed this rule.
-	 * Used for retroactive rule completion.
-	 * So far, this is only used in Quests, but may be used elsewhere at a later point.
-	 *
-	 * @param Member $member
-	 * @param array $filters
-	 * @return bool
-	 */
-	public function isRuleCompleted( Member $member, array $filters ) : bool
-	{
-		$total = 0;
-		foreach( Application::allExtensions( 'core', 'ContentRouter', false ) as $extension )
-		{
-			foreach( $extension->classes as $itemClass )
-			{
-				if( !isset( $itemClass::$commentClass ) or ( !empty( $filters['type'] ) and $filters['type'] != $itemClass::$commentClass ) )
-				{
-					continue;
-				}
-
-				/* @var \IPS\Content\Comment $class */
-				$class = $itemClass::$commentClass;
-
-				/* @var array $databaseColumnMap */
-				$where = [
-					[ $class::$databasePrefix . $class::$databaseColumnMap['author'] . '=?', $member->member_id ]
-				];
-
-				if( isset( $class::$databaseColumnMap['approved'] ) )
-				{
-					$where[] = [ $class::$databasePrefix . $class::$databaseColumnMap['approved'] . '=?', 1 ];
-				}
-
-				$total += (int) Db::i()->select( 'count(*)', $class::$databaseTable, $where )->first();
-			}
-		}
-
-		if( !empty( $filters['milestone'] ) )
-		{
-			return $total >= $filters['milestone'];
-		}
-
-		return $total > 0;
 	}
 	
 	/**
@@ -207,56 +148,52 @@ class Comment extends ContentAchievementActionAbstract
 		$sprintf = [];
 		try
 		{
-			if( !class_exists( $exploded[0] ) )
+			if( !\class_exists( $exploded[0] ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
 			$comment = $exploded[0]::load( $exploded[1] );
 			$item = $comment->item();
 			$sprintf = [ 'htmlsprintf' => [
-				Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $comment->url(), TRUE, $item->mapped('title') ?: $item->indefiniteArticle(), FALSE )
+				\IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $comment->url(), TRUE, $item->mapped('title') ?: $item->indefiniteArticle(), FALSE )
 			] ];
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			$sprintf = [ 'sprintf' => [ Member::loggedIn()->language()->addToStack('modcp_deleted') ] ];
+			$sprintf = [ 'sprintf' => [ \IPS\Member::loggedIn()->language()->addToStack('modcp_deleted') ] ];
 		}
 		
-		return Member::loggedIn()->language()->addToStack( 'AchievementAction__Comment_log', FALSE, $sprintf );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__Comment_log', FALSE, $sprintf );
 	}
 	
 	/**
 	 * Get "description" for rule
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	public function ruleDescription( Rule $rule ): ?string
+	public function ruleDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		$type = $rule->filters['type'] ?? NULL;
 		
 		$conditions = [];
 		if ( isset( $rule->filters['milestone'] ) )
 		{
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
 				'htmlsprintf' => [
-					Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'milestone', Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
+					\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'milestone', \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
 				],
-				'sprintf'		=> [ $type ? Member::loggedIn()->language()->addToStack( $type::$title ) : Member::loggedIn()->language()->addToStack('AchievementAction__Comment_title_generic') ]
+				'sprintf'		=> [ $type ? \IPS\Member::loggedIn()->language()->addToStack( $type::$title ) : \IPS\Member::loggedIn()->language()->addToStack('AchievementAction__Comment_title_generic') ]
 			] );
 		}
 		if ( $nodeCondition = $this->_nodeFilterDescription( $rule ) )
 		{
 			$conditions[] = $nodeCondition;
 		}
-		if( $questCondition = $this->_questFilterDescription( $rule ) )
-		{
-			$conditions[] = $questCondition;
-		}
 		
-		return Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescription(
-			$type ? Member::loggedIn()->language()->addToStack( 'AchievementAction__NewContentItem_title_t', FALSE, [ 'sprintf' => [ Member::loggedIn()->language()->addToStack( $type::$title ) ] ] ) : Member::loggedIn()->language()->addToStack( 'AchievementAction__Comment_title' ),
+		return \IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescription(
+			$type ? \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__NewContentItem_title_t', FALSE, [ 'sprintf' => [ \IPS\Member::loggedIn()->language()->addToStack( $type::$title ) ] ] ) : \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__Comment_title' ),
 			$conditions
 		);
 	}

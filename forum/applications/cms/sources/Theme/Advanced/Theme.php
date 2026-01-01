@@ -12,34 +12,23 @@
 namespace IPS\cms\Theme\Advanced;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use IPS\cms\Theme as SystemTheme;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Theme\Dev\Theme as DevTheme;
-use IPS\Theme\Setup\Theme as SetupTheme;
-use function count;
-use function defined;
-use function strtolower;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Designer's Mode Theme
  */
-class Theme extends SystemTheme
+class _Theme extends \IPS\cms\Theme
 {
 	/**
 	 * Get currently logged in member's theme
 	 *
-	 * @return	static|SetupTheme|DevTheme
+	 * @return	static
 	 */
-	public static function i() : static|SetupTheme|DevTheme
+	public static function i()
 	{
 		return new self;
 	}
@@ -49,9 +38,9 @@ class Theme extends SystemTheme
 	 *
 	 * @return void
 	 */
-	public static function export() : void
+	public static function export()
 	{
-		foreach( Db::i()->select(
+		foreach( \IPS\Db::i()->select(
 			"*, MD5( CONCAT(template_location, ',', template_group, ',', template_title) ) as bit_key",
 			'cms_templates',
 			NULL,
@@ -67,20 +56,20 @@ class Theme extends SystemTheme
 	 *
 	 * @return	void
 	 */
-	public static function import() : void
+	public static function import()
 	{
 		$seen = array();
 		
 		foreach( array( 'block', 'page', 'database', 'js', 'css' ) as $location )
 		{
-			$templates = iterator_to_array( Db::i()->select(
+			$templates = iterator_to_array( \IPS\Db::i()->select(
 					"*, MD5( CONCAT(template_location, ',', template_group, ',', template_title) ) as bit_key",
 					'cms_templates',
 					array( 'template_location=?', $location ),
 					'template_user_edited ASC'  /* Ensure we get edited versions, not the master version if one exists */
 				)->setKeyField('bit_key') );
 		
-			$master = iterator_to_array( Db::i()->select(
+			$master = iterator_to_array( \IPS\Db::i()->select(
 					"*, MD5( CONCAT(template_location, ',', template_group, ',', template_title) ) as bit_key",
 					'cms_templates',
 					array( 'template_master=1 and template_location=?', $location )
@@ -90,7 +79,7 @@ class Theme extends SystemTheme
 
 			if ( is_dir( $path ) )
 			{
-				foreach( new DirectoryIterator( $path ) as $group )
+				foreach( new \DirectoryIterator( $path ) as $group )
 				{
 					if ( $group->isDot() || mb_substr( $group->getFilename(), 0, 1 ) === '.' )
 					{
@@ -101,7 +90,7 @@ class Theme extends SystemTheme
 					{
 						$seen = array();
 
-						foreach( new DirectoryIterator( $path . '/' . $group->getFilename() ) as $file )
+						foreach( new \DirectoryIterator( $path . '/' . $group->getFilename() ) as $file )
 						{
 							if ( $file->isDot() || ( mb_substr( $file->getFilename(), -6 ) !== '.phtml' and mb_substr( $file->getFilename(), -3 ) !== '.js' and mb_substr( $file->getFilename(), -4 ) !== '.css' ) )
 							{
@@ -147,7 +136,7 @@ class Theme extends SystemTheme
 								if ( ! $templates[ $key ]['template_master'] )
 								{
 									$added = TRUE;
-									Db::i()->update( 'cms_templates', array(
+									\IPS\Db::i()->update( 'cms_templates', array(
 										'template_content'     => $html,
 										'template_params'      => ( isset($params[1]) ) ? $params[1] : '',
 										'template_file_object' => NULL
@@ -169,7 +158,7 @@ class Theme extends SystemTheme
 								}
 									
 								/* New template */
-								Db::i()->insert( 'cms_templates', array(
+								\IPS\Db::i()->insert( 'cms_templates', array(
 									'template_key'            => $location . '_' . $group->getFilename() . '_' . $title,
 									'template_title'	      => $title,
 									'template_desc'		      => '',
@@ -187,19 +176,19 @@ class Theme extends SystemTheme
 							}
 
 							/* remove compiled version */
-							$key = strtolower( 'template_cms_' .static::makeBuiltTemplateLookupHash( 'cms', $location, $group->getFilename() ) . '_' . static::cleanGroupName( $group->getFilename() ) );
+							$key = \strtolower( 'template_cms_' .static::makeBuiltTemplateLookupHash( 'cms', $location, $group->getFilename() ) . '_' . static::cleanGroupName( $group->getFilename() ) );
 
-							if ( isset( Store::i()->$key ) )
+							if ( isset( \IPS\Data\Store::i()->$key ) )
 							{
-								unset(Store::i()->$key);
+								unset(\IPS\Data\Store::i()->$key);
 							}
 						}
 					}
 					
 					/* Remove any templates we've not imported for this location/group */
-					if ( count( $seen ) )
+					if ( \count( $seen ) )
 					{
-						Db::i()->delete( 'cms_templates', array('template_master=0 and template_location=? and template_group=? and ' . Db::i()->in( 'template_title', $seen, TRUE ), $location, $group->getFilename() ) );
+						\IPS\Db::i()->delete( 'cms_templates', array('template_master=0 and template_location=? and template_group=? and ' . \IPS\Db::i()->in( 'template_title', $seen, TRUE ), $location, $group->getFilename() ) );
 					}
 				}
 			}
@@ -213,7 +202,7 @@ class Theme extends SystemTheme
 	 * @param string|null 	  $path			Path or Filename
 	 * @return string
 	 */
-	protected static function _getHtmlPath( string $app, ?string $location=null, ?string $path=null ) : string
+	protected static function _getHtmlPath( $app, $location=null, $path=null )
 	{
 		return rtrim( \IPS\ROOT_PATH . "/themes/cms/{$location}/{$path}", '/' ) . '/';
 	}

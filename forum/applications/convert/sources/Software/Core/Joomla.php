@@ -12,37 +12,23 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Search\Index;
-use IPS\convert\Software;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Login;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task;
-use PasswordHash;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Joomla Core Converter
  */
-class Joomla extends Software
+class _Joomla extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "Joomla";
@@ -51,9 +37,9 @@ class Joomla extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "joomla";
@@ -62,9 +48,9 @@ class Joomla extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertGroups'				=> array(
@@ -81,9 +67,9 @@ class Joomla extends Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -91,9 +77,9 @@ class Joomla extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertGroups'
@@ -103,10 +89,10 @@ class Joomla extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Method name
-	 * @return    array|null
+	 * @param	string	$method	Method name
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 
@@ -117,15 +103,15 @@ class Joomla extends Software
 
 				$options = array();
 				$options['none'] = 'None';
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[$group->g_id] = $group->name;
 				}
 
 				foreach( $this->db->select( '*', 'usergroups' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['id']}"]		= $group['title'];
-					Member::loggedIn()->language()->words["map_group_{$group['id']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['id']}"]		= $group['title'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['id']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 
 					$return['convertGroups']["map_group_{$group['id']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -144,19 +130,19 @@ class Joomla extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 		
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
 
 		return array( "f_search_index_rebuild", "f_clear_caches" );
 	}
@@ -166,7 +152,7 @@ class Joomla extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -188,7 +174,7 @@ class Joomla extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -202,7 +188,7 @@ class Joomla extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -250,22 +236,22 @@ class Joomla extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
 		/* Joomla 3 */
 		if( preg_match( '/^\$2[ay]\$(0[4-9]|[1-2][0-9]|3[0-1])\$[a-zA-Z0-9.\/]{53}/', $member->conv_password ) )
 		{
 			require_once \IPS\ROOT_PATH . "/applications/convert/sources/Login/PasswordHash.php";
-			$ph = new PasswordHash( 8, TRUE );
-			return $ph->CheckPassword( $password, $member->conv_password );
+			$ph = new \PasswordHash( 8, TRUE );
+			return $ph->CheckPassword( $password, $member->conv_password ) ? TRUE : FALSE;
 		}
 
 		/* Joomla 2 */
-		if ( Login::compareHashes( $member->conv_password, md5( $password . $member->misc ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, md5( $password . $member->misc ) ) )
 		{
 			return TRUE;
 		}

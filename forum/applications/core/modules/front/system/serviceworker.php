@@ -12,69 +12,57 @@ namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use IPS\Dispatcher\Controller;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Xml\DOMDocument;
-use function count;
-use function defined;
-use const IPS\DEBUG_JS;
-use const IPS\DEV_DEBUG_JS;
-use const IPS\IN_DEV;
-use const IPS\ROOT_PATH;
+use function mb_strlen;
+use const LIBXML_NOWARNING;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Service worker controller
  */
-class serviceworker extends Controller
+class _serviceworker extends \IPS\Dispatcher\Controller
 {	
 	/**
 	 * View Notifications
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$cachedUrls = array();
 
 		$notificationIcon = NULL;
 
 		/* Get an icon to use in notifications */
-		$homeScreenIcons = json_decode( Settings::i()->icons_homescreen, TRUE ) ?? array();
+		$homeScreenIcons = json_decode( \IPS\Settings::i()->icons_homescreen, TRUE ) ?? array();
 		
-		if( count( $homeScreenIcons ) )
+		if( \count( $homeScreenIcons ) )
 		{
 			foreach( $homeScreenIcons as $name => $image )
 			{
 				if( isset( $image['width'] ) and $image['width'] == 192 )
 				{
-					$notificationIcon = File::get( 'core_Icons', $image['url'] )->url;
+					$notificationIcon = \IPS\File::get( 'core_Icons', $image['url'] )->url;
 					break;
 				}
 			}
 		}
 
 		/* VARIABLES TO PASS THROUGH TO JS */
-		$CACHE_VERSION = Theme::i()->cssCacheBustKey();
+		$CACHE_VERSION = \IPS\Theme::i()->cssCacheBustKey();
 		$variables = [
-			"DEBUG" => boolval( ( IN_DEV and DEV_DEBUG_JS ) or DEBUG_JS ),
-			"BASE_URL" => Settings::i()->base_url,
+			"DEBUG" => boolval( ( \IPS\IN_DEV and \IPS\DEV_DEBUG_JS ) or \IPS\DEBUG_JS ),
+			"BASE_URL" => \IPS\Settings::i()->base_url,
 			"CACHED_ASSETS" => $cachedUrls,
 			"CACHE_NAME" => "invision-community-{$CACHE_VERSION}",
 			"CACHE_VERSION" => $CACHE_VERSION,
 			"NOTIFICATION_ICON" => $notificationIcon ?: null,
-			"DEFAULT_NOTIFICATION_TITLE" => Member::loggedIn()->language()->addToStack( 'default_notification_title'),
-			"DEFAULT_NOTIFICATION_BODY" => Member::loggedIn()->language()->addToStack( 'default_notification_body'),
+			"DEFAULT_NOTIFICATION_TITLE" => \IPS\Member::loggedIn()->language()->addToStack('default_notification_title'),
+			"DEFAULT_NOTIFICATION_BODY" => \IPS\Member::loggedIn()->language()->addToStack('default_notification_body'),
 			"OFFLINE_PAGE" => $this->buildCollapsedOfflinePage(),
 		];
 
@@ -91,13 +79,11 @@ JAVASCRIPT;
 
 		}
 
-
-		Member::loggedIn()->language()->parseOutputForDisplay( $output );
-		$output .= file_get_contents( ROOT_PATH . '/applications/core/interface/js/serviceWorker.js' );
-		$cacheHeaders	= !IN_DEV ? Output::getCacheHeaders(time(), 86400) : array();
-		Output::i()->sendOutput($output, 200, 'text/javascript', $cacheHeaders);
+		\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $output );
+		$output .= file_get_contents( \IPS\ROOT_PATH . '/applications/core/interface/js/serviceWorker.js' );
+		$cacheHeaders	= \IPS\IN_DEV !== true ? \IPS\Output::getCacheHeaders(time(), 86400) : array();
+		\IPS\Output::i()->sendOutput($output, 200, 'text/javascript', $cacheHeaders);
 	}
-
 
 	/**
 	 * Return template for offline page
@@ -106,10 +92,10 @@ JAVASCRIPT;
 	 */
 	protected function buildCollapsedOfflinePage() : string
 	{
-		$html = Theme::i()->getTemplate( 'global', 'core', 'global' )->offline();
-		Member::loggedIn()->language()->parseOutputForDisplay( $html );
+		$html = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->swOffline();
+		\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $html );
 
-		$doc = new DOMDocument( "2.0", "utf-8" );
+		$doc = new \IPS\Xml\DOMDocument( "2.0", "utf-8" );
 		$doc->preserveWhiteSpace = false;
 		$doc->loadHTML( $html, LIBXML_NOBLANKS );
 		$doc->formatOutput = true;

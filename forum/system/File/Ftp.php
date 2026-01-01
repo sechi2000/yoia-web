@@ -11,36 +11,16 @@
 namespace IPS\File;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadFunctionCallException;
-use DomainException;
-use InvalidArgumentException;
-use IPS\File;
-use IPS\Ftp as FtpClass;
-use IPS\Ftp\Exception;
-use IPS\Ftp\RecursiveDirectoryFtpIterator;
-use IPS\Ftp\Sftp as SftpClass;
-use IPS\Http\Url;
-use IPS\Member;
-use LogicException;
-use RecursiveIteratorIterator;
-use function count;
-use function defined;
-use function file_put_contents;
-use function function_exists;
-use function in_array;
-use const IPS\TEMP_DIRECTORY;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Handler: FTP
  */
-class Ftp extends File
+class _Ftp extends \IPS\File
 {
 	/* !ACP Configuration */
 	
@@ -50,7 +30,7 @@ class Ftp extends File
 	 * @param	array	$configuration		Configuration if editing a setting, or array() if creating a setting.
 	 * @return	array
 	 */
-	public static function settings( array $configuration=array() ) : array
+	public static function settings( $configuration=array() )
 	{
 		return array(
 			'ftp_details'	=> array( 'type' => 'Ftp', 'options' => array( 'validate' => FALSE ) ),
@@ -63,47 +43,47 @@ class Ftp extends File
 	 *
 	 * @param	array	$values	The submitted values
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public static function testSettings( array &$values ) : void
+	public static function testSettings( &$values )
 	{		
-		if ( !function_exists( 'ftp_connect' ) )
+		if ( !\function_exists( 'ftp_connect' ) )
 		{
-			throw new BadFunctionCallException( 'ftp_err_no_ext' );
+			throw new \BadFunctionCallException( 'ftp_err_no_ext' );
 		}
-		elseif ( $values['ftp_details']['protocol'] === 'ssl_ftp' and !function_exists( 'ftp_ssl_connect' ) )
+		elseif ( $values['ftp_details']['protocol'] === 'ssl_ftp' and !\function_exists( 'ftp_ssl_connect' ) )
 		{
-			throw new BadFunctionCallException( 'ftp_err_no_ssl' );
+			throw new \BadFunctionCallException( 'ftp_err_no_ssl' );
 		}
-		elseif ( $values['ftp_details']['protocol'] === 'sftp' and !function_exists( 'ssh2_connect' ) )
+		elseif ( $values['ftp_details']['protocol'] === 'sftp' and !\function_exists( 'ssh2_connect' ) )
 		{
-			throw new BadFunctionCallException( 'ftp_err_no_sftp' );
+			throw new \BadFunctionCallException( 'ftp_err_no_sftp' );
 		}
 		
 		$values['url'] = rtrim( $values['url'], '/' );
 		
 		if ( filter_var( $values['url'], FILTER_VALIDATE_URL ) === false )
 		{
-			throw new DomainException( Member::loggedIn()->language()->addToStack( 'url_is_not_real', FALSE, array( 'sprintf' => array( $values['url'] ) ) ) );
+			throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'url_is_not_real', FALSE, array( 'sprintf' => array( $values['url'] ) ) ) );
 		}
 		
 		try
 		{
 			if ( $values['ftp_details']['protocol'] == 'sftp' )
 			{
-				$ftp = new SftpClass( $values['ftp_details']['server'], $values['ftp_details']['un'], $values['ftp_details']['pw'], $values['ftp_details']['port'] );
+				$ftp = new \IPS\Ftp\Sftp( $values['ftp_details']['server'], $values['ftp_details']['un'], $values['ftp_details']['pw'], $values['ftp_details']['port'] );
 			}
 			else
 			{
-				$ftp = new FtpClass( $values['ftp_details']['server'], $values['ftp_details']['un'], $values['ftp_details']['pw'], $values['ftp_details']['port'], ( $values['ftp_details']['protocol'] == 'ssl_ftp' ) );
+				$ftp = new \IPS\Ftp( $values['ftp_details']['server'], $values['ftp_details']['un'], $values['ftp_details']['pw'], $values['ftp_details']['port'], ( $values['ftp_details']['protocol'] == 'ssl_ftp' ) );
 			}
 			$ftp->chdir( $values['ftp_details']['path'] );
 			
 			$filename = md5( mt_rand() ) . '.ips.txt';
-			$tmpFileName = tempnam( TEMP_DIRECTORY, 'IPS' );
-			file_put_contents( $tmpFileName, 'OK' );
+			$tmpFileName = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
+			\file_put_contents( $tmpFileName, 'OK' );
 			$ftp->upload( $filename, $tmpFileName );
-			$result = Url::external( $values['url'] . '/' . $filename)->request()->get();
+			$result = \IPS\Http\Url::external( $values['url'] . '/' . $filename)->request()->get();
 			$ftp->delete( $filename );
 			unlink( $tmpFileName );
 
@@ -111,17 +91,17 @@ class Ftp extends File
 			{
 				if ( $result->httpResponseCode == 200 )
 				{
-					throw new InvalidArgumentException( Member::loggedIn()->language()->addToStack( 'file_storage_test_ftp_unexpected_response', FALSE, array( 'sprintf' => array( $values['ftp_details']['server'] ) ) ) );
+					throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack( 'file_storage_test_ftp_unexpected_response', FALSE, array( 'sprintf' => array( $values['ftp_details']['server'] ) ) ) );
 				}
 				else
 				{
-					throw new InvalidArgumentException( Member::loggedIn()->language()->addToStack( 'file_storage_test_error_ftp', FALSE, array( 'sprintf' => array( $values['ftp_details']['server'], $result->httpResponseCode ) ) ) );
+					throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack( 'file_storage_test_error_ftp', FALSE, array( 'sprintf' => array( $values['ftp_details']['server'], $result->httpResponseCode ) ) ) );
 				}
 			}
 		}
-		catch ( Exception $e )
+		catch ( \IPS\Ftp\Exception $e )
 		{
-			throw new DomainException( 'ftp_err-' . $e->getMessage() );
+			throw new \DomainException( 'ftp_err-' . $e->getMessage() );
 		}		
 	}
 	
@@ -131,9 +111,9 @@ class Ftp extends File
 	 * @param	array	$settings	Configuration settings
 	 * @return	string
 	 */
-	public static function displayName( array $settings ) : string
+	public static function displayName( $settings )
 	{
-		return Member::loggedIn()->language()->addToStack( 'filehandler_display_name', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack('filehandler__Ftp'), ( !empty( $settings['ftp_details']['path'] ) ) ? $settings['ftp_details']['server'] . " (" . $settings['ftp_details']['path'] . ")" : $settings['ftp_details']['server'] ) ) );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'filehandler_display_name', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack('filehandler__Ftp'), ( !empty( $settings['ftp_details']['path'] ) ) ? $settings['ftp_details']['server'] . " (" . $settings['ftp_details']['path'] . ")" : $settings['ftp_details']['server'] ) ) );
 	}
 	
 	/* !File Handling */
@@ -144,7 +124,7 @@ class Ftp extends File
 	 * @param	array	$configuration	Storage configuration
 	 * @return	void
 	 */
-	public function __construct( array $configuration )
+	public function __construct( $configuration )
 	{
 		$this->container = 'monthly_' . date( 'm' ) . '_' . date( 'Y' );
 		parent::__construct( $configuration );
@@ -155,7 +135,7 @@ class Ftp extends File
 	 *
 	 * @return string
 	 */
-	public function baseUrl() : string
+	public function baseUrl()
 	{
 		return rtrim( $this->configuration['url'], '/' );
 	}
@@ -164,26 +144,26 @@ class Ftp extends File
 	 * Save File
 	 *
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function save() : void
+	public function save()
 	{
 		/* Get contents */
 		$contents = $this->contents();
 				
 		/* Create a temporary file */
-		$tmpFileName = tempnam( TEMP_DIRECTORY, 'IPS' );
-		file_put_contents( $tmpFileName, $contents );
+		$tmpFileName = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
+		\file_put_contents( $tmpFileName, $contents );
 				
 		/* Move into the correct folder */		
-		if( !in_array( $this->container, $this->ftp()->ls() ) )
+		if( !\in_array( $this->container, $this->ftp()->ls() ) )
 		{
 			/* Make dir */
 			$this->ftp()->mkdir( $this->container );
 			
 			/* Stick an index.html file in */
-			$tmpIndexFile = tempnam( TEMP_DIRECTORY, 'IPS' );
-			file_put_contents( $tmpIndexFile, '' );
+			$tmpIndexFile = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
+			\file_put_contents( $tmpIndexFile, '' );
 			$this->ftp()->upload( 'index.html', $tmpIndexFile );
 
 			unlink( $tmpIndexFile );
@@ -200,16 +180,16 @@ class Ftp extends File
 		unlink( $tmpFileName );
 		
 		/* Set the URL */
-		$this->url = Url::createFromString( $this->fullyQualifiedUrl( "{$this->container}/{$this->filename}" ), FALSE );
+		$this->url = \IPS\Http\Url::createFromString( $this->fullyQualifiedUrl( "{$this->container}/{$this->filename}" ), FALSE );
 	}
 	
 	/**
 	 * Delete
 	 *
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function delete() : void
+	public function delete()
 	{
 		/* Only issue delete command if the file (and container) exist...otherwise a delete command would fail but our intention is complete */
 		if( $this->checkExists( $this->container . '/' . $this->filename ) )
@@ -221,7 +201,7 @@ class Ftp extends File
 		$immediateCaller = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 1 );
 		$debug = array_map( function( $row ) {
 			return array_filter( $row, function( $key ) {
-				return in_array( $key, array( 'class', 'function', 'line' ) );
+				return \in_array( $key, array( 'class', 'function', 'line' ) );
 			}, ARRAY_FILTER_USE_KEY );
 		}, debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ) );
 		$this->log( "file_deletion", 'delete', $debug, 'log' );
@@ -232,14 +212,14 @@ class Ftp extends File
 	 *
 	 * @param	string	$container	Key
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function deleteContainer( string $container ) : void
+	public function deleteContainer( $container )
 	{
 		/* Actually remove, checking if it exists before attempting */
 		if( $this->checkExists( $container ) )
 		{
-			$this->ftp()->rmdir($container, TRUE);
+			$this->ftp()->rmdir( $container, TRUE );
 		}
 
 		/* Log deletion request */
@@ -255,15 +235,15 @@ class Ftp extends File
 	 * @param	string	$path	Path to check
 	 * @return	bool
 	 */
-	protected function checkExists( string $path ) : bool
+	protected function checkExists( $path )
 	{
 		$pathBits		= explode( '/', $path );
 		$reconstructed	= array();
 
 		foreach( $pathBits as $piece )
 		{
-			$pathToCheck = count( $reconstructed ) ? implode( '/', $reconstructed ) : '.';
-			if( $this->ftp()->ls( $pathToCheck ) === FALSE OR !in_array( $piece, $this->ftp()->ls( $pathToCheck ) ) )
+			$pathToCheck = \count( $reconstructed ) ? implode( '/', $reconstructed ) : '.';
+			if( $this->ftp()->ls( $pathToCheck ) === FALSE OR !\in_array( $piece, $this->ftp()->ls( $pathToCheck ) ) )
 			{
 				return FALSE;
 			}
@@ -279,15 +259,15 @@ class Ftp extends File
 	/**
 	 * @brief	FTP Connection
 	 */
-	protected static array $ftp = array();
+	protected static $ftp = array();
 	
 	/**
 	 * Get FTP Connection
 	 *
-	 * @return	FtpClass
-	 * @throws	Exception
+	 * @return	\IPS\Ftp
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	protected function ftp() : FtpClass
+	protected function ftp()
 	{
 		$key = md5( json_encode( $this->configuration ) );
 		
@@ -295,11 +275,11 @@ class Ftp extends File
 		{
 			if ( $this->configuration['ftp_details']['protocol'] == 'sftp' )
 			{
-				static::$ftp[ $key ] = new SftpClass( $this->configuration['ftp_details']['server'], $this->configuration['ftp_details']['un'], $this->configuration['ftp_details']['pw'], $this->configuration['ftp_details']['port'] );
+				static::$ftp[ $key ] = new \IPS\Ftp\Sftp( $this->configuration['ftp_details']['server'], $this->configuration['ftp_details']['un'], $this->configuration['ftp_details']['pw'], $this->configuration['ftp_details']['port'] );
 			}
 			else
 			{
-				static::$ftp[ $key ] = new FtpClass( $this->configuration['ftp_details']['server'], $this->configuration['ftp_details']['un'], $this->configuration['ftp_details']['pw'], $this->configuration['ftp_details']['port'], ( $this->configuration['ftp_details']['protocol'] == 'ssl_ftp' ) );
+				static::$ftp[ $key ] = new \IPS\Ftp( $this->configuration['ftp_details']['server'], $this->configuration['ftp_details']['un'], $this->configuration['ftp_details']['pw'], $this->configuration['ftp_details']['port'], ( $this->configuration['ftp_details']['protocol'] == 'ssl_ftp' ) );
 			}
 
 			static::$ftp[ $key ]->chdir( $this->configuration['ftp_details']['path'] );
@@ -314,7 +294,7 @@ class Ftp extends File
 	 * @param	array	$engines	All file storage engine extension objects
 	 * @return	array
 	 */
-	public function removeOrphanedFiles( int $fileIndex, array $engines ) : array
+	public function removeOrphanedFiles( $fileIndex, $engines )
 	{
 		/* Start off our results array */
 		$results	= array(
@@ -326,7 +306,7 @@ class Ftp extends File
 		$checked	= 0;
 		$skipped	= 0;
 
-		$iterator	= new RecursiveIteratorIterator( new RecursiveDirectoryFtpIterator( $this->ftp(), $this->configuration['ftp_details']['path'] ) );
+		$iterator	= new \RecursiveIteratorIterator( new \IPS\Ftp\RecursiveDirectoryFtpIterator( $this->ftp(), $this->configuration['ftp_details']['path'] ) );
 
 		while( $iterator->valid() )
 		{
@@ -386,9 +366,9 @@ class Ftp extends File
 	/**
 	 * Get filesize (in bytes)
 	 *
-	 * @return	int|bool
+	 * @return	string|bool
 	 */
-	public function filesize() : int|bool
+	public function filesize()
 	{
 		if( $this->_cachedFilesize !== null )
 		{
@@ -410,7 +390,7 @@ class Ftp extends File
 
 			$this->_cachedFilesize = $size ?: parent::filesize();
 		}
-		catch( Exception $e )
+		catch( \IPS\Ftp\Exception $e )
 		{
 			$this->_cachedFilesize = FALSE;
 		}
@@ -426,10 +406,10 @@ class Ftp extends File
 	 * @param	int|null	$throttle	Throttle speed
 	 * @return	void
 	 */
-	public function printFile( ?int $start=NULL, ?int $length=NULL, ?int $throttle=NULL ) : void
+	public function printFile( $start=NULL, $length=NULL, $throttle=NULL )
 	{
 		/* Download the file locally */
-		$file	= $this->ftp()->download($this->configuration['ftp_details']['path'] . ($this->container ? '/' . $this->container : '') . '/' . $this->filename, NULL, TRUE);
+		$file	= $this->ftp()->download( $this->configuration['ftp_details']['path'] . ( $this->container ? '/' . $this->container : '' ) . '/' . $this->filename, NULL, TRUE );
 
 		/* Send the file */
 		$this->sendFile( $file, $start, $length, $throttle );

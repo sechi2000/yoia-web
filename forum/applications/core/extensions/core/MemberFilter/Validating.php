@@ -12,48 +12,40 @@
 namespace IPS\core\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db\Select;
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\Radio;
-use LogicException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member Filter Extension
  */
-class Validating extends MemberFilterAbstract
+class _Validating
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param	string	$area	Area to check (bulkmail, group_promotions, automatic_moderation, passwordreset)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'bulkmail' ) );
+		return \in_array( $area, array( 'bulkmail' ) );
 	}
 
 	/** 
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		$options = array( 'any' => 'any', 'validating' => 'mf_validating_validating', 'notvalidating' => 'mf_validating_not_validating' );
 
 		return array(
-			new Radio( 'mf_validating', $criteria['validating'] ?? 'any', FALSE, array( 'options' => $options ) ),
+			new \IPS\Helpers\Form\Radio( 'mf_validating', isset( $criteria['validating'] ) ? $criteria['validating'] : 'any', FALSE, array( 'options' => $options ) ),
 		);
 	}
 	
@@ -61,21 +53,21 @@ class Validating extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return    array|bool            False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array|bool
+	public function save( $post )
 	{
-		return ( isset( $post['mf_validating'] ) and in_array( $post['mf_validating'], array( 'validating', 'notvalidating' ) ) ) ? array( 'validating' => $post['mf_validating'] ) : FALSE;
+		return ( isset( $post['mf_validating'] ) and \in_array( $post['mf_validating'], array( 'validating', 'notvalidating' ) ) ) ? array( 'validating' => $post['mf_validating'] ) : FALSE;
 	}
 	
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		if ( isset( $data['validating'] ) )
 		{
@@ -83,10 +75,10 @@ class Validating extends MemberFilterAbstract
 			{
 				case 'validating':
 					return array( "( v.lost_pass=0 AND v.forgot_security=0 AND v.vid IS NOT NULL )" );
-
+					break;
 				case 'notvalidating':
 					return array( "( v.vid IS NULL )" );
-
+					break;
 			}
 		}
 
@@ -97,15 +89,17 @@ class Validating extends MemberFilterAbstract
 	 * Callback for member retrieval database query
 	 * Can be used to set joins
 	 *
-	 * @param array $data	The array returned from the save() method
-	 * @param	Select	$query	The query
+	 * @param	mixed			$data	The array returned from the save() method
+	 * @param	\IPS\Db\Query	$query	The query
 	 * @return	void
 	 */
-	public function queryCallback( array $data, Select $query ) : void
+	public function queryCallback( $data, &$query )
 	{
 		if( isset( $data['validating'] ) )
 		{
 			$query->join( [ 'core_validating', 'v' ], "core_members.member_id=v.member_id" );
 		}
+
+		return NULL;
 	}
 }

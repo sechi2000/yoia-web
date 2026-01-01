@@ -11,80 +11,56 @@
 namespace IPS\Dispatcher;
  
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Application;
-use IPS\Application\Module;
-use IPS\Data\Cache;
-use IPS\Data\Cache\None;
-use IPS\Data\Store;
-use IPS\Db\Exception;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function intval;
-use function is_array;
-use const IPS\CIC2;
-use const IPS\SITE_FILES_PATH;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Standard Dispatcher
  */
-abstract class Standard extends Dispatcher
+abstract class _Standard extends \IPS\Dispatcher
 {
 	/**
 	 * Application
 	 */
-	public ?Application $application = NULL;
+	public $application;
 	
 	/**
 	 * Module
 	 */
-	public ?Module $module = NULL;
+	public $module;
 	
 	/**
 	 * Controller
 	 */
-	public ?string $controller = NULL;
+	public $controller;
 
 	/**
 	 * @brief	Check access permissions
 	 */
-	public bool $checkGenericPermissions = TRUE;
-
-	public array $platformFeatureExpires = [];
+	public $checkGenericPermissions = TRUE;
 	
 	/**
 	 * Base CSS
 	 *
 	 * @return	void
 	 */
-	public static function baseCss() : void
+	public static function baseCss()
 	{
-		if ( !Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'framework/framework.css', 'core', 'global' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'framework.css', 'core', 'global' ) );
+			if ( \IPS\Theme::i()->settings['responsive'] )
+			{
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'responsive.css', 'core', 'global' ) );
+			}
 		}
 
-		if ( count( Lang::languages() ) > 1 )
+		if ( \count( \IPS\Lang::languages() ) > 1 )
 		{
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'flags.css', 'core', 'global' ) );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'flags.css', 'core', 'global' ) );
 		}
 	}
 
@@ -93,24 +69,28 @@ abstract class Standard extends Dispatcher
 	 *
 	 * @return void
 	 */
-	protected static function baseJs() : void
+	protected static function baseJs()
 	{
 		/* Stuff for output */
-		if ( !Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
 			/* JS */
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'library.js' ) );
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, [ Output\Javascript::getLanguageUrl( Member::loggedIn()->language() ) ] );
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'framework.js' ) );
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_core.js', 'core', 'global' ) );
-			Output::i()->jsVars['date_format'] = mb_strtolower( Member::loggedIn()->language()->preferredDateFormat() );
-			Output::i()->jsVars['date_first_day'] = 0;
-			Output::i()->jsVars['ipb_url_filter_option'] = Settings::i()->ipb_url_filter_option;
-			Output::i()->jsVars['url_filter_any_action'] = Settings::i()->url_filter_any_action;
-			Output::i()->jsVars['bypass_profanity'] = intval( Member::loggedIn()->group['g_bypass_badwords'] );
-			Output::i()->jsVars['emoji_cache'] = (int) Settings::i()->emoji_cache;
-			Output::i()->jsVars['image_jpg_quality'] = (int) Settings::i()->image_jpg_quality ?: 85;
-			Output::i()->jsVars['cloud2'] = (bool) CIC2;
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'library.js' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'js_lang_' . \IPS\Member::loggedIn()->language()->id . '.js' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'framework.js' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_core.js', 'core', 'global' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'plugins.js', 'core', 'plugins' ) );
+			\IPS\Output::i()->jsVars['date_format'] = mb_strtolower( \IPS\Member::loggedIn()->language()->preferredDateFormat() );
+			\IPS\Output::i()->jsVars['date_first_day'] = 0;
+			\IPS\Output::i()->jsVars['ipb_url_filter_option'] = \IPS\Settings::i()->ipb_url_filter_option;
+			\IPS\Output::i()->jsVars['url_filter_any_action'] = \IPS\Settings::i()->url_filter_any_action;
+			\IPS\Output::i()->jsVars['bypass_profanity'] = \intval( \IPS\Member::loggedIn()->group['g_bypass_badwords'] );
+			\IPS\Output::i()->jsVars['emoji_style'] = ( \IPS\Settings::i()->getFromConfGlobal('sql_utf8mb4') === TRUE ) ? \IPS\Settings::i()->emoji_style : 'disabled';
+			\IPS\Output::i()->jsVars['emoji_shortcodes'] = (bool) \IPS\Settings::i()->emoji_shortcodes;
+			\IPS\Output::i()->jsVars['emoji_ascii'] = (bool) \IPS\Settings::i()->emoji_ascii;
+			\IPS\Output::i()->jsVars['emoji_cache'] = (int) \IPS\Settings::i()->emoji_cache;
+			\IPS\Output::i()->jsVars['image_jpg_quality'] = (int) \IPS\Settings::i()->image_jpg_quality ?: 85;
+			\IPS\Output::i()->jsVars['cloud2'] = (bool) \IPS\CIC2;
 		}
 	}
 	
@@ -119,15 +99,15 @@ abstract class Standard extends Dispatcher
 	 *
 	 * @return	void
 	 */
-	public function finish() : void
+	public function finish()
 	{		
 		/* If we're still here - output */
-		if ( ! Request::i()->isAjax() )
+		if ( ! \IPS\Request::i()->isAjax() )
 		{
 			/* Load all models for this app and location */
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'app.js', Dispatcher::i()->application->directory ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'app.js', \IPS\Dispatcher::i()->application->directory ) );
 			/* Map.js must come last as it will always have the correct file names */
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'map.js' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'map.js' ) );
 		}
 		
 		parent::finish();
@@ -136,54 +116,54 @@ abstract class Standard extends Dispatcher
 	/**
 	 * @brief	Initialize tasks
 	 */
-	protected bool $runTasks = FALSE;
+	protected $runTasks = FALSE;
 
 	/**
 	 * Init
 	 *
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function init() : void
+	public function init()
 	{
-		$this->runTasks = (bool) Member::loggedIn()->member_id;
+		$this->runTasks = (bool) \IPS\Member::loggedIn()->member_id;
 		
 		/* Force HTTPs and correct domain (e.g. not "www." if that's not in the base URL) */
 		if ( mb_strtolower( $_SERVER['REQUEST_METHOD'] ) == 'get' )
 		{
-			$baseUrl	= new Url( Settings::i()->base_url );
-			$newUrl		= Request::i()->url();
+			$baseUrl	= new \IPS\Http\Url( \IPS\Settings::i()->base_url );
+			$newUrl		= \IPS\Request::i()->url();
 
-			if( $baseUrl->data['scheme'] === 'https' and Request::i()->url()->data['scheme'] !== 'https' )
+			if( $baseUrl->data['scheme'] === 'https' and \IPS\Request::i()->url()->data['scheme'] !== 'https' )
 			{
 				$newUrl = $newUrl->setScheme('https');
 			}
 
-			if( $baseUrl->data['host'] !== Request::i()->url()->data['host'] )
+			if( $baseUrl->data['host'] !== \IPS\Request::i()->url()->data['host'] )
 			{
 				$newUrl = $newUrl->setHost( $baseUrl->data['host'] );
 			}
 
-			if( $newUrl != Request::i()->url() )
+			if( $newUrl != \IPS\Request::i()->url() )
 			{
-				Output::i()->redirect( $newUrl );
+				\IPS\Output::i()->redirect( $newUrl );
 			}
 		}
 
 		/* Set locale */
-		Member::loggedIn()->language()->setLocale();
+		\IPS\Member::loggedIn()->language()->setLocale();
 
 		/* Set Application */
-		if ( isset( Request::i()->app ) )
+		if ( isset( \IPS\Request::i()->app ) )
 		{
 			try
 			{
-				$this->application = Application::load( Request::i()->app );
+				$this->application = \IPS\Application::load( \IPS\Request::i()->app );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				$applications = Application::applications();
-
+				$applications = \IPS\Application::applications();
+			
 				foreach( $applications as $application )
 				{
 					if( $application->default )
@@ -191,19 +171,19 @@ abstract class Standard extends Dispatcher
 						$this->application = $application;
 					}
 				}
-
+				
 				if( !isset( $this->application ) )
 				{
 					$this->application = array_shift( $applications );
 				}
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'app.js' ) );
-				throw new DomainException( 'requested_route_404', 5 );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'app.js' ) );
+				throw new \DomainException( 'requested_route_404', 5 );
 			}
 		}
 		else
 		{
-			$applications = Application::applications();
-
+			$applications = \IPS\Application::applications();
+			
 			foreach( $applications as $application )
 			{
 				if( $application->default )
@@ -211,7 +191,7 @@ abstract class Standard extends Dispatcher
 					$this->application = $application;
 				}
 			}
-
+			
 			if( !isset( $this->application ) )
 			{
 				$this->application = array_shift( $applications );
@@ -219,11 +199,11 @@ abstract class Standard extends Dispatcher
 		}
 		
 		/* Init Application */
-		if( $this->checkGenericPermissions === TRUE AND !$this->application->canAccess( Member::loggedIn() ) AND $this->controllerLocation != 'admin' )
+		if( $this->checkGenericPermissions === TRUE AND !$this->application->canAccess( \IPS\Member::loggedIn() ) AND $this->controllerLocation != 'admin' )
 		{
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'app.js' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'app.js' ) );
 			$message = $this->application->disabled_message ?: 'generic_offline_message';
-			throw new DomainException( $message, 4 );
+			throw new \DomainException( $message, 4 );
 		}
 		if ( method_exists( $this->application, 'init' ) )
 		{
@@ -231,16 +211,16 @@ abstract class Standard extends Dispatcher
 		}
 		
 		/* Set Module */
-		if ( isset( Request::i()->module ) )
+		if ( isset( \IPS\Request::i()->module ) )
 		{
 			try
 			{
-				$this->module = Module::get( $this->application->directory, Request::i()->module, static::i()->controllerLocation );
+				$this->module = \IPS\Application\Module::get( $this->application->directory, \IPS\Request::i()->module, static::i()->controllerLocation );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'app.js' ) );
-				throw new DomainException( 'requested_route_404', 6 );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'app.js' ) );
+				throw new \DomainException( 'requested_route_404', 6 );
 			}
 		}
 		else
@@ -249,49 +229,54 @@ abstract class Standard extends Dispatcher
 		}
 				
 		/* Set controller */
-		$this->controller = isset( Request::i()->controller ) ? Request::i()->controller : $this->module->default_controller;
+		$this->controller = isset( \IPS\Request::i()->controller ) ? \IPS\Request::i()->controller : $this->module->default_controller;
 
-		if( is_array( $this->controller ) )
+		if( \is_array( $this->controller ) )
 		{
 			$this->controller	= NULL;
-			throw new DomainException( 'requested_route_404', 7 );
+			throw new \DomainException( 'requested_route_404', 7 );
 		}
 
 		/* Set classname */
 		$this->classname = 'IPS\\' . $this->application->directory . '\\modules\\' . $this->controllerLocation . '\\' . $this->module->key . '\\' . $this->controller;
 		
 		/* Base Templates, CSS and JS */
-		if ( !Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
 			/* Templates */
-			if ( Cache::i() instanceof None )
+			if ( \IPS\Data\Cache::i() instanceof \IPS\Data\Cache\None )
 			{
-				Store::i()->templateLoad[] = array( 'core', $this->controllerLocation, 'global' );
-				Store::i()->templateLoad[] = array( 'core', 'global', 'global' );
-				Store::i()->templateLoad[] = array( 'core', 'global', 'forms' );
-				Store::i()->templateLoad[] = array( 'core', $this->controllerLocation, 'forms' );
+				\IPS\Data\Store::i()->templateLoad[] = array( 'core', $this->controllerLocation, 'global' );
+				\IPS\Data\Store::i()->templateLoad[] = array( 'core', 'global', 'global' );
+				\IPS\Data\Store::i()->templateLoad[] = array( 'core', 'global', 'forms' );
+				\IPS\Data\Store::i()->templateLoad[] = array( 'core', $this->controllerLocation, 'forms' );
 				$templateLoad = array();
-				foreach ( Store::i()->templateLoad as $data )
+				if ( ! \IPS\Theme::isUsingTemplateDiskCache() )
 				{
-					$templateLoad[] = 'template_' . Theme::i()->id . '_' . Theme::makeBuiltTemplateLookupHash( $data[0], $data[1], $data[2] ) . '_' . $data[2];
+					foreach ( \IPS\Data\Store::i()->templateLoad as $data )
+					{
+						$templateLoad[] = 'template_' . \IPS\Theme::i()->id . '_' . \IPS\Theme::makeBuiltTemplateLookupHash( $data[0], $data[1], $data[2] ) . '_' . $data[2];
+					}
+					\IPS\Data\Store::i()->loadIntoMemory( $templateLoad );
 				}
-
-				Store::i()->loadIntoMemory( $templateLoad );
 			}
 			
 			/* App JS */
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'app.js' ) );
-
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'app.js' ) );
+			
 			/* App CSS */
-			$currentApp = $this->application;
-			$currentApp::outputCss();
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( $this->application->directory . '.css', $this->application->directory, $this->controllerLocation ) );
+			if ( \IPS\Theme::i()->settings['responsive'] )
+			{
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( $this->application->directory . '_responsive.css', $this->application->directory, $this->controllerLocation ) );
+			}
 
 			/* VLE */
-			if ( Lang::vleActive() )
+			if ( \IPS\Lang::vleActive() )
 			{
-				Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'customization/visuallanguage.css', 'core', 'admin' ) );
-				Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_customization.js', 'core', 'global' ) );
-				Output::i()->globalControllers[] = 'core.global.customization.visualLang';
+				\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'customization/visuallanguage.css', 'core', 'admin' ) );
+				\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_customization.js', 'core', 'global' ) );
+				\IPS\Output::i()->globalControllers[] = 'core.global.customization.visualLang';
 			}			
 		}
 	}
@@ -301,7 +286,7 @@ abstract class Standard extends Dispatcher
 	 *
 	 * @return void
 	 */
-	protected function setDefaultModule() : void
+	protected function setDefaultModule()
 	{
 		$modules = $this->application->modules( static::i()->controllerLocation );
 		foreach( $modules as $module )
@@ -323,13 +308,13 @@ abstract class Standard extends Dispatcher
 	 * @brief   Enable destruct method
 	 * @note    Disable to avoid an automatic database connection
 	 */
-	public bool $destruct = true;
+	public $destruct = true;
 
 	/**
 	 * @brief  Flag to check if we are in the destructor
 	 */
 	public bool $inDestructor = false;
-
+	
 	/**
 	 * Destructor
 	 * Runs tasks
@@ -339,61 +324,23 @@ abstract class Standard extends Dispatcher
 	public function __destruct()
 	{
 		/* If you visit and you are redirected to installer, this code should not run */
-		if( !file_exists( SITE_FILES_PATH . '/conf_global.php' ) OR !$this->destruct )
+		if( !file_exists( \IPS\SITE_FILES_PATH . '/conf_global.php' ) OR !$this->destruct )
 		{
 			return;
 		}
 
-		if ( $this->runTasks and Settings::i()->task_use_cron == 'normal' and !Request::i()->isAjax() )
+		if ( $this->runTasks and \IPS\Settings::i()->task_use_cron == 'normal' and !\IPS\Request::i()->isAjax() )
 		{
 			$this->inDestructor = true;
 			try
 			{
-				$task = Task::queued();
+				$task = \IPS\Task::queued();
 				if ( $task )
 				{
 					$task->runAndLog();
 				}
 			}
-			catch( Exception $e ) { }
+			catch( \IPS\Db\Exception $e ) { }
 		}
 	}
-
-
-	/**
-	 * Check ACP Permission
-	 *
-	 * @param string $key Permission Key
-	 * @param string|Application|null $app Application (NULL will default to current)
-	 * @param string|Module|null $module Module (NULL will default to current)
-	 * @param boolean $return Return boolean (true/false) instead of throwing an error
-	 * @return int|bool|null
-	 */
-	public function checkAcpPermission( string $key, string|Application $app=NULL, Module|string $module=NULL, bool $return=FALSE ): int|bool|null
-	{
-		$result = Bridge::i()->checkPlatformPermission( $key, $app, $module, $return );
-
-		if ( is_int( $result ) )
-		{
-			return $result;
-		}
-
-		if ( !Member::loggedIn()->hasAcpRestriction( ( $app ?: $this->application ), ( $module ?: $this->module ), $key ) )
-		{
-			if ( $return )
-			{
-				return FALSE;
-			}
-
-			Output::i()->error( 'no_module_permission', '2S107/2', 403, '' );
-		}
-
-		if ( $return )
-		{
-			return TRUE;
-		}
-
-		return NULL;
-	}
-
 }

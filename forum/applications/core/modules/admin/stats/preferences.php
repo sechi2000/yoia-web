@@ -12,36 +12,25 @@
 namespace IPS\core\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * preferences
  */
-class preferences extends Controller
+class _preferences extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'preferences_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'preferences_manage' );
 		parent::execute();
 	}
 
@@ -50,36 +39,43 @@ class preferences extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$tabs		= array(
 			'theme'		=> 'stats_member_pref_theme',
 			'lang'		=> 'stats_member_pref_lang',
 		);
-		Request::i()->tab ??= 'lang';
-		$activeTab	= ( isset( Request::i()->tab ) and array_key_exists( Request::i()->tab, $tabs ) ) ? Request::i()->tab : 'lang';
+		\IPS\Request::i()->tab ??= 'lang';
+		$activeTab	= ( isset( \IPS\Request::i()->tab ) and array_key_exists( \IPS\Request::i()->tab, $tabs ) ) ? \IPS\Request::i()->tab : 'lang';
 
 		switch( $activeTab )
 		{
 			case 'theme':
-
-				$chart = Chart::loadFromExtension( 'core', 'Theme' )->getChart( Url::internal( "app=core&module=stats&controller=preferences&tab=theme" ) );
+				$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'Theme' )->getChart( \IPS\Http\Url::internal( "app=core&module=stats&controller=preferences&tab=theme" ) );
 				break;
 				
 			case 'lang':
-
-				$chart = Chart::loadFromExtension( 'core', 'Language' )->getChart( Url::internal( "app=core&module=stats&controller=preferences&tab=lang" ) );
+				$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'Language' )->getChart( \IPS\Http\Url::internal( "app=core&module=stats&controller=preferences&tab=lang" ) );
 				break;
 		}
 		
-		if ( Request::i()->isAjax() )
+		$chart = $chart->render('PieChart', array( 
+				'backgroundColor' 	=> '#ffffff',
+				'pieHole' => 0.4,
+				'chartArea' => array( 
+					'width' =>"90%", 
+					'height' => "90%" 
+				) 
+			) );
+		
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = (string) $chart;
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->paddedBlock( (string) $chart, NULL, "ipsPad" );
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_stats_preferences');
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string) $chart, Url::internal( "app=core&module=stats&controller=preferences" ), 'tab', '', '' );
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_stats_preferences');
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, (string) $chart, \IPS\Http\Url::internal( "app=core&module=stats&controller=preferences" ), 'tab', '', 'ipsPad' );
 		}
 			
 	}

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Ajax only methods
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -13,37 +12,25 @@
 namespace IPS\cms\modules\front\database;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Databases;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url\Friendly;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\cms\Records;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Ajax only methods
  */
-class ajax extends Controller
+class _ajax extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Return a FURL
 	 *
 	 * @return	void
 	 */
-	protected function makeFurl() : void
+	protected function makeFurl()
 	{
-		Output::i()->json( array( 'slug' => Friendly::seoTitle( Request::i()->slug ) ) );
+		return \IPS\Output::i()->json( array( 'slug' => \IPS\Http\Url\Friendly::seoTitle( \IPS\Request::i()->slug ) ) );
 	}
 
 	/**
@@ -51,21 +38,19 @@ class ajax extends Controller
 	 *
 	 * @return	void
 	 */
-	public function findRecord() : void
+	public function findRecord()
 	{
 		$results  = array();
-		$database = Databases::load( Request::i()->id );
-		$input    = mb_strtolower( Request::i()->input );
+		$database = \IPS\cms\Databases::load( \IPS\Request::i()->id );
+		$input    = mb_strtolower( \IPS\Request::i()->input );
 		$field    = "field_" . $database->field_title;
-
-		/* @var Records $class */
 		$class    = '\IPS\cms\Records' . $database->id;
 		$category = '';
 
 		$where = array( $field . " LIKE CONCAT('%', ?, '%')" );
 		$binds = array( $input );
 
-		foreach ( Db::i()->select( '*', 'cms_custom_database_' . $database->id, array_merge( array( implode( ' OR ', $where ) ), $binds ), 'LENGTH(' . $field . ') ASC', array( 0, 20 ) ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'cms_custom_database_' . $database->id, array_merge( array( implode( ' OR ', $where ) ), $binds ), 'LENGTH(' . $field . ') ASC', array( 0, 20 ) ) as $row )
 		{
 			$record = $class::constructFromData( $row );
 			
@@ -76,18 +61,18 @@ class ajax extends Controller
 			
 			if ( $database->use_categories )
 			{
-				$category = Member::loggedIn()->language()->addToStack( 'cms_autocomplete_category', FALSE, array( 'sprintf' => array( $record->container()->_title ) ) );
+				$category = \IPS\Member::loggedIn()->language()->addToStack( 'cms_autocomplete_category', FALSE, array( 'sprintf' => array( $record->container()->_title ) ) );
 			}
 
 			$results[] = array(
 				'id'	   => $record->_id,
 				'value'    => $record->_title,
 				'category' => $category,
-				'date'	   => DateTime::ts( $record->record_publish_date )->html(),
+				'date'	   => \IPS\DateTime::ts( $record->record_publish_date )->html(),
 			);
 		}
 
-		Output::i()->json( $results );
+		\IPS\Output::i()->json( $results );
 	}
 	
 }

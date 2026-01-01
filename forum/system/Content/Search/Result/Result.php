@@ -11,25 +11,16 @@
 namespace IPS\Content\Search;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Member;
-use IPS\Settings;
-use IPS\Text\Parser;
-use function defined;
-use function preg_replace;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Search Result
  */
-abstract class Result
+abstract class _Result
 {
 	/**
 	 * Pre-Display logic for search index content
@@ -37,21 +28,31 @@ abstract class Result
 	 * @param	string	$content	The search result content
 	 * @return	string
 	 */
-	public static function preDisplay( string $content ): string
+	public static function preDisplay( $content )
 	{
-        /* We need to strip the image labels as returned by the AI image scanner */
-        return preg_replace('#<i\s+?l="([^<]+?)</i>#', '', $content);
+		/* We cannot use images (or *anything* other than text) in search results as it messes with the truncation
+			logic. All HTML (including emoticons) are already stripped before they go into the search index
+			for this reason, but Emoji (because they're text) won't be. We can't swap the Emoji back out
+			with one of the alternative Emoji style images though because that re-introduces images, so we
+			just strip them out (making them behave like emoticons) */
+
+		if ( \IPS\Settings::i()->emoji_style == 'twemoji' )
+		{
+			$content = preg_replace( '/(?:' . \IPS\Text\Parser::EMOJI_REGEX . '|\x{200d})+/u', '', $content );
+		}
+
+		return $content;
 	}
 	
 	/**
 	 * @brief	Created Date
 	 */
-	public DateTime $createdDate;
+	public $createdDate;
 	
 	/**
 	 * @brief	Last Updated Date
 	 */
-	public DateTime $lastUpdatedDate;
+	public $lastUpdatedDate;
 	
 	/**
 	 * Separator for activity streams - "past hour", "today", etc.
@@ -59,13 +60,13 @@ abstract class Result
 	 * @param	bool	$createdDate	If TRUE, uses $createdDate, otherwise uses $lastUpdatedDate
 	 * @return	string
 	 */
-	public function streamSeparator( bool $createdDate=TRUE ): string
+	public function streamSeparator( $createdDate=TRUE )
 	{
 		$date = $createdDate ? $this->createdDate : $this->lastUpdatedDate;
 		
-		$now = DateTime::ts( time() );
+		$now = \IPS\DateTime::ts( time() );
 		$yesterday = clone $now;
-		$yesterday = $yesterday->sub( new DateInterval('P1D') );
+		$yesterday = $yesterday->sub( new \DateInterval('P1D') );
 		$diff = $date->diff( $now );
 
 		if ( $date->format('Y-m-d') == $yesterday->format('Y-m-d') )
@@ -93,7 +94,7 @@ abstract class Result
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse			string				title					Title of search result
 	 * @apiresponse			string				content					Content of search result
@@ -116,9 +117,8 @@ abstract class Result
 	 * @apiresponse			string				authorPhotoThumbnail	URL to author's profile photo thumbnail
 	 * @apiresponse			array				tags					Array of tags associated with the search result
 	 */
-	public function apiOutput( Member|null $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		/* @note This is only here to populate the AdminCP reference tab - the array of search result entries is built manually */
-		return [];
 	}
 }

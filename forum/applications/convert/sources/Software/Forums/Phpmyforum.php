@@ -13,33 +13,23 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\convert\Software;
-use IPS\forums\Forum;
-use IPS\forums\Topic;
-use IPS\Http\Url;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PhpMyForum Forums Converter
  */
-class Phpmyforum extends Software
+class _Phpmyforum extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "PhpMyForum";
@@ -48,9 +38,9 @@ class Phpmyforum extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "phpmyforum";
@@ -59,9 +49,9 @@ class Phpmyforum extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|NULL
+	 * @return	NULL
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return NULL;
 	}
@@ -69,49 +59,49 @@ class Phpmyforum extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'board.php' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'board.php' ) !== FALSE )
 		{
 			try
 			{
-				$data = (string) $this->app->getLink( Request::i()->id, array( 'forums', 'forums_forums' ) );
-				$item = Forum::load( $data );
+				$data = (string) $this->app->getLink( \IPS\Request::i()->id, array( 'forums', 'forums_forums' ) );
+				$item = \IPS\forums\Forum::load( $data );
 
 				if( $item->can( 'view' ) )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
 		}
-		elseif( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'topic.php' ) !== FALSE )
+		elseif( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'topic.php' ) !== FALSE )
 		{
 			try
 			{
 				try
 				{
-					$data = (string) $this->app->getLink( Request::i()->id, array( 'topics', 'forums_topics' ) );
+					$data = (string) $this->app->getLink( \IPS\Request::i()->id, array( 'topics', 'forums_topics' ) );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
-					$data = (string) $this->app->getLink( Request::i()->id, array( 'topics', 'forums_topics' ), FALSE, TRUE );
+					$data = (string) $this->app->getLink( \IPS\Request::i()->id, array( 'topics', 'forums_topics' ), FALSE, TRUE );
 				}
-				$item = Topic::load( $data );
+				$item = \IPS\forums\Topic::load( $data );
 
 				if( $item->canView() )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

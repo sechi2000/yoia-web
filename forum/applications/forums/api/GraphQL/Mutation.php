@@ -10,48 +10,41 @@
  */
 
 namespace IPS\forums\api\GraphQL;
-use IPS\forums\api\GraphQL\Mutations\CreateTopic;
-use IPS\forums\api\GraphQL\Mutations\MarkForumRead;
-use IPS\forums\api\GraphQL\Mutations\MarkTopicRead;
-use IPS\forums\api\GraphQL\Mutations\MarkTopicSolved;
-use IPS\forums\api\GraphQL\Mutations\PostReaction;
-use IPS\forums\api\GraphQL\Mutations\ReplyTopic;
-use IPS\forums\api\GraphQL\Mutations\ReportPost;
-use IPS\forums\api\GraphQL\Mutations\RevokePostReport;
-use IPS\forums\api\GraphQL\Mutations\SetBestAnswer;
-use IPS\forums\api\GraphQL\Mutations\VoteInPoll;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Forums mutationss GraphQL API
  */
-abstract class Mutation
+abstract class _Mutation
 {
 	/**
 	 * Get the supported query types in this app
 	 *
 	 * @return	array
 	 */
-	public static function mutations() : array
+	public static function mutations()
 	{
 		return [
-			'createTopic' => new CreateTopic(),
-			'replyTopic' => new ReplyTopic(),
-			'postReaction' => new PostReaction(),
-			'markForumRead' => new MarkForumRead(),
-			'markTopicRead' => new MarkTopicRead(),
-			'markTopicSolved' => new MarkTopicSolved(),
-			'voteInPoll' => new VoteInPoll(),
-			'setBestAnswer' => new SetBestAnswer(),
-			'reportPost' => new ReportPost(),
-			'revokePostReport' => new RevokePostReport(),
+			'createTopic' => new \IPS\forums\api\GraphQL\Mutations\CreateTopic(),
+			'replyTopic' => new \IPS\forums\api\GraphQL\Mutations\ReplyTopic(),
+			'postReaction' => new \IPS\forums\api\GraphQL\Mutations\PostReaction(),
+			'markForumRead' => new \IPS\forums\api\GraphQL\Mutations\MarkForumRead(),
+			'markTopicRead' => new \IPS\forums\api\GraphQL\Mutations\MarkTopicRead(),
+			'markTopicSolved' => new \IPS\forums\api\GraphQL\Mutations\MarkTopicSolved(),
+			'voteInPoll' => new \IPS\forums\api\GraphQL\Mutations\VoteInPoll(),
+			'voteQuestion' => new \IPS\forums\api\GraphQL\Mutations\VoteQuestion(),
+			'voteAnswer' => new \IPS\forums\api\GraphQL\Mutations\VoteAnswer(),
+			'setBestAnswer' => new \IPS\forums\api\GraphQL\Mutations\SetBestAnswer(),
+			'reportPost' => new \IPS\forums\api\GraphQL\Mutations\ReportPost(),
+			'revokePostReport' => new \IPS\forums\api\GraphQL\Mutations\RevokePostReport(),
 		];
 	}
 }

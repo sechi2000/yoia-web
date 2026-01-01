@@ -11,59 +11,48 @@
 namespace IPS\core\modules\admin\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\modules\front\system\ajax as SystemAjax;
-use IPS\Db;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use function count;
-use function defined;
-use function file_put_contents;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Core AJAX Responders
  */
-class ajax extends SystemAjax
+class _ajax extends \IPS\core\modules\front\system\ajax
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Save ACP Tabs
 	 *
 	 * @return	void
 	 */
-	protected function saveTabs() : void
+	protected function saveTabs()
 	{
-		Session::i()->csrfCheck();
-
-		$tabs	= array();
-		if ( is_array( Request::i()->tabOrder ) )
+		\IPS\Session::i()->csrfCheck();
+		
+		if ( \is_array( \IPS\Request::i()->tabOrder ) )
 		{
-			foreach( Request::i()->tabOrder as $topLevelTab )
+			$tabs	= array();
+
+			foreach( \IPS\Request::i()->tabOrder as $topLevelTab )
 			{
-				$tabs[ str_replace( "tab_", "", $topLevelTab ) ]	= ( isset( Request::i()->menuOrder[ $topLevelTab ] ) ) ? Request::i()->menuOrder[ $topLevelTab ] : array();
+				$tabs[ str_replace( "tab_", "", $topLevelTab ) ]	= ( isset( \IPS\Request::i()->menuOrder[ $topLevelTab ] ) ) ? \IPS\Request::i()->menuOrder[ $topLevelTab ] : array();
 			}
 			
 			$tabs = json_encode( $tabs );
 
-			Db::i()->insert( 'core_acp_tab_order', array( 'id' => Member::loggedIn()->member_id, 'data' => $tabs ), TRUE );
+			\IPS\Db::i()->insert( 'core_acp_tab_order', array( 'id' => \IPS\Member::loggedIn()->member_id, 'data' => $tabs ), TRUE );
 			
-			Request::i()->setCookie( 'acpTabs', $tabs );
+			\IPS\Request::i()->setCookie( 'acpTabs', $tabs );
 		}
 		
-		Output::i()->json( ['message' =>'ok', 'tabs' => $tabs], 201 );
+		\IPS\Output::i()->json( 'ok' );
 	}
 	
 	/**
@@ -71,38 +60,38 @@ class ajax extends SystemAjax
 	 *
 	 * @return	void
 	 */
-	protected function searchKeywords() : void
+	protected function searchKeywords()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		if ( \IPS\IN_DEV )
 		{
-			$url = base64_decode( Request::i()->url );
+			$url = base64_decode( \IPS\Request::i()->url );
 			$qs = array();
 			parse_str( $url, $qs );
 			
-			Db::i()->delete( 'core_acp_search_index', array( 'url=?', $url ) );
+			\IPS\Db::i()->delete( 'core_acp_search_index', array( 'url=?', $url ) );
 			
 			$inserts = array();
 
-			foreach ( Request::i()->keywords as $word )
+			foreach ( \IPS\Request::i()->keywords as $word )
 			{
 				$inserts[] = array(
 					'url'			=> $url,
 					'keyword'		=> $word,
 					'app'			=> $qs['app'],
-					'lang_key'		=> Request::i()->lang_key,
-					'restriction'	=> Request::i()->restriction ?: NULL
+					'lang_key'		=> \IPS\Request::i()->lang_key,
+					'restriction'	=> \IPS\Request::i()->restriction ?: NULL
 				);
 			}
 			
-			if( count( $inserts ) )
+			if( \count( $inserts ) )
 			{
-				Db::i()->insert( 'core_acp_search_index', $inserts );
+				\IPS\Db::i()->insert( 'core_acp_search_index', $inserts );
 			}
 
 			$keywords = array();
-			foreach ( Db::i()->select( '*', 'core_acp_search_index', array( 'app=?', $qs['app'] ), 'url ASC, keyword ASC' ) as $word )
+			foreach ( \IPS\Db::i()->select( '*', 'core_acp_search_index', array( 'app=?', $qs['app'] ), 'url ASC, keyword ASC' ) as $word )
 			{
 				$keywords[ $word['url'] ]['lang_key'] = $word['lang_key'];
 				$keywords[ $word['url'] ]['restriction'] = $word['restriction'];
@@ -115,9 +104,9 @@ class ajax extends SystemAjax
 				$keywords[ $url ]['keywords'] = array_unique( $entry['keywords'] );
 			}
 
-			file_put_contents( \IPS\ROOT_PATH . "/applications/{$qs['app']}/data/acpsearch.json", json_encode( $keywords, JSON_PRETTY_PRINT ) );
+			\file_put_contents( \IPS\ROOT_PATH . "/applications/{$qs['app']}/data/acpsearch.json", json_encode( $keywords, JSON_PRETTY_PRINT ) );
 		}
 		
-		Output::i()->json( 'ok' );
+		\IPS\Output::i()->json( 'ok' );
 	}
 }

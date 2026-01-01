@@ -12,91 +12,52 @@
 namespace IPS\core\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\core\FrontNavigation\FrontNavigationAbstract;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Exception as UrlException;
-use IPS\Http\Url\Friendly;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Request;
-use function defined;
-use function urldecode;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Custom Item
  */
-class CustomItem extends FrontNavigationAbstract
+class _CustomItem extends \IPS\core\FrontNavigation\FrontNavigationAbstract
 {
 	/**
 	 * Get Type Title which will display in the AdminCP Menu Manager
 	 *
 	 * @return	string
 	 */
-	public static function typeTitle(): string
+	public static function typeTitle()
 	{
-		return Member::loggedIn()->language()->addToStack('menu_custom_item');
+		return \IPS\Member::loggedIn()->language()->addToStack('menu_custom_item');
 	}
 	
 	/**
 	 * Allow multiple instances?
 	 *
-	 * @return    bool
-	 */
-	public static function allowMultiple(): bool
-	{
-		return TRUE;
-	}
-
-	/**
-	 * Can the currently logged in user see this menu item?
-	 *
 	 * @return	bool
 	 */
-	public function canView() : bool
+	public static function allowMultiple()
 	{
-		/* This might link to an internal app that is disabled, so let's try to figure out where we are */
-		if( isset( $this->configuration['menu_custom_item_url'] ) )
-		{
-			/* See if we can parse this out to find an application */
-			parse_str( $this->configuration['menu_custom_item_url'], $queryString );
-			if( isset( $queryString['app'] ) and !Application::appIsEnabled( $queryString['app'] ) )
-			{
-				return false;
-			}
-		}
-
-		return parent::canView();
+		return TRUE;
 	}
 	
 	/**
 	 * Get configuration fields
 	 *
 	 * @param	array	$existingConfiguration	The existing configuration, if editing an existing item
-	 * @param int|null $id						The ID number of the existing item, if editing
-	 * @return    array
+	 * @param	int		$id						The ID number of the existing item, if editing
+	 * @return	array
 	 */
-	public static function configuration(array $existingConfiguration, ?int $id = NULL ): array
+	public static function configuration( $existingConfiguration, $id = NULL )
 	{
 		$currentUrl = NULL;
-
 		if ( isset( $existingConfiguration['menu_custom_item_url'] ) )
 		{
-			$existingConfiguration['menu_custom_item_url'] = urldecode( $existingConfiguration['menu_custom_item_url'] );
-			
 			if ( isset( $existingConfiguration['internal'] ) )
 			{
-				$currentUrl = (string) Url::internal( $existingConfiguration['menu_custom_item_url'], 'front', $existingConfiguration['internal'], $existingConfiguration['seoTitles'] ?? array() );
+				$currentUrl = (string) \IPS\Http\Url::internal( $existingConfiguration['menu_custom_item_url'], 'front', $existingConfiguration['internal'], isset( $existingConfiguration['seoTitles'] ) ? $existingConfiguration['seoTitles'] : array() );
 			}
 			else
 			{
@@ -105,21 +66,21 @@ class CustomItem extends FrontNavigationAbstract
 		}
 		
 		return array(
-			new Translatable( 'menu_custom_item_link', NULL, NULL, array( 'app' => 'core', 'key' => $id ? "menu_item_{$id}" : NULL ), function( $val )
+			new \IPS\Helpers\Form\Translatable( 'menu_custom_item_link', NULL, NULL, array( 'app' => 'core', 'key' => $id ? "menu_item_{$id}" : NULL ), function( $val )
 			{
-				if ( !trim( $val[ Lang::defaultLanguage() ] ) )
+				if ( !trim( $val[ \IPS\Lang::defaultLanguage() ] ) )
 				{
-					throw new InvalidArgumentException('form_required');
+					throw new \InvalidArgumentException('form_required');
 				}
 			} ),
 			new \IPS\Helpers\Form\Url( 'menu_custom_item_url', $currentUrl, NULL, array(), function( $val )
 			{
-				if ( isset( Request::i()->menu_manager_extension ) and Request::i()->menu_manager_extension === 'core_CustomItem' and empty( $val ) )
+				if ( isset( \IPS\Request::i()->menu_manager_extension ) and \IPS\Request::i()->menu_manager_extension === 'core_CustomItem' and empty( $val ) )
 				{
-					throw new InvalidArgumentException('form_required');
+					throw new \InvalidArgumentException('form_required');
 				}
 			} ),
-			new YesNo( 'menu_custom_item_target_blank', $existingConfiguration['menu_custom_item_target_blank'] ?? FALSE )
+			new \IPS\Helpers\Form\YesNo( 'menu_custom_item_target_blank', isset( $existingConfiguration['menu_custom_item_target_blank'] ) ? $existingConfiguration['menu_custom_item_target_blank'] : FALSE )
 		);
 	}
 	
@@ -128,13 +89,13 @@ class CustomItem extends FrontNavigationAbstract
 	 *
 	 * @param	array	$configuration	The values received from the form
 	 * @param	int		$id				The ID number of the existing item, if editing
-	 * @return    array
+	 * @return	array
 	 */
-	public static function parseConfiguration( array $configuration, int $id ): array
+	public static function parseConfiguration( $configuration, $id )
 	{
-		$baseUrl = Url::internal('', 'front');
+		$baseUrl = \IPS\Http\Url::internal('', 'front');
 		
-		if ( $configuration['menu_custom_item_url'] instanceof Friendly )
+		if ( $configuration['menu_custom_item_url'] instanceof \IPS\Http\Url\Friendly )
 		{
 			$configuration['internal'] = $configuration['menu_custom_item_url']->seoTemplate;
 			$configuration['seoTitles'] = $configuration['menu_custom_item_url']->seoTitles;
@@ -145,7 +106,7 @@ class CustomItem extends FrontNavigationAbstract
 			$configuration['menu_custom_item_url'] = (string) $configuration['menu_custom_item_url'];
 		}
 				
-		Lang::saveCustom( 'core', "menu_item_{$id}", $configuration['menu_custom_item_link'] );
+		\IPS\Lang::saveCustom( 'core', "menu_item_{$id}", $configuration['menu_custom_item_link'] );
 		unset( $configuration['menu_custom_item_link'] );
 		
 		return $configuration;
@@ -154,9 +115,9 @@ class CustomItem extends FrontNavigationAbstract
 	/**
 	 * Permissions can be inherited?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function permissionsCanInherit(): bool
+	public static function permissionsCanInherit()
 	{
 		return FALSE;
 	}
@@ -164,40 +125,29 @@ class CustomItem extends FrontNavigationAbstract
 	/**
 	 * Get Title
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack( "menu_item_{$this->id}" );
+		return \IPS\Member::loggedIn()->language()->addToStack( "menu_item_{$this->id}" );
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|string|null
+	public function link()
 	{
 		if ( isset( $this->configuration['menu_custom_item_url'] ) and ( $this->configuration['menu_custom_item_url'] or isset( $this->configuration['internal'] ) ) )
 		{
 			if ( isset( $this->configuration['internal'] ) )
 			{
-				try
-				{
-					return Url::internal( urldecode( $this->configuration['menu_custom_item_url'] ), 'front', $this->configuration['internal'], $this->configuration['seoTitles'] ?? array() );
-				}
-				catch( UrlException $e )
-				{
-					/* We shouldn't get this far, because the canView method should stop it, but just in case */
-					if( $e->getMessage() == "INVALID_SEO_TEMPLATE" )
-					{
-						return '#';
-					}
-				}
+				return \IPS\Http\Url::internal( $this->configuration['menu_custom_item_url'], 'front', $this->configuration['internal'], isset( $this->configuration['seoTitles'] ) ? $this->configuration['seoTitles'] : array() );
 			}
 			else
 			{
-				return Url::external( urldecode( $this->configuration['menu_custom_item_url'] ) );
+				return \IPS\Http\Url::external( $this->configuration['menu_custom_item_url'] );
 			}
 		}
 		else
@@ -211,7 +161,7 @@ class CustomItem extends FrontNavigationAbstract
 	 *
 	 * @return	string
 	 */
-	public function target() : string
+	public function target()
 	{
 		if ( isset( $this->configuration['menu_custom_item_target_blank'] ) and $this->configuration['menu_custom_item_target_blank'] )
 		{
@@ -221,15 +171,5 @@ class CustomItem extends FrontNavigationAbstract
 		{
 			return '';
 		}		
-	}
-
-	/**
-	 * Is Active?
-	 *
-	 * @return    bool
-	 */
-	public function active(): bool
-	{
-		return false;
 	}
 }

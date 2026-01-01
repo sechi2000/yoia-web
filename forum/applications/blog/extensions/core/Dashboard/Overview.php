@@ -12,29 +12,23 @@
 namespace IPS\blog\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\DashboardAbstract;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Dashboard extension: Overview
  */
-class Overview extends DashboardAbstract
+class _Overview
 {
 	/**
 	* Can the current user view this dashboard item?
 	*
 	* @return	bool
 	*/
-	public function canView(): bool
+	public function canView()
 	{
 		return TRUE;
 	}
@@ -44,16 +38,26 @@ class Overview extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
 		/* Basic stats */
 		$data = array(
-			'total_blogs'		=> (int) Db::i()->select( 'COUNT(*)', 'blog_blogs' )->first(),
-			'total_entries'		=> (int) Db::i()->select( 'COUNT(*)', 'blog_entries' )->first(),
-			'total_comments'	=> (int) Db::i()->select( 'COUNT(*)', 'blog_comments' )->first(),
+			'total_blogs'		=> (int) \IPS\Db::i()->select( 'COUNT(*)', 'blog_blogs' )->first(),
+			'total_entries'		=> (int) \IPS\Db::i()->select( 'COUNT(*)', 'blog_entries' )->first(),
+			'total_comments'	=> (int) \IPS\Db::i()->select( 'COUNT(*)', 'blog_comments' )->first(),
 		);
 		
 		/* Display */
-		return Theme::i()->getTemplate( 'dashboard', 'blog' )->overview( $data );
+		return \IPS\Theme::i()->getTemplate( 'dashboard', 'blog' )->overview( $data );
+	}
+
+	/** 
+	 * Return the block information
+	 *
+	 * @return	array	array( 'name' => 'Block title', 'key' => 'unique_key', 'size' => [1,2,3], 'by' => 'Author name' )
+	 */
+	public function getInfo()
+	{
+		return array();
 	}
 }

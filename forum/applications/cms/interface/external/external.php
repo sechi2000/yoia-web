@@ -10,35 +10,28 @@
  *
  */
 
-use IPS\cms\Blocks\Block;
-use IPS\Dispatcher\External;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-
-define('REPORT_EXCEPTIONS', TRUE);
+\define('REPORT_EXCEPTIONS', TRUE);
 require_once str_replace( 'applications/cms/interface/external/external.php', '', str_replace( '\\', '/', __FILE__ ) ) . 'init.php';
-External::i();
+\IPS\Dispatcher\External::i();
 
-$id = Request::i()->blockid;
-$k = Request::i()->widgetid;
-$blockHtml = Block::display( $id );
+$id = \IPS\Request::i()->blockid;
+$k = \IPS\Request::i()->widgetid;
+$blockHtml = \IPS\cms\Blocks\Block::display( $id );
 
-Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_external.js', 'cms', 'front' ) );
-Output::i()->globalControllers[] = 'cms.front.external.communication';
+\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_external.js', 'cms', 'front' ) );
+\IPS\Output::i()->globalControllers[] = 'cms.front.external.communication';
 
 $cache = FALSE;
 
 try
 {
-	if ( is_numeric( $id ) )
+	if ( \is_numeric( $id ) )
 	{
-		$block = Block::load( $id );
+		$block = \IPS\cms\Blocks\Block::load( $id );
 	}
-	else if ( is_string( $id ) )
+	else if ( \is_string( $id ) )
 	{
-		$block = Block::load( $id, 'block_key' );
+		$block = \IPS\cms\Blocks\Block::load( $id, 'block_key' );
 	}
 
 	if ( $block->active )
@@ -46,25 +39,25 @@ try
 		$cache = ( $block->type == 'custom' ) ? $block->cache : TRUE;
 	}
 }
-catch(OutOfRangeException $ex ){}
+catch( \OutOfRangeException $ex ){}
 
-if( !$cache OR !Settings::i()->widget_cache_ttl )
+if( !$cache OR !\IPS\Settings::i()->widget_cache_ttl )
 {
-	Output::setCacheTime( false );
+	\IPS\Output::setCacheTime( false );
 	$headers = array();
 }
 else
 {
-	$headers = Output::getCacheHeaders( time(), Settings::i()->widget_cache_ttl );
+	$headers = \IPS\Output::getCacheHeaders( time(), \IPS\Settings::i()->widget_cache_ttl );
 }
 
 /* Remove protection headers. This is fine in this case because we only output */
-if( isset( Output::i()->httpHeaders['X-Frame-Options'] ) )
+if( isset( \IPS\Output::i()->httpHeaders['X-Frame-Options'] ) )
 {
 	foreach( [ 'Content-Security-Policy','X-Content-Security-Policy', 'X-Frame-Options' ]  as $toRemove )
 	{
-		unset( Output::i()->httpHeaders[$toRemove] );
+		unset( \IPS\Output::i()->httpHeaders[$toRemove] );
 	}
 }
 
-Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $blockHtml ), 200, 'text/html', $headers );
+\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $blockHtml ), 200, 'text/html', $headers );

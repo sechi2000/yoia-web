@@ -12,16 +12,9 @@
 namespace IPS\downloads\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Output;
-use IPS\Request;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -30,20 +23,20 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  *
  * @deprecated
  */
-class member extends Controller
+class _member extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Output::i()->redirect( Url::internal("app=core&module=members&controller=members&do=view&id=" . Request::i()->id . "&blockKey=core_ContentStatistics&block[core_ContentStatistics]=downloads_Downloads") );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal("app=core&module=members&controller=members&do=view&id=" . \IPS\Request::i()->id . "&blockKey=core_ContentStatistics&block[core_ContentStatistics]=downloads_Downloads") );
 	}
 }

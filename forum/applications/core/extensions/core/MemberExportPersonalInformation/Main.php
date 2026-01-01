@@ -11,36 +11,24 @@
 namespace IPS\core\extensions\core\MemberExportPersonalInformation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\core\ProfileFields\Field;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\MemberExportPiiAbstract;
-use IPS\Member;
-use IPS\Member\Device;
-use IPS\Patterns\ActiveRecordIterator;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Export Personal Information
  */
-class Main extends MemberExportPiiAbstract
+class _Main
 {
 	/**
 	 * Return data
-	 * @param	Member		$member		The member
+	 * @param	\IPS\Member		$member		The member
 	 *
 	 * @return	array
 	 */
-	public function getData( Member $member ): array
+	public function getData( \IPS\Member $member )
 	{
 		$return = array();
 		
@@ -64,7 +52,7 @@ class Main extends MemberExportPiiAbstract
 			{
 				case 'last_visit':
 				case 'last_post':
-					$val = ( ! empty( $member->$col ) ) ? DateTime::ts( $member->$col )->rfc3339() : NULL;
+					$val = ( ! empty( $member->$col ) ) ? \IPS\DateTime::ts( $member->$col )->rfc3339() : NULL;
 				break;
 				case 'joined':
 					$val = $member->joined->rfc3339();
@@ -81,49 +69,49 @@ class Main extends MemberExportPiiAbstract
 		$return['known_ip_addresses'] = array_keys( $member->ipAddresses() );
 		
 		/* Devices used */
-		$devices = new ActiveRecordIterator( Db::i()->select( '*', 'core_members_known_devices', array( 'member_id=? AND last_seen>?', $member->member_id, ( new \DateTime )->sub( new DateInterval( Device::LOGIN_KEY_VALIDITY ) )->getTimestamp() ), 'last_seen DESC' ), 'IPS\Member\Device' );
+		$devices = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members_known_devices', array( 'member_id=? AND last_seen>?', $member->member_id, ( new \DateTime )->sub( new \DateInterval( \IPS\Member\Device::LOGIN_KEY_VALIDITY ) )->getTimestamp() ), 'last_seen DESC' ), 'IPS\Member\Device' );
 
 		foreach ( $devices as $device )
 		{
 			try
 			{
-				$log = Db::i()->select( '*', 'core_members_known_ip_addresses', array( 'member_id=? AND device_key=?', $member->member_id, $device->device_key ), 'last_seen DESC' )->first();
+				$log = \IPS\Db::i()->select( '*', 'core_members_known_ip_addresses', array( 'member_id=? AND device_key=?', $member->member_id, $device->device_key ), 'last_seen DESC' )->first();
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				continue;
 			}
 			
 			$return['known_browsers'][] = array(
 				'useragent' => $device->userAgent()->browser . ' ' . $device->userAgent()->browserVersion,
-				'last_seen' => DateTime::ts( $log['last_seen'] )->rfc3339()
+				'last_seen' => \IPS\DateTime::ts( $log['last_seen'] )->rfc3339()
 			);
 		}
 		
 		/* Accepted T&S */
-		foreach( Db::i()->select( '*', 'core_member_history', array( 'log_app=? and log_member=? and log_type=?', 'core', $member->member_id, 'terms_acceptance' ) ) as $row  )
+		foreach( \IPS\Db::i()->select( '*', 'core_member_history', array( 'log_app=? and log_member=? and log_type=?', 'core', $member->member_id, 'terms_acceptance' ) ) as $row  )
 		{
 			$data = json_decode( $row['log_data'], TRUE );
 			if ( ! empty( $data['type'] ) )
 			{
-				$return['terms_accepted'][ $data['type'] ][] = DateTime::ts( $row['log_date'] )->rfc3339();
+				$return['terms_accepted'][ $data['type'] ][] = \IPS\DateTime::ts( $row['log_date'] )->rfc3339();
 			}
 		}
 		
 		/* Accepted Bulk Email */
-		foreach( Db::i()->select( '*', 'core_member_history', array( 'log_app=? and log_member=? and log_type=?', 'core', $member->member_id, 'admin_mails' ) ) as $row  )
+		foreach( \IPS\Db::i()->select( '*', 'core_member_history', array( 'log_app=? and log_member=? and log_type=?', 'core', $member->member_id, 'admin_mails' ) ) as $row  )
 		{
 			$data = json_decode( $row['log_data'], TRUE );
 			$return['bulk_mail_optins'][] = array(
 				'enabled' => (boolean) $data['enabled'],
-				'date'    => DateTime::ts( $row['log_date'] )->rfc3339()
+				'date'    => \IPS\DateTime::ts( $row['log_date'] )->rfc3339()
 			);
 		}
 
 		/* PII Profile Fields */
-		$fieldValues	= Db::i()->select( '*', 'core_pfields_content', array( 'member_id=?', $member->member_id ) )->first();
+		$fieldValues	= \IPS\Db::i()->select( '*', 'core_pfields_content', array( 'member_id=?', $member->member_id ) )->first();
 
-		foreach ( Field::values( $fieldValues, Field::PII_DATA_EXPORT ) as $group => $profielFields )
+		foreach ( \IPS\core\ProfileFields\Field::values( $fieldValues, \IPS\core\ProfileFields\Field::PII_DATA_EXPORT ) as $group => $profielFields )
 		{
 			foreach( $profielFields as $fieldID => $value )
 			{

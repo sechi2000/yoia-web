@@ -12,28 +12,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DomainException;
-use IPS\Ftp as FtpClass;
-use IPS\Ftp\Exception;
-use IPS\Ftp\Sftp as SftpClass;
-use IPS\Output;
-use IPS\Text\Encrypt;
-use IPS\Theme;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * FTP input class for Form Builder
  */
-class Ftp extends FormAbstract
+class _Ftp extends \IPS\Helpers\Form\FormAbstract
 {	
 	/**
 	 * @brief	Default Options
@@ -44,7 +32,7 @@ class Ftp extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'validate'				=> TRUE,
 		'allowBypassValidation'	=> FALSE,
 		'rejectUnsupportedSftp'	=> FALSE,
@@ -55,18 +43,18 @@ class Ftp extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_forms.js', 'nexus', 'global' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_forms.js', 'nexus', 'global' ) );
 		
-		$value = is_array( $this->value ) ? $this->value : json_decode( Encrypt::fromTag( $this->value )->decrypt(), TRUE );
-		$defaultValue = is_array( $this->defaultValue ) ? $this->defaultValue : json_decode( Encrypt::fromTag( $this->defaultValue )->decrypt(), TRUE );
+		$value = \is_array( $this->value ) ? $this->value : json_decode( \IPS\Text\Encrypt::fromTag( $this->value )->decrypt(), TRUE );
+		$defaultValue = \is_array( $this->defaultValue ) ? $this->defaultValue : json_decode( \IPS\Text\Encrypt::fromTag( $this->defaultValue )->decrypt(), TRUE );
 		if ( isset( $value['pw'] ) and isset( $defaultValue['pw'] ) and $value['pw'] and $value['pw'] === $defaultValue['pw'] and !$this->error )
 		{
 			$value['pw'] = '********';
 		}
 		
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->ftp( $this->name, $value, $this->options['allowBypassValidation'] and $this->error );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->ftp( $this->name, $value, $this->options['allowBypassValidation'] and $this->error );
 	}
 	
 	/**
@@ -74,13 +62,13 @@ class Ftp extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$value = parent::getValue();
 		
 		if ( isset( $value['pw'] ) and $value['pw'] === '********' )
 		{
-			$defaultValue = is_array( $this->defaultValue ) ? $this->defaultValue : json_decode( Encrypt::fromTag( $this->defaultValue )->decrypt(), TRUE );
+			$defaultValue = \is_array( $this->defaultValue ) ? $this->defaultValue : json_decode( \IPS\Text\Encrypt::fromTag( $this->defaultValue )->decrypt(), TRUE );
 			$value['pw'] = $defaultValue['pw'];
 		}
 		
@@ -90,18 +78,18 @@ class Ftp extends FormAbstract
 	/** 
 	 * Validate
 	 *
-	 * @param array $value	The value
-	 * @return	FtpClass|SftpClass
+	 * @param	array	$value	The value
+	 * @return	\IPS\Ftp
 	 */
-	public static function connectFromValue( array $value ): FtpClass|SftpClass
+	public static function connectFromValue( $value )
 	{
 		if ( $value['protocol'] == 'sftp' )
 		{
-			$ftp = new SftpClass( $value['server'], $value['un'], $value['pw'], $value['port'] );
+			$ftp = new \IPS\Ftp\Sftp( $value['server'], $value['un'], $value['pw'], $value['port'] );
 		}
 		else
 		{
-			$ftp = new FtpClass( $value['server'], $value['un'], $value['pw'], $value['port'], ( $value['protocol'] == 'ssl_ftp' ), 3 );
+			$ftp = new \IPS\Ftp( $value['server'], $value['un'], $value['pw'], $value['port'], ( $value['protocol'] == 'ssl_ftp' ), 3 );
 		}
 		
 		$ftp->chdir( $value['path'] );
@@ -114,13 +102,13 @@ class Ftp extends FormAbstract
 	 *
 	 * @return	bool
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		/* Do we have a value? */
 		if ( $this->value['server'] or $this->value['un'] or $this->value['pw'] )
 		{
 			/* And is it different to what it was originally, or do we need to establish the connection for custom validation? */
-			$defaultValue = is_array( $this->defaultValue ) ? $this->defaultValue : json_decode( Encrypt::fromTag( $this->defaultValue )->decrypt(), TRUE );
+			$defaultValue = \is_array( $this->defaultValue ) ? $this->defaultValue : json_decode( \IPS\Text\Encrypt::fromTag( $this->defaultValue )->decrypt(), TRUE );
 			if ( !isset( $defaultValue['protocol'] ) or $defaultValue['protocol'] != $this->value['protocol'] or $defaultValue['server'] != $this->value['server'] or $defaultValue['port'] != $this->value['port'] or $defaultValue['un'] != $this->value['un'] or $defaultValue['pw'] != $this->value['pw'] or $defaultValue['path'] != $this->value['path'] or $this->customValidationCode !== NULL )
 			{
 				/* And are we supposed to be validating? */
@@ -131,16 +119,16 @@ class Ftp extends FormAbstract
 					{
 						$ftp = static::connectFromValue( $this->value );
 					}
-					catch ( Exception $e )
+					catch ( \IPS\Ftp\Exception $e )
 					{
-						throw new DomainException( 'ftp_err-' . $e->getMessage() );
+						throw new \DomainException( 'ftp_err-' . $e->getMessage() );
 					}
-					catch ( BadMethodCallException $e )
+					catch ( \BadMethodCallException $e )
 					{
 						// This means we tried an SFTP connection, but the server doesn't support it. We'll have to assume it's correct unless we've specifically set not to
 						if ( $this->options['rejectUnsupportedSftp'] )
 						{
-							throw new DomainException( 'ftp_err_no_sftp' );
+							throw new \DomainException( 'ftp_err_no_sftp' );
 						}
 					}
 				}
@@ -156,7 +144,7 @@ class Ftp extends FormAbstract
 		/* If not, should we? */
 		elseif ( $this->required )
 		{
-			throw new DomainException( 'form_required' );
+			throw new \DomainException( 'form_required' );
 		}
 
 		return true;
@@ -166,10 +154,10 @@ class Ftp extends FormAbstract
 	 * String Value
 	 *
 	 * @param	mixed	$value	The value
-	 * @return    string|int|null
+	 * @return	string
 	 */
-	public static function stringValue( mixed $value ): string|int|null
+	public static function stringValue( $value )
 	{
-		return Encrypt::fromPlaintext( json_encode( $value ) )->tag();
+		return \IPS\Text\Encrypt::fromPlaintext( json_encode( $value ) )->tag();
 	}
 }

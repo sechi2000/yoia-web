@@ -10,38 +10,34 @@
  */
 
 namespace IPS\forums\api\GraphQL;
-use IPS\forums\api\GraphQL\Queries\Forum;
-use IPS\forums\api\GraphQL\Queries\Forums;
-use IPS\forums\api\GraphQL\Queries\Post;
-use IPS\forums\api\GraphQL\Queries\Topic;
-use IPS\forums\api\GraphQL\Queries\Topics;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Forums queries for GraphQL API
  */
-abstract class Query
+abstract class _Query
 {
 	/**
 	 * Get the supported query types in this app
 	 *
 	 * @return	array
 	 */
-	public static function queries() : array
+	public static function queries()
 	{
 		return [
-			'forums' => new Forums(),
-			'forum' => new Forum(),
-			'topics' => new Topics(),
-			'topic' => new Topic(),
-			'post' => new Post()
+			'forums' => new \IPS\forums\api\GraphQL\Queries\Forums(),
+			'forum' => new \IPS\forums\api\GraphQL\Queries\Forum(),
+			'topics' => new \IPS\forums\api\GraphQL\Queries\Topics(),
+			'topic' => new \IPS\forums\api\GraphQL\Queries\Topic(),
+			'post' => new \IPS\forums\api\GraphQL\Queries\Post()
 		];
 	}
 }

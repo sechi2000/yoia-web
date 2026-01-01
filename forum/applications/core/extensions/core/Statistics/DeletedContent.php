@@ -11,40 +11,31 @@
 namespace IPS\core\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class DeletedContent extends \IPS\core\Statistics\Chart
+class _DeletedContent extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_activitystats_deletedcontent';
+	public $controller = 'core_activitystats_deletedcontent';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$chart	= new Database( $url, 'core_deletion_log', 'dellog_deleted_date', '', array(
+		$chart	= new \IPS\Helpers\Chart\Database( $url, 'core_deletion_log', 'dellog_deleted_date', '', array( 
 			'isStacked' => TRUE,
 			'backgroundColor' 	=> '#ffffff',
 			'hAxis'				=> array( 'gridlines' => array( 'color' => '#f5f5f5' ) ),
@@ -55,21 +46,21 @@ class DeletedContent extends \IPS\core\Statistics\Chart
 		
 		$chart->groupBy = 'dellog_content_class';
 
-		$types = Db::i()->select( 'DISTINCT(dellog_content_class)', 'core_deletion_log' );
+		$types = \IPS\Db::i()->select( 'DISTINCT(dellog_content_class)', 'core_deletion_log' );
 		
 		foreach( $types as $class )
 		{
 			$lang = $class::$title;
-			$chart->addSeries(  Member::loggedIn()->language()->addToStack( $lang ), 'number', 'COUNT(*)', TRUE, $class );
+			$chart->addSeries(  \IPS\Member::loggedIn()->language()->addToStack( $lang ), 'number', 'COUNT(*)', TRUE, $class );		
 		}
 
-		$chart->title = Member::loggedIn()->language()->addToStack('stats_deletedcontent_title');
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('stats_deletedcontent_title');
 		$chart->availableTypes = array( 'LineChart', 'AreaChart', 'ColumnChart', 'BarChart' );
 
 		$chart->tableParsers = array(
 			'dellog_deleted_date'	=> function( $val )
 			{
-				return (string) DateTime::ts( $val );
+				return (string) \IPS\DateTime::ts( $val );
 			}
 		);
 		

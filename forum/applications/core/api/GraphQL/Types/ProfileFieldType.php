@@ -12,24 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ProfileFieldType for GraphQL API
  */
-class ProfileFieldType extends ObjectType
+class _ProfileFieldType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -57,7 +56,7 @@ class ProfileFieldType extends ObjectType
 						'type' => TypeRegistry::string(),
 						'description' => "Profile field title",
 						'resolve' => function ($field) {
-							return Member::loggedIn()->language()->get( $field['title'] );
+							return \IPS\Member::loggedIn()->language()->get( $field['title'] );
 						}
 					],
 					'value' => [

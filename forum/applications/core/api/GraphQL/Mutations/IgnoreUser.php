@@ -10,31 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\IgnoreOptionType;
-use IPS\core\Ignore;
-use IPS\Member;
-use OutOfRangeException;
-use function defined;
-use function in_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Ignore user mutation for GraphQL API
  */
-class IgnoreUser
+class _IgnoreUser
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Ignore a member";
+	public static $description = "Ignore a member";
 
 	/*
 	 * Mutation arguments
@@ -51,7 +45,7 @@ class IgnoreUser
 	/**
 	 * Return the mutation return type
 	 */
-	public function type() : IgnoreOptionType
+	public function type() 
 	{
 		return \IPS\core\api\GraphQL\TypeRegistry::ignoreOption();
 	}
@@ -59,46 +53,47 @@ class IgnoreUser
 	/**
 	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val	Value passed into this resolver
-	 * @param 	array $args 	Arguments
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
 	 * @return	array
 	 */
-	public function resolve( mixed $val, array $args ) : array
+	public function resolve($val, $args)
 	{
-		if ( !in_array( $args['type'], Ignore::types() ) )
+		if ( !\in_array( $args['type'], \IPS\core\Ignore::types() ) )
         {
-            throw new SafeException( 'INVALID_TYPE', 'GQL/0006/1', 404 );
+            throw new \IPS\Api\GraphQL\SafeException( 'INVALID_TYPE', 'GQL/0006/1', 404 );
         }
         
         $type = $args['type'];
-        $member = Member::load( $args['member'] );
+        $member = \IPS\Member::load( $args['member'] );
 
         if( !$member->member_id )
         {
-            throw new SafeException( 'INVALID_MEMBER', 'GQL/0006/2', 403 );
+            throw new \IPS\Api\GraphQL\SafeException( 'INVALID_MEMBER', 'GQL/0006/2', 403 );
         }
 
-        if ( $member->member_id == Member::loggedIn()->member_id )
+        if ( $member->member_id == \IPS\Member::loggedIn()->member_id )
         {
-            throw new SafeException( 'NO_IGNORE_SELF', 'GQL/0006/3', 403 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_IGNORE_SELF', 'GQL/0006/3', 403 );
         }
         
         if ( !$member->canBeIgnored() )
         {
-            throw new SafeException( 'NO_IGNORE_MEMBER', 'GQL/0006/4', 403 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_IGNORE_MEMBER', 'GQL/0006/4', 403 );
         }
 
         try
         {
-            $ignore = Ignore::load( $member->member_id, 'ignore_ignore_id', array( 'ignore_owner_id=?', Member::loggedIn()->member_id ) );
+            $ignore = \IPS\core\Ignore::load( $member->member_id, 'ignore_ignore_id', array( 'ignore_owner_id=?', \IPS\Member::loggedIn()->member_id ) );
             $ignore->$type = $args['isIgnoring'];
             $ignore->save();
         }
-        catch( OutOfRangeException $e )
+        catch( \OutOfRangeException $e )
         {
-            $ignore = new Ignore;
+            $ignore = new \IPS\core\Ignore;
             $ignore->$type = $args['isIgnoring'];
-            $ignore->owner_id	= Member::loggedIn()->member_id;
+            $ignore->owner_id	= \IPS\Member::loggedIn()->member_id;
             $ignore->ignore_id	= $member->member_id;
             $ignore->save();
         }
@@ -108,8 +103,8 @@ class IgnoreUser
             'is_being_ignored' => $args['isIgnoring']
         );
 
-        Member::loggedIn()->members_bitoptions['has_no_ignored_users'] = FALSE;
-		Member::loggedIn()->save();
+        \IPS\Member::loggedIn()->members_bitoptions['has_no_ignored_users'] = FALSE;
+		\IPS\Member::loggedIn()->save();
 
 		return $return;
 	}

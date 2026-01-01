@@ -13,30 +13,23 @@ namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\UnionType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content;
-use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Content\Review;
-use IPS\Member;
-use IPS\Node\Model;
-use function count;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PromotedItemType for GraphQL API
  */
-class PromotedItemType extends ObjectType
+class _PromotedItemType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -56,7 +49,7 @@ class PromotedItemType extends ObjectType
 						'type' => \IPS\core\api\GraphQL\TypeRegistry::member(),
 						'description' => 'Who promoted this item',
 						'resolve' => function ($item) {
-							return Member::load( $item->added_by );
+							return \IPS\Member::load( $item->added_by );
 						}
 					],
 					'images' => [
@@ -65,7 +58,7 @@ class PromotedItemType extends ObjectType
 						'resolve' => function ($item) {
 							$images = array();
 
-							if( count( $item->imageObjects() ) )
+							if( \count( $item->imageObjects() ) )
 							{
 								foreach( $item->imageObjects() as $file )
 								{
@@ -94,24 +87,23 @@ class PromotedItemType extends ObjectType
 						'type' => new UnionType([
 							'name' => 'core_PromotedItem_TypeUnion',
 							'types' => [
-								Content\Api\GraphQL\TypeRegistry::comment(),
-								Content\Api\GraphQL\TypeRegistry::item(),
+								\IPS\Content\Api\GraphQL\TypeRegistry::comment(),
+								\IPS\Content\Api\GraphQL\TypeRegistry::item(),
 								\IPS\Node\Api\GraphQL\TypeRegistry::node()
 							],
 							'resolveType' => function ($item) {
-								if ( $item instanceof Comment )
+								if ( $item instanceof \IPS\Content\Comment )
 								{
-									return Content\Api\GraphQL\TypeRegistry::comment();
+									return \IPS\Content\Api\GraphQL\TypeRegistry::comment();
 								}
-								else if ( $item instanceof Item )
+								else if ( $item instanceof \IPS\Content\Item )
 								{
-									return Content\Api\GraphQL\TypeRegistry::item();
+									return \IPS\Content\Api\GraphQL\TypeRegistry::item();
 								}
-								else if( $item instanceof Model )
+								else if( $item instanceof \IPS\Node\Model )
 								{
 									return \IPS\Node\Api\GraphQL\TypeRegistry::node();
-								}
-								return null;
+								} 
 							}
 						]),
 						'description' => 'The original item',
@@ -126,22 +118,25 @@ class PromotedItemType extends ObjectType
 						]),
 						'description' => "What kind of content is this item?",
 						'resolve' => function ($item) {
-							if ( $item->object() instanceof Comment )
+							if ( $item->object() instanceof \IPS\Content\Comment )
 							{
 								return 'COMMENT';
 							}
-							else if ( $item->object() instanceof Review )
+							else if ( $item->object() instanceof \IPS\Content\Review )
 							{
 								return 'REVIEW';
 							}
-							else if ( $item->object() instanceof Content )
+							else if ( $item->object() instanceof \IPS\Content )
 							{
 								return 'ITEM';
 							}
-							else if ( $item->object() instanceof Model )
+							else if ( $item->object() instanceof \IPS\Node\Model )
 							{
 								return 'NODE';
 							}
+
+							print_r( $item->object() );
+							exit;
 
 							return NULL;
 						}
@@ -150,7 +145,7 @@ class PromotedItemType extends ObjectType
 						'type' => TypeRegistry::string(),
 						'description' => 'Promoted blurb provided by staff',
 						'resolve' => function ($item) {
-							$text = trim( $item->getText(false) );
+							$text = trim( $item->getText('internal', false) );
 
 							if( $text ){
 								return $text;
@@ -169,7 +164,8 @@ class PromotedItemType extends ObjectType
 					'reputation' => [
 						'type' => TypeRegistry::reputation(),
 						'resolve' => function ($item) {
-							return $item->objectReactionClass;
+							$reactionClass = $item->objectReactionClass;
+							return $reactionClass;
 						}
 					],
 					'dataCount' => [

@@ -12,88 +12,67 @@
 namespace IPS\cms\modules\admin\pages;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\cms\Blocks\Block;
-use IPS\cms\Databases;
-use IPS\cms\Pages\Page;
-use IPS\cms\Templates;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Widget;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Members AJAX actions
  */
-class ajax extends Controller
+class _ajax extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Return a CSS or HTML menu
 	 *
 	 * @return	void
 	 */
-	public function loadMenu() : void
+	public function loadMenu()
 	{
 		$request   = array(
-			't_location'  => ( isset( Request::i()->t_location ) ) ? Request::i()->t_location : null,
-			't_group'     => ( isset( Request::i()->t_group ) ) ? Request::i()->t_group : null,
-			't_key' 	  => ( isset( Request::i()->t_key ) ) ? Request::i()->t_key : null,
-			't_type'      => ( isset( Request::i()->t_type ) ) ? Request::i()->t_type : 'templates',
+			't_location'  => ( isset( \IPS\Request::i()->t_location ) ) ? \IPS\Request::i()->t_location : null,
+			't_group'     => ( isset( \IPS\Request::i()->t_group ) ) ? \IPS\Request::i()->t_group : null,
+			't_key' 	  => ( isset( \IPS\Request::i()->t_key ) ) ? \IPS\Request::i()->t_key : null,
+			't_type'      => ( isset( \IPS\Request::i()->t_type ) ) ? \IPS\Request::i()->t_type : 'templates',
 		);
 
 		switch( $request['t_type'] )
 		{
 			default:
 			case 'template':
-				$flag = Templates::RETURN_ONLY_TEMPLATE;
+				$flag = \IPS\cms\Templates::RETURN_ONLY_TEMPLATE;
 				break;
 			case 'js':
-				$flag = Templates::RETURN_ONLY_JS;
+				$flag = \IPS\cms\Templates::RETURN_ONLY_JS;
 				break;
 			case 'css':
-				$flag = Templates::RETURN_ONLY_CSS;
+				$flag = \IPS\cms\Templates::RETURN_ONLY_CSS;
 				break;
 		}
 
-		$templates = Templates::buildTree( Templates::getTemplates( $flag + Templates::RETURN_DATABASE_ONLY ) );
+		$templates = \IPS\cms\Templates::buildTree( \IPS\cms\Templates::getTemplates( $flag + \IPS\cms\Templates::RETURN_DATABASE_ONLY ) );
 
-		$current = new Templates;
+		$current = new \IPS\cms\Templates;
 		
 		if ( ! empty( $request['t_key'] ) )
 		{
 			try
 			{
-				$current = Templates::load( $request['t_key'] );
+				$current = \IPS\cms\Templates::load( $request['t_key'] );
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
 				
 			}
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'templates' )->menu( $templates, $current, $request );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'templates' )->menu( $templates, $current, $request );
 	}
 
 	/**
@@ -101,23 +80,31 @@ class ajax extends Controller
 	 *
 	 * @return	void
 	 */
-	public function loadTemplate() : void
+	public function loadTemplate()
 	{
-		$t_location  = Request::i()->t_location;
-		$t_key       = Request::i()->t_key;
+		$t_location  = \IPS\Request::i()->t_location;
+		$t_key       = \IPS\Request::i()->t_key;
 		
-		if ( $t_location === 'block' and $t_key === '_default_' and isset( Request::i()->block_key ) )
+		if ( $t_location === 'block' and $t_key === '_default_' and isset( \IPS\Request::i()->block_key ) )
 		{
-
-			$plugin = Widget::load( Application::load( Request::i()->block_app ), Request::i()->block_key, mt_rand() );
+			/* Find it from the normal template system */
+			if ( isset( \IPS\Request::i()->block_app ) )
+			{
+				$plugin = \IPS\Widget::load( \IPS\Application::load( \IPS\Request::i()->block_app ), \IPS\Request::i()->block_key, mt_rand() );
+			}
+			else
+			{
+				$plugin = \IPS\Widget::load( \IPS\Plugin::load( \IPS\Request::i()->block_plugin ), \IPS\Request::i()->block_key, mt_rand() );
+			}
+			
 			$location = $plugin->getTemplateLocation();
 			
-			$templateBits  = Theme::master()->getAllTemplates( $location['app'], $location['location'], $location['group'], Theme::RETURN_ALL );
+			$templateBits  = \IPS\Theme::master()->getRawTemplates( $location['app'], $location['location'], $location['group'], \IPS\Theme::RETURN_ALL );
 			$templateBit   = $templateBits[ $location['app'] ][ $location['location'] ][ $location['group'] ][ $location['name'] ];
 			
-			if ( ! isset( Request::i()->noencode ) OR ! Request::i()->noencode )
+			if ( ! isset( \IPS\Request::i()->noencode ) OR ! \IPS\Request::i()->noencode )
 			{
-				$templateBit['template_content'] = htmlentities( $templateBit['template_content'], ENT_DISALLOWED, 'UTF-8' );
+				$templateBit['template_content'] = htmlentities( $templateBit['template_content'], ENT_DISALLOWED, 'UTF-8', TRUE );
 			}
 			
 			$templateArray = array(
@@ -139,18 +126,18 @@ class ajax extends Controller
 		{
 			try
 			{
-				if ( is_numeric( $t_key ) )
+				if ( \is_numeric( $t_key ) )
 				{
-					$template = Templates::load( $t_key, 'template_id' );
+					$template = \IPS\cms\Templates::load( $t_key, 'template_id' );
 				}
 				else
 				{
-					$template = Templates::load( $t_key );
+					$template = \IPS\cms\Templates::load( $t_key );
 				}
 			}
-			catch( OutOfRangeException $ex )
+			catch( \OutOfRangeException $ex )
 			{
-				Output::i()->json( array( 'error' => true ) );
+				\IPS\Output::i()->json( array( 'error' => true ) );
 			}
 
 			if ( $template !== null )
@@ -160,7 +147,7 @@ class ajax extends Controller
 	                'template_key' 			=> $template->key,
 	                'template_title'		=> $template->title,
 	                'template_desc' 		=> $template->desc,
-	                'template_content' 		=> ( isset( Request::i()->noencode ) AND Request::i()->noencode ) ? ( $template->content ?? '' ) : htmlentities( ( $template->content ?? '' ), ENT_DISALLOWED, 'UTF-8' ),
+	                'template_content' 		=> ( isset( \IPS\Request::i()->noencode ) AND \IPS\Request::i()->noencode ) ? $template->content : htmlentities( $template->content, ENT_DISALLOWED, 'UTF-8', TRUE ),
 	                'template_location' 	=> $template->location,
 	                'template_group' 		=> $template->group,
 	                'template_container' 	=> $template->container,
@@ -172,13 +159,13 @@ class ajax extends Controller
 			}
 		}
 
-		if ( Request::i()->show == 'json' )
+		if ( \IPS\Request::i()->show == 'json' )
 		{
-			Output::i()->json( $templateArray );
+			\IPS\Output::i()->json( $templateArray );
 		}
 		else
 		{
-			Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( Theme::i()->getTemplate( 'templates', 'cms', 'admin' )->viewTemplate( $templateArray ) ) );
+			\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( \IPS\Theme::i()->getTemplate( 'templates', 'cms', 'admin' )->viewTemplate( $templateArray ) ), 200, 'text/html' );
 		}
 	}
 	
@@ -187,32 +174,32 @@ class ajax extends Controller
 	 *
 	 * @return	void
 	 */
-	public function searchtemplates() : void
+	public function searchtemplates()
 	{
-		Dispatcher::i()->checkAcpPermission( 'template_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'template_manage' );
 				
 		$where = array();
-		if ( Request::i()->term )
+		if ( \IPS\Request::i()->term )
 		{
-			$where[] = array( '( LOWER(template_title) LIKE ? OR LOWER(template_content) LIKE ? )', '%' . mb_strtolower( Request::i()->term ) . '%', '%' . mb_strtolower( Request::i()->term ) . '%' );
+			$where[] = array( '( LOWER(template_title) LIKE ? OR LOWER(template_content) LIKE ? )', '%' . mb_strtolower( \IPS\Request::i()->term ) . '%', '%' . mb_strtolower( \IPS\Request::i()->term ) . '%' );
 		}
 	
-		if ( ! in_array( 'custom', explode( ',', Request::i()->filters ) ) )
+		if ( ! \in_array( 'custom', explode( ',', \IPS\Request::i()->filters ) ) )
 		{
 			$where[] = array( 'template_master=1 OR (template_user_created=1 and template_user_edited=0)' );
 		}
 		
-		if ( ! in_array( 'unmodified', explode( ',', Request::i()->filters ) ) )
+		if ( ! \in_array( 'unmodified', explode( ',', \IPS\Request::i()->filters ) ) )
 		{
 			$where[] = array( 'template_user_created=1 and template_user_edited=1' );
 		}
 
-		if ( isset( Request::i()->type ) )
+		if ( isset( \IPS\Request::i()->type ) )
 		{
-			$where[] = array( 'template_type=?', Request::i()->type );
+			$where[] = array( 'template_type=?', \IPS\Request::i()->type );
 		}
 		
-		$select = Db::i()->select(
+		$select = \IPS\Db::i()->select(
 			'*',
 			'cms_templates',
 			$where,
@@ -225,7 +212,7 @@ class ajax extends Controller
 			$return[ $result['template_location'] ][ $result['template_group'] ][ $result['template_key'] ] = $result['template_title'];
 		}
 		
-		Output::i()->json( $return );
+		\IPS\Output::i()->json( $return );
 	}
 	
 	/**
@@ -233,30 +220,30 @@ class ajax extends Controller
 	 *
 	 * @return	void
 	 */
-	public function loadTags() : void
+	public function loadTags()
 	{
 		$page = NULL;
-		if ( isset( Request::i()->pageId ) )
+		if ( isset( \IPS\Request::i()->pageId ) )
 		{
 			try
 			{
-				$page = Page::load( Request::i()->pageId );
+				$page = \IPS\cms\Pages\Page::load( \IPS\Request::i()->pageId );
 			}
-			catch( OutOfRangeException $e ) {}
+			catch( \OutOfRangeException $e ) {}
 		}
 		
 		$tags		= array();
 		$tagLinks	= array();
 
-		if ( $page and $page->id == Settings::i()->cms_error_page )
+		if ( $page and $page->id == \IPS\Settings::i()->cms_error_page )
 		{
 			$tags['cms_error_page']['{error_message}'] = 'cms_error_page_message';
 			$tags['cms_error_page']['{error_code}']    = 'cms_error_page_code';
 		}
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'cms', 'databases', 'databases_use' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'cms', 'databases', 'databases_use' ) )
 		{
-			foreach ( Databases::roots( NULL ) as $id => $db )
+			foreach ( \IPS\cms\Databases::roots( NULL, NULL ) as $id => $db )
 			{
 				if ( !$db->page_id )
 				{
@@ -265,33 +252,33 @@ class ajax extends Controller
 			}
 		}
 
-		foreach( Block::roots( NULL ) as $id => $block )
+		foreach( \IPS\cms\Blocks\Block::roots( NULL, NULL ) as $id => $block )
 		{
 			$tags['cms_tag_blocks']['{block="' . $block->key . '"}'] = $block->_title;
 		}
 
-		foreach( Db::i()->select( '*', 'cms_pages', NULL, 'page_full_path ASC', array( 0, 50 ) ) as $page )
+		foreach( \IPS\Db::i()->select( '*', 'cms_pages', NULL, 'page_full_path ASC', array( 0, 50 ) ) as $page )
 		{
-			$tags['cms_tag_pages']['{pageurl="' . $page['page_full_path'] . '"}' ] = Member::loggedIn()->language()->addToStack( Page::$titleLangPrefix . $page['page_id'] );
+			$tags['cms_tag_pages']['{pageurl="' . $page['page_full_path'] . '"}' ] = \IPS\Member::loggedIn()->language()->addToStack( \IPS\cms\Pages\Page::$titleLangPrefix . $page['page_id'] );
 		}
 		
 		/* If we can manage words, then the header needs to always show */
-		if (  Member::loggedIn()->hasAcpRestriction( 'core', 'languages', 'lang_words' ) )
+		if (  \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'languages', 'lang_words' ) )
 		{
 			$tags['cms_tag_lang'] = array();
 			$tagLinks['cms_tag_lang']	= array(
 				'icon'		=> 'plus',
-				'title'		=> Member::loggedIn()->language()->addToStack('add_word'),
-				'link'		=> Url::internal( "app=core&module=languages&controller=languages&do=addWord" ),
-				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'add_word' ), 'ipsDialog-remoteSubmit' => TRUE, 'action' => "wordForm" )
+				'title'		=> \IPS\Member::loggedIn()->language()->addToStack('add_word'),
+				'link'		=> \IPS\Http\Url::internal( "app=core&module=languages&controller=languages&do=addWord" ),
+				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack( 'add_word' ), 'ipsDialog-remoteSubmit' => TRUE, 'action' => "wordForm" )
 			);
 		}
 		
-		foreach( Db::i()->select( '*', 'core_sys_lang_words', array( "word_is_custom=? AND lang_id=?", 1, Member::loggedIn()->language()->_id ) ) AS $lang )
+		foreach( \IPS\Db::i()->select( '*', 'core_sys_lang_words', array( "word_is_custom=? AND lang_id=?", 1, \IPS\Member::loggedIn()->language()->_id ) ) AS $lang )
 		{
 			$tags['cms_tag_lang']['{lang="' . $lang['word_key'] . '"}'] = $lang['word_custom'] ?: $lang['word_default'];
 		}
 		
-		Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( Theme::i()->getTemplate( 'forms', 'core', 'global' )->editorTags( $tags, $tagLinks ) ) );
+		\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->editorTags( $tags, $tagLinks ) ), 200, 'text/html' );
 	}
 }

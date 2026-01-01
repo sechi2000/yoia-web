@@ -12,25 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\modules\front\search\search;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * SearchType for GraphQL API
  */
-class SearchType extends ObjectType
+class _SearchType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -66,17 +64,15 @@ class SearchType extends ObjectType
 								{
 									case 'key':
 										return $type;
-
+									break;
 									case 'lang':
-										return Member::loggedIn()->language()->get( $type . '_pl' );
-
+										return \IPS\Member::loggedIn()->language()->get( $type . '_pl' );
+									break;
 								}
-
-								return null;
 							}
 						]) ),
 						'resolve' => function () {
-							return array_merge( array('core_members'), array_keys( search::contentTypes() ) );
+							return array_merge( array('core_members'), array_keys( \IPS\core\modules\front\search\search::contentTypes() ) );
 						}
 					]
 				];

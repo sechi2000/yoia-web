@@ -11,30 +11,23 @@
 namespace IPS\Geolocation\Api\GraphQL;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\GeoLocation;
-use IPS\Member;
-use IPS\Settings;
-use UnderflowException;
-use function defined;
-use function is_array;
-use function strtoupper;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base class for GeoLocation
  */
-class GeoLocationType extends ObjectType
+class _GeoLocationType extends ObjectType
 {
 	/**
 	 * Get root type
 	 *
-	 * @return	void
+	 * @return	array
 	 */
 	public function __construct()
 	{		 
@@ -113,20 +106,20 @@ class GeoLocationType extends ObjectType
 		parent::__construct($config);
 	}
 
-	protected static function buildAddressPiece($geolocation, $type): string
+	protected static function buildAddressPiece($geolocation, $type)
 	{
 		$output = array();
 		if ( $geolocation->$type )
 		{
 			if ( $type == 'country' )
 			{
-				if( $geolocation->country !== GeoLocation::buildFromJson( Settings::i()->site_address )->country )
+				if( $geolocation->country !== \IPS\GeoLocation::buildFromJson( \IPS\Settings::i()->site_address )->country )
 				{
 					try
 					{
-						$output[] = strtoupper( Member::loggedIn()->language()->get( htmlspecialchars( 'country-' . $geolocation->country, ENT_DISALLOWED, 'UTF-8', FALSE ) ) );
+						$output[] = \IPS\Member::loggedIn()->language()->get( htmlspecialchars( 'country-' . $geolocation->country, ENT_DISALLOWED, 'UTF-8', FALSE ), FALSE, array( 'strtoupper' => TRUE ) );
 					}
-					catch ( UnderflowException $e )
+					catch ( \UnderflowException $e )
 					{
 						$output[] = htmlspecialchars( $geolocation->country, ENT_DISALLOWED, 'UTF-8', FALSE );
 					}
@@ -134,7 +127,7 @@ class GeoLocationType extends ObjectType
 			}
 			else
 			{
-				if ( is_array( $geolocation->$type ) )
+				if ( \is_array( $geolocation->$type ) )
 				{
 					foreach ( $geolocation->$type as $v )
 					{

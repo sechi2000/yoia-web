@@ -11,63 +11,35 @@
 namespace IPS\core\modules\admin\achievements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\core\Achievements\Badge;
-use IPS\core\Achievements\Rule;
-use IPS\core\CustomBadge;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use IPS\Xml\SimpleXML;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function mb_substr;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\TEMP_DIRECTORY;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement badges
  */
-class badges extends Controller
+class _badges extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\core\Achievements\Badge';
+	protected $nodeClass = 'IPS\core\Achievements\Badge';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'badges_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'badges_manage' );
 		parent::execute();
 	}
 
@@ -76,35 +48,34 @@ class badges extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		if( $data = Rule::getRebuildProgress() )
+		if( $data = \IPS\core\Achievements\Rule::getRebuildProgress() )
 		{
-			Output::i()->output .= Theme::i()->getTemplate( 'achievements', 'core' )->rebuildProgress( $data, TRUE );
+			\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'achievements' )->rebuildProgress( $data, TRUE );
 		}
 
-		Output::i()->sidebar['actions']['export'] = array(
+		\IPS\Output::i()->sidebar['actions']['export'] = array(
 			'primary' => false,
 			'icon' => 'cloud-download',
-			'link' => Url::internal('app=core&module=achievements&controller=badges&do=exportForm'),
-			'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('acp_achievements_export') ),
+			'link' => \IPS\Http\Url::internal('app=core&module=achievements&controller=badges&do=exportForm'),
+			'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('acp_achievements_export') ),
 			'title' => 'acp_achievements_export',
 		);
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'achievements', 'badges_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'achievements', 'badges_manage' ) )
 		{
-			Output::i()->sidebar['actions']['import'] = array(
+			\IPS\Output::i()->sidebar['actions']['import'] = array(
 				'primary' => false,
 				'icon' => 'cloud-upload',
-				'link' => Url::internal('app=core&module=achievements&controller=badges&do=importForm'),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('acp_achievements_import') ),
+				'link' => \IPS\Http\Url::internal('app=core&module=achievements&controller=badges&do=importForm'),
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('acp_achievements_import') ),
 				'title' => 'acp_achievements_import',
 			);
 		}
 
-		Output::i()->output .= Theme::i()->getTemplate( 'forms', 'core' )->blurb( 'cheev_badges_blurb' );
 
-		parent::manage();
+		return parent::manage();
 	}
 
 	/**
@@ -113,13 +84,13 @@ class badges extends Controller
 	 * @param	object	$node	Node returned from $nodeClass::load()
 	 * @return	NULL|string
 	 */
-	public function _getRowHtml( object $node ): ?string
+	public function _getRowHtml( $node )
 	{
-		$count = Db::i()->select( 'COUNT(*)', 'core_member_badges', [ 'badge=?', $node->id ] )->first();
+		$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_member_badges', [ 'badge=?', $node->id ] )->first();
 		
-		$url = Url::internal("app=core&module=achievements&controller=badges&do=view&id={$node->id}");
+		$url = \IPS\Http\Url::internal("app=core&module=achievements&controller=badges&do=view&id={$node->id}");
 		
-		return Theme::i()->getTemplate('achievements')->memberCount( $url, $count );
+		return \IPS\Theme::i()->getTemplate('achievements')->memberCount( $url, $count );
 	}
 	
 	/**
@@ -127,11 +98,11 @@ class badges extends Controller
 	 *
 	 * @return	void
 	 */
-	public function view() : void
+	public function view()
 	{
-		$badge = Badge::load( Request::i()->id );
+		$badge = \IPS\core\Achievements\Badge::load( \IPS\Request::i()->id );
 		
-		$table = new \IPS\Helpers\Table\Db( 'core_member_badges', Url::internal("app=core&module=achievements&controller=badges&do=view&id={$badge->id}"), [ 'badge=?', $badge->id ] );
+		$table = new \IPS\Helpers\Table\Db( 'core_member_badges', \IPS\Http\Url::internal("app=core&module=achievements&controller=badges&do=view&id={$badge->id}"), [ 'badge=?', $badge->id ] );
 		$table->joins[] = [
 			'select'	=> 'action,identifier',
 			'from'		=> 'core_achievements_log',
@@ -143,13 +114,13 @@ class badges extends Controller
 		$table->sortBy = $table->sortBy ?: 'datetime';
 
 		$table->advancedSearch = array(
-			'datetime'	=> SEARCH_DATE_RANGE,
+			'datetime'	=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
 			);
 
 		$table->parsers = array(
 			'member'	=> function ( $val, $row )
 			{
-				return Theme::i()->getTemplate( 'global', 'core' )->userLink( Member::load( $val ) );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userLink( \IPS\Member::load( $val ) );
 			},
 			'action_log'	=> function( $val, $row ) {
 				try
@@ -157,17 +128,17 @@ class badges extends Controller
 					if ( $row['action'] )
 					{
 						$exploded = explode( '_', $row['action'] );
-						$extension = Application::load( $exploded[0] )->extensions( 'core', 'AchievementAction' )[ $exploded[1] ];
+						$extension = \IPS\Application::load( $exploded[0] )->extensions( 'core', 'AchievementAction' )[ $exploded[1] ];
 						return $extension->logRow( $row['identifier'], explode( ',', $row['actor'] ) );
 					}
 					else
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
-					return Member::loggedIn()->language()->addToStack('unknown');
+					return \IPS\Member::loggedIn()->language()->addToStack('unknown');
 				}
 			},
 			'rule'	=> function( $val, $row ) {
@@ -176,28 +147,28 @@ class badges extends Controller
 				{
 					try
 					{
-						$rule = Rule::load( $val );
+						$rule = \IPS\core\Achievements\Rule::load( $val );
 					}
-					catch ( OutOfRangeException $e ) { }
+					catch ( \OutOfRangeException $e ) { }
 				}
 				
 				if ( $rule )
 				{
-					return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( Url::internal("app=core&module=achievements&controller=rules&do=form&id={$rule->id}"), FALSE, $rule->extension()?->ruleDescription( $rule ), TRUE, FALSE, FALSE, TRUE );
+					return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( \IPS\Http\Url::internal("app=core&module=achievements&controller=rules&do=form&id={$rule->id}"), FALSE, $rule->extension()->ruleDescription( $rule ), TRUE, FALSE, FALSE, TRUE );
 				}
 				else
 				{
-					return Member::loggedIn()->language()->addToStack('unknown');
+					return \IPS\Member::loggedIn()->language()->addToStack('unknown');
 				}
 			},
 			'datetime'	=> function( $val )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			}
 		);
 		
-		Output::i()->title		= $badge->_title;
-		Output::i()->output	= $table;
+		\IPS\Output::i()->title		= $badge->_title;
+		\IPS\Output::i()->output	= $table;
 	}
 
 	/**
@@ -205,53 +176,53 @@ class badges extends Controller
 	 *
 	 * @return void
 	 */
-	public function exportForm() : void
+	public function exportForm()
 	{
-		Dispatcher::i()->checkAcpPermission( 'badges_manage' );
-		$assignedBadges = Badge::getAssignedBadgeIds();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'badges_manage' );
+		$assignedBadges = \IPS\core\Achievements\Badge::getAssignedBadgeIds();
 
 		$where = NULL;
-		if ( count( $assignedBadges ) )
+		if ( \count( $assignedBadges ) )
 		{
-			$where = [ Db::i()->in( '`id`', $assignedBadges, TRUE ) ];
+			$where = [ \IPS\Db::i()->in( '`id`', $assignedBadges, TRUE ) ];
 		}
 
-		$exportableBadges = Db::i()->select( 'COUNT(*)', 'core_badges', $where )->first();
+		$exportableBadges = \IPS\Db::i()->select( 'COUNT(*)', 'core_badges', $where )->first();
 
 		/* Display */
-		Output::i()->output = Theme::i()->getTemplate( 'achievements', 'core' )->badgeExport( $exportableBadges );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'achievements' )->badgeExport( $exportableBadges );
 	}
 
 	/**
 	 * Export ranks with images as an XML file (XML is better at potentially large values from raw image data)
 	 *
 	 * @return void
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	public function export() : void
+	public function export()
 	{
-		$xml = SimpleXML::create('badges');
+		$xml = \IPS\Xml\SimpleXML::create('badges');
 
 		$langs = [];
-		foreach( Db::i()->select('word_key, word_default', 'core_sys_lang_words', [ "lang_id=? AND word_key LIKE 'core_badges_%'", Member::loggedIn()->language()->id ] ) as $row )
+		foreach( \IPS\Db::i()->select('word_key, word_default', 'core_sys_lang_words', [ "lang_id=? AND word_key LIKE 'core_badges_%'", \IPS\Member::loggedIn()->language()->id ] ) as $row )
 		{
-			$langs[ mb_substr( $row['word_key'], 12 ) ] = $row['word_default'];
+			$langs[ \mb_substr( $row['word_key'], 12 ) ] = $row['word_default'];
 		}
 
-		$assignedBadges = Badge::getAssignedBadgeIds();
+		$assignedBadges = \IPS\core\Achievements\Badge::getAssignedBadgeIds();
 
 		$where = NULL;
-		if ( count( $assignedBadges ) )
+		if ( \count( $assignedBadges ) )
 		{
-			$where = [ Db::i()->in( '`id`', $assignedBadges, TRUE ) ];
+			$where = [ \IPS\Db::i()->in( '`id`', $assignedBadges, TRUE ) ];
 		}
 
 		/* Ranks */
-		foreach ( Db::i()->select( '*', 'core_badges', $where ) as $badge )
+		foreach ( \IPS\Db::i()->select( '*', 'core_badges', $where ) as $badge )
 		{
 			try
 			{
-				$icon = File::get( 'core_Badges', $badge['image'] );
+				$icon = \IPS\File::get( 'core_Badges', $badge['image'] );
 
 				$forXml = [
 					'manually_awarded' => $badge['manually_awarded'],
@@ -262,12 +233,12 @@ class badges extends Controller
 
 				$xml->addChild( 'badge', $forXml );
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 		
-		Session::i()->log( 'acplogs__exported_badges' );
+		\IPS\Session::i()->log( 'acplogs__exported_badges' );
 
-		Output::i()->sendOutput( $xml->asXML(), 200, 'application/xml', array( 'Content-Disposition' => Output::getContentDisposition( 'attachment', "Achievement_Badges.xml" ) ) );
+		\IPS\Output::i()->sendOutput( $xml->asXML(), 200, 'application/xml', array( 'Content-Disposition' => \IPS\Output::getContentDisposition( 'attachment', "Achievement_Badges.xml" ) ) );
 	}
 
 	/**
@@ -275,27 +246,27 @@ class badges extends Controller
 	 *
 	 * @return	void
 	 */
-	public function import() : void
+	public function import()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		if ( !file_exists( Request::i()->file ) or md5_file( Request::i()->file ) !== Request::i()->key )
+		if ( !file_exists( \IPS\Request::i()->file ) or md5_file( \IPS\Request::i()->file ) !== \IPS\Request::i()->key )
 		{
-			Output::i()->error( 'generic_error', '3C130/1', 500, '' );
+			\IPS\Output::i()->error( 'generic_error', '3C130/1', 500, '' );
 		}
 
 		try
 		{
-			Badge::importXml( Request::i()->file, ( ! empty( Request::i()->wipe ) ) );
+			\IPS\core\Achievements\Badge::importXml( \IPS\Request::i()->file, ( ! empty( \IPS\Request::i()->wipe ) ) );
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
-			Output::i()->error( $e->getMessage(), '2C422/1', 403, '' );
+			\IPS\Output::i()->error( $e->getMessage(), '2C422/1', 403, '' );
 		}
 		
-		Session::i()->log( 'acplogs__imported_badges' );
+		\IPS\Session::i()->log( 'acplogs__imported_badges' );
 
-		Output::i()->redirect( Url::internal( 'app=core&module=achievements&controller=badges' ), 'completed' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=achievements&controller=badges' ), 'completed' );
 	}
 
 	/**
@@ -303,44 +274,24 @@ class badges extends Controller
 	 *
 	 * @return void
 	 */
-	public function importForm() : void
+	public function importForm()
 	{
-		$form = new Form( 'form', 'acp_achievements_import' );
+		$form = new \IPS\Helpers\Form( 'form', 'acp_achievements_import' );
 
-		$form->add( new YesNo( 'acp_achievements_import_option_badge_wipe', 0, FALSE, [], NULL, NULL, NULL, 'acp_achievements_import_option_rule_wipe' ) );
-		$form->add( new Upload( 'acp_achievements_import_xml', NULL, FALSE, [ 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ], NULL, NULL, NULL, 'acp_achievements_import_xml' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'acp_achievements_import_option_badge_wipe', 0, FALSE, [], NULL, NULL, NULL, 'acp_achievements_import_option_rule_wipe' ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'acp_achievements_import_xml', NULL, FALSE, [ 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ], NULL, NULL, NULL, 'acp_achievements_import_xml' ) );
 
 		if ( $values = $form->values() )
 		{
 			/* Move it to a temporary location */
-			$tempFile = tempnam( TEMP_DIRECTORY, 'IPS' );
+			$tempFile = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
 			move_uploaded_file( $values['acp_achievements_import_xml'], $tempFile );
 
 			/* Initate a redirector */
-			Output::i()->redirect( Url::internal( 'app=core&module=achievements&controller=badges&do=import' )->setQueryString( array('wipe' => $values['acp_achievements_import_option_badge_wipe'], 'file' => $tempFile, 'key' => md5_file( $tempFile )) )->csrf() );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=achievements&controller=badges&do=import' )->setQueryString( array('wipe' => $values['acp_achievements_import_option_badge_wipe'], 'file' => $tempFile, 'key' => md5_file( $tempFile )) )->csrf() );
 		}
 
 		/* Display */
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( Member::loggedIn()->language()->addToStack('acp_achievements_import'), $form, FALSE );
-	}
-
-
-	public function badgePreview() : void
-	{
-		header('content-type: image/svg+xml');
-
-		$badge = new CustomBadge;
-		$badge->shape = Request::i()->shape ?: 'circle';
-		$badge->foreground = Request::i()->foreground ?: '#fff';
-		$badge->background = Request::i()->background ?: '#eeb95f';
-		$badge->border = Request::i()->border ?: '#f7d36f';
-		$badge->icon = Request::i()->icon ? json_decode( Request::i()->icon, true ) : null;
-		$badge->rotation = Request::i()->rotation ?: 0;
-		$badge->sides = Request::i()->sides ?: 5;
-		$badge->number_overlay = Request::i()->numberoverlay ?: 0;
-		$badge->icon_size = Request::i()->iconsize ?: 3;
-		$badge->generateSVG( true );
-		echo $badge->raw;
-		exit();
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( \IPS\Member::loggedIn()->language()->addToStack('acp_achievements_import'), $form, FALSE );
 	}
 }

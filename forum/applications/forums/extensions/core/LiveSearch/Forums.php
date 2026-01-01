@@ -12,35 +12,26 @@
 namespace IPS\forums\extensions\core\LiveSearch;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Extensions\LiveSearchAbstract;
-use IPS\forums\Forum;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Live Search Extension
  */
-class Forums extends LiveSearchAbstract
+class _Forums
 {
 	/**
 	 * Check we have access
 	 *
 	 * @return	bool
 	 */
-	public function hasAccess(): bool
+	public function hasAccess()
 	{
 		/* Check Permissions */
-		return Member::loggedIn()->hasAcpRestriction( 'forums', 'forums', 'forums_manage' );
+		return \IPS\Member::loggedIn()->hasAcpRestriction( 'forums', 'forums', 'forums_manage' );
 	}
 
 	/**
@@ -49,7 +40,7 @@ class Forums extends LiveSearchAbstract
 	 * @param	string	$searchTerm	Search Term
 	 * @return	array 	Array of results
 	 */
-	public function getResults( string $searchTerm ): array
+	public function getResults( $searchTerm )
 	{
 		/* Init */
 		$results = array();
@@ -59,10 +50,10 @@ class Forums extends LiveSearchAbstract
 		if( $this->hasAccess() )
 		{
 			/* Perform the search */
-			$forums = Db::i()->select(
+			$forums = \IPS\Db::i()->select(
 							"*",
 							'forums_forums',
-							array( "club_id IS NULL AND word_custom LIKE CONCAT( '%', ?, '%' ) AND lang_id=?", $searchTerm, Member::loggedIn()->language()->id ),
+							array( "club_id IS NULL AND word_custom LIKE CONCAT( '%', ?, '%' ) AND lang_id=?", $searchTerm, \IPS\Member::loggedIn()->language()->id ),
 							NULL,
 							NULL
 					)->join(
@@ -73,9 +64,9 @@ class Forums extends LiveSearchAbstract
 			/* Format results */
 			foreach ( $forums as $forum )
 			{
-				$forum = Forum::constructFromData( $forum );
+				$forum = \IPS\forums\Forum::constructFromData( $forum );
 				
-				$results[] = Theme::i()->getTemplate( 'livesearch', 'forums', 'admin' )->forum( $forum );
+				$results[] = \IPS\Theme::i()->getTemplate( 'livesearch', 'forums', 'admin' )->forum( $forum );
 			}
 		}
 
@@ -87,8 +78,8 @@ class Forums extends LiveSearchAbstract
 	 *
 	 * @return	bool
 	 */
-	public function isDefault(): bool
+	public function isDefault()
 	{
-		return Dispatcher::i()->application->directory == 'forums';
+		return \IPS\Dispatcher::i()->application->directory == 'forums';
 	}
 }

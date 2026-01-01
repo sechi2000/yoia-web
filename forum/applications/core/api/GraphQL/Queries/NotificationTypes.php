@@ -10,31 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use GraphQL\Type\Definition\ListOfType;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Application;
-use IPS\core\api\GraphQL\Types\NotificationTypeType;
-use IPS\Member;
-use IPS\Notification;
-use function defined;
-use function in_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * NotificationTypes query for GraphQL API
  */
-class NotificationTypes
+class _NotificationTypes
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns available notification types";
+	public static $description = "Returns available notification types";
 
 	/*
 	 * Query arguments
@@ -46,10 +40,8 @@ class NotificationTypes
 
 	/**
 	 * Return the query return type
-	 *
-	 * @return ListOfType<NotificationTypeType>
 	 */
-	public function type() : ListOfType
+	public function type() 
 	{
 		return TypeRegistry::listOf( \IPS\core\api\GraphQL\TypeRegistry::notificationType() );
 	}
@@ -57,23 +49,23 @@ class NotificationTypes
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @return	array
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\core\Stream
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : array
+	public function resolve($val, $args, $context)
 	{
 		//$defaultConfiguration = \IPS\Notification::defaultConfiguration();
 		//$memberConfiguration = $member->notificationsConfiguration();
 		$notificationTypes = array();
 
-		$extensions = Application::allExtensions( 'core', 'Notifications' );
+		$extensions = \IPS\Application::allExtensions( 'core', 'Notifications' );
 		$availableOptions = array();
 
 		foreach( $extensions as $extensionKey => $extension )
 		{
-			$extensionOptions = Notification::availableOptions( Member::loggedIn(), $extension );
+			$extensionOptions = \IPS\Notification::availableOptions( \IPS\Member::loggedIn(), $extension );
 
 			foreach( $extensionOptions as $key => $option )
 			{
@@ -92,9 +84,9 @@ class NotificationTypes
 						continue;
 					}
 
-					$methods[ $method ]['default'] = isset( $option['default'] ) && in_array( $method, $option['default'] );
-					$methods[ $method ]['disabled'] = isset( $option['disabled'] ) && in_array( $method, $option['disabled'] );
-					$methods[ $method ]['member'] = ( $option['options'][ $method ]['value'] == TRUE );
+					$methods[ $method ]['default'] = isset( $option['default'] ) && \in_array( $method, $option['default'] );
+					$methods[ $method ]['disabled'] = isset( $option['disabled'] ) && \in_array( $method, $option['disabled'] );
+					$methods[ $method ]['member'] = isset( $option['options'][ $method ] ) && $option['options'][ $method ]['value'] == TRUE;
 				}
 
 				$notificationTypes[] = array(

@@ -12,57 +12,46 @@
 namespace IPS\nexus\Customer;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\CustomField as SystemCustomField;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\YesNo;
-use IPS\Login;
-use IPS\Member\ProfileStep;
-use IPS\Settings;
-use IPS\Widget;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Custom Profile Field Node
  */
-class CustomField extends SystemCustomField
+class _CustomField extends \IPS\CustomField
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_customer_fields';
+	public static $databaseTable = 'nexus_customer_fields';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'f_';
+	public static $databasePrefix = 'f_';
 		
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 	
 	/**
 	 * @brief	[CustomField] Title/Description lang prefix
 	 */
-	protected static string $langKey = 'nexus_ccfield';
+	protected static $langKey = 'nexus_ccfield';
 	
 	/**
 	 * @brief	[CustomField] Content database table
 	 */
-	protected static string $contentDatabaseTable = 'nexus_customers';
+	protected static $contentDatabaseTable = 'nexus_customers';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -80,7 +69,7 @@ class CustomField extends SystemCustomField
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'nexus',
 		'module'	=> 'customers',
 		'prefix'	=> 'customer_fields_'
@@ -89,17 +78,17 @@ class CustomField extends SystemCustomField
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'nexus_customer_fields';
+	public static $nodeTitle = 'nexus_customer_fields';
 
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'nexus_ccfield_';
+	public static $titleLangPrefix = 'nexus_ccfield_';
 	
 	/**
 	 * @brief	[CustomField] Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'content'	=> 'extra',
 		'not_null'	=> 'reg_require'
 	);
@@ -107,34 +96,34 @@ class CustomField extends SystemCustomField
 	/**
 	 * @brief	[CustomField] Editor Options
 	 */
-	public static array $editorOptions = array( 'app' => 'nexus', 'key' => 'Customer' );
+	public static $editorOptions = array( 'app' => 'nexus', 'key' => 'Customer' );
 	
 	/**
 	 * @brief	[CustomField] Upload Storage Extension
 	 */
-	public static string $uploadStorageExtension = 'nexus_Customer';
+	public static $uploadStorageExtension = 'nexus_Customer';
 			
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		parent::form( $form );
 		
-		if ( Login::registrationType() == 'full' )
+		if ( \IPS\Login::registrationType() == 'full' )
 		{
 			/* Quick register is disabled */
 			$form->addHeader( 'customer_field_registration' );
-			$form->add( new YesNo( 'f_reg_show', $this->reg_show ) );
-			$form->add( new YesNo( 'f_reg_require', $this->reg_require ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'f_reg_show', $this->reg_show ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'f_reg_require', $this->reg_require ) );
 		}
 		
 		$form->addHeader( 'customer_field_purchase' );
-		$form->add( new YesNo( 'f_purchase_show', $this->purchase_show ) );
-		$form->add( new YesNo( 'f_purchase_require', $this->purchase_require ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'f_purchase_show', $this->purchase_show ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'f_purchase_require', $this->purchase_require ) );
 
 		unset( $form->elements[''][1] );
 		unset( $form->elements['']['pf_not_null'] );
@@ -152,39 +141,50 @@ class CustomField extends SystemCustomField
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
 		if ( !$this->column )
 		{
 			$this->column = "field_{$this->id}";
 			$this->save();
 		}
-
-		parent::postSaveForm( $values );
 	}
 	
 	/**
 	 * [ActiveRecord] Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		parent::save();
-		Widget::deleteCaches( 'donations', 'nexus' );
+		\IPS\Widget::deleteCaches( 'donations', 'nexus' );
+		static::recountCustomerFields();
 	}
 	
 	/**
 	 * [ActiveRecord] Delete
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		parent::delete();
+		static::recountCustomerFields();
 
 		/* Do we need to do stuff with profile steps? */
-		ProfileStep::resync();
+		\IPS\Member\ProfileStep::resync();
+	}
+	
+	/**
+	 * Recount card storage gateays
+	 *
+	 * @return	void
+	 */
+	protected static function recountCustomerFields()
+	{
+		$count = \count( static::roots() );
+		\IPS\Settings::i()->changeValues( array( 'customer_fields' => $count ) );
 	}
 
 	/**
@@ -193,7 +193,7 @@ class CustomField extends SystemCustomField
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		$values['allow_attachments']	= $values['pf_allow_attachments'];
 		unset( $values['pf_allow_attachments'] );

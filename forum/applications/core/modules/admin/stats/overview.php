@@ -11,71 +11,50 @@
 namespace IPS\core\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use Exception;
-use IPS\Application;
-use IPS\DateTime;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Date;
-use IPS\Helpers\Form\DateRange;
-use IPS\Helpers\Form\Select;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function array_merge;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * User activity statistics overview
  */
-class overview extends Controller
+class _overview extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 
 	/**
 	 * @brief Date range to restrict to, or NULL for no restriction
 	 */
-	protected string $dateRange = '7';
+	protected $dateRange = '7';
 
 	/**
 	 * @brief Form object
 	 */
-	protected ?Form $form = NULL;
+	protected $form = NULL;
 
 	/**
 	 * @brief Template group to use to output
 	 */
-	protected string $templateGroup = 'stats';
+	protected $templateGroup = 'stats';
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Output::i()->jsFiles  = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_stats.js', 'core' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/statistics.css', 'core', 'admin' ) );
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'system/reports.css', 'core', 'admin' ) );
-		Dispatcher::i()->checkAcpPermission( 'overview_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'overview_manage' );
 
 		$options = array(
 			'7'		=> 'last_week',
@@ -87,9 +66,9 @@ class overview extends Controller
 			'-1'	=> 'custom'
 		);
 
-		$this->form = new Form( 'posts', 'update' );
-		$this->form->add( new Select( 'predate', '7', FALSE, array( 'options' => $options, 'toggles' => array( '-1' => array( 'dateFilterInputs' ) ) ) ) );
-		$this->form->add( new DateRange( 'date', NULL, FALSE, array(), NULL, NULL, NULL, 'dateFilterInputs' ) );
+		$this->form = new \IPS\Helpers\Form( 'posts', 'update' );
+		$this->form->add( new \IPS\Helpers\Form\Select( 'predate', '7', FALSE, array( 'options' => $options, 'toggles' => array( '-1' => array( 'dateFilterInputs' ) ) ) ) );
+		$this->form->add( new \IPS\Helpers\Form\DateRange( 'date', NULL, FALSE, array(), NULL, NULL, NULL, 'dateFilterInputs' ) );
 
 		parent::execute();
 	}
@@ -99,13 +78,15 @@ class overview extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$formHtml = $this->form->customTemplate( array( Theme::i()->getTemplate( 'stats' ), 'filtersOverviewForm' ) );
-		$blocks = Application::allExtensions( 'core', 'OverviewStatistics', TRUE, 'core', 'Registrations' );
+		$formHtml = $this->form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'stats' ), 'filtersOverviewForm' ) );
+		$blocks = \IPS\Application::allExtensions( 'core', 'OverviewStatistics', TRUE, 'core', 'Registrations' );
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_keystats_overview');
-		Output::i()->output = Theme::i()->getTemplate( $this->templateGroup )->overview( $formHtml, $blocks );
+		\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_stats.js', 'core' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'system/statistics.css', 'core', 'admin' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_stats_overview');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( $this->templateGroup )->overview( $formHtml, $blocks );
 	}
 
 	/**
@@ -113,38 +94,38 @@ class overview extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function loadBlock() : void
+	protected function loadBlock()
 	{
-		$blocks = Application::allExtensions( 'core', 'OverviewStatistics', TRUE, 'core', 'Registrations' );
+		$blocks = \IPS\Application::allExtensions( 'core', 'OverviewStatistics', TRUE, 'core', 'Registrations' );
 
-		if( !isset( $blocks[ Request::i()->blockKey ] ) )
+		if( !isset( $blocks[ \IPS\Request::i()->blockKey ] ) )
 		{
-			Output::i()->error( 'stats_overview_block_not_found', '2C412/1', 404, '' );
+			\IPS\Output::i()->error( 'stats_overview_block_not_found', '2C412/1', 404, '' );
 		}
 
 		$dateFilters = NULL;
 
-		if( Request::i()->range )
+		if( \IPS\Request::i()->range )
 		{
-			$dateFilters = Request::i()->range;
+			$dateFilters = \IPS\Request::i()->range;
 		}
-		elseif( Request::i()->start )
+		elseif( \IPS\Request::i()->start )
 		{
 			try
 			{
-				$timezone = Member::loggedIn()->timezone ? new DateTimeZone( Member::loggedIn()->timezone ) : NULL;
+				$timezone = \IPS\Member::loggedIn()->timezone ? new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) : NULL;
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
 				$timezone = NULL;
 			}
 
 			$dateFilters = array(
-				'start'	=> new DateTime( Date::_convertDateFormat( Request::i()->start ), $timezone ),
-				'end'	=> ( new DateTime( Date::_convertDateFormat( Request::i()->end ), $timezone ) )->setTime( 23, 59, 59 )
+				'start'	=> new \IPS\DateTime( \IPS\Helpers\Form\Date::_convertDateFormat( \IPS\Request::i()->start ), $timezone ),
+				'end'	=> ( new \IPS\DateTime( \IPS\Helpers\Form\Date::_convertDateFormat( \IPS\Request::i()->end ), $timezone ) )->setTime( 23, 59, 59 )
 			);
 		}
 
-		Output::i()->sendOutput( $blocks[ Request::i()->blockKey ]->getBlock( $dateFilters, Request::i()->subblock ) );
+		\IPS\Output::i()->sendOutput( $blocks[ \IPS\Request::i()->blockKey ]->getBlock( $dateFilters, \IPS\Request::i()->subblock ) );
 	}
 }

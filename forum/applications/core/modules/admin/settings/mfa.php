@@ -11,54 +11,30 @@
 namespace IPS\core\modules\admin\settings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Tree\Tree;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\MFA\MFAHandler;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Multi-Factor Authentication
  */
-class mfa extends Controller
+class _mfa extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'mfa_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'mfa_manage' );
 		parent::execute();
 	}
 
@@ -67,14 +43,14 @@ class mfa extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$activeTabContents = '';
 		$tabs = array(
 			'handlers' 	=> 'mfa_handlers',
 			'settings'	=> 'mfa_settings'
 		);
-		$activeTab = ( isset( Request::i()->tab ) and array_key_exists( Request::i()->tab, $tabs ) ) ? Request::i()->tab : 'handlers';
+		$activeTab = ( isset( \IPS\Request::i()->tab ) and array_key_exists( \IPS\Request::i()->tab, $tabs ) ) ? \IPS\Request::i()->tab : 'handlers';
 		
 		if ( $activeTab === 'handlers' )
 		{
@@ -85,14 +61,14 @@ class mfa extends Controller
 			$activeTabContents = $this->_manageSettings();
 		}
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_settings_mfa');
-		if( Request::i()->isAjax() )
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_settings_mfa');
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $activeTabContents;
+			\IPS\Output::i()->output = $activeTabContents;
 		}
 		else
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'forms' )->blurb( 'mfa_blurb' ) . Theme::i()->getTemplate( 'global' )->tabs( $tabs, $activeTab, $activeTabContents, Url::internal( "app=core&module=settings&controller=mfa" ) );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->tabs( $tabs, $activeTab, $activeTabContents, \IPS\Http\Url::internal( "app=core&module=settings&controller=mfa" ) );
 		}
 	}
 	
@@ -101,22 +77,22 @@ class mfa extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _manageHandlers() : string
+	protected function _manageHandlers()
 	{
 		/* Create the tree */
-		$url = Url::internal( "app=core&module=settings&controller=mfa&tab=handlers" );
-		$tree = new Tree(
+		$url = \IPS\Http\Url::internal( "app=core&module=settings&controller=mfa&tab=handlers" );
+		$tree = new \IPS\Helpers\Tree\Tree(
 			$url,
 			NULL,
 			function() use( $url ) {
 				$return = array();
 				
-				foreach ( MFAHandler::handlers() as $key => $handler )
+				foreach ( \IPS\MFA\MFAHandler::handlers() as $key => $handler )
 				{
-					$return[] = Theme::i()->getTemplate( 'trees', 'core' )->row(
+					$return[] = \IPS\Theme::i()->getTemplate( 'trees', 'core' )->row(
 						$url,
 						$key,
-						Member::loggedIn()->language()->addToStack("mfa_{$key}_title"),
+						\IPS\Member::loggedIn()->language()->addToStack("mfa_{$key}_title"),
 						FALSE,
 						array(
 							'settings' => array(
@@ -125,7 +101,7 @@ class mfa extends Controller
 								'link'	=> $url->setQueryString( array( 'do' => 'settings', 'key' => $key ) ),
 							)
 						),
-						Member::loggedIn()->language()->addToStack("mfa_{$key}_desc"),
+						\IPS\Member::loggedIn()->language()->addToStack("mfa_{$key}_desc"),
 						NULL,
 						NULL,
 						FALSE,
@@ -141,7 +117,7 @@ class mfa extends Controller
 		);
 		
 		/* Return */
-		return $tree;
+		return \IPS\Theme::i()->getTemplate( 'forms' )->blurb( 'mfa_blurb', TRUE, TRUE ) . $tree;
 	}
 	
 	/**
@@ -149,42 +125,42 @@ class mfa extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function enableToggle() : void
+	protected function enableToggle()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		$key = Request::i()->id;
-		$handlers = MFAHandler::handlers();
+		$key = \IPS\Request::i()->id;
+		$handlers = \IPS\MFA\MFAHandler::handlers();
 		if ( !isset( $handlers[ $key ] ) )
 		{
-			Output::i()->error( 'node_error', '2C345/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C345/1', 404, '' );
 		}
 		
 		try
 		{
-			$handlers[ $key ]->toggle( Request::i()->status );
+			$handlers[ $key ]->toggle( \IPS\Request::i()->status );
 			
-			if ( Request::i()->status )
+			if ( \IPS\Request::i()->status )
 			{
-				Session::i()->log( 'acplogs__mfa_handler_enabled', array( "mfa_{$key}_title" => TRUE ) );
+				\IPS\Session::i()->log( 'acplogs__mfa_handler_enabled', array( "mfa_{$key}_title" => TRUE ) );
 			}
 			else
 			{
-				Session::i()->log( 'acplogs__mfa_handler_disabled', array( "mfa_{$key}_title" => TRUE ) );
+				\IPS\Session::i()->log( 'acplogs__mfa_handler_disabled', array( "mfa_{$key}_title" => TRUE ) );
 			}
 			
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->json('OK');
+				\IPS\Output::i()->json('OK');
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( "app=core&module=settings&controller=mfa" ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=settings&controller=mfa" ) );
 			}
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Output::i()->redirect( Url::internal( "app=core&module=settings&controller=mfa&tab=handlers&do=settings&key=" . $key ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=settings&controller=mfa&tab=handlers&do=settings&key=" . $key ) );
 		}
 	}
 	
@@ -193,21 +169,21 @@ class mfa extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function settings() : void
+	protected function settings()
 	{
-		$key = Request::i()->key;
-		$handlers = MFAHandler::handlers();
+		$key = \IPS\Request::i()->key;
+		$handlers = \IPS\MFA\MFAHandler::handlers();
 		if ( !isset( $handlers[ $key ] ) )
 		{
-			Output::i()->error( 'node_error', '2C345/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C345/2', 404, '' );
 		}
 		
 		$output = $handlers[ $key ]->acpSettings();
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack("mfa_{$key}_title");
-		Output::i()->output = $output;
-		Output::i()->breadcrumb[] = array( Url::internal('app=core&module=settings&controller=mfa&tab=handlers'), Member::loggedIn()->language()->addToStack('menu__core_settings_mfa') );
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack("mfa_{$key}_title") );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack("mfa_{$key}_title");
+		\IPS\Output::i()->output = $output;
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal('app=core&module=settings&controller=mfa&tab=handlers'), \IPS\Member::loggedIn()->language()->addToStack('menu__core_settings_mfa') );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack("mfa_{$key}_title") );
 	}
 	
 	/**
@@ -215,26 +191,26 @@ class mfa extends Controller
 	 *
 	 * @return	string
 	 */
-	protected function _manageSettings() : string
+	protected function _manageSettings()
 	{
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		
 		$form->addHeader('mfa_header_setup');
-		$groups = array_combine( array_keys( Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, Group::groups() ) );
-		$form->add( new CheckboxSet( 'mfa_required_groups', Settings::i()->mfa_required_groups == '*' ? '*' : explode( ',', Settings::i()->mfa_required_groups ), FALSE, array(
+		$groups = array_combine( array_keys( \IPS\Member\Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, \IPS\Member\Group::groups() ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'mfa_required_groups', \IPS\Settings::i()->mfa_required_groups == '*' ? '*' : explode( ',', \IPS\Settings::i()->mfa_required_groups ), FALSE, array(
 			'multiple'			=> TRUE,
 			'options'			=> $groups,
 			'unlimited'			=> '*',
 			'unlimitedLang'		=> 'everyone',
 			'impliedUnlimited'	=> TRUE
 		) ) );
-		$form->add( new Radio( 'mfa_required_prompt', Settings::i()->mfa_required_prompt, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'mfa_required_prompt', \IPS\Settings::i()->mfa_required_prompt, FALSE, array(
 			'options'	=> array(
 				'immediate'	=> 'mfa_prompt_immediate',
 				'access'	=> 'mfa_prompt_access',
 			)
 		), NULL, NULL, NULL, 'mfa_required_prompt' ) );
-		$form->add( new Radio( 'mfa_optional_prompt', Settings::i()->mfa_optional_prompt, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'mfa_optional_prompt', \IPS\Settings::i()->mfa_optional_prompt, FALSE, array(
 			'options'	=> array(
 				'immediate'	=> 'mfa_prompt_immediate',
 				'access'	=> 'mfa_prompt_access',
@@ -245,15 +221,15 @@ class mfa extends Controller
 				'access'	=> array( 'security_questions_opt_out_warning' ),
 			)
 		), NULL, NULL, NULL, 'mfa_optional_prompt' ) );
-		$form->add( new Translatable( 'security_questions_opt_out_warning', NULL, FALSE, array( 'app' => 'core', 'key' => 'security_questions_opt_out_warning_value' ), NULL, NULL, NULL, 'security_questions_opt_out_warning' ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'security_questions_opt_out_warning', NULL, FALSE, array( 'app' => 'core', 'key' => 'security_questions_opt_out_warning_value' ), NULL, NULL, NULL, 'security_questions_opt_out_warning' ) );
 
 		$form->addHeader('mfa_header_authentication');
-		$form->add( new CheckboxSet( 'security_questions_areas', Settings::i()->security_questions_areas ? explode( ',', Settings::i()->security_questions_areas ) : array_keys( MFAHandler::areas() ), FALSE, array( 'options' => MFAHandler::areas() ), NULL, NULL, NULL, 'security_questions_areas' ) );
-		$form->add( new Interval( 'security_questions_timer', Settings::i()->security_questions_timer, FALSE, array( 'valueAs' => Interval::MINUTES, 'unlimited' => 0, 'unlimitedLang' => 'security_questions_timer_session' ) ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'security_questions_areas', \IPS\Settings::i()->security_questions_areas ? explode( ',', \IPS\Settings::i()->security_questions_areas ) : array_keys( \IPS\MFA\MFAHandler::areas() ), FALSE, array( 'options' => \IPS\MFA\MFAHandler::areas() ), NULL, NULL, NULL, 'security_questions_areas' ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'security_questions_timer', \IPS\Settings::i()->security_questions_timer, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::MINUTES, 'unlimited' => 0, 'unlimitedLang' => 'security_questions_timer_session' ) ) );
 
 		$form->addHeader('mfa_header_recovery');
-		$form->add( new Number( 'security_questions_tries', Settings::i()->security_questions_tries, FALSE, array( 'min' => 1 ) ) );
-		$form->add( new Radio( 'mfa_lockout_behaviour', Settings::i()->mfa_lockout_behaviour, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Number( 'security_questions_tries', \IPS\Settings::i()->security_questions_tries, FALSE, array( 'min' => 1 ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'mfa_lockout_behaviour', \IPS\Settings::i()->mfa_lockout_behaviour, FALSE, array(
 			'options'	=> array(
 				'lock'		=> 'mfa_lockout_behaviour_lock',
 				'email'		=> 'mfa_lockout_behaviour_email',
@@ -263,8 +239,8 @@ class mfa extends Controller
 				'lock'		=> array( 'mfa_lockout_time' )
 			)
 		) ) );
-		$form->add( new Interval( 'mfa_lockout_time', Settings::i()->mfa_lockout_time, FALSE, array( 'valueAs' => Interval::MINUTES, 'min' => 1 ), NULL, NULL, NULL, 'mfa_lockout_time' ) );
-		$form->add( new CheckboxSet( 'mfa_forgot_behaviour', explode( ',', Settings::i()->mfa_forgot_behaviour ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Interval( 'mfa_lockout_time', \IPS\Settings::i()->mfa_lockout_time, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::MINUTES, 'min' => 1 ), NULL, NULL, NULL, 'mfa_lockout_time' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'mfa_forgot_behaviour', explode( ',', \IPS\Settings::i()->mfa_forgot_behaviour ), FALSE, array(
 			'options' => array(
 				'email'		=> 'mfa_forgot_behaviour_email',
 				'contact'	=> 'mfa_forgot_behaviour_contact',
@@ -274,7 +250,7 @@ class mfa extends Controller
 		
 		if ( $values = $form->values() )
 		{
-			Lang::saveCustom( 'core', 'security_questions_opt_out_warning_value', $values['security_questions_opt_out_warning'] );
+			\IPS\Lang::saveCustom( 'core', 'security_questions_opt_out_warning_value', $values['security_questions_opt_out_warning'] );
 			unset( $values['security_questions_opt_out_warning'] );
 			
 			$values['mfa_required_groups'] = ( $values['mfa_required_groups'] == '*' ) ? '*' : implode( ',', $values['mfa_required_groups'] );
@@ -283,8 +259,8 @@ class mfa extends Controller
 			
 			$form->saveAsSettings( $values );			
 			
-			Session::i()->log( 'acplogs__mfa_settings_updated' );
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=mfa&tab=settings' ), 'saved' );
+			\IPS\Session::i()->log( 'acplogs__mfa_settings_updated' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=mfa&tab=settings' ), 'saved' );
 		}
 		
 		return (string) $form;
@@ -295,16 +271,16 @@ class mfa extends Controller
 	 *
 	 * @return	void
 	 */
-	public function resetSecurityAnswers() : void
+	public function resetSecurityAnswers()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		Db::i()->delete( 'core_security_answers' );
-		Db::i()->update( 'core_members', "members_bitoptions2=members_bitoptions2 &~ 512" );
+		\IPS\Db::i()->delete( 'core_security_answers' );
+		\IPS\Db::i()->update( 'core_members', "members_bitoptions2=members_bitoptions2 &~ 512" );
 
 		/* Log MFA reset */
-		Session::i()->log( 'acplogs__mfa_questions_reset' );
+		\IPS\Session::i()->log( 'acplogs__mfa_questions_reset' );
 
-		Output::i()->redirect( Url::internal( "app=core&module=settings&controller=mfa&tab=handlers&do=settings&key=questions" ), 'acplogs__mfa_questions_reset' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=settings&controller=mfa&tab=handlers&do=settings&key=questions" ), 'acplogs__mfa_questions_reset' );
 	}
 }

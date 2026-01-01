@@ -11,120 +11,40 @@
 namespace IPS\core\modules\admin\applications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DirectoryIterator;
-use DomainException;
-use Exception;
-use FilesystemIterator;
-use IPS\Application;
-use IPS\Application\BuilderIterator;
-use IPS\Application\Module;
-use IPS\cms\Templates;
-use IPS\Content\Search\Index;
-use IPS\core\FrontNavigation;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Exception as DbException;
-use IPS\Developer;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Helpers\Tree\Tree;
-use IPS\Http\Url;
-use IPS\Http\Url\Internal;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Controller;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Output\Javascript;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfRangeException;
-use Phar;
-use PharData;
-use PharException;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
-use Throwable;
-use UnderflowException;
-use UnexpectedValueException;
-use function count;
-use function defined;
-use function extension_loaded;
-use function file_get_contents;
-use function file_put_contents;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_dir;
-use function time;
-use function unlink;
-use const IPS\CIC2;
-use const IPS\DEMO_MODE;
-use const IPS\FILE_PERMISSION_NO_WRITE;
-use const IPS\IN_DEV;
-use const IPS\IPS_ALPHA_BUILD;
-use const IPS\IPS_FILE_PERMISSION;
-use const IPS\IPS_FOLDER_PERMISSION;
-use const IPS\IPS_PASSWORD;
-use const IPS\NO_WRITES;
-use const IPS\SITE_FILES_PATH;
-use const IPS\TEMP_DIRECTORY;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Application & Module Management Controller
  */
-class applications extends Controller
+class _applications extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = 'IPS\Application';
+	protected $nodeClass = 'IPS\Application';
 
 	/**
 	 * Description can contain HTML?
 	 */
-	public bool $_descriptionHtml = TRUE;
+	public $_descriptionHtml = TRUE;
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'app_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'app_manage' );
 		parent::execute();
 	}
 
@@ -133,129 +53,93 @@ class applications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		/* Create the basic tree */
-		if ( !Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
-			if( IPS::canManageResources() )
+			if( \IPS\IPS::canManageResources() )
 			{
-				if ( IPS::checkThirdParty() )
-				{
-					Output::i()->output = Theme::i()->getTemplate('forms')->blurb( 'applications_blurb' );
-				}
-				else
-				{
-					Output::i()->output = Theme::i()->getTemplate('forms')->blurb('applications_blurb_no_custom');
-				}
+				\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate('forms')->blurb( 'applications_blurb' );
 			}
 			else
 			{
-				Output::i()->output = Theme::i()->getTemplate('forms')->blurb( 'applications_blurb_no_upload' );
+				\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate('forms')->blurb( 'applications_blurb_no_upload' );
 			}
 		}
 		parent::manage();
 
 		/* Find uninstalled applications */
 		$uninstalled	= array();
-		$legacyApps		= array();
-		$installed		= array_keys( Application::applications() );
+		$installed		= array_keys( \IPS\Application::applications() );
 
-		/* Build a list of uninstalled and legacy apps */
-		$applicationDirectories = [ \IPS\ROOT_PATH . "/applications/" ];
-		if( CIC2 and is_dir( SITE_FILES_PATH . "/applications/" ) )
+		foreach ( new \DirectoryIterator( \IPS\ROOT_PATH . "/applications/" ) as $file )
 		{
-			$applicationDirectories[] = SITE_FILES_PATH. "/applications/";
-		}
-		foreach( $applicationDirectories as $dir )
-		{
-			foreach ( new DirectoryIterator( $dir ) as $file )
+			if ( $file->isDir() AND !\in_array( $file->getFilename(), $installed ) AND !$file->isDot() )
 			{
-				if ( $file->isDir() AND !in_array( $file->getFilename(), $installed ) AND !$file->isDot() )
+				if( file_exists( $file->getPathname() . '/data/application.json' ) )
 				{
-					if( file_exists( $file->getPathname() . '/data/application.json' ) )
-					{
-						$application	= json_decode( file_get_contents( $file->getPathname() . '/data/application.json' ), TRUE );
+					$application	= json_decode( file_get_contents( $file->getPathname() . '/data/application.json' ), TRUE );
 
-						$uninstalled[ $file->getFilename() ]	= array(
-							'title'		=> $application['application_title'],
-							'author'	=> $application['app_author'],
-							'website'	=> $application['app_website'],
-						);
-					}
-				}
-			}
-		}
-
-		/* And 4.x applications not yet upgraded */
-		foreach ( Db::i()->select( '*', 'core_applications', Db::i()->in( 'app_directory', array_merge( IPS::$ipsApps, $installed ), true ), 'app_position' ) as $application )
-		{
-			try
-			{
-				if( $application['app_requires_manual_intervention'] and !in_array( $application['app_directory'], IPS::$ipsApps ) )
-				{
-					$legacyApps[ $application['app_directory'] ]	= array(
-						'title'		=> $application['app_title'] ?? $application['app_directory'],
+					$uninstalled[ $file->getFilename() ]	= array(
+						'title'		=> $application['application_title'],
 						'author'	=> $application['app_author'],
 						'website'	=> $application['app_website'],
-						'update_version' => ( $application['app_update_version'] ? json_decode( $application['app_update_version'], true ) : null ),
-						'long_version' => $application['app_long_version'],
-						'version' => $application['app_version']
-					);
-
-					if( isset( $uninstalled[ $application['app_directory'] ] ) )
-					{
-						unset( $uninstalled[ $application['app_directory'] ] );
-					}
-				}
-				else
-				{
-					Application::constructFromData( $application );
-				}
-			}
-			catch( UnexpectedValueException $e )
-			{
-				if ( mb_stristr( $e->getMessage(), 'Missing:' ) )
-				{
-					$legacyApps[ $application['app_directory'] ]	= array(
-						'title'		=> $application['app_title'] ?? $application['app_directory'],
-						'author'	=> $application['app_author'],
-						'website'	=> $application['app_website'],
-						'update_version' => ( $application['app_update_version'] ? json_decode( $application['app_update_version'], true ) : null ),
-						'long_version' => $application['app_long_version'],
-						'version' => $application['app_version']
 					);
 				}
 			}
 		}
 
-		if( count( $uninstalled ) AND empty( Request::i()->root ) )
+		if ( \IPS\CIC2 )
+		{
+			if ( \is_dir( \IPS\SITE_FILES_PATH . "/applications/" ) )
+			{
+				foreach( new \DirectoryIterator( \IPS\SITE_FILES_PATH . "/applications/" ) AS $file )
+				{
+					if ( $file->isDir() AND !\in_array( $file->getFilename(), $installed ) AND !$file->isDot() )
+					{
+						if ( file_exists( $file->getPathname() . '/data/application.json' ) )
+						{
+							$application	= json_decode( file_get_contents( $file->getPathname() . '/data/application.json' ), TRUE );
+
+							$uninstalled[ $file->getFilename() ]	= array(
+								'title'		=> $application['application_title'],
+								'author'	=> $application['app_author'],
+								'website'	=> $application['app_website'],
+							);
+						}
+					}
+				}
+			}
+		}
+
+		if( \count( $uninstalled ) AND empty( \IPS\Request::i()->root ) )
 		{
 			$baseUrl	= $this->url;
-			$tree = new Tree(
+			$tree = new \IPS\Helpers\Tree\Tree(
 				$this->url,
-				Member::loggedIn()->language()->addToStack('uninstalled_applications'),
+				\IPS\Member::loggedIn()->language()->addToStack('uninstalled_applications'),
 				function() use ( $uninstalled, $baseUrl )
 				{
 					$rows = array();
 
-					if( !empty($uninstalled) AND is_array($uninstalled) )
+					if( !empty($uninstalled) AND \is_array($uninstalled) )
 					{
 						foreach ( $uninstalled as $k => $app )
 						{
 							$buttons = array();
-							if( IPS::canManageResources() )
+							if( \IPS\IPS::canManageResources() )
 							{
 								$buttons = array(
 									'add'	=> array(
 										'icon'		=> 'plus-circle',
 										'title'		=> 'install',
-										'link'		=> Url::internal( "app=core&module=applications&controller=applications&appKey={$k}&do=install" )->csrf(),
+										'link'		=> \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&appKey={$k}&do=install" )->csrf(),
 									)
 								);
 							}
 
-							$rows[ $k ] = Theme::i()->getTemplate( 'trees' )->row( $baseUrl, $k, $app['title'], FALSE, $buttons );
+							$rows[ $k ] = \IPS\Theme::i()->getTemplate( 'trees' )->row( $baseUrl, $k, $app['title'], FALSE, $buttons );
 						}
 					}
 					return $rows;
@@ -263,18 +147,18 @@ class applications extends Controller
 				function( $key, $root=FALSE ) use ( $uninstalled, $baseUrl )
 				{
 					$buttons = array();
-					if( IPS::canManageResources() AND IPS::checkThirdParty() )
+					if( \IPS\IPS::canManageResources() )
 					{
 						$buttons = array(
 							'add'	=> array(
 								'icon'		=> 'plus-circle',
 								'title'		=> 'install',
-								'link'		=> Url::internal( "app=core&module=applications&controller=applications&appKey={$key}&do=install" )->csrf(),
+								'link'		=> \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&appKey={$key}&do=install" )->csrf(),
 							)
 						);
 					}
 
-					return Theme::i()->getTemplate( 'trees' )->row( $baseUrl, $key, $uninstalled[ $key ]['title'], FALSE, $buttons, '', NULL, NULL, $root );
+					return \IPS\Theme::i()->getTemplate( 'trees' )->row( $baseUrl, $key, $uninstalled[ $key ]['title'], FALSE, $buttons, '', NULL, NULL, $root );
 				},
 				function() { return 0; },
 				function() { return array(); },
@@ -284,61 +168,54 @@ class applications extends Controller
 				TRUE
 			);
 
-			Output::i()->output .= Theme::i()->getTemplate( 'applications' )->applicationWrapper( $tree, 'uninstalled_applications' );
+			\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'applications' )->applicationWrapper( $tree, 'uninstalled_applications' );
 		}
 
-		if( count( $legacyApps ) AND empty( Request::i()->root ) )
+		/* And 3.x applications not yet upgraded */
+		$legacyApps = array();
+		foreach ( \IPS\Db::i()->select( '*', 'core_applications', NULL, 'app_position' ) as $application )
+		{
+			try
+			{
+				\IPS\Application::constructFromData( $application );
+			}
+			catch( \UnexpectedValueException $e )
+			{
+				if ( mb_stristr( $e->getMessage(), 'Missing:' ) )
+				{
+					$legacyApps[ $application['app_directory'] ]	= array(
+						'title'		=> isset( $application['app_title'] ) ? $application['app_title'] : $application['app_directory'],
+						'author'	=> $application['app_author'],
+						'website'	=> $application['app_website'],
+					);
+				}
+			}
+		}
+		if( \count( $legacyApps ) AND empty( \IPS\Request::i()->root ) )
 		{
 			$baseUrl	= $this->url;
-			$legacyTree = new Tree(
+			$legacyTree = new \IPS\Helpers\Tree\Tree(
 				$this->url,
-				Member::loggedIn()->language()->addToStack('legacy_applications'),
+				\IPS\Member::loggedIn()->language()->addToStack('legacy_applications'),
 				function() use ( $legacyApps, $baseUrl )
 				{
 					$rows = array();
- 					if( !empty( $legacyApps ) AND is_array( $legacyApps ) )
+ 					if( !empty( $legacyApps ) AND \is_array( $legacyApps ) )
 					{
 						foreach ( $legacyApps as $k => $app )
 						{
-							$badge = null;
 							$buttons = array();
-							if( IPS::canManageResources() AND IPS::checkThirdParty() )
+							if( \IPS\IPS::canManageResources() )
 							{
 								$buttons['upgrade'] = array(
 									'icon' => 'upload',
 									'title' => 'upload_new_version',
-									'link' => Url::internal( "app=core&module=applications&controller=applications&appKey={$k}&do=upload" ),
-									'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'upload_new_version' ) )
+									'link' => \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&appKey={$k}&do=upload" ),
+									'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack( 'upload_new_version' ) )
 								);
-
-								if( isset( $app['update_version'] ) and is_iterable( $app['update_version'] ) )
-								{
-									$update = null;
-									if ( !isset( $app['update_version'][0] ) and isset( $app['update_version']['longversion'] ) )
-									{
-										$app['update_version'] = array( $app['update_version'] );
-									}
-
-									foreach ( $app['update_version'] as $data )
-									{
-										if( !empty( $data['longversion'] ) and $data['longversion'] > $app['long_version'] and $data['version'] != $app['version'] )
-										{
-											if( $data['released'] AND ( (int) $data['released'] != $data['released'] OR strlen($data['released']) != 10 ) )
-											{
-												$data['released']	= strtotime( $data['released'] );
-											}
-											$update = $data;
-										}
-									}
-
-									if( $update !== null )
-									{
-										$badge = [ 'new', '', Theme::i()->getTemplate( 'global', 'core' )->updatebadge( $update['version'], $update['updateurl'] ?? '', DateTime::ts( $update['released'] )->localeDate() ) ];
-									}
-								}
 							}
 
-							if( Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'app_delete' ) )
+							if( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'app_delete' ) )
 							{
 								$buttons['delete'] = array(
 									'icon'	=> 'times-circle',
@@ -349,7 +226,7 @@ class applications extends Controller
 								);
 							}
 
-							$rows[ $k ] = Theme::i()->getTemplate( 'trees' )->row( $baseUrl, $k, $app['title'], FALSE, $buttons, $app['author'], null, null, false, null, null, $badge );
+							$rows[ $k ] = \IPS\Theme::i()->getTemplate( 'trees' )->row( $baseUrl, $k, $app['title'], FALSE, $buttons );
 						}
 					}
 					return $rows;
@@ -357,17 +234,17 @@ class applications extends Controller
 				function( $key, $root=FALSE ) use ( $legacyApps, $baseUrl )
 				{
 					$buttons = array();
-					if( IPS::canManageResources() AND IPS::checkThirdParty() )
+					if( \IPS\IPS::canManageResources() )
 					{
 						$buttons['upgrade']	= array(
 							'icon' => 'upload',
 							'title' => 'upload_new_version',
-							'link' => Url::internal( "app=core&module=applications&controller=applications&appKey={$key}&do=upload" ),
-							'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'upload_new_version' ) )
+							'link' => \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&appKey={$key}&do=upload" ),
+							'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack( 'upload_new_version' ) )
 						);
 					}
 
-					if( Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'app_delete' ) )
+					if( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'app_delete' ) )
 					{
 						$buttons['delete'] = array(
 							'icon'	=> 'times-circle',
@@ -378,7 +255,7 @@ class applications extends Controller
 						);
 					}
 
-					return Theme::i()->getTemplate( 'trees' )->row( $baseUrl, $key, $legacyApps[ $key ]['title'], FALSE, $buttons, '', NULL, NULL, $root );
+					return \IPS\Theme::i()->getTemplate( 'trees' )->row( $baseUrl, $key, $legacyApps[ $key ]['title'], FALSE, $buttons, '', NULL, NULL, $root );
 				},
 				function() { return 0; },
 				function() { return array(); },
@@ -388,57 +265,27 @@ class applications extends Controller
 				TRUE
 			);
 
-			Output::i()->output .= Theme::i()->getTemplate( 'applications' )->applicationWrapper( $legacyTree, 'legacy_applications' );
+			\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'applications' )->applicationWrapper( $legacyTree, 'legacy_applications' );
 		}
 
 		/* Javascript */
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_system.js', 'core', 'admin' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_system.js', 'core', 'admin' ) );
 
 		/* Check for updates button */
-		Output::i()->sidebar['actions']['settings'] = array(
+		\IPS\Output::i()->sidebar['actions']['settings'] = array(
 			'icon'	=> 'refresh',
-			'link'	=> Url::internal( 'app=core&module=applications&controller=applications&do=updateCheck' )->csrf(),
+			'link'	=> \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications&do=updateCheck' )->csrf(),
 			'title'	=> 'check_for_updates',
 		);
-
-		if( IPS::canManageResources() and IPS::checkThirdParty() )
+		if ( \IPS\IN_DEV )
 		{
-			Output::i()->sidebar['actions']['upload'] = array(
-				'icon' => 'upload',
-				'title' => 'upload',
-				'link' => Url::internal( "app=core&module=applications&controller=applications&do=upload" ),
-				'data' => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'install_application' ) )
-			);
-		}
-
-		if ( IN_DEV )
-		{
-			Output::i()->sidebar['actions']['build_all'] = array(
+			\IPS\Output::i()->sidebar['actions']['build_all'] = array(
 				'icon'	=> 'cogs',
-				'link'	=> Url::internal( 'app=core&module=applications&controller=applications&do=buildAll' ),
+				'link'	=> \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications&do=buildAll' ),
 				'title'	=> 'build_all_apps',
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('build_all_apps') )
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('build_all_apps') )
 			);
 		}
-	}
-
-	/**
-	 * Redirect after save
-	 *
-	 * @param Model|null $old			A clone of the node as it was before or NULL if this is a creation
-	 * @param Model $new			The node now
-	 * @param bool|string $lastUsedTab	The tab last used in the form
-	 * @return	void
-	 */
-	protected function _afterSave( ?Model $old, Model $new, bool|string $lastUsedTab = FALSE ): void
-	{
-		/* Redirect to the dev center */
-		if( IN_DEV )
-		{
-			Output::i()->redirect( Url::internal( "app=core&module=developer&controller=details&appKey=" . $new->directory ) );
-		}
-
-		parent::_afterSave( $old, $new, $lastUsedTab );
 	}
 
 	/**
@@ -446,14 +293,14 @@ class applications extends Controller
 	 *
 	 * @return	void
 	 */
-	public function updateCheck() : void
+	public function updateCheck()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		$task = Task::constructFromData( Db::i()->select( '*', 'core_tasks', array( 'app=? AND `key`=?', 'core', 'updatecheck' ) )->first() );
+		$task = \IPS\Task::constructFromData( \IPS\Db::i()->select( '*', 'core_tasks', array( 'app=? AND `key`=?', 'core', 'updatecheck' ) )->first() );
 		$task->type = 'manual';
 		$task->run();
-		Output::i()->redirect( Url::internal( "app=core&module=applications&controller=applications" ), 'update_check_complete' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=applications" ), 'update_check_complete' );
 	}
 
 	/**
@@ -461,21 +308,21 @@ class applications extends Controller
 	 *
 	 * @return void
 	 */
-	public function setAsDefault() : void
+	public function setAsDefault()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		$application = Application::load( Request::i()->appKey );
+		$application = \IPS\Application::load( \IPS\Request::i()->appKey );
 
-		if ( !count( $application->modules( 'front' ) ) )
+		if ( !\count( $application->modules( 'front' ) ) )
 		{
-			Output::i()->error( 'app_cannot_be_default', '2C133/W', 403, '' );
+			\IPS\Output::i()->error( 'app_cannot_be_default', '2C133/W', 403, '' );
 		}
 
 		$application->setAsDefault();
-		Session::i()->log( 'acplog__application_set_default', array( $application->titleForLog() => FALSE ) );
+		\IPS\Session::i()->log( 'acplog__application_set_default', array( $application->titleForLog() => FALSE ) );
 
-		Output::i()->redirect( Url::internal( "app=core&module=applications&controller=applications" ), 'saved' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=applications" ), 'saved' );
 	}
 
 	/**
@@ -483,21 +330,21 @@ class applications extends Controller
 	 *
 	 * @return void
 	 */
-	public function setDefaultModule() : void
+	public function setDefaultModule()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		try
 		{
-			$module	= Module::load( Request::i()->id );
+			$module	= \IPS\Application\Module::load( \IPS\Request::i()->id );
 			$module->setAsDefault();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'no_module_for_default', '2C133/A', 403, '' );
+			\IPS\Output::i()->error( 'no_module_for_default', '2C133/A', 403, '' );
 		}
 
-		Output::i()->redirect( Url::internal( "app=core&module=applications&controller=applications&root={$module->application}" ), 'saved' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&root={$module->application}" ), 'saved' );
 	}
 
 	/**
@@ -506,20 +353,19 @@ class applications extends Controller
 	 * @param	int|string	$id		Row ID
 	 * @return	array
 	 */
-	public function _getChildren( int|string $id ): array
+	public function _getChildren( $id )
 	{
 		$rows = array();
 
-		/* @var Model $nodeClass */
 		$nodeClass = $this->nodeClass;
 
 		try
 		{
 			$node	= $nodeClass::load( $id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2S101/R', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2S101/R', 404, '' );
 		}
 
 		foreach ( $node->children( NULL ) as $child )
@@ -538,17 +384,16 @@ class applications extends Controller
 	/**
 	 * Get Single Row
 	 *
-	 * @param mixed $id May be ID number (or key) or an \IPS\Node\Model object
-	 * @param bool $root Format this as the root node?
-	 * @param bool $noSort If TRUE, sort options will be disabled (used for search results)
-	 * @return    string
-	 * @note    Overridden so we can set the status toggle information to provide the offline message/permissions functionality
-	 * @throws Exception
+	 * @param	mixed	$id		May be ID number (or key) or an \IPS\Node\Model object
+	 * @param	bool	$root	Format this as the root node?
+	 * @param	bool	$noSort	If TRUE, sort options will be disabled (used for search results)
+	 * @return	string
+	 * @note	Overridden so we can set the status toggle information to provide the offline message/permissions functionality
 	 */
-	public function _getRow( mixed $id, bool $root=FALSE, bool $noSort=FALSE ): string
+	public function _getRow( $id, $root=FALSE, $noSort=FALSE )
 	{
 		/* Load the node first */
-		if ( $id instanceof Model )
+		if ( $id instanceof \IPS\Node\Model )
 		{
 			$node = $id;
 		}
@@ -557,59 +402,32 @@ class applications extends Controller
 			try
 			{
 				$nodeClass = $this->nodeClass;
-				/* @var $nodeClass Model */
 				$node = $nodeClass::load( $id );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				Output::i()->error( 'node_error', '2S101/P', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2S101/P', 404, '' );
 			}
 		}
 
 		/* Don't do this for modules, just applications */
-		if( $node instanceof Module )
+		if( $node instanceof \IPS\Application\Module )
 		{
 			return parent::_getRow( $node, $root, $noSort );
 		}
 
-		if ( Application::appIsEnabled('cloud') )
-		{
-			$config = \IPS\cloud\Application::getCloudAppPermissions();
-
-			if ( isset( $config['_other']['disabled_apps'] ) )
-			{
-				if ( is_array( $config['_other']['disabled_apps'] ) and isset( $config['_other']['disabled_apps']['what'] ) )
-				{
-					$time = ( isset( $config['_other']['disabled_apps']['when'] ) and mb_substr( $config['_other']['disabled_apps']['when'], 0, 1 ) == 'P' )
-						? DateTime::ts( Settings::i()->board_start )->add( new DateInterval( $config['_other']['disabled_apps']['when'] ) )->getTimestamp()
-						: 0;
-
-					if ( is_array( $config['_other']['disabled_apps']['what'] ) and count( $config['_other']['disabled_apps']['what'] ) )
-					{
-						foreach ( $config['_other']['disabled_apps']['what'] as $key )
-						{
-							if ( $key === $node->directory and $time < time() )
-							{
-								return Theme::i()->getTemplate( 'applications', 'cloud', 'admin' )->appDisabled( $node );
-							}
-						}
-					}
-				}
-			}
-		}
-
 		/* Work out buttons */
-		$buttons = $node->getButtons($this->url, !($node instanceof $this->nodeClass));
-		if ( isset( Request::i()->searchResult ) and isset( $buttons['edit'] ) )
+		$buttons = $node->getButtons( $this->url, !( $node instanceof $this->nodeClass ) );
+		if ( isset( \IPS\Request::i()->searchResult ) and isset( $buttons['edit'] ) )
 		{
-			$buttons['edit']['link'] = $buttons['edit']['link']->setQueryString( 'searchResult', Request::i()->searchResult );
+			$buttons['edit']['link'] = $buttons['edit']['link']->setQueryString( 'searchResult', \IPS\Request::i()->searchResult );
 		}
 
 		/* Return */
-		return Theme::i()->getTemplate( 'trees', 'core' )->row(
+		return \IPS\Theme::i()->getTemplate( 'trees', 'core' )->row(
 			$this->url,
 			$node->_id,
-			Theme::i()->getTemplate('applications')->appRowTitle( $node ),
+			\IPS\Theme::i()->getTemplate('applications')->appRowTitle( $node ),
 			$node->childrenCount( NULL ),
 			$buttons,
 			$node->_description,
@@ -617,13 +435,13 @@ class applications extends Controller
 			( $node->canEdit() ) ? $node->_position : NULL,
 			$root,
 			$node->_enabled,
-			( $node->_locked or !$node->canEdit() or NO_WRITES ),
-			( ( $node instanceof Model ) ? $node->_badge : $this->_getRowBadge( $node ) ),
+			( $node->_locked or !$node->canEdit() or \IPS\NO_WRITES ),
+			( ( $node instanceof \IPS\Node\Model ) ? $node->_badge : $this->_getRowBadge( $node ) ),
 			TRUE,
 			$this->_descriptionHtml,
 			$node->canAdd(),
 			TRUE,
-            Theme::i()->getTemplate('applications')->appRowAdditional( $node ),
+			\IPS\Theme::i()->getTemplate('applications')->appRowAdditional( $node ),
 			$node->_lockedLang
 		);
 	}
@@ -633,49 +451,47 @@ class applications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function permissions() : void
+	protected function permissions()
 	{
 		/* Work out which class we're using */
-		/* @var Model $nodeClass */
 		$nodeClass = $this->nodeClass;
-		if ( Request::i()->subnode )
+		if ( \IPS\Request::i()->subnode )
 		{
-			parent::permissions();
-			return;
+			return parent::permissions();
 		}
 
 		/* Load Node */
 		try
 		{
-			$node = $nodeClass::load( Request::i()->id );
+			$node = $nodeClass::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '3S101/A', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '3S101/A', 404, '' );
 		}
 
 		/* Check we're not locked */
 		if( $node->_locked or !$node->canEdit() )
 		{
-			Output::i()->error( 'node_noperm_enable', '2S101/3', 403, '' );
+			\IPS\Output::i()->error( 'node_noperm_enable', '2S101/3', 403, '' );
 		}
 
 		/* Create the form */
-		$form = new Form;
-		$form->add( new YesNo( 'app_enabled', $node->disabled_groups === NULL, TRUE, array( 'togglesOff' => array( 'app_disabled_groups', 'app_disabled_message_editor' ), 'disabled' => NO_WRITES ) ) );
-		if ( NO_WRITES )
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\YesNo( 'app_enabled', $node->disabled_groups === NULL, TRUE, array( 'togglesOff' => array( 'app_disabled_groups', 'app_disabled_message_editor' ), 'disabled' => \IPS\NO_WRITES ) ) );
+		if ( \IPS\NO_WRITES )
 		{
-			Member::loggedIn()->language()->words['app_enabled_desc'] = Member::loggedIn()->language()->addToStack( 'app_enabled_desc_no_writes' );
+			\IPS\Member::loggedIn()->language()->words['app_enabled_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'app_enabled_desc_no_writes' );
 		}
 
-		$form->add( new CheckboxSet( 'app_disabled_groups', ( $node->disabled_groups == '*' or $node->disabled_groups === NULL ) ? '*' : explode( ',', $node->disabled_groups ), FALSE, array(
-			'options' 	=> array_combine( array_keys( Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, Group::groups() ) ),
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'app_disabled_groups', ( $node->disabled_groups == '*' or $node->disabled_groups === NULL ) ? '*' : explode( ',', $node->disabled_groups ), FALSE, array(
+			'options' 	=> array_combine( array_keys( \IPS\Member\Group::groups() ), array_map( function( $_group ) { return (string) $_group; }, \IPS\Member\Group::groups() ) ),
 			'multiple' 	=> true,
 			'unlimited'		=> '*',
 			'unlimitedLang'	=> 'all',
 			'impliedUnlimited' => TRUE
 		), NULL, NULL, NULL, 'app_disabled_groups' ) );
-		$form->add( new Editor( 'app_disabled_message', $node->disabled_message, FALSE, array( 'app' => 'core', 'key' => 'Admin', 'autoSaveKey' => $node->_key . 'app_disabled_message', 'attachIds' => array( $node->id, NULL, 'appdisabled' ) ), NULL, NULL, NULL, 'app_disabled_message_editor' ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'app_disabled_message', $node->disabled_message, FALSE, array( 'app' => 'core', 'key' => 'Admin', 'autoSaveKey' => $node->_key . 'app_disabled_message', 'attachIds' => array( $node->id, NULL, 'appdisabled' ) ), NULL, NULL, NULL, 'app_disabled_message_editor' ) );
 
 		/* And then save the values, if appropriate */
 		if ( $values = $form->values() )
@@ -684,14 +500,22 @@ class applications extends Controller
 			$node->disabled_groups	= $values['app_enabled'] ? NULL : ( $values['app_disabled_groups'] == '*' ? '*' : implode( ',', $values['app_disabled_groups'] ) );
 			$node->save();
 
+			if ( !\IPS\NO_WRITES )
+			{
+				\IPS\Plugin\Hook::writeDataFile();
+			}
+
 			/* Clear templates to rebuild automatically */
-			Theme::deleteCompiledTemplate();
+			\IPS\Theme::deleteCompiledTemplate();
+
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
 
 			$this->_logToggleAndRedirect( $node );
 		}
 
 		/* Display */
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 
 	/**
@@ -699,9 +523,9 @@ class applications extends Controller
 	 *
 	 * @param	string	$appKey					The application key
 	 * @param	bool	$includeDownloadOption	If a "just download" option should be included
-	 * @return	Form
+	 * @return	\IPS\Helpers\Form
 	 */
-	protected function _buildForm( string $appKey, bool $includeDownloadOption=FALSE ) : Form
+	protected function _buildForm( $appKey, $includeDownloadOption=FALSE )
 	{
 		$json = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$appKey}/data/versions.json" ), TRUE );
 		ksort( $json );
@@ -712,7 +536,7 @@ class applications extends Controller
 		foreach ( array_reverse( $json, TRUE ) as $long => $human )
 		{
 			$exploded = explode( '.', $human );
-			$defaults['human'] = "{$exploded[0]}.{$exploded[1]}." . ( intval( $exploded[2] ) + 1 );
+			$defaults['human'] = "{$exploded[0]}.{$exploded[1]}." . ( \intval( $exploded[2] ) + 1 );
 			$defaults['long'] = $long + 1;
 			break;
 		}
@@ -724,7 +548,7 @@ class applications extends Controller
 		if ( $human !== NULL )
 		{
 			$options['options']['rebuild'] = 'developer_build_type_rebuild';
-			Member::loggedIn()->language()->words['developer_build_type_rebuild'] = sprintf( Member::loggedIn()->language()->get('developer_build_type_rebuild'), $human );
+			\IPS\Member::loggedIn()->language()->words['developer_build_type_rebuild'] = sprintf( \IPS\Member::loggedIn()->language()->get('developer_build_type_rebuild'), $human );
 		}
 		$options['options']['new'] = 'developer_build_new';
 		if ( $includeDownloadOption )
@@ -732,40 +556,30 @@ class applications extends Controller
 			$options['options']['download'] = 'developer_build_download';
 		}
 
-		$form = new Form;
-		$form->add( new Radio( 'developer_build_type', 'rebuild', TRUE, $options ) );
-		$form->add( new Text( 'versions_human', $defaults['human'], NULL, array(), function( $val )
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Radio( 'developer_build_type', 'rebuild', TRUE, $options ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'versions_human', $defaults['human'], NULL, array(), function( $val )
 		{
 			if ( !preg_match( '/^([0-9]+\.[0-9]+\.[0-9]+)/', $val ) )
 			{
-				throw new DomainException( 'versions_human_bad' );
+				throw new \DomainException( 'versions_human_bad' );
 			}
 		}, NULL, NULL, 'versions_human' ) );
-		$form->add( new Text( 'versions_long', $defaults['long'], NULL, array(), function( $val ) use ( $json )
+		$form->add( new \IPS\Helpers\Form\Text( 'versions_long', $defaults['long'], NULL, array(), function( $val ) use ( $json )
 		{
 			if ( !preg_match( '/^\d*$/', $val ) )
 			{
-				throw new DomainException( 'form_number_bad' );
+				throw new \DomainException( 'form_number_bad' );
 			}
 			if( $val < 10000 )
 			{
-				throw new DomainException( 'versions_long_too_low' );
+				throw new \DomainException( 'versions_long_too_low' );
 			}
 			if( isset( $json[ $val ] ) )
 			{
-				throw new DomainException( 'versions_long_exists' );
+				throw new \DomainException( 'versions_long_exists' );
 			}
 		}, NULL, NULL, 'versions_long' ) );
-
-		$app = Application::load( $appKey );
-		if( !in_array( $app->directory, IPS::$ipsApps ) )
-		{
-			 /* Show current description */
-			$form->addHeader( 'app_details_app_description');
-			$html = Theme::i()->getTemplate( 'applications' )->appDescConfirm($app);
-			$form->addHtml( Theme::i()->getTemplate( 'forms' )->blurb( $html , false, true ) );
-			$form->addButton( 'cancel', 'button', class: 'ipsButton ipsButton--negative', attributes: ['data-action'=>"dialogClose"]);
-		}
 
 		return $form;
 	}
@@ -775,20 +589,26 @@ class applications extends Controller
 	 *
 	 * @return void
 	 */
-	public function buildAll() : void
+	public function buildAll()
 	{
-		if ( !IN_DEV )
+		if ( !\IPS\IN_DEV )
 		{
-			Output::i()->error( 'not_in_dev', '2C133/M', 403, '' );
+			\IPS\Output::i()->error( 'not_in_dev', '2C133/M', 403, '' );
 		}
 
 		$form = $this->_buildForm( 'core' );
-		$form->add( new YesNo( 'developer_build_submit', (bool) IPS_PASSWORD ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'developer_build_submit', (bool) \IPS\IPS_PASSWORD ) );
 
 		if ( $values = $form->values() )
 		{
-			foreach ( Application::applications() as $application )
+			foreach ( \IPS\Application::applications() as $application )
 			{
+				/* Skip building defined apps */
+				if( \in_array( $application->directory, \IPS\DEV_SKIP_BUILD_APPS ) )
+				{
+					continue;
+				}
+
 				if ( $values['developer_build_type'] === 'new' )
 				{
 					$application->assignNewVersion( $values['versions_long'], $values['versions_human'] );
@@ -798,23 +618,23 @@ class applications extends Controller
 				{
 					$application->build();
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
-					Output::i()->error( $e->getMessage(), '' );
+					\IPS\Output::i()->error( $e->getMessage(), '' );
 				}
 			}
 
 			if ( $values['developer_build_submit'] )
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=applications&controller=applications&do=submit' )->csrf() );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications&do=submit' )->csrf() );
 			}
 			else
 			{
-				Output::i()->redirect( Url::internal( 'app=core&module=applications&controller=applications' ), 'application_now_built' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications' ), 'application_now_built' );
 			}
 		}
 
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 
 	/**
@@ -822,20 +642,14 @@ class applications extends Controller
 	 *
 	 * @return void
 	 */
-	public function build() : void
+	public function build()
 	{
-		if ( !IN_DEV )
+		if ( !\IPS\IN_DEV )
 		{
-			Output::i()->error( 'not_in_dev', '2C133/N', 403, '' );
+			\IPS\Output::i()->error( 'not_in_dev', '2C133/N', 403, '' );
 		}
 
-		$application = Application::load( Request::i()->appKey );
-
-		if( !in_array( $application->directory, IPS::$ipsApps ) and $application->description == '' )
-		{
-			Output::i()->output = Theme::i()->getTemplate( 'applications' )->appDescMissing( $application );
-			return;
-		}
+		$application = \IPS\Application::load( \IPS\Request::i()->appKey );
 
 		$form = $this->_buildForm( $application->directory );
 
@@ -850,15 +664,15 @@ class applications extends Controller
 			{
 				$application->build();
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				Output::i()->error( $e->getMessage() . "\n" . $e->getTraceAsString(), '' );
+				\IPS\Output::i()->error( $e->getMessage(), '' );
 			}
 
-			Output::i()->redirect( Url::internal( 'app=core&module=developer&appKey=' . $application->directory ), 'application_now_built' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications' ), 'application_now_built' );
 		}
 
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 
 	/**
@@ -868,28 +682,28 @@ class applications extends Controller
 	 */
 	public function downloadNullForums()
 	{
-		$application = Application::load( Request::i()->appKey );
+		$application = \IPS\Application::load( \IPS\Request::i()->appKey );
 
 		try
 		{
-			$pharPath	= str_replace( '\\', '/', rtrim( TEMP_DIRECTORY, '/' ) ) . '/' . $application->directory . ".tar";
+			$pharPath	= str_replace( '\\', '/', rtrim( \IPS\TEMP_DIRECTORY, '/' ) ) . '/' . $application->directory . ".tar";
 			$download	= new \PharData( $pharPath, 0, $application->directory . ".tar", \Phar::TAR );
 
-			$download->buildFromIterator( new BuilderIterator( $application ), \IPS\ROOT_PATH . "/applications/" . $application->directory . "/" );
+			$download->buildFromIterator( new \IPS\Application\BuilderIterator( $application ) );
 		}
 		catch( \PharException $e )
 		{
-			Log::log( $e, 'phar' );
-			Output::i()->error( 'app_no_phar', '4C133/7', 403, '' );
+			\IPS\Log::log( $e, 'phar' );
+			\IPS\Output::i()->error( 'app_no_phar', '4C133/7', 403, '' );
 		}
 
-		$output	= \file_get_contents( rtrim( TEMP_DIRECTORY, '/' ) . '/' . $application->directory . ".tar" );
+		$output	= \file_get_contents( rtrim( \IPS\TEMP_DIRECTORY, '/' ) . '/' . $application->directory . ".tar" );
 
 		/* Cleanup */
 		unset($download);
 		\Phar::unlinkArchive($pharPath);
 
-		Output::i()->sendOutput( $output, 200, 'application/tar', array( 'Content-Disposition' => Output::getContentDisposition( 'attachment', Member::loggedIn()->language()->get('__app_' . $application->directory ) . " {$application->version}.tar" ) ), FALSE, FALSE, FALSE );
+		\IPS\Output::i()->sendOutput( $output, 200, 'application/tar', array( 'Content-Disposition' => \IPS\Output::getContentDisposition( 'attachment', \IPS\Member::loggedIn()->language()->get('__app_' . $application->directory ) . " {$application->version}.tar" ) ), FALSE, FALSE, FALSE );
 	}
 
 	/**
@@ -898,20 +712,14 @@ class applications extends Controller
 	 * @return void
 	 * @note	We have to use a custom RecursiveDirectoryIterator in order to skip the /dev folder
 	 */
-	public function download() : void
+	public function download()
 	{
-		$application = Application::load( Request::i()->appKey );
+		$application = \IPS\Application::load( \IPS\Request::i()->appKey );
 
 		/* Downloads need developer mode */
-		if( !IN_DEV )
+		if( !\IPS\IN_DEV )
 		{
-			Output::i()->error( 'not_in_dev', '2C133/10', 403, '' );
-		}
-
-		if( !in_array( $application->directory, IPS::$ipsApps ) and $application->description == '' )
-		{
-			Output::i()->output = Theme::i()->getTemplate( 'applications' )->appDescMissing( $application );
-			return;
+			\IPS\Output::i()->error( 'not_in_dev', '2C133/10', 403, '' );
 		}
 
 		$form = $this->_buildForm( $application->directory, TRUE );
@@ -927,49 +735,35 @@ class applications extends Controller
 				{
 					$application->build();
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
-					Output::i()->error( $e->getMessage(), '' );
+					\IPS\Output::i()->error( $e->getMessage(), '' );
 				}
 			}
 
 			try
 			{
-				$pharPath	= str_replace( '\\', '/', rtrim( TEMP_DIRECTORY, '/' ) ) . '/' . $application->directory . ".tar";
-				$download	= new PharData( $pharPath, 0, $application->directory . ".tar", Phar::TAR );
-				$download->buildFromIterator( new BuilderIterator( $application ), \IPS\ROOT_PATH . "/applications/" . $application->directory . "/" );
+				$pharPath	= str_replace( '\\', '/', rtrim( \IPS\TEMP_DIRECTORY, '/' ) ) . '/' . $application->directory . ".tar";
+				$download	= new \PharData( $pharPath, 0, $application->directory . ".tar", \Phar::TAR );
+
+				$download->buildFromIterator( new \IPS\Application\BuilderIterator( $application ) );
 			}
-			catch( PharException $e )
+			catch( \PharException $e )
 			{
-				Log::log( $e, 'phar' );
-				Output::i()->error( 'app_no_phar', '4C133/7', 403, '' );
+				\IPS\Log::log( $e, 'phar' );
+				\IPS\Output::i()->error( 'app_no_phar', '4C133/7', 403, '' );
 			}
 
-			$output	= file_get_contents( rtrim( TEMP_DIRECTORY, '/' ) . '/' . $application->directory . ".tar" );
-			unset( $download );
+			$output	= \file_get_contents( rtrim( \IPS\TEMP_DIRECTORY, '/' ) . '/' . $application->directory . ".tar" );
 
 			/* Cleanup */
-			register_shutdown_function( function () use ( $pharPath )
-			{
-				if ( file_exists( $pharPath ) )
-				{
-					try
-					{
-						Phar::unlinkArchive($pharPath);
-					}
-					catch( Exception $e ) { }
+			unset($download);
+			\Phar::unlinkArchive($pharPath);
 
-					if( file_exists( $pharPath ) )
-					{
-						unlink( $pharPath );
-					}
-				}
-			} );
-
-			Output::i()->sendOutput( $output, 200, 'application/tar', array( 'Content-Disposition' => Output::getContentDisposition( 'attachment', Member::loggedIn()->language()->get('__app_' . $application->directory ) . " {$application->version}.tar" ) ), FALSE, FALSE, FALSE );
+			\IPS\Output::i()->sendOutput( $output, 200, 'application/tar', array( 'Content-Disposition' => \IPS\Output::getContentDisposition( 'attachment', \IPS\Member::loggedIn()->language()->get('__app_' . $application->directory ) . " {$application->version}.tar" ) ), FALSE, FALSE, FALSE );
 		}
 
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 
 	/**
@@ -977,57 +771,51 @@ class applications extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function enableToggle() : void
+	protected function enableToggle()
 	{
-		/* Clear editor plugins so that it will automatically regenerate */
-		Application::resetEditorPlugins();
+		parent::enableToggle();
 
 		/* update the essential cookie name list */
-		unset( Store::i()->essentialCookieNames );
-
-		/* Call the parent last because it will send a JSON response.
-		Anything after this will not be executed. */
-		parent::enableToggle();
+		unset( \IPS\Data\Store::i()->essentialCookieNames );
 	}
 
 	/**
 	 * Upgrade an application that is currently installed. After importing a PHAR the user is redirected to this method.
 	 *
-	 * @return    void
-	 * @see        applications::import
+	 * @see		\IPS\core\modules\admin\applications\applications::import()
+	 * @return	void
 	 */
-	public function upgrade() : void
+	public function upgrade()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('upgrading_application');
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('upgrading_application');
 
-		unset( Store::i()->syncCompleted );
+		unset( \IPS\Data\Store::i()->syncCompleted );
 
-		$url = Url::internal( "app=core&module=applications&controller=applications&do=upgrade&appKey=" . Request::i()->appKey )->csrf();
+		$url = \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&do=upgrade&appKey=" . \IPS\Request::i()->appKey )->csrf();
 
-		Output::i()->output	= new MultipleRedirect(
+		\IPS\Output::i()->output	= new \IPS\Helpers\MultipleRedirect(
 			$url,
 			function( $data )
 			{
 				/* On first cycle return data */
-				if ( !is_array( $data ) )
+				if ( !\is_array( $data ) )
 				{
 					/* Does this application exist in the database? */
 					try
 					{
-						$app = Db::i()->select( "*", 'core_applications', [ 'app_directory=?', Request::i()->appKey ] )->first();
-						$app = Application::constructFromData( $app );
+						$app = \IPS\Application::load( \IPS\Request::i()->appKey );
 					}
-					catch( UnderflowException $e )
+					catch( \OutOfRangeException $e )
 					{
-						Output::i()->error( 'no_app_to_update', '3C133/G', 403, '' );
+						\IPS\Output::i()->error( 'no_app_to_update', '3C133/G', 403, '' );
 					}
 
 					/* Get the application data to update the application record */
-					if( file_exists( Application::getRootPath( Request::i()->appKey ) . '/applications/' . Request::i()->appKey . '/data/application.json' ) )
+					if( file_exists( \IPS\Application::getRootPath( \IPS\Request::i()->appKey ) . '/applications/' . \IPS\Request::i()->appKey . '/data/application.json' ) )
 					{
-						$application	= json_decode( file_get_contents( Application::getRootPath( $app->directory ) . '/applications/' . $app->directory . '/data/application.json' ), TRUE );
+						$application	= json_decode( file_get_contents( \IPS\Application::getRootPath( $app->directory ) . '/applications/' . $app->directory . '/data/application.json' ), TRUE );
 
 						//\IPS\Lang::saveCustom( $app->directory, "__app_{$app->directory}", $application['application_title'] );
 
@@ -1039,19 +827,16 @@ class applications extends Controller
 							$app->$column	= $value;
 						}
 
-						/* If we are upgrading, we can unlock */
-						$app->requires_manual_intervention = false;
-
 						$app->save();
 					}
 					else
 					{
-						Output::i()->error( 'app_invalid_data', '3C133/H', 403, '' );
+						\IPS\Output::i()->error( 'app_invalid_data', '3C133/H', 403, '' );
 					}
 
 					return array(
-						array( 'laststep' => 'start', 'key' => Request::i()->appKey ),
-						Member::loggedIn()->language()->addToStack('installing_application'),
+						array( 'laststep' => 'start', 'key' => \IPS\Request::i()->appKey ),
+						\IPS\Member::loggedIn()->language()->addToStack('installing_application'),
 						1
 					);
 				}
@@ -1066,25 +851,25 @@ class applications extends Controller
 				{
 					case 'start':
 						/* Determine our current version and the last version we ran */
-						$currentVersion	= Application::load( $data['key'] )->long_version;
-						$allVersions	= Application::load( $data['key'] )->getAllVersions();
+						$currentVersion	= \IPS\Application::load( $data['key'] )->long_version;
+						$allVersions	= \IPS\Application::load( $data['key'] )->getAllVersions();
 						$longVersions	= array_keys( $allVersions );
 						$humanVersions	= array_values( $allVersions );
-						$lastRan		= ( isset( $data['extra']['_last'] ) ) ? intval( $data['extra']['_last'] ) : $currentVersion;
+						$lastRan		= ( isset( $data['extra']['_last'] ) ) ? \intval( $data['extra']['_last'] ) : $currentVersion;
 
-						if( count($allVersions) )
+						if( \count($allVersions) )
 						{
 							$latestLVersion	= array_pop( $longVersions );
 							$latestHVersion	= array_pop( $humanVersions );
 
-							Db::i()->insert( 'core_upgrade_history', array( 'upgrade_version_human' => $latestHVersion, 'upgrade_version_id' => $latestLVersion, 'upgrade_date' => time(), 'upgrade_mid' => (int) Member::loggedIn()->member_id, 'upgrade_app' => $data['key'] ) );
+							\IPS\Db::i()->insert( 'core_upgrade_history', array( 'upgrade_version_human' => $latestHVersion, 'upgrade_version_id' => $latestLVersion, 'upgrade_date' => time(), 'upgrade_mid' => (int) \IPS\Member::loggedIn()->member_id, 'upgrade_app' => $data['key'] ) );
 						}
 
 						/* Now find any upgrade paths since the last one we ran that need to be executed */
-						$upgradeSteps	= Application::load( $data['key'] )->getUpgradeSteps( $lastRan );
+						$upgradeSteps	= \IPS\Application::load( $data['key'] )->getUpgradeSteps( $lastRan );
 
 						/* Did we find any? */
-						if( count( $upgradeSteps ) )
+						if( \count( $upgradeSteps ) )
 						{
 							/* Re-initialize $extra variable */
 							$extra	= array();
@@ -1092,7 +877,7 @@ class applications extends Controller
 							/* Store a count of all the upgrade steps for later use */
 							if( !$lastRan )
 							{
-								$extra['_totalSteps']			= count($upgradeSteps);
+								$extra['_totalSteps']			= \count($upgradeSteps);
 								$data['extra']['_totalSteps']	= $extra['_totalSteps'];
 							}
 							else
@@ -1103,7 +888,7 @@ class applications extends Controller
 							/* We need to populate \IPS\Request with the extra data returned from the last upgrader step call */
 							if( isset( $data['extra']['_upgradeData'] ) )
 							{
-								Request::i()->extra	= $data['extra']['_upgradeData'];
+								\IPS\Request::i()->extra	= $data['extra']['_upgradeData'];
 							}
 
 							/* Grab next upgrade step to run */
@@ -1113,26 +898,26 @@ class applications extends Controller
 							$extra['_last']	= $_next;
 
 							/* What step in the upgrader file are we on? */
-							$upgradeStep	= ( isset($data['extra']['_upgradeStep']) ) ? intval($data['extra']['_upgradeStep']) : 1;
+							$upgradeStep	= ( isset($data['extra']['_upgradeStep']) ) ? \intval($data['extra']['_upgradeStep']) : 1;
 
 							/* Delete removed language strings */
 							if( file_exists( \IPS\ROOT_PATH . "/applications/{$data['key']}/setup/upg_{$_next}/lang.json" ) )
  							{
- 								$langChanges = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$data['key']}/setup/upg_{$_next}/lang.json" ), TRUE );
+ 								$langChanges = json_decode( \file_get_contents( \IPS\ROOT_PATH . "/applications/{$data['key']}/setup/upg_{$_next}/lang.json" ), TRUE );
  								if ( isset( $langChanges['normal']['removed'] ) and $langChanges['normal']['removed'] )
  								{
- 									Db::i()->delete( 'core_sys_lang_words', array( array( 'word_app=?', $data['key'] ), array( 'word_js=0' ), array( Db::i()->in( 'word_key', $langChanges['normal']['removed'] ) ) ) );
+ 									\IPS\Db::i()->delete( 'core_sys_lang_words', array( array( 'word_app=?', $data['key'] ), array( 'word_js=0' ), array( \IPS\Db::i()->in( 'word_key', $langChanges['normal']['removed'] ) ) ) );
  								}
  								if ( isset( $langChanges['js']['removed'] ) and $langChanges['js']['removed'] )
  								{
- 									Db::i()->delete( 'core_sys_lang_words', array( array( 'word_app=?', $data['key'] ), array( 'word_js=1' ), array( Db::i()->in( 'word_key', $langChanges['js']['removed'] ) ) ) );
+ 									\IPS\Db::i()->delete( 'core_sys_lang_words', array( array( 'word_app=?', $data['key'] ), array( 'word_js=1' ), array( \IPS\Db::i()->in( 'word_key', $langChanges['js']['removed'] ) ) ) );
  								}
  							}
 
 							/* If we haven't run the raw queries yet, do so */
 							if( $upgradeStep == 1 AND !isset( $data['extra']['_upgradeData'] ) )
 							{
-								Application::load( $data['key'] )->installDatabaseUpdates( $_next );
+								\IPS\Application::load( $data['key'] )->installDatabaseUpdates( $_next );
 							}
 
 							/* Get the object */
@@ -1179,42 +964,42 @@ class applications extends Controller
 							}
 
 							$laststep		= 'start';
-							$language		= $language ?: Member::loggedIn()->language()->addToStack('appupdate_databasechanges', FALSE, array( 'sprintf' => $allVersions[ $_next ] ) );
-							$progress		= round( ( 30 * ( $data['extra']['_totalSteps'] - count($upgradeSteps) ) ) / ( $data['extra']['_totalSteps'] ?: 1 ) );
+							$language		= $language ?: \IPS\Member::loggedIn()->language()->addToStack('appupdate_databasechanges', FALSE, array( 'sprintf' => $allVersions[ $_next ] ) );
+							$progress		= round( ( 30 * ( $data['extra']['_totalSteps'] - \count($upgradeSteps) ) ) / ( $data['extra']['_totalSteps'] ?: 1 ) );
 						}
 						else
 						{
 							$laststep		= 'db';
-							$language		= Member::loggedIn()->language()->addToStack('appinstall_databasechanges');
+							$language		= \IPS\Member::loggedIn()->language()->addToStack('appinstall_databasechanges');
 							$progress		= 30;
 						}
 					break;
 
 					case 'db':
 						/* Rebuild data */
-						Application::load( $data['key'] )->installJsonData();
+						\IPS\Application::load( $data['key'] )->installJsonData();
 
 						$laststep	= 'basics';
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_basics');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_basics');
 						$progress	= 40;
 					break;
 
 					case 'basics':
 						/* Insert lang data */
-						Application::load( $data['key'] )->installLanguages();
+						\IPS\Application::load( $data['key'] )->installLanguages();
 
 						$laststep	= 'lang';
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_languages');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_languages');
 						$progress	= 60;
 					break;
 
 					case 'lang':
 						/* Insert email templates */
-						Application::load( $data['key'] )->installEmailTemplates();
+						\IPS\Application::load( $data['key'] )->installEmailTemplates();
 
-						$hasCmsTemplates = file_exists( \IPS\ROOT_PATH . '/applications/' . Application::load( $data['key'] )->directory . '/data/cmsTemplates.xml' );
+						$hasCmsTemplates = file_exists( \IPS\ROOT_PATH . '/applications/' . \IPS\Application::load( $data['key'] )->directory . '/data/cmsTemplates.xml' );
 						$laststep	= $hasCmsTemplates ? 'emails' : 'cmstemplates';
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_emails');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_emails');
 						$progress	= 75;
 					break;
 
@@ -1223,28 +1008,29 @@ class applications extends Controller
 						$_SESSION['cmsConflictKey'] = '';
 						try
 						{
-							$result = Templates::importUserTemplateXml( Application::getRootPath( $data['key'] ) . '/applications/' . Application::load( $data['key'] )->directory . '/data/cmsTemplates.xml' );
-							if( $result instanceof Internal )
+							$result = \IPS\cms\Templates::importUserTemplateXml( \IPS\Application::getRootPath( $data['key'] ) . '/applications/' . \IPS\Application::load( $data['key'] )->directory . '/data/cmsTemplates.xml' );
+							if( $result instanceof \IPS\Http\Url\Internal )
 							{
-								$_SESSION['cmsConflictKey'] = $result->setQueryString( [ 'application' => Application::load( $data['key'] )->directory, 'lang' => 'updated' ] );
+								$_SESSION['cmsConflictKey'] = $result->setQueryString( [ 'application' => \IPS\Application::load( $data['key'] )->directory, 'lang' => 'updated' ] );
 							}
 						}
-						catch( Throwable $e )
+						catch( \Throwable $e )
 						{
-							Log::log( $e, 'cms_template_app_install' );
+							\IPS\Log::log( $e, 'cms_template_app_install' );
 						}
 
 						$laststep	= 'cmstemplates';
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_cmstemplates');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_cmstemplates');
 						$progress	= 95;
 					break;
 
 					case 'cmstemplates':
 						/* Insert skin templates */
-						Application::load( $data['key'] )->installSkins( TRUE );
-						Application::load( $data['key'] )->installJavascript();
+						\IPS\Application::load( $data['key'] )->installSkins( TRUE );
+						\IPS\Application::load( $data['key'] )->installJavascript();
 
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_skins');
+						$laststep	= NULL;
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_skins');
 						$progress	= 100;
 					break;
 				}
@@ -1252,7 +1038,9 @@ class applications extends Controller
 				/* Return null to indicate we are done */
 				if( $laststep === NULL )
 				{
-					Session::i()->log( 'acplog__application_updated', array( Application::load( $data['key'] )->titleForLog() => FALSE, Application::load( $data['key'] )->version => TRUE ) );
+					\IPS\Application::load( $data['key'] )->save();
+
+					\IPS\Session::i()->log( 'acplog__application_updated', array( \IPS\Application::load( $data['key'] )->titleForLog() => FALSE, \IPS\Application::load( $data['key'] )->version => TRUE ) );
 
 					return NULL;
 				}
@@ -1264,8 +1052,8 @@ class applications extends Controller
 			function()
 			{
 				/* IPS Cloud Sync */
-				IPS::resyncIPSCloud('Upgraded application in ACP');
-				$application = Application::load( Request::i()->appKey );
+				\IPS\IPS::resyncIPSCloud('Upgraded application in ACP');
+				$application = \IPS\Application::load( \IPS\Request::i()->appKey );
 
 				/* Unlock the app for PHP8 Usage */
 				if ( $application->requires_manual_intervention )
@@ -1274,21 +1062,17 @@ class applications extends Controller
 					$application->save();
 				}
 
-				/* Clear editor plugins so that it will automatically regenerate */
-				Application::resetEditorPlugins();
-
-				/* Clear caches */
-				Store::i()->clearAll();
-				Cache::i()->clearAll();
+				/* Invalidate disk templates */
+				\IPS\Theme::resetAllCacheKeys();
 
 				/* If CMS Template install had conflicts, solve those now */
 				if( !empty( $_SESSION['cmsConflictKey'] ) )
 				{
-					Output::i()->redirect( $_SESSION['cmsConflictKey'] );
+					\IPS\Output::i()->redirect( $_SESSION['cmsConflictKey'] );
 				}
 
 				/* And redirect back to the overview screen */
-				Output::i()->redirect( Url::internal( 'app=core&module=applications&controller=applications' ), 'application_now_updated' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications' ), 'application_now_updated' );
 			}
 		);
 	}
@@ -1296,49 +1080,49 @@ class applications extends Controller
 	/**
 	 * Install an application that is currently stored on disk. After importing a PHAR the user is redirected to this method.
 	 *
-	 * @return    void
-	 * @see        applications::import
+	 * @see		\IPS\core\modules\admin\applications\applications::import()
+	 * @return	void
 	 */
-	public function install() : void
+	public function install()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		unset( Store::i()->syncCompleted );
+		unset( \IPS\Data\Store::i()->syncCompleted );
 
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('installing_application');
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('installing_application');
 
-		$url = Url::internal( "app=core&module=applications&controller=applications&do=install&appKey=" . Request::i()->appKey )->csrf();
+		$url = \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&do=install&appKey=" . \IPS\Request::i()->appKey )->csrf();
 
-		Output::i()->output	= new MultipleRedirect(
+		\IPS\Output::i()->output	= new \IPS\Helpers\MultipleRedirect(
 			$url,
 			function( $data )
 			{
 				/* On first cycle return data */
-				if ( !is_array( $data ) )
+				if ( !\is_array( $data ) )
 				{
 					/* Does this application exist in the database? */
 					try
 					{
-						$application = Application::load( Request::i()->appKey );
+						$application = \IPS\Application::load( \IPS\Request::i()->appKey );
 
 						if( $application->id )
 						{
-							Output::i()->error( 'app_already_installed', '2C133/4', 403, '' );
+							\IPS\Output::i()->error( 'app_already_installed', '2C133/4', 403, '' );
 						}
 					}
-					catch( OutOfRangeException $e ){} // We don't need to do anything if it hasn't loaded - that's good
+					catch( \OutOfRangeException $e ){} // We don't need to do anything if it hasn't loaded - that's good
 
 					/* Get the application data to insert the application record */
-					if( file_exists( Application::getRootPath( Request::i()->appKey ) . '/applications/' . Request::i()->appKey . '/data/application.json' ) )
+					if( file_exists( \IPS\Application::getRootPath( \IPS\Request::i()->appKey ) . '/applications/' . \IPS\Request::i()->appKey . '/data/application.json' ) )
 					{
-						$application	= json_decode( file_get_contents( Application::getRootPath( Request::i()->appKey ) . '/applications/' . Request::i()->appKey . '/data/application.json' ), TRUE );
+						$application	= json_decode( file_get_contents( \IPS\Application::getRootPath( \IPS\Request::i()->appKey ) . '/applications/' . \IPS\Request::i()->appKey . '/data/application.json' ), TRUE );
 
 						if( !$application['app_directory'] )
 						{
-							Output::i()->error( 'app_invalid_data', '4C133/5', 403, '' );
+							\IPS\Output::i()->error( 'app_invalid_data', '4C133/5', 403, '' );
 						}
 
-						$application['app_position']	= Db::i()->select( 'MAX(app_position)', 'core_applications' )->first() + 1;
+						$application['app_position']	= \IPS\Db::i()->select( 'MAX(app_position)', 'core_applications' )->first() + 1;
 						$application['app_added']		= time();
 						$application['app_protected']	= 0;
 						$application['app_enabled']		= 0;	/* We will reset this post-installation */
@@ -1346,22 +1130,16 @@ class applications extends Controller
 						//\IPS\Lang::saveCustom( $application['app_directory'], "__app_{$application['app_directory']}", $application['application_title'] );
 						unset($application['application_title']);
 
-						Db::i()->insert( 'core_applications', $application );
-
-						try
-						{
-							unset( Store::i()->applications );
-						}
-						catch( OutOfRangeException ){}
+						\IPS\Db::i()->insert( 'core_applications', $application );
 					}
 					else
 					{
-						Output::i()->error( 'app_invalid_data', '4C133/6', 403, '' );
+						\IPS\Output::i()->error( 'app_invalid_data', '4C133/6', 403, '' );
 					}
 
 					return array(
-						array( 'laststep' => 'start', 'key' => Request::i()->appKey ),
-						Member::loggedIn()->language()->addToStack('installing_application'),
+						array( 'laststep' => 'start', 'key' => \IPS\Request::i()->appKey ),
+						\IPS\Member::loggedIn()->language()->addToStack('installing_application'),
 						1
 					);
 				}
@@ -1375,27 +1153,27 @@ class applications extends Controller
 				{
 					case 'start':
 						/* Perform database changes */
-						Application::load( $data['key'] )->installDatabaseSchema();
+						\IPS\Application::load( $data['key'] )->installDatabaseSchema();
 
 						$laststep	= 'db';
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_databasechanges');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_databasechanges');
 						$progress	= 12.5;
 					break;
 
 					case 'db':
 						/* Rebuild data */
-						Application::load( $data['key'] )->installJsonData();
+						\IPS\Application::load( $data['key'] )->installJsonData();
 
 						$laststep	= 'basics';
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_basics');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_basics');
 						$progress	= 25;
 					break;
 
 					case 'basics':
 						/* Insert lang data */
-						$offset = ( isset( $data['offset'] ) ) ? intval( $data['offset'] ) : 0;
+						$offset = ( isset( $data['offset'] ) ) ? \intval( $data['offset'] ) : 0;
 
-						$inserted	= Application::load( $data['key'] )->installLanguages( $offset, 250 );
+						$inserted	= \IPS\Application::load( $data['key'] )->installLanguages( $offset, 250 );
 
 						if( $inserted )
 						{
@@ -1408,40 +1186,39 @@ class applications extends Controller
 							unset( $data['offset'] );
 						}
 
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_languages');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_languages');
 						$progress	= 37.5;
 					break;
 
 					case 'lang':
 						/* Insert email templates */
-						Application::load( $data['key'] )->installEmailTemplates();
+						\IPS\Application::load( $data['key'] )->installEmailTemplates();
 
 						$laststep	= 'emails';
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_emails');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_emails');
 						$progress	= 50;
 					break;
 
 					case 'emails':
 						/* Install Extensions */
-						Application::load( $data['key'] )->installExtensions();
+						\IPS\Application::load( $data['key'] )->installExtensions();
 
 						$laststep	= 'extensions';
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_extensions');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_extensions');
 						$progress	= 62.5;
 					break;
 
 					case 'extensions':
 						/* Insert skin templates */
-						$offset = ( isset( $data['offset'] ) ) ? intval( $data['offset'] ) : 0;
+						$offset = ( isset( $data['offset'] ) ) ? \intval( $data['offset'] ) : 0;
 
 						if( !$offset )
 						{
-							Application::load( $data['key'] )->installThemeEditorSettings();
-							Application::load( $data['key'] )->installCustomTemplates();
-							Application::load( $data['key'] )->clearTemplates();
+							\IPS\Application::load( $data['key'] )->installThemeSettings();
+							\IPS\Application::load( $data['key'] )->clearTemplates();
 						}
 
-						$inserted = Application::load( $data['key'] )->installTemplates( FALSE, $offset, 150 );
+						$inserted = \IPS\Application::load( $data['key'] )->installTemplates( FALSE, $offset, 150 );
 
 						if( $inserted )
 						{
@@ -1454,17 +1231,17 @@ class applications extends Controller
 							unset( $data['offset'] );
 						}
 
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_skins');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_skins');
 						$progress	= 75;
 					break;
 
 					case 'skins':
 						/* Insert skin templates */
-						Application::load( $data['key'] )->installJavascript();
+						\IPS\Application::load( $data['key'] )->installJavascript();
 
-						$hasCmsTemplates = file_exists( Application::getRootPath( $data['key'] ) . '/applications/' . $data['key'] . '/data/cmsTemplates.xml' );
+						$hasCmsTemplates = file_exists( \IPS\Application::getRootPath( $data['key'] ) . '/applications/' . $data['key'] . '/data/cmsTemplates.xml' );
 						$laststep	= $hasCmsTemplates ? 'cmstemplates' : 'javascript';
-						$language	= $hasCmsTemplates ? Member::loggedIn()->language()->addToStack('appinstall_cmstemplates') : Member::loggedIn()->language()->addToStack('appinstall_javascript');
+						$language	= $hasCmsTemplates ? \IPS\Member::loggedIn()->language()->addToStack('appinstall_cmstemplates') : \IPS\Member::loggedIn()->language()->addToStack('appinstall_javascript');
 						$progress	= 87.5;
 					break;
 
@@ -1473,27 +1250,28 @@ class applications extends Controller
 						$_SESSION['cmsConflictKey'] = '';
 						try
 						{
-							$result = Templates::importUserTemplateXml( Application::getRootPath( $data['key'] ) . '/applications/' . $data['key'] . '/data/cmsTemplates.xml' );
-							if( $result instanceof Internal )
+							$result = \IPS\cms\Templates::importUserTemplateXml( \IPS\Application::getRootPath( $data['key'] ) . '/applications/' . $data['key'] . '/data/cmsTemplates.xml' );
+							if( $result instanceof \IPS\Http\Url\Internal )
 							{
 								$_SESSION['cmsConflictKey'] = $result->setQueryString( [ 'application' => $data['key'], 'lang' => 'installed' ] );
 							}
 						}
-						catch( Throwable $e )
+						catch( \Throwable $e )
 						{
-							Log::log( $e, 'cms_template_app_install' );
+							\IPS\Log::log( $e, 'cms_template_app_install' );
 						}
 
 						$laststep	= 'javascript';
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_javascript');
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_javascript');
 						$progress	= 95;
 					break;
 
 					case 'javascript':
 						/* Insert other data */
-						Application::load( $data['key'] )->installOther();
+						\IPS\Application::load( $data['key'] )->installOther();
 
-						$language	= Member::loggedIn()->language()->addToStack('appinstall_finish');
+						$laststep	= NULL;
+						$language	= \IPS\Member::loggedIn()->language()->addToStack('appinstall_finish');
 						$progress	= 100;
 					break;
 				}
@@ -1501,7 +1279,9 @@ class applications extends Controller
 				/* Return null to indicate we are done */
 				if( $laststep === NULL )
 				{
-					Session::i()->log( 'acplog__application_installed', array( "__app_" . $data['key'] => TRUE ) );
+					\IPS\Application::load( $data['key'] )->save();
+
+					\IPS\Session::i()->log( 'acplog__application_installed', array( "__app_" . $data['key'] => TRUE ) );
 
 					return NULL;
 				}
@@ -1514,27 +1294,29 @@ class applications extends Controller
 			function()
 			{
 				/* Enable the application now */
-				$application = Application::load( Request::i()->appKey );
+				$application = \IPS\Application::load( \IPS\Request::i()->appKey );
 				$application->enabled	= 1;
 				$application->save();
 
-				/* Clear caches so templates can rebuild and so on */
-				Store::i()->clearAll();
-				Cache::i()->clearAll();
-				IPS::resyncIPSCloud('Installed application in ACP');
+				/* Install hooks - do this after enabling the application */
+				$application->installHooks();
 
-				/* Clear editor plugins so that it will automatically regenerate */
-				Application::resetEditorPlugins();
+				/* Clear caches so templates can rebuild and so on */
+				\IPS\Data\Store::i()->clearAll();
+				\IPS\Data\Cache::i()->clearAll();
+				\IPS\IPS::resyncIPSCloud('Installed application in ACP');
+
+				/* Invalidate disk templates */
+				\IPS\Theme::resetAllCacheKeys();
 
 				/* If CMS Template install had conflicts, solve those now */
 				if( !empty( $_SESSION['cmsConflictKey'] ) )
 				{
-					Output::i()->redirect( $_SESSION['cmsConflictKey'] );
+					\IPS\Output::i()->redirect( $_SESSION['cmsConflictKey'] );
 				}
 
 				/* And redirect back to the overview screen */
-					Output::i()->redirect( Url::internal( 'app=core&module=applications&controller=applications' ), 'application_now_installed' );
-
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications' ), 'application_now_installed' );
 			}
 		);
 	}
@@ -1545,14 +1327,13 @@ class applications extends Controller
 	 * @return	void
 	 * @note	For application uninstall we don't need the whole move children thing
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Get node */
-		/* @var Model $nodeClass */
 		$nodeClass = $this->nodeClass;
-		if ( Request::i()->subnode )
+		if ( \IPS\Request::i()->subnode )
 		{
 			$nodeClass = $nodeClass::$subnodeClass;
 		}
@@ -1563,436 +1344,77 @@ class applications extends Controller
 				and if no Application.php an exception will be thrown. We don't need to stop just based on that, we want to proceed with delete. */
 			$node = NULL;
 
-			foreach( Store::i()->applications as $application )
+			foreach( \IPS\Data\Store::i()->applications as $application )
 			{
-				if( $application['app_directory'] == Request::i()->id )
+				if( $application['app_directory'] == \IPS\Request::i()->id )
 				{
-					/* If this is a legacy app, reroute */
-					if( $application['app_requires_manual_intervention'] )
-					{
-						static::_deleteLegacyApp( $application['app_directory'] );
-						return;
-					}
-
-					$node	= Application::constructFromData( $application );
+					$node	= \IPS\Application::constructFromData( $application );
 					break;
 				}
 			}
 
 			if( $node === NULL )
 			{
-				throw new UnexpectedValueException;
+				throw new \UnexpectedValueException;
 			}
 
 			/* Permission check */
 			if( !$node->canDelete() )
 			{
-				Output::i()->error( 'node_noperm_delete', '2C133/J', 403, '' );
+				\IPS\Output::i()->error( 'node_noperm_delete', '2C133/J', 403, '' );
 			}
 
 			if ( $node->default )
 			{
-				$this->setNewDefaultApplication($node);
-				return;
+				return $this->setNewDefaultApplication($node);
 			}
 			else
 			{
 				/* Make sure the user confirmed the deletion */
-				Request::i()->confirmedDelete();
+				\IPS\Request::i()->confirmedDelete();
 			}
 
 			/* Delete it */
-			Session::i()->log( 'acplog__application_uninstalled', array( $node->directory => TRUE ) );
+			\IPS\Session::i()->log( 'acplog__application_uninstalled', array( $node->directory => TRUE ) );
 			$node->delete();
 
-			/* Clear caches */
-			Cache::i()->clearAll();
+			/* Clear guest page caches */
+			\IPS\Data\Cache::i()->clearAll();
 
 			/* Clear \Data\Store */
-			Store::i()->clearAll();
+			\IPS\Data\Store::i()->clearAll();
 		}
 		/* Legacy */
-		catch ( UnexpectedValueException $e )
+		catch ( \UnexpectedValueException $e )
 		{
-			if( !Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'app_delete' ) )
+			if( !\IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'applications', 'app_delete' ) )
 			{
-				Output::i()->error( 'node_noperm_delete', '2C133/J', 403, '' );
+				\IPS\Output::i()->error( 'node_noperm_delete', '2C133/J', 403, '' );
 			}
 
-			Db::i()->delete( 'core_applications', array( 'app_directory=?', Request::i()->id ) );
+			\IPS\Db::i()->delete( 'core_applications', array( 'app_directory=?', \IPS\Request::i()->id ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2C133/I', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C133/I', 404, '' );
 		}
 
 		/* Boink */
-		Output::i()->redirect( Url::internal( 'app=core&module=applications&controller=applications' ), 'deleted' );
-	}
-
-	/**
-	 * Delete a legacy application
-	 * We need a custom method because we can't actually load any classes here
-	 * @see Application::delete()
-	 *
-	 * @param string $app
-	 * @return void
-	 */
-	protected static function _deleteLegacyApp( string $app ) : void
-	{
-		Request::i()->confirmedDelete();
-
-		Session::i()->log( 'acplog__application_uninstalled', array( $app => TRUE ) );
-
-		/* The following includes as much as possible from the main delete method. */
-
-		/* Call onOtherUninstall so that other applications may perform any necessary cleanup */
-		foreach( Application::allExtensions( 'core', 'Uninstall', FALSE ) as $extension )
-		{
-			$extension->onOtherUninstall( $app );
-		}
-
-		foreach( Db::i()->select( '*', 'core_profile_steps' ) as $step )
-		{
-			[ $application, $extension ] = explode( "_", $step['step_extension'] );
-			if( $application == $app )
-			{
-				Lang::deleteCustom( 'core', 'profile_step_title_' . $step['step_id'] );
-				Lang::deleteCustom( 'core', 'profile_step_text_' . $step['step_id'] );
-				Db::i()->delete( 'core_profile_completion', array( 'step_id=?', $step['step_id'] ) );
-				Db::i()->delete( 'core_profile_steps', [ 'step_id=?', $step['step_id'] ] );
-			}
-		}
-
-		/* FrontNavigation can handle a string, so just use that */
-		FrontNavigation::deleteByApplication( $app );
-
-		// @todo Search index
-
-		/* Delete data from shared tables */
-		Db::i()->delete( 'core_clubs_node_map', array( "node_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-		Db::i()->delete( 'core_permission_index', array( 'app=? AND perm_type=? AND perm_type_id IN(?)', 'core', 'module', Db::i()->select( 'sys_module_id', 'core_modules', array( 'sys_module_application=?', $app ) ) ) );
-		Db::i()->delete( 'core_modules', array( 'sys_module_application=?', $app ) );
-		Db::i()->delete( 'core_dev', array( 'app_key=?', $app ) );
-		Db::i()->delete( 'core_item_markers', array( 'item_app=?', $app ) );
-		Db::i()->delete( 'core_reputation_index', array( 'app=?', $app ) );
-		Db::i()->delete( 'core_permission_index', array( 'app=?', $app ) );
-		Db::i()->delete( 'core_upgrade_history', array( 'upgrade_app=?', $app ) );
-		Db::i()->delete( 'core_admin_logs', array( 'appcomponent=?', $app ) );
-		Db::i()->delete( 'core_sys_conf_settings', array( 'conf_app=?', $app ) );
-		Db::i()->delete( 'core_queue', array( 'app=?', $app ) );
-		Db::i()->delete( 'core_follow', array( 'follow_app=?', $app ) );
-		Db::i()->delete( 'core_follow_count_cache', array( "class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-		Db::i()->delete( 'core_item_statistics_cache', array( "cache_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-		Db::i()->delete( 'core_view_updates', array( "classname LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-		Db::i()->delete( 'core_moderator_logs', array( 'appcomponent=?', $app ) );
-		Db::i()->delete( 'core_member_history', array( 'log_app=?', $app ) );
-		Db::i()->delete( 'core_acp_notifications', array( 'app=?', $app ) );
-		Db::i()->delete( 'core_solved_index', array( 'app=?', $app ) );
-		Db::i()->delete( 'core_notifications', array( 'notification_app=?', $app ) );
-		Db::i()->delete( 'core_javascript', array( 'javascript_app=?', $app ) );
-		Db::i()->delete( 'core_theme_templates_custom', array( 'template_app=?', $app ) );
-
-		$rulesToDelete = iterator_to_array( Db::i()->select( 'id', 'core_achievements_rules', [ "action LIKE CONCAT( ?, '_%' )", $app ] ) );
-		Db::i()->delete( 'core_achievements_rules', Db::i()->in( 'id', $rulesToDelete ) );
-		Db::i()->delete( 'core_achievements_log_milestones', Db::i()->in( 'milestone_rule', $rulesToDelete ) );
-		Db::i()->delete( 'core_acp_notifications_preferences', array( "type LIKE CONCAT( ?, '%' )", "{$app}_" ) );
-
-		$queueWhere = array();
-		$queueWhere[] = array( 'app=?', 'core' );
-		$queueWhere[] = array( Db::i()->in( '`key`', array( 'rebuildPosts', 'RebuildReputationIndex' ) ) );
-
-		foreach (Db::i()->select( '*', 'core_queue', $queueWhere ) as $queue )
-		{
-			$queue['data'] = json_decode( $queue['data'], TRUE );
-			foreach( $queue['data']['class'] as $class )
-			{
-				$bits = explode( "\\", $class );
-				if( $bits[1] == $app )
-				{
-					Db::i()->delete( 'core_queue', array( 'id=?', $queue['id'] ) );
-					break;
-				}
-			}
-		}
-
-		Db::i()->delete( 'core_notifications', array( "item_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Delete Deletion Log Records */
-		Db::i()->delete( 'core_deletion_log', array( "dellog_content_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Delete Promoted Content from this app */
-		Db::i()->delete( 'core_content_promote', array( "promote_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Delete ratings from this app */
-		Db::i()->delete( 'core_ratings', array( "class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Delete merge redirects */
-		Db::i()->delete( 'core_item_redirect', array( "redirect_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Delete member map */
-		Db::i()->delete( 'core_item_member_map', array( "map_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Delete RSS Imports */
-		foreach( Db::i()->select( '*', 'core_rss_import', array( "rss_import_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) ) as $import )
-		{
-			Db::i()->delete( 'core_rss_imported', [ 'rss_imported_import_id=?', $import['rss_import_id'] ] );
-			Db::i()->delete( 'core_rss_import', [ 'rss_import_id=?', $import['rss_import_id'] ] );
-		}
-
-		/* Delete PBR Data */
-		Db::i()->delete( 'core_post_before_registering', array( "class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Delete Anonymous Data */
-		Db::i()->delete( 'core_anonymous_posts', array( "anonymous_object_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Delete Polls */
-		Db::i()->delete( 'core_voters', array( 'poll in (?)', Db::i()->select( 'pid', 'core_polls', array( "poll_item_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) ) ) );
-		Db::i()->delete( 'core_polls', array( "poll_item_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Assignments */
-		Db::i()->delete( 'core_assignments', array( "assign_item_class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Delete attachment maps - if the attachment is unused, the regular cleanup task will remove the file later */
-		$extensions = array();
-		if( file_exists( Application::getRootPath( $app ) . "/applications/{$app}/extensions/core/EditorLocations" ) )
-		{
-			foreach( new DirectoryIterator( Application::getRootPath( $app ) . "/applications/{$app}/extensions/core/EditorLocations" ) as $extension )
-			{
-				if( !$extension->isDir() and !$extension->isDot() )
-				{
-					if( substr( $extension->getFilename(), -4 ) == '.php' )
-					{
-						$extensions[] = $app . '_' . str_replace( '.php', '', $extension->getFilename() );
-					}
-				}
-			}
-		}
-
-		Db::i()->delete( 'core_attachments_map', array( Db::i()->in( 'location_key', $extensions ) ) );
-
-		/* Cleanup some caches */
-		Settings::i()->clearCache();
-		unset( Store::i()->acpNotifications );
-		unset( Store::i()->acpNotificationIds );
-
-		/* Delete tasks and task logs */
-		Db::i()->delete( 'core_tasks_log', array( 'task IN(?)', Db::i()->select( 'id', 'core_tasks', array( 'app=?', $app ) ) ) );
-		Db::i()->delete( 'core_tasks', array( 'app=?', $app ) );
-
-		/* Delete reports */
-		Db::i()->delete( 'core_rc_reports', array( 'rid IN(?)', Db::i()->select('id', 'core_rc_index', array( "class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) ) ) );
-		Db::i()->delete( 'core_rc_comments', array( 'rid IN(?)', Db::i()->select('id', 'core_rc_index', array( "class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) ) ) );
-		Db::i()->delete( 'core_rc_index', array( "class LIKE CONCAT( ?, '%' )", "IPS\\\\{$app}\\\\" ) );
-
-		/* Delete language strings */
-		Db::i()->delete( 'core_sys_lang_words', array( 'word_app=?', $app ) );
-
-		/* Delete email templates */
-		$emailTemplates	= Db::i()->select( '*', 'core_email_templates', array( 'template_app=?', $app ) );
-
-		if( $emailTemplates->count() )
-		{
-			foreach( $emailTemplates as $template )
-			{
-				if( $template['template_content_html'] )
-				{
-					$k = $template['template_key'] . '_email_html';
-					unset( Store::i()->$k );
-				}
-
-				if( $template['template_content_plaintext'] )
-				{
-					$k = $template['template_key'] . '_email_plaintext';
-					unset( Store::i()->$k );
-				}
-			}
-
-			Db::i()->delete( 'core_email_templates', array( 'template_app=?', $app ) );
-		}
-
-		/* Delete skin template/CSS/etc. */
-		Theme::removeTemplates( $app, NULL, NULL, NULL, TRUE );
-		Theme::removeCss( $app, NULL, NULL, NULL, TRUE );
-		Theme::removeResources( $app, NULL, NULL, NULL, TRUE );
-		Theme::removeEditorSettings( $app );
-
-		unset( Store::i()->themes );
-
-		/* Delete database tables */
-		if( file_exists( Application::getRootPath( $app ) . "/applications/{$app}/data/schema.json" ) )
-		{
-			$schema	= @json_decode( file_get_contents( Application::getRootPath( $app ) . "/applications/{$app}/data/schema.json" ), TRUE );
-
-			if( is_array( $schema ) AND count( $schema ) )
-			{
-				foreach( $schema as $tableName => $definition )
-				{
-					try
-					{
-						Db::i()->dropTable( $tableName, TRUE );
-					}
-					catch( DbException $e )
-					{
-						/* Ignore "Cannot drop table because it does not exist" */
-						if( $e->getCode() <> 1051 )
-						{
-							throw $e;
-						}
-					}
-				}
-			}
-		}
-
-		/* Revert other database changes performed by installation */
-		if( file_exists( Application::getRootPath( $app ) . "/applications/{$app}/setup/install/queries.json" ) )
-		{
-			$schema	= json_decode( file_get_contents( Application::getRootPath( $app ) . "/applications/{$app}/setup/install/queries.json" ), TRUE );
-
-			ksort($schema);
-
-			foreach( $schema as $instruction )
-			{
-				switch ( $instruction['method'] )
-				{
-					case 'addColumn':
-						try
-						{
-							Db::i()->dropColumn( $instruction['params'][0], $instruction['params'][1]['name'] );
-						}
-						catch( Exception $e )
-						{
-							/* Ignore "Cannot drop key because it does not exist" */
-							if( $e->getCode() <> 1091 )
-							{
-								throw $e;
-							}
-						}
-						break;
-
-					case 'addIndex':
-						try
-						{
-							Db::i()->dropIndex( $instruction['params'][0], $instruction['params'][1]['name'] );
-						}
-						catch( Exception $e )
-						{
-							/* Ignore "Cannot drop key because it does not exist" */
-							if( $e->getCode() <> 1091 )
-							{
-								throw $e;
-							}
-						}
-						break;
-				}
-			}
-		}
-
-		/* delete widgets */
-		Db::i()->delete( 'core_widgets', array( 'app = ?', $app ) );
-		Db::i()->delete( 'core_widget_areas', array( 'app = ?', $app ) );
-
-		/* clean up widget areas table */
-		foreach (Db::i()->select( '*', 'core_widget_areas' ) as $row )
-		{
-			$data = json_decode( $row['widgets'], true );
-
-			foreach ( $data as $key => $widget)
-			{
-				if ( isset( $widget['app'] ) and $widget['app'] == $app )
-				{
-					unset( $data[$key]) ;
-				}
-			}
-
-			Db::i()->update( 'core_widget_areas', array( 'widgets' => json_encode( $data ) ), array( 'id=?', $row['id'] ) );
-		}
-
-		/* Clean up widget trash table */
-		$trash = array();
-		foreach(Db::i()->select( '*', 'core_widget_trash' ) AS $garbage )
-		{
-			$data = json_decode( $garbage['data'], TRUE );
-
-			if ( isset( $data['app'] ) AND $data['app'] == $app )
-			{
-				$trash[] = $garbage['id'];
-			}
-		}
-
-		Db::i()->delete( 'core_widget_trash', Db::i()->in( 'id', $trash ) );
-
-		/* Clean up FURL Definitions */
-		if ( file_exists( Application::getRootPath( $app ) . "/applications/{$app}/data/furl.json" ) )
-		{
-			$current = json_decode( Db::i()->select( 'conf_value', 'core_sys_conf_settings', array( "conf_key=?", 'furl_configuration' ) )->first(), true );
-			$default = json_decode( preg_replace( '/\/\*.+?\*\//s', '', @file_get_contents( Application::getRootPath( $app ) . "/applications/{$app}/data/furl.json" ) ), true );
-
-			if ( isset( $default['pages'] ) and $current !== NULL )
-			{
-				foreach( $default['pages'] AS $key => $def )
-				{
-					if ( isset( $current[$key] ) )
-					{
-						unset( $current[$key] );
-					}
-				}
-
-				Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => json_encode( $current ) ), array( "conf_key=?", 'furl_configuration' ) );
-			}
-		}
-
-		/* Delete from DB */
-		Db::i()->delete( 'core_applications', [ 'app_directory=?', $app ] );
-
-		/* Clear out data store for updated values */
-		unset( Store::i()->modules );
-		unset( Store::i()->applications );
-		unset( Store::i()->widgets );
-		unset( Store::i()->furl_configuration );
-
-		Settings::i()->clearCache();
-
-		/* Remove the files and folders, if possible (if not IN_DEV and not in DEMO_MODE and not on platform) */
-		if ( !CIC2 AND !IN_DEV AND !DEMO_MODE AND file_exists( \IPS\ROOT_PATH . '/applications/' . $app ) )
-		{
-			try
-			{
-				$iterator = new RecursiveDirectoryIterator( \IPS\ROOT_PATH . '/applications/' . $app, FilesystemIterator::SKIP_DOTS );
-				foreach ( new RecursiveIteratorIterator( $iterator, RecursiveIteratorIterator::CHILD_FIRST ) as $file )
-				{
-					if ( $file->isDir() )
-					{
-						@rmdir( $file->getPathname() );
-					}
-					else
-					{
-						@unlink( $file->getPathname() );
-					}
-				}
-				$dir = \IPS\ROOT_PATH . '/applications/' . $app;
-				$handle = opendir( $dir );
-				closedir ( $handle );
-				@rmdir( $dir );
-			}
-			catch( UnexpectedValueException $e ){}
-		}
-
-		Bridge::i()->applicationDeleted( $app );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications' ), 'deleted' );
 	}
 
 
 	/**
 	 * Set a new default application if the current default app is being uninstalled
 	 *
-	 * @param	$node	Application	Application to delete
+	 * @param	$node	\IPS\Application	Application to delete
 	 * @return	void
 	 */
-	protected function setNewDefaultApplication( Application $node ) : void
+	protected function setNewDefaultApplication($node)
 	{
-		$form = new Form();
+		$form = new \IPS\Helpers\Form();
 		$form->hiddenValues['wasConfirmed']	= 1;
-		$form->add( new Node( 'new_default_app', NULL, TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Node( 'new_default_app', NULL, TRUE, array(
 				'class'					=> 'IPS\Application',
 				'subnodes' => false,
 				'permissionCheck' => function( $app ) use ( $node )
@@ -2012,13 +1434,13 @@ class applications extends Controller
 		if  ( $values = $form->values() )
 		{
 			$values['new_default_app']->setAsDefault();
-			Session::i()->log( 'acplog__application_set_default', array( $values['new_default_app']->titleForLog() => FALSE ) );
+			\IPS\Session::i()->log( 'acplog__application_set_default', array( $values['new_default_app']->titleForLog() => FALSE ) );
 
-			Output::i()->redirect( Url::internal( "app=core&module=applications&controller=applications&do=delete&id={$node->_id}&wasConfirmed=1" )->csrf() );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&do=delete&id={$node->_id}&wasConfirmed=1" )->csrf() );
 		}
 		else
 		{
-			Output::i()->output = (string) $form;
+			\IPS\Output::i()->output = (string) $form;
 		}
 	}
 
@@ -2027,12 +1449,11 @@ class applications extends Controller
 	 *
 	 * @return	void
 	 */
-	public function details() : void
+	public function details()
 	{
 		/* Get node */
-		/* @var Model $nodeClass */
 		$nodeClass = $this->nodeClass;
-		if ( Request::i()->subnode )
+		if ( \IPS\Request::i()->subnode )
 		{
 			$nodeClass = $nodeClass::$subnodeClass;
 		}
@@ -2040,22 +1461,22 @@ class applications extends Controller
 		/* Get the application */
 		try
 		{
-			$application	= $nodeClass::load( Request::i()->id );
+			$application	= $nodeClass::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'error_no_app', '2C133/1', 404, '' );
+			\IPS\Output::i()->error( 'error_no_app', '2C133/1', 404, '' );
 		}
 
 		/* Work out tab */
-		$tab				= Request::i()->tab ?: 'details';
-		$tabFunction		= array( $this, '_show' . IPS::mb_ucfirst( $tab ) );
+		$tab				= \IPS\Request::i()->tab ?: 'details';
+		$tabFunction		= array( $this, '_show' . mb_ucfirst( $tab ) );
 		$activeTabContents	= $tabFunction( $application );
 
 		/* If this is an AJAX request, just return tab contents */
-		if( Request::i()->isAjax() && Request::i()->tab and !isset( Request::i()->ajaxValidate ) )
+		if( \IPS\Request::i()->isAjax() && \IPS\Request::i()->tab and !isset( \IPS\Request::i()->ajaxValidate ) )
 		{
-			Output::i()->output = $activeTabContents;
+			\IPS\Output::i()->output = $activeTabContents;
 			return;
 		}
 
@@ -2063,10 +1484,11 @@ class applications extends Controller
 		$tabs				= array();
 		$tabs['details']	= 'app_details_details';
 		$tabs['upgrades']	= 'app_details_upgrades';
+		$tabs['hooks']		= 'app_details_hooks';
 
 		/* Output */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack( $tabs[ $tab ] );
-		Output::i()->output 	= Theme::i()->getTemplate( 'global' )->tabs( $tabs, $tab, $activeTabContents, Url::internal( "app=core&module=applications&controller=applications&do=details&id={$application->directory}" ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack( $tabs[ $tab ] );
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate( 'global' )->tabs( $tabs, $tab, $activeTabContents, \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&do=details&id={$application->directory}" ) );
 	}
 
 	/**
@@ -2074,84 +1496,94 @@ class applications extends Controller
 	 *
 	 * @return void
 	 */
-	public function upload() : void
+	public function upload()
 	{
-		if ( DEMO_MODE )
+		if ( \IPS\DEMO_MODE )
 		{
-			Output::i()->error( 'demo_mode_function_blocked', '1C133/V', 403, '' );
+			\IPS\Output::i()->error( 'demo_mode_function_blocked', '1C133/V', 403, '' );
 		}
 
-		if ( NO_WRITES )
+		if ( \IPS\NO_WRITES )
 		{
-			Output::i()->error( 'no_writes', '1C133/B', 403, '' );
+			\IPS\Output::i()->error( 'no_writes', '1C133/B', 403, '' );
 		}
 
-		if( !CIC2 AND !is_writable( \IPS\ROOT_PATH . "/applications/" ) )
+		if( !\IPS\CIC2 AND !is_writable( \IPS\ROOT_PATH . "/applications/" ) )
 		{
-			Output::i()->error( 'app_dir_not_write', '4C133/8', 500, '' );
+			\IPS\Output::i()->error( 'app_dir_not_write', '4C133/8', 500, '' );
 		}
 
-		if ( !extension_loaded('phar') )
+		if( !\IPS\CIC2 AND !is_writable( \IPS\ROOT_PATH . "/plugins/" ) ) // necessary as we write the hooks.php file here
 		{
-			Output::i()->error( 'no_phar_extension', '1C133/P', 403, '' );
+			\IPS\Output::i()->error( 'plugin_dir_not_write', '4C133/L', 403, '' );
 		}
 
-		if ( !IPS::checkThirdParty() )
+		if ( !\IPS\CIC2 AND file_exists( \IPS\ROOT_PATH . "/plugins/hooks.php") AND !is_writable( \IPS\ROOT_PATH . "/plugins/hooks.php" ) )
 		{
-			Output::i()->error( 'cic_3rdparty_unavailable', '2C133/Z', 403, '' );
+			\IPS\Output::i()->error( 'plugin_file_not_write', '4C133/U', 403, '' );
+		}
+
+		if ( !\extension_loaded('phar') )
+		{
+			\IPS\Output::i()->error( 'no_phar_extension', '1C133/P', 403, '' );
 		}
 
 		$_type	= 'install';
 
 		/* Are we upgrading an application? */
-		if( Request::i()->appKey )
+		if( \IPS\Request::i()->appKey )
 		{
 			try
 			{
 				$app = NULL;
 
-				foreach( Store::i()->applications as $application )
+				foreach( \IPS\Data\Store::i()->applications as $application )
 				{
-					if( $application['app_directory'] == Request::i()->appKey )
+					if( $application['app_directory'] == \IPS\Request::i()->appKey )
 					{
-						$app	= $application;
+						$app	= \IPS\Application::constructFromData( $application );
 						break;
 					}
 				}
 
 				if( $app === NULL )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 			}
-			catch ( UnexpectedValueException $e )
+			catch ( \UnexpectedValueException $e )
 			{
 				// Legacy 3.x app
-				if ( !CIC2 )
+				if ( !\IPS\CIC2 )
 				{
-					if ( !is_dir( \IPS\ROOT_PATH . "/applications/" . Request::i()->appKey ) )
+					if ( !is_dir( \IPS\ROOT_PATH . "/applications/" . \IPS\Request::i()->appKey ) )
 					{
-						mkdir( \IPS\ROOT_PATH . "/applications/" . Request::i()->appKey );
-						chmod( \IPS\ROOT_PATH . "/applications/" . Request::i()->appKey, IPS_FOLDER_PERMISSION );
+						mkdir( \IPS\ROOT_PATH . "/applications/" . \IPS\Request::i()->appKey );
+						chmod( \IPS\ROOT_PATH . "/applications/" . \IPS\Request::i()->appKey, \IPS\IPS_FOLDER_PERMISSION );
 					}
 				}
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				Output::i()->error( 'no_app_to_update', '2C133/C', 403, '' );
+				\IPS\Output::i()->error( 'no_app_to_update', '2C133/C', 403, '' );
 			}
 
-			if( !CIC2 AND !is_writable( \IPS\ROOT_PATH . "/applications/" . $app['app_directory'] ) )
+			if( !\IPS\CIC2 AND !is_writable( \IPS\ROOT_PATH . "/applications/" . $app->directory ) )
 			{
-				Output::i()->error( Member::loggedIn()->language()->addToStack( "app_specific_dir_nowrite", FALSE, array( 'sprintf' => $app['app_directory'] ) ), '4C133/D', 500, '' );
+				\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack( "app_specific_dir_nowrite", FALSE, array( 'sprintf' => $app->directory ) ), '4C133/D', 500, '' );
+			}
+
+			if ( \IPS\Theme::designersModeEnabled() )
+			{
+				\IPS\Output::i()->error( \IPS\Member::loggedIn()->language()->addToStack( "app_upload_designersmode", FALSE, array( 'sprintf' => \IPS\Http\Url::internal( 'app=core&module=customization&controller=themes&do=designersmode' ) ) ), '2C133/O', 403, '' );
 			}
 
 			$_type	= 'upgrade';
 		}
 
-		$form = new Form( 'form', 'install' );
+		$form = new \IPS\Helpers\Form( 'form', 'install' );
 		$form->addMessage('applications_manual_install_warning');
-		$form->add( new Upload( 'application_file', NULL, TRUE, array( 'allowedFileTypes' => array( 'tar' ), 'temporary' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'application_file', NULL, TRUE, array( 'allowedFileTypes' => array( 'tar' ), 'temporary' => TRUE ) ) );
 
 		if ( $values = $form->values() )
 		{
@@ -2167,7 +1599,7 @@ class applications extends Controller
 				}
 
 				/* Test the phar */
-				$application = new PharData( $values['application_file'], 0, NULL, Phar::TAR );
+				$application = new \PharData( $values['application_file'], 0, NULL, \Phar::TAR );
 
  				/* Get app directory */
 				$appdata = json_decode( file_get_contents( "phar://" . $values['application_file'] . '/data/application.json' ), TRUE );
@@ -2175,22 +1607,22 @@ class applications extends Controller
 				/* Make sure that the app data is valid */
 				if( !isset( $appdata['app_directory'] ) )
 				{
-					throw new UnexpectedValueException;
+					throw new \UnexpectedValueException;
 				}
 
 				$appDirectory	= $appdata['app_directory'];
 
-				if ( CIC2 )
+				if ( \IPS\CIC2 )
 				{
-					unset( Store::i()->syncCompleted );
+					unset( \IPS\Data\Store::i()->syncCompleted );
 
-					\IPS\Cicloud\file( "IPScustomapp_{$appdata['app_directory']}.tar", file_get_contents( $values['application_file'] ) );
+					\IPS\Cicloud\file( "IPScustomapp_{$appdata['app_directory']}.tar", \file_get_contents( $values['application_file'] ) );
 
 					/* Check files are ready */
 					$i = 0;
 					do
 					{
-						if ( ( isset( Store::i()->syncCompleted ) AND Store::i()->syncCompleted ) OR $i >= 30 ) # 30 x 0.25 seconds
+						if ( ( isset( \IPS\Data\Store::i()->syncCompleted ) AND \IPS\Data\Store::i()->syncCompleted ) OR $i >= 30 ) # 30 x 0.25 seconds
 						{
 							/* We need to wait for the backend to process the tar */
 							sleep(3);
@@ -2208,24 +1640,24 @@ class applications extends Controller
 					/* Extract */
 					$application->extractTo( \IPS\ROOT_PATH . "/applications/" . $appDirectory, NULL, TRUE );
 					$this->_checkChmod( \IPS\ROOT_PATH . '/applications/' . $appDirectory );
-					IPS::resyncIPSCloud('Uploaded new application in ACP');
+					\IPS\IPS::resyncIPSCloud('Uploaded new application in ACP');
 				}
 			}
-			catch( PharException $e )
+			catch( \PharException $e )
 			{
-				Log::log( $e, 'phar' );
-				Output::i()->error( 'application_notvalid', '1C133/9', 403, '' );
+				\IPS\Log::log( $e, 'phar' );
+				\IPS\Output::i()->error( 'application_notvalid', '1C133/9', 403, '' );
 			}
-			catch( UnexpectedValueException $e )
+			catch( \UnexpectedValueException $e )
 			{
-				Output::i()->error( 'application_notvalid', '1C133/K', 403, '' );
+				\IPS\Output::i()->error( 'application_notvalid', '1C133/K', 403, '' );
 			}
 
-			Output::i()->redirect( Url::internal( "app=core&module=applications&controller=applications&do={$_type}&appKey={$appDirectory}" )->csrf(), Member::loggedIn()->language()->addToStack('installing_application') );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&do={$_type}&appKey={$appDirectory}" )->csrf(), \IPS\Member::loggedIn()->language()->addToStack('installing_application') );
 		}
 
 		/* Display */
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 
 	/**
@@ -2235,24 +1667,24 @@ class applications extends Controller
 	 * @return	void
 	 * @see		Ticket 956849
 	 */
-	public static function _checkChmod( string $directory ) : void
+	public static function _checkChmod( $directory )
 	{
 		if ( !is_dir( $directory ) )
 		{
-			throw new UnexpectedValueException;
+			throw new \UnexpectedValueException;
 		}
 
-		$it = new RecursiveDirectoryIterator( $directory, FilesystemIterator::SKIP_DOTS );
-		foreach( new RecursiveIteratorIterator( $it ) AS $f )
+		$it = new \RecursiveDirectoryIterator( $directory, \FilesystemIterator::SKIP_DOTS );
+		foreach( new \RecursiveIteratorIterator( $it ) AS $f )
 		{
 			if ( $f->isDir() )
 			{
-				@chmod( $f->getPathname(), IPS_FOLDER_PERMISSION );
+				@chmod( $f->getPathname(), \IPS\IPS_FOLDER_PERMISSION );
 			}
 			else
 			{
 				/* If this is a .php file in the /interface/ folder it will be called via web directly. We cannot set permissions too high though or it won't execute in many environments */
-				@chmod( $f->getPathname(), ( mb_strpos( $f->getPathname(), '/interface/' ) !== FALSE AND mb_strtolower( $f->getExtension() ) == 'php' ) ? FILE_PERMISSION_NO_WRITE : IPS_FILE_PERMISSION );
+				@chmod( $f->getPathname(), ( mb_strpos( $f->getPathname(), '/interface/' ) !== FALSE AND mb_strtolower( $f->getExtension() ) == 'php' ) ? \IPS\FILE_PERMISSION_NO_WRITE : \IPS\IPS_FILE_PERMISSION );
 			}
 		}
 	}
@@ -2262,25 +1694,25 @@ class applications extends Controller
 	 *
 	 * @return	void
 	 */
-	public function compilejs() : void
+	public function compilejs()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		Output::i()->output = new MultipleRedirect(
-			Url::internal( 'app=core&module=applications&controller=applications&do=compilejs&appKey=' . Request::i()->appKey )->csrf(),
+		\IPS\Output::i()->output = new \IPS\Helpers\MultipleRedirect(
+			\IPS\Http\Url::internal( 'app=core&module=applications&controller=applications&do=compilejs&appKey=' . \IPS\Request::i()->appKey )->csrf(),
 			function( $data )
 			{
 				/* Is this the first cycle? */
-				if ( !is_array( $data ) )
+				if ( !\is_array( $data ) )
 				{
 					/* Start importing */
 					$data = array( 'toDo' => array( 'import', 'compile' ) );
 
-					return array( $data, Member::loggedIn()->language()->addToStack('processing') );
+					return array( $data, \IPS\Member::loggedIn()->language()->addToStack('processing') );
 				}
 
 				/* Grab something to build */
-				if ( count( $data['toDo'] ) )
+				if ( \count( $data['toDo'] ) )
 				{
 					reset( $data['toDo'] );
 					$command = array_shift( $data['toDo'] );
@@ -2288,27 +1720,27 @@ class applications extends Controller
 					switch( $command )
 					{
 						case 'import':
-							$xml = Javascript::createXml( Request::i()->appKey );
+							$xml = \IPS\Output\Javascript::createXml( \IPS\Request::i()->appKey );
 
 							/* Write it */
-							if ( is_writable( \IPS\ROOT_PATH . '/applications/' . Request::i()->appKey . '/data' ) )
+							if ( is_writable( \IPS\ROOT_PATH . '/applications/' . \IPS\Request::i()->appKey . '/data' ) )
 							{
-								file_put_contents( \IPS\ROOT_PATH . '/applications/' . Request::i()->appKey . '/data/javascript.xml', $xml->outputMemory() );
+								\file_put_contents( \IPS\ROOT_PATH . '/applications/' . \IPS\Request::i()->appKey . '/data/javascript.xml', $xml->outputMemory() );
 							}
 						break;
 						case 'compile':
-							Javascript::compile( Request::i()->appKey );
+							\IPS\Output\Javascript::compile( \IPS\Request::i()->appKey );
 
 							/* Compile global JS after so map is written and correct */
-							if ( Request::i()->appKey == 'core' )
+							if ( \IPS\Request::i()->appKey == 'core' )
 							{
-								Javascript::compile('global');
+								\IPS\Output\Javascript::compile('global');
 							}
 
 						break;
 					}
 
-					return array( $data, Member::loggedIn()->language()->addToStack('processing') );
+					return array( $data, \IPS\Member::loggedIn()->language()->addToStack('processing') );
 				}
 				else
 				{
@@ -2319,7 +1751,7 @@ class applications extends Controller
 			function()
 			{
 				/* Finished */
-				Output::i()->redirect( Url::internal( 'app=core&module=developer&appKey=' . Request::i()->appKey ), 'completed' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications' ), 'completed' );
 			}
 		);
 	}
@@ -2329,69 +1761,68 @@ class applications extends Controller
 	 *
 	 * @return void
 	 */
-	public function submit() : void
+	public function submit()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		$url = Url::internal('app=core&module=applications&controller=applications&do=submit')->csrf();
-		Output::i()->output = (string) new MultipleRedirect( $url, function( $data )
+		$url = \IPS\Http\Url::internal('app=core&module=applications&controller=applications&do=submit')->csrf();
+		\IPS\Output::i()->output = (string) new \IPS\Helpers\MultipleRedirect( $url, function( $data )
 		{
 			if ( !isset( $data['done'] ) )
 			{
 				$data['done'] = array();
 			}
 
-			foreach ( IPS::$ipsApps as $app )
+			foreach ( \IPS\IPS::$ipsApps as $app )
 			{
-				if ( in_array( $app, $data['done'] ) )
+				if ( \in_array( $app, $data['done'] ) )
 				{
 					continue;
 				}
 
-				/* Prevent race conditions */
-				$data['done'][] = $app;
-
 				try
 				{
-					$version = Application::getAvailableVersion( $app );
+					$version = \IPS\Application::getAvailableVersion( $app );
 					$info = json_decode( file_get_contents( \IPS\ROOT_PATH . '/applications/' . $app . '/setup/upg_' . $version . '/data.json' ), TRUE );
 					$info['built'] = time();
 
-					$response = Url::ips('upgrade')->request()->login( 'dev', IPS_PASSWORD )->post( array(
+					$response = \IPS\Http\Url::ips('upgrade')->request()->login( 'dev', \IPS\IPS_PASSWORD )->post( array(
 						'version'	=> $version,
 						'app'		=> $app,
 						'type'		=> 'info',
 						'data'		=> json_encode( $info ),
-						'alpha'		=> (int) IPS_ALPHA_BUILD,
+						'alpha'		=> (int) \IPS\IPS_ALPHA_BUILD,
 					) );
 					if ( $response->httpResponseCode != 200 )
 					{
-						Output::i()->error( $app . $response, '2C133/X', 403, '' );
+						\IPS\Output::i()->error( (string) $app . $response, '2C133/X', 403, '' );
 					}
 
 					foreach ( $info['steps'] as $k => $v )
 					{
-						if ( $v and !in_array( $k, array( 'customOptions', 'customRoutines' ) ) and file_exists( \IPS\ROOT_PATH . '/applications/' . $app . '/setup/upg_' . $version . '/' . $k . '.json' ) )
+						if ( $v and !\in_array( $k, array( 'customOptions', 'customRoutines' ) ) )
 						{
-							$response = Url::ips('upgrade')->request()->login( 'dev', IPS_PASSWORD )->post( array(
+							$response = \IPS\Http\Url::ips('upgrade')->request()->login( 'dev', \IPS\IPS_PASSWORD )->post( array(
 								'version'	=> $version,
 								'app'		=> $app,
 								'type'		=> $k,
-								'alpha'		=> (int) IPS_ALPHA_BUILD,
+								'alpha'		=> (int) \IPS\IPS_ALPHA_BUILD,
 								'data'		=> json_encode( json_decode( file_get_contents( \IPS\ROOT_PATH . '/applications/' . $app . '/setup/upg_' . $version . '/' . $k . '.json' ) ) )
 							) );
 							if ( $response->httpResponseCode != 200 )
 							{
-								Output::i()->error( $app .  $response, '2C133/Z', 403, '' );
+								\IPS\Output::i()->error( (string) $app .  $response, '2C133/Z', 403, '' );
 							}
 						}
 					}
 
-					return array( $data, Member::loggedIn()->language()->addToStack('processing') );
+					$data['done'][] = $app;
+
+					return array( $data, \IPS\Member::loggedIn()->language()->addToStack('processing') );
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
-					Output::i()->error( $e->getMessage(), '2C133/Y', 500, '' );
+					\IPS\Output::i()->error( $e->getMessage(), '2C133/Y', 500, '' );
 				}
 			}
 
@@ -2399,45 +1830,71 @@ class applications extends Controller
 		},
 		function()
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=applications&controller=applications' ), 'application_now_built' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=applications&controller=applications' ), 'application_now_built' );
 		} );
 	}
 
 	/**
 	 * Get application details
 	 *
-	 * @param	Model	$application	Application node
+	 * @param	\IPS\Node\Model	$application	Application node
 	 * @return	string
 	 */
-	protected function _showDetails( Model $application ) : string
+	protected function _showDetails( $application )
 	{
 		try
 		{
-			$history = Db::i()->select( 'upgrade_date', 'core_upgrade_history', array( 'upgrade_app=?', $application->directory ), 'upgrade_version_id DESC', array( 0, 1 ) )->first();
+			$history = \IPS\Db::i()->select( 'upgrade_date', 'core_upgrade_history', array( 'upgrade_app=?', $application->directory ), 'upgrade_version_id DESC', array( 0, 1 ) )->first();
 		}
-		catch( UnderflowException $ex )
+		catch( \UnderflowException $ex )
 		{
 			$history = null;
 		}
 
-		return Theme::i()->getTemplate( 'applications' )->details( $application, $history );
+		return \IPS\Theme::i()->getTemplate( 'applications' )->details( $application, $history );
 	}
 
 	/**
 	 * Show the application upgrade history
 	 *
-	 * @param	Model	$application	Application node
+	 * @param	\IPS\Node\Model	$application	Application node
 	 * @return	string
 	 */
-	protected function _showUpgrades( Model $application ) : string
+	protected function _showUpgrades( $application )
 	{
 		$list		= array();
-		$upgrades = Db::i()->select( '*', 'core_upgrade_history', array( 'upgrade_app=?', $application->directory ), 'upgrade_version_id DESC' );
+		$upgrades = \IPS\Db::i()->select( '*', 'core_upgrade_history', array( 'upgrade_app=?', $application->directory ), 'upgrade_version_id DESC' );
 		foreach(  $upgrades as $version )
 		{
-			$list[ (string) DateTime::ts( $version['upgrade_date'] ) ]	= Member::loggedIn()->language()->addToStack('app_version_string', FALSE, array( 'sprintf' => array( $version['upgrade_version_human'], $version['upgrade_version_id'] ) ) );
+			$list[ (string) \IPS\DateTime::ts( $version['upgrade_date'] ) ]	= \IPS\Member::loggedIn()->language()->addToStack('app_version_string', FALSE, array( 'sprintf' => array( $version['upgrade_version_human'], $version['upgrade_version_id'] ) ) );
 		}
 
-		return ( count( $upgrades ) ) ? Theme::i()->getTemplate( 'global' )->definitionTable( $list ) : Theme::i()->getTemplate( 'global' )->paddedBlock( Member::loggedIn()->language()->addToStack('app_no_upgrade_history') );
+		return ( \count( $upgrades ) ) ? \IPS\Theme::i()->getTemplate( 'global' )->definitionTable( $list ) : \IPS\Theme::i()->getTemplate( 'global' )->paddedBlock( \IPS\Member::loggedIn()->language()->addToStack('app_no_upgrade_history') );
+	}
+
+	/**
+	 * Show the application hooks
+	 *
+	 * @param	\IPS\Application	$application	Application
+	 * @return	string
+	 */
+	protected function _showHooks( $application )
+	{
+		$table = new \IPS\Helpers\Table\Db( 'core_hooks', \IPS\Http\Url::internal( "app=core&module=applications&controller=applications&do=details&id={$application->directory}&tab=hooks" ), array( 'app=?', $application->directory ) );
+		$table->include = array( 'filename', 'class' );
+		$table->langPrefix = 'plugin_hook_';
+		if ( !$table->sortBy )
+		{
+			$table->sortBy = 'class';
+			$table->sortDirection = 'asc';
+		}
+		$table->parsers = array(
+			'filename'	=> function( $val, $row )
+			{
+				return $val . '.php';
+			}
+		);
+
+		return $table;
 	}
 }

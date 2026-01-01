@@ -12,28 +12,21 @@
 namespace IPS\blog\extensions\core\OverviewStatistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\OverviewStatisticsAbstract;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Overview statistics extension: Blogs
  */
-class Blogs extends OverviewStatisticsAbstract
+class _Blogs
 {
 	/**
 	 * @brief	Which statistics page (activity or user)
 	 */
-	public string $page	= 'activity';
+	public $page	= 'activity';
 
 	/**
 	 * Return the sub-block keys
@@ -41,7 +34,7 @@ class Blogs extends OverviewStatisticsAbstract
 	 * @note This is designed to allow one class to support multiple blocks, for instance using the ContentRouter to generate blocks.
 	 * @return array
 	 */
-	public function getBlocks(): array
+	public function getBlocks()
 	{
 		return array( 'blogs' );
 	}
@@ -49,41 +42,26 @@ class Blogs extends OverviewStatisticsAbstract
 	/**
 	 * Return block details (title and description)
 	 *
-	 * @param string|null $subBlock	The subblock we are loading as returned by getBlocks()
+	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
 	 * @return	array
 	 */
-	public function getBlockDetails( string $subBlock = NULL ): array
+	public function getBlockDetails( $subBlock = NULL )
 	{
 		/* Description can be null and will not be shown if so */
-		return array( 'app' => 'blog', 'title' => 'stats_overview_blogs', 'description' => Member::loggedIn()->language()->addToStack( 'stats_overview_blogs_desc' ), 'refresh' => 120 );
+		return array( 'app' => 'blog', 'title' => 'stats_overview_blogs', 'description' => \IPS\Member::loggedIn()->language()->addToStack( 'stats_overview_blogs_desc' ), 'refresh' => 120 );
 	}
 
 	/** 
 	 * Return the block HTML to show
 	 *
-	 * @param array|string|null $dateRange	NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
-	 * @param string|null $subBlock	The subblock we are loading as returned by getBlocks()
+	 * @param	array|NULL	$dateRange	NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
+	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
 	 * @return	string
 	 */
-	public function getBlock( array|string|null $dateRange = NULL, string $subBlock = NULL ): string
+	public function getBlock( $dateRange = NULL, $subBlock = NULL )
 	{
-		return Theme::i()->getTemplate( 'stats' )->overviewComparisonCount(
-			$this->getBlockNumbers( $dateRange, $subBlock )['statsreports_current_count'],
-			NULL,
-			NULL
-		);
-	}
+		$total = \IPS\Db::i()->select( 'COUNT(*)', 'blog_blogs' )->first();
 
-	/**
-	 * @param array|string  $dateRange=null
-	 * @param string $subBlock = null
-	 *
-	 * @return array{statsreports_current_count: number}
-	 */
-	public function getBlockNumbers( array|string $dateRange = null, string $subBlock = null ) : array
-	{
-		return [
-			'statsreports_current_count' => Db::i()->select( "COUNT(*)", 'blog_blogs' )->first()
-		];
+		return \IPS\Theme::i()->getTemplate( 'stats' )->overviewComparisonCount( $total, NULL, NULL );
 	}
 }

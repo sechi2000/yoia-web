@@ -11,28 +11,16 @@
 namespace IPS\Content\Search;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Item;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Settings;
-use function defined;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Abstract Search Query
  */
-abstract class Query
+abstract class _Query
 {
 	const TERM_OR_TAGS = 1; // If both tags and a term are provided, match results where either the tags or the term match
 	const TERM_AND_TAGS = 2; // If both tags and a term are provided, match only results where BOTH the tags or the term match
@@ -59,45 +47,38 @@ abstract class Query
 	/**
 	 * Create new query
 	 *
-	 * @param	Member|null	$member	The member performing the search (NULL for currently logged in member)
-	 * @return    Query
+	 * @param	\IPS\Member	$member	The member performing the search (NULL for currently logged in member)
+	 * @return	\IPS\Content\Search\Query
 	 */
-	public static function init( Member|null $member = NULL ): static
+	public static function init( \IPS\Member $member = NULL )
 	{
-		if ( Settings::i()->search_method == 'elastic' )
+		if ( \IPS\Settings::i()->search_method == 'elastic' )
 		{
-			$search = new Elastic\Query( $member ?: Member::loggedIn(), Url::external( rtrim( Settings::i()->search_elastic_server, '/' ) . '/' . Settings::i()->search_elastic_index ) );
+			return new \IPS\Content\Search\Elastic\Query( $member ?: \IPS\Member::loggedIn(), \IPS\Http\Url::external( rtrim( \IPS\Settings::i()->search_elastic_server, '/' ) . '/' . \IPS\Settings::i()->search_elastic_index ) );
 		}
 		else
 		{
-			$search =  new Mysql\Query( $member ?: Member::loggedIn() );
+			return new \IPS\Content\Search\Mysql\Query( $member ?: \IPS\Member::loggedIn() );
 		}
-
-		/* Don't include any club content if we have disabled clubs */
-		if( !Settings::i()->clubs )
-		{
-			$search->filterByClub( NULL );
-		}
-		return $search;
 	}
 		
 	/**
 	 * @brief	Number of results to get
 	 */
-	public int $resultsToGet = 25;
+	public $resultsToGet = 25;
 	
 	/**
 	 * @brief	The member performing the search
 	 */
-	protected Member $member;
+	protected $member;
 				
 	/**
 	 * Constructor
 	 *
-	 * @param	Member	$member	The member performing the search
+	 * @param	\IPS\Member	$member	The member performing the search
 	 * @return	void
 	 */
-	public function __construct( Member $member )
+	public function __construct( \IPS\Member $member )
 	{
 		$this->member = $member;
 		
@@ -106,17 +87,12 @@ abstract class Query
 		{
 			$this->setHiddenFilter( static::HIDDEN_VISIBLE );
 		}
-
-		$filters = [];
 		
 		/* Exclude disabled applications */
-		foreach( SearchContent::searchableClasses() as $class )
+		$filters = array();
+		foreach ( \IPS\Content::routedClasses( $member, FALSE, TRUE ) as $class )
 		{
-			/* We only want items here */
-			if( is_subclass_of( $class, Item::class ) )
-			{
-				$filters[] = ContentFilter::init( $class );
-			}
+			$filters[] = \IPS\Content\Search\ContentFilter::init( $class );
 		}
 		if ( !empty( $filters ) )
 		{
@@ -129,50 +105,50 @@ abstract class Query
 	 *
 	 * @param	array	$contentFilters	Array of \IPS\Content\Search\ContentFilter objects
 	 * @param	bool	$type			TRUE means only include results matching the filters, FALSE means exclude all results matching the filters
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByContent( array $contentFilters, bool $type = TRUE ): static;
+	abstract public function filterByContent( array $contentFilters, $type = TRUE );
 		
 	/**
 	 * Filter by author
 	 *
-	 * @param	Member|int|array	$author						The author, or an array of author IDs
-	 * @return    Query    (for daisy chaining)
+	 * @param	\IPS\Member|int|array	$author						The author, or an array of author IDs
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByAuthor( Member|int|array $author ): static;
+	abstract public function filterByAuthor( $author );
 	
 	/**
 	 * Filter by club
 	 *
-	 * @param	Club|int|array|null	$club	The club, or array of club IDs
-	 * @return    Query    (for daisy chaining)
+	 * @param	\IPS\Member\Club|int|array	$club	The club, or array of club IDs
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByClub( Club|int|array|null $club ): static;
+	abstract public function filterByClub( $club );
 	
 	/**
 	 * Filter for profile
 	 *
-	 * @param	Member	$member	The member whose profile is being viewed
-	 * @return    Query    (for daisy chaining)
+	 * @param	\IPS\Member	$member	The member whose profile is being viewed
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterForProfile( Member $member ): static;
+	abstract public function filterForProfile( \IPS\Member $member );
 	
 	/**
 	 * Filter by item author
 	 *
-	 * @param	Member	$author		The author
-	 * @return    Query    (for daisy chaining)
+	 * @param	\IPS\Member	$author		The author
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByItemAuthor( Member $author ): static;
+	abstract public function filterByItemAuthor( \IPS\Member $author );
 	
 	/**
 	 * Filter by container class
 	 *
 	 * @param	array	$classes	Container classes to exclude from results.
 	 * @param	array	$exclude	Content classes to exclude from the filter. For cases where multiple content classes may have the same container class such as Gallery images, comments and reviews.
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByContainerClasses( array $classes=array(), array $exclude=array() ): static;
+	abstract public function filterByContainerClasses( $classes=array(), $exclude=array() );
 	
 	/**
 	 * Filter by content the user follows
@@ -180,72 +156,72 @@ abstract class Query
 	 * @param	bool	$includeContainers	Include content in containers the user follows?
 	 * @param	bool	$includeItems		Include items and comments/reviews on items the user follows?
 	 * @param	bool	$includeMembers		Include content posted by members the user follows?
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByFollowed( bool $includeContainers, bool $includeItems, bool $includeMembers ): static;
+	abstract public function filterByFollowed( $includeContainers, $includeItems, $includeMembers );
 	
 	/**
 	 * Filter by content the user has posted in
 	 *
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByItemsIPostedIn(): static;
+	abstract public function filterByItemsIPostedIn();
 	
 	/**
 	 * Filter by content the user has not read
 	 *
 	 * @note	If applicable, it is more efficient to call filterByContent() before calling this method
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByUnread(): static;
+	abstract public function filterByUnread();
 
 	/**
 	 * Filter by content the user has not read
 	 *
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterBySolved(): static;
+	abstract public function filterBySolved();
 
 	/**
 	 * Filter by content the user has not read
 	 *
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByUnsolved(): static;
+	abstract public function filterByUnsolved();
 	
 	/**
 	 * Filter by start date
 	 *
-	 * @param	DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
-	 * @param	DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
-	 * @return    Query    (for daisy chaining)
+	 * @param	\IPS\DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
+	 * @param	\IPS\DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByCreateDate( DateTime|null $start = NULL, DateTime|null $end = NULL ): static;
+	abstract public function filterByCreateDate( \IPS\DateTime $start = NULL, \IPS\DateTime $end = NULL );
 	
 	/**
 	 * Filter by last updated date
 	 *
-	 * @param	DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
-	 * @param	DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
-	 * @return    Query    (for daisy chaining)
+	 * @param	\IPS\DateTime|NULL	$start		The start date (only results AFTER this date will be returned)
+	 * @param	\IPS\DateTime|NULL	$end		The end date (only results BEFORE this date will be returned)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function filterByLastUpdatedDate( DateTime|null $start = NULL, DateTime|null $end = NULL ): static;
+	abstract public function filterByLastUpdatedDate( \IPS\DateTime $start = NULL, \IPS\DateTime $end = NULL );
 	
 	/**
 	 * Set hidden status
 	 *
 	 * @param	int|array|NULL	$statuses	The statuses (see HIDDEN_ constants) or NULL for any
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function setHiddenFilter( int|array|null $statuses ): static;
+	abstract public function setHiddenFilter( $statuses );
 	
 	/**
 	 * Set limit
 	 *
 	 * @param	int		$limit	Number per page
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	public function setLimit( int $limit ): static
+	public function setLimit( $limit )
 	{
 		$this->resultsToGet = $limit;
 		return $this;
@@ -255,24 +231,24 @@ abstract class Query
 	 * Set page
 	 *
 	 * @param	int		$page	The page number
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function setPage( int $page ): static;
+	abstract public function setPage( $page );
 	
 	/**
 	 * Set order
 	 *
 	 * @param	int		$order	Order (see ORDER_ constants)
-	 * @return    Query    (for daisy chaining)
+	 * @return	\IPS\Content\Search\Query	(for daisy chaining)
 	 */
-	abstract public function setOrder( int $order ): static;
+	abstract public function setOrder( $order );
 	
 	/**
 	 * Permission Array
 	 *
 	 * @return	array
 	 */
-	public function permissionArray(): array
+	public function permissionArray()
 	{
 		return $this->member->permissionArray();
 	}
@@ -284,16 +260,16 @@ abstract class Query
 	 * @param	array|null	$tags		The tags to search for
 	 * @param	int			$method 	See \IPS\Content\Search\Query::TERM_* contants
 	 * @param	string|null	$operator	If $term contains more than one word, determines if searching for both ("and") or any ("or") of those terms. NULL will go to admin-defined setting
-	 * @return    Results
+	 * @return	\IPS\Content\Search\Results
 	 */
-	abstract public function search( string|null $term = NULL, array|null $tags = NULL, int $method = 1, string|null $operator = NULL ): Results;
+	abstract public function search( $term = NULL, $tags = NULL, $method = 1, $operator = NULL );
 	
 	/**
 	 * Get the default date cut off
 	 *
 	 * @return string
 	 */
-	public function getDefaultDateCutOff(): string
+	public function getDefaultDateCutOff()
 	{
 		return 'any';
 	}
@@ -303,7 +279,7 @@ abstract class Query
 	 *
 	 * @return string
 	 */
-	public function getDefaultSortMethod(): string
+	public function getDefaultSortMethod()
 	{
 		return 'relevancy';
 	}
@@ -325,9 +301,9 @@ abstract class Query
 	 * @param	array|null	$tags		The tags to search for
 	 * @param	int			$method		\IPS\Content\Search\Index::i()->TERM_OR_TAGS or \IPS\Content\Search\Index::i()->TERM_AND_TAGS
 	 * @param	string|null	$operator	If $term contains more than one word, determines if searching for both ("and") or any ("or") of those terms. NULL will go to admin-defined setting
-	 * @return	Select|int
+	 * @return	int
 	 */
-	public function count( string|null $term = NULL, array|null $tags = NULL, int $method = 1, string|null $operator = NULL ): Select|int
+	public function count( $term = NULL, $tags = NULL, $method = 1, $operator = NULL )
 	{
 		return $this->search( $term, $tags, $method, $operator )->count( TRUE );
 	}
@@ -338,9 +314,9 @@ abstract class Query
 	 * @param	string	$term	The term to search for
 	 * @return	boolean
 	 */
-	public static function termIsPhrase( string $term ): bool
+	public static function termIsPhrase( $term )
 	{
-		return (bool) preg_match( '#^".*"$#', $term );
+		return (boolean) preg_match( '#^".*"$#', $term );
 	}
 	
 	/**
@@ -352,10 +328,10 @@ abstract class Query
 	 * @param	int|NULL		$maxLength		The maximum length a sequence of characters can be for it to be considered a word. If null, ft_max_word_len/innodb_ft_max_token_size is used.
 	 * @return	array
 	 */
-	public static function termAsWordsArray( string $term, bool $ignorePhrase=FALSE, int|null $minLength=NULL, int|null $maxLength=NULL ): array
+	public static function termAsWordsArray( $term, $ignorePhrase=FALSE, $minLength=NULL, $maxLength=NULL )
 	{		
-		$minLength = is_null( $minLength ) ? 0 : $minLength;
-		$maxLength = is_null( $maxLength ) ? 255 : $maxLength;
+		$minLength = \is_null( $minLength ) ? 0 : $minLength;
+		$maxLength = \is_null( $maxLength ) ? 255 : $maxLength;
 		
 		/* Sub quotes with smaller than min word strings can cause issues for larger tables, so we convert the sub quote into normal words for a boolean search */
 		if ( ! static::termIsPhrase( $term ) )
@@ -429,37 +405,8 @@ abstract class Query
 	 *
 	 * @return boolean
 	 */
-	 public static function isRebuildRunning(): bool
+	 public static function isRebuildRunning()
 	 {
-		 return (bool) Db::i()->select( 'COUNT(*)', 'core_queue', array( '`key`=?', 'RebuildSearchIndex' ) )->first();
-	 }
-
-	/**
-	 * Run custom search engine filters
-	 *
-	 * @param bool $itemsOnly
-	 * @return void
-	 */
-	 public function customFiltering( bool $itemsOnly=FALSE ) : void
-	 {
-		 /* Get the list of valid classes */
-		 $classesChecked = array();
-		 foreach( SearchContent::searchableClasses() as $class )
-		 {
-			 if ( $itemsOnly AND in_array( 'IPS\Content\Item', class_parents( $class ) ) )
-			 {
-				 $classesChecked[]	= $class;
-			 }
-		 }
-
-		 /* Give content item classes a chance to inspect and manipulate filters */
-		 $filters = array();
-		 foreach( $classesChecked as $itemClass )
-		 {
-			 if( $extension = SearchContent::extension( $itemClass ) )
-			 {
-				 $extension::searchEngineFiltering( $filters, $this );
-			 }
-		 }
+		 return \IPS\Db::i()->select( 'COUNT(*)', 'core_queue', array( '`key`=?', 'RebuildSearchIndex' ) )->first() ? TRUE : FALSE;
 	 }
 }

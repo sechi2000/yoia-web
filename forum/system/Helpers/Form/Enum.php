@@ -11,21 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use OutOfRangeException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Enumeration class for Form Builder
  */
-class Enum extends FormAbstract
+class _Enum extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -35,45 +30,46 @@ class Enum extends FormAbstract
 	 )
 	 @encode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'threshold'		=> 25
 	);
 	
 	/**
 	 * @brief	Form Class
 	 */
-	protected mixed $class = NULL;
+	protected $class;
 	
 	/**
 	 * @brief	Threshold
 	 */
-	protected mixed $threshold = NULL;
-
+	protected $threshold;
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		$options['multiple'] = TRUE;
 		
 		$this->threshold = $options['threshold'] ?? $this->defaultOptions['threshold'];
 		
-		if ( count( $options['options'] ) >= $this->threshold )
+		if ( \count( $options['options'] ) >= $this->threshold )
 		{
-			$this->class = new Select( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
+			$this->class = new \IPS\Helpers\Form\Select( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
 		}
 		else
 		{
-			$this->class = new CheckboxSet( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
+			$this->class = new \IPS\Helpers\Form\CheckboxSet( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
 		}
 		
 		parent::__construct( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
@@ -84,7 +80,7 @@ class Enum extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		return $this->class->html();
 	}
@@ -94,7 +90,7 @@ class Enum extends FormAbstract
 	 *
 	 * @return	array
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		return $this->class->getValue();
 	}
@@ -102,10 +98,10 @@ class Enum extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 * @return	bool
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		return $this->class->validate();
 	}

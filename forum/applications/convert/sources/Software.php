@@ -12,68 +12,46 @@
 namespace IPS\convert;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Db\Exception as DbException;
-use IPS\Db\Select;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Member;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_null;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Converter Software Class
  */
-abstract class Software
+abstract class _Software
 {
 	/**
 	 * @brief	\IPS\convert\App instance
 	 */
-	public ?App $app			= NULL;
+	public $app			= NULL;
 	
 	/**
 	 * @brief	\IPS\Db instance to the source application
 	 */
-	public ?Db $db			= NULL;
+	public $db			= NULL;
 	
 	/**
 	 * @brief	Is UTF8
 	 */
-	public bool $isUtfEight	= TRUE;
+	public $isUtfEight	= TRUE;
 	
 	/**
 	 * @brief	Flag to indicate the post data has been fixed during conversion, and we only need to use Legacy Parser
 	 */
-	public static bool $contentFixed = FALSE;
-
-	/**
-	 * @var Software|string|null
-	 */
-	public Software|string|null $parent = null;
+	public static $contentFixed = FALSE;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param App $app	The application to reference for database and other information.
-	 * @param bool $needDB	If the database is needed or not.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
+	 * @param	bool				$needDB	If the database is needed or not.
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
 		$this->app = $app;
 		
@@ -112,28 +90,28 @@ abstract class Software
 		{
 			try
 			{
-				$this->db = Db::i( 'convert_' . $this->app->app_id, $connectionSettings );
+				$this->db = \IPS\Db::i( 'convert_' . $this->app->app_id, $connectionSettings );
 				
 				/* Are we utf8? */
-				if ( !in_array( $this->app->db_charset, array( 'utf8', 'utf8mb4' ) ) )
+				if ( !\in_array( $this->app->db_charset, array( 'utf8', 'utf8mb4' ) ) )
 				{
 					/* Get all db charsets */
 					$charsets = static::getDatabaseCharsets( $this->db );
 
 					/* Set a flag that the data is not UTF8... we need to convert it to UTF8 at conversion time. */
-					if ( !in_array( mb_strtolower( $this->app->db_charset ), $charsets ) )
+					if ( !\in_array( mb_strtolower( $this->app->db_charset ), $charsets ) )
 					{
 						/* @todo We need to use a comprehensive conversion system like the UTF8 Converter... or maybe we can provide instructions on how to use it on non-IPS databases if MB can't do it? */
-						throw new InvalidArgumentException( 'invalid_charset' );
+						throw new \InvalidArgumentException( 'invalid_charset' );
 					}
 					
 					$this->isUtfEight = FALSE;
 					$this->db->set_charset( $this->app->db_charset );
 				}
 			}
-			catch( DbException $e )
+			catch( \IPS\Db\Exception $e )
 			{
-				throw new InvalidArgumentException( "Database Connection Failed: " . $e->getMessage() );
+				throw new \InvalidArgumentException( "Database Connection Failed: " . $e->getMessage() );
 			}
 		}
 	}
@@ -145,7 +123,7 @@ abstract class Software
 	 * @param	mixed	$arguments		Arguments to pass to the method
 	 * @return 	mixed
 	 */
-	public function __call( string $name, mixed $arguments )
+	public function __call( $name, $arguments )
 	{
 		if ( method_exists( $this, 'convert' . $name ) )
 		{
@@ -158,7 +136,7 @@ abstract class Software
 		}
 		else
 		{
-			Log::log( "Call to undefined method in " . get_class( $this ) . "::{$name}", 'converters' );
+			\IPS\Log::log( "Call to undefined method in " . \get_class( $this ) . "::{$name}", 'converters' );
 			return NULL;
 		}
 	}
@@ -168,10 +146,10 @@ abstract class Software
 	 *
 	 * @return	array
 	 */
-	public static function software() : array
+	public static function software()
 	{
-		$software = [
-			'core'			=> [
+		return array(
+			'core'			=> array(
 				'expressionengine'		=> 'IPS\convert\Software\Core\Expressionengine',
 				'invisioncommunity'		=> 'IPS\convert\Software\Core\Invisioncommunity',
 				'joomla'				=> 'IPS\convert\Software\Core\Joomla',
@@ -189,28 +167,28 @@ abstract class Software
 				'wordpress'				=> 'IPS\convert\Software\Core\Wordpress',
 				'wpforo'				=> 'IPS\convert\Software\Core\Wpforo',
 				'xenforo'				=> 'IPS\convert\Software\Core\Xenforo',
-			],
-			'blog'			=> [
+			),
+			'blog'			=> array(
 				'vbulletin'				=> 'IPS\convert\Software\Blog\Vbulletin',
 				'invisioncommunity'		=> 'IPS\convert\Software\Blog\Invisioncommunity',
-			],
-			'calendar'		=> [
+			),
+			'calendar'		=> array(
 				'mybb'					=> 'IPS\convert\Software\Calendar\Mybb',
 				'vbulletin'				=> 'IPS\convert\Software\Calendar\Vbulletin',
 				'invisioncommunity'		=> 'IPS\convert\Software\Calendar\Invisioncommunity',
-			],
-			'cms'			=> [
+			),
+			'cms'			=> array(
 				'joomla'				=> 'IPS\convert\Software\Cms\Joomla',
 				'vbulletin'				=> 'IPS\convert\Software\Cms\Vbulletin',
 				'wordpress'				=> 'IPS\convert\Software\Cms\Wordpress',
 				'xenforo'				=> 'IPS\convert\Software\Cms\Xenforo',
 				'xenfororm'				=> 'IPS\convert\Software\Cms\Xenfororm',
-			],
-			'downloads'		=> [
+			),
+			'downloads'		=> array(
 				'invisioncommunity'		=> 'IPS\convert\Software\Downloads\Invisioncommunity',
 				'xenforo'				=> 'IPS\convert\Software\Downloads\Xenforo',
-			],
-			'forums'		=> [
+			),
+			'forums'		=> array(
 				'bbpress'				=> 'IPS\convert\Software\Forums\Bbpress',
 				'expressionengine'		=> 'IPS\convert\Software\Forums\Expressionengine',
 				'invisioncommunity'		=> 'IPS\convert\Software\Forums\Invisioncommunity',
@@ -226,78 +204,49 @@ abstract class Software
 				'woltlab'				=> 'IPS\convert\Software\Forums\Woltlab',
 				'wpforo'				=> 'IPS\convert\Software\Forums\Wpforo',
 				'xenforo'				=> 'IPS\convert\Software\Forums\Xenforo',
-			],
-			'gallery'		=> [
+			),
+			'gallery'		=> array(
 				'coppermine'			=> 'IPS\convert\Software\Gallery\Coppermine',
 				'invisioncommunity'		=> 'IPS\convert\Software\Gallery\Invisioncommunity',
 				'photoplog'				=> 'IPS\convert\Software\Gallery\Photoplog',
 				'photopost'				=> 'IPS\convert\Software\Gallery\Photopost',
 				'vbulletin'				=> 'IPS\convert\Software\Gallery\Vbulletin',
 				'xenforo'				=> 'IPS\convert\Software\Gallery\Xenforo',
-			],
-			'nexus'			=> []
-		];
-
-		/* Library Extensions */
-		foreach ( Application::allExtensions( 'convert', 'Library', FALSE, construct: false ) as $extension )
-		{
-			try
-			{
-				if( !empty( $extension::$app ) AND !isset( $software[ $extension::$app ] ) )
-				{
-					$software[ $extension::$app ] = [];
-				}
-			}
-			catch( \BadMethodCallException ) {}
-		}
-
-		/* Software Extensions */
-		foreach ( Application::allExtensions( 'convert', 'Software', FALSE, construct: false ) as $extension )
-		{
-			try
-			{
-				if( !empty( $extension::$targetApp ) AND isset( $software[ $extension::$targetApp ] )
-					AND !isset( $software[ $extension::$targetApp ][ $extension::softwareKey() ] ) )
-				{
-					$software[ $extension::$targetApp ][ $extension::softwareKey() ] = $extension;
-				}
-			}
-			catch( \BadMethodCallException ) {}
-		}
-
-		return $software;
+			),
+			'nexus'			=> array()
+		);
 	}
 	
 	/**
 	 * Software Name
 	 *
-	 * @return    string
-	 * @throws	BadMethodCallException
+	 * @return	string
+	 * @throws	\BadMethodCallException
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
-		throw new BadMethodCallException( 'no_name' );
+		throw new \BadMethodCallException( 'no_name' );
 	}
 	
 	/**
 	 * Software Key
 	 *
-	 * @return    string
-	 * @throws	BadMethodCallException
+	 * @return	string
+	 * @throws	\BadMethodCallException
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
-		throw new BadMethodCallException( 'no_key' );
+		throw new \BadMethodCallException( 'no_key' );
 	}
 	
 	/**
 	 * Requires Parent
 	 *
-	 * @return    bool
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return FALSE;
 	}
@@ -305,9 +254,9 @@ abstract class Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|NULL
+	 * @return	NULL|array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return NULL;
 	}
@@ -315,9 +264,9 @@ abstract class Software
 	/**
 	 * Uses Prefix
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function usesPrefix(): bool
+	public static function usesPrefix()
 	{
 		return TRUE;
 	}
@@ -325,21 +274,21 @@ abstract class Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|NULL
-	 * @throws	BadMethodCallException
+	 * @return	array|NULL
+	 * @throws	\BadMethodCallException
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		/* Child classes must override this method */
-		throw new BadMethodCallException( 'nothing_to_convert' );
+		throw new \BadMethodCallException( 'nothing_to_convert' );
 	}
 	
 	/**
 	 * Can we translate settings over to our Invision Community equivalents?
 	 *
-	 * @return    bool
+	 * @return	boolean
 	 */
-	public static function canConvertSettings(): bool
+	public static function canConvertSettings()
 	{
 		return FALSE;
 	}
@@ -348,12 +297,12 @@ abstract class Software
 	 * Settings Map
 	 *
 	 * @code
-	 	* return array(
-		 	* 'source_setting_key' => array( 'ips_setting_key' );
+	 	return array(
+		 	'source_setting_key' => array( 'ips_setting_key' );
 	 * @endcode
-	 * @return    array
+	 * @return	array
 	 */
-	public function settingsMap(): array
+	public function settingsMap()
 	{
 		return array();
 	}
@@ -362,15 +311,15 @@ abstract class Software
 	 * Settings Map List
 	 *
 	 * @code
-	 	* return array(
-		 	* 'source_setting_key' => array(
-			 	* 'title'		=> 'Human Readable Name as presented in the source',
-			 	* 'value'		=> 'The value from the source',
-		 * );
+	 	return array(
+		 	'source_setting_key' => array(
+			 	'title'		=> 'Human Readable Name as presented in the source',
+			 	'value'		=> 'The value from the source',
+		 );
 	 * @endcode
-	 * @return    array
+	 * @return	array
 	 */
-	public function settingsMapList():array
+	public function settingsMapList()
 	{
 		return array();
 	}
@@ -378,9 +327,9 @@ abstract class Software
 	/**
 	 * List of Conversion Methods that require more information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array();
 	}
@@ -388,24 +337,24 @@ abstract class Software
 	/**
 	 * An array of steps which require more information. This method should return array like below if any steps require additional information. Otherwise, it should return NULL.
 	 *
-	 * @param string $method Conversion method
-	 * @return    array|NULL
+	 * @param	string	$method	Conversion method
+	 * @return	array|NULL
 	 *
 	 * @code
-	 	* return array(
-		 	* 'convertAttachments' => array(
-			 * 'upload_path'	=> array( // The key is the name of the field, or the first parameter of the helper class constructor.
-				* 'field_class' 		=> 'IPS\\Helpers\\Form\\Text', // The form helper class for this field
-				* 'field_default'		=> NULL, // The default value for this field.
-				* 'field_required'	=> TRUE, // TRUE if this field is required.
-				* 'field_extra'		=> array(), // Array of extra data that would normally go in $options for the form helper.
-				* 'field_hint'		=> NULL, // A language key of hint text to display after the form (such as path to IPS Suite files). NULL for no additional text.
-			 * ),
-			* )
-		* );
+	 	return array(
+		 	'convertAttachments' => array(
+			 'upload_path'	=> array( // The key is the name of the field, or the first parameter of the helper class constructor.
+				'field_class' 		=> 'IPS\\Helpers\\Form\\Text', // The form helper class for this field
+				'field_default'		=> NULL, // The default value for this field.
+				'field_required'	=> TRUE, // TRUE if this field is required.
+				'field_extra'		=> array(), // Array of extra data that would normally go in $options for the form helper.
+				'field_hint'		=> NULL, // A language key of hint text to display after the form (such as path to IPS Suite files). NULL for no additional text.
+			 ),
+			)
+		);
 	 * @endcode
 	 */
-	public function getMoreInfo( string $method ):?array
+	public function getMoreInfo( $method )
 	{
 		return NULL;
 	}
@@ -413,9 +362,9 @@ abstract class Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    bool
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return FALSE;
 	}
@@ -423,47 +372,47 @@ abstract class Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    int
-	 * @throws    Exception
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
+	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		try
 		{
 			$cacheKey = 'convert_' . $this->app->app_id . '_' . md5( $table . json_encode( $where ) );
 
-			if( !isset( Store::i()->$cacheKey ) OR $recache === TRUE )
+			if( !isset( \IPS\Data\Store::i()->$cacheKey ) OR $recache === TRUE )
 			{
-				Store::i()->$cacheKey = $this->db->select( 'COUNT(*)', $table, $where )->first();
+				\IPS\Data\Store::i()->$cacheKey = $this->db->select( 'COUNT(*)', $table, $where )->first();
 			}
 
-			return Store::i()->$cacheKey;
+			return \IPS\Data\Store::i()->$cacheKey;
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
-			throw new Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+			throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 		}
 	}
 	
 	/**
 	 * Get Library Class
 	 *
-	 * @param string|NULL $library	Specific library to fetch
-	 * @return    Library
-	 * @throws	InvalidArgumentException
+	 * @param	string|NULL		$library	Specific library to fetch
+	 * @return	\IPS\convert\Library
+	 * @throws	\InvalidArgumentException
 	 */
-	public function getLibrary( ?string $library=NULL ): Library
+	public function getLibrary( $library=NULL )
 	{
 		$library = $library ?: $this->app->sw;
 		
-		$classname = Library::libraries()[ $library ];
+		$classname = \IPS\convert\Library::libraries()[ $library ];
 		
 		if ( ! class_exists( $classname ) )
 		{
-			throw new InvalidArgumentException( 'invalid_library' );
+			throw new \InvalidArgumentException( 'invalid_library' );
 		}
 		
 		return new $classname( $this );
@@ -472,9 +421,9 @@ abstract class Software
 	/**
 	 * Allows software to add additional menu row options
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function extraMenuRows(): array
+	public function extraMenuRows()
 	{
 		return array();
 	}
@@ -482,9 +431,9 @@ abstract class Software
 	/**
 	 * Returns a block of text, or a language string, that explains what the admin must do to start this conversion
 	 *
-	 * @return    string|NULL
+	 * @return	string|NULL
 	 */
-	public static function getPreConversionInformation(): ?string
+	public static function getPreConversionInformation()
 	{
 		return NULL;
 	}
@@ -492,13 +441,13 @@ abstract class Software
 	/**
 	 * Fetch Remote Data
 	 *
-	 * @param string|array $table		The table to selected data from
-	 * @param string $idColumn	The ID column to sort on, when not using keys.
-	 * @param string|array|NULL $where		WHERE clause for specific data to fetch.
-	 * @param string $what		What to fetch
-	 * @return    Select    An \IPS\Db\Select object that can be further manipulated if necessary (e.g. joins)
+	 * @param	string				$table		The table to selected data from
+	 * @param	string				$idColumn	The ID column to sort on, when not using keys.
+	 * @param	string|array|NULL	$where		WHERE clause for specific data to fetch.
+	 * @param	string				$what		What to fetch
+	 * @return	\IPS\Db\Select	An \IPS\Db\Select object that can be further manipulated if necessary (e.g. joins)
 	 */
-	public function fetch( string|array $table, string $idColumn='id', string|array|null $where=NULL, string $what='*' ): Select
+	public function fetch( $table, $idColumn='id', $where=NULL, $what='*' )
 	{
 		$libraryClass = $this->getLibrary();
 		if ( $libraryClass::$usingKeys === FALSE )
@@ -515,9 +464,9 @@ abstract class Software
 			$whereClause		= array();
 			$whereClause[]	= array( $libraryClass::$currentKeyName . '>?', $_SESSION['currentKeyValue'] );
 			
-			if ( !is_null( $where ) )
+			if ( !\is_null( $where ) )
 			{
-				if ( is_string( $where ) )
+				if ( \is_string( $where ) )
 				{
 					$whereClause[] = array( $where );
 				}
@@ -535,23 +484,20 @@ abstract class Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		return array();
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Updates Posted Content to work with the parser.
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string		$post	The post
+	 * @return	string		The converted post
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		return $post;
 	}
@@ -559,10 +505,10 @@ abstract class Software
 	/**
 	 * Get database charsets
 	 *
-	 * @param	Db		$database	Database connection
+	 * @param	\IPS\Db		$database	Database connection
 	 * @return	array
 	 */
-	public static function getDatabaseCharsets( Db $database ) : array
+	public static function getDatabaseCharsets( $database )
 	{
 		$charsets = array();
 		$result   = $database->query( "SHOW CHARACTER SET;" );
@@ -578,9 +524,9 @@ abstract class Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
 		return NULL;
 	}

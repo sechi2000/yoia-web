@@ -10,28 +10,16 @@
 namespace IPS\core\extensions\core\AchievementAction;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Achievements\Actions\AchievementActionAbstract;
-use IPS\core\Achievements\Rule;
-use IPS\Db;
-use IPS\Helpers\Form\Number;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement Action Extension
  */
-class NewClub extends AchievementActionAbstract // NOTE: Other classes exist to provided bases for common situations, like where node-based filters will be required
+class _NewClub extends \IPS\core\Achievements\Actions\AbstractAchievementAction // NOTE: Other classes exist to provided bases for common situations, like where node-based filters will be required
 {
 	/**
 	 * Can use this rule?
@@ -40,23 +28,23 @@ class NewClub extends AchievementActionAbstract // NOTE: Other classes exist to 
 	 */
 	public function canUse(): bool
 	{
-		return parent::canUse() and Settings::i()->clubs;
+		return (bool) parent::canUse() and \IPS\Settings::i()->clubs;
 	}
 	
 	/**
 	 * Get filter form elements
 	 *
 	 * @param	array|NULL		$filters	Current filter values (if editing)
-	 * @param	Url	$url		The URL the form is being shown on
+	 * @param	\IPS\Http\Url	$url		The URL the form is being shown on
 	 * @return	array
 	 */
-	public function filters( ?array $filters, Url $url ): array
+	public function filters( ?array $filters, \IPS\Http\Url $url ): array
 	{
-		$return = parent::filters( $filters, $url );
+		$nthFilter = new \IPS\Helpers\Form\Number( 'achievement_filter_club_nth', ( $filters and isset( $filters['milestone'] ) and $filters['milestone'] ) ? $filters['milestone'] : 0, FALSE, [], NULL, \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_nth_their'), \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_NewClub_nth_suffix') );
+		$nthFilter->label = \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_NewClub_nth');
 
-		$nthFilter = new Number( 'achievement_filter_club_nth', ( $filters and isset( $filters['milestone'] ) and $filters['milestone'] ) ? $filters['milestone'] : 0, FALSE, [], NULL, Member::loggedIn()->language()->addToStack('achievement_filter_nth_their'), Member::loggedIn()->language()->addToStack('achievement_filter_NewClub_nth_suffix') );
-		$nthFilter->label = Member::loggedIn()->language()->addToStack('achievement_filter_NewClub_nth');
-
+		$return = array();
+		
 		$return['milestone'] = $nthFilter;
 		
 		return $return;
@@ -70,7 +58,7 @@ class NewClub extends AchievementActionAbstract // NOTE: Other classes exist to 
 	 */
 	public function formatFilterValues( array $values ): array
 	{
-		$return = parent::formatFilterValues( $values );
+		$return = [];
 
 		if ( isset( $values['achievement_filter_club_nth'] ) )
 		{
@@ -86,19 +74,19 @@ class NewClub extends AchievementActionAbstract // NOTE: Other classes exist to 
 	 * calls that BEFORE making its change in the database (or there is read/write separation), you will need to add
 	 * 1 to the value being considered for milestones
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	array		$filters	The value returned by formatFilterValues()
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	bool
 	 */
-	public function filtersMatch( Member $subject, array $filters, mixed $extra = NULL ): bool
+	public function filtersMatch( \IPS\Member $subject, array $filters, $extra = NULL ): bool
 	{		
 		if ( isset( $filters['milestone'] ) )
 		{
 			$where = [];
 			$where[] = [ 'owner=? and approved=?', $subject->member_id, 1 ];
 					
-			$count = Db::i()->select( 'COUNT(*)', 'core_clubs', $where )->first();
+			$count = \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs', $where )->first();
 			
 			if ( $count < $filters['milestone'] )
 			{
@@ -113,38 +101,13 @@ class NewClub extends AchievementActionAbstract // NOTE: Other classes exist to 
 	 * Get identifier to prevent the member being awarded points for the same action twice
 	 * Must be unique within within of this domain, must not exceed 32 chars.
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	string
 	 */
-	public function identifier( Member $subject, mixed $extra = NULL ): string
+	public function identifier( \IPS\Member $subject, $extra = NULL ): string
 	{
 		return (string) $extra->id;
-	}
-
-	/**
-	 * Determines if the member has already completed this rule.
-	 * Used for retroactive rule completion.
-	 * So far, this is only used in Quests, but may be used elsewhere at a later point.
-	 *
-	 * @param Member $member
-	 * @param array $filters
-	 * @return bool
-	 */
-	public function isRuleCompleted( Member $member, array $filters ) : bool
-	{
-		if( !Settings::i()->clubs )
-		{
-			return false;
-		}
-
-		$total = Db::i()->select( 'count(*)', 'core_clubs', [ 'owner=? and approved=?', $member->member_id, 1 ] )->first();
-		if( !empty( $filters['milestone'] ) )
-		{
-			return $total >= $filters['milestone'];
-		}
-
-		return $total >  0;
 	}
 	
 	/**
@@ -156,38 +119,33 @@ class NewClub extends AchievementActionAbstract // NOTE: Other classes exist to 
 	 */
 	public function logRow( string $identifier, array $actor ): string
 	{
-		$club = Club::load( $identifier );
-		$clubLink = Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $club->url(), TRUE, $club->name, FALSE );
+		$club = \IPS\Member\Club::load( $identifier );
+		$clubLink = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $club->url(), TRUE, $club->name, FALSE );
 			
-		return Member::loggedIn()->language()->addToStack( 'AchievementAction__NewClub_log', FALSE, [ 'htmlsprintf' => [ $clubLink ] ] );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__NewClub_log', FALSE, [ 'htmlsprintf' => [ $clubLink ] ] );
 	}
 	
 	/**
 	 * Get "description" for rule
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	public function ruleDescription( Rule $rule ): ?string
+	public function ruleDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		$conditions = [];
 		if ( isset( $rule->filters['milestone'] ) )
 		{
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
 				'htmlsprintf' => [
-					Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'milestone', Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
+					\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'milestone', \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
 				],
-				'sprintf'		=> [ Member::loggedIn()->language()->addToStack('AchievementAction__NewClub_title_generic') ]
+				'sprintf'		=> [ \IPS\Member::loggedIn()->language()->addToStack('AchievementAction__NewClub_title_generic') ]
 			] );
 		}
 
-		if( $questCondition = $this->_questFilterDescription( $rule ) )
-		{
-			$conditions[] = $questCondition;
-		}
-
-		return Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescription(
-			Member::loggedIn()->language()->addToStack( 'AchievementAction__NewClub_title' ),
+		return \IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescription(
+			\IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__NewClub_title' ),
 			$conditions
 		);
 	}
@@ -197,7 +155,7 @@ class NewClub extends AchievementActionAbstract // NOTE: Other classes exist to 
 	 *
 	 * @return	array
 	 */
-	static public function rebuildData(): array
+	static public function rebuildData()
 	{
 		return [ [
 			'table' => 'core_clubs',
@@ -214,8 +172,8 @@ class NewClub extends AchievementActionAbstract // NOTE: Other classes exist to 
 	 * @param array		$data	Data collected when starting rebuild [table, pkey...]
 	 * @return void
 	 */
-	public static function rebuildRow( array $row, array $data ) : void
+	public static function rebuildRow( $row, $data )
 	{
-		Member::load( $row['owner'] )->achievementAction( 'core', 'NewClub', Club::load( $row['id'] ) );
+		\IPS\Member::load( $row['owner'] )->achievementAction( 'core', 'NewClub', \IPS\Member\Club::load( $row['id'] ) );
 	}
 }

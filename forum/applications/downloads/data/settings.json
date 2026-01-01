@@ -5,6 +5,16 @@
         "report": "full"
     },
     {
+        "key": "idm_default_view",
+        "default": "table",
+        "report": "bool"
+    },
+    {
+        "key": "idm_default_view_choose",
+        "default": "1",
+        "report": "bool"
+    },
+    {
         "key": "idm_featured_count",
         "default": "4",
         "report": "full"

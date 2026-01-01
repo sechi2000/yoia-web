@@ -12,44 +12,27 @@
 namespace IPS\core\modules\front\clubs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Club\Page as ClubPage;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * page
  */
-class page extends Controller
+class _page extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Page
 	 */
-	protected ?ClubPage $page = null;
+	protected $page;
 
 	/**
 	 * @brief These properties are used to specify datalayer context properties.
 	 *
 	 */
-	public static array $dataLayerContext = array(
+	public static $dataLayerContext = array(
 		'community_area' =>  [ 'value' => 'clubs', 'odkUpdate' => 'true']
 	);
 	
@@ -58,41 +41,41 @@ class page extends Controller
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		try
 		{
-			$this->page = ClubPage::loadAndCheckPerms( Request::i()->id );
+			$this->page = \IPS\Member\Club\Page::loadAndCheckPerms( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2S410/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2S410/4', 404, '' );
 		}
 		
-		Output::i()->sidebar['contextual'] = '';
+		\IPS\Output::i()->sidebar['contextual'] = '';
 
 		/* Club info in sidebar */
-		if ( Settings::i()->clubs_header == 'sidebar' )
+		if ( \IPS\Settings::i()->clubs_header == 'sidebar' )
 		{
-			Output::i()->sidebar['contextual'] .= Theme::i()->getTemplate( 'clubs', 'core' )->header( $this->page->club, NULL, 'sidebar', $this->page );
+			\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->header( $this->page->club, NULL, 'sidebar', $this->page );
 		}
 
-		if( ( GeoLocation::enabled() and Settings::i()->clubs_locations AND $location = $this->page->club->location() ) )
+		if( ( \IPS\GeoLocation::enabled() and \IPS\Settings::i()->clubs_locations AND $location = $this->page->club->location() ) )
 		{
-			Output::i()->sidebar['contextual'] .= Theme::i()->getTemplate( 'clubs', 'core' )->clubLocationBox( $this->page->club, $location );
+			\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->clubLocationBox( $this->page->club, $location );
 		}
 		
-		if( $this->page->club->type != Club::TYPE_PUBLIC AND $this->page->club->canViewMembers() )
+		if( $this->page->club->type != \IPS\Member\Club::TYPE_PUBLIC AND $this->page->club->canViewMembers() )
 		{
-			Output::i()->sidebar['contextual'] .= Theme::i()->getTemplate( 'clubs', 'core' )->clubMemberBox( $this->page->club );
+			\IPS\Output::i()->sidebar['contextual'] .= \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->clubMemberBox( $this->page->club );
 		}
 		
-		Output::i()->breadcrumb[] = array( $this->page->club->url(), $this->page->club->name );
-		Output::i()->breadcrumb[] = array( NULL, $this->page->title );
+		\IPS\Output::i()->breadcrumb[] = array( $this->page->club->url(), $this->page->club->name );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, $this->page->title );
 
 		if( !$this->page->meta_index )
 		{
-			Output::i()->metaTags['robots'] = 'noindex';
+			\IPS\Output::i()->metaTags['robots'] = 'noindex';
 		}
 
 		parent::execute();
@@ -103,15 +86,15 @@ class page extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		if ( !$this->page->club->rulesAcknowledged() )
 		{
-			Url::internal( $this->page->club->url()->setQueryString( 'do', 'rules' ) );
+			\IPS\Http\Url::internal( $this->page->club->url()->setQueryString( 'do', 'rules' ) );
 		}
 		
-		Output::i()->title = $this->page->title;
-		Output::i()->output = Theme::i()->getTemplate( 'clubs' )->viewPage( $this->page );
+		\IPS\Output::i()->title = $this->page->title;
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'clubs' )->viewPage( $this->page );
 	}
 	
 	/**
@@ -119,17 +102,17 @@ class page extends Controller
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
 		if( !$this->page->canEdit() )
 		{
-			Output::i()->error( 'node_noperm_edit', '2S410/1', 403, '' );
+			\IPS\Output::i()->error( 'node_noperm_edit', '2S410/1', 403, '' );
 		}
 
 		/* Init form */
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--edit-club-page';
-		ClubPage::form( $form, $this->page->club, $this->page );
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical';
+		\IPS\Member\Club\Page::form( $form, $this->page->club, $this->page );
 		
 		/* Form Submission */
 		if ( $values = $form->values() )
@@ -137,20 +120,20 @@ class page extends Controller
 			$this->page->formatFormValues( $values );
 			$this->page->save();
 			
-			File::claimAttachments( "club-page-{$this->page->id}", $this->page->id );
+			\IPS\File::claimAttachments( "club-page-{$this->page->id}", $this->page->id );
 			
-			if ( Request::i()->isAjax() )
+			if ( \IPS\Request::i()->isAjax() )
 			{
-				Output::i()->json( 'OK' );
+				\IPS\Output::i()->json( 'OK' );
 			}
 			else
 			{
-				Output::i()->redirect( $this->page->url() );
+				\IPS\Output::i()->redirect( $this->page->url() );
 			}
 		}
 		
-		Output::i()->title		= Member::loggedIn()->language()->addToStack( "edit" );
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack( "edit" );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/**
@@ -158,17 +141,17 @@ class page extends Controller
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		if( !$this->page->canDelete() )
 		{
-			Output::i()->error( 'node_noperm_delete', '2S410/2', 403, '' );
+			\IPS\Output::i()->error( 'node_noperm_delete', '2S410/2', 403, '' );
 		}
 		
 		$this->page->delete();
 		
-		Output::i()->redirect( $this->page->club->url(), 'deleted' );
+		\IPS\Output::i()->redirect( $this->page->club->url(), 'deleted' );
 	}
 }

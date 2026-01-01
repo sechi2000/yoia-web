@@ -13,44 +13,23 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Smf as SmfCore;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function chr;
-use function defined;
-use function is_array;
-use function is_null;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * SMF Forums Converter
  */
-class Smf extends Software
+class _Smf extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "Simple Machines Forum (2.0.x)";
@@ -59,9 +38,9 @@ class Smf extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "smf";
@@ -70,9 +49,9 @@ class Smf extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsBoards'		=> array(
@@ -102,15 +81,15 @@ class Smf extends Software
 	/**
 	 * Allows software to add additional menu row options
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function extraMenuRows(): array
+	public function extraMenuRows()
 	{
 		$rows = array();
 		$rows['convertForumsBoards'] = array(
 			'step_title'	=> 'convert_forums_forums',
 			'step_method'	=> 'convertForumsBoards',
-			'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'forums_forums' ),
+			'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'forums_forums' ),
 			'source_rows'	=> array( 'table' => static::canConvert()['convertForumsBoards']['table'], 'where' => static::canConvert()['convertForumsBoards']['where'] ),
 			'per_cycle'		=> 200,
 			'dependencies'	=> array( 'convertForumsForums' ),
@@ -123,13 +102,13 @@ class Smf extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
@@ -138,22 +117,24 @@ class Smf extends Software
 				{
 					return $this->db->select( 'COUNT(*)', 'categories' )->first() + $this->db->select( 'COUNT(*)', 'boards' )->first();
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 			
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -161,9 +142,9 @@ class Smf extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'smf' ) );
 	}
@@ -171,9 +152,9 @@ class Smf extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertAttachments'
@@ -183,10 +164,10 @@ class Smf extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		
@@ -199,8 +180,8 @@ class Smf extends Software
 						'field_default'		=> NULL,
 						'field_required'	=> TRUE,
 						'field_extra'		=> array(),
-						'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_smf_attach_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_smf_attach_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					),
 				);
 				break;
@@ -212,32 +193,29 @@ class Smf extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return SmfCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Smf::fixPostData( $post );
 	}
 	
 	/**
@@ -245,7 +223,7 @@ class Smf extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums(): void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -266,21 +244,42 @@ class Smf extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsBoards(): void
+	public function convertForumsBoards()
 	{
 		$libraryClass = $this->getLibrary();
+		
 		$libraryClass::setKey( 'id_board' );
 		
 		foreach( $this->fetch( 'boards', 'id_board' ) AS $row )
 		{
+			$last_post_time		= 0;
+			$last_poster		= 0;
+			$last_title			= NULL;
+			$last_poster_name	= NULL;
+			
+			try
+			{
+				$last_post = $this->db->select( '*', 'messages', array( "id_msg=?", $row['id_last_msg'] ) )->first();
+				
+				$last_post_time		= $last_post['poster_time'];
+				$last_poster		= $last_post['id_member'];
+				$last_poster_name	= $last_post['poster_name'];
+				$last_title			= $last_post['subject']; # Yes, I know this is technically wrong, but it's better than just not showing anything
+			}
+			catch( \UnderflowException $e ) {}
+			
 			$info = array(
 				'id'				=> $row['id_board'],
 				'name'				=> $row['name'],
 				'description'		=> $row['description'],
 				'topics'			=> $row['num_topics'],
 				'posts'				=> $row['num_posts'],
+				'last_post'			=> $last_post_time,
+				'last_poster_id'	=> $last_poster,
+				'last_poster_name'	=> $last_poster_name,
 				'parent_id'			=> ( $row['id_parent'] <> 0 ) ? $row['id_parent'] : 'c' . $row['id_cat'],
 				'position'			=> $row['board_order'],
+				'last_title'		=> $last_title,
 				'redirect_url'		=> $row['redirect'],
 				'queued_topics'		=> $row['unapproved_topics'],
 				'queued_posts'		=> $row['unapproved_posts'],
@@ -298,7 +297,7 @@ class Smf extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics(): void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -310,7 +309,7 @@ class Smf extends Software
 			{
 				$firstPost = $this->db->select( '*', 'messages', array( "id_msg=?", $row['id_first_msg'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$libraryClass->setLastKeyValue( $row['id_topic'] );
 				continue;
@@ -321,7 +320,7 @@ class Smf extends Software
 			{
 				$lastPost = $this->db->select( '*', 'messages', array( "id_msg=?", $row['id_last_msg'] ) )->first();
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			$poll = NULL;
 			if ( $row['id_poll'] )
@@ -345,10 +344,10 @@ class Smf extends Software
 					$member_votes = array();
 					foreach( $this->db->select( '*', 'log_polls', array( "id_poll=?", $poll_data['id_poll'] ) ) AS $vote )
 					{
-						$member_votes[ $vote['id_member'] ] = [
+						$member_votes[ $vote['id_member'] ] = array(
 							'member_id'			=> $vote['id_member'],
-							'member_choices'	=> [ 1 => array_search( $vote['id_choice'], $search ) ]
-						];
+							'member_choices'	=> array( 1 => array_search( $vote['id_choice'], $search ) )
+						);
 					}
 					
 					$poll = array(
@@ -367,7 +366,7 @@ class Smf extends Software
 						'vote_data'	=> $member_votes
 					);
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 			
 			$info = array(
@@ -418,7 +417,7 @@ class Smf extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts(): void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -447,28 +446,28 @@ class Smf extends Software
 	/**
 	 * @brief	Cached attachment paths
 	 */
-	protected static ?array $paths = NULL;
+	protected static $paths = NULL;
 	
 	/**
 	 * Convert attachments
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments(): void
+	public function convertAttachments()
 	{
-		if ( is_null( static::$paths ) )
+		if ( \is_null( static::$paths ) )
 		{
 			try
 			{
-				static::$paths = @unserialize( $this->db->select( 'value', 'settings', array( "variable=?", 'attachmentUploadDir' ) )->first() );
+				static::$paths = @\unserialize( $this->db->select( 'value', 'settings', array( "variable=?", 'attachmentUploadDir' ) )->first() );
 				
 				/* Unserialize failed. Set to an array so we don't try again */
-				if ( !is_array( static::$paths ) )
+				if ( !\is_array( static::$paths ) )
 				{
 					static::$paths = array();
 				}
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				static::$paths = array();
 			}
@@ -484,7 +483,7 @@ class Smf extends Software
 			{
 				$post = $this->db->select( 'id_topic, poster_time', 'messages', array( "id_msg=?", $row['id_msg'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$libraryClass->setLastKeyValue( $row['id_attach'] );
 				continue;
@@ -524,8 +523,8 @@ class Smf extends Software
 			$row['filename'] = str_replace(']', '', $row['filename']);
 			$row['filename'] = str_replace('&', '', $row['filename']);
 			$row['filename'] = str_replace('\'', '', $row['filename']);
-			$row['filename'] = str_replace( chr(195) . chr(182) , 'A', $row['filename']);
-			$row['filename'] = str_replace( chr(195) . chr(164) , 'A', $row['filename']);
+			$row['filename'] = str_replace( \chr(195) . \chr(182) , 'A', $row['filename']);
+			$row['filename'] = str_replace( \chr(195) . \chr(164) , 'A', $row['filename']);
 			
 			/* General Information */
 			$info = array(
@@ -588,36 +587,36 @@ class Smf extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
 		/* Support SMF friendly URLs ( index.php/topic,1000.0.html ) */
-		$url = Request::i()->url();
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'topic,' ) !== FALSE )
+		$url = \IPS\Request::i()->url();
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'topic,' ) !== FALSE )
 		{
-			Request::i()->topic = (int) explode( ',', $url->data[ Url::COMPONENT_PATH ] )[1];
+			\IPS\Request::i()->topic = (int) explode( ',', $url->data[ \IPS\Http\Url::COMPONENT_PATH ] )[1];
 		}
 
-		if( isset( Request::i()->topic ) )
+		if( isset( \IPS\Request::i()->topic ) )
 		{
-			if( mb_strpos( Request::i()->topic, '.msg' ) !== FALSE )
+			if( mb_strpos( \IPS\Request::i()->topic, '.msg' ) !== FALSE )
 			{
 				$class	= '\IPS\forums\Topic\Post';
 				$types	= array( 'posts', 'forums_posts' );
-				$oldId	= mb_substr( Request::i()->topic, mb_strpos( Request::i()->topic, '.msg' ) + 4 );
+				$oldId	= mb_substr( \IPS\Request::i()->topic, mb_strpos( \IPS\Request::i()->topic, '.msg' ) + 4 );
 			}
 			else
 			{
-				$pieces	= explode( '.', Request::i()->topic );
+				$pieces	= explode( '.', \IPS\Request::i()->topic );
 				$class	= '\IPS\forums\Topic';
 				$types	= array( 'topics', 'forums_topics' );
 				$oldId	= $pieces[0];
 			}
 		}
-		elseif( isset( Request::i()->board ) )
+		elseif( isset( \IPS\Request::i()->board ) )
 		{
-			$pieces = explode( '.', Request::i()->board );
+			$pieces = explode( '.', \IPS\Request::i()->board );
 			$class	= '\IPS\forums\Forum';
 			$types	= array( 'forums', 'forums_forums' );
 			$oldId	= $pieces[0];
@@ -631,20 +630,20 @@ class Smf extends Software
 				{
 					$data = (string) $this->app->getLink( $oldId, $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( $oldId, $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				elseif( $item instanceof Model )
+				elseif( $item instanceof \IPS\Node\Model )
 				{
 					if( $item->can( 'view' ) )
 					{
@@ -652,7 +651,7 @@ class Smf extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

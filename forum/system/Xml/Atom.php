@@ -11,29 +11,23 @@
 namespace IPS\Xml;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\DateTime;
-use IPS\Http\Url;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0') . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Class for managing Atom documents
  */
-class Atom extends SimpleXML
+class _Atom extends SimpleXML
 {
 	/**
 	 * Get title
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
 		return $this->title;
 	}
@@ -41,13 +35,12 @@ class Atom extends SimpleXML
 	/**
 	 * Get articles
 	 *
-	 * @param mixed|null $guidKey	In previous versions, we encoded a key with the GUID. For legacy purposes, this can be passed here.
+	 * @param	mixed	$guidKey	In previous versions, we encoded a key with the GUID. For legacy purposes, this can be passed here.
 	 * @return	array
 	 */
-	public function articles( mixed $guidKey=NULL ): array
+	public function articles( $guidKey=NULL )
 	{
 		$articles = array();
-		$namespaces = $this->getDocNamespaces();
 		
 		foreach ( $this->entry as $item )
 		{
@@ -71,48 +64,18 @@ class Atom extends SimpleXML
 				{
 					try
 					{
-						$link = Url::external( $linkToCheck );
+						$link = \IPS\Http\Url::external( $linkToCheck );
 					}
-					catch ( Exception $e ) {  }
+					catch ( \Exception $e ) {  }
 				}
 			}
-
-			$key = md5( $guidKey . ( (string) $item->id ) );
-			$articles[ $key ] = array(
+			
+			$articles[ md5( $guidKey . ( (string) $item->id ) ) ] = array(
 				'title'		=> ( (string) $item->title ) ?: ( mb_substr( strip_tags( $item->content ), 0, 47 ) . '...' ),
 				'content'	=> isset( $item->content ) ? (string) $item->content : (string) $item->title,
-				'date'		=> DateTime::ts( strtotime( $item->updated ) ),
+				'date'		=> \IPS\DateTime::ts( strtotime( $item->updated ) ),
 				'link'		=> $link
 			);
-
-			/* Loop through all child elements and just add them to the array
-			in case there is a custom extension to process them */
-			foreach( $item->children() as $name => $element )
-			{
-				if( !in_array( $name, [ 'link', 'title', 'content', 'updated' ] ) )
-				{
-					$articles[ $key ][ $name ] = (string) $element;
-				}
-			}
-
-			foreach( $namespaces as $prefix => $namespace )
-			{
-				if( empty( $prefix ) )
-				{
-					continue;
-				}
-
-				if( $elements = $item->children( $prefix, true ) )
-				{
-					foreach( $elements as $name => $element )
-					{
-						if( !isset( $articles[ $key ][ $prefix . ":" . $name ] ) )
-						{
-							$articles[ $key ][ $prefix . ":" . $name ] = (string) $element;
-						}
-					}
-				}
-			}
 		}
 		return $articles;
 	}

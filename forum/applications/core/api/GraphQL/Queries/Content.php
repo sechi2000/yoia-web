@@ -10,32 +10,26 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use Exception;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Application;
-use IPS\Content as ContentClass;
-use IPS\Content\Api\GraphQL\ContentType;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Me query for GraphQL API
  */
-class Content
+class _Content
 {
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Return a generic piece of content";
+	public static $description = "Return a generic piece of content";
 
 	/*
 	 * Query arguments
@@ -50,7 +44,7 @@ class Content
 	/**
 	 * Return the query return type
 	 */
-	public function type() : ContentType
+	public function type()
 	{
 		return \IPS\Content\Api\GraphQL\TypeRegistry::content();
 	}
@@ -58,20 +52,21 @@ class Content
 	/**
 	 * Resolves this query
 	 *
-	 * @param 	mixed $val	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @return    ContentClass|null
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\Member|null
 	 */
-	public function resolve( mixed $val, array $args ) : ?ContentClass
+	public function resolve($val, $args)
 	{
-		$url = Url::createFromString( $args['url'] );
+		$url = \IPS\Http\Url::createFromString( $args['url'] );
 
 		if ( !isset( $url->hiddenQueryString['app'] ) )
 		{
 			throw new Exception('Not a valid URL');
 		}
 
-		foreach ( Application::load( $url->hiddenQueryString['app'] )->extensions( 'core', 'ContentRouter' ) as $ext )
+		foreach ( \IPS\Application::load( $url->hiddenQueryString['app'] )->extensions( 'core', 'ContentRouter' ) as $ext )
 		{
 			foreach ( $ext->classes as $class )
 			{
@@ -90,7 +85,7 @@ class Content
 						$object = $reviewClass::load( $url->queryString['review'] );
 					}
 
-					if ( !$object->canView( Member::loggedIn() ) )
+					if ( !$object->canView( \IPS\Member::loggedIn() ) )
 					{
 						// No permission
 						return NULL;
@@ -98,7 +93,7 @@ class Content
 
 					return $object;
 				}
-				catch (Exception $e)
+				catch (\Exception $e)
 				{}
 			}
 		}

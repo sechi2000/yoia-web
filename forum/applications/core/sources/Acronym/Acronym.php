@@ -11,62 +11,53 @@
 namespace IPS\core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Url;
-use IPS\Helpers\Form\YesNo;
-use IPS\Patterns\ActiveRecord;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Acronym Model
  */
-class Acronym extends ActiveRecord
+class _Acronym extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_acronyms';
+	public static $databaseTable = 'core_acronyms';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = '';
+	public static $databasePrefix = '';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 		
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'a_id';
+	public static $databaseColumnId = 'a_id';
 	
 	/**
 	 * Display Form
 	 *
 	 * @param	static|NULL	$acronym	Acronym we are currently editing
-	 * @return	Form
+	 * @return	\IPS\Helpers\Form
 	 */
-	public static function form( ?Acronym $acronym ) : Form
+	public static function form( $acronym )
 	{
 		/* Build form */
-		$form = new Form();
+		$form = new \IPS\Helpers\Form();
 	
-		$form->add( new Radio( 'word_a_type', ( $acronym ) ? $acronym->a_type : 'acronym', FALSE, array( 'options' => array( 'acronym' => 'word_type_acronym', 'link' => 'word_type_link' ), 'toggles' => array( 'acronym' => array( 'word_a_long' ), 'link' => array( 'word_a_url' ) ) ), NULL, NULL, NULL, 'word_a_type' ) );
-		$form->add( new Text( 'word_a_short', ( $acronym ) ? $acronym->a_short : NULL, TRUE ) );
-		$form->add( new Text( 'word_a_long', ( $acronym AND ( !$acronym->a_type OR $acronym->a_type == 'acronym' ) ) ? $acronym->a_long : NULL, NULL, array(), NULL, NULL, NULL, 'word_a_long' ) );
-		$form->add( new Url( 'word_a_url', ( $acronym AND $acronym->a_type AND $acronym->a_type == 'link' ) ? $acronym->a_long : NULL, NULL, array(), NULL, NULL, NULL, 'word_a_url' ) );
-		$form->add( new YesNo( 'word_a_casesensitive', ( $acronym ) ? $acronym->a_casesensitive : NULL, FALSE, array(), NULL, NULL, NULL, 'word_a_casesensitive' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'word_a_type', ( $acronym ) ? $acronym->a_type : 'acronym', FALSE, array( 'options' => array( 'acronym' => 'word_type_acronym', 'link' => 'word_type_link' ), 'toggles' => array( 'acronym' => array( 'word_a_long' ), 'link' => array( 'word_a_url' ) ) ), NULL, NULL, NULL, 'word_a_type' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'word_a_short', ( $acronym ) ? $acronym->a_short : NULL, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'word_a_long', ( $acronym AND ( !$acronym->a_type OR $acronym->a_type == 'acronym' ) ) ? $acronym->a_long : NULL, NULL, array(), NULL, NULL, NULL, 'word_a_long' ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'word_a_url', ( $acronym AND $acronym->a_type AND $acronym->a_type == 'link' ) ? $acronym->a_long : NULL, NULL, array(), NULL, NULL, NULL, 'word_a_url' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'word_a_casesensitive', ( $acronym ) ? $acronym->a_casesensitive : NULL, FALSE, array(), NULL, NULL, NULL, 'word_a_casesensitive' ) );
 		
 		return $form;
 	}
@@ -75,10 +66,10 @@ class Acronym extends ActiveRecord
 	 * Create from form
 	 *
 	 * @param	array	$values	Values from form
-	 * @param	static|null	$current	The acronym we are currently editing
-	 * @return    Acronym
+	 * @param	static	$current	The acronym we are currently editing
+	 * @return	\IPS\core\Acronym
 	 */
-	public static function createFromForm( array $values, ?Acronym $current ) : Acronym
+	public static function createFromForm( $values, $current )
 	{
 		if( $current )
 		{

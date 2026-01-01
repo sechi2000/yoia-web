@@ -12,102 +12,66 @@
 namespace IPS\calendar\modules\front\calendar;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DateInterval;
-use DateTimeInterface;
-use Exception;
-use IPS\Api\Webhook;
-use IPS\Application;
-use IPS\calendar\Calendar;
-use IPS\calendar\Date;
-use IPS\calendar\Event as EventClass;
-use IPS\calendar\Icalendar\ICSParser;
-use IPS\Content\Controller;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Notification;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * View Event Controller
  */
-class event extends Controller
+class _event extends \IPS\Content\Controller
 {
 	/**
 	 * [Content\Controller]	Class
 	 */
-	protected static string $contentModel = 'IPS\calendar\Event';
-
-	/**
-	 * @var EventClass|null
-	 */
-	protected ?EventClass $event = null;
+	protected static $contentModel = 'IPS\calendar\Event';
 
 	/**
 	 * Init
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Calendar::addCss();
+		\IPS\calendar\Calendar::addCss();
 
 		try
 		{
-			$this->event = EventClass::load( Request::i()->id );
+			$this->event = \IPS\calendar\Event::load( \IPS\Request::i()->id );
 			
-			if ( !$this->event->canView( Member::loggedIn() ) )
+			if ( !$this->event->canView( \IPS\Member::loggedIn() ) )
 			{
 				if ( $this->event->container()->can('view') AND !$this->event->container()->can('read') )
 				{
-					if ( Member::loggedIn()->member_id )
+					if ( \IPS\Member::loggedIn()->member_id )
 					{
-						Output::i()->error( 'no_module_permission', '2L179/8', 404, '' );
+						\IPS\Output::i()->error( 'no_module_permission', '2L179/8', 404, '' );
 					}
 					else
 					{
-						Output::i()->error( 'no_module_permission_guest', '2L179/9', 404, '' );
+						\IPS\Output::i()->error( 'no_module_permission_guest', '2L179/9', 404, '' );
 					}
 				}
-
-				Output::i()->error( 'node_error', '2L179/1', 403, '' );
+				
+				\IPS\Output::i()->error( 'node_error', '2L179/1', 403, '' );
 			}
 			
 			if ( $this->event->cover_photo )
 			{
-				Output::i()->metaTags['og:image'] = File::get( 'calendar_Events', $this->event->cover_photo )->url;
+				\IPS\Output::i()->metaTags['og:image'] = \IPS\File::get( 'calendar_Events', $this->event->cover_photo )->url;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2L179/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2L179/2', 404, '' );
 		}
 		
 		$this->event->container()->clubCheckRules();
 
 		/* We want to present the same breadcrumb structure as the rest of the calendar */
-		Output::i()->breadcrumb['module'] = array( Url::internal( "app=calendar&module=calendar&controller=view", 'front', 'calendar' ), Member::loggedIn()->language()->addToStack('module__calendar_calendar') );
+		\IPS\Output::i()->breadcrumb['module'] = array( \IPS\Http\Url::internal( "app=calendar&module=calendar&controller=view", 'front', 'calendar' ), \IPS\Member::loggedIn()->language()->addToStack('module__calendar_calendar') );
 
 		parent::execute();
 	}
@@ -115,9 +79,9 @@ class event extends Controller
 	/**
 	 * View Event
 	 *
-	 * @return	mixed
+	 * @return	void
 	 */
-	protected function manage() : mixed
+	protected function manage()
 	{
 		/* Init */
 		parent::manage();
@@ -127,7 +91,7 @@ class event extends Controller
 		{
 			$attendees	= $this->event->attendees();
 		}
-		catch( BadMethodCallException $e )
+		catch( \BadMethodCallException $e )
 		{
 			$attendees	= array( 0 => array(), 1 => array(), 2 => array() );
 		}
@@ -135,111 +99,112 @@ class event extends Controller
 		/* Sort out comments and reviews */
 		$tabs = $this->event->commentReviewTabs();
 		$_tabs = array_keys( $tabs );
-		$tab = isset( Request::i()->tab ) ? Request::i()->tab : array_shift( $_tabs );
+		$tab = isset( \IPS\Request::i()->tab ) ? \IPS\Request::i()->tab : array_shift( $_tabs );
 		$activeTabContents = $this->event->commentReviews( $tab );
 		
-		if ( count( $tabs ) > 1 )
+		if ( \count( $tabs ) > 1 )
 		{
-			$commentsAndReviews = count( $tabs ) ? Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $tab, $activeTabContents, $this->event->url(), 'tab', FALSE, FALSE ) : NULL;
+			$commentsAndReviews = \count( $tabs ) ? \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $tab, $activeTabContents, $this->event->url(), 'tab', FALSE, TRUE ) : NULL;
 		}
 		else
 		{
 			$commentsAndReviews = $activeTabContents;
 		}
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $activeTabContents;
-			return null;
+			\IPS\Output::i()->output = $activeTabContents;
+			return;
 		}
 
 		/* Online User Location */
-		Session::i()->setLocation( $this->event->url(), $this->event->onlineListPermissions(), 'loc_calendar_viewing_event', array( $this->event->title => FALSE ) );
+		\IPS\Session::i()->setLocation( $this->event->url(), $this->event->onlineListPermissions(), 'loc_calendar_viewing_event', array( $this->event->title => FALSE ) );
+
+		/* Reminder */
+		$reminder = NULL;
+		try
+		{
+			$reminder = \IPS\Db::i()->select( '*', 'calendar_event_reminders', array( 'reminder_event_id=? and reminder_member_id=?', $this->event->id, (int) \IPS\Member::loggedIn()->member_id ) )->first();
+		}
+		catch ( \UnderflowException $e ) {}
 
 		/* Address */
 		$address = NULL;
 		$location = NULL;
 		$addressName = NULL;
-		if ( Settings::i()->calendar_venues_enabled and $this->event->venue() )
+		if ( \IPS\Settings::i()->calendar_venues_enabled and $this->event->venue() )
 		{
-			$location = GeoLocation::buildFromjson( $this->event->venue()->address );
+			$location = \IPS\GeoLocation::buildFromjson( $this->event->venue()->address );
 			$address = $location->toString();
 			$addressName = $this->event->venue()->_title;
 		}
 		else if ( $this->event->location )
 		{
-			$location = GeoLocation::buildFromjson( $this->event->location );
+			$location = \IPS\GeoLocation::buildFromjson( $this->event->location );
 			$address = $location->toString();
 		}
 
 		/* Add JSON-LD */
-		$format = $this->event->all_day ? "Y-m-d" : DateTimeInterface::ATOM;
-		Output::i()->jsonLd['event']	= array(
-			'@context'		=> "https://schema.org",
+		$format = $this->event->all_day ? "Y-m-d" : \IPS\DateTime::ISO8601;
+		\IPS\Output::i()->jsonLd['event']	= array(
+			'@context'		=> "http://schema.org",
 			'@type'			=> "Event",
 			'url'			=> (string) $this->event->url(),
 			'name'			=> $this->event->mapped('title'),
-			'description'	=> $this->event->truncated( TRUE, NULL ) ?? "",
+			'description'	=> $this->event->truncated( TRUE, NULL ),
 			'eventStatus'	=> "EventScheduled",
 			'organizer'		=> array(
-				'@type'		=> 'Person',
-				'name'		=> $this->event->author()->name,
-				'image'		=> $this->event->author()->get_photo( TRUE, TRUE )
+				'@type'			=> 'Person',
+				'name'			=> $this->event->author()->name
 			),
-			'startDate'		=> $this->event->nextOccurrence( Date::getDate(), 'startDate' ) ?
-				$this->event->nextOccurrence( Date::getDate(), 'startDate' )->format( $format ) :
+			'eventAttendanceMode' => ( $this->event->online ) ? 'OnlineEventAttendanceMode' : 'OfflineEventAttendanceMode',
+			'startDate'		=> $this->event->nextOccurrence( \IPS\calendar\Date::getDate(), 'startDate' ) ? 
+				$this->event->nextOccurrence( \IPS\calendar\Date::getDate(), 'startDate' )->format( $format ) :
 				$this->event->lastOccurrence( 'startDate' )->format( $format )
 		);
 
-		if( $this->event->author()->member_id )
-		{
-			Output::i()->jsonLd['event']['organizer']['url'] = (string) $this->event->author()->url();
-		}
-
-		if( $image = $this->event->coverPhotoFile() )
-		{
-			Output::i()->jsonLd['event']['image'] = (string) $image->url;
-		}
-
 		if( $this->event->_end_date )
 		{
-			Output::i()->jsonLd['event']['endDate'] = $this->event->nextOccurrence( $this->event->nextOccurrence( Date::getDate(), 'startDate' ) ?: Date::getDate(), 'endDate' ) ?
-				$this->event->nextOccurrence( $this->event->nextOccurrence( Date::getDate(), 'startDate' ) ?: Date::getDate(), 'endDate' )->format( $format ) :
+			\IPS\Output::i()->jsonLd['event']['endDate'] = $this->event->nextOccurrence( $this->event->nextOccurrence( \IPS\calendar\Date::getDate(), 'startDate' ) ?: \IPS\calendar\Date::getDate(), 'endDate' ) ? 
+				$this->event->nextOccurrence( $this->event->nextOccurrence( \IPS\calendar\Date::getDate(), 'startDate' ) ?: \IPS\calendar\Date::getDate(), 'endDate' )->format( $format ) :
 				$this->event->lastOccurrence( 'endDate' )->format( $format );
 		}
 
 		if( $this->event->container()->allow_reviews AND $this->event->reviews AND $this->event->averageReviewRating() )
 		{
-			Output::i()->jsonLd['event']['aggregateRating'] = array(
+			\IPS\Output::i()->jsonLd['event']['aggregateRating'] = array(
 				'@type'			=> 'AggregateRating',
 				'reviewCount'	=> $this->event->reviews,
 				'ratingValue'	=> $this->event->averageReviewRating(),
-				'bestRating'	=> Settings::i()->reviews_rating_out_of,
+				'bestRating'	=> \IPS\Settings::i()->reviews_rating_out_of,
 			);
+		}
+
+		if( $this->event->coverPhoto()->file )
+		{
+			\IPS\Output::i()->jsonLd['event']['image'] = (string) $this->event->coverPhoto()->file->url;
 		}
 
 		if( $this->event->rsvp )
 		{
-			Output::i()->jsonLd['event']['eventAttendanceMode'] = 'https://schema.org/MixedEventAttendanceMode';
-
-			if( count( $attendees[1] ) )
+			if( \count( $attendees[1] ) )
 			{
-				Output::i()->jsonLd['event']['attendee'] = array();
+				\IPS\Output::i()->jsonLd['event']['attendee'] = array();
 
 				foreach( $attendees[1] as $attendee )
 				{
-					Output::i()->jsonLd['event']['attendee'][] = array(
+					\IPS\Output::i()->jsonLd['event']['attendee'][] = array(
 						'@type'		=> 'Person',
 						'name'		=> $attendee->name
 					);
 				}
 			}
 		}
-
+		
 		/* If we have a physical location, use that. */
 		if( $location )
 		{
-			Output::i()->jsonLd['event']['location'] = array(
+			\IPS\Output::i()->jsonLd['event']['location'] = array(
 				'@type'		=> 'Place',
 				'address'	=> array(
 					'@type'				=> 'PostalAddress',
@@ -252,36 +217,31 @@ class event extends Controller
 			);
 			if( $addressName )
 			{
-				Output::i()->jsonLd['event']['location']['name'] = $addressName;
+				\IPS\Output::i()->jsonLd['event']['location']['name'] = $addressName;
 			}
-
-			Output::i()->jsonLd['event']['eventAttendanceMode'] = 'https://schema.org/OfflineEventAttendanceMode';
 		}
 		/* If not, default to events URL */
 		else
 		{
-			Output::i()->jsonLd['event']['location'] = array(
+			\IPS\Output::i()->jsonLd['event']['location'] = array(
 				'@type'		=> 'Place',
-				'name'		=> Settings::i()->board_name,
-				'address'	=> Output::i()->jsonLd['event']['url'],
-				'url'		=> Output::i()->jsonLd['event']['url']
+				'name'		=> \IPS\Settings::i()->board_name,
+				'address'	=> \IPS\Output::i()->jsonLd['event']['url'],
+				'url'		=> \IPS\Output::i()->jsonLd['event']['url']
 			);
 		}
-
+		
 		/* Finally, if event is online and there is a URL, use that */
 		if ( $this->event->online AND $this->event->url )
 		{
-			Output::i()->jsonLd['event']['location'] = array(
+			\IPS\Output::i()->jsonLd['event']['location'] = array(
 				'@type'		=> 'VirtualLocation',
 				'url'		=> $this->event->url
 			);
-
-			Output::i()->jsonLd['event']['eventAttendanceMode'] = 'https://schema.org/OnlineEventAttendanceMode';
 		}
 
 		/* Display */
-		Output::i()->output = Theme::i()->getTemplate( 'view' )->view( $this->event, $commentsAndReviews, $attendees, $address, $this->event->getReminder() );
-		return null;
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'view' )->view( $this->event, $commentsAndReviews, $attendees, $address, $reminder );
 	}
 
 	/**
@@ -289,27 +249,27 @@ class event extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function hovercard() : void
+	protected function hovercard()
 	{
 		/* Figure out our date object */
 		$date = NULL;
 
-		if( Request::i()->sd )
+		if( \IPS\Request::i()->sd )
 		{
-			$dateBits	= explode( '-', Request::i()->sd );
+			$dateBits	= explode( '-', \IPS\Request::i()->sd );
 
-			if( count( $dateBits ) === 3 )
+			if( \count( $dateBits ) === 3 )
 			{
-				$date	= Date::getDate( $dateBits[0], $dateBits[1], $dateBits[2] );
+				$date	= \IPS\calendar\Date::getDate( $dateBits[0], $dateBits[1], $dateBits[2] );
 			}
 		}
 
 		if( $date === NULL )
 		{
-			$date	= Date::getDate();
+			$date	= \IPS\calendar\Date::getDate();
 		}
 
-		Output::i()->output = Theme::i()->getTemplate( 'view' )->eventHovercard( $this->event, $date );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'view' )->eventBlock( $this->event, $date );
 	}
 
 	/**
@@ -317,18 +277,18 @@ class event extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function download() : void
+	protected function download()
 	{
 
-		$feed	= new ICSParser;
+		$feed	= new \IPS\calendar\Icalendar\ICSParser;
 		$feed->addEvent( $this->event );
 
 		$ics	= $feed->buildICalendarFeed( $this->event->container() );
 
-		Output::i()->sendHeader( "Content-type: text/calendar; charset=UTF-8" );
-		Output::i()->sendHeader( 'Content-Disposition: inline; filename=calendarEvents.ics' );
+		\IPS\Output::i()->sendHeader( "Content-type: text/calendar; charset=UTF-8" );
+		\IPS\Output::i()->sendHeader( 'Content-Disposition: inline; filename=calendarEvents.ics' );
 
-		Member::loggedIn()->language()->parseOutputForDisplay( $ics );
+		\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $ics );
 		print $ics;
 		exit;
 	}
@@ -338,11 +298,11 @@ class event extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function downloadRsvp() : void
+	protected function downloadRsvp()
 	{
-		$output	= Theme::i()->getTemplate( 'view' )->attendees( $this->event );
-		Member::loggedIn()->language()->parseOutputForDisplay( $output );
-		Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $output ) );
+		$output	= \IPS\Theme::i()->getTemplate( 'view' )->attendees( $this->event );
+		\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $output );
+		\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $output ) );
 	}
 
 	/**
@@ -350,44 +310,44 @@ class event extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function rsvp() : void
+	protected function rsvp()
 	{
 		if( !$this->event->can('rsvp') )
 		{
-			Output::i()->error( 'rsvp_error', '2L179/3', 403, '' );
+			\IPS\Output::i()->error( 'rsvp_error', '2L179/3', 403, '' );
 		}
 
-		if( $this->event->hasPassed() AND Settings::i()->calendar_block_past_changes )
+		if( $this->event->hasPassed() AND \IPS\Settings::i()->calendar_block_past_changes )
 		{
-			Output::i()->error( 'no_rsvp_past_event', '2L179/6', 403, '' );
+			\IPS\Output::i()->error( 'no_rsvp_past_event', '2L179/6', 403, '' );
 		}
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* We delete either way at this point, because even if we select a different action we have to remove any existing RSVP preference */
-		Db::i()->delete( 'calendar_event_rsvp', array( 'rsvp_event_id=? AND rsvp_member_id=?', $this->event->id, (int) Member::loggedIn()->member_id ) );
+		\IPS\Db::i()->delete( 'calendar_event_rsvp', array( 'rsvp_event_id=? AND rsvp_member_id=?', $this->event->id, (int) \IPS\Member::loggedIn()->member_id ) );
 
-		if( Request::i()->action == 'leave' )
+		if( \IPS\Request::i()->action == 'leave' )
 		{
 			$message	= 'rsvp_not_going';
 		}
 		else
 		{
 			/* Figure out the action */
-			switch( Request::i()->action )
+			switch( \IPS\Request::i()->action )
 			{
 				case 'yes':
-					$_go	= EventClass::RSVP_YES;
+					$_go	= \IPS\calendar\Event::RSVP_YES;
 				break;
 
 				case 'maybe':
-					$_go	= EventClass::RSVP_MAYBE;
+					$_go	= \IPS\calendar\Event::RSVP_MAYBE;
 				break;
 
 				case 'no':
 				default:
-					Request::i()->action	= 'no';
-					$_go	= EventClass::RSVP_NO;
+					\IPS\Request::i()->action	= 'no';
+					$_go	= \IPS\calendar\Event::RSVP_NO;
 				break;
 			}
 
@@ -395,47 +355,39 @@ class event extends Controller
 			if( $this->event->rsvp_limit > 0 )
 			{
 				/* We do not accept "maybe" in this case */
-				if( $_go === EventClass::RSVP_MAYBE )
+				if( $_go === \IPS\calendar\Event::RSVP_MAYBE )
 				{
-					Output::i()->error( 'rsvp_limit_nomaybe', '3L179/4', 403, '' );
+					\IPS\Output::i()->error( 'rsvp_limit_nomaybe', '3L179/4', 403, '' );
 				}
 
 				/* And we have to actually check the limit */
-				if( $_go == EventClass::RSVP_YES and count( $this->event->attendees( EventClass::RSVP_YES ) ) >= $this->event->rsvp_limit )
+				if( $_go == \IPS\calendar\Event::RSVP_YES and \count( $this->event->attendees( \IPS\calendar\Event::RSVP_YES ) ) >= $this->event->rsvp_limit )
 				{
-					Output::i()->error( 'rsvp_limit_reached', '3L179/5', 403, '' );
+					\IPS\Output::i()->error( 'rsvp_limit_reached', '3L179/5', 403, '' );
 				}
 			}
 
-			Db::i()->insert( 'calendar_event_rsvp', array(
+			\IPS\Db::i()->insert( 'calendar_event_rsvp', array(
 				'rsvp_event_id'		=> $this->event->id,
-				'rsvp_member_id'	=> (int) Member::loggedIn()->member_id,
+				'rsvp_member_id'	=> (int) \IPS\Member::loggedIn()->member_id,
 				'rsvp_date'			=> time(),
 				'rsvp_response'		=> (int) $_go
 			) );
-			
-			Member::loggedIn()->achievementAction( 'calendar', 'Rsvp', $this->event );
 
-            /* If we responded that we are going, send a notification to the event owner */
-            if( $_go == EventClass::RSVP_YES )
-            {
-                $notification = new Notification( Application::load( 'calendar' ), 'event_rsvp', $this->event, [ $this->event, Member::loggedIn() ], [ 'member' => Member::loggedIn()->member_id ] );
-                $notification->recipients->attach( $this->event->author() );
-                $notification->send();
-            }
+			\IPS\Member::loggedIn()->achievementAction( 'calendar', 'Rsvp', $this->event );
 		}
 
 		$webhookData = [
-		'event' => $this->event->apiOutput(),
-		'action' => Request::i()->action,
-		'attendee' => Member::loggedIn()->apiOutput(),
+			'event' => $this->event->apiOutput(),
+			'action' => \IPS\Request::i()->action,
+			'attendee' => \IPS\Member::loggedIn()->apiOutput(),
 		];
 
-		Webhook::fire( 'calendarEvent_rsvp', $webhookData );
-		\IPS\Events\Event::fire( 'onEventRsvp', Member::loggedIn(), array( $this->event, $_go ?? EventClass::RSVP_LEFT ) );
-		$message	= 'rsvp_selection_' . Request::i()->action;
+		$message	= 'rsvp_selection_' . \IPS\Request::i()->action;
 
-		Output::i()->redirect( $this->event->url(), $message );
+		\IPS\Api\Webhook::fire( 'calendarEvent_rsvp', $webhookData );
+
+		\IPS\Output::i()->redirect( $this->event->url(), $message );
 	}
 
 	/**
@@ -443,44 +395,44 @@ class event extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function edit() : void
+	protected function edit()
 	{
-		if ( Application::appIsEnabled('cloud') and $this->event->livetopic_id )
+		if ( \IPS\Application::appIsEnabled('cloud') and $this->event->livetopic_id )
 		{
 			/* Allow live topic edit form to handle this */
 			try
 			{
 				/* Make sure it's a valid topic */
 				$liveTopic = \IPS\cloud\LiveTopic::load( $this->event->livetopic_id );
-				Output::i()->redirect( Url::internal( 'app=core&module=modcp&controller=modcp&tab=livetopics&action=create&fromEvent=1&id=' . $liveTopic->id, 'front', 'modcp_livetopics' ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=modcp&controller=modcp&tab=livetopics&action=create&fromEvent=1&id=' . $liveTopic->id, 'front', 'modcp_livetopics' ) );
 			}
-			catch( Exception )	{ }
+			catch( \Exception )	{ }
 		}
 
 		/* Are we blocking changes to past events? */
-		if( $this->event->hasPassed() AND Settings::i()->calendar_block_past_changes )
+		if( $this->event->hasPassed() AND \IPS\Settings::i()->calendar_block_past_changes )
 		{
-			if ( !EventClass::modPermission( 'edit', Member::loggedIn(), $this->event->containerWrapper() ) )
+			if ( !\IPS\calendar\Event::modPermission( 'edit', \IPS\Member::loggedIn(), $this->event->containerWrapper() ) )
 			{
-				Output::i()->error( 'no_edit_past_event', '2L179/7', 403, '' );
+				\IPS\Output::i()->error( 'no_edit_past_event', '2L179/7', 403, '' );
 			}
 		}
 
 		/* Output resources and go */
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_submit.js', 'calendar', 'front' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_submit.js', 'calendar', 'front' ) );
 
-		parent::edit();
+		return parent::edit();
 	}
 
 	/**
 	 * Return the form for editing. Abstracted so controllers can define a custom template if desired.
 	 *
-	 * @param Form $form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	string
 	 */
-	protected function getEditForm( Form $form ): string
+	protected function getEditForm( $form )
 	{
-		return $form->customTemplate( array( Theme::i()->getTemplate( 'submit', 'calendar' ), 'submitForm' ) );
+		return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'submit', 'calendar' ), 'submitForm' ) );
 	}
 
 	/**
@@ -488,69 +440,69 @@ class event extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function setReminder() : void
+	protected function setReminder()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		/* Members only */
-		if( !Member::loggedIn()->member_id )
+		if( !\IPS\Member::loggedIn()->member_id )
 		{
-			Output::i()->error( 'node_error', '3L369/1', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '3L369/1', 403, '' );
 		}
 
 		/* Existing reminder? */
-		$existing = $this->event->getReminder();
+		$existing = NULL;
+		try
+		{
+			$existing = \IPS\Db::i()->select( '*', 'calendar_event_reminders', array( 'reminder_event_id=? and reminder_member_id=?', $this->event->id, (int) \IPS\Member::loggedIn()->member_id ) )->first();
+		}
+		catch ( \UnderflowException $e ) {}
 
 		/* Build the form */
 
 		/* How far in the future is this event so we can set realistic max reminders */
-		$diff = $this->event->_start_date->diff( DateTime::create() );
+		$diff = $this->event->_start_date->diff( \IPS\DateTime::create() );
 		$max = $diff->days;
 
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--set-reminder';
-		$form->add( new Number( 'event_remind_me', isset( $existing ) ? $existing['reminder_days_before'] : ( ( $max < 3 ) ? $max : 3 ), TRUE, array( 'min' => 1, 'max' => (int) $max ), NULL, NULL, Member::loggedIn()->language()->addToStack('event_remind_days_before'), 'event_remind_me' ) );
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical';
+		$form->add( new \IPS\Helpers\Form\Number( 'event_remind_me', isset( $existing ) ? $existing['reminder_days_before'] : ( ( $max < 3 ) ? $max : 3 ), TRUE, array( 'min' => 1, 'max' => (int) $max ), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('event_remind_days_before'), 'event_remind_me' ) );
 
 		if ( $existing )
 		{
-			$form->addButton( 'event_dont_remind', 'link', Url::internal( "app=calendar&module=calendar&controller=event&do=removeReminder&action=remove&id={$this->event->id}")->csrf(), 'ipsButton ipsButton--negative', array('data-action' => 'removereminder') );
+			$form->addButton( 'event_dont_remind', 'link', \IPS\Http\Url::internal( "app=calendar&module=calendar&controller=event&do=removeReminder&action=remove&id={$this->event->id}")->csrf(), 'ipsButton ipsButton_negative ipsPos_right', array('data-action' => 'removereminder') );
 		}
 
 		if( $values = $form->values() )
 		{
 			/* Delete existing */
-			Db::i()->delete( 'calendar_event_reminders', array( 'reminder_event_id=? AND reminder_member_id=?', $this->event->id, (int) Member::loggedIn()->member_id ) );
+			\IPS\Db::i()->delete( 'calendar_event_reminders', array( 'reminder_event_id=? AND reminder_member_id=?', $this->event->id, (int) \IPS\Member::loggedIn()->member_id ) );
 
-			Db::i()->insert( 'calendar_event_reminders', array(
+			\IPS\Db::i()->insert( 'calendar_event_reminders', array(
 				'reminder_event_id'		=> $this->event->id,
-				'reminder_member_id'	=> (int) Member::loggedIn()->member_id,
-				'reminder_date'			=> $this->event->_start_date->sub( new DateInterval( 'P' . (int) $values['event_remind_me'] . 'D' ) )->getTimestamp(),
+				'reminder_member_id'	=> (int) \IPS\Member::loggedIn()->member_id,
+				'reminder_date'			=> $this->event->_start_date->sub( new \DateInterval( 'P' . (int) $values['event_remind_me'] . 'D' ) )->getTimestamp(),
 				'reminder_days_before'	=> (int) $values['event_remind_me'],
 			) );
 
-			Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'eventreminders' ) );
+			\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'eventreminders' ) );
 
-			if( Request::i()->isAjax() )
-			{
-				Output::i()->sendOutput( Theme::i()->getTemplate( 'view', 'calendar', 'front' )->reminderButton( $this->event, $this->event->getReminder() ) );
-			}
-			else
-			{
-				Output::i()->redirect( $this->event->url(), 'event_reminder_added' );
-			}
+			$message = 'event_reminder_added';
+
+			\IPS\Output::i()->redirect( $this->event->url(), $message );
 		}
 
 		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'event_set_reminder' );
-		$output = $form->customTemplate( array( Theme::i()->getTemplate( 'view', 'calendar' ), 'reminderForm' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'event_set_reminder' );
+		$output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'view', 'calendar' ), 'reminderForm' ) );
 
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->sendOutput( $output );
+			\IPS\Output::i()->sendOutput( $output, 200, 'text/html' );
 		}
 		else
 		{
-			Output::i()->output = $output;
+			\IPS\Output::i()->output = $output;
 		}
 	}
 
@@ -559,25 +511,25 @@ class event extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function removeReminder() : void
+	protected function removeReminder()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		if ( Request::i()->action == 'remove' )
+		if ( \IPS\Request::i()->action == 'remove' )
 		{
 			/* Delete existing */
-			Db::i()->delete( 'calendar_event_reminders', array( 'reminder_event_id=? AND reminder_member_id=?', $this->event->id, (int) Member::loggedIn()->member_id ) );
+			\IPS\Db::i()->delete( 'calendar_event_reminders', array( 'reminder_event_id=? AND reminder_member_id=?', $this->event->id, (int) \IPS\Member::loggedIn()->member_id ) );
 
 			$message = 'event_reminder_removed';
 		}
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'ok' );
+			\IPS\Output::i()->json( 'ok' );
 		}
 		else
 		{
-			Output::i()->redirect( $this->event->url(), $message ?? '' );
+			\IPS\Output::i()->redirect( $this->event->url(), $message );
 		}
 	}
 
@@ -586,8 +538,18 @@ class event extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function reminderButton() : void
+	protected function reminderButton()
 	{
-		Output::i()->sendOutput( Theme::i()->getTemplate( 'view', 'calendar', 'front' )->reminderButton( $this->event, $this->event->getReminder() ) );
+		/* Existing reminder? */
+		$existing = NULL;
+		try
+		{
+			$existing = \IPS\Db::i()->select( '*', 'calendar_event_reminders', array( 'reminder_event_id=? and reminder_member_id=?', $this->event->id, (int)\IPS\Member::loggedIn()->member_id ) )->first();
+		}
+		catch ( \UnderflowException $e )
+		{
+		}
+
+		\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'view', 'calendar', 'front' )->reminderButton( $this->event, $existing ) );
 	}
 }

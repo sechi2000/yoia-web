@@ -11,46 +11,35 @@
 namespace IPS\core\modules\admin\activitystats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Activity
  */
-class communityactivity extends Controller
+class _communityactivity extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'communityactivity_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'communityactivity_manage' );
 		parent::execute();
 	}
 
@@ -60,18 +49,20 @@ class communityactivity extends Controller
 	 * @return	void
 	 * @note	Activity includes posting, following, reacting
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$chart = Chart::loadFromExtension( 'core', 'CommunityActivity' )->getChart( Url::internal( "app=core&module=activitystats&controller=communityactivity" ) );
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'CommunityActivity' )->getChart( \IPS\Http\Url::internal( "app=core&module=activitystats&controller=communityactivity" ) );
 
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = (string) $chart;
+			\IPS\Output::i()->output = (string) $chart;
 			return;
 		}
 	
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_activitystats_communityactivity');
-		Output::i()->output = Theme::i()->getTemplate( 'stats' )->activitymessage();
-		Output::i()->output .= $chart;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_activitystats_communityactivity');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'stats' )->activitymessage();
+		\IPS\Output::i()->output .= (string) $chart;
 	}
+
+	
 }

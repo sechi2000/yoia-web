@@ -12,29 +12,23 @@
 namespace IPS\Api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content;
-use IPS\Db;
-use IPS\Member;
-use IPS\Settings;
-use function defined;
-use function get_class;
-use function intval;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ReputationType for GraphQL API
  */
-class ReputationType extends ObjectType
+class _ReputationType extends ObjectType
 {
 	/**
 	 * Get root type
 	 *
+	 * @return	array
 	 */
 	public function __construct()
 	{		 
@@ -45,7 +39,7 @@ class ReputationType extends ObjectType
 				'reactionCount' => [
 					'type' => TypeRegistry::int(),
 					'resolve' => function ($content, $args) {
-						if( !Settings::i()->reputation_enabled )
+						if( !\IPS\Settings::i()->reputation_enabled )
 						{
 							return 0;
 						}
@@ -56,13 +50,13 @@ class ReputationType extends ObjectType
 				'canViewReps' => [
 					'type' => TypeRegistry::boolean(),
 					'resolve' => function ($content, $args) {
-						return Settings::i()->reputation_enabled && Member::loggedIn()->group['gbw_view_reps'];
+						return \IPS\Settings::i()->reputation_enabled && \IPS\Member::loggedIn()->group['gbw_view_reps'];
 					}
 				],
 				'canReact' => [
 					'type' => TypeRegistry::boolean(),
 					'resolve' => function ($content, $args) {
-						return Settings::i()->reputation_enabled && $content->canReact();
+						return \IPS\Settings::i()->reputation_enabled && $content->canReact();
 					}
 				],
 				'hasReacted' => [
@@ -71,7 +65,7 @@ class ReputationType extends ObjectType
 				'isLikeMode' => [
 					'type' => TypeRegistry::boolean(),
 					'resolve' => function ($content, $args) {
-						return Settings::i()->reputation_enabled && Content\Reaction::isLikeMode();
+						return \IPS\Settings::i()->reputation_enabled && \IPS\Content\Reaction::isLikeMode();
 					}
 				],
 				'givenReaction' => [
@@ -86,7 +80,7 @@ class ReputationType extends ObjectType
 				'reactions' => [
 					'type' => TypeRegistry::listOf( \IPS\core\api\GraphQL\TypeRegistry::contentReaction() ),
 					'resolve' => function ($content) {
-						if( !Settings::i()->reputation_enabled )
+						if( !\IPS\Settings::i()->reputation_enabled )
 						{
 							return NULL;
 						}
@@ -96,7 +90,7 @@ class ReputationType extends ObjectType
 
 						foreach( $content->reactBlurb() as $key => $count )
 						{
-							$return[] = array( 'id' => md5( get_class( $content ) . '-' . $content->$idColumn ) . '-' . $key, 'reactionId' => $key, 'count' => $count );
+							$return[] = array( 'id' => md5( \get_class( $content ) . '-' . $content->$idColumn ) . '-' . $key, 'reactionId' => $key, 'count' => $count );
 						}
 
 						return $return;
@@ -116,7 +110,7 @@ class ReputationType extends ObjectType
 						]
 					],
 					'resolve' => function ($content, $args) {
-						if( !Settings::i()->reputation_enabled || !Member::loggedIn()->group['gbw_view_reps'] )
+						if( !\IPS\Settings::i()->reputation_enabled || !\IPS\Member::loggedIn()->group['gbw_view_reps'] )
 						{
 							return NULL;
 						}
@@ -128,12 +122,12 @@ class ReputationType extends ObjectType
 
 						if( isset( $args['id'] ) )
 						{
-							$reaction = intval( $args['id']);
+							$reaction = \intval( $args['id']);
 						}
 
-						foreach( Db::i()->select( '*', 'core_reputation_index', $content->getReactionWhereClause( $reaction ), 'rep_date desc', array( $offset, $limit ) )->join( 'core_reactions', 'reaction=reaction_id' ) AS $reaction )
+						foreach( \IPS\Db::i()->select( '*', 'core_reputation_index', $content->getReactionWhereClause( $reaction ), 'rep_date desc', array( $offset, $limit ) )->join( 'core_reactions', 'reaction=reaction_id' ) AS $reaction )
 						{
-							$members[] = Member::load( $reaction['member_id'] );
+							$members[] = \IPS\Member::load( $reaction['member_id'] );
 						}
 
 						return $members;
@@ -141,12 +135,12 @@ class ReputationType extends ObjectType
 				]
 			],
 			'resolveField' => function ($content, $args, $context, $info) {
-				if( !Settings::i()->reputation_enabled )
+				if( !\IPS\Settings::i()->reputation_enabled )
 				{
 					return NULL;
 				}
 
-				$enabledReactions = Content\Reaction::enabledReactions();
+				$enabledReactions = \IPS\Content\Reaction::enabledReactions();
 				$defaultReaction = reset( $enabledReactions );
 				$reacted = $content->reacted();
 
@@ -154,25 +148,25 @@ class ReputationType extends ObjectType
 				{
 					case 'hasReacted':
 						return ( $reacted and isset( $enabledReactions[ $reacted->id ] ) );
-
+					break;
 					case 'givenReaction':
 						if( !$reacted )
 						{
 							return NULL;
 						}
 
-						$reaction = $enabledReactions[$reacted->id] ?? $defaultReaction;
+						$reaction = isset( $enabledReactions[ $reacted->id ] ) ? $enabledReactions[ $reacted->id ] : $defaultReaction;
 						return array( 
 							'id' => $reaction->id,
 							'reaction' => $reaction
 						);
-
+					break;
 					case 'defaultReaction':
 						return array( 
 							'id' => $defaultReaction->id,
 							'reaction' => $defaultReaction
 						);
-
+					break;
 					case 'availableReactions':
 						$reactions = array();
 
@@ -185,10 +179,8 @@ class ReputationType extends ObjectType
 						}
 
 						return $reactions;
-
+					break;
 				}
-
-				return null;
 			}
 		];
 

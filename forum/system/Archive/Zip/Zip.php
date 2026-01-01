@@ -11,32 +11,27 @@
 namespace IPS\Archive;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Archive;
-use function defined;
-use function extension_loaded;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Zip Archive Class
  */
-abstract class Zip extends Archive
+abstract class _Zip extends \IPS\Archive
 {
 	/**
 	 * Create object from local file
 	 *
-	 * @param string $path			Path to archive file
-	 * @param string $containerName	The root folder name which should be ignored (with trailing slash)
-	 * @return    static
+	 * @param	string	$path			Path to archive file
+	 * @param	string	$containerName	The root folder name which should be ignored (with trailing slash)
+	 * @return	\IPS\Archive
 	 */
-	public static function fromLocalFile( string $path, string $containerName = '' ): static
+	public static function fromLocalFile( $path, $containerName = '' )
 	{
-		if ( extension_loaded( 'Zip' ) )
+		if ( \extension_loaded( 'Zip' ) )
 		{
 			$object = Zip\ZipArchive::_fromLocalFile( $path );
 		}

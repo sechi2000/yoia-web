@@ -12,44 +12,30 @@
 namespace IPS\convert\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\convert\App;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task\Queue\OutOfRangeException;
-use function defined;
-use const IPS\REBUILD_INTENSE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class RebuildGalleryImages extends QueueAbstract
+class _RebuildGalleryImages
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data	Data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		try
 		{
-			$data['count'] = Db::i()->select( 'count(image_id)', 'gallery_images' )->first();
+			$data['count'] = \IPS\Db::i()->select( 'count(image_id)', 'gallery_images' )->first();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			throw new \OutOfRangeException;
 		}
@@ -69,29 +55,29 @@ class RebuildGalleryImages extends QueueAbstract
 	 *
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
-	 * @return	int					New offset or NULL if complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @return	int|null					New offset or NULL if complete
+	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
-		if ( !class_exists( 'IPS\gallery\Image' ) OR !Application::appIsEnabled( 'gallery' ) )
+		if ( !class_exists( 'IPS\gallery\Image' ) OR !\IPS\Application::appIsEnabled( 'gallery' ) )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 		
 		/* Intentionally no try/catch as it means app doesn't exist */
 		try
 		{
-			$app = App::load( $data['app'] );
+			$app = \IPS\convert\App::load( $data['app'] );
 		}
 		catch( \OutOfRangeException $e )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		$last = NULL;
 		
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'gallery_images', array( "image_id>?", $offset ), 'image_id ASC', array( 0, REBUILD_INTENSE ) ), 'IPS\gallery\Image' ) AS $image )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'gallery_images', array( "image_id>?", $offset ), 'image_id ASC', array( 0, \IPS\REBUILD_INTENSE ) ), 'IPS\gallery\Image' ) AS $image )
 		{
 			$data['completed']++;
 
@@ -112,7 +98,12 @@ class RebuildGalleryImages extends QueueAbstract
 				$image->buildThumbnails();
 				$image->save();
 			}
-			catch( DomainException | InvalidArgumentException $e )
+			catch( \DomainException $e )
+			{
+				$image->delete();
+			}
+			/* File fails the image type test */
+			catch( \InvalidArgumentException $e )
 			{
 				$image->delete();
 			}
@@ -122,7 +113,7 @@ class RebuildGalleryImages extends QueueAbstract
 
 		if( $last === NULL )
 		{
-			throw new OutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		return $last;
@@ -135,8 +126,8 @@ class RebuildGalleryImages extends QueueAbstract
 	 * @param	int						$offset	Offset
 	 * @return	array	Text explaning task and percentage complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' => Member::loggedIn()->language()->addToStack( 'queue_rebuilding_gallery_images' ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'queue_rebuilding_gallery_images' ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
 	}	
 }

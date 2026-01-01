@@ -11,41 +11,31 @@
 namespace IPS\core\modules\admin\members;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Session;
-use IPS\Task;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Recount and Reset Tools
  */
-class reset extends Controller
+class _reset extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'member_recount_content' );
-		parent::execute();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'member_recount_content' );
+		return parent::execute();
 	}
 
 	/**
@@ -53,12 +43,12 @@ class reset extends Controller
 	 *
 	 * @return	void
 	 */
-	public function posts() : void
+	public function posts()
 	{
-		Session::i()->csrfCheck();
-		Task::queue( 'core', 'RecountMemberContent', array(), 4 );
-		Session::i()->log( 'acplog__recount_member_content' );
-		Output::i()->redirect( Url::internal( 'app=core&module=members&controller=members' ), Member::loggedIn()->language()->addToStack( 'member_recount_content_process' ) );
+		\IPS\Session::i()->csrfCheck();
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array(), 4 );
+		\IPS\Session::i()->log( 'acplog__recount_member_content' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=members&controller=members' ), \IPS\Member::loggedIn()->language()->addToStack( 'member_recount_content_process' ) );
 	}
 
 	/**
@@ -66,11 +56,11 @@ class reset extends Controller
 	 *
 	 * @return	void
 	 */
-	public function rep() : void
+	public function rep()
 	{
-		Session::i()->csrfCheck();
-		Task::queue( 'core', 'RecountMemberReputation', array(), 4 );
-		Session::i()->log( 'acplog__recount_member_rep' );
-		Output::i()->redirect( Url::internal( 'app=core&module=members&controller=members' ), Member::loggedIn()->language()->addToStack( 'member_recount_rep_process' ) );
+		\IPS\Session::i()->csrfCheck();
+		\IPS\Task::queue( 'core', 'RecountMemberReputation', array(), 4 );
+		\IPS\Session::i()->log( 'acplog__recount_member_rep' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=members&controller=members' ), \IPS\Member::loggedIn()->language()->addToStack( 'member_recount_rep_process' ) );
 	}
 }

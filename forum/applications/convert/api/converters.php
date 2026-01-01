@@ -12,27 +12,16 @@
 namespace IPS\convert\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use IPS\Api\Controller;
-use IPS\Api\Response;
-use IPS\Lang;
-use IPS\Request;
-use ReflectionMethod;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Converters API
  */
-class converters extends Controller
+class _converters extends \IPS\Api\Controller
 {	
 	/**
 	 * GET /convert/converters
@@ -42,13 +31,13 @@ class converters extends Controller
 	 * @apiparam	string	applications	Comma-delimited list of applications to filter by
 	 * @return		array
 	 */
-	public function GETindex(): Response
+	public function GETindex()
 	{
 		$response		= array();
-		$applications	= Request::i()->applications ? explode( ',', Request::i()->applications ) : array();
+		$applications	= \IPS\Request::i()->applications ? explode( ',', \IPS\Request::i()->applications ) : array();
 
 		/* Loop over software directory to figure out software we can convert */
-		foreach( new DirectoryIterator( \IPS\ROOT_PATH . '/applications/convert/sources/Software/' ) as $directory )
+		foreach( new \DirectoryIterator( \IPS\ROOT_PATH . '/applications/convert/sources/Software/' ) as $directory )
 		{
 			/* Skip ../ and any non-directories */
 			if( $directory->isDot() OR !$directory->isDir() )
@@ -57,13 +46,13 @@ class converters extends Controller
 			}
 
 			/* Are we filtering by supported applications? */
-			if( count( $applications ) AND !in_array( mb_convert_case( $directory->getFilename(), MB_CASE_TITLE ) ) )
+			if( \count( $applications ) AND !\in_array( mb_convert_case( $directory->getFilename(), MB_CASE_TITLE ) ) )
 			{
 				continue;
 			}
 
 			/* Loop over all of the software in this directory */
-			foreach( new DirectoryIterator( $directory->getPathname() ) as $softwares )
+			foreach( new \DirectoryIterator( $directory->getPathname() ) as $softwares )
 			{
 				/* Skip ../ and any non-files */
 				if( $softwares->isDot() OR !$softwares->isFile() OR mb_substr( $softwares->getFilename(), -3 ) !== 'php' )
@@ -112,12 +101,12 @@ class converters extends Controller
 				foreach( $rawConvert as $convertType )
 				{
 					/* Skip extra steps */
-					if( in_array( $convertType, $extraSteps ) )
+					if( \in_array( $convertType, $extraSteps ) )
 					{
 						continue;
 					}
 
-					$canConvert[] = Lang::load( Lang::defaultLanguage() )->addToStack(
+					$canConvert[] = \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->addToStack(
 						preg_replace_callback( "/([A-Z])/", function( $match ){
 							return "_" . mb_strtolower( $match[1] );
 						}, $convertType )
@@ -125,7 +114,7 @@ class converters extends Controller
 				}
 
 				/* Reflect the class to figure out if redirects are enabled */
-				$reflect = new ReflectionMethod( $classname, 'checkRedirects' );
+				$reflect = new \ReflectionMethod( $classname, 'checkRedirects' );
 
 				/* Now store the data for this application that we need */
 				$response[ mb_strtolower( $namespace ) ][ mb_strtolower( $application ) ][] = array(
@@ -155,6 +144,6 @@ class converters extends Controller
 		/* Sort */
 		ksort( $response );
 
-		return new Response( 200, $response );
+		return new \IPS\Api\Response( 200, $response );
 	}
 }

@@ -11,105 +11,101 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DateInterval;
-use DomainException;
-use Exception;
-use IPS\Application;
-use IPS\core\StoredReplies;
-use IPS\Data\Cache;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Helpers\Form\Editor as FormEditor;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output;
-use IPS\Redis;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Text\Parser;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use UnexpectedValueException;
-use function class_exists;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function md5;
-use function strtolower;
-use function strtoupper;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor AJAX functions Controller
  */
-class editor extends Controller
+class _editor extends \IPS\Dispatcher\Controller
 {
+	/**
+	 * Preview iframe
+	 *
+	 * @return	void
+	 */
+	protected function preview()
+	{
+		$output = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->preview( \IPS\Request::i()->editor_id );
+		\IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core' )->blankTemplate( $output ) );
+	}
+
+	/**
+	 * Link Dialog
+	 *
+	 * @return	void
+	 */
+	protected function link()
+	{
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->link( \IPS\Request::i()->current, \IPS\Request::i()->editorId, isset( \IPS\Request::i()->block ) );
+	}
+	
+	/**
+	 * Code Dialog
+	 *
+	 * @return	void
+	 */
+	protected function code()
+	{
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'codemirror/codemirror.css', 'core', 'interface' ) );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->code( htmlentities( \IPS\Request::i()->val, ENT_QUOTES | ENT_DISALLOWED, 'UTF-8' ), \IPS\Request::i()->editorId, md5( mt_rand() ), \IPS\Request::i()->lang ?: '' );
+	}
+	
 	/**
 	 * Image Dialog
 	 *
 	 * @return	void
 	 */
-	protected function image() : void
+	protected function image()
 	{
-		$maxImageDims = Settings::i()->attachment_image_size ? explode( 'x', Settings::i()->attachment_image_size ) : array( 1000, 750 );
+		$maxImageDims = \IPS\Settings::i()->attachment_image_size ? explode( 'x', \IPS\Settings::i()->attachment_image_size ) : array( 1000, 750 );
 
 		/* Let's do some casting here */
-		Request::i()->width = (int) Request::i()->width;
-		Request::i()->height = (int) Request::i()->height;
-		Request::i()->actualWidth = (int) Request::i()->actualWidth;
-		Request::i()->actualHeight = (int) Request::i()->actualHeight;
+		
+		\IPS\Request::i()->width = (int) \IPS\Request::i()->width;
+		\IPS\Request::i()->height = (int) \IPS\Request::i()->height;
+		\IPS\Request::i()->actualWidth = (int) \IPS\Request::i()->actualWidth;
+		\IPS\Request::i()->actualHeight = (int) \IPS\Request::i()->actualHeight;
 		$maxImageDims = array_map('intval', $maxImageDims);
 
 		foreach( array( 'width', 'height', 'actualWidth', 'actualHeight' ) as $key )
 		{
-			if( Request::i()->$key <= 0 )
+			if( \IPS\Request::i()->$key <= 0 )
 			{
-				Output::i()->error( 'invalid_image_dimensions', '2C270/2', 403, '' );
+				\IPS\Output::i()->error( 'invalid_image_dimensions', '2C270/2', 403, '' );
 			}
 		}
+		
+		$ratioH = round( \IPS\Request::i()->height / \IPS\Request::i()->width, 2 );
+		$ratioW = round( \IPS\Request::i()->width / \IPS\Request::i()->height, 2 );
 
-		$ratioH = round( Request::i()->height / Request::i()->width, 2 );
-		$ratioW = round( Request::i()->width / Request::i()->height, 2 );
-
-		if( $maxImageDims[0] === 0 && $maxImageDims[1] === 0 )
+		if( $maxImageDims[0] === 0 &&  $maxImageDims[1] === 0 )
 		{
-			$maxWidth = (int) Request::i()->actualWidth;
-			$maxHeight = (int) Request::i()->actualHeight;
+			$maxWidth = (int) \IPS\Request::i()->actualWidth;
+			$maxHeight = (int) \IPS\Request::i()->actualHeight;
 		}
 		else
 		{
-			$maxWidth = ( Request::i()->actualWidth < $maxImageDims[0] ) ?  Request::i()->actualWidth : $maxImageDims[0];
-			$maxHeight = ( Request::i()->actualHeight < $maxImageDims[1] ) ? Request::i()->actualHeight : $maxImageDims[1];
+			$maxWidth = ( \IPS\Request::i()->actualWidth < $maxImageDims[0] ) ?  \IPS\Request::i()->actualWidth : $maxImageDims[0];
+			$maxHeight = ( \IPS\Request::i()->actualHeight < $maxImageDims[1] ) ? \IPS\Request::i()->actualHeight : $maxImageDims[1];
 		}			
 
-		if ( Request::i()->width > $maxWidth )
+		if ( \IPS\Request::i()->width > $maxWidth )
 		{			
-			Request::i()->width = $maxWidth;
-			Request::i()->height = floor( Request::i()->width * $ratioH );
+			\IPS\Request::i()->width = $maxWidth;
+			\IPS\Request::i()->height = floor( \IPS\Request::i()->width * $ratioH );
 		}
 
-		if ( Request::i()->height > $maxHeight )
+		if ( \IPS\Request::i()->height > $maxHeight )
 		{
-			Request::i()->height = $maxHeight;
-			Request::i()->width = floor( Request::i()->height * $ratioW );
+			\IPS\Request::i()->height = $maxHeight;
+			\IPS\Request::i()->width = floor( \IPS\Request::i()->height * $ratioW );
 		}
 	
-		Output::i()->output = Theme::i()->getTemplate( 'editor', 'core', 'global' )->image( Request::i()->editorId, Request::i()->width, Request::i()->height, $maxWidth, $maxHeight, Request::i()->float, Request::i()->link, $ratioW, $ratioH, urldecode( Request::i()->imageAlt ), Request::i()->editorUniqueId );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->image( \IPS\Request::i()->editorId, \IPS\Request::i()->width, \IPS\Request::i()->height, $maxWidth, $maxHeight, \IPS\Request::i()->float, \IPS\Request::i()->link, $ratioW, $ratioH, urldecode( \IPS\Request::i()->imageAlt ), \IPS\Request::i()->editorUniqueId );
 	}
 	
 	/**
@@ -117,202 +113,99 @@ class editor extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function validateLink() : void
+	protected function validateLink()
 	{
 		/* CSRF check */
-		Session::i()->csrfCheck();
-
-		$internalEmbedAllowed = FormEditor::memberHasPermission( 'internal_embed', comments: isset( Request::i()->commenteditor ) );
-		$externalEmbedAllowed = !Request::i()->noEmbed and FormEditor::memberHasPermission( 'external_embed', comments: isset( Request::i()->commenteditor ) );
-		$imageRequest = boolval( !Request::i()->noEmbed and Request::i()->image and Request::i()->width and Request::i()->height );
-		$externalImageAllowed = $imageRequest and $externalEmbedAllowed and FormEditor::memberHasPermission( 'external_image', comments: isset( Request::i()->commenteditor ) );
+		\IPS\Session::i()->csrfCheck();
 
 		/* Have we recently checked and validated this link? */
-		$cacheKey = 'url_validate_' . md5( json_encode([
-			Request::i()->url,
-			(bool) Request::i()->noEmbed,
-			Member::loggedIn()->language()->id,
-			$imageRequest,
-			$externalEmbedAllowed,
-			$externalImageAllowed,
-			$internalEmbedAllowed,
-			Settings::i()->iframely_enabled ? Settings::i()->iframely_api_key : false, // we need to consider this when creating the cache key because it can change the results
-		]));
-
+		$cacheKey = md5( \IPS\Request::i()->url . (bool) \IPS\Request::i()->noEmbed . (bool) \IPS\Request::i()->image . \IPS\Member::loggedIn()->language()->id );
 		try
 		{
-			$cachedResult = Cache::i()->getWithExpire( $cacheKey, TRUE );
-			$cachedResult['fromCache'] = 1;
-			Output::i()->json( $cachedResult );
+			$cachedResult = \IPS\Data\Cache::i()->getWithExpire( $cacheKey, TRUE );
+
+			\IPS\Output::i()->json( $cachedResult );
 		}
-		catch( OutOfRangeException $e ){}
+		catch( \OutOfRangeException $e ){}
 
 		/* Fetch the result and cache it, then return it */
 		try
 		{
 			$title		= NULL;
 			$isEmbed	= FALSE;
-			$url		= Url::createFromString( Request::i()->url, TRUE, TRUE );
+			$url		= \IPS\Http\Url::createFromString( \IPS\Request::i()->url, TRUE, TRUE );
 			$embed		= NULL;
 			$error		= NULL;
 
-			if ( !Request::i()->noEmbed )
+			if ( !\IPS\Request::i()->noEmbed )
 			{
-				// First make sure this url can be embedded under the current settings
-				if ( $url instanceof Url\Internal and !$internalEmbedAllowed )
+				try
 				{
-					$embed = null;
+					if ( \IPS\Request::i()->image and \IPS\Request::i()->width and \IPS\Request::i()->height )
+					{
+						\IPS\Text\Parser::isAllowedImageUrl( $url );
+						$embed = \IPS\Text\Parser::imageEmbed( $url, \intval( \IPS\Request::i()->width ), \intval( \IPS\Request::i()->height ) );
+					}
+					else
+					{
+						$embed = \IPS\Text\Parser::embeddableMedia( $url );
+					}
 				}
-				else if ( !( $url instanceof Url\Internal ) and ( !$externalEmbedAllowed or ( $imageRequest and !$externalImageAllowed ) ) )
+				catch( \UnexpectedValueException $e )
 				{
-					$embed = null;
+					switch( $e->getMessage() )
+					{
+						case 'embed__fail_404':
+							$error	= \IPS\Member::loggedIn()->language()->addToStack( $e->getMessage(), FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->get( 'embed__fail_' . $e->getCode() ) ) ) );
+						break;
+
+						case 'embed__fail_403':
+							$error	= \IPS\Member::loggedIn()->language()->addToStack( $e->getMessage(), FALSE, array( 'sprintf' => array( $url->data['host'], \IPS\Member::loggedIn()->language()->get( 'embed__fail_' . $e->getCode() ) ) ) );
+						break;
+
+						case 'embed__fail_500':
+							$error	= \IPS\Member::loggedIn()->language()->addToStack( $e->getMessage(), FALSE, array( 'sprintf' => array( $url->data['host'] ) ) );
+						break;
+
+						default:
+							$error	= \IPS\Member::loggedIn()->language()->addToStack( $e->getMessage() );
+						break;
+					}
 				}
-				else
+				catch ( \Exception $e )
 				{
-					try
-					{
-						if ( $imageRequest )
-						{
-							Parser::isAllowedContentUrl( $url );
-							$embed = Parser::imageEmbed(
-								$url instanceof Url\Internal ? $url : (string) Request::i()->url,
-								intval( Request::i()->width ),
-								intval( Request::i()->height )
-							);
-						}
-						else
-						{
-							$embed = Parser::embeddableMedia( $url );
-						}
-					}
-					catch ( UnexpectedValueException $e )
-					{
-						switch ( $e->getMessage() )
-						{
-							case 'embed__fail_404':
-								$error = Member::loggedIn()->language()->addToStack( $e->getMessage(), FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->get( 'embed__fail_' . $e->getCode() ) ) ) );
-								break;
-
-							case 'embed__fail_403':
-								$error = Member::loggedIn()->language()->addToStack( $e->getMessage(), FALSE, array( 'sprintf' => array( $url->data['host'], Member::loggedIn()->language()->get( 'embed__fail_' . $e->getCode() ) ) ) );
-								break;
-
-							case 'embed__fail_500':
-								$error = Member::loggedIn()->language()->addToStack( $e->getMessage(), FALSE, array( 'sprintf' => array( $url->data['host'] ) ) );
-								break;
-
-							case 'embed__fail_400':
-								$error = Member::loggedIn()->language()->addToStack( $e->getMessage(), FALSE, array( 'sprintf' => array( 'Bad Request' ) ) );
-								break;
-
-							default:
-								$error = Member::loggedIn()->language()->addToStack( $e->getMessage() );
-								break;
-						}
-					}
-					catch ( Exception $e )
-					{
-						/* Log it if debug logging is enabled so we can see what happened. Maybe save another dev fifteen minutes of "why isn't this working" */
-						Log::debug( $e, 'embed_fail' );
-					}
+					/* Log it if debug logging is enabled so we can see what happened. Maybe save another dev fifteen minutes of "why isn't this working" */
+					\IPS\Log::debug( $e, 'embed_fail' );
 				}
 			}
 
 			if ( $embed OR $error )
 			{
-				$insert = $embed ?: "";
-				$isEmbed = !$error;
+				$insert = $embed;
+				$isEmbed = $error ? FALSE : TRUE;
 			}
 			else
 			{
-				$title	= Request::i()->title ?: (string) $url;
+				$title	= \IPS\Request::i()->title ?: (string) $url;
 				$insert	= "<a href='{$url}' ipsNoEmbed='true'>{$title}</a>";
 			}
 
-			$result = array(
-				'preview' 		=> trim( $insert ),
-				'title' 		=> $title,
-				'embed' 		=> $isEmbed,
-				'errorMessage' 	=> NULL,
-				'allowCustom' 	=> ( !isset( Request::i()->noExternal ) and FormEditor::memberHasPermission( 'og_embed' ) and !$isEmbed and Parser::isAllowedContentUrl( $url ) ),
-			);
+			$result = array( 'preview' => trim( $insert ), 'title' => $title, 'embed' => $isEmbed, 'errorMessage' => $error ? \IPS\Member::loggedIn()->language()->addToStack( 'embed_failure_message', FALSE, array( 'sprintf' => array( $error ) ) ) : NULL );
 
 			if( $error )
 			{
-				$result['errorMessage'] = Member::loggedIn()->language()->addToStack( 'embed_failure_message', FALSE, array( 'sprintf' => array( $error ) ) );
-				Member::loggedIn()->language()->parseOutputForDisplay( $result['errorMessage'] );
-				Log::debug( $url . "\n" . $result['errorMessage'], 'embed_fail' );
+				\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $result['errorMessage'] );
+				\IPS\Log::debug( $url . "\n" . $result['errorMessage'], 'embed_failure' );
 			}
 
-			Cache::i()->storeWithExpire( $cacheKey, $result, DateTime::create()->add( new DateInterval( 'P10D' ) ), true );
+			\IPS\Data\Cache::i()->storeWithExpire( $cacheKey, $result, \IPS\DateTime::create()->add( new \DateInterval( 'PT10S' ) ), TRUE );
 
-			Output::i()->json( $result );
+			\IPS\Output::i()->json( $result );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Output::i()->json( $e->getMessage(), 500 );
+			\IPS\Output::i()->json( $e->getMessage(), 500 );
 		}
-	}
-
-	/**
-	 * Get data from an external endpoint to embed in the editor
-	 *
-	 * @return void
-	 */
-	protected function getLinkContent() : void
-	{
-		/* The csrf check is important to prevent spamming this endpoint, causing all sorts of requests */
-		Session::i()->csrfCheck();
-		$content = "";
-
-		/* Have we recently checked and validated this link? */
-		$cacheKey = md5( 'content' . Request::i()->url . Member::loggedIn()->language()->id );
-		try
-		{
-			$cachedResult = Cache::i()->getWithExpire( $cacheKey, TRUE );
-
-			Output::i()->json( [ 'content' => $cachedResult ] );
-		}
-		catch( OutOfRangeException $e ){}
-
-		/* Let's make sure this IP address isn't spamming the endpoint */
-		if ( Redis::isEnabled() )
-		{
-			try
-			{
-				Redis::i()->zIncrBy( 'linkContentRequest', 1, Request::i()->ipAddress(), 180 );
-
-				/* If the IP address has attempted to get link content 50 times in the last 3 minutes, return nothing. Perhaps in the future, the editor can accept a return code and display a message "Chill out man" or some such */
-				if ( Redis::i()->zScore( 'linkContentRequest', Request::i()->ipAddress() ) > 50 )
-				{
-					Output::i()->json( [ 'content' => '' ] );
-				}
-			}
-			catch( Exception $e ) {}
-		}
-
-		/* Still here? Best get the link */
-		try
-		{
-			if ( !Request::i()->url )
-			{
-				throw new DomainException;
-			}
-
-			$request = Url::external( Request::i()->url )->requestUntrusted();
-
-			$response = $request->get();
-			if ( is_string( $response->content ) and str_starts_with( (string) $response->httpResponseCode, '2' ) and str_starts_with( mb_strtolower( $response->httpHeaders['Content-Type'] ), 'text/html' ) )
-			{
-				$content = $response->content;
-			}
-
-		}
-		catch ( Exception ) { }
-
-		Cache::i()->storeWithExpire( $cacheKey, $content, DateTime::create()->add( new DateInterval( 'PT5M' ) ) );
-
-		Output::i()->json([ "content" => $content ]);
 	}
 			
 	/**
@@ -320,52 +213,46 @@ class editor extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function emoji() : void
+	protected function emoji()
 	{
-		try
+		$emoji = ( \IPS\Settings::i()->emoji_style == 'disabled' or \IPS\Settings::i()->getFromConfGlobal('sql_utf8mb4') !== TRUE ) ? array() : json_decode( file_get_contents( \IPS\ROOT_PATH . '/applications/core/data/emoji.json' ), TRUE );
+		
+		$setsToAdd = array();
+		foreach ( \IPS\Db::i()->select( '*', 'core_emoticons', NULL, 'emo_set_position,emo_position' ) as $row )
 		{
-			$emojis = Cache::i()->getWithExpire( 'core_editor_emoji_sets' );
-			if ( !is_array( $emojis ) )
+			$shortcode = ( \IPS\Settings::i()->emoji_shortcodes and preg_match( '/^:.*:$/', $row['typed'] ) );
+
+			try
 			{
-				throw new OutOfRangeException;
+				$categoryName = \IPS\Member::loggedIn()->language()->get( 'core_emoticon_group_' . $row['emo_set'] );
 			}
+			catch( \UnderflowException $e )
+			{
+				$categoryName = '_default';
+			}
+			
+			$setsToAdd[ $row['emo_set'] ][] = array(
+				'code'			=> 'custom-' . $row['emo_set'] . '-' . $row['id'],
+				'name'			=> $row['typed'],
+				'skinTone'		=> false,
+				'shortNames'	=> $shortcode ? array( trim( $row['typed'], ':' ) ) : array(),
+				'ascii'			=> $shortcode ? array() : array( $row['typed'] ),
+				'categoryName'	=> $categoryName,
+				'image'			=> \IPS\File::get( 'core_Emoticons', $row['image'] )->url,
+				'image2x'		=> $row['image_2x'] ? \IPS\File::get( 'core_Emoticons', $row['image_2x'] )->url : FALSE,
+				'width'			=> $row['width'],
+				'height'		=> $row['height'],
+			);
 		}
-		catch ( OutOfRangeException )
+		foreach ( $setsToAdd as $setKey => $emojiInSet )
 		{
-			$emojis = array();
-			$categoryNames = array();
-			foreach ( Db::i()->select( '*', 'core_emoticons', NULL, 'emo_set_position,emo_position' ) as $row )
-			{
-				try
-				{
-					$categoryName = $categoryNames[ $row['emo_set'] ] ?? Member::loggedIn()->language()->get( 'core_emoticon_group_' . $row['emo_set'] );
-				}
-				catch ( UnderflowException )
-				{
-					$categoryName = '_default';
-				}
-
-				$code = 'custom-' . $row['emo_set'] . '-' . $row['id'];
-				$categoryNames[ $row['emo_set'] ] = $categoryName;
-				$emojis[ $categoryName ][ $code ] = array(
-					'unicode'     => $code,
-					'description' => trim( $row['typed'], ":" ),
-					'skinTones'   => false,
-					'hairStyles'  => false,
-					'sortKey'     => $row['emo_position'],
-					'image'       => array(
-							'image'   	=> (string) File::get( 'core_Emoticons', $row['image'] )->url,
-							'image2x' 	=> (string) ( $row['image_2x'] ? File::get( 'core_Emoticons', $row['image_2x'] )->url : "" ),
-							'width'   	=> $row['width'] ?: 20,
-							'height'  	=> $row['height'] ?: 20
-					)
-				);
-			}
-
-			Cache::i()->storeWithExpire( "core_editor_emoji_sets", $emojis, ( new DateTime )->add( new DateInterval( "P7D" ) ) );
-		}
-
-		Output::i()->json( $emojis );
+			$emoji[] = array(
+				'category'	=> $setKey,
+				'emoji'		=> $emojiInSet
+			);
+		}		
+		
+		\IPS\Output::i()->json( $emoji );
 	}
 	
 	/**
@@ -373,44 +260,43 @@ class editor extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function myMedia() : void
+	protected function myMedia()
 	{
 		/* Init */
 		$perPage = 12;
-		$search = isset( Request::i()->search ) ? Request::i()->search : null;
+		$search = isset( \IPS\Request::i()->search ) ? \IPS\Request::i()->search : null;
 		
 		/* Get all our available sources */
 		$mediaSources = array();
-		foreach ( Application::allExtensions( 'core', 'EditorMedia' ) as $k => $class )
+		foreach ( \IPS\Application::allExtensions( 'core', 'EditorMedia' ) as $k => $class )
 		{
-			if ( $class->count( Member::loggedIn(), isset( Request::i()->postKey ) ? Request::i()->postKey : '' ) )
+			if ( $class->count( \IPS\Member::loggedIn(), isset( \IPS\Request::i()->postKey ) ? \IPS\Request::i()->postKey : '' ) )
 			{
 				$mediaSources[] = $k;
 			}
 		}
 		/* Work out what tab we're on */
-		if ( !Request::i()->tab or !in_array( Request::i()->tab, $mediaSources ) )
+		if ( !\IPS\Request::i()->tab )
 		{
-			if( !count( $mediaSources ) )
+			if( !\count( $mediaSources ) )
 			{
-				Output::i()->output = Theme::i()->getTemplate( 'editor', 'core', 'global' )->myMedia( Request::i()->editorId, $mediaSources, NULL, NULL, NULL );
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->myMedia( \IPS\Request::i()->editorId, $mediaSources, NULL, NULL, NULL );
 				return;
 			}
 			
 			$sources = $mediaSources;
-			Request::i()->tab = array_shift( $sources );
+			\IPS\Request::i()->tab = array_shift( $sources );
 		}
 
-		$exploded = explode( '_', Request::i()->tab );
-		$classname = Application::getExtensionClass( $exploded[0], 'EditorMedia', $exploded[1] );
-
+		$exploded = explode( '_', \IPS\Request::i()->tab );
+		$classname = "IPS\\{$exploded[0]}\\extensions\\core\\EditorMedia\\{$exploded[1]}";
 		$extension = new $classname;
-		$url = Url::internal( "app=core&module=system&controller=editor&do=myMedia&tab=" . Request::i()->tab . "&key=" . Request::i()->key . "&postKey=" . Request::i()->postKey . "&existing=1" );
+		$url = \IPS\Http\Url::internal( "app=core&module=system&controller=editor&do=myMedia&tab=" . \IPS\Request::i()->tab . "&key=" . \IPS\Request::i()->key . "&postKey=" . \IPS\Request::i()->postKey . "&existing=1" );
 		
 		/* Count how many we have */
-		$count = $extension->count( Member::loggedIn(), isset( Request::i()->postKey ) ? Request::i()->postKey : '', $search );
+		$count = $extension->count( \IPS\Member::loggedIn(), isset( \IPS\Request::i()->postKey ) ? \IPS\Request::i()->postKey : '', $search );
 
-		$page = isset( Request::i()->page ) ? intval( Request::i()->page ) : 1;
+		$page = isset( \IPS\Request::i()->page ) ? \intval( \IPS\Request::i()->page ) : 1;
 
 		if( $page < 1 )
 		{
@@ -418,49 +304,49 @@ class editor extends Controller
 		}
 
 		/* Display */
-		if ( isset( Request::i()->existing ) )
+		if ( isset( \IPS\Request::i()->existing ) )
 		{
-			if ( isset( Request::i()->search ) || ( isset( Request::i()->page ) && Request::i()->page !== 1 ) )
+			if ( isset( \IPS\Request::i()->search ) || ( isset( \IPS\Request::i()->page ) && \IPS\Request::i()->page !== 1 ) )
 			{
-				Output::i()->output = Theme::i()->getTemplate( 'editor', 'core', 'global' )->myMediaResults(
-					$extension->get( Member::loggedIn(), $search, isset( Request::i()->postKey ) ? Request::i()->postKey : '', $page, $perPage ),
-					Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination(
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->myMediaResults(
+					$extension->get( \IPS\Member::loggedIn(), $search, isset( \IPS\Request::i()->postKey ) ? \IPS\Request::i()->postKey : '', $page, $perPage ),
+					\IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination(
 						$url,
 						ceil( $count / $perPage ),
 						$page,
 						$perPage
 					),
 					$url,
-					Request::i()->tab
+					\IPS\Request::i()->tab
 				);
 			}
 			else
 			{
-				Output::i()->output = Theme::i()->getTemplate( 'editor', 'core', 'global' )->myMediaContent(
-					$extension->get( Member::loggedIn(), $search, isset( Request::i()->postKey ) ? Request::i()->postKey : '', $page, $perPage ),
-					Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination(
+				\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->myMediaContent(
+					$extension->get( \IPS\Member::loggedIn(), $search, isset( \IPS\Request::i()->postKey ) ? \IPS\Request::i()->postKey : '', $page, $perPage ),
+					\IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination(
 						$url,
 						ceil( $count / $perPage ),
 						$page,
 						$perPage
 					),
 					$url,
-					Request::i()->tab
+					\IPS\Request::i()->tab
 				);
 			}
 		}
 		else
 		{
-			Output::i()->output = Theme::i()->getTemplate( 'editor', 'core', 'global' )->myMedia( Request::i()->editorId, $mediaSources, Request::i()->tab, $url, Theme::i()->getTemplate( 'editor', 'core', 'global' )->myMediaContent(
-				$extension->get( Member::loggedIn(), $search, isset( Request::i()->postKey ) ? Request::i()->postKey : '', $page, $perPage ),
-				Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination(
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->myMedia( \IPS\Request::i()->editorId, $mediaSources, \IPS\Request::i()->tab, $url, \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->myMediaContent(
+				$extension->get( \IPS\Member::loggedIn(), $search, isset( \IPS\Request::i()->postKey ) ? \IPS\Request::i()->postKey : '', $page, $perPage ),
+				\IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination(
 					$url,
 					ceil( $count / $perPage ),
 					$page,
 					$perPage
 				),
 				$url,
-				Request::i()->tab
+				\IPS\Request::i()->tab
 			) );
 		}
 	}
@@ -470,68 +356,55 @@ class editor extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function mention() : void
+	protected function mention()
 	{
-		$results = [];
-		if ( mb_strlen( Request::i()->input ) > 0 )
+		$results = '';
+		if ( mb_strlen( \IPS\Request::i()->input ) > 0 )
 		{
 			$memberIds = [];
-			if ( isset( Request::i()->contentClass ) AND isset( Request::i()->contentId ) )
+			if ( isset( \IPS\Request::i()->contentClass ) AND isset( \IPS\Request::i()->contentId ) )
 			{
-				$class = Request::i()->contentClass;
-				if ( class_exists( $class ) AND IPS::classUsesTrait( $class, 'IPS\Content\Statistics' ) )
+				$class = \IPS\Request::i()->contentClass;
+				if ( \class_exists( $class ) AND \IPS\IPS::classUsesTrait( $class, 'IPS\Content\Statistics' ) )
 				{
 					try
 					{
-						$item = $class::load( Request::i()->contentId );
-						foreach( $item->mostRecent( Request::i()->input, 10, false ) AS $member )
+						$item = $class::load( \IPS\Request::i()->contentId );
+						foreach( $item->mostRecent( \IPS\Request::i()->input, 10, FALSE ) AS $row )
 						{
-							$memberIds[] = $member->member_id;
-							$results[] = [
-								'userId'	=> (string) $member->member_id,
-								'name'		=> $member->name,
-								'link'		=> (string) $member->url(),
-								'hoverLink' => (string) $member->url()->setQueryString([ 'do' => 'hovercard' ]),
-								'photo'		=> (string) $member->photo,
-							];
+							$memberIds[] = $row->member_id;
+							$results .= \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->mentionRow( $row );
 						}
 					}
-					catch( OutOfRangeException | BadMethodCallException $e ) { }
+					catch( \OutOfRangeException | \BadMethodCallException $e ) { }
 				}
 			}
 			
 			/* If there are less than ten recent participants matching the input, fill it out with non-participants. */
-			if ( count( $memberIds ) < 10 )
+			if ( \count( $memberIds ) < 10 )
 			{
-				$where = array( Db::i()->like( 'name', Request::i()->input ) );
+				$where = array( \IPS\Db::i()->like( 'name', \IPS\Request::i()->input ) );
 				$where[] = array( 'temp_ban !=?', '-1' );
-				if ( count( $memberIds ) )
+				if ( \count( $memberIds ) )
 				{
-					$where[] = array( Db::i()->in( 'member_id', $memberIds, TRUE ) );
+					$where[] = array( \IPS\Db::i()->in( 'member_id', $memberIds, TRUE ) );
 				}
 				
-				foreach ( Db::i()->select( '*', 'core_members', $where, 'name', 10 - count( $memberIds ) ) as $row )
+				foreach ( \IPS\Db::i()->select( '*', 'core_members', $where, 'name', 10 - \count( $memberIds ) ) as $row )
 				{
-					$member = Member::constructFromData( $row );
-					$results[] = [
-						'userId'	=> (string) $member->member_id,
-						'name'		=> $member->name,
-						'link'		=> (string) $member->url(),
-						'hoverLink' => (string) $member->url()->setQueryString([ 'do' => 'hovercard' ]),
-						'photo'		=> (string) $member->photo,
-					];
+					$results .= \IPS\Theme::i()->getTemplate( 'editor', 'core', 'global' )->mentionRow( \IPS\Member::constructFromData( $row ) );
 				}
 			}
 		}
 		
-		Output::i()->json( $results );
+		\IPS\Output::i()->sendOutput( $results );
 	}
 
 	/**
 	 * @brief	Languages supported by giphy
 	 * @see		https://developers.giphy.com/docs/optional-settings/#language-support
 	 */
-	protected static array $giphyLanguages = array( 'en', 'es', 'pt', 'id', 'fr', 'ar', 'tr', 'th', 'vi', 'hi', 'bn', 'da', 'fa', 'tl', 'fi',
+	protected static $giphyLanguages = array( 'en', 'es', 'pt', 'id', 'fr', 'ar', 'tr', 'th', 'vi', 'hi', 'bn', 'da', 'fa', 'tl', 'fi',
 											'de', 'it', 'ja', 'ru', 'ko', 'pl', 'nl', 'ro', 'hu', 'sv', 'cs', 'iw', 'ms', 'no', 'uk', 'zh-CN', 'zh-TW'
 										);
 
@@ -540,105 +413,78 @@ class editor extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function giphy() : void
+	protected function giphy()
 	{
-		if ( Settings::i()->giphy_enabled )
+		if ( \IPS\Settings::i()->giphy_enabled )
 		{
-			try
+			$limit = isset( \IPS\Request::i()->limit ) ? \IPS\Request::i()->limit : 30;
+			$offset = isset( \IPS\Request::i()->offset ) ? \IPS\Request::i()->offset : 0;
+
+			$q = urlencode( \IPS\Request::i()->search );
+
+			/* Return the trending images if there's no search term */
+			if ( !$q OR $q == '' )
 			{
-				$limit = isset( Request::i()->limit ) ? Request::i()->limit : 30;
-				$offset = isset( Request::i()->offset ) ? Request::i()->offset : 0;
+				$url = \IPS\Http\Url::external( "https://api.giphy.com/v1/gifs/trending" );
+			}
+			else
+			{
+				$url = \IPS\Http\Url::external( "https://api.giphy.com/v1/gifs/search" )->setQueryString( 'q', $q );
+			}
 
-				$q = urlencode( Request::i()->search );
+			$parameters = array(
+				'api_key' => ( \IPS\Settings::i()->giphy_apikey ? \IPS\Settings::i()->giphy_apikey : \IPS\Settings::i()->giphy_apikey_default ),
+				'limit' => $limit,
+				'offset' => $offset
+			);
 
-				/* Return the trending images if there's no search term */
-				if ( !$q or $q == '' )
+			$ourLocale = \IPS\Member::loggedIn()->language()->short;
+
+			if ( preg_match( '/^\w{2}[-_]\w{2}($|\.)/i',$ourLocale ) ) // This will only work for Unix-style locales
+			{
+				$langCode = \strtolower( \substr( $ourLocale, 0, 2 ) );
+
+				/* Giphy supports zh-CN and zh-TW, so we have to handle this one special */
+				if( $langCode == 'zh' )
 				{
-					$url = Url::external( "https://api.giphy.com/v1/gifs/trending" );
-				}
-				else
-				{
-					$url = Url::external( "https://api.giphy.com/v1/gifs/search" )->setQueryString( 'q', $q );
+					$langCode = \strtolower( \substr( $ourLocale, 0, 2 ) ) . '-' . \strtoupper( \substr( $ourLocale, 3, 2 ) );
 				}
 
-				$parameters = array(
-					'api_key' => ( Settings::i()->giphy_apikey ? Settings::i()->giphy_apikey : Settings::i()->giphy_apikey_default ),
-					'limit'   => $limit,
-					'offset'  => $offset
+				if( \in_array( $langCode, static::$giphyLanguages ) )
+				{
+					$parameters['lang'] = $langCode;
+				}
+			}
+
+			$url = $url->setQueryString($parameters);
+
+			if ( \IPS\Settings::i()->giphy_rating and \IPS\Settings::i()->giphy_rating !== 'x' )
+			{
+				$url = $url->setQueryString( 'rating', \IPS\Settings::i()->giphy_rating );
+			}
+
+			$request = json_decode( $url->request()->get()->content, true );
+			if ( isset( $request['message'] ) AND $request['message'] )
+			{
+				\IPS\Output::i()->json( array('error' => $request['message'] ) );
+			}
+
+			$results = array( 'pagination' => $request['pagination'] );
+			foreach ( $request['data'] as $row )
+			{
+				$results['images'][] = array(
+					'thumb'	=> $row['images']['fixed_height_small']['url'],
+					'url'   => $row['images']['fixed_height']['url'],
+					'title' => $row['title']
 				);
-
-				$ourLocale = Member::loggedIn()->language()->short;
-
-				if ( preg_match( '/^\w{2}[-_]\w{2}($|\.)/i', $ourLocale ) ) // This will only work for Unix-style locales
-				{
-					$langCode = strtolower( substr( $ourLocale, 0, 2 ) );
-
-					/* Giphy supports zh-CN and zh-TW, so we have to handle this one special */
-					if ( $langCode == 'zh' )
-					{
-						$langCode = strtolower( substr( $ourLocale, 0, 2 ) ) . '-' . strtoupper( substr( $ourLocale, 3, 2 ) );
-					}
-
-					if ( in_array( $langCode, static::$giphyLanguages ) )
-					{
-						$parameters['lang'] = $langCode;
-					}
-				}
-
-				$url = $url->setQueryString( $parameters );
-
-				if ( Settings::i()->giphy_rating and Settings::i()->giphy_rating !== 'x' )
-				{
-					$url = $url->setQueryString( 'rating', Settings::i()->giphy_rating );
-				}
-
-				$cacheKey = "IPS_GIPHY__" . md5( $url );
-				$results = null;
-				try
-				{
-					$results = json_decode( Cache::i()->getWithExpire( $cacheKey, true ), true );
-				}
-				catch ( OutOfRangeException ) {}
-
-				if ( !is_array( $results ) )
-				{
-					$data = $url->request()->get()->decodeJson();
-					if ( isset( $data['message'] ) and $data['message'] )
-					{
-						Output::i()->json( array( 'error' => $data['message'] ) );
-					}
-
-					if ( !isset( $data['data'] ) OR !is_array( $data['data'] ) )
-					{
-						Output::i()->json( ['error' => 'could not fetch results'], 500 );
-					}
-
-					$results = array( 'pagination' => $data['pagination'] ?? '', 'images' => [] );
-					foreach ( $data['data'] as $row )
-					{
-						if ( !isset( $row['images']['fixed_height'] ) or !isset( $row['images']['fixed_height_small'] ) or !isset( $row['images']['fixed_height']['url'] ) )
-						{
-							continue;
-						}
-						
-						$results['images'][] = array(
-							'thumb' => $row['images']['fixed_height_small']['url'] ?? $row['images']['fixed_height']['url'],
-							'url'   => $row['images']['fixed_height']['url'],
-							'title' => $row['title'],
-							'width' => intval($row['images']['fixed_height_small']['width'] ?? 150),
-							'height' => intval($row['images']['fixed_height_small']['height'] ?? 100)
-						);
-					}
-
-					Cache::i()->storeWithExpire( $cacheKey, json_encode( $results ), ( new DateTime() )->add( new DateInterval( 'PT1H' ) ), true );
-				}
-
-				Output::i()->json( $results );
 			}
-			catch ( Exception $e )
+
+			if ( empty( $results['images'] ) )
 			{
-				Output::i()->json( [ 'error' => var_export( $e, true ), 'request' => $data ?? '' ], 500 );
+				\IPS\Output::i()->json( array( 'error' => \IPS\Theme::i()->getTemplate( 'system', 'core' )->noResults() ) );
 			}
+			
+			\IPS\Output::i()->json( $results );
 		}
 	}
 
@@ -647,43 +493,42 @@ class editor extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function storedReplies() : void
+	protected function storedReplies()
 	{
-		if ( isset( Request::i()->id ) )
+		if ( isset( \IPS\Request::i()->id ) )
 		{
 			try
 			{
-				$reply = StoredReplies::loadAndCheckPerms( Request::i()->id );
+				$reply = \IPS\core\StoredReplies::loadAndCheckPerms( \IPS\Request::i()->id );
 
-				Output::i()->json( [
+				\IPS\Output::i()->json( [
 					'id' => $reply->id,
 					'title' => $reply->title,
 					'reply' => $reply->text
 				] );
 			}
-			catch( Exception )
+			catch( \Exception $e )
 			{
-				Output::i()->json( [ 'error' => "An unexpected error occurred" ], 500 );
+				\IPS\Output::i()->json( [ 'error' => \IPS\Theme::i()->getTemplate( 'system', 'core' )->noResults() ] );
 			}
 		}
 		else
 		{
-			try
+			$results = [];
+			foreach ( \IPS\core\StoredReplies::roots() as $reply )
 			{
-				$results = [];
-				foreach ( StoredReplies::roots() as $reply )
+				if ( $reply->enabled )
 				{
-					if ( $reply->enabled )
-					{
-						$results[] = [ 'id' => $reply->id, 'title' => $reply->title ];
-					}
+					$results[] = ['id' => $reply->id, 'title' => $reply->title];
 				}
-				Output::i()->json( [ "results" => $results ] );
 			}
-			catch ( Exception )
+
+			if ( empty( $results ) )
 			{
-				Output::i()->json( [ "error" => 'An unexpected error occurred', "results" => [] ], 500 );
+				\IPS\Output::i()->json( [ 'error' => \IPS\Theme::i()->getTemplate( 'system', 'core' )->noResults() ] );
 			}
+
+			\IPS\Output::i()->json( $results );
 		}
 	}
 }

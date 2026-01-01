@@ -11,47 +11,40 @@
 namespace IPS\Notification;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ArrayAccess;
-use Countable;
-use IPS\Member;
-use Iterator;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Data Structure for storing notification recipieints - basically a non-unique SplObjectStorage
  */
-class Recipients implements Countable, Iterator, ArrayAccess
+class _Recipients implements \Countable, \Iterator, \ArrayAccess
 {
 	/**
 	 * @brief	Recipients
 	 */
-	protected array $recipients = array();
+	protected $recipients = array();
 	
 	/**
 	 * @brief	Count
 	 */
-	protected int $count = 0;
+	protected $count = 0;
 	
 	/**
 	 * @brief	Current position
 	 */
-	protected int $position = 0;
+	protected $position = 0;
 	
 	/**
 	 * [SplObjectStorage] Add a recipient
 	 *
-	 * @param	Member	$member		The member object
-	 * @param array|null $followData	If the notification is about something being followed, the appropriate row from core_follow
+	 * @param	\IPS\Member	$member		The member object
+	 * @param	array|null	$followData	If the notification is about something being followed, the appropriate row from core_follow
 	 * @return	void
 	 */
-	public function attach( Member $member, array $followData = NULL ) : void
+	public function attach( \IPS\Member $member, $followData = NULL )
 	{
 		$this->recipients[] = array( 'member' => $member, 'followData' => $followData );
 		$this->count++;
@@ -60,10 +53,10 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	/**
 	 * [SplObjectStorage] Remove a recipient
 	 *
-	 * @param	Member	$member		The member object
+	 * @param	\IPS\Member	$member		The member object
 	 * @return	void
 	 */
-	public function detach( Member $member ) : void
+	public function detach( \IPS\Member $member, $followData = NULL )
 	{
 		foreach ( $this->recipients as $k => $data )
 		{
@@ -80,7 +73,7 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
 		return $this->count;
 	}
@@ -88,9 +81,9 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	/**
 	 * [Iterator] Get current
 	 *
-	 * @return	Member
+	 * @return	\IPS\Member
 	 */
-	public function current(): Member
+	public function current()
 	{
 		return $this->recipients[ $this->position ]['member'];
 	}
@@ -100,7 +93,7 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	 *
 	 * @return	array|null
 	 */
-	public function getInfo(): ?array
+	public function getInfo()
 	{
 		return $this->recipients[ $this->position ]['followData'];
 	}
@@ -110,7 +103,7 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	 *
 	 * @return	int
 	 */
-	public function key(): int
+	public function key()
 	{
 		return $this->position;
 	}
@@ -120,7 +113,7 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	 *
 	 * @return	void
 	 */
-	public function next() : void
+	public function next()
 	{
 		$this->position++;
 	}
@@ -130,7 +123,7 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	 *
 	 * @return	void
 	 */
-	public function rewind() : void
+	public function rewind()
 	{
 		$this->position = 0;
 	}
@@ -140,7 +133,7 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	 *
 	 * @return	bool
 	 */
-	public function valid(): bool
+	public function valid()
 	{
 		return $this->position < $this->count;
 	}
@@ -151,7 +144,7 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	 * @param	mixed	$offset	The offset
 	 * @return	bool
 	 */
-	public function offsetExists( mixed $offset ): bool
+	public function offsetExists( $offset )
 	{
 		return $offset < $this->count;
 	}
@@ -160,9 +153,9 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	 * [ArrayAccess] Get offset
 	 *
 	 * @param	mixed	$offset	The offset
-	 * @return	Member
+	 * @return	\IPS\Member
 	 */
-	public function offsetGet( mixed $offset ): Member
+	public function offsetGet( $offset )
 	{
 		return $this->recipients[ $offset ]['member'];
 	}
@@ -172,9 +165,9 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	 *
 	 * @param	mixed	$offset	The offset
 	 * @param	mixed	$value	The value
-	 * @return	void
+	 * @return	bool
 	 */
-	public function offsetSet( mixed $offset, mixed $value ): void
+	public function offsetSet( $offset, $value )
 	{
 		$this->recipients[] = array( 'member' => $value, 'followData' => NULL );
 		
@@ -190,7 +183,7 @@ class Recipients implements Countable, Iterator, ArrayAccess
 	 * @param	mixed	$offset	The offset
 	 * @return	void
 	 */
-	public function offsetUnset( mixed $offset ) : void
+	public function offsetUnset( $offset )
 	{
 		if ( isset( $this->recipients[ $offset ] ) )
 		{

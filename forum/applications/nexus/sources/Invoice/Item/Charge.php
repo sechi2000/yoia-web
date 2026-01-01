@@ -12,33 +12,24 @@
 namespace IPS\nexus\Invoice\Item;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\nexus\Invoice\Item;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invoice Item Class for Charges
  */
-abstract class Charge extends Item
+abstract class _Charge extends \IPS\nexus\Invoice\Item
 {
 	/**
 	 * @brief	Act (new/charge)
 	 */
-	public static string $act = 'charge';
+	public static $act = 'charge';
 	
 	/**
 	 * @brief	Requires login to purchase?
 	 */
-	public static bool $requiresAccount = FALSE;
-
-	/**
-	 * @brief	Can use coupons?
-	 */
-	public static bool $canUseCoupons = false;
+	public static $requiresAccount = FALSE;
 }

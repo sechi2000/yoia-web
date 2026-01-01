@@ -12,25 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Member;
-use IPS\Session\Store;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ActiveUsers for GraphQL API
  */
-class ActiveUsersType extends ObjectType
+class _ActiveUsersType extends ObjectType
 {
     /**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -47,14 +45,14 @@ class ActiveUsersType extends ObjectType
 							]
 						],
 						'resolve' => function ($val, $args) {
-							$flags = Store::ONLINE_MEMBERS;
+							$flags = \IPS\Session\Store::ONLINE_MEMBERS;
 
 							if( $args['includeGuests'] )
 							{
-								$flags = Store::ONLINE_MEMBERS | Store::ONLINE_GUESTS;
+								$flags = \IPS\Session\Store::ONLINE_MEMBERS | \IPS\Session\Store::ONLINE_GUESTS;
 							}
 
-							return Store::i()->getOnlineUsers( $flags | Store::ONLINE_COUNT_ONLY, 'asc', NULL, NULL, Member::loggedIn()->isAdmin() );
+							return \IPS\Session\Store::i()->getOnlineUsers( $flags | \IPS\Session\Store::ONLINE_COUNT_ONLY, 'asc', NULL, NULL, \IPS\Member::loggedIn()->isAdmin() );
 						}
 					],
 					'users' => [
@@ -81,15 +79,17 @@ class ActiveUsersType extends ObjectType
 							]
 						],
 						'resolve' => function ($val, $args) {
-							$flags = Store::ONLINE_MEMBERS;
+							$flags = \IPS\Session\Store::ONLINE_MEMBERS;
 
 							if( $args['includeGuests'] )
 							{
-								$flags = Store::ONLINE_MEMBERS | Store::ONLINE_GUESTS;
+								$flags = \IPS\Session\Store::ONLINE_MEMBERS | \IPS\Session\Store::ONLINE_GUESTS;
 							}
 							$offset = max( $args['offset'], 0 );
 							$limit = min( $args['limit'], 50 );
-							return Store::i()->getOnlineUsers( $flags, $args['sortDir'], array( $offset, $limit ), NULL, Member::loggedIn()->isAdmin() );
+							$users = \IPS\Session\Store::i()->getOnlineUsers( $flags, $args['sortDir'], array( $offset, $limit ), NULL, \IPS\Member::loggedIn()->isAdmin() );
+
+							return $users;
 						}
 					]
 				];

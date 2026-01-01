@@ -11,46 +11,37 @@
 namespace IPS\core\modules\setup\upgrade;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Output;
-use UnderflowException;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Upgrader: Continue Upgrade
  */
-class continueupgrade extends Controller
+class _continueupgrade extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Show Form
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		/* Best check for the upgrade file first */
 		try
 		{
-			$json = json_decode( Db::i()->select( 'upgrade_data', 'upgrade_temp' )->first(), TRUE );
+			$json = json_decode( \IPS\Db::i()->select( 'upgrade_data', 'upgrade_temp' )->first(), TRUE );
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			$json = NULL;
 		}
 			
-		if ( is_array( $json ) and isset( $json['session'] ) and isset( $json['data'] ) )
+		if ( \is_array( $json ) and isset( $json['session'] ) and isset( $json['data'] ) )
 		{
-			$url = Url::internal( "controller=upgrade" )->setQueryString( 'key', $_SESSION['uniqueKey'] );
+			$url = \IPS\Http\Url::internal( "controller=upgrade" )->setQueryString( 'key', $_SESSION['uniqueKey'] );
 			
 			/* Update session */
 			foreach( $json['session'] as $k => $v )
@@ -63,11 +54,11 @@ class continueupgrade extends Controller
 			
 			/* Populate the MR data */
 			$_SESSION[ 'mr-' . md5( $url ) ] = json_encode( $json['data'] );
-			Output::i()->redirect( $url );
+			\IPS\Output::i()->redirect( $url );
 		}
 		else
 		{
-			Output::i()->error( 'cannot_continue_upgrade', '', 403, '' );
+			\IPS\Output::i()->error( 'cannot_continue_upgrade', '', 403, '' );
 		}
 	}
 }

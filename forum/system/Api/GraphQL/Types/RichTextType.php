@@ -12,25 +12,23 @@
 namespace IPS\Api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Output;
-use IPS\Text\Parser;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * RichTextType for GraphQL API
  */
-class RichTextType extends ObjectType
+class _RichTextType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -56,7 +54,7 @@ class RichTextType extends ObjectType
 					'resolve' => function ($string, $args) {
 						
 						/* Remove stuff we don't want to include (quotes, spoilers, scripts) */
-						$string = Parser::removeElements( $string, array( 'blockquote', 'script', 'div[class=ipsSpoiler]' ) );
+						$string = \IPS\Text\Parser::removeElements( $string, array( 'blockquote', 'script', 'div[class=ipsSpoiler]' ) );
 						
 						/* Put a break in places where we actually want one */
 						$string = str_replace( array( '</p>', '</h1>', '</h2>', '</h3>', '</h4>', '</h5>', '</h6>', '</li>' ), '<br>', $string );
@@ -85,9 +83,20 @@ class RichTextType extends ObjectType
 				'original' => [
 					'type' => TypeRegistry::string(),
 					'description' => "Returns original rich text (i.e. containing full rich markup)",
-					'args' => [ ],
+					'args' => [
+						'removeLazyLoad' => [
+							'type' => TypeRegistry::boolean(),
+							'description' => "Remove lazy-load placeholders?",
+							'defaultValue' => TRUE
+						]
+					],
 					'resolve' => function ($string, $args) {
-						Output::i()->parseFileObjectUrls( $string );
+						if( $args['removeLazyLoad'] )
+						{
+							$string = \IPS\Text\Parser::removeLazyLoad( $string );
+						}
+
+						\IPS\Output::i()->parseFileObjectUrls( $string );
 						return $string;
 					}
 				]

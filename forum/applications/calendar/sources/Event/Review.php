@@ -12,64 +12,43 @@
 namespace IPS\calendar\Event;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use IPS\Content\EditHistory;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Hideable;
-use IPS\Content\Reactable;
-use IPS\Content\Reportable;
-use IPS\Content\Review as ContentReview;
-use IPS\Content\Shareable;
-use IPS\Http\Url;
-use IPS\Http\Url\Exception;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Event Review Model
  */
-class Review extends ContentReview implements Embeddable,
-	Filter
+class _Review extends \IPS\Content\Review implements \IPS\Content\EditHistory, \IPS\Content\Hideable, \IPS\Content\Searchable, \IPS\Content\Embeddable
 {
-	use	Reactable,
-		Reportable,
-		Shareable,
-		EditHistory,
-		Hideable;
+	use \IPS\Content\Reactable, \IPS\Content\Reportable;
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[Content\Comment]	Item Class
 	 */
-	public static ?string $itemClass = 'IPS\calendar\Event';
+	public static $itemClass = 'IPS\calendar\Event';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'calendar_event_reviews';
+	public static $databaseTable = 'calendar_event_reviews';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'review_';
+	public static $databasePrefix = 'review_';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'item'				=> 'eid',
 		'author'			=> 'mid',
 		'author_name'		=> 'author_name',
@@ -90,32 +69,32 @@ class Review extends ContentReview implements Embeddable,
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'calendar';
+	public static $application = 'calendar';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'calendar_event_review';
+	public static $title = 'calendar_event_review';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'calendar';
+	public static $icon = 'calendar';
 	
 	/**
 	 * @brief	[Content]	Key for hide reasons
 	 */
-	public static ?string $hideLogKey = 'calendar-events-rev';
+	public static $hideLogKey = 'calendar-events-rev';
 	
 	/**
 	 * Get URL for doing stuff
 	 *
 	 * @param	string|NULL		$action		Action
-	 * @return	Url
-	 * @throws	BadMethodCallException
-	 * @throws	Exception
+	 * @return	\IPS\Http\Url
+	 * @throws	\BadMethodCallException
+	 * @throws	\IPS\Http\Url\Exception
 	 */
-	public function url( ?string $action='find' ): Url
+	public function url( $action='find' )
 	{
 		return parent::url( $action )->setQueryString( 'tab', 'reviews' );
 	}
@@ -123,11 +102,28 @@ class Review extends ContentReview implements Embeddable,
 	/**
 	 * Get template for content tables
 	 *
-	 * @return array
+	 * @return	callable
 	 */
-	public static function contentTableTemplate(): array
+	public static function contentTableTemplate()
 	{
-		return array( Theme::i()->getTemplate( 'tables', 'core', 'front' ), 'commentRows' );
+		return array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'front' ), 'commentRows' );
+	}
+
+	/**
+	 * Get snippet HTML for search result display
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$authorData		Basic data about the author. Only includes columns returned by \IPS\Member::columnsForPhoto()
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	array		$reputationData	Array of people who have given reputation and the reputation they gave
+	 * @param	int|NULL	$reviewRating	If this is a review, the rating
+	 * @param	string		$view			'expanded' or 'condensed'
+	 * @return	callable
+	 */
+	public static function searchResultSnippet( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating, $view )
+	{
+		return \IPS\calendar\Event\Comment::searchResultSnippet( $indexData, $authorData, $itemData, $containerData, $reputationData, $reviewRating, $view );
 	}
 	
 	/**
@@ -135,7 +131,7 @@ class Review extends ContentReview implements Embeddable,
 	 *
 	 * @return	string
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		return 'review_id';
 	}
@@ -143,12 +139,12 @@ class Review extends ContentReview implements Embeddable,
 	/**
 	 * Get content for embed
 	 *
-	 * @param array $params Additional parameters to add to URL
-	 * @return string
+	 * @param	array	$params	Additional parameters to add to URL
+	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'calendar', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'calendar' )->embedEventReview( $this, $this->item(), $this->url()->setQueryString( $params ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'calendar', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'calendar' )->embedEventReview( $this, $this->item(), $this->url()->setQueryString( $params ) );
 	}
 }

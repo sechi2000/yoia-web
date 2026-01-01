@@ -11,25 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use LengthException;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Text input class for Form Builder
  */
-class TextArea extends FormAbstract
+class _TextArea extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -42,52 +33,34 @@ class TextArea extends FormAbstract
 	 		'nullLang'		=> 'no_value',				// If provided, an "or X" checkbox will appear with X being the value of this language key. When checked, NULL will be returned as the value.
 	 		'tags'			=> array(),					// An array of extra insertable tags in key => value pair with key being what is inserted and value serving as a description
 	 		'class'			=> 'ipsField_codeInput',	// Additional CSS class
-			'tagLinks'		=> array(),					// An array of links to display next to the headers for tags.
-			'tagSource'		=> \IPS\Http\Url( ... ), 	// A URL that will fetch tags using AJAX.
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'minLength'		=> NULL,
 		'maxLength'		=> NULL,
 		'disabled'		=> FALSE,
 		'placeholder'	=> NULL,
 		'nullLang'		=> NULL,
 		'tags'			=> array(),
-		'tagSource'		=> null,
-		'tagLinks'		=> array(),
 		'rows'			=> NULL,
 		'class'			=> '',
-		'codeMode' 		=> false,
-		'codeModeAllowedLanguages' => null
 	);
 
 	/**
 	 * Constructor
 	 *
-	 * @param string 		$name 					Name
-	 * @param mixed 		$defaultValue 			Default value
-	 * @param bool|null 	$required 				Required? (NULL for not required, but appears to be so)
-	 * @param array{
-	 *     minLength?: 		null|string,
-	 *     maxLength?:		null|string,
-	 *     disabled?:		boolean,
-	 *     placeholder?:	null|string,
-	 *     nullLang?:		null|string,
-	 *     tags?:			array,
-	 *     tagSource?:		null|string|\IPS\Http\Url,
-	 *     tagLinks?:		array,
-	 *     rows?:			null|mixed,
-	 *     class?:			string,
-	 *     codeMode?:		boolean,
-	 *     codeModeAllowedLanguages?: null|string[]
-	 * } 					$options 				Type-specific options
-	 * @param callable|null $customValidationCode 	Custom validation code
-	 * @param string|null 	$prefix 				HTML to show before input field
-	 * @param string|null 	$suffix 				HTML to show after input field
-	 * @param string|null 	$id 					The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		/* Call parent constructor */
 		parent::__construct( $name, $defaultValue, $required, $options, $customValidationCode, $prefix, $suffix, $id );
@@ -105,7 +78,7 @@ class TextArea extends FormAbstract
 		/* Append needed javascript if appropriate */
 		if( !empty( $this->options['tags'] ) )
 		{
-			Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'jquery/jquery.rangyinputs.js', 'core', 'interface' ) );
+			\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'jquery/jquery.rangyinputs.js', 'core', 'interface' ) );
 		}
 	}
 	
@@ -114,20 +87,20 @@ class TextArea extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->textarea( $this->name, $this->value, $this->required, $this->options['maxLength'], $this->options['disabled'], $this->options['class'], $this->options['placeholder'], $this->options['nullLang'], $this->options['tags'], $this->options['rows'], $this->options );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->textarea( $this->name, $this->value, $this->required, $this->options['maxLength'], $this->options['disabled'], $this->options['class'], $this->options['placeholder'], $this->options['nullLang'], $this->options['tags'], $this->options['rows'] );
 	}
-
+	
 	/**
 	 * Get value
 	 *
-	 * @return mixed
+	 * @return	string|null
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$nullName = "{$this->name}_null";
-		if ( $this->options['nullLang'] !== NULL and isset( Request::i()->$nullName ) )
+		if ( $this->options['nullLang'] !== NULL and isset( \IPS\Request::i()->$nullName ) )
 		{
 			return NULL;
 		}
@@ -138,26 +111,26 @@ class TextArea extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	LengthException
+	 * @throws	\LengthException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		parent::validate();
 		
 		/* Tags are stored as an array so we can't do things like mb_strlen() against them */
-		if( is_array( $this->value ) )
+		if( \is_array( $this->value ) )
 		{
 			return TRUE;
 		}
 
 		if( $this->options['minLength'] !== NULL and mb_strlen( $this->value ) < $this->options['minLength'] )
 		{
-			throw new LengthException( Member::loggedIn()->language()->addToStack( 'form_minlength', FALSE, array( 'pluralize' => array( $this->options['minLength'] ) ) ) );
+			throw new \LengthException( \IPS\Member::loggedIn()->language()->addToStack( 'form_minlength', FALSE, array( 'pluralize' => array( $this->options['minLength'] ) ) ) );
 		}
 		if( $this->options['maxLength'] !== NULL and mb_strlen( $this->value ) > $this->options['maxLength'] )
 		{
-			throw new LengthException( Member::loggedIn()->language()->addToStack( 'form_maxlength', FALSE, array( 'pluralize' => array( $this->options['maxLength'] ) ) ) );
+			throw new \LengthException( \IPS\Member::loggedIn()->language()->addToStack( 'form_maxlength', FALSE, array( 'pluralize' => array( $this->options['maxLength'] ) ) ) );
 		}
 		
 		return TRUE;

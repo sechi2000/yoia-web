@@ -11,41 +11,29 @@
 namespace IPS\Text;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use HTMLPurifier_AttrDef_URI;
-use HTMLPurifier_Config;
-use HTMLPurifier_Context;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Http\Url\Exception as UrlException;
-use IPS\Http\Url\Friendly;
-use IPS\Http\Url\Internal;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * A HTMLPurifier Attribute Definition used for attributes which must be internal URLs
  */
-class HtmlPurifierInternalLinkDef extends HTMLPurifier_AttrDef_URI
+class _HtmlPurifierInternalLinkDef extends \HTMLPurifier_AttrDef_URI
 {
 	/**
 	 * @brief	Allowed bases
 	 */
-	protected ?array $allowedBases = NULL;
+	protected $allowedBases = NULL;
 	
 	/**
 	 * Constructor
 	 *
      * @param	bool		$embeds_resource		Does the URI here result in an extra HTTP request?
-     * @param array|null $allowedBases			If an array is provided, only URLs with the query strings set allowed - for example array( array( 'app' => 'core', 'module' => 'members', 'controller' => 'profile' ) ) will only allow URLs to profiles. If NULL, any internal URL beside the open proxy and attachment downloads is allowed
+     * @param	array|null	$allowedBases			If an array is provided, only URLs with the query strings set allowed - for example array( array( 'app' => 'core', 'module' => 'members', 'controller' => 'profile' ) ) will only allow URLs to profiles. If NULL, any internal URL beside the open proxy and attachment downloads is allowed
      */
-    public function __construct( bool $embeds_resource=FALSE, array $allowedBases = NULL )
+    public function __construct( $embeds_resource = false, $allowedBases = NULL )
     {
 	    $this->allowedBases = $allowedBases;
         return parent::__construct( $embeds_resource );
@@ -55,24 +43,24 @@ class HtmlPurifierInternalLinkDef extends HTMLPurifier_AttrDef_URI
 	 * Validate
 	 * 
      * @param	string					$uri
-     * @param	HTMLPurifier_Config	$config
-     * @param	HTMLPurifier_Context	$context
+     * @param	\HTMLPurifier_Config	$config
+     * @param	\HTMLPurifier_Context	$context
      * @return	bool|string
      */
-    public function validate($uri, $config, $context): bool|string
-	{
+    public function validate($uri, $config, $context)
+    {
 	    /* Create the URL */
-		try
-		{
-			$url = Url::createFromString( str_replace( array( '%7B___base_url___%7D/', '{___base_url___}/' ), Settings::i()->base_url, $uri ) );
-		}
-		catch( UrlException $e )
+	    try
+	    {
+		    $url = \IPS\Http\Url::createFromString( str_replace( array( '%7B___base_url___%7D/', '{___base_url___}/' ), \IPS\Settings::i()->base_url, $uri ) );
+	    }
+		catch( \IPS\Http\Url\Exception $e )
 		{
 			return FALSE;
 		}
-
+	    
 	    /* If it's not internal, we can stop now */
-	    if ( !( $url instanceof Internal ) )
+	    if ( !( $url instanceof \IPS\Http\Url\Internal ) )
 	    {
 		    return FALSE;
 	    }
@@ -81,7 +69,7 @@ class HtmlPurifierInternalLinkDef extends HTMLPurifier_AttrDef_URI
 	    if ( $this->allowedBases )
 	    {
 		    $isOkay = FALSE;
-		    $queryString = ( $url instanceof Friendly ) ? ( $url->hiddenQueryString + $url->queryString ) : $url->queryString;
+		    $queryString = ( $url instanceof \IPS\Http\Url\Friendly ) ? ( $url->hiddenQueryString + $url->queryString ) : $url->queryString;
 		    
 		    foreach ( $this->allowedBases as $requiredQueryString )
 		    {
@@ -129,15 +117,15 @@ class HtmlPurifierInternalLinkDef extends HTMLPurifier_AttrDef_URI
     /**
      * @brief	Uploaded file base URLs (i.e. URL to uploads directory)
      */
-    protected static ?array $uploadUrls	= NULL;
+    protected static $uploadUrls	= NULL;
 
-	/**
-	 * Fetch and cache upload URLs
-	 *
-	 * @return array|null
-	 */
-    protected static function getUploadUrls(): ?array
-	{
+    /**
+     * Fetch and cache upload URLs
+     *
+     * @return	array
+     */
+    protected static function getUploadUrls()
+    {
     	if( static::$uploadUrls !== NULL )
     	{
     		return static::$uploadUrls;
@@ -145,15 +133,15 @@ class HtmlPurifierInternalLinkDef extends HTMLPurifier_AttrDef_URI
 
     	static::$uploadUrls	= array();
 
-		foreach( File::getStore() as $configuration )
+		foreach( \IPS\File::getStore() as $configuration )
 		{
-			$class = File::getClass( $configuration['id'] );
+			$class = \IPS\File::getClass( $configuration['id'] );
 
 			if( $class->baseUrl() !== NULL )
 			{
-				$url = new Url( $class->baseUrl() );
+				$url = new \IPS\Http\Url( $class->baseUrl() );
 
-				if( $url instanceof Internal )
+				if( $url instanceof \IPS\Http\Url\Internal )
 				{
 					static::$uploadUrls[ $class->baseUrl() ]	= $class->baseUrl();
 				}

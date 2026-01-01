@@ -11,15 +11,9 @@
 namespace IPS\Node;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -31,24 +25,24 @@ trait Colorize
 	/**
 	 * @brief	Table column name that holds the feature color hex
 	 */
-	public static string $featureColumnName = 'feature_color';
+	public static $featureColumnName = 'feature_color';
 	
 	/**
 	 * @brief	Cache the calculated formatted title for this node
 	 */
-	protected ?string $formattedTitle = NULL;
+	protected $formattedTitle = NULL;
 	
 	/**
 	 * @brief	Cache the formatted text colour for this node
 	 */
-	protected ?string $featureTextColor = NULL;
+	protected $featureTextColor = NULL;
 	
 	/**
 	 * Get HTML formatted title. Allows apps or nodes to format the title, such as adding different colours, etc
 	 *
 	 * @return	string
 	 */
-	public function get__formattedTitle(): string
+	public function get__formattedTitle()
 	{
 		if ( $this->formattedTitle === NULL )
 		{
@@ -60,30 +54,19 @@ trait Colorize
 			}
 			else
 			{
-		        $this->formattedTitle = Theme::i()->getTemplate( 'global', 'core', 'front' )->formattedTitle( $this );
+		        $this->formattedTitle = \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->formattedTitle( $this );
 			}
 		}
 		
 		return $this->formattedTitle;
 	}
-
-	/**
-	 * Get the featured color for use in CSS
-	 *
-	 * @return	string|null
-	 */
-	public function get__featureColor(): ?string
-	{
-		$columnName = static::$featureColumnName;
-		return $this->$columnName;
-	}
-
+	
 	/**
 	 * Get the featured text color for use in CSS
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function get__featureTextColor(): ?string
+	public function get__featureTextColor()
 	{
 		if ( $this->featureTextColor === NULL )
 		{
@@ -100,27 +83,26 @@ trait Colorize
 		
 		return $this->featureTextColor;
 	}
-
+	
 	/**
 	 * Static method to fetch the text colour based on the the contrast from the background color
 	 *
-	 * @param $featureColor
-	 * @return    string
+	 * @return	string
 	 */
-	public static function featureTextColor( $featureColor ): string
+	public static function featureTextColor( $featureColor )
 	{
 		$hexColor = str_replace( '#', '', $featureColor );
 		$blackColor = '000000';
 		$textColor = '#ffffff';
 		
 		/* Use luminosity contrast algorithm to determine font color */
-		$r1 = hexdec( substr( $hexColor, 0, 2 ) );
-        $g1 = hexdec( substr( $hexColor, 2, 2 ) );
-        $b1 = hexdec( substr( $hexColor, 4, 2 ) );
+		$r1 = hexdec( \substr( $hexColor, 0, 2 ) );
+        $g1 = hexdec( \substr( $hexColor, 2, 2 ) );
+        $b1 = hexdec( \substr( $hexColor, 4, 2 ) );
 
-        $r2 = hexdec( substr( $blackColor, 0, 2 ) );
-        $g2 = hexdec( substr( $blackColor, 2, 2 ) );
-        $b2 = hexdec( substr( $blackColor, 4, 2 ) );
+        $r2 = hexdec( \substr( $blackColor, 0, 2 ) );
+        $g2 = hexdec( \substr( $blackColor, 2, 2 ) );
+        $b2 = hexdec( \substr( $blackColor, 4, 2 ) );
 
         $l1 = 0.2126 * pow( $r1 / 255, 2.2 ) + 0.7152 * pow( $g1 / 255, 2.2 ) + 0.0722 * pow( $b1 / 255, 2.2 );
         $l2 = 0.2126 * pow( $r2 / 255, 2.2 ) + 0.7152 * pow( $g2 / 255, 2.2 ) + 0.0722 * pow( $b2 / 255, 2.2 );
@@ -151,9 +133,9 @@ trait Colorize
 	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
 	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
 	 * @param	bool		$escape			If the title should be escaped for HTML output. If FALSE, the feature color will not be used, because that requires HTML output
-	 * @return	mixed
+	 * @return	\IPS\Http\Url
 	 */
-	public static function titleFromIndexData(array $indexData, array $itemData, ?array $containerData, bool $escape = TRUE ): mixed
+	public static function titleFromIndexData( $indexData, $itemData, $containerData, $escape = TRUE )
 	{
 		if ( !$escape or !isset( $containerData[ static::$databasePrefix . static::$featureColumnName ] ) )
 		{
@@ -161,17 +143,17 @@ trait Colorize
 		}
 		
 		$node = $containerData;
-		$node['title'] = Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $indexData['index_container_id'], 'NULL', array( 'escape' => true ) );
+		$node['title'] = \IPS\Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $indexData['index_container_id'], 'NULL', array( 'escape' => true ) );
 		$node['text_color'] = static::featureTextColor( $node[ static::$databasePrefix . static::$featureColumnName ] );
 		
 		/* Normalize */
 		$node['feature_color'] = $node[ static::$databasePrefix . static::$featureColumnName ];
 		
-		$title = Theme::i()->getTemplate( 'global', 'core', 'front' )->formattedTitle( $node );
+		$title = \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->formattedTitle( $node );
 		
 		if ( $indexData['index_club_id'] and isset( $containerData['_club'] ) )
 		{
-			return Member::loggedIn()->language()->addToStack( 'club_container_title', FALSE, array( 'sprintf' => array( $containerData['_club']['name'] ), 'htmlsprintf' => array( $title ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'club_container_title', FALSE, array( 'sprintf' => array( $containerData['_club']['name'] ), 'htmlsprintf' => array( $title ) ) );
 		}
 		else
 		{

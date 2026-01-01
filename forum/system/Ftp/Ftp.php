@@ -11,47 +11,41 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use FTP\Connection;
-use IPS\Ftp\Exception;
-use function defined;
-use function function_exists;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * FTP Class
  */
-class Ftp
+class _Ftp
 {
 	/**
 	 * @brief	Connection resource
 	 */
-	protected ?Connection $ftp = null;
+	protected $ftp;
 
 	/**
 	 * Constructor
 	 *
-	 * @param string $host		Hostname
-	 * @param string $username	Username
-	 * @param string $password	Password
-	 * @param int $port		Port
-	 * @param bool $secure		Use secure SSL-FTP connection?
-	 * @param int $timeout	Timeout (in seconds)
+	 * @param	string	$host		Hostname
+	 * @param	string	$username	Username
+	 * @param	string	$password	Password
+	 * @param	int		$port		Port
+	 * @param	bool	$secure		Use secure SSL-FTP connection?
+	 * @param	int		$timeout	Timeout (in seconds)
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function __construct( string $host, string $username, string $password, int $port=21, bool $secure = false, int $timeout=10 )
+	public function __construct( $host, $username, $password, $port=21, $secure=FALSE, $timeout=10 )
 	{
 		if ( $secure )
 		{
-			if( !function_exists('ftp_ssl_connect') )
+			if( !\function_exists('ftp_ssl_connect') )
 			{
-				throw new Exception( 'SSL_NOT_AVAILABLE' );
+				throw new \IPS\Ftp\Exception( 'SSL_NOT_AVAILABLE' );
 			}
 
 			$this->ftp = @ftp_ssl_connect( $host, $port, $timeout );
@@ -63,11 +57,11 @@ class Ftp
 		
 		if ( $this->ftp === FALSE )
 		{
-			throw new Exception( 'COULD_NOT_CONNECT' );
+			throw new \IPS\Ftp\Exception( 'COULD_NOT_CONNECT' );
 		}
 		if ( !@ftp_login( $this->ftp, $username, $password ) )
 		{
-			throw new Exception( 'COULD_NOT_LOGIN' );
+			throw new \IPS\Ftp\Exception( 'COULD_NOT_LOGIN' );
 		}
 
 		/* Typically if passive mode is required, ftp_nlist will return FALSE instead of an array */
@@ -93,15 +87,15 @@ class Ftp
 	/**
 	 * chdir
 	 *
-	 * @param string $dir	Directory
+	 * @param	string	$dir	Directory
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function chdir( string $dir ) : void
+	public function chdir( $dir )
 	{
 		if ( !@ftp_chdir( $this->ftp, $dir ) )
 		{
-			throw new Exception( 'COULD_NOT_CHDIR' );
+			throw new \IPS\Ftp\Exception( 'COULD_NOT_CHDIR' );
 		}
 	}
 	
@@ -109,38 +103,38 @@ class Ftp
 	 * cdup
 	 *
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function cdup() : void
+	public function cdup()
 	{
 		if ( !@ftp_cdup( $this->ftp ) )
 		{
-			throw new Exception( 'COULD_NOT_CDUP' );
+			throw new \IPS\Ftp\Exception( 'COULD_NOT_CDUP' );
 		}
 	}
 	
 	/**
 	 * mkdir
 	 *
-	 * @param string $dir	Directory
+	 * @param	string	$dir	Directory
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function mkdir( string $dir ) : void
+	public function mkdir( $dir )
 	{
 		if ( !@ftp_mkdir( $this->ftp, $dir ) )
 		{
-			throw new Exception( 'COULD_NOT_MKDIR' );
+			throw new \IPS\Ftp\Exception( 'COULD_NOT_MKDIR' );
 		}
 	}
 	
 	/**
 	 * ls
 	 *
-	 * @param string $path	Argument to pass to ftp_nlist
+	 * @param	string	$path	Argument to pass to ftp_nlist
 	 * @return	array|bool
 	 */
-	public function ls( string $path = '.' ): bool|array
+	public function ls( $path = '.' )
 	{
 		return ftp_nlist( $this->ftp, $path );
 	}
@@ -148,11 +142,11 @@ class Ftp
 	/**
 	 * Raw list
 	 *
-	 * @param string $path		Argument to pass to ftp_nlist
-	 * @param bool $recursive	Whether or not to list recursively
+	 * @param	string	$path		Argument to pass to ftp_nlist
+	 * @param	bool	$recursive	Whether or not to list recursively
 	 * @return	array
 	 */
-	public function rawList( string $path = '.', bool $recursive = false ): array
+	public function rawList( $path = '.', $recursive = FALSE )
 	{
 		return ftp_rawlist( $this->ftp, $path, $recursive );
 	}
@@ -160,40 +154,40 @@ class Ftp
 	/**
 	 * Upload File
 	 *
-	 * @param string $filename	Filename to use
-	 * @param string $file		Path to local file
+	 * @param	string	$filename	Filename to use
+	 * @param	string	$file		Path to local file
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function upload( string $filename, string $file ) : void
+	public function upload( $filename, $file )
 	{
 		if ( !@ftp_put( $this->ftp, $filename, $file, FTP_BINARY ) )
 		{
-			throw new Exception( 'COULD_NOT_UPLOAD' );
+			throw new \IPS\Ftp\Exception( 'COULD_NOT_UPLOAD' );
 		}
 	}
 	
 	/**
 	 * Download File
 	 *
-	 * @param string $filename	The file to download
-	 * @param string|null $target		Location to save downloaded file or NULL to return contents
-	 * @param bool $returnPath	Return the path to the downloaded file instead of the contents
-	 * @return	string|null		File contents
-	 * @throws	Exception
+	 * @param	string		$filename	The file to download
+	 * @param	string|null	$target		Location to save downloaded file or NULL to return contents
+	 * @param	bool		$returnPath	Return the path to the downloaded file instead of the contents
+	 * @return	string		File contents
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function download( string $filename, ?string $target=NULL, bool $returnPath = false ): ?string
+	public function download( $filename, $target=NULL, $returnPath=FALSE )
 	{
 		$temp = FALSE;
 		if ( $target === NULL )
 		{
 			$temp = TRUE;
-			$target = tempnam( TEMP_DIRECTORY, 'IPS' );
+			$target = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
 		}
 		
 		if ( !@ftp_get( $this->ftp, $target, $filename, FTP_BINARY ) )
 		{
-			throw new Exception( 'COULD_NOT_DOWNLOAD' );
+			throw new \IPS\Ftp\Exception( 'COULD_NOT_DOWNLOAD' );
 		}
 
 		/* We use this to avoid out of memory errors - just return path */
@@ -215,41 +209,41 @@ class Ftp
 	/**
 	 * CHMOD
 	 * 
-	 * @param string $filename	The file to CHMOD
-	 * @param int $mode		Mode (in octal form)
-	 * @return	void
+	 * @param	string		$filename	The file to CHMOD
+	 * @param	int			$mode		Mode (in octal form)
+	 * @return	@e void
 	 * @throws	Exception	CHMOD_ERROR
 	 */
-	public function chmod( string $filename, int $mode ) : void
+	public function chmod( $filename, $mode )
 	{
 		if( !@ftp_chmod( $this->ftp, $mode, $filename ) )
 		{
-			throw new Exception( 'CHMOD_ERROR' );
+			throw new \IPS\Ftp\Exception( 'CHMOD_ERROR' );
 		}
 	}
 	
 	/**
 	 * Delete file
 	 *
-	 * @param string $file		Path to file
+	 * @param	string	$file		Path to file
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function delete( string $file ) : void
+	public function delete( $file )
 	{
 		if ( !@ftp_delete( $this->ftp, $file ) )
 		{
-			throw new Exception( 'COULD_NOT_DELETE' );
+			throw new \IPS\Ftp\Exception( 'COULD_NOT_DELETE' );
 		}
 	}
 
 	/**
 	 * Get file size (if possible)
 	 *
-	 * @param string $file		Path to file
-	 * @return	float|int
+	 * @param	string	$file		Path to file
+	 * @return	float
 	 */
-	public function size( string $file ): float|int
+	public function size( $file )
 	{
 		$size = @ftp_size( $this->ftp, $file );
 
@@ -271,12 +265,12 @@ class Ftp
 	/**
 	 * Delete directory
 	 *
-	 * @param string $dir		Path to directory
-	 * @param bool $recursive	Recursive? (If FALSE and directory is not empty, operation will fail)
+	 * @param	string	$dir		Path to directory
+	 * @param	bool	$recursive	Recursive? (If FALSE and directory is not empty, operation will fail)
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Ftp\Exception
 	 */
-	public function rmdir( string $dir, bool $recursive=FALSE ) : void
+	public function rmdir( $dir, $recursive=FALSE )
 	{	
 		if ( $recursive )
 		{
@@ -288,7 +282,7 @@ class Ftp
 				{
 					if ( $matches[1] === 'd' )
 					{
-						$this->rmdir($matches[2], TRUE);
+						$this->rmdir( $matches[2], TRUE );
 					}
 					else
 					{
@@ -301,7 +295,7 @@ class Ftp
 				
 		if ( !@ftp_rmdir( $this->ftp, $dir ) )
 		{
-			throw new Exception( 'COULD_NOT_DELETE' );
+			throw new \IPS\Ftp\Exception( 'COULD_NOT_DELETE' );
 		}
 	}
 }

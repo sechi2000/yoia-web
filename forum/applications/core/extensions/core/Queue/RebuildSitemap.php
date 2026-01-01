@@ -11,26 +11,16 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Extensions\QueueAbstract;
-use IPS\Log;
-use IPS\Member;
-use IPS\Sitemap;
-use OutOfRangeException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class RebuildSitemap extends QueueAbstract
+class _RebuildSitemap
 {
 
 	/**
@@ -42,7 +32,7 @@ class RebuildSitemap extends QueueAbstract
 	protected function getExtension( $data )
 	{
 	    /* Get all sitemap extensions and use the guest object for access permissions */
-		$extensions	= Application::allExtensions( 'core', 'Sitemap', new Member, 'core' );
+		$extensions	= \IPS\Application::allExtensions( 'core', 'Sitemap', new \IPS\Member, 'core' );
 		if ( isset( $extensions[ $data[ 'extensionKey'] ] ) )
 		{
 			return $extensions[ $data[ 'extensionKey' ] ];
@@ -54,11 +44,11 @@ class RebuildSitemap extends QueueAbstract
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
-		Log::debug( "Getting preQueueData for " . $data[ 'extensionKey'], 'rebuildSitemap' );
+		\IPS\Log::debug( "Getting preQueueData for " . $data[ 'extensionKey'], 'rebuildSitemap' );
 
 		$extension = $this->getExtension( $data );
 		if ( !$extension )
@@ -67,7 +57,7 @@ class RebuildSitemap extends QueueAbstract
 		}
 
 		$files = $extension->getFilenames();
-		$data['count'] = count( $files );
+		$data['count'] = \count( $files );
 
 		if( $data['count'] == 0 )
 		{
@@ -86,7 +76,7 @@ class RebuildSitemap extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ): int
+	public function run( $data, $offset )
 	{
 	    if ( $offset >= $data['count'] )
         {
@@ -97,7 +87,7 @@ class RebuildSitemap extends QueueAbstract
 
         if ( !$extension )
         {
-			Log::log( "Trying to build sitemap for not existing class " . $data[ 'extensionKey'], 'rebuildSitemapError' );
+			\IPS\Log::log( "Trying to build sitemap for not existing class " . $data[ 'extensionKey'], 'rebuildSitemapError' );
             throw new \IPS\Task\Queue\OutOfRangeException;
         }
 
@@ -111,9 +101,11 @@ class RebuildSitemap extends QueueAbstract
 
 		$name = $filenames[$offset];
 
-		$sitemap = new Sitemap;
+		$sitemap = new \IPS\Sitemap;
 		$extension->generateSitemap( $name, $sitemap );
-		return $offset + 1;
+		$lastId = $offset + 1;
+
+		return $lastId;
 	}
 	
 	/**
@@ -122,9 +114,9 @@ class RebuildSitemap extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 	    /* We need to load the extension to load the dynamic langstrings */
         $extension = $this->getExtension( $data );
@@ -132,7 +124,7 @@ class RebuildSitemap extends QueueAbstract
         /* Was the application probably uninstalled? */
         if ( !$extension )
         {
-            throw new OutOfRangeException;
+            throw new \OutOfRangeException;
         }
 
         /* If this is a content class Sitemap Extension, we can use the class to build the title */
@@ -140,14 +132,14 @@ class RebuildSitemap extends QueueAbstract
         {
             $class  = $extension->class;
             $key = 'sitemap_core_Content_' . mb_substr( str_replace( '\\', '_', $class ), 4 ) ;
-            Member::loggedIn()->language()->words[ $key ] = Member::loggedIn()->language()->addToStack( $class::$title . '_pl', FALSE );
+            \IPS\Member::loggedIn()->language()->words[ $key ] = \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl', FALSE );
         }
         else
         {
            $key = 'sitemap_' . $data[ 'extensionKey' ];
         }
 
-        return array( 'text' => Member::loggedIn()->language()->addToStack( 'rebuilding_sitemap_stuff', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( $key ) ) ) ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $offset, 2 ) ) : 100 );
+        return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'rebuilding_sitemap_stuff', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $key ) ) ) ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $offset, 2 ) ) : 100 );
 	}
 
 }

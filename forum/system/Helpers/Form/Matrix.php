@@ -11,25 +11,9 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Helpers\Form;
-use IPS\IPS;
-use IPS\Login;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use Throwable;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_object;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -62,95 +46,95 @@ if ( $values = $matrix->values() )
 \IPS\Output::i()->output = $matrix;
  * @endcode
  */
-class Matrix extends Form
+class _Matrix extends \IPS\Helpers\Form
 {
 	/**
 	 * @brief	Input Elements array
 	 */
-	public array $elements = array();
+	public $elements = NULL;
 	
 	/**
 	 * @brief	Columns array
 	 */
-	public array $columns = array();
+	public $columns = array();
 	
 	/**
 	 * @brief	Widths
 	 */
-	public array $widths = array();
+	public $widths = array();
 	
 	/**
 	 * @brief	Columns to have "check all" checkboxes
 	 */
-	public array $checkAlls = array();
+	public $checkAlls = array();
 	
 	/**
 	 * @brief	Should rows have all/none toggles?
 	 */
-	public bool $checkAllRows = FALSE;
+	public $checkAllRows = FALSE;
 	
 	/**
 	 * @brief	Rows array
 	 */
-	public array $rows = array();
+	public $rows = array();
 	
 	/**
 	 * @brief	Manageable? (Rows can be added and deleted)
 	 */
-	public bool $manageable = TRUE;
+	public $manageable = TRUE;
 	
 	/**
 	 * @brief	Sortable?
 	 */
-	public bool $sortable = FALSE;
+	public $sortable = FALSE;
 
 	/**
 	 * @brief	Squash fields? (values in the matrix are json_encode'd as a single value to get around max_post_vars limits)
 	 */
-	public bool $squashFields = TRUE;
+	public $squashFields = TRUE;
 	
 	/**
 	 * @brief	Added rows
-	 * @see        Matrix::values
+	 * @see		\IPS\Helpers\Form\Matrix::values
 	 */
-	public array $addedRows = array();
+	public $addedRows = array();
 	
 	/**
 	 * @brief	Changed rows
-	 * @see        Matrix::values
+	 * @see		\IPS\Helpers\Form\Matrix::values
 	 */
-	public array $changedRows = array();
+	public $changedRows = array();
 	
 	/**
 	 * @brief	Removed rows
-	 * @see        Matrix::elements
+	 * @see		\IPS\Helpers\Form\Matrix::elements
 	 */
-	public array $removedRows = array();
+	public $removedRows = array();
 	
 	/**
 	 * @brief	Prefix to add to the language keys used for column headers
 	 */
-	public string $langPrefix = '';
+	public $langPrefix = '';
 
 	/**
 	 * @brief	Classnames to add to the table within the matrix
 	 */
-	public array $classes = array();
+	public $classes = array();
 
 	/**
 	 * @brief	Show tooltips in each cell?
 	 */
-	public bool $showTooltips = FALSE;
+	public $showTooltips = FALSE;
 
 	/**
-	 * @brief	Form ID, Set if Matrix is part of a form
+	 * @brief	Form Id, Set it Matrix is part of a form
 	 */
-	public ?string $formId = NULL;
+	public $formId = NULL;
 
 	/**
 	 * @brief Determines whether the Row Titles are processed as raw html instead of a language string. Not needed if $langPrefix is set
 	 */
-	public bool $styledRowTitle = FALSE;
+	public $styledRowTitle = FALSE;
 	
 	/**
 	 * Get HTML
@@ -161,12 +145,15 @@ class Matrix extends Form
 	{
 		try
 		{			
-			return Theme::i()->getTemplate( 'forms', 'core', 'global' )->matrix( $this->id, array_keys( $this->columns ), $this->elements(), $this->action, $this->hiddenValues, $this->actionButtons, $this->langPrefix, $this->calculateWidths(), $this->manageable, $this->checkAlls, $this->checkAllRows, $this->classes, $this->showTooltips, $this->squashFields, $this->sortable, $this->styledRowTitle );
+			return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->matrix( $this->id, array_keys( $this->columns ), $this->elements(), $this->action, $this->hiddenValues, $this->actionButtons, $this->langPrefix, $this->calculateWidths(), $this->manageable, $this->checkAlls, $this->checkAllRows, $this->classes, $this->showTooltips, $this->squashFields, $this->sortable, $this->styledRowTitle );
 		}
-		catch ( Exception|Throwable $e )
+		catch ( \Exception $e )
 		{
-			IPS::exceptionHandler( $e );
-			return '';
+			\IPS\IPS::exceptionHandler( $e );
+		}
+		catch ( \Throwable $e )
+		{
+			\IPS\IPS::exceptionHandler( $e );
 		}
 	}
 	
@@ -175,9 +162,9 @@ class Matrix extends Form
 	 *
 	 * @return	string
 	 */
-	public function nested(): string
+	public function nested()
 	{		
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->matrixNested( $this->id, array_keys( $this->columns ), $this->elements(), $this->action, $this->hiddenValues, $this->actionButtons, $this->langPrefix, $this->calculateWidths(), $this->manageable, $this->checkAlls, $this->checkAllRows, $this->classes, $this->showTooltips, $this->squashFields, $this->sortable, $this->styledRowTitle );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->matrixNested( $this->id, array_keys( $this->columns ), $this->elements(), $this->action, $this->hiddenValues, $this->actionButtons, $this->langPrefix, $this->calculateWidths(), $this->manageable, $this->checkAlls, $this->checkAllRows, $this->classes, $this->showTooltips, $this->squashFields, $this->sortable, $this->styledRowTitle );
 	}
 	
 	/**
@@ -185,10 +172,10 @@ class Matrix extends Form
 	 *
 	 * @return	array
 	 */
-	protected function calculateWidths(): array
+	protected function calculateWidths()
 	{
 		$widths = $this->widths;
-		$width = ( ( 100 - array_sum( $this->widths ) ) / count( $this->columns ) );
+		$width = ( ( 100 - array_sum( $this->widths ) ) / \count( $this->columns ) );
 		foreach ( array_keys( $this->columns ) as $c )
 		{
 			if ( !isset( $widths[ $c ] ) )
@@ -199,22 +186,22 @@ class Matrix extends Form
 				
 		return $widths;
 	}
-
+	
 	/**
 	 * Get elements
 	 *
-	 * @param bool $getValues Get values?
-	 * @return array|null
+	 * @param	bool	$getValues	Get values?
+	 * @return	array
 	 */
-	public function elements( bool $getValues=TRUE ): ?array
+	public function elements( $getValues=TRUE )
 	{
-		if( !count( $this->elements ) )
+		if ( $this->elements === NULL )
 		{
 			/* Stuff about our form */
 			$name = "{$this->id}_submitted";
 			$formName = $this->formId ? "{$this->formId}_submitted" : NULL;
 			$matrixName = "{$this->id}_matrixRows";
-			$matrixValues = Request::i()->$matrixName;
+			$matrixValues = \IPS\Request::i()->$matrixName;
 
 			/* Loop our defined rows */
 			$this->elements = array();
@@ -222,7 +209,7 @@ class Matrix extends Form
 			{
 				/* Have we deleted this row? */
 				$deleteKey = "{$rowId}_delete";
-				if ( $this->manageable and ( isset( Request::i()->$name ) or ( $formName and isset( Request::i()->$formName ) ) ) and ( isset( Request::i()->$deleteKey ) or !isset( $matrixValues[ $rowId ] ) or !$matrixValues[ $rowId ] ) )
+				if ( $this->manageable and ( isset( \IPS\Request::i()->$name ) or ( $formName and isset( \IPS\Request::i()->$formName ) ) ) and ( isset( \IPS\Request::i()->$deleteKey ) or !isset( $matrixValues[ $rowId ] ) or !$matrixValues[ $rowId ] ) )
 				{
 					$this->removedRows[] = $rowId;
 					continue;
@@ -239,10 +226,10 @@ class Matrix extends Form
 			}
 						
 			/* Look for added ones */
-			if ( isset( Request::i()->_new_ ) )
+			if ( isset( \IPS\Request::i()->_new_ ) )
 			{
 				$i = 1;
-				foreach ( Request::i()->_new_ as $newId => $data )
+				foreach ( \IPS\Request::i()->_new_ as $newId => $data )
 				{
 					$added = TRUE;
 					if ( $newId === 'x_unlimited' )
@@ -265,11 +252,11 @@ class Matrix extends Form
 					if ( $added )
 					{
 						/* Select lists can have user-supplied input, so look for that too */
-						foreach( Request::i() as $inputKey => $inputValue )
+						foreach( \IPS\Request::i() as $inputKey => $inputValue )
 						{
 							if( $pos = mb_strpos( $inputKey, '_new_' ) AND $inputKey !== '_new_' )
 							{
-								if( is_array( $inputValue ) AND isset( $inputValue[ $newId ] ) )
+								if( \is_array( $inputValue ) AND isset( $inputValue[ $newId ] ) )
 								{
 									/* @note This previously used an array_merge() however this was causing elements to be overwritten with a blank value in some cases */
 									foreach( $inputValue[ $newId ] AS $key => $value )
@@ -300,12 +287,12 @@ class Matrix extends Form
 			if ( $this->sortable )
 			{
 				$matrixOrderName = "{$this->id}_matrixOrder";
-				if  ( isset( Request::i()->$matrixOrderName ) )
+				if  ( isset( \IPS\Request::i()->$matrixOrderName ) )
 				{
-					$matrixOrderValues = Request::i()->$matrixOrderName;
+					$matrixOrderValues = \IPS\Request::i()->$matrixOrderName;
 					
 					uksort( $this->elements, function( $a, $b ) use ( $matrixOrderValues ) {
-						if ( in_array( $a, $matrixOrderValues ) and in_array( $b, $matrixOrderValues ) )
+						if ( \in_array( $a, $matrixOrderValues ) and \in_array( $b, $matrixOrderValues ) )
 						{
 							return array_search( $a, $matrixOrderValues ) - array_search( $b, $matrixOrderValues );
 						}
@@ -317,18 +304,18 @@ class Matrix extends Form
 
 		return $this->elements;
 	}
-
+	
 	/**
 	 * Build Row
 	 *
-	 * @param mixed $rowId Row identifier
-	 * @param mixed $data Values
-	 * @return array|string
+	 * @param	mixed	$rowId	Row identifier
+	 * @param	array	$data	Values
+	 * @return	array
 	 */
-	protected function buildRow( mixed $rowId, mixed $data ): array|string
+	protected function buildRow( $rowId, $data )
 	{
 		$row = array();
-		if ( is_string( $data ) )
+		if ( \is_string( $data ) )
 		{
 			return $data;
 		}
@@ -337,20 +324,20 @@ class Matrix extends Form
 			$inputName = "{$rowId}[{$columnName}]";
 				
 			/* Create using array */
-			if ( is_array( $columnData ) )
+			if ( \is_array( $columnData ) )
 			{
 				$classname = '\IPS\Helpers\Form\\' . $columnData[0];
 				$row[ $columnName ] = new $classname(
 					$inputName,
-					$data[$columnName] ?? ( $columnData[1] ?? NULL ),
-					$columnData[2] ?? FALSE,
-					$columnData[3] ?? array()
+					isset( $data[ $columnName ] ) ? $data[ $columnName ] : ( isset( $columnData[1] ) ? $columnData[1] : NULL ),
+					isset( $columnData[2] ) ? $columnData[2] : FALSE,
+					isset( $columnData[3] ) ? $columnData[3] : array()
 					);
 			}
 			/* Create using callback function */
 			else
 			{
-				$row[ $columnName ] = $columnData( $inputName, $data[$columnName] ?? NULL, $data );
+				$row[ $columnName ] = $columnData( $inputName, isset( $data[ $columnName ] ) ? $data[ $columnName ] : NULL, $data );
 			}
 		}
 		if ( isset( $data['_level'] ) )
@@ -364,42 +351,42 @@ class Matrix extends Form
 	/**
 	 * Get submitted values
 	 *
-	 * @param bool $stringValues	If true, wil not check if form was submitted (used for nested matrixes)
+	 * @param	bool			$force	If true, wil not check if form was submitted (used for nested matrixes)
 	 * @return	array|FALSE		Array of field values or FALSE if the form has not been submitted or if there were validation errors
 	 */
-	public function values( bool $stringValues=FALSE ): array|false
+	public function values( $force=FALSE )
 	{
 		$values = array();
 				
 		$name = "{$this->id}_submitted";		
-		if( $stringValues or ( isset( Request::i()->$name ) and Login::compareHashes( Session::i()->csrfKey, (string) Request::i()->csrfKey ) ) )
+		if( $force or ( isset( \IPS\Request::i()->$name ) and \IPS\Login::compareHashes( (string) \IPS\Session::i()->csrfKey, (string) \IPS\Request::i()->csrfKey ) ) )
 		{
 			// Do we need to unsquash any values?
 			// Squashed values are json_encoded by javascript to prevent us exceeding max_post_vars
 			$squashedField = $this->id . '_squashed';
 			
 			// If 'squashedField' isn't in the request it might indicate the user didn't have JS enabled
-			if ( $this->squashFields && isset( Request::i()->$squashedField ) )
+			if ( $this->squashFields && isset( \IPS\Request::i()->$squashedField ) )
 			{
-				if ( isset( Request::i()->$squashedField ) )
+				if ( isset( \IPS\Request::i()->$squashedField ) )
 				{
-					$unsquashed = json_decode( Request::i()->$squashedField, TRUE );
+					$unsquashed = json_decode( \IPS\Request::i()->$squashedField, TRUE );
 					
 					foreach( $unsquashed as $key => $value )
 					{
-						Request::i()->$key = $value;
+						\IPS\Request::i()->$key = $value;
 					}
 				}
 			}
 
 			foreach ( $this->elements( FALSE ) as $rowId => $columns )
 			{
-				if ( is_array( $columns ) )
+				if ( \is_array( $columns ) )
 				{
 					foreach ( $columns as $columnName => $element )
 					{
 						/* If this was a ehader or something, skip it */
-						if ( !is_object( $element ) )
+						if ( !\is_object( $element ) )
 						{
 							continue;
 						}
@@ -411,7 +398,7 @@ class Matrix extends Form
 						}
 						
 						/* If the "check all" box was checked, set it to TRUE */
-						if ( $element instanceof Checkbox and isset( Request::i()->__all[ $columnName ] ) and ! $element->options['disabled'] )
+						if ( $element instanceof Checkbox and isset( \IPS\Request::i()->__all[ $columnName ] ) and ! $element->options['disabled'] )
 						{
 							$element->value = TRUE;
 						}
@@ -420,7 +407,7 @@ class Matrix extends Form
 						if ( isset( $element->options['unlimited'] ) )
 						{
 							$unlimitedKey = "{$rowId}[{$columnName}_unlimited]";
-							$value = Request::i()->valueFromArray( $unlimitedKey );
+							$value = \IPS\Request::i()->valueFromArray( $unlimitedKey );
 							if ( $value !== NULL )
 							{
 								$element->value = $value;
@@ -430,7 +417,7 @@ class Matrix extends Form
 						if ( isset( $element->options['nullLang'] ) )
 						{
 							$nullKey = "{$rowId}[{$columnName}_null]";
-							if ( $value = Request::i()->valueFromArray( $nullKey ) )
+							if ( $value = \IPS\Request::i()->valueFromArray( $nullKey ) )
 							{
 								$element->value = NULL;
 							}

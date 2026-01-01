@@ -13,12 +13,6 @@
 // e.g: /usr/bin/php /path/to/site/applications/core/interface/task/task.php abc1234 6
 // would execute task with ID 6
 
-use IPS\Application;
-use IPS\Log;
-use IPS\Settings;
-use IPS\Task;
-use const IPS\CIC;
-
 @header( "Cache-Control: no-cache, no-store, must-revalidate, max-age=0, s-maxage=0" );
 @header( "Expires: 0" );
 
@@ -30,8 +24,8 @@ if ( !isset( $_SERVER['argv'] ) )
 }
 
 /* Init Invision Community */
-define('READ_WRITE_SEPARATION', FALSE);
-define('REPORT_EXCEPTIONS', TRUE);
+\define('READ_WRITE_SEPARATION', FALSE);
+\define('REPORT_EXCEPTIONS', TRUE);
 
 $path = str_replace( 'interface/task/task.php', 'data/requirements.json', str_replace( '\\', '/', __FILE__ ) );
 
@@ -48,7 +42,7 @@ if( version_compare($phpVersion, $requirements['php']['required'] ) < 0 )
 
 require_once str_replace( 'applications/core/interface/task/task.php', 'init.php', str_replace( '\\', '/', __FILE__ ) );
 
-if ( !CIC and $_SERVER['argv'][1] !== Settings::i()->task_cron_key )
+if ( !\IPS\CIC and $_SERVER['argv'][1] !== \IPS\Settings::i()->task_cron_key )
 {
 	echo "Incorrect key\n";
 	exit;
@@ -58,30 +52,30 @@ if ( !CIC and $_SERVER['argv'][1] !== Settings::i()->task_cron_key )
 try
 {
 	/* Ensure applications set up correctly before task is executed. Pages, for example, needs to set up spl autoloaders first */
-	Application::applications();
+	\IPS\Application::applications();
 	
 	if( isset( $_SERVER['argv'][2] ) )
 	{
-		$task = Task::load( $_SERVER['argv'][2], ( is_numeric( $_SERVER['argv'][2] ) ) ? NULL : 'key' );
+		$task = \IPS\Task::load( $_SERVER['argv'][2], ( \is_numeric( $_SERVER['argv'][2] ) ) ? NULL : 'key' );
 
 		if ( !$task )
 		{
-			throw new OutOfRangeException( 'NO_TASK' );
+			throw new \OutOfRangeException( 'NO_TASK' );
 		}
 		
 		$task->runAndLog();
 	}
 	else
 	{
-		while( $task = Task::queued() )
+		while( $task = \IPS\Task::queued() )
 		{
 			$task->runAndLog();
 		}
 	}
 }
-catch (Exception $e )
+catch ( \Exception $e )
 {
-	Log::log( $e, 'uncaught_exception' );
+	\IPS\Log::log( $e, 'uncaught_exception' );
 	
 	echo "Exception:\n";
 	print_r( $e );

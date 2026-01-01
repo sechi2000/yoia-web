@@ -12,52 +12,36 @@
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Codemirror;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancement
  */
-class GoogleAnalytics extends CommunityEnhancementsAbstract
+class _GoogleAnalytics
 {
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= FALSE;
+	public $ips	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= TRUE;
+	public $hasOptions	= TRUE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "google_analytics.png";
+	public $icon	= "google_analytics.png";
 	
 	/**
 	 * Constructor
@@ -66,7 +50,7 @@ class GoogleAnalytics extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		$this->enabled = ( Settings::i()->ga_enabled and Settings::i()->ga_code );
+		$this->enabled = ( \IPS\Settings::i()->ga_enabled and \IPS\Settings::i()->ga_code );
 	}
 	
 	/**
@@ -74,44 +58,45 @@ class GoogleAnalytics extends CommunityEnhancementsAbstract
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
-		$form = new Form;
 		
-		$form->add( new YesNo( 'ga_enabled', Settings::i()->ga_enabled, FALSE, array(
-			'togglesOn' => [ 'ga_code' ]
-		) ) );
-		$form->add( new Codemirror( 'ga_code', Settings::i()->ga_code, null, array( 'height' => 150, 'codeModeAllowedLanguages' => [ 'html' ] ), function( $val ){
-			if( empty( $val ) and Request::i()->ga_enabled_checkbox )
+		$validation = function( $val ) {
+			if ( $val and !\IPS\Request::i()->ga_code )
 			{
-				throw new InvalidArgumentException('form_required');
+				throw new \DomainException('ga_code_required');
 			}
-		}, NULL, NULL, 'ga_code' ) );
+		};
 		
-		if( $form->values() )
+		$form = new \IPS\Helpers\Form;		
+		
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ga_enabled', \IPS\Settings::i()->ga_enabled, FALSE, array(), $validation ) );
+		$form->add( new \IPS\Helpers\Form\Codemirror( 'ga_code', \IPS\Settings::i()->ga_code, FALSE, array( 'height' => 150, 'mode' => 'javascript' ), NULL, NULL, NULL, 'ga_code' ) );	
+		
+		if ( $form->values() )
 		{
 			try
 			{
 				$form->saveAsSettings();
 
-				Output::i()->inlineMessage	= Member::loggedIn()->language()->addToStack('saved');
+				\IPS\Output::i()->inlineMessage	= \IPS\Member::loggedIn()->language()->addToStack('saved');
 			}
-			catch ( LogicException $e )
+			catch ( \LogicException $e )
 			{
 				$form->error = $e->getMessage();
 			}
 		}
 		
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'help'	=> array(
 				'title'		=> 'learn_more',
 				'icon'		=> 'question-circle',
-				'link'		=> Url::ips( 'docs/googleanalytics' ), //@todo
+				'link'		=> \IPS\Http\Url::ips( 'docs/googleanalytics' ), //@todo
 				'target'	=> '_blank'
 			),
 		);
 		
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_GoogleAnalytics', $form );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_GoogleAnalytics', $form );
 	}
 	
 	/**
@@ -119,24 +104,24 @@ class GoogleAnalytics extends CommunityEnhancementsAbstract
 	 *
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		if ( $enabled )
 		{
-			if ( Settings::i()->ga_code )
+			if ( \IPS\Settings::i()->ga_code )
 			{
-				Settings::i()->changeValues( array( 'ga_enabled' => 1 ) );
+				\IPS\Settings::i()->changeValues( array( 'ga_enabled' => 1 ) );
 			}
 			else
 			{
-				throw new DomainException;
+				throw new \DomainException;
 			}
 		}
 		else
 		{
-			Settings::i()->changeValues( array( 'ga_enabled' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'ga_enabled' => 0 ) );
 		}
 	}
 }

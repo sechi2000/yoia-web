@@ -10,21 +10,20 @@
  */
 
 namespace IPS\blog\api\GraphQL;
-use IPS\blog\api\GraphQL\Mutations\CreateEntry;
-use IPS\blog\api\GraphQL\Mutations\ReplyEntry;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * Blog mutationss GraphQL API
  */
-abstract class Mutation
+abstract class _Mutation
 {
     /**
      * Get the supported query types in this app
@@ -33,9 +32,10 @@ abstract class Mutation
      */
     public static function mutations(): array
     {
-        return [
-            'createEntry' => new CreateEntry(),
-            'replyEntry' => new ReplyEntry(),
+        $return = [
+            'createEntry' => new \IPS\blog\api\GraphQL\Mutations\CreateEntry(),
+            'replyEntry' => new \IPS\blog\api\GraphQL\Mutations\ReplyEntry(),
         ];
+        return $return;
     }
 }

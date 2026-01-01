@@ -11,38 +11,31 @@
 namespace IPS\core\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content\Reaction;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Reactions extends \IPS\core\Statistics\Chart
+class _Reactions extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_activitystats_reactions_type';
+	public $controller = 'core_activitystats_reactions_type';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$chart = new Database( $url, 'core_reputation_index', 'rep_date', '', array(
+		$chart = new \IPS\Helpers\Chart\Database( $url, 'core_reputation_index', 'rep_date', '', array( 
 				'isStacked'			=> FALSE,
 				'backgroundColor' 	=> '#ffffff',
 				'colors'			=> array( '#10967e', '#ea7963', '#de6470', '#6b9dde', '#b09be4', '#eec766', '#9fc973', '#e291bf', '#55c1a6', '#5fb9da' ),
@@ -60,7 +53,7 @@ class Reactions extends \IPS\core\Statistics\Chart
 		
 		$chart->groupBy = 'reaction';
 
-		foreach( Reaction::roots() as $reaction )
+		foreach( \IPS\Content\Reaction::roots() as $reaction )
 		{
 			$chart->addSeries( $reaction->_title, 'number', 'COUNT(*)', TRUE, $reaction->id );
 		}

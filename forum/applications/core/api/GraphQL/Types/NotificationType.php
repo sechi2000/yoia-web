@@ -12,23 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * NotificationType for GraphQL API
  */
-class NotificationType extends ObjectType
+class _NotificationType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -97,21 +97,21 @@ class NotificationType extends ObjectType
 						'type' => \IPS\core\Api\GraphQL\TypeRegistry::member(),
 						'description' => "Member that triggered this notification",
 						'resolve' => function ($notification) {
-							return $notification['data']['author'] ?? NULL;
+							return isset( $notification['data']['author'] ) ? $notification['data']['author'] : NULL;
 						}
 					],
 					'title' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Notification title",
 						'resolve' => function ($notification) {
-							return $notification['data']['title'] ?? NULL;
+							return isset( $notification['data']['title'] ) ? $notification['data']['title'] : NULL;
 						}
 					],
 					'content' => [
 						'type' => TypeRegistry::richText(),
 						'description' => "Notification content",
 						'resolve' => function ($notification) {
-							return $notification['data']['content'] ?? NULL;
+							return isset( $notification['data']['content'] ) ? $notification['data']['content'] : NULL;
 						}
 					],
 					'url' => [

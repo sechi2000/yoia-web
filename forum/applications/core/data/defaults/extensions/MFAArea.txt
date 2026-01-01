@@ -11,20 +11,17 @@
 
 namespace IPS\{app}\extensions\core\MFAArea;
 
-use IPS\Extensions\MFAAreaAbstract;
-use function defined;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Multi-Factor Authentication Area
  */
-class {class} extends MFAAreaAbstract
+class _{class}
 {
 	/**
 	 * Is this area available and should show in the ACP configuration?

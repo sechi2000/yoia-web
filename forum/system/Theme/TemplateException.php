@@ -11,50 +11,44 @@
 namespace IPS\Theme;
  
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Theme;
-use RuntimeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Exception Class
  */
-class TemplateException extends RuntimeException
+class _TemplateException extends \RuntimeException
 {
 	/**
 	 * @brief	Template data
 	 */
-	public array $template	= array( 'location' => NULL, 'group' => NULL, 'app' => NULL );
+	public $template	= array( 'location' => NULL, 'group' => NULL, 'app' => NULL );
 
 	/**
 	 * @brief	Theme
 	 */
-	public ?Theme $theme		= NULL;
+	public $theme		= NULL;
 
 	/**
 	 * Constructor
 	 *
-	 * @param string|null $message MySQL Error message
-	 * @param int $code MySQL Error Code
-	 * @param Exception|NULL $previous Previous Exception
-	 * @param array|null $template Template data (app, group, location)
-	 * @param Theme|null $theme Theme object
+	 * @param	string			$message	MySQL Error message
+	 * @param	int				$code		MySQL Error Code
+	 * @param	\Exception|NULL	$previous	Previous Exception
+	 * @param	array 			$template	Template data (app, group, location)
+	 * @param	\IPS\Theme		$theme		Theme object
+	 * @return	void
 	 */
-	public function __construct( ?string $message = null, int $code = 0, ?Exception $previous = null, ?array $template=NULL, ?Theme $theme=NULL )
+	public function __construct( $message = null, $code = 0, $previous = null, $template=NULL, $theme=NULL )
 	{
 		/* Store these for the extraLogData() method */
 		$this->template = $template;
 		$this->theme = $theme;
 				
-		parent::__construct( $message, $code, $previous );
+		return parent::__construct( $message, $code, $previous );
 	}
 
 	/**
@@ -62,19 +56,18 @@ class TemplateException extends RuntimeException
 	 *
 	 * @return	bool
 	 */
-	public function isThirdPartyError() : bool
+	public function isThirdPartyError()
 	{
-		/* Look for a custom template inserted via hookpoint */
+		/* Try to see if the template group has any modifications...if so, ignore the exception for reporting purposes */
 		try
 		{
-			return (bool) Db::i()->select( 'count(*)', 'core_theme_templates_custom', [
-				[ 'template_set_id=?', $this->theme->id ],
-				[ "template_hook_point LIKE CONCAT(?,'%')", ( $this->template['app'] . '/' . $this->template['location'] . '/' . $this->template['group'] . '/' ) ]
-			])->first();
+			return (bool) \IPS\Db::i()->select( 'COUNT(*)', 'core_theme_templates', array( 'template_set_id=? AND template_group=? AND template_location=? AND template_app=?', $this->theme->id, $this->template['group'], $this->template['location'], $this->template['app'] ) )->first();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return FALSE;
 		}
+		
+		return FALSE;
 	}
 }

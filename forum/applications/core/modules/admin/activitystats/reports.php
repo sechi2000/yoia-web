@@ -12,34 +12,25 @@
 namespace IPS\core\modules\admin\activitystats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * reports
  */
-class reports extends Controller
+class _reports extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'reportstats_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'reportstats_manage' );
 		parent::execute();
 	}
 
@@ -48,12 +39,11 @@ class reports extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$chart = Chart::loadFromExtension( 'core', 'Reports' )->getChart( Url::internal( "app=core&module=activitystats&controller=reports" ) );
-
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_activitystats_reports');
-		Output::i()->output = (string) $chart;
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'Reports' )->getChart( \IPS\Http\Url::internal( "app=core&module=activitystats&controller=reports" ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_activitystats_reports');
+		\IPS\Output::i()->output = (string) $chart;
 	}
 	
 }

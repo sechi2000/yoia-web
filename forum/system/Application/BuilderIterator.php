@@ -5,54 +5,71 @@
  * @copyright	(c) Invision Power Services, Inc.
  * @license		https://www.invisioncommunity.com/legal/standards/
  * @package		Invision Community
- * @since		8 Aug 2013
-
+ * @since		8 Aug 2013
  */
 
 namespace IPS\Application;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use FilesystemIterator;
-use IPS\Application;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Custom filter iterator for application building
  */
-class BuilderIterator extends RecursiveIteratorIterator
+class _BuilderIterator extends \RecursiveIteratorIterator
 {
 	/**
 	 * @brief	The application
 	 */
-	protected Application $application;
+	protected $application;
 
 	/**
 	 * Constructor
 	 *
-	 * @param Application $application
+	 * @param \IPS\Application $application
 	 */
-	public function __construct( Application $application )
+	public function __construct( \IPS\Application $application )
 	{
 		$this->application = $application;
-		parent::__construct( new BuilderFilter( new RecursiveDirectoryIterator( \IPS\ROOT_PATH . "/applications/" . $application->directory, FilesystemIterator::SKIP_DOTS ) ) );
+		parent::__construct( new BuilderFilter( new \RecursiveDirectoryIterator( \IPS\ROOT_PATH . "/applications/" . $application->directory, \RecursiveDirectoryIterator::SKIP_DOTS ) ) );
 	}
 	
 	/**
 	 * Current key
 	 *
-	 * @return	string
+	 * @return	void
 	 */
-	public function key() : string
+	public function key()
 	{
 		return mb_substr( parent::current(), mb_strlen( \IPS\ROOT_PATH . "/applications/" . $this->application->directory ) + 1 );
+	}
+	
+	/**
+	 * Current value
+	 *
+	 * @return	void
+	 */
+	public function current()
+	{
+		$file = (string) parent::current();
+		if ( mb_substr( str_replace( '\\', '/', $file ), mb_strlen( \IPS\ROOT_PATH . "/applications/" . $this->application->directory ) + 1, 6 ) === 'hooks/' )
+		{
+			$temporary = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
+			\file_put_contents( $temporary, \IPS\Plugin::addExceptionHandlingToHookFile( $file ) );
+
+			register_shutdown_function( function( $temporary ) {
+				unlink( $temporary );
+			}, $temporary );
+			
+			return $temporary;
+		}
+		else
+		{
+			return $file;
+		}
 	}
 }

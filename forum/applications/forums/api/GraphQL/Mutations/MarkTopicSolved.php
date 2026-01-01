@@ -10,35 +10,25 @@
  */
 
 namespace IPS\forums\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Db;
-use IPS\forums\api\GraphQL\Types\TopicType;
-use IPS\forums\Topic;
-use IPS\forums\Topic\Post;
-use IPS\Member;
-use IPS\Node\Api\GraphQL\NodeMutator;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-use function intval;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Mark topic solved mutation for GraphQL API
  */
-class MarkTopicSolved extends NodeMutator
+class _MarkTopicSolved extends \IPS\Node\Api\GraphQL\NodeMutator
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Mark a topic solved";
+	public static $description = "Mark a topic solved";
 
 	/*
 	 * Mutation arguments
@@ -57,10 +47,8 @@ class MarkTopicSolved extends NodeMutator
 
 	/**
 	 * Return the mutation return type
-	 *
-	 * @return TopicType
 	 */
-	public function type() : TopicType
+	public function type() 
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::topic();
 	}
@@ -68,34 +56,34 @@ class MarkTopicSolved extends NodeMutator
 	/**
 	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @return	Topic
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @return	\IPS\forums\Topic
 	 */
-	public function resolve( mixed $val, array $args ) : Topic
+	public function resolve($val, $args)
 	{
 		try 
 		{
-			$topic = Topic::loadAndCheckPerms( intval( $args['id'] ) );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( \intval( $args['id'] ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'NO_TOPIC', 'GQL', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_TOPIC', 'GQL', 403 );
 		}
 
 		try 
 		{
-			$post = Post::loadAndCheckPerms( intval( $args['answer'] ) );
+			$post = \IPS\forums\Topic\Post::loadAndCheckPerms( \intval( $args['answer'] ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'NO_POST', 'GQL', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_POST', 'GQL', 403 );
 		}
 
 		/* This is "solved" mode */
 		if ( !$topic->canSolve() )
 		{
-			throw new SafeException( 'NO_PERMISSION', 'GQL', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_PERMISSION', 'GQL', 403 );
 		}
 
 		
@@ -108,12 +96,12 @@ class MarkTopicSolved extends NodeMutator
 			$topic->toggleSolveComment( $post->pid, FALSE );
 		}
 
-		Db::i()->insert( 'core_moderator_logs', array(
-			'member_id'			=> Member::loggedIn()->member_id,
-			'member_name'		=> Member::loggedIn()->name,
+		\IPS\Db::i()->insert( 'core_moderator_logs', array( 
+			'member_id'			=> \IPS\Member::loggedIn()->member_id,
+			'member_name'		=> \IPS\Member::loggedIn()->name,
 			'ctime'				=> time(),
 			'note'				=> json_encode( array( $post->pid => $args['solved'] ) ),
-			'ip_address'		=> Request::i()->ipAddress(),
+			'ip_address'		=> \IPS\Request::i()->ipAddress(),
 			'appcomponent'		=> 'forums',
 			'module'			=> 'forums',
 			'controller'		=> 'topic',

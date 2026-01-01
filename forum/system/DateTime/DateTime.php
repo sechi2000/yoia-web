@@ -11,47 +11,37 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DateTimeZone;
-use Exception;
-use UnexpectedValueException;
-use function count;
-use function defined;
-use function in_array;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Date/Time Class
  */
-class DateTime extends \DateTime
+class _DateTime extends \DateTime
 {
 	/**
 	 * Create from timestamp
 	 *
-	 * @param int$	timestamp		UNIX Timestamp
-	 * @param bool $bypassTimezone	Ignore timezone (useful for things like rfc1123() which forces to GMT anyways)
-	 * @return    DateTime
+	 * @param	int		$timestamp		UNIX Timestamp
+	 * @param	bool	$bypassTimezone	Ignore timezone (useful for things like rfc1123() which forces to GMT anyways)
+	 * @return	\IPS\DateTime
 	 */
-	public static function ts( int $timestamp, bool $bypassTimezone=FALSE ): DateTime
+	public static function ts( $timestamp, $bypassTimezone=FALSE )
 	{
 		$obj = new static;
-		$obj->setTimestamp( $timestamp );
-		if ( !$bypassTimezone AND Dispatcher::hasInstance() and Member::loggedIn()->timezone )
+		$obj->setTimestamp( (int) $timestamp );
+		if ( !$bypassTimezone AND \IPS\Dispatcher::hasInstance() and \IPS\Member::loggedIn()->timezone )
 		{
-			if( in_array( Member::loggedIn()->timezone, static::getTimezoneIdentifiers() ) )
+			if( \in_array( \IPS\Member::loggedIn()->timezone, static::getTimezoneIdentifiers() ) )
 			{
 				try
 				{
-					$obj->setTimezone( new DateTimeZone( Member::loggedIn()->timezone ) );
+					$obj->setTimezone( new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) );
 				}
-				catch ( Exception $e )
+				catch ( \Exception $e )
 				{
 					
 				}
@@ -63,7 +53,7 @@ class DateTime extends \DateTime
 	/**
 	 * @brief	Cached timezone identifiers
 	 */
-	protected static ?array $timeZoneIdentifiers = NULL;
+	protected static $timeZoneIdentifiers = NULL;
 
 	/**
 	 * Get the valid time zone identifiers
@@ -71,11 +61,11 @@ class DateTime extends \DateTime
 	 * @note	Abstracted to implement caching
 	 * @return	array
 	 */
-	public static function getTimezoneIdentifiers(): array
+	public static function getTimezoneIdentifiers()
 	{
 		if( static::$timeZoneIdentifiers === NULL )
 		{
-			static::$timeZoneIdentifiers = DateTimeZone::listIdentifiers();
+			static::$timeZoneIdentifiers = \DateTimeZone::listIdentifiers();
 		}
 
 		return static::$timeZoneIdentifiers;
@@ -84,14 +74,14 @@ class DateTime extends \DateTime
 	/**
 	 * Helper method to fix Argentinian Timezones https://bugs.webkit.org/show_bug.cgi?id=218542
 	 *
-	 * @param string|null $timezone
+	 * @param string $timezone
 	 * @return string|null
 	 */
 	public static function getFixedTimezone( ?string $timezone=NULL ) :? string
 	{
-		if ( in_array( $timezone, [ 'America/Buenos_Aires', 'America/Catamarca', 'America/Cordoba', 'America/Jujuy', 'America/La_Rioja', 'America/Mendoza', 'America/Rio_Gallegos', 'America/Salta', 'America/San_Juan', 'America/San_Luis', 'America/Tucuman', 'America/Ushuaia' ] ) )
+		if ( \in_array( $timezone, [ 'America/Buenos_Aires', 'America/Catamarca', 'America/Cordoba', 'America/Jujuy', 'America/La_Rioja', 'America/Mendoza', 'America/Rio_Gallegos', 'America/Salta', 'America/San_Juan', 'America/San_Luis', 'America/Tucuman', 'America/Ushuaia' ] ) )
 		{
-			return 'America/Argentina/' . substr( $timezone, 8 );
+			return 'America/Argentina/' . \substr( $timezone, 8 );
 		}
 
 		/* Chromium reports the wrong timezones for these locations - https://bugs.chromium.org/p/chromium/issues/detail?id=580195 */
@@ -106,9 +96,9 @@ class DateTime extends \DateTime
 	/**
 	 * Create New
 	 *
-	 * @return    DateTime
+	 * @return	\IPS|DateTime
 	 */
-	public static function create(): DateTime
+	public static function create()
 	{
 		return new static;
 	}
@@ -116,12 +106,12 @@ class DateTime extends \DateTime
 	/**
 	 * Format a DateInterval showing only the relevant pieces.
 	 *
-	 * @param	DateInterval	$diff			The interval
-	 * @param int $restrictParts	The maximum number of "pieces" to return.  Restricts "1 year, 1 month, 1 day, 1 hour, 1 minute, 1 second" to just "1 year, 1 month".  Pass 0 to not reduce.
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	\DateInterval	$diff			The interval
+	 * @param	int				$restrictParts	The maximum number of "pieces" to return.  Restricts "1 year, 1 month, 1 day, 1 hour, 1 minute, 1 second" to just "1 year, 1 month".  Pass 0 to not reduce.
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string 
 	 */
-	public static function formatInterval( DateInterval $diff, int $restrictParts=2, Lang|Member $memberOrLanguage=NULL ): string
+	public static function formatInterval( \DateInterval $diff, $restrictParts=2, $memberOrLanguage=NULL )
 	{
 		$language = static::determineLanguage( $memberOrLanguage );
 
@@ -154,7 +144,7 @@ class DateTime extends \DateTime
 		}
 
 		/* If we don't have anything but seconds, return "less than a minute ago" */
-		if( !count($format) )
+		if( !\count($format) )
 		{
 			if( $diff->s !== 0 )
 			{
@@ -197,35 +187,31 @@ class DateTime extends \DateTime
 	 */
 	public function __toString()
 	{
-		return static::strftime( '%x ' . static::localeTimeFormat(), $this->getTimestamp() + $this->getTimezone()->getOffset( $this ), Member::loggedIn()->language() );
+		return (string) static::strftime( '%x ' . static::localeTimeFormat(), $this->getTimestamp() + $this->getTimezone()->getOffset( $this ), \IPS\Member::loggedIn()->language() ); 
 	}
 	
 	/**
 	 * Get HTML output
 	 *
-	 * @param bool $capitalize			TRUE if by itself, FALSE if in the middle of a sentence
-	 * @param bool $short				Whether or not to use the short form
-	 * @param Lang|Member|null $memberOrLanguage	The language or member to use, or NULL for currently logged in member
-	 * @param bool $useTitle            Whether to add a title attribute to the <time> element
-	 *
+	 * @param	bool						$capitalize			TRUE if by itself, FALSE if in the middle of a sentence
+	 * @param	bool						$short				Whether or not to use the short form
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage	The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function html(bool $capitalize=TRUE, bool $short=FALSE, Lang|Member $memberOrLanguage=NULL, bool $useTitle = true ): string
+	public function html( $capitalize=TRUE, $short=FALSE, $memberOrLanguage=NULL )
 	{
 		$format = $short ? 1 : ( $capitalize ? static::RELATIVE_FORMAT_NORMAL : static::RELATIVE_FORMAT_LOWER );
-		$shortLong = $short ? 'short' : 'long';
-		$title = $useTitle ? "title='{$this}'" : '';
 
-		return "<time datetime='{$this->rfc3339()}' {$title} data-short='" . trim( $this->relative( 1, $memberOrLanguage ) ) . "' class='ipsTime ipsTime--{$shortLong}'><span class='ipsTime__long'>" . trim( $this->relative( $format, $memberOrLanguage ) ) . "</span><span class='ipsTime__short'>" . trim( $this->relative( 1, $memberOrLanguage ) ) . "</span></time>";
+		return "<time datetime='{$this->rfc3339()}' title='{$this}' data-short='" . trim( $this->relative( 1, $memberOrLanguage ) ) . "'>" . trim( $this->relative( $format, $memberOrLanguage ) ) . "</time>";
 	}
 
 	/**
 	 * Get total number of days from DateInterval
 	 *
-	 * @param   DateInterval               $interval           DateInterval
+	 * @param   \DateInterval               $interval           DateInterval
 	 * @return  int
 	 */
-	static public function intervalToDays( DateInterval $interval ): int
+	static public function intervalToDays( \DateInterval $interval ): int
 	{
 		$days = 0;
 		if ( $interval->y )
@@ -247,10 +233,10 @@ class DateTime extends \DateTime
 	/**
 	 * Format the date according to the user's locale (without the time)
 	 *
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function localeDate( Lang|Member $memberOrLanguage=NULL ): string
+	public function localeDate( $memberOrLanguage=NULL )
 	{
 		return static::strftime( '%x', $this->getTimestamp() + $this->getTimezone()->getOffset( $this ), static::determineLanguage( $memberOrLanguage ) );
 	}
@@ -258,10 +244,10 @@ class DateTime extends \DateTime
 	/**
 	 * Format the date to return month and day without a year
 	 *
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function dayAndMonth( Lang|Member $memberOrLanguage=NULL ): string
+	public function dayAndMonth( $memberOrLanguage=NULL )
 	{
 		$language = static::determineLanguage( $memberOrLanguage );
 		return $language->addToStack(
@@ -279,10 +265,10 @@ class DateTime extends \DateTime
 	/**
 	 * Format the date to return short month and day without a year
 	 *
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function dayAndShortMonth( Lang|Member $memberOrLanguage=NULL ): string
+	public function dayAndShortMonth( $memberOrLanguage=NULL )
 	{
 		$language = static::determineLanguage( $memberOrLanguage );
 		return $language->addToStack(
@@ -300,10 +286,10 @@ class DateTime extends \DateTime
 	/**
 	 * Format the date to return short month and full year.
 	 *
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function shortMonthAndFullYear( Lang|Member $memberOrLanguage=NULL ): string
+	public function shortMonthAndFullYear( $memberOrLanguage=NULL )
 	{
 		$language = static::determineLanguage( $memberOrLanguage );
 		return $language->addToStack(
@@ -324,10 +310,10 @@ class DateTime extends \DateTime
 	/**
 	 * Get locale date, forced to 4-digit year format
 	 *
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function fullYearLocaleDate( Lang|Member $memberOrLanguage=NULL ): string
+	public function fullYearLocaleDate( $memberOrLanguage=NULL )
 	{
 		$language		= static::determineLanguage( $memberOrLanguage );
 		$timestamp		= $this->getTimestamp() + $this->getTimezone()->getOffset( $this );
@@ -347,14 +333,14 @@ class DateTime extends \DateTime
 	 * countries prefer 12-hour format, so we override
 	 * specifically for them
 	 *
-	 * @param bool $seconds	If TRUE, will include seconds
-	 * @param bool $minutes	If TRUE, will include minutes
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	bool				$seconds	If TRUE, will include seconds
+	 * @param	bool				$minutes	If TRUE, will include minutes
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public static function localeTimeFormat( bool $seconds=FALSE, bool $minutes=TRUE, Lang|Member $memberOrLanguage=NULL ): string
+	public static function localeTimeFormat( $seconds=FALSE, $minutes=TRUE, $memberOrLanguage=NULL )
 	{
-		if ( in_array( preg_replace( '/\.UTF-?8$/', '', static::determineLanguage( $memberOrLanguage )->short ), array(
+		if ( \in_array( preg_replace( '/\.UTF-?8$/', '', static::determineLanguage( $memberOrLanguage )->short ), array(
 			'sq_AL', // Albanian - Albania
 			'zh_SG', 'sgp', 'singapore', // Chinese - Singapore
 			'zh_TW', 'twn', 'taiwan', // Chinese - Taiwan
@@ -380,21 +366,21 @@ class DateTime extends \DateTime
 				return '%l' . ( $minutes ? ':%M' : '' ) . ( $seconds ? ':%S ' : ' ' ) . ' %p';
 			}
 		}
-		
+
 		return '%H' . ( $minutes ? ':%M' : '' ) . ( $seconds ? ':%S ' : '' );
 	}
 	
 	/**
 	 * Format the time according to the user's locale (without the date)
 	 *
-	 * @param bool $seconds	If TRUE, will include seconds
-	 * @param bool $minutes	If TRUE, will include minutes
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	bool				$seconds	If TRUE, will include seconds
+	 * @param	bool				$minutes	If TRUE, will include minutes
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function localeTime( bool $seconds=TRUE, bool $minutes=TRUE, Lang|Member $memberOrLanguage=NULL ): string
+	public function localeTime( $seconds=TRUE, $minutes=TRUE, $memberOrLanguage=NULL )
 	{
-		return static::strftime( static::localeTimeFormat($seconds, $minutes, $memberOrLanguage), $this->getTimestamp() + $this->getTimezone()->getOffset( $this ), static::determineLanguage( $memberOrLanguage ) );
+		return static::strftime( static::localeTimeFormat( $seconds, $minutes, $memberOrLanguage ), $this->getTimestamp() + $this->getTimezone()->getOffset( $this ), static::determineLanguage( $memberOrLanguage ) );
 	}
 	
 	/**
@@ -416,17 +402,17 @@ class DateTime extends \DateTime
 	 * Format the date relative to the current date/time
 	 * e.g. "30 minutes ago"
 	 *
-	 * @param int $format		The format (see RELATIVE_FORMAT_* constants)
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	int					$format		The format (see RELATIVE_FORMAT_* constants)
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function relative( int $format=0, Lang|Member $memberOrLanguage=NULL ): string
+	public function relative( $format=0, $memberOrLanguage=NULL )
 	{
 		$language	= static::determineLanguage( $memberOrLanguage );
 
-		if( Settings::i()->relative_dates_enable )
+		if( \IPS\Settings::i()->relative_dates_enable )
 		{
-			$now		= static::ts(time());
+			$now		= static::ts( time() );
 			$difference	= $this->diff( $now );
 			$capitalKey = ( $format == static::RELATIVE_FORMAT_LOWER ) ? '' : '_c';
 
@@ -480,7 +466,7 @@ class DateTime extends \DateTime
 						return $language->addToStack( 'f_days_short', FALSE, array( 'pluralize' => array( $difference->d ) ) );
 					}
 					/* Yesterday: "Yesterday at 23:56" */
-					elseif ( $difference->d == 1 && ( $compare->add( new DateInterval( 'P1D' ) )->format( 'Y-m-d', $language ) == $now->format( 'Y-m-d', $language ) ) )
+					elseif ( $difference->d == 1 && ( $compare->add( new \DateInterval( 'P1D' ) )->format( 'Y-m-d', $language ) == $now->format( 'Y-m-d', $language ) ) )
 					{
 						return $language->addToStack( "_date_yesterday{$capitalKey}", FALSE, array( 'sprintf' => array( $this->localeTime( FALSE, TRUE, $language ) ) ) );
 					}
@@ -570,11 +556,11 @@ class DateTime extends \DateTime
 	/**
 	 * Format times based on strftime() calls instead of date() calls, and convert to UTF-8 if necessary
 	 *
-	 * @param string $format		Format accepted by strftime()
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	string				$format		Format accepted by strftime()
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function strFormat( string $format, Lang|Member $memberOrLanguage=NULL ): string
+	public function strFormat( $format, $memberOrLanguage=NULL )
 	{
 		/* We only do this on Windows - Windows does not support the %e formatter */
 		if( mb_strtoupper( mb_substr( PHP_OS, 0, 3 ) ) === 'WIN' )
@@ -589,10 +575,10 @@ class DateTime extends \DateTime
 	 * Wrapper for format() so we can convert to UTF-8 if needed
 	 *
 	 * @param	string				$format		Format accepted by date()
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function format( string $format, Lang|Member $memberOrLanguage=NULL ): string
+	public function format( $format, $memberOrLanguage=NULL )
 	{
 		/* If this is just the year, which we do periodically, then we can skip UTF-8 conversion stuff since the result is always an integer -
 			saves resources, especially from the relative() method which can be called 25+ times per page load and can call this method 4 times each*/
@@ -610,7 +596,7 @@ class DateTime extends \DateTime
 	 *
 	 * @return	string
 	 */
-	public function rfc3339(): string
+	public function rfc3339()
 	{
 		return date( 'Y-m-d', $this->getTimestamp() ) . 'T' . date( 'H:i:s', $this->getTimestamp() ) . 'Z';
 	}
@@ -621,7 +607,7 @@ class DateTime extends \DateTime
 	 *
 	 * @return	string
 	 */
-	public function rfc1123(): string
+	public function rfc1123()
 	{
 		return gmdate( "D, d M Y H:i:s", $this->getTimestamp() ) . ' GMT';
 	}
@@ -629,44 +615,44 @@ class DateTime extends \DateTime
 	/**
 	 * Determine the language object to use based on the passed in parameter, which could be NULL, \IPS\Member or \IPS\Lang
 	 *
-	 * @param Lang|Member|NULL	$formatter	Value we are using to determine how to format the result
-	 * @return    Lang
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$formatter	Value we are using to determine how to format the result
+	 * @return	\IPS\Lang
 	 */
-	protected static function determineLanguage( Lang|Member|null $formatter=NULL ): Lang
+	protected static function determineLanguage( $formatter=NULL )
 	{
 		/* If nothing is passed in (the norm) we want the current viewing user's language selection */
 		if( $formatter === NULL )
 		{
-			return Member::loggedIn()->language();
+			return \IPS\Member::loggedIn()->language();
 		}
-		elseif( $formatter instanceof Member)
+		elseif( $formatter instanceof \IPS\Member )
 		{
 			return $formatter->language();
 		}
-		elseif( $formatter instanceof Lang)
+		elseif( $formatter instanceof \IPS\Lang )
 		{
 			return $formatter;
 		}
 
-		throw new UnexpectedValueException;
+		throw new \UnexpectedValueException;
 	}
 
 	/**
 	 * Run strftime() call using a given language object
 	 *
-	 * @param string $formatter	Time format to be passed to stftime()
-	 * @param int $time		Timestamp
-	 * @param Lang $language	Language to use
+	 * @param	string		$formatter	Time format to be passed to stftime()
+	 * @param	int			$time		Timestamp
+	 * @param	\IPS\Lang	$language	Language to use
 	 * @return	string
 	 */
-	protected static function strftime( string $formatter, int $time, Lang $language ): string
+	protected static function strftime( $formatter, $time, $language )
 	{
 		$curLocale	= setlocale( LC_ALL, '0' );
 		$language->setLocale();
 
 		$result = $language->convertString( strftime( $formatter, $time ) );
 
-		Lang::restoreLocale( $curLocale );
+		\IPS\Lang::restoreLocale( $curLocale );
 
 		return $result;
 	}
@@ -675,11 +661,11 @@ class DateTime extends \DateTime
 	 * Show a datetime diff rounded for human readability
 	 * e.g. "4 days, 5 hours"
 	 *
-	 * @param DateTime $date					Date to compare against
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	\IPS\DateTime				$date					Date to compare against
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public function roundedDiff( DateTime $date, Lang|Member $memberOrLanguage=NULL ): string
+	public function roundedDiff( \IPS\DateTime $date, $memberOrLanguage=NULL )
 	{
 		$language	= static::determineLanguage( $memberOrLanguage );
 		$difference	= $this->diff( $date );
@@ -764,14 +750,14 @@ class DateTime extends \DateTime
 	 * Show a datetime diff rounded for human readability based purely on a number of seconds
 	 * e.g. "4 days, 5 hours"
 	 *
-	 * @param int $seconds				Number of seconds difference
-	 * @param Lang|Member|null $memberOrLanguage		The language or member to use, or NULL for currently logged in member
+	 * @param	int							$seconds				Number of seconds difference
+	 * @param	\IPS\Lang|\IPS\Member|NULL	$memberOrLanguage		The language or member to use, or NULL for currently logged in member
 	 * @return	string
 	 */
-	public static function roundedDiffFromSeconds( int $seconds, Lang|Member $memberOrLanguage=NULL ): string
+	public static function roundedDiffFromSeconds( $seconds, $memberOrLanguage=NULL )
 	{
-		$now 	= static::ts(time());
-		$then	= static::ts(time() - $seconds);
+		$now 	= static::ts( time() );
+		$then	= static::ts( time() - $seconds );
 
 		return $now->roundedDiff( $then, $memberOrLanguage );
 	}

@@ -10,29 +10,25 @@
  */
 
 namespace IPS\blog\api\GraphQL\Queries;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\blog\api\GraphQL\Types\EntryType;
-use IPS\blog\Entry as EntryClass;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * Entry query for GraphQL API
  */
-class Entry
+class _Entry
 {
     /*
      * @brief 	Query description
      */
-    public static string $description = "Returns a Blog Entry";
+    public static $description = "Returns a Blog Entry";
 
     /*
      * Query arguments
@@ -47,7 +43,7 @@ class Entry
     /**
      * Return the query return type
      */
-    public function type(): EntryType
+    public function type()
     {
         return \IPS\blog\api\GraphQL\TypeRegistry::entry();
     }
@@ -55,26 +51,25 @@ class Entry
     /**
      * Resolves this query
      *
-     * @param 	mixed $val 	Value passed into this resolver
-     * @param 	array $args 	Arguments
-     * @param 	array $context 	Context values
-	 * @param 	mixed $info
-     * @return    EntryClass
-	 */
-    public function resolve( mixed $val, array $args, array $context, mixed $info ): EntryClass
-	{
+     * @param 	mixed 	Value passed into this resolver
+     * @param 	array 	Arguments
+     * @param 	array 	Context values
+     * @return	\IPS\blog\Entry
+     */
+    public function resolve($val, $args, $context, $info)
+    {
         try
         {
-            $entry = EntryClass::loadAndCheckPerms( $args['id'] );
+            $entry = \IPS\blog\Entry::loadAndCheckPerms( $args['id'] );
         }
-        catch ( OutOfRangeException )
+        catch ( \OutOfRangeException $e )
         {
-            throw new SafeException( 'NO_TOPIC', '2B300/A_graphql', 400 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_TOPIC', '2B300/A_graphql', 400 );
         }
 
         if( !$entry->can('read') )
         {
-            throw new SafeException( 'NO_PERMISSION', '2B300/9_graphql', 403 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_PERMISSION', '2B300/9_graphql', 403 );
         }
 
         return $entry;

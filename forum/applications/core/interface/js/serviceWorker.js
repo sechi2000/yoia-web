@@ -86,7 +86,7 @@ self.addEventListener("push", (e) => {
 				throw new Error("Server error");
 			}
 
-			const { body, url, grouped, groupedTitle, groupedUrl, icon, image, unreadCount } = data;
+			const { body, url, grouped, groupedTitle, groupedUrl, icon, image } = data;
 			let { title } = data;
 			let tag;
 
@@ -94,11 +94,6 @@ self.addEventListener("push", (e) => {
 				tag = data.tag.substr(0, 30);
 			}
 
-			if ( unreadCount && 'setAppBadge' in navigator )
-			{
-				navigator.setAppBadge(unreadCount);
-			}
-			
 			let options = {
 				body,
 				icon: icon ? icon : NOTIFICATION_ICON,

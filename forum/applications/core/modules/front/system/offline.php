@@ -11,31 +11,25 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Offline page Controller
  */
-class offline extends Controller
+class _offline extends \IPS\Dispatcher\Controller
 {	
 	/**
 	 * View Notifications
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Output::i()->metaTags['robots'] = 'noindex';
-        Output::i()->sendOutput( Theme::i()->getTemplate( 'global', 'core', 'global' )->offline() );
+		\IPS\Output::i()->metaTags['robots'] = 'noindex';
+        \IPS\Output::i()->sendOutput( \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->offline(), 200, 'text/html' );
     }
 }

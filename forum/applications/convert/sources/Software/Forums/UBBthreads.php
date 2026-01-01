@@ -12,43 +12,23 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\UBBthreads as UBBthreadsCore;
-use IPS\convert\Software\Exception as SoftwareException;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\forums\Forum;
-use IPS\forums\Topic;
-use IPS\forums\Topic\Post;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use const PATHINFO_EXTENSION;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * UBBThreads Forums Converter
  */
-class UBBthreads extends Software
+class _UBBthreads extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "UBBthreads";
@@ -57,9 +37,9 @@ class UBBthreads extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "ubbthreads";
@@ -68,9 +48,9 @@ class UBBthreads extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums'             => array(
@@ -109,9 +89,9 @@ class UBBthreads extends Software
 	/**
 	 * Allows software to add additional menu row options
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function extraMenuRows(): array
+	public function extraMenuRows()
 	{
 		$rows = array();
 		$count = $this->countRows( static::canConvert()['convertForumsTopicsRatings']['table'], static::canConvert()['convertForumsTopicsRatings']['where'] );
@@ -121,7 +101,7 @@ class UBBthreads extends Software
 			$rows['convertForumsTopicsRatings'] = array(
 				'step_method'		=> 'convertForumsTopicsRatings',
 				'step_title'		=> 'convert_ratings',
-				'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_ratings' ),
+				'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_ratings' ),
 				'source_rows'		=> $count,
 				'per_cycle'			=> 200,
 				'dependencies'		=> array( 'convertForumsTopics' ),
@@ -136,7 +116,7 @@ class UBBthreads extends Software
 			$rows['convertForumsTopicsFollowers'] = array(
 				'step_method'		=> 'convertForumsTopicsFollowers',
 				'step_title'		=> 'convert_follows',
-				'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_follow' ),
+				'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_follow' ),
 				'source_rows'		=> $count,
 				'per_cycle'			=> 200,
 				'dependencies'		=> array( 'convertForumsTopics' ),
@@ -150,13 +130,13 @@ class UBBthreads extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch ( $table )
 		{
@@ -170,9 +150,9 @@ class UBBthreads extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -180,9 +160,9 @@ class UBBthreads extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'ubbthreads' ) );
 	}
@@ -190,9 +170,9 @@ class UBBthreads extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertAttachments'
@@ -202,10 +182,10 @@ class UBBthreads extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 
@@ -218,7 +198,7 @@ class UBBthreads extends Software
 						'field_default'	    => NULL,
 						'field_required'    => TRUE,
 						'field_extra'       => array(),
-						'field_hint'        => Member::loggedIn()->language()->addToStack('convert_ubb_attach_path'),
+						'field_hint'        => \IPS\Member::loggedIn()->language()->addToStack('convert_ubb_attach_path'),
 					),
 				);
 				break;
@@ -230,32 +210,29 @@ class UBBthreads extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return UBBthreadsCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\UBBthreads::fixPostData( $post );
 	}
 
 	/**
@@ -263,7 +240,7 @@ class UBBthreads extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums(): void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -292,13 +269,17 @@ class UBBthreads extends Software
 				'description'			=> $row['FORUM_DESCRIPTION'],
 				'topics'				=> $row['FORUM_TOPICS'],
 				'posts'					=> $row['FORUM_POSTS'],
+				'last_post'				=> \IPS\DateTime::create()->setTimestamp( $row['FORUM_LAST_POST_TIME'] ),
+				'last_poster_id'		=> $row['FORUM_LAST_POSTER_ID'],
+				'last_poster_name'		=> $row['FORUM_LAST_POSTER_NAME'],
 				'parent_id'				=> $row['FORUM_PARENT_ID'] ?: ( 10000 + $row['CATEGORY_ID'] ),
 				'position'				=> $row['FORUM_SORT_ORDER'],
+				'last_title'			=> $row['FORUM_LAST_POST_SUBJECT'],
 				'allow_poll'            => $row['FORUM_ALLOW_POLLS']
 			) );
 		}
 
-		throw new SoftwareException;
+		throw new \IPS\convert\Software\Exception;
 	}
 
 	/**
@@ -306,7 +287,7 @@ class UBBthreads extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForumsFollowers(): void
+	public function convertForumsForumsFollowers()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -328,7 +309,7 @@ class UBBthreads extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics(): void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'TOPIC_ID' );
@@ -371,7 +352,7 @@ class UBBthreads extends Software
 							'votes'             => $votes
 						) ),
 						'poll_question'     => strip_tags( $pollData['POLL_BODY'] ),
-						'start_date'        => DateTime::create()->setTimestamp( $row['POLL_START_TIME'] ),
+						'start_date'        => \IPS\DateTime::create()->setTimestamp( $row['POLL_START_TIME'] ),
 						'starter_id'        => $row['USER_ID'],
 					);
 
@@ -399,7 +380,7 @@ class UBBthreads extends Software
 						);
 					}
 				}
-				catch( UnderflowException $e ) {} # if the poll is missing, don't bother
+				catch( \UnderflowException $e ) {} # if the poll is missing, don't bother
 			}
 
 			$libraryClass->convertForumsTopic( array(
@@ -409,9 +390,9 @@ class UBBthreads extends Software
 				'state'             => ( $row['TOPIC_STATUS'] == 'C' ) ? 'closed' : 'open',
 				'posts'             => $row['TOPIC_REPLIES'],
 				'starter_id'        => $row['USER_ID'],
-				'start_date'        => DateTime::create()->setTimestamp( $row['TOPIC_CREATED_TIME'] ),
+				'start_date'        => \IPS\DateTime::create()->setTimestamp( $row['TOPIC_CREATED_TIME'] ),
 				'last_poster_id'    => $row['TOPIC_LAST_POSTER_ID'],
-				'last_post'         => DateTime::create()->setTimestamp( $row['TOPIC_LAST_REPLY_TIME'] ),
+				'last_post'         => \IPS\DateTime::create()->setTimestamp( $row['TOPIC_LAST_REPLY_TIME'] ),
 				'last_poster_name'  => $row['TOPIC_LAST_POSTER_NAME'],
 				'views'             => $row['TOPIC_VIEWS'],
 				'approved'          => $row['TOPIC_IS_APPROVED'],
@@ -428,7 +409,7 @@ class UBBthreads extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopicsRatings(): void
+	public function convertForumsTopicsRatings()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -449,7 +430,7 @@ class UBBthreads extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopicsFollowers(): void
+	public function convertForumsTopicsFollowers()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -471,7 +452,7 @@ class UBBthreads extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts(): void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'POST_ID' );
@@ -488,7 +469,7 @@ class UBBthreads extends Software
 				'author_id'     => $row['USER_ID'],
 				'author_name'   => $row['POST_POSTER_NAME'],
 				'ip_address'    => $row['POST_POSTER_IP'],
-				'post_date'     => DateTime::create()->setTimestamp( $row['POST_POSTED_TIME'] ),
+				'post_date'     => \IPS\DateTime::create()->setTimestamp( $row['POST_POSTED_TIME'] ),
 				'queued'        => ( ! $row['POST_IS_APPROVED'] ),
 				'new_topic'     => $row['POST_IS_TOPIC'],
 			) );
@@ -502,7 +483,7 @@ class UBBthreads extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments(): void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'FILE_ID' );
@@ -520,15 +501,15 @@ class UBBthreads extends Software
 				$map['id1'] = $topicId;
 				$map['id2'] = $row['POST_ID'];
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 
 			$info = array(
 				'attach_id'			=> $row['FILE_ID'],
 				'attach_file'		=> $row['FILE_NAME'],
-				'attach_date'		=> DateTime::create()->setTimestamp( $row['FILE_ADD_TIME'] ),
+				'attach_date'		=> \IPS\DateTime::create()->setTimestamp( $row['FILE_ADD_TIME'] ),
 				'attach_member_id'	=> $row['USER_ID'],
 				'attach_hits'		=> $row['FILE_DOWNLOADS'],
-				'attach_ext'		=> pathinfo( $row['FILE_NAME'], PATHINFO_EXTENSION ),
+				'attach_ext'		=> pathinfo( $row['FILE_NAME'], \PATHINFO_EXTENSION ),
 				'attach_filesize'	=> $row['FILE_SIZE'],  // Note: Apparently not always readily available?
 			);
 
@@ -540,37 +521,37 @@ class UBBthreads extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
 		/* Make sure it's a UBBThreads URL */
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'ubbthreads.php' ) === FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'ubbthreads.php' ) === FALSE )
 		{
 			return NULL;
 		}
 
 		//ubbthreads.php?ubb=showflat&Number=?
-		if( isset( Request::i()->Number ) AND isset( Request::i()->ubb ) )
+		if( isset( \IPS\Request::i()->Number ) AND isset( \IPS\Request::i()->ubb ) )
 		{
 			try
 			{
-				$data = (string) $this->app->getLink( (int) Request::i()->Number, array( 'posts', 'forums_posts' ) );
-				$post = Post::load( $data );
+				$data = (string) $this->app->getLink( (int) \IPS\Request::i()->Number, array( 'posts', 'forums_posts' ) );
+				$post = \IPS\forums\Topic\Post::load( $data );
 
 				if( $post->item()->canView() )
 				{
 					return $post->url();
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				return NULL;
 			}
 		}
-		elseif( preg_match( '#/ubbthreads.php/topics/([0-9]+)($|/)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		elseif( preg_match( '#/ubbthreads.php/topics/([0-9]+)($|/)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			try
 			{
@@ -578,64 +559,64 @@ class UBBthreads extends Software
 				{
 					$data = (string) $this->app->getLink( (int) $matches[1], array( 'topics', 'forums_topics' ) );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( (int) $matches[1], array( 'topics', 'forums_topics' ), FALSE, TRUE );
 				}
-				$item = Topic::load( $data );
+				$item = \IPS\forums\Topic::load( $data );
 
 				if( $item->canView() )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				try
 				{
 					$data = (string) $this->app->getLink( (int) $matches[1], array( 'posts', 'forums_posts' ) );
-					$post = Post::load( $data );
+					$post = \IPS\forums\Topic\Post::load( $data );
 
 					if( $post->item()->canView() )
 					{
 						return $post->url();
 					}
 				}
-				catch ( OutOfRangeException $e ) { }
+				catch ( \OutOfRangeException $e ) { }
 
 				return NULL;
 			}
 		}
-		elseif( preg_match( '#/ubbthreads.php/forums/([0-9]+)($|/)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		elseif( preg_match( '#/ubbthreads.php/forums/([0-9]+)($|/)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			try
 			{
 				$data = (string) $this->app->getLink( (int) $matches[1], array( 'forums', 'forums_forums' ) );
-				$item = Forum::load( $data );
+				$item = \IPS\forums\Forum::load( $data );
 
 				if( $item->can( 'view' ) )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
 		}
-		elseif( preg_match( '#ubbthreads.php/ubb/showflat/Number/([0-9]+)($|/)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		elseif( preg_match( '#ubbthreads.php/ubb/showflat/Number/([0-9]+)($|/)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			try
 			{
 				$data = (string) $this->app->getLink( (int) $matches[1], array( 'posts', 'forums_posts' ) );
-				$post = Post::load( $data );
+				$post = \IPS\forums\Topic\Post::load( $data );
 
 				if( $post->item()->canView() )
 				{
 					return $post->url();
 				}
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
 				return NULL;
 			}

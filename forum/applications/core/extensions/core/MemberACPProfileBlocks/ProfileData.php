@@ -11,61 +11,39 @@
 namespace IPS\core\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\TabbedBlock;
-use IPS\core\ProfileFields\Field;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Profile Data Block
  */
-class ProfileData extends TabbedBlock
+class _ProfileData extends \IPS\core\MemberACPProfile\TabbedBlock
 {
 	/**
 	 * @brief	Fields
 	 */
-	protected array $fields = array();
+	protected $fields = array();
 	
 	/**
 	 * @brief	Clubs
 	 */
-	protected array|ActiveRecordIterator|null $clubs = NULL;
+	protected $clubs = NULL;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function __construct( Member $member )
+	public function __construct( \IPS\Member $member )
 	{
 		parent::__construct( $member );
 		
-		$this->fields = $this->member->profileFields( Field::STAFF );
-		$this->clubs = Settings::i()->clubs ? Club::clubs( NULL, NULL, 'last_activity', array( 'member' => $this->member, 'statuses' => array( Club::STATUS_MODERATOR, Club::STATUS_EXPIRED_MODERATOR, Club::STATUS_LEADER ) ) ) : array();
+		$this->fields = $this->member->profileFields( \IPS\core\ProfileFields\Field::STAFF );
+		$this->clubs = \IPS\Settings::i()->clubs ? \IPS\Member\Club::clubs( NULL, NULL, 'last_activity', array( 'member' => $this->member, 'statuses' => array( \IPS\Member\Club::STATUS_MODERATOR, \IPS\Member\Club::STATUS_EXPIRED_MODERATOR, \IPS\Member\Club::STATUS_LEADER ) ) ) : array();
 	}
 	
 	/**
@@ -73,7 +51,7 @@ class ProfileData extends TabbedBlock
 	 *
 	 * @return	string
 	 */
-	public function blockTitle() : string
+	public function blockTitle()
 	{
 		return 'profile_data';
 	}
@@ -81,16 +59,16 @@ class ProfileData extends TabbedBlock
 	/**
 	 * Get Tab Names
 	 *
-	 * @return	array
+	 * @return	string
 	 */
-	public function tabs(): array
+	public function tabs()
 	{
 		$return = array();
-		if ( count( $this->fields ) || $this->member->rank['title'] || $this->member->rank['image'] || Settings::i()->profile_birthday_type != 'none' || Settings::i()->signatures_enabled )
+		if ( \count( $this->fields ) || $this->member->rank['title'] || $this->member->rank['image'] || \IPS\Settings::i()->profile_birthday_type != 'none' || \IPS\Settings::i()->signatures_enabled )
 		{
 			$return['fields'] = 'profile_fields';
 		}		
-		if ( count( $this->clubs ) )
+		if ( \count( $this->clubs ) )
 		{
 			$return['clubs'] = 'club_ownership';
 		}
@@ -103,7 +81,7 @@ class ProfileData extends TabbedBlock
 	 *
 	 * @return	bool
 	 */
-	protected function showEditLink() : bool
+	protected function showEditLink()
 	{
 		return true;
 	}
@@ -111,21 +89,18 @@ class ProfileData extends TabbedBlock
 	/**
 	 * Get output
 	 *
-	 * @param string $tab
-	 * @return    mixed
+	 * @return	string
 	 */
-	public function tabOutput(string $tab ): mixed
+	public function tabOutput( $tab )
 	{
 		if ( $tab == 'fields' )
 		{
-			return Theme::i()->getTemplate('memberprofile')->profileData( $this->member, $this->fields );
+			return \IPS\Theme::i()->getTemplate('memberprofile')->profileData( $this->member, $this->fields );
 		}
 		elseif ( $tab == 'clubs' )
 		{			
-			return Theme::i()->getTemplate('memberprofile')->clubs( $this->member, $this->clubs );
+			return \IPS\Theme::i()->getTemplate('memberprofile')->clubs( $this->member, $this->clubs );
 		}
-
-		return '';
 	}
 	
 	/**
@@ -133,40 +108,40 @@ class ProfileData extends TabbedBlock
 	 *
 	 * @return	string
 	 */
-	public function edit(): string
+	public function edit()
 	{
 		/* Build basic form */
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$form->addHeader('profile_data');
-		if ( Settings::i()->profile_birthday_type !== 'none' )
+		if ( \IPS\Settings::i()->profile_birthday_type !== 'none' )
 		{
-			$form->add( new Custom( 'bday', array( 'year' => $this->member->bday_year, 'month' => $this->member->bday_month, 'day' => $this->member->bday_day ), FALSE, array( 'getHtml' => function( $element )
+			$form->add( new \IPS\Helpers\Form\Custom( 'bday', array( 'year' => $this->member->bday_year, 'month' => $this->member->bday_month, 'day' => $this->member->bday_day ), FALSE, array( 'getHtml' => function( $element )
 			{
-				return strtr( Member::loggedIn()->language()->preferredDateFormat(), array(
-					'DD'	=> Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_day( $element->name, $element->value, $element->error ),
-					'MM'	=> Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_month( $element->name, $element->value, $element->error ),
-					'YY'	=> Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_year( $element->name, $element->value, $element->error ),
-					'YYYY'	=> Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_year( $element->name, $element->value, $element->error ),
+				return strtr( \IPS\Member::loggedIn()->language()->preferredDateFormat(), array(
+					'DD'	=> \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_day( $element->name, $element->value, $element->error ),
+					'MM'	=> \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_month( $element->name, $element->value, $element->error ),
+					'YY'	=> \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_year( $element->name, $element->value, $element->error ),
+					'YYYY'	=> \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->bdayForm_year( $element->name, $element->value, $element->error ),
 				) );
 			} ) ) );
 		}
-		if ( Settings::i()->signatures_enabled )
+		if ( \IPS\Settings::i()->signatures_enabled )
 		{
-			$form->add( new Editor( 'signature', $this->member->signature, FALSE, array( 'app' => 'core', 'key' => 'Signatures', 'autoSaveKey' => "sig-{$this->member->member_id}", 'attachIds' => array( $this->member->member_id ) ) ) );
+			$form->add( new \IPS\Helpers\Form\Editor( 'signature', $this->member->signature, FALSE, array( 'app' => 'core', 'key' => 'Signatures', 'autoSaveKey' => "sig-{$this->member->member_id}", 'attachIds' => array( $this->member->member_id ) ) ) );
 		}
 	
 		/* Profile Fields */
 		try
 		{
-			$values = Db::i()->select( '*', 'core_pfields_content', array( 'member_id=?', $this->member->member_id ) )->first();
+			$values = \IPS\Db::i()->select( '*', 'core_pfields_content', array( 'member_id=?', $this->member->member_id ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			$values	= array();
 		}
-		if( count( $values ) )
+		if( \count( $values ) )
 		{
-			foreach ( Field::fields( $values, Field::STAFF, $this->member ) as $group => $fields )
+			foreach ( \IPS\core\ProfileFields\Field::fields( $values, \IPS\core\ProfileFields\Field::STAFF, $this->member ) as $group => $fields )
 			{
 				$form->addHeader( "core_pfieldgroups_{$group}" );
 				foreach ( $fields as $field )
@@ -182,23 +157,23 @@ class ProfileData extends TabbedBlock
 			/* Profile Fields */
 			try
 			{
-				$profileFields = Db::i()->select( '*', 'core_pfields_content', array( 'member_id=?', $this->member->member_id ) )->first();
+				$profileFields = \IPS\Db::i()->select( '*', 'core_pfields_content', array( 'member_id=?', $this->member->member_id ) )->first();
 				
-				if ( !is_array( $profileFields ) ) // If \IPS\Db::i()->select()->first() has only one column, then the contents of that column is returned. We do not want this here
+				if ( !\is_array( $profileFields ) ) // If \IPS\Db::i()->select()->first() has only one column, then the contents of that column is returned. We do not want this here
 				{
 					$profileFields = array();
 				}
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$profileFields	= array();
 			}			
 			$profileFields['member_id'] = $this->member->member_id;
-			foreach ( Field::fields( $profileFields, Field::STAFF, $this->member ) as $group => $fields )
+			foreach ( \IPS\core\ProfileFields\Field::fields( $profileFields, \IPS\core\ProfileFields\Field::STAFF, $this->member ) as $group => $fields )
 			{
 				foreach ( $fields as $id => $field )
 				{
-					if ( $field instanceof Upload )
+					if ( $field instanceof \IPS\Helpers\Form\Upload )
 					{
 						$profileFields[ "field_{$id}" ] = (string) $values[ $field->name ];
 					}
@@ -209,36 +184,30 @@ class ProfileData extends TabbedBlock
 				}
 			}
 			$this->member->changedCustomFields = $profileFields;
-			Db::i()->replace( 'core_pfields_content', $profileFields );
+			\IPS\Db::i()->replace( 'core_pfields_content', $profileFields );
 
 			/* Profile Preferences */
-			if( Settings::i()->profile_birthday_type !== 'none' )
+			if ( $values['bday'] )
 			{
-				if ( $values['bday'] )
-				{
-					$this->member->bday_day	= $values['bday']['day'];
-					$this->member->bday_month	= $values['bday']['month'];
-					$this->member->bday_year	= $values['bday']['year'];
-				}
-				else
-				{
-					$this->member->bday_day = NULL;
-					$this->member->bday_month = NULL;
-					$this->member->bday_year = NULL;
-				}
+				$this->member->bday_day	= $values['bday']['day'];
+				$this->member->bday_month	= $values['bday']['month'];
+				$this->member->bday_year	= $values['bday']['year'];
 			}
-
-			if ( Settings::i()->signatures_enabled )
+			else
+			{
+				$this->member->bday_day = NULL;
+				$this->member->bday_month = NULL;
+				$this->member->bday_year = NULL;
+			}
+			if ( \IPS\Settings::i()->signatures_enabled )
 			{
 				$this->member->signature = $values['signature'];
-				File::claimAttachments( 'sig-' . $this->member->member_id, $this->member->member_id );
 			}
-
 			$this->member->save();
 											
 			/* Log and Redirect */
-			Session::i()->log( 'acplog__members_edited_profile', array( $this->member->name => FALSE ) );
-			Output::i()->redirect( Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member->member_id}" ), 'saved' );
+			\IPS\Session::i()->log( 'acplog__members_edited_profile', array( $this->member->name => FALSE ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member->member_id}" ), 'saved' );
 		}
 		
 		/* Display */

@@ -12,58 +12,36 @@
 namespace IPS\forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\File;
-use IPS\forums\Topic\Post;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_object;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Saved Action Node
  */
-class SavedAction extends Model
+class _SavedAction extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'forums_topic_mmod';
+	public static $databaseTable = 'forums_topic_mmod';
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'saved_actions';
+	public static $nodeTitle = 'saved_actions';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'mm_id';
+	public static $databaseColumnId = 'mm_id';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -81,7 +59,7 @@ class SavedAction extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'forums',
 		'module'	=> 'forums',
 		'prefix'	=> 'savedActions_'
@@ -90,32 +68,25 @@ class SavedAction extends Model
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'forums_mmod_';
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
+	public static $titleLangPrefix = 'forums_mmod_';
 	
 	/**
 	 * Get available saved actions for a forum
 	 *
-	 * @param Forum $forum	The forum
-	 * @param	Member|NULL	$member	The member (NULL for currently logged in)
+	 * @param	\IPS\forums\Forum	$forum	The forum
+	 * @param	\IPS\Member|NULL	$member	The member (NULL for currently logged in)
 	 * @return	array
 	 */
-	public static function actions( Forum $forum, Member $member = NULL ): array
+	public static function actions( \IPS\forums\Forum $forum, \IPS\Member $member = NULL )
 	{
 		$return = array();
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
-		if ( $member->modPermission('can_use_saved_actions') and Topic::modPermission( 'use_saved_actions', $member, $forum ) )
+		if ( $member->modPermission('can_use_saved_actions') and \IPS\forums\Topic::modPermission( 'use_saved_actions', $member, $forum ) )
 		{
 			foreach ( static::getStore() as $action )
 			{
-				if ( $action['mm_enabled'] and ( $action['mm_forums'] == '*' or in_array( $forum->id, $forum->normalizeIds( $action['mm_forums'] ) ) ) )
+				if ( $action['mm_enabled'] and ( $action['mm_forums'] == '*' or \in_array( $forum->id, array_filter( explode( ',', $action['mm_forums'] ) ) ) ) )
 				{
 					$return[ $action['mm_id'] ] = static::constructFromData( $action );
 				}
@@ -132,7 +103,7 @@ class SavedAction extends Model
 	 * @note	Return value NULL indicates the node cannot be enabled/disabled
 	 * @return	bool|null
 	 */
-	protected function get__enabled(): ?bool
+	protected function get__enabled()
 	{
 		return $this->mm_enabled;
 	}
@@ -143,7 +114,7 @@ class SavedAction extends Model
 	 * @param	bool|int	$enabled	Whether to set it enabled or disabled
 	 * @return	void
 	 */
-	protected function set__enabled( bool|int $enabled ) : void
+	protected function set__enabled( $enabled )
 	{
 		$this->mm_enabled	= $enabled;
 	}
@@ -151,46 +122,33 @@ class SavedAction extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$form->addHeader( 'settings' );
-		$form->add( new Translatable( 'mm_title', NULL, TRUE, array( 'app' => 'forums', 'key' => ( $this->mm_id ? "forums_mmod_{$this->mm_id}" : NULL ) ) ) );
-		$form->add( new Node( 'mm_forums', ( $this->mm_id and $this->mm_forums != '*' ) ? $this->mm_forums : 0, FALSE, array(
-			'class' => 'IPS\forums\Forum',
-			'multiple' => true,
-			'nodeGroups' => true,
-			'clubs' => true,
-			'zeroVal' => 'all' )
-		) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'mm_title', NULL, TRUE, array( 'app' => 'forums', 'key' => ( $this->mm_id ? "forums_mmod_{$this->mm_id}" : NULL ) ) ) );		
+		$form->add( new \IPS\Helpers\Form\Node( 'mm_forums', ( $this->mm_id and $this->mm_forums != '*' ) ? $this->mm_forums : 0, FALSE, array( 'class' => 'IPS\forums\Forum', 'clubs' => true, 'multiple' => TRUE, 'zeroVal' => 'all' ) ) );
 		
 		$form->addHeader( 'topic_properties' );
-		$form->add( new Radio( 'topic_state', $this->mm_id ? $this->topic_state : 'leave', FALSE, array( 'options' => array( 'leave' => 'mm_leave', 'open' => 'unlock', 'close' => 'lock' ) ) ) );
-		$form->add( new Radio( 'topic_pin', $this->mm_id ? $this->topic_pin : 'leave', FALSE, array( 'options' => array( 'leave' => 'mm_leave', 'pin' => 'pin', 'unpin' => 'unpin' ) ) ) );
-		$form->add( new Radio( 'topic_approve', $this->mm_id ? $this->topic_approve : 0, FALSE, array( 'options' => array( 0 => 'mm_leave', 1 => 'unhide', 2 => 'hide' ) ) ) );
-		$form->add( new Node( 'topic_move', ( $this->mm_id and $this->topic_move != -1 ) ? $this->topic_move : 0, FALSE, array(
-			'class' => 'IPS\forums\Forum',
-			'zeroVal' => 'topic_move_none',
-			'zeroValTogglesOff' => array( 'topic_move_link' ),
-			'permissionCheck' => function ( $forum )
-			{
-				return $forum->sub_can_post and !$forum->redirect_url;
-			} )
-		) );
-		$form->add( new YesNo( 'topic_move_link', $this->mm_id ? $this->topic_move_link : TRUE, FALSE, array(), NULL, NULL, NULL, 'topic_move_link' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'topic_state', $this->mm_id ? $this->topic_state : 'leave', FALSE, array( 'options' => array( 'leave' => 'mm_leave', 'open' => 'unlock', 'close' => 'lock' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'topic_pin', $this->mm_id ? $this->topic_pin : 'leave', FALSE, array( 'options' => array( 'leave' => 'mm_leave', 'pin' => 'pin', 'unpin' => 'unpin' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'topic_approve', $this->mm_id ? $this->topic_approve : 0, FALSE, array( 'options' => array( 0 => 'mm_leave', 1 => 'unhide', 2 => 'hide' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'topic_move', ( $this->mm_id and $this->topic_move != -1 ) ? $this->topic_move : 0, FALSE, array( 'class' => 'IPS\forums\Forum', 'clubs' => true, 'zeroVal' => 'topic_move_none', 'zeroValTogglesOff' => array( 'topic_move_link' ), 'permissionCheck' => function ( $forum )
+					{
+						return $forum->sub_can_post and !$forum->redirect_url;
+					} ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'topic_move_link', $this->mm_id ? $this->topic_move_link : TRUE, FALSE, array(), NULL, NULL, NULL, 'topic_move_link' ) );
 		
 		$form->addHeader( 'topic_title' );
-		$form->add( new Text( 'topic_title_st', $this->mm_id ? $this->topic_title_st : NULL, FALSE, array( 'trim' => FALSE ) ) );
-		$form->add( new Text( 'topic_title_end', $this->mm_id ? $this->topic_title_end : NULL, FALSE, array( 'trim' => FALSE ) ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'topic_title_st', $this->mm_id ? $this->topic_title_st : NULL, FALSE, array( 'trim' => FALSE ) ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'topic_title_end', $this->mm_id ? $this->topic_title_end : NULL, FALSE, array( 'trim' => FALSE ) ) );
 		
 		$form->addHeader( 'add_reply' );
-		$form->add( new YesNo( 'topic_reply', $this->mm_id ? $this->topic_reply : FALSE, FALSE, array( 'togglesOn' => array( 'topic_reply_content_editor', 'topic_reply_postcount' ) ) ) );
-		$form->add( new Editor( 'topic_reply_content', $this->mm_id ? $this->topic_reply_content : FALSE, FALSE, array( 'app' => 'core', 'key' => 'Admin', 'autoSaveKey' => ( $this->mm_id ? "forums-mmod-{$this->mm_id}" : "forums-new-mmod" ), 'attachIds' => $this->mm_id ? array( $this->mm_id, NULL, 'mmod' ) : NULL ), NULL, NULL, NULL, 'topic_reply_content_editor' ) );
-		$form->add( new YesNo( 'topic_reply_postcount', $this->mm_id ? $this->topic_reply_postcount : TRUE, FALSE, array(), NULL, NULL, NULL, 'topic_reply_postcount' ) );
-
-		parent::form( $form );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'topic_reply', $this->mm_id ? $this->topic_reply : FALSE, FALSE, array( 'togglesOn' => array( 'topic_reply_content_editor', 'topic_reply_postcount' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'topic_reply_content', $this->mm_id ? $this->topic_reply_content : FALSE, FALSE, array( 'app' => 'core', 'key' => 'Admin', 'autoSaveKey' => ( $this->mm_id ? "forums-mmod-{$this->mm_id}" : "forums-new-mmod" ), 'attachIds' => $this->mm_id ? array( $this->mm_id, NULL, 'mmod' ) : NULL ), NULL, NULL, NULL, 'topic_reply_content_editor' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'topic_reply_postcount', $this->mm_id ? $this->topic_reply_postcount : TRUE, FALSE, array(), NULL, NULL, NULL, 'topic_reply_postcount' ) );
 	}
 	
 	/**
@@ -199,7 +157,7 @@ class SavedAction extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if( isset( $values['mm_forums'] ) )
 		{
@@ -209,13 +167,19 @@ class SavedAction extends Model
 			}
 			else 
 			{
-				$values['mm_forums'] = array_keys( $values['mm_forums'] );
+				$forums = array();
+				foreach ( $values['mm_forums'] as $forum )
+				{
+					$forums[] = $forum->_id;
+				}
+				
+				$values['mm_forums'] = ( implode( ',', $forums ) );
 			}
 		}
 
 		if( isset( $values['topic_move'] ) )
 		{
-			if ( !is_object( $values['topic_move'] ) and $values['topic_move'] == 0 )
+			if ( !\is_object( $values['topic_move'] ) and $values['topic_move'] == 0 )
 			{
 				$values['topic_move'] = -1;
 			}
@@ -229,12 +193,12 @@ class SavedAction extends Model
 		{
 			$this->mm_enabled = $values['mm_enabled'] = TRUE;
 			$this->save();
-			File::claimAttachments( 'forums-new-mmod', $this->mm_id, NULL, 'forumsSavedAction' );
+			\IPS\File::claimAttachments( 'forums-new-mmod', $this->mm_id, NULL, 'forumsSavedAction' );
 		}
 
 		if ( isset( $values['mm_title'] ) )
 		{
-			Lang::saveCustom( 'forums', "forums_mmod_{$this->mm_id}", $values['mm_title'] );
+			\IPS\Lang::saveCustom( 'forums', "forums_mmod_{$this->mm_id}", $values['mm_title'] );
 			unset( $values['mm_title'] );
 		}
 
@@ -244,36 +208,36 @@ class SavedAction extends Model
 	/**
 	 * Check Permissions and run the saved action
 	 *
-	 * @param Topic $topic	The topic to run on
-	 * @param	Member|NULL	$member	Member running (NULL for currently logged in member)
+	 * @param	\IPS\forums\Topic	$topic	The topic to run on
+	 * @param	\IPS\Member|NULL	$member	Member running (NULL for currently logged in member)
 	 * @return	void
 	 */
-	public function runOn( Topic $topic, Member $member = NULL ) : void
+	public function runOn( \IPS\forums\Topic $topic, \IPS\Member $member = NULL )
 	{
 		/* Permission Checks */
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Check the member can use saved actions, and they can moderate in this forum */
 		if ( !$member->modPermission('can_use_saved_actions') )
 		{
-			throw new DomainException('NO_PERMISSION');
+			throw new \DomainException('NO_PERMISSION');
 		}
 
 		if ( $member->modPermission( 'forums' ) !== -1 AND $member->modPermission( 'forums' ) !== TRUE )
 		{
-			if ( !is_array( $member->modPermission( 'forums' ) ) or !in_array( $topic->container()->_id, $member->modPermission( 'forums' ) ) )
+			if ( !\is_array( $member->modPermission( 'forums' ) ) or !\in_array( $topic->container()->_id, $member->modPermission( 'forums' ) ) )
 			{
-				throw new DomainException('NO_PERMISSION');
+				throw new \DomainException('NO_PERMISSION');
 			}
 		}
 		/* Check the action is enabled and allowed for the content item */
 		if ( !$this->mm_enabled )
 		{
-			throw new DomainException('DISABLED');
+			throw new \DomainException('DISABLED');
 		}
-		if ( $this->mm_forums !== '*' and !in_array( $topic->container()->_id, explode( ',', $this->mm_forums ) ) )
+		if ( $this->mm_forums !== '*' and !\in_array( $topic->container()->_id, explode( ',', $this->mm_forums ) ) )
 		{
-			throw new DomainException('BAD_FORUM');
+			throw new \DomainException('BAD_FORUM');
 		}
 
 		$this->_runOn( $topic, $member);
@@ -282,16 +246,16 @@ class SavedAction extends Model
 	/**
 	 * Run saved action
 	 *
-	 * @param Topic $topic	The topic to run on
-	 * @param	Member|NULL	$member	Member running (NULL for currently logged in member)
+	 * @param	\IPS\forums\Topic	$topic	The topic to run on
+	 * @param	\IPS\Member|NULL	$member	Member running (NULL for currently logged in member)
 	 * @return	void
 	 */
-	protected function _runOn( Topic $topic, Member $member = NULL ) : void
+	protected function _runOn( \IPS\forums\Topic $topic, \IPS\Member $member = NULL )
 	{
 		/* Archived Topics can't used saved actions */
 		if ( $topic->isArchived() )
 		{
-			throw new DomainException('TOPIC_ARCHIVED');
+			throw new \DomainException('TOPIC_ARCHIVED');
 		}
 		/* Open/Close */
 		if ( $this->topic_state == 'open' )
@@ -339,7 +303,7 @@ class SavedAction extends Model
 		/* Reply */
 		if ( $this->topic_reply )
 		{
-			$reply = Post::create( $topic, $this->topic_reply_content, false, null, isset( $this->topic_reply_postcount ) and $this->topic_reply_postcount );
+			$reply = \IPS\forums\Topic\Post::create( $topic, $this->topic_reply_content, FALSE, NULL, isset( $this->topic_reply_postcount ) AND  $this->topic_reply_postcount ? TRUE : FALSE );
 		}
 
 		/* Move */
@@ -347,20 +311,20 @@ class SavedAction extends Model
 		{
 			try
 			{
-				$topic->move( Forum::load( $this->topic_move ), $this->topic_move_link );
+				$topic->move( \IPS\forums\Forum::load( $this->topic_move ), $this->topic_move_link );
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 	}
 
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		File::unclaimAttachments( 'core_Admin', $this->mm_id, NULL, 'forumsSavedAction' );
+		\IPS\File::unclaimAttachments( 'core_Admin', $this->mm_id, NULL, 'forumsSavedAction' );
 		parent::delete();
 	}
 
@@ -368,20 +332,20 @@ class SavedAction extends Model
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'forumsSavedActions' );
+	protected $caches = array( 'forumsSavedActions' );
 
 	/**
 	 * Get data store
 	 *
 	 * @return	array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->forumsSavedActions ) )
+		if ( !isset( \IPS\Data\Store::i()->forumsSavedActions ) )
 		{
-			Store::i()->forumsSavedActions = iterator_to_array( Db::i()->select( '*', 'forums_topic_mmod' ) );
+			\IPS\Data\Store::i()->forumsSavedActions = iterator_to_array( \IPS\Db::i()->select( '*', 'forums_topic_mmod' ) );
 		}
 		
-		return Store::i()->forumsSavedActions;
+		return \IPS\Data\Store::i()->forumsSavedActions;
 	}
 }

@@ -12,31 +12,16 @@
 namespace IPS\nexus\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use IPS\GeoLocation;
-use IPS\Helpers\Form\Address;
-use IPS\Http\Request\Exception;
-use IPS\Log;
-use IPS\nexus\Tax;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Consumer/business address input class for Form Builder
  */
-class BusinessAddress extends Address
+class _BusinessAddress extends \IPS\Helpers\Form\Address
 {
 	/**
 	 * @brief	Default Options
@@ -48,30 +33,25 @@ class BusinessAddress extends Address
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'minimize' 				=> FALSE,
 		'requireFullAddress'	=> TRUE,
 		'vat'					=> FALSE
 	);
-
-	/**
-	 * @brief 	Country codes that require a business name
-	 */
-	protected static array $vatCountries = array( 'AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','GB','GP','MQ','RE','BL','GF','MF','NC','PF','PM','TF','YT','WF' );
 	
 	/** 
 	 * Get HTML
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'global_forms.js', 'nexus', 'global' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'global_forms.js', 'nexus', 'global' ) );
 
 		/* If we don't have a value, set their country based on the HTTP headers */
-		if ( !$this->value OR ( $this->value instanceof GeoLocation AND !$this->value->country ) )
+		if ( !$this->value OR ( $this->value instanceof \IPS\GeoLocation AND !$this->value->country ) )
 		{
-			$this->value = ( $this->value instanceof GeoLocation ) ? $this->value : new GeoLocation;
+			$this->value = ( $this->value instanceof \IPS\GeoLocation ) ? $this->value : new \IPS\GeoLocation;
 			if ( $defaultCountry = static::calculateDefaultCountry() )
 			{
 				$this->value->country = $defaultCountry;
@@ -85,7 +65,7 @@ class BusinessAddress extends Address
 		}
 		
 		/* Display */
-		return Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->businessAddress( $this->name, $this->value, Settings::i()->googleplacesautocomplete ? Settings::i()->google_maps_api_key : NULL, $this->options['minimize'], $this->options['requireFullAddress'], $this->htmlId, $this->options['vat'] );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->businessAddress( $this->name, $this->value, \IPS\Settings::i()->googleplacesautocomplete ? \IPS\Settings::i()->google_maps_api_key : NULL, $this->options['minimize'], $this->options['requireFullAddress'], $this->htmlId, $this->options['vat'] );
 	}
 	
 	/**
@@ -93,7 +73,7 @@ class BusinessAddress extends Address
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		/* Get the normal address stuff */
 		$value = parent::getValue();
@@ -102,13 +82,13 @@ class BusinessAddress extends Address
 		if ( $value )
 		{
 			$name = $this->name;
-			if( Request::i()->$name['type'] === 'business' )
+			if( \IPS\Request::i()->$name['type'] === 'business' )
 			{
-				$value->business = Request::i()->$name['business'];
+				$value->business = \IPS\Request::i()->$name['business'];
 				
-				if ( $this->options['vat'] and in_array( $value->country, static::$vatCountries ) and Request::i()->$name['vat'] )
+				if ( $this->options['vat'] and \in_array( $value->country, array('AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','GB') ) and \IPS\Request::i()->$name['vat'] )
 				{
-					$value->vat = Request::i()->$name['vat'];
+					$value->vat = \IPS\Request::i()->$name['vat'];
 				}
 				else
 				{
@@ -129,38 +109,38 @@ class BusinessAddress extends Address
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		parent::validate();
 		
 		if( $this->value )
 		{
-			if ( $this->options['vat'] and in_array( $this->value->country, static::$vatCountries ) and $this->value->business === '' )
+			if ( $this->value->business === '' )
 			{
-				throw new DomainException('cm_business_name_required');
+				throw new \DomainException('cm_business_name_required');
 			}
 			
 			if ( $this->value->vat )
 			{
 				try
 				{
-					$response = Tax::validateVAT( $this->value->vat );
+					$response = \IPS\nexus\Tax::validateVAT( $this->value->vat );
 					if ( !$response )
 					{
-						throw new DomainException('cm_checkout_vat_invalid');
+						throw new \DomainException('cm_checkout_vat_invalid');
 					}
 					elseif ( $response['countryCode'] !== $this->value->country )
 					{
-						throw new DomainException('cm_checkout_vat_wrong_country');
+						throw new \DomainException('cm_checkout_vat_wrong_country');
 					}
 				}
-				catch ( Exception $e )
+				catch ( \IPS\Http\Request\Exception $e )
 				{
-					Log::log( $e, 'vat-validation' );
-					throw new DomainException('cm_checkout_vat_error');
+					\IPS\Log::log( $e, 'vat-validation' );
+					throw new \DomainException('cm_checkout_vat_error');
 				}
 			}
 		}

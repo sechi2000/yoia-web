@@ -12,51 +12,36 @@
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Codemirror;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancement
  */
-class Matomo extends CommunityEnhancementsAbstract
+class _Matomo
 {
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= FALSE;
+	public $ips	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= TRUE;
+	public $hasOptions	= TRUE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "matomo.png";
+	public $icon	= "matomo.png";
 	
 	/**
 	 * Constructor
@@ -65,7 +50,7 @@ class Matomo extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		$this->enabled = ( Settings::i()->matomo_enabled and Settings::i()->matomo_code );
+		$this->enabled = ( \IPS\Settings::i()->matomo_enabled and \IPS\Settings::i()->matomo_code );
 	}
 	
 	/**
@@ -73,20 +58,20 @@ class Matomo extends CommunityEnhancementsAbstract
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
 		
 		$validation = function( $val ) {
-			if ( $val and !Request::i()->matomo_code )
+			if ( $val and !\IPS\Request::i()->matomo_code )
 			{
-				throw new DomainException('matomo_code_required');
+				throw new \DomainException('matomo_code_required');
 			}
 		};
 		
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;		
 		
-		$form->add( new YesNo( 'matomo_enabled', Settings::i()->matomo_enabled, FALSE, array(), $validation ) );
-		$form->add( new Codemirror( 'matomo_code', Settings::i()->matomo_code, FALSE, array( 'height' => 150, 'codeModeAllowedLanguages' => [ 'html' ] ), NULL, NULL, NULL, 'matomo_code' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'matomo_enabled', \IPS\Settings::i()->matomo_enabled, FALSE, array(), $validation ) );
+		$form->add( new \IPS\Helpers\Form\Codemirror( 'matomo_code', \IPS\Settings::i()->matomo_code, FALSE, array( 'height' => 150, 'mode' => 'javascript' ), NULL, NULL, NULL, 'matomo_code' ) );	
 		
 		if ( $form->values() )
 		{
@@ -94,24 +79,24 @@ class Matomo extends CommunityEnhancementsAbstract
 			{
 				$form->saveAsSettings();
 
-				Output::i()->inlineMessage	= Member::loggedIn()->language()->addToStack('saved');
+				\IPS\Output::i()->inlineMessage	= \IPS\Member::loggedIn()->language()->addToStack('saved');
 			}
-			catch ( LogicException $e )
+			catch ( \LogicException $e )
 			{
 				$form->error = $e->getMessage();
 			}
 		}
 		
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'help'	=> array(
 				'title'		=> 'learn_more',
 				'icon'		=> 'question-circle',
-				'link'		=> Url::ips( 'docs/matomo' ),
+				'link'		=> \IPS\Http\Url::ips( 'docs/matomo' ),
 				'target'	=> '_blank'
 			),
 		);
 		
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_Matomo', $form );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( 'enhancements__core_Matomo', $form );
 	}
 	
 	/**
@@ -119,24 +104,24 @@ class Matomo extends CommunityEnhancementsAbstract
 	 *
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		if ( $enabled )
 		{
-			if ( Settings::i()->matomo_code )
+			if ( \IPS\Settings::i()->matomo_code )
 			{
-				Settings::i()->changeValues( array( 'matomo_enabled' => 1 ) );
+				\IPS\Settings::i()->changeValues( array( 'matomo_enabled' => 1 ) );
 			}
 			else
 			{
-				throw new DomainException;
+				throw new \DomainException;
 			}
 		}
 		else
 		{
-			Settings::i()->changeValues( array( 'matomo_enabled' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'matomo_enabled' => 0 ) );
 		}
 	}
 }

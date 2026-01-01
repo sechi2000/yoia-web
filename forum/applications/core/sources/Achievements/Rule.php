@@ -11,60 +11,31 @@
 namespace IPS\core\Achievements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Application;
-use IPS\core\Achievements\Actions\AchievementActionAbstract;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Translatable;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Task;
-use IPS\Theme;
-use OutOfRangeException;
-use XMLReader;
-use function count;
-use function defined;
-use function get_class;
-use function intval;
-use function is_array;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievements Rule Model
  */
-class Rule extends Model
+class _Rule extends \IPS\Node\Model
 {
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_achievements_rules';
+	public static $databaseTable = 'core_achievements_rules';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'achievements_rules';
+	public static $nodeTitle = 'achievements_rules';
 
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -82,7 +53,7 @@ class Rule extends Model
 	'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'achievements',
 		'prefix'	=> 'rules_',
@@ -92,7 +63,7 @@ class Rule extends Model
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = ['achievementRules'];
+	protected $caches = ['achievementRules'];
 	
 	/**
 	 * [ActiveRecord] Get cached rules
@@ -101,7 +72,7 @@ class Rule extends Model
 	 */
 	public static function getStore(): array
 	{
-		if ( !isset( Store::i()->achievementRules ) )
+		if ( !isset( \IPS\Data\Store::i()->achievementRules ) )
 		{
 			$v = [];
 			foreach ( static::roots() as $rule )
@@ -119,21 +90,21 @@ class Rule extends Model
 					'enabled'       => $rule->enabled
 				];
 			}
-			Store::i()->achievementRules = $v;
+			\IPS\Data\Store::i()->achievementRules = $v;
 		}
 		
-		return Store::i()->achievementRules;
+		return \IPS\Data\Store::i()->achievementRules;
 	}
 	
 	/**
 	 * Get the extension
 	 *
-	 * @return	AchievementActionAbstract|null
+	 * @return	\IPS\core\Achievements\Actions\AbstractAchievementAction
 	 */
-	public function extension(): ?AchievementActionAbstract
+	public function extension(): \IPS\core\Achievements\Actions\AbstractAchievementAction
 	{
 		$exploded = explode( '_', $this->action );
-		return Application::load( $exploded[0] )->extensions( 'core', 'AchievementAction' )[ $exploded[1] ] ?? null;
+		return \IPS\Application::load( $exploded[0] )->extensions( 'core', 'AchievementAction' )[ $exploded[1] ];
 	}
 		
 	/**
@@ -141,9 +112,9 @@ class Rule extends Model
 	 *
 	 * @return	array|NULL
 	 */
-	protected function get_filters() : ?array
+	protected function get_filters()
 	{
-		if ( isset( $this->_data['filters'] ) and is_array( $this->_data['filters'] ) )
+		if ( isset( $this->_data['filters'] ) and \is_array( $this->_data['filters'] ) )
 		{
 			return $this->_data['filters'];
 		}
@@ -154,32 +125,31 @@ class Rule extends Model
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
+		$form->_activeFilters = [];
+		
 		$options = [];
 		$toggles = [];
 		$extraElements = [];
-		foreach ( Application::allExtensions( 'core', 'AchievementAction' ) as $achievementAction )
+		foreach ( \IPS\Application::allExtensions( 'core', 'AchievementAction' ) as $achievementAction )
 		{
 			if ( ! $achievementAction->canUse() )
 			{
 				continue;
 			}
 
-			$exploded = explode( '\\', get_class( $achievementAction ) );
-			$app = $exploded[1];
-			$extClass = $exploded[5];
-			$inputKey = implode( "_", [$app, $extClass] );
-			$options[ $inputKey ] = "AchievementAction__{$extClass}";
+			$exploded = explode( '\\', \get_class( $achievementAction ) );
+			$options[ "{$exploded[1]}_{$exploded[5]}" ] = "AchievementAction__{$exploded[5]}";
 
-			$toggles[ $inputKey ] = [ "{$inputKey}_award_subject" ];
-			$toggles[ $inputKey ][] = "{$inputKey}_award_subject_badge";
-			foreach ($achievementAction->filters( $this->filters, Url::internal( $this->id ? "app=core&module=achievements&controller=rules&do=form&id={$this->id}" : 'app=core&module=achievements&controller=rules&do=form' ) ) as $filterKey => $filterElement )
+			$toggles[ "{$exploded[1]}_{$exploded[5]}" ] = [ "{$exploded[1]}_{$exploded[5]}_award_subject" ];
+			$toggles[ "{$exploded[1]}_{$exploded[5]}" ][] = "{$exploded[1]}_{$exploded[5]}_award_subject_badge";
+			foreach ( $achievementAction->filters( $this->filters, \IPS\Http\Url::internal( $this->id ? "app=core&module=achievements&controller=rules&do=form&id={$this->id}" : 'app=core&module=achievements&controller=rules&do=form' ) ) as $filterKey => $filterElement )
 			{
-				if ( is_array( $this->filters ) and array_key_exists( $filterKey, $this->filters ) )
+				if ( $this->filters and array_key_exists( $filterKey, $this->filters ) )
 				{
 					$form->_activeFilters[] = $filterElement->name;
 				}
@@ -187,39 +157,39 @@ class Rule extends Model
 				{
 					$filterElement->htmlId = $filterElement->name;
 				}
-				$toggles[ $inputKey ][] = $filterElement->htmlId;
+				$toggles[ "{$exploded[1]}_{$exploded[5]}" ][] = $filterElement->htmlId;
 				$extraElements[] = $filterElement;
 			}
 
 			$awardTo = $achievementAction->awardOptions( $this->filters );
-			$awardSubjectField = new Custom( "{$inputKey}_award_subject", [ 'points' => $this->points_subject, 'badge' => $this->badge_subject ], FALSE, [
+			$awardSubjectField = new \IPS\Helpers\Form\Custom( "{$exploded[1]}_{$exploded[5]}_award_subject", [ 'points' => $this->points_subject, 'badge' => $this->badge_subject ], FALSE, [
 				'getHtml' => function( $field ) {
-					return Theme::i()->getTemplate('achievements')->awardField( $field->name, $field->value );
+					return \IPS\Theme::i()->getTemplate('achievements')->awardField( $field->name, $field->value );
 				}
-			], NULL, NULL, NULL, "{$inputKey}_award_subject" );
+			], NULL, NULL, NULL, "{$exploded[1]}_{$exploded[5]}_award_subject" );
 			if ( isset( $awardTo['subject'] ) )
 			{
-				$awardSubjectField->label = Member::loggedIn()->language()->addToStack( $awardTo['subject'] );
+				$awardSubjectField->label = \IPS\Member::loggedIn()->language()->addToStack( $awardTo['subject'] );
 			}
 			$extraElements[] = $awardSubjectField;
-			$extraElements[] = new Translatable( "{$inputKey}_award_subject_badge", NULL, NULL, [ 'app' => 'core', 'key' => ( $this->id ) ? "core_award_subject_badge_" . $this->id : NULL ], NULL, NULL, NULL, "{$inputKey}_award_subject_badge" );
+			$extraElements[] = new \IPS\Helpers\Form\Translatable( "{$exploded[1]}_{$exploded[5]}_award_subject_badge", NULL, NULL, [ 'app' => 'core', 'key' => ( $this->id ) ? "core_award_subject_badge_" . $this->id : NULL ], NULL, NULL, NULL, "{$exploded[1]}_{$exploded[5]}_award_subject_badge" );
 
 			if ( isset( $awardTo['other'] ) )
 			{
-				$awardOtherField = new Custom( "{$inputKey}_award_other", [ 'points' => $this->points_other, 'badge' => $this->badge_other ], FALSE, [
+				$awardOtherField = new \IPS\Helpers\Form\Custom( "{$exploded[1]}_{$exploded[5]}_award_other", [ 'points' => $this->points_other, 'badge' => $this->badge_other ], FALSE, [
 					'getHtml' => function( $field ) {
-						return Theme::i()->getTemplate('achievements')->awardField( $field->name, $field->value );
+						return \IPS\Theme::i()->getTemplate('achievements')->awardField( $field->name, $field->value );
 					}
-				], NULL, NULL, NULL, "{$inputKey}_award_other" );
-				$awardOtherField->label = Member::loggedIn()->language()->addToStack( $awardTo['other'] );
+				], NULL, NULL, NULL, "{$exploded[1]}_{$exploded[5]}_award_other" );
+				$awardOtherField->label = \IPS\Member::loggedIn()->language()->addToStack( $awardTo['other'] );
 				$extraElements[] = $awardOtherField;
-				$extraElements[] = new Translatable( "{$inputKey}_award_other_badge", NULL, NULL, [ 'app' => 'core', 'key' => ( $this->id ) ? "core_award_other_badge_" . $this->id : NULL ], NULL, NULL, NULL, "{$inputKey}_award_other_badge" );
-				$toggles[ $inputKey ][] = "{$inputKey}_award_other";
-				$toggles[ $inputKey ][] = "{$inputKey}_award_other_badge";
+				$extraElements[] = new \IPS\Helpers\Form\Translatable( "{$exploded[1]}_{$exploded[5]}_award_other_badge", NULL, NULL, [ 'app' => 'core', 'key' => ( $this->id ) ? "core_award_other_badge_" . $this->id : NULL ], NULL, NULL, NULL, "{$exploded[1]}_{$exploded[5]}_award_other_badge" );
+				$toggles[ "{$exploded[1]}_{$exploded[5]}" ][] = "{$exploded[1]}_{$exploded[5]}_award_other";
+				$toggles[ "{$exploded[1]}_{$exploded[5]}" ][] = "{$exploded[1]}_{$exploded[5]}_award_other_badge";
 			}
 		}
 
-		$form->add( new Select( 'achievement_rule_action', $this->action, TRUE, [ 'options' => $options, 'toggles' => $toggles, 'sort' => TRUE ] ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'achievement_rule_action', $this->action, TRUE, [ 'options' => $options, 'toggles' => $toggles, 'sort' => TRUE ] ) );
 
 		foreach ( $extraElements as $element )
 		{
@@ -233,22 +203,22 @@ class Rule extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( !$this->id )
 		{
 			$this->action = '';
-			$this->filters = null;
+			$this->filters = NULL;
 			$this->points_other = 0;
 			$this->points_subject = 0;
 			$this->save();
 		}
 
 		$exploded = explode( '_', $values['achievement_rule_action'] );
-		$extension = Application::load( $exploded[0] )->extensions( 'core', 'AchievementAction' )[ $exploded[1] ];
+		$extension = \IPS\Application::load( $exploded[0] )->extensions( 'core', 'AchievementAction' )[ $exploded[1] ];
 		
 		$filterValues = [];
-		foreach ( Request::i()->activeFilters ?: [] as $k => $v )
+		foreach ( \IPS\Request::i()->activeFilters ?: [] as $k => $v )
 		{
 			$filterValues[ $k ] = $values[ $k ];
 		}
@@ -260,37 +230,39 @@ class Rule extends Model
 			{
 				if ( $values[$values['achievement_rule_action'] . '_award_' . $type]['badge'] )
 				{
-					Lang::saveCustom( 'core', "core_award_" . $type . "_badge_{$this->id}", $values[$values['achievement_rule_action'] . '_award_' . $type . '_badge'] );
+					\IPS\Lang::saveCustom( 'core', "core_award_" . $type . "_badge_{$this->id}", $values[$values['achievement_rule_action'] . '_award_' . $type . '_badge'] );
 				}
 				else
 				{
-					Lang::deleteCustom( 'core', "core_award_" . $type . "_badge_{$this->id}" );
+					\IPS\Lang::deleteCustom( 'core', "core_award_" . $type . "_badge_{$this->id}" );
 				}
 
 				unset( $values[$values['achievement_rule_action'] . '_award_' . $type . '_badge'] );
 			}
 		}
 
-		return [
+		$return = [
 			'action'		=> $values['achievement_rule_action'],
 			'filters'		=> $filters ? json_encode( $filters ) : NULL,
-			'milestone'		=> ( isset( $filters['milestone'] ) and is_numeric( $filters['milestone'] ) ) ? $filters['milestone'] : NULL,
-			'points_subject'=> intval( $values[ $values['achievement_rule_action'] . '_award_subject' ]['points'] ),
-			'badge_subject'	=> $values[ $values['achievement_rule_action'] . '_award_subject' ]['badge'] ? intval( $values[ $values['achievement_rule_action'] . '_award_subject' ]['badge'] ): NULL,
-			'points_other'	=> intval( isset( $values[ $values['achievement_rule_action'] . '_award_other' ] ) ? $values[ $values['achievement_rule_action'] . '_award_other' ]['points'] : 0 ),
-			'badge_other'	=> isset( $values[ $values['achievement_rule_action'] . '_award_other' ] ) ? ( $values[ $values['achievement_rule_action'] . '_award_other' ]['badge'] ? intval( $values[ $values['achievement_rule_action'] . '_award_other' ]['badge'] ) : NULL ) : NULL,
+			'milestone'		=> ( isset( $filters['milestone'] ) and \is_numeric( $filters['milestone'] ) ) ? $filters['milestone'] : NULL,
+			'points_subject'=> \intval( $values[ $values['achievement_rule_action'] . '_award_subject' ]['points'] ),
+			'badge_subject'	=> $values[ $values['achievement_rule_action'] . '_award_subject' ]['badge'] ? \intval( $values[ $values['achievement_rule_action'] . '_award_subject' ]['badge'] ): NULL,
+			'points_other'	=> \intval( isset( $values[ $values['achievement_rule_action'] . '_award_other' ] ) ? $values[ $values['achievement_rule_action'] . '_award_other' ]['points'] : 0 ),
+			'badge_other'	=> isset( $values[ $values['achievement_rule_action'] . '_award_other' ] ) ? ( $values[ $values['achievement_rule_action'] . '_award_other' ]['badge'] ? \intval( $values[ $values['achievement_rule_action'] . '_award_other' ]['badge'] ) : NULL ) : NULL,
 		];
+
+		return $return;
 	}
 
 	/**
 	 * [Node] Get buttons to display in tree
 	 * Example code explains return value
 	 *
-	 * @param Url $url		Base URL
-	 * @param bool $subnode	Is this a subnode?
-	 * @return    array
+	 * @param	string	$url		Base URL
+	 * @param	bool	$subnode	Is this a subnode?
+	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ): array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = parent::getButtons( $url, $subnode );
 
@@ -298,7 +270,7 @@ class Rule extends Model
 		$buttons['toggleEnabled']	= array(
 			'icon'	=> ( $this->enabled ) ? 'pause-circle' : 'play-circle',
 			'title'	=> ( $this->enabled ) ? 'acp_disable_rule' : 'acp_enable_rule',
-			'link'	=> Url::internal( "app=core&module=achievements&controller=rules&do=toggleEnabled&id={$this->_id}&enable=" . ( $this->enabled ? 0 : 1 ) )->csrf(),
+			'link'	=> \IPS\Http\Url::internal( "app=core&module=achievements&controller=rules&do=toggleEnabled&id={$this->_id}&enable=" . ( $this->enabled ? 0 : 1 ) )->csrf(),
 			'data'	=> [ 'data-confirm' => 'true' ]
 		);
 
@@ -308,17 +280,17 @@ class Rule extends Model
 	/**
 	 * Get badge for subject
 	 *
-	 * @return    Badge|NULL
+	 * @return	\IPS\core\Achievements\Badge|NULL
 	 */
-	public function badgeSubject(): ?Badge
+	public function badgeSubject(): ?\IPS\core\Achievements\Badge
 	{
 		if ( $this->badge_subject )
 		{
 			try
 			{
-				return Badge::load( $this->badge_subject );
+				return \IPS\core\Achievements\Badge::load( $this->badge_subject );
 			}
-			catch( OutOfRangeException $e ) { }
+			catch( \OutOfRangeException $e ) { }
 		}
 		return NULL;
 	}
@@ -326,17 +298,17 @@ class Rule extends Model
 	/**
 	 * Get badge for others
 	 *
-	 * @return    Badge|NULL
+	 * @return	\IPS\core\Achievements\Badge|NULL
 	 */
-	public function badgeOther(): ?Badge
+	public function badgeOther(): ?\IPS\core\Achievements\Badge
 	{
 		if ( $this->badge_other )
 		{
 			try
 			{
-				return Badge::load( $this->badge_other );
+				return \IPS\core\Achievements\Badge::load( $this->badge_other );
 			}
-			catch( OutOfRangeException $e ) { }
+			catch( \OutOfRangeException $e ) { }
 		}
 		return NULL;
 	}
@@ -344,16 +316,16 @@ class Rule extends Model
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		parent::delete();
 
-		Db::i()->delete( 'core_achievements_log_milestones', array( 'milestone_rule=?', $this->id ) );
+		\IPS\Db::i()->delete( 'core_achievements_log_milestones', array( 'milestone_rule=?', $this->id ) );
 
-		Lang::deleteCustom( 'core', "core_award_subject_badge_{$this->id}" );
-		Lang::deleteCustom( 'core', "core_award_other_badge_{$this->id}" );
+		\IPS\Lang::deleteCustom( 'core', "core_award_subject_badge_{$this->id}" );
+		\IPS\Lang::deleteCustom( 'core', "core_award_other_badge_{$this->id}" );
 	}
 
 	/**
@@ -373,7 +345,7 @@ class Rule extends Model
 
 		foreach ( array( 'subject' => "core_award_subject_badge_{$this->id}", 'other' => "core_award_other_badge_{$this->id}") as $fieldKey => $langKey ) {
 			$oldLangKey = str_replace( $this->id, $oldId, $langKey );
-			Lang::saveCustom( 'core', $langKey, iterator_to_array(Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array('word_key=?', $oldLangKey ) )->setKeyField('lang_id')->setValueField('word_custom' ) ) );
+			\IPS\Lang::saveCustom( 'core', $langKey, iterator_to_array(\IPS\Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array('word_key=?', $oldLangKey ) )->setKeyField('lang_id')->setValueField('word_custom' ) ) );
 		}
 	}
 
@@ -386,7 +358,7 @@ class Rule extends Model
 	{
 		$return = [ 'count' => 0, 'processed' => 0 ];
 		$rebuilding = FALSE;
-		foreach( Db::i()->select( '*', 'core_queue', [ [ '`key`=?', 'RebuildAchievements' ] ] ) as $rebuild )
+		foreach( \IPS\Db::i()->select( '*', 'core_queue', [ [ '`key`=?', 'RebuildAchievements' ] ] ) as $rebuild )
 		{
 			$data = json_decode( $rebuild['data'], TRUE );
 
@@ -406,30 +378,33 @@ class Rule extends Model
 	/**
 	 * Rebuild all cheeeeeevs
 	 *
-	 * @param DateTime|null $time
+	 * @param \IPS\DateTime|null $time
 	 */
-	public static function rebuildAllAchievements( ?DateTime $time ) : void
+	public static function rebuildAllAchievements( ?\IPS\DateTime $time )
 	{
-		Db::i()->delete( 'core_achievements_log' );
-		Db::i()->delete( 'core_achievements_log_milestones' );
-		Db::i()->delete( 'core_points_log' );
-		Db::i()->delete( 'core_member_badges', [ 'rule > 0' ] ); /* 0 is a manually awarded badge. Don't hate the coder, hate the player */
-		Db::i()->update( 'core_members', [ 'achievements_points' => 0 ] );
+		\IPS\Db::i()->delete( 'core_achievements_log' );
+		\IPS\Db::i()->delete( 'core_achievements_log_milestones' );
+		\IPS\Db::i()->delete( 'core_points_log' );
+		\IPS\Db::i()->delete( 'core_member_badges', [ 'rule > 0' ] ); /* 0 is a manually awarded badge. Don't hate the coder, hate the player */
+		\IPS\Db::i()->update( 'core_members', [ 'achievements_points' => 0 ] );
 
 		/* Remove all previous tasks */
-		Db::i()->delete( 'core_queue', [ '`key`=?', 'RebuildAchievements' ] );
+		\IPS\Db::i()->delete( 'core_queue', [ '`key`=?', 'RebuildAchievements' ] );
 
-		foreach( Application::applications() as $app )
+		foreach( \IPS\Application::applications() as $app )
 		{
-			foreach ( Application::load( $app->directory )->extensions( 'core', 'AchievementAction' ) as $extension )
+			foreach ( \IPS\Application::load( $app->directory )->extensions( 'core', 'AchievementAction' ) as $extension )
 			{
-				$bits = explode( '\\', get_class( $extension ) );
-				$className = array_pop( $bits );
-				Task::queue( 'core', 'RebuildAchievements', [
-				'extension' => $app->directory . '_' . $className,
-				'data' => $extension::rebuildData(),
-				'time' => ( $time ) ? $time->getTimestamp() : NULL,
-				], 4 );
+				if ( method_exists( $extension, 'rebuildData' ) )
+				{
+					$bits = explode( '\\', \get_class( $extension ) );
+					$className = array_pop( $bits );
+					\IPS\Task::queue( 'core', 'RebuildAchievements', [
+						'extension' => $app->directory . '_' . $className,
+						'data' => $extension::rebuildData(),
+						'time' => ( $time ) ? $time->getTimestamp() : NULL,
+					], 4 );
+				}
 			}
 		}
 	}
@@ -442,20 +417,20 @@ class Rule extends Model
 	 *
 	 * @return	void
 	 */
-	public static function importXml( string $file, bool $deleteExisting=FALSE ) : void
+	public static function importXml( $file, $deleteExisting=FALSE )
 	{
 		/* Open XML file */
 		$xml = \IPS\Xml\XMLReader::safeOpen( $file );
 
 		if ( ! @$xml->read() )
 		{
-			throw new DomainException( 'xml_upload_invalid' );
+			throw new \DomainException( 'xml_upload_invalid' );
 		}
 
 		/* Did we want to wipe first? */
 		if ( $deleteExisting )
 		{
-			foreach(Rule::getStore() as $action => $rules )
+			foreach( \IPS\core\Achievements\Rule::getStore() as $action => $rules )
 			{
 				foreach( $rules as $ruleId => $rule )
 				{
@@ -463,7 +438,7 @@ class Rule extends Model
 					{
 						static::load( $ruleId )->delete();
 					}
-					catch( OutOfRangeException $e ){}
+					catch( \OutOfRangeException $e ){}
 
 				}
 			}
@@ -475,7 +450,7 @@ class Rule extends Model
 		/* Rules: Start looping through each row */
 		while ( $xml->read() )
 		{
-			if( $xml->nodeType != XMLReader::ELEMENT )
+			if( $xml->nodeType != \XMLReader::ELEMENT )
 			{
 				continue;
 			}
@@ -499,7 +474,7 @@ class Rule extends Model
 
 				while ( $xml->read() and $xml->name != 'rule' )
 				{
-					if ( $xml->nodeType != XMLReader::ELEMENT )
+					if ( $xml->nodeType != \XMLReader::ELEMENT )
 					{
 						continue;
 					}
@@ -535,23 +510,23 @@ class Rule extends Model
 					}
 				}
 
-				$insertId = Db::i()->insert( 'core_achievements_rules', $insert );
+				$insertId = \IPS\Db::i()->insert( 'core_achievements_rules', $insert );
 				$allBadges[ $insertId ] = $badgesToUpdate;
 
 				if ( ! empty( $awardSubject ) )
 				{
-					Lang::saveCustom( 'core', "core_award_subject_badge_{$insertId}", $awardSubject );
+					\IPS\Lang::saveCustom( 'core', "core_award_subject_badge_{$insertId}", $awardSubject );
 				}
 
 				if ( ! empty( $awardOther ) )
 				{
-					Lang::saveCustom( 'core', "core_award_other_badge_{$insertId}", $awardOther );
+					\IPS\Lang::saveCustom( 'core', "core_award_other_badge_{$insertId}", $awardOther );
 				}
 			}
 			/* Badges: Start looping through each row */
 			else if ( $xml->name == 'badge' )
 			{
-				if( $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -562,7 +537,7 @@ class Rule extends Model
 
 				while ( $xml->read() and $xml->name != 'badge' )
 				{
-					if( $xml->nodeType != XMLReader::ELEMENT )
+					if( $xml->nodeType != \XMLReader::ELEMENT )
 					{
 						continue;
 					}
@@ -589,22 +564,22 @@ class Rule extends Model
 
 				if ( ! empty( $insert['icon_name'] ) and ! empty( $insert['icon_data'] ) )
 				{
-					$insert['image'] = (string) File::create( 'core_Badges', $insert['icon_name'], $insert['icon_data'], NULL, TRUE, NULL, FALSE );
+					$insert['image'] = (string) \IPS\File::create( 'core_Badges', $insert['icon_name'], $insert['icon_data'], NULL, TRUE, NULL, FALSE );
 					unset( $insert['icon_name'] );
 					unset( $insert['icon_data'] );
 				}
 
-				$insertId = Db::i()->insert( 'core_badges', $insert );
+				$insertId = \IPS\Db::i()->insert( 'core_badges', $insert );
 				$badgeMap[ $id ] = $insertId;
 
 				if ( ! empty( $title ) )
 				{
-					Lang::saveCustom( 'core', "core_badges_{$insertId}", $title );
+					\IPS\Lang::saveCustom( 'core', "core_badges_{$insertId}", $title );
 				}
 			}
 		}
 
-		if ( count( $allBadges ) )
+		if ( \count( $allBadges ) )
 		{
 			foreach( $allBadges as $ruleId => $data )
 			{
@@ -617,14 +592,14 @@ class Rule extends Model
 					}
 				}
 
-				if ( count( $update ) )
+				if ( \count( $update ) )
 				{
-					Db::i()->update( 'core_achievements_rules', $update, ['`id`=?', $ruleId ] );
+					\IPS\Db::i()->update( 'core_achievements_rules', $update, ['`id`=?', $ruleId ] );
 				}
 			}
 		}
 
-		unset( Store::i()->achievementRules );
+		unset( \IPS\Data\Store::i()->achievementRules );
 	}
 
 	/**
@@ -635,14 +610,8 @@ class Rule extends Model
 	 */
 	public static function canImport( string $value ) : bool
 	{
-		/* If we are in the middle of an installation, we can always import */
-		if( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'setup' )
-		{
-			return true;
-		}
-
 		$appKey = explode( '_', $value );
-		return Application::appIsEnabled( $appKey[0] );
+		return \IPS\Application::appIsEnabled( $appKey[0] );
 	}
 
 	/**
@@ -653,7 +622,7 @@ class Rule extends Model
 	 */
 	public static function ruleHasMilestone( ?array $filters ): bool
 	{
-		if ( is_array( $filters ) and count( $filters ) )
+		if ( \is_array( $filters ) and \count( $filters ) )
 		{
 			foreach( $filters as $key => $value )
 			{
@@ -672,9 +641,9 @@ class Rule extends Model
 	 *
 	 * @return	string|null
 	 */
-	public function titleForLog(): ?string
+	public function titleForLog()
 	{	
 		$exploded = explode( '_', $this->action );
-		return Lang::load( Lang::defaultLanguage() )->get( 'AchievementAction__' . $exploded[1] . '_title' ) . " #" . $this->id;
+		return \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( 'AchievementAction__' . $exploded[1] . '_title' ) . " #" . $this->id;
 	}
 }

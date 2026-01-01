@@ -11,81 +11,56 @@
 namespace IPS\core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content;
-use IPS\Content\Search\ContentFilter;
-use IPS\Content\Search\Query;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Member as FormMember;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Xml\Rss as XmlRss;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * RSS Exports
  */
-class Rss extends Model
+class _Rss extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_rss_export';
+	public static $databaseTable = 'core_rss_export';
 	
 	/**
 	 * @brief	[ActiveRecord]	Database Prefix
 	 */
-	public static string $databasePrefix = 'rss_';
+	public static $databasePrefix = 'rss_';
 			
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 		
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'rss_exports';
+	public static $nodeTitle = 'rss_exports';
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'rss_export_title_';
+	public static $titleLangPrefix = 'rss_export_title_';
 	
 	/**
 	 * @brief	[Node] Description suffix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}_{$descriptionLangSuffix}" as the key
 	 */
-	public static ?string $descriptionLangSuffix = '_desc';
+	public static $descriptionLangSuffix = '_desc';
 	
 	/**
 	 * @brief	[Node] Enabled/Disabled Column
 	 */
-	public static ?string $databaseColumnEnabledDisabled = 'enabled';
+	public static $databaseColumnEnabledDisabled = 'enabled';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -103,7 +78,7 @@ class Rss extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'core',
 		'module'	=> 'discovery',
 		'all'	 	=> 'rss_export_manage',
@@ -112,48 +87,48 @@ class Rss extends Model
 	/**
 	 * @brief	[Node] URL Base
 	 */
-	public static string $urlBase = 'app=core&module=discover&controller=rss&id=';
+	public static $urlBase = 'app=core&module=discover&controller=rss&id=';
 	
 	/**
 	 * @brief	[Node] SEO Template
 	 */
-	public static string $urlTemplate = 'rss_feed';
+	public static $urlTemplate = 'rss_feed';
 	
 	/**
 	 * @brief	SEO Title Column
 	 */
-	public static string $seoTitleColumn = 'seo_title';
+	public static $seoTitleColumn = 'seo_title';
 
 	/**
 	 * @brief	[ActiveRecord] Attempt to load from cache
 	 * @note	If this is set to TRUE you MUST define a getStore() method to return the objects from cache
 	 */
-	protected static bool $loadFromCache = TRUE;
+	protected static $loadFromCache = TRUE;
 
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		/* Main Settings Form */
 		$form->addHeader( 'rss_settings' );
-		$form->add( new Translatable( 'rss_name', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->_id ) ? "rss_export_title_{$this->_id}" : NULL ) ) );
-		$form->add( new Translatable( 'rss_desc', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->_id ) ? "rss_export_title_{$this->_id}_desc" : NULL ) ) );
-		$form->add( new Number( 'rss_count', ( $this->_id ) ? $this->count : 25, TRUE, array( 'min' => 1, 'max' => 100 ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'rss_name', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->_id ) ? "rss_export_title_{$this->_id}" : NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'rss_desc', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->_id ) ? "rss_export_title_{$this->_id}_desc" : NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'rss_count', ( $this->_id ) ? $this->count : 25, TRUE, array( 'min' => 1, 'max' => 100 ) ) );
 		
 		$groups = array();
-		foreach( Group::groups() AS $group_id => $group )
+		foreach( \IPS\Member\Group::groups() AS $group_id => $group )
 		{
 			$groups[ $group_id ] = $group->name;
 		}
-		$form->add( new CheckboxSet( 'rss_groups', ( $this->_id ) ? $this->groups : '*', FALSE, array( 'options' => $groups, 'multiple' => TRUE, 'unlimited' => '*', 'impliedUnlimited' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'rss_groups', ( $this->_id ) ? $this->groups : '*', FALSE, array( 'options' => $groups, 'multiple' => TRUE, 'unlimited' => '*', 'impliedUnlimited' => TRUE ) ) );
 		
 		/* Content Form */
 		$form->addHeader( 'rss_content' );
-		foreach( Content::routedClasses( TRUE, FALSE, TRUE ) AS $class )
+		foreach( \IPS\Content::routedClasses( TRUE, FALSE, TRUE ) AS $class )
 		{
 			if ( isset( $class::$databaseColumnMap['author'] ) )
 			{
@@ -165,17 +140,17 @@ class Rss extends Model
 					$containerClass = $class::$containerNodeClass;
 				}
 
-				Member::loggedIn()->language()->words["rss_classes_{$class}"] = Member::loggedIn()->language()->addToStack( $class::$title . '_pl' );
-				$form->add( new YesNo( 'rss_classes_' . $class, ( $this->_id ) ? in_array( $class, $this->configuration['classes'] ) : FALSE, FALSE, $options ) );
+				\IPS\Member::loggedIn()->language()->words["rss_classes_{$class}"] = \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl' );
+				$form->add( new \IPS\Helpers\Form\YesNo( 'rss_classes_' . $class, ( $this->_id ) ? \in_array( $class, $this->configuration['classes'] ) : FALSE, FALSE, $options ) );
 				
 				if ( $containerClass )
 				{
-					Member::loggedIn()->language()->words["nodes_{$class}"] = Member::loggedIn()->language()->addToStack( $containerClass::$nodeTitle );
-					$form->add( new Node( "nodes_{$class}", ( $this->_id AND isset( $this->configuration['containers'][$class] ) ) ? $this->configuration['containers'][$class] : 0, FALSE, array(
+					\IPS\Member::loggedIn()->language()->words["nodes_{$class}"] = \IPS\Member::loggedIn()->language()->addToStack( $containerClass::$nodeTitle );
+					$form->add( new \IPS\Helpers\Form\Node( "nodes_{$class}", ( $this->_id AND isset( $this->configuration['containers'][$class] ) ) ? $this->configuration['containers'][$class] : 0, FALSE, array(
 						'class'				=> $containerClass,
 						'zeroVal'			=> 'all',
 						'multiple'			=> TRUE,
-						'permissionCheck'	=> function( $val ) { return $val->can( 'view', new Member ); },
+						'permissionCheck'	=> function( $val ) { return $val->can( 'view', new \IPS\Member ); },
 						'forceOwner'		=> FALSE,
 					), NULL, NULL, NULL, "rss_nodes_{$class::$title}" ) );
 				}
@@ -185,17 +160,17 @@ class Rss extends Model
 		$members = NULL;
 		if ( $this->_id AND isset( $this->configuration['members'] ) )
 		{
-			if ( count( $this->configuration['members'] ) )
+			if ( \count( $this->configuration['members'] ) )
 			{
 				$members = array();
 				foreach( $this->configuration['members'] AS $member )
 				{
-					$members[] = Member::load( $member );
+					$members[] = \IPS\Member::load( $member );
 				}
 			}
 		}
 		
-		$form->add( new FormMember( 'rss_members', $members, FALSE, array( 'multiple' => NULL, 'nullLang' => 'everyone' ) ) );
+		$form->add( new \IPS\Helpers\Form\Member( 'rss_members', $members, FALSE, array( 'multiple' => NULL, 'nullLang' => 'everyone' ) ) );
 	}
 	
 	/**
@@ -204,7 +179,7 @@ class Rss extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		/* Build our config */
 		$config = array(
@@ -218,7 +193,7 @@ class Rss extends Model
 		{
 			if ( mb_substr( $k, 0, 12 ) == 'rss_classes_' )
 			{
-				if ( $v )
+				if ( $values[$k] == TRUE )
 				{
 					$config['classes'][] = str_replace( 'rss_classes_', '', $k );
 				}
@@ -227,11 +202,11 @@ class Rss extends Model
 			}
 			else if ( mb_substr( $k, 0, 6 ) == 'nodes_' )
 			{
-				if ( is_array( $v ) )
+				if ( \is_array( $v ) )
 				{
 					foreach( $v AS $id => $node )
 					{
-						if ( $node instanceof Model )
+						if ( $node instanceof \IPS\Node\Model )
 						{
 							$config['containers'][ str_replace( 'nodes_', '', $k ) ][] = $node->_id;
 						}
@@ -243,7 +218,7 @@ class Rss extends Model
 				}
 				else
 				{
-					if ( $v instanceof Model )
+					if ( $v instanceof \IPS\Node\Model )
 					{
 						$config['containers'][ str_replace( 'nodes_', '', $k ) ][] = $v->_id;
 					}
@@ -260,17 +235,17 @@ class Rss extends Model
 		/* Set the members */
 		if ( array_key_exists( 'rss_members', $values ) )
 		{
-			if ( is_array( $values['rss_members'] ) )
+			if ( \is_array( $values['rss_members'] ) )
 			{
 				foreach( $values['rss_members'] AS $member )
 				{
-					if ( $member instanceof Member )
+					if ( $member instanceof \IPS\Member )
 					{
 						$config['members'][] = $member->member_id;
 					}
 				}
 			}
-			else if ( $values['rss_members'] instanceof Member )
+			else if ( $values['rss_members'] instanceof \IPS\Member )
 			{
 				$config['members'][] = $values['rss_members']->member_id;
 			}
@@ -288,16 +263,16 @@ class Rss extends Model
 		/* Custom Language Strings */
 		if ( array_key_exists( 'rss_name', $values ) )
 		{
-			Lang::saveCustom( 'core', "rss_export_title_{$this->_id}", $values['rss_name'] );
+			\IPS\Lang::saveCustom( 'core', "rss_export_title_{$this->_id}", $values['rss_name'] );
 			
-			if ( is_array( $values['rss_name'] ) )
+			if ( \is_array( $values['rss_name'] ) )
 			{
 				reset( $values['rss_name'] );
-				$this->seo_title = Friendly::seoTitle( $values['rss_name'][ key( $values['rss_name'] ) ] );
+				$this->seo_title = \IPS\Http\Url\Friendly::seoTitle( $values['rss_name'][ key( $values['rss_name'] ) ] );
 			}
 			else
 			{
-				$this->seo_title = Friendly::seoTitle( $values['rss_name'] );
+				$this->seo_title = \IPS\Http\Url\Friendly::seoTitle( $values['rss_name'] );
 			}
 			
 			unset( $values['rss_name'] );
@@ -305,7 +280,7 @@ class Rss extends Model
 		
 		if ( array_key_exists( 'rss_desc', $values ) )
 		{
-			Lang::saveCustom( 'core', "rss_export_title_{$this->_id}_desc", $values['rss_desc'] );
+			\IPS\Lang::saveCustom( 'core', "rss_export_title_{$this->_id}_desc", $values['rss_desc'] );
 			
 			unset( $values['rss_desc'] );
 		}
@@ -318,14 +293,14 @@ class Rss extends Model
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'rssFeeds' );
+	protected $caches = array( 'rssFeeds' );
 
 	/**
 	 * Get Configuration
 	 *
 	 * @return	array
 	 */
-	public function get_configuration() : array
+	public function get_configuration()
 	{
 		return json_decode( $this->_data['configuration'], TRUE );
 	}
@@ -336,7 +311,7 @@ class Rss extends Model
 	 * @param	array	$values	The configuration
 	 * @return	void
 	 */
-	public function set_configuration( array $values ) : void
+	public function set_configuration( array $values )
 	{
 		$this->_data['configuration'] = json_encode( $values );
 	}
@@ -347,9 +322,9 @@ class Rss extends Model
 	 * @param	array|string	$values	The groups, or an asterisk for all groups
 	 * @return	void
 	 */
-	public function set_groups( array|string $values ) : void
+	public function set_groups( $values )
 	{
-		if ( is_array( $values ) )
+		if ( \is_array( $values ) )
 		{
 			$this->_data['groups'] = implode( ',', $values );
 		}
@@ -362,9 +337,9 @@ class Rss extends Model
 	/**
 	 * Get Groups
 	 *
-	 * @return	array|string
+	 * @return	array
 	 */
-	public function get_groups() : array|string
+	public function get_groups()
 	{
 		if ( $this->_data['groups'] == '*' )
 		{
@@ -377,32 +352,32 @@ class Rss extends Model
 	/**
 	 * Generate the feed
 	 *
-	 * @param	Member|NULL	$member	The member, or NULL for a Guest
+	 * @param	\IPS\Member|NULL	$member	The member, or NULL for a Guest
 	 * @return	string
 	 */
-	public function generate( ?Member $member=NULL ) : string
+	public function generate( $member=NULL )
 	{
-		$member = $member ?: new Member;
+		$member = $member ?: new \IPS\Member;
 		
-		$search			= Query::init( $member );
+		$search			= \IPS\Content\Search\Query::init( $member );
 		$filterByClass	= FALSE;
 
-		if ( count( $this->configuration['classes'] ) )
+		if ( \count( $this->configuration['classes'] ) )
 		{
 			$filterByClass	= TRUE;
 			$filters		= array();
 
 			foreach( $this->configuration['classes'] AS $class )
 			{
-				if( class_exists( $class ) )
+				if( class_exists( $class, TRUE ) )
 				{
 					if ( isset( $class::$firstCommentRequired ) AND $class::$firstCommentRequired )
 					{
-						$filter = ContentFilter::init( $class, TRUE, TRUE, FALSE )->onlyFirstComment();
+						$filter = \IPS\Content\Search\ContentFilter::init( $class, TRUE, TRUE, FALSE )->onlyFirstComment();
 					}
 					else
 					{
-						$filter = ContentFilter::init( $class, TRUE, FALSE, FALSE );
+						$filter = \IPS\Content\Search\ContentFilter::init( $class, TRUE, FALSE, FALSE );
 					}
 					
 					if ( !empty( $this->configuration['containers'][$class] ) )
@@ -417,15 +392,15 @@ class Rss extends Model
 			$search->filterByContent( $filters );
 		}
 		
-		if ( isset( $this->configuration['members'] ) AND count( $this->configuration['members'] ) )
+		if ( isset( $this->configuration['members'] ) AND \count( $this->configuration['members'] ) )
 		{
 			$search->filterByAuthor( $this->configuration['members'] );
 		}
 		
 		$search->setLimit( $this->count );
-		$search->setOrder( Query::ORDER_NEWEST_CREATED );
+		$search->setOrder( \IPS\Content\Search\Query::ORDER_NEWEST_CREATED );
 		
-		if( $filterByClass AND !count( $filters ) )
+		if( $filterByClass == TRUE AND !\count( $filters ) )
 		{
 			$results = array();
 		}
@@ -435,10 +410,10 @@ class Rss extends Model
 		}
 
 		/* We have to use get() to ensure CDATA tags wrap the title properly */
-		$title			= Member::loggedIn()->language()->get( "rss_export_title_{$this->_id}" );
-		$description	= Member::loggedIn()->language()->get( "rss_export_title_{$this->_id}_desc" );
+		$title			= \IPS\Member::loggedIn()->language()->get( "rss_export_title_{$this->_id}" );
+		$description	= \IPS\Member::loggedIn()->language()->get( "rss_export_title_{$this->_id}_desc" );
 		
-		$document = XmlRss::newDocument( $this->url(), $title, $description );
+		$document = \IPS\Xml\Rss::newDocument( $this->url(), $title, $description );
 		
 		foreach( $results AS $result )
 		{
@@ -453,28 +428,28 @@ class Rss extends Model
 	 *
 	 * @return	array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->rssFeeds ) )
+		if ( !isset( \IPS\Data\Store::i()->rssFeeds ) )
 		{
-			Store::i()->rssFeeds = iterator_to_array( Db::i()->select( '*', static::$databaseTable, NULL, "rss_position ASC" )->setKeyField( 'rss_id' ) );
+			\IPS\Data\Store::i()->rssFeeds = iterator_to_array( \IPS\Db::i()->select( '*', static::$databaseTable, NULL, "rss_position ASC" )->setKeyField( 'rss_id' ) );
 		}
 
-		return Store::i()->rssFeeds;
+		return \IPS\Data\Store::i()->rssFeeds;
 	}
 	
 	/**
 	 * Get URL
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function url(): Url|string|null
+	public function url()
 	{
 		$url = parent::url();
 		
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
-			$url = $url->setQueryString( array( 'member_id' => Member::loggedIn()->member_id, 'key' => Member::loggedIn()->getUniqueMemberHash() ) );
+			$url = $url->setQueryString( array( 'member_id' => \IPS\Member::loggedIn()->member_id, 'key' => \IPS\Member::loggedIn()->getUniqueMemberHash() ) );
 		}
 		
 		return $url;

@@ -11,70 +11,30 @@
 namespace IPS\core\modules\admin\clubs;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Helpers\Tree\Tree;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-use const IPS\Helpers\Table\SEARCH_NUMERIC;
-use const IPS\Helpers\Table\SEARCH_QUERY_TEXT;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Clubs
  */
-class clubs extends Controller
+class _clubs extends \IPS\Dispatcher\Controller
 {	
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
-
-	/**
-	 * @var string|null
-	 */
-	protected ?string $nodeClass = null;
-
-	/**
-	 * @var Club|null
-	 */
-	protected ?Club $club = null;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'clubs_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'clubs_manage' );
 		parent::execute();
 	}
 	
@@ -83,37 +43,37 @@ class clubs extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{			
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_clubs_clubs');
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_clubs_clubs');
 		
-		if ( Settings::i()->clubs )
+		if ( \IPS\Settings::i()->clubs )
 		{			
 			/* Create the table */
-			$table = new TableDb( 'core_clubs', Url::internal( 'app=core&module=clubs&controller=clubs' ) );
+			$table = new \IPS\Helpers\Table\Db( 'core_clubs', \IPS\Http\Url::internal( 'app=core&module=clubs&controller=clubs' ) );
 			$table->include = array( 'name', 'type', 'members', 'owner', 'created' );
 			$table->langPrefix = 'club_';
 			$table->parsers = array(
 				'name'	=> function( $value, $row )
 				{
-					return Theme::i()->getTemplate('clubs')->name( $value, $row );
+					return \IPS\Theme::i()->getTemplate('clubs')->name( $value, $row );
 				},
 				'type'	=> function( $value ) {
-					return Theme::i()->getTemplate('clubs')->privacy( $value );
+					return \IPS\Theme::i()->getTemplate('clubs')->privacy( $value );
 				},
 				'created'	=> function( $value ) {
-					return DateTime::ts( $value );
+					return \IPS\DateTime::ts( $value );
 				},
 				'members'	=> function( $value, $row ) {
-					if ( $row['type'] !== Club::TYPE_PUBLIC )
+					if ( $row['type'] !== \IPS\Member\Club::TYPE_PUBLIC )
 					{
-						$link = Url::internal( "app=core&module=clubs&controller=view&id={$row['id']}&do=members", 'front', 'clubs_view', array( Friendly::seoTitle( $row['name'] ) ) );
-						return Theme::i()->getTemplate('clubs')->members( $value, $link );
+						$link = \IPS\Http\Url::internal( "app=core&module=clubs&controller=view&id={$row['id']}&do=members", 'front', 'clubs_view', array( \IPS\Http\Url\Friendly::seoTitle( $row['name'] ) ) );
+						return \IPS\Theme::i()->getTemplate('clubs')->members( $value, $link );
 					}
 					return '';
 				},
 				'owner'	=> function( $value ) {
-					return Theme::i()->getTemplate('clubs')->owner( Member::load( $value ) );
+					return \IPS\Theme::i()->getTemplate('clubs')->owner( \IPS\Member::load( $value ) );
 				},
 				'_highlight' => function( $row ) {
 					if ( !$row['approved'] )
@@ -127,96 +87,96 @@ class clubs extends Controller
 			$table->sortBy = $table->sortBy ?: 'members';
 			$table->quickSearch = 'name';
 			$table->advancedSearch = array(
-				'name'	=> SEARCH_QUERY_TEXT,
-				'members' => SEARCH_NUMERIC,
-				'owner'	=> SEARCH_MEMBER,
-				'created'	=> SEARCH_DATE_RANGE,
+				'name'	=> \IPS\Helpers\Table\SEARCH_QUERY_TEXT,
+				'members' => \IPS\Helpers\Table\SEARCH_NUMERIC,
+				'owner'	=> \IPS\Helpers\Table\SEARCH_MEMBER,
+				'created'	=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
 			);
-			if ( Settings::i()->clubs_require_approval )
+			if ( \IPS\Settings::i()->clubs_require_approval )
 			{
 				$table->filters = array(
 					'pending_approval' => 'approved=0'
 				);
-				$table->advancedSearch['type'] = array( SEARCH_SELECT, array( 'options' => array(
-					Club::TYPE_PUBLIC	=> 'club_type_' . Club::TYPE_PUBLIC,
-					Club::TYPE_OPEN	=> 'club_type_' . Club::TYPE_OPEN,
-					Club::TYPE_CLOSED	=> 'club_type_' . Club::TYPE_CLOSED,
-					Club::TYPE_PRIVATE	=> 'club_type_' . Club::TYPE_PRIVATE,
-					Club::TYPE_READONLY	=> 'club_type_' . Club::TYPE_READONLY,
+				$table->advancedSearch['type'] = array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => array(
+					\IPS\Member\Club::TYPE_PUBLIC	=> 'club_type_' . \IPS\Member\Club::TYPE_PUBLIC,
+					\IPS\Member\Club::TYPE_OPEN	=> 'club_type_' . \IPS\Member\Club::TYPE_OPEN,
+					\IPS\Member\Club::TYPE_CLOSED	=> 'club_type_' . \IPS\Member\Club::TYPE_CLOSED,
+					\IPS\Member\Club::TYPE_PRIVATE	=> 'club_type_' . \IPS\Member\Club::TYPE_PRIVATE,
+					\IPS\Member\Club::TYPE_READONLY	=> 'club_type_' . \IPS\Member\Club::TYPE_READONLY,
 				), 'multiple' => TRUE ) );
 			}
 			else
 			{
 				$table->filters = array(
-					'club_type_' . Club::TYPE_PUBLIC	=> array( 'type=?', Club::TYPE_PUBLIC ),
-					'club_type_' . Club::TYPE_OPEN		=> array( 'type=?', Club::TYPE_OPEN ),
-					'club_type_' . Club::TYPE_CLOSED	=> array( 'type=?', Club::TYPE_CLOSED ),
-					'club_type_' . Club::TYPE_PRIVATE	=> array( 'type=?', Club::TYPE_PRIVATE ),
-					'club_type_' . Club::TYPE_READONLY	=> array( 'type=?', Club::TYPE_READONLY )
+					'club_type_' . \IPS\Member\Club::TYPE_PUBLIC	=> array( 'type=?', \IPS\Member\Club::TYPE_PUBLIC ),
+					'club_type_' . \IPS\Member\Club::TYPE_OPEN		=> array( 'type=?', \IPS\Member\Club::TYPE_OPEN ),
+					'club_type_' . \IPS\Member\Club::TYPE_CLOSED	=> array( 'type=?', \IPS\Member\Club::TYPE_CLOSED ),
+					'club_type_' . \IPS\Member\Club::TYPE_PRIVATE	=> array( 'type=?', \IPS\Member\Club::TYPE_PRIVATE ),
+					'club_type_' . \IPS\Member\Club::TYPE_READONLY	=> array( 'type=?', \IPS\Member\Club::TYPE_READONLY )
 				);
 			}
 			$table->rowButtons = function( $row ) {
 				$return = array();
 				if ( !$row['approved'] )
 				{
-					if ( Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_edit' ) )
+					if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_edit' ) )
 					{
 						$return['approve']	= array(
 							'title'	=> 'approve',
 							'icon'	=> 'check',
-							'link'	=> Url::internal("app=core&module=clubs&controller=clubs&do=approve&id={$row['id']}")->csrf()
+							'link'	=> \IPS\Http\Url::internal("app=core&module=clubs&controller=clubs&do=approve&id={$row['id']}")->csrf()
 						);
 					}
-					if ( Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_delete' ) )
+					if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_delete' ) )
 					{
 						$return['delete'] = array(
 							'title'	=> 'delete',
 							'icon'	=> 'times',
-							'link'	=> Url::internal("app=core&module=clubs&controller=clubs&do=delete&id={$row['id']}"),
-							'data'	=> Db::i()->select( 'COUNT(*)', 'core_clubs_node_map', array( 'club_id=?', $row['id'] ) )->first() ? array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('delete') ) : array( 'delete' => '' )
+							'link'	=> \IPS\Http\Url::internal("app=core&module=clubs&controller=clubs&do=delete&id={$row['id']}"),
+							'data'	=> \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs_node_map', array( 'club_id=?', $row['id'] ) )->first() ? array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('delete') ) : array( 'delete' => '' )
 						);
 					}
 				}
 				$return['open']	= array(
 					'title'	=> 'view',
 					'icon'	=> 'search',
-					'link'	=> Url::internal( "app=core&module=clubs&controller=view&id={$row['id']}", 'front', 'clubs_view', array( Friendly::seoTitle( $row['name'] ) ) ),
+					'link'	=> \IPS\Http\Url::internal( "app=core&module=clubs&controller=view&id={$row['id']}", 'front', 'clubs_view', array( \IPS\Http\Url\Friendly::seoTitle( $row['name'] ) ) ),
 					'target'=> '_blank'
 				);
-				if ( Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_edit' ) )
+				if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_edit' ) )
 				{
 					$return['edit']	= array(
 						'title'	=> 'edit',
 						'icon'	=> 'pencil',
-						'link'	=> Url::internal("app=core&module=clubs&controller=clubs&do=edit&id={$row['id']}")
+						'link'	=> \IPS\Http\Url::internal("app=core&module=clubs&controller=clubs&do=edit&id={$row['id']}")
 					);
 				}
-				if ( !isset( $return['delete'] ) and Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_delete' ) )
+				if ( !isset( $return['delete'] ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_delete' ) )
 				{
 					$return['delete'] = array(
 						'title'	=> 'delete',
 						'icon'	=> 'times-circle',
-						'link'	=> Url::internal("app=core&module=clubs&controller=clubs&do=delete&id={$row['id']}"),
-						'data'	=> Db::i()->select( 'COUNT(*)', 'core_clubs_node_map', array( 'club_id=?', $row['id'] ) )->first() ? array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('delete') ) : array( 'delete' => '' )
+						'link'	=> \IPS\Http\Url::internal("app=core&module=clubs&controller=clubs&do=delete&id={$row['id']}"),
+						'data'	=> \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs_node_map', array( 'club_id=?', $row['id'] ) )->first() ? array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('delete') ) : array( 'delete' => '' )
 					);
 				}
 				return $return;
 			};
 				
 			/* Display */
-			Output::i()->output = (string) $table;
+			\IPS\Output::i()->output = (string) $table;
 		}
 		else
 		{
 			$availableTypes = array();
-			foreach ( Club::availableNodeTypes( NULL ) as $class )
+			foreach ( \IPS\Member\Club::availableNodeTypes( NULL ) as $class )
 			{
-				$availableTypes[] = Member::loggedIn()->language()->addToStack( $class::clubAcpTitle() );
+				$availableTypes[] = \IPS\Member::loggedIn()->language()->addToStack( $class::clubAcpTitle() );
 			}
 			
-			$availableTypes = Member::loggedIn()->language()->formatList( $availableTypes );
+			$availableTypes = \IPS\Member::loggedIn()->language()->formatList( $availableTypes );
 			
-			Output::i()->output = Theme::i()->getTemplate( 'clubs' )->disabled( $availableTypes );
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'clubs' )->disabled( $availableTypes );
 		}
 	}
 	
@@ -225,18 +185,18 @@ class clubs extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function enable() : void
+	protected function enable()
 	{	
-		Dispatcher::i()->checkAcpPermission( 'clubs_settings_manage' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'clubs_settings_manage' );
+		\IPS\Session::i()->csrfCheck();
 		
-		Settings::i()->changeValues( array( 'clubs' => true ) );
+		\IPS\Settings::i()->changeValues( array( 'clubs' => true ) );
 
-		Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'clubrebuild' ) );
+		\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'clubrebuild' ) );
 		
-		Session::i()->log( 'acplog__club_settings' );
+		\IPS\Session::i()->log( 'acplog__club_settings' );
 		
-		Output::i()->redirect( Url::internal('app=core&module=clubs&controller=clubs') );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=clubs&controller=clubs') );
 	}
 	
 	/**
@@ -245,28 +205,28 @@ class clubs extends Controller
 	 * @csrfChecked	Uses node form() 7 Oct 2019
 	 * @return	void
 	 */
-	protected function edit() : void
+	protected function edit()
 	{
-		Dispatcher::i()->checkAcpPermission( 'clubs_edit' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'clubs_edit' );
 		
 		/* Load Club */
 		try
 		{
-			$club = Club::load( Request::i()->id );
+			$club = \IPS\Member\Club::load( \IPS\Request::i()->id );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Output::i()->error( 'node_error', '2C352/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C352/1', 404, '' );
 		}
-		$editUrl = Url::internal("app=core&module=clubs&controller=clubs&do=edit&id={$club->id}");
+		$editUrl = \IPS\Http\Url::internal("app=core&module=clubs&controller=clubs&do=edit&id={$club->id}");
 		
 		/* Tabs */
 		$tabs = array( 'settings' => 'settings' );
-		foreach ( Club::availableNodeTypes( Member::loggedIn() ) as $class )
+		foreach ( \IPS\Member\Club::availableNodeTypes( \IPS\Member::loggedIn() ) as $class )
 		{
 			$tabs[ str_replace( '\\', '-', preg_replace( '/^IPS\\\/', '', $class ) ) ] = $class::clubAcpTitle();
 		}
-		$activeTab = ( isset( Request::i()->tab ) and array_key_exists( Request::i()->tab, $tabs ) ) ? Request::i()->tab : 'settings';
+		$activeTab = ( isset( \IPS\Request::i()->tab ) and array_key_exists( \IPS\Request::i()->tab, $tabs ) ) ? \IPS\Request::i()->tab : 'settings';
 		
 		/* Settings */
 		if ( $activeTab === 'settings' )
@@ -284,16 +244,16 @@ class clubs extends Controller
 
 				if ( !empty( $changes ) )
 				{
-					Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'product_change_blurb', array(
-						'product_change_blurb_existing'	=> Url::internal( "app=core&module=clubs&controller=clubs&do=updateExisting&id={$club->id}" )->setQueryString( 'changes', json_encode( $changes ) )->csrf(),
-						'product_change_blurb_new'		=> Url::internal( "app=core&module=clubs&controller=clubs" ),
+					\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->decision( 'product_change_blurb', array(
+						'product_change_blurb_existing'	=> \IPS\Http\Url::internal( "app=core&module=clubs&controller=clubs&do=updateExisting&id={$club->id}" )->setQueryString( 'changes', json_encode( $changes ) )->csrf(),
+						'product_change_blurb_new'		=> \IPS\Http\Url::internal( "app=core&module=clubs&controller=clubs" ),
 					) );
 
 					return;
 				}
 				else
 				{
-					Output::i()->redirect( Url::internal("app=core&module=clubs&controller=clubs"), "saved" );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::internal("app=core&module=clubs&controller=clubs"), "saved" );
 				}
 			}
 			else
@@ -305,22 +265,21 @@ class clubs extends Controller
 		/* Node List */
 		else
 		{
-			$nodeClass = 'IPS\\' . str_replace( '-', '\\', Request::i()->tab );
+			$nodeClass = 'IPS\\' . str_replace( '-', '\\', \IPS\Request::i()->tab );
 			$this->nodeClass = $nodeClass;
 			$this->club = $club;
-
-			/* @var Model $nodeClass */
-			$tree = new Tree( $editUrl->setQueryString( 'tab', Request::i()->tab ), 'x', array( $this, '_getNodeRows' ), array( $this, '_getNodeRow' ), function() { return NULL; }, function() { return array(); }, function() use( $nodeClass ) {
-				if ( Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_add_nodes' ) )
+			
+			$tree = new \IPS\Helpers\Tree\Tree( $editUrl->setQueryString( 'tab', \IPS\Request::i()->tab ), 'x', array( $this, '_getNodeRows' ), array( $this, '_getNodeRow' ), function() { return NULL; }, function() { return array(); }, function() use( $nodeClass ) {
+				if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_add_nodes' ) )
 				{
 					return array(
 						'create'	=> array(
 							'title'		=> 'add',
 							'icon'		=> 'plus',
-							'link'		=> Url::internal("app=core&module=clubs&controller=clubs&do=nodeForm&club={$this->club->id}&nodeClass={$nodeClass}" ),
+							'link'		=> \IPS\Http\Url::internal("app=core&module=clubs&controller=clubs&do=nodeForm&club={$this->club->id}&nodeClass={$nodeClass}" ),
 							'data'	=> array(
 								'ipsDialog'			=> '',
-								'ipsDialog-title'	=> Member::loggedIn()->language()->addToStack( $nodeClass::clubAcpTitle() )
+								'ipsDialog-title'	=> \IPS\Member::loggedIn()->language()->addToStack( $nodeClass::clubAcpTitle() )
 							)
 						)
 					);
@@ -332,14 +291,14 @@ class clubs extends Controller
 		}
 		
 		/* Output */
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $activeTabContents;
+			\IPS\Output::i()->output = $activeTabContents;
 		}
 		else
 		{
-			Output::i()->title = $club->name;
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, $activeTabContents, $editUrl );
+			\IPS\Output::i()->title = $club->name;
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, $activeTabContents, $editUrl );
 		}
 	}
 	
@@ -348,19 +307,19 @@ class clubs extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function approve() : void
+	protected function approve()
 	{
-		Dispatcher::i()->checkAcpPermission( 'clubs_edit' );
-		Session::i()->csrfCheck();
+		\IPS\Dispatcher::i()->checkAcpPermission( 'clubs_edit' );
+		\IPS\Session::i()->csrfCheck();
 		
 		/* Load Club */
 		try
 		{
-			$club = Club::load( Request::i()->id );
+			$club = \IPS\Member\Club::load( \IPS\Request::i()->id );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Output::i()->error( 'node_error', '2C352/8', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C352/8', 404, '' );
 		}
 		
 		/* Approve */
@@ -370,13 +329,13 @@ class clubs extends Controller
 		$club->onApprove();
 			
 		/* Redirect */
-		$target = Url::internal("app=core&module=clubs&controller=clubs");
-		if ( Db::i()->select( 'COUNT(*)', 'core_clubs', array( 'approved=0 AND id!=?', $club->id ) )->first() )
+		$target = \IPS\Http\Url::internal("app=core&module=clubs&controller=clubs");
+		if ( \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs', array( 'approved=0 AND id!=?', $club->id ) )->first() )
 		{
 			$target = $target->setQueryString( 'filter', 'pending_approval' );
 		}
-		Session::i()->modLog( 'acplog__club_approved', array( $club->name => FALSE ) );
-		Output::i()->redirect( $target, "approved" );
+		\IPS\Session::i()->modLog( 'acplog__club_approved', array( $club->name => FALSE ) );
+		\IPS\Output::i()->redirect( $target, "approved" );
 	}
 	
 	/**
@@ -384,38 +343,38 @@ class clubs extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function delete() : void
+	protected function delete()
 	{
-		Dispatcher::i()->checkAcpPermission( 'clubs_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'clubs_delete' );
 		
 		/* Load Club */
 		try
 		{
-			$club = Club::load( Request::i()->id );
+			$club = \IPS\Member\Club::load( \IPS\Request::i()->id );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Output::i()->error( 'node_error', '2C352/7', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C352/7', 404, '' );
 		}
 		
 		/* Ask what to do with each node */
 		$nodes = $club->nodes();
-		if ( count( $nodes ) )
+		if ( \count( $nodes ) )
 		{
-			$form = new Form( 'form', 'delete' );
+			$form = new \IPS\Helpers\Form( 'form', 'delete' );
 			$form->addMessage( 'club_delete_blurb' );
 			foreach ( $nodes as $data )
 			{
 				try
 				{
-					$field = new Node( 'node_' . str_replace( '\\', '-', preg_replace( '/^IPS\\\/', '', $data['node_class'] ) ) . '_' . $data['node_id'], 0, TRUE, array( 'class' => $data['node_class'], 'disabled' => array( $data['node_id'] ), 'disabledLang' => 'node_move_delete', 'zeroVal' => 'node_delete_content', 'subnodes' => FALSE, 'permissionCheck' => function( $node )
+					$field = new \IPS\Helpers\Form\Node( 'node_' . str_replace( '\\', '-', preg_replace( '/^IPS\\\/', '', $data['node_class'] ) ) . '_' . $data['node_id'], 0, TRUE, array( 'class' => $data['node_class'], 'disabled' => array( $data['node_id'] ), 'disabledLang' => 'node_move_delete', 'zeroVal' => 'node_delete_content', 'subnodes' => FALSE, 'permissionCheck' => function( $node )
 					{
 						return array_key_exists( 'add', $node->permissionTypes() );
 					}, 'clubs' => TRUE ) );
 					$field->label = htmlspecialchars( $data['name'] );
 					$form->add( $field );
 				}
-				catch ( Exception $e ) {}
+				catch ( \Exception $e ) {}
 			}
 			if ( $values = $form->values() )
 			{
@@ -426,7 +385,6 @@ class clubs extends Controller
 					
 					try
 					{
-						/* @var Model $nodeClass */
 						$node = $nodeClass::load( $exploded[2] );
 						
 						$nodesToQueue = array( $node );
@@ -452,35 +410,35 @@ class clubs extends Controller
 							$_node->deleteOrMoveFormSubmit( $_values );
 						}
 					}
-					catch ( Exception $e ) {}
+					catch ( \Exception $e ) {}
 				}
 			}
 			else
 			{
-				Output::i()->output = $form;
+				\IPS\Output::i()->output = $form;
 				return;
 			}
 		}
 		else
 		{
-			Request::i()->confirmedDelete();
+			\IPS\Request::i()->confirmedDelete();
 		}
 		
 		/* Delete it */
-		Session::i()->log( 'acplog__club_deleted', array( $club->name => FALSE ) );
+		\IPS\Session::i()->log( 'acplog__club_deleted', array( $club->name => FALSE ) );
 		$club->delete();
-		Db::i()->delete( 'core_clubs_memberships', array( 'club_id=?', $club->id ) );
-		Db::i()->delete( 'core_clubs_node_map', array( 'club_id=?', $club->id ) );
-		Db::i()->delete( 'core_clubs_fieldvalues', array( 'club_id=?', $club->id ) );
+		\IPS\Db::i()->delete( 'core_clubs_memberships', array( 'club_id=?', $club->id ) );
+		\IPS\Db::i()->delete( 'core_clubs_node_map', array( 'club_id=?', $club->id ) );
+		\IPS\Db::i()->delete( 'core_clubs_fieldvalues', array( 'club_id=?', $club->id ) );
 
 		/* Boink */
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( "OK" );
+			\IPS\Output::i()->json( "OK" );
 		}
 		else
 		{
-			Output::i()->redirect( Url::internal('app=core&module=clubs&controller=clubs'), 'deleted' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=clubs&controller=clubs'), 'deleted' );
 		}
 	}
 	
@@ -489,59 +447,59 @@ class clubs extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function nodeForm() : void
+	protected function nodeForm()
 	{
 		/* Load Club */
 		try
 		{
-			$club = Club::load( Request::i()->club );
+			$club = \IPS\Member\Club::load( \IPS\Request::i()->club );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Output::i()->error( 'node_error', '2C352/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C352/2', 404, '' );
 		}
 		
 		/* Load Node */
-		$nodeClass = Request::i()->nodeClass;
-		if ( isset( Request::i()->nodeId ) )
+		$nodeClass = \IPS\Request::i()->nodeClass;
+		if ( isset( \IPS\Request::i()->nodeId ) )
 		{
-			Dispatcher::i()->checkAcpPermission( 'clubs_edit_nodes' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'clubs_edit_nodes' );
 			
 			try
 			{
-				$node = $nodeClass::load( Request::i()->nodeId );
+				$node = $nodeClass::load( \IPS\Request::i()->nodeId );
 				$nodeClub = $node->club();
 				if ( !$nodeClub or $nodeClub->id !== $club->id )
 				{
-					throw new Exception;
+					throw new \Exception;
 				}
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				Output::i()->error( 'node_error', '2C352/3', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2C352/3', 404, '' );
 			}
 		}
 		else
 		{
-			Dispatcher::i()->checkAcpPermission( 'clubs_add_nodes' );
+			\IPS\Dispatcher::i()->checkAcpPermission( 'clubs_add_nodes' );
 			$node = new $nodeClass;
 		}
 		
 		/* Build Form */
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		$node->clubForm( $form, $club );
 		
 		/* Handle submissions */
 		if ( $values = $form->values() )
 		{
 			$node->saveClubForm( $club, $values );
-			Session::i()->log( 'acplog__node_edited_club', array( $nodeClass::$nodeTitle => TRUE, $node->titleForLog() => FALSE, $club->name => FALSE ) );
-			Output::i()->redirect( Url::internal( "app=core&module=clubs&controller=clubs&do=edit&id={$club->id}&tab=" . str_replace( '\\', '-', preg_replace( '/^IPS\\\/', '', $nodeClass ) ) ) );
+			\IPS\Session::i()->log( 'acplog__node_edited_club', array( $nodeClass::$nodeTitle => TRUE, $node->titleForLog() => FALSE, $club->name => FALSE ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=clubs&controller=clubs&do=edit&id={$club->id}&tab=" . str_replace( '\\', '-', preg_replace( '/^IPS\\\/', '', $nodeClass ) ) ) );
 		}
 		
 		/* Display */
-		Output::i()->title = $node->_title;
-		Output::i()->output = $form;
+		\IPS\Output::i()->title = $node->_title;
+		\IPS\Output::i()->output = $form;		
 	}
 	
 	/**
@@ -549,36 +507,36 @@ class clubs extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function deleteNode() : void
+	protected function deleteNode()
 	{
-		Dispatcher::i()->checkAcpPermission( 'clubs_delete_nodes' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'clubs_delete_nodes' );
 		
 		/* Load Club */
 		try
 		{
-			$club = Club::load( Request::i()->club );
+			$club = \IPS\Member\Club::load( \IPS\Request::i()->club );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Output::i()->error( 'node_error', '2C352/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C352/4', 404, '' );
 		}
 		
 		/* Load Node */
-		$nodeClass = Request::i()->nodeClass;
+		$nodeClass = \IPS\Request::i()->nodeClass;
 		try
 		{
-			$node = $nodeClass::load( Request::i()->nodeId );
+			$node = $nodeClass::load( \IPS\Request::i()->nodeId );
 			$nodeClub = $node->club();
 			if ( !$nodeClub or $nodeClub->id !== $club->id )
 			{
-				throw new Exception;
+				throw new \Exception;
 			}
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Output::i()->error( 'node_error', '2C352/5', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2C352/5', 404, '' );
 		}
-		$targetUrl = Url::internal( "app=core&module=clubs&controller=clubs&do=edit&id={$club->id}&tab=" . str_replace( '\\', '-', preg_replace( '/^IPS\\\/', '', $nodeClass ) ) );
+		$targetUrl = \IPS\Http\Url::internal( "app=core&module=clubs&controller=clubs&do=edit&id={$club->id}&tab=" . str_replace( '\\', '-', preg_replace( '/^IPS\\\/', '', $nodeClass ) ) );
 		
 		/* Do we have any children or content? */
 		if ( $node->hasChildren( NULL, NULL, TRUE ) or $node->showDeleteOrMoveForm() )
@@ -586,36 +544,36 @@ class clubs extends Controller
 			$form = $node->deleteOrMoveForm( FALSE );
 			if ( $values = $form->values() )
 			{
-				Db::i()->delete( 'core_clubs_node_map', array( 'club_id=? AND node_class=? AND node_id=?', $club->id, $nodeClass, $node->_id ) );
+				\IPS\Db::i()->delete( 'core_clubs_node_map', array( 'club_id=? AND node_class=? AND node_id=?', $club->id, $nodeClass, $node->_id ) );
 				$node->deleteOrMoveFormSubmit( $values );				
-				Output::i()->redirect( $targetUrl );
+				\IPS\Output::i()->redirect( $targetUrl );
 			}
 			else
 			{
 				/* Show form */
-				Output::i()->output = $form;
+				\IPS\Output::i()->output = $form;
 				return;
 			}
 		}
 		else
 		{
 			/* Make sure the user confirmed the deletion */
-			Request::i()->confirmedDelete();
+			\IPS\Request::i()->confirmedDelete();
 		}
 		
 		/* Delete it */
-		Db::i()->delete( 'core_clubs_node_map', array( 'club_id=? AND node_class=? AND node_id=?', $club->id, $nodeClass, $node->_id ) );
-		Session::i()->log( 'acplog__node_deleted_club', array( $nodeClass::$nodeTitle => TRUE, $node->titleForLog() => FALSE, $club->name => FALSE ) );
+		\IPS\Db::i()->delete( 'core_clubs_node_map', array( 'club_id=? AND node_class=? AND node_id=?', $club->id, $nodeClass, $node->_id ) );
+		\IPS\Session::i()->log( 'acplog__node_deleted_club', array( $nodeClass::$nodeTitle => TRUE, $node->titleForLog() => FALSE, $club->name => FALSE ) );
 		$node->delete();
 
 		/* Boink */
-		if( Request::i()->isAjax() )
+		if( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( "OK" );
+			\IPS\Output::i()->json( "OK" );
 		}
 		else
 		{
-			Output::i()->redirect( $targetUrl );
+			\IPS\Output::i()->redirect( $targetUrl );
 		}
 	}
 	
@@ -624,9 +582,8 @@ class clubs extends Controller
 	 *
 	 * @return	array
 	 */
-	public function _getNodeRows() : array
+	public function _getNodeRows()
 	{
-		/* @var Model $nodeClass */
 		$nodeClass = $this->nodeClass;
 		$rows = array();
 		foreach( $nodeClass::roots( NULL, NULL, array( $nodeClass::$databasePrefix . $nodeClass::clubIdColumn() . '=?', $this->club->id ) ) as $node )
@@ -645,11 +602,11 @@ class clubs extends Controller
 	 * @param	bool	$noSort	If TRUE, sort options will be disabled (used for search results)
 	 * @return	string
 	 */
-	public function _getNodeRow( mixed $id, bool $root=FALSE, bool $noSort=FALSE ) : string
+	public function _getNodeRow( $id, $root=FALSE, $noSort=FALSE )
 	{
 		$nodeClass = $this->nodeClass;
 		
-		if ( $id instanceof Model )
+		if ( $id instanceof \IPS\Node\Model )
 		{
 			$node = $id;
 		}
@@ -657,12 +614,11 @@ class clubs extends Controller
 		{
 			try
 			{
-				/* @var Model $nodeClass */
 				$node = $nodeClass::load( $id );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				Output::i()->error( 'node_error', '2C352/6', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2C352/6', 404, '' );
 			}
 		}
 		
@@ -675,29 +631,29 @@ class clubs extends Controller
 				'target'=> '_blank',
 			)
 		);
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_edit_nodes' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_edit_nodes' ) )
 		{
 			$buttons['edit'] = array(
 				'title'	=> 'edit',
 				'icon'	=> 'pencil',
-				'link'	=> Url::internal("app=core&module=clubs&controller=clubs&do=nodeForm&club={$this->club->id}&nodeClass={$nodeClass}&nodeId={$node->_id}"),
+				'link'	=> \IPS\Http\Url::internal("app=core&module=clubs&controller=clubs&do=nodeForm&club={$this->club->id}&nodeClass={$nodeClass}&nodeId={$node->_id}"),
 				'data'	=> array(
 					'ipsDialog'			=> '',
 					'ipsDialog-title'	=> $node->_title
 				)
 			);
 		}
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_delete_nodes' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_delete_nodes' ) )
 		{
 			$buttons['delete'] = array(
 				'title'	=> 'delete',
 				'icon'	=> 'times-circle',
-				'link'	=> Url::internal("app=core&module=clubs&controller=clubs&do=deleteNode&club={$this->club->id}&nodeClass={$nodeClass}&nodeId={$node->_id}"),
+				'link'	=> \IPS\Http\Url::internal("app=core&module=clubs&controller=clubs&do=deleteNode&club={$this->club->id}&nodeClass={$nodeClass}&nodeId={$node->_id}"),
 				'data' 	=> ( $node->hasChildren( NULL, NULL, TRUE ) or $node->showDeleteOrMoveForm() ) ? array( 'ipsDialog' => '', 'ipsDialog-title' => $node->_title ) : array( 'delete' => '' ),
 			);
 		}
 		
-		return Theme::i()->getTemplate( 'trees', 'core' )->row(
+		return \IPS\Theme::i()->getTemplate( 'trees', 'core' )->row(
 			NULL,
 			$node->_id,
 			$node->_title,
@@ -712,23 +668,23 @@ class clubs extends Controller
 	 *
 	 * @return	void
 	 */
-	public function updateExisting() : void
+	public function updateExisting()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
 		try
 		{
-			$club = Club::load( Request::i()->id );
+			$club = \IPS\Member\Club::load( \IPS\Request::i()->id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'no_module_permission', '3C352/8', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '3C352/8', 403, '' );
 		}
 
-		$changes = json_decode( Request::i()->changes, TRUE );
+		$changes = json_decode( \IPS\Request::i()->changes, TRUE );
 
-		Task::queue( 'core', 'UpdateClubRenewals', array( 'changes' => $changes, 'club' => $club->id ), 5 );
+		\IPS\Task::queue( 'core', 'UpdateClubRenewals', array( 'changes' => $changes, 'club' => $club->id ), 5 );
 
-		Output::i()->redirect( Url::internal( "app=core&module=clubs&controller=clubs" ), 'saved' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=clubs&controller=clubs" ), 'saved' );
 	}
 }

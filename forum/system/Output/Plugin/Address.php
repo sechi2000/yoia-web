@@ -11,28 +11,25 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Address formatting
  */
-class Address
+class _Address
 {
 	/**
 	 * Run the plug-in
 	 *
-	 * @param string $data	  The initial data from the tag
-	 * @param array $options    Array of options
+	 * @param	string 		$data	  The initial data from the tag
+	 * @param	array		$options    Array of options
 	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options ): string
+	public static function runPlugin( $data, $options )
 	{
 		if( mb_substr( $data, 0, 1 ) === '\\' OR mb_substr( $data, 0, 1 ) === '$' )
 		{

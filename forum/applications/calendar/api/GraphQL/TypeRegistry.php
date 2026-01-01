@@ -10,38 +10,36 @@
  */
 
 namespace IPS\calendar\api\GraphQL;
-use IPS\calendar\api\GraphQL\Types\CalendarType;
-use IPS\calendar\api\GraphQL\Types\CommentType;
-use IPS\calendar\api\GraphQL\Types\EventType;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 
-class TypeRegistry
+class _TypeRegistry
 {
     /**
      * The calendar type instance
-     * @var CalendarType
+     * @var \IPS\calendar\api\GraphQL\Types\CalendarType
      */
-    protected static CalendarType $calendar;
+    protected static $calendar;
 
     /**
      * The event type instance
-     * @var EventType
+     * @var \IPS\calendar\api\GraphQL\Types\EventType
      */
-    protected static EventType $event;
+    protected static $event;
 
     /**
      * The event comment instance
-     * @var CommentType
+     * @var \IPS\calendar\api\GraphQL\Types\CalendarType
      */
-    protected static CommentType $comment;
+    protected static $comment;
 
     /**
      * Constructor
@@ -54,21 +52,21 @@ class TypeRegistry
     /**
      * @return CalendarType
      */
-    public static function calendar() : CalendarType
+    public static function calendar() : \IPS\calendar\api\GraphQL\Types\CalendarType
     {
-        return self::$calendar ?? (self::$calendar = new CalendarType());
+        return self::$calendar ?: (self::$calendar = new \IPS\calendar\api\GraphQL\Types\CalendarType());
     }
 
     /**
      * @return EventType
      */
-    public static function event() : EventType
+    public static function event() : \IPS\calendar\api\GraphQL\Types\EventType
     {
-        return self::$event ?? (self::$event = new EventType());
+        return self::$event ?: (self::$event = new \IPS\calendar\api\GraphQL\Types\EventType());
     }
 
-    public static function comment() : CommentType
+    public static function comment() : \IPS\calendar\api\GraphQL\Types\CommentType
     {
-        return self::$comment ?? ( self::$comment = new CommentType() );
+        return self::$comment ?: ( self::$comment = new \IPS\calendar\api\GraphQL\Types\CommentType() );
     }
 }

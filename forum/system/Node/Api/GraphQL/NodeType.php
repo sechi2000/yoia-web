@@ -9,44 +9,35 @@
  */
 
 namespace IPS\Node\Api\GraphQL;
-use Exception;
 use GraphQL\Type\Definition\ObjectType;
-use IPS\Api\GraphQL\Fields\TagsEditField;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Item;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecordIterator;
-use function defined;
-use function is_array;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Base class for Nodes
  */
-class NodeType extends ObjectType
+class _NodeType extends ObjectType
 {
-	/**
+	/*
 	 * @brief 	The item classname we use for this type
-	 * @var Model|string
 	 */
-	protected static string $nodeClass	= '\IPS\Node\Model';
+	protected static $nodeClass	= '\IPS\Node\Model';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'core_Node';
+	protected static $typeName = 'core_Node';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'A generic node';
+	protected static $typeDescription = 'A generic node';
 
 
 	public function __construct()
@@ -67,7 +58,7 @@ class NodeType extends ObjectType
 	 *
 	 * @return	array
 	 */
-	public function fields(): array
+	public function fields()
 	{
 		return array(
 			'id' => [
@@ -79,7 +70,7 @@ class NodeType extends ObjectType
 			'name' => [
 				'type' => TypeRegistry::string(),
 				'resolve' => function ($node) {
-					return $node->getTitleForLanguage( Member::loggedIn()->language() );
+					return $node->getTitleForLanguage( \IPS\Member::loggedIn()->language() );
 				}
 			],
 			'url' => [
@@ -91,14 +82,12 @@ class NodeType extends ObjectType
 			'itemCount' => [
 				'type' => TypeRegistry::int(),
 				'resolve' => function ($node) {
-					/* @var Item $contentItemClass */
 					return static::$nodeClass::$contentItemClass::contentCount($node, TRUE, FALSE);
 				}
 			],
 			'commentCount' => [
 				'type' => TypeRegistry::int(),
 				'resolve' => function ($node) {
-					/* @var Item $contentItemClass */
 					return static::$nodeClass::$contentItemClass::contentCount($node, FALSE, TRUE);
 				}
 			],
@@ -111,7 +100,6 @@ class NodeType extends ObjectType
 			'hasUnread' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($node) {
-					/* @var Item $contentItemClass */
 					return static::$nodeClass::$contentItemClass::containerUnread( $node );
 				}
 			],
@@ -125,7 +113,7 @@ class NodeType extends ObjectType
 			'follow' => [
 				'type' => TypeRegistry::follow(),
 				'resolve' => function ($node) {
-					if( isset( static::$followData ) && is_array( static::$followData ) ){
+					if( isset( static::$followData ) && \is_array( static::$followData ) ){
 						return array_merge( static::$followData, array(
 							'id' => $node->_id,
 							'node' => $node,
@@ -154,7 +142,7 @@ class NodeType extends ObjectType
 					return array( 'postKey' => $args['postKey'] );
 				}
 			],
-			'tagPermissions' => TagsEditField::getDefinition(static::$typeName . '_tags')
+			'tagPermissions' => \IPS\Api\GraphQL\Fields\TagsEditField::getDefinition(static::$typeName . '_tags')
 		);
 	}
 
@@ -163,7 +151,7 @@ class NodeType extends ObjectType
 	 *
 	 * @return	ObjectType
 	 */
-	public static function getItemType(): ObjectType
+	public static function getItemType()
 	{
 		return \IPS\Content\Api\GraphQL\TypeRegistry::item();
 	}
@@ -173,20 +161,19 @@ class NodeType extends ObjectType
 	 *
 	 * @return	array
 	 */
-	public static function getNodePermissionFields(): array
+	public static function getNodePermissionFields()
 	{
 		return array(
 			'canCreate' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($node, $args, $context) {
-					return $node->can('add', Member::loggedIn(), FALSE);
+					return $node->can('add', \IPS\Member::loggedIn(), FALSE);
 				}
 			],
 			'itemsRequireApproval' => [
 				'type' => TypeRegistry::boolean(),
 				'resolve' => function ($node, $args, $context) {
-					/* @var Item $contentItemClass */
-					return static::$nodeClass::$contentItemClass::moderateNewItems( Member::loggedIn(), $node, FALSE );
+					return static::$nodeClass::$contentItemClass::moderateNewItems( \IPS\Member::loggedIn(), $node, FALSE );
 				}
 			],
 			'commentsRequireApproval' => [
@@ -209,12 +196,10 @@ class NodeType extends ObjectType
 	/**
 	 * Resolve children field
 	 *
-	 * @param Model $node
-	 * @param array $args
-	 * @param array $context
-	 * @return    array
+	 * @param 	\IPS\Node\Model
+	 * @return	array
 	 */
-	protected static function children( Model $node, array $args, array $context): array
+	protected static function children($node, $args, $context)
 	{
 		return $node->children('view');
 	}
@@ -222,11 +207,11 @@ class NodeType extends ObjectType
 	/**
 	 * Resolve the topics field
 	 *
-	 * @param 	Model $node
-	 * @param 	array $args 	Arguments passed to this resolver
-	 * @return	ActiveRecordIterator|int
+	 * @param 	\IPS\forums\Forum
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	array
 	 */
-	protected static function items( Model $node, array $args): ActiveRecordIterator|int
+	protected static function items($node, $args)
 	{
 		try 
 		{
@@ -236,24 +221,20 @@ class NodeType extends ObjectType
 			}
 			else
 			{
-				/* @var Item $contentItemClass */
-				/* @var array $databaseColumnMap */
 				$orderBy = static::$nodeClass::$contentItemClass::$databaseColumnMap[ $args['orderBy'] ];
 			}
 
 			if( $args['orderBy'] === 'last_comment' )
 			{
-				$orderBy = is_array( $orderBy ) ? array_pop( $orderBy ) : $orderBy;
+				$orderBy = \is_array( $orderBy ) ? array_pop( $orderBy ) : $orderBy;
 			}
 		}
-		catch (Exception $e)
+		catch (\Exception $e)
 		{
 			$orderBy = 'title';
 		}
 
 		$where = array();
-
-		/* @var Item $class */
 		$class = static::$nodeClass::$contentItemClass;
 		$sortBy = $class::$databaseTable . '.' . $class::$databasePrefix . "{$orderBy} {$args['orderDir']}";
 

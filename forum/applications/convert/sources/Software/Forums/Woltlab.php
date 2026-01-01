@@ -12,47 +12,28 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Woltlab as WoltlabCore;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function preg_match;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Woltlab Forums Converter
  */
-class Woltlab extends Software
+class _Woltlab extends \IPS\convert\Software
 {
 	/**
 	 * @brief	The WBB table prefix can change depending on the number of installs
 	 */
-	public static int $installId = 1;
+	public static $installId = 1;
 	
 	/**
 	 * Software Name
 	 *
 	 * @return    string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "WoltLab Suite Forum";
@@ -63,7 +44,7 @@ class Woltlab extends Software
 	 *
 	 * @return    string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "woltlab";
@@ -72,9 +53,9 @@ class Woltlab extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums'		=> array(
@@ -90,7 +71,7 @@ class Woltlab extends Software
 				'where'						=> NULL
 			),
 			'convertAttachments'		=> array(
-				'table'						=> 'wcf' . Woltlab::$installId . '_attachment',
+				'table'						=> 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_attachment',
 				'where'						=> NULL
 			)
 		);
@@ -99,9 +80,9 @@ class Woltlab extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -109,9 +90,9 @@ class Woltlab extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'woltlab' ) );
 	}
@@ -119,23 +100,23 @@ class Woltlab extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		/* Rebuild Leaderboard */
-		Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
-		Db::i()->delete('core_reputation_leaderboard_history');
+		\IPS\Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
+		\IPS\Db::i()->delete('core_reputation_leaderboard_history');
 
 		/* Caches */
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
 
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics", "f_topic_tags_recount" );
 	}
@@ -143,56 +124,55 @@ class Woltlab extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
-			case 'wcf' . Woltlab::$installId . '_attachment':
+			case 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_attachment':
 				try
 				{
-					$postObjects = iterator_to_array( $this->db->select( 'objectTypeID', 'wcf' . Woltlab::$installId . '_object_type', "objectType='com.woltlab.wbb.post'" ) );
-					return $this->db->select( 'count(attachmentID)', 'wcf' . Woltlab::$installId . '_attachment', array( $this->db->in( 'objectTypeID', $postObjects ) ) )->first();
+					$postObjects = iterator_to_array( $this->db->select( 'objectTypeID', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_object_type', "objectType='com.woltlab.wbb.post'" ) );
+					return $this->db->select( 'count(attachmentID)', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_attachment', array( $this->db->in( 'objectTypeID', $postObjects ) ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					return 0;
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix Post Data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string	$post	Post
+	 * @return	string	Fixed Post
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return WoltlabCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Woltlab::fixPostData( $post );
 	}
 
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertAttachments',
@@ -203,10 +183,10 @@ class Woltlab extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -215,10 +195,10 @@ class Woltlab extends Software
 				/* Get our reactions to let the admin map them */
 				$options		= array();
 				$descriptions	= array();
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
 				{
 					$options[ $reaction->id ]		= $reaction->_icon->url;
-					$descriptions[ $reaction->id ]	= Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
+					$descriptions[ $reaction->id ]	= \IPS\Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
 				}
 
 				$return['convertForumsPosts'] = array(
@@ -248,8 +228,8 @@ class Woltlab extends Software
 						'field_default'			=> NULL,
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(),
-						'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_woltlab_attach_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_woltlab_attach_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;
@@ -263,12 +243,12 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums() : void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'boardID' );
 
-		$boardObjects = iterator_to_array( $this->db->select( 'objectTypeID', 'wcf' . Woltlab::$installId . '_object_type', "objectType='com.woltlab.wbb.board'" ) );
+		$boardObjects = iterator_to_array( $this->db->select( 'objectTypeID', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_object_type', "objectType='com.woltlab.wbb.board'" ) );
 
 		foreach( $this->fetch( 'wbb' . static::$installId . '_board', 'boardID' ) AS $row )
 		{
@@ -289,7 +269,7 @@ class Woltlab extends Software
 			$libraryClass->convertForumsForum( $info );
 
 			/* Followers */
-			foreach( $this->db->select( 'wcf' . Woltlab::$installId . '_user_object_watch.*', 'wcf' . Woltlab::$installId . '_user_object_watch', array( "objectID=? AND " . $this->db->in('objectTypeID', $boardObjects ), $row['boardID'] ) ) AS $follow )
+			foreach( $this->db->select( 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_user_object_watch.*', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_user_object_watch', array( "objectID=? AND " . $this->db->in('objectTypeID', $boardObjects ), $row['boardID'] ) ) AS $follow )
 			{
 				$libraryClass->convertFollow( array(
 					'follow_app'			=> 'forums',
@@ -316,12 +296,12 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics() : void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'threadID' );
 
-		$threadObjects = iterator_to_array( $this->db->select( 'objectTypeID', 'wcf' . Woltlab::$installId . '_object_type', "objectType='com.woltlab.wbb.thread'" ) );
+		$threadObjects = iterator_to_array( $this->db->select( 'objectTypeID', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_object_type', "objectType='com.woltlab.wbb.thread'" ) );
 
 		foreach( $this->fetch( 'wbb' . static::$installId . '_thread', 'threadID', array( 'movedThreadID IS NULL' ) ) AS $row )
 		{
@@ -344,8 +324,8 @@ class Woltlab extends Software
 			$libraryClass->convertForumsTopic( $info );
 
 			/* Tags */
-			$tags = $this->db->select( 'wcf' . Woltlab::$installId . '_tag_to_object.tagID', 'wcf' . Woltlab::$installId . '_tag_to_object', array( "objectID=? AND " . $this->db->in('objectTypeID', $threadObjects ), $row['threadID'] ) );
-			$tagText = $this->db->select( 'name', 'wcf' . Woltlab::$installId . '_tag', array( $this->db->in( 'tagID', iterator_to_array( $tags ) ) ) );
+			$tags = $this->db->select( 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_tag_to_object.tagID', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_tag_to_object', array( "objectID=? AND " . $this->db->in('objectTypeID', $threadObjects ), $row['threadID'] ) );
+			$tagText = $this->db->select( 'name', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_tag', array( $this->db->in( 'tagID', iterator_to_array( $tags ) ) ) );
 
 			foreach( $tagText as $text )
 			{
@@ -361,7 +341,7 @@ class Woltlab extends Software
 			}
 
 			/* Follows */
-			foreach( $this->db->select( 'wcf' . Woltlab::$installId . '_user_object_watch.*', 'wcf' . Woltlab::$installId . '_user_object_watch', array( "objectID=? AND " . $this->db->in('objectTypeID', $threadObjects ), $row['threadID'] ) ) AS $follow )
+			foreach( $this->db->select( 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_user_object_watch.*', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_user_object_watch', array( "objectID=? AND " . $this->db->in('objectTypeID', $threadObjects ), $row['threadID'] ) ) AS $follow )
 			{
 				$libraryClass->convertFollow( array(
 					'follow_app'			=> 'forums',
@@ -388,12 +368,12 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts() : void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'postID' );
 
-		$postLikeObjects = iterator_to_array( $this->db->select( 'objectTypeID', 'wcf' . Woltlab::$installId . '_object_type', "objectType='com.woltlab.wbb.likeablePost'" ) );
+		$postLikeObjects = iterator_to_array( $this->db->select( 'objectTypeID', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_object_type', "objectType='com.woltlab.wbb.likeablePost'" ) );
 
 		foreach( $this->fetch( 'wbb' . static::$installId . '_post', 'postID' ) AS $row )
 		{
@@ -413,7 +393,7 @@ class Woltlab extends Software
 			$libraryClass->convertForumsPost( $info );
 
 			/* Reputation */
-			foreach( $this->db->select( '*', 'wcf' . Woltlab::$installId . '_like', array( "objectID=? AND " . $this->db->in('objectTypeID', $postLikeObjects ), $row['postID'] ) ) AS $rep )
+			foreach( $this->db->select( '*', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_like', array( "objectID=? AND " . $this->db->in('objectTypeID', $postLikeObjects ), $row['postID'] ) ) AS $rep )
 			{
 				$reaction = ( $rep['likeValue'] > 0 ) ? $this->app->_session['more_info']['convertForumsPosts']['rep_positive'] : $this->app->_session['more_info']['convertForumsPosts']['rep_negative'];
 
@@ -438,20 +418,20 @@ class Woltlab extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'attachmentID' );
 
-		$postObjects = iterator_to_array( $this->db->select( 'objectTypeID', 'wcf' . Woltlab::$installId . '_object_type', "objectType='com.woltlab.wbb.post'" ) );
+		$postObjects = iterator_to_array( $this->db->select( 'objectTypeID', 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_object_type', "objectType='com.woltlab.wbb.post'" ) );
 
-		foreach( $this->fetch( 'wcf' . Woltlab::$installId . '_attachment', 'attachmentID', array( $this->db->in( 'objectTypeID', $postObjects ) ) ) AS $row )
+		foreach( $this->fetch( 'wcf' . \IPS\convert\Software\Core\Woltlab::$installId . '_attachment', 'attachmentID', array( $this->db->in( 'objectTypeID', $postObjects ) ) ) AS $row )
 		{
 			try
 			{
 				$topicId = $this->db->select( 'threadID', 'wbb' . static::$installId . '_post', array( "postID=?", $row['objectID'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				/* Post is orphaned */
 				$libraryClass->setLastKeyValue( $row['attachmentID'] );
@@ -481,16 +461,16 @@ class Woltlab extends Software
 				{
 					$pid = $this->app->getLink( $row['objectID'], 'forums_posts' );
 
-					$post = Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
+					$post = \IPS\Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
 
-					if( preg_match( '#\[attach]#i', $post ) )
+					if( \preg_match( '#\[attach]#i', $post ) )
 					{
 						$post = str_ireplace( '[attach]' . $row['attachmentID'] . '[/attach]', '[attachment=' . $attachId . ':name]', $post );
-						Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
+						\IPS\Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
 					}
 				}
 			}
-			catch( UnderflowException | OutOfRangeException $e ) {}
+			catch( \UnderflowException | \OutOfRangeException $e ) {}
 
 			$libraryClass->setLastKeyValue( $row['attachmentID'] );
 		}
@@ -499,19 +479,19 @@ class Woltlab extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( preg_match( '#/thread/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/thread/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
-			if( !empty( Request::i()->postID ) )
+			if( !empty( \IPS\Request::i()->postID ) )
 			{
 				$class	= '\IPS\forums\Topic\Post';
 				$types	= array( 'posts', 'forums_posts' );
-				$oldId	= (int) Request::i()->postID;
+				$oldId	= (int) \IPS\Request::i()->postID;
 			}
 			else
 			{
@@ -520,7 +500,7 @@ class Woltlab extends Software
 				$oldId	= (int) $matches[1];
 			}
 		}
-		elseif( preg_match( '#/board/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		elseif( preg_match( '#/board/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			$class	= '\IPS\forums\Forum';
 			$types	= array( 'forums', 'forums_forums' );
@@ -535,20 +515,20 @@ class Woltlab extends Software
 				{
 					$data = (string) $this->app->getLink( $oldId, $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( $oldId, $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				elseif( $item instanceof Model )
+				elseif( $item instanceof \IPS\Node\Model )
 				{
 					if( $item->can( 'view' ) )
 					{
@@ -556,7 +536,7 @@ class Woltlab extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

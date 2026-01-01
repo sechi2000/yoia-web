@@ -11,48 +11,32 @@
 namespace IPS\core\modules\admin\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Session;
-use IPS\Task;
-use IPS\Theme;
-use UnderflowException;
-use function defined;
-use function intval;
-use function is_array;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background processes 'Run Now'
  */
-class background extends Controller
+class _background extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		if ( CIC )
+		if ( \IPS\CIC )
 		{
-			Output::i()->error( 'no_writes', '2C347/1', 403, '' );
+			\IPS\Output::i()->error( 'no_writes', '2C347/1', 403, '' );
 		}
 		
 		parent::execute();
@@ -63,10 +47,10 @@ class background extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		Output::i()->title = Member::loggedIn()->language()->addToStack('background_process_run_title');
-		Output::i()->output = Theme::i()->getTemplate( 'system' )->backgroundProcessesRunNow();
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('background_process_run_title');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'system' )->backgroundProcessesRunNow();
 	}
 	
 	/**
@@ -74,35 +58,35 @@ class background extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function process() : void
+	protected function process()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		$self = $this;
-		$multiRedirect = new MultipleRedirect(
-			Url::internal('app=core&module=system&controller=background&do=process')->csrf(),
+		$multiRedirect = new \IPS\Helpers\MultipleRedirect(
+			\IPS\Http\Url::internal('app=core&module=system&controller=background&do=process')->csrf(),
 			function( $data ) use ( $self )
 			{
 				/* Make sure the task is locked */
-				$task = Task::load('queue', 'key');
+				$task = \IPS\Task::load('queue', 'key');
 				$task->running = TRUE;
 				$task->next_run = time() + 900;
 				$task->save();
 				
-				if ( ! is_array( $data ) )
+				if ( ! \is_array( $data ) )
 				{
 					$count = $self->getCount();
 					 
-					return array( array( 'count' => $count, 'done' => 0 ), Member::loggedIn()->language()->addToStack('background_process_starting') );
+					return array( array( 'count' => $count, 'done' => 0 ), \IPS\Member::loggedIn()->language()->addToStack('background_process_starting') );
 				}
 				else
 				{
 					try
 					{
 						/* Run the next queue task, if any */
-						$queueData = Task::runQueue();
+						$queueData = \IPS\Task::runQueue();
 					}
-					catch ( UnderflowException $e )
+					catch ( \UnderflowException $e )
 					{
 						/* If we're here it means there were no rows in core_queue and we are done */
 						return NULL;
@@ -129,7 +113,7 @@ class background extends Controller
 					if ( isset( $json['count'] ) )
 					{
 						/* If the offset is larger than the count, then we should just show the count instead (to avoid situations where it will display 150 / 139, for example) */
-						$offset = intval( $queueData['offset'] );
+						$offset = \intval( $queueData['offset'] );
 						if ( $offset > $json['count'] )
 						{
 							$offset = $json['count'];
@@ -137,25 +121,25 @@ class background extends Controller
 						$lang[] = " " . $offset . ' / ' . $json['count'];
 					}
 					
-					return array( $data, Member::loggedIn()->language()->addToStack('background_processes_processing', FALSE, array( 'sprintf' => array( implode( ' - ', $lang ) ) ) ), ( $data['count'] ) ? round( ( 100 / $data['count'] * $data['done'] ), 2 ) : 100 );
+					return array( $data, \IPS\Member::loggedIn()->language()->addToStack('background_processes_processing', FALSE, array( 'sprintf' => array( implode( ' - ', $lang ) ) ) ), ( $data['count'] ) ? round( ( 100 / $data['count'] * $data['done'] ), 2 ) : 100 );
 				}
 			},
 			function()
 			{
 				/* Make sure the task is unlocked */
-				$task = Task::load('queue', 'key');
+				$task = \IPS\Task::load('queue', 'key');
 				$task->running = FALSE;
 				$task->next_run = time() + 60;
 				$task->save();
 				
-				Session::i()->log( 'acplog__background_tasks_ran' );
+				\IPS\Session::i()->log( 'acplog__background_tasks_ran' );
 				
-				Output::i()->redirect( Url::internal('app=core&module=overview&controller=dashboard'), 'completed' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=overview&controller=dashboard'), 'completed' );
 			}
 		);
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('background_process_run_title');
-		Output::i()->output = $multiRedirect;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('background_process_run_title');
+		\IPS\Output::i()->output = $multiRedirect;
 	}
 	
 	/**
@@ -163,10 +147,10 @@ class background extends Controller
 	 *
 	 * @return int
 	 */
-	public function getCount() : int
+	public function getCount()
 	{
 		$count = 0;
-		foreach( Db::i()->select( '*', 'core_queue' ) as $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_queue' ) as $row )
 		{
 			if ( ! empty( $row['data'] ) )
 			{
@@ -174,11 +158,11 @@ class background extends Controller
 				
 				if( isset( $data['realCount'] ) )
 				{
-					$count += intval( $data['realCount'] );
+					$count += \intval( $data['realCount'] );
 				}
 				elseif ( isset( $data['count'] ) )
 				{
-					$count += intval( $data['count'] );
+					$count += \intval( $data['count'] );
 				}
 				else
 				{

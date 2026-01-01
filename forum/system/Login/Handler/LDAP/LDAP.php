@@ -11,47 +11,21 @@
 namespace IPS\Login\Handler;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use IPS\Db;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Login;
-use IPS\Login\Exception;
-use IPS\Login\Handler;
-use IPS\Login\Handler\LDAP\Exception as LdapException;
-use IPS\Member;
-use IPS\Settings;
-use LDAP\Connection;
-use LDAP\ResultEntry;
-use LogicException;
-use RuntimeException;
-use UnderflowException;
-use function defined;
-use function extension_loaded;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * LDAP Database Login Handler
  */
-class LDAP extends Handler
+class _LDAP extends \IPS\Login\Handler
 {
 	/**
 	 * @brief	Can we have multiple instances of this handler?
 	 */
-	public static bool $allowMultiple = TRUE;
+	public static $allowMultiple = TRUE;
 	
 	use UsernamePasswordHandler;
 	
@@ -62,7 +36,7 @@ class LDAP extends Handler
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return 'login_handler_Ldap';
 	}
@@ -70,65 +44,66 @@ class LDAP extends Handler
 	/**
 	 * ACP Settings Form
 	 *
+	 * @param	string	$url	URL to redirect user to after successful submission
 	 * @return	array	List of settings to save - settings will be stored to core_login_methods.login_settings DB field
 	 * @code
 	 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{
 		$id = $this->id ?: 'new';
 
 		$return = array(
 			'ldap_header',
-			'server_protocol'	=> new Radio( 'ldap_server_protocol', $this->settings['server_protocol'] ?? 3, TRUE, array( 'options' => array( 3 => 'V3', 2 => 'V2' ) ) ),
-			'server_host'		=> new Text( 'ldap_server_host', $this->settings['server_host'] ?? NULL, TRUE, array( 'placeholder' => 'ldap.example.com' ) ),
-			'server_port'		=> new Number( 'ldap_server_port', $this->settings['server_port'] ?? 389, TRUE ),
-			'server_user'		=> new Text( 'ldap_server_user', $this->settings['server_user'] ?? NULL ),
-			'server_pass'		=> new Text( 'ldap_server_pass', $this->settings['server_pass'] ?? NULL ),
-			'opt_referrals'		=> new YesNo( 'ldap_opt_referrals', $this->settings['opt_referrals'] ?? TRUE, TRUE ),
+			'server_protocol'	=> new \IPS\Helpers\Form\Radio( 'ldap_server_protocol', isset( $this->settings['server_protocol'] ) ? $this->settings['server_protocol'] : 3, TRUE, array( 'options' => array( 3 => 'V3', 2 => 'V2' ) ) ),
+			'server_host'		=> new \IPS\Helpers\Form\Text( 'ldap_server_host', isset( $this->settings['server_host'] ) ? $this->settings['server_host'] : NULL, TRUE, array( 'placeholder' => 'ldap.example.com' ) ),
+			'server_port'		=> new \IPS\Helpers\Form\Number( 'ldap_server_port', isset( $this->settings['server_port'] ) ? $this->settings['server_port'] : 389, TRUE ),
+			'server_user'		=> new \IPS\Helpers\Form\Text( 'ldap_server_user', isset( $this->settings['server_user'] ) ? $this->settings['server_user'] : NULL ),
+			'server_pass'		=> new \IPS\Helpers\Form\Text( 'ldap_server_pass', isset( $this->settings['server_pass'] ) ? $this->settings['server_pass'] : NULL ),
+			'opt_referrals'		=> new \IPS\Helpers\Form\YesNo( 'ldap_opt_referrals', isset( $this->settings['opt_referrals'] ) ? $this->settings['opt_referrals'] : TRUE, TRUE ),
 			'ldap_directory',
-			'base_dn'			=> new Text( 'ldap_base_dn', $this->settings['base_dn'] ?? NULL, TRUE, array( 'placeholder' => 'dc=example,dc=com' ) ),
-			'uid_field'			=> new Text( 'ldap_uid_field', $this->settings['uid_field'] ?? 'uid', TRUE ),
-			'un_suffix'			=> new Text( 'ldap_un_suffix', $this->settings['un_suffix'] ?? NULL, FALSE, array( 'placeholder' => '@example.com' ) ),
-			'name_field'		=> new Text( 'ldap_name_field', $this->_nameField() ?: 'cn' ),
-			'email_field'		=> new Text( 'ldap_email_field', $this->settings['email_field'] ?? 'mail' ),
-			'filter'			=> new Text( 'ldap_filter', $this->settings['filter'] ?? NULL, FALSE, array( 'placeholder' => 'ou=your_department' ) ),
+			'base_dn'			=> new \IPS\Helpers\Form\Text( 'ldap_base_dn', isset( $this->settings['base_dn'] ) ? $this->settings['base_dn'] : NULL, TRUE, array( 'placeholder' => 'dc=example,dc=com' ) ),
+			'uid_field'			=> new \IPS\Helpers\Form\Text( 'ldap_uid_field', isset( $this->settings['uid_field'] ) ?  $this->settings['uid_field'] : 'uid', TRUE ),
+			'un_suffix'			=> new \IPS\Helpers\Form\Text( 'ldap_un_suffix', isset( $this->settings['un_suffix'] ) ? $this->settings['un_suffix'] : NULL, FALSE, array( 'placeholder' => '@example.com' ) ),
+			'name_field'		=> new \IPS\Helpers\Form\Text( 'ldap_name_field', $this->_nameField() ?: 'cn' ),
+			'email_field'		=> new \IPS\Helpers\Form\Text( 'ldap_email_field', isset( $this->settings['email_field'] ) ? $this->settings['email_field'] : 'mail' ),
+			'filter'			=> new \IPS\Helpers\Form\Text( 'ldap_filter', isset( $this->settings['filter'] ) ? $this->settings['filter'] : NULL, FALSE, array( 'placeholder' => 'ou=your_department' ) ),
 			'login_settings',
-			'auth_types'	=> new Select( 'login_auth_types', $this->settings['auth_types'] ?? ( Login::AUTH_TYPE_EMAIL ), TRUE, array( 'options' => array(
-				Login::AUTH_TYPE_USERNAME + Login::AUTH_TYPE_EMAIL => 'username_or_email',
-				Login::AUTH_TYPE_EMAIL	=> 'email_address',
-				Login::AUTH_TYPE_USERNAME => 'username',
-			), 'toggles' => array( Login::AUTH_TYPE_USERNAME + Login::AUTH_TYPE_EMAIL => array( 'form_' . $id . '_login_auth_types_warning' ), Login::AUTH_TYPE_USERNAME => array( 'form_' . $id . '_login_auth_types_warning' ) ) ) ),
-			'pw_required'		=> new YesNo( 'ldap_pw_required', $this->settings['pw_required'] ?? TRUE ),
+			'auth_types'	=> new \IPS\Helpers\Form\Select( 'login_auth_types', isset( $this->settings['auth_types'] ) ? $this->settings['auth_types'] : ( \IPS\Login::AUTH_TYPE_EMAIL ), TRUE, array( 'options' => array(
+				\IPS\Login::AUTH_TYPE_USERNAME + \IPS\Login::AUTH_TYPE_EMAIL => 'username_or_email',
+				\IPS\Login::AUTH_TYPE_EMAIL	=> 'email_address',
+				\IPS\Login::AUTH_TYPE_USERNAME => 'username',
+			), 'toggles' => array( \IPS\Login::AUTH_TYPE_USERNAME + \IPS\Login::AUTH_TYPE_EMAIL => array( 'form_' . $id . '_login_auth_types_warning' ), \IPS\Login::AUTH_TYPE_USERNAME => array( 'form_' . $id . '_login_auth_types_warning' ) ) ) ),
+			'pw_required'		=> new \IPS\Helpers\Form\YesNo( 'ldap_pw_required', isset( $this->settings['pw_required'] ) ? $this->settings['pw_required'] : TRUE ),
 		);
-		if ( Settings::i()->allow_forgot_password == 'normal' or Settings::i()->allow_forgot_password == 'handler' )
+		if ( \IPS\Settings::i()->allow_forgot_password == 'normal' or \IPS\Settings::i()->allow_forgot_password == 'handler' )
 		{
-			$return['forgot_password_url'] = new \IPS\Helpers\Form\Url( 'handler_forgot_password_url', $this->settings['forgot_password_url'] ?? NULL );
-			Member::loggedIn()->language()->words['handler_forgot_password_url_desc'] = Member::loggedIn()->language()->addToStack( Settings::i()->allow_forgot_password == 'normal' ? 'handler_forgot_password_url_desc_normal' : 'handler_forgot_password_url_deschandler' );
+			$return['forgot_password_url'] = new \IPS\Helpers\Form\Url( 'handler_forgot_password_url', isset( $this->settings['forgot_password_url'] ) ? $this->settings['forgot_password_url'] : NULL );
+			\IPS\Member::loggedIn()->language()->words['handler_forgot_password_url_desc'] = \IPS\Member::loggedIn()->language()->addToStack( \IPS\Settings::i()->allow_forgot_password == 'normal' ? 'handler_forgot_password_url_desc_normal' : 'handler_forgot_password_url_deschandler' );
 		}
 		
 		$return[] = 'account_management_settings';
-		$return['sync_name_changes'] = new Radio( 'login_sync_name_changes', $this->settings['sync_name_changes'] ?? 1, FALSE, array( 'options' => array(
+		$return['sync_name_changes'] = new \IPS\Helpers\Form\Radio( 'login_sync_name_changes', isset( $this->settings['sync_name_changes'] ) ? $this->settings['sync_name_changes'] : 1, FALSE, array( 'options' => array(
 			1	=> 'login_sync_changes_yes',
 			0	=> 'login_sync_changes_no',
 		) ) );
-		if ( Settings::i()->allow_email_changes == 'normal' )
+		if ( \IPS\Settings::i()->allow_email_changes == 'normal' )
 		{
-			$return['sync_email_changes'] = new Radio( 'login_sync_email_changes', $this->settings['sync_email_changes'] ?? 1, FALSE, array( 'options' => array(
+			$return['sync_email_changes'] = new \IPS\Helpers\Form\Radio( 'login_sync_email_changes', isset( $this->settings['sync_email_changes'] ) ? $this->settings['sync_email_changes'] : 1, FALSE, array( 'options' => array(
 				1	=> 'login_sync_changes_yes',
 				0	=> 'login_sync_changes_no',
 			) ) );
 		}
-		if ( Settings::i()->allow_password_changes == 'normal' )
+		if ( \IPS\Settings::i()->allow_password_changes == 'normal' )
 		{
-			$return['sync_password_changes'] = new Radio( 'login_sync_password_changes', $this->settings['sync_password_changes'] ?? 1, FALSE, array( 'options' => array(
+			$return['sync_password_changes'] = new \IPS\Helpers\Form\Radio( 'login_sync_password_changes', isset( $this->settings['sync_password_changes'] ) ? $this->settings['sync_password_changes'] : 1, FALSE, array( 'options' => array(
 				1	=> 'login_sync_changes_yes',
 				0	=> 'login_sync_password_changes_no',
 			) ) );
 		}
 		
-		$return['show_in_ucp'] = new Radio( 'login_handler_show_in_ucp', $this->settings['show_in_ucp'] ?? 'disabled', FALSE, array(
+		$return['show_in_ucp'] = new \IPS\Helpers\Form\Radio( 'login_handler_show_in_ucp', isset( $this->settings['show_in_ucp'] ) ? $this->settings['show_in_ucp'] : 'disabled', FALSE, array(
 			'options' => array(
 				'always'		=> 'login_handler_show_in_ucp_always',
 				'loggedin'		=> 'login_handler_show_in_ucp_loggedin',
@@ -145,37 +120,37 @@ class LDAP extends Handler
 		if ( $forceNameHandler = static::handlerHasForceSync( 'name', $this ) )
 		{
 			$nameChangesDisabled[] = 'force';
-			Member::loggedIn()->language()->words['login_update_changes_yes_name_desc'] = Member::loggedIn()->language()->addToStack( 'login_update_changes_yes_disabled', FALSE, array( 'sprintf' => $forceNameHandler->_title ) );
+			\IPS\Member::loggedIn()->language()->words['login_update_changes_yes_name_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'login_update_changes_yes_disabled', FALSE, array( 'sprintf' => $forceNameHandler->_title ) );
 		}
 		$emailChangesDisabled = array();
 		if ( $forceEmailHandler = static::handlerHasForceSync( 'email', $this ) )
 		{
 			$emailChangesDisabled[] = 'force';
-			Member::loggedIn()->language()->words['login_update_changes_yes_email_desc'] = Member::loggedIn()->language()->addToStack( 'login_update_changes_yes_disabled', FALSE, array( 'sprintf' => $forceEmailHandler->_title ) );
+			\IPS\Member::loggedIn()->language()->words['login_update_changes_yes_email_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'login_update_changes_yes_disabled', FALSE, array( 'sprintf' => $forceEmailHandler->_title ) );
 		}
 		
-		$return['update_name_changes_inc_optional'] = new Radio( 'login_update_name_changes_inc_optional', $this->settings['update_name_changes'] ?? 'disabled', FALSE, array( 'options' => array(
+		$return['update_name_changes_inc_optional'] = new \IPS\Helpers\Form\Radio( 'login_update_name_changes_inc_optional', isset( $this->settings['update_name_changes'] ) ? $this->settings['update_name_changes'] : 'disabled', FALSE, array( 'options' => array(
 			'force'		=> 'login_update_changes_yes_name',
 			'optional'	=> 'login_update_changes_optional',
 			'disabled'	=> 'login_update_changes_no',
 		), 'disabled' => $nameChangesDisabled ), NULL, NULL, NULL, 'login_update_name_changes_inc_optional' );
-		$return['update_name_changes_no_optional'] = new Radio( 'login_update_name_changes_no_optional', ( isset( $this->settings['update_name_changes'] ) and $this->settings['update_name_changes'] != 'optional' ) ? $this->settings['update_name_changes'] : 'disabled', FALSE, array( 'options' => array(
+		$return['update_name_changes_no_optional'] = new \IPS\Helpers\Form\Radio( 'login_update_name_changes_no_optional', ( isset( $this->settings['update_name_changes'] ) and $this->settings['update_name_changes'] != 'optional' ) ? $this->settings['update_name_changes'] : 'disabled', FALSE, array( 'options' => array(
 			'force'		=> 'login_update_changes_yes_name',
 			'disabled'	=> 'login_update_changes_no',
 		), 'disabled' => $nameChangesDisabled ), NULL, NULL, NULL, 'login_update_name_changes_no_optional' );
-		$return['update_email_changes_inc_optional'] = new Radio( 'login_update_email_changes_inc_optional', $this->settings['update_email_changes'] ?? 'force', FALSE, array( 'options' => array(
+		$return['update_email_changes_inc_optional'] = new \IPS\Helpers\Form\Radio( 'login_update_email_changes_inc_optional', isset( $this->settings['update_email_changes'] ) ? $this->settings['update_email_changes'] : 'force', FALSE, array( 'options' => array(
 			'force'		=> 'login_update_changes_yes_email',
 			'optional'	=> 'login_update_changes_optional',
 			'disabled'	=> 'login_update_changes_no',
 		), 'disabled' => $emailChangesDisabled ), NULL, NULL, NULL, 'login_update_email_changes_inc_optional' );
-		$return['update_email_changes_no_optional'] = new Radio( 'login_update_email_changes_no_optional', ( isset( $this->settings['update_email_changes'] ) and $this->settings['update_email_changes'] != 'optional' ) ? $this->settings['update_email_changes'] : 'force', FALSE, array( 'options' => array(
+		$return['update_email_changes_no_optional'] = new \IPS\Helpers\Form\Radio( 'login_update_email_changes_no_optional', ( isset( $this->settings['update_email_changes'] ) and $this->settings['update_email_changes'] != 'optional' ) ? $this->settings['update_email_changes'] : 'force', FALSE, array( 'options' => array(
 			'force'		=> 'login_update_changes_yes_email',
 			'disabled'	=> 'login_update_changes_no',
 		), 'disabled' => $emailChangesDisabled ), NULL, NULL, NULL, 'login_update_email_changes_no_optional' );
-		Member::loggedIn()->language()->words['login_update_name_changes_inc_optional'] = Member::loggedIn()->language()->addToStack('login_update_name_changes');
-		Member::loggedIn()->language()->words['login_update_name_changes_no_optional'] = Member::loggedIn()->language()->addToStack('login_update_name_changes');
-		Member::loggedIn()->language()->words['login_update_email_changes_inc_optional'] = Member::loggedIn()->language()->addToStack('login_update_email_changes');
-		Member::loggedIn()->language()->words['login_update_email_changes_no_optional'] = Member::loggedIn()->language()->addToStack('login_update_email_changes');
+		\IPS\Member::loggedIn()->language()->words['login_update_name_changes_inc_optional'] = \IPS\Member::loggedIn()->language()->addToStack('login_update_name_changes');
+		\IPS\Member::loggedIn()->language()->words['login_update_name_changes_no_optional'] = \IPS\Member::loggedIn()->language()->addToStack('login_update_name_changes');
+		\IPS\Member::loggedIn()->language()->words['login_update_email_changes_inc_optional'] = \IPS\Member::loggedIn()->language()->addToStack('login_update_email_changes');
+		\IPS\Member::loggedIn()->language()->words['login_update_email_changes_no_optional'] = \IPS\Member::loggedIn()->language()->addToStack('login_update_email_changes');
 		
 		return $return;
 	}
@@ -186,7 +161,7 @@ class LDAP extends Handler
 	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function acpFormSave( array &$values ): array
+	public function acpFormSave( &$values )
 	{
 		$_values = $values;
 		
@@ -215,13 +190,13 @@ class LDAP extends Handler
 	 * Test Settings
 	 *
 	 * @return	bool
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function testSettings(): bool
+	public function testSettings()
 	{
-		if ( !extension_loaded('ldap') )
+		if ( !\extension_loaded('ldap') )
 		{
-			throw new InvalidArgumentException( Member::loggedIn()->language()->addToStack( 'login_ldap_err' ) );
+			throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack( 'login_ldap_err' ) );
 		}
 		
 		try
@@ -230,7 +205,7 @@ class LDAP extends Handler
 		}
 		catch ( LDAP\Exception $e )
 		{
-			throw new InvalidArgumentException( $e->getMessage() ?: Member::loggedIn()->language()->addToStack('login_ldap_err_connect' ) );
+			throw new \InvalidArgumentException( $e->getMessage() ?: \IPS\Member::loggedIn()->language()->addToStack('login_ldap_err_connect' ) );
 		}
 		
 		return TRUE;
@@ -241,13 +216,13 @@ class LDAP extends Handler
 	/**
 	 * Authenticate
 	 *
-	 * @param	Login	$login				The login object
-	 * @param string $usernameOrEmail	The username or email address provided by the user
-	 * @param object $password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
-	 * @return	Member
-	 * @throws	Exception
+	 * @param	\IPS\Login	$login				The login object
+	 * @param	string		$usernameOrEmail	The username or email address provided by the user
+	 * @param	object		$password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @return	\IPS\Member
+	 * @throws	\IPS\Login\Exception
 	 */
-	public function authenticateUsernamePassword( Login $login, string $usernameOrEmail, object $password ): Member
+	public function authenticateUsernamePassword( \IPS\Login $login, $usernameOrEmail, $password )
 	{
 		try
 		{
@@ -256,7 +231,16 @@ class LDAP extends Handler
 			if( $usernameOrEmail )
 			{
 				/* Try email address */
-				$result = $this->_getUserWithFilter( $this->settings['email_field'] . '=' . ldap_escape( $usernameOrEmail, NULL, LDAP_ESCAPE_FILTER ) );
+				if ( $this->authType() & \IPS\Login::AUTH_TYPE_EMAIL )
+				{
+					$result = $this->_getUserWithFilter( $this->settings['email_field'] . '=' . ldap_escape( $usernameOrEmail, NULL, LDAP_ESCAPE_FILTER ) );
+				}
+				
+				/* Try username */
+				if ( !$result and $this->authType() & \IPS\Login::AUTH_TYPE_USERNAME )
+				{
+					$result = $this->_getUserWithFilter( $this->_nameField() . '=' . ldap_escape( $usernameOrEmail . $this->settings['un_suffix'], NULL, LDAP_ESCAPE_FILTER ) );
+				}
 			}
 						
 			/* Don't have anything? */
@@ -264,10 +248,13 @@ class LDAP extends Handler
 			{
 				$member = NULL;
 
-				$member = new Member;
-				$member->email = $usernameOrEmail;
+				if ( $this->authType() & \IPS\Login::AUTH_TYPE_EMAIL )
+				{
+					$member = new \IPS\Member;
+					$member->email = $usernameOrEmail;
+				}
 
-				throw new Exception( Member::loggedIn()->language()->addToStack( 'login_err_no_account', FALSE ), Exception::NO_ACCOUNT, NULL, $member );
+				throw new \IPS\Login\Exception( \IPS\Member::loggedIn()->language()->addToStack( 'login_err_no_account', FALSE, array( 'pluralize' => array( $this->authType() ) ) ), \IPS\Login\Exception::NO_ACCOUNT, NULL, $member );
 			}
 			
 			/* Get a local account if one exists */
@@ -282,22 +269,22 @@ class LDAP extends Handler
 			$member = NULL;
 			try
 			{
-				$link = Db::i()->select( '*', 'core_login_links', array( 'token_login_method=? AND token_identifier=?', $this->id, $attrs[ $this->settings['uid_field'] ][0] ) )->first();
-				$member = Member::load( $link['token_member'] );
+				$link = \IPS\Db::i()->select( '*', 'core_login_links', array( 'token_login_method=? AND token_identifier=?', $this->id, $attrs[ $this->settings['uid_field'] ][0] ) )->first();
+				$member = \IPS\Member::load( $link['token_member'] );
 				
 				/* If the user never finished the linking process, or the account has been deleted, discard this access token */
 				if ( !$link['token_linked'] or !$member->member_id )
 				{
-					Db::i()->delete( 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $link['token_member'] ) );
+					\IPS\Db::i()->delete( 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $link['token_member'] ) );
 					$member = NULL;
 				}
 			}
-			catch ( UnderflowException $e ) { }
+			catch ( \UnderflowException $e ) { }
 						
 			/* Verify password */
 			if ( !$this->_passwordIsValid( $result, $password ) )
 			{
-				throw new Exception( Member::loggedIn()->language()->addToStack( 'login_err_bad_password', FALSE ), Exception::BAD_PASSWORD, NULL, $member );
+				throw new \IPS\Login\Exception( \IPS\Member::loggedIn()->language()->addToStack( 'login_err_bad_password', FALSE, array( 'pluralize' => array( $this->authType() ) ) ), \IPS\Login\Exception::BAD_PASSWORD, NULL, $member );
 			}
 			
 			/* Create account if we don't have one */
@@ -309,9 +296,9 @@ class LDAP extends Handler
 			{				
 				try
 				{
-					if ( $login->type === Login::LOGIN_UCP )
+					if ( $login->type === \IPS\Login::LOGIN_UCP )
 					{
-						$exception = new Exception( 'generic_error', Exception::MERGE_SOCIAL_ACCOUNT );
+						$exception = new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::MERGE_SOCIAL_ACCOUNT );
 						$exception->handler = $this;
 						$exception->member = $login->reauthenticateAs;
 						throw $exception;
@@ -319,7 +306,7 @@ class LDAP extends Handler
 					
 					$member = $this->createAccount( $name, $email );
 					
-					Db::i()->insert( 'core_login_links', array(
+					\IPS\Db::i()->insert( 'core_login_links', array(
 						'token_login_method'	=> $this->id,
 						'token_member'			=> $member->member_id,
 						'token_identifier'		=> $attrs[ $this->settings['uid_field'] ][0],
@@ -348,23 +335,23 @@ class LDAP extends Handler
 					
 					return $member;
 				}
-				catch ( Exception $exception )
+				catch ( \IPS\Login\Exception $exception )
 				{
-					if ( $exception->getCode() === Exception::MERGE_SOCIAL_ACCOUNT )
+					if ( $exception->getCode() === \IPS\Login\Exception::MERGE_SOCIAL_ACCOUNT )
 					{
 						try
 						{
-							$identifier = Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $exception->member->member_id ) )->first();
+							$identifier = \IPS\Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $exception->member->member_id ) )->first();
 
 							if( $identifier != $attrs[ $this->settings['uid_field'] ][0] )
 							{
-								$exception->setCode( Exception::LOCAL_ACCOUNT_ALREADY_MERGED );
+								$exception->setCode( \IPS\Login\Exception::LOCAL_ACCOUNT_ALREADY_MERGED );
 								throw $exception;
 							}
 						}
-						catch( UnderflowException $e )
+						catch( \UnderflowException $e )
 						{
-							Db::i()->insert( 'core_login_links', array(
+							\IPS\Db::i()->insert( 'core_login_links', array(
 								'token_login_method'	=> $this->id,
 								'token_member'			=> $exception->member->member_id,
 								'token_identifier'		=> $attrs[ $this->settings['uid_field'] ][0],
@@ -379,48 +366,48 @@ class LDAP extends Handler
 		}
 		catch ( LDAP\Exception $e )
 		{
-			Log::log( $e, 'ldap' );
-			throw new Exception( 'generic_error', Exception::INTERNAL_ERROR );
+			\IPS\Log::log( $e, 'ldap' );
+			throw new \IPS\Login\Exception( 'generic_error', \IPS\Login\Exception::INTERNAL_ERROR );
 		}
 	}
 		
 	/**
 	 * Authenticate
 	 *
-	 * @param	Member	$member				The member
-	 * @param object $password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	\IPS\Member	$member				The member
+	 * @param	object		$password			The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	bool
 	 */
-	public function authenticatePasswordForMember( Member $member, object $password ): bool
+	public function authenticatePasswordForMember( \IPS\Member $member, $password )
 	{
 		try
 		{
-			$linkedId = Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) )->first();
+			$linkedId = \IPS\Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) )->first();
 			if ( $result = $this->_getUserWithFilter( $this->settings['uid_field'] . '=' . ldap_escape( $linkedId, NULL, LDAP_ESCAPE_FILTER ) ) )
 			{
 				return $this->_passwordIsValid( $result, $password );
 			}
 		}
-		catch ( UnderflowException $e ) { }
+		catch ( \UnderflowException $e ) { }
 		
 		return FALSE;
 	}
 	
 	/* !Utility Methods */
 	
-	protected ?Connection $_ldap = null;
+	protected $_ldap;
 	
 	/**
 	 * Get LDAP Connection
 	 *
-	 * @return	Connection
-	 * @throws    LdapException
+	 * @return	bool
+	 * @throws	\IPS\Login\Handler\LDAP\Exception
 	 */
-	protected function _ldap() : Connection
+	protected function _ldap()
 	{
 		if ( !$this->_ldap )
 		{
-			$this->_ldap = ldap_connect( $this->settings['server_host'], ( isset( $this->settings['server_port'] ) and $this->settings['server_port'] ) ? intval( $this->settings['server_port'] ) : 389 );
+			$this->_ldap = ldap_connect( $this->settings['server_host'], ( isset( $this->settings['server_port'] ) and $this->settings['server_port'] ) ? \intval( $this->settings['server_port'] ) : 389 );
 			if ( !$this->_ldap )
 			{
 				throw new LDAP\Exception;
@@ -441,20 +428,20 @@ class LDAP extends Handler
 	/**
 	 * Get name field
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function _nameField(): ?string
+	public function _nameField()
 	{
-		return $this->settings['name_field'] ?? ( $this->settings['uid_field'] ?? NULL );
+		return isset( $this->settings['name_field'] ) ? $this->settings['name_field'] : ( isset( $this->settings['uid_field'] ) ?  $this->settings['uid_field'] : NULL );
 	}
 	
 	/**
 	 * Get a user
 	 *
-	 * @param string $filter		Filter
-	 * @return	ResultEntry|null
+	 * @param	string	$filter		Filter
+	 * @return	resource|NULL
 	 */
-	protected function _getUserWithFilter( string $filter ) : ?ResultEntry
+	protected function _getUserWithFilter( $filter )
 	{		
 		/* Add any additional filter */
 		if ( $this->settings['filter'] )
@@ -489,24 +476,23 @@ class LDAP extends Handler
 	/**
 	 * Password is valid
 	 *
-	 * @param	ResultEntry		$result				The resource from LDAP
-	 * @param object|string $providedPassword	The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	resource		$result				The resource from LDAP
+	 * @param	object		$providedPassword	The plaintext password provided by the user, wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	bool
 	 */
-	protected function _passwordIsValid( ResultEntry $result, object|string $providedPassword ): bool
+	protected function _passwordIsValid( $result, $providedPassword )
 	{
-		return @ldap_bind( $this->_ldap(), ldap_get_dn( $this->_ldap(), $result ), ( $this->settings['pw_required'] ? ( (string) $providedPassword ) : '' ) );
+		return (bool) @ldap_bind( $this->_ldap(), ldap_get_dn( $this->_ldap(), $result ), ( $this->settings['pw_required'] ? ( (string) $providedPassword ) : '' ) );
 	}
 	
 	/* !Other Login Handler Methods */
 
 	/**
-	 * Can this handler process a password change for a member?
+	 * Can this handler process a password change for a member? 
 	 *
-	 * @param Member $member
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canChangePassword( Member $member ): bool
+	public function canChangePassword( \IPS\Member $member )
 	{
 		if ( !isset( $this->settings['sync_password_changes'] ) or $this->settings['sync_password_changes'] )
 		{
@@ -520,9 +506,9 @@ class LDAP extends Handler
 	 *
 	 * @return	bool
 	 */
-	public function canSyncPassword(): bool
+	public function canSyncPassword()
 	{
-		return ( isset( $this->settings['sync_password_changes'] ) AND $this->settings['sync_password_changes'] );
+		return (bool) ( isset( $this->settings['sync_password_changes'] ) AND $this->settings['sync_password_changes'] );
 	}
 	
 	/**
@@ -530,10 +516,10 @@ class LDAP extends Handler
 	 * Used when registering or changing an email address to check the new one is available
 	 *
 	 * @param	string				$email		Email Address
-	 * @param	Member|NULL	$exclude	Member to exclude
-	 * @return	bool|null Boolean indicates if email is in use (TRUE means is in use and thus not registerable) or NULL if this handler does not support such an API
+	 * @param	\IPS\Member|NULL	$exclude	Member to exclude
+	 * @return	bool|NULL Boolean indicates if email is in use (TRUE means is in use and thus not registerable) or NULL if this handler does not support such an API
 	 */
-	public function emailIsInUse( string $email, Member $exclude=NULL ): ?bool
+	public function emailIsInUse( $email, \IPS\Member $exclude=NULL )
 	{
 		if ( $this->settings['email_field'] )
 		{
@@ -543,14 +529,14 @@ class LDAP extends Handler
 				{
 					try
 					{
-						$linkedId = Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $exclude->member_id ) )->first();
+						$linkedId = \IPS\Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $exclude->member_id ) )->first();
 						
 						if ( $attrs = @ldap_get_attributes( $this->_ldap(), $result ) and $attrs[ $this->settings['uid_field'] ][0] == $linkedId )
 						{
 							return FALSE;
 						}
 					}
-					catch ( UnderflowException $e ) { }
+					catch ( \UnderflowException $e ) { }
 				}
 				
 				return TRUE;
@@ -565,10 +551,10 @@ class LDAP extends Handler
 	 * Used when registering or changing an username to check the new one is available
 	 *
 	 * @param	string				$username	Username
-	 * @param	Member|NULL	$exclude	Member to exclude
+	 * @param	\IPS\Member|NULL	$exclude	Member to exclude
 	 * @return	bool|NULL			Boolean indicates if username is in use (TRUE means is in use and thus not registerable) or NULL if this handler does not support such an API
 	 */
-	public function usernameIsInUse( string $username, Member $exclude=NULL ): ?bool
+	public function usernameIsInUse( $username, \IPS\Member $exclude=NULL )
 	{
 		if ( $this->_nameField() )
 		{
@@ -578,14 +564,14 @@ class LDAP extends Handler
 				{
 					try
 					{
-						$linkedId = Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $exclude->member_id ) )->first();
+						$linkedId = \IPS\Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $exclude->member_id ) )->first();
 						
 						if ( $attrs = @ldap_get_attributes( $this->_ldap(), $result ) and $attrs[ $this->settings['uid_field'] ][0] == $linkedId )
 						{
 							return FALSE;
 						}
 					}
-					catch ( UnderflowException $e ) { }
+					catch ( \UnderflowException $e ) { }
 				}
 				
 				return TRUE;
@@ -598,94 +584,94 @@ class LDAP extends Handler
 	/**
 	 * Change Email Address
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	string		$oldEmail	Old Email Address
 	 * @param	string		$newEmail	New Email Address
 	 * @return	void
 	 */
-	public function changeEmail( Member $member, string $oldEmail, string $newEmail ) : void
+	public function changeEmail( \IPS\Member $member, $oldEmail, $newEmail )
 	{
 		if ( !isset( $this->settings['sync_email_changes'] ) or $this->settings['sync_email_changes'] )
 		{
 			try
 			{
-				$linkedId = Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) )->first();
+				$linkedId = \IPS\Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) )->first();
 				if ( $result = $this->_getUserWithFilter( $this->settings['uid_field'] . '=' . ldap_escape( $linkedId, NULL, LDAP_ESCAPE_FILTER ) ) )
 				{
 					if ( !@ldap_modify( $this->_ldap(), ldap_get_dn( $this->_ldap(), $result ), array( $this->settings['email_field'] => $newEmail ) ) )
 					{
 						$e = new LDAP\Exception( ldap_error( $this->_ldap() ), ldap_errno( $this->_ldap() ) );
-						Log::log( $e, 'ldap' );
+						\IPS\Log::log( $e, 'ldap' );
 					}
 				}
 			}
-			catch ( UnderflowException $e ) { }
+			catch ( \UnderflowException $e ) { }
 		}
 	}
 	
 	/**
 	 * Change Password
 	 *
-	 * @param	Member	$member			The member
-	 * @param string $newPassword		New Password, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	\IPS\Member	$member			The member
+	 * @param	string		$newPassword		New Password, wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	void
 	 */
-	public function changePassword( Member $member, string $newPassword ) : void
+	public function changePassword( \IPS\Member $member, $newPassword )
 	{
 		if ( !isset( $this->settings['sync_password_changes'] ) or $this->settings['sync_password_changes'] )
 		{
 			try
 			{
-				$linkedId = Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) )->first();
+				$linkedId = \IPS\Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) )->first();
 				if ( $result = $this->_getUserWithFilter( $this->settings['uid_field'] . '=' . ldap_escape( $linkedId, NULL, LDAP_ESCAPE_FILTER ) ) )
 				{
 					if ( !@ldap_modify( $this->_ldap(), ldap_get_dn( $this->_ldap(), $result ), array( 'userPassword' => "{SHA}" . base64_encode( pack( "H*", sha1( $newPassword ) ) ) ) ) )
 					{
 						$e = new LDAP\Exception( ldap_error( $this->_ldap() ), ldap_errno( $this->_ldap() ) );
-						Log::log( $e, 'ldap' );
+						\IPS\Log::log( $e, 'ldap' );
 					}
 				}
 			}
-			catch ( UnderflowException $e ) { }
+			catch ( \UnderflowException $e ) { }
 		}
 	}
 	
 	/**
 	 * Change Username
 	 *
-	 * @param	Member	$member			The member
+	 * @param	\IPS\Member	$member			The member
 	 * @param	string		$oldUsername	Old Username
 	 * @param	string		$newUsername	New Username
 	 * @return	void
 	 */
-	public function changeUsername( Member $member, string $oldUsername, string $newUsername ) : void
+	public function changeUsername( \IPS\Member $member, $oldUsername, $newUsername )
 	{
 		if ( !isset( $this->settings['sync_name_changes'] ) or $this->settings['sync_name_changes'] )
 		{
 			try
 			{
-				$linkedId = Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) )->first();
+				$linkedId = \IPS\Db::i()->select( 'token_identifier', 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) )->first();
 				if ( $result = $this->_getUserWithFilter( $this->settings['uid_field'] . '=' . ldap_escape( $linkedId, NULL, LDAP_ESCAPE_FILTER ) ) )
 				{
 					if ( !@ldap_modify( $this->_ldap(), ldap_get_dn( $this->_ldap(), $result ), array( $this->_nameField() => $newUsername ) ) )
 					{
 						$e = new LDAP\Exception( ldap_error( $this->_ldap() ), ldap_errno( $this->_ldap() ) );
-						Log::log( $e, 'ldap' );
+						\IPS\Log::log( $e, 'ldap' );
 					}
 				}
 			}
-			catch ( UnderflowException $e ) { }
+			catch ( \UnderflowException $e ) { }
 		}
 	}
 	
 	/**
 	 * Forgot Password URL
 	 *
-	 * @return	Url|NULL
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function forgotPasswordUrl(): ?Url
+	public function forgotPasswordUrl()
 	{
-		return ( isset( $this->settings['forgot_password_url'] ) and $this->settings['forgot_password_url'] ) ? Url::external( $this->settings['forgot_password_url'] ) : NULL;
+		return ( isset( $this->settings['forgot_password_url'] ) and $this->settings['forgot_password_url'] ) ? \IPS\Http\Url::external( $this->settings['forgot_password_url'] ) : NULL;
 	}
 	
 	
@@ -693,19 +679,19 @@ class LDAP extends Handler
 	 * Get user's profile name
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfileName( Member $member ): ?string
+	public function userProfileName( \IPS\Member $member )
 	{
 		if ( $nameField = $this->_nameField() )
 		{
 			if ( !( $link = $this->_link( $member ) ) )
 			{
-				throw new Exception( "", Exception::INTERNAL_ERROR );
+				throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 			
 			if ( $result = $this->_getUserWithFilter( $this->settings['uid_field'] . '=' . ldap_escape( $link['token_identifier'], NULL, LDAP_ESCAPE_FILTER ) ) )
@@ -716,12 +702,12 @@ class LDAP extends Handler
 				}
 				else
 				{
-					throw new RuntimeException;
+					throw new \RuntimeException;
 				}
 			}
 			else
 			{
-				throw new Exception( "", Exception::INTERNAL_ERROR );
+				throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 		}
 		
@@ -732,19 +718,19 @@ class LDAP extends Handler
 	 * Get user's email address
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws	Exception	The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userEmail( Member $member ): ?string
+	public function userEmail( \IPS\Member $member )
 	{
 		if ( $this->settings['email_field'] )
 		{
 			if ( !( $link = $this->_link( $member ) ) )
 			{
-				throw new Exception( "", Exception::INTERNAL_ERROR );
+				throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 			
 			if ( $result = $this->_getUserWithFilter( $this->settings['uid_field'] . '=' . ldap_escape( $link['token_identifier'], NULL, LDAP_ESCAPE_FILTER ) ) )
@@ -755,12 +741,12 @@ class LDAP extends Handler
 				}
 				else
 				{
-					throw new RuntimeException;
+					throw new \RuntimeException;
 				}
 			}
 			else
 			{
-				throw new Exception( "", Exception::INTERNAL_ERROR );
+				throw new \IPS\Login\Exception( NULL, \IPS\Login\Exception::INTERNAL_ERROR );
 			}
 		}
 		
@@ -770,11 +756,11 @@ class LDAP extends Handler
 	/**
 	 * Syncing Options
 	 *
-	 * @param	Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
+	 * @param	\IPS\Member	$member			The member we're asking for (can be used to not show certain options iof the user didn't grant those scopes)
 	 * @param	bool		$defaultOnly	If TRUE, only returns which options should be enabled by default for a new account
 	 * @return	array
 	 */
-	public function syncOptions( Member $member, bool $defaultOnly=FALSE ): array
+	public function syncOptions( \IPS\Member $member, $defaultOnly = FALSE )
 	{
 		$return = array();
 		
@@ -796,7 +782,7 @@ class LDAP extends Handler
 	 *
 	 * @return	bool
 	 */
-	public function hasSyncOptions(): bool
+	public function hasSyncOptions()
 	{
 		return TRUE;
 	}

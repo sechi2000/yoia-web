@@ -12,40 +12,36 @@
 namespace IPS\downloads\extensions\core\EditorLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Content;
-use IPS\Db;
-use IPS\downloads\Category;
-use IPS\Extensions\EditorLocationsAbstract;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Text\Parser;
-use LogicException;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: Category descriptions
  */
-class Categories extends EditorLocationsAbstract
+class _Categories
 {
+	/**
+	 * Can we use HTML in this editor?
+	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
+	 */
+	public function canUseHtml( $member )
+	{
+		return NULL;
+	}
+	
 	/**
 	 * Can we use attachments in this editor?
 	 *
-	 * @param	Member					$member	The member
-	 * @param	Editor	$field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
 	 */
-	public function canAttach( Member $member, Editor $field ): ?bool
+	public function canAttach( $member, $field )
 	{
 		return NULL;
 	}
@@ -53,7 +49,7 @@ class Categories extends EditorLocationsAbstract
 	/**
 	 * Permission check for attachments
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	int|null	$id1		Primary ID
 	 * @param	int|null	$id2		Secondary ID
 	 * @param	string|null	$id3		Arbitrary data
@@ -61,14 +57,14 @@ class Categories extends EditorLocationsAbstract
 	 * @param	bool		$viewOnly	If true, just check if the user can see the attachment rather than download it
 	 * @return	bool
 	 */
-	public function attachmentPermissionCheck( Member $member, ?int $id1, ?int $id2, ?string $id3, array $attachment, bool $viewOnly=FALSE ): bool
+	public function attachmentPermissionCheck( $member, $id1, $id2, $id3, $attachment, $viewOnly=FALSE )
 	{
 		try
 		{
-			$file = Category::load( $id1 );
+			$file = \IPS\downloads\Category::load( $id1 );
 			return $file->can( 'view', $member );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}
@@ -80,12 +76,25 @@ class Categories extends EditorLocationsAbstract
 	 * @param	int|null	$id1	Primary ID
 	 * @param	int|null	$id2	Secondary ID
 	 * @param	string|null	$id3	Arbitrary data
-	 * @return	Url|Content|Model|Member|null
-	 * @throws	LogicException
+	 * @return	\IPS\Http\Url|\IPS\Content|\IPS\Node\Model
+	 * @throws	\LogicException
 	 */
-	public function attachmentLookup( int $id1=NULL, int $id2=NULL, string $id3=NULL ): Model|Content|Url|Member|null
+	public function attachmentLookup( $id1, $id2, $id3 )
 	{
-		return Category::load( $id1 );
+		return \IPS\downloads\Category::load( $id1 );
+	}
+
+	/**
+	 * Rebuild attachment images in non-content item areas
+	 *
+	 * @param	int|null	$offset	Offset to start from
+	 * @param	int|null	$max	Maximum to parse
+	 * @return	int			Number completed
+	 * @note	This method is optional and will only be called if it exists
+	 */
+	public function rebuildAttachmentImages( $offset, $max )
+	{
+		return $this->performRebuild( $offset, $max, array( 'IPS\Text\Parser', 'rebuildAttachmentUrls' ) );
 	}
 
 	/**
@@ -96,10 +105,15 @@ class Categories extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildContent( ?int $offset, ?int $max ): int
+	public function rebuildContent( $offset, $max )
 	{
 		return $this->performRebuild( $offset, $max, array( 'IPS\Text\LegacyParser', 'parseStatic' ) );
 	}
+
+	/**
+	 * @brief	Use the cached image URL instead of the original URL
+	 */
+	protected $proxyUrl	= FALSE;
 
 	/**
 	 * Rebuild content to add or remove image proxy
@@ -110,25 +124,31 @@ class Categories extends EditorLocationsAbstract
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildImageProxy( ?int $offset, ?int $max, bool $proxyUrl = FALSE ): int
+	public function rebuildImageProxy( $offset, $max, $proxyUrl = FALSE )
 	{
-		$callback = function( $value ) use ( $proxyUrl ) {
-			return Parser::removeImageProxy( $value, $proxyUrl );
-		};
-		return $this->performRebuild( $offset, $max, $callback );
+		$this->proxyUrl = $proxyUrl;
+		return $this->performRebuild( $offset, $max, 'parseImageProxy' );
 	}
+
+	/**
+	 * @brief	Store lazy loading status ( true = enabled )
+	 */
+	protected $_lazyLoadStatus = null;
 
 	/**
 	 * Rebuild content to add or remove lazy loading
 	 *
 	 * @param	int|null		$offset		Offset to start from
 	 * @param	int|null		$max		Maximum to parse
+	 * @param	bool			$status		Enable/Disable lazy loading
 	 * @return	int			Number completed
 	 * @note	This method is optional and will only be called if it exists
 	 */
-	public function rebuildLazyLoad( ?int $offset, ?int $max ): int
+	public function rebuildLazyLoad( $offset, $max, $status=TRUE )
 	{
-		return $this->performRebuild( $offset, $max, [ 'IPS\Text\Parser', 'parseLazyLoad' ] );
+		$this->_lazyLoadStatus = $status;
+
+		return $this->performRebuild( $offset, $max, 'parseLazyLoad' );
 	}
 
 	/**
@@ -139,26 +159,33 @@ class Categories extends EditorLocationsAbstract
 	 * @param	callable	$callback	Method to call to rebuild content
 	 * @return	int			Number completed
 	 */
-	protected function performRebuild( ?int $offset, ?int $max, callable $callback ): int
+	protected function performRebuild( $offset, $max, $callback )
 	{
 		$did	= 0;
 
 		/* Language bits */
-		foreach( Db::i()->select( '*', 'core_sys_lang_words', "word_key LIKE 'downloads_category_%_desc' OR word_key LIKE 'downloads_category_%_disclaimer' OR word_key LIKE 'downloads_category_%_subterms' OR word_key LIKE 'downloads_category_%_npd' OR word_key LIKE 'downloads_category_%_npv'", 'word_id ASC', array( $offset, $max ) ) as $word )
+		foreach( \IPS\Db::i()->select( '*', 'core_sys_lang_words', "word_key LIKE 'downloads_category_%_desc' OR word_key LIKE 'downloads_category_%_disclaimer' OR word_key LIKE 'downloads_category_%_subterms' OR word_key LIKE 'downloads_category_%_npd' OR word_key LIKE 'downloads_category_%_npv'", 'word_id ASC', array( $offset, $max ) ) as $word )
 		{
 			$did++;
-			$rebuilt = FALSE;
 			
 			try
 			{
-				if( !empty( $word['word_custom'] ) )
+				if( $callback == 'parseImageProxy' )
+				{
+					$rebuilt = \IPS\Text\Parser::removeImageProxy( $word['word_custom'], $this->proxyUrl );
+				}
+				elseif( $callback == 'parseLazyLoad' )
+				{
+					$rebuilt = \IPS\Text\Parser::parseLazyLoad( $word['word_custom'], $this->_lazyLoadStatus );
+				}
+				else
 				{
 					$rebuilt = $callback( $word['word_custom'] );
 				}
 			}
-			catch( InvalidArgumentException $e )
+			catch( \InvalidArgumentException $e )
 			{
-				if( is_array( $callback ) and $callback[1] == 'parseStatic' AND $e->getcode() == 103014 )
+				if( $callback[1] == 'parseStatic' AND $e->getcode() == 103014 )
 				{
 					$rebuilt	= preg_replace( "#\[/?([^\]]+?)\]#", '', $word['word_custom'] );
 				}
@@ -170,7 +197,7 @@ class Categories extends EditorLocationsAbstract
 
 			if( $rebuilt !== FALSE )
 			{
-				Db::i()->update( 'core_sys_lang_words', array( 'word_custom' => $rebuilt ), 'word_id=' . $word['word_id'] );
+				\IPS\Db::i()->update( 'core_sys_lang_words', array( 'word_custom' => $rebuilt ), 'word_id=' . $word['word_id'] );
 			}
 		}
 
@@ -182,8 +209,8 @@ class Categories extends EditorLocationsAbstract
 	 *
 	 * @return	int			Total Count
 	 */
-	public function contentCount(): int
+	public function contentCount()
 	{
-		return Db::i()->select( 'COUNT(*)', 'core_sys_lang_words', "word_key LIKE 'downloads_category_%_desc' OR word_key LIKE 'downloads_category_%_disclaimer' OR word_key LIKE 'downloads_category_%_subterms' OR word_key LIKE 'downloads_category_%_npd' OR word_key LIKE 'downloads_category_%_npv'" )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'core_sys_lang_words', "word_key LIKE 'downloads_category_%_desc' OR word_key LIKE 'downloads_category_%_disclaimer' OR word_key LIKE 'downloads_category_%_subterms' OR word_key LIKE 'downloads_category_%_npd' OR word_key LIKE 'downloads_category_%_npv'" )->first();
 	}
 }

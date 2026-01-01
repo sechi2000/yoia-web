@@ -12,34 +12,21 @@
 namespace IPS\downloads\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Content\Api\CommentController;
-use IPS\downloads\File;
-use IPS\downloads\File\Comment;
-use IPS\Member;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Downloads File Comments API
  */
-class comments extends CommentController
+class _comments extends \IPS\Content\Api\CommentController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\downloads\File\Comment';
+	protected $class = 'IPS\downloads\File\Comment';
 	
 	/**
 	 * GET /downloads/comments
@@ -55,12 +42,11 @@ class comments extends CommentController
 	 * @apiparam	string	sortDir			Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page			Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\downloads\File\Comment>
-	 * @return PaginatedResponse<Comment>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\downloads\File\Comment>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
-		return $this->_list();
+		return $this->_list( array(), 'categories' );
 	}
 	
 	/**
@@ -69,14 +55,12 @@ class comments extends CommentController
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		2D304/1	INVALID_ID	The comment ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\downloads\File\Comment
-	 * @return Response
+	 * @return		\IPS\downloads\File\Comment
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{
-			/* @var Comment $class */
 			$class = $this->class;
 			if ( $this->member )
 			{
@@ -87,11 +71,11 @@ class comments extends CommentController
 				$object = $class::load( $id );
 			}
 			
-			return new Response( 200, $object->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $object->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2D304/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2D304/1', 404 );
 		}
 	}
 	
@@ -112,19 +96,18 @@ class comments extends CommentController
 	 * @throws		1D304/3		NO_AUTHOR	The author ID does not exist
 	 * @throws		1D304/4		NO_CONTENT	No content was supplied
 	 * @throws		2D304/8		NO_PERMISSION		The authorized user does not have permission to comment on that file
-	 * @apireturn		\IPS\downloads\File\Comment
-	 * @return Response
+	 * @return		\IPS\downloads\File\Comment
 	 */
-	public function POSTindex(): Response
+	public function POSTindex()
 	{
 		/* Get file */
 		try
 		{
-			$file = File::load( Request::i()->file );
+			$file = \IPS\downloads\File::load( \IPS\Request::i()->file );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2D304/2', 403 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2D304/2', 403 );
 		}
 		
 		/* Get author */
@@ -132,38 +115,38 @@ class comments extends CommentController
 		{
 			if ( !$file->canComment( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2D304/8', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2D304/8', 403 );
 			}
 			$author = $this->member;
 		}
 		else
 		{
-			if ( Request::i()->author )
+			if ( \IPS\Request::i()->author )
 			{
-				$author = Member::load( Request::i()->author );
+				$author = \IPS\Member::load( \IPS\Request::i()->author );
 				if ( !$author->member_id )
 				{
-					throw new Exception( 'NO_AUTHOR', '1D304/3', 404 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1D304/3', 404 );
 				}
 			}
 			else
 			{
-				if ( (int) Request::i()->author === 0 )
+				if ( \IPS\Request::i()->author === 0 ) 
 				{
-					$author = new Member;
-					$author->name = Request::i()->author_name;
+					$author = new \IPS\Member;
+					$author->name = \IPS\Request::i()->author_name;
 				}
 				else 
 				{
-					throw new Exception( 'NO_AUTHOR', '1D304/3', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1D304/3', 400 );
 				}
 			}
 		}
 		
 		/* Check we have a post */
-		if ( !Request::i()->content )
+		if ( !\IPS\Request::i()->content )
 		{
-			throw new Exception( 'NO_CONTENT', '1D304/4', 403 );
+			throw new \IPS\Api\Exception( 'NO_CONTENT', '1D304/4', 403 );
 		}
 		
 		/* Do it */
@@ -184,22 +167,21 @@ class comments extends CommentController
 	 * @throws		2D304/5		INVALID_ID			The comment ID does not exist or the authorized user does not have permission to view it
 	 * @throws		1D304/6		NO_AUTHOR			The author ID does not exist
 	 * @throws		2D304/9		NO_PERMISSION		The authorized user does not have permission to edit the comment
-	 * @apireturn		\IPS\downloads\File\Comment
-	 * @return Response
+	 * @return		\IPS\downloads\File\Comment
 	 */
-	public function POSTitem( int $id ): Response
+	public function POSTitem( $id )
 	{
 		try
 		{
 			/* Load */
-			$comment = Comment::load( $id );
+			$comment = \IPS\downloads\File\Comment::load( $id );
 			if ( $this->member and !$comment->canView( $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			if ( $this->member and !$comment->canEdit( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2D304/9', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2D304/9', 403 );
 			}
 						
 			/* Do it */
@@ -207,14 +189,14 @@ class comments extends CommentController
 			{
 				return $this->_edit( $comment );
 			}
-			catch ( InvalidArgumentException $e )
+			catch ( \InvalidArgumentException $e )
 			{
-				throw new Exception( 'NO_AUTHOR', '1D304/6', 400 );
+				throw new \IPS\Api\Exception( 'NO_AUTHOR', '1D304/6', 400 );
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2D304/5', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2D304/5', 404 );
 		}
 	}
 		
@@ -225,27 +207,25 @@ class comments extends CommentController
 	 * @param		int			$id			ID Number
 	 * @throws		2D304/7		INVALID_ID		The comment ID does not exist
 	 * @throws		2D304/A		NO_PERMISSION	The authorized user does not have permission to delete the comment
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
 		try
-		{
-			/* @var Comment $class */
+		{			
 			$class = $this->class;
 			$object = $class::load( $id );
 			if ( $this->member and !$object->canDelete( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2D304/A', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2D304/A', 403 );
 			}
 			$object->delete();
 			
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2D304/7', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2D304/7', 404 );
 		}
 	}
 
@@ -256,15 +236,14 @@ class comments extends CommentController
 	 * @param		int		$id			ID Number
 	 * @apiparam	int		id			ID of the reaction to add
 	 * @apiparam	int     author      ID of the member reacting
-	 * @apireturn		\IPS\downloads\File\Comment
+	 * @return		\IPS\downloads\File\Comment
 	 * @throws		1S425/2		NO_REACTION	The reaction ID does not exist
 	 * @throws		1S425/3		NO_AUTHOR	The author ID does not exist
 	 * @throws		1S425/4		REACT_ERROR	Error adding the reaction
 	 * @throws		1S425/5		INVALID_ID	Object ID does not exist
 	 * @note		If the author has already reacted to this content, any existing reaction will be removed first
-	 * @return Response
 	 */
-	public function POSTitem_react( int $id ): Response
+	public function POSTitem_react( $id )
 	{
 		return $this->_reactAdd( $id );
 	}
@@ -275,14 +254,13 @@ class comments extends CommentController
 	 *
 	 * @param		int		$id			ID Number
 	 * @apiparam	int     author      ID of the member who reacted
-	 * @apireturn		\IPS\downloads\File\Comment
+	 * @return		\IPS\downloads\File\Comment
 	 * @throws		1S425/6		NO_AUTHOR	The author ID does not exist
 	 * @throws		1S425/7		REACT_ERROR	Error adding the reaction
 	 * @throws		1S425/8		INVALID_ID	Object ID does not exist
 	 * @note		If the author has already reacted to this content, any existing reaction will be removed first
-	 * @return Response
 	 */
-	public function DELETEitem_react( int $id ): Response
+	public function DELETEitem_react( $id )
 	{
 		return $this->_reactRemove( $id );
 	}
@@ -297,10 +275,9 @@ class comments extends CommentController
 	 * @apiparam	string		message			Optional message
 	 * @throws		1S425/B		NO_AUTHOR			The author ID does not exist
 	 * @throws		1S425/C		REPORTED_ALREADY	The member has reported this item in the past 24 hours
-	 * @apireturn		\IPS\downloads\File\Comment
-	 * @return Response
+	 * @return		\IPS\downloads\File\Comment
 	 */
-	public function POSTitem_report( int $id ): Response
+	public function POSTitem_report( $id )
 	{
 		return $this->_report( $id );
 	}

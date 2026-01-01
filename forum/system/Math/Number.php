@@ -11,72 +11,62 @@
 namespace IPS\Math;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use JsonSerializable;
-use RuntimeException;
-use function defined;
-use function extension_loaded;
-use function intval;
-use function is_string;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Number Class for precise math
  */
-class Number implements JsonSerializable
+class _Number implements \JsonSerializable
 {
 	/* !Bootstrap */
 	
 	/**
 	 * @brief	Positive
 	 */
-	protected bool $positive = TRUE;
+	protected $positive = TRUE;
 	
 	/**
 	 * @brief	Number before decimal point
 	 */
-	protected int $beforeDecimalPoint = 0;
+	protected $beforeDecimalPoint = 0;
 	
 	/**
 	 * @brief	Number of decimal places
 	 */
-	protected int $numberOfDecimalPlaces = 0;
+	protected $numberOfDecimalPlaces = 0;
 	
 	/**
 	 * @brief	After decimal point
 	 */
-	protected int $afterDecimalPoint = 0;
+	protected $afterDecimalPoint = 0;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param string $number		The number, as a string, using "." for decimal points
+	 * @param	string	$number		The number, as a string, using "." for decimal points
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( string $number )
+	public function __construct( $number )
 	{
 		/* Check it's valid */
-		if ( !is_string( $number ) )
+		if ( !\is_string( $number ) )
 		{
-			throw new InvalidArgumentException('NOT_A_STRING');
+			throw new \InvalidArgumentException('NOT_A_STRING');
 		}
 
 		if ( $number === '' )
 		{
-			throw new InvalidArgumentException('NOT_VALID_NUMBER');
+			throw new \InvalidArgumentException('NOT_VALID_NUMBER');
 		}
 
 		if ( !preg_match( '/^([+-])?(\d*)(\.(\d*))?$/', $number, $matches ) )
 		{
-			throw new InvalidArgumentException('NOT_VALID_NUMBER');
+			throw new \InvalidArgumentException('NOT_VALID_NUMBER');
 		}
 		
 		/* Set properties */
@@ -84,9 +74,9 @@ class Number implements JsonSerializable
 		{
 			$this->positive = FALSE;
 		}		
-		$this->beforeDecimalPoint = isset( $matches[2] ) ? intval( $matches[2] ) : 0;
+		$this->beforeDecimalPoint = isset( $matches[2] ) ? \intval( $matches[2] ) : 0;
 		$this->numberOfDecimalPlaces = isset( $matches[4] ) ? mb_strlen( $matches[4] ) : 0;
-		$this->afterDecimalPoint = isset( $matches[4] ) ? intval( $matches[4] ) : 0;
+		$this->afterDecimalPoint = isset( $matches[4] ) ? \intval( $matches[4] ) : 0;
 		
 		/* If we have x.y00, simplify to x.y */
 		$this->_simplifyDecimalPlaces();
@@ -97,7 +87,7 @@ class Number implements JsonSerializable
 	 *
 	 * @return	bool
 	 */
-	public function isPositive(): bool
+	public function isPositive()
 	{	
 		return $this->positive;
 	}
@@ -107,7 +97,7 @@ class Number implements JsonSerializable
 	 *
 	 * @return	bool
 	 */
-	public function isZero(): bool
+	public function isZero()
 	{
 		return ( !$this->beforeDecimalPoint and !$this->afterDecimalPoint );
 	}
@@ -117,20 +107,20 @@ class Number implements JsonSerializable
 	 *
 	 * @return	bool
 	 */
-	public function isGreaterThanZero(): bool
+	public function isGreaterThanZero()
 	{
 		return $this->isPositive() and ( $this->beforeDecimalPoint or $this->afterDecimalPoint );
 	}
 	
 	/* !Basic Math */
-
+	
 	/**
 	 * Add
 	 *
-	 * @param Number $number Number to add
-	 * @return Number
+	 * @param	\IPS\Math\Number	$number	Number to add
+	 * @return	\IPS\Math\Number
 	 */
-	public function add( Number $number ): Number
+	public function add( Number $number )
 	{			
 		/* This method handles adding two positive numbers, if either (or both) are negative, pass off to subtract() as appropriate */
 		if ( !$this->positive )
@@ -162,8 +152,8 @@ class Number implements JsonSerializable
 		}
 		
 		/* Otherwise, add the two absolute values together */
-		$paddedThis = intval( "{$this->beforeDecimalPoint}" . str_pad( str_pad( $this->afterDecimalPoint, $this->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), $biggerDecimalPlaces, '0' ) );
-		$paddedNumber = intval( "{$number->beforeDecimalPoint}" . str_pad( str_pad( $number->afterDecimalPoint, $number->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), $biggerDecimalPlaces, '0' ) );
+		$paddedThis = \intval( "{$this->beforeDecimalPoint}" . str_pad( str_pad( $this->afterDecimalPoint, $this->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), $biggerDecimalPlaces, '0' ) );
+		$paddedNumber = \intval( "{$number->beforeDecimalPoint}" . str_pad( str_pad( $number->afterDecimalPoint, $number->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), $biggerDecimalPlaces, '0' ) );
 		$absoluteResult = $paddedThis + $paddedNumber;
 
 		/* ... and then add the decimal back in the correct place */
@@ -177,10 +167,10 @@ class Number implements JsonSerializable
 	/**
 	 * Subtract
 	 *
-	 * @param Number $number	Number to subtract
-	 * @return    Number
+	 * @param	\IPS\Math\Number	$number	Number to subtract
+	 * @return	\IPS\Math\Number
 	 */
-	public function subtract( Number $number ): Number
+	public function subtract( $number )
 	{
 		/* This method handles subtracting two positive numbers, if either (or both) are negative, pass off to add() as appropriate */
 		if ( !$this->positive )
@@ -212,8 +202,8 @@ class Number implements JsonSerializable
 		}
 		
 		/* Otherwise, add the two absolute values together */
-		$paddedThis = intval( "{$this->beforeDecimalPoint}" . str_pad( str_pad( $this->afterDecimalPoint, $this->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), $biggerDecimalPlaces, '0' ) );
-		$paddedNumber = intval( "{$number->beforeDecimalPoint}" . str_pad( str_pad( $number->afterDecimalPoint, $number->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), $biggerDecimalPlaces, '0' ) );
+		$paddedThis = \intval( "{$this->beforeDecimalPoint}" . str_pad( str_pad( $this->afterDecimalPoint, $this->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), $biggerDecimalPlaces, '0' ) );
+		$paddedNumber = \intval( "{$number->beforeDecimalPoint}" . str_pad( str_pad( $number->afterDecimalPoint, $number->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), $biggerDecimalPlaces, '0' ) );
 		$absoluteResult = $paddedThis - $paddedNumber;
 				
 		/* ... and then add the decimal back in the correct place */
@@ -235,13 +225,13 @@ class Number implements JsonSerializable
 	/**
 	 * Multiple
 	 *
-	 * @param Number $number	Number to multiply by
-	 * @return    Number
+	 * @param	\IPS\Math\Number	$number	Number to multiply by
+	 * @return	\IPS\Math\Number
 	 */
-	public function multiply( Number $number ): Number
+	public function multiply( $number )
 	{
 		/* Multiply the absolute numbers */
-		$absoluteResult = intval( "{$this->beforeDecimalPoint}" . ( $this->afterDecimalPoint ? str_pad( $this->afterDecimalPoint, $this->numberOfDecimalPlaces, '0', STR_PAD_LEFT ) : '' ) ) * intval( "{$number->beforeDecimalPoint}" . ( $number->afterDecimalPoint ? str_pad( $number->afterDecimalPoint, $number->numberOfDecimalPlaces, '0', STR_PAD_LEFT ) : '' ) );
+		$absoluteResult = \intval( "{$this->beforeDecimalPoint}" . ( $this->afterDecimalPoint ? str_pad( $this->afterDecimalPoint, $this->numberOfDecimalPlaces, '0', STR_PAD_LEFT ) : '' ) ) * \intval( "{$number->beforeDecimalPoint}" . ( $number->afterDecimalPoint ? str_pad( $number->afterDecimalPoint, $number->numberOfDecimalPlaces, '0', STR_PAD_LEFT ) : '' ) );
 
 		/* Work out where the decimal point goes */
 		$numberOfDecimalPlaces = $this->numberOfDecimalPlaces + $number->numberOfDecimalPlaces;
@@ -278,18 +268,18 @@ class Number implements JsonSerializable
 	/**
 	 * Divide
 	 *
-	 * @param Number $number			Number to divide by
-	 * @param int $precision		The precision to work to
+	 * @param	\IPS\Math\Number	$number			Number to divide by
+	 * @param	int					$precision		The precision to work to
 	 * @param	int|NULL			$round			Handles how to round the result. See ROUND_* constants
-	 * @return    Number
-	 * @throws	RuntimeException
+	 * @return	\IPS\Math\Number
+	 * @throws	\RuntimeException
 	 */
-	public function divide( Number $number, int $precision = 3, ?int $round = Number::ROUND_TRUNCATE ): Number
+	public function divide( $number, $precision = 3, $round = \IPS\Math\Number::ROUND_TRUNCATE )
 	{
 		/* Can't divide by 0 */
 		if ( $number->compare( new static('0') ) === 0 )
 		{
-			throw new RuntimeException('DIVIDE_BY_ZERO');
+			throw new \RuntimeException('DIVIDE_BY_ZERO');
 		}
 		
 		/* Divide by 1 does nothing */
@@ -305,7 +295,7 @@ class Number implements JsonSerializable
 		}
 		
 		/* If the bcmath extension is available, we can use bcdiv to do this effectively */	
-		if ( extension_loaded('bcmath') )
+		if ( \extension_loaded('bcmath') )
 		{
 			$result = str_replace( '.', '', bcdiv( (string) $this->absolute(), (string) $number->absolute(), $precision ) ); // It will automatically return with correct $precision - e.g. "1.000" rather than "1", so we can just strip the decimal to get the absolute value we need
 		}
@@ -319,7 +309,7 @@ class Number implements JsonSerializable
 		/* Round it */
 		if ( $round !== static::ROUND_TRUNCATE )
 		{
-			$lastDigit = intval( mb_substr( $result, -1 ) );
+			$lastDigit = \intval( mb_substr( $result, -1 ) );
 			$result = mb_substr( $result, 0, -1 );
 
 			if ( $lastDigit !== 0 )
@@ -363,11 +353,11 @@ class Number implements JsonSerializable
 	/**
 	 * Modulus
 	 *
-	 * @param Number $number			Number to get modulus of
-	 * @param int $divides		Dividend
-	 * @return    Number
+	 * @param	\IPS\Math\Number	$number			Number to get modulus of
+	 * @param	int					$divides		Dividend		
+	 * @return	\IPS\Math\Number
 	 */
-	public function modulus( Number $number, int &$divides = 0 ): Number
+	public function modulus( $number, &$divides = 0 )
 	{
 		/* Start with positiver numbers */
 		$remainder = clone $this;
@@ -406,10 +396,10 @@ class Number implements JsonSerializable
 	/**
 	 * Compare
 	 *
-	 * @param Number $number			Number to compare against
+	 * @param	\IPS\Math\Number	$number			Number to compare against
 	 * @return	int					Returns 0 if the two numbers are equal, 1 if this number is larger than the $number, -1 otherwise
 	 */
-	public function compare( Number $number ): int
+	public function compare( $number )
 	{
 		list( $number1, $number2 ) = static::_normaliseTwoNumbers( $this, $number );
 		
@@ -450,11 +440,11 @@ class Number implements JsonSerializable
 	/**
 	 * Round to a number of decimal places
 	 *
-	 * @param int $decimalPlaces	The number of decimal places to round to
+	 * @param	int		$decimalPlaces	The number of decimal places to round to
 	 * @param	int		$round			Handles how to round. See ROUND_* constants
-	 * @return    Number
+	 * @return	\IPS\Math\Number
 	 */
-	public function round( int $decimalPlaces, int $round = Number::ROUND_NORMAL ): Number
+	public function round( $decimalPlaces, $round = \IPS\Math\Number::ROUND_NORMAL )
 	{		
 		/* If it's already precise enough, we don't need to do anything */
 		if ( $decimalPlaces >= $this->numberOfDecimalPlaces )
@@ -465,7 +455,7 @@ class Number implements JsonSerializable
 		/* If we don't know if we're going up or down, figure that out */
 		if ( $round === static::ROUND_NORMAL )
 		{	
-			$numberToExamine = intval( substr( str_pad( $this->afterDecimalPoint, $this->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), $decimalPlaces, 1 ) );
+			$numberToExamine = \intval( \substr( str_pad( $this->afterDecimalPoint, $this->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), $decimalPlaces, 1 ) );
 			if ( $numberToExamine >= 5 )
 			{
 				$round = static::ROUND_UP;
@@ -477,18 +467,18 @@ class Number implements JsonSerializable
 		}	
 
 		/* Start with a number without the decimal point, truncated where we need it */
-		$abs = "{$this->beforeDecimalPoint}" . str_pad( substr( str_pad( $this->afterDecimalPoint, $this->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), 0, $decimalPlaces ), $decimalPlaces, '0', STR_PAD_LEFT );
+		$abs = "{$this->beforeDecimalPoint}" . str_pad( \substr( str_pad( $this->afterDecimalPoint, $this->numberOfDecimalPlaces, '0', STR_PAD_LEFT ), 0, $decimalPlaces ), $decimalPlaces, '0', STR_PAD_LEFT );
 		
 		/* If we're going up, add one on */
 		if ( $round === static::ROUND_UP )
 		{
-			$abs = intval( $abs ) + 1;
+			$abs = \intval( $abs ) + 1;
 		}
 						
 		/* Put the decimal back */
 		if ( $decimalPlaces )
 		{
-			return new static( ( $this->positive === FALSE ? "-" : '' ) . substr( $abs, 0, -$decimalPlaces ) . '.' . str_pad( substr( $abs, -$decimalPlaces ), $decimalPlaces, '0', STR_PAD_LEFT ) );
+			return new static( ( $this->positive === FALSE ? "-" : '' ) . \substr( $abs, 0, -$decimalPlaces ) . '.' . str_pad( \substr( $abs, -$decimalPlaces ), $decimalPlaces, '0', STR_PAD_LEFT ) );
 		}
 		else
 		{
@@ -499,10 +489,10 @@ class Number implements JsonSerializable
 	/**
 	 * Calculate percentage
 	 *
-	 * @param int|Number $percentage	The percentage
-	 * @return    Number
+	 * @param	int|\IPS\Math\Number	$percentage	The percentage
+	 * @return	\IPS\Math\Number
 	 */
-	public function percentage( Number|int $percentage ): Number
+	public function percentage( $percentage )
 	{
 		if ( !( $percentage instanceof static ) )
 		{
@@ -515,11 +505,11 @@ class Number implements JsonSerializable
 	/**
 	 * Get absolute value
 	 *
-	 * @return    Number
+	 * @return	\IPS\Math\Number
 	 */
-	public function absolute(): Number    // we need the underscore version as long as we have monkey patching
+	public function absolute()
 	{
-		return $this->positive ? $this : $this->multiply( new Number('-1') );
+		return $this->positive ? $this : $this->multiply( new \IPS\Math\Number('-1') );
 	}
 	
 	/* !Array math */
@@ -528,9 +518,9 @@ class Number implements JsonSerializable
 	 * Get sum of numbers
 	 *
 	 * @param	array	$numbers	array of \IPS\Math\Number objects
-	 * @return    Number
+	 * @return	\IPS\Math\Number
 	 */
-	public static function sum( array $numbers ): Number
+	public static function sum( array $numbers )
 	{
 		$result = new static('0');
 		foreach ( $numbers as $number )
@@ -539,63 +529,14 @@ class Number implements JsonSerializable
 		}
 		return $result;
 	}
-
-	/**
-	 * Get the moving average series from a series of numbers
-	 *
-	 * @param number[] $numbers
-	 * @param int $degree   How many elements of the source $numbers to average over
-	 * @param float $weightIncrement    How much to scale the weight of each value in the moving average as it approaches the current date. The weight starts at 1 and will be multiplied by this number
-	 * @return (number|null)[]      If the input array contains non-numeric values, these will be omitted from the moving average. If there are no numbers in the average period, null is added to the output array instead of a number
-	 */
-	public static function movingAverage( array $numbers, int $degree=5, float $weightIncrement=1 ) : array
-	{
-		if ( count( $numbers ) <= 1 OR $degree <= 1 )
-		{
-			return [...$numbers];
-		}
-
-		$final = [];
-		$values = array_values( $numbers );
-		$keys = array_keys( $numbers );
-		for ( $i = 1; $i < count( $numbers ); $i++ )
-		{
-			$start = max(0, $i - $degree);
-			$slice = array_slice( $values, $start, $i + 1 - $start );
-			$sum = 0;
-			$count = 0;
-			$weight = 1;
-			foreach ( $slice as $number )
-			{
-				if ( !is_numeric( $number ) )
-				{
-					continue;
-				}
-
-				$number = ( is_int( $number ) or is_float( $number ) ) ? $number : (float) $number;
-				$sum += $number * $weight;
-				$count += $weight;
-				$weight *= $weightIncrement;
-			}
-
-			if ( $count === 0 )
-			{
-				$final[$keys[$i]] = null;
-				continue;
-			}
-			$final[$keys[$i]] = $sum / $count;
-		}
-
-		return $final;
-	}
-
+	
 	/**
 	 * Get product of numbers
 	 *
-	 * @param array $numbers array of \IPS\Math\Number objects
-	 * @return Number
+	 * @param	array	$numbers	array of \IPS\Math\Number objects
+	 * @return	\IPS\Math\Number
 	 */
-	public static function product( array $numbers ): Number
+	public static function product( array $numbers )
 	{
 		$result = new static('0');
 		foreach ( $numbers as $number )
@@ -611,11 +552,11 @@ class Number implements JsonSerializable
 	 * Normalise two numbers
 	 * Makes the number of decimal places for both numbers equal so that math can be done on them
 	 *
-	 * @param Number $number1	Number 1
-	 * @param Number $number2	Number 2
+	 * @param	\IPS\Math\Number	$number1	Number 1
+	 * @param	\IPS\Math\Number	$number2	Number 2
 	 * @return	array
 	 */
-	protected static function _normaliseTwoNumbers( Number $number1, Number $number2 ): array
+	protected static function _normaliseTwoNumbers( Number $number1, Number $number2 )
 	{
 		$number1 = clone $number1;
 		$number2 = clone $number2;
@@ -638,10 +579,10 @@ class Number implements JsonSerializable
 	/**
 	 * Makes the number of decimal places a specific number
 	 *
-	 * @param int $to	The number of decimal places
+	 * @param	int	$to	The number of decimal places
 	 * @return	void
 	 */
-	protected function _normaliseDecimalPlaces( int $to ) : void
+	protected function _normaliseDecimalPlaces( $to )
 	{
 		$this->afterDecimalPoint *= ( ( $to - $this->numberOfDecimalPlaces ) * 10 );
 		$this->numberOfDecimalPlaces = $to;
@@ -652,7 +593,7 @@ class Number implements JsonSerializable
 	 *
 	 * @return	void
 	 */
-	protected function _simplifyDecimalPlaces() : void
+	protected function _simplifyDecimalPlaces()
 	{
 		if ( $this->afterDecimalPoint === 0 )
 		{
@@ -690,7 +631,7 @@ class Number implements JsonSerializable
 	 *
 	 * @return	string
 	 */
-	public function jsonSerialize(): string
+	public function jsonSerialize()
 	{
 		return (string) $this;
 	}

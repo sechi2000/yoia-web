@@ -12,26 +12,16 @@
 namespace IPS\nexus\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\nexus\Gateway;
-use IPS\nexus\Payout;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-use function method_exists;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * payoutPending Task
  */
-class payoutPending extends Task
+class _payoutPending extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -41,12 +31,12 @@ class payoutPending extends Task
 	 * If an error occurs which means the task could not finish running, throw an \IPS\Task\Exception - do not log an error as a normal log.
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
-	 * @return	string|null	Message to log or NULL
-	 * @throws	Exception
+	 * @return	mixed	Message to log or NULL
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : string|null
+	public function execute()
 	{
-		$iterator = new ActiveRecordIterator( Db::i()->select( '*', 'nexus_payouts', array( 'po_status=? AND po_gw_id IS NOT NULL', Payout::STATUS_PROCESSING ) ), 'IPS\nexus\Payout' );
+		$iterator = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_payouts', array( 'po_status=? AND po_gw_id IS NOT NULL', \IPS\nexus\Payout::STATUS_PROCESSING ) ), 'IPS\nexus\Payout' );
 
 		if( !$iterator->count() )
 		{
@@ -57,14 +47,14 @@ class payoutPending extends Task
 
 		foreach( $iterator as $payout )
 		{
-			$payoutClass = Gateway::payoutGateways()[ $payout->gateway ];
+			$payoutClass = \IPS\nexus\Gateway::payoutGateways()[ $payout->gateway ];
 
-			if( !method_exists( $payoutClass, 'checkStatus' ) )
+			if( !\method_exists( $payoutClass, 'checkStatus' ) )
 			{
 				continue;
 			}
 
-			if( $payoutClass::checkStatus( $payout->gw_id ) == Payout::STATUS_COMPLETE )
+			if( $payoutClass::checkStatus( $payout->gw_id ) == \IPS\nexus\Payout::STATUS_COMPLETE )
 			{
 				$payout->markCompleted();
 			}
@@ -82,7 +72,7 @@ class payoutPending extends Task
 	 *
 	 * @return	void
 	 */
-	public function cleanup() : void
+	public function cleanup()
 	{
 		
 	}

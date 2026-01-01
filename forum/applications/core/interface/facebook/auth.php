@@ -8,21 +8,17 @@
  * @since		20 Mar 2013
  */
 
-use IPS\Http\Url;
-use IPS\Output;
-use IPS\Request;
-
 define('REPORT_EXCEPTIONS', TRUE);
 require_once str_replace( 'applications/core/interface/facebook/auth.php', '', str_replace( '\\', '/', __FILE__ ) ) . 'init.php';
 
-$target = Url::internal( 'oauth/callback/', 'none' );
+$target = \IPS\Http\Url::internal( 'oauth/callback/', 'none' );
 
 foreach ( array( 'code', 'state', 'scope', 'error', 'error_description', 'error_uri' ) as $k )
 {
-	if ( isset( Request::i()->$k ) )
+	if ( isset( \IPS\Request::i()->$k ) )
 	{
-		$target = $target->setQueryString( $k, Request::i()->$k );
+		$target = $target->setQueryString( $k, \IPS\Request::i()->$k );
 	}
 }
 
-Output::i()->redirect( $target );
+\IPS\Output::i()->redirect( $target );

@@ -6,12 +6,12 @@
     },
     {
         "key": "achievements_last_rebuilt",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "achievements_rebuilding",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -31,7 +31,7 @@
     },
     {
         "key": "acp_menu_cookie_rebuild",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
@@ -71,32 +71,12 @@
     },
     {
         "key": "ads_exist",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "ads_force_sidebar",
-        "default": "",
-        "report": "full"
-    },
-    {
-        "key": "ads_txt",
-        "default": "",
-        "report": "none"
-    },
-    {
-        "key": "ads_txt_enabled",
-        "default": "",
-        "report": "bool"
-    },
-    {
-        "key": "ads_txt_redirect_url",
-        "default": "",
-        "report": "bool"
-    },
-    {
-        "key": "ajax_pagination",
-        "default": "1",
+        "default": "0",
         "report": "full"
     },
     {
@@ -130,6 +110,11 @@
         "report": "full"
     },
     {
+        "key": "all_activity_rep_neg",
+        "default": "0",
+        "report": "full"
+    },
+    {
         "key": "allow_creator_vote",
         "default": "1",
         "report": "full"
@@ -155,6 +140,11 @@
         "report": "none"
     },
     {
+        "key": "allow_only_https_remote_images",
+        "default": "1",
+        "report": "full"
+    },
+    {
         "key": "allow_password_changes",
         "default": "normal",
         "report": "full"
@@ -173,6 +163,11 @@
         "key": "allow_reg_target",
         "default": "",
         "report": "none"
+    },
+    {
+        "key": "allow_remote_images",
+        "default": "1",
+        "report": "full"
     },
     {
         "key": "allow_result_view",
@@ -216,7 +211,7 @@
     },
     {
         "key": "authy_enabled",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -256,12 +251,12 @@
     },
     {
         "key": "auto_follow_new_content",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "auto_follow_replied_to",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -271,13 +266,28 @@
     },
     {
         "key": "automoderation_enabled",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "automoderation_report_again_mins",
         "default": "60",
         "report": "full"
+    },
+    {
+        "key": "base_url_stored",
+        "default": "",
+        "report": "none"
+    },
+    {
+        "key": "bitly_enabled",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "bitly_token",
+        "default": "",
+        "report": "none"
     },
     {
         "key": "board_name",
@@ -300,6 +310,21 @@
         "report": "full"
     },
     {
+        "key": "ckeditor_extraPlugins",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "ckeditor_permissions",
+        "default": "{}",
+        "report": "bool"
+    },
+    {
+        "key": "ckeditor_toolbars",
+        "default": "{\"desktop\":[{\"name\":\"row1\",\"items\":[\"Bold\",\"Italic\",\"Underline\",\"Strike\",\"-\",\"ipsLink\",\"Ipsquote\",\"ipsCode\",\"ipsEmoticon\",\"-\",\"BulletedList\",\"NumberedList\",\"-\",\"JustifyLeft\",\"JustifyCenter\",\"JustifyRight\",\"-\",\"TextColor\",\"FontSize\",\"-\",\"ipsPreview\"]},\"\\\/\"],\"tablet\":[{\"name\":\"row1\",\"items\":[\"Bold\",\"Italic\",\"Underline\",\"-\",\"ipsLink\",\"Ipsquote\",\"ipsEmoticon\",\"-\",\"BulletedList\",\"NumberedList\",\"-\",\"ipsPreview\"]},\"\\\/\"],\"phone\":[{\"name\":\"row1\",\"items\":[\"Bold\",\"Italic\",\"Underline\",\"-\",\"ipsEmoticon\",\"-\",\"ipsLink\",\"-\",\"ipsPreview\"]},\"\\\/\"]}",
+        "report": "bool"
+    },
+    {
         "key": "clickjackprevention",
         "default": "xframe",
         "report": "full"
@@ -316,7 +341,7 @@
     },
     {
         "key": "clubs",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -341,7 +366,7 @@
     },
     {
         "key": "clubs_locations",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -351,7 +376,7 @@
     },
     {
         "key": "clubs_paid_commission",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
@@ -361,12 +386,12 @@
     },
     {
         "key": "clubs_paid_on",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
         "key": "clubs_paid_tax",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
@@ -376,8 +401,13 @@
     },
     {
         "key": "clubs_require_approval",
-        "default": "",
+        "default": "0",
         "report": "full"
+    },
+    {
+        "key": "connect_slaves",
+        "default": "0",
+        "report": "none"
     },
     {
         "key": "contact_access",
@@ -391,6 +421,11 @@
     },
     {
         "key": "contact_emails",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "contact_nexus_department",
         "default": "",
         "report": "bool"
     },
@@ -410,6 +445,11 @@
         "report": "bool"
     },
     {
+        "key": "coppa_consent_extra",
+        "default": "",
+        "report": "bool"
+    },
+    {
         "key": "coppa_fax",
         "default": "",
         "report": "bool"
@@ -421,7 +461,7 @@
     },
     {
         "key": "core_datalayer_enabled",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
@@ -436,17 +476,17 @@
     },
     {
         "key": "core_datalayer_include_pii",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
         "key": "core_datalayer_member_pii_choice",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
         "key": "core_datalayer_pii",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
@@ -456,12 +496,22 @@
     },
     {
         "key": "core_datalayer_replace_with_sso",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
         "key": "core_datalayer_use_gtm",
         "default": "1",
+        "report": "none"
+    },
+    {
+        "key": "countries_block",
+        "default": "",
+        "report": "none"
+    },
+    {
+        "key": "countries_moderate",
+        "default": "",
         "report": "none"
     },
     {
@@ -476,31 +526,6 @@
     },
     {
         "key": "custom_page_view_js",
-        "default": "",
-        "report": "none"
-    },
-    {
-        "key": "debug_log_enabled",
-        "default": "",
-        "report": "none"
-    },
-    {
-        "key": "debug_log_events",
-        "default": "",
-        "report": "none"
-    },
-    {
-        "key": "debug_log_level",
-        "default": "0",
-        "report": "full"
-    },
-    {
-        "key": "debug_log_requests",
-        "default": "",
-        "report": "none"
-    },
-    {
-        "key": "debug_log_webhooks",
         "default": "",
         "report": "none"
     },
@@ -525,6 +550,11 @@
         "report": "full"
     },
     {
+        "key": "disable_all_plugins",
+        "default": "",
+        "report": "none"
+    },
+    {
         "key": "edit_log",
         "default": "1",
         "report": "full"
@@ -536,17 +566,37 @@
     },
     {
         "key": "edit_log_public",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
-        "key": "editor_mode_restrictions",
-        "default": "{\"-1\": [\"internal_embed\",\"external_embed\",\"image_embed\"], \"0\": [\"float\",\"heading_1\",\"font_family\", \"og_embed\"], \"2\": [\"raw_embed\"]}",
+        "key": "editor_allowed_classes",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "editor_allowed_datacontrollers",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "editor_allowed_iframe_bases",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "editor_embeds",
+        "default": "1",
         "report": "full"
     },
     {
         "key": "editor_paragraph_padding",
         "default": "1",
+        "report": "full"
+    },
+    {
+        "key": "editor_paste_behaviour",
+        "default": "rich",
         "report": "full"
     },
     {
@@ -580,9 +630,9 @@
         "report": "bool"
     },
     {
-        "key": "embed_url_filter_any_action",
-        "default": "allow",
-        "report": "none"
+        "key": "emoji_ascii",
+        "default": "1",
+        "report": "full"
     },
     {
         "key": "emoji_cache",
@@ -592,6 +642,16 @@
     {
         "key": "emoji_shortcodes",
         "default": "1",
+        "report": "full"
+    },
+    {
+        "key": "emoji_style",
+        "default": "native",
+        "report": "full"
+    },
+    {
+        "key": "enable_bbcode",
+        "default": "0",
         "report": "full"
     },
     {
@@ -606,18 +666,13 @@
     },
     {
         "key": "error_notify",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "error_notify_level",
         "default": "3",
         "report": "full"
-    },
-    {
-        "key": "favorite_blocks",
-        "default": "[\"Wysiwyg\",\"RecordFeed\",\"trending\",\"postFeed\",\"topicFeed\"]",
-        "report": "none"
     },
     {
         "key": "fb_ig_oembed_appid",
@@ -636,12 +691,12 @@
     },
     {
         "key": "fb_pixel_delay",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "fb_pixel_enabled",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -666,7 +721,7 @@
     },
     {
         "key": "force_reg_terms",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -681,7 +736,7 @@
     },
     {
         "key": "ga_enabled",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -725,23 +780,13 @@
         "report": "bool"
     },
     {
-        "key": "google_maps_groups",
-        "default": "*",
-        "report": "none"
-    },
-    {
         "key": "google_maps_static_use_embed",
-        "default": "",
-        "report": "none"
-    },
-    {
-        "key": "google_maps_zoom",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
         "key": "googleauth_enabled",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -761,7 +806,7 @@
     },
     {
         "key": "googletag_enabled",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -781,7 +826,7 @@
     },
     {
         "key": "guest_terms_bar",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -796,7 +841,7 @@
     },
     {
         "key": "htaccess_mod_rewrite",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -835,31 +880,6 @@
         "report": "bool"
     },
     {
-        "key": "iframely_api_key",
-        "default": "",
-        "report": "none"
-    },
-    {
-        "key": "iframely_enabled",
-        "default": "0",
-        "report": "full"
-    },
-    {
-        "key": "iframely_facebook_enabled",
-        "default": "0",
-        "report": "full"
-    },
-    {
-        "key": "iframely_instagram_enabled",
-        "default": "0",
-        "report": "full"
-    },
-    {
-        "key": "iframely_url_whitelist",
-        "default": "",
-        "report": "none"
-    },
-    {
         "key": "ignore_system_on",
         "default": "1",
         "report": "full"
@@ -886,7 +906,7 @@
     },
     {
         "key": "indexnow_enabled",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -915,18 +935,13 @@
         "report": "full"
     },
     {
-        "key": "ipb_embed_url_filter_option",
-        "default": "0",
-        "report": "full"
-    },
-    {
-        "key": "ipb_embed_url_whitelist",
+        "key": "ipb_copy_number",
         "default": "",
-        "report": "none"
+        "report": "bool"
     },
     {
         "key": "ipb_poll_only",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1025,6 +1040,11 @@
         "report": "bool"
     },
     {
+        "key": "ips_cp_purchase",
+        "default": "0",
+        "report": "full"
+    },
+    {
         "key": "ipseo_ga",
         "default": "",
         "report": "bool"
@@ -1035,8 +1055,13 @@
         "report": "full"
     },
     {
-        "key": "javascript_updated",
+        "key": "itunes_affiliate_string",
         "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "javascript_updated",
+        "default": "0",
         "report": "none"
     },
     {
@@ -1053,6 +1078,11 @@
         "key": "last_data_store_update",
         "default": "",
         "report": "none"
+    },
+    {
+        "key": "lazy_load_enabled",
+        "default": "1",
+        "report": "full"
     },
     {
         "key": "leaderboard_excluded_groups",
@@ -1080,29 +1110,14 @@
         "report": "full"
     },
     {
+        "key": "lp_method",
+        "default": "random",
+        "report": "full"
+    },
+    {
         "key": "mail_method",
         "default": "php",
         "report": "full"
-    },
-    {
-        "key": "mailchimp_api_key",
-        "default": "",
-        "report": "bool"
-    },
-    {
-        "key": "mailchimp_enabled",
-        "default": "0",
-        "report": "full"
-    },
-    {
-        "key": "mailchimp_lists",
-        "default": "",
-        "report": "full"
-    },
-    {
-        "key": "mailchimp_server_prefix",
-        "default": "",
-        "report": "none"
     },
     {
         "key": "manifest_details",
@@ -1111,7 +1126,7 @@
     },
     {
         "key": "mapbox",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1120,14 +1135,9 @@
         "report": "none"
     },
     {
-        "key": "mapbox_groups",
-        "default": "*",
-        "report": "none"
-    },
-    {
-        "key": "mapbox_zoom",
-        "default": "",
-        "report": "none"
+        "key": "match_browser",
+        "default": "0",
+        "report": "full"
     },
     {
         "key": "match_ipaddress",
@@ -1141,13 +1151,8 @@
     },
     {
         "key": "matomo_enabled",
-        "default": "",
-        "report": "full"
-    },
-    {
-        "key": "max_embeddedmedia_width",
         "default": "0",
-        "report": "none"
+        "report": "full"
     },
     {
         "key": "max_internalembed_width",
@@ -1180,8 +1185,23 @@
         "report": "full"
     },
     {
-        "key": "merge_concurrent_posts",
+        "key": "max_video_width",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "max_video_width_css",
+        "default": "none",
+        "report": "bool"
+    },
+    {
+        "key": "member_menu_create_key",
         "default": "",
+        "report": "none"
+    },
+    {
+        "key": "merge_concurrent_posts",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1221,7 +1241,7 @@
     },
     {
         "key": "minimum_age",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1230,38 +1250,33 @@
         "report": "none"
     },
     {
-        "key": "mp_onboard_complete",
-        "default": "1",
-        "report": "none"
-    },
-    {
         "key": "new_device_email",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "new_reg_notify",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "notification_prefs_one_per_view",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "notification_prefs_popup",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "onboard_complete",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
         "key": "orig_tables_checked",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
@@ -1276,7 +1291,7 @@
     },
     {
         "key": "password_strength_meter_enforce",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1311,7 +1326,7 @@
     },
     {
         "key": "pixabay_enabled",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1326,8 +1341,33 @@
     },
     {
         "key": "poll_allow_vdelete",
-        "default": "",
+        "default": "0",
         "report": "full"
+    },
+    {
+        "key": "pop3_password",
+        "default": "",
+        "report": "none"
+    },
+    {
+        "key": "pop3_port",
+        "default": "995",
+        "report": "none"
+    },
+    {
+        "key": "pop3_server",
+        "default": "",
+        "report": "none"
+    },
+    {
+        "key": "pop3_tls",
+        "default": "1",
+        "report": "none"
+    },
+    {
+        "key": "pop3_user",
+        "default": "",
+        "report": "none"
     },
     {
         "key": "post_before_registering",
@@ -1381,7 +1421,42 @@
     },
     {
         "key": "profile_birthday_type",
-        "default": "none",
+        "default": "public",
+        "report": "full"
+    },
+    {
+        "key": "profile_comment_approval",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "profile_comments",
+        "default": "1",
+        "report": "full"
+    },
+    {
+        "key": "promote_community_enabled",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "promote_groups",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "promote_members",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "promote_scheduled",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "promote_tz",
+        "default": "UTC",
         "report": "full"
     },
     {
@@ -1411,7 +1486,7 @@
     },
     {
         "key": "prune_log_admin",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1436,7 +1511,7 @@
     },
     {
         "key": "prune_log_moderator",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1466,7 +1541,7 @@
     },
     {
         "key": "prune_pms",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1500,13 +1575,8 @@
         "report": "bool"
     },
     {
-        "key": "ref_member_input",
-        "default": "",
-        "report": "bool"
-    },
-    {
         "key": "ref_on",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1525,13 +1595,13 @@
         "report": "bool"
     },
     {
-        "key": "reg_welcome_email",
+        "key": "relative_dates_enable",
         "default": "1",
         "report": "full"
     },
     {
-        "key": "relative_dates_enable",
-        "default": "1",
+        "key": "remote_image_cache",
+        "default": "7",
         "report": "full"
     },
     {
@@ -1556,7 +1626,7 @@
     },
     {
         "key": "reputation_can_self_vote",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1696,7 +1766,7 @@
     },
     {
         "key": "search_index_timeframe",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1721,7 +1791,7 @@
     },
     {
         "key": "security_questions_enabled",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1756,13 +1826,13 @@
     },
     {
         "key": "sendgrid_click_tracking",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "sendgrid_deprecated",
         "default": "1",
-        "report": "bool"
+        "report": "full"
     },
     {
         "key": "sendgrid_ip_pool",
@@ -1771,7 +1841,7 @@
     },
     {
         "key": "sendgrid_use_for",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1786,22 +1856,22 @@
     },
     {
         "key": "setup_in_progress",
-        "default": "",
+        "default": "0",
         "report": "none"
     },
     {
         "key": "signatures_enabled",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "signatures_guests",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "signatures_mobile",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1836,7 +1906,7 @@
     },
     {
         "key": "site_site_elsewhere",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -1883,6 +1953,11 @@
         "key": "sitemap_url",
         "default": "",
         "report": "bool"
+    },
+    {
+        "key": "sixty_second_emails",
+        "default": "1",
+        "report": "full"
     },
     {
         "key": "smtp_host",
@@ -1965,6 +2040,31 @@
         "report": "full"
     },
     {
+        "key": "sparkpost_api_key",
+        "default": "",
+        "report": "none"
+    },
+    {
+        "key": "sparkpost_click_tracking",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "sparkpost_ip_pool",
+        "default": "",
+        "report": "bool"
+    },
+    {
+        "key": "sparkpost_use_for",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "spm_notify",
+        "default": "0",
+        "report": "full"
+    },
+    {
         "key": "spm_option",
         "default": "disable,unapprove",
         "report": "full"
@@ -1976,7 +2076,7 @@
     },
     {
         "key": "staff_directory_empty",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -2010,8 +2110,23 @@
         "report": "full"
     },
     {
+        "key": "status_updates_mem_enable",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "tags_alphabetical",
+        "default": "0",
+        "report": "full"
+    },
+    {
         "key": "tags_can_prefix",
         "default": "1",
+        "report": "full"
+    },
+    {
+        "key": "tags_clean",
+        "default": "0",
         "report": "full"
     },
     {
@@ -2025,24 +2140,39 @@
         "report": "full"
     },
     {
-        "key": "tags_landing_limit",
-        "default": "12",
-        "report": "none"
+        "key": "tags_len_max",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "tags_len_min",
+        "default": "0",
+        "report": "full"
     },
     {
         "key": "tags_max",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "tags_min",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
         "key": "tags_min_req",
-        "default": "",
+        "default": "0",
         "report": "full"
+    },
+    {
+        "key": "tags_open_system",
+        "default": "1",
+        "report": "full"
+    },
+    {
+        "key": "tags_predefined",
+        "default": "",
+        "report": "bool"
     },
     {
         "key": "task_cron_key",
@@ -2055,8 +2185,23 @@
         "report": "full"
     },
     {
-        "key": "theme_designer_mode",
+        "key": "theme_designers_mode",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "theme_disk_cache_path",
         "default": "",
+        "report": "none"
+    },
+    {
+        "key": "theme_disk_cache_templates",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "theme_editing_advanced_mode",
+        "default": "0",
         "report": "full"
     },
     {
@@ -2111,7 +2256,7 @@
     },
     {
         "key": "use_coppa",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -2206,7 +2351,7 @@
     },
     {
         "key": "warnings_acknowledge",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -2216,7 +2361,7 @@
     },
     {
         "key": "webhook_logs_success",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {
@@ -2236,7 +2381,7 @@
     },
     {
         "key": "xforward_matching",
-        "default": "",
+        "default": "0",
         "report": "full"
     },
     {

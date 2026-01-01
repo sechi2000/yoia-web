@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <language>
- <app key="downloads" version="5001403">
+ <app key="downloads" version="107827">
   <word key="__app_downloads" js="0">Downloads</word>
   <word key="frontnavigation_downloads" js="0">Downloads</word>
   <word key="__indefart_downloads_file_comment" js="0">a comment on a file</word>
@@ -27,9 +27,8 @@
   <word key="filestorage__downloads_Files" js="0">Downloads Files</word>
   <word key="filestorage__downloads_Screenshots" js="0">Downloads Screenshots</word>
   <word key="filestorage__downloads_FileField" js="0">Downloads Custom Fields</word>
-  <word key="filestorage__downloads_Icons" js="0">Downloads Category Icons</word>
-  <word key="filestorage__downloads_Cards" js="0">Downloads Category Card Images</word>
   <word key="downloads_files" js="0">Downloads Files</word>
+  <word key="downloads_file" js="0">File</word>
   <word key="downloads_file_sg_lc" js="0">downloads file</word>
   <word key="modlog__action_restorebackup" js="0"><![CDATA[Restored a previous version for a file: <a href='%s'>%s</a>]]></word>
   <word key="modlog__action_visibilitybackup" js="0"><![CDATA[Toggled visibility for a previous version for a file: <a href='%s'>%s</a>]]></word>
@@ -43,7 +42,6 @@
   <word key="modlog__action_purchasestatus_stats" js="0">Toggled purchase status of a file</word>
   <word key="modlog__action_newversion_reject_stats" js="0">Rejected a new version of a file</word>
   <word key="modlog__action_newversion_approved_stats" js="0">Approved a new version of a file</word>
-  <word key="modlog__linkedfile_edit_title" js="0"><![CDATA[Renamed <a href='%s'>%s</a> from %s]]></word>
   <word key="mark_category_read" js="0">Mark category read</word>
   <word key="mark_category_read_title" js="0">Mark this category as read</word>
   <word key="editor__downloads_Categories" js="0">Download Categories</word>
@@ -143,15 +141,6 @@
   <word key="cdisclaimer_purchase" js="0">Before Purchase</word>
   <word key="cdisclaimer_download" js="0">Before Download</word>
   <word key="cdisclaimer_both" js="0">Before Purchase and Download</word>
-  <word key="cicon_choose" js="0">Icon</word>
-  <word key="cicon_choose_desc" js="0"><![CDATA[The icon displays next to the category in the category list. It will automatically be faded out to indicate if there is no unread content within the category.<br>If none is provided, the default icon will be used.]]></word>
-  <word key="cicon_choose_icon" js="0">Choose an icon</word>
-  <word key="cicon_choose_upload" js="0">Upload an icon</word>
-  <word key="cicon_picker" js="0">Icon Picker</word>
-  <word key="cicon_upload" js="0">Upload</word>
-  <word key="cicon_choose_icon_none" js="0">No custom icon</word>
-  <word key="ccard_image" js="0">Card Image</word>
-  <word key="ccard_image_desc" js="0">When viewing downloads as a grid or feed, your chosen image will appear as the cover photo.</word>
   <word key="modperms__core_Content_downloads_File" js="0">Downloads</word>
   <word key="download_categories" js="0">Categories</word>
   <word key="can_pin_downloads_file" js="0">Can pin files?</word>
@@ -183,7 +172,6 @@
   <word key="can_add_item_message_downloads_file" js="0">Can add messages to files?</word>
   <word key="can_edit_item_message_downloads_file" js="0">Can edit messages on files?</word>
   <word key="can_delete_item_message_downloads_file" js="0">Can delete messages on files?</word>
-  <word key="can_view_reports_downloads_file" js="0">Can view reported files?</word>
   <word key="modperms__downloads_Files" js="0">Downloads</word>
   <word key="can_make_purchasable" js="0">Can enable purchases on files?</word>
   <word key="can_make_unpurchasable" js="0">Can disable purchases on files?</word>
@@ -196,7 +184,6 @@
   <word key="idm_cfield_sidebar" js="0">In the sidebar</word>
   <word key="downloads_field_paid" js="0">Purchase Required?</word>
   <word key="downloads_field_paid_desc" js="0">If enabled, this field's contents will only be shown to members's who have purchased the file. This setting has no effect on free files.</word>
-  <word key="ccfields_sg" js="0">Field</word>
   <word key="perm_cfield_perm__view" js="0">View Field Content</word>
   <word key="perm_cfield_perm__edit" js="0">Edit Field Content</word>
   <word key="perm_cfield_perm__add" js="0">Add Content to Field</word>
@@ -213,13 +200,13 @@
   <word key="idm_watermarkpath_desc" js="0">The image provided will be overlaid on all screenshot images (for example, to show a copyright message). For best results, use a small image with a transparent background.</word>
   <word key="acplogs__downloads_recount_downloads" js="0">Recounted downloads for category: %s</word>
   <word key="download_settings_saved_rebuilding" js="0">Saved. Your screenshots are rebuilding in the background.</word>
+  <word key="idm_default_view" js="0">Default category view</word>
+  <word key="idm_default_view_choose" js="0">Member can choose?</word>
   <word key="downloads_default_view_table" js="0">Table: A traditional table view</word>
   <word key="downloads_default_view_grid" js="0">Grid: Display files as cards in a grid</word>
   <word key="downloads_default_view_choose" js="0">Members can choose?</word>
   <word key="downloads_default_view_choose_desc" js="0">Select the views you will allow members to choose from</word>
   <word key="downloads_default_view_choose_none" js="0">Do not allow members to choose</word>
-  <word key="downloads_categories_view" js="0">Downloads Category View</word>
-  <word key="downloads_updating_views" js="0">Updating Member Views for Downloads</word>
   <word key="idm_view_approvers" js="0">Can view who approved files?</word>
   <word key="idm_bypass_revision" js="0">Can manage versions?</word>
   <word key="idm_view_downloads" js="0">Can view who has downloaded files?</word>
@@ -235,6 +222,7 @@
   <word key="idm_bypass_revision_desc" js="0"><![CDATA[When an author uploads a new version of a file within a category that has versioning enabled, the previous version is stored and is available for download. When this setting is enabled, the user will be given the option to not store the previous version when uploading a new version, and will be able to restore, hide and delete their previous versions.<br>The user needs permission to edit the file.]]></word>
   <word key="limit_sim" js="0">Maximum simultaneous downloads</word>
   <word key="min_posts" js="0">Posts required to download</word>
+  <word key="download_min_posts" js="0">You may only download files after you have made {# [1:post][?:posts]}.</word>
   <word key="daily_bw" js="0">Maximum bandwidth usage per day</word>
   <word key="weekly_bw" js="0">Maximum bandwidth usage per week</word>
   <word key="monthly_bw" js="0">Maximum bandwidth usage per month</word>
@@ -300,7 +288,6 @@
   <word key="x_purchases" js="0">{# [1:purchase][?:purchases]}</word>
   <word key="num_downloads" js="0">{# [1:download][?:downloads]}</word>
   <word key="files_no_number" js="0">{!# [1:file][?:files]}</word>
-  <word key="downloads_file" js="0">File</word>
   <word key="downloads_file_comment" js="0">File Comment</word>
   <word key="downloads_file_review" js="0">File Review</word>
   <word key="downloads_file_pl" js="0">Files</word>
@@ -366,12 +353,11 @@
   <word key="download_begins_in" js="0">Download begins in </word>
   <word key="file_actions" js="0">File Actions</word>
   <word key="max_simultaneous_downloads" js="0">You may only download {# [1:file][?:files]} at a time. Wait until {!# [1:your other download has][?:some of your other downloads have]} finished, then try again.</word>
-  <word key="download_min_posts" js="0">You may only download files after you have made {# [1:post][?:posts]}.</word>
   <word key="bandwidth_limit_daily" js="0">You may only download %s per day. You will be able to download this file after %s.</word>
   <word key="bandwidth_limit_week" js="0">You may only download %s per week. You will be able to download this file after %s.</word>
+  <word key="bandwidth_limit_month" js="0">You may only download %s per month. The file you are trying to download is %s which is above your limit.</word>
   <word key="bandwidth_limit_daily_never" js="0">You may only download %s per day. The file you are trying to download is %s which is above your limit.</word>
   <word key="bandwidth_limit_weekly" js="0">You may only download %s per week. The file you are trying to download is %s which is above your limit.</word>
-  <word key="bandwidth_limit_month" js="0">You may only download %s per month. The file you are trying to download is %s which is above your limit.</word>
   <word key="download_limit_daily" js="0">You may only download {# [1:file][?:files]} per day. You will be able to download this file after %s.</word>
   <word key="download_limit_weekly" js="0">You may only download {# [1:file][?:files]} per week. You will be able to download this file after %s.</word>
   <word key="download_limit_monthly" js="0">You may only download {# [1:file][?:files]} per month. You will be able to download this file after %s.</word>
@@ -445,7 +431,7 @@
   <word key="file_locked_cannot_comment" js="0">This file is now closed to further comments.</word>
   <word key="file__save" js="0">Save</word>
   <word key="downloads_no_file" js="0">File not found</word>
-  <word key="download_teaser" js="0">Register or sign in to download</word>
+  <word key="download_teaser" js="0">Create an account or sign in to download this</word>
   <word key="download_no_permission" js="0">Sorry, you aren't permitted to download this file.</word>
   <word key="download_no_permission_guest" js="0">Sorry, you aren't permitted to download this file. However, you may be able to download if you sign in.</word>
   <word key="downloads_file_info" js="0">Downloads</word>
@@ -455,7 +441,6 @@
   <word key="disable_purchases" js="0">Disable Purchases</word>
   <word key="enable_purchases" js="0">Enable Purchases</word>
   <word key="purchasing_disabled" js="0">This file is not currently available for purchase.</word>
-  <word key="file_container" js="0">Category</word>
   <word key="block_downloads_Overview" js="0">Downloads Overview</word>
   <word key="total_disk_spaced" js="0">Total Diskspace Used</word>
   <word key="total_files" js="0">Total Files</word>
@@ -467,7 +452,7 @@
   <word key="most_downloaded_file" js="0">Most Downloaded File</word>
   <word key="total_files_front" js="0">Files</word>
   <word key="total_authors" js="0">Authors</word>
-  <word key="latest_file" js="0">Latest file by %s</word>
+  <word key="latest_file" js="0">Latest File</word>
   <word key="latest_submitter" js="0">Latest Submitter</word>
   <word key="top_week" js="0">Week</word>
   <word key="top_month" js="0">Month</word>
@@ -518,8 +503,6 @@
   <word key="stats_overview_downloads_desc" js="0">Logging of downloads and the retention period for logs can be adjusted on a per-category basis</word>
   <word key="downloads_stats_uploader_count" js="0">{# [1:member][?:members]} uploaded files.</word>
   <word key="downloads_stats_downloader_count" js="0">{# [1:member][?:members]} downloaded files.</word>
-  <word key="downloads_file_name" js="0">File Name</word>
-  <word key="downloads_file_downloads" js="0">Downloads</word>
   <word key="ipAddresses__downloads_DownloadLog" js="0">Downloads</word>
   <word key="acplogs__downloads_resync_topics" js="0">Resynchronized topic content for %s</word>
   <word key="block_fileFeed" js="0">Files Feed</word>
@@ -648,8 +631,6 @@
   <word key="AchievementAction__DownloadFile_title" js="0">User downloads a file</word>
   <word key="AchievementAction__DownloadFile" js="0">Member downloads a Downloads File</word>
   <word key="webhook_downloads_new_version" js="0">Fired when a new version gets available</word>
-  <word key="acpsearch__cdesc" js="0">Category Description</word>
-  <word key="acpsearch__pf_desc" js="0">Custom Field Description</word>
   <word key="makePrimaryScreenshot" js="1">Make this the primary screenshot for this file</word>
   <word key="makePrimary" js="1">Primary</word>
   <word key="removeScreenshot" js="1">Remove this screenshot</word>

@@ -12,22 +12,16 @@
 namespace IPS\forums\setup\upg_105021;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use function defined;
-use function IPS\Cicloud\getForcedArchiving;
-use const IPS\CIC2;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.5.0 Beta 5 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Auto-enable archiving on CIC2 if appropriate
@@ -37,10 +31,10 @@ class Upgrade
 	public function step1()
 	{
 		/* Auto-enable post archiving if the community is CIC2 and has more than 255K posts */
-		if ( CIC2 AND getForcedArchiving() )
+		if ( \IPS\CIC2 AND \IPS\Cicloud\getForcedArchiving() )
 		{
 			/* Make sure archiving is on */
-			Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'archive' ) );
+			\IPS\Db::i()->update( 'core_tasks', array( 'enabled' => 1 ), array( '`key`=?', 'archive' ) );
 		}
 
 		return TRUE;

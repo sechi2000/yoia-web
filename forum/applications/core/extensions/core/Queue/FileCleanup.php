@@ -11,67 +11,54 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\File;
-use IPS\Log;
-use IPS\Member;
-use OutOfRangeException;
-use function defined;
-use function is_array;
-use function is_numeric;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class FileCleanup extends QueueAbstract
+class _FileCleanup
 {
 	/**
 	 * @brief Number of thumbnails to build per cycle
 	 */
-	public int $perCycle	= REBUILD_SLOW;
+	public $perCycle	= \IPS\REBUILD_SLOW;
 
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		/* Make sure we have the minimal amount of data we need */
 		if( !$this->canBeRun( $data ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		$data['maxId']	= NULL;
 
 		if( isset( $data['primaryId'] ) )
 		{
-			$data['maxId']			= Db::i()->select( 'MAX(' . $data['primaryId'] . ')', $data['table'] )->first();
+			$data['maxId']			= \IPS\Db::i()->select( 'MAX(' . $data['primaryId'] . ')', $data['table'] )->first();
 		}
 		
-		$data['count']			= Db::i()->select( 'count(*)', $data['table'] )->first();
+		$data['count']			= \IPS\Db::i()->select( 'count(*)', $data['table'] )->first();
 		$data['deleted']		= 0;
 
 		/* Convert the storage extension to get the configuration ID */
-		if( !is_numeric( $data['storageExtension'] ) )
+		if( !\is_numeric( $data['storageExtension'] ) )
 		{
-			$data['storageExtension'] = (int) File::getClass( $data['storageExtension'] )->configurationId;
+			$data['storageExtension'] = (int) \IPS\File::getClass( $data['storageExtension'] )->configurationId;
 		}
 
 		/* Normalize columns */
-		$data['column']	= !is_array( $data['column'] ) ? array( $data['column'] ) : $data['column'];
+		$data['column']	= !\is_array( $data['column'] ) ? array( $data['column'] ) : $data['column'];
 
 		return $data;
 	}
@@ -84,7 +71,7 @@ class FileCleanup extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		if( !$this->canBeRun( $data) )
 		{
@@ -94,9 +81,9 @@ class FileCleanup extends QueueAbstract
 		$last		= ( isset( $data['primaryId'] ) ) ? NULL : $offset;
 		$deleted	= 0;
 
-		Log::debug( "Deleting files from an offset of " . $offset, 'deleteFilesTask' );
+		\IPS\Log::debug( "Deleting files from an offset of " . $offset, 'deleteFilesTask' );
 
-		$where = $data['where'] ?? array();
+		$where = isset( $data['where'] ) ? $data['where'] : array();
 		if( isset( $data['primaryId'] ) )
 		{
 			$where[]	= array( $data['primaryId'] . '> ?', $offset );
@@ -109,7 +96,7 @@ class FileCleanup extends QueueAbstract
 			$order		= NULL;
 		}
 
-		foreach( Db::i()->select( '*', $data['table'], $where, $order, $limit ) as $row )
+		foreach( \IPS\Db::i()->select( '*', $data['table'], $where, $order, $limit ) as $row )
 		{
 			/* Set the last ID we deleted now */
 			$last	= ( isset( $data['primaryId'] ) ) ? $row[ $data['primaryId'] ] : ( $last + 1 );
@@ -128,11 +115,11 @@ class FileCleanup extends QueueAbstract
 					{
 						try
 						{
-							File::get( $data['storageExtension'], $fileLocation )->delete();
+							\IPS\File::get( $data['storageExtension'], $fileLocation )->delete();
 						}
-						catch( Exception $e )
+						catch( \Exception $e )
 						{
-							Log::log( $e, 'fileCleanupDeleteFailed' );
+							\IPS\Log::log( $e, 'fileCleanupDeleteFailed' );
 							continue;
 						}
 					}
@@ -156,11 +143,11 @@ class FileCleanup extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		return array( 'text' => Member::loggedIn()->language()->addToStack('deleting_files_generic'), 'complete' => $data['count'] ? ( round( ( 100 / $data['count'] ) * $data['deleted'], 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('deleting_files_generic'), 'complete' => $data['count'] ? ( round( ( 100 / $data['count'] ) * $data['deleted'], 2 ) ) : 100 );
 	}
 
 	/**
@@ -170,26 +157,21 @@ class FileCleanup extends QueueAbstract
 	 * @param	bool	$processed	Was anything processed or not? If preQueueData returns NULL, this will be FALSE.
 	 * @return	void
 	 */
-	public function postComplete( array $data, bool $processed = TRUE ) : void
+	public function postComplete( $data, $processed = TRUE )
 	{
-		if( !isset( $data['data'] ) )
-		{
-			return;
-		}
-
 		$data = json_decode( $data['data'], TRUE );
 
 		if( isset( $data['dropTable'] ) )
 		{
-			Db::i()->dropTable( $data['dropTable'], TRUE );
+			\IPS\Db::i()->dropTable( $data['dropTable'], TRUE );
 		}
 		elseif( isset( $data['dropColumn'] ) AND isset( $data['dropColumnTable'] ) )
 		{
-			Db::i()->dropColumn( $data['dropColumnTable'], $data['dropColumn'] );
+			\IPS\Db::i()->dropColumn( $data['dropColumnTable'], $data['dropColumn'] );
 		}
 		elseif( isset( $data['deleteRows'] ) AND $data['deleteRows'] )
 		{
-			Db::i()->delete( $data['table'], $data['where'] );
+			\IPS\Db::i()->delete( $data['table'], $data['where'] );
 		}
 	}
 
@@ -201,6 +183,6 @@ class FileCleanup extends QueueAbstract
 	 */
 	protected function canBeRun( array $data ): bool
 	{
-		return !( !isset( $data['table'] ) OR empty( $data['column'] ) OR empty( $data['storageExtension'] ) OR !Db::i()->checkForTable( $data['table'] ) );
+		return !( !isset( $data['table'] ) OR empty( $data['column'] ) OR empty( $data['storageExtension'] ) OR !\IPS\Db::i()->checkForTable( $data['table'] ) );
 	}
 }

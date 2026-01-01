@@ -12,48 +12,40 @@
 namespace IPS\core\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\Radio;
-use IPS\Member;
-use LogicException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member Filter Extension
  */
-class Banned extends MemberFilterAbstract
+class _Banned
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param string $area Area to check (bulkmail, group_promotions, automatic_moderation, passwordreset)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'group_promotions' ) );
+		return \in_array( $area, array( 'group_promotions' ) );
 	}
 
 	/** 
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		$options = array( 'any' => 'any', 'banned' => 'mf_banned_banned', 'notbanned' => 'mf_banned_not_banned' );
 
 		return array(
-			new Radio( 'mf_banned', $criteria['banned'] ?? 'any', FALSE, array( 'options' => $options ) ),
+			new \IPS\Helpers\Form\Radio( 'mf_banned', isset( $criteria['banned'] ) ? $criteria['banned'] : 'any', FALSE, array( 'options' => $options ) ),
 		);
 	}
 
@@ -61,12 +53,12 @@ class Banned extends MemberFilterAbstract
 	 * Determine if a member matches specified filters
 	 *
 	 * @note	This is only necessary if availableIn() includes group_promotions
-	 * @param	Member	$member		Member object to check
+	 * @param	\IPS\Member	$member		Member object to check
 	 * @param	array 		$filters	Previously defined filters
 	 * @param	object|NULL	$object		Calling class
 	 * @return	bool
 	 */
-	public function matches( Member $member, array $filters, ?object $object=NULL ) : bool
+	public function matches( \IPS\Member $member, $filters, $object=NULL )
 	{
 		if( !isset( $filters['banned'] ) )
 		{
@@ -76,11 +68,11 @@ class Banned extends MemberFilterAbstract
 		switch ( $filters['banned'] )
 		{
 			case 'banned':
-				return ( $member->temp_ban !== 0 );
-
+				return ( (int) $member->temp_ban !== 0 );
+			break;
 			case 'notbanned':
 				return empty( $member->temp_ban );
-
+			break;
 		}
 
 		return FALSE;
@@ -90,21 +82,21 @@ class Banned extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return    array|bool            False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array|bool
+	public function save( $post )
 	{
-		return ( isset( $post['mf_banned'] ) and in_array( $post['mf_banned'], array( 'banned', 'notbanned' ) ) ) ? array( 'banned' => $post['mf_banned'] ) : FALSE;
+		return ( isset( $post['mf_banned'] ) and \in_array( $post['mf_banned'], array( 'banned', 'notbanned' ) ) ) ? array( 'banned' => $post['mf_banned'] ) : FALSE;
 	}
 	
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		if ( isset( $data['banned'] ) )
 		{
@@ -112,10 +104,10 @@ class Banned extends MemberFilterAbstract
 			{
 				case 'banned':
 					return array( "temp_ban<>0" );
-
+					break;
 				case 'notbanned':
 					return array( "(temp_ban IS NULL OR temp_ban=0)" );
-
+					break;
 			}
 		}
 

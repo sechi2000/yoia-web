@@ -12,41 +12,25 @@
 namespace IPS\{app}\extensions\core\Build;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\BuildAbstract;
-use IPS\Application\BuilderFilter;
-use RuntimeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Build process plugin
  */
-class {class} extends BuildAbstract
+class _{class}
 {
 	/**
 	 * Build
 	 *
 	 * @return	void
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public function build() : void
+	public function build()
 	{
-	}
-
-	/**
-	* Should the current file/directory be included in the tar
-	*
-	* @return bool
-	*/
-	public function accept( BuilderFilter $current ): bool
-	{
-		return true;
 	}
 	
 	/**
@@ -54,7 +38,7 @@ class {class} extends BuildAbstract
 	 *
 	 * @return	void
 	 */
-	public function finish() : void
+	protected function finish()
 	{
 	}
 }

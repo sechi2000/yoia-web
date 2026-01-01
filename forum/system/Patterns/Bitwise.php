@@ -11,56 +11,51 @@
 namespace IPS\Patterns;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ArrayAccess;
-use function defined;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Bitwise Class
  */
-class Bitwise implements ArrayAccess
+class _Bitwise implements \ArrayAccess
 {
 	/**
 	 * @brief	Values
 	 */
-	public array $values = array();
+	public $values = array();
 	
 	/**
 	 * @brief	Original Values
 	 */
-	public int|array $originalValues = 0;
+	public $originalValues = 0;
 	
 	/**
 	 * @brief	Keys
 	 */
-	protected array $keys = array();
+	protected $keys = array();
 	
 	/**
 	 * @brief	Keys Lookup
 	 */
-	protected array $lookup = array();
+	protected $lookup = array();
 	
 	/**
 	 * @brief	Callback when value is changed
 	 */
-	protected ?string $callback = NULL;
+	protected $callback = NULL;
 	
 	/**
 	 * Constructor
 	 *
 	 * @param	array			$values		The numbers
 	 * @param	array			$keys		Multi-dimensional array. Keys match keys in $value, value is associative array with keys and representive value, or just a list of keys in order
-	 * @param callback|null $callback	Callback when value is changed
+	 * @param	callback|null	$callback	Callback when value is changed
 	 * @return	void
 	 */
-	public function __construct(array $values, array $keys, callable $callback=NULL )
+	public function __construct( array $values, array $keys, $callback=NULL )
 	{
 		$this->values = $values;
 		$this->originalValues = $values;
@@ -70,7 +65,7 @@ class Bitwise implements ArrayAccess
 			$i = 1;
 			foreach ( $fields as $k => $v )
 			{
-				if ( is_string( $v ) )
+				if ( \is_string( $v ) )
 				{
 					$this->keys[ $groupKey ][ $v ] = $i;
 					$this->lookup[ $k ] = $groupKey;
@@ -101,7 +96,7 @@ class Bitwise implements ArrayAccess
 	 * @param	string	$offset	Offset
 	 * @return	bool
 	 */
-	public function offsetExists( $offset ): bool
+	public function offsetExists( $offset )
 	{
 		return isset( $this->lookup[ $offset ] );
 	}
@@ -112,7 +107,7 @@ class Bitwise implements ArrayAccess
 	 * @param	string	$offset	Offset
 	 * @return	bool
 	 */
-	public function offsetGet( $offset ): bool
+	public function offsetGet( $offset )
 	{
 		$group = $this->lookup[ $offset ];
 		return (bool) ( $this->values[ $group ] & $this->keys[ $group ][ $offset ] );
@@ -125,7 +120,7 @@ class Bitwise implements ArrayAccess
 	 * @param	bool	$value	Value
 	 * @return	void
 	 */
-	public function offsetSet( mixed $offset, mixed $value ): void
+	public function offsetSet( $offset, $value )
 	{
 		if ( $this->callback !== NULL )
 		{
@@ -150,9 +145,9 @@ class Bitwise implements ArrayAccess
 	 * @param	string	$offset	Offset
 	 * @return	void
 	 */
-	public function offsetUnset( mixed $offset ): void
+	public function offsetUnset( $offset )
 	{
-		$this->offsetSet( $offset, FALSE );
+		return $this->offsetSet( $offset, FALSE );
 	}
 	
 	/** 
@@ -160,7 +155,7 @@ class Bitwise implements ArrayAccess
 	 *
 	 * @return	array
 	 */
-	public function asArray(): array
+	public function asArray()
 	{	
 		$return = array();
 						

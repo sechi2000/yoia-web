@@ -12,30 +12,25 @@
 namespace IPS\{app}\extensions\core\SearchIndex;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content as ContentClass;
-use IPS\Content\Search\SearchIndexAbstract;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Search Index
  */
-class {class} extends SearchIndexAbstract
+class _{class}
 {
 	/**
 	 * Alter index_content before it is stored
 	 *
-	 * @param	ContentClass	    $object		The class object (eg: \IPS\forums\Topic\Post)
-	 * @param	string		$content	The HTML stripped content
+	 * @param	\IPS\Content	$object		The class object (eg: \IPS\forums\Topic\Post)
+	 * @param	string			$content	The HTML stripped content
 	 * @return	string
 	 */
-	public function content(  ContentClass $object, string $content ): string
+	public function content( $object, $content ): string
 	{		
 		return $content;
 	}

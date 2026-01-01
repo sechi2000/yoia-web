@@ -11,36 +11,29 @@
 namespace IPS\Theme;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Error;
-use ErrorException;
-use IPS\Log;
-use Throwable;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Sameboxed Template Class
  */
-class SandboxedTemplate
+class _SandboxedTemplate
 {
 	/**
 	 * @brief	Template
 	 */
-	public Template $template;
+	public $template;
 	
 	/**
 	 * Contructor
 	 *
-	 * @param Template $template	Template to use
+	 * @param	\IPS\Theme\Template	$template	Template to use
 	 * @return	void
 	 */
-	public function __construct( Template $template )
+	public function __construct( $template )
 	{
 		$this->template = $template;
 	}
@@ -48,11 +41,11 @@ class SandboxedTemplate
 	/**
 	 * Call
 	 *
-	 * @param string $name	Method name
-	 * @param array $args	Method arguments
+	 * @param	string	$name	Method name
+	 * @param	array	$args	Method arguments
 	 * @return	string
 	 */
-	public function __call( string $name, array $args )
+	public function __call( $name, $args )
 	{
 		try
 		{
@@ -67,15 +60,15 @@ class SandboxedTemplate
 				{
 					return $this->template->$name( ...$args );
 				}
-				catch ( ErrorException $e )
+				catch ( \ErrorException $e )
 				{
-					throw new Error( $e );
+					throw new \Error( $e );
 				}
 			}
 		}
-		catch( Throwable $e )
+		catch( \Throwable $e )
 		{
-			Log::log( $e, 'template_error' );
+			\IPS\Log::log( $e, 'template_error' );
 
 			return "<span style='background:black;color:white;padding:6px;'>[[Template {$this->template->app}/{$this->template->templateLocation}/{$this->template->templateName}/{$name} is throwing an error. This theme may be out of date. Run the support tool in the AdminCP to restore the default theme.]]</span>";
 		}

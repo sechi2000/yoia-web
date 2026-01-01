@@ -12,51 +12,59 @@
 namespace IPS\downloads\extensions\core\IpAddresses;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\downloads\File;
-use IPS\Extensions\IpAddressesAbstract;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Http\Useragent;
-use IPS\Member;
-use IPS\Output\Plugin\Filesize;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Lookup extension
  */
-class DownloadLog extends IpAddressesAbstract
+class _DownloadLog
 {
 	/**
+	 * Supported in the ACP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInAcp()
+	{
+		return TRUE;
+	}
+
+	/**
+	 * Supported in the ModCP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInModCp(): bool
+	{
+		return TRUE;
+	}
+
+	/** 
 	 * Find Records by IP
 	 *
 	 * @param	string			$ip			The IP Address
-	 * @param	Url|null	$baseUrl	URL table will be displayed on or NULL to return a count
-	 * @return	string|int|null
+	 * @param	\IPS\Http\Url	$baseUrl	URL table will be displayed on or NULL to return a count
+	 * @return	\IPS\Helpers\Table|int|null
 	 */
-	public function findByIp( string $ip, ?Url $baseUrl = NULL ): string|int|null
+	public function findByIp( $ip, \IPS\Http\Url $baseUrl = NULL )
 	{
 		/* Return count */
 		if ( $baseUrl === NULL )
 		{
-			return Db::i()->select( 'COUNT(*)', 'downloads_downloads', array( "dip LIKE ?", $ip ) )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'downloads_downloads', array( "dip LIKE ?", $ip ) )->first();
 		}
 		
 		/* Init Table */
-		$table = new TableDb( 'downloads_downloads', $baseUrl, array( "dip LIKE ?", $ip ) );
+		$table = new \IPS\Helpers\Table\Db( 'downloads_downloads', $baseUrl, array( "dip LIKE ?", $ip ) );
 
-		$table->tableTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
-		$table->rowsTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
+		$table->tableTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
+		$table->rowsTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
 		
 		$table->include = array( 'dfid', 'dtime', 'dsize', 'dua', 'dmid', 'dip' );
 		$table->sortBy = $table->sortBy ?: 'dtime';
@@ -67,30 +75,30 @@ class DownloadLog extends IpAddressesAbstract
 			{
 				try
 				{
-					$file = File::load( $val );
-					return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $file->url(), TRUE, $file->name );
+					$file = \IPS\downloads\File::load( $val );
+					return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $file->url(), TRUE, $file->name );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					return Member::loggedIn()->language()->addToStack('content_deleted');
+					return \IPS\Member::loggedIn()->language()->addToStack('content_deleted');
 				}
 			},
 			'dtime'	=> function( $val )
 			{
-				return (string) DateTime::ts( $val );
+				return (string) \IPS\DateTime::ts( $val );
 			},
 			'dsize'	=> function( $val )
 			{
-				return Filesize::humanReadableFilesize( $val );
+				return \IPS\Output\Plugin\Filesize::humanReadableFilesize( $val );
 			},
 			'dua'	=> function( $val )
 			{
-				return (string) Useragent::parse( $val );
+				return (string) \IPS\Http\Useragent::parse( $val );
 			},
 			'dmid'	=> function( $val )
 			{
-				$member = Member::load( $val );
-				return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
+				$member = \IPS\Member::load( $val );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
 			},
 		);
 		
@@ -112,13 +120,11 @@ class DownloadLog extends IpAddressesAbstract
 		 	...
 	 	);
 	 * @endcode
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	array
 	 */
-	public function findByMember( Member $member ) : array
+	public function findByMember( $member )
 	{
-		return iterator_to_array(
-			Db::i()->select( "dip AS ip, count(*) AS count, MIN(dtime) AS first, MAX(dtime) AS last", 'downloads_downloads', array( "dmid=?", $member->member_id ), NULL, NULL, 'dip' )->setKeyField( 'ip' )
-		);
+		return \IPS\Db::i()->select( "dip AS ip, count(*) AS count, MIN(dtime) AS first, MAX(dtime) AS last", 'downloads_downloads', array( "dmid=?", $member->member_id ), NULL, NULL, 'dip' )->setKeyField( 'ip' );
 	}	
 }

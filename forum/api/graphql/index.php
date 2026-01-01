@@ -9,7 +9,5 @@
  * @version		SVN_VERSION_NUMBER
  */
 
-use IPS\Dispatcher\GraphQL;
-
 require_once '../../init.php';
-GraphQL::i()->run();
+\IPS\Dispatcher\GraphQL::i()->run();

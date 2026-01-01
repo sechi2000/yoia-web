@@ -12,49 +12,23 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application\Module;
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function unserialize;
-use const ENT_HTML5;
-use const ENT_QUOTES;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * MyBB Core Converter
  */
-class Mybb extends Software
+class _Mybb extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "MyBB 1.8.x";
@@ -63,9 +37,9 @@ class Mybb extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "mybb";
@@ -74,9 +48,9 @@ class Mybb extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertBanfilters'			=> array(
@@ -133,9 +107,9 @@ class Mybb extends Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -143,9 +117,9 @@ class Mybb extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertEmoticons',
@@ -158,23 +132,23 @@ class Mybb extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
 		{
 			case 'convertEmoticons':
-				Member::loggedIn()->language()->words['emoticon_path'] = Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'MyBB' ) ) );
+				\IPS\Member::loggedIn()->language()->words['emoticon_path'] = \IPS\Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'MyBB' ) ) );
 				$return['convertEmoticons']['emoticon_path'] = array(
 					'field_class'		=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'		=> NULL,
 					'field_required'	=> TRUE,
 					'field_extra'		=> array(),
 					'field_hint'		=> NULL,
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				$return['convertEmoticons']['keep_existing_emoticons']	= array(
 					'field_class'		=> 'IPS\\Helpers\\Form\\Checkbox',
@@ -189,16 +163,16 @@ class Mybb extends Software
 				$return['convertProfileFields'] = array();
 				
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
 				{
 					$options[$field->_id] = $field->_title;
 				}
 				
 				foreach( $this->db->select( '*', 'profilefields' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["map_pfield_{$field['fid']}"]		= $field['name'];
-					Member::loggedIn()->language()->words["map_pfield_{$field['fid']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['fid']}"]		= $field['name'];
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['fid']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
 					
 					$return['convertProfileFields']["map_pfield_{$field['fid']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -214,16 +188,16 @@ class Mybb extends Software
 				$return['convertGroups'] = array();
 				
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[$group->g_id] = $group->name;
 				}
 				
 				foreach( $this->db->select( '*', 'usergroups' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['gid']}"]			= $group['title'];
-					Member::loggedIn()->language()->words["map_group_{$group['gid']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['gid']}"]			= $group['title'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['gid']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 					
 					$return['convertGroups']["map_group_{$group['gid']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -234,14 +208,14 @@ class Mybb extends Software
 					);
 				}
 				
-				Member::loggedIn()->language()->words['icon_path'] = Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'MyBB' ) ) );
+				\IPS\Member::loggedIn()->language()->words['icon_path'] = \IPS\Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'MyBB' ) ) );
 				$return['convertGroups']['icon_path'] = array(
 					'field_class'			=> "IPS\\Helpers\\Form\\Text",
 					'field_default'			=> NULL,
 					'field_required'		=> FALSE,
 					'field_extra'			=> array(),
-					'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_groupicon_hint'),
-					'field_validation'		=> function( $value ) { if ( !empty( $value ) AND !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_groupicon_hint'),
+					'field_validation'		=> function( $value ) { if ( !empty( $value ) AND !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				break;
 			
@@ -249,29 +223,29 @@ class Mybb extends Software
 				$return['convertMembers'] = array();
 
 				/* Find out where the photos live */
-				Member::loggedIn()->language()->words['photo_location']		= Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'MyBB' ) ) );
-				Member::loggedIn()->language()->words['photo_location_desc']	= '';
+				\IPS\Member::loggedIn()->language()->words['photo_location']		= \IPS\Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'MyBB' ) ) );
+				\IPS\Member::loggedIn()->language()->words['photo_location_desc']	= '';
 				$return['convertMembers']['photo_location'] = array(
 					'field_class'			=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
 					'field_hint'			=> NULL,
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 
 				foreach( array( 'website', 'icq', 'aim', 'yahoo', 'skype', 'google', 'usertitle' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["field_{$field}"]		= Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
-					Member::loggedIn()->language()->words["field_{$field}_desc"]	= Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}"]		= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
 					$return['convertMembers']["field_{$field}"] = array(
 						'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 						'field_default'			=> 'no_convert',
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'no_convert'			=> Member::loggedIn()->language()->addToStack( 'no_convert' ),
-								'create_field'			=> Member::loggedIn()->language()->addToStack( 'create_field' ),
+								'no_convert'			=> \IPS\Member::loggedIn()->language()->addToStack( 'no_convert' ),
+								'create_field'			=> \IPS\Member::loggedIn()->language()->addToStack( 'create_field' ),
 							),
 							'userSuppliedInput'		=> 'create_field'
 						),
@@ -287,45 +261,42 @@ class Mybb extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 		
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 		
 		/* Non-Content Rebuilds */
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_announcements', 'extension' => 'core_Announcement' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_announcements', 'extension' => 'core_Announcement' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
 		
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
 		
 		return array( "f_search_index_rebuild", "f_clear_caches", "f_rebuild_pms", "f_signatures_rebuild", "f_announce_rebuild" );
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		/* Replace align tags with left/right/center/justify */
 		$post = preg_replace( '/\[align=(justify|left|center|right)\](.+?)\[\/align\]/i', '[$1]$2[/$1]', $post );
@@ -344,7 +315,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAnnouncements() : void
+	public function convertAnnouncements()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -371,7 +342,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertBanfilters() : void
+	public function convertBanfilters()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -410,7 +381,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertEmoticons() : void
+	public function convertEmoticons()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -450,7 +421,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertWarnActions() : void
+	public function convertWarnActions()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -458,7 +429,7 @@ class Mybb extends Software
 		
 		foreach( $this->fetch( 'warninglevels', 'lid' ) AS $row )
 		{
-			$action = unserialize( $row['action'] );
+			$action = \unserialize( $row['action'] );
 			
 			$mq				= 0;
 			$mq_unit		= 'h';
@@ -477,6 +448,7 @@ class Mybb extends Software
 					}
 					else
 					{
+						$suspend_unit	= 'h';
 						$suspend		= floor( $action['length'] / 3600 );
 					}
 					break;
@@ -490,6 +462,7 @@ class Mybb extends Software
 					}
 					else
 					{
+						$rpa_unit		= 'h';
 						$rpa			= floor( $action['length'] / 3600 );
 					}
 					break;
@@ -503,6 +476,7 @@ class Mybb extends Software
 					}
 					else
 					{
+						$mq_unit		= 'h';
 						$mq				= floor( $action['length'] / 3600 );
 					}
 					break;
@@ -528,7 +502,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertWarnReasons() : void
+	public function convertWarnReasons()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -552,7 +526,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfileFields() : void
+	public function convertProfileFields()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -596,28 +570,31 @@ class Mybb extends Software
 	 * @param	string	$type	MyBB Type
 	 * @return	string	IPS Type
 	 */
-	protected function _fieldMap( string $type ) : string
+	protected function _fieldMap( $type )
 	{
 		switch( $type )
 		{
 			case 'text':
 				return 'Text';
+				break;
 			
 			case 'textarea':
 				return "TextArea";
+				break;
 			
 			case 'select':
 			case 'multiselect':
 				return 'Select';
+				break;
 			
 			case 'checkbox':
 				return 'CheckboxSet';
+				break;
 			
 			case 'radio':
 				return 'Radio';
+				break;
 		}
-
-		return '';
 	}
 	
 	/**
@@ -625,7 +602,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -647,29 +624,31 @@ class Mybb extends Software
 				switch( $promotion['requirements'] )
 				{
 					case 'postcount':
-						if ( !in_array( $promotion['posttype'], array( '>', '>=', '=' ) ) )
+						if ( !\in_array( $promotion['posttype'], array( '>', '>=', '=' ) ) )
 						{
 							/* Bubble up */
-							throw new UnderflowException;
+							throw new \UnderflowException;
 						}
+						$promotion_unit = 0;
 						$promotion_data = array( $promotion['newusergroup'], $promotion['posts'] );
 						break;
 					
 					case 'timeregistered':
-						if ( !in_array( $promotion['registeredtype'], array( '>', '>=', '=' ) ) )
+						if ( !\in_array( $promotion['registeredtype'], array( '>', '>=', '=' ) ) )
 						{
-							throw new UnderflowException;
+							throw new \UnderflowException;
 						}
+						$promotion_unit = 0;
 						$promotion_data = array( $promotion['newusergroup'], $promotion['registered'] );
 						break;
 				}
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			/* Username Styles */
 			$style = explode( '{username}', $row['namestyle'] );
-			$prefix = $style[0] ?? '';
-			$suffix = $style[1] ?? '';
+			$prefix = isset( $style[0] ) ? $style[0] : '';
+			$suffix = isset( $style[1] ) ? $style[1] : '';
 			
 			$info = array(
 				'g_id'					=> $row['gid'],
@@ -709,7 +688,7 @@ class Mybb extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -723,7 +702,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -737,7 +716,7 @@ class Mybb extends Software
 			{
 				$last_warn = $this->db->select( 'dateline', 'warnings', array( "uid=?", $row['uid'] ), "dateline DESC" )->first();
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			/* Restrict posting */
 			$restrict_post = 0;
@@ -814,11 +793,11 @@ class Mybb extends Software
 					$temp_ban = -1;
 				}
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			$info = array(
 				'member_id'				=> $row['uid'],
-				'name'					=> html_entity_decode( $row['username'], ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
+				'name'					=> html_entity_decode( $row['username'], \ENT_QUOTES | \ENT_HTML5, 'UTF-8' ),
 				'email'					=> $row['email'],
 				'password'				=> $row['password'],
 				'password_extra'		=> $row['salt'],
@@ -830,7 +809,7 @@ class Mybb extends Software
 				'restrict_post'			=> $restrict_post,
 				'bday_day'				=> str_pad( $bday_day, 2, '0', STR_PAD_LEFT ),
 				'bday_month'			=> str_pad( $bday_month, 2, '0', STR_PAD_LEFT ),
-				'bday_year'				=> $bday_year ? intval( $bday_year ) : NULL,
+				'bday_year'				=> $bday_year ? \intval( $bday_year ) : NULL,
 				'msg_count_new'			=> $row['unreadpms'],
 				'msg_count_total'		=> $row['totalpms'],
 				'msg_show_notification'	=> $row['pmnotify'],
@@ -869,7 +848,7 @@ class Mybb extends Software
 					$pfields[ $key ] = $field;
 				}
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			foreach( array( 'website', 'icq', 'aim', 'yahoo', 'skype', 'google', 'usertitle' ) AS $pseudo )
 			{
@@ -885,7 +864,7 @@ class Mybb extends Software
 					/* We don't actually need this, but we need to make sure the field was created */
 					$fieldId = $this->app->getLink( $pseudo, 'core_pfields_data' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$libraryClass->convertProfileField( array(
 						'pf_id'				=> $pseudo,
@@ -976,7 +955,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1019,7 +998,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1045,7 +1024,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertProfanityFilters() : void
+	public function convertProfanityFilters()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1068,7 +1047,7 @@ class Mybb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertQuestionAndAnswers() : void
+	public function convertQuestionAndAnswers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -1088,26 +1067,26 @@ class Mybb extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
 		/* If we can't access profiles, don't bother trying to redirect */
-		if( !Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+		if( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 		{
 			return NULL;
 		}
 
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'member.php' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'member.php' ) !== FALSE )
 		{
 			try
 			{
-				$data = (string) $this->app->getLink( Request::i()->uid, array( 'members', 'core_members' ) );
-				return Member::load( $data )->url();
+				$data = (string) $this->app->getLink( \IPS\Request::i()->uid, array( 'members', 'core_members' ) );
+				return \IPS\Member::load( $data )->url();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
@@ -1119,13 +1098,13 @@ class Mybb extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
-		if ( Login::compareHashes( $member->conv_password, md5( md5( $member->misc ) . md5( $password ) ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, md5( md5( $member->misc ) . md5( $password ) ) ) )
 		{
 			return TRUE;
 		}

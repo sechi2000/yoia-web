@@ -13,92 +13,40 @@ namespace IPS\blog;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use BadMethodCallException;
-use InvalidArgumentException;
-use IPS\Api\Webhook;
-use IPS\Application;
-use IPS\Content;
-use IPS\Content\ClubContainer;
 use IPS\Content\Comment;
-use IPS\Content\ContentMenuLink;
-use IPS\Content\Embeddable;
-use IPS\Content\Item;
-use IPS\Content\Search\Index;
-use IPS\Content\ViewUpdates;
-use IPS\core\Rss\Import;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\SocialGroup;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Menu;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Node\Ratings;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Xml\SimpleXML;
-use OutOfBoundsException;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_called_class;
-use function get_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_object;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Blog Node
  */
-class Blog extends Model implements Embeddable
+class _Blog extends \IPS\Node\Model implements \IPS\Node\Ratings, \IPS\Content\Embeddable
 {
-	use ClubContainer, Ratings, ViewUpdates;
+	use \IPS\Content\ClubContainer, \IPS\Content\ViewUpdates;
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 		
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'blog_blogs';
+	public static $databaseTable = 'blog_blogs';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'blog_';
+	public static $databasePrefix = 'blog_';
 	
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'author'				=> 'member_id',
 		'title'					=> 'name',
 		'views'					=> 'num_views',
@@ -112,57 +60,57 @@ class Blog extends Model implements Embeddable
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'blogs';
+	public static $nodeTitle = 'blogs';
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'blogs_blog_';
+	public static $titleLangPrefix = 'blogs_blog_';
 	
 	/**
 	 * @brief	[Node] Description suffix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}_{$descriptionLangSuffix}" as the key
 	 */
-	public static ?string $descriptionLangSuffix = '_desc';
+	public static $descriptionLangSuffix = '_desc';
 
 	/**
 	 * @brief	[Node] Parent Node ID Database Column
 	 */
-	public static string $parentNodeColumnId = 'category_id';
+	public static $parentNodeColumnId = 'category_id';
 	
 	/**
 	 * @brief	[Node] Moderator Permission
 	 */
-	public static string $modPerm = 'blogs';
+	public static $modPerm = 'blogs';
 
 	/**
 	 * @brief	[Node] Maximum results to display at a time in any node helper form elements. Useful for user-submitted node types when there may be a lot. NULL for no limit.
 	 */
-	public static ?int $maxFormHelperResults = 2000;
+	public static $maxFormHelperResults = 2000;
 	
 	/**
 	 * @brief	Content Item Class
 	 */
-	public static ?string $contentItemClass = 'IPS\blog\Entry';
+	public static $contentItemClass = 'IPS\blog\Entry';
 
 	/**
 	 * @brief	Category
 	 */
-	protected ?Category $category = null;
+	protected $category;
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'pen-to-square';
+	public static $icon = 'file-text';
 	
 	/**
 	* @brief	[Node] If the node can be "owned", the owner "type" (typically "member" or "group") and the associated database column
 	*/
-	public static ?array $ownerTypes = array( 'member' => 'member_id', 'group' => array( 'ids' => 'groupblog_ids', 'name' => 'groupblog_name' ) );
+	public static $ownerTypes = array( 'member' => 'member_id', 'group' => array( 'ids' => 'groupblog_ids', 'name' => 'groupblog_name' ) );
 	
 	/**
 	 * @brief	[Node] By mapping appropriate columns (rating_average and/or rating_total + rating_hits) allows to cache rating values
 	 */
-	public static array $ratingColumnMap	= array(
+	public static $ratingColumnMap	= array(
 			'rating_average'	=> 'rating_average',
 			'rating_total'		=> 'rating_total',
 			'rating_hits'		=> 'rating_count',
@@ -171,31 +119,19 @@ class Blog extends Model implements Embeddable
 	/**
 	 * @brief	Cover Photo Storage Extension
 	 */
-	public static string $coverPhotoStorageExtension = 'blog_Blogs';
+	public static $coverPhotoStorageExtension = 'blog_Blogs';
 	
 	/**
 	 * @brief	Use a default cover photo
 	 */
-	public static bool $coverPhotoDefault = true;
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
-
-    /**
-     * @brief	[Node] Sortable?
-     */
-    public static bool $nodeSortable = false;
+	public static $coverPhotoDefault = true;
 
 	/**
 	 * Columns needed to query for search result / stream view
 	 *
 	 * @return	array
 	 */
-	public static function basicDataColumns(): array
+	public static function basicDataColumns()
 	{
 		$return = parent::basicDataColumns();
 		$return[] = 'blog_member_id';
@@ -205,52 +141,34 @@ class Blog extends Model implements Embeddable
 	/**
 	 * Get template for content tables
 	 *
-	 * @return	array
+	 * @return	callable
 	 */
-	public static function contentTableTemplate(): array
+	public static function contentTableTemplate()
 	{
-		return array( Theme::i()->getTemplate( 'browse', 'blog', 'front' ), 'rows' );
+		return array( \IPS\Theme::i()->getTemplate( 'browse', 'blog', 'front' ), 'rows' );
 	}
 	
 	/**
 	 * Can create blog?
 	 *
-	 * @param	Member|NULL	$member	The member (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public static function canCreate( Member $member = NULL ): bool
+	public static function canCreate( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		if ( $member->member_id and $member->group['g_blog_allowlocal'] )
 		{
 			if ( $member->group['g_blog_maxblogs'] )
 			{
-				return ( Db::i()->select( 'COUNT(*)', 'blog_blogs', array( 'blog_member_id=?', $member->member_id ) )->first() < $member->group['g_blog_maxblogs'] );
+				return ( \IPS\Db::i()->select( 'COUNT(*)', 'blog_blogs', array( 'blog_member_id=?', $member->member_id ) )->first() < $member->group['g_blog_maxblogs'] );
 			}
 			
 			return TRUE;
 		}
 		
 		return FALSE;
-	}
-
-	/**
-	 * Check the action column map if the action is enabled in this node
-	 *
-	 * @param string $action
-	 * @return bool
-	 */
-	public function checkAction( string $action ) : bool
-	{
-		/* We don't want any kind of specific comment moderation here, just leave it up to the
-		general rules */
-		if( $action == 'moderate_comments' or $action == 'moderate_items' )
-		{
-			return false;
-		}
-
-		return parent::checkAction( $action );
 	}
 	
 	/**
@@ -261,23 +179,22 @@ class Blog extends Model implements Embeddable
 	 * if there should be a "Submit" button
 	 *
 	 * @param	mixed								$permission						A key which has a value in static::$permissionMap['view'] matching a column ID in core_permission_index
-	 * @param	Member|Group|NULL	$member							The member or group to check (NULL for currently logged in member)
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$member							The member or group to check (NULL for currently logged in member)
 	 * @param	array								$where							Additional WHERE clause
 	 * @param	bool								$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
 	 * @return	bool
-	 * @throws	OutOfBoundsException	If $permission does not exist in static::$permissionMap
+	 * @throws	\OutOfBoundsException	If $permission does not exist in static::$permissionMap
 	 */
-	public static function canOnAny( mixed $permission, Group|Member $member=NULL, array $where = array(), bool $considerPostBeforeRegistering = TRUE ): bool
+	public static function canOnAny( $permission, $member=NULL, $where = array(), $considerPostBeforeRegistering = TRUE )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		/* Posts per day - we need to do this independently here, because Blogs do not implement the Permissions interface */
-		if ( in_array( $permission, array( 'add', 'reply' ) ) )
+		if ( \in_array( $permission, array( 'add', 'reply' ) ) )
 		{
 			$checkPostsPerDay = TRUE;
 			if ( isset( static::$contentItemClass ) )
 			{
-				/* @var Item $contentClass */
 				$contentClass = static::$contentItemClass;
 				$checkPostsPerDay = $contentClass::$checkPostsPerDay;
 			}
@@ -296,17 +213,17 @@ class Blog extends Model implements Embeddable
 	 * Check permissions
 	 *
 	 * @param	mixed								$permission						A key which has a value in static::$permissionMap['view'] matching a column ID in core_permission_index
-	 * @param Group|Member|null $member							The member or group to check (NULL for currently logged in member)
-	 * @param bool $considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$member							The member or group to check (NULL for currently logged in member)
+	 * @param	bool								$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
 	 * @return	bool
-	 * @throws	OutOfBoundsException	If $permission does not exist in static::$permissionMap
+	 * @throws	\OutOfBoundsException	If $permission does not exist in static::$permissionMap
 	 */
-	public function can( mixed $permission, Group|Member $member=NULL, bool $considerPostBeforeRegistering = TRUE ): bool
+	public function can( $permission, $member=NULL, $considerPostBeforeRegistering = TRUE )
 	{		
 		/* Load member */
 		if ( $member === NULL )
 		{
-			$member = Member::loggedIn();
+			$member = \IPS\Member::loggedIn();
 		}
 		
 		/* If the member has hit their posting limits, then just stop here. */
@@ -350,9 +267,9 @@ class Blog extends Model implements Embeddable
 			{
 				try
 				{
-					Db::i()->select( '*', 'core_sys_social_group_members', array( 'group_id=? AND member_id=?', $this->social_group, $member->member_id ) )->first();
+					\IPS\Db::i()->select( '*', 'core_sys_social_group_members', array( 'group_id=? AND member_id=?', $this->social_group, $member->member_id ) )->first();
 				}
-				catch ( UnderflowException )
+				catch ( \UnderflowException $e )
 				{
 					return FALSE;
 				}
@@ -393,7 +310,7 @@ class Blog extends Model implements Embeddable
 	 *	@li			Number prepended by "m" indicates a member
 	 *	@li			Number prepended by "s" indicates a social group
 	 */
-	public function searchIndexPermissions(): string
+	public function searchIndexPermissions()
 	{
 		$return = parent::searchIndexPermissions();
 		
@@ -427,32 +344,32 @@ class Blog extends Model implements Embeddable
 	/**
 	 * Additional WHERE clauses for Follow view
 	 *
-	 * @param array $joins	Joins
+	 * @param	array	$joins	Joins
 	 * @return	array
 	 */
-	public static function followWhere( array &$joins ): array
+	public static function followWhere( &$joins )
 	{
 		$where = array();
 		
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
-			$where[] = array( '( blog_blogs.blog_social_group IS NULL OR blog_blogs.blog_member_id=' . Member::loggedIn()->member_id . ' OR ( ' . Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', Member::loggedIn() ) . ' ) )' );
+			$where[] = array( '( blog_blogs.blog_social_group IS NULL OR blog_blogs.blog_member_id=' . \IPS\Member::loggedIn()->member_id . ' OR ( ' . \IPS\Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', \IPS\Member::loggedIn() ) . ' ) )' );
 		}
 		else
 		{
-			$where[] = Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', Member::loggedIn() );
+			$where[] = \IPS\Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', \IPS\Member::loggedIn() );
 		}
 		
-		if ( Settings::i()->clubs )
+		if ( \IPS\Settings::i()->clubs )
 		{
 			$joins[] = array( 'from' => 'core_clubs', 'where' => 'core_clubs.id=blog_blogs.blog_club_id' );
-			if ( Member::loggedIn()->member_id )
+			if ( \IPS\Member::loggedIn()->member_id )
             {
-				$where[] = array( '( blog_blogs.blog_club_id IS NULL OR ' . Db::i()->in( 'blog_blogs.blog_club_id', Member::loggedIn()->clubs() ) . ' OR core_clubs.type=? OR core_clubs.type=? )', Club::TYPE_PUBLIC, Club::TYPE_READONLY );
+				$where[] = array( '( blog_blogs.blog_club_id IS NULL OR ' . \IPS\Db::i()->in( 'blog_blogs.blog_club_id', \IPS\Member::loggedIn()->clubs() ) . ' OR core_clubs.type=? OR core_clubs.type=? )', \IPS\Member\Club::TYPE_PUBLIC, \IPS\Member\Club::TYPE_READONLY );
             }
             else
             {
-				$where[] = array( '( blog_blogs.blog_club_id IS NULL OR core_clubs.type=? OR core_clubs.type=? )', Club::TYPE_PUBLIC, Club::TYPE_READONLY );
+				$where[] = array( '( blog_blogs.blog_club_id IS NULL OR core_clubs.type=? OR core_clubs.type=? )', \IPS\Member\Club::TYPE_PUBLIC, \IPS\Member\Club::TYPE_READONLY );
             }
 		}
 				
@@ -462,69 +379,76 @@ class Blog extends Model implements Embeddable
 	/**
 	 * [Node] Does the currently logged in user have permission to delete this node?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canDelete(): bool
+	public function canDelete()
 	{
-		foreach ( Db::i()->select( 'data', 'core_queue', array( 'app=? AND `key`=?', 'core', 'DeleteOrMoveContent' ) ) as $row )
+		foreach ( \IPS\Db::i()->select( 'data', 'core_queue', array( 'app=? AND `key`=?', 'core', 'DeleteOrMoveContent' ) ) as $row )
 		{
 			$data = json_decode( $row, TRUE );
-			if ( $data['class'] === get_class( $this ) and $data['id'] == $this->_id )
+			if ( $data['class'] === \get_class( $this ) and $data['id'] == $this->_id )
 			{
 				return FALSE;
 			}
 		}
 		
-		return static::restrictionCheck( 'delete' ) or ( $this->member_id === Member::loggedIn()->member_id and Member::loggedIn()->group['g_blog_allowdelete'] );
+		return static::restrictionCheck( 'delete' ) or ( $this->member_id === \IPS\Member::loggedIn()->member_id and \IPS\Member::loggedIn()->group['g_blog_allowdelete'] );
 	}
 	
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
-	 * @param bool $public	Whether this is a public form or not
+	 * @param	\IPS\Helpers\Form	$form	The form
+	 * @param	bool				$public	Whether this is a public form or not
 	 * @return	void
 	 */
-	public function form( Form &$form, bool $public=FALSE ) : void
+	public function form( &$form, $public=FALSE )
 	{
 		if( $public )
 		{
 			$form->addTab( 'blog_settings' );
 			
-			if ( !$this->id OR Member::loggedIn()->modPermission('can_mod_blogs') )
+			if ( !$this->id OR \IPS\Member::loggedIn()->modPermission('can_mod_blogs') )
 			{
-				$form->add( new Node( 'blog_category_id', $this->id ? $this->category_id : NULL, TRUE, array(
+				$form->add( new \IPS\Helpers\Form\Node( 'blog_category_id', $this->id ? $this->category_id : NULL, TRUE, array(
 					'class'				=> '\IPS\blog\Category',
 					'subnodes'	=> FALSE,
 				), NULL, NULL, NULL, 'blog_category_id' ) );
 			}
 
-			$form->add( new Text( 'blog_name', $this->id ? $this->_title : NULL, TRUE, array(), NULL, NULL, NULL, 'blog_name' ) );
-			$form->add( new Editor( 'blog_desc', $this->id ? $this->description : NULL, FALSE, array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blog-{$this->id}" : "blogs-new-blog" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'blog_desc_placeholder' ), NULL, NULL, NULL, 'blog_desc_wrap' ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'blog_name', $this->id ? $this->_title : NULL, TRUE, array(), NULL, NULL, NULL, 'blog_name' ) );
+			$form->add( new \IPS\Helpers\Form\Editor( 'blog_desc', $this->id ? $this->description : NULL, FALSE, array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blog-{$this->id}" : "blogs-new-blog" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'blog_desc_placeholder' ), NULL, NULL, NULL, 'blog_desc_wrap' ) );
+
+			/* Sidebar */
+			if ( \IPS\Settings::i()->blog_enable_sidebar )
+			{
+				$form->add( new \IPS\Helpers\Form\YesNo( 'blog_sidebar_enabled', $this->sidebar ? TRUE : FALSE, FALSE, array( 'togglesOn' => array( 'blog_sidebar_wrap' ) ) ) );
+				$form->add( new \IPS\Helpers\Form\Editor( 'blog_sidebar', $this->id ? $this->sidebar : NULL, FALSE, array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blogsidebar-{$this->id}" : "blogs-new-blog-sidebar" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'sidebar' ) : NULL ), NULL, NULL, NULL, 'blog_sidebar_wrap' ) );
+			}
 		}
 		else
 		{
 			if( $this->id )
 			{
-				$form->add( new Node( 'blog_category_id', $this->category_id, TRUE, array(
+				$form->add( new \IPS\Helpers\Form\Node( 'blog_category_id', $this->category_id, TRUE, array(
 					'class'				=> '\IPS\blog\Category',
 					'subnodes'	=> FALSE,
 				), NULL, NULL, NULL, 'blog_category_id' ) );
 			}
 			else
 			{
-				$form->hiddenValues['blog_category_id'] = Request::i()->parent;
+				$form->hiddenValues['blog_category_id'] = \IPS\Request::i()->parent;
 			}
 
 			$groups = array();
-			foreach ( Group::groups() as $k => $v )
+			foreach ( \IPS\Member\Group::groups() as $k => $v )
 			{
 				$groups[ $k ] = $v->name;
 			}
 
 			$id = $this->id ?: 'new';
 	
-			$form->add( new Radio( 'blog_type', ( $this->id AND $this->groupblog_ids ) ? 'group' : 'member', TRUE, array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'blog_type', ( $this->id AND $this->groupblog_ids ) ? 'group' : 'member', TRUE, array(
 					'options' => array(
 							'member' 	=> 'blog_type_normal',
 							'group' 	=> 'blog_type_group'
@@ -535,21 +459,21 @@ class Blog extends Model implements Embeddable
 					)
 			) ) );
 			
-			$form->add( new Form\Member( 'blog_member_id', $this->member_id ? Member::load( $this->member_id ) : NULL, FALSE, array(), function($member ) use ( $form )
+			$form->add( new \IPS\Helpers\Form\Member( 'blog_member_id', $this->member_id ? \IPS\Member::load( $this->member_id ) : NULL, FALSE, array(), function( $member ) use ( $form )
 			{
-				if ( Request::i()->blog_type === 'member' )
+				if ( \IPS\Request::i()->blog_type === 'member' )
 				{
-					if( !is_object( $member ) or !$member->member_id )
+					if( !\is_object( $member ) or !$member->member_id )
 					{
-						throw new InvalidArgumentException( 'no_blog_author_selected' );
+						throw new \InvalidArgumentException( 'no_blog_author_selected' );
 					}
 				}
 			},
 			NULL, NULL, 'blog_member_id' ) );
 
-			$form->add( new CheckboxSet( 'blog_groupblog_ids', $this->id ? explode( ',', $this->groupblog_ids ) : array(), FALSE, array( 'options' => $groups, 'multiple' => TRUE ), NULL, NULL, NULL, 'blog_groupblog_ids' ) );
-			$form->add( new Translatable( 'blog_groupblog_name', NULL, FALSE, array( 'app' => 'blog', 'key' => ( $this->id ? "blogs_groupblog_name_{$this->id}" : NULL ) ), function( $value ) {
-				if ( Request::i()->blog_type === 'group' )
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'blog_groupblog_ids', $this->id ? explode( ',', $this->groupblog_ids ) : array(), FALSE, array( 'options' => $groups, 'multiple' => TRUE ), NULL, NULL, NULL, 'blog_groupblog_ids' ) );
+			$form->add( new \IPS\Helpers\Form\Translatable( 'blog_groupblog_name', NULL, FALSE, array( 'app' => 'blog', 'key' => ( $this->id ? "blogs_groupblog_name_{$this->id}" : NULL ) ), function( $value ) {
+				if ( \IPS\Request::i()->blog_type === 'group' )
 				{
 					$hasTitle = FALSE;
 
@@ -564,23 +488,23 @@ class Blog extends Model implements Embeddable
 
 					if( !$hasTitle )
 					{
-						throw new InvalidArgumentException( 'form_required' );
+						throw new \InvalidArgumentException( 'form_required' );
 					}
 				}
 			}, NULL, NULL, 'blog_groupblog_name' ) );
 
 			/* Owned blogs */
-			$form->add( new Text( 'blog_name', $this->id ? $this->_title : NULL, FALSE, array(), function( $value ) {
-				if ( Request::i()->blog_type === 'member' AND !$value )
+			$form->add( new \IPS\Helpers\Form\Text( 'blog_name', $this->id ? $this->_title : NULL, FALSE, array(), function( $value ) {
+				if ( \IPS\Request::i()->blog_type === 'member' AND !$value )
 				{
-					throw new InvalidArgumentException( 'form_required' );
+					throw new \InvalidArgumentException( 'form_required' );
 				}
 			}, NULL, NULL, 'blog_name' ) );
-			$form->add( new Editor( 'blog_desc', $this->id ? $this->description : NULL, FALSE, array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blog-{$this->id}m" : "blogs-new-blog" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'blog_desc_placeholder' ), NULL, NULL, NULL, 'blog_desc_wrap' ) );
+			$form->add( new \IPS\Helpers\Form\Editor( 'blog_desc', $this->id ? $this->description : NULL, FALSE, array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blog-{$this->id}m" : "blogs-new-blog" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'blog_desc_placeholder' ), NULL, NULL, NULL, 'blog_desc_wrap' ) );
 
 			/* Group blogs - only one or the other will show at any given time */
-			$form->add( new Translatable( 'blog_name_group', ( $this->id AND !$this->groupblog_ids ) ? $this->_title : NULL, FALSE, array( 'app' => 'blog', 'key' => ( $this->id ? "blogs_blog_{$this->id}" : NULL ) ), function( $value ) {
-				if ( Request::i()->blog_type === 'group' )
+			$form->add( new \IPS\Helpers\Form\Translatable( 'blog_name_group', ( $this->id AND !$this->groupblog_ids ) ? $this->_title : NULL, FALSE, array( 'app' => 'blog', 'key' => ( $this->id ? "blogs_blog_{$this->id}" : NULL ) ), function( $value ) {
+				if ( \IPS\Request::i()->blog_type === 'group' )
 				{
 					$hasTitle = FALSE;
 
@@ -595,23 +519,23 @@ class Blog extends Model implements Embeddable
 
 					if( !$hasTitle )
 					{
-						throw new InvalidArgumentException( 'form_required' );
+						throw new \InvalidArgumentException( 'form_required' );
 					}
 				}
 			}, NULL, NULL, 'blog_name_group' ) );
-			$form->add( new Translatable( 'blog_desc_group', NULL, FALSE, array( 'app' => 'blog', 'key' => ( $this->id ? "blogs_blog_{$this->id}_desc" : NULL ), 'editor' => array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blog-{$this->id}-group" : "blogs-new-blog-group" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'blog_desc_placeholder' ) ), NULL, NULL, NULL, 'blog_desc_group_wrap' ) );
+			$form->add( new \IPS\Helpers\Form\Translatable( 'blog_desc_group', NULL, FALSE, array( 'app' => 'blog', 'key' => ( $this->id ? "blogs_blog_{$this->id}_desc" : NULL ), 'editor' => array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blog-{$this->id}-group" : "blogs-new-blog-group" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'blog_desc_placeholder' ) ), NULL, NULL, NULL, 'blog_desc_group_wrap' ) );
+
+			/* Sidebar */
+			if ( \IPS\Settings::i()->blog_enable_sidebar )
+			{
+				$form->add( new \IPS\Helpers\Form\YesNo( 'blog_sidebar_enabled', $this->sidebar ? TRUE : FALSE, FALSE, array( 'togglesOn' => array( 'blog_sidebar_wrap' ) ) ) );
+				$form->add( new \IPS\Helpers\Form\Editor( 'blog_sidebar', $this->id ? $this->sidebar : NULL, FALSE, array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blogsidebar-{$this->id}" : "blogs-new-blog-sidebar" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'sidebar' ) : NULL ), NULL, NULL, NULL, 'blog_sidebar_wrap' ) );
+			}
 		}
 
-		/* Sidebar */
-		if ( Settings::i()->blog_enable_sidebar )
+		if ( \IPS\Member::loggedIn()->group['g_blog_allowprivate'] )
 		{
-			$form->add( new YesNo( 'blog_sidebar_enabled', (bool)$this->sidebar, FALSE, array( 'togglesOn' => array( 'blog_sidebar_wrap' ) ) ) );
-			$form->add( new Editor( 'blog_sidebar', $this->id ? $this->sidebar : NULL, FALSE, array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blogsidebar-{$this->id}" : "blogs-new-blog-sidebar" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'sidebar' ) : NULL ), NULL, NULL, NULL, 'blog_sidebar_wrap' ) );
-		}
-
-		if ( Member::loggedIn()->group['g_blog_allowprivate'] )
-		{
-			$form->add( new Radio( 'blog_privacy', $this->social_group ? 'private' : 'open', FALSE, array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'blog_privacy', $this->social_group ? 'private' : 'open', FALSE, array(
 				'options' => array(
 					'open' 		=> 'blog_privacy_open',
 					'private' 	=> 'blog_privacy_private'
@@ -620,17 +544,22 @@ class Blog extends Model implements Embeddable
 					'private'		=> array( 'blog_social_group' )
 				)
 			) ) );
-			$form->add( new SocialGroup( 'blog_social_group', $this->social_group, NULL, array( 'owner' => $this->owner() ), NULL, NULL, NULL, 'blog_social_group' ) );
+			$form->add( new \IPS\Helpers\Form\SocialGroup( 'blog_social_group', $this->social_group, NULL, array( 'owner' => $this->owner() ), NULL, NULL, NULL, 'blog_social_group' ) );
 		}
 		
-		if( Settings::i()->blog_allow_rss )
+		if( \IPS\Settings::i()->blog_allow_rss )
 		{
-			$form->add( new YesNo( 'blog_enable_rss', $this->id ? $this->settings['allowrss'] : TRUE ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'blog_enable_rss', $this->id ? $this->settings['allowrss'] : TRUE ) );
 		}
 		
-		$form->add( new YesNo( 'allow_anonymous_comments', $this->id ? $this->allow_anonymous : FALSE, FALSE, array() ) );
-
-        parent::form( $form );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'allow_anonymous_comments', $this->id ? $this->allow_anonymous : FALSE, FALSE, array() ) );
+		
+		/* Categories */
+		if ( $public and $this->id )
+		{
+			$form->addTab( 'blog_entry_categories' );
+			$form->addHtml( \IPS\Theme::i()->getTemplate( 'view', 'blog', 'front' )->manageCategories( $this ) );
+		}
 	}
 	
 	/**
@@ -639,22 +568,26 @@ class Blog extends Model implements Embeddable
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
-		if ( isset( $values['blog_category_id'] ) and is_object( $values[ 'blog_category_id' ] ) )
+		if ( isset( $values['blog_category_id'] ) and \is_object( $values[ 'blog_category_id' ] ) )
 		{
-			$values[ 'blog_category_id' ] = intval( $values[ 'blog_category_id' ]->id );
+			$values[ 'blog_category_id' ] = \intval( $values[ 'blog_category_id' ]->id );
 		}
 
-		if( isset( $values['blog_type'] ) and $values['blog_type'] == 'member' and isset( $values['blog_member_id'] ) and is_object( $values['blog_member_id'] ) )
+		if( isset( $values['blog_type'] ) and $values['blog_type'] == 'member' and isset( $values['blog_member_id'] ) and \is_object( $values['blog_member_id'] ) )
 		{
+			$values['blog_member_id']->create_menu = NULL;
+			$values['blog_member_id']->save();
 			$values['blog_member_id']		= $values['blog_member_id']->member_id;
 			$values['blog_groupblog_ids']	= '';
 			$this->member_id				= $values['blog_member_id'];
 		}
 		else if ( !$this->id and !isset( $values['blog_type'] ) )
 		{
-			$values['blog_member_id'] = Member::loggedIn()->member_id;
+			$values['blog_member_id'] = \IPS\Member::loggedIn()->member_id;
+			\IPS\Member::loggedIn()->create_menu = NULL;
+			\IPS\Member::loggedIn()->save();
 			$this->member_id = $values['blog_member_id'];
 		}
 		else if ( isset( $values['blog_type'] ) )
@@ -687,8 +620,8 @@ class Blog extends Model implements Embeddable
 			{
 				$this->massUpdateIndex = TRUE;
 
-				Db::i()->delete( 'core_sys_social_groups', array( 'group_id=?', $this->social_group ) );
-				Db::i()->delete( 'core_sys_social_group_members', array( 'group_id=?', $this->social_group ) );
+				\IPS\Db::i()->delete( 'core_sys_social_groups', array( 'group_id=?', $this->social_group ) );
+				\IPS\Db::i()->delete( 'core_sys_social_group_members', array( 'group_id=?', $this->social_group ) );
 			}
 			
 			$values['blog_social_group'] = NULL;
@@ -706,11 +639,11 @@ class Blog extends Model implements Embeddable
 
 			if( $values['blog_member_id'] )
 			{
-				File::claimAttachments( 'blogs-new-blog', $this->id, NULL, 'description' );
+				\IPS\File::claimAttachments( 'blogs-new-blog', $this->id, NULL, 'description' );
 			}
 			else
 			{
-				File::claimAttachments( 'blogs-new-blog-group', $this->id, NULL, 'description', TRUE );
+				\IPS\File::claimAttachments( 'blogs-new-blog-group', $this->id, NULL, 'description', TRUE );
 			}
 		}
 
@@ -721,11 +654,11 @@ class Blog extends Model implements Embeddable
 			{
 				if ( isset( $values[ $fieldKey ] ) )
 				{
-					Lang::saveCustom( 'blog', $langKey, $values[ $fieldKey ] );
+					\IPS\Lang::saveCustom( 'blog', $langKey, $values[ $fieldKey ] );
 		
-					if ( $fieldKey === 'blog_name' )
+					if ( $fieldKey === 'blog_name_group' )
 					{
-						$values['seo_name'] = Friendly::seoTitle( ( is_array( $values[ $fieldKey ] ) ) ? $values[ $fieldKey ][ Lang::defaultLanguage() ] : $values[ $fieldKey ] );
+						$values['seo_name'] = \IPS\Http\Url\Friendly::seoTitle( ( \is_array( $values[ $fieldKey ] ) ) ? $values[ $fieldKey ][ \IPS\Lang::defaultLanguage() ] : $values[ $fieldKey ] );
 					}
 		
 					unset( $values[ $fieldKey ] );
@@ -744,9 +677,9 @@ class Blog extends Model implements Embeddable
 			{
 				try
 				{
-					$feed = Import::constructFromData( Db::i()->select( '*', 'core_rss_import', array( 'rss_import_class=? AND rss_import_node_id=?', 'IPS\\blog\\Entry', $this->id ) )->first() );
+					$feed = \IPS\core\Rss\Import::constructFromData( \IPS\Db::i()->select( '*', 'core_rss_import', array( 'rss_import_class=? AND rss_import_node_id=?', 'IPS\\blog\\Entry', $this->id ) )->first() );
 				}
-				catch ( UnderflowException )
+				catch ( \UnderflowException $e )
 				{
 					$feed = NULL;
 				}
@@ -758,12 +691,12 @@ class Blog extends Model implements Embeddable
 				}
 			}
 			
-			Lang::saveCustom( 'blog', "blogs_blog_{$this->id}", $values['blog_name'] );
+			\IPS\Lang::saveCustom( 'blog', "blogs_blog_{$this->id}", $values['blog_name'] );
 			
 			/* This is here in case an admin changes a group blog to a member blog */
-			Lang::deleteCustom( 'blog', "blogs_groupblog_name_{$this->id}" );
+			\IPS\Lang::deleteCustom( 'blog', "blogs_groupblog_name_{$this->id}" );
 
-			$values['seo_name'] = Friendly::seoTitle( $values['blog_name'] );
+			$values['seo_name'] = \IPS\Http\Url\Friendly::seoTitle( $values['blog_name'] );
 		}
 		
 		if( array_key_exists( 'blog_name', $values ) )
@@ -808,9 +741,34 @@ class Blog extends Model implements Embeddable
 	}
 
 	/**
+	 * [Node] Get the title to store in the log
+	 *
+	 * @return	string|null
+	 */
+	public function titleForLog()
+	{
+		if ( !$this->member_id )
+		{
+			try
+			{
+				return \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( static::$titleLangPrefix . $this->_id );
+			}
+			catch( \UnderflowException $e )
+			{
+				/* If we're changing from a member blog to a group blog, the language string won't exist yet */
+				return $this->_title;
+			}
+		}
+		else
+		{
+			return $this->_title;
+		}
+	}
+
+	/**
 	 * @brief	Mass update search index after changes
 	 */
-	protected bool $massUpdateIndex	= FALSE;
+	protected $massUpdateIndex	= FALSE;
 
 	/**
 	 * [Node] Perform actions after saving the form
@@ -818,34 +776,32 @@ class Blog extends Model implements Embeddable
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
 		/* Update index? */
 		if ( $this->massUpdateIndex )
 		{
-			Index::i()->massUpdate( 'IPS\blog\Entry', $this->id, NULL, $this->searchIndexPermissions() );
+			\IPS\Content\Search\Index::i()->massUpdate( 'IPS\blog\Entry', $this->id, NULL, $this->searchIndexPermissions() );
 		}
 
 		/* If this was a new blog, fire the webhook */
 		if ( $this->newBlog )
 		{
-			Webhook::fire( 'blogBlog_create', $this, $this->webhookFilters() );
+			\IPS\Api\Webhook::fire( 'blogBlog_create', $this, $this->webhookFilters() );
 		}
-
-        parent::postSaveForm( $values );
 	}
 
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 
 	/**
 	 * Get SEO name
 	 *
 	 * @return	string
 	 */
-	public function get_seo_name(): string
+	public function get_seo_name()
 	{
 		/* If we have the seo_name, just return it - don't query the language string */
 		if( isset( $this->_data['seo_name'] ) and $this->_data['seo_name'] )
@@ -854,9 +810,9 @@ class Blog extends Model implements Embeddable
 		}
 
 		/* The seo_name isn't set, so let's fix that real quick and return it */
-		$title = Lang::load( Lang::defaultLanguage() )->get( 'blogs_blog_' . $this->id );
+		$title = $this->member_id ? $this->name : \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( 'blogs_blog_' . $this->id );
 
-		$seoTitle = Url::seoTitle( $title );
+		$seoTitle = \IPS\Http\Url::seoTitle( $title );
 		$this->seo_name	= $seoTitle;
 		$this->save();
 
@@ -866,23 +822,23 @@ class Blog extends Model implements Embeddable
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlBase = 'app=blog&module=blogs&controller=view&id=';
+	public static $urlBase = 'app=blog&module=blogs&controller=view&id=';
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlTemplate = 'blogs_blog';
+	public static $urlTemplate = 'blogs_blog';
 	
 	/**
 	 * @brief	SEO Title Column
 	 */
-	public static string $seoTitleColumn = 'seo_name';
+	public static $seoTitleColumn = 'seo_name';
 	
 	/**
 	 * @brief	Cached latest entry
 	 */
-	protected ?Entry $latestEntry = NULL;
-	
+	protected $latestEntry = NULL;
+
 	/**
 	 * Set last comment
 	 *
@@ -890,7 +846,7 @@ class Blog extends Model implements Embeddable
 	 * @param Item|null $updatedItem We sometimes run setLastComment() when an item has been edited, if so, that item will be here
 	 * @return    void
 	 */
-	protected function _setLastComment( Comment $comment=NULL, Item $updatedItem=NULL ) : void
+	public function _setLastComment( \IPS\Content\Comment $comment=NULL, \IPS\Content\Item $updatedItem=NULL )
 	{
 		$lastUpdateColumn	= static::$databaseColumnMap['date'];
 		
@@ -909,9 +865,9 @@ class Blog extends Model implements Embeddable
 	/**
 	 * Get latest entry
 	 *
-	 * @return    Entry|NULL
+	 * @return	\IPS\blog\Entry|NULL
 	 */
-	public function latestEntry(): ?Entry
+	public function latestEntry()
 	{
 		if( $this->latestEntry !== NULL )
 		{
@@ -921,10 +877,10 @@ class Blog extends Model implements Embeddable
 		try
 		{
 			/* @note entry_hidden is flipped to map to "approved" and that this method will always only return the latest, visible, entry. */
-			$this->latestEntry = Entry::constructFromData( Db::i()->select( '*', 'blog_entries', array( 'entry_blog_id=? AND entry_is_future_entry=0 AND entry_hidden=1 AND entry_status!=?', $this->_id, 'draft' ), 'entry_date DESC', 1 )->first() );
+			$this->latestEntry = \IPS\blog\Entry::constructFromData( \IPS\Db::i()->select( '*', 'blog_entries', array( 'entry_blog_id=? AND entry_is_future_entry=0 AND entry_hidden=1 AND entry_status!=?', $this->_id, 'draft' ), 'entry_date DESC', 1 )->first() );
 			return $this->latestEntry;
 		}
-		catch ( UnderflowException )
+		catch ( \UnderflowException $e )
 		{
 			return NULL;
 		}
@@ -935,14 +891,14 @@ class Blog extends Model implements Embeddable
 	 *
 	 * @return	array
 	 */
-	public function contributors(): array
+	public function contributors()
 	{
 		$contributors = array();
 		
 		try 
 		{
 			/* Get member IDs and contributions count */
-			$select = Db::i()->select(
+			$select = \IPS\Db::i()->select(
 					"entry_author_id, count( entry_id ) as contributions",
 					'blog_entries',
 					array( "entry_blog_id=? AND entry_author_id !=? AND entry_hidden!=?", $this->id, 0, -2 ),
@@ -960,11 +916,11 @@ class Blog extends Model implements Embeddable
 				$memberIds[] = $member;
 			}
 
-			if( count( $memberIds ) )
+			if( \count( $memberIds ) )
 			{
-				foreach( Db::i()->select( '*', 'core_members', 'member_id IN(' . implode( ',', $memberIds ) . ')' ) as $member )
+				foreach( \IPS\Db::i()->select( '*', 'core_members', 'member_id IN(' . implode( ',', $memberIds ) . ')' ) as $member )
 				{
-					$members[ $member['member_id'] ] = Member::constructFromData( $member );
+					$members[ $member['member_id'] ] = \IPS\Member::constructFromData( $member );
 				}
 			}
 
@@ -974,7 +930,7 @@ class Blog extends Model implements Embeddable
 				$contributors[] = array( 'member' => $members[ $member ], 'contributions' => $contributions );
 			}
 		}
-		catch ( UnderflowException ) {}
+		catch ( \UnderflowException $e ) {}
 
 		return $contributors;
 	}
@@ -982,19 +938,19 @@ class Blog extends Model implements Embeddable
 	/**
 	 * Retrieve recent entries
 	 *
-	 * @return	ActiveRecordIterator
+	 * @return	\IPS\Patterns\ActiveRecordIterator
 	 */
-	public function get__recentEntries(): ActiveRecordIterator
+	public function get__recentEntries()
 	{
-		return Entry::getItemsWithPermission( array( array( 'entry_blog_id=? AND entry_is_future_entry=0 AND entry_status!=?', $this->id, 'draft' ) ), NULL, 5 );
+		return \IPS\blog\Entry::getItemsWithPermission( array( array( 'entry_blog_id=? AND entry_is_future_entry=0 AND entry_status!=?', $this->id, 'draft' ) ), NULL, 5 );
 	}
 	
 	/**
 	 * [Node] Get number of content items
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__items(): ?int
+	protected function get__items()
 	{
 		return $this->count_entries;
 	}
@@ -1002,9 +958,9 @@ class Blog extends Model implements Embeddable
 	/**
 	 * [Node] Get number of content comments
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__comments(): ?int
+	protected function get__comments()
 	{
 		return $this->count_comments;
 	}
@@ -1012,9 +968,9 @@ class Blog extends Model implements Embeddable
 	/**
 	 * [Node] Get number of unapproved content items
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__unnapprovedItems(): ?int
+	protected function get__unnapprovedItems()
 	{
 		return $this->count_entries_hidden;
 	}
@@ -1022,9 +978,9 @@ class Blog extends Model implements Embeddable
 	/**
 	 * [Node] Get number of unapproved content comments
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__unapprovedComments(): ?int
+	protected function get__unapprovedComments()
 	{
 		return $this->count_comments_hidden;
 	}
@@ -1032,32 +988,32 @@ class Blog extends Model implements Embeddable
 	/**
 	 * Set number of items
 	 *
-	 * @param int $val	Items
+	 * @param	int	$val	Items
 	 * @return	void
 	 */
-	protected function set__items( int $val ) : void
+	protected function set__items( $val )
 	{
-		$this->count_entries = $val;
+		$this->count_entries = (int) $val;
 	}
 	
 	/**
 	 * Set number of items
 	 *
-	 * @param int $val	Comments
+	 * @param	int	$val	Comments
 	 * @return	void
 	 */
-	protected function set__comments( int $val ) : void
+	protected function set__comments( $val )
 	{
-		$this->count_comments = $val;
+		$this->count_comments = (int) $val;
 	}
 	
 	/**
 	 * [Node] Get number of unapproved content items
 	 *
-	 * @param int $val	Unapproved Items
+	 * @param	int	$val	Unapproved Items
 	 * @return	void
 	 */
-	protected function set__unapprovedItems( int $val ) : void
+	protected function set__unapprovedItems( $val )
 	{
 		$this->count_entries_hidden = $val;
 	}
@@ -1065,10 +1021,10 @@ class Blog extends Model implements Embeddable
 	/**
 	 * [Node] Get number of unapproved content comments
 	 *
-	 * @param int $val	Unapproved Comments
+	 * @param	int	$val	Unapproved Comments
 	 * @return	void
 	 */
-	protected function set__unapprovedComments( int $val ) : void
+	protected function set__unapprovedComments( $val )
 	{
 		$this->count_comments_hidden = $val;
 	}
@@ -1076,9 +1032,9 @@ class Blog extends Model implements Embeddable
 	/**
 	 * [Node] Get number of future publishing items
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__futureItems(): ?int
+	protected function get__futureItems()
 	{
 		return $this->count_entries_future;
 	}
@@ -1089,29 +1045,19 @@ class Blog extends Model implements Embeddable
 	 * @param	int	$val	Unapproved Items
 	 * @return	void
 	 */
-	protected function set__futureItems( int $val ) : void
+	protected function set__futureItems( $val )
 	{
 		$this->count_entries_future = ( $val > 0 ) ? $val : 0;
 	}
-
+	
 	/**
 	 * Returns the title
 	 *
-	 * @return string|null
+	 * @return string
 	 */
-	protected function get_description(): ?string
+	protected function get_description()
 	{
-		if( $this->member_id )
-		{
-			return $this->desc;
-		}
-
-		if( Member::loggedIn()->language()->checkKeyExists( static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix ) )
-		{
-			return Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix );
-		}
-
-		return null;
+		return $this->member_id ? $this->desc : \IPS\Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix );
 	}
 	
 	/**
@@ -1119,18 +1065,20 @@ class Blog extends Model implements Embeddable
 	 *
 	 * @return	array
 	 */
-	public function get_settings(): array
+	public function get_settings()
 	{
-		return isset( $this->_data['settings'] ) ? json_decode( $this->_data['settings'], TRUE ) : array();
+		$settings = isset( $this->_data['settings'] ) ? json_decode( $this->_data['settings'], TRUE ) : array();
+
+		return $settings;
 	}
 	
 	/**
 	 * Set settings
 	 *
-	 * @param array $values	Values
+	 * @param	array	$values	Values
 	 * @return	void
 	 */
-	public function set_settings( array $values ) : void
+	public function set_settings( $values )
 	{
 		$this->_data['settings'] = json_encode( $values );
 	}
@@ -1140,9 +1088,9 @@ class Blog extends Model implements Embeddable
 	 *
 	 * @return	void
 	 */
-	public function ping() : void
+	public function ping()
 	{		
-		$xml = SimpleXML::create('methodCall');
+		$xml = \IPS\Xml\SimpleXML::create('methodCall');
 	
 		$methodName = $xml->addChild( 'methodName', 'weblogUpdates.ping' );
 		$params = $xml->addChild( 'params' );
@@ -1151,38 +1099,38 @@ class Blog extends Model implements Embeddable
 		
 		try
 		{
-	 		Url::external( 'https://rpc.pingomatic.com/RPC2' )
+	 		\IPS\Http\Url::external( 'http://rpc.pingomatic.com/RPC2' )
 			->request()
-			->setHeaders( array( 'Content-Type' => 'text/xml', 'User-Agent' => "InvisionCommunity/" . Application::load('core')->long_version ) )
+			->setHeaders( array( 'Content-Type' => 'text/xml', 'User-Agent' => "InvisionCommunity/" . \IPS\Application::load('core')->long_version ) )
 			->post( $xml->asXML() );
 		}
-		catch ( Exception $e )
+		catch ( \IPS\Http\Request\Exception $e )
 		{
-			Log::log( $e, 'pingomatic' );
+			\IPS\Log::log( $e, 'pingomatic' );
 		}
 	}
 
 	/**
 	 * Get template for node tables
 	 *
-	 * @return array
+	 * @return	callable
 	 */
-	public static function nodeTableTemplate(): array
+	public static function nodeTableTemplate()
 	{
-		return array( Theme::i()->getTemplate( 'browse', 'blog' ), 'rows' );
+		return array( \IPS\Theme::i()->getTemplate( 'browse', 'blog' ), 'rows' );
 	}
 
 	/**
 	 * @brief	Remember if this is a new blog so we can fire the webhook if so
 	 */
-	protected ?bool $newBlog	= NULL;
+	protected $newBlog	= NULL;
 	
 	/**
 	 * Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		if( $this->newBlog === NULL )
 		{
@@ -1195,48 +1143,52 @@ class Blog extends Model implements Embeddable
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		/* Delete RSS Imports */
 		try
 		{
-			$import = Import::constructFromData( Db::i()->select( '*', 'core_rss_import', array( "rss_import_class=? AND rss_import_node_id=?", 'IPS\\blog\\Entry', $this->_id ) )->first() );
+			$import = \IPS\core\Rss\Import::constructFromData( \IPS\Db::i()->select( '*', 'core_rss_import', array( "rss_import_class=? AND rss_import_node_id=?", 'IPS\\blog\\Entry', $this->_id ) )->first() );
 			$import->delete();
 		}
-		catch( UnderflowException ) { }
+		catch( \UnderflowException $e ) { }
 		
 		/* Delete Language Strings */
 		foreach ( array( 'blog_groupblog_name' => "blogs_groupblog_name_{$this->id}" ) as $fieldKey => $langKey )
 		{
-			Lang::deleteCustom( 'blog', $langKey );
+			\IPS\Lang::deleteCustom( 'blog', $langKey );
 		}
-
+		
+		/* Reset create menu */
+		$member = \IPS\Member::load( $this->member_id );
+		$member->create_menu = NULL;
+		$member->save();
 		
 		/* Unclaim Attachments */
-		File::unclaimAttachments( 'blog_Blogs', $this->id );
+		\IPS\File::unclaimAttachments( 'blog_Blogs', $this->id );
 
 		$this->coverPhotoFile()?->delete();
 		
 		/* Delete Follows */
-		Db::i()->delete( 'core_follow', array( "follow_app=? AND follow_area=? AND follow_rel_id=?", 'blog', 'blog', $this->_id ) );
+		\IPS\Db::i()->delete( 'core_follow', array( "follow_app=? AND follow_area=? AND follow_rel_id=?", 'blog', 'blog', $this->_id ) );
 		
 		/* Delete Entry categories */
-		Db::i()->delete( 'blog_entry_categories', array( "entry_category_blog_id = ?", $this->_id ) );
+		\IPS\Db::i()->delete( 'blog_entry_categories', array( "entry_category_blog_id = ?", $this->_id ) );
 		
-		parent::delete();
+		return parent::delete();
 	}
 	
 	/**
 	 * Cover Photo
 	 *
-	 * @return	mixed
+	 * @return	\IPS\Helpers\CoverPhoto
 	 */
-	public function coverPhoto(): mixed
+	public function coverPhoto()
 	{
 		$photo = parent::coverPhoto();
-        $photo->overlay = Theme::i()->getTemplate('view', 'blog', 'front')->coverPhotoOverlay($this);
+        $photo->overlay = \IPS\Theme::i()->getTemplate('view', 'blog', 'front')->coverPhotoOverlay($this);
 		return $photo;
 	}
 
@@ -1245,7 +1197,7 @@ class Blog extends Model implements Embeddable
 	 *
 	 * @return string
 	 */
-	public function coverPhotoBackgroundColor(): string
+	public function coverPhotoBackgroundColor()
 	{
 		return $this->staticCoverPhotoBackgroundColor( $this->titleForLog() );
 	}
@@ -1253,23 +1205,23 @@ class Blog extends Model implements Embeddable
 	/**
 	 * Get content for embed
 	 *
-	 * @param array $params	Additional parameters to add to URL
+	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'blog', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'blog' )->embedBlogs( $this, $this->url()->setQueryString( $params ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'blog', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'blog' )->embedBlogs( $this, $this->url()->setQueryString( $params ) );
 	}
 
 	/**
-	 * [Node] Get content table meta description
+	 * [Node] Get content table meta description 
 	 *
-	 * @return string|null
+	 * @return	string
 	 */
-	public function metaDescription(): ?string
+	public function metaDescription()
 	{
-		if( $this->member_id AND $this->desc )
+		if( $this->member_id )
 		{
 			return strip_tags( $this->desc );
 		}
@@ -1280,7 +1232,7 @@ class Blog extends Model implements Embeddable
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	int						id			ID number
 	 * @apiresponse	string					name		Name
@@ -1293,7 +1245,7 @@ class Blog extends Model implements Embeddable
 	 * @apiresponse	string					url			URL
 	 * @apiresponse	\IPS\blog\Category|NULL	category	Category, or NULL for club blogs
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		$groups = array();
 		if ( $this->groupblog_ids )
@@ -1302,16 +1254,16 @@ class Blog extends Model implements Embeddable
 			{
 				try
 				{
-					$groups[] = Group::load( $groupId )->apiOutput( $authorizedMember );
+					$groups[] = \IPS\Member\Group::load( $groupId )->apiOutput( $authorizedMember );
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 		}
 		
 		$return = array(
 			'id'			=> $this->id,
 			'name'			=> $this->_title,
-			'description'	=> $this->member_id ? $this->desc : Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix ),
+			'description'	=> $this->member_id ? \IPS\Text\Parser::removeLazyLoad( $this->desc ) : \IPS\Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix , NULL, array( 'removeLazyLoad' => TRUE ) ),
 			'owner'			=> $this->member_id ? $this->owner()->apiOutput( $authorizedMember ) : null,
 			'groups'		=> $groups,
 			'pinned'		=> (bool) $this->pinned,
@@ -1325,7 +1277,7 @@ class Blog extends Model implements Embeddable
 		{
 			$return['category'] = $this->category()->apiOutput();
 		}
-		catch( OutOfRangeException ){}
+		catch( \OutOfRangeException $e ){}
 
 		return $return;
 	}
@@ -1335,7 +1287,7 @@ class Blog extends Model implements Embeddable
 	 *
 	 * @return	array
 	 */
-	public function permissionTypes(): array
+	public function permissionTypes()
 	{
 		return array( 'view' => 'view', 'add' => 'add' );
 	}
@@ -1347,33 +1299,40 @@ class Blog extends Model implements Embeddable
 	 *
 	 * @return	string
 	 */
-	public static function clubFrontTitle(): string
+	public static function clubFrontTitle()
 	{
 		return 'blogs_sg';
 	}
-
+	
 	/**
 	 * Set form for creating a node of this type in a club
 	 *
-	 * @param Form $form Form object
-	 * @param Club $club
-	 * @return    void
+	 * @param	\IPS\Helpers\Form	$form	Form object
+	 * @return	void
 	 */
-	public function _clubForm( Form $form, Club $club ) : void
+	public function clubForm( \IPS\Helpers\Form $form, \IPS\Member\Club $club )
 	{
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_view.js', 'blog', 'front' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_view.js', 'blog', 'front' ) );
 
+		$form->addTab( 'blog_settings' );
 		$itemClass = static::$contentItemClass;
-		$form->add( new Text( 'club_node_name', $this->_id ? $this->_title : Member::loggedIn()->language()->addToStack( 'blogs_sg' ), TRUE, array( 'maxLength' => 255 ) ) );
-		$form->add( new Editor( 'club_node_description', $this->_id ? Member::loggedIn()->language()->get( static::$titleLangPrefix . $this->_id . '_desc' ) : NULL, FALSE, array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blog-{$this->id}" : "blogs-new-blog" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'blog_desc_placeholder' ) ) );
-		if( Settings::i()->blog_allow_rss )
+		$form->add( new \IPS\Helpers\Form\Text( 'club_node_name', $this->_id ? $this->_title : \IPS\Member::loggedIn()->language()->addToStack( 'blogs_sg' ), TRUE, array( 'maxLength' => 255 ) ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'club_node_description', $this->_id ? \IPS\Member::loggedIn()->language()->get( static::$titleLangPrefix . $this->_id . '_desc' ) : NULL, FALSE, array( 'app' => 'blog', 'key' => 'Blogs', 'autoSaveKey' => ( $this->id ? "blogs-blog-{$this->id}" : "blogs-new-blog" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'blog_desc_placeholder' ) ) );
+		if( \IPS\Settings::i()->blog_allow_rss )
 		{
-			$form->add( new YesNo( 'blog_enable_rss', $this->id ? $this->settings['allowrss'] : TRUE ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'blog_enable_rss', $this->id ? $this->settings['allowrss'] : TRUE ) );
 		}
 		
 		if( $club->type == 'closed' )
 		{
-			$form->add( new Radio( 'club_node_public', $this->id ? $this->isPublic() : 0, TRUE, array( 'options' => array( '0' => 'club_node_public_no', '1' => 'club_node_public_view', '2' => 'club_node_public_participate' ) ) ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'club_node_public', $this->id ? $this->isPublic() : 0, TRUE, array( 'options' => array( '0' => 'club_node_public_no', '1' => 'club_node_public_view', '2' => 'club_node_public_participate' ) ) ) );
+		}
+
+		/* Categories */
+		if ( $this->id )
+		{
+			$form->addTab( 'blog_entry_categories' );
+			$form->addHtml( \IPS\Theme::i()->getTemplate( 'view', 'blog', 'front' )->manageCategories( $this ) );
 		}
 
 	}
@@ -1381,13 +1340,13 @@ class Blog extends Model implements Embeddable
 	/**
 	 * Class-specific routine when saving club form
 	 *
-	 * @param	Club	$club	The club
+	 * @param	\IPS\Member\Club	$club	The club
 	 * @param	array				$values	Values
 	 * @return	void
 	 */
-	public function _saveClubForm( Club $club, array $values ) : void
+	public function _saveClubForm( \IPS\Member\Club $club, $values )
 	{
-		if( Settings::i()->blog_allow_rss )
+		if( \IPS\Settings::i()->blog_allow_rss )
 		{
 			$settings = $this->settings;
 			$settings['allowrss'] = $values['blog_enable_rss'];
@@ -1396,23 +1355,23 @@ class Blog extends Model implements Embeddable
 		
 		if ( $values['club_node_name'] )
 		{
-			$this->seo_name	= Friendly::seoTitle( $values['club_node_name'] );
+			$this->seo_name	= \IPS\Http\Url\Friendly::seoTitle( $values['club_node_name'] );
 		}
 		
 		if ( !$this->_id )
 		{
 			$this->save();
-			File::claimAttachments( 'blogs-new-blog', $this->id, NULL, 'description' );
+			\IPS\File::claimAttachments( 'blogs-new-blog', $this->id, NULL, 'description' );
 		}
 	}
 	
 	/**
 	 * Set the permission index permissions to a specific club
 	 *
-	 * @param	Club	$club	The club
+	 * @param	\IPS\Member\Club	$club	The club
 	 * @return  void
 	 */
-	public function setPermissionsToClub( Club $club ) : void
+	public function setPermissionsToClub( \IPS\Member\Club $club )
 	{
 		// Deliberately do nothing, Blog handles permissions differently
 	}
@@ -1421,13 +1380,13 @@ class Blog extends Model implements Embeddable
 	 * Fetch All Nodes in Clubs
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	mixed				$where				Additional WHERE clause
 	 * @return	array
 	 */
-	public static function clubNodes( ?string $permissionCheck='view', ?Member $member=NULL, array $where=array() ): array
+	public static function clubNodes( $permissionCheck='view', $member=NULL, $where=array() )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		$where[] = array( 'blog_club_id IS NOT NULL' );
 		
@@ -1439,34 +1398,34 @@ class Blog extends Model implements Embeddable
 		{
 			if ( $permissionCheck === 'add' )
 			{
-				$statuses = array( Club::STATUS_LEADER, Club::STATUS_MODERATOR );
+				$statuses = array( \IPS\Member\Club::STATUS_LEADER, \IPS\Member\Club::STATUS_MODERATOR );
 			}
 			else
 			{
-				$statuses = array( Club::STATUS_LEADER, Club::STATUS_MODERATOR, Club::STATUS_MEMBER );
+				$statuses = array( \IPS\Member\Club::STATUS_LEADER, \IPS\Member\Club::STATUS_MODERATOR, \IPS\Member\Club::STATUS_MEMBER );
 			}
-			$where[] = array( Db::i()->in( 'status', $statuses ) );
+			$where[] = array( \IPS\Db::i()->in( 'status', $statuses ) );
 			
-			return iterator_to_array( new ActiveRecordIterator( Db::i()->select( '*', 'blog_blogs', $where )->join( 'core_clubs_memberships', array( 'club_id=blog_club_id AND member_id=?', $member->member_id ) ), get_called_class() ) );
+			return iterator_to_array( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'blog_blogs', $where )->join( 'core_clubs_memberships', array( 'club_id=blog_club_id AND member_id=?', $member->member_id ) ), \get_called_class() ) );
 		}
 	}
 
 	/**
 	 * Get category
 	 *
-	 * @return	Model
-	 * @throws	OutOfRangeException|BadMethodCallException
+	 * @return	\IPS\Node\Model
+	 * @throws	\OutOfRangeException|\BadMethodCallException
 	 */
-	public function category(): Model
+	public function category()
 	{
 		if( !$this->category_id )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		if ( $this->category === NULL )
 		{
-			$this->category	= Category::load( $this->category_id );
+			$this->category	= \IPS\blog\Category::load( $this->category_id );
 		}
 
 		return $this->category;
@@ -1476,99 +1435,43 @@ class Blog extends Model implements Embeddable
 	 * Get last comment time
 	 *
 	 * @note	This should return the last comment time for this node only, not for children nodes
-	 * @param   Member|null    $member         MemberObject
-	 * @return	DateTime|NULL
+	 * @param   \IPS\Member|NULL    $member         MemberObject
+	 * @return	\IPS\DateTime|NULL
 	 */
-	public function getLastCommentTime( Member $member = NULL ): ?DateTime
+	public function getLastCommentTime( \IPS\Member $member = NULL )
 	{
-		return $this->last_edate ? DateTime::ts( $this->last_edate ) : NULL;
+		return $this->last_edate ? \IPS\DateTime::ts( $this->last_edate ) : NULL;
 	}
 
 	/**
 	 * @brief   The class of the ACP \IPS\Node\Controller that manages this node type
 	 */
-	protected static ?string $acpController = "IPS\\calendar\\modules\\admin\\calendars\\calendars";
+	protected static $acpController = "IPS\\calendar\\modules\\admin\\calendars\\calendars";
 
 
 	/**
 	 * Get the URL of the AdminCP page for this node
 	 *
-	 * @param string|null $do The "do" query parameter of the url (e.g. 'form', 'permissions', etc).
+	 * @param   string|NULL  $do The "do" query parameter of the url (e.g. 'form', 'permissions', etc).
 	 *
-	 * @return Url | NULL
+	 * @return \IPS\Http\Url | NULL
 	 */
-	public function acpUrl( ?string $do="form" ): ?Url
+	public function acpUrl( $do="form" )
 	{
 		try
 		{
 			$parentCol = static::$parentNodeColumnId;
-			$parent = Category::load( $this->$parentCol );
+			$parent = \IPS\blog\Category::load( $this->$parentCol );
 			$url = parent::acpUrl( $do );
 			if ( $url !== NULL )
 			{
 				$this->_acpUrls[$do] = $url->setQueryString([ 'subnode' => $this->$parentCol ]);
 			}
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			$this->_acpUrls[$do] = NULL;
 		}
 		return $this->_acpUrls[$do];
-	}
-
-	/**
-	 * Build the moderation menu links
-	 *
-	 * @param Member|null $member
-	 * @return Menu
-	 */
-	public function menu( Member $member = null ): Menu
-	{
-		$member = $member ?: Member::loggedIn();
-		$menu = new Menu( name: 'manage_blog', css: 'ipsButton ipsButton--text' );
-
-		$links = [];
-
-		if( $this->canEdit() )
-		{
-			if( !$this->groupblog_ids )
-			{
-				$editLink = new ContentMenuLink( $this->url()->setQueryString( 'do', 'editBlog' )->csrf(), 'edit_blog' );
-				$editLink->opensDialog( 'edit_blog' );
-				$links[] = $editLink;
-			}
-
-			$categoryLink = new ContentMenuLink( $this->url()->setQueryString( 'do', 'manageCategories' ), 'blog_manage_entry_categories' );
-			$categoryLink->opensDialog( 'blog_manage_entry_categories' );
-			$links[] = $categoryLink;
-
-			if( Settings::i()->blog_allow_rssimport )
-			{
-				$rssLink = new ContentMenuLink( $this->url()->setQueryString( 'do', 'rssImport' ), 'blog_rss_import' );
-				$rssLink->opensDialog( 'blog_rss_import' );
-				$links[] = $rssLink;
-			}
-		}
-
-		if( $this->pinned AND Member::loggedIn()->modPermission( 'can_unpin_content' ) )
-		{
-			$links[] = new ContentMenuLink( $this->url()->setQueryString( 'do', 'changePin' )->csrf(), 'unpin_blog' );
-		}
-		if( !$this->pinned AND Member::loggedIn()->modPermission( 'can_pin_content' ) )
-		{
-			$links[] = new ContentMenuLink( $this->url()->setQueryString( 'do', 'changePin' )->csrf(), 'pin_blog' );
-		}
-
-		if( $this->canDelete() )
-		{
-			$deleteLink = new ContentMenuLink( $this->url()->setQueryString( 'do', 'deleteBlog' )->csrf(), 'delete_blog', 'iDropdown__li', [
-				'data-confirm' => '',
-				'data-confirmMessage' => Member::loggedIn()->language()->addToStack( 'delete_blog_confirm' ),
-				'data-confirmSubMessage' => Member::loggedIn()->language()->addToStack( 'delete_blog_warning' )
-			] );
-			$links[] = $deleteLink;
-		}
-		$menu->elements = $links;
-		return $menu;
 	}
 }

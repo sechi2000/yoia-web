@@ -11,58 +11,47 @@
 namespace IPS\core\extensions\core\FileStorage;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Extensions\FileStorageAbstract;
-use IPS\File;
-use IPS\Settings;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Storage Extension: Icons
  */
-class Icons extends FileStorageAbstract
+class _Icons
 {
 	/**
 	 * @var int     Cache icons for 3mo
 	 */
-	public static int $cacheControlTtl = 7776000; // 3 mo
+	public static $cacheControlTtl = 7776000; // 3 mo
 
 	/**
 	 * Count stored files
 	 *
 	 * @return	int
 	 */
-	public function count(): int
+	public function count()
 	{
-		$count	= Settings::i()->icons_favicon ? 1 : 0;
+		$count	= \IPS\Settings::i()->icons_favicon ? 1 : 0;
 
-		if( Settings::i()->icons_sharer_logo )
+		if( \IPS\Settings::i()->icons_sharer_logo )
 		{
-			$count	+= count( json_decode( Settings::i()->icons_sharer_logo, true ) );
+			$count	+= \count( json_decode( \IPS\Settings::i()->icons_sharer_logo, true ) );
 		}
 
-		if( Settings::i()->icons_homescreen )
+		if( \IPS\Settings::i()->icons_homescreen )
 		{
-			$count	+= count( json_decode( Settings::i()->icons_homescreen, TRUE ) );
+			$count	+= \count( json_decode( \IPS\Settings::i()->icons_homescreen, TRUE ) );
 		}
 
-		if( Settings::i()->icons_apple_startup )
+		if( \IPS\Settings::i()->icons_apple_startup )
 		{
-			$count	+= count( json_decode( Settings::i()->icons_apple_startup, TRUE ) );
+			$count	+= \count( json_decode( \IPS\Settings::i()->icons_apple_startup, TRUE ) );
 		}
 
-		if( Settings::i()->icons_mask_icon )
+		if( \IPS\Settings::i()->icons_mask_icon )
 		{
 			$count	+= 1;
 		}
@@ -76,115 +65,195 @@ class Icons extends FileStorageAbstract
 	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param	int|NULL	$oldConfiguration		Old storage configuration ID
-	 * @throws	UnderflowException					When file record doesn't exist. Indicating there are no more files to move
-	 * @return	void							An offset integer to use on the next cycle, or nothing
+	 * @throws	\UnderflowException					When file record doesn't exist. Indicating there are no more files to move
+	 * @return	void|int							An offset integer to use on the next cycle, or nothing
 	 */
-	public function move( int $offset, int $storageConfiguration, int $oldConfiguration=NULL ) : void
+	public function move( $offset, $storageConfiguration, $oldConfiguration=NULL )
 	{
-		if( Settings::i()->icons_favicon )
+		if( \IPS\Settings::i()->icons_favicon )
 		{
 			try
 			{
-				File::get( $oldConfiguration ?: 'core_Icons', Settings::i()->icons_favicon )->move( $storageConfiguration );
+				\IPS\File::get( $oldConfiguration ?: 'core_Icons', \IPS\Settings::i()->icons_favicon )->move( $storageConfiguration );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				/* Any issues are logged */
 			}
 		}
 
-		if( Settings::i()->icons_sharer_logo )
+		if( \IPS\Settings::i()->icons_sharer_logo )
 		{
-			$logos	= json_decode( Settings::i()->icons_sharer_logo, true );
+			$logos	= json_decode( \IPS\Settings::i()->icons_sharer_logo, true );
 
 			foreach( $logos as $logo )
 			{
 				try
 				{
-					File::get( $oldConfiguration ?: 'core_Icons', $logo )->move( $storageConfiguration );
+					\IPS\File::get( $oldConfiguration ?: 'core_Icons', $logo )->move( $storageConfiguration );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					/* Any issues are logged */
 				}
 			}
 		}
 
-		if( Settings::i()->icons_homescreen )
+		if( \IPS\Settings::i()->icons_homescreen )
 		{
-			$homeScreen = json_decode( Settings::i()->icons_homescreen, TRUE );
+			$homeScreen = json_decode( \IPS\Settings::i()->icons_homescreen, TRUE );
 
 			foreach( $homeScreen as $key => $logo )
 			{
 				try
 				{
-					File::get( $oldConfiguration ?: 'core_Icons', ( $key == 'original' ) ? $logo : $logo['url'] )->move( $storageConfiguration );
+					\IPS\File::get( $oldConfiguration ?: 'core_Icons', ( $key == 'original' ) ? $logo : $logo['url'] )->move( $storageConfiguration );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					/* Any issues are logged */
 				}
 			}
 		}
 
-		if( Settings::i()->icons_apple_startup )
+		if( \IPS\Settings::i()->icons_apple_startup )
 		{
-			$apple = json_decode( Settings::i()->icons_apple_startup, TRUE );
+			$apple = json_decode( \IPS\Settings::i()->icons_apple_startup, TRUE );
 
 			foreach( $apple as $key => $logo )
 			{
 				try
 				{
-					File::get( $oldConfiguration ?: 'core_Icons', ( $key == 'original' ) ? $logo : $logo['url'] )->move( $storageConfiguration );
+					\IPS\File::get( $oldConfiguration ?: 'core_Icons', ( $key == 'original' ) ? $logo : $logo['url'] )->move( $storageConfiguration );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					/* Any issues are logged */
 				}
 			}
 		}
 
-		if( Settings::i()->icons_mask_icon )
+		if( \IPS\Settings::i()->icons_mask_icon )
 		{
 			try
 			{
-				File::get( $oldConfiguration ?: 'core_Icons', Settings::i()->icons_mask_icon )->move( $storageConfiguration );
+				\IPS\File::get( $oldConfiguration ?: 'core_Icons', \IPS\Settings::i()->icons_mask_icon )->move( $storageConfiguration );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				/* Any issues are logged */
 			}
 		}
 
-		throw new UnderflowException;
+		throw new \UnderflowException;
+	}
+
+	/**
+	 * Fix all URLs
+	 *
+	 * @param	int			$offset					This will be sent starting with 0, increasing to get all files stored by this extension
+	 * @return void
+	 */
+	public function fixUrls( $offset )
+	{
+		$updated = array();
+
+		if( \IPS\Settings::i()->icons_favicon )
+		{
+			$updated['icons_favicon'] = \IPS\File::repairUrl( \IPS\Settings::i()->icons_favicon );
+		}
+
+		if( \IPS\Settings::i()->icons_sharer_logo )
+		{
+			$newLogos	= array();
+
+			foreach( json_decode( \IPS\Settings::i()->icons_sharer_logo, true ) as $logo )
+			{
+				$newLogos[] = \IPS\File::repairUrl( $logo );
+			}
+
+			$updated['icons_sharer_logo']	= json_encode( $newLogos );
+		}
+
+		if( \IPS\Settings::i()->icons_homescreen )
+		{
+			$newLogos	= array();
+
+			foreach( json_decode( \IPS\Settings::i()->icons_homescreen, TRUE ) as $key => $logo )
+			{
+				if( $key == 'original' )
+				{
+					$newLogos[ $key ] = \IPS\File::repairUrl( $logo );
+				}
+				else
+				{
+					$newLogos[ $key ] = $logo;
+					$newLogos[ $key ]['url'] = \IPS\File::repairUrl( $logo['url'] );
+				}
+			}
+
+			$updated['icons_homescreen']	= json_encode( $newLogos );
+		}
+
+		if( \IPS\Settings::i()->icons_apple_startup )
+		{
+			$newLogos	= array();
+
+			foreach( json_decode( \IPS\Settings::i()->icons_apple_startup, TRUE ) as $key => $logo )
+			{
+				if( $key == 'original' )
+				{
+					$newLogos[ $key ] = \IPS\File::repairUrl( $logo );
+				}
+				else
+				{
+					$newLogos[ $key ] = $logo;
+					$newLogos[ $key ]['url'] = \IPS\File::repairUrl( $logo['url'] );
+				}
+			}
+
+			$updated['icons_apple_startup']	= json_encode( $newLogos );
+		}
+
+		if( \IPS\Settings::i()->icons_mask_icon )
+		{
+			$updated['icons_mask_icon'] = \IPS\File::repairUrl( \IPS\Settings::i()->icons_mask_icon );
+		}
+
+		if( \count( $updated ) )
+		{
+			\IPS\Settings::i()->changeValues( $updated );
+		}
+		
+		throw new \UnderflowException;
 	}
 
 	/**
 	 * Check if a file is valid
 	 *
-	 * @param	File|string	$file		The file path to check
+	 * @param	string	$file		The file path to check
 	 * @return	bool
 	 */
-	public function isValidFile( File|string $file ): bool
+	public function isValidFile( $file )
 	{
-		if( Settings::i()->icons_favicon AND $file == Settings::i()->icons_favicon )
+		if( \IPS\Settings::i()->icons_favicon AND $file == \IPS\Settings::i()->icons_favicon )
 		{
 			return TRUE;
 		}
 
-		if( Settings::i()->icons_sharer_logo )
+		if( \IPS\Settings::i()->icons_sharer_logo )
 		{
-			$logos	= json_decode( Settings::i()->icons_sharer_logo, true );
+			$logos	= json_decode( \IPS\Settings::i()->icons_sharer_logo, true );
 
-			if( in_array( $file, $logos ) )
+			if( \in_array( $file, $logos ) )
 			{
 				return TRUE;
 			}
 		}
 
-		if( Settings::i()->icons_homescreen )
+		if( \IPS\Settings::i()->icons_homescreen )
 		{
-			foreach( json_decode( Settings::i()->icons_homescreen, TRUE ) as $key => $logo )
+			foreach( json_decode( \IPS\Settings::i()->icons_homescreen, TRUE ) as $key => $logo )
 			{
 				if( ( $key == 'original' AND $file == $logo ) OR ( $key != 'original' AND $file == $logo['url'] ) )
 				{
@@ -193,9 +262,9 @@ class Icons extends FileStorageAbstract
 			}
 		}
 
-		if( Settings::i()->icons_apple_startup )
+		if( \IPS\Settings::i()->icons_apple_startup )
 		{
-			foreach( json_decode( Settings::i()->icons_apple_startup, TRUE ) as $key => $logo )
+			foreach( json_decode( \IPS\Settings::i()->icons_apple_startup, TRUE ) as $key => $logo )
 			{
 				if( ( $key == 'original' AND $file == $logo ) OR ( $key != 'original' AND $file == $logo['url'] ) )
 				{
@@ -204,7 +273,7 @@ class Icons extends FileStorageAbstract
 			}
 		}
 
-		if( Settings::i()->icons_mask_icon AND $file == Settings::i()->icons_mask_icon )
+		if( \IPS\Settings::i()->icons_mask_icon AND $file == \IPS\Settings::i()->icons_mask_icon )
 		{
 			return TRUE;
 		}
@@ -217,62 +286,62 @@ class Icons extends FileStorageAbstract
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		if( Settings::i()->icons_favicon )
+		if( \IPS\Settings::i()->icons_favicon )
 		{
 			try
 			{
-				File::get( 'core_Icons', Settings::i()->icons_favicon )->delete();
+				\IPS\File::get( 'core_Icons', \IPS\Settings::i()->icons_favicon )->delete();
 			}
-			catch( OutOfRangeException $e ){}
+			catch( \OutOfRangeException $e ){}
 		}
 
-		if( Settings::i()->icons_sharer_logo )
+		if( \IPS\Settings::i()->icons_sharer_logo )
 		{
-			foreach( json_decode( Settings::i()->icons_sharer_logo, true ) as $logo )
+			foreach( json_decode( \IPS\Settings::i()->icons_sharer_logo, true ) as $logo )
 			{
 				try
 				{
-					File::get( 'core_Icons', $logo )->delete();
+					\IPS\File::get( 'core_Icons', $logo )->delete();
 				}
-				catch( OutOfRangeException $e ){}
+				catch( \OutOfRangeException $e ){}
 			}
 		}
 
-		if( Settings::i()->icons_homescreen )
+		if( \IPS\Settings::i()->icons_homescreen )
 		{
-			foreach( json_decode( Settings::i()->icons_homescreen, TRUE ) as $key => $logo )
+			foreach( json_decode( \IPS\Settings::i()->icons_homescreen, TRUE ) as $key => $logo )
 			{
 				try
 				{
-					File::get( 'core_Icons', ( $key == 'original' ) ? $logo : $logo['url'] )->delete();
+					\IPS\File::get( 'core_Icons', ( $key == 'original' ) ? $logo : $logo['url'] )->delete();
 				}
-				catch( OutOfRangeException $e ){}
+				catch( \OutOfRangeException $e ){}
 			}
 		}
 
-		if( Settings::i()->icons_apple_startup )
+		if( \IPS\Settings::i()->icons_apple_startup )
 		{
-			foreach( json_decode( Settings::i()->icons_apple_startup, TRUE ) as $key => $logo )
+			foreach( json_decode( \IPS\Settings::i()->icons_apple_startup, TRUE ) as $key => $logo )
 			{
 				try
 				{
-					File::get( 'core_Icons', ( $key == 'original' ) ? $logo : $logo['url'] )->delete();
+					\IPS\File::get( 'core_Icons', ( $key == 'original' ) ? $logo : $logo['url'] )->delete();
 				}
-				catch( OutOfRangeException $e ){}
+				catch( \OutOfRangeException $e ){}
 			}
 		}
 
-		if( Settings::i()->icons_mask_icon )
+		if( \IPS\Settings::i()->icons_mask_icon )
 		{
 			try
 			{
-				File::get( 'core_Icons', Settings::i()->icons_mask_icon )->delete();
+				\IPS\File::get( 'core_Icons', \IPS\Settings::i()->icons_mask_icon )->delete();
 			}
-			catch( OutOfRangeException $e ){}
+			catch( \OutOfRangeException $e ){}
 		}
 
-		Settings::i()->changeValues( array( 'icons_favicon' => NULL, 'icons_sharer_logo' => NULL, 'icons_homescreen' => NULL, 'icons_apple_startup' => NULL, 'icons_mask_icon' => NULL ) );
+		\IPS\Settings::i()->changeValues( array( 'icons_favicon' => NULL, 'icons_sharer_logo' => NULL, 'icons_homescreen' => NULL, 'icons_apple_startup' => NULL, 'icons_mask_icon' => NULL ) );
 	}
 }

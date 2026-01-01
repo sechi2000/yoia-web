@@ -12,44 +12,31 @@
 namespace IPS\nexus;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Lang;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\Settings;
-use NumberFormatter;
-use function defined;
-use function floatval;
-use function function_exists;
-use function intval;
-use function is_string;
-use function strlen;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Money Object
  */
-class Money
+class _Money
 {	
 	/**
 	 * Get available currencies
 	 *
 	 * @return	array
 	 */
-	public static function currencies() : array
+	public static function currencies()
 	{
-		if ( $currencies = json_decode( Settings::i()->nexus_currency, TRUE ) )
+		if ( $currencies = json_decode( \IPS\Settings::i()->nexus_currency, TRUE ) )
 		{
 			return array_keys( $currencies );
 		}
 		else
 		{
-			return array( Settings::i()->nexus_currency );
+			return array( \IPS\Settings::i()->nexus_currency );
 		}
 	}
 	
@@ -59,7 +46,7 @@ class Money
 	 * @param	string	$currency	Currency code
 	 * @return	int
 	 */
-	public static function numberOfDecimalsForCurrency( string $currency ) : int
+	public static function numberOfDecimalsForCurrency( $currency )
 	{
 		switch ( $currency )
 		{
@@ -108,17 +95,17 @@ class Money
 	/**
 	 * @brief	Amount
 	 */
-	public ?Number $amount = null;
+	public $amount;
 	
 	/**
 	 * @brief	Currency
 	 */
-	public string $currency = "";
+	public $currency;
 	
 	/**
 	 * @brief	Number of decimal points
 	 */
-	protected int $numberOfDecimalPlaces = 2;
+	protected $numberOfDecimalPlaces = 2;
 	
 	/**
 	 * Contructor
@@ -127,18 +114,18 @@ class Money
 	 * @param	string	$currency	Currency code
 	 * @return	void
 	 */
-	public function __construct( mixed $amount, string $currency )
+	public function __construct( $amount, $currency )
 	{
 		$this->currency = $currency;
 		$this->numberOfDecimalPlaces = static::numberOfDecimalsForCurrency( $currency );
 		
-		if ( !( $amount instanceof Number ) )
+		if ( !( $amount instanceof \IPS\Math\Number ) )
 		{
-			if ( is_string( $amount ) )
+			if ( \is_string( $amount ) )
 			{
-				$amount = floatval( $amount );
+				$amount = \floatval( $amount );
 			}
-			$amount = new Number( number_format( $amount, $this->numberOfDecimalPlaces, '.', '' ) );
+			$amount = new \IPS\Math\Number( number_format( $amount, $this->numberOfDecimalPlaces, '.', '' ) );
 		}
 		
 		$this->amount = $amount->round( $this->numberOfDecimalPlaces );
@@ -148,9 +135,9 @@ class Money
 	 * Amount as string (not formatted, not locale aware)
 	 * Used for gateways where, for example, (float) 10.5 is not acceptable, and (string) "10.50" is required
 	 *
-	 * @return    string
+	 * @return	\IPS\nexus\Money
 	 */
-	public function amountAsString() : string
+	public function amountAsString()
 	{
 		return sprintf( "%01." . $this->numberOfDecimalPlaces . "F", (string) $this->amount );
 	}
@@ -160,27 +147,27 @@ class Money
 	 *
 	 * @return	string
 	 */
-	public function __toString() : string
+	public function __toString()
 	{
-		return $this->toString( Member::loggedIn()->language() );
+		return $this->toString( \IPS\Member::loggedIn()->language() );
 	}
 	
 	/**
 	 * To string for language
 	 *
-	 * @param	Lang	$language	The language to use
+	 * @param	\IPS\Lang	$language	The language to use
 	 * @return	string
 	 */
-	public function toString( Lang $language ) : string
+	public function toString( \IPS\Lang $language )
 	{
 		/* If intl is installed, use NumberFormatter */
 		if( class_exists( "NumberFormatter" ) and trim( $language->locale['int_curr_symbol'] ) === $this->currency )
 		{
-			$formatter = new NumberFormatter( $language->short, NumberFormatter::CURRENCY );
+			$formatter = new \NumberFormatter( $language->short, \NumberFormatter::CURRENCY );
 			
-			if ( floatval( (string) $this->amount ) == intval( (string) $this->amount ) )
+			if ( \floatval( (string) $this->amount ) == \intval( (string) $this->amount ) )
 			{
-				$formatter->setAttribute( NumberFormatter::FRACTION_DIGITS, 0 );
+				$formatter->setAttribute( \NumberFormatter::FRACTION_DIGITS, 0 );
 			}
 
 			$result = $formatter->formatCurrency( (string) $this->amount, $this->currency );
@@ -193,7 +180,7 @@ class Money
 		}
 
 		/* If this currency matches the locale the user is using, and we are not using PHP 7.4, AND money_format is supported (Windows doesn't support it), use that */
-		if ( function_exists( 'money_format' ) and version_compare( PHP_VERSION, '7.4.0', '<' ) and trim( $language->locale['int_curr_symbol'] ) === $this->currency )
+		if ( \function_exists( 'money_format' ) and version_compare( PHP_VERSION, '7.4.0', '<' ) and trim( $language->locale['int_curr_symbol'] ) === $this->currency )
 		{
 			/* We need to make sure the locale is correct */
 			$currentLocale = setlocale( LC_ALL, '0' );
@@ -203,14 +190,14 @@ class Money
 			$return = money_format( '%n', (string) $this->amount );
 			
 			/* Then put the locale back */
-			Lang::restoreLocale( $currentLocale );
+			\IPS\Lang::restoreLocale( $currentLocale );
 			
 			/* And return */
 			return $return;
 		}
 				
 		/* If it matches any of the installed languages, we can do something with the locale data */
-		foreach ( Lang::languages() as $lang )
+		foreach ( \IPS\Lang::languages() as $lang )
 		{
 			if ( isset( $lang->locale['int_curr_symbol'] ) AND trim( $lang->locale['int_curr_symbol'] ) === $this->currency )
 			{
@@ -223,7 +210,7 @@ class Money
 				if ( $positiveNegativeSymbol )
 				{
 					$positiveNegativeSymbolFormat = $this->amount->isPositive() ? $lang->locale['p_sign_posn'] : $lang->locale['n_sign_posn'];
-					$positiveNegativeSymbolFormatLength = strlen( $positiveNegativeSymbolFormat );
+					$positiveNegativeSymbolFormatLength = \strlen( $positiveNegativeSymbolFormat );
 					for ( $i=0; $i < $positiveNegativeSymbolFormatLength; $i++ )
 					{
 						switch ( $positiveNegativeSymbolFormat[ $i ] )
@@ -281,12 +268,12 @@ class Money
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	string	currency	The currency code (e.g. 'USD')
 	 * @apiresponse	string	amount		The amount
 	 */
-	public function apiOutput( ?Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'currency'	=> $this->currency,

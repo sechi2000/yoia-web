@@ -11,6 +11,13 @@
             "controller": "files",
             "do": "",
             "restriction": "files_view"
+        },
+        "mycharts": {
+            "tab": "stats",
+            "controller": "mycharts",
+            "do": "",
+            "restriction": "mycharts_manage",
+            "subcontrollers": ""
         }
     },
     "applications": {
@@ -25,6 +32,12 @@
             "controller": "enhancements",
             "do": "",
             "restriction": "enhancements_manage"
+        },
+        "plugins": {
+            "tab": "core",
+            "controller": "plugins",
+            "do": "",
+            "restriction": "plugins_view"
         },
         "menu": {
             "tab": "core",
@@ -68,7 +81,7 @@
             "tab": "core",
             "controller": "posting",
             "do": "",
-            "restriction": "posting_manage,posting_manage_acronym,posting_manage_polls,posting_manage_profanity,posting_manage_url"
+            "restriction": "posting_manage,posting_manage_acronym,posting_manage_polls,posting_manage_profanity,posting_manage_tags,posting_manage_url"
         },
         "email": {
             "tab": "core",
@@ -133,13 +146,6 @@
             "controller": "rss",
             "do": "",
             "restriction": "rss_manage"
-        },
-        "tags": {
-            "tab": "core",
-            "controller": "tags",
-            "do": "",
-            "restriction": "tags_manage",
-            "subcontrollers": ""
         }
     },
     "promotion": {
@@ -161,6 +167,12 @@
             "controller": "sharelinks",
             "do": "",
             "restriction": "sharelinks_manage"
+        },
+        "promote": {
+            "tab": "core",
+            "controller": "promote",
+            "do": "",
+            "restriction": "promote_manage"
         }
     },
     "members": {
@@ -262,7 +274,8 @@
             "tab": "members",
             "controller": "report",
             "do": "",
-            "restriction": "reportedContentTypes_manage"
+            "restriction": "reportedContentTypes_manage",
+            "subcontrollers": ""
         },
         "spam": {
             "tab": "members",
@@ -310,8 +323,7 @@
             "tab": "customization",
             "controller": "themes",
             "do": "",
-            "restriction": "theme_templates_manage",
-            "subcontrollers": "themeeditor,customtemplates"
+            "restriction": "theme_templates_manage"
         },
         "emails": {
             "tab": "customization",
@@ -327,11 +339,23 @@
         }
     },
     "editor": {
+        "toolbar": {
+            "tab": "customization",
+            "controller": "toolbar",
+            "do": "",
+            "restriction": "toolbar_manage"
+        },
         "emoticons": {
             "tab": "customization",
             "controller": "emoticons",
             "do": "",
             "restriction": "emoticons_manage"
+        },
+        "settings": {
+            "tab": "customization",
+            "controller": "settings",
+            "do": "",
+            "restriction": "settings_manage"
         },
         "storedreplies": {
             "tab": "customization",
@@ -356,9 +380,23 @@
             "do": "",
             "restriction": "get_support",
             "subcontrollers": "systemLogs,errorLogs"
+        },
+        "v5": {
+            "tab": "core",
+            "controller": "v5",
+            "do": "",
+            "restriction": null,
+            "subcontrollers": ""
         }
     },
     "activitystats": {
+        "overview": {
+            "tab": "stats",
+            "controller": "overview",
+            "do": "",
+            "restriction": "overview_manage",
+            "subcontrollers": ""
+        },
         "communityactivity": {
             "tab": "stats",
             "controller": "communityactivity",
@@ -409,16 +447,16 @@
             "do": "",
             "restriction": "deletedcontent_manage",
             "subcontrollers": ""
-        },
-        "adverts": {
-            "tab": "stats",
-            "controller": "adverts",
-            "do": "",
-            "restriction": "adverts_manage",
-            "subcontrollers": ""
         }
     },
     "stats": {
+        "overview": {
+            "tab": "stats",
+            "controller": "overview",
+            "do": "",
+            "restriction": "overview_manage",
+            "subcontrollers": ""
+        },
         "registrationstats": {
             "tab": "stats",
             "controller": "registrationstats",
@@ -513,13 +551,6 @@
             "do": "",
             "restriction": "rankprogression_manage",
             "subcontrollers": ""
-        },
-        "helpful": {
-            "tab": "stats",
-            "controller": "helpful",
-            "do": "",
-            "restriction": "helpful_manage",
-            "subcontrollers": ""
         }
     },
     "messengerstats": {
@@ -548,8 +579,7 @@
             "tab": "community",
             "controller": "settings",
             "do": "",
-            "restriction": "clubs_settings_manage",
-            "subcontrollers": "templates"
+            "restriction": "clubs_settings_manage"
         },
         "stats": {
             "tab": "stats",
@@ -559,221 +589,5 @@
             "subcontrollers": ""
         }
     },
-    "developer_overview": {
-        "details": {
-            "tab": "developer",
-            "controller": "details",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        }
-    },
-    "developer_admin": {
-        "acpmenu": {
-            "tab": "developer",
-            "controller": "acpmenu",
-            "module_url": "developer",
-            "do": "",
-            "restriction": "",
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;",
-            "activemenuitem": "core_developer_admin_acpmenu"
-        },
-        "acprestrictions": {
-            "tab": "developer",
-            "controller": "acprestrictions",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "acpsearch": {
-            "tab": "developer",
-            "controller": "acpsearch",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "modulesadmin": {
-            "tab": "developer",
-            "controller": "modules",
-            "module_url": "developer",
-            "do": "&location=admin",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        }
-    },
-    "developer_front": {
-        "modulesfront": {
-            "tab": "developer",
-            "controller": "modules",
-            "module_url": "developer",
-            "do": "&location=front",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "widgets": {
-            "tab": "developer",
-            "controller": "widgets",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "customtemplates": {
-            "tab": "developer",
-            "controller": "customtemplates",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "themeeditor": {
-            "tab": "developer",
-            "controller": "themeeditor",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "cmstemplates": {
-            "tab": "developer",
-            "controller": "cmstemplates",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV AND \\IPS\\Application::appIsEnabled( 'cms' );"
-        },
-        "parser": {
-            "tab": "developer",
-            "controller": "parser",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        }
-    },
-    "developer_build": {
-        "schema": {
-            "tab": "developer",
-            "controller": "schema",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "extensions": {
-            "tab": "developer",
-            "controller": "extensions",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "listeners": {
-            "tab": "developer",
-            "controller": "listeners",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "settings": {
-            "tab": "developer",
-            "controller": "settings",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "tasks": {
-            "tab": "developer",
-            "controller": "tasks",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "furls": {
-            "tab": "developer",
-            "controller": "furls",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        },
-        "versions": {
-            "tab": "developer",
-            "controller": "versions",
-            "module_url": "developer",
-            "do": "",
-            "restriction": null,
-            "subcontrollers": "",
-            "callback": "return \\IPS\\IN_DEV;"
-        }
-    },
-    "keystats": {
-        "mycharts": {
-            "tab": "stats",
-            "controller": "mycharts",
-            "do": "",
-            "restriction": "mycharts_manage",
-            "subcontrollers": "",
-            "module_url": "overview"
-        },
-        "community_health": {
-            "tab": "stats",
-            "controller": "mycharts",
-            "do": "communityhealth",
-            "restriction": "mycharts_manage",
-            "subcontrollers": "",
-            "module_url": "overview",
-            "activemenuitem": "core_keystats_communityhealth"
-        },
-        "activityoverview": {
-            "tab": "stats",
-            "controller": "overview",
-            "do": "",
-            "restriction": "overview_manage",
-            "subcontrollers": "",
-            "module_url": "activitystats",
-            "activemenuitem": "core_keystats_activityoverview",
-            "menu_checks": {
-                "module": [
-                    "activitystats"
-                ]
-            }
-        },
-        "overview": {
-            "tab": "stats",
-            "controller": "overview",
-            "do": "",
-            "restriction": "overview_manage",
-            "subcontrollers": "",
-            "module_url": "stats",
-            "menu_checks": {
-                "module": [
-                    "stats"
-                ]
-            }
-        }
-    }
+    "marketplace": []
 }

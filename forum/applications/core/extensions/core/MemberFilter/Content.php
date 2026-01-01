@@ -11,54 +11,45 @@
 namespace IPS\core\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\Custom;
-use IPS\Member;
-use IPS\Theme;
-use LogicException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member filter: Content Count
  */
-class Content extends MemberFilterAbstract
+class _Content
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param	string	$area	Area to check (bulkmail, group_promotions, automatic_moderation, passwordreset)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'bulkmail', 'group_promotions', 'automatic_moderation' ) );
+		return \in_array( $area, array( 'bulkmail', 'group_promotions', 'automatic_moderation' ) );
 	}
 
 	/**
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		return array(
-			new Custom( 'mf_content_count', array( 0 => $criteria['content_count_operator'] ?? NULL, 1 => $criteria['content_count_score'] ?? NULL ), FALSE, array(
+			new \IPS\Helpers\Form\Custom( 'mf_content_count', array( 0 => isset( $criteria['content_count_operator'] ) ? $criteria['content_count_operator'] : NULL, 1 => isset( $criteria['content_count_score'] ) ? $criteria['content_count_score'] : NULL ), FALSE, array(
 				'getHtml'	=> function( $element )
 				{
-					return Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", $element->value[0], $element->required, array(
-						'any'	=> Member::loggedIn()->language()->addToStack('any'),
-						'gt'	=> Member::loggedIn()->language()->addToStack('gt'),
-						'lt'	=> Member::loggedIn()->language()->addToStack('lt'),
-						'eq'	=> Member::loggedIn()->language()->addToStack('exactly'),
+					return \IPS\Theme::i()->getTemplate( 'forms', 'core' )->select( "{$element->name}[0]", $element->value[0], $element->required, array(
+						'any'	=> \IPS\Member::loggedIn()->language()->addToStack('any'),
+						'gt'	=> \IPS\Member::loggedIn()->language()->addToStack('gt'),
+						'lt'	=> \IPS\Member::loggedIn()->language()->addToStack('lt'),
+						'eq'	=> \IPS\Member::loggedIn()->language()->addToStack('exactly'),
 					),
 						FALSE,
 						NULL,
@@ -70,7 +61,7 @@ class Content extends MemberFilterAbstract
 							'eq'	=> array( 'elNumber_' . $element->name . '-qty' ),
 						) )
 					. ' '
-					. Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( "{$element->name}[1]", $element->value[1], $element->required, NULL, FALSE, NULL, NULL, NULL, 0, NULL, FALSE, NULL, array(), array(), array(), $element->name . '-qty' );
+					. \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( "{$element->name}[1]", $element->value[1], $element->required, NULL, FALSE, NULL, NULL, NULL, 0, NULL, FALSE, NULL, array(), array(), array(), $element->name . '-qty' );
 				}
 			) )
 		);
@@ -80,10 +71,10 @@ class Content extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return	array|bool			False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array|bool
+	public function save( $post )
 	{
 		return array( 'content_count_operator' => $post['mf_content_count'][0], 'content_count_score' => $post['mf_content_count'][1] );
 	}
@@ -91,10 +82,10 @@ class Content extends MemberFilterAbstract
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		if ( isset( $data['content_count_operator'] ) and isset( $data['content_count_score'] ) )
 		{
@@ -102,13 +93,13 @@ class Content extends MemberFilterAbstract
 			{
 				case 'gt':
 					return array( "member_posts>{$data['content_count_score']}" );
-					
+					break;
 				case 'lt':
 					return array( "member_posts<{$data['content_count_score']}" );
-					
+					break;
 				case 'eq':
 					return array( "member_posts={$data['content_count_score']}" );
-					
+					break;
 			}
 		}
 
@@ -119,12 +110,12 @@ class Content extends MemberFilterAbstract
 	 * Determine if a member matches specified filters
 	 *
 	 * @note	This is only necessary if availableIn() includes group_promotions
-	 * @param	Member	$member		Member object to check
+	 * @param	\IPS\Member	$member		Member object to check
 	 * @param	array 		$filters	Previously defined filters
 	 * @param	object|NULL	$object		Calling class
 	 * @return	bool
 	 */
-	public function matches( Member $member, array $filters, ?object $object=NULL ) : bool
+	public function matches( \IPS\Member $member, $filters, $object=NULL )
 	{
 		/* If we aren't filtering by this, then any member matches */
 		if( !isset( $filters['content_count_operator'] ) OR !isset( $filters['content_count_score'] ) )
@@ -135,14 +126,14 @@ class Content extends MemberFilterAbstract
 		switch ( $filters['content_count_operator'] )
 		{
 			case 'gt':
-				return ( $member->member_posts > (int) $filters['content_count_score'] );
-				
+				return (bool) ( $member->member_posts > (int) $filters['content_count_score'] );
+				break;
 			case 'lt':
-				return ( $member->member_posts < (int) $filters['content_count_score'] );
-				
+				return (bool) ( $member->member_posts < (int) $filters['content_count_score'] );
+				break;
 			case 'eq':
-				return ( $member->member_posts == (int) $filters['content_count_score'] );
-				
+				return (bool) ( $member->member_posts == (int) $filters['content_count_score'] );
+				break;
 		}
 
 		/* If we are still here, then there wasn't an appropriate operator (maybe they selected 'any') so return true */
@@ -152,24 +143,24 @@ class Content extends MemberFilterAbstract
 	/**
 	 * Return a lovely human description for this rule if used
 	 *
-	 * @param	array				$filters	The array returned from the save() method
+	 * @param	mixed				$filters	The array returned from the save() method
 	 * @return	string|NULL
 	 */
-	public function getDescription( array $filters ) : ?string
+	public function getDescription( $filters )
 	{
 		if ( ! empty( $filters['content_count_score'] ) and $filters['content_count_score'] > 0 )
 		{
 			switch ( $filters['content_count_operator'] )
 			{
 				case 'gt':
-					return Member::loggedIn()->language()->addToStack( 'member_filter_core_content_gt_desc', FALSE, array( 'sprintf' => array( $filters['content_count_score'] ) ) );
-				
+					return \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_content_gt_desc', FALSE, array( 'sprintf' => array( $filters['content_count_score'] ) ) );
+				break;
 				case 'lt':
-					return Member::loggedIn()->language()->addToStack( 'member_filter_core_content_lt_desc', FALSE, array( 'sprintf' => array( $filters['content_count_score'] ) ) );
-				
+					return \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_content_lt_desc', FALSE, array( 'sprintf' => array( $filters['content_count_score'] ) ) );
+				break;
 				case 'eq':
-					return Member::loggedIn()->language()->addToStack( 'member_filter_core_content_eq_desc', FALSE, array( 'sprintf' => array( $filters['content_count_score'] ) ) );
-				
+					return \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_content_eq_desc', FALSE, array( 'sprintf' => array( $filters['content_count_score'] ) ) );
+				break;
 			}
 		}
 		

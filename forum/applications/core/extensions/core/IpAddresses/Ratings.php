@@ -11,64 +11,75 @@
 namespace IPS\core\extensions\core\IpAddresses;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Extensions\IpAddressesAbstract;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * IP Address Lookup: Ratings
  */
-class Ratings extends IpAddressesAbstract
+class _Ratings
 {
 	/**
 	 * Removes the logged IP address
 	 *
-	 * @param int $time
+	 * @param int $timestamp
 	 * @return void
 	 */
-	public function pruneIpAddresses( int $time ) : void
+	public function pruneIpAddresses(int $time)
 	{
-		Db::i()->update('core_ratings', [ 'ip' => '' ] , [ "ip != '' and rating_date IS NOT NULL and rating_date <?", $time ] );
+		\IPS\Db::i()->update('core_ratings', [ 'ip' => '' ] , [ "ip != '' AND rating_date IS NOT NULL AND rating_date <?", $time ] );
+	}
+	
+	/**
+	 * Supported in the ACP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInAcp()
+	{
+		return TRUE;
+	}
+
+	/**
+	 * Supported in the ModCP IP address lookup tool?
+	 *
+	 * @return	bool
+	 * @note	If the method does not exist in an extension, the result is presumed to be TRUE
+	 */
+	public function supportedInModCp(): bool
+	{
+		return TRUE;
 	}
 
 	/** 
 	 * Find Records by IP
 	 *
 	 * @param	string			$ip			The IP Address
-	 * @param	Url|null	$baseUrl	URL table will be displayed on or NULL to return a count
-	 * @return	string|int|null
+	 * @param	\IPS\Http\Url	$baseUrl	URL table will be displayed on or NULL to return a count
+	 * @return	\IPS\Helpers\Table|int|null
 	 */
-	public function findByIp( string $ip, ?Url $baseUrl = NULL ): string|int|null
+	public function findByIp( $ip, \IPS\Http\Url $baseUrl = NULL )
 	{
 		/* Return count */
 		if ( $baseUrl === NULL )
 		{
-			return Db::i()->select( 'COUNT(*)', 'core_ratings', array( "ip LIKE ?", $ip ) )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'core_ratings', array( "ip LIKE ?", $ip ) )->first();
 		}
 		
 		/* Init Table */
-		$table = new TableDb( 'core_ratings', $baseUrl, array( "ip LIKE ?", $ip ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_ratings', $baseUrl, array( "ip LIKE ?", $ip ) );
 				
 		/* Columns we need */
 		$table->include = array( 'member', 'rating', 'rated', 'ip' );
 		$table->mainColumn = 'ip';
 		$table->langPrefix = 'rating_';
 
-		$table->tableTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
-		$table->rowsTemplate  = array( Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
+		$table->tableTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'table' );
+		$table->rowsTemplate  = array( \IPS\Theme::i()->getTemplate( 'tables', 'core', 'admin' ), 'rows' );
 				
 		/* Default sort options */
 		$table->sortBy = $table->sortBy ?: 'id';
@@ -78,8 +89,8 @@ class Ratings extends IpAddressesAbstract
 		$table->parsers = array(
 			'member'			=> function( $val, $row )
 			{
-				$member = Member::load( $val );
-				return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
+				$member = \IPS\Member::load( $val );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
 			},
 			'rated'				=> function( $val, $row )
 			{
@@ -87,9 +98,9 @@ class Ratings extends IpAddressesAbstract
 				{
 					$class = $row['class'];
 					$rated = $class::load( $row['item_id'] );
-					return Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $rated->url(), TRUE, $rated->mapped('title') );
+					return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $rated->url(), TRUE, $rated->mapped('title') );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					return '';
 				}
@@ -114,11 +125,11 @@ class Ratings extends IpAddressesAbstract
 		 	...
 	 	);
 	 * @endcode
-	 * @param	Member	$member	The member
-	 * @return	array|Select
+	 * @param	\IPS\Member	$member	The member
+	 * @return	array
 	 */
-	public function findByMember( Member $member ) : array|Select
+	public function findByMember( $member )
 	{
-		return Db::i()->select( "ip, count(*) AS count, MIN(rating_date) AS first, MAX(rating_date) AS last", 'core_ratings', array( '`member`=?', $member->member_id ), NULL, NULL, 'ip' )->setKeyField( 'ip' );
+		return \IPS\Db::i()->select( "ip, count(*) AS count, MIN(rating_date) AS first, MAX(rating_date) AS last", 'core_ratings', array( '`member`=?', $member->member_id ), NULL, NULL, 'ip' )->setKeyField( 'ip' );
 	}	
 }

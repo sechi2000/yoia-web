@@ -11,39 +11,30 @@
 namespace IPS\core\modules\admin\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Output;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Live Search
  */
-class livesearch extends Controller
+class _livesearch extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'livesearch_manage', 'core' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'livesearch_manage', 'core', 'livesearch' );
 		parent::execute();
 	}
 
@@ -52,24 +43,24 @@ class livesearch extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
 		$results = array();
 		
 		try
 		{
-			$exploded = explode( '_', Request::i()->search_key );
-			$app = Application::load( $exploded[0] );
+			$exploded = explode( '_', \IPS\Request::i()->search_key );
+			$app = \IPS\Application::load( $exploded[0] );
 			foreach ( $app->extensions( 'core', 'LiveSearch' ) as $k => $extension )
 			{
-				if ( $k === $exploded[1] )
+				if ( $k === $exploded[1] and method_exists( $extension, 'getResults' ) )
 				{
-					$results = $extension->getResults( urldecode( Request::i()->search_term ) );
+					$results = $extension->getResults( urldecode( \IPS\Request::i()->search_term ) );
 				}
 			}
 		}
-		catch ( OutOfRangeException $e ) { }
+		catch ( \OutOfRangeException $e ) { }
 						
-		Output::i()->json( array_values( $results ) );
+		\IPS\Output::i()->json( array_values( $results ) );
 	}
 }

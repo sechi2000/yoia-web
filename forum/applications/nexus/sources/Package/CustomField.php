@@ -12,58 +12,41 @@
 namespace IPS\nexus\Package;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Content;
-use IPS\CustomField as SystemCustomField;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Helpers\Form\Ftp;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\nexus\Package;
-use IPS\Text\Encrypt;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Custom Profile Field Node
  */
-class CustomField extends SystemCustomField
+class _CustomField extends \IPS\CustomField
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_package_fields';
+	public static $databaseTable = 'nexus_package_fields';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'cf_';
+	public static $databasePrefix = 'cf_';
 		
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 	
 	/**
 	 * @brief	[CustomField] Title/Description lang prefix
 	 */
-	protected static string $langKey = 'nexus_pfield';
+	protected static $langKey = 'nexus_pfield';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -81,7 +64,7 @@ class CustomField extends SystemCustomField
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'nexus',
 		'module'	=> 'store',
 		'prefix'	=> 'package_fields_',
@@ -90,17 +73,17 @@ class CustomField extends SystemCustomField
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'custom_package_fields';
+	public static $nodeTitle = 'custom_package_fields';
 
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'nexus_pfield_';
+	public static $titleLangPrefix = 'nexus_pfield_';
 	
 	/**
 	 * @brief	[CustomField] Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'content'	=> 'extra',
 		'not_null'	=> 'required'
 	);
@@ -108,7 +91,7 @@ class CustomField extends SystemCustomField
 	/**
 	 * @brief	[CustomField] Additional Field Classes
 	 */
-	public static array $additionalFieldTypes = array(
+	public static $additionalFieldTypes = array(
 		'UserPass'	=> 'sf_type_UserPass',
 		'Ftp'		=> 'sf_type_Ftp'
 	);
@@ -116,17 +99,17 @@ class CustomField extends SystemCustomField
 	/**
 	 * @brief	[CustomField] Upload Field Storage Extension
 	 */
-	public static string $uploadStorageExtension = 'nexus_PurchaseFields';
+	public static $uploadStorageExtension = 'nexus_PurchaseFields';
 	
 	/**
 	 * @brief	[CustomField] Editor Options
 	 */
-	public static array $editorOptions = array( 'app' => 'nexus', 'key' => 'Purchases' );
+	public static $editorOptions = array( 'app' => 'nexus', 'key' => 'Purchases' );
 	
 	/**
 	 * @brief	[CustomField] Additional Field Toggles
 	 */
-	public static array $additionalFieldToggles = array(
+	public static $additionalFieldToggles = array(
 		'Address'		=> array( 'cf_sticky' ),
 		'Checkbox'		=> array( 'cf_sticky' ),
 		'CheckboxSet'	=> array( 'cf_sticky' ),
@@ -142,38 +125,34 @@ class CustomField extends SystemCustomField
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		parent::form( $form );
 
 		$packages = array();
-		if( $this->packages )
+		foreach ( array_filter( explode( ',', $this->packages ) ) as $id )
 		{
-			foreach ( array_filter( explode( ',', $this->packages ) ) as $id )
+			try
 			{
-				try
-				{
-					$packages[] = Package::load( $id );
-				}
-				catch ( OutOfRangeException ) { }
+				$packages[] = \IPS\nexus\Package::load( $id );
 			}
+			catch ( \OutOfRangeException $e ) { }
 		}
-
-		$form->add( new Node( 'cf_packages', $packages, FALSE, array( 'class' => 'IPS\nexus\Package\Group', 'noParentNodes' => 'custom_packages', 'multiple' => TRUE, 'permissionCheck' => function( $node )
+		$form->add( new \IPS\Helpers\Form\Node( 'cf_packages', $packages, FALSE, array( 'class' => 'IPS\nexus\Package\Group', 'noParentNodes' => 'custom_packages', 'multiple' => TRUE, 'permissionCheck' => function( $node )
 		{
-			return !( $node instanceof Group);
+			return !( $node instanceof \IPS\nexus\Package\Group );
 		} ) ), 'pf_desc' );
-		$form->add( new YesNo( 'cf_sticky', $this->sticky ?: FALSE, FALSE, array(), NULL, NULL, NULL, 'cf_sticky' ), 'pf_type' );
-		$form->add( new YesNo( 'cf_allow_attachments', $this->id ? $this->allow_attachments : 1, FALSE, array( ), NULL, NULL, NULL, 'pf_allow_attachments' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cf_sticky', $this->sticky ?: FALSE, FALSE, array(), NULL, NULL, NULL, 'cf_sticky' ), 'pf_type' );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cf_allow_attachments', $this->id ? $this->allow_attachments : 1, FALSE, array( ), NULL, NULL, NULL, 'pf_allow_attachments' ) );
 		
 		$form->addHeader( 'display_settings' );
-		$form->add( new YesNo( 'cf_purchase', $this->purchase, FALSE ) );
-		$form->add( new YesNo( 'cf_editable', $this->editable, FALSE ) );
-		$form->add( new YesNo( 'cf_required', $this->required ?: FALSE, FALSE, array(), NULL, NULL, NULL, 'pf_not_null' ) );
-		$form->add( new YesNo( 'cf_invoice', $this->invoice ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cf_purchase', $this->purchase, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cf_editable', $this->editable, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cf_required', $this->required ?: FALSE, FALSE, array(), NULL, NULL, NULL, 'pf_not_null' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'cf_invoice', $this->invoice ) );
 		
 		unset( $form->elements[''][1] );	
 		unset( $form->elements['']['pf_not_null'] );
@@ -192,9 +171,9 @@ class CustomField extends SystemCustomField
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
-		if( isset( $values['cf_packages'] ) AND is_array( $values['cf_packages'] ) )
+		if( isset( $values['cf_packages'] ) AND \is_array( $values['cf_packages'] ) )
 		{
 			$values['packages'] = implode( ',', array_map( function( $node ){ return $node->id; }, $values['cf_packages'] ) );
 			unset( $values['cf_packages'] );
@@ -210,24 +189,23 @@ class CustomField extends SystemCustomField
 		}
 
 		/* Disable 'sticky' for fields that don't support it */
-		if( !in_array( 'cf_sticky', static::$additionalFieldToggles[ $values['pf_type'] ] ?? [] ) )
+		if( !\in_array( 'cf_sticky', static::$additionalFieldToggles[ $values['pf_type'] ] ?? [] ) )
 		{
 			$values['cf_sticky'] = false;
 		}
 
 		return parent::formatFormValues( $values );
 	}
-
+	
 	/**
 	 * Build Form Helper
 	 *
-	 * @param mixed|null $value The value
-	 * @param callback|null $customValidationCode Custom validation code
-	 * @param Content|NULL $content The associated content, if editing
-	 * @param int $flags
-	 * @return Text|FormAbstract
+	 * @param	mixed		$value					The value
+	 * @param	callback	$customValidationCode	Custom validation code
+	 * @param   \IPS\Content|NULL		$content				The associated content, if editing
+	 * @return \IPS\Helpers\Form\FormAbstract
 	 */
-	public function buildHelper( mixed $value=NULL, callable $customValidationCode=NULL, ?Content $content = NULL, int $flags=0 ): Text|FormAbstract
+	public function buildHelper( $value=NULL, $customValidationCode=NULL, \IPS\Content $content = NULL )
 	{
 		if ( $this->type === 'UserPass' )
 		{
@@ -236,7 +214,7 @@ class CustomField extends SystemCustomField
 		}
 		elseif ( $this->type === 'Ftp' )
 		{
-			return new Ftp( static::$langKey . '_' . $this->id, $value, $this->not_null, array( 'validate' => $this->validate ), NULL, NULL, NULL, static::$langKey . '_' . $this->id );
+			return new \IPS\Helpers\Form\Ftp( static::$langKey . '_' . $this->id, $value, $this->not_null, array( 'validate' => $this->validate ), NULL, NULL, NULL, static::$langKey . '_' . $this->id );
 		}
 		
 		return parent::buildHelper( $value, $customValidationCode, $content );
@@ -247,16 +225,16 @@ class CustomField extends SystemCustomField
 	 *
 	 * @param	mixed	$value						The value
 	 * @param	bool	$showSensitiveInformation	If TRUE, potentially sensitive data (like passwords) will be displayed - otherwise will be blanked out
-	 * @param	string|null	$separator					Used to separate items when displaying a field with multiple values.
-	 * @return	string|null
+	 * @param	string	$separator					Used to separate items when displaying a field with multiple values.
+	 * @return	string
 	 */
-	public function displayValue( mixed $value=NULL, bool $showSensitiveInformation=FALSE, ?string $separator=NULL ): ?string
+	public function displayValue( $value=NULL, $showSensitiveInformation=FALSE, $separator=NULL )
 	{
 		if ( $this->type === 'UserPass' )
 		{
-			if ( !is_array( $value ) )
+			if ( !\is_array( $value ) )
 			{
-				$value = json_decode( Encrypt::fromTag( $value )->decrypt(), TRUE );
+				$value = json_decode( \IPS\Text\Encrypt::fromTag( $value )->decrypt(), TRUE );
 			}
 			
 			if ( !$showSensitiveInformation )
@@ -264,19 +242,19 @@ class CustomField extends SystemCustomField
 				$value['pw'] = '********';
 			}
 			
-			return Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->usernamePasswordDisplay( $value );
+			return \IPS\Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->usernamePasswordDisplay( $value );
 		}
 
 		/* Select boxes store the value and not the index, but the parent method uses the index to determine the value.
 		When using numeric options, this causes the wrong value to be returned. */
-		if ( $this->type == 'Select' )
+		if( $this->type == 'Select' )
 		{
-			if ( $this->multiple )
+			if( $this->multiple )
 			{
-				return implode( ( $separator ) ?: '<br>', explode( ',', htmlspecialchars( $value, ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', false ) ) );
+				return implode( ( $separator ) ? $separator : '<br>', explode( ',', htmlspecialchars( $value, ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE ) ) );
 			}
 
-			return htmlspecialchars( $value, ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', false );
+			return htmlspecialchars( $value, ENT_DISALLOWED | ENT_QUOTES, 'UTF-8', FALSE );
 		}
 		
 		return parent::displayValue( $value, $showSensitiveInformation );

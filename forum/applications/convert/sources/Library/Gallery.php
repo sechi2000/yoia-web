@@ -12,35 +12,9 @@
 namespace IPS\convert\Library;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ErrorException;
-use Exception;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\gallery\Album;
-use IPS\gallery\Category;
-use IPS\GeoLocation;
-use IPS\Http\Url;
-use IPS\Image;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Club;
-use LogicException;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_null;
-use function strstr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -48,12 +22,12 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * Invision Gallery Converter
  * @note	We must extend the Core Library here so we can access methods like convertAttachment, convertFollow, etc
  */
-class Gallery extends Core
+class _Gallery extends Core
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $app = 'gallery';
+	public $app = 'gallery';
 
 	/**
 	 * Returns an array of items that we can convert, including the amount of rows stored in the Community Suite as well as the recommend value of rows to convert per cycle
@@ -61,7 +35,7 @@ class Gallery extends Core
 	 * @param	bool	$rowCounts		enable row counts
 	 * @return	array
 	 */
-	public function menuRows( bool $rowCounts=FALSE ) : array
+	public function menuRows( $rowCounts=FALSE )
 	{
 		$return		= array();
 		$extraRows 	= $this->software->extraMenuRows();
@@ -74,7 +48,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertGalleryCategories',
 						'step_title'		=> 'convert_gallery_categories',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'gallery_categories' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'gallery_categories' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array(),
@@ -94,7 +68,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertGalleryAlbums',
 						'step_title'		=> 'convert_gallery_albums',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'gallery_albums' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'gallery_albums' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> $dependencies,
@@ -106,7 +80,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertGalleryAlbumComments',
 						'step_title'		=> 'convert_gallery_album_comments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'gallery_album_comments' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'gallery_album_comments' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertGalleryAlbums' ),
@@ -119,7 +93,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertGalleryAlbumReviews',
 						'step_title'		=> 'convert_gallery_album_reviews',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'gallery_album_reviews' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'gallery_album_reviews' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertGalleryAlbums' ),
@@ -145,7 +119,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertGalleryImages',
 						'step_title'		=> 'convert_gallery_images',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'gallery_images' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'gallery_images' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 10,
 						'dependencies'		=> $dependencies,
@@ -158,7 +132,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertGalleryComments',
 						'step_title'		=> 'convert_gallery_comments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'gallery_comments' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'gallery_comments' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertGalleryImages' ),
@@ -171,7 +145,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertGalleryReviews',
 						'step_title'		=> 'convert_gallery_reviews',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'gallery_reviews' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'gallery_reviews' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertGalleryImages' ),
@@ -184,7 +158,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_gallery_categories',
 						'step_method'		=> 'convertClubGalleryCategories',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'gallery_categories', array( "category_club_id IS NOT NULL" ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'gallery_categories', array( "category_club_id IS NOT NULL" ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertGalleryImages' ),
@@ -196,7 +170,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_gallery_images',
 						'step_method'		=> 'convertClubGalleryImages',
-						'ips_rows'			=> Db::i()->select( 'SUM(category_count_imgs)', 'gallery_categories', array( "category_club_id IS NOT NULL" ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'SUM(category_count_imgs)', 'gallery_categories', array( "category_club_id IS NOT NULL" ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 10,
 						'dependencies'		=> array( 'convertClubGalleryCategories' ),
@@ -208,7 +182,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_gallery_comments',
 						'step_method'		=> 'convertClubGalleryComments',
-						'ips_rows'			=> Db::i()->select( 'SUM(category_count_comments)', 'gallery_categories', array( "category_club_id IS NOT NULL" ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'SUM(category_count_comments)', 'gallery_categories', array( "category_club_id IS NOT NULL" ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubGalleryImages' ),
@@ -220,7 +194,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_club_gallery_reviews',
 						'step_method'		=> 'convertClubGalleryReviews',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'gallery_reviews', array( Db::i()->in( 'review_image_id', Db::i()->select( 'image_id', 'gallery_images', array( Db::i()->in( 'image_category_id', Db::i()->select( 'category_id', 'gallery_categories', array( "category_club_id IS NOT NULL" ) ) ) ) ) ) ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'gallery_reviews', array( \IPS\Db::i()->in( 'review_image_id', \IPS\Db::i()->select( 'image_id', 'gallery_images', array( \IPS\Db::i()->in( 'image_category_id', \IPS\Db::i()->select( 'category_id', 'gallery_categories', array( "category_club_id IS NOT NULL" ) ) ) ) ) ) ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertClubGalleryImages' ),
@@ -244,7 +218,7 @@ class Gallery extends Core
 					$return[ $k ] = array(
 						'step_method'		=> 'convertAttachments',
 						'step_title'		=> 'convert_attachments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( "location_key=?", 'gallery_Images' ) ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( "location_key=?", 'gallery_Images' ) ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 10,
 						'dependencies'		=> $dependencies,
@@ -278,12 +252,11 @@ class Gallery extends Core
 	 * @param	string	$method	Method to truncate
 	 * @return	array
 	 */
-	protected function truncate( string $method ) : array
+	protected function truncate( $method )
 	{
 		$return		= array();
-		$classname	= get_class( $this->software );
+		$classname	= \get_class( $this->software );
 
-		/* @var Software $classname */
 		if( $classname::canConvert() === NULL )
 		{
 			return array();
@@ -326,7 +299,7 @@ class Gallery extends Core
 					break;
 				
 				case 'convertAttachments':
-					$return['convertAttachments'] = array( 'core_attachments' => Db::i()->select( 'attachment_id', 'core_attachments_map', array( "location_key=?", 'gallery_Gallery' ) ), 'core_attachments_map' => array( 'location_key=?', 'gallery_Gallery' ) );
+					$return['convertAttachments'] = array( 'core_attachments' => \IPS\Db::i()->select( 'attachment_id', 'core_attachments_map', array( "location_key=?", 'gallery_Gallery' ) ), 'core_attachments_map' => array( 'location_key=?', 'gallery_Gallery' ) );
 					break;
 
 				case 'convertClubGalleryCategories':
@@ -334,15 +307,15 @@ class Gallery extends Core
 					break;
 
 				case 'convertClubGalleryImages':
-					$return['convertClubGalleryImages'] = array( 'gallery_images' => array( 'image_id IN ( ' . Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_gallery_images' AND app={$this->software->app->app_id}" ) ) . ')' ) );
+					$return['convertClubGalleryImages'] = array( 'gallery_images' => array( 'image_id IN ( ' . (string) \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_gallery_images' AND app={$this->software->app->app_id}" ) ) . ')' ) );
 					break;
 
 				case 'convertClubGalleryComments':
-					$return['convertClubGalleryComments'] = array( 'gallery_comments' => array( 'comment_id IN ( ' . Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_gallery_comments' AND app={$this->software->app->app_id}" ) ) . ')' ) );
+					$return['convertClubGalleryComments'] = array( 'gallery_comments' => array( 'comment_id IN ( ' . (string) \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_gallery_comments' AND app={$this->software->app->app_id}" ) ) . ')' ) );
 					break;
 
 				case 'convertClubGalleryReviews':
-					$return['convertClubGalleryReviews'] = array( 'gallery_reviews' => array( 'review_id IN ( ' . Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_gallery_reviews' AND app={$this->software->app->app_id}" ) ) . ')' ) );
+					$return['convertClubGalleryReviews'] = array( 'gallery_reviews' => array( 'review_id IN ( ' . (string) \IPS\Db::i()->select( 'ipb_id', 'convert_link', array( "type='core_clubs_gallery_reviews' AND app={$this->software->app->app_id}" ) ) . ')' ) );
 					break;
 			}
 		}
@@ -368,20 +341,20 @@ class Gallery extends Core
 	 * Convert a category
 	 *
 	 * @param	array			$info	Data to insert
-	 * @return	int|bool	The ID of the newly converted category, or FALSE on error.
+	 * @return	integer|boolean	The ID of the newly converted category, or FALSE on error.
 	 */
-	public function convertGalleryCategory( array $info=array() ) : bool|int
+	public function convertGalleryCategory( $info=array() )
 	{
 		if ( !isset( $info['category_id'] ) )
 		{
-			$this->software->app->log( 'gallery_category_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'gallery_category_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['category_name'] ) )
 		{
 			$name = "Untitled Category {$info['category_id']}";
-			$this->software->app->log( 'gallery_category_missing_name', __METHOD__, App::LOG_NOTICE, $info['category_id'] );
+			$this->software->app->log( 'gallery_category_missing_name', __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['category_id'] );
 		}
 		else
 		{
@@ -405,7 +378,7 @@ class Gallery extends Core
 			{
 				$info['category_parent_id'] = $this->software->app->getLink( $info['category_parent_id'], 'gallery_categories' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['category_conv_parent'] = $info['category_parent_id'];
 			}
@@ -415,7 +388,7 @@ class Gallery extends Core
 			$info['category_parent_id'] = 0;
 		}
 		
-		$info['category_name_seo'] = Url::seoTitle( $name );
+		$info['category_name_seo'] = \IPS\Http\Url::seoTitle( $name );
 		
 		/* Counts */
 		foreach( array( 'category_count_imgs', 'category_count_comments', 'category_count_imgs_hidden', 'category_count_comments_hidden', 'category_public_albums', 'category_nonpublic_albums', 'category_rating_aggregate', 'category_rating_count', 'category_rating_total' ) AS $count )
@@ -433,13 +406,13 @@ class Gallery extends Core
 
 		/* Album Sort Order */
 		$sortOrders = array( 'album_last_img_date', 'album_last_comment', 'album_rating_aggregate', 'album_comments','album_reviews', 'album_name', 'album_count_comments', 'album_count_imgs' );
-		if ( !isset( $info['category_sort_options'] ) OR !in_array( $info['category_sort_options'], $sortOrders ) )
+		if ( !isset( $info['category_sort_options'] ) OR !\in_array( $info['category_sort_options'], $sortOrders ) )
 		{
 			$info['category_sort_options'] = 'album_last_img_date';
 		}
 
 		/* Image Sort Order */
-		if ( !isset( $info['category_sort_options_img'] ) OR !in_array( $info['category_sort_options_img'], array( 'updated', 'last_comment', 'title', 'rating', 'date', 'num_comments', 'num_reviews', 'views' ) ) )
+		if ( !isset( $info['category_sort_options_img'] ) OR !\in_array( $info['category_sort_options_img'], array( 'updated', 'last_comment', 'title', 'rating', 'date', 'num_comments', 'num_reviews', 'views' ) ) )
 		{
 			$info['category_sort_options_img'] = 'updated';
 		}
@@ -468,7 +441,7 @@ class Gallery extends Core
 		
 		if ( !isset( $info['category_position'] ) )
 		{
-			$position = Db::i()->select( 'MAX(category_position)', 'gallery_categories' )->first();
+			$position = \IPS\Db::i()->select( 'MAX(category_position)', 'gallery_categories' )->first();
 			
 			$info['category_position'] = $position + 1;
 		}
@@ -479,7 +452,7 @@ class Gallery extends Core
 			{
 				$info['category_club_id'] = $this->software->app->getLink( $info['category_club_id'], 'core_clubs', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['category_club_id'] = NULL;
 			}
@@ -492,25 +465,25 @@ class Gallery extends Core
 		$id = $info['category_id'];
 		unset( $info['category_id'] );
 		
-		$inserted_id = Db::i()->insert( 'gallery_categories', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'gallery_categories', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'gallery_categories' );
 		
-		Lang::saveCustom( 'gallery', "gallery_category_{$inserted_id}", $name );
-		Lang::saveCustom( 'gallery', "gallery_category_{$inserted_id}_desc", $desc );
+		\IPS\Lang::saveCustom( 'gallery', "gallery_category_{$inserted_id}", $name );
+		\IPS\Lang::saveCustom( 'gallery', "gallery_category_{$inserted_id}_desc", $desc );
 		
-		Db::i()->update( 'gallery_categories', array( "category_parent_id" => $inserted_id ), array( "category_conv_parent=?", $id ) );
-		Db::i()->insert( 'core_permission_index', array( 'app' => 'gallery', 'perm_type' => 'category', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
+		\IPS\Db::i()->update( 'gallery_categories', array( "category_parent_id" => $inserted_id ), array( "category_conv_parent=?", $id ) );
+		\IPS\Db::i()->insert( 'core_permission_index', array( 'app' => 'gallery', 'perm_type' => 'category', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
 		
 		if ( $info['category_club_id'] )
 		{
-			Db::i()->insert( 'core_clubs_node_map', array(
+			\IPS\Db::i()->insert( 'core_clubs_node_map', array(
 				'node_id'		=> $inserted_id,
 				'node_class'	=> "IPS\\gallery\\Category",
 				'club_id'		=> $info['category_club_id'],
 				'name'			=> $name
 			) );
 			
-			Category::load( $inserted_id )->setPermissionsToClub( Club::load( $info['category_club_id'] ) );
+			\IPS\gallery\Category::load( $inserted_id )->setPermissionsToClub( \IPS\Member\Club::load( $info['category_club_id'] ) );
 		}
 		
 		return $inserted_id;
@@ -521,18 +494,18 @@ class Gallery extends Core
 	 *
 	 * @param	array			$info			Data to insert
 	 * @param	array|NULL		$socialgroup	Array of social group data, or NULL.
-	 * @param	int|NULL	$category		If the source software only has albums, and not categories, an existing category ID can be passed here to store converted albums. NULL to auto-create.
-	 * @return	int|bool	The ID of the newly converted album, or FALSE on error.
+	 * @param	integer|NULL	$category		If the source software only has albums, and not categories, an existing category ID can be passed here to store converted albums. NULL to auto-create.
+	 * @return	integer|boolean	The ID of the newly converted album, or FALSE on error.
 	 */
-	public function convertGalleryAlbum( array $info=array(), ?array $socialgroup=NULL, ?int $category=NULL ) : bool|int
+	public function convertGalleryAlbum( $info=array(), $socialgroup=NULL, $category=NULL )
 	{
 		if ( !isset( $info['album_id'] ) )
 		{
-			$this->software->app->log( 'gallery_album_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'gallery_album_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( is_null( $category ) )
+		if ( \is_null( $category ) )
 		{
 			if ( isset( $info['album_category_id'] ) )
 			{
@@ -540,7 +513,7 @@ class Gallery extends Core
 				{
 					$info['album_category_id'] = $this->software->app->getLink( $info['album_category_id'], 'gallery_categories' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$info['album_category_id'] = $this->_orphanedAlbumsCategory();
 				}
@@ -557,9 +530,9 @@ class Gallery extends Core
 			/* Check the category exists */
 			try
 			{
-				Category::load( $info['album_category_id'] );
+				\IPS\gallery\Category::load( $info['album_category_id'] );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['album_category_id'] = $this->_orphanedAlbumsCategory();
 			}
@@ -571,7 +544,7 @@ class Gallery extends Core
 			{
 				$info['album_owner_id'] = $this->software->app->getLink( $info['album_owner_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['album_owner_id'] = 0;
 			}
@@ -584,17 +557,17 @@ class Gallery extends Core
 		if ( !isset( $info['album_name'] ) )
 		{
 			$info['album_name'] = "Untitled Album {$info['album_id']}";
-			$this->software->app->log( 'gallery_album_missing_name', __METHOD__, App::LOG_NOTICE, $info['album_id'] );
+			$this->software->app->log( 'gallery_album_missing_name', __METHOD__, \IPS\convert\App::LOG_NOTICE, $info['album_id'] );
 		}
 		
-		$info['album_name_seo'] = Url::seoTitle( $info['album_name'] );
+		$info['album_name_seo'] = \IPS\Http\Url::seoTitle( $info['album_name'] );
 		
 		if ( !isset( $info['album_description'] ) )
 		{
 			$info['album_description'] = '';
 		}
 		
-		if ( !isset( $info['album_type'] ) OR !in_array( $info['album_type'], array( 1, 2, 3 ) ) )
+		if ( !isset( $info['album_type'] ) OR !\in_array( $info['album_type'], array( 1, 2, 3 ) ) )
 		{
 			$info['album_type'] = 1;
 		}
@@ -614,7 +587,7 @@ class Gallery extends Core
 		$info['album_last_img_date']	= 0;
 		$info['album_last_x_images']	= NULL;
 		
-		if ( !isset( $info['album_sort_options'] ) OR !in_array( $info['album_sort_options'], array( 'updated', 'last_comment', 'title', 'rating', 'date', 'num_comments', 'num_reviews', 'views' ) ) )
+		if ( !isset( $info['album_sort_options'] ) OR !\in_array( $info['album_sort_options'], array( 'updated', 'last_comment', 'title', 'rating', 'date', 'num_comments', 'num_reviews', 'views' ) ) )
 		{
 			$info['album_sort_options'] = 'updated';
 		}
@@ -636,15 +609,15 @@ class Gallery extends Core
 		
 		if ( !isset( $info['album_position'] ) )
 		{
-			$position = Db::i()->select( 'MAX(album_position)', 'gallery_albums', array( "album_owner_id=?", $info['album_owner_id'] ) )->first();
+			$position = \IPS\Db::i()->select( 'MAX(album_position)', 'gallery_albums', array( "album_owner_id=?", $info['album_owner_id'] ) )->first();
 			
 			$info['album_position'] = $position + 1;
 		}
 		
 		$info['album_allowed_access'] = NULL;
-		if ( is_array( $socialgroup ) )
+		if ( !\is_null( $socialgroup ) AND \is_array( $socialgroup ) )
 		{
-			$socialGroupId = Db::i()->insert( 'core_sys_social_groups', array( 'owner_id' => $info['album_owner_id'] ) );
+			$socialGroupId = \IPS\Db::i()->insert( 'core_sys_social_groups', array( 'owner_id' => $info['album_owner_id'] ) );
 			$members	= array();
 			$members[]	= array( 'group_id' => $socialGroupId, 'member_id' => $info['album_owner_id'] );
 			foreach( $socialgroup['members'] AS $member )
@@ -653,12 +626,12 @@ class Gallery extends Core
 				{
 					$members[] = array( 'group_id' => $socialGroupId, 'member_id' => $this->software->app->getLink( $member, 'core_members', TRUE ) );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					continue;
 				}
 			}
-			Db::i()->insert( 'core_sys_social_group_members', $members );
+			\IPS\Db::i()->insert( 'core_sys_social_group_members', $members );
 			
 			$info['album_allowed_access'] = $socialGroupId;
 		}
@@ -671,7 +644,7 @@ class Gallery extends Core
 		$id = $info['album_id'];
 		unset( $info['album_id'] );
 		
-		$inserted_id = Db::i()->insert( 'gallery_albums', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'gallery_albums', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'gallery_albums' );
 		
 		return $inserted_id;
@@ -680,9 +653,9 @@ class Gallery extends Core
 	/**
 	 * Orphaned Albums Category
 	 *
-	 * @return	int	Orphaned Albums Category ID
+	 * @return	integer	Orphaned Albums Category ID
 	 */
-	protected function _orphanedAlbumsCategory() : int
+	protected function _orphanedAlbumsCategory()
 	{
 		try
 		{
@@ -691,18 +664,18 @@ class Gallery extends Core
 			/* Check the category exists */
 			try
 			{
-				Category::load( $id );
+				\IPS\gallery\Category::load( $id );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				/* Delete the relation if it no longer exists */
 				$this->software->app->deleteLink( '__orphaned__', 'gallery_categories' );
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 
 			return $id;
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			return $this->convertGalleryCategory( array(
 				'category_id'		=> '__orphaned__',
@@ -716,21 +689,21 @@ class Gallery extends Core
 	 *
 	 * @param	array			$info		Data to insert
 	 * @param	string|NULL		$filepath	The path to the image, or NULL.
-	 * @param	string|NULL		$filedata	The binary data for the image, or NULL
-	 * @return	int|bool	The ID of the newly inserted image, or FALSE on failure.
+	 * @param	string|NULL		$fileinfo	The binary data for the image, or NULL
+	 * @return	integer|boolean	The ID of the newly inserted image, or FALSE on failure.
 	 */
-	public function convertGalleryImage( array $info=array(), ?string $filepath=NULL, ?string $filedata=NULL ) : bool|int
+	public function convertGalleryImage( $info=array(), $filepath=NULL, $filedata=NULL )
 	{
 		if ( !isset( $info['image_id'] ) )
 		{
-			$this->software->app->log( 'gallery_image_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'gallery_image_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		/* If we don't have any image to process, just stop here */
-		if ( is_null( $filedata ) AND ( is_null( $filepath ) OR !file_exists( $filepath ) ) )
+		if ( \is_null( $filedata ) AND ( \is_null( $filepath ) OR !file_exists( $filepath ) ) )
 		{
-			$this->software->app->log( 'gallery_image_missing_image', __METHOD__, App::LOG_WARNING, $info['image_id'] );
+			$this->software->app->log( 'gallery_image_missing_image', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['image_id'] );
 			return FALSE;
 		}
 		
@@ -745,11 +718,11 @@ class Gallery extends Core
 				{
 					$info['image_album_id'] = $this->software->app->getLink( $info['image_album_id'], 'gallery_albums' );
 					
-					$album = Album::load( $info['image_album_id'] );
+					$album = \IPS\gallery\Album::load( $info['image_album_id'] );
 					$info['image_category_id'] = $album->category_id;
 					$categoryFound = TRUE;
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* We can just dump directly into the category */
 					$info['image_album_id'] = 0;
@@ -761,20 +734,20 @@ class Gallery extends Core
 			$info['image_album_id'] = 0;
 		}
 		
-		if ( isset( $info['image_category_id'] ) AND !$categoryFound )
+		if ( isset( $info['image_category_id'] ) AND $categoryFound == FALSE )
 		{
 			try
 			{
 				$info['image_category_id'] = $this->software->app->getLink( $info['image_category_id'], 'gallery_categories' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['image_category_id'] = $this->_orphanedAlbumsCategory();
 			}
 		}
 		else
 		{
-			if ( !$categoryFound )
+			if ( $categoryFound == FALSE )
 			{
 				$info['image_category_id'] = $this->_orphanedAlbumsCategory();
 			}
@@ -786,7 +759,7 @@ class Gallery extends Core
 			{
 				$info['image_member_id'] = $this->software->app->getLink( $info['image_member_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				/* Set it to NULL - we can try a few other methods. */
 				$info['image_member_id'] = NULL;
@@ -797,14 +770,14 @@ class Gallery extends Core
 			$info['image_member_id'] = NULL;
 		}
 		
-		if ( is_null( $info['image_member_id'] ) )
+		if ( \is_null( $info['image_member_id'] ) )
 		{
 			try
 			{
-				$album = Album::load( $info['image_album_id'] );
+				$album = \IPS\gallery\Album::load( $info['image_album_id'] );
 				$info['image_member_id'] = (int) $album->owner()->member_id;
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['image_member_id'] = 0;
 			}
@@ -822,11 +795,11 @@ class Gallery extends Core
 		/* Figure this out before we bother creating the image */
 		if ( !isset( $info['image_file_type'] ) )
 		{
-			$mime_type = File::getMimeType( $info['image_file_name'] );
+			$mime_type = \IPS\File::getMimeType( $info['image_file_name'] );
 			
-			if ( $mime_type === 'application/x-unknown' OR ( strstr( $mime_type, 'image' ) === FALSE AND strstr( $mime_type, 'video' ) === FALSE ) )
+			if ( $mime_type === 'application/x-unknown' OR ( \strstr( $mime_type, 'image' ) === FALSE AND \strstr( $mime_type, 'video' ) === FALSE ) )
 			{
-				$this->software->app->log( 'gallery_image_invalid_mime_type', __METHOD__, App::LOG_WARNING, $info['image_id'] );
+				$this->software->app->log( 'gallery_image_invalid_mime_type', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['image_id'] );
 				return FALSE;
 			}
 			
@@ -836,7 +809,7 @@ class Gallery extends Core
 		if ( !isset( $info['image_file_name'] ) )
 		{
 			/* If we were passed a path, try and figure it out */
-			if ( !is_null( $filepath ) )
+			if ( !\is_null( $filepath ) )
 			{
 				$file_name = explode( '/', $filepath );
 				$file_name = array_pop( $file_name );
@@ -845,7 +818,7 @@ class Gallery extends Core
 			else
 			{
 				/* We can't do much here... we have binary data, but no way to figure out the file name */
-				$this->software->app->log( 'gallery_image_missing_file_name', __METHOD__, App::LOG_WARNING, $info['image_id'] );
+				$this->software->app->log( 'gallery_image_missing_file_name', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['image_id'] );
 				return FALSE;
 			}
 		}
@@ -857,7 +830,7 @@ class Gallery extends Core
 		/* Image Caption */
 		if ( !isset( $info['image_caption'] ) )
 		{
-			if ( !is_null( $filepath ) )
+			if ( !\is_null( $filepath ) )
 			{
 				$caption = explode( '/', $info['image_file_name'] );
 				$caption = array_pop( $caption );
@@ -880,7 +853,7 @@ class Gallery extends Core
 		{
 			if ( isset( $info[ $date ] ) )
 			{
-				if ( $info[ $date ] instanceof DateTime )
+				if ( $info[ $date ] instanceof \IPS\DateTime )
 				{
 					$info[ $date ] = $info[ $date ]->getTimestamp();
 				}
@@ -902,17 +875,17 @@ class Gallery extends Core
 		/* Okay, let's create our image. We can use data returned from this later if it's missing. */
 		try
 		{
-			if ( is_null( $filedata ) AND !is_null( $filepath ) )
+			if ( \is_null( $filedata ) AND !\is_null( $filepath ) )
 			{
 				if( !file_exists( $filepath ) )
 				{
-					$this->software->app->log( 'gallery_image_missing_file', __METHOD__, App::LOG_WARNING, $info['image_id'] );
+					$this->software->app->log( 'gallery_image_missing_file', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['image_id'] );
 					return FALSE;
 				}
 
 				$filedata = file_get_contents( $filepath );
 			}
-			$image = File::create( 'gallery_Images', $info['image_file_name'], $filedata, $container );
+			$image = \IPS\File::create( 'gallery_Images', $info['image_file_name'], $filedata, $container );
 			$info['image_original_file_name'] = (string) $image;
 			
 			if ( !isset( $info['image_file_size'] ) )
@@ -920,12 +893,17 @@ class Gallery extends Core
 				$info['image_file_size'] = $image->filesize();
 			}
 		}
-		catch( Exception|ErrorException $e )
+		catch( \Exception $e )
 		{
-			$this->software->app->log( $e->getMessage(), __METHOD__, App::LOG_WARNING, $info['image_id'] );
+			$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_WARNING, $info['image_id'] );
 			return FALSE;
 		}
-
+		catch( \ErrorException $e )
+		{
+			$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_WARNING, $info['image_id'] );
+			return FALSE;
+		}
+		
 		if ( !isset( $info['image_approved'] ) )
 		{
 			$info['image_approved'] = 1;
@@ -947,7 +925,7 @@ class Gallery extends Core
 		
 		if ( !isset( $info['image_media'] ) )
 		{
-			if ( strstr( $info['image_file_type'], 'video' ) !== FALSE )
+			if ( \strstr( $info['image_file_type'], 'video' ) !== FALSE )
 			{
 				$info['image_media'] = 1;
 			}
@@ -971,9 +949,9 @@ class Gallery extends Core
 		{
 			try
 			{
-				$exif = Image::create( $image->contents() )->getExifData();
+				$exif = \IPS\Image::create( $image->contents() )->getExifData();
 			}
-			catch( LogicException $e )
+			catch( \LogicException $e )
 			{
 				$exif = NULL;
 			}
@@ -981,7 +959,7 @@ class Gallery extends Core
 			$info['image_metadata'] = json_encode( $exif );
 		}
 		
-		$info['image_caption_seo'] = Url::seoTitle( $info['image_caption'] );
+		$info['image_caption_seo'] = \IPS\Http\Url::seoTitle( $info['image_caption'] );
 		
 		if ( !isset( $info['image_privacy'] ) )
 		{
@@ -996,7 +974,7 @@ class Gallery extends Core
 		}
 		
 		/* GeoLocation Stuffs */
-		if ( isset( $info['image_geolocation'] ) AND $info['image_geolocation'] instanceof GeoLocation )
+		if ( isset( $info['image_geolocation'] ) AND $info['image_geolocation'] instanceof \IPS\GeoLocation )
 		{
 			if ( !isset( $info['image_gps_show'] ) )
 			{
@@ -1024,7 +1002,7 @@ class Gallery extends Core
 			{
 				$info['image_approved_by'] = $this->software->app->getLink( $info['image_approved_by'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['image_approved_by'] = NULL;
 			}
@@ -1036,7 +1014,7 @@ class Gallery extends Core
 		
 		if ( isset( $info['image_approved_on'] ) )
 		{
-			if ( $info['image_approved_on'] instanceof DateTime )
+			if ( $info['image_approved_on'] instanceof \IPS\DateTime )
 			{
 				$info['image_approved_on'] = $info['image_approved_on']->getTimestamp();
 			}
@@ -1063,7 +1041,7 @@ class Gallery extends Core
 		$id = $info['image_id'];
 		unset( $info['image_id'] );
 		
-		$inserted_id = Db::i()->insert( 'gallery_images', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'gallery_images', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'gallery_images' );
 		
 		return $inserted_id;
@@ -1073,19 +1051,19 @@ class Gallery extends Core
 	 * Convert an album comment
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted comment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted comment, or FALSE on failure.
 	 */
-	public function convertGalleryAlbumComment( array $info=array() ) : bool|int
+	public function convertGalleryAlbumComment( $info=array() )
 	{
 		if ( !isset( $info['comment_id'] ) )
 		{
-			$this->software->app->log( 'gallery_album_comment_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'gallery_album_comment_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( empty( $info['comment_text'] ) )
 		{
-			$this->software->app->log( 'gallery_album_comment_missing_content', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'gallery_album_comment_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 
@@ -1095,21 +1073,21 @@ class Gallery extends Core
 			{
 				$info['comment_album_id'] = $this->software->app->getLink( $info['comment_album_id'], 'gallery_albums' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'gallery_album_comment_missing_image', __METHOD__, ApP::LOG_WARNING, $info['comment_id'] );
+				$this->software->app->log( 'gallery_album_comment_missing_image', __METHOD__, \IPS\convert\ApP::LOG_WARNING, $info['comment_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'gallery_album_omment_missing_image', __METHOD__, ApP::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'gallery_album_omment_missing_image', __METHOD__, \IPS\convert\ApP::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 
 		if ( isset( $info['comment_edit_time'] ) )
 		{
-			if ( $info['comment_edit_time'] instanceof DateTime )
+			if ( $info['comment_edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['comment_edit_time'] = $info['comment_edit_time']->getTimestamp();
 			}
@@ -1125,7 +1103,7 @@ class Gallery extends Core
 			{
 				$info['comment_author_id'] = $this->software->app->getLink( $info['comment_author_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['comment_author_id'] = 0;
 			}
@@ -1137,7 +1115,7 @@ class Gallery extends Core
 
 		if ( !isset( $info['comment_author_name'] ) )
 		{
-			$author = Member::load( $info['comment_author_id'] );
+			$author = \IPS\Member::load( $info['comment_author_id'] );
 
 			if ( $author->member_id )
 			{
@@ -1156,7 +1134,7 @@ class Gallery extends Core
 
 		if ( isset( $info['comment_post_date'] ) )
 		{
-			if ( $info['comment_post_date'] instanceof DateTime )
+			if ( $info['comment_post_date'] instanceof \IPS\DateTime )
 			{
 				$info['comment_post_date'] = $info['comment_post_date']->getTimestamp();
 			}
@@ -1184,7 +1162,7 @@ class Gallery extends Core
 		$id = $info['comment_id'];
 		unset( $info['comment_id'] );
 
-		$inserted_id = Db::i()->insert( 'gallery_album_comments', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'gallery_album_comments', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'gallery_album_comments' );
 
 		return $inserted_id;
@@ -1194,25 +1172,25 @@ class Gallery extends Core
 	 * Convert an album review
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted reiew, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted reiew, or FALSE on failure.
 	 */
-	public function convertGalleryAlbumReview( array $info=array() ) : bool|int
+	public function convertGalleryAlbumReview( $info=array() )
 	{
 		if ( !isset( $info['review_id'] ) )
 		{
-			$this->software->app->log( 'gallery_album_review_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'gallery_album_review_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 
 		if ( empty( $info['review_content'] ) )
 		{
-			$this->software->app->log( 'gallery_album_review_missing_content', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'gallery_album_review_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 
 		if ( !isset( $info['review_rating'] ) OR $info['review_rating'] < 1 )
 		{
-			$this->software->app->log( 'gallery_album_review_missing_rating', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'gallery_album_review_missing_rating', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 
@@ -1222,15 +1200,15 @@ class Gallery extends Core
 			{
 				$info['review_author'] = $this->software->app->getLink( $info['review_author'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'gallery_album_review_missing_author', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+				$this->software->app->log( 'gallery_album_review_missing_author', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'gallery_album_review_missing_author', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'gallery_album_review_missing_author', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 
@@ -1240,21 +1218,21 @@ class Gallery extends Core
 			{
 				$info['review_album_id'] = $this->software->app->getLink( $info['review_album_id'], 'gallery_albums' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'gallery_album_review_missing_album', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+				$this->software->app->log( 'gallery_album_review_missing_album', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 				return FALSE;
 			}
 		}
 
 		if ( !isset( $info['review_author_name'] ) )
 		{
-			$info['review_author_name'] = Member::load( $info['review_author'] )->name;
+			$info['review_author_name'] = \IPS\Member::load( $info['review_author'] )->name;
 		}
 
 		if ( isset( $info['review_date'] ) )
 		{
-			if ( $info['review_date'] instanceof DateTime )
+			if ( $info['review_date'] instanceof \IPS\DateTime )
 			{
 				$info['review_date'] = $info['review_date']->getTimestamp();
 			}
@@ -1271,7 +1249,7 @@ class Gallery extends Core
 
 		if ( isset( $info['review_edit_time'] ) )
 		{
-			if ( $info['review_edit_time'] instanceof DateTime )
+			if ( $info['review_edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['review_edit_time'] = $info['review_edit_time']->getTimestamp();
 			}
@@ -1293,13 +1271,13 @@ class Gallery extends Core
 
 		if ( isset( $info['review_votes_data'] ) )
 		{
-			if ( !is_array( $info['review_votes_data'] ) )
+			if ( !\is_array( $info['review_votes_data'] ) )
 			{
 				$info['review_votes_data'] = json_decode( $info['review_votes_data'], TRUE );
 			}
 
 			$newVoters = array();
-			if ( !is_null( $info['review_votes_data'] ) AND count( $info['review_votes_data'] ) )
+			if ( !\is_null( $info['review_votes_data'] ) AND \count( $info['review_votes_data'] ) )
 			{
 				foreach( $info['review_votes_data'] AS $member => $vote )
 				{
@@ -1307,7 +1285,7 @@ class Gallery extends Core
 					{
 						$memberId = $this->software->app->getLink( $member, 'core_members', TRUE );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						continue;
 					}
@@ -1316,7 +1294,7 @@ class Gallery extends Core
 				}
 			}
 
-			if ( count( $newVoters ) )
+			if ( \count( $newVoters ) )
 			{
 				$info['review_votes_data'] = json_encode( $newVoters );
 			}
@@ -1332,19 +1310,19 @@ class Gallery extends Core
 
 		if ( !isset( $info['review_votes'] ) )
 		{
-			if ( is_null( $info['review_votes_data'] ) )
+			if ( \is_null( $info['review_votes_data'] ) )
 			{
 				$info['review_votes'] = 0;
 			}
 			else
 			{
-				$info['review_votes'] = count( json_decode( $info['review_votes_data'], TRUE ) );
+				$info['review_votes'] = \count( json_decode( $info['review_votes_data'], TRUE ) );
 			}
 		}
 
 		if ( !isset( $info['review_votes_helpful'] ) )
 		{
-			if ( is_null( $info['review_votes_data'] ) )
+			if ( \is_null( $info['review_votes_data'] ) )
 			{
 				$info['review_votes_helpful'] = 0;
 			}
@@ -1371,7 +1349,7 @@ class Gallery extends Core
 		$id = $info['review_id'];
 		unset( $info['review_id'] );
 
-		$inserted_id = Db::i()->insert( 'gallery_album_reviews', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'gallery_album_reviews', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'gallery_album_reviews' );
 
 		return $inserted_id;
@@ -1381,19 +1359,19 @@ class Gallery extends Core
 	 * Convert a comment
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted comment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted comment, or FALSE on failure.
 	 */
-	public function convertGalleryComment( array $info=array() ) : bool|int
+	public function convertGalleryComment( $info=array() )
 	{
 		if ( !isset( $info['comment_id'] ) )
 		{
-			$this->software->app->log( 'gallery_comment_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'gallery_comment_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( empty( $info['comment_text'] ) )
 		{
-			$this->software->app->log( 'gallery_comment_missing_content', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'gallery_comment_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 		
@@ -1403,21 +1381,21 @@ class Gallery extends Core
 			{
 				$info['comment_img_id'] = $this->software->app->getLink( $info['comment_img_id'], 'gallery_images' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'gallery_comment_missing_image', __METHOD__, ApP::LOG_WARNING, $info['comment_id'] );
+				$this->software->app->log( 'gallery_comment_missing_image', __METHOD__, \IPS\convert\ApP::LOG_WARNING, $info['comment_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'gallery_comment_missing_image', __METHOD__, ApP::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'gallery_comment_missing_image', __METHOD__, \IPS\convert\ApP::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 		
 		if ( isset( $info['comment_edit_time'] ) )
 		{
-			if ( $info['comment_edit_time'] instanceof DateTime )
+			if ( $info['comment_edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['comment_edit_time'] = $info['comment_edit_time']->getTimestamp();
 			}
@@ -1433,7 +1411,7 @@ class Gallery extends Core
 			{
 				$info['comment_author_id'] = $this->software->app->getLink( $info['comment_author_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['comment_author_id'] = 0;
 			}
@@ -1445,7 +1423,7 @@ class Gallery extends Core
 		
 		if ( !isset( $info['comment_author_name'] ) )
 		{
-			$author = Member::load( $info['comment_author_id'] );
+			$author = \IPS\Member::load( $info['comment_author_id'] );
 			
 			if ( $author->member_id )
 			{
@@ -1464,7 +1442,7 @@ class Gallery extends Core
 		
 		if ( isset( $info['comment_post_date'] ) )
 		{
-			if ( $info['comment_post_date'] instanceof DateTime )
+			if ( $info['comment_post_date'] instanceof \IPS\DateTime )
 			{
 				$info['comment_post_date'] = $info['comment_post_date']->getTimestamp();
 			}
@@ -1492,7 +1470,7 @@ class Gallery extends Core
 		$id = $info['comment_id'];
 		unset( $info['comment_id'] );
 		
-		$inserted_id = Db::i()->insert( 'gallery_comments', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'gallery_comments', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'gallery_comments' );
 		
 		return $inserted_id;
@@ -1502,25 +1480,25 @@ class Gallery extends Core
 	 * Convert a review
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted reiew, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted reiew, or FALSE on failure.
 	 */
-	public function convertGalleryReview( array $info=array() ) : bool|int
+	public function convertGalleryReview( $info=array() )
 	{
 		if ( !isset( $info['review_id'] ) )
 		{
-			$this->software->app->log( 'gallery_review_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'gallery_review_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( empty( $info['review_content'] ) )
 		{
-			$this->software->app->log( 'gallery_review_missing_content', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'gallery_review_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['review_rating'] ) OR $info['review_rating'] < 1 )
 		{
-			$this->software->app->log( 'gallery_review_missing_rating', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'gallery_review_missing_rating', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 		
@@ -1530,15 +1508,15 @@ class Gallery extends Core
 			{
 				$info['review_author'] = $this->software->app->getLink( $info['review_author'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'gallery_review_missing_author', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+				$this->software->app->log( 'gallery_review_missing_author', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'gallery_review_missing_author', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'gallery_review_missing_author', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 		
@@ -1548,21 +1526,21 @@ class Gallery extends Core
 			{
 				$info['review_image_id'] = $this->software->app->getLink( $info['review_image_id'], 'gallery_images' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'gallery_review_missing_image', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+				$this->software->app->log( 'gallery_review_missing_image', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 				return FALSE;
 			}
 		}
 		
 		if ( !isset( $info['review_author_name'] ) )
 		{
-			$info['review_author_name'] = Member::load( $info['review_author'] )->name;
+			$info['review_author_name'] = \IPS\Member::load( $info['review_author'] )->name;
 		}
 		
 		if ( isset( $info['review_date'] ) )
 		{
-			if ( $info['review_date'] instanceof DateTime )
+			if ( $info['review_date'] instanceof \IPS\DateTime )
 			{
 				$info['review_date'] = $info['review_date']->getTimestamp();
 			}
@@ -1579,7 +1557,7 @@ class Gallery extends Core
 		
 		if ( isset( $info['review_edit_time'] ) )
 		{
-			if ( $info['review_edit_time'] instanceof DateTime )
+			if ( $info['review_edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['review_edit_time'] = $info['review_edit_time']->getTimestamp();
 			}
@@ -1601,13 +1579,13 @@ class Gallery extends Core
 		
 		if ( isset( $info['review_votes_data'] ) )
 		{
-			if ( !is_array( $info['review_votes_data'] ) )
+			if ( !\is_array( $info['review_votes_data'] ) )
 			{
 				$info['review_votes_data'] = json_decode( $info['review_votes_data'], TRUE );
 			}
 			
 			$newVoters = array();
-			if ( !is_null( $info['review_votes_data'] ) AND count( $info['review_votes_data'] ) )
+			if ( !\is_null( $info['review_votes_data'] ) AND \count( $info['review_votes_data'] ) )
 			{
 				foreach( $info['review_votes_data'] AS $member => $vote )
 				{
@@ -1615,7 +1593,7 @@ class Gallery extends Core
 					{
 						$memberId = $this->software->app->getLink( $member, 'core_members', TRUE );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						continue;
 					}
@@ -1624,7 +1602,7 @@ class Gallery extends Core
 				}
 			}
 			
-			if ( count( $newVoters ) )
+			if ( \count( $newVoters ) )
 			{
 				$info['review_votes_data'] = json_encode( $newVoters );
 			}
@@ -1640,19 +1618,19 @@ class Gallery extends Core
 		
 		if ( !isset( $info['review_votes'] ) )
 		{
-			if ( is_null( $info['review_votes_data'] ) )
+			if ( \is_null( $info['review_votes_data'] ) )
 			{
 				$info['review_votes'] = 0;
 			}
 			else
 			{
-				$info['review_votes'] = count( json_decode( $info['review_votes_data'], TRUE ) );
+				$info['review_votes'] = \count( json_decode( $info['review_votes_data'], TRUE ) );
 			}
 		}
 		
 		if ( !isset( $info['review_votes_helpful'] ) )
 		{
-			if ( is_null( $info['review_votes_data'] ) )
+			if ( \is_null( $info['review_votes_data'] ) )
 			{
 				$info['review_votes_helpful'] = 0;
 			}
@@ -1679,7 +1657,7 @@ class Gallery extends Core
 		$id = $info['review_id'];
 		unset( $info['review_id'] );
 		
-		$inserted_id = Db::i()->insert( 'gallery_reviews', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'gallery_reviews', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'gallery_reviews' );
 		
 		return $inserted_id;
@@ -1693,9 +1671,9 @@ class Gallery extends Core
 	 * @param	string|NULL		$filepath	The path to the attachment, or NULL.
 	 * @param	string|NULL		$filedata	The binary data of the attachment, or NULL.
 	 * @param	string|NULL		$thumbnailpath	Path to thumbnail, or NULL.
-	 * @return	int|bool	The ID of the newly inserted attachment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted attachment, or FALSE on failure.
 	 */
-	public function convertAttachment( array $info=array(), array $map=array(), ?string $filepath=NULL, ?string $filedata=NULL, ?string $thumbnailpath = NULL ) : bool|int
+	public function convertAttachment( $info=array(), $map=array(), $filepath=NULL, $filedata=NULL, $thumbnailpath = NULL )
 	{
 		$map['location_key']	= 'gallery_Gallery';
 		$map['id1_type']		= 'gallery_images';
@@ -1707,7 +1685,7 @@ class Gallery extends Core
 			$info['id3'] = NULL;
 		}
 		
-		if ( is_null( $info['id3'] ) OR $info['id3'] != 'review' )
+		if ( \is_null( $info['id3'] ) OR $info['id3'] != 'review' )
 		{
 			$map['id2_type'] = 'gallery_comments';
 		}
@@ -1723,9 +1701,9 @@ class Gallery extends Core
 	 * Convert a Club Gallery Category
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted category, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted category, or FALSE on failure.
 	 */
-	public function convertClubGalleryCategory( array $info=array() ) : bool|int
+	public function convertClubGalleryCategory( $info=array() )
 	{
 		$insertedId = $this->convertGalleryCategory( $info );
 		if ( $insertedId )
@@ -1741,9 +1719,9 @@ class Gallery extends Core
 	 * @param	array			$info		Data to insert
 	 * @param	string|NULL		$filepath	The path to the image, or NULL.
 	 * @param	string|NULL		$filedata	The binary data for the image, or NULL
-	 * @return	int|bool	The ID of the newly inserted image, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted image, or FALSE on failure.
 	 */
-	public function convertClubGalleryImage( array $info=array(), ?string $filepath=NULL, ?string $filedata=NULL ) : bool|int
+	public function convertClubGalleryImage( $info=array(), $filepath=NULL, $filedata=NULL )
 	{
 		$insertedId = $this->convertGalleryImage( $info, $filepath, $filedata );
 		if ( $insertedId )
@@ -1757,9 +1735,9 @@ class Gallery extends Core
 	 * Convert a Club Gallery Comment
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted comment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted comment, or FALSE on failure.
 	 */
-	public function convertClubGalleryComment( array $info=array() ) : bool|int
+	public function convertClubGalleryComment( $info=array() )
 	{
 		$insertedId = $this->convertGalleryComment( $info );
 		if ( $insertedId )
@@ -1773,9 +1751,9 @@ class Gallery extends Core
 	 * Convert a Club Gallery Review
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted review, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted review, or FALSE on failure.
 	 */
-	public function convertClubGalleryReview( array $info=array() ) : bool|int
+	public function convertClubGalleryReview( $info=array() )
 	{
 		$insertedId = $this->convertGalleryReview( $info );
 		if ( $insertedId )

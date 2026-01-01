@@ -11,32 +11,23 @@
 namespace IPS\core\extensions\core\Dashboard;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Data\Store;
-use IPS\Extensions\DashboardAbstract;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Theme;
-use RuntimeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Dashboard extension: Latest News
  */
-class LatestNews extends DashboardAbstract
+class _LatestNews
 {
 	/**
 	* Can the current user view this dashboard item?
 	*
 	* @return	bool
 	*/
-	public function canView(): bool
+	public function canView()
 	{
 		return TRUE;
 	}
@@ -46,21 +37,21 @@ class LatestNews extends DashboardAbstract
 	 *
 	 * @return	string
 	 */
-	public function getBlock(): string
+	public function getBlock()
 	{
-		return '';
+		//
 	}
 
 	/**
 	 * Updates news store
 	 *
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\IPS\Http\Request\Exception
 	 */
-	protected function refreshNews() : void
+	protected function refreshNews()
 	{
-		Store::i()->ips_news = json_encode( array(
-			'content'	=> Url::ips( 'news' )->request()->get()->decodeJson(),
+		\IPS\Data\Store::i()->ips_news = json_encode( array(
+			'content'	=> \IPS\Http\Url::ips( 'news' )->request()->get()->decodeJson(),
 			'time'		=> time()
 		) );
 	}

@@ -11,48 +11,45 @@
 namespace IPS\core\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Feature;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Output;
-use IPS\Theme;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Promoted Content Widget
  */
-class promoted extends PermissionCache implements Customizable
+class _promoted extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'promoted';
+	public $key = 'promoted';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'core';
+	public $app = 'core';
 	
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Initialize widget
 	 *
-	 * @return	void
+	 * @return	null
 	 */
-	public function init(): void
+	public function init()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/promote.css', 'core' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/promote.css', 'core' ) );
+
+		if ( \IPS\Theme::i()->settings['responsive'] )
+  		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/promote_responsive.css', 'core' ) );
+		}
 
 		parent::init();
 	}
@@ -60,14 +57,14 @@ class promoted extends PermissionCache implements Customizable
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
  	{
  		$form = parent::configuration( $form );
  		
-		$form->add( new Number( 'toshow', $this->configuration['toshow'] ?? 5, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'toshow', isset( $this->configuration['toshow'] ) ? $this->configuration['toshow'] : 5, TRUE ) );
 		
 		return $form;
  	}
@@ -77,12 +74,12 @@ class promoted extends PermissionCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
-		$limit = $this->configuration['toshow'] ?? 5;
-		$stream = Feature::internalStream( $limit );
+		$limit = isset ( $this->configuration['toshow'] ) ? $this->configuration['toshow'] : 5;
+		$stream = \IPS\core\Promote::internalStream( $limit );
 
-		if ( ! count( $stream ) )
+		if ( ! \count( $stream ) )
 		{
 			return '';
 		}

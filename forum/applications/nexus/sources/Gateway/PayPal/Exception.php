@@ -12,52 +12,46 @@
 namespace IPS\nexus\Gateway\PayPal;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Http\Response;
-use IPS\Log;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PayPal Exception
  */
-class Exception extends DomainException
+class _Exception extends \DomainException
 {
 	/**
 	 * @brief	Name
 	 */
-	protected string $name;
+	protected $name;
 	
 	/**
 	 * @brief	Details
 	 */
-	protected array $details = array();
+	protected $details = array();
 	
 	/**
 	 * @brief	Full Response
 	 */
-	protected string $fullResponse = '';
+	protected $fullResponse = '';
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Response	$response	Response from PayPal
+	 * @param	\IPS\Http\Response	$response	Response from PayPal
 	 * @param	bool				$refund		request is for a refund?
+	 * @return	void
 	 */
-	public function __construct( Response $response, bool $refund=FALSE )
+	public function __construct( \IPS\Http\Response $response, $refund=FALSE )
 	{
 		$this->fullResponse = (string) $response;
-		Log::debug( (string) $response, 'paypal' );
+		\IPS\Log::debug( (string) $response, 'paypal' );
 		
 		$details = $response->decodeJson();
-		$this->name = $details['name'] ?? ( $details[0]['issue'] ?? '' );
+		$this->name = $details['name'];
 		if ( isset( $details['details'] ) )
 		{
 			$this->details = $details['details'];
@@ -66,51 +60,51 @@ class Exception extends DomainException
 		switch ( $this->name )
 		{				
 			case 'EXPIRED_CREDIT_CARD':
-				$message = Member::loggedIn()->language()->get( 'card_expire_expired' );
+				$message = \IPS\Member::loggedIn()->language()->get( 'card_expire_expired' );
 				break;
 							
 			case 'CREDIT_CARD_REFUSED':
-				$message = Member::loggedIn()->language()->get( 'card_refused' );
+				$message = \IPS\Member::loggedIn()->language()->get( 'card_refused' );
 				break;
 			
 			case 'CREDIT_CARD_CVV_CHECK_FAILED':
-				$message = Member::loggedIn()->language()->get( 'ccv_invalid' );
+				$message = \IPS\Member::loggedIn()->language()->get( 'ccv_invalid' );
 				break;
 				
 			case 'REFUND_EXCEEDED_TRANSACTION_AMOUNT':
 			case 'FULL_REFUND_NOT_ALLOWED_AFTER_PARTIAL_REFUND':
-				$message = Member::loggedIn()->language()->get( 'refund_amount_exceeds' );
+				$message = \IPS\Member::loggedIn()->language()->get( 'refund_amount_exceeds' );
 				break;
 				
 			case 'REFUND_TIME_LIMIT_EXCEEDED':
-				$message = Member::loggedIn()->language()->get( 'refund_time_limit' );
+				$message = \IPS\Member::loggedIn()->language()->get( 'refund_time_limit' );
 				break;
 				
 			case 'TRANSACTION_ALREADY_REFUNDED':
-				$message = Member::loggedIn()->language()->get( 'refund_already_processed' );
+				$message = \IPS\Member::loggedIn()->language()->get( 'refund_already_processed' );
 				break;
 			
 			case 'ADDRESS_INVALID':
 			case 'VALIDATION_ERROR':
-				$message = Member::loggedIn()->language()->get( 'address_invalid' );
+				$message = \IPS\Member::loggedIn()->language()->get( 'address_invalid' );
 				break;
 			
 			case 'INSTRUMENT_DECLINED':
-				$message = Member::loggedIn()->language()->get( 'payment_refused' );
+				$message = \IPS\Member::loggedIn()->language()->get( 'payment_refused' );
 				break;
 			
 			default:
 				if( isset( $details[0] ) AND $details[0]['issue'] === 'INSTRUMENT_DECLINED' )
 				{
-					$message = Member::loggedIn()->language()->get( 'payment_refused' );
+					$message = \IPS\Member::loggedIn()->language()->get( 'payment_refused' );
 				}
 				elseif ( $refund )
 				{
-					$message = Member::loggedIn()->language()->get( 'refund_failed' );
+					$message = \IPS\Member::loggedIn()->language()->get( 'refund_failed' );
 				}
 				else
 				{
-					$message = Member::loggedIn()->language()->get( 'gateway_err' );
+					$message = \IPS\Member::loggedIn()->language()->get( 'gateway_err' );
 				}
 				break;
 		}
@@ -123,7 +117,7 @@ class Exception extends DomainException
 	 *
 	 * @return	string
 	 */
-	public function getName() : string
+	public function getName()
 	{
 		return $this->name;
 	}
@@ -133,7 +127,7 @@ class Exception extends DomainException
 	 *
 	 * @return	string
 	 */
-	public function extraLogData() : string
+	public function extraLogData()
 	{
 		return $this->fullResponse;
 	}

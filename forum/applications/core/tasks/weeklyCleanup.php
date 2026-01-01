@@ -12,26 +12,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Task\Exception;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * weeklyCleanup Task
  */
-class weeklyCleanup extends Task
+class _weeklyCleanup extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -42,14 +32,14 @@ class weeklyCleanup extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		/* If we are currently pruning any large tables via a bg task, find out so we don't try to prune them normally here as well. The bg task should finish first. */
 		$currentlyPruning = array();
 
-		foreach( Db::i()->select( '*', 'core_queue', array( '`key`=?', 'PruneLargeTable' ) ) as $pruneTask )
+		foreach( \IPS\Db::i()->select( '*', 'core_queue', array( '`key`=?', 'PruneLargeTable' ) ) as $pruneTask )
 		{
 			$data = json_decode( $pruneTask['data'], true );
 
@@ -57,15 +47,13 @@ class weeklyCleanup extends Task
 		}
 
 		/* Delete old follows */
-		if ( Settings::i()->prune_follows AND !in_array( 'core_follow', $currentlyPruning ) )
+		if ( \IPS\Settings::i()->prune_follows AND !\in_array( 'core_follow', $currentlyPruning ) )
 		{
-			Db::i()->delete( 'core_follow', array( 'follow_app!=? AND follow_area!=? AND follow_member_id IN(?)', 'core', 'member', Db::i()->select( 'member_id', 'core_members', array( 'last_activity < ?', DateTime::create()->sub( new DateInterval( 'P' . Settings::i()->prune_follows . 'D' ) )->getTimestamp() ) ) ) );
+			\IPS\Db::i()->delete( 'core_follow', array( 'follow_app!=? AND follow_area!=? AND follow_member_id IN(?)', 'core', 'member', \IPS\Db::i()->select( 'member_id', 'core_members', array( 'last_activity < ?', \IPS\DateTime::create()->sub( new \DateInterval( 'P' . \IPS\Settings::i()->prune_follows . 'D' ) )->getTimestamp() ) ) ) );
 
 			/* And clear the cache so it can rebuild */
-			Db::i()->delete( 'core_follow_count_cache' );
+			\IPS\Db::i()->delete( 'core_follow_count_cache' );
 		}
-
-		return null;
 	}
 	
 	/**

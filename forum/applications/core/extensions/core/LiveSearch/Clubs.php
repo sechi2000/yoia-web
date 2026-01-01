@@ -11,35 +11,26 @@
 namespace IPS\core\extensions\core\LiveSearch;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Extensions\LiveSearchAbstract;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Live Search Extension
  */
-class Clubs extends LiveSearchAbstract
+class _Clubs
 {
 	/**
 	 * Check we have access
 	 *
 	 * @return	bool
 	 */
-	public function hasAccess(): bool
+	public function hasAccess()
 	{
 		/* Check Permissions */
-		return Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_manage' );
+		return \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'clubs', 'clubs_manage' );
 	}
 
 	/**
@@ -48,7 +39,7 @@ class Clubs extends LiveSearchAbstract
 	 * @param	string	$searchTerm	Search Term
 	 * @return	array 	Array of results
 	 */
-	public function getResults( string $searchTerm ): array
+	public function getResults( $searchTerm )
 	{
 		/* Init */
 		$results = array();
@@ -58,7 +49,7 @@ class Clubs extends LiveSearchAbstract
 		if( $this->hasAccess() )
 		{
 			/* Perform the search */
-			$clubs = Db::i()->select(
+			$clubs = \IPS\Db::i()->select(
 							"*",
 							'core_clubs',
 							array( "name LIKE CONCAT( '%', ?, '%' )", $searchTerm ),
@@ -69,9 +60,9 @@ class Clubs extends LiveSearchAbstract
 			/* Format results */
 			foreach ( $clubs as $club )
 			{
-				$club = Club::constructFromData( $club );
+				$club = \IPS\Member\Club::constructFromData( $club );
 				
-				$results[] = Theme::i()->getTemplate( 'livesearch', 'core', 'admin' )->club( $club );
+				$results[] = \IPS\Theme::i()->getTemplate( 'livesearch', 'core', 'admin' )->club( $club );
 			}
 		}
 
@@ -83,8 +74,8 @@ class Clubs extends LiveSearchAbstract
 	 *
 	 * @return	bool
 	 */
-	public function isDefault(): bool
+	public function isDefault()
 	{
-		return Dispatcher::i()->application->directory == 'core' and Dispatcher::i()->module->key == 'clubs';
+		return \IPS\Dispatcher::i()->application->directory == 'core' and \IPS\Dispatcher::i()->module->key == 'clubs';
 	}
 }

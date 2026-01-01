@@ -11,139 +11,58 @@
 
 namespace IPS\forums;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application as SystemApplication;
-use IPS\cms\Databases;
-use IPS\Content\ClubContainer;
 use IPS\Content\Comment;
-use IPS\Content\Item;
-use IPS\Content\Search\Index;
-use IPS\Content\Search\SearchContent;
-use IPS\Content\Taggable;
-use IPS\Content\ViewUpdates;
-use IPS\Data\Store;
-use IPS\DateTime;
 use IPS\Db;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\downloads\Category;
-use IPS\forums\Topic\Post;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Color;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Password;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\Url as FormUrl;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Group;
-use IPS\Node\Colorize;
-use IPS\Node\DelayedCount;
-use IPS\Node\Grouping;
-use IPS\Node\Icon;
-use IPS\Node\Model;
-use IPS\Node\Permissions;
-use IPS\Node\Statistics;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Session;
 use IPS\Settings;
-use IPS\Theme;
-use IPS\Widget;
-use OutOfBoundsException;
-use OutOfRangeException;
-use OverflowException;
-use UnderFlowException;
-use function array_flip;
-use function array_intersect_key;
-use function array_keys;
-use function array_merge;
-use function array_shift;
-use function array_slice;
-use function array_unique;
-use function count;
-use function defined;
-use function explode;
-use function get_called_class;
-use function In_array;
-use function intval;
-use function is_array;
-use function json_decode;
-use function json_encode;
-use function krsort;
-use function strpos;
-use function substr;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Forum Node
  */
-class Forum extends Model implements Permissions
+class _Forum extends \IPS\Node\Model implements \IPS\Node\Permissions
 {
-	use ClubContainer;
-	use Colorize;
-	use DelayedCount;
-	use Grouping;
-	use Statistics;
-	use ViewUpdates;
-	use Icon;
+	use \IPS\Content\ClubContainer;
+	use \IPS\Node\Colorize;
+	use \IPS\Node\Statistics;
+	use \IPS\Content\ViewUpdates;
+	use \IPS\Node\DelayedCount;
 
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'forums_forums';
+	public static $databaseTable = 'forums_forums';
 			
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 	
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnParent = 'parent_id';
+	public static $databaseColumnParent = 'parent_id';
 	
 	/**
 	 * @brief	[Node] Parent ID Root Value
 	 * @note	This normally doesn't need changing though some legacy areas use -1 to indicate a root node
 	 */
-	public static int $databaseColumnParentRootValue = -1;
+	public static $databaseColumnParentRootValue = -1;
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'forums';
+	public static $nodeTitle = 'forums';
 			
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -161,7 +80,7 @@ class Forum extends Model implements Permissions
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'forums',
 		'module'	=> 'forums',
 		'prefix' 	=> 'forums_',
@@ -171,17 +90,17 @@ class Forum extends Model implements Permissions
 	/**
 	 * @brief	[Node] App for permission index
 	 */
-	public static ?string $permApp = 'forums';
+	public static $permApp = 'forums';
 	
 	/**
 	 * @brief	[Node] Type for permission index
 	 */
-	public static ?string $permType = 'forum';
+	public static $permType = 'forum';
 	
 	/**
 	 * @brief	The map of permission columns
 	 */
-	public static array $permissionMap = array(
+	public static $permissionMap = array(
 		'view' 				=> 'view',
 		'read'				=> 2,
 		'add'				=> 3,
@@ -192,77 +111,48 @@ class Forum extends Model implements Permissions
 	/**
 	 * @brief	[Node] Prefix string that is automatically prepended to permission matrix language strings
 	 */
-	public static string $permissionLangPrefix = 'perm_forum_';
+	public static $permissionLangPrefix = 'perm_forum_';
 	
 	/**
 	 * @brief	Bitwise values for forums_bitoptions field
 	 */
-	public static array $bitOptions = array(
+	public static $bitOptions = array(
 		'forums_bitoptions' => array(
 			'forums_bitoptions' => array(
 				'bw_disable_tagging'		  => 1,
 				'bw_disable_prefixes'		  => 2,
-				'bw_enable_answers'			  => 4, //deprecated
-				'bw_solved_set_by_member'	  => 8,
-				'bw_solved_set_by_moderator' => 16,
+				'bw_enable_answers'			  => 4,
+				'bw_enable_answers_member'	  => 8,
+				'bw_enable_answers_moderator' => 16,
 				'bw_fluid_view'				  => 32,
-				'bw_enable_assignments'		  => 64
 			)
 		)
 	);
 
 	/**
-	 * Mapping of node columns to specific actions (e.g. comment, review)
-	 * Note: Mappings can also reference bitoptions keys.
-	 *
-	 * @var array
-	 */
-	public static array $actionColumnMap = array(
-		'tags'				=> 'bw_disable_tagging', // bitoption
-		'prefix'			=> 'bw_disable_prefixes' // bitoption
-	);
-
-	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'forums_forum_';
+	public static $titleLangPrefix = 'forums_forum_';
 	
 	/**
 	 * @brief	[Node] Description suffix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}_{$descriptionLangSuffix}" as the key
 	 */
-	public static ?string $descriptionLangSuffix = '_desc';
+	public static $descriptionLangSuffix = '_desc';
 	
 	/**
 	 * @brief	[Node] Moderator Permission
 	 */
-	public static string $modPerm = 'forums';
+	public static $modPerm = 'forums';
 	
 	/**
 	 * @brief	Content Item Class
 	 */
-	public static ?string $contentItemClass = 'IPS\forums\Topic';
+	public static $contentItemClass = 'IPS\forums\Topic';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'comments';
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
-
-	/**
-	 * @brief	FileStorage extension
-	 */
-	public static string $iconStorageExtension = 'forums_Icons';
-
-	/**
-	 * @var string
-	 */
-	public static string $iconFormPrefix = 'forum_';
+	public static $icon = 'comments';
 	
 	/**
 	 * Callback from \IPS\Http\Url\Inernal::correctUrlFromVerifyClass()
@@ -270,10 +160,10 @@ class Forum extends Model implements Permissions
 	 * This is called when verifying the *the URL currently being viewed* is correct, before calling self::loadFromUrl()
 	 * Can be used if there is a more effecient way to load and cache the objects that will be used later on that page
 	 *
-	 * @param Url $url	The URL of the page being viewed, which belongs to this class
+	 * @param	\IPS\Http\Url	$url	The URL of the page being viewed, which belongs to this class
 	 * @return	void
 	 */
-	public static function preCorrectUrlFromVerifyClass( Url $url ) : void
+	public static function preCorrectUrlFromVerifyClass( \IPS\Http\Url $url )
 	{
 		static::loadIntoMemory();
 	}
@@ -281,29 +171,29 @@ class Forum extends Model implements Permissions
 	/**
 	 * Form fields prefix with "forum_" but the database columns do not have this prefix - let's strip for the massChange feature
 	 *
-	 * @param mixed $key	Key
-	 * @param	mixed	$value	Value
+	 * @param	string	$k	Key
+	 * @param	mixed	$v	Value
 	 * @return	void
 	 */
-	public function __set( mixed $key, mixed $value ) : void
+	public function __set( $k, $v )
 	{
-		if( mb_strpos( $key, "forum_" ) === 0 )
+		if( mb_strpos( $k, "forum_" ) === 0 AND $k !== 'forum_allow_rating' )
 		{
-			$key = preg_replace( "/^forum_(.+?)$/", "$1", $key );
-			$this->$key	= $value;
+			$k = preg_replace( "/^forum_(.+?)$/", "$1", $k );
+			$this->$k	= $v;
 			return;
 		}
 
-		parent::__set( $key, $value );
+		parent::__set( $k, $v );
 	}
 
 	/**
 	 * When setting parent ID to -1 (category) make sure sub_can_post is toggled off too
 	 *
-	 * @param int $val	Parent ID
+	 * @param	int	$val	Parent ID
 	 * @return	void
 	 */
-	protected function set_parent_id( int $val ) : void
+	protected function set_parent_id( $val )
 	{
 		$this->_data['parent_id']	= $val;
 		$this->changed['parent_id']	= $val;
@@ -320,36 +210,36 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	public function get_name_seo(): string
+	public function get_name_seo()
 	{
 		if( !$this->_data['name_seo'] )
 		{
-			$this->name_seo	= Friendly::seoTitle( Lang::load( Lang::defaultLanguage() )->get( 'forums_forum_' . $this->id ) );
+			$this->name_seo	= \IPS\Http\Url\Friendly::seoTitle( \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( 'forums_forum_' . $this->id ) );
 			$this->save();
 		}
 
-		return $this->_data['name_seo'] ?: Friendly::seoTitle( Lang::load( Lang::defaultLanguage() )->get( 'forums_forum_' . $this->id ) );
+		return $this->_data['name_seo'] ?: \IPS\Http\Url\Friendly::seoTitle( \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( 'forums_forum_' . $this->id ) );
 	}
 
 	/**
 	 * Get number of items
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__items(): ?int
+	protected function get__items()
 	{
-		return $this->topics;
+		return (int) $this->topics;
 	}
 	
 	/**
 	 * Set number of items
 	 *
 	 * @param	int	$val	Items
-	 * @return	void
+	 * @return	int
 	 */
-	protected function set__items( int $val ) : void
+	protected function set__items( $val )
 	{
-		$this->topics = $val;
+		$this->topics = (int) $val;
 	}
 
 	/**
@@ -357,11 +247,11 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return	NULL|array		Null for no badge, or an array of badge data (0 => CSS class type, 1 => language string, 2 => optional raw HTML to show instead of language string)
 	 */
-	protected function get__badge(): ?array
+	protected function get__badge()
 	{
 		if( $this->isCombinedView() )
 		{
-			return array( 0 => 'positive', 1 => 'combined_fluid_view' );
+			return array( 0 => 'positive ipsPos_right', 1 => 'combined_fluid_view' );
 		}
 
 		return parent::get__badge();
@@ -370,40 +260,40 @@ class Forum extends Model implements Permissions
 	/**
 	 * Get number of comments
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__comments(): ?int
+	protected function get__comments()
 	{
-		return $this->posts;
+		return (int) $this->posts;
 	}
 	
 	/**
 	 * Set number of items
 	 *
 	 * @param	int	$val	Comments
-	 * @return	void
+	 * @return	int
 	 */
-	protected function set__comments( int $val ) : void
+	protected function set__comments( $val )
 	{
-		$this->posts = $val;
+		$this->posts = (int) $val;
 	}
 	
 	/**
 	 * [Node] Get number of unapproved content items
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__unapprovedItems() : ?int
+	protected function get__unapprovedItems()
 	{
 		return $this->queued_topics;
 	}
-
+	
 	/**
 	 * [Node] Get number of unapproved content comments
 	 *
-	 * @return int|null
+	 * @return	int
 	 */
-	protected function get__unapprovedComments(): ?int
+	protected function get__unapprovedComments()
 	{
 		return $this->queued_posts;
 	}
@@ -414,7 +304,7 @@ class Forum extends Model implements Permissions
 	 * @param	int	$val	Unapproved Items
 	 * @return	void
 	 */
-	protected function set__unapprovedItems( int $val ) : void
+	protected function set__unapprovedItems( $val )
 	{
 		$this->queued_topics = $val;
 	}
@@ -425,7 +315,7 @@ class Forum extends Model implements Permissions
 	 * @param	int	$val	Unapproved Comments
 	 * @return	void
 	 */
-	protected function set__unapprovedComments( int $val ) : void
+	protected function set__unapprovedComments( $val )
 	{
 		$this->queued_posts = $val;
 	}
@@ -433,104 +323,17 @@ class Forum extends Model implements Permissions
 	/**
 	 * Get default sort key
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function get__sortBy(): ?string
+	public function get__sortBy()
 	{
 		return $this->sort_key ?: 'last_post';
-	}
-
+	}	
+	
 	/**
-	 * Set last post array
-	 *
-	 * @param array $value
-	 * @return void
+	 * Last Poster ID Column
 	 */
-	public function set__last_post_data( array $value ): void
-	{
-		krsort( $value );
-		$this->_data['last_post_data'] = json_encode( $value );
-	}
-
-	/**
-	 * Get last post array
-	 *
-	 * @return	array
-	 */
-	protected function get__last_post_data(): array
-	{
-		if ( $this->_data['last_post_data'] !== null and !is_array( $this->_data['last_post_data'] ) )
-		{
-			$this->_data['last_post_data'] = json_decode( $this->_data['last_post_data'], true );
-		}
-
-		return $this->_data['last_post_data'] ?? [];
-	}
-
-	/**
-	 * Wrapper for the last_post field because we now have an array of data
-	 *
-	 * @return int|null
-	 */
-	public function get_last_post() : ?int
-	{
-		$lastPostTime = 0;
-		foreach( $this->_last_post_data as $k => $v )
-		{
-			if( $v['last_post'] > $lastPostTime )
-			{
-				$lastPostTime = $v['last_post'];
-			}
-		}
-		return $lastPostTime;
-	}
-
-	/**
-	 * Check the action column map if the action is enabled in this node
-	 *
-	 * @param string $action
-	 * @return bool
-	 */
-	public function checkAction( string $action ) : bool
-	{
-		switch( $action )
-		{
-			case 'moderate_items':
-				return $this->moderateNewItems();
-			case 'moderate_comments':
-				return $this->moderateNewComments();
-		}
-
-		$return = parent::checkAction( $action );
-
-		/* Some actions here are reversed, we mark them as disabled instead of enabled */
-		if( in_array( $action, array( 'tags', 'prefix' ) ) )
-		{
-			return !$return;
-		}
-
-		return $return;
-	}
-
-	/**
-	 * Container-level check to see if items should be moderated
-	 *
-	 * @return bool
-	 */
-	public function moderateNewItems() : bool
-	{
-		return $this->preview_posts == 1 or $this->preview_posts == 2;
-	}
-
-	/**
-	 * Container-level check to see if comments should be moderated
-	 *
-	 * @return bool
-	 */
-	public function moderateNewComments() : bool
-	{
-		return $this->preview_posts == 1 or $this->preview_posts == 3;
-	}
+	protected static $lastPosterIdColumn = 'last_poster_id';
 
 	/**
 	 * Set last comment
@@ -539,7 +342,7 @@ class Forum extends Model implements Permissions
 	 * @param Item|null $updatedItem We sometimes run setLastComment() when an item has been edited, if so, that item will be here
 	 * @return    void
 	 */
-	protected function _setLastComment( Comment $comment=null, Item $updatedItem=NULL ): void
+	public function _setLastComment( \IPS\Content\Comment $comment=NULL, \IPS\Content\Item $updatedItem=NULL )
 	{
 		/* If we were given an item, but it's older than the current last post, clear it */
 		if( $updatedItem !== NULL AND $updatedItem->mapped('last_comment') < $this->last_post )
@@ -547,57 +350,8 @@ class Forum extends Model implements Permissions
 			$updatedItem = null;
 		}
 
-		/* If we have an item, check if it is already in the last post data */
-		$lastPostData = [];
-		if( $updatedItem !== null )
-		{
-			if ( $updatedItem->last_poster_id and ! $updatedItem->last_poster_name )
-			{
-				$member = Member::load( $updatedItem->last_poster_id );
-				if ( $member->member_id )
-				{
-					$updatedItem->last_poster_name = $member->name;
-					$updatedItem->last_poster_anon = 0;
-				}
-				else
-				{
-					$updatedItem->last_poster_name = '';
-					$updatedItem->last_poster_id = 0;
-				}
-			}
-
-			if( $comment === null )
-			{
-				$comment = $updatedItem->comments( 1, 0, 'date', 'desc', null, false, null, null, true ); // Bypass any cached data
-			}
-
-			$lastPostData = [
-				$updatedItem->last_post . '.' . $updatedItem->tid => [
-					'last_post' => $updatedItem->last_post,
-					'last_poster_id' => $updatedItem->last_poster_id,
-					'last_poster_name' => $updatedItem->last_poster_name,
-					'seo_last_name' => Friendly::seoTitle( $updatedItem->last_poster_name ),
-					'last_title' => $updatedItem->title,
-					'seo_last_title' => $updatedItem->title_seo,
-					'last_id' => $updatedItem->tid,
-					'last_poster_anon' => $updatedItem->last_poster_anon,
-					'last_post_snippet' => $comment?->truncated( true, 350 ),
-					'posts' => $updatedItem->posts
-				]
-			];
-
-			/* Add the current last post data to the new array, but check if we have a duplicate */
-			foreach( $this->_last_post_data as $k => $v )
-			{
-				if( $v['last_id'] != $updatedItem->tid )
-				{
-					$lastPostData[ $k ] = $v;
-				}
-			}
-		}
-
-		/* If we don't have a count of 5, get what we need */
-		if( count( $lastPostData ) < 5 )
+		/* If we still have no item, load the latest topic */
+		if( $updatedItem === null )
 		{
 			try
 			{
@@ -606,323 +360,177 @@ class Forum extends Model implements Permissions
 				 * We also need to fetch from the write server in the event that something has just been deleted and the comment hasn't been passed.
 				 * We also cannot look for future entries since this code is used in older upgrades, but we can look for the date instead.
 				 */
-				foreach( Db::i()->select( '*', 'forums_topics', array( "forums_topics.forum_id=? AND forums_topics.approved=1 AND forums_topics.state != ? AND forums_topics.last_post<=? AND forums_topics.publish_date <=?", $this->id, 'link', time(), time() ), 'forums_topics.last_post DESC', array( count( $lastPostData ), ( 5 - count( $lastPostData ) ) ) ) as $row )
-				{
-					$topic = Topic::constructFromData( $row );
-					$lastComment = $topic->comments( 1, 0, 'date', 'desc', null, false );
 
-					if ( ! $lastComment )
-					{
-						continue;
-					}
+				$select = \IPS\Db::i()->select( '*', 'forums_topics', array( "forums_topics.forum_id=? AND forums_topics.approved=1 AND forums_topics.state != ? AND forums_topics.last_post<=? AND forums_topics.publish_date <=?", $this->id, 'link', time(), time() ), 'forums_topics.last_post DESC', 1 )->first();
 
-					$lastPost = [];
-					if ( $topic->last_poster_id and ! $topic->last_poster_name )
-					{
-						$member = Member::load( $topic->last_poster_id );
-						if ( $member->member_id )
-						{
-							$lastPost['last_poster_name'] = $member->name;
-							$lastPost['last_poster_id'] = $member->member_id;
-						}
-						else
-						{
-							$lastPost['last_poster_name'] = '';
-							$lastPost['last_poster_id'] = 0;
-						}
-					}
-					else
-					{
-						$lastPost['last_poster_id'] = (int) $topic->last_poster_id;
-						$lastPost['last_poster_name'] = $topic->last_poster_name;
-					}
-
-					if( $lastPost['last_poster_id'] AND !empty( $lastPost['last_poster_name'] ) )
-					{
-						$lastPost['seo_last_name'] = Friendly::seoTitle( $lastPost['last_poster_name'] );
-					}
-
-					$lastPost['last_post'] = ( $lastComment ? $lastComment->post_date : $topic->last_post );
-					$lastPost['last_title'] = $topic->title;
-					$lastPost['seo_last_title'] = Friendly::seoTitle( $topic->title );
-					$lastPost['last_id'] = $topic->tid;
-					$lastPost['last_poster_anon'] = $topic->last_poster_anon;
-					$lastPost['last_post_snippet'] = $lastComment?->truncated( true, 350 );
-					$lastPost['posts'] = $topic->posts - 1;
-
-					$lastPostData[ $topic->last_post . '.' . $topic->tid ] = $lastPost;
-				}
+				$updatedItem = \IPS\forums\Topic::constructFromData( $select );
 			}
-			catch ( UnderflowException $e ){}
+			catch( \UnderflowException $e )
+			{
+				/* At this point we have nothing, so clear the last post data */
+				$this->last_post = NULL;
+				$this->last_poster_id = 0;
+				$this->last_poster_name = '';
+				$this->last_title = NULL;
+				$this->last_id = NULL;
+				$this->last_poster_anon = 0;
+				return;
+			}
 		}
 
-		$this->_last_post_data = $lastPostData;
-		$this->save();
+		if ( $updatedItem->last_poster_id and ! $updatedItem->last_poster_name )
+		{
+			$member = \IPS\Member::load( $updatedItem->last_poster_id );
+			if ( $member->member_id )
+			{
+				$updatedItem->last_poster_name = $member->name;
+			}
+			else
+			{
+				$updatedItem->last_poster_name = '';
+				$updatedItem->last_poster_id = 0;
+			}
+		}
+
+		$this->last_post = $updatedItem->last_post;
+		$this->last_poster_id = (int) $updatedItem->last_poster_id;
+		$this->last_poster_name = $updatedItem->last_poster_name;
+		$this->seo_last_name = \IPS\Http\Url\Friendly::seoTitle( $this->last_poster_name );
+		$this->last_title = $updatedItem->title;
+		$this->seo_last_title = \IPS\Http\Url\Friendly::seoTitle( $this->last_title );
+		$this->last_id = $updatedItem->tid;
+		$this->last_poster_anon = $updatedItem->last_poster_anon;
 	}
 
 	/**
 	 * Get last comment time
 	 *
 	 * @note	This should return the last comment time for this node only, not for children nodes
-	 * @param   Member|null    $member         MemberObject
-	 * @return	DateTime|NULL
+	 * @param   \IPS\Member|NULL    $member         MemberObject
+	 * @return	\IPS\DateTime|NULL
 	 */
-	public function getLastCommentTime( Member $member = NULL ): ?DateTime
+	public function getLastCommentTime( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
         if( !$this->memberCanAccessOthersTopics( $member ) )
         {
             try
             {
-                $select = Db::i()->select('*', 'forums_posts', array("forums_posts.queued=0 AND forums_topics.forum_id={$this->id} AND forums_topics.approved=1 AND forums_topics.starter_id=?", $member->member_id), 'forums_posts.post_date DESC', 1)->join('forums_topics', 'forums_topics.tid=forums_posts.topic_id')->first();
+                $select = \IPS\Db::i()->select('*', 'forums_posts', array("forums_posts.queued=0 AND forums_topics.forum_id={$this->id} AND forums_topics.approved=1 AND forums_topics.starter_id=?", $member->member_id), 'forums_posts.post_date DESC', 1)->join('forums_topics', 'forums_topics.tid=forums_posts.topic_id')->first();
             }
-            catch ( UnderflowException $e )
+            catch ( \UnderflowException $e )
             {
                 return NULL;
             }
 
-            return $select['last_post'] ?  DateTime::ts( $select['last_post'] ) : NULL;
+            return $select['last_post'] ?  \IPS\DateTime::ts( $select['last_post'] ) : NULL;
         }
 
-		if( $lastPost = $this->last_post )
-		{
-			return DateTime::ts( $lastPost );
-		}
-
-		return null;
+		return $this->last_post ? \IPS\DateTime::ts( $this->last_post ) : NULL;
 	}
-
-	/**
-	 * Prevent looking up the same members constantly when building the last post members
-	 *
-	 * @var array
-	 */
-	private static array $lastPostLoadedMembers = [];
-
+	
 	/**
 	 * Get last post data
 	 *
-	 * @param int $count Max number of items, most available is 5
-	 * @param bool $isChild
-	 * @return    array|null
+	 * @return	array|NULL
 	 */
-	public function lastPost( int $count=1, bool $isChild=false ): ?array
+	public function lastPost()
 	{
-		$results = [];
-
-		if ( $count > 5 )
-		{
-			throw new OverflowException( 'Too many posts to return, maximum is 5' );
-		}
-
 		if ( !$this->loggedInMemberHasPasswordAccess() )
 		{
-			return null;
+			return NULL;
 		}
-		elseif ( !$this->memberCanAccessOthersTopics( Member::loggedIn() ) )
+		elseif ( !$this->memberCanAccessOthersTopics( \IPS\Member::loggedIn() ) )
 		{
 			try
 			{
-
-				foreach(
-					new ActiveRecordIterator(
-						Db::i()->select( '*', 'forums_posts', array( 'topic_id=? AND queued=0', Db::i()->select( 'tid', 'forums_topics', array( 'forum_id=? AND approved=1 AND starter_id=? AND is_future_entry=0', $this->_id, Member::loggedIn()->member_id ), 'last_post DESC', 1 )->first() ), 'post_date DESC', $count ),
-					 Post::class ) as $post )
-				{
-					/* @var Post $post */
-					$results[ $post->post_date ] = [
-						'_author'			=> $post->author()->member_id,
-						'author'		    => $post->author(),
-						'topic_url'		    => $post->item()->url(),
-						'topic_title'	    => $post->item()->title,
-						'date'			    => $post->post_date,
-						'last_poster_anon'  => $post->mapped('is_anon'),
-						'last_post_snippet' => $post->truncated( true, 350 ),
-						'posts' 			=> $post->item()->posts - 1
-					];
-				}
+				$lastPost = \IPS\forums\Topic\Post::constructFromData( \IPS\Db::i()->select( '*', 'forums_posts', array( 'topic_id=? AND queued=0', \IPS\Db::i()->select( 'tid', 'forums_topics', array( 'forum_id=? AND approved=1 AND starter_id=? AND is_future_entry=0', $this->_id, \IPS\Member::loggedIn()->member_id ), 'last_post DESC', 1 )->first() ), 'post_date DESC', 1 )->first() );
+				$result = array(
+					'author'		=> $lastPost->author(),
+					'topic_url'		=> $lastPost->item()->url(),
+					'topic_title'	=> $lastPost->item()->title,
+					'date'			=> $lastPost->post_date
+				);
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
-				$results = [];
+				$result = NULL;
 			}
 
 			foreach( $this->children() as $child )
 			{
-				/* We need to merge all children and pick the top 5 */
-				if ( $childLastPost = $child->lastPost( $count, true ) )
+				$childLastPost = $child->lastPost();
+
+				if( $result === NULL OR ( $childLastPost !== NULL AND $childLastPost['date'] > $result['date'] ) )
 				{
-					if ( is_array( $childLastPost ) )
-					{
-						if ( isset( $childLastPost['date'] ) )
-						{
-							$results[$childLastPost['date']] = $childLastPost;
-						}
-						else
-						{
-							$results = $results + $childLastPost;
-						}
-					}
+					$result = $childLastPost;
 				}
 			}
+
+			return $result;
 		}
 		elseif ( !$this->permission_showtopic and !$this->can('view') )
 		{
+			$return = NULL;
+
 			if( !$this->sub_can_post )
 			{
 				foreach( $this->children() as $child )
 				{
-					/* We need to merge all children and pick the top 5 */
-					if ( $childLastPost = $child->lastPost( $count, true ) )
+					$childLastPost = $child->lastPost();
+
+					if( $return === NULL OR ( $childLastPost !== NULL AND $childLastPost['date'] > $return['date'] ) )
 					{
-						if ( is_array( $childLastPost ) )
-						{
-							if ( isset( $childLastPost['date'] ) )
-							{
-								$results[$childLastPost['date']] = $childLastPost;
-							}
-							else
-							{
-								$results = $results + $childLastPost;
-							}
-						}
+						$return = $childLastPost;
 					}
 				}
 			}
+
+			return $return;
 		}
 		else
 		{
-			/* Do we have any data, or do we need to update? The default or cleared state is NULL, forums without topics should have [] */
-			if ( $this->sub_can_post and $this->posts and !$this->_data['last_post_data'] )
-			{
-				$this->setLastComment();
+			$result	= NULL;
 
-				/* We can't use save as dynamic variables have now been assigned which confuses save() */
-				Db::i()->update( 'forums_forums', ['last_post_data' => $this->_data['last_post_data']], ['id=?', $this->_id] );
-			}
-
-			$lastPostData = $this->_last_post_data;
-			if ( count( $lastPostData ) )
+			if( $this->last_post )
 			{
-				foreach ( $lastPostData as $lastPostTime => $lastPost )
+				if ( $this->last_poster_id )
 				{
-					if ( $this->sub_can_post and !$this->permission_showtopic and !$this->can( 'read' ) )
-					{
-						$lastPost['last_title'] = null;
-					}
-
-					$author = null;
-					if ( $lastPost['last_poster_anon'] )
-					{
-						$author = Member::loggedIn()->language()->addToStack( "post_anonymously_placename" );
-					}
-					else
-					{
-						$author = !empty( $lastPost['last_poster_id'] ) ? $lastPost['last_poster_id'] : ( $lastPost['last_poster_name'] ?? Member::loggedIn()->language()->addToStack( "guest" ) );
-					}
-
-					$results[$lastPostTime] = [
-						'author' => null,
-						'_author' => $author,
-						'topic_url' => Url::internal( "app=forums&module=forums&controller=topic&id={$lastPost['last_id']}", 'front', 'forums_topic', [$lastPost['seo_last_title']] ),
-						'topic_title' => $lastPost['last_title'],
-						'date' => ( $lastPost['last_post'] ?? (int)( substr( $lastPostTime, 0, strpos( $lastPostTime, '.' ) ) ) ),
-						'last_poster_anon' => $lastPost['last_poster_anon'],
-						'last_post_snippet' => $lastPost['last_post_snippet'] ?? null,
-						'posts' => $lastPost['posts'] ?? 0
-					];
+					$lastAuthor = \IPS\Member::load( $this->last_poster_id );
 				}
-			}
-
-			foreach ( $this->children() as $child )
-			{
-				/* @var Forum $child */
-				/* We need to merge all children and pick the top 5 */
-				if ( $childLastPost = $child->lastPost( $count, true ) )
+				else
 				{
-					if ( is_array( $childLastPost ) )
+					$lastAuthor = new \IPS\Member;
+					if ( $this->last_poster_name )
 					{
-						if ( isset( $childLastPost['date'] ) )
-						{
-							$results[$childLastPost['date']] = $childLastPost;
-						}
-						else
-						{
-							$results = $results + $childLastPost;
-						}
+						$lastAuthor->name = $this->last_poster_name;
 					}
 				}
+				
+				$result = array(
+					'author'		=> $lastAuthor,
+					'topic_url'		=> \IPS\Http\Url::internal( "app=forums&module=forums&controller=topic&id={$this->last_id}", 'front', 'forums_topic', array( $this->seo_last_title ) ),
+					'topic_title'	=> $this->last_title,
+					'date'			=> $this->last_post
+				);
 			}
-		}
 
-		if ( count( $results ) )
-		{
-			/* Don't process the author details if we're not going to use them */
-			if ( ! $isChild )
+			foreach( $this->children() as $child )
 			{
-				$membersToLoad = [];
+				$childLastPost = $child->lastPost();
 
-				/* Let's get the author details */
-				foreach ( $results as $timestamp => $data )
+				if( $result === NULL OR ( $childLastPost !== NULL AND $childLastPost['date'] > $result['date'] ) )
 				{
-					if ( $data['_author'] and is_int( $data['_author'] ) )
-					{
-						$membersToLoad[ $timestamp ] = $data['_author'];
-					}
-					else
-					{
-						/* Default to a guest account so we can be sure the author is never null */
-						$results[ $timestamp ]['author'] = new Member;
-						if ( $data['_author'] and is_string( $data['_author'] ) )
-						{
-							$results[ $timestamp ]['author']->name = $data['_author'];
-						}
-					}
-				}
-
-				$idsToLoad = array_unique( array_values( $membersToLoad ) );
-
-				/* Load the members not in static::$lastPostLoadedMembers */
-				$idsToLoad = array_diff( $idsToLoad, array_keys( static::$lastPostLoadedMembers ) );
-
-				if ( count( $idsToLoad ) )
-				{
-					foreach( Db::i()->select( '*', 'core_members', [ Db::i()->in( 'member_id', $idsToLoad ) ] ) as $lastPostMember )
-					{
-						static::$lastPostLoadedMembers[ $lastPostMember['member_id'] ] = Member::constructFromData( $lastPostMember );
-					}
-				}
-
-				if ( count( $membersToLoad ) )
-				{
-					foreach ( $membersToLoad as $timestamp => $memberId )
-					{
-						if ( isset( static::$lastPostLoadedMembers[ $memberId ] ) )
-						{
-							$results[$timestamp]['author'] = static::$lastPostLoadedMembers[ $memberId ];
-						}
-						else
-						{
-							/* Technically we shouldn't ever get here, but let's not throw an exception */
-							$results[$timestamp]['author'] = Member::load( $memberId );
-						}
-					}
+					$result = $childLastPost;
 				}
 			}
-
-			krsort( $results );
-			if ( $count === 1 )
+			
+			if ( $this->sub_can_post and !$this->permission_showtopic and !$this->can('read') AND !\is_null( $result ) )
 			{
-				/* return the first from the array */
-				return array_shift( $results );
+				$result['topic_title'] = NULL;
 			}
-
-			/* array_slice re-indexes, and we'd lose the krsort timestamp key */
-			return array_intersect_key( $results, array_flip( array_slice( array_keys( $results ), 0, $count ) ) );
-		}
-		else
-		{
-			return null;
+			
+			return $result;
 		}
 	}
 	
@@ -931,7 +539,7 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return	array
 	 */
-	public function permissionTypes():array
+	public function permissionTypes()
 	{
 		if ( !$this->sub_can_post )
 		{
@@ -945,12 +553,13 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return	array
 	 */
-	public static function basicDataColumns(): array
+	public static function basicDataColumns()
 	{
 		$return = parent::basicDataColumns();
 		$return[] = 'forums_bitoptions';
 		$return[] = 'password';
 		$return[] = 'password_override';
+		$return[] = 'min_posts_view';
 		$return[] = 'club_id';
 		return $return;
 	}
@@ -960,19 +569,19 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return	bool
 	 */
-	public function loggedInMemberHasPasswordAccess(): bool
+	public function loggedInMemberHasPasswordAccess()
 	{
 		if ( $this->password === NULL )
 		{
 			return TRUE;
 		}
 		
-		if ( Member::loggedIn()->inGroup( explode( ',', $this->password_override ) ) )
+		if ( \IPS\Member::loggedIn()->inGroup( explode( ',', $this->password_override ) ) )
 		{
 			return TRUE;
 		}
 		
-		if ( isset( Request::i()->cookie[ 'ipbforumpass_' . $this->id ] ) and Login::compareHashes( md5( $this->password ), Request::i()->cookie[ 'ipbforumpass_' . $this->id ] ) )
+		if ( isset( \IPS\Request::i()->cookie[ 'ipbforumpass_' . $this->id ] ) and \IPS\Login::compareHashes( md5( $this->password ), \IPS\Request::i()->cookie[ 'ipbforumpass_' . $this->id ] ) )
 		{
 			return TRUE;
 		}
@@ -983,26 +592,26 @@ class Forum extends Model implements Permissions
 	/**
 	 * Password Form
 	 *
-	 * @return	Form|NULL
+	 * @return	\IPS\Helpers\Form|NULL
 	 * @note	Return of NULL indicates password has been provided correctly
 	 */
-	public function passwordForm(): ?Form
+	public function passwordForm()
 	{
 		/* Already have access? */
-		if ( $this->loggedInMemberHasPasswordAccess() && !isset( Request::i()->passForm ) )
+		if ( $this->loggedInMemberHasPasswordAccess() && !isset( \IPS\Request::i()->passForm ) )
 		{
 			return NULL;
 		}
 		
 		/* Build form */
 		$password = $this->password;
-		$form = new Form( 'forum_password', 'continue' );
-		$form->class = 'ipsForm--vertical ipsForm--password-form';
-		$form->add( new Password( 'password', NULL, TRUE, array(), function( $val ) use ( $password )
+		$form = new \IPS\Helpers\Form( 'forum_password', 'continue' );
+		$form->class = 'ipsForm_vertical';
+		$form->add( new \IPS\Helpers\Form\Password( 'password', NULL, TRUE, array(), function( $val ) use ( $password )
 		{
 			if ( $val != $password )
 			{
-				throw new DomainException( 'forum_password_bad' );
+				throw new \DomainException( 'forum_password_bad' );
 			}
 		} ) );
 		
@@ -1013,19 +622,19 @@ class Forum extends Model implements Permissions
 			$this->setPasswordCookie( $password );
 			
 			/* If we have a topic ID, redirect to it */
-			if ( isset( Request::i()->topic ) )
+			if ( isset( \IPS\Request::i()->topic ) )
 			{
 				try
 				{
-					Output::i()->redirect( Topic::loadAndCheckPerms( Request::i()->topic )->url() );
+					\IPS\Output::i()->redirect( \IPS\forums\Topic::loadAndCheckPerms( \IPS\Request::i()->topic )->url() );
 				}
-				catch ( OutOfRangeException $e ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 			
 			/* Make sure passForm isn't returned on the URL if viewing the forum */
-			if ( isset( Request::i()->module ) and isset( Request::i()->controller ) and Request::i()->module === 'forums' and Request::i()->controller === 'forums' )
+			if ( isset( \IPS\Request::i()->module ) and isset( \IPS\Request::i()->controller ) and \IPS\Request::i()->module === 'forums' and \IPS\Request::i()->controller === 'forums' )
 			{
-				Output::i()->redirect( $this->url() );
+				\IPS\Output::i()->redirect( $this->url() );
 			}
 			
 			/* Return */
@@ -1039,12 +648,12 @@ class Forum extends Model implements Permissions
 	/**
 	 * Set Password Cookie
 	 *
-	 * @param string $password	Password to set for forum
+	 * @param	string	$password	Password to set for forum
 	 * @return	void
 	 */
-	public function setPasswordCookie( string $password ) : void
+	public function setPasswordCookie( $password )
 	{
-		Request::i()->setCookie( 'ipbforumpass_' . $this->id, md5( $password ), DateTime::create()->add( new DateInterval( 'P7D' ) ) );
+		\IPS\Request::i()->setCookie( 'ipbforumpass_' . $this->id, md5( $password ), \IPS\DateTime::create()->add( new \DateInterval( 'P7D' ) ) );
 	}
 	
 	/**
@@ -1052,15 +661,15 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return	void
 	 */
-	public function setTheme() : void
+	public function setTheme()
 	{
 		if ( $this->skin_id )
 		{
 			try
 			{
-				Theme::switchTheme( $this->skin_id );
+				\IPS\Theme::switchTheme( $this->skin_id );
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 	}
 
@@ -1068,18 +677,18 @@ class Forum extends Model implements Permissions
 	 * Fetch All Root Nodes
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	mixed				$where				Additional WHERE clause
 	 * @param	array|NULL			$limit				Limit/offset to use, or NULL for no limit (default)
 	 * @return	array
 	 */
-	public static function roots( ?string $permissionCheck='view', Member $member=NULL, mixed $where=array(), array $limit=NULL ): array
+	public static function roots( $permissionCheck='view', $member=NULL, $where=array(), $limit=NULL )
 	{
 		/* @todo remove this temp fix */
-		if( !isset( Store::i()->_forumsChecked ) OR !Store::i()->_forumsChecked )
+		if( !isset( \IPS\Data\Store::i()->_forumsChecked ) OR !\IPS\Data\Store::i()->_forumsChecked )
 		{
-			Db::i()->update( 'forums_forums', array( 'parent_id' => '-1' ), array( 'parent_id=?', 0 ) );
-			Store::i()->_forumsChecked = 1;
+			\IPS\Db::i()->update( 'forums_forums', array( 'parent_id' => '-1' ), array( 'parent_id=?', 0 ) );
+			\IPS\Data\Store::i()->_forumsChecked = 1;
 		}
 
 		return parent::roots( $permissionCheck, $member, $where, $limit );
@@ -1089,32 +698,41 @@ class Forum extends Model implements Permissions
 	 * Load into memory (taking permissions into account)
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	array				$where				Additional where clause
 	 * @return	void
 	 */
-	public static function loadIntoMemory( ?string $permissionCheck='view', ?Member $member=NULL, array $where = array() ) : void
+	public static function loadIntoMemory( $permissionCheck='view', $member=NULL, $where = array() )
 	{
 		/* @todo remove this temp fix */
-		if( !isset( Store::i()->_forumsChecked ) OR !Store::i()->_forumsChecked )
+		if( !isset( \IPS\Data\Store::i()->_forumsChecked ) OR !\IPS\Data\Store::i()->_forumsChecked )
 		{
-			Db::i()->update( 'forums_forums', array( 'parent_id' => '-1' ), array( 'parent_id=?', 0 ) );
-			Store::i()->_forumsChecked = 1;
+			\IPS\Db::i()->update( 'forums_forums', array( 'parent_id' => '-1' ), array( 'parent_id=?', 0 ) );
+			\IPS\Data\Store::i()->_forumsChecked = 1;
 		}
 
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
-		if ( in_array( $permissionCheck, array( 'add', 'reply' ) ) )
+		if ( \in_array( $permissionCheck, array( 'add', 'reply' ) ) )
 		{
 			$where[] = array( 'sub_can_post=1' );
-
+			$where[] = array( 'min_posts_post<=?', $member->member_posts );
+		}
+		
+		if ( $permissionCheck == 'view' )
+		{
+			$where[] = array( '(sub_can_post=0 OR min_posts_view<=?)', $member->member_posts );
+		}
+		
+		if ( \in_array( $permissionCheck, array( 'read', 'add' ) ) )
+		{
 			if ( static::customPermissionNodes() )
 			{
-				$whereString = 'password=? OR ' . Db::i()->findInSet( 'forums_forums.password_override', $member->groups );
+				$whereString = 'password=? OR ' . \IPS\Db::i()->findInSet( 'forums_forums.password_override', $member->groups );
 				$whereParams = array( NULL );
-				if ( $member->member_id === Member::loggedIn()->member_id )
+				if ( $member->member_id === \IPS\Member::loggedIn()->member_id )
 				{
-					foreach ( Request::i()->cookie as $k => $v )
+					foreach ( \IPS\Request::i()->cookie as $k => $v )
 					{
 						if ( mb_substr( $k, 0, 13 ) === 'ipbforumpass_' )
 						{
@@ -1128,28 +746,38 @@ class Forum extends Model implements Permissions
 			}
 		}
 		
-		parent::loadIntoMemory( $permissionCheck, $member, $where );
+		return parent::loadIntoMemory( $permissionCheck, $member, $where );
 	}
 	
 	/**
 	 * Check permissions
 	 *
 	 * @param	mixed								$permission						A key which has a value in static::$permissionMap['view'] matching a column ID in core_permission_index
-	 * @param Group|Member|null $member							The member or group to check (NULL for currently logged in member)
-	 * @param bool $considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$member							The member or group to check (NULL for currently logged in member)
+	 * @param	bool								$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
 	 * @return	bool
-	 * @throws	OutOfBoundsException	If $permission does not exist in static::$permissionMap
+	 * @throws	\OutOfBoundsException	If $permission does not exist in static::$permissionMap
 	 */
-	public function can( mixed $permission, Group|Member $member=NULL, bool $considerPostBeforeRegistering = TRUE ): bool
+	public function can( $permission, $member=NULL, $considerPostBeforeRegistering = TRUE )
 	{
-		if ( !$this->sub_can_post and in_array( $permission, array( 'add', 'reply' ) ) )
+		if ( !$this->sub_can_post and \in_array( $permission, array( 'add', 'reply' ) ) )
+		{
+			return FALSE;
+		}
+
+		$_member = $member ?: \IPS\Member::loggedIn();
+		if ( $permission == 'view' and $this->sub_can_post and $this->min_posts_view and $this->min_posts_view > $_member->member_posts )
+		{
+			return FALSE;
+		}
+		if ( \in_array( $permission, array( 'add', 'reply' ) ) and $this->min_posts_post and $this->min_posts_post > $_member->member_posts )
 		{
 			return FALSE;
 		}
 						
 		$return = parent::can( $permission, $member, $considerPostBeforeRegistering );
 		
-		if ( $return === TRUE and $this->password !== NULL and in_array( $permission, array( 'read', 'add' ) ) and ( ( $member !== NULL and $member->member_id !== Member::loggedIn()->member_id ) or !$this->loggedInMemberHasPasswordAccess() ) )
+		if ( $return === TRUE and $this->password !== NULL and \in_array( $permission, array( 'read', 'add' ) ) and ( ( $member !== NULL and $member->member_id !== \IPS\Member::loggedIn()->member_id ) or !$this->loggedInMemberHasPasswordAccess() ) )
 		{
 			return FALSE;
 		}
@@ -1162,14 +790,14 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	public function errorMessage(): string
+	public function errorMessage()
 	{
-		if ( Member::loggedIn()->language()->checkKeyExists( "forums_forum_{$this->id}_permerror" ) )
+		if ( \IPS\Member::loggedIn()->language()->checkKeyExists( "forums_forum_{$this->id}_permerror" ) )
 		{
-			$message = trim( Member::loggedIn()->language()->get( "forums_forum_{$this->id}_permerror" ) );
+			$message = trim( \IPS\Member::loggedIn()->language()->get( "forums_forum_{$this->id}_permerror" ) );
 			if ( $message and $message != '<p></p>' )
 			{
-				return Theme::i()->getTemplate('global', 'core', 'global')->richText( $message, array('') );
+				return \IPS\Theme::i()->getTemplate('global', 'core', 'global')->richText( $message, array('ipsType_normal') );
 			}
 		}
 		
@@ -1180,11 +808,11 @@ class Forum extends Model implements Permissions
 	 * [Node] Get buttons to display in tree
 	 * Example code explains return value
 	 *
-	 * @param Url $url		Base URL
-	 * @param bool $subnode	Is this a subnode?
-	 * @return    array
+	 * @param	string	$url		Base URL
+	 * @param	bool	$subnode	Is this a subnode?
+	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ): array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = parent::getButtons( $url, $subnode );
 		
@@ -1197,16 +825,6 @@ class Forum extends Model implements Permissions
 		{
 			$buttons['add']['title'] = 'forums_add_child_cat';
 		}
-
-		if ( isset( $buttons['delete'] ) AND $this->isUsedByADownloadsCategory() )
-		{
-			unset( $buttons['delete']['data'] );
-		}
-
-		if ( isset( $buttons['delete'] ) AND $this->isUsedByCms() )
-		{
-			unset( $buttons['delete']['data'] );
-		}
 		
 		return $buttons;
 	}
@@ -1214,22 +832,26 @@ class Forum extends Model implements Permissions
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$groups = array();
-		foreach ( Group::groups() as $k => $v )
+		foreach ( \IPS\Member\Group::groups() as $k => $v )
 		{
 			$groups[ $k ] = $v->name;
 		}
-
-		$form->class = 'ipsForm--horizontal ipsForm--forum-settings';
+		$groupsNoGuests = array();
+		foreach ( \IPS\Member\Group::groups( TRUE, FALSE ) as $k => $v )
+		{
+			$groupsNoGuests[ $k ] = $v->name;
+		}
+				
 		$form->addTab( 'forum_settings' );
 		$form->addHeader( 'forum_settings' );
-		$form->add( new Translatable( 'forum_name', NULL, TRUE, array( 'app' => 'forums', 'key' => ( $this->id ? "forums_forum_{$this->id}" : NULL ) ) ) );
-		$form->add( new Translatable( 'forum_description', NULL, FALSE, array( 'app' => 'forums', 'key' => ( $this->id ? "forums_forum_{$this->id}_desc" : NULL ), 'editor' => array( 'app' => 'forums', 'key' => 'Forums', 'autoSaveKey' => ( $this->id ? "forums-forum-{$this->id}" : "forums-new-forum" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'forum_description_placeholder' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'forum_name', NULL, TRUE, array( 'app' => 'forums', 'key' => ( $this->id ? "forums_forum_{$this->id}" : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'forum_description', NULL, FALSE, array( 'app' => 'forums', 'key' => ( $this->id ? "forums_forum_{$this->id}_desc" : NULL ), 'editor' => array( 'app' => 'forums', 'key' => 'Forums', 'autoSaveKey' => ( $this->id ? "forums-forum-{$this->id}" : "forums-new-forum" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'forum_description_placeholder' ) ) ) );
 		
 		$type = 'normal';
 		if ( $this->id )
@@ -1242,67 +864,85 @@ class Forum extends Model implements Permissions
 			{
 				$type = 'category';
 			}
+			elseif ( $this->forums_bitoptions['bw_enable_answers'] )
+			{
+				$type = 'qa';
+			}
 		}
-		elseif ( !isset( Request::i()->parent ) )
+		elseif ( !isset( \IPS\Request::i()->parent ) )
 		{
 			$type = 'category';
 		}
 				
 		$id = $this->id ?: 'new';
-		$form->add( new Radio( 'forum_type', $type, TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'forum_type', $type, TRUE, array(
 			'options' => array(
 				'normal' 	=> 'forum_type_normal',
+				'qa' 		=> 'forum_type_qa',
 				'category'	=> 'forum_type_category',
 				'redirect'	=> 'forum_type_redirect'
 			),
 			'toggles'	=> array(
-				'normal'	=> array(
+				'normal'	=> array( // make sure when adding here that you also add to qa below
 					'forum_password_on',
 					'forum_ipseo_priority',
+					'forum_min_posts_view',
 					'forum_can_view_others',
 					'forum_permission_showtopic',
 					'forum_permission_custom_error',
 					"form_{$id}_header_permissions",
-					"ipsTabs_form_{$id}_forum_display",
+					"form_{$id}_tab_forum_display",
+					'forum_allow_rating',
 					'forum_disable_sharelinks',
-					"ipsTabs_form_{$id}_posting_settings",
+					"form_{$id}_tab_posting_settings",
 					"form_{$id}_header_forum_display_topic",
-					"ipsTabs_form_{$id}_permissions",
 					'forum_preview_posts',
-					'forum_icon_choose',
+					'forum_icon',
 					'forum_sort_key',
-					'forum_feature_color',
-					'forum_skin_id',
-					"form_{$id}_header_forum_solved_options",
-					"forum_solved_mode",
-					"forum_enable_assignments",
-					"bw_fluid_view",
-					"form_{$id}_header_forum_display_forum",
-					"ipsTabs_form_{$id}_forum_rules",
-					"ipsTabs_form_{$id}_topic_and_post_settings",
+					'forum_best_answer',
+					'forum_use_feature_color'
+				),
+				'qa'	=> array(
+					'forum_password_on',
+					'forum_ipseo_priority',
+					'forum_min_posts_view',
+					'forum_can_view_others_qa',
+					'forum_permission_showtopic_qa',
+					'forum_permission_custom_error',
+					"form_{$id}_header_permissions",
+					"form_{$id}_tab_forum_display",
+					'forum_allow_rating',
+					'forum_disable_sharelinks',
+					"form_{$id}_tab_posting_settings",
+					"form_{$id}_header_forum_display_question",
+					'forum_can_view_others_qa',
+					'bw_enable_answers_member',
+					'forum_qa_rate_questions',
+					'forum_qa_rate_answers',
+					'forum_preview_posts_qa',
+					'forum_icon',
+					'forum_sort_key_qa',
+					'forum_use_feature_color'
 				),
 				'category'	=> array(
-					"ipsTabs_form_{$id}_forum_display",
-					'forum_feature_color',
-					'forum_skin_id',
-					"bw_fluid_view",
-					"form_{$id}_header_forum_display_forum",
-					"ipsTabs_form_{$id}_forum_rules",
-					"ipsTabs_form_{$id}_topic_and_post_settings",
+					"form_{$id}_tab_forum_display",
+					'forum_rules_title',
+					'forum_rules_text',
+					'forum_use_feature_color'
 				),
 				'redirect'	=> array(
 					'forum_password_on',
 					'forum_redirect_url',
 					'forum_redirect_hits',
-					'forum_icon_choose',
-					'forum_feature_color'
+					'forum_icon',
+					'forum_use_feature_color'
 				),
 			)
 		) ) );
 
-		$class = get_called_class();
+		$class = \get_called_class();
 
-		$form->add( new Node( 'forum_parent_id', ( !$this->id AND $this->parent_id === -1 ) ? NULL : ( $this->parent_id === -1 ? 0 : $this->parent_id ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Node( 'forum_parent_id', ( !$this->id AND $this->parent_id === -1 ) ? NULL : ( $this->parent_id === -1 ? 0 : $this->parent_id ), FALSE, array(
 			'class'		      	=> '\IPS\forums\Forum',
 			'disabled'	      	=> array(),
 			'zeroVal'         	=> 'node_no_parentf',
@@ -1314,71 +954,97 @@ class Forum extends Model implements Permissions
 					return FALSE;
 				}
 
-				return !isset( Request::i()->id ) or ( $node->id != Request::i()->id and !$node->isChildOf( $node::load( Request::i()->id ) ) );
+				return !isset( \IPS\Request::i()->id ) or ( $node->id != \IPS\Request::i()->id and !$node->isChildOf( $node::load( \IPS\Request::i()->id ) ) );
 			}
 		), function( $val )
 		{
-			if ( !$val and Request::i()->forum_type !== 'category' )
+			if ( !$val and \IPS\Request::i()->forum_type !== 'category' )
 			{
-				throw new DomainException('forum_parent_id_error');
+				throw new \DomainException('forum_parent_id_error');
 			}
 		} ) );
 
-		$form->add( new FormUrl( 'forum_redirect_url', $this->id ? $this->redirect_url : array(), FALSE, array( 'placeholder' => 'http://www.example.com/' ),
+		/* Color */
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_use_feature_color', $this->feature_color ? 1 : 0, FALSE, array( 'togglesOn' => array( 'forum_feature_color' ) ), NULL, NULL, NULL, 'forum_use_feature_color' ) );
+		$form->add( new \IPS\Helpers\Form\Color( 'forum_feature_color', $this->feature_color ?: '', FALSE, array(), NULL, NULL, NULL, 'forum_feature_color' ) );
+
+		$form->add( new \IPS\Helpers\Form\Upload( 'forum_icon', $this->icon ? \IPS\File::get( 'forums_Icons', $this->icon ) : NULL, FALSE, array( 'image' => TRUE, 'storageExtension' => 'forums_Icons' ), NULL, NULL, NULL, 'forum_icon' ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'forum_card_image', $this->card_image ? \IPS\File::get( 'forums_Cards', $this->card_image ) : NULL, FALSE, array( 'image' => array( 'maxWidth' => 800, 'maxHeight' => 800 ), 'storageExtension' => 'forums_Cards', 'allowStockPhotos' => TRUE ), NULL, NULL, NULL, 'forum_card_image' ) );
+
+
+		$form->add( new \IPS\Helpers\Form\Url( 'forum_redirect_url', $this->id ? $this->redirect_url : array(), FALSE, array( 'placeholder' => 'http://www.example.com/' ),
 			function( $val )
 			{
-				if ( !$val and Request::i()->forum_type === 'redirect' )
+				if ( !$val and \IPS\Request::i()->forum_type === 'redirect' )
 				{
-					throw new DomainException('form_required');
+					throw new \DomainException('form_required');
 				}
 			}, NULL, NULL, 'forum_redirect_url' ) );
-		$form->add( new Number( 'forum_redirect_hits', $this->id ? $this->redirect_hits : 0, FALSE, array(), NULL, NULL, NULL, 'forum_redirect_hits' ) );
-		$form->add( new YesNo( 'forum_password_on', $this->id ? ( $this->password !== NULL ) : FALSE, FALSE, array( 'togglesOn' => array( 'forum_password', 'forum_password_override' ) ), NULL, NULL, NULL, 'forum_password_on' ) );
-		$form->add( new Password( 'forum_password', $this->password, FALSE, array(), NULL, NULL, NULL, 'forum_password' ) );
-		$form->add( new CheckboxSet( 'forum_password_override', $this->id ? explode( ',', $this->password_override ) : array(), FALSE, array( 'options' => $groups, 'multiple' => TRUE ), NULL, NULL, NULL, 'forum_password_override' ) );
-		if ( count( Theme::themes() ) > 1 )
+		$form->add( new \IPS\Helpers\Form\Number( 'forum_redirect_hits', $this->id ? $this->redirect_hits : 0, FALSE, array(), NULL, NULL, NULL, 'forum_redirect_hits' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_password_on', $this->id ? ( $this->password !== NULL ) : FALSE, FALSE, array( 'togglesOn' => array( 'forum_password', 'forum_password_override' ) ), NULL, NULL, NULL, 'forum_password_on' ) );
+		$form->add( new \IPS\Helpers\Form\Password( 'forum_password', $this->password, FALSE, array(), NULL, NULL, NULL, 'forum_password' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'forum_password_override', $this->id ? explode( ',', $this->password_override ) : array(), FALSE, array( 'options' => $groups, 'multiple' => TRUE ), NULL, NULL, NULL, 'forum_password_override' ) );
+		if ( \count( \IPS\Theme::themes() ) > 1 )
 		{
 			$themes = array( 0 => 'forum_skin_id_default' );
-			foreach ( Theme::themes() as $theme )
+			foreach ( \IPS\Theme::themes() as $theme )
 			{
 				$themes[ $theme->id ] = $theme->_title;
 			}
-			$form->add( new Select( 'forum_skin_id', $this->id ? $this->skin_id : 0, FALSE, array( 'options' => $themes ), NULL, NULL, NULL, 'forum_skin_id' ) );
+			$form->add( new \IPS\Helpers\Form\Select( 'forum_skin_id', $this->id ? $this->skin_id : 0, FALSE, array( 'options' => $themes ), NULL, NULL, NULL, 'forum_skin_id' ) );
 		}
-
-		$form->addHeader( 'forum_solved_options' );
-
-		$mode = 'off';
-		if ( $this->id )
-		{
-			if ( $this->forums_bitoptions['bw_solved_set_by_moderator'] and $this->forums_bitoptions['bw_solved_set_by_member'] )
-			{
-				$mode = 'starter_and_mods';
-			}
-			else if ( $this->forums_bitoptions['bw_solved_set_by_moderator'] )
-			{
-				$mode = 'mods';
-			}
-		}
-
-		$form->add( new Radio( 'forum_solved_mode', $this->id ? $mode : 'off', FALSE, array(
-			'options' => [
-				'off' => 'forum_solved_mode_off',
-				'mods' => 'forum_solved_mode_mods',
-				'starter_and_mods' => 'forum_solved_mode_starter'
-			]
-		), NULL, NULL, NULL, 'forum_solved_mode' ) );
-
-		if( Bridge::i()->featureIsEnabled( 'assignments' ) )
-		{
-			$form->add( new YesNo( 'forum_enable_assignments', $this->forums_bitoptions['bw_enable_assignments'], false, array(), null, null, null, 'forum_enable_assignments' ) );
-		}
-
+		
+		$form->add( new \IPS\Helpers\Form\Select( 'forum_ipseo_priority', $this->id ? $this->ipseo_priority : '-1', FALSE, array(
+			'options' => array(
+				'1'		=> '1',
+				'0.9'	=> '0.9',
+				'0.8'	=> '0.8',
+				'0.7'	=> '0.7',
+				'0.6'	=> '0.6',
+				'0.5'	=> '0.5',
+				'0.4'	=> '0.4',
+				'0.3'	=> '0.3',
+				'0.2'	=> '0.2',
+				'0.1'	=> '0.1',
+				'0'		=> 'sitemap_do_not_include',
+				'-1'	=> 'sitemap_default_priority'
+			)
+		), NULL, NULL, NULL, 'forum_ipseo_priority' ) );
+		
+		$form->addHeader( 'permissions' );
+		$form->add( new \IPS\Helpers\Form\Number( 'forum_min_posts_view', $this->id ? $this->min_posts_view : 0, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'no_restriction' ), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('approved_posts_comments'), 'forum_min_posts_view' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_can_view_others', $this->id ? $this->can_view_others : TRUE, FALSE, array(), NULL, NULL, NULL, 'forum_can_view_others' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_can_view_others_qa', $this->id ? $this->can_view_others : TRUE, FALSE, array(), NULL, NULL, NULL, 'forum_can_view_others_qa' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_permission_showtopic', $this->permission_showtopic ?: 0, FALSE, array(), NULL, NULL, NULL, 'forum_permission_showtopic' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_permission_showtopic_qa', $this->permission_showtopic ?: 0, FALSE, array(), NULL, NULL, NULL, 'forum_permission_showtopic_qa' ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'forum_permission_custom_error', NULL, FALSE, array( 'app' => 'forums', 'key' => ( $this->id ? "forums_forum_{$this->id}_permerror" : NULL ), 'editor' => array( 'app' => 'forums', 'key' => 'Forums', 'autoSaveKey' => ( $this->id ? "forums-permerror-{$this->id}" : "forums-new-permerror" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'permerror' ) : NULL, 'minimize' => 'forum_permerror_placeholder' ) ), NULL, NULL, NULL, 'forum_permission_custom_error' ) );
+		
+		$form->addTab( 'forum_display' );
 		$form->addHeader( 'forum_display_forum' );
-
+		
 		$sortOptions = array( 'last_post' => 'sort_updated', 'last_real_post' => 'sort_last_comment', 'posts' => 'sort_num_comments', 'views' => 'sort_views', 'title' => 'sort_title', 'starter_name' => 'sort_author_name', 'last_poster_name' => 'sort_last_comment_name', 'start_date' => 'sort_date' );
+		$sortOptionsQA = array( 'question_rating' => 'sort_question_rating' );
 
-		$form->add( new Select( 'forum_sort_key', $this->id ? $this->sort_key : 'last_post', FALSE, array( 'options' => $sortOptions ), NULL, NULL, NULL, 'forum_sort_key' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'forum_sort_key', $this->id ? $this->sort_key : 'last_post', FALSE, array( 'options' => $sortOptions ), NULL, NULL, NULL, 'forum_sort_key' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'forum_sort_key_qa', $this->id ? $this->sort_key : 'last_post', FALSE, array( 'options' => array_merge( $sortOptions, $sortOptionsQA ) ), NULL, NULL, NULL, 'forum_sort_key_qa' ) );
+
+		$form->add( new \IPS\Helpers\Form\Radio( 'forum_show_rules', $this->id ? $this->show_rules : 0, FALSE, array(
+			'options' => array(
+				0	=> 'forum_show_rules_none',
+				1	=> 'forum_show_rules_link',
+				2	=> 'forum_show_rules_full'
+			),
+			'toggles'	=> array(
+				1	=> array(
+					'forum_rules_title',
+					'forum_rules_text'
+				),
+				2	=> array(
+					'forum_rules_title',
+					'forum_rules_text'
+				),
+			)
+		) ) );
 
 		/* Show the combined fluid view option if we have children */
 		$disabledFluidView = FALSE;
@@ -1387,25 +1053,28 @@ class Forum extends Model implements Permissions
 			$disabledFluidView = TRUE;
 			$this->forums_bitoptions['bw_fluid_view'] = FALSE;
 
-			Member::loggedIn()->language()->words['bw_fluid_view_warning'] = Member::loggedIn()->language()->addToStack( 'bw_fluid_view__warning' );
+			\IPS\Member::loggedIn()->language()->words['bw_fluid_view_warning'] = \IPS\Member::loggedIn()->language()->addToStack( 'bw_fluid_view__warning' );
 		}
 
-		$form->add( new YesNo( 'bw_fluid_view', $this->id ? $this->forums_bitoptions['bw_fluid_view'] : FALSE, FALSE, array( 'disabled' => $disabledFluidView ), NULL, NULL, NULL, 'bw_fluid_view' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'bw_fluid_view', $this->id ? $this->forums_bitoptions['bw_fluid_view'] : FALSE, FALSE, array( 'disabled' => $disabledFluidView ), NULL, NULL, NULL, 'bw_fluid_view' ) );
 
-		/* Customi(s|z)ations */
-		$form->addTab( 'forum_customizations' );
-		$form->addHeader( 'forum_customizations' );
-
-		$form->add( new Color( 'forum_feature_color', $this->feature_color ?: '', FALSE, array( 'allowNone' => true ), NULL, NULL, NULL, 'forum_feature_color' ) );
-
-		/* Icon fields */
-		$this->iconFormFields( $form );
-
-		$form->add( new Upload( 'forum_card_image', $this->card_image ? File::get( 'forums_Cards', $this->card_image ) : NULL, FALSE, array( 'image' => array( 'maxWidth' => 800, 'maxHeight' => 800 ), 'storageExtension' => 'forums_Cards', 'allowStockPhotos' => TRUE ), NULL, NULL, NULL, 'forum_card_image' ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'forum_rules_title', NULL, FALSE, array( 'app' => 'forums', 'key' => ( $this->id ? "forums_forum_{$this->id}_rulestitle" : NULL ) ), NULL, NULL, NULL, 'forum_rules_title' ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'forum_rules_text', NULL, FALSE, array( 'app' => 'forums', 'key' => ( $this->id ? "forums_forum_{$this->id}_rules" : NULL ), 'editor' => array( 'app' => 'forums', 'key' => 'Forums', 'autoSaveKey' => ( $this->id ? "forums-rules-{$this->id}" : "forums-new-rules" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'rules' ) : NULL ) ), NULL, NULL, NULL, 'forum_rules_text' ) );
 		
-		$form->addTab( 'permissions' );
-		$form->addHeader( 'permissions' );
+		$form->addHeader( 'forum_display_topic' );
+		$form->addHeader( 'forum_display_question' );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'bw_enable_answers_member', $this->id ? $this->forums_bitoptions['bw_enable_answers_member'] : TRUE, FALSE, array(), NULL, NULL, NULL, 'bw_enable_answers_member' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'forum_qa_rate_questions', $this->id ? (  ( $this->qa_rate_questions == '*' or $this->qa_rate_questions === NULL ) ? '*' : explode( ',', $this->qa_rate_questions ) ) : '*', FALSE, array( 'options' => $groupsNoGuests, 'unlimited' => '*', 'multiple' => TRUE, 'impliedUnlimited' => TRUE ), NULL, NULL, NULL, 'forum_qa_rate_questions' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'forum_qa_rate_answers', $this->id ? (  ( $this->qa_rate_answers == '*' or $this->qa_rate_answers === NULL ) ? '*' : explode( ',', $this->qa_rate_answers ) ) : '*', FALSE, array( 'options' => $groupsNoGuests, 'unlimited' => '*', 'multiple' => TRUE, 'impliedUnlimited' => TRUE ), NULL, NULL, NULL, 'forum_qa_rate_answers' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_forum_allow_rating', $this->id ? $this->forum_allow_rating : FALSE, FALSE, array(), NULL, NULL, NULL, 'forum_allow_rating' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_disable_sharelinks', $this->id ? !$this->disable_sharelinks : TRUE, FALSE, array(), NULL, NULL, NULL, 'forum_disable_sharelinks' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'bw_enable_answers_moderator', $this->id ? $this->forums_bitoptions['bw_enable_answers_moderator'] : FALSE, FALSE, array( 'togglesOn' => array( 'bw_enable_answers__member', 'solved_stats_from_cutoff' ) ), NULL, NULL, NULL, 'forum_best_answer' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'bw_enable_answers__member', $this->id ? $this->forums_bitoptions['bw_enable_answers_member'] : FALSE, FALSE, array(), NULL, NULL, NULL, 'bw_enable_answers__member' ) );
+		$form->add( new \IPS\Helpers\Form\Interval( 'solved_stats_from_cutoff', $this->id ? $this->solved_stats_from_cutoff : 0, FALSE, array( 'valueAs'	 => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'alltime' ), NULL, NULL, NULL, 'solved_stats_from_cutoff' ) );
 
+		$form->addTab( 'posting_settings' );
+		$form->addHeader('posts');
+		
 		$previewPosts = array();
 		if ( $this->id )
 		{
@@ -1422,67 +1091,23 @@ class Forum extends Model implements Permissions
 					break;
 			}
 		}
-
-		$form->add( new CheckboxSet( 'forum_preview_posts', $previewPosts, FALSE, array( 'options' => array( 'topics' => 'forum_preview_posts_topics', 'posts' => 'forum_preview_posts_posts' ) ), NULL, NULL, NULL, 'forum_preview_posts' ) );
-		$form->add( new YesNo( 'forum_can_view_others', $this->id ? $this->can_view_others : TRUE, FALSE, array(), NULL, NULL, NULL, 'forum_can_view_others' ) );
-		$form->add( new YesNo( 'forum_permission_showtopic', $this->permission_showtopic ?: 0, FALSE, array(), NULL, NULL, NULL, 'forum_permission_showtopic' ) );
-		$form->add( new Translatable( 'forum_permission_custom_error', NULL, FALSE, array( 'app' => 'forums', 'key' => ( $this->id ? "forums_forum_{$this->id}_permerror" : NULL ), 'editor' => array( 'app' => 'forums', 'key' => 'Forums', 'autoSaveKey' => ( $this->id ? "forums-permerror-{$this->id}" : "forums-new-permerror" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'permerror' ) : NULL, 'minimize' => 'forum_permerror_placeholder' ) ), NULL, NULL, NULL, 'forum_permission_custom_error' ) );
-		$form->add( new Select( 'forum_ipseo_priority', $this->id ? $this->ipseo_priority : '-1', FALSE, array(
-			'options' => array(
-				'1'		=> '1',
-				'0.9'	=> '0.9',
-				'0.8'	=> '0.8',
-				'0.7'	=> '0.7',
-				'0.6'	=> '0.6',
-				'0.5'	=> '0.5',
-				'0.4'	=> '0.4',
-				'0.3'	=> '0.3',
-				'0.2'	=> '0.2',
-				'0.1'	=> '0.1',
-				'0'		=> 'sitemap_do_not_include',
-				'-1'	=> 'sitemap_default_priority'
-			)
-		), NULL, NULL, NULL, 'forum_ipseo_priority' ) );
-
-		/* Rules */
-		$form->addTab( 'forum_rules' );
-		$form->addHeader( 'forum_rules' );
-
-		$form->add( new Radio( 'forum_show_rules', $this->id ? $this->show_rules : 0, FALSE, array(
-			'options' => array(
-				0	=> 'forum_show_rules_none',
-				1	=> 'forum_show_rules_link',
-				2	=> 'forum_show_rules_full'
-			),
-			'toggles'	=> array(
-				1	=> array(
-					'forum_rules_title',
-					'forum_rules_text'
-				),
-				2	=> array(
-					'forum_rules_title',
-					'forum_rules_text'
-				),
-			)
-		), null, null, null, "forum_show_rules" ) );
-
-		$form->add( new Translatable( 'forum_rules_title', NULL, FALSE, array( 'app' => 'forums', 'key' => ( $this->id ? "forums_forum_{$this->id}_rulestitle" : NULL ) ), NULL, NULL, NULL, 'forum_rules_title' ) );
-		$form->add( new Translatable( 'forum_rules_text', NULL, FALSE, array( 'app' => 'forums', 'key' => ( $this->id ? "forums_forum_{$this->id}_rules" : NULL ), 'editor' => array( 'app' => 'forums', 'key' => 'Forums', 'autoSaveKey' => ( $this->id ? "forums-rules-{$this->id}" : "forums-new-rules" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'rules' ) : NULL ) ), NULL, NULL, NULL, 'forum_rules_text' ) );
-
-		$form->addTab( 'topic_and_post_settings' );
-		$form->addHeader( 'forum_display_topic' );
-
-		$form->add( new YesNo( 'forum_disable_sharelinks', $this->id ? !$this->disable_sharelinks : TRUE, FALSE, array(), NULL, NULL, NULL, 'forum_disable_sharelinks' ) );
-		$form->add( new Interval( 'solved_stats_from_cutoff', $this->id ? $this->solved_stats_from_cutoff : 0, FALSE, array( 'valueAs'	 => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'alltime' ), NULL, NULL, NULL, 'solved_stats_from_cutoff' ) );
-
-		$form->addHeader('posts');
-		$form->add( new YesNo( 'forum_inc_postcount', $this->id ? $this->inc_postcount : TRUE, FALSE, array() ) );
-		$form->add( new YesNo( 'allow_anonymous', $this->id ? $this->allow_anonymous : FALSE, FALSE, array() ) );
-
+		
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'forum_preview_posts', $previewPosts, FALSE, array( 'options' => array( 'topics' => 'forum_preview_posts_topics', 'posts' => 'forum_preview_posts_posts' ) ), NULL, NULL, NULL, 'forum_preview_posts' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'forum_preview_posts_qa', $previewPosts, FALSE, array( 'options' => array( 'topics' => 'forum_preview_posts_questions', 'posts' => 'forum_preview_posts_answers' ) ), NULL, NULL, NULL, 'forum_preview_posts_qa' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_inc_postcount', $this->id ? $this->inc_postcount : TRUE, FALSE, array() ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'allow_anonymous', $this->id ? $this->allow_anonymous : FALSE, FALSE, array() ) );
 		$form->addHeader( 'polls' );
-		$form->add( new YesNo( 'forum_allow_poll', $this->id ? $this->allow_poll : TRUE, FALSE, array() ) );
-
-		parent::form( $form );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_allow_poll', $this->id ? $this->allow_poll : TRUE, FALSE, array() ) );
+		$form->addHeader( 'posting_requirements' );
+		$form->add( new \IPS\Helpers\Form\Number( 'forum_min_posts_post', $this->id ? $this->min_posts_post : 0, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'no_restriction' ), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('approved_posts_comments') ) );
+		
+		if ( \IPS\Settings::i()->tags_enabled )
+		{
+			$form->addHeader( 'tags' );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'bw_disable_tagging', !$this->forums_bitoptions['bw_disable_tagging'], FALSE, array( 'togglesOn' => array( 'bw_disable_prefixes', 'forum_tag_predefined' ) ), NULL, NULL, NULL, 'bw_disable_tagging' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'bw_disable_prefixes', !$this->forums_bitoptions['bw_disable_prefixes'], FALSE, array(), NULL, NULL, NULL, 'bw_disable_prefixes' ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'forum_tag_predefined', $this->tag_predefined ?: NULL, FALSE, array( 'autocomplete' => array( 'unique' => 'true', 'alphabetical' => \IPS\Settings::i()->tags_alphabetical ), 'nullLang' => 'forum_tag_predefined_unlimited' ), NULL, NULL, NULL, 'forum_tag_predefined' ) );
+		}
 	}
 	
 	/**
@@ -1490,7 +1115,7 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return bool
 	 */
-	public function canAdd(): bool
+	public function canAdd()
 	{
 		if ( $this->redirect_on )
 		{
@@ -1505,7 +1130,7 @@ class Forum extends Model implements Permissions
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		/* Type */
 		if ( isset( $values['forum_parent_id'] ) AND $values['forum_parent_id'] === 0 )
@@ -1520,44 +1145,59 @@ class Forum extends Model implements Permissions
 				$values['sub_can_post'] = ( $values['forum_type'] !== 'category' );
 				$values['redirect_on'] = FALSE;
 				$values['forum_redirect_url'] = NULL;
+				
+				if ( $values['forum_type'] === 'qa' )
+				{
+					$values['forums_bitoptions']['bw_enable_answers'] = TRUE;
+					$values['forum_preview_posts'] = $values['forum_preview_posts_qa'];
+					$values['forum_can_view_others'] = $values['forum_can_view_others_qa'];
+					$values['forum_permission_showtopic'] = $values['forum_permission_showtopic_qa'];
+					$values['forum_sort_key'] = $values['forum_sort_key_qa'];
+				}
+				else
+				{
+					$values['forums_bitoptions']['bw_enable_answers'] = FALSE;
+
+					if ( isset( $values['bw_enable_answers__member'] ) )
+					{
+						$values['bw_enable_answers_member'] = $values['bw_enable_answers__member'];
+					}
+				}
 			}
 			else
 			{
 				$values['sub_can_post'] = FALSE;
 				$values['redirect_on'] = TRUE;
 			}
-		}
 
-		/* Figure out solved mode */
-		if ( isset( $values['forum_solved_mode'] ) )
-		{
-			$values['bw_solved_set_by_moderator'] = false;
-			$values['bw_solved_set_by_member'] = false;
-
-			if ( $values['forum_solved_mode'] == 'starter_and_mods' )
+			if ( isset( $values['bw_enable_answers__member'] ) )
 			{
-				$values['bw_solved_set_by_moderator'] = true;
-				$values['bw_solved_set_by_member'] = true;
-			}
-			else if ( $values['forum_solved_mode'] == 'mods' )
-			{
-				$values['bw_solved_set_by_moderator'] = true;
+				unset( $values['bw_enable_answers__member'] );
 			}
 
-			unset( $values['forum_solved_mode'] );
+			unset( $values['forum_can_view_others_qa'] );
+			unset( $values['forum_permission_showtopic_qa'] );
+			unset( $values['forum_preview_posts_qa'] );
+			unset( $values['forum_sort_key_qa'] );
 		}
 
-		if( isset( $values['forum_enable_assignments'] ) )
+		/* We are copying the "Allow user to mark topic as solved" option */
+		if( !isset( $values['forum_type'] ) AND isset( $values['bw_enable_answers__member'] ) )
 		{
-			$values['bw_enable_assignments'] = $values['forum_enable_assignments'];
-			unset( $values['forum_enable_assignments'] );
-		}
+			/* We don't want to copy this to QA forums */
+			if( $this->_forum_type == 'normal' )
+			{
+				$values['bw_enable_answers_member'] = $values['bw_enable_answers__member'];
+			}
 
+			unset( $values['bw_enable_answers__member'] );
+		}
+		
 		if ( isset( $values['forum_parent_id'] ) )
 		{
 			if ( $values['forum_parent_id'] )
 			{
-				$values['forum_parent_id'] = is_scalar( $values['forum_parent_id'] ) ? intval( $values['forum_parent_id'] ) : intval( $values['forum_parent_id']->id );
+				$values['forum_parent_id'] = is_scalar( $values['forum_parent_id'] ) ? \intval( $values['forum_parent_id'] ) : \intval( $values['forum_parent_id']->id );
 			}
 			else
 			{
@@ -1566,30 +1206,29 @@ class Forum extends Model implements Permissions
 		}
 		
 		/* Bitwise */
-		foreach ( array( 'bw_solved_set_by_member', 'bw_solved_set_by_moderator', 'bw_fluid_view', 'bw_enable_assignments' ) as $k )
+		foreach ( array( 'bw_disable_tagging', 'bw_disable_prefixes', 'bw_enable_answers_member', 'bw_enable_answers_moderator', 'bw_fluid_view' ) as $k )
 		{
 			if( isset( $values[ $k ] ) )
 			{
-				/* If were disabling bw_solved_set_by_moderator for discussion forums, we need to make sure bw_solved_set_by_member is also disabled */
-				if ( $values['forum_type'] == 'normal' AND $k == 'bw_solved_set_by_moderator' AND !$values[ $k ] )
+				/* If were disabling bw_enable_answers_moderator for discussion forums, we need to make sure bw_enable_answers_member is also disabled */
+				if ( $values['forum_type'] == 'normal' AND $k == 'bw_enable_answers_moderator' AND !$values[ $k ] )
 				{
-					$values['forums_bitoptions']['bw_solved_set_by_moderator'] = FALSE;
-					$values['forums_bitoptions']['bw_solved_set_by_member'] = FALSE;
-					unset( $values['bw_solved_set_by_moderator'], $values['bw_solved_set_by_member'] );
+					$values['forums_bitoptions']['bw_enable_answers_moderator'] = FALSE;
+					$values['forums_bitoptions']['bw_enable_answers_member'] = FALSE;
+					unset( $values['bw_enable_answers_moderator'], $values['bw_enable_answers_member'] );
 				}
 				else
 				{
-					$values['forums_bitoptions'][ $k ] = ( in_array( $k, array( 'bw_disable_tagging', 'bw_disable_prefixes' ) ) ) ? !$values[ $k ] : $values[ $k ];
+					$values['forums_bitoptions'][ $k ] = ( $k == 'bw_enable_answers_member' or $k == 'bw_enable_answers_moderator' or $k == 'bw_fluid_view' ) ? $values[ $k ] : !$values[ $k ];
 					unset( $values[ $k ] );
 				}
 			}
 		}
-
-
+		
 		if ( isset( $values['solved_stats_from_cutoff'] ) )
 		{
 			/* If answers is disabled, set this to no. */
-			if ( !$values['forums_bitoptions']['bw_solved_set_by_moderator'] )
+			if ( !$values['forums_bitoptions']['bw_enable_answers_moderator'] )
 			{
 				$values['solved_stats_from_cutoff'] = 0;
 			}
@@ -1599,10 +1238,7 @@ class Forum extends Model implements Permissions
 				$values['solved_stats_from'] = 0;
 			}
 		}
-
-		/* Save icon fields */
-		$values = $this->formatIconFieldValues( $values );
-
+		
 		/* Remove forum_ prefix */
 		$_values = $values;
 		$values = array();
@@ -1619,9 +1255,12 @@ class Forum extends Model implements Permissions
 		}
 		
 		/* Implode */
-		if( isset( $values['password_override'] ) )
+		foreach ( array( 'password_override', 'tag_predefined', 'qa_rate_questions', 'qa_rate_answers' ) as $k )
 		{
-			$values['password_override'] = is_array( $values['password_override'] ) ? implode( ',', $values['password_override'] ) : $values['password_override'];
+			if ( isset( $values[ $k ] ) )
+			{
+				$values[ $k ] = ( \is_array( $values[ $k ] ) ) ? implode( ',', $values[ $k ] ) : $values[ $k ];
+			}
 		}
 
 		/* Set forum password to NULL if not there */
@@ -1631,7 +1270,7 @@ class Forum extends Model implements Permissions
 		}
 
 		/* Reset password and can view others if toggling back to a category */
-		if( isset( $values['type'] ) AND in_array( $values['type'], array( 'category', 'redirect' ) ) )
+		if( isset( $values['type'] ) AND \in_array( $values['type'], array( 'category', 'redirect' ) ) )
 		{
 			$values['password'] = NULL;
 			$values['can_view_others'] = TRUE;
@@ -1646,15 +1285,15 @@ class Forum extends Model implements Permissions
 		/* Moderation */
 		if( isset( $values['preview_posts'] ) )
 		{
-			if ( in_array( 'topics', $values['preview_posts'] ) and in_array( 'posts', $values['preview_posts'] ) )
+			if ( \in_array( 'topics', $values['preview_posts'] ) and \in_array( 'posts', $values['preview_posts'] ) )
 			{
 				$values['preview_posts'] = 1;
 			}
-			elseif ( in_array( 'topics', $values['preview_posts'] ) )
+			elseif ( \in_array( 'topics', $values['preview_posts'] ) )
 			{
 				$values['preview_posts'] = 2;
 			}
-			elseif ( in_array( 'posts', $values['preview_posts'] ) )
+			elseif ( \in_array( 'posts', $values['preview_posts'] ) )
 			{
 				$values['preview_posts'] = 3;
 			}
@@ -1663,6 +1302,8 @@ class Forum extends Model implements Permissions
 				$values['preview_posts'] = 0;
 			}
 		}
+
+		$values['min_posts_post'] = (int) $values['min_posts_post'];
 		
 		/* Feature color */
 		if ( isset( $values['use_feature_color'] ) )
@@ -1684,11 +1325,11 @@ class Forum extends Model implements Permissions
 		{
 			if ( array_key_exists( $fieldKey, $values ) )
 			{
-				Lang::saveCustom( 'forums', $langKey, $values[ $fieldKey ] );
+				\IPS\Lang::saveCustom( 'forums', $langKey, $values[ $fieldKey ] );
 				
 				if ( $fieldKey === 'name' )
 				{
-					$this->name_seo = Friendly::seoTitle( $values[ $fieldKey ][ Lang::defaultLanguage() ] );
+					$this->name_seo = \IPS\Http\Url\Friendly::seoTitle( $values[ $fieldKey ][ \IPS\Lang::defaultLanguage() ] );
 					$this->save();
 				}
 				
@@ -1721,15 +1362,13 @@ class Forum extends Model implements Permissions
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
-		unset( Store::i()->forumsCustomNodes );
+		unset( \IPS\Data\Store::i()->forumsCustomNodes );
 		
-		File::claimAttachments( 'forums-new-forum', $this->id, NULL, 'description', TRUE );
-		File::claimAttachments( 'forums-new-permerror', $this->id, NULL, 'permerror', TRUE );
-		File::claimAttachments( 'forums-new-rules', $this->id, NULL, 'rules', TRUE );
-
-        parent::postSaveForm( $values );
+		\IPS\File::claimAttachments( 'forums-new-forum', $this->id, NULL, 'description', TRUE );
+		\IPS\File::claimAttachments( 'forums-new-permerror', $this->id, NULL, 'permerror', TRUE );
+		\IPS\File::claimAttachments( 'forums-new-rules', $this->id, NULL, 'rules', TRUE );
 	}
 	
 	/**
@@ -1739,7 +1378,7 @@ class Forum extends Model implements Permissions
 	 * @param	mixed	$value	Setting value
 	 * @return	bool
 	 */
-	public function canCopyValue( string $key, mixed $value ): bool
+	public function canCopyValue( $key, $value )
 	{
 		if ( mb_strpos( $key, 'forum_' ) === 0 )
 		{
@@ -1751,73 +1390,64 @@ class Forum extends Model implements Permissions
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlBase = 'app=forums&module=forums&controller=forums&id=';
+	public static $urlBase = 'app=forums&module=forums&controller=forums&id=';
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlTemplate = 'forums_forum';
+	public static $urlTemplate = 'forums_forum';
 	
 	/**
 	 * @brief	SEO Title Column
 	 */
-	public static string $seoTitleColumn = 'name_seo';
+	public static $seoTitleColumn = 'name_seo';
 	
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		unset( Store::i()->forumsCustomNodes );
+		try
+		{
+			\IPS\File::get( 'forums_Icons', $this->icon )->delete();
+		}
+		catch( \Exception $ex ) { }
+		
+		unset( \IPS\Data\Store::i()->forumsCustomNodes );
 		
 		parent::delete();
 		
 		foreach ( array( 'rules_title' => "forums_forum_{$this->id}_rulestitle", 'rules_text' => "forums_forum_{$this->id}_rules", 'permission_custom_error' => "forums_forum_{$this->id}_permerror" ) as $fieldKey => $langKey )
 		{
-			Lang::deleteCustom( 'forums', $langKey );
-		}
-
-		/* Unclaim Attachments */
-		foreach( [ 'permerror', 'rules', 'description' ] as $id3 )
-		{
-			File::unclaimAttachments( 'forums_Forums', $this->_id, null, $id3 );
-		}
-
-		if( $this->card_image )
-		{
-			try
-			{
-				File::get( 'forums_Cards', $this->card_image )->delete();
-			}
-			catch( Exception $e ){}
+			\IPS\Lang::deleteCustom( 'forums', $langKey );
 		}
 	}
-
+	
 	/**
 	 * Get template for node tables
 	 *
-	 * @return callable|array
+	 * @return	callable
 	 */
-	public static function nodeTableTemplate(): callable|array
+	public static function nodeTableTemplate()
 	{
-		return array( Theme::i()->getTemplate( 'index', 'forums' ), 'forumTableRow' );
+		return array( \IPS\Theme::i()->getTemplate( 'index', 'forums' ), 'forumTableRow' );
 	}
 
 	/**
 	 * Get template for managing this nodes follows
 	 *
-	 * @return callable|array
+	 * @return	callable
 	 */
-	public static function manageFollowNodeRow(): callable|array
+	public static function manageFollowNodeRow()
 	{
-		return array( Theme::i()->getTemplate( 'global', 'forums' ), 'manageFollowNodeRow' );
+		return array( \IPS\Theme::i()->getTemplate( 'global', 'forums' ), 'manageFollowNodeRow' );
 	}
 	
 	/**
@@ -1833,6 +1463,7 @@ class Forum extends Model implements Permissions
 		}
 		
 		$oldId = $this->id;
+		$oldIcon = $this->icon;
 		$oldGridImage = $this->card_image;
 		
 		$this->show_rules = 0;
@@ -1842,35 +1473,34 @@ class Forum extends Model implements Permissions
 		foreach ( array( 'rules_title' => "forums_forum_{$this->id}_rulestitle", 'rules_text' => "forums_forum_{$this->id}_rules", 'permission_custom_error' => "forums_forum_{$this->id}_permerror" ) as $fieldKey => $langKey )
 		{
 			$oldLangKey = str_replace( $this->id, $oldId, $langKey );
-			Lang::saveCustom( 'forums', $langKey, iterator_to_array( Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', $oldLangKey ) )->setKeyField( 'lang_id' )->setValueField('word_custom') ) );
-		}
-
-		/* If the description had attachments, link them */
-		$attachmentMappings = [];
-		foreach( Db::i()->select( '*', 'core_attachments_map', [
-			[ 'location_key=?', 'forums_Forums' ],
-			[ 'id1=?', $oldId ],
-			[ 'id2 is null' ],
-			[ Db::i()->in( 'id3', [ 'description', 'rules', 'permerror' ] ) ]
-		] ) as $attachment )
-		{
-			$attachment['id1'] = $this->_id;
-			$attachmentMappings[] = $attachment;
-		}
-		if( count( $attachmentMappings ) )
-		{
-			Db::i()->insert( 'core_attachments_map', $attachmentMappings );
+			\IPS\Lang::saveCustom( 'forums', $langKey, iterator_to_array( \IPS\Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', $oldLangKey ) )->setKeyField( 'lang_id' )->setValueField('word_custom') ) );
 		}
 		
+		if ( $oldIcon )
+		{
+			try
+			{
+				$icon = \IPS\File::get( 'forums_Icons', $oldIcon );
+				$newIcon = \IPS\File::create( 'forums_Icons', $icon->originalFilename, $icon->contents() );
+				$this->icon = (string) $newIcon;
+			}
+			catch ( \Exception $e )
+			{
+				$this->icon = NULL;
+			}
+			
+			$this->save();
+		}
+
 		if ( $oldGridImage )
 		{
 			try
 			{
-				$gridImg = File::get( 'forums_Cards', $oldGridImage );
-				$newImage = File::create( 'forums_Cards', $gridImg->originalFilename, $gridImg->contents() );
+				$gridImg = \IPS\File::get( 'forums_Cards', $oldGridImage );
+				$newImage = \IPS\File::create( 'forums_Cards', $gridImg->originalFilename, $gridImg->contents() );
 				$this->card_image = (string) $newImage;
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
 				$this->card_image = NULL;
 			}
@@ -1882,9 +1512,9 @@ class Forum extends Model implements Permissions
 	/**
 	 * If there is only one forum (and it isn't a redirect forum or password protected), that forum, or NULL
 	 *
-	 * @return    Forum|NULL
+	 * @return	\IPS\forums\Forum||NULL
 	 */
-	public static function theOnlyForum(): ?Model
+	public static function theOnlyForum()
 	{
 		return static::theOnlyNode( array( 'redirect_url' => FALSE, 'password' => FALSE ), FALSE );
 	}
@@ -1892,10 +1522,10 @@ class Forum extends Model implements Permissions
 	/**
 	 * Can a given member view topics created by other members in this forum?
 	 * 
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public function memberCanAccessOthersTopics( Member $member ): bool
+	public function memberCanAccessOthersTopics( \IPS\Member $member )
 	{
 		/* If everyone can view topics posted in this forum by others then this whole check is irrelevant */
 		if ( $this->can_view_others )
@@ -1918,7 +1548,7 @@ class Forum extends Model implements Permissions
 				{
 					return TRUE;
 				}
-				elseif ( is_array( $forumsTheMemberIsModeratorOf ) and in_array( $this->_id, $forumsTheMemberIsModeratorOf ) ) // This forum specifically
+				elseif ( \is_array( $forumsTheMemberIsModeratorOf ) and \in_array( $this->_id, $forumsTheMemberIsModeratorOf ) ) // This forum specifically
 				{
 					return TRUE;
 				}
@@ -1940,7 +1570,7 @@ class Forum extends Model implements Permissions
 	 * 
 	 * @return	array
 	 */
-	public function permissionsThatCanAccessAllTopics(): array
+	public function permissionsThatCanAccessAllTopics()
 	{
 		$normal		= $this->searchIndexPermissions();
 		$return		= array();
@@ -1953,13 +1583,13 @@ class Forum extends Model implements Permissions
 		}
 		else
 		{
-			foreach ( Db::i()->select( '*', 'core_moderators' ) as $moderator )
+			foreach ( \IPS\Db::i()->select( '*', 'core_moderators' ) as $moderator )
 			{
 				$json = json_decode( $moderator['perms'], TRUE );
 
 				if ( $moderator['perms'] === '*' OR
 					(
-						!empty( $json['can_read_all_topics'] ) AND ( !empty( $json['forums'] ) AND ( $json['forums'] === -1 OR in_array( $this->_id, $json['forums'] ) ) )
+						!empty( $json['can_read_all_topics'] ) AND ( !empty( $json['forums'] ) AND ( $json['forums'] === -1 OR \in_array( $this->_id, $json['forums'] ) ) )
 					) )
 				{
 					if( $moderator['type'] === 'g' )
@@ -1976,7 +1606,7 @@ class Forum extends Model implements Permissions
 
 		$return = ( $normal == '*' ) ? array_unique( $return ) : array_intersect( explode( ',', $normal ), array_unique( $return ) );
 		
-		if( count( $members ) )
+		if( \count( $members ) )
 		{
 			$return = array_merge( $return, $members );
 		}
@@ -1989,28 +1619,28 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return  void
 	 */
-	protected function updateSearchIndexPermissions() : void
+	protected function updateSearchIndexPermissions()
 	{
 		if ( $this->can_view_others )
 		{
-			parent::updateSearchIndexPermissions();
+			return parent::updateSearchIndexPermissions();
 		}
 		else
 		{
 			$permissions = implode( ',', $this->permissionsThatCanAccessAllTopics() );
-			Index::i()->massUpdate( 'IPS\forums\Topic', $this->_id, NULL, $permissions, NULL, NULL, NULL, NULL, NULL, TRUE );
-			Index::i()->massUpdate( 'IPS\forums\Topic\Post', $this->_id, NULL, $permissions, NULL, NULL, NULL, NULL, NULL, TRUE );
+			\IPS\Content\Search\Index::i()->massUpdate( 'IPS\forums\Topic', $this->_id, NULL, $permissions, NULL, NULL, NULL, NULL, NULL, TRUE );
+			\IPS\Content\Search\Index::i()->massUpdate( 'IPS\forums\Topic\Post', $this->_id, NULL, $permissions, NULL, NULL, NULL, NULL, NULL, TRUE );
 		}
 	}
 	
 	/**
 	 * Mass move content items in this node to another node
 	 *
-	 * @param Model|null $node	New node to move content items to, or NULL to delete
-	 * @param array|null $data	Additional filters to mass move by
+	 * @param	\IPS\Node\Model|null	$node	New node to move content items to, or NULL to delete
+	 * @param	array|null				$data	Additional filters to mass move by
 	 * @return	NULL|int
 	 */
-	public function massMoveorDelete( Model $node=NULL, array $data=NULL ): ?int
+	public function massMoveorDelete( $node=NULL, $data=NULL )
 	{
 		/* If we are mass deleting, let parent handle it. Also do this the slow way if we can't view other topics in the destination forum, because we need to
 			adjust search index permissions on a row-by-row basis in that case. */
@@ -2032,7 +1662,7 @@ class Forum extends Model implements Permissions
 		/* Can we allow the mass move? */
 		if(	!$node->sub_can_post or $node->redirect_url )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 
 		/* Adjust the node counts */
@@ -2080,20 +1710,22 @@ class Forum extends Model implements Permissions
 		}
 
 		/* Do the move */
-		Db::i()->update( 'forums_topics', array( 'forum_id' => $node->_id ), array( 'forum_id=?', $this->_id ) );
+		\IPS\Db::i()->update( 'forums_topics', array( 'forum_id' => $node->_id ), array( 'forum_id=?', $this->_id ) );
+		\IPS\Db::i()->update( 'forums_question_ratings', array( 'forum' => $node->_id ), array( 'forum=?', $this->_id ) );
+
 		/* Rebuild tags */
-		if( IPS::classUsesTrait( $contentItemClass, Taggable::class ) )
+		if ( \in_array( 'IPS\Content\Tags', class_implements( $contentItemClass ) ) )
 		{
-			Db::i()->update( 'core_tags', array(
+			\IPS\Db::i()->update( 'core_tags', array(
 				'tag_aap_lookup'		=> md5( static::$permApp . ';' . static::$permType . ';' . $node->_id ),
 				'tag_meta_parent_id'	=> $node->_id
 			), array( 'tag_aap_lookup=?', md5( static::$permApp . ';' . static::$permType . ';' . $this->_id ) ) );
 
 			if ( isset( static::$permissionMap['read'] ) )
 			{
-				Db::i()->update( 'core_tags_perms', array(
+				\IPS\Db::i()->update( 'core_tags_perms', array(
 					'tag_perm_aap_lookup'	=> md5( static::$permApp . ';' . static::$permType . ';' . $node->_id ),
-					'tag_perm_text'			=> Db::i()->select( 'perm_' . static::$permissionMap['read'], 'core_permission_index', array( 'app=? AND perm_type=? AND perm_type_id=?', static::$permApp, static::$permType, $node->_id ) )->first()
+					'tag_perm_text'			=> \IPS\Db::i()->select( 'perm_' . static::$permissionMap['read'], 'core_permission_index', array( 'app=? AND perm_type=? AND perm_type_id=?', static::$permApp, static::$permType, $node->_id ) )->first()
 				), array( 'tag_perm_aap_lookup=?', md5( static::$permApp . ';' . static::$permType . ';' . $this->_id ) ) );
 			}
 		}
@@ -2107,35 +1739,34 @@ class Forum extends Model implements Permissions
 		$this->save();
 
 		/* Add to search index */
-		if( SearchContent::isSearchable( $contentItemClass ) )
+		if ( \in_array( 'IPS\Content\Searchable', class_implements( $contentItemClass ) ) )
 		{
 			/* Grab permissions...we already account for !can_view_others by letting the parent handle this the old fashioned way in that case at the start of the method */
 			$permissions = $node->searchIndexPermissions();
 
 			/* Do the update */
-			Index::i()->massUpdate( $contentItemClass, $this->_id, NULL, $permissions, NULL, $node->_id );
+			\IPS\Content\Search\Index::i()->massUpdate( $contentItemClass, $this->_id, NULL, $permissions, NULL, $node->_id );
 
 			foreach ( array( 'commentClass', 'reviewClass' ) as $class )
 			{
 				if ( isset( $contentItemClass::$$class ) )
 				{
 					$className = $contentItemClass::$$class;
-					if( SearchContent::isSearchable( $className ) )
+					if ( \in_array( 'IPS\Content\Searchable', class_implements( $className ) ) )
 					{
-						Index::i()->massUpdate( $className, $this->_id, NULL, $permissions, NULL, $node->_id );
+						\IPS\Content\Search\Index::i()->massUpdate( $className, $this->_id, NULL, $permissions, NULL, $node->_id );
 					}
 				}
 			}
 		}
 
 		/* Update caches */
-		Widget::deleteCaches( NULL, static::$permApp );
+		\IPS\Widget::deleteCaches( NULL, static::$permApp );
 
 		/* Log */
-		if ( Dispatcher::hasInstance() )
+		if ( \IPS\Dispatcher::hasInstance() )
 		{
-			/* @var Topic $contentItemClass */
-			Session::i()->modLog( 'modlog__action_massmove', array( $contentItemClass::$title . '_pl_lc' => TRUE, $node->url()->__toString() => FALSE, $node->_title => FALSE ) );
+			\IPS\Session::i()->modLog( 'modlog__action_massmove', array( $contentItemClass::$title . '_pl_lc' => TRUE, $node->url()->__toString() => FALSE, $node->_title => FALSE ) );
 		}
 
 		return NULL;
@@ -2146,7 +1777,7 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return	array
 	 */
-	public function unapprovedContentRecursive(): array
+	public function unapprovedContentRecursive()
 	{
 		$return = array( 'topics' => $this->queued_topics, 'posts' => $this->queued_posts );
 		
@@ -2166,11 +1797,11 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return array	array( {group_id} => array( 'read', 'view', 'perm_7' );
 	 */
-	public function disabledPermissions(): array
+	public function disabledPermissions()
 	{
 		if( $this->sub_can_post and !$this->can_view_others )
 		{
-			return array( Settings::i()->guest_group => array( 2, 3, 4, 5 ) );
+			return array( \IPS\Settings::i()->guest_group => array( 2, 3, 4, 5 ) );
 		}
 
 		return array();
@@ -2182,7 +1813,7 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return string|callable function
 	 */
-	public static function searchableNodesPermission(): callable|string
+	public static function searchableNodesPermission()
 	{
 		return function( $node )
 		{
@@ -2196,23 +1827,47 @@ class Forum extends Model implements Permissions
 	}
 	
 	/**
+	 * @brief	Cached unsearchable node ids
+	 */
+	protected static $unsearchableNodeIds	= FALSE;
+
+	/**
+	 * Return either NULL for no restrictions, or a list of container IDs we cannot search in because of app specific permissions and configuration
+	 * You do not need to check for 'view' permissions against the logged in member here. The Query search class does this for you.
+	 * This method is intended for more complex set up items, like needing to have X posts to see a forum, etc.
+	 * This is used for search and the activity stream.
+	 * We return a list of IDs and not node objects for memory efficiency.
+	 *
+	 * @return 	null|array
+	 */
+	public static function unsearchableNodeIds()
+	{
+		if( static::$unsearchableNodeIds !== FALSE )
+		{
+			return static::$unsearchableNodeIds;
+		}
+
+		/* For memory efficiency, we query the database directly rather than manage nodes */
+		$forums = iterator_to_array( \IPS\Db::i()->select( 'id', 'forums_forums', array( 'min_posts_view > ?', \IPS\Member::loggedIn()->member_posts ) )->setKeyField('id') );
+		static::$unsearchableNodeIds	= \count( $forums ) ? $forums : NULL;
+		return static::$unsearchableNodeIds;
+	}
+	
+	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse			int					id				ID number
 	 * @apiresponse			string				name			Forum name
-	 * @apiresponse			string				description		Forum description
-	 * @apiresponse			string				cardImage		Forum card image
 	 * @apiresponse			string				path			Forum name including parents (e.g. "Example Category > Example Forum")
 	 * @apiresponse			string				type			The type of forum: "discussions", "questions", "category", or "redirect"
 	 * @apiresponse			int					topics			Number of topics in forum
 	 * @apiresponse			string				url				URL
 	 * @apiresponse			int|null			parentId		Parent Node ID
-	 * @apiresponse			int					followerCount	Total members following this forum
 	 * @clientapiresponse	object|null		permissions		Node permissions
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		$path = array();
 		foreach( $this->parents() AS $parent )
@@ -2220,6 +1875,7 @@ class Forum extends Model implements Permissions
 			$path[] = $parent->_title;
 		}
 		$path[] = $this->_title;
+		
 		$type = 'discussions';
 		if ( $this->redirect_url )
 		{
@@ -2233,18 +1889,15 @@ class Forum extends Model implements Permissions
 		{
 			$type = 'questions';
 		}
-
+		
 		$return = array(
 			'id'			=> $this->id,
 			'name'			=> $this->_title,
-			'description'	=> $this->description,
-			'cardImage'		=> null,
 			'path'			=> implode( ' > ', $path ),
 			'type'			=> $type,
 			'topics'		=> $this->topics,
 			'url'			=> (string) $this->url(),
-			'parentId'		=> static::$databaseColumnParent ? $this->{static::$databaseColumnParent} : NULL,
-			'followerCount'	=> Topic::containerFollowerCount( $this )
+			'parentId'		=> static::$databaseColumnParent ? $this->{static::$databaseColumnParent} : NULL
 		);
 
 		if( $authorizedMember === NULL )
@@ -2252,7 +1905,7 @@ class Forum extends Model implements Permissions
 			$return['permissions']	= $this->permissions();
 		}
 
-		if ( IPS::classUsesTrait( get_called_class(), 'IPS\Content\ClubContainer' ) )
+		if ( \IPS\IPS::classUsesTrait( \get_called_class(), 'IPS\Content\ClubContainer' ) )
 		{
 			if( $this->club() )
 			{
@@ -2264,13 +1917,7 @@ class Forum extends Model implements Permissions
 				$return['club'] = 0;
 			}
 		}
-
-		if ( $this->card_image )
-		{
-			$file = File::get( 'forums_Cards', $this->card_image );
-			$return['card_image'] = $file->fullyQualifiedUrl( $this->card_image );
-		}
-
+		
 		return $return;
 	}
 
@@ -2288,25 +1935,25 @@ class Forum extends Model implements Permissions
 				$where = [['forum_id=?', $this->_id]];
 				if ( $this->solved_stats_from_cutoff )
 				{
-					$cutoff = DateTime::create()->sub( new DateInterval( 'P' . $this->solved_stats_from_cutoff . 'D' ) )->getTimestamp();
+					$cutoff = \IPS\DateTime::create()->sub( new \DateInterval( 'P' . $this->solved_stats_from_cutoff . 'D' ) )->getTimestamp();
 					$where[] = ['start_date>?', $cutoff];
 				}
-
-				$post = Db::i()->select( '*', 'forums_posts', [
-					'pid IN (?)', Db::i()->select( 'topic_answered_pid', 'forums_topics', $where )
+				
+				$post = \IPS\Db::i()->select( '*', 'forums_posts', [
+					'pid IN (?)', \IPS\Db::i()->select( 'topic_answered_pid', 'forums_topics', $where )
 				], 'post_date ASC', 1 )->first();
 
 				try
 				{
-					$this->solved_stats_from = Db::i()->select( 'solved_date', 'core_solved_index', [ 'app=? and comment_id=? AND type=? AND hidden=0', 'forums', $post['pid'], 'solved' ] )->first();
+					$this->solved_stats_from = \IPS\Db::i()->select( 'solved_date', 'core_solved_index', [ 'app=? and comment_id=?', 'forums', $post['pid'] ] )->first();
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					/* If that goes wrong... */
 					$this->solved_stats_from = $post['post_date'];
 				}
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				/* If all that goes wrong, we have nothing marked so just store now to prevent it rebuilding over and over */
 				$this->solved_stats_from = time();
@@ -2319,69 +1966,41 @@ class Forum extends Model implements Permissions
 	}
 	
 	/* !Clubs */
-
+	
 	/**
 	 * Set form for creating a node of this type in a club
 	 *
-	 * @param Form $form Form object
-	 * @param Club $club
-	 * @return    void
+	 * @param	\IPS\Helpers\Form	$form	Form object
+	 * @return	void
 	 */
-	public function _clubForm( Form $form, Club $club ) : void
+	public function clubForm( \IPS\Helpers\Form $form, \IPS\Member\Club $club )
 	{
-		/* @var Topic $itemClass */
 		$itemClass = static::$contentItemClass;
-		$form->add( new Text( 'club_node_name', $this->_id ? $this->_title : Member::loggedIn()->language()->addToStack( $itemClass::$title . '_pl' ), TRUE, array( 'maxLength' => 255 ) ) );
-		$form->add( new Editor( 'club_node_description', $this->_id ? Member::loggedIn()->language()->get( static::$titleLangPrefix . $this->_id . '_desc' ) : NULL, FALSE, array( 'app' => 'forums', 'key' => 'Forums', 'autoSaveKey' => ( $this->id ? "forums-forum-{$this->id}" : "forums-new-forum" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'forum_description_placeholder' ) ) );
-		$form->add( new YesNo( 'forum_can_view_others_club', $this->id ? $this->can_view_others : TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'club_node_name', $this->_id ? $this->_title : \IPS\Member::loggedIn()->language()->addToStack( $itemClass::$title . '_pl' ), TRUE, array( 'maxLength' => 255 ) ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'club_node_description', $this->_id ? \IPS\Member::loggedIn()->language()->get( static::$titleLangPrefix . $this->_id . '_desc' ) : NULL, FALSE, array( 'app' => 'forums', 'key' => 'Forums', 'autoSaveKey' => ( $this->id ? "forums-forum-{$this->id}" : "forums-new-forum" ), 'attachIds' => $this->id ? array( $this->id, NULL, 'description' ) : NULL, 'minimize' => 'forum_description_placeholder' ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'forum_can_view_others_club', $this->id ? $this->can_view_others : TRUE ) );
 		
 		if( $club->type == 'closed' )
 		{
-			$form->add( new Radio( 'club_node_public', $this->id ? $this->isPublic() : 0, TRUE, array( 'options' => array( '0' => 'club_node_public_no', '1' => 'club_node_public_view', '2' => 'club_node_public_participate' ) ) ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'club_node_public', $this->id ? $this->isPublic() : 0, TRUE, array( 'options' => array( '0' => 'club_node_public_no', '1' => 'club_node_public_view', '2' => 'club_node_public_participate' ) ) ) );
 		}
 
-		$mode = 'off';
-		if ( $this->id )
-		{
-			if ( $this->forums_bitoptions['bw_solved_set_by_moderator'] and $this->forums_bitoptions['bw_solved_set_by_member'] )
-			{
-				$mode = 'starter_and_mods';
-			}
-			else if ( $this->forums_bitoptions['bw_solved_set_by_moderator'] )
-			{
-				$mode = 'mods';
-			}
-		}
-
-		$field = new Radio( 'forum_solved_mode', $this->id ? $mode : 'off', FALSE, array(
-			'options' => [
-				'off' => 'forum_solved_mode_off',
-				'mods' => 'forum_solved_mode_mods',
-				'starter_and_mods' => 'forum_solved_mode_starter'
-			]
-		), NULL, NULL, NULL, 'forum_solved_mode' );
-
-		/* The default description includes an ACP link */
-		if( Dispatcher::i()->controllerLocation == 'front' )
-		{
-			$field->description = Member::loggedIn()->language()->addToStack( 'forum_solved_mode_desc_front' );
-		}
-
-		$form->add( $field );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'bw_enable_answers_moderator', $this->id ? $this->forums_bitoptions['bw_enable_answers_moderator'] : FALSE, FALSE, array( 'togglesOn' => array( 'bw_enable_answers__member' ) ), NULL, NULL, NULL, 'forum_best_answer' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'bw_enable_answers__member', $this->id ? $this->forums_bitoptions['bw_enable_answers_member'] : FALSE, FALSE, array(), NULL, NULL, NULL, 'bw_enable_answers__member' ) );
 	}
 	
 	/**
 	 * Class-specific routine when saving club form
 	 *
-	 * @param	Club	$club	The club
+	 * @param	\IPS\Member\Club	$club	The club
 	 * @param	array				$values	Values
 	 * @return	void
 	 */
-	public function _saveClubForm( Club $club, array $values ) : void
+	public function _saveClubForm( \IPS\Member\Club $club, $values )
 	{
 		if ( $values['club_node_name'] )
 		{
-			$this->name_seo	= Friendly::seoTitle( $values['club_node_name'] );
+			$this->name_seo	= \IPS\Http\Url\Friendly::seoTitle( $values['club_node_name'] );
 		}
 		
 		if( $this->can_view_others != $values['forum_can_view_others_club'] )
@@ -2394,30 +2013,20 @@ class Forum extends Model implements Permissions
 			}
 		}
 
-		/* Figure out solved mode */
-		if ( isset( $values['forum_solved_mode'] ) )
-		{
-			$values['bw_solved_set_by_moderator'] = false;
-			$values['bw_solved_set_by_member'] = false;
-
-			if ( $values['forum_solved_mode'] == 'starter_and_mods' )
-			{
-				$values['bw_solved_set_by_moderator'] = true;
-				$values['bw_solved_set_by_member'] = true;
-			}
-			else if ( $values['forum_solved_mode'] == 'mods' )
-			{
-				$values['bw_solved_set_by_moderator'] = true;
-			}
-
-			unset( $values['forum_solved_mode'] );
-		}
-
-		foreach ( array( 'bw_solved_set_by_member', 'bw_solved_set_by_moderator' ) as $k )
+		foreach ( array( 'bw_enable_answers_member', 'bw_enable_answers_moderator' ) as $k )
 		{
 			if( isset( $values[ $k ] ) )
 			{
-				$this->forums_bitoptions[ $k ] = $values[ $k ];
+				/* If we're disabling bw_enable_answers_moderator for discussion forums, we need to make sure bw_enable_answers_member is also disabled */
+				if ( $k == 'bw_enable_answers_moderator' AND !$values[ $k ] )
+				{
+					$this->forums_bitoptions['bw_enable_answers_moderator'] = FALSE;
+					$this->forums_bitoptions['bw_enable_answers_member'] = FALSE;
+				}
+				else
+				{
+					$this->forums_bitoptions[ $k ] = $values[ $k ];
+				}
 			}
 		}
 
@@ -2427,7 +2036,7 @@ class Forum extends Model implements Permissions
 		if ( !$this->_id )
 		{
 			$this->save();
-			File::claimAttachments( 'forums-new-forum', $this->id, NULL, 'description' );
+			\IPS\File::claimAttachments( 'forums-new-forum', $this->id, NULL, 'description' );
 		}
 	}
 
@@ -2437,21 +2046,20 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return boolean
 	 */
-	public function isCombinedView(): bool
+	public function isCombinedView()
 	{
 		return (bool) $this->forums_bitoptions['bw_fluid_view'];
 	}
 
 	/* !Simple view */
-
+	
 	/**
 	 * Is simple view one? Calculates admin settings and user's choice
 	 *
-	 * @param Forum|NULL $forum The forum objectr
+	 * @param	\IPS\forums\Forum|NULL	$forum The forum objectr
 	 * @return boolean
-	 * @throws Exception
 	 */
-	public static function isSimpleView( ?Forum $forum=NULL ): bool
+	public static function isSimpleView( $forum=NULL )
 	{
 		$simpleView = false;
 		
@@ -2462,12 +2070,29 @@ class Forum extends Model implements Permissions
 		}
 
 		/* If this was called via CLI (e.g. tasks ran via cron), then use the default */
-		if( !Dispatcher::hasInstance() )
+		if( !\IPS\Dispatcher::hasInstance() )
 		{
-			return false;
+			return \IPS\Settings::i()->forums_default_view === 'fluid' ? true : false;
 		}
 
-		if ( Member::loggedIn()->getLayoutValue('forums_forum') === 'fluid' )
+		/* Guests are locked to the admin choice */
+		if ( ! \IPS\Member::loggedIn()->member_id )
+		{
+			return \IPS\Settings::i()->forums_default_view === 'fluid' ? true : false;
+		}
+		
+		if ( \IPS\Settings::i()->forums_default_view === 'fluid' )
+		{
+			$simpleView = true;
+		}
+		
+		$method = static::getMemberView();
+
+		if ( $method !== 'fluid' )
+		{
+			$simpleView = false;
+		}
+		else if ( $method === 'fluid' )
 		{
 			$simpleView = true;
 		}
@@ -2476,17 +2101,89 @@ class Forum extends Model implements Permissions
 	}
 
 	/**
+	 * Get the member's topic list view method
+	 *
+	 * @return string
+	 * @throws \Exception
+	 */
+	public static function getMemberListView()
+	{
+		$method = ( isset( \IPS\Request::i()->cookie['forum_list_view'] ) ) ? \IPS\Request::i()->cookie['forum_list_view'] : NULL;
+		$chooseable = \IPS\Settings::i()->forums_view_list_choose;
+		
+		if ( ! $chooseable or !\IPS\Member::loggedIn()->member_id )
+		{
+			return \IPS\Settings::i()->forums_view_list_method;
+		}
+		
+		if ( ! $method )
+		{
+			try
+			{
+				$method = \IPS\Db::i()->select( 'method', 'forums_view_method', array( 'member_id=? and type=?', \IPS\Member::loggedIn()->member_id, 'list' ) )->first();
+			}
+			catch( \UnderFlowException $e )
+			{
+				$method = \IPS\Settings::i()->forums_view_list_method;
+			}
+			
+			/* Attempt to set the cookie again */
+			\IPS\Request::i()->setCookie( 'forum_list_view', $method, ( new \IPS\DateTime )->add( new \DateInterval( 'P1Y' ) ) );
+		}
+		
+		return $method;
+	}
+	
+	/**
+	 * Get the member's view method
+	 *
+	 * @return string
+	 */
+	public static function getMemberView()
+	{
+		$method = ( isset( \IPS\Request::i()->cookie['forum_view'] ) ) ? \IPS\Request::i()->cookie['forum_view'] : NULL;
+		$chooseable = \IPS\Settings::i()->forums_default_view_choose ? json_decode( \IPS\Settings::i()->forums_default_view_choose , TRUE ) : FALSE;
+		
+		if ( ! $chooseable or !\IPS\Member::loggedIn()->member_id )
+		{
+			return \IPS\Settings::i()->forums_default_view;
+		}
+		
+		if ( ! $method )
+		{
+			try
+			{
+				$method = \IPS\Db::i()->select( 'method', 'forums_view_method', array( 'member_id=? and type=?', \IPS\Member::loggedIn()->member_id, 'index' ) )->first();
+			}
+			catch( \UnderFlowException $e )
+			{
+				$method = \IPS\Settings::i()->forums_default_view;
+			}
+			
+			/* Attempt to set the cookie again */
+			\IPS\Request::i()->setCookie( 'forum_view', $method, ( new \IPS\DateTime )->add( new \DateInterval( 'P1Y' ) ) );
+		}
+		
+		if ( ! $method or ( $chooseable != '*' AND ! \in_array( $method, $chooseable ) ) )
+		{
+			$method = \IPS\Settings::i()->forums_default_view;
+		}
+		
+		return $method;
+	}
+	
+	/**
 	 * Return if this node has custom permissions
 	 *
 	 * @return null|array
 	 */
-	public static function customPermissionNodes(): ?array
+	public static function customPermissionNodes()
 	{
-		if ( ! isset( Store::i()->forumsCustomNodes ) )
+		if ( ! isset( \IPS\Data\Store::i()->forumsCustomNodes ) )
 		{
 			$data = [ 'count' => 0, 'password' => [], 'cannotViewOthersItems' => [] ];
 
-			foreach( Db::i()->select( '*', 'forums_forums', array( 'password IS NOT NULL or can_view_others=0' ) ) as $forum )
+			foreach( \IPS\Db::i()->select( '*', 'forums_forums', array( 'password IS NOT NULL or can_view_others=0' ) ) as $forum )
 			{
 				$data['count']++;
 				if ( $forum['password'] )
@@ -2500,22 +2197,22 @@ class Forum extends Model implements Permissions
 				}
 			}
 
-			Store::i()->forumsCustomNodes = $data;
+			\IPS\Data\Store::i()->forumsCustomNodes = $data;
 		}
 		
-		return ( Store::i()->forumsCustomNodes['count'] ) ? Store::i()->forumsCustomNodes : NULL;
+		return ( \IPS\Data\Store::i()->forumsCustomNodes['count'] ) ? \IPS\Data\Store::i()->forumsCustomNodes : NULL;
 	}
-
+	
 	/**
 	 * Get URL
 	 *
-	 * @return Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function url(): Url|string|null
+	public function url()
 	{
 		if ( static::isSimpleView() and ! $this->club() )
 		{
-			return Url::internal( 'app=forums&module=forums&controller=index&forumId=' . $this->id, 'front', 'forums' );
+			return \IPS\Http\Url::internal( 'app=forums&module=forums&controller=index&forumId=' . $this->id, 'front', 'forums' );
 		}
 		
 		return parent::url();
@@ -2524,7 +2221,7 @@ class Forum extends Model implements Permissions
 	/**
 	 * @brief   The class of the ACP \IPS\Node\Controller that manages this node type
 	 */
-	protected static ?string $acpController = "IPS\\forums\\modules\\admin\\forums\\forums";
+	protected static $acpController = "IPS\\forums\\modules\\admin\\forums\\forums";
 	
 	/**
 	 * Get URL from index data
@@ -2532,13 +2229,13 @@ class Forum extends Model implements Permissions
 	 * @param	array		$indexData		Data from the search index
 	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
 	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
-	 * @return    Url
+	 * @return	\IPS\Http\Url
 	 */
-	public static function urlFromIndexData( array $indexData, array $itemData, ?array $containerData ): Url
+	public static function urlFromIndexData( $indexData, $itemData, $containerData )
 	{
 		if ( static::isSimpleView() and ! $containerData['club_id'] )
 		{
-			return Url::internal( 'app=forums&module=forums&controller=index&forumId=' . $indexData['index_container_id'], 'front', 'forums' );
+			return \IPS\Http\Url::internal( 'app=forums&module=forums&controller=index&forumId=' . $indexData['index_container_id'], 'front', 'forums' );
 		}
 		
 		return parent::urlFromIndexData( $indexData, $itemData, $containerData );
@@ -2549,7 +2246,7 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return	string
 	 */
-	protected function get__forum_type(): string
+	protected function get__forum_type()
 	{
 		if ( $this->redirect_url )
 		{
@@ -2558,6 +2255,10 @@ class Forum extends Model implements Permissions
 		elseif ( !$this->sub_can_post )
 		{
 			$type = 'category';
+		}
+		elseif ( $this->forums_bitoptions['bw_enable_answers'] )
+		{
+			$type = 'qa';
 		}
 		else
 		{
@@ -2572,13 +2273,13 @@ class Forum extends Model implements Permissions
 	 * Allow node classes that can determine if content should be held for approval in individual nodes
 	 *
 	 * @param	string				$content	The type of content we are checking (item, comment, review).
-	 * @param	Member|NULL	$member		Member to check or NULL for currently logged in member.
+	 * @param	\IPS\Member|NULL	$member		Member to check or NULL for currently logged in member.
 	 * @return	bool
 	 */
-	public function contentHeldForApprovalByNode( string $content, ?Member $member = NULL ): bool
+	public function contentHeldForApprovalByNode( string $content, ?\IPS\Member $member = NULL ): bool
 	{
 		/* If members group bypasses, then no. */
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		if ( $member->group['g_avoid_q'] )
 		{
 			return FALSE;
@@ -2587,105 +2288,13 @@ class Forum extends Model implements Permissions
 		switch( $content )
 		{
 			case 'item':
-				return ( in_array( $this->preview_posts, array( 1, 2 ) ) );
+				return (bool) ( \in_array( $this->preview_posts, array( 1, 2 ) ) );
+				break;
 			
 			case 'comment':
-				return ( in_array( $this->preview_posts, array( 1, 3 ) ) );
+				return (bool) ( \in_array( $this->preview_posts, array( 1, 3 ) ) );
+				break;
 		}
-
-		return FALSE;
-	}
-
-	/**
-	 * Is this Forum used by any downloads app category ?
-	 *
-	 * @return bool|Category
-	 */
-	public function isUsedByADownloadsCategory(): Category|bool
-	{
-		if( !SystemApplication::appIsEnabled( 'downloads' ) )
-		{
-			return false;
-		}
-
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'downloads_categories' ), 'IPS\downloads\Category' ) AS $category )
-		{
-			if ( $category->forum_id and $category->forum_id == $this->id )
-			{
-				return $category;
-			}
-		}
-		return FALSE;
-	}
-
-	/**
-	 * Is this Forum used by any cms category for record/comment topics?
-	 *
-	@return bool|\IPS\cms\Databases
-	 */
-	public function isUsedByCms()
-	{
-		if( !SystemApplication::appIsEnabled( 'cms' ) )
-		{
-			return false;
-		}
-
-		foreach ( Databases::databases() as $database )
-		{
-			if ( $database->forum_record and $database->forum_forum and $database->forum_forum == $this->id )
-			{
-				return $database;
-			}
-		}
-		return FALSE;
-	}
-
-	/**
-	 * Get the expert members from this forum
-	 *
-	 * @return array|null
-	 */
-	public function getExperts(): array|null
-	{
-		if( !Bridge::i()->featureIsEnabled( 'experts' ) )
-		{
-			return null;
-		}
-
-		$key = 'forums_expert_users_' . $this->_id;
-
-		try
-		{
-			$experts = Store::i()->$key;
-		}
-		catch( Exception )
-		{
-			$experts = array();
-			foreach( Db::i()->select( '*', 'core_expert_users', array( 'node_id=?', $this->_id ) ) as $expert )
-			{
-				$experts[] = $expert['member_id'];
-			}
-
-			Store::i()->$key = $experts;
-		}
-
-		return count( $experts ) ? $experts : null;
-	}
-
-	/**
-	 * Allow for individual classes to override and
-	 * specify a primary image. Used for grid views, etc.
-	 *
-	 * @return File|null
-	 */
-	public function primaryImage() : ?File
-	{
-		if( $this->card_image )
-		{
-			return File::get( 'forums_Cards', $this->card_image );
-		}
-
-		return parent::primaryImage();
 	}
 
 	/**
@@ -2693,7 +2302,7 @@ class Forum extends Model implements Permissions
 	 *
 	 * @return void
 	 */
-	protected function recount() : void
+	protected function recount()
 	{
 		$this->_items = (int) Db::i()->select( 'count(*)', 'forums_topics', [ 'forum_id=? and approved=? and state != ?', $this->_id, 1, 'link' ] )->first();
 		$this->_unapprovedItems = (int) Db::i()->select( 'count(*)', 'forums_topics', [ 'forum_id=? and approved = ? and state !=?', $this->_id, 0, 'link' ] )->first();
@@ -2703,6 +2312,16 @@ class Forum extends Model implements Permissions
 		$this->_unapprovedComments = (int) Db::i()->select( 'count(*)', 'forums_posts', [ 'queued =? and forum_id=? and approved=? and state != ?', 1, $this->_id, 1, 'link' ] )
 			->join( 'forums_topics', 'forums_posts.topic_id=forums_topics.tid' )
 			->first();
+
+		/* Count archived posts */
+		if( Settings::i()->archive_on )
+		{
+			/* Here we use the sum from the topics table because once the topic is archived, these won't change */
+			$archiveStats = Db::i()->select( 'IFNULL( sum(posts), 0 ) as approved, IFNULL( sum(topic_queuedposts), 0 ) as unapproved', 'forums_topics', [ 'forum_id=? and approved=? and state != ? and topic_archive_status=?', $this->_id, 1, 'link', Topic::ARCHIVE_DONE ] )->first();
+			$this->_comments += $archiveStats['approved'];
+			$this->_unapprovedComments += $archiveStats['unapproved'];
+		}
+
 		$this->save();
 	}
 }

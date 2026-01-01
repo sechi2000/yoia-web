@@ -12,36 +12,25 @@
 namespace IPS\downloads\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use InvalidArgumentException;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Form helper class for linked screenshots
  */
-class LinkedScreenshots extends FormAbstract
+class _LinkedScreenshots extends \IPS\Helpers\Form\FormAbstract
 {
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
-	 * @throws	DomainException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\DomainException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		parent::validate();
 
@@ -49,7 +38,7 @@ class LinkedScreenshots extends FormAbstract
 		{
 			foreach( $this->formatValue() as $value )
 			{
-				$value = Url::createFromString( $value );
+				$value = \IPS\Http\Url::createFromString( $value );
 
 				try
 				{
@@ -61,18 +50,16 @@ class LinkedScreenshots extends FormAbstract
 					{
 						if ( !preg_match( '/^image\/.+$/i', $contentType ) )
 						{
-							throw new DomainException( 'form_url_bad_mime' );
+							throw new \DomainException( 'form_url_bad_mime' );
 						}
 					}
 				}
-				catch ( Exception $e )
+				catch ( \IPS\Http\Request\Exception $e )
 				{
-					throw new DomainException( 'form_url_error' );
+					throw new \DomainException( 'form_url_error' );
 				}
 			}
 		}
-
-		return TRUE;
 	}
 
 	/**
@@ -80,16 +67,16 @@ class LinkedScreenshots extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		if ( is_array( $this->value ) and !isset( $this->value['values'] ) )
+		if ( \is_array( $this->value ) and !isset( $this->value['values'] ) )
 		{
-			$value = array( 'values' => $this->value, 'default' => Request::i()->screenshots_primary_screenshot );
+			$value = array( 'values' => $this->value, 'default' => \IPS\Request::i()->screenshots_primary_screenshot );
 		}
 		else
 		{
 			$value = $this->value;
 		}
-		return Theme::i()->getTemplate( 'submit', 'downloads', 'front' )->linkedScreenshotField( $this->name, $value );
+		return \IPS\Theme::i()->getTemplate( 'submit', 'downloads', 'front' )->linkedScreenshotField( $this->name, $value );
 	}
 }

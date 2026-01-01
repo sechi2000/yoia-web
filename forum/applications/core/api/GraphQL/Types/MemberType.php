@@ -11,43 +11,24 @@
 
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
-use IPS\Api\GraphQL\Fields\CoverPhotoField;
-use IPS\Api\GraphQL\SafeException;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Application;
-use IPS\Content\Search\Query;
-use IPS\Content\Search\Results;
-use IPS\core\Ignore;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\forums\Topic;
-use IPS\Helpers\Form\Editor;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Group;
-use IPS\Notification\Api;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use LogicException;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * MemberrType for GraphQL API
  */
-class MemberType extends ObjectType
+class _MemberType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -59,14 +40,14 @@ class MemberType extends ObjectType
 					'id' => [
 						'type' => TypeRegistry::id(),
 						'description' => "Returns the member's ID",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							return $member->member_id;
 						}
 					],
 					'email' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Returns the member's email address (depending on permissions)",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							if( !self::isAuthorized($member) )
 							{
 								return NULL;
@@ -77,7 +58,7 @@ class MemberType extends ObjectType
 					'url' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Returns the URL to member's profile",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							return (string) $member->url();
 						}
 					],
@@ -90,21 +71,21 @@ class MemberType extends ObjectType
 								'defaultValue' => FALSE
 							]
 						],
-						'resolve' => function( $member, $args ) {
-							return ( $args['formatted'] ) ? Group::load( $member->member_group_id )->formatName( $member->name ) : $member->name;
+						'resolve' => function( $member, $args, $context, $info ) {
+							return ( $args['formatted'] ) ? \IPS\Member\Group::load( $member->member_group_id )->formatName( $member->name ) : $member->name;
 						}
 					],
 					'title' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Returns the member's title",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							return null;
 						}
 					],
 					'timezone' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Returns the member's timezone (depending on permissions)",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							if( !self::isAuthorized($member) )
 							{
 								return NULL;
@@ -115,7 +96,7 @@ class MemberType extends ObjectType
 					'joined' => [
 						'type' => TypeRegistry::int(),
 						'description' => "Returns the date the member joined",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							return $member->joined->getTimestamp();
 						}
 					],
@@ -150,7 +131,7 @@ class MemberType extends ObjectType
 								'defaultValue' => NULL
 							]
 						],
-						'resolve' => function( $member, $args, $context ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							if( !self::isOwnerMember($member) )
 							{
 								return NULL;
@@ -161,7 +142,7 @@ class MemberType extends ObjectType
 					'notificationCount' => [
 						'type' => TypeRegistry::int(),
 						'description' => "Returns the member's notification count (depending on permissions)",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							if( !self::isOwnerMember($member) )
 							{
 								return NULL;
@@ -172,40 +153,41 @@ class MemberType extends ObjectType
 					'posts' => [
 						'type' => TypeRegistry::int(),
 						'description' => "Returns the member's post count",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							return $member->member_posts;
 						}
 					],
 					'contentCount' => [
 						'type' => TypeRegistry::int(),
 						'description' => "Returns the member's post count",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							return $member->member_posts;
 						}
 					],
 					'reputationCount' => [
 						'type' => TypeRegistry::int(),
 						'description' => "Returns the member's reputation count",
-						'resolve' => function( $member ) {
-							return ( Settings::i()->reputation_enabled ) ? $member->pp_reputation_points : null;
+						'resolve' => function( $member, $args, $context, $info ) {
+							return ( \IPS\Settings::i()->reputation_enabled ) ? $member->pp_reputation_points : null;
 						}
 					],
 					'solvedCount' => [
 						'type' => TypeRegistry::int(),
 						'description' => "Returns the number of items this member has solved",
 						'resolve' => function ($member) {
-							if( !Application::appIsEnabled('forums') || !Topic::anyContainerAllowsSolvable() )
+							if( !\IPS\Application::appIsEnabled('forums') || !\IPS\forums\Topic::anyContainerAllowsSolvable() )
 							{
 								return 0;
 							}
 
-							return (int) Db::i()->select( 'COUNT(*) as count', 'core_solved_index', array( 'member_id=? AND type=?', $member->member_id, 'solved' ) )->first();
+							$count = \IPS\Db::i()->select( 'COUNT(*) as count', 'core_solved_index', array( 'member_id=?', $member->member_id ) )->first();
+							return $count;
 						}
 					],
 					'ip_address' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Returns the member's IP address (depending on permissions)",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							if( !self::isAuthorized($member) )
 							{
 								return NULL;
@@ -216,7 +198,7 @@ class MemberType extends ObjectType
 					'warn_level' => [
 						'type' => TypeRegistry::int(),
 						'description' => "Returns the member's warning level (depending on permissions)",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							if( !self::isAuthorized($member) ){
 								return NULL;
 							}
@@ -226,7 +208,7 @@ class MemberType extends ObjectType
 					'profileViews' => [
 						'type' => TypeRegistry::int(),
 						'description' => "Returns the number of profile views for this member (depending on permissions)",
-						'resolve' => function( $member ) {
+						'resolve' => function( $member, $args, $context, $info ) {
 							if( !self::isAuthorized($member) )
 							{
 								return NULL;
@@ -249,35 +231,35 @@ class MemberType extends ObjectType
 						'type' => \IPS\core\api\GraphQL\TypeRegistry::group(),
 						'description' => "Returns the member's primary group",
 						'resolve' => function( $member, $args, $context, $info ) {
-							return Group::load( $member->member_group_id );
+							return \IPS\Member\Group::load( $member->member_group_id );
 						}
 					],
 					'isOnline' => [
 						'type' => TypeRegistry::boolean(),
 						'description' => "Indicates whether the user is online, taking permissions into account",
 						'resolve' => function ($member) {
-							return ( $member->isOnline() AND !$member->isOnlineAnonymously() ) OR ( $member->isOnlineAnonymously() AND Member::loggedIn()->isAdmin() );
+							return ( $member->isOnline() AND !$member->isOnlineAnonymously() ) OR ( $member->isOnlineAnonymously() AND \IPS\Member::loggedIn()->isAdmin() );
 						}
 					],
 					'lastActivity' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Returns the timestamp of the member's last activity",
 						'resolve' => function( $member, $args, $context, $info ) {
-							return DateTime::ts( $member->last_activity )->rfc3339();
+							return \IPS\DateTime::ts( $member->last_activity )->rfc3339();
 						}
 					],
 					'lastVisit'	=> [
 						'type' => TypeRegistry::string(),
 						'description' => "Returns the timestamp of the member's last visit",
 						'resolve' => function( $member, $args, $context, $info ) {
-							return DateTime::ts( $member->last_visit )->rfc3339();
+							return \IPS\DateTime::ts( $member->last_visit )->rfc3339();
 						}
 					],
 					'lastPost' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Returns the timestamp of member's last post",
 						'resolve' => function( $member, $args, $context, $info ) {
-							return DateTime::ts( $member->member_last_post )->rfc3339();
+							return \IPS\DateTime::ts( $this->member_last_post )->rfc3339();
 						}
 					],
 					'secondaryGroups' => [
@@ -343,7 +325,7 @@ class MemberType extends ObjectType
 						'type' => TypeRegistry::listOf( \IPS\core\api\GraphQL\TypeRegistry::club() ),
 						'description' => "Returns the member's clubs (depending on permissions)",
 						'resolve' => function( $member, $args, $context, $info ) {
-							return Club::clubs( $member, 25, 'last_activity' );
+							return \IPS\Member\Club::clubs( $member, 25, 'last_activity' );
 						}
 					],
 					'photo' => [
@@ -353,7 +335,7 @@ class MemberType extends ObjectType
 							return self::photo($member);
 						}
 					],
-					'coverPhoto' => CoverPhotoField::getDefinition('core_MemberCoverPhoto'),
+					'coverPhoto' => \IPS\Api\GraphQL\Fields\CoverPhotoField::getDefinition('core_MemberCoverPhoto'),
 					'customFieldGroups' => [
 						'type' => TypeRegistry::listOf( \IPS\core\api\GraphQL\TypeRegistry::profileFieldGroup() ),
 						'resolve' => function( $member, $args, $context, $info ) {
@@ -366,10 +348,10 @@ class MemberType extends ObjectType
 						'resolve' => function( $member ) {
 							if( $member->member_id && !self::isOwnerMember( $member ) )
 							{
-								throw new SafeException( 'INVALID_USER', '2S401/1', 403 );
+								throw new \IPS\Api\GraphQL\SafeException( 'INVALID_USER', '2S401/1', 403 ); 
 							}
 
-							return Editor::maxTotalAttachmentSize( $member, 0 );
+							return \IPS\Helpers\Form\Editor::maxTotalAttachmentSize( $member, 0 );
 						}
 					],
 					'canBeIgnored' => [
@@ -417,10 +399,10 @@ class MemberType extends ObjectType
 	/**
 	 * Return a member's photo
 	 *
-	 * @param 	Member $member
+	 * @param 	\IPS\Member
 	 * @return	string
 	 */
-	protected static function photo( Member $member ) : string
+	protected static function photo($member) 
 	{
 		$member_properties = array();
 
@@ -429,7 +411,7 @@ class MemberType extends ObjectType
 			$member_properties[ $column ] = $member->$column;
 		}
 
-		$photoUrl = Member::photoUrl( $member_properties );
+		$photoUrl = \IPS\Member::photoUrl( $member_properties );
 
 		if( mb_strpos( $photoUrl, "data:image/svg+xml" ) === 0 )
 		{
@@ -444,12 +426,12 @@ class MemberType extends ObjectType
 	/**
 	 * Return a json array containing letter/color combo for a user's letter photo
 	 *
-	 * @param 	Member $member
+	 * @param 	\IPS\Member
 	 * @return	string
 	 */
-	protected static function getLetterPhotoData( Member $member ) : string
+	protected static function getLetterPhotoData($member)
 	{
-		return json_encode( Member::generateLetterPhoto( array(
+		return json_encode( \IPS\Member::generateLetterPhoto( array(
 				'name'			=> $member->name,
 				'pp_main_photo'	=> $member->pp_main_photo,
 				'member_id'		=> $member->member_id
@@ -459,33 +441,32 @@ class MemberType extends ObjectType
 	/**
 	 * Determines if this is a user authorized to access sensitive data
 	 *
-	 * @param 	Member $member
+	 * @param 	\IPS\Member
 	 * @return	boolean
 	 */
-	protected static function isAuthorized( Member $member ) : bool
+	protected static function isAuthorized($member)
 	{
-		return self::isOwnerMember($member) || Member::loggedIn()->isAdmin();
+		return self::isOwnerMember($member) || \IPS\Member::loggedIn()->isAdmin();
 	}
 
 	/**
 	 * Determines if this user is the same as the user requesting the info
 	 *
-	 * @param 	Member $member
+	 * @param 	\IPS\Member
 	 * @return	boolean
 	 */
-	protected static function isOwnerMember( Member $member ) : bool
+	protected static function isOwnerMember($member)
 	{
-		return $member->member_id && $member->member_id == Member::loggedIn()->member_id;
+		return $member->member_id && $member->member_id == \IPS\Member::loggedIn()->member_id;
 	}
 
 	/**
 	 * Returns a member's content
 	 *
-	 * @param 	Member $member
-	 * @param array $args
-	 * @return	Results
+	 * @param 	\IPS\Member
+	 * @return	boolean
 	 */
-	protected static function content( Member $member, array $args) : Results
+	protected static function content($member, $args)
 	{
 		// Get page
 		// We don't know the count at this stage, so figure out the page number from
@@ -499,8 +480,8 @@ class MemberType extends ObjectType
 			$page = floor( $offset / $limit ) + 1;
 		}
 
-		$latestActivity = Query::init()->filterForProfile( $member )->setLimit( $limit )->setPage( $page )->setOrder( Query::ORDER_NEWEST_CREATED )->search();
-		$latestActivity->init();
+		$latestActivity = \IPS\Content\Search\Query::init()->filterForProfile( $member )->setLimit( $limit )->setPage( $page )->setOrder( \IPS\Content\Search\Query::ORDER_NEWEST_CREATED )->search();
+		$latestActivity->init( TRUE );
 
 		return $latestActivity;
 	}
@@ -508,20 +489,20 @@ class MemberType extends ObjectType
 	/**
 	 * Return user's notifications
 	 *
-	 * @param 	Member $member
+	 * @param 	\IPS\Member
 	 * @param 	array 	$args
 	 * @param 	array 	$context
 	 * @return	array
 	 */
-	protected static function notifications( Member $member, array $args, array $context ) : array
+	protected static function notifications($member, $args, $context)
 	{
 		/* Specify filter in where clause */
 		$where = array();
-		$where[] = array( "notification_app IN('" . implode( "','", array_keys( Application::enabledApplications() ) ) . "')" );
-		$where[] = array( "`member`=?", Member::loggedIn()->member_id );
+		$where[] = array( "notification_app IN('" . implode( "','", array_keys( \IPS\Application::enabledApplications() ) ) . "')" );
+		$where[] = array( "`member`=?", \IPS\Member::loggedIn()->member_id );
 
 		/* Are we filtering by unread status? */
-		if( isset( $args['unread'] ) )
+		if( isset( $args['unread'] ) && $args['unread'] !== NULL )
 		{
 			if( $args['unread'] === TRUE )
 			{
@@ -542,21 +523,21 @@ class MemberType extends ObjectType
 		}
 
 		/* Get Count */
-		$count = Db::i()->select( 'COUNT(*) as cnt', 'core_notifications', $where )->first();
+		$count = \IPS\Db::i()->select( 'COUNT(*) as cnt', 'core_notifications', $where )->first();
 
 		/* Get results */
 		$returnRows = array();
 		$offset = max( $args['offset'], 0 );
 		$limit = min( $args['limit'], 50 );
 
-		foreach( Db::i()->select( '*', 'core_notifications', $where, $sort, array( $offset, $limit ) ) as $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_notifications', $where, $sort, array( $offset, $limit ) ) as $row )
 		{
 			try
 			{
-				$notification   = Api::constructFromData( $row );
+				$notification   = \IPS\Notification\Api::constructFromData( $row );
 				$returnRows[]	= array( 'notification' => $notification, 'data' => $notification->getData( FALSE ) );
 			}
-			catch ( LogicException $e ) { }
+			catch ( \LogicException $e ) { }
 		}
 
 		return $returnRows;
@@ -565,19 +546,17 @@ class MemberType extends ObjectType
 	/**
 	 * Return custom profile field groups
 	 *
-	 * @param 	Member $member
-	 * @param array $args
-	 * @param array $context
-	 * @return	array|null
+	 * @param 	\IPS\Member
+	 * @return	boolean
 	 */
-	protected static function customFieldGroups( Member $member, array $args, array $context ) : ?array
+	protected static function customFieldGroups($member, $args, $context)
 	{
 		/* Get profile field values */
 		try
 		{
-			$profileFieldValues	= Db::i()->select( '*', 'core_pfields_content', array( 'member_id=?', $member->member_id ) )->first();
+			$profileFieldValues	= \IPS\Db::i()->select( '*', 'core_pfields_content', array( 'member_id=?', $member->member_id ) )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return null;
 		}
@@ -586,11 +565,11 @@ class MemberType extends ObjectType
 		{
 			$fields = array();
 
-			if( Member::loggedIn()->isAdmin() OR Member::loggedIn()->modPermissions() )
+			if( \IPS\Member::loggedIn()->isAdmin() OR \IPS\Member::loggedIn()->modPermissions() )
 			{
 				$where = array( "pfd.pf_member_hide='owner' OR pfd.pf_member_hide='staff' OR pfd.pf_member_hide='all'" );
 			}
-			elseif( Member::loggedIn()->member_id == $member->member_id )
+			elseif( \IPS\Member::loggedIn()->member_id == $member->member_id )
 			{
 				$where = array( "pfd.pf_member_hide='owner' OR pfd.pf_member_hide='all'" );
 			}
@@ -599,7 +578,7 @@ class MemberType extends ObjectType
 				$where = array( "pfd.pf_member_hide='all'" );
 			}
 
-			foreach( new ActiveRecordIterator( Db::i()->select( 'pfd.*', array('core_pfields_data', 'pfd'), $where, 'pfg.pf_group_order, pfd.pf_position' )->join(
+			foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( 'pfd.*', array('core_pfields_data', 'pfd'), $where, 'pfg.pf_group_order, pfd.pf_position' )->join(
 				array('core_pfields_groups', 'pfg'),
 				"pfd.pf_group_id=pfg.pf_group_id"
 			), 'IPS\core\ProfileFields\Field' ) as $field )
@@ -619,7 +598,7 @@ class MemberType extends ObjectType
 						'id' => md5( $member->member_id . $field->id ),
 						'fieldId' => $field->id,
 						'title' => 'core_pfield_' . $field->id,
-						'value' => json_encode( $field->apiValue( $profileFieldValues['field_' . $field->id], true ) ),
+						'value' => json_encode( $field->apiValue( $profileFieldValues['field_' . $field->id] ) ),
 						'type' => $field->type
 					);
 				}
@@ -634,20 +613,18 @@ class MemberType extends ObjectType
 	/**
 	 * Resolve followers field
 	 *
-	 * @param 	Member $member
-	 * @param 	array $args 	Arguments passed to this resolver
-	 * @param array $context
-	 * @param array $info
+	 * @param 	\IPS\Member
+	 * @param 	array 	Arguments passed to this resolver
 	 * @return	array
 	 */
-	protected static function followers( Member $member, array $args, array $context, array $info ) : array
+	protected static function followers($member, $args, $context, $info)
 	{
 		$limit = min( $args['limit'], 50 );
 
 		return array_map(
 			function ($followRow)
 			{
-				return Member::load( $followRow['follow_member_id'] );
+				return \IPS\Member::load( $followRow['follow_member_id'] );
 			},
 			iterator_to_array( $member->followers( 3, array( 'immediate', 'daily', 'weekly' ), NULL, array(0, $limit ) ) )
 		);
@@ -656,22 +633,20 @@ class MemberType extends ObjectType
 	/**
 	 * Resolve secondary groups field
 	 *
-	 * @param Member $member
-	 * @param array $args
-	 * @param array $context
-	 * @param array $info
-	 * @return    array
+	 * @param 	\IPS\Member
+	 * @param 	array 	Arguments passed to this resolver
+	 * @return	array
 	 */
-	protected static function secondaryGroups( Member $member, array $args, array $context, array $info ) : array
+	protected static function secondaryGroups($member, $args, $context, $info)
 	{
 		$secondaryGroups = array();
 		foreach ( array_filter( array_map( "intval", explode( ',', $member->mgroup_others ) ) ) as $secondaryGroupId )
 		{
 			try
 			{
-				$secondaryGroups[] = Group::load( $secondaryGroupId );
+				$secondaryGroups[] = \IPS\Member\Group::load( $secondaryGroupId );
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 
 		return $secondaryGroups;
@@ -680,12 +655,12 @@ class MemberType extends ObjectType
 	/**
 	 * Resolve ignore status field
 	 *
-	 * @param 	Member $member	Member to check
-	 * @return	array|null
+	 * @param 	\IPS\Member $member	Member to check
+	 * @return	array
 	 */
-	protected static function ignoreStatus( Member $member) : ?array
+	protected static function ignoreStatus( \IPS\Member $member)
 	{
-		if( !$member->canBeIgnored() || $member->member_id === Member::loggedIn()->member_id ){
+		if( !$member->canBeIgnored() || $member->member_id === \IPS\Member::loggedIn()->member_id ){
 			return NULL;
 		}
 
@@ -693,15 +668,15 @@ class MemberType extends ObjectType
 
 		try
 		{
-			$ignore = Ignore::load( $member->member_id, 'ignore_ignore_id', array( 'ignore_owner_id=?', Member::loggedIn()->member_id ) );
+			$ignore = \IPS\core\Ignore::load( $member->member_id, 'ignore_ignore_id', array( 'ignore_owner_id=?', \IPS\Member::loggedIn()->member_id ) );
 		}
-		catch ( OutOfRangeException $e ) {
+		catch ( \OutOfRangeException $e ) {
 			// Just keep ignore as false
 		}
 
 		$ignoreStatus = array();
 
-		foreach ( Ignore::types() as $type )
+		foreach ( \IPS\core\Ignore::types() as $type )
 		{
 			$ignoreStatus[] = array(
 				'type' => $type,
@@ -712,7 +687,7 @@ class MemberType extends ObjectType
 		return $ignoreStatus;
 	}
 
-	public static function getOrderByOptions() : array
+	public static function getOrderByOptions()
 	{
 		return ['member_id', 'joined','last_activity','name','last_visit'];
 	}

@@ -10,83 +10,71 @@
 
 namespace IPS\Db;
 
+use function preg_replace;
+
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Countable;
-use InvalidArgumentException;
-use IPS\Db;
-use Iterator;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_callable;
-use function is_string;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Database SELECT Statement
  */
-class Select implements Iterator, Countable
+class _Select implements \Iterator, \Countable
 {
 	/**
 	 * @brief	The query
 	 */
-	public string $query;
-
+	public $query;
+	
 	/**
 	 * @brief	Non-JOIN Binds
 	 */
-	public array $binds = array();
-
+	public $binds = array();
+	
 	/**
 	 * @brief	JOIN Binds (need to separate them because the JOIN clauses come before the WHERE clause)
 	 */
-	protected array $joinBinds = array();
-
+	protected $joinBinds = array();
+	
 	/**
 	 * @brief	The database object
 	 */
-	protected Db $db;
-
+	protected $db;
+	
 	/**
 	 * @brief	The statement
 	 */
-	protected mixed $stmt = NULL;
-
+	protected $stmt;
+		
 	/**
 	 * @brief	If TRUE, will return the result as a multidimensional array, with each joined table separately
 	 */
-	protected bool $multiDimensional = FALSE;
-
+	protected $multiDimensional = FALSE;
+	
 	/**
 	 * @brief	If read/write separation is enabled, SELECTs normally go to the read server - this flag will set this query to use the write server
 	 */
-	protected bool $useWriteServer = FALSE;
+	protected $useWriteServer = FALSE;
 
 	/**
 	 * @brief   Is this a union query? - this should only be set by the UNION method in \IPS\Db
 	 */
-	public bool $isUnion = FALSE;
-
+	public $isUnion = FALSE;
+	
 	/**
 	 * Constuctor
 	 *
-	 * @param string $query				The query
+	 * @param	string	$query				The query
 	 * @param	array	$binds				Binds
-	 * @param	Db	$db					The database object
-	 * @param bool $multiDimensional	If TRUE, will return the result as a multidimensional array, with each joined table separately
-	 * @param bool $useWriteServer		If read/write sepration is enabled, SELECTs normally go to the read server - this flag will set thia query to use the write server
+	 * @param	\IPS\Db	$db					The database object
+	 * @param	bool	$multiDimensional	If TRUE, will return the result as a multidimensional array, with each joined table separately
+	 * @param	bool	$useWriteServer		If read/write sepration is enabled, SELECTs normally go to the read server - this flag will set thia query to use the write server
 	 * @return	void
 	 */
-	public function __construct( string $query, array $binds, Db $db, bool $multiDimensional=FALSE, bool $useWriteServer=FALSE )
+	public function __construct( $query, array $binds, \IPS\Db $db, $multiDimensional = FALSE, $useWriteServer = FALSE )
 	{
 		$this->query				= $query;
 		$this->binds				= $binds;
@@ -110,18 +98,35 @@ class Select implements Iterator, Countable
 	 *
 	 * @return	string
 	 */
-	public function returnFullQuery(): string
+	public function returnFullQuery()
 	{
-		return Db::_replaceBinds( $this->query, array_merge( $this->joinBinds, $this->binds ) );
+		return \IPS\Db::_replaceBinds( $this->query, array_merge( $this->joinBinds, $this->binds ) );
+	}
+
+	/**
+	 * Set a max execution time for this query
+	 *
+	 * @param	int		$milliseconds		Number of milliseconds to set as the max execution time
+	 * @return	\IPS\Db\Select
+	 */
+	public function setExecutionTime( int $milliseconds )
+	{
+		/* This feature was introduced in MySQL 5.7.4 @note https://dev.mysql.com/doc/refman/8.4/en/optimizer-hints.html#optimizer-hints-execution-time */
+		if ( ! mb_stristr( \IPS\Db::i()->server_info, '-MariaDB' ) and \IPS\Db::i()->server_version >= 50704 )
+		{
+			$this->query = preg_replace( '/(^SELECT\s+)([a-z]|\*)/', "$1 /*+ MAX_EXECUTION_TIME({$milliseconds}) */ $2", $this->query, 1 );
+		}
+
+		return $this;
 	}
 
 	/**
 	 * Force an index
 	 *
-	 * @param string $index		Index name to force
-	 * @return    Select
+	 * @param	string		$index		Index name to force
+	 * @return	\IPS\Db\Select
 	 */
-	public function forceIndex( string $index ): Select
+	public function forceIndex( $index )
 	{
 		$this->query = preg_replace( '/(FROM `(.+?)`( AS `(.+?)`)?)/', "$1 FORCE INDEX(`" . $index . "`)", $this->query, 1 );
 
@@ -131,32 +136,32 @@ class Select implements Iterator, Countable
 	/**
 	 * Add Join
 	 *
-	 * @param array|string|Select $table	The table to select from. Either (string) table_name or (array) ( name, alias ) or \IPS\Db\Select object
+	 * @param	array|string|\IPS\Db\Select 	$table	The table to select from. Either (string) table_name or (array) ( name, alias ) or \IPS\Db\Select object
 	 * @param	mixed							$on		The on clause for the join
-	 * @param string $type	Type of join (left, right, inner, cross, straight_join)
-	 * @param bool $using	Whether to append the using clause for the join
-	 * @return    Select
+	 * @param	string							$type	Type of join (left, right, inner, cross, straight_join)
+	 * @param	bool							$using	Whether to append the using clause for the join
+	 * @return	\IPS\Db\Select
 	 */
-	public function join( Select|array|string $table, mixed $on, string $type='LEFT', bool $using=FALSE ): Select
+	public function join( $table, $on, $type='LEFT', $using=FALSE )
 	{
 		$query = '';
 		$joinConditionIsOptional = TRUE;
-
+		
 		switch ( $type )
 		{
 			case 'INNER':
 			case 'CROSS':
 				$query .= ' INNER JOIN ';
 				break;
-
+				
 			case 'STRAIGHT_JOIN':
 				$query .= ' STRAIGHT_JOIN';
 				if ( $using )
 				{
-					throw new InvalidArgumentException; // USING cannot be used with STRAIGHT_JOIN
+					throw new \InvalidArgumentException; // USING cannot be used with STRAIGHT_JOIN
 				}
 				break;
-
+				
 			case 'LEFT':
 			case 'RIGHT':
 				$query .= ' ' . $type . ' JOIN';
@@ -167,11 +172,11 @@ class Select implements Iterator, Countable
 				break;
 		}
 
-		if ( $table instanceof Select)
-		{
+		if ( $table instanceof \IPS\Db\Select )
+		{	
 			$tableQuery = $table->query;
 			preg_match( '/FROM `(.+?)`( AS `(.+?)`)?/', $tableQuery, $matches );
-
+			
 			if ( isset( $matches[2] ) )
 			{
 				$query .= "( " . str_replace( $matches[2], '', $tableQuery ) . " ) AS `{$matches[3]}`";
@@ -181,9 +186,9 @@ class Select implements Iterator, Countable
 				$query .= "( {$tableQuery} ) AS `{$matches[1]}`";
 			}
 		}
-		elseif ( is_array( $table ) )
+		elseif ( \is_array( $table ) )
 		{
-			if ( substr( $table[0], 0, 1 ) === '(' )
+			if ( \substr( $table[0], 0, 1 ) === '(' )
 			{
 				$query .= " {$table[0]} AS `{$table[1]}`";
 			}
@@ -196,21 +201,21 @@ class Select implements Iterator, Countable
 		{
 			$query .= $this->db->prefix ? " `{$this->db->prefix}{$table}` AS `{$table}`" : " `{$table}`";
 		}
-
+					
 		if ( $on )
 		{
 			if ( $using )
 			{
 				$query .= ' USING ( ' . implode( ', ', array_map( function( $col )
-					{
-						return '`' . $col . '`';
-					}, $on ) ) . ' ) ';
+				{
+					return '`' . $col . '`';
+				}, $on ) ) . ' ) ';
 			}
-			else if ( is_array( $on ) AND isset($on[1]) and $on[1] instanceof Select)
+			else if ( \is_array( $on ) AND isset($on[1]) and $on[1] instanceof \IPS\Db\Select )
 			{
 				$query .= ' ON ' . $on[0] . '=(' . $on[1]->query . ')';
 
-				if( count( $on[1]->binds ) )
+				if( \count( $on[1]->binds ) )
 				{
 					foreach ( $on[1]->binds as $bind )
 					{
@@ -230,7 +235,7 @@ class Select implements Iterator, Countable
 		}
 		elseif ( !$joinConditionIsOptional )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 
 		/* If we are joining on a sub-query already, remove it temporarily to ensure our regex below works correctly */
@@ -260,223 +265,223 @@ class Select implements Iterator, Countable
 
 		return $this;
 	}
-
+	
 	/**
 	 * @brief	Columns in the resultset
 	 */
-	protected array $columns = array();
-
+	protected $columns = array();
+	
 	/**
 	 * @brief	Key Field
 	 */
-	protected mixed $keyField = NULL;
-
+	protected $keyField = NULL;
+	
 	/**
 	 * @brief	Key Table
 	 */
-	protected ?string $keyTable = NULL;
-
+	protected $keyTable = NULL;
+	
 	/**
 	 * @brief	Value Field
 	 */
-	protected mixed $valueField = NULL;
-
+	protected $valueField = NULL;
+	
 	/**
 	 * @brief	Value Table
 	 */
-	protected ?string $valueTable = NULL;
-
+	protected $valueTable = NULL;
+		
 	/**
 	 * Set key field
 	 *
-	 * @param callable|string $column	Column to treat as the key
-	 * @param string|null $table	The table, if this is a multidimensional select
-	 * @return    Select
+	 * @param	string		$column	Column to treat as the key
+	 * @param	string|NULL	$table	The table, if this is a multidimensional select
+	 * @return	\IPS\Db\Select
 	 */
-	public function setKeyField( callable|string $column, string $table=NULL ): Select
+	public function setKeyField( $column, $table=NULL )
 	{
 		if ( !$this->stmt )
 		{
 			$this->runQuery();
 		}
 
-		if ( is_string( $column ) )
+		if ( \is_string( $column ) )
 		{
 			if ( $this->multiDimensional )
 			{
-				if ( !isset( $this->columns[ $table ] ) or !in_array( $column, $this->columns[ $table ] ) )
+				if ( !isset( $this->columns[ $table ] ) or !\in_array( $column, $this->columns[ $table ] ) )
 				{
-					throw new InvalidArgumentException;
+					throw new \InvalidArgumentException;
 				}
 			}
 			else
 			{
-				if ( !in_array( $column, $this->columns ) )
+				if ( !\in_array( $column, $this->columns ) )
 				{
-					throw new InvalidArgumentException;
+					throw new \InvalidArgumentException;
 				}
 			}
 		}
-
+		
 		$this->keyField = $column;
 		$this->keyTable = $table;
-
+		
 		return $this;
 	}
-
+	
 	/**
 	 * Set value field
 	 *
-	 * @param callback|string $column		Column to treat as the value. Callback to determine on a per-row basis.
-	 * @param string|null $table	The table, if this is a multidimensional select
-	 * @return    Select
+	 * @param	string|callback		$column		Column to treat as the value. Callback to determine on a per-row basis.
+	 * @param	string|NULL			$table	The table, if this is a multidimensional select
+	 * @return	\IPS\Db\Select
 	 */
-	public function setValueField( callable|string $column, string $table=NULL ): Select
+	public function setValueField( $column, $table=NULL )
 	{
 		if ( !$this->stmt )
 		{
 			$this->runQuery();
 		}
-
-		if ( is_string( $column ) )
+		
+		if ( \is_string( $column ) )
 		{
 			if ( $this->multiDimensional )
 			{
-				if ( !isset( $this->columns[ $table ] ) or !in_array( $column, $this->columns[ $table ] ) )
+				if ( !isset( $this->columns[ $table ] ) or !\in_array( $column, $this->columns[ $table ] ) )
 				{
-					throw new InvalidArgumentException;
+					throw new \InvalidArgumentException;
 				}
 			}
 			else
 			{
-				if ( !in_array( $column, $this->columns ) )
+				if ( !\in_array( $column, $this->columns ) )
 				{
-					throw new InvalidArgumentException;
+					throw new \InvalidArgumentException;
 				}
 			}
 		}
-
+		
 		$this->valueField = $column;
 		$this->valueTable = $table;
-
+		
 		return $this;
 	}
-
+	
 	/**
 	 * @brief	The current row
 	 */
-	protected mixed $row = NULL;
-
+	protected $row;
+	
 	/**
 	 * @brief	The current key
 	 */
-	protected ?int $key = null;
-
+	protected $key;
+	
 	/**
 	 * Get first record
 	 *
-	 * @return	mixed
-	 * @throws	UnderflowException
+	 * @return	array|int|string
+	 * @throws	\UnderflowException
 	 */
-	public function first(): mixed
-	{
+	public function first()
+	{		
 		/* Move to the first result */
 		$this->rewind();
-
+		
 		/* Return it */
 		if ( !$this->valid() )
 		{
-			throw new UnderflowException;
+			throw new \UnderflowException;
 		}
 		return $this->current();
 	}
-
+	
 	/**
 	 * Run the query
 	 *
 	 * @return	void
 	 */
-	protected function runQuery() : void
+	protected function runQuery()
 	{
 		/* Run the query */
 		$this->stmt = $this->db->preparedQuery( $this->query, array_merge( $this->joinBinds, $this->binds ), !$this->useWriteServer );
-
+		
 		/* Populate $this->row which we read into */
 		$this->row = array();
 		$params = array();
-		$meta = $this->stmt->result_metadata();
+    	$meta = $this->stmt->result_metadata();
 
 		if ( !$meta )
 		{
-			throw new Exception( $this->db->errno ? $this->db->error : "No result metadata - possible table crash", $this->db->errno ?: -1, NULL, $this->query, array_merge( $this->joinBinds, $this->binds ) );
+			throw new \IPS\Db\Exception( $this->db->errno ? $this->db->error : "No result metadata - possible table crash", $this->db->errno ?: -1, NULL, $this->query, array_merge( $this->joinBinds, $this->binds ) );
 		}
 
-		while ( $field = $meta->fetch_field() )
-		{
-			if ( $this->multiDimensional )
-			{
-				$params[] = &$this->row[ $field->table ][ $field->name ];
-			}
-			else
-			{
-				$params[] = &$this->row[ $field->name ];
-			}
-		}
+    	while ( $field = $meta->fetch_field() )
+    	{
+	    	if ( $this->multiDimensional )
+	    	{
+		    	$params[] = &$this->row[ $field->table ][ $field->name ];
+	    	}
+	    	else
+	    	{
+	    		$params[] = &$this->row[ $field->name ];
+	    	}
+    	}
+    	
+    	$meta->free_result();
 
-		$meta->free_result();
-
-		if ( $this->multiDimensional )
-		{
-			foreach ( $this->row as $table => $columns )
-			{
-				$this->columns[ $table ] = array_keys( $columns );
-			}
-		}
-		else
-		{
-			$this->columns = array_keys( $this->row );
-		}
-
-		$stmtReference = $this->stmt;
-		$stmtReference->bind_result( ...$params );
-
-		/* Set counts */
-		$this->count = $this->stmt->num_rows;
-
-		/* Set the key to -1 (i.e. we haven't fetched any row yet) */
-		$this->key = -1;
+    	if ( $this->multiDimensional )
+    	{
+	    	foreach ( $this->row as $table => $columns )
+	    	{
+		    	$this->columns[ $table ] = array_keys( $columns );
+	    	}
+	    }
+	    else
+	    {
+		    $this->columns = array_keys( $this->row );
+	    }
+	    
+	    $stmtReference = $this->stmt;
+    	$stmtReference->bind_result( ...$params );
+    	
+    	/* Set counts */
+    	$this->count = $this->stmt->num_rows;
+    	
+    	/* Set the key to -1 (i.e. we haven't fetched any row yet) */
+    	$this->key = -1;
 	}
-
+	
 	/**
 	 * [Iterator] Rewind - will (re-)execute statement
 	 *
 	 * @return	void
 	 */
-	public function rewind(): void
+	public function rewind()
 	{
 		/* If we haven't run the query yet, or we have already traversed the result set beyond the first result, (re-)run the query */
 		if ( !$this->stmt or $this->key > 0 )
 		{
 			$this->runQuery();
 		}
-
+		
 		/* Move to the first result if we haven't already */
 		if ( $this->key === -1 )
 		{
 			$this->next();
 		}
 	}
-
+	
 	/**
 	 * [Iterator] Get current row
 	 *
-	 * @return	mixed
+	 * @return	array
 	 */
-	public function current(): mixed
+	public function current()
 	{
 		if ( $this->valueField )
 		{
-			if ( !is_string( $this->valueField ) and is_callable( $this->valueField ) )
+			if ( !\is_string( $this->valueField ) and \is_callable( $this->valueField ) )
 			{
 				$valueField = $this->valueField;
 				return $valueField( $this->row );
@@ -493,7 +498,7 @@ class Select implements Iterator, Countable
 				}
 			}
 		}
-		elseif ( count( $this->row ) === 1 )
+		elseif ( \count( $this->row ) === 1 )
 		{
 			foreach ( $this->row as $v )
 			{
@@ -505,7 +510,7 @@ class Select implements Iterator, Countable
 			$row = array();
 			foreach ( $this->row as $k => $v )
 			{
-				if ( is_array( $v ) )
+				if ( \is_array( $v ) )
 				{
 					foreach ( $v as $k2 => $v2 )
 					{
@@ -519,20 +524,18 @@ class Select implements Iterator, Countable
 			}
 			return $row;
 		}
-
-		return NULL;
 	}
-
+	
 	/**
 	 * [Iterator] Get current key
 	 *
 	 * @return	mixed
 	 */
-	public function key(): mixed
+	public function key()
 	{
 		if ( $this->keyField )
 		{
-			if ( is_string( $this->keyField ) )
+			if ( \is_string( $this->keyField ) )
 			{
 				if ( $this->keyTable )
 				{
@@ -554,50 +557,50 @@ class Select implements Iterator, Countable
 			return $this->key;
 		}
 	}
-
+	
 	/**
 	 * [Iterator] Fetch next result
 	 *
 	 * @return	void
 	 */
-	public function next(): void
-	{
+	public function next()
+	{		
 		$fetch = $this->stmt->fetch();
-		if ( $fetch === NULL )
-		{
-			$this->stmt->close();
-			$this->row = NULL;
-		}
-		$this->key++;
+    	if ( $fetch === NULL )
+    	{
+	    	$this->stmt->close();
+	    	$this->row = NULL;
+    	}
+    	$this->key++;
 	}
-
+	
 	/**
 	 * [Iterator] Is the current row valid?
 	 *
 	 * @return	bool
 	 */
-	public function valid(): bool
+	public function valid()
 	{
 		return ( $this->row !== NULL );
 	}
-
+	
 	/**
 	 * @brief	Number of rows in this set
 	 */
-	protected ?int $count = NULL;
+	protected $count;
 
 	/**
 	 * [Countable] Get number of rows
 	 *
 	 * @return	int
 	 */
-	public function count(): int
-	{
+	public function count()
+	{		
 		if ( !$this->stmt )
 		{
 			$this->runQuery();
 		}
-
+		
 		return $this->count;
 	}
 }

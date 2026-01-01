@@ -12,160 +12,79 @@
 namespace IPS\gallery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use Exception;
-use GraphQL\Type\Definition\NullableType;
-use IPS\Application;
-use IPS\Content\Anonymous;
-use IPS\Content\Comment;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Followable;
-use IPS\Content\Hideable;
-use IPS\Content\Lockable;
-use IPS\Content\MetaData;
-use IPS\Content\Featurable;
-use IPS\Content\Pinnable;
-use IPS\Content\Ratings;
-use IPS\Content\Reactable;
-use IPS\Content\ReadMarkers;
-use IPS\Content\Reportable;
-use IPS\Content\Shareable;
-use IPS\Content\Tag;
-use IPS\Content\Taggable;
-use IPS\Content\ViewUpdates;
-use IPS\Content\Statistics;
-use IPS\Content\Item as ContentItem;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Email;
-use IPS\File;
-use IPS\gallery\Album\Item;
-use IPS\gallery\Application as GalleryApplication;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Image as ImageClass;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Notification;
-use IPS\Output;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfBoundsException;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function array_slice;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_null;
-use function strpos;
-use const IPS\NOTIFICATION_BACKGROUND_THRESHOLD;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Image Model
- *
- * @property array $metadata
  */
-class Image extends ContentItem implements Embeddable,
-Filter
+class _Image extends \IPS\Content\Item implements
+\IPS\Content\Permissions,
+\IPS\Content\Tags,
+\IPS\Content\Followable,
+\IPS\Content\ReadMarkers,
+\IPS\Content\Hideable, \IPS\Content\Featurable, \IPS\Content\Pinnable, \IPS\Content\Lockable,
+\IPS\Content\Shareable,
+\IPS\Content\Ratings,
+\IPS\Content\Searchable,
+\IPS\Content\Embeddable,
+\IPS\Content\MetaData,
+\IPS\Content\Anonymous
 {
-	use Reactable,
-		Reportable,
-		Pinnable,
-		Anonymous,
-		Followable,
-		Lockable,
-		MetaData,
-		Ratings,
-		Shareable,
-		Taggable,
-		ReadMarkers,
-		Hideable,
-		Statistics,
-		ViewUpdates,
-		Featurable
-		{
-			Hideable::onHide as public _onHide;
-			Hideable::onUnhide as public _onUnhide;
-			Hideable::logDelete as public _logDelete;
-			Hideable::approvalQueueHtml as public _approvalQueueHtml;
-			Followable::notificationRecipients as public _notificationRecipients;
-		}
+	use \IPS\Content\Reactable, \IPS\Content\Reportable, \IPS\Content\Statistics, \IPS\Content\ViewUpdates;
 	
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'gallery';
+	public static $application = 'gallery';
 	
 	/**
 	 * @brief	Module
 	 */
-	public static string $module = 'gallery';
+	public static $module = 'gallery';
 	
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'gallery_images';
+	public static $databaseTable = 'gallery_images';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'image_';
+	public static $databasePrefix = 'image_';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	Node Class
 	 */
-	public static ?string $containerNodeClass = 'IPS\gallery\Category';
+	public static $containerNodeClass = 'IPS\gallery\Category';
 
 	/**
 	 * @brief	Additional classes for following
 	 */
-	public static array $containerFollowClasses = array( 'category_id' => 'IPS\gallery\Category', 'album_id' => 'IPS\gallery\Album' );
+	public static $containerFollowClasses = array( 'category_id' => 'IPS\gallery\Category', 'album_id' => 'IPS\gallery\Album' );
 	
 	/**
 	 * @brief	Comment Class
 	 */
-	public static ?string $commentClass = 'IPS\gallery\Image\Comment';
+	public static $commentClass = 'IPS\gallery\Image\Comment';
 
 	/**
 	 * @brief	Review Class
 	 */
-	public static string $reviewClass = 'IPS\gallery\Image\Review';
+	public static $reviewClass = 'IPS\gallery\Image\Review';
 
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'container'				=> 'category_id',
 		'author'				=> 'member_id',
 		'views'					=> 'views',
@@ -199,29 +118,29 @@ Filter
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'gallery_image';
+	public static $title = 'gallery_image';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'camera';
+	public static $icon = 'camera';
 	
 	/**
 	 * @brief	Form Lang Prefix
 	 */
-	public static string $formLangPrefix = 'image_';
+	public static $formLangPrefix = 'image_';
 	
 	/**
 	 * @brief	[Content]	Key for hide reasons
 	 */
-	public static ?string $hideLogKey = 'gallery-image';
+	public static $hideLogKey = 'gallery-image';
 	
 	/**
 	 * Columns needed to query for search result / stream view
 	 *
 	 * @return	array
 	 */
-	public static function basicDataColumns(): array
+	public static function basicDataColumns()
 	{
 		$return = parent::basicDataColumns();
 		$return[] = 'image_masked_file_name';
@@ -230,8 +149,6 @@ Filter
 		$return[] = 'image_album_id';
 		$return[] = 'image_copyright';
 		$return[] = 'image_nsfw';
-        $return[] = 'image_media';
-        $return[] = 'image_file_type';
 		return $return;
 	}
 	
@@ -241,7 +158,7 @@ Filter
 	 * @param	array	$items	Item data (will be an array containing values from basicDataColumns())
 	 * @return	array
 	 */
-	public static function searchResultExtraData( array $items ): array
+	public static function searchResultExtraData( $items )
 	{
 		$albumIds = array();
 		foreach ( $items as $itemData )
@@ -252,10 +169,10 @@ Filter
 			}
 		}
 		
-		if ( count( $albumIds ) )
+		if ( \count( $albumIds ) )
 		{
 			$return = array();
-			$albumData = iterator_to_array( Db::i()->select( array( 'album_id', 'album_name', 'album_name_seo' ), 'gallery_albums', Db::i()->in( 'album_id', $albumIds ) )->setKeyField( 'album_id' ) );
+			$albumData = iterator_to_array( \IPS\Db::i()->select( array( 'album_id', 'album_name', 'album_name_seo' ), 'gallery_albums', \IPS\Db::i()->in( 'album_id', $albumIds ) )->setKeyField( 'album_id' ) );
 			
 			foreach ( $albumIds as $imageId => $albumId )
 			{
@@ -273,7 +190,7 @@ Filter
 	 *
 	 * @return	array
 	 */
-	public function get_metadata(): array
+	public function get_metadata()
 	{
 		/* Videos don't have EXIF data */
 		if( !isset( $this->_data['metadata'] ) )
@@ -281,27 +198,7 @@ Filter
 			return array();
 		}
 
-        /* Did we disable metadata viewing? */
-        if( Settings::i()->gallery_metadata == static::IMAGE_METADATA_NONE )
-        {
-            return array();
-        }
-
-		$metadata = is_array( $this->_data['metadata'] ) ? $this->_data['metadata'] : ( $this->_data['metadata'] ? json_decode( $this->_data['metadata'], TRUE ) : array() );
-
-        /* If we're stripping sensitive data, then remove it here */
-        if( Settings::i()->gallery_metadata == static::IMAGE_METADATA_NOSENSITIVE )
-        {
-            foreach( $metadata as $k => $v )
-            {
-                if( str_starts_with( $k, 'GPS.' ) )
-                {
-                    unset( $metadata[ $k ] );
-                }
-            }
-        }
-
-        return $metadata;
+		return \is_array( $this->_data['metadata'] ) ? $this->_data['metadata'] : ( $this->_data['metadata'] ? json_decode( $this->_data['metadata'], TRUE ) : array() );
 	}
 
 	/**
@@ -309,23 +206,18 @@ Filter
 	 *
 	 * @return	array
 	 */
-	public function get__dimensions(): array
+	public function get__dimensions()
 	{
-		if( isset( $this->_data['data'] ) )
-		{
-			$data = is_array( $this->_data['data'] ) ? $this->_data['data'] : json_decode( $this->_data['data'], true );
-		}
-
-		return $data ?? [ 'large' => [ null, null ], 'small' => [ null, null ] ];
+		return \is_array( $this->_data['data'] ) ? $this->_data['data'] : ( $this->_data['data'] ? json_decode( $this->_data['data'], TRUE ) : array() );
 	}
 
 	/**
 	 * Set any image dimensions
 	 *
-	 * @param array $dimensions	Image dimensions to store
-	 * @return	void
+	 * @param	array	$dimensions	Image dimensions to store
+	 * @return	array
 	 */
-	public function set__dimensions( array $dimensions ) : void
+	public function set__dimensions( $dimensions )
 	{
 		$this->data	= json_encode( $dimensions );
 	}
@@ -335,19 +227,9 @@ Filter
 	 *
 	 * @return	array
 	 */
-	public function get__notes(): array
+	public function get__notes()
 	{
-		if( is_array( ( $this->_data['notes'] ) ) )
-		{
-			return $this->_data['notes'];
-		}
-
-		if( isset( $this->_data['notes'] ) and $data  = json_decode( $this->_data['notes'], true )  )
-		{
-			return $data;
-		}
-
-		return [];
+		return \is_array( $this->_data['notes'] ) ? $this->_data['notes'] : ( $this->_data['notes'] ? json_decode( $this->_data['notes'], TRUE ) : array() );
 	}
 	
 	/**
@@ -355,17 +237,17 @@ Filter
 	 *
 	 * @return string
 	 */
-	public function get__notes_json(): string
+	public function get__notes_json()
 	{
 		/* We want to essentially double encode the entities so that when javascript decodes the JSON it is safe */
-		if( $this->_notes and is_array( $this->_notes ) )
+		if( $this->_notes and \is_array( $this->_notes ) )
 		{ 
 			$notes = $this->_notes;
 			array_walk( $notes, function( &$v, $k )
 			{
 				if ( ! empty( $v['NOTE'] ) )
 				{
-					$v['NOTE'] = htmlspecialchars( $v['NOTE'], ENT_DISALLOWED, 'UTF-8' );
+					$v['NOTE'] = htmlspecialchars( $v['NOTE'], ENT_DISALLOWED, 'UTF-8', TRUE );
 				}
 			} );
 		}
@@ -381,9 +263,9 @@ Filter
 	 * Set any image notes stored
 	 *
 	 * @param	array	$notes	Image notes to store
-	 * @return	void
+	 * @return	array
 	 */
-	public function set__notes( array $notes ) : void
+	public function set__notes( $notes )
 	{
 		$this->notes	= json_encode( $notes );
 	}
@@ -393,7 +275,7 @@ Filter
 	 *
 	 * @return	string
 	 */
-	public function get_focallength(): string
+	public function get_focallength()
 	{
 		if( !isset( $this->metadata['EXIF.FocalLength'] ) )
 		{
@@ -402,28 +284,28 @@ Filter
 
 		$length	= $this->metadata['EXIF.FocalLength'];
 
-		if( strpos( $length, '/' ) !== FALSE )
+		if( \strpos( $length, '/' ) !== FALSE )
 		{
 			$bits	= explode( '/', $length );
 
-			return Member::loggedIn()->language()->addToStack( 'gallery_focal_length_mm', FALSE, array( 'sprintf' => array( ( $bits[1] > 0 ) ? round( $bits[0] / $bits[1], 1 ) : $bits[0] ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'gallery_focal_length_mm', FALSE, array( 'sprintf' => array( ( $bits[1] > 0 ) ? round( $bits[0] / $bits[1], 1 ) : $bits[0] ) ) );
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack( 'gallery_focal_length_mm', FALSE, array( 'sprintf' => array( $length ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'gallery_focal_length_mm', FALSE, array( 'sprintf' => array( $length ) ) );
 		}
 	}
 
 	/**
 	 * Set name
 	 *
-	 * @param string $name	Name
+	 * @param	string	$name	Name
 	 * @return	void
 	 */
-	public function set_caption( string $name ) : void
+	public function set_caption( $name )
 	{
 		$this->_data['caption']		= $name;
-		$this->_data['caption_seo']	= Friendly::seoTitle( $name );
+		$this->_data['caption_seo']	= \IPS\Http\Url\Friendly::seoTitle( $name );
 	}
 
 	/**
@@ -431,84 +313,67 @@ Filter
 	 *
 	 * @return	string
 	 */
-	public function get_caption_seo(): string
+	public function get_caption_seo()
 	{
 		if( !$this->_data['caption_seo'] )
 		{
-			$this->caption_seo	= Friendly::seoTitle( $this->caption );
+			$this->caption_seo	= \IPS\Http\Url\Friendly::seoTitle( $this->caption );
 			$this->save();
 		}
 
-		return $this->_data['caption_seo'] ?: Friendly::seoTitle( $this->caption );
+		return $this->_data['caption_seo'] ?: \IPS\Http\Url\Friendly::seoTitle( $this->caption );
 	}
 
 	/**
 	 * Get Small File Name
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function get_small_file_name(): ?string
+	public function get_small_file_name()
 	{
 		if( isset( $this->_data['small_file_name'] ) AND $this->_data['small_file_name'] )
 		{
-			return $this->_data['small_file_name'] ?? '';
+			return $this->_data['small_file_name'];
 		}
 		else
 		{
-			return $this->masked_file_name ?? '';
+			return $this->masked_file_name;
 		}
-	}
-
-	/**
-	 * @return string
-	 */
-	public function get_masked_file_name() : string
-	{
-		/* Make sure this never returns null */
-		return $this->_data['masked_file_name'] ?? '';
-	}
-
-	/**
-	 * @return string
-	 */
-	public function get_original_file_name() : string
-	{
-		return $this->_data['original_file_name'] ?? '';
 	}
 
 	/**
 	 * @brief	Cached URLs
 	 */
-	protected mixed $_url = array();
+	protected $_url	= array();
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlBase = 'app=gallery&module=gallery&controller=view&id=';
+	public static $urlBase = 'app=gallery&module=gallery&controller=view&id=';
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlTemplate = 'gallery_image';
+	public static $urlTemplate = 'gallery_image';
 	
 	/**
 	 * @brief	SEO Title Column
 	 */
-	public static string $seoTitleColumn = 'caption_seo';
+	public static $seoTitleColumn = 'caption_seo';
 
-	/* v5 todo: Can the below be removed now that we don't use patchwork? */
 	/**
 	 * Return selection of image data as a JSON-encoded string (used for patchwork)
 	 *
-	 * @param array $parameters		Optional key => value array of additional query string parameters to use with the image URL
+	 * @param	array 	$parameters		Optional key => value array of additional query string parameters to use with the image URL
 	 * @return	string
 	 */
-	public function json( array $parameters=array() ): string
+	public function json( $parameters=array() )
 	{
 		$imageSizes	= json_decode( $this->_data['data'], true );
 		$state		= array();
 		$modActions	= array();
 		$modStates	= array();
+		$unread		= FALSE;
 
 		/* Some generic moderator permissions */
 		if ( $this->canSeeMultiModTools() OR ( $this->container()->club() AND $this->container()->club()->isModerator() ) )
@@ -536,7 +401,22 @@ Filter
 			{
 				$modActions[] = 'lock';
 			}
-
+	
+			if ( $this->mapped('featured') )
+			{
+				if( $this->canUnfeature() )
+				{
+					$modActions[] = 'unfeature';
+				}
+	
+				$state['featured'] = TRUE;
+				$modStates[] = 'featured';
+			}
+			else if( $this->canFeature() )
+			{
+				$modActions[] = 'feature';
+			}
+	
 			if ( $this->mapped('pinned') )
 			{
 				if( $this->canUnpin() )
@@ -587,12 +467,12 @@ Filter
 		/* Set read or unread status */
 		if ( $this->unread() === -1 )
 		{
-			$unread = Member::loggedIn()->language()->addToStack( 'new' );
+			$unread = \IPS\Member::loggedIn()->language()->addToStack( 'new' );
 			$modStates[] = 'unread';
 		}
 		elseif( $this->unread() === 1 )
 		{
-			$unread = Member::loggedIn()->language()->addToStack( 'updated' );
+			$unread = \IPS\Member::loggedIn()->language()->addToStack( 'updated' );
 			$modStates[] = 'unread';
 		}
 		else
@@ -605,15 +485,15 @@ Filter
 
 		return json_encode( array(
 			'filenames'		=> array(
-				'small' 		=> array( $this->_data['small_file_name'] ? (string) File::get( 'gallery_Images', $this->_data['small_file_name'] )->url : null, $this->_data['small_file_name'] ? $imageSizes['small'][0] : null, $this->_data['small_file_name'] ? $imageSizes['small'][1] : null ),
-				'large' 		=> array( $this->_data['masked_file_name'] ? (string) File::get( 'gallery_Images', $this->_data['masked_file_name'] )->url : null, $this->_data['masked_file_name'] ? $imageSizes['large'][0] : null, $this->_data['masked_file_name'] ? $imageSizes['large'][1] : null )
+				'small' 		=> array( $this->_data['small_file_name'] ? (string) \IPS\File::get( 'gallery_Images', $this->_data['small_file_name'] )->url : null, $this->_data['small_file_name'] ? $imageSizes['small'][0] : null, $this->_data['small_file_name'] ? $imageSizes['small'][1] : null ),
+				'large' 		=> array( $this->_data['masked_file_name'] ? (string) \IPS\File::get( 'gallery_Images', $this->_data['masked_file_name'] )->url : null, $this->_data['masked_file_name'] ? $imageSizes['large'][0] : null, $this->_data['masked_file_name'] ? $imageSizes['large'][1] : null )
 			),
 			/* We do not use ENT_QUOTES as this replaces " to &quot; which browsers turn back into " again which breaks the JSON string as it needs to be \", single quotes break the data-attribute='' boundaries */
 			'caption'		=> $this->_data['caption'],
-			'date'			=> DateTime::ts( $this->mapped('date') )->relative(),
-			'hasState'		=> (bool) count($state),
+			'date'			=> \IPS\DateTime::ts( $this->mapped('date') )->relative(),
+			'hasState'		=> \count( $state ) ? TRUE : FALSE,
 			'state'			=> $state,
-			'container' 	=> ( $this->directContainer() instanceof Category) ? Member::loggedIn()->language()->addToStack( "gallery_category_{$this->directContainer()->_id}", false, array( 'json' => true, 'jsonEscape' => true ) ) : $this->directContainer()->_title,
+			'container' 	=> ( $this->directContainer() instanceof \IPS\gallery\Category ) ? \IPS\Member::loggedIn()->language()->addToStack( "gallery_category_{$this->directContainer()->_id}", false, array( 'json' => true, 'jsonEscape' => true ) ) : $this->directContainer()->_title,
 			'id' 			=> $this->_data['id'],
 			'url'			=> (string) $this->url()->setQueryString( $parameters ),
 			'author'		=> array(
@@ -633,17 +513,22 @@ Filter
 	 *
 	 * @return	array
 	 */
-	public function exif(): array
+	public function exif()
 	{
-		return $this->metadata;
+		if( $this->metadata !== NULL )
+		{
+			return json_decode( $this->metadata, TRUE );
+		}
+
+		return array();
 	}
 
 	/**
 	 * Get URL for last comment page
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function lastCommentPageUrl(): Url
+	public function lastCommentPageUrl()
 	{
 		return parent::lastCommentPageUrl()->setQueryString( 'tab', 'comments' );
 	}
@@ -651,23 +536,23 @@ Filter
 	/**
 	 * Get template for content tables
 	 *
-	 * @return array
+	 * @return	callable
 	 */
-	public static function contentTableTemplate(): array
+	public static function contentTableTemplate()
 	{
-		GalleryApplication::outputCss();
+		\IPS\gallery\Application::outputCss();
 		
-		return array( Theme::i()->getTemplate( 'browse', 'gallery', 'front' ), 'tableRowsRows' );
+		return array( \IPS\Theme::i()->getTemplate( 'browse', 'gallery', 'front' ), 'tableRowsRows' );
 	}
 
 	/**
 	 * HTML to manage an item's follows 
 	 *
-	 * @return	array
+	 * @return	callable
 	 */
-	public static function manageFollowRows(): array
+	public static function manageFollowRows()
 	{
-		return array( Theme::i()->getTemplate( 'global', 'gallery', 'front' ), 'manageFollowRow' );
+		return array( \IPS\Theme::i()->getTemplate( 'global', 'gallery', 'front' ), 'manageFollowRow' );
 	}
 
 	/**
@@ -675,17 +560,17 @@ Filter
 	 *
 	 * @return	array
 	 */
-	public function commentReviewTabs(): array
+	public function commentReviewTabs()
 	{
 		$tabs = array();
 
 		if ( $this->container()->allow_reviews AND $this->directContainer()->allow_reviews )
 		{
-			$tabs['reviews'] = Member::loggedIn()->language()->addToStack( 'image_review_count', TRUE, array( 'pluralize' => array( $this->mapped('num_reviews') ) ) );
+			$tabs['reviews'] = \IPS\Member::loggedIn()->language()->addToStack( 'image_review_count', TRUE, array( 'pluralize' => array( $this->mapped('num_reviews') ) ) );
 		}
 		if ( $this->container()->allow_comments AND $this->directContainer()->allow_comments )
 		{
-			$tabs['comments'] = Member::loggedIn()->language()->addToStack( 'image_comment_count', TRUE, array( 'pluralize' => array( $this->mapped('num_comments') ) ) );
+			$tabs['comments'] = \IPS\Member::loggedIn()->language()->addToStack( 'image_comment_count', TRUE, array( 'pluralize' => array( $this->mapped('num_comments') ) ) );
 		}
 
 		return $tabs;
@@ -694,19 +579,19 @@ Filter
 	/**
 	 * Get comment/review output
 	 *
-	 * @param string|null $tab Active tab
-	 * @param bool $condensed Use condensed style
-	 * @return    string
+	 * @param	string	$tab		Active tab
+	 * @param	bool	$condensed	Use condensed style
+	 * @return	string
 	 */
-	public function commentReviews( string $tab=NULL, ?bool $condensed=FALSE ): string
+	public function commentReviews( $tab, $condensed=FALSE )
 	{
 		if ( $tab === 'reviews' AND $this->container()->allow_reviews AND $this->directContainer()->allow_reviews )
 		{
-			return (string) Theme::i()->getTemplate('view')->reviews( $this, $condensed );
+			return \IPS\Theme::i()->getTemplate('view')->reviews( $this, $condensed );
 		}
 		elseif( $tab === 'comments' AND $this->container()->allow_comments AND $this->directContainer()->allow_comments )
 		{
-			return (string) Theme::i()->getTemplate('view')->comments( $this, $condensed );
+			return \IPS\Theme::i()->getTemplate('view')->comments( $this, $condensed );
 		}
 
 		return '';
@@ -715,26 +600,93 @@ Filter
 	/**
 	 * Return the album node if the image belongs to an album, otherwise return the category
 	 *
-	 * @return    Model
+	 * @return	\IPS\gallery\Category|\IPS\gallery\Album
 	 */
-	public function directContainer(): Model
+	public function directContainer()
 	{
 		if( $this->album_id )
 		{
-			return Album::load( $this->album_id );
+			return \IPS\gallery\Album::load( $this->album_id );
+		}
+		else
+		{
+			return $this->container();
+		}
+	}
+
+	/**
+	 * Return the container class to store in the search index
+	 *
+	 * @return \IPS\Node\Model|NULL
+	 */
+	public function searchIndexContainerClass()
+	{
+		return $this->directContainer();
+	}
+
+	/**
+	 * Give class a chance to inspect and manipulate search engine filters for streams
+	 *
+	 * @param	array 						$filters	Filters to be used for activity stream
+	 * @param	\IPS\Content\Search\Query	$query		Search query object
+	 * @return	void
+	 */
+	public static function searchEngineFiltering( &$filters, &$query )
+	{
+		/* Make sure our CSS is output */
+		if( \IPS\Dispatcher::hasInstance() )
+		{
+			\IPS\gallery\Application::outputCss();
 		}
 
-		return parent::directContainer();
+		/* Loop through and see if we are also including albums */
+		$includingAlbums = FALSE;
+
+		if( !\count( $filters ) )
+		{
+			$includingAlbums = TRUE;
+		}
+		else
+		{
+			foreach( $filters as $filter )
+			{
+				if( $filter->itemClass == 'IPS\\gallery\\Album\\Item' )
+				{
+					$includingAlbums = TRUE;
+				}
+			}
+		}
+
+		if( $includingAlbums === TRUE )
+		{
+			if( \count( $filters ) )
+			{
+				foreach( $filters as $k => $filter )
+				{
+					if( $filter->itemClass == 'IPS\\gallery\\Image' )
+					{
+						/* container class can be category or album */
+						$filter->containerClasses = array( 'IPS\\gallery\\Category' );
+						$filter->containerClassExclusions = array( 'IPS\\gallery\\Image\\Comment', 'IPS\\gallery\\Image\\Review' );
+					}
+				}
+			}
+			else
+			{
+				$query->filterByContainerClasses( array( 'IPS\\gallery\\Album' ), array( 'IPS\\gallery\\Image\\Comment', 'IPS\\gallery\\Image\\Review' ) );
+			}
+		}
 	}
 
 	/**
 	 * Users to receive immediate notifications
 	 *
-	 * @param int|array|null $limit LIMIT clause
-	 * @param bool $countOnly Just return the count
-	 * @return Select|int
+	 * @param	int|array		$limit		LIMIT clause
+	 * @param	string|NULL		$extra		Additional data
+	 * @param	boolean			$countOnly	Just return the count
+	 * @return \IPS\Db\Select
 	 */
-	public function notificationRecipients( int|array|null $limit=array( 0, 25 ), bool $countOnly=FALSE ): Select|int
+	public function notificationRecipients( $limit=array( 0, 25 ), $extra=NULL, $countOnly=FALSE )
 	{
 		/* Do we only want the count? */
 		if( $countOnly )
@@ -742,9 +694,8 @@ Filter
 			$count	= 0;
 			$count	+= $this->author()->followersCount( 3, array( 'immediate' ), $this->mapped('date') );
 			$count	+= static::containerFollowerCount( $this->container(), 3, array( 'immediate' ), $this->mapped('date') );
-			$count  += $this->tagsFollowerCount( 3, array( 'immediate' ) );
 
-			if( get_class( $this->container() ) != get_class( $this->directContainer() ) )
+			if( \get_class( $this->container() ) != \get_class( $this->directContainer() ) )
 			{
 				$count	+= static::containerFollowerCount( $this->directContainer(), 3, array( 'immediate' ), $this->mapped('date') );
 			}
@@ -755,7 +706,7 @@ Filter
 		/* Create a union query to return the followers */
 		$unions	= array( static::containerFollowers( $this->container(), 3, array( 'immediate' ), $this->mapped('date'), NULL ) );
 
-		if( get_class( $this->container() ) != get_class( $this->directContainer() ) )
+		if( \get_class( $this->container() ) != \get_class( $this->directContainer() ) )
 		{
 			$unions[]	= static::containerFollowers( $this->directContainer(), 3, array( 'immediate' ), $this->mapped('date'), NULL );
 		}
@@ -765,23 +716,22 @@ Filter
 			$unions[] = $followersQuery;
 		}
 		
-		return Db::i()->union( $unions, 'follow_added', $limit );
+		return \IPS\Db::i()->union( $unions, 'follow_added', $limit );
 	}
 	
 	/**
 	 * Users to receive immediate notifications (bulk)
 	 *
-	 * @param Category $category	The category the images were posted in.
-	 * @param Album|NULL	$album		The album the images were posted in, or NULL for no album.
-	 * @param	Member|NULL		$member		The member posting the images or NULL for currently logged in member.
-	 * @param array|null	$tags
-	 * @param	int|array|null		$limit		LIMIT clause
+	 * @param	\IPS\gallery\Category	$category	The category the images were posted in.
+	 * @param	\IPS\gallery\Album|NULL	$album		The album the images were posted in, or NULL for no album.
+	 * @param	\IPS\Member|NULL		$member		The member posting the images or NULL for currently logged in member.
+	 * @param	int|array				$limit		LIMIT clause
 	 * @param	bool					$countOnly	Only return the count
-	 * @return	Select|int
+	 * @return	\IPS\Db\Select
 	 */
-	public static function _imageNotificationRecipients( Category $category, ?Album $album=NULL, ?Member $member=NULL, ?array $tags=null, int|array|null $limit=array( 0, 25 ), bool $countOnly=FALSE ) : Select|int
+	public static function _notificationRecipients( $category, $album=NULL, $member=NULL, $limit=array( 0, 25 ), $countOnly=FALSE )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Do we only want the count? */
 		if( $countOnly )
@@ -800,7 +750,7 @@ Filter
 
 		$unions = array( static::containerFollowers( $category, 3, array( 'immediate' ), NULL, NULL, 'follow_added' ) );
 		
-		if ( !is_null( $album ) )
+		if ( !\is_null( $album ) )
 		{
 			$unions[] = static::containerFollowers( $album, 3, array( 'immediate' ), NULL, NULL, 'follow_added' );
 		}
@@ -809,27 +759,26 @@ Filter
 		{
 			$unions[] = $followersQuery;
 		}
-
-		return Db::i()->union( $unions, 'follow_added', $limit );
+		
+		return \IPS\Db::i()->union( $unions, 'follow_added', $limit );
 	}
 	
 	/**
 	 * Send Notifications (bulk)
 	 *
-	 * @param Category $category	The category the images were posted in.
-	 * @param Album|NULL	$album		The album the images were posted in, or NULL for no album.
-	 * @param	Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
-	 * @param	array|null	$tags
+	 * @param	\IPS\gallery\Category	$category	The category the images were posted in.
+	 * @param	\IPS\gallery\Album|NULL	$album		The album the images were posted in, or NULL for no album.
+	 * @param	\IPS\Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
 	 * @return	void
 	 */
-	public static function _sendNotifications( Category $category, ?Album $album=NULL, ?Member $member=NULL, ?array $tags=NULL ) : void
+	public static function _sendNotifications( $category, $album=NULL, $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		try
 		{
-			$count = static::_imageNotificationRecipients( $category, $album, $member, $tags, NULL, TRUE );
+			$count = static::_notificationRecipients( $category, $album, $member, NULL, TRUE );
 		}
-		catch( BadMethodCallException )
+		catch( \BadMethodCallException $e )
 		{
 			return;
 		}
@@ -837,40 +786,39 @@ Filter
 		$categoryIdColumn	= $category::$databaseColumnId;
 		$albumIdColumn		= $album ? $album::$databaseColumnId : NULL;
 		
-		if ( $count > NOTIFICATION_BACKGROUND_THRESHOLD )
+		if ( $count > \IPS\NOTIFICATION_BACKGROUND_THRESHOLD )
 		{
 			$queueData = array(
 				'followerCount'		=> $count,
 				'category_id'		=> $category->$categoryIdColumn,
 				'member_id'			=> $member->member_id,
-				'album_id'			=> $album?->$albumIdColumn,
-				'tags'				=> $tags
+				'album_id'			=> $album ? $album->$albumIdColumn : NULL
 			);
 
-			Task::queue( 'gallery', 'Follow', $queueData, 2 );
+			\IPS\Task::queue( 'gallery', 'Follow', $queueData, 2 );
 		}
 		else
 		{
-			static::_sendNotificationsBatch( $category, $album, $member, $tags );
+			static::_sendNotificationsBatch( $category, $album, $member );
 		}
 	}
 	
 	/**
 	 * Send Unapproved Notification (bulk)(
 	 *
-	 * @param Category $category	The category the images were posted too.
-	 * @param Album|NULL	$album		The album the images were posted too, or NULL for no album.
-	 * @param	Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
+	 * @param	\IPS\gallery\Category	$category	The category the images were posted too.
+	 * @param	\IPS\gallery\Album|NULL	$album		The album the images were posted too, or NULL for no album.
+	 * @param	\IPS\Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
 	 * @return	void
 	 */
-	public static function _sendUnapprovedNotifications( Category $category, ?Album $album=NULL, ?Member $member=NULL ) : void
+	public static function _sendUnapprovedNotifications( $category, $album=NULL, $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		$directContainer = $album ?: $category;
 		
 		$moderators = array( 'g' => array(), 'm' => array() );
-		foreach( Db::i()->select( '*', 'core_moderators' ) AS $mod )
+		foreach( \IPS\Db::i()->select( '*', 'core_moderators' ) AS $mod )
 		{
 			$canView = FALSE;
 			if ( $mod['perms'] == '*' )
@@ -896,10 +844,10 @@ Filter
 			}
 		}
 		
-		$notification = new Notification( Application::load('core'), 'unapproved_content_bulk', $directContainer, array( $directContainer, $member, $directContainer::$contentItemClass ), array( $member->member_id ) );
-		foreach ( Db::i()->select( '*', 'core_members', ( count( $moderators['m'] ) ? Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $moderator )
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'unapproved_content_bulk', $directContainer, array( $directContainer, $member, $directContainer::$contentItemClass ), array( $member->member_id ) );
+		foreach ( \IPS\Db::i()->select( '*', 'core_members', ( \count( $moderators['m'] ) ? \IPS\Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . \IPS\Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . \IPS\Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $moderator )
 		{
-			$notification->recipients->attach( Member::constructFromData( $moderator ) );
+			$notification->recipients->attach( \IPS\Member::constructFromData( $moderator ) );
 		}
 		$notification->send();
 	}
@@ -907,46 +855,45 @@ Filter
 	/**
 	 * Send Notification Batch (bulk)
 	 *
-	 * @param Category $category	The category the images were posted too.
-	 * @param Album|NULL	$album		The album the images were posted too, or NULL for no album.
-	 * @param	Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
-	 * @param array|null	$tags
+	 * @param	\IPS\gallery\Category	$category	The category the images were posted too.
+	 * @param	\IPS\gallery\Album|NULL	$album		The album the images were posted too, or NULL for no album.
+	 * @param	\IPS\Member|NULL		$member		The member posting the images, or NULL for currently logged in member.
 	 * @param	int						$offset		Offset
 	 * @return	int|NULL				New Offset or NULL if complete
 	 */
-	public static function _sendNotificationsBatch( Category $category, ?Album $album=NULL, ?Member $member=NULL, ?array $tags=null, int $offset=0 ) : ?int
+	public static function _sendNotificationsBatch( $category, $album=NULL, $member=NULL, $offset=0 )
 	{
 		/* Check notification initiator spam status */
-		if( ( $member instanceof Member ) AND $member->members_bitoptions['bw_is_spammer'] )
+		if( ( $member instanceof \IPS\Member ) AND $member->members_bitoptions['bw_is_spammer'] )
 		{
 			/* Initiator is flagged as spammer, don't send notifications */
 			return NULL;
 		}
 
-		$member				= $member ?: Member::loggedIn();
+		$member				= $member ?: \IPS\Member::loggedIn();
 		$directContainer	= $album ?: $category;
 		
 		$followIds = array();
-		$followers = iterator_to_array( static::_imageNotificationRecipients( $category, $album, $member, $tags, array( $offset, static::NOTIFICATIONS_PER_BATCH ) ) );
+		$followers = iterator_to_array( static::_notificationRecipients( $category, $album, $member, array( $offset, static::NOTIFICATIONS_PER_BATCH ) ) );
 
-		if( !count( $followers ) )
+		if( !\count( $followers ) )
 		{
 			return NULL;
 		}
 		
-		$notification = new Notification( Application::load( 'core' ), 'new_content_bulk', $directContainer, array( $directContainer, $member, $directContainer::$contentItemClass ), array( $member->member_id ) );
+		$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'new_content_bulk', $directContainer, array( $directContainer, $member, $directContainer::$contentItemClass ), array( $member->member_id ) );
 		
 		foreach( $followers AS $follower )
 		{
-			$followMember = Member::load( $follower['follow_member_id'] );
-			if ( $followMember !== $member and $directContainer->can( 'view', $followMember ) )
+			$followMember = \IPS\Member::load( $follower['follow_member_id'] );
+			if ( $followMember != $member and $directContainer->can( 'view', $followMember ) )
 			{
 				$followIds[] = $follower['follow_id'];
 				$notification->recipients->attach( $followMember, $follower );
 			}
 		}
 
-		Db::i()->update( 'core_follow', array( 'follow_notify_sent' => time() ), Db::i()->in( 'follow_id', $followIds ) );
+		\IPS\Db::i()->update( 'core_follow', array( 'follow_notify_sent' => time() ), \IPS\Db::i()->in( 'follow_id', $followIds ) );
 		$notification->send();
 		
 		return $offset + static::NOTIFICATIONS_PER_BATCH;
@@ -972,10 +919,9 @@ Filter
 	/**
 	 * Return the first or last image in this album or category
 	 *
-	 * @param string $which
-	 * @return ActiveRecord|null
+	 * @return \IPS\Patterns\ActiveRecord|null
 	 */
-	public function fetchFirstOrLast( string $which='first') : ActiveRecord|null
+	public function fetchFirstOrLast( $which='first')
 	{
 		$where	= array();
 		$direction = $which == 'first' ? 'DESC' : 'ASC';
@@ -997,7 +943,7 @@ Filter
 			$direction	= ( $direction == 'ASC' ) ? 'DESC' : 'ASC';
 		}
 
-		foreach( static::getItemsWithPermission( $where, static::$databasePrefix . $sortBy . ' ' . $direction . ', image_id ' . $direction, 1 ) as $image )
+		foreach( \IPS\gallery\Image::getItemsWithPermission( $where, static::$databasePrefix . $sortBy . ' ' . $direction . ', image_id ' . $direction, 1 ) as $image )
 		{
 			return $image;
 		}
@@ -1012,7 +958,7 @@ Filter
 	 * @param	string	$direction	DESC or ASC
 	 * @return	array
 	 */
-	public function fetchNextOrPreviousImages( int $count, string $direction = 'DESC' ) : array
+	public function fetchNextOrPreviousImages( $count, $direction = 'DESC' )
 	{
 		$where	= array();
 		$dir	= $direction == 'DESC' ? '<' : '>';
@@ -1058,16 +1004,16 @@ Filter
 			$where['date']	= array( $sortBy . " {$dir}= ?", $sortValue );
 		}
 
-		return iterator_to_array( static::getItemsWithPermission( $where, $sortBy . ' ' . $direction, $count, 'read', null, 0, null, false, false, false, false, null, false, false, false, false  ) );
+		return iterator_to_array( \IPS\gallery\Image::getItemsWithPermission( $where, $sortBy . ' ' . $direction, $count, 'read', null, 0, null, false, false, false, false, null, false, false, false, false  ) );
 	}
 
 	/**
 	 * Get Next Item
 	 *
-	 * @param string|null $context	Context to consider next/previous from
-	 * @return    static|NULL
+	 * @param	string|NULL		$context	Context to consider next/previous from
+	 * @return	\IPS\Content\Item|NULL
 	 */
-	public function nextItem( string $context=NULL ): static|NULL
+	public function nextItem( $context=NULL )
 	{
 		if( $context !== NULL )
 		{
@@ -1079,7 +1025,7 @@ Filter
 				break;
 
 				case 'new':
-					$results	= iterator_to_array( static::getItemsWithPermission( static::clubImageExclusion(), NULL, 30, 'read', Filter::FILTER_AUTOMATIC, 0, NULL, !Settings::i()->club_nodes_in_apps ) );
+					$results	= iterator_to_array( static::getItemsWithPermission( static::clubImageExclusion(), NULL, 30, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, !\IPS\Settings::i()->club_nodes_in_apps ) );
 				break;
 			}
 
@@ -1105,21 +1051,19 @@ Filter
 
 		$result = $this->fetchNextOrPreviousImages( 1, 'DESC' );
 
-		if( count( $result ) )
+		if( \is_array( $result ) )
 		{
 			return array_pop( $result );
 		}
-
-		return null;
 	}
 	
 	/**
 	 * Get Previous Item
 	 *
-	 * @param string|null $context	Context to consider next/previous from
-	 * @return    static|NULL
+	 * @param	string|NULL		$context	Context to consider next/previous from
+	 * @return	\IPS\Content\Item|NULL
 	 */
-	public function prevItem( string $context=NULL ): static|NULL
+	public function prevItem( $context=NULL )
 	{
 		if( $context !== NULL )
 		{
@@ -1131,7 +1075,7 @@ Filter
 				break;
 
 				case 'new':
-					$results	= iterator_to_array( static::getItemsWithPermission( static::clubImageExclusion(), NULL, 30, 'read', Filter::FILTER_AUTOMATIC, 0, NULL, !Settings::i()->club_nodes_in_apps ) );
+					$results	= iterator_to_array( static::getItemsWithPermission( static::clubImageExclusion(), NULL, 30, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, !\IPS\Settings::i()->club_nodes_in_apps ) );
 				break;
 			}
 
@@ -1154,12 +1098,52 @@ Filter
 
 		$result = $this->fetchNextOrPreviousImages( 1, 'ASC' );
 
-		if( count( $result ) )
+		if( \is_array( $result ) )
 		{
 			return array_pop( $result );
 		}
+	}
 
-		return null;
+	/**
+	 * Should new items be moderated?
+	 *
+	 * @param	\IPS\Member		$member							The member posting
+	 * @param	\IPS\Node\Model	$container						The container
+	 * @param	bool			$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @return	bool
+	 */
+	public static function moderateNewItems( \IPS\Member $member, \IPS\Node\Model $container = NULL, $considerPostBeforeRegistering = FALSE )
+	{
+		if ( $container and $container->approve_img and !$member->group['g_avoid_q'] )
+		{
+			return !static::modPermission( 'approve', $member, $container );
+		}
+		
+		return parent::moderateNewItems( $member, $container, $considerPostBeforeRegistering );
+	}
+	
+	/**
+	 * Should new comments be moderated?
+	 *
+	 * @param	\IPS\Member	$member							The member posting
+	 * @param	bool		$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @return	bool
+	 */
+	public function moderateNewComments( \IPS\Member $member, $considerPostBeforeRegistering = FALSE )
+	{
+		$commentClass = static::$commentClass;
+		return ( $this->container()->approve_com and !$member->group['g_avoid_q'] ) or parent::moderateNewComments( $member, $considerPostBeforeRegistering );
+	}
+
+	/**
+	 * Can change author?
+	 *
+	 * @param	\IPS\Member\NULL	$member	The member (NULL for currently logged in member)
+	 * @return	bool
+	 */
+	public function canChangeAuthor( \IPS\Member $member = NULL )
+	{
+		return static::modPermission( 'edit', $member, $this->container() );
 	}
 	
 	/**
@@ -1167,21 +1151,21 @@ Filter
 	 *
 	 * @return	callable
 	 */
-	public function approvalQueueHtml( $ref, $container, $title ): mixed
+	public function approvalQueueHtml( $ref, $container, $title )
 	{
-		return Theme::i()->getTemplate( 'global', 'gallery', 'front' )->approvalQueueItem( $this, $ref, $container, $title );
+		return \IPS\Theme::i()->getTemplate( 'global', 'gallery', 'front' )->approvalQueueItem( $this, $ref, $container, $title );
 	}
 
 	/**
 	 * Get elements for add/edit form
 	 *
-	 * @param Item|null $item The current item if editing or NULL if creating
-	 * @param Model|null $container Container (e.g. forum) ID, if appropriate
-	 * @param int|null $currentlyEditing If this is for a new submission, the index ID of the image in the array
-	 * @param int|null $tempId If this is for a new submission, the temporary image ID
-	 * @return    array
+	 * @param	\IPS\Content\Item|NULL	$item				The current item if editing or NULL if creating
+	 * @param	int						$container			Container (e.g. forum) ID, if appropriate
+	 * @param	int|NULL				$currentlyEditing	If this is for a new submission, the index ID of the image in the array
+	 * @param	int|NULL				$tempId				If this is for a new submission, the temporary image ID
+	 * @return	array
 	 */
-	public static function formElements( ContentItem $item=NULL, Model $container=NULL, int $currentlyEditing=NULL, int $tempId=NULL ): array
+	public static function formElements( $item=NULL, \IPS\Node\Model $container=NULL, $currentlyEditing=NULL, $tempId=NULL )
 	{
 		/* Init */
 		$return = parent::formElements( $item, $container );
@@ -1190,18 +1174,18 @@ Filter
 		unset( $return['container'] );
 
 		/* Some other details */
-		$return['description']	= new Editor( 'image_description', $item?->description, FALSE, array(
+		$return['description']	= new \IPS\Helpers\Form\Editor( 'image_description', $item ? $item->description : NULL, FALSE, array(
 			'app' 			=> 'gallery',
 			'key' 			=> 'Images',
 			'autoSaveKey' 	=> ( $item === NULL ? NULL : ( 'contentEdit-' . static::$application . '/' . static::$module . '-' . $item->id ) ),
 			'editorId'		=> ( $item === NULL ) ? "filedata_{$currentlyEditing}_image_description" : 'image_description'
 		) );
-		$return['credit_info']	= new TextArea( 'image_credit_info', $item?->credit_info, FALSE );
-		$return['copyright']	= new Text( 'image_copyright', $item?->copyright, FALSE, array( 'maxLength' => 255 ) );
+		$return['credit_info']	= new \IPS\Helpers\Form\TextArea( 'image_credit_info', $item ? $item->credit_info : NULL, FALSE );
+		$return['copyright']	= new \IPS\Helpers\Form\Text( 'image_copyright', $item ? $item->copyright : NULL, FALSE, array( 'maxLength' => 255 ) );
 
-		if( Settings::i()->gallery_nsfw )
+		if( \IPS\Settings::i()->gallery_nsfw )
 		{
-			$return['nsfw']	= new YesNo( 'image_nsfw', $item ? $item->nsfw : FALSE );
+			$return['nsfw']	= new \IPS\Helpers\Form\YesNo( 'image_nsfw', $item ? $item->nsfw : FALSE );
 		}
 
 		/* If we are editing, return the appropriate fields */
@@ -1210,37 +1194,37 @@ Filter
 			/* Is this a media file, or an image? */
 			if( $item->media )
 			{
-				$return['imageLocation'] = new Upload( 'mediaLocation', File::get( 'gallery_Images', $item->original_file_name ), TRUE, array(
+				$return['imageLocation'] = new \IPS\Helpers\Form\Upload( 'mediaLocation', \IPS\File::get( 'gallery_Images', $item->original_file_name ), TRUE, array( 
 					'storageExtension'	=> 'gallery_Images', 
 					'allowedFileTypes'	=> array( 'flv', 'f4v', 'wmv', 'mpg', 'mpeg', 'mp4', 'mkv', 'm4a', 'm4v', '3gp', 'mov', 'avi', 'webm', 'ogg' ), 
 					'multiple'			=> FALSE, 
 					'minimize'			=> TRUE,
 					/* 'template' => "...",		// This is the javascript template for the submission form */ 
 					/* This has to be converted from kB to mB */
-					'maxFileSize'		=> Member::loggedIn()->group['g_movie_size'] ? ( Member::loggedIn()->group['g_movie_size'] / 1024 ) : NULL,
+					'maxFileSize'		=> \IPS\Member::loggedIn()->group['g_movie_size'] ? ( \IPS\Member::loggedIn()->group['g_movie_size'] / 1024 ) : NULL,
 				) );
 
-				$return['image_thumbnail'] = new Upload( 'image_thumbnail', $item->masked_file_name ? File::get( 'gallery_Images', $item->masked_file_name ) : NULL, FALSE, array(
+				$return['image_thumbnail'] = new \IPS\Helpers\Form\Upload( 'image_thumbnail', $item->masked_file_name ? \IPS\File::get( 'gallery_Images', $item->masked_file_name ) : NULL, FALSE, array( 
 					'storageExtension'	=> 'gallery_Images', 
 					'image'				=> TRUE, 
 					'multiple'			=> FALSE, 
 					'minimize'			=> TRUE,
 					/* 'template' => "...",		// This is the javascript template for the submission form */ 
 					/* This has to be converted from kB to mB */
-					'maxFileSize'		=> Member::loggedIn()->group['g_max_upload'] ? ( Member::loggedIn()->group['g_max_upload'] / 1024 ) : NULL,
+					'maxFileSize'		=> \IPS\Member::loggedIn()->group['g_max_upload'] ? ( \IPS\Member::loggedIn()->group['g_max_upload'] / 1024 ) : NULL,
 					'canBeModerated'		=> TRUE
 				) );
 			}
 			else
 			{
-				$return['imageLocation'] = new Upload( 'imageLocation', File::get( 'gallery_Images', $item->original_file_name ), TRUE, array(
+				$return['imageLocation'] = new \IPS\Helpers\Form\Upload( 'imageLocation', \IPS\File::get( 'gallery_Images', $item->original_file_name ), TRUE, array( 
 					'storageExtension'	=> 'gallery_Images', 
 					'image'				=> TRUE, 
 					'multiple'			=> FALSE, 
 					'minimize'			=> TRUE,
 					/* 'template' => "...",		// This is the javascript template for the submission form */ 
 					/* This has to be converted from kB to mB */
-					'maxFileSize'		=> Member::loggedIn()->group['g_max_upload'] ? ( Member::loggedIn()->group['g_max_upload'] / 1024 ) : NULL,
+					'maxFileSize'		=> \IPS\Member::loggedIn()->group['g_max_upload'] ? ( \IPS\Member::loggedIn()->group['g_max_upload'] / 1024 ) : NULL,
 					'canBeModerated'		=> TRUE
 				) );
 			}
@@ -1250,16 +1234,41 @@ Filter
 	}
 
 	/**
-	 * Process after the object has been edited on the front-end
+	 * Process created object AFTER the object has been created
 	 *
-	 * @param array $values		Values from form
+	 * @param	\IPS\Content\Comment|NULL	$comment	The first comment
+	 * @param	array						$values		Values from form
 	 * @return	void
 	 */
-	public function processAfterEdit( array $values ): void
+	protected function processAfterCreate( $comment, $values )
+	{
+		parent::processAfterCreate( $comment, $values );
+
+		if( $this->album_id and !$this->isFutureDate() )
+		{
+			if( $this->hidden() === 0 and !$this->isFutureDate() )
+			{
+				$this->directContainer()->_items = ( $this->directContainer()->_items + 1 );
+			}
+			elseif( $this->hidden() === 1 )
+			{
+				$this->directContainer()->_unapprovedItems = ( $this->directContainer()->_unapprovedItems + 1 );
+			}
+			$this->directContainer()->save();
+		}
+	}
+
+	/**
+	 * Process after the object has been edited on the front-end
+	 *
+	 * @param	array	$values		Values from form
+	 * @return	void
+	 */
+	public function processAfterEdit( $values )
 	{
 		parent::processAfterEdit( $values );
 
-		Request::i()->setClearAutosaveCookie( 'contentEdit-' . static::$application . '/' . static::$module . '-' . $this->id );
+		\IPS\Request::i()->setClearAutosaveCookie( 'contentEdit-' . static::$application . '/' . static::$module . '-' . $this->id );
 	}
 
 	/**
@@ -1268,12 +1277,13 @@ Filter
 	 * @param	array				$values	Values from form
 	 * @return	void
 	 */
-	public function processForm( array $values ): void
+	public function processForm( $values )
 	{
 		parent::processForm( $values );
 
 		/* Set a few details */
 		$oldContent = NULL;
+		$sendFilterNotifications = FALSE;
 		if ( isset( $values['image_description'] ) )
 		{
 			if ( !$this->_new )
@@ -1309,10 +1319,9 @@ Filter
 
 		/* Get the file... */
 		$file = NULL;
-
 		if( isset( $values['imageLocation'] ) AND $values['imageLocation'] and $values['imageLocation'] != $this->original_file_name) 
 		{
-			$file = File::get( 'gallery_Images', $values['imageLocation'] );
+			$file = \IPS\File::get( 'gallery_Images', $values['imageLocation'] );
 			if ( isset( $values['imageRequiresModeration'] ) )
 			{
 				$file->requiresModeration = $values['imageRequiresModeration'];
@@ -1322,18 +1331,18 @@ Filter
 			/* Get some details about the file */
 			$this->file_size	= $file->filesize();
 			$this->file_name	= $file->originalFilename;
-			$this->file_type	= File::getMimeType( $file->filename );
+			$this->file_type	= \IPS\File::getMimeType( $file->filename );
 
 			/* If this is an image, grab EXIF data and create thumbnails */
 			if ( $file->isImage() )
 			{
 				/* Extract EXIF data if possible */
-				if( ImageClass::exifSupported() )
+				if( \IPS\Image::exifSupported() )
 				{
-					$this->metadata	= ( isset( $values['_exif'] ) ) ? $values['_exif'] : ImageClass::create( $file->contents() )->parseExif();
+					$this->metadata	= ( isset( $values['_exif'] ) ) ? $values['_exif'] : \IPS\Image::create( $file->contents() )->parseExif();
 
 					/* And then parse geolocation data */
-					if( count( $this->metadata ) )
+					if( \count( $this->metadata ) )
 					{
 						$this->parseGeolocation();
 
@@ -1342,6 +1351,11 @@ Filter
 
 					/* We need to do this after parsing the geolocation data */
 					$metadata	= $this->metadata;
+					
+					array_walk_recursive( $metadata, function( &$val, $key )
+					{
+						$val = utf8_encode( $val );
+					} );
 
 					$this->metadata	= json_encode( $metadata );
 				}
@@ -1353,37 +1367,35 @@ Filter
 			{
 				/* This is a media file */
 				$this->media	= 1;
-			}
-		}
 
-		/* Manage the thumbnail */
-		if( isset( $values['image_thumbnail'] ) and $values['image_thumbnail'] and ( $this->new or $values['image_thumbnail'] != $this->masked_file_name ) )
-		{
-			$file = File::get( 'gallery_Images', $values['image_thumbnail'] );
-
-			/* Create the various thumbnails */
-			$this->buildThumbnails( $file );
-
-			$file->delete();
-		}
-		/* Or was the thumbnail removed? */
-		elseif( !$this->_new AND $this->masked_file_name and isset( $values['image_thumbnail'] ) and ! $values['image_thumbnail'] )
-		{
-			foreach( array( 'masked_file_name', 'small_file_name' ) as $key )
-			{
-				if( $this->$key )
+				if( isset( $values['image_thumbnail'] ) and $values['image_thumbnail'] )
 				{
-					File::get( 'gallery_Images', $this->$key )->delete();
+					$file = \IPS\File::get( 'gallery_Images', $values['image_thumbnail'] );
 
-					$this->$key = NULL;
+					/* Create the various thumbnails */
+					$this->buildThumbnails( $file );
+
+					$file->delete();
+				}
+				/* Or was the thumbnail removed? */
+				elseif( !$this->_new AND $this->masked_file_name )
+				{
+					foreach( array( 'masked_file_name', 'small_file_name' ) as $key )
+					{
+						if( $this->$key )
+						{
+							\IPS\File::get( 'gallery_Images', $this->$key )->delete();
+
+							$this->$key = NULL;
+						}
+					}
 				}
 			}
 		}
-
 		
 		/* Check profanity filters */
 		$filesForImageScanner = [];
-		if ( ( isset( $values['imageLocation'] ) AND $values['imageLocation'] AND ( $values['imageLocation'] instanceof File ) ) )
+		if ( ( isset( $values['imageLocation'] ) AND $values['imageLocation'] AND ( $values['imageLocation'] instanceof \IPS\File ) ) )
 		{
 			$filesForImageScanner[] = $values['imageLocation'];
 		}
@@ -1393,13 +1405,13 @@ Filter
 		}
 		if ( $this->media and isset( $values['image_thumbnail'] ) and $values['image_thumbnail'] )
 		{
-			if ( $values['image_thumbnail'] instanceof File )
+			if ( $values['image_thumbnail'] instanceof \IPS\File )
 			{
 				$filesForImageScanner[] = $values['image_thumbnail'];
 			}
 			else
 			{
-				$thumbnail = File::get( 'gallery_Images', $values['image_thumbnail'] );
+				$thumbnail = \IPS\File::get( 'gallery_Images', $values['image_thumbnail'] );
 				if ( isset( $values['image_thumbnail_requires_moderation'] ) and $values['image_thumbnail_requires_moderation'] )
 				{
 					$thumbnail->requiresModeration = TRUE;
@@ -1407,9 +1419,8 @@ Filter
 				$filesForImageScanner[] = $thumbnail;
 			}
 		}
-
 		$sendFilterNotifications = $this->checkProfanityFilters( FALSE, !$this->_new, NULL, NULL, NULL, NULL, $filesForImageScanner );
-		if ( $oldContent AND $sendFilterNotifications === FALSE )
+		if ( !$this->_new AND $sendFilterNotifications === FALSE )
 		{
 			$this->sendAfterEditNotifications( $oldContent );
 		}
@@ -1421,9 +1432,9 @@ Filter
 	 * @param	array				$values	Values from form
 	 * @return	void
 	 */
-	protected function processBeforeCreate( array $values ): void
+	protected function processBeforeCreate( $values )
 	{
-		$this->category_id	= ( isset( $values['category'] ) ) ? $values['category'] : Album::load( $values['album'] )->category()->_id;
+		$this->category_id	= ( isset( $values['category'] ) ) ? $values['category'] : \IPS\gallery\Album::load( $values['album'] )->category()->_id;
 
 		if( isset( $values['album'] ) )
 		{
@@ -1434,36 +1445,11 @@ Filter
 	}
 
 	/**
-	 * Process created object AFTER the object has been created
-	 *
-	 * @param Comment|NULL	$comment	The first comment
-	 * @param	array		$values		Values from form
-	 * @return	void
-	 */
-	protected function processAfterCreate( Comment|null $comment, array $values ): void
-	{
-		parent::processAfterCreate( $comment, $values );
-
-		if( $this->album_id )
-		{
-			if( $this->hidden() === 0 )
-			{
-				$this->directContainer()->_items = ( $this->directContainer()->_items + 1 );
-			}
-			elseif( $this->hidden() === 1 )
-			{
-				$this->directContainer()->_unapprovedItems = ( $this->directContainer()->_unapprovedItems + 1 );
-			}
-			$this->directContainer()->save();
-		}
-	}
-
-	/**
 	 * Attempt to parse geolocation data from EXIF data
 	 *
 	 * @return	void
 	 */
-	public function parseGeolocation() : void
+	public function parseGeolocation()
 	{
 		if( isset( $this->metadata['GPS.GPSLatitudeRef'] ) && isset( $this->metadata['GPS.GPSLatitude'] ) && isset( $this->metadata['GPS.GPSLongitudeRef'] ) && isset( $this->metadata['GPS.GPSLongitude'] ) )
 		{
@@ -1472,11 +1458,11 @@ Filter
 
 			try
 			{
-				$this->gps_raw		= GeoLocation::getByLatLong( $this->gps_lat, $this->gps_lon );
+				$this->gps_raw		= \IPS\GeoLocation::getByLatLong( $this->gps_lat, $this->gps_lon );
 				$this->loc_short	= (string) $this->gps_raw;
 				$this->gps_raw		= json_encode( $this->gps_raw );
 			}
-			catch( Exception ) {}
+			catch( \Exception $e ) {}
 		}
 	}
 
@@ -1484,10 +1470,10 @@ Filter
 	 * Convert the coordinates stored in EXIF to lat/long
 	 *
 	 * @param	string	$ref	Reference (N, S, W, E)
-	 * @param	array	$degree	Degrees
+	 * @param	string	$degree	Degrees
 	 * @return	string
 	 */
-	protected function _getCoordinates( string $ref, array $degree ) : string
+	protected function _getCoordinates( $ref, $degree )
 	{
 		return ( ( $ref == 'S' || $ref == 'W' ) ? '-' : '' ) . sprintf( '%.6F', $this->_degreeToInteger( $degree[0] ) + ( ( ( $this->_degreeToInteger( $degree[1] ) * 60 ) + ( $this->_degreeToInteger( $degree[2] ) ) ) / 3600 ) );
 	}
@@ -1496,9 +1482,9 @@ Filter
 	 * Convert the degree value stored in EXIF to an integer
 	 *
 	 * @param	string	$coordinate	Coordinate
-	 * @return	string
+	 * @return	int
 	 */
-	protected function _degreeToInteger( string $coordinate ) : string
+	protected function _degreeToInteger( $coordinate )
 	{
 		if ( mb_strpos( $coordinate, '/' ) === false )
 		{
@@ -1506,7 +1492,7 @@ Filter
 		}
 		else
 		{
-			[ $base, $divider ]	= explode( "/", $coordinate, 2 );
+			list( $base, $divider )	= explode( "/", $coordinate, 2 );
 			
 			if ( $divider == 0 )
 			{
@@ -1524,7 +1510,7 @@ Filter
 	 *
 	 * @return	void
 	 */
-	public function deleteThumbnails() : void
+	public function deleteThumbnails()
 	{
 		/* We don't delete thumbnails for videos */
 		if( $this->media )
@@ -1538,9 +1524,9 @@ Filter
 			{
 				try
 				{
-					File::get( 'gallery_Images', $this->$size )->delete();
+					\IPS\File::get( 'gallery_Images', $this->$size )->delete();
 				}
-				catch( Exception ){}
+				catch( \Exception $e ){}
 			}
 		}
 	}
@@ -1548,28 +1534,28 @@ Filter
 	/**
 	 * Build the copies of the image with watermark as appropriate
 	 *
-	 * @param	File|NULL	$file	Base file to create from (if not supplied it will be found automatically)
+	 * @param	\IPS\File|NULL	$file	Base file to create from (if not supplied it will be found automatically)
 	 * @return	void
 	 */
-	public function buildThumbnails( ?File $file=NULL ) : void
+	public function buildThumbnails( $file=NULL )
 	{
 		$this->deleteThumbnails();
 
 		if( $file === NULL )
 		{
-			$file	= File::get( 'gallery_Images', $this->original_file_name );
+			$file	= \IPS\File::get( 'gallery_Images', $this->original_file_name );
 		}
 
 		$thumbnailDimensions	= array();
-		$watermarks = explode( ',', Settings::i()->gallery_watermark_images );
+		$watermarks = explode( ',', \IPS\Settings::i()->gallery_watermark_images );
 
 		/* Create the various thumbnails - For animated gifs use the original image for the large version */
-		$largeImage				= $file->isAnimatedImage() ? $file : File::create( 'gallery_Images', 'large.' . $file->originalFilename, $this->createImageFile( $file, explode( 'x', Settings::i()->gallery_large_dims ), FALSE, in_array( 'large', $watermarks ) ), $file->container );
+		$largeImage				= $file->isAnimatedImage() ? $file : \IPS\File::create( 'gallery_Images', 'large.' . $file->originalFilename, $this->createImageFile( $file, explode( 'x', \IPS\Settings::i()->gallery_large_dims ), FALSE, \in_array( 'large', $watermarks ) ), $file->container );
 		$this->masked_file_name	= (string) $largeImage;
 
 		$thumbnailDimensions['large']	= $largeImage->getImageDimensions();
 
-		$smallImage				= File::create( 'gallery_Images', 'small.' . $file->originalFilename, $this->createImageFile( $file, explode( 'x', Settings::i()->gallery_small_dims ), Settings::i()->gallery_use_square_thumbnails, in_array( 'small', $watermarks ) ), $file->container );
+		$smallImage				= \IPS\File::create( 'gallery_Images', 'small.' . $file->originalFilename, $this->createImageFile( $file, explode( 'x', \IPS\Settings::i()->gallery_small_dims ), \IPS\Settings::i()->gallery_use_square_thumbnails, \in_array( 'small', $watermarks ) ), $file->container );
 		$this->small_file_name	= (string) $smallImage;
 
 		$thumbnailDimensions['small']	= $smallImage->getImageDimensions();
@@ -1580,15 +1566,15 @@ Filter
 	/**
 	 * Create image object and apply watermark, if appropriate
 	 *
-	 * @param	File	$file			Base file to create from
+	 * @param	\IPS\File	$file			Base file to create from
 	 * @param	array|NULL	$dimensions		Dimensions to resize to, or NULL to not resize
 	 * @param	bool		$crop			Whether to crop (true) or resize (false)
 	 * @param	bool		$watermark		Watermark the created image
-	 * @return    ImageClass
+	 * @return	\IPS\Image
 	 */
-	public function createImageFile( File $file, ?array $dimensions, bool $crop=FALSE, bool $watermark=TRUE ) : ImageClass
+	public function createImageFile( $file, $dimensions, $crop=FALSE, $watermark=TRUE )
 	{
-		$image	= ImageClass::create( $file->contents() );
+		$image	= \IPS\Image::create( $file->contents() );
 
 		if( $dimensions !== NULL )
 		{
@@ -1603,55 +1589,38 @@ Filter
 			}
 		}
 
-        if( $watermark and Settings::i()->gallery_use_watermarks and Settings::i()->gallery_watermark_path AND $this->container()->watermark )
+        if( $watermark and \IPS\Settings::i()->gallery_use_watermarks and \IPS\Settings::i()->gallery_watermark_path AND $this->container()->watermark )
         {
             try
             {
-                $image->watermark( ImageClass::create( File::get( 'core_Theme', Settings::i()->gallery_watermark_path )->contents() ) );
+                $image->watermark( \IPS\Image::create( \IPS\File::get( 'core_Theme', \IPS\Settings::i()->gallery_watermark_path )->contents() ) );
             }
-            catch ( RuntimeException )
+            catch ( \RuntimeException $e )
             {
-                throw new RuntimeException( 'WATERMARK_DOES_NOT_EXIST' );
+                throw new \RuntimeException( 'WATERMARK_DOES_NOT_EXIST' );
             }
         }
 
 		return $image;
 	}
 
-    /**
-     * @brief Metadata-related constants
-     */
-    const IMAGE_METADATA_NONE = 0;
-    const IMAGE_METADATA_ALL = 1;
-    const IMAGE_METADATA_NOSENSITIVE = 2;
-
-    /**
-     * Determines if the map and location data should be displayed
-     *
-     * @return bool
-     */
-    public function showLocation() : bool
-    {
-        return GeoLocation::enabled() and Settings::i()->gallery_metadata == static::IMAGE_METADATA_ALL and $this->gps_show;
-    }
-
 	/**
 	 * Return the map for the image if available
 	 *
 	 * @param	int		$width	Width
-	 * @param	int		$height	Height
+	 * @param	int		$heigth	Height
 	 * @return	string
 	 * @note	\BadMethodCallException can be thrown if the google maps integration is shut off - don't show any error if that happens.
 	 */
-	public function map( int $width, int $height ): string
+	public function map( $width, $height )
 	{
 		if( $this->gps_raw )
 		{
 			try
 			{
-				return GeoLocation::buildFromJson( $this->gps_raw )->map()->render( $width, $height );
+				return \IPS\GeoLocation::buildFromJson( $this->gps_raw )->map()->render( $width, $height );
 			}
-			catch( BadMethodCallException ){}
+			catch( \BadMethodCallException $e ){}
 		}
 
 		return '';
@@ -1663,22 +1632,22 @@ Filter
 	 * @param	bool	$lightbox	Is this for the lightbox?
 	 * @return	string
 	 */
-	public function enableMapForm( bool $lightbox = FALSE ) : string
+	public function enableMapForm( $lightbox = FALSE )
 	{
 		if( $this->canEdit() )
 		{
 			/* We do this to prevent a javascript error from having two elements on the same page with the same name/id */
 			$setting = $lightbox ? "map_enabled_lightbox" : "map_enabled";
 
-			$form	= new Form;
-			$form->class = 'ipsForm--vertical ipsForm--enable-map';
-			$form->add( new YesNo( $setting, $this->gps_show, FALSE ) );
+			$form	= new \IPS\Helpers\Form;
+			$form->class = 'ipsForm_vertical';
+			$form->add( new \IPS\Helpers\Form\YesNo( $setting, $this->gps_show, FALSE ) );
 
 			if( $values = $form->values() )
 			{
 				$this->gps_show	= $values[ $setting ];
 				$this->save();
-				Output::i()->redirect( $this->url() );
+				\IPS\Output::i()->redirect( $this->url() );
 			}
 
 			return $form;
@@ -1692,7 +1661,7 @@ Filter
 	 *
 	 * @return	array
 	 */
-	public function sizes() : array
+	public function sizes()
 	{
 		$return	= array();
 		$data	= json_decode( $this->data, TRUE );
@@ -1701,7 +1670,7 @@ Filter
 		{
 			foreach ( $data as $k => $v )
 			{
-				if ( !in_array( $v, $return ) )
+				if ( !\in_array( $v, $return ) )
 				{
 					$return[ $k ] = $v;
 				}
@@ -1714,17 +1683,17 @@ Filter
 	/**
 	 * Log for deletion later
 	 *
-	 * @param	Member|null 	$member	The member, NULL for currently logged in, or FALSE for no member
+	 * @param	\IPS\Member|NULL 	$member	The member, NULL for currently logged in, or FALSE for no member
 	 * @return	void
 	 */
-	public function logDelete( ?Member $member = NULL ) : void
+	public function logDelete( $member = NULL )
 	{
-		$this->_logDelete( $member );
+		parent::logDelete( $member );
 
 		/* Now we need to update "last image" info */
 		if( $this->album_id )
 		{
-			$album	= Album::load( $this->album_id );
+			$album	= \IPS\gallery\Album::load( $this->album_id );
 			$album->setLastImage();
 			$album->save();
 		}
@@ -1733,9 +1702,9 @@ Filter
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		parent::delete();
 		
@@ -1745,35 +1714,54 @@ Filter
 		{
 			try
 			{
-				File::get( 'gallery_Images', $this->original_file_name )->delete();
+				\IPS\File::get( 'gallery_Images', $this->original_file_name )->delete();
 			}
-			catch( Exception ){}
+			catch( \Exception $e ){}
 		}
 
 		/* Delete bandwidth logs */
-		Db::i()->delete( 'gallery_bandwidth', array( 'image_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'gallery_bandwidth', array( 'image_id=?', $this->id ) );
 
 		/* Remove cover id association */
-		Db::i()->update( 'gallery_albums', array( 'album_cover_img_id' => 0 ), array( 'album_cover_img_id=?', $this->id ) );
-		Db::i()->update( 'gallery_categories', array( 'category_cover_img_id' => 0 ), array( 'category_cover_img_id=?', $this->id ) );
+		\IPS\Db::i()->update( 'gallery_albums', array( 'album_cover_img_id' => 0 ), array( 'album_cover_img_id=?', $this->id ) );
+		\IPS\Db::i()->update( 'gallery_categories', array( 'category_cover_img_id' => 0 ), array( 'category_cover_img_id=?', $this->id ) );
 
 		/* Now we need to update "last image" info */
 		if( $this->album_id )
 		{
-			$album	= Album::load( $this->album_id );
+			$album	= \IPS\gallery\Album::load( $this->album_id );
 			$album->setLastImage();
 			$album->save();
 		}
 	}
 	
 	/**
+	 * Get snippet HTML for search result display
+	 *
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$authorData		Basic data about the author. Only includes columns returned by \IPS\Member::columnsForPhoto()
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	array		$reputationData	Array of people who have given reputation and the reputation they gave
+	 * @param	int|NULL	$reviewRating	If this is a review, the rating
+	 * @param	string		$view			'expanded' or 'condensed'
+	 * @return	callable
+	 */
+	public static function searchResultSnippet( array $indexData, array $authorData, array $itemData, ?array $containerData, array $reputationData, $reviewRating, $view )
+	{
+		$url = \IPS\Http\Url::internal( static::$urlBase . $indexData['index_item_id'], 'front', static::$urlTemplate, \IPS\Http\Url\Friendly::seoTitle( $indexData['index_title'] ?: $itemData[ static::$databasePrefix . static::$databaseColumnMap['title'] ] ) );
+
+		return \IPS\Theme::i()->getTemplate( 'global', 'gallery', 'front' )->searchResultImageSnippet( $indexData, $itemData, ( isset( $itemData['extra'] ) ? $itemData['extra'] : NULL ), $itemData['image_small_file_name'], $url, $view == 'condensed' );
+	}
+	
+	/**
 	 * Are comments supported by this class?
 	 *
-	 * @param	Member|NULL		$member		The member to check for or NULL to not check permission
-	 * @param	Model|NULL	$container	The container to check in, or NULL for any container
+	 * @param	\IPS\Member|NULL		$member		The member to check for or NULL to not check permission
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check in, or NULL for any container
 	 * @return	bool
 	 */
-	public static function supportsComments( Member $member = NULL, Model $container = NULL ): bool
+	public static function supportsComments( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
 		if( $container !== NULL )
 		{
@@ -1781,18 +1769,18 @@ Filter
 		}
 		else
 		{
-			return parent::supportsComments() and ( !$member or Category::countWhere( 'read', $member, array( 'category_allow_comments=1' ) ) );
+			return parent::supportsComments() and ( !$member or \IPS\gallery\Category::countWhere( 'read', $member, array( 'category_allow_comments=1' ) ) );
 		}
 	}
 	
 	/**
 	 * Are reviews supported by this class?
 	 *
-	 * @param	Member|NULL		$member		The member to check for or NULL to not check permission
-	 * @param	Model|NULL	$container	The container to check in, or NULL for any container
+	 * @param	\IPS\Member|NULL		$member		The member to check for or NULL to not check permission
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check in, or NULL for any container
 	 * @return	bool
 	 */
-	public static function supportsReviews( Member $member = NULL, Model $container = NULL ): bool
+	public static function supportsReviews( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
 		if( $container !== NULL )
 		{
@@ -1800,15 +1788,15 @@ Filter
 		}
 		else
 		{
-			return parent::supportsReviews() and ( !$member or Category::countWhere( 'read', $member, array( 'category_allow_reviews=1' ) ) );
+			return parent::supportsReviews() and ( !$member or \IPS\gallery\Category::countWhere( 'read', $member, array( 'category_allow_reviews=1' ) ) );
 		}
 	}
 	
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @return    array
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @return	array
 	 * @apiresponse	int						id				ID number
 	 * @apiresponse	string					caption			Caption
 	 * @apiresponse	string					description		Description
@@ -1836,27 +1824,27 @@ Filter
 	 * @apiresponse	float					rating			Average Rating
 	 * @apiresponse	bool					nsfw			Not safe for work
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{				
 		return array(
 			'id'				=> $this->id,
 			'caption'			=> $this->caption,
-			'description'		=> $this->description,
+			'description'		=> \IPS\Text\Parser::removeLazyLoad( $this->description ),
 			'filename'			=> $this->file_name,
-			'filesize'			=> intval( $this->file_size ),
+			'filesize'			=> \intval( $this->file_size ),
 			'images'			=> array(
-				'original'			=> (string) File::get( 'gallery_Images', $this->original_file_name )->url,
-				'large'				=> (string) File::get( 'gallery_Images', $this->masked_file_name )->url,
-				'small'				=> (string) File::get( 'gallery_Images', $this->small_file_name )->url,
+				'original'			=> (string) \IPS\File::get( 'gallery_Images', $this->original_file_name )->url,
+				'large'				=> (string) \IPS\File::get( 'gallery_Images', $this->masked_file_name )->url,
+				'small'				=> (string) \IPS\File::get( 'gallery_Images', $this->small_file_name )->url,
 			),
 			'album'				=> $this->album_id ? $this->directContainer()->apiOutput() : null,
 			'category'			=> $this->container()->apiOutput(),
 			'author'			=> $this->author()->apiOutput(),
 			'copyright'			=> $this->copyright ?: null,
 			'credit'			=> $this->credit_info ?: null,
-			'location'			=> $this->gps_raw ? GeoLocation::buildFromJson( $this->gps_raw ) : null,
+			'location'			=> $this->gps_raw ? \IPS\GeoLocation::buildFromJson( $this->gps_raw ) : null,
 			'exif'				=> $this->metadata ?: null,
-			'date'				=> DateTime::ts( $this->date )->rfc3339(),
+			'date'				=> \IPS\DateTime::ts( $this->date )->rfc3339(),
 			'comments'			=> $this->comments,
 			'reviews'			=> $this->reviews,
 			'views'				=> $this->views,
@@ -1872,19 +1860,61 @@ Filter
 		);
 	}
 
+	/* !Tags */
+	
+	/**
+	 * Can tag?
+	 *
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	bool
+	 */
+	public static function canTag( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
+	{
+		return parent::canTag( $member, $container ) and ( $container === NULL or $container->can_tag );
+	}
+	
+	/**
+	 * Can use prefixes?
+	 *
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	bool
+	 */
+	public static function canPrefix( \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
+	{
+		return parent::canPrefix( $member, $container ) and ( $container === NULL or $container->tag_prefixes );
+	}
+	
+	/**
+	 * Defined Tags
+	 *
+	 * @param	\IPS\Node\Model|NULL	$container	The container to check if tags can be used in, if applicable
+	 * @return	array
+	 */
+	public static function definedTags( \IPS\Node\Model $container = NULL )
+	{
+		if ( $container and $container->preset_tags )
+		{
+			return explode( ',', $container->preset_tags );
+		}
+		
+		return parent::definedTags( $container );
+	}
+
 	/**
 	 * Move
 	 *
-	 * @param	Model	$container	Container to move to
-	 * @param bool $keepLink	If TRUE, will keep a link in the source
+	 * @param	\IPS\Node\Model	$container	Container to move to
+	 * @param	bool			$keepLink	If TRUE, will keep a link in the source
 	 * @return	void
 	 */
-	public function move( Model $container, bool $keepLink=FALSE ): void
+	public function move( \IPS\Node\Model $container, $keepLink=FALSE )
 	{
 		/* Remember the album id */
 		$previousAlbum	= $this->album_id;
 
-		if( $container instanceof Album)
+		if( $container instanceof \IPS\gallery\Album )
 		{
 			$category	= $container->category();
 
@@ -1898,12 +1928,12 @@ Filter
 		}
 
 		/* Move */
-		parent::move( $container, $keepLink );
+		$result	= parent::move( $container, $keepLink );
 
 		/* Rebuild previous album */
 		if( $previousAlbum )
 		{
-			$album	= Album::load( $previousAlbum );
+			$album	= \IPS\gallery\Album::load( $previousAlbum );
 			$album->_items = $album->_items -1;
 			$album->setLastImage();
 			$album->save();
@@ -1912,24 +1942,52 @@ Filter
 		/* Rebuild new album */
 		if( $this->album_id )
 		{
-			$album	= Album::load( $this->album_id );
+			$album	= \IPS\gallery\Album::load( $this->album_id );
+			$album->_items = $album->_items +1;
 			$album->setLastImage();
 			$album->save();
 		}
+
+		/* And return */
+		return $result;
 	}
 
+	/**
+	 * Can Rate?
+	 *
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @return	bool
+	 * @throws	\BadMethodCallException
+	 */
+	public function canRate( \IPS\Member $member = NULL )
+	{
+		if( parent::canRate( $member ) )
+		{
+			if( $this->directContainer()->allow_rating )
+			{
+				return $this->directContainer()->can( 'rate', $member );
+			}
+			else
+			{
+				return FALSE;
+			}
+		}
+
+		return FALSE;
+	}
+	
 	/**
 	 * Check permissions
 	 *
 	 * @param	mixed								$permission						A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index
-	 * @param	Member|Group|NULL	$member							The member or group to check (NULL for currently logged in member)
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$member							The member or group to check (NULL for currently logged in member)
 	 * @param	bool								$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
 	 * @return	bool
-	 * @throws	OutOfBoundsException	If $permission does not exist in map
+	 * @throws	\OutOfBoundsException	If $permission does not exist in map
 	 */
-	public function can( mixed $permission, Member|Group|null $member=null, bool $considerPostBeforeRegistering=TRUE ): bool
+	public function can( $permission, $member=NULL, $considerPostBeforeRegistering=TRUE )
 	{
-		if( !parent::can( $permission, $member, $considerPostBeforeRegistering ) )
+		if ( !parent::can( $permission, $member, $considerPostBeforeRegistering ) )
 		{
 			return FALSE;
 		}
@@ -1941,7 +1999,7 @@ Filter
 				return FALSE;
 			}
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
 			/* If the direct container is lost, assume we can do nothing. @see \IPS\Content\Item::can() */
 			return FALSE;
@@ -1954,10 +2012,10 @@ Filter
 	/**
 	 * Can view?
 	 *
-	 * @param	Member|NULL	$member	The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member	The member to check for or NULL for the currently logged in member
 	 * @return	bool
 	 */
-	public function canView( ?Member $member=null ): bool
+	public function canView( $member=NULL )
 	{
 		if( !parent::canView( $member ) )
 		{
@@ -1965,35 +2023,35 @@ Filter
 		}
 
 		/* Check if the image is in a private or restricted access album */
-		if( !static::modPermission( 'edit', NULL, $this->container() ) AND $this->directContainer() instanceof Album)
+		if( !\IPS\gallery\Image::modPermission( 'edit', NULL, $this->container() ) AND $this->directContainer() instanceof \IPS\gallery\Album )
 		{
 			/* Make sure we have a member */
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
 
 			/* Is this a private album we can't access? */
-			if( $this->directContainer()->type == Album::AUTH_TYPE_PRIVATE AND $this->directContainer()->owner()->member_id != $member->member_id )
+			if( $this->directContainer()->type == \IPS\gallery\Album::AUTH_TYPE_PRIVATE AND $this->directContainer()->owner()->member_id != $member->member_id )
 			{
 				return FALSE;
 			}
 
 			/* Is this a restricted album we can't access? */
-			if( $this->directContainer()->type == Album::AUTH_TYPE_RESTRICTED AND $this->directContainer()->owner()->member_id != $member->member_id )
+			if( $this->directContainer()->type == \IPS\gallery\Album::AUTH_TYPE_RESTRICTED AND $this->directContainer()->owner()->member_id != $member->member_id )
 			{
 				/* This will throw an exception of the row does not exist */
 				try
 				{
 					if( !$member->member_id )
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 
-					$member	= Member::constructFromData( Db::i()->select( '*', 'core_sys_social_group_members', array( 'group_id=? AND member_id=?', $this->directContainer()->allowed_access, $member->member_id ) )->first() );
+					$member	= \IPS\Member::constructFromData( \IPS\Db::i()->select( '*', 'core_sys_social_group_members', array( 'group_id=? AND member_id=?', $this->directContainer()->allowed_access, $member->member_id ) )->first() );
 				}
-				catch( OutOfRangeException )
+				catch( \OutOfRangeException $e )
 				{
 					return FALSE;
 				}
-				catch( UnderflowException )
+				catch( \UnderflowException $e )
 				{
 					/* Access checking for share strips in the parent::canView() method can throw UnderflowException */
 					return FALSE;
@@ -2002,7 +2060,7 @@ Filter
 		}
 
 		/* And make sure we're not in a hidden album, unless we can view hidden albums */
-		if( $this->directContainer() instanceof Album)
+		if( $this->directContainer() instanceof \IPS\gallery\Album )
 		{
 			if( !$this->directContainer()->asItem()->canView( $member ) )
 			{
@@ -2016,20 +2074,14 @@ Filter
 	/**
 	 * Can set as album coverphoto?
 	 *
-	 * @param	Member|NULL	$member	The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member	The member to check for or NULL for the currently logged in member
 	 * @return	bool
 	 */
-	public function canSetAsAlbumCover( ?Member $member=NULL ) : bool
+	public function canSetAsAlbumCover( $member=NULL )
 	{
-		/* If this image is not part of an album, this is always false */
-		if( !$this->album_id or !( $this->directContainer() instanceof Album ) )
-		{
-			return false;
-		}
-
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		/* Allow album owners to always change the album cover */
-		if( ( $album = Album::load( $this->album_id ) AND $member->member_id AND $album->owner_id == $member->member_id ) OR static::modPermission( 'edit', $member, $this->container() ) )
+		if( ( $this->album_id AND $album = \IPS\gallery\Album::load( $this->album_id ) AND $member->member_id AND $album->owner_id == $member->member_id ) OR static::modPermission( 'edit', $member, $this->container() ) )
 		{
 			return TRUE;
 		}
@@ -2039,10 +2091,10 @@ Filter
 	/**
 	 * Can set as category coverphoto?
 	 *
-	 * @param	Member|NULL	$member	The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member	The member to check for or NULL for the currently logged in member
 	 * @return	bool
 	 */
-	public function canSetAsCategoryCover( ?Member $member=NULL ) : bool
+	public function canSetAsCategoryCover( $member=NULL )
 	{
 		if( static::modPermission( 'edit', $member, $this->container() ) )
 		{
@@ -2055,11 +2107,11 @@ Filter
 	 * WHERE clause for getItemsWithPermission
 	 *
 	 * @param	array		$where				Current WHERE clause
-	 * @param	Member|null	$member				The member (NULL to use currently logged in member)
-	 * @param	array|null		$joins				Additional joins
+	 * @param	\IPS\Member	$member				The member (NULL to use currently logged in member)
+	 * @param	bool		$joins				Additional joins
 	 * @return	array
 	 */
-	public static function getItemsWithPermissionWhere( array $where, ?Member $member, ?array &$joins ) : array
+	public static function getItemsWithPermissionWhere( $where, $member, &$joins )
 	{
 		/* If we already filtered by a specific album, we can stop right here */
 		if( array_key_exists( 'album', $where ) )
@@ -2068,7 +2120,7 @@ Filter
 		}
 
 		/* Then we need to make sure we can access the album the image is in, if applicable */
-		$member		= $member ?: Member::loggedIn();
+		$member		= $member ?: \IPS\Member::loggedIn();
 
 		/* Skip permissions for guests */
 		if( !$member->member_id )
@@ -2078,13 +2130,13 @@ Filter
 		else
 		{
 			/* If you can edit images in a category you can see images in private albums in that category. We can only really check globally at this stage, however. */
-			if( Image::modPermission( 'edit', $member ) )
+			if( \IPS\gallery\Image::modPermission( 'edit', $member ) )
 			{
 				return array();
 			}
 
 			$restricted	= $member->socialGroups();
-			if( count( $restricted ) )
+			if( \count( $restricted ) )
 			{
 				$subQuery = array( "( album_type=1 OR ( album_type=2 AND album_owner_id=? ) OR ( album_type=3 AND ( album_owner_id=? OR album_allowed_access IN (" . implode( ',', $restricted ) . ") ) ) )", $member->member_id, $member->member_id );
 			}
@@ -2094,11 +2146,11 @@ Filter
 			}
 
 			/* Make sure the images aren't in hidden albums, unless we can view hidden albums */
-			$hiddenContainers = Item::canViewHiddenItemsContainers( $member );
+			$hiddenContainers = \IPS\gallery\Album\Item::canViewHiddenItemsContainers( $member );
 
 			if( $hiddenContainers !== TRUE )
 			{
-				if( is_array( $hiddenContainers ) AND count( $hiddenContainers ) )
+				if( \is_array( $hiddenContainers ) AND \count( $hiddenContainers ) )
 				{
 					$subQuery[0] .= " AND ( album_hidden=0 OR album_category_id IN(" . implode( ',', $hiddenContainers ) . ") )";
 				}
@@ -2109,33 +2161,33 @@ Filter
 			}
 		}
 
-		return array( '( gallery_images.image_album_id=0 OR gallery_images.image_album_id IN( ' . Db::i()->select( 'album_id', 'gallery_albums', $subQuery )->returnFullQuery() . ' ) )' );
+		return array( '( gallery_images.image_album_id=0 OR gallery_images.image_album_id IN( ' . \IPS\Db::i()->select( 'album_id', 'gallery_albums', $subQuery )->returnFullQuery() . ' ) )' );
 	}
 	
 	/**
 	 * Get items with permisison check
 	 *
-	 * @param array $where				Where clause
-	 * @param string|null $order				MySQL ORDER BY clause (NULL to order by date)
-	 * @param int|array|null $limit				Limit clause
-	 * @param string|null $permissionKey		A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index or NULL to ignore permissions
-	 * @param int|bool|null $includeHiddenItems	Include hidden items? NULL to detect if currently logged in member has permission, -1 to return public content only, TRUE to return unapproved content and FALSE to only return unapproved content the viewing member submitted
-	 * @param int $queryFlags			Select bitwise flags
-	 * @param	Member|NULL	$member				The member (NULL to use currently logged in member)
-	 * @param bool $joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinComments		If true, will join comment data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinReviews		If true, will join review data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $countOnly			If true will return the count
-	 * @param array|null $joins				Additional arbitrary joins for the query
-	 * @param bool|Model $skipPermission		If you are getting records from a specific container, pass the container to reduce the number of permission checks necessary or pass TRUE to skip conatiner-based permission. You must still specify this in the $where clause
-	 * @param bool $joinTags			If true, will join the tags table
-	 * @param bool $joinAuthor			If true, will join the members table for the author
-	 * @param bool $joinLastCommenter	If true, will join the members table for the last commenter
-	 * @param bool $showMovedLinks		If true, moved item links are included in the results
-	 * @param array|null $location			Array of item lat and long
-	 * @return	ActiveRecordIterator|int
+	 * @param	array		$where				Where clause
+	 * @param	string		$order				MySQL ORDER BY clause (NULL to order by date)
+	 * @param	int|array	$limit				Limit clause
+	 * @param	string|NULL	$permissionKey		A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index or NULL to ignore permissions
+	 * @param	mixed		$includeHiddenItems	Include hidden items? NULL to detect if currently logged in member has permission, -1 to return public content only, TRUE to return unapproved content and FALSE to only return unapproved content the viewing member submitted
+	 * @param	int			$queryFlags			Select bitwise flags
+	 * @param	\IPS\Member|NULL	$member				The member (NULL to use currently logged in member)
+	 * @param	bool		$joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinComments		If true, will join comment data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinReviews		If true, will join review data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$countOnly			If true will return the count
+	 * @param	array|null	$joins				Additional arbitrary joins for the query
+	 * @param	mixed		$skipPermission		If you are getting records from a specific container, pass the container to reduce the number of permission checks necessary or pass TRUE to skip conatiner-based permission. You must still specify this in the $where clause
+	 * @param	bool		$joinTags			If true, will join the tags table
+	 * @param	bool		$joinAuthor			If true, will join the members table for the author
+	 * @param	bool		$joinLastCommenter	If true, will join the members table for the last commenter
+	 * @param	bool		$showMovedLinks		If true, moved item links are included in the results
+	 * @param	array|null	$location			Array of item lat and long
+	 * @return	\IPS\Patterns\ActiveRecordIterator|int
 	 */
-	public static function getItemsWithPermission( array $where=array(), string $order=NULL, int|array|null $limit=10, ?string $permissionKey='read', int|bool|null $includeHiddenItems=null, int $queryFlags=0, Member $member=null, bool $joinContainer=FALSE, bool $joinComments=FALSE, bool $joinReviews=FALSE, bool $countOnly=FALSE, array|null $joins=null, bool|Model $skipPermission=FALSE, bool $joinTags=TRUE, bool $joinAuthor=TRUE, bool $joinLastCommenter=TRUE, bool $showMovedLinks=FALSE, array|null $location=null ): ActiveRecordIterator|int
+	public static function getItemsWithPermission( $where=array(), $order=NULL, $limit=10, $permissionKey='read', $includeHiddenItems=NULL, $queryFlags=0, \IPS\Member $member=NULL, $joinContainer=FALSE, $joinComments=FALSE, $joinReviews=FALSE, $countOnly=FALSE, $joins=NULL, $skipPermission=FALSE, $joinTags=TRUE, $joinAuthor=TRUE, $joinLastCommenter=TRUE, $showMovedLinks=FALSE, $location=NULL )
 	{
 		if ( $order === NULL )
 		{
@@ -2150,7 +2202,7 @@ Filter
 		{
 			$_check = explode( ' ', trim( $_order ) );
 
-			if( count( $_check ) == 2 )
+			if( \count( $_check ) == 2 )
 			{
 				if( $_check[0] == 'image_updated' OR $_check[0] == 'image_date' )
 				{
@@ -2183,11 +2235,11 @@ Filter
 				}
 			}
 
-			if ( count( $albumIds ) )
+			if ( \count( $albumIds ) )
 			{
-				foreach ( Db::i()->select( '*', 'gallery_albums', array( Db::i()->in( 'album_id', $albumIds ) ) ) as $album )
+				foreach ( \IPS\Db::i()->select( '*', 'gallery_albums', array( \IPS\Db::i()->in( 'album_id', $albumIds ) ) ) as $album )
 				{
-					Album::constructFromData( $album );
+					\IPS\gallery\Album::constructFromData( $album );
 				}
 			}
 		}
@@ -2198,19 +2250,19 @@ Filter
 	/**
 	 * Additional WHERE clauses for Follow view
 	 *
-	 * @param bool $joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
-	 * @param array $joins				Other joins
+	 * @param	bool		$joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
+	 * @param	array		$joins				Other joins
 	 * @return	array
 	 */
-	public static function followWhere( bool &$joinContainer, array &$joins ): array
+	public static function followWhere( &$joinContainer, &$joins )
 	{
-		return array_merge( parent::followWhere( $joinContainer, $joins ), static::getItemsWithPermissionWhere( array(), Member::loggedIn(), $joins ) );
+		return array_merge( parent::followWhere( $joinContainer, $joins ), static::getItemsWithPermissionWhere( array(), \IPS\Member::loggedIn(), $joins ) );
 	}
 
 	/**
 	 * Total item \count(including children)
 	 *
-	 * @param	Model	$container			The container
+	 * @param	\IPS\Node\Model	$container			The container
 	 * @param	bool			$includeItems		If TRUE, items will be included (this should usually be true)
 	 * @param	bool			$includeComments	If TRUE, comments will be included
 	 * @param	bool			$includeReviews		If TRUE, reviews will be included
@@ -2219,18 +2271,18 @@ Filter
 	 * @note	This method may return something like "100+" if it has lots of children to avoid exahusting memory. It is intended only for display use
 	 * @note	This method includes counts of hidden and unapproved content items as well
 	 */
-	public static function contentCount( Model $container, bool $includeItems=TRUE, bool $includeComments=FALSE, bool $includeReviews=FALSE, int $depth=0 ): int|NULL|string
+	public static function contentCount( \IPS\Node\Model $container, $includeItems=TRUE, $includeComments=FALSE, $includeReviews=FALSE, $depth=0 )
 	{
 		if( !$container->nonpublic_albums )
 		{
 			return parent::contentCount( $container, $includeItems, $includeComments, $includeReviews, $depth );
 		}
 
-		$_key = md5( get_class( $container ) . $container->_id );
+		$_key = md5( \get_class( $container ) . $container->_id );
 
 		if( !isset( static::$itemCounts[ $_key ][ $container->_id ] ) )
 		{
-			static::$itemCounts[ $_key ][ $container->_id ] = static::getItemsWithPermission( array( array( 'gallery_images.image_category_id=?', $container->_id ) ), NULL, 1, 'read', Filter::FILTER_AUTOMATIC, 0, NULL, FALSE, FALSE, FALSE, TRUE );
+			static::$itemCounts[ $_key ][ $container->_id ] = static::getItemsWithPermission( array( array( 'gallery_images.image_category_id=?', $container->_id ) ), NULL, 1, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, FALSE, FALSE, FALSE, TRUE );
 		}
 
 		return parent::contentCount( $container, $includeItems, $includeComments, $includeReviews, $depth );
@@ -2241,16 +2293,11 @@ Filter
 	/**
 	 * Get image for embed
 	 *
-	 * @return	File|NULL
+	 * @return	\IPS\File|NULL
 	 */
-	public function embedImage(): ?File
+	public function embedImage()
 	{
-		if( $this->media )
-		{
-			return null;
-		}
-
-		return File::get( 'gallery_Images', $this->small_file_name );
+		return \IPS\File::get( 'gallery_Images', $this->small_file_name );
 	}
 
 	/**
@@ -2259,54 +2306,74 @@ Filter
 	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'gallery', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'gallery' )->embedImage( $this, $this->url()->setQueryString( $params ), $this->embedImage() );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'gallery', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'gallery' )->embedImage( $this, $this->url()->setQueryString( $params ), $this->embedImage() );
 	}
 
+    /**
+     * Search Index Permissions
+     *
+     * @return	string	Comma-delimited values or '*'
+     * 	@li			Number indicates a group
+     *	@li			Number prepended by "m" indicates a member
+     *	@li			Number prepended by "s" indicates a social group
+     */
+    public function searchIndexPermissions()
+    {
+        /* If this is a private album, only the author can view in search */
+        if ( $this->directContainer() instanceof \IPS\gallery\Album and $this->directContainer()->type != \IPS\gallery\Album::AUTH_TYPE_PUBLIC )
+        {
+            if ( $this->member_id )
+            {
+                $return = "m{$this->member_id}";
+            }
+            else
+            {
+            	$return = '';
+            }
+        }
+        else
+        {
+            $return = parent::searchIndexPermissions();
+        }
+
+        return $return;
+    }
+
 	/**
-	 * Syncing to run when hiding
+	 * Hide
 	 *
-	 * @param	Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @param	string					$reason	Reason
 	 * @return	void
 	 */
-	public function onHide( Member|null|bool $member ): void
+	public function hide( $member, $reason = NULL )
 	{
-		$this->_onHide( $member );
+		parent::hide( $member, $reason );
 
-		if( $this->album_id )
+		if( $this->directContainer() instanceof \IPS\gallery\Album )
 		{
-			$album = $this->directContainer();
-			$album->_items = ( $album->_items >= 0 ) ? ( $album->_items - 1 ) : 0;
-			$album->setLastImage();
-			$album->save();
+			$this->directContainer()->setLastImage();
+			$this->directContainer()->save();
 		}
 	}
 
 	/**
-	 * Syncing to run when unhiding
+	 * Unhide
 	 *
-	 * @param	bool					$approving	If true, is being approved for the first time
-	 * @param	Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
 	 * @return	void
 	 */
-	public function onUnhide( bool $approving, Member|null|bool $member ): void
+	public function unhide( $member )
 	{
-		$this->_onUnhide( $approving, $member );
+		parent::unhide( $member );
 
-		if( $this->album_id )
+		if( $this->directContainer() instanceof \IPS\gallery\Album )
 		{
-			$album = $this->directContainer();
-			$album->_items = ( $album->_items + 1 );
-
-			if( $approving )
-			{
-				$album->_unapprovedItems = ( $album->_unapprovedItems >= 0 ) ? ( $album->_unapprovedItems - 1 ) : 0;
-			}
-
-			$album->setLastImage( $this );
-			$album->save();
+			$this->directContainer()->setLastImage();
+			$this->directContainer()->save();
 		}
 	}
 
@@ -2315,46 +2382,35 @@ Filter
 	 *
 	 * @return	string
 	 */
-	public function shareImage(): string
+	public function shareImage()
 	{
-		if ( $this->masked_file_name )
-		{
-			return (string)File::get( 'gallery_Images', $this->masked_file_name )->url;
-		}
-
-		return '';
+		return (string) \IPS\File::get( 'gallery_Images', $this->masked_file_name )->url;
 	}
 
 	/**
-	 * Check if a specific action is available for this Content.
-	 * Default to TRUE, but used for overrides in individual Item/Comment classes.
+	 * Can comment?
 	 *
-	 * @param string $action
-	 * @param Member|null	$member
-	 * @return bool
+	 * @param	\IPS\Member\NULL	$member							The member (NULL for currently logged in member)
+	 * @param	bool				$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @return	bool
 	 */
-	public function actionEnabled( string $action, ?Member $member=null ) : bool
+	public function canComment( $member=NULL, $considerPostBeforeRegistering = TRUE )
 	{
-		/* Categories are checked in the base class. Check direct containers here */
-		switch( $action )
-		{
-			case 'comment':
-			case 'reply':
-				if( !$this->directContainer()->checkAction( 'comment' ) )
-				{
-					return FALSE;
-				}
-				break;
+		$member = $member ?: \IPS\Member::loggedIn();
+		return parent::canComment( $member, $considerPostBeforeRegistering ) and $this->container()->allow_comments and $this->directContainer()->allow_comments;
+	}
 
-			case 'review':
-				if( !$this->directContainer()->checkAction( 'review' ) )
-				{
-					return FALSE;
-				}
-				break;
-		}
-
-		return parent::actionEnabled( $action, $member );
+	/**
+	 * Can review?
+	 *
+	 * @param	\IPS\Member\NULL	$member							The member (NULL for currently logged in member)
+	 * @param	bool				$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @return	bool
+	 */
+	public function canReview( $member=NULL, $considerPostBeforeRegistering = TRUE )
+	{
+		$member = $member ?: \IPS\Member::loggedIn();
+		return parent::canReview( $member, $considerPostBeforeRegistering ) and $this->container()->allow_reviews and $this->directContainer()->allow_reviews;
 	}
 	
 	/**
@@ -2362,7 +2418,7 @@ Filter
 	 *
 	 * @return	string
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		return 'image_id';
 	}
@@ -2372,7 +2428,7 @@ Filter
 	 *
 	 * @return	array
 	 */
-	public static function supportedMetaDataTypes(): array
+	public static function supportedMetaDataTypes()
 	{
 		return array( 'core_FeaturedComments', 'core_ContentMessages' );
 	}
@@ -2382,7 +2438,7 @@ Filter
 	 *
 	 * @return array
 	 */
-	public static function getWidgetSortOptions(): array
+	public static function getWidgetSortOptions()
 	{
 		$sortOptions = parent::getWidgetSortOptions();
 
@@ -2397,9 +2453,9 @@ Filter
 	 * @param	int|null	$limit				Number of attachments to fetch, or NULL for all
 	 * @param	bool		$ignorePermissions	If set to TRUE, permission to view the images will not be checked
 	 * @return	array|NULL
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function contentImages( int $limit = NULL, bool $ignorePermissions = FALSE ): array|null
+	public function contentImages( $limit = NULL, $ignorePermissions = FALSE )
 	{
 		$result = parent::contentImages( $limit, $ignorePermissions );
 
@@ -2410,23 +2466,22 @@ Filter
 
 		$result[] = array( 'gallery_Images' => $this->masked_file_name );
 
-		return array_slice( $result, 0, $limit );
+		return \array_slice( $result, 0, $limit );
 	}
-
+	
 	/**
 	 * Get content for an email
 	 *
-	 * @param Email $email The email
-	 * @param string $type 'html' or 'plaintext'
-	 * @param bool $includeLinks
-	 * @param bool $includeAuthor
-	 * @return    string
+	 * @param	\IPS\Email	$email	The email
+	 * @param	string		$type	'html' or 'plaintext'
+	 
+	 * @return	string
 	 */
-	public function emailContent(Email $email, string $type, bool $includeLinks=TRUE, bool $includeAuthor=TRUE ): string
+	public function emailContent( \IPS\Email $email, $type, $includeLinks=TRUE, $includeAuthor=TRUE )
 	{
 		if ( $type === 'html' )
 		{
-			return Email::template( 'gallery', '_imageContent', $type, array( $this, $includeLinks, $includeAuthor, $email ) );
+			return \IPS\Email::template( 'gallery', '_imageContent', $type, array( $this, $includeLinks, $includeAuthor, $email ) );
 		}
 		else
 		{
@@ -2448,15 +2503,21 @@ Filter
 	 *	@li DOWNLOAD_ORIGINAL_NONE
 	 *	@li DOWNLOAD_ORIGINAL_RAW
 	 *	@li DOWNLOAD_ORIGINAL_WATERMARKED
-	 * @param	Member|NULL	$member		The member to test, or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member		The member to test, or NULL for currently logged in member
 	 * @return	int
 	 */
-	public function canDownloadOriginal( ?Member $member=NULL ) : int
+	public function canDownloadOriginal( $member=NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		return $member->group['g_download_original'];
 	}
+
+	/**
+	 * Store club node IDs so we can save on queries
+	 * @var array|null
+	 */
+	protected static ?array $_clubNodeIds = null;
 
 	/**
 	 * Return query WHERE clause to use for getItemsWithPermission when excluding club content
@@ -2465,32 +2526,37 @@ Filter
 	 */
 	public static function clubImageExclusion(): array
 	{
-		if( Settings::i()->club_nodes_in_apps )
+		if( !\IPS\Settings::i()->club_nodes_in_apps )
 		{
-			return array();
+			if( static::$_clubNodeIds === null )
+			{
+				static::$_clubNodeIds = iterator_to_array( \IPS\Db::i()->select( 'node_id', 'core_clubs_node_map', array( 'node_class=?', 'IPS\gallery\Category' ) ) );
+			}
+
+			if( \count( static::$_clubNodeIds ) )
+			{
+				return array(
+					array( \IPS\Db::i()->in( 'gallery_images.image_category_id', static::$_clubNodeIds, true ) )
+				);
+			}
 		}
-		else
-		{
-			return array( array( 
-				'gallery_images.image_category_id NOT IN(?)',
-				Db::i()->select( 'node_id', 'core_clubs_node_map', array( 'node_class=?', 'IPS\gallery\Category' ) )
-			) );
-		}
+
+		return array();
 	}
 
 	/**
 	 * Returns the labels from image scanner for search
 	 *
-	 * @return	array
-	 * @throws	BadMethodCallException
+	 * @return	array|NULL
+	 * @throws	\BadMethodCallException
 	 */
-	public function imageLabelsForSearch() : array
+	public function imageLabelsForSearch()
 	{
 		$return = [];
 
 		$labels = $this->labels ? json_decode( $this->labels, TRUE ) : array();
 
-		if( $labels and count( $labels ) )
+		if( $labels and \count( $labels ) )
 		{
 			foreach( $labels as $label )
 			{
@@ -2504,27 +2570,11 @@ Filter
 	/**
 	 * Is the image NSFW?
 	 *
+	 * @param	\IPS\Member\NULL	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function nsfw() : bool
+	public function nsfw()
 	{
 		return (bool) $this->nsfw;
-	}
-
-	/**
-	 * Allow for individual classes to override and
-	 * specify a primary image. Used for grid views, etc.
-	 *
-	 * @return File|null
-	 */
-	public function primaryImage() : ?File
-	{
-		try
-		{
-			return $this->small_file_name ? File::get( 'gallery_Images', $this->small_file_name ) : null;
-		}
-		catch( Exception ){}
-
-		return parent::primaryImage();
 	}
 }

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		Stripe Gateway
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -14,95 +13,52 @@ namespace IPS\nexus\Gateway;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use DateInterval;
-use DomainException;
-use InvalidArgumentException;
-use IPS\core\AdminNotification;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Customer\CreditCard as CustomerCard;
-use IPS\nexus\Fraud\MaxMind\Request;
-use IPS\nexus\Gateway;
-use IPS\nexus\Gateway\Stripe\CreditCard;
-use IPS\nexus\Gateway\Stripe\Exception;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
 use IPS\nexus\Transaction;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use RuntimeException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_numeric;
-use function is_string;
-use function str_starts_with;
-use function strlen;
-use const IPS\CIC;
-use const IPS\LONG_REQUEST_TIMEOUT;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Stripe Gateway
  */
-class Stripe extends Gateway
+class _Stripe extends \IPS\nexus\Gateway
 {
 	/* !Features */
 	
 	const SUPPORTS_REFUNDS = TRUE;
 	const SUPPORTS_PARTIAL_REFUNDS = TRUE;
-	const SUPPORTS_AUTOPAY =  TRUE;
-
+	
 	/**
 	 * Check the gateway can process this...
 	 *
-	 * @param    $amount            Money        The amount
-	 * @param    $billingAddress    GeoLocation|NULL    The billing address, which may be NULL if one if not provided
-	 * @param    $customer        Customer|null        The customer (Default NULL value is for backwards compatibility - it should always be provided.)
-	 * @param array $recurrings Details about recurring costs
-	 * @return    bool
+	 * @param	$amount			\IPS\nexus\Money		The amount
+	 * @param	$billingAddress	\IPS\GeoLocation|NULL	The billing address, which may be NULL if one if not provided
+	 * @param	$customer		\IPS\nexus\Customer		The customer (Default NULL value is for backwards compatibility - it should always be provided.)
+	 * @param	array			$recurrings				Details about recurring costs
+	 * @see		<a href="https://stripe.com/docs/currencies">Supported Currencies</a>
+	 * @return	bool
 	 */
-	public function checkValidity(Money $amount, ?GeoLocation $billingAddress = NULL, ?Customer $customer = NULL, array $recurrings = array() ) : bool
+	public function checkValidity( \IPS\nexus\Money $amount, \IPS\GeoLocation $billingAddress = NULL, \IPS\nexus\Customer $customer = NULL, $recurrings = array() )
 	{
 		$settings = json_decode( $this->settings, TRUE );
 
-		/* Check if we are using test or live keys */
-		if( \IPS\NEXUS_TEST_GATEWAYS )
+		/* If we have nothing to pay now, but we have something to pay later,
+		then check against the renewal amount */
+		if( $amount->amount->isZero() and \count( $recurrings ) )
 		{
-			if( !str_starts_with( $settings['secret_key'], 'sk_test_' ) or !str_starts_with( $settings['publishable_key'], 'pk_test_' ) )
+			foreach( $recurrings as $format => $terms )
 			{
-				return false;
+				if( $terms['term'] instanceof \IPS\nexus\Purchase\RenewalTerm and $terms['term']->cost->amount->isGreaterThanZero() )
+				{
+					$amount = $terms['term']->cost;
+					break;
+				}
 			}
 		}
-		elseif( !str_starts_with( $settings['secret_key'], 'sk_live_' ) or !str_starts_with( $settings['publishable_key'], 'pk_live_' ) )
-		{
-			return false;
-		}
-
+		
 		/* Stripe has a minimum transaction fee. This is based on the businesses currency, but as we don't know what the transaction rate is
 			we'll do this check only in the transactions we know - anything else will be rejected when the user tries to pay */
 		switch ( $amount->currency )
@@ -182,13 +138,13 @@ class Stripe extends Gateway
 		}
 		
 		/* And the maximum is based on the size of the amount */
-		if ( strlen( static::_amountAsCents( $amount ) ) > 8 )
+		if ( \strlen( static::_amountAsCents( $amount ) ) > 8 )
 		{
 			return FALSE;
 		}
 				
 		/* European methods are EUR only */
-		if ( isset( $settings['type'] ) and in_array( $settings['type'], array( 'bancontact', 'giropay', 'ideal', 'sofort' ) ) )
+		if ( isset( $settings['type'] ) and \in_array( $settings['type'], array( 'bancontact', 'giropay', 'ideal', 'sofort' ) ) )
 		{
 			if ( $amount->currency !== 'EUR' )
 			{
@@ -196,7 +152,7 @@ class Stripe extends Gateway
 			}
 			
 			/* Sofort is only for Austria, Belgium, Germany, Netherlands, Spain */
-			if ( $settings['type'] == 'sofort' and ( !$billingAddress or !in_array( $billingAddress->country, array( 'AT', 'BE', 'DE', 'NL', 'ES' ) ) ) )
+			if ( $settings['type'] == 'sofort' and ( !$billingAddress or !\in_array( $billingAddress->country, array( 'AT', 'BE', 'DE', 'NL', 'ES' ) ) ) )
 			{
 				return FALSE;
 			}
@@ -205,7 +161,7 @@ class Stripe extends Gateway
 		/* Otherwise, see https://stripe.com/docs/currencies (it makes it look like what currencies are supported depends on the business country, but at time of writing, all countries have the same list */
 		else
 		{
-			if( !in_array( $amount->currency, array(
+			if( !\in_array( $amount->currency, array(
 				'USD', 'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN', 'BAM', 'BBD', 'BDT', 'BGN', 'BIF', 'BMD', 'BND', 'BOB', 'BRL',
 				'BSD', 'BWP', 'BZD', 'CAD', 'CDF', 'CHF', 'CLP', 'CNY', 'COP', 'CRC', 'CVE', 'CZK', 'DJF', 'DKK', 'DOP', 'DZD', 'EGP', 'ETB', 'EUR', 'FJD',
 				'FKP', 'GBP', 'GEL', 'GIP', 'GMD', 'GNF', 'GTQ', 'GYD', 'HKD', 'HNL', 'HRK', 'HTG', 'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JMD', 'JPY', 'KES',
@@ -225,7 +181,7 @@ class Stripe extends Gateway
 			{
 				return FALSE;
 			}
-			if ( $billingAddress and !in_array( $billingAddress->country, array( 'AT', 'AU', 'BE', 'BR', 'CA', 'CH', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'HK', 'IE', 'IN', 'IT', 'JP', 'LT', 'LU', 'LV', 'MX', 'NL', 'NZ', 'NO', 'PH', 'PL', 'PT', 'RO', 'SE', 'SG', 'SK', 'US' ) ) )
+			if ( $billingAddress and !\in_array( $billingAddress->country, array( 'AT', 'AU', 'BE', 'BR', 'CA', 'CH', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'HK', 'IE', 'IN', 'IT', 'JP', 'LT', 'LU', 'LV', 'MX', 'NL', 'NZ', 'NO', 'PH', 'PL', 'PT', 'RO', 'SE', 'SG', 'SK', 'US' ) ) )
 			{
 				return FALSE;
 			}
@@ -238,10 +194,10 @@ class Stripe extends Gateway
 	/**
 	 * Can store cards?
 	 *
-	 * @param bool $adminCreatableOnly	If TRUE, will only return gateways where the admin (opposed to the user) can create a new option
-	 * @return    bool
+	 * @param	bool	$adminCreatableOnly	If TRUE, will only return gateways where the admin (opposed to the user) can create a new option
+	 * @return	bool
 	 */
-	public function canStoreCards(bool $adminCreatableOnly = FALSE ): bool
+	public function canStoreCards( $adminCreatableOnly = FALSE )
 	{
 		$settings = json_decode( $this->settings, TRUE );
 		return ( ( !isset( $settings['type'] ) or $settings['type'] == 'card' ) and $settings['cards'] );
@@ -250,10 +206,10 @@ class Stripe extends Gateway
 	/**
 	 * Admin can manually charge using this gateway?
 	 *
-	 * @param	Customer	$customer	The customer we're wanting to charge
-	 * @return    bool
+	 * @param	\IPS\nexus\Customer	$customer	The customer we're wanting to charge
+	 * @return	bool
 	 */
-	public function canAdminCharge( Customer $customer ): bool
+	public function canAdminCharge( \IPS\nexus\Customer $customer )
 	{
 		return TRUE;
 	}
@@ -263,70 +219,70 @@ class Stripe extends Gateway
 	/**
 	 * Should the submit button show when this payment method is shown?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function showSubmitButton(): bool
+	public function showSubmitButton()
 	{
 		$settings = json_decode( $this->settings, TRUE );
-		return !in_array( $settings['type'], array( 'amex', 'native' ) );
+		return !\in_array( $settings['type'], array( 'amex', 'native' ) );
 	}
 	
 	/**
 	 * Payment Screen Fields
 	 *
-	 * @param	Invoice		$invoice	Invoice
-	 * @param	Money		$amount		The amount to pay now
-	 * @param Customer|null $member		The member the payment screen is for (if in the ACP charging to a member's card) or NULL for currently logged in member
-	 * @param array $recurrings	Details about recurring costs
-	 * @param string $type		'checkout' means the cusotmer is doing this on the normal checkout screen, 'admin' means the admin is doing this in the ACP, 'card' means the user is just adding a card
-	 * @return    array
+	 * @param	\IPS\nexus\Invoice		$invoice	Invoice
+	 * @param	\IPS\nexus\Money		$amount		The amount to pay now
+	 * @param	\IPS\nexus\Customer		$member		The member the payment screen is for (if in the ACP charging to a member's card) or NULL for currently logged in member
+	 * @param	array					$recurrings	Details about recurring costs
+	 * @param	bool					$type		'checkout' means the cusotmer is doing this on the normal checkout screen, 'admin' means the admin is doing this in the ACP, 'card' means the user is just adding a card
+	 * @return	array
 	 */
-	public function paymentScreen(Invoice $invoice, Money $amount, ?Customer $member = NULL, array $recurrings = array(), string $type = 'checkout' ): array
+	public function paymentScreen( \IPS\nexus\Invoice $invoice, \IPS\nexus\Money $amount, \IPS\nexus\Customer $member = NULL, $recurrings = array(), $type = 'checkout' )
 	{
 		$settings = json_decode( $this->settings, TRUE );
 		if ( !isset( $settings['type'] ) or $settings['type'] === 'card' )
 		{			
 			if ( isset( \IPS\Request::i()->createPaymentIntent ) )
 			{
-				$member = $member ?: Customer::loggedIn();
+				$member = $member ?: \IPS\nexus\Customer::loggedIn();
 				
 				try
 				{			
 					$paymentMethod = \IPS\Request::i()->createPaymentIntent;
 					$savePaymentMethod = ( isset( \IPS\Request::i()->savePaymentMethod ) and \IPS\Request::i()->savePaymentMethod and \IPS\Request::i()->savePaymentMethod != 'false' );
 					
-					if ( is_numeric( $paymentMethod ) ) // That means it's a saved card
+					if ( \is_numeric( $paymentMethod ) ) // That means it's a saved card
 					{
 						try
 						{
-							$card = Customer\CreditCard::load( $paymentMethod );
+							$card = \IPS\nexus\Customer\CreditCard::load( $paymentMethod );
 							if ( $card->member->member_id !== $member->member_id )
 							{
-								throw new DomainException;
+								throw new \DomainException;
 							}
 							
 							$paymentMethod = $card->data;
 							$savePaymentMethod = FALSE;
 						}
-						catch ( \Exception ) { }
+						catch ( \Exception $e ) { }
 					}
 					
 					$response = $this->_createPaymentIntent( $invoice, $amount, $member, $paymentMethod, $savePaymentMethod, $type );
-					Output::i()->json( array( 'success' => true, 'type' => 'payment', 'response' => $response ) );
+					\IPS\Output::i()->json( array( 'success' => true, 'type' => 'payment', 'response' => $response ) );
 				}
-				catch( Exception $e )
+				catch( \IPS\nexus\Gateway\Stripe\Exception $e )
 				{
-					Output::i()->json( array( 'success' => false, 'message' => $e->getMessage() ), 500 );
+					\IPS\Output::i()->json( array( 'success' => false, 'message' => $e->getMessage() ), 500 );
 				}
 			}
 			
 			
 			$supportedCards = array( \IPS\nexus\CreditCard::TYPE_VISA, \IPS\nexus\CreditCard::TYPE_MASTERCARD );
-			if ( ( $settings['country'] == 'IN' and $invoice->currency == 'USD' ) or ( $settings['country'] == 'MX' and $invoice->currency == 'MXN' ) or ( !in_array( $settings['country'], [ 'IN', 'MX' ] ) and !in_array( $invoice->currency, array( 'AFN', 'AOA', 'ARS', 'BOB', 'BRL', 'CLP', 'COP', 'CRC', 'CVE', 'CZK', 'DJF', 'FKP', 'GNF', 'GTQ', 'HNL', 'HUF', 'INR', 'LAK', 'MUR', 'NIO', 'PAB', 'PEN', 'PYG', 'SHP', 'SRD', 'STD', 'UYU', 'XOF', 'XPF' ) ) ) )
+			if ( ( $settings['country'] == 'IN' and $invoice->currency == 'USD' ) or ( $settings['country'] == 'MX' and $invoice->currency == 'MXN' ) or ( !\in_array( $settings['country'], [ 'IN', 'MX' ] ) and !\in_array( $invoice->currency, array( 'AFN', 'AOA', 'ARS', 'BOB', 'BRL', 'CLP', 'COP', 'CRC', 'CVE', 'CZK', 'DJF', 'FKP', 'GNF', 'GTQ', 'HNL', 'HUF', 'INR', 'LAK', 'MUR', 'NIO', 'PAB', 'PEN', 'PYG', 'SHP', 'SRD', 'STD', 'UYU', 'XOF', 'XPF' ) ) ) )
 			{
 				$supportedCards[] = \IPS\nexus\CreditCard::TYPE_AMERICAN_EXPRESS;
 			}
-			if ( in_array( $settings['country'], [ 'AU', 'CA', 'JA', 'NZ', 'US' ] ) and $invoice->currency == 'USD' )
+			if ( \in_array( $settings['country'], [ 'AU', 'CA', 'JA', 'NZ', 'US' ] ) and $invoice->currency == 'USD' )
 			{
 				$supportedCards[] = \IPS\nexus\CreditCard::TYPE_DISCOVER;
 				$supportedCards[] = \IPS\nexus\CreditCard::TYPE_DINERS_CLUB;
@@ -340,9 +296,9 @@ class Stripe extends Gateway
 				{
 					$setupIntent = $this->api( 'setup_intents', array( 'usage' => 'off_session' ) );
 				}
-				catch ( Exception $e )
+				catch ( \IPS\nexus\Gateway\Stripe\Exception $e )
 				{
-					Log::log( $e, 'checkout' );
+					\IPS\Log::log( $e, 'checkout' );
 					return array();
 				}
 			}
@@ -357,10 +313,10 @@ class Stripe extends Gateway
 					'data-name'			=> $member ? $member->cm_name : $invoice->member->cm_name,
 					'data-address1'		=> ( $invoice->billaddress and isset( $invoice->billaddress->addressLines[0] ) ) ? $invoice->billaddress->addressLines[0] : NULL,
 					'data-address2'		=> ( $invoice->billaddress and isset( $invoice->billaddress->addressLines[1] ) ) ? $invoice->billaddress->addressLines[1] : NULL,
-					'data-city'			=> $invoice->billaddress?->city,
-					'data-state'		=> $invoice->billaddress?->region,
-					'data-zip'			=> $invoice->billaddress?->postalCode,
-					'data-country'		=> $invoice->billaddress?->country,
+					'data-city'			=> $invoice->billaddress ? $invoice->billaddress->city : NULL,
+					'data-state'		=> $invoice->billaddress ? $invoice->billaddress->region : NULL,
+					'data-zip'			=> $invoice->billaddress ? $invoice->billaddress->postalCode : NULL,
+					'data-country'		=> $invoice->billaddress ? $invoice->billaddress->country : NULL,
 					'data-email'		=> $member ? $member->email : $invoice->member->email,
 					'data-phone'		=> isset( $member->cm_phone ) ? $member->cm_phone : ( $invoice->member->cm_phone ?? null ),
 					'data-amount'		=> static::_amountAsCents( $amount ),
@@ -375,25 +331,15 @@ class Stripe extends Gateway
 				'member'		=> $member,
 			) ) );
 		}
-		elseif ( $settings['type'] === 'sofort' and \IPS\NEXUS_TEST_GATEWAYS )
-		{
-			return array(
-				new Radio( 'stripe_debug_action', 'succeeding_charge', FALSE, array( 'options' => array(
-					'succeeding_charge'	=> 'stripe_debug_succeeding_charge',
-					'pending_charge'	=> 'stripe_debug_pending_charge',
-					'failing_charge'	=> 'stripe_debug_failing_charge',
-				) ) )
-			);
-		}
-		elseif ( in_array( $settings['type'], array( 'alipay', 'bancontact', 'giropay', 'ideal', 'sofort' ) ) )
+		elseif ( \in_array( $settings['type'], array( 'alipay', 'bancontact', 'giropay', 'ideal', 'sofort' ) ) )
 		{
 			return array();
 		}
 		else
 		{
-			return array( 'card' => new Custom( $this->id . '_card', NULL, FALSE, array(
+			return array( 'card' => new \IPS\Helpers\Form\Custom( $this->id . '_card', NULL, FALSE, array(
 				'rowHtml'	=> function( $field ) use ( $settings, $invoice, $amount ) {
-					return Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->paymentRequestApi( $field, $this, $settings['publishable_key'], $invoice->billaddress ? $invoice->billaddress->country : 'US', $invoice, mb_strtolower( $amount->currency ), static::_amountAsCents( $amount ), $amount->amount );
+					return \IPS\Theme::i()->getTemplate( 'forms', 'nexus', 'global' )->paymentRequestApi( $field, $this, $settings['publishable_key'], $invoice->billaddress ? $invoice->billaddress->country : 'US', $invoice, mb_strtolower( $amount->currency ), static::_amountAsCents( $amount ), $amount->amount );
 				}
 			), NULL, NULL, NULL, $this->id . '_card' ) );
 		}
@@ -402,17 +348,17 @@ class Stripe extends Gateway
 	/**
 	 * Create a payment intent
 	 *
-	 * @param	Invoice						$invoice				Invoice
-	 * @param	Money							$amount					The amount to pay now
-	 * @param	Customer						$member					The customer making the payment, or, if in the ACP charging to a member's card, the customer that the payment is for
+	 * @param	\IPS\nexus\Invoice						$invoice				Invoice
+	 * @param	\IPS\nexus\Money							$amount					The amount to pay now
+	 * @param	\IPS\nexus\Customer						$member					The customer making the payment, or, if in the ACP charging to a member's card, the customer that the payment is for
 	 * @param	string									$paymentMethod			Stripe payment method ID ("pm_....") - can be for a new card or a card already on file
 	 * @param	bool									$savePaymentMethod		Save this payment method for future (off-session) payments?
 	 * @param	string									$type					'checkout' means the cusotmer is doing this on the normal checkout screen, 'admin' means the admin is doing this in the ACP, 'card' means the user is just adding a card
 	 * @return	array
 	 * @throws	
 	 */
-	protected function _createPaymentIntent( Invoice $invoice, Money $amount, Customer $member, string $paymentMethod, bool $savePaymentMethod = FALSE, string $type = 'checkout' ) : array
-	{	
+	protected function _createPaymentIntent( \IPS\nexus\Invoice $invoice, \IPS\nexus\Money $amount, \IPS\nexus\Customer $member, $paymentMethod, $savePaymentMethod = FALSE, $type = 'checkout' )
+	{
 		$data = array(
 			'amount'				=> static::_amountAsCents( $amount ),
 			'currency'				=> $amount->currency,
@@ -423,7 +369,7 @@ class Stripe extends Gateway
 			'metadata'				=> array(
 				"Invoice ID"			=> $invoice->id,
 				"Customer ID"			=> $member->member_id,
-				"Customer Email"		=> $member->email,
+				"Customer Email"		=> $invoice->member->email,
 				"IP Address"			=> \IPS\Request::i()->ipAddress(),
 				"Payment Method ID"		=> $this->id
 			),
@@ -432,7 +378,22 @@ class Stripe extends Gateway
 
 		if ( $type === 'admin' )
 		{
-			$data['metadata']["Admin"] = Member::loggedIn()->member_id;
+			$data['metadata']["Admin"] = \IPS\Member::loggedIn()->member_id;
+		}
+		if ( $invoice->shipaddress )
+		{
+			$data['shipping'] = array(
+				'address'	=> array(
+					'city'			=> $invoice->shipaddress->city,
+					'country'		=> $invoice->shipaddress->country,
+					'line1'			=> isset( $invoice->shipaddress->addressLines[0] ) ? $invoice->shipaddress->addressLines[0] : NULL,
+					'line2'			=> isset( $invoice->shipaddress->addressLines[1] ) ? $invoice->shipaddress->addressLines[1] : NULL,
+					'postal_code'	=> $invoice->shipaddress->postalCode,
+					'state'			=> $invoice->shipaddress->region,
+				),
+				'name'		=> $invoice->member->cm_name,
+				'phone'		=> isset( $invoice->member->cm_phone ) ? $invoice->member->cm_phone : NULL
+			);
 		}
 		$profiles = $member->cm_profiles;
 		if ( isset( $profiles[ $this->id ] ) )
@@ -448,15 +409,18 @@ class Stripe extends Gateway
 			if( isset( $response['customer'] ) )
 			{
 				$data['customer'] = $response['customer'];
-				$profiles[ $this->id ] = $response['customer'];
 
 				if( $member->member_id )
 				{
+					$profiles[ $this->id ] = $response['customer'];
+					
 					$member->cm_profiles = $profiles;
 					$member->save();
 				}
 				else
 				{
+					$profiles[ $this->id ] = $response['customer'];
+					
 					$guestData = $invoice->guest_data;
 					$guestData['member']['cm_profiles'] = $profiles;
 					$guestData['cards'][] = array(
@@ -469,42 +433,42 @@ class Stripe extends Gateway
 			}
 		}
 
-        if ( !isset( $data['customer'] ) )
-        {
-            if ( $member->member_id )
-            {
-                $response = $this->api( 'customers', array(
-                    'name'			=> $member->cm_name,
-                    'email'			=> $member->email,
-                    'metadata' 		=> array(
-                        "Customer ID" => $member->member_id
-                    )
-                ) );
-                $profiles[ $this->id ] = $response['id'];
+		if ( !isset( $data['customer'] ) )
+		{
+			if ( $member->member_id )
+			{
+				$response = $this->api( 'customers', array(
+					'name'			=> $member->cm_name,
+					'email'			=> $member->email,
+					'metadata' 		=> array(
+						"Customer ID" => $member->member_id
+					)
+				) );
+				$profiles[ $this->id ] = $response['id'];
 
-                $member->cm_profiles = $profiles;
-                $member->save();
-            }
-            else
-            {
-                $response = $this->api( 'customers', array(
-                    'name'			=> $invoice->member->cm_name,
-                    'email'			=> $invoice->member->email,
-                ) );
-                $profiles[ $this->id ] = $response['id'];
+				$member->cm_profiles = $profiles;
+				$member->save();
+			}
+			else
+			{
+				$response = $this->api( 'customers', array(
+					'name'			=> $invoice->member->cm_name,
+					'email'			=> $invoice->member->email,
+				) );
+				$profiles[ $this->id ] = $response['id'];
 
-                $guestData = $invoice->guest_data;
-                $guestData['member']['cm_profiles'] = $profiles;
-                $guestData['cards'][] = array(
-                    'card_method'	=> $this->id,
-                    'card_data'		=> $paymentMethod
-                );
-                $invoice->guest_data = $guestData;
-                $invoice->save();
-            }
+				$guestData = $invoice->guest_data;
+				$guestData['member']['cm_profiles'] = $profiles;
+				$guestData['cards'][] = array(
+					'card_method'	=> $this->id,
+					'card_data'		=> $paymentMethod
+				);
+				$invoice->guest_data = $guestData;
+				$invoice->save();
+			}
 
-            $data['customer'] = $profiles[ $this->id ];
-        }
+			$data['customer'] = $profiles[ $this->id ];
+		}
 
 		if ( $savePaymentMethod )
 		{
@@ -516,7 +480,7 @@ class Stripe extends Gateway
 		
 		if ( $savePaymentMethod and $member->member_id )
 		{
-			Db::i()->insert( 'nexus_customer_cards', array(
+			\IPS\Db::i()->insert( 'nexus_customer_cards', array(
 				'card_member'	=> $member->member_id,
 				'card_method'	=> $this->id,
 				'card_data'		=> $paymentMethod
@@ -534,7 +498,7 @@ class Stripe extends Gateway
 	 * @param string $type 'checkout' means the cusotmer is doing this on the normal checkout screen, 'admin' means the admin is doing this in the ACP, 'card' means the user is just adding a card
 	 * @return    array
 	 */
-	protected function _createNonCardPaymentIntent( Transaction $transaction, ?string $paymentMethod, string $type = 'checkout' ) : array
+	protected function _createNonCardPaymentIntent( \IPS\nexus\Transaction $transaction, ?string $paymentMethod, string $type = 'checkout' ) : array
 	{
 		$invoice = $transaction->invoice;
 		$data = array(
@@ -547,19 +511,19 @@ class Stripe extends Gateway
 			'metadata'				=> array(
 				"Invoice ID"			=> $invoice->id,
 				"Customer ID"			=> $transaction->member->member_id,
-				"Customer Email"		=> $transaction->member->email,
+				"Customer Email"		=> $transaction->invoice->member->email,
 				"IP Address"			=> \IPS\Request::i()->ipAddress(),
 				"Payment Method ID"		=> $this->id,
 				"Transaction ID"		=> $transaction->id
 			),
 			'payment_method' => $paymentMethod,
 			'payment_method_types' => [ $paymentMethod ],
-			'return_url'	=> Settings::i()->base_url . 'applications/nexus/interface/gateways/stripe-redirector.php?nexusTransactionId=' . $transaction->id
+			'return_url'	=> \IPS\Settings::i()->base_url . 'applications/nexus/interface/gateways/stripe-redirector.php?nexusTransactionId=' . $transaction->id
 		);
 
 		if ( $type === 'admin' )
 		{
-			$data['metadata']["Admin"] = Member::loggedIn()->member_id;
+			$data['metadata']["Admin"] = \IPS\Member::loggedIn()->member_id;
 		}
 		if ( $invoice->shipaddress )
 		{
@@ -610,44 +574,45 @@ class Stripe extends Gateway
 
 		return $this->api( 'payment_intents', $data );
 	}
-
+		
 	/**
 	 * Authorize
 	 *
-	 * @param Transaction $transaction Transaction
-	 * @param array|Customer\CreditCard $values Values from form OR a stored card object if this gateway supports them
-	 * @param Request|NULL $maxMind *If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made
-	 * @param array $recurrings Details about recurring costs
-	 * @param string|NULL $source 'checkout' if the customer is doing this at a normal checkout, 'renewal' is an automatically generated renewal invoice, 'manual' is admin manually charging. NULL is unknown
-	 * @return    array|DateTime|NULL                        Auth is valid until or NULL to indicate auth is good forever
-	 * @throws    LogicException                            Message will be displayed to user
+	 * @param	\IPS\nexus\Transaction					$transaction	Transaction
+	 * @param	array|\IPS\nexus\Customer\CreditCard	$values			Values from form OR a stored card object if this gateway supports them
+	 * @param	\IPS\nexus\Fraud\MaxMind\Request|NULL	$maxMind		*If* MaxMind is enabled, the request object will be passed here so gateway can additional data before request is made	
+	 * @param	array									$recurrings		Details about recurring costs
+	 * @param	string|NULL								$source			'checkout' if the customer is doing this at a normal checkout, 'renewal' is an automatically generated renewal invoice, 'manual' is admin manually charging. NULL is unknown
+	 * @return	\IPS\DateTime|NULL|array					Auth is valid until, NULL to indicate auth is good forever, or if we need to wait for a webhook: an array containing existing transaction IDs to skip
+	 * @throws	\LogicException							Message will be displayed to user
 	 */
-	public function auth(Transaction $transaction, array|Customer\CreditCard $values, ?Request $maxMind = NULL, array $recurrings = array(), ?string $source = NULL ): DateTime|array|null
+	public function auth( \IPS\nexus\Transaction $transaction, $values, \IPS\nexus\Fraud\MaxMind\Request $maxMind = NULL, $recurrings = array(), $source = NULL )
 	{
 		$settings = json_decode( $this->settings, TRUE );
 		
 		/* Do we need to redirect? */
-		if( in_array( $settings['type'], [ 'alipay', 'bancontact', 'giropay', 'ideal', 'sofort' ] ) and !isset( $values[ $this->id . '_card' ] ) )
-		{	
+		if( \in_array( $settings['type'], [ 'alipay', 'bancontact', 'giropay', 'ideal', 'sofort' ] ) and !isset( $values[ $this->id . '_card' ] ) )
+		{
 			/* We need a transaction ID */
 			$transaction->save();
+
 			/* Create a payment intent */
 			$response = $this->_createNonCardPaymentIntent( $transaction, $settings['type'], 'checkout' );
 			if( $response['status'] == 'requires_action' )
 			{
 				$transaction->gw_id = $response['id'];
-				$transaction->status = Transaction::STATUS_GATEWAY_PENDING;
+				$transaction->status = \IPS\nexus\Transaction::STATUS_GATEWAY_PENDING;
 				$transaction->save();
 
 				$actionType = $response['next_action']['type'];
 				if ( isset( $response['next_action'][$actionType]['url'] ) )
 				{
-					Output::i()->redirect( Url::createFromString( $response['next_action'][$actionType]['url'] ) );
+					\IPS\Output::i()->redirect( \IPS\Http\Url::createFromString( $response['next_action'][$actionType]['url'] ) );
 				}
 			}
 
 			/* still here? There was an error */
-			throw new RuntimeException;
+			throw new \RuntimeException;
 		}
 				
 		/* Set MaxMind type */
@@ -662,7 +627,7 @@ class Stripe extends Gateway
 		$card = $values[ $this->id . '_card' ];
 		
 		/* If we got a payment intent ID, we just need to confirm it and then wait for the webhooks */
-		if ( $card and !is_string( $card ) and $card->token and mb_substr( $card->token, 0, 3 ) === 'pi_' )
+		if ( $card and !\is_string( $card ) and $card->token and mb_substr( $card->token, 0, 3 ) === 'pi_' )
 		{
 			/* Confirm it */
 			$response = $this->api( "payment_intents/{$card->token}" );
@@ -687,19 +652,34 @@ class Stripe extends Gateway
 				"Transaction ID"	=> $transaction->id,
 				"Invoice ID"		=> $transaction->invoice->id,
 				"Customer ID"		=> $transaction->member->member_id,
-				"Customer Email"	=> $transaction->member->email,
+				"Customer Email"	=> $transaction->invoice->member->email,
 			),			
 		);
-
+		if ( $transaction->invoice->shipaddress )
+		{
+			$data['shipping'] = array(
+				'address'	=> array(
+					'city'			=> $transaction->invoice->shipaddress->city,
+					'country'		=> $transaction->invoice->shipaddress->country,
+					'line1'			=> isset( $transaction->invoice->shipaddress->addressLines[0] ) ? $transaction->invoice->shipaddress->addressLines[0] : NULL,
+					'line2'			=> isset( $transaction->invoice->shipaddress->addressLines[1] ) ? $transaction->invoice->shipaddress->addressLines[1] : NULL,
+					'postal_code'	=> $transaction->invoice->shipaddress->postalCode,
+					'state'			=> $transaction->invoice->shipaddress->region,
+				),
+				'name'		=> $transaction->invoice->member->cm_name,
+				'phone'		=> isset( $transaction->invoice->member->cm_phone ) ? $transaction->invoice->member->cm_phone : NULL
+			);
+		}
+		
 		/* Source-based */
-		if ( is_string( $card ) )
+		if ( \is_string( $card ) )
 		{			
 			$data['source'] = $card;
 			unset( $data['capture'] );
 		}
 		
 		/* Stored Card (for recurring payments) */
-		elseif ( $card instanceof CreditCard )
+		elseif ( $card instanceof \IPS\nexus\Gateway\Stripe\CreditCard )
 		{		
 			$profiles = $card->member->cm_profiles;
 			$data['customer'] = $profiles[ $this->id ];
@@ -719,13 +699,13 @@ class Stripe extends Gateway
 				if ( $paymentIntent['status'] === 'requires_capture' )
 				{
 					$transaction->gw_id = $paymentIntent['id'];
-					return DateTime::ts( $paymentIntent['created'] )->add( new DateInterval( 'P7D' ) );
+					return \IPS\DateTime::ts( $paymentIntent['created'] )->add( new \DateInterval( 'P7D' ) );
 				}
 				else
 				{
 					// It could just be that the card requires authentication, but throwing this exception will automatically try any other payment methods
 					// on file and then ultimately send the customer an invoice if none succeeded, so we can just allow that to happen.
-					throw new DomainException("Unexpected Payment Intent status: {$paymentIntent['status']}");
+					throw new \DomainException("Unexpected Payment Intent status: {$paymentIntent['status']}");
 				}
 			}
 			elseif ( mb_substr( $values[ $this->id . '_card' ]->data, 0, 4 ) === 'src_' )
@@ -744,7 +724,7 @@ class Stripe extends Gateway
 		{
 			$response = $this->api( 'charges', $data );
 		}
-		catch ( Exception $e )
+		catch ( \IPS\nexus\Gateway\Stripe\Exception $e )
 		{
 			if ( isset( $e->details['charge'] ) and $e->details['charge'] )
 			{
@@ -757,12 +737,12 @@ class Stripe extends Gateway
 						$note = $response['outcome']['seller_message'];
 					}
 				}
-				catch ( \Exception ) { }
+				catch ( \Exception $e ) { }
 				
 				$transaction->gw_id = $e->details['charge'];
 				$transaction->status = $transaction::STATUS_REFUSED;
 				$extra = $transaction->extra;
-				$extra['history'][] = array( 's' => Transaction::STATUS_REFUSED, 'noteRaw' => $note );
+				$extra['history'][] = array( 's' => \IPS\nexus\Transaction::STATUS_REFUSED, 'noteRaw' => $note );
 				$transaction->extra = $extra;
 				$transaction->save();
 			}
@@ -777,18 +757,18 @@ class Stripe extends Gateway
 		}
 		else
 		{
-			return DateTime::ts( $response['created'] )->add( new DateInterval( 'P7D' ) );
+			return \IPS\DateTime::ts( $response['created'] )->add( new \DateInterval( 'P7D' ) );
 		}
 	}
 		
 	/**
 	 * Void
 	 *
-	 * @param	Transaction	$transaction	Transaction
-	 * @return    mixed
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @return	void
 	 * @throws	\Exception
 	 */
-	public function void( Transaction $transaction ): mixed
+	public function void( \IPS\nexus\Transaction $transaction )
 	{
 		try
 		{
@@ -798,25 +778,23 @@ class Stripe extends Gateway
 			}
 			else
 			{
-				$response = $this->refund($transaction);
+				$response = $this->refund( $transaction );
 			}
 		}
-		catch ( \Exception ) { }
-
-		return null;
+		catch ( \Exception $e ) { }
 	}
 	
 	/**
 	 * Capture
 	 *
-	 * @param	Transaction	$transaction	Transaction
-	 * @return    void
-	 * @throws	LogicException
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @return	void
+	 * @throws	\LogicException
 	 */
-	public function capture( Transaction $transaction ): void
+	public function capture( \IPS\nexus\Transaction $transaction )
 	{
 		$settings = json_decode( $this->settings, TRUE );
-		if ( isset( $settings['type'] ) and in_array( $settings['type'], array( 'alipay', 'bancontact', 'giropay', 'ideal', 'sofort' ) ) )
+		if ( isset( $settings['type'] ) and \in_array( $settings['type'], array( 'alipay', 'bancontact', 'giropay', 'ideal', 'sofort' ) ) )
 		{
 			return;
 		}
@@ -832,7 +810,7 @@ class Stripe extends Gateway
 				$this->api( "charges/{$transaction->gw_id}/capture" );
 			}
 		}
-		catch( Exception $e )
+		catch( \IPS\nexus\Gateway\Stripe\Exception $e )
 		{
 			/* If we have already captured/refunded the charge we don't need to let an exception bubble up */
 			if( $e->details['code'] == 'charge_already_captured' or $e->details['code'] == 'charge_already_refunded' )
@@ -854,18 +832,18 @@ class Stripe extends Gateway
 	/**
 	 * Refund
 	 *
-	 * @param	Transaction	$transaction	Transaction to be refunded
-	 * @param mixed|NULL $amount			Amount to refund (NULL for full amount - always in same currency as transaction)
-	 * @param string|null $reason
-	 * @return    mixed                                    Gateway reference ID for refund, if applicable
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction to be refunded
+	 * @param	float|NULL				$amount			Amount to refund (NULL for full amount - always in same currency as transaction)
+	 * @param	string|NULL				$reason			Reason for refund, if applicable
+	 * @return	mixed									Gateway reference ID for refund, if applicable
 	 * @throws	\Exception
  	 */
-	public function refund(Transaction $transaction, mixed $amount = NULL, ?string $reason = NULL): mixed
+	public function refund( \IPS\nexus\Transaction $transaction, $amount = NULL, $reason = NULL )
 	{
 		$data = NULL;
 		if ( $amount )
 		{
-			$data['amount'] = static::_amountAscents( new Money( $amount, $transaction->currency ) );
+			$data['amount'] = static::_amountAscents( new \IPS\nexus\Money( $amount, $transaction->currency ) );
 		}
 		if ( $reason )
 		{
@@ -881,7 +859,7 @@ class Stripe extends Gateway
 				if ( $charge['paid'] )
 				{
 					$this->api( "charges/{$charge['id']}/refund", $data );
-					return null;
+					return;
 				}
 			}
 		}
@@ -889,16 +867,14 @@ class Stripe extends Gateway
 		{
 			$this->api( "charges/{$transaction->gw_id}/refund", $data );
 		}
-
-		return null;
 	}
 	
 	/**
 	 * Refund Reasons that the gateway understands, if the gateway supports this
 	 *
-	 * @return    array
+	 * @return	array
  	 */
-	public static function refundReasons(): array
+	public static function refundReasons()
 	{
 		return array(
 			'requested_by_customer'	=> 'refund_reason_requested_by_customer',
@@ -910,14 +886,15 @@ class Stripe extends Gateway
 	/**
 	 * Extra data to show on the ACP transaction page
 	 *
-	 * @param	Transaction	$transaction	Transaction
-	 * @return    string
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @param	string					$type			"short" or "full"
+	 * @return	string
  	 */
-	public function extraData( Transaction $transaction ): string
+	public function extraData( \IPS\nexus\Transaction $transaction, $type = 'short' )
 	{
 		if ( !$transaction->gw_id )
 		{
-			return '';
+			return NULL;
 		}
 				
 		try
@@ -954,9 +931,9 @@ class Stripe extends Gateway
 						$response2 = $this->api( "sources/{$response['source']['three_d_secure']['card']}", NULL, 'get' );
 						$response['source']['card'] = $response2['card'];
 					}
-					catch ( \Exception )
+					catch ( \Exception $e )
 					{
-						return Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->stripeData( $response, 'error' );
+						return \IPS\Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->stripeData( $response, 'error' );
 					}
 				}
 				elseif ( $response['source']['object'] === 'card' and isset( $response['card'] ) ) // For cards stored in older versions
@@ -965,44 +942,45 @@ class Stripe extends Gateway
 				}
 			}
 		}
-		catch ( \Exception )
+		catch ( \Exception $e )
 		{
-			return Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->stripeData( NULL, 'error' );
+			return \IPS\Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->stripeData( NULL, 'error' );
 		}		
 										
-		return Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->stripeData( $response );
+		return \IPS\Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->stripeData( $response );
 	}
 	
 	/**
 	 * Extra data to show on the ACP transaction page for a dispute
 	 *
-	 * @param	Transaction	$transaction	Transaction
-	 * @param string|array $ref			Dispute log data
-	 * @return    string
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @param	array					$ref			Dispute log data
+	 * @return	string
  	 */
-	public function disputeData(Transaction $transaction, string|array $ref ): string
+	public function disputeData( \IPS\nexus\Transaction $transaction, $log )
 	{
-		if ( is_array( $ref ) AND isset( $ref['ref'] ) )
+		if ( isset( $log['ref'] ) )
 		{
 			try
 			{
-				$response = $this->api( "disputes/{$ref['ref']}", NULL, 'get' );
-				return Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->stripeDispute( $transaction, $ref, $response );
+				$response = $this->api( "disputes/{$log['ref']}", NULL, 'get' );
 			}
-			catch ( \Exception ){}
+			catch ( \Exception $e )
+			{
+				return \IPS\Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->stripeDispute( $transaction, $log, NULL, TRUE );
+			}
+			return \IPS\Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->stripeDispute( $transaction, $log, $response );
 		}
-
-		return Theme::i()->getTemplate( 'transactions', 'nexus', 'admin' )->stripeDispute( $transaction, $ref, NULL, TRUE );
 	}
 	
 	/**
 	 * Run any gateway-specific anti-fraud checks and return status for transaction
 	 * This is only called if our local anti-fraud rules have not matched
 	 *
-	 * @param	Transaction	$transaction	Transaction
-	 * @return    string
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @return	string
 	 */
-	public function fraudCheck( Transaction $transaction ): string
+	public function fraudCheck( \IPS\nexus\Transaction $transaction )
 	{
 		try
 		{
@@ -1031,7 +1009,7 @@ class Stripe extends Gateway
 			}
 			return $transaction::STATUS_PAID;
 		}
-		catch ( \Exception )
+		catch ( \Exception $e )
 		{
 			return $transaction::STATUS_PAID;
 		}
@@ -1040,12 +1018,12 @@ class Stripe extends Gateway
 	/**
 	 * URL to view transaction in gateway
 	 *
-	 * @param	Transaction	$transaction	Transaction
-	 * @return    Url|NULL
+	 * @param	\IPS\nexus\Transaction	$transaction	Transaction
+	 * @return	\IPS\Http\Url|NULL
  	 */
-	public function gatewayUrl( Transaction $transaction ): Url|null
+	public function gatewayUrl( \IPS\nexus\Transaction $transaction )
 	{
-		return Url::external( "https://dashboard.stripe.com/payments/{$transaction->gw_id}" );
+		return \IPS\Http\Url::external( "https://dashboard.stripe.com/payments/{$transaction->gw_id}" );
 	}
 	
 	/* !ACP Configuration */
@@ -1053,35 +1031,35 @@ class Stripe extends Gateway
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$form->addHeader('stripe_basic_settings');
-		$form->add( new Translatable( 'paymethod_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_paymethod_{$this->id}" : NULL ) ) );
-		$form->add( new Select( 'paymethod_countries', ( $this->id and $this->countries !== '*' ) ? explode( ',', $this->countries ) : '*', FALSE, array( 'options' => array_map( function( $val )
+		$form->add( new \IPS\Helpers\Form\Translatable( 'paymethod_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_paymethod_{$this->id}" : NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'paymethod_countries', ( $this->id and $this->countries !== '*' ) ? explode( ',', $this->countries ) : '*', FALSE, array( 'options' => array_map( function( $val )
 		{
 			return "country-{$val}";
-		}, array_combine( GeoLocation::$countries, GeoLocation::$countries ) ), 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'no_restriction' ) ) );
+		}, array_combine( \IPS\GeoLocation::$countries, \IPS\GeoLocation::$countries ) ), 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'no_restriction' ) ) );
 		$this->settings( $form );
 	}
 	
 	/**
 	 * Settings
 	 *
-	 * @param Form $form	The form
-	 * @return    void
+	 * @param	\IPS\Helpers\Form	$form	The form
+	 * @return	void
 	 */
-	public function settings( Form $form ): void
+	public function settings( &$form )
 	{
-		$settings = $this->settings ? json_decode( $this->settings, TRUE ) : null;
+		$settings = json_decode( $this->settings, TRUE );
 		$form->addHeader('stripe_keys');
 		$form->addMessage('stripe_keys_blurb');
-		$form->add( new Text( 'stripe_secret_key', $settings ? $settings['secret_key'] : NULL, TRUE ) );
-		$form->add( new Text( 'stripe_publishable_key', $settings ? $settings['publishable_key'] : NULL, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'stripe_secret_key', $settings ? $settings['secret_key'] : NULL, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'stripe_publishable_key', $settings ? $settings['publishable_key'] : NULL, TRUE ) );
 		$form->addHeader('stripe_type_header');
-		$form->add( new Radio( 'stripe_type', $settings['type'] ?? 'card', TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'stripe_type', isset( $settings['type'] ) ? $settings['type'] : 'card', TRUE, array(
 			'options'	=> array(
 				'card'		=> 'stripe_type_card',
 				'native' 	=> 'stripe_type_native',
@@ -1096,35 +1074,35 @@ class Stripe extends Gateway
 				'native'	=> array( 'stripe_apple_pay_file')
 			)
 		) ) );
-		$form->add( new YesNo( 'stripe_cards', $settings ? $settings['cards'] : TRUE, FALSE, array(), NULL, NULL, NULL, 'stripe_cards' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'stripe_cards', $settings ? $settings['cards'] : TRUE, FALSE, array(), NULL, NULL, NULL, 'stripe_cards' ) );
 
-		if ( CIC )
+		if ( \IPS\CIC )
 		{
-			$form->add( new Upload( 'm_validationfile', $this->validationfile ? File::get( 'nexus_Gateways', $this->validationfile ) : '', FALSE, array(  'storageExtension' => 'nexus_Gateways' ), NULL, NULL, NULL, 'stripe_apple_pay_file' ) );
-			Member::loggedIn()->language()->words[ 'm_validationfile']     = Member::loggedIn()->language()->addToStack('stripe_apple_verificationfile');
+			$form->add( new \IPS\Helpers\Form\Upload( 'm_validationfile', $this->validationfile ? \IPS\File::get( 'nexus_Gateways', $this->validationfile ) : '', FALSE, array(  'storageExtension' => 'nexus_Gateways' ), NULL, NULL, NULL, 'stripe_apple_pay_file' ) );
+			\IPS\Member::loggedIn()->language()->words[ 'm_validationfile']     = \IPS\Member::loggedIn()->language()->addToStack('stripe_apple_verificationfile');
 		}
 
 		$form->addHeader('stripe_webhook');
 		$form->addMessage('stripe_webhook_blurb');
-		Member::loggedIn()->language()->words["stripe_webhook_blurb"] = sprintf( Member::loggedIn()->language()->get('stripe_webhook_blurb'),
-			(string) Url::internal( 'applications/nexus/interface/gateways/stripe.php', 'interface' ),
-			Member::loggedIn()->language()->formatList( $this->webhookEvents ) );
-		$form->add( new Text( 'stripe_webhook_secret', $settings['webhook_secret'] ?? NULL, TRUE ) );
+		\IPS\Member::loggedIn()->language()->words["stripe_webhook_blurb"] = sprintf( \IPS\Member::loggedIn()->language()->get('stripe_webhook_blurb'),
+			(string) \IPS\Http\Url::internal( 'applications/nexus/interface/gateways/stripe.php', 'interface' ),
+			\IPS\Member::loggedIn()->language()->formatList( $this->webhookEvents ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'stripe_webhook_secret', isset( $settings['webhook_secret'] ) ? $settings['webhook_secret'] : NULL, TRUE ) );
 	}
 
 	/**
 	 * @brief Webhook events we need
 	 */
-	protected array $webhookEvents = array( 'source.chargeable', 'charge.succeeded', 'charge.failed', 'charge.dispute.created', 'charge.dispute.closed' );
+	protected $webhookEvents = array( 'source.chargeable', 'charge.succeeded', 'charge.failed', 'charge.dispute.created', 'charge.dispute.closed'/*, 'payment_intent.payment_failed'*/ );
 	
 	/**
 	 * Test Settings
 	 *
-	 * @param array $settings	Settings
-	 * @return    array
-	 * @throws	InvalidArgumentException
+	 * @param	array	$settings	Settings
+	 * @return	array
+	 * @throws	\InvalidArgumentException
 	 */
-	public function testSettings(array $settings=array() ): array
+	public function testSettings( $settings )
 	{
 		try
 		{
@@ -1133,14 +1111,14 @@ class Stripe extends Gateway
 			$settings['country'] = $response['country'];
 			
 			/* Check we have a webhook. We can't actually verify if the secret we have is correct, but if we see a webhook with our URL we'll assume it is */
-			$correctWebhookUrl = Settings::i()->base_url . 'applications/nexus/interface/gateways/stripe.php';
+			$correctWebhookUrl = \IPS\Settings::i()->base_url . 'applications/nexus/interface/gateways/stripe.php';
 			$webhookId = NULL;
 			$webhooks = $this->api( 'webhook_endpoints', NULL, 'get', $settings );
 			foreach ( $webhooks['data'] as $webhook )
 			{
 				if ( $webhook['url'] === $correctWebhookUrl and $webhook['status'] === 'enabled' )
 				{
-					if( in_array( '*', $webhook['enabled_events'] ) OR count( array_intersect( $webhook['enabled_events'], $this->webhookEvents ) ) === count( $this->webhookEvents ) )
+					if( \in_array( '*', $webhook['enabled_events'] ) OR \count( array_intersect( $webhook['enabled_events'], $this->webhookEvents ) ) === \count( $this->webhookEvents ) )
 					{
 						$webhookId = $webhook['id'];
 						break;
@@ -1149,17 +1127,17 @@ class Stripe extends Gateway
 			}
 			if ( !$webhookId )
 			{
-				throw new InvalidArgumentException( Member::loggedIn()->language()->addToStack( 'stripe_webhook_invalid', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( $this->webhookEvents ) ) ) ) );
+				throw new \InvalidArgumentException( \IPS\Member::loggedIn()->language()->addToStack( 'stripe_webhook_invalid', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $this->webhookEvents ) ) ) ) );
 			}
 			$settings['webhook_id'] = $webhookId;
 															
 			/* Return */
-			AdminNotification::remove( 'nexus', 'ConfigurationError', "pm{$this->id}" );
+			\IPS\core\AdminNotification::remove( 'nexus', 'ConfigurationError', "pm{$this->id}" );
 			return $settings;
 		}
-		catch ( Exception $e )
+		catch ( \IPS\nexus\Gateway\Stripe\Exception $e )
 		{
-			throw new InvalidArgumentException( $e->details['message'] );
+			throw new \InvalidArgumentException( $e->details['message'] );
 		}
 	}
 	
@@ -1169,18 +1147,19 @@ class Stripe extends Gateway
 	 * Send API Request
 	 *
 	 * @param	string		$uri		The API to request (e.g. "charges")
-	 * @param	array|null		$data		The data to send
+	 * @param	array		$data		The data to send
 	 * @param	string		$method		Method (get/post)
 	 * @param	array|NULL	$settings	Settings (NULL for saved setting)
 	 * @return	array
-	 * @throws    Exception
+	 * @throws	\IPS\Http|Exception
+	 * @throws	\IPS\nexus\Gateway\PayPal\Exception
 	 */
-	public function api( string $uri, ?array $data=NULL, string $method='post', ?array $settings = NULL ) : array
+	public function api( $uri, $data=NULL, $method='post', $settings = NULL )
 	{		
 		$settings = $settings ?: json_decode( $this->settings, TRUE );
 		
-		$response = Url::external( 'https://api.stripe.com/v1/' . $uri )
-			->request( LONG_REQUEST_TIMEOUT )
+		$response = \IPS\Http\Url::external( 'https://api.stripe.com/v1/' . $uri )
+			->request( \IPS\LONG_REQUEST_TIMEOUT )
 			->setHeaders( array( 'Stripe-Version' => '2022-11-15' ) )
 			->forceTls()
 			->login( $settings['secret_key'], '' )
@@ -1189,7 +1168,7 @@ class Stripe extends Gateway
 			
 		if ( isset( $response['error'] ) )
 		{
-			throw new Exception( $response['error'] );
+			throw new \IPS\nexus\Gateway\Stripe\Exception( $response['error'] );
 		}
 		
 		return $response;
@@ -1198,46 +1177,18 @@ class Stripe extends Gateway
 	/**
 	 * Convert amount into cents
 	 *
-	 * @param	Money	$amount		The amount
+	 * @param	\IPS\nexus\Money	$amount		The amount
 	 * @return	int
 	 */
-	protected static function _amountAsCents( Money $amount ) : int
+	protected static function _amountAsCents( \IPS\nexus\Money $amount )
 	{
-		if ( in_array( $amount->currency, array( 'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'VUV', 'XAF', 'XOF', 'XPF' ) ) )
+		if ( \in_array( $amount->currency, array( 'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'VUV', 'XAF', 'XOF', 'XPF' ) ) )
 		{
-			return intval( (string) $amount->amount );
+			return \intval( (string) $amount->amount );
 		}
 		else
 		{
-			return intval( (string) $amount->amount->multiply( new Number( '100' ) ) );
+			return \intval( (string) $amount->amount->multiply( new \IPS\Math\Number( '100' ) ) );
 		}
-	}
-
-	/**
-	 * Automatically take payment
-	 * Return an array of all transactions generated by this method
-	 *
-	 * @param Invoice $invoice
-	 * @return Transaction[]
-	 */
-	public function autopay( Invoice $invoice ) : array
-	{
-		$where = [
-			array( 'card_member=?', $invoice->member->member_id ),
-			array( 'card_method=?', $this->_id )
-		];
-
-		$return = [];
-		foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_customer_cards', $where ), 'IPS\nexus\Customer\CreditCard' ) as $card )
-		{
-			/* @var CustomerCard $card */
-			try
-			{
-				$return[] = $card->takePayment( $invoice );
-			}
-			catch( \Exception $e ){}
-		}
-
-		return $return;
 	}
 }

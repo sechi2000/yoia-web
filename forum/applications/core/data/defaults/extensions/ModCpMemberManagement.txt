@@ -11,29 +11,25 @@
 
 namespace IPS\{app}\extensions\core\ModCpMemberManagement;
 
-use IPS\Extensions\ModCpMemberManagementAbstract;
-use function defined;
-
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Moderator Control Panel Member Management Extension: {class}
  */
-class {class} extends ModCpMemberManagementAbstract
+class _{class}
 {
 	/**
 	 * Returns the tab key for the navigation bar
 	 *
 	 * @return	string|null
 	 */
-	public function getTab() : ?string
+	public function getTab()
 	{
-	    return '{class}';
 	}
 	
 	/**
@@ -41,8 +37,7 @@ class {class} extends ModCpMemberManagementAbstract
 	 *
 	 * @return	string
 	 */
-	public function manage() : string
+	public function manage()
 	{
-	    return '';
 	}
 }

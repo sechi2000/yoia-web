@@ -11,99 +11,17 @@
 namespace IPS\Member;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use DomainException;
-use InvalidArgumentException;
-use IPS\Api\Webhook;
-use IPS\Application;
-use IPS\Application\Module;
-use IPS\cms\Categories;
-use IPS\cms\Pages\Page;
-use IPS\Content\ClubContainer;
-use IPS\Content\Embeddable;
-use IPS\Content\Followable;
-use IPS\core\Approval;
-use IPS\core\extensions\nexus\Item\ClubMembership;
-use IPS\core\FrontNavigation;
-use IPS\core\ProfileFields\Api\Field;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Exception;
-use IPS\Db\Select;
-use IPS\Dispatcher;
-use IPS\Events\Event;
-use IPS\Extensions\ClubAbstract;
-use IPS\File;
-use IPS\GeoLocation;
-use IPS\Helpers\Badge;
-use IPS\Helpers\Badge\Icon;
-use IPS\Helpers\CoverPhoto;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Address;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Menu;
-use IPS\Helpers\Menu\Buttons;
-use IPS\Helpers\Menu\Link;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\Member\Club\CustomField;
-use IPS\Member\Club\Page as ClubPage;
-use IPS\Member\Club\Template;
-use IPS\nexus\Customer;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Tax;
-use IPS\Node\Model;
-use IPS\Notification;
-use IPS\Output;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfRangeException;
-use OverflowException;
-use UnderflowException;
-use function array_key_exists;
-use function class_exists;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_object;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Club Model
  */
-class Club extends ActiveRecord implements Embeddable
+class _Club extends \IPS\Patterns\ActiveRecord implements \IPS\Content\Embeddable
 {
-	use Followable
-    {
-        Followable::unfollow as public _unfollow;
-        Followable::follow as public _follow;
-    }
-
 	/**
 	 * @brief	Club: public
 	 */
@@ -183,46 +101,32 @@ class Club extends ActiveRecord implements Embeddable
 	 * @brief	Status: leader
 	 */
 	const STATUS_LEADER = 'leader';
-
-	/**
-	 * @brief	Not actually a status, but used for member history
-	 */
-	const STATUS_LEFT = 'left';
-
-	/**
-	 * @breif 	Constants for node permissions values
-	 */
-	const NODE_PRIVATE = 0;
-	const NODE_PUBLIC = 1;
-	const NODE_MODERATORS = 2;
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_clubs';
+	public static $databaseTable = 'core_clubs';
 	
 	/**
 	 * @brief	Use a default cover photo
 	 */
-	public static bool $coverPhotoDefault = true;
-
-	public static string $title = 'clubs';
+	public static $coverPhotoDefault = true;
 	
 	/* !Fetch Clubs */
 	
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    static
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): static
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
 		$return = parent::constructFromData( $data, $updateMultitonStoreIfExists );
 		
@@ -237,17 +141,16 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Get all clubs a member can see
 	 *
-	 * @param	Member|null				$member		The member to base permission off or NULL for all clubs
-	 * @param int|array|null $limit		Number to get
-	 * @param string $sortOption	The sort option ('last_activity', 'members', 'content' or 'created')
-	 * @param bool|array|Member $mineOnly	Limit to clubs a particular member has joined (TRUE to use the same value as $member). Can also provide an array as array( 'member' => \IPS\Member, 'statuses' => array( STATUS_MEMBER... ) ) to limit to certain member statuses
-	 * @param array $filters	Custom field filters
-	 * @param mixed|null $extraWhere	Additional WHERE clause
-	 * @param bool $countOnly	Only return a count, instead of an iterator
-     * @param array|null $location  Array with lat and lon
-	 * @return	ActiveRecordIterator|array|int
+	 * @param	\IPS\Member				$member		The member to base permission off or NULL for all clubs
+	 * @param	int						$limit		Number to get
+	 * @param	string					$sortOption	The sort option ('last_activity', 'members', 'content' or 'created')
+	 * @param	bool|\IPS\Member|array	$mineOnly	Limit to clubs a particular member has joined (TRUE to use the same value as $member). Can also provide an array as array( 'member' => \IPS\Member, 'statuses' => array( STATUS_MEMBER... ) ) to limit to certain member statuses
+	 * @param	array					$filters	Custom field filters
+	 * @param	mixed					$extraWhere	Additional WHERE clause
+	 * @param	bool					$countOnly	Only return a count, instead of an iterator
+	 * @return	\IPS\Patterns\ActiveRecordIterator|array|int
 	 */
-	public static function clubs( ?Member $member, int|array|null $limit, string $sortOption, bool|array|Member $mineOnly=FALSE, array $filters=array(), mixed $extraWhere=NULL, bool $countOnly=FALSE, ?array $location=null ): ActiveRecordIterator|int|array
+	public static function clubs( ?\IPS\Member $member, $limit, $sortOption, $mineOnly=FALSE, $filters=array(), $extraWhere=NULL, $countOnly=FALSE )
 	{
 		$where = array();
 		$joins = array();
@@ -256,7 +159,7 @@ class Club extends ActiveRecord implements Embeddable
 		if ( $member and !$member->modPermission('can_access_all_clubs') )
 		{
 			/* Exclude clubs which are pending approval, unless we are the owner */
-			if ( Settings::i()->clubs_require_approval )
+			if ( \IPS\Settings::i()->clubs_require_approval )
 			{
 				$where[] = array( '( approved=1 OR owner=? )', $member->member_id );
 			}
@@ -276,7 +179,7 @@ class Club extends ActiveRecord implements Embeddable
 		/* Restrict to clubs we have joined */
 		if ( $mineOnly )
 		{
-			if ( is_array( $mineOnly ) )
+			if ( \is_array( $mineOnly ) )
 			{
 				$statuses = $mineOnly['statuses'];
 				$mineOnly = $mineOnly['member'];
@@ -308,9 +211,9 @@ class Club extends ActiveRecord implements Embeddable
 			$joins['core_clubs_fieldvalues'] = array( 'core_clubs_fieldvalues', array( 'core_clubs_fieldvalues.club_id=core_clubs.id' ) );
 			foreach ( $filters as $k => $v )
 			{
-				if ( is_array( $v ) )
+				if ( \is_array( $v ) )
 				{
-					$where[] = array( Db::i()->findInSet( "field_{$k}", $v ) );
+					$where[] = array( \IPS\Db::i()->findInSet( "field_{$k}", $v ) );
 				}
 				else
 				{
@@ -318,24 +221,11 @@ class Club extends ActiveRecord implements Embeddable
 				}
 			}
 		}
-
-        $selectClause  = '*';
-        $having = NULL;
-
-        /* Location? */
-        if ( isset( $location['lat'] ) and isset( $location['lon'] ) )
-        {
-            /* Make sure co-ordinates are in a valid format regardless of locale */
-            $location['lat'] = number_format( $location['lat'], 6, '.', '' );
-            $location['lon'] = number_format( $location['lon'], 6, '.', '' );
-
-            $selectClause .= ', ( 3959 * acos( cos( radians(' . $location['lat'] . ') ) * cos( radians( location_lat ) ) * cos( radians( location_long ) - radians( ' . $location['lon'] . ' ) ) + sin( radians( ' . $location['lat'] . ' ) ) * sin( radians( location_lat ) ) ) ) AS distance';
-        }
 		
 		/* Additional where clause */
 		if ( $extraWhere )
 		{
-			if ( is_array( $extraWhere ) )
+			if ( \is_array( $extraWhere ) )
 			{
 				$where = array_merge( $where, $extraWhere );
 			}
@@ -344,27 +234,15 @@ class Club extends ActiveRecord implements Embeddable
 				$where[] = array( $extraWhere );
 			}
 		}
-
-		/* Extensions */
-		foreach( Application::allExtensions( 'core', 'Club' ) AS $ext )
-		{
-			/* @var ClubAbstract $ext */
-			foreach( $ext->clubsWhere( $member ) as $clause )
-			{
-				$where[] = $clause;
-			}
-		}
 		
 		/* Query */
 		if( $countOnly )
 		{
-			$select = Db::i()->select( 'COUNT(*)', 'core_clubs', $where, null, null, null, $having );
+			$select = \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs', $where );
 		}
 		else
 		{
-			/* If we are sorting by distance, we want null values last */
-			$sortOption = ( $sortOption === 'distance' ) ? '-distance' : $sortOption;
-			$select = Db::i()->select( $selectClause, 'core_clubs', $where, "{$sortOption} " . ( $sortOption === 'name' ? 'ASC' : 'DESC' ), $limit, null, $having );
+			$select = \IPS\Db::i()->select( '*', 'core_clubs', $where, ( $sortOption === 'name' ? "{$sortOption} ASC" : "{$sortOption} DESC" ), $limit );
 		}
 		
 		foreach ( $joins as $join )
@@ -380,18 +258,18 @@ class Club extends ActiveRecord implements Embeddable
 		$select->setKeyField( 'id' );
 
 		/* Return */
-		return new ActiveRecordIterator( $select, 'IPS\Member\Club' );
+		return new \IPS\Patterns\ActiveRecordIterator( $select, 'IPS\Member\Club' );
 	}	
 	
 	/**
 	 * Get number clubs a member is leader of
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	int
 	 */
-	public static function numberOfClubsMemberIsLeaderOf( Member $member ): int
+	public static function numberOfClubsMemberIsLeaderOf( \IPS\Member $member )
 	{
-		return Db::i()->select( 'COUNT(*)', 'core_clubs_memberships', array( 'member_id=? AND status=?', $member->member_id, static::STATUS_LEADER ) )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs_memberships', array( 'member_id=? AND status=?', $member->member_id, static::STATUS_LEADER ) );
 	}
 		
 	/* !ActiveRecord */
@@ -401,41 +279,41 @@ class Club extends ActiveRecord implements Embeddable
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->type = static::TYPE_OPEN;
-		$this->created = new DateTime;
+		$this->created = new \IPS\DateTime;
 		$this->last_activity = time();
 		$this->members = 1;
 		$this->owner = NULL;
-		$this->approved = Settings::i()->clubs_require_approval ? 0 : 1;
+		$this->approved = \IPS\Settings::i()->clubs_require_approval ? 0 : 1;
 	}
 	
 	/**
 	 * Get owner
 	 *
-	 * @return	Member|NULL
+	 * @return	\IPS\Member|NULL
 	 */
-	public function get_owner(): ?Member
+	public function get_owner()
 	{
 		try
 		{
-			$owner = Member::load( $this->_data['owner'] );
+			$owner = \IPS\Member::load( $this->_data['owner'] );
 			return $owner->member_id ? $owner : NULL;
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
 	}
-
+	
 	/**
 	 * Set member
 	 *
-	 * @param Member|null $owner The owner
-	 * @return    void
+	 * @param	\IPS\Member	$owner	The owner
+	 * @return	void
 	 */
-	public function set_owner( Member $owner = NULL ) : void
+	public function set_owner( \IPS\Member $owner = NULL )
 	{
 		$this->_data['owner'] = $owner ? ( (int) $owner->member_id ) : NULL;
 	}
@@ -443,20 +321,20 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Get created date
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_created(): DateTime
+	public function get_created()
 	{
-		return DateTime::ts( $this->_data['created'] );
+		return \IPS\DateTime::ts( $this->_data['created'] );
 	}
 	
 	/**
 	 * Set created date
 	 *
-	 * @param	DateTime	$date	The creation date
+	 * @param	\IPS\DateTime	$date	The creation date
 	 * @return	void
 	 */
-	public function set_created( DateTime $date ) : void
+	public function set_created( \IPS\DateTime $date )
 	{
 		$this->_data['created'] = $date->getTimestamp();
 	}
@@ -464,11 +342,11 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Get club URL
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	function url(): Url|string|null
+	public function url()
 	{
-		return Url::internal( "app=core&module=clubs&controller=view&id={$this->id}", 'front', 'clubs_view', Friendly::seoTitle( $this->name ) );
+		return \IPS\Http\Url::internal( "app=core&module=clubs&controller=view&id={$this->id}", 'front', 'clubs_view', \IPS\Http\Url\Friendly::seoTitle( $this->name ) );
 	}
 	
 	/**
@@ -476,7 +354,7 @@ class Club extends ActiveRecord implements Embeddable
 	 *
 	 * @return	array
 	 */
-	public static function basicDataColumns(): array
+	public static function basicDataColumns()
 	{
 		return array( 'id', 'name' );
 	}
@@ -484,48 +362,48 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Edit Club Form
 	 *
-	 * @param bool $acp			TRUE if editing in the ACP
-	 * @param bool $new			TRUE if creating new
-	 * @param array|null $availableTypes	If creating new, the available types
-	 * @return	Form|NULL
+	 * @param	bool	$acp			TRUE if editing in the ACP
+	 * @param	bool	$new			TRUE if creating new
+	 * @param	array	$availableTypes	If creating new, the available types
+	 * @return	\IPS\Helpers\Form|NULL
 	 */
-	public function form( bool $acp=FALSE, bool $new=FALSE, array $availableTypes=NULL ): ?Form
+	public function form( $acp=FALSE, $new=FALSE, $availableTypes=NULL )
 	{
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		
-		$form->add( new Text( 'club_name', $this->name, TRUE, array( 'maxLength' => 255 ) ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'club_name', $this->name, TRUE, array( 'maxLength' => 255 ) ) );
 		
-		if ( $acp or ( $new and count( $availableTypes ) > 1 ) )
+		if ( $acp or ( $new and \count( $availableTypes ) > 1 ) )
 		{
-			$form->add( new Radio( 'club_type', $this->type, TRUE, array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'club_type', $this->type, TRUE, array(
 				'options' => $new ? $availableTypes : array(
-					Club::TYPE_PUBLIC	=> 'club_type_' . Club::TYPE_PUBLIC,
-					Club::TYPE_OPEN	=> 'club_type_' . Club::TYPE_OPEN,
-					Club::TYPE_CLOSED	=> 'club_type_' . Club::TYPE_CLOSED,
-					Club::TYPE_PRIVATE	=> 'club_type_' . Club::TYPE_PRIVATE,
-					Club::TYPE_READONLY	=> 'club_type_' . Club::TYPE_READONLY,
+					\IPS\Member\Club::TYPE_PUBLIC	=> 'club_type_' . \IPS\Member\Club::TYPE_PUBLIC,
+					\IPS\Member\Club::TYPE_OPEN	=> 'club_type_' . \IPS\Member\Club::TYPE_OPEN,
+					\IPS\Member\Club::TYPE_CLOSED	=> 'club_type_' . \IPS\Member\Club::TYPE_CLOSED,
+					\IPS\Member\Club::TYPE_PRIVATE	=> 'club_type_' . \IPS\Member\Club::TYPE_PRIVATE,
+					\IPS\Member\Club::TYPE_READONLY	=> 'club_type_' . \IPS\Member\Club::TYPE_READONLY,
 				),
 				'toggles'	=> array(
-					Club::TYPE_OPEN		=> array( 'club_membership_fee', 'club_show_membertab' ),
-					Club::TYPE_CLOSED	=> array( 'club_membership_fee', 'club_show_membertab' ),
-					Club::TYPE_PRIVATE	=> array( 'club_membership_fee', 'club_show_membertab' ),
-					Club::TYPE_READONLY	=> array( 'club_membership_fee', 'club_show_membertab' ),
+					\IPS\Member\Club::TYPE_OPEN		=> array( 'club_membership_fee', 'club_show_membertab' ),
+					\IPS\Member\Club::TYPE_CLOSED	=> array( 'club_membership_fee', 'club_show_membertab' ),
+					\IPS\Member\Club::TYPE_PRIVATE	=> array( 'club_membership_fee', 'club_show_membertab' ),
+					\IPS\Member\Club::TYPE_READONLY	=> array( 'club_membership_fee', 'club_show_membertab' ),
 				)
 			) ) );
 			
 			if ( $acp )
 			{
-				$form->add( new Form\Member( 'club_owner', $this->owner, TRUE ) );
+				$form->add( new \IPS\Helpers\Form\Member( 'club_owner', $this->owner, TRUE ) );
 			}
 		}
 		
-		$form->add( new TextArea( 'club_about', $this->about ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'club_about', $this->about ) );
 
 		$memberTabFieldPosition = '';
 
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->clubs_paid_on and Member::loggedIn()->group['gbw_paid_clubs'] )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->clubs_paid_on and \IPS\Member::loggedIn()->group['gbw_paid_clubs'] )
 		{
-			$form->add( new Radio( 'club_membership_fee', ( $this->id and $this->fee ) ? 'paid' : 'free', TRUE, array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'club_membership_fee', ( $this->id and $this->fee ) ? 'paid' : 'free', TRUE, array(
 				'options' => array(
 					'free'	=> 'club_membership_free',
 					'paid'	=> 'club_membership_paid'
@@ -537,73 +415,73 @@ class Club extends ActiveRecord implements Embeddable
 			
 			$commissionBlurb = NULL;
 			$fees = NULL;
-			if ( $_fees = Settings::i()->clubs_paid_transfee )
+			if ( $_fees = \IPS\Settings::i()->clubs_paid_transfee )
 			{
 				$fees = array();
 				foreach ( $_fees as $fee )
 				{
-					$fees[] = (string) ( new Money( $fee['amount'], $fee['currency'] ) );
+					$fees[] = (string) ( new \IPS\nexus\Money( $fee['amount'], $fee['currency'] ) );
 				}
-				$fees = Member::loggedIn()->language()->formatList( $fees, Member::loggedIn()->language()->get('or_list_format') );
+				$fees = \IPS\Member::loggedIn()->language()->formatList( $fees, \IPS\Member::loggedIn()->language()->get('or_list_format') );
 			}
-			if ( Settings::i()->clubs_paid_commission and $fees )
+			if ( \IPS\Settings::i()->clubs_paid_commission and $fees )
 			{
-				$commissionBlurb = Member::loggedIn()->language()->addToStack( 'club_fee_desc_both', FALSE, array( 'sprintf' => array( Settings::i()->clubs_paid_commission, $fees ) ) );
+				$commissionBlurb = \IPS\Member::loggedIn()->language()->addToStack( 'club_fee_desc_both', FALSE, array( 'sprintf' => array( \IPS\Settings::i()->clubs_paid_commission, $fees ) ) );
 			}
-			elseif ( Settings::i()->clubs_paid_commission )
+			elseif ( \IPS\Settings::i()->clubs_paid_commission )
 			{
-				$commissionBlurb = Member::loggedIn()->language()->addToStack('club_fee_desc_percent', FALSE, array( 'sprintf' => Settings::i()->clubs_paid_commission ) );
+				$commissionBlurb = \IPS\Member::loggedIn()->language()->addToStack('club_fee_desc_percent', FALSE, array( 'sprintf' => \IPS\Settings::i()->clubs_paid_commission ) );
 			}
 			elseif ( $fees )
 			{
-				$commissionBlurb = Member::loggedIn()->language()->addToStack('club_fee_desc_fee', FALSE, array( 'sprintf' => $fees ) );
+				$commissionBlurb = \IPS\Member::loggedIn()->language()->addToStack('club_fee_desc_fee', FALSE, array( 'sprintf' => $fees ) );
 			}
 			
-			Member::loggedIn()->language()->words['club_fee_desc'] = $commissionBlurb;
+			\IPS\Member::loggedIn()->language()->words['club_fee_desc'] = $commissionBlurb;			
 			$form->add( new \IPS\nexus\Form\Money( 'club_fee', $this->id ? json_decode( $this->fee, TRUE ) : array(), NULL, array(), function( $value ){
 
-				if ( count( $value ) == 0 )
+				if ( \count( $value ) == 0 )
 				{
-					throw new DomainException( 'form_required' );
+					throw new \DomainException( 'form_required' );
 				}
 				
 				foreach( $value as $currency => $fee )
 				{
 					if( !$fee->amount->isGreaterThanZero() )
 					{
-						throw new DomainException( 'form_required' );
+						throw new \DomainException( 'form_required' );
 					}
 				}
 			}, NULL, NULL, 'club_fee' ) );
-			$form->add( new Radio( 'club_renewals', $this->id ? ( $this->renewal_term ? 1 : 0 ) : 0, TRUE, array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'club_renewals', $this->id ? ( $this->renewal_term ? 1 : 0 ) : 0, TRUE, array(
 				'options'	=> array( 0 => 'club_renewals_off', 1 => 'club_renewals_on' ),
 				'toggles'	=> array( 1 => array( 'club_renewal_term' ) )
 			), NULL, NULL, NULL, 'club_renewals' ) );
-			Member::loggedIn()->language()->words['club_renewal_term_desc'] = $commissionBlurb;
+			\IPS\Member::loggedIn()->language()->words['club_renewal_term_desc'] = $commissionBlurb;
 			$renewTermForEdit = NULL;
 			if ( $this->id and $this->renewal_term )
 			{
 				$renewPrices = array();
 				foreach ( json_decode( $this->renewal_price, TRUE ) as $currency => $data )
 				{
-					$renewPrices[ $currency ] = new Money( $data['amount'], $currency );
+					$renewPrices[ $currency ] = new \IPS\nexus\Money( $data['amount'], $currency );
 				}
-				$renewTermForEdit = new RenewalTerm( $renewPrices, new DateInterval( 'P' . $this->renewal_term . mb_strtoupper( $this->renewal_units ) ) );
+				$renewTermForEdit = new \IPS\nexus\Purchase\RenewalTerm( $renewPrices, new \DateInterval( 'P' . $this->renewal_term . mb_strtoupper( $this->renewal_units ) ) );
 			}
 			$form->add( new \IPS\nexus\Form\RenewalTerm( 'club_renewal_term', $renewTermForEdit, NULL, array( 'allCurrencies' => TRUE ), NULL, NULL, NULL, 'club_renewal_term' ) );
 
 			$memberTabFieldPosition = 'club_renewal_term';
 		}
 		
-		$form->add( new Upload( 'club_profile_photo', $this->profile_photo ? File::get( 'core_Clubs', $this->profile_photo ) : NULL, FALSE, array( 'storageExtension' => 'core_Clubs', 'allowStockPhotos' => TRUE, 'image' => array( 'maxWidth' => 200, 'maxHeight' => 200 ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'club_profile_photo', $this->profile_photo ? \IPS\File::get( 'core_Clubs', $this->profile_photo ) : NULL, FALSE, array( 'storageExtension' => 'core_Clubs', 'allowStockPhotos' => TRUE, 'image' => array( 'maxWidth' => 200, 'maxHeight' => 200 ) ) ) );
 		
-		if ( Settings::i()->clubs_locations )
+		if ( \IPS\Settings::i()->clubs_locations )
 		{
-			$form->add( new Address( 'club_location', $this->location_json ? GeoLocation::buildFromJson( $this->location_json ) : NULL, FALSE, array( 'requireFullAddress' => FALSE, 'minimize' => !$this->location_json, 'preselectCountry' => FALSE ) ) );
+			$form->add( new \IPS\Helpers\Form\Address( 'club_location', $this->location_json ? \IPS\GeoLocation::buildFromJson( $this->location_json ) : NULL, FALSE, array( 'requireFullAddress' => FALSE, 'minimize' => ( $this->location_json ) ? FALSE : TRUE, 'preselectCountry' => FALSE ) ) );
 		}
 		
 		$fieldValues = $this->fieldValues();
-		foreach ( CustomField::roots() as $field )
+		foreach ( \IPS\Member\Club\CustomField::roots() as $field )
 		{
 			if ( $field->type === 'Editor' )
 			{
@@ -612,7 +490,7 @@ class Club extends ActiveRecord implements Embeddable
 					$field::$editorOptions = array_merge( $field::$editorOptions, array( 'attachIds' => array( $this->id, $field->id, NULL ), 'autoSaveKey' => "clubs-field{$field->id}-{$this->id}" ) );
 				}
 			}
-			$helper = $field->buildHelper( $fieldValues["field_{$field->id}"] ?? NULL );
+			$helper = $field->buildHelper( isset( $fieldValues["field_{$field->id}"] ) ? $fieldValues["field_{$field->id}"] : NULL );
 			if ( $field->type === 'Editor' )
 			{
 				if ( $field->allow_attachments AND $new )
@@ -624,9 +502,9 @@ class Club extends ActiveRecord implements Embeddable
 		}
 
 
-		if ( $acp or ( $new and count( $availableTypes ) > 1 ) )
+		if ( $acp or ( $new and \count( $availableTypes ) > 1 ) )
 		{
-			$form->add( new Radio( 'club_show_membertab', ( $this AND $this->show_membertab ) ? $this->show_membertab : 'nonmember', TRUE, array( 'options' => array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'club_show_membertab', ( $this AND $this->show_membertab ) ? $this->show_membertab : 'nonmember', TRUE, array( 'options' => array(
 				'nonmember'	=> 'club_membertab_everyone',
 				'member'		=> 'club_membertab_members',
 				'moderator'	=> 'club_membertab_moderators'
@@ -635,53 +513,31 @@ class Club extends ActiveRecord implements Embeddable
 		/* We want to show the member page configuration also while editing the club */
 		else if ( !$new )
 		{
-			$form->add( new Radio( 'club_show_membertab', ( $this AND $this->show_membertab ) ? $this->show_membertab : 'nonmember', TRUE, array( 'options' => array(
+			$form->add( new \IPS\Helpers\Form\Radio( 'club_show_membertab', ( $this AND $this->show_membertab ) ? $this->show_membertab : 'nonmember', TRUE, array( 'options' => array(
 				'nonmember'	=> 'club_membertab_everyone',
 				'member'		=> 'club_membertab_members',
 				'moderator'	=> 'club_membertab_moderators'
 			) ),  NULL, NULL, NULL, 'club_show_membertab' ), $memberTabFieldPosition );
 		}
 		
-		$form->add( new YesNo( 'show_rules', ( !$new AND $this->rules ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\YesNo( 'show_rules', ( !$new AND $this->rules ) ? TRUE : FALSE, FALSE, array(
 			'togglesOn'	=> array(
 				'club_rules',
 				'club_rules_required'
 			)
 		) ) );
-		$form->add( new Editor( 'club_rules', $this->rules ?: NULL, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Editor( 'club_rules', ( $this->rules ) ? $this->rules : NULL, FALSE, array(
 			'app'			=> 'core',
 			'key'			=> 'ClubRules',
 			'attachIds'		=> ( $new ) ? array( NULL, NULL, NULL ) : array( $this->id, NULL, 'rules' ),
 			'autoSaveKey'	=> ( $new ) ? "club-rules-new" : "club-rules-{$this->id}"
 		), NULL, NULL, NULL, 'club_rules' ) );
-		$form->add( new YesNo( 'club_rules_required', $this->rules_required, FALSE, array( 'togglesOn' => array( 'club_rules_reacknowledge' ) ), NULL, NULL, NULL, 'club_rules_required' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'club_rules_required', $this->rules_required, FALSE, array( 'togglesOn' => array( 'club_rules_reacknowledge' ) ), NULL, NULL, NULL, 'club_rules_required' ) );
 		
 		/* Only show this if we're editing a club */
 		if ( !$new )
 		{
-			$form->add( new YesNo( 'club_rules_reacknowledge', FALSE, FALSE, [], NULL, NULL, NULL, 'club_rules_reacknowledge' ) );
-		}
-
-		$form->add( new YesNo( 'club_auto_follow', $this->auto_follow, false ) );
-		if( !$new )
-		{
-			Member::loggedIn()->language()->words['club_auto_follow_desc'] = Member::loggedIn()->language()->get( 'club_auto_follow_desc_edit' );
-		}
-
-		foreach( Application::allExtensions( 'core', 'Club' ) AS $ext )
-		{
-			/* @var ClubAbstract $ext */
-			foreach( $ext->formElements( $this ) as $element )
-			{
-				if( is_object( $element ) )
-				{
-					$form->add( $element );
-				}
-				else
-				{
-					$form->addHtml( $element );
-				}
-			}
+			$form->add( new \IPS\Helpers\Form\YesNo( 'club_rules_reacknowledge', FALSE, FALSE, [], NULL, NULL, NULL, 'club_rules_reacknowledge' ) );
 		}
 
 		return $form;
@@ -694,14 +550,14 @@ class Club extends ActiveRecord implements Embeddable
 	 * @param bool $acp TRUE if editing in the ACP
 	 * @param bool $new TRUE if creating new
 	 * @param array|null $availableTypes If creating new, the available types
-	 * @return    Form|NULL
+	 * @return    \IPS\Helpers\Form|NULL
 	 */
-	public function processForm($values, bool $acp, bool $new = FALSE, array $availableTypes = NULL): ?Form
+	public function processForm($values, bool $acp, bool $new = FALSE, array $availableTypes = NULL): ?\IPS\Helpers\Form
 	{
 		$this->name = $values['club_name'];
 
 		/* If there is only one type available, set it. */
-		if( is_array( $availableTypes ) AND count( $availableTypes ) == 1 )
+		if( \is_array( $availableTypes ) AND \count( $availableTypes ) == 1 )
 		{
 			$values['club_type'] = key( $availableTypes );
 		}
@@ -720,16 +576,16 @@ class Club extends ActiveRecord implements Embeddable
 				$this->addMember( $values['club_owner'], Club::STATUS_LEADER, TRUE );
 
 				/* Update purchases for commission */
-				if( Application::appIsEnabled( 'nexus' ) and Settings::i()->clubs_paid_on )
+				if( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->clubs_paid_on )
 				{
-					Db::i()->update( 'nexus_purchases', array( 'ps_pay_to' => $this->owner->member_id ), array( "ps_pay_to IS NOT NULL and ps_app=? and ps_type=? and ps_item_id=?", 'core', 'club', $this->id ) );
+					\IPS\Db::i()->update( 'nexus_purchases', array( 'ps_pay_to' => $this->owner->member_id ), array( "ps_pay_to IS NOT NULL and ps_app=? and ps_type=? and ps_item_id=?", 'core', 'club', $this->id ) );
 				}
 			}
 		}
 		elseif ( $new )
 		{
 			$this->type = $values['club_type'];
-			$this->owner = Member::loggedIn();
+			$this->owner = \IPS\Member::loggedIn();
 		}
 
 		$this->about = $values['club_about'];
@@ -761,7 +617,7 @@ class Club extends ActiveRecord implements Embeddable
 			$this->location_long = NULL;
 		}
 
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->clubs_paid_on and Member::loggedIn()->group['gbw_paid_clubs'] )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->clubs_paid_on and \IPS\Member::loggedIn()->group['gbw_paid_clubs'] )
 		{
 			switch ( $values['club_membership_fee'] )
 			{
@@ -802,23 +658,20 @@ class Club extends ActiveRecord implements Embeddable
 			$this->show_membertab		= "nonmember";
 		}
 
-		$this->auto_follow = $values['club_auto_follow'];
-		$autoFollow = ( !$new and isset( $this->changed['auto_follow'] ) and $this->changed['auto_follow'] );
-
 		$this->save();
 
 		if ( $values['show_rules'] )
 		{
 			$this->rules = $values['club_rules'];
-			File::claimAttachments( ( $new ) ? "club-rules-new" : "club-rules-{$this->id}", $this->id, NULL, 'rules' );
+			\IPS\File::claimAttachments( ( $new ) ? "club-rules-new" : "club-rules-{$this->id}", $this->id, NULL, 'rules' );
 			$this->rules_required = (bool) $values['club_rules_required'];
 
 			/* Do we need to reset the acknowledge flags? */
-			if ( !$new AND array_key_exists( 'club_rules_reacknowledge', $values ) )
+			if ( !$new AND \array_key_exists( 'club_rules_reacknowledge', $values ) )
 			{
 				if ( $values['club_rules_reacknowledge'] )
 				{
-					Db::i()->update( 'core_clubs_memberships', array( "rules_acknowledged" => FALSE ), array( "club_id=?", $this->id ) );
+					\IPS\Db::i()->update( 'core_clubs_memberships', array( "rules_acknowledged" => FALSE ), array( "club_id=?", $this->id ) );
 				}
 			}
 		}
@@ -830,31 +683,25 @@ class Club extends ActiveRecord implements Embeddable
 			if ( !$new )
 			{
 				/* If this isn't a new club, update all memberships in case they decide to re-add rules later on */
-				Db::i()->update( "core_clubs_memberships", array( 'rules_acknowledged' => FALSE ), array( "club_id=?", $this->id ) );
+				\IPS\Db::i()->update( "core_clubs_memberships", array( 'rules_acknowledged' => FALSE ), array( "club_id=?", $this->id ) );
 			}
-		}
-
-		/* If we are auto-following and this is not a new club, trigger a background task */
-		if( $autoFollow )
-		{
-			Task::queue( 'core', 'AutoFollowClubs', [ 'club' => $this->id, 'node' => null ], 3, [ 'club', 'node' ] );
 		}
 
 		if ( $new )
 		{
-			$this->addMember( Member::loggedIn(), Club::STATUS_LEADER );
-			$this->acknowledgeRules( Member::loggedIn() );
+			$this->addMember( \IPS\Member::loggedIn(), Club::STATUS_LEADER );
+			$this->acknowledgeRules( \IPS\Member::loggedIn() );
 		}
 		$this->recountMembers();
 
 		$customFieldValues = array();
-		foreach ( CustomField::roots() as $field )
+		foreach ( \IPS\Member\Club\CustomField::roots() as $field )
 		{
 			if ( isset( $values["core_clubfield_{$field->id}"] ) )
 			{
 				$helper							 			= $field->buildHelper();
 
-				if ( $helper instanceof Upload )
+				if ( $helper instanceof \IPS\Helpers\Form\Upload )
 				{
 					$customFieldValues[ "field_{$field->id}" ] = (string) $values["core_clubfield_{$field->id}"];
 				}
@@ -869,10 +716,10 @@ class Club extends ActiveRecord implements Embeddable
 				}
 			}
 		}
-		if ( count( $customFieldValues ) )
+		if ( \count( $customFieldValues ) )
 		{
 			$customFieldValues['club_id'] = $this->id;
-			Db::i()->insert( 'core_clubs_fieldvalues', $customFieldValues, TRUE );
+			\IPS\Db::i()->insert( 'core_clubs_fieldvalues', $customFieldValues, TRUE );
 		}
 
 		if ( $needToUpdatePermissions )
@@ -889,51 +736,18 @@ class Club extends ActiveRecord implements Embeddable
 			}
 		}
 
-		/* Extensions */
-		foreach( Application::allExtensions( 'core', 'Club' ) AS $ext )
+		if( $new and \IPS\Settings::i()->clubs_require_approval and !$this->approved )
 		{
-			/* @var ClubAbstract $ext */
-			$ext->saveForm( $this, $values, $new );
-		}
-
-		/* Default nodes */
-		if( $new )
-		{
-			foreach( Template::roots() as $template )
-			{
-				$nodeClass = new ( $template->node_class );
-				$nodeClass->saveClubForm( $this, $template->node_data, $template );
-			}
-		}
-
-		if( $new and Settings::i()->clubs_require_approval and !$this->approved )
-		{
-			/* Add it to the approval queue */
-			$log = new Approval;
-			$log->content_class	= get_called_class();
-			$log->content_id	= $this->id;
-			$log->save();
-
 			$this->sendModeratorApprovalNotification();
 		}
 
 		if( $new and $this->approved )
 		{
-			Webhook::fire( 'club_created', $this );
-
+			\IPS\Api\Webhook::fire( 'club_created', $this );
 		}
 		else if( !$new AND isset( $this->changed['approved'] ) )
 		{
 			$this->onApprove();
-		}
-
-		if( $new )
-		{
-			Event::fire( 'onCreate', $this );
-		}
-		else
-		{
-			Event::fire( 'onEdit', $this );
 		}
 
 		return NULL;
@@ -942,11 +756,11 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Redirect after save
 	 *
-	 * @param Club $old A clone of the club as it was before
-	 * @param Club $new The club now
+	 * @param \IPS\Member\Club $old A clone of the club as it was before
+	 * @param \IPS\Member\Club\ $new The club now
 	 * @return    array
 	 */
-	public static function renewalChanges(Club $old, Club $new): array
+	public static function renewalChanges(Club $old, Club $new)
 	{
 		$changes = array();
 
@@ -964,16 +778,16 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Send moderator notice of new club pending approval
 	 *
-	 * @param Member|null $savingMember		Member saving the club or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$savingMember		Member saving the club or NULL for currently logged in member
 	 * @return void
 	 */
-	public function sendModeratorApprovalNotification( Member $savingMember = NULL ) : void
+	public function sendModeratorApprovalNotification( $savingMember = NULL )
 	{
-		$savingMember = $savingMember ?? Member::loggedIn();
+		$savingMember = $savingMember ?? \IPS\Member::loggedIn();
 
 		/* Send notification to mods */
 		$moderators = array( 'm' => array(), 'g' => array() );
-		foreach ( Db::i()->select( '*', 'core_moderators' ) as $mod )
+		foreach ( \IPS\Db::i()->select( '*', 'core_moderators' ) as $mod )
 		{
 			$canView = FALSE;
 			if ( $mod['perms'] == '*' )
@@ -994,16 +808,16 @@ class Club extends ActiveRecord implements Embeddable
 				$moderators[ $mod['type'] ][] = $mod['id'];
 			}
 		}
-		$notification = new Notification( Application::load('core'), 'unapproved_club', $this, array( $this ) );
-		foreach ( Db::i()->select( '*', 'core_members', ( count( $moderators['m'] ) ? Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $member )
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'unapproved_club', $this, array( $this ) );
+		foreach ( \IPS\Db::i()->select( '*', 'core_members', ( \count( $moderators['m'] ) ? \IPS\Db::i()->in( 'member_id', $moderators['m'] ) . ' OR ' : '' ) . \IPS\Db::i()->in( 'member_group_id', $moderators['g'] ) . ' OR ' . \IPS\Db::i()->findInSet( 'mgroup_others', $moderators['g'] ) ) as $member )
 		{
 			if( $member['member_id'] != $savingMember->member_id )
 			{
-				$notification->recipients->attach( Member::constructFromData( $member ) );
+				$notification->recipients->attach( \IPS\Member::constructFromData( $member ) );
 			}
 		}
 
-		if( count( $notification->recipients ) )
+		if( \count( $notification->recipients ) )
 		{
 			$notification->send();
 		}
@@ -1014,48 +828,38 @@ class Club extends ActiveRecord implements Embeddable
 	 *
 	 * @return	array
 	 */
-	public function fieldValues(): array
+	public function fieldValues()
 	{
 		try
 		{
-			$values = Db::i()->select( '*', 'core_clubs_fieldvalues', array( 'club_id=?', $this->id ) )->first();
-
-			/* If we do not have any custom fields, then this query just returns an INT as there is only one column */
-			if ( is_numeric( $values ) )
-			{
-				return [];
-			}
-			$values = array_filter( $values, function ( $val) { return ( $val !== '' AND $val !== NULL ); } );
-
-			return $values;
+			return \IPS\Db::i()->select( '*', 'core_clubs_fieldvalues', array( 'club_id=?', $this->id ) )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
-			return [];
+			return array();
 		}
 	}
 	
 	/**
 	 * Cover Photo
 	 *
-	 * @param bool $getOverlay	If FALSE, will not set the overlay, which saves queries if it will not be used (such as in clubCard)
-	 * @param string $position	Position of cover photo
-	 * @param Model|ClubPage|null	$container	Node or Page currently viewing
-	 * @return    CoverPhoto
+	 * @param	bool	$getOverlay	If FALSE, will not set the overlay, which saves queries if it will not be used (such as in clubCard)
+	 * @param	string	$position	Position of cover photo
+	 * @return	\IPS\Helpers\CoverPhoto
 	 */
-	public function coverPhoto( bool $getOverlay=TRUE, string $position='full', Model|ClubPage|null $container=null ): CoverPhoto
+	public function coverPhoto( $getOverlay=TRUE, $position='full' )
 	{
-		$photo = new CoverPhoto;
+		$photo = new \IPS\Helpers\CoverPhoto;
 
-		$photo->maxSize = Settings::i()->club_max_cover;
+		$photo->maxSize = \IPS\Settings::i()->club_max_cover;
 		if ( $this->cover_photo )
 		{
-			$photo->file = File::get( 'core_Clubs', $this->cover_photo );
+			$photo->file = \IPS\File::get( 'core_Clubs', $this->cover_photo );
 			$photo->offset = $this->cover_offset;
 		}
 		if ( $getOverlay )
 		{
-			$photo->overlay = Theme::i()->getTemplate( 'clubs', 'core', 'front' )->coverPhotoOverlay( $this, $position, $container );
+			$photo->overlay = \IPS\Theme::i()->getTemplate( 'clubs', 'core', 'front' )->coverPhotoOverlay( $this, $position );
 		}
 		$photo->editable = $this->isLeader();
 		$photo->object = $this;
@@ -1068,7 +872,7 @@ class Club extends ActiveRecord implements Embeddable
 	 *
 	 * @return string
 	 */
-	public function coverPhotoBackgroundColor(): string
+	public function coverPhotoBackgroundColor()
 	{
 		return $this->staticCoverPhotoBackgroundColor( $this->name );
 	}
@@ -1076,13 +880,13 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Location
 	 *
-	 * @return	GeoLocation|NULL
+	 * @return	\IPS\GeoLocation|NULL
 	 */
-	public function location(): ?GeoLocation
+	public function location()
 	{
 		if ( $this->location_json )
 		{
-			return GeoLocation::buildFromJson( $this->location_json );
+			return \IPS\GeoLocation::buildFromJson( $this->location_json );
 		}
 		return NULL;
 	}
@@ -1092,9 +896,9 @@ class Club extends ActiveRecord implements Embeddable
 	 *
 	 * @return	bool
 	 */
-	public function isPaid(): bool
+	public function isPaid()
 	{
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->clubs_paid_on and $this->fee )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->clubs_paid_on and $this->fee )
 		{
 			return TRUE;
 		}
@@ -1107,38 +911,38 @@ class Club extends ActiveRecord implements Embeddable
 	 *
 	 * @return	string
 	 */
-	public function memberFeeMessage(): string
+	public function memberFeeMessage()
 	{
 		if ( $this->type === static::TYPE_CLOSED )
 		{
-			return Member::loggedIn()->language()->addToStack( 'club_closed_join_fee', FALSE, array( 'sprintf' => array( $this->priceBlurb() ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'club_closed_join_fee', FALSE, array( 'sprintf' => array( $this->priceBlurb() ) ) );
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack( 'club_open_join_fee', FALSE, array( 'sprintf' => array( $this->priceBlurb() ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'club_open_join_fee', FALSE, array( 'sprintf' => array( $this->priceBlurb() ) ) );
 		}
 	}
 	
 	/**
 	 * Joining fee
 	 *
-	 * @param string|null $currency	Desired currency, or NULL to choose based on member's chosen currency
-	 * @return	Money|NULL
+	 * @param	string|NULL	$currency	Desired currency, or NULL to choose based on member's chosen currency
+	 * @return	\IPS\nexus\Money|NULL
 	 */
-	public function joiningFee( string $currency = NULL ) : ?Money
+	public function joiningFee( $currency = NULL )
 	{
 		if ( $this->isPaid() )
 		{
 			if ( !$currency )
 			{
-				$currency = ( isset( Request::i()->cookie['currency'] ) and in_array( Request::i()->cookie['currency'], Money::currencies() ) ) ? Request::i()->cookie['currency'] : Customer::loggedIn()->defaultCurrency();
+				$currency = ( isset( \IPS\Request::i()->cookie['currency'] ) and \in_array( \IPS\Request::i()->cookie['currency'], \IPS\nexus\Money::currencies() ) ) ? \IPS\Request::i()->cookie['currency'] : \IPS\nexus\Customer::loggedIn()->defaultCurrency();
 			}
 			
 			$costs = json_decode( $this->fee, TRUE );
 			
-			if ( is_array( $costs ) and isset( $costs[ $currency ]['amount'] ) and $costs[ $currency ]['amount'] )
+			if ( \is_array( $costs ) and isset( $costs[ $currency ]['amount'] ) and $costs[ $currency ]['amount'] )
 			{
-				return new Money( $costs[ $currency ]['amount'], $currency );
+				return new \IPS\nexus\Money( $costs[ $currency ]['amount'], $currency );
 			}
 		}
 		
@@ -1148,26 +952,26 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Renewal fee
 	 *
-	 * @param string|null $currency	Desired currency, or NULL to choose based on member's chosen currency
-	 * @return	Money|RenewalTerm|NULL
-	 * @throws	OutOfRangeException
+	 * @param	string|NULL	$currency	Desired currency, or NULL to choose based on member's chosen currency
+	 * @return	\IPS\nexus\Money|NULL
+	 * @throws	\OutOfRangeException
 	 */
-	public function renewalTerm( string $currency = NULL ): Money|RenewalTerm|null
+	public function renewalTerm( $currency = NULL )
 	{
 		if ( $this->renewal_price and $renewalPrices = json_decode( $this->renewal_price, TRUE ) )
 		{
 			if ( !$currency )
 			{
-				$currency = ( isset( Request::i()->cookie['currency'] ) and in_array( Request::i()->cookie['currency'], Money::currencies() ) ) ? Request::i()->cookie['currency'] : Customer::loggedIn()->defaultCurrency();
+				$currency = ( isset( \IPS\Request::i()->cookie['currency'] ) and \in_array( \IPS\Request::i()->cookie['currency'], \IPS\nexus\Money::currencies() ) ) ? \IPS\Request::i()->cookie['currency'] : \IPS\nexus\Customer::loggedIn()->defaultCurrency();
 			}
 			
 			if ( isset( $renewalPrices[ $currency ] ) )
 			{
-				return new RenewalTerm( new Money( $renewalPrices[ $currency ]['amount'], $currency ), new DateInterval( 'P' . $this->renewal_term . mb_strtoupper( $this->renewal_units ) ) );
+				return new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $renewalPrices[ $currency ]['amount'], $currency ), new \DateInterval( 'P' . $this->renewal_term . mb_strtoupper( $this->renewal_units ) ) );
 			}
 			else
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
 		
@@ -1177,11 +981,11 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Price Blurb
 	 *
-	 * @return	Money|string|RenewalTerm|null
+	 * @return	string|NULL
 	 */
-	public function priceBlurb(): Money|string|RenewalTerm|null
+	public function priceBlurb()
 	{
-		if ( Application::appIsEnabled( 'nexus' ) and Settings::i()->clubs_paid_on )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) and \IPS\Settings::i()->clubs_paid_on )
 		{
 			if ( $this->isPaid() )
 			{				
@@ -1189,13 +993,13 @@ class Club extends ActiveRecord implements Embeddable
 				{
 					/* Include tax? */
 					$taxRate = NULL;
-					if ( Settings::i()->nexus_show_tax and Settings::i()->clubs_paid_tax )
+					if ( \IPS\Settings::i()->nexus_show_tax and \IPS\Settings::i()->clubs_paid_tax )
 					{
 						try
 						{
-							$taxRate = new Number( Tax::load( Settings::i()->clubs_paid_tax )->rate( Customer::loggedIn()->estimatedLocation() ) );
+							$taxRate = new \IPS\Math\Number( \IPS\nexus\Tax::load( \IPS\Settings::i()->clubs_paid_tax )->rate( \IPS\nexus\Customer::loggedIn()->estimatedLocation() ) );
 						}
-						catch ( OutOfRangeException $e ) {}
+						catch ( \OutOfRangeException $e ) {}
 					}
 							
 					if ( $taxRate )
@@ -1216,28 +1020,28 @@ class Club extends ActiveRecord implements Embeddable
 						{
 							return $fee;
 						}
-						else if ( $renewalTerm->cost->amount === $fee->amount )
+						else if ( $renewalTerm AND $renewalTerm->cost->amount == $fee->amount )
 						{
 							return $renewalTerm;
 						}
 						else
 						{
-							return Member::loggedIn()->language()->addToStack( 'club_fee_plus_renewal', FALSE, array( 'sprintf' => array( $fee, $renewalTerm ) ) );
+							return \IPS\Member::loggedIn()->language()->addToStack( 'club_fee_plus_renewal', FALSE, array( 'sprintf' => array( $fee, $renewalTerm ) ) );
 						}
 					}
-					catch ( OutOfRangeException $e )
+					catch ( \OutOfRangeException $e )
 					{
-						return Member::loggedIn()->language()->addToStack('club_paid_unavailable');
+						return \IPS\Member::loggedIn()->language()->addToStack('club_paid_unavailable');
 					}
 				}
 				else
 				{
-					return Member::loggedIn()->language()->addToStack('club_paid_unavailable');
+					return \IPS\Member::loggedIn()->language()->addToStack('club_paid_unavailable');
 				}
 			}
 			else
 			{
-				return Member::loggedIn()->language()->addToStack('club_membership_free');
+				return \IPS\Member::loggedIn()->language()->addToStack('club_membership_free');
 			}
 		}
 		return NULL;
@@ -1246,37 +1050,37 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Generate invoice for a member
 	 *
-	 * @param	Customer|null	$member	Member to generate the invoice for
-	 * @return	Url
+	 * @param	\IPS\nexus\Customer|null	$member	Member to generate the invoice for
+	 * @return	\IPS\Http\Url
 	 */
-	public function generateInvoice( Customer $member = NULL ): Url
+	public function generateInvoice( \IPS\nexus\Customer $member = NULL )
 	{
-		$member = $member ?: Customer::loggedIn();
+		$member = $member ?: \IPS\nexus\Customer::loggedIn();
 
 		$fee = $this->joiningFee();
 
 		/* Create the item */		
-		$item = new ClubMembership( $this->name, $fee );
+		$item = new \IPS\core\extensions\nexus\Item\ClubMembership( $this->name, $fee );
 		$item->id = $this->id;
 		try
 		{
-			$item->tax = Settings::i()->clubs_paid_tax ? Tax::load( Settings::i()->clubs_paid_tax ) : NULL;
+			$item->tax = \IPS\Settings::i()->clubs_paid_tax ? \IPS\nexus\Tax::load( \IPS\Settings::i()->clubs_paid_tax ) : NULL;
 		}
-		catch ( OutOfRangeException $e ) { }
-		if ( Settings::i()->clubs_paid_gateways )
+		catch ( \OutOfRangeException $e ) { }
+		if ( \IPS\Settings::i()->clubs_paid_gateways )
 		{
-			$item->paymentMethodIds = explode( ',', Settings::i()->clubs_paid_gateways );
+			$item->paymentMethodIds = explode( ',', \IPS\Settings::i()->clubs_paid_gateways );
 		}
 		$item->renewalTerm = $this->renewalTerm( $fee->currency );
 		$item->payTo = $this->owner;
-		$item->commission = Settings::i()->clubs_paid_commission;
-		if ( $fees = Settings::i()->clubs_paid_transfee and isset( $fees[ $fee->currency ] ) )
+		$item->commission = \IPS\Settings::i()->clubs_paid_commission;
+		if ( $fees = \IPS\Settings::i()->clubs_paid_transfee and isset( $fees[ $fee->currency ] ) )
 		{
-			$item->fee = new Money( $fees[ $fee->currency ]['amount'], $fee->currency );
+			$item->fee = new \IPS\nexus\Money( $fees[ $fee->currency ]['amount'], $fee->currency );
 		}
 		
 		/* Generate the invoice */
-		$invoice = new Invoice;
+		$invoice = new \IPS\nexus\Invoice;
 		$invoice->currency = $fee->currency;
 		$invoice->member = $member;
 		$invoice->addItem( $item );
@@ -1292,17 +1096,17 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Get members
 	 *
-	 * @param array $statuses			The membership statuses to get
-	 * @param array|int|null $limit				Rows to fetch or array( offset, limit )
-	 * @param string|null $order				ORDER BY clause
-	 * @param int $returnType			0 = core_clubs_memberships rows, 1 = core_clubs_memberships plus \IPS\Member::columnsForPhoto(), 2 = full core_members rows, 3 = same as 1 but also getting name of adder/invitee, 4 = count only, 5 = same as 3 but also getting expire date
-	 * @return	Select|int
+	 * @param	array		$statuses			The membership statuses to get
+	 * @param	array|int	$limit				Rows to fetch or array( offset, limit )
+	 * @param	string		$order				ORDER BY clause
+	 * @param	int			$returnType			0 = core_clubs_memberships rows, 1 = core_clubs_memberships plus \IPS\Member::columnsForPhoto(), 2 = full core_members rows, 3 = same as 1 but also getting name of adder/invitee, 4 = count only, 5 = same as 3 but also getting expire date
+	 * @return	\IPS\Db\Select|int
 	 */
-	public function members( array $statuses = array( 'member', 'moderator', 'leader' ), array|int|null $limit = 25, ?string $order = 'core_clubs_memberships.joined ASC', int $returnType = 1 ): Select|int
+	public function members( $statuses = array( 'member', 'moderator', 'leader' ), $limit = 25, $order = 'core_clubs_memberships.joined ASC', $returnType = 1 )
 	{	
 		if ( $returnType === 4 )
 		{
-			return Db::i()->select( 'COUNT(*)', 'core_clubs_memberships', array( array( 'club_id=?', $this->id ), array( Db::i()->in( 'status', $statuses ) ) ) )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs_memberships', array( array( 'club_id=?', $this->id ), array( \IPS\Db::i()->in( 'status', $statuses ) ) ) )->first();
 		}
 		else
 		{
@@ -1317,20 +1121,20 @@ class Club extends ActiveRecord implements Embeddable
 				{
 					$columns .= ',' . implode( ',', array_map( function( $column ) {
 						return 'core_members.' . $column;
-					}, Member::columnsForPhoto() ) );
+					}, \IPS\Member::columnsForPhoto() ) );
 				}
 				if ( $returnType === 3 or $returnType === 5 )
 				{
 					$columns .= ',added_by.name,invited_by.name';
 					
-					if ( $returnType === 5 and Application::appIsEnabled('nexus') and Settings::i()->clubs_paid_on and $this->isPaid() and $this->renewal_price )
+					if ( $returnType === 5 and \IPS\Application::appIsEnabled('nexus') and \IPS\Settings::i()->clubs_paid_on and $this->isPaid() and $this->renewal_price )
 					{
 						$columns .= ',nexus_purchases.ps_active,nexus_purchases.ps_expire';
 					}
 				}
 			}
 			
-			$select = Db::i()->select( $columns, 'core_clubs_memberships', array( array( 'club_id=?', $this->id ), array( Db::i()->in( 'status', $statuses ) ) ), $order, $limit, NULL, NULL, Db::SELECT_MULTIDIMENSIONAL_JOINS );
+			$select = \IPS\Db::i()->select( $columns, 'core_clubs_memberships', array( array( 'club_id=?', $this->id ), array( \IPS\Db::i()->in( 'status', $statuses ) ) ), $order, $limit, NULL, NULL, \IPS\Db::SELECT_MULTIDIMENSIONAL_JOINS );
 		}
 
 		if ( $returnType === 1 or $returnType === 2 or $returnType === 3 or $returnType === 5 )
@@ -1342,7 +1146,7 @@ class Club extends ActiveRecord implements Embeddable
 			$select->join( array( 'core_members', 'added_by' ), 'added_by.member_id=core_clubs_memberships.added_by' );
 			$select->join( array( 'core_members', 'invited_by' ), 'invited_by.member_id=core_clubs_memberships.invited_by' );
 			
-			if ( $returnType === 5 and Application::appIsEnabled('nexus') and Settings::i()->clubs_paid_on and $this->isPaid() and $this->renewal_price )
+			if ( $returnType === 5 and \IPS\Application::appIsEnabled('nexus') and \IPS\Settings::i()->clubs_paid_on and $this->isPaid() and $this->renewal_price )
 			{
 				$select->join( 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_member=core_clubs_memberships.member_id AND ps_item_id=? AND ps_cancelled=0', 'core', 'club', $this->id ) );
 			}
@@ -1354,14 +1158,14 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * @brief	Cache of randomTenMembers()
 	 */
-	protected ?array $_randomTenMembers = NULL;
+	protected $_randomTenMembers = NULL;
 	
 	/**
 	 * Get basic data of a random ten members in the club (for cards)
 	 *
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function randomTenMembers(): ?array
+	public function randomTenMembers()
 	{
 		if ( !isset( $this->_randomTenMembers ) )
 		{
@@ -1373,35 +1177,38 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Add a member
 	 *
-	 * @param	Member			$member		The member
-	 * @param string $status		Status
-	 * @param bool $update		Update membership if already a member?
-	 * @param	Member|NULL	$addedBy	The leader who added them, or NULL if joining themselves
-	 * @param	Member|NULL	$invitedBy	The member who invited them, or NULL if joining themselves
-	 * @param bool $updateJoinedDate	Whether to update the joined date or not (FALSE by default, set to TRUE when an invited member accepts)
+	 * @param	\IPS\Member			$member		The member
+	 * @param	string				$status		Status
+	 * @param	bool				$update		Update membership if already a member?
+	 * @param	\IPS\Member|NULL	$addedBy	The leader who added them, or NULL if joining themselves
+	 * @param	\IPS\Member|NULL	$invitedBy	The member who invited them, or NULL if joining themselves
+	 * @param	bool				$updateJoinedDate	Whether to update the joined date or not (FALSE by default, set to TRUE when an invited member accepts)
 	 * @return	void
-	 * @throws	OverflowException	Member is already in the club and $update was FALSE
+	 * @throws	\OverflowException	Member is already in the club and $update was FALSE
 	 */
-	public function addMember( Member $member, string $status = 'member', bool $update=FALSE, Member $addedBy = NULL, Member $invitedBy = NULL, bool $updateJoinedDate=FALSE ) : void
+	public function addMember( \IPS\Member $member, $status = 'member', $update = FALSE, \IPS\Member $addedBy = NULL, \IPS\Member $invitedBy = NULL, $updateJoinedDate = FALSE )
 	{
-		/* Get the current status so that we can figure out if this is a new membership */
-		$currentStatus = $this->memberStatus( $member );
-
 		try
 		{
-			Db::i()->insert( 'core_clubs_memberships', array(
+			\IPS\Db::i()->insert( 'core_clubs_memberships', array(
 				'club_id'	=> $this->id,
 				'member_id'	=> $member->member_id,
 				'joined'	=> time(),
 				'status'	=> $status,
-				'added_by'	=> $addedBy?->member_id,
-				'invited_by'=> $invitedBy?->member_id
+				'added_by'	=> $addedBy ? $addedBy->member_id : NULL,
+				'invited_by'=> $invitedBy ? $invitedBy->member_id : NULL
 			) );
 
 			$member->rebuildPermissionArray();
+			if ( \IPS\Settings::i()->club_nodes_in_apps )
+			{
+				$member->create_menu = NULL;
+				$member->save();
+			}
+
 			$this->memberStatuses[ $member->member_id ] = $status;
 		}
-		catch ( Exception $e )
+		catch ( \IPS\Db\Exception $e )
 		{
 			if ( $e->getCode() === 1062 )
 			{
@@ -1423,37 +1230,36 @@ class Club extends ActiveRecord implements Embeddable
 						$save['joined']	= time();
 					}
 								
-					Db::i()->update( 'core_clubs_memberships', $save, array( 'club_id=? AND member_id=?', $this->id, $member->member_id ) );
+					/* Log to Member History */
+					if ( \in_array( $status, array( \IPS\Member\Club::STATUS_MEMBER, \IPS\Member\Club::STATUS_BANNED ) ) )
+					{
+						$memberStatus = $this->memberStatus( $member, 2 );
+						
+						/* Joining by invite */
+						if ( $memberStatus['status'] == \IPS\Member\Club::STATUS_INVITED ) 
+						{
+							$addedBy = \IPS\Member::load( $memberStatus['invited_by'] );
+						} 
+						$member->logHistory( 'core', 'club_membership', array('club_id' => $this->id, 'type' => $status ), $addedBy );
+					}
+					\IPS\Db::i()->update( 'core_clubs_memberships', $save, array( 'club_id=? AND member_id=?', $this->id, $member->member_id ) );
 					
 					$member->rebuildPermissionArray();
-					$this->memberStatuses[ $member->member_id ] = $status;
+					if ( \IPS\Settings::i()->club_nodes_in_apps )
+					{
+						$member->create_menu = NULL;
+						$member->save();
+					}
 				}
 				else
 				{
-					throw new OverflowException;
+					throw new \OverflowException;
 				}
 			}
 			else
 			{
 				throw $e;
-			}
-		}
-
-		/* Is this club an auto-follow? */
-		if( $this->auto_follow and in_array( $status, [ static::STATUS_MEMBER, static::STATUS_LEADER, static::STATUS_MODERATOR ] ) and !in_array( $currentStatus, [ static::STATUS_MEMBER, static::STATUS_LEADER, static::STATUS_MODERATOR ] ) )
-		{
-			$this->follow( 'immediate', true, $member );
-		}
-
-		/* Log to Member History */
-		$memberStatus = $this->memberStatus( $member, 2 );
-		if( in_array( $memberStatus['status'], [ Club::STATUS_INVITED, Club::STATUS_INVITED_BYPASSING_PAYMENT, Club::STATUS_BANNED, Club::STATUS_MEMBER, Club::STATUS_DECLINED, Club::STATUS_REQUESTED ] ) )
-		{
-			if ( $memberStatus['status'] == Club::STATUS_INVITED )
-			{
-				$addedBy = Member::load( $memberStatus['invited_by'] );
-			}
-			$member->logHistory( 'core', 'club_membership', array('club_id' => $this->id, 'type' => $status ), $addedBy );
+			}			
 		}
 
 		$params = [
@@ -1462,12 +1268,10 @@ class Club extends ActiveRecord implements Embeddable
 			'status' => $status
 		];
 
-		Webhook::fire( 'club_member_added', $params );
-
-        Event::fire( 'onJoinClub', $member, array( $this ) );
+		\IPS\Api\Webhook::fire( 'club_member_added', $params );
 		
 		/* Achievements */
-		if( in_array( $status, array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER, static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR ) ) )
+		if( \in_array( $status, array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER, static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR ) ) )
 		{
 			$member->achievementAction( 'core', 'JoinClub', $this );
 		}		
@@ -1476,19 +1280,19 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Send an invitation to a member
 	 *
-	 * @param	Member		$inviter	Person doing the inviting
-	 * @param array $members	Array of members being invited
+	 * @param	\IPS\Member		$inviter	Person doing the inviting
+	 * @param	array			$members	Array of members being invited
 	 * @return	void
 	 */
-	public function sendInvitation( Member $inviter, array $members ) : void
+	public function sendInvitation( \IPS\Member $inviter, $members )
 	{
-		$notification = new Notification( Application::load('core'), 'club_invitation', $this, array( $this, $inviter ), array( 'invitedBy' => $inviter->member_id ) );
+		$notification = new \IPS\Notification( \IPS\Application::load('core'), 'club_invitation', $this, array( $this, $inviter ), array( 'invitedBy' => $inviter->member_id ) );
 		foreach ( $members as $member )
 		{
-			if ( $member instanceof Member )
+			if ( $member instanceof \IPS\Member )
 			{
 				$memberStatus = $this->memberStatus( $member );
-				if ( !$memberStatus or in_array( $memberStatus, array( Club::STATUS_INVITED, Club::STATUS_REQUESTED, Club::STATUS_DECLINED, Club::STATUS_BANNED ) ) )
+				if ( !$memberStatus or \in_array( $memberStatus, array( \IPS\Member\Club::STATUS_INVITED, \IPS\Member\Club::STATUS_REQUESTED, \IPS\Member\Club::STATUS_DECLINED, \IPS\Member\Club::STATUS_BANNED ) ) )
 				{
 					$notification->recipients->attach( $member );
 				}
@@ -1500,27 +1304,22 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Remove a member
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @return	void
 	 */
-	public function removeMember( Member $member ) : void
+	public function removeMember( \IPS\Member $member )
 	{
-		Db::i()->delete( 'core_clubs_memberships', array( 'club_id=? AND member_id=?', $this->id, $member->member_id ) );
+		\IPS\Db::i()->delete( 'core_clubs_memberships', array( 'club_id=? AND member_id=?', $this->id, $member->member_id ) );
 
+		\IPS\Api\Webhook::fire( 'club_member_removed', ['club' => $this, 'member' => $member] );
+
+		
 		$member->rebuildPermissionArray();
-
-		/* Clear out the member from any local caches */
-		if( isset( $this->memberStatuses[ $member->member_id ] ) )
+		if ( \IPS\Settings::i()->club_nodes_in_apps )
 		{
-			unset( $this->memberStatuses[ $member->member_id ] );
+			$member->create_menu = NULL;
+			$member->save();
 		}
-
-		/* Unfollow the club */
-		$this->unfollow( $member );
-
-		Webhook::fire( 'club_member_removed', ['club' => $this, 'member' => $member] );
-
-        Event::fire( 'onLeaveClub', $member, array( $this ) );
 	}
 	
 	/**
@@ -1528,9 +1327,9 @@ class Club extends ActiveRecord implements Embeddable
 	 *
 	 * @return	void
 	 */
-	public function recountMembers() : void
+	public function recountMembers()
 	{
-		$this->members = Db::i()->select( 'COUNT(*)', 'core_clubs_memberships', array( 'club_id=? AND ( status=? OR status=? OR status=? OR status=? OR status=? )', $this->id, static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER, static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR ) )->first();
+		$this->members = \IPS\Db::i()->select( 'COUNT(*)', 'core_clubs_memberships', array( 'club_id=? AND ( status=? OR status=? OR status=? OR status=? OR status=? )', $this->id, static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER, static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR ) )->first();
 		$this->save();
 	}
 	
@@ -1539,28 +1338,22 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Get available features
 	 *
-	 * @param	Member|NULL	$member	If a member object is provided, will only get the types that member can create
+	 * @param	\IPS\Member|NULL	$member	If a member object is provided, will only get the types that member can create
 	 * @return	array
 	 */
-	public static function availableNodeTypes( Member $member = NULL ): array
+	public static function availableNodeTypes( \IPS\Member $member = NULL )
 	{
 		$return = array();
 						
-		foreach ( Application::allExtensions( 'core', 'ContentRouter' ) as $contentRouter )
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter' ) as $contentRouter )
 		{
 			foreach ( $contentRouter->classes as $class )
 			{
-				if ( isset( $class::$containerNodeClass ) and IPS::classUsesTrait( $class::$containerNodeClass, ClubContainer::class ) )
-				{
-					$nodeClass = $class::$containerNodeClass;
-					if( !$nodeClass::canBeAddedToClub() )
+				if ( isset( $class::$containerNodeClass ) and \IPS\IPS::classUsesTrait( $class::$containerNodeClass, 'IPS\Content\ClubContainer' ) )
+				{					
+					if ( $member === NULL or $member->group['g_club_allowed_nodes'] === '*' or \in_array( $class::$containerNodeClass, explode( ',', $member->group['g_club_allowed_nodes'] ) ) )
 					{
-						continue;
-					}
-
-					if ( $member === NULL or $member->group['g_club_allowed_nodes'] === '*' or in_array( $nodeClass, explode( ',', $member->group['g_club_allowed_nodes'] ) ) )
-					{
-						$return[] = $nodeClass;
+						$return[] = $class::$containerNodeClass;
 					}
 				}
 			}
@@ -1577,7 +1370,7 @@ class Club extends ActiveRecord implements Embeddable
 	public function pages(): array
 	{
 		$return = array();
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_club_pages', array( "page_club=?", $this->id ) ), 'IPS\Member\Club\Page' ) AS $row )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_club_pages', array( "page_club=?", $this->id ) ), 'IPS\Member\Club\Page' ) AS $row )
 		{
 			$return['page-' . $row->id] = $row;
 		}
@@ -1587,35 +1380,28 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * @brief	Cached nodes
 	 */
-	protected ?array $cachedNodes	= NULL;
-
+	protected $cachedNodes	= NULL;
+	
 	/**
 	 * Get Node names and URLs
 	 *
-	 * @return array|null
+	 * @return	array
 	 */
-	public function nodes(): ?array
+	public function nodes()
 	{
 		if( $this->cachedNodes === NULL )
 		{
 			$this->cachedNodes = array();
 			
-			foreach ( Db::i()->select( '*', 'core_clubs_node_map', array( 'club_id=?', $this->id ) ) as $row )
+			foreach ( \IPS\Db::i()->select( '*', 'core_clubs_node_map', array( 'club_id=?', $this->id ) ) as $row )
 			{
 				$class		= $row['node_class'];
 				$classBits	= explode( '\\', $class );
-				try
-				{
-					if( !Application::load( $classBits[1] )->_enabled )
-					{
-						continue;
-					}
-				}
-				catch( \OutOfRangeException $e)
+
+				if( !\IPS\Application::load( $classBits[1] )->_enabled )
 				{
 					continue;
 				}
-
 
 				/* Make sure the class exists. This can happen in the case of Pages databases/categories */
 				if( !class_exists( $row['node_class'] ) )
@@ -1627,12 +1413,12 @@ class Club extends ActiveRecord implements Embeddable
 				{
 					$node = $row['node_class']::load( $row['node_id'] );
 
-					if ( class_exists( '\\IPS\\cms\\Categories' ) and $node instanceof Categories and !( class_exists( '\\IPS\\cms\\Pages\\Page' ) and Page::loadByDatabaseId( $node->database()->_id ) ) )
+					if ( \class_exists( '\\IPS\\cms\\Categories' ) and $node instanceof \IPS\cms\Categories and !( \class_exists( '\\IPS\\cms\\Pages\\Page' ) and \IPS\cms\Pages\Page::loadByDatabaseId( $node->database()->_id ) ) )
 					{
 						continue;
 					}
 					
-					if( $node instanceof Categories )
+					if( $node instanceof \IPS\cms\Categories )
 					{
 						if( !$node->canView() )
 						{
@@ -1648,9 +1434,9 @@ class Club extends ActiveRecord implements Embeddable
 					'public'		=> $row['public']
 					);
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
-					Log::log( 'Missing club node ' . $row['node_class'] . ' ' . $row['node_id'] . " is being loaded.", 'club_nodes');
+					\IPS\Log::log( 'Missing club node ' . $row['node_class'] . ' ' . $row['node_id'] . " is being loaded.", 'club_nodes');
 				}
 			}
 		}
@@ -1664,15 +1450,15 @@ class Club extends ActiveRecord implements Embeddable
 	 *
 	 * @param	mixed	$id		ID
 	 * @return	static
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadAndCheckPerms( mixed $id ): static
+	public static function loadAndCheckPerms( $id )
 	{
 		$obj = static::load( $id );
 
 		if ( !$obj->canView() )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		return $obj;
@@ -1681,21 +1467,21 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Can a member see this club and who's in it?
 	 *
-	 * @param	Member|null	$member	The member (NULL for currently logged in member)
+	 * @param	\IPS\Member	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canView( Member $member = NULL ): bool
+	public function canView( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		/* If we can't access the module, stop here */
-		if ( !$member->canAccessModule( Module::get( 'core', 'clubs', 'front' ) ) )
+		if ( !$member->canAccessModule( \IPS\Application\Module::get( 'core', 'clubs', 'front' ) ) )
 		{
 			return FALSE;
 		}
 
 		/* If it's not approved, only moderators and the person who created it can see it */
-		if ( Settings::i()->clubs_require_approval and !$this->approved )
+		if ( \IPS\Settings::i()->clubs_require_approval and !$this->approved )
 		{
 			return ( $member->modPermission('can_access_all_clubs') or ( $this->owner AND $member->member_id == $this->owner->member_id ) );
 		}
@@ -1713,19 +1499,19 @@ class Club extends ActiveRecord implements Embeddable
 		}
 				
 		/* Otherwise, only if they're a member or have been invited */		
-		return in_array( $this->memberStatus( $member ), array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER, static::STATUS_INVITED, static::STATUS_INVITED_BYPASSING_PAYMENT, static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR ) );
+		return \in_array( $this->memberStatus( $member ), array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER, static::STATUS_INVITED, static::STATUS_INVITED_BYPASSING_PAYMENT, static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR ) );
 	}
 	
 	/**
 	 * Can a member join (or ask to join) this club?
 	 *
-	 * @param	Member|null	$member	The member (NULL for currently logged in member)
+	 * @param	\IPS\Member	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canJoin( Member $member = NULL ): bool
+	public function canJoin( \IPS\Member $member = NULL )
 	{
 		/* If it's not approved, nobody can join it */
-		if ( Settings::i()->clubs_require_approval and !$this->approved )
+		if ( \IPS\Settings::i()->clubs_require_approval and !$this->approved )
 		{
 			return FALSE;
 		}
@@ -1737,7 +1523,7 @@ class Club extends ActiveRecord implements Embeddable
 		}
 		
 		/* Guests cannot join clubs */
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		if ( !$member->member_id )
 		{
 			return FALSE;
@@ -1745,7 +1531,7 @@ class Club extends ActiveRecord implements Embeddable
 		
 		/* If they're already a member, or have aleready asked to join, they can't join again */
 		$memberStatus = $this->memberStatus( $member );
-		if ( in_array( $memberStatus, array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER, static::STATUS_REQUESTED, static::STATUS_DECLINED, static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR ) ) )
+		if ( \in_array( $memberStatus, array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER, static::STATUS_REQUESTED, static::STATUS_DECLINED, static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR ) ) )
 		{
 			return FALSE;
 		}
@@ -1759,7 +1545,7 @@ class Club extends ActiveRecord implements Embeddable
 		/* If it's private or read-only, they have to be invited */
 		if ( $this->type === static::TYPE_PRIVATE or $this->type === static::TYPE_READONLY )
 		{
-			return in_array( $memberStatus, array( static::STATUS_INVITED, static::STATUS_INVITED_BYPASSING_PAYMENT ) );
+			return \in_array( $memberStatus, array( static::STATUS_INVITED, static::STATUS_INVITED_BYPASSING_PAYMENT ) );
 		}
 		
 		/* Otherwise they can join */
@@ -1769,10 +1555,10 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Can a member see the posts in this club?
 	 *
-	 * @param	Member|null	$member	The member (NULL for currently logged in member)
+	 * @param	\IPS\Member	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canRead( Member $member = NULL ) : bool
+	public function canRead( \IPS\Member $member = NULL )
 	{
 		switch ( $this->type )
 		{
@@ -1783,20 +1569,18 @@ class Club extends ActiveRecord implements Embeddable
 				
 			case static::TYPE_CLOSED:
 			case static::TYPE_PRIVATE:
-				$member = $member ?: Member::loggedIn();
-				return ( $member->modPermission('can_access_all_clubs') or in_array( $this->memberStatus( $member ), array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER ) ) );
+				$member = $member ?: \IPS\Member::loggedIn();
+				return ( $member->modPermission('can_access_all_clubs') or \in_array( $this->memberStatus( $member ), array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER ) ) );
 		}
-
-		return false;
 	}
 	
 	/**
 	 * Can a member participate this club?
 	 *
-	 * @param	Member|null	$member	The member (NULL for currently logged in member)
+	 * @param	\IPS\Member	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canPost( Member $member = NULL ) : bool
+	public function canPost( \IPS\Member $member = NULL )
 	{
 		switch ( $this->type )
 		{
@@ -1807,22 +1591,20 @@ class Club extends ActiveRecord implements Embeddable
 			case static::TYPE_CLOSED:
 			case static::TYPE_PRIVATE:
 			case static::TYPE_READONLY:
-				$member = $member ?: Member::loggedIn();
-				return $member->modPermission('can_access_all_clubs') or in_array( $this->memberStatus( $member ), array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER ) );
+				$member = $member ?: \IPS\Member::loggedIn();
+				return $member->modPermission('can_access_all_clubs') or \in_array( $this->memberStatus( $member ), array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER ) );
 		}
-
-		return false;
 	}
 	
 	/**
 	 * Can a member invite other members
 	 *
-	 * @param	Member|null	$member	The member (NULL for currently logged in member)
+	 * @param	\IPS\Member	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canInvite( Member $member = NULL ): bool
+	public function canInvite( \IPS\Member $member = NULL )
 	{
-		if ( Settings::i()->clubs_require_approval and !$this->approved )
+		if ( \IPS\Settings::i()->clubs_require_approval and !$this->approved )
 		{
 			return FALSE;
 		}
@@ -1833,68 +1615,66 @@ class Club extends ActiveRecord implements Embeddable
 				return FALSE;
 				
 			case static::TYPE_OPEN:
-				$member = $member ?: Member::loggedIn();
-				return $member->modPermission('can_access_all_clubs') or in_array( $this->memberStatus( $member ), array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER ) );
+				$member = $member ?: \IPS\Member::loggedIn();
+				return $member->modPermission('can_access_all_clubs') or \in_array( $this->memberStatus( $member ), array( static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER ) );
 				
 			case static::TYPE_CLOSED:
 			case static::TYPE_PRIVATE:
 			case static::TYPE_READONLY:
 				return $this->isLeader( $member );
 		}
-
-		return FALSE;
 	}
 
 	/**
 	 * Does this user have permissions to manage the navigation
 	 *
-	 * @param	Member|null	$member	The member (NULL for currently logged in member)
+	 * @param	\IPS\Member	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canManageNavigation( Member $member = NULL ): bool
+	public function canManageNavigation( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		return $this->isLeader( $member );
 	}
 	
 	/**
 	 * Does this user have leader permissions in the club?
 	 *
-	 * @param	Member|null	$member	The member (NULL for currently logged in member)
+	 * @param	\IPS\Member	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function isLeader( Member $member = NULL ): bool
+	public function isLeader( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		return $member->modPermission('can_access_all_clubs') or $this->memberStatus( $member ) === static::STATUS_LEADER;
 	}
 	
 	/**
 	 * Does this user have moderator permissions in the club?
 	 *
-	 * @param	Member|null	$member	The member (NULL for currently logged in member)
+	 * @param	\IPS\Member	$member	The member (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function isModerator( Member $member = NULL ) : bool
+	public function isModerator( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
-		return $member->modPermission('can_access_all_clubs') or in_array( $this->memberStatus( $member ), array( static::STATUS_MODERATOR, static::STATUS_LEADER ) );
+		$member = $member ?: \IPS\Member::loggedIn();
+		return $member->modPermission('can_access_all_clubs') or \in_array( $this->memberStatus( $member ), array( static::STATUS_MODERATOR, static::STATUS_LEADER ) );
 	}
 
 	
 	/**
 	 * @brief	Membership status cache
 	 */
-	public array $memberStatuses = array();
+	public $memberStatuses = array();
 	
 	/**
 	 * Get status of a particular member
 	 *
-	 * @param	Member	$member		The member
-	 * @param int $returnType	1 will return a string with the type or NULL if not applicable. 2 will return array with status, joined, accepted_by, invited_by
+	 * @param	\IPS\Member	$member		The member
+	 * @param	int			$returnType	1 will return a string with the type or NULL if not applicable. 2 will return array with status, joined, accepted_by, invited_by
 	 * @return	mixed
 	 */
-	public function memberStatus( Member $member, int $returnType = 1 ): mixed
+	public function memberStatus( \IPS\Member $member, $returnType = 1 )
 	{
 		if ( !$member->member_id )
 		{
@@ -1905,7 +1685,7 @@ class Club extends ActiveRecord implements Embeddable
 		{
 			try
 			{
-				$val = Db::i()->select( $returnType === 2 ? '*' : array( 'status' ), 'core_clubs_memberships', array( 'club_id=? AND member_id=?', $this->id, $member->member_id ) )->first();
+				$val = \IPS\Db::i()->select( $returnType === 2 ? '*' : array( 'status' ), 'core_clubs_memberships', array( 'club_id=? AND member_id=?', $this->id, $member->member_id ) )->first();
 				
 				if ( $returnType === 2 )
 				{
@@ -1916,7 +1696,7 @@ class Club extends ActiveRecord implements Embeddable
 					$this->memberStatuses[ $member->member_id ] = $val;
 				}
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				$this->memberStatuses[ $member->member_id ] = NULL;
 			}
@@ -1928,50 +1708,93 @@ class Club extends ActiveRecord implements Embeddable
 	/* ! Following */
 
 	/**
+	 * @brief	Following publicly
+	 */
+	const FOLLOW_PUBLIC = 1;
+
+	/**
+	 * @brief	Following anonymously
+	 */
+	const FOLLOW_ANONYMOUS = 2;
+	
+	/**
+	 * @brief	Cache for current follow data, used on "My Followed Content" screen
+	 */
+	public $_followData;
+		
+	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'core';
+	public static $application = 'core';
+	
+	/**
+	 * Followers Count
+	 *
+	 * @param	int						$privacy		static::FOLLOW_PUBLIC + static::FOLLOW_ANONYMOUS
+	 * @param	array					$frequencyTypes	array( 'immediate', 'daily', 'weekly' )
+	 * @param	\IPS\DateTime|int|NULL	$date			Only users who started following before this date will be returned. NULL for no restriction
+	 * @return	int
+	 */
+	public function followersCount( $privacy=3, $frequencyTypes=array( 'none', 'immediate', 'daily', 'weekly' ), $date=NULL )
+	{
+		/* Return the count */
+		return static::_followersCount( 'club', $this->id, $privacy, $frequencyTypes, $date );
+	}
+	
+	/**
+	 * Followers
+	 *
+	 * @param	int						$privacy		static::FOLLOW_PUBLIC + static::FOLLOW_ANONYMOUS
+	 * @param	array					$frequencyTypes	array( 'immediate', 'daily', 'weekly' )
+	 * @param	\IPS\DateTime|int|NULL	$date			Only users who started following before this date will be returned. NULL for no restriction
+	 * @param	int|array				$limit			LIMIT clause
+	 * @param	string					$order			Column to order by
+	 * @return	\IPS\Db\Select|NULL
+	 * @throws	\BadMethodCallException
+	 */
+	public function followers( $privacy=3, $frequencyTypes=array( 'none', 'immediate', 'daily', 'weekly' ), $date=NULL, $limit=array( 0, 25 ), $order=NULL )
+	{		
+		return static::_followers( 'club', $this->id, $privacy, $frequencyTypes, $date, $limit, $order );
+	}
 	
 	/* ! Utility */
 
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		parent::delete();
 
-		Webhook::fire( 'club_deleted', $this );
+		\IPS\Api\Webhook::fire( 'club_deleted', $this );
 
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_club_pages', array( 'page_club=?', $this->id ) ), 'IPS\Member\Club\Page' ) as $page )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_club_pages', array( 'page_club=?', $this->id ) ), 'IPS\Member\Club\Page' ) as $page )
 		{
 			$page->delete( FALSE );
 		}
 
 		$this->coverPhoto( FALSE )->delete();
-
-		Event::fire( 'onDelete', $this );
 	}
 	
 	/**
 	 * Remove nodes that are owned by a specific application. Used when uninstalling an app
 	 *
-	 * @param	Application	$app	The application being deleted
+	 * @param	\IPS\Application	$app	The application being deleted
 	 * @return void
 	 */
-	public static function deleteByApplication( Application $app ) : void
+	public static function deleteByApplication( \IPS\Application $app )
 	{
-		foreach( Db::i()->select( 'node_class', 'core_clubs_node_map', NULL, NULL, NULL, 'node_class' ) as $class )
+		foreach( \IPS\Db::i()->select( 'node_class', 'core_clubs_node_map', NULL, NULL, NULL, 'node_class' ) as $class )
 		{
-			if ( class_exists( $class ) and isset( $class::$contentItemClass ) )
+			if ( isset( $class::$contentItemClass ) )
 			{
 				$contentItemClass = $class::$contentItemClass;
 
 				if ( $contentItemClass::$application == $app->directory )
 				{
-					Db::i()->delete( 'core_clubs_node_map', array( 'node_class=?', $class  ) );
+					\IPS\Db::i()->delete( 'core_clubs_node_map', array( 'node_class=?', $class  ) );
 				}
 			}
 		}
@@ -1980,7 +1803,7 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return		array
 	 * @apiresponse	int			id				ID number
 	 * @apiresponse	string		name			Name
@@ -2009,13 +1832,13 @@ class Club extends ActiveRecord implements Embeddable
 	 * @apiresponse	\IPS\nexus\Purchase\RenewalTerm|null	renewalTerm	Renewal term for the club, or null if there are no renewals
 	 * @note	When trying to determine all users who can access the club, the owner object should be combined with all leaders, moderators and members. Only up to 250 members will be returned (sorted by most recently joining the club) but the full member count can be seen with the memberCount property.
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		$coverPhoto = NULL;
 
 		if ( $this->cover_photo )
 		{
-			$coverPhoto = (string) File::get( 'core_Clubs', $this->cover_photo )->url;
+			$coverPhoto = (string) \IPS\File::get( 'core_Clubs', $this->cover_photo )->url;
 		}
 
 		$members		= array();
@@ -2024,9 +1847,9 @@ class Club extends ActiveRecord implements Embeddable
 
 		foreach( $this->members( array( 'member', 'moderator', 'leader' ), 250, 'core_clubs_memberships.joined DESC', 2 ) as $member )
 		{
-			$member = Member::constructFromData( $member );
+			$member = \IPS\Member::constructFromData( $member );
 
-			if( $this->owner !== $member )
+			if( $this->owner != $member )
 			{
 				if( $this->isLeader( $member ) )
 				{
@@ -2046,13 +1869,13 @@ class Club extends ActiveRecord implements Embeddable
 		$customFields	= array();
 		$fieldValues	= $this->fieldValues();
 
-		if( CustomField::roots() )
+		if( \IPS\Member\Club\CustomField::roots() )
 		{
-			foreach( CustomField::roots() as $field )
+			foreach( \IPS\Member\Club\CustomField::roots() as $field )
 			{
 				if( isset( $fieldValues['field_' . $field->id ] ) )
 				{
-					$fieldObject = new Field( Lang::load( Lang::defaultLanguage() )->get( 'core_clubfield_' . $field->id ), $fieldValues[ 'field_' . $field->id ] );
+					$fieldObject = new \IPS\core\ProfileFields\Api\Field( \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( 'core_clubfield_' . $field->id ), $fieldValues[ 'field_' . $field->id ] );
 					$customFields[] = $fieldObject->apiOutput( $authorizedMember );
 				}
 			}
@@ -2066,12 +1889,12 @@ class Club extends ActiveRecord implements Embeddable
 			'created'			=> $this->created->rfc3339(),
 			'memberCount'		=> $this->members,
 			'owner'				=> $this->owner ? $this->owner->apiOutput() : NULL,
-			'photo'				=> $this->profile_photo ? (string) File::get( 'core_Clubs', $this->profile_photo )->url : NULL,
+			'photo'				=> $this->profile_photo ? (string) \IPS\File::get( 'core_Clubs', $this->profile_photo )->url : NULL,
 			'featured'			=> (bool) $this->featured,
-			'paid'				=> $this->isPaid(),
+			'paid'				=> (bool) $this->isPaid(),
 			'location'			=> ( $location = $this->location() ) ? $location->apiOutput() : NULL,
 			'about'				=> $this->about,
-			'lastActivity'		=> DateTime::ts( $this->last_activity )->rfc3339(),
+			'lastActivity'		=> \IPS\DateTime::ts( $this->last_activity )->rfc3339(),
 			'contentCount'		=> $this->content,
 			'coverPhotoUrl'		=> $coverPhoto,
 			'coverOffset'		=> $this->cover_offset,
@@ -2084,6 +1907,7 @@ class Club extends ActiveRecord implements Embeddable
 					$node['url'] = (string) $node['url'];
 					$node['id']  = $node['node_id'];
 					$node['class'] = $node['node_class'];
+					$node['public'] = $node['public'];
 
 					unset( $node['node_id'], $node['node_class'] );
 
@@ -2096,16 +1920,16 @@ class Club extends ActiveRecord implements Embeddable
 			$return['approved']	= (bool) $this->approved;
 		}
 
-		if ( Application::appIsEnabled( 'nexus' ) )
+		if ( \IPS\Application::appIsEnabled( 'nexus' ) )
 		{
-			$defaultCurrency = $authorizedMember ? Customer::load( $authorizedMember->member_id )->defaultCurrency() : ( new Customer )->defaultCurrency();
+			$defaultCurrency = $authorizedMember ? \IPS\nexus\Customer::load( $authorizedMember->member_id )->defaultCurrency() : ( new \IPS\nexus\Customer )->defaultCurrency();
 
 			$return['joiningFee']	= $this->joiningFee( $defaultCurrency ) ? $this->joiningFee( $defaultCurrency )->apiOutput() : NULL;
 			try
 			{
 				$return['renewalTerm']	= $this->renewalTerm( $defaultCurrency ) ? $this->renewalTerm( $defaultCurrency )->apiOutput() : NULL;
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$return['renewalTerm']	= NULL;
 			}
@@ -2123,32 +1947,32 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * @brief	Cached tabs
 	 */
-	static ?array $tabs = NULL;
+	static $tabs = NULL;
 
 	/**
 	 * Get the club navbar tabs
 	 *
-	 * @param	Model|ClubPage|null	$container	Container
+	 * @param	\IPS\Node\Model|NULL	$container	Container
 	 * @return	array
 	 */
-	public function tabs( Model|ClubPage|null $container = NULL ) : array
+	public function tabs( \IPS\Node\Model $container = NULL )
 	{
 		if ( !static::$tabs )
 		{
 			$tabs = array();
 
-			$tabs[ 'club_home' ] = array( 'href' => $this->url()->setQueryString('do', 'overview'), 'title' => Member::loggedIn()->language()->addToStack( 'club_home' ), 'isActive' => ( Request::i()->module == 'clubs' AND Request::i()->do == 'overview' ) );
+			$tabs[ 'club_home' ] = array( 'href' => $this->url()->setQueryString('do', 'overview'), 'title' => \IPS\Member::loggedIn()->language()->addToStack( 'club_home' ), 'isActive' => ( \IPS\Request::i()->module == 'clubs' AND \IPS\Request::i()->do == 'overview' ) ? TRUE : FALSE );
 
 			if  ( $this->canViewMembers() )
 			{
-				$tabs['club_members'] = array( 'href' => $this->url()->setQueryString('do', 'members'), 'title' => Member::loggedIn()->language()->addToStack( 'club_members' ), 'isActive' => ( Request::i()->module == 'clubs' AND Request::i()->do == 'members' ) );
+				$tabs['club_members'] = array( 'href' => $this->url()->setQueryString('do', 'members'), 'title' => \IPS\Member::loggedIn()->language()->addToStack( 'club_members' ), 'isActive' => ( \IPS\Request::i()->module == 'clubs' AND \IPS\Request::i()->do == 'members' ) ? TRUE : FALSE );
 			}
 
 			foreach( $this->nodes() as $nodeID => $node )
 			{
 				if  ( $this->canRead() or $node['public'] )
 				{
-					$tabs[$nodeID] = array( 'href' => $node['url'] , 'title' => $node['name'], 'isActive' => ( isset( $container ) AND get_class( $container ) === $node['node_class'] and $container->_id == $node['node_id'] ) );
+					$tabs[$nodeID] = array( 'href' => $node['url'] , 'title' => $node['name'], 'isActive' => ( isset( $container ) AND \get_class( $container ) === $node['node_class'] and $container->_id == $node['node_id'] ) ? TRUE : FALSE );
 				}	
 			}
 				
@@ -2156,7 +1980,7 @@ class Club extends ActiveRecord implements Embeddable
 			{
 				if ( $page->canView() )
 				{
-					$tabs[$pageId] = array( 'href' => $page->url(), 'title' => $page->title, 'isActive' => ( Request::i()->module == 'clubs' AND Request::i()->controller == 'page' AND Request::i()->id == $page->id ) );
+					$tabs[$pageId] = array( 'href' => $page->url(), 'title' => $page->title, 'isActive' => ( \IPS\Request::i()->module == 'clubs' AND \IPS\Request::i()->controller == 'page' AND \IPS\Request::i()->id == $page->id ) );
 				}
 			}
 
@@ -2169,11 +1993,11 @@ class Club extends ActiveRecord implements Embeddable
 				$order = array_values( json_decode( $this->menu_tabs , TRUE ) );
 
 				uksort( $tabs, function( $a, $b ) use ( $order, &$changed ) {
-					if ( in_array( $a, $order ) and in_array( $b, $order ) )
+					if ( \in_array( $a, $order ) and \in_array( $b, $order ) )
 					{
 						return ( array_search( $a, $order ) > array_search( $b, $order ) ? 1 : -1 );
 					}
-					elseif ( !in_array( $b, $order) )
+					elseif ( !\in_array( $b, $order) )
 					{
 						/* A new node was added, attach it to the end */
 						$changed = TRUE;
@@ -2200,6 +2024,7 @@ class Club extends ActiveRecord implements Embeddable
 
 			if( !$hasActive )
 			{
+				reset( $tabs );
 				$first = key( $tabs );
 
 				$tabs[ $first ]['isActive'] = TRUE;
@@ -2218,270 +2043,17 @@ class Club extends ActiveRecord implements Embeddable
 	}
 
 	/**
-	 * Build the club menu
-	 *
-	 * @param Model|ClubPage|null	$container
-	 * @return Menu
-	 */
-	public function menu( Model|ClubPage|null $container = null ) : Menu
-	{
-		$menu = new Menu( 'club_manage', css: 'ipsButton ipsButton--inherit' );
-		if( Settings::i()->clubs_header == 'sidebar' )
-		{
-			$menu->css .= ' i-width_100p i-margin-top_2';
-		}
-
-		if( !$this->isLeader() and $this->owner->member_id != Member::loggedIn()->member_id and !Member::loggedIn()->modPermission( 'can_access_all_clubs' ) )
-		{
-			return $menu;
-		}
-
-		if( !Settings::i()->clubs_require_approval or $this->approved )
-		{
-			if ( $this->isLeader() and $nodeTypes = static::availableNodeTypes() )
-			{
-				foreach( $nodeTypes as $nodeType )
-				{
-					$menu->add( new Link( $this->url()->setQueryString( [ 'do' => 'nodeForm', 'type' => $nodeType ] ), $nodeType::clubFrontTitle(), dataAttributes: [ 'data-ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'club_create_node' ) ], opensDialog: true ) );
-				}
-			}
-
-			if( ( $this->owner and $this->owner->member_id == Member::loggedIn()->member_id ) or Member::loggedIn()->modPermission( 'can_access_all_clubs' ) or Member::loggedIn()->modPermission( 'can_manage_featured_clubs' ) )
-			{
-				$menu->addSeparator();
-			}
-		}
-
-		if( $this->isLeader() )
-		{
-			$menu->add( new Link( $this->url()->setQueryString( 'do', 'editPhoto' ), 'club_profile_photo', dataAttributes: [
-				'data-ipsDialog' => true,
-				'data-ipsDialog-modal' => true,
-				'data-ipsDialog-forceReload' => true,
-				'data-ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'club_profile_photo' ),
-				'data-action' => 'editPhoto'
-			] ) );
-		}
-
-		if( ( $this->owner and $this->owner->member_id == Member::loggedIn()->member_id ) or Member::loggedIn()->modPermission( 'can_access_all_clubs' ) )
-		{
-			$menu->add( new Link( $this->url()->setQueryString( 'do', 'edit' ), 'club_edit_settings', opensDialog: true ) );
-		}
-
-		if( Member::loggedIn()->modPermission( 'can_manage_featured_clubs' ) )
-		{
-			if( $this->featured )
-			{
-				$menu->add( new Link( $this->url()->csrf()->setQueryString( 'do', 'unfeature' ), 'club_unfeature', dataAttributes: [ 'data-confirm' => '' ] ) );
-			}
-			else
-			{
-				$menu->add( new Link( $this->url()->csrf()->setQueryString( 'do', 'feature' ), 'club_feature', dataAttributes: [ 'data-confirm' => '' ] ) );
-			}
-		}
-
-		if( $this->canInvite() )
-		{
-			$menu->add( new Link( $this->url()->setQueryString( 'do', 'invite' ), 'club_invite_members', dataAttributes: [ 'data-ipsDialog-size' => 'narrow' ], opensDialog: true ) );
-		}
-
-		if( $this->canManageNavigation() and count( $this->tabs( $container ) ) > 1 )
-		{
-			$menu->add( new Link( '#', 'reorder_club_menu', dataAttributes: [ 'data-action' => 'reorderClubmenu' ] ) );
-		}
-
-		if( ClubPage::canAdd( $this ) )
-		{
-			$menu->add( new Link( $this->url()->setQueryString( 'do', 'addPage' ), 'club_add_page', dataAttributes: [
-				'data-ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'add_page_to_club', true, [ 'sprintf' => $this->name ] )
-			], opensDialog: true ) );
-		}
-
-		if( $container instanceof ClubPage)
-		{
-			if( $container->canEdit() )
-			{
-				$menu->add( new Link( $container->url( 'edit' ), 'edit_page', opensDialog: true ) );
-			}
-			if( $container->canDelete() )
-			{
-				$menu->add( new Link( $container->url( 'delete' )->csrf(), 'delete_page', dataAttributes: [ 'data-confirm' => '' ] ) );
-			}
-		}
-
-		if( $container instanceof Model and $this->isLeader() and $container->canLeaderManage() )
-		{
-			$menu->addSeparator();
-			$menu->add( new Link( $this->url()->setQueryString( [ 'do' => 'nodeForm', 'type' => get_class( $container ), 'node' => $container->_id ] ), Member::loggedIn()->language()->addToStack( 'clubs_edit_this_container', true, [ 'sprintf' => Member::loggedIn()->language()->addToStack( $container::$nodeTitle . '_sg' ) ] ), dataAttributes: [ 'data-ipsDialog-title' => $container->_title ], opensDialog: true ) );
-
-			if( isset( $container::$contentItemClass ) and $itemClass = $container::$contentItemClass and ( $container->modPermission( 'delete', Member::loggedIn(), $itemClass ) or !!$itemClass::contentCount( $container, true, true, true, 1 ) ) )
-			{
-				$menu->add( new Link( $this->url()->setQueryString( [ 'do' => 'nodeDelete', 'type' => get_class( $container ), 'node' => $container->_id] )->csrf(), Member::loggedIn()->language()->addToStack( 'clubs_delete_this_container', true, [ 'sprintf' => Member::loggedIn()->language()->addToStack( $container::$nodeTitle . '_sg' ) ] ), dataAttributes: [ 'data-confirm' => '', 'data-confirmSubMessage' => Member::loggedIn()->language()->addToStack( 'clubs_delete_container_confirm' ) ] ) );
-			}
-		}
-
-		/* Extensions */
-		foreach( Application::allExtensions( 'core', 'Club' ) AS $ext )
-		{
-			foreach( $ext->menu( $this, $container ) as $link )
-			{
-				$menu->add( $link );
-			}
-		}
-
-		return $menu;
-	}
-
-	/**
-	 * Generate a buttons list for the club header
-	 *
-	 * @return Buttons
-	 */
-	public function buttons() : Buttons
-	{
-		$buttons = new Buttons();
-
-		$memberStatus = $this->memberStatus( Member::loggedIn() );
-		if( $this->type !== static::TYPE_PUBLIC )
-		{
-			if( $memberStatus === static::STATUS_BANNED )
-			{
-				$buttons->addButton( null, 'club_banned_title', icon: 'fa-solid fa-xmark', tooltip: 'club_banned_desc_short' );
-			}
-			elseif( in_array( $memberStatus, [ static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER, static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR, static::STATUS_WAITING_PAYMENT ] ) )
-			{
-				if( $memberStatus === static::STATUS_WAITING_PAYMENT )
-				{
-					$buttons->addButton( $this->url()->setQueryString( 'do', 'join' )->csrf(), 'club_pay_membership_fee' );
-				}
-				if( in_array( $memberStatus, [ static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR ] ) )
-				{
-					$buttons->addButton( $this->url()->setQueryString( 'do', 'renew' )->csrf(), 'club_renew_membership' );
-				}
-				if( !$this->owner or $this->owner->member_id != Member::loggedIn()->member_id )
-				{
-					$attributes = [ 'data-confirm' => '' ];
-					if( $this->isPaid() )
-					{
-						$attributes['data-confirmSubMessage'] = Member::loggedIn()->language()->addToStack( 'club_leave_paid_warning' );
-					}
-					$buttons->addButton( $this->url()->setQueryString( 'do', 'leave' )->csrf(), 'club_leave', dataAttributes: $attributes );
-				}
-			}
-			elseif( $this->canJoin() )
-			{
-				/* We skip the join button for the sidebar view; it's shown somewhere else */
-				if( Settings::i()->clubs_header != 'sidebar' )
-				{
-					$attributes = [];
-					if( $this->isPaid() and $memberStatus !== static::STATUS_INVITED_BYPASSING_PAYMENT )
-					{
-						$attributes = [
-							'data-confirm' => '',
-							'data-confirmIcon' => 'info',
-							'data-confirmMessage' => Member::loggedIn()->language()->addToStack( 'club_membership_item' ),
-							'data-confirmSubmessage' => Member::loggedIn()->language()->addToStack( $this->memberFeeMessage() )
-						];
-					}
-					$buttons->addButton( $this->url()->csrf()->setQueryString( 'do', 'join' )->addRef( Request::i()->url() ), 'club_join', dataAttributes: $attributes );
-				}
-			}
-			elseif( !$this->canRead() )
-			{
-				if( $memberStatus === static::STATUS_REQUESTED )
-				{
-					$buttons->addButton( $this->url()->csrf()->setQueryString( 'do', 'cancelJoin' ), 'club_cancel_request', 'ipsButton ipsButton--text', icon: 'fa-solid fa-xmark' );
-				}
-				elseif( $memberStatus === static::STATUS_DECLINED )
-				{
-					$buttons->addButton( null, 'club_denied_title', dataAttributes: [ 'aria-disabled' => 'true' ], icon: 'fa-solid fa-xmark', tooltip: Member::loggedIn()->language()->addToStack( 'club_denied_desc_short' ) );
-				}
-			}
-		}
-
-		/* Extensions */
-		foreach( Application::allExtensions( 'core', 'Club' ) AS $ext )
-		{
-			foreach( $ext->buttons( $this ) as $button )
-			{
-				if( is_string( $button ) )
-				{
-					$buttons->addHtml( $button );
-				}
-				else
-				{
-					$buttons->add( $button );
-				}
-			}
-		}
-
-		return $buttons;
-	}
-
-	/**
-	 * Return badges that should be displayed
-	 *
-	 * @return array
-	 */
-	public function badges() : array
-	{
-		$badges = [];
-
-		if( Settings::i()->clubs_require_approval and !$this->approved )
-		{
-			$badges[] = new Icon( Badge::BADGE_WARNING, 'fa-eye-slash', Member::loggedIn()->language()->addToStack( 'club_unapproved' ) );
-		}
-		else
-		{
-			if( $this->featured )
-			{
-				$badges[] = new Icon( Badge::BADGE_POSITIVE, 'fa-star', Member::loggedIn()->language()->addToStack( 'featured' ) );
-			}
-
-			$memberStatus = $this->memberStatus( Member::loggedIn() );
-			if( in_array( $memberStatus, [ static::STATUS_MEMBER, static::STATUS_MODERATOR, static::STATUS_LEADER ] ) )
-			{
-				$badges[] = new Icon( Badge::BADGE_POSITIVE, 'fa-check', Member::loggedIn()->language()->addToStack( 'club_member' ) );
-			}
-			elseif( in_array( $memberStatus, [ static::STATUS_EXPIRED, static::STATUS_EXPIRED_MODERATOR ] ) )
-			{
-				$badges[] = new Icon( Badge::BADGE_INTERMEDIARY, 'fa-triangle-exclamation', Member::loggedIn()->language()->addToStack( 'club_expired' ) );
-			}
-			elseif( in_array( $memberStatus, [ static::STATUS_INVITED, static::STATUS_INVITED_BYPASSING_PAYMENT ] ) )
-			{
-				$badges[] = new Icon( Badge::BADGE_NEUTRAL, 'fa-envelope', Member::loggedIn()->language()->addToStack( 'club_invited' ) );
-			}
-			elseif( $memberStatus == static::STATUS_WAITING_PAYMENT )
-			{
-				$badges[] = new Icon( Badge::BADGE_NEUTRAL, 'fa-check', Member::loggedIn()->language()->addToStack( 'club_awaiting_payment_title' ) );
-			}
-			elseif( $memberStatus == static::STATUS_REQUESTED )
-			{
-				$badges[] = new Icon( Badge::BADGE_INTERMEDIARY, 'fa-clock', Member::loggedIn()->language()->addToStack( 'club_requested_desc_short' ) );
-			}
-		}
-
-		foreach( Application::allExtensions( 'core', 'Club' ) AS $ext )
-		{
-			/* @var ClubAbstract $ext */
-			$badges = array_merge( $badges, $ext->badges( $this ) );
-		}
-
-		return $badges;
-	}
-
-	/**
 	 * Can a member view the members page
 	 *
-	 * @param Member|null $member	The member (NULL for currently logged in member)
+	 * @param \IPS\Member|null $member	The member (NULL for currently logged in member)
 	 * @return bool
 	 */
-	public function canViewMembers( Member $member = NULL ): bool
+	public function canViewMembers( \IPS\Member $member = NULL ): bool
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Public Clubs have no member list */
-		if ( $this->type == Club::TYPE_PUBLIC )
+		if ( $this->type == \IPS\Member\Club::TYPE_PUBLIC )
 		{
 			return FALSE;
 		}
@@ -2493,19 +2065,19 @@ class Club extends ActiveRecord implements Embeddable
 		}
 
 		/* Leader can see it always*/
-		if (  $this->memberStatus( $member ) === Club::STATUS_LEADER )
+		if (  $this->memberStatus( $member ) === \IPS\Member\Club::STATUS_LEADER )
 		{
 			return TRUE;
 		}
 
 		/* Moderator */
-		if ( $this->show_membertab == 'moderator' AND ( $this->memberStatus( $member ) === Club::STATUS_MODERATOR ) )
+		if ( $this->show_membertab == 'moderator' AND ( $this->memberStatus( $member ) === \IPS\Member\Club::STATUS_MODERATOR ) )
 		{
 			return TRUE;
 		}
 
 		/* Members */
-		if ( $this->show_membertab == 'member' AND in_array( $this->memberStatus( $member ), array( Club::STATUS_MEMBER, Club::STATUS_INVITED, Club::STATUS_INVITED_BYPASSING_PAYMENT, Club::STATUS_EXPIRED, Club::STATUS_EXPIRED_MODERATOR, Club::STATUS_MODERATOR ) ) )
+		if ( $this->show_membertab == 'member' AND \in_array( $this->memberStatus( $member ), array( \IPS\Member\Club::STATUS_MEMBER, \IPS\Member\Club::STATUS_MODERATOR, \IPS\Member\Club::STATUS_INVITED, \IPS\Member\Club::STATUS_INVITED_BYPASSING_PAYMENT, \IPS\Member\Club::STATUS_EXPIRED, \IPS\Member\Club::STATUS_EXPIRED_MODERATOR ) ) )
 		{
 			return TRUE;
 		}
@@ -2521,31 +2093,20 @@ class Club extends ActiveRecord implements Embeddable
 	 * Can be used by 3rd parties to add own club navigation tabs before they get sorted
 	 *
 	 * @param array $tabs	Tabs
-	 * @param Model|ClubPage|null $container	Container
+	 * @param \IPS\Node\Model|NULL $container	Container
 	 * @return array
 	 */
-	protected function _tabs( array $tabs, Model|ClubPage|null $container = NULL ) : array
+	protected function _tabs( array $tabs, \IPS\Node\Model $container = NULL ) : array
 	{
-		foreach( Application::allExtensions( 'core', 'Club' ) AS $ext )
-		{
-			$app = explode( "\\", get_class( $ext ) )[1];
-			foreach( $ext->tabs( $this, $container ) AS $key => $tab )
-			{
-				if ( $tab['show'] === TRUE )
-				{
-					$tabs[$app . '_' . $key] = $tab;
-				}
-			}
-		}
 		return $tabs;
 	}
 
 	/**
 	 * Get the first tab for the club page
 	 *
-	 * @return array
+	 * @return mixed
 	 */
-	public function firstTab(): array
+	public function firstTab()
 	{
 		$tabs =  $this->tabs();
 		reset( $tabs );
@@ -2560,7 +2121,7 @@ class Club extends ActiveRecord implements Embeddable
 	 *
 	 * @return int
 	 */
-	public function membersPerPage(): int
+	public function membersPerPage()
 	{
 		return 24;
 	}
@@ -2568,39 +2129,43 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Set navigational breadcrumbs
 	 *
-	 * @param Model $node	The node we are viewing
+	 * @param	\IPS\Node\Model	$node	The node we are viewing
 	 * @return	void
 	 */
-	public function setBreadcrumbs( Model $node ) : void
+	public function setBreadcrumbs( $node )
 	{
-		FrontNavigation::$clubTabActive = TRUE;
+		\IPS\core\FrontNavigation::$clubTabActive = TRUE;
 
-		Output::i()->breadcrumb = array();
-		Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), Member::loggedIn()->language()->addToStack('module__core_clubs') );
+		\IPS\Output::i()->breadcrumb = array();
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), \IPS\Member::loggedIn()->language()->addToStack('module__core_clubs') );
 
 		/* We have to prime the cache to ensure the correct club tab is selected */
 		$this->tabs( $node );
 
 		if( !( $firstTab = $this->firstTab() AND $firstTab = array_pop( $firstTab ) ) OR (string) $firstTab['href'] != (string) $node->url() )
 		{
-			Output::i()->breadcrumb[] = array( $this->url(), $this->name );
-			Output::i()->breadcrumb[] = array( NULL, $node->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $this->url(), $this->name );
+			\IPS\Output::i()->breadcrumb[] = array( NULL, $node->_title );
 		}
 		else
 		{
-			Output::i()->breadcrumb[] = array( NULL, $this->name );
+			\IPS\Output::i()->breadcrumb[] = array( NULL, $this->name );
 		}
 		
-		if ( Settings::i()->clubs_header == 'sidebar' )
+		if ( \IPS\Settings::i()->clubs_header == 'sidebar' )
 		{
-			Output::i()->sidebar['contextual'] = Theme::i()->getTemplate( 'clubs', 'core' )->header( $this, $node, 'sidebar' );
+			\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->header( $this, $node, 'sidebar' );
 		}
 
 		/* CSS */
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'styles/clubs.css', 'core', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/clubs.css', 'core', 'front' ) );
+		if ( \IPS\Theme::i()->settings['responsive'] )
+		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'styles/clubs_responsive.css', 'core', 'front' ) );
+		}
 
 		/* JS */
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_clubs.js', 'core', 'front' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'front_clubs.js', 'core', 'front' ) );
 	}
 
 	/**
@@ -2610,7 +2175,7 @@ class Club extends ActiveRecord implements Embeddable
 	 */
 	public static function userIsInClub() : bool
 	{
-		return FrontNavigation::$clubTabActive or ( Dispatcher::i()->application->directory === 'core' and Dispatcher::i()->module->key === 'clubs' );
+		return \IPS\core\FrontNavigation::$clubTabActive or ( \IPS\Dispatcher::i()->application->directory === 'core' and \IPS\Dispatcher::i()->module->key === 'clubs' );
 	}
 	
 	/* ! Rules */
@@ -2618,10 +2183,10 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Rules have been acknowledged
 	 *
-	 * @param	Member|NULL		$member		Member to check, or NULL for currently logged in member.
+	 * @param	\IPS\Member|NULL		$member		Member to check, or NULL for currently logged in member.
 	 * @return	bool
 	 */
-	public function rulesAcknowledged( ?Member $member = NULL ): bool
+	public function rulesAcknowledged( ?\IPS\Member $member = NULL ): bool
 	{
 		/* Rules must be acknowledged? */
 		if ( !$this->rules_required )
@@ -2629,25 +2194,25 @@ class Club extends ActiveRecord implements Embeddable
 			return TRUE;
 		}
 		
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		/* Owners are exempt. */
-		if ( $this->owner === $member )
+		if ( $this->owner == $member )
 		{
 			return TRUE;
 		}
 		
 		/* Leaders and Moderators are exempt. */
-		if ( in_array( $this->memberStatus( $member ), array( static::STATUS_LEADER, static::STATUS_MODERATOR, static::STATUS_EXPIRED_MODERATOR ) ) )
+		if ( \in_array( $this->memberStatus( $member ), array( static::STATUS_LEADER, static::STATUS_MODERATOR, static::STATUS_EXPIRED_MODERATOR ) ) )
 		{
 			return TRUE;
 		}
 		
 		try
 		{
-			return (bool) Db::i()->select( 'rules_acknowledged', 'core_clubs_memberships', array( "club_id=? AND member_id=?", $this->id, $member->member_id ) )->first();
+			return (bool) \IPS\Db::i()->select( 'rules_acknowledged', 'core_clubs_memberships', array( "club_id=? AND member_id=?", $this->id, $member->member_id ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			/* If we can join the club return FALSE so we see the acknowledgement form. If we can't join, just return TRUE so the rules are returned but the user is not prompted to accept them. */
 			return !$this->canJoin( $member );
@@ -2657,20 +2222,20 @@ class Club extends ActiveRecord implements Embeddable
 	/**
 	 * Acknowledge the rules
 	 *
-	 * @param	Member|NULL		$member		Member to set, or NULL for currently logged in member.
+	 * @param	\IPS\Member|NULL		$member		Member to set, or NULL for currently logged in member.
 	 * @return	void
-	 * @throws InvalidArgumentException
+	 * @throws \InvalidArgumentException
 	 */
-	public function acknowledgeRules( ?Member $member = NULL ) : void
+	public function acknowledgeRules( ?\IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		if ( $this->memberStatus( $member ) === NULL )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 		
-		Db::i()->update( 'core_clubs_memberships', array( 'rules_acknowledged' => TRUE ), array( "club_id=? AND member_id=?", $this->id, $member->member_id ) );
+		\IPS\Db::i()->update( 'core_clubs_memberships', array( 'rules_acknowledged' => TRUE ), array( "club_id=? AND member_id=?", $this->id, $member->member_id ) );
 	}
 
 	/**
@@ -2678,66 +2243,39 @@ class Club extends ActiveRecord implements Embeddable
 	 * 
 	 * @return void
 	 */
-	public function onApprove() : void
+	public function onApprove()
 	{
-		Webhook::fire( 'club_created', $this );
-		Event::fire( 'onCreate', $this );
+		\IPS\Api\Webhook::fire( 'club_created', $this );
 		$this->owner->achievementAction( 'core', 'NewClub', $this );
-
-		try
-		{
-			Approval::loadFromContent( get_called_class(), $this->id )->delete();
-		}
-		catch( OutOfRangeException ){}
-	}
-
-	/**
-	 * Embed Content
-	 *
-	 * @return	string
-	 */
-	public function embedContent(): string
-	{
-		return Theme::i()->getTemplate( 'clubs', 'core' )->embedClub( $this );
-	}
-
-	/**
-	 * Get image for embed
-	 *
-	 * @return	File|NULL
-	 */
-	public function embedImage(): ?File
-	{
-		return $this->coverPhotoFile();
 	}
 
 	/**
 	 * Update existing purchases
 	 *
-	 * @param	Purchase	$purchase							The purchase
+	 * @param	\IPS\nexus\Purchase	$purchase							The purchase
 	 * @param	array				$changes							The old values
 	 * @param	bool				$cancelBillingAgreementIfNecessary	If making changes to renewal terms, TRUE will cancel associated billing agreements. FALSE will skip that change
 	 * @return	void
 	 */
-	public function updatePurchase( Purchase $purchase, array $changes=array(), bool $cancelBillingAgreementIfNecessary=FALSE ) : void
+	public function updatePurchase( \IPS\nexus\Purchase $purchase, $changes=array(), $cancelBillingAgreementIfNecessary=FALSE )
 	{
 		$tax = NULL;
 		if ( $purchase->tax )
 		{
 			try
 			{
-				$tax = Tax::load( $purchase->tax );
+				$tax = \IPS\nexus\Tax::load( $purchase->tax );
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 
 		$currency = $purchase->renewal_currency ?: $purchase->member->defaultCurrency( );
 
 		$price = json_decode( $this->renewal_price, TRUE );
 
-		$purchase->renewals = new RenewalTerm(
-			new Money( $price[$currency]['amount'], $currency ),
-			new DateInterval( 'P' . $this->renewal_term . mb_strtoupper( $this->renewal_units ) ),
+		$purchase->renewals = new \IPS\nexus\Purchase\RenewalTerm(
+			new \IPS\nexus\Money( $price[$currency]['amount'], $currency ),
+			new \DateInterval( 'P' . $this->renewal_term . mb_strtoupper( $this->renewal_units ) ),
 			$tax
 		);
 
@@ -2756,94 +2294,4 @@ class Club extends ActiveRecord implements Embeddable
 
 		$purchase->save();
 	}
-
-	/**
-	 * Iterate through all the club nodes and set the last_activity
-	 *
-	 * @param Member|null $member
-	 * @return void
-	 */
-	public function updateLastActivityAndItemCount( Member $member = null ) : void
-	{
-		$member = $member ?: Member::loggedIn();
-		$this->content = 0;
-		$this->last_activity = 0;
-
-		foreach ( $this->nodes() as $node )
-		{
-			try
-			{
-				$nodeClass = $node['node_class'];
-				if ( ! class_exists( $nodeClass ) )
-				{
-					continue;
-				}
-
-				$node = $nodeClass::load( $node['node_id'] );
-
-				if ( $lastCommentTime = $node->getLastCommentTime( $member ) and $lastCommentTime->getTimestamp() > $this->last_activity )
-				{
-					$this->last_activity = $lastCommentTime->getTimestamp();
-				}
-
-				$this->content += (int) $node->getContentItemCount();
-			}
-			catch ( \Exception $e ) { }
-		}
-
-		$this->rebuilt = time();
-		$this->save();
-	}
-
-    /**
-     * Follow this object
-     *
-     * @param string        $frequency      ( 'none', 'immediate', 'daily', 'weekly' )
-     * @param bool          $public
-     * @param Member|null   $member
-     * @return void
-     */
-    public function follow( string $frequency, bool $public=true, ?Member $member=null ) : void
-    {
-        $member = $member ?: Member::loggedIn();
-        $this->_follow( $frequency, $public, $member );
-
-        /* Follow all nodes */
-        foreach( $this->nodes() as $node )
-        {
-            try
-            {
-                /* @var Model $class */
-                $class = $node['node_class'];
-                $class::load( $node['node_id'] )->follow( $frequency, $public, $member );
-            }
-            catch( OutOfRangeException ){}
-        }
-    }
-
-    /**
-     * Unfollow this object
-     *
-     * @param Member|null $member
-     * @param string|null   $followId
-     * @return void
-     */
-    public function unfollow( ?Member $member=null, ?string $followId=null ) : void
-    {
-        /* First run the main method so that we unfollow the club itself */
-        $member = $member ?: Member::loggedIn();
-        $this->_unfollow( $member, $followId );
-
-        /* Now unfollow any nodes in the club */
-        foreach( $this->nodes() as $node )
-        {
-            try
-            {
-                /* @var Model $class */
-                $class = $node['node_class'];
-                $class::load( $node['node_id'] )->unfollow( $member );
-            }
-            catch( OutOfRangeException ){}
-        }
-    }
 }

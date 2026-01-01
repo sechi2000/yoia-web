@@ -562,18 +562,6 @@
                 "auto_increment": false,
                 "binary": false
             },
-            "record_image_offset": {
-                "name": "record_image_offset",
-                "type": "INT",
-                "length": null,
-                "decimals": null,
-                "values": null,
-                "allow_null": false,
-                "default": 0,
-                "comment": "",
-                "unsigned": true,
-                "auto_increment": false
-            },
              "record_last_review": {
                 "allow_null": true,
                 "auto_increment": false,
@@ -803,22 +791,6 @@
                 "name": "record_last_comment_anon",
                 "type": "TINYINT",
                 "unsigned": true,
-                "values": [
-
-                ],
-                "zerofill": false
-            },
-            "record_assignment_id": {
-                "allow_null": false,
-                "auto_increment": false,
-                "binary": false,
-                "comment": "",
-                "decimals": null,
-                "default": "0",
-                "length": 20,
-                "name": "record_assignment_id",
-                "type": "BIGINT",
-                "unsigned": false,
                 "values": [
 
                 ],

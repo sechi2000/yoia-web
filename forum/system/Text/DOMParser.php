@@ -11,23 +11,16 @@
 namespace IPS\Text;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DOMDocument;
-use DOMNode;
-use DOMNodeList;
-use function defined;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * DOM Parser
  */
-class DOMParser
+class _DOMParser
 {
 	/**
 	 * @brief	Callback to parse a DOMElement object
@@ -42,12 +35,12 @@ class DOMParser
 	/**
 	 * Parse
 	 *
-	 * @param string $value			Contents to parse
-	 * @param callback $elementParser	Callback to parse a DOMElement object. Is expected to call `$parent->appendChild( $element )` after doing any parsing and call `$parser->_parseDomNodeList()`.	`function ( \DOMElement $element, \DOMNode $parent, \IPS\Text\DOMParser $parser )`
-	 * @param callback|null $textParser		Callback to parse a DOMText object. Is expected to call `$parent->appendChild( $element )` after doing any parsing.											`function ( \DOMText $textNode, \DOMNode $parent, \IPS\Text\DOMParser $parser )`
+	 * @param	string			$value			Contents to parse
+	 * @param	callback		$elementParser	Callback to parse a DOMElement object. Is expected to call `$parent->appendChild( $element )` after doing any parsing and call `$parser->_parseDomNodeList()`.	`function ( \DOMElement $element, \DOMNode $parent, \IPS\Text\DOMParser $parser )`
+	 * @param	callback|NULL	$textParser		Callback to parse a DOMText object. Is expected to call `$parent->appendChild( $element )` after doing any parsing.											`function ( \DOMText $textNode, \DOMNode $parent, \IPS\Text\DOMParser $parser )`
 	 * @return	string
 	 */
-	public static function parse( string $value, callable $elementParser, callable $textParser = NULL ): string
+	public static function parse( $value, $elementParser, $textParser = NULL )
 	{
 		$content = static::getDocumentBodyContents( ( new static( $elementParser, $textParser ) )->parseValueIntoDocument( $value ) );
 
@@ -61,11 +54,11 @@ class DOMParser
 	/**
 	 * Constructor
 	 *
-	 * @param callback $elementParser	Callback to parse a DOMElement object. Is expected to call `$parent->appendChild( $element )` after doing any parsing and call `$parser->_parseDomNodeList()`.	`function ( \DOMElement $element, \DOMNode $parent, \IPS\Text\DOMParser $parser )`
-	 * @param callback|null $textParser		Callback to parse a DOMText object. Is expected to call `$parent->appendChild( $element )` after doing any parsing.											`function ( \DOMText $textNode, \DOMNode $parent, \IPS\Text\DOMParser $parser )`
-	 * @return	void
+	 * @param	callback		$elementParser	Callback to parse a DOMElement object. Is expected to call `$parent->appendChild( $element )` after doing any parsing and call `$parser->_parseDomNodeList()`.	`function ( \DOMElement $element, \DOMNode $parent, \IPS\Text\DOMParser $parser )`
+	 * @param	callback|NULL	$textParser		Callback to parse a DOMText object. Is expected to call `$parent->appendChild( $element )` after doing any parsing.											`function ( \DOMText $textNode, \DOMNode $parent, \IPS\Text\DOMParser $parser )`
+	 * @return	string
 	 */
-	public function __construct( callable $elementParser, callable $textParser = NULL )
+	public function __construct( $elementParser, $textParser = NULL )
 	{
 		$this->elementParser = $elementParser;
 		$this->textParser = $textParser;
@@ -74,10 +67,10 @@ class DOMParser
 	/**
 	 * Parse Value into DOMDocument
 	 *
-	 * @param string $value			Contents to parse
-	 * @return	\IPS\Xml\DOMDocument
+	 * @param	string			$value			Contents to parse
+	 * @return	\DOMDocument
 	 */
-	public function parseValueIntoDocument( string $value ): \IPS\Xml\DOMDocument
+	public function parseValueIntoDocument( $value )
 	{
 		/* Load the value into a DOMDocument */
 		$source = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
@@ -96,11 +89,11 @@ class DOMParser
 	/**
 	 * Parse DOMNode
 	 *
-	 * @param	DOMNode	$node	The node from the source document to parse
-	 * @param	DOMNode	$parent	The node from the new document which will be this node's parent
+	 * @param	\DOMNode	$node	The node from the source document to parse
+	 * @param	\DOMNode	$parent	The node from the new document which will be this node's parent
 	 * @return	void
 	 */
-	public function _parseDomNode( DOMNode $node, DOMNode &$parent ) : void
+	public function _parseDomNode( \DOMNode $node, \DOMNode &$parent )
 	{
 		switch ( $node->nodeType )
 		{
@@ -157,11 +150,11 @@ class DOMParser
 	/**
 	 * Loop child nodes of a node and parse them
 	 *
-	 * @param	DOMNodeList	$children	The child nodes from the source document
-	 * @param	DOMNode		$parent		The node from the new document which will be the parent of all these nodes
+	 * @param	\DOMNodeList	$children	The child nodes from the source document
+	 * @param	\DOMNode		$parent		The node from the new document which will be the parent of all these nodes
 	 * @return	void
 	 */
-	public function _parseDomNodeList( DOMNodeList $children, DOMNode $parent ) : void
+	public function _parseDomNodeList( \DOMNodeList $children, \DOMNode $parent )
 	{
 		foreach ( $children as $child )
 		{
@@ -172,10 +165,10 @@ class DOMParser
 	/**
 	 * Get body contents from document
 	 *
-	 * @param	DOMDocument	$document	The document
-	 * @return    DOMNode|null
+	 * @param	\DOMDocument	$document	The document
+	 * @return	string
 	 */
-	public static function getDocumentBody( DOMDocument $document ): ?DOMNode
+	public static function getDocumentBody( \DOMDocument $document )
 	{
 		return $document->getElementsByTagName('body')->item(0);
 	}
@@ -183,14 +176,14 @@ class DOMParser
 	/**
 	 * Get body contents from document
 	 *
-	 * @param	DOMDocument	$document	The document
+	 * @param	\DOMDocument	$document	The document
 	 * @return	string
 	 */
-	public static function getDocumentBodyContents( DOMDocument $document ): string
+	public static function getDocumentBodyContents( \DOMDocument $document )
 	{
 		if ( $body = static::getDocumentBody( $document ) )
 		{
-			return substr( $document->saveHTML( $body ), 6, -7 );
+			return \substr( $document->saveHTML( $body ), 6, -7 );
 		}
 		else
 		{

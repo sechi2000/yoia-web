@@ -1,7 +1,0 @@
-{
-    "Calendar": {
-        "type": "MemberListenerType",
-        "classname": "IPS\\calendar\\listeners\\Calendar",
-        "extends": "IPS\\Member"
-    }
-}

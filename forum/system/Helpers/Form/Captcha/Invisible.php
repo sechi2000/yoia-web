@@ -11,44 +11,35 @@
 namespace IPS\Helpers\Form\Captcha;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use RuntimeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Invisible reCAPTCHA
  */
-class Invisible implements CaptchaInterface
+class _Invisible implements CaptchaInterface
 {
 	/**
 	 *  Does this CAPTCHA service support being added in a modal?
 	 */
-	public static bool $supportsModal = TRUE;
+	public static $supportsModal = TRUE;
 	
 	/**
 	 * @brief	Error
 	 */
-	protected ?string $error;
+	protected $error;
 	
 	/**
 	 * Display
 	 *
 	 * @return	string
 	 */
-	public function getHtml(): string
+	public function getHtml()
 	{		
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->captchaInvisible( Settings::i()->recaptcha2_public_key, preg_replace( '/^(.+?)\..*$/', '$1', Member::loggedIn()->language()->short ) );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->captchaInvisible( \IPS\Settings::i()->recaptcha2_public_key, preg_replace( '/^(.+?)\..*$/', '$1', \IPS\Member::loggedIn()->language()->short ) );
 	}
 	
 	/**
@@ -56,9 +47,9 @@ class Invisible implements CaptchaInterface
 	 *
 	 * @return	string
 	 */
-	public function rowHtml(): string
+	public function rowHtml()
 	{
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->captchaInvisible( Settings::i()->recaptcha2_public_key, preg_replace( '/^(.+?)\..*$/', '$1', Member::loggedIn()->language()->short ), TRUE );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->captchaInvisible( \IPS\Settings::i()->recaptcha2_public_key, preg_replace( '/^(.+?)\..*$/', '$1', \IPS\Member::loggedIn()->language()->short ), TRUE );
 	}
 		
 	/**
@@ -66,19 +57,19 @@ class Invisible implements CaptchaInterface
 	 *
 	 * @return	bool|null	TRUE/FALSE indicate if the test passed or not. NULL indicates the test failed, but the captcha system will display an error so we don't have to.
 	 */
-	public function verify(): ?bool
+	public function verify()
 	{		
 		try
 		{
-			$response = Url::external( 'https://www.google.com/recaptcha/api/siteverify' )->request()->post( array(
-				'secret'		=> Settings::i()->recaptcha2_private_key,
-				'response'		=> trim( Request::i()->__get('g-recaptcha-response') ),
-				'remoteip'		=> Request::i()->ipAddress(),
-			) )->decodeJson();
+			$response = \IPS\Http\Url::external( 'https://www.google.com/recaptcha/api/siteverify' )->request()->post( array(
+				'secret'		=> \IPS\Settings::i()->recaptcha2_private_key,
+				'response'		=> trim( \IPS\Request::i()->__get('g-recaptcha-response') ),
+				'remoteip'		=> \IPS\Request::i()->ipAddress(),
+			) )->decodeJson( TRUE );
 						
-			return ( ( $response['success'] ) and ( $response['hostname'] === Url::internal('')->data[ Url::COMPONENT_HOST ] ) );
+			return ( ( (bool) $response['success'] ) and ( $response['hostname'] === \IPS\Http\Url::internal('')->data[ \IPS\Http\Url::COMPONENT_HOST ] ) );
 		}
-		catch( RuntimeException $e )
+		catch( \RuntimeException $e )
 		{
 			if( $e->getMessage() == 'BAD_JSON' )
 			{

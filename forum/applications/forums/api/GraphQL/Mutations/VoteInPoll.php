@@ -10,36 +10,31 @@
  */
 
 namespace IPS\forums\api\GraphQL\Mutations;
+use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\InputObjectType;
-use IPS\Api\GraphQL\SafeException;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\forums\api\GraphQL\Types\TopicType;
-use IPS\forums\Topic;
-use IPS\Poll\Api\GraphQL\PollMutator;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Vote in poll mutation for GraphQL API
  */
-class VoteInPoll extends PollMutator
+class _VoteInPoll extends \IPS\Poll\Api\GraphQL\PollMutator
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\forums\Topic';
+	protected $class = 'IPS\forums\Topic';
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Vote in a poll in a topic";
+	public static $description = "Vote in a poll in a topic";
 
 	/*
 	 * Mutation arguments
@@ -62,10 +57,8 @@ class VoteInPoll extends PollMutator
 
 	/**
 	 * Return the mutation return type
-	 *
-	 * @return TopicType
 	 */
-	public function type() : TopicType
+	public function type() 
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::topic();
 	}
@@ -73,26 +66,27 @@ class VoteInPoll extends PollMutator
 	/**
 	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @return	Topic
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\forums\Forum
 	 */
-	public function resolve( mixed $val, array $args ) : Topic
+	public function resolve($val, $args)
 	{
 		/* Get topic */
 		try
 		{
-			$topic = Topic::loadAndCheckPerms( $args['itemID'] );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( $args['itemID'] );
 			$poll = $topic->getPoll();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'INVALID_TOPIC', 'GQL/0006/1', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_TOPIC', 'GQL/0006/1', 403 );
 		}
 		
 		if( !$topic->can('read') || $poll === NULL )
 		{
-			throw new SafeException( 'NO_POLL', 'GQL/0006/2', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_POLL', 'GQL/0006/2', 403 );
 		}
 
 		$this->_vote( $poll, $args['poll'] );

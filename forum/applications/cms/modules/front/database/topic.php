@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @brief		topic
  * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
@@ -13,72 +12,36 @@
 namespace IPS\cms\modules\front\database;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\cms\Categories;
-use IPS\cms\Databases;
-use IPS\cms\Fields;
-use IPS\cms\Pages\Page;
-use IPS\cms\Records;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\File;
-use IPS\forums\Topic as TopicClass;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\MultipleRedirect;
-use IPS\Helpers\Wizard;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * topic
  */
-class topic extends Controller
+class _topic extends \IPS\Dispatcher\Controller
 {
-	/**
-	 * @var TopicClass|null
-	 */
-	protected ?TopicClass $topic = null;
-
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		if ( !Member::loggedIn()->modPermission( 'can_copy_topic_database' ) )
+		if ( !\IPS\Member::loggedIn()->modPermission( 'can_copy_topic_database' ) )
 		{
-			Output::i()->error( 'node_error', '2T353/1', 403, '' );
+			\IPS\Output::i()->error( 'node_error', '2T353/1', 403, '' );
 		}
 		
 		try
 		{
-			$this->topic = TopicClass::load( Request::i()->id );
+			$this->topic = \IPS\forums\Topic::load( \IPS\Request::i()->id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2T353/3', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2T353/3', 404, '' );
 		}
 		
 		parent::execute();
@@ -89,37 +52,37 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$wizard = new Wizard( array(
+		$wizard = new \IPS\Helpers\Wizard( array(
 			'database'	=> array( $this, '_database' ),
 			'category'	=> array( $this, '_category' ),
-		), Url::internal( "app=cms&module=database&controller=topic&id=" . Request::i()->id, 'front', 'topic_copy', $this->topic->title_seo ), FALSE );
+		), \IPS\Http\Url::internal( "app=cms&module=database&controller=topic&id=" . \IPS\Request::i()->id, 'front', 'topic_copy', $this->topic->title_seo ), FALSE );
 
 		/* Set Breadcrumb */
 		foreach ( $this->topic->container()->parents() as $parent )
 		{
-			Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 		}
 
-		Output::i()->breadcrumb[] = array( $this->topic->container()->url(), $this->topic->container()->_title );
+		\IPS\Output::i()->breadcrumb[] = array( $this->topic->container()->url(), $this->topic->container()->_title );
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'copy_topic_to_database' );
-		Output::i()->output = (string) $wizard;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'copy_topic_to_database' );
+		\IPS\Output::i()->output = (string) $wizard;
 	}
 	
 	/**
 	 * Database
 	 *
 	 * @param	mixed	$data	Data
-	 * @return array|string
+	 * @return void
 	 */
-	public function _database( mixed $data ) : array|string
+	public function _database( $data )
 	{
-		$form = new Form( 'database', 'copy_select_database', Url::internal( "app=cms&module=database&controller=topic&id=" . Request::i()->id, 'front', 'topic_copy', $this->topic->title_seo ) );
-		$form->class = 'ipsForm--vertical ipsForm--copy-database-topic';
-		$form->hiddenValues['topic_id'] = Request::i()->id;
-		$form->add( new Node( 'database', NULL, TRUE, array( 'class' => '\IPS\cms\Databases', 'permissionCheck' => function( $row )
+		$form = new \IPS\Helpers\Form( 'database', 'copy_select_database', \IPS\Http\Url::internal( "app=cms&module=database&controller=topic&id=" . \IPS\Request::i()->id, 'front', 'topic_copy', $this->topic->title_seo ) );
+		$form->class = 'ipsForm_vertical';
+		$form->hiddenValues['topic_id'] = \IPS\Request::i()->id;
+		$form->add( new \IPS\Helpers\Form\Node( 'database', NULL, TRUE, array( 'class' => '\IPS\cms\Databases', 'permissionCheck' => function( $row )
 		{
 			/* If this database does not have a title or content field, we cannot copy. */
 			if ( !$row->field_title OR !$row->field_content )
@@ -143,39 +106,39 @@ class topic extends Controller
 			);
 		}
 		
-		return $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/**
 	 * Category
 	 *
 	 * @param	mixed	$data	Data
-	 * @return	string
+	 * @return	void
 	 */
-	public function _category( mixed $data ) : string
+	public function _category( $data )
 	{
 		/* Do we need to even bother? */
-		$database = Databases::load( $data['database_id'] );
+		$database = \IPS\cms\Databases::load( $data['database_id'] );
 		
 		if ( !$database->use_categories )
 		{
-			Output::i()->redirect( Url::internal( "app=cms&module=database&controller=topic&do=form&id={$data['topic_id']}", 'front', 'topic_copy', $this->topic->title_seo )->setQueryString( array( 'database_id' => $data['database_id'], 'category_id' => $database->default_category ) ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=cms&module=database&controller=topic&do=form&id={$data['topic_id']}", 'front', 'topic_copy', $this->topic->title_seo )->setQueryString( array( 'database_id' => $data['database_id'], 'category_id' => $database->default_category ) ) );
 		}
 		
 		$catClass = 'IPS\cms\Categories' . $data['database_id'];
 		
-		$form = new Form( 'category', 'copy_select_category', Url::internal( "app=cms&module=database&controller=topic&id=" . Request::i()->id, 'front', 'topic_copy', $this->topic->title_seo ) );
-		$form->class = 'ipsForm--vertical ipsForm--copy-database-topic-category';
+		$form = new \IPS\Helpers\Form( 'category', 'copy_select_category', \IPS\Http\Url::internal( "app=cms&module=database&controller=topic&id=" . \IPS\Request::i()->id, 'front', 'topic_copy', $this->topic->title_seo ) );
+		$form->class = 'ipsForm_vertical';
 		$form->hiddenValues['topic_id'] = $data['topic_id'];
 		$form->hiddenValues['database_id'] = $data['database_id'];
-		$form->add( new Node( 'select_category', NULL, TRUE, array( 'class' => $catClass, 'permissionCheck' => 'add' ) ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'select_category', NULL, TRUE, array( 'class' => $catClass, 'permissionCheck' => 'add' ) ) );
 		
 		if ( $values = $form->values() )
 		{
-			Output::i()->redirect( Url::internal( "app=cms&module=database&controller=topic&do=form&id={$values['topic_id']}", 'front', 'topic_copy', $this->topic->title_seo )->setQueryString( array( 'database_id' => $values['database_id'], 'category_id' => $values['select_category']->_id ) ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=cms&module=database&controller=topic&do=form&id={$values['topic_id']}", 'front', 'topic_copy', $this->topic->title_seo )->setQueryString( array( 'database_id' => $values['database_id'], 'category_id' => $values['select_category']->_id ) ) );
 		}
 		
-		return $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/**
@@ -183,35 +146,33 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function form() : void
+	protected function form()
 	{
-		Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_records.js', 'cms' ) );
+		\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_records.js', 'cms' ) );
 		
 		try
 		{
-			$database	= Databases::load( Request::i()->database_id );
+			$database	= \IPS\cms\Databases::load( \IPS\Request::i()->database_id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2T353/2', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2T353/2', 404, '' );
 		}
 		
 		try
 		{
-			$page = Page::load( $database->page_id );
+			$page = \IPS\cms\Pages\Page::load( $database->page_id );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2T353/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2T353/4', 404, '' );
 		}
-
-		/* @var Categories $catClass
-		 * @var Records $recordClass
-		 * @var Fields $fieldClass */
+		
 		$recordClass	= 'IPS\cms\Records' . $database->_id;
+		$commentClass	= 'IPS\cms\Comments' . $database->_id;
 		$fieldClass		= 'IPS\cms\Fields' . $database->_id;
 		$catClass		= 'IPS\cms\Categories' . $database->_id;
-		$category		= $catClass::load( Request::i()->category_id );
+		$category		= $catClass::load( \IPS\Request::i()->category_id );
 		
 		$titleField		= "field_{$database->field_title}";
 		$contentField	= "field_{$database->field_content}";
@@ -219,28 +180,27 @@ class topic extends Controller
 		$fakeRecord = new $recordClass;
 		$fakeRecord->$titleField	= $this->topic->mapped('title');
 		$fakeRecord->$contentField	= $this->topic->content();
-		$fakeRecord->category_id	= Request::i()->category_id;
-        Request::i()->tags = $this->topic->tags();
+		$fakeRecord->category_id	= \IPS\Request::i()->category_id;
 
 		if( $fakeRecord->_forum_record AND $fakeRecord->_forum_comments )
 		{
-			Member::loggedIn()->language()->words['copy_comments_desc']	= sprintf( Member::loggedIn()->language()->get( 'copy_comments_assoc_desc' ), $recordClass::_definiteArticle(), $recordClass::_definiteArticle() );
+			\IPS\Member::loggedIn()->language()->words['copy_comments_desc']	= sprintf( \IPS\Member::loggedIn()->language()->get( 'copy_comments_assoc_desc' ), $recordClass::_definiteArticle(), $recordClass::_definiteArticle() );
 		}
 		else
 		{
-			Member::loggedIn()->language()->words['copy_comments_desc']	= sprintf( Member::loggedIn()->language()->get( 'copy_comments_desc' ), $recordClass::_definiteArticle() );
+			\IPS\Member::loggedIn()->language()->words['copy_comments_desc']	= sprintf( \IPS\Member::loggedIn()->language()->get( 'copy_comments_desc' ), $recordClass::_definiteArticle() );
 		}
 		
-		Member::loggedIn()->language()->words['copy_author_desc']		= sprintf( Member::loggedIn()->language()->get( 'copy_author_desc' ), $recordClass::_definiteArticle() );
+		\IPS\Member::loggedIn()->language()->words['copy_author_desc']		= sprintf( \IPS\Member::loggedIn()->language()->get( 'copy_author_desc' ), $recordClass::_definiteArticle() );
 
-		$form = new Form;
-		$form->class = 'ipsForm--vertical ipsForm--copy-database-topic-categories';
+		$form = new \IPS\Helpers\Form;
+		$form->class = 'ipsForm_vertical';
 		$form->hiddenValues['record_category_id'] = $category->_id;
 		
 		foreach( $recordClass::formElements( $fakeRecord, $category ) AS $key => $element )
 		{
 			/* Skip these */
-			if ( in_array( $key, array( 'record_edit_reason', 'record_edit_show' ) ) )
+			if ( \in_array( $key, array( 'record_edit_reason', 'record_edit_show' ) ) )
 			{
 				continue;
 			}
@@ -250,17 +210,17 @@ class topic extends Controller
 		
 		if ( $database->options['comments'] )
 		{
-			$form->add( new YesNo( 'copy_comments', FALSE, FALSE, array( 'togglesOn' => array( 'comments_show_message' ) ) ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'copy_comments', FALSE, FALSE, array( 'togglesOn' => array( 'comments_show_message' ) ) ) );
 
-			$form->add( new YesNo( 'comments_show_message', TRUE, FALSE, array( 'togglesOn' => array( 'comments_meta_message', 'comments_meta_color' ) ), NULL, NULL, NULL, 'comments_show_message' ) );
-			$form->add( new Editor( 'comments_meta_message', Member::loggedIn()->language()->addToStack('default_copyposts_message'), FALSE, array( 'app' => 'core', 'key' => 'Meta', 'autoSaveKey' => "meta-message-new", 'attachIds' => NULL ), NULL, NULL, NULL, 'comments_meta_message' ) );
-			$form->add( new Custom( 'comments_meta_color', 'none', FALSE, array( 'getHtml' => function( $element )
+			$form->add( new \IPS\Helpers\Form\YesNo( 'comments_show_message', TRUE, FALSE, array( 'togglesOn' => array( 'comments_meta_message', 'comments_meta_color' ) ), NULL, NULL, NULL, 'comments_show_message' ) );
+			$form->add( new \IPS\Helpers\Form\Editor( 'comments_meta_message', \IPS\Member::loggedIn()->language()->addToStack('default_copyposts_message'), FALSE, array( 'app' => 'core', 'key' => 'Meta', 'autoSaveKey' => "meta-message-new", 'attachIds' => NULL ), NULL, NULL, NULL, 'comments_meta_message' ) );
+			$form->add( new \IPS\Helpers\Form\Custom( 'comments_meta_color', 'none', FALSE, array( 'getHtml' => function( $element )
 			{
-				return Theme::i()->getTemplate( 'forms', 'core', 'front' )->colorSelection( $element->name, $element->value );
+				return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'front' )->colorSelection( $element->name, $element->value );
 			} ), NULL, NULL, NULL, 'comments_meta_color' ) );
 		}
 		
-		$form->add( new YesNo( 'copy_author', TRUE ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'copy_author', TRUE ) );
 		
 		if ( $values = $form->values() )
 		{
@@ -289,7 +249,7 @@ class topic extends Controller
 			unset( $values['copy_author'] );
 
 			/* If we are copying comments and we use the forums for comments, skip creating a topic as we will just reassocciate */
-			if( $fakeRecord->_forum_record )
+			if( $comments AND $fakeRecord->_forum_record AND $fakeRecord->_forum_comments )
 			{
 				$recordClass::$skipTopicCreation = true;
 			}
@@ -306,55 +266,46 @@ class topic extends Controller
 				if( $metaMessage['show'] )
 				{
 					$id = $record->addMessage( $metaMessage['message'], $metaMessage['color'] );
-					File::claimAttachments( "meta-message-new", $id, NULL, 'core_ContentMessages' );
+					\IPS\File::claimAttachments( "meta-message-new", $id, NULL, 'core_ContentMessages' );
 				}
 			}
 			
 			/* If the record syncs with the forums and we are copying topics, just associate with the existing topic */
-			if( $record->_forum_record )
+			if( $comments AND $record->_forum_record AND $record->_forum_comments )
 			{
 				$record->record_topicid = $this->topic->tid;
 				$record->save();
 				
 				/* Reload using the proper class so first and last comment data can be rebuilt properly */
-				if( $comments and $record->_forum_comments )
-				{
-					$obj = $record->recordForTopicSynch();
-					$obj->rebuildFirstAndLastCommentData();
-				}
-
-                /* Remove tags from the original topic, so that we don't have duplicates on the tag page */
-                $this->topic->setTags( [] );
-
-                /* Now we want to update the original topic in case we made any changes */
-                $record->syncTopic();
+				$class = 'IPS\cms\Records\RecordsTopicSync' . $database->_id;
+				$class::load( $this->topic->tid )->rebuildFirstAndLastCommentData();
 
 				try
 				{
 					/* If the database is on a page, go to the record */
-					Output::i()->redirect( $record->url() );
+					\IPS\Output::i()->redirect( $record->url() );
 				}
-				catch( LogicException $e )
+				catch( \LogicException $e )
 				{
 					/* If it is NOT then go back to the topic */
-					Output::i()->redirect( $this->topic->url() );
+					\IPS\Output::i()->redirect( $this->topic->url() );
 				}
 			}
 			elseif ( $comments )
 			{
-				Output::i()->redirect( Url::internal( "app=cms&module=database&controller=topic&do=comments&id={$this->topic->tid}", 'front', 'topic_copy', $this->topic->title_seo )->csrf()->setQueryString( array( 'record_id' => $record->primary_id_field, 'database_id' => $database->_id ) ) );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=cms&module=database&controller=topic&do=comments&id={$this->topic->tid}", 'front', 'topic_copy', $this->topic->title_seo )->csrf()->setQueryString( array( 'record_id' => $record->primary_id_field, 'database_id' => $database->_id ) ) );
 			}
 			else
 			{
 				try
 				{
 					/* If the database is on a page, go to the record */
-					Output::i()->redirect( $record->url() );
+					\IPS\Output::i()->redirect( $record->url() );
 				}
-				catch( LogicException $e )
+				catch( \LogicException $e )
 				{
 					/* If it is NOT then go back to the topic */
-					Output::i()->redirect( $this->topic->url() );
+					\IPS\Output::i()->redirect( $this->topic->url() );
 				}
 			}
 		}
@@ -368,27 +319,27 @@ class topic extends Controller
 			 $fieldClass::fixedFieldFormShow( 'record_allow_comments' ) or
 			 $fieldClass::fixedFieldFormShow( 'record_expiry_date' ) or
 			 $fieldClass::fixedFieldFormShow( 'record_comment_cutoff' ) or
-			 Member::loggedIn()->modPermission('can_content_edit_meta_tags') )
+			 \IPS\Member::loggedIn()->modPermission('can_content_edit_meta_tags') )
 		{
 			$hasModOptions = TRUE;
 		}
 		
-		array_shift( Output::i()->breadcrumb );
+		array_shift( \IPS\Output::i()->breadcrumb );
 		$container	= NULL;
 		try
 		{
 			$container = $this->topic->container();
 			foreach ( $container->parents() as $parent )
 			{
-				Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 			}
-			Output::i()->breadcrumb[] = array( $container->url(), $container->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $container->url(), $container->_title );
 		}
-		catch ( Exception $e ) { }
-		Output::i()->breadcrumb[] = array( $this->topic->url(), $this->topic->mapped( 'title' ) );
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( 'copy_topic_to_database' ) );
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'copy_topic_to_database' );
-		Output::i()->output = $form->customTemplate( array( \IPS\cms\Theme::i()->getTemplate( $database->template_form, 'cms', 'database' ), 'recordForm' ), NULL, $category, $database, $page, Member::loggedIn()->language()->addToStack( 'copy_topic_to_database' ), $hasModOptions );
+		catch ( \Exception $e ) { }
+		\IPS\Output::i()->breadcrumb[] = array( $this->topic->url(), $this->topic->mapped( 'title' ) );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( 'copy_topic_to_database' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'copy_topic_to_database' );
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\cms\Theme::i()->getTemplate( $database->template_form, 'cms', 'database' ), 'recordForm' ), NULL, $category, $database, $page, \IPS\Member::loggedIn()->language()->addToStack( 'copy_topic_to_database' ), $hasModOptions );
 	}
 	
 	/**
@@ -396,24 +347,21 @@ class topic extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function comments() : void
+	protected function comments()
 	{
-		Session::i()->csrfCheck();
-
-		$mr = new MultipleRedirect( Url::internal( "app=cms&module=database&controller=topic&id=" . Request::i()->id . "&do=comments", 'front', 'topic_copy', $this->topic->title_seo )->csrf()->setQueryString( array( 'database_id' => Request::i()->database_id, 'record_id' => Request::i()->record_id ) ), function( $data ) {
-
-			/* @var Records $recordClass
-			 * @var Records\Comment $commentClass */
-			$database		= Databases::load( Request::i()->database_id );
-			$recordClass	= 'IPS\cms\Records' . Request::i()->database_id;
+		\IPS\Session::i()->csrfCheck();
+		
+		$mr = new \IPS\Helpers\MultipleRedirect( \IPS\Http\Url::internal( "app=cms&module=database&controller=topic&id=" . \IPS\Request::i()->id . "&do=comments", 'front', 'topic_copy', $this->topic->title_seo )->csrf()->setQueryString( array( 'database_id' => \IPS\Request::i()->database_id, 'record_id' => \IPS\Request::i()->record_id ) ), function( $data ) {
+			$database		= \IPS\cms\Databases::load( \IPS\Request::i()->database_id );
+			$recordClass	= 'IPS\cms\Records' . \IPS\Request::i()->database_id;
 			$commentClass	= $recordClass::$commentClass;
-			$record			= $recordClass::load( Request::i()->record_id );
-			$total			= Db::i()->select( 'COUNT(*)', 'forums_posts', array( "topic_id=? AND new_topic=? AND queued!=?", Request::i()->id, 0, 2 ) )->first();
+			$record			= $recordClass::load( \IPS\Request::i()->record_id );
+			$total			= \IPS\Db::i()->select( 'COUNT(*)', 'forums_posts', array( "topic_id=? AND new_topic=? AND queued!=?", \IPS\Request::i()->id, 0, 2 ) )->first();
 			
 			$done = 0;
-			foreach( new ActiveRecordIterator( Db::i()->select( '*', 'forums_posts', array( "topic_id=? AND new_topic=? AND queued!=?", Request::i()->id, 0, -2 ), "pid ASC", array( $data, 100 ) ), 'IPS\forums\Topic\Post' ) AS $post )
+			foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'forums_posts', array( "topic_id=? AND new_topic=? AND queued!=?", \IPS\Request::i()->id, 0, -2 ), "pid ASC", array( $data, 100 ) ), 'IPS\forums\Topic\Post' ) AS $post )
 			{
-				$commentClass::create( $record, $post->content(), FALSE, NULL, TRUE, $post->author(), DateTime::create(), $post->ip_address, $post->hidden() );
+				$commentClass::create( $record, $post->content(), FALSE, NULL, TRUE, $post->author(), \IPS\DateTime::create(), $post->ip_address, $post->hidden() );
 				$done++;
 			}
 			
@@ -422,42 +370,40 @@ class topic extends Controller
 				return NULL;
 			}
 			
-			return array( $data + $done, Member::loggedIn()->language()->addToStack( 'copying_comments' ), 100 / $total * ( $data + 100 ) );
+			return array( $data + $done, \IPS\Member::loggedIn()->language()->addToStack( 'copying_comments' ), 100 / $total * ( $data + 100 ) );
 			
 		}, function() {
-
-			/* @var Records $recordClass */
-			$recordClass	= 'IPS\cms\Records' . Request::i()->database_id;
-			$record			= $recordClass::load( Request::i()->record_id );
+			$recordClass	= 'IPS\cms\Records' . \IPS\Request::i()->database_id;
+			$record			= $recordClass::load( \IPS\Request::i()->record_id );
 			
 			try
 			{
-				Output::i()->redirect( $record->url() );
+				\IPS\Output::i()->redirect( $record->url() );
 			}
-			catch( LogicException $e )
+			catch( \LogicException $e )
 			{
-				Output::i()->redirect( TopicClass::load( Request::i()->id )->url() );
+				\IPS\Output::i()->redirect( \IPS\forums\Topic::load( \IPS\Request::i()->id )->url() );
 			}
 		} );
 		
-		$topic = TopicClass::load( Request::i()->id );
+		$topic = \IPS\forums\Topic::load( \IPS\Request::i()->id );
 		
-		array_shift( Output::i()->breadcrumb );
+		array_shift( \IPS\Output::i()->breadcrumb );
 		$container	= NULL;
 		try
 		{
 			$container = $topic->container();
 			foreach ( $container->parents() as $parent )
 			{
-				Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 			}
-			Output::i()->breadcrumb[] = array( $container->url(), $container->_title );
+			\IPS\Output::i()->breadcrumb[] = array( $container->url(), $container->_title );
 		}
-		catch ( Exception $e ) { }
-		Output::i()->breadcrumb[] = array( $topic->url(), $topic->mapped( 'title' ) );
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack( 'copy_topic_to_database' ) );
+		catch ( \Exception $e ) { }
+		\IPS\Output::i()->breadcrumb[] = array( $topic->url(), $topic->mapped( 'title' ) );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( 'copy_topic_to_database' ) );
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'copying_comments' );
-		Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'front' )->genericBlock( (string) $mr, Member::loggedIn()->language()->addToStack( 'copying_comments' ), 'ipsBox i-padding_3' );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'copying_comments' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->genericBlock( (string) $mr, \IPS\Member::loggedIn()->language()->addToStack( 'copying_comments' ), 'ipsBox ipsPad' );
 	}
 }

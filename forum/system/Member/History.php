@@ -12,58 +12,48 @@
 namespace IPS\Member;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Patterns\ActiveRecordIterator;
-use Throwable;
-use function defined;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_QUERY_TEXT;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member History Model
  */
-class History extends \IPS\Helpers\Table\Db
+class _History extends \IPS\Helpers\Table\Db
 {
 	/**
 	 * @brief	Parser extensions
 	 */
-	static ?array $extensions = NULL;
+	static $extensions = NULL;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	Url	$url			The URL the table will be displayed on
+	 * @param	\IPS\Http\Url	$url			The URL the table will be displayed on
 	 * @param	mixed			$where			WHERE clause
-	 * @param bool $showIp			If the IP address column should be included
-	 * @param bool $showMember		If the customer column should show
-	 * @param bool $showApp		If the app column should show
-	 * @param bool $showType		If the type column should show
+	 * @param	bool			$showIp			If the IP address column should be included
+	 * @param	bool			$showMember		If the customer column should show
+	 * @param	bool			$showApp		If the app column should show
+	 * @param	bool			$showType		If the type column should show
 	 * @return	void
 	 */
-	public function __construct( Url $url, mixed $where, bool $showIp=TRUE, bool $showMember=FALSE, bool $showApp=TRUE, bool $showType=FALSE )
+	public function __construct( \IPS\Http\Url $url, $where, $showIp=TRUE, $showMember=FALSE, $showApp=TRUE, $showType=FALSE )
 	{
 		parent::__construct( 'core_member_history', $url, $where );
 
 		$this->include = array();
 		if( static::$extensions === NULL )
 		{
-			$apps = Application::appsWithExtension( 'core', 'MemberHistory' );
+			$apps = \IPS\Application::appsWithExtension( 'core', 'MemberHistory' );
 
 			foreach( $apps as $application )
 			{
-                static::$extensions[ $application->directory ] = $application->extensions( 'core', 'MemberHistory' );
+				$result = $application->extensions( 'core', 'MemberHistory' );
+
+				/* Since we're parsing, we only want to have one extension */
+				static::$extensions[ $application->directory ] = array_pop( $result );
 			}
 		}
 
@@ -87,36 +77,30 @@ class History extends \IPS\Helpers\Table\Db
 		$options	= array();
 		$extensions	= static::$extensions;
 
-		foreach( $extensions as $app => $appExtensions )
+		foreach( $extensions as $extension )
 		{
-            foreach( $appExtensions as $index => $extension )
-            {
-                if( $extension === null )
-                {
-                    unset( $extensions[ $app ][ $index ] );
-                    continue;
-                }
-
-                foreach( $extension->getTypes() as $type )
-                {
-                    if ( $type === 'oauth' and Db::i()->select( 'COUNT(*)', 'core_oauth_clients', array( Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) )->first() === 1 )
-                    {
-                        foreach ( new ActiveRecordIterator( Db::i()->select( '*', 'core_oauth_clients', array( Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) ), 'IPS\Api\OAuthClient' ) as $client )
-                        {
-                            $options[ $type ] = $client->_title;
-                            continue 2;
-                        }
-                    }
-
-                    $options[ $type ] = 'log_type_title_' . $type;
-                }
-            }
+			if( method_exists( $extension, 'getTypes' ) )
+			{
+				foreach( $extension->getTypes() as $type )
+				{
+					if ( $type === 'oauth' and \IPS\Db::i()->select( 'COUNT(*)', 'core_oauth_clients', array( \IPS\Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) )->first() === 1 )
+					{
+						foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_oauth_clients', array( \IPS\Db::i()->findInSet( 'oauth_grant_types', array( 'authorization_code', 'implicit', 'password' ) ) ) ), 'IPS\Api\OAuthClient' ) as $client )
+						{
+							$options[ $type ] = $client->_title;
+							continue 2;
+						}
+					}
+					
+					$options[ $type ] = 'log_type_title_' . $type;
+				}
+			}
 		}
 		
 		$this->advancedSearch = array(
-			'log_ip_address'		=> SEARCH_QUERY_TEXT,
-			'log_date'				=> SEARCH_DATE_RANGE,
-			'log_type'				=> array( SEARCH_SELECT, array( 'options' => $options, 'multiple' => TRUE ) )
+			'log_ip_address'		=> \IPS\Helpers\Table\SEARCH_QUERY_TEXT,
+			'log_date'				=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
+			'log_type'				=> array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => $options, 'multiple' => TRUE ) )
 		);
 
 		$this->sortBy = $this->sortBy ?: 'log_date';
@@ -127,57 +111,59 @@ class History extends \IPS\Helpers\Table\Db
 			{
 				try
 				{
-                    foreach( $extensions[ $row['log_app'] ] as $extension )
-                    {
-                        if( in_array( $row['log_type'], $extension->getTypes() ) )
-                        {
-                            return $extension->parseLogType( $val, $row );
-                        }
-                    }
+					if( method_exists( $extensions[ $row['log_app'] ], 'parseLogType' ) )
+					{
+						return $extensions[ $row['log_app'] ]->parseLogType( $val, $row );
+					}
 				}
-				catch( Throwable $e )
+				catch( \Throwable $e )
 				{
-					Log::log( $e, 'member_history' );
+					\IPS\Log::log( $e, 'member_history' );
 				}
 
 				return $val;
 			},
 			'log_date'	=> function( $val )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
 			'log_ip_address'	=> function( $val )
 			{
-				return "<a href='" . Url::internal( "app=core&module=members&controller=ip&ip={$val}" ) . "'>{$val}</a>";
+				return "<a href='" . \IPS\Http\Url::internal( "app=core&module=members&controller=ip&ip={$val}" ) . "'>{$val}</a>";
 			},
 			'log_member'=> function( $val, $row ) use ( $extensions )
 			{
-                foreach( $extensions[ $row['log_app'] ] as $extension )
-                {
-                    if( in_array( $row['log_type'], $extension->getTypes() ) )
-                    {
-                        return $extension->parseLogMember( $val, $row );
-                    }
-                }
-				return '';
+				try
+				{
+					if( method_exists( $extensions[ $row['log_app'] ], 'parseLogMember' ) )
+					{
+						return $extensions[ $row['log_app'] ]->parseLogMember( $val, $row );
+					}
+				}
+				catch( \Throwable $e )
+				{
+					\IPS\Log::log( $e, 'member_history' );
+				}
+
+				$member = \IPS\Member::load( $val );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( $member, 'tiny' ) . ' ' . $member->link();
 			},
 			'log_data'	=> function( $val, $row ) use ( $extensions )
 			{
 				try
 				{
-                    foreach( $extensions[ $row['log_app'] ] as $extension )
-                    {
-                        if( in_array( $row['log_type'], $extension->getTypes() ) )
-                        {
-                            return $extension->parseLogData( $val, $row );
-                        }
-                    }
+					if( method_exists( $extensions[ $row['log_app'] ], 'parseLogData' ) )
+					{
+						return $extensions[ $row['log_app'] ]->parseLogData( $val, $row );
+					}
 				}
-				catch( Throwable $e )
+				catch( \Throwable $e )
 				{
-					Log::log( $e, 'member_history' );
+					\IPS\Log::log( $e, 'member_history' );
 					return $val; # Return the value so the admin may have some clue as to what the log entry was for
 				}
+
+				return '';
 			}
 		);
 	}

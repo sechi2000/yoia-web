@@ -12,42 +12,23 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Content;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Phpbb as PhpbbCore;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * PhpBB Forums Converter
  */
-class Phpbb extends Software
+class _Phpbb extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "phpBB (3.1.x/3.2.x/3.3.x)";
@@ -56,9 +37,9 @@ class Phpbb extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "phpbb";
@@ -67,9 +48,9 @@ class Phpbb extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums'	=> array(
@@ -94,9 +75,9 @@ class Phpbb extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertForumsForums',
@@ -107,10 +88,10 @@ class Phpbb extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		
@@ -123,8 +104,8 @@ class Phpbb extends Software
 				{
 					if ( $forum['forum_password'] )
 					{
-						Member::loggedIn()->language()->words["forum_password_{$forum['forum_id']}"] = Member::loggedIn()->language()->addToStack( 'convert_forum_password', FALSE, array( 'sprintf' => array( $forum['forum_name'] ) ) );
-						Member::loggedIn()->language()->words["forum_password_{$forum['forum_id']}_desc"] = Member::loggedIn()->language()->addToStack( 'convert_forum_password_desc' );
+						\IPS\Member::loggedIn()->language()->words["forum_password_{$forum['forum_id']}"] = \IPS\Member::loggedIn()->language()->addToStack( 'convert_forum_password', FALSE, array( 'sprintf' => array( $forum['forum_name'] ) ) );
+						\IPS\Member::loggedIn()->language()->words["forum_password_{$forum['forum_id']}_desc"] = \IPS\Member::loggedIn()->language()->addToStack( 'convert_forum_password_desc' );
 						
 						$return['convertForumsForums']["forum_password_{$forum['forum_id']}"] = array(
 							'field_class'		=> 'IPS\\Helpers\\Form\\Text',
@@ -143,8 +124,8 @@ class Phpbb extends Software
 						'field_default'		=> NULL,
 						'field_required'	=> TRUE,
 						'field_extra'		=> array(),
-						'field_hint'		=> Member::loggedIn()->language()->addToStack('convert_phpbb_attach_path'),
-						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack('convert_phpbb_attach_path'),
+						'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					),
 				);
 				break;
@@ -156,9 +137,9 @@ class Phpbb extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -166,9 +147,9 @@ class Phpbb extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'phpbb' ) );
 	}
@@ -176,32 +157,29 @@ class Phpbb extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 		
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return PhpbbCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Phpbb::fixPostData( $post );
 	}
 	
 	/**
@@ -209,9 +187,10 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums(): void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
+		
 		$libraryClass::setKey( 'forum_id' );
 		
 		foreach( $this->fetch( 'forums', 'forum_id' ) AS $row )
@@ -220,15 +199,19 @@ class Phpbb extends Software
 				'id'				=> $row['forum_id'],
 				'name'				=> $row['forum_name'],
 				'description'		=> $row['forum_desc'],
-				'topics'			=> $row['forum_topics_approved'] ?? $row['forum_topics'],
-				'posts'				=> $row['forum_posts_approved'] ?? $row['forum_posts'],
+				'topics'			=> isset( $row['forum_topics_approved'] ) ? $row['forum_topics_approved'] : $row['forum_topics'],
+				'posts'				=> isset( $row['forum_posts_approved'] ) ? $row['forum_posts_approved'] : $row['forum_posts'],
+				'last_post'			=> $row['forum_last_post_time'],
+				'last_poster_id'	=> $row['forum_last_poster_id'],
+				'last_poster_name'	=> $row['forum_last_poster_name'],
 				'parent_id'			=> ( $row['parent_id'] != 0 ) ? $row['parent_id'] : -1,
 				'conv_parent'		=> ( $row['parent_id'] != 0 ) ? $row['parent_id'] : -1,
 				'position'			=> $row['left_id'],
 				'password'			=> ( isset( $this->app->_session['more_info']['convertForumsForums']["forum_password_{$row['forum_id']}"] ) ) ? $this->app->_session['more_info']['convertForumsForums']["forum_password_{$row['forum_id']}"] : NULL,
-				'queued_topics'		=> $row['forum_topics_unapproved'] ?? 0,
+				'last_title'		=> $row['forum_last_post_subject'],
+				'queued_topics'		=> isset( $row['forum_topics_unapproved'] ) ? $row['forum_topics_unapproved'] : 0,
 				'queued_posts'		=> isset( $row['forum_posts_unapproved'] ) ? $row['forum_topics_unapproved'] : 0,
-				'sub_can_post'		=> $row['forum_type'] == 1
+				'sub_can_post'		=> ( $row['forum_type'] == 1 ) ? TRUE : FALSE
 			);
 			
 			$libraryClass->convertForumsForum( $info );
@@ -261,7 +244,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics(): void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -324,8 +307,15 @@ class Phpbb extends Software
 					);
 				}
 			}
-
-			$visibility = $row['topic_visibility'] ?? $row['topic_approved'];
+			
+			if ( isset( $row['topic_visibility'] ) )
+			{
+				$visibility = $row['topic_visibility'];
+			}
+			else
+			{
+				$visibility = $row['topic_approved'];
+			}
 			
 			/* Global Topics */
 			if ( !$row['forum_id'] )
@@ -334,7 +324,7 @@ class Phpbb extends Software
 				{
 					$orphaned = $this->app->getLink( '__global__', 'forums_forums' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* Create a forum to store it in */
 					$libraryClass->convertForumsForum( array(
@@ -351,7 +341,7 @@ class Phpbb extends Software
 				'title'				=> $row['topic_title'],
 				'forum_id'			=> $row['forum_id'],
 				'state'				=> ( $row['topic_status'] == 0 ) ? 'open' : 'closed',
-				'posts'				=> $row['topic_posts_approved'] ?? $row['topic_replies'],
+				'posts'				=> isset( $row['topic_posts_approved'] ) ? $row['topic_posts_approved'] : $row['topic_replies'],
 				'starter_id'		=> $row['topic_poster'],
 				'start_date'		=> $row['topic_time'],
 				'last_poster_id'	=> $row['topic_last_poster_id'],
@@ -396,7 +386,7 @@ class Phpbb extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts(): void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -404,7 +394,14 @@ class Phpbb extends Software
 		
 		foreach( $this->fetch( 'posts', 'post_id' ) AS $row )
 		{
-			$visibility = $row['post_visibility'] ?? $row['post_approved'];
+			if ( isset( $row['post_visibility'] ) )
+			{
+				$visibility = $row['post_visibility'];
+			}
+			else
+			{
+				$visibility = $row['post_approved'];
+			}
 
 			$editName = null;
 			if( $row['post_edit_time'] AND $row['post_edit_user'] )
@@ -413,13 +410,13 @@ class Phpbb extends Software
 				{
 					$editName = $this->db->select( 'username', 'users', array( 'user_id=?', $row['post_edit_user'] ) )->first();
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 			
 			$info = array(
 				'pid'			=> $row['post_id'],
 				'topic_id'		=> $row['topic_id'],
-				'post'			=> PhpbbCore::stripUid( $row['post_text'], $row['bbcode_uid'] ),
+				'post'			=> \IPS\convert\Software\Core\Phpbb::stripUid( $row['post_text'], $row['bbcode_uid'] ),
 				'append_edit'	=> ( $row['post_edit_user'] ) ? 1 : 0,
 				'edit_time'		=> $row['post_edit_time'],
 				'edit_name'     => $editName,
@@ -428,7 +425,7 @@ class Phpbb extends Software
 				'ip_address'	=> $row['poster_ip'],
 				'post_date'		=> $row['post_time'],
 				'queued'		=> ( $visibility == 1 ) ? 0 : -1,
-				'pdelete_time'	=> $row['post_delete_time'] ?? NULL,
+				'pdelete_time'	=> isset( $row['post_delete_time'] ) ? $row['post_delete_time'] : NULL,
 			);
 			
 			$libraryClass->convertForumsPost( $info );
@@ -439,9 +436,9 @@ class Phpbb extends Software
 				try
 				{
 					$log	= $this->db->select( '*', 'log', array( "log_id=?", $warning['log_id'] ) )->first();
-					$data	= unserialize( $log['log_data'] );
+					$data	= \unserialize( $log['log_data'] );
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					$log	= array( 'user_id' => 0 );
 					$data	= array( 0 => NULL );
@@ -453,7 +450,7 @@ class Phpbb extends Software
 						'wl_moderator'			=> $log['user_id'],
 						'wl_date'				=> $warning['warning_time'],
 						'wl_points'				=> 1,
-						'wl_note_member'		=> $data[0] ?? NULL,
+						'wl_note_member'		=> isset( $data[0] ) ? $data[0] : NULL,
 					) );
 
 				/* Add a member history record for this member */
@@ -475,14 +472,14 @@ class Phpbb extends Software
 	/**
 	 * @brief   temporarily store post content
 	 */
-	protected array $_postContent = array();
+	protected $_postContent = array();
 	
 	/**
 	 * Convert attachments
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments(): void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -516,7 +513,7 @@ class Phpbb extends Software
 
 					if( !isset( $this->_postContent[ $pid ] ) )
 					{
-						$this->_postContent[ $pid ] = Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
+						$this->_postContent[ $pid ] = \IPS\Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
 					}
 
 					$attachmentName = preg_quote( $row['real_filename'], '/' );
@@ -542,7 +539,8 @@ class Phpbb extends Software
 						$this->_postContent[ $pid ] .= '<br>' . $replacement;
 					}
 				}
-				catch( UnderflowException|OutOfRangeException $e ) {}
+				catch( \UnderflowException $e ) {}
+				catch( \OutOfRangeException $e ) {}
 			}
 			
 			$libraryClass->setLastKeyValue( $row['attach_id'] );
@@ -551,49 +549,49 @@ class Phpbb extends Software
 		/* Do the updates */
 		foreach( $this->_postContent as $pid => $content )
 		{
-			Db::i()->update( 'forums_posts', array( 'post' => $content ), array( 'pid=?', $pid ) );
+			\IPS\Db::i()->update( 'forums_posts', array( 'post' => $content ), array( 'pid=?', $pid ) );
 		}
 	}
 
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'viewtopic.php' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'viewtopic.php' ) !== FALSE )
 		{
-			if( isset( Request::i()->p ) )
+			if( isset( \IPS\Request::i()->p ) )
 			{
 				$class	= '\IPS\forums\Topic\Post';
 				$types	= array( 'posts', 'forums_posts' );
-				$oldId	= Request::i()->p;
+				$oldId	= \IPS\Request::i()->p;
 			}
 			else
 			{
 				$class	= '\IPS\forums\Topic';
 				$types	= array( 'topics', 'forums_topics' );
-				$oldId	= Request::i()->tid ?: Request::i()->t;
+				$oldId	= \IPS\Request::i()->tid ?: \IPS\Request::i()->t;
 			}
 		}
-		elseif( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'viewforum.php' ) !== FALSE )
+		elseif( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'viewforum.php' ) !== FALSE )
 		{
 			$class	= '\IPS\forums\Forum';
 			$types	= array( 'forums', 'forums_forums' );
-			$oldId	= Request::i()->f;
+			$oldId	= \IPS\Request::i()->f;
 		}
-		elseif( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'download/file.php' ) !== FALSE )
+		elseif( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'download/file.php' ) !== FALSE )
 		{
 			try
 			{
-				$data = (string) $this->app->getLink( Request::i()->id, array( 'attachments', 'core_attachments' ) );
+				$data = (string) $this->app->getLink( \IPS\Request::i()->id, array( 'attachments', 'core_attachments' ) );
 
-				return Url::external( Settings::i()->base_url . 'applications/core/interface/file/attachment.php' )->setQueryString( 'id', $data );
+				return \IPS\Http\Url::external( \IPS\Settings::i()->base_url . 'applications/core/interface/file/attachment.php' )->setQueryString( 'id', $data );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
@@ -607,20 +605,20 @@ class Phpbb extends Software
 				{
 					$data = (string) $this->app->getLink( $oldId, $types );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( $oldId, $types, FALSE, TRUE );
 				}
 				$item = $class::load( $data );
 
-				if( $item instanceof Content )
+				if( $item instanceof \IPS\Content )
 				{
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				elseif( $item instanceof Model )
+				elseif( $item instanceof \IPS\Node\Model )
 				{
 					if( $item->can( 'view' ) )
 					{
@@ -628,7 +626,7 @@ class Phpbb extends Software
 					}
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

@@ -12,38 +12,36 @@
 namespace IPS\blog\extensions\core\EditorLocations;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\blog\Entry;
-use IPS\Content;
-use IPS\Extensions\EditorLocationsAbstract;
-use IPS\Helpers\Form\Editor;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use LogicException;
-use RuntimeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor Extension: Blogs
  */
-class Entries extends EditorLocationsAbstract
+class _Entries
 {
+	/**
+	 * Can we use HTML in this editor?
+	 *
+	 * @param	\IPS\Member	$member	The member
+	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
+	 */
+	public function canUseHtml( $member )
+	{
+		return NULL;
+	}
+	
 	/**
 	 * Can we use attachments in this editor?
 	 *
-	 * @param Member $member	The member
-	 * @param Editor $field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool|null	NULL will cause the default value (based on the member's permissions) to be used, and is recommended in most cases. A boolean value will override that.
 	 */
-	public function canAttach( Member $member, Editor $field ): ?bool
+	public function canAttach( $member, $field )
 	{
 		return NULL;
 	}
@@ -52,11 +50,11 @@ class Entries extends EditorLocationsAbstract
 	 * Can whatever is posted in this editor be moderated?
 	 * If this returns TRUE, we must ensure the content is ran through word, link and image filters
 	 *
-	 * @param Member $member	The member
-	 * @param Editor $field	The editor field
+	 * @param	\IPS\Member					$member	The member
+	 * @param	\IPS\Helpers\Form\Editor	$field	The editor field
 	 * @return	bool
 	 */
-	public function canBeModerated( Member $member, Editor $field ): bool
+	public function canBeModerated( $member, $field )
 	{
 		if ( preg_match( '/^blog\-(?:entry|edit)\-\d+$/', $field->options['autoSaveKey'] ) )
 		{
@@ -66,48 +64,40 @@ class Entries extends EditorLocationsAbstract
 		{
 			if ( \IPS\IN_DEV )
 			{
-				throw new RuntimeException( 'Unknown canBeModerated: ' . $field->options['autoSaveKey'] );
+				throw new \RuntimeException( 'Unknown canBeModerated: ' . $field->options['autoSaveKey'] );
 			}
-
-			return parent::canBeModerated( $member, $field );
+			return FALSE;
 		}
 	}
 
 	/**
 	 * Permission check for attachments
 	 *
-	 * @param Member $member		The member
-	 * @param int|null $id1		Primary ID
-	 * @param int|null $id2		Secondary ID
-	 * @param string|null $id3		Arbitrary data
-	 * @param array $attachment	The attachment data
-	 * @param bool $viewOnly	If true, just check if the user can see the attachment rather than download it
+	 * @param	\IPS\Member	$member		The member
+	 * @param	int|null	$id1		Primary ID
+	 * @param	int|null	$id2		Secondary ID
+	 * @param	string|null	$id3		Arbitrary data
+	 * @param	array		$attachment	The attachment data
+	 * @param	bool		$viewOnly	If true, just check if the user can see the attachment rather than download it
 	 * @return	bool
 	 */
-	public function attachmentPermissionCheck( Member $member, ?int $id1, ?int $id2, ?string $id3, array $attachment, bool $viewOnly=FALSE ): bool
+	public function attachmentPermissionCheck( $member, $id1, $id2, $id3, $attachment, $viewOnly=FALSE )
 	{
-		return Entry::load( $id1 )->canView( $member );
+		return \IPS\blog\Entry::load( $id1 )->canView( $member );
 	}
 	
 	/**
 	 * Attachment lookup
 	 *
-	 * @param int|null $id1	Primary ID
-	 * @param int|null $id2	Secondary ID
-	 * @param string|null $id3	Arbitrary data
-	 * @return    Content|Member|Model|Url|null
-	 * @throws	LogicException
+	 * @param	int|null	$id1	Primary ID
+	 * @param	int|null	$id2	Secondary ID
+	 * @param	string|null	$id3	Arbitrary data
+	 * @return	\IPS\blog\Blog
+	 * @throws	\LogicException
 	 */
-	public function attachmentLookup( ?int $id1=null, ?int $id2=null, ?string $id3=null ): Model|Content|Url|Member|null
+	public function attachmentLookup( $id1, $id2, $id3 )
 	{
-		try
-		{
-			return Entry::load( $id1 );
-		}
-		catch( Exception $e )
-		{
-			throw new LogicException;
-		}
+		return \IPS\blog\Entry::load( $id1 );
 	}
 
 }

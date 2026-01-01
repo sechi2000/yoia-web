@@ -12,83 +12,58 @@
 namespace IPS\nexus\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\DateRange;
-use IPS\Helpers\Form\Node;
-use IPS\nexus\Package;
-use IPS\nexus\Package\Group;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member filter extension
  */
-class Purchases extends MemberFilterAbstract
+class _Purchases
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param string $area Area to check (bulkmail, group_promotions, automatic_moderation)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'bulkmail' ) );
+		return \in_array( $area, array( 'bulkmail' ) );
 	}
 
 	/** 
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		return array(
-			new Node( 'nexus_bm_filters_packages', isset( $criteria['nexus_bm_filters_packages'] ) ? array_filter( array_map( function( $val )
+			new \IPS\Helpers\Form\Node( 'nexus_bm_filters_packages', isset( $criteria['nexus_bm_filters_packages'] ) ? array_filter( array_map( function( $val )
 			{
 				try
 				{
-					return Package::load( $val );
+					return \IPS\nexus\Package::load( $val );
 				}
-				catch ( OutOfRangeException )
+				catch ( \OutOfRangeException $e )
 				{
 					return NULL;
 				}
 			}, explode( ',', $criteria['nexus_bm_filters_packages'] ) ) ) : 0, FALSE, array( 'zeroVal' => 'nexus_bm_filters_packages_none', 'multiple' => TRUE, 'class' => 'IPS\nexus\Package\Group', 'zeroValTogglesOff' => array( 'nexus_bm_filters_pkg_active', 'nexus_bm_filters_pkg_expired', 'nexus_bm_filters_pkg_canceled' ), 'permissionCheck' => function( $node )
 			{
-				return !( $node instanceof Group );
+				return !( $node instanceof \IPS\nexus\Package\Group );
 			} ) ),
-			new CheckboxSet( 'nexus_bm_filters_type', $criteria['nexus_bm_filters_type'] ?? array('active'), FALSE, array( 'toggles' => array( 'expired' => array( 'nexus_bm_filters_pkg_expired' ) ), 'options' => array( 'active' => 'nexus_bm_filters_type_active', 'expired' => 'nexus_bm_filters_type_expired', 'canceled' => 'nexus_bm_filters_type_canceled' ) ), NULL, NULL, NULL, 'nexus_bm_filters_types' ),
-			new Custom( 'nexus_bm_filters_pkg_expired', array(
-				0 => $criteria['nexus_bm_filters_pkg_expired']['range'] ?? '',
-				1 => $criteria['nexus_bm_filters_pkg_expired']['days'] ?? NULL,
-				3 => $criteria['nexus_bm_filters_pkg_expired']['days_lt'] ?? NULL
-			), FALSE, array(
+			new \IPS\Helpers\Form\CheckboxSet( 'nexus_bm_filters_type', isset( $criteria['nexus_bm_filters_type'] ) ? $criteria['nexus_bm_filters_type'] : array( 'active' ), FALSE, array( 'toggles' => array( 'expired' => array( 'nexus_bm_filters_pkg_expired' ) ), 'options' => array( 'active' => 'nexus_bm_filters_type_active', 'expired' => 'nexus_bm_filters_type_expired', 'canceled' => 'nexus_bm_filters_type_canceled' ) ), NULL, NULL, NULL, 'nexus_bm_filters_types' ),
+			new \IPS\Helpers\Form\Custom( 'nexus_bm_filters_pkg_expired', array( 0 => isset( $criteria['nexus_bm_filters_pkg_expired']['range'] ) ? $criteria['nexus_bm_filters_pkg_expired']['range'] : '', 1 => isset( $criteria['nexus_bm_filters_pkg_expired']['days'] ) ? $criteria['nexus_bm_filters_pkg_expired']['days'] : NULL, 3 => isset( $criteria['nexus_bm_filters_pkg_expired']['days_lt'] ) ? $criteria['nexus_bm_filters_pkg_expired']['days_lt'] : NULL ), FALSE, array(
 				'getHtml'	=> function( $element )
 				{
-					$dateRange = new DateRange( "{$element->name}[0]", $element->value[0], FALSE );
+					$dateRange = new \IPS\Helpers\Form\DateRange( "{$element->name}[0]", $element->value[0], FALSE );
 
-					return Theme::i()->getTemplate( 'members', 'core', 'global' )->dateFilters( $dateRange, $element );
+					return \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->dateFilters( $dateRange, $element );
 				}
 			), NULL, NULL, NULL, 'nexus_bm_filters_pkg_expired' ),
 		);
@@ -98,14 +73,14 @@ class Purchases extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return    array|bool            False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array|bool
+	public function save( $post )
 	{
 		$return = array();
 
-		if ( is_array( $post['nexus_bm_filters_packages'] ) )
+		if ( \is_array( $post['nexus_bm_filters_packages'] ) )
 		{
 			$ids = array();
 			foreach ( $post['nexus_bm_filters_packages'] as $package )
@@ -119,27 +94,21 @@ class Purchases extends MemberFilterAbstract
 		if( isset( $post['nexus_bm_filters_type'] ) )
 		{
 			$return['nexus_bm_filters_type']			= $post['nexus_bm_filters_type'];
-			$return['nexus_bm_filters_pkg_active']		= ( in_array( "active", $post['nexus_bm_filters_type'] ) );
-			$return['nexus_bm_filters_pkg_canceled']	= ( in_array( "canceled", $post['nexus_bm_filters_type'] ) );
+			$return['nexus_bm_filters_pkg_active']		= (bool) ( \in_array( "active", $post['nexus_bm_filters_type'] ) );
+			$return['nexus_bm_filters_pkg_canceled']	= (bool) ( \in_array( "canceled", $post['nexus_bm_filters_type'] ) );
+			$return['nexus_bm_filters_pkg_expired']		= NULL;
 
 			if( isset( $post['nexus_bm_filters_pkg_expired'][2] ) AND $post['nexus_bm_filters_pkg_expired'][2] == 'days' )
 			{
-				$return['nexus_bm_filters_pkg_expired'] = $post['nexus_bm_filters_pkg_expired'][1] ? array( 'days' => intval( $post['nexus_bm_filters_pkg_expired'][1] ) ) : FALSE;
+				$return['nexus_bm_filters_pkg_expired'] = $post['nexus_bm_filters_pkg_expired'][1] ? array( 'days' => \intval( $post['nexus_bm_filters_pkg_expired'][1] ) ) : FALSE;
 			}
 			elseif( isset( $post['nexus_bm_filters_pkg_expired'][2] ) AND $post['nexus_bm_filters_pkg_expired'][2] == 'days_lt' )
 			{
-				$return['nexus_bm_filters_pkg_expired'] = $post['nexus_bm_filters_pkg_expired'][3] ? array( 'days_lt' => intval( $post['nexus_bm_filters_pkg_expired'][3] ) ) : FALSE;
+				$return['nexus_bm_filters_pkg_expired'] = $post['nexus_bm_filters_pkg_expired'][3] ? array( 'days_lt' => \intval( $post['nexus_bm_filters_pkg_expired'][3] ) ) : FALSE;
 			}
 			elseif( isset( $post['nexus_bm_filters_pkg_expired'][2] ) AND $post['nexus_bm_filters_pkg_expired'][2] == 'range' )
 			{
-				if( empty( $post['nexus_bm_filters_pkg_expired'][0] ) or ( empty( $post['nexus_bm_filters_pkg_expired'][0]['start'] ) and empty( $post['nexus_bm_filters_pkg_expired'][0]['end'] ) ) )
-				{
-					$return['nexus_bm_filters_pkg_expired'] = false;
-				}
-				else
-				{
-					$return['nexus_bm_filters_pkg_expired'] = array( 'range' => json_decode( json_encode( $post['nexus_bm_filters_pkg_expired'][0] ), true ) );
-				}
+				$return['nexus_bm_filters_pkg_expired'] = array( 'range' => json_decode( json_encode( $post['nexus_bm_filters_pkg_expired'][0] ), TRUE ) );
 			}
 			else
 			{
@@ -147,16 +116,16 @@ class Purchases extends MemberFilterAbstract
 			}
 		}
 		
-		return count( $return ) ? $return : FALSE;
+		return \count( $return ) ? $return : FALSE;
 	}
 	
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
 		if ( isset( $data['nexus_bm_filters_packages'] ) and $data['nexus_bm_filters_packages'] )
 		{
@@ -169,11 +138,11 @@ class Purchases extends MemberFilterAbstract
 	 * Callback for member retrieval database query
 	 * Can be used to set joins
 	 *
-	 * @param array $data	The array returned from the save() method
-	 * @param	Select	$query	The query
+	 * @param	mixed			$data	The array returned from the save() method
+	 * @param	\IPS\Db\Query	$query	The query
 	 * @return	void
 	 */
-	public function queryCallback( array $data, Select $query ) : void
+	public function queryCallback( $data, &$query )
 	{
 		if ( isset( $data['nexus_bm_filters_packages'] ) and $data['nexus_bm_filters_packages'] )
 		{
@@ -189,36 +158,28 @@ class Purchases extends MemberFilterAbstract
 				$types[] = 'purchase.ps_cancelled=1';
 			}
 
-			if ( !empty( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ] ) AND ( !empty( $data['nexus_bm_filters_pkg_expired']['range']['start'] ) or !empty( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ][ 'end' ] ) ) )
+			if ( !empty( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ] ) AND !empty( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ][ 'end' ] ) )
 			{
-				$start = ( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ][ 'start' ] ) ? new DateTime( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ][ 'start' ] ) : NULL;
-				$end = ( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ][ 'end' ] ) ? new DateTime( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ][ 'end' ] ) : NULL;
+				$start = ( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ][ 'start' ] ) ? new \IPS\DateTime( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ][ 'start' ] ) : NULL;
+				$end = ( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ][ 'end' ] ) ? new \IPS\DateTime( $data[ 'nexus_bm_filters_pkg_expired' ][ 'range' ][ 'end' ] ) : NULL;
 
 				if ( $start and $end )
 				{
 					$types[] = "( purchase.ps_active=0 AND purchase.ps_cancelled=0 AND purchase.ps_expire BETWEEN {$start->getTimestamp()} AND {$end->getTimestamp()})";
 				}
-				elseif( $start )
-				{
-					$types[] = "( purchase.ps_active=0 AND purchase.ps_cancelled=0 AND purchase.ps_expire >= {$start->getTimestamp()} )";
-				}
-				else
-				{
-					$types[] = "( purchase.ps_active=0 AND purchase.ps_cancelled=0 AND purchase.ps_expire < {$end->getTimestamp()} )";
-				}
 			}
 			elseif ( !empty( $data[ 'nexus_bm_filters_pkg_expired' ][ 'days' ] ) )
 			{
-				$date = DateTime::create()->sub( new DateInterval( 'P' . $data[ 'nexus_bm_filters_pkg_expired' ][ 'days' ] . 'D' ) );
+				$date = \IPS\DateTime::create()->sub( new \DateInterval( 'P' . $data[ 'nexus_bm_filters_pkg_expired' ][ 'days' ] . 'D' ) );
 				$types[] = "( purchase.ps_active=0 AND purchase.ps_cancelled=0 AND purchase.ps_expire < {$date->getTimestamp()})";
 			}
 			elseif( !empty( $data[ 'nexus_bm_filters_pkg_expired' ][ 'days_lt' ] ) AND (int) $data[ 'nexus_bm_filters_pkg_expired' ][ 'days_lt' ] )
 			{
-				$date = DateTime::create()->sub( new DateInterval( 'P' . (int) $data[ 'nexus_bm_filters_pkg_expired' ][ 'days_lt' ] . 'D' ) );
+				$date = \IPS\DateTime::create()->sub( new \DateInterval( 'P' . (int) $data[ 'nexus_bm_filters_pkg_expired' ][ 'days_lt' ] . 'D' ) );
 
 				$types[] = "( purchase.ps_active=0 AND purchase.ps_cancelled=0 AND purchase.ps_expire > {$date->getTimestamp()})";
 			}
-			elseif( isset( $data['nexus_bm_filters_type'] ) AND in_array( 'expired', $data['nexus_bm_filters_type'] ) )
+			elseif( isset( $data['nexus_bm_filters_type'] ) AND \in_array( 'expired', $data['nexus_bm_filters_type'] ) )
 			{
 				$types[] = "(purchase.ps_expire < " . time() . ")";
 			}
@@ -228,7 +189,7 @@ class Purchases extends MemberFilterAbstract
 				$types = implode( ' OR ', $types );
 			}
 
-			$query->join( ['nexus_purchases', 'purchase'], "purchase.ps_app='nexus' AND purchase.ps_type='package' AND purchase.ps_member=core_members.member_id AND " . Db::i()->in( 'purchase.ps_item_id', explode( ',', $data['nexus_bm_filters_packages'] ) ) . ( $types ? " AND ( {$types} )" : '' ) );
+			$query->join( ['nexus_purchases', 'purchase'], "purchase.ps_app='nexus' AND purchase.ps_type='package' AND purchase.ps_member=core_members.member_id AND " . \IPS\Db::i()->in( 'purchase.ps_item_id', explode( ',', $data['nexus_bm_filters_packages'] ) ) . ( $types ? " AND ( {$types} )" : '' ) );
 		}
 	}
 }

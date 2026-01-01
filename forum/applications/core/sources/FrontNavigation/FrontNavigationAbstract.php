@@ -12,122 +12,56 @@
 namespace IPS\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\FrontNavigation;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function is_array;
-use function json_decode;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Custom Item
  */
-abstract class FrontNavigationAbstract
+abstract class _FrontNavigationAbstract
 {
-	/**
-	 * @var string Default icon
-	 */
-	public string $defaultIcon;
-
 	/**
 	 * @brief	Store sub item objects for re-use later
 	 */
-	protected ?array $subItems = NULL;
+	protected $subItems = NULL;
 	
 	/**
 	 * Get sub items of an item
 	 *
 	 * @return	array
 	 */
-	public function subItems() : array
+	public function subItems()
 	{
 		if ( $this->subItems === NULL )
 		{
 			$this->subItems = array();
-			$frontNavigation = FrontNavigation::frontNavigation();
+			$frontNavigation = \IPS\core\FrontNavigation::frontNavigation();
 			
 			if ( isset( $frontNavigation[ $this->id ] ) )
 			{
 				foreach ( $frontNavigation[ $this->id ] as $item )
 				{
-					try
+					$class = 'IPS\\' . $item['app'] . '\extensions\core\FrontNavigation\\' . $item['extension'];
+					if ( class_exists( $class ) )
 					{
-						$class = Application::getExtensionClass( $item['app'], 'FrontNavigation', $item['extension'] );
-						$this->subItems[$item['id']] = new $class( json_decode( $item['config'], TRUE ), $item['id'], $item['permissions'], $item['menu_types'], json_decode( (string)$item['icon'], TRUE ) );
-					} catch ( OutOfRangeException ){}
+						$this->subItems[ $item['id'] ] = new $class( json_decode( $item['config'], TRUE ), $item['id'], $item['permissions'] );
+					}
 				}
 			}
 		}
 
 		return $this->subItems;
 	}
-
-	/**
-	 * Return the icon data for the attribute
-	 * @return string
-	 */
-	public function getIconDataForAttribute(): string
-	{
-		if ( $this->icon and ! empty( $this->icon ) and is_array( $this->icon ) )
-		{
-			/* This is from the icon picker, so let's format a bit */
-			$icon = $this->icon[0];
-
-			if ( $icon['type'] === 'emoji' )
-			{
-				return $icon['raw'];
-			}
-			else if ( $icon['type'] === 'fa' )
-			{
-				return 'fa';
-			}
-		}
-
-		return $this->getDefaultIcon();
-	}
-
-	/**
-	 * Return the icon data for the attribute
-	 * @return string
-	 */
-	public function getIconData(): string
-	{
-		if ( !empty( $this->icon[0]['raw'] ) )
-		{
-			return $this->icon[0]['raw'];
-		}
-
-		return "";
-	}
-
-	/**
-	 * Return the default icon
-	 *
-	 * @return string
-	 */
-	public function getDefaultIcon(): string
-	{
-		return ( $this->defaultIcon ?? '\f1c5' );
-	}
-
+	
 	/**
 	 * Allow multiple instances?
 	 *
 	 * @return	bool
 	 */
-	public static function allowMultiple() : bool
+	public static function allowMultiple()
 	{
 		return FALSE;
 	}
@@ -136,10 +70,10 @@ abstract class FrontNavigationAbstract
 	 * Get configuration fields
 	 *
 	 * @param	array	$existingConfiguration	The existing configuration, if editing an existing item
-	 * @param	int|null		$id						The ID number of the existing item, if editing
+	 * @param	int		$id						The ID number of the existing item, if editing
 	 * @return	array
 	 */
-	public static function configuration( array $existingConfiguration, ?int $id = NULL ) : array
+	public static function configuration( $existingConfiguration, $id = NULL )
 	{
 		return array();
 	}
@@ -151,7 +85,7 @@ abstract class FrontNavigationAbstract
 	 * @param	int		$id				The ID number of the existing item, if editing
 	 * @return	array
 	 */
-	public static function parseConfiguration( array $configuration, int $id ) : array
+	public static function parseConfiguration( $configuration, $id )
 	{
 		return $configuration;
 	}
@@ -159,50 +93,31 @@ abstract class FrontNavigationAbstract
 	/**
 	 * @brief	The configuration
 	 */
-	protected array $configuration = [];
+	protected $configuration;
 	
 	/**
 	 * @brief	The ID number
 	 */
-	public ?int $id = null;
+	public $id;
 	
 	/**
 	 * @brief	The permissions
 	 */
-	public array|string|null $permissions = null;
-
-	/**
-	 * @brief	The menu types
-	 */
-	public string $menuTypes = '';
-
-	/**
-	 * @brief	The icon data
-	 */
-	public array|null $icon = null;
-
-	/**
-	 * @brief	Parent ID
-	 */
-	public int $parent = 0;
-
+	public $permissions;
+	
 	/**
 	 * Constructor
 	 *
 	 * @param	array	$configuration	The configuration
 	 * @param	int		$id				The ID number
-	 * @param	string|null	$permissions	The permissions (* or comma-delimited list of groups)
-	 * @param	string	$menuTypes		The menu types (either * or json string)
+	 * @param	string	$permissions	The permissions (* or comma-delimited list of groups)
 	 * @return	void
 	 */
-	public function __construct( array $configuration, int $id, string|null $permissions, string $menuTypes, array|null $icon, int|null $parent = 0 )
+	public function __construct( $configuration, $id, $permissions )
 	{
 		$this->configuration = $configuration;
 		$this->id = $id;
 		$this->permissions = $permissions;
-		$this->menuTypes = $menuTypes;
-		$this->icon = $icon;
-		$this->parent = intval( $parent ); // Always make sure we have an integer, and not a null from the database
 	}
 	
 	/**
@@ -210,7 +125,7 @@ abstract class FrontNavigationAbstract
 	 *
 	 * @return	bool
 	 */
-	public static function permissionsCanInherit() : bool
+	public static function permissionsCanInherit()
 	{
 		return TRUE;
 	}
@@ -222,7 +137,7 @@ abstract class FrontNavigationAbstract
 	 *
 	 * @return	bool
 	 */
-	public static function isEnabled() : bool
+	public static function isEnabled()
 	{
 		return TRUE;
 	}
@@ -232,7 +147,7 @@ abstract class FrontNavigationAbstract
 	 *
 	 * @return	bool
 	 */
-	public function canAccessContent() : bool
+	public function canAccessContent()
 	{
 		return TRUE;
 	}
@@ -242,7 +157,7 @@ abstract class FrontNavigationAbstract
 	 *
 	 * @return	bool
 	 */
-	public function canView() : bool
+	public function canView()
 	{
 		if ( static::isEnabled() )
 		{
@@ -252,7 +167,7 @@ abstract class FrontNavigationAbstract
 			}
 			else
 			{
-				return $this->permissions == '*' ? TRUE : Member::loggedIn()->inGroup( explode( ',', $this->permissions ) );
+				return $this->permissions == '*' ? TRUE : \IPS\Member::loggedIn()->inGroup( explode( ',', $this->permissions ) );
 			}
 		}
 		return FALSE;
@@ -263,28 +178,21 @@ abstract class FrontNavigationAbstract
 	 *
 	 * @return	string
 	 */
-	abstract public function title() : string;
+	abstract public function title();
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	abstract public function link() : Url|string|null;
-
-	/**
-	 * Get Type Title which will display in the AdminCP Menu Manager
-	 *
-	 * @return	string
-	 */
-	abstract public static function typeTitle(): string;
+	abstract public function link();
 
 	/**
 	 * Get Attributes
 	 *
 	 * @return	string
 	 */
-	public function attributes() : string
+	public function attributes()
 	{
 		return '';
 	}
@@ -294,30 +202,26 @@ abstract class FrontNavigationAbstract
 	 *
 	 * @return	bool
 	 */
-	abstract public function active() : bool;
+	public function active()
+	{
+		return FALSE;
+	}
 		
 	/**
-	 * Is this item, or any of its child items, active?
+	 * Is this item, or any of it's child items, active?
 	 *
-	 * @param string|null $menuType 	header|sidebar|smallscreen
 	 * @return	bool
 	 */
-	public function activeOrChildActive( ?string $menuType=null ) : bool
+	public function activeOrChildActive()
 	{
-		if( $menuType === null )
-		{
-			$menuType = ( Theme::i()->getLayoutValue( 'global_view_mode' ) == 'side' ) ? 'sidebar' : 'header';
-		}
-
-		if ( $this->isAvailableFor( $menuType ) and $this->active() )
+		if ( $this->active() )
 		{
 			return TRUE;
 		}
 		
 		foreach ( $this->subItems() as $item )
 		{
-			/* @var FrontNavigationAbstract $item */
-			if ( $item->isAvailableFor( $menuType ) and $item->active() )
+			if ( $item->active() )
 			{
 				return TRUE;
 			}
@@ -330,56 +234,10 @@ abstract class FrontNavigationAbstract
 	 * Children
 	 *
 	 * @param	bool	$noStore	If true, will skip datastore and get from DB (used for ACP preview)
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function children( bool $noStore=FALSE ) : ?array
+	public function children( $noStore=FALSE )
 	{
 		return NULL;
-	}
-
-	/**
-	 * Is this item available for the specified type?
-	 *
-	 * @param string $type
-	 * @return bool
-	 */
-	public function isAvailableFor( string $type ): bool
-	{
-		if( !$this->canView() )
-		{
-			return false;
-		}
-
-		if ( $this->menuTypes === '*' )
-		{
-			return true;
-		}
-
-		if ( $json = json_decode( $this->menuTypes, true ) )
-		{
-			return in_array( $type, $json );
-		}
-
-		return false;
-	}
-
-	/**
-	 * A super handy method to avoid lots of PHP code in templates
-	 *
-	 * @return boolean
-	 */
-	public function isSideBarItemCollapsed(): bool
-	{
-		if ( isset( Request::i()->cookie['collapsedNavigationPanels'] ) AND in_array( $this->id, json_decode( Request::i()->cookie['collapsedNavigationPanels'], true ) ) )
-		{
-			return true;
-		}
-		else if ( ! isset( Request::i()->cookie['collapsedNavigationPanels'] ) )
-		{
-			/* By default, we just want to collapse the sub-items, not the top level items */
-			return $this->parent > 0;
-		}
-
-		return false;
 	}
 }

@@ -11,33 +11,21 @@
 namespace IPS\core\extensions\core\OverviewStatistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\OverviewStatisticsAbstract;
-use IPS\Member;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-use function is_array;
-use function round;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Overview statistics extension: Devices
  */
-class Devices extends OverviewStatisticsAbstract
+class _Devices
 {
 	/**
 	 * @brief	Which statistics page (activity or user)
 	 */
-	public string $page	= 'user';
+	public $page	= 'user';
 
 	/**
 	 * Return the sub-block keys
@@ -45,7 +33,7 @@ class Devices extends OverviewStatisticsAbstract
 	 * @note This is designed to allow one class to support multiple blocks, for instance using the ContentRouter to generate blocks.
 	 * @return array
 	 */
-	public function getBlocks(): array
+	public function getBlocks()
 	{
 		return array( 'devices' );
 	}
@@ -56,9 +44,9 @@ class Devices extends OverviewStatisticsAbstract
 	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
 	 * @return	array
 	 */
-	public function getBlockDetails( string $subBlock = NULL ): array
+	public function getBlockDetails( $subBlock = NULL )
 	{
-		$pruneNotice = Settings::i()->stats_device_usage_prune ? Member::loggedIn()->language()->addToStack( 'stats_overview_prune', TRUE, array( 'pluralize' => array( Settings::i()->stats_device_usage_prune ) ) ) : NULL;
+		$pruneNotice = \IPS\Settings::i()->stats_device_usage_prune ? \IPS\Member::loggedIn()->language()->addToStack( 'stats_overview_prune', TRUE, array( 'pluralize' => array( \IPS\Settings::i()->stats_device_usage_prune ) ) ) : NULL;
 
 		/* Description can be null and will not be shown if so */
 		return array( 'app' => 'core', 'title' => 'stats_overview_devices', 'description' => $pruneNotice, 'refresh' => 10 );
@@ -67,50 +55,21 @@ class Devices extends OverviewStatisticsAbstract
 	/** 
 	 * Return the block HTML to show
 	 *
-	 * @param	array|string|null    $dateRange	String for a fixed time period in days, NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
+	 * @param	array|NULL	$dateRange	NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
 	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
 	 * @return	string
 	 */
-	public function getBlock( array|string $dateRange = NULL, string $subBlock = NULL ): string
+	public function getBlock( $dateRange = NULL, $subBlock = NULL )
 	{
 		/* Init Chart */
 		$pieBarData = array();
-		$numbers = $this->getBlockNumbers( $dateRange, $subBlock );
-		foreach( $numbers as $key => $value )
-		{
-			if ( $key === 'statsreports_current_total' )
-			{
-				continue;
-			}
-
-			$pieBarData[] = array(
-				'name' =>  Member::loggedIn()->language()->addToStack( $key ),
-				'value' => $value,
-				'percentage' => $numbers['statsreports_current_total'] ? round( ( $value / $numbers['statsreports_current_total'] ) * 100, 2 ) : 0
-			);
-		}
-
-		return Theme::i()->getTemplate( 'global', 'core', 'global'  )->applePieChart( $pieBarData );
-	}
-
-
-	/**
-	 * Get the block numbers
-	 *
-	 * @param array|string|null $dateRange String for a fixed time period in days, NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
-	 * @param string|NULL $subBlock The subblock we are loading as returned by getBlocks()
-	 *
-	 * @return array
-	 */
-	public function getBlockNumbers( array|string $dateRange = NULL, string $subBlock=NULL ) : array
-	{
-
+		
 		/* Add Rows */
 		$where		= NULL;
 
 		if( $dateRange !== NULL )
 		{
-			if( is_array( $dateRange ) )
+			if( \is_array( $dateRange ) )
 			{
 				$where = array(
 					array( 'time > ?', $dateRange['start']->getTimestamp() ),
@@ -119,49 +78,48 @@ class Devices extends OverviewStatisticsAbstract
 			}
 			else
 			{
-				$currentDate = new DateTime;
+				$currentDate = new \IPS\DateTime;
 
 				switch( $dateRange )
 				{
 					case '7':
-						$where = array( array( 'time > ? ', $currentDate->sub( new DateInterval( 'P7D' ) )->getTimestamp() ) );
-						break;
+						$where = array( array( 'time > ? ', $currentDate->sub( new \DateInterval( 'P7D' ) )->getTimestamp() ) );
+					break;
 
 					case '30':
-						$where = array( array( 'time > ? ', $currentDate->sub( new DateInterval( 'P1M' ) )->getTimestamp() ) );
-						break;
+						$where = array( array( 'time > ? ', $currentDate->sub( new \DateInterval( 'P1M' ) )->getTimestamp() ) );
+					break;
 
 					case '90':
-						$where = array( array( 'time > ? ', $currentDate->sub( new DateInterval( 'P3M' ) )->getTimestamp() ) );
-						break;
+						$where = array( array( 'time > ? ', $currentDate->sub( new \DateInterval( 'P3M' ) )->getTimestamp() ) );
+					break;
 
 					case '180':
-						$where = array( array( 'time > ? ', $currentDate->sub( new DateInterval( 'P6M' ) )->getTimestamp() ) );
-						break;
+						$where = array( array( 'time > ? ', $currentDate->sub( new \DateInterval( 'P6M' ) )->getTimestamp() ) );
+					break;
 
 					case '365':
-						$where = array( array( 'time > ? ', $currentDate->sub( new DateInterval( 'P1Y' ) )->getTimestamp() ) );
-						break;
+						$where = array( array( 'time > ? ', $currentDate->sub( new \DateInterval( 'P1Y' ) )->getTimestamp() ) );
+					break;
 				}
 			}
 		}
 		$where[] = ['type=?', 'devices'];
-		$result = Db::i()->select( 'SUM(value_1) as mobiles, SUM(value_2) AS tablets, SUM(value_3) as consoles, SUM(value_4) as desktops', 'core_statistics', $where )->first();
-		$total = 0;
-		$return = [];
+		$result = \IPS\Db::i()->select( 'SUM(value_1) as mobiles, SUM(value_2) AS tablets, SUM(value_3) as consoles, SUM(value_4) as desktops', 'core_statistics', $where )->first();
+		$total = $result['mobiles'] + $result['tablets'] + $result['consoles'] + $result['desktops'];
 
 		foreach( array('mobiles', 'tablets', 'consoles', 'desktops' ) as $device )
 		{
 			if( $result[ $device ] > 0 )
 			{
-				$return[ 'stats_devices_' . $device ] = $result[ $device ];
-				$total += $result[$device];
+				$pieBarData[] = array(
+					'name' =>  \IPS\Member::loggedIn()->language()->addToStack('stats_devices_' . $device),
+					'value' => $result[ $device ],
+					'percentage' => $result[ $device ] > 0 ? round( ( $result[ $device ] / $total ) * 100, 2 ) : 0
+				);
 			}
 		}
 
-		$return['statsreports_current_total'] = $total;
-
-
-		return $return;
+		return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global'  )->applePieChart( $pieBarData );
 	}
 }

@@ -10,165 +10,107 @@
 
 namespace IPS\Node;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use Exception;
-use IPS\Application\Module;
-use IPS\Content\ClubContainer;
 use IPS\Content\Comment;
-use IPS\Content\Followable;
-use IPS\Content\Item;
-use IPS\Content\Permissions as PermissionsExtension;
-use IPS\Content\Review;
-use IPS\Content\Search\Index;
-use IPS\Content\Search\SearchContent;
-use IPS\Content\ViewUpdates;
-use IPS\core\DeletionLog;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Events\Event;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
 use IPS\Login;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Output\UI\UiExtension;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
 use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use OutOfBoundsException;
-use OutOfRangeException;
-use RuntimeException;
-use SplStack;
-use UnderflowException;
-use function array_merge;
-use function array_values;
-use function class_implements;
-use function count;
-use function defined;
-use function get_called_class;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_int;
-use function is_null;
-use function is_numeric;
-use function mb_substr;
-use function strlen;
-use function substr;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ($_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0') . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Node Model
- *
- * @mixin ClubContainer
- * @mixin DelayedCount
- * @mixin Grouping
- * @mixin Statistics
- * @mixin Colorize
- * @mixin Permissions
- * @mixin Icon
- * @mixin CustomBadge
+ * @mixin \IPS\Node\DelayedCount
+ * @mixin \IPS\Node\Colorize
+ * @mixin \IPS\Node\Statistics
  */
-abstract class Model extends ActiveRecord
+abstract class _Model extends \IPS\Patterns\ActiveRecord
 {
 	/* !Abstract Properties */
 
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnParent = NULL;
+	public static $databaseColumnParent = NULL;
 
 	/**
 	 * @brief	[Node] Parent ID Root Value
 	 * @note	This normally doesn't need changing though some legacy areas use -1 to indicate a root node
 	 */
-	public static int $databaseColumnParentRootValue = 0;
+	public static $databaseColumnParentRootValue = 0;
 
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = NULL;
+	public static $databaseColumnOrder = NULL;
 
 	/**
 	 * @brief	[Node] Automatically set position for new nodes
 	 */
-	public static bool $automaticPositionDetermination = TRUE;
+	public static $automaticPositionDetermination = TRUE;
 
 	/**
 	 * @brief	[Node] Enabled/Disabled Column
 	 */
-	public static ?string $databaseColumnEnabledDisabled = NULL;
+	public static $databaseColumnEnabledDisabled = NULL;
 
 	/**
 	 * @brief	[Node] If the node can be "owned", the owner "type" (typically "member" or "group") and the associated database column
 	 */
-	public static ?array $ownerTypes = NULL;
+	public static $ownerTypes = NULL;
 
 	/**
 	 * @brief	[Node] Sortable?
 	 */
-	public static bool $nodeSortable = TRUE;
+	public static $nodeSortable = TRUE;
 
 	/**
 	 * @brief	[Node] Subnode class
 	 */
-	public static ?string $subnodeClass = NULL;
+	public static $subnodeClass = NULL;
 
 	/**
 	 * @brief	[Node] Show forms modally?
 	 */
-	public static bool $modalForms = FALSE;
+	public static $modalForms = FALSE;
 
 	/**
 	 * @brief	[Node] App for permission index
 	 */
-	public static ?string $permApp = NULL;
+	public static $permApp = NULL;
 
 	/**
 	 * @brief	[Node] Type for permission index
 	 */
-	public static ?string $permType = NULL;
+	public static $permType = NULL;
 
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}" as the key
 	 */
-	public static ?string $titleLangPrefix = NULL;
+	public static $titleLangPrefix = NULL;
 
 	/**
 	 * @brief	[Node] Description suffix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}_{$descriptionLangSuffix}" as the key
 	 */
-	public static ?string $descriptionLangSuffix = NULL;
+	public static $descriptionLangSuffix = NULL;
 
 	/**
 	 * @brief	[Node] Prefix string that is automatically prepended to permission matrix language strings
 	 */
-	public static string $permissionLangPrefix = '';
+	public static $permissionLangPrefix = '';
 
 	/**
 	 * @brief	[Node] By mapping appropriate columns (rating_average and/or rating_total + rating_hits) allows to cache rating values
 	 */
-	public static array $ratingColumnMap	= array();
+	public static $ratingColumnMap	= array();
 
 	/**
 	 * @brief	[Node] Maximum results to display at a time in any node helper form elements. Useful for user-submitted node types when there may be a lot. NULL for no limit.
 	 */
-	public static ?int $maxFormHelperResults = NULL;
+	public static $maxFormHelperResults = NULL;
 
 	/**
 	 * @brief	[Node] Cache Total Followers Count
@@ -192,46 +134,31 @@ abstract class Model extends ActiveRecord
 	'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/massManageContent/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = NULL;
-
-	/**
-	 * Mapping of node columns to specific actions (e.g. comment, review)
-	 * Note: Mappings can also reference bitoptions keys.
-	 *
-	 * @var array
-	 */
-	public static array $actionColumnMap = array();
+	protected static $restrictions = NULL;
 
 	/* !Static Methods */
 
 	/**
 	 * @brief	Cache for roots
 	 */
-	protected static ?array $rootsResult = array();
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = false;
+	protected static $rootsResult = array();
 
 	/**
 	 * Fetch All Root Nodes
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param mixed $where				Additional WHERE clause
-	 * @param array|null $limit				Limit/offset to use, or NULL for no limit (default)
-	 * @return	static[]
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	mixed				$where				Additional WHERE clause
+	 * @param	array|NULL			$limit				Limit/offset to use, or NULL for no limit (default)
+	 * @return	array
 	 */
-	public static function roots( ?string $permissionCheck='view', Member $member=NULL, mixed $where=array(), array $limit=NULL ): array
+	public static function roots( $permissionCheck='view', $member=NULL, $where=array(), $limit=NULL )
 	{
 		/* Will we need to check permissions? */
-		$usingPermissions = ( in_array( 'IPS\Node\Permissions', class_implements( get_called_class() ) ) and $permissionCheck !== NULL );
-		if ( $usingPermissions )
+		$usingPermssions = ( \in_array( 'IPS\Node\Permissions', class_implements( \get_called_class() ) ) and $permissionCheck !== NULL );
+		if ( $usingPermssions )
 		{
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
 		}
 				
 		/* Specify that we only want the ones without a parent */
@@ -241,84 +168,59 @@ abstract class Model extends ActiveRecord
 		}
 		
 		/* And aren't in clubs */
-		if ( IPS::classUsesTrait( get_called_class(), 'IPS\Content\ClubContainer' ) )
+		if ( \IPS\IPS::classUsesTrait( \get_called_class(), 'IPS\Content\ClubContainer' ) )
 		{
 			$where[] = array( static::$databasePrefix . static::clubIdColumn() . ' IS NULL' );
 		}
 		
 		/* Have we got a cached result we can use? */
-		if ( $usingPermissions )
+		if ( $usingPermssions )
 		{
-			$cacheKey = md5( get_called_class() . $permissionCheck . $member->member_id . json_encode( $where ) . json_encode( $limit ) );
+			$cacheKey = md5( \get_called_class() . $permissionCheck . $member->member_id . json_encode( $where ) . json_encode( $limit ) );
 		}
 		else
 		{
-			$cacheKey = md5( get_called_class() . $permissionCheck . json_encode( $where ) . json_encode( $limit ) );
+			$cacheKey = md5( \get_called_class() . $permissionCheck . json_encode( $where ) . json_encode( $limit ) );
 		}
 		
 		if( isset( static::$rootsResult[ $cacheKey ] ) )
 		{
 			return static::$rootsResult[ $cacheKey ];
 		}
+		
+		/* Fetch */
+		$nodes = static::nodesWithPermission( $usingPermssions ? $permissionCheck : NULL, $member, $where, NULL, $limit );
+
+		/* Set cache */
+		static::$rootsResult[ $cacheKey ] = $nodes;
 
 		/* Return */
-		static::$rootsResult[ $cacheKey ] = static::nodesWithPermission( $usingPermissions ? $permissionCheck : NULL, $member, $where, NULL, $limit );
 		return static::$rootsResult[ $cacheKey ];
 	}
 	
 	/**
 	 * Fetch All Root Nodes
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param mixed $where				Additional WHERE clause
-	 * @param string|null $order				ORDER BY clause
-	 * @param array|null $limit				Limit/offset to use, or NULL for no limit (default)
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	mixed				$where				Additional WHERE clause
+	 * @param	string				$order				ORDER BY clause
+	 * @param	array|NULL			$limit				Limit/offset to use, or NULL for no limit (default)
 	 * @return	array
 	 */
-	protected static function nodesWithPermission( ?string $permissionCheck, ?Member $member, mixed $where=array(), string $order=NULL, array $limit=NULL ): array
+	protected static function nodesWithPermission( $permissionCheck, $member, $where=array(), $order=NULL, $limit=NULL )
 	{
-		/* Check if we have a cached result from loadIntoMemory() */
-		$member = $member ?: Member::loggedIn();
-		$cacheKey = md5( $permissionCheck . $member->member_id . TRUE . json_encode( $where ) );
-		$rootsCacheKey = md5( get_called_class() . $permissionCheck . ( $permissionCheck ? $member->member_id : '' ) . json_encode( $where ) . json_encode( $limit ) );
-		if( isset( static::$rootsResult[ $rootsCacheKey ] ) )
-		{
-			$nodes = static::$rootsResult[ $rootsCacheKey ];
-			foreach( static::$rootsResult[ $rootsCacheKey ] as $node )
-			{
-				if( isset( static::$multitons[ $node->_id ]->_childrenResults[ $cacheKey ] ) )
-				{
-					$nodes = array_merge( $nodes, static::$multitons[ $node->_id ]->_childrenResults[ $cacheKey ] );
-				}
-			}
-
-			/* Sort by databaseColumnOrder */
-			if( $order == null and static::$databaseColumnOrder !== null )
-			{
-				$column = static::$databaseColumnOrder;
-				usort( $nodes, function( $a, $b ) use ( $column ){
-					return $a->$column <=> $b->$column;
-				});
-			}
-
-			return $nodes;
-		}
-
 		/* Permission check? */
 		if ( $permissionCheck )
 		{
-			foreach( PermissionsExtension::nodePermissionClause( $permissionCheck, get_called_class(), $member ) as $clause )
-			{
-				$where[] = $clause;
-			}
-
+			$member = $member ?: \IPS\Member::loggedIn();
+			$where[] = array( '(' . \IPS\Db::i()->findInSet( 'core_permission_index.perm_' . static::$permissionMap[ $permissionCheck ], $member->permissionArray() ) . ' OR ' . 'core_permission_index.perm_' . static::$permissionMap[ $permissionCheck ] . '=? )', '*' );
 			if ( static::$databaseColumnEnabledDisabled )
 			{
 				$where[] = array( static::$databasePrefix . static::$databaseColumnEnabledDisabled . '=1' );
 			}
 		}
-
+		
 		/* Specify the order */
 		if( $order == NULL and static::$databaseColumnOrder !== NULL )
 		{
@@ -326,7 +228,7 @@ abstract class Model extends ActiveRecord
 		}
 		
 		/* Select */
-		$select = Db::i()->select( '*', static::$databaseTable, $where, $order, $limit );
+		$select = \IPS\Db::i()->select( '*', static::$databaseTable, $where, $order, $limit );
 		if ( $permissionCheck )
 		{
 			$select->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . static::$databaseTable . "." . static::$databasePrefix . static::$databaseColumnId, static::$permApp, static::$permType ) );
@@ -341,7 +243,7 @@ abstract class Model extends ActiveRecord
 			{
 				$nodes[ $k ] = static::constructFromData( $data );
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
 		/* Return */
@@ -351,23 +253,20 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Get a count of all nodes
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULL to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param mixed $where				Additional WHERE clause
-	 * @return	int
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULL to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	mixed				$where				Additional WHERE clause
+	 * @return	array
 	 */
-	public static function countWhere( ?string $permissionCheck='view', Member $member=NULL, mixed $where=array() ): int
+	public static function countWhere( $permissionCheck='view', $member=NULL, $where=array() )
 	{
 		/* Permission check? */
-		$usingPermssions = ( in_array( 'IPS\Node\Permissions', class_implements( get_called_class() ) ) and $permissionCheck !== NULL );
+		$usingPermssions = ( \in_array( 'IPS\Node\Permissions', class_implements( \get_called_class() ) ) and $permissionCheck !== NULL );
 		if ( $usingPermssions )
 		{
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
 
-			foreach( PermissionsExtension::nodePermissionClause( $permissionCheck, get_called_class(), $member ) as $clause )
-			{
-				$where[] = $clause;
-			}
+			$where[] = array( '(' . \IPS\Db::i()->findInSet( 'core_permission_index.perm_' . static::$permissionMap[ $permissionCheck ], $member->groups ) . ' OR ' . 'core_permission_index.perm_' . static::$permissionMap[ $permissionCheck ] . '=? )', '*' );
 			if ( static::$databaseColumnEnabledDisabled )
 			{
 				$where[] = array( static::$databasePrefix . static::$databaseColumnEnabledDisabled . '=1' );
@@ -375,7 +274,7 @@ abstract class Model extends ActiveRecord
 		}
 
 		/* Select */
-		$select = Db::i()->select( 'COUNT(*)', static::$databaseTable, $where );
+		$select = \IPS\Db::i()->select( 'COUNT(*)', static::$databaseTable, $where );
 		if ( $usingPermssions )
 		{
 			$select->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . static::$databaseTable . "." . static::$databasePrefix . static::$databaseColumnId, static::$permApp, static::$permType ) );
@@ -388,12 +287,12 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Fetch All Root Nodes as array
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param mixed $where				Additional WHERE clause
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	mixed				$where				Additional WHERE clause
 	 * @return	array
 	 */
-	public static function rootsAsArray( ?string $permissionCheck='view', Member $member=NULL, mixed $where=array() ): array
+	public static function rootsAsArray( $permissionCheck='view', $member=NULL, $where=array() )
 	{
 		$return = array();
 		foreach ( static::roots( $permissionCheck, $member, $where ) as $node )
@@ -406,36 +305,36 @@ abstract class Model extends ActiveRecord
 	/**
 	 * @brief	Cache for owned noded
 	 */
-	protected static array $ownedNodesCache = array();
+	protected static $ownedNodesCache = array();
 
 	/**
 	 * Fetch all nodes owned by a given user
 	 *
-	 * @param Member|int|null $member		The member whose nodes to load
-	 * @param array $where		Initial where clause
+	 * @param	\IPS\Member|NULL	$member		The member whose nodes to load
+	 * @param	array				$where		Initial where clause
 	 * @return	array
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public static function loadByOwner( Member|int|null $member=NULL, array $where=array() ): array
+	public static function loadByOwner( $member=NULL, $where=array() )
 	{
 		/* Can these nodes even be owned? */
 		if( static::$ownerTypes === NULL )
 		{
-			throw new RuntimeException;
+			throw new \RuntimeException;
 		}
 
 		/* Load member */
-		$member = $member === NULL ? Member::loggedIn() : $member;
+		$member = $member === NULL ? \IPS\Member::loggedIn() : $member;
 
-		if( is_int( $member ) )
+		if( \is_int( $member ) )
 		{
-			$member	= Member::load( $member );
+			$member	= \IPS\Member::load( $member );
 		}
 
 		/* Check the cache first */
-		if( isset( static::$ownedNodesCache[ md5( get_called_class() . $member->member_id . json_encode( $where ) ) ] ) )
+		if( isset( static::$ownedNodesCache[ md5( \get_called_class() . $member->member_id . json_encode( $where ) ) ] ) )
 		{
-			return static::$ownedNodesCache[ md5( get_called_class() . $member->member_id . json_encode( $where ) ) ];
+			return static::$ownedNodesCache[ md5( \get_called_class() . $member->member_id . json_encode( $where ) ) ];
 		}
 
 		/* Specify the order */
@@ -448,7 +347,7 @@ abstract class Model extends ActiveRecord
 		/* Select */
 		if( isset( static::$ownerTypes['member'] ) and isset( static::$ownerTypes['group'] ) )
 		{
-			$where[] = array( '(' . Db::i()->findInSet( static::$databasePrefix . static::$ownerTypes['group']['ids'], $member->groups ) . ' OR ' . static::$databasePrefix . static::$ownerTypes['member'] . '=? )', $member->member_id );
+			$where[] = array( '(' . \IPS\Db::i()->findInSet( static::$databasePrefix . static::$ownerTypes['group']['ids'], $member->groups ) . ' OR ' . static::$databasePrefix . static::$ownerTypes['member'] . '=? )', $member->member_id );
 		}
 		elseif( isset( static::$ownerTypes['member'] ) )
 		{
@@ -456,10 +355,10 @@ abstract class Model extends ActiveRecord
 		}
 		else
 		{
-			$where[] = array( Db::i()->findInSet( static::$databasePrefix . static::$ownerTypes['group']['ids'], $member->groups ) );
+			$where[] = array( \IPS\Db::i()->findInSet( static::$databasePrefix . static::$ownerTypes['group']['ids'], $member->groups ) );
 		}
 
-		$select = Db::i()->select( '*', static::$databaseTable, $where, $order );
+		$select = \IPS\Db::i()->select( '*', static::$databaseTable, $where, $order );
 
 		$select->setKeyField( static::$databasePrefix . static::$databaseColumnId );
 
@@ -471,40 +370,40 @@ abstract class Model extends ActiveRecord
 		}
 
 		/* Set cache */
-		static::$ownedNodesCache[ md5( get_called_class(). $member->member_id  . json_encode( $where ) ) ] = $nodes;
+		static::$ownedNodesCache[ md5( \get_called_class(). $member->member_id  . json_encode( $where ) ) ] = $nodes;
 
 		/* Return */
-		return static::$ownedNodesCache[ md5( get_called_class(). $member->member_id  . json_encode( $where ) ) ];
+		return static::$ownedNodesCache[ md5( \get_called_class(). $member->member_id  . json_encode( $where ) ) ];
 	}
 
 	/**
 	 * Search
 	 *
-	 * @param string $column	Column to search
-	 * @param string $query	Search query
-	 * @param string|null $order	Column to order by
-	 * @param mixed $where	Where clause
+	 * @param	string		$column	Column to search
+	 * @param	string		$query	Search query
+	 * @param	string|null	$order	Column to order by
+	 * @param	mixed		$where	Where clause
 	 * @return	array
 	 */
-	public static function search( string $column, string $query, ?string $order=NULL, mixed $where=array() ): array
+	public static function search( $column, $query, $order, $where=array() )
 	{
 		if ( $column === '_title' AND static::$titleLangPrefix !== NULL )
 		{
 			$return = array();
-			foreach ( Member::loggedIn()->language()->searchCustom( static::$titleLangPrefix, $query ) as $key => $value )
+			foreach ( \IPS\Member::loggedIn()->language()->searchCustom( static::$titleLangPrefix, $query ) as $key => $value )
 			{
 				try
 				{
 					$return[ $key ] = static::load( $key );
 				}
-				catch ( OutOfRangeException $e ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 
 			return $return;
 		}
 
 		$nodes = array();
-		foreach( Db::i()->select( '*', static::$databaseTable, array_merge( array( array( "{$column} LIKE CONCAT( '%', ?, '%' )", $query ) ), $where ), $order ) as $k => $data )
+		foreach( \IPS\Db::i()->select( '*', static::$databaseTable, array_merge( array( array( "{$column} LIKE CONCAT( '%', ?, '%' )", $query ) ), $where ), $order ) as $k => $data )
 		{
 			$nodes[ $k ] = static::constructFromData( $data );
 		}
@@ -512,19 +411,24 @@ abstract class Model extends ActiveRecord
 	}
 
 	/**
+	 * Last Poster ID Column
+	 */
+	protected static $lastPosterIdColumn;
+
+	/**
 	 * Load into memory (taking permissions into account)
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param array $where				Additional where clause
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	array				$where				Additional where clause
 	 * @return	void
 	 */
-	public static function loadIntoMemory( ?string $permissionCheck='view', Member $member=NULL, array $where = array() ) : void
+	public static function loadIntoMemory( $permissionCheck='view', $member=NULL, $where = array() )
 	{
 		/* Init */
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		$cacheKey = md5( $permissionCheck . $member->member_id . TRUE . json_encode( NULL ) . json_encode( array() ) );
-		$rootsCacheKey = md5( get_called_class() . $permissionCheck . $member->member_id . json_encode( array() ) );
+		$rootsCacheKey = md5( \get_called_class() . $permissionCheck . $member->member_id . json_encode( array() ) );
 
 		/* Exclude disabled */
 		if ( static::$databaseColumnEnabledDisabled )
@@ -534,20 +438,23 @@ abstract class Model extends ActiveRecord
 
 		/* Run query */
 		$order = static::$databaseColumnOrder !== NULL ? static::$databasePrefix . static::$databaseColumnOrder : NULL;
-		if ( in_array( 'IPS\Node\Permissions', class_implements( get_called_class() ) ) and $permissionCheck !== NULL )
+		if ( \in_array( 'IPS\Node\Permissions', class_implements( \get_called_class() ) ) and $permissionCheck !== NULL )
 		{
-			$permQueryWhere = PermissionsExtension::nodePermissionClause( $permissionCheck, get_called_class(), $member );
-			$permQueryWhere[] = [ 'core_permission_index.app=?', static::$permApp ];
-			$permQueryWhere[] = [ 'core_permission_index.perm_type=?', static::$permType ];
 			$where[] = array(
-				'(' . static::$databaseTable . '.' . static::$databasePrefix . static::$databaseColumnId . ' IN( ' . Db::i()->select( 'perm_type_id', 'core_permission_index', $permQueryWhere )->returnFullQuery() . ') )',
-			);
+				'(' . static::$databaseTable . '.' . static::$databasePrefix . static::$databaseColumnId . ' IN(?) )',
+				\IPS\Db::i()->select( 'perm_type_id', 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND ( ( " . \IPS\Db::i()->findInSet( 'perm_' . static::$permissionMap[ $permissionCheck ], $member->permissionArray() ) . ' ) OR perm_' . static::$permissionMap[ $permissionCheck ] . '=? )', static::$permApp, static::$permType, '*' ) ) );
 
-			$select = Db::i()->select( '*', static::$databaseTable, $where, $order, NULL, NULL, NULL, Db::SELECT_MULTIDIMENSIONAL_JOINS );
+			$select = \IPS\Db::i()->select( '*', static::$databaseTable, $where, $order, NULL, NULL, NULL, \IPS\Db::SELECT_MULTIDIMENSIONAL_JOINS );
 		}
 		else
 		{
-			$select = Db::i()->select( '*', static::$databaseTable, NULL, $order, NULL, NULL, NULL, Db::SELECT_MULTIDIMENSIONAL_JOINS );
+			$select = \IPS\Db::i()->select( '*', static::$databaseTable, NULL, $order, NULL, NULL, NULL, \IPS\Db::SELECT_MULTIDIMENSIONAL_JOINS );
+		}
+
+		/* Join last poster */
+		if ( static::$lastPosterIdColumn )
+		{
+			$select->join( 'core_members', 'core_members.member_id=' . static::$databaseTable . '.' . static::$databasePrefix . static::$lastPosterIdColumn );
 		}
 
 		/* Put into a tree */
@@ -563,7 +470,7 @@ abstract class Model extends ActiveRecord
 			/* If we have member data, store it to prevent an extra query later */
 			if ( isset( $row['core_members'] ) )
 			{
-				Member::constructFromData( $row['core_members'], FALSE );
+				\IPS\Member::constructFromData( $row['core_members'], FALSE );
 			}
 
 			/* Create object */
@@ -594,47 +501,47 @@ abstract class Model extends ActiveRecord
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 
 	/**
 	 * Get URL
 	 *
-	 * @return    Url|string|null
-	 * @throws	BadMethodCallException
+	 * @return	\IPS\Http\Url
+	 * @throws	\BadMethodCallException
 	 */
-	public function url(): Url|string|null
+	public function url()
 	{
 		if ( isset( static::$urlBase ) and isset( static::$urlTemplate ) and isset( static::$seoTitleColumn ) )
 		{
 			if( $this->_url === NULL )
 			{
 				$seoTitleColumn = static::$seoTitleColumn;
-				$this->_url = Url::internal( static::$urlBase . $this->_id, 'front', static::$urlTemplate, array( $this->$seoTitleColumn ) );
+				$this->_url = \IPS\Http\Url::internal( static::$urlBase . $this->_id, 'front', static::$urlTemplate, array( $this->$seoTitleColumn ) );
 			}
 
 			return $this->_url;
 		}
-		throw new BadMethodCallException;
+		throw new \BadMethodCallException;
 	}
 
 	/**
 	 * @brief	Cached AdminCP urls
 	 */
-	protected array $_acpUrls	= array();
+	protected $_acpUrls	= array();
 
 	/**
 	 * @brief   The class of the ACP \IPS\Node\Controller that manages this node type
 	 */
-	protected static ?string $acpController = NULL;
+	protected static $acpController = NULL;
 
 	/**
 	 * Get the URL of the AdminCP page for this node
 	 *
-	 * @param string|null $do The "do" query parameter of the url (e.g. 'form', 'permissions', etc).
+	 * @param   string|NULL  $do The "do" query parameter of the url (e.g. 'form', 'permissions', etc).
 	 *
-	 * @return Url | NULL
+	 * @return \IPS\Http\Url | NULL
 	 */
-	public function acpUrl( ?string $do="form" ): ?Url
+	public function acpUrl( $do="form" )
 	{
 		if ( !isset( $this->acpUrls[$do] ) AND static::$acpController !== NULL )
 		{
@@ -643,7 +550,7 @@ abstract class Model extends ActiveRecord
 			{
 				$bits = explode( "\\", static::$acpController );
 				$acpUrlBase = "app={$bits[1]}&module={$bits[4]}&controller={$bits[5]}";
-				$this->_acpUrls[$do] = Url::internal( $acpUrlBase )->setQueryString( array( 'do' => $do, 'id' => $this->_id ) );
+				$this->_acpUrls[$do] = \IPS\Http\Url::internal( $acpUrlBase )->setQueryString( array( 'do' => $do, 'id' => $this->_id ) );
 			}
 		}
 		return $this->_acpUrls[$do] ?? NULL;
@@ -654,7 +561,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public static function basicDataColumns(): array
+	public static function basicDataColumns()
 	{
 		$return = array( static::$databasePrefix . static::$databaseColumnId, static::$databasePrefix . static::$seoTitleColumn );
 		
@@ -670,34 +577,34 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Get URL from index data
 	 *
-	 * @param array $indexData		Data from the search index
-	 * @param array $itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
-	 * @param array|null $containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
-	 * @return    Url
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @return	\IPS\Http\Url
 	 */
-	public static function urlFromIndexData( array $indexData, array $itemData, ?array $containerData ): Url
+	public static function urlFromIndexData( $indexData, $itemData, $containerData )
 	{
-		return Url::internal( static::$urlBase . $indexData['index_container_id'], 'front', static::$urlTemplate, array( $containerData[ static::$databasePrefix . static::$seoTitleColumn ] ) );
+		return \IPS\Http\Url::internal( static::$urlBase . $indexData['index_container_id'], 'front', static::$urlTemplate, array( $containerData[ static::$databasePrefix . static::$seoTitleColumn ] ) );
 	}
 
 	/**
 	 * Get title from index data
 	 *
-	 * @param array $indexData		Data from the search index
-	 * @param array $itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
-	 * @param array|null $containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
-	 * @param bool $escape			If the title should be escaped for HTML output
-	 * @return    mixed
+	 * @param	array		$indexData		Data from the search index
+	 * @param	array		$itemData		Basic data about the item. Only includes columns returned by item::basicDataColumns()
+	 * @param	array|NULL	$containerData	Basic data about the container. Only includes columns returned by container::basicDataColumns()
+	 * @param	bool		$escape			If the title should be escaped for HTML output
+	 * @return	\IPS\Http\Url
 	 */
-	public static function titleFromIndexData(array $indexData, array $itemData, ?array $containerData, bool $escape = TRUE ): mixed
+	public static function titleFromIndexData( $indexData, $itemData, $containerData, $escape = TRUE )
 	{
 		if ( $indexData['index_club_id'] and isset( $containerData['_club'] ) )
 		{
-			return Member::loggedIn()->language()->addToStack( 'club_container_title', FALSE, array( 'sprintf' => array( $containerData['_club']['name'], Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $indexData['index_container_id'], 'NULL', $escape ? array( 'escape' => TRUE ) : array() ) ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'club_container_title', FALSE, array( 'sprintf' => array( $containerData['_club']['name'], \IPS\Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $indexData['index_container_id'], 'NULL', $escape ? array( 'escape' => TRUE ) : array() ) ) ) );
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $indexData['index_container_id'], NULL, $escape ? array( 'escape' => TRUE ) : array() );
+			return \IPS\Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $indexData['index_container_id'], NULL, $escape ? array( 'escape' => TRUE ) : array() );
 		}
 	}
 
@@ -705,14 +612,14 @@ abstract class Model extends ActiveRecord
 	 * [Node] Fetches the only node if only one exists
 	 * One Node to rule them all, One Node to find them, One Node to bring them all and in the darkness bind them
 	 *
-	 * @param array $properties				Array of property=>value i.e. array( 'redirect_url' => FALSE, 'password' => FALSE );
-	 * @param bool $returnRoots			Enable to check and return the root node
-	 * @param bool $subNodes				Enable to check subnodes
-	 * @return    Model|NULL
+	 * @param	array       $properties				Array of property=>value i.e. array( 'redirect_url' => FALSE, 'password' => FALSE );
+	 * @param	bool        $returnRoots			Enable to check and return the root node
+	 * @param	bool        $subNodes				Enable to check subnodes
+	 * @return	\IPS\Node\Model|NULL
 	 */
-	public static function theOnlyNode( array $properties=array(), bool $returnRoots=TRUE, bool $subNodes=TRUE ): ?Model
+	public static function theOnlyNode( $properties=array(), $returnRoots=TRUE, $subNodes=TRUE )
 	{
-		if ( count( static::roots() ) === 1 )
+		if ( \count( static::roots() ) === 1 )
 		{
 			foreach ( static::roots() as $root )
 			{
@@ -754,15 +661,15 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	string|null
 	 */
-	public function titleForLog(): ?string
+	public function titleForLog()
 	{
 		if ( static::$titleLangPrefix )
 		{
 			try
 			{
-				return Lang::load( Lang::defaultLanguage() )->get( static::$titleLangPrefix . $this->_id );
+				return \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->get( static::$titleLangPrefix . $this->_id );
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				return static::$titleLangPrefix . $this->_id;
 			}
@@ -778,9 +685,9 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get ID Number
 	 *
-	 * @return	int|string|null
+	 * @return	int
 	 */
-	protected function get__id(): int|string|null
+	protected function get__id()
 	{
 		$idColumn = static::$databaseColumnId;
 		return $this->$idColumn;
@@ -791,11 +698,11 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		if ( static::$titleLangPrefix )
 		{
-			return Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $this->_id, NULL, array( 'escape' => TRUE ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $this->_id, NULL, array( 'escape' => TRUE ) );
 		}
 
 		return '';
@@ -805,11 +712,11 @@ abstract class Model extends ActiveRecord
 	 * Get the title for a node using the specified language object
 	 * This is commonly used where we cannot use the logged in member's language, such as sending emails
 	 *
-	 * @param Lang $language	Language object to fetch the title with
-	 * @param array $options	What options to use for language parsing
+	 * @param	\IPS\Lang	$language	Language object to fetch the title with
+	 * @param	array 		$options	What options to use for language parsing
 	 * @return	string
 	 */
-	public function getTitleForLanguage( Lang $language, array $options=array() ): string
+	public function getTitleForLanguage( $language, $options=array() )
 	{
 		if ( static::$titleLangPrefix )
 		{
@@ -824,7 +731,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	string|null
 	 */
-	protected function get__titleLanguageKey(): ?string
+	protected function get__titleLanguageKey()
 	{
 		if ( static::$titleLangPrefix )
 		{
@@ -838,7 +745,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	public function get__formattedTitle(): string
+	public function get__formattedTitle()
 	{
 		return $this->_title;
 	}
@@ -848,7 +755,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	string|null
 	 */
-	protected function get__description(): ?string
+	protected function get__description()
 	{
 		return NULL;
 	}
@@ -856,13 +763,13 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get content table description
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	protected function get_description(): ?string
+	protected function get_description()
 	{
 		if ( static::$titleLangPrefix and static::$descriptionLangSuffix )
 		{
-			return Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $this->id . static::$descriptionLangSuffix );
+			return \IPS\Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $this->id . static::$descriptionLangSuffix );
 		}
 		return NULL;
 	}
@@ -870,13 +777,13 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get content table meta description
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function metaDescription(): ?string
+	public function metaDescription()
 	{
 		if ( static::$titleLangPrefix and static::$descriptionLangSuffix )
 		{
-			return Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $this->id . static::$descriptionLangSuffix, FALSE, array( 'striptags' => TRUE, 'escape' => TRUE, 'removeNewlines' => TRUE ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( static::$titleLangPrefix . $this->id . static::$descriptionLangSuffix, FALSE, array( 'striptags' => TRUE, 'escape' => TRUE, 'removeNewlines' => TRUE ) );
 		}
 		return NULL;
 	}
@@ -886,7 +793,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	public function metaTitle(): string
+	public function metaTitle()
 	{
 		return $this->_title;
 	}
@@ -896,27 +803,26 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	NULL|array		Null for no badge, or an array of badge data (0 => CSS class type, 1 => language string, 2 => optional raw HTML to show instead of language string)
 	 */
-	protected function get__badge(): ?array
+	protected function get__badge()
 	{
 		if ( $this->deleteOrMoveQueued() === TRUE )
 		{
 			return array(
-				0	=> 'ipsBadge ipsBadge--intermediary',
+				0	=> 'ipsBadge ipsBadge_intermediary',
 				1	=> 'node_move_delete_queued',
 			);
 		}
 
-		/* Check extensions for a possible badge */
-		return $this->ui( 'rowBadge', array(), true );
+		return NULL;
 	}
 
 	/**
 	 * [Node] Get Icon for tree
 	 *
 	 * @note	Return the class for the icon (e.g. 'globe', the 'fa fa-' is added automatically so you do not need this here)
-	 * @return	mixed
+	 * @return	string|null
 	 */
-	protected function get__icon(): mixed
+	protected function get__icon()
 	{
 		return NULL;
 	}
@@ -927,7 +833,7 @@ abstract class Model extends ActiveRecord
 	 * @note	Return value NULL indicates the node cannot be enabled/disabled
 	 * @return	bool|null
 	 */
-	protected function get__enabled(): ?bool
+	protected function get__enabled()
 	{
 		if ( $col = static::$databaseColumnEnabledDisabled )
 		{
@@ -939,10 +845,10 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Set whether or not this node is enabled
 	 *
-	 * @param bool|int $enabled	Whether to set it enabled or disabled
+	 * @param	bool|int	$enabled	Whether to set it enabled or disabled
 	 * @return	void
 	 */
-	protected function set__enabled( bool|int $enabled ) : void
+	protected function set__enabled( $enabled )
 	{
 		if ( $col = static::$databaseColumnEnabledDisabled )
 		{
@@ -956,7 +862,7 @@ abstract class Model extends ActiveRecord
 	 * @note	Return value NULL indicates the node cannot be enabled/disabled
 	 * @return	bool|null
 	 */
-	protected function get__locked(): ?bool
+	protected function get__locked()
 	{
 		return NULL;
 	}
@@ -966,7 +872,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return string|null
 	 */
-	protected function get__lockedLang(): ?string
+	protected function get__lockedLang()
 	{
 		return null;
 	}
@@ -974,20 +880,20 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get position
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__position(): int|null
+	protected function get__position()
 	{
 		$orderColumn = static::$databaseColumnOrder;
-		return (int) $this->$orderColumn;
+		return $this->$orderColumn;
 	}
 
 	/**
 	 * [Node] Get number of content items
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__items(): ?int
+	protected function get__items()
 	{
 		return NULL;
 	}
@@ -995,10 +901,10 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Set number of items
 	 *
-	 * @param int $val	Items
+	 * @param	int	$val	Items
 	 * @return	void
 	 */
-	protected function set__items( int $val ) : void
+	protected function set__items( $val )
 	{
 
 	}
@@ -1006,9 +912,9 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get number of content comments
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__comments(): ?int
+	protected function get__comments()
 	{
 		return NULL;
 	}
@@ -1016,10 +922,10 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Set number of content comments
 	 *
-	 * @param int $val	Comments
+	 * @param	int	$val	Comments
 	 * @return	void
 	 */
-	protected function set__comments( int $val ) : void
+	protected function set__comments( $val )
 	{
 
 	}
@@ -1027,9 +933,9 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get number of content reviews
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__reviews(): ?int
+	protected function get__reviews()
 	{
 		return NULL;
 	}
@@ -1037,10 +943,10 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Set number of content reviews
 	 *
-	 * @param int $val	Reviews
+	 * @param	int	$val	Reviews
 	 * @return	void
 	 */
-	protected function set__reviews( int $val ) : void
+	protected function set__reviews( $val )
 	{
 
 	}
@@ -1048,9 +954,9 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get number of future publishing items
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__futureItems(): ?int
+	protected function get__futureItems()
 	{
 		return NULL;
 	}
@@ -1058,9 +964,9 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get number of unapproved content items
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__unnapprovedItems(): ?int
+	protected function get__unnapprovedItems()
 	{
 		return NULL;
 	}
@@ -1068,9 +974,9 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get number of unapproved content comments
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__unapprovedComments(): ?int
+	protected function get__unapprovedComments()
 	{
 		return NULL;
 	}
@@ -1078,9 +984,9 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get number of unapproved content reviews
 	 *
-	 * @return	int|null
+	 * @return	int
 	 */
-	protected function get__unapprovedReviews(): ?int
+	protected function get__unapprovedReviews()
 	{
 		return NULL;
 	}
@@ -1088,9 +994,9 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Get sort key
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function get__sortBy(): ?string
+	public function get__sortBy()
 	{
 		return NULL;
 	}
@@ -1100,7 +1006,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	public function get__sortOrder(): string
+	public function get__sortOrder()
 	{
 		foreach ( array( 'title', 'author_name', 'last_comment_name' ) as $k )
 		{
@@ -1117,56 +1023,24 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Get default filter
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function get__filter(): ?string
+	public function get__filter()
 	{
 		return NULL;
 	}
 
 	/**
-	 * Check the action column map if the action is enabled in this node
-	 *
-	 * @param string $action
-	 * @return bool
-	 */
-	public function checkAction( string $action ) : bool
-	{
-		/* Check the column mapping */
-		if( isset( static::$actionColumnMap[ $action ] ) )
-		{
-			$column = static::$actionColumnMap[ $action ];
-		}
-		else
-		{
-			/* Default to true because this means there is nothing in the node itself that should prevent this */
-			return TRUE;
-		}
-
-		/* Check bitoptions */
-		foreach( static::$bitOptions as $key => $values )
-		{
-			if( isset( $this->$key[ $column ] ) )
-			{
-				return (bool) $this->$key[ $column ];
-			}
-		}
-
-		/* Check the column mapping */
-		return (bool) $this->$column;
-	}
-
-	/**
 	 * [Node] Return the owner if this node can be owned
 	 *
-	 * @throws	RuntimeException
-	 * @return	Member|null
+	 * @throws	\RuntimeException
+	 * @return	\IPS\Member|null
 	 */
-	public function owner(): ?Member
+	public function owner()
 	{
 		if( static::$ownerTypes === NULL OR ( static::$ownerTypes['member'] === NULL and static::$ownerTypes['group'] === NULL ) )
 		{
-			throw new RuntimeException;
+			throw new \RuntimeException;
 		}
 
 		if ( static::$ownerTypes['member'] )
@@ -1174,7 +1048,7 @@ abstract class Model extends ActiveRecord
 			$column	= static::$ownerTypes['member'];
 			if( $this->$column )
 			{
-				return Member::load( $this->$column );
+				return \IPS\Member::load( $this->$column );
 			}
 		}
 
@@ -1184,11 +1058,11 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Set last comment
 	 *
-	 * @param Comment|null $comment The latest comment or NULL to work it out
-	 * @param Item|null $updatedItem We sometimes run setLastComment() when an item has been edited, if so, that item will be here
+	 * @param \IPS\Content\Comment|null $comment The latest comment or NULL to work it out
+	 * @param \IPS\Content\Item|null $updatedItem We sometimes run setLastComment() when an item has been edited, if so, that item will be here
 	 * @return    void
 	 */
-	public function setLastComment( Comment $comment=NULL, Item $updatedItem=NULL ) : void
+	public function setLastComment( ?\IPS\Content\Comment $comment=NULL, ?\IPS\Content\Item $updatedItem=NULL )
 	{
 		/* If either the comment or item are hidden, set to null so that we will load the correct one */
 		if( $comment !== null and $comment->hidden() <> 0 )
@@ -1212,7 +1086,7 @@ abstract class Model extends ActiveRecord
 
 		$this->save();
 
-		if( IPS::classUsesTrait( $this, 'IPS\Node\DelayedCount' ) )
+		if( \IPS\IPS::classUsesTrait( $this, 'IPS\Node\DelayedCount' ) )
 		{
 			$this->storeUpdateTime();
 		}
@@ -1222,10 +1096,10 @@ abstract class Model extends ActiveRecord
 	 * Called from Model::setLastComment(), must be implemented by each class
 	 *
 	 * @param Comment|null $comment
-	 * @param Item|null $updatedItem
+	 * @param \IPS\Content\Item|null $updatedItem
 	 * @return void
 	 */
-	protected function _setLastComment( Comment $comment=null, Item $updatedItem=null )
+	protected function _setLastComment( \IPS\Content\Comment $comment=null, \IPS\Content\Item $updatedItem=null )
 	{
 
 	}
@@ -1234,10 +1108,10 @@ abstract class Model extends ActiveRecord
 	 * Get last comment time
 	 *
 	 * @note	This should return the last comment time for this node only, not for children nodes
-	 * @param   Member|null    $member         MemberObject
-	 * @return	DateTime|NULL
+	 * @param   \IPS\Member|NULL    $member         MemberObject
+	 * @return	\IPS\DateTime|NULL
 	 */
-	public function getLastCommentTime( Member $member = NULL ): ?DateTime
+	public function getLastCommentTime( \IPS\Member $member = NULL )
 	{
 		return NULL;
 	}
@@ -1245,10 +1119,10 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Set last review
 	 *
-	 * @param	Review|NULL	$review	The latest review or NULL to work it out
-	 * @return	void
+	 * @param	\IPS\Content\Review|NULL	$review	The latest review or NULL to work it out
+	 * @return	int
 	 */
-	public function setLastReview( Review $review=NULL ) : void
+	public function setLastReview( \IPS\Content\Review $review=NULL )
 	{
 		// Don't do anything by default, but nodes could extract data
 	}
@@ -1258,9 +1132,9 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get Parent
 	 *
-	 * @return	mixed
+	 * @return	static|null
 	 */
-	public function parent(): mixed
+	public function parent()
 	{
 		if ( isset( static::$parentNodeClass ) )
 		{
@@ -1287,27 +1161,16 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Get parent list
 	 *
-	 * @return	SplStack
+	 * @return	\SplStack
 	 */
-	public function parents(): SplStack
+	public function parents()
 	{
-		$stack = new SplStack;
-
-		if( IPS::classUsesTrait( $this, 'IPS\Content\ClubContainer' ) )
-		{
-			$clubIdColumn = static::clubIdColumn();
-
-			/* Only do this if this node is actually associated with a club */
-			if ( $this->$clubIdColumn )
-			{
-				return new SplStack;
-			}
-		}
+		$stack = new \SplStack;
 
 		$working = $this;
 		while ( $working = $working->parent() )
 		{
-			if( ! $working instanceof Model)
+			if( ! $working instanceof \IPS\Node\Model )
 			{
 				return $stack;
 			}
@@ -1321,10 +1184,10 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Is this node a child (or sub child, or sub-sub-child etc) of another node?
 	 *
-	 * @param Model $node	The node to check
+	 * @param	\IPS\Node\Model	$node	The node to check
 	 * @return	bool
 	 */
-	public function isChildOf(Model $node ): bool
+	public function isChildOf( \IPS\Node\Model $node )
 	{
 		foreach ( $this->parents() as $parent )
 		{
@@ -1340,58 +1203,58 @@ abstract class Model extends ActiveRecord
 	 * [Node] Does this node have children?
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	bool				$subnodes			Include subnodes? NULL to *only* check subnodes
 	 * @param	mixed				$_where				Additional WHERE clause
 	 * @return	bool
 	 */
-	public function hasChildren( ?string $permissionCheck='view', Member $member=NULL, bool $subnodes=TRUE, array $_where=array() ): bool
+	public function hasChildren( $permissionCheck='view', $member=NULL, $subnodes=TRUE, $_where=array() )
 	{
 		return ( $this->childrenCount( $permissionCheck, $member, $subnodes, $_where ) > 0 );
 	}
 
 	/**
 	 * @brief	Cache for get__children
-	 * @see        Model::get__children
+	 * @see		\IPS\Node\Model::get__children
 	 */
-	protected array $_childrenResults = array();
+	protected $_childrenResults = array();
 
 	/**
 	 * [Node] Get Number of Children
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param bool|null $subnodes			Include subnodes? NULL to *only* check subnodes
-	 * @param mixed $_where				Additional WHERE clause
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	bool				$subnodes			Include subnodes? NULL to *only* check subnodes
+	 * @param	mixed				$_where				Additional WHERE clause
 	 * @return	int
 	 */
-	public function childrenCount( ?string $permissionCheck='view', Member $member=NULL, bool|null $subnodes=TRUE, mixed $_where=array() ): int
+	public function childrenCount( $permissionCheck='view', $member=NULL, $subnodes=TRUE, $_where=array() )
 	{
 		/* We almost universally need the children after getting the count, so let's just cut to the chase and run one query instead of 2 */
-		return count( $this->children( $permissionCheck, $member, $subnodes, NULL, $_where ) );
+		return \count( $this->children( $permissionCheck, $member, $subnodes, NULL, $_where ) );
 	}
 
 	/**
 	 * [Node] Fetch Child Nodes
 	 *
-	 * @param string|null $permissionCheck	The permission key to check for or NULL to not check permissions
-	 * @param Member|null $member				The member to check permissions for or NULL for the currently logged in member
-	 * @param bool|null $subnodes			Include subnodes? NULL to *only* check subnodes
-	 * @param array|null $skip				Children IDs to skip
-	 * @param mixed $_where				Additional WHERE clause
+	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULL to not check permissions
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	bool				$subnodes			Include subnodes? NULL to *only* check subnodes
+	 * @param	array|NULL			$skip				Children IDs to skip
+	 * @param	mixed				$_where				Additional WHERE clause
 	 * @return	array
 	 */
-	public function children( ?string $permissionCheck='view', Member $member=NULL, bool|null $subnodes=TRUE, array $skip=null, mixed $_where=array() ): array
+	public function children( $permissionCheck='view', $member=NULL, $subnodes=TRUE, $skip=null, $_where=array() )
 	{
 		$children = array();
 		
 		if ( $permissionCheck !== NULL )
 		{
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
 		}
 
 		/* Load member */
-		if ( $permissionCheck !== NULL AND in_array( 'IPS\Node\Permissions', class_implements( $this ) ) )
+		if ( $permissionCheck !== NULL AND \in_array( 'IPS\Node\Permissions', class_implements( $this ) ) )
 		{
 			$cacheKey	= md5( $permissionCheck . $member->member_id . $subnodes . json_encode( $skip ) . json_encode( $_where ) );
 		}
@@ -1414,29 +1277,27 @@ abstract class Model extends ActiveRecord
 			$where = $_where;
 			$where[] = array( static::$databasePrefix . static::$databaseColumnParent . '=?', $this->$idColumn );
 
-			if ( is_array( $skip ) and count( $skip ) )
+			if ( \is_array( $skip ) and \count( $skip ) )
 			{
-				$where[] = array( '( ! ' . Db::i()->in( static::$databasePrefix . static::$databaseColumnId, $skip ) . ' )' );
+				$where[] = array( '( ! ' . \IPS\Db::i()->in( static::$databasePrefix . static::$databaseColumnId, $skip ) . ' )' );
 			}
 
 			/* Permission check? */
-			if( in_array( Permissions::class, class_implements( $this ) ) and $permissionCheck !== null )
+			if ( $this instanceof \IPS\Node\Permissions and $permissionCheck !== NULL )
 			{
-				foreach( PermissionsExtension::nodePermissionClause( $permissionCheck, get_class( $this ), $member, false ) as $clause )
-				{
-					$where[] = $clause;
-				}
+
+				$where[] = array( '(' . \IPS\Db::i()->findInSet( 'perm_' . static::$permissionMap[ $permissionCheck ], $member->groups ) . ' OR ' . 'perm_' . static::$permissionMap[ $permissionCheck ] . '=? )', '*' );
 				if ( static::$databaseColumnEnabledDisabled )
 				{
 					$where[] = array( static::$databasePrefix . static::$databaseColumnEnabledDisabled . '=1' );
 				}
 
-				$select = Db::i()->select( '*', static::$databaseTable, $where, static::$databaseColumnOrder ? ( static::$databasePrefix . static::$databaseColumnOrder ) : NULL )->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . static::$databaseTable . "." . static::$databasePrefix . static::$databaseColumnId, static::$permApp, static::$permType ) );
+				$select = \IPS\Db::i()->select( '*', static::$databaseTable, $where, static::$databaseColumnOrder ? ( static::$databasePrefix . static::$databaseColumnOrder ) : NULL )->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . static::$databaseTable . "." . static::$databasePrefix . static::$databaseColumnId, static::$permApp, static::$permType ) );
 			}
 			/* Nope - normal */
 			else
 			{
-				$select = Db::i()->select( '*', static::$databaseTable, $where, static::$databaseColumnOrder ? ( static::$databasePrefix . static::$databaseColumnOrder ) : NULL );
+				$select = \IPS\Db::i()->select( '*', static::$databaseTable, $where, static::$databaseColumnOrder ? ( static::$databasePrefix . static::$databaseColumnOrder ) : NULL );
 			}
 
 			/* Get em! */
@@ -1444,7 +1305,7 @@ abstract class Model extends ActiveRecord
 			{
 				$row = static::constructFromData( $row );
 
-				if ( $row instanceof Permissions and $permissionCheck !== NULL )
+				if ( $row instanceof \IPS\Node\Permissions and $permissionCheck !== NULL )
 				{
 					if( $row->can( $permissionCheck ) )
 					{
@@ -1461,7 +1322,6 @@ abstract class Model extends ActiveRecord
 		/* Subnodes */
 		if( ( $subnodes === TRUE or $subnodes === NULL ) and static::$subnodeClass !== NULL )
 		{
-			/* @var Model $subnodeClass */
 			$subnodeClass = static::$subnodeClass;
 
 			/* Specify our parent node ID */
@@ -1475,24 +1335,20 @@ abstract class Model extends ActiveRecord
 			}
 
 			/* Permission check? */
-			if ( in_array( 'IPS\Node\Permissions', class_implements( $subnodeClass ) ) and $permissionCheck !== NULL )
+			if ( \in_array( 'IPS\Node\Permissions', class_implements( $subnodeClass ) ) and $permissionCheck !== NULL )
 			{
-				/* @var $permissionMap array */
-				foreach( PermissionsExtension::nodePermissionClause( $permissionCheck, $subnodeClass, $member, false ) as $clause )
-				{
-					$where[] = $clause;
-				}
+				$where[] = array( '(' . \IPS\Db::i()->findInSet( 'perm_' . $subnodeClass::$permissionMap[ $permissionCheck ], $member->groups ) . ' OR ' . 'perm_' . $subnodeClass::$permissionMap[ $permissionCheck ] . '=? )', '*' );
 				if ( $subnodeClass::$databaseColumnEnabledDisabled )
 				{
 					$where[] = array( $subnodeClass::$databasePrefix . $subnodeClass::$databaseColumnEnabledDisabled . '=1' );
 				}
 
-				$select = Db::i()->select( '*', $subnodeClass::$databaseTable, $where, $subnodeClass::$databaseColumnOrder ? ( $subnodeClass::$databasePrefix . $subnodeClass::$databaseColumnOrder ) : NULL )->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . $subnodeClass::$databaseTable . "." . $subnodeClass::$databasePrefix . $subnodeClass::$databaseColumnId, $subnodeClass::$permApp, $subnodeClass::$permType ) );
+				$select =\IPS\Db::i()->select( '*', $subnodeClass::$databaseTable, $where, $subnodeClass::$databaseColumnOrder ? ( $subnodeClass::$databasePrefix . $subnodeClass::$databaseColumnOrder ) : NULL )->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . $subnodeClass::$databaseTable . "." . $subnodeClass::$databasePrefix . $subnodeClass::$databaseColumnId, $subnodeClass::$permApp, $subnodeClass::$permType ) );
 			}
 			/* Nope - normal */
 			else
 			{
-				$select = Db::i()->select( '*', $subnodeClass::$databaseTable, $where, $subnodeClass::$databaseColumnOrder ? ( $subnodeClass::$databasePrefix . $subnodeClass::$databaseColumnOrder ) : NULL );
+				$select = \IPS\Db::i()->select( '*', $subnodeClass::$databaseTable, $where, $subnodeClass::$databaseColumnOrder ? ( $subnodeClass::$databasePrefix . $subnodeClass::$databaseColumnOrder ) : NULL );
 			}
 
 			/* Get em! */
@@ -1500,7 +1356,7 @@ abstract class Model extends ActiveRecord
 			{
 				$row = $subnodeClass::constructFromData( $row );
 
-				if ( $row instanceof Permissions and $permissionCheck !== NULL )
+				if ( $row instanceof \IPS\Node\Permissions and $permissionCheck !== NULL )
 				{
 					if( $row->can( $permissionCheck ) )
 					{
@@ -1525,21 +1381,21 @@ abstract class Model extends ActiveRecord
 	 * Example code explains return value
 	 *
 	 * @code
-	* array(
-	* array(
-	* 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
-	* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	* ),
-	* ...							// Additional buttons
-	* );
+	array(
+	array(
+	'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
+	'title'	=> 'foo',		// Language key to use for button's title parameter
+	'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	),
+	...							// Additional buttons
+	);
 	 * @endcode
-	 * @param Url $url		Base URL
+	 * @param	string	$url		Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ): array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = array();
 
@@ -1554,7 +1410,7 @@ abstract class Model extends ActiveRecord
 				'icon'	=> 'plus-circle',
 				'title'	=> static::$nodeTitle . '_add_child',
 				'link'	=> $url->setQueryString( array( 'subnode' => (int) isset( static::$subnodeClass ), 'do' => 'form', 'parent' => $this->_id ) ),
-				'data'	=> ( static::$modalForms ? array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('add') ) : array() )
+				'data'	=> ( static::$modalForms ? array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('add') ) : array() )
 			);
 		}
 
@@ -1564,7 +1420,7 @@ abstract class Model extends ActiveRecord
 				'icon'	=> 'pencil',
 				'title'	=> 'edit',
 				'link'	=> $url->setQueryString( array( 'do' => 'form', 'id' => $this->_id ) ),
-				'data'	=> ( static::$modalForms ? array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit') ) : array() ),
+				'data'	=> ( static::$modalForms ? array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit') ) : array() ),
 				'hotkey'=> 'e return'
 			);
 		}
@@ -1575,7 +1431,7 @@ abstract class Model extends ActiveRecord
 				'icon'	=> 'lock',
 				'title'	=> 'permissions',
 				'link'	=> $url->setQueryString( array( 'do' => 'permissions', 'id' => $this->_id ) ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('permissions') )
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('permissions') )
 			);
 		}
 
@@ -1584,10 +1440,10 @@ abstract class Model extends ActiveRecord
 			$copyUrl = $url->setQueryString( array( 'do' => 'copy', 'id' => $this->_id ) );
 			$willDisplayModal = ( $this->hasChildren( NULL, NULL, FALSE ) );
 			$buttons['copy'] = array(
-				'icon'	=> 'clone',
+				'icon'	=> 'files-o',
 				'title'	=> 'copy',
 				'link'	=> $willDisplayModal ? $copyUrl : $copyUrl->csrf(),
-				'data' => $willDisplayModal ? array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('copy') ) : array()
+				'data' => $willDisplayModal ? array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('copy') ) : array()
 			);
 		}
 
@@ -1607,14 +1463,9 @@ abstract class Model extends ActiveRecord
 				'icon'	=> 'times-circle',
 				'title'	=> 'delete',
 				'link'	=> $url->setQueryString( array( 'do' => 'delete', 'id' => $this->_id ) )->csrf(),
-				'data' 	=> ( $this->hasChildren( NULL ) or $this->showDeleteOrMoveForm() ) ? array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('delete') ) : array( 'delete' => '' ),
+				'data' 	=> ( $this->hasChildren( NULL, NULL, TRUE ) or $this->showDeleteOrMoveForm() ) ? array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('delete') ) : array( 'delete' => '' ),
 				'hotkey'=> 'd'
 			);
-		}
-
-		foreach( $this->ui( 'rowButtons', array(), TRUE ) as $index => $button )
-		{
-			$buttons[$index] = $button;
 		}
 
 		return $buttons;
@@ -1628,9 +1479,9 @@ abstract class Model extends ActiveRecord
 	 * @param	string	$key	Restriction key to check
 	 * @return	bool
 	 */
-	protected static function restrictionCheck( string $key ): bool
+	protected static function restrictionCheck( $key )
 	{
-		if( !Member::loggedIn()->isAdmin() )
+		if( !\IPS\Member::loggedIn()->isAdmin() )
 		{
 			return FALSE;
 		}
@@ -1656,7 +1507,7 @@ abstract class Model extends ActiveRecord
 				return FALSE;
 			}
 			
-			return Member::loggedIn()->hasAcpRestriction( static::$restrictions['app'], static::$restrictions['module'], $_key );
+			return \IPS\Member::loggedIn()->hasAcpRestriction( static::$restrictions['app'], static::$restrictions['module'], $_key );
 		}
 
 		return TRUE;
@@ -1667,7 +1518,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public static function canAddRoot(): bool
+	public static function canAddRoot()
 	{
 		return static::restrictionCheck( 'add' );
 	}
@@ -1677,7 +1528,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public function canAdd(): bool
+	public function canAdd()
 	{
 		/* If there is no parent/child relationship and no subnode class, you can't add a child */
 		if( static::$databaseColumnParent === NULL AND static::$subnodeClass === NULL )
@@ -1698,7 +1549,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public function canEdit(): bool
+	public function canEdit()
 	{
 		/* If the node is being deleted or moved, it cannot be edited */
 		if ( $this->deleteOrMoveQueued() === TRUE )
@@ -1717,7 +1568,7 @@ abstract class Model extends ActiveRecord
 		{
 			$column	= static::$ownerTypes['member'];
 
-			if( $this->$column and $this->$column == Member::loggedIn()->member_id )
+			if( $this->$column and $this->$column == \IPS\Member::loggedIn()->member_id )
 			{
 				return TRUE;
 			}
@@ -1729,14 +1580,14 @@ abstract class Model extends ActiveRecord
 			$column	= static::$ownerTypes['group']['ids'];
 
 			$value = $this->$column;
-			if( count( array_intersect( explode( ",", $value ), Member::loggedIn()->groups ) ) )
+			if( \count( array_intersect( explode( ",", $value ), \IPS\Member::loggedIn()->groups ) ) )
 			{
 				return TRUE;
 			}
 		}
 
 		/* Does the node belong to a club that we are a leader of? */
-		if ( IPS::classUsesTrait( get_called_class(), 'IPS\Content\ClubContainer' ) AND $this->club() )
+		if ( \IPS\IPS::classUsesTrait( \get_called_class(), 'IPS\Content\ClubContainer' ) AND $this->club() )
 		{
 			if ( $this->club()->isLeader() )
 			{
@@ -1752,7 +1603,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public function canCopy(): bool
+	public function canCopy()
 	{
 		if ( $this->deleteOrMoveQueued() === TRUE )
 		{
@@ -1767,7 +1618,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public function canManagePermissions(): bool
+	public function canManagePermissions()
 	{
 		if ( $this->deleteOrMoveQueued() === TRUE )
 		{
@@ -1782,7 +1633,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public function canMassManageContent(): bool
+	public function canMassManageContent()
 	{
 		if ( !isset( static::$contentItemClass ) )
 		{
@@ -1805,16 +1656,10 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Does the currently logged in user have permission to delete this node?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canDelete(): bool
+	public function canDelete()
 	{
-		/* Extensions go first */
-		if( static::$canBeExtended and $permCheck = PermissionsExtension::can( 'delete', $this ) )
-		{
-			return ( $permCheck === PermissionsExtension::PERM_ALLOW );
-		}
-
 		if ( $this->deleteOrMoveQueued() === TRUE )
 		{
 			return FALSE;
@@ -1829,7 +1674,7 @@ abstract class Model extends ActiveRecord
 		{
 			$column	= static::$ownerTypes['member'];
 
-			if( $this->$column == Member::loggedIn()->member_id )
+			if( $this->$column == \IPS\Member::loggedIn()->member_id )
 			{
 				return TRUE;
 			}
@@ -1840,7 +1685,7 @@ abstract class Model extends ActiveRecord
 			$column	= static::$ownerTypes['group']['ids'];
 
 			$value = $this->$column;
-			if( count( array_intersect( explode( ",", $value ), Member::loggedIn()->groups ) ) )
+			if( \count( array_intersect( explode( ",", $value ), \IPS\Member::loggedIn()->groups ) ) )
 			{
 				return TRUE;
 			}
@@ -1862,18 +1707,18 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Does the currently logged in user have permission to post anonymously in this node?
 	 *
-	 * @param int $where		What are we checking, 0 => means don't check it, 2 means comments only
-	 * @param	Member|null 	$member		The member posting anonymously or NULL for logged in member
+	 * @param	 int 				$where		What are we checking, 0 => means don't check it, 2 means comments only
+	 * @param	\IPS\Member|NULL 	$member		The member posting anonymously or NULL for logged in member
 	 * @return    bool
 	 */
-	public function canPostAnonymously( int $where = 0, Member $member = NULL ): bool
+	public function canPostAnonymously( $where = 0, \IPS\Member $member = NULL ): bool
 	{
-		if ( ! isset( static::$contentItemClass ) or ! IPS::classUsesTrait( static::$contentItemClass, 'IPS\Content\Anonymous' ) )
+		if ( ! isset( static::$contentItemClass ) or ! \in_array( 'IPS\Content\Anonymous', class_implements( static::$contentItemClass ) ) )
 		{
 			return FALSE;
 		}
 
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		if( ! $member->member_id or ! $member->group['gbw_can_post_anonymously'] )
 		{
@@ -1916,17 +1761,17 @@ abstract class Model extends ActiveRecord
 	/**
 	 * @brief	The map of permission columns
 	 */
-	public static array $permissionMap = array( 'view' => 'view' );
+	public static $permissionMap = array( 'view' => 'view' );
 
 	/**
 	 * @brief	Permissions
 	 */
-	protected ?array $_permissions = NULL;
+	protected $_permissions = NULL;
 
 	/**
 	 * @brief	Permissions when we first loaded them from the DB
 	 */
-	protected ?array $_originalPermissions = NULL;
+	protected $_originalPermissions = NULL;
 
 	/**
 	 * Construct Load Query
@@ -1934,23 +1779,23 @@ abstract class Model extends ActiveRecord
 	 * @param	int|string	$id					ID
 	 * @param	string		$idField			The database column that the $id parameter pertains to
 	 * @param	mixed		$extraWhereClause	Additional where clause(s)
-	 * @return	Select
+	 * @return	\IPS\Db\Select
 	 */
-	protected static function constructLoadQuery( int|string $id, string $idField, mixed $extraWhereClause ): Select
+	protected static function constructLoadQuery( $id, $idField, $extraWhereClause )
 	{
-		if ( in_array( 'IPS\Node\Permissions', class_implements( get_called_class() ) ) )
+		if ( \in_array( 'IPS\Node\Permissions', class_implements( \get_called_class() ) ) )
 		{
 			$where = array( array( static::$databaseTable . '.' . $idField . '=?', $id ) );
 			if( $extraWhereClause !== NULL )
 			{
-				if ( !is_array( $extraWhereClause ) or !is_array( $extraWhereClause[0] ) )
+				if ( !\is_array( $extraWhereClause ) or !\is_array( $extraWhereClause[0] ) )
 				{
 					$extraWhereClause = array( $extraWhereClause );
 				}
 				$where = array_merge( $where, $extraWhereClause );
 			}
 
-			return Db::i()->select(
+			return \IPS\Db::i()->select(
 				static::$databaseTable . '.*, core_permission_index.perm_id, core_permission_index.perm_view, core_permission_index.perm_2, core_permission_index.perm_3, core_permission_index.perm_4, core_permission_index.perm_5, core_permission_index.perm_6, core_permission_index.perm_7',
 				static::$databaseTable,
 				$where
@@ -1968,13 +1813,13 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    ActiveRecord|static
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): ActiveRecord|static
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
-		if ( in_array( 'IPS\Node\Permissions', class_implements( get_called_class() ) ) )
+		if ( \in_array( 'IPS\Node\Permissions', class_implements( \get_called_class() ) ) )
 		{
 			/* Does that exist in the multiton store? */
 			$obj = NULL;
@@ -1996,17 +1841,17 @@ abstract class Model extends ActiveRecord
 			/* Initiate an object */
 			if ( !$obj )
 			{
-				$classname = get_called_class();
+				$classname = \get_called_class();
 				$obj = new $classname;
 				$obj->_new  = FALSE;
 				$obj->_data = array();
 			}
 
 			/* Import data */
-			$databasePrefixLength = strlen( static::$databasePrefix );
+			$databasePrefixLength = \strlen( static::$databasePrefix );
 			foreach ( $data as $k => $v )
 			{
-				if ( in_array( $k, array( 'perm_id', 'perm_view', 'perm_2', 'perm_3', 'perm_4', 'perm_5', 'perm_6', 'perm_7' ) ) )
+				if ( \in_array( $k, array( 'perm_id', 'perm_view', 'perm_2', 'perm_3', 'perm_4', 'perm_5', 'perm_6', 'perm_7' ) ) )
 				{
 					$obj->_permissions[ $k ] = $v;
 				}
@@ -2014,7 +1859,7 @@ abstract class Model extends ActiveRecord
 				{
 					if( static::$databasePrefix AND mb_strpos( $k, static::$databasePrefix ) === 0 )
 					{
-						$k = substr( $k, $databasePrefixLength );
+						$k = \substr( $k, $databasePrefixLength );
 					}
 
 					$obj->_data[ $k ] = $v;
@@ -2034,35 +1879,31 @@ abstract class Model extends ActiveRecord
 			{
 				static::$multitons[ $id ] = $obj;
 			}
+
+			/* Return */
+			return $obj;
 		}
 		else
 		{
-			$obj = parent::constructFromData( $data, $updateMultitonStoreIfExists );
+			return parent::constructFromData( $data, $updateMultitonStoreIfExists );
 		}
-
-		return $obj;
 	}
 
 	/**
 	 * Load and check permissions
 	 *
 	 * @param	mixed	$id		ID
-	 * @param string $perm	Permission Key
+	 * @param	string	$perm	Permission Key
 	 * @return	static
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadAndCheckPerms( mixed $id, string $perm='view' ): static
+	public static function loadAndCheckPerms( $id, $perm='view' )
 	{
-		if( !$id )
-		{
-			throw new OutOfRangeException;
-		}
-		
 		$obj = static::load( $id );
 
 		if ( !$obj->can( $perm ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		return $obj;
@@ -2074,7 +1915,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return string|callable function
 	 */
-	public static function searchableNodesPermission(): callable|string
+	public static function searchableNodesPermission()
 	{
 		return 'view';
 	}
@@ -2088,7 +1929,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * return 	null|array
 	 */
-	public static function unsearchableNodeIds() : ?array
+	public static function unsearchableNodeIds()
 	{
 		return NULL;
 	}
@@ -2096,21 +1937,21 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Set the permission index permissions
 	 *
-	 * @param array $insert	Permission data to insert
+	 * @param	array	$insert	Permission data to insert
 	 * @return  void
 	 */
-	public function setPermissions( array $insert ) : void
+	public function setPermissions( $insert )
 	{
 		/* Delete current rows */
-		Db::i()->delete( 'core_permission_index', array( 'app=? AND perm_type=? AND perm_type_id=?', static::$permApp, static::$permType, $this->_id ) );
+		\IPS\Db::i()->delete( 'core_permission_index', array( 'app=? AND perm_type=? AND perm_type_id=?', static::$permApp, static::$permType, $this->_id ) );
 
 		/* Insert */
-		$permId = Db::i()->insert( 'core_permission_index', $insert );
+		$permId = \IPS\Db::i()->insert( 'core_permission_index', $insert );
 		
 		/* Update tags permission cache */
 		if ( isset( static::$permissionMap['read'] ) )
 		{
-			Db::i()->update( 'core_tags_perms', array( 'tag_perm_text' => $insert[ 'perm_' . static::$permissionMap['read'] ] ), array( 'tag_perm_aap_lookup=?', md5( static::$permApp . ';' . static::$permType . ';' . $this->_id ) ) );
+			\IPS\Db::i()->update( 'core_tags_perms', array( 'tag_perm_text' => $insert[ 'perm_' . static::$permissionMap['read'] ] ), array( 'tag_perm_aap_lookup=?', md5( static::$permApp . ';' . static::$permType . ';' . $this->_id ) ) );
 		}
 
 		/* Make sure this object resets the permissions internally */
@@ -2128,14 +1969,14 @@ abstract class Model extends ActiveRecord
 	 * 
 	 * @return	void
 	 */
-	protected function updateDeleteLogPermissions() : void
+	protected function updateDeleteLogPermissions()
 	{
 		if ( isset( static::$contentItemClass ) )
 		{
 			$contentItemClass = static::$contentItemClass;
-			if ( IPS::classUsesTrait( $contentItemClass, 'IPS\Content\Hideable' ) )
+			if ( \in_array( 'IPS\Content\Hideable', class_implements( $contentItemClass ) ) )
 			{
-				DeletionLog::updateNodePermissions( get_called_class(), $this->_id, $this->deleteLogPermissions() );
+				\IPS\core\DeletionLog::updateNodePermissions( \get_called_class(), $this->_id, $this->deleteLogPermissions() );
 			}
 		}
 	}
@@ -2150,14 +1991,14 @@ abstract class Model extends ActiveRecord
 	 *	@li			Number prepended by "m" indicates a member
 	 *	@li			Number prepended by "s" indicates a social group
 	 */
-	public function deleteLogPermissions(): string
+	public function deleteLogPermissions()
 	{
 		try
 		{
 			return $this->searchIndexPermissions();
 		}
 		/* The container may not exist */
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			return '';
 		}
@@ -2168,23 +2009,23 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return  void
 	 */
-	protected function updateSearchIndexPermissions() : void
+	protected function updateSearchIndexPermissions()
 	{
 		if ( isset( static::$contentItemClass ) )
 		{
 			$contentItemClass = static::$contentItemClass;
-			if( SearchContent::isSearchable( $contentItemClass ) )
+			if ( \in_array( 'IPS\Content\Searchable', class_implements( $contentItemClass ) ) )
 			{
-				Index::i()->massUpdate( $contentItemClass, $this->_id, NULL, $this->searchIndexPermissions() );
+				\IPS\Content\Search\Index::i()->massUpdate( $contentItemClass, $this->_id, NULL, $this->searchIndexPermissions() );
 			}
 			foreach ( array( 'commentClass', 'reviewClass' ) as $class )
 			{
 				if ( isset( $contentItemClass::$$class ) )
 				{
 					$className = $contentItemClass::$$class;
-					if( SearchContent::isSearchable( $className ) )
+					if ( \in_array( 'IPS\Content\Searchable', class_implements( $className ) ) )
 					{
-						Index::i()->massUpdate( $className, $this->_id, NULL, $this->searchIndexPermissions() );
+						\IPS\Content\Search\Index::i()->massUpdate( $className, $this->_id, NULL, $this->searchIndexPermissions() );
 					}
 				}
 			}
@@ -2194,7 +2035,7 @@ abstract class Model extends ActiveRecord
 	/**
 	 * @brief	Cached canOnAny permission check
 	 */
-	protected static array $_canOnAny	= array();
+	protected static $_canOnAny	= array();
 
 	/**
 	 * Check permissions on any node
@@ -2204,16 +2045,16 @@ abstract class Model extends ActiveRecord
 	 * if there should be a "Submit" button
 	 *
 	 * @param	mixed								$permission						A key which has a value in static::$permissionMap['view'] matching a column ID in core_permission_index
-	 * @param Group|Member|null $member							The member or group to check (NULL for currently logged in member)
-	 * @param array $where							Additional WHERE clause
-	 * @param bool $considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$member							The member or group to check (NULL for currently logged in member)
+	 * @param	array								$where							Additional WHERE clause
+	 * @param	bool								$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
 	 * @return	bool
-	 * @throws	OutOfBoundsException	If $permission does not exist in static::$permissionMap
+	 * @throws	\OutOfBoundsException	If $permission does not exist in static::$permissionMap
 	 */
-	public static function canOnAny( mixed $permission, Group|Member $member=NULL, array $where = array(), bool $considerPostBeforeRegistering = TRUE ): bool
+	public static function canOnAny( $permission, $member=NULL, $where = array(), $considerPostBeforeRegistering = TRUE )
 	{
 		/* If this is not permission-dependant, return TRUE */
-		if ( !in_array( 'IPS\Node\Permissions', class_implements( get_called_class() ) ) )
+		if ( !\in_array( 'IPS\Node\Permissions', class_implements( \get_called_class() ) ) )
 		{
 			return TRUE;
 		}
@@ -2221,13 +2062,13 @@ abstract class Model extends ActiveRecord
 		/* Check it exists */
 		if ( !isset( static::$permissionMap[ $permission ] ) )
 		{
-			throw new OutOfBoundsException;
+			throw new \OutOfBoundsException;
 		}
 
 		/* Load member */
 		if ( $member === NULL )
 		{
-			$member = Member::loggedIn();
+			$member = \IPS\Member::loggedIn();
 		}
 
 		/* Restricted */
@@ -2237,7 +2078,7 @@ abstract class Model extends ActiveRecord
 		}
 		
 		/* Posts per day */
-		if ( in_array( $permission, array( 'add', 'reply' ) ) )
+		if ( \in_array( $permission, array( 'add', 'reply' ) ) )
 		{
 			$checkPostsPerDay = TRUE;
 			if ( isset( static::$contentItemClass ) )
@@ -2252,7 +2093,7 @@ abstract class Model extends ActiveRecord
 			}
 		}
 
-		$_key = md5( get_called_class() . json_encode( $where ) );
+		$_key = md5( \get_called_class() . json_encode( $where ) );
 
 		/* Have we already cached the check? */
 		if( isset( static::$_canOnAny[ $_key ][ $permission ] ) )
@@ -2264,32 +2105,32 @@ abstract class Model extends ActiveRecord
 		$groupsToCheck = $member->groups;
 
 		/* Work out which to use taking Post Before Registering into consideration and return */
-		$considerPostBeforeRegistering = ( $considerPostBeforeRegistering and Settings::i()->post_before_registering
-			and Login::registrationType() != 'disabled' and Settings::i()->bot_antispam_type !== 'none' );
+		$considerPostBeforeRegistering = ( $considerPostBeforeRegistering and \IPS\Settings::i()->post_before_registering
+			and \IPS\Login::registrationType() != 'disabled' and \IPS\Settings::i()->bot_antispam_type !== 'none' );
 		if ( !$member->member_id and $considerPostBeforeRegistering )
 		{
-			$groupsToCheck[] = Settings::i()->member_group;
+			$groupsToCheck[] = \IPS\Settings::i()->member_group;
 		}
 		
-		if ( Settings::i()->clubs AND Settings::i()->club_nodes_in_apps AND IPS::classUsesTrait( get_called_class(), 'IPS\Content\ClubContainer' ) )
+		if ( \IPS\Settings::i()->clubs AND \IPS\Settings::i()->club_nodes_in_apps AND \IPS\IPS::classUsesTrait( \get_called_class(), 'IPS\Content\ClubContainer' ) )
 		{
 			$clubWhere = array();
 			foreach( $member->clubs() AS $club )
 			{
 				$clubWhere[] = "core_permission_index.perm_" . static::$permissionMap[ $permission ] . "='cm,c{$club}'";
 			}
-			if ( count( $clubWhere ) )
+			if ( \count( $clubWhere ) )
 			{
-				$where[] = array( Db::i()->findInSet( 'core_permission_index.perm_' . static::$permissionMap[ $permission ], $groupsToCheck ) . ' OR core_permission_index.perm_' . static::$permissionMap[ $permission ] . "='*' OR core_permission_index.perm_" . static::$permissionMap[ $permission ] . "='ca' OR " . implode( ' OR ', $clubWhere ) );
+				$where[] = array( \IPS\Db::i()->findInSet( 'core_permission_index.perm_' . static::$permissionMap[ $permission ], $groupsToCheck ) . ' OR core_permission_index.perm_' . static::$permissionMap[ $permission ] . "='*' OR core_permission_index.perm_" . static::$permissionMap[ $permission ] . "='ca' OR " . implode( ' OR ', $clubWhere ) );
 			}
 			else
 			{
-				$where[] = array( Db::i()->findInSet( 'core_permission_index.perm_' . static::$permissionMap[ $permission ], $groupsToCheck ) . ' OR core_permission_index.perm_' . static::$permissionMap[ $permission ] . "='*' OR core_permission_index.perm_" . static::$permissionMap[ $permission ] . "='ca'" );
+				$where[] = array( \IPS\Db::i()->findInSet( 'core_permission_index.perm_' . static::$permissionMap[ $permission ], $groupsToCheck ) . ' OR core_permission_index.perm_' . static::$permissionMap[ $permission ] . "='*' OR core_permission_index.perm_" . static::$permissionMap[ $permission ] . "='ca'" );
 			}
 		}
 		else
 		{
-			$where[] = array( Db::i()->findInSet( 'core_permission_index.perm_' . static::$permissionMap[ $permission ], $groupsToCheck ) . ' OR core_permission_index.perm_' . static::$permissionMap[ $permission ] . "='*'" );
+			$where[] = array( \IPS\Db::i()->findInSet( 'core_permission_index.perm_' . static::$permissionMap[ $permission ], $groupsToCheck ) . ' OR core_permission_index.perm_' . static::$permissionMap[ $permission ] . "='*'" );
 		}
 		
 		/* Run query and return */
@@ -2298,7 +2139,7 @@ abstract class Model extends ActiveRecord
 			$where[] = array( static::$databasePrefix . static::$databaseColumnEnabledDisabled . '=1' );
 		}
 		
-		static::$_canOnAny[ $_key ][ $permission ]	= (bool) Db::i()->select( 'COUNT(*)', static::$databaseTable, $where )
+		static::$_canOnAny[ $_key ][ $permission ]	= (bool) \IPS\Db::i()->select( 'COUNT(*)', static::$databaseTable, $where )
 			->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . static::$databaseTable . "." . static::$databasePrefix . static::$databaseColumnId, static::$permApp, static::$permType ) )
 			->first();
 
@@ -2312,7 +2153,7 @@ abstract class Model extends ActiveRecord
 	 * @return array	array( {group_id} => array( 'read', 'view', 'perm_7' );
 	 * @throws UnderflowException (if guest group ID is invalid)
 	 */
-	public function disabledPermissions(): array
+	public function disabledPermissions()
 	{
 		return array();
 	}
@@ -2322,77 +2163,36 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function permissionTypes(): array
+	public function permissionTypes()
 	{
 		return static::$permissionMap;
 	}
 
 	/**
-	 * @var array|null
-	 */
-	protected static ?array $_allPermissions = null;
-
-	/**
-	 * Load permissions per app/type all at once so we
-	 * don't have to query individually
-	 *
-	 * @return array
-	 */
-	protected static function permissionStore() : array
-	{
-		if( static::$_allPermissions === null )
-		{
-			static::$_allPermissions = [];
-		}
-
-		if( !isset( static::$_allPermissions[ get_called_class() ] ) )
-		{
-			static::$_allPermissions[ get_called_class() ] = iterator_to_array(
-				Db::i()->select(  array( 'perm_type_id', 'perm_id', 'perm_view', 'perm_2', 'perm_3', 'perm_4', 'perm_5', 'perm_6', 'perm_7' ), 'core_permission_index', array( "app=? AND perm_type=?", static::$permApp, static::$permType ) )
-					->setKeyField( 'perm_type_id' )
-			);
-		}
-
-		return static::$_allPermissions;
-	}
-
-	/**
 	 * Get permissions
 	 *
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function permissions() : array|null
+	public function permissions()
 	{
-		/* If we don't use permissions, stop here */
-		if ( !in_array( 'IPS\Node\Permissions', class_implements( $this ) ) )
-		{
-			return null;
-		}
-
 		if ( $this->_permissions === NULL )
 		{
-			if( !isset( static::permissionStore()[ get_called_class() ][ $this->_id ] ) )
+			try
 			{
-				try
-				{
-					static::$_allPermissions[ get_called_class() ][ $this->_id ] = Db::i()->select( array( 'perm_type_id', 'perm_id', 'perm_view', 'perm_2', 'perm_3', 'perm_4', 'perm_5', 'perm_6', 'perm_7' ), 'core_permission_index', array( "app=? AND perm_type=? and perm_type_id=?", static::$permApp, static::$permType, $this->_id ) )->first();
-				}
-				catch( UnderflowException )
-				{
-					$permId = Db::i()->insert( 'core_permission_index', array(
-						'app'			=> static::$permApp,
-						'perm_type'		=> static::$permType,
-						'perm_type_id'	=> $this->_id,
-						'perm_view'		=> ''
-					) );
-
-					static::$_allPermissions[ get_called_class() ][ $this->_id ] = array( 'perm_id' => $permId, 'perm_view' => '', 'perm_2' => NULL, 'perm_3' => NULL, 'perm_4' => NULL, 'perm_5' => NULL, 'perm_6' => NULL, 'perm_7' => NULL );
-				}
+				$this->_permissions = \IPS\Db::i()->select( array( 'perm_id', 'perm_view', 'perm_2', 'perm_3', 'perm_4', 'perm_5', 'perm_6', 'perm_7' ), 'core_permission_index', array( "app=? AND perm_type=? AND perm_type_id=?", static::$permApp, static::$permType, $this->_id ) )->first();
 			}
-
-			$this->_permissions = static::permissionStore()[ get_called_class() ][ $this->_id ];
+			catch ( \UnderflowException $e )
+			{
+				$permId = \IPS\Db::i()->insert( 'core_permission_index', array(
+					'app'			=> static::$permApp,
+					'perm_type'		=> static::$permType,
+					'perm_type_id'	=> $this->_id,
+					'perm_view'		=> ''
+				) );
+				
+				$this->_permissions = array( 'perm_id' => $permId, 'perm_view' => '', 'perm_2' => NULL, 'perm_3' => NULL, 'perm_4' => NULL, 'perm_5' => NULL, 'perm_6' => NULL, 'perm_7' => NULL );
+			}
 		}
-
 		return $this->_permissions;
 	}
 
@@ -2404,9 +2204,9 @@ abstract class Model extends ActiveRecord
 	 *	@li			Number prepended by "m" indicates a member
 	 *	@li			Number prepended by "s" indicates a social group
 	 */
-	public function searchIndexPermissions(): string
+	public function searchIndexPermissions()
 	{
-		if( in_array( Permissions::class, class_implements( $this ) ) )
+		if( $this instanceof \IPS\Node\Permissions )
 		{
 			/* Compare both read and view */
 			$result	= static::_getPermissions( $this );
@@ -2434,10 +2234,10 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Retrieve the computed permissions
 	 *
-	 * @param Model $node	Node
+	 * @param	\IPS\Node\Model	$node	Node
 	 * @return	string
 	 */
-	protected static function _getPermissions( Model $node ): string
+	protected static function _getPermissions( $node )
 	{
 		$permissions = $node->permissions();
 		$permissionTypes = $node->permissionTypes();
@@ -2466,41 +2266,41 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Populate the Permission Matrix for the Permissions extension
 	 *
-	 * @param	array $rows Our current rows array we need to populate.
-	 * @param Model $node The node to merge in.
-	 * @param	Group|int $group The group currently being adjusted.
-	 * @param	array $current Current permissions.
-	 * @param	int $level Our current depth level
-	 * @return	void
+	 * @param	array					Our current rows array we need to populate.
+	 * @param	\IPS\Node\Model			The node to merge in.
+	 * @param	\IPS\Member\Group|int	The group currently being adjusted.
+	 * @param	array					Current permissions.
+	 * @param	int						Our current depth level
+	 * @return	array
 	 * @throws
 	 *	@li	BadMethodCallException
 	 *  @li UnderflowException (if guest group ID is invalid)
 	 */
-	public static function populatePermissionMatrix( array &$rows, Model $node, Group|int $group, array $current, int $level=0 ) : void
+	public static function populatePermissionMatrix( &$rows, $node, $group, $current, $level=0 )
 	{
-		if ( !in_array( 'IPS\Node\Permissions', class_implements( $node ) ) )
+		if ( !\in_array( 'IPS\Node\Permissions', class_implements( $node ) ) )
 		{
-			throw new BadMethodCallException;
+			throw new \BadMethodCallException;
 		}
 
-		$group = ( $group instanceof Group ) ? $group->g_id : $group;
+		$group = ( $group instanceof \IPS\Member\Group ) ? $group->g_id : $group;
 
 		$rows[ $node->_id ] = array( '_level' => $level, 'label' => $node->_title );
 
 		$disabledPermissions = $node->disabledPermissions();
 		foreach( $node->permissionTypes() AS $k => $v )
 		{
-			$value = ( ( isset( $current[ $node->_id ] ) ) AND ( $current[ $node->_id ]['perm_' . $v ] === '*' OR in_array( $group, explode( ',', $current[ $node->_id ]['perm_' . $v ] ) ) ) );
+			$value = ( ( isset( $current[ $node->_id ] ) ) AND ( $current[ $node->_id ]['perm_' . $v ] === '*' OR \in_array( $group, explode( ',', $current[ $node->_id ]['perm_' . $v ] ) ) ) );
 
 			$disabled = FALSE;
-			if ( array_key_exists( $group, $disabledPermissions ) and is_array( $disabledPermissions[ $group ] ) )
+			if ( array_key_exists( $group, $disabledPermissions ) and \is_array( $disabledPermissions[ $group ] ) )
 			{
-				$disabled = in_array( $v, array_values( $disabledPermissions[ $group ] ) );
+				$disabled = \in_array( $v, array_values( $disabledPermissions[ $group ] ) );
 			}
 
 			if ( $disabled === FALSE )
 			{
-				$disabled = ( $group == Settings::i()->guest_group AND in_array( $k, array('review', 'rate' ) ) );
+				$disabled = ( $group == \IPS\Settings::i()->guest_group AND \in_array( $k, array('review', 'rate' ) ) ) ? TRUE : FALSE;
 			}
 
 			if ( $disabled )
@@ -2525,12 +2325,12 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Can View
 	 *
-	 * @param Group|Member|null $member			The member or group to check (NULL for currently logged in member)
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$member			The member or group to check (NULL for currently logged in member)
 	 * @return	bool
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 * @note	This is just a quick wrapper to brings things consistent between Content Items and Nodes for things like Reactions, which may support both
 	 */
-	public function canView( Group|Member $member=NULL ): bool
+	public function canView( $member=NULL )
 	{
 		return $this->can( 'view', $member );
 	}
@@ -2540,7 +2340,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return null|array
 	 */
-	public static function customPermissionNodes(): ?array
+	public static function customPermissionNodes()
 	{
 		return NULL;
 	}
@@ -2548,29 +2348,20 @@ abstract class Model extends ActiveRecord
 	/**
 	 * @brief	Cached permission checks
 	 */
-	protected array $cachedPermissionChecks = array();
+	protected $cachedPermissionChecks = array();
 
 	/**
 	 * Check permissions
 	 *
 	 * @param	mixed								$permission						A key which has a value in static::$permissionMap['view'] matching a column ID in core_permission_index
-	 * @param Group|Member|null $member							The member or group to check (NULL for currently logged in member)
-	 * @param bool $considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
+	 * @param	\IPS\Member|\IPS\Member\Group|NULL	$member							The member or group to check (NULL for currently logged in member)
+	 * @param	bool								$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
 	 * @return	bool
-	 * @throws	OutOfBoundsException	If $permission does not exist in static::$permissionMap
+	 * @throws	\OutOfBoundsException	If $permission does not exist in static::$permissionMap
 	 */
-	public function can( mixed $permission, Group|Member $member=NULL, bool $considerPostBeforeRegistering = TRUE ): bool
+	public function can( $permission, $member=NULL, $considerPostBeforeRegistering = TRUE )
 	{
-		/* Extensions go first, but only for viewing and commenting, not for modifying the node */
-		if( in_array( $permission, [ 'view', 'read', 'add', 'comment', 'reply', 'review' ] ) )
-		{
-			if( static::$canBeExtended and !( $member instanceof  Group ) and $permCheck = PermissionsExtension::can( $permission, $this, $member ) )
-			{
-				return ( $permCheck === PermissionsExtension::PERM_ALLOW );
-			}
-		}
-
-		$_key = md5( $permission . ( $member ? ( ( $member instanceof Group ) ? $member->g_id : $member->member_id . '-' . $member->member_group_id ) : Member::loggedIn()->member_id . '-' . Member::loggedIn()->member_group_id ) . (int) $considerPostBeforeRegistering );
+		$_key = md5( $permission . ( $member ? ( ( $member instanceof \IPS\Member\Group ) ? $member->g_id : $member->member_id . '-' . $member->member_group_id ) : \IPS\Member::loggedIn()->member_id . '-' . \IPS\Member::loggedIn()->member_group_id ) . (int) $considerPostBeforeRegistering );
 
 		if( isset( $this->cachedPermissionChecks[ $_key ] ) )
 		{
@@ -2585,7 +2376,7 @@ abstract class Model extends ActiveRecord
 		}
 
 		/* If this is not permission-dependant, return TRUE */
-		if( !in_array( Permissions::class, class_implements( $this ) ) )
+		if ( !( $this instanceof \IPS\Node\Permissions ) )
 		{
 			$this->cachedPermissionChecks[ $_key ] = TRUE;
 			return $this->cachedPermissionChecks[ $_key ];
@@ -2594,19 +2385,19 @@ abstract class Model extends ActiveRecord
 		/* Check it exists */
 		if ( !isset( static::$permissionMap[ $permission ] ) )
 		{
-			throw new OutOfBoundsException;
+			throw new \OutOfBoundsException;
 		}
 
 		/* Load member */
 		if ( $member === NULL )
 		{
-			$member = Member::loggedIn();
+			$member = \IPS\Member::loggedIn();
 		}
 
 		/* If this is an owned node, we don't have permission if we don't own it */
-		if( static::$ownerTypes !== NULL AND static::$ownerTypes['member'] !== NULL AND in_array( $permission, array( 'add', 'edit', 'delete' ) ) )
+		if( static::$ownerTypes !== NULL AND static::$ownerTypes['member'] !== NULL AND \in_array( $permission, array( 'add', 'edit', 'delete' ) ) )
 		{
-			if( $member instanceof Group )
+			if( $member instanceof \IPS\Member\Group )
 			{
 				$this->cachedPermissionChecks[ $_key ] = FALSE;
 				return $this->cachedPermissionChecks[ $_key ];
@@ -2622,12 +2413,12 @@ abstract class Model extends ActiveRecord
 		}
 		
 		/* If this is a club, we need to make sure we can view the module */
-		if ( in_array( $permission, array( 'view', 'read' ) ) )
+		if ( \in_array( $permission, array( 'view', 'read' ) ) )
 		{
 			/* If this is a club node, make sure we can access the clubs module */
-			if ( IPS::classUsesTrait( get_called_class(), 'IPS\Content\ClubContainer' ) AND $this->club() )
+			if ( \IPS\IPS::classUsesTrait( \get_called_class(), 'IPS\Content\ClubContainer' ) AND $this->club() )
 			{
-				if ( !$member->canAccessModule( Module::get( 'core', 'clubs', 'front' ) ) )
+				if ( !$member->canAccessModule( \IPS\Application\Module::get( 'core', 'clubs', 'front' ) ) )
 				{
 					$this->cachedPermissionChecks[ $_key ] = FALSE;
 					return $this->cachedPermissionChecks[ $_key ];
@@ -2650,7 +2441,7 @@ abstract class Model extends ActiveRecord
 				}
 			}
 				/* If parent or parents do not exist, we cannot view - happens sometimes with upgrades due to old bugs */
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$this->cachedPermissionChecks[ $_key ] = FALSE;
 				return $this->cachedPermissionChecks[ $_key ];
@@ -2658,7 +2449,7 @@ abstract class Model extends ActiveRecord
 		}
 
 		/* If we're checking add permissions - make sure we are not over our posts per day limit */
-		if ( in_array( $permission, array( 'add', 'reply', 'review' ) ) AND $member instanceof Member )
+		if ( \in_array( $permission, array( 'add', 'reply', 'review' ) ) AND $member instanceof \IPS\Member )
 		{
 			$checkPostsPerDay = TRUE;
 			if ( isset( static::$contentItemClass ) )
@@ -2692,27 +2483,27 @@ abstract class Model extends ActiveRecord
 		/* Work out which to use taking Post Before Registering into consideration and return */
 		$considerPostBeforeRegistering = ( $considerPostBeforeRegistering and Settings::i()->post_before_registering
 			and Login::registrationType() != 'disabled' and Settings::i()->bot_antispam_type !== 'none' );
-		if( $member instanceof Group )
+		if( $member instanceof \IPS\Member\Group )
 		{
-			if ( $considerPostBeforeRegistering and $member->g_id == Settings::i()->guest_group )
+			if ( $considerPostBeforeRegistering and $member->g_id == \IPS\Settings::i()->guest_group )
 			{
-				$groupId = Settings::i()->member_group;
+				$groupId = \IPS\Settings::i()->member_group;
 			}
 			else
 			{
 				$groupId = $member->g_id;
 			}
 			
-			$this->cachedPermissionChecks[ $_key ] = in_array( $groupId, $relevantPermissionArray );
+			$this->cachedPermissionChecks[ $_key ] = \in_array( $groupId, $relevantPermissionArray );
 			return $this->cachedPermissionChecks[ $_key ];
 		}
 		else
 		{
-			$canPermission = (bool) count( array_intersect( $relevantPermissionArray, $member->permissionArray() ) );
+			$canPermission = (bool) \count( array_intersect( $relevantPermissionArray, $member->permissionArray() ) );
 
-			if ( !$canPermission AND $considerPostBeforeRegistering and !$member->member_id and in_array( $permission, array( 'add', 'reply', 'review' ) ) )
+			if ( !$canPermission AND $considerPostBeforeRegistering and !$member->member_id and \in_array( $permission, array( 'add', 'reply', 'review' ) ) )
 			{
-				$this->cachedPermissionChecks[ $_key ] = in_array( Settings::i()->member_group, $relevantPermissionArray );
+				$this->cachedPermissionChecks[ $_key ] = \in_array( \IPS\Settings::i()->member_group, $relevantPermissionArray );
 			}
 			else
 			{
@@ -2726,12 +2517,12 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Return a list of groups that cannot see this node
 	 *
-	 * @return 	array|null
+	 * @return 	NULL|Array
 	 */
-	public function cannotViewGroups(): array|null
+	public function cannotViewGroups()
 	{
 		$groups = array();
-		foreach( Group::groups() as $group )
+		foreach( \IPS\Member\Group::groups() as $group )
 		{
 			if ( ! $this->can( 'view', $group, FALSE ) )
 			{
@@ -2739,92 +2530,19 @@ abstract class Model extends ActiveRecord
 			}
 		}
 
-		return count( $groups ) ? $groups : NULL;
-	}
-
-	/**
-	 * @var array
-	 */
-	protected static array $_moderators = [];
-
-	/**
-	 * Get all moderators for this container
-	 *
-	 * @param Model|null $container
-	 * @return array
-	 */
-	public static function moderators( ?Model $container=null ) : array
-	{
-		$containerId = $container ? $container->_id : 0;
-		if( !isset( static::$_moderators[ $containerId ] ) )
-		{
-			/* If we don't have a datastore of moderator configuration, load that now */
-			if ( !isset( Store::i()->moderators ) )
-			{
-				Store::i()->moderators = array(
-					'm'	=> iterator_to_array( Db::i()->select( '*', 'core_moderators', array( 'type=?', 'm' ) )->setKeyField( 'id' ) ),
-					'g'	=> iterator_to_array( Db::i()->select( '*', 'core_moderators', array( 'type=?', 'g' ) )->setKeyField( 'id' ) ),
-				);
-			}
-
-			$moderators = [ 'g' => [], 'm' => [] ];
-			foreach( Store::i()->moderators as $type => $mods )
-			{
-				foreach( $mods as $mod )
-				{
-					$canView = FALSE;
-					if ( $mod['perms'] == '*' )
-					{
-						$canView = TRUE;
-					}
-
-					if ( $canView === FALSE )
-					{
-						$perms = json_decode( $mod['perms'], TRUE );
-						if( isset( static::$modPerm ) )
-						{
-							if ( !isset( $perms[ static::$modPerm ] ) or $perms[ static::$modPerm ] == '*' or $perms[ static::$modPerm ] == -1 )
-							{
-								$canView = true;
-							}
-							elseif( $container !==  null and !empty( $perms[ static::$modPerm ] ) and in_array( $containerId, $perms[ static::$modPerm ] ) )
-							{
-								$canView = true;
-							}
-						}
-					}
-
-					if ( $canView === TRUE )
-					{
-						$moderators[ $mod['type'] ][] = $mod['id'];
-					}
-				}
-			}
-
-			static::$_moderators[ $containerId ] = $moderators;
-		}
-
-		return static::$_moderators[ $containerId ] ?? [];
+		return \count( $groups ) ? $groups : NULL;
 	}
 	
 	/**
 	 * Check Moderator Permission
 	 *
-	 * @param string $type		'edit', 'hide', 'unhide', 'delete', etc.
-	 * @param	Member			$member		The member to check for or NULL for the currently logged in member
-	 * @param string $class		The class to check against
+	 * @param	string						$type		'edit', 'hide', 'unhide', 'delete', etc.
+	 * @param	\IPS\Member|NULL			$member		The member to check for or NULL for the currently logged in member
+	 * @param	string						$class		The class to check against
 	 * @return	bool
 	 */
-	public function modPermission( string $type, Member $member, string $class ): bool
+	public function modPermission( $type, \IPS\Member $member, $class )
 	{
-		if( IPS::classUsesTrait( $this, 'IPS\Content\ClubContainer' ) )
-		{
-			if( $this->clubContainerPermission( $type, $member, $class ) )
-			{
-				return TRUE;
-			}
-		}
-
 		if ( isset( static::$modPerm ) )
 		{
 			$class = $class ?: static::$contentItemClass;
@@ -2835,7 +2553,7 @@ abstract class Model extends ActiveRecord
 				{
 					return TRUE;
 				}
-				if ( is_array( $member->modPermission( static::$modPerm ) ) and in_array( $this->_id, $member->modPermission( static::$modPerm ) ) )
+				if ( \is_array( $member->modPermission( static::$modPerm ) ) and \in_array( $this->_id, $member->modPermission( static::$modPerm ) ) )
 				{
 					return TRUE;
 				}
@@ -2848,27 +2566,18 @@ abstract class Model extends ActiveRecord
 	/**
 	 * @brief	Disable the copy button - useful when the forms are very distinctly different
 	 */
-	public bool $noCopyButton	= FALSE;
+	public $noCopyButton	= FALSE;
 
 	/**
 	 * [ActiveRecord] Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
-		/* Validate the counts, sometimes we inadvertently end up with a count less than 0 */
-		foreach( [ '_items', '_comments', '_reviews', '_unapprovedItems', '_unapprovedComments', '_unapprovedReviews', '_futureItems' ] as $column )
-		{
-			if( $this->$column !== null and $this->$column < 0 )
-			{
-				$this->$column = 0;
-			}
-		}
-
 		parent::save();
 
-		if ( in_array( Permissions::class, class_implements( $this ) ) and $this->_permissions !== NULL and $this->_permissions != $this->_originalPermissions )
+		if ( $this instanceof \IPS\Node\Permissions and $this->_permissions !== NULL and $this->_permissions != $this->_originalPermissions )
 		{
 			if ( !isset( $this->_permissions['perm_id'] ) )
 			{
@@ -2880,37 +2589,36 @@ abstract class Model extends ActiveRecord
 					}
 				}
 
-				Db::i()->replace( 'core_permission_index', $this->_permissions );
+				\IPS\Db::i()->replace( 'core_permission_index', $this->_permissions );
 			}
 			else
 			{
-				Db::i()->update( 'core_permission_index', $this->_permissions, array( 'perm_id=?', $this->_permissions['perm_id'] ) );
+				\IPS\Db::i()->update( 'core_permission_index', $this->_permissions, array( 'perm_id=?', $this->_permissions['perm_id'] ) );
 			}
 		}
 	}
-
+	
 	/**
 	 * Get where clause for a mass move/delete
 	 *
-	 * @param array|null $data	Additional filters to mass move by
+	 * @param	array|null	$data	Additional filters to mass move by
 	 * @return	array
 	 */
-	public function massMoveorDeleteWhere( array $data=NULL ): array
+	public function massMoveorDeleteWhere( $data=NULL )
 	{
 		$contentItemClass = static::$contentItemClass;
 
 		$where = array();
-		if ( isset( $data['additional'] ) AND count( $data['additional'] ) )
+		if ( isset( $data['additional'] ) AND \count( $data['additional'] ) )
 		{
 			/* Author */
-			/* @var $databaseColumnMap array */
 			if ( isset( $data['additional']['author'] ) )
 			{
-				if ( is_array( $data['additional']['author'] ) )
+				if ( \is_array( $data['additional']['author'] ) )
 				{
-					if ( count( $data['additional']['author'] ) )
+					if ( \count( $data['additional']['author'] ) )
 					{
-						$where[] = array( Db::i()->in( $contentItemClass::$databasePrefix . $contentItemClass::$databaseColumnMap['author'], $data['additional']['author'] ) );
+						$where[] = array( \IPS\Db::i()->in( $contentItemClass::$databasePrefix . $contentItemClass::$databaseColumnMap['author'], $data['additional']['author'] ) );
 					}
 				}
 				else
@@ -2934,7 +2642,7 @@ abstract class Model extends ActiveRecord
 			
 			/* Last post was before */
 			$lastCommentField = $contentItemClass::$databaseColumnMap['last_comment'];
-			$field = is_array( $lastCommentField ) ? array_pop( $lastCommentField ) : $lastCommentField;
+			$field = \is_array( $lastCommentField ) ? array_pop( $lastCommentField ) : $lastCommentField;
 			if ( isset( $data['additional']['no_comments'] ) AND $data['additional']['no_comments'] > 0 ) // Legacy, may still be in queue
 			{
 				$where[] = array( $contentItemClass::$databasePrefix . $contentItemClass::$databaseColumnMap['num_comments'] . '<=? AND ' . $contentItemClass::$databasePrefix . $field . '<?', $contentItemClass::$firstCommentRequired ? 1 : 0, $data['additional']['no_comments'] );
@@ -2990,15 +2698,15 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Mass move content items in this node to another node
 	 *
-	 * @param Model|null $node	New node to move content items to, or NULL to delete
-	 * @param array|null $data	Additional filters to mass move by
+	 * @param	\IPS\Node\Model|null	$node	New node to move content items to, or NULL to delete
+	 * @param	array|null				$data	Additional filters to mass move by
 	 * @return	NULL|int
 	 */
-	public function massMoveorDelete( Model $node=NULL, array $data=NULL ): ?int
+	public function massMoveorDelete( $node=NULL, $data=NULL )
 	{
 		$select = $this->getContentItems( 100, 0, $this->massMoveorDeleteWhere( $data ) );
 
-		if ( count( $select ) )
+		if ( \count( $select ) )
 		{
 			foreach ( $select as $item )
 			{
@@ -3025,7 +2733,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function resetCommentCounts(): void
+	public function resetCommentCounts()
 	{
 		if ( !isset( static::$contentItemClass ) )
 		{
@@ -3033,7 +2741,7 @@ abstract class Model extends ActiveRecord
 		}
 
 		/* If we have delayed counts, don't slam the write server now, we'll handle it later */
-		iF( IPS::classUsesTrait( $this, 'IPS\Node\DelayedCount' ) )
+		iF( \IPS\IPS::classUsesTrait( $this, 'IPS\Node\DelayedCount' ) )
 		{
 			$this->storeUpdateTime();
 			return;
@@ -3057,11 +2765,10 @@ abstract class Model extends ActiveRecord
 			$reviewClass	= $itemClass::$reviewClass;
 		}
 
-		/* @var $databaseColumnMap array */
 		$containerWhere    = array( array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['container'] . '=?', $this->_id ) );
 		$anyContainerWhere = $containerWhere;
 
-		if ( IPS::classUsesTrait( $itemClass, 'IPS\Content\Hideable' ) )
+		if ( \in_array( 'IPS\Content\Hideable', class_implements( $itemClass ) ) )
 		{
 			if ( isset( $itemClass::$databaseColumnMap['approved'] ) )
 			{
@@ -3074,7 +2781,7 @@ abstract class Model extends ActiveRecord
 		}
 		if ( $this->_items !== NULL )
 		{
-			$this->_items = Db::i()->select( 'COUNT(*)', $itemClass::$databaseTable, $containerWhere, NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first();
+			$this->_items = \IPS\Db::i()->select( 'COUNT(*)', $itemClass::$databaseTable, $containerWhere, NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 		}
 		if ( $this->_comments !== NULL AND $commentClass !== NULL AND !isset( $itemClass::$databaseColumnMap['num_comments'] ) )
 		{
@@ -3083,7 +2790,7 @@ abstract class Model extends ActiveRecord
 				array( $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['container'] . '=?', $this->_id )
 			);
 
-			if ( IPS::classUsesTrait( $itemClass, 'IPS\Content\Hideable' ) )
+			if ( \in_array( 'IPS\Content\Hideable', class_implements( $itemClass ) ) )
 			{
 				if ( isset( $itemClass::$databaseColumnMap['approved'] ) )
 				{
@@ -3104,10 +2811,10 @@ abstract class Model extends ActiveRecord
 				$commentWhere[] = array( $commentClass::$databaseTable . '.' . $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['hidden'] . '=?', 0 );
 			}
 
-			$this->_comments = Db::i()->select( 'COUNT(*)', array(
+			$this->_comments = \IPS\Db::i()->select( 'COUNT(*)', array(
 				array( $commentClass::$databaseTable, $commentClass::$databaseTable ),
 				array( $itemClass::$databaseTable, $itemClass::$databaseTable ),
-			), $commentWhere )->first();
+			), $commentWhere, NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 		}
 		/* If we have a cached value, use that instead */
 		elseif( $this->_comments !== NULL AND $commentClass !== NULL AND isset( $itemClass::$databaseColumnMap['num_comments'] ) )
@@ -3116,7 +2823,7 @@ abstract class Model extends ActiveRecord
 				array( $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['container'] . '=?', $this->_id )
 			);
 
-			if ( IPS::classUsesTrait( $itemClass, 'IPS\Content\Hideable' ) )
+			if ( \in_array( 'IPS\Content\Hideable', class_implements( $itemClass ) ) )
 			{
 				if ( isset( $itemClass::$databaseColumnMap['approved'] ) )
 				{
@@ -3128,7 +2835,7 @@ abstract class Model extends ActiveRecord
 				}
 			}
 
-			$this->_comments = (int) Db::i()->select( "SUM({$itemClass::$databasePrefix}{$itemClass::$databaseColumnMap['num_comments']})", $itemClass::$databaseTable, $commentWhere )->first();
+			$this->_comments = (int) \IPS\Db::i()->select( "SUM({$itemClass::$databasePrefix}{$itemClass::$databaseColumnMap['num_comments']})", $itemClass::$databaseTable, $commentWhere )->first();
 		}
 
 		if ( $this->_reviews !== NULL AND $reviewClass !== NULL )
@@ -3147,13 +2854,13 @@ abstract class Model extends ActiveRecord
 				$reviewWhere[] = array( $reviewClass::$databaseTable . '.' . $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['hidden'] . '=?', 0 );
 			}
 
-			$this->_reviews = Db::i()->select( 'COUNT(*)', array(
+			$this->_reviews = \IPS\Db::i()->select( 'COUNT(*)', array(
 				array( $reviewClass::$databaseTable, $reviewClass::$databaseTable ),
 				array( $itemClass::$databaseTable, $itemClass::$databaseTable )
 			), $reviewWhere )->first();
 		}
 
-		if ( IPS::classUsesTrait( $itemClass, 'IPS\Content\Hideable' ) )
+		if ( \in_array( 'IPS\Content\Hideable', class_implements( $itemClass ) ) )
 		{
 			if ( $this->_unapprovedItems !== NULL )
 			{
@@ -3168,10 +2875,10 @@ abstract class Model extends ActiveRecord
 					$hiddenContainerWhere[] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['hidden'] . '=?', 1 );
 				}
 
-				$this->_unapprovedItems = Db::i()->select( 'COUNT(*)', $itemClass::$databaseTable, $hiddenContainerWhere )->first();
+				$this->_unapprovedItems = \IPS\Db::i()->select( 'COUNT(*)', $itemClass::$databaseTable, $hiddenContainerWhere, NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 			}
 
-			if( $commentClass !== NULL AND IPS::classUsesTrait( $commentClass, 'IPS\Content\Hideable' ) )
+			if( $commentClass !== NULL AND \in_array( 'IPS\Content\Hideable', class_implements( $commentClass ) ) )
 			{
 				$commentWhere = array( array( $commentClass::$databaseTable . '.' . $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['item'] . ' = ' . $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemIdColumn ) );
 				if ( $this->_unapprovedComments !== NULL AND !isset( $itemClass::$databaseColumnMap['unapproved_comments'] ) )
@@ -3195,7 +2902,7 @@ abstract class Model extends ActiveRecord
 						$commentWhere[] = array( $commentClass::$databaseTable . '.' . $commentClass::$databasePrefix . $commentClass::$databaseColumnMap['hidden'] . '=?', 1 );
 					}
 
-					$this->_unapprovedComments = Db::i()->select( 'COUNT(*)', array(
+					$this->_unapprovedComments = \IPS\Db::i()->select( 'COUNT(*)', array(
 						array( $commentClass::$databaseTable, $commentClass::$databaseTable ),
 						array( $itemClass::$databaseTable, $itemClass::$databaseTable )
 					), $commentWhere )->first();
@@ -3207,7 +2914,7 @@ abstract class Model extends ActiveRecord
 						array( $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['container'] . '=?', $this->_id )
 					);
 
-					if ( IPS::classUsesTrait( $itemClass, 'IPS\Content\Hideable' ) )
+					if ( \in_array( 'IPS\Content\Hideable', class_implements( $itemClass ) ) )
 					{
 						if ( isset( $itemClass::$databaseColumnMap['approved'] ) )
 						{
@@ -3219,11 +2926,11 @@ abstract class Model extends ActiveRecord
 						}
 					}
 
-					$this->_unapprovedComments = (int) Db::i()->select( "SUM({$itemClass::$databasePrefix}{$itemClass::$databaseColumnMap['unapproved_comments']})", $itemClass::$databaseTable, $commentWhere )->first();
+					$this->_unapprovedComments = (int) \IPS\Db::i()->select( "SUM({$itemClass::$databasePrefix}{$itemClass::$databaseColumnMap['unapproved_comments']})", $itemClass::$databaseTable, $commentWhere )->first();
 				}
 			}
 
-			if( $reviewClass !== NULL AND IPS::classUsesTrait( $reviewClass, 'IPS\Content\Hideable' ) )
+			if( $reviewClass !== NULL AND \in_array( 'IPS\Content\Hideable', class_implements( $reviewClass ) ) )
 			{
 				$reviewWhere = array( array( $reviewClass::$databaseTable . '.' . $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['item'] . ' = ' . $itemClass::$databaseTable . '.' . $itemClass::$databasePrefix . $itemIdColumn ) );
 				if ( $this->_unapprovedReviews !== NULL )
@@ -3239,7 +2946,7 @@ abstract class Model extends ActiveRecord
 						$reviewWhere[] = array( $reviewClass::$databaseTable . '.' . $reviewClass::$databasePrefix . $reviewClass::$databaseColumnMap['hidden'] . '=?', 1 );
 					}
 
-					$this->_unapprovedReviews = Db::i()->select( 'COUNT(*)', array(
+					$this->_unapprovedReviews = \IPS\Db::i()->select( 'COUNT(*)', array(
 						array( $reviewClass::$databaseTable, $reviewClass::$databaseTable ),
 						array( $itemClass::$databaseTable, $itemClass::$databaseTable )
 					), $reviewWhere )->first();
@@ -3251,19 +2958,19 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Retrieve the content item count
 	 *
-	 * @param array|null $data	Data array for mass move/delete
+	 * @param	null|array	$data	Data array for mass move/delete
 	 * @return	null|int
 	 */
-	public function getContentItemCount(array $data=NULL ): ?int
+	public function getContentItemCount( $data=NULL )
 	{
 		if ( !isset( static::$contentItemClass ) )
 		{
-			return null;
+			return false;
 		}
 
 		$contentItemClass = static::$contentItemClass;
 		$idColumn = static::$databaseColumnId;
-		/* @var $databaseColumnMap array */
+
 		$where = array( array( $contentItemClass::$databasePrefix . $contentItemClass::$databaseColumnMap['container'] . '=?', $this->$idColumn ) );
 
 		if( $data )
@@ -3271,31 +2978,32 @@ abstract class Model extends ActiveRecord
 			$where = array_merge_recursive( $where, $this->massMoveorDeleteWhere( $data ) );
 		}
 
-		return (int) Db::i()->select( 'COUNT(*)', $contentItemClass::$databaseTable, $where )->first();
+		return (int) \IPS\Db::i()->select( 'COUNT(*)', $contentItemClass::$databaseTable, $where )->first();
 	}
 
 	/**
 	 * Retrieve content items (if applicable) for a node.
 	 *
-	 * @param int|null $limit The limit
-	 * @param int|null $offset The offset
-	 * @param array $additionalWhere Where Additional where clauses
-	 * @param bool|int $countOnly If TRUE, will get the number of results
-	 * @return    ActiveRecordIterator|int
+	 * @param	int		$limit			The limit
+	 * @param	int		$offset			The offset
+	 * @param	array	$additional		Where Additional where clauses
+	 * @param	int		$countOnly		If TRUE, will get the number of results
+	 * @return	\IPS\Patterns\ActiveRecordIterator|int
+	 * @throws	\BadMethodCallException
 	 */
-	public function getContentItems( ?int $limit, ?int $offset, array $additionalWhere = array(), bool|int $countOnly=FALSE ): ActiveRecordIterator|int
+	public function getContentItems( $limit, $offset, $additionalWhere = array(), $countOnly=FALSE )
 	{
 		if ( !isset( static::$contentItemClass ) )
 		{
-			throw new BadMethodCallException;
+			throw new \BadMethodCallException;
 		}
 
 		$contentItemClass = static::$contentItemClass;
-		/* @var $databaseColumnMap array */
+
 		$where		= array();
 		$where[]	= array( $contentItemClass::$databasePrefix . $contentItemClass::$databaseColumnMap['container'] . '=?', $this->_id );
 
-		if ( count( $additionalWhere ) )
+		if ( \count( $additionalWhere ) )
 		{
 			foreach( $additionalWhere AS $clause )
 			{
@@ -3305,30 +3013,30 @@ abstract class Model extends ActiveRecord
 		
 		if ( $countOnly )
 		{
-			return Db::i()->select( 'COUNT(*)', $contentItemClass::$databaseTable, $where )->first();
+			return \IPS\Db::i()->select( 'COUNT(*)', $contentItemClass::$databaseTable, $where )->first();
 		}
 		else
 		{
 			$contentItemClass = static::$contentItemClass;
 			$limit	= ( $offset !== NULL ) ? array( $offset, $limit ) : NULL;
-			return new ActiveRecordIterator( Db::i()->select( '*', $contentItemClass::$databaseTable, $where, $contentItemClass::$databasePrefix . $contentItemClass::$databaseColumnId, $limit ), $contentItemClass );
+			return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', $contentItemClass::$databaseTable, $where, $contentItemClass::$databasePrefix . $contentItemClass::$databaseColumnId, $limit ), $contentItemClass );
 		}
 	}
 
 	/**
 	 * Alter permissions for an individual group
 	 *
-	 * @param int|Group $group	Group to alter
-	 * @param array $permissions	Array map of permission key => boolean value
+	 * @param	int|\IPS\Member\Group	$group	Group to alter
+	 * @param	array					$permissions	Array map of permission key => boolean value
 	 * @return	void
 	 */
-	public function changePermissions( int|Group $group, array $permissions ) : void
+	public function changePermissions( $group, $permissions )
 	{
 		/* Get our group ID */
-		$groupId	= ( $group instanceof Group ) ? $group->g_id : (int) $group;
+		$groupId	= ( $group instanceof \IPS\Member\Group ) ? $group->g_id : (int) $group;
 
 		/* Get all groups - we will need it to adjust permissions we are adding or taking away */
-		$allGroups	= Group::groups();
+		$allGroups	= \IPS\Member\Group::groups();
 
 		/* Set a flag so we know if we actually need to update anything later (i.e. in the search index) */
 		$hasChange	= FALSE;
@@ -3390,18 +3098,18 @@ abstract class Model extends ActiveRecord
 				{
 					$existing	= explode( ',', $existing );
 
-					if( !in_array( $groupId, $existing ) )
+					if( !\in_array( $groupId, $existing ) )
 					{
 						/* This group was previously not allowed and now it is */
 						$hasChange	= TRUE;
 					}
 
 					$updated	= array_unique( array_merge( $existing, array( $groupId ) ) );
-					$updated	= ( count( $updated ) == count( $allGroups ) ) ? '*' : implode( ',', $updated );
+					$updated	= ( \count( $updated ) == \count( $allGroups ) ) ? '*' : implode( ',', $updated );
 				}
 			}
 
-			if( !is_array( $updated ) )
+			if( !\is_array( $updated ) )
 			{
 				$this->_permissions[ 'perm_' . static::$permissionMap[ $permissionKey ] ]	= $updated;
 			}
@@ -3418,6 +3126,17 @@ abstract class Model extends ActiveRecord
 	}
 	
 	/**
+	 * Can promote this comment/item?
+	 *
+	 * @param	\IPS\Member|NULL	$member	The member to check for (NULL for currently logged in member)
+	 * @return	boolean
+	 */
+	public function canPromoteToSocialMedia( $member=NULL )
+	{
+		return \IPS\core\Promote::canPromote( $member );
+	}
+	
+	/**
 	 * [ActiveRecord] Duplicate
 	 *
 	 * @return	void
@@ -3429,64 +3148,35 @@ abstract class Model extends ActiveRecord
 			return;
 		}
 
-		if( in_array( Permissions::class, class_implements( $this ) ) )
+		if ( $this instanceof \IPS\Node\Permissions )
 		{
-			$this->_permissions = Db::i()->select( array( 'perm_id', 'perm_view', 'perm_2', 'perm_3', 'perm_4', 'perm_5', 'perm_6', 'perm_7' ), 'core_permission_index', array( "app=? AND perm_type=? AND perm_type_id=?", static::$permApp, static::$permType, $this->_id ) )->first();
+			$this->_permissions = \IPS\Db::i()->select( array( 'perm_id', 'perm_view', 'perm_2', 'perm_3', 'perm_4', 'perm_5', 'perm_6', 'perm_7' ), 'core_permission_index', array( "app=? AND perm_type=? AND perm_type_id=?", static::$permApp, static::$permType, $this->_id ) )->first();
 			unset( $this->_permissions['perm_id'] );
 		}
 
 		$oldId = $this->_id;
 
-		$oldIcon = null;
-		if( IPS::classUsesTrait( $this, Icon::class ) )
-		{
-			$iconColumn = static::$iconColumn;
-			$oldIcon = $this->$iconColumn;
-		}
-
 		parent::__clone();
 
 		if ( static::$titleLangPrefix )
 		{
-			Lang::saveCustom( ( static::$permApp !== NULL ) ? static::$permApp : 'core', static::$titleLangPrefix . $this->_id, iterator_to_array( Db::i()->select( 'CONCAT(word_custom, \' ' . Member::loggedIn()->language()->get('copy_noun') . '\') as word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', static::$titleLangPrefix . $oldId ) )->setKeyField( 'lang_id' )->setValueField('word_custom') ) );
+			\IPS\Lang::saveCustom( ( static::$permApp !== NULL ) ? static::$permApp : 'core', static::$titleLangPrefix . $this->_id, iterator_to_array( \IPS\Db::i()->select( 'CONCAT(word_custom, \' ' . \IPS\Member::loggedIn()->language()->get('copy_noun') . '\') as word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', static::$titleLangPrefix . $oldId ) )->setKeyField( 'lang_id' )->setValueField('word_custom') ) );
 		}
 		elseif ( method_exists( $this, 'get__title' ) and method_exists( $this, 'set__title' ) )
 		{
-			$this->_title = $this->_title . ' ' . Member::loggedIn()->language()->get('copy_noun');
+			$this->_title = $this->_title . ' ' . \IPS\Member::loggedIn()->language()->get('copy_noun');
 		}
 
 		if( isset( static::$descriptionLangSuffix ) )
 		{
-			Lang::saveCustom( ( static::$permApp !== NULL ) ? static::$permApp : 'core', static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix, iterator_to_array( Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', static::$titleLangPrefix . $oldId . static::$descriptionLangSuffix ) )->setKeyField( 'lang_id' )->setValueField('word_custom') ) );
+			\IPS\Lang::saveCustom( ( static::$permApp !== NULL ) ? static::$permApp : 'core', static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix, iterator_to_array( \IPS\Db::i()->select( 'word_custom, lang_id', 'core_sys_lang_words', array( 'word_key=?', static::$titleLangPrefix . $oldId . static::$descriptionLangSuffix ) )->setKeyField( 'lang_id' )->setValueField('word_custom') ) );
 		}
 
 		if( isset( static::$databaseColumnOrder ) )
 		{
 			$orderColumn = static::$databaseColumnOrder;
-			$order = Db::i()->select( array( "MAX( `" . static::$databasePrefix . static::$databaseColumnOrder . "` )" ), static::$databaseTable, array() )->first();
-
-			/* Make sure this is numeric; we might be ordering by a string */
-			if( is_numeric( $order ) )
-			{
-				$this->$orderColumn = $order + 1;
-			}
-		}
-
-		if( IPS::classUsesTrait( $this, Icon::class ) and $oldIcon )
-		{
-			$iconColumn = static::$iconColumn;
-			if( $iconFile = $this->getIconFile() )
-			{
-				try
-				{
-					$newIcon = File::create( static::iconStorageExtension(), $iconFile->originalFilename, $iconFile->contents() );
-					$this->$iconColumn = (string) $newIcon;
-				}
-				catch( Exception $ex )
-				{
-					$this->$iconColumn = null;
-				}
-			}
+			$order = \IPS\Db::i()->select( array( "MAX( `" . static::$databasePrefix . static::$databaseColumnOrder . "` )" ), static::$databaseTable, array() )->first();
+			$this->$orderColumn = $order + 1;
 		}
 
 		$this->_items = 0;
@@ -3508,115 +3198,58 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
-		if( in_array( Permissions::class, class_implements( $this ) ) )
+		if ( $this instanceof \IPS\Node\Permissions )
 		{
-			Db::i()->delete( 'core_permission_index', array( "app=? AND perm_type=? AND perm_type_id=?", static::$permApp, static::$permType, $this->_id ) );
+			\IPS\Db::i()->delete( 'core_permission_index', array( "app=? AND perm_type=? AND perm_type_id=?", static::$permApp, static::$permType, $this->_id ) );
 		}
 
-		if( in_array( Ratings::class, class_implements( $this ) ) )
+		if ( $this instanceof \IPS\Node\Ratings )
 		{
-			Db::i()->delete( 'core_ratings', array( "class=? AND item_id=?", get_called_class(), $this->_id ) );
+			\IPS\Db::i()->delete( 'core_ratings', array( "class=? AND item_id=?", \get_called_class(), $this->_id ) );
 		}
 
 		if( !empty( static::$permApp ) )
 		{
-			Db::i()->delete( 'core_follow', array("follow_app=? AND follow_area=? AND follow_rel_id=?", static::$permApp, static::$permType, $this->_id ) );
-			Db::i()->delete( 'core_follow_count_cache', array( 'id=? AND class=?', $this->_id, get_called_class() ) );
+			\IPS\Db::i()->delete( 'core_follow', array("follow_app=? AND follow_area=? AND follow_rel_id=?", static::$permApp, static::$permType, $this->_id ) );
+			\IPS\Db::i()->delete( 'core_follow_count_cache', array( 'id=? AND class=?', $this->_id, \get_called_class() ) );
 
 			/* Remove any entries in the promotions table */
-			if( IPS::classUsesTrait( $this, 'IPS\Content\Featurable' ) )
-			{
-				Db::i()->delete( 'core_content_promote', array( 'promote_class=? AND promote_class_id=?', get_called_class(), $this->_id ) );
-			}
+			\IPS\Db::i()->delete( 'core_social_promote', array( 'promote_class=? AND promote_class_id=?', \get_called_class(), $this->_id ) );
 		}
 
 		/* Delete lang strings */
 		if ( static::$titleLangPrefix )
 		{
-			Lang::deleteCustom( ( static::$permApp !== NULL ) ? static::$permApp : 'core', static::$titleLangPrefix . $this->_id );
+			\IPS\Lang::deleteCustom( ( static::$permApp !== NULL ) ? static::$permApp : 'core', static::$titleLangPrefix . $this->_id );
 		}
 
 		if( isset( static::$descriptionLangSuffix ) )
 		{
-			Lang::deleteCustom( ( static::$permApp !== NULL ) ? static::$permApp : 'core', static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix );
+			\IPS\Lang::deleteCustom( ( static::$permApp !== NULL ) ? static::$permApp : 'core', static::$titleLangPrefix . $this->_id . static::$descriptionLangSuffix );
 		}
 
 		/* Delete Rss Imports */
-		foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_rss_import', array( 'rss_import_class=? AND rss_import_node_id=?', get_called_class() , $this->id ) ), 'IPS\core\Rss\Import' ) as $import )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_rss_import', array( 'rss_import_class=? AND rss_import_node_id=?', \get_called_class() , $this->id ) ), 'IPS\core\Rss\Import' ) as $import )
 		{
 			$import->delete();
 		}
-
-		/* Icons */
-		if( IPS::classUsesTrait( $this, Icon::class ) )
-		{
-			if( $iconFile = $this->getIconFile() )
-			{
-				$iconFile->delete();
-			}
-		}
-
-		/* Delete any node menu items */
-		foreach( Db::i()->select( '*', 'core_menu', [ 'app=? and extension=?', 'core', 'Node' ] ) as $row )
-		{
-			if( $row['config'] and $config = json_decode( $row['config'], true ) )
-			{
-				if( $config['nodeClass'] == get_called_class() and $config['id'] == $this->_id )
-				{
-					Db::i()->delete( 'core_menu', [ 'id=?', $row['id'] ] );
-				}
-			}
-		}
-
-		try
-		{
-			unset( Store::i()->frontNavigation );
-		}
-		catch( OutOfRangeException ){}
-
-		/* Delete custom badges */
-		if( IPS::classUsesTrait( $this, CustomBadge::class ) )
-		{
-			if( $badge = $this->getRecordBadge() )
-			{
-				$badge->delete();
-			}
-		}
-
-		/* Delete Node Groups */
-		if( IPS::classUsesTrait( $this, Grouping::class ) )
-		{
-			Db::i()->delete( 'core_node_groups_nodes', [
-				[ 'node_id=?', $this->id ],
-				[ Db::i()->in( 'group_id', array_keys( static::availableNodeGroups() ) ) ]
-			]);
-		}
-
-        /* Pending view updates */
-        if( IPS::classUsesTrait( get_called_class(), ViewUpdates::class ) )
-        {
-            Db::i()->delete( 'core_view_updates', [ 'classname=? and id=?', get_called_class(), $this->_id ] );
-        }
-
-		parent::delete();
-
-		Event::fire( 'onDelete', $this );
+		return parent::delete();
 	}
 
 	/**
 	 * @brief	Cache for current follow data, used on "My Followed Content" screen
 	 */
-	public ?array $_followData = array();
+	public $_followData;
 
 	/**
-	 * @param Model|null $node	Null or specific node
+	 * @param NULL|\IPS\Node\Model 	$node	Null or specific node
 	 * @return void
 	 */
-	public static function populateFollowerCounts( Model $node=NULL ) : void
+	public static function populateFollowerCounts( $node=NULL )
 	{
 		$children = array();
 		$nodeClass = NULL;
@@ -3642,9 +3275,9 @@ abstract class Model extends ActiveRecord
 
 		if ( isset( $nodeClass::$contentItemClass ) )
 		{
-			if ( !IPS::classUsesTrait( $nodeClass::$contentItemClass, 'IPS\Content\Followable' ) )
+			if ( !\in_array( 'IPS\Content\Followable', class_implements( $nodeClass::$contentItemClass ) ) )
 			{
-				throw new BadMethodCallException;
+				throw new \BadMethodCallException;
 			}
 		}
 
@@ -3664,7 +3297,7 @@ abstract class Model extends ActiveRecord
 				}
 			}
 
-			$followers = iterator_to_array( $contentClass::containerFollowerCounts( array_values( $nodes ) ) );
+			$followers = iterator_to_array( $contentClass::containerFollowerCounts( \array_values( $nodes ) ) );
 
 			foreach ( static::roots() as $root )
 			{
@@ -3691,7 +3324,7 @@ abstract class Model extends ActiveRecord
 				}
 			}
 
-			$followers = iterator_to_array( $contentClass::containerFollowerCounts( array_values( $nodes ) ) );
+			$followers = iterator_to_array( $contentClass::containerFollowerCounts( \array_values( $nodes ) ) );
 
 			if ( $node->hasChildren() )
 			{
@@ -3706,95 +3339,16 @@ abstract class Model extends ActiveRecord
 		}
 	}
 
-    /**
-     * Follow this object
-     *
-     * @param string        $frequency      ( 'none', 'immediate', 'daily', 'weekly' )
-     * @param bool          $public
-     * @param Member|null   $member
-     * @return void
-     */
-    public function follow( string $frequency, bool $public=true, ?Member $member=null ) : void
-    {
-        if( isset( static::$contentItemClass ) )
-        {
-            $itemClass = static::$contentItemClass;
-            if( IPS::classUsesTrait( $itemClass, Followable::class ) )
-            {
-                $itemClass::staticFollow( $this, $frequency, $public, $member );
-
-                /* Achievements */
-                Member::loggedIn()->achievementAction( 'core', 'FollowNode', $this );
-            }
-        }
-    }
-
-    /**
-     * Unfollow a node
-     *
-     * @param Member|null $member
-     * @return void
-     */
-    public function unfollow( ?Member $member=null ) : void
-    {
-        if( isset( static::$contentItemClass ) )
-        {
-            $itemClass = static::$contentItemClass;
-            if( IPS::classUsesTrait( $itemClass, Followable::class ) )
-            {
-                $itemClass::containerUnfollow( $this, $member );
-            }
-        }
-    }
-
 	/* !ACP forms */
 
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
-        /* Now loop through and add all the elements to the form */
-		if( static::$canBeExtended )
-		{
-			foreach( UiExtension::i()->run( $this, 'formElements' ) as $element )
-			{
-				if( is_object( $element ) )
-				{
-					$form->add( $element );
-				}
-				else
-				{
-					$form->addHtml( $element );
-				}
-			}
-		}
-
-		if( IPS::classUsesTrait( $this, CustomBadge::class ) )
-		{
-			$this->addBadgeFieldsToForm( $form, $this->getRecordBadge() );
-		}
-
-		/* If the form initially had one tab, and now it has additional tabs (because of extensions),
-		make sure that the first tab has a key and is not an empty string */
-		$tabs = array_keys( $form->elements );
-		if( count( $tabs ) > 1 and $tabs[0] == '' )
-		{
-			$originalElements = $form->elements;
-			$form->elements = [
-				'__default_tab_settings' => $originalElements['']
-			];
-			foreach( $originalElements as $k => $v )
-			{
-				if( $k != '' )
-				{
-					$form->elements[ $k ] = $v;
-				}
-			}
-		}
 	}
 
 	/**
@@ -3803,7 +3357,7 @@ abstract class Model extends ActiveRecord
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		return $values;
 	}
@@ -3811,25 +3365,11 @@ abstract class Model extends ActiveRecord
 	/**
 	 * [Node] Save Add/Edit Form
 	 *
-	 * @param array $values	Values from the form
-	 * @return    mixed
+	 * @param	array	$values	Values from the form
+	 * @return	void
 	 */
-	public function saveForm( array $values ): mixed
+	public function saveForm( $values )
 	{
-		/* Loop through each extension and update the values */
-		if( static::$canBeExtended )
-		{
-			foreach( UiExtension::i()->getObjectExtensions( $this ) as $extension )
-			{
-				$values = $extension->processForm( $this, $values );
-			}
-		}
-
-		if( IPS::classUsesTrait( $this, CustomBadge::class ) )
-		{
-			$this->saveRecordBadge( $values );
-		}
-
 		foreach ( $values as $k => $v )
 		{
 			if( $k == 'csrfKey' )
@@ -3842,10 +3382,10 @@ abstract class Model extends ActiveRecord
 				$k = mb_substr( $k, mb_strlen( static::$databasePrefix ) );
 			}
 
-			if ( is_array( $v ) )
+			if ( \is_array( $v ) )
 			{
 				/* Handle bitoptions */
-				if( is_array( static::$bitOptions ) AND array_key_exists( $k, static::$bitOptions ) )
+				if( \is_array( static::$bitOptions ) AND array_key_exists( $k, static::$bitOptions ) )
 				{
 					$options = $this->$k;
 					foreach( $v as $_k => $_v )
@@ -3867,8 +3407,6 @@ abstract class Model extends ActiveRecord
 
 		$this->save();
 		$this->postSaveForm( $values );
-
-		return NULL;
 	}
 
 	/**
@@ -3877,19 +3415,16 @@ abstract class Model extends ActiveRecord
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
-        $this->ui( 'formPostSave', array( $values ) );
 	}
 
 	/**
 	 * Can a value be copied to this node?
 	 *
-	 * @param string $key
-	 * @param mixed $value
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canCopyValue( string $key, mixed $value ): bool
+	public function canCopyValue( $key, $value )
 	{
 		if ( $key === static::$databasePrefix . static::$databaseColumnParent and $value )
 		{
@@ -3899,7 +3434,7 @@ abstract class Model extends ActiveRecord
 				{
 					$value = static::load( $value );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					return TRUE;
 				}
@@ -3927,7 +3462,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return bool
 	 */
-	public function showDeleteOrMoveForm(): bool
+	public function showDeleteOrMoveForm()
 	{
 		/* Do we have any children or content? */
 		$hasContent = FALSE;
@@ -3946,10 +3481,10 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Form to delete or move content
 	 *
-	 * @param bool $showMoveToChildren	If TRUE, will show "move to children" even if there are no children
-	 * @return	Form
+	 * @param	bool	$showMoveToChildren	If TRUE, will show "move to children" even if there are no children
+	 * @return	\IPS\Helpers\Form
 	 */
-	public function deleteOrMoveForm( bool $showMoveToChildren=FALSE ): Form
+	public function deleteOrMoveForm( $showMoveToChildren=FALSE )
 	{
 		$hasContent = FALSE;
 		if ( isset( static::$contentItemClass ) )
@@ -3957,13 +3492,13 @@ abstract class Model extends ActiveRecord
 			$hasContent	= (bool) $this->getContentItemCount();
 		}
 
-		$form = new Form( 'delete_node_form', 'delete' );
+		$form = new \IPS\Helpers\Form( 'delete_node_form', 'delete' );
 		$form->addMessage( 'node_delete_blurb' );
-		if ( $showMoveToChildren or $this->hasChildren( NULL ) )
+		if ( $showMoveToChildren or $this->hasChildren( NULL, NULL, TRUE ) )
 		{
-			Member::loggedIn()->language()->words['node_move_children'] = sprintf( Member::loggedIn()->language()->get( 'node_move_children' ), Member::loggedIn()->language()->addToStack( static::$nodeTitle, FALSE, array( 'strtolower' => TRUE) ) );
-			$form->add( new Node( 'node_move_children', 0, TRUE, array(
-				'class'			=> get_class( $this ),
+			\IPS\Member::loggedIn()->language()->words['node_move_children'] = sprintf( \IPS\Member::loggedIn()->language()->get( 'node_move_children', FALSE ), \IPS\Member::loggedIn()->language()->addToStack( static::$nodeTitle, FALSE, array( 'strtolower' => TRUE) ) );
+			$form->add( new \IPS\Helpers\Form\Node( 'node_move_children', 0, TRUE, array( 
+				'class'			=> \get_class( $this ), 
 				'disabled'		=> array( $this->_id ), 
 				'disabledLang'	=> 'node_move_delete', 
 				'zeroVal'		=> 'node_delete_children', 
@@ -3977,7 +3512,7 @@ abstract class Model extends ActiveRecord
 		if ( $hasContent )
 		{
 			$contentItemClass	= static::$contentItemClass;
-			$form->add( new Node( 'node_move_content', 0, TRUE, array( 'class' => get_class( $this ), 'disabled' => array( $this->_id ), 'disabledLang' => 'node_move_delete', 'zeroVal' => 'node_delete_content', 'subnodes' => FALSE, 'clubs' => TRUE, 'permissionCheck' => function( $node )
+			$form->add( new \IPS\Helpers\Form\Node( 'node_move_content', 0, TRUE, array( 'class' => \get_class( $this ), 'disabled' => array( $this->_id ), 'disabledLang' => 'node_move_delete', 'zeroVal' => 'node_delete_content', 'subnodes' => FALSE, 'clubs' => TRUE, 'permissionCheck' => function( $node )
 			{
 				return array_key_exists( 'add', $node->permissionTypes() );
 			} ) ) );
@@ -3989,17 +3524,17 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Recursive Helper Method for queueing a node and all it's sub nodes, sub-sub nodes, sub-sub-sub nodes, etc.
 	 *
-	 * @param Model $node	The initial node
+	 * @param	\IPS\Node\Model		$node	The initial node
 	 * @return	array
 	 */
-	protected static function _nodesToQueue( Model $node ): array
+	protected static function _nodesToQueue( \IPS\Node\Model $node ): array
 	{
 		$return = array( $node );
 		if ( $node->hasChildren( NULL ) )
 		{
 			foreach( $node->children( NULL ) AS $child )
 			{
-				$return = array_merge( $return, static::_nodesToQueue( $child ) );
+				$return = \array_merge( $return, static::_nodesToQueue( $child ) );
 			}
 		}
 		return $return;
@@ -4008,10 +3543,10 @@ abstract class Model extends ActiveRecord
 	/**
 	 * Handle submissions of form to delete or move content
 	 *
-	 * @param array $values			Values from form
+	 * @param	array	$values			Values from form
 	 * @return	void
 	 */
-	public function deleteOrMoveFormSubmit( array $values ) : void
+	public function deleteOrMoveFormSubmit( $values )
 	{
 		if ( isset( $values['node_move_children'] ) AND $values['node_move_children'] )
 		{
@@ -4021,7 +3556,7 @@ abstract class Model extends ActiveRecord
 			foreach ( $this->children( NULL ) as $child )
 			{
 				$parentColumn = ( isset( static::$subnodeClass ) AND $child instanceof static::$subnodeClass ) ? $child::$parentNodeColumnId : $child::$databaseColumnParent;
-				$child->$parentColumn = ( isset( $values['node_destination'] ) ) ? $values['node_destination'] : Request::i()->node_move_children;
+				$child->$parentColumn = ( isset( $values['node_destination'] ) ) ? $values['node_destination'] : \IPS\Request::i()->node_move_children;
 				$child->setLastComment();
 				$child->setLastReview();
 				$child->save();
@@ -4034,36 +3569,36 @@ abstract class Model extends ActiveRecord
 		}
 
 		/* Load existing tasks */
-		$existing = iterator_to_array( Db::i()->select( 'id,data', 'core_queue', array( 'app=? AND `key`=?', 'core', 'DeleteOrMoveContent' ) )->setKeyField('id')->setValueField('data') );
+		$existing = iterator_to_array( \IPS\Db::i()->select( 'id,data', 'core_queue', array( 'app=? AND `key`=?', 'core', 'DeleteOrMoveContent' ) )->setKeyField('id')->setValueField('data') );
 
 		foreach ( $nodesToQueue as $_node )
 		{
-			if ( in_array( 'IPS\Node\Permissions', class_implements( $_node ) ) )
+			if ( \in_array( 'IPS\Node\Permissions', class_implements( $_node ) ) )
 			{
-				Db::i()->update( 'core_permission_index', array( 'perm_view' => '' ), array( "app=? AND perm_type=? AND perm_type_id=?", $_node::$permApp, $_node::$permType, $_node->_id ) );
+				\IPS\Db::i()->update( 'core_permission_index', array( 'perm_view' => '' ), array( "app=? AND perm_type=? AND perm_type_id=?", $_node::$permApp, $_node::$permType, $_node->_id ) );
 			}
 
 			$additional = array();
 
 			if ( isset( $values['node_move_content'] ) and $values['node_move_content'] )
 			{
-				Task::queue( 'core', 'DeleteOrMoveContent', array( 'class' => get_class( $_node ), 'id' => $_node->_id, 'moveToClass' => get_class( $values['node_move_content'] ), 'moveTo' => $values['node_move_content']->_id, 'deleteWhenDone' => TRUE, 'additional' => $additional ) );
+				\IPS\Task::queue( 'core', 'DeleteOrMoveContent', array( 'class' => \get_class( $_node ), 'id' => $_node->_id, 'moveToClass' => \get_class( $values['node_move_content'] ), 'moveTo' => $values['node_move_content']->_id, 'deleteWhenDone' => TRUE, 'additional' => $additional ) );
 			}
 			else
 			{
-				Task::queue( 'core', 'DeleteOrMoveContent', array( 'class' => get_class( $_node ), 'id' => $_node->_id, 'deleteWhenDone' => TRUE, 'additional' => $additional ) );
+				\IPS\Task::queue( 'core', 'DeleteOrMoveContent', array( 'class' => \get_class( $_node ), 'id' => $_node->_id, 'deleteWhenDone' => TRUE, 'additional' => $additional ) );
 			}
 
 			/* Check existing tasks for in-progress moves to one of these nodes */
 			foreach( $existing AS $rowId => $row )
 			{
 				$data = json_decode( $row, TRUE );
-				if ( isset( $data['moveToClass'] ) AND $data['moveToClass'] === get_class( $_node ) AND isset( $data['moveTo'] ) AND $data['moveTo'] == $_node->_id )
+				if ( isset( $data['moveToClass'] ) AND $data['moveToClass'] === \get_class( $_node ) AND isset( $data['moveTo'] ) AND $data['moveTo'] == $_node->_id )
 				{
 					/* Move the content into a different node */
 					if ( isset( $values['node_move_content'] ) and $values['node_move_content'] )
 					{
-						$data['moveToClass'] = get_class( $values['node_move_content'] );
+						$data['moveToClass'] = \get_class( $values['node_move_content'] );
 						$data['moveTo'] = $values['node_move_content']->_id;
 					}
 					/* Delete opted to delete all content, change the task so that it deletes instead */
@@ -4072,7 +3607,7 @@ abstract class Model extends ActiveRecord
 						unset( $data['moveToClass'], $data['moveTo'] );
 					}
 
-					Db::i()->update( 'core_queue', array( 'data' => json_encode( $data ) ), array( 'id=?', $rowId ) );
+					\IPS\Db::i()->update( 'core_queue', array( 'data' => json_encode( $data ) ), array( 'id=?', $rowId ) );
 				}
 			}
 		}
@@ -4082,17 +3617,17 @@ abstract class Model extends ActiveRecord
 	 * @brief	Cache of open DeleteOrMoveContent queue tasks
 	 * @see		deleteOrMoveQueued()
 	 */
-	protected static ?array $deleteOrMoveQueue = NULL;
+	protected static $deleteOrMoveQueue = NULL;
 
 	/**
 	 * Is this node currently queued for deleting or moving content OR is it the target of content queued to be moved from another node?
 	 *
 	 * @return	bool
 	 */
-	public function deleteOrMoveQueued(): bool
+	public function deleteOrMoveQueued()
 	{
 		/* If we already know, don't bother */
-		if ( is_null( $this->queued ) )
+		if ( \is_null( $this->queued ) )
 		{
 			$this->queued = FALSE;
 
@@ -4101,23 +3636,23 @@ abstract class Model extends ActiveRecord
 				return $this->queued;
 			}
 			
-			if ( !is_array( static::$deleteOrMoveQueue ) )
+			if ( !\is_array( static::$deleteOrMoveQueue ) )
 			{
-				static::$deleteOrMoveQueue = iterator_to_array( Db::i()->select( 'data', 'core_queue', array( 'app=? AND `key`=?', 'core', 'DeleteOrMoveContent' ) ) );
+				static::$deleteOrMoveQueue = iterator_to_array( \IPS\Db::i()->select( 'data', 'core_queue', array( 'app=? AND `key`=?', 'core', 'DeleteOrMoveContent' ) ) );
 			}
 
 			foreach( static::$deleteOrMoveQueue AS $row )
 			{
 				$data = json_decode( $row, TRUE );
-				if ( $data['class'] === get_class( $this ) AND $data['id'] == $this->_id )
+				if ( $data['class'] === \get_class( $this ) AND $data['id'] == $this->_id )
 				{
 					$this->queued = TRUE;
 				}
 				elseif ( isset( $data['moveTo'] ) )
 				{
-					$moveToClass = $data['moveToClass'] ?? get_class( $this );
+					$moveToClass = $data['moveToClass'] ?? \get_class( $this );
 
-					if ( $moveToClass === get_class( $this ) AND $data['moveTo'] == $this->_id )
+					if ( $moveToClass === \get_class( $this ) AND $data['moveTo'] == $this->_id )
 					{
 						$this->queued = TRUE;
 					}
@@ -4131,34 +3666,162 @@ abstract class Model extends ActiveRecord
 	/**
 	 * @brief	Flag for currently queued
 	 */
-	protected ?bool $queued = NULL;
+	protected $queued = NULL;
+
+	/* !Ratings */
+
+	/**
+	 * Can Rate?
+	 *
+	 * @param	\IPS\Member|NULL		$member		The member to check for (NULL for currently logged in member)
+	 * @return	bool
+	 * @throws	\BadMethodCallException
+	 */
+	public function canRate( \IPS\Member $member = NULL )
+	{
+		$member = $member ?: \IPS\Member::loggedIn();
+
+		switch ( $member->group['g_topic_rate_setting'] )
+		{
+			case 2:
+				return TRUE;
+			case 1:
+				try
+				{
+					$idColumn = static::$databaseColumnId;
+					\IPS\Db::i()->select( '*', 'core_ratings', array( 'class=? AND item_id=? AND `member`=?', \get_called_class(), $this->$idColumn, $member->member_id ) )->first();
+					return FALSE;
+				}
+				catch ( \UnderflowException $e )
+				{
+					return TRUE;
+				}
+				break;
+			default:
+				return FALSE;
+		}
+	}
+
+	/**
+	 * Get average rating
+	 *
+	 * @return	int
+	 * @throws	\BadMethodCallException
+	 */
+	public function averageRating()
+	{
+		if ( !( $this instanceof \IPS\Node\Ratings ) )
+		{
+			throw new \BadMethodCallException;
+		}
+
+		if ( isset( static::$ratingColumnMap['rating_average'] ) )
+		{
+			$column	= static::$ratingColumnMap['rating_average'];
+			return $this->$column;
+		}
+		elseif ( isset( static::$ratingColumnMap['rating_total'] ) and isset( static::$ratingColumnMap['rating_hits'] ) )
+		{
+			$hits	= static::$ratingColumnMap['rating_hits'];
+			$total	= static::$ratingColumnMap['rating_total'];
+			return $this->$hits ? round( $this->$total / $this->$hits, 1 ) : 0;
+		}
+		else
+		{
+			$idColumn = static::$databaseColumnId;
+			return round( \IPS\Db::i()->select( 'AVG(rating)', 'core_ratings', array( 'class=? AND item_id=?', \get_called_class(), $this->$idColumn ) )->first(), 1 );
+		}
+	}
+
+	/**
+	 * Display rating (will just display stars if member cannot rate)
+	 *
+	 * @return	string
+	 * @throws	\BadMethodCallException
+	 */
+	public function rating()
+	{
+		if ( !( $this instanceof \IPS\Node\Ratings ) )
+		{
+			throw new \BadMethodCallException;
+		}
+
+		if ( $this->canRate() )
+		{
+			$idColumn = static::$databaseColumnId;
+
+			$form = new \IPS\Helpers\Form('rating');
+			$form->add( new \IPS\Helpers\Form\Rating( 'rating', $this->averageRating() ) );
+
+			if ( $values = $form->values() )
+			{
+				\IPS\Db::i()->insert( 'core_ratings', array(
+					'class'			=> \get_called_class(),
+					'item_id'		=> $this->$idColumn,
+					'member'		=> \IPS\Member::loggedIn()->member_id,
+					'rating'		=> $values['rating'],
+					'ip'			=> \IPS\Request::i()->ipAddress(),
+					'rating_date'	=> time()
+				), TRUE );
+
+				if ( isset( static::$ratingColumnMap['rating_average'] ) )
+				{
+					$column = static::$ratingColumnMap['rating_average'];
+					$this->$column = round( \IPS\Db::i()->select( 'AVG(rating)', 'core_ratings', array( 'class=? AND item_id=?', \get_called_class(), $this->$idColumn ) )->first(), 1 );
+				}
+				if ( isset( static::$ratingColumnMap['rating_total'] ) )
+				{
+					$column = static::$ratingColumnMap['rating_total'];
+					$this->$column = \IPS\Db::i()->select( 'SUM(rating)', 'core_ratings', array( 'class=? AND item_id=?', \get_called_class(), $this->$idColumn ) )->first();
+				}
+				if ( isset( static::$ratingColumnMap['rating_hits'] ) )
+				{
+					$column = static::$ratingColumnMap['rating_hits'];
+					$this->$column = \IPS\Db::i()->select( 'COUNT(*)', 'core_ratings', array( 'class=? AND item_id=?', \get_called_class(), $this->$idColumn ) )->first();
+				}
+
+				$this->save();
+
+				if ( \IPS\Request::i()->isAjax() )
+				{
+					\IPS\Output::i()->json( 'OK' );
+				}
+			}
+
+			return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'ratingTemplate' ) );
+		}
+		else
+		{
+			return \IPS\Theme::i()->getTemplate( 'global', 'core' )->rating( 'veryLarge', $this->averageRating() );
+		}
+	}
 
 	/* !Tables */
 
 	/**
 	 * Get template for node tables
 	 *
-	 * @return	callable|array
+	 * @return	callable
 	 */
-	public static function nodeTableTemplate(): callable|array
+	public static function nodeTableTemplate()
 	{
-		return array( Theme::i()->getTemplate( 'tables', 'core' ), 'nodeRows' );
+		return array( \IPS\Theme::i()->getTemplate( 'tables', 'core' ), 'nodeRows' );
 	}
 
 	/**
 	 * Get template for managing this nodes follows
 	 *
-	 * @return	callable|array
+	 * @return	callable
 	 */
-	public static function manageFollowNodeRow(): callable|array
+	public static function manageFollowNodeRow()
 	{
-		return array( Theme::i()->getTemplate( 'tables', 'core' ), 'manageFollowNodeRow' );
+		return array( \IPS\Theme::i()->getTemplate( 'tables', 'core' ), 'manageFollowNodeRow' );
 	}
 
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	int			id				ID number
 	 * @apiresponse	string		name			Name
@@ -4167,22 +3830,22 @@ abstract class Model extends ActiveRecord
 	 * @apiresponse	int|null	parentId		Parent Node ID
 	 * @clientapiresponse	object|null		permissions		Node permissions
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		$return = array(
 			'id'			=> $this->id,
 			'name'			=> $this->_title,
 			'url'			=> (string) $this->url(),
-			'class'			=> get_class( $this ),
+			'class'			=> \get_class( $this ),
 			'parentId'		=> static::$databaseColumnParent ? $this->{static::$databaseColumnParent} : NULL
 		);
 
 		if( $authorizedMember === NULL )
 		{
-			$return['permissions']	= in_array( 'IPS\Node\Permissions', class_implements( get_class( $this ) ) ) ? $this->permissions() : NULL;
+			$return['permissions']	= \in_array( 'IPS\Node\Permissions', class_implements( \get_class( $this ) ) ) ? $this->permissions() : NULL;
 		}
 
-		if ( IPS::classUsesTrait( get_called_class(), 'IPS\Content\ClubContainer' ) )
+		if ( \IPS\IPS::classUsesTrait( \get_called_class(), 'IPS\Content\ClubContainer' ) )
 		{
 			if( $this->club() )
 			{
@@ -4203,7 +3866,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function webhookFilters(): array
+	public function webhookFilters()
 	{
 		return array();
 	}
@@ -4213,7 +3876,7 @@ abstract class Model extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	public static function fullyQualifiedType(): string
+	public static function fullyQualifiedType()
 	{
 		return static::$nodeTitle . '_sg';
 	}
@@ -4221,14 +3884,14 @@ abstract class Model extends ActiveRecord
 	/**
 	 * @brief   Field cache for getDataLayerProperties
 	 */
-	protected array $_dataLayerProperties = array();
+	protected $_dataLayerProperties = array();
 
 	/**
 	 * Get the properties that can be added to the datalayer for this key
 	 *
 	 * @return  array
 	 */
-	public function getDataLayerProperties(): array
+	public function getDataLayerProperties()
 	{
 		if ( empty( $this->_dataLayerProperties ) )
 		{
@@ -4236,7 +3899,7 @@ abstract class Model extends ActiveRecord
 			{
 				$url = (string) $this->url();
 			}
-			catch ( BadMethodCallException $e )
+			catch ( \BadMethodCallException $e )
 			{
 				$url = null;
 			}
@@ -4253,7 +3916,7 @@ abstract class Model extends ActiveRecord
 			}
 			else
 			{
-				$class = get_called_class();
+				$class = \get_called_class();
 				$matches = array();
 				preg_match( '/IPS\\\\([a-z]+)\\\\/', $class, $matches );
 				$app = $matches[1] ?? null;
@@ -4262,7 +3925,7 @@ abstract class Model extends ActiveRecord
 			/* If we got a valid app (directory) name, try its language key */
 			if ( $app )
 			{
-				$area = Lang::load( Lang::defaultLanguage() )->addToStack( "__app_$app" );
+				$area = \IPS\Lang::load( \IPS\Lang::defaultLanguage() )->addToStack( "__app_$app" );
 			}
 
 			/* Get the path */
@@ -4292,118 +3955,11 @@ abstract class Model extends ActiveRecord
 	 * Allow node classes that can determine if content should be held for approval in individual nodes
 	 *
 	 * @param	string				$content	The type of content we are checking (item, comment, review).
-	 * @param	Member|NULL	$member		Member to check or NULL for currently logged in member.
+	 * @param	\IPS\Member|NULL	$member		Member to check or NULL for currently logged in member.
 	 * @return	bool
 	 */
-	public function contentHeldForApprovalByNode( string $content, ?Member $member = NULL ): bool
+	public function contentHeldForApprovalByNode( string $content, ?\IPS\Member $member = NULL ): bool
 	{
-		/* If members group bypasses, then no. */
-		$member = $member ?: Member::loggedIn();
-		if ( $member->group['g_avoid_q'] )
-		{
-			return FALSE;
-		}
-
-		return match ( $content )
-		{
-			'item' => $this->checkAction( 'moderate_items' ),
-			'comment' => $this->checkAction( 'moderate_comments' ),
-			'review' => $this->checkAction( 'moderate_reviews' ),
-			default => false,
-		};
-
-	}
-
-    /**
-     * Run a UI extension method
-     * This is identical to UiExtension::run, but used to simplify templates
-     *
-     * @param string $method
-     * @param array|null $payload
-     * @param bool  $returnAsArray
-     * @param string $separator
-     * @return array|string
-     */
-    public function ui( string $method, ?array $payload=array(), bool $returnAsArray=false, string $separator = " " ) : array|string
-    {
-        $response = UiExtension::i()->run( $this, $method, $payload );
-        if( !$returnAsArray )
-        {
-            return implode( $separator, $response );
-        }
-        return $response;
-    }
-
-	/**
-	 * Normalise IDs from stored data, which may be a string, array, numeric or even a node group
-	 *
-	 * @param mixed $ids
-	 * @return array
-	 */
-	public static function normalizeIds( mixed $ids ): array
-	{
-		/* Is this a comma-separated list? */
-		if( is_string( $ids ) and mb_strpos( $ids, ',' ) !== false )
-		{
-			$ids = array_filter( explode( ',', $ids ) );
-		}
-
-		if( is_array( $ids ) )
-		{
-			foreach( $ids as $id )
-			{
-				if ( ! is_numeric( $id ) and mb_substr( $id, 0, 1 ) === 'g' )
-				{
-					/* Is this a node group? */
-					if( IPS::classUsesTrait( static::class, Grouping::class ) )
-					{
-						$groupId = mb_substr( $id, 1, 1 );
-						$group = static::availableNodeGroups();
-
-						if( isset( $group[ $groupId ] ) )
-						{
-							/* Yeah, so grab the real IDs */
-							$ids = array_merge( $ids, $group[ $groupId ]->nodes );
-						}
-					}
-				}
-			}
-
-			return $ids;
-		}
-		else if( is_numeric( $ids ) )
-		{
-			return array( $ids );
-		}
-		else if( is_string( $ids ) )
-		{
-			if ( mb_substr( $ids, 0, 1 ) == 'g' )
-			{
-				/* Is this a node group? */
-				if( IPS::classUsesTrait( static::class, Grouping::class ) )
-				{
-					$groupId = mb_substr( $ids, 1, 1 );
-					$group = static::availableNodeGroups();
-
-					if( isset( $group[ $groupId ] ) )
-					{
-						/* Yeah, so grab the real IDs */
-						return $group[ $groupId ]->nodes;
-					}
-					else
-					{
-						return array();
-					}
-				}
-				else
-				{
-					return array();
-				}
-			}
-
-			return explode( ',', $ids );
-		}
-
-		return array();
+		return FALSE;
 	}
 }

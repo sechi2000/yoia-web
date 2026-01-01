@@ -11,44 +11,39 @@
 namespace IPS\Db;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use RuntimeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Exception class for database errors
  */
-class Exception extends RuntimeException
+class _Exception extends \RuntimeException
 {
 	/**
 	 * @brief	Query
 	 */
-	public ?string $query = NULL;
+	public $query;
 	
 	/**
 	 * @brief	Binds
 	 */
-	public array $binds = array();
-
+	public $binds = array();
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string|null $message MySQL Error message
-	 * @param int $code MySQL Error Code
-	 * @param mixed $previous Previous Exception
-	 * @param mixed|null $query MySQL Query that caused exception
-	 * @param array $binds Binds for query
-	 * @see        <a href='https://bugs.php.net/bug.php?id=30471'>Recursion "bug" with var_export()</a>
+	 * @param	string			$message	MySQL Error message
+	 * @param	int				$code		MySQL Error Code
+	 * @param	\Exception|NULL	$previous	Previous Exception
+	 * @param	string|NULL		$query		MySQL Query that caused exception
+	 * @param	array			$binds		Binds for query
+	 * @return	void
+	 * @see		<a href='https://bugs.php.net/bug.php?id=30471'>Recursion "bug" with var_export()</a>
 	 */
-	public function __construct( string $message=NULL, int $code = 0, mixed $previous=NULL, mixed $query=NULL, array $binds=array() )
+	public function __construct( $message = null, $code = 0, $previous = null, $query=NULL, $binds=array() )
 	{
 		/* Store these for the extraLogData() method */
 		$this->query = $query;
@@ -62,10 +57,10 @@ class Exception extends RuntimeException
 	 *
 	 * @return	bool
 	 */
-	public function isServerError(): bool
+	public function isServerError()
 	{
 		/* Low-end server errors */
-		if ( $this->getCode() < 1046 or in_array( $this->getCode(), array( 1129, 1130, 1194, 1195, 1203 ) ) )
+		if ( $this->getCode() < 1046 or \in_array( $this->getCode(), array( 1129, 1130, 1194, 1195, 1203 ) ) )
 		{
 			return TRUE;
 		}
@@ -88,10 +83,10 @@ class Exception extends RuntimeException
 	/**
 	 * Additional log data?
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function extraLogData(): ?string
+	public function extraLogData()
 	{
-		return Db::_replaceBinds( $this->query, $this->binds );
+		return \IPS\Db::_replaceBinds( $this->query, $this->binds );
 	}
 }

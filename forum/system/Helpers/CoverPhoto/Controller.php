@@ -11,77 +11,52 @@
 namespace IPS\Helpers\CoverPhoto;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Content;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller as DispatcherController;
-use IPS\Helpers\CoverPhoto;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Output\UI\UiExtension;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Cover Photo Controller
  */
-abstract class Controller extends DispatcherController
+abstract class _Controller extends \IPS\Dispatcher\Controller
 {		
 	/**
 	 * Upload Cover Photo
 	 *
 	 * @return	void
 	 */
-	protected function coverPhotoUpload() : void
+	protected function coverPhotoUpload()
 	{	
 		$photo = $this->_coverPhotoGet();
 		if ( !$photo->editable )
 		{
-			Output::i()->error( 'no_module_permission', '2S216/1', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2S216/1', 403, '' );
 		}
 
-		$form = new Form( 'coverPhoto' );
-		$form->class = 'ipsForm--vertical ipsForm--cover-photo ipsForm--noLabels';
-		$form->add( new Upload( 'cover_photo', NULL, TRUE, array( 'image' => [ 'maxWidth' => NULL, 'maxHeight' => NULL ], 'allowStockPhotos' => TRUE, 'minimize' => FALSE, 'maxFileSize' => ( $photo->maxSize and $photo->maxSize != -1 ) ? $photo->maxSize / 1024 : NULL, 'storageExtension' => $this->_coverPhotoStorageExtension() ) ) );
+		$form = new \IPS\Helpers\Form( 'coverPhoto' );
+		$form->class = 'ipsForm_vertical ipsForm_noLabels';
+		$form->add( new \IPS\Helpers\Form\Upload( 'cover_photo', NULL, TRUE, array( 'image' => [ 'maxWidth' => NULL, 'maxHeight' => NULL ], 'allowStockPhotos' => TRUE, 'minimize' => FALSE, 'maxFileSize' => ( $photo->maxSize and $photo->maxSize != -1 ) ? $photo->maxSize / 1024 : NULL, 'storageExtension' => $this->_coverPhotoStorageExtension() ) ) );
 		if ( $values = $form->values() )
 		{
 			try
 			{
 				$photo->delete();
 			}
-			catch ( Exception $e ) { }
-
-			$coverPhoto = new CoverPhoto( $values['cover_photo'], 0 );
-			$this->_coverPhotoSet( $coverPhoto, 'new' );
-
-			/* Call any UI Extensions that might be linked to this object */
-			if( $photo->object instanceof Content or $photo->object instanceof Model )
-			{
-				UiExtension::i()->run( $photo->object, 'formPostSave', [ [ 'cover_photo' => $coverPhoto ] ] );
-			}
-
-			Output::i()->redirect( $this->_coverPhotoReturnUrl()->setQueryString( array( '_position' => 1 ) ) );
+			catch ( \Exception $e ) { }
+			
+			$this->_coverPhotoSet( new \IPS\Helpers\CoverPhoto( $values['cover_photo'], 0 ), 'new' );
+			\IPS\Output::i()->redirect( $this->_coverPhotoReturnUrl()->setQueryString( array( '_position' => 1 ) ) );
 		}
 		
-		if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'admin' )
+		if ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation == 'admin' )
 		{
-			Output::i()->output = $form;
+			\IPS\Output::i()->output = $form;
 		}
 		else
 		{
-			Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+			\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 		}
 	}
 	
@@ -90,36 +65,29 @@ abstract class Controller extends DispatcherController
 	 *
 	 * @return	void
 	 */
-	protected function coverPhotoRemove() : void
+	protected function coverPhotoRemove()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		$photo = $this->_coverPhotoGet();
 		if ( !$photo->editable )
 		{
-			Output::i()->error( 'no_module_permission', '2S216/2', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2S216/2', 403, '' );
 		}
 		
 		try
 		{
 			$photo->delete();
 		}
-		catch ( Exception $e ) { }
+		catch ( \Exception $e ) { }
 		
-		$this->_coverPhotoSet( new CoverPhoto( NULL, 0 ), 'remove' );
-
-		/* Call any UI Extensions that might be linked to this object */
-		if( $photo->object instanceof Content or $photo->object instanceof Model )
+		$this->_coverPhotoSet( new \IPS\Helpers\CoverPhoto( NULL, 0 ), 'remove' );
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			UiExtension::i()->run( $photo->object, 'formPostSave', [ [ 'cover_photo' => null, 'cover_photo_offset' => 0 ] ] );
-		}
-
-		if ( Request::i()->isAjax() )
-		{
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 		else
 		{
-			Output::i()->redirect( $this->_coverPhotoReturnUrl() );
+			\IPS\Output::i()->redirect( $this->_coverPhotoReturnUrl() );
 		}
 	}
 	
@@ -128,31 +96,25 @@ abstract class Controller extends DispatcherController
 	 *
 	 * @return	void
 	 */
-	protected function coverPhotoPosition() : void
+	protected function coverPhotoPosition()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		$photo = $this->_coverPhotoGet();
 		if ( !$photo->editable )
 		{
-			Output::i()->error( 'no_module_permission', '2S216/3', 403, '' );
+			\IPS\Output::i()->error( 'no_module_permission', '2S216/3', 403, '' );
 		}
 		
-		$photo->offset = Request::i()->offset;
+		$photo->offset = \IPS\Request::i()->offset;
 		$this->_coverPhotoSet( $photo, 'reposition' );
-
-		/* Call any UI Extensions that might be linked to this object */
-		if( $photo->object instanceof Content or $photo->object instanceof Model )
-		{
-			UiExtension::i()->run( $photo->object, 'formPostSave', [ [ 'cover_photo_offset' => $photo->offset ] ] );
-		}
 		
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( 'OK' );
+			\IPS\Output::i()->json( 'OK' );
 		}
 		else
 		{
-			Output::i()->redirect( $this->_coverPhotoReturnUrl() );
+			\IPS\Output::i()->redirect( $this->_coverPhotoReturnUrl() );
 		}
 	}
 	
@@ -161,30 +123,30 @@ abstract class Controller extends DispatcherController
 	 *
 	 * @return	string
 	 */
-	abstract protected function _coverPhotoStorageExtension(): string;
+	abstract protected function _coverPhotoStorageExtension();
 	
 	/**
 	 * Set Cover Photo
 	 *
-	 * @param	CoverPhoto	$photo	New Photo
+	 * @param	\IPS\Helpers\CoverPhoto	$photo	New Photo
 	 * @return	void
 	 */
-	abstract protected function _coverPhotoSet( CoverPhoto $photo ) : void;
+	abstract protected function _coverPhotoSet( \IPS\Helpers\CoverPhoto $photo );
 	
 	/**
 	 * Get Cover Photo
 	 *
-	 * @return	CoverPhoto
+	 * @return	\IPS\Helpers\CoverPhoto
 	 */
-	abstract protected function _coverPhotoGet(): CoverPhoto;
+	abstract protected function _coverPhotoGet();
 	
 	/**
 	 * Get URL to return to after editing cover photo
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	protected function _coverPhotoReturnUrl(): Url
+	protected function _coverPhotoReturnUrl()
 	{
-		return Request::i()->referrer() ?: Request::i()->url()->stripQueryString( array( 'do', 'csrfKey' ) );
+		return \IPS\Request::i()->referrer() ?: \IPS\Request::i()->url()->stripQueryString( array( 'do', 'csrfKey' ) );
 	}
 }

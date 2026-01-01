@@ -1,10 +1,14 @@
 {
     "core": {
-        "Club": {
-            "Blog": "IPS\\blog\\extensions\\core\\Club\\Blog"
+        "BBCode": {
+            "blog": "IPS\\blog\\extensions\\core\\BBCode\\blog",
+            "entry": "IPS\\blog\\extensions\\core\\BBCode\\entry"
         },
         "ContentRouter": {
             "Blog": "IPS\\blog\\extensions\\core\\ContentRouter\\Blog"
+        },
+        "CreateMenu": {
+            "Entry": "IPS\\blog\\extensions\\core\\CreateMenu\\Entry"
         },
         "Dashboard": {
             "Overview": "IPS\\blog\\extensions\\core\\Dashboard\\Overview"
@@ -30,6 +34,9 @@
         "MemberFilter": {
             "Blog": "IPS\\blog\\extensions\\core\\MemberFilter\\Blog"
         },
+        "MemberSync": {
+            "Blog": "IPS\\blog\\extensions\\core\\MemberSync\\Blog"
+        },
         "ModeratorPermissions": {
             "Blogs": "IPS\\blog\\extensions\\core\\ModeratorPermissions\\Blogs"
         },
@@ -39,11 +46,11 @@
         "Profile": {
             "blog": "IPS\\blog\\extensions\\core\\Profile\\blog"
         },
+        "Queue": {
+            "RebuildEntryImages": "IPS\\blog\\extensions\\core\\Queue\\RebuildEntryImages"
+        },
         "RssImport": {
             "RssImport": "IPS\\blog\\extensions\\core\\RssImport\\RssImport"
-        },
-        "SearchContent": {
-            "Entries": "IPS\\blog\\extensions\\core\\SearchContent\\Entries"
         }
     }
 }

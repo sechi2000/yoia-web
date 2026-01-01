@@ -11,86 +11,53 @@
 namespace IPS;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Data\Store;
-use IPS\File\FileSystem;
-use IPS\Http\Url;
-use IPS\Output\Plugin\Filesize;
-use IPS\Platform\Bridge;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use function count;
-use function defined;
-use function file_get_contents;
-use function function_exists;
-use function get_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function strlen;
-use function strpos;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Class
  */
-abstract class File
-{
-	/**
-	 * Alternative information about the file which will be shown before the filename.
-	 * 
-	 * @var string|null
-	 */
-	public ?string $contextInfo;
-
-	/**
-	 * @var mixed|null
-	 */
-	public mixed $screenshot = null;
-	
+abstract class _File
+{	
 	/**
 	 * Get available storage handlers
 	 *
 	 * @param	array|NULL	$current	The file storage configuration being edited
 	 * @return	array
 	 */
-	public static function storageHandlers( ?array $current ) : array
+	public static function storageHandlers( $current )
 	{
 		$return = array();
 		
-		if ( !CIC OR ( $current and $current['method'] === 'FileSystem' ) )
+		if ( !\IPS\CIC OR ( $current and $current['method'] === 'FileSystem' ) )
 		{
 			$return['FileSystem'] = 'IPS\\File\\FileSystem';
 		}
 		 
-		if ( !CIC OR ( $current and $current['method'] === 'Database' ) )
+		if ( !\IPS\CIC OR ( $current and $current['method'] === 'Database' ) )
 		{
 			$return['Database'] = 'IPS\\File\\Database';
 		}
-
+		
 		$return['Amazon'] = 'IPS\\File\\Amazon';
+
 		if ( $current and $current['method'] === 'Backblaze' )
 		{
 			$return['Backblaze'] = 'IPS\\File\\Backblaze';
 		}
-
+		
+		if ( \IPS\CIC AND file_exists( \IPS\ROOT_PATH . '/applications/cloud/sources/Media/Handler.php' ) )
+		{
+			$return['Cloud'] = 'IPS\\cloud\\Media\\Handler';
+		}
 		
 		if ( $current and $current['method'] === 'Ftp' )
 		{
 			$return['Ftp'] = 'IPS\\File\\Ftp';
 		}
-		
-		$return = Bridge::i()->fileHandlers( $return );
 		
 		return $return;
 	}
@@ -98,37 +65,37 @@ abstract class File
 	/**
 	 * @brief	File extensions considered safe. Not an exhaustive list but these are the files we're most interested in being recognised.
 	 */
-	public static array $safeFileExtensions = array( 'js', 'css', 'txt', 'ico', 'gif', 'jpg', 'jpe', 'jpeg', 'png', 'mp4', '3gp', 'mov', 'ogg', 'ogv', 'mp3', 'mpg', 'mpeg', 'ico', 'flv', 'webm', 'wmv', 'avi', 'm4v', 'webp', 'm4a', 'wav', 'avif' );
+	public static $safeFileExtensions = array( 'js', 'css', 'txt', 'ico', 'gif', 'jpg', 'jpe', 'jpeg', 'png', 'mp4', '3gp', 'mov', 'ogg', 'ogv', 'mp3', 'mpg', 'mpeg', 'ico', 'flv', 'webm', 'wmv', 'avi', 'm4v', 'webp', 'm4a', 'wav' );
 	
 	/**
 	 * @brief	File extensions for HTML5 compatible videos
 	 */
-	public static array $videoExtensions = array( 'mp4', '3gp', 'mov', 'ogg', 'ogv', 'mpg', 'mpeg', 'flv', 'webm', 'wmv', 'avi', 'm4v' );
+	public static $videoExtensions = array( 'mp4', '3gp', 'mov', 'ogg', 'ogv', 'mpg', 'mpeg', 'flv', 'webm', 'wmv', 'avi', 'm4v' );
 		
 	/**
 	 * @brief	File extensions for HTML5 compatible audio
 	 */
-	public static array $audioExtensions = array( 'mp3', 'ogg', 'wav', 'm4a' );
+	public static $audioExtensions = array( 'mp3', 'ogg', 'wav', 'm4a' );
 
 	/**
 	 * @brief	Does this storage method support chunked uploads?
 	 */
-	public static bool $supportsChunking = FALSE;
+	public static $supportsChunking = FALSE;
 	
 	/**
 	 * @brief	Storage Configurations
 	 */
-	protected static ?array $storageConfigurations = NULL;
+	protected static $storageConfigurations = NULL;
 	
 	/**
 	 * @brief	Thumbnail dimensions
 	 */
-	protected static array $thumbnailDimensions = array();
+	protected static $thumbnailDimensions = array();
 
 	/**
 	 * @brief Cached filesize
 	 */
-	protected ?int $_cachedFilesize	= NULL;
+	protected $_cachedFilesize	= NULL;
 
 	/**
 	 * @brief	Ignore errors from uploaded files?
@@ -145,31 +112,31 @@ abstract class File
 	 *
 	 * @param	string|int		$storageExtension	Storage extension or configuration ID
 	 * @param   bool			$tryOldFirst		Whether to try the old file storage config first or not
-	 * @throws 	RuntimeException
+	 * @throws 	\RuntimeException
 	 * @return	static
 	 */
-	public static function getClass( string|int $storageExtension, bool $tryOldFirst=FALSE ) : static
+	public static function getClass( $storageExtension, $tryOldFirst=FALSE )
 	{
 		static::getStore();
 		
 		$configurationId = NULL;
-		if ( is_numeric( $storageExtension ) )
+		if ( \is_int( $storageExtension ) ) 
 		{
 			$configurationId = $storageExtension;
 		}
 		else
 		{
-			$settings = json_decode( Settings::i()->upload_settings, TRUE );
+			$settings = json_decode( \IPS\Settings::i()->upload_settings, TRUE );
 
 			/* If we are IN_DEV, make sure this is a valid file storage extension */
-			if ( IN_DEV and !isset( $settings[ "filestorage__{$storageExtension}" ] ) )
+			if ( \IPS\IN_DEV and !isset( $settings[ "filestorage__{$storageExtension}" ] ) )
 			{
 				/* Quick sanity check in case this is a new extension that hasn't been set yet. */
 				$isValid = FALSE;
 
-				foreach( Application::allExtensions( 'core', 'FileStorage', FALSE ) as $extension )
+				foreach( \IPS\Application::allExtensions( 'core', 'FileStorage', FALSE ) as $extension )
 				{
-					$extensionNamespace = explode( '\\', get_class( $extension ) );
+					$extensionNamespace = explode( '\\', \get_class( $extension ) );
 					$extensionName		= array_pop( $extensionNamespace );
 
 					if( $storageExtension == $extensionNamespace[1] . '_' . $extensionName )
@@ -181,7 +148,7 @@ abstract class File
 
 				if( !$isValid )
 				{
-					throw new RuntimeException( 'NO_STORAGE_EXTENSION' );
+					throw new \RuntimeException( 'NO_STORAGE_EXTENSION' );			
 				}
 			}
 			
@@ -214,10 +181,10 @@ abstract class File
 
 						/* Now store this for future reference */
 						$settings["filestorage__{$storageExtension}"] = $configurationId;
-						Settings::i()->changeValues( array( 'upload_settings' => json_encode( $settings ) ) );
+						\IPS\Settings::i()->changeValues( array( 'upload_settings' => json_encode( $settings ) ) );
 						break;
 					}
-					catch( LogicException $e )
+					catch( \LogicException $e )
 					{
 						/* Move on to the next file storage configuration */
 						continue;
@@ -227,7 +194,7 @@ abstract class File
 			else
 			{
 				/* We have an array of IDs when a move is in progress, the first ID is the new storage method, the second ID is the old */
-				if ( is_array( $settings[ "filestorage__{$storageExtension}" ] ) )
+				if ( \is_array( $settings[ "filestorage__{$storageExtension}" ] ) )
 				{
 					/* Do we want to use the old storage config if available? */
 					if ( $tryOldFirst === TRUE )
@@ -266,7 +233,7 @@ abstract class File
 		
 		if ( ! isset( static::$storageConfigurations[ $configurationId ] ) )
 		{
-			throw new RuntimeException;
+			throw new \RuntimeException;
 		}		
 		
 		$handlers	= static::storageHandlers( static::$storageConfigurations[ $configurationId ] );
@@ -281,18 +248,18 @@ abstract class File
 	 *
 	 * @return	array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
 		if ( static::$storageConfigurations === NULL )
 		{
-			if ( isset( Store::i()->storageConfigurations ) )
+			if ( isset( \IPS\Data\Store::i()->storageConfigurations ) )
 			{
-				static::$storageConfigurations = Store::i()->storageConfigurations;
+				static::$storageConfigurations = \IPS\Data\Store::i()->storageConfigurations;
 			}
 			else
 			{
-				Store::i()->storageConfigurations = iterator_to_array( Db::i()->select( '*', 'core_file_storage' )->setKeyField('id') );
-				static::$storageConfigurations = Store::i()->storageConfigurations;
+				\IPS\Data\Store::i()->storageConfigurations = iterator_to_array( \IPS\Db::i()->select( '*', 'core_file_storage' )->setKeyField('id') );
+				static::$storageConfigurations = \IPS\Data\Store::i()->storageConfigurations;
 			}
 		}
 
@@ -302,12 +269,12 @@ abstract class File
 	/**
 	 * @brief	Copy files instead of moving them
 	 */
-	public static bool $copyFiles = FALSE;
+	public static $copyFiles = FALSE;
 
 	/**
 	 * @brief	Temporarily stored EXIF data for an image
 	 */
-	public ?array $exifData	= NULL;
+	public $exifData	= NULL;
 
 	/**
 	 * Create File
@@ -319,16 +286,16 @@ abstract class File
 	 * @param	boolean		$isSafe				This file is safe and doesn't require security checking
 	 * @param	string|null	$filePath			Path to existing file on disk - Filesystem can move file without loading all of the contents into memory if this method is used
 	 * @param	bool		$obscure			Controls if an md5 hash should be added to the filename
-	 * @return    File
-	 * @throws	DomainException
-	 * @throws	RuntimeException
+	 * @return	\IPS\File
+	 * @throws	\DomainException
+	 * @throws	\RuntimeException
 	 */
-	public static function create( string $storageExtension, string $filename, ?string $data=NULL, ?string $container=NULL, bool $isSafe=FALSE, ?string $filePath=NULL, bool $obscure=TRUE ) : File
+	public static function create( $storageExtension, $filename, $data=NULL, $container=NULL, $isSafe=FALSE, $filePath=NULL, $obscure=TRUE )
 	{
 		/* Check we have a file */
 		if( $data === NULL AND $filePath === NULL )
 		{
-			throw new DomainException( "NO_FILE_UPLOADED", 1 );
+			throw new \DomainException( "NO_FILE_UPLOADED", 1 );
 		}
 
 		/* Init */
@@ -342,12 +309,12 @@ abstract class File
 						
 		/* Image-specific stuff */
 		$ext = mb_substr( $filename, ( mb_strrpos( $filename, '.' ) + 1 ) );
-		if( in_array( mb_strtolower( $ext ), Image::supportedExtensions() ) and ( !$isSafe or Image::exifSupported() ) )
+		if( \in_array( mb_strtolower( $ext ), \IPS\Image::supportedExtensions() ) and ( !$isSafe or \IPS\Image::exifSupported() ) )
 		{
 			/* Get contents */
 			if( $data === NULL AND $filePath !== NULL )
 			{
-				$data = file_get_contents( $filePath );
+				$data = \file_get_contents( $filePath );
 				$filePath = NULL;
 			}
 			
@@ -356,27 +323,27 @@ abstract class File
 			if( !$isSafe and static::checkXssInFile( $data ) )
 			{
 				/* Try to just strip the EXIF */
-				$image = Image::create( $data );
+				$image = \IPS\Image::create( $data );
 				$image->resize( $image->width, $image->height );
 				$data = (string) $image;
 				
 				/* And if it still fails, throw an error */
 				if ( static::checkXssInFile( $data ) )
 				{
-					throw new DomainException( "SECURITY_EXCEPTION_RAISED", 99 );
+					throw new \DomainException( "SECURITY_EXCEPTION_RAISED", 99 );
 				}
 			}
 			
 			/* Correct orientation */
-			if ( Image::exifSupported() )
+			if ( \IPS\Image::exifSupported() )
 			{
-				$image = $image ?: Image::create( $data );
+				$image = $image ?: \IPS\Image::create( $data );
 
 				$class->exifData = $image->parseExif();
 				
 				if ( $image->hasBeenRotated )
 				{
-					$data = (string) Image::create( $data );
+					$data = (string) \IPS\Image::create( $data );
 				}
 			}
 		}
@@ -408,14 +375,14 @@ abstract class File
 	 * @param	int|NULL	$maxFileSize		The maximum file size in MB, or NULL to allow any size
 	 * @param	int|NULL	$totalMaxSize		The maximum total size of all files in MB, or NULL for no limit
 	 * @param	int			$flags				`\IPS\File::IGNORE_UPLOAD_ERRORS` to skip over invalid files rather than throw exception
-	 * @param	array|callable|NULL	$callback			Callback function to run against the file contents before creating the file (useful for resizing images, for instance)
+	 * @param	array|NULL	$callback			Callback function to run against the file contents before creating the file (useful for resizing images, for instance)
 	 * @param	string|null	$container			Key to identify container for storage
 	 * @param	bool		$obscure			Controls if an md5 hash should be added to the filename
 	 * @return	array		Array of \IPS\File objects
-	 * @throws	DomainException
-	 * @throws	RuntimeException
+	 * @throws	\DomainException
+	 * @throws	\RuntimeException
 	 */
-	public static function createFromUploads( string $storageLocation, ?string $fieldName=NULL, ?array $allowedFileTypes=NULL, int|float $maxFileSize=NULL, int|float $totalMaxSize=NULL, int $flags=0, array|callable|null $callback=NULL, ?string $container=NULL, bool $obscure=TRUE ) : array
+	public static function createFromUploads( $storageLocation, $fieldName=NULL, $allowedFileTypes=NULL, $maxFileSize=NULL, $totalMaxSize=NULL, $flags=0, $callback=NULL, $container=NULL, $obscure=TRUE )
 	{				
 		/* Do we have any uploads? */
 		if( empty( $_FILES ) )
@@ -434,7 +401,7 @@ abstract class File
 		/* Normalize the files array */
 		$files			= static::normalizeFilesArray( $fieldName );
 		$fileObjects	= array();
-
+		
 		/* Now loop over each file */
 		$currentTotal = 0;
 		foreach( $files as $i => $file )
@@ -449,7 +416,7 @@ abstract class File
 					$currentTotal += $file['size'];
 					if ( $currentTotal > ( $totalMaxSize * 1048576 ) )
 					{
-						throw new DomainException( Member::loggedIn()->language()->addToStack('uploaderr_total_size', FALSE, array( 'sprintf' => array( Filesize::humanReadableFilesize( $totalMaxSize * 1048576 ) ) ) ) );
+						throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack('uploaderr_total_size', FALSE, array( 'sprintf' => array( \IPS\Output\Plugin\Filesize::humanReadableFilesize( $totalMaxSize * 1048576 ) ) ) ) );
 					}
 				}
 				
@@ -472,7 +439,7 @@ abstract class File
 				/* Check that the filename doesn't have an invalid bytecode sequence */
 				if( !preg_match( '//u', $file['name'] ) )
 				{
-					throw new DomainException( 'upload_error', 4 );
+					throw new \DomainException( 'upload_error', 4 );
 				}
 
 				if( $callback !== NULL )
@@ -492,7 +459,7 @@ abstract class File
 					@unlink( $file['tmp_name'] );
 				}
 			}
-			catch( DomainException $e )
+			catch( \DomainException $e )
 			{				
 				if( is_file( $file['tmp_name'] ) and file_exists( $file['tmp_name'] ) )
 				{
@@ -500,7 +467,7 @@ abstract class File
 				}
 
 				/* Are we ignoring upload errors? */
-				if( $flags === File::IGNORE_UPLOAD_ERRORS )
+				if( $flags === \IPS\File::IGNORE_UPLOAD_ERRORS )
 				{
 					continue;
 				}
@@ -520,7 +487,7 @@ abstract class File
 	 * @param	string|NULL	$fieldName			Restrict collection of uploads to this upload field name, or pass NULL to collect any and all uploads
 	 * @return	array
 	 */
-	public static function normalizeFilesArray( ?string $fieldName=NULL ) : array
+	public static function normalizeFilesArray( $fieldName=NULL )
 	{
 		$files			= array();
 
@@ -532,14 +499,14 @@ abstract class File
 			}
 
 			/* Do we have $_FILES['field'] = array( 'name' => ..., 'size' => ... ) */
-			if( isset( $file['name'] ) AND !is_array( $file['name'] ) )
+			if( isset( $file['name'] ) AND !\is_array( $file['name'] ) )
 			{
 				$files[]	= $file;
 			}
 			/* Or do we have $_FILES['field'] = array( 'name' => array( 0 => ..., 1 => ... ), 'size' => array( 0 => ..., 1 => ... ) ) */
 			else
 			{
-				if( is_array( $file['name'] ) )
+				if( \is_array( $file['name'] ) )
 				{
 					foreach( $file as $fieldName => $fields )
 					{
@@ -558,13 +525,14 @@ abstract class File
 	/**
 	 * Validate the uploaded file is valid
 	 *
-	 * @param array $file The uploaded file data
-	 * @param array|NULL $allowedFileTypes Array of allowed file extensions, or NULL to allow any extensions
-	 * @param int|float|null $maxFileSize The maximum file size in MB, or NULL to allow any size
-	 * @return    void
-	 * @note    plupload inherently supports certain errors, so when appropriate we return the error code plupload expects
+	 * @param	array 		$file	The uploaded file data
+	 * @param	array|NULL	$allowedFileTypes	Array of allowed file extensions, or NULL to allow any extensions
+	 * @param	int|NULL	$maxFileSize		The maximum file size in MB, or NULL to allow any size
+	 * @return	void
+	 * @throws	\DomainException
+	 * @note	plupload inherently supports certain errors, so when appropriate we return the error code plupload expects
 	 */
-	public static function validateUpload( array $file, ?array $allowedFileTypes, int|float|null $maxFileSize=null ) : void
+	public static function validateUpload( $file, $allowedFileTypes, $maxFileSize )
 	{
 		/* Was an error registered by PHP already? */
 		if( $file['error'] )
@@ -593,19 +561,19 @@ abstract class File
 				break;
 			}
 
-			throw new DomainException( $errorCode, $extraInfo );
+			throw new \DomainException( $errorCode, $extraInfo );
 		}
 		
 		/* Do we have a path? */
 		if ( empty( $file['tmp_name'] ) AND !isset( $file['_skipUploadCheck'] ) )
 		{
-			throw new DomainException( 'upload_error', 1 );
+			throw new \DomainException( 'upload_error', 1 );
 		}
 
 		/* Is this actually an uploaded file? */
 		if( !is_uploaded_file( $file['tmp_name'] ) AND !isset( $file['_skipUploadCheck'] ) )
 		{
-			throw new DomainException( 'upload_error', 1 );
+			throw new \DomainException( 'upload_error', 1 );
 		}
 		
 		/* Check size */
@@ -614,45 +582,47 @@ abstract class File
 			$maxFileSize	= $maxFileSize * 1048576;
 			if( $file['size'] > $maxFileSize OR ( !isset( $file['_skipUploadCheck'] ) AND filesize( $file['tmp_name'] ) > $maxFileSize ) )
 			{
-				throw new DomainException( '-600', 2 );
+				throw new \DomainException( '-600', 2 );
 			}
 		}
 
 		/* Check allowed types */
 		$ext = mb_substr( $file['name'], mb_strrpos( $file['name'], '.' ) + 1 );
-		if( $allowedFileTypes !== NULL and !empty( $allowedFileTypes ) )
+		if( $allowedFileTypes !== NULL and \is_array( $allowedFileTypes ) and !empty( $allowedFileTypes ) )
 		{
-			if( !in_array( mb_strtolower( $ext ), array_map( 'mb_strtolower', $allowedFileTypes ) ) )
+			if( !\in_array( mb_strtolower( $ext ), array_map( 'mb_strtolower', $allowedFileTypes ) ) )
 			{
-				throw new DomainException( '-601', 3 );
+				throw new \DomainException( '-601', 3 );
 			}
 		}
 
 		/* If it's got an image extension, check it's actually a valid image */
-		if ( in_array( $ext, Image::supportedExtensions() ) AND !isset( $file['_skipUploadCheck'] ) )
+		if ( \in_array( $ext, \IPS\Image::supportedExtensions() ) AND !isset( $file['_skipUploadCheck'] ) )
 		{
 			$imageAttributes = getimagesize( $file['tmp_name'] );
-			if( !in_array( $imageAttributes[2], array( IMAGETYPE_GIF, IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP, IMAGETYPE_AVIF ) ) )
+			if( !\in_array( $imageAttributes[2], array( IMAGETYPE_GIF, IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP ) ) )
 			{
-				throw new DomainException( 'upload_error', 4 );
+				throw new \DomainException( 'upload_error', 4 );
 			}
 		}
+
+		return;
 	}
 
 	/**
 	 * Load File
 	 *
 	 * @param	string					$storageExtension	Storage extension
-	 * @param	string|Url	$url				URL to file
-	 * @param 	int|null					$cachedFilesize		Pre-cache filesize (bytes)
-	 * @return    File
-	 * @throws	OutOfRangeException
+	 * @param	string|\IPS\Http|Url	$url				URL to file
+	 * @param 	int						$cachedFilesize		Pre-cache filesize (bytes)
+	 * @return	\IPS\File
+	 * @throws	\OutOfRangeException
 	 */
-	public static function get( string $storageExtension, string|Url $url, ?int $cachedFilesize=NULL ) : File
+	public static function get( $storageExtension, $url, int $cachedFilesize=NULL )
 	{
 		if( mb_strpos( rawurldecode( $url ), '../' ) !== FALSE OR mb_strpos( rawurldecode( $url ), '..\\' ) !== FALSE )
 		{
-			throw new OutOfRangeException( 'INVALID_PATH' );
+			throw new \OutOfRangeException( 'INVALID_PATH' );
 		}
 
 		$class = static::getClass( $storageExtension, TRUE );
@@ -666,13 +636,13 @@ abstract class File
 	/**
 	 * Remove orphaned files based on a given storage configuration
 	 *
-	 * @param	int		$configurationId	Storage configuration ID
+	 * @param	array		$configurationId	Storage configuration ID
 	 * @param	int			$fileIndex			The file offset to start at in a listing
 	 * @return	array
 	 */
-	public static function orphanedFiles( int $configurationId, int $fileIndex ) : array
+	public static function orphanedFiles( $configurationId, $fileIndex )
 	{
-		return static::getClass( $configurationId )->removeOrphanedFiles( $fileIndex, Application::allExtensions( 'core', 'FileStorage', FALSE ) );
+		return static::getClass( $configurationId )->removeOrphanedFiles( $fileIndex, \IPS\Application::allExtensions( 'core', 'FileStorage', FALSE ) );
 	}
 	
 	/**
@@ -682,10 +652,10 @@ abstract class File
 	 * @param	array		$oldConfiguration   Existing Storage Configuration
 	 * @return	boolean
 	 */
-	public static function moveCheck( array $configuration, array $oldConfiguration ) : bool
+	public static function moveCheck( $configuration, $oldConfiguration )
 	{
 		$needsMove = FALSE;
-		if ( count( array_merge( array_diff( $configuration, $oldConfiguration ), array_diff( $oldConfiguration, $configuration ) ) ) )
+		if ( \count( array_merge( array_diff( $configuration, $oldConfiguration ), array_diff( $oldConfiguration, $configuration ) ) ) )
 		{
 			$needsMove = TRUE;
 		}
@@ -701,7 +671,7 @@ abstract class File
 				}
 			}
 
-			$needsMove = !$pass;
+			$needsMove = ( $pass ) ? FALSE : TRUE;
 		}
 
 		return $needsMove;
@@ -713,7 +683,7 @@ abstract class File
 	 * @param	string	$url		URL to examine
 	 * @return	boolean
 	 */
-	public static function isFullyQualifiedUrl( string $url ) : bool
+	public static function isFullyQualifiedUrl( $url )
 	{
 		return ( mb_substr( $url, 0, 4 ) === 'http' OR mb_substr( $url, 0, 2 ) === '//' );
 	}
@@ -725,7 +695,7 @@ abstract class File
 	 * @param	string	$url	The URL to repair
 	 * @return string|boolean	URL (string) if URL needed repairing, or FALSE if it did not.
 	 */
-	public static function repairUrl( string $url ) : string|bool
+	public static function repairUrl( $url )
 	{
 		if ( static::isFullyQualifiedUrl( $url ) )
 		{
@@ -752,60 +722,61 @@ abstract class File
 	/**
 	 * @brief	Storage Configuration
 	 */
-	public array $configuration = array();
+	public $configuration = array();
 	
 	/**
 	 * @brief	Storage Configuration ID
 	 */
-	public ?int $configurationId = null;
+	public $configurationId;
 	
 	/**
 	 * @brief	Storage Extension (core_Theme, etc)
 	 */
-	public ?string $storageExtension = '';
+	public $storageExtension;
 	
 	/**
 	 * @brief	Original Filename
 	 */
-	public string $originalFilename = '';
+	public $originalFilename;
 	
 	/**
 	 * @brief	Filename
 	 */
-	public string $filename = '';
+	public $filename;
 	
 	/**
 	 * @brief	Container
 	 */
-	public ?string $container = null;
+	public $container;
 	
 	/**
 	 * @brief	Cached contents
 	 */
-	protected ?string $contents = null;
+	protected $contents;
 
 	/**
 	 * @brief	URL
 	 */
-	public Url|string|null $url = null;
+	public $url;
 	
 	/**
 	 * @brief	Temp ID
 	 */
-	public int $tempId = 0;
+	public $tempId;
 	
 	/**
 	 * @brief	A flag used immediately after the file is uploaded to indicate if it has been flagged by the image scanner
 	 */
-	public ?bool $requiresModeration = NULL;
+	public $requiresModeration = NULL;
 	
 	/**
 	 * Constructor
 	 *
 	 * @param	array	$configuration		Storage configuration
-	 * @param 	int|null		$cachedFilesize		Pre-cached filesize
+	 * @param 	int		$cachedFilesize		Pre-cached filesize
+	 * @return	void
 	 */
-	public function __construct( array $configuration, ?int $cachedFilesize=null )
+	public function __construct( $configuration, int $cachedFilesize=null )
 	{
 		$this->configuration = $configuration;
 		$this->_cachedFilesize = $cachedFilesize;
@@ -814,28 +785,11 @@ abstract class File
 	/**
 	 * Return the base URL
 	 *
-	 * @return string|null
+	 * @return string
 	 */
-	public function baseUrl() : ?string
+	public function baseUrl()
 	{
 		return NULL;
-	}
-
-	/**
-	 * Return all available base URLs
-	 * Typically we only have 1, but if a move is in progress, there might
-	 * be more than one.
-	 *
-	 * @return array
-	 */
-	public static function baseUrls() : array
-	{
-		$return = [];
-		foreach( static::getStore() as $row )
-		{
-			$return[] = static::getClass( $row['id'] )->baseUrl();
-		}
-		return $return;
 	}
 
 	/**
@@ -846,7 +800,7 @@ abstract class File
 	 * @param	int|null	$throttle	Throttle speed
 	 * @return	void
 	 */
-	public function printFile( ?int $start=NULL, ?int $length=NULL, ?int $throttle=NULL ) : void
+	public function printFile( $start=NULL, $length=NULL, $throttle=NULL )
 	{
 		if( $start AND $length )
 		{
@@ -864,10 +818,10 @@ abstract class File
 		else
 		{
 			$pointer	= 0;
-			$contentsLength = strlen( $contents );
+			$contentsLength = \strlen( $contents );
 			while( $pointer < $contentsLength )
 			{
-				print substr( $contents, $pointer, $throttle );
+				print \substr( $contents, $pointer, $throttle );
 				$pointer	+= $throttle;
 
 				sleep( 1 );
@@ -887,7 +841,7 @@ abstract class File
 	 * @param	int|null	$throttle	Throttle speed
 	 * @return	void
 	 */
-	protected function sendFile( string $file, ?int $start=NULL, ?int $length=NULL, ?int $throttle=NULL ) : void
+	protected function sendFile( $file, $start=NULL, $length=NULL, $throttle=NULL )
 	{
 		/* Turn off output buffering if it is on */
 		while( ob_get_level() > 0 )
@@ -895,7 +849,7 @@ abstract class File
 			ob_end_clean();
 		}
 
-		if( $throttle === NULL AND $start === NULL AND function_exists('readfile') )
+		if( $throttle === NULL AND $start === NULL AND \function_exists('readfile') )
 		{
 			readfile( $file );
 		}
@@ -952,11 +906,11 @@ abstract class File
 	 * @param	bool	$refresh	If TRUE, will fetch again
 	 * @return	string
 	 */
-	public function contents( bool $refresh=FALSE ) : string
+	public function contents( $refresh=FALSE )
 	{
 		if ( $this->contents === NULL or $refresh === TRUE )
 		{
-			$this->contents = (string) Url::external( $this->url )->request()->get();
+			$this->contents = (string) \IPS\Http\Url::external( $this->url )->request()->get();
 		}
 		return $this->contents;
 	}
@@ -964,9 +918,9 @@ abstract class File
 	/**
 	 * Get filesize (in bytes)
 	 *
-	 * @return	int|bool
+	 * @return	string|bool
 	 */
-	public function filesize() : int|bool
+	public function filesize()
 	{
 		if( $this->_cachedFilesize !== NULL )
 		{
@@ -975,9 +929,9 @@ abstract class File
 
 		try
 		{
-			$this->_cachedFilesize = strlen( $this->contents() );
+			$this->_cachedFilesize = \strlen( $this->contents() );
 		}
-		catch( RuntimeException $ex )
+		catch( \RuntimeException $ex )
 		{
 			$this->_cachedFilesize = FALSE;
 		}
@@ -991,7 +945,7 @@ abstract class File
 	 * @param	string	$filepath	The path to the file on disk
 	 * @return	void
 	 */
-	public function setFile( string $filepath ) : void
+	public function setFile( $filepath )
 	{
 		$this->contents	= file_get_contents( $filepath );
 	}
@@ -1003,7 +957,7 @@ abstract class File
 	 * @param	bool	$obscure	Controls if an md5 hash should be added to the filename
 	 * @return	void
 	 */
-	public function setFilename( string $filename, bool $obscure=TRUE ) : void
+	public function setFilename( $filename, $obscure=TRUE )
 	{
 		$this->originalFilename = $filename;
 		
@@ -1011,7 +965,7 @@ abstract class File
 		if ( preg_match( '#[^a-zA-Z0-9!\-_\.\*\(\)\@]#', $filename ) )
 		{
 			$filename = preg_replace( '#[^a-zA-Z0-9!\-_\.\*\(\)\@]#', '', $filename );
-			if( !$obscure OR strlen( pathinfo( $filename, PATHINFO_FILENAME ) ) === 0 )
+			if( !$obscure OR \strlen( pathinfo( $filename, PATHINFO_FILENAME ) ) === 0 )
 			{
 				$filename = mt_rand() . '_' . $filename;
 			}
@@ -1021,9 +975,13 @@ abstract class File
 		{
 			$filename = static::obscureFilename( $filename );
 		}
+		else
+		{
+			$filename = $filename;
+		}
 
 		/* Most operating systems allow a max filename length of 255 bytes, so we should make sure we don't go over that */
-		if( strlen( $filename ) > 200 )
+		if( \strlen( $filename ) > 200 )
 		{
 			/* If the filename is over 200 chars, grab the first 100 and the last 100 and concatenate with a dash - this should help ensure we retain the most useful info */
 			$filename = mb_substr( $filename, 0, 100 ) . '-' . mb_substr( $filename, -100 );
@@ -1038,10 +996,10 @@ abstract class File
 	 * @param	string	$filename	The filename
 	 * @return	string
 	 */
-	protected function obscureFilename( string $filename ) : string
+	protected function obscureFilename( $filename )
 	{
 		$ext  = mb_substr( $filename, ( mb_strrpos( $filename, '.' ) + 1 ) );
-		$safe = in_array( mb_strtolower( $ext ), static::$safeFileExtensions );
+		$safe = \in_array( mb_strtolower( $ext ), static::$safeFileExtensions );
 
 		if ( ! $safe )
 		{
@@ -1053,7 +1011,7 @@ abstract class File
 			$filename = str_replace( '.' . $matches[2], '_' . $matches[2], $filename );
 		}
 
-		return str_replace( array( ' ', '#' ), '_', $filename ) . '.' . Login::generateRandomString( 32 ) . ( ( $safe ) ? '.' . $ext : '' );
+		return str_replace( array( ' ', '#' ), '_', $filename ) . '.' . \IPS\Login::generateRandomString( 32 ) . ( ( $safe ) ? '.' . $ext : '' );
 	}
 
 	/**
@@ -1062,7 +1020,7 @@ abstract class File
 	 * @param	string	$filename	The filename
 	 * @return	string
 	 */
-	protected function unObscureFilename( string $filename ) : string
+	protected function unObscureFilename( $filename )
 	{
 		$ext = mb_substr( $filename, ( mb_strrpos( $filename, '.' ) + 1 ) );
 		if ( mb_strlen( $ext ) == 32 )
@@ -1100,7 +1058,7 @@ abstract class File
 	 *
 	 * @return	void
 	 */
-	public function load() : void
+	public function load()
 	{
 		$url = (string) $this->url;
 		
@@ -1112,7 +1070,7 @@ abstract class File
 		$exploded = explode( '/', $url );
 		$this->filename = array_pop( $exploded );		
 		$this->originalFilename = $this->unObscureFilename( $this->filename );
-		$this->url = Url::createFromString( $this->fullyQualifiedUrl( $this->url ), FALSE, TRUE );
+		$this->url = \IPS\Http\Url::createFromString( $this->fullyQualifiedUrl( $this->url ), FALSE, TRUE );
 
 		/* Upon upgrade we don't rename every file, so we need to account for this */
 		if( mb_strpos( $this->originalFilename, '.' ) === FALSE )
@@ -1129,7 +1087,7 @@ abstract class File
 	 * @param	string	$contents	New contents
 	 * @return	void
 	 */
-	public function replace( string $contents ) : void
+	public function replace( $contents )
 	{
 		$this->contents = $contents;
 		$this->save();
@@ -1140,14 +1098,14 @@ abstract class File
 	 *
 	 * @return	void
 	 */
-	abstract public function save() : void;
+	abstract public function save();
 	
 	/**
 	 * Delete
 	 *
 	 * @return	void
 	 */
-	abstract public function delete() : void;
+	abstract public function delete();
 	
 	/**
 	 * Delete Container
@@ -1155,7 +1113,7 @@ abstract class File
 	 * @param	string	$container	Key
 	 * @return	void
 	 */
-	abstract public function deleteContainer( string $container ) : void;
+	abstract public function deleteContainer( $container );
 	
 	/**
 	 * Get the relative URL
@@ -1172,29 +1130,29 @@ abstract class File
 	 *
 	 * @return void
 	 */
-	public function settingsUpdated() : void
+	public function settingsUpdated()
 	{
-		$settings = json_decode( Settings::i()->upload_settings, TRUE );
+		$settings = json_decode( \IPS\Settings::i()->upload_settings, TRUE );
 		
 		foreach( $settings as $method => $id )
 		{
 			if ( $id == $this->configurationId )
 			{
-				$exploded  = explode( '_', str_replace( 'filestorage__', '', $method ) );
-				try
+				$exploded  = explode( '_', str_replace( 'filestorage__', '', $method ) );		
+				$classname = "IPS\\{$exploded[0]}\\extensions\\core\\FileStorage\\{$exploded[1]}";
+				
+				if ( method_exists( $classname, 'settingsUpdated' ) )
 				{
-					$classname = Application::getExtensionClass( $exploded[0], 'FileStorage', $exploded[1] );
-					if ( method_exists( $classname, 'settingsUpdated' ) )
-					{
-						$classname::settingsUpdated( $this->configuration );
-					}
+					$classname::settingsUpdated( $this->configuration );
 				}
-				catch( OutOfRangeException ){}
 			}
 		}
+		
+		/* Clear guest page caches */
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Clear datastore */
-		Store::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
 	}
 	
 	/**
@@ -1203,7 +1161,7 @@ abstract class File
 	 * @param	string	$url	URL
 	 * @return string
 	 */
-	public function fullyQualifiedUrl( string $url ) : string
+	public function fullyQualifiedUrl( $url )
 	{
 		if ( mb_substr( $url, 0, 4 ) !== 'http' AND mb_substr( $url, 0, 2 ) !== '//' )
 		{
@@ -1219,9 +1177,9 @@ abstract class File
 	 * @param	string	$filename	Filename in the URL
 	 * @return string
 	 */
-	public function encodeFileUrl( string $filename ) : string
+	public function encodeFileUrl( $filename )
 	{
-		return Url::encodeComponent( Url::COMPONENT_PATH, $filename );
+		return \IPS\Http\Url::encodeComponent( \IPS\Http\Url::COMPONENT_PATH, $filename );
 	}
 	
 	/**
@@ -1229,23 +1187,23 @@ abstract class File
 	 *
 	 * @param	int			$storageConfiguration	New storage configuration ID
 	 * @param   int         $flags                  Bitwise Flags
-	 * @return    File
+	 * @return	\IPS\File
 	 */
-	public function move( int $storageConfiguration, int $flags=0 ) : File
+	public function move( $storageConfiguration, $flags=0 )
 	{
 		/* Copy file */
 		try
 		{
 			$class = $this->copy( $storageConfiguration );
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
-			throw new RuntimeException( $e->getMessage(), $e->getCode() );
+			throw new \RuntimeException( $e->getMessage(), $e->getCode() );
 		}
 
 		try
 		{
-			if( $flags === File::MOVE_DELETE_NOW )
+			if( $flags === \IPS\File::MOVE_DELETE_NOW )
 			{
 				/* Delete this one */
 				$this->delete();	
@@ -1261,11 +1219,11 @@ abstract class File
 				), 'move' );
 			}
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			$this->log( $e->getMessage(), 'delete' );
 
-			throw new RuntimeException( $e->getMessage(), $e->getCode() );
+			throw new \RuntimeException( $e->getMessage(), $e->getCode() );
 		}
 
 		/* Return */
@@ -1275,14 +1233,14 @@ abstract class File
 	/**
 	 * Create a duplicate of this file in the same storage location but with a new filename
 	 *
-	 * @return    File
-	 * @throws  RuntimeException
+	 * @return	\IPS\File
+	 * @throws  \RuntimeException
 	 */
-	public function duplicate() : File
+	public function duplicate()
 	{
 		$copyFiles = static::$copyFiles;
 		static::$copyFiles = TRUE;
-		$return = static::create( $this->storageExtension, $this->originalFilename, $this->contents(), $this->container, false, $this instanceof FileSystem ? ( $this->configuration['dir'] . '/' . ( $this->container ? "{$this->container}/" : '' ) . $this->filename ) : null );
+		$return = static::create( $this->storageExtension, $this->originalFilename, $this->contents(), $this->container, $this instanceof \IPS\File\FileSystem ? ( $this->configuration['dir'] . '/' . ( $this->container ? "{$this->container}/" : '' ) . $this->filename ) : NULL );
 		static::$copyFiles = $copyFiles;
 		return $return;
 	}
@@ -1291,10 +1249,10 @@ abstract class File
 	 * Copy a file to a different storage location
 	 *
 	 * @param	int			       $storageConfiguration	New storage configuration ID
-	 * @return    File
-	 * @throws  RuntimeException
+	 * @return	\IPS\File
+	 * @throws  \RuntimeException
 	 */
-	public function copy( int $storageConfiguration ) : File
+	public function copy( $storageConfiguration )
 	{
 		/* Load class */
 		static::getStore();
@@ -1316,28 +1274,28 @@ abstract class File
 		{
 			$class->contents = $this->contents();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			$this->log( $e->getMessage(), 'copy', array(
 				'method'            => static::$storageConfigurations[ $storageConfiguration ]['method'],
 				'configuration_id'  => $storageConfiguration
 			) );
 
-			throw new RuntimeException( $e->getMessage(), $e->getCode() );
+			throw new \RuntimeException( $e->getMessage(), $e->getCode() );
 		}
 
 		try
 		{
 			$class->save();
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			$this->log( $e->getMessage(), 'copy', array(
 				'method'            => static::$storageConfigurations[ $storageConfiguration ]['method'],
 				'configuration_id'  => $storageConfiguration
 			) );
 
-			throw new RuntimeException( $e->getMessage(), $e->getCode() );
+			throw new \RuntimeException( $e->getMessage(), $e->getCode() );
 		}
 
 		/* Return */
@@ -1347,30 +1305,30 @@ abstract class File
 	/**
 	 * @brief Attachment thumbnail URL
 	 */
-	public ?string $attachmentThumbnailUrl	= NULL;
+	public $attachmentThumbnailUrl	= NULL;
 	
 	/**
 	 * @brief	Security Key
 	 */
-	public ?string $securityKey = NULL;
+	public $securityKey = NULL;
 
 	/**
 	 * Make into an attachment
 	 *
 	 * @param	string				$postKey				Post key
-	 * @param Member|NULL		$member					Member who uploaded the attachment
+	 * @param	\IPS\Member|NULL		$member					Member who uploaded the attachment
 	 * @param	bool				$requiresModeration		If this attachment requires moderation
-	 * @param	string|NULL				$labels		Image scanner labels
+	 * @param	array|NULL				$labels		Image scanner labels
 	 * @return	array
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function makeAttachment( string $postKey, ?Member $member = NULL, bool $requiresModeration = FALSE, ?string $labels=NULL ) : array
+	public function makeAttachment( $postKey, \IPS\Member $member = NULL, $requiresModeration = FALSE, $labels=NULL )
 	{
 		$ext = mb_substr( $this->originalFilename, mb_strrpos($this->originalFilename, '.') + 1 );
 
 		$memberId = ( $member and $member->member_id ) ? $member->member_id : 0;
 		
-		$this->securityKey = Login::generateRandomString();
+		$this->securityKey = \IPS\Login::generateRandomString();
 
 		$data = array(
 			'attach_ext'				=> $ext,
@@ -1397,7 +1355,7 @@ abstract class File
 		{
 			try
 			{
-				$thumbDims	= Settings::i()->attachment_image_size ? explode( 'x', Settings::i()->attachment_image_size ) : [ 0, 0 ];
+				$thumbDims	= \IPS\Settings::i()->attachment_image_size ? explode( 'x', \IPS\Settings::i()->attachment_image_size ) : [ 0, 0 ];
 				$dimensions	= $this->getImageDimensions();
 				
 				$data['attach_is_image'] = TRUE;
@@ -1416,10 +1374,10 @@ abstract class File
 				$data['attach_labels'] = $labels;
 			}
 			
-			catch ( InvalidArgumentException $e ) { }
+			catch ( \InvalidArgumentException $e ) { }
 		}
 		
-		return array_merge( array( 'attach_id' => Db::i()->insert( 'core_attachments', $data ) ), $data );
+		return array_merge( array( 'attach_id' => \IPS\Db::i()->insert( 'core_attachments', $data ) ), $data );
 	}
 
 	/**
@@ -1427,11 +1385,11 @@ abstract class File
 	 *
 	 * @return	bool
 	 */
-	public function isImage() : bool
+	public function isImage()
 	{
 		$ext = mb_substr( $this->originalFilename, mb_strrpos( $this->originalFilename, '.' ) + 1 );
 
-		if ( in_array( mb_strtolower( $ext ), Image::supportedExtensions() ) )
+		if ( \in_array( mb_strtolower( $ext ), \IPS\Image::supportedExtensions() ) )
 		{
 			return TRUE;
 		}
@@ -1444,11 +1402,11 @@ abstract class File
 	 *
 	 * @return	bool
 	 */
-	public function isVideo() : bool
+	public function isVideo()
 	{
 		$ext = mb_substr( $this->originalFilename, mb_strrpos( $this->originalFilename, '.' ) + 1 );
 
-		if ( in_array( mb_strtolower( $ext ), File::$videoExtensions ) )
+		if ( \in_array( mb_strtolower( $ext ), \IPS\File::$videoExtensions ) )
 		{
 			return TRUE;
 		}
@@ -1461,11 +1419,11 @@ abstract class File
 	 *
 	 * @return	bool
 	 */
-	public function isAudio() : bool
+	public function isAudio()
 	{
 		$ext = mb_substr( $this->originalFilename, mb_strrpos( $this->originalFilename, '.' ) + 1 );
 
-		if ( in_array( mb_strtolower( $ext ), File::$audioExtensions ) )
+		if ( \in_array( mb_strtolower( $ext ), \IPS\File::$audioExtensions ) )
 		{
 			return TRUE;
 		}
@@ -1476,9 +1434,9 @@ abstract class File
 	/**
 	 * Get media type ("file", "image" or "video")
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
-	public function mediaType() : string
+	public function mediaType()
 	{
 		if ( $this->isVideo() )
 		{
@@ -1501,10 +1459,10 @@ abstract class File
 	/**
 	 * Generate a temporary download URL the user can be redirected to
 	 *
-	 * @param	int $validForSeconds	The number of seconds the link should be valid for
-	 * @return	Url|null
+	 * @param	$validForSeconds	int	The number of seconds the link should be valid for
+	 * @return	\IPS\Http\Url
 	 */
-	public function generateTemporaryDownloadUrl( int $validForSeconds = 1200 ) : ?Url
+	public function generateTemporaryDownloadUrl( $validForSeconds = 1200 )
 	{
 		return NULL;
 	}
@@ -1513,18 +1471,18 @@ abstract class File
 	 * If the file is an image, get the dimensions
 	 *
 	 * @return	array
-	 * @throws	DomainException
-	 * @throws	InvalidArgumentException
-	 * @throws	RuntimeException
+	 * @throws	\DomainException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\RuntimeException
 	 */
-	public function getImageDimensions() : array
+	public function getImageDimensions()
 	{
 		if( !$this->isImage() )
 		{
-			throw new DomainException;
+			throw new \DomainException;
 		}
 
-		$image     = Image::create( $this->contents() );
+		$image     = \IPS\Image::create( $this->contents() );
 
 		return array( $image->width, $image->height );
 	}
@@ -1535,42 +1493,42 @@ abstract class File
 	 * @param	string		$autoSaveKey	Auto-save key
 	 * @param	int|NULL	$id1			ID 1	
 	 * @param	int|NULL	$id2			ID 2		
-	 * @param	int|string|NULL	$id3			ID 3
+	 * @param	int|NULL	$id3			ID 3		
 	 * @param	bool		$translatable	Are we claiming from a Translatable field?
 	 * @return	void
 	 * @note	If you call this, it is your responsibility to call unclaimAttachments if/when the thing is deleted
 	 */
-	public static function claimAttachments( string $autoSaveKey, ?int $id1=NULL, ?int $id2=NULL, int|string|null $id3=NULL, bool $translatable=FALSE ) : void
+	public static function claimAttachments( $autoSaveKey, $id1=NULL, $id2=NULL, $id3=NULL, $translatable=FALSE )
 	{
 		if ( $translatable )
 		{
-			foreach (Lang::languages() as $lang )
+			foreach ( \IPS\Lang::languages() as $lang )
 			{
-				Db::i()->update( 'core_attachments_map', array(
+				\IPS\Db::i()->update( 'core_attachments_map', array(
 					'id1'	=> $id1,
 					'id2'	=> $id2,
 					'id3'	=> $id3,
 					'temp'	=> NULL
 				), array( 'temp=?', md5( $autoSaveKey . $lang->id ) ) );
 				
-				Db::i()->update( 'core_attachments', array( 'attach_post_key' => '' ), array( 'attach_post_key=?', md5( $autoSaveKey . $lang->id . ':' . session_id() ) ) );
+				\IPS\Db::i()->update( 'core_attachments', array( 'attach_post_key' => '' ), array( 'attach_post_key=?', md5( $autoSaveKey . $lang->id . ':' . session_id() ) ) );
 				
 				
-				Request::i()->setClearAutosaveCookie( $autoSaveKey . $lang->id );
+				\IPS\Request::i()->setClearAutosaveCookie( $autoSaveKey . $lang->id );
 			}
 		}
 		else
 		{
-			Db::i()->update( 'core_attachments_map', array(
+			\IPS\Db::i()->update( 'core_attachments_map', array(
 				'id1'	=> $id1,
 				'id2'	=> $id2,
 				'id3'	=> $id3,
 				'temp'	=> NULL
 			), array( 'temp=?', md5( $autoSaveKey ) ) );
 			
-			Db::i()->update( 'core_attachments', array( 'attach_post_key' => '' ), array( 'attach_post_key=?', md5( $autoSaveKey . ':' . session_id() ) ) );
+			\IPS\Db::i()->update( 'core_attachments', array( 'attach_post_key' => '' ), array( 'attach_post_key=?', md5( $autoSaveKey . ':' . session_id() ) ) );
 			
-			Request::i()->setClearAutosaveCookie( $autoSaveKey );
+			\IPS\Request::i()->setClearAutosaveCookie( $autoSaveKey );
 		}
 	}
 	
@@ -1580,11 +1538,11 @@ abstract class File
 	 * @param	string		$locationKey	Location key (e.g. "forums_Forums")
 	 * @param	int|NULL	$id1			ID 1	
 	 * @param	int|NULL	$id2			ID 2		
-	 * @param	int|string|NULL	$id3			ID 3
+	 * @param	int|NULL	$id3			ID 3		
 	 * @return	void
 	 * @note	If any of the IDs are NULL, this will unclaim any attachments with any value. This can be useful to unclaim all attachments for all posts in a topic, but caution must be used.
 	 */
-	public static function unclaimAttachments( string $locationKey, ?int $id1=NULL, ?int $id2=NULL, int|string|null $id3=NULL ) : void
+	public static function unclaimAttachments( $locationKey, $id1=NULL, $id2=NULL, $id3=NULL )
 	{
 		/* Delete from core_attachments_map */
 		$where = array( array( 'location_key=?', $locationKey ) );
@@ -1596,37 +1554,37 @@ abstract class File
 				$where[] = array( "{$v}=?", $$v );
 			}
 		}
-		Db::i()->delete( 'core_attachments_map', $where );
+		\IPS\Db::i()->delete( 'core_attachments_map', $where );
 	}
 
 	/**
 	 * @brief This can be used to force a thumbnail name
 	 */
-	public ?string $thumbnailName = NULL;
+	public $thumbnailName = NULL;
 
 	/**
 	 * @brief This can be used to force a thumbnail container
 	 */
-	public ?string $thumbnailContainer = NULL;
+	public $thumbnailContainer = NULL;
 
 	/**
 	 * Make a thumbnail of the file - copies file, resizes and returns new file object
 	 *
 	 * @param	string	$storageExtension	Storage extension to use for generated thumbnail
-	 * @param	int|null		$maxWidth			Max width (in pixels) - NULL to use \IPS\THUMBNAIL_SIZE
-	 * @param	int|null		$maxHeight			Max height (in pixels) - NULL to use \IPS\THUMBNAIL_SIZE
+	 * @param	int		$maxWidth			Max width (in pixels) - NULL to use \IPS\THUMBNAIL_SIZE
+	 * @param	int		$maxHeight			Max height (in pixels) - NULL to use \IPS\THUMBNAIL_SIZE
 	 * @param	bool	$cropToSquare		If TRUE, will first crop to a square
-	 * @return    File
+	 * @return	\IPS\File
 	 */
-	public function thumbnail( string $storageExtension, ?int $maxWidth=NULL, ?int $maxHeight=NULL, bool $cropToSquare=FALSE ) : File
+	public function thumbnail( $storageExtension, $maxWidth=NULL, $maxHeight=NULL, $cropToSquare=FALSE )
 	{	
 		/* Work out size */	
-		$defaultSize = explode( 'x', THUMBNAIL_SIZE);
+		$defaultSize = explode( 'x', \IPS\THUMBNAIL_SIZE );
 		$maxWidth    = $maxWidth ?: $defaultSize[0];
 		$maxHeight   = $maxHeight ?: $defaultSize[1];
 
 		/* Create an \IPS\Image object */
-		$image = Image::create( $this->contents() );
+		$image = \IPS\Image::create( $this->contents() );
 		
 		/* Crop it */
 		if ( $cropToSquare and $image->width != $image->height )
@@ -1644,7 +1602,7 @@ abstract class File
 		$thumbnailName = $this->thumbnailName ?: mb_substr( $this->originalFilename, 0, mb_strrpos( $this->originalFilename, '.' ) ) . '.thumb' . mb_substr( $this->originalFilename, mb_strrpos( $this->originalFilename, '.' ) );
 
 		/* Create and return */
-		return File::create( $storageExtension, $thumbnailName, (string) $image, $this->thumbnailContainer, FALSE, NULL, !$this->thumbnailName );
+		return \IPS\File::create( $storageExtension, $thumbnailName, (string) $image, $this->thumbnailContainer, FALSE, NULL, $this->thumbnailName ? FALSE : TRUE );
 	}
 
 	/**
@@ -1656,14 +1614,14 @@ abstract class File
 	 * @param      string   $type       Type of log (error/log/copy/move)
 	 * @return     void
 	 */
-	protected function log( string $message, string $action, mixed $data=NULL, string $type='error' ) : void
+	protected function log( $message, $action, $data=NULL, $type='error' )
 	{
 		if ( $this->configurationId === NULL )
 		{
 			return;
 		}
 		
-		Db::i()->insert( 'core_file_logs', array (
+		\IPS\Db::i()->insert( 'core_file_logs', array (
           'log_action'           => $action,
           'log_type'             => $type,
           'log_configuration_id' => $this->configurationId,
@@ -1673,7 +1631,7 @@ abstract class File
           'log_container'        => $this->container,
           'log_msg'              => $message,
           'log_date'             => time(),
-          'log_data'             => is_array( $data ) ? json_encode( $data ) : NULL
+          'log_data'             => \is_array( $data ) ? json_encode( $data ) : NULL
         ) );
 	}
 	
@@ -1681,9 +1639,8 @@ abstract class File
 	 * Log a found orphaned file
 	 *
 	 * @param      string   $url	URL or container/filename.ext
-	 * @return void
 	 */
-	protected function logOrphanedFile( string $url ) : void
+	protected function logOrphanedFile( $url )
 	{
 		if ( static::isFullyQualifiedUrl( $url ) )
 		{
@@ -1695,7 +1652,7 @@ abstract class File
 		$container = implode( '/', $exploded );
 		$method    = static::$storageConfigurations[ $this->configurationId ]['method'];
 		
-		Db::i()->delete( 'core_file_logs', array(
+		\IPS\Db::i()->delete( 'core_file_logs', array(
 			'log_action=? AND log_type=? AND log_configuration_id=? AND log_method=? AND log_url=?',
 			'orphaned',
 			'orphaned',
@@ -1704,7 +1661,7 @@ abstract class File
 			$url
 		) );
 		
-		Db::i()->insert( 'core_file_logs', array (
+		\IPS\Db::i()->insert( 'core_file_logs', array (
           'log_action'           => 'orphaned',
           'log_type'             => 'orphaned',
           'log_configuration_id' => $this->configurationId,
@@ -1725,13 +1682,13 @@ abstract class File
 	 * @return	bool
 	 * @note	Thanks to Nicolas Grekas from comments at www.splitbrain.org for helping to identify all vulnerable HTML tags
 	 */
-	public static function checkXssInFile( string $data ) : bool
+	public static function checkXssInFile( $data )
 	{
 		/* We only need to check the first 1kb of the file...some programs will use more, but this is the most common */
-		$firstBytes	= substr( $data, 0, 1024 );
+		$firstBytes	= \substr( $data, 0, 1024 );
 
 		/* @see https://mimesniff.spec.whatwg.org/#identifying-a-resource-with-an-unknown-mime-type */
-		if( preg_match( '#(<\!DOCTYPE\s+HTML|<script|<html|<head|<iframe|<h1|<div|<font|<table|<title|<style|<body|<pre|<br|<a\s+href|<img|<plaintext|<cross\-domain\-policy|<\!\-\-|<\?xml)(\s|>)#si', $firstBytes, $matches ) )
+		if( preg_match( '#(<\!DOCTYPE\s+HTML|<script|<html|<head|<iframe|<h1|<div|<font|<table|<title|<style|<body|<pre|<table|<br|<a\s+href|<img|<plaintext|<cross\-domain\-policy|<\!\-\-|<\?xml)(\s|>)#si', $firstBytes, $matches ) )
 		{
 			return TRUE;
 		}
@@ -1745,7 +1702,7 @@ abstract class File
 	 * @param	string	$filename	Filename (with extension)
 	 * @return	string
 	 */
-	public static function getMimeType( string $filename ) : string
+	public static function getMimeType( $filename )
 	{
 		$extension	= mb_strtolower( mb_substr( $filename, mb_strrpos( $filename, '.' ) + 1 ) );
 		
@@ -1764,7 +1721,7 @@ abstract class File
 	 * @param	string|int	$size	The size we want to convert to bytes (see note)
 	 * @return	float
 	 */
-	public static function returnBytes( string|int $size ) : float
+	public static function returnBytes( $size )
 	{
 		$size	= trim( $size );
 
@@ -1774,10 +1731,10 @@ abstract class File
 		}
 
 		/* Get the last character, which may be 'm' or may be a number */
-		$last	= mb_strtolower( $size[ strlen( $size ) - 1 ] );
+		$last	= mb_strtolower( $size[ \strlen( $size ) - 1 ] );
 		
 		/* Convert $size to a number */
-		$size = intval( preg_replace( '/[^0-9]/', '', $size ) );
+		$size = \intval( preg_replace( '/[^0-9]/', '', $size ) );
 
 		/* Adjust value as necessary - note that we do not break intentionally */
 		switch( $last )
@@ -1796,10 +1753,10 @@ abstract class File
 	/**
 	 * Returns an icon to represent the file, based on its extension
 	 * 
-	 * @param 	string 	$filename 	The full filename
+	 * @param 	string 	filename 	The full filename
 	 * @return 	string
 	 */
-	public static function getIconFromName( string $filename ) : string
+	public static function getIconFromName( $filename )
 	{
 		$ext = pathinfo( $filename, PATHINFO_EXTENSION );
 
@@ -1808,20 +1765,20 @@ abstract class File
 			return static::$fileIconMap[ $ext ];
 		}
 
-		return 'file';
+		return 'file-o';
 	}
 
 	
 	/**
 	 * Get output for API
 	 *
-	 * @param Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse	string	name	The filename
 	 * @apiresponse	string	url		URL to where file is stored
 	 * @apiresponse	int		size	Filesize in bytes
 	 */
-	public function apiOutput( ?Member $authorizedMember = NULL ) : array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'name'	=> $this->originalFilename,
@@ -1833,54 +1790,50 @@ abstract class File
 	/**
 	 * @brief 	Maps file extensions to fontawesome icons
 	 */
-	public static array $fileIconMap = array(
-		'txt' => 'file-lines',
-		'rtf' => 'file-lines',
-		'csv' => 'file-lines',
-		'pdf' => 'file-pdf',
-		'doc' => 'file-word',
-		'docx' => 'file-word',
-		'xls' => 'file-excel',
-		'xlsx' => 'file-excel',
-		'xlsm' => 'file-excel',
-		'zip' => 'file-archive',
-		'tar' => 'file-archive',
-		'gz' => 'file-archive',
-		'ppt' => 'file-powerpoint',
-		'pptx' => 'file-powerpoint',
-		'ico' => 'file-image',
-		'gif' => 'file-image',
-		'jpeg' => 'file-image',
-		'jpg' => 'file-image',
-		'jpe' => 'file-image',
-		'png' => 'file-image',
-		'psd' => 'file-image',
-		'svg' => 'file-image',
-		'aac' => 'file-audio',
-		'mp3' => 'file-audio',
-		'ogg' => 'file-audio',
-		'ogv' => 'file-audio',
-		'wav' => 'file-audio',
-		'm4a' => 'file-audio',
-		'flv' => 'file-video',
-		'mkv' => 'file-video',
-		'mp4' => 'file-video',
-		'mpg' => 'file-video',
-		'mpeg' => 'file-video',
-		'3gp' => 'file-video',
-		'webm' => 'file-video',
-		'wmv' => 'file-video',
-		'avi' => 'file-video',
-		'm4v' => 'file-video',
-		'mov' => 'file-video',
-		'css' => 'file-code',
-		'html' => 'file-code',
-		'js' => 'file-code',
-		'xml' => 'file-code',
-		'ttf' => 'font',
-		'woff' => 'font',
-		'woff2' => 'font',
-		'eot' => 'font'
+	public static $fileIconMap = array(
+		'txt' => 'file-text-o',
+		'rtf' => 'file-text-o',
+		'csv' => 'file-text-o',
+		'pdf' => 'file-pdf-o',
+		'doc' => 'file-word-o',
+		'docx' => 'file-word-o',
+		'xls' => 'file-excel-o',
+		'xlsx' => 'file-excel-o',
+		'xlsm' => 'file-excel-o',
+		'zip' => 'file-archive-o',
+		'tar' => 'file-archive-o',
+		'gz' => 'file-archive-o',
+		'ppt' => 'file-powerpoint-o',
+		'pptx' => 'file-powerpoint-o',
+		'ico' => 'file-image-o',
+		'gif' => 'file-image-o',
+		'jpeg' => 'file-image-o',
+		'jpg' => 'file-image-o',
+		'jpe' => 'file-image-o',
+		'png' => 'file-image-o',
+		'psd' => 'file-image-o',
+		'aac' => 'file-audio-o',
+		'mp3' => 'file-audio-o',
+		'ogg' => 'file-audio-o',
+		'ogv' => 'file-audio-o',
+		'wav' => 'file-audio-o',
+		'm4a' => 'file-audio-o',
+		'avi' => 'file-video-o',
+		'flv' => 'file-video-o',
+		'mkv' => 'file-video-o',
+		'mp4' => 'file-video-o',
+		'mpg' => 'file-video-o',
+		'mpeg' => 'file-video-o',
+		'3gp' => 'file-video-o',
+		'webm' => 'file-video-o',
+		'wmv' => 'file-video-o',
+		'avi' => 'file-video-o',
+		'm4v' => 'file-video-o',
+		'mov' => 'file-video-o',
+		'css' => 'file-code-o',
+		'html' => 'file-code-o',
+		'js' => 'file-code-o',
+		'xml' => 'file-code-o',
 	);
 
 	/* !Mime-Type Map */
@@ -1888,7 +1841,7 @@ abstract class File
 	/**
 	 * @brief	Mime-Type Map
 	 */
-	public static array $mimeTypes = array(
+	public static $mimeTypes = array(
         '3dml' => 'text/vnd.in3d.3dml',
         '3g2' => 'video/3gpp2',
         '3gp' => 'video/3gpp',
@@ -1937,7 +1890,6 @@ abstract class File
         'atx' => 'application/vnd.antix.game-component',
         'au' => 'audio/basic',
         'avi' => 'video/x-msvideo',
-		'avif' => 'image/avif',
         'aw' => 'application/applixware',
         'axd' => 'text/plain',
         'azf' => 'application/vnd.airzip.filesecure.azf',
@@ -2808,7 +2760,7 @@ abstract class File
 
 		while ( $frame < 2 )
 		{
-			$pos = strpos( $contents, "\x00\x21\xF9\x04", $offset );
+			$pos = \strpos( $contents, "\x00\x21\xF9\x04", $offset );
 			if ( $pos === false )
 			{
 				break;
@@ -2816,7 +2768,7 @@ abstract class File
 			else
 			{
 				$offset = $pos + 1;
-				$newPos = strpos( $contents, "\x00\x2C", $offset );
+				$newPos = \strpos( $contents, "\x00\x2C", $offset );
 				if ( $newPos === false )
 				{
 					break;

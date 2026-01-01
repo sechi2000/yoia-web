@@ -12,132 +12,61 @@
 namespace IPS\blog;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use IPS\Application;
-use IPS\blog\Entry\Category;
-use IPS\Content;
-use IPS\Content\Anonymous;
-use IPS\Content\Comment;
-use IPS\Content\EditHistory;
-use IPS\Content\Embeddable;
-use IPS\Content\Filter;
-use IPS\Content\Followable;
-use IPS\Content\FuturePublishing;
-use IPS\Content\Hideable;
-use IPS\Content\Item;
-use IPS\Content\Lockable;
-use IPS\Content\MetaData;
-use IPS\Content\Featurable;
-use IPS\Content\Pinnable;
-use IPS\Content\Polls;
-use IPS\Content\Ratings;
-use IPS\Content\Reactable;
-use IPS\Content\ReadMarkers;
-use IPS\Content\Reportable;
-use IPS\Content\Shareable;
-use IPS\Content\Statistics;
-use IPS\Content\Taggable;
-use IPS\Content\ViewUpdates;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\gallery\Album;
-use IPS\Helpers\Badge;
-use IPS\Helpers\Badge\Icon;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\IPS;
-use IPS\Login;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Poll;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function array_slice;
-use function count;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Entry Model
  */
-class Entry extends Item implements
-	Embeddable,
-	Filter
+class _Entry extends \IPS\Content\Item implements
+	\IPS\Content\Pinnable, \IPS\Content\Lockable, \IPS\Content\Hideable, \IPS\Content\Featurable,
+	\IPS\Content\Tags,
+	\IPS\Content\Followable,
+	\IPS\Content\Shareable,
+	\IPS\Content\ReadMarkers,
+	\IPS\Content\Polls,
+	\IPS\Content\Ratings,
+	\IPS\Content\EditHistory,
+	\IPS\Content\Searchable,
+	\IPS\Content\Embeddable,
+	\IPS\Content\FuturePublishing,
+	\IPS\Content\MetaData,
+	\IPS\Content\Anonymous
 {
-	use Reactable,
-		Reportable,
-		Pinnable,
-		Anonymous,
-		Followable,
-		FuturePublishing,
-		Lockable,
-		MetaData,
-		Polls,
-		Ratings,
-		Shareable,
-		Taggable,
-		EditHistory,
-		ReadMarkers,
-		Statistics,
-		Hideable,
-		ViewUpdates,
-		Featurable
-		{
-			FuturePublishing::onPublish as public _onPublish;
-			FuturePublishing::onUnpublish as public _onUnpublish;
-		}
+	use \IPS\Content\Reactable, \IPS\Content\Reportable, \IPS\Content\ViewUpdates, \IPS\Content\Statistics;
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 		
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'blog';
+	public static $application = 'blog';
 	
 	/**
 	 * @brief	Module
 	 */
-	public static string $module = 'blogs';
+	public static $module = 'blogs';
 	
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'blog_entries';
+	public static $databaseTable = 'blog_entries';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'entry_';
+	public static $databasePrefix = 'entry_';
 		
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 		'author'				=> 'author_id',
 		'author_name'			=> 'author_name',
 		'content'				=> 'content',
@@ -158,7 +87,7 @@ class Entry extends Item implements
 		'ip_address'			=> 'ip_address',
 		'locked'				=> 'locked',
 		'cover_photo'			=> 'cover_photo',
-		'cover_photo_offset'	=> 'cover_photo_offset',
+		'cover_photo_offset'	=> 'cover_offset',
 		'is_future_entry'		=> 'is_future_entry',
         'future_date'           => 'publish_date',
 		'status'				=> 'status',
@@ -174,37 +103,37 @@ class Entry extends Item implements
 	/**
 	 * @brief	Title
 	*/
-	public static string $title = 'blog_entry';
+	public static $title = 'blog_entry';
 	
 	/**
 	 * @brief	Node Class
 	 */
-	public static ?string $containerNodeClass = 'IPS\blog\Blog';
+	public static $containerNodeClass = 'IPS\blog\Blog';
 	
 	/**
 	 * @brief	[Content\Item]	Comment Class
 	 */
-	public static ?string $commentClass = 'IPS\blog\Entry\Comment';
+	public static $commentClass = 'IPS\blog\Entry\Comment';
 	
 	/**
 	 * @brief	[Content\Item]	First "comment" is part of the item?
 	 */
-	public static bool $firstCommentRequired = FALSE;
+	public static $firstCommentRequired = FALSE;
 	
 	/**
 	 * @brief	[Content\Comment]	Language prefix for forms
 	 */
-	public static string $formLangPrefix = 'blog_entry_';
+	public static $formLangPrefix = 'blog_entry_';
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'pen-to-square';
+	public static $icon = 'file-text';
 	
 	/**
 	 * @brief	The map of permission columns
 	 */
-	public static array $permissionMap = array(
+	public static $permissionMap = array(
 			'view' 				=> 'view',
 			'read'				=> 2,
 			'add'				=> 3,
@@ -214,17 +143,17 @@ class Entry extends Item implements
 	/**
 	 * @brief	[Content]	Key for hide reasons
 	 */
-	public static ?string $hideLogKey = 'blog-entry';
+	public static $hideLogKey = 'blog-entry';
 	
 	/**
 	 * @brief	[CoverPhoto]	Storage extension
 	 */
-	public static string $coverPhotoStorageExtension = 'blog_Entries';
+	public static $coverPhotoStorageExtension = 'blog_Entries';
 	
 	/**
 	 * @brief	Use a default cover photo
 	 */
-	public static bool $coverPhotoDefault = true;
+	public static $coverPhotoDefault = true;
 	
 	/**
 	 * Set the title
@@ -232,10 +161,10 @@ class Entry extends Item implements
 	 * @param	string	$name	Title
 	 * @return	void
 	 */
-	public function set_name( string $name ) : void
+	public function set_name( $name )
 	{
 		$this->_data['name'] = $name;
-		$this->_data['name_seo'] = Friendly::seoTitle( $name );
+		$this->_data['name_seo'] = \IPS\Http\Url\Friendly::seoTitle( $name );
 	}
 
 	/**
@@ -243,15 +172,15 @@ class Entry extends Item implements
 	 *
 	 * @return	string
 	 */
-	public function get_name_seo(): string
+	public function get_name_seo()
 	{
 		if( !$this->_data['name_seo'] )
 		{
-			$this->name_seo	= Friendly::seoTitle( $this->name );
+			$this->name_seo	= \IPS\Http\Url\Friendly::seoTitle( $this->name );
 			$this->save();
 		}
 
-		return $this->_data['name_seo'] ?: Friendly::seoTitle( $this->name );
+		return $this->_data['name_seo'] ?: \IPS\Http\Url\Friendly::seoTitle( $this->name );
 	}
 
 	/**
@@ -259,20 +188,21 @@ class Entry extends Item implements
 	 *
 	 * @return	string
 	 */
-	public function get__album(): string
+	public function get__album()
 	{
-		if( Application::appIsEnabled( 'gallery' ) AND $this->gallery_album )
+		if( \IPS\Application::appIsEnabled( 'gallery' ) AND $this->gallery_album )
 		{
 			try
 			{
-				$album = Album::loadAndCheckPerms( $this->gallery_album );
+				$album = \IPS\gallery\Album::loadAndCheckPerms( $this->gallery_album );
 	
-				$gallery = Application::load( 'gallery' );
+				$gallery = \IPS\Application::load( 'gallery' );
 				$gallery::outputCss();
 	
-				return (string) Theme::i()->getTemplate( 'browse', 'gallery', 'front' )->miniAlbum( $album );
+				return \IPS\Theme::i()->getTemplate( 'browse', 'gallery', 'front' )->miniAlbum( $album );
 			}
-			catch( OutOfRangeException | UnderflowException ){}
+			catch( \OutOfRangeException $e ){}
+			catch( \UnderflowException $e ){}
 		}
 	
 		return '';
@@ -281,51 +211,51 @@ class Entry extends Item implements
 	/**
 	 * @brief	Cached URLs
 	 */
-	protected mixed $_url = array();
+	protected $_url	= array();
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlBase = 'app=blog&module=blogs&controller=entry&id=';
+	public static $urlBase = 'app=blog&module=blogs&controller=entry&id=';
 	
 	/**
 	 * @brief	URL Base
 	 */
-	public static string $urlTemplate = 'blog_entry';
+	public static $urlTemplate = 'blog_entry';
 	
 	/**
 	 * @brief	SEO Title Column
 	 */
-	public static string $seoTitleColumn = 'name_seo';
+	public static $seoTitleColumn = 'name_seo';
 
 	/**
-	 * @brief	Category|null
+	 * @brief	Category
 	 */
-	protected ?Category $category = null;
+	protected $category;
 	
 	/**
 	 * Can view this entry
 	 *
-	 * @param	Member|NULL	$member		The member or NULL for currently logged in member.
+	 * @param	\IPS\Member|NULL	$member		The member or NULL for currently logged in member.
 	 * @return	bool
 	 */
-	public function canView( Member $member = null ): bool
+	public function canView( $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
-
+		$member = $member ?: \IPS\Member::loggedIn();
+		
 		$return = parent::canView( $member );
 
-		if ( $this->status == 'draft' AND !static::canViewHiddenItems( $member, $this->container() ) AND !in_array( $this->container()->id, array_keys( Blog::loadByOwner( $member ) ) ) )
+		if ( $this->status == 'draft' AND !static::canViewHiddenItems( $member, $this->container() ) AND !\in_array( $this->container()->id, array_keys( \IPS\blog\Blog::loadByOwner( $member ) ) ) )
 		{
 			$return = FALSE;
-			if ( ( $club = $this->container()->club() AND in_array( $club->memberStatus( Member::loggedIn() ), array( Club::STATUS_LEADER, Club::STATUS_MODERATOR ) ) ) )
+			if ( ( $club = $this->container()->club() AND \in_array( $club->memberStatus( \IPS\Member::loggedIn() ), array( \IPS\Member\Club::STATUS_LEADER, \IPS\Member\Club::STATUS_MODERATOR ) ) ) )
 			{
 				$return = TRUE;
 			}
 		}
 		
 		/* Is this a future publish entry and we are the owner of the blog? */
-		if ( $this->status == 'draft' AND $this->is_future_entry == 1 AND in_array( $this->container()->id, array_keys( Blog::loadByOwner( $member ) ) ) )
+		if ( $this->status == 'draft' AND $this->is_future_entry == 1 AND \in_array( $this->container()->id, array_keys( \IPS\blog\Blog::loadByOwner( $member ) ) ) )
 		{
 			$return = TRUE;
 		}
@@ -350,9 +280,9 @@ class Entry extends Item implements
 					return FALSE;
 				}
 
-				$member	= Db::i()->select( '*', 'core_sys_social_group_members', array( 'group_id=? AND member_id=?', $this->container()->social_group, $member->member_id ) )->first();
+				$member	= \IPS\Db::i()->select( '*', 'core_sys_social_group_members', array( 'group_id=? AND member_id=?', $this->container()->social_group, $member->member_id ) )->first();
 			}
-			catch( UnderflowException )
+			catch( \UnderflowException $e )
 			{
 				return FALSE;
 			}
@@ -366,63 +296,63 @@ class Entry extends Item implements
 	 *
 	 * @return	void
 	 */
-	protected function unclaimAttachments(): void
+	protected function unclaimAttachments()
 	{
-		File::unclaimAttachments( 'blog_Entries', $this->id );
+		\IPS\File::unclaimAttachments( 'blog_Entries', $this->id );
 	}
 	
 	/**
 	 * Get items with permisison check
 	 *
-	 * @param array $where				Where clause
-	 * @param string|null $order				MySQL ORDER BY clause (NULL to order by date)
-	 * @param int|array|null $limit				Limit clause
-	 * @param string|null $permissionKey		A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index or NULL to ignore permissions
-	 * @param int|bool|null $includeHiddenItems	Include hidden items? NULL to detect if currently logged in member has permission, -1 to return public content only, TRUE to return unapproved content and FALSE to only return unapproved content the viewing member submitted
-	 * @param int $queryFlags			Select bitwise flags
-	 * @param	Member|null	$member				The member (NULL to use currently logged in member)
-	 * @param bool $joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinComments		If true, will join comment data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $joinReviews		If true, will join review data (set to TRUE if your $where clause depends on this data)
-	 * @param bool $countOnly			If true will return the count
-	 * @param array|null $joins				Additional arbitrary joins for the query
-	 * @param bool|Model $skipPermission		If you are getting records from a specific container, pass the container to reduce the number of permission checks necessary or pass TRUE to skip conatiner-based permission. You must still specify this in the $where clause
-	 * @param bool $joinTags			If true, will join the tags table
-	 * @param bool $joinAuthor			If true, will join the members table for the author
-	 * @param bool $joinLastCommenter	If true, will join the members table for the last commenter
-	 * @param bool $showMovedLinks		If true, moved item links are included in the results
-	 * @param array|null $location			Array of item lat and long
-	 * @return	ActiveRecordIterator|int
+	 * @param	array		$where				Where clause
+	 * @param	string		$order				MySQL ORDER BY clause (NULL to order by date)
+	 * @param	int|array	$limit				Limit clause
+	 * @param	string|NULL	$permissionKey		A key which has a value in the permission map (either of the container or of this class) matching a column ID in core_permission_index or NULL to ignore permissions
+	 * @param	mixed		$includeHiddenItems	Include hidden items? NULL to detect if currently logged in member has permission, -1 to return public content only, TRUE to return unapproved content and FALSE to only return unapproved content the viewing member submitted
+	 * @param	int			$queryFlags			Select bitwise flags
+	 * @param	\IPS\Member	$member				The member (NULL to use currently logged in member)
+	 * @param	bool		$joinContainer		If true, will join container data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinComments		If true, will join comment data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$joinReviews		If true, will join review data (set to TRUE if your $where clause depends on this data)
+	 * @param	bool		$countOnly			If true will return the count
+	 * @param	array|null	$joins				Additional arbitrary joins for the query
+	 * @param	mixed		$skipPermission		If you are getting records from a specific container, pass the container to reduce the number of permission checks necessary or pass TRUE to skip conatiner-based permission. You must still specify this in the $where clause
+	 * @param	bool		$joinTags			If true, will join the tags table
+	 * @param	bool		$joinAuthor			If true, will join the members table for the author
+	 * @param	bool		$joinLastCommenter	If true, will join the members table for the last commenter
+	 * @param	bool		$showMovedLinks		If true, moved item links are included in the results
+	 * @param	array|null	$location			Array of item lat and long
+	 * @return	\IPS\Patterns\ActiveRecordIterator|int
 	 */
-	public static function getItemsWithPermission( array $where=array(), string $order=null, int|array|null $limit=10, ?string $permissionKey='read', int|bool|null $includeHiddenItems= Filter::FILTER_AUTOMATIC, int $queryFlags=0, Member $member=null, bool $joinContainer=FALSE, bool $joinComments=FALSE, bool $joinReviews=FALSE, bool $countOnly=FALSE, array|null $joins=null, bool|Model $skipPermission=FALSE, bool $joinTags=TRUE, bool $joinAuthor=TRUE, bool $joinLastCommenter=TRUE, bool $showMovedLinks=FALSE, array|null $location=null ): ActiveRecordIterator|int
+	public static function getItemsWithPermission( $where=array(), $order=NULL, $limit=10, $permissionKey='read', $includeHiddenItems=\IPS\Content\Hideable::FILTER_AUTOMATIC, $queryFlags=0, \IPS\Member $member=NULL, $joinContainer=FALSE, $joinComments=FALSE, $joinReviews=FALSE, $countOnly=FALSE, $joins=NULL, $skipPermission=FALSE, $joinTags=TRUE, $joinAuthor=TRUE, $joinLastCommenter=TRUE, $showMovedLinks=FALSE, $location=NULL )
 	{
-		if ( in_array( $permissionKey, array( 'view', 'read' ) ) )
+		if ( \in_array( $permissionKey, array( 'view', 'read' ) ) )
 		{
 			$joinContainer = TRUE;
 						
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
             if ( $member->member_id )
             {
-                $where[] = array( '( blog_blogs.blog_member_id=' . $member->member_id . ' OR ( ' . Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', $member ) . ' ) OR blog_blogs.blog_social_group IS NULL )' );
+                $where[] = array( '( blog_blogs.blog_member_id=' . $member->member_id . ' OR ( ' . \IPS\Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', $member ) . ' ) OR blog_blogs.blog_social_group IS NULL )' );
             }
             else
             {
-                $where[] = array( "(" . Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', $member ) . " OR blog_blogs.blog_social_group IS NULL )" );
+                $where[] = array( "(" . \IPS\Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', $member ) . " OR blog_blogs.blog_social_group IS NULL )" );
             }
             
-			if ( Settings::i()->clubs )
+			if ( \IPS\Settings::i()->clubs )
 			{
 				$joins[] = array( 'from' => 'core_clubs', 'where' => 'core_clubs.id=blog_blogs.blog_club_id' );
 				if ( $member->member_id )
 				{
 					if ( !$member->modPermission( 'can_access_all_clubs' ) )
 					{
-						$where[] = array( '( blog_blogs.blog_club_id IS NULL OR ' . Db::i()->in( 'blog_blogs.blog_club_id', $member->clubs() ) . ' OR core_clubs.type=? OR core_clubs.type=?  OR core_clubs.type=?)', Club::TYPE_PUBLIC, Club::TYPE_READONLY, Club::TYPE_OPEN );
+						$where[] = array( '( blog_blogs.blog_club_id IS NULL OR ' . \IPS\Db::i()->in( 'blog_blogs.blog_club_id', $member->clubs() ) . ' OR core_clubs.type=? OR core_clubs.type=?  OR core_clubs.type=?)', \IPS\Member\Club::TYPE_PUBLIC, \IPS\Member\Club::TYPE_READONLY, \IPS\Member\Club::TYPE_OPEN );
 					}
 				}
 				else
 				{
-					$where[] = array( '( blog_blogs.blog_club_id IS NULL OR core_clubs.type=? OR core_clubs.type=? OR core_clubs.type=? )', Club::TYPE_PUBLIC, Club::TYPE_READONLY, Club::TYPE_OPEN );
+					$where[] = array( '( blog_blogs.blog_club_id IS NULL OR core_clubs.type=? OR core_clubs.type=? OR core_clubs.type=? )', \IPS\Member\Club::TYPE_PUBLIC, \IPS\Member\Club::TYPE_READONLY, \IPS\Member\Club::TYPE_OPEN );
 				}
 			}
 		}
@@ -436,28 +366,28 @@ class Entry extends Item implements
 	 * @param	array		$joins				Other joins
 	 * @return	array
 	 */
-	public static function followWhere( bool &$joinContainer, array &$joins ): array
+	public static function followWhere( &$joinContainer, &$joins )
 	{
 		$joinContainer = TRUE;
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
-			$where = array( array( '( blog_blogs.blog_social_group IS NULL OR blog_blogs.blog_member_id=' . Member::loggedIn()->member_id . ' OR ( ' . Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', Member::loggedIn() ) . ' ) )' ) );
+			$where = array( array( '( blog_blogs.blog_social_group IS NULL OR blog_blogs.blog_member_id=' . \IPS\Member::loggedIn()->member_id . ' OR ( ' . \IPS\Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', \IPS\Member::loggedIn() ) . ' ) )' ) );
 		}
 		else
 		{
-			$where = array( Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', Member::loggedIn() ) );
+			$where = array( \IPS\Content::socialGroupGetItemsWithPermissionWhere( 'blog_blogs.blog_social_group', \IPS\Member::loggedIn() ) );
 		}
 		
-		if ( Settings::i()->clubs )
+		if ( \IPS\Settings::i()->clubs )
 		{
 			$joins[] = array( 'from' => 'core_clubs', 'where' => 'core_clubs.id=blog_blogs.blog_club_id' );
-			if ( Member::loggedIn()->member_id )
+			if ( \IPS\Member::loggedIn()->member_id )
             {
-				$where[] = array( '( blog_blogs.blog_club_id IS NULL OR ' . Db::i()->in( 'blog_blogs.blog_club_id', Member::loggedIn()->clubs() ) . ' OR core_clubs.type=? OR core_clubs.type=? )', Club::TYPE_PUBLIC, Club::TYPE_READONLY );
+				$where[] = array( '( blog_blogs.blog_club_id IS NULL OR ' . \IPS\Db::i()->in( 'blog_blogs.blog_club_id', \IPS\Member::loggedIn()->clubs() ) . ' OR core_clubs.type=? OR core_clubs.type=? )', \IPS\Member\Club::TYPE_PUBLIC, \IPS\Member\Club::TYPE_READONLY );
             }
             else
             {
-				$where[] = array( '( blog_blogs.blog_club_id IS NULL OR core_clubs.type=? OR core_clubs.type=? )', Club::TYPE_PUBLIC, Club::TYPE_READONLY );
+				$where[] = array( '( blog_blogs.blog_club_id IS NULL OR core_clubs.type=? OR core_clubs.type=? )', \IPS\Member\Club::TYPE_PUBLIC, \IPS\Member\Club::TYPE_READONLY );
             }
 		}
 
@@ -467,16 +397,17 @@ class Entry extends Item implements
 	/**
 	 * Get elements for add/edit form
 	 *
-	 * @param	Item|null	$item		The current item if editing or NULL if creating
-	 * @param	Model|null						$container	Container (e.g. forum) ID, if appropriate
+	 * @param	\IPS\Content\Item|NULL	$item		The current item if editing or NULL if creating
+	 * @param	int						$container	Container (e.g. forum) ID, if appropriate
 	 * @return	array
 	 */
-	public static function formElements( Item $item=NULL, Model $container=NULL ): array
+	public static function formElements( $item=NULL, \IPS\Node\Model $container=NULL )
 	{
 		$return = parent::formElements( $item, $container );
-		$return['entry'] = new Editor( 'blog_entry_content', $item?->content, TRUE, array( 'app' => 'blog', 'key' => 'Entries', 'autoSaveKey' => ( $item === NULL ) ? 'blog-entry-' . $container?->id : 'blog-edit-' . $item->id, 'attachIds' => ( $item === NULL ? NULL : array( $item->id ) ) ) );
+		$return['entry'] = new \IPS\Helpers\Form\Editor( 'blog_entry_content', $item ? $item->content : NULL, TRUE, array( 'app' => 'blog', 'key' => 'Entries', 'autoSaveKey' => ( $item === NULL ) ? 'blog-entry-' . $container->id : 'blog-edit-' . $item->id, 'attachIds' => ( $item === NULL ? NULL : array( $item->id ) ) ) );
 
 		/* Edit Log Fields need to be under the editor */
+		$editReason = NULL;
 		if( isset( $return['edit_reason']) )
 		{
 			$editReason = $return['edit_reason'];
@@ -484,6 +415,7 @@ class Entry extends Item implements
 			$return['edit_reason'] = $editReason;
 		}
 
+		$logEdit = NULL;
 		if( isset( $return['log_edit']) )
 		{
 			$logEdit = $return['log_edit'];
@@ -492,51 +424,48 @@ class Entry extends Item implements
 		}
 
 		/* Gallery album association */
-		if( Application::appIsEnabled( 'gallery' ) )
+		if( \IPS\Application::appIsEnabled( 'gallery' ) )
 		{
-			$return['album']	= new Node( 'entry_gallery_album', ( $item AND $item->gallery_album ) ? $item->gallery_album : NULL, FALSE, array(
-					'url'					=> Url::internal( 'app=blog&module=blogs&controller=submit', 'front', 'blog_submit' ),
+			$return['album']	= new \IPS\Helpers\Form\Node( 'entry_gallery_album', ( $item AND $item->gallery_album ) ? $item->gallery_album : NULL, FALSE, array(
+					'url'					=> \IPS\Http\Url::internal( 'app=blog&module=blogs&controller=submit', 'front', 'blog_submit' ),
 					'class'					=> 'IPS\gallery\Album',
 					'permissionCheck'		=> 'add',
 			) );
 		}
 
-		if( $container )
+		$categories = \IPS\blog\Entry\Category::roots( NULL, NULL, array( 'entry_category_blog_id=?', $container->id ) );
+		$choiceOptions = array( 0 => 'entry_category_choice_new' );
+		$choiceToggles = array( 0 => array( 'blog_entry_new_category' ) );
+
+		if( \count( $categories ) )
 		{
-			$categories = Category::roots( NULL, NULL, array( 'entry_category_blog_id=?', $container->id ) );
-			$choiceOptions = array( 0 => 'entry_category_choice_new' );
-			$choiceToggles = array( 0 => array( 'blog_entry_new_category' ) );
-
-			if( count( $categories ) )
-			{
-				$choiceOptions[1] = 'entry_category_choice_existing';
-				$choiceToggles[1] = array( 'entry_category_id' );
-			}
-
-			$return['entry_category_choice'] = new Radio( 'entry_category_choice', ( ( $item AND $item->category_id ) or Request::i()->cat ) ? 1 : 0, FALSE, array(
-				'options' => $choiceOptions,
-				'toggles' => $choiceToggles
-			) );
-
-			if( count( $categories ) )
-			{
-				$options = array();
-				foreach ( $categories as $category )
-				{
-					$options[ $category->id ] = $category->name;
-				}
-
-				$return[ 'entry_category_id' ] = new Select( 'entry_category_id', ( $item AND $item->category_id ) ? $item->category_id : ( Request::i()->cat ? Request::i()->cat : NULL ), FALSE, array( 'options' => $options, 'parse' => 'normal' ), NULL, NULL, NULL, "entry_category_id" );
-			}
+			$choiceOptions[1] = 'entry_category_choice_existing';
+			$choiceToggles[1] = array( 'entry_category_id' );
 		}
-
-		$return['blog_entry_new_category']	= new Text( 'blog_entry_new_category', NULL, TRUE, array(), NULL, NULL, NULL, "blog_entry_new_category" );
-
-		$return['image'] = new Upload( 'blog_entry_cover_photo', ( ( $item AND $item->cover_photo ) ? File::get( 'blog_Entries', $item->cover_photo ) : NULL ), FALSE, array( 'storageExtension' => 'blog_Entries', 'allowStockPhotos' => TRUE, 'image' => array( 'maxWidth' => 4800, 'maxHeight' => 4800 ), 'canBeModerated' => TRUE ) );
 		
-		$return['publish'] = new YesNo( 'blog_entry_publish', $item ? $item->status : TRUE, FALSE, array( 'togglesOn' => array( 'blog_entry_date' ) ) );
+		$return['entry_category_choice'] = new \IPS\Helpers\Form\Radio( 'entry_category_choice', ( ( $item AND $item->category_id ) or \IPS\Request::i()->cat ) ? 1 : 0, FALSE, array(
+			'options' => $choiceOptions,
+			'toggles' => $choiceToggles
+		) );
+
+		if( \count( $categories ) )
+		{
+			$options = array();
+			foreach ( $categories as $category )
+			{
+				$options[ $category->id ] = $category->name;
+			}
+
+			$return[ 'entry_category_id' ] = new \IPS\Helpers\Form\Select( 'entry_category_id', ( $item AND $item->category_id ) ? $item->category_id : ( \IPS\Request::i()->cat ? \IPS\Request::i()->cat : NULL ), FALSE, array( 'options' => $options, 'parse' => 'normal' ), NULL, NULL, NULL, "entry_category_id" );
+		}
+		$return['blog_entry_new_category']	= new \IPS\Helpers\Form\Text( 'blog_entry_new_category', NULL, TRUE, array(), NULL, NULL, NULL, "blog_entry_new_category" );
+
+		$return['image'] = new \IPS\Helpers\Form\Upload( 'blog_entry_cover_photo', ( ( $item AND $item->cover_photo ) ? \IPS\File::get( 'blog_Entries', $item->cover_photo ) : NULL ), FALSE, array( 'storageExtension' => 'blog_Entries', 'allowStockPhotos' => TRUE, 'image' => array( 'maxWidth' => 4800, 'maxHeight' => 4800 ), 'canBeModerated' => TRUE ) );
+		
+		$return['publish'] = new \IPS\Helpers\Form\YesNo( 'blog_entry_publish', $item ? $item->status : TRUE, FALSE, array( 'togglesOn' => array( 'blog_entry_date' ) ) );
 		
 		/* Publish date needs to go near the bottom */
+		$date = NULL;
 		if ( isset( $return['date'] ) )
 		{
 			$date = $return['date'];
@@ -546,6 +475,7 @@ class Entry extends Item implements
 		}
 		
 		/* Poll always needs to go on the end */
+		$poll = NULL;
 		if ( isset( $return['poll'] ) )
 		{
 			$poll = $return['poll'];
@@ -564,7 +494,7 @@ class Entry extends Item implements
 	 * @param	array				$values	Values from form
 	 * @return	void
 	 */
-	public function processForm( array $values ): void
+	public function processForm( $values )
 	{
 		$new = $this->_new;
 
@@ -593,7 +523,7 @@ class Entry extends Item implements
 		$this->cover_photo = (string) $values['blog_entry_cover_photo'];
 		
 		/* Gallery album association */
-		if( Application::appIsEnabled( 'gallery' ) AND $values['entry_gallery_album'] instanceof Album )
+		if( \IPS\Application::appIsEnabled( 'gallery' ) AND $values['entry_gallery_album'] instanceof \IPS\gallery\Album )
 		{
 			$this->gallery_album = $values['entry_gallery_album']->_id;
 		}
@@ -614,9 +544,9 @@ class Entry extends Item implements
 		}
 		else
 		{
-			$newCategory = new Category;
+			$newCategory = new \IPS\blog\Entry\Category;
 			$newCategory->name = $values['blog_entry_new_category'];
-			$newCategory->seo_name = Friendly::seoTitle( $values['blog_entry_new_category'] );
+			$newCategory->seo_name = \IPS\Http\Url\Friendly::seoTitle( $values['blog_entry_new_category'] );
 
 			$newCategory->blog_id = $this->blog_id;
 			$newCategory->save();
@@ -631,12 +561,12 @@ class Entry extends Item implements
 	/**
 	 * Can a given member create this type of content?
 	 *
-	 * @param	Member	$member		The member
-	 * @param	Model|NULL	$container	Container (e.g. forum), if appropriate
-	 * @param bool $showError	If TRUE, rather than returning a boolean value, will display an error
+	 * @param	\IPS\Member	$member		The member
+	 * @param	\IPS\Node\Model|NULL	$container	Container (e.g. forum), if appropriate
+	 * @param	bool		$showError	If TRUE, rather than returning a boolean value, will display an error
 	 * @return	bool
 	 */
-	public static function canCreate( Member $member, Model $container=null, bool $showError=FALSE ): bool
+	public static function canCreate( \IPS\Member $member, \IPS\Node\Model $container=NULL, $showError=FALSE )
 	{
 		parent::canCreate( $member, $container, $showError );
 		
@@ -644,7 +574,7 @@ class Entry extends Item implements
 		{
 			if ( $showError )
 			{
-				Output::i()->error( 'posts_per_day_error', '1B203/2', 403, '' );
+				\IPS\Output::i()->error( 'posts_per_day_error', '1B203/2', 403, '' );
 			}
 			else
 			{
@@ -654,7 +584,7 @@ class Entry extends Item implements
 		
 		$return = TRUE;
 
-		$blogs = Blog::loadByOwner( $member );
+		$blogs = \IPS\blog\Blog::loadByOwner( $member );
 
 		if ( $container )
 		{
@@ -663,7 +593,7 @@ class Entry extends Item implements
 				$return = $club->isModerator( $member );
 				$error = 'no_module_permission';
 			}
-			elseif ( !in_array( $container->id, array_keys( $blogs ) ) )
+			elseif ( !\in_array( $container->id, array_keys( $blogs ) ) )
 			{
 				$return = FALSE;
 				$error = 'no_module_permission';
@@ -677,7 +607,7 @@ class Entry extends Item implements
 		}
 		else
 		{
-			if( !count( $blogs ) )
+			if( !\count( $blogs ) )
 			{
 				$return = FALSE;
 				$error = 'no_module_permission';
@@ -687,7 +617,7 @@ class Entry extends Item implements
 		/* Return */
 		if ( $showError and !$return )
 		{
-			Output::i()->error( $error, '1B203/1', 403, '' );
+			\IPS\Output::i()->error( $error, '1B203/1', 403, '' );
 		}
 		
 		return $return;
@@ -696,23 +626,19 @@ class Entry extends Item implements
 	/**
 	 * Process created object AFTER the object has been created
 	 *
-	 * @param	Comment|NULL	$comment	The first comment
+	 * @param	\IPS\Content\Comment|NULL	$comment	The first comment
 	 * @param	array						$values		Values from form
 	 * @return	void
 	 */
-	protected function processAfterCreate( ?Comment $comment, array $values ): void
+	protected function processAfterCreate( $comment, $values )
 	{
 		parent::processAfterCreate( $comment, $values );
 
-		File::claimAttachments( 'blog-entry-' . $this->container()->id, $this->id );
+		\IPS\File::claimAttachments( 'blog-entry-' . $this->container()->id, $this->id );
 
 		if ( $this->status == 'published' )
 		{
-
-			/* @var Blog $blog */
 			$blog						= $this->container();
-
-			/* @var array $databaseColumnMap */
 			$lastUpdateColumn			= $blog::$databaseColumnMap['date'];
 			$blog->$lastUpdateColumn	= time();
 			$blog->save();
@@ -722,15 +648,15 @@ class Entry extends Item implements
 	/**
 	 * Syncing to run when publishing something previously pending publishing
 	 *
-	 * @param	Member|null|bool	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
 	 * @return	void
 	 */
-	public function onPublish( Member|bool|null $member ) : void
+	public function onPublish( $member )
 	{
 		$this->status = 'published';
 		$this->save();
 		
-		$this->_onPublish( $member );
+		parent::onPublish( $member );
 		
 		/* The blog system is slightly different from the \Content future entry stuff. Future entries are treated as drafts,
 			so do count towards entries but parent::onPublish will try and increment item count again after publish */
@@ -741,106 +667,82 @@ class Entry extends Item implements
 	/**
 	 * Syncing to run when unpublishing an item (making it a future dated entry when it was already published)
 	 *
-	 * @param	Member|bool|null	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
+	 * @param	\IPS\Member|NULL|FALSE	$member	The member doing the action (NULL for currently logged in member, FALSE for no member)
 	 * @return	void
 	 */
-	public function onUnpublish( Member|bool|null $member ) : void
+	public function onUnpublish( $member )
 	{
 		$this->status = 'draft';
 		$this->save();
 		
-		$this->_onUnpublish( $member );
+		parent::onUnpublish( $member );
 		
 		/* The blog system is slightly different from the \Content future entry stuff. Future entries are treated as drafts,
 			so do count towards entries but parent::onUnpublish will try and decrement item count after unpublish */
 		$this->container()->resetCommentCounts();
 		$this->container()->save();
 	}
-
-	/**
-	 * Check if a specific action is available for this Content.
-	 * Default to TRUE, but used for overrides in individual Item/Comment classes.
-	 *
-	 * @param string $action
-	 * @param Member|null	$member
-	 * @return bool
-	 */
-	public function actionEnabled( string $action, ?Member $member=null ) : bool
-	{
-		$member = $member ?: Member::loggedIn();
-		switch( $action )
-		{
-			case 'comment':
-			case 'reply':
-				if ( $member->checkPostsPerDay() === FALSE )
-				{
-					return FALSE;
-				}
-				break;
-
-			case 'featureComment':
-			case 'unfeatureComment':
-				if ( $member->member_id AND $member->member_id === $this->author()->member_id AND $member->group['g_blog_allowownmod'] )
-				{
-					return TRUE;
-				}
-				break;
-		}
-
-		return parent::actionEnabled( $action, $member );
-	}
 	
 	/**
 	 * Can comment?
 	 *
-	 * @param	Member|NULL	$member							The member (NULL for currently logged in member)
+	 * @param	\IPS\Member\NULL	$member							The member (NULL for currently logged in member)
 	 * @param	bool				$considerPostBeforeRegistering	If TRUE, and $member is a guest, will return TRUE if "Post Before Registering" feature is enabled
 	 * @return	bool
 	 */
-	public function canComment( Member $member=NULL, bool $considerPostBeforeRegistering = TRUE ): bool
+	public function canComment( $member=NULL, $considerPostBeforeRegistering = TRUE )
 	{
-		$member = $member ?: Member::loggedIn();
-
-		$response = parent::canComment( $member, $considerPostBeforeRegistering );
-		if( $response )
+		$member = $member ?: \IPS\Member::loggedIn();
+		
+		if ( parent::canComment( $member, $considerPostBeforeRegistering ) )
 		{
-			if ( !$member->member_id and ( !$considerPostBeforeRegistering or !Settings::i()->post_before_registering )
-				and Login::registrationType() != 'disabled' )
+			if ( $member->checkPostsPerDay() === FALSE )
 			{
-				/* We can override post before register for guests */
-				return (bool) Group::load( Settings::i()->guest_group )->g_blog_allowcomment;
+				return FALSE;
 			}
-			elseif( $member->member_id )
+			elseif ( $member->group['g_blog_allowcomment'] )
 			{
-				return (bool) $member->group['g_blog_allowcomment'];
+				return TRUE;
+			}
+			elseif ( !$member->member_id and $considerPostBeforeRegistering and \IPS\Settings::i()->post_before_registering
+				and \IPS\Login::registrationType() != 'disabled'and \IPS\Settings::i()->bot_antispam_type !== 'none' )
+			{
+				return (bool) \IPS\Member\Group::load( \IPS\Settings::i()->member_group )->g_blog_allowcomment;
 			}
 		}
 		
-		return $response;
+		return FALSE;
+	}
+	
+	/**
+	 * Can set items to be published in the future?
+	 *
+	 * @param	\IPS\Member|NULL	    $member	        The member to check for (NULL for currently logged in member)
+	 * @param   \IPS\Node\Model|null    $container      Container
+	 * @return	bool
+	 */
+	public static function canFuturePublish( $member=NULL, \IPS\Node\Model $container = NULL )
+	{
+		$member = $member ?: \IPS\Member::loggedIn();
+		return (boolean) $member->member_id > 0;
 	}
 	
 	/**
 	 * Check Moderator Permission
 	 *
 	 * @param	string						$type		'edit', 'hide', 'unhide', 'delete', etc.
-	 * @param	Member|NULL			$member		The member to check for or NULL for the currently logged in member
-	 * @param	Model|NULL		$container	The container
+	 * @param	\IPS\Member|NULL			$member		The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Node\Model|NULL		$container	The container
 	 * @return	bool
 	 */
-	public static function modPermission( string $type, ?Member $member = NULL, Model $container = NULL ): bool
+	public static function modPermission( $type, \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
-
-		if( $type == 'future_publish' AND $member->member_id > 0 )
-		{
-			return TRUE;
-		}
-
+		$member = $member ?: \IPS\Member::loggedIn();
 		$result = parent::modPermission( $type, $member, $container );
 		
 		if ( $result !== TRUE )
 		{
-			if ( in_array( $type, array( 'edit', 'delete', 'lock', 'unlock' ) ) and $container and $container->member_id === $member->member_id )
+			if ( \in_array( $type, array( 'edit', 'delete', 'lock', 'unlock' ) ) and $container and $container->member_id === $member->member_id )
 			{
 				$result = $member->group['g_blog_allowownmod'];
 			}
@@ -852,9 +754,9 @@ class Entry extends Item implements
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		parent::delete();
 
@@ -864,11 +766,11 @@ class Entry extends Item implements
 	/**
 	 * Get template for content tables
 	 *
-	 * @return	array
+	 * @return	callable
 	 */
-	public static function contentTableTemplate(): array
+	public static function contentTableTemplate()
 	{
-		return array( Theme::i()->getTemplate( 'global', 'blog', 'front' ), 'rows' );
+		return array( \IPS\Theme::i()->getTemplate( 'global', 'blog', 'front' ), 'rows' );
 	}
 
 	/**
@@ -881,12 +783,30 @@ class Entry extends Item implements
 		return array( array( 'blog_entries.entry_is_future_entry=0 AND blog_entries.entry_status!=?', 'draft' ) );
 	}
 
+    /**
+     * Search Index Permissions
+     *
+     * @return	string	Comma-delimited values or '*'
+     * 	@li			Number indicates a group
+     *	@li			Number prepended by "m" indicates a member
+     *	@li			Number prepended by "s" indicates a social group
+     */
+    public function searchIndexPermissions()
+    {
+        if ( $this->status == 'draft' )
+        {
+            return '0';
+        }
+        
+        return parent::searchIndexPermissions();
+    }
+
 	/**
 	 * WHERE clause for getting items for sitemap (permissions are already accounted for)
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function sitemapWhere(): array
+	public static function sitemapWhere()
 	{
 		return array( array( 'blog_entries.entry_is_future_entry=0 AND blog_entries.entry_status!=?', 'draft' ) );
 	}
@@ -894,8 +814,8 @@ class Entry extends Item implements
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL				$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @return    array
+	 * @param	\IPS\Member|NULL				$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @return	array
 	 * @apiresponse	int							id				ID number
 	 * @apiresponse	string						title			Title
 	 * @apiresponse	\IPS\blog\Blog				blog			Blog
@@ -917,7 +837,7 @@ class Entry extends Item implements
 	 * @apiresponse	float						rating			Average Rating
 	 * @apiresponse	\IPS\blog\Entry\Category	category		Category
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		return array(
 			'id'			=> $this->id,
@@ -925,18 +845,18 @@ class Entry extends Item implements
 			'blog'			=> $this->container()->apiOutput( $authorizedMember ),
 			'author'		=> $this->author()->apiOutput( $authorizedMember ),
 			'draft'			=> $this->status == 'draft',
-			'date'			=> DateTime::ts( $this->date )->rfc3339(),
-			'entry'			=> $this->content(),
+			'date'			=> \IPS\DateTime::ts( $this->date )->rfc3339(),
+			'entry'			=> \IPS\Text\Parser::removeLazyLoad( $this->content() ),
 			'comments'		=> $this->num_comments,
 			'views'			=> $this->views,
 			'prefix'		=> $this->prefix(),
 			'tags'			=> $this->tags(),
-			'locked'		=> $this->locked(),
+			'locked'		=> (bool) $this->locked(),
 			'hidden'		=> (bool) $this->hidden(),
 			'future'		=> $this->isFutureDate(),
 			'pinned'		=> (bool) $this->mapped('pinned'),
 			'featured'		=> (bool) $this->mapped('featured'),
-			'poll'			=> $this->poll_state ? Poll::load( $this->poll_state )->apiOutput( $authorizedMember ) : null,
+			'poll'			=> $this->poll_state ? \IPS\Poll::load( $this->poll_state )->apiOutput( $authorizedMember ) : null,
 			'url'			=> (string) $this->url(),
 			'rating'		=> $this->averageRating(),
 			'category'		=> $this->category_id ? $this->category()->apiOutput() : NULL,
@@ -948,7 +868,7 @@ class Entry extends Item implements
 	 *
 	 * @return	string
 	 */
-	public static function reactionType(): string
+	public static function reactionType()
 	{
 		return 'entry_id';
 	}
@@ -958,9 +878,55 @@ class Entry extends Item implements
 	 *
 	 * @return	array
 	 */
-	public static function supportedMetaDataTypes(): array
+	public static function supportedMetaDataTypes()
 	{
 		return array( 'core_FeaturedComments', 'core_ContentMessages' );
+	}
+	
+	/**
+	 * Can Feature a Comment
+	 *
+	 * @param	\IPS\Member|NULL	$member	The member, or NULL for currently logged in
+	 * @return	bool
+	 */
+	public function canFeatureComment( \IPS\Member $member = NULL )
+	{
+		$return = parent::canFeatureComment( $member );
+		
+		if ( $return === FALSE )
+		{
+			$member = $member ?: \IPS\Member::loggedIn();
+			
+			if ( $member->member_id AND $member->member_id === $this->author()->member_id AND $member->group['g_blog_allowownmod'] )
+			{
+				$return = TRUE;
+			}
+		}
+		
+		return $return;
+	}
+	
+	/**
+	 * Can Unfeature a Comment
+	 *
+	 * @param	\IPS\Member|NULL	$member	The member, or NULL for currently logged in
+	 * @return	bool
+	 */
+	public function canUnfeatureComment( \IPS\Member $member = NULL )
+	{
+		$return = parent::canUnfeatureComment( $member );
+		
+		if ( $return === FALSE )
+		{
+			$member = $member ?: \IPS\Member::loggedIn();
+			
+			if ( $member->member_id AND $member->member_id === $this->author()->member_id AND $member->group['g_blog_allowownmod'] )
+			{
+				$return = TRUE;
+			}
+		}
+		
+		return $return;
 	}
 
 	/**
@@ -969,9 +935,9 @@ class Entry extends Item implements
 	 * @param	int|null	$limit				Number of attachments to fetch, or NULL for all
 	 * @param	bool		$ignorePermissions	If set to TRUE, permission to view the images will not be checked
 	 * @return	array|NULL
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function contentImages( int $limit = NULL, bool $ignorePermissions = FALSE ): array|null
+	public function contentImages( $limit = NULL, $ignorePermissions = FALSE )
 	{
 		$idColumn = static::$databaseColumnId;
 		$internal = NULL;
@@ -979,12 +945,12 @@ class Entry extends Item implements
 		
 		if ( isset( static::$databaseColumnMap['content'] ) )
 		{
-			$internal = Db::i()->select( 'attachment_id', 'core_attachments_map', array( 'location_key=? and id1=?', 'blog_Entries', $this->$idColumn ) );
+			$internal = \IPS\Db::i()->select( 'attachment_id', 'core_attachments_map', array( 'location_key=? and id1=?', 'blog_Entries', $this->$idColumn ) );
 		}
 
 		if ( $internal )
 		{
-			foreach( Db::i()->select( '*', 'core_attachments', array( array( 'attach_id IN(?)', $internal ), array( 'attach_is_image=1' ) ), 'attach_id ASC', $limit ) as $row )
+			foreach( \IPS\Db::i()->select( '*', 'core_attachments', array( array( 'attach_id IN(?)', $internal ), array( 'attach_is_image=1' ) ), 'attach_id ASC', $limit ) as $row )
 			{
 				$attachments[] = array( 'core_Attachment' => $row['attach_location'] );
 			}
@@ -1003,12 +969,27 @@ class Entry extends Item implements
 		}
 
 		/* IS there a club with a cover photo? */
-		if ( IPS::classUsesTrait( $this->container(), 'IPS\Content\ClubContainer' ) and $club = $this->container()->club() )
+		if ( \IPS\IPS::classUsesTrait( $this->container(), 'IPS\Content\ClubContainer' ) and $club = $this->container()->club() )
 		{
 			$attachments[] = array( 'core_Clubs' => $club->cover_photo );
 		}
 		
-		return count( $attachments ) ? array_slice( $attachments, 0, $limit ) : NULL;
+		return \count( $attachments ) ? \array_slice( $attachments, 0, $limit ) : NULL;
+	}
+
+	/**
+	 * Is this a future entry?
+	 *
+	 * @return bool
+	 */
+	public function isFutureDate()
+	{
+		if ( $this->date > time() )
+		{
+			return TRUE;
+		}
+
+		return FALSE;
 	}
 
 	/**
@@ -1017,23 +998,23 @@ class Entry extends Item implements
 	 * @param	array	$params	Additional parameters to add to URL
 	 * @return	string
 	 */
-	public function embedContent( array $params ): string
+	public function embedContent( $params )
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'embed.css', 'blog', 'front' ) );
-		return Theme::i()->getTemplate( 'global', 'blog' )->embedEntry( $this, $this->container(), $this->url()->setQueryString( $params ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'embed.css', 'blog', 'front' ) );
+		return \IPS\Theme::i()->getTemplate( 'global', 'blog' )->embedEntry( $this, $this->container(), $this->url()->setQueryString( $params ) );
 	}
 
 	/**
 	 * Get category
 	 *
-	 * @return	Category
-	 * @throws	OutOfRangeException
+	 * @return	\IPS\blog\Entry\Category
+	 * @throws	\OutOfRangeException
 	 */
-	public function category(): Category
+	public function category()
 	{
 		if ( $this->category === NULL )
 		{
-			$this->category	= Category::load( $this->category_id );
+			$this->category	= \IPS\blog\Entry\Category::load( $this->category_id );
 		}
 
 		return $this->category;
@@ -1042,51 +1023,15 @@ class Entry extends Item implements
 	/**
 	 * Move
 	 *
-	 * @param	Model	$container	Container to move to
-	 * @param bool $keepLink	If TRUE, will keep a link in the source
+	 * @param	\IPS\Node\Model	$container	Container to move to
+	 * @param	bool			$keepLink	If TRUE, will keep a link in the source
 	 * @return	void
 	 */
-	public function move( Model $container, bool $keepLink=FALSE ): void
+	public function move( \IPS\Node\Model $container, $keepLink=FALSE )
 	{
 		parent::move( $container, $keepLink );
 		
 		$this->category_id = NULL;
 		$this->save();
-	}
-
-	public static string $itemMenuCss = '';
-
-	/**
-	 * Return badges that should be displayed with the content header
-	 *
-	 * @return array
-	 */
-	public function badges() : array
-	{
-		$return = parent::badges();
-
-		if( $this->status === 'draft' )
-		{
-			$return['unpublished'] = new Icon( Badge::BADGE_WARNING, 'fa-pen-to-square fa-regular', Member::loggedIn()->language()->addToStack( 'unpublished' ) );
-		}
-
-		return $return;
-	}
-
-	/**
-	 * Allow for individual classes to override and
-	 * specify a primary image. Used for grid views, etc.
-	 *
-	 * @return File|null
-	 */
-	public function primaryImage() : ?File
-	{
-		if( $image = parent::primaryImage() )
-		{
-			return $image;
-		}
-
-		/* If we don't have a cover photo for the entry, maybe we have one for the blog? */
-		return $this->container()->primaryImage();
 	}
 }

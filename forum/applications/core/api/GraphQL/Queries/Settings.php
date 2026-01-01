@@ -10,28 +10,26 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use IPS\core\api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\SettingsType;
-use IPS\Settings as SettingsClass;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Settings query for GraphQL API
  */
-class Settings
+class _Settings
 {
 
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns values of system settings (subject to the setting being exposed by the API)";
+	public static $description = "Returns values of system settings (subject to the setting being exposed by the API)";
 
 	/*
 	 * Query arguments
@@ -44,21 +42,21 @@ class Settings
 	/**
 	 * Return the query return type
 	 */
-	public function type() : SettingsType
+	public function type() 
 	{
-		return TypeRegistry::settings();
+		return \IPS\core\api\GraphQL\TypeRegistry::settings();
 	}
 
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @return	SettingsClass
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\Settings
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : SettingsClass
+	public function resolve($val, $args, $context)
 	{
-		return SettingsClass::i();
+		return \IPS\Settings::i();
 	}
 }

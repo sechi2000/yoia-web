@@ -10,30 +10,25 @@
  */
 
 namespace IPS\forums\api\GraphQL\Mutations;
-use Exception;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\forums\api\GraphQL\Types\PostType;
-use IPS\forums\Topic\Post;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Set a post as best answer mutation for GraphQL API
  */
-class SetBestAnswer
+class _SetBestAnswer
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Set a post as best answer";
+	public static $description = "Set a post as best answer";
 
 	/*
 	 * Mutation arguments
@@ -47,10 +42,8 @@ class SetBestAnswer
 
 	/**
 	 * Return the mutation return type
-	 *
-	 * @return PostType
 	 */
-	public function type() : PostType
+	public function type() 
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::post();
 	}
@@ -58,30 +51,36 @@ class SetBestAnswer
 	/**
 	 * Resolves this mutation
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @return	Post
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\forums\Forum
 	 */
-	public function resolve( mixed $val, array $args ) : Post
+	public function resolve($val, $args)
 	{
 		try
 		{
-			$post = Post::loadAndCheckPerms( $args['id'] );
+			$post = \IPS\forums\Topic\Post::loadAndCheckPerms( $args['id'] );
 			$topic = $post->item();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'NO_POST', 'GQL/0010/1', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_POST', 'GQL/0010/1', 403 );
 		}
 
 		if( !$topic->can('read') )
 		{
-			throw new SafeException( 'INVALID_ID', 'GQL/0010/2', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_ID', 'GQL/0010/2', 403 );
+		}
+
+		if( !$topic->isQuestion() )
+		{
+			throw new \IPS\Api\GraphQL\SafeException( 'NON_QUESTION', 'GQL/0010/3', 403 );
 		}
 
 		if( !$topic->canSetBestAnswer() )
 		{
-			throw new SafeException( 'NO_PERMISSION', 'GQL/0010/4', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_PERMISSION', 'GQL/0010/4', 403 );
 		}
 
 		// Do we have an existing best answer
@@ -89,11 +88,11 @@ class SetBestAnswer
 		{
 			try
 			{
-				$oldBestAnswer = Post::load( $topic->topic_answered_pid );
+				$oldBestAnswer = \IPS\forums\Topic\Post::load( $topic->topic_answered_pid );
 				$oldBestAnswer->post_bwoptions['best_answer'] = FALSE;
 				$oldBestAnswer->save();
 			}
-			catch ( Exception $e ) {}
+			catch ( \Exception $e ) {}
 		}
 
 		$post->post_bwoptions['best_answer'] = TRUE;

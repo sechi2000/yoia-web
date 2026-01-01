@@ -12,41 +12,34 @@
 namespace IPS\gallery\modules\admin\stats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Output;
-use IPS\Request;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member Stats
  */
-class member extends Controller
+class _member extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * @brief	Allow MySQL RW separation for efficiency
 	 */
-	public static bool $allowRWSeparation = TRUE;
+	public static $allowRWSeparation = TRUE;
 	
 	/**
 	 * Images
 	 *
 	 * @return	void
 	 */
-	protected function images() : void
+	protected function images()
 	{
-		Output::i()->redirect( Url::internal("app=core&module=members&controller=members&do=view&id=" . Request::i()->id . "&blockKey=core_ContentStatistics&block[core_ContentStatistics]=gallery_Gallery") );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal("app=core&module=members&controller=members&do=view&id=" . \IPS\Request::i()->id . "&blockKey=core_ContentStatistics&block[core_ContentStatistics]=gallery_Gallery") );
 	}
 }

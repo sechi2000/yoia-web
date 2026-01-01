@@ -10,63 +10,46 @@
 
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Email\Outgoing\SendGrid as SendGridClass;
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Session;
 use IPS\Settings;
-use LogicException;
-use function defined;
-use function in_array;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancements: SendGrid integration
  */
-class SendGrid extends CommunityEnhancementsAbstract
+class _SendGrid
 {
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= FALSE;
+	public $ips	= FALSE;
 
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= TRUE;
+	public $hasOptions	= TRUE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "sendgrid.png";
+	public $icon	= "sendgrid.png";
 
 	/**
-	 * Can we use this? - SendGrid is only available for those that have used it previously, new installs do not have access
+	 * Can we use this?
 	 *
-	 * @return	bool
+	 * @return	void
 	 */
-	public static function isAvailable(): bool
+	public static function isAvailable()
 	{
 		if( Settings::i()->sendgrid_deprecated )
 		{
@@ -82,7 +65,7 @@ class SendGrid extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		$this->enabled = ( static::isAvailable() && Settings::i()->sendgrid_api_key && Settings::i()->sendgrid_use_for );
+		$this->enabled = ( static::isAvailable() && \IPS\Settings::i()->sendgrid_api_key && \IPS\Settings::i()->sendgrid_use_for );
 	}
 	
 	/**
@@ -90,10 +73,10 @@ class SendGrid extends CommunityEnhancementsAbstract
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
-		$form = new Form;
-		$form->add( new Radio( 'sendgrid_use_for', Settings::i()->sendgrid_use_for, TRUE, array(
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Radio( 'sendgrid_use_for', \IPS\Settings::i()->sendgrid_use_for, TRUE, array(
 					'options'	=> array(
 										'0'	=> 'sendgrid_donot_use',
 										'1'	=> 'sendgrid_bulkmail_use',
@@ -105,9 +88,9 @@ class SendGrid extends CommunityEnhancementsAbstract
 										'2'	=> array( 'sendgrid_api_key', 'sendgrid_click_tracking', 'sendgrid_ip_pool' ),
 										)
 				) ) );
-		$form->add( new Text( 'sendgrid_api_key', Settings::i()->sendgrid_api_key, FALSE, array(), NULL, NULL, Member::loggedIn()->language()->addToStack('sendgrid_api_key_suffix'), 'sendgrid_api_key' ) );
-		$form->add( new YesNo( 'sendgrid_click_tracking', Settings::i()->sendgrid_click_tracking, FALSE, array(), NULL, NULL, NULL, 'sendgrid_click_tracking' ) );
-		$form->add( new Text( 'sendgrid_ip_pool', Settings::i()->sendgrid_ip_pool ?: NULL, FALSE, array( 'nullLang' => 'sendgrid_ip_pool_none' ), NULL, NULL, NULL, 'sendgrid_ip_pool' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'sendgrid_api_key', \IPS\Settings::i()->sendgrid_api_key, FALSE, array(), NULL, NULL, \IPS\Member::loggedIn()->language()->addToStack('sendgrid_api_key_suffix'), 'sendgrid_api_key' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'sendgrid_click_tracking', \IPS\Settings::i()->sendgrid_click_tracking, FALSE, array(), NULL, NULL, NULL, 'sendgrid_click_tracking' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'sendgrid_ip_pool', \IPS\Settings::i()->sendgrid_ip_pool ?: NULL, FALSE, array( 'nullLang' => 'sendgrid_ip_pool_none' ), NULL, NULL, NULL, 'sendgrid_ip_pool' ) );
 
 		if ( $values = $form->values() )
 		{
@@ -115,26 +98,31 @@ class SendGrid extends CommunityEnhancementsAbstract
 			{
 				$this->testSettings( $values );
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				Output::i()->error( $e->getMessage(), '2C339/1' );
+				\IPS\Output::i()->error( $e->getMessage(), '2C339/1', 500 );
+			}
+
+			if( $values['sendgrid_use_for'] > 0 )
+			{
+				$values['sparkpost_use_for'] = 0;
 			}
 
 			$form->saveAsSettings( $values );
-			Session::i()->log( 'acplog__enhancements_edited', array( 'enhancements__core_SendGrid' => TRUE ) );
-			Output::i()->inlineMessage	= Member::loggedIn()->language()->addToStack('saved');
+			\IPS\Session::i()->log( 'acplog__enhancements_edited', array( 'enhancements__core_SendGrid' => TRUE ) );
+			\IPS\Output::i()->inlineMessage	= \IPS\Member::loggedIn()->language()->addToStack('saved');
 		}
 		
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'help'		=> array(
 				'title'		=> 'learn_more',
 				'icon'		=> 'question-circle',
-				'link'		=> Url::ips( 'docs/sendgrid' ),
+				'link'		=> \IPS\Http\Url::ips( 'docs/sendgrid' ),
 				'target'	=> '_blank'
 			),
 		);
 		
-		Output::i()->output = $form;
+		\IPS\Output::i()->output = $form;
 	}
 	
 	/**
@@ -142,25 +130,25 @@ class SendGrid extends CommunityEnhancementsAbstract
 	 *
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		/* If we're disabling, just disable */
 		if( !$enabled )
 		{
-			Settings::i()->changeValues( array( 'sendgrid_use_for' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'sendgrid_use_for' => 0 ) );
 		}
 
 		/* Otherwise if we already have an API key, just toggle bulk mail on */
-		if( $enabled && Settings::i()->sendgrid_api_key )
+		if( $enabled && \IPS\Settings::i()->sendgrid_api_key )
 		{
-			Settings::i()->changeValues( array( 'sendgrid_use_for' => 1 ) );
+			\IPS\Settings::i()->changeValues( array( 'sendgrid_use_for' => 1, 'sparkpost_use_for' => 0 ) );
 		}
 		else
 		{
 			/* Otherwise we need to let them enter an API key before we can enable.  Throwing an exception causes you to be redirected to the settings page. */
-			throw new DomainException;
+			throw new \DomainException;
 		}
 	}
 	
@@ -169,16 +157,16 @@ class SendGrid extends CommunityEnhancementsAbstract
 	 *
 	 * @param	array 	$values	Form values
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	protected function testSettings( array $values ) : void
+	protected function testSettings( $values )
 	{
 		/* If we've disabled, just shut off */
 		if( (int) $values['sendgrid_use_for'] === 0 )
 		{
-			if( Settings::i()->mail_method == 'sendgrid' )
+			if( \IPS\Settings::i()->mail_method == 'sendgrid' )
 			{
-				Settings::i()->changeValues( array( 'mail_method' => 'mail' ) );
+				\IPS\Settings::i()->changeValues( array( 'mail_method' => 'mail' ) );
 			}
 
 			return;
@@ -187,23 +175,23 @@ class SendGrid extends CommunityEnhancementsAbstract
 		/* If we enable SendGrid but do not supply an API key, this is a problem */
 		if( !$values['sendgrid_api_key'] )
 		{
-			throw new InvalidArgumentException( "sendgrid_enable_need_details" );
+			throw new \InvalidArgumentException( "sendgrid_enable_need_details" );
 		}
 
 		/* Test SendGrid settings */
 		try
 		{
-			$sendgrid = new SendGridClass( $values['sendgrid_api_key'] );
+			$sendgrid = new \IPS\Email\Outgoing\SendGrid( $values['sendgrid_api_key'] );
 			$scopes = $sendgrid->scopes();
 			
-			if ( !in_array( 'mail.send', $scopes['scopes'] ) )
+			if ( !\in_array( 'mail.send', $scopes['scopes'] ) )
 			{
-				throw new DomainException( 'sendgrid_bad_scopes' );
+				throw new \DomainException( 'sendgrid_bad_scopes' );
 			}
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			throw new DomainException( 'sendgrid_bad_credentials' );
+			throw new \DomainException( 'sendgrid_bad_credentials' );
 		}
 	}
 }

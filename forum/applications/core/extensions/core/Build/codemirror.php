@@ -11,33 +11,25 @@
 namespace IPS\core\extensions\core\Build;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Garfix\JsMinify\Minifier;
-use IPS\Extensions\BuildAbstract;
-use IPS\Theme;
-use RuntimeException;
-use function defined;
-use function file_put_contents;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Build CodeMirror for release
  */
-class Codemirror extends BuildAbstract
+class _Codemirror
 {
 	/**
 	 * Build
 	 *
 	 * @return	void
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 * @note	You can define JAVA_PATH in constants.php if you need to specify the path to your java executable
 	 */
-	public function build() : void
+	public function build()
 	{
 		/* Copy the CSS file */
 		$css = file_get_contents( \IPS\ROOT_PATH . '/applications/core/dev/codemirror/lib/codemirror.css' );
@@ -68,10 +60,10 @@ class Codemirror extends BuildAbstract
 		require_once( \IPS\ROOT_PATH . '/system/3rd_party/JsMinify/MinifierError.php' );
 		require_once( \IPS\ROOT_PATH . '/system/3rd_party/JsMinify/MinifierExpressions.php' );
 
-		$css = Theme::minifyCss( $css );
-		file_put_contents( \IPS\ROOT_PATH . '/applications/core/interface/static/codemirror/codemirror.css', $css );
-		$js = Minifier::minify( $js, array( 'flaggedComments' => false ) );
-		file_put_contents( \IPS\ROOT_PATH . '/applications/core/interface/static/codemirror/codemirror.js', $js );
+		\file_put_contents( \IPS\ROOT_PATH . '/applications/core/interface/codemirror/codemirror.css', $css );
+		$css = \IPS\Theme::minifyCss( $css );
+		$js = \Garfix\JsMinify\Minifier::minify( $js, array( 'flaggedComments' => false ) );
+		\file_put_contents( \IPS\ROOT_PATH . '/applications/core/interface/codemirror/codemirror.js', $js );
 		
 		/* Finish */
 		$this->finish();
@@ -82,7 +74,7 @@ class Codemirror extends BuildAbstract
 	 *
 	 * @return	void
 	 */
-	public function finish() : void
+	protected function finish()
 	{
 
 	}

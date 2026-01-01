@@ -12,27 +12,20 @@
 namespace IPS\cms\extensions\core\ModeratorPermissions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\cms\Databases as DatabasesClass;
-use IPS\Extensions\ModeratorPermissionsAbstract;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Moderator Permissions: Databases
  */
-class Databases extends ModeratorPermissionsAbstract
+class _Databases
 {
 	/**
 	 * Get Permissions
 	 *
-	 * @param array $toggles
 	 * @code
 	 	return array(
 	 		'key'	=> 'YesNo',	// Can just return a string with type
@@ -47,10 +40,10 @@ class Databases extends ModeratorPermissionsAbstract
 	 * @endcode
 	 * @return	array
 	 */
-	public function getPermissions( array $toggles ): array
+	public function getPermissions()
 	{
 		/* Preload words */
-		DatabasesClass::databases();
+		\IPS\cms\Databases::databases();
 		
 		$return = array(
 			'can_content_revisions_content'		=> 'YesNo',
@@ -59,11 +52,34 @@ class Databases extends ModeratorPermissionsAbstract
 			'can_content_view_others_records'	=> "YesNo"
 		);
 		
-		if ( Application::appIsEnabled('forums') )
+		if ( \IPS\Application::appIsEnabled('forums') )
 		{
 			$return['can_copy_topic_database'] = 'YesNo';
 		}
 		
 		return $return;
+	}
+	
+	/**
+	 * After change
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @param	array	$changed	Values that were changed
+	 * @return	void
+	 */
+	public function onChange( $moderator, $changed )
+	{
+		
+	}
+	
+	/**
+	 * After delete
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @return	void
+	 */
+	public function onDelete( $moderator )
+	{
+		
 	}
 }

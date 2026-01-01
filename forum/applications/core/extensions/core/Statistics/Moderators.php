@@ -10,43 +10,46 @@
 
 namespace IPS\core\extensions\core\Statistics;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
+use IPS\core\Statistics\Chart as ParentClass;
+use IPS\Http\Url;
 use IPS\Helpers\Chart;
 use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
 use IPS\Member;
 use IPS\Theme;
-use function count;
-use function defined;
+use IPS\DateTime as IPSDateTime;
+use IPS\Db;
 
+use function defined;
+use function header;
+use function count;
+use function implode;
+
+/* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Moderators extends \IPS\core\Statistics\Chart
+class _Moderators extends ParentClass
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_stats_moderators';
+	public $controller = 'core_stats_moderators';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
 	public function getChart( Url $url ): Chart
 	{
-		$chart	= new Database( $url, 'core_moderator_logs', 'ctime', '', array(
+		$chart	= new Database( $url, 'core_moderator_logs', 'ctime', '', array( 
 			'isStacked' => TRUE,
 			'backgroundColor' 	=> '#ffffff',
 			'hAxis'				=> array( 'gridlines' => array( 'color' => '#f5f5f5' ) ),
@@ -58,7 +61,7 @@ class Moderators extends \IPS\core\Statistics\Chart
 		$chart->groupBy = 'member_id';
 		$chart->title = Member::loggedIn()->language()->addToStack('stats_moderator_activity_title');
 		$chart->availableTypes = array( 'LineChart', 'AreaChart', 'ColumnChart', 'BarChart' );
-
+		
 		$chart->tableLangPrefix = 'mod_stats_';
 		$chart->tableInclude = array( 'member_id', 'lang_key', 'ctime' );
 		$chart->tableParsers = array(
@@ -70,16 +73,16 @@ class Moderators extends \IPS\core\Statistics\Chart
 			},
 			'ctime'	=> function( $val )
 			{
-				return (string) DateTime::ts( $val );
+				return (string) IPSDateTime::ts( $val );
 			}
 		);
 		
 		/* Didn't find any specified? Do the default of the top 50 moderators */
 		$where = array();
-		if ( $chart->start instanceof DateTime or $chart->end instanceof DateTime )
+		if ( $chart->start instanceof IPSDateTime or $chart->end instanceof IPSDateTime )
 		{
-			$start = $chart->start instanceof DateTime ? $chart->start->getTimestamp() : 0;
-			$end   = $chart->end instanceof DateTime ? $chart->end->getTimestamp() : time();
+			$start = $chart->start instanceof IPSDateTime ? $chart->start->getTimestamp() : 0;
+			$end   = $chart->end instanceof IPSDateTime ? $chart->end->getTimestamp() : time();
 			$where[]  = array( 'ctime BETWEEN ? AND ?', $start, $end );
 		}
 		
@@ -124,7 +127,7 @@ class Moderators extends \IPS\core\Statistics\Chart
 		{
 			$member = Member::load( $moderatorRow['member_id'] );
 			$chart->addSeries(
-				( $member->member_id ) ? $member->name : Member::loggedIn()->language()->addToStack( 'deleted_member' ),
+				( $member->member_id ) ? $member->name : \IPS\Member::loggedIn()->language()->addToStack( 'deleted_member' ),
 				'number',
 				'COUNT(*)',
 				TRUE,

@@ -11,50 +11,39 @@
 namespace IPS\core\Online;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Table\Table as TableHelper;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use IPS\Session\Store;
-use IPS\Settings;
-use function defined;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Promote Table Helper
  */
-class Table extends TableHelper
+class _Table extends \IPS\Helpers\Table\Table
 {	
 	/**
 	 * @brief	Rows
 	 */
-	protected static ?array $rows = null;
+	protected static $rows = null;
 	
 	/**
 	 * @brief	WHERE clause
 	 */
-	protected array $where = array();
+	protected $where = array();
 	
 	/**
 	 * @brief	WHERE clause
 	 */
-	public int $count = 0;
+	public $count = 0;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Url|null $url	Base URL
+	 * @param	\IPS\Http\Url	Base URL
 	 * @return	void
 	 */
-	public function __construct( Url $url=NULL )
+	public function __construct( \IPS\Http\Url $url=NULL )
 	{
 		/* Init */	
 		parent::__construct( $url );
@@ -63,10 +52,10 @@ class Table extends TableHelper
 	/**
 	 * Get rows
 	 *
-	 * @param	array|null	$advancedSearchValues	Values from the advanced search form
+	 * @param	array	$advancedSearchValues	Values from the advanced search form
 	 * @return	array
 	 */
-	public function getRows( array $advancedSearchValues=NULL ): array
+	public function getRows( $advancedSearchValues=NULL )
 	{
 		if ( static::$rows === NULL )
 		{
@@ -74,28 +63,28 @@ class Table extends TableHelper
 			static::$rows = array();
 			
 			/* What are we sorting by? */
-			$sortDirection = ( ( $this->sortDirection and mb_strtolower( $this->sortDirection ) == 'asc' ) ? 'asc' : 'desc' );
-			$flags = Store::ONLINE_MEMBERS | Store::ONLINE_GUESTS;
+			$sortDirection = ( mb_strtolower( $this->sortDirection ) == 'asc' ? 'asc' : 'desc' );
+			$flags = \IPS\Session\Store::ONLINE_MEMBERS | \IPS\Session\Store::ONLINE_GUESTS;
 			$memberGroup = NULL;
 			
 			if ( $this->filter == 'filter_loggedin' )
 			{
-				$flags = Store::ONLINE_MEMBERS;
+				$flags = \IPS\Session\Store::ONLINE_MEMBERS;
 			}
-			elseif ( $this->filter and mb_stristr( $this->filter, 'group_' ) )
+			elseif ( mb_stristr( $this->filter, 'group_' ) )
 			{
-				$memberGroup = intval( $this->filters[ $this->filter ] );
+				$memberGroup = \intval( $this->filters[ $this->filter ] );
 			}
 
-			$this->count = Store::i()->getOnlineUsers( $flags | Store::ONLINE_COUNT_ONLY, $sortDirection, NULL, $memberGroup, Member::loggedIn()->isAdmin() );
+			$this->count = \IPS\Session\Store::i()->getOnlineUsers( $flags | \IPS\Session\Store::ONLINE_COUNT_ONLY, $sortDirection, NULL, $memberGroup, \IPS\Member::loggedIn()->isAdmin() );
 			
 			/* If we're not filtering - update our most online count */
 			if ( $this->filter === NULL )
 			{
-				$mostOnline = json_decode( Settings::i()->most_online, TRUE );
+				$mostOnline = json_decode( \IPS\Settings::i()->most_online, TRUE );
 				if ( $this->count > $mostOnline['count'] )
 				{
-					Settings::i()->changeValues( array( 'most_online' => json_encode( array(
+					\IPS\Settings::i()->changeValues( array( 'most_online' => json_encode( array(
 						'count'		=> $this->count,
 						'time'		=> time()
 					) ) ) );
@@ -105,7 +94,7 @@ class Table extends TableHelper
 	  		$this->pages = ceil( $this->count / $this->limit );
 	
 			/* Get results */
-			$rows = Store::i()->getOnlineUsers( $flags, $sortDirection, array( ( $this->limit * ( $this->page - 1 ) ), $this->limit ), $memberGroup, Member::loggedIn()->isAdmin() );
+			$rows = \IPS\Session\Store::i()->getOnlineUsers( $flags, $sortDirection, array( ( $this->limit * ( $this->page - 1 ) ), $this->limit ), $memberGroup, \IPS\Member::loggedIn()->isAdmin() );
 			
 			/* Loop the data */
 			foreach ( $rows as $rowId => $row )
@@ -117,14 +106,14 @@ class Table extends TableHelper
 					$row = array();
 					foreach ( $this->include as $k )
 					{
-						$row[ $k ] = $_row[$k] ?? NULL;
+						$row[ $k ] = isset( $_row[ $k ] ) ? $_row[ $k ] : NULL;
 					}
 					
-					if( !empty( $advancedSearchValues ) AND !isset( Request::i()->noColumn ) )
+					if( !empty( $advancedSearchValues ) AND !isset( \IPS\Request::i()->noColumn ) )
 					{
 						foreach ( $advancedSearchValues as $k => $v )
 						{
-							$row[ $k ] = $_row[$k] ?? NULL;
+							$row[ $k ] = isset( $_row[ $k ] ) ? $_row[ $k ] : NULL;
 						}
 					}
 				}
@@ -143,7 +132,7 @@ class Table extends TableHelper
 					}
 	
 					/* Are we including this one? */
-					if( ( ( $this->include !== NULL and !in_array( $k, $this->include ) ) or ( $this->exclude !== NULL and in_array( $k, $this->exclude ) ) ) and !array_key_exists( $k, $advancedSearchValues ) )
+					if( ( ( $this->include !== NULL and !\in_array( $k, $this->include ) ) or ( $this->exclude !== NULL and \in_array( $k, $this->exclude ) ) ) and !array_key_exists( $k, $advancedSearchValues ) )
 					{
 						unset( $row[ $k ] );
 						continue;
@@ -168,7 +157,7 @@ class Table extends TableHelper
 	 * @param	array|NULL	$advancedSearchValues	Advanced search values
 	 * @return	array
 	 */
-	public function getHeaders( array $advancedSearchValues=NULL ): array
+	public function getHeaders( $advancedSearchValues )
 	{
 		return array();
 	}

@@ -12,73 +12,51 @@
 namespace IPS\nexus;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\nexus\Form\Money;
-use IPS\Node\Model;
-use IPS\Settings;
-use IPS\Theme;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Commission Rule Node
  */
-class CommissionRule extends Model
+class _CommissionRule extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_referral_rules';
+	public static $databaseTable = 'nexus_referral_rules';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'rrule_';
+	public static $databasePrefix = 'rrule_';
 		
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'name';
+	public static $databaseColumnOrder = 'name';
 
 	/**
 	 * @brief	[Node] Automatically set position for new nodes
 	 */
-	public static bool $automaticPositionDetermination = FALSE;
+	public static $automaticPositionDetermination = FALSE;
 	
 	/**
 	 * @brief	[Node] Sortable?
 	 */
-	public static bool $nodeSortable = FALSE;
+	public static $nodeSortable = FALSE;
 		
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'commission_rules';
+	public static $nodeTitle = 'commission_rules';
 	
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -96,7 +74,7 @@ class CommissionRule extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'nexus',
 		'module'	=> 'customers',
 		'all'		=> 'referrals_commission_rules'
@@ -107,45 +85,23 @@ class CommissionRule extends Model
 	 *
 	 * @return	string
 	 */
-	protected function get__title(): string
+	protected function get__title()
 	{
 		return $this->name;
-	}
-
-	/**
-	 * @return array|null
-	 */
-	public function get_purchase_packages() : ?array
-	{
-		if( isset( $this->_data['purchase_packages'] ) and $this->_data['purchase_packages'] )
-		{
-			if( $test = json_decode( $this->_data['purchase_packages'], true ) )
-			{
-				return $test;
-			}
-
-			return [
-				'product' => [
-					'products' => explode( ",", $this->_data['purchase_packages'] )
-				]
-			];
-		}
-
-		return null;
 	}
 	
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
 		$numberOfPurchasesField = array(
 			'getHtml'	=> function( $field )
 			{
-				return Theme::i()->getTemplate('customers', 'nexus' )->numberOfPurchasesField( $field );
+				return \IPS\Theme::i()->getTemplate('customers', 'nexus' )->numberOfPurchasesField( $field );
 			},
 			'formatValue'=> function( $field )
 			{
@@ -165,28 +121,28 @@ class CommissionRule extends Model
 		);
 		
 		$groups = array();
-		foreach ( Group::groups() as $group )
+		foreach ( \IPS\Member\Group::groups() as $group )
 		{
 			$groups[ $group->g_id ] = $group->name;
 		}
 		$groupsExcludingGuests = $groups;
-		unset( $groupsExcludingGuests[ Settings::i()->guest_group ] );
+		unset( $groupsExcludingGuests[ \IPS\Settings::i()->guest_group ] );
 
-		$form->add( new Text( 'rrule_name', $this->name, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'rrule_name', $this->name, TRUE ) );
 		
 		$form->addHeader('rrule_referrer');
-		$form->add( new Custom( 'rrule_by_purchases', array( $this->by_purchases_type, $this->by_purchases_op, $this->by_purchases_unit ), FALSE, $numberOfPurchasesField ) );
-		$form->add( new CheckboxSet( 'rrule_by_group', ( $this->by_group and $this->by_group != '*' ) ? explode( ',', $this->by_group ) : '*', FALSE, array( 'options' => $groupsExcludingGuests, 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'any', 'impliedUnlimited' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'rrule_by_purchases', array( $this->by_purchases_type, $this->by_purchases_op, $this->by_purchases_unit ), FALSE, $numberOfPurchasesField ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'rrule_by_group', ( $this->by_group and $this->by_group != '*' ) ? explode( ',', $this->by_group ) : '*', FALSE, array( 'options' => $groupsExcludingGuests, 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'any', 'impliedUnlimited' => TRUE ) ) );
 
 		$form->addHeader('rrule_referree');
-		$form->add( new Custom( 'rrule_for_purchases', array( $this->for_purchases_type, $this->for_purchases_op, $this->for_purchases_unit ), FALSE, $numberOfPurchasesField ) );
-		$form->add( new CheckboxSet( 'rrule_for_group', ( $this->for_group and $this->for_group != '*' ) ? explode( ',', $this->for_group ) : '*', FALSE, array( 'options' => $groups, 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'any', 'impliedUnlimited' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'rrule_for_purchases', array( $this->for_purchases_type, $this->for_purchases_op, $this->for_purchases_unit ), FALSE, $numberOfPurchasesField ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'rrule_for_group', ( $this->for_group and $this->for_group != '*' ) ? explode( ',', $this->for_group ) : '*', FALSE, array( 'options' => $groups, 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'any', 'impliedUnlimited' => TRUE ) ) );
 		
 		$form->addHeader('rrule_purchase');
-		$form->add( new Custom( 'rrule_purchase_amount', array( $this->purchase_amount_op, $this->purchase_amount_unit ), FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Custom( 'rrule_purchase_amount', array( $this->purchase_amount_op, $this->purchase_amount_unit ), FALSE, array(
 			'getHtml'	=> function( $field )
 			{
-				return Theme::i()->getTemplate( 'customers', 'nexus' )->purchaseValueField( $field );
+				return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->purchaseValueField( $field );
 			},
 			'formatValue'	=> function( $field )
 			{
@@ -195,56 +151,44 @@ class CommissionRule extends Model
 				{
 					return array( '', '' );
 				}
-				$value[1] = is_array( $value[1] ) ? json_encode( $value[1] ) : $value[1];
+				$value[1] = \is_array( $value[1] ) ? json_encode( $value[1] ) : $value[1];
 				return $value;
 			}
 		) ) );
-
-		$productFields = [];
-		$toggles = [ 'rrule_purchase_renewal', 'rrule_purchase_package_limit' ];
-		foreach( Application::allExtensions( 'nexus', 'Item', null, null, null, false ) as $extension )
-		{
-			if( method_exists( $extension, 'customFormElements' ) )
-			{
-				$fields = $extension::customFormElements( $this->purchase_packages );
-				if( count( $fields ) )
-				{
-					foreach( $fields as $field )
-					{
-						/* @var FormAbstract $field */
-						$productFields[] = $field;
-						$toggles[] = $field->htmlId ?? $field->name;
-					}
-				}
-			}
-		}
-
-		$form->add( new Radio( 'rrule_purchase_any', $this->purchase_packages ? $this->purchase_any : 2, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'rrule_purchase_any', $this->purchase_packages ? $this->purchase_any : 2, FALSE, array(
 			'options'	=> array(
 				2	=> 'rrule_purchase_any_nr',
 				0	=> 'rrule_purchase_any_all',
 				1	=> 'rrule_purchase_any_any',
 			),
 			'toggles'	=> array(
-				0	=> $toggles,
-				1	=> $toggles,
+				0	=> array( 'rrule_purchase_packages', 'rrule_purchase_renewal', 'rrule_purchase_package_limit' ),
+				1	=> array( 'rrule_purchase_packages', 'rrule_purchase_renewal', 'rrule_purchase_package_limit' ),
 			)
 		) ) );
-
-		foreach( $productFields as $field )
+		$form->add( new \IPS\Helpers\Form\Node( 'rrule_purchase_packages', array_map( function( $id )
 		{
-			$form->add( $field );
-		}
-
-		$form->add( new YesNo( 'rrule_purchase_renewal', $this->purchase_renewal, FALSE, array(), NULL, NULL, NULL, 'rrule_purchase_renewal' ) );
+			try
+			{
+				return \IPS\nexus\Package::load( $id );
+			}
+			catch ( \Exception $e )
+			{
+				return NULL;
+			}
+		}, explode( ',', $this->purchase_packages ) ), FALSE, array( 'class' => 'IPS\nexus\Package\Group', 'multiple' => TRUE, 'permissionCheck' => function( $node )
+		{
+			return !( $node instanceof \IPS\nexus\Package\Group );
+		} ), NULL, NULL, NULL, 'rrule_purchase_packages' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'rrule_purchase_renewal', $this->purchase_renewal, FALSE, array(), NULL, NULL, NULL, 'rrule_purchase_renewal' ) );
 		
 		$form->addHeader('rrule_commission_header');
-		$form->add( new Number( 'rrule_commission', (int) $this->commission, TRUE, array( 'min' => 0, 'max' => 100 ), NULL, NULL, '%' ) );
-		$form->add( new Radio( 'rrule_purchase_package_limit', $this->purchase_package_limit, FALSE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Number( 'rrule_commission', (int) $this->commission, TRUE, array( 'min' => 0, 'max' => 100 ), NULL, NULL, '%' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'rrule_purchase_package_limit', $this->purchase_package_limit, FALSE, array( 'options' => array(
 			0	=> 'rrule_purchase_package_limit_no',
 			1	=> 'rrule_purchase_package_limit_yes'
 		) ), NULL, NULL, NULL, 'rrule_purchase_package_limit' ) );
-		$form->add( new Money( 'rrule_commission_limit', $this->commission_limit ?: '*', FALSE, array( 'unlimitedLang' => 'no_restriction' ) ) );
+		$form->add( new \IPS\nexus\Form\Money( 'rrule_commission_limit', $this->commission_limit ?: '*', FALSE, array( 'unlimitedLang' => 'no_restriction' ) ) );
 		
 	}
 	
@@ -254,7 +198,7 @@ class CommissionRule extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		foreach ( array( 'by_purchases', 'for_purchases' ) as $k )
 		{
@@ -278,20 +222,6 @@ class CommissionRule extends Model
 			$values['purchase_amount_unit'] = $values['rrule_purchase_amount'][1];
 			unset( $values['rrule_purchase_amount'] );
 		}
-
-		/* We need to loop through the extensions even if we
-		are not going to use the data, because the fields need to be unset */
-		$productData = [];
-		foreach( Application::allExtensions( 'nexus', 'Item', null, null, null, false ) as $extension )
-		{
-			if( method_exists( $extension, 'saveCustomForm' ) )
-			{
-				if( $extensionData = $extension::saveCustomForm( $values, $this ) )
-				{
-					$productData[ $extension::$title ] = $extensionData;
-				}
-			}
-		}
 		
 		if( isset( $values['rrule_purchase_any'] ) )
 		{
@@ -299,11 +229,15 @@ class CommissionRule extends Model
 			{
 				case 0:
 				case 1:
-					$values['rrule_purchase_packages'] = json_encode( $productData );
+					$values['rrule_purchase_packages'] = implode( ',', array_map( function( $v )
+					{
+						return ltrim( $v, 's' );
+					}, array_keys( $values['rrule_purchase_packages'] ) ) );
 					break;
 				case 2:
 					$values['rrule_purchase_packages'] = '';
 					$values['rrule_purchase_any'] = 1;
+					
 					break;
 			}
 		}
@@ -321,7 +255,7 @@ class CommissionRule extends Model
 	 *
 	 * @return	string
 	 */
-	public function description(): string
+	public function description()
 	{
 		$conditions = array();
 		
@@ -333,15 +267,15 @@ class CommissionRule extends Model
 				$prices = array();
 				foreach ( json_decode( $this->for_purchases_unit, TRUE ) as $currency => $amount )
 				{
-					$prices[] = new Money( $amount, $currency );
+					$prices[] = new \IPS\nexus\Money( $amount, $currency );
 				}
-				$prices = Member::loggedIn()->language()->formatList( $prices, Member::loggedIn()->language()->get('or_list_format') );
+				$prices = \IPS\Member::loggedIn()->language()->formatList( $prices, \IPS\Member::loggedIn()->language()->get('or_list_format') );
 			}
 			
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'ref_cond_for_purch', FALSE, array( 'sprintf' => array(
-				Member::loggedIn()->language()->addToStack( 'ref_cond_' . $this->for_purchases_op ),
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'ref_cond_for_purch', FALSE, array( 'sprintf' => array(
+				\IPS\Member::loggedIn()->language()->addToStack( 'ref_cond_' . $this->for_purchases_op ),
 				$this->for_purchases_type == 'v' ? $prices : $this->for_purchases_unit,
-				Member::loggedIn()->language()->addToStack( 'ref_cond_' . $this->for_purchases_type ),
+				\IPS\Member::loggedIn()->language()->addToStack( 'ref_cond_' . $this->for_purchases_type ),
 			) ) );
 		}
 		
@@ -350,27 +284,24 @@ class CommissionRule extends Model
 			$groups = array();
 			foreach ( explode( ',', $this->for_group ) as $groupId )
 			{
-				$groups[] = Group::load( $groupId )->name;
+				$groups[] = \IPS\Member\Group::load( $groupId )->name;
 			}
 			
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'ref_cond_for_group', FALSE, array( 'sprintf' => array(
-				Member::loggedIn()->language()->formatList( $groups, Member::loggedIn()->language()->get('or_list_format') )
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'ref_cond_for_group', FALSE, array( 'sprintf' => array(
+				\IPS\Member::loggedIn()->language()->formatList( $groups, \IPS\Member::loggedIn()->language()->get('or_list_format') )
 			) ) );
 		}
 		
 		if ( $this->purchase_packages )
 		{
 			$packages = array();
-			foreach( Application::allExtensions( 'nexus', 'Item', null, null, null, false ) as $extension )
+			foreach ( explode( ',', $this->purchase_packages ) as $packageId )
 			{
-				if( method_exists( $extension, 'customFormDescription' ) )
-				{
-					$packages = array_merge( $packages, $extension::customFormDescription( $this->purchase_packages ) );
-				}
+				$packages[] = \IPS\Member::loggedIn()->language()->addToStack( 'nexus_package_' . $packageId );
 			}
 			
-			$conditions[] = Member::loggedIn()->language()->addToStack( $this->purchase_renewal ? 'ref_cond_packages_r' : 'ref_cond_packages', FALSE, array( 'sprintf' => array(
-				Member::loggedIn()->language()->formatList( $packages, $this->purchase_any ? Member::loggedIn()->language()->get('or_list_format') : NULL )
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( $this->purchase_renewal ? 'ref_cond_packages_r' : 'ref_cond_packages', FALSE, array( 'sprintf' => array(
+				\IPS\Member::loggedIn()->language()->formatList( $packages, $this->purchase_any ? \IPS\Member::loggedIn()->language()->get('or_list_format') : NULL )
 			) ) );
 		}
 		
@@ -379,23 +310,23 @@ class CommissionRule extends Model
 			$prices = array();
 			foreach ( json_decode( $this->purchase_amount_unit, TRUE ) as $currency => $amount )
 			{
-				$prices[] = new Money( $amount, $currency );
+				$prices[] = new \IPS\nexus\Money( $amount, $currency );
 			}
-			$prices = Member::loggedIn()->language()->formatList( $prices, Member::loggedIn()->language()->get('or_list_format') );
+			$prices = \IPS\Member::loggedIn()->language()->formatList( $prices, \IPS\Member::loggedIn()->language()->get('or_list_format') );
 			
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'ref_cond_purchase_value', FALSE, array( 'sprintf' => array(
-				Member::loggedIn()->language()->addToStack( 'ref_cond_' . $this->purchase_amount_op ),
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'ref_cond_purchase_value', FALSE, array( 'sprintf' => array(
+				\IPS\Member::loggedIn()->language()->addToStack( 'ref_cond_' . $this->purchase_amount_op ),
 				$prices
 			) ) );
 		}
 
-		if( count( $conditions ) )
+		if( \count( $conditions ) )
 		{
-			return Member::loggedIn()->language()->addToStack( 'ref_cond', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( $conditions ) ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'ref_cond', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $conditions ) ) ) );
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack( 'ref_no_cond', FALSE );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'ref_no_cond', FALSE );
 		}
 	}
 	
@@ -404,16 +335,16 @@ class CommissionRule extends Model
 	 *
 	 * @return	string
 	 */
-	public function commissionLimit(): string
+	public function commissionLimit()
 	{
 		$prices = array();
-		if ( $this->commission_limit and $limits = json_decode( $this->commission_limit, TRUE ) and is_array( $limits ) )
+		if ( $this->commission_limit and $limits = json_decode( $this->commission_limit, TRUE ) and \is_array( $limits ) )
 		{
 			foreach ( $limits as $currency => $amount )
 			{
-				$prices[] = new Money( $amount['amount'], $currency );
+				$prices[] = new \IPS\nexus\Money( $amount['amount'], $currency );
 			}
 		}
-		return count( $prices ) ? Member::loggedIn()->language()->addToStack( 'ref_comm_limit', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->formatList( $prices, Member::loggedIn()->language()->get('or_list_format') ) ) ) ) : '';
+		return \count( $prices ) ? \IPS\Member::loggedIn()->language()->addToStack( 'ref_comm_limit', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->formatList( $prices, \IPS\Member::loggedIn()->language()->get('or_list_format') ) ) ) ) : '';
 	}
 }

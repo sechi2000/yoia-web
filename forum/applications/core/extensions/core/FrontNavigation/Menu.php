@@ -12,45 +12,33 @@
 namespace IPS\core\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\core\FrontNavigation;
-use IPS\core\FrontNavigation\FrontNavigationAbstract;
-use IPS\Helpers\Form\Translatable;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use OutOfRangeException;
-use function defined;
-use function json_decode;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Dropdown Menu
  */
-class Menu extends FrontNavigationAbstract
+class _Menu extends \IPS\core\FrontNavigation\FrontNavigationAbstract
 {
 	/**
 	 * Get Type Title which will display in the AdminCP Menu Manager
 	 *
 	 * @return	string
 	 */
-	public static function typeTitle(): string
+	public static function typeTitle()
 	{
-		return Member::loggedIn()->language()->addToStack('menu_custom_menu');
+		return \IPS\Member::loggedIn()->language()->addToStack('menu_custom_menu');
 	}
 	
 	/**
 	 * Allow multiple instances?
 	 *
-	 * @return    bool
+	 * @return	string
 	 */
-	public static function allowMultiple(): bool
+	public static function allowMultiple()
 	{
 		return TRUE;
 	}
@@ -59,13 +47,13 @@ class Menu extends FrontNavigationAbstract
 	 * Get configuration fields
 	 *
 	 * @param	array	$existingConfiguration	The existing configuration, if editing an existing item
-	 * @param int|null $id						The ID number of the existing item, if editing
-	 * @return    array
+	 * @param	int		$id						The ID number of the existing item, if editing
+	 * @return	array
 	 */
-	public static function configuration(array $existingConfiguration, ?int $id = NULL ): array
+	public static function configuration( $existingConfiguration, $id = NULL )
 	{
 		return array(
-			new Translatable( 'menu_custom_menu_title', NULL, TRUE, array( 'app' => 'core', 'key' => $id ? "menu_item_{$id}" : NULL ) ),
+			new \IPS\Helpers\Form\Translatable( 'menu_custom_menu_title', NULL, TRUE, array( 'app' => 'core', 'key' => $id ? "menu_item_{$id}" : NULL ) ),
 		);
 	}
 	
@@ -74,11 +62,11 @@ class Menu extends FrontNavigationAbstract
 	 *
 	 * @param	array	$configuration	The values received from the form
 	 * @param	int		$id				The ID number of the existing item, if editing
-	 * @return    array
+	 * @return	array
 	 */
-	public static function parseConfiguration( array $configuration, int $id ): array
+	public static function parseConfiguration( $configuration, $id )
 	{		
-		Lang::saveCustom( 'core', "menu_item_{$id}", $configuration['menu_custom_menu_title'] );
+		\IPS\Lang::saveCustom( 'core', "menu_item_{$id}", $configuration['menu_custom_menu_title'] );
 		unset( $configuration['menu_custom_menu_title'] );
 		
 		return $configuration;
@@ -87,9 +75,9 @@ class Menu extends FrontNavigationAbstract
 	/**
 	 * Permissions can be inherited?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function permissionsCanInherit(): bool
+	public static function permissionsCanInherit()
 	{
 		return FALSE;
 	}
@@ -97,19 +85,19 @@ class Menu extends FrontNavigationAbstract
 	/**
 	 * Get Title
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack( "menu_item_{$this->id}" );
+		return \IPS\Member::loggedIn()->language()->addToStack( "menu_item_{$this->id}" );
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|string|null
+	public function link()
 	{
 		return NULL;
 	}
@@ -117,9 +105,9 @@ class Menu extends FrontNavigationAbstract
 	/**
 	 * Is Active?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function active(): bool
+	public function active()
 	{
 		foreach ( $this->children() as $child )
 		{
@@ -128,72 +116,50 @@ class Menu extends FrontNavigationAbstract
 				return TRUE;
 			}
 		}
-
-		return FALSE;
 	}
 	
 	/**
 	 * @brief	Store child objects for re-use later
 	 */
-	protected ?array $children = NULL;
+	protected $children = NULL;
 	
 	/**
 	 * Children
 	 *
 	 * @param	bool	$noStore	If true, will skip datastore and get from DB (used for ACP preview)
-	 * @return    array|null
+	 * @return	array
 	 */
-	public function children( bool $noStore=FALSE ): array|null
+	public function children( $noStore=FALSE )
 	{
 		if ( $this->children === NULL)
 		{
 			$this->children = array();
-			$frontNavigation = FrontNavigation::frontNavigation( $noStore );
-
-			/* If this is a root level item, don't return children, we'll use the subbars instead */
-			if( isset( $frontNavigation[0][ $this->id ] ) )
-			{
-				$this->children = [];
-			}
-			elseif ( isset( $frontNavigation[ $this->id ] ) )
+			$frontNavigation = \IPS\core\FrontNavigation::frontNavigation( $noStore );
+			if ( isset( $frontNavigation[ $this->id ] ) )
 			{
 				foreach ( $frontNavigation[ $this->id ] as $item )
 				{
-					try
+					if ( ! empty( $item['is_menu_child'] ) and \IPS\Application::appIsEnabled( $item['app'] ) )
 					{
-						$class = Application::getExtensionClass( $item['app'], 'FrontNavigation', $item['extension'] );
-						$this->children[ $item['id'] ] = new $class( json_decode( $item['config'], TRUE ), $item['id'], $item['permissions'], $item['menu_types'], json_decode( (string) $item['icon'], TRUE ) );
+						$class = 'IPS\\' . $item['app'] . '\extensions\core\FrontNavigation\\' . $item['extension'];
+						if ( class_exists( $class ) )
+						{
+							$this->children[ $item['id'] ] = new $class( json_decode( $item['config'], TRUE ), $item['id'], $item['permissions'] );
+						}
 					}
-					catch( OutOfRangeException ){}
 				}
 			}
 		}
 
 		return $this->children;
 	}
-
-	/**
-	 * Can the currently logged in user see this menu item?
-	 *
-	 * @return	bool
-	 */
-	public function canView() : bool
-	{
-		/* If we have no children, don't show this, regardless of permissions */
-		if( !count( $this->children() ) and !isset( FrontNavigation::i()->subBars()[ $this->id ] ) )
-		{
-			return false;
-		}
-
-		return parent::canView();
-	}
 	
 	/**
 	 * Can the currently logged in user access the content this item links to?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canAccessContent(): bool
+	public function canAccessContent()
 	{
 		foreach ( $this->children() as $child )
 		{
@@ -202,20 +168,6 @@ class Menu extends FrontNavigationAbstract
 				return TRUE;
 			}
 		}
-
-		/* If we're a root item we probably have sub-bars */
-		$subbars = FrontNavigation::i()->subBars();
-		if( isset( $subbars[ $this->id ] ) and count( $subbars[ $this->id ] ) )
-		{
-			foreach( $subbars[ $this->id ] as $subbar )
-			{
-				if( $subbar->canView() )
-				{
-					return true;
-				}
-			}
-		}
-
 		return FALSE;
 	}
 }

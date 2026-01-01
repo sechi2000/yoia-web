@@ -11,50 +11,36 @@
 namespace IPS\Image;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Imagick;
-use ImagickDraw;
-use ImagickException;
-use ImagickPixel;
-use InvalidArgumentException;
-use IPS\Image;
-use IPS\Settings;
-use function count;
-use function defined;
-use function file_put_contents;
-use function in_array;
-use const IPS\TEMP_DIRECTORY;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Image Class - ImageMagick
  */
-class Imagemagick extends Image
+class _Imagemagick extends \IPS\Image
 {
 	/**
 	 * @brief	Temporary filename
 	 */
-	protected string|null|false $tempFile = NULL;
+	protected $tempFile = NULL;
 	
 	/**
 	 * @brief	Imagick object
 	 */
-	protected Imagick $imagick;
+	protected $imagick;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param string|null $contents	Contents
-	 * @param bool $noImage	We are creating a new instance of the object internally and are not passing an image string
+	 * @param	string|NULL	$contents	Contents
+	 * @param	bool		$noImage	We are creating a new instance of the object internally and are not passing an image string
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( ?string $contents, bool $noImage=FALSE )
+	public function __construct( $contents, $noImage=FALSE )
 	{
 		/* If we are just creating an instance of the object without passing image contents as a string, return now */
 		if( $noImage === TRUE )
@@ -62,22 +48,22 @@ class Imagemagick extends Image
 			return;
 		}
 
-		$this->tempFile = tempnam( TEMP_DIRECTORY, 'imagick' );
-		file_put_contents( $this->tempFile, $contents );
+		$this->tempFile = tempnam( \IPS\TEMP_DIRECTORY, 'imagick' );
+		\file_put_contents( $this->tempFile, $contents );
 		
 		try
 		{
-			$this->imagick = new Imagick( $this->tempFile );
+			$this->imagick = new \Imagick( $this->tempFile );
 
 			/* Set quality (if image format is JPEG) */
-			if ( in_array( mb_strtolower( $this->imagick->getImageFormat() ), array( 'jpg', 'jpeg', 'webp', 'avif' ) ) )
+			if ( \in_array( mb_strtolower( $this->imagick->getImageFormat() ), array( 'jpg', 'jpeg', 'webp' ) ) )
 			{
-				$this->imagick->setImageCompressionQuality( (int) Settings::i()->image_jpg_quality ?: 85 );
+				$this->imagick->setImageCompressionQuality( (int) \IPS\Settings::i()->image_jpg_quality ?: 85 );
 			}
 		}
-		catch ( ImagickException $e )
+		catch ( \ImagickException $e )
 		{
-			throw new InvalidArgumentException( $e->getMessage(), $e->getCode() );
+			throw new \InvalidArgumentException( $e->getMessage(), $e->getCode() );
 		}
 
 		/* Set width/height */
@@ -105,19 +91,19 @@ class Imagemagick extends Image
 	public function __toString()
 	{
 		/* If possible, retain the color profiles when stripping EXIF data */
-		if( Settings::i()->imagick_strip_exif )
+		if( \IPS\Settings::i()->imagick_strip_exif )
 		{
 			$imageColorProfiles	= array();
 
 			try
 			{
-				$imageColorProfiles = $this->imagick->getImageProfiles( 'icc' );
+				$imageColorProfiles = $this->imagick->getImageProfiles( 'icc', true );
 			}
-			catch( ImagickException $e ){}
+			catch( \ImagickException $e ){}
 
 			$this->imagick->stripImage();
 
-			if( count( $imageColorProfiles ) )
+			if( \count( $imageColorProfiles ) )
 			{
 				foreach( $imageColorProfiles as $type => $profile )
 				{
@@ -125,22 +111,22 @@ class Imagemagick extends Image
 					{
 						$this->imagick->profileImage( $type, $profile );
 					}
-					catch( ImagickException $e ){}
+					catch( \ImagickException $e ){}
 				}
 			}
 		}
 
-		return $this->imagick->getImagesBlob();
+		return (string) $this->imagick->getImagesBlob();
 	}
 	
 	/**
 	 * Resize
 	 *
-	 * @param int $width			Width (in pixels)
-	 * @param int $height			Height (in pixels)
+	 * @param	int		$width			Width (in pixels)
+	 * @param	int		$height			Height (in pixels)
 	 * @return	void
 	 */
-	public function resize( int $width, int $height ) : void
+	public function resize( $width, $height )
 	{
 		$format = $this->imagick->getImageFormat();
 
@@ -156,11 +142,11 @@ class Imagemagick extends Image
 			/* Needs ImageMagick 6.2.9 or higher for optimizeImageLayers */
 			try
 			{
-				$this->imagick->optimizeImageLayers();
+				$this->imagick	= $this->imagick->optimizeImageLayers();
 			}
-			catch( ImagickException $e )
+			catch( \ImagickException $e )
 			{
-				$this->imagick->deconstructImages();
+				$this->imagick	= $this->imagick->deconstructImages();
 			}
 		}
 		else
@@ -175,11 +161,11 @@ class Imagemagick extends Image
 	/**
 	 * Crop to a given width and height (will attempt to downsize first)
 	 *
-	 * @param int $width			Width (in pixels)
-	 * @param int $height			Height (in pixels)
+	 * @param	int		$width			Width (in pixels)
+	 * @param	int		$height			Height (in pixels)
 	 * @return	void
 	 */
-	public function crop( int $width, int $height ) : void
+	public function crop( $width, $height )
 	{
 		$this->imagick->cropThumbnailImage( $width, $height );
 
@@ -190,13 +176,13 @@ class Imagemagick extends Image
 	/**
 	 * Crop at specific points
 	 *
-	 * @param int $point1X		x-point for top-left corner
-	 * @param int $point1Y		y-point for top-left corner
-	 * @param int $point2X		x-point for bottom-right corner
-	 * @param int $point2Y		y-point for bottom-right corner
+	 * @param	int		$point1X		x-point for top-left corner
+	 * @param	int		$point1Y		y-point for top-left corner
+	 * @param	int		$point2X		x-point for bottom-right corner
+	 * @param	int		$point2Y		y-point for bottom-right corner
 	 * @return	void
 	 */
-	public function cropToPoints( int $point1X, int $point1Y, int $point2X, int $point2Y ) : void
+	public function cropToPoints( $point1X, $point1Y, $point2X, $point2Y )
 	{
 		if( mb_strtolower( $this->imagick->getImageFormat() ) === 'gif' )
 		{
@@ -211,11 +197,11 @@ class Imagemagick extends Image
 			/* Needs ImageMagick 6.2.9 or higher for optimizeImageLayers */
 			try
 			{
-				$this->imagick->optimizeImageLayers();
+				$this->imagick	= $this->imagick->optimizeImageLayers();
 			}
-			catch( ImagickException $e )
+			catch( \ImagickException $e )
 			{
-				$this->imagick->deconstructImages();
+				$this->imagick	= $this->imagick->deconstructImages();
 			}
 		}
 		else
@@ -230,36 +216,25 @@ class Imagemagick extends Image
 	/**
 	 * Impose image
 	 *
-	 * @param Image $image	Image to impose
-	 * @param int $x		Location to impose to, x axis
-	 * @param int $y		Location to impose to, y axis
+	 * @param	\IPS\Image	$image	Image to impose
+	 * @param	int			$x		Location to impose to, x axis
+	 * @param	int			$y		Location to impose to, y axis
 	 * @return	void
 	 */
-	public function impose( Image $image, int $x=0, int $y=0 ) : void
+	public function impose( $image, $x=0, $y=0 )
 	{
-		$this->imagick->compositeImage( $image->imagick, Imagick::COMPOSITE_DEFAULT, $x, $y );
+		$this->imagick->compositeImage( $image->imagick, \Imagick::COMPOSITE_DEFAULT, $x, $y );
 	}
 
 	/**
 	 * Rotate image
 	 *
-	 * @param int $angle	Angle of rotation
+	 * @param	int		$angle	Angle of rotation
 	 * @return	void
 	 */
-	public function rotate( int $angle ) : void
+	public function rotate( $angle )
 	{
-		$this->imagick->rotateImage( new ImagickPixel('#00000000'), $angle );
-
-		/* Set width/height */
-		$this->setDimensions();
-	}
-
-	/**
-	 * @return void
-	 */
-	public function flip(): void
-	{
-		$this->imagick->flopImage();
+		$this->imagick->rotateImage( new \ImagickPixel('#00000000'), $angle );
 
 		/* Set width/height */
 		$this->setDimensions();
@@ -270,7 +245,7 @@ class Imagemagick extends Image
 	 *
 	 * @return	void
 	 */
-	protected function setDimensions() : void
+	protected function setDimensions()
 	{
 		/* If this is a gif, we need to coalesce the image in order to get the proper dimensions */
 		if ( mb_strtolower( $this->imagick->getImageFormat() ) === 'gif' )
@@ -288,18 +263,14 @@ class Imagemagick extends Image
 	 *
 	 * @return	int|NULL
 	 */
-	public function getImageOrientation(): int|NULL
+	public function getImageOrientation()
 	{
 		try
 		{
-			if ( $orientation = parent::getImageOrientation() )
-			{
-				return $orientation;
-			}
 			/* This method does not exist in ImageMagick < 6.6.4 */
 			return ( method_exists( $this->imagick, 'getImageOrientation' ) ) ? $this->imagick->getImageOrientation() : NULL;
 		}
-		catch( ImagickException $e )
+		catch( \ImagickException $e )
 		{
 			return NULL;
 		}
@@ -308,10 +279,10 @@ class Imagemagick extends Image
 	/**
 	 * Set image orientation
 	 *
-	 * @param int $orientation The orientation
+	 * @param	int		$orientation The orientation
 	 * @return	void
 	 */
-	public function setImageOrientation( int $orientation ) : void
+	public function setImageOrientation( $orientation )
 	{
 		if( method_exists( $this->imagick, 'getImageOrientation' ) )
 		{
@@ -324,7 +295,7 @@ class Imagemagick extends Image
 	 *
 	 * @return	bool
 	 */
-	public static function canWriteText(): bool
+	public static function canWriteText()
 	{
 		return TRUE;
 	}
@@ -332,19 +303,19 @@ class Imagemagick extends Image
 	/**
 	 * Create a new blank canvas image
 	 *
-	 * @param int $width	Width
-	 * @param int $height	Height
-	 * @param array $rgb	Color to use for bg
-	 * @return	Image
+	 * @param	int		$width	Width
+	 * @param	int		$height	Height
+	 * @param	array 	$rgb	Color to use for bg
+	 * @return	\IPS\Image
 	 */
-	public static function newImageCanvas( int $width, int $height, array $rgb ): Image
+	public static function newImageCanvas( $width, $height, $rgb )
 	{
-		$obj			= new static(NULL, TRUE);
-		$obj->imagick	= new Imagick();
+		$obj			= new static( NULL, TRUE );
+		$obj->imagick	= new \Imagick();
 		$obj->width		= $width;
 		$obj->height	= $height;
 		$obj->type		= 'png';
-		$pixel			= new ImagickPixel( "rgba({$rgb[0]}, {$rgb[1]}, {$rgb[2]}, 1)" );
+		$pixel			= new \ImagickPixel( "rgba({$rgb[0]}, {$rgb[1]}, {$rgb[2]}, 1)" );
 
 		$obj->imagick->newImage( $width, $height, $pixel );
 		$obj->imagick->setImageFormat( "png" );
@@ -355,20 +326,20 @@ class Imagemagick extends Image
 	/**
 	 * Write text on our image
 	 *
-	 * @param string $text	Text
-	 * @param string $font	Path to font to use
-	 * @param int $size	Size of text
+	 * @param	string	$text	Text
+	 * @param	string	$font	Path to font to use
+	 * @param	int		$size	Size of text
 	 * @return	void
 	 */
-	public function write( string $text, string $font, int $size ) : void
+	public function write( $text, $font, $size )
 	{
-		$draw			= new ImagickDraw();
+		$draw			= new \ImagickDraw();
 		$draw->setTextAntialias( true );
-		$draw->setGravity( Imagick::GRAVITY_CENTER );
+		$draw->setGravity( \Imagick::GRAVITY_CENTER );
 		$draw->setFont( $font );
 		$draw->setFontSize( $size );
 
-		$draw->setFillColor( new ImagickPixel( "rgba(255,255,255,1)" ) );
+		$draw->setFillColor( "rgb( 255, 255, 255 )" );
 
 		$this->imagick->annotateImage( $draw, 0, 0, 0, $text );
 	}
@@ -378,18 +349,13 @@ class Imagemagick extends Image
 	 *
 	 * @return	array
 	 */
-	public static function supportedExtensions(): array
+	public static function supportedExtensions()
 	{
 		$extensions = static::$imageExtensions;
 		
-		if( in_array( 'WEBP', Imagick::queryFormats() ) )
+		if( \in_array( 'WEBP', \Imagick::queryFormats() ) )
 		{
 			$extensions[] = 'webp';
-		}
-
-		if( in_array( 'AVIF', Imagick::queryFormats() ) )
-		{
-			$extensions[] = 'avif';
 		}
 
 		return $extensions;

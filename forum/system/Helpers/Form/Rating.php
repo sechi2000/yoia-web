@@ -11,22 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Theme;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Rating input class for Form Builder
  */
-class Rating extends FormAbstract
+class _Rating extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -38,7 +32,7 @@ class Rating extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'max'		=> 5,
 		'display'	=> NULL,
 		'userRated'	=> NULL,
@@ -49,32 +43,32 @@ class Rating extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->rating( $this->name, $this->value, $this->required, $this->options['max'], $this->options['display'], $this->options['userRated'] );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->rating( $this->name, $this->value, $this->required, $this->options['max'], $this->options['display'], $this->options['userRated'] );
 	}
-
+	
 	/**
 	 * Format Value
 	 *
-	 * @return mixed
+	 * @return	int|NULL
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{
-		return $this->value ? intval( $this->value ) : NULL;
+		return $this->value ? \intval( $this->value ) : NULL;
 	}
 	
 	/**
 	 * Validate
 	 *
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		if( $this->value === NULL and $this->required )
 		{
-			throw new InvalidArgumentException('form_required');
+			throw new \InvalidArgumentException('form_required');
 		}
 		
 		return parent::validate();

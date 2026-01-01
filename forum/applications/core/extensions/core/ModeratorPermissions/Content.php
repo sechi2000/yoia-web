@@ -11,23 +11,16 @@
 namespace IPS\core\extensions\core\ModeratorPermissions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\ModeratorPermissionsAbstract;
-use IPS\Member;
-use IPS\Platform\Bridge;
-use IPS\Settings;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Moderator Permissions: Content
  */
-class Content extends ModeratorPermissionsAbstract
+class _Content
 {
 	/**
 	 * Get Permissions
@@ -47,7 +40,7 @@ class Content extends ModeratorPermissionsAbstract
 	 * @endcode
 	 * @return	array
 	 */
-	public function getPermissions( array $toggles ): array
+	public function getPermissions( $toggles )
 	{
 		$return = array(
 			'can_pin_content'				=> array( 'YesNo', array( 'togglesOff' => $toggles['pin'] ) ),
@@ -81,19 +74,14 @@ class Content extends ModeratorPermissionsAbstract
 			) ),
 			'can_recognize_content_no_point_limit' => 'YesNo'
 		);
-
-		if( Bridge::i()->featureIsEnabled( 'assignments' ) )
-		{
-			$return['can_assign_content'] = array( 'YesNo', array( 'togglesOff' => $toggles['assign'] ) );
-		}
 		
-		if ( Settings::i()->edit_log == 2 )
+		if ( \IPS\Settings::i()->edit_log == 2 )
 		{
 			$return['can_view_editlog'] = 'YesNo';
 		}
 		
 		$return['can_view_moderation_log'] = 'YesNo';
-		$return['can_view_reports'] = array( 'YesNo', array( 'togglesOff' => $toggles['view_reports'] ) );
+		$return['can_view_reports'] = 'YesNo';
 		$return['can_manage_announcements']	= 'YesNo';
 		
 		$return['can_see_poll_voters']	= 'YesNo';
@@ -103,9 +91,6 @@ class Content extends ModeratorPermissionsAbstract
 		$return['can_view_anonymous_posters'] = 'YesNo';
 
 		$return['can_manage_alerts']	= 'YesNo';
-
-		$return['can_pin_tagged'] = 'YesNo';
-		$return['can_edit_tags'] = 'YesNo';
 		
 		return $return;
 	}
@@ -114,11 +99,26 @@ class Content extends ModeratorPermissionsAbstract
 	 * After change
 	 *
 	 * @param	array	$moderator	The moderator
-	 * @param array|string $changed	Values that were changed
+	 * @param	array	$changed	Values that were changed
 	 * @return	void
 	 */
-	public function onChange( array $moderator, array|string $changed ) : void
+	public function onChange( $moderator, $changed )
 	{
-
+		/* Rebuild the create menu cache if the announcement permission was changed */
+		if ( $changed == 'can_manage_announcements' )
+		{
+			\IPS\Member::clearCreateMenu();
+		}
+	}
+	
+	/**
+	 * After delete
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @return	void
+	 */
+	public function onDelete( $moderator )
+	{
+		
 	}
 }

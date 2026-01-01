@@ -11,42 +11,16 @@
 namespace IPS\core\extensions\core\ProfileSteps;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Extensions\ProfileStepsAbstract;
-use IPS\File;
-use IPS\File\Exception as FileException;
-use IPS\Helpers\CoverPhoto;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Image;
-use IPS\Log;
-use IPS\Member;
-use IPS\Member\ProfileStep;
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-use IPS\Widget;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use const IPS\PHOTO_THUMBNAIL_SIZE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Profile Photo Profile Completition Extension
  */
-class Photo extends ProfileStepsAbstract
+class _Photo
 {
 	/* !Extension Methods */
 	
@@ -55,10 +29,11 @@ class Photo extends ProfileStepsAbstract
 	 *
 	 * @return	array	array( 'key' => 'lang_string' )
 	 */
-	public static function actions(): array
+	public static function actions()
 	{
-		return array( 'profile_photo' => 'complete_profile_photo' );
+		$return = array( 'profile_photo' => 'complete_profile_photo' );
 
+		return $return;
 	}
 	
 	/**
@@ -66,7 +41,7 @@ class Photo extends ProfileStepsAbstract
 	 *
 	 * @return	array	array( 'key' => 'lang_string' )
 	 */
-	public static function subActions(): array
+	public static function subActions()
 	{
 		/* Basic stuff */
 		$return['profile_photo'] = array(
@@ -81,9 +56,9 @@ class Photo extends ProfileStepsAbstract
 	 * Can the actions have multiple choices?
 	 *
 	 * @param	string		$action		Action key (basic_profile, etc)
-	 * @return	bool|null
+	 * @return	boolean
 	 */
-	public static function actionMultipleChoice( string $action ): ?bool
+	public static function actionMultipleChoice( $action )
 	{
 		return TRUE;
 	}
@@ -94,7 +69,7 @@ class Photo extends ProfileStepsAbstract
 	 * @return	array
 	 * @note	This is intended for items which have their own independent settings and dedicated enable pages, such as Social Login integration
 	 */
-	public static function canBeRequired() : array
+	public static function canBeRequired()
 	{
 		return array( 'profile_photo' );
 	}
@@ -103,11 +78,11 @@ class Photo extends ProfileStepsAbstract
 	 * Format Form Values
 	 *
 	 * @param	array				$values	The form values
-	 * @param	Member			$member	The member
-	 * @param	Form	$form	The form object
+	 * @param	\IPS\Member			$member	The member
+	 * @param	\IPS\Helpers\Form	$form	The form object
 	 * @return	void
 	 */
-	public static function formatFormValues( array $values, Member $member, Form $form ) : void
+	public static function formatFormValues( $values, &$member, &$form )
 	{
 		if ( array_key_exists( 'pp_photo_type', $values ) )
 		{
@@ -123,6 +98,7 @@ class Photo extends ProfileStepsAbstract
 						if ( (string) $values['member_photo_upload'] !== '' )
 						{
 							$member->pp_photo_type  = 'custom';
+							$member->pp_main_photo  = NULL;
 							$member->pp_main_photo  = (string) $values['member_photo_upload'];
 							$member->photo_last_update = time();
 							$member->pp_thumb_photo = NULL;
@@ -161,7 +137,7 @@ class Photo extends ProfileStepsAbstract
 			{
 				$photo->delete();
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 			
 			/* Make sure profile sync services are disabled */
 			$profileSync = $member->profilesync;
@@ -172,10 +148,10 @@ class Photo extends ProfileStepsAbstract
 				$member->save();
 			}
 			
-			$newPhoto = new CoverPhoto( $values['complete_profile_cover_photo'], 0 );
+			$newPhoto = new \IPS\Helpers\CoverPhoto( $values['complete_profile_cover_photo'], 0 );
 
 			$member->pp_cover_photo = (string) $newPhoto->file;
-			$member->pp_cover_offset = $newPhoto->offset;
+			$member->pp_cover_offset = (int) $newPhoto->offset;
 			
 			if ( $newPhoto->file )
 			{
@@ -191,19 +167,18 @@ class Photo extends ProfileStepsAbstract
 	/**
 	 * Has a specific step been completed?
 	 *
-	 * @param	ProfileStep	$step	The step to check
-	 * @param	Member|NULL		$member	The member to check, or NULL for currently logged in
+	 * @param	\IPS\Member\ProfileStep	$step	The step to check
+	 * @param	\IPS\Member|NULL		$member	The member to check, or NULL for currently logged in
 	 * @return	bool
 	 */
-	public function completed( ProfileStep $step, Member $member = NULL ): bool
+	public function completed( \IPS\Member\ProfileStep $step, \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
 		if ( !$member->member_id )
 		{
 			return FALSE;
 		}
 		
-		static::$_member = $member;
+		static::$_member = $member ?: \IPS\Member::loggedIn();
 		static::$_step = $step;
 		
 		foreach( $step->subcompletion_act as $item )
@@ -222,7 +197,9 @@ class Photo extends ProfileStepsAbstract
 			}
 			else
 			{
-				Log::debug( "missing_profile_step_method", 'profile_completion' );
+				\IPS\Log::debug( "missing_profile_step_method", 'profile_completion' );
+
+				continue;
 			}
 		}
 
@@ -232,25 +209,27 @@ class Photo extends ProfileStepsAbstract
 	/**
 	 * Wizard Steps
 	 *
-	 * @param	Member|NULL	$member	Member or NULL for currently logged in member
-	 * @return	array|string
+	 * @param	\IPS\Member|NULL	$member	Member or NULL for currently logged in member
+	 * @return	array
 	 */
-	public static function wizard( Member $member = NULL ): array|string
+	public static function wizard( \IPS\Member $member = NULL )
 	{
-		static::$_member = $member ?: Member::loggedIn();
+		static::$_member = $member ?: \IPS\Member::loggedIn();
 
-		return static::wizardPhoto();
+		$return = static::wizardPhoto();
+
+		return $return;
 	}
 
 	/**
 	 * Extra Step - useful for steps that require additional input after save
 	 *
-	 * @param	Member|NULL	$member	Member or NULL for currently logged in member
+	 * @param	\IPS\Member|NULL	$member	Member or NULL for currently logged in member
 	 * @return	array
 	 */
-	public static function extraStep( ?Member $member = NULL ) : array
+	public static function extraStep( \IPS\Member $member = NULL )
 	{
-		static::$_member = $member ?: Member::loggedIn();
+		static::$_member = $member ?: \IPS\Member::loggedIn();
 
 		$return = array();
 
@@ -267,7 +246,7 @@ class Photo extends ProfileStepsAbstract
 	 *
 	 * @return	string
 	 */
-	public static function extraStepTitle() : string
+	public static function extraStepTitle()
 	{
 		return 'profile_step_title_crop';
 	}
@@ -277,19 +256,19 @@ class Photo extends ProfileStepsAbstract
 	/**
 	 * @brief	Member
 	 */
-	protected static ?Member $_member = NULL;
+	protected static $_member = NULL;
 	
 	/**
 	 * @brief	Step
 	 */
-	protected static ?ProfileStep $_step = NULL;
+	protected static $_step = NULL;
 	
 	/**
 	 * Added a photo?
 	 *
 	 * @return	bool
 	 */
-	protected static function completedPhoto() : bool
+	protected static function completedPhoto()
 	{
 		if ( !static::$_member->pp_photo_type )
 		{
@@ -299,7 +278,7 @@ class Photo extends ProfileStepsAbstract
 		if ( static::$_member->pp_photo_type === 'none' )
 		{
 			/* We just specified 'none' so we should continue now and act as if this is done */
-			if( isset( $_SESSION['profileCompletionData'] ) AND is_array( $_SESSION['profileCompletionData'] ) AND in_array( 'photo-none', $_SESSION['profileCompletionData'] ) )
+			if( isset( $_SESSION['profileCompletionData'] ) AND \is_array( $_SESSION['profileCompletionData'] ) AND \in_array( 'photo-none', $_SESSION['profileCompletionData'] ) )
 			{
 				return TRUE;
 			}
@@ -320,7 +299,7 @@ class Photo extends ProfileStepsAbstract
 	 *
 	 * @return	bool
 	 */
-	protected static function completedCrop() : bool
+	protected static function completedCrop()
 	{
 		if ( !static::$_member->pp_thumb_photo )
 		{
@@ -335,7 +314,7 @@ class Photo extends ProfileStepsAbstract
 	 *
 	 * @return	bool
 	 */
-	protected static function completedCoverPhoto() : bool
+	protected static function completedCoverPhoto()
 	{
 		return (bool) static::$_member->pp_cover_photo;
 	}
@@ -347,12 +326,12 @@ class Photo extends ProfileStepsAbstract
 	 *
 	 * @return	array
 	 */
-	protected static function wizardPhoto() : array
+	protected static function wizardPhoto()
 	{
 		$member = static::$_member;
 		$wizards = array();
 
-		foreach( ProfileStep::loadAll() AS $step )
+		foreach( \IPS\Member\ProfileStep::loadAll() AS $step )
 		{
 			$include = array();
 			if ( $step->completion_act === 'profile_photo' )
@@ -362,14 +341,14 @@ class Photo extends ProfileStepsAbstract
 					switch( $item )
 					{
 						case 'photo':
-							if ( !static::completedPhoto() )
+							if ( !static::completedPhoto( static::$_member ) )
 							{
 								$include['photo'] = $step;
 							}
 						break;
 						
 						case 'cover_photo':
-							if ( !static::completedCoverPhoto() )
+							if ( !static::completedCoverPhoto( static::$_member ) )
 							{
 								$include['cover_photo'] = $step;
 							}
@@ -377,10 +356,10 @@ class Photo extends ProfileStepsAbstract
 					}
 				}
 				
-				if ( count( $include ) )
+				if ( \count( $include ) )
 				{
 					$wizards[ $step->key ] = function( $data ) use ( $member, $include, $step ) {
-						$form = new Form( 'profile_generic_' . $step->id, 'profile_complete_next' );
+						$form = new \IPS\Helpers\Form( 'profile_generic_' . $step->id, 'profile_complete_next' );
 						
 						if ( isset( $include['photo'] ) )
 						{
@@ -400,7 +379,7 @@ class Photo extends ProfileStepsAbstract
 							return $values;
 						}
 	
-						return $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'profileCompleteTemplate' ), $step );
+						return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'profileCompleteTemplate' ), $step );
 					};
 				}
 
@@ -415,22 +394,22 @@ class Photo extends ProfileStepsAbstract
 	 *
 	 * @return	array
 	 */
-	protected static function wizardCrop() : array
+	protected static function wizardCrop()
 	{
 		$member = static::$_member;
 		$wizards = array();
-		foreach( ProfileStep::loadAll() AS $step )
+		foreach( \IPS\Member\ProfileStep::loadAll() AS $step )
 		{
 			if ( $step->completion_act === 'profile_photo' )
 			{
 				$wizards[ 'profile_step_title_crop' ] = function( $data ) use ( $member, $step ) {
 					/* We just specified 'none' so we should continue now and act as if this is done */
-					if( isset( $_SESSION['profileCompletionData'] ) AND is_array( $_SESSION['profileCompletionData'] ) AND in_array( 'photo-none', $_SESSION['profileCompletionData'] ) )
+					if( isset( $_SESSION['profileCompletionData'] ) AND \is_array( $_SESSION['profileCompletionData'] ) AND \in_array( 'photo-none', $_SESSION['profileCompletionData'] ) )
 					{
 						return array();
 					}
 
-					$form = new Form( 'profile_generic_crop', 'profile_complete_next' );
+					$form = new \IPS\Helpers\Form( 'profile_generic_crop', 'profile_complete_next' );
 
 					static::cropForm( $form, $step, $member );
 
@@ -442,7 +421,7 @@ class Photo extends ProfileStepsAbstract
 						return $values;
 					}
 
-					return $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'profileCompleteTemplate' ), $step );
+					return $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'profileCompleteTemplate' ), $step );
 				};
 			}
 		}
@@ -455,12 +434,12 @@ class Photo extends ProfileStepsAbstract
 	/**
 	 * Photo Form
 	 *
-	 * @param	Form		$form	The form
-	 * @param	ProfileStep	$step	The step
-	 * @param	Member				$member	The member
+	 * @param	\IPS\Helpers\Form		$form	The form
+	 * @param	\IPS\Member\ProfileStep	$step	The step
+	 * @param	\IPS\Member				$member	The member
 	 * @return	void
 	 */
-	protected static function photoForm( Form $form, ProfileStep $step, Member $member ) : void
+	protected static function photoForm( &$form, $step, $member )
 	{
 		$photoVars = explode( ':', $member->group['g_photo_max_vars'] );
 					
@@ -485,9 +464,9 @@ class Photo extends ProfileStepsAbstract
 		}
 
 		/* Create that selection */
-		if( count( $options ) > 1 )
+		if( \count( $options ) > 1 )
 		{
-			$form->add( new Radio( 'pp_photo_type', 'none', $step->required, array( 'options' => $options, 'toggles' => $toggles ) ) );
+			$form->add( new \IPS\Helpers\Form\Radio( 'pp_photo_type', 'none', $step->required, array( 'options' => $options, 'toggles' => $toggles ) ) );
 		}
 		else
 		{
@@ -496,22 +475,22 @@ class Photo extends ProfileStepsAbstract
 		
 		if ( $photoVars[0] )
 		{
-			$form->add( new Upload( 'member_photo_upload', NULL, FALSE, array( 'supportsDelete' => FALSE, 'image' => array( 'maxWidth' => $photoVars[1], 'maxHeight' => $photoVars[2] ), 'allowStockPhotos' => TRUE, 'storageExtension' => 'core_Profile', 'maxFileSize' => $photoVars[0] / 1024 ), function( $val ) use ( $member ) {
-				if( Request::i()->pp_photo_type == 'custom' AND !$val )
+			$form->add( new \IPS\Helpers\Form\Upload( 'member_photo_upload', NULL, FALSE, array( 'supportsDelete' => FALSE, 'image' => array( 'maxWidth' => $photoVars[1], 'maxHeight' => $photoVars[2] ), 'allowStockPhotos' => TRUE, 'storageExtension' => 'core_Profile', 'maxFileSize' => $photoVars[0] ? $photoVars[0] / 1024 : NULL ), function( $val ) use ( $member ) {
+				if( \IPS\Request::i()->pp_photo_type == 'custom' AND !$val )
 				{
-					throw new DomainException('form_required');
+					throw new \DomainException('form_required');
 				}
 
-				if( $val instanceof File )
+				if( $val instanceof \IPS\File )
 				{
 					try
 					{
-						$image = Image::create( $val->contents() );
+						$image = \IPS\Image::create( $val->contents() );
 						if( $image->isAnimatedGif and !$member->group['g_upload_animated_photos'] )
 						{
-							throw new DomainException('member_photo_upload_no_animated');
+							throw new \DomainException('member_photo_upload_no_animated');
 						}
-					} catch ( FileException $e ){}
+					} catch ( \IPS\File\Exception $e ){}
 
 				}
 			}, NULL, NULL, 'member_photo_upload' ) );
@@ -521,22 +500,22 @@ class Photo extends ProfileStepsAbstract
 	/**
 	 * Crop Form
 	 *
-	 * @param	Form		$form	The form
-	 * @param	ProfileStep	$step	The step
-	 * @param	Member				$member	The member
+	 * @param	\IPS\Helpers\Form		$form	The form
+	 * @param	\IPS\Member\ProfileStep	$step	The step
+	 * @param	\IPS\Member				$member	The member
 	 * @return	void
 	 */
-	protected static function cropForm( Form $form, ProfileStep $step, Member $member ) : void
+	protected static function cropForm( &$form, $step, $member )
 	{
 		/* Get the photo */
 		try
 		{
-			$original = File::get( 'core_Profile', $member->pp_main_photo );
-			$image = Image::create( $original->contents() );
+			$original = \IPS\File::get( 'core_Profile', $member->pp_main_photo );
+			$image = \IPS\Image::create( $original->contents() );
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
-			Output::i()->redirect( Url::internal( 'app=core&module=system&controller=settings&do=completion', 'front', 'settings' )->setQueryString('_moveToStep', $step->getNextStep() ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&do=completion', 'front', 'settings' )->setQueryString('_moveToStep', $step->getNextStep() ) );
 		}
 
 		/* Work out which dimensions to suggest */
@@ -550,11 +529,11 @@ class Photo extends ProfileStepsAbstract
 		}
 
 		/* Build form */
-		$form->class = 'ipsForm--noLabels';
-		$form->add( new Custom('photo_crop', array( 0, 0, $suggestedWidth, $suggestedHeight ), FALSE, array(
+		$form->class = 'ipsForm_noLabels';
+		$form->add( new \IPS\Helpers\Form\Custom('photo_crop', array( 0, 0, $suggestedWidth, $suggestedHeight ), FALSE, array(
 			'getHtml'	=> function( $field ) use ( $original, $member )
 			{
-				return Theme::i()->getTemplate('members', 'core', 'global')->photoCrop( $field->name, $field->value, $member->url()->setQueryString( 'do', 'cropPhotoGetPhoto' )->csrf() );
+				return \IPS\Theme::i()->getTemplate('members', 'core', 'global')->photoCrop( $field->name, $field->value, $member->url()->setQueryString( 'do', 'cropPhotoGetPhoto' )->csrf() );
 			}
 		) ) );
 
@@ -571,26 +550,26 @@ class Photo extends ProfileStepsAbstract
 				{
 					try
 					{
-						File::get( 'core_Profile', $member->pp_thumb_photo )->delete();
+						\IPS\File::get( 'core_Profile', $member->pp_thumb_photo )->delete();
 					}
-					catch ( Exception $e ) { }
+					catch ( \Exception $e ) { }
 				}
 
 				/* Save the new */
-				$cropped = File::create( 'core_Profile', $original->originalFilename, (string) $image );
-				$member->pp_thumb_photo = (string) $cropped->thumbnail( 'core_Profile', PHOTO_THUMBNAIL_SIZE, PHOTO_THUMBNAIL_SIZE );
+				$cropped = \IPS\File::create( 'core_Profile', $original->originalFilename, (string) $image );
+				$member->pp_thumb_photo = (string) $cropped->thumbnail( 'core_Profile', \IPS\PHOTO_THUMBNAIL_SIZE, \IPS\PHOTO_THUMBNAIL_SIZE );
 				$member->save();
 
 				/* Delete the temporary full size cropped image */
 				$cropped->delete();
 
 				/* Edited member, so clear widget caches (stats, widgets that contain photos, names and so on) */
-				Widget::deleteCaches();
+				\IPS\Widget::deleteCaches();
 
 			}
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
-				$form->error = Member::loggedIn()->language()->addToStack('photo_crop_bad');
+				$form->error = \IPS\Member::loggedIn()->language()->addToStack('photo_crop_bad');
 			}
 		}
 	}
@@ -598,17 +577,17 @@ class Photo extends ProfileStepsAbstract
 	/**
 	 * Cover Photo Form
 	 *
-	 * @param	Form		$form	The form
-	 * @param	ProfileStep	$step	The step
-	 * @param	Member				$member	The member
+	 * @param	\IPS\Helpers\Form		$form	The form
+	 * @param	\IPS\Member\ProfileStep	$step	The step
+	 * @param	\IPS\Member				$member	The member
 	 * @return	void
 	 */
 
-	protected static function coverPhotoForm( Form $form, ProfileStep $step, Member $member ) : void
+	protected static function coverPhotoForm( &$form, $step, $member )
 	{
 		$photo = $member->coverPhoto();
 
-		$form->add( new Upload( 'complete_profile_cover_photo', $photo->file, $step->required, array( 'allowStockPhotos' => TRUE, 'image' => TRUE, 'minimize' => TRUE, 'maxFileSize' => ( $photo->maxSize and $photo->maxSize != -1 ) ? $photo->maxSize / 1024 : NULL, 'storageExtension' => 'core_Profile' ) ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'complete_profile_cover_photo', NULL, $step->required, array( 'allowStockPhotos' => TRUE, 'image' => TRUE, 'minimize' => TRUE, 'maxFileSize' => ( $photo->maxSize and $photo->maxSize != -1 ) ? $photo->maxSize / 1024 : NULL, 'storageExtension' => 'core_Profile' ) ) );
 				
 	}
 }

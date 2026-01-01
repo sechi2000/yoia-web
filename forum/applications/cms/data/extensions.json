@@ -4,20 +4,27 @@
             "Pages": "IPS\\cms\\extensions\\core\\ContentRouter\\Pages",
             "Records": "IPS\\cms\\extensions\\core\\ContentRouter\\Records"
         },
+        "CreateMenu": {
+            "Records": "IPS\\cms\\extensions\\core\\CreateMenu\\Records"
+        },
+        "DesignersMode": {
+            "Cms": "IPS\\cms\\extensions\\core\\DesignersMode\\Cms"
+        },
         "EditorLocations": {
             "BlockContent": "IPS\\cms\\extensions\\core\\EditorLocations\\BlockContent",
             "Records": "IPS\\cms\\extensions\\core\\EditorLocations\\Records",
             "Widgets": "IPS\\cms\\extensions\\core\\EditorLocations\\Widgets"
         },
         "FileStorage": {
-            "Categories": "IPS\\cms\\extensions\\core\\FileStorage\\Categories",
             "Media": "IPS\\cms\\extensions\\core\\FileStorage\\Media",
             "Pages": "IPS\\cms\\extensions\\core\\FileStorage\\Pages",
-            "PagesImages": "IPS\\cms\\extensions\\core\\FileStorage\\PagesImages",
             "Records": "IPS\\cms\\extensions\\core\\FileStorage\\Records"
         },
         "FrontNavigation": {
             "Pages": "IPS\\cms\\extensions\\core\\FrontNavigation\\Pages"
+        },
+        "MemberSync": {
+            "Databases": "IPS\\cms\\extensions\\core\\MemberSync\\Databases"
         },
         "ModeratorPermissions": {
             "Databases": "IPS\\cms\\extensions\\core\\ModeratorPermissions\\Databases"
@@ -30,25 +37,23 @@
             "Widget": "IPS\\cms\\extensions\\core\\OutputPlugins\\Widget"
         },
         "Queue": {
+            "ConvertPages": "IPS\\cms\\extensions\\core\\Queue\\ConvertPages",
             "FixCommentAttachments": "IPS\\cms\\extensions\\core\\Queue\\FixCommentAttachments",
             "MoveComments": "IPS\\cms\\extensions\\core\\Queue\\MoveComments",
+            "MoveSingleRecord": "IPS\\cms\\extensions\\core\\Queue\\MoveSingleRecord",
+            "RebuildCategories": "IPS\\cms\\extensions\\core\\Queue\\RebuildCategories",
+            "RebuildCommentLikes": "IPS\\cms\\extensions\\core\\Queue\\RebuildCommentLikes",
+            "RebuildEditorFields": "IPS\\cms\\extensions\\core\\Queue\\RebuildEditorFields",
             "RebuildReciprocalMaps": "IPS\\cms\\extensions\\core\\Queue\\RebuildReciprocalMaps",
-            "ResyncTopicContent": "IPS\\cms\\extensions\\core\\Queue\\ResyncTopicContent",
-            "UpdateHtmlPages": "IPS\\cms\\extensions\\core\\Queue\\UpdateHtmlPages"
+            "RebuildRecords": "IPS\\cms\\extensions\\core\\Queue\\RebuildRecords",
+            "ResyncTopicContent": "IPS\\cms\\extensions\\core\\Queue\\ResyncTopicContent"
         },
         "RssImport": {
             "RssImport": "IPS\\cms\\extensions\\core\\RssImport\\RssImport"
         },
-        "SearchContent": {
-            "Pages": "IPS\\cms\\extensions\\core\\SearchContent\\Pages",
-            "Records": "IPS\\cms\\extensions\\core\\SearchContent\\Records"
-        },
         "Sitemap": {
             "Databases": "IPS\\cms\\extensions\\core\\Sitemap\\Databases",
             "Pages": "IPS\\cms\\extensions\\core\\Sitemap\\Pages"
-        },
-        "UIItem": {
-            "CopyTopicToDatabase": "IPS\\cms\\extensions\\core\\UIItem\\CopyTopicToDatabase"
         },
         "Uninstall": {
             "Databases": "IPS\\cms\\extensions\\core\\Uninstall\\Databases",

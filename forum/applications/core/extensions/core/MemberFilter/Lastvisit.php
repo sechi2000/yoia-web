@@ -11,57 +11,43 @@
 namespace IPS\core\extensions\core\MemberFilter;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\DateTime;
-use IPS\Extensions\MemberFilterAbstract;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\DateRange;
-use IPS\Member;
-use IPS\Theme;
-use LogicException;
-use function defined;
-use function in_array;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member filter: Member last visit date
  */
-class Lastvisit extends MemberFilterAbstract
+class _Lastvisit
 {
 	/**
 	 * Determine if the filter is available in a given area
 	 *
-	 * @param	string	$area	Area to check (bulkmail, group_promotions, automatic_moderation, passwordreset)
+	 * @param	string	$area	Area to check
 	 * @return	bool
 	 */
-	public function availableIn( string $area ): bool
+	public function availableIn( $area )
 	{
-		return in_array( $area, array( 'bulkmail', 'group_promotions', 'automatic_moderation', 'passwordreset' ) );
+		return \in_array( $area, array( 'bulkmail', 'group_promotions', 'automatic_moderation', 'passwordreset' ) );
 	}
 
 	/** 
 	 * Get Setting Field
 	 *
-	 * @param array $criteria	Value returned from the save() method
+	 * @param	mixed	$criteria	Value returned from the save() method
 	 * @return	array 	Array of form elements
 	 */
-	public function getSettingField( array $criteria ): array
+	public function getSettingField( $criteria )
 	{
 		return array(
-			new Custom( 'bmf_members_last_visit', array( 0 => $criteria['range'] ?? '', 1 => $criteria['days'] ?? NULL, 3 => $criteria['days_lt'] ?? NULL ), FALSE, array(
+			new \IPS\Helpers\Form\Custom( 'bmf_members_last_visit', array( 0 => isset( $criteria['range'] ) ? $criteria['range'] : '', 1 => isset( $criteria['days'] ) ? $criteria['days'] : NULL, 3 => isset( $criteria['days_lt'] ) ? $criteria['days_lt'] : NULL ), FALSE, array(
 				'getHtml'	=> function( $element )
 				{
-					$dateRange = new DateRange( "{$element->name}[0]", $element->value[0], FALSE );
+					$dateRange = new \IPS\Helpers\Form\DateRange( "{$element->name}[0]", $element->value[0], FALSE );
 
-					return Theme::i()->getTemplate( 'members', 'core', 'global' )->dateFilters( $dateRange, $element );
+					return \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->dateFilters( $dateRange, $element );
 				}
 			) )
 		);
@@ -71,29 +57,24 @@ class Lastvisit extends MemberFilterAbstract
 	 * Save the filter data
 	 *
 	 * @param	array	$post	Form values
-	 * @return    array|bool            False, or an array of data to use later when filtering the members
-	 * @throws LogicException
+	 * @return	mixed			False, or an array of data to use later when filtering the members
+	 * @throws \LogicException
 	 */
-	public function save( array $post ): array|bool
+	public function save( $post )
 	{
 		if ( isset( $post['bmf_members_last_visit'][2] ) )
 		{
 			if ( $post['bmf_members_last_visit'][2] == 'days' )
 			{
-				return $post['bmf_members_last_visit'][1] ? array( 'days' => intval( $post['bmf_members_last_visit'][1] ) ) : FALSE;
+				return $post['bmf_members_last_visit'][1] ? array( 'days' => \intval( $post['bmf_members_last_visit'][1] ) ) : FALSE;
 			}
 			else if ( $post['bmf_members_last_visit'][2] == 'days_lt' )
 			{
-				return $post['bmf_members_last_visit'][3] ? array( 'days_lt' => intval( $post['bmf_members_last_visit'][3] ) ) : FALSE;
+				return $post['bmf_members_last_visit'][3] ? array( 'days_lt' => \intval( $post['bmf_members_last_visit'][3] ) ) : FALSE;
 			}
 			elseif( $post['bmf_members_last_visit'][2] == 'range' )
 			{
-				if( empty( $post['bmf_members_last_visit'][0] ) or ( empty( $post['bmf_members_last_visit'][0]['start'] ) and empty( $post['bmf_members_last_visit'][0]['end'] ) ) )
-				{
-					return false;
-				}
-
-				return array( 'range' => json_decode( json_encode( $post['bmf_members_last_visit'][0] ), true ) );
+				return ( empty( $post['bmf_members_last_visit'][0] ) OR empty( $post['bmf_members_last_visit'][0]['start'] ) ) ? FALSE : array( 'range' => json_decode( json_encode( $post['bmf_members_last_visit'][0] ), TRUE ) );
 			}
 		}
 		else
@@ -101,19 +82,17 @@ class Lastvisit extends MemberFilterAbstract
 			/* Normalize objects to their array form. Bulk mailer stores options as a json array where as member export does not, so $data['range']['start'] is a DateTime object */
 			return ( empty( $post['bmf_members_last_visit'][0] ) OR empty( $post['bmf_members_last_visit'][0]['start'] ) ) ? FALSE : array( 'range' => json_decode( json_encode( $post['bmf_members_last_visit'][0] ), TRUE ) );
 		}
-
-		return FALSE;
 	}
 	
 	/**
 	 * Get where clause to add to the member retrieval database query
 	 *
-	 * @param array $data	The array returned from the save() method
+	 * @param	mixed				$data	The array returned from the save() method
 	 * @return	array|NULL			Where clause - must be a single array( "clause" )
 	 */
-	public function getQueryWhereClause( array $data ): ?array
+	public function getQueryWhereClause( $data )
 	{
-		if( !empty($data['range']) or !empty($data['range']['end']) )
+		if( !empty($data['range']) AND !empty($data['range']['end']) )
 		{
 			$start	= NULL;
 			$end	= NULL;
@@ -122,24 +101,24 @@ class Lastvisit extends MemberFilterAbstract
 				try
 				{
 					/* Try just what is stored */
-					$start = new DateTime( $data['range']['start'] );
+					$start = new \IPS\DateTime( $data['range']['start'] );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					/* If there was an error, try dashes so DateTime will assume European dates. @see <a href='http://php.net/manual/en/function.strtotime.php#refsect1-function.strtotime-notes'>PHP Documentation</a> */
-					$start = new DateTime( str_replace( '/', '-', $data['range']['start'] ) );
+					$start = new \IPS\DateTime( str_replace( '/', '-', $data['range']['start'] ) );
 				}
 			}
-
-			if( $data['range']['end'] )
+			
+			if ( $data['range']['end'] )
 			{
 				try
 				{
-					$end = new DateTime( $data['range']['end'] );
+					$end = new \IPS\DateTime( $data['range']['end'] );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					$end = new DateTime( str_replace( '/', '-', $data['range']['end'] ) );
+					$end = new \IPS\DateTime( str_replace( '/', '-', $data['range']['end'] ) );
 				}
 			}
 
@@ -147,24 +126,16 @@ class Lastvisit extends MemberFilterAbstract
 			{
 				return array( "GREATEST( core_members.last_activity, core_members.last_visit ) BETWEEN {$start->getTimestamp()} AND {$end->getTimestamp()}" );
 			}
-			elseif( $start )
-			{
-				return array( "GREATEST( core_members.last_activity, core_members.last_visit ) >= {$start->getTimestamp()}" );
-			}
-			else
-			{
-				return array( "GREATEST( core_members.last_activity, core_members.last_visit ) < {$end->getTimestamp()}" );
-			}
 		}
 		elseif( !empty( $data['days'] ) AND (int) $data['days'] )
 		{
-			$date = DateTime::create()->sub( new DateInterval( 'P' . (int) $data['days'] . 'D' ) );
+			$date = \IPS\DateTime::create()->sub( new \DateInterval( 'P' . (int) $data['days'] . 'D' ) );
 
 			return array( "GREATEST( core_members.last_activity, core_members.last_visit ) < {$date->getTimestamp()}" );
 		}
 		elseif( !empty( $data['days_lt'] ) AND (int) $data['days_lt'] )
 		{
-			$date = DateTime::create()->sub( new DateInterval( 'P' . (int) $data['days_lt'] . 'D' ) );
+			$date = \IPS\DateTime::create()->sub( new \DateInterval( 'P' . (int) $data['days_lt'] . 'D' ) );
 
 			return array( "GREATEST( core_members.last_activity, core_members.last_visit ) > {$date->getTimestamp()}" );
 		}
@@ -176,22 +147,22 @@ class Lastvisit extends MemberFilterAbstract
 	 * Determine if a member matches specified filters
 	 *
 	 * @note	This is only necessary if availableIn() includes group_promotions
-	 * @param	Member	$member		Member object to check
+	 * @param	\IPS\Member	$member		Member object to check
 	 * @param	array 		$filters	Previously defined filters
 	 * @param	object|NULL	$object		Calling class
 	 * @return	bool
 	 */
-	public function matches( Member $member, array $filters, ?object $object=NULL ) : bool
+	public function matches( \IPS\Member $member, $filters, $object=NULL )
 	{
 		/* If we aren't filtering by this, then any member matches */
-		if( ( !isset( $filters['range'] ) OR !$filters['range'] OR ( empty( $filters['range']['end'] ) AND empty( $filters['range']['start'] ) ) ) AND ( !isset( $filters['days'] ) OR !$filters['days'] ) AND ( !isset( $filters['days_lt'] ) OR !$filters['days_lt'] ) )
+		if( ( !isset( $filters['range'] ) OR !$filters['range'] OR empty( $filters['range']['end'] ) ) AND ( !isset( $filters['days'] ) OR !$filters['days'] ) AND ( !isset( $filters['days_lt'] ) OR !$filters['days_lt'] ) )
 		{
 			return TRUE;
 		}
 
-		$lastVisit = DateTime::ts( max( (int) $member->last_visit, (int) $member->last_activity ) );
+		$lastVisit = \IPS\DateTime::ts( max( $member->last_visit, $member->last_activity ) );
 
-		if( !empty( $filters['range'] ) )
+		if( !empty( $filters['range'] ) AND !empty( $filters['range']['end'] ) )
 		{
 			$start	= NULL;
 			$end	= NULL;
@@ -200,47 +171,39 @@ class Lastvisit extends MemberFilterAbstract
 			{
 				try
 				{
-					$start = new DateTime( $filters['range']['start'] );
+					$start = new \IPS\DateTime( $filters['range']['start'] );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					$start = new DateTime( $filters['range']['start'] );
+					$start = new \IPS\DateTime( $filters['range']['start'] );
 				}
 			}
-
-			if( $filters['range']['end'] )
+			
+			if ( $filters['range']['end'] )
 			{
 				try
 				{
-					$end = new DateTime( $filters['range']['end'] );
+					$end = new \IPS\DateTime( $filters['range']['end'] );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					$end = new DateTime( str_replace( '/', '-', $filters['range']['end'] ) );
+					$end = new \IPS\DateTime( str_replace( '/', '-', $filters['range']['end'] ) );
 				}
 			}
 
-			if( $start and $lastVisit->getTimestamp() < $start->getTimestamp() )
+			if( $start and $end )
 			{
-				return false;
+				return (bool) ( $lastVisit->getTimestamp() > $start->getTimestamp() AND $lastVisit->getTimestamp() < $end->getTimestamp() );
 			}
-			if( $end and $lastVisit->getTimestamp() > $end->getTimestamp() )
-			{
-				return false;
-			}
-
-			return true;
 		}
 		elseif( !empty( $filters['days'] ) AND (int) $filters['days'] )
 		{
-			return ( $lastVisit->add( new DateInterval( 'P' . (int) $filters['days'] . 'D' ) )->getTimestamp() < time() );
+			return (bool) ( $lastVisit->add( new \DateInterval( 'P' . (int) $filters['days'] . 'D' ) )->getTimestamp() < time() );
 		}
 		elseif( !empty( $filters['days_lt'] ) AND (int) $filters['days_lt'] )
 		{
-			return ( $lastVisit->add( new DateInterval( 'P' . (int) $filters['days_lt'] . 'D' ) )->getTimestamp() > time() );
+			return (bool) ( $lastVisit->add( new \DateInterval( 'P' . (int) $filters['days_lt'] . 'D' ) )->getTimestamp() > time() );
 		}
-
-		return false;
 	}
 	
 	/**
@@ -249,7 +212,7 @@ class Lastvisit extends MemberFilterAbstract
 	 * @param	mixed				$filters	The array returned from the save() method
 	 * @return	string|NULL
 	 */
-	public function getDescription( array $filters ) : ?string
+	public function getDescription( $filters )
 	{
 		if( !empty( $filters['range'] ) AND !empty( $filters['range']['end'] ) )
 		{
@@ -260,45 +223,38 @@ class Lastvisit extends MemberFilterAbstract
 			{
 				try
 				{
-					$start = new DateTime( $filters['range']['start'] );
+					$start = new \IPS\DateTime( $filters['range']['start'] );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					$start = new DateTime( $filters['range']['start'] );
+					$start = new \IPS\DateTime( $filters['range']['start'] );
 				}
 			}
-
-			if( $filters['range']['end'] )
+			
+			if ( $filters['range']['end'] )
 			{
 				try
 				{
-					$end = new DateTime( $filters['range']['end'] );
+					$end = new \IPS\DateTime( $filters['range']['end'] );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					$end = new DateTime( str_replace( '/', '-', $filters['range']['end'] ) );
+					$end = new \IPS\DateTime( str_replace( '/', '-', $filters['range']['end'] ) );
 				}
 			}
 
 			if ( $start and $end )
 			{
-				return Member::loggedIn()->language()->addToStack( 'member_filter_core_lastvisit_range_desc', FALSE, array( 'sprintf' => array( $start->localeDate(), $end->localeDate() ) ) );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_lastvisit_range_desc', FALSE, array( 'sprintf' => array( $start->localeDate(), $end->localeDate() ) ) );
 			}
-
-			if( $start )
-			{
-				return Member::loggedIn()->language()->addToStack( 'member_filter_core_lastvisit_start_desc', FALSE, array( 'sprintf' => array( $start->localeDate() ) ) );
-			}
-
-			return Member::loggedIn()->language()->addToStack( 'member_filter_core_lastvisit_end_desc', FALSE, array( 'sprintf' => array( $end->localeDate() ) ) );
 		}
 		elseif( !empty( $filters['days'] ) AND (int) $filters['days'] )
 		{
-			return Member::loggedIn()->language()->addToStack( 'member_filter_core_lastvisit_days_desc', FALSE, array( 'sprintf' => array( $filters['days'] ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_lastvisit_days_desc', FALSE, array( 'sprintf' => array( $filters['days'] ) ) );
 		}
 		elseif( !empty( $filters['days_lt'] ) AND (int) $filters['days_lt'] )
 		{
-			return Member::loggedIn()->language()->addToStack( 'member_filter_core_lastvisit_days_lt_desc', FALSE, array( 'sprintf' => array( $filters['days_lt'] ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'member_filter_core_lastvisit_days_lt_desc', FALSE, array( 'sprintf' => array( $filters['days_lt'] ) ) );
 		}
 		
 		return NULL;

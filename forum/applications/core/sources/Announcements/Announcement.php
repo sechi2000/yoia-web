@@ -12,51 +12,16 @@ namespace IPS\core\Announcements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Content\Controller;
-use IPS\Content\Item;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Extensions\AnnouncementsAbstract;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Date;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Url as FormUrl;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use OutOfRangeException;
-use RuntimeException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Announcements Model
  */
-class Announcement extends Item
+class _Announcement extends \IPS\Content\Item
 {
 	/**
 	 * @brief	Title-only announcement
@@ -76,43 +41,43 @@ class Announcement extends Item
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_announcements';
+	public static $databaseTable = 'core_announcements';
 
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'announcements' );
+	protected $caches = array( 'announcements' );
 
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'core';
+	public static $application = 'core';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'announce_';
+	public static $databasePrefix = 'announce_';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 		
 	/**
 	 * @brief	Database Column Map
 	 */
-	public static array $databaseColumnMap = array(
+	public static $databaseColumnMap = array(
 			'title'			=> 'title',
 			'date'			=> 'start',
 			'author'		=> 'member_id',
@@ -123,19 +88,19 @@ class Announcement extends Item
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'announcement';
+	public static $title = 'announcement';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $icon = 'bullhorn';
+	public static $icon = 'bullhorn';
 
 	/**
 	 * Get page location array
 	 *
 	 * @return	array
 	 */
-	protected function get_page_location() : array
+	protected function get_page_location()
 	{
 		return explode( ',', $this->_data['page_location'] );
 	}
@@ -145,15 +110,15 @@ class Announcement extends Item
 	 *
 	 * @return	string
 	 */
-	public function get_seo_title() : string
+	public function get_seo_title()
 	{
 		if( !$this->_data['seo_title'] )
 		{
-			$this->seo_title	= Friendly::seoTitle( $this->title );
+			$this->seo_title	= \IPS\Http\Url\Friendly::seoTitle( $this->title );
 			$this->save();
 		}
 
-		return $this->_data['seo_title'] ?: Friendly::seoTitle( $this->title );
+		return $this->_data['seo_title'] ?: \IPS\Http\Url\Friendly::seoTitle( $this->title );
 	}
 
 	/**
@@ -162,10 +127,10 @@ class Announcement extends Item
 	 * @param	string		$location		Page location: top, content or sidebar
 	 * @return	array
 	 */
-	public static function loadAllByLocation( string $location ) : array
+	public static function loadAllByLocation( $location )
 	{
 		/* Are we banned? If so, do not return any announcements */
-		if ( Member::loggedIn()->isBanned() )
+		if ( \IPS\Member::loggedIn()->isBanned() )
 		{
 			return [];
 		}
@@ -178,7 +143,7 @@ class Announcement extends Item
 			$announcement = static::constructFromData( $announce );
 
 			/* Check page location, active status and permissions */
-			if( ! in_array( $location, $announcement->page_location ) OR !$announcement->active OR ( $announcement->start !== 0 AND $announcement->start >= time() ) OR ( $announcement->end !== 0 AND $announcement->end <= time() ) OR !$announcement->canView() )
+			if( ! \in_array( $location, $announcement->page_location ) OR !$announcement->active OR ( $announcement->start !== 0 AND $announcement->start >= time() ) OR ( $announcement->end !== 0 AND $announcement->end <= time() ) OR !$announcement->canView() )
 			{
 				continue;
 			}
@@ -191,15 +156,15 @@ class Announcement extends Item
 			}
 
 			/* If the dispatcher did not finish loading (perhaps we hit an error that occurred early in execution) we can't check per-app locations */
-			if( !Dispatcher::i()->application )
+			if( !\IPS\Dispatcher::i()->application )
 			{
 				continue;
 			}
 
-			$extensions = Dispatcher::i()->application->extensions( 'core', 'Announcements' );
+			$extensions = \IPS\Dispatcher::i()->application->extensions( 'core', 'Announcements' );
 
 			/* If we have no extension, we can only check the global setting */
-			if ( !$extensions AND $announcement->app == Dispatcher::i()->application->directory )
+			if ( !$extensions AND $announcement->app == \IPS\Dispatcher::i()->application->directory )
 			{
 				$return[] = $announcement;
 			}
@@ -208,42 +173,39 @@ class Announcement extends Item
 				/* App and container specific announcements */
 				foreach ( $extensions as $key => $extension )
 				{
-					/* @var AnnouncementsAbstract $extension */
 					$id = $extension::$idField;
 
-					if ( $announcement->ids AND isset( Request::i()->$id ) )
+					if ( $announcement->ids AND isset( \IPS\Request::i()->$id ) )
 					{
-						$idsToCheck = $extension->getAnnouncementIds( $announcement->ids );
-
 						/* Are we viewing a content item */
-						if ( Dispatcher::i()->dispatcherController instanceof Controller )
+						if ( \IPS\Dispatcher::i()->dispatcherController instanceof \IPS\Content\Controller )
 						{
-							foreach( Dispatcher::i()->application->extensions( 'core', 'ContentRouter' ) AS $contentRouter )
+							foreach( \IPS\Dispatcher::i()->application->extensions( 'core', 'ContentRouter' ) AS $contentRouter )
 							{
 								foreach( $contentRouter->classes AS $class )
 								{
 									try
 									{
-										if( $announcement->location == $key AND in_array( $class::load( Request::i()->$id )->mapped('container'), $idsToCheck ) )
+										if( $announcement->location == $key AND \in_array( $class::load( \IPS\Request::i()->$id )->mapped('container'), explode( ',', $announcement->ids ) ) )
 										{
 											$return[] = $announcement;
 										}
 									}
-									catch( OutOfRangeException $e ){}
+									catch( \OutOfRangeException $e ){}
 								}
 							}
 						}
 						/* Or are we inside an allowed controller */
-						else if (isset( Dispatcher::i()->dispatcherController ) AND in_array( get_class( Dispatcher::i()->dispatcherController ), $extension::$controllers ) )
+						else if (isset( \IPS\Dispatcher::i()->dispatcherController ) AND \in_array( \get_class( \IPS\Dispatcher::i()->dispatcherController ), $extension::$controllers ) )
 						{
 							try
 							{
-								if( $announcement->location == $key AND in_array(  Request::i()->$id , $idsToCheck ) )
+								if( $announcement->location == $key AND \in_array(  \IPS\Request::i()->$id , explode( ',', $announcement->ids ) ) )
 								{
 									$return[] = $announcement;
 								}
 							}
-							catch( OutOfRangeException $e ){}
+							catch( \OutOfRangeException $e ){}
 						}
 					}
 					/* App specific, doesn't matter which container we're in */
@@ -262,31 +224,30 @@ class Announcement extends Item
 	 * Display Form
 	 *
 	 * @param	static|NULL	$announcement	Existing announcement (for edits)
-	 * @return	Form
+	 * @return	\IPS\Helpers\Form
 	 */
-	public static function form( ?Announcement $announcement ) : Form
+	public static function form( $announcement )
 	{
 		/* Build the form */
-		$form = new Form( NULL, 'save' );
-		$form->class = 'ipsForm--vertical ipsForm--edit-announcement';
+		$form = new \IPS\Helpers\Form( NULL, 'save' );
+		$form->class = 'ipsForm_vertical';
 		
-		$form->add( new Text( 'announce_title', ( $announcement ) ? $announcement->title : NULL, TRUE, array( 'maxLength' => 255 ) ) );
-		$form->add( new Date( 'announce_start', ( $announcement ) ? DateTime::ts( $announcement->start ) : new DateTime ) );
-		$form->add( new Date( 'announce_end', ( $announcement AND $announcement->end ) ? DateTime::ts( $announcement->end ) : 0, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'indefinitely' ), function($val){
-
+		$form->add( new \IPS\Helpers\Form\Text( 'announce_title', ( $announcement ) ? $announcement->title : NULL, TRUE, array( 'maxLength' => 255 ) ) );
+		$form->add( new \IPS\Helpers\Form\Date( 'announce_start', ( $announcement ) ? \IPS\DateTime::ts( $announcement->start ) : new \IPS\DateTime ) );
+		$form->add( new \IPS\Helpers\Form\Date( 'announce_end', ( $announcement AND $announcement->end ) ? \IPS\DateTime::ts( $announcement->end ) : 0, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'indefinitely' ), function($val){
+			
 			/* Compare with announce_start and make sure it's after this */
-			$start =	new DateTime( Request::i()->announce_start );
+			$start =	new \IPS\DateTime( \IPS\Request::i()->announce_start );
 			if( $val and $val->getTimestamp() < $start->getTimestamp() )
 			{
-				throw new InvalidArgumentException( 'invalid_end_date' );
+				throw new \InvalidArgumentException( 'invalid_end_date' );
 			}
 		} ) );
-
-		$form->add( new Radio( 'announce_type', ( $announcement ) ? $announcement->type : 'content', TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'announce_type', ( $announcement ) ? $announcement->type : 'content', TRUE, array(
 			'options' => array(
-				static::TYPE_NONE		=> Member::loggedIn()->language()->addToStack( 'announce_type_none' ),
-				static::TYPE_CONTENT	=> Member::loggedIn()->language()->addToStack( 'announce_type_content' ),
-				static::TYPE_URL		=> Member::loggedIn()->language()->addToStack( 'announce_type_url' ),
+				static::TYPE_NONE		=> \IPS\Member::loggedIn()->language()->addToStack( 'announce_type_none' ),
+				static::TYPE_CONTENT	=> \IPS\Member::loggedIn()->language()->addToStack( 'announce_type_content' ),
+				static::TYPE_URL		=> \IPS\Member::loggedIn()->language()->addToStack( 'announce_type_url' ),
 			),
 			'toggles' => array(
 				static::TYPE_CONTENT 	=> array( 'announce_content' ),
@@ -294,19 +255,19 @@ class Announcement extends Item
 			 ),
 		) ) );
 
-		$form->add( new Editor( 'announce_content', ( $announcement ) ? $announcement->content : NULL, NULL, array( 'app' => 'core', 'key' => 'Announcement', 'autoSaveKey' => ( $announcement ? 'editAnnouncement__' . $announcement->id : 'createAnnouncement' ), 'attachIds' => $announcement ? array( $announcement->id, NULL, 'announcement' ) : NULL ), NULL, NULL, NULL, 'announce_content' ) );
-		$form->add( new FormUrl( 'announce_url', ( $announcement ) ? $announcement->url : NULL, NULL, array( 'maxLength' => 2048 ), NULL, NULL, NULL, 'announce_url' ) );
-		$form->add( new CheckboxSet( 'announce_page_location', ( $announcement ) ? $announcement->page_location : array(), TRUE, array( 'options' => array( 'top' => 'page_top', 'content' => 'content_top', 'sidebar' => 'sidebar' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'announce_content', ( $announcement ) ? $announcement->content : NULL, NULL, array( 'app' => 'core', 'key' => 'Announcement', 'autoSaveKey' => ( $announcement ? 'editAnnouncement__' . $announcement->id : 'createAnnouncement' ), 'attachIds' => $announcement ? array( $announcement->id, NULL, 'announcement' ) : NULL ), NULL, NULL, NULL, 'announce_content' ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'announce_url', ( $announcement ) ? $announcement->url : NULL, NULL, array( 'maxLength' => 2048 ), NULL, NULL, NULL, 'announce_url' ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'announce_page_location', ( $announcement ) ? $announcement->page_location : array(), TRUE, array( 'options' => array( 'top' => 'page_top', 'content' => 'content_top', 'sidebar' => 'sidebar' ) ) ) );
 
 		/* Apps */
 		$apps = array();
 		
-		foreach( Application::applications() as $key => $data )
+		foreach( \IPS\Application::applications() as $key => $data )
 		{
 			if ( $key != 'core' )
 			{
 				/* Don't list apps without front modules or that are not being revealed */
-				if( !count( $data->modules( 'front' ) ) OR $data->hide_tab )
+				if( !\count( $data->modules( 'front' ) ) OR $data->hide_tab )
 				{
 					continue;
 				}
@@ -318,18 +279,21 @@ class Announcement extends Item
 		$toggles = array();
 		$formFields = array();
 		
-		foreach ( Application::allExtensions( 'core', 'Announcements', TRUE, 'core' ) as $key => $extension )
+		foreach ( \IPS\Application::allExtensions( 'core', 'Announcements', TRUE, 'core' ) as $key => $extension )
 		{
 			$app = mb_substr( $key, 0, mb_strpos( $key, '_' ) );
 
-			/* Grab our fields and add to the form */
-			$field	= $extension->getSettingField( $announcement );
-
-			$toggles[ $app ][] = $field->name;
-			$formFields[] = $field;
+			if( method_exists( $extension, 'getSettingField' ) )
+			{
+				/* Grab our fields and add to the form */
+				$field	= $extension->getSettingField( $announcement );
+				
+				$toggles[ $app ][] = $field->name;
+				$formFields[] = $field;
+			}
 		}
 		
-		$form->add( new Select( 'announce_app', ( $announcement ) ? $announcement->app : '*', TRUE, array( 'options' => $apps,'toggles' => $toggles, 'unlimited' => "*", 'unlimitedLang' => "everywhere" ) ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'announce_app', ( $announcement ) ? $announcement->app : '*', TRUE, array( 'options' => $apps,'toggles' => $toggles, 'unlimited' => "*", 'unlimitedLang' => "everywhere" ) ) );
 
 		foreach( $formFields as $field )
 		{
@@ -337,15 +301,15 @@ class Announcement extends Item
 		}
 
 		$groups = array();
-		foreach ( Group::groups() as $group )
+		foreach ( \IPS\Member\Group::groups() as $group )
 		{
 			$groups[ $group->g_id ] = $group->name;
 		}
 
-		$form->add( new CheckboxSet( 'announce_permissions', $announcement ? ( $announcement->permissions == '*' ? '*' : explode( ',', $announcement->permissions ) ) : '*', NULL, array( 'multiple' => TRUE, 'options' => $groups, 'unlimited' => '*', 'unlimitedLang' => 'everyone', 'impliedUnlimited' => TRUE ) ) );
-		$form->add( new Custom( 'announce_color', $announcement ? $announcement->color : 'information', NULL, array( 'getHtml' => function( $element )
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'announce_permissions', $announcement ? ( $announcement->permissions == '*' ? '*' : explode( ',', $announcement->permissions ) ) : '*', NULL, array( 'multiple' => TRUE, 'options' => $groups, 'unlimited' => '*', 'unlimitedLang' => 'everyone', 'impliedUnlimited' => TRUE ) ) );
+		$form->add( new \IPS\Helpers\Form\Custom( 'announce_color', $announcement ? $announcement->color : 'information', NULL, array( 'getHtml' => function( $element )
         {
-            return Theme::i()->getTemplate( 'forms', 'core', 'front' )->colorSelection( $element->name, $element->value );
+            return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'front' )->colorSelection( $element->name, $element->value );
         } ), NULL, NULL, NULL, 'announce_color' ) );
 
 		return $form;
@@ -356,24 +320,24 @@ class Announcement extends Item
 	 *
 	 * @return	array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->announcements ) )
+		if ( !isset( \IPS\Data\Store::i()->announcements ) )
 		{
-			Store::i()->announcements = iterator_to_array( Db::i()->select( '*', static::$databaseTable, NULL, "announce_id ASC" )->setKeyField( 'announce_id' ) );
+			\IPS\Data\Store::i()->announcements = iterator_to_array( \IPS\Db::i()->select( '*', static::$databaseTable, NULL, "announce_id ASC" )->setKeyField( 'announce_id' ) );
 		}
 
-		return Store::i()->announcements;
+		return \IPS\Data\Store::i()->announcements;
 	}
 	
 	/**
 	 * Create from form
 	 *
 	 * @param	array	$values	Values from form
-	 * @param Announcement|null $current	Current announcement
-	 * @return    Announcement
+	 * @param	\IPS\core\Announcements\Announcement|NULL $current	Current announcement
+	 * @return	\IPS\core\Announcements\Announcement
 	 */
-	public static function _createFromForm( array $values, ?Announcement $current ) : static
+	public static function _createFromForm( $values, $current )
 	{
 		if( $current )
 		{
@@ -382,18 +346,18 @@ class Announcement extends Item
 		else
 		{
 			$obj = new static;
-			$obj->member_id = Member::loggedIn()->member_id;
+			$obj->member_id = \IPS\Member::loggedIn()->member_id;
 		}
 
 		$obj->title			= $values['announce_title'];
-		$obj->seo_title 	= Friendly::seoTitle( $values['announce_title'] );
+		$obj->seo_title 	= \IPS\Http\Url\Friendly::seoTitle( $values['announce_title'] );
 		$obj->type			= $values['announce_type'];
 		$obj->content		= $values['announce_content'];
 		$obj->url			= $values['announce_url'];
 		$obj->start			= $values['announce_start'] ? $values['announce_start']->getTimestamp() : time();
 		$obj->end			= $values['announce_end'] ? $values['announce_end']->getTimestamp() : 0;
-		$obj->app			= $values['announce_app'] ?: "*";
-		$obj->permissions	= is_array( $values['announce_permissions'] ) ? implode( ',', $values['announce_permissions'] ) : '*';
+		$obj->app			= $values['announce_app'] ? $values['announce_app'] : "*";
+		$obj->permissions	= \is_array( $values['announce_permissions'] ) ? implode( ',', $values['announce_permissions'] ) : '*';
 		$obj->page_location = $values['announce_page_location'];
 		$obj->color			= $values['announce_color'];
 
@@ -401,21 +365,24 @@ class Announcement extends Item
 		$obj->location = "*";
 		$obj->ids = NULL;
 
-        if( in_array( $obj->app, array_keys(Application::applications() ) ) )
+        if( \in_array( $obj->app, array_keys(\IPS\Application::applications() ) ) )
         {
-            foreach ( Application::load( $obj->app )->extensions( 'core', 'Announcements' ) as $key => $extension )
+            foreach ( \IPS\Application::load( $obj->app )->extensions( 'core', 'Announcements' ) as $key => $extension )
             {
-				$field = $extension->getSettingField( $obj );
-				$obj->ids = is_array( $values[ $field->name ] ) ? implode( ",", array_keys( $values[ $field->name ] ) ) : $values[ $field->name ];
-				$obj->location = mb_substr( $key, mb_strpos( $key, '_' ) );
-			}
+                if( method_exists( $extension, 'getSettingField' ) )
+                {
+                    $field	= $extension->getSettingField( array() );
+                    $obj->ids = \is_array( $values[ $field->name ] ) ? implode( ",", array_keys( $values[ $field->name ] ) ) : $values[ $field->name ];
+                    $obj->location = mb_substr( $key, mb_strpos( $key, '_' ) );
+                }
+            }
         }
 		
 		$obj->save();
 		
 		if( !$current )
 		{
-			File::claimAttachments( 'createAnnouncement', $obj->id, NULL, 'announcement' );
+			\IPS\File::claimAttachments( 'createAnnouncement', $obj->id, NULL, 'announcement' );
 		}
 		
 		return $obj;
@@ -424,28 +391,28 @@ class Announcement extends Item
 	/**
 	 * @brief	Cached URLs
 	 */
-	protected mixed $_url = array();
+	protected $_url	= array();
 
 	/**
 	 * Get URL
 	 *
 	 * @param	string|NULL		$action		Action
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function url( string|null $action=NULL ): Url
+	public function url( $action=NULL )
 	{
-		$_key	= $action ? md5( $action ) : NULL;
+		$_key	= md5( $action );
 
 		if( !isset( $this->_url[ $_key ] ) )
 		{
 			if( $action )
 			{
-				$this->_url[ $_key ] = Url::internal( "app=core&module=modcp&controller=modcp&tab=announcements&id={$this->id}", 'front', 'modcp_announcements' );
+				$this->_url[ $_key ] = \IPS\Http\Url::internal( "app=core&module=modcp&controller=modcp&tab=announcements&id={$this->id}", 'front', 'modcp_announcements' );
 				$this->_url[ $_key ] = $this->_url[ $_key ]->setQueryString( 'action', $action );
 			}
 			else
 			{
-				$this->_url[ $_key ] = Url::internal( "app=core&module=system&controller=announcement&id={$this->id}", 'front', 'announcement', $this->seo_title );
+				$this->_url[ $_key ] = \IPS\Http\Url::internal( "app=core&module=system&controller=announcement&id={$this->id}", 'front', 'announcement', $this->seo_title );
 			}
 		}
 	
@@ -455,11 +422,11 @@ class Announcement extends Item
 	/**
 	 * Get owner
 	 *
-	 * @return	Member
+	 * @return	\IPS\Member
 	 */
-	public function owner() : Member
+	public function owner()
 	{
-		return Member::load( $this->member_id );
+		return \IPS\Member::load( $this->member_id );
 	}
 	
 	/**
@@ -467,29 +434,29 @@ class Announcement extends Item
 	 *
 	 * @return	void
 	 */
-	protected function unclaimAttachments(): void
+	protected function unclaimAttachments()
 	{
-		File::unclaimAttachments( 'core_Announcement', $this->id, NULL, 'announcement' );
+		\IPS\File::unclaimAttachments( 'core_Announcement', $this->id, NULL, 'announcement' );
 	}
 
 	/**
 	 * Check Moderator Permission
 	 *
 	 * @param	string						$type		'edit', 'hide', 'unhide', 'delete', etc.
-	 * @param	Member|NULL			$member		The member to check for or NULL for the currently logged in member
-	 * @param	Model|NULL		$container	The container
+	 * @param	\IPS\Member|NULL			$member		The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Node\Model|NULL		$container	The container
 	 * @return	bool
 	 */
-	public static function modPermission( string $type, ?Member $member = NULL, ?Model $container = NULL ): bool
+	public static function modPermission( $type, \IPS\Member $member = NULL, \IPS\Node\Model $container = NULL )
 	{
-		if( in_array( $type, array( 'move', 'merge', 'lock', 'unlock', 'feature', 'unfeature', 'pin', 'unpin' ) ) )
+		if( \in_array( $type, array( 'move', 'merge', 'lock', 'unlock', 'feature', 'unfeature', 'pin', 'unpin' ) ) )
 		{
 			return FALSE;
 		}
 
 		if( $type == 'hide' OR $type == 'unhide' OR $type == 'active' OR $type == 'inactive' )
 		{
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
 			return $member->modPermission( "can_manage_announcements" );
 		}
 
@@ -501,7 +468,7 @@ class Announcement extends Item
 	 *
 	 * @return	array
 	 */
-	public static function getTableFilters(): array
+	public static function getTableFilters()
 	{
 		return array(
 			'active', 'inactive'
@@ -513,7 +480,7 @@ class Announcement extends Item
 	 *
 	 * @return string
 	 */
-	public function tableStates(): string
+	public function tableStates()
 	{
 		$states = explode( ' ', parent::tableStates() );
 
@@ -533,19 +500,19 @@ class Announcement extends Item
 	 * Do Moderator Action
 	 *
 	 * @param	string				$action	The action
-	 * @param	Member|NULL	$member	The member doing the action (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member doing the action (NULL for currently logged in member)
 	 * @param	string|NULL			$reason	Reason (for hides)
 	 * @param	bool				$immediately	Delete immediately
 	 * @return	void
-	 * @throws	OutOfRangeException|InvalidArgumentException|RuntimeException
+	 * @throws	\OutOfRangeException|\InvalidArgumentException|\RuntimeException
 	 */
-	public function modAction( string $action, ?Member $member = NULL, mixed $reason = NULL, bool $immediately=FALSE ): void
+	public function modAction( $action, \IPS\Member $member = NULL, $reason = NULL, $immediately = FALSE )
 	{
 		if( static::modPermission( $action, $member ) )
 		{
 			if( $action == 'active' )
 			{
-				Session::i()->modLog( 'modlog__action_announceactive', array( static::$title => TRUE, $this->url()->__toString() => FALSE, $this->mapped('title') => FALSE ), $this );
+				\IPS\Session::i()->modLog( 'modlog__action_announceactive', array( static::$title => TRUE, $this->url()->__toString() => FALSE, $this->mapped('title') => FALSE ), $this );
 
 				$this->active	= 1;
 				$this->save();
@@ -555,7 +522,7 @@ class Announcement extends Item
 
 			if( $action == 'inactive' )
 			{
-				Session::i()->modLog( 'modlog__action_announceinactive', array( static::$title => TRUE, $this->url()->__toString() => FALSE, $this->mapped('title') => FALSE ), $this );
+				\IPS\Session::i()->modLog( 'modlog__action_announceinactive', array( static::$title => TRUE, $this->url()->__toString() => FALSE, $this->mapped('title') => FALSE ), $this );
 
 				$this->active	= 0;
 				$this->save();
@@ -564,7 +531,7 @@ class Announcement extends Item
 			}
 		}
 
-		parent::modAction( $action, $member, $reason, $immediately );
+		return parent::modAction( $action, $member, $reason, $immediately );
 	}
 
 	/**
@@ -572,7 +539,7 @@ class Announcement extends Item
 	 *
 	 * @return	array
 	 */
-	public function customMultimodActions(): array
+	public function customMultimodActions()
 	{
 		if( !$this->active )
 		{
@@ -587,10 +554,10 @@ class Announcement extends Item
 	/**
 	 * Can view?
 	 *
-	 * @param	Member|NULL	$member	The member to check for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member	The member to check for or NULL for the currently logged in member
 	 * @return	bool
 	 */
-	public function canView( ?Member $member=NULL ): bool
+	public function canView( $member=NULL )
 	{
 		/* If all groups have access, we can */
 		if( $this->permissions == '*' )
@@ -599,12 +566,12 @@ class Announcement extends Item
 		}
 
 		/* Check member */
-		$member	= ( $member === NULL ) ? Member::loggedIn() : $member;
+		$member	= ( $member === NULL ) ? \IPS\Member::loggedIn() : $member;
 		$memberGroups	= array_merge( array( $member->member_group_id ), array_filter( explode( ',', $member->mgroup_others ) ) );
 		$accessGroups	= explode( ',', $this->permissions );
 
 		/* Are we in an allowed group? */
-		if( count( array_intersect( $accessGroups, $memberGroups ) ) )
+		if( \count( array_intersect( $accessGroups, $memberGroups ) ) )
 		{
 			return TRUE;
 		}
@@ -618,7 +585,7 @@ class Announcement extends Item
 	 * @note	Return in format of array( array( 'action' => ..., 'icon' => ..., 'language' => ... ) )
 	 * @return	array
 	 */
-	public static function availableCustomMultimodActions(): array
+	public static function availableCustomMultimodActions()
 	{
 		return array(
 			array(
@@ -647,7 +614,7 @@ class Announcement extends Item
 	 * @param	array		$value	Page locations: top, content and sidebar
 	 * @return	void
 	 */
-	protected function set_page_location( array $value ) : void
+	protected function set_page_location( $value )
 	{
 		$this->_data['page_location'] = implode( ',', $value );
 	}

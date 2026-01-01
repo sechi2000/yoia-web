@@ -10,23 +10,23 @@
  */
 
 namespace IPS\Content\Api\GraphQL;
-use function defined;
+use GraphQL\Type\Definition\Type;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * \IPS\Content base types
  */
-class TypeRegistry
+class _TypeRegistry
 {
-	protected static CommentType $comment;
-	protected static ContentType $content;
-	protected static ItemType $item;
+	protected static $comment;
+	protected static $content;
+	protected static $item;
 
 	/**
 	 * Constructor
@@ -39,24 +39,24 @@ class TypeRegistry
 	/**
 	 * @return CommentType
 	 */
-	public static function comment(): CommentType
+	public static function comment()
 	{
-		return self::$comment ?? (self::$comment = new CommentType());
+		return self::$comment ?: (self::$comment = new \IPS\Content\Api\GraphQL\CommentType());
 	}
 
 	/**
 	 * @return ItemType
 	 */
-	public static function item(): ItemType
+	public static function item()
 	{
-		return self::$item ?? (self::$item = new ItemType());
+		return self::$item ?: (self::$item = new \IPS\Content\Api\GraphQL\ItemType());
 	}
 
 	/**
 	 * @return ContentType
 	 */
-	public static function content(): ContentType
+	public static function content()
 	{
-		return self::$content ?? (self::$content = new ContentType());
+		return self::$content ?: (self::$content = new \IPS\Content\Api\GraphQL\ContentType());
 	}
 }

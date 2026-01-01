@@ -12,58 +12,33 @@
 namespace IPS\convert\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DOMElement;
-use Exception;
-use IPS\Application;
-use IPS\convert\App;
-use IPS\Extensions\QueueAbstract;
-use IPS\Http\Url;
-use IPS\Log;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use IPS\Task\Queue\OutOfRangeException as QueueOutOfRangeException;
-use IPS\Text\DOMParser;
-use IPS\Xml\DOMDocument;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use function is_array;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class InvisionCommunityRebuildContent extends QueueAbstract
+class _InvisionCommunityRebuildContent
 {
 	/**
 	 * @brief Number of content items to rebuild per cycle
 	 */
-	public int $rebuild	= REBUILD_SLOW;
-
-	/**
-	 * @var App|null
-	 */
-	protected ?App $app = null;
+	public $rebuild	= \IPS\REBUILD_SLOW;
 
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data	Data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		$classname = $data['class'];
 
-		Log::debug( "Getting preQueueData for " . $classname, 'ICrebuildPosts' );
+		\IPS\Log::debug( "Getting preQueueData for " . $classname, 'ICrebuildPosts' );
 
 		try
 		{
@@ -73,12 +48,12 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 			/* We're going to use the < operator, so we need to ensure the most recent item is rebuilt */
 		    $data['runPid'] = $data['count'] + 1;
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
-		Log::debug( "PreQueue count for " . $classname . " is " . $data['count'], 'ICrebuildPosts' );
+		\IPS\Log::debug( "PreQueue count for " . $classname . " is " . $data['count'], 'ICrebuildPosts' );
 
 		if( $data['count'] == 0 )
 		{
@@ -95,47 +70,47 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 	 *
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
-	 * @return	int					New offset or NULL if complete
-	 * @throws    QueueOutOfRangeException    Indicates offset doesn't exist and thus task is complete
+	 * @return	int|null					New offset or NULL if complete
+	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$classname = $data['class'];
 		$exploded = explode( '\\', $classname );
-		if ( !class_exists( $classname ) or !Application::appIsEnabled( $exploded[1] ) )
+		if ( !class_exists( $classname ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
-			throw new QueueOutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		/* Make sure there's even content to parse */
 		if( !isset( $classname::$databaseColumnMap['content'] ) )
 		{
-			throw new QueueOutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		/* Intentionally no try/catch as it means app doesn't exist */
 		try
 		{
-			$this->app = App::load( $data['app'] );
+			$this->app = \IPS\convert\App::load( $data['app'] );
 
 			/* This extension is ONLY for InvisionCommunity conversions */
 			if( $this->app->app_key != 'invisioncommunity' )
 			{
-				throw new QueueOutOfRangeException;
+				throw new \IPS\Task\Queue\OutOfRangeException;
 			}
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			throw new QueueOutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		$softwareClass = $this->app->getSource( FALSE, FALSE );
 
-		Log::debug( "Running " . $classname . ", with an offset of " . $offset, 'ICrebuildPosts' );
+		\IPS\Log::debug( "Running " . $classname . ", with an offset of " . $offset, 'ICrebuildPosts' );
 
-		$where	  = ( is_subclass_of( $classname, 'IPS\Content\Comment' ) ) ? ( is_array( $classname::commentWhere() ) ? array( $classname::commentWhere() ) : array() ) : array();
+		$where	  = ( is_subclass_of( $classname, 'IPS\Content\Comment' ) ) ? ( \is_array( $classname::commentWhere() ) ? array( $classname::commentWhere() ) : array() ) : array();
 		$select   = $classname::db()->select( '*', $classname::$databaseTable, array_merge( $where, array( array( $classname::$databasePrefix . $classname::$databaseColumnId . ' < ?',  $data['runPid'] ) ) ), $classname::$databasePrefix . $classname::$databaseColumnId . ' DESC', array( 0, $this->rebuild ) );
-		$iterator = new ActiveRecordIterator( $select, $classname );
+		$iterator = new \IPS\Patterns\ActiveRecordIterator( $select, $classname );
 		$last     = NULL;
 
 		foreach( $iterator as $item )
@@ -148,7 +123,7 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 				/* Just checking, we don't actually need anything */
 				$this->app->checkLink( $item->$idColumn, $data['link'] );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$last = $item->$idColumn;
 				$data['indexed']++;
@@ -157,8 +132,8 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 
 			$contentColumn	= $classname::$databaseColumnMap['content'];
 
-			$source = new DOMDocument( '1.0', 'UTF-8' );
-			$source->loadHTML( DOMDocument::wrapHtml( $item->$contentColumn ) );
+			$source = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
+			$source->loadHTML( \IPS\Xml\DOMDocument::wrapHtml( $item->$contentColumn ) );
 
 			if( mb_stristr( $item->$contentColumn, 'data-mentionid' ) )
 			{
@@ -205,7 +180,7 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 			}
 
 			/* Get DOMDocument output */
-			$content = DOMParser::getDocumentBodyContents( $source );
+			$content = \IPS\Text\DOMParser::getDocumentBodyContents( $source );
 
 			/* Replace file storage tags */
 			$content = preg_replace( '/&lt;fileStore\.([\d\w\_]+?)&gt;/i', '<fileStore.$1>', $content );
@@ -225,7 +200,7 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 
 		if( $last === NULL )
 		{
-			throw new QueueOutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		/* Return the number rebuilt so far, so that the rebuild progress bar text makes sense */
@@ -238,27 +213,27 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		$class = $data['class'];
 		$exploded = explode( '\\', $class );
-		if ( !class_exists( $class ) or !Application::appIsEnabled( $exploded[1] ) )
+		if ( !class_exists( $class ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
-		return array( 'text' => Member::loggedIn()->language()->addToStack('rebuilding_stuff', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( $class::$title . '_pl', FALSE, array( 'strtolower' => TRUE ) ) ) ) ), 'complete' => $data['realCount'] ? ( round( 100 / $data['realCount'] * $data['indexed'], 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('rebuilding_stuff', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl', FALSE, array( 'strtolower' => TRUE ) ) ) ) ), 'complete' => $data['realCount'] ? ( round( 100 / $data['realCount'] * $data['indexed'], 2 ) ) : 100 );
 	}
 
 	/**
 	 * Update mentions with new display name, ID and URL
 	 *
-	 * @param	DOMElement		$element	DOM element
+	 * @param	\DOMElement		$element	DOM element
 	 * @return	void
 	 */
-	public function updateMention( DOMElement $element ) : void
+	public function updateMention( \DOMElement $element )
 	{
 		try
 		{
@@ -266,34 +241,34 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 			$newMemberId = $this->app->getLink( $element->getAttribute( 'data-mentionid' ), 'core_members' );
 
 			/* Get new member */
-			$member = Member::load( $newMemberId );
+			$member = \IPS\Member::load( $newMemberId );
 
 			$element->setAttribute( 'data-mentionid', $newMemberId );
-			$element->setAttribute( 'href', str_replace( Settings::i()->base_url, '<___base_url___>/', $member->url() ) );
-			$element->setAttribute( 'data-ipshover-target', str_replace( Settings::i()->base_url, '<___base_url___>/', $member->url()->setQueryString( 'do', 'hovercard' ) ) );
+			$element->setAttribute( 'href', str_replace( \IPS\Settings::i()->base_url, '<___base_url___>/', $member->url() ) );
+			$element->setAttribute( 'data-ipshover-target', str_replace( \IPS\Settings::i()->base_url, '<___base_url___>/', $member->url()->setQueryString( 'do', 'hovercard' ) ) );
 			$element->nodeValue = '@' . $member->name;
 		}
-		catch( Exception $e ) {}
+		catch( \Exception $e ) {}
 	}
 
 	/**
 	 * @brief	Mapping of content types to converter lookups - Add more for other apps when we support them
 	 */
-	protected array $embedLocations = array( 'forums' => array( 'content' => 'forums_topics', 'comment' => 'forums_posts' ) );
+	protected $embedLocations = array( 'forums' => array( 'content' => 'forums_topics', 'comment' => 'forums_posts' ) );
 
 	/**
 	 * Update local embeds for new names, IDs
 	 *
-	 * @param	DOMElement		$element	DOM element
+	 * @param	\DOMElement		$element	DOM element
 	 * @return	void
 	 */
-	public function updateEmbed( DOMElement $element ) : void
+	public function updateEmbed( \DOMElement $element )
 	{
 		try
 		{
-			$url = Url::createFromString( str_replace( '<___base_url___>', rtrim( Settings::i()->base_url, '/' ), $element->getAttribute( 'src' ) ) );
+			$url = \IPS\Http\Url::createFromString( str_replace( '<___base_url___>', rtrim( \IPS\Settings::i()->base_url, '/' ), $element->getAttribute( 'src' ) ) );
 
-			if( !in_array( $url->hiddenQueryString['app'], array_keys( $this->embedLocations ) ) )
+			if( !\in_array( $url->hiddenQueryString['app'], array_keys( $this->embedLocations ) ) )
 			{
 				return;
 			}
@@ -307,7 +282,7 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 					$url = $url->setQueryString( 'comment', $this->app->getLink( $url->queryString['comment'], $this->embedLocations[ $url->hiddenQueryString['app'] ]['comment'] ) );
 				}
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$url = $url->stripQueryString( 'comment' );
 			}
@@ -319,23 +294,23 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 					$url = $url->setQueryString( 'embedComment', $this->app->getLink( $url->queryString['embedComment'], $this->embedLocations[ $url->hiddenQueryString['app'] ]['comment'] ) );
 				}
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$url = $url->stripQueryString( 'embedComment' );
 			}
 
-			$element->setAttribute( 'src', str_replace( Settings::i()->base_url, '<___base_url___>/', (string) $url->correctFriendlyUrl() ) );
+			$element->setAttribute( 'src', str_replace( \IPS\Settings::i()->base_url, '<___base_url___>/', (string) $url->correctFriendlyUrl() ) );
 		}
-		catch( Exception $e ) {}
+		catch( \Exception $e ) {}
 	}
 
 	/**
 	 * Update quotes for new names, IDs
 	 *
-	 * @param	DOMElement		$element	DOM element
+	 * @param	\DOMElement		$element	DOM element
 	 * @return	void
 	 */
-	public function updateQuote( DOMElement $element ) : void
+	public function updateQuote( \DOMElement $element )
 	{
 		try
 		{
@@ -343,7 +318,7 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 			$newMemberId = $this->app->getLink( $element->getAttribute( 'data-ipsquote-userid' ), 'core_members' );
 
 			/* Get new member */
-			$member = Member::load( $newMemberId );
+			$member = \IPS\Member::load( $newMemberId );
 
 			/* Get old username */
 			$oldUsername = $element->getAttribute( 'data-ipsquote-username' );
@@ -360,12 +335,12 @@ class InvisionCommunityRebuildContent extends QueueAbstract
 			/* find the citation to update the username */
 			foreach ( $element->childNodes as $child )
 			{
-				if ( $child instanceof DOMElement and $child->getAttribute('class') == 'ipsQuote_citation' )
+				if ( $child instanceof \DOMElement and $child->getAttribute('class') == 'ipsQuote_citation' )
 				{
 					$child->nodeValue = str_replace( $oldUsername, $member->name, $child->nodeValue );
 				}
 			}
 		}
-		catch( Exception $e ) {}
+		catch( \Exception $e ) {}
 	}
 }

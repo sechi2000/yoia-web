@@ -12,59 +12,49 @@
 namespace IPS\nexus\Customer;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Patterns\Bitwise;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Alternative Contact Model
  */
-class AlternativeContact extends ActiveRecord
+class _AlternativeContact extends \IPS\Patterns\ActiveRecord
 {	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_alternate_contacts';
+	public static $databaseTable = 'nexus_alternate_contacts';
 	
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = "";
-
+	public static $databaseColumnId = NULL;
+		
 	/**
 	 * Get main account
 	 *
-	 * @return	Customer
+	 * @return	\IPS\nexus\Customer
 	 */
-	public function get_main_id() : Customer
+	public function get_main_id()
 	{
-		return Customer::load( $this->_data['main_id'] );
+		return \IPS\nexus\Customer::load( $this->_data['main_id'] );
 	}
 	
 	/**
 	 * Set main account
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function set_main_id( Member $member ) : void
+	public function set_main_id( \IPS\Member $member )
 	{
 		$this->_data['main_id'] = $member->member_id;
 	}
@@ -72,20 +62,20 @@ class AlternativeContact extends ActiveRecord
 	/**
 	 * Get alternate account
 	 *
-	 * @return	Customer
+	 * @return	\IPS\nexus\Customer
 	 */
-	public function get_alt_id() : Customer
+	public function get_alt_id()
 	{
-		return Customer::load( $this->_data['alt_id'] );
+		return \IPS\nexus\Customer::load( $this->_data['alt_id'] );
 	}
 	
 	/**
 	 * Set alternate account
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function set_alt_id( Member $member ) : void
+	public function set_alt_id( \IPS\Member $member )
 	{
 		$this->_data['alt_id'] = $member->member_id;
 	}
@@ -93,11 +83,11 @@ class AlternativeContact extends ActiveRecord
 	/**
 	 * Get purchases
 	 *
-	 * @return	ActiveRecordIterator
+	 * @return	\IPS\Patterns\ActiveRecordIterator
 	 */
-	public function get_purchases() : ActiveRecordIterator
+	public function get_purchases()
 	{
-		return new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', array( array( 'ps_member=?', $this->main_id->member_id ), Db::i()->in( 'ps_id', $this->purchaseIds() ) ) ), 'IPS\nexus\Purchase' );
+		return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', array( array( 'ps_member=?', $this->main_id->member_id ), \IPS\Db::i()->in( 'ps_id', $this->purchaseIds() ) ) ), 'IPS\nexus\Purchase' );
 	}
 	
 	/**
@@ -105,7 +95,7 @@ class AlternativeContact extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function purchaseIds() : array
+	public function purchaseIds()
 	{
 		return explode( ',', $this->_data['purchases'] );
 	}
@@ -116,43 +106,17 @@ class AlternativeContact extends ActiveRecord
 	 * @param	array	$purchases	The purchases
 	 * @return	void
 	 */
-	public function set_purchases( array $purchases ) : void
+	public function set_purchases( array $purchases )
 	{
 		$this->_data['purchases'] = implode( ',', array_keys( $purchases ) );
-	}
-
-	/**
-	 * Construct ActiveRecord from database row
-	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    ActiveRecord
-	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): ActiveRecord
-	{
-		/* Initiate an object */
-		$classname = get_called_class();
-		$obj = new $classname;
-		$obj->_new  = FALSE;
-		$obj->_data = array();
-
-		/* Import data */
-		foreach ( $data as $k => $v )
-		{
-			$obj->_data[ $k ] = $v;
-		}
-
-		$obj->changed = array();
-
-		return $obj;
 	}
 	
 	/**
 	 * Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		if ( $this->_new )
 		{
@@ -169,13 +133,14 @@ class AlternativeContact extends ActiveRecord
 			{
 				foreach( $this->$k->values as $field => $value )
 				{
-					$data[ $field ] = intval( $value );
+					$data[ $field ] = \intval( $value );
 				}
 			}
 		}
 	
 		if ( $this->_new )
 		{
+			$insert = array();
 			if( static::$databasePrefix === NULL )
 			{
 				$insert = $data;
@@ -223,9 +188,9 @@ class AlternativeContact extends ActiveRecord
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		static::db()->delete( 'nexus_alternate_contacts', array( 'main_id=? AND alt_id=?', $this->_data['main_id'], $this->_data['alt_id'] ) );
 	}

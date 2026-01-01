@@ -1,9 +1,0 @@
-{
-    "added": [
-        "login_after_inactivity_notification"
-    ],
-    "edited": [],
-    "removed": [
-        "guest_captcha"
-    ]
-}

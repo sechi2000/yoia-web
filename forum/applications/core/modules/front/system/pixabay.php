@@ -11,43 +11,29 @@
 namespace IPS\core\modules\front\system;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\Data\Cache;
-use IPS\DateTime;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Editor AJAX functions Controller
  */
-class pixabay extends Controller
+class _pixabay extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * Show the dialog window
 	 *
 	 * @return void
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		if ( Settings::i()->pixabay_enabled )
+		if ( \IPS\Settings::i()->pixabay_enabled )
 		{
-			$output = Theme::i()->getTemplate( 'system' )->pixabay( Request::i()->uploader );
-			Output::i()->sendOutput( $output );
+			$output = \IPS\Theme::i()->getTemplate( 'system' )->pixabay( \IPS\Request::i()->uploader );
+			\IPS\Output::i()->sendOutput( $output );
 		}
 	}
 
@@ -55,23 +41,23 @@ class pixabay extends Controller
 	 * Search pixabay
 	 *
 	 * @return void
-	 * @throws Exception
+	 * @throws \Exception
 	 */
-	protected function search() : void
+	protected function search()
 	{
-		if ( Settings::i()->pixabay_enabled )
+		if ( \IPS\Settings::i()->pixabay_enabled )
 		{
-			$limit = isset( Request::i()->limit ) ? Request::i()->limit : 20;
-			$offset = isset( Request::i()->offset ) ? Request::i()->offset : 0;
-			$query = isset( Request::i()->search ) ? Request::i()->search : '';
-			$url = Url::external( "https://pixabay.com/api/" );
+			$limit = isset( \IPS\Request::i()->limit ) ? \IPS\Request::i()->limit : 20;
+			$offset = isset( \IPS\Request::i()->offset ) ? \IPS\Request::i()->offset : 0;
+			$query = isset( \IPS\Request::i()->search ) ? \IPS\Request::i()->search : '';
+			$url = \IPS\Http\Url::external( "https://pixabay.com/api/" );
 
 			$parameters = array(
-				'key' => Settings::i()->pixabay_apikey,
+				'key' => \IPS\Settings::i()->pixabay_apikey,
 				'image_type' => 'photo',
 				'per_page' => 20,
 				'page' => ( $offset ) ? ceil( $offset / 20 ) + 1 : 1,
-				'safesearch' => ( Settings::i()->pixabay_safesearch ) ? 'true' : 'false',
+				'safesearch' => ( \IPS\Settings::i()->pixabay_safesearch ) ? 'true' : 'false',
 			);
 
 			$parameters['q'] = urlencode( $query );
@@ -79,19 +65,19 @@ class pixabay extends Controller
 
 			try
 			{
-				$request = Cache::i()->getWithExpire( $cacheKey, TRUE );
+				$request = \IPS\Data\Cache::i()->getWithExpire( $cacheKey, TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$url = $url->setQueryString($parameters);
 				$request = json_decode( $url->request()->get()->content, true );
 
-				Cache::i()->storeWithExpire( $cacheKey, $request, DateTime::create()->add( new DateInterval('P1D') ), TRUE );
+				\IPS\Data\Cache::i()->storeWithExpire( $cacheKey, $request, \IPS\DateTime::create()->add( new \DateInterval('P1D') ), TRUE );
 			}
 
 			if ( isset( $request['message'] ) AND $request['message'] )
 			{
-				Output::i()->json( array('error' => $request['message'] ) );
+				\IPS\Output::i()->json( array('error' => $request['message'] ) );
 			}
 
 
@@ -102,19 +88,15 @@ class pixabay extends Controller
 					'thumb'	=> $row['webformatURL'],
 					'url'   => $row['largeImageURL'],
 					'imgid'	=> $row['id'],
-					'imageHeight' => $row['imageHeight'],
-					'imageWidth' => $row['imageWidth'],
-					'thumbHeight' => $row['webformatHeight'],
-					'thumbWidth' => $row['webformatWidth'],
 				);
 			}
 
 			if ( empty( $results['images'] ) )
 			{
-				Output::i()->json( array( 'error' => Theme::i()->getTemplate( 'system', 'core' )->noResults() ) );
+				\IPS\Output::i()->json( array( 'error' => \IPS\Theme::i()->getTemplate( 'system', 'core' )->noResults() ) );
 			}
 
-			Output::i()->json( $results );
+			\IPS\Output::i()->json( $results );
 		}
 	}
 
@@ -123,14 +105,14 @@ class pixabay extends Controller
 	 *
 	 * @return void
 	 */
-	protected function getById() : void
+	protected function getById()
 	{
-		if ( isset( Request::i()->id ) )
+		if ( isset( \IPS\Request::i()->id ) )
 		{
 
-			$url = Url::external( "https://pixabay.com/api/" )->setQueryString( array(
-				'key' => Settings::i()->pixabay_apikey,
-				'id' => Request::i()->id
+			$url = \IPS\Http\Url::external( "https://pixabay.com/api/" )->setQueryString( array(
+				'key' => \IPS\Settings::i()->pixabay_apikey,
+				'id' => \IPS\Request::i()->id
 			) );
 			
 
@@ -149,7 +131,7 @@ class pixabay extends Controller
 			}
 
 			/* Now get the URL contents */
-			$data = Url::external( $url )->request()->get();
+			$data = \IPS\Http\Url::external( $url )->request()->get();
 			
 			if ( ! $filename )
 			{
@@ -157,7 +139,7 @@ class pixabay extends Controller
 			}
 
 			list( $image, $type ) = explode( '/', $data->httpHeaders['Content-Type'] );
-			Output::i()->json( array( 'content' => base64_encode( $data->content ), 'type' => $data->httpHeaders['Content-Type'], 'imageType' => $type, 'filename' => $filename ) );
+			\IPS\Output::i()->json( array( 'content' => base64_encode( $data->content ), 'type' => $data->httpHeaders['Content-Type'], 'imageType' => $type, 'filename' => $filename ) );
 		}
 	}
 }

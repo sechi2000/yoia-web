@@ -11,86 +11,79 @@
 namespace IPS\Api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use Iterator;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * API Response
  */
-class PaginatedResponse extends Response
+class _PaginatedResponse extends Response
 {
 	/**
 	 * @brief	HTTP Response Code
 	 */
-	public int $httpCode = 200;
+	public $httpCode;
 	
 	/**
 	 * @brief	Iterator (usually a select query)
 	 */
-	protected Iterator|array|null $iterator = null;
+	protected $iterator;
 	
 	/**
 	 * @brief	Current page
 	 */
-	protected int $page = 1;
+	protected $page = 1;
 	
 	/**
 	 * @brief	Results per page
 	 */
-	protected int $resultsPerPage = 25;
+	protected $resultsPerPage = 25;
 	
 	/**
 	 * @brief	ActiveRecord class
 	 */
-	protected string $activeRecordClass = '';
+	protected $activeRecordClass;
 	
 	/**
 	 * @brief	Total Count
 	 */
-	protected int $count = 0;
+	protected $count;
 	
 	/**
 	 * @brief	The member making the API request or NULL for API Key / client_credentials
 	 */
-	protected ?Member $authorizedMember = null;
+	protected $authorizedMember;
 	
 	/**
 	 * Constructor
 	 *
 	 * @param	int				$httpCode			HTTP Response code
-	 * @param	Iterator|array		$iterator			Select query or \IPS\Patterns\ActiveRecordIterator instance
+	 * @param	\Iterator		$iterator			Select query or \IPS\Patterns\ActiveRecordIterator instance
 	 * @param	int				$page				Current page
 	 * @param	string			$activeRecordClass	ActiveRecord class
 	 * @param	int|NULL				$count				Total Count
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @param	int|null				$perPage			Number of results per page
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	int				$perPage			Number of results per page
 	 * @return	void
 	 */
-	public function __construct( int $httpCode, Iterator|array $iterator, int $page, string $activeRecordClass, ?int $count, ?Member $authorizedMember = NULL, ?int $perPage=NULL )
+	public function __construct( $httpCode, $iterator, $page, $activeRecordClass, $count, \IPS\Member $authorizedMember = NULL, $perPage=NULL )
 	{
 		$this->httpCode				= $httpCode;
+		$page = (int) $page;
 		$this->page = $page > 0 ? $page : 1;
 		$this->iterator				= $iterator;
 		$this->activeRecordClass	= $activeRecordClass;
 		$this->count				= (int) $count;
-		$this->resultsPerPage		= $perPage ?: 25;
+		$this->resultsPerPage		= $perPage ? (int) $perPage : 25;
 		$this->authorizedMember		= $authorizedMember;
 
-		if( $this->iterator instanceof Select )
+		if( $this->iterator instanceof \IPS\Db\Select )
 		{
 			/* Limit the query before calling count(), as this runs the query so it cannot be modified after */
-			$this->iterator->query .= Db::i()->compileLimitClause( array( ( $this->page - 1 ) * $this->resultsPerPage, $this->resultsPerPage ) );
+			$this->iterator->query .= \IPS\Db::i()->compileLimitClause( array( ( $this->page - 1 ) * $this->resultsPerPage, $this->resultsPerPage ) );
 
 			if ( $count === NULL )
 			{
@@ -104,13 +97,13 @@ class PaginatedResponse extends Response
 	 *
 	 * @return	array
 	 */
-	public function getOutput() : array
+	public function getOutput()
 	{
 		$results = array();
 
 		if ( $this->activeRecordClass )
 		{
-			if( $this->iterator instanceof ActiveRecordIterator )
+			if( $this->iterator instanceof \IPS\Patterns\ActiveRecordIterator )
 			{
 				foreach ( $this->iterator as $result )
 				{
@@ -119,7 +112,7 @@ class PaginatedResponse extends Response
 			}
 			else
 			{
-				foreach ( new ActiveRecordIterator( $this->iterator, $this->activeRecordClass ) as $result )
+				foreach ( new \IPS\Patterns\ActiveRecordIterator( $this->iterator, $this->activeRecordClass ) as $result )
 				{
 					$results[] = $result->apiOutput( $this->authorizedMember );
 				}

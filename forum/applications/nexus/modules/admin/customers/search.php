@@ -12,48 +12,30 @@
 namespace IPS\nexus\modules\admin\customers;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\GeoLocation;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Customer\CustomField;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-use const IPS\Helpers\Table\SEARCH_BOOL;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-use const IPS\Helpers\Table\SEARCH_NUMERIC;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Customer Search
  */
-class search extends Controller
+class _search extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'customers_view' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'customers_view' );
 		parent::execute();
 	}
 
@@ -62,9 +44,9 @@ class search extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$table = new Db( 'core_members', Url::internal('app=nexus&module=customers&controller=search') );
+		$table = new \IPS\Helpers\Table\Db( 'core_members', \IPS\Http\Url::internal('app=nexus&module=customers&controller=search') );
 		$table->langPrefix = 'customerTable_';
 		$table->joins = array(
 			array(
@@ -82,11 +64,11 @@ class search extends Controller
 		$table->parsers = array(
 			'photo'	=> function( $val, $row )
 			{
-				return Theme::i()->getTemplate('customers')->rowPhoto( Member::constructFromData( $row ) );
+				return \IPS\Theme::i()->getTemplate('customers')->rowPhoto( \IPS\Member::constructFromData( $row ) );
 			},
 			'address'		=> function( $val )
 			{
-				return $val ? GeoLocation::buildFromJson( $val ) : NULL;
+				return \IPS\GeoLocation::buildFromJson( $val );
 			}
 		);
 		$table->noSort = array( 'photo', 'address' );
@@ -94,44 +76,44 @@ class search extends Controller
 		$table->rowClasses = array( 'address' => array( 'ipsTable_wrap' ) );
 		
 		$table->advancedSearch = array(
-			'cm_first_name'		=> SEARCH_CONTAINS_TEXT,
-			'cm_last_name'		=> SEARCH_CONTAINS_TEXT,
-			'email'				=> SEARCH_CONTAINS_TEXT,
-			'name'				=> SEARCH_CONTAINS_TEXT
+			'cm_first_name'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'cm_last_name'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'email'				=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'name'				=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT
 		);
-		foreach ( CustomField::roots() as $field )
+		foreach ( \IPS\nexus\Customer\CustomField::roots() as $field )
 		{
 			switch ( $field->type )
 			{
 				case 'Checkbox':
 				case 'YesNo':
-					$table->advancedSearch[ $field->column ] = SEARCH_BOOL;
+					$table->advancedSearch[ $field->column ] = \IPS\Helpers\Table\SEARCH_BOOL;
 					break;
 					
 				case 'CheckboxSet':
 				case 'Select':
 				case 'Radio':
-					$table->advancedSearch[ $field->column ] = array( SEARCH_SELECT, array( 'options' => json_decode( $field->extra ), 'multiple' => $field->multiple ) );
+					$table->advancedSearch[ $field->column ] = array( \IPS\Helpers\Table\SEARCH_SELECT, array( 'options' => json_decode( $field->extra ), 'multiple' => $field->multiple ) );
 					break;
 					
 				case 'Date':
-					$table->advancedSearch[ $field->column ] = SEARCH_DATE_RANGE;
+					$table->advancedSearch[ $field->column ] = \IPS\Helpers\Table\SEARCH_DATE_RANGE;
 					break;
 					
 				case 'Member':
-					$table->advancedSearch[ $field->column ] = array( SEARCH_MEMBER, array( 'multiple' => $field->multiple ) );
+					$table->advancedSearch[ $field->column ] = array( \IPS\Helpers\Table\SEARCH_MEMBER, array( 'multiple' => $field->multiple ) );
 					break;
 					
 				case 'Number':
-					$table->advancedSearch[ $field->column ] = SEARCH_NUMERIC;
+					$table->advancedSearch[ $field->column ] = \IPS\Helpers\Table\SEARCH_NUMERIC;
 					break;
 				
 				default:
-					$table->advancedSearch[ $field->column ] = SEARCH_CONTAINS_TEXT;
+					$table->advancedSearch[ $field->column ] = \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
 					break;
 			}
 			
-			Member::loggedIn()->language()->words[ 'customerTable_field_' . $field->id ] = $field->_title;
+			\IPS\Member::loggedIn()->language()->words[ 'customerTable_field_' . $field->id ] = $field->_title;
 			
 			$table->parsers[ $field->column ] = array( $field, 'displayValue' );
 		}
@@ -142,12 +124,12 @@ class search extends Controller
 				'view'	=> array(
 					'icon'	=> 'search',
 					'title'	=> 'view',
-					'link'	=> Url::internal("app=core&module=members&controller=members&do=view&tab=nexus_Main&id={$row['member_id']}"),
+					'link'	=> \IPS\Http\Url::internal("app=core&module=members&controller=members&do=view&tab=nexus_Main&id={$row['member_id']}"),
 				),
 			);
 		};
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__nexus_customers');
-		Output::i()->output = (string) $table;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__nexus_customers');
+		\IPS\Output::i()->output = (string) $table;
 	}
 }

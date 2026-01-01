@@ -11,37 +11,29 @@
 namespace IPS\GeoLocation\Maps;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\GeoLocation;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Mapbox Maps
  */
-class Mapbox
+class _Mapbox
 {	
 	/**
 	 * @brief	GeoLocation
 	 */
-	public ?GeoLocation $geolocation = NULL;
+	public $geoLocation;
 
 	/**
 	 * Constructor
 	 *
-	 * @param	GeoLocation	$geoLocation	Location
+	 * @param	\IPS\GeoLocation	$geoLocation	Location
 	 * @return	void
 	 */
-	public function __construct( GeoLocation $geoLocation )
+	public function __construct( \IPS\GeoLocation $geoLocation )
 	{
 		$this->geolocation	= $geoLocation;
 	}
@@ -49,41 +41,30 @@ class Mapbox
 	/**
 	 * Render
 	 *
-	 * @param int $width	Width
-	 * @param int $height	Height
-	 * @param float|null $zoom	The zoom amount (a value between 0 being totally zoomed out view of the world, and 1 being as fully zoomed in as possible) or NULL to zoom automatically based on how much data is available
+	 * @param	int			$width	Width
+	 * @param	int			$height	Height
+	 * @param	float|NULL	$zoom	The zoom amount (a value between 0 being totally zoomed out view of the world, and 1 being as fully zoomed in as possible) or NULL to zoom automatically based on how much data is available
 	 * @return	string
 	 */
-	public function render( int $width, int $height, float $zoom=NULL ): string
+	public function render( $width, $height, $zoom=NULL )
 	{
 		if( !($this->geolocation->long and $this->geolocation->lat ) )
 		{
 			return "";
 		}
 
-		/* Check group permissions */
-		if( Settings::i()->mapbox_groups != '*' and !Member::loggedIn()->inGroup( explode( ",", Settings::i()->mapbox_groups ) ) )
-		{
-			return '';
-		}
-
-		if( empty( $zoom ) )
-		{
-			$zoom = Settings::i()->mapbox_zoom ?: null;
-		}
-
-		return Theme::i()->getTemplate( 'global', 'core', 'global' )->staticMap( NULL, $this->mapUrl( $width, $height, $zoom ), $this->geolocation->lat, $this->geolocation->long, $width, $height );
+		return \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->staticMap( NULL, $this->mapUrl( $width, $height, $zoom ), $this->geolocation->lat, $this->geolocation->long, $width, $height );
 	}
 
 	/**
 	 * Return the map image URL
 	 *
-	 * @param int $width	Width
-	 * @param int $height	Height
-	 * @param float|null $zoom	The zoom amount (a value between 0 being totally zoomed out view of the world, and 1 being as fully zoomed in as possible) or NULL to zoom automatically based on how much data is available
-	 * @return	Url|NULL
+	 * @param	int			$width	Width
+	 * @param	int			$height	Height
+	 * @param	float|NULL	$zoom	The zoom amount (a value between 0 being totally zoomed out view of the world, and 1 being as fully zoomed in as possible) or NULL to zoom automatically based on how much data is available
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function mapUrl( int $width, int $height, float $zoom=NULL ): ?Url
+	public function mapUrl( $width, $height, $zoom=NULL )
 	{
 		if( !($this->geolocation->long and $this->geolocation->lat ) )
 		{
@@ -92,11 +73,8 @@ class Mapbox
 
 		$location = str_replace( ',', '.', $this->geolocation->long ) . ',' . str_replace( ',', '.', $this->geolocation->lat );
 
-		/* Leaving zoom null breaks the map */
-		$zoom = $zoom ?? 13;
-
-		return Url::external( "https://api.mapbox.com/styles/v1/mapbox/streets-v10/static/pin-l-marker+f00({$location})/{$location},{$zoom},0,60/{$width}x{$height}@2x" )->setQueryString( array(
-			'access_token'	=> Settings::i()->mapbox_api_key
+		return \IPS\Http\Url::external( "https://api.mapbox.com/styles/v1/mapbox/streets-v10/static/pin-l-marker+f00({$location})/{$location},14,0,60/{$width}x{$height}@2x" )->setQueryString( array(
+			'access_token'	=> \IPS\Settings::i()->mapbox_api_key,
 		) );
 	}
 }

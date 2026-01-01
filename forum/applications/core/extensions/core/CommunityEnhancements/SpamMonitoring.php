@@ -11,49 +11,36 @@
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Output;
-use IPS\Settings;
-use LogicException;
-use RuntimeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancements: Spam Monitoring Service
  */
-class SpamMonitoring extends CommunityEnhancementsAbstract
+class _SpamMonitoring
 {
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= TRUE;
+	public $ips	= TRUE;
 
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= TRUE;
+	public $hasOptions	= TRUE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "ips.png";
+	public $icon	= "ips.png";
 	
 	/**
 	 * Constructor
@@ -62,14 +49,14 @@ class SpamMonitoring extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		$licenseData = IPS::licenseKey();
+		$licenseData = \IPS\IPS::licenseKey();
 		if( !$licenseData or !isset( $licenseData['products']['spam'] ) or !$licenseData['products']['spam'] or ( !$licenseData['cloud'] AND strtotime( $licenseData['expires'] ) < time() ) )
 		{
 			$this->enabled	= false;
 		}
 		else
 		{
-			$this->enabled = Settings::i()->spam_service_enabled;
+			$this->enabled = \IPS\Settings::i()->spam_service_enabled;
 		}
 	}
 	
@@ -78,22 +65,22 @@ class SpamMonitoring extends CommunityEnhancementsAbstract
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
 		try
 		{
 			$this->testSettings();
 		}
-		catch ( RuntimeException $e )
+		catch ( \RuntimeException $e )
 		{
-			Output::i()->error( 'spam_service_error', '3C116/3', 500, '' );
+			\IPS\Output::i()->error( 'spam_service_error', '3C116/3', 500, '' );
 		}
-		catch ( LogicException $e )
+		catch ( \LogicException $e )
 		{
-			Output::i()->error( $e->getMessage(), '2C116/2', 403, '' );
+			\IPS\Output::i()->error( $e->getMessage(), '2C116/2', 403, '' );
 		}
 		
-		Output::i()->redirect( Url::internal( 'app=core&module=moderation&controller=spam&tab=service' ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=moderation&controller=spam&tab=service' ) );
 	}
 	
 	/**
@@ -101,39 +88,39 @@ class SpamMonitoring extends CommunityEnhancementsAbstract
 	 *
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\Exception
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		if ( $enabled )
 		{
 			$this->testSettings();
 		}
 		
-		Settings::i()->changeValues( array( 'spam_service_enabled' => $enabled ) );
+		\IPS\Settings::i()->changeValues( array( 'spam_service_enabled' => $enabled ) );
 	}
 	
 	/**
 	 * Test Settings
 	 *
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\Exception
 	 */
-	protected function testSettings() : void
+	protected function testSettings()
 	{
-		$licenseData = IPS::licenseKey();
+		$licenseData = \IPS\IPS::licenseKey();
 			
 		if ( !$licenseData )
 		{
-			throw new DomainException( Member::loggedIn()->language()->addToStack('spam_service_nokey', FALSE, array( 'sprintf' => array( Url::internal( 'app=core&module=settings&controller=licensekey' ) ) ) ) );
+			throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack('spam_service_nokey', FALSE, array( 'sprintf' => array( \IPS\Http\Url::internal( 'app=core&module=settings&controller=licensekey', null ) ) ) ) );
 		}
 		if ( !$licenseData['cloud'] AND strtotime( $licenseData['expires'] ) < time() )
 		{
-			throw new DomainException('licensekey_expired');
+			throw new \DomainException('licensekey_expired');
 		}
 		if ( !$licenseData['products']['spam'] )
 		{
-			throw new DomainException('spam_service_noservice');
+			throw new \DomainException('spam_service_noservice');
 		}		
 	}
 }

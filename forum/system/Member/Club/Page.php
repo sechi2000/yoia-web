@@ -11,67 +11,47 @@
 namespace IPS\Member\Club;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Editor;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Http\Url\Internal;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Patterns\ActiveRecord;
-use IPS\Settings;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Club Page Model
  */
-class Page extends ActiveRecord
+class _Page extends \IPS\Patterns\ActiveRecord
 {
 		/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_club_pages';
+	public static $databaseTable = 'core_club_pages';
 	
 	/**
 	 * @brief	[ActiveRecord]	Database Prefix
 	 */
-	public static string $databasePrefix = 'page_';
+	public static $databasePrefix = 'page_';
 	
 	/**
 	 * @brief	Club Store
 	 */
-	protected static array $clubs = array();
+	protected static $clubs = array();
 	
 	/**
 	 * Get Club
 	 *
-	 * @return	Club
+	 * @return	\IPS\Member\Club
 	 */
-	public function get_club(): Club
+	public function get_club(): \IPS\Member\Club
 	{
 		if ( !isset( static::$clubs[ $this->_data['club'] ] ) )
 		{
-			static::$clubs[ $this->_data['club'] ] = Club::load( $this->_data['club'] );
+			static::$clubs[ $this->_data['club'] ] = \IPS\Member\Club::load( $this->_data['club'] );
 		}
 		
 		return static::$clubs[ $this->_data['club'] ];
@@ -80,10 +60,10 @@ class Page extends ActiveRecord
 	/**
 	 * Set Club
 	 *
-	 * @param	Club		$club	The club
+	 * @param	\IPS\Member\Club		$club	The club
 	 * @return	void
 	 */
-	public function set_club( Club $club ) : void
+	public function set_club( \IPS\Member\Club $club )
 	{
 		$this->_data['club'] = $club->id;
 		unset( static::$clubs[ $club->id ] );
@@ -98,7 +78,7 @@ class Page extends ActiveRecord
 	{
 		if ( !$this->_data['seo_title'] )
 		{
-			$this->seo_title = Friendly::seoTitle( $this->_data['title'] );
+			$this->seo_title = \IPS\Http\Url\Friendly::seoTitle( $this->_data['title'] );
 			$this->save();
 		}
 		
@@ -111,10 +91,10 @@ class Page extends ActiveRecord
 	 * @param	string	$title	The page title
 	 * @return	void
 	 */
-	public function set_title( string $title ) : void
+	public function set_title( string $title )
 	{
 		$this->_data['title'] = $title;
-		$this->_data['seo_title'] = Friendly::seoTitle( $title );
+		$this->_data['seo_title'] = \IPS\Http\Url\Friendly::seoTitle( $title );
 	}
 	
 	/**
@@ -123,9 +103,9 @@ class Page extends ActiveRecord
 	 * @param	array|NULL	$value		The value to set
 	 * @return	void
 	 */
-	public function set_can_view( ?array $value ) : void
+	public function set_can_view( ?array $value )
 	{
-		if ( is_array( $value ) )
+		if ( \is_array( $value ) )
 		{
 			$this->_data['can_view'] = implode( ',', $value );
 		}
@@ -148,30 +128,30 @@ class Page extends ActiveRecord
 	/**
 	 * Form
 	 *
-	 * @param	Form			$form		Form Object
-	 * @param	Club				$club		Club this page belongs too.
-	 * @param Page|NULL	$current	If we are editing, the current page.
+	 * @param	\IPS\Helpers\Form			$form		Form Object
+	 * @param	\IPS\Member\Club				$club		Club this page belongs too.
+	 * @param	\IPS\Member\Club\Page|NULL	$current	If we are editing, the current page.
 	 * @return	void
 	 */
-	public static function form( Form $form, Club $club, ?Page $current = NULL ) : void
+	public static function form( \IPS\Helpers\Form $form, \IPS\Member\Club $club, ?\IPS\Member\Club\Page $current = NULL )
 	{
 		$form->hiddenValues['page_club'] = $club->id;
-		$form->add( new Text( 'club_page_title', ( $current ) ? $current->title : NULL, TRUE ) );
-		$form->add( new Editor( 'club_page_content', ( $current ) ? $current->content : NULL, TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Text( 'club_page_title', ( $current ) ? $current->title : NULL, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Editor( 'club_page_content', ( $current ) ? $current->content : NULL, TRUE, array(
 			'app'			=> 'core',
 			'key'			=> 'ClubPage',
 			'autoSaveKey'	=> ( $current ) ? "club-page-{$current->id}" : "club-page-new",
 			'attachIds'		=> ( $current ) ? array( $current->id, NULL, NULL ) : NULL
 		) ) );
 		
-		if ( $club->type !== Club::TYPE_PUBLIC )
+		if ( $club->type !== \IPS\Member\Club::TYPE_PUBLIC )
 		{
 			$defaults = array( 'member', 'moderator' );
-			if ( $club->type !== Club::TYPE_PRIVATE )
+			if ( $club->type !== \IPS\Member\Club::TYPE_PRIVATE )
 			{
 				$defaults[] = 'nonmember';
 			}
-			$form->add( new CheckboxSet( 'page_can_view', ( $current AND $current->can_view ) ? $current->can_view : $defaults, FALSE, array( 'options' => array(
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'page_can_view', ( $current AND $current->can_view ) ? $current->can_view : $defaults, FALSE, array( 'options' => array(
 				'nonmember'	=> 'club_page_nonmembers',
 				'member'		=> 'club_page_members',
 				'moderator'	=> 'club_page_moderators'
@@ -179,9 +159,9 @@ class Page extends ActiveRecord
 		}
 
 		/* Add the index setting if this page is shown to guests */
-		if ( $club->type !== Club::TYPE_PRIVATE AND Member::loggedIn()->group['gbw_club_manage_indexing'] )
+		if ( $club->type !== \IPS\Member\Club::TYPE_PRIVATE AND \IPS\Member::loggedIn()->group['gbw_club_manage_indexing'] )
 		{
-			$form->add( new YesNo('club_page_meta_index', ( $current ) ? $current->meta_index : TRUE, FALSE, [], NULL, NULL, NULL, 'club_page_meta_index' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo('club_page_meta_index', ( $current ) ? $current->meta_index : TRUE, FALSE, [], NULL, NULL, NULL, 'club_page_meta_index' ) );
 		}
 	}
 	
@@ -191,9 +171,9 @@ class Page extends ActiveRecord
 	 * @param	$values		array	Values
 	 * @return	void
 	 */
-	public function formatFormValues( array $values ) : void
+	public function formatFormValues( array $values )
 	{
-		$this->club			= Club::load( $values['page_club'] );
+		$this->club			= \IPS\Member\Club::load( $values['page_club'] );
 		$this->title			= $values['club_page_title'];
 		$this->content		= $values['club_page_content'];
 		if ( array_key_exists( 'page_can_view', $values ) )
@@ -214,11 +194,11 @@ class Page extends ActiveRecord
 	 * URL
 	 *
 	 * @param	NULL|string		$action		Value for the "do" parameter, or NULL for no action.
-	 * @return	Friendly
+	 * @return	\IPS\Http\Url\Friendly
 	 */
-	public function url( ?string $action = NULL ): Internal
+	public function url( ?string $action = NULL ): \IPS\Http\Url\Internal
 	{
-		$return = Url::internal( "app=core&module=clubs&controller=page&id={$this->id}", 'front', 'clubs_page', array( $this->seo_title ) );
+		$return = \IPS\Http\Url::internal( "app=core&module=clubs&controller=page&id={$this->id}", 'front', 'clubs_page', array( $this->seo_title ) );
 		
 		if ( $action )
 		{
@@ -232,17 +212,17 @@ class Page extends ActiveRecord
 	 * Load and check permissions
 	 *
 	 * @param	int					$id			ID of the page to load
-	 * @param	Member|NULL		$member		Optional member to check against
-	 * @return    Page
-	 * @throws OutOfRangeException
+	 * @param	\IPS\Member|NULL		$member		Optional member to check against
+	 * @return	\IPS\Member\Club\Page
+	 * @throws \OutOfRangeException
 	 */
-	public static function loadAndCheckPerms( int $id, ?Member $member = NULL ): Page
+	public static function loadAndCheckPerms( int $id, ?\IPS\Member $member = NULL ): \IPS\Member\Club\Page
 	{
 		$page = static::load( $id );
 		
 		if ( !$page->canView( $member ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		return $page;
@@ -251,12 +231,12 @@ class Page extends ActiveRecord
 	/**
 	 * Can view this page
 	 *
-	 * @param	Member|NULL		$member	The member trying to view the page.
+	 * @param	\IPS\Member|NULL		$member	The member trying to view the page.
 	 * @return	bool
 	 */
-	public function canView( ?Member $member = NULL ): bool
+	public function canView( ?\IPS\Member $member = NULL ): bool
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
 		/* If NULL, everyone can view */
 		if ( $this->can_view === NULL )
@@ -271,30 +251,30 @@ class Page extends ActiveRecord
 		}
 		
 		/* If it's not approved, only moderators and the person who created it can see it */
-		if ( Settings::i()->clubs_require_approval and !$this->club->approved )
+		if ( \IPS\Settings::i()->clubs_require_approval and !$this->club->approved )
 		{
 			return ( $member->modPermission('can_access_all_clubs') or ( $this->club->owner AND $member->member_id == $this->club->owner->member_id ) );
 		}
 		
 		/* Owner or leader? */
-		if ( $member->member_id === $this->club->owner->member_id OR $this->club->memberStatus( $member ) === Club::STATUS_LEADER )
+		if ( $member->member_id === $this->club->owner->member_id OR $this->club->memberStatus( $member ) === \IPS\Member\Club::STATUS_LEADER )
 		{
 			return TRUE;
 		}
 		
 		/* Moderators? */
-		if ( in_array( 'moderator', $this->can_view ) AND $this->club->memberStatus( $member ) === Club::STATUS_MODERATOR )
+		if ( \in_array( 'moderator', $this->can_view ) AND $this->club->memberStatus( $member ) === \IPS\Member\Club::STATUS_MODERATOR )
 		{
 			return TRUE;
 		}
 		
 		/* Members */
-		if ( in_array( 'member', $this->can_view ) AND in_array( $this->club->memberStatus( $member ), array( Club::STATUS_MEMBER, Club::STATUS_INVITED, Club::STATUS_INVITED_BYPASSING_PAYMENT, Club::STATUS_EXPIRED, Club::STATUS_EXPIRED_MODERATOR ) ) )
+		if ( \in_array( 'member', $this->can_view ) AND \in_array( $this->club->memberStatus( $member ), array( \IPS\Member\Club::STATUS_MEMBER, \IPS\Member\Club::STATUS_INVITED, \IPS\Member\Club::STATUS_INVITED_BYPASSING_PAYMENT, \IPS\Member\Club::STATUS_EXPIRED, \IPS\Member\Club::STATUS_EXPIRED_MODERATOR ) ) )
 		{
 			return TRUE;
 		}
 		
-		if ( in_array( 'nonmember', $this->can_view ) )
+		if ( \in_array( 'nonmember', $this->can_view ) )
 		{
 			return TRUE;
 		}
@@ -306,24 +286,24 @@ class Page extends ActiveRecord
 	/**
 	 * Can Add a page
 	 *
-	 * @param	Club		$club	The club the page will be added too.
-	 * @param	Member|NULL		$member	The member adding the page.
+	 * @param	\IPS\Member\Club		$club	The club the page will be added too.
+	 * @param	\IPS\Member|NULL		$member	The member adding the page.
 	 * @return	bool
 	 */
-	public static function canAdd( Club $club, ?Member $member = NULL ): bool
+	public static function canAdd( \IPS\Member\Club $club, ?\IPS\Member $member = NULL ): bool
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		return $club->owner->member_id === $member->member_id OR $club->isLeader( $member );
 	}
 	
 	/**
 	 * Can edit this page
 	 *
-	 * @param	Member|NULL			$member	The member editing the page.
+	 * @param	\IPS\Member|NULL			$member	The member editing the page.
 	 * @return	bool
 	 * @note	Functionally, this is no different from canAdd, however it's been abstracted out for third parties.
 	 */
-	public function canEdit( ?Member $member = NULL ): bool
+	public function canEdit( ?\IPS\Member $member = NULL ): bool
 	{
 		return static::canAdd( $this->club, $member );
 	}
@@ -331,11 +311,11 @@ class Page extends ActiveRecord
 	/**
 	 * Can delete this page
 	 *
-	 * @param	Member|NULL $member
+	 * @param	\IPS\Member|NULL
 	 * @return	bool
 	 * @note	Functionally, this is no different from canAdd, however it's been abstracted out for third parties.
 	 */
-	public function canDelete( ?Member $member = NULL ): bool
+	public function canDelete( ?\IPS\Member $member = NULL ): bool
 	{
 		return static::canAdd( $this->club, $member );
 	}
@@ -343,17 +323,17 @@ class Page extends ActiveRecord
 	/**
 	 * Delete
 	 *
-	 * @param bool $updateClub		Update club tabs
-	 * @return    void
+	 * @param	bool	$updateClub		Update club tabs
+	 * @return	void
 	 */
-	public function delete( bool $updateClub=TRUE ): void
+	public function delete( $updateClub=TRUE )
 	{
-		File::unclaimAttachments( 'core_ClubPage', $this->id );
+		\IPS\File::unclaimAttachments( 'core_ClubPage', $this->id );
 
 		if( $updateClub === TRUE )
 		{
 			$tabs = @json_decode( $this->club->menu_tabs, TRUE );
-			if ( is_countable( $tabs ) AND count( $tabs ) )
+			if ( is_countable( $tabs ) AND \count( $tabs ) )
 			{
 				if ( isset( $tabs['page-' . $this->id] ) )
 				{

@@ -11,48 +11,46 @@
 
 namespace IPS\gallery\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
-use IPS\Content\Api\GraphQL\ItemType;
-use IPS\gallery\api\GraphQL\TypeRegistry;
-use function defined;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * AlbumItemType for GraphQL API
  */
-class AlbumItemType extends ItemType
+class _AlbumItemType extends \IPS\Content\Api\GraphQL\ItemType
 {
 	/*
 	 * @brief 	The item classname we use for this type
 	 */
-	protected static string $itemClass	= '\IPS\gallery\Album\Item';
+	protected static $itemClass	= '\IPS\gallery\Album\Item';
 
 	/*
 	 * @brief 	GraphQL type name
 	 */
-	protected static string $typeName = 'gallery_AlbumItem';
+	protected static $typeName = 'gallery_AlbumItem';
 
 	/*
 	 * @brief 	GraphQL type description
 	 */
-	protected static string $typeDescription = 'An album';
+	protected static $typeDescription = 'An album';
 
 	/*
 	 * @brief 	Follow data passed in to FollowType resolver
 	 */
-	protected static array $followData = array('app' => 'gallery', 'area' => 'album');
+	protected static $followData = array('app' => 'gallery', 'area' => 'album');
 
 	/**
 	 * Return the fields available in this type
 	 *
 	 * @return	array
 	 */
-	public function fields(): array
+	public function fields()
 	{
 		// Extend our fields with image-specific stuff
 		$defaultFields = parent::fields();
@@ -70,8 +68,8 @@ class AlbumItemType extends ItemType
 	 *
 	 * @return	ObjectType
 	 */
-	protected static function getCommentType(): ObjectType
+	protected static function getCommentType()
 	{
-		return TypeRegistry::albumComment();
+		return \IPS\gallery\api\GraphQL\TypeRegistry::albumComment();
 	}
 }

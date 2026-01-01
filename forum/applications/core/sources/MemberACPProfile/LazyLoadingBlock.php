@@ -11,30 +11,25 @@
 namespace IPS\core\MemberACPProfile;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Theme;
-use function defined;
-use function get_called_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Block
  */
-abstract class LazyLoadingBlock extends Block
+abstract class _LazyLoadingBlock extends Block
 {
 	/**
 	 * Get Output
 	 *
 	 * @return	string
 	 */
-	public function output() : string
+	public function output()
 	{
-		return Theme::i()->getTemplate('memberprofile')->lazyLoad( $this->member, get_called_class() );
+		return \IPS\Theme::i()->getTemplate('memberprofile')->lazyLoad( $this->member, \get_called_class() );
 	}
 	
 	/**
@@ -42,5 +37,5 @@ abstract class LazyLoadingBlock extends Block
 	 *
 	 * @return	string
 	 */
-	abstract public function lazyOutput() : string;
+	abstract public function lazyOutput();
 }

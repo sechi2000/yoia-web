@@ -1,1 +1,0 @@
-;(function($,_,undefined){"use strict";ips.controller.register('nexus.global.misc.print',{initialize:function(){window.print();},});}(jQuery,_));;

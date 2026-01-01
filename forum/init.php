@@ -10,74 +10,50 @@
 
 namespace IPS;
 
-use DomainException;
-use ErrorException;
-use IPS\core\AdminNotification;
-use IPS\core\DataLayer;
-use IPS\Data\Store;
-use IPS\Http\Request\Exception;
-use IPS\Http\Url;
-use ParseError;
-use ReflectionClass;
-use RuntimeException;
-use Throwable;
-use Whoops\Run;
-use function constant;
-use function define;
-use function defined;
-use function function_exists;
-use function get_class;
-use function in_array;
-use function intval;
-use function IPS\Cicloud\applyLatestFilesIPSCloud;
-use function IPS\Cicloud\canManageResources;
-use function IPS\Cicloud\checkThirdParty;
-use function IPS\Cicloud\compileRedisConfig;
-use function IPS\Cicloud\isManaged;
-use function IPS\Cicloud\resyncIPSCloud;
-use function IPS\Cicloud\unpackCicConfig;
-use function is_array;
-use function is_numeric;
-use function strrpos;
-use function strstr;
-use function strtolower;
-use function substr;
-use function trait_exists;
-
 /**
  * Class to contain Invision Community autoloader and exception handler
  */
 class IPS
 {
 	/**
+	 * @brief	Classes that have hooks on
+	 */
+	public static $hooks = array();
+
+	/**
+	 * @brief	Loaded Hooks
+	 */
+	public static $loadedHooks = array();
+
+	/**
 	 * @brief	Unique key for this suite (used in http requests to defy browser caching)
 	 */
-	public static ?string $suiteUniqueKey = NULL;
+	public static $suiteUniqueKey = NULL;
 
 	/**
 	 * @brief	Developer Code to be added to all namespaces
 	 */
-	private static string $inDevCode = '';
+	private static $inDevCode = '';
 
 	/**
 	 * @brief	Namespaces developer code has been imported to
 	 */
-	private static array $inDevCodeImportedTo = array();
+	private static $inDevCodeImportedTo = array();
 
 	/**
 	 * @brief	Vendors to use PSR-0 autoloader for
 	 */
-	public static array $PSR0Namespaces = array();
+	public static $PSR0Namespaces = array();
 
 	/**
 	 * @brief	Community in the Cloud configuration
 	 */
-	public static array $cicConfig = array();
+	public static $cicConfig = array();
 
 	/**
 	 * @brief	IPS Applications
 	 */
-	public static array $ipsApps = array(
+	public static $ipsApps = array(
 		'blog',
 		'calendar',
 		'cloud',
@@ -104,26 +80,49 @@ class IPS
 		$cacheConfig = '{}';
 		$redisConfig = NULL;
 		$redisEnabled = FALSE;
+		$outputCache = 'Database';
+		$outputCacheConfig = NULL;
 		$guestTimeout = 900;
 		$redisMaxConnectionAttempts = 5;
 
-		if ( isset( self::$cicConfig['redis'] ) and is_array( self::$cicConfig['redis'] ) AND self::$cicConfig['redis']['enabled'] == TRUE )
+		if ( isset( self::$cicConfig['guests']['guest_cache_timeout'] ) and self::$cicConfig['guests']['guest_cache_timeout'] and \is_numeric( self::$cicConfig['guests']['guest_cache_timeout'] ) )
 		{
-			$storeMethod = 'Redis';
-			$cacheMethod = 'Redis';
-			$redisEnabled = TRUE;
+			$guestTimeout = \intval( self::$cicConfig['guests']['guest_cache_timeout'] );
+		}
+
+		if ( isset( self::$cicConfig['redis'] ) and \is_array( self::$cicConfig['redis'] ) AND self::$cicConfig['redis']['enabled'] == TRUE )
+		{
+			if ( isset( self::$cicConfig['redis']['guest_cache'] ) and self::$cicConfig['redis']['guest_cache'] == TRUE )
+			{
+				$outputCache = 'Redis';
+				$guestTimeout = self::$cicConfig['redis']['guest_cache_timeout'];
+			}
 
 			if ( isset( self::$cicConfig['redis']['max_connection_attempts'] ) and self::$cicConfig['redis']['max_connection_attempts'] > 0 )
 			{
 				$redisMaxConnectionAttempts = (int) self::$cicConfig['redis']['max_connection_attempts'];
 			}
 
+			$storeMethod = 'Redis';
+			$cacheMethod = 'Redis';
+			$redisEnabled = TRUE;
+
 			$redisConfig = self::compileCicRedisConfig();
 		}
-
-		if ( isset( self::$cicConfig['settings']['guest_cache'] ) and self::$cicConfig['redis']['guest_cache'] == TRUE )
+		else if ( isset( $_SERVER['IPS_CIC'] ) )
 		{
-			$guestTimeout = self::$cicConfig['settings']['guest_cache_timeout'];
+			$guestTimeout = ( $guestTimeout == 30 ) ? 300 : $guestTimeout;
+
+			$storeMethod = 'Database';
+			$storeConfig = '{}';
+			$cacheMethod = 'None';
+			$cacheConfig = '{}';
+		}
+
+		/* Completely disable output caching */
+		if( isset( self::$cicConfig['guests']['disable_output_caching'] ) AND self::$cicConfig['guests']['disable_output_caching'] === TRUE )
+		{
+			$outputCache = 'None';
 		}
 
 		$sitePath = __DIR__;
@@ -183,7 +182,7 @@ class IPS
 				// Upgrading page
 				// Is shown when upgrade is in process. You can change it if you want to translate
 				// or otherwise customise it.
-				'UPGRADING_PAGE' => 'admin/upgrade/upgrading.html',
+				'UPGRADING_PAGE' => ( \defined( 'CP_DIRECTORY' ) ) ? CP_DIRECTORY . '/upgrade/upgrading.html' : 'admin/upgrade/upgrading.html',
 
 				// Disable login for the upgrader?
 				// The upgrader can only use the standard login handler so if you have turned that off
@@ -216,6 +215,9 @@ class IPS
 				'REDIS_ENABLED'				=> $redisEnabled,		// Use Redis for sessions and to topic view counters in addition to normal caching?
 				'REDIS_CONFIG' 				=> $redisConfig,			// JSON-encoded settings specific to Redis
 				'REDIS_MAX_CONNECTION_ATTEMPTS' => $redisMaxConnectionAttempts, // Maximum number of connection attempts before giving up
+				// These ones can't be changed in the AdminCP, but it's the same idea - allows Redis to be used for caching *except* guest page caching:
+				'OUTPUT_CACHE_METHOD'			=> $outputCache, 		// Caching Method for guest page caching (Redis, Database or None)
+				'OUTPUT_CACHE_METHOD_CONFIG'	=> $outputCacheConfig	,	// JSON-encoded settings specific to the guest page caching method
 
 				// Elastic search HTTP auth
 				'ELASTICSEARCH_USER' 	  => NULL,
@@ -223,9 +225,6 @@ class IPS
 
 				// Sitemap
 				'SITEMAP_MAX_PER_FILE'	  => 500,	// Maximum number of entries per sitemap file
-
-				// Archiving
-				'DISABLE_ARCHIVING'		  => FALSE, // Disables archiving and unarchives everything
 
 			//--------------------------------------------------------------------------------------
 			// SERVER ENVIRONMENT OPTIONS: CAN BE CHANGED IF YOU'RE 100% SURE YOU KNOW WHAT YOU'RE DOING
@@ -303,7 +302,14 @@ class IPS
 				'UPGRADE_MANUAL_THRESHOLD'	=> 250000,		// More than this number of rows
 				'UPGRADE_LARGE_TABLE_SIZE'	=> 100000000,	// Bigger than this for what MySQL reports as "Data_length" in the table status (what the value means differs between MySQL and ISAM)
 
-				// Default timeouts for cURL requests
+				// cURL settings
+				// BY default, we use cURL if version 7.36 or above is installed, and fallback to using
+				// socket connections if not. These can change that (usually used more for testing/debugging
+				// than in real-world use)
+				'BYPASS_CURL'	=> FALSE,	// This will make cURL *never* be used, even if it's installed
+				'FORCE_CURL'		=> FALSE,	// This will make cURL be used even if it is a version less than 7.36 is installed (no effect if BYPASS_CURL is TRUE)
+
+				// Default timeouts for cURL/socket requests
 				// All values in seconds
 				'DEFAULT_REQUEST_TIMEOUT'		=> 10,	// Default where no other timeout is set
 				'LONG_REQUEST_TIMEOUT'			=> 30,	// Used for specific API-based calls where we expect a slightly longer response time
@@ -324,16 +330,18 @@ class IPS
 				// Number of replies when a topic is considered large
 				'LARGE_TOPIC_REPLIES'   => 10000,
 
-				// Number of replies when a topic gets locked and split off into another topic
-				'LARGE_TOPIC_LOCK'		=> 100000,
-
-				// Maximum number of replies that can be made before the topic gets auto-locked
-				'LARGE_TOPIC_WARNING'	=> 50,
-
 			//--------------------------------------------------------------------------------------
 			// DEPRECATED OPTIONS: CHANGE AT YOUR OWN RISK
 			// These constants were once customisable but their fucntionality should now be
 			// considered deprecated.
+
+				// AdminCP Obscurity Settings
+				// It was once recommended for site owners to rename the directory for security
+				// and set the CP_DIRECTORY constant so some links still work, the upgrader can put
+				// files in the right place, etc. While it is still honoured, it is no longer recommended
+				// as much more secure alternatives like two factor authentication now exist.
+				'CP_DIRECTORY'	=> 'admin',	// The name of the directory where the AdminCP is
+				'SHOW_ACP_LINK'	=> TRUE,		// Show a link to the AdminCP for logged-in administrators?
 
 				// These ones don't do anything at all, but we keep them just in case any third
 				// party stuff if referencing them
@@ -352,6 +360,13 @@ class IPS
 				// https://remoteservices.invisionpower.com/docs/in_dev for more information
 				'IN_DEV' => FALSE,
 
+				// Perform coding standards checks?
+				// If enabled, some aspects of the code are checked to ensure they follow IPS
+				// coding standards. IPS developers use this internally but third party
+				// developers may want to disable it.
+				// Has no effect if IN_DEV is FALSE
+				'IN_DEV_STRICT_MODE' => TRUE,
+
 				// Disable ACP session timeout?
 				// Disables the ACP session timeout check. Useful for developing where you may
 				// get logged out of the ACP in between requests while working.
@@ -363,6 +378,10 @@ class IPS
 				// screenshots from Developer Mode installs without it looking unappealing.
 				// Has no effect if IN_DEV is FALSE
 				'DEV_HIDE_DEV_TOOLS' => FALSE,
+
+				// Skip building apps?
+				// Apps keys to be skipped when using 'build all'
+				'DEV_SKIP_BUILD_APPS' => [],
 
 				// Whoops error handler settings
 				// When in developer mode, Whoops overrides the normal error handler to provide more
@@ -409,12 +428,16 @@ class IPS
 				// difficult to debug if it causes an error. With this turned on, each template will get
 				// written to a PHP file and then that file will be included.
 				'DEBUG_TEMPLATES' => FALSE,
-				'DEBUG_CUSTOM_TEMPLATES' => FALSE,
 
 				// Enable debug logging?
 				// Throughout the code we call \IPS\Log::debug() with debug infotmation, but by default
 				// this doesn't do anything. Turn this on to make that information get logged.
 				'DEBUG_LOG' => FALSE,
+
+				// Enable debug on hooks?
+				// By default, if a hook throws an exception, the exception is caught silently and the parent
+				// method is executed. Turn this on to log those exceptions.
+			    'DEBUG_HOOKS' => FALSE,
 
 				// Enable logging of output headers?
 				// Logs every header the server is sending (if supported by the server) for
@@ -467,6 +490,7 @@ class IPS
 				// Use old UI in converter app?
 				// Used for development/testing purposes
 				'CONVERTERS_DEV_UI' => FALSE,
+
 			//--------------------------------------------------------------------------------------
 			// CODING SHORTCUTS: NEVER CHANGE
 			// These constants only exist so that if their values need to change we only need to
@@ -553,7 +577,7 @@ class IPS
 		mb_internal_encoding('UTF-8');
 
 		/* Define the IN_IPB constant - this needs to be in the global namespace for backwards compatibility */
-		define( 'IN_IPB', TRUE );
+		\define( 'IN_IPB', TRUE );
 
 		/* Load constants.php */
 		if ( isset( $_SERVER['IPS_CLOUD2'] ) AND isset( $_SERVER['IPS_CLOUD2_ID'] ) )
@@ -585,18 +609,24 @@ class IPS
 
 		foreach ( $defaultConstants as $k => $v )
 		{
-			if( defined( $k ) )
+			if( \defined( $k ) )
 			{
-				define( 'IPS\\' . $k, constant( $k ) );
+				\define( 'IPS\\' . $k, \constant( $k ) );
 			}
 			else
 			{
-				define( 'IPS\\' . $k, $v );
+				\define( 'IPS\\' . $k, $v );
 			}
 		}
 
+		/* If they have customized the ACP directory but it doesn't exist, throw an error */
+		if( !is_dir( ROOT_PATH . '/' . CP_DIRECTORY ) AND CP_DIRECTORY != $defaultConstants['CP_DIRECTORY'] )
+		{
+			die( "You have defined a custom ACP directory (CP_DIRECTORY) in constants.php, however it is not valid.  Please remove or correct this constant definition." );
+		}
+
 		/* Load developer code */
-		if( IN_DEV and file_exists( ROOT_PATH . '/dev/function_overrides.php' ) )
+		if( IN_DEV and IN_DEV_STRICT_MODE and file_exists( ROOT_PATH . '/dev/function_overrides.php' ) )
 		{
 			self::$inDevCode = file_get_contents( ROOT_PATH . '/dev/function_overrides.php' );
 		}
@@ -605,16 +635,16 @@ class IPS
 		spl_autoload_register( '\IPS\IPS::autoloader', true, true );
 
 		/* Set error handlers */
-		if ( IN_DEV AND DEV_USE_WHOOPS and file_exists( ROOT_PATH . '/dev/Whoops/Run.php' ) )
+		if ( \IPS\IN_DEV AND \IPS\DEV_USE_WHOOPS and file_exists( ROOT_PATH . '/dev/Whoops/Run.php' ) )
 		{
 			self::$PSR0Namespaces['Whoops'] = ROOT_PATH . '/dev/Whoops';
-			$whoops = new Run;
-			$handlerClass = DEV_WHOOPS_HANDLER;
+			$whoops = new \Whoops\Run;
+			$handlerClass = \IPS\DEV_WHOOPS_HANDLER;
 			$handler =  new $handlerClass;
 
-			if (DEV_WHOOPS_EDITOR)
+			if ( \IPS\DEV_WHOOPS_EDITOR )
 			{
-				$handler->setEditor(DEV_WHOOPS_EDITOR);
+				$handler->setEditor( \IPS\DEV_WHOOPS_EDITOR );
 			}
 			$whoops->pushHandler( $handler );
 			$whoops->register();
@@ -622,14 +652,23 @@ class IPS
 			/* Remove some 8.1 deprecated errors for now */
 			$dirSep = preg_quote( DIRECTORY_SEPARATOR );
 			$whoops->silenceErrorsInPaths( [
+				"#applications{$dirSep}(" . implode( '|', static::$ipsApps ) . ')#',
 				"#system#i",
-				"#calendar#i",
 			], E_DEPRECATED );
 		}
 		else
 		{
 			set_error_handler( '\IPS\IPS::errorHandler' );
 			set_exception_handler( '\IPS\IPS::exceptionHandler' );
+		}
+
+		/* Init hooks */
+		if ( file_exists( \IPS\SITE_FILES_PATH . "/plugins/hooks.php" ) )
+		{
+			if ( \IPS\RECOVERY_MODE or !( self::$hooks = require( \IPS\SITE_FILES_PATH . '/plugins/hooks.php' ) ) )
+			{
+				self::$hooks = array();
+			}
 		}
 	}
 
@@ -661,18 +700,19 @@ class IPS
 		$namespace = empty( $bits ) ? 'IPS' : ( 'IPS\\' . implode( '\\', $bits ) );
 		$inDevCode = '';
 
-		if( !class_exists( "{$namespace}\\{$class}", FALSE ) )
+		/* We only need to load the file if we don't have the underscore-prefixed one */
+		if( !class_exists( "{$namespace}\\_{$class}", FALSE ) )
 		{
 			/* Locate file */
 			$path = '';
 			$sourcesDirSet = FALSE;
 			foreach ( array_merge( $bits, array( $class ) ) as $i => $bit )
 			{
-				if( $bit and preg_match( "/^[a-z0-9]/", $bit ) )
+				if( preg_match( "/^[a-z0-9]/", $bit ) )
 				{
 					if( $i === 0 )
 					{
-						if ( CIC2 AND !in_array( $bit, static::$ipsApps ) )
+						if ( \IPS\CIC2 AND !\in_array( $bit, static::$ipsApps ) )
 						{
 							$path .= SITE_FILES_PATH . '/applications/'; // Applications are in the root on Cloud2
 						}
@@ -711,10 +751,10 @@ class IPS
 			}
 
 			/* Load it */
-			$path = substr( $path, 0, -1 ) . '.php';
+			$path = \substr( $path, 0, -1 ) . '.php';
 			if( !file_exists( $path ) )
 			{
-				$path = substr( $path, 0, -4 ) . substr( $path, strrpos( $path, '/' ) );
+				$path = \substr( $path, 0, -4 ) . \substr( $path, \strrpos( $path, '/' ) );
 				if ( !file_exists( $path ) )
 				{
 					return FALSE;
@@ -734,23 +774,191 @@ class IPS
 				return;
 			}
 
-			/* Is it an enumeration? */
-			if ( function_exists( 'enum_exists' ) AND enum_exists( "{$namespace}\\{$class}", FALSE ) )
-			{
-				return;
-			}
-
-			/* Does it exist? */
-			if ( class_exists( "{$namespace}\\{$class}", FALSE ) )
-			{
-				return;
-			}
-
 			/* Doesn't exist? */
-			if( !class_exists( "{$namespace}\\{$class}", FALSE ) )
+			if( !class_exists( "{$namespace}\\_{$class}", FALSE ) )
 			{
-				trigger_error( "Class {$classname} could not be loaded. Ensure it is in the correct namespace.", E_USER_ERROR );
+				trigger_error( "Class {$classname} could not be loaded. Ensure it has been properly prefixed with an underscore and is in the correct namespace.", E_USER_ERROR );
 			}
+
+			/* Stuff for developer mode */
+			if( IN_DEV and IN_DEV_STRICT_MODE )
+			{
+				$reflection = new \ReflectionClass( "{$namespace}\\_{$class}" );
+
+				/* Import our code to override forbidden functions */
+				if( !\in_array( \strtolower( $namespace ), self::$inDevCodeImportedTo ) )
+				{
+					$inDevCode = self::$inDevCode;
+					self::$inDevCodeImportedTo[] = \strtolower( $namespace );
+				}
+
+				/* Any classes which extend a core PHP class are exempt from our rules */
+				$extendsCorePhpClass = FALSE;
+				for ( $workingClass = $reflection; $parent = $workingClass->getParentClass(); $workingClass = $parent )
+				{
+					if ( \substr( $parent->getNamespaceName(), 0, 3 ) !== 'IPS' )
+					{
+						$extendsCorePhpClass = TRUE;
+						break;
+					}
+				}
+				if ( !$extendsCorePhpClass )
+				{
+					/* Make sure it's name follows our standards */
+					if( !preg_match( '/^_[A-Z0-9]+$/i', $reflection->getShortName() ) )
+					{
+						trigger_error( "{$classname} does not follow our naming conventions. Please rename using only alphabetic characters and PascalCase. (PHP Coding Standards: Classes.5)", E_USER_ERROR );
+					}
+
+					/* Loop methods */
+					$hasNonAbstract = FALSE;
+					$hasNonStatic = FALSE;
+					foreach ( $reflection->getMethods() as $method )
+					{
+						if ( \substr( $method->getDeclaringClass()->getName(), 0, 3 ) === 'IPS' )
+						{
+							/* Make sure it's not private */
+							if( $method->isPrivate() )
+							{
+								trigger_error( "{$classname}::{$method->name} is declared as private. In order to ensure that hooks are able to work freely, please use protected instead. (PHP Coding Standards: Functions and Methods.4)", E_USER_ERROR );
+							}
+
+							/* We need to know for later if we have non-abstract methods */
+							if( !$method->isAbstract() )
+							{
+								$hasNonAbstract = TRUE;
+							}
+
+							/* We need to know for later if we have non-static methods */
+							if( !$method->isStatic() )
+							{
+								$hasNonStatic = TRUE;
+							}
+
+							/* Make sure the name follows our conventions */
+							if(
+								!preg_match( '/^_?[a-z][A-Za-z0-9]*$/', $method->name )	// Normal pattern most methods should match
+								and
+								!preg_match( '/^get_/i', $method->name )		// get_* is allowed
+								and
+								!preg_match( '/^set_/i', $method->name )		// set_* is allowed
+								and
+								!preg_match( '/^parse_/i', $method->name )		// parse_* is allowed
+								and
+								!preg_match( '/^setBitwise_/i', $method->name )	// set_Bitiwse_* is allowed
+								and
+								!preg_match( '/^(GET|POST|PUT|DELETE)[a-zA-Z_]+$/', $method->name )	// API methods have a specific naming format
+								and
+								!\in_array( $method->name, array(					// PHP's magic methods are allowed (except __sleep and __wakeup as we don't allow serializing)
+									'__construct',
+									'__destruct',
+									'__call',
+									'__callStatic',
+									'__get',
+									'__set',
+									'__isset',
+									'__unset',
+									'__toString',
+									'__invoke',
+									'__set_state',
+									'__clone',
+									'__debugInfo',
+								) )
+							) {
+								trigger_error( "{$classname}::{$method->name} does not follow our naming conventions. Please rename using only alphabetic characters and camelCase. (PHP Coding Standards: Functions and Methods.1-3)", E_USER_ERROR );
+							}
+						}
+					}
+
+					/* Loop properties */
+					foreach ( $reflection->getProperties() as $property )
+					{
+						$hasNonAbstract = TRUE;
+
+						/* Make sure it's not private */
+						if( $property->isPrivate() )
+						{
+							trigger_error( "{$classname}::\${$property->name} is declared as private. In order to ensure that hooks are able to work freely, please use protected instead. (PHP Coding Standards: Properties and Variables.3)", E_USER_ERROR );
+						}
+
+						/* Make sure the name follows our conventions */
+						if( !preg_match( '/^_?[a-z][A-Za-z]*$/', $property->name ) )
+						{
+							trigger_error( "{$classname}::\${$property->name} does not follow our naming conventions. Please rename using only alphabetic characters and camelCase. (PHP Coding Standards: Properties and Variables.1-2)", E_USER_ERROR );
+						}
+					}
+
+					/* Check an interface wouldn't be more appropriate */
+					if( !$hasNonAbstract )
+					{
+						trigger_error( "You do not have any non-abstract methods in {$classname}. Please use an interface instead. (PHP Coding Standards: Classes.7)", E_USER_ERROR );
+					}
+
+					/* Check we have at least one non-static method (unless this class is abstract or has a parent) */
+					elseif( !$reflection->isAbstract() and $reflection->getParentClass() === FALSE and !$hasNonStatic and $reflection->getNamespacename() !== 'IPS\Output\Plugin' and !\in_array( 'extensions', $bits ) and !\in_array( 'templateplugins', $bits ) )
+					{
+						trigger_error( "You do not have any methods in {$classname} which are not static. Please refactor. (PHP Coding Standards: Functions and Methods.6)", E_USER_ERROR );
+					}
+				}
+			}
+		}
+
+		/* Monkey Patch */
+		self::monkeyPatch( $namespace, $class, $inDevCode );
+	}
+
+	/**
+	 * Monkey Patch
+	 *
+	 * @param	string	$namespace	The namespace
+	 * @param	string	$finalClass	The final class name we want to be able to use (without namespace)
+	 * @param	string	$extraCode	Any additonal code to import before the class is defined
+	 * @return	null
+	 */
+	public static function monkeyPatch( $namespace, $finalClass, $extraCode = '' )
+	{
+		$realClass = "_{$finalClass}";
+		if( isset( self::$hooks[ "\\{$namespace}\\{$finalClass}" ] ) AND \IPS\RECOVERY_MODE === FALSE )
+		{
+			foreach ( self::$hooks[ "\\{$namespace}\\{$finalClass}" ] as $id => $data )
+			{
+
+				$path = ROOT_PATH;
+				if ( \IPS\CIC2 AND static::isThirdParty( $data['file'] ) )
+				{
+					$path = SITE_FILES_PATH;
+				}
+				if ( file_exists( $path . '/' . $data['file'] ) )
+				{
+					if( static::isThirdParty( $data['file'] ) )
+					{
+						static::$loadedHooks[] = $data['file'];
+					}
+
+					$contents = "namespace {$namespace}; ". str_replace( '_HOOK_CLASS_', $realClass, file_get_contents( $path . '/' . $data['file'] ) );
+					try
+					{
+						if( @eval( $contents ) !== FALSE )
+						{
+							$realClass = $data['class'];
+						}
+					}
+					catch ( \ParseError $e )
+					{
+						/* Show the error if we have development mode enabled or the error originated in the cloud app */
+						if( \IPS\IN_DEV or strstr( $data['file'], 'applications/cloud/') )
+						{
+							throw $e;
+						}
+					}
+				}
+			}
+		}
+
+		$reflection = new \ReflectionClass( "{$namespace}\\_{$finalClass}" );
+		if( eval( "namespace {$namespace}; ". $extraCode . ( $reflection->isAbstract() ? 'abstract' : '' )." class {$finalClass} extends {$realClass} {}" ) === FALSE )
+		{
+			trigger_error( "There was an error initiating the class {$namespace}\\{$finalClass}.", E_USER_ERROR );
 		}
 	}
 
@@ -764,7 +972,13 @@ class IPS
 	{
 		$bits = explode( '/', $path );
 
-		if ( $bits[0] === 'applications' AND isset( $bits[1] ) AND in_array( $bits[1], static::$ipsApps ) )
+		/* Plugins are always third party */
+		if ( $bits[0] === 'plugins' )
+		{
+			return TRUE;
+		}
+
+		if ( $bits[0] === 'applications' AND isset( $bits[1] ) AND \in_array( $bits[1], static::$ipsApps ) )
 		{
 			return FALSE;
 		}
@@ -773,27 +987,26 @@ class IPS
 	}
 
 	/**
-	 * @brief	$lastError Last error
+	 * @var	Last error
 	 */
-	public static ?\Exception $lastError = NULL;
+	public static $lastError;
 
 	/**
 	 * Error Handler
 	 *
-	 * @param int $errno Error number
-	 * @param string $errstr Error message
-	 * @param string $errfile File
-	 * @param int $errline Line
-	 * @param null $trace Backtrace
-	 * @return    void
-	 * @throws ErrorException
+	 * @param	int		$errno		Error number
+	 * @param	string	$errstr		Error message
+	 * @param	string	$errfile	File
+	 * @param	int		$errline	Line
+	 * @param	array	$trace		Backtrace
+	 * @return	void
 	 */
 	public static function errorHandler( $errno, $errstr, $errfile, $errline, $trace=NULL )
 	{
-		self::$lastError = new ErrorException( $errstr, $errno, 0, $errfile, $errline );
+		self::$lastError = new \ErrorException( $errstr, $errno, 0, $errfile, $errline );
 
 		/* We don't care about these in production */
-		if ( in_array( $errno, array( E_WARNING, E_NOTICE, E_STRICT, E_DEPRECATED ) ) )
+		if ( \in_array( $errno, array( E_WARNING, E_NOTICE, E_STRICT, E_DEPRECATED ) ) )
 		{
 			return;
 		}
@@ -810,13 +1023,13 @@ class IPS
 	/**
 	 * Exception Handler
 	 *
-	 * @param	Throwable	$exception	Exception class
+	 * @param	\Throwable	$exception	Exception class
 	 * @return	void
 	 */
 	public static function exceptionHandler( $exception )
 	{
 		/* Should we show the exception message? */
-		$showMessage = ( Dispatcher::hasInstance() AND Dispatcher::i()->controllerLocation == 'admin' );
+		$showMessage = ( \IPS\Dispatcher::hasInstance() AND \IPS\Dispatcher::i()->controllerLocation == 'admin' );
 		if ( method_exists( $exception, 'isServerError' ) and $exception->isServerError() )
 		{
 			$showMessage = TRUE;
@@ -827,21 +1040,21 @@ class IPS
 		/* Log it (unless it's a MySQL server error) */
 		if( ! ( $exception instanceof \IPS\Db\Exception and $exception->isServerError() ) )
 		{
-			Log::log( $log, 'uncaught_exception' );
+			\IPS\Log::log( $log, 'uncaught_exception' );
 		}
 
 		/* Report it */
 		try
 		{
 			if (
-				!IN_DEV
-				and REPORT_EXCEPTIONS === TRUE
-				and Settings::i()->diagnostics_reporting
-				and !Settings::i()->theme_designer_mode
+				!\IPS\IN_DEV
+				and \IPS\REPORT_EXCEPTIONS === TRUE
+				and \IPS\Settings::i()->diagnostics_reporting
+				and !\IPS\Settings::i()->theme_designers_mode
 				and !self::exceptionWasThrownByThirdParty( $exception )
 				and ( !method_exists( $exception, 'isThirdPartyError' ) or !$exception->isThirdPartyError() )
 				and ( !method_exists( $exception, 'isServerError' ) or !$exception->isServerError() )
-				and !( $exception instanceof ParseError )
+				and !( $exception instanceof \ParseError )
 				)
 			{
 				self::reportExceptionToIPS( $exception );
@@ -855,27 +1068,27 @@ class IPS
 			/* If we couldn't connect to the database, don't bother trying to show the friendly page because nope */
 			if( $exception instanceof \IPS\Db\Exception AND $exception->getCode() === 0 )
 			{
-				throw new RuntimeException;
+				throw new \RuntimeException;
 			}
 
 			/* If we're in the installer/upgrader, show the raw message */
 			$message = 'generic_error';
-			if( Dispatcher::hasInstance() AND Dispatcher::i()->controllerLocation == 'setup' )
+			if( \IPS\Dispatcher::hasInstance() AND \IPS\Dispatcher::i()->controllerLocation == 'setup' )
 			{
 				$message = $exception->getMessage();
 			}
 
-			$faultyAppId = static::exceptionWasThrownByThirdParty( $exception );
+			$faultyAppOrHookId = static::exceptionWasThrownByThirdParty( $exception );
 
 			/* Output */
-			Output::i()->error( $message, "EX{$exception->getCode()}", 500, NULL, array(), $log, $faultyAppId );
+			\IPS\Output::i()->error( $message, "EX{$exception->getCode()}", 500, NULL, array(), $log, $faultyAppOrHookId );
 		}
 		/* And if *that* fails, show our generic page */
 		catch ( \Exception $e )
 		{
 			static::genericExceptionPage( $showMessage ? $exception->getMessage() : NULL );
 		}
-		catch ( Throwable $e )
+		catch ( \Throwable $e )
 		{
 			static::genericExceptionPage( $showMessage ? $exception->getMessage() : NULL );
 		}
@@ -886,10 +1099,10 @@ class IPS
 	/**
 	 * Get exception details as a string, suitable to display in an error (to admins only)
 	 *
-	 * @param \Exception|\Error $exception	Exception or Error
+	 * @param	\Exception	$exception	Exception
 	 * @return	string
 	 */
-	public static function getExceptionDetails( \Exception|\Error $exception ): string
+	public static function getExceptionDetails( $exception )
 	{
 		/* Work out what we'll log - exception classes can provide extra data */
 		$log = '';
@@ -897,7 +1110,7 @@ class IPS
 		{
 			$log .= $exception->extraLogData() . "\n";
 		}
-		$log .= get_class( $exception ) . ": " . $exception->getMessage() . " (" . $exception->getCode() . ")\n" . $exception->getTraceAsString();
+		$log .= \get_class( $exception ) . ": " . $exception->getMessage() . " (" . $exception->getCode() . ")\n" . $exception->getTraceAsString();
 
 		return $log;
 	}
@@ -905,24 +1118,24 @@ class IPS
 	/**
 	 * Should a given exception be reported to IPS? Filter out 3rd party etc.
 	 *
-	 * @param	Throwable	$exception	The exception
+	 * @param	\Throwable	$exception	The exception
 	 * @return	void
 	 */
 	final public static function reportExceptionToIPS( $exception )
 	{
-		$response = Url::external('https://invisionpowerdiagnostics.com')->request()->post( array(
-			'version'	=> Application::getAvailableVersion('core'),
-			'class'		=> get_class( $exception ),
+		$response = \IPS\Http\Url::external('https://invisionpowerdiagnostics.com')->request()->post( array(
+			'version'	=> \IPS\Application::getAvailableVersion('core'),
+			'class'		=> \get_class( $exception ),
 			'message'	=> $exception->getMessage(),
 			'code'		=> $exception->getCode(),
-			'file'		=> str_replace( ROOT_PATH, '', $exception->getFile() ),
+			'file'		=> str_replace( \IPS\ROOT_PATH, '', $exception->getFile() ),
 			'line'		=> $exception->getLine(),
-			'backtrace'	=> str_replace( ROOT_PATH, '', $exception->getTraceAsString() )
+			'backtrace'	=> str_replace( \IPS\ROOT_PATH, '', $exception->getTraceAsString() )
 		) );
 
 		if ( $response->httpResponseCode == 410 )
 		{
-			Settings::i()->changeValues( array( 'diagnostics_reporting' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'diagnostics_reporting' => 0 ) );
 		}
 	}
 
@@ -935,7 +1148,7 @@ class IPS
 	 */
 	public static function genericExceptionPage( $message = NULL )
 	{
-		if( isset( $_SERVER['SERVER_PROTOCOL'] ) and strstr( $_SERVER['SERVER_PROTOCOL'], '/1.0' ) !== false )
+		if( isset( $_SERVER['SERVER_PROTOCOL'] ) and \strstr( $_SERVER['SERVER_PROTOCOL'], '/1.0' ) !== false )
 		{
 			header( "HTTP/1.0 500 Internal Server Error" );
 		}
@@ -945,12 +1158,12 @@ class IPS
 		}
 
 		/* Don't allow error pages to be cached */
-		foreach(Output::getNoCacheHeaders() as $headerKey => $headerValue )
+		foreach( \IPS\Output::getNoCacheHeaders() as $headerKey => $headerValue )
 		{
 			header( "{$headerKey}: {$headerValue}" );
 		}
 
-		require ROOT_PATH . '/' . ERROR_PAGE;
+		require \IPS\ROOT_PATH . '/' . \IPS\ERROR_PAGE;
 		exit;
 	}
 
@@ -966,7 +1179,7 @@ class IPS
 	{
 	    do
 	    {
-		    if ( in_array( $trait, class_uses( $class ) ) )
+		    if ( \in_array( $trait, class_uses( $class ) ) )
 		    {
 			    return TRUE;
 		    }
@@ -984,211 +1197,61 @@ class IPS
 	 */
 	public static function licenseKey( $forceRefresh = FALSE )
 	{
-		return array(
-			'key' => Settings::i()->ipb_reg_number,
-			'url' => Settings::i()->base_url,
-			'test_url' => Settings::i()->base_url,
-			'active' => 1,
-			'cloud' => FALSE,
-			'expires' => "2065-01-01 23:23:23",
-			'products' => array(
-				'blog' => 1,
-				'calendar' => 1,
-				'cms' => 1,
-				'core' => 1,
-				'downloads' => 1,
-				'forums' => 1,
-				'gallery' => 1,
-				'nexus' => 1,
-				'spam' => 0
-			),
-			'support' => 'Standard',
-			'is_5' => 1
-		);
-
-		/* Do we even have a license key? */
-		if ( !Settings::i()->ipb_reg_number )
-		{
-			try
-			{
-				AdminNotification::send( 'core', 'License', 'missing', FALSE );
-			}
-			/* AdminCP Notifications table may not exist yet if upgrading */
-			catch( \IPS\Db\Exception $e ) {}
-			return NULL;
+		/* We haven't license key saved in settings? Saving... */
+		if ( !\IPS\Settings::i()->ipb_reg_number ) {
+			\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => 'LICENSE KEY GOES HERE!-123456789' ), array( 'conf_key=?', 'ipb_reg_number' ) );
+			\IPS\Settings::i()->ipb_reg_number	= 'LICENSE KEY GOES HERE!-123456789';
 		}
 
-		/* Get the cached value */
-		$response = NULL;
+		$response = array(
+				'key' => \IPS\Settings::i()->ipb_reg_number, //IPS Key
+				'active' => \IPS\Settings::i()->ipb_license_active, //License Active?
+				'cloud' => \IPS\Settings::i()->ipb_license_cloud, //We are "cloud" clients?
+				'url' => \IPS\Settings::i()->ipb_license_url, //Forum URL
+				'test_url' => \IPS\Settings::i()->ipb_license_test_url, //Test URL
+			 	'expires' => \IPS\Settings::i()->ipb_license_expires, //When our license will expire?
+			 	'products' => array( //Array of components. Can we use...
+			 	 	'forums' => \IPS\Settings::i()->ipb_license_product_forums, //...IP.Board // Forums?
+			 	 	'calendar' => \IPS\Settings::i()->ipb_license_product_calendar, //...IP.Calendar // Calendar?
+			 	 	'blog' => \IPS\Settings::i()->ipb_license_product_blog, //...IP.Blogs // Blogs?
+			 	 	'gallery' => \IPS\Settings::i()->ipb_license_product_gallery, //...IP.Gallery // Gallery?
+			 	 	'downloads' => \IPS\Settings::i()->ipb_license_product_downloads, //...IP.Downloads // Downloads?
+			 	 	'cms' => \IPS\Settings::i()->ipb_license_product_cms, //...IP.Content // Pages?
+			 	 	'nexus' => \IPS\Settings::i()->ipb_license_product_nexus, //...IP.Nexus // Commerce?
+			 	 	'spam' => FALSE, //...IPS Spam Service? No! Hardcoded to prevent requests to IPS servers.
+			 	 	'copyright' => \IPS\Settings::i()->ipb_license_product_copyright, //...remove copyright function?
+		 		),
+			 	'chat_limit' => \IPS\Settings::i()->ipb_license_chat_limit, //How many users can use IP.Chat?
+			 	'support' => \IPS\Settings::i()->ipb_license_support, //Can we use Support?
+			);
+
 		$cached = NULL;
-		$setFetched = FALSE;
-		if ( isset( Store::i()->license_data ) )
+		if ( isset( \IPS\Data\Store::i()->license_data ) ) //License data exists in cache?
 		{
-			$cached = Store::i()->license_data;
-
-			/* If it's younger than 21 days, just use that */
-			if ( $cached['fetched'] > ( time() - 1814400 ) and !$forceRefresh )
+			$cached = \IPS\Data\Store::i()->license_data;
+			/* Keep license data updated in cache store */
+			if ( $cached['fetched'] < ( time() - 1814400 ) )
 			{
-				/* If the license is not expired, return the data */
-				if( empty( $cached['data']['expires'] ) OR !$cached['data']['expires'] OR strtotime( $cached['data']['expires'] ) > time() )
-				{
-					$response = $cached['data'] ?? [];
-				}
-				/* Otherwise if the license is expired but we've automatically refetched, return the data */
-				else if( $cached['data']['expires'] AND strtotime( $cached['data']['expires'] ) < time() AND isset( $cached['refetched'] ) )
-				{
-					$response = $cached['data'] ?? [];
-				}
-				/* Otherwise remember to set the 'refetched' flag */
-				else
-				{
-					$setFetched = TRUE;
-				}
+				/* Data older, than 21 days. Updating... */
+				unset( \IPS\Data\Store::i()->license_data );
+				\IPS\Data\Store::i()->license_data = array( //Add information to cache...
+					'fetched' => time(),
+					'data' => $response,
+				);
+				return $response;
+			} else {
+				return $cached['data'];
 			}
 		}
-
-		/* If we can't use the cache, call the actual server */
-		if ( $response === NULL )
+		else
 		{
-			try
-			{
-				/* Prevent a race condition and set the next check cycle to be 10 mins from the 21 day cut off in case this request fails */
-				Store::i()->license_data	= [ 'fetched' => mt_rand( time() - 1813830, time() - 1813770 ), 'data' => $cached['data'] ?? NULL ];
-
-				/* Actually call the server */
-				$response = Url::ips( 'license/' . trim( Settings::i()->ipb_reg_number ) )->request()->get();
-				if ( $response->httpResponseCode == 404 )
-				{
-					Store::i()->license_data	= array( 'fetched' => time() - 1728000, 'data' => $cached['data'] ?? NULL );
-					return $cached;
-				}
-				elseif( $response->httpResponseCode == 403 )
-				{
-					// Use the data stored above, try again in ~10 mins
-					return $cached;
-				}
-				$response = $response->decodeJson();
-
-				/* Update the license info in the store */
-				$licenseData = array( 'fetched' => time(), 'data' => $response );
-				if( $setFetched )
-				{
-					$licenseData['refetched']	= 1;
-				}
-				Store::i()->license_data	= $licenseData;
-
-				/* Clear the data layer cache, the available events and properties could have changed so there could be issues due to partial events in the cache */
-				if ( method_exists( DataLayer::i(), "clearCachedConfiguration" ) )
-				{
-					DataLayer::i()->clearCachedConfiguration();
-				}
-			}
-			catch ( \Exception $e )
-			{
-				/* If we can't access the license server right now, store something in cache to prevent a request on every page load. We
-					set fetched to 20 days ago so that this cache is only good for 1 day instead of 21 days however. */
-				if( $cached === NULL )
-				{
-					Store::i()->license_data	= array( 'fetched' => time() - 1728000, 'data' => NULL );
-				}
-				else
-				{
-					/* We wipe the data to prevent a race condition, but the license server failed so restore the data and set to try again in 1 day */
-					Store::i()->license_data	= array( 'fetched' => time() - 1728000, 'data' => ( isset( $cached['data'] ) ? $cached['data'] : NULL ) );
-				}
-
-				/* If the server is offline right now, use the cached value from above */
-				$response = $cached;
-			}
+			/* Cached license data is missing? Creating... */
+			\IPS\Data\Store::i()->license_data = array( //Add information to cache...
+				'fetched' => time(),
+				'data' => $response,
+			);
+			return $response;
 		}
-
-		/* Check it's good */
-		if ( !empty( $response['legacy'] ) )
-		{
-			try
-			{
-				AdminNotification::send( 'core', 'License', 'missing', FALSE );
-			}
-			/* AdminCP Notifications table may not exist yet if upgrading */
-			catch( \IPS\Db\Exception $e ) {}
-			$response = NULL;
-		}
-		elseif( isset( $response['expires'] ) AND isset( $response['active'] ) )
-		{
-			try
-			{
-				AdminNotification::remove( 'core', 'License', 'missing' );
-
-				if ( !CIC)
-				{
-					/* Check it hasn't expired */
-					if ( strtotime( $response['expires'] ) < time() or !$response['active'] )
-					{
-						AdminNotification::send( 'core', 'License', 'expired', FALSE );
-						AdminNotification::remove( 'core', 'License', 'expireSoon' );
-					}
-					else
-					{
-						AdminNotification::remove( 'core', 'License', 'expired' );
-
-						/* Or there's 7 days or less to go */
-						$daysLeft = (int) (new DateTime)->diff( DateTime::ts( strtotime( $response['expires'] ), TRUE ) )->format('%r%a');
-						if( $daysLeft < 0 )
-						{
-							$daysLeft = 0;
-						}
-						if ( $daysLeft <= 7 )
-						{
-							AdminNotification::send( 'core', 'License', 'expireSoon', FALSE );
-						}
-						else
-						{
-							AdminNotification::remove( 'core', 'License', 'expireSoon' );
-						}
-					}
-				}
-
-				/* Check the URL is correct */
-				$doUrlCheck = TRUE;
-				$parsed = parse_url( Settings::i()->base_url );
-				if ( CIC or $parsed['host'] === 'localhost' or mb_substr( $parsed['host'], -4 ) === '.dev' or mb_substr( $parsed['host'], -5 ) === '.test' )
-				{
-					$doUrlCheck = FALSE;
-				}
-				if ( $doUrlCheck )
-				{
-					/* Normalize our URL's. Specifically ignore the www. subdomain. */
-					$validUrls		= array();
-					if ( ! empty( $response['url'] ) )
-					{
-						$validUrls[] = rtrim( str_replace( ['http://', 'https://', 'www.'], '', $response['url'] ), '/' );
-					}
-					if( !empty( $response['test_url'] ) )
-					{
-						$validUrls[] = rtrim( str_replace (array( 'http://', 'https://', 'www.' ), '', $response['test_url'] ), '/' );
-					}
-					$ourUrl			= rtrim( str_replace( array( 'http://', 'https://', 'www.' ), '', Settings::i()->base_url ), '/' );
-
-					if ( !in_array( $ourUrl, $validUrls ) )
-					{
-						AdminNotification::send( 'core', 'License', 'url', FALSE );
-					}
-					else
-					{
-						AdminNotification::remove( 'core', 'License', 'url' );
-					}
-				}
-				else
-				{
-					AdminNotification::remove( 'core', 'License', 'url' );
-				}
-			}
-			/* AdminCP Notifications table may not exist yet if upgrading */
-			catch( \IPS\Db\Exception $e ) {}
-		}
-
-		/* Return */
-		return $response;
 	}
 
 	/**
@@ -1197,89 +1260,61 @@ class IPS
 	 * @param	string	$val	The license key
 	 * @param	string	$url	The site URL
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
 	public static function checkLicenseKey( $val, $url )
 	{
-		// For what? :)
-		return;
-
-		$test = FALSE;
-		if ( mb_substr( $val, -12 ) === '-TESTINSTALL' )
-		{
-			$test = TRUE;
-			$val = mb_substr( $val, 0, -12 );
-		}
-		$urlKey = $test ? 'test_url' : 'url';
-
-		try
-		{
-			$response = Url::ips( 'license/' . $val )->setQueryString( $urlKey, $url )->request()->get();
-			switch ( $response->httpResponseCode )
-			{
-				case 200:
-					$response = json_decode( $response, TRUE );
-					if ( $response['legacy'] )
-					{
-						throw new DomainException( 'license_key_legacy' );
-					}
-
-					if ( !$response[ $urlKey ] )
-					{
-						Url::ips( 'license/' . $val )->request()->post( array(
-							$urlKey	=> $url
-						) );
-					}
-					elseif ( $response[ $urlKey ] != $url )
-					{
-						if ( rtrim( preg_replace( '/^https?:\/\//', '', $response[ $urlKey ] ), '/' ) == rtrim( preg_replace( '/^https?:\/\//', '', $url ), '/' ) ) // Allow changing if the difference is http/https or just a trailing slash
-						{
-							Url::ips( 'license/' . $val )->request()->post( array(
-								$urlKey	=> $url
-							) );
-						}
-						else
-						{
-							throw new DomainException( $test ? 'license_key_test_active' : 'license_key_active' );
-						}
-					}
-					break;
-
-				case 404:
-					throw new DomainException( 'license_key_not_found' );
-
-				default:
-					throw new DomainException( 'license_generic_error' );
-			}
-		}
-		catch ( Exception $e )
-		{
-			throw new DomainException( sprintf( Member::loggedIn()->language()->get( 'license_server_error' ), $e->getMessage() ) );
-		}
+		//
 	}
 
 	/**
 	 * Was the exception thrown by a third party app/plugin?
 	 *
-	 * @param	Throwable			$exception	The exception
-	 * @return	string|NULL		string = application directory
+	 * @param	\Throwable			$exception	The exception
+	 * @return	string|int|NULL		string = application directory, int = hook id, null means that it was probably caused by an application
 	 */
 	public static function exceptionWasThrownByThirdParty( $exception )
 	{
 		$trace = $exception->getTraceAsString();
 
-		/* Did this happen in a custom app? */
-		foreach ( explode( "\n", $trace ) as $line )
+		/* Did it happen in a hook? */
+		if ( preg_match( '/init\.php\(\d*\) : eval\(\)\'d code$/', $exception->getFile() ) )
 		{
-			if ( preg_match( '/' . preg_quote( DIRECTORY_SEPARATOR, '/' ) . 'applications' . preg_quote( DIRECTORY_SEPARATOR, '/' ) . '([a-zA-Z]+)/', str_replace( ROOT_PATH, '', $line ), $matches ) )
+			/* Did it happen inside a plugin hook? */
+			if ( preg_match( '/hook(\d+)/', $trace, $matches ) )
 			{
-				if ( !in_array( $matches[1], IPS::$ipsApps ) )
+				/* Return the hook id, the error method will fetch the plugin name */
+				return $matches[1];
+			}
+			/* Did it happen inside an applications hook? */
+			else if ( preg_match_all( '/([a-zA-Z]+)_hook/', $trace, $matches ) )
+			{
+				foreach ( $matches[1] as $appKey )
 				{
-					return $matches[1];
+					if ( !\in_array( $appKey, \IPS\IPS::$ipsApps ) )
+					{
+						return $appKey;
+					}
 				}
-				else
+			}
+
+			return NULL;
+		}
+		/* Exception was thrown by 'normal code', check if it's from a third-party app */
+		else
+		{
+			foreach ( explode( "\n", $trace ) as $line )
+			{
+				if ( preg_match( '/' . preg_quote( DIRECTORY_SEPARATOR, '/' ) . 'applications' . preg_quote( DIRECTORY_SEPARATOR, '/' ) . '([a-zA-Z]+)/', str_replace( \IPS\ROOT_PATH, '', $line ), $matches ) )
 				{
-					return NULL;
+					if ( !\in_array( $matches[1], \IPS\IPS::$ipsApps ) )
+					{
+						return $matches[1];
+					}
+					else
+					{
+						return NULL;
+					}
 				}
 			}
 		}
@@ -1300,9 +1335,9 @@ class IPS
 	 */
 	final public static function resyncIPSCloud( $reason = NULL )
 	{
-		if ( CIC AND function_exists( 'IPS\Cicloud\resyncIPSCloud' ) )
+		if ( \IPS\CIC AND \function_exists( 'IPS\Cicloud\resyncIPSCloud' ) )
 		{
-			resyncIPSCloud( $reason );
+			\IPS\Cicloud\resyncIPSCloud( $reason );
 		}
 	}
 
@@ -1315,9 +1350,9 @@ class IPS
 	 */
 	final public static function applyLatestFilesIPSCloud( ?int $version = NULL )
 	{
-		if ( CIC AND function_exists( 'IPS\Cicloud\applyLatestFilesIPSCloud' ) )
+		if ( \IPS\CIC AND \function_exists( 'IPS\Cicloud\applyLatestFilesIPSCloud' ) )
 		{
-			applyLatestFilesIPSCloud( $version );
+			\IPS\Cicloud\applyLatestFilesIPSCloud( $version );
 		}
 	}
 
@@ -1328,7 +1363,7 @@ class IPS
 	 */
 	final public static function getCicUsername(): ?string
 	{
-		if ( CIC AND function_exists( 'IPS\Cicloud\getCicUsername' ) )
+		if ( \IPS\CIC AND \function_exists( 'IPS\Cicloud\getCicUsername' ) )
 		{
 			return \IPS\Cicloud\getCicUsername();
 		}
@@ -1343,9 +1378,9 @@ class IPS
 	final public static function unpackCicConfig()
 	{
 		/* This method is slightly different because it needs to run before anything else to establish our Cicloud configuration */
-		if ( function_exists( 'IPS\Cicloud\unpackCicConfig' ) )
+		if ( \function_exists( 'IPS\Cicloud\unpackCicConfig' ) )
 		{
-			unpackCicConfig();
+			\IPS\Cicloud\unpackCicConfig();
 		}
 	}
 
@@ -1356,9 +1391,9 @@ class IPS
 	 */
 	final public static function compileCicRedisConfig()
 	{
-		if ( function_exists( 'IPS\Cicloud\compileRedisConfig' ) )
+		if ( \function_exists( 'IPS\Cicloud\compileRedisConfig' ) )
 		{
-			return compileRedisConfig();
+			return \IPS\Cicloud\compileRedisConfig();
 		}
 
 		return array();
@@ -1371,24 +1406,9 @@ class IPS
 	 */
 	final public static function canManageResources(): bool
 	{
-		if ( function_exists( 'IPS\Cicloud\canManageResources' ) )
+		if ( \function_exists( 'IPS\Cicloud\canManageResources' ) )
 		{
-			return canManageResources();
-		}
-
-		return TRUE;
-	}
-
-	/**
-	 * Check third party
-	 *
-	 * @return	bool
-	 */
-	final public static function checkThirdParty( bool $upgrade=FALSE ): bool
-	{
-		if ( function_exists( 'IPS\Cicloud\checkThirdParty' ) )
-		{
-			return checkThirdParty( $upgrade );
+			return \IPS\Cicloud\canManageResources();
 		}
 
 		return TRUE;
@@ -1401,25 +1421,23 @@ class IPS
 	 */
 	final public static function isManaged(): bool
 	{
-		if ( function_exists( 'IPS\Cicloud\isManaged' ) )
+		if ( \function_exists( 'IPS\Cicloud\isManaged' ) )
 		{
-			return isManaged();
+			return \IPS\Cicloud\isManaged();
 		}
 
 		return FALSE;
-	}
-
-	/**
-	 * Multi-bte UTF-8 aware ucfirst
-	 *
-	 * @return string
-	 */
-	final public static function mb_ucfirst(): string
-	{
-		$text = \func_get_arg( 0 );
-		return ( $text ) ? mb_strtoupper( mb_substr( $text, 0, 1 ) ) . mb_substr( $text, 1 ) : "";
 	}
 }
 
 /* Init */
 IPS::init();
+
+/* Custom mb_ucfirst() function - eval'd so we can put into global namespace */
+eval( '
+function mb_ucfirst()
+{
+	$text = \func_get_arg( 0 );
+	return mb_strtoupper( mb_substr( $text, 0, 1 ) ) . mb_substr( $text, 1 );
+}
+');

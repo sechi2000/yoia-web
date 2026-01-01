@@ -12,51 +12,23 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application\Module;
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use ValueError;
-use function count;
-use function defined;
-use function in_array;
-use function preg_replace;
-use function str_replace;
-use function stristr;
-use function strtolower;
-use function strtotime;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * wpForo Core Converter
  */
-class Wpforo extends Software
+class _Wpforo extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "wpForo (2.1.x)";
@@ -65,9 +37,9 @@ class Wpforo extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "wpforo";
@@ -76,9 +48,9 @@ class Wpforo extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return [
 			'convertGroups'     => [
@@ -107,9 +79,9 @@ class Wpforo extends Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -117,9 +89,9 @@ class Wpforo extends Software
 	/**
 	 * Returns a block of text, or a language string, that explains what the admin must do to start this conversion
 	 *
-	 * @return    string|null
+	 * @return	string
 	 */
-	public static function getPreConversionInformation(): ?string
+	public static function getPreConversionInformation()
 	{
 		return 'convert_wpforo_preconvert';
 	}
@@ -127,9 +99,9 @@ class Wpforo extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return [
 			'convertMembers',
@@ -138,25 +110,22 @@ class Wpforo extends Software
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		/* Mentions */
 		$matches = [];
 		preg_match_all( '/@([^@ ]+)/i', $post, $matches );
 
-		if( count( $matches ) )
+		if( \count( $matches ) )
 		{
 			foreach( $matches[0] as $key => $tag )
 			{
-				$member = Member::load( $matches[1][ $key ], 'name' );
+				$member = \IPS\Member::load( $matches[1][ $key ], 'name' );
 				if( !$member->member_id )
 				{
 					continue;
@@ -175,10 +144,10 @@ class Wpforo extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = [];
 
@@ -191,24 +160,24 @@ class Wpforo extends Software
 						'field_default'			=> NULL,
 						'field_required'		=> TRUE,
 						'field_extra'			=> [],
-						'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_wp_typical_path'),
-						'field_validation'	    => function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_wp_typical_path'),
+						'field_validation'	    => function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					]
 				];
 
 				/* Pseudo Fields */
 				foreach( $this->_profileFields AS $field )
 				{
-					Member::loggedIn()->language()->words["field_{$field}"]		= Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, [ 'sprintf' => ucwords( str_replace( '_', ' ', $field ) ) ] );
-					Member::loggedIn()->language()->words["field_{$field}_desc"]	= Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}"]		= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, [ 'sprintf' => ucwords( str_replace( '_', ' ', $field ) ) ] );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
 					$return['convertMembers']["field_{$field}"] = [
 						'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 						'field_default'			=> 'no_convert',
 						'field_required'		=> TRUE,
 						'field_extra'			=> [
 							'options'				=> [
-								'no_convert'			=> Member::loggedIn()->language()->addToStack( 'no_convert' ),
-								'create_field'			=> Member::loggedIn()->language()->addToStack( 'create_field' ),
+								'no_convert'			=> \IPS\Member::loggedIn()->language()->addToStack( 'no_convert' ),
+								'create_field'			=> \IPS\Member::loggedIn()->language()->addToStack( 'create_field' ),
 							],
 							'userSuppliedInput'		=> 'create_field'
 						],
@@ -221,16 +190,16 @@ class Wpforo extends Software
 				$return['convertGroups'] = [];
 
 				$options = [];
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[ $group->g_id ] = $group->name;
 				}
 
 				foreach( $this->db->select( '*', 'wpforo_usergroups' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['groupid']}"]			= $group['name'];
-					Member::loggedIn()->language()->words["map_group_{$group['groupid']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['groupid']}"]			= $group['name'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['groupid']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 
 					$return['convertGroups']["map_group_{$group['groupid']}"] = [
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -249,21 +218,21 @@ class Wpforo extends Software
 	/**
 	 * @brief   temporarily store post content
 	 */
-	protected array $_postContent = [];
+	protected $_postContent = [];
 
 	/**
 	 * Convert attachments
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'pmid' );
 
 		foreach( $this->fetch( 'wpforo_pms', 'pmid' ) AS $row )
 		{
-			if( !stristr( $row['message'], '[attach]' ) AND !stristr( $row['message'], 'wpforo-attached-file' ) )
+			if( !\stristr( $row['message'], '[attach]' ) AND !\stristr( $row['message'], 'wpforo-attached-file' ) )
 			{
 				$libraryClass->setLastKeyValue( $row['pmid'] );
 				continue;
@@ -283,7 +252,7 @@ class Wpforo extends Software
 			$matches = [];
 			preg_match_all( '/\[attach\](\d+)\[\/attach\]/i', $row['message'], $matches );
 
-			if( count( $matches ) )
+			if( \count( $matches ) )
 			{
 				foreach( $matches[1] as $key => $id )
 				{
@@ -294,7 +263,7 @@ class Wpforo extends Software
 					$info = [
 						'attach_id'			=> $row['pmid'],
 						'attach_file'		=> $sourceAttachment['filename'],
-						'attach_date'		=> strtotime( $row['date'] ),
+						'attach_date'		=> \strtotime( $row['date'] ),
 						'attach_member_id'	=> $sourceAttachment['userid'],
 						'attach_filesize'	=> $sourceAttachment['size'],
 					];
@@ -313,13 +282,14 @@ class Wpforo extends Software
 
 							if( !isset( $this->_postContent[ $messagePostId ] ) )
 							{
-								$this->_postContent[ $messagePostId ] = Db::i()->select( 'msg_post', 'core_message_posts', [ "msg_id=?", $messagePostId ] )->first();
+								$this->_postContent[ $messagePostId ] = \IPS\Db::i()->select( 'msg_post', 'core_message_posts', [ "msg_id=?", $messagePostId ] )->first();
 							}
 
 							$this->_postContent[ $messagePostId ] = str_replace( $matches[0][ $key ], '[attachment=' . $attachId . ':name]', $this->_postContent[ $messagePostId ] );
 						}
 					}
-					catch( UnderflowException|OutOfRangeException $e ) {}
+					catch( \UnderflowException $e ) {}
+					catch( \OutOfRangeException $e ) {}
 				}
 			}
 
@@ -327,7 +297,7 @@ class Wpforo extends Software
 			$matches = [];
 			preg_match_all( '/\<div id\="wpfa\-[\d]+"(.+?)?>\<a class\="wpforo\-default\-attachment" href\="(.+?)"(.+?)?>\<i class\="(.+?)">\<\/i>(.+?)<\/a><\/div>/i', $row['message'], $matches );
 
-			if( count( $matches ) )
+			if( \count( $matches ) )
 			{
 				foreach( $matches[2] as $key => $url )
 				{
@@ -336,7 +306,7 @@ class Wpforo extends Software
 					$info = [
 						'attach_id'			=> $row['pmid'],
 						'attach_file'		=> $filename,
-						'attach_date'		=> strtotime( $row['date'] ),
+						'attach_date'		=> \strtotime( $row['date'] ),
 						'attach_member_id'	=> $row['fromuserid'],
 					];
 
@@ -354,13 +324,14 @@ class Wpforo extends Software
 
 							if( !isset( $this->_postContent[ $messagePostId ] ) )
 							{
-								$this->_postContent[ $messagePostId ] = Db::i()->select( 'msg_post', 'core_message_posts', [ "msg_id=?", $messagePostId ] )->first();
+								$this->_postContent[ $messagePostId ] = \IPS\Db::i()->select( 'msg_post', 'core_message_posts', [ "msg_id=?", $messagePostId ] )->first();
 							}
 
 							$this->_postContent[ $messagePostId ] = str_replace( $matches[0][ $key ], '[attachment=' . $attachId . ':name]', $this->_postContent[ $messagePostId ] );
 						}
 					}
-					catch( UnderflowException|OutOfRangeException $e ) {}
+					catch( \UnderflowException $e ) {}
+					catch( \OutOfRangeException $e ) {}
 				}
 			}
 
@@ -370,7 +341,7 @@ class Wpforo extends Software
 		/* Do the updates */
 		foreach( $this->_postContent as $id => $content )
 		{
-			Db::i()->update( 'core_message_posts', [ 'msg_post' => $content ], [ "msg_id=?", $id ] );
+			\IPS\Db::i()->update( 'core_message_posts', [ 'msg_post' => $content ], [ "msg_id=?", $id ] );
 		}
 	}
 
@@ -379,7 +350,7 @@ class Wpforo extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'groupid' );
@@ -409,7 +380,7 @@ class Wpforo extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -421,14 +392,14 @@ class Wpforo extends Software
 	/**
 	 * @brief   Hardcoded wpForo profile fields
 	 */
-	protected array $_profileFields = [ 'site', 'icq', 'aim', 'yahoo', 'msn', 'facebook', 'twitter', 'gtalk', 'skype', 'about', 'occupation', 'location' ];
+	protected $_profileFields = [ 'site', 'icq', 'aim', 'yahoo', 'msn', 'facebook', 'twitter', 'gtalk', 'skype', 'about', 'occupation', 'location' ];
 
 	/**
 	 * Convert members
 	 *
 	 * @return	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'users.ID' );
@@ -437,9 +408,9 @@ class Wpforo extends Software
 		{
 			try
 			{
-				$joined = ( new DateTime( $user['user_registered'] ) )->getTimestamp();
+				$joined = ( new \IPS\DateTime( $user['user_registered'] ) )->getTimestamp();
 			}
-			catch( ValueError $e )
+			catch( \ValueError $e )
 			{
 				$joined = time();
 			}
@@ -467,7 +438,7 @@ class Wpforo extends Software
 					{
 						$fieldId = $this->app->getLink( $field, 'core_pfields_data' );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						$libraryClass->convertProfileField( [
 							'pf_id'				=> $field,
@@ -499,7 +470,7 @@ class Wpforo extends Software
 				/* Take a guess */
 				foreach( [ 'jpg', 'png', 'jpeg', 'gif' ] as $ext )
 				{
-					$filename = strtolower( str_replace( '_', '', preg_replace( '/\s|\.(?=.*\.)/i', '-',$user['display_name'] ) ) ) . '_' . $user['ID'] . '.' . $ext;
+					$filename = \strtolower( \str_replace( '_', '', \preg_replace( '/\s|\.(?=.*\.)/i', '-',$user['display_name'] ) ) ) . '_' . $user['ID'] . '.' . $ext;
 
 					if( file_exists( $avatarPath . '/' . $filename ) )
 					{
@@ -524,7 +495,7 @@ class Wpforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'folderid' );
@@ -535,7 +506,7 @@ class Wpforo extends Software
 			{
 				$firstMessage = $this->db->select( '*', 'wpforo_pms', [ 'folderid=?', $row['folderid'] ], 'pmid ASC', 1 )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$libraryClass->setLastKeyValue( $row['folderid'] );
 				continue;
@@ -545,7 +516,7 @@ class Wpforo extends Software
 			{
 				$lastMessage = $this->db->select( '*', 'wpforo_pms', [ 'folderid=?', $row['folderid'] ], 'pmid DESC', 1 )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$libraryClass->setLastKeyValue( $row['folderid'] );
 				continue;
@@ -553,18 +524,18 @@ class Wpforo extends Software
 
 			$topic = [
 				'mt_id'				=> $row['folderid'],
-				'mt_date'			=> strtotime( $firstMessage['date'] ),
+				'mt_date'			=> \strtotime( $firstMessage['date'] ),
 				'mt_title'			=> $row['name'] ?: 'Message',
 				'mt_starter_id'		=> $firstMessage['fromuserid'],
-				'mt_start_time'		=> strtotime( $firstMessage['date'] ),
-				'mt_last_post_time'	=> strtotime( $lastMessage['date'] ),
+				'mt_start_time'		=> \strtotime( $firstMessage['date'] ),
+				'mt_last_post_time'	=> \strtotime( $lastMessage['date'] ),
 				'mt_to_count'		=> $row['user_count'],
 			];
 
 			$maps = [];
 			$maps[ $firstMessage['fromuserid'] ] = [
 				'map_user_id'		=> $firstMessage['fromuserid'],
-				'map_read_time'		=> strtotime( $firstMessage['date'] ),
+				'map_read_time'		=> \strtotime( $firstMessage['date'] ),
 				'map_is_starter'	=> true
 			];
 
@@ -579,7 +550,7 @@ class Wpforo extends Software
 
 				$maps[ $participant ] = [
 					'map_user_id'		=> $participant,
-					'map_read_time'		=> in_array( $participant, $readData ) ? time() : 0,
+					'map_read_time'		=> \in_array( $participant, $readData ) ? time() : 0,
 					'map_user_active'	=> 1,
 				];
 			}
@@ -594,7 +565,7 @@ class Wpforo extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'pmid' );
@@ -604,7 +575,7 @@ class Wpforo extends Software
 			$libraryClass->convertPrivateMessageReply( [
 				'msg_id'			=> $row['pmid'],
 				'msg_topic_id'		=> $row['folderid'],
-				'msg_date'			=> strtotime( $row['date'] ),
+				'msg_date'			=> \strtotime( $row['date'] ),
 				'msg_post'			=> $row['message'],
 				'msg_author_id'		=> $row['fromuserid'],
 			] );
@@ -616,32 +587,32 @@ class Wpforo extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Non-Content Rebuilds */
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', [ 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ], 2, [ 'app', 'link', 'extension' ] );
-		Task::queue( 'convert', 'RebuildNonContent', [ 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ], 2, [ 'app', 'link', 'extension' ] );
-		Task::queue( 'convert', 'RebuildNonContent', [ 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ], 2, [ 'app', 'link', 'extension' ] );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', [ 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ], 2, [ 'app', 'link', 'extension' ] );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', [ 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ], 2, [ 'app', 'link', 'extension' ] );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', [ 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ], 2, [ 'app', 'link', 'extension' ] );
 
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', [ 'app' => $this->app->app_id ], 4, [ 'app' ] );
-		Task::queue( 'core', 'RebuildItemCounts', [ 'class' => 'IPS\core\Messenger\Message' ], 3, [ 'class' ] );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', [ 'app' => $this->app->app_id ], 4, [ 'app' ] );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', [ 'class' => 'IPS\core\Messenger\Message' ], 3, [ 'class' ] );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', [ 'app' => $this->app->app_id ], 2, [ 'app' ] );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', [ 'app' => $this->app->app_id ], 2, [ 'app' ] );
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', [ 'app' => $this->app->app_id ], 1, [ 'app' ] );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', [ 'app' => $this->app->app_id ], 1, [ 'app' ] );
 
 		return [ "f_search_index_rebuild", "f_clear_caches", "f_rebuild_pms", "f_signatures_rebuild" ];
 	}
@@ -649,30 +620,30 @@ class Wpforo extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
-		return Wordpress::login( $member, $password );
+		return \IPS\convert\Software\Core\Wordpress::login( $member, $password );
 	}
 
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
-		$wpForoSlug = defined('WPFORO_SLUG') ? WPFOROSLUG : 'community';
+		$url = \IPS\Request::i()->url();
+		$wpForoSlug = \defined('WPFORO_SLUG') ? WPFOROSLUG : 'community';
 
 		$matches = [];
-		if( preg_match( '#/' . $wpForoSlug . '/profile/([a-z0-9-]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/' . $wpForoSlug . '/profile/([a-z0-9-]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			/* If we can't access profiles, don't bother trying to redirect */
-			if( !Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+			if( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 			{
 				return NULL;
 			}
@@ -680,9 +651,9 @@ class Wpforo extends Software
 			try
 			{
 				$data = (string) $this->app->getLink( $matches[1], [ 'member_furl' ] );
-				return Member::load( $data )->url();
+				return \IPS\Member::load( $data )->url();
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 
 		return NULL;

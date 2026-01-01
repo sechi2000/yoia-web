@@ -11,25 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Task;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Task that removes files from core_files_temp that were never claimed
  */
-class cleanupfiles extends Task
+class _cleanupfiles extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -40,24 +31,24 @@ class cleanupfiles extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws    Task\Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
-		foreach ( Db::i()->select( '*', 'core_files_temp', array( 'time < ?', DateTime::create()->sub( new DateInterval( 'P1D' ) )->getTimestamp() ) ) as $file )
+		foreach ( \IPS\Db::i()->select( '*', 'core_files_temp', array( 'time < ?', \IPS\DateTime::create()->sub( new \DateInterval( 'P1D' ) )->getTimestamp() ) ) as $file )
 		{
 			
 			try
 			{
-				Db::i()->delete( 'core_files_temp', array( '`id`=?', $file['id'] ) );
+				\IPS\Db::i()->delete( 'core_files_temp', array( '`id`=?', $file['id'] ) );
 				
 				/* storage_extension was added in 4.1.14. If available, remove the file on disk too */
 				if ( ! empty( $file['storage_extension'] ) )
 				{
-					File::get( $file['storage_extension'], $file['contents'] )->delete();
+					\IPS\File::get( $file['storage_extension'], $file['contents'] )->delete();
 				}
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 
 		return NULL;

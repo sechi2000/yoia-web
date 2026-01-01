@@ -11,96 +11,72 @@
 namespace IPS\Member;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Extensions\ProfileStepsAbstract;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Lang;
-use IPS\Login;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use OutOfBoundsException;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Profile Step Model
  */
-class ProfileStep extends Model
+class _ProfileStep extends \IPS\Node\Model
 {
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_profile_steps';
+	public static $databaseTable = 'core_profile_steps';
 		
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'step_';
+	public static $databasePrefix = 'step_';
 
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'profile_completion';
+	public static $nodeTitle = 'profile_completion';
 	
 	/**
 	 * @brief	[Node] Sortable
 	 */
-	public static bool $nodeSortable = TRUE;
+	public static $nodeSortable = TRUE;
 	
 	/**
 	 * @brief	[Node] Positon Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'profile_step_title_';
+	public static $titleLangPrefix = 'profile_step_title_';
 
 	/**
 	 * [Node] Return the custom badge for each row
 	 *
 	 * @return	NULL|array		Null for no badge, or an array of badge data (0 => CSS class type, 1 => language string, 2 => optional raw HTML to show instead of language string)
 	 */
-	protected function get__badge(): ?array
+	protected function get__badge()
 	{
 		if( $this->required )
 		{
-			return array( 0 => 'positive i-float_end', 1 => 'required' );
+			return array( 0 => 'positive ipsPos_right', 1 => 'required' );
 		}
 
 		return parent::get__badge();
@@ -112,28 +88,28 @@ class ProfileStep extends Model
 	 * @return	array
 	 * @note	Note that all records are returned, even disabled promotion rules. Enable status needs to be checked in userland code when appropriate.
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->profileSteps ) )
+		if ( !isset( \IPS\Data\Store::i()->profileSteps ) )
 		{
-			Store::i()->profileSteps = iterator_to_array( Db::i()->select( '*', 'core_profile_steps', NULL, "step_position ASC" )->setKeyField( 'step_id' ) );
+			\IPS\Data\Store::i()->profileSteps = iterator_to_array( \IPS\Db::i()->select( '*', 'core_profile_steps', NULL, "step_position ASC" )->setKeyField( 'step_id' ) );
 		}
 		
-		return Store::i()->profileSteps;
+		return \IPS\Data\Store::i()->profileSteps;
 	}
 
 	/**
 	 * Fetch All Root Nodes
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	mixed				$where				Additional WHERE clause
 	 * @param	array|NULL			$limit				Limit/offset to use, or NULL for no limit (default)
 	 * @return	array
 	 */
-	public static function roots( ?string $permissionCheck='view', Member $member=NULL, mixed $where=array(), array $limit=NULL ): array
+	public static function roots( $permissionCheck='view', $member=NULL, $where=array(), $limit=NULL )
 	{
-		if ( !count( $where ) )
+		if ( !\count( $where ) )
 		{
 			$return = array();
 			foreach( static::getStore() AS $node )
@@ -153,32 +129,32 @@ class ProfileStep extends Model
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'profileSteps' );
+	protected $caches = array( 'profileSteps' );
 
 	/**
 	 * @brief	[ActiveRecord] Attempt to load from cache
 	 * @note	If this is set to TRUE you MUST define a getStore() method to return the objects from cache
 	 */
-	protected static bool $loadFromCache = TRUE;
+	protected static $loadFromCache = TRUE;
 
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		if ( method_exists( $this->extension, 'onDelete' ) )
 		{
 			$this->extension->onDelete( $this );
 		}
 
-		Lang::deleteCustom( 'core', 'profile_step_title_' . $this->id );
-		Lang::deleteCustom( 'core', 'profile_step_text_' . $this->id );
+		\IPS\Lang::deleteCustom( 'core', 'profile_step_title_' . $this->id );
+		\IPS\Lang::deleteCustom( 'core', 'profile_step_text_' . $this->id );
 
 		parent::delete();
 
-		Db::i()->delete( 'core_profile_completion', array( 'step_id=?', $this->id ) );
+		\IPS\Db::i()->delete( 'core_profile_completion', array( 'step_id=?', $this->id ) );
 	}
 	
 	/**
@@ -186,10 +162,10 @@ class ProfileStep extends Model
 	 *
 	 * @return array
 	 */
-	public function get_subcompletion_act(): array
+	public function get_subcompletion_act()
 	{
 		$return = ! empty( $this->_data['subcompletion_act'] ) ? json_decode( $this->_data['subcompletion_act'], TRUE ) : array();
-		if ( ! is_array( $return ) and ! empty( $this->_data['subcompletion_act'] ) )
+		if ( ! \is_array( $return ) and ! empty( $this->_data['subcompletion_act'] ) )
 		{
 			$return = array( $this->_data['subcompletion_act'] );
 		}
@@ -200,12 +176,12 @@ class ProfileStep extends Model
 	/**
 	 * Set the "subcompletion_act" field
 	 *
-	 * @param array|string $value	Value of field
+	 * @param	string|array	$value	Value of field
 	 * @return	void
 	 */
-	public function set_subcompletion_act( array|string $value ) : void
+	public function set_subcompletion_act( $value )
 	{
-		$this->_data['subcompletion_act'] = ( is_array( $value ) ? json_encode( $value ) : $value );
+		$this->_data['subcompletion_act'] = ( \is_array( $value ) ? json_encode( $value ) : $value );
 	}
 	
 	/**
@@ -213,13 +189,13 @@ class ProfileStep extends Model
 	 *
 	 * @return	array	array( 'key1', 'key2', 'key3' )
 	 */
-	public function usedSubActions(): array
+	public function usedSubActions()
 	{
 		$return = array();
 		
 		foreach( static::loadAll() as $id => $object )
 		{
-			if ( $object->id !== $this->id and count( $object->subcompletion_act ) )
+			if ( $object->id !== $this->id and \count( $object->subcompletion_act ) )
 			{
 				foreach( $object->subcompletion_act as $item )
 				{
@@ -236,13 +212,13 @@ class ProfileStep extends Model
 	 *
 	 * @return int|string
 	 */
-	public function getNextStep(): int|string
+	public function getNextStep()
 	{
 		$nextOneIsIt = false;
 		$steps = array();
-		foreach( Application::allExtensions( 'core', 'ProfileSteps' ) AS $extension )
+		foreach( \IPS\Application::allExtensions( 'core', 'ProfileSteps' ) AS $extension )
 		{
-			if ( is_array( $extension::wizard() ) AND count( $extension::wizard() ) )
+			if ( method_exists( $extension, 'wizard') AND \is_array( $extension::wizard() ) AND \count( $extension::wizard() ) )
 			{
 				$steps = array_merge( $steps, $extension::wizard() );
 			}
@@ -272,7 +248,7 @@ class ProfileStep extends Model
 	 *
 	 * @return	array
 	 */
-	public static function loadAll(): array
+	public static function loadAll()
 	{
 		$return = array();
 
@@ -287,24 +263,24 @@ class ProfileStep extends Model
 	/**
 	 * @brief	Actions Cache
 	 */
-	protected static ?array $_actions = NULL;
+	protected static $_actions = NULL;
 	
 	/**
 	 * @brief	Sub actions cache
 	 */
-	protected static ?array $_subActions = NULL;
+	protected static $_subActions = NULL;
 	
 	/**
 	 * Available parent actions to complete steps
 	 *
-	 * @return	array|null	array( 'key' => 'lang_string' )
+	 * @return	array	array( 'key' => 'lang_string' )
 	 */
-	public static function actions(): ?array
+	public static function actions()
 	{
 		if ( static::$_actions === NULL )
 		{
 			static::$_actions = array();
-			foreach( Application::allExtensions( 'core', 'ProfileSteps' ) AS $key => $extension )
+			foreach( \IPS\Application::allExtensions( 'core', 'ProfileSteps' ) AS $key => $extension )
 			{
 				foreach( $extension::actions() AS $action => $lang )
 				{
@@ -315,24 +291,27 @@ class ProfileStep extends Model
 		
 		return static::$_actions;
 	}
-
+	
 	/**
 	 * Available sub actions to complete steps
 	 *
-	 * @return array|null array( 'key' => 'lang_string' )
+	 * @return	array	array( 'key' => 'lang_string' )
 	 */
-	public static function subActions(): ?array
+	public static function subActions()
 	{
 		if ( static::$_subActions === NULL )
 		{
 			static::$_subActions = array();
-			foreach( Application::allExtensions( 'core', 'ProfileSteps' ) AS $key => $extension )
+			foreach( \IPS\Application::allExtensions( 'core', 'ProfileSteps' ) AS $key => $extension )
 			{
-				foreach( $extension::subActions() as $parent => $row )
+				if ( method_exists( $extension, 'subActions' ) )
 				{
-					foreach( $row as $action => $lang )
+					foreach( $extension::subActions() AS $parent => $row )
 					{
-						static::$_subActions[ $parent ][ $action ] = $lang;
+						foreach( $row as $action => $lang )
+						{
+							static::$_subActions[ $parent ][ $action ] = $lang;
+						}
 					}
 				}
 			}
@@ -345,18 +324,21 @@ class ProfileStep extends Model
 	/**
 	 * Can the actions have multiple choices?
 	 *
-	 * @param string $action		Action key (basic_profile, etc)
+	 * @param	string		$action		Action key (basic_profile, etc)
 	 * @return	boolean|null
 	 */
-	public static function actionMultipleChoice( string $action ): ?bool
+	public static function actionMultipleChoice( $action )
 	{
-		foreach( Application::allExtensions( 'core', 'ProfileSteps' ) AS $key => $extension )
+		foreach( \IPS\Application::allExtensions( 'core', 'ProfileSteps' ) AS $key => $extension )
 		{
-			foreach( $extension::actions() AS $extensionAction => $lang )
+			if ( method_exists( $extension, 'actionMultipleChoice' ) )
 			{
-				if ( $action == $extensionAction )
+				foreach( $extension::actions() AS $extensionAction => $lang )
 				{
-					return $extension::actionMultipleChoice( $action );
+					if ( $action == $extensionAction )
+					{
+						return $extension::actionMultipleChoice( $action );
+					}
 				}
 			}
 		}
@@ -370,10 +352,10 @@ class ProfileStep extends Model
 	 * @return	array
 	 * @note	This is intended for items which have their own independent settings and dedicated enable pages, such as MFA and Social Login integration
 	 */
-	public static function canBeRequired(): array
+	public static function canBeRequired()
 	{
 		$return = array();
-		foreach( Application::allExtensions( 'core', 'ProfileSteps' ) AS $key => $extension )
+		foreach( \IPS\Application::allExtensions( 'core', 'ProfileSteps' ) AS $key => $extension )
 		{
 			foreach( $extension::canBeRequired() AS $action )
 			{
@@ -383,32 +365,13 @@ class ProfileStep extends Model
 		
 		return $return;
 	}
-
-	/**
-	 * Return all actions that can be used multiple times
-	 *
-	 * @return array
-	 */
-	public static function allowMultiple() : array
-	{
-		$return = array();
-		foreach( Application::allExtensions( 'core', 'ProfileSteps' ) as $key => $extension )
-		{
-			foreach( $extension::allowMultiple() as $action )
-			{
-				$return[] = $action;
-			}
-		}
-
-		return $return;
-	}
 	
 	/**
 	 * Get the wizard step key
 	 *
 	 * @return string
 	 */
-	public function get_key(): string
+	public function get_key()
 	{
 		return "profile_step_title_" . $this->id;
 	}
@@ -419,11 +382,11 @@ class ProfileStep extends Model
 	 *
 	 * @return string
 	 */
-	public function get_acpTitle(): string
+	public function get_acpTitle()
 	{
 		if ( empty( $this->subcompletion_act ) )
 		{
-			return Member::loggedIn()->language()->get( 'complete_profile_' . $this->completion_act );
+			return \IPS\Member::loggedIn()->language()->get( 'complete_profile_' . $this->completion_act );
 		}
 		
 		$extension = $this->extension;
@@ -434,20 +397,20 @@ class ProfileStep extends Model
 		{
 			if ( isset( $subActions[ $item ] ) )
 			{
-				$lang[] = Member::loggedIn()->language()->addToStack( $subActions[ $item ] );
+				$lang[] = \IPS\Member::loggedIn()->language()->addToStack( $subActions[ $item ] );
 			}
 		}
 		
-		if ( count( $lang ) )
+		if ( \count( $lang ) )
 		{
-			$result = Member::loggedIn()->language()->get( 'complete_profile_' . $this->completion_act ) . ' (' . Member::loggedIn()->language()->formatList( $lang ) . ')';
-			Member::loggedIn()->language()->parseOutputForDisplay( $result );
+			$result = \IPS\Member::loggedIn()->language()->get( 'complete_profile_' . $this->completion_act ) . ' (' . \IPS\Member::loggedIn()->language()->formatList( $lang ) . ')';
+			\IPS\Member::loggedIn()->language()->parseOutputForDisplay( $result );
 
 			return $result;
 		}
 		else
 		{
-			return Member::loggedIn()->language()->get( 'complete_profile_' . $this->completion_act );
+			return \IPS\Member::loggedIn()->language()->get( 'complete_profile_' . $this->completion_act );
 		}
 	}
 	
@@ -456,65 +419,36 @@ class ProfileStep extends Model
 	 *
 	 * @return mixed
 	 */
-	public function get_extension(): mixed
+	public function get_extension()
 	{
-		if( !isset( $this->_data['extension'] ) )
-		{
-			$this->_data['extension'] = static::findExtensionFromAction( $this->completion_act );
-			$this->save();
-		}
-
 		list( $app, $extension ) = explode( '_', $this->_data['extension'] );
-		try
-		{
-			$class = Application::getExtensionClass( $app, 'ProfileSteps', $extension );
-			return new $class;
-		}
-		catch( OutOfRangeException )
-		{
-			return null;
-		}
+		$class = "\\IPS\\{$app}\\extensions\\core\\ProfileSteps\\{$extension}";
+		return new $class;
 	}
 	
 	/**
 	 * Has a specific step been completed?
 	 *
-	 * @param	Member|NULL	$member	The member to check, or NULL for currently logged in
+	 * @param	\IPS\Member|NULL	$member	The member to check, or NULL for currently logged in
 	 * @return	bool
 	 */
-	public function completed( Member $member = NULL ): bool
+	public function completed( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		return $this->extension->completed( $this, $member );
-	}
-
-	/**
-	 * Checks if the member has permission to complete this profile step
-	 * Some steps might be skipped for some members
-	 *
-	 * @param Member|NULL $member
-	 * @return bool
-	 */
-	public function canComplete( Member $member = NULL ) : bool
-	{
-		$member = $member ?: Member::loggedIn();
-
-		/* @var ProfileStepsAbstract $extension */
-		$extension = $this->extension;
-		return $extension->canComplete( $member );
 	}
 	
 	/**
 	 * @brief	Can add cache
 	 */
-	protected static mixed $canAdd = NULL;
-
+	protected static $canAdd = NULL;
+	
 	/**
 	 * Can add new steps
 	 *
-	 * @return bool
+	 * @return bool|int
 	 */
-	public function canAdd(): bool
+	public function canAdd()
 	{
 		/* We can't add children, so just return now */
 		if( $this->id )
@@ -534,16 +468,17 @@ class ProfileStep extends Model
 				{
 					if ( isset( $usedSubActions[ $key ] ) )
 					{
-						if ( count( $usedSubActions[ $key ] ) == count( $subActions[ $key ] ) )
+						if ( \count( $usedSubActions[ $key ] ) == \count( $subActions[ $key ] ) )
 						{
 							/* Nothing left to select, so skip this */
 							unset( $actions[ $key ] );
+							continue;
 						}
 					}
 				}
 			}
 			
-			static::$canAdd = (bool) count( $actions );
+			static::$canAdd = \count( $actions );
 		}
 		
 		return static::$canAdd;
@@ -552,17 +487,16 @@ class ProfileStep extends Model
 	/**
 	 * Form
 	 *
-	 * @param	Form	$form	Form
+	 * @param	\IPS\Helpers\Form	$form	Form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
-		$form->add( new Translatable( 'profile_step_title', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ) ? "profile_step_title_{$this->id}" : NULL ) ) );
-		$form->add( new Translatable( 'profile_step_text', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ) ? "profile_step_text_{$this->id}" : NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'profile_step_title', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ) ? "profile_step_title_{$this->id}" : NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'profile_step_text', NULL, FALSE, array( 'app' => 'core', 'key' => ( $this->id ) ? "profile_step_text_{$this->id}" : NULL ) ) );
 		
 		$actions = static::actions();
 		$subActions = static::subActions();
-		$reusableActions = static::allowMultiple();
 		$toggles = array();
 		$subActionFormElements = array();
 		$usedSubActions = $this->usedSubActions();
@@ -573,9 +507,9 @@ class ProfileStep extends Model
 			{
 				$disabled = NULL;
 				
-				if ( isset( $usedSubActions[ $key ] ) and !in_array( $key, $reusableActions ) )
+				if ( isset( $usedSubActions[ $key ] ) )
 				{
-					if ( count( $usedSubActions[ $key ] ) >= count( $subActions[ $key ] ) )
+					if ( \count( $usedSubActions[ $key ] ) >= \count( $subActions[ $key ] ) )
 					{
 						/* Nothing left to select, so skip this */
 						unset( $actions[ $key ] );
@@ -589,7 +523,7 @@ class ProfileStep extends Model
 
 				if( $choiceType === NULL )
 				{
-					$subActionFormElements[] = new Translatable( 'profile_step_subaction_' . $key, $this->subcompletion_act, TRUE, array( 'app' => 'core', 'editor' => array( 'app' => 'core', 'key' => 'ProfileSteps', 'autoSaveKey' => 'core-step-' . $key . ( $this->id ?: 0 ) )  ), NULL, NULL, NULL, 'profile_step_subaction_' . $key );
+					$subActionFormElements[] = new \IPS\Helpers\Form\Translatable( 'profile_step_subaction_' . $key, $this->subcompletion_act, TRUE, array( 'app' => 'core', 'editor' => array( 'app' => 'core', 'key' => 'ProfileSteps', 'autoSaveKey' => 'core-step-' . $key . ( $this->id ?: 0 ) )  ), NULL, NULL, NULL, 'profile_step_subaction_' . $key );
 				}
 				else
 				{
@@ -606,23 +540,14 @@ class ProfileStep extends Model
 			$toggles[ $action ][] = 'step_required';
 		}
 		
-		$form->add( new Radio( 'profile_step_completion_act', $this->completion_act, FALSE, array( 'options' => $actions, 'toggles' => $toggles ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'profile_step_completion_act', $this->completion_act, FALSE, array( 'options' => $actions, 'toggles' => $toggles ) ) );
 		
 		foreach( $subActionFormElements as $element )
 		{
 			$form->add( $element );
 		}
 		
-		$form->add( new YesNo( 'profile_step_required', $this->required, FALSE, array(), NULL, NULL, NULL, 'step_required' ) );
-
-		$form->add( new YesNo( 'profile_step_registration', $this->registration, false, array(
-			'disabled' => ( Login::registrationType() != 'full' )
-		), null, null, null, 'step_registration' ) );
-
-		if( Login::registrationType() != 'full' )
-		{
-			$form->addMessage( 'profile_step_no_registration', 'ipsMessage ipsMessage--warning' );
-		}
+		$form->add( new \IPS\Helpers\Form\YesNo( 'profile_step_required', $this->required, FALSE, array(), NULL, NULL, NULL, 'step_required' ) );
 	}
 	
 	/**
@@ -630,36 +555,23 @@ class ProfileStep extends Model
 	 * @param	array	$values	Values
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		$return = array();
-
-		/* Do we have an editor field to clear? */
-		$autoSaveKey = null;
-		$choiceType = static::actionMultipleChoice( $values['profile_step_completion_act'] );
-		if( $choiceType === null )
-		{
-			$autoSaveKey = 'core-step-' . $values['profile_step_completion_act'] . ( $this->id ?: 0 );
-		}
 		
 		if ( !$this->id )
 		{
 			/* Set initial position to the end of the list and save initial data */
 			try
 			{
-				$this->position = Db::i()->select( 'MAX(step_position)', 'core_profile_steps' )->first() + 1;
+				$this->position = \IPS\Db::i()->select( 'MAX(step_position)', 'core_profile_steps' )->first() + 1;
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				$this->position = 1;
 			}
 			
 			$this->save();
-		}
-
-		if( $autoSaveKey )
-		{
-			File::claimAttachments( $autoSaveKey, $this->id, null, null, true );
 		}
 		
 		if ( isset( $values[ 'profile_step_subaction_' . $values['profile_step_completion_act'] ] ) )
@@ -673,16 +585,17 @@ class ProfileStep extends Model
 			$return[ str_replace( 'profile_', '', $key ) ] = $value;
 		}
 
-		/*try
+		try
 		{
-			$ext = explode( '_', static::findExtensionFromAction( $return['step_completion_act'] ) );
-			$class = Application::getExtensionClass( $ext[0], 'ProfileSteps', $ext[1] );
-			$return['step_extension'] = implode( "_", $ext );
+			$ext		= static::findExtensionFromAction( $return['step_completion_act'] );
+			$ext		= explode( '_', $ext );
+			$class		= "\\IPS\\{$ext[0]}\\extensions\\core\\ProfileSteps\\{$ext[1]}";
+			$extension	= new $class;
 		}
-		catch( OutOfBoundsException | OutOfRangeException $e )
+		catch( \OutOfBoundsException $e )
 		{
-			throw new InvalidArgumentException;
-		}*/
+			throw new \InvalidArgumentException;
+		}
 	
 		return $return;
 	}
@@ -693,7 +606,7 @@ class ProfileStep extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	void
 	 */
-	public function postSaveForm( array $values ) : void
+	public function postSaveForm( $values )
 	{
 		$return = array();
 		foreach( $values AS $key => $value )
@@ -703,7 +616,7 @@ class ProfileStep extends Model
 		
 		if ( array_key_exists( 'step_title', $return ) )
 		{
-			if ( is_array( $return['step_title'] ) )
+			if ( \is_array( $return['step_title'] ) )
 			{
 				foreach( $return['step_title'] AS $lang => $text )
 				{
@@ -716,7 +629,7 @@ class ProfileStep extends Model
 			else
 			{
 				$return['step_title'] = array();
-				foreach( Lang::languages() AS $lang )
+				foreach( \IPS\Lang::languages() AS $lang )
 				{
 					$return['step_title'][ $lang->_id ] = $this->acpTitle;
 				}
@@ -725,32 +638,26 @@ class ProfileStep extends Model
 		else
 		{
 			$return['step_title'] = array();
-			foreach( Lang::languages() AS $lang )
+			foreach( \IPS\Lang::languages() AS $lang )
 			{
 				$return['step_title'][ $lang->_id ] = $this->acpTitle;
 			}
 		}
 		
-		Lang::saveCustom( 'core', "profile_step_title_{$this->id}", $return['step_title'] );
-		Lang::saveCustom( 'core', "profile_step_text_{$this->id}", $return['step_text'] );
-
-		/* If we have a profile step that is used on registration, switch registration type to full */
-		if( $this->registration )
-		{
-			Settings::i()->changeValues( [ 'allow_reg' => 'full' ] );
-		}
+		\IPS\Lang::saveCustom( 'core', "profile_step_title_{$this->id}", $return['step_title'] );
+		\IPS\Lang::saveCustom( 'core', "profile_step_text_{$this->id}", $return['step_text'] );
 	}
 	
 	/**
 	 * Find extension key from action key
 	 *
-	 * @param string $key	The action key
+	 * @param	string	$key	The action key
 	 * @return	string	The extension key
-	 * @throws	OutOfBoundsException
+	 * @throws	\OutOfBoundsException
 	 */
-	public static function findExtensionFromAction( string $key ): string
+	public static function findExtensionFromAction( $key )
 	{
-		foreach( Application::allExtensions( 'core', 'ProfileSteps' ) AS $extkey => $extension )
+		foreach( \IPS\Application::allExtensions( 'core', 'ProfileSteps' ) AS $extkey => $extension )
 		{
 			foreach( $extension::actions() AS $action => $lang )
 			{
@@ -761,29 +668,7 @@ class ProfileStep extends Model
 			}
 		}
 		
-		throw new OutOfBoundsException;
-	}
-
-	/**
-	 * Load an instance of the extension
-	 *
-	 * @param string $key
-	 * @return ProfileStepsAbstract|null
-	 */
-	public static function loadExtensionFromAction( string $key ) : ?ProfileStepsAbstract
-	{
-		if( $extensionKey = static::findExtensionFromAction( $key ) )
-		{
-			list( $app, $extension ) = explode( '_', $extensionKey );
-			try
-			{
-				$class = Application::getExtensionClass( $app, 'ProfileSteps', $extension );
-				return new $class;
-			}
-			catch( OutOfRangeException ){}
-		}
-
-		return null;
+		throw new \OutOfBoundsException;
 	}
 	
 	/**
@@ -792,9 +677,9 @@ class ProfileStep extends Model
 	 *
 	 * @return void
 	 */
-	 public static function resync() : void
+	 public static function resync()
 	 {
-		 $iterator = new ActiveRecordIterator( Db::i()->select( '*', 'core_profile_steps' ), '\IPS\Member\ProfileStep' );
+		 $iterator = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_profile_steps' ), '\IPS\Member\ProfileStep' );
 		
 		 foreach( $iterator as $step )
 		 {
@@ -811,12 +696,12 @@ class ProfileStep extends Model
 	  * Delete by application
 	  * Deletes all steps tied to an application
 	  *
-	  * @param	Application	$app	The application being deleted
+	  * @param	\IPS\Application	$app	The application being deleted
 	  * @return void
 	  */
-	public static function deleteByApplication( Application $app ) : void
+	public static function deleteByApplication( \IPS\Application $app )
 	{
-		$iterator = new ActiveRecordIterator( Db::i()->select( '*', 'core_profile_steps' ), '\IPS\Member\ProfileStep' );
+		$iterator = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_profile_steps' ), '\IPS\Member\ProfileStep' );
 		
 		foreach( $iterator as $step )
 		{
@@ -832,11 +717,11 @@ class ProfileStep extends Model
 	/**
 	 * Given an array of wizard steps, reorder them based on AdminCP order
 	 *
-	 * @param array $steps	Wizard steps
-	 * @param bool $countExtra	Include extra steps
+	 * @param	array 	$steps	Wizard steps
+	 * @param	bool	$countExtra	Include extra steps
 	 * @return	array
 	 */
-	public static function setOrder( array $steps, bool $countExtra = TRUE ): array
+	public static function setOrder( $steps, $countExtra = TRUE )
 	{
 		$finalSteps = array();
 
@@ -851,7 +736,7 @@ class ProfileStep extends Model
 			if ( $countExtra and method_exists( $profileStep->extension, 'extraStep') )
 			{
 				$extension = $profileStep->extension;
-				if( count( $extension::extraStep() ) and isset( $steps[ $extension::extraStepTitle() ] ) )
+				if( \count( $extension::extraStep() ) and isset( $steps[ $extension::extraStepTitle() ] ) )
 				{
 					$finalSteps[ $extension::extraStepTitle() ] = $steps[ $extension::extraStepTitle() ];
 				}
@@ -867,7 +752,7 @@ class ProfileStep extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canCopy(): bool
+	public function canCopy()
 	{
 		return FALSE;
 	}

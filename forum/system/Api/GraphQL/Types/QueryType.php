@@ -11,22 +11,19 @@
 
 namespace IPS\Api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
-use IPS\Api\Exception;
-use IPS\Api\GraphQL\AppQueries;
-use IPS\Application;
-use function defined;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * API Exception
  */
-class QueryType extends ObjectType
+class _QueryType extends ObjectType
 {
 	public function __construct()
 	{
@@ -35,11 +32,11 @@ class QueryType extends ObjectType
 			'fields' => function () {
 				$_fields = array();
 
-				foreach( Application::enabledApplications() as $key => $app )
+				foreach( \IPS\Application::enabledApplications() as $key => $app )
 				{
 					try 
 					{
-						$globalAppQueries = AppQueries::queries( $app );
+						$globalAppQueries = \IPS\Api\GraphQL\AppQueries::queries($app->directory);
 						$appQueryClass = "\\IPS\\" . $app->directory . "\\api\\GraphQL\\Query";
 
 						if( !class_exists( $appQueryClass ) )
@@ -70,7 +67,7 @@ class QueryType extends ObjectType
 							);
 						}
 
-						$_fields[ $app->directory ] = new ObjectType( array(
+						$_fields[ $app->directory ] = new \GraphQL\Type\Definition\ObjectType( array(
 							'name' => $app->directory,
 							'fields' => $queryFields
 						) );
@@ -87,7 +84,7 @@ class QueryType extends ObjectType
 			'resolveField' => function ($val, $args, $context, $info) {
 				try 
 				{
-					$globalAppQueries = AppQueries::queries($info->fieldName);
+					$globalAppQueries = \IPS\Api\GraphQL\AppQueries::queries($info->fieldName);
 					$appQueryClass = '\\IPS\\' . $info->fieldName . '\\api\\GraphQL\\Query';					
 					$queryResolvers = array();
 					$queryTypes = $appQueryClass::queries();
@@ -114,7 +111,7 @@ class QueryType extends ObjectType
 				}
 				catch ( \Exception $e )
 				{
-					throw new Exception( 'NO_RESOLVE', '3S291/2', 405 );
+					throw new \IPS\Api\Exception( 'NO_RESOLVE', '3S291/2', 405 );
 				}
 			}
 		];

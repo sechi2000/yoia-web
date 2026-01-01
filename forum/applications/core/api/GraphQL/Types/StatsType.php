@@ -10,32 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Types;
-use DateInterval;
-use Exception;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Application;
-use IPS\Data\Cache;
-use IPS\DateTime;
-use IPS\Db;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * StatsType for GraphQL API
  */
-class StatsType extends ObjectType
+class _StatsType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -48,7 +41,7 @@ class StatsType extends ObjectType
 						'type' => TypeRegistry::int(),
 						'description' => "Content count",
 						'resolve' => function () {
-							return static::getContentCount();
+							return (int) static::getContentCount();
 						}
 					],
 					'memberCount' => [
@@ -65,18 +58,18 @@ class StatsType extends ObjectType
 		parent::__construct($config);
 	}
 
-	protected static function getContentCount() : int
+	protected static function getContentCount()
 	{
 		$cacheKey = 'content_count';
 		$total = 0;
 
 		try
 		{
-			return Cache::i()->getWithExpire( $cacheKey, TRUE );
+			return \IPS\Data\Cache::i()->getWithExpire( $cacheKey, TRUE );
 		}
-		catch( OutOfRangeException $e ){}
+		catch( \OutOfRangeException $e ){}
 
-		foreach( Application::enabledApplications() as $app )
+		foreach( \IPS\Application::enabledApplications() as $app )
 		{
 			foreach( $app->extensions( 'core', 'ContentRouter', TRUE, TRUE ) as $object )
 			{			
@@ -128,24 +121,25 @@ class StatsType extends ObjectType
 								}
 							}
 						} 
-						catch( Exception $e ){}
+						catch( \Exception $e ){}
 					}
 				}
 			}	
 		}
 
-		Cache::i()->storeWithExpire( $cacheKey, $total, DateTime::create()->add( new DateInterval('P1W') ), TRUE );
+		\IPS\Data\Cache::i()->storeWithExpire( $cacheKey, $total, \IPS\DateTime::create()->add( new \DateInterval('P1W') ), TRUE );
 		
 		return $total;
 	}
 
-	protected static function getMemberCount() : ?int
+	protected static function getMemberCount()
 	{
 		try 
 		{
-			return Db::i()->select( 'COUNT(*)', 'core_members', array( 'completed=?', true ) )->first();
+			$memberCount = \IPS\Db::i()->select( 'COUNT(*)', 'core_members', array( 'completed=?', true ) )->first();
+			return $memberCount;
 		} 
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
 			return NULL;
 		}

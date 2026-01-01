@@ -9,6 +9,9 @@
         "ContentRouter": {
             "calendar": "IPS\\calendar\\extensions\\core\\ContentRouter\\calendar"
         },
+        "CreateMenu": {
+            "Event": "IPS\\calendar\\extensions\\core\\CreateMenu\\Event"
+        },
         "EditorLocations": {
             "Calendar": "IPS\\calendar\\extensions\\core\\EditorLocations\\Calendar",
             "Venue": "IPS\\calendar\\extensions\\core\\EditorLocations\\Venue"
@@ -22,17 +25,14 @@
         "LiveSearch": {
             "Calendars": "IPS\\calendar\\extensions\\core\\LiveSearch\\Calendars"
         },
-        "MemberFilter": {
-            "Rsvp": "IPS\\calendar\\extensions\\core\\MemberFilter\\Rsvp"
+        "MemberSync": {
+            "Calendar": "IPS\\calendar\\extensions\\core\\MemberSync\\Calendar"
         },
         "Notifications": {
             "Events": "IPS\\calendar\\extensions\\core\\Notifications\\Events"
         },
         "Permissions": {
             "Permissions": "IPS\\calendar\\extensions\\core\\Permissions\\Permissions"
-        },
-        "SearchContent": {
-            "Events": "IPS\\calendar\\extensions\\core\\SearchContent\\Events"
         },
         "Statistics": {
             "Rsvp": "IPS\\calendar\\extensions\\core\\Statistics\\Rsvp"

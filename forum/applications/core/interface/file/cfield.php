@@ -8,60 +8,52 @@
  * @since		11 Feb 2016
  */
 
-use IPS\Application;
-use IPS\Dispatcher\Front;
-use IPS\File;
-use IPS\Output;
-use IPS\Request;
-
 define('REPORT_EXCEPTIONS', TRUE);
 require_once str_replace( 'applications/core/interface/file/cfield.php', '', str_replace( '\\', '/', __FILE__ ) ) . 'init.php';
 
 try
 {
 	/* Get the extension */
-	list( $app, $extension ) = explode( '_', Request::i()->storage );
-	try
+	list( $app, $extension ) = explode( '_', \IPS\Request::i()->storage );
+	$classname = 'IPS\\' . $app . '\extensions\core\FileStorage\\' . $extension;	
+	if ( !class_exists( $classname ) )
 	{
-		$classname = Application::getExtensionClass( $app, 'FileStorage', $extension );
-	}
-	catch( OutOfRangeException )
-	{
-		throw new RuntimeException;
+		throw new \RuntimeException;
 	}
 	$extension = new $classname;
 
-	if ( ! isset( Request::i()->fileKey ) )
+	if ( ! isset( \IPS\Request::i()->fileKey ) )
 	{
-		throw new RuntimeException;
+		throw new \RuntimeException;
 	}
 
 	/* Get the actual filename from the extension */
-	$realFileName = \IPS\Text\Encrypt::fromTag( Request::i()->fileKey )->decrypt();
+	$realFileName = \IPS\Text\Encrypt::fromTag( \IPS\Request::i()->fileKey )->decrypt();
 
 	/* Check the file is valid */
-	$file = File::get( Request::i()->storage, $realFileName );
+	$file = \IPS\File::get( \IPS\Request::i()->storage, $realFileName );
 	if ( !$extension->isValidFile( $realFileName ) )
 	{
-		throw new RuntimeException;
+		throw new \RuntimeException;
 	}
 	
 	/* Send headers and print file */
-	Output::i()->sendStatusCodeHeader( 200 );
-	Output::i()->sendHeader( "Content-type: " . File::getMimeType( Request::i()->path ) . ";charset=UTF-8" );
-	foreach( array_merge( Output::getCacheHeaders( time(), 360 ), array( "Content-Disposition" => Output::getContentDisposition( 'attachment', Request::i()->path ), "X-Content-Type-Options" => "nosniff" ) ) as $key => $header )
+	\IPS\Output::i()->sendStatusCodeHeader( 200 );
+	\IPS\Output::i()->sendHeader( "Content-type: " . \IPS\File::getMimeType( \IPS\Request::i()->path ) . ";charset=UTF-8" );
+	foreach( array_merge( \IPS\Output::getCacheHeaders( time(), 360 ), array( "Content-Disposition" => \IPS\Output::getContentDisposition( 'attachment', \IPS\Request::i()->path ), "X-Content-Type-Options" => "nosniff" ) ) as $key => $header )
 	{
-		Output::i()->sendHeader( $key . ': ' . $header );
+		\IPS\Output::i()->sendHeader( $key . ': ' . $header );
 	}
-	Output::i()->sendHeader( "Content-Length: " . $file->filesize() );
-	Output::i()->sendHeader( "Content-Security-Policy: default-src 'none'; sandbox" );
-	Output::i()->sendHeader( "X-Content-Security-Policy:  default-src 'none'; sandbox" );
-	Output::i()->sendHeader( "Cross-Origin-Opener-Policy: same-origin" );
+	\IPS\Output::i()->sendHeader( "Content-Length: " . $file->filesize() );
+	\IPS\Output::i()->sendHeader( "Content-Security-Policy: default-src 'none'; sandbox" );
+	\IPS\Output::i()->sendHeader( "X-Content-Security-Policy:  default-src 'none'; sandbox" );
+	\IPS\Output::i()->sendHeader( "Cross-Origin-Opener-Policy: same-origin" );
+
 	$file->printFile();
 	exit;
 }
-catch (Exception $e )
+catch ( \Exception $e )
 {
-	Front::i();
-	Output::i()->sendOutput( '', 404 );
+	\IPS\Dispatcher\Front::i();
+	\IPS\Output::i()->sendOutput( '', 404 );
 }

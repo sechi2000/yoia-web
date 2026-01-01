@@ -11,64 +11,40 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application\Module;
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Exception as SoftwareException;
-use IPS\core\Ignore;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function strtoupper;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * UBBThreads Core Converter
  */
-class UBBthreads extends Software
+class _UBBthreads extends \IPS\convert\Software
 {
 	/**
 	 * @brief   Emoticons WHERE statement
 	 * @see     convertEmoticons()
 	 */
-	protected static string $emoticonsWhere = 'GRAEMLIN_IS_ACTIVE=1';
+	protected static $emoticonsWhere = 'GRAEMLIN_IS_ACTIVE=1';
 
 	/**
 	 * @brief   Groups WHERE statement
 	 * @see     convertGroups()
 	 */
-	protected static string $groupsWhere = 'GROUP_IS_DISABLED=0';
+	protected static $groupsWhere = 'GROUP_IS_DISABLED=0';
 
 	/**
 	 * @brief   Ignored users WHERE statement
 	 * @see     convertIgnoredUsers()
 	 */
-	protected static string $ignoredUsersWhere = "USER_IGNORE_LIST IS NOT NULL AND USER_IGNORE_LIST NOT IN ( '', '-' )";
+	protected static $ignoredUsersWhere = "USER_IGNORE_LIST IS NOT NULL AND USER_IGNORE_LIST NOT IN ( '', '-' )";
 
 	/**
 	 * @brief   Members WHERE statement
 	 * @see     convertMembers()
 	 */
-	protected static array $membersWhere = array( 'u.USER_LOGIN_NAME<>?', '**DONOTDELETE**' );
+	protected static $membersWhere = array( 'u.USER_LOGIN_NAME<>?', '**DONOTDELETE**' );
 
 	/**
 	 * This is.. kind of hacky, but it's used so we can try and support non-exact profanity matches without converting
@@ -77,7 +53,7 @@ class UBBthreads extends Software
 	 * @brief   Profanity filters WHERE statement
 	 * @see     convertProfanityFilters()
 	 */
-	protected static string $profanityFiltersWhere = '(
+	protected static $profanityFiltersWhere = '(
 		CENSOR_WORD NOT LIKE "%(.*)%" AND (
 			CENSOR_WORD NOT LIKE "%(.*?)%" OR (
 			    CENSOR_WORD LIKE "%(.*?)" AND CENSOR_WORD NOT LIKE "%(.*?)%(.*?)"
@@ -88,9 +64,9 @@ class UBBthreads extends Software
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "UBBthreads";
@@ -99,9 +75,9 @@ class UBBthreads extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "ubbthreads";
@@ -110,9 +86,9 @@ class UBBthreads extends Software
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertEmoticons'				=> array(
@@ -158,9 +134,9 @@ class UBBthreads extends Software
 	/**
 	 * Allows software to add additional menu row options
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function extraMenuRows(): array
+	public function extraMenuRows()
 	{
 		$rows = array();
 		$count = $this->countRows( static::canConvert()['convertMembersFollowers']['table'], static::canConvert()['convertMembersFollowers']['where'] );
@@ -170,7 +146,7 @@ class UBBthreads extends Software
 			$rows['convertMembersFollowers'] = array(
 				'step_method'		=> 'convertMembersFollowers',
 				'step_title'		=> 'convert_follows',
-				'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_follow', array( 'follow_app=? and follow_area=?', 'core', 'member' ) ),
+				'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_follow', array( 'follow_app=? and follow_area=?', 'core', 'member' ) ),
 				'source_rows'		=> $count,
 				'per_cycle'			=> 200,
 				'dependencies'		=> array( 'convertMembers' ),
@@ -184,9 +160,9 @@ class UBBthreads extends Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -194,13 +170,13 @@ class UBBthreads extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch ( $table )
 		{
@@ -216,9 +192,9 @@ class UBBthreads extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertEmoticons',
@@ -231,15 +207,15 @@ class UBBthreads extends Software
 	 * Attempt to convert a textual date(time) representation to a DateTime instance
 	 *
 	 * @param   string  $date	Date to try to convert
-	 * @return  DateTime|null
+	 * @return  \IPS\DateTime|null
 	 */
-	protected function stringToDateTime( string $date ) : ?DateTime
+	protected function stringToDateTime( $date )
 	{
 		try
 		{
-			return new DateTime( $date );
+			return new \IPS\DateTime( $date );
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
 			return NULL;
 		}
@@ -248,10 +224,10 @@ class UBBthreads extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -259,7 +235,7 @@ class UBBthreads extends Software
 			case 'convertEmoticons':
 				$return['convertEmoticons'] = array();
 
-				Member::loggedIn()->language()->words['emoticon_path'] = Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'UBBthreads' ) ) );
+				\IPS\Member::loggedIn()->language()->words['emoticon_path'] = \IPS\Member::loggedIn()->language()->addToStack( 'source_path', FALSE, array( 'sprintf' => array( 'UBBthreads' ) ) );
 				$return['convertEmoticons']['emoticon_path'] = array(
 					'field_class'		=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'		=> NULL,
@@ -280,16 +256,16 @@ class UBBthreads extends Software
 				$return['convertGroups'] = array();
 
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[ $group->g_id ] = $group->name;
 				}
 
 				foreach( $this->db->select( '*', 'GROUPS' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['GROUP_ID']}"]        = $group['GROUP_NAME'];
-					Member::loggedIn()->language()->words["map_group_{$group['GROUP_ID']}_desc"]   = Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['GROUP_ID']}"]        = $group['GROUP_NAME'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['GROUP_ID']}_desc"]   = \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 
 					$return['convertGroups']["map_group_{$group['GROUP_ID']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -309,8 +285,8 @@ class UBBthreads extends Software
 					'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 					'field_default'			=> 'display_name',
 					'field_required'		=> TRUE,
-					'field_extra'			=> array( 'options' => array( 'username' => Member::loggedIn()->language()->addToStack( 'user_name' ), 'display_name' => Member::loggedIn()->language()->addToStack( 'display_name' ) ) ),
-					'field_hint'			=> Member::loggedIn()->language()->addToStack( 'username_hint' ),
+					'field_extra'			=> array( 'options' => array( 'username' => \IPS\Member::loggedIn()->language()->addToStack( 'user_name' ), 'display_name' => \IPS\Member::loggedIn()->language()->addToStack( 'display_name' ) ) ),
+					'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack( 'username_hint' ),
 				);
 
 				$return['convertMembers']['photo_location'] = array(
@@ -318,22 +294,22 @@ class UBBthreads extends Software
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
-					'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_ubbthreads_photo_path'),
-					'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_ubbthreads_photo_path'),
+					'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 
 				foreach( array( 'homepage', 'occupation', 'hobbies', 'location', 'icq', 'yahoo', 'aim', 'msn', 'custom_title' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["field_{$field}"]		= Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
-					Member::loggedIn()->language()->words["field_{$field}_desc"]	= Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}"]		= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
 					$return['convertMembers']["field_{$field}"] = array(
 						'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 						'field_default'			=> 'no_convert',
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'no_convert'			=> Member::loggedIn()->language()->addToStack( 'no_convert' ),
-								'create_field'			=> Member::loggedIn()->language()->addToStack( 'create_field' ),
+								'no_convert'			=> \IPS\Member::loggedIn()->language()->addToStack( 'no_convert' ),
+								'create_field'			=> \IPS\Member::loggedIn()->language()->addToStack( 'create_field' ),
 							),
 							'userSuppliedInput'		=> 'create_field'
 						),
@@ -349,45 +325,42 @@ class UBBthreads extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 
 		/* Non-Content Rebuilds */
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
 
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\core\Messenger\Conversation' ), 3, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\core\Messenger\Conversation' ), 3, array( 'class' ) );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
 
 		return array( "f_search_index_rebuild", "f_clear_caches", "f_rebuild_pms", "f_signatures_rebuild", "f_rebuild_attachments" );
 	}
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		$post = preg_replace( "#\[quote=(.+?)\]#i", "[quote name=\"$1\"]", $post );
 		$post = preg_replace( '#\[img:(left|center|right)\](.+?)\[\/img\]#i', '[$1][img]$2[/img][/$1]', $post );
@@ -401,7 +374,7 @@ class UBBthreads extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertBanfilters() : void
+	public function convertBanfilters()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -435,7 +408,7 @@ class UBBthreads extends Software
 			) );
 		}
 
-		throw new SoftwareException;
+		throw new \IPS\convert\Software\Exception;
 	}
 
 	/**
@@ -443,7 +416,7 @@ class UBBthreads extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertEmoticons() : void
+	public function convertEmoticons()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -477,7 +450,7 @@ class UBBthreads extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'GROUP_ID' );
@@ -497,7 +470,7 @@ class UBBthreads extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -511,7 +484,7 @@ class UBBthreads extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertIgnoredUsers() : void
+	public function convertIgnoredUsers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'USER_ID' );
@@ -534,7 +507,7 @@ class UBBthreads extends Software
 				);
 
 				/* Assume we want to ignore everything by this member */
-				foreach ( Ignore::types() as $type )
+				foreach ( \IPS\core\Ignore::types() as $type )
 				{
 					$info[ 'ignore_' . $type ] = 1;
 				}
@@ -550,7 +523,7 @@ class UBBthreads extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'u.USER_ID' );
@@ -585,24 +558,24 @@ class UBBthreads extends Software
 				'md5_password'              => $row['USER_PASSWORD'],
 				'member_group_id'           => $primaryGroup,
 				'mgroup_others'             => $secondaryGroups,
-				'joined'                    => DateTime::create()->setTimestamp( $row['USER_REGISTERED_ON'] ),
+				'joined'                    => \IPS\DateTime::create()->setTimestamp( $row['USER_REGISTERED_ON'] ),
 				'ip_address'                => $row['USER_REGISTRATION_IP'],
 				'bday_day'                  => $birthday['day'],
 				'bday_month'                => $birthday['month'],
 				'bday_year'                 => $birthday['year'],
 				'msg_count_total'           => $row['USER_TOTAL_PM'],
-				'last_visit'                => DateTime::create()->setTimestamp( $row['USER_LAST_VISIT_TIME'] ),
-				'last_activity'             => DateTime::create()->setTimestamp(
+				'last_visit'                => \IPS\DateTime::create()->setTimestamp( $row['USER_LAST_VISIT_TIME'] ),
+				'last_activity'             => \IPS\DateTime::create()->setTimestamp(
 					max( (int) $row['USER_LAST_POST_TIME'], (int) $row['USER_LAST_SEARCH_TIME'] )
 				),
 				'allow_admin_mails'         => ( $row['USER_ACCEPT_ADMIN_EMAILS'] != 'Off' ),
 				'member_posts'              => $row['USER_TOTAL_POSTS'],
 				'signature'					=> $row['USER_DEFAULT_SIGNATURE'],
-				'member_last_post'          => DateTime::create()->setTimestamp( $row['USER_LAST_POST_TIME'] ),
+				'member_last_post'          => \IPS\DateTime::create()->setTimestamp( $row['USER_LAST_POST_TIME'] ),
 				'temp_ban'                  => isset( $row['BAN_EXPIRATION'] )
 					? ( ( (string) $row['BAN_EXPIRATION'] === '0' )
 						? -1
-						: DateTime::create()->setTimestamp( $row['BAN_EXPIRATION'] ) )
+						: \IPS\DateTime::create()->setTimestamp( $row['BAN_EXPIRATION'] ) )
 					: NULL,
 			);
 
@@ -622,7 +595,7 @@ class UBBthreads extends Software
 					/* We don't actually need this, but we need to make sure the field was created */
 					$fieldId = $this->app->getLink( $pseudo, 'core_pfields_data' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$libraryClass->convertProfileField( array(
 						'pf_id'				=> $pseudo,
@@ -637,8 +610,8 @@ class UBBthreads extends Software
 					) );
 				}
 
-				$fieldColumn = 'USER_' . strtoupper( $pseudo );
-				$pfields[ $pseudo ] = $row[$fieldColumn] ?? NULL;
+				$fieldColumn = 'USER_' . \strtoupper( $pseudo );
+				$pfields[ $pseudo ] = isset( $row[ $fieldColumn ] ) ? $row[ $fieldColumn ] : NULL;
 			}
 
 			/* Profile photo */
@@ -658,7 +631,7 @@ class UBBthreads extends Software
 				try
 				{
 					$profilePhotoName = pathinfo( parse_url( $row['USER_AVATAR'], PHP_URL_PATH ), PATHINFO_BASENAME );
-					$profilePhotoData = Url::external( $row['USER_AVATAR'] )->request()->get();
+					$profilePhotoData = \IPS\Http\Url::external( $row['USER_AVATAR'] )->request()->get();
 				}
 				catch( \IPS\Http\Request\Exception $e ) { }
 			}
@@ -673,7 +646,7 @@ class UBBthreads extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertMembersFollowers() : void
+	public function convertMembersFollowers()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -695,7 +668,7 @@ class UBBthreads extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'TOPIC_ID' );
@@ -704,11 +677,11 @@ class UBBthreads extends Software
 		{
 			$topic = array(
 				'mt_id'             => $topicRow['TOPIC_ID'],
-				'mt_date'           => DateTime::create()->setTimestamp( $topicRow['TOPIC_TIME'] ),
+				'mt_date'           => \IPS\DateTime::create()->setTimestamp( $topicRow['TOPIC_TIME'] ),
 				'mt_title'          => $topicRow['TOPIC_SUBJECT'],
 				'mt_starter_id'     => $topicRow['USER_ID'],
-				'mt_start_time'     => DateTime::create()->setTimestamp( $topicRow['TOPIC_TIME'] ),
-				'mt_last_post_time' => DateTime::create()->setTimestamp( $topicRow['TOPIC_LAST_REPLY_TIME'] ),
+				'mt_start_time'     => \IPS\DateTime::create()->setTimestamp( $topicRow['TOPIC_TIME'] ),
+				'mt_last_post_time' => \IPS\DateTime::create()->setTimestamp( $topicRow['TOPIC_LAST_REPLY_TIME'] ),
 				'mt_replies'        => $topicRow['TOPIC_REPLIES'],
 			);
 
@@ -717,7 +690,7 @@ class UBBthreads extends Software
 			/* Make sure the topic starter is in the map */
 			$maps[ $topicRow['USER_ID'] ] = array(
 				'map_user_id'   => $topicRow['USER_ID'],
-				'map_read_time' => DateTime::create()->setTimestamp( $topicRow['TOPIC_TIME'] )
+				'map_read_time' => \IPS\DateTime::create()->setTimestamp( $topicRow['TOPIC_TIME'] )
 			);
 	
 			foreach ( $this->db->select( '*', 'PRIVATE_MESSAGE_USERS',  array( 'TOPIC_ID=?', $topicRow['TOPIC_ID'] ) ) as $userRow )
@@ -738,7 +711,7 @@ class UBBthreads extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -749,7 +722,7 @@ class UBBthreads extends Software
 			$libraryClass->convertPrivateMessageReply( array(
 				'msg_id'			=> $row['POST_ID'],
 				'msg_topic_id'		=> $row['TOPIC_ID'],
-				'msg_date'			=> DateTime::create()->setTimestamp( $row['POST_TIME'] ),
+				'msg_date'			=> \IPS\DateTime::create()->setTimestamp( $row['POST_TIME'] ),
 				'msg_post'			=> $row['POST_DEFAULT_BODY'],
 				'msg_author_id'		=> $row['USER_ID'],
 				'msg_ip_address'	=> '127.0.0.1',
@@ -764,7 +737,7 @@ class UBBthreads extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertProfanityFilters() : void
+	public function convertProfanityFilters()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -786,37 +759,37 @@ class UBBthreads extends Software
 			) );
 		}
 
-		throw new SoftwareException;
+		throw new \IPS\convert\Software\Exception;
 	}
 
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
 		/* Make sure it's a UBBThreads URL */
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'ubbthreads.php' ) === FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'ubbthreads.php' ) === FALSE )
 		{
 			return NULL;
 		}
 
-		if( preg_match( '#/ubbthreads.php/users/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/ubbthreads.php/users/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			try
 			{
 				$data = $this->app->getLink( (int) $matches[1], array( 'members', 'core_members' ) );
-				$item = Member::load( $data );
+				$item = \IPS\Member::load( $data );
 
-				if( Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+				if( \IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
@@ -828,29 +801,29 @@ class UBBthreads extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
 		$hash = $member->members_pass_hash;
 		$salt = $member->members_pass_salt;
 
-		if ( Login::compareHashes( $hash, md5( $password ) ) )
+		if ( \IPS\Login::compareHashes( $hash, md5( $password ) ) )
 		{
 			return TRUE;
 		}
 
 		// Not using md5, UBB salts the password with the password
 		// IPB already md5'd it though, *sigh*
-		if ( Login::compareHashes( $hash, md5( md5( $salt ) . crypt( $password, $password ) ) ) )
+		if ( \IPS\Login::compareHashes( $hash, md5( md5( $salt ) . crypt( $password, $password ) ) ) )
 		{
 			return TRUE;
 		}
 
 		// Now standard IPB check.
-		if ( Login::compareHashes( $hash, md5( md5( $salt ) . md5( $password ) ) ) )
+		if ( \IPS\Login::compareHashes( $hash, md5( md5( $salt ) . md5( $password ) ) ) )
 		{
 			return TRUE;
 		}

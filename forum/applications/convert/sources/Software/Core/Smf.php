@@ -11,48 +11,23 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application\Module;
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\core\Ignore;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use PasswordHash;
-use UnderflowException;
-use function count;
-use function defined;
-use function file_exists;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * SMF Core Converter
  */
-class Smf extends Software
+class _Smf extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "Simple Machines Forum (2.0.x)";
@@ -61,9 +36,9 @@ class Smf extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "smf";
@@ -72,9 +47,9 @@ class Smf extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertBanfilters'			=> array(
@@ -115,9 +90,9 @@ class Smf extends Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -125,9 +100,9 @@ class Smf extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertEmoticons',
@@ -140,13 +115,13 @@ class Smf extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
@@ -155,27 +130,29 @@ class Smf extends Software
 				{
 					return $this->db->select( 'SUM(CHAR_LENGTH(buddy_list) - CHAR_LENGTH(REPLACE(buddy_list, ",", "") + 1))', 'members', array( "pm_ignore_list!=?", '' ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					return 0;
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 			
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 	
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -187,7 +164,7 @@ class Smf extends Software
 					'field_required'	=> TRUE,
 					'field_extra'		=> array(),
 					'field_hint'		=> NULL,
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				$return['convertEmoticons']['keep_existing_emoticons']	= array(
 					'field_class'		=> 'IPS\\Helpers\\Form\\Checkbox',
@@ -202,16 +179,16 @@ class Smf extends Software
 				$return['convertProfileFields'] = array();
 				
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_pfields_data' ), 'IPS\core\ProfileFields\Field' ) AS $field )
 				{
 					$options[$field->_id] = $field->_title;
 				}
 				
 				foreach( $this->db->select( '*', 'custom_fields' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["map_pfield_{$field['id_field']}"]		= $field['field_name'];
-					Member::loggedIn()->language()->words["map_pfield_{$field['id_field']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['id_field']}"]		= $field['field_name'];
+					\IPS\Member::loggedIn()->language()->words["map_pfield_{$field['id_field']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_pfield_desc' );
 					
 					$return['convertProfileFields']["map_pfield_{$field['id_field']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -227,16 +204,16 @@ class Smf extends Software
 				$return['convertGroups'] = array();
 				
 				$options = array();
-				$options['none'] = Member::loggedIn()->language()->addToStack( 'none' );
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				$options['none'] = \IPS\Member::loggedIn()->language()->addToStack( 'none' );
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[$group->g_id] = $group->name;
 				}
 				
 				foreach( $this->db->select( '*', 'membergroups' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['id_group']}"]			= $group['group_name'];
-					Member::loggedIn()->language()->words["map_group_{$group['id_group']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['id_group']}"]			= $group['group_name'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['id_group']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 					
 					$return['convertGroups']["map_group_{$group['id_group']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -259,14 +236,14 @@ class Smf extends Software
 					'field_hint'			=> NULL,
 				);
 
-				Member::loggedIn()->language()->words['photo_location_desc'] = Member::loggedIn()->language()->addToStack( 'photo_location_nodb_desc' );
+				\IPS\Member::loggedIn()->language()->words['photo_location_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'photo_location_nodb_desc' );
 				$return['convertMembers']['photo_location'] = array(
 					'field_class'			=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
 					'field_hint'			=> "This is typically: /path/to/smf/attachments/",
-					'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				
 				$return['convertMembers']['gallery_location'] = array(
@@ -275,21 +252,21 @@ class Smf extends Software
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
 					'field_hint'			=> "This is typically: /path/to/smf/uploads/avatars/",
-					'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				
 				foreach( array( 'gender', 'website_url', 'location', 'icq', 'aim', 'yim', 'msn', 'personal_text', 'usertitle' ) AS $field )
 				{
-					Member::loggedIn()->language()->words["field_{$field}"]		= Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
-					Member::loggedIn()->language()->words["field_{$field}_desc"]	= Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}"]		= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field', FALSE, array( 'sprintf' => $field ) );
+					\IPS\Member::loggedIn()->language()->words["field_{$field}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'pseudo_field_desc' );
 					$return['convertMembers']["field_{$field}"] = array(
 						'field_class'			=> 'IPS\\Helpers\\Form\\Radio',
 						'field_default'			=> 'no_convert',
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'no_convert'			=> Member::loggedIn()->language()->addToStack( 'no_convert' ),
-								'create_field'			=> Member::loggedIn()->language()->addToStack( 'create_field' ),
+								'no_convert'			=> \IPS\Member::loggedIn()->language()->addToStack( 'no_convert' ),
+								'create_field'			=> \IPS\Member::loggedIn()->language()->addToStack( 'create_field' ),
 							),
 							'userSuppliedInput'		=> 'create_field'
 						),
@@ -305,44 +282,41 @@ class Smf extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 		
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
 		
 		/* Non-Content Rebuilds */
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
 
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 		
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
 		
 		return array( "f_search_index_rebuild", "f_clear_caches", "f_rebuild_pms", "f_signatures_rebuild", "f_rebuild_attachments" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		// Replace BBCode - The table HTML is removed by our parser, but it leaves the posts cleaner than having unparsed bbcode
 		$search = array( '[li]', '[/li]', '[table]', '[/table]', '[tr]', '[/tr]', '[td]', '[/td]', '[tt]', '[/tt]' );
@@ -364,7 +338,7 @@ class Smf extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertBanfilters() : void
+	public function convertBanfilters()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -406,7 +380,7 @@ class Smf extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertEmoticons() : void
+	public function convertEmoticons()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -435,7 +409,7 @@ class Smf extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -493,7 +467,7 @@ class Smf extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$libraryClass = $this->getLibrary();
 
@@ -518,7 +492,7 @@ class Smf extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertProfileFields() : void
+	public function convertProfileFields()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -557,10 +531,10 @@ class Smf extends Software
 				'pf_type'			=> $type,
 				'pf_name'			=> $row['field_name'],
 				'pf_desc'			=> $row['field_desc'],
-				'pf_content'		=> ( in_array( $row['field_type'], array( 'select', 'radio' ) ) ) ? json_encode( explode( ',', $row['field_options'] ) ) : NULL,
+				'pf_content'		=> ( \in_array( $row['field_type'], array( 'select', 'radio' ) ) ) ? json_encode( explode( ',', $row['field_options'] ) ) : NULL,
 				'pf_not_null'		=> ( $row['show_reg'] == 2 ) ? 1 : 0,
 				'pf_member_hide'	=> ( $row['private'] >= 3 ) ? 'hide' : 'all',
-				'pf_max_input'		=> ( !in_array( $row['field_type'], array( 'select', 'radio', 'check' ) ) ) ? $row['field_length'] : NULL,
+				'pf_max_input'		=> ( !\in_array( $row['field_type'], array( 'select', 'radio', 'check' ) ) ) ? $row['field_length'] : NULL,
 				'pf_member_edit'	=> ( $row['private'] < 4 ) ? 1 : 0,
 				'pf_position'		=> $row['placement'],
 				'pf_show_on_reg'	=> ( $row['show_reg'] >= 1 ) ? 1 : 0,
@@ -580,7 +554,7 @@ class Smf extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -613,7 +587,7 @@ class Smf extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -627,7 +601,7 @@ class Smf extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -665,7 +639,7 @@ class Smf extends Software
 					$rp = $time;
 				}
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 
 			/* Catch out of range issues */
 			if( $ban > 2147483647 )
@@ -724,7 +698,7 @@ class Smf extends Software
 				{
 					$fieldId = $this->app->getLink( $pseudo, 'core_pfields_data' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$type		= 'Text';
 					$content	= '[]';
@@ -795,13 +769,13 @@ class Smf extends Software
 					/* Remote */
 					try
 					{
-						$file = Url::external( $row['avatar'] )->request()->get();
+						$file = \IPS\Http\Url::external( $row['avatar'] )->request()->get();
 						
 						$filename = explode( '/', $row['avatar'] );
 						$filename = array_pop( $filename );
 						$filedata = (string) $file;
 					}
-					catch( Exception $e ) {}
+					catch( \Exception $e ) {}
 				}
 				else
 				{
@@ -841,18 +815,18 @@ class Smf extends Software
 						$legacyName = preg_replace( '~\.[\.]+~', '.', $cleanName );
 					}
 					
-					if ( file_exists( $path . '/' . $location ) )
+					if ( \file_exists( $path . '/' . $location ) )
 					{
 						$filename = $attach['filename'];
 						$filepath = $path . '/' . $location;
 					}
-					elseif( !empty( $legacyName ) AND file_exists( $path . '/' . $legacyName ) )
+					elseif( !empty( $legacyName ) AND \file_exists( $path . '/' . $legacyName ) )
 					{
 						$filename = $attach['filename'];
 						$filepath = $path;
 					}
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 			
 			$libraryClass->convertMember( $info, $pfields, $filename, $filepath, $filedata );
@@ -866,7 +840,7 @@ class Smf extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertIgnoredUsers() : void
+	public function convertIgnoredUsers()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -886,7 +860,7 @@ class Smf extends Software
 				$info['ignore_owner_id']	= $row['id_member'];
 				$info['ignore_ignore_id']	= $id;
 				
-				foreach( Ignore::types() AS $type )
+				foreach( \IPS\core\Ignore::types() AS $type )
 				{
 					$info['ignore_' . $type] = 1;
 				}
@@ -900,26 +874,26 @@ class Smf extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 * @note	Current profile URL format: /index.php?action=profile;u=123
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
 		/* If we can't access profiles, don't bother trying to redirect */
-		if( !Member::loggedIn()->canAccessModule( Module::get( 'core', 'members' ) ) )
+		if( !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'members' ) ) )
 		{
 			return NULL;
 		}
 
-		if( isset( Request::i()->action ) AND mb_strpos( Request::i()->action, 'profile' ) !== FALSE )
+		if( isset( \IPS\Request::i()->action ) AND mb_strpos( \IPS\Request::i()->action, 'profile' ) !== FALSE )
 		{
-			if( isset( Request::i()->u ) )
+			if( isset( \IPS\Request::i()->u ) )
 			{
-				$oldId	= Request::i()->u;
+				$oldId	= \IPS\Request::i()->u;
 			}
 			else
 			{
-				$pieces	= explode( ';', Request::i()->action );
+				$pieces	= explode( ';', \IPS\Request::i()->action );
 
 				foreach( $pieces as $piece )
 				{
@@ -936,9 +910,9 @@ class Smf extends Software
 			try
 			{
 				$data = (string) $this->app->getLink( $oldId, array( 'members', 'core_members' ) );
-				return Member::load( $data )->url();
+				return \IPS\Member::load( $data )->url();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
@@ -950,29 +924,29 @@ class Smf extends Software
 	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
-		if ( Login::compareHashes( $member->conv_password, sha1( mb_strtolower( $member->name ) . html_entity_decode( $password ) ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, sha1( mb_strtolower( $member->name ) . html_entity_decode( $password ) ) ) )
 		{
 			return TRUE;
 		}
-		else if ( Login::compareHashes( $member->conv_password, sha1( mb_strtolower( $member->name ) . $password ) ) )
+		else if ( \IPS\Login::compareHashes( $member->conv_password, sha1( mb_strtolower( $member->name ) . $password ) ) )
 		{
 			return TRUE;
 		}
 		/* In 4.2.6 we save the original members name as the salt so that we don't have one that has been modified in the conversion process */
-		else if ( Login::compareHashes( $member->conv_password, sha1( mb_strtolower( $member->conv_password_extra ) . $password ) ) )
+		else if ( \IPS\Login::compareHashes( $member->conv_password, sha1( mb_strtolower( $member->conv_password_extra ) . $password ) ) )
 		{
 			return TRUE;
 		}
 		else
 		{
 			require_once \IPS\ROOT_PATH . "/applications/convert/sources/Login/PasswordHash.php";
-			$ph = new PasswordHash( 8, TRUE );
+			$ph = new \PasswordHash( 8, TRUE );
 
 			if( $ph->CheckPassword( mb_strtolower( $member->name ) . $password, $member->conv_password ) )
 			{

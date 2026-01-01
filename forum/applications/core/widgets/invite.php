@@ -11,46 +11,41 @@
 namespace IPS\core\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Widget;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * invite Widget
  */
-class invite extends Widget
+class _invite extends \IPS\Widget
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'invite';
+	public $key = 'invite';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'core';
+	public $app = 'core';
 		
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Initialise this widget
 	 *
 	 * @return void
 	 */
-	public function init(): void
+	public function init()
 	{
 		// Use this to perform any set up and to assign a template that is not in the following format:
-		$this->template( array( Theme::i()->getTemplate( 'widgets', $this->app, 'front' ), $this->key ) );
+		$this->template( array( \IPS\Theme::i()->getTemplate( 'widgets', $this->app, 'front' ), $this->key ) );
 
 		parent::init();
 	}
@@ -61,7 +56,7 @@ class invite extends Widget
  	 * @param	array	$values	Values from form
  	 * @return	array
  	 */
- 	public function preConfig( array $values ): array
+ 	public function preConfig( $values )
  	{
  		return $values;
  	}
@@ -71,14 +66,14 @@ class invite extends Widget
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
-		$subject = Member::loggedIn()->language()->addToStack('block_invite_subject', FALSE, array( 'sprintf' => array( Settings::i()->board_name ), 'rawurlencode' => TRUE ) );
-		$url = Url::internal( "" );
+		$subject = \IPS\Member::loggedIn()->language()->addToStack('block_invite_subject', FALSE, array( 'sprintf' => array( \IPS\Settings::i()->board_name ), 'rawurlencode' => TRUE ) );
+		$url = \IPS\Http\Url::internal( "" );
 
-		if( Settings::i()->ref_on and Member::loggedIn()->member_id )
+		if( \IPS\Settings::i()->ref_on and \IPS\Member::loggedIn()->member_id )
 		{
-			$url = $url->setQueryString( array( '_rid' => Member::loggedIn()->member_id  ) );
+			$url = $url->setQueryString( array( '_rid' => \IPS\Member::loggedIn()->member_id  ) );
 		}
 
 		return $this->output( $subject, urlencode( $url ) );

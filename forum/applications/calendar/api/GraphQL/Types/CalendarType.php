@@ -11,42 +11,39 @@
 
 namespace IPS\calendar\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
-use IPS\calendar\api\GraphQL\TypeRegistry;
-use IPS\calendar\Calendar;
-use IPS\Node\Api\GraphQL\NodeType;
-use function defined;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * CalendarType for GraphQL API
  */
-class CalendarType extends NodeType
+class _CalendarType extends \IPS\Node\Api\GraphQL\NodeType
 {
     /*
      * @brief 	The item classname we use for this type
      */
-    protected static string $nodeClass	= Calendar::class;
+    protected static $nodeClass	= \IPS\calendar\Calendar::class;
 
     /*
      * @brief 	GraphQL type name
      */
-    protected static string $typeName = 'calendar_Calendar';
+    protected static $typeName = 'calendar_Calendar';
 
     /*
      * @brief 	GraphQL type description
      */
-    protected static string $typeDescription = 'A calendar';
+    protected static $typeDescription = 'A calendar';
 
     /*
      * @brief 	Follow data passed in to FollowType resolver
      */
-    protected static array $followData = array('app' => 'calendar', 'area' => 'calendar');
+    protected static $followData = array('app' => 'calendar', 'area' => 'calendar');
 
 
     /**
@@ -54,9 +51,9 @@ class CalendarType extends NodeType
      *
      * @return	ObjectType
      */
-    public static function getItemType(): ObjectType
-	{
-        return TypeRegistry::event();
+    public static function getItemType()
+    {
+        return \IPS\calendar\api\GraphQL\TypeRegistry::event();
     }
 }
 

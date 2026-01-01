@@ -11,28 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Member;
-use IPS\Request;
-use IPS\Theme;
-use LengthException;
-use function defined;
-use function floatval;
-use function intval;
-use function is_int;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Text input class for Form Builder
  */
-class Number extends FormAbstract
+class _Number extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -53,7 +41,7 @@ class Number extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'min'				=> 0,
 		'max'				=> NULL,
 		'unlimited'			=> NULL,
@@ -67,26 +55,27 @@ class Number extends FormAbstract
 		'disabled'			=> FALSE,
 		'endSuffix'			=> NULL,
 	);
-
+	
 	/**
 	 * Constructor
 	 *
-	 * @param string $name Name
-	 * @param mixed $defaultValue Default value
-	 * @param bool|null $required Required? (NULL for not required, but appears to be so)
-	 * @param array $options Type-specific options
-	 * @param callable|null $customValidationCode Custom validation code
-	 * @param string|null $prefix HTML to show before input field
-	 * @param string|null $suffix HTML to show after input field
-	 * @param string|null $id The ID to add to the row
+	 * @param	string			$name					Name
+	 * @param	mixed			$defaultValue			Default value
+	 * @param	bool|NULL		$required				Required? (NULL for not required, but appears to be so)
+	 * @param	array			$options				Type-specific options
+	 * @param	callback		$customValidationCode	Custom validation code
+	 * @param	string			$prefix					HTML to show before input field
+	 * @param	string			$suffix					HTML to show after input field
+	 * @param	string			$id						The ID to add to the row
+	 * @return	void
 	 */
-	public function __construct( string $name, mixed $defaultValue=NULL, ?bool $required=FALSE, array $options=array(), callable $customValidationCode=NULL, string $prefix=NULL, string $suffix=NULL, string $id=NULL )
+	public function __construct( $name, $defaultValue=NULL, $required=FALSE, $options=array(), $customValidationCode=NULL, $prefix=NULL, $suffix=NULL, $id=NULL )
 	{
 		/* Specify there's a value if the unlimited element contains a value */
 		$unlimitedName = "{$name}_unlimited";		
-		if( isset( $options['unlimited'] ) and isset( Request::i()->$unlimitedName ) )
+		if( isset( $options['unlimited'] ) and $options['unlimited'] !== NULL and isset( \IPS\Request::i()->$unlimitedName ) )
 		{
-			Request::i()->$name = $options['unlimited'];
+			\IPS\Request::i()->$name = $options['unlimited'];
 		}
 		
 		/* Work out the step */
@@ -109,19 +98,19 @@ class Number extends FormAbstract
 	/**
 	 * Generated HTML store
 	 */
-	protected static array $generatedHtml = array();
+	protected static $generatedHtml = array();
 	
 	/** 
 	 * Get HTML
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		/* Display */
 		if ( ! isset( static::$generatedHtml[ $this->_name ] ) )
 		{
-			static::$generatedHtml[ $this->_name ] = Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( $this->name, $this->value, $this->required, $this->options['unlimited'], $this->options['range'], $this->options['min'], $this->options['max'], $this->options['step'], $this->options['decimals'], $this->options['unlimitedLang'], $this->options['disabled'], $this->suffix, $this->options['unlimitedToggles'], $this->options['unlimitedToggleOn'], $this->options['valueToggles'], NULL, $this->prefix );
+			static::$generatedHtml[ $this->_name ] = \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->number( $this->name, $this->value, $this->required, $this->options['unlimited'], $this->options['range'], $this->options['min'], $this->options['max'], $this->options['step'], $this->options['decimals'], $this->options['unlimitedLang'], $this->options['disabled'], $this->suffix, $this->options['unlimitedToggles'], $this->options['unlimitedToggleOn'], $this->options['valueToggles'], NULL, $this->prefix );
 		}
 		
 		/* Because we mess around with suffixes in the Number field, we store the HTML here otherwise when it is regenerated, the suffix is missing */
@@ -133,14 +122,14 @@ class Number extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$name = $this->name;
 		
 		if ( $pos = mb_strpos( $name, '[' ) )
 		{
 			$_name = mb_substr( preg_replace( '/\[(.+?)\]/', '[$1_unlimited]', $name, 1 ), 0, $pos );
-			$val = Request::i()->$_name;
+			$val = \IPS\Request::i()->$_name;		
 			preg_match_all( '/\[(.+?)\]/', $name, $matches );
 			foreach ( $matches[1] as $_name )
 			{
@@ -160,17 +149,17 @@ class Number extends FormAbstract
 		else
 		{
 			$unlimitedName = "{$name}_unlimited";
-			$unlimitedChecked = isset( Request::i()->$unlimitedName );
+			$unlimitedChecked = isset( \IPS\Request::i()->$unlimitedName );
 		}
 				
 		/* Unlimited? */
-		if ( $this->options['unlimited'] !== NULL and isset( Request::i()->$unlimitedName ) )
+		if ( $this->options['unlimited'] !== NULL and isset( \IPS\Request::i()->$unlimitedName ) )
 		{
 			return $this->options['unlimited'];
 		}
 		
 		/* Get value */
-		return Request::i()->$name;
+		return \IPS\Request::i()->$name;
 	}
 	
 	/**
@@ -178,7 +167,7 @@ class Number extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function formatValue(): mixed
+	public function formatValue()
 	{		
 		/* Get value */
 		$value = $this->value;
@@ -194,20 +183,20 @@ class Number extends FormAbstract
 			of the locale to . in an attempt to get us to the former from the latter, but we don't 
 			do the thousand seperator in case what we received was the former alredy, which would turn
 			for example "10,00" into "1000" */
-		$value = str_replace( trim( Member::loggedIn()->language()->locale['decimal_point'] ), '.', $value );
+		$value = str_replace( trim( \IPS\Member::loggedIn()->language()->locale['decimal_point'] ), '.', $value );
 
 		/* Convert to int/float */
 		if ( $this->options['decimals'] and $value != '' )
 		{
-			$value = floatval( $value );
-			if ( is_int( $this->options['decimals'] ) )
+			$value = \floatval( $value );
+			if ( \is_int( $this->options['decimals'] ) )
 			{
 				$value = round( $value, $this->options['decimals'] );
 			}
 		}
 		else
 		{
-			$value = ( $value != '' ) ? intval( $value ) : '';
+			$value = ( $value != '' ) ? \intval( $value ) : '';
 		}
 
 		/* Return */
@@ -217,32 +206,29 @@ class Number extends FormAbstract
 	/**
 	 * Validate
 	 *
-	 * @throws	LengthException
+	 * @throws	\LengthException
 	 * @return	TRUE
 	 */
-	public function validate(): bool
+	public function validate()
 	{
 		parent::validate();
 						
 		if ( $this->options['unlimited'] === NULL or $this->value !== $this->options['unlimited'] )
 		{
 			/* If it's not numeric, throw an exception */
-			if ( ( !is_numeric( $this->value ) and $this->value !== '' and $this->required === FALSE ) or ( !is_numeric( $this->value ) and $this->required === TRUE ) )
+			if ( ( !\is_numeric( $this->value ) and $this->value !== '' and $this->required === FALSE ) or ( !\is_numeric( $this->value ) and $this->required === TRUE ) )
 			{
-				throw new InvalidArgumentException( 'form_number_bad' );
+				throw new \InvalidArgumentException( 'form_number_bad' );
 			}
-
-			$valueToCheck = ( isset( $this->options['decimals'] ) and $this->options['decimals'] ) ? floatval( $this->value ) : (int) $this->value;
-			if ( $this->options['min'] !== NULL and $valueToCheck < $this->options['min'] )
+			
+			if ( $this->options['min'] !== NULL and (int) $this->value < $this->options['min'] )
 			{
-				throw new LengthException( Member::loggedIn()->language()->addToStack('form_number_min', FALSE, array( 'sprintf' => array( $this->options['min'] ) ) ) );
+				throw new \LengthException( \IPS\Member::loggedIn()->language()->addToStack('form_number_min', FALSE, array( 'sprintf' => array( $this->options['min'] ) ) ) );
 			}
-			if ( $this->options['max'] !== NULL and $valueToCheck > $this->options['max'] )
+			if ( $this->options['max'] !== NULL and (int) $this->value > $this->options['max'] )
 			{
-				throw new LengthException( Member::loggedIn()->language()->addToStack('form_number_max', FALSE, array( 'sprintf' => array( $this->options['max'] ) ) ) );
+				throw new \LengthException( \IPS\Member::loggedIn()->language()->addToStack('form_number_max', FALSE, array( 'sprintf' => array( $this->options['max'] ) ) ) );
 			}
 		}
-
-		return TRUE;
 	}
 }

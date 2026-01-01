@@ -11,96 +11,93 @@
 namespace IPS\Content\Search;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Content Filter for Search Queries
  */
-class ContentFilter
+class _ContentFilter
 {
 	/**
 	 * @brief	Item class
 	 */
-	public string $itemClass;
+	public $itemClass;
 	
 	/**
 	 * @brief	Classes to include
 	 */
-	public array $classes = array();
+	public $classes = array();
 
 	/**
 	 * @brief	Container classes to include
 	 * @note	NULL means not to filter by container classes
 	 */
-	public array|null $containerClasses = NULL;
+	public $containerClasses = NULL;
 
 	/**
 	 * @brief	Classes to include when filtering by container classes
 	 * @note	NULL means no special overrides
 	 */
-	public array|null $containerClassExclusions = NULL;
+	public $containerClassExclusions = NULL;
 	
 	/**
 	 * @brief	Container ID filter
 	 */
-	public bool|null $containerIdFilter = NULL;
+	public $containerIdFilter = NULL;
 	
 	/**
 	 * @brief	Container IDs
 	 */
-	public array $containerIds = array();
+	public $containerIds = array();
 	
 	/**
 	 * @brief	Item ID filter
 	 */
-	public bool|null $itemIdFilter = NULL;
+	public $itemIdFilter = NULL;
 	
 	/**
 	 * @brief	Item IDs
 	 */
-	public array $itemIds = array();
+	public $itemIds = array();
 	
 	/**
 	 * @brief	Object ID filter
 	 */
-	public bool|null $objectIdFilter = NULL;
+	public $objectIdFilter = NULL;
 	
 	/**
 	 * @brief	Object IDs
 	 */
-	public array $objectIds = array();
+	public $objectIds = array();
 	
 	/**
 	 * @brief	Minimum comments
 	 */
-	public int $minimumComments = 0;
+	public $minimumComments = 0;
 	
 	/**
 	 * @brief	Minimum reviews
 	 */
-	public int $minimumReviews = 0;
+	public $minimumReviews = 0;
 	
 	/**
 	 * @brief	Minimum views
 	 */
-	public int $minimumViews = 0;
+	public $minimumViews = 0;
 	
 	/**
 	 * @brief	Only include results which are the first comment on an item requiring a comment
 	 */
-	public bool $onlyFirstComment = FALSE;
+	public $onlyFirstComment = FALSE;
 	
 	/**
 	 * @brief	Only include results which are the last comment on an item requiring a comment
 	 */
-	public bool $onlyLastComment = FALSE;
+	public $onlyLastComment = FALSE;
 			
 	/**
 	 * Constructor
@@ -111,7 +108,7 @@ class ContentFilter
 	 * @param	bool	$includeReviews		Include reviews in results?
 	 * @return	static
 	 */
-	public static function init( string $itemClass, bool $includeItems=TRUE, bool $includeComments=TRUE, bool $includeReviews=TRUE ): static
+	public static function init( $itemClass, $includeItems=TRUE, $includeComments=TRUE, $includeReviews=TRUE )
 	{		
 		$obj = new static;
 		$obj->itemClass = $itemClass;
@@ -141,7 +138,7 @@ class ContentFilter
 	 * @param	string	$class				The  class
 	 * @return	static
 	 */
-	public static function initWithSpecificClass( string $class ): static
+	public static function initWithSpecificClass( $class )
 	{		
 		$obj = new static;
 		$obj->classes = array( $class );
@@ -155,7 +152,7 @@ class ContentFilter
 	 * @param	array	$ids	Acceptable container IDs
 	 * @return	static	(for daisy chaining)
 	 */
-	public function onlyInContainers( array $ids ): static
+	public function onlyInContainers( array $ids )
 	{
 		$this->containerIdFilter = TRUE;
 		$this->containerIds = $ids;
@@ -169,7 +166,7 @@ class ContentFilter
 	 * @param	array	$ids	Acceptable container IDs
 	 * @return	static	(for daisy chaining)
 	 */
-	public function excludeInContainers( array $ids ): static
+	public function excludeInContainers( array $ids )
 	{
 		$this->containerIdFilter = FALSE;
 		$this->containerIds = $ids;
@@ -183,7 +180,7 @@ class ContentFilter
 	 * @param	array	$ids	Acceptable item IDs
 	 * @return	static	(for daisy chaining)
 	 */
-	public function onlyInItems( array $ids ): static
+	public function onlyInItems( array $ids )
 	{
 		$this->itemIdFilter = TRUE;
 		$this->itemIds = $ids;
@@ -197,7 +194,7 @@ class ContentFilter
 	 * @param	array	$ids	Acceptable object IDs
 	 * @return	static	(for daisy chaining)
 	 */
-	public function onlyInIds( array $ids ): static
+	public function onlyInIds( array $ids )
 	{
 		$this->objectIdFilter = TRUE;
 		$this->objectIds = $ids;
@@ -211,7 +208,7 @@ class ContentFilter
 	 * @param	array	$ids	Acceptable container IDs
 	 * @return	static	(for daisy chaining)
 	 */
-	public function excludeInItems( array $ids ): static
+	public function excludeInItems( array $ids )
 	{
 		$this->itemIdFilter = FALSE;
 		$this->itemIds = $ids;
@@ -225,7 +222,7 @@ class ContentFilter
 	 * @param	int	$minimumComments	The minimum number of comments
 	 * @return	static	(for daisy chaining)
 	 */
-	public function minimumComments( int $minimumComments ): static
+	public function minimumComments( $minimumComments )
 	{
 		$this->minimumComments = $minimumComments;
 		
@@ -238,7 +235,7 @@ class ContentFilter
 	 * @param	int	$minimumReviews	The minimum number of reviews
 	 * @return	static	(for daisy chaining)
 	 */
-	public function minimumReviews( int $minimumReviews ): static
+	public function minimumReviews( $minimumReviews )
 	{
 		$this->minimumReviews = $minimumReviews;
 		
@@ -251,7 +248,7 @@ class ContentFilter
 	 * @param	int	$minimumViews	The minimum number of views
 	 * @return	static	(for daisy chaining)
 	 */
-	public function minimumViews( int $minimumViews ): static
+	public function minimumViews( $minimumViews )
 	{
 		$this->minimumViews = $minimumViews;
 		
@@ -263,7 +260,7 @@ class ContentFilter
 	 *
 	 * @return	static	(for daisy chaining)
 	 */
-	public function onlyFirstComment(): static
+	public function onlyFirstComment()
 	{
 		$this->onlyFirstComment = TRUE;
 		
@@ -275,7 +272,7 @@ class ContentFilter
 	 *
 	 * @return	static	(for daisy chaining)
 	 */
-	public function onlyLastComment(): static
+	public function onlyLastComment()
 	{
 		$this->onlyLastComment = TRUE;
 		

@@ -11,64 +11,50 @@
 namespace IPS\core\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application\Module;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Translatable;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Club\CustomField;
-use IPS\Settings;
-use IPS\Widget;
-use IPS\Widget\Customizable;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Clubs Widget
  */
-class clubs extends Widget implements Customizable
+class _clubs extends \IPS\Widget
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'clubs';
+	public $key = 'clubs';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'core';
+	public $app = 'core';
 		
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 	
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
 		$form = parent::configuration( $form );
  		
- 		$form->add( new Translatable( 'widget_feed_title', isset( $this->configuration['language_key'] ) ? NULL : Member::loggedIn()->language()->addToStack( 'my_clubs' ), FALSE, array( 'app' => 'core', 'key' => ( $this->configuration['language_key'] ?? NULL ) ) ) );
+ 		$form->add( new \IPS\Helpers\Form\Translatable( 'widget_feed_title', isset( $this->configuration['language_key'] ) ? NULL : \IPS\Member::loggedIn()->language()->addToStack( 'my_clubs' ), FALSE, array( 'app' => 'core', 'key' => ( isset( $this->configuration['language_key'] ) ? $this->configuration['language_key'] : NULL ) ) ) );
 
-		$form->add( new Radio( 'club_filter_type', $this->configuration['club_filter_type'] ?? 'mine', TRUE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'club_filter_type', isset( $this->configuration['club_filter_type'] ) ? $this->configuration['club_filter_type'] : 'mine', TRUE, array( 'options' => array(
 			'mine'	=> 'user_clubs',
 			'all'	=> 'all_clubs',
 		) ) ) );
 		
-		$fields = CustomField::roots();
+		$fields = \IPS\Member\Club\CustomField::roots();
 		foreach ( $fields as $field )
 		{
 			if ( $field->filterable )
@@ -77,7 +63,7 @@ class clubs extends Widget implements Customizable
 				{
 					case 'Checkbox':
 					case 'YesNo':
-						$input = new CheckboxSet( 'field_' . $field->id, isset( $this->configuration['filters'][ $field->id ] ) ? $this->configuration['filters'][ $field->id ] : array( 1, 0 ), FALSE, array( 'options' => array(
+						$input = new \IPS\Helpers\Form\CheckboxSet( 'field_' . $field->id, isset( $this->configuration['filters'][ $field->id ] ) ? $this->configuration['filters'][ $field->id ] : array( 1, 0 ), FALSE, array( 'options' => array(
 							1			=> 'yes',
 							0			=> 'no',
 						) ) );
@@ -89,7 +75,7 @@ class clubs extends Widget implements Customizable
 					case 'Radio':
 					case 'Select':
 						$options = json_decode( $field->extra, TRUE );
-						$input = new CheckboxSet( 'field_' . $field->id, isset( $this->configuration['filters'][ $field->id ] ) ? $this->configuration['filters'][ $field->id ] : array_keys( $options ), FALSE, array( 'options' => $options ) );
+						$input = new \IPS\Helpers\Form\CheckboxSet( 'field_' . $field->id, isset( $this->configuration['filters'][ $field->id ] ) ? $this->configuration['filters'][ $field->id ] : array_keys( $options ), FALSE, array( 'options' => $options ) );
 						$input->label = $field->_title;
 						$form->add( $input );
 						break;
@@ -97,13 +83,13 @@ class clubs extends Widget implements Customizable
 			}
 		}
 
-		$form->add( new Radio( 'sort_by', $this->configuration['sort_by'] ?? 'last_activity', TRUE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'sort_by', isset( $this->configuration['sort_by'] ) ? $this->configuration['sort_by'] : 'last_activity', TRUE, array( 'options' => array(
 			'last_activity'	=> 'clubs_sort_last_activity',
 			'members'		=> 'clubs_sort_members',
 			'content'		=> 'clubs_sort_content',
 			'created'		=> 'clubs_sort_created',
 		) ) ) );
-		$form->add( new Number( 'number_to_show', $this->configuration['number_to_show'] ?? 10, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'number_to_show', isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 10, TRUE ) );
  		return $form;
  	} 
  	
@@ -113,17 +99,17 @@ class clubs extends Widget implements Customizable
  	 * @param	array	$values	Values from form
  	 * @return	array
  	 */
- 	public function preConfig( array $values ): array
+ 	public function preConfig( $values )
  	{
 	 	if ( !isset( $this->configuration['language_key'] ) )
  		{
 	 		$this->configuration['language_key'] = 'widget_title_' . md5( mt_rand() );
  		}
 		$values['language_key'] = $this->configuration['language_key'];
-		Lang::saveCustom( 'core', $this->configuration['language_key'], $values['widget_feed_title'] );
+		\IPS\Lang::saveCustom( 'core', $this->configuration['language_key'], $values['widget_feed_title'] );
  		unset( $values['widget_feed_title'] );
  		
- 		$fields = CustomField::roots();
+ 		$fields = \IPS\Member\Club\CustomField::roots();
  		foreach ( $fields as $field )
 		{
 			if ( $field->filterable )
@@ -132,7 +118,7 @@ class clubs extends Widget implements Customizable
 				{
 					case 'Checkbox':
 					case 'YesNo':
-						if ( count( $values[ 'field_' . $field->id ] ) === 1 )
+						if ( \count( $values[ 'field_' . $field->id ] ) === 1 )
 						{
 							$values['filters'][ $field->id ] = array_pop( $values[ 'field_' . $field->id ] );
 						}
@@ -143,12 +129,12 @@ class clubs extends Widget implements Customizable
 					case 'Radio':
 					case 'Select':
 						$options = json_decode( $field->extra, TRUE );
-						if ( count( $values[ 'field_' . $field->id ] ) > 0 and count( $values[ 'field_' . $field->id ] ) < count( $options ) )
+						if ( \count( $values[ 'field_' . $field->id ] ) > 0 and \count( $values[ 'field_' . $field->id ] ) < \count( $options ) )
 						{
 							$values['filters'][ $field->id ] = array();
 							foreach ( $values[ 'field_' . $field->id ] as $v )
 							{
-								$values['filters'][ $field->id ][] = $v;
+								$values['filters'][ $field->id ][] = $options[ $v ];
 							}
 						}
 						unset( $values[ 'field_' . $field->id ] );
@@ -165,50 +151,47 @@ class clubs extends Widget implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
-		if( !Member::loggedIn()->member_id and $this->configuration['club_filter_type'] == 'mine' )
-		{
-			return '';
-		}
-
-		if ( Settings::i()->clubs and Member::loggedIn()->canAccessModule( Module::get( 'core', 'clubs', 'front' ) ) )
+		if ( \IPS\Settings::i()->clubs and \IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'clubs', 'front' ) ) )
 		{
 			/* Strip any not existing custom field filters, e.g. when a field was deleted */
 			if ( isset( $this->configuration['filters'] ) and \is_array( $this->configuration['filters'] ) )
 			{
-				$fields = CustomField::roots();
+				$fields = \IPS\Member\Club\CustomField::roots();
 				foreach ( $this->configuration['filters'] as $key => $value )
 				{
-					if( !isset( $fields[ $key ] ) )
-					{
-						unset( $this->configuration['filters'][ $key ] );
-					}
+				 	if( !isset( $fields[ $key ] ) )
+				 	{
+					 	unset( $this->configuration['filters'][ $key ] );
+				 	}
 				}
 			}
-			$clubsCount = Club::clubs(
-				Member::loggedIn(),
-				$this->configuration['number_to_show'] ?? 10,
-				$this->configuration['sort_by'] ?? 'last_activity',
+			
+			$clubsCount = \IPS\Member\Club::clubs(
+				\IPS\Member::loggedIn(),
+				isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 10,
+				isset( $this->configuration['sort_by'] ) ? $this->configuration['sort_by'] : 'last_activity',
 				!isset( $this->configuration['club_filter_type'] ) or $this->configuration['club_filter_type'] == 'mine',
-				$this->configuration['filters'] ?? array(),
+				isset( $this->configuration['filters'] ) ? $this->configuration['filters'] : array(),
 				NULL,
 				TRUE
 			);
 			
 			if ( $clubsCount )
 			{
-				$clubs = Club::clubs(
-					Member::loggedIn(),
-					$this->configuration['number_to_show'] ?? 10,
-					$this->configuration['sort_by'] ?? 'last_activity',
+				$clubs = \IPS\Member\Club::clubs(
+					\IPS\Member::loggedIn(),
+					isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 10,
+					isset( $this->configuration['sort_by'] ) ? $this->configuration['sort_by'] : 'last_activity',
 					!isset( $this->configuration['club_filter_type'] ) or $this->configuration['club_filter_type'] == 'mine',
-					$this->configuration['filters'] ?? array()
+					isset( $this->configuration['filters'] ) ? $this->configuration['filters'] : array()
 				);
 
 				return $this->output(
 					$clubs,
-					isset( $this->configuration['language_key'] ) ? Member::loggedIn()->language()->addToStack( $this->configuration['language_key'], FALSE, array( 'escape' => TRUE ) ) : Member::loggedIn()->language()->addToStack( 'my_clubs' )
+					isset( $this->configuration['language_key'] ) ? \IPS\Member::loggedIn()->language()->addToStack( $this->configuration['language_key'], FALSE, array( 'escape' => TRUE ) ) : \IPS\Member::loggedIn()->language()->addToStack( 'my_clubs' ),
+					$this->orientation
 				);
 			}
 		}

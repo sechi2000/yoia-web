@@ -12,78 +12,40 @@
 namespace IPS\forums\modules\front\forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use Exception;
-use IPS\Application;
-use IPS\Application\Module;
-use IPS\core\DataLayer;
-use IPS\core\FrontNavigation;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\forums\Forum as ForumClass;
-use IPS\forums\SavedAction;
-use IPS\forums\Topic;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Table\Content;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Platform\Bridge;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function array_merge;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_numeric;
-use const IPS\Helpers\Table\SEARCH_SELECT;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Forum Index
  */
-class forums extends Controller
+class _forums extends \IPS\Dispatcher\Controller
 {
-	protected mixed $themeGroup = NULL;
-
-	protected string $nodeClass = 'IPS\forums\Forum';
+	protected $themeGroup = NULL;
 	
 	/**
 	 * Route
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
-	{
-		Output::i()->bodyAttributes['contentClass'] = ForumClass::class;
+	protected function manage()
+	{	
 		$forum = NULL;
 		try
 		{
-			$this->_forum( ForumClass::loadAndCheckPerms( Request::i()->id ) );
+			$this->_forum( \IPS\forums\Forum::loadAndCheckPerms( \IPS\Request::i()->id ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'node_error', '2F176/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2F176/1', 404, '' );
 		}
 	}
 
-	protected array $childrenIds = [];
+	protected $childrenIds = [];
 
-	protected function getChildrenIds( $forum ): array
+	protected function getChildrenIds( $forum )
 	{
 		$this->childrenIds[] = $forum->_id;
 
@@ -102,51 +64,51 @@ class forums extends Controller
 	/**
 	 * Show Forum
 	 *
-	 * @param ForumClass $forum	The forum to show
+	 * @param	\IPS\forums\Forum	$forum	The forum to show
 	 * @return	void
 	 */
-	public function _forum( ForumClass $forum ) : void
+	public function _forum( $forum )
 	{
 		$forum->clubCheckRules();
 				
 		/* Is simple mode on? If so, redirect to the index page */
-		if ( ForumClass::isSimpleView( $forum ) )
+		if ( \IPS\forums\Forum::isSimpleView( $forum ) )
 		{
-			if ( ! isset( Request::i()->url()->hiddenQueryString['rss'] ) )
+			if ( ! isset( \IPS\Request::i()->url()->hiddenQueryString['rss'] ) )
 			{
-				Output::i()->redirect( $forum->url(), '', 302 );
+				\IPS\Output::i()->redirect( $forum->url(), '', 302 );
 			}
 		}
 
 		/* Theme */
 		$forum->setTheme();
-		$this->themeGroup = Theme::i()->getTemplate( 'forums', 'forums', 'front' );
+		$this->themeGroup = \IPS\Theme::i()->getTemplate( 'forums', 'forums', 'front' );
 		
 		/* Password protected */
 		if ( $form = $forum->passwordForm() )
 		{
-			Output::i()->title = $forum->_title;
-			Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forums', 'forums', 'front' ), 'forumPasswordPopup' ), $forum );
+			\IPS\Output::i()->title = $forum->_title;
+			\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forums', 'forums', 'front' ), 'forumPasswordPopup' ), $forum );
 			return;
 		}
 
 		/* We can read? */
 		if ( $forum->sub_can_post and !$forum->permission_showtopic and !$forum->can('read') )
 		{
-			Output::i()->error( $forum->errorMessage(), '1F176/3', 403, '' );
+			\IPS\Output::i()->error( $forum->errorMessage(), '1F176/3', 403, '' );
 		}
 
         /* Users can see topics posted by other users? */
         $where = array();
-        if ( !$forum->memberCanAccessOthersTopics( Member::loggedIn() ) )
+        if ( !$forum->memberCanAccessOthersTopics( \IPS\Member::loggedIn() ) )
         {
-            $where[] = array( 'starter_id = ?', Member::loggedIn()->member_id );
+            $where[] = array( 'starter_id = ?', \IPS\Member::loggedIn()->member_id );
         }
 		
-		$getReactions = $getFirstComment = $getFollowerCount = ( Member::loggedIn()->getLayoutValue('forums_topic') === 'snippet' );
-
+		$getReactions = $getFirstComment = $getFollowerCount = (boolean) ( \IPS\forums\Forum::getMemberListView() === 'snippet' );
+		
 		/* Do view update now - we want to include redirect forums */
-		if ( ! Request::i()->isAjax() )
+		if ( !\IPS\Request::i()->isAjax() )
 		{
 			$forum->updateViews();
 		}
@@ -156,7 +118,7 @@ class forums extends Controller
 		{
 			$forum->redirect_hits++;
 			$forum->save();
-			Output::i()->redirect( $forum->redirect_url );
+			\IPS\Output::i()->redirect( $forum->redirect_url );
 		}
 
 		/* Display */
@@ -165,12 +127,12 @@ class forums extends Controller
 			$childrenIds = $this->getChildrenIds( $forum );
 			$where = array();
 
-			if ( ForumClass::customPermissionNodes() )
+			if ( \IPS\forums\Forum::customPermissionNodes() )
 			{
 				$where['container'][] = array( 'forums_forums.password IS NULL' );
 			}
 
-			if ( !Settings::i()->club_nodes_in_apps OR !Member::loggedIn()->canAccessModule( Module::get( 'core', 'clubs', 'front' ) ) )
+			if ( !\IPS\Settings::i()->club_nodes_in_apps OR !\IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'core', 'clubs', 'front' ) ) )
 			{
 				$where['container'][] = array( 'forums_forums.club_id IS NULL' );
 			}
@@ -179,15 +141,15 @@ class forums extends Controller
 			$ids = $childrenIds;
 			$urlParam = 'forumId' . $forum->_id;
 
-			if ( isset( Request::i()->$urlParam ) )
+			if ( isset( \IPS\Request::i()->$urlParam ) )
 			{
-				$ids = explode( ',', Request::i()->$urlParam );
+				$ids = explode( ',', \IPS\Request::i()->$urlParam );
 			}
-			else if ( isset( Request::i()->cookie['forums_flowIdsRoots'] ) and $cookie = json_decode( Request::i()->cookie['forums_flowIdsRoots'], TRUE ) )
+			else if ( isset( \IPS\Request::i()->cookie['forums_flowIdsRoots'] ) and $cookie = json_decode( \IPS\Request::i()->cookie['forums_flowIdsRoots'], TRUE ) )
 			{
 				if ( isset( $cookie[ $forum->_id ] ) )
 				{
-					if ( is_array( $cookie[ $forum->_id ] ) )
+					if ( \is_array( $cookie[ $forum->_id ] ) )
 					{
 						$ids = $cookie[$forum->_id];
 					}
@@ -195,16 +157,16 @@ class forums extends Controller
 			}
 
 			/* Inline forum IDs? */
-			if ( ( is_array( $ids ) and ! count( $ids ) ) )
+			if ( ( \is_array( $ids ) and ! \count( $ids ) ) )
 			{
 				/* If we unselect all the filters, then there is nothing to show... */
 				$where[] = [ "1=2" ];
 			}
-			else if ( count( $ids ) )
+			else if ( \count( $ids ) )
 			{
 				foreach( $ids as $id )
 				{
-					if ( ! in_array( $id, $childrenIds ) )
+					if ( ! \in_array( $id, $childrenIds ) )
 					{
 						continue;
 					}
@@ -212,83 +174,91 @@ class forums extends Controller
 					try
 					{
 						/* Panic not, they are all loaded into memory at this point */
-						$_forum = ForumClass::load( $id );
+						$_forum = \IPS\forums\Forum::load( $id );
 						$forumIds[] = $_forum->id;
 
 					}
-					catch( Exception $ex ) { }
+					catch( \Exception $ex ) { }
 				}
 
-				if ( count( $forumIds ) )
+				if ( \count( $forumIds ) )
 				{
-					$where['container'][] = array( Db::i()->in( 'forums_forums.id', array_filter( $forumIds ) ) );
+					$where['container'][] = array( \IPS\Db::i()->in( 'forums_forums.id', array_filter( $forumIds ) ) );
 				}
 			}
 
 			/* Simplified view */
-			$table = new Content( 'IPS\forums\Topic', $forum->url(), $where, $forum, NULL, 'read', TRUE, FALSE, NULL, FALSE, ( $getReactions and Member::loggedIn()->getLayoutValue('forums_topic') == 'snippet' ), ( $getFollowerCount and Member::loggedIn()->getLayoutValue('forums_topic') == 'snippet' ), FALSE );
-			$table->tableTemplate = array( Theme::i()->getTemplate( 'index' ), 'simplifiedForumTable' );
-			$table->classes = array( 'ipsData--topic-list' );
-			$table->limit = Settings::i()->forums_topics_per_page;
+			$table = new \IPS\Helpers\Table\Content( 'IPS\forums\Topic', $forum->url(), $where, $forum, NULL, 'read', TRUE, FALSE, NULL, FALSE, FALSE, FALSE, FALSE );
+			$table->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'index' ), 'simplifiedForumTable' );
+			$table->classes = array( 'cTopicList' );
+			$table->limit = \IPS\Settings::i()->forums_topics_per_page;
 			$table->enableRealtime = true;
 
-			if ( Member::loggedIn()->getLayoutValue('forums_topic') == 'snippet' )
+			if ( \IPS\forums\Forum::getMemberListView() == 'snippet' )
 			{
-				$table->rowsTemplate = array( Theme::i()->getTemplate( 'index' ), 'simplifiedTopicRowSnippet' );
+				$table->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'index' ), 'simplifiedTopicRowSnippet' );
 			}
 			else
 			{
-				$table->rowsTemplate = array( Theme::i()->getTemplate( 'index' ), 'simplifiedTopicRow' );
+				$table->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'index' ), 'simplifiedTopicRow' );
 			}
 
-			$table->honorPinned = Settings::i()->forums_fluid_pinned;
+			$table->honorPinned = \IPS\Settings::i()->forums_fluid_pinned;
 			$table->hover = TRUE;
 			$table->sortOptions['num_replies']	= $table->sortOptions['num_comments'];
 			unset( $table->sortOptions['num_comments'] );
 
-			if( ForumClass::theOnlyForum() === NULL )
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'index' )->simplifiedView( $table );
+
+			if( \IPS\forums\Forum::theOnlyForum() === NULL )
 			{
-				Output::i()->sidebar['contextual'] = Theme::i()->getTemplate( 'index' )->simplifiedViewForumSidebar( $forum );
+				\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate( 'index' )->simplifiedViewForumSidebar( $forum );
 			}
 
 			if ( isset( $where['container'] ) )
 			{
-				$allForumIds = iterator_to_array( Db::i()->select( 'id', 'forums_forums', $where['container'] ) );
-				Output::i()->contextualSearchOptions[ Member::loggedIn()->language()->addToStack('forums_chosen_forums') ] = array( 'type' => 'forums_topic', 'nodes' => implode( ',', $allForumIds ) );
+				$allForumIds = iterator_to_array( \IPS\Db::i()->select( 'id', 'forums_forums', $where['container'] ) );
+				\IPS\Output::i()->contextualSearchOptions[ \IPS\Member::loggedIn()->language()->addToStack('forums_chosen_forums') ] = array( 'type' => 'forums_topic', 'nodes' => implode( ',', $allForumIds ) );
 			}
 		}
 		else
 		{
 			/* Init table (it won't show anything until after the password check, but it sets navigation and titles) */
-			$table = new Content( 'IPS\forums\Topic', $forum->url(), $where, $forum, NULL, 'view', isset( Request::i()->rss ) ? FALSE : TRUE, isset( Request::i()->rss ) ? FALSE : TRUE, NULL, $getFirstComment, $getFollowerCount, $getReactions );
-			$table->tableTemplate = array(Theme::i()->getTemplate( 'forums', 'forums', 'front' ), 'forumTable');
-			$table->classes = array('ipsData--topic-list');
-			$table->limit = Settings::i()->forums_topics_per_page;
-			$table->title = Member::loggedIn()->language()->addToStack('count_topics_in_forum', FALSE, array('pluralize' => array($forum->topics)) );
-
-			if ( Member::loggedIn()->getLayoutValue('forums_topic') == 'snippet' )
+			$table = new \IPS\Helpers\Table\Content( 'IPS\forums\Topic', $forum->url(), $where, $forum, NULL, 'view', isset( \IPS\Request::i()->rss ) ? FALSE : TRUE, isset( \IPS\Request::i()->rss ) ? FALSE : TRUE, NULL, $getFirstComment, $getFollowerCount, $getReactions );
+			$table->tableTemplate = array(\IPS\Theme::i()->getTemplate( 'forums', 'forums', 'front' ), 'forumTable');
+			$table->classes = array('cTopicList');
+			$table->limit = \IPS\Settings::i()->forums_topics_per_page;
+			$table->title = \IPS\Member::loggedIn()->language()->addToStack( ( $forum->forums_bitoptions['bw_enable_answers'] ) ? 'count_questions_in_forum' : 'count_topics_in_forum', FALSE, array('pluralize' => array($forum->topics)) );
+			if ( $forum->forums_bitoptions['bw_enable_answers'] )
 			{
-				$table->rowsTemplate = array($this->themeGroup, 'topicRowSnippet');
+				$table->rowsTemplate = array($this->themeGroup, 'questionRow');
 			}
 			else
 			{
-				$table->rowsTemplate = array($this->themeGroup, 'topicRow');
+				if ( \IPS\forums\Forum::getMemberListView() == 'snippet' )
+				{
+					$table->rowsTemplate = array($this->themeGroup, 'topicRowSnippet');
+				}
+				else
+				{
+					$table->rowsTemplate = array($this->themeGroup, 'topicRow');
+				}
 			}
 
-			Output::i()->contextualSearchOptions[ Member::loggedIn()->language()->addToStack( 'search_contextual_item_forums' ) ] = array( 'type' => 'forums_topic', 'nodes' => $forum->_id );
+			\IPS\Output::i()->contextualSearchOptions[ \IPS\Member::loggedIn()->language()->addToStack( 'search_contextual_item_forums' ) ] = array( 'type' => 'forums_topic', 'nodes' => $forum->_id );
 		}
 
 		/* If there's only one forum and we're not in a club, and we're not in a sub-forum, we actually don't want the nav */
-		if ( $theOnlyForum = ForumClass::theOnlyForum() AND $theOnlyForum->_id == $forum->_id and !$forum->club() )
+		if ( $theOnlyForum = \IPS\forums\Forum::theOnlyForum() AND $theOnlyForum->_id == $forum->_id and !$forum->club() )
 		{
-			Output::i()->breadcrumb = isset( Output::i()->breadcrumb['module'] ) ? array('module' => Output::i()->breadcrumb['module']) : array();
+			\IPS\Output::i()->breadcrumb = isset( \IPS\Output::i()->breadcrumb['module'] ) ? array('module' => \IPS\Output::i()->breadcrumb['module']) : array();
 		}
 		
 		/* We need to shift the breadcrumb if we are in a sub-forum and we have $theOnlyForum */
 		if ( $theOnlyForum AND $theOnlyForum->_id != $forum->_id )
 		{
-			array_shift( Output::i()->breadcrumb );
-			array_shift( Output::i()->breadcrumb );
+			array_shift( \IPS\Output::i()->breadcrumb );
+			array_shift( \IPS\Output::i()->breadcrumb );
 		}
 
 		$table->hover = TRUE;
@@ -302,6 +272,7 @@ class forums extends Controller
 		$filterOptions = array(
 			'all' => 'all_topics',
 			'open' => 'open_topics',
+			'popular' => 'popular_now',
 			'poll' => 'poll',
 			'locked' => 'locked_topics',
 			'moved' => 'moved_topics',
@@ -320,27 +291,39 @@ class forums extends Controller
 			'last_90_days' => 'last_90_days',
 		);
 
-		if ( Member::loggedIn()->member_id )
+		if ( \IPS\Member::loggedIn()->member_id )
 		{
-			$filterOptions['starter'] = 'topics_i_started';
-			$filterOptions['replied'] = 'topics_i_posted_in';
+			$filterOptions['starter'] = $forum->forums_bitoptions['bw_enable_answers'] ? 'questions_i_asked' : 'topics_i_started';
+			$filterOptions['replied'] = $forum->forums_bitoptions['bw_enable_answers'] ? 'questions_i_posted_in' : 'topics_i_posted_in';
 
-			if ( Member::loggedIn()->member_id and Member::loggedIn()->last_visit )
+			if ( \IPS\Member::loggedIn()->member_id and \IPS\Member::loggedIn()->last_visit )
 			{
-				$timeFrameOptions['since_last_visit'] = Member::loggedIn()->language()->addToStack( 'since_last_visit', FALSE, array('sprintf' => array(DateTime::ts( (int) Member::loggedIn()->last_visit ))) );
+				$timeFrameOptions['since_last_visit'] = \IPS\Member::loggedIn()->language()->addToStack( 'since_last_visit', FALSE, array('sprintf' => array(\IPS\DateTime::ts( \IPS\Member::loggedIn()->last_visit ))) );
 			}
 		}
 
-		if ( $forum->forums_bitoptions['bw_solved_set_by_moderator'] )
+		if ( $forum->forums_bitoptions['bw_enable_answers'] )
 		{
 			$table->filters = array(
-				'solved_topics' => 'topic_answered_pid>0',
-				'unsolved_topics' => 'topic_answered_pid=0',
+				'questions_with_best_answers' => 'topic_answered_pid>0',
+				'questions_without_best_answers' => 'topic_answered_pid=0',
 			);
+
+			$table->sortOptions['question_rating'] = 'forums_topics.question_rating';
+		}
+		else
+		{
+			if ( $forum->forums_bitoptions['bw_enable_answers_moderator'] )
+			{
+				$table->filters = array(
+					'solved_topics' => 'topic_answered_pid>0',
+					'unsolved_topics' => 'topic_answered_pid=0',
+				);
+			}
 		}
 
 		/* Are we a moderator? */
-		if ( Topic::modPermission( 'unhide', NULL, $forum ) )
+		if ( \IPS\forums\Topic::modPermission( 'unhide', NULL, $forum ) )
 		{
 			$filterOptions['queued_topics'] = 'queued_topics';
 			$filterOptions['queued_posts'] = 'queued_posts';
@@ -349,41 +332,32 @@ class forums extends Controller
 			$table->filters['filter_hidden_posts_in_topics'] = 'topic_hiddenposts=1';
 		}
 
-		/* Assignments */
-		if( $forum->forums_bitoptions['bw_enable_assignments'] AND Bridge::i()->featureIsEnabled( 'assignments' ) )
-		{
-			if( Topic::modPermission( 'assign', null, $forum ) or $teams = Member::loggedIn()->teams() or ( Member::loggedIn()->modPermissions() and Member::loggedIn()->totalAssignments() ) )
-			{
-				$table->filters['filter_assigned_topics'] = 'assignment_id>0';
-			}
-		}
-
 		/* Are we filtering by queued topics or posts? */
-		if ( Request::i()->filter == 'queued_topics' or Request::i()->filter == 'queued_posts' )
+		if ( \IPS\Request::i()->filter == 'queued_topics' or \IPS\Request::i()->filter == 'queued_posts' )
 		{
-			Request::i()->advanced_search_submitted = 1;
-			Request::i()->csrfKey = Session::i()->csrfKey;
-			Request::i()->topic_type = Request::i()->filter;
+			\IPS\Request::i()->advanced_search_submitted = 1;
+			\IPS\Request::i()->csrfKey = \IPS\Session::i()->csrfKey;
+			\IPS\Request::i()->topic_type = \IPS\Request::i()->filter;
 		}
 
 		$table->advancedSearch = array(
-			'topic_type' => array(SEARCH_SELECT, array('options' => $filterOptions)),
-			'sort_by' => array(SEARCH_SELECT, array('options' => array(
+			'topic_type' => array(\IPS\Helpers\Table\SEARCH_SELECT, array('options' => $filterOptions)),
+			'sort_by' => array(\IPS\Helpers\Table\SEARCH_SELECT, array('options' => array(
 				'last_post' => 'last_post',
 				'replies' => 'replies',
 				'views' => 'views',
 				'topic_title' => 'topic_title',
 				'last_poster' => 'last_poster',
 				'topic_started' => 'topic_started',
-				'topic_starter' => 'topic_starter',
+				'topic_starter' => $forum->forums_bitoptions['bw_enable_answers'] ? 'question_asker' : 'topic_starter',
 			))
 			),
-			'sort_direction' => array(SEARCH_SELECT, array('options' => array(
+			'sort_direction' => array(\IPS\Helpers\Table\SEARCH_SELECT, array('options' => array(
 				'asc' => 'asc',
 				'desc' => 'desc',
 			))
 			),
-			'time_frame' => array(SEARCH_SELECT, array('options' => $timeFrameOptions)),
+			'time_frame' => array(\IPS\Helpers\Table\SEARCH_SELECT, array('options' => $timeFrameOptions)),
 		);
 		$table->advancedSearchCallback = function ( $table, $values ) {
 			/* Type */
@@ -391,6 +365,9 @@ class forums extends Controller
 			{
 				case 'open':
 					$table->where[] = array('state=?', 'open');
+					break;
+				case 'popular':
+					$table->where[] = array('popular_time IS NOT NULL AND popular_time>?', time());
 					break;
 				case 'poll':
 					$table->where[] = array('poll_state<>0');
@@ -402,11 +379,11 @@ class forums extends Controller
 					$table->where[] = array('state=?', 'link');
 					break;
 				case 'starter':
-					$table->where[] = array('starter_id=?', Member::loggedIn()->member_id);
+					$table->where[] = array('starter_id=?', \IPS\Member::loggedIn()->member_id);
 					break;
 				case 'replied':
 					$table->joinComments = TRUE;
-					$table->where[] = array('forums_posts.author_id=?', Member::loggedIn()->member_id);
+					$table->where[] = array('forums_posts.author_id=?', \IPS\Member::loggedIn()->member_id);
 					break;
 				case 'answered':
 					$table->where[] = array('topic_answered_pid<>0');
@@ -491,78 +468,108 @@ class forums extends Controller
 						$days = 90;
 						break;
 					case 'since_last_visit':
-						$table->where[] = array('forums_topics.last_post>?', Member::loggedIn()->last_visit);
+						$table->where[] = array('forums_topics.last_post>?', \IPS\Member::loggedIn()->last_visit);
 						break;
 				}
 			}
 
 			if ( $days !== NULL )
 			{
-				$table->where[] = array('forums_topics.last_post>?', DateTime::create()->sub( new DateInterval( 'P' . $days . 'D' ) )->getTimestamp());
+				$table->where[] = array('forums_topics.last_post>?', \IPS\DateTime::create()->sub( new \DateInterval( 'P' . $days . 'D' ) )->getTimestamp());
 			}
 		};
-		Request::i()->sort_direction = Request::i()->sort_direction ?: mb_strtolower( $table->sortDirection );
+		\IPS\Request::i()->sort_direction = \IPS\Request::i()->sort_direction ?: mb_strtolower( $table->sortDirection );
 
 		/* Saved actions */
-		foreach ( SavedAction::actions( $forum ) as $action )
+		foreach ( \IPS\forums\SavedAction::actions( $forum ) as $action )
 		{
 			$table->savedActions[ $action->_id ] = $action->_title;
 		}
 		
 		/* RSS */
-		if ( Settings::i()->forums_rss and $forum->topics )
+		if ( \IPS\Settings::i()->forums_rss and $forum->topics )
 		{
 			/* Show the link */
-			$rssUrl = Url::internal( "app=forums&module=forums&controller=forums&id={$forum->_id}&rss=1", 'front', 'forums_rss', array( $forum->name_seo ) );
+			$rssUrl = \IPS\Http\Url::internal( "app=forums&module=forums&controller=forums&id={$forum->_id}&rss=1", 'front', 'forums_rss', array( $forum->name_seo ) );
 
-			if ( Member::loggedIn()->member_id )
+			if ( \IPS\Member::loggedIn()->member_id )
 			{
-				$key = Member::loggedIn()->getUniqueMemberHash();
+				$key = \IPS\Member::loggedIn()->getUniqueMemberHash();
 
-				$rssUrl = $rssUrl->setQueryString( array( 'member' => Member::loggedIn()->member_id , 'key' => $key ) );
+				$rssUrl = $rssUrl->setQueryString( array( 'member' => \IPS\Member::loggedIn()->member_id , 'key' => $key ) );
 			}
 
-			$rssTitle = Member::loggedIn()->language()->addToStack( 'forum_rss_title_topics', FALSE, array( 'escape' => true, 'sprintf' => array( $forum->_title ) ) );
-
-			Output::i()->rssFeeds[ $rssTitle ] = $rssUrl;
+			if ( $forum->forums_bitoptions['bw_enable_answers'] )
+			{
+				$rssTitle = \IPS\Member::loggedIn()->language()->addToStack( 'forum_rss_title_questions', FALSE, array( 'escape' => true, 'sprintf' => array( $forum->_title ) ) );
+			}
+			else
+			{
+				$rssTitle = \IPS\Member::loggedIn()->language()->addToStack( 'forum_rss_title_topics', FALSE, array( 'escape' => true, 'sprintf' => array( $forum->_title ) ) );
+			}
+			\IPS\Output::i()->rssFeeds[ $rssTitle ] = $rssUrl;
 		}
 
 		/* Online User Location */
 		$permissions = $forum->permissions();
-		Session::i()->setLocation( $forum->url(), explode( ",", $permissions['perm_view'] ), 'loc_forums_viewing_forum', array( "forums_forum_{$forum->id}" => TRUE ) );
+		\IPS\Session::i()->setLocation( $forum->url(), explode( ",", $permissions['perm_view'] ), 'loc_forums_viewing_forum', array( "forums_forum_{$forum->id}" => TRUE ) );
 		
-		if ( Member::loggedIn()->getLayoutValue('forums_forum') === 'grid' )
+		if ( \IPS\forums\Forum::getMemberView() === 'grid' )
 		{
-			ForumClass::populateFollowerCounts( $forum );
+			\IPS\forums\Forum::populateFollowerCounts( $forum );
 		}
 
 		/* Data Layer Context */
-		if ( !Request::i()->isAjax AND DataLayer::enabled() )
+		if ( !\IPS\Request::i()->isAjax AND \IPS\Settings::i()->core_datalayer_enabled )
 		{
 			foreach ( $forum->getDataLayerProperties() as $key => $value )
 			{
-				DataLayer::i()->addContextProperty( $key, $value );
-				DataLayer::i()->addContextProperty( 'sort_direction', Request::i()->sort_direction ?: null );
-				$sortby = Request::i()->sort_by ?: null;
-				if ( $sortby AND !in_array( $sortby, ['asc', 'desc'] ) )
+				\IPS\core\DataLayer::i()->addContextProperty( $key, $value );
+				\IPS\core\DataLayer::i()->addContextProperty( 'sort_direction', \IPS\Request::i()->sort_direction ?: null );
+				$sortby = \IPS\Request::i()->sort_by ?: null;
+				if ( $sortby AND !\in_array( $sortby, ['asc', 'desc'] ) )
 				{
 					$sortby = null;
 				}
-				DataLayer::i()->addContextProperty( 'sort_by', $sortby );
-				DataLayer::i()->addContextProperty( 'page_number', 'page' );
+				\IPS\core\DataLayer::i()->addContextProperty( 'sort_by', $sortby );
+				\IPS\core\DataLayer::i()->addContextProperty( 'page_number', 'page' );
 			}
 		}
 			
 		/* Show Forum */
-		if ( isset( Request::i()->advancedSearchForm ) )
+		if ( isset( \IPS\Request::i()->advancedSearchForm ) )
 		{
-			Output::i()->output = (string) $table;
+			\IPS\Output::i()->output = (string) $table;
 			return;
 		}
 
 		$forumOutput = '';
 
-		if( $forum->sub_can_post or $forum->isCombinedView() )
+		if ( ! $forum->isCombinedView() and $forum->forums_bitoptions['bw_enable_answers'] )
+		{	
+			$featuredTopic = NULL;
+
+			foreach ( \IPS\forums\Topic::featured( 1, 'RAND()', $forum ) as $featuredTopic )
+			{
+				break;
+			}
+			
+			$popularQuestions = \IPS\forums\Topic::getItemsWithPermission( array( array( 'forum_id=?', $forum->id ), array( 'start_date>?', \IPS\DateTime::ts( time() - ( 86400 * 30 ) )->getTimestamp() ), array( 'question_rating>0' ) ), 'question_rating DESC, views DESC', 5 );
+			$newQuestionsWhere = array( array( 'forum_id=?', $forum->id ) );
+
+			if ( !\IPS\Settings::i()->forums_new_questions )
+			{
+				$newQuestionsWhere[] = array( 'topic_answered_pid=0' );
+			}
+			else
+			{
+				$newQuestionsWhere[] = array( '( forums_topics.posts IS NULL OR forums_topics.posts=1 )' );
+			}
+			
+			$newQuestions = \IPS\forums\Topic::getItemsWithPermission( $newQuestionsWhere, 'start_date DESC', 5 );			
+			$forumOutput = \IPS\Theme::i()->getTemplate( 'forums' )->qaForum( (string) $table, $popularQuestions, $newQuestions, $featuredTopic, $forum );
+		}
+		else if( $forum->sub_can_post or $forum->isCombinedView() )
 		{
 			$forumOutput = (string) $table;
 		}
@@ -570,26 +577,18 @@ class forums extends Controller
 		$table = $this->postProcessTable( $table );
 		
 		/* Set default search to this forum */
-		Output::i()->defaultSearchOption = array( 'forums_topic', 'forums_topic_el' );
+		\IPS\Output::i()->defaultSearchOption = array( 'forums_topic', 'forums_topic_el' );
 
-		Output::i()->jsFiles	= array_merge( Output::i()->jsFiles, Output::i()->js('front_forum.js', 'forums' ) );
-
-        if ( Application::appIsEnabled('cloud') )
-        {
-            Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'front_realtime.js', 'cloud', 'front' ) );
-        }
-
-		Output::i()->output	= $this->themeGroup->forumDisplay( $forum, $forumOutput );
+		\IPS\Output::i()->jsFiles	= array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js('front_forum.js', 'forums' ) );
+		\IPS\Output::i()->output	= $this->themeGroup->forumDisplay( $forum, $forumOutput );
 	}
 
 	/**
 	 * Return the forum table
-	 *
-	 * @param Content $table
-	 * @return Content
+	 * 
+	 * @return \IPS\Helpers\Table\Content
 	 */
-	protected function postProcessTable( Content $table ): Content
-	{
+	protected function postProcessTable( $table ) {
 		return $table;
 	}
 	
@@ -598,21 +597,21 @@ class forums extends Controller
 	 *
 	 * @return	void
 	 */
-	public function clubs() : void
+	public function clubs()
 	{
-		if ( !Settings::i()->club_nodes_in_apps )
+		if ( !\IPS\Settings::i()->club_nodes_in_apps )
 		{
-			Output::i()->error( 'node_error', '2F176/4', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '2F176/4', 404, '' );
 		}
 
-		if ( ForumClass::isSimpleView() )
+		if ( \IPS\forums\Forum::isSimpleView() )
 		{
-			Output::i()->redirect( Url::internal( 'app=forums&module=forums&controller=index&forumId=clubs', 'front', 'forums' ), '', 302 );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=forums&module=forums&controller=index&forumId=clubs', 'front', 'forums' ), '', 302 );
 		}
 		
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('club_node_forums') );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('club_node_forums');
-		Output::i()->output = Theme::i()->getTemplate( 'forums' )->clubForums();
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack('club_node_forums') );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('club_node_forums');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'forums' )->clubForums();
 	}
 
 	/**
@@ -620,9 +619,9 @@ class forums extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function add() : void
+	protected function add()
 	{
-		if ( !isset( Request::i()->id ) )
+		if ( !isset( \IPS\Request::i()->id ) )
 		{
 			$this->_selectForum();
 			return;
@@ -630,74 +629,79 @@ class forums extends Controller
 
 		try
 		{
-			$forum = ForumClass::loadAndCheckPerms( Request::i()->id );
+			$forum = \IPS\forums\Forum::loadAndCheckPerms( \IPS\Request::i()->id );
 			$forum->setTheme();
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'no_module_permission', '2F173/2', 403, 'no_module_permission_guest' );
+			\IPS\Output::i()->error( 'no_module_permission', '2F173/2', 403, 'no_module_permission_guest' );
 		}
 		
-		$form = Topic::create( $forum );
+		if ( $forum->forums_bitoptions['bw_enable_answers'] )
+		{
+			\IPS\Member::loggedIn()->language()->words['topic_mainTab'] = \IPS\Member::loggedIn()->language()->addToStack( 'question_mainTab', FALSE );
+		}
+		
+		$form = \IPS\forums\Topic::create( $forum );
 
 		$hasModOptions = false;
 		
-		$canHide = ( Member::loggedIn()->group['g_hide_own_posts'] == '1' or in_array( 'IPS\forums\Topic', explode( ',', Member::loggedIn()->group['g_hide_own_posts'] ) ) );
-		if ( Topic::modPermission( 'lock', NULL, $forum ) or
-			 Topic::modPermission( 'pin', NULL, $forum ) or
-			 Topic::modPermission( 'hide', NULL, $forum ) or
+		$canHide = ( \IPS\Member::loggedIn()->group['g_hide_own_posts'] == '1' or \in_array( 'IPS\forums\Topic', explode( ',', \IPS\Member::loggedIn()->group['g_hide_own_posts'] ) ) );
+		if ( \IPS\forums\Topic::modPermission( 'lock', NULL, $forum ) or
+			 \IPS\forums\Topic::modPermission( 'pin', NULL, $forum ) or
+			 \IPS\forums\Topic::modPermission( 'hide', NULL, $forum ) or
 			 $canHide or 
-			 Topic::modPermission( 'feature', NULL, $forum ) )
+			 \IPS\forums\Topic::modPermission( 'feature', NULL, $forum ) )
 		{
 			$hasModOptions = TRUE;
 		}
 		
-		$formTemplate = $form->customTemplate( array( Theme::i()->getTemplate( 'submit', 'forums' ), 'createTopicForm' ), $forum, $hasModOptions, NULL );
+		$formTemplate = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'submit', 'forums' ), 'createTopicForm' ), $forum, $hasModOptions, NULL );
 		
-		$guestPostBeforeRegister = ( !Member::loggedIn()->member_id ) ? !$forum->can( 'add', Member::loggedIn(), FALSE ) : FALSE;
-		$modQueued = Topic::moderateNewItems( Member::loggedIn(), $forum, $guestPostBeforeRegister );
+		$guestPostBeforeRegister = ( !\IPS\Member::loggedIn()->member_id ) ? !$forum->can( 'add', \IPS\Member::loggedIn(), FALSE ) : NULL;
+		$modQueued = \IPS\forums\Topic::moderateNewItems( \IPS\Member::loggedIn(), $forum, $guestPostBeforeRegister );
 		if ( $guestPostBeforeRegister or $modQueued )
 		{
-			$formTemplate = Theme::i()->getTemplate( 'forms', 'core' )->postingInformation( $guestPostBeforeRegister, $modQueued, TRUE ) . $formTemplate;
+			$formTemplate = \IPS\Theme::i()->getTemplate( 'forms', 'core' )->postingInformation( $guestPostBeforeRegister, $modQueued, TRUE ) . $formTemplate;
 		}
 
-		$title = 'create_new_topic';
+		$title = $forum->forums_bitoptions['bw_enable_answers'] ? 'ask_new_question' : 'create_new_topic';
 
 		/* Online User Location */
 		$permissions = $forum->permissions();
-		Session::i()->setLocation( $forum->url(), explode( ",", $permissions['perm_view'] ), 'loc_forums_creating_topic', array( "forums_forum_{$forum->id}" => TRUE ) );
+		\IPS\Session::i()->setLocation( $forum->url(), explode( ",", $permissions['perm_view'] ), 'loc_forums_creating_topic', array( "forums_forum_{$forum->id}" => TRUE ) );
 		
-		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->linkTags['canonical'] = (string) $forum->url()->setQueryString( 'do', 'add' );
-		Output::i()->output = Theme::i()->getTemplate( 'submit' )->createTopic( $formTemplate, $forum, $title );
-		Output::i()->title = Member::loggedIn()->language()->addToStack( $title );
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->linkTags['canonical'] = (string) $forum->url()->setQueryString( 'do', 'add' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'submit' )->createTopic( $formTemplate, $forum, $title );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( $title );
 		
 		if ( $club = $forum->club() )
 		{
-			FrontNavigation::$clubTabActive = TRUE;
-			Output::i()->breadcrumb = array();
-			Output::i()->breadcrumb[] = array( Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), Member::loggedIn()->language()->addToStack('module__core_clubs') );
-			Output::i()->breadcrumb[] = array( $club->url(), $club->name );
-			Output::i()->breadcrumb[] = array( $forum->url(), $forum->_title );
+			\IPS\core\FrontNavigation::$clubTabActive = TRUE;
+			\IPS\Output::i()->breadcrumb = array();
+			\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( 'app=core&module=clubs&controller=directory', 'front', 'clubs_list' ), \IPS\Member::loggedIn()->language()->addToStack('module__core_clubs') );
+			\IPS\Output::i()->breadcrumb[] = array( $club->url(), $club->name );
+			\IPS\Output::i()->breadcrumb[] = array( $forum->url(), $forum->_title );
 			
-			if ( Settings::i()->clubs_header == 'sidebar' )
+			if ( \IPS\Settings::i()->clubs_header == 'sidebar' )
 			{
-				Output::i()->sidebar['contextual'] = Theme::i()->getTemplate( 'clubs', 'core' )->header( $club, $forum, 'sidebar' );
+				\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate( 'clubs', 'core' )->header( $club, $forum, 'sidebar' );
 			}
 		}
-		elseif ( !ForumClass::theOnlyForum() )
+		elseif ( !\IPS\forums\Forum::theOnlyForum() )
 		{
 			try
 			{
 				foreach( $forum->parents() as $parent )
 				{
-					Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+					\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 				}
 			}
-			catch( UnderflowException $e ) {}
-			Output::i()->breadcrumb[] = array( $forum->url(), $forum->_title );
+			catch( \UnderflowException $e ) {}
+			\IPS\Output::i()->breadcrumb[] = array( $forum->url(), $forum->_title );
 		}
-		Output::i()->breadcrumb[] = array( NULL, Member::loggedIn()->language()->addToStack('create_new_topic' ) );
+		\IPS\Output::i()->breadcrumb[] = array( NULL, \IPS\Member::loggedIn()->language()->addToStack( ( $forum->forums_bitoptions['bw_enable_answers'] ) ? 'ask_new_question' : 'create_new_topic' ) );
 	}
 	
 	/**
@@ -705,7 +709,7 @@ class forums extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function createMenu() : void
+	protected function createMenu()
 	{
 		$this->_selectForum();
 	}
@@ -715,46 +719,70 @@ class forums extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function markRead() : void
+	protected function markRead()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
 		try
 		{
-			$forum		= ForumClass::load( Request::i()->id );
+			$forum		= \IPS\forums\Forum::load( \IPS\Request::i()->id );
 			$returnTo	= $forum;
 
-			if( Request::i()->return )
+			if( \IPS\Request::i()->return )
 			{
-				$returnTo	= ForumClass::load( Request::i()->return );
+				$returnTo	= \IPS\forums\Forum::load( \IPS\Request::i()->return );
 			}
 			
-			if ( Request::i()->fromForum )
+			if ( \IPS\Request::i()->fromForum )
 			{
-				Topic::markContainerRead( $forum, NULL, FALSE );
+				\IPS\forums\Topic::markContainerRead( $forum, NULL, FALSE );
 			}
 			else
 			{
-				Topic::markContainerRead( $forum );
+				\IPS\forums\Topic::markContainerRead( $forum );
 			}
 
-			Output::i()->redirect( ( Request::i()->return OR Request::i()->fromForum ) ? $returnTo->url() : Url::internal( 'app=forums&module=forums&controller=index', NULL, 'forums' ) );
+			\IPS\Output::i()->redirect( ( \IPS\Request::i()->return OR \IPS\Request::i()->fromForum ) ? $returnTo->url() : \IPS\Http\Url::internal( 'app=forums&module=forums&controller=index', NULL, 'forums' ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			Output::i()->error( 'no_module_permission', '2F173/3', 403, 'no_module_permission_guest' );
+			\IPS\Output::i()->error( 'no_module_permission', '2F173/3', 403, 'no_module_permission_guest' );
 		}
+	}
+	
+	/**
+	 * Set the viewing method
+	 *
+	 * @return	void
+	 */
+	protected function setMethod()
+	{
+		\IPS\Session::i()->csrfCheck();
+		
+		$method = ( isset( \IPS\Request::i()->method ) ) ? \IPS\Request::i()->method : \IPS\Settings::i()->forums_default_view;
+		
+		\IPS\Request::i()->setCookie( 'forum_list_view', $method, ( new \IPS\DateTime )->add( new \DateInterval( 'P1Y' ) ) );
+		
+		if ( \IPS\Member::loggedIn()->member_id )
+		{
+			\IPS\Db::i()->replace( 'forums_view_method', array( 'member_id' => \IPS\Member::loggedIn()->member_id, 'method' => $method, 'type' => 'list' ) );
+		}
+
+		if ( ! \IPS\Request::i()->id )
+		{
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=forums&module=forums&controller=index', 'front', 'forums' ) );
+		}
+		\IPS\Output::i()->redirect( \IPS\forums\Forum::load( \IPS\Request::i()->id )->url() );
 	}
 
 	/**
 	 * Populate the combined fluid view start modal form elements
-	 * @param array $nodes
-	 * @param array $disabled
-	 * @param ForumClass $node
+	 * @param $nodes
+	 * @param $disabled
+	 * @param $node
 	 * @param int $depth
-	 * @return void
 	 */
-	protected function _selectForumPopulate( array &$nodes, array &$disabled, ForumClass $node, int $depth = 0 ) : void
+	protected function _selectForumPopulate( &$nodes, &$disabled, $node, $depth = 0 )
 	{
 		if ( $node->can('view') )
 		{
@@ -777,32 +805,32 @@ class forums extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function _selectForum() : void
+	protected function _selectForum()
 	{
-		if( !ForumClass::canOnAny( 'add' ) )
+		if( !\IPS\forums\Forum::canOnAny( 'add' ) )
 		{
-			Output::i()->error( 'no_module_permission', '2F176/5', 403, 'no_module_permission_guest' );
+			\IPS\Output::i()->error( 'no_module_permission', '2F176/5', 403, 'no_module_permission_guest' );
 		}
 
-		$form = new Form( 'select_forum', 'continue' );
-		$form->class = 'ipsForm--vertical ipsForm--select-forum ipsForm--noLabels';
+		$form = new \IPS\Helpers\Form( 'select_forum', 'continue' );
+		$form->class = 'ipsForm_vertical ipsForm_noLabels';
 
-		if ( isset( Request::i()->root ) )
+		if ( isset( \IPS\Request::i()->root ) )
 		{
-			$root = ForumClass::load( Request::i()->root );
+			$root = \IPS\forums\Forum::load( \IPS\Request::i()->root );
 			$options = [];
 			$disabled = [];
 			$this->_selectForumPopulate( $options, $disabled, $root );
 
-			$form->add( new Select( 'forum', $root->id, TRUE, [
+			$form->add( new \IPS\Helpers\Form\Select( 'forum', $root->id, TRUE, [
 				'options' => $options,
 				'disabled' => $disabled
 			] ) );
 		}
 		else
 		{
-			$form->add( new Node( 'forum', NULL, TRUE, array(
-				'url' => Url::internal( 'app=forums&module=forums&controller=forums&do=createMenu' ),
+			$form->add( new \IPS\Helpers\Form\Node( 'forum', NULL, TRUE, array(
+				'url' => \IPS\Http\Url::internal( 'app=forums&module=forums&controller=forums&do=createMenu' ),
 				'class' => 'IPS\forums\Forum',
 				'permissionCheck' => function ( $node ) {
 					if ( $node->can( 'view' ) )
@@ -817,82 +845,25 @@ class forums extends Controller
 
 					return NULL;
 				},
-				'clubs' => Settings::i()->club_nodes_in_apps
+				'clubs' => \IPS\Settings::i()->club_nodes_in_apps
 			) ) );
 		}
 		if ( $values = $form->values() )
 		{
-			if ( is_numeric( $values['forum'] ) )
+			if ( \is_numeric( $values['forum'] ) )
 			{
-				$forum = ForumClass::load( $values['forum'] );
+				$forum = \IPS\forums\Forum::load( $values['forum'] );
 			}
 			else
 			{
 				$forum = $values['forum'];
 			}
 
-			Output::i()->redirect( $forum->url()->setQueryString( 'do', 'add' ) );
+			\IPS\Output::i()->redirect( $forum->url()->setQueryString( 'do', 'add' ) );
 		}
 		
-		Output::i()->title			= Member::loggedIn()->language()->addToStack( 'select_forum' );
-		Output::i()->breadcrumb[]	= array( NULL, Member::loggedIn()->language()->addToStack( 'select_forum' ) );
-		Output::i()->output		= Theme::i()->getTemplate( 'forums' )->forumSelector( $form );
-	}
-
-	/**
-	 * Delete
-	 *
-	 * @return	void
-	 */
-	protected function delete(): void
-	{
-		if( Application::appIsEnabled( 'cms' ) )
-		{
-			/* Load forum and verify that it is not used for comments */
-			/* @var ForumClass $nodeClass */
-			$nodeClass = $this->nodeClass;
-			if ( Request::i()->subnode )
-			{
-				$nodeClass = $nodeClass::$subnodeClass;
-			}
-
-			try
-			{
-				$node = $nodeClass::load( Request::i()->id );
-			}
-			catch (OutOfRangeException $e )
-			{
-				Output::i()->error( 'node_error', '2S101/J', 404, '' );
-			}
-
-			/* Is any database synced with this forum? */
-			if ( $db = $node->isUsedByCms() )
-			{
-				Member::loggedIn()->language()->words['cms_forum_used'] = sprintf( Member::loggedIn()->language()->get('cms_forum_used'), $db->recordWord( 1 ) );
-
-				Output::i()->error( 'cms_forum_used', '1T371/1', 403, '' );
-			}
-		}
-	}
-
-	/**
-	 * Toggle the forum view
-	 *
-	 * @return void
-	 */
-	protected function setMethod() : void
-	{
-		Session::i()->csrfCheck();
-
-		Member::loggedIn()->setLayoutValue( 'forums_topic', Request::i()->method );
-
-		try
-		{
-			Output::i()->redirect( ForumClass::load( Request::i()->id )->url() );
-		}
-		catch( OutOfRangeException )
-		{
-			Output::i()->error( 'node_error', '2F177/1', 404, '' );
-		}
+		\IPS\Output::i()->title			= \IPS\Member::loggedIn()->language()->addToStack( 'select_forum' );
+		\IPS\Output::i()->breadcrumb[]	= array( NULL, \IPS\Member::loggedIn()->language()->addToStack( 'select_forum' ) );
+		\IPS\Output::i()->output		= \IPS\Theme::i()->getTemplate( 'forums' )->forumSelector( $form );
 	}
 }

@@ -11,33 +11,9 @@
 namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application\Module;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Member\Club;
-use IPS\Member\Club\Template;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Output\UI\UiExtension;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_called_class;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -51,7 +27,7 @@ trait ClubContainer
 	 *
 	 * @return	string
 	 */
-	public static function clubIdColumn(): string
+	public static function clubIdColumn()
 	{
 		return 'club_id';
 	}
@@ -61,7 +37,7 @@ trait ClubContainer
 	 *
 	 * @return	string
 	 */
-	public static function clubFrontTitle(): string
+	public static function clubFrontTitle()
 	{
 		$itemClass = static::$contentItemClass;
 		return $itemClass::$title . '_pl';
@@ -72,21 +48,9 @@ trait ClubContainer
 	 *
 	 * @return	string
 	 */
-	public static function clubAcpTitle(): string
+	public static function clubAcpTitle()
 	{
 		return static::$nodeTitle;
-	}
-
-	/**
-	 * Check if the node can be added as a club feature
-	 * This was mainly implemented to handle the club categories,
-	 * which are based on database settings.
-	 *
-	 * @return bool
-	 */
-	public static function canBeAddedToClub() : bool
-	{
-		return true;
 	}
 	
 	/**
@@ -94,161 +58,97 @@ trait ClubContainer
 	 *
 	 * @return void
 	 */
-	public function clubCheckRules(): void
+	public function clubCheckRules()
 	{
-		if ( $club = $this->club() AND !$club->rulesAcknowledged() AND !Member::loggedIn()->modPermission( 'can_access_all_clubs' ) )
+		if ( $club = $this->club() AND !$club->rulesAcknowledged() AND !\IPS\Member::loggedIn()->modPermission( 'can_access_all_clubs' ) )
 		{
-			Output::i()->redirect( $club->url()->setQueryString( 'do', 'rules' )->addRef( Request::i()->url() ) );
+			\IPS\Output::i()->redirect( $club->url()->setQueryString( 'do', 'rules' )->addRef( \IPS\Request::i()->url() ) );
 		}
 	}
 	
 	/**
 	 * Get the associated club
 	 *
-	 * @return	Club|NULL
+	 * @return	\IPS\Member\Club|NULL
 	 */
-	public function club(): Club|NULL
+	public function club()
 	{
+		if ( \IPS\Settings::i()->clubs )
+		{
 			$clubIdColumn = $this->clubIdColumn();
 			if ( $this->$clubIdColumn )
 			{
 				try
 				{
-					return Club::load( $this->$clubIdColumn );
+					return \IPS\Member\Club::load( $this->$clubIdColumn );
 				}
-				catch ( OutOfRangeException $e ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
+		}
 		return NULL;
 	}
-
+		
 	/**
 	 * Set form for creating a node of this type in a club
 	 *
-	 * @param Form $form Form object
-	 * @param Club $club
-	 * @return    void
+	 * @param	\IPS\Helpers\Form	$form	Form object
+	 * @return	void
 	 */
-	public function clubForm( Form $form, Club $club ): void
+	public function clubForm( \IPS\Helpers\Form $form, \IPS\Member\Club $club )
 	{
-		$this->_clubForm( $form, $club );
-
-		/* Only do this if the form is still empty */
-		if( empty( $form->elements ) )
-		{
-			$itemClass = static::$contentItemClass;
-			$form->add( new Text( 'club_node_name', $this->_id ? $this->_title : Member::loggedIn()->language()->addToStack( static::clubFrontTitle() ), TRUE, array( 'maxLength' => 255 ) ) );
-		}
-
-		$form->add( new Radio( 'club_node_creators', $this->_id ? $this->creators() : null, false, [ 'options' => [ 0 => 'club_node_creators_0', 1 => 'club_node_creators_1' ] ] ) );
-
-		/* Now loop through and add all the elements to the form */
-		if( static::$canBeExtended )
-		{
-			foreach( UiExtension::i()->getObjectExtensions( $this ) as $extension )
-			{
-				foreach( $extension->clubFormElements( $this, $club ) as $element )
-				{
-					if( is_object( $element ) )
-					{
-						$form->add( $element );
-					}
-					else
-					{
-						$form->addHtml( $element );
-					}
-				}
-			}
-		}
-	}
-
-	/**
-	 * Class-specific method for each Model to implement
-	 *
-	 * @param Form $form
-	 * @param Club $club
-	 * @return void
-	 */
-	public function _clubForm( Form $form, Club $club ) : void
-	{
-		/* Intentionally blank */
+		$itemClass = static::$contentItemClass;
+		$form->add( new \IPS\Helpers\Form\Text( 'club_node_name', $this->_id ? $this->_title : \IPS\Member::loggedIn()->language()->addToStack( static::clubFrontTitle() ), TRUE, array( 'maxLength' => 255 ) ) );
 	}
 	
 	/**
 	 * Save club form
 	 *
-	 * @param	Club	$club	The club
+	 * @param	\IPS\Member\Club	$club	The club
 	 * @param	array				$values	Values
-	 * @param Template|null	$template
 	 * @return	void
 	 */
-	public function saveClubForm( Club $club, array $values, ?Template $template = null ): void
+	public function saveClubForm( \IPS\Member\Club $club, $values )
 	{
-		/* @var Model $nodeClass */
-		$nodeClass = get_called_class();
+		$nodeClass = \get_called_class();
 		$itemClass = $nodeClass::$contentItemClass;
-
-		$clubIdColumn = $this->clubIdColumn();
 		$haveId = (bool) $this->_id;
-
-		/* We want to make sure the club ID is set before we
-		run the _saveClubForm method */
-		if( !$haveId )
-		{
-			$this->$clubIdColumn = $club->id;
-		}
-
-		/* Loop through each extension and update the values; do this before we save */
-		if( static::$canBeExtended )
-		{
-			foreach( UiExtension::i()->getObjectExtensions( $this ) as $extension )
-			{
-				$values = $extension->processClubForm( $this, $club, $values );
-			}
-		}
-
+		
 		$this->_saveClubForm( $club, $values );
-
+		
 		$needToUpdatePermissions = FALSE;
 		
 		if ( !$haveId )
 		{
+			$clubIdColumn = $this->clubIdColumn();
+			$this->$clubIdColumn = $club->id;
 			$this->save();
-
-			Db::i()->insert( 'core_clubs_node_map', array(
+			\IPS\Db::i()->insert( 'core_clubs_node_map', array(
 				'club_id'		=> $club->id,
 				'node_class'	=> $nodeClass,
 				'node_id'		=> $this->_id,
 				'name'			=> $values['club_node_name'],
-				'public'		=> $values['club_node_public'] ?? Club::NODE_PRIVATE,
-				'creators'		=> $values['club_node_creators'] ?? 0,
-				'template_id'	=> $template ? $template->id : 0
+				'public'		=> ( isset( $values['club_node_public'] ) ) ? $values['club_node_public'] : 0
 			) );
 			
 			$needToUpdatePermissions = TRUE;
-
-			/* If auto-follow is enabled in the club, queue the task so all members will follow the node */
-			if( $this->auto_follow )
-			{
-				Task::queue( 'core', 'AutoFollowClubs', [ 'club' => $this->club()->id, 'node' => $nodeClass, 'nodeId' => $this->_id ], 3, [ 'club', 'node', 'nodeId' ] );
-			}
 		}
 		else
 		{
-			if( ( isset( $values['club_node_public'] ) and $values['club_node_public'] != $this->isPublic() ) or ( isset( $values['club_node_creators'] ) and $values['club_node_creators'] != $this->creators() ) )
+			if ( $this instanceof \IPS\cms\Categories )
+			{
+				$values['club_node_public'] = \intval( \in_array( 'member', explode( ',', $this->club_view_permission ) ) or \mb_strpos( '*', $this->club_view_permission ) !== false );
+			}
+			if( isset( $values['club_node_public'] ) AND $values['club_node_public'] != $this->isPublic() )
 			{
 				$needToUpdatePermissions = TRUE;
 			}
 			
 			$this->save();
-			Db::i()->update( 'core_clubs_node_map', array(
-				'name' => $values['club_node_name'],
-				'public' => isset( $values['club_node_public'] ) ? (int) $values['club_node_public'] : Club::NODE_PRIVATE,
-				'creators' => isset( $values['club_node_creators'] ) ? (int) $values['club_node_creators'] : 0
-			), array( 'club_id=? AND node_class=? AND node_id=?', $club->id, $nodeClass, $this->_id ) );
+			\IPS\Db::i()->update( 'core_clubs_node_map', array( 'name' => $values['club_node_name'], 'public' => isset( $values['club_node_public'] ) ? (int) $values['club_node_public'] : 0), array( 'club_id=? AND node_class=? AND node_id=?', $club->id, $nodeClass, $this->_id ) );
 		}
 		
-		Lang::saveCustom( $itemClass::$application, static::$titleLangPrefix . $this->_id, $values['club_node_name'] );
-		Lang::saveCustom( $itemClass::$application, static::$titleLangPrefix . $this->_id . '_desc', $values['club_node_description'] ?? '' );
+		\IPS\Lang::saveCustom( $itemClass::$application, static::$titleLangPrefix . $this->_id, $values['club_node_name'] );
+		\IPS\Lang::saveCustom( $itemClass::$application, static::$titleLangPrefix . $this->_id . '_desc', isset( $values['club_node_description'] ) ? $values['club_node_description'] : '' );
 		
 		if ( $needToUpdatePermissions )
 		{
@@ -257,28 +157,18 @@ trait ClubContainer
 
 		if ( !$haveId )
 		{
-			/* @var string $nodeClass */
 			$followApp = $itemClass::$application;
 			$followArea = mb_strtolower( mb_substr( $nodeClass, mb_strrpos( $nodeClass, '\\' ) + 1 ) );
 			$time = time();
 			$follows = array();
-			foreach( Db::i()->select( "MD5( CONCAT( '{$followApp};{$followArea};{$this->_id};', follow_member_id ) ) AS follow_id, '{$followApp}' AS follow_app, '{$followArea}' AS follow_area, '{$this->_id}' AS follow_rel_id, follow_member_id, follow_is_anon, '{$time}' AS follow_added, follow_notify_do, follow_notify_meta, follow_notify_freq, 0 AS follow_notify_sent, follow_visible", 'core_follow', array(	'follow_app=? AND follow_area=? AND follow_rel_id=?', 'core', 'club', $club->id ) ) AS $follow )
+			foreach( \IPS\Db::i()->select( "MD5( CONCAT( '{$followApp};{$followArea};{$this->_id};', follow_member_id ) ) AS follow_id, '{$followApp}' AS follow_app, '{$followArea}' AS follow_area, '{$this->_id}' AS follow_rel_id, follow_member_id, follow_is_anon, '{$time}' AS follow_added, follow_notify_do, follow_notify_meta, follow_notify_freq, 0 AS follow_notify_sent, follow_visible", 'core_follow', array(	'follow_app=? AND follow_area=? AND follow_rel_id=?', 'core', 'club', $club->id ) ) AS $follow )
 			{
 				$follows[] = $follow;
 			}
 
-			if ( count( $follows ) )
+			if ( \count( $follows ) )
 			{
-				Db::i()->insert( 'core_follow', $follows );
-			}
-		}
-
-		/* At the very end, call the post-save in extensions */
-		if( static::$canBeExtended )
-		{
-			foreach( UiExtension::i()->getObjectExtensions( $this ) as $extension )
-			{
-				$values = $extension->clubFormPostSave( $this, $club, $values );
+				\IPS\Db::i()->insert( 'core_follow', $follows );
 			}
 		}
 	}
@@ -286,11 +176,11 @@ trait ClubContainer
 	/**
 	 * Class-specific routine when saving club form
 	 *
-	 * @param	Club	$club	The club
+	 * @param	\IPS\Member\Club	$club	The club
 	 * @param	array				$values	Values
 	 * @return	void
 	 */
-	public function _saveClubForm( Club $club, array $values ): void
+	public function _saveClubForm( \IPS\Member\Club $club, $values )
 	{
 		// Deliberately does nothing so classes can override
 	}
@@ -298,19 +188,19 @@ trait ClubContainer
 	/**
 	 * Set the permission index permissions to a specific club
 	 *
-	 * @param	Club	$club	The club
+	 * @param	\IPS\Member\Club	$club	The club
 	 * @return  void
 	 */
-	public function setPermissionsToClub( Club $club ): void
+	public function setPermissionsToClub( \IPS\Member\Club $club )
 	{
 		/* Delete current rows */
-		Db::i()->delete( 'core_permission_index', array( 'app=? AND perm_type=? AND perm_type_id=?', static::$permApp, static::$permType, $this->_id ) );
+		\IPS\Db::i()->delete( 'core_permission_index', array( 'app=? AND perm_type=? AND perm_type_id=?', static::$permApp, static::$permType, $this->_id ) );
 
 		/* Build new rows */
 		$insert = array( 'app' => static::$permApp, 'perm_type' => static::$permType, 'perm_type_id' => $this->_id );
 		foreach ( static::$permissionMap as $k => $v )
 		{
-			if ( in_array( $k, array( 'view', 'read' ) ) )
+			if ( \in_array( $k, array( 'view', 'read' ) ) )
 			{
 				switch ( $club->type )
 				{
@@ -320,46 +210,28 @@ trait ClubContainer
 						$insert[ 'perm_' . $v ] = '*';
 						break;					
 					case $club::TYPE_CLOSED:
-						switch( $this->isPublic() )
-						{
-							case Club::NODE_PRIVATE:
-								$insert['perm_' . $v ] = "cm,c{$club->id}";
-								break;
-							case Club::NODE_PUBLIC:
-								$insert['perm_' . $v ] = '*';
-								break;
-							case Club::NODE_MODERATORS:
-								$insert['perm_' . $v ] = 'cm';
-								break;
-						}
+						$insert[ 'perm_' . $v ] = ( $this->isPublic() ) ? "*" : "cm,c{$club->id}";						
 						break;
 					case $club::TYPE_PRIVATE:
-						$insert[ 'perm_' . $v ] = ( $this->isPublic() == Club::NODE_MODERATORS ) ? "cm" : "cm,c{$club->id}";
+						$insert[ 'perm_' . $v ] = "cm,c{$club->id}";
 						break;
 				}
 			}
-			elseif ( in_array( $k, array( 'add', 'edit', 'reply', 'review' ) ) )
+			elseif ( \in_array( $k, array( 'add', 'edit', 'reply', 'review' ) ) )
 			{
-				if( in_array( $k, [ 'add', 'edit' ] ) and $this->creators() == 1 )
+				switch ( $club->type )
 				{
-					$insert[ 'perm_' . $v ] = 'cm';
-				}
-				else
-				{
-					switch ( $club->type )
-					{
-						case $club::TYPE_PUBLIC:
-							$insert[ 'perm_' . $v ] = 'ca';
-							break;
-						case $club::TYPE_CLOSED:
-							$insert[ 'perm_' . $v ] = ( $this->isPublic() == 2 ) ? "*" : "cm,c{$club->id}";
-							break;
-						case $club::TYPE_OPEN:
-						case $club::TYPE_PRIVATE:
-						case $club::TYPE_READONLY:
-							$insert[ 'perm_' . $v ] = "cm,c{$club->id}";
-							break;
-					}
+					case $club::TYPE_PUBLIC:
+						$insert[ 'perm_' . $v ] = 'ca';
+						break;
+					case $club::TYPE_CLOSED:
+						$insert[ 'perm_' . $v ] = ( $this->isPublic() == 2 ) ? "*" : "cm,c{$club->id}";
+						break;
+					case $club::TYPE_OPEN:
+					case $club::TYPE_PRIVATE:
+					case $club::TYPE_READONLY:
+						$insert[ 'perm_' . $v ] = "cm,c{$club->id}";
+						break;
 				}
 			}
 			else
@@ -381,12 +253,12 @@ trait ClubContainer
 		}
 
 		/* Insert */
-		$permId = Db::i()->insert( 'core_permission_index', $insert );
+		$permId = \IPS\Db::i()->insert( 'core_permission_index', $insert );
 		
 		/* Update tags permission cache */
 		if ( isset( static::$permissionMap['read'] ) )
 		{
-			Db::i()->update( 'core_tags_perms', array( 'tag_perm_text' => $insert[ 'perm_' . static::$permissionMap['read'] ] ), array( 'tag_perm_aap_lookup=?', md5( static::$permApp . ';' . static::$permType . ';' . $this->_id ) ) );
+			\IPS\Db::i()->update( 'core_tags_perms', array( 'tag_perm_text' => $insert[ 'perm_' . static::$permissionMap['read'] ] ), array( 'tag_perm_aap_lookup=?', md5( static::$permApp . ';' . static::$permType . ';' . $this->_id ) ) );
 		}
 
 		/* Make sure this object resets the permissions internally */
@@ -400,18 +272,18 @@ trait ClubContainer
 	 * Fetch All Root Nodes
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULL to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	mixed				$where				Additional WHERE clause
 	 * @param	array|NULL			$limit				Limit/offset to use, or NULL for no limit (default)
 	 * @return	array
 	 */
-	public static function rootsWithClubs( ?string $permissionCheck='view', Member $member=NULL, mixed $where=array(), array|null $limit=NULL ): array
+	public static function rootsWithClubs( $permissionCheck='view', $member=NULL, $where=array(), $limit=NULL )
 	{
 		/* Will we need to check permissions? */
-		$usingPermssions = ( in_array( 'IPS\Node\Permissions', class_implements( get_called_class() ) ) and $permissionCheck !== NULL );
+		$usingPermssions = ( \in_array( 'IPS\Node\Permissions', class_implements( \get_called_class() ) ) and $permissionCheck !== NULL );
 		if ( $usingPermssions )
 		{
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
 		}
 
 		if( static::$databaseColumnParent !== NULL )
@@ -432,17 +304,17 @@ trait ClubContainer
 	/**
 	 * @brief	Cached club nodes
 	 */
-	protected static array|null $cachedClubNodes = NULL;
+	protected static $cachedClubNodes = NULL;
 	
 	/**
 	 * Fetch All Nodes in Clubs
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	mixed				$where				Additional WHERE clause
 	 * @return	array
 	 */
-	public static function clubNodes( string|null $permissionCheck='view', Member|null $member=NULL, mixed $where=array() ): array
+	public static function clubNodes( $permissionCheck='view', $member=NULL, $where=array() )
 	{
 		if( static::$cachedClubNodes === NULL )
 		{
@@ -450,11 +322,21 @@ trait ClubContainer
 
 			$where[] = array( static::$databasePrefix . $clubIdColumn . ' IS NOT NULL' );
 			
-			$member = $member ?: Member::loggedIn();
+			$member = $member ?: \IPS\Member::loggedIn();
 
-			if( $member->canAccessModule( Module::get( 'core', 'clubs', 'front' ) ) )
+			if( $member->canAccessModule( \IPS\Application\Module::get( 'core', 'clubs', 'front' ) ) )
 			{
-				static::$cachedClubNodes = static::nodesWithPermission( $permissionCheck, $member, $where );
+				/* nodesWithPermission joins on the permissions table, which is not used for club categories */
+				$nodes = [];
+				foreach( static::nodesWithPermission( $permissionCheck, $member, $where ) as $node )
+				{
+					if( !( $node instanceof \IPS\cms\Categories ) or ( $permissionCheck AND $node->can( $permissionCheck ) ) )
+					{
+						$nodes[] = $node;
+					}
+				}
+
+				static::$cachedClubNodes = $nodes;
 			}
 			else
 			{
@@ -466,17 +348,14 @@ trait ClubContainer
 
 			foreach( static::$cachedClubNodes as $node )
 			{
-				if ( $node->$clubIdColumn )
-				{
-					$clubIds[] = $node->$clubIdColumn;
-				}
+				$clubIds[] = $node->$clubIdColumn;
 			}
 
-			if( count( $clubIds ) )
+			if( \count( $clubIds ) )
 			{
-				foreach( Db::i()->select( '*', 'core_clubs', array( 'id IN(' . implode( ',', $clubIds ) . ')' ) ) as $clubData )
+				foreach( \IPS\Db::i()->select( '*', 'core_clubs', array( 'id IN(' . implode( ',', $clubIds ) . ')' ) ) as $clubData )
 				{
-					Club::constructFromData( $clubData );
+					\IPS\Member\Club::constructFromData( $clubData );
 				}
 			}
 		}
@@ -487,14 +366,14 @@ trait ClubContainer
 	/**
 	 * Check Moderator Permission
 	 *
-	 * @param string $type		'edit', 'hide', 'unhide', 'delete', etc.
-	 * @param	Member|NULL			$member		The member to check for or NULL for the currently logged in member
-	 * @param string $class		The class to check against
+	 * @param	string						$type		'edit', 'hide', 'unhide', 'delete', etc.
+	 * @param	\IPS\Member|NULL			$member		The member to check for or NULL for the currently logged in member
+	 * @param	string						$class		The class to check against
 	 * @return	bool
 	 */
-	public function clubContainerPermission( string $type, Member|null $member, string $class ): bool
+	public function modPermission( $type, \IPS\Member $member, $class )
 	{
-		if ( Settings::i()->clubs )
+		if ( \IPS\Settings::i()->clubs )
 		{
 			$clubIdColumn	= $this->clubIdColumn();
 			
@@ -503,16 +382,16 @@ trait ClubContainer
 
 			if ( $this->$clubIdColumn and $club = $this->club() )
 			{
-				if ( in_array( $club->memberStatus( $member ), array( Club::STATUS_LEADER, Club::STATUS_MODERATOR ) ) )
+				if ( \in_array( $club->memberStatus( $member ), array( \IPS\Member\Club::STATUS_LEADER, \IPS\Member\Club::STATUS_MODERATOR ) ) )
 				{
-					if ( in_array( $type, explode( ',', Settings::i()->clubs_modperms ) ) )
+					if ( \in_array( $type, explode( ',', \IPS\Settings::i()->clubs_modperms ) ) )
 					{
 						return TRUE;
 					}
 				}
-				elseif ( $member->modPermission( "can_{$type}_{$title}" ) and ( is_array( $member->modPermission( static::$modPerm ) ) or $member->modPermission( static::$modPerm ) === true ) and $member->modPermission('can_access_all_clubs') )
+				elseif ( $member->modPermission( "can_{$type}_{$title}" ) and \is_array( $member->modPermission( static::$modPerm ) ) and $member->modPermission('can_access_all_clubs') )
 				{
-					if ( in_array( $type, explode( ',', Settings::i()->clubs_modperms ) ) )
+					if ( \in_array( $type, explode( ',', \IPS\Settings::i()->clubs_modperms ) ) )
 					{
 						return TRUE;
 					}
@@ -520,7 +399,27 @@ trait ClubContainer
 			}		
 		}
 
-		return false;
+		return parent::modPermission( $type, $member, $class );
+	}
+		
+	/**
+	 * [Node] Get parent list
+	 *
+	 * @return	\SplStack
+	 */
+	public function parents()
+	{
+		$clubIdColumn = static::clubIdColumn();
+		
+		/* Only do this if this node is actually associated with a club */
+		if ( $this->$clubIdColumn )
+		{
+			return new \SplStack;
+		}
+		else
+		{
+			return parent::parents();
+		}
 	}
 	
 	/**
@@ -528,65 +427,15 @@ trait ClubContainer
 	 *
 	 * @return	int 0 = not public, 1 = anyone can view, 2 = anyone can participate
 	 */
-	public function isPublic(): int
+	public function isPublic()
 	{
 		try
 		{
-			return (int) Db::i()->select( 'public', 'core_clubs_node_map', array( 'club_id=? AND node_class=? AND node_id=?', $this->club()->id, get_called_class(), $this->_id ) )->first();
+			return (int) \IPS\Db::i()->select( 'public', 'core_clubs_node_map', array( 'club_id=? AND node_class=? AND node_id=?', $this->club()->id, \get_called_class(), $this->_id ) )->first();
 		}
-		catch ( UnderflowException $e )
-		{
-			return Club::NODE_PRIVATE;
-		}
-	}
-
-	/**
-	 * Who can create content in this node?
-	 *
-	 * @return int
-	 */
-	public function creators() : int
-	{
-		try
-		{
-			return (int) Db::i()->select( 'creators', 'core_clubs_node_map', array( 'club_id=? AND node_class=? AND node_id=?', $this->club()->id, get_called_class(), $this->_id ) )->first();
-		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return 0;
 		}
-	}
-
-	/**
-	 * @return Template|null
-	 */
-	public function template() : ?Template
-	{
-		try
-		{
-			$templateId = Db::i()->select( 'template_id', 'core_clubs_node_map', [ 'node_class=? and node_id=?', get_called_class(), $this->_id ] )->first();
-			return Template::load( $templateId );
-		}
-		catch( UnderflowException | OutOfRangeException ){}
-
-		return null;
-	}
-
-	/**
-	 * Determines if the club leader can manage this node
-	 *
-	 * @return bool
-	 */
-	public function canLeaderManage() : bool
-	{
-		if( $template = $this->template() )
-		{
-			if( array_key_exists( 'clubtemplates_leader_edit', $template->node_data ) )
-			{
-				return $template->node_data['clubtemplates_leader_edit'];
-			}
-		}
-
-		return true;
 	}
 }

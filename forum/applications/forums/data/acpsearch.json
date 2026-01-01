@@ -9,22 +9,144 @@
             "forums"
         ]
     },
-    "app=forums&module=forums&controller=forums&do=form&searchResult=forum_solved_mode": {
-        "lang_key": "forum_solved_mode",
+    "app=forums&module=forums&controller=forums&do=form&searchResult=bw_enable_answers__member": {
+        "lang_key": "bw_enable_answers__member",
         "restriction": "forums_manage",
         "keywords": [
-            "answer",
-            "helpful",
-            "solution",
-            "support"
+            "solved"
         ]
     },
-    "app=forums&module=forums&controller=forums&searchResult=form_new_allow_anonymous": {
+    "app=forums&module=forums&controller=forums&do=form&searchResult=forum_best_answer": {
+        "lang_key": "bw_enable_answers_moderator",
+        "restriction": "forums_manage",
+        "keywords": [
+            "solution",
+            "solved"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=bw_disable_prefixes": {
+        "lang_key": "bw_disable_prefixes",
+        "restriction": "forums_manage",
+        "keywords": [
+            "can set",
+            "can set tag prefixes",
+            "tag prefixes"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=bw_disable_tagging": {
+        "lang_key": "bw_disable_tagging",
+        "restriction": "forums_manage",
+        "keywords": [
+            "can use tags",
+            "tags",
+            "use tags"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_1_forum_description": {
+        "lang_key": "forum_description",
+        "restriction": "forums_manage",
+        "keywords": [
+            "category description",
+            "forum description"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_1_forum_name": {
+        "lang_key": "forum_name",
+        "restriction": "forums_manage",
+        "keywords": [
+            "category name",
+            "forum name"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_1_forum_parent_id": {
+        "lang_key": "forum_parent_id",
+        "restriction": "forums_manage",
+        "keywords": [
+            "parent",
+            "parent forum"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_1_forum_type": {
+        "lang_key": "forum_type",
+        "restriction": "forums_manage",
+        "keywords": [
+            "category type",
+            "discussions",
+            "questions",
+            "redirect"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_2_allow_anonymous": {
         "lang_key": "allow_anonymous",
         "restriction": "forums_manage",
         "keywords": [
             "anonymous",
             "anonymously"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_2_forum_allow_poll": {
+        "lang_key": "forum_allow_poll",
+        "restriction": "forums_manage",
+        "keywords": [
+            "allow polls",
+            "polls"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_2_forum_description": {
+        "lang_key": "forum_description",
+        "restriction": "forums_manage",
+        "keywords": [
+            "forum description"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_2_forum_inc_postcount": {
+        "lang_key": "forum_inc_postcount",
+        "restriction": "forums_manage",
+        "keywords": [
+            "increase content",
+            "increase content counts",
+            "increase counts"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_2_forum_min_posts_post": {
+        "lang_key": "forum_min_posts_post",
+        "restriction": "forums_manage",
+        "keywords": [
+            "minimum content count",
+            "minimum count"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_2_forum_name": {
+        "lang_key": "forum_name",
+        "restriction": "forums_manage",
+        "keywords": [
+            "forum name"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_2_forum_parent_id": {
+        "lang_key": "forum_parent_id",
+        "restriction": "forums_manage",
+        "keywords": [
+            "parent",
+            "parent forum"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_2_forum_show_rules": {
+        "lang_key": "forum_show_rules",
+        "restriction": "forums_manage",
+        "keywords": [
+            "rules",
+            "show rules"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_2_forum_type": {
+        "lang_key": "forum_type",
+        "restriction": "forums_manage",
+        "keywords": [
+            "category",
+            "forum type",
+            "questions",
+            "redirect"
         ]
     },
     "app=forums&module=forums&controller=forums&searchResult=form_new_forum_allow_poll": {
@@ -50,6 +172,14 @@
             "content counts",
             "increase content",
             "increase content counts"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=form_new_forum_min_posts_post": {
+        "lang_key": "forum_min_posts_post",
+        "restriction": "forums_manage",
+        "keywords": [
+            "count post",
+            "minimum content count"
         ]
     },
     "app=forums&module=forums&controller=forums&searchResult=form_new_forum_name": {
@@ -86,8 +216,17 @@
             "redirect"
         ]
     },
+    "app=forums&module=forums&controller=forums&searchResult=forum_allow_rating": {
+        "lang_key": "forum_forum_allow_rating",
+        "restriction": "forums_manage",
+        "keywords": [
+            "enable star",
+            "star",
+            "star ratings"
+        ]
+    },
     "app=forums&module=forums&controller=forums&searchResult=forum_best_answer": {
-        "lang_key": "bw_solved_set_by_moderator",
+        "lang_key": "bw_enable_answers_moderator",
         "restriction": "forums_manage",
         "keywords": [
             "answer",
@@ -113,8 +252,8 @@
             "sharing"
         ]
     },
-    "app=forums&module=forums&controller=forums&searchResult=forum_icon_choose": {
-        "lang_key": "forum_icon_choose",
+    "app=forums&module=forums&controller=forums&searchResult=forum_icon": {
+        "lang_key": "forum_icon",
         "restriction": "forums_manage",
         "keywords": [
             "forum icon",
@@ -126,6 +265,15 @@
         "restriction": "forums_manage",
         "keywords": [
             "sitemap priority"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&searchResult=forum_min_posts_view": {
+        "lang_key": "forum_min_posts_view",
+        "restriction": "forums_manage",
+        "keywords": [
+            "minimum content",
+            "minimum count",
+            "see forums"
         ]
     },
     "app=forums&module=forums&controller=forums&searchResult=forum_password_on": {
@@ -171,6 +319,190 @@
             "sort order"
         ]
     },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=bw_disable_prefixes": {
+        "lang_key": "bw_disable_prefixes",
+        "restriction": "forums_manage",
+        "keywords": [
+            "can set tag prefixes",
+            "prefixes",
+            "set prefixes"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=bw_disable_tagging": {
+        "lang_key": "bw_disable_tagging",
+        "restriction": "forums_manage",
+        "keywords": [
+            "can use tags",
+            "tags",
+            "use tags"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=form_new_forum_allow_poll": {
+        "lang_key": "forum_allow_poll",
+        "restriction": "forums_manage",
+        "keywords": [
+            "allow polls",
+            "polls"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=form_new_forum_description": {
+        "lang_key": "forum_description",
+        "restriction": "forums_manage",
+        "keywords": [
+            "forum description"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=form_new_forum_inc_postcount": {
+        "lang_key": "forum_inc_postcount",
+        "restriction": "forums_manage",
+        "keywords": [
+            "content counts",
+            "increase content",
+            "increase content counts",
+            "increase counts"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=form_new_forum_min_posts_post": {
+        "lang_key": "forum_min_posts_post",
+        "restriction": "forums_manage",
+        "keywords": [
+            "content count post",
+            "minimum content count post",
+            "minimum count",
+            "minimum post"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=form_new_forum_name": {
+        "lang_key": "forum_name",
+        "restriction": "forums_manage",
+        "keywords": [
+            "forum name"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=form_new_forum_parent_id": {
+        "lang_key": "forum_parent_id",
+        "restriction": "forums_manage",
+        "keywords": [
+            "parent",
+            "parent forum"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=form_new_forum_show_rules": {
+        "lang_key": "forum_show_rules",
+        "restriction": "forums_manage",
+        "keywords": [
+            "show rules"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=form_new_forum_type": {
+        "lang_key": "forum_type",
+        "restriction": "forums_manage",
+        "keywords": [
+            "categories",
+            "discussions",
+            "forum type",
+            "questions",
+            "redirect"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_allow_rating": {
+        "lang_key": "forum_forum_allow_rating",
+        "restriction": "forums_manage",
+        "keywords": [
+            "enable ratings",
+            "enable star ratings",
+            "star ratings"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_can_view_others": {
+        "lang_key": "forum_can_view_others",
+        "restriction": "forums_manage",
+        "keywords": [
+            "other users",
+            "see topics"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_disable_sharelinks": {
+        "lang_key": "forum_disable_sharelinks",
+        "restriction": "forums_manage",
+        "keywords": [
+            "enable sharing",
+            "sharing"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_icon": {
+        "lang_key": "forum_icon",
+        "restriction": "forums_manage",
+        "keywords": [
+            "forum icon",
+            "icon"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_ipseo_priority": {
+        "lang_key": "forum_ipseo_priority",
+        "restriction": "forums_manage",
+        "keywords": [
+            "priority",
+            "sitemap",
+            "sitemap priority"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_min_posts_view": {
+        "lang_key": "forum_min_posts_view",
+        "restriction": "forums_manage",
+        "keywords": [
+            "content count",
+            "minimum content",
+            "minimum content count",
+            "minimum count"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_password_on": {
+        "lang_key": "forum_password_on",
+        "restriction": "forums_manage",
+        "keywords": [
+            "forum password",
+            "password",
+            "protected"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_permission_custom_error": {
+        "lang_key": "forum_permission_custom_error",
+        "restriction": "forums_manage",
+        "keywords": [
+            "custom error",
+            "custom permission error",
+            "permission error"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_permission_showtopic": {
+        "lang_key": "forum_permission_showtopic",
+        "restriction": "forums_manage",
+        "keywords": [
+            "read permissions",
+            "users without",
+            "users without read permissions",
+            "without permissions"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_preview_posts": {
+        "lang_key": "forum_preview_posts",
+        "restriction": "forums_manage",
+        "keywords": [
+            "must approved",
+            "posts approved",
+            "posts must approved"
+        ]
+    },
+    "app=forums&module=forums&controller=forums&subnode=0&parent=2&searchResult=forum_sort_key": {
+        "lang_key": "forum_sort_key",
+        "restriction": "forums_manage",
+        "keywords": [
+            "default sort",
+            "default sort order",
+            "sort order"
+        ]
+    },
     "app=forums&module=forums&controller=savedActions": {
         "lang_key": "menu__forums_forums_savedActions",
         "restriction": "savedActions_manage",
@@ -180,8 +512,80 @@
             "saved actions"
         ]
     },
+    "app=forums&module=forums&controller=savedActions&searchResult=form_1_mm_forums": {
+        "lang_key": "mm_forums",
+        "restriction": "savedActions_manage",
+        "keywords": [
+            "multimod forums",
+            "settings forums"
+        ]
+    },
+    "app=forums&module=forums&controller=savedActions&searchResult=form_1_mm_title": {
+        "lang_key": "mm_title",
+        "restriction": "savedActions_manage",
+        "keywords": [
+            "multimod name",
+            "name",
+            "settings name"
+        ]
+    },
+    "app=forums&module=forums&controller=savedActions&searchResult=form_1_topic_approve": {
+        "lang_key": "topic_approve",
+        "restriction": "savedActions_manage",
+        "keywords": [
+            "hide",
+            "unhide"
+        ]
+    },
+    "app=forums&module=forums&controller=savedActions&searchResult=form_1_topic_move": {
+        "lang_key": "topic_move",
+        "restriction": "savedActions_manage",
+        "keywords": [
+            "move"
+        ]
+    },
+    "app=forums&module=forums&controller=savedActions&searchResult=form_1_topic_pin": {
+        "lang_key": "topic_pin",
+        "restriction": "savedActions_manage",
+        "keywords": [
+            "pin",
+            "unpin"
+        ]
+    },
+    "app=forums&module=forums&controller=savedActions&searchResult=form_1_topic_reply": {
+        "lang_key": "topic_reply",
+        "restriction": "savedActions_manage",
+        "keywords": [
+            "add reply",
+            "reply"
+        ]
+    },
+    "app=forums&module=forums&controller=savedActions&searchResult=form_1_topic_state": {
+        "lang_key": "topic_state",
+        "restriction": "savedActions_manage",
+        "keywords": [
+            "lock",
+            "unlock"
+        ]
+    },
+    "app=forums&module=forums&controller=savedActions&searchResult=form_1_topic_title_end": {
+        "lang_key": "topic_title_end",
+        "restriction": "savedActions_manage",
+        "keywords": [
+            "add end",
+            "end title"
+        ]
+    },
+    "app=forums&module=forums&controller=savedActions&searchResult=form_1_topic_title_st": {
+        "lang_key": "topic_title_st",
+        "restriction": "savedActions_manage",
+        "keywords": [
+            "add start",
+            "start title"
+        ]
+    },
     "app=forums&module=forums&controller=savedActions&searchResult=form_new_mm_forums": {
-        "lang_key": "acpsearch__mm_forums",
+        "lang_key": "mm_forums",
         "restriction": "savedActions_manage",
         "keywords": [
             "actions forums",
@@ -189,7 +593,7 @@
         ]
     },
     "app=forums&module=forums&controller=savedActions&searchResult=form_new_mm_title": {
-        "lang_key": "acpsearch__mm_title",
+        "lang_key": "mm_title",
         "restriction": "savedActions_manage",
         "keywords": [
             "actions name",
@@ -218,7 +622,7 @@
         "lang_key": "topic_pin",
         "restriction": "savedActions_manage",
         "keywords": [
-            "pin topic",
+            " pin topic",
             "properties",
             "unpin topic"
         ]
@@ -265,13 +669,39 @@
             "forum settings"
         ]
     },
-    "app=forums&module=forums&controller=settings&searchResult=form_forums_helpful_highlight": {
-        "lang_key": "forums_helpful_highlight",
+    "app=forums&module=forums&controller=settings&searchResult=form_forums_answers_downvote": {
+        "lang_key": "forums_answers_downvote",
         "restriction": "settings_access",
         "keywords": [
-            "helpful",
-            "solution",
-            "solved"
+            "answers",
+            "questions"
+        ]
+    },
+    "app=forums&module=forums&controller=settings&searchResult=form_forums_default_view": {
+        "lang_key": "forums_default_view",
+        "restriction": "settings_access",
+        "keywords": [
+            "fluid",
+            "grid",
+            "mode",
+            "table",
+            "view"
+        ]
+    },
+    "app=forums&module=forums&controller=settings&searchResult=form_forums_new_questions": {
+        "lang_key": "forums_new_questions",
+        "restriction": "settings_access",
+        "keywords": [
+            "answers",
+            "questions"
+        ]
+    },
+    "app=forums&module=forums&controller=settings&searchResult=form_forums_popular_now": {
+        "lang_key": "forums_popular_now",
+        "restriction": "settings_access",
+        "keywords": [
+            "hot",
+            "popular"
         ]
     },
     "app=forums&module=forums&controller=settings&searchResult=form_forums_posts_per_page": {
@@ -281,11 +711,28 @@
             "posts per page"
         ]
     },
+    "app=forums&module=forums&controller=settings&searchResult=form_forums_questions_downvote": {
+        "lang_key": "forums_questions_downvote",
+        "restriction": "settings_access",
+        "keywords": [
+            "answers",
+            "questions"
+        ]
+    },
     "app=forums&module=forums&controller=settings&searchResult=form_forums_rss": {
         "lang_key": "forums_rss",
         "restriction": "settings_access",
         "keywords": [
             "rss export"
+        ]
+    },
+    "app=forums&module=forums&controller=settings&searchResult=form_forums_solved_topic_reengage": {
+        "lang_key": "forums_solved_topic_reengage",
+        "restriction": "settings_access",
+        "keywords": [
+            "email",
+            "notification",
+            "solved"
         ]
     },
     "app=forums&module=forums&controller=settings&searchResult=form_forums_topic_activity": {
@@ -295,7 +742,7 @@
             "desktop",
             "topic",
             "topic activity",
-            "topic overview"
+            "topic summary"
         ]
     },
     "app=forums&module=forums&controller=settings&searchResult=form_forums_topic_activity_features": {
@@ -304,7 +751,7 @@
         "keywords": [
             "attachments",
             "top post",
-            "topic overview"
+            "topic summary"
         ]
     },
     "app=forums&module=forums&controller=settings&searchResult=form_forums_topics_show_meta": {
@@ -321,7 +768,7 @@
         "keywords": [
             "desktop",
             "tablet",
-            "topic overview"
+            "topic summary"
         ]
     },
     "app=forums&module=forums&controller=settings&tab=archiving": {
@@ -350,8 +797,7 @@
         "lang_key": "forums_solved_topic_reengage",
         "restriction": "settings_access",
         "keywords": [
-            "email",
-            "notification",
+            "notifications",
             "solved"
         ]
     },
@@ -410,23 +856,6 @@
             "new topic stats",
             "topic statistics",
             "topic stats"
-        ]
-    },
-    "app=forums&module=stats&controller=solvers": {
-        "lang_key": "menu__forums_stats_solvers",
-        "restriction": "topics_manage",
-        "keywords": [
-            "solve",
-            "forum",
-            "solution"
-        ]
-    },
-    "app=forums&module=forums&controller=settings&tab=autolock": {
-        "lang_key": "autolock",
-        "restriction": "autolock_settings",
-        "keywords": [
-            "autolock",
-            "lock"
         ]
     }
 }

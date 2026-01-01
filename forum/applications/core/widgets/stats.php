@@ -11,53 +11,44 @@
 namespace IPS\core\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Member;
-use IPS\Session\Store;
-use IPS\Settings;
-use IPS\Widget;
-use IPS\Widget\StaticCache;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Stats Widget
  */
-class stats extends StaticCache
+class _stats extends \IPS\Widget\StaticCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'stats';
+	public $key = 'stats';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'core';
+	public $app = 'core';
 	
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	Form|NULL	$form	Form helper
-	 * @return	Form
+	 * @param	\IPS\Helpers\Form|NULL	$form	Form helper
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
  	{
 		$form = parent::configuration( $form );
 
-		$mostOnline = json_decode( Settings::i()->most_online, TRUE );
-		$form->add( new Number( 'stats_most_online', $mostOnline['count'], TRUE ) );
+		$mostOnline = json_decode( \IPS\Settings::i()->most_online, TRUE );
+		$form->add( new \IPS\Helpers\Form\Number( 'stats_most_online', $mostOnline['count'], TRUE ) );
 		
 		return $form;
  	}
@@ -68,16 +59,16 @@ class stats extends StaticCache
  	 * @param	array	$values	Values from form
  	 * @return	array
  	 */
- 	public function preConfig( array $values ): array
+ 	public function preConfig( $values )
  	{
- 		if ( Member::loggedIn()->isAdmin() and Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'member_recount_content' ) )
+ 		if ( \IPS\Member::loggedIn()->isAdmin() and \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'members', 'member_recount_content' ) )
  		{
  			$mostOnline = array( 'count' => $values['stats_most_online'], 'time' => time() );
-			Settings::i()->changeValues( array( 'most_online' => json_encode( $mostOnline ) ) );
+			\IPS\Settings::i()->changeValues( array( 'most_online' => json_encode( $mostOnline ) ) );
 
 			unset( $values['stats_most_online'] );
 
- 			Widget::deleteCaches( 'stats', 'core' );
+ 			\IPS\Widget::deleteCaches( 'stats', 'core' );
  		}
 
  		return $values;
@@ -88,37 +79,37 @@ class stats extends StaticCache
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		$stats = array();
-		$mostOnline = json_decode( Settings::i()->most_online, TRUE );
+		$mostOnline = json_decode( \IPS\Settings::i()->most_online, TRUE );
 
 		/* fetch only successful registered members ; if this needs to be changed, please review the other areas where we have the name<>? AND email<>? condition */
 		$where = array( 'completed=?', true );
 
 		/* Member count */
-		$stats['member_count'] = Db::i()->select( 'COUNT(*)', 'core_members', $where )->first();
+		$stats['member_count'] = \IPS\Db::i()->select( 'COUNT(*)', 'core_members', $where )->first();
 		
 		/* Most online */
-		$count = Store::i()->getOnlineUsers( Store::ONLINE_GUESTS | Store::ONLINE_MEMBERS | Store::ONLINE_COUNT_ONLY );
+		$count = \IPS\Session\Store::i()->getOnlineUsers( \IPS\Session\Store::ONLINE_GUESTS | \IPS\Session\Store::ONLINE_MEMBERS | \IPS\Session\Store::ONLINE_COUNT_ONLY );
 		if( $count > $mostOnline['count'] )
 		{
 			$mostOnline = array( 'count' => $count, 'time' => time() );
-			Settings::i()->changeValues( array( 'most_online' => json_encode( $mostOnline ) ) );
+			\IPS\Settings::i()->changeValues( array( 'most_online' => json_encode( $mostOnline ) ) );
 		}
 		$stats['most_online'] = $mostOnline;
 				
 		/* Last Registered Member */
 		$where   = array( array( "completed=1 AND temp_ban != -1" ) );
-		$where[] = array( '( ! ' . Db::i()->bitwiseWhere( Member::$bitOptions['members_bitoptions'], 'bw_is_spammer' ) . ' )' );
-		$where[] = array( 'member_id NOT IN(?)', Db::i()->select( 'member_id', 'core_validating', array( 'new_reg=1' ) ) );
-		$where[] = array( 'NOT(members_bitoptions2 & ?)', Member::$bitOptions['members_bitoptions']['members_bitoptions2']['is_support_account'] );
+		$where[] = array( '( ! ' . \IPS\Db::i()->bitwiseWhere( \IPS\Member::$bitOptions['members_bitoptions'], 'bw_is_spammer' ) . ' )' );
+		$where[] = array( 'member_id NOT IN(?)', \IPS\Db::i()->select( 'member_id', 'core_validating', array( 'new_reg=1' ) ) );
+		$where[] = array( 'NOT(members_bitoptions2 & ?)', \IPS\Member::$bitOptions['members_bitoptions']['members_bitoptions2']['is_support_account'] );
 
 		try
 		{
-			$stats['last_registered'] = Member::constructFromData( Db::i()->select( 'core_members.*', 'core_members', $where, 'core_members.member_id DESC', array( 0, 1 ) )->first() );
+			$stats['last_registered'] = \IPS\Member::constructFromData( \IPS\Db::i()->select( 'core_members.*', 'core_members', $where, 'core_members.member_id DESC', array( 0, 1 ) )->first() );
 		}
-		catch( UnderflowException $ex )
+		catch( \UnderflowException $ex )
 		{
 			$stats['last_registered'] = NULL;
 		}

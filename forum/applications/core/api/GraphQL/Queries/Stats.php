@@ -10,26 +10,25 @@
  */
 
 namespace IPS\core\api\GraphQL\Queries;
-use IPS\core\api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\StatsType;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\TypeRegistry;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Stats query for GraphQL API
  */
-class Stats
+class _Stats
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns community stats";
+	public static $description = "Returns community stats";
 
 	/*
 	 * Query arguments
@@ -42,20 +41,20 @@ class Stats
 	/**
 	 * Return the query return type
 	 */
-	public function type() : StatsType
+	public function type() 
 	{
-		return TypeRegistry::stats();
+		return \IPS\core\api\GraphQL\TypeRegistry::stats();
 	}
 
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @return	mixed
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\core\Stream
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : mixed
+	public function resolve($val, $args, $context)
 	{
 		return $val;
 	}

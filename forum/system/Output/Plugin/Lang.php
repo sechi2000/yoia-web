@@ -11,28 +11,21 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Theme;
-use function count;
-use function defined;
-use function strpos;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Lang
  */
-class Lang
+class _Lang
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = FALSE;
+	public static $canBeUsedInCss = FALSE;
 	
 	/**
 	 * Run the plug-in
@@ -41,17 +34,17 @@ class Lang
 	 * @param	array		$options    Array of options
 	 * @return	array		array( 'pre' => Code to eval before 'return', 'return' => Code to eval to return desired value )
 	 */
-	public static function runPlugin( string $data, array $options ): array
+	public static function runPlugin( $data, $options )
 	{		
 		$return = array();
 		$return['pre'] = null;
 		$params = array();
 		
-		$data = Theme::expandShortcuts( $data );
+		$data = \IPS\Theme::expandShortcuts( $data );
 	
-		if( substr( $data, 0, 1 ) !== '\\' and strpos( $data, '$' ) !== FALSE )
+		if( \substr( $data, 0, 1 ) !== '\\' and \strpos( $data, '$' ) !== FALSE )
 		{
-			if ( strpos( $data, '$' ) === 0 )
+			if ( \strpos( $data, '$' ) === 0 )
 			{
 			
 				$data = '{' . $data . '}';
@@ -116,7 +109,7 @@ class Lang
 
 		$vle	= 'TRUE';
 
-		if( count( $params ) )
+		if( \count( $params ) )
 		{
 			$vle	= 'FALSE';
 		}

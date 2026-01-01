@@ -12,127 +12,89 @@
 namespace IPS\nexus\Package;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\core\Advertisement;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\WidthHeight;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\nexus\Invoice;
-use IPS\nexus\Package;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\Request;
-use IPS\Theme;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Advertisement Package
  */
-class Ad extends Package
+class _Ad extends \IPS\nexus\Package
 {
 	/**
 	 * @brief	Database Table
 	 */
-	protected static string $packageDatabaseTable = 'nexus_packages_ads';
+	protected static $packageDatabaseTable = 'nexus_packages_ads';
 	
 	/**
 	 * @brief	Which columns belong to the local table
 	 */
-	protected static array $packageDatabaseColumns = array( 'p_locations', 'p_exempt', 'p_expire', 'p_expire_unit', 'p_max_height', 'p_max_width', 'p_settings', 'p_email' );
+	protected static $packageDatabaseColumns = array( 'p_locations', 'p_exempt', 'p_expire', 'p_expire_unit', 'p_max_height', 'p_max_width' );
 	
 	/**
 	 * @brief	Icon
 	 */
-	public static string $icon = 'newspaper';
+	public static $icon = 'newspaper-o';
 	
 	/**
 	 * @brief	Title
 	 */
-	public static string $title = 'advertisement';
+	public static $title = 'advertisement';
 		
 	/* !ACP Package Form */
 	
 	/**
 	 * ACP Fields
 	 *
-	 * @param	Package	$package	The package
-	 * @param bool $custom		If TRUE, is for a custom package
-	 * @param bool $customEdit	If TRUE, is editing a custom package
-	 * @return    array
+	 * @param	\IPS\nexus\Package	$package	The package
+	 * @param	bool				$custom		If TRUE, is for a custom package
+	 * @param	bool				$customEdit	If TRUE, is editing a custom package
+	 * @return	array
 	 */
-	public static function acpFormFields( Package $package, bool $custom=FALSE, bool $customEdit=FALSE ): array
+	public static function acpFormFields( \IPS\nexus\Package $package, $custom=FALSE, $customEdit=FALSE )
 	{
 		$return = array();
-
-		$currentValues = ( $package->id AND $package->settings ) ? json_decode( $package->settings, true ) : array();
-		$settingFields = Advertisement::locationFields( $currentValues, ( ( $package->id and $package->locations ) ? explode( ",", $package->locations ) : [] ) );
-		$emailFields = Advertisement::emailFields( $currentValues );
-
-		$settingToggles = [];
-		foreach( $settingFields as $field )
-		{
-			$settingToggles[] = $field->htmlId;
-		}
-		$emailToggles = [];
-		foreach( $emailFields as $field )
-		{
-			$emailToggles[] = $field->htmlId;
-		}
-
-		$return['package_settings']['ad_type'] = new Radio( 'ad_type', ( $package->id and $package->email ) ? 'emails' : 'site', true, [
-			'options' => [
-				'site' => 'advertisements_site',
-				'emails' => 'advertisements_emails'
-			],
-			'toggles' => [
-				'site' => $settingToggles,
-				'emails' => $emailToggles
-			],
-			'disabled' => (bool) ( $package->id )
-		], id: 'ad_type' );
-
+		
 		if ( !$customEdit ) // If we're editing a custom package, they can get to this by editing the advertisement
 		{
-			foreach( $settingFields as $settingField )
+			$locations	= array(
+				'ad_global_header'	=> array(),
+				'ad_global_footer'	=> array(),
+				'ad_sidebar'		=> array(),
+			);
+			foreach ( \IPS\Application::allExtensions( 'core', 'AdvertisementLocations', FALSE, 'core' ) as $key => $extension )
 			{
-				$return['package_settings'][ $settingField->name ] = $settingField;
+				$result	= $extension->getSettings( array() );
+				$locations = array_merge( $locations, $result['locations'] );
 			}
-
-			foreach( $emailFields as $emailField )
+			$locations['_ad_custom_'] = array('p_locations_custom');
+			$locationValues = array();
+			$customLocations = array();
+			if ( $package->id )
 			{
-				$return['package_settings'][ $emailField->name ] = $emailField;
+				$locationValues = explode( ',', $package->locations );
+				$customLocations = array_diff( $locationValues, array_keys( $locations ) );
+				if ( !empty( $customLocations ) )
+				{
+					$locationValues[] = '_ad_custom_';
+				}
+				$locationValues = array_intersect( $locationValues, array_keys( $locations ) );
 			}
-
-			$return['package_settings']['p_exempt'] = new CheckboxSet( 'p_exempt', ( $package->id and $package->exempt ) ? ( $package->exempt == '*' ? '*' : explode( ',', $package->exempt ) ) : '*', FALSE, array( 'options' => Group::groups(), 'parse' => 'normal', 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'everyone', 'impliedUnlimited' => TRUE ) );
+			$return['package_settings']['p_locations'] = new \IPS\Helpers\Form\CheckboxSet( 'p_locations', $locationValues, TRUE, array( 'options' => array_combine( array_keys( $locations ), array_keys( $locations ) ), 'toggles' => $locations, 'userSuppliedInput' => '_ad_custom_' ) );
+			$return['package_settings']['p_locations_custom'] = new \IPS\Helpers\Form\Stack( 'p_locations_custom', $customLocations, FALSE, array(), NULL, NULL, NULL, 'p_locations_custom' );
+			
+			$return['package_settings']['p_exempt'] = new \IPS\Helpers\Form\CheckboxSet( 'p_exempt', $package->id ? ( $package->exempt == '*' ? '*' : explode( ',', $package->exempt ) ) : '*', FALSE, array( 'options' => \IPS\Member\Group::groups(), 'parse' => 'normal', 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'everyone', 'impliedUnlimited' => TRUE ) );
 	
-			$return['package_settings']['p_expire'] = new Custom( 'p_expire', array( 'value' => ( $package->id and $package->expire ) ? $package->expire : -1, 'type' => ( $package->id ) ? $package->expire_unit : 'i' ), FALSE, array(
+			$return['package_settings']['p_expire'] = new \IPS\Helpers\Form\Custom( 'p_expire', array( 'value' => ( $package->id ) ? $package->expire : -1, 'type' => ( $package->id ) ? $package->expire_unit : 'i' ), FALSE, array(
 				'getHtml'	=> function( $element )
 				{
-					return Theme::i()->getTemplate( 'promotion', 'core' )->imageMaximums( $element->name, $element->value['value'], $element->value['type'] );
+					return \IPS\Theme::i()->getTemplate( 'promotion', 'core' )->imageMaximums( $element->name, $element->value['value'], $element->value['type'] );
 				},
 				'formatValue' => function( $element )
 				{
-					if( !is_array( $element->value ) AND $element->value == -1 )
+					if( !\is_array( $element->value ) AND $element->value == -1 )
 					{
 						return array( 'value' => -1, 'type' => 'i' );
 					}
@@ -143,7 +105,7 @@ class Ad extends Package
 			
 			if ( !$custom )
 			{
-				$return['package_settings']['p_max_dims'] = new WidthHeight( 'p_max_dims', ( $package->id and $package->max_width ) ? array( $package->max_width, $package->max_height ) : null, FALSE, array( 'unlimited' => array( 0, 0 ), 'resizableDiv' => FALSE ) );
+				$return['package_settings']['p_max_dims'] = new \IPS\Helpers\Form\WidthHeight( 'p_max_dims', array( $package->max_width, $package->max_height ), FALSE, array( 'unlimited' => array( 0, 0 ), 'resizableDiv' => FALSE ) );
 			}
 		}
 				
@@ -156,16 +118,16 @@ class Ad extends Package
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if( isset( $values['p_exempt'] ) )
 		{
-			$values['p_exempt'] = is_array( $values['p_exempt'] ) ? implode( ',', $values['p_exempt'] ) : $values['p_exempt'];
+			$values['p_exempt'] = \is_array( $values['p_exempt'] ) ? implode( ',', $values['p_exempt'] ) : $values['p_exempt'];
 		}
 				
-		if ( isset( $values['p_expire'] ) and is_array( $values['p_expire'] ) )
+		if ( isset( $values['p_expire'] ) and \is_array( $values['p_expire'] ) )
 		{
-			$values['expire'] = intval( $values['p_expire']['value'] );
+			$values['expire'] = \intval( $values['p_expire']['value'] );
 			$values['expire_unit'] = $values['p_expire']['type'];
 			unset( $values['p_expire'] );
 		}
@@ -177,31 +139,18 @@ class Ad extends Package
 			unset( $values['p_max_dims'] );
 		}
 		
-		if ( isset( $values['ad_location'] ) )
+		if ( isset( $values['p_locations'] ) )
 		{
-			$values['p_locations'] = is_array( $values['ad_location'] ) ? implode( ',', $values['ad_location'] ) : '';
-		}
-
-		$values['p_email'] = ( $values['ad_type'] == 'emails' );
-		if( $values['p_email'] )
-		{
-			$additionalSettings = Advertisement::processEmailFields( $values );
-		}
-		else
-		{
-			$additionalSettings = Advertisement::processLocationFields( $values );
-		}
-
-		/* Unset any elements that were added */
-		foreach( $values as $k => $v )
-		{
-			if( str_starts_with( $k, 'ad_' ) or str_starts_with( $k, '_ad' ) )
+			$locations = $values['p_locations'];
+			$customKey = array_search( '_ad_custom_', $locations );
+			if ( $customKey !== FALSE )
 			{
-				unset( $values[ $k ] );
+				unset( $locations[ $customKey ] );
+				$locations = array_merge( $locations, $values['p_locations_custom'] );
 			}
+			$values['p_locations'] = implode( ',', $locations );
 		}
-
-		$values['p_settings'] = json_encode( $additionalSettings );
+		unset( $values['p_locations_custom'] );
 		
 		return parent::formatFormValues( $values );
 	}
@@ -211,7 +160,7 @@ class Ad extends Package
 	 *
 	 * @return	array
 	 */
-	public static function updateableFields() : array
+	public static function updateableFields()
 	{
 		return array_merge( parent::updateableFields(), array(
 			'locations',
@@ -224,23 +173,22 @@ class Ad extends Package
 	/**
 	 * Update existing purchases
 	 *
-	 * @param	Purchase	$purchase							The purchase
-	 * @param array $changes							The old values
-	 * @param bool $cancelBillingAgreementIfNecessary	If making changes to renewal terms, TRUE will cancel associated billing agreements. FALSE will skip that change
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase							The purchase
+	 * @param	array				$changes							The old values
+	 * @param	bool				$cancelBillingAgreementIfNecessary	If making changes to renewal terms, TRUE will cancel associated billing agreements. FALSE will skip that change
+	 * @return	void
 	 */
-	public function updatePurchase(Purchase $purchase, array $changes, bool $cancelBillingAgreementIfNecessary=FALSE ): void
+	public function updatePurchase( \IPS\nexus\Purchase $purchase, $changes, $cancelBillingAgreementIfNecessary=FALSE )
 	{
 		if ( $purchase->extra['ad'] )
 		{
 			try
 			{
-				$ad = Db::i()->select( '*','core_advertisements', array( 'ad_id=?', $purchase->extra['ad'] ) )->first();
+				$ad = \IPS\Db::i()->select( '*','core_advertisements', array( 'ad_id=?', $purchase->extra['ad'] ) )->first();
 			}
-			catch ( UnderflowException )
+			catch ( \UnderflowException $e )
 			{
-				parent::updatePurchase( $purchase, $changes, $cancelBillingAgreementIfNecessary );
-				return;
+				return parent::updatePurchase( $purchase, $changes, $cancelBillingAgreementIfNecessary );
 			}
 			
 			$update = array();
@@ -264,7 +212,7 @@ class Ad extends Package
 							break;
 					}
 					
-					if ( isset( $i ) AND $ad[ $i ] == $changes[ $k ] )
+					if ( $ad[ $i ] == $changes[ $k ] )
 					{
 						$update[ $i ] = $this->$k;
 					}
@@ -272,11 +220,11 @@ class Ad extends Package
 			}
 			if ( !empty( $update ) )
 			{
-				Db::i()->update( 'core_advertisements', $update, array( 'ad_id=?', $purchase->extra['ad'] ) );
+				\IPS\Db::i()->update( 'core_advertisements', $update, array( 'ad_id=?', $purchase->extra['ad'] ) );
 			}
 		}
 		
-		parent::updatePurchase( $purchase, $changes, $cancelBillingAgreementIfNecessary );
+		return parent::updatePurchase( $purchase, $changes, $cancelBillingAgreementIfNecessary );
 	}
 	
 	/* !Store */
@@ -284,13 +232,13 @@ class Ad extends Package
 	/**
 	 * Store Form
 	 *
-	 * @param	Form	$form			The form
-	 * @param string $memberCurrency	The currency being used
-	 * @return    void
+	 * @param	\IPS\Helpers\Form	$form			The form
+	 * @param	string				$memberCurrency	The currency being used
+	 * @return	void
 	 */
-	public function storeForm(Form $form, string $memberCurrency ): void
+	public function storeForm( \IPS\Helpers\Form $form, $memberCurrency )
 	{
-		$form->add( new Form\Url( 'advertisement_url', NULL, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Url( 'advertisement_url', NULL, TRUE ) );
 		
 		$maxDims = TRUE;
 		if ( $this->max_height or $this->max_width )
@@ -306,48 +254,41 @@ class Ad extends Package
 			}
 		}
 		
-		if ( !isset( Request::i()->stockCheck ) ) // The stock check will attempt to save the upload which we don't want to do until the form is actually submitted
+		if ( !isset( \IPS\Request::i()->stockCheck ) ) // The stock check will attempt to save the upload which we don't want to do until the form is actually submitted
 		{
-			$form->add( new Upload( 'advertisement_image', NULL, TRUE, array( 'storageExtension' => 'nexus_Ads', 'image' => $maxDims ) ) );
+			$form->add( new \IPS\Helpers\Form\Upload( 'advertisement_image', NULL, TRUE, array( 'storageExtension' => 'nexus_Ads', 'image' => $maxDims ) ) );
 		}
 		
 		if ( $this->max_height and $this->max_width )
 		{
-			Member::loggedIn()->language()->words['advertisement_image_desc'] = Member::loggedIn()->language()->addToStack( 'advertisement_image_max_wh', FALSE, array( 'sprintf' => array( $this->max_width, $this->max_height ) ) );
+			\IPS\Member::loggedIn()->language()->words['advertisement_image_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'advertisement_image_max_wh', FALSE, array( 'sprintf' => array( $this->max_width, $this->max_height ) ) );
 		}
 		elseif ( $this->max_height )
 		{
-			Member::loggedIn()->language()->words['advertisement_image_desc'] = Member::loggedIn()->language()->addToStack( 'advertisement_image_max_h', FALSE, array( 'sprintf' => array( $this->max_height ) ) );
+			\IPS\Member::loggedIn()->language()->words['advertisement_image_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'advertisement_image_max_h', FALSE, array( 'sprintf' => array( $this->max_height ) ) );
 		}
 		elseif ( $this->max_width )
 		{
-			Member::loggedIn()->language()->words['advertisement_image_desc'] = Member::loggedIn()->language()->addToStack( 'advertisement_image_max_w', FALSE, array( 'sprintf' => array( $this->max_width ) ) );
+			\IPS\Member::loggedIn()->language()->words['advertisement_image_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'advertisement_image_max_w', FALSE, array( 'sprintf' => array( $this->max_width ) ) );
 		}
-
-		$form->add( new Text( 'ad_image_alt', NULL, FALSE, array(), NULL, NULL, NULL, 'ad_image_alt' ) );
-
-		if( !$this->email )
-		{
-			$form->add( new YesNo( 'ad_image_more', FALSE, FALSE, array( 'togglesOn' => array( 'ad_image_small', 'ad_image_medium' ) ), NULL, NULL, NULL, 'ad_image_more' ) );
-			$form->add( new Upload( 'ad_image_small', NULL, FALSE, array( 'image' => TRUE, 'storageExtension' => 'nexus_Ads' ), NULL, NULL, NULL, 'ad_image_small' ) );
-			$form->add( new Upload( 'ad_image_medium', NULL, FALSE, array( 'image' => TRUE, 'storageExtension' => 'nexus_Ads' ), NULL, NULL, NULL, 'ad_image_medium' ) );
-		}
+		
+		$form->add( new \IPS\Helpers\Form\YesNo( 'ad_image_more', FALSE, FALSE, array( 'togglesOn' => array( 'ad_image_small', 'ad_image_medium' ) ), NULL, NULL, NULL, 'ad_image_more' ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'ad_image_small', NULL, FALSE, array( 'image' => TRUE, 'storageExtension' => 'nexus_Ads' ), NULL, NULL, NULL, 'ad_image_small' ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'ad_image_medium', NULL, FALSE, array( 'image' => TRUE, 'storageExtension' => 'nexus_Ads' ), NULL, NULL, NULL, 'ad_image_medium' ) );
 	}
 	
 	/**
 	 * Add To Cart
 	 *
-	 * @param \IPS\nexus\Invoice\Item $item			The item
+	 * @param	\IPS\nexus\extensions\nexus\Item\Package	$item			The item
 	 * @param	array										$values			Values from form
-	 * @param string $memberCurrency	The currency being used
-	 * @return    array    Additional items to add
+	 * @param	string										$memberCurrency	The currency being used
+	 * @return	array	Additional items to add
 	 */
-	public function addToCart(\IPS\nexus\Invoice\Item $item, array $values, string $memberCurrency ): array
+	public function addToCart( \IPS\nexus\extensions\nexus\Item\Package $item, array $values, $memberCurrency )
 	{
-		$item->extra['image'] = json_encode( array( 'large' => (string) $values['advertisement_image'], 'medium' => (string) ( $values['ad_image_medium'] ?? '' ), 'small' => (string) ( $values['ad_image_small'] ?? '' ) ) );
+		$item->extra['image'] = json_encode( array( 'large' => (string) $values['advertisement_image'], 'medium' => (string) $values['ad_image_medium'], 'small' => (string) $values['ad_image_small'] ) );
 		$item->extra['link'] = (string) $values['advertisement_url'];
-		$item->extra['alt'] = $values['ad_image_alt'];
-		return parent::addToCart( $item, $values, $memberCurrency );
 	}
 	
 	/* !Client Area */
@@ -357,7 +298,7 @@ class Ad extends Package
 	 *
 	 * @return	bool
 	 */
-	public function showPurchaseRecord(): bool
+	public function showPurchaseRecord()
 	{
 		return TRUE;
 	}
@@ -365,23 +306,23 @@ class Ad extends Package
 	/**
 	 * Get Client Area Page HTML
 	 *
-	 * @param	Purchase	$purchase	The purchase
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
 	 * @return	array( 'packageInfo' => '...', 'purchaseInfo' => '...' )
 	 */
-	public function clientAreaPage( Purchase $purchase ) : array
+	public function clientAreaPage( \IPS\nexus\Purchase $purchase )
 	{	
 		$parent = parent::clientAreaPage( $purchase );
 		
 		try
 		{
-			$advertisement = Advertisement::load( $purchase->extra['ad'] );
+			$advertisement = \IPS\core\Advertisement::load( $purchase->extra['ad'] );
 			
 			return array(
-				'packageInfo'	=> $parent['packageInfo'] . Theme::i()->getTemplate( 'purchases' )->advertisementType( $purchase, $advertisement ),
-				'purchaseInfo'	=> $parent['purchaseInfo'] . Theme::i()->getTemplate('purchases')->advertisement( $purchase, $advertisement ),
+				'packageInfo'	=> $parent['packageInfo'],
+				'purchaseInfo'	=> $parent['purchaseInfo'] . \IPS\Theme::i()->getTemplate('purchases')->advertisement( $purchase, $advertisement ),
 			);
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return $parent;
 		}
@@ -392,92 +333,81 @@ class Ad extends Package
 	/**
 	 * ACP Generate Invoice Form
 	 *
-	 * @param	Form	$form	The form
-	 * @param string $k		The key to add to the field names
-	 * @return    void
+	 * @param	\IPS\Helpers\Form	$form	The form
+	 * @param	string				$k		The key to add to the field names
+	 * @return	void
 	 */
-	public function generateInvoiceForm(Form $form, string $k ): void
+	public function generateInvoiceForm( \IPS\Helpers\Form $form, $k )
 	{
 		$form->attributes['data-bypassValidation'] = true;
-		$field = new Form\Url( 'advertisement_url' . $k, NULL, TRUE );
-		$field->label = Member::loggedIn()->language()->addToStack('advertisement_url');
+		$field = new \IPS\Helpers\Form\Url( 'advertisement_url' . $k, NULL, TRUE );
+		$field->label = \IPS\Member::loggedIn()->language()->addToStack('advertisement_url');
 		$form->add( $field );
 				
-		$field = new Upload( 'ad_image' . $k, NULL, TRUE, array( 'image' => TRUE, 'storageExtension' => 'nexus_Ads' ) );
-		$field->label = Member::loggedIn()->language()->addToStack('ad_image');
+		$field = new \IPS\Helpers\Form\Upload( 'ad_image' . $k, NULL, TRUE, array( 'image' => TRUE, 'storageExtension' => 'nexus_Ads' ) );
+		$field->label = \IPS\Member::loggedIn()->language()->addToStack('ad_image');
 		$form->add( $field );
-
-		$field = new Text( 'ad_image_alt' . $k, NULL, FALSE );
-		$field->label = Member::loggedIn()->language()->addToStack( 'ad_image_alt' );
+		
+		$field = new \IPS\Helpers\Form\YesNo( 'ad_image_more' . $k, FALSE, FALSE, array( 'togglesOn' => array( 'ad_image_small' . $k, 'ad_image_medium' . $k ) ) );
+		$field->label = \IPS\Member::loggedIn()->language()->addToStack('ad_image_more');
 		$form->add( $field );
-
-		if( !$this->email )
-		{
-			$field = new YesNo( 'ad_image_more' . $k, FALSE, FALSE, array( 'togglesOn' => array( 'ad_image_small' . $k, 'ad_image_medium' . $k ) ) );
-			$field->label = Member::loggedIn()->language()->addToStack('ad_image_more');
-			$form->add( $field );
-
-			$field = new Upload( 'ad_image_small' . $k, NULL, FALSE, array( 'image' => TRUE, 'storageExtension' => 'nexus_Ads' ), NULL, NULL, NULL, 'ad_image_small' . $k );
-			$field->label = Member::loggedIn()->language()->addToStack('ad_image_small');
-			$form->add( $field );
-
-			$field = new Upload( 'ad_image_medium' . $k, NULL, FALSE, array( 'image' => TRUE, 'storageExtension' => 'nexus_Ads' ), NULL, NULL, NULL, 'ad_image_medium' . $k );
-			$field->label = Member::loggedIn()->language()->addToStack('ad_image_medium');
-			$form->add( $field );
-		}
+		
+		$field = new \IPS\Helpers\Form\Upload( 'ad_image_small' . $k, NULL, FALSE, array( 'image' => TRUE, 'storageExtension' => 'nexus_Ads' ), NULL, NULL, NULL, 'ad_image_small' . $k );
+		$field->label = \IPS\Member::loggedIn()->language()->addToStack('ad_image_small');
+		$form->add( $field );
+		
+		$field = new \IPS\Helpers\Form\Upload( 'ad_image_medium' . $k, NULL, FALSE, array( 'image' => TRUE, 'storageExtension' => 'nexus_Ads' ), NULL, NULL, NULL, 'ad_image_medium' . $k );
+		$field->label = \IPS\Member::loggedIn()->language()->addToStack('ad_image_medium');
+		$form->add( $field );		
 	}
 	
 	/**
 	 * ACP Add to invoice
 	 *
-	 * @param \IPS\nexus\Invoice\Item $item			The item
+	 * @param	\IPS\nexus\extensions\nexus\Item\Package	$item			The item
 	 * @param	array										$values			Values from form
-	 * @param string $k				The key to add to the field names
-	 * @param	Invoice							$invoice		The invoice
-	 * @return    void
+	 * @param	string										$k				The key to add to the field names
+	 * @param	\IPS\nexus\Invoice							$invoice		The invoice
+	 * @return	void
 	 */
-	public function acpAddToInvoice(\IPS\nexus\Invoice\Item $item, array $values, string $k, Invoice $invoice ): void
+	public function acpAddToInvoice( \IPS\nexus\extensions\nexus\Item\Package $item, array $values, $k, \IPS\nexus\Invoice $invoice )
 	{
-		$item->extra['image'] = json_encode( array( 'large' => (string) $values[ 'ad_image' . $k ], 'medium' => (string) ( $values[ 'ad_image_medium' . $k ] ?? '' ), 'small' => (string) ( $values[ 'ad_image_small' . $k ] ?? '' ) ) );
+		$item->extra['image'] = json_encode( array( 'large' => (string) $values[ 'ad_image' . $k ], 'medium' => (string) $values[ 'ad_image_medium' . $k ], 'small' => (string) $values[ 'ad_image_small' . $k ] ) );
 		$item->extra['link'] = (string) $values[ 'advertisement_url' . $k ];
-		$item->extra['alt'] = $values['ad_image_alt' . $k ];
 	}
 	
 	/**
 	 * Get ACP Page HTML
 	 *
-	 * @param	Purchase	$purchase	Purchase record
-	 * @return    string
+	 * @param	\IPS\nexus\Purchase	$purchase	Purchase record
+	 * @return	string
 	 */
-	public function acpPage( Purchase $purchase ): string
+	public function acpPage( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			return Theme::i()->getTemplate( 'purchases' )->advertisement( $purchase, Advertisement::load( $purchase->extra['ad'] ) );
+			return \IPS\Theme::i()->getTemplate( 'purchases' )->advertisement( $purchase, \IPS\core\Advertisement::load( $purchase->extra['ad'] ) );
 		}
-		catch ( OutOfRangeException )
-		{
-			return '';
-		}
+		catch ( \OutOfRangeException $e ) { }
 	}
 	
 	/**
 	 * Get ACP Page Buttons
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @param Url $url		The page URL
-	 * @return    array
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @param	\IPS\Http\Url		$url		The page URL
+	 * @return	array
 	 */
-	public function acpButtons(Purchase $purchase, Url $url ): array
+	public function acpButtons( \IPS\nexus\Purchase $purchase, $url )
 	{
 		$return = parent::acpButtons( $purchase, $url );
 		
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'advertisements_edit' ) and isset( $purchase->extra['ad'] ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'promotion', 'advertisements_edit' ) and isset( $purchase->extra['ad'] ) )
 		{
 			$return['edit_advertisement'] = array(
 				'icon'	=> 'list-alt',
 				'title'	=> 'edit_advertisement',
-				'link'	=> Url::internal( 'app=core&module=promotion&controller=advertisements&do=form&id=' . $purchase->extra['ad'] ),
+				'link'	=> \IPS\Http\Url::internal( 'app=core&module=promotion&controller=advertisements&do=form&id=' . $purchase->extra['ad'] ),
 			);
 		}
 		
@@ -489,18 +419,17 @@ class Ad extends Package
 	/**
 	 * On Purchase Generated
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @param Invoice $invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public function onPurchaseGenerated(Purchase $purchase, Invoice $invoice ): void
+	public function onPurchaseGenerated( \IPS\nexus\Purchase $purchase, \IPS\nexus\Invoice $invoice )
 	{		
-		$insertId = Db::i()->insert( 'core_advertisements', array(
+		$insertId = \IPS\Db::i()->insert( 'core_advertisements', array(
 			'ad_location'			=> $this->locations,
 			'ad_html'				=> NULL,
 			'ad_images'				=> $purchase->extra['image'],
 			'ad_link'				=> $purchase->extra['link'],
-			'ad_image_alt'			=> $purchase->extra['alt'] ?? '',
 			'ad_impressions'		=> 0,
 			'ad_clicks'				=> 0,
 			'ad_exempt'				=> $this->exempt === '*' ? '*' : json_encode( explode( ',', $this->exempt ) ),
@@ -510,10 +439,10 @@ class Ad extends Package
 			'ad_end'				=> $purchase->expire ? $purchase->expire->getTimestamp() : 0,
 			'ad_maximum_value'		=> $this->expire,
 			'ad_maximum_unit'		=> $this->expire_unit,
-			'ad_additional_settings'=> $this->settings,
+			'ad_additional_settings'=> json_encode( array() ),
 			'ad_html_https_set'		=> 0,
 			'ad_member'				=> $purchase->member->member_id,
-			'ad_type'				=> ( $this->email ? Advertisement::AD_EMAIL : Advertisement::AD_IMAGES ),
+			'ad_type'				=> \IPS\core\Advertisement::AD_IMAGES,
 		) );
 		
 		$extra = $purchase->extra;
@@ -521,7 +450,7 @@ class Ad extends Package
 		$purchase->extra = $extra;
 		$purchase->save();
 		
-		AdminNotification::send( 'nexus', 'Advertisement', NULL, TRUE, $purchase );
+		\IPS\core\AdminNotification::send( 'nexus', 'Advertisement', NULL, TRUE, $purchase );
 
 		parent::onPurchaseGenerated( $purchase, $invoice );
 	}
@@ -529,14 +458,14 @@ class Ad extends Package
 	/**
 	 * On Expiration Date Change
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public function onExpirationDateChange( Purchase $purchase ): void
+	public function onExpirationDateChange( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			$ad = Advertisement::load( $purchase->extra['ad'] );
+			$ad = \IPS\core\Advertisement::load( $purchase->extra['ad'] );
 			$ad->end = $purchase->expire ? $purchase->expire->getTimestamp() : 0;
 						
 			if ( ( !$ad->end or $ad->end > time() ) )
@@ -578,7 +507,7 @@ class Ad extends Package
 			
 			$ad->save();
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 		
 		parent::onExpirationDateChange( $purchase );
 	}
@@ -586,18 +515,18 @@ class Ad extends Package
 	/**
 	 * On Purchase Expired
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public function onExpire( Purchase $purchase ): void
+	public function onExpire( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			$ad = Advertisement::load( $purchase->extra['ad'] );
+			$ad = \IPS\core\Advertisement::load( $purchase->extra['ad'] );
 			$ad->active = 0;			
 			$ad->save();
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 		
 		parent::onExpire( $purchase );
 	}
@@ -605,18 +534,18 @@ class Ad extends Package
 	/**
 	 * On Purchase Canceled
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public function onCancel( Purchase $purchase ): void
+	public function onCancel( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			$ad = Advertisement::load( $purchase->extra['ad'] );
+			$ad = \IPS\core\Advertisement::load( $purchase->extra['ad'] );
 			$ad->active = 0;			
 			$ad->save();
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 		
 		parent::onCancel( $purchase );
 	}
@@ -624,16 +553,16 @@ class Ad extends Package
 	/**
 	 * On Purchase Deleted
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public function onDelete( Purchase $purchase ): void
+	public function onDelete( \IPS\nexus\Purchase $purchase )
 	{
 		try
 		{
-			Advertisement::load( $purchase->extra['ad'] )->delete();
+			\IPS\core\Advertisement::load( $purchase->extra['ad'] )->delete();
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 		
 		parent::onDelete( $purchase );
 	}
@@ -641,10 +570,10 @@ class Ad extends Package
 	/**
 	 * On Purchase Reactivated (renewed after being expired or reactivated after being canceled)
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public function onReactivate( Purchase $purchase ): void
+	public function onReactivate( \IPS\nexus\Purchase $purchase )
 	{
 		$this->onExpirationDateChange( $purchase );
 		
@@ -654,19 +583,19 @@ class Ad extends Package
 	/**
 	 * On Transfer (is ran before transferring)
 	 *
-	 * @param	Purchase	$purchase		The purchase
-	 * @param	Member			$newCustomer	New Customer
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase		The purchase
+	 * @param	\IPS\Member			$newCustomer	New Customer
+	 * @return	void
 	 */
-	public function onTransfer( Purchase $purchase, Member $newCustomer ): void
+	public function onTransfer( \IPS\nexus\Purchase $purchase, \IPS\Member $newCustomer )
 	{
 		try
 		{
-			$ad = Advertisement::load( $purchase->extra['ad'] );
-			$ad->member = $newCustomer->member_id;
+			$ad = \IPS\core\Advertisement::load( $purchase->extra['ad'] );
+			$ad->member = $newCustomer->member_id;			
 			$ad->save();
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 		
 		parent::onTransfer( $purchase, $newCustomer );
 	}
@@ -674,23 +603,23 @@ class Ad extends Package
 	/**
 	 * On Upgrade/Downgrade
 	 *
-	 * @param	Purchase							$purchase				The purchase
-	 * @param	Package							$newPackage				The package to upgrade to
-	 * @param int|RenewalTerm|NULL $chosenRenewalOption	The chosen renewal option
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase							$purchase				The purchase
+	 * @param	\IPS\nexus\Package							$newPackage				The package to upgrade to
+	 * @param	int|NULL|\IPS\nexus\Purchase\RenewalTerm	$chosenRenewalOption	The chosen renewal option
+	 * @return	void
 	 */
-	public function onChange(Purchase $purchase, Package $newPackage, RenewalTerm|int|null $chosenRenewalOption = NULL ): void
+	public function onChange( \IPS\nexus\Purchase $purchase, \IPS\nexus\Package $newPackage, $chosenRenewalOption = NULL )
 	{
 		try
 		{
-			$ad = Advertisement::load( $purchase->extra['ad'] );
+			$ad = \IPS\core\Advertisement::load( $purchase->extra['ad'] );
 			$ad->location = $newPackage->locations;
 			$ad->exempt = $newPackage->exempt === '*' ? '*' : json_encode( explode( ',', $newPackage->exempt ) );
 			$ad->maximum_value = $newPackage->expire;
 			$ad->maximum_unit = $newPackage->expire_unit;
 			$ad->save();
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 
 		parent::onChange( $purchase, $newPackage );
 	}

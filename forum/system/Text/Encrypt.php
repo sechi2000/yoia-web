@@ -11,71 +11,62 @@
 namespace IPS\Text;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use AesCtr;
-use IPS\Settings;
-use function defined;
-use function function_exists;
-use function in_array;
-use function substr;
-use const IPS\TEXT_ENCRYPTION_KEY;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Encrypted
  */
-class Encrypt
+class _Encrypt
 {
 	/**
 	 * Get Key
 	 *
-	 * @return	string
+	 * @return	void
 	 */
-	public static function key() : string
+	public static function key()
 	{
-		return TEXT_ENCRYPTION_KEY ?: md5( Settings::i()->sql_pass . Settings::i()->sql_database );
+		return \IPS\TEXT_ENCRYPTION_KEY ?: md5( \IPS\Settings::i()->sql_pass . \IPS\Settings::i()->sql_database );
 	}
 	
 	/**
 	 * @brief	Cipher
 	 */
-	public ?string $cipher = NULL;
+	public $cipher;
 	
 	/**
 	 * @brief	IV
 	 */
-	protected ?string $iv = NULL;
+	protected $iv = NULL;
 	
 	/**
 	 * @brief	Tag
 	 */
-	protected ?string $tag = NULL;
+	protected $tag = NULL;
 	
 	/**
 	 * @brief	Hash of cipher
 	 */
-	protected ?string $hmac = NULL;
+	protected $hmac = NULL;
 			
 	/**
 	 * From plaintext
 	 *
-	 * @param string $plaintext	Plaintext
+	 * @param	string	$plaintext	Plaintext
 	 * @return	static
 	 */
-	public static function fromPlaintext( string $plaintext ): static
+	public static function fromPlaintext( $plaintext )
 	{
 		$obj = new static;
 		
 		/* Try to use OpenSSL if it's available... */
-		if ( function_exists( 'openssl_get_cipher_methods' ) )
+		if ( \function_exists( 'openssl_get_cipher_methods' ) )
 		{
 			/* If GCM is available (PHP 7.1+), use that as if provides authenticated encryption natively */
-			if ( in_array( 'aes-128-gcm', openssl_get_cipher_methods() ) )
+			if ( \in_array( 'aes-128-gcm', openssl_get_cipher_methods() ) )
 			{
 				$obj->iv = openssl_random_pseudo_bytes( openssl_cipher_iv_length( 'aes-128-gcm' ) );
 				$obj->cipher = openssl_encrypt( $plaintext, 'aes-128-gcm', static::key(), 0, $obj->iv, $obj->tag );
@@ -83,7 +74,7 @@ class Encrypt
 			}
 			
 			/* Otherwise, use CBC and store the hash so we can do our own authentication when decrypting */
-			elseif ( in_array( 'aes-128-cbc', openssl_get_cipher_methods() ) )
+			elseif ( \in_array( 'aes-128-cbc', openssl_get_cipher_methods() ) )
 			{
 				$obj->iv = openssl_random_pseudo_bytes( openssl_cipher_iv_length( 'aes-128-cbc' ) );
 				$obj->cipher = openssl_encrypt( $plaintext, 'aes-128-cbc', static::key(), OPENSSL_RAW_DATA, $obj->iv );
@@ -94,20 +85,20 @@ class Encrypt
 		
 		/* If we're still here, fallback to the PHP library */
 		require_once \IPS\ROOT_PATH . '/system/3rd_party/AES/AES.php';
-		$obj->cipher = AesCtr::encrypt( $plaintext, static::key(), 256 );
+		$obj->cipher = \AesCtr::encrypt( $plaintext, static::key(), 256 );
 		return $obj;
 	}
 	
 	/**
 	 * From plaintext
 	 *
-	 * @param string $cipher	Cipher
-	 * @param string|null $iv		The IV, or if null, will use the PHP library rather than built-in openssl_*() methods
-	 * @param string|null $tag		The tag if using AES-128-GCM
-	 * @param string|null $hash	The hash if using AES-128-CBC
+	 * @param	string		$cipher	Cipher
+	 * @param	string|null	$iv		The IV, or if null, will use the PHP library rather than built-in openssl_*() methods
+	 * @param	string|null	$tag		The tag if using AES-128-GCM
+	 * @param	string|null	$hash	The hash if using AES-128-CBC
 	 * @return	static
 	 */
-	public static function fromCipher( string $cipher, string $iv = NULL, string $tag = NULL, string $hash = NULL ): static
+	public static function fromCipher( $cipher, $iv = NULL, $tag = NULL, $hash = NULL )
 	{
 		$obj = new static;
 		$obj->cipher = $cipher;
@@ -120,10 +111,10 @@ class Encrypt
 	/**
 	 * From tag
 	 *
-	 * @param string $tag	Tag
+	 * @param	string	$tag	Tag
 	 * @return	static
 	 */
-	public static function fromTag( string $tag ): static
+	public static function fromTag( $tag )
 	{
 		if ( preg_match( '/^\[\!AES128GCM\[(.+?)\]\[(.+?)\]\[(.+?)\]\]/', $tag, $matches ) )
 		{
@@ -134,7 +125,7 @@ class Encrypt
 			$cipher = base64_decode( $matches[1] );
 			$ivLength = openssl_cipher_iv_length('aes-128-cbc');
 			
-			return static::fromCipher( substr( $cipher, $ivLength + 32 ), substr( $cipher, 0, $ivLength ), NULL, substr( $cipher, $ivLength, 32 ) );
+			return static::fromCipher( \substr( $cipher, $ivLength + 32 ), \substr( $cipher, 0, $ivLength ), NULL, \substr( $cipher, $ivLength, 32 ) );
 		}
 		elseif ( preg_match( '/^\[\!AES\[(.+?)\]\]/', $tag, $matches ) )
 		{
@@ -151,7 +142,7 @@ class Encrypt
 	 *
 	 * @return	string
 	 */
-	public function tag(): string
+	public function tag()
 	{
 		if ( $this->tag )
 		{
@@ -166,7 +157,7 @@ class Encrypt
 			return '[!AES[' . $this->cipher . ']]';
 		}
 	}
-
+	
 	/**
 	 * Decrypt
 	 *
@@ -193,7 +184,7 @@ class Encrypt
 		else
 		{
 			require_once \IPS\ROOT_PATH . '/system/3rd_party/AES/AES.php';
-			return AesCtr::decrypt( $this->cipher, $keyToUse, 256 );
+			return \AesCtr::decrypt( $this->cipher, $keyToUse, 256 );
 		}
 	}
 }

@@ -12,59 +12,46 @@
 namespace IPS\downloads\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\downloads\Category;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Member;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Theme;
-use IPS\Widget\Customizable;
-use IPS\Widget\PermissionCache;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * topDownloads Widget
  */
-class topDownloads extends PermissionCache implements Customizable
+class _topDownloads extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'topDownloads';
+	public $key = 'topDownloads';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'downloads';
+	public $app = 'downloads';
 		
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 
 	/**
 	 * @brief	Cache Expiration
 	 * @note	We allow this cache to be valid for 48 hours
 	 */
-	public int $cacheExpiration = 172800;
+	public $cacheExpiration = 172800;
 
 	/**
 	* Init the widget
 	*
 	* @return	void
 	*/
-	public function init(): void
+	public function init()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'widgets.css', 'downloads', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'widgets.css', 'downloads', 'front' ) );
 
 		parent::init();
 	}
@@ -72,14 +59,14 @@ class topDownloads extends PermissionCache implements Customizable
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
  	{
 		$form = parent::configuration( $form );
  		
-		$form->add( new Number( 'number_to_show', $this->configuration['number_to_show'] ?? 5, TRUE ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'number_to_show', isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 5, TRUE ) );
 		return $form;
  	}
 
@@ -88,16 +75,16 @@ class topDownloads extends PermissionCache implements Customizable
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		$categories = array();
 
-		foreach( Db::i()->select( 'perm_type_id', 'core_permission_index', array( 'app=? and perm_type=? and (' . Db::i()->findInSet( 'perm_' . Category::$permissionMap['read'], Member::loggedIn()->groups ) . ' OR ' . 'perm_' . Category::$permissionMap['read'] . '=? )', 'downloads', 'category', '*' ) ) as $category )
+		foreach( \IPS\Db::i()->select( 'perm_type_id', 'core_permission_index', array( 'app=? and perm_type=? and (' . \IPS\Db::i()->findInSet( 'perm_' . \IPS\downloads\Category::$permissionMap['read'], \IPS\Member::loggedIn()->groups ) . ' OR ' . 'perm_' . \IPS\downloads\Category::$permissionMap['read'] . '=? )', 'downloads', 'category', '*' ) ) as $category )
 		{
 			$categories[]	= $category;
 		}
 
-		if( !count( $categories ) )
+		if( !\count( $categories ) )
 		{
 			return '';
 		}
@@ -107,22 +94,22 @@ class topDownloads extends PermissionCache implements Customizable
 			$where = array( array( 'file_cat IN(' . implode( ',', $categories ) . ')' ) );
 			if ( $interval )
 			{
-				$where[] = array( 'dtime>?', DateTime::create()->sub( new DateInterval( $interval ) )->getTimestamp() );
+				$where[] = array( 'dtime>?', \IPS\DateTime::create()->sub( new \DateInterval( $interval ) )->getTimestamp() );
 			}
 			
 			$ids	= array();
 			$cases	= array();
 
-			foreach( Db::i()->select( 'dfid, count(*) AS downloads', 'downloads_downloads', $where, 'downloads DESC', $this->configuration['number_to_show'] ?? 5, array( 'dfid' ) )->join( 'downloads_files', 'dfid=file_id' ) as $download )
+			foreach( \IPS\Db::i()->select( 'dfid, count(*) AS downloads', 'downloads_downloads', $where, 'downloads DESC', isset( $this->configuration['number_to_show'] ) ? $this->configuration['number_to_show'] : 5, array( 'dfid' ) )->join( 'downloads_files', 'dfid=file_id' ) as $download )
 			{
 				$ids[]		= $download['dfid'];
 				$cases[]	= "WHEN file_id={$download['dfid']} THEN {$download['downloads']}";
 			}
 
-			if( count( $ids ) )
+			if( \count( $ids ) )
 			{
-				$$time = new ActiveRecordIterator(
-					Db::i()->select(
+				$$time = new \IPS\Patterns\ActiveRecordIterator(
+					\IPS\Db::i()->select(
 						'*, CASE ' . implode( ' ', $cases ) . ' END AS file_downloads',
 						'downloads_files',
 						'file_id IN(' . implode( ',', $ids ) . ')',

@@ -11,57 +11,50 @@
 namespace IPS\forums\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\forums\Forum;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class TimeSolved extends \IPS\core\Statistics\Chart
+class _TimeSolved extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'forums_stats_solved_time';
+	public $controller = 'forums_stats_solved_time';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		/* Determine minimum date - if there is nothing, set it to today */
-		$minimumDate = Db::i()->select( 'min(solved_date)', 'core_solved_index' )->first();
-		$minimumDate = $minimumDate ? DateTime::ts( $minimumDate ) : DateTime::create();
-
+		/* Determine minimum date */
+		$minimumDate = NULL;
+		
 		/* We can't retrieve any stats prior to the new tracking being implemented */
-		$oldestLog = Db::i()->select( 'MIN(time)', 'core_statistics', array( 'type=?', 'solved' ) )->first();
-		if( $oldestLog )
+		try
 		{
-			if( $oldestLog < $minimumDate->getTimestamp() )
+			$oldestLog = \IPS\Db::i()->select( 'MIN(time)', 'core_statistics', array( 'type=?', 'solved' ) )->first();
+		
+			if( !$minimumDate OR $oldestLog < $minimumDate->getTimestamp() )
 			{
-				$minimumDate = DateTime::ts( $oldestLog );
+				$minimumDate = \IPS\DateTime::ts( $oldestLog );
 			}
 		}
+		catch( \UnderflowException $e )
+		{
+			/* We have nothing tracked, set minimum date to today */
+			$minimumDate = \IPS\DateTime::create();
+		}
 		
-		$chart = new Database( $url, 'core_statistics', 'time', '', array(
+		$chart = new \IPS\Helpers\Chart\Database( $url, 'core_statistics', 'time', '', array(
 			'isStacked' => FALSE,
 			'backgroundColor' => '#ffffff',
 			'hAxis' => array('gridlines' => array('color' => '#f5f5f5')),
@@ -75,11 +68,11 @@ class TimeSolved extends \IPS\core\Statistics\Chart
 		);
 		$chart->setExtension( $this );
 
-		$chart->description = Member::loggedIn()->language()->addToStack( 'solved_stats_chart_desc' );
+		$chart->description = \IPS\Member::loggedIn()->language()->addToStack( 'solved_stats_chart_desc' );
 		$chart->availableTypes = array('AreaChart', 'ColumnChart', 'BarChart');
 		$chart->enableHourly = FALSE;
 		$chart->groupBy = 'value_1';
-		$chart->title = Member::loggedIn()->language()->addToStack('forums_solved_stats_time');
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('forums_solved_stats_time');
 		$chart->where[] = array( "type=?", 'solved' );
 		
 		foreach( $validForumIds = $this->getValidForumIds() as $forumId => $forum )
@@ -95,18 +88,18 @@ class TimeSolved extends \IPS\core\Statistics\Chart
 	 *
 	 * @return array
 	 */
-	protected function getValidForumIds() : array
+	protected function getValidForumIds()
 	{
 		$validForumIds = [];
-		
-		foreach( Db::i()->select( 'value_1', 'core_statistics', [ 'value_4 IS NOT NULL and type=?', 'solved' ], NULL, [ 0,100 ], 'value_1' ) as $forumId )
+
+		foreach( \IPS\Db::i()->select( 'value_1', 'core_statistics', [ 'value_4 IS NOT NULL and type=?', 'solved' ], NULL, [ 0,100 ], 'value_1' ) as $forumId )
 		{
 			try
 			{
 				/* @var $forumId int */
-				$validForumIds[ $forumId ] = Forum::load( $forumId );
+				$validForumIds[ $forumId ] = \IPS\forums\Forum::load( $forumId );
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 		
 		return $validForumIds;

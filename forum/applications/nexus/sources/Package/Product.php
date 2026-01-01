@@ -12,71 +12,70 @@
 namespace IPS\nexus\Package;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\YesNo;
-use IPS\IPS;
-use IPS\Member;
-use IPS\nexus\Invoice;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\LicenseKey;
-use IPS\nexus\Package as NexusPackage;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Product Package
  */
-class Product extends NexusPackage
+class _Product extends \IPS\nexus\Package
 {
 	/**
 	 * @brief	Database Table
 	 */
-	protected static string $packageDatabaseTable = 'nexus_packages_products';
+	protected static $packageDatabaseTable = 'nexus_packages_products';
 	
 	/**
 	 * @brief	Which columns belong to the local table
 	 */
-	protected static array $packageDatabaseColumns = array( 'p_subscription', 'p_lkey', 'p_lkey_identifier', 'p_lkey_uses', 'p_show' );
+	protected static $packageDatabaseColumns = array( 'p_physical', 'p_subscription', 'p_shipping', 'p_weight', 'p_lkey', 'p_lkey_identifier', 'p_lkey_uses', 'p_show', 'p_length', 'p_width', 'p_height' );
 	
 	/**
 	 * ACP Fields
 	 *
-	 * @param NexusPackage $package	The package
-	 * @param bool $custom		If TRUE, is for a custom package
-	 * @param bool $customEdit	If TRUE, is editing a custom package
-	 * @return    array
+	 * @param	\IPS\nexus\Package	$package	The package
+	 * @param	bool				$custom		If TRUE, is for a custom package
+	 * @param	bool				$customEdit	If TRUE, is editing a custom package
+	 * @return	array
 	 */
-	public static function acpFormFields(NexusPackage $package, bool $custom=FALSE, bool $customEdit=FALSE ): array
+	public static function acpFormFields( \IPS\nexus\Package $package, $custom=FALSE, $customEdit=FALSE )
 	{
 		$return = array();
 		$formId = $package->id ? "form_{$package->id}" : 'form_new';
-
-		$return['package_settings']['show'] = new YesNo( 'p_show', $package->type === 'product' ? $package->show : TRUE, FALSE, array( 'togglesOn' => array( "{$formId}_tab_package_client_area", "{$formId}_header_package_associations", "{$formId}_header_package_associations_desc", 'p_associate', "{$formId}_header_package_renewals", 'p_renews', 'p_lkey' ) ) );
+		
+		if ( !$customEdit ) // After the package has been created, these are unimportant
+		{
+			$return['package_settings']['physical'] = new \IPS\Helpers\Form\YesNo( 'p_physical', $package->type === 'product' ? $package->physical : FALSE, FALSE, array( 'disableCopy' => TRUE, 'togglesOn' => array( 'p_weight', 'p_length', 'p_width', 'p_height', 'p_shipping' ), 'togglesOff' => array( 'elProductTaxWarningContainer' ) ) );
+			$return['package_settings']['weight'] = new \IPS\nexus\Form\Weight( 'p_weight', $package->type === 'product' ? new \IPS\nexus\Shipping\Weight( $package->weight ) : NULL, FALSE, array( 'disableCopy' => TRUE ), NULL, NULL, NULL, 'p_weight' );
+			$return['package_settings']['length'] = new \IPS\nexus\Form\Length( 'p_length', $package->type === 'product' ? new \IPS\nexus\Shipping\Length( $package->length ) : NULL, FALSE, array( 'disableCopy' => TRUE ), NULL, NULL, NULL, 'p_length' );
+			$return['package_settings']['width'] = new \IPS\nexus\Form\Length( 'p_width', $package->type === 'product' ? new \IPS\nexus\Shipping\Length( $package->width ) : NULL, FALSE, array( 'disableCopy' => TRUE ), NULL, NULL, NULL, 'p_width' );
+			$return['package_settings']['height'] = new \IPS\nexus\Form\Length( 'p_height', $package->type === 'product' ? new \IPS\nexus\Shipping\Length( $package->height ) : NULL, FALSE, array( 'disableCopy' => TRUE ), NULL, NULL, NULL, 'p_height' );
+		
+			$availableShippingMethods = array();
+			foreach ( \IPS\nexus\Shipping\FlatRate::roots() as $rate )
+			{
+				$availableShippingMethods[ $rate->_id ] = $rate->_title;
+			}
+			if ( \IPS\Settings::i()->easypost_api_key and \IPS\Settings::i()->easypost_show_rates )
+			{
+				$availableShippingMethods['easypost'] = 'enhancements__nexus_EasyPost';
+			}
+			$return['package_settings']['shipping'] = new \IPS\Helpers\Form\CheckboxSet( 'p_shipping', ( $package->type === 'product' and $package->shipping !== '*' ) ? explode( ',', $package->shipping ) : '*', FALSE, array( 'options' => $availableShippingMethods, 'multiple' => TRUE, 'unlimited' => '*', 'impliedUnlimited' => TRUE ), NULL, NULL, NULL, 'p_shipping' );
+		}
+		
+		$return['package_settings']['show'] = new \IPS\Helpers\Form\YesNo( 'p_show', $package->type === 'product' ? $package->show : TRUE, FALSE, array( 'togglesOn' => array( "{$formId}_tab_package_client_area", "{$formId}_header_package_associations", "{$formId}_header_package_associations_desc", 'p_associate', "{$formId}_header_package_renewals", 'p_renews', 'p_support_severity', 'p_lkey' ) ) );
 		
 		if ( !$custom )
 		{		
-			$return['store_permissions']['subscription'] = new YesNo( 'p_subscription', $package->type === 'product' ? !$package->subscription : TRUE );
+			$return['store_permissions']['subscription'] = new \IPS\Helpers\Form\YesNo( 'p_subscription', $package->type === 'product' ? !$package->subscription : TRUE );
 		}
 			
 		$licenseKeyOptions = array();
 		$licenseKeyToggles = array();
-		foreach ( LicenseKey::licenseKeyTypes() as $key => $class )
+		foreach ( \IPS\nexus\Purchase\LicenseKey::licenseKeyTypes() as $key => $class )
 		{
 			$licenseKeyOptions[ mb_strtolower( $key ) ] = 'lkey_' . $key;
 			$licenseKeyToggles[ mb_strtolower( $key ) ] = array( 'p_lkey_identifier', 'p_lkey_uses' );
@@ -84,10 +83,10 @@ class Product extends NexusPackage
 		if ( !empty( $licenseKeyOptions ) )
 		{ 
 			array_unshift( $licenseKeyOptions, 'lkey_none' );
-			$return['package_benefits']['lkey'] = new Radio( 'p_lkey', $package->type === 'product' ? $package->lkey : 0, FALSE, array( 'options' => $licenseKeyOptions, 'toggles' => $licenseKeyToggles ), NULL, NULL, NULL, 'p_lkey' );
+			$return['package_benefits']['lkey'] = new \IPS\Helpers\Form\Radio( 'p_lkey', $package->type === 'product' ? $package->lkey : 0, FALSE, array( 'options' => $licenseKeyOptions, 'toggles' => $licenseKeyToggles ), NULL, NULL, NULL, 'p_lkey' );
 		}
 		
-		$return['package_benefits']['lkey_uses'] = new Number( 'p_lkey_uses', $package->type === 'product' ? $package->lkey_uses : -1, FALSE, array( 'unlimited' => -1 ) );
+		$return['package_benefits']['lkey_uses'] = new \IPS\Helpers\Form\Number( 'p_lkey_uses', $package->type === 'product' ? $package->lkey_uses : -1, FALSE, array( 'unlimited' => -1 ) );
 		
 		$identifierOptions = array(
 			'name'		=> 'lkey_identifier_name',
@@ -96,13 +95,13 @@ class Product extends NexusPackage
 		);
 		if ( $package->id )
 		{
-			foreach (CustomField::roots( NULL, NULL, array( array( Db::i()->findInSet( 'cf_packages', array( $package->id ) ) ) ) ) as $field )
+			foreach ( \IPS\nexus\Package\CustomField::roots( NULL, NULL, array( array( \IPS\Db::i()->findInSet( 'cf_packages', array( $package->id ) ) ) ) ) as $field )
 			{
 				$identifierOptions[ $field->id ] = $field->_title;
 			}
 		}
 		
-		$return['package_benefits']['lkey_identifier'] = new Select( 'p_lkey_identifier', $package->type === 'product' ? $package->lkey_identifier : '0', FALSE, array( 'options' => $identifierOptions, 'unlimited' => '0', 'unlimitedLang' => 'lkey_identifier_none' ), NULL, NULL, NULL, 'p_lkey_identifier' );
+		$return['package_benefits']['lkey_identifier'] = new \IPS\Helpers\Form\Select( 'p_lkey_identifier', $package->type === 'product' ? $package->lkey_identifier : '0', FALSE, array( 'options' => $identifierOptions, 'unlimited' => '0', 'unlimitedLang' => 'lkey_identifier_none' ), NULL, NULL, NULL, 'p_lkey_identifier' );
 		
 		return $return;
 	}
@@ -113,9 +112,53 @@ class Product extends NexusPackage
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
-	{
-		$values['p_subscription'] = isset( $values['p_subscription'] ) ? !$values['p_subscription'] : FALSE;
+	public function formatFormValues( $values )
+	{		
+		if( isset( $values['p_subscription'] ) )
+		{
+			$values['p_subscription'] = isset( $values['p_subscription'] ) ? !$values['p_subscription'] : FALSE;
+		}
+		
+		if( isset( $values['p_weight'] ) )
+		{
+			$values['p_weight'] = \is_object( $values['p_weight'] ) ? $values['p_weight']->kilograms : 0;
+		}
+		else
+		{
+			$values['p_weight'] = 0;
+		}
+
+		if( isset( $values['p_length'] ) )
+		{
+			$values['p_length'] = \is_object( $values['p_length'] ) ? $values['p_length']->metres : 0;
+		}
+		else
+		{
+			$values['p_length'] = 0;
+		}
+
+		if( isset( $values['p_width'] ) )
+		{
+			$values['p_width'] = \is_object( $values['p_width'] ) ? $values['p_width']->metres : 0;
+		}
+		else
+		{
+			$values['p_width'] = 0;
+		}
+
+		if( isset( $values['p_height'] ) )
+		{
+			$values['p_height'] = \is_object( $values['p_height'] ) ? $values['p_height']->metres : 0;
+		}
+		else
+		{
+			$values['p_height'] = 0;
+		}
+		
+		if( isset( $values['p_shipping'] ) )
+		{
+			$values['p_shipping'] = \is_array( $values['p_shipping'] ) ? implode( ',', $values['p_shipping'] ) : '*';
+		}
 
 		return parent::formatFormValues( $values );
 	}
@@ -125,7 +168,7 @@ class Product extends NexusPackage
 	 *
 	 * @return	array
 	 */
-	public static function updateableFields() : array
+	public static function updateableFields()
 	{
 		return array_merge( parent::updateableFields(), array(
 			'lkey',
@@ -138,15 +181,17 @@ class Product extends NexusPackage
 	/**
 	 * Update existing purchases
 	 *
-	 * @param	Purchase	$purchase							The purchase
-	 * @param array $changes							The old values
-	 * @param bool $cancelBillingAgreementIfNecessary	If making changes to renewal terms, TRUE will cancel associated billing agreements. FALSE will skip that change
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase							The purchase
+	 * @param	array				$changes							The old values
+	 * @param	bool				$cancelBillingAgreementIfNecessary	If making changes to renewal terms, TRUE will cancel associated billing agreements. FALSE will skip that change
+	 * @return	void
 	 */
-	public function updatePurchase(Purchase $purchase, array $changes, bool $cancelBillingAgreementIfNecessary=FALSE ): void
+	public function updatePurchase( \IPS\nexus\Purchase $purchase, $changes, $cancelBillingAgreementIfNecessary=FALSE )
 	{
 		if ( array_key_exists( 'lkey', $changes ) )
 		{
+			$oldKey = NULL;
+
 			$lKey = $purchase->licenseKey();
 
 			if ( $lKey )
@@ -154,11 +199,11 @@ class Product extends NexusPackage
 				$lKey->delete();
 			}
 
-			$licenseTypes = LicenseKey::licenseKeyTypes();
+			$licenseTypes = \IPS\nexus\Purchase\LicenseKey::licenseKeyTypes();
 
-			if( class_exists( $licenseTypes[ IPS::mb_ucfirst( $this->lkey ) ]) )
+			if( class_exists( $licenseTypes[ mb_ucfirst( $this->lkey ) ]) )
 			{
-				$class = $licenseTypes[ IPS::mb_ucfirst( $this->lkey ) ];
+				$class = $licenseTypes[ mb_ucfirst( $this->lkey ) ];
 				$licenseKey = new $class;
 				$licenseKey->identifier = $this->lkey_identifier;
 				$licenseKey->purchase = $purchase;
@@ -185,7 +230,7 @@ class Product extends NexusPackage
 			$purchase->save();
 		}
 		
-		parent::updatePurchase( $purchase, $changes, $cancelBillingAgreementIfNecessary );
+		return parent::updatePurchase( $purchase, $changes, $cancelBillingAgreementIfNecessary );
 	}
 	
 	/* !Actions */
@@ -193,23 +238,23 @@ class Product extends NexusPackage
 	/**
 	 * Add To Cart
 	 *
-	 * @param \IPS\nexus\Invoice\Item $item			The item
+	 * @param	\IPS\nexus\extensions\nexus\Item\Package	$item			The item
 	 * @param	array										$values			Values from form
-	 * @param string $memberCurrency	The currency being used
-	 * @return    array    Additional items to add
+	 * @param	string										$memberCurrency	The currency being used
+	 * @return	array	Additional items to add
 	 */
-	public function addToCart(\IPS\nexus\Invoice\Item $item, array $values, string $memberCurrency ): array
+	public function addToCart( \IPS\nexus\extensions\nexus\Item\Package $item, array $values, $memberCurrency )
 	{
 		if ( $this->subscription )
 		{
 			if ( $item->quantity > 1 )
 			{
-				Output::i()->error( 'err_subscription_qty', '1X247/2', 403, '' );
+				\IPS\Output::i()->error( 'err_subscription_qty', '1X247/2', 403, '' );
 			}
 			
-			if ( $this->_memberHasPurchasedSubscription( Member::loggedIn() ) )
+			if ( $this->_memberHasPurchasedSubscription( \IPS\Member::loggedIn() ) )
 			{
-				Output::i()->error( 'err_subscription_bought', '1X247/1', 403, '' );
+				\IPS\Output::i()->error( 'err_subscription_bought', '1X247/1', 403, '' );
 			}
 			
 			if ( isset( $_SESSION['cart'] ) )
@@ -218,7 +263,7 @@ class Product extends NexusPackage
 				{
 					if ( $_item->id === $this->id )
 					{
-						Output::i()->error( 'err_subscription_in_cart', '1X247/3', 403, '' );
+						\IPS\Output::i()->error( 'err_subscription_in_cart', '1X247/3', 403, '' );
 					}
 				}
 			}
@@ -233,31 +278,31 @@ class Product extends NexusPackage
 	 * is ran to check the items they are purchasing can be bought.
 	 * Is expected to throw a DomainException with an error message to display to the user if not valid
 	 *
-	 * @param	Member	$member	The new member
-	 * @return    void
-	 * @throws	DomainException
+	 * @param	\IPS\Member	$member	The new member
+	 * @return	void
+	 * @throws	\DomainException
 	 */
-	public function memberCanPurchase( Member $member ): void
+	public function memberCanPurchase( \IPS\Member $member )
 	{
 		if ( $this->subscription and $this->_memberHasPurchasedSubscription( $member ) )
 		{
-			throw new DomainException( $member->language()->addToStack( 'err_subscription_bought_login', FALSE, array( 'sprintf' => array( $member->language()->addToStack( "nexus_package_{$this->id}" ) ) ) ) );
+			throw new \DomainException( $member->language()->addToStack( 'err_subscription_bought_login', FALSE, array( 'sprintf' => array( $member->language()->addToStack( "nexus_package_{$this->id}" ) ) ) ) );
 		}
 		if ( ! ( $this->member_groups == "*" or !empty( ( array_intersect( explode( ",", $this->member_groups ), $member->groups ) ) ) ) )
 		{
-			throw new DomainException( $member->language()->addToStack( 'err_group_cant_purchase', FALSE, array( 'sprintf' => array( $member->language()->addToStack( "nexus_package_{$this->id}" ) ) ) ) );
+			throw new \DomainException( $member->language()->addToStack( 'err_group_cant_purchase', FALSE, array( 'sprintf' => array( $member->language()->addToStack( "nexus_package_{$this->id}" ) ) ) ) );
 		}
 	}
 	
 	/**
 	 * Check if a member has purchased this subscription product
 	 *
-	 * @param	Member	$member	The new member
+	 * @param	\IPS\Member	$member	The new member
 	 * @return	bool
 	 */
-	protected function _memberHasPurchasedSubscription( Member $member ) : bool
+	protected function _memberHasPurchasedSubscription( \IPS\Member $member )
 	{
-		return (bool) Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_cancelled=0 AND ps_member=?', 'nexus', 'package', $this->id, $member->member_id ) )->first();
+		return (bool) \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=? AND ps_cancelled=0 AND ps_member=?', 'nexus', 'package', $this->id, $member->member_id ) )->first();
 	}
 	
 	/**
@@ -265,7 +310,7 @@ class Product extends NexusPackage
 	 *
 	 * @return	bool
 	 */
-	public function showPurchaseRecord(): bool
+	public function showPurchaseRecord()
 	{
 		return $this->show;
 	}
@@ -273,39 +318,36 @@ class Product extends NexusPackage
 	/**
 	 * Get ACP Page HTML
 	 *
-	 * @param Purchase $purchase
-	 * @return    string
+	 * @return	string
 	 */
-	public function acpPage( Purchase $purchase ): string
+	public function acpPage( \IPS\nexus\Purchase $purchase )
 	{
-		if ( $this->lkey and Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'lkeys_view' ) )
+		if ( $this->lkey and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'lkeys_view' ) )
 		{
 			if ( $lkey = $purchase->licenseKey() )
 			{
-				return Theme::i()->getTemplate('purchases')->lkey( $lkey );
+				return \IPS\Theme::i()->getTemplate('purchases')->lkey( $lkey );
 			}
 			else
 			{
-				return Theme::i()->getTemplate('purchases')->noLkey( $purchase );
+				return \IPS\Theme::i()->getTemplate('purchases')->noLkey( $purchase );
 			}
 		}
-
-		return '';
 	}
 	
 	/**
 	 * ACP Action
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    string|null
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	void
 	 */
-	public function acpAction( Purchase $purchase ): string|null
+	public function acpAction( \IPS\nexus\Purchase $purchase )
 	{
-		switch ( Request::i()->act )
+		switch ( \IPS\Request::i()->act )
 		{
 			case 'lkeyReset':
-				Dispatcher::i()->checkAcpPermission( 'lkeys_reset' );
-				Session::i()->csrfCheck();
+				\IPS\Dispatcher::i()->checkAcpPermission( 'lkeys_reset' );
+				\IPS\Session::i()->csrfCheck();
 				
 				$oldKey = NULL;
 				try
@@ -316,13 +358,13 @@ class Product extends NexusPackage
 						$old->delete();
 					}
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
 				
 				/* Invalidate License Key Cache so old data is not loaded */
 				$purchase->licenseKey = NULL;
 				
-				$licenseTypes = LicenseKey::licenseKeyTypes();
-				$class = $licenseTypes[ IPS::mb_ucfirst( $this->lkey ) ];
+				$licenseTypes = \IPS\nexus\Purchase\LicenseKey::licenseKeyTypes();
+				$class = $licenseTypes[ mb_ucfirst( $this->lkey ) ];
 				$licenseKey = new $class;
 				$licenseKey->identifier = $this->lkey_identifier;
 				$licenseKey->purchase = $purchase;
@@ -330,7 +372,7 @@ class Product extends NexusPackage
 				$licenseKey->save();
 				
 				$purchase->member->log( 'lkey', array( 'type' => 'reset', 'key' => $oldKey, 'new' => $licenseKey->key, 'ps_id' => $purchase->id, 'ps_name' => $purchase->name ) );
-				return null;
+				break;
 				
 			default:
 				return parent::acpAction( $purchase );
@@ -340,16 +382,16 @@ class Product extends NexusPackage
 	/**
 	 * On Purchase Generated
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @param Invoice $invoice	The invoice
-	 * @return    void
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @param	\IPS\nexus\Invoice	$invoice	The invoice
+	 * @return	void
 	 */
-	public function onPurchaseGenerated(Purchase $purchase, Invoice $invoice ): void
+	public function onPurchaseGenerated( \IPS\nexus\Purchase $purchase, \IPS\nexus\Invoice $invoice )
 	{
 		if ( $this->lkey )
 		{
-			$licenseTypes = LicenseKey::licenseKeyTypes();
-			$class = $licenseTypes[ IPS::mb_ucfirst( $this->lkey ) ];
+			$licenseTypes = \IPS\nexus\Purchase\LicenseKey::licenseKeyTypes();
+			$class = $licenseTypes[ mb_ucfirst( $this->lkey ) ];
 			$licenseKey = new $class;
 			$licenseKey->identifier = $this->lkey_identifier;
 			$licenseKey->purchase = $purchase;
@@ -363,10 +405,10 @@ class Product extends NexusPackage
 	/**
 	 * Warning to display to admin when cancelling a purchase
 	 *
-	 * @param	Purchase	$purchase	The purchase
-	 * @return    string|null
+	 * @param	\IPS\nexus\Purchase	$purchase	The purchase
+	 * @return	string
 	 */
-	public function onCancelWarning( Purchase $purchase ): string|null
+	public function onCancelWarning( \IPS\nexus\Purchase $purchase )
 	{
 		return NULL;
 	}

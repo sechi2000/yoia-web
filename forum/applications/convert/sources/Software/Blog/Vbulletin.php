@@ -12,57 +12,38 @@
 namespace IPS\convert\Software\Blog;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\blog\Entry;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Vbulletin as VbulletinClass;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * vBulletin Blog Converter
  */
-class Vbulletin extends Software
+class _Vbulletin extends \IPS\convert\Software
 {
 	/**
 	 * @brief	vBulletin 4 Stores all attachments under one table - this will store the content type for the blog app.
 	 */
-	protected static mixed $entryContentType		= NULL;
+	protected static $entryContentType		= NULL;
 	
 	/**
 	 * @brief	The schematic for vB3 and vB4 is similar enough that we can make specific concessions in a single converter for either version.
 	 */
-	protected static ?bool $isLegacy					= NULL;
+	protected static $isLegacy					= NULL;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 		
 		/* Is this vB3 or vB4? */
 		try
@@ -83,20 +64,22 @@ class Vbulletin extends Software
 			
 			
 			/* If this is vB4, what is the content type ID for posts? */
-			if ( static::$entryContentType === NULL AND ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) AND $needDB )
+			if ( static::$entryContentType === NULL AND ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) AND $needDB )
 			{
 				static::$entryContentType = $this->db->select( 'contenttypeid', 'contenttype', array( "class=?", 'BlogEntry' ) )->first();
 			}
 		}
-		catch( Exception $e ) {}
+		catch( \Exception $e ) {}
+		
+		return $return;
 	}
 	
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "vBulletin Blog (3.8.x/4.x)";
@@ -105,9 +88,9 @@ class Vbulletin extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "vbulletin";
@@ -116,13 +99,13 @@ class Vbulletin extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		$attachmentTable = 'blog_attachment';
 		$attachmentWhere = NULL;
-		if ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) )
+		if ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) )
 		{
 			$attachmentTable = 'attachment';
 			$attachmentWhere = array( "contenttypeid=?", static::$entryContentType );
@@ -155,30 +138,32 @@ class Vbulletin extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
 			default:
 				return parent::countRows( $table, $where );
+				break;
 			
 			case 'blog_text':
-				return $this->db->select( 'COUNT(*)', 'blog_text', array( 'blogtextid NOT IN (' . $this->db->select( 'firstblogtextid', 'blog' ) . ')' ) )->first();
+				return $this->db->select( 'COUNT(*)', 'blog_text', array( 'blogtextid NOT IN (' . (string) $this->db->select( 'firstblogtextid', 'blog' ) . ')' ) )->first();
+				break;
 		}
 	}
 
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -186,9 +171,9 @@ class Vbulletin extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'vbulletin' ) );
 	}
@@ -196,39 +181,36 @@ class Vbulletin extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\blog\Entry\Category', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'blog_entries', 'class' => 'IPS\blog\Entry' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'blog_comments', 'class' => 'IPS\blog\Entry\Comment' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'blog_entries', 'class' => 'IPS\blog\Entry' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\blog\Entry\Category', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'blog_entries', 'class' => 'IPS\blog\Entry' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'blog_comments', 'class' => 'IPS\blog\Entry\Comment' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'blog_entries', 'class' => 'IPS\blog\Entry' ), 3, array( 'app', 'link', 'class' ) );
 		
 		return array( "f_blog_entries_rebuilding", "f_entry_comments_rebuilding", "f_blogs_recounting", "f_entry_tags_cache" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix Post Data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string	$post	Post
+	 * @return	string	Fixed Posts
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return VbulletinClass::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Vbulletin::fixPostData( $post );
 	}
 
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array( 'convertAttachments' );
 	}
@@ -236,10 +218,10 @@ class Vbulletin extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -252,13 +234,13 @@ class Vbulletin extends Software
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'database'				=> Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
-								'file_system'			=> Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
+								'database'				=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
+								'file_system'			=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
 							),
 							'userSuppliedInput'	=> 'file_system',
 						),
 						'field_hint'			=> NULL,
-						'field_validation'	=> function( $value ) { if ( $value != 'database' AND !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_validation'	=> function( $value ) { if ( $value != 'database' AND !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;
@@ -272,7 +254,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertBlogs() : void
+	public function convertBlogs()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -284,7 +266,7 @@ class Vbulletin extends Software
 			{
 				$member = $this->db->select( '*', 'user', array( "userid=?", $blog['bloguserid'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				/* User no longer exists, so skip */
 				$libraryClass->setLastKeyValue( $blog['bloguserid'] );
@@ -358,7 +340,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertBlogEntryCategories() : void
+	public function convertBlogEntryCategories()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'blogcategoryid' );
@@ -382,7 +364,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertBlogEntries() : void
+	public function convertBlogEntries()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -394,7 +376,7 @@ class Vbulletin extends Software
 			{
 				$text = $this->db->select( '*', 'blog_text', array( "blogtextid=?", $entry['firstblogtextid'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$libraryClass->setLastKeyValue( $entry['blogid'] );
 				continue;
@@ -406,7 +388,7 @@ class Vbulletin extends Software
 			{
 				$lastcommenterid = $this->db->select( 'userid', 'blog_text', array( "blogtextid=?", $entry['lastblogtextid'] ) )->first();
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			$status = 'published';
 			if ( $entry['state'] == 'draft' )
@@ -422,7 +404,7 @@ class Vbulletin extends Software
 				$editname = $editlog['username'];
 				$editReason = $editlog['reason'];
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 
 			$categories = explode( ',', $entry['categories'] );
 			$mainCategory = array_pop( $categories );
@@ -444,7 +426,7 @@ class Vbulletin extends Software
 				'entry_edit_time'			=> $edittime,
 				'entry_edit_name'			=> $editname,
 				'entry_edit_reason'			=> $editReason,
-				'entry_append_edit'			=> (bool)$edittime,
+				'entry_append_edit'			=> $edittime ? TRUE : FALSE,
 				'entry_ip_address'			=> long2ip( (int) $text['ipaddress'] ),
 				'entry_category_id'			=> $mainCategory
 			);
@@ -464,7 +446,7 @@ class Vbulletin extends Software
 				) );
 			}
 
-			if ( count( $categories ) )
+			if ( \count( $categories ) )
 			{
 				foreach( $categories as $category )
 				{
@@ -472,7 +454,7 @@ class Vbulletin extends Software
 					{
 						$data = $this->db->select( '*', 'blog_category', array( "blogcategoryid=?", $category ) )->first();
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
 						continue;
 					}
@@ -523,14 +505,14 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertBlogComments() : void
+	public function convertBlogComments()
 	{
 		$libraryClass = $this->getLibrary();
 		
 		$libraryClass::setKey( 'blogtextid' );
 
 		// Exclude text of blog entry from iterator
-		foreach( $this->fetch( 'blog_text', 'blogtextid', array( 'blogtextid NOT IN (' . $this->db->select( 'firstblogtextid', 'blog' ) . ')' ) ) AS $comment )
+		foreach( $this->fetch( 'blog_text', 'blogtextid', array( 'blogtextid NOT IN (' . (string) $this->db->select( 'firstblogtextid', 'blog' ) . ')' ) ) AS $comment )
 		{
 			$edittime = $editname = NULL;
 			try
@@ -539,7 +521,7 @@ class Vbulletin extends Software
 				$edittime = $editlog['dateline'];
 				$editname = $editlog['username'];
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			switch( $comment['state'] )
 			{
@@ -580,7 +562,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -589,7 +571,7 @@ class Vbulletin extends Software
 		$where			= NULL;
 		$column			= NULL;
 		
-		if ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) )
+		if ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) )
 		{
 			$where			= array( "contenttypeid=?", static::$entryContentType );
 			$column			= 'contentid';
@@ -603,17 +585,17 @@ class Vbulletin extends Software
 		
 		foreach( $this->fetch( $table, 'attachmentid', $where ) as $attachment )
 		{
-			if ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) )
+			if ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) )
 			{
 				try
 				{
 					$filedata = $this->db->select( '*', 'filedata', array( "filedataid=?", $attachment['filedataid'] ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					/* If the filedata row is missing, there isn't much we can do. */
 					$libraryClass->setLastKeyValue( $attachment['attachmentid'] );
-					$this->app->log( 'vb_attach_missing_filedata', __METHOD__, App::LOG_WARNING, $attachment['attachmentid'] );
+					$this->app->log( 'vb_attach_missing_filedata', __METHOD__, \IPS\convert\App::LOG_WARNING, $attachment['attachmentid'] );
 					continue;
 				}
 			}
@@ -668,15 +650,16 @@ class Vbulletin extends Software
 					/* Do some re-jiggery on the post itself to make sure attachment displays */
 					$entry_id = $this->app->getLink( $attachment[ $column ], 'blog_entries' );
 
-					$post = Db::i()->select( 'entry_content', 'blog_entries', array( "entry_id=?", $entry_id ) )->first();
+					$post = \IPS\Db::i()->select( 'entry_content', 'blog_entries', array( "entry_id=?", $entry_id ) )->first();
 
 					if ( preg_match( "/\[ATTACH([^\]]+?)?\]".$attachment['attachmentid']."\[\/ATTACH\]/i", $post ) )
 					{
 						$post = preg_replace( "/\[ATTACH([^\]]+?)?\]" . $attachment['attachmentid'] . "\[\/ATTACH\]/i", '[attachment=' . $attach_id . ':name]', $post );
-						Db::i()->update( 'blog_entries', array( 'entry_content' => $post ), array( "entry_id=?", $entry_id ) );
+						\IPS\Db::i()->update( 'blog_entries', array( 'entry_content' => $post ), array( "entry_id=?", $entry_id ) );
 					}
 				}
-				catch( UnderflowException|OutOfRangeException $e ) {}
+				catch( \UnderflowException $e ) {}
+				catch( \OutOfRangeException $e ) {}
 			}
 
 			$libraryClass->setLastKeyValue( $attachment['attachmentid'] );
@@ -686,25 +669,25 @@ class Vbulletin extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
-		if( preg_match( '#/entries/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#/entries/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			try
 			{
 				$data = (string) $this->app->getLink( (int) $matches[1], array( 'blog_entries' ) );
-				$item = Entry::load( $data );
+				$item = \IPS\blog\Entry::load( $data );
 
 				if( $item->can( 'view' ) )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e ) {}
+			catch( \Exception $e ) {}
 		}
 
 		return NULL;

@@ -191,6 +191,7 @@
         "app=core&module=promotion&controller=sharelinks",
         "app=core&module=settings&controller=advanced&do=tasks",
         "app=core&module=settings&controller=advanced&searchResult=form_auto_polling_enabled",
+        "app=core&module=settings&controller=advanced&searchResult=form_lazy_load_enabled",
         "app=core&module=settings&controller=advanced&tab=datastore",
         "app=core&module=settings&controller=advanced&tab=datastore&searchResult=cache_guest_page",
         "app=core&module=settings&controller=advanced&tab=datastore&searchResult=cache_method",

@@ -12,38 +12,23 @@
 namespace IPS\convert\Software\Cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use DOMXPath;
-use IPS\convert\Software;
-use IPS\convert\Software\Exception;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Member;
-use IPS\Task;
-use IPS\Text\DOMParser;
-use IPS\Xml\DOMDocument;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
- * WordPress Pages Converter
+ * Wordpress Pages Converter
  */
-class Wordpress extends Software
+class _Wordpress extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "WordPress (5.x)";
@@ -52,9 +37,9 @@ class Wordpress extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "wordpress";
@@ -63,9 +48,9 @@ class Wordpress extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertCmsPages'				=> array(
@@ -98,30 +83,32 @@ class Wordpress extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
 			case 'cms_database':
 				return 1;
+				break;
 			
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 
 	/**
 	 * Requires Parent?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -129,9 +116,9 @@ class Wordpress extends Software
 	/**
 	 * Available Parents
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'wordpress', 'wpforo' ) );
 	}
@@ -139,9 +126,9 @@ class Wordpress extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertAttachments',
@@ -152,10 +139,10 @@ class Wordpress extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		
@@ -167,8 +154,8 @@ class Wordpress extends Software
 					'field_required'	=> TRUE,
 					'field_default'		=> NULL,
 					'field_extra'		=> array(),
-					'field_hint'		=> Member::loggedIn()->language()->addToStack( 'convert_wp_typical_path' ),
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack( 'convert_wp_typical_path' ),
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				break;
 				
@@ -178,8 +165,8 @@ class Wordpress extends Software
 					'field_required'	=> TRUE,
 					'field_default'		=> NULL,
 					'field_extra'		=> array(),
-					'field_hint'		=> Member::loggedIn()->language()->addToStack( 'convert_wp_typical_path' ),
-					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+					'field_hint'		=> \IPS\Member::loggedIn()->language()->addToStack( 'convert_wp_typical_path' ),
+					'field_validation'	=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 				);
 				break;
 		}
@@ -190,23 +177,23 @@ class Wordpress extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		try
 		{
 			$database = $this->app->getLink( 1, 'cms_databases' );
-			Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\cms\Categories' . $database, 'count' => 0 ), 5, array( 'class' ) );
-			Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\cms\Records' . $database ), 3, array( 'class' ) );
+			\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\cms\Categories' . $database, 'count' => 0 ), 5, array( 'class' ) );
+			\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\cms\Records' . $database ), 3, array( 'class' ) );
 
-			Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'cms_records', 'class' => 'IPS\cms\Records' . $database ), 3, array( 'app', 'link', 'class' ) );
-			Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'cms_custom_database_' . $database, 'class' => 'IPS\cms\Records' . $database ), 2, array( 'app', 'link', 'class' ) );
-			Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'cms_database_comments', 'class' => 'IPS\cms\Records\Comment' . $database ), 2, array( 'app', 'link', 'class' ) );
+			\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'cms_records', 'class' => 'IPS\cms\Records' . $database ), 3, array( 'app', 'link', 'class' ) );
+			\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'cms_custom_database_' . $database, 'class' => 'IPS\cms\Records' . $database ), 2, array( 'app', 'link', 'class' ) );
+			\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'cms_database_comments', 'class' => 'IPS\cms\Records\Comment' . $database ), 2, array( 'app', 'link', 'class' ) );
 
 			return array( "f_recount_cms_categories", "f_rebuild_cms_tags" );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			return array();
 		}
@@ -217,7 +204,7 @@ class Wordpress extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsPages() : void
+	public function convertCmsPages()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -241,7 +228,7 @@ class Wordpress extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsDatabases() : void
+	public function convertCmsDatabases()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -277,7 +264,7 @@ class Wordpress extends Software
 		) );
 		
 		/* Throw an exception here to tell the library that we're done with this step */
-		throw new Exception;
+		throw new \IPS\convert\Software\Exception;
 	}
 
 	/**
@@ -285,7 +272,7 @@ class Wordpress extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsDatabaseCategories() : void
+	public function convertCmsDatabaseCategories()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -311,7 +298,7 @@ class Wordpress extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsDatabaseRecords() : void
+	public function convertCmsDatabaseRecords()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -366,7 +353,7 @@ class Wordpress extends Software
 					$imagePath = rtrim( $this->app->_session['more_info']['convertCmsDatabaseRecords']['file_location'], '/' ) . '/' . $location;
 					$filename = basename( $imagePath );
 				}
-				catch( UnderflowException $e ) {}
+				catch( \UnderflowException $e ) {}
 			}
 			
 			$info = array(
@@ -376,13 +363,13 @@ class Wordpress extends Software
 				'record_locked'			=> ( $row['comment_status'] == 'closed' ) ? 1 : 0,
 				'record_comments'		=> $row['comment_count'],
 				'record_allow_comments'	=> 1,
-				'record_saved'			=> new DateTime( $row['post_date'] ),
-				'record_updated'		=> $row['post_modified'] !== '0000-00-00 00:00:00' ? new DateTime( $row['post_modified'] ) : NULL, # Older WordPress installs may be missing a modified date
+				'record_saved'			=> new \IPS\DateTime( $row['post_date'] ),
+				'record_updated'		=> $row['post_modified'] !== '0000-00-00 00:00:00' ? new \IPS\DateTime( $row['post_modified'] ) : NULL, # Older WordPress installs may be missing a modified date
 				'category_id'			=> $category,
 				'record_approved'		=> $approved,
 				'record_dynamic_furl'	=> $row['post_name'],
 				'record_static_furl'	=> $row['post_name'],
-				'record_publish_date'	=> new DateTime( $row['post_date'] ),
+				'record_publish_date'	=> new \IPS\DateTime( $row['post_date'] ),
 				'record_image'			=> $filename,
 			);
 			
@@ -421,7 +408,7 @@ class Wordpress extends Software
 					'tag_meta_id'			=> $row['ID'],
 					'tag_text'				=> $tag,
 					'tag_member_id'			=> $row['post_author'],
-					'tag_added'             => new DateTime( $row['post_date'] ),
+					'tag_added'             => new \IPS\DateTime( $row['post_date'] ),
 					'tag_prefix'			=> 0,
 					'tag_meta_link'			=> 'cms_custom_database_' . $database,
 					'tag_meta_parent_link'	=> 'cms_database_categories',
@@ -437,7 +424,7 @@ class Wordpress extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertCmsDatabaseComments() : void
+	public function convertCmsDatabaseComments()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -465,7 +452,7 @@ class Wordpress extends Software
 				'comment_id'			=> $row['comment_ID'],
 				'comment_database_id'	=> 1,
 				'comment_record_id'		=> $row['comment_post_ID'],
-				'comment_date'			=> new DateTime( $row['comment_date'] ),
+				'comment_date'			=> new \IPS\DateTime( $row['comment_date'] ),
 				'comment_ip_address'	=> $row['comment_author_IP'],
 				'comment_user'			=> $row['user_id'],
 				'comment_author'		=> $row['comment_author'],
@@ -477,14 +464,14 @@ class Wordpress extends Software
 		}
 	}
 
-	protected array $postContent = [];
+	protected $postContent = [];
 
 	/**
 	 * Convert attachments
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$database = $this->app->getLink( 1, 'cms_databases' );
 		$contentField = $this->app->getLink( 2, 'cms_database_fields' );
@@ -501,7 +488,7 @@ class Wordpress extends Software
 				$libraryClass->setLastKeyValue( $row['ID'] );
 				continue;
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 
 			try
 			{
@@ -509,10 +496,10 @@ class Wordpress extends Software
 				$postId = $this->app->getLink( $wpPost['ID'], "cms_custom_database_" . $database );
 				if( !isset( $this->postContent[ $postId ] ) )
 				{
-					$this->postContent[ $postId ] = Db::i()->select( 'field_' . $contentField, 'cms_custom_database_' . $database, array( "primary_id_field=?", $postId ) )->first();
+					$this->postContent[ $postId ] = \IPS\Db::i()->select( 'field_' . $contentField, 'cms_custom_database_' . $database, array( "primary_id_field=?", $postId ) )->first();
 				}
 			}
-			catch( UnderflowException|OutOfRangeException $e )
+			catch( \UnderflowException | \OutOfRangeException $e )
 			{
 				$libraryClass->setLastKeyValue( $row['ID'] );
 				continue;
@@ -535,7 +522,7 @@ class Wordpress extends Software
 			$info = array(
 				'attach_id'			=> $row['ID'],
 				'attach_file'		=> basename( $meta['_wp_attached_file'] ),
-				'attach_date'		=> new DateTime( $row['post_date'] ),
+				'attach_date'		=> new \IPS\DateTime( $row['post_date'] ),
 				'attach_member_id'	=> $row['post_author']
 			);
 
@@ -543,9 +530,9 @@ class Wordpress extends Software
 
 			if( $attachId !== FALSE AND mb_stristr( $this->postContent[ $postId ], $meta['_wp_attached_file'] ) )
 			{
-				$dom = new DOMDocument( '1.0', 'UTF-8' );
-				$dom->loadHTML( DOMDocument::wrapHtml( $this->postContent[ $postId ] ) );
-				$xPath = new DOMXPath( $dom );
+				$dom = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
+				$dom->loadHTML( \IPS\Xml\DOMDocument::wrapHtml( $this->postContent[ $postId ] ) );
+				$xPath = new \DOMXPath( $dom );
 
 				foreach ( $xPath->query( "//img[contains(@src, '" . $meta['_wp_attached_file'] ."')] | //a[contains(@href, '" . $meta['_wp_attached_file'] ."')]" ) as $tag )
 				{
@@ -554,7 +541,7 @@ class Wordpress extends Software
 				}
 
 				/* Get DOMDocument output */
-				$content = DOMParser::getDocumentBodyContents( $dom );
+				$content = \IPS\Text\DOMParser::getDocumentBodyContents( $dom );
 
 				/* Replace file storage tags */
 				$content = preg_replace( '/&lt;fileStore\.([\d\w\_]+?)&gt;/i', '<fileStore.$1>', $content );
@@ -569,7 +556,7 @@ class Wordpress extends Software
 		/* Do the updates */
 		foreach( $this->postContent as $pid => $content )
 		{
-			Db::i()->update( 'cms_custom_database_' . $database, array( 'field_' . $contentField => $content ), array( 'primary_id_field=?', $pid ) );
+			\IPS\Db::i()->update( 'cms_custom_database_' . $database, array( 'field_' . $contentField => $content ), array( 'primary_id_field=?', $pid ) );
 		}
 	}
 }

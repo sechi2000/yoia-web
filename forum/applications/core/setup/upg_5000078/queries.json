@@ -1,9 +1,0 @@
-{
-    "1": {
-        "method": "dropTable",
-        "params": [
-            "core_hive_subscribers",
-            true
-        ]
-    }
-}

@@ -45,28 +45,28 @@
         "report": "none"
     },
     {
-        "key": "autolock_topic_settings",
-        "default": "",
-        "report": "none"
-    },
-    {
         "key": "email_truncate",
         "default": "1",
         "report": "full"
     },
     {
-        "key": "forum_post_use_minimal_editor",
-        "default": "0",
-        "report": "none"
-    },
-    {
-        "key": "forums_fluid_pinned",
+        "key": "forums_answers_downvote",
         "default": "1",
         "report": "full"
     },
     {
-        "key": "forums_helpful_highlight",
-        "default": "5",
+        "key": "forums_default_view",
+        "default": "table",
+        "report": "full"
+    },
+    {
+        "key": "forums_default_view_choose",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "forums_fluid_pinned",
+        "default": "1",
         "report": "full"
     },
     {
@@ -75,8 +75,23 @@
         "report": "full"
     },
     {
+        "key": "forums_new_questions",
+        "default": "0",
+        "report": "full"
+    },
+    {
+        "key": "forums_popular_now",
+        "default": "{\"posts\":\"10\",\"minutes\":\"60\"}",
+        "report": "bool"
+    },
+    {
         "key": "forums_posts_per_page",
         "default": "25",
+        "report": "full"
+    },
+    {
+        "key": "forums_questions_downvote",
+        "default": "0",
         "report": "full"
     },
     {
@@ -105,11 +120,6 @@
         "report": "none"
     },
     {
-        "key": "forums_topic_summary_post_count",
-        "default": "10",
-        "report": "full"
-    },
-    {
         "key": "forums_topics_activity_pages_show",
         "default": "3",
         "report": "full"
@@ -122,6 +132,16 @@
     {
         "key": "forums_topics_show_meta",
         "default": "[\"time\", \"moderation\"]",
+        "report": "full"
+    },
+    {
+        "key": "forums_view_list_choose",
+        "default": "1",
+        "report": "full"
+    },
+    {
+        "key": "forums_view_list_method",
+        "default": "list",
         "report": "full"
     }
 ]

@@ -12,25 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content\Reaction;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ContentReactionType for GraphQL API
  */
-class ContentReactionType extends ObjectType
+class _ContentReactionType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -57,14 +55,14 @@ class ContentReactionType extends ObjectType
 						'type' => TypeRegistry::int(),
 						'description' => "Count of this reaction type",
 						'resolve' => function ($reaction) {
-							return $reaction['count'] ?? 0;
+							return isset( $reaction['count'] ) ? $reaction['count'] : 0;
 						}
 					],
 					'image' => [
 						'type' => TypeRegistry::string(),
 						'description' => "Reaction image",
 						'resolve' => function ($reaction) {
-							$_reaction = $reaction['reaction'] ?? Reaction::load( $reaction['reactionId'] );
+							$_reaction = isset( $reaction['reaction'] ) ? $reaction['reaction'] : \IPS\Content\Reaction::load( $reaction['reactionId'] );
 							return (string) $_reaction->_icon->url;
 						}
 					],
@@ -72,8 +70,8 @@ class ContentReactionType extends ObjectType
 						'type' => TypeRegistry::string(),
 						'description' => "Reaction name",
 						'resolve' => function ($reaction) {
-							$_reaction = $reaction['reaction'] ?? Reaction::load( $reaction['reactionId'] );
-							return Member::loggedIn()->language()->addToStack("reaction_title_{$_reaction->id}", FALSE, array('escape' => TRUE));
+							$_reaction = isset( $reaction['reaction'] ) ? $reaction['reaction'] : \IPS\Content\Reaction::load( $reaction['reactionId'] );
+							return \IPS\Member::loggedIn()->language()->addToStack("reaction_title_{$_reaction->id}", FALSE, array('escape' => TRUE));
 						}
 					]
 				];

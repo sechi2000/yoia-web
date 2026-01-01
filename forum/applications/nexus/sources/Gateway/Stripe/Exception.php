@@ -12,27 +12,21 @@
 namespace IPS\nexus\Gateway\Stripe;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use IPS\Dispatcher;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Stripe Exception
  */
-class Exception extends DomainException
+class _Exception extends \DomainException
 {
 	/**
 	 * @brief	Details
 	 */
-	public array $details = [];
+	public $details;
 	
 	/**
 	 * Constructor
@@ -43,13 +37,13 @@ class Exception extends DomainException
 	public function __construct( array $response )
 	{
 		$this->details = $response;
-		if ( $response['type'] == 'card_error' or !Dispatcher::hasInstance() )
+		if ( $response['type'] == 'card_error' or !\IPS\Dispatcher::hasInstance() )
 		{
 			parent::__construct( $response['message'] );
 		}
 		else
 		{
-			parent::__construct( Member::loggedIn()->language()->get( 'gateway_err' ) );
+			parent::__construct( \IPS\Member::loggedIn()->language()->get( 'gateway_err' ) );
 		}
 	}
 }

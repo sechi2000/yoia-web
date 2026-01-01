@@ -11,48 +11,38 @@
 namespace IPS\core\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\DateTime;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP Notification: License will/has expired
  */
-class License extends AdminNotification
+class _License extends \IPS\core\AdminNotification
 {
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'important';
+	public static $group = 'important';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 1;
+	public static $groupPriority = 1;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 3;
+	public static $itemPriority = 3;
 	
 	/**
 	 * Title for settings
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle(): string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_License';
 	}
@@ -60,10 +50,10 @@ class License extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member )
 	{
 		return $member->hasAcpRestriction( 'core', 'settings', 'licensekey_manage' );
 	}
@@ -71,9 +61,9 @@ class License extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional(): bool
+	public static function mayBeOptional()
 	{
 		return FALSE;
 	}
@@ -83,7 +73,7 @@ class License extends AdminNotification
 	 *
 	 * @return	bool
 	 */
-	public static function mayRecur(): bool
+	public static function mayRecur()
 	{
 		return FALSE;
 	}
@@ -93,58 +83,51 @@ class License extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
 		switch ( $this->extra )
 		{
 			case 'missing':
 			case 'url':
-				return Member::loggedIn()->language()->addToStack('license_error');
+				return \IPS\Member::loggedIn()->language()->addToStack('license_error');
 			case 'expireSoon':
-				$licenseKeyData = IPS::licenseKey();
-				if( !empty( $licenseKeyData ) and !isset( $licenseKeyData['expires'] ) )
-				{
-					/* Fail-safe in case the data is missing */
-					return Member::loggedIn()->language()->addToStack('license_error');
-				}
-				return Member::loggedIn()->language()->addToStack( 'license_renewal_soon', FALSE, array( 'pluralize' => array( intval( DateTime::create()->diff( DateTime::ts( strtotime( $licenseKeyData['expires'] ), TRUE ) )->format('%r%a') ) ) ) );
+				$licenseKeyData = \IPS\IPS::licenseKey();
+				return \IPS\Member::loggedIn()->language()->addToStack( 'license_renewal_soon', FALSE, array( 'pluralize' => array( \intval( \IPS\DateTime::create()->diff( \IPS\DateTime::ts( strtotime( $licenseKeyData['expires'] ), TRUE ) )->format('%r%a') ) ) ) );
 			case 'expired':
-				return Member::loggedIn()->language()->addToStack('license_expired');
+				return \IPS\Member::loggedIn()->language()->addToStack('license_expired');				
 		}
-
-		return '';
 	}
 	
 	/**
 	 * Notification Subtitle (no HTML)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function subtitle(): ?string
+	public function subtitle()
 	{
 		switch ( $this->extra )
 		{
 			case 'missing':
 			case 'url':
-				return Member::loggedIn()->language()->addToStack('license_error_subtitle');
+				return \IPS\Member::loggedIn()->language()->addToStack('license_error_subtitle');
 			default:
-				return Member::loggedIn()->language()->addToStack('license_benefits_info');
+				return \IPS\Member::loggedIn()->language()->addToStack('license_benefits_info');
 		}
 	}
 	
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body()
 	{
 		switch ( $this->extra )
 		{
 			case 'missing':
-				return Member::loggedIn()->language()->addToStack('license_error_none');
+				return \IPS\Member::loggedIn()->language()->addToStack('license_error_none');
 			default:
-				return Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->licenseKey( $this->id, $this->extra );
+				return \IPS\Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->licenseKey( $this->id, $this->extra );				
 		}
 	}
 	
@@ -153,7 +136,7 @@ class License extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function severity(): string
+	public function severity()
 	{
 		switch ( $this->extra )
 		{				
@@ -170,7 +153,7 @@ class License extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function dismissible(): string
+	public function dismissible()
 	{
 		return static::DISMISSIBLE_NO;
 	}
@@ -178,9 +161,9 @@ class License extends AdminNotification
 	/**
 	 * Style
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
-	public function style(): string
+	public function style()
 	{
 		switch ( $this->extra )
 		{
@@ -192,17 +175,15 @@ class License extends AdminNotification
 			case 'expireSoon':
 				return static::STYLE_EXPIRE;
 		}
-
-		return '';
 	}
 	
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url
+	 * @return	bool
 	 */
-	public function link(): Url
+	public function link()
 	{
-		return Url::internal( 'app=core&module=settings&controller=licensekey' );
+		return \IPS\Http\Url::internal( 'app=core&module=settings&controller=licensekey' );
 	}
 }

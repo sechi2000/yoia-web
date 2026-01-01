@@ -11,59 +11,51 @@
 namespace IPS\nexus\extensions\core\MemberACPProfileBlocks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\Block;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Member Profile: Notes
  */
-class Notes extends Block
+class _Notes extends \IPS\core\MemberACPProfile\Block
 {
 	/**
 	 * @brief	Notes
 	 */
-	protected ?Db $notes = NULL;
+	protected $notes;
 	
 	/**
 	 * @brief	Note Count
 	 */
-	protected ?int $noteCount = NULL;
+	protected $noteCount;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function __construct( Member $member )
+	public function __construct( \IPS\Member $member )
 	{
 		parent::__construct( $member );
 		
 		$this->notes = NULL;
 		$this->noteCount = 0;
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customer_notes_view' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customer_notes_view' ) )
 		{
 			$this->noteCount = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_notes', array( 'note_member=?', $this->member->member_id ) )->first();
 			
-			$this->notes = new Db( 'nexus_notes', $this->member->acpUrl()->setQueryString( array( 'view' => 'notes' ) ), array( 'note_member=?', $this->member->member_id ) );
-			$this->notes->tableTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'notes' );
+			$this->notes = new \IPS\Helpers\Table\Db( 'nexus_notes', $this->member->acpUrl()->setQueryString( array( 'view' => 'notes', 'support' => isset( \IPS\Request::i()->support ) ? \IPS\Request::i()->support : 0 ) ), array( 'note_member=?', $this->member->member_id ) );
+			$this->notes->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'notes' );
 			$this->notes->sortBy = 'note_date';
 			
 			$this->notes->parsers = array(
 				'note_member'	=> function( $val )
 				{
-					return Member::load( $val );
+					return \IPS\Member::load( $val );
 				},
 				'note_text'		=> function( $val )
 				{
@@ -74,19 +66,30 @@ class Notes extends Block
 			$this->notes->rowButtons = function( $row )
 			{
 				$return = array();
-				if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customer_notes_edit' ) )
+				if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customer_notes_edit' ) )
 				{
-					$return['edit'] = array(
-						'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'noteForm', 'note_id' => $row['note_id'] ) ),
-						'title'	=> 'edit',
-						'icon'	=> 'pencil',
-						'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit_note') )
-					);
+					if ( !isset( \IPS\Request::i()->support ) or !\IPS\Request::i()->support )
+					{
+						$return['edit'] = array(
+							'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'noteForm', 'note_id' => $row['note_id'], 'support' => isset( \IPS\Request::i()->support ) ? \IPS\Request::i()->support : 0 ) ),
+							'title'	=> 'edit',
+							'icon'	=> 'pencil',
+							'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit_note') )
+						);
+					}
+					else
+					{
+						$return['edit'] = array(
+							'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'noteForm', 'note_id' => $row['note_id'], 'support' => isset( \IPS\Request::i()->support ) ? \IPS\Request::i()->support : 0 ) ),
+							'title'	=> 'edit',
+							'icon'	=> 'pencil',
+						);
+					}
 				}
-				if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customer_notes_delete' ) )
+				if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customer_notes_delete' ) )
 				{
 					$return['delete'] = array(
-						'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'deleteNote', 'note_id' => $row['note_id'] ) )->csrf(),
+						'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'deleteNote', 'note_id' => $row['note_id'], 'support' => isset( \IPS\Request::i()->support ) ? \IPS\Request::i()->support : 0 ) )->csrf(),
 						'title'	=> 'delete',
 						'icon'	=> 'times-circle',
 						'data'	=> array( 'confirm' => '' )
@@ -95,14 +98,14 @@ class Notes extends Block
 				return $return;
 			};
 			
-			if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customer_notes_add' ) )
+			if ( ( !isset( \IPS\Request::i()->support ) or !\IPS\Request::i()->support ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'customer_notes_add' ) )
 			{
 				$this->notes->rootButtons = array(
 					'add'	=> array(
-						'link'	=> Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'noteForm' ) ),
+						'link'	=> \IPS\Http\Url::internal("app=nexus&module=customers&controller=view&id={$this->member->member_id}")->setQueryString( array( 'do' => 'noteForm', 'support' => isset( \IPS\Request::i()->support ) ? \IPS\Request::i()->support : 0 ) ),
 						'title'	=> 'add',
 						'icon'	=> 'plus',
-						'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('add_note') )
+						'data'	=> array( 'ipsDialog' => true, 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('add_note') )
 					)
 				);
 			}
@@ -114,13 +117,13 @@ class Notes extends Block
 	 *
 	 * @return	string
 	 */
-	public function output(): string
+	public function output()
 	{
 		$this->notes->limit = 2;
-		$this->notes->tableTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'notesOverview' );
-		$this->notes->rowsTemplate = array( Theme::i()->getTemplate( 'customers', 'nexus' ), 'notesOverviewRows' );
+		$this->notes->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'notesOverview' );
+		$this->notes->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'customers', 'nexus' ), 'notesOverviewRows' );
 		
-		return (string) Theme::i()->getTemplate( 'customers', 'nexus' )->notesBlock( $this->member, $this->noteCount, $this->notes );
+		return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->notesBlock( $this->member, $this->noteCount, $this->notes );
 	}
 	
 	/**
@@ -128,8 +131,8 @@ class Notes extends Block
 	 *
 	 * @return	string
 	 */
-	public function lazyOutput(): string
+	public function lazyOutput()
 	{
-		return (string) Theme::i()->getTemplate( 'customers', 'nexus' )->customerPopup( $this->notes );
+		return \IPS\Theme::i()->getTemplate( 'customers', 'nexus' )->customerPopup( $this->notes );
 	}
 }

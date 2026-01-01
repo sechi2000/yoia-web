@@ -2,10 +2,12 @@
 <build>
  <module key="admin/blogs"><![CDATA[{"default_controller":"","protected":0,"default":1}]]></module>
  <module key="front/blogs"><![CDATA[{"default_controller":"browse","protected":0,"default":1}]]></module>
+ <setting key="blog_allow_grid"><![CDATA[{"key":"blog_allow_grid","default":"1","report":"full"}]]></setting>
  <setting key="blog_allow_rss"><![CDATA[{"key":"blog_allow_rss","default":"1","report":"full"}]]></setting>
  <setting key="blog_allow_rssimport"><![CDATA[{"key":"blog_allow_rssimport","default":"1","report":"full"}]]></setting>
  <setting key="blog_enable_rating"><![CDATA[{"key":"blog_enable_rating","default":"0","report":"full"}]]></setting>
  <setting key="blog_enable_sidebar"><![CDATA[{"key":"blog_enable_sidebar","default":"0","report":"full"}]]></setting>
+ <setting key="blog_view_mode"><![CDATA[{"key":"blog_view_mode","default":"grid","report":"bool"}]]></setting>
  <widget key="blogStatistics"><![CDATA[{"class":"\\IPS\\Widget\\StaticCache","restrict":[],"default_area":"","allow_reuse":false,"menu_style":"menu","embeddable":true}]]></widget>
  <widget key="entryFeed"><![CDATA[{"class":"\\IPS\\Widget\\PermissionCache","restrict":["sidebar","cms"],"default_area":"","allow_reuse":true,"menu_style":"modal","embeddable":true}]]></widget>
  <widget key="blogCommentFeed"><![CDATA[{"class":"\\IPS\\Widget\\PermissionCache","restrict":["sidebar","cms"],"default_area":"","allow_reuse":true,"menu_style":"modal","embeddable":true}]]></widget>
@@ -25,5 +27,4 @@
  <acpsearch key="app=core&amp;module=members&amp;controller=groups&amp;searchResult=4_g_blog_allowlocal"><![CDATA[{"lang_key":"g_blog_allowlocal","restriction":"groups_manage","keywords":["blogs","blogs permission","create blogs","post blogs"]}]]></acpsearch>
  <acpsearch key="app=core&amp;module=members&amp;controller=groups&amp;searchResult=g_blog_allowdelete"><![CDATA[{"lang_key":"g_blog_allowdelete","restriction":"groups_manage","keywords":["delete blogs","delete own blogs"]}]]></acpsearch>
  <acpsearch key="app=core&amp;module=members&amp;controller=groups&amp;searchResult=g_blog_allowprivate"><![CDATA[{"lang_key":"g_blog_allowprivate","restriction":"groups_manage","keywords":["private blogs"]}]]></acpsearch>
- <themeeditorsetting key="layout_blog_view"><![CDATA[{"key":"layout_blog_view","type":"select","name":"Blog View","desc":"Change the default layout of the blog view","refresh":true,"options":[["table","Table"],["grid","Grid"]],"default":"grid","cat":"pageLayouts"}]]></themeeditorsetting>
 </build>

@@ -12,80 +12,25 @@
 namespace IPS\Login;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application;
-use IPS\core\ShareLinks\Service;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Login;
-use IPS\Login\Exception as LoginException;
-use IPS\Login\Handler as HandlerClass;
-use IPS\Login\Handler\Standard;
-use IPS\Member;
-use IPS\Member\Device;
-use IPS\Node\Model;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use LogicException;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_object;
-use function is_string;
-use function mb_stripos;
-use function strlen;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Abstract Login Handler
  */
-abstract class Handler extends Model
+abstract class _Handler extends \IPS\Node\Model
 {
-	/**
-	 * @brief	[ActiveRecord] Caches
-	 * @note	Defined cache keys will be cleared automatically as needed
-	 */
-	protected array $caches = [ 'loginMethods' ];
-
-	/**
-	 * Is this login handler supported? - Implemented like this for BC
-	 *
-	 * @return bool
-	 */
-	public static function isSupported(): bool
-	{
-		return TRUE;
-	}
-
 	/**
 	 * Get all handler classes
 	 *
 	 * @return	array
 	 */
-	public static function handlerClasses(): array
+	public static function handlerClasses()
 	{
-		$return = array(
+		return array(
 			'IPS\Login\Handler\Standard',
 			'IPS\Login\Handler\OAuth2\Apple',
 			'IPS\Login\Handler\OAuth2\Facebook',
@@ -99,27 +44,17 @@ abstract class Handler extends Model
 			'IPS\Login\Handler\ExternalDatabase',
 			'IPS\Login\Handler\LDAP',
 		);
-
-		foreach ( Application::allExtensions( 'core', 'LoginHandler', FALSE, 'core' ) as $key => $extension )
-		{
-			if( $extension::isSupported() )
-			{
-				$return[] = $extension::class;
-			}
-		}
-
-		return $return;
 	}
 	
 	/**
 	 * Find a particular handler
 	 *
-	 * @param string $classname	Classname
-	 * @return    mixed
+	 * @param	string	$classname	Classname
+	 * @return	\IPS\Login\Hander|NULL
 	 */
-	public static function findMethod( string $classname ): mixed
+	public static function findMethod( $classname )
 	{
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
 			if ( $method instanceof $classname )
 			{
@@ -134,19 +69,19 @@ abstract class Handler extends Model
 	/**
 	 * @brief	Can we have multiple instances of this handler?
 	 */
-	public static bool $allowMultiple = FALSE;
+	public static $allowMultiple = FALSE;
 	
 	/**
 	 * @brief	Share Service
 	 */
-	public static ?string $shareService = NULL;
+	public static $shareService = NULL;
 	
 	/**
 	 * Get title
 	 *
 	 * @return	string
 	 */
-	public static function getTitle(): string
+	public static function getTitle()
 	{
 		return '';
 	}
@@ -159,7 +94,7 @@ abstract class Handler extends Model
 	 	return array( 'savekey'	=> new \IPS\Helpers\Form\[Type]( ... ), ... );
 	 * @endcode
 	 */
-	public function acpForm(): array
+	public function acpForm()
 	{
 		return array();
 	}
@@ -167,15 +102,15 @@ abstract class Handler extends Model
 	/**
 	 * Save Handler Settings
 	 *
-	 * @param array $values	Values from form
+	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function acpFormSave( array &$values ): array
+	public function acpFormSave( &$values )
 	{
 		$settings = array();
 		foreach ( $this->acpForm() as $key => $field )
 		{
-			if ( is_object( $field ) )
+			if ( \is_object( $field ) )
 			{
 				$settings[ $key ] = $values[ $field->name ];
 				unset( $values[ $field->name ] );
@@ -195,30 +130,15 @@ abstract class Handler extends Model
 	 *
 	 * @return	int
 	 */
-	abstract public function type(): int;
-
-	/**
-	 * Determine if a root can be added
-	 *
-	 * @return    bool
-	 */
-	public static function canAddRoot(): bool
-	{
-		if ( IPS::canManageResources() )
-		{
-			return TRUE;
-		}
-
-		return parent::canAddRoot();
-	}
+	abstract public function type();
 	
 	/**
 	 * Can this handler process a login for a member? 
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	bool
 	 */
-	public function canProcess( Member $member ): bool
+	public function canProcess( \IPS\Member $member )
 	{
 		return (bool) $this->_link( $member );
 	}
@@ -228,41 +148,32 @@ abstract class Handler extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canSyncPassword(): bool
+	public function canSyncPassword()
 	{
 		return FALSE;
 	}
-
-    /**
-     * Can this handler sync profile photos?
-     *
-     * @return bool
-     */
-    public function canSyncProfilePhoto() : bool
-    {
-        return false;
-    }
 	
 	/**
 	 * @brief	Cached links
 	 */
-	protected array $_cachedLinks = array();
+	protected $_cachedLinks = array();
 	
 	/**
 	 * Get link
 	 *
-	 * @param	Member	$member	Member
-	 * @return	array|null
+	 * @param	\IPS\Member	$member	Member
+	 * @return	array
 	 */
-	protected function _link( Member $member ): ?array
+	protected function _link( \IPS\Member $member )
 	{
 		if ( !isset( $this->_cachedLinks[ $member->member_id ] ) )
 		{
 			try
-			{				
-				$this->_cachedLinks[ $member->member_id ] = Db::i()->select( '*', 'core_login_links', array( 'token_login_method=? AND token_member=? AND token_linked=1', $this->id, $member->member_id ), NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first();
+			{
+				/* @note SELECT_FROM_WRITE_SERVER Added in 2e3846f8e6e50b0fc89f18ada73539e7034c5290 "Read/Write Separation issue with OAuth logins" */
+				$this->_cachedLinks[ $member->member_id ] = \IPS\Db::i()->select( '*', 'core_login_links', array( 'token_login_method=? AND token_member=? AND token_linked=1', $this->id, $member->member_id ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				$this->_cachedLinks[ $member->member_id ] = NULL;
 			}
@@ -273,10 +184,10 @@ abstract class Handler extends Model
 	/**
 	 * Can this handler process a password change for a member? 
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	bool
 	 */
-	public function canChangePassword( Member $member ): bool
+	public function canChangePassword( \IPS\Member $member )
 	{
 		return FALSE;
 	}
@@ -285,11 +196,11 @@ abstract class Handler extends Model
 	 * Email is in use?
 	 * Used when registering or changing an email address to check the new one is available
 	 *
-	 * @param string $email		Email Address
-	 * @param	Member|NULL	$exclude	Member to exclude
-	 * @return	bool|null Boolean indicates if email is in use (TRUE means is in use and thus not registerable) or NULL if this handler does not support such an API
+	 * @param	string				$email		Email Address
+	 * @param	\IPS\Member|NULL	$exclude	Member to exclude
+	 * @return	bool|NULL Boolean indicates if email is in use (TRUE means is in use and thus not registerable) or NULL if this handler does not support such an API
 	 */
-	public function emailIsInUse( string $email, Member $exclude=NULL ): ?bool
+	public function emailIsInUse( $email, \IPS\Member $exclude=NULL )
 	{
 		return NULL;
 	}
@@ -298,11 +209,11 @@ abstract class Handler extends Model
 	 * Username is in use?
 	 * Used when registering or changing an username to check the new one is available
 	 *
-	 * @param string $username	Username
-	 * @param	Member|NULL	$exclude	Member to exclude
+	 * @param	string				$username	Username
+	 * @param	\IPS\Member|NULL	$exclude	Member to exclude
 	 * @return	bool|NULL			Boolean indicates if username is in use (TRUE means is in use and thus not registerable) or NULL if this handler does not support such an API
 	 */
-	public function usernameIsInUse( string $username, Member $exclude=NULL ): ?bool
+	public function usernameIsInUse( $username, \IPS\Member $exclude=NULL )
 	{
 		return NULL;
 	}
@@ -310,13 +221,13 @@ abstract class Handler extends Model
 	/**
 	 * Change Username
 	 *
-	 * @param	Member	$member			The member
-	 * @param string $oldUsername	Old Username
-	 * @param string $newUsername	New Username
+	 * @param	\IPS\Member	$member			The member
+	 * @param	string		$oldUsername	Old Username
+	 * @param	string		$newUsername	New Username
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\Exception
 	 */
-	public function changeUsername( Member $member, string $oldUsername, string $newUsername ) : void
+	public function changeUsername( \IPS\Member $member, $oldUsername, $newUsername )
 	{
 		// By default do nothing. Handlers can extend.
 	}
@@ -324,13 +235,13 @@ abstract class Handler extends Model
 	/**
 	 * Change Email Address
 	 *
-	 * @param	Member	$member			The member
-	 * @param string $oldEmail		Old Email
-	 * @param string $newEmail		New Email
+	 * @param	\IPS\Member	$member			The member
+	 * @param	string		$oldEmail		Old Email
+	 * @param	string		$newEmail		New Email
 	 * @return	void
-	 * @throws	Exception
+	 * @throws	\Exception
 	 */
-	public function changeEmail( Member $member, string $oldEmail, string $newEmail ) : void
+	public function changeEmail( \IPS\Member $member, $oldEmail, $newEmail )
 	{
 		// By default do nothing. Handlers can extend.
 	}
@@ -338,9 +249,9 @@ abstract class Handler extends Model
 	/**
 	 * Forgot Password URL
 	 *
-	 * @return	Url|NULL
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function forgotPasswordUrl(): ?Url
+	public function forgotPasswordUrl()
 	{
 		return NULL;
 	}
@@ -348,11 +259,11 @@ abstract class Handler extends Model
 	/**
 	 * Force Password Reset URL
 	 *
-	 * @param	Member			$member	The member
-	 * @param	Url|NULL	$ref	Referrer
-	 * @return	Url|NULL
+	 * @param	\IPS\Member			$member	The member
+	 * @param	\IPS\Http\Url|NULL	$ref	Referrer
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function forcePasswordResetUrl( Member $member, ?Url $ref = NULL ): ?Url
+	public function forcePasswordResetUrl( \IPS\Member $member, ?\IPS\Http\Url $ref ): ?\IPS\Http\Url
 	{
 		return NULL;
 	}
@@ -360,21 +271,21 @@ abstract class Handler extends Model
 	/**
 	 * Create an account from login - checks registration is enabled, the name/email doesn't already exists and calls the spam service
 	 *
-	 * @param string|null $name				The desired username. If not provided, not allowed, or another existing user has this name, it will be left blank and the user prompted to provide it.
-	 * @param string|null $email				The user's email address. If it matches an existing account, an \IPS\Login\Exception object will be thrown so the user can be prompted to link those accounts. If not provided, it will be left blank and the user prompted to provide it.
-	 * @param bool $allowCreateAccount	If an account can be created
-	 * @return	Member
-	 * @throws    LoginException    If email address matches (\IPS\Login\Exception::MERGE_SOCIAL_ACCOUNT), registration is disabled (IPS\Login\Exception::REGISTRATION_DISABLED) or the spam service denies registration (\IPS\Login\Exception::REGISTRATION_DENIED_BY_SPAM_SERVICE)
+	 * @param	string	$name				The desired username. If not provided, not allowed, or another existing user has this name, it will be left blank and the user prompted to provide it.
+	 * @param	string	$email				The user's email address. If it matches an existing account, an \IPS\Login\Exception object will be thrown so the user can be prompted to link those accounts. If not provided, it will be left blank and the user prompted to provide it.
+	 * @param	bool	$allowCreateAccount	If an account can be created
+	 * @return	\IPS\Member
+	 * @throws	\IPS\Login\Exception	If email address matches (\IPS\Login\Exception::MERGE_SOCIAL_ACCOUNT), registration is disabled (IPS\Login\Exception::REGISTRATION_DISABLED) or the spam service denies registration (\IPS\Login\Exception::REGISTRATION_DENIED_BY_SPAM_SERVICE)
 	 */
-	protected function createAccount( string $name=NULL, string $email=NULL, bool $allowCreateAccount=TRUE ): Member
+	protected function createAccount( $name=NULL, $email=NULL, $allowCreateAccount=TRUE )
 	{
 		/* Is there an existing user with the same email address? */
 		if ( $email )
 		{
-			$existingAccount = Member::load( $email, 'email' );
+			$existingAccount = \IPS\Member::load( $email, 'email' );
 			if ( $existingAccount->member_id )
 			{
-				$exception = new LoginException( 'link_your_accounts_error', LoginException::MERGE_SOCIAL_ACCOUNT );
+				$exception = new \IPS\Login\Exception( 'link_your_accounts_error', \IPS\Login\Exception::MERGE_SOCIAL_ACCOUNT );
 				$exception->handler = $this;
 				$exception->member = $existingAccount;
 				throw $exception;
@@ -384,19 +295,19 @@ abstract class Handler extends Model
 		/* Nope - we need to register one - can we do that? */
 		if( !$this->register or !$allowCreateAccount )
 		{
-			$exception = new LoginException( Login::registrationType() == 'disabled' ? 'reg_disabled' : 'reg_not_allowed_by_login', LoginException::REGISTRATION_DISABLED );
+			$exception = new \IPS\Login\Exception( \IPS\Login::registrationType() == 'disabled' ? 'reg_disabled' : 'reg_not_allowed_by_login', \IPS\Login\Exception::REGISTRATION_DISABLED );
 			$exception->handler = $this;
 			throw $exception;
 		}
 		
 		/* Create the account */
-		$member = new Member;
-		$member->member_group_id = Settings::i()->member_group;
+		$member = new \IPS\Member;
+		$member->member_group_id = \IPS\Settings::i()->member_group;
 		$member->members_bitoptions['view_sigs'] = TRUE;
-		$member->members_bitoptions['must_reaccept_terms'] = (bool) Settings::i()->force_reg_terms;
-		if ( $name and Login::usernameIsAllowed( $name ) )
+		$member->members_bitoptions['must_reaccept_terms'] = (bool) \IPS\Settings::i()->force_reg_terms;
+		if ( $name and \IPS\Login::usernameIsAllowed( $name ) )
 		{
-			$existingUsername = Member::load( $name, 'name' );
+			$existingUsername = \IPS\Member::load( $name, 'name' );
 			if ( !$existingUsername->member_id )
 			{
 				$member->name = $name;
@@ -408,12 +319,12 @@ abstract class Handler extends Model
 		{
 			/* Check it's an allowed domain */
 			$allowed = TRUE;
-			if ( Settings::i()->allowed_reg_email and $allowedEmailDomains = explode( ',', Settings::i()->allowed_reg_email )  )
+			if ( \IPS\Settings::i()->allowed_reg_email and $allowedEmailDomains = explode( ',', \IPS\Settings::i()->allowed_reg_email )  )
 			{
 				$allowed = FALSE;
 				foreach ( $allowedEmailDomains AS $domain )
 				{
-					if( mb_stripos( $email,  "@" . $domain ) !== FALSE )
+					if( \mb_stripos( $email,  "@" . $domain ) !== FALSE )
 					{
 						$allowed = TRUE;
 					}
@@ -425,35 +336,35 @@ abstract class Handler extends Model
 			}	
 			
 			/* Check the spam service is okay with it */
-			if( Settings::i()->spam_service_enabled )
+			if( \IPS\Settings::i()->spam_service_enabled )
 			{
 				$spamAction = $member->spamService( 'register', NULL, $spamCode );
 				if( $spamAction == 4 )
 				{
-					$exception = new LoginException( 'spam_denied_account', LoginException::REGISTRATION_DENIED_BY_SPAM_SERVICE );
+					$exception = new \IPS\Login\Exception( 'spam_denied_account', \IPS\Login\Exception::REGISTRATION_DENIED_BY_SPAM_SERVICE );
 					$exception->handler = $this;
 					throw $exception;
 				}
 			}
 		}
 		$member->save();
-		$member->logHistory( 'core', 'account', array( 'type' => 'register_handler', 'service' => static::getTitle(), 'handler' => $this->id, 'spamCode' => $spamCode, 'spamAction' => $spamAction, 'complete' => ( $member->real_name and $member->email ) ), FALSE );
+		$member->logHistory( 'core', 'account', array( 'type' => 'register_handler', 'service' => static::getTitle(), 'handler' => $this->id, 'spamCode' => $spamCode, 'spamAction' => $spamAction, 'complete' => (bool) ( $member->real_name and $member->email ) ), FALSE );
 		
 		/* Create a device setting $sendNewDeviceEmail to false so that when we hand back to the login
 			handler is doesn't send the new device email */
-		Device::loadOrCreate( $member, FALSE )->save();
+		\IPS\Member\Device::loadOrCreate( $member, FALSE )->save();
 								
 		/* If registration is complete, do post-registration stuff */
 		if ( $member->real_name and $member->email and !$member->members_bitoptions['bw_is_spammer'] )
 		{
 			$postBeforeRegister = NULL;
-			if ( isset( Request::i()->cookie['post_before_register'] ) )
+			if ( isset( \IPS\Request::i()->cookie['post_before_register'] ) )
 			{
 				try
 				{
-					$postBeforeRegister = Db::i()->select( '*', 'core_post_before_registering', array( 'secret=?', Request::i()->cookie['post_before_register'] ) )->first();
+					$postBeforeRegister = \IPS\Db::i()->select( '*', 'core_post_before_registering', array( 'secret=?', \IPS\Request::i()->cookie['post_before_register'] ) )->first();
 				}
-				catch ( UnderflowException $e ) { }
+				catch ( \UnderflowException $e ) { }
 			}
 
 			/* If account wasn't flagged as spammer and banned, handle validation stuff */
@@ -470,13 +381,13 @@ abstract class Handler extends Model
 	/**
 	 * Link Account
 	 *
-	 * @param	Member	$member		The member
+	 * @param	\IPS\Member	$member		The member
 	 * @param	mixed		$details	Details as they were passed to the exception
 	 * @return	void
 	 */
-	public function completeLink(Member $member, mixed $details ) : void
+	public function completeLink( \IPS\Member $member, $details )
 	{
-		Db::i()->update( 'core_login_links', array( 'token_linked' => 1 ), array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) );
+		\IPS\Db::i()->update( 'core_login_links', array( 'token_linked' => 1 ), array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) );
 		unset( $this->_cachedLinks[ $member->member_id ] );
 		
 		$member->logHistory( 'core', 'social_account', array(
@@ -487,36 +398,23 @@ abstract class Handler extends Model
 			'linked'		=> TRUE,
 		) );
 	}
-
-	/**
-	 * [ActiveRecord] Delete Record
-	 *
-	 * @return    void
-	 */
-	public function delete(): void
-	{
-		parent::delete();
-
-		/* Delete login links for this handler */
-		Db::i()->delete( 'core_login_links', [ 'token_login_method=?', $this->_id ] );
-	}
 	
 	/**
 	 * Unlink Account
 	 *
-	 * @param	Member|null	$member		The member or NULL for currently logged in member
+	 * @param	\IPS\Member	$member		The member or NULL for currently logged in member
 	 * @return	void
 	 */
-	public function disassociate( ?Member $member = NULL ) : void
+	public function disassociate( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		try
 		{
 			$userId		= $this->userId( $member );
 			$userName	= $this->userProfileName( $member );
 		}
-		catch(Exception $e )
+		catch( \IPS\Login\Exception $e )
 		{
 			$userId		= NULL;
 			$userName	= NULL;
@@ -530,26 +428,26 @@ abstract class Handler extends Model
 			'linked'		=> FALSE,
 		) );
 		
-		Db::i()->delete( 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) );
+		\IPS\Db::i()->delete( 'core_login_links', array( 'token_login_method=? AND token_member=?', $this->id, $member->member_id ) );
 	}
 		
 	/**
 	 * Get logo to display in information about logins with this method
 	 * Returns NULL for methods where it is not necessary to indicate the method, e..g Standard
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url|NULL
 	 */
-	public function logoForDeviceInformation(): Url|string|null
+	public function logoForDeviceInformation()
 	{
 		return NULL;
 	}
-
+	
 	/**
 	 * Get logo to display in user cp sidebar
 	 *
-	 * @return Url|string|null
+	 * @return	\IPS\Http\Url|string
 	 */
-	public function logoForUcp(): Url|string|null
+	public function logoForUcp()
 	{
 		return $this->logoForDeviceInformation() ?: 'database';
 	}
@@ -557,10 +455,10 @@ abstract class Handler extends Model
 	/**
 	 * Show in Account Settings?
 	 *
-	 * @param	Member|NULL	$member	The member, or NULL for if it should show generally
+	 * @param	\IPS\Member|NULL	$member	The member, or NULL for if it should show generally
 	 * @return	bool
 	 */
-	public function showInUcp( Member $member = NULL ): bool
+	public function showInUcp( \IPS\Member $member = NULL )
 	{
 		if( !$this->enabled )
 		{
@@ -589,7 +487,7 @@ abstract class Handler extends Model
 	 *
 	 * @return	array
 	 */
-	public function forceSync(): array
+	public function forceSync()
 	{
 		$return = array();
 		
@@ -602,27 +500,22 @@ abstract class Handler extends Model
 		{
 			$return[] = 'email';
 		}
-
-        if( isset( $this->settings['update_photo_changes'] ) and $this->settings['update_photo_changes'] === 'force' )
-        {
-            $return[] = 'photo';
-        }
 		
 		return $return;
 	}
-
+	
 	/**
 	 * Check if any handler has a particular value set in forceSync()
 	 *
-	 * @note    Deliberately checks disabled methods, otherwise you'd be able to re-enable two which have it enabled bypassing the check
-	 * @param string $type The type to check for
-	 * @param Handler|null $not Exclude a particular handler from the check
-	 * @param Member|null $member If specified, only login handlers that member has set up will be checked
-	 * @return    Handler|FALSE
+	 * @note	Deliberately checks disabled methods, otherwise you'd be able to re-enable two which have it enabled bypassing the check
+	 * @param	string					$type	The type to check for
+	 * @param	\IPS\Login\Handler|NULL	$not	Exclude a particular handler from the check
+	 * @param	\IPS\Member				$member	If specified, only login handlers that member has set up will be checked
+	 * @return	\IPS\Login\Handler|FALSE
 	 */
-	public static function handlerHasForceSync( string $type, Handler $not = NULL, Member $member = NULL ): Handler|FALSE
+	public static function handlerHasForceSync( $type, $not = NULL, \IPS\Member $member = NULL )
 	{
-		foreach ( Db::i()->select( '*', 'core_login_methods' ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'core_login_methods' ) as $row )
 		{
 			try
 			{
@@ -630,13 +523,13 @@ abstract class Handler extends Model
 				
 				if ( ( !$not or $not->_id != $method->_id ) and ( !$member or $method->canProcess( $member ) ) )
 				{
-					if ( in_array( $type, $method->forceSync() ) )
+					if ( \in_array( $type, $method->forceSync() ) )
 					{
 						return $method;
 					}
 				}
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 		}
 		return FALSE;
 	}
@@ -644,11 +537,11 @@ abstract class Handler extends Model
 	/**
 	 * Syncing Options
 	 *
-	 * @param	Member	$member			The member we're asking for (can be used to not show certain options if the user didn't grant those scopes)
-	 * @param bool $defaultOnly	If TRUE, only returns which options should be enabled by default for a new account
+	 * @param	\IPS\Member	$member			The member we're asking for (can be used to not show certain options if the user didn't grant those scopes)
+	 * @param	bool		$defaultOnly	If TRUE, only returns which options should be enabled by default for a new account
 	 * @return	array
 	 */
-	public function syncOptions( Member $member, bool $defaultOnly=FALSE ): array
+	public function syncOptions( \IPS\Member $member, $defaultOnly = FALSE )
 	{
 		return array();
 	}
@@ -658,7 +551,7 @@ abstract class Handler extends Model
 	 *
 	 * @return	bool
 	 */
-	public function hasSyncOptions(): bool
+	public function hasSyncOptions()
 	{
 		return FALSE;
 	}
@@ -667,13 +560,13 @@ abstract class Handler extends Model
 	 * Get user's identifier (may not be a number)
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws    Exception    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userId( Member $member ): ?string
+	public function userId( \IPS\Member $member )
 	{
 		return NULL;
 	}
@@ -682,13 +575,13 @@ abstract class Handler extends Model
 	 * Get user's profile photo
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
-	 * @return	Url|NULL
-	 * @throws    Exception    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	\IPS\Member	$member	Member
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfilePhoto( Member $member ): ?Url
+	public function userProfilePhoto( \IPS\Member $member )
 	{
 		return NULL;
 	}
@@ -697,13 +590,13 @@ abstract class Handler extends Model
 	 * Get user's profile name
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws    Exception    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userProfileName( Member $member ): ?string
+	public function userProfileName( \IPS\Member $member )
 	{
 		return NULL;
 	}
@@ -712,13 +605,13 @@ abstract class Handler extends Model
 	 * Get user's email address
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	string|NULL
-	 * @throws    Exception    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userEmail( Member $member ): ?string
+	public function userEmail( \IPS\Member $member )
 	{
 		return NULL;
 	}
@@ -727,31 +620,65 @@ abstract class Handler extends Model
 	 * Get user's cover photo
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param	Member	$member	Member
-	 * @return	Url|NULL
-	 * @throws    Exception    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	\IPS\Member	$member	Member
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userCoverPhoto( Member $member ): ?Url
+	public function userCoverPhoto( \IPS\Member $member )
 	{
 		return NULL;
+	}
+	
+	/**
+	 * Get user's statuses since a particular date
+	 *
+	 * @param	\IPS\Member			$member	Member
+	 * @param	\IPS\DateTime|NULL	$since	Date/Time to get statuses since then, or NULL to get the latest one
+	 * @return	array
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
+	 */
+	public function userStatuses( \IPS\Member $member, \IPS\DateTime $since = NULL )
+	{
+		return array();
 	}
 	
 	/**
 	 * Get link to user's remote profile
 	 * May return NULL if server doesn't support this
 	 *
-	 * @param string $identifier	The ID Nnumber/string from remote service
-	 * @param string|null $username	The username from remote service
-	 * @return	Url|NULL
-	 * @throws    Exception    The token is invalid and the user needs to reauthenticate
-	 * @throws	DomainException		General error where it is safe to show a message to the user
-	 * @throws	RuntimeException		Unexpected error from service
+	 * @param	string	$identifier	The ID Nnumber/string from remote service
+	 * @param	string	$username	The username from remote service
+	 * @return	\IPS\Http\Url|NULL
+	 * @throws	\IPS\Login\Exception	The token is invalid and the user needs to reauthenticate
+	 * @throws	\DomainException		General error where it is safe to show a message to the user
+	 * @throws	\RuntimeException		Unexpected error from service
 	 */
-	public function userLink( string $identifier, ?string $username ): ?Url
+	public function userLink( $identifier, $username )
 	{
 		return NULL;
+	}
+	
+	/**
+	 * Parse status text - ensures valid and safe HTML, filters profanity, etc.
+	 *
+	 * @param	\IPS\Member	$member	Member
+	 * @param	string		$value	Status text to parse
+	 * @return	void
+	 */
+	protected function _parseStatusText( \IPS\Member $member, $value )
+	{
+		/* Make sure utf8mb4 characters won't cause us issues */
+		$value = \IPS\Text\Parser::utf8mb4SafeDecode( $value );
+		
+		/* Parse */		
+		$value = \IPS\Text\Parser::parseStatic( $value, FALSE, NULL, $member, 'core_Members' );
+		
+		/* Return */
+		return $value;
 	}
 	
 	/* !ActiveRecord & Node */
@@ -759,51 +686,51 @@ abstract class Handler extends Model
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_login_methods';
+	public static $databaseTable = 'core_login_methods';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'login_';
+	public static $databasePrefix = 'login_';
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'login_handlers';
+	public static $nodeTitle = 'login_handlers';
 	
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'order';
+	public static $databaseColumnOrder = 'order';
 	
 	/**
 	 * @brief	[Node] Enabled/Disabled Column
 	 */
-	public static ?string $databaseColumnEnabledDisabled = 'enabled';
+	public static $databaseColumnEnabledDisabled = 'enabled';
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'login_method_';
+	public static $titleLangPrefix = 'login_method_';	
 	
 	/**
 	 * Construct ActiveRecord from database row
 	 *
-	 * @param array $data							Row from database table
-	 * @param bool $updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
-	 * @return    HandlerClass
+	 * @param	array	$data							Row from database table
+	 * @param	bool	$updateMultitonStoreIfExists	Replace current object in multiton store if it already exists there?
+	 * @return	static
 	 */
-	public static function constructFromData( array $data, bool $updateMultitonStoreIfExists = TRUE ): HandlerClass
+	public static function constructFromData( $data, $updateMultitonStoreIfExists = TRUE )
 	{
 		$classname = $data['login_classname'];
 		if ( !class_exists( $classname ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		/* Initiate an object */
@@ -812,12 +739,12 @@ abstract class Handler extends Model
 		$obj->_data = array();
 		
 		/* Import data */
-		$databasePrefixLength = strlen( static::$databasePrefix );
+		$databasePrefixLength = \strlen( static::$databasePrefix );
 		foreach ( $data as $k => $v )
 		{
 			if( static::$databasePrefix AND mb_strpos( $k, static::$databasePrefix ) === 0 )
 			{
-				$k = substr( $k, $databasePrefixLength );
+				$k = \substr( $k, $databasePrefixLength );
 			}
 
 			$obj->_data[ $k ] = $v;
@@ -839,24 +766,13 @@ abstract class Handler extends Model
 		/* Return */
 		return $obj;
 	}
-
-	/**
-	 * [Node] Get whether or not this node is locked to current enabled/disabled status
-	 *
-	 * @note	Return value NULL indicates the node cannot be enabled/disabled
-	 * @return	bool|null
-	 */
-	protected function get__locked(): ?bool
-	{
-		return !IPS::canManageResources();
-	}
 	
 	/**
 	 * Get settings
 	 *
 	 * @return	array
 	 */
-	protected function get_settings(): array
+	protected function get_settings()
 	{
 		return ( isset( $this->_data['settings'] ) and $this->_data['settings'] ) ? json_decode( $this->_data['settings'], TRUE ) : array();
 	}
@@ -864,10 +780,10 @@ abstract class Handler extends Model
 	/**
 	 * Set settings
 	 *
-	 * @param array $values	Values
+	 * @param	array	$values	Values
 	 * @return	void
 	 */
-	public function set_settings( array $values ) : void
+	public function set_settings( $values )
 	{
 		$this->_data['settings'] = json_encode( $values );
 	}
@@ -877,9 +793,9 @@ abstract class Handler extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canCopy(): bool
+	public function canCopy()
 	{
-		if ( !static::$allowMultiple OR !IPS::canManageResources() )
+		if ( !static::$allowMultiple )
 		{
 			return FALSE;
 		}
@@ -889,17 +805,13 @@ abstract class Handler extends Model
 	/**
 	 * [Node] Does the currently logged in user have permission to delete this node?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canDelete(): bool
+	public function canDelete()
 	{
-		if( !IPS::canManageResources() )
-		{
-			return FALSE;
-		}
 		if ( parent::canDelete() )
 		{
-			return count( static::roots() ) > 1;
+			return \count( static::roots() ) > 1;
 		}
 		return FALSE;
 	}
@@ -909,44 +821,36 @@ abstract class Handler extends Model
 	/**
 	 * @brief	Should ACP logins be enabled by default
 	 */
-	protected static bool $enableAcpLoginByDefault = TRUE;
+	protected static $enableAcpLoginByDefault = TRUE;
 	
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
-		/* No Editing for Managed */
-		if ( !IPS::canManageResources() )
-		{
-			$form->attributes = ['inert' => 'true'];
-			$form->actionButtons = [];
-			$form->addMessage( 'login_method_cannot_edit_managed', 'error' );
-		}
-
 		$form->addHeader('login_method_basic_settings');
-		$form->add( new Translatable( 'login_method_name', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? 'login_method_' . $this->id : NULL ) ) ) );
-		if ( !( $this instanceof Standard ) ) {
+		$form->add( new \IPS\Helpers\Form\Translatable( 'login_method_name', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? 'login_method_' . $this->id : NULL ) ) ) );
+		if ( !( $this instanceof \IPS\Login\Handler\Standard ) ) {
 			$self = $this;
-			$form->add(new YesNo('login_acp', $this->id ? $this->acp : static::$enableAcpLoginByDefault, FALSE, array(), function ($val) use ($self) {
+			$form->add(new \IPS\Helpers\Form\YesNo('login_acp', $this->id ? $this->acp : static::$enableAcpLoginByDefault, FALSE, array(), function ($val) use ($self) {
 				if (!$val) {
-					foreach (Login::methods() as $method) {
-						if ($method != $self and $method->canProcess(Member::loggedIn()) and $method->acp) {
+					foreach (\IPS\Login::methods() as $method) {
+						if ($method != $self and $method->canProcess(\IPS\Member::loggedIn()) and $method->acp) {
 							return true;
 						}
 					}
-					throw new DomainException('login_handler_cannot_disable_acp');
+					throw new \DomainException('login_handler_cannot_disable_acp');
 				}
 			}));
 		}
 
-		$form->add( new YesNo( 'login_front', $this->id ? $this->front : static::$enableAcpLoginByDefault, FALSE, array() ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'login_front', $this->id ? $this->front : static::$enableAcpLoginByDefault, FALSE, array() ) );
 
-		if ( !( $this instanceof Standard ) ) {
-			$form->add( new Radio( 'login_register', $this->id ? $this->register : TRUE, FALSE, array(
+		if ( !( $this instanceof \IPS\Login\Handler\Standard ) ) {
+			$form->add( new \IPS\Helpers\Form\Radio( 'login_register', $this->id ? $this->register : TRUE, FALSE, array(
 				'options' 	=> array(
 					1	=> 'login_register_enabled',
 					0	=> 'login_register_disabled'
@@ -957,13 +861,15 @@ abstract class Handler extends Model
 			) ) );
 		}
 
+		$form->add( new \IPS\Helpers\Form\YesNo( 'login_front', $this->id ? $this->front : static::$enableAcpLoginByDefault, FALSE, array() ) );
+
 		foreach ( $this->acpForm() as $key => $field )
 		{
-			if ( is_string( $field ) )
+			if ( \is_string( $field ) )
 			{
 				$form->addHeader( $field );
 			}
-			elseif ( is_array( $field ) )
+			elseif ( \is_array( $field ) )
 			{
 				$form->addHeader( $field[0] );
 				$form->addMessage( $field[1] );
@@ -978,41 +884,35 @@ abstract class Handler extends Model
 		{
 			try
 			{
-				$shareService = Service::load( static::$shareService, 'share_key' );
+				$shareService = \IPS\core\ShareLinks\Service::load( static::$shareService, 'share_key' );
 				$form->addHeader( 'sharelinks' );
-				$form->add( new YesNo( 'share_autoshare_' . static::$shareService, $shareService->autoshare ) );
+				$form->add( new \IPS\Helpers\Form\YesNo( 'share_autoshare_' . static::$shareService, $shareService->autoshare ) );
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 	}
 	
 	/**
 	 * [Node] Save Add/Edit Form
 	 *
-	 * @param array $values	Values from the form
-	 * @return    mixed
+	 * @param	array	$values	Values from the form
+	 * @return	void
 	 */
-	public function saveForm( array $values ): mixed
+	public function saveForm( $values )
 	{
-		/* No Editing for Managed */
-		if( !IPS::canManageResources() )
-		{
-			Output::i()->error( 'login_method_cannot_edit_managed', '3S440/1', 403, '' );
-		}
-
 		if ( isset( static::$shareService ) and isset( $values[ 'share_autoshare_' . static::$shareService ] ) )
 		{
 			try
 			{
-				$shareService = Service::load( static::$shareService, 'share_key' );
+				$shareService = \IPS\core\ShareLinks\Service::load( static::$shareService, 'share_key' );
 				$shareService->autoshare = $values[ 'share_autoshare_' . static::$shareService ];
 				$shareService->save();
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }			
 			unset( $values[ 'share_autoshare_' . static::$shareService ] );
 		}
 		
-		return parent::saveForm( $values );
+		parent::saveForm( $values );
 	}		
 	/**
 	 * [Node] Format form values from add/edit form for save
@@ -1020,7 +920,7 @@ abstract class Handler extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		$settings = $this->acpFormSave( $values );
 		$values['login_settings'] = $settings;
@@ -1033,7 +933,7 @@ abstract class Handler extends Model
 			{
 				$this->save();
 			}
-			Lang::saveCustom( 'core', "login_method_{$this->id}", $values['login_method_name'] );
+			\IPS\Lang::saveCustom( 'core', "login_method_{$this->id}", $values['login_method_name'] );
 			unset( $values['login_method_name'] );
 		}
 
@@ -1044,9 +944,9 @@ abstract class Handler extends Model
 	 * Test Compatibility
 	 *
 	 * @return	bool
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public static function testCompatibility(): bool
+	public static function testCompatibility()
 	{		
 		return TRUE;
 	}
@@ -1056,9 +956,9 @@ abstract class Handler extends Model
 	 * Test Settings
 	 *
 	 * @return	bool
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function testSettings(): bool
+	public function testSettings()
 	{
 		return static::testCompatibility();
 	}
@@ -1066,13 +966,13 @@ abstract class Handler extends Model
 	/**
 	 * [ActiveRecord] Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		parent::save();
-		unset( Store::i()->loginMethods, Store::i()->essentialCookieNames );
-		Cache::i()->clearAll();
+		unset( \IPS\Data\Store::i()->loginMethods, \IPS\Data\Store::i()->essentialCookieNames );
+		\IPS\Data\Cache::i()->clearAll();
 	}
 	
 }

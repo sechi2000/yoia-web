@@ -12,34 +12,21 @@
 namespace IPS\calendar\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\calendar\Calendar;
-use IPS\Http\Url\Friendly;
-use IPS\Lang;
-use IPS\Node\Api\NodeController;
-use IPS\Node\Model;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Calendars API
  */
-class calendars extends NodeController
+class _calendars extends \IPS\Node\Api\NodeController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\calendar\Calendar';
+	protected $class = 'IPS\calendar\Calendar';
 
 	/**
 	 * GET /calendar/calendars
@@ -49,10 +36,9 @@ class calendars extends NodeController
 	 * @apiparam	int		page			Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
 	 * @note		For requests using an OAuth Access Token for a particular member, only calendars the authorized user can view will be included
-	 * @apireturn		PaginatedResponse<IPS\calendar\Calendar>
-	 * @return PaginatedResponse<Calendar>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\calendar\Calendar>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Return */
 		return $this->_list();
@@ -64,18 +50,17 @@ class calendars extends NodeController
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		1L364/1	INVALID_ID	The calendar does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\calendar\Calendar
-	 * @return Response
+	 * @return		\IPS\calendar\Calendar
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{
 			return $this->_view( $id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1L364/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1L364/1', 404 );
 		}
 	}
 
@@ -92,18 +77,17 @@ class calendars extends NodeController
 	 * @apiparam	int			allow_reviews		0|1 Allow reviews
 	 * @apiparam	int			approve_reviews		0|1 Reviews must be approved
 	 * @apiparam	object		permissions			An object with the keys as permission options (view, read, add, reply, review, askrsvp, rsvp) and values as permissions to use (which may be * to grant access to all groups, or an array of group IDs to permit access to)
-	 * @apireturn		\IPS\calendar\Calendar
+	 * @return		\IPS\calendar\Calendar
 	 * @throws		1L364/2	NO_TITLE	A title for the calendar must be supplied
-	 * @return Response
 	 */
-	public function POSTindex(): Response
+	public function POSTindex()
 	{
-		if ( !Request::i()->title )
+		if ( !\IPS\Request::i()->title )
 		{
-			throw new Exception( 'NO_TITLE', '1L364/2', 400 );
+			throw new \IPS\Api\Exception( 'NO_TITLE', '1L364/2', 400 );
 		}
 
-		return new Response( 201, $this->_create()->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 201, $this->_create()->apiOutput( $this->member ) );
 	}
 
 	/**
@@ -120,16 +104,14 @@ class calendars extends NodeController
 	 * @apiparam	int			approve_reviews		0|1 Reviews must be approved
 	 * @apiparam	object		permissions			An object with the keys as permission options (view, read, add, reply, review, askrsvp, rsvp) and values as permissions to use (which may be * to grant access to all groups, or an array of group IDs to permit access to)
 	 * @param		int		$id			ID Number
-	 * @apireturn		\IPS\calendar\Calendar
-	 * @return Response
+	 * @return		\IPS\calendar\Calendar
 	 */
-	public function POSTitem( int $id ): Response
+	public function POSTitem( $id )
 	{
-		/* @var Calendar $class */
 		$class = $this->class;
 		$calendar = $class::load( $id );
 
-		return new Response( 200, $this->_createOrUpdate( $calendar )->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $this->_createOrUpdate( $calendar )->apiOutput( $this->member ) );
 	}
 
 	/**
@@ -138,10 +120,9 @@ class calendars extends NodeController
 	 *
 	 * @apiclientonly
 	 * @param		int		$id			ID Number
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
 		return $this->_delete( $id );
 	}
@@ -149,27 +130,27 @@ class calendars extends NodeController
 	/**
 	 * Create or update node
 	 *
-	 * @param	Model	$calendar				The node
-	 * @return	Model
+	 * @param	\IPS\node\Model	$calendar				The node
+	 * @return	\IPS\node\Model
 	 */
-	protected function _createOrUpdate( Model $calendar ): Model
+	protected function _createOrUpdate( \IPS\Node\Model $calendar )
 	{
-		if ( Request::i()->title )
+		if ( \IPS\Request::i()->title )
 		{
-			Lang::saveCustom( 'calendar', 'calendar_calendar_' . $calendar->id, Request::i()->title );
-			$calendar->title_seo	= Friendly::seoTitle( Request::i()->title );
+			\IPS\Lang::saveCustom( 'calendar', 'calendar_calendar_' . $calendar->id, \IPS\Request::i()->title );
+			$calendar->title_seo	= \IPS\Http\Url\Friendly::seoTitle( \IPS\Request::i()->title );
 		}
 
-		if ( isset( Request::i()->color ) )
+		if ( isset( \IPS\Request::i()->color ) )
 		{
-			$calendar->color = Request::i()->color;
+			$calendar->color = \IPS\Request::i()->color;
 		}
 
-		$calendar->moderate 		= (int) isset( Request::i()->approve_events ) ? Request::i()->approve_events : 0;
-		$calendar->allow_comments	= (int) isset( Request::i()->allow_comments ) ? Request::i()->allow_comments : 0;
-		$calendar->comment_moderate = (int) isset( Request::i()->approve_comments ) ? Request::i()->approve_comments : 0;
-		$calendar->allow_reviews 	= (int) isset( Request::i()->allow_reviews ) ? Request::i()->allow_reviews : 0;
-		$calendar->review_moderate	= (int) isset( Request::i()->approve_reviews ) ? Request::i()->approve_reviews : 0;
+		$calendar->moderate 		= (int) isset( \IPS\Request::i()->approve_events ) ? \IPS\Request::i()->approve_events : 0;
+		$calendar->allow_comments	= (int) isset( \IPS\Request::i()->allow_comments ) ? \IPS\Request::i()->allow_comments : 0;
+		$calendar->comment_moderate = (int) isset( \IPS\Request::i()->approve_comments ) ? \IPS\Request::i()->approve_comments : 0;
+		$calendar->allow_reviews 	= (int) isset( \IPS\Request::i()->allow_reviews ) ? \IPS\Request::i()->allow_reviews : 0;
+		$calendar->review_moderate	= (int) isset( \IPS\Request::i()->approve_reviews ) ? \IPS\Request::i()->approve_reviews : 0;
 
 		return parent::_createOrUpdate( $calendar );
 	}

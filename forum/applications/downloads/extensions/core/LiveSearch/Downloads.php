@@ -12,35 +12,26 @@
 namespace IPS\downloads\extensions\core\LiveSearch;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\downloads\Category;
-use IPS\Extensions\LiveSearchAbstract;
-use IPS\Member;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ACP Live Search Extension
  */
-class downloads extends LiveSearchAbstract
+class _downloads
 {
 	/**
 	 * Check we have access
 	 *
 	 * @return	bool
 	 */
-	public function hasAccess(): bool
+	public function hasAccess()
 	{
 		/* Check Permissions */
-		return Member::loggedIn()->hasAcpRestriction( 'downloads', 'downloads', 'categories_manage' );
+		return \IPS\Member::loggedIn()->hasAcpRestriction( 'downloads', 'downloads', 'categories_manage' );
 	}
 	
 	/**
@@ -49,7 +40,7 @@ class downloads extends LiveSearchAbstract
 	 * @param	string	$searchTerm	Search Term
 	 * @return	array 	Array of results
 	 */
-	public function getResults( string $searchTerm ): array
+	public function getResults( $searchTerm )
 	{
 		if( !$this->hasAccess() )
 		{
@@ -61,10 +52,10 @@ class downloads extends LiveSearchAbstract
 		$searchTerm = mb_strtolower( $searchTerm );
 		
 		/* Perform the search */
-		$categories = Db::i()->select(
+		$categories = \IPS\Db::i()->select(
 						"*",
 						'downloads_categories',
-						array( "cclub_id IS NULL AND word_custom LIKE CONCAT( '%', ?, '%' ) AND lang_id=?", $searchTerm, Member::loggedIn()->language()->id ),
+						array( "cclub_id IS NULL AND word_custom LIKE CONCAT( '%', ?, '%' ) AND lang_id=?", $searchTerm, \IPS\Member::loggedIn()->language()->id ),
 						NULL,
 						NULL
 				)->join(
@@ -75,9 +66,9 @@ class downloads extends LiveSearchAbstract
 		/* Format results */
 		foreach ( $categories as $category )
 		{
-			$category = Category::constructFromData( $category );
+			$category = \IPS\downloads\Category::constructFromData( $category );
 			
-			$results[] = Theme::i()->getTemplate( 'livesearch', 'downloads', 'admin' )->category( $category );
+			$results[] = \IPS\Theme::i()->getTemplate( 'livesearch', 'downloads', 'admin' )->category( $category );
 		}
 		
 		return $results;
@@ -88,8 +79,8 @@ class downloads extends LiveSearchAbstract
 	 *
 	 * @return	bool
 	 */
-	public function isDefault(): bool
+	public function isDefault()
 	{
-		return Dispatcher::i()->application->directory == 'downloads';
+		return \IPS\Dispatcher::i()->application->directory == 'downloads';
 	}
 }

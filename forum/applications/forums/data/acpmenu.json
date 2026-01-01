@@ -32,6 +32,13 @@
             "do": "",
             "restriction": "posts_manage"
         },
+        "questions": {
+            "tab": "stats",
+            "controller": "questions",
+            "do": "",
+            "restriction": "questions_manage",
+            "subcontrollers": ""
+        },
         "solved": {
             "tab": "stats",
             "controller": "solved",

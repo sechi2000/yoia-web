@@ -10,154 +10,73 @@
 
 namespace IPS;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
 use BadFunctionCallException;
-use BadMethodCallException;
-use DateInterval;
-use DateTimeZone;
-use DomainException;
-use ErrorException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Api\Webhook;
-use IPS\Application\Module;
-use IPS\Content\Comment;
-use IPS\Content\Followable;
-use IPS\Content\Review;
-use IPS\core\Achievements\Badge;
-use IPS\core\Achievements\Rank;
-use IPS\core\Achievements\Rule;
-use IPS\core\AdminNotification;
-use IPS\core\Assignments\Assignment;
-use IPS\core\ProfileFields\Api\Field;
-use IPS\core\ProfileFields\Api\FieldGroup;
-use IPS\core\Reports\Report;
-use IPS\Data\Store;
-use IPS\Db\Select;
-use IPS\Events\Event;
-use IPS\Helpers\CoverPhoto;
-use IPS\Helpers\Menu;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Lang\Setup\Lang as SetupLang;
-use IPS\Lang\Upgrade\Lang as UpgradeLang;
-use IPS\Login\Handler;
-use IPS\Math\Number;
-use IPS\Member\Club;
-use IPS\Member\Device;
-use IPS\Member\Group;
-use IPS\Member\GroupPromotion;
-use IPS\Member\LetterPhoto;
-use IPS\Member\PrivacyAction;
-use IPS\Member\ProfileStep;
-use IPS\Member\Team;
-use IPS\Member\UserMenu;
-use IPS\Patterns\ActiveRecord;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Platform\Bridge;
+use IPS\Db;
+use IPS\Settings;
 use IPS\Text\Encrypt;
-use IPS\Xml\SimpleXML;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use function array_key_exists;
-use function count;
-use function defined;
-use function get_called_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_string;
-use function mb_stripos;
-use function strlen;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member Model
- *
- * @property ?int member_id
- * @property DateTime joined
  */
-class Member extends ActiveRecord
+class _Member extends \IPS\Patterns\ActiveRecord
 {
-	use Followable
-	{
-		Followable::followersCount as public _followersCountBase;
-		Followable::followers as public _followersBase;
-        Followable::follow as public _followBase;
-	}
-
-	/**
-	 * @brief Spam Check Post Threshold
-	 */
-	const SPAM_CHECK_POST_THRESHOLD = 5;
-
-	/**
-	 * @brief	Spam Check Dormant Threshold
-	 */
-	const SPAM_CHECK_DORMANT_THRESHOLD = 'P6M';
-
-	/**
-	 * @brief   Period for login after inactivity notification
-	 */
-	const LOGIN_INACTIVITY_NOTIFICATION = 'P6M';
-
 	/**
 	 * @brief	Application
 	 */
-	public static string $application = 'core';
+	public static $application = 'core';
 	
 	/* !\IPS\Patterns\ActiveRecord */
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_members';
+	public static $databaseTable = 'core_members';
 		
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'member_id';
+	public static $databaseColumnId = 'member_id';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'name', 'email' );
+	protected static $databaseIdFields = array( 'name', 'email' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	Bitwise values for members_bitoptions field
 	 */
-	public static array $bitOptions = array(
+	public static $bitOptions = array(
 		'members_bitoptions'	=> array(
 			'members_bitoptions'	=> array(
 				'bw_is_spammer'					=> 1,			// Flagged as spam?
 				// 2 is deprecated
 				// 4 (bw_vnc_type) is deprecated
 				// 8 (bw_forum_result_type) is deprecated
-				// 16 (bw_no_status_update is deprecated
+				'bw_no_status_update'			=> 16,			// Can post status updates?, 1 means they CAN'T post status updates. 0 means they can.
 				// 32 (bw_status_email_mine) is deprecated
 				// 64 (bw_status_email_all) is deprecated
 				// 128 is deprecated (previously bw_disable_customization)
 				// 256 is deprecated (bw_local_password_set) - used to represent if a local passwnot was set and block the change password form if not
 				'bw_disable_tagging'			=> 512,			// Tags disabled for this member? 1 means they are, 0 means they aren't.
 				'bw_disable_prefixes'			=> 1024,		// Tag prefixes disabled? 1 means they are, 0 means they aren't.
-				'bw_using_skin_gen'				=> 2048,		// 1 means the user has the theme editor active, 0 means they do not.
+				'bw_using_skin_gen'				=> 2048,		// 1 means the user has the easy mode editor active, 0 means they do not.
 				// 4096 (bw_disable_gravatar) is deprecated
 				// 8192 (bw_paste_plain) is deprecated
 				// 16384 (bw_html_sig) is deprecated
@@ -206,10 +125,7 @@ class Member extends ActiveRecord
 				'new_device_email'				=> 16777216, // Send an email when a new device is used to log in.
 				'no_solved_reenage'				=> 33554432, // User does not want to get topic  re-engagement emails
 				'datalayer_pii_optout'			=> 67108864, // User has opted in to having their PII collected by datalayer
-				'email_messages_bounce'			=> 134217728, // @deprecated User's email keeps returning hard bounces so they need to change it
-				// 268435456 - cookie_optout moved to cookie preferences
-				'expert_user_disabled'				=> 536870912, // User does not want to be a community expert
-				'expert_user_blocked'			    => 1073741824 // Admin has blocked expert user
+				'email_messages_bounce'			=> 134217728, // @deprecated
 			)
 		)
 	);
@@ -219,41 +135,61 @@ class Member extends ActiveRecord
 	 *
 	 * @var string[]
 	 */
-	public static array $changesToSkipForMemberEditWebhooks = [
+	public static $changesToSkipForMemberEditWebhooks = [
 		'last_visit',
 		'last_activity',
-		'profilesync_lastsync'
+		'profilesync_lastsync',
 	];
 	
 	/* !Follow */
 	
 	/**
-	 * @brief	Cached logged in member
+	 * @brief	Cache for current follow data, used on "My Followed Content" screen
 	 */
-	public static ?Member $loggedInMember	= NULL;
+	public $_followData;
+
+	/**
+	 * @brief	Following publicly
+	 */
+	const FOLLOW_PUBLIC = 1;
+
+	/**
+	 * @brief	Following anonymously
+	 */
+	const FOLLOW_ANONYMOUS = 2;
+
+	/**
+	 * @brief   Period for login after inactivity notification
+	 */
+	const LOGIN_INACTIVITY_NOTIFICATION = 'P6M';
 	
 	/**
-	 * @brief	If we change the photo_type, then we need to record the previous photo type to determine if set_pp_main_photo should attempt removal of existing images
+	 * @brief	Cached logged in member
 	 */
-	protected ?string $_previousPhotoType = NULL;
+	public static $loggedInMember	= NULL;
+	
+	/**
+	 * @brief	If we change the photo_type, then we need to record the previous photo type to determin if set_pp_main_photo should attempt removal of existing images
+	 */
+	protected $_previousPhotoType = NULL;
 
 	/**
 	 * Get logged in member
 	 *
-	 * @return    Member|null
+	 * @return	\IPS\Member
 	 */
-	public static function loggedIn(): ?Member
+	public static function loggedIn()
 	{
 		/* If we haven't loaded the member yet, or if the session member has changed since we last loaded the member, reload and cache */
 		if( static::$loggedInMember === NULL )
 		{
-			if( Request::isCliEnvironment() )
+			if( \IPS\Request::isCliEnvironment() )
 			{
-				static::$loggedInMember = new Member;
+				static::$loggedInMember = new \IPS\Member;
 			}
 			else
 			{
-				static::$loggedInMember = Session::i()->member;
+				static::$loggedInMember = \IPS\Session::i()->member;
 			}
 			
 			if ( isset( $_SESSION['logged_in_as_key'] ) )
@@ -262,24 +198,24 @@ class Member extends ActiveRecord
 				{
 					$key = $_SESSION['logged_in_as_key'];
 	
-					if ( isset( Store::i()->$key ) )
+					if ( isset( \IPS\Data\Store::i()->$key ) )
 					{
-						static::$loggedInMember	= static::load( Store::i()->$key );
+						static::$loggedInMember	= static::load( \IPS\Data\Store::i()->$key );
 						
 						if ( !static::$loggedInMember->member_id )
 						{
-							unset( Store::i()->$key );
+							unset( \IPS\Data\Store::i()->$key );
 							unset( $_SESSION['logged_in_as_key'] );
 						}
 					}
 				}
 			}
 			
-			if ( !static::$loggedInMember->member_id and isset( Request::i()->cookie['ipsTimezone'] ) )
+			if ( !static::$loggedInMember->member_id and isset( \IPS\Request::i()->cookie['ipsTimezone'] ) )
 			{
 				/* Check for valid timezone identifier */
-				$tz = DateTime::getFixedTimezone( Request::i()->cookie['ipsTimezone'] );
-				if( in_array( $tz, DateTimeZone::listIdentifiers() ) )
+				$tz = \IPS\DateTime::getFixedTimezone( \IPS\Request::i()->cookie['ipsTimezone'] );
+				if( \in_array( $tz, \DateTimeZone::listIdentifiers() ) )
 				{
 					static::$loggedInMember->timezone = $tz;
 				}
@@ -288,24 +224,24 @@ class Member extends ActiveRecord
 
 		return static::$loggedInMember;
 	}
-
+	
 	/**
 	 * Load Record
 	 * We override it so we return a guest object for a non-existant member
 	 *
-	 * @param int|string|null	$id					ID
-	 * @param	string|null		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
+	 * @see		\IPS\Db::build
+	 * @param	int|string	$id					ID
+	 * @param	string		$idField			The database column that the $id parameter pertains to (NULL will use static::$databaseColumnId)
 	 * @param	mixed		$extraWhereClause	Additional where clause (see \IPS\Db::build for details)
-	 * @return	static|ActiveRecord
-	 *@see		Db::build
+	 * @return	static
 	 */
-	public static function load( int|string|null $id, string $idField=NULL, mixed $extraWhereClause=NULL ): ActiveRecord|static
+	public static function load( $id, $idField=NULL, $extraWhereClause=NULL )
 	{
 		try
 		{
 			if( $id === NULL OR $id === 0 OR $id === '' )
 			{
-				$classname = get_called_class();
+				$classname = \get_called_class();
 				return new $classname;
 			}
 			else
@@ -321,9 +257,9 @@ class Member extends ActiveRecord
 				return $member;
 			}
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			$classname = get_called_class();
+			$classname = \get_called_class();
 			return new $classname;
 		}
 	}
@@ -331,25 +267,25 @@ class Member extends ActiveRecord
 	/**
 	 * Load record based on a URL
 	 *
-	 * @param	Url	$url	URL to load from
-	 * @return	mixed
-	 * @throws	InvalidArgumentException
-	 * @throws	OutOfRangeException
+	 * @param	\IPS\Http\Url	$url	URL to load from
+	 * @return	static
+	 * @throws	\InvalidArgumentException
+	 * @throws	\OutOfRangeException
 	 */
-	public static function loadFromUrl( Url $url ): mixed
+	public static function loadFromUrl( \IPS\Http\Url $url )
 	{
 		try
 		{
 			$member = parent::loadFromUrl( $url );
 		}
-		catch( InvalidArgumentException $e )
+		catch( \InvalidArgumentException $e )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
 		if ( !$member->member_id )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		return $member;
 	}
@@ -359,55 +295,53 @@ class Member extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		/* If we're in the installer - don't do this */
-		if ( Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation === 'setup' )
+		if ( \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation === 'setup' )
 		{
 			return;
 		}
 
-		$this->member_group_id		= Settings::i()->guest_group;
+		$this->member_group_id		= \IPS\Settings::i()->guest_group;
 		$this->mgroup_others		= '';
 		$this->joined				= time();
-		$this->marked_site_read		= time();
-		$this->ip_address			= Request::i()->ipAddress();
+		$this->ip_address			= \IPS\Request::i()->ipAddress();
 		$this->timezone				= 'UTC';
-		$this->allow_admin_mails	= ( Settings::i()->updates_consent_default == 'enabled' );
+		$this->allow_admin_mails	= ( \IPS\Settings::i()->updates_consent_default == 'enabled' );
 		$this->pp_photo_type        = '';
 		$this->member_posts 		= 0;
 		$this->last_visit			= NULL;
 		$this->_data['pp_main_photo'] = NULL;
 		$this->_data['pp_thumb_photo'] = NULL;
-		$this->_data['failed_logins'] = NULL;
 		$this->_data['mfa_details'] = NULL;
 		$this->_data['pp_reputation_points'] = 0;
 		$this->_data['signature'] = '';
 
 		/* We need to enable the view_sigs bit if we want to show signatures to guests */
-		if ( Settings::i()->signatures_guests )
+		if ( \IPS\Settings::i()->signatures_guests )
 		{
 			$this->members_bitoptions['view_sigs'] = TRUE;
 		}
 
 		$this->members_bitoptions['new_device_email'] = TRUE;
-		$this->members_bitoptions['show_pm_popup'] = (bool)Settings::i()->notification_prefs_popup;
-		$this->members_bitoptions['email_notifications_once'] = (bool)Settings::i()->notification_prefs_one_per_view;
+		$this->members_bitoptions['show_pm_popup'] = ( \IPS\Settings::i()->notification_prefs_popup  ) ? TRUE : FALSE;
+		$this->members_bitoptions['email_notifications_once'] = ( \IPS\Settings::i()->notification_prefs_one_per_view  ) ? TRUE : FALSE;
 
 		$this->_data['auto_track']	= json_encode( array(
-			'content'	=> Settings::i()->auto_follow_new_content ? 1 : 0,
-			'comments'	=> Settings::i()->auto_follow_replied_to ? 1 : 0,
+			'content'	=> \IPS\Settings::i()->auto_follow_new_content ? 1 : 0,
+			'comments'	=> \IPS\Settings::i()->auto_follow_replied_to ? 1 : 0,
 			'method'	=> 'immediate'
 		)	);
 
-		if( isset( Request::i()->cookie['language'] ) AND Request::i()->cookie['language'] )
+		if( isset( \IPS\Request::i()->cookie['language'] ) AND \IPS\Request::i()->cookie['language'] )
 		{
-			$this->language	= Request::i()->cookie['language'];
+			$this->language	= \IPS\Request::i()->cookie['language'];
 		}
 		
-		if( isset( Request::i()->cookie['theme'] ) AND Request::i()->cookie['theme'] )
+		if( isset( \IPS\Request::i()->cookie['theme'] ) AND \IPS\Request::i()->cookie['theme'] )
 		{
-			$this->skin	= Request::i()->cookie['theme'];
+			$this->skin	= \IPS\Request::i()->cookie['theme'];
 		}
 	}
 
@@ -419,25 +353,24 @@ class Member extends ActiveRecord
 	 */
 	public function setAllowOptionalCookies( bool $allow = TRUE ): bool
 	{
-		$expire = ( new DateTime )->add( new DateInterval('P6M' ) );
-		Request::i()->setCookie( 'cookie_consent', 1, $expire, FALSE );
+		$expire = ( new \IPS\DateTime )->add( new \DateInterval('P6M' ) );
+		\IPS\Request::i()->setCookie( 'cookie_consent', 1, $expire, FALSE );
 
-		if ( !$allow )
+		if( !$allow )
 		{
 			/* Remove optional cookies */
-			foreach ( Request::i()->cookie as $cookieName => $value )
+			foreach( \IPS\Request::i()->cookie as $cookieName => $value )
 			{
-				if ( !in_array( $cookieName, Request::i()->getEssentialCookies() ) )
+				if( !\in_array( $cookieName, \IPS\Request::i()->getEssentialCookies() ) )
 				{
-					Request::i()->setCookie( $cookieName, null );
+					\IPS\Request::i()->setCookie( $cookieName, NULL);
 				}
 			}
-
-			Request::i()->setCookie( 'cookie_consent_optional', NULL );
+			\IPS\Request::i()->setCookie( 'cookie_consent_optional', NULL );
 		}
 		else
 		{
-			Request::i()->setCookie( 'cookie_consent_optional', 1, $expire, FALSE );
+			\IPS\Request::i()->setCookie( 'cookie_consent_optional', 1, $expire, FALSE );
 		}
 
 		return $allow;
@@ -450,7 +383,7 @@ class Member extends ActiveRecord
 	 */
 	public function get_optionalCookiesAllowed(): bool
 	{
-		return isset( Request::i()->cookie[ 'cookie_consent' ] ) AND isset( Request::i()->cookie[ 'cookie_consent_optional' ] );
+		return isset( \IPS\Request::i()->cookie[ 'cookie_consent' ] ) AND isset( \IPS\Request::i()->cookie[ 'cookie_consent_optional' ] );
 	}
 
 	/**
@@ -460,12 +393,12 @@ class Member extends ActiveRecord
 	 * @param bool $keepAuthorName		Keeps the author name
 	 * @return void
 	 */
-	public function delete( bool $setAuthorToGuest = TRUE, bool $keepAuthorName = TRUE ): void
+	public function delete( $setAuthorToGuest = TRUE, $keepAuthorName = TRUE )
 	{
 		/* Is this a guest object? */
 		if( !$this->member_id )
 		{
-			Log::log( [ $this->name, $this->email ], 'guest_delete_attempt' );
+			\IPS\Log::log( [ $this->name, $this->email ], 'guest_delete_attempt' );
 			return;
 		}
 
@@ -477,45 +410,45 @@ class Member extends ActiveRecord
         }
 
 		/* Let apps do their stuff */
-		Event::fire( 'onDelete', $this );
+		$this->memberSync( 'onDelete' );
 		
 		/* Actually delete from database */
 		parent::delete();
 		
 		/* We may have deleted a member waiting validation */
-		if ( !Db::i()->select( 'COUNT(*)', 'core_validating', array( 'user_verified=?', TRUE ) )->first() )
+		if ( !\IPS\Db::i()->select( 'COUNT(*)', 'core_validating', array( 'user_verified=?', TRUE ) )->first() )
 		{
-			AdminNotification::remove( 'core', 'NewRegValidate' );
+			\IPS\core\AdminNotification::remove( 'core', 'NewRegValidate' );
 		}
-		if ( $latestReg = Db::i()->select( 'joined', 'core_members',  array( 'email != ?', '' ), 'joined DESC', 1 )->first() )
+		if ( $latestReg = \IPS\Db::i()->select( 'joined', 'core_members',  array( 'email != ?', '' ), 'joined DESC', 1 )->first() )
 		{
-			AdminNotification::remove( 'core', 'NewRegComplete', NULL, DateTime::ts( $latestReg ) );
+			\IPS\core\AdminNotification::remove( 'core', 'NewRegComplete', NULL, \IPS\DateTime::ts( $latestReg ) );
 		}
 		else
 		{
-			AdminNotification::remove( 'core', 'NewRegComplete' );
+			\IPS\core\AdminNotification::remove( 'core', 'NewRegComplete', NULL );
 		}
 		if ( $this->members_bitoptions['is_support_account'] )
 		{
-			AdminNotification::remove( 'core', 'ConfigurationError', "supportAdmin-{$this->member_id}" );
+			\IPS\core\AdminNotification::remove( 'core', 'ConfigurationError', "supportAdmin-{$this->member_id}" );
 		}
 
 		/* Delete from member map */
-		Db::i()->delete( 'core_item_member_map', array( 'map_member_id=?', $this->member_id ) );
+		\IPS\Db::i()->delete( 'core_item_member_map', array( 'map_member_id=?', $this->member_id ) );
 
 		/* Reset statistics */
-		Widget::deleteCaches();
+		\IPS\Widget::deleteCaches();
 	}
 
 	/**
 	 * [ActiveRecord] Save Changed Columns
 	 *
-	 * @return    void
+	 * @return	void
 	 * @note	We have to be careful when upgrading in case we are coming from an older version
 	 */
-	public function save(): void
+	public function save()
 	{
-		if ( $this->member_id AND ( !Dispatcher::hasInstance() OR Dispatcher::i()->controllerLocation != 'setup' ) )
+		if ( $this->member_id AND ( !\IPS\Dispatcher::hasInstance() OR \IPS\Dispatcher::i()->controllerLocation != 'setup' ) )
 		{
 			$this->checkGroupPromotion();
 		}
@@ -523,12 +456,18 @@ class Member extends ActiveRecord
 		$new		= $this->_new;
 		$changes	= $this->changed;
 
+		/* Set default status updates enabled/disabled status */
+		if( $new AND !isset( $this->_data['pp_setting_count_comments'] ) )
+		{
+			$this->_data['pp_setting_count_comments'] = \IPS\Settings::i()->status_updates_mem_enable;
+		}
+
 		/* If we don't have a name or email address, account is not 'complete' */
 		/* @note The completed column is added in the 4.4.0 Beta 1 routine, so we need to verify the upgrade has been performed otherwise
 			the auto-upgrader can replace this file before the column is added, and an SQL error can prevent the admin from completing the
 			auto-upgrade process */
 		$fireRegistrationCompletedWebhook = FALSE;
-		if ( Application::load( 'core' )->long_version > 104000 )
+		if ( \IPS\Application::load( 'core' )->long_version > 104000 )
 		{
 			if( $this->completed AND ( !$this->name OR !$this->email ) )
 			{
@@ -539,6 +478,7 @@ class Member extends ActiveRecord
 			{
 				$this->completed = TRUE;
 				$fireRegistrationCompletedWebhook = TRUE;
+
 			}
 		}
 
@@ -547,39 +487,45 @@ class Member extends ActiveRecord
 		if ( $new )
 		{
 			/* Profile Fields */
-			Db::i()->insert( 'core_pfields_content', array( 'member_id' => $this->member_id ), TRUE );
-
-			Event::fire( 'onCreateAccount', $this );
+			\IPS\Db::i()->insert( 'core_pfields_content', array( 'member_id' => $this->member_id ), TRUE );
+			
+			$this->memberSync( 'onCreateAccount' );
 		}
 		else
 		{
-			if ( $fireRegistrationCompletedWebhook )
+			if( $fireRegistrationCompletedWebhook )
 			{
-				Webhook::fire( 'member_registration_complete', $this, $this->webhookFilters() );
+				\IPS\Api\Webhook::fire( 'member_registration_complete', $this, $this->webhookFilters() );
 			}
-
-			/* Run member sync, but not if the only change is the last_activity timestamp and if we're not just updating the member's language during language() init when no language is set */
-			if( ( Member::loggedIn()->member_id != $this->member_id or $this->_lang !== null ) and ( count( $this->changedCustomFields ) > 0 OR ( count( $changes ) > 0 AND !( count( $changes ) === 1 AND isset( $changes['last_activity'] ) ) ) ) )
+			/* Run member sync, but not if the only change is the last_activity timestamp */
+			if( \count( $this->changedCustomFields ) > 0 OR ( \count( $changes ) > 0 AND !( \count( $changes ) === 1 AND isset( $changes['last_activity'] ) ) ) )
 			{
-				Event::fire( 'onProfileUpdate', $this, array( 'changes' => array_merge( $changes, $this->changedCustomFields ) ) );
+				$this->memberSync( 'onProfileUpdate', array( 'changes' => array_merge( $changes, $this->changedCustomFields ) ) );
 			}
 		}
 
 		/* If we have updated custom fields, make sure we don't have any cached in the class - just wipe out cache so we will refetch if needed */
-		if( count( $this->changedCustomFields ) )
+		if( \count( $this->changedCustomFields ) )
 		{
 			$this->rawProfileFieldsData	= NULL;
 			$this->profileFields		= NULL;
+		}
+
+		/* rebuild create menu if the user changed status settings or group(s) */
+		if ( !$new AND ( isset( $changes['pp_setting_count_comments'] ) or isset( $changes['member_group_id'] ) or isset( $changes['mgroup_others'] ) ) )
+		{
+			$this->create_menu = NULL;
+			parent::save();
 		}
 
 		/* Remove pending validation entries if our email address has changed */
 		if( !$new AND isset( $changes['email'] ) )
 		{
 			/* Delete any pending validation emails */
-			Db::i()->delete( 'core_validating', array( 'member_id=? AND email_chg=1', $this->member_id ) );
+			\IPS\Db::i()->delete( 'core_validating', array( 'member_id=? AND email_chg=1', $this->member_id ) );
 
 			/* Delete any pending password reset emails */
-			Db::i()->delete( 'core_validating', array( 'member_id=? AND lost_pass=1', $this->member_id ) );
+			\IPS\Db::i()->delete( 'core_validating', array( 'member_id=? AND lost_pass=1', $this->member_id ) );
 		}
 	}
 	
@@ -588,54 +534,54 @@ class Member extends ActiveRecord
 	/**
 	 * Group Data, taking into consideration secondary groups
 	 */
-	public ?array $_group = NULL;
+	public $_group = NULL;
 	
 	/**
 	 * @brief	Admin CP Restrictions
 	 */
-	protected mixed $restrictions = NULL;
+	protected $restrictions = NULL;
 	
 	/**
 	 * @brief	Moderator Permissions
 	 */
-	protected mixed $modPermissions = NULL;
+	protected $modPermissions = NULL;
 	
 	/**
 	 * @brief	Calculated language ID
 	 */
-	protected ?int $calculatedLanguageId = NULL;
+	protected $calculatedLanguageId = NULL;
 	
 	/**
 	 * @brief	Marker Cache
 	 */
-	public array $markers = array();
+	public $markers = array();
 
 	/**
 	 * @brief	Markers reset times
 	 */
-	public array $markersResetTimes = array();
+	public $markersResetTimes = array();
 
 	/**
 	 * @brief	We have fetched markers already
 	 */
-	public bool $haveAllMarkers = FALSE;
+	public $haveAllMarkers = FALSE;
 	
 	/**
 	 * @brief	Default stream ID
 	 */
-	protected mixed $defaultStreamId = FALSE;
+	protected $defaultStreamId = FALSE;
 	
 	/**
 	 * @brief	Keep track of any changed profile fields
 	 */
-	public array $changedCustomFields = array();
+	public $changedCustomFields = array();
 
 	/**
 	 * Get name, do not return "guest" name if not set
 	 *
 	 * @return	string
 	 */
-	public function get_real_name(): string
+	public function get_real_name()
 	{
 		return ( isset( $this->_data['name'] ) ) ? $this->_data['name'] : '';
 	}
@@ -645,14 +591,14 @@ class Member extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	public function get_name(): string
+	public function get_name()
 	{
 		if( !isset( $this->_data['name'] ) )
 		{
-			return Member::loggedIn()->language()->addToStack('guest');
+			return \IPS\Member::loggedIn()->language()->addToStack('guest');
 		}
 		
-		return $this->member_id ? $this->_data['name'] : Member::loggedIn()->language()->addToStack( 'guest_name_shown', FALSE, array( 'sprintf' => array( $this->_data['name'] ) ) );
+		return $this->member_id ? $this->_data['name'] : \IPS\Member::loggedIn()->language()->addToStack( 'guest_name_shown', FALSE, array( 'sprintf' => array( $this->_data['name'] ) ) );
 	}
 	
 	/**
@@ -660,28 +606,28 @@ class Member extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	public function get__name(): string
+	public function get__name()
 	{
 		if ( !isset( $this->_data['name'] ) )
 		{
-			return Member::loggedIn()->language()->get('guest');
+			return \IPS\Member::loggedIn()->language()->get('guest');
 		}
 		
-		return $this->member_id ? $this->_data['name'] : sprintf( Member::loggedIn()->language()->get('guest_name_shown'), $this->_data['name'] );
+		return $this->member_id ? $this->_data['name'] : sprintf( \IPS\Member::loggedIn()->language()->get('guest_name_shown'), $this->_data['name'] );
 	}
 
 	/**
 	 * @brief	Previous name - stored temporarily for display name history log
 	 */
-	protected ?string $previousName	= NULL;
+	protected $previousName	= NULL;
 
 	/**
 	 * Set name
 	 *
-	 * @param string $value	Value
+	 * @param	string	$value	Value
 	 * @return	void
 	 */
-	public function set_name( string $value ) : void
+	public function set_name( $value )
 	{
 		if( isset( $this->_data['name'] ) )
 		{
@@ -689,33 +635,33 @@ class Member extends ActiveRecord
 		}
 
 		$this->_data['name']				= $value;
-		$this->_data['members_seo_name']	= Friendly::seoTitle( $value );
+		$this->_data['members_seo_name']	= \IPS\Http\Url\Friendly::seoTitle( $value );
 	}
 
 	/**
 	 * Set group
 	 *
-	 * @param int $value	Value
+	 * @param	int	$value	Value
 	 * @return	void
 	 */
-	public function set_member_group_id( int $value ) : void
+	public function set_member_group_id( $value )
 	{
-		$this->_data['member_group_id'] = $value;
+		$this->_data['member_group_id'] = (int) $value;
 		$this->resetGroupsCaches();
 	}
 	
 	/**
 	 * Set Secondary Groups
 	 *
-	 * @param string $value	Value
+	 * @param	string	$value	Value
 	 * @return	void
 	 */
-	public function set_mgroup_others( string $value ) : void
+	public function set_mgroup_others( $value )
 	{
 		$groups = array_filter( explode( ",", $value ) );
-		if ( in_array( Settings::i()->guest_group, $groups ) )
+		if ( \in_array( \IPS\Settings::i()->guest_group, $groups ) )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 				
 		$this->_data['mgroup_others'] = implode( ',', $groups );
@@ -727,20 +673,20 @@ class Member extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function flagAsSpammer() : void
+	public function flagAsSpammer()
 	{
 		if ( !$this->members_bitoptions['bw_is_spammer'] )
 		{
-			$actions = explode( ',', Settings::i()->spm_option );
+			$actions = explode( ',', \IPS\Settings::i()->spm_option );
 						
 			/* Hide or delete */
-			if ( in_array( 'unapprove', $actions ) or in_array( 'delete', $actions ) )
+			if ( \in_array( 'unapprove', $actions ) or \in_array( 'delete', $actions ) )
 			{
 				/* Send to queue */
-				$this->hideOrDeleteAllContent( in_array( 'delete', $actions ) ? 'delete' : 'hide' );
+				$this->hideOrDeleteAllContent( \in_array( 'delete', $actions ) ? 'delete' : 'hide' );
 				
 				/* Clear out their profile */
-				if ( in_array( 'delete', $actions ) )
+				if ( \in_array( 'delete', $actions ) )
 				{
 					$this->signature		= '';
 					$this->pp_main_photo	= NULL;
@@ -750,14 +696,14 @@ class Member extends ActiveRecord
 					$this->pp_cover_photo	= '';
 					$this->pp_cover_offset	= 0;
 					
-					Db::i()->delete( 'core_pfields_content', array( 'member_id=?', $this->member_id ) );
+					\IPS\Db::i()->delete( 'core_pfields_content', array( 'member_id=?', $this->member_id ) );
 				}
 			}
 			
 			/* Restrict from posting or ban */
-			if ( in_array( 'disable', $actions ) or in_array( 'ban', $actions ) )
+			if ( \in_array( 'disable', $actions ) or \in_array( 'ban', $actions ) )
 			{
-				if ( in_array( 'ban', $actions ) )
+				if ( \in_array( 'ban', $actions ) )
 				{
 					$this->temp_ban = -1;
 				}
@@ -774,13 +720,13 @@ class Member extends ActiveRecord
 
 			/* Run sync */
 			$this->logHistory( 'core', 'account', array( 'type' => 'spammer', 'set' => TRUE, 'actions' => $actions ) );
-			Event::fire( 'onSetAsSpammer', $this );
-			Webhook::fire( 'member_flagged_as_spammer', $this );
+			$this->memberSync( 'onSetAsSpammer' );
+			
 			/* Notify admin */
-			AdminNotification::send( 'core', 'Spammer', NULL, TRUE, $this->member_id, Member::loggedIn() );
+			\IPS\core\AdminNotification::send( 'core', 'Spammer', NULL, TRUE, $this->member_id, \IPS\Member::loggedIn() );
 			
 			/* Feedback to Spam Monitoring Service */
-			if ( Settings::i()->spam_service_enabled and Settings::i()->spam_service_send_to_ips )
+			if ( \IPS\Settings::i()->spam_service_enabled and \IPS\Settings::i()->spam_service_send_to_ips )
 			{
 				$this->spamService( 'markspam' );
 			}
@@ -790,38 +736,40 @@ class Member extends ActiveRecord
 	/**
 	 * Hide/Delete All Content
 	 *
-	 * @param string $action	'hide' or 'delete' or 'merge'
-	 * @param array $extra	Extra data needed by the MemberContent plugin
+	 * @param	string	$action	'hide' or 'delete' or 'merge'
+	 * @param	array 	$extra	Extra data needed by the MemberContent plugin
 	 * @return	void
 	 */
-	public function hideOrDeleteAllContent( string $action, array $extra=array() ) : void
+	public function hideOrDeleteAllContent( $action, $extra=array() )
 	{
 		/* Edited member, so clear widget caches (stats, widgets that contain photos, names and so on) */
-		Widget::deleteCaches();
+		\IPS\Widget::deleteCaches();
 
 		/* Send to the queue, include archived content */
-		foreach ( Content::routedClasses( FALSE, TRUE, FALSE ) as $class )
+		foreach ( \IPS\Content::routedClasses( FALSE, TRUE, FALSE ) as $class )
 		{
-			if ( isset( $class::$databaseColumnMap['author'] ) and ( $action == 'delete' or IPS::classUsesTrait( $class, 'IPS\Content\Hideable' ) ) )
+			if ( isset( $class::$databaseColumnMap['author'] ) and ( $action == 'delete' or \in_array( 'IPS\Content\Hideable', class_implements( $class ) ) ) )
 			{
 				/* Comments run first when merging so rebuilding topic doesn't fail with incorrect author ID */
 				switch( $action )
 				{
 					case 'hide':
-					case 'delete':
 						$order = 1;
 						break;
 					case 'merge':
 						$order = ( !is_subclass_of( $class, '\IPS\Content\Comment' ) ) ? 3 : 2;
 						break;
+					case 'delete':
+						$order = 1;
+						break;
 				}
 
-				Task::queue( 'core', 'MemberContent', array_merge( array( 'initiated_by_member_id' => Member::loggedIn()->member_id, 'member_id' => $this->member_id, 'name' => $this->name, 'class' => $class, 'action' => $action ), $extra ), $order );
+				\IPS\Task::queue( 'core', 'MemberContent', array_merge( array( 'initiated_by_member_id' => \IPS\Member::loggedIn()->member_id, 'member_id' => $this->member_id, 'name' => $this->name, 'class' => $class, 'action' => $action ), $extra ), $order );
 			}
 		}
 
 		/* And private messages */
-		Task::queue( 'core', 'MemberContent', array_merge( array( 'initiated_by_member_id' => Member::loggedIn()->member_id, 'member_id' => $this->member_id, 'name' => $this->name, 'class' => 'IPS\\core\\Messenger\\Conversation', 'action' => $action ), $extra ), 2 );
+		\IPS\Task::queue( 'core', 'MemberContent', array_merge( array( 'initiated_by_member_id' => \IPS\Member::loggedIn()->member_id, 'member_id' => $this->member_id, 'name' => $this->name, 'class' => 'IPS\\core\\Messenger\\Conversation', 'action' => $action ), $extra ), 2 );
 	}
 	
 	/**
@@ -829,7 +777,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function unflagAsSpammer() : void
+	public function unflagAsSpammer()
 	{
 		if ( $this->members_bitoptions['bw_is_spammer'] )
 		{
@@ -841,25 +789,24 @@ class Member extends ActiveRecord
 			$this->logHistory( 'core', 'account', array( 'type' => 'spammer', 'set' => FALSE ) );
 
 			/* Remove any pending hide or delete content queued tasks */
-			foreach(Db::i()->select( '*', 'core_queue', array( '`key`=?', 'MemberContent' ) ) as $task )
+			foreach( \IPS\Db::i()->select( '*', 'core_queue', array( '`key`=?', 'MemberContent' ) ) as $task )
 			{
 				$data = json_decode( $task['data'], true );
 
 				if( $data['member_id'] == $this->member_id )
 				{
-					Db::i()->delete( 'core_queue', array( 'id=?', $task['id'] ) );
+					\IPS\Db::i()->delete( 'core_queue', array( 'id=?', $task['id'] ) );
 				}
 			}
 			
 			/* Report back to spam service */
-			if ( Settings::i()->spam_service_enabled and Settings::i()->spam_service_send_to_ips )
+			if ( \IPS\Settings::i()->spam_service_enabled and \IPS\Settings::i()->spam_service_send_to_ips )
 			{
 				$this->spamService( 'notspam' );
 			}
 
 			/* Run sync */
-			Event::fire( 'onUnSetAsSpammer', $this );
-			Webhook::fire( 'member_unflagged_as_spammer', $this );
+			$this->memberSync( 'onUnSetAsSpammer' );
 		}
 	}
 
@@ -868,7 +815,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function get_auto_follow(): array
+	public function get_auto_follow()
 	{
 		return ( mb_substr( $this->_data['auto_track'], 0, 1 ) !== '{' ) ?
 			array( 'method' => 'immediate', 'content' => 0, 'comments' => (int) $this->_data['auto_track'] ) :
@@ -878,19 +825,19 @@ class Member extends ActiveRecord
 	/**
 	 * Set banned
 	 *
-	 * @param string $value	Value
+	 * @param	string	$value	Value
 	 * @return	void
 	 */
-	public function set_temp_ban( string $value ) : void
+	public function set_temp_ban( $value )
 	{
 		$this->_data['temp_ban'] = $value;
 		if ( $value == -1 )
 		{
-			Db::i()->delete( 'core_validating', array( 'member_id=?', $this->member_id ) );
+			\IPS\Db::i()->delete( 'core_validating', array( 'member_id=?', $this->member_id ) );
 			
-			if ( !Db::i()->select( 'COUNT(*)', 'core_validating', array( 'user_verified=?', TRUE ) )->first() )
+			if ( !\IPS\Db::i()->select( 'COUNT(*)', 'core_validating', array( 'user_verified=?', TRUE ) )->first() )
 			{
-				AdminNotification::remove( 'core', 'NewRegValidate' );
+				\IPS\core\AdminNotification::remove( 'core', 'NewRegValidate' );
 			}
 		}
 		else
@@ -901,29 +848,27 @@ class Member extends ActiveRecord
 		/* Revoke oAuth tokens */
 		if( $value )
 		{
-			Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'member_id=?', $this->member_id ) );
+			\IPS\Db::i()->update( 'core_oauth_server_access_tokens', array( 'status' => 'revoked' ), array( 'member_id=?', $this->member_id ) );
 		}
-
-		Webhook::fire( 'member_ban_state_changed', [$this, $value] );
 	}
-
+	
 	/**
 	 * Get Group Data
 	 *
-	 * @return array|null
+	 * @return	array
 	 */
-	public function get_group(): ?array
+	public function get_group()
 	{
 		if ( $this->_group === NULL )
 		{
 			/* Load primary group */
 			try
 			{
-				$group = Group::load( $this->_data['member_group_id'] );
+				$group = \IPS\Member\Group::load( $this->_data['member_group_id'] );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				$group = Group::load( Settings::i()->member_group );
+				$group = \IPS\Member\Group::load( \IPS\Settings::i()->member_group );
 			}
 			
 			$this->_group = array_merge( $group->data(), $group->g_bitoptions->asArray() );
@@ -939,33 +884,36 @@ class Member extends ActiveRecord
 				$callback		= array();
 	
 				/* Get the limits we need to work out from apps */
-				foreach (Application::allExtensions( 'core', 'GroupLimits', FALSE, 'core' ) as $key => $extension )
+				foreach ( \IPS\Application::allExtensions( 'core', 'GroupLimits', FALSE, 'core' ) as $key => $extension )
 				{
-					$appLimits = $extension->getLimits();
-
-					if( !empty( $appLimits[ 'neg1IsBest' ] ) )
+					if( method_exists( $extension, 'getLimits' ) )
 					{
-						$neg1IsBest = array_merge( $neg1IsBest, $appLimits[ 'neg1IsBest' ] );
-					}
-
-					if( !empty( $appLimits[ 'zeroIsBest' ] ) )
-					{
-						$zeroIsBest = array_merge( $zeroIsBest, $appLimits[ 'zeroIsBest' ] );
-					}
-
-					if( !empty( $appLimits[ 'lessIsMore' ] ) )
-					{
-						$lessIsMore = array_merge( $lessIsMore, $appLimits[ 'lessIsMore' ] );
-					}
-
-					if( !empty( $appLimits[ 'exclude' ] ) )
-					{
-						$exclude = array_merge( $exclude, $appLimits[ 'exclude' ] );
-					}
-
-					if( !empty( $appLimits[ 'callback' ] ) )
-					{
-						$callback = array_merge( $callback, $appLimits[ 'callback' ] );
+						$appLimits = $extension->getLimits();
+						
+						if( !empty( $appLimits['neg1IsBest'] ) )
+						{
+							$neg1IsBest	= array_merge( $neg1IsBest, $appLimits['neg1IsBest'] );
+						}
+							
+						if( !empty( $appLimits['zeroIsBest'] ) )
+						{
+							$zeroIsBest = array_merge( $zeroIsBest, $appLimits['zeroIsBest'] );
+						}
+							
+						if( !empty( $appLimits['lessIsMore'] ) )
+						{
+							$lessIsMore	= array_merge( $lessIsMore, $appLimits['lessIsMore'] );
+						}
+							
+						if( !empty( $appLimits['exclude'] ) )
+						{
+							$exclude = array_merge( $exclude, $appLimits['exclude'] );
+						}
+						
+						if( !empty( $appLimits['callback'] ) )
+						{
+							$callback = array_merge( $callback, $appLimits['callback'] );
+						}
 					}
 				}
 				
@@ -976,9 +924,9 @@ class Member extends ActiveRecord
 				{
 					try
 					{
-						$group = Group::load( $gid );
+						$group = \IPS\Member\Group::load( $gid );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						$skippedGroups[]	= $gid;
 						continue;
@@ -988,9 +936,9 @@ class Member extends ActiveRecord
 	
 					foreach( $_data as $k => $v )
 					{
-						if ( ! in_array( $k, $exclude ) )
+						if ( ! \in_array( $k, $exclude ) )
 						{
-							if ( in_array( $k, $zeroIsBest ) )
+							if ( \in_array( $k, $zeroIsBest ) )
 							{
 								if ( empty( $this->_group[ $k ] ) )
 								{
@@ -1005,7 +953,7 @@ class Member extends ActiveRecord
 									$this->_group[ $k ] = $v;
 								}
 							}
-							else if( in_array( $k, $neg1IsBest ) )
+							else if( \in_array( $k, $neg1IsBest ) )
 							{
 								
 								if ( $this->_group[ $k ] == -1 )
@@ -1021,7 +969,7 @@ class Member extends ActiveRecord
 									$this->_group[ $k ] = $v;
 								}
 							}
-							else if ( in_array( $k, $lessIsMore ) )
+							else if ( \in_array( $k, $lessIsMore ) )
 							{
 								if ( $v < $this->_group[ $k ] )
 								{
@@ -1033,7 +981,7 @@ class Member extends ActiveRecord
 								$callbackFunction = $callback[ $k ];
 								$result = $callbackFunction( $this->_group, $_data, $k, $this->_data );
 	
-								if( is_array( $result ) )
+								if( \is_array( $result ) )
 								{
 									$this->_group	= array_merge( $this->_group, $result );
 								}
@@ -1053,7 +1001,7 @@ class Member extends ActiveRecord
 					}
 				}
 	
-				if( count( $skippedGroups ) )
+				if( \count( $skippedGroups ) )
 				{
 					$this->mgroup_others = implode( ',', array_diff( $groups, $skippedGroups ) );
 					
@@ -1070,7 +1018,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return string
 	 */
-	public function get_groupName(): string
+	public function get_groupName()
 	{
 		if ( $this->_group === NULL )
 		{
@@ -1079,8 +1027,8 @@ class Member extends ActiveRecord
 
 		if( $this->_data['member_group_id'] )
 		{
-			$group = Group::load( $this->_data['member_group_id'] );
-			$this->_group['name'] = $group->formatName( Member::loggedIn()->language()->addToStack( "core_group_{$group->g_id}" ) );
+			$group = \IPS\Member\Group::load( $this->_data['member_group_id'] );
+			$this->_group['name'] = $group->formatName( \IPS\Member::loggedIn()->language()->addToStack( "core_group_{$group->g_id}" ) );
 		}
 
 		return $this->_group['name'];
@@ -1089,25 +1037,24 @@ class Member extends ActiveRecord
 	/**
 	 * @brief	Cached groups check
 	 */
-	protected ?array $_groups = NULL;
+	protected $_groups = NULL;
 
 	/**
 	 * Reset the group and groups cache
 	 *
 	 * @return void
 	 */
-	protected function resetGroupsCaches(): void
+	protected function resetGroupsCaches()
 	{
 		$this->_group = NULL;
 		$this->_groups = NULL;
 	}
-
 	/**
 	 * Get an array of the group IDs (including secondary groups) this member belongs to
 	 *
-	 * @return array|null
+	 * @return	array
 	 */
-	public function get_groups(): ?array
+	public function get_groups()
 	{
 		if ( $this->_groups !== NULL )
 		{
@@ -1118,9 +1065,9 @@ class Member extends ActiveRecord
 
 		if( $this->_data['mgroup_others'] )
 		{
-			foreach( array_filter( explode( ',', $this->_data['mgroup_others'] ) ) as $id )
+			foreach( explode( ',', $this->_data['mgroup_others'] ) as $id )
 			{
-				$this->_groups[] = intval( $id );
+				$this->_groups[] = \intval( $id );
 			}
 		}
 		
@@ -1133,15 +1080,15 @@ class Member extends ActiveRecord
 	/**
 	 * Social Groups
 	 */
-	protected ?array $_socialGroups = NULL;
+	protected $_socialGroups = NULL;
 	
 	/**
 	 * Social Groups
 	 *
-	 * @param bool $bypassCache	Fetch directly from the database
-	 * @return	array|null
+	 * @param	bool	$bypassCache	Fetch directly from the database
+	 * @return	array
 	 */
-	public function socialGroups( bool $bypassCache=FALSE ): ?array
+	public function socialGroups( $bypassCache = FALSE )
 	{
 		if ( $this->_socialGroups === NULL OR $bypassCache )
 		{
@@ -1154,8 +1101,9 @@ class Member extends ActiveRecord
 			{
 				if( $bypassCache )
 				{
-					$this->_socialGroups = iterator_to_array( Db::i()
-						->select( 'group_id', 'core_sys_social_group_members', array( 'member_id=?', $this->member_id ), NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )
+					/* @note SELECT_FROM_WRITE_SERVER added in Pull #2341 @todo check if needed */
+					$this->_socialGroups = iterator_to_array( \IPS\Db::i()
+						->select( 'group_id', 'core_sys_social_group_members', array( 'member_id=?', $this->member_id ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )
 						->setKeyField( 'group_id' )
 						->setValueField( 'group_id' ) );
 				}
@@ -1181,36 +1129,37 @@ class Member extends ActiveRecord
 	/**
 	 * Clubs
 	 */
-	protected ?array $_clubs = array();
+	protected $_clubs = array();
 	
 	/**
 	 * Clubs
 	 *
-	 * @param bool $fromWriteServer	If Read/Write separation is enabled, this flag can be used to force reading from the write server, which can be used when rebuilding cached permission strings
-	 * @param bool $moderatorOnly	If true will only return clubs the member is a modertor of
+	 * @param	bool	$fromWriteServer	If Read/Write separation is enabled, this flag can be used to force reading from the write server, which can be used when rebuilding cached permission strings
+	 * @param	bool	$moderatorOnly	If true will only return clubs the member is a modertor of
 	 * @return	array
 	 */
-	public function clubs( bool $fromWriteServer=FALSE, bool $moderatorOnly=FALSE ): array
+	public function clubs( $fromWriteServer = FALSE, $moderatorOnly = FALSE )
 	{
-		if ( !Settings::i()->clubs )
+		if ( !\IPS\Settings::i()->clubs )
 		{
 			return array();
 		}
-		if ( !isset( $this->_clubs[ intval( $moderatorOnly ) ] ) )
+		if ( !isset( $this->_clubs[ \intval( $moderatorOnly ) ] ) )
 		{
 			/* If this is a guest, they will not have any clubs - save the query */
 			if( !$this->member_id )
 			{
-				$this->_clubs[ intval( $moderatorOnly ) ] = array();
+				$this->_clubs[ \intval( $moderatorOnly ) ] = array();
 			}
 			else
 			{
-				$statuses = $moderatorOnly ? ( Club::STATUS_MODERATOR . "','" . Club::STATUS_LEADER ) : ( Club::STATUS_MEMBER . "','" . Club::STATUS_MODERATOR . "','" . Club::STATUS_LEADER ) ;
-				
-				$this->_clubs[ intval( $moderatorOnly ) ] = iterator_to_array( Db::i()->select( 'club_id', 'core_clubs_memberships', array( "member_id=? AND status IN('" . $statuses . "')", $this->member_id ), NULL, NULL, NULL, NULL, $fromWriteServer ? Db::SELECT_FROM_WRITE_SERVER : 0 ) );
+				$statuses = $moderatorOnly ? ( \IPS\Member\Club::STATUS_MODERATOR . "','" . \IPS\Member\Club::STATUS_LEADER ) : ( \IPS\Member\Club::STATUS_MEMBER . "','" . \IPS\Member\Club::STATUS_MODERATOR . "','" . \IPS\Member\Club::STATUS_LEADER ) ;
+
+				/* @note SELECT_FROM_WRITE_SERVER honors $fromWriteServer */
+				$this->_clubs[ \intval( $moderatorOnly ) ] = iterator_to_array( \IPS\Db::i()->select( 'club_id', 'core_clubs_memberships', array( "member_id=? AND status IN('" . $statuses . "')", $this->member_id ), NULL, NULL, NULL, NULL, $fromWriteServer ? \IPS\Db::SELECT_FROM_WRITE_SERVER : 0 ) );
 			}
 		}
-		return $this->_clubs[ intval( $moderatorOnly ) ];
+		return $this->_clubs[ \intval( $moderatorOnly ) ];
 	}
 	
 	/**
@@ -1218,7 +1167,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function permissionArray(): array
+	public function permissionArray()
 	{
 		$return = $this->groups;
 
@@ -1226,7 +1175,7 @@ class Member extends ActiveRecord
 		{
 			$return[] = "m{$this->member_id}";
 
-			if ( Settings::i()->clubs )
+			if ( \IPS\Settings::i()->clubs )
 			{
 				$return[] = "ca"; // Public clubs, which is everyone except guests
 			}
@@ -1255,26 +1204,26 @@ class Member extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function rebuildPermissionArray() : void
+	public function rebuildPermissionArray()
 	{
 		$permissionArray = array();
-		foreach ($this->socialGroups(TRUE) as $socialGroupId )
+		foreach ( $this->socialGroups( TRUE ) as $socialGroupId )
 		{
 			$permissionArray[] = "s{$socialGroupId}";
 		}
-		if ( Settings::i()->clubs )
+		if ( \IPS\Settings::i()->clubs )
 		{
 			/* Wipe club cache as when we are added, perm is rebuilt but the new club membership is not detected as we are using cached value */
 			$this->_clubs = NULL;
 			
-			$clubs = $this->clubs(TRUE);
+			$clubs = $this->clubs( TRUE );
 			if ( $clubs )
 			{
 				foreach ( $clubs as $clubId )
 				{
 					$permissionArray[] = "c{$clubId}";
 				}
-				foreach ($this->clubs(TRUE, TRUE) as $clubId )
+				foreach ( $this->clubs( TRUE, TRUE ) as $clubId )
 				{
 					$permissionArray[] = "cm{$clubId}";
 				}
@@ -1288,19 +1237,19 @@ class Member extends ActiveRecord
 	/**
 	 * Get Joined Date
 	 *
-	 * @return    DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_joined(): DateTime
+	public function get_joined()
 	{
-		return DateTime::ts( $this->_data['joined'] );
+		return \IPS\DateTime::ts( $this->_data['joined'] );
 	}
 	
 	/**
 	 * Get SEO Name
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function get_members_seo_name(): ?string
+	public function get_members_seo_name()
 	{
 		/* Set it so it will be saved */
 		if( !isset( $this->_data['members_seo_name'] ) or !$this->_data['members_seo_name'] )
@@ -1310,10 +1259,10 @@ class Member extends ActiveRecord
 				return NULL;
 			}
 			
-			$this->members_seo_name	= Friendly::seoTitle( $this->name );
+			$this->members_seo_name	= \IPS\Http\Url\Friendly::seoTitle( $this->name );
 		}
 
-		return $this->_data['members_seo_name'] ?: Friendly::seoTitle( $this->name );
+		return $this->_data['members_seo_name'] ?: \IPS\Http\Url\Friendly::seoTitle( $this->name );
 	}
 
 	/**
@@ -1321,19 +1270,19 @@ class Member extends ActiveRecord
 	 *
 	 * @return	string|null
 	 */
-	public function get_birthday(): ?string
+	public function get_birthday()
 	{
 		try
 		{
 			if( $this->_data['bday_year'] )
 			{
-				$date	= new DateTime( str_pad( $this->_data['bday_year'], 4, 0, STR_PAD_LEFT ) . str_pad( $this->_data['bday_month'], 2, 0, STR_PAD_LEFT ) . str_pad( $this->_data['bday_day'], 2, 0, STR_PAD_LEFT ) );
+				$date	= new \IPS\DateTime( str_pad( $this->_data['bday_year'], 4, 0, STR_PAD_LEFT ) . str_pad( $this->_data['bday_month'], 2, 0, STR_PAD_LEFT ) . str_pad( $this->_data['bday_day'], 2, 0, STR_PAD_LEFT ) );
 
 				return $date->fullYearLocaleDate();
 			}
 			else if( $this->_data['bday_month'] )
 			{
-				$date	= new DateTime( $this->_data['bday_month'] . '/' . $this->_data['bday_day'] );
+				$date	= new \IPS\DateTime( $this->_data['bday_month'] . '/' . $this->_data['bday_day'] );
 
 				return $date->dayAndMonth();
 			}
@@ -1342,9 +1291,9 @@ class Member extends ActiveRecord
 				return NULL;
 			}
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Log::debug( "Member " . $this->id ." has a not valid birthday date" , 'birthday_error' );
+			\IPS\Log::debug( "Member " . $this->id ." has a not valid birthday date" , 'birthday_error' );
 			return NULL;
 		}
 	}
@@ -1352,23 +1301,23 @@ class Member extends ActiveRecord
 	/**
 	 * Get the member's age
 	 *
-	 * @param DateTime|null $date	If supplied, birthday is calculated from this point
+	 * @param	\IPS\DateTime|null	$date	If supplied, birthday is calculated from this point
 	 * @note	If the member has not specified a birth year (which is optional), NULL is returned
 	 * @return	int|null
 	 */
-	public function age( DateTime $date=NULL ): ?int
+	public function age( $date=NULL )
 	{
 		if( $this->_data['bday_year'] AND checkdate( $this->_data['bday_month'], $this->_data['bday_day'], $this->_data['bday_year'] ) )
 		{
 			/* We use dashes because DateTime accepts two digit years with it */
-			$birthday	= new DateTime( $this->_data['bday_year'] . '-' . $this->_data['bday_month'] . '-' . $this->_data['bday_day'] );
+			$birthday	= new \IPS\DateTime( $this->_data['bday_year'] . '-' . $this->_data['bday_month'] . '-' . $this->_data['bday_day'] );
 			$birthday->setTime( 0, 0, 1 );
 
-			$today = $date ? new DateTime( $date->format('Y') . '-' . $date->format('m') . '-' . $date->format('d') ) : new DateTime();
+			$today = $date ? new \IPS\DateTime( $date->format('Y') . '-' . $date->format('m') . '-' . $date->format('d') ) : new \IPS\DateTime();
 
-			if( Member::loggedIn()->timezone )
+			if( \IPS\Member::loggedIn()->timezone )
 			{
-				$today->setTimezone( new DateTimeZone( Member::loggedIn()->timezone ) );
+				$today->setTimezone( new \DateTimeZone( \IPS\Member::loggedIn()->timezone ) );
 			}
 
 			$today->setTime( 23, 59, 59 ); // We want how old they'll be at the end of the provided date
@@ -1380,26 +1329,26 @@ class Member extends ActiveRecord
 			return NULL;
 		}
 	}
-
+			
 	/**
 	 * User's photo URL
 	 *
-	 * @param bool $thumb Use thumbnail?
-	 * @param bool $email Is the photo going to be used in an email?
-	 * @return string|null
+	 * @param	bool	$thumb	Use thumbnail?
+	 * @param	bool	$email	Is the photo going to be used in an email?
+	 * @return string
 	 */
-	public function get_photo( bool $thumb=TRUE, bool $email=FALSE ): ?string
+	public function get_photo( $thumb=TRUE, $email=FALSE )
 	{
-		return static::photoUrl($this->_data, $thumb, $email);
+		return static::photoUrl( $this->_data, $thumb, $email );
 	}
 
 	/**
 	 * Set Photo Type
 	 *
-	 * @param string|null $type	Photo type
+	 * @param	string	$type	Photo type
 	 * @return	void
 	 */
-	public function set_pp_photo_type( ?string $type ) : void
+	public function set_pp_photo_type( $type )
 	{
 		if ( $this->_previousPhotoType === NULL and isset( $this->_data['pp_photo_type'] ) )
 		{
@@ -1411,10 +1360,10 @@ class Member extends ActiveRecord
 	/**
 	 * Set Photo
 	 *
-	 * @param string|null $photo	Photo location
+	 * @param	string	$photo	Photo location
 	 * @return	void
 	 */
-	public function set_pp_main_photo( ?string $photo ) : void
+	public function set_pp_main_photo( $photo )
 	{
 		$this->deletePhoto();
 		
@@ -1426,7 +1375,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function deletePhoto() : void
+	public function deletePhoto()
 	{
 		/* It is common to update pp_photo_type before pp_main_photo */
 		$photoType = ( $this->_previousPhotoType !== NULL ) ? $this->_previousPhotoType : $this->_data['pp_photo_type'];
@@ -1438,18 +1387,18 @@ class Member extends ActiveRecord
 			{
 				try
 				{
-					File::get( 'core_Profile', $this->_data['pp_main_photo'] )->delete();
+					\IPS\File::get( 'core_Profile', $this->_data['pp_main_photo'] )->delete();
 				}
-				catch ( Exception $e ) {}
+				catch ( \Exception $e ) {}
 			}
 			if ( $this->_data['pp_thumb_photo'] )
 			{
 				try
 				{
-					File::get( 'core_Profile', $this->_data['pp_thumb_photo'] )->delete();
+					\IPS\File::get( 'core_Profile', $this->_data['pp_thumb_photo'] )->delete();
 					$this->_data['pp_thumb_photo'] = NULL;
 				}
-				catch ( Exception $e ) {}
+				catch ( \Exception $e ) {}
 			}
 		}
 	}
@@ -1459,7 +1408,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	int
 	 */
-	public function get_pp_reputation_points(): int
+	public function get_pp_reputation_points()
 	{
 		return isset( $this->_data['pp_reputation_points'] ) ? (int) $this->_data['pp_reputation_points'] : 0;
 	}
@@ -1469,7 +1418,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	int
 	 */
-	public function get_warn_level(): int
+	public function get_warn_level()
 	{
 		return isset( $this->_data['warn_level'] ) ? (int) $this->_data['warn_level'] : 0;
 	}
@@ -1480,7 +1429,7 @@ class Member extends ActiveRecord
 	 * @return		array
 	 * @deprecated	Use rank() instead
 	 */
-	public function get_rank(): array
+	public function get_rank()
 	{
 		if ( $rank = $this->rank() )
 		{
@@ -1494,7 +1443,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	string|null
 	 */
-	public function get_location(): ?string
+	public function get_location()
 	{
 		return $this->location();
 	}
@@ -1504,7 +1453,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function get_members_day_posts(): array
+	public function get_members_day_posts()
 	{
 		return explode( ',', $this->_data['members_day_posts'] );
 	}
@@ -1512,10 +1461,10 @@ class Member extends ActiveRecord
 	/**
 	 * Set members posts for today
 	 *
-	 * @param array $value	Array of daily post data. Index 0 is the amount of posts posted in this time period, and optional index 1 is a timestamp of when we started counting
+	 * @param	array	$value	Array of daily post data. Index 0 is the amount of posts posted in this time period, and optional index 1 is a timestamp of when we started counting
 	 * @return	void
 	 */
-	public function set_members_day_posts(array $value ) : void
+	public function set_members_day_posts( $value )
 	{
 		/* Are we updating time? */
 		if ( ! isset( $value[1] ) )
@@ -1531,13 +1480,13 @@ class Member extends ActiveRecord
 	 *
 	 * @return	int|null
 	 */
-	public function get_defaultStream(): ?int
+	public function get_defaultStream()
 	{
 		if ( $this->defaultStreamId === FALSE )
 		{
-			if ( $this->member_streams and $streams = json_decode( $this->member_streams, TRUE ) and count( $streams ) )
+			if ( $this->member_streams and $streams = json_decode( $this->member_streams, TRUE ) and \count( $streams ) )
 			{
-				$this->defaultStreamId = ( $streams['default'] ?? NULL );
+				$this->defaultStreamId = ( isset( $streams['default'] ) ? $streams['default'] : NULL );
 			}
 			else
 			{
@@ -1551,12 +1500,12 @@ class Member extends ActiveRecord
 	/**
 	 * Set member's default stream
 	 *
-	 * @param int|null $value	Null or stream ID. 0 is for 'all activity'
+	 * @param	null|int	$value	Null or stream ID. 0 is for 'all activity'
 	 * @return	void
 	 */
-	public function set_defaultStream( ?int $value ) : void
+	public function set_defaultStream( $value )
 	{
-		if ( $this->member_streams and $streams = json_decode( $this->member_streams, TRUE ) and count( $streams ) )
+		if ( $this->member_streams and $streams = json_decode( $this->member_streams, TRUE ) and \count( $streams ) )
 		{
 			$streams['default'] = $value;
 		}
@@ -1576,7 +1525,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	string|null
 	 */
-	public function location(): ?string
+	public function location()
 	{
 		if( $this->sessionData === FALSE )
 		{
@@ -1585,10 +1534,10 @@ class Member extends ActiveRecord
 
 		if( $this->sessionData === NULL )
 		{
-			$this->sessionData = Session\Store::i()->getLatestMemberSession( $this->member_id );
+			$this->sessionData = \IPS\Session\Store::i()->getLatestMemberSession( $this->member_id );
 		}
 		
-		return ( $this->sessionData ) ? Session::i()->getLocation( $this->sessionData ) : NULL;
+		return ( $this->sessionData ) ? \IPS\Session::i()->getLocation( $this->sessionData ) : NULL;
 	}
 
 	/**
@@ -1597,13 +1546,13 @@ class Member extends ActiveRecord
 	 * @param 	null	$validatingRow
 	 * @return 	string
 	 */
-	public function validatingDescription( $validatingRow=NULL ): string
+	public function validatingDescription( $validatingRow=NULL )
 	{
 		try
 		{
-			$validatingRow = ( $validatingRow ) ?: Db::i()->select( '*', 'core_validating', array( 'member_id=?', $this->member_id ) )->first();
+			$validatingRow = ( $validatingRow ) ?: \IPS\Db::i()->select( '*', 'core_validating', array( 'member_id=?', $this->member_id ) )->first();
 		}
-		catch( UnderflowException $ex )
+		catch( \UnderflowException $ex )
 		{
 			return '';
 		}
@@ -1613,30 +1562,30 @@ class Member extends ActiveRecord
 		{
 			if ( $validatingRow['reg_cancelled'] )
 			{
-				$validatingDescription = Member::loggedIn()->language()->addToStack('members_validating_cancelled');
+				$validatingDescription = \IPS\Member::loggedIn()->language()->addToStack('members_validating_cancelled');
 			}
 			elseif ( $validatingRow['user_verified'] )
 			{
-				$validatingDescription = Member::loggedIn()->language()->addToStack('members_validating_admin');
+				$validatingDescription = \IPS\Member::loggedIn()->language()->addToStack('members_validating_admin');
 			}
 			else
 			{
-				$validatingDescription = Member::loggedIn()->language()->addToStack('members_validating_user');
+				$validatingDescription = \IPS\Member::loggedIn()->language()->addToStack('members_validating_user');
 			}
 	
 			if ( $validatingRow['coppa_user'] )
 			{
-				$validatingDescription .= Member::loggedIn()->language()->addToStack('members_validating_coppa');
+				$validatingDescription .= \IPS\Member::loggedIn()->language()->addToStack('members_validating_coppa');
 			}
 	
 			if ( $validatingRow['spam_flag'] )
 			{
-				$validatingDescription .= Member::loggedIn()->language()->addToStack('members_validating_spam');
+				$validatingDescription .= \IPS\Member::loggedIn()->language()->addToStack('members_validating_spam');
 			}
 		}
 		elseif ( $validatingRow['email_chg'] )
 		{
-			$validatingDescription .= Member::loggedIn()->language()->addToStack('members_validating_email_chg');
+			$validatingDescription .= \IPS\Member::loggedIn()->language()->addToStack('members_validating_email_chg');
 		}
 		
 		return $validatingDescription;
@@ -1645,20 +1594,14 @@ class Member extends ActiveRecord
 	/**
 	 * Followers Count
 	 *
-	 * @param	int						$privacy		Content::FOLLOW_PUBLIC + Content::FOLLOW_ANONYMOUS
-	 * @param	array					$frequencyTypes	array( 'none', 'immediate', 'daily', 'weekly' )
-	 * @param	DateTime|int|NULL	$date			Only users who started following before this date will be returned. NULL for no restriction
+	 * @param	int						$privacy		static::FOLLOW_PUBLIC + static::FOLLOW_ANONYMOUS
+	 * @param	array					$frequencyTypes	array( 'immediate', 'daily', 'weekly' )
+	 * @param	\IPS\DateTime|int|NULL	$date			Only users who started following before this date will be returned. NULL for no restriction
 	 * @return	int
-	 * @throws	BadMethodCallException
 	 */
-	public function followersCount( int $privacy=3, array $frequencyTypes=array( 'none', 'immediate', 'daily', 'weekly' ), DateTime|int|null $date=NULL ): int
+	public function followersCount( $privacy=3, $frequencyTypes=array( 'none', 'immediate', 'daily', 'weekly' ), $date=NULL )
 	{
 		if( $this->members_bitoptions['pp_setting_moderate_followers'] )
-		{
-			return 0;
-		}
-
-		if( !$this->member_id )
 		{
 			return 0;
 		}
@@ -1670,76 +1613,58 @@ class Member extends ActiveRecord
 	/**
 	 * Followers
 	 *
-	 * @param	int						$privacy		Content::FOLLOW_PUBLIC + Content::FOLLOW_ANONYMOUS
-	 * @param	array					$frequencyTypes	array( 'none', 'immediate', 'daily', 'weekly' )
-	 * @param	DateTime|int|NULL		$date			Only users who started following before this date will be returned. NULL for no restriction
-	 * @param	int|array|NULL			$limit			LIMIT clause
-	 * @param	string|NULL				$order			Column to order by
-	 * @param	bool					$countOnly		Return only the count
-	 * @return	Select|int
-	 * @throws	BadMethodCallException
+	 * @param	int						$privacy		static::FOLLOW_PUBLIC + static::FOLLOW_ANONYMOUS
+	 * @param	array					$frequencyTypes	array( 'immediate', 'daily', 'weekly' )
+	 * @param	\IPS\DateTime|int|NULL	$date			Only users who started following before this date will be returned. NULL for no restriction
+	 * @param	int|array				$limit			LIMIT clause
+	 * @param	string					$order			Column to order by
+	 * @return	\IPS\Db\Select|NULL
+	 * @throws	\BadMethodCallException
 	 */
-	public function followers(int $privacy=3, array $frequencyTypes=array( 'none', 'immediate', 'daily', 'weekly' ), DateTime|int|null $date=NULL, int|array|null $limit=array( 0, 25 ), string|null $order=NULL, bool $countOnly=FALSE ): Select|int
+	public function followers( $privacy=3, $frequencyTypes=array( 'none', 'immediate', 'daily', 'weekly' ), $date=NULL, $limit=array( 0, 25 ), $order=NULL )
 	{
 		if( $this->members_bitoptions['pp_setting_moderate_followers'] )
 		{
-			return 0;
+			return NULL;
 		}
-
-		return static::_followers( 'member', $this->member_id ?: 0, $privacy, $frequencyTypes, $date, $limit, $order, FALSE, null );
+		
+		return static::_followers( 'member', $this->member_id, $privacy, $frequencyTypes, $date, $limit, $order );
 	}
-
-    /**
-     * Follow this object
-     *
-     * @param string        $frequency      ( 'none', 'immediate', 'daily', 'weekly' )
-     * @param bool          $public
-     * @param Member|null   $member
-     * @return void
-     */
-    public function follow( string $frequency, bool $public=true, ?Member $member=null ) : void
-    {
-        $member = $member ?: Member::loggedIn();
-        $this->_followBase( $frequency, $public, $member );
-
-        if( $public )
-        {
-            $this->achievementAction( 'core', 'FollowMember', [
-                'giver' => $member
-            ] );
-
-            $notification = new Notification( Application::load( 'core' ), 'member_follow', $member, array( $member ) );
-            $notification->recipients->attach( $this );
-            $notification->send();
-        }
-    }
 
 	/**
 	 * Record a failed login attempt
 	 *
 	 * @return void
 	 */
-	public function failedLogin(): void
+	public function failedLogin()
 	{
-		Db::i()->insert( 'core_login_failures', [
+		\IPS\Db::i()->insert( 'core_login_failures', [
 			'login_member_id'   => $this->member_id ?: NULL,
-			'login_date'        => ( new DateTime )->getTimestamp(),
-			'login_ip_address'  => Request::i()->ipAddress(),
+			'login_date'        => ( new \IPS\DateTime )->getTimestamp(),
+			'login_ip_address'  => \IPS\Request::i()->ipAddress(),
 			'login_email'       => $this->member_id ? NULL : $this->email
 		]);
 
 		if( $this->member_id )
 		{
-			$where = [ [ 'login_date>=?', ( Settings::i()->ipb_bruteforce_unlock ? ( new DateTime() )->sub( new DateInterval( 'PT' . Settings::i()->ipb_bruteforce_period . 'M' ) )->getTimestamp() : 0 ) ] ];
-			$where[] = [ 'login_ip_address IS NOT NULL AND login_member_id=?', $this->member_id ];
-			$failedLogins = iterator_to_array( Db::i()->select( 'count(login_ip_address)', 'core_login_failures', $where, NULL, NULL, 'login_ip_address' ) );
-
-			/* We hit an issue where the query above returned an empty result set,
-			possibly a read/write issue. Rather than switch to the writer, just assume we have
-			1 failure, or we wouldn't be here. */
-			$this->failed_login_count = count( $failedLogins ) ? max( $failedLogins ) : 1;
-			$this->save();
+			$this->recountFailedLogins();
 		}
+	}
+
+	/**
+	 * Recount failed logins.
+	 *
+	 * @return void
+	 * @throws \Exception
+	 */
+	public function recountFailedLogins()
+	{
+		$where = [ [ 'login_date>=?', ( \IPS\Settings::i()->ipb_bruteforce_unlock ? ( new \IPS\DateTime() )->sub( new \DateInterval( 'PT' . \IPS\Settings::i()->ipb_bruteforce_period . 'M' ) )->getTimestamp() : 0 ) ] ];
+		$where[] = [ 'login_ip_address IS NOT NULL AND login_member_id=?', $this->member_id ];
+
+		$failures = iterator_to_array( \IPS\Db::i()->select( 'count(login_ip_address)', 'core_login_failures', $where, NULL, NULL, 'login_ip_address' ) );
+		$this->failed_login_count = count( $failures ) ? max( $failures ) : 0;
+		$this->save();
 	}
 	
 	/**
@@ -1747,18 +1672,17 @@ class Member extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function get_mfa_details(): array
+	public function get_mfa_details()
 	{
-		return $this->_data['mfa_details'] ? json_decode( $this->_data['mfa_details'], TRUE ) : array();
+		return json_decode( $this->_data['mfa_details'], TRUE ) ?: array();
 	}
 	
 	/**
 	 * Set MFA details
 	 *
-	 * @param array $data	Data
-	 * @return void
+	 * @param	array	$data	Data
 	 */
-	public function set_mfa_details( array $data ) : void
+	public function set_mfa_details( $data )
 	{
 		$this->_data['mfa_details'] = json_encode( $data );
 	}
@@ -1768,7 +1692,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public function get_profilesync(): array
+	public function get_profilesync()
 	{
 		$return = isset( $this->_data['profilesync'] ) ? ( json_decode( $this->_data['profilesync'], TRUE ) ?: array() ) : array();
 		
@@ -1795,6 +1719,7 @@ class Member extends ActiveRecord
 					case 'live':
 					case 'microsoft':
 						$classname = 'IPS\\Login\\Handler\\OAuth2\\Microsoft';
+						$settings['legacy_redirect'] = TRUE;
 						break;
 					case 'twitter':
 						$classname = 'IPS\\Login\\Handler\\OAuth1\\Twitter';
@@ -1805,7 +1730,7 @@ class Member extends ActiveRecord
 				{
 					try
 					{
-						$methodId = Db::i()->select( 'login_id', 'core_login_methods', array( 'login_classname=? AND login_enabled=1', $classname ) )->first();
+						$methodId = \IPS\Db::i()->select( 'login_id', 'core_login_methods', array( 'login_classname=? AND login_enabled=1', $classname ) )->first();
 						
 						foreach ( $prefs as $option => $v )
 						{
@@ -1815,7 +1740,7 @@ class Member extends ActiveRecord
 							}
 						}
 					}
-					catch ( UnderflowException $e ) { }
+					catch ( \UnderflowException $e ) { }
 				}
 			}
 			
@@ -1829,10 +1754,9 @@ class Member extends ActiveRecord
 	/**
 	 * Set profile sync settings
 	 *
-	 * @param array $data	Data
-	 * @return void
+	 * @param	array	$data	Data
 	 */
-	public function set_profilesync( array $data ) : void
+	public function set_profilesync( $data )
 	{
 		$this->_data['profilesync'] = json_encode( $data );
 		
@@ -1845,11 +1769,11 @@ class Member extends ActiveRecord
 	/**
 	 * Get timezone
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function get_timezone(): ?string
+	public function get_timezone()
 	{
-		return DateTime::getFixedTimezone( $this->_data['timezone'] );
+		return \IPS\DateTime::getFixedTimezone( $this->_data['timezone'] );
 	}
 	
 	/* !Photos */
@@ -1859,7 +1783,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public static function columnsForPhoto(): array
+	public static function columnsForPhoto()
 	{
 		return array( 'member_id', 'name', 'members_seo_name', 'member_group_id', 'mgroup_others', 'pp_photo_type', 'pp_main_photo', 'pp_thumb_photo' );
 	}
@@ -1867,13 +1791,13 @@ class Member extends ActiveRecord
 	/**
 	 * Get photo from data
 	 *
-	 * @param array $memberData			Array of member data, must include values for at least the keys returned by columnsForPhoto()
-	 * @param bool $thumb				Use thumbnail?
-	 * @param bool $email				Is the photo going to be used in an email?
-	 * @param bool $useDefaultPhoto	If there is no photo, should the default (rather than NULL) be returned?
-	 * @return	string|null
+	 * @param	array	$memberData			Array of member data, must include values for at least the keys returned by columnsForPhoto()
+	 * @param	bool	$thumb				Use thumbnail?
+	 * @param	bool	$email				Is the photo going to be used in an email?
+	 * @param	bool	$useDefaultPhoto	If there is no photo, should the default (rather than NULL) be returned?
+	 * @return	string
 	 */
-	public static function photoUrl( array $memberData, bool $thumb=TRUE, bool $email=FALSE, bool $useDefaultPhoto=TRUE ): ?string
+	public static function photoUrl( $memberData, $thumb=TRUE, $email=FALSE, $useDefaultPhoto=TRUE )
 	{
 		$photoUrl = NULL;
 
@@ -1885,25 +1809,32 @@ class Member extends ActiveRecord
 			{
 				try
 				{
-					$photoUrl = File::get( 'core_Profile', ( $thumb and $memberData['pp_thumb_photo'] ) ? $memberData['pp_thumb_photo'] : $memberData['pp_main_photo'] )->url;
+					$photoUrl = \IPS\File::get( 'core_Profile', ( $thumb and $memberData['pp_thumb_photo'] ) ? $memberData['pp_thumb_photo'] : $memberData['pp_main_photo'] )->url;
 				}
-				catch ( InvalidArgumentException $e ) { }
+				catch ( \InvalidArgumentException $e ) { }
+			}
+			/* Letter photos are enabled and we do not have a photo set, but only if this isn't for email */
+			elseif( \IPS\Settings::i()->letter_photos == 'letters' AND $email === FALSE and isset( $memberData['name'] ) )
+			{
+				if( $photo = static::generateLetterPhoto( $memberData ) )
+				{
+					$photoUrl = $photo;
+				}
 			}
 			/* Other - This allows an app (such as Gallery) to set the pp_photo_type to a storage container to support custom images without duplicating them */
 			elseif( $memberData['pp_photo_type'] and $memberData['pp_photo_type'] != 'none' and mb_strpos( $memberData['pp_photo_type'], '_' ) !== FALSE )
 			{
 				try
 				{
-					$photoUrl = File::get( $memberData['pp_photo_type'], $memberData['pp_main_photo'] )->url;
+					$photoUrl = \IPS\File::get( $memberData['pp_photo_type'], $memberData['pp_main_photo'] )->url;
 				}
-				catch ( InvalidArgumentException $e ){}
-			}
-			/* Letter photos are enabled, and we do not have a photo set, but only if this isn't for email */
-			elseif( Settings::i()->letter_photos == 'letters' AND $email === FALSE and isset( $memberData['name'] ) )
-			{
-				if( $photo = static::generateLetterPhoto($memberData) )
-				{
-					$photoUrl = $photo;
+				catch ( \InvalidArgumentException $e )
+				{				
+					/* If there was an exception, clear these values out - most likely the image or storage container is no longer valid */
+					$member = \IPS\Member::load( $memberData['member_id'] );
+					$member->pp_photo_type	= NULL;
+					$member->pp_main_photo	= NULL;
+					$member->save();
 				}
 			}
 
@@ -1919,19 +1850,19 @@ class Member extends ActiveRecord
 		{
 			if( $email )
 			{
-				return rtrim( Settings::i()->base_url, '/' ) . '/applications/core/interface/email/default_photo.png';
+				return rtrim( \IPS\Settings::i()->base_url, '/' ) . '/applications/core/interface/email/default_photo.png';
 			}
 			else
 			{
-				if( Settings::i()->letter_photos == 'letters' AND isset( $memberData['member_id'] ) AND $memberData['member_id'] AND isset( $memberData['name'] ) AND $memberData['name'] )
+				if( \IPS\Settings::i()->letter_photos == 'letters' AND isset( $memberData['member_id'] ) AND $memberData['member_id'] AND isset( $memberData['name'] ) AND $memberData['name'] )
 				{
-					if( $photo = static::generateLetterPhoto($memberData) )
+					if( $photo = static::generateLetterPhoto( $memberData ) )
 					{
 						return (string) $photo;
 					}
 				}
 
-				return (string) Theme::i()->resource( 'default_photo.png', 'core', 'global' );
+				return (string) \IPS\Theme::i()->resource( 'default_photo.png', 'core', 'global' );
 			}
 		}
 		return NULL;
@@ -1941,23 +1872,23 @@ class Member extends ActiveRecord
 	 * Generate a letter photo (SVG)
 	 *
 	 * @param	array 	$memberData	Member data
-	 * @param bool $returnJson		Return the letter and color as an array, instead of the SVG string
+	 * @param	bool	$returnJson		Return the letter and color as an array, instead of the SVG string
 	 * @return	string|array
 	 */
-	public static function generateLetterPhoto(array $memberData, bool $returnJson=FALSE ): array|string
+	public static function generateLetterPhoto( $memberData, $returnJson=FALSE )
 	{
 		/* Get the letter we'll use */
 		$letter = static::getLettersForPhoto( $memberData['name'] );
 
 		/* Have we already cached the color? */
-		if( isset( $memberData['pp_main_photo'] ) AND $memberData['pp_main_photo'] AND strlen( $memberData['pp_main_photo'] ) === 6 )
+		if( isset( $memberData['pp_main_photo'] ) AND $memberData['pp_main_photo'] AND \strlen( $memberData['pp_main_photo'] ) === 6 )
 		{
 			$color = $memberData['pp_main_photo'];
 		}
 		else
 		{
 			/* Generate a new unique color */
-			$photo = new LetterPhoto( $memberData['name'] );
+			$photo = new \IPS\Member\LetterPhoto( $memberData['name'] );
 
 			$color = $photo->generateColorCode();
 
@@ -1986,11 +1917,11 @@ class Member extends ActiveRecord
 	/**
 	 * Return the first X non-punctuation characters of the name
 	 *
-	 * @param string $name		Name to use
-	 * @param int $letters	Number of letters to return
+	 * @param	string	$name		Name to use
+	 * @param	int		$letters	Number of letters to return
 	 * @return	string|NULL
 	 */
-	public static function getLettersForPhoto( string $name, int $letters=1 ): ?string
+	public static function getLettersForPhoto( $name, $letters=1 )
 	{
 		$name = str_replace( array( '<', '>', '=', '-', '+', '"', "'" ), '', $name );
 		$name = preg_replace( "/(\pP)+/u", '', trim( $name ) );
@@ -2005,16 +1936,16 @@ class Member extends ActiveRecord
 	 *
 	 * @return	array
 	 */
-	public static function administrators(): array
+	public static function administrators()
 	{
-		if ( !isset( Store::i()->administrators ) )
+		if ( !isset( \IPS\Data\Store::i()->administrators ) )
 		{
-			Store::i()->administrators = array(
-				'm'	=> iterator_to_array( Db::i()->select( '*', 'core_admin_permission_rows', array( 'row_id_type=?', 'member' ) )->setKeyField( 'row_id' ) ),
-				'g'	=> iterator_to_array( Db::i()->select( '*', 'core_admin_permission_rows', array( 'row_id_type=?', 'group' ) )->setKeyField( 'row_id' ) ),
+			\IPS\Data\Store::i()->administrators = array(
+				'm'	=> iterator_to_array( \IPS\Db::i()->select( '*', 'core_admin_permission_rows', array( 'row_id_type=?', 'member' ) )->setKeyField( 'row_id' ) ),
+				'g'	=> iterator_to_array( \IPS\Db::i()->select( '*', 'core_admin_permission_rows', array( 'row_id_type=?', 'group' ) )->setKeyField( 'row_id' ) ),
 			);
 		}
-		return Store::i()->administrators;
+		return \IPS\Data\Store::i()->administrators;
 	}
 	
 	/**
@@ -2022,91 +1953,22 @@ class Member extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public function isAdmin(): bool
+	public function isAdmin()
 	{
 		return $this->acpRestrictions() !== FALSE;
 	}
 
 	/**
-	 * Does this member have any moderator permissions?
-	 *
-	 * @return bool
-	 */
-	public function isModerator() : bool
-	{
-		if( $this->isAdmin() )
-		{
-			return true;
-		}
-
-		return (bool) $this->modShowBadge();
-	}
-
-	/**
-	 * @brief	Is this member an expert in the community?
-	 */
-	protected mixed $isExpert = null;
-
-	/**
-	 * Is Member a community Expert?
-	 *
-	 * @return	bool
-	 */
-	public function isExpert(): bool
-	{
-		if( !Bridge::i()->featureIsEnabled( 'experts' ) )
-		{
-			return false;
-		}
-
-		/* Admin level blocked */
-		if ( $this->members_bitoptions['expert_user_blocked'] )
-		{
-			return false;
-		}
-
-		/* Is the member in a group that is allowed to be an expert? This setting might have been changed. */
-		if( Settings::i()->ips_experts_allowed_groups !== '*' and ! $this->inGroup( explode( ',', Settings::i()->ips_experts_allowed_groups ) ) )
-		{
-			$this->isExpert = false;
-		}
-
-		if ( $this->isExpert === null )
-		{
-			try
-			{
-				$this->isExpert = (bool)Db::i()->select( 'member_id', 'core_expert_users', ['member_id=?', $this->member_id] )->first();
-			}
-			catch ( UnderflowException $e )
-			{
-				$this->isExpert = false;
-			}
-		}
-
-		return $this->isExpert;
-	}
-
-	/**
-	 * Does this member want to be an expert?
-	 *
-	 * @return	bool
-	 */
-	public function showAsExpert(): bool
-	{
-		return ( $this->members_bitoptions['expert_user_disabled'] and $this->isExpert );
-	}
-
-	/**
 	 * @brief	Cache the session data if we pull it for location, etc.
 	 */
-	protected mixed $sessionData	= NULL;
-
+	protected $sessionData	= NULL;
+	
 	/**
 	 * Is online?
 	 *
 	 * @return	bool
 	 */
-	public function isOnline(): bool
+	public function isOnline()
 	{
 		if( !$this->member_id )
 		{
@@ -2115,7 +1977,7 @@ class Member extends ActiveRecord
 
 		if ( $this->sessionData === NULL )
 		{
-	    	$this->sessionData	= Session\Store::i()->getLatestMemberSession( $this->member_id );
+	    	$this->sessionData	= \IPS\Session\Store::i()->getLatestMemberSession( $this->member_id );
 		}
 		
 		if( $this->sessionData === FALSE )
@@ -2123,7 +1985,7 @@ class Member extends ActiveRecord
 			return FALSE;
 		}
 
-		$diff = DateTime::ts( $this->last_activity )->diff( DateTime::create() );
+		$diff = \IPS\DateTime::ts( $this->last_activity )->diff( \IPS\DateTime::create() );
 		if ( $diff->y or $diff->m or $diff->d or $diff->h or $diff->i > 15 )
 		{
 			return FALSE;
@@ -2136,7 +1998,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	bool
 	 */
-	public function isOnlineAnonymously(): bool
+	public function isOnlineAnonymously()
 	{
 		if ( !$this->member_id )
 		{
@@ -2157,42 +2019,14 @@ class Member extends ActiveRecord
 		
 		return $this->members_bitoptions['is_anon'];
 	}
-
-	/**
-	 * Are any of these memberIds following me?
-	 *
-	 * @param array $memberIds
-	 * @return array
-	 */
-	public function isFollowing( array $memberIds ): array
-	{
-		$memberIds = array_unique( array_filter( $memberIds ) );
-		if ( !$memberIds )
-		{
-			return array();
-		}
-
-		$follows = array();
-		foreach ( $memberIds as $memberId )
-		{
-			$follows[ $memberId ] = false;
-		}
-
-		foreach( Db::i()->select( 'follow_rel_id', 'core_follow', array( "follow_app='core' AND follow_area='member' AND follow_rel_id IN (" . implode( ',', $memberIds ) . ") AND follow_member_id=?", $this->member_id ) ) as $member )
-		{
-			$follows[ $member ] = true;
-		}
-
-		return $follows;
-	}
-
+	
 	/**
 	 * Is banned?
 	 * If is banned until a certain time, returns an \IPS\DateTime object
 	 *
-	 * @return bool|DateTime
+	 * @return	FALSE|\IPS\DateTime|TRUE
 	 */
-	public function isBanned(): bool|DateTime
+	public function isBanned()
 	{
 		if ( $this->temp_ban != 0 )
 		{
@@ -2204,7 +2038,7 @@ class Member extends ActiveRecord
 			}
 			elseif ( $this->temp_ban > 0 )
 			{
-				return DateTime::ts( $this->temp_ban );
+				return \IPS\DateTime::ts( $this->temp_ban );
 			}
 			
 			return TRUE;
@@ -2221,20 +2055,20 @@ class Member extends ActiveRecord
 	/**
 	 * Is the member in a certain group (including secondary groups)
 	 *
-	 * @param array|int|Group $group				The group, or array of groups
-	 * @param bool $permissionArray	If TRUE, checks the permission array rather than the groups
+	 * @param	int|\IPS\Member\Group|array	$group				The group, or array of groups
+	 * @param	bool						$permissionArray	If TRUE, checks the permission array rather than the groups
 	 * @return	bool
 	 */
-	public function inGroup( array|int|Group $group, bool $permissionArray=FALSE ): bool
+	public function inGroup( $group, $permissionArray=FALSE )
 	{
-		$group = array_filter( is_array( $group ) ? $group : array( $group ) );
+		$group = array_filter( \is_array( $group ) ? $group : array( $group ) );
 		$check = array_filter( $permissionArray ? $this->permissionArray() : $this->groups );
 
 		foreach ( $group as $_group )
 		{
-			$groupId = ( $_group instanceof Group ) ? $_group->g_id : $_group;
+			$groupId = ( $_group instanceof \IPS\Member\Group ) ? $_group->g_id : $_group;
 
-			if ( in_array( $groupId, $check ) )
+			if ( \in_array( $groupId, $check ) )
 			{
 				return TRUE;
 			}
@@ -2244,28 +2078,17 @@ class Member extends ActiveRecord
 	}
 
 	/**
-	 * Is this member editing the theme?
-	 * @note This is only used in the front-end
-	 *
-	 * @return bool
-	 */
-	public function isEditingTheme(): bool
-	{
-		return (bool) $this->members_bitoptions['bw_using_skin_gen'];
-	}
-
-	/**
 	 * Store a reference to the language object
 	 */
-	protected Lang|UpgradeLang|SetupLang|null $_lang = NULL;
-
+	protected $_lang	= NULL;
+	
 	/**
 	 * Return the language object to use for this member - returns default if member has not selected a language
 	 *
-	 * @param bool $frontOnly If TRUE, will only look at the the langauge for the front-end, not the AdminCP
-	 * @return Lang|UpgradeLang|SetupLang|null
+	 * @param	bool	$frontOnly	If TRUE, will only look at the the langauge for the front-end, not the AdminCP
+	 * @return	\IPS\Lang
 	 */
-	public function language(bool $frontOnly=FALSE ): Lang|UpgradeLang|SetupLang|null
+	public function language( $frontOnly=FALSE )
 	{
 		/* Did we already load the language object? */
 		if( $this->_lang !== NULL )
@@ -2274,27 +2097,27 @@ class Member extends ActiveRecord
 		}
 
 		/* If in API use the lang set by dispatcher */
-		if ( Dispatcher::hasInstance() and class_exists( 'IPS\Dispatcher', FALSE ) AND Dispatcher::i()->controllerLocation === 'api' )
+		if ( \IPS\Dispatcher::hasInstance() and class_exists( 'IPS\Dispatcher', FALSE ) AND \IPS\Dispatcher::i()->controllerLocation === 'api' )
 		{
-			$this->_lang = Dispatcher::i()->_setLanguage();
+			$this->_lang = \IPS\Dispatcher::i()->_setLanguage();
 			return $this->_lang;
 		}
 
 		/* If in setup, create a "dummy" language */
-		if ( Dispatcher::hasInstance() and class_exists( 'IPS\Dispatcher', FALSE ) AND Dispatcher::i()->controllerLocation === 'setup' AND Dispatcher::i()->setupLocation === 'install' )
+		if ( \IPS\Dispatcher::hasInstance() and class_exists( 'IPS\Dispatcher', FALSE ) AND \IPS\Dispatcher::i()->controllerLocation === 'setup' AND \IPS\Dispatcher::i()->setupLocation === 'install' )
 		{
-			$this->_lang = Lang::setupLanguage();
+			$this->_lang = \IPS\Lang::setupLanguage();
 			return $this->_lang;
 		}
-		else if ( Dispatcher::hasInstance() and class_exists( 'IPS\Dispatcher', FALSE ) AND Dispatcher::i()->controllerLocation === 'setup' AND Dispatcher::i()->setupLocation === 'upgrade' )
+		else if ( \IPS\Dispatcher::hasInstance() and class_exists( 'IPS\Dispatcher', FALSE ) AND \IPS\Dispatcher::i()->controllerLocation === 'setup' AND \IPS\Dispatcher::i()->setupLocation === 'upgrade' )
 		{
-			$this->_lang = Lang::upgraderLanguage();
+			$this->_lang = \IPS\Lang::upgraderLanguage();
 			return $this->_lang;
 		}
 
 		/* Work out if we are getting the ACP language or the normal language */
 		$column	= 'language';
-		if ( !$frontOnly and Dispatcher::hasInstance() and Dispatcher::i()->controllerLocation == 'admin' and $this->member_id and $this->member_id == static::loggedIn()->member_id )
+		if ( !$frontOnly and \IPS\Dispatcher::hasInstance() and \IPS\Dispatcher::i()->controllerLocation == 'admin' and $this->member_id and $this->member_id == static::loggedIn()->member_id )
 		{
 			$column	= 'acp_language';
 		}
@@ -2304,7 +2127,7 @@ class Member extends ActiveRecord
 		{
 			try
 			{
-				$this->_lang	= Lang::load( $this->calculatedLanguageId ?: $this->$column );
+				$this->_lang	= \IPS\Lang::load( $this->calculatedLanguageId ?: $this->$column );
 
 				/* Disabled Languages are allowed to be used in the ACP */
 				if( $this->_lang->enabled OR $column == 'acp_language' )
@@ -2312,14 +2135,14 @@ class Member extends ActiveRecord
 					return $this->_lang;
 				}
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 		
 		/* Otherwise, if this is us, try looking at HTTP_ACCEPT_LANGUAGE, if enabled */
-		if ( Dispatcher::hasInstance() and $this->member_id == static::loggedIn()->member_id and Settings::i()->lang_auto_detect )
+		if ( \IPS\Dispatcher::hasInstance() and $this->member_id == static::loggedIn()->member_id and \IPS\Settings::i()->lang_auto_detect )
 		{
 			/* Work out what's in HTTP_ACCEPT_LANGUAGE */
-			$preferredLanguage = isset( $_SERVER['HTTP_ACCEPT_LANGUAGE'] ) ? Lang::autoDetectLanguage( $_SERVER['HTTP_ACCEPT_LANGUAGE'] ) : NULL;
+			$preferredLanguage = isset( $_SERVER['HTTP_ACCEPT_LANGUAGE'] ) ? \IPS\Lang::autoDetectLanguage( $_SERVER['HTTP_ACCEPT_LANGUAGE'] ) : NULL;
 			
 			/* If we worked one out, use that and save it on the account so it gets used for emails etc */
 			if ( $preferredLanguage )
@@ -2335,20 +2158,20 @@ class Member extends ActiveRecord
 			/* Otherwise, just use the default */
 			else
 			{
-				$this->calculatedLanguageId = Lang::defaultLanguage();
+				$this->calculatedLanguageId = \IPS\Lang::defaultLanguage();
 			}
 		}		
 		else
 		{
 			/* Just return the default language */
-			$this->calculatedLanguageId = Lang::defaultLanguage();
+			$this->calculatedLanguageId = \IPS\Lang::defaultLanguage();
 		}
 		
 		/* Set it */
-		$this->_lang = Lang::load( $this->calculatedLanguageId );
+		$this->_lang = \IPS\Lang::load( $this->calculatedLanguageId );
 		
 		/* Add upgrader language bits if appropriate */
-		if ( Dispatcher::hasInstance() AND class_exists( 'IPS\Dispatcher', FALSE ) AND Dispatcher::i()->controllerLocation === 'setup' AND Dispatcher::i()->setupLocation === 'upgrade' )
+		if ( \IPS\Dispatcher::hasInstance() AND class_exists( 'IPS\Dispatcher', FALSE ) AND \IPS\Dispatcher::i()->controllerLocation === 'setup' AND \IPS\Dispatcher::i()->setupLocation === 'upgrade' )
 		{
 			$this->_lang->upgraderLanguage();
 		}
@@ -2360,18 +2183,18 @@ class Member extends ActiveRecord
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 
 	/**
 	 * Get URL
 	 *
-	 * @return	Url|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	function url(): Url|string|null
+	public function url()
 	{
 		if( $this->_url === NULL )
 		{
-			$this->_url = Url::internal( "app=core&module=members&controller=profile&id={$this->member_id}", 'front', 'profile', ( $this->members_seo_name ?? '-' ) );
+			$this->_url = \IPS\Http\Url::internal( "app=core&module=members&controller=profile&id={$this->member_id}", 'front', 'profile', $this->members_seo_name );
 		}
 
 		return $this->_url;
@@ -2380,45 +2203,45 @@ class Member extends ActiveRecord
 	/**
 	 * URL to ACP "Edit Member"
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function acpUrl(): Url
+	public function acpUrl()
 	{
-		return Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member_id}", 'admin' );
+		return \IPS\Http\Url::internal( "app=core&module=members&controller=members&do=view&id={$this->member_id}", 'admin' );
 	}
 	
 	/**
 	 * HTML link to profile with hovercard
 	 *
-	 * @param string|null $warningRef			The reference key for warnings
-	 * @param boolean|null $groupFormatting		Apply the group prefix/suffix to the name?
-	 * @param boolean|null $anonymous			Is this shown with anonymous content?
+	 * @param	string|NULL		$warningRef			The reference key for warnings
+	 * @param	boolean|NULL 	$groupFormatting		Apply the group prefix/suffix to the name?
+	 * @param	boolean|NULL 	$anonymous			Is this shown with anonymous content?
 	 * @return	string
 	 */
-	public function link( string $warningRef=NULL, bool $groupFormatting=NULL, ?bool $anonymous=FALSE ): string
+	public function link( $warningRef=NULL, $groupFormatting=NULL, $anonymous=FALSE )
 	{
-		$groupFormatting = ( $groupFormatting === NULL ) ? !( ( Settings::i()->group_formatting == 'legacy' ) ) : $groupFormatting;
+		$groupFormatting = ( $groupFormatting === NULL ) ? ( ( \IPS\Settings::i()->group_formatting == 'legacy' ) ? FALSE : TRUE ) : $groupFormatting;
 
-		if ( !Settings::i()->warn_on )
+		if ( !\IPS\Settings::i()->warn_on )
 		{
 			$warningRef = NULL;
 		}
-		return Theme::i()->getTemplate( 'global', 'core', 'front' )->userLink( $this, $warningRef, $groupFormatting, $anonymous );
+		return \IPS\Theme::i()->getTemplate( 'global', 'core', 'front' )->userLink( $this, $warningRef, $groupFormatting, $anonymous );
 	}
 	
 	/**
 	 * Profile Fields shown next to users content
 	 */
-	public ?array $rawProfileFieldsData = NULL;
+	public $rawProfileFieldsData = NULL;
 
 	/**
 	 * Profile Fields
 	 *
-	 * @param int $location	\IPS\core\ProfileFields\Field::PROFILE for profile, \IPS\core\ProfileFields\Field::REG for registration screen, \IPS\core\ProfileFields\Field::STAFF for ModCP/ACP, \IPS\core\ProfileFields\Field::EDIT for member editing
-	 * @param bool $raw		Returns the raw value if true or the display value if false. Useful for comparisons for field types like Yes/NO to see if a value is set.
-	 * @return	array|null
+	 * @param	int			$location	\IPS\core\ProfileFields\Field::PROFILE for profile, \IPS\core\ProfileFields\Field::REG for registration screen, \IPS\core\ProfileFields\Field::STAFF for ModCP/ACP, \IPS\core\ProfileFields\Field::EDIT for member editing
+	 * @param	bool		$raw		Returns the raw value if true or the display value if false. Useful for comparisons for field types like Yes/NO to see if a value is set.
+	 * @return	array
 	 */
-	public function profileFields( int $location = 0, bool $raw=FALSE ): ?array
+	public function profileFields( $location = 0, $raw = FALSE )
 	{
 		if ( !$this->member_id )
 		{
@@ -2435,13 +2258,13 @@ class Member extends ActiveRecord
 		
 		try
 		{
-			$values = Db::i()->select( '*', 'core_pfields_content', array( 'member_id = ?', $this->member_id ) )->first();
+			$values = \IPS\Db::i()->select( '*', 'core_pfields_content', array( 'member_id = ?', $this->member_id ) )->first();
 		}
-		catch ( UnderflowException $e ) {}
+		catch ( \UnderflowException $e ) {}
 
 		if( !empty( $values ) )
 		{
-			foreach (core\ProfileFields\Field::values( $values, $location, $raw ) as $group => $fields )
+			foreach ( \IPS\core\ProfileFields\Field::values( $values, $location, $raw ) as $group => $fields )
 			{
 				$this->rawProfileFieldsData[ 'core_pfieldgroups_' . $group ] =  $fields;
 			}
@@ -2453,32 +2276,32 @@ class Member extends ActiveRecord
 	/**
 	 * Profile Fields shown next to users content
 	 */
-	public ?array $profileFields = NULL;
+	public $profileFields;
 
 	/**
 	 * Profile Fields shown next to users content
 	 *
-	 * @param array|null $fieldValues Field values already fetched from the database
+	 * @param	array $fieldValues	Field values already fetched from the database
 	 *
-	 * @return array|null
+	 * @return array
 	 */
-	public function contentProfileFields( array $fieldValues=NULL ): ?array
+	public function contentProfileFields( $fieldValues=NULL )
 	{
 		if ( $this->profileFields === NULL )
 		{
 			$this->profileFields = array();
-			if ( $this->member_id AND core\ProfileFields\Field::fieldsForContentView() )
+			if ( $this->member_id AND \IPS\core\ProfileFields\Field::fieldsForContentView() )
 			{
 				$select = '*';
 
 				/* Can we view private fields? */
-				if( !Dispatcher::hasInstance() OR !( Member::loggedIn()->isAdmin() OR Member::loggedIn()->member_id === $this->member_id ) )
+				if( !\IPS\Dispatcher::hasInstance() OR !( \IPS\Member::loggedIn()->isAdmin() OR \IPS\Member::loggedIn()->member_id === $this->member_id ) )
 				{
 					$select = 'member_id';
-					$publicFields = Db::i()->select( '*', 'core_pfields_data', array( 'pf_topic_hide != ?', 'hide' ) );
+					$publicFields = \IPS\Db::i()->select( '*', 'core_pfields_data', array( 'pf_topic_hide != ?', 'hide' ) );
 					foreach( $publicFields as $field )
 					{
-						if( $field['pf_topic_hide'] == 'all' OR ( $field['pf_topic_hide'] == 'staff' AND ( Member::loggedIn()->isAdmin() OR Member::loggedIn()->modPermissions() ) )
+						if( $field['pf_topic_hide'] == 'all' OR ( $field['pf_topic_hide'] == 'staff' AND ( \IPS\Member::loggedIn()->isAdmin() OR \IPS\Member::loggedIn()->modPermissions() ) )
 						  )
 						{
 							$select .= ", field_{$field['pf_id']}";
@@ -2486,7 +2309,7 @@ class Member extends ActiveRecord
 					}
 				}
 				
-				if ( $fieldValues !== NULL and is_array( $fieldValues ) )
+				if ( $fieldValues !== NULL and \is_array( $fieldValues ) )
 				{
 					if ( $select == '*' )
 					{
@@ -2509,12 +2332,12 @@ class Member extends ActiveRecord
 				{
 					try
 					{
-						$values = Db::i()->select( $select, 'core_pfields_content', array( 'member_id = ?', $this->member_id ) )->first();
+						$values = \IPS\Db::i()->select( $select, 'core_pfields_content', array( 'member_id = ?', $this->member_id ) )->first();
 					}
-					catch ( UnderflowException $e ) {}
+					catch ( \UnderflowException $e ) {}
 				}
 				
-				if ( is_array( $values ) )
+				if ( \is_array( $values ) )
 				{
 					$this->setProfileFieldValuesInMemory( $values );
 				}
@@ -2530,7 +2353,7 @@ class Member extends ActiveRecord
 	 * @param	array	$values
 	 * @return	void
 	 */
-	public function setProfileFieldValuesInMemory( array $values ) : void
+	public function setProfileFieldValuesInMemory( array $values )
 	{
 		$this->profileFields = array();
 
@@ -2541,7 +2364,7 @@ class Member extends ActiveRecord
 			/* Make sure member_id is set */
 			$values['member_id'] = $this->member_id;
 
-			foreach (core\ProfileFields\Field::values( $values, core\ProfileFields\Field::CONTENT ) as $group => $fields )
+			foreach ( \IPS\core\ProfileFields\Field::values( $values, \IPS\core\ProfileFields\Field::CONTENT ) as $group => $fields )
 			{
 				$this->profileFields[ 'core_pfieldgroups_' . $group ] = $fields;
 			}
@@ -2563,11 +2386,11 @@ class Member extends ActiveRecord
 	 * @endcode
 	 * @return	array
 	 */
-	public function ipAddresses(): array
+	public function ipAddresses()
 	{
 		$return = array();
 		
-		foreach ( Application::allExtensions( 'core', 'IpAddresses' ) as $class )
+		foreach ( \IPS\Application::allExtensions( 'core', 'IpAddresses' ) as $class )
 		{
 			$results	= $class->findByMember( $this );
 
@@ -2608,10 +2431,10 @@ class Member extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function markAllAsRead() : void
+	public function markAllAsRead()
 	{
 		/* Delete all member markers */
-		Db::i()->delete( 'core_item_markers', array( 'item_member_id=?', $this->member_id ) );
+		\IPS\Db::i()->delete( 'core_item_markers', array( 'item_member_id=?', $this->member_id ) );
 		
 		$this->marked_site_read = time();
 		$this->save();
@@ -2620,20 +2443,20 @@ class Member extends ActiveRecord
 	/**
 	 * Get read/unread markers
 	 *
-	 * @param string $app	Application key
-	 * @param string $key	Marker key
+	 * @param	string	$app	Application key
+	 * @param	string	$key	Marker key
 	 * @return	array
 	 */
-	public function markersItems( string $app, string $key ): array
+	public function markersItems( $app, $key )
 	{
 		if ( !isset( $this->markers[ $app ] ) or !array_key_exists( $key, $this->markers[ $app ] ) )
 		{
 			try
 			{
-				$marker = Db::i()->select( '*', 'core_item_markers', array( 'item_key=? AND item_member_id=? AND item_app=?', $key, $this->member_id, $app ) )->first();
+				$marker = \IPS\Db::i()->select( '*', 'core_item_markers', array( 'item_key=? AND item_member_id=? AND item_app=?', $key, $this->member_id, $app ) )->first();
 				$this->markers[ $app ][ $key ] = $marker;
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				$this->markers[ $app ][ $key ] = NULL;
 			}
@@ -2645,9 +2468,9 @@ class Member extends ActiveRecord
 	 * Get read/unread markers for containers
 	 *
 	 * @param	string|NULL	$app	Application key or NULL for all applications
-	 * @return	array|int
+	 * @return	array
 	 */
-	public function markersResetTimes( ?string $app ): array|int
+	public function markersResetTimes( $app )
 	{
 		if ( ( !$app and !$this->haveAllMarkers ) or ( $app and !isset( $this->markersResetTimes[ $app ] ) ) )
 		{
@@ -2664,7 +2487,7 @@ class Member extends ActiveRecord
 					$this->markersResetTimes = array();
 				}
 
-				foreach (Db::i()->select( '*', 'core_item_markers', $where ) as $row )
+				foreach ( \IPS\Db::i()->select( '*', 'core_item_markers', $where ) as $row )
 				{
 					$this->setMarkerResetTimes( $row );
 				}
@@ -2674,7 +2497,7 @@ class Member extends ActiveRecord
 					$this->haveAllMarkers = TRUE;
 				}
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				if ( $app )
 				{
@@ -2700,12 +2523,12 @@ class Member extends ActiveRecord
 	/**
 	 * Set read/unread markers for containers
 	 *
-	 * @param array $row	Row of marker data
+	 * @param	array	$row	Row of marker data
 	 * @return	void
 	 */
-	public function setMarkerResetTimes( array $row ) : void
+	public function setMarkerResetTimes( $row )
 	{
-		if( !isset( $this->markersResetTimes[ $row['item_app'] ] ) or !is_array( $this->markersResetTimes[ $row['item_app'] ] ) )
+		if( !isset( $this->markersResetTimes[ $row['item_app'] ] ) or !\is_array( $this->markersResetTimes[ $row['item_app'] ] ) )
 		{
 			$this->markersResetTimes[ $row['item_app'] ] = array();
 		}
@@ -2714,14 +2537,14 @@ class Member extends ActiveRecord
 		{
 			if ( $row['item_app_key_2'] )
 			{
-				if( !isset( $this->markersResetTimes[ $row['item_app'] ][ $row['item_app_key_1'] ] ) OR !is_array( $this->markersResetTimes[ $row['item_app'] ][ $row['item_app_key_1'] ] ) )
+				if( !isset( $this->markersResetTimes[ $row['item_app'] ][ $row['item_app_key_1'] ] ) OR !\is_array( $this->markersResetTimes[ $row['item_app'] ][ $row['item_app_key_1'] ] ) )
 				{
 					$this->markersResetTimes[ $row['item_app'] ][ $row['item_app_key_1'] ]	= array();
 				}
 
 				if ( $row['item_app_key_3'] )
 				{
-					if( !isset( $this->markersResetTimes[ $row['item_app'] ][ $row['item_app_key_1'] ][ $row['item_app_key_2'] ] ) OR !is_array( $this->markersResetTimes[ $row['item_app'] ][ $row['item_app_key_1'] ][ $row['item_app_key_2'] ] ) )
+					if( !isset( $this->markersResetTimes[ $row['item_app'] ][ $row['item_app_key_1'] ][ $row['item_app_key_2'] ] ) OR !\is_array( $this->markersResetTimes[ $row['item_app'] ][ $row['item_app_key_1'] ][ $row['item_app_key_2'] ] ) )
 					{
 						$this->markersResetTimes[ $row['item_app'] ][ $row['item_app_key_1'] ][ $row['item_app_key_2'] ]	= array();
 					}
@@ -2749,19 +2572,19 @@ class Member extends ActiveRecord
 	/**
 	 * Get Warnings
 	 *
-	 * @param int|null $limit			The number to get
-	 * @param bool|null $acknowledged	If true, will only get warnings that have been acknowledged, if false will only get warnings that have not been knowledged. If NULL, will get both.
-	 * @param string|null $type			If specified, will only pull warnings that applied a specific action.
-	 * @return	ActiveRecordIterator|array
+	 * @param	int			$limit			The number to get
+	 * @param	bool|NULL	$acknowledged	If true, will only get warnings that have been acknowledged, if false will only get warnings that have not been knowledged. If NULL, will get both.
+	 * @param	string|NULL	$type			If specified, will only pull warnings that applied a specific action.
+	 * @return	\IPS\Patterns\ActiveRecordIterator
 	 */
-	public function warnings( int|null $limit, bool $acknowledged=NULL, string $type=NULL ): ActiveRecordIterator|array
+	public function warnings( $limit, $acknowledged=NULL, $type=NULL )
 	{
 		if ( !$this->member_id )
 		{
 			return array();
 		}
 		
-		if ( !Settings::i()->warn_on )
+		if ( !\IPS\Settings::i()->warn_on )
 		{
 			return array();
 		}
@@ -2785,33 +2608,33 @@ class Member extends ActiveRecord
 				break;
 		}
 				
-		return new ActiveRecordIterator( Db::i()->select( '*', 'core_members_warn_logs', $where, 'wl_date DESC', $limit, NULL, NULL, Db::SELECT_DISTINCT ), 'IPS\core\Warnings\Warning' );
+		return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members_warn_logs', $where, 'wl_date DESC', $limit, NULL, NULL, \IPS\Db::SELECT_DISTINCT ), 'IPS\core\Warnings\Warning' );
 	}
 
 	/**
 	 * @brief	Cached reputation data
 	 */
-	protected ?array $_reputationData	= NULL;
+	protected $_reputationData	= NULL;
 	
 	/**
 	 * Calculate and cache the member's reputation level data
 	 *
-	 * @return	array
+	 * @return	void
 	 */
-	protected function getReputationData() : array
+	protected function getReputationData()
 	{
 		if( $this->_reputationData === NULL )
 		{
 			$this->_reputationData	= array();
 			
-			if ( isset( Store::i()->reputationLevels ) )
+			if ( isset( \IPS\Data\Store::i()->reputationLevels ) )
 			{
-				$reputationLevels = Store::i()->reputationLevels;
+				$reputationLevels = \IPS\Data\Store::i()->reputationLevels;
 			}
 			else
 			{
-				$reputationLevels = iterator_to_array( Db::i()->select( '*', 'core_reputation_levels', NULL, 'level_points DESC' ) );
-				Store::i()->reputationLevels = $reputationLevels;
+				$reputationLevels = iterator_to_array( \IPS\Db::i()->select( '*', 'core_reputation_levels', NULL, 'level_points DESC' ) );
+				\IPS\Data\Store::i()->reputationLevels = $reputationLevels;
 			}
 			
 			foreach ( $reputationLevels as $level )
@@ -2830,25 +2653,25 @@ class Member extends ActiveRecord
 	/**
 	 * @brief	Cached reputation last day won
 	 */
-	protected array|null|false $_reputationLastDayWon = NULL;
+	protected $_reputationLastDayWon = NULL;
 		
 	/**
 	 * Return the 'date' of the last day won, along with the 'rep_total'.
 	 *
-	 * @return array|bool|null ( 'date' => \IPS\DateTime, 'rep_total' => int )|FALSE
+	 * @return array( 'date' => \IPS\DateTime, 'rep_total' => int )|FALSE
 	 */
-	public function getReputationLastDayWon(): bool|array|null
+	public function getReputationLastDayWon()
 	{
 		if ( $this->_reputationLastDayWon === NULL )
 		{
 			try
 			{
-				$dayWon = Db::i()->select( 'leader_date, leader_rep_total', 'core_reputation_leaderboard_history', array( 'leader_position=1 AND leader_member_id=?', $this->member_id ), 'leader_date DESC', array( 0, 1 ) )->first();
+				$dayWon = \IPS\Db::i()->select( 'leader_date, leader_rep_total', 'core_reputation_leaderboard_history', array( 'leader_position=1 AND leader_member_id=?', $this->member_id ), 'leader_date DESC', array( 0, 1 ) )->first();
 				/* The 'day won' must be in the leaderboard timezone otherwise it will be off for people in significantly different timezones */
-				$this->_reputationLastDayWon = array( 'date' => DateTime::ts( $dayWon['leader_date'], true )->setTimezone( new DateTimeZone( Settings::i()->reputation_timezone ) ), 'rep_total' => $dayWon['leader_rep_total'] );
+				$this->_reputationLastDayWon = array( 'date' => \IPS\DateTime::ts( $dayWon['leader_date'], true )->setTimezone( new \DateTimeZone( \IPS\Settings::i()->reputation_timezone ) ), 'rep_total' => $dayWon['leader_rep_total'] );
 				
 			}
-			catch( UnderflowException $ex )
+			catch( \UnderflowException $ex )
 			{
 				$this->_reputationLastDayWon = FALSE;
 			}
@@ -2860,18 +2683,18 @@ class Member extends ActiveRecord
 	/**
 	 * @brief	Cached reputation days won count
 	 */
-	protected ?int $_reputationDaysWonCount = NULL;
+	protected $_reputationDaysWonCount = NULL;
 	
 	/**
 	 * Return the total number of days won
 	 *
-	 * @return int|null
+	 * @return int
 	 */
-	public function getReputationDaysWonCount(): ?int
+	public function getReputationDaysWonCount()
 	{
 		if ( $this->_reputationDaysWonCount === NULL )
 		{
-			$this->_reputationDaysWonCount = Db::i()->select( 'COUNT(*)', 'core_reputation_leaderboard_history', array( 'leader_position=1 AND leader_member_id=?', $this->member_id ) )->first();
+			$this->_reputationDaysWonCount = \IPS\Db::i()->select( 'COUNT(*)', 'core_reputation_leaderboard_history', array( 'leader_position=1 AND leader_member_id=?', $this->member_id ) )->first();
 		}
 		
 		return $this->_reputationDaysWonCount;
@@ -2882,13 +2705,13 @@ class Member extends ActiveRecord
 	 *
 	 * @return	string|NULL
 	 */
-	public function reputation(): ?string
+	public function reputation()
 	{
 		$level	= $this->getReputationData();
 		
 		if( isset( $level['level_id'] ) )
 		{
-			return Member::loggedIn()->language()->addToStack( 'core_reputation_level_' . $level['level_id'] );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'core_reputation_level_' . $level['level_id'] );
 		}
 		else
 		{
@@ -2901,7 +2724,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	string|NULL
 	 */
-	public function reputationImage(): ?string
+	public function reputationImage()
 	{
 		$level	= $this->getReputationData();
 		
@@ -2918,12 +2741,12 @@ class Member extends ActiveRecord
 	/**
 	 * Verify legacy password
 	 *
-	 * @param object $password	The (legacy) password to verify, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	object	$password	The (legacy) password to verify, wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	bool
 	 */
-	public function verifyLegacyPassword( object $password ): bool
+	public function verifyLegacyPassword( $password )
 	{
-		return Login::compareHashes( $this->members_pass_hash, md5( md5( $this->members_pass_salt ) . md5( Request::legacyEscape( $password ) ) ) );
+		return \IPS\Login::compareHashes( $this->members_pass_hash, md5( md5( $this->members_pass_salt ) . md5( \IPS\Request::legacyEscape( $password ) ) ) );
 	}
 	
 	/**
@@ -2933,10 +2756,10 @@ class Member extends ActiveRecord
 	 * if you have alreadu checked it is enabled. In most cases, it is better to let
 	 * the available login handlers handle password management
 	 *
-	 * @param object|string $password	Password to encrypt, can be wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	object	$password	Password to encrypt, wrapped in an object that can be cast to a string so it doesn't show in any logs
 	 * @return	void
 	 */
-	public function setLocalPassword( string|object $password ) : void
+	public function setLocalPassword( $password )
 	{
 		/* We can safeuly assume that no matter what, this doesn't need to be set anymore */
 		$this->members_bitoptions['password_reset_forced'] = FALSE;
@@ -2948,14 +2771,14 @@ class Member extends ActiveRecord
 	/**
 	 * Change member's password for all applicable login handlers
 	 *
-	 * @param	object	$newPassword		The new password in plaintext, wrapped in an object that can be cast to a string so it doesn't show in any logs
-	 * @param string $type			Type of change for log
+	 * @param	string	$newPassword		The new password in plaintext, wrapped in an object that can be cast to a string so it doesn't show in any logs
+	 * @param	string	$type			Type of change for log
 	 * @return	bool
 	 */
-	public function changePassword( object $newPassword, string $type='manual' ): bool
+	public function changePassword( $newPassword, $type='manual' )
 	{
 		$return = FALSE;
-		foreach (Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
 			if ( $method->canChangePassword( $this ) )
 			{
@@ -2964,10 +2787,10 @@ class Member extends ActiveRecord
 					$method->changePassword( $this, $newPassword );
 					$return = TRUE;
 				}
-				catch( BadMethodCallException $e ){}
+				catch( \BadMethodCallException $e ){}
 			}
 		}
-		Event::fire( 'onPassChange', $this, array( $newPassword ) );
+		$this->memberSync( 'onPassChange', array( $newPassword ) );
 		$this->logHistory( 'core', 'password_change', $type );
 		
 		return $return;
@@ -2978,7 +2801,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function forcePasswordReset() : void
+	public function forcePasswordReset()
 	{
 		/* If the user is already forced, but hasn't yet, just return */
 		if ( $this->members_bitoptions['password_reset_forced'] )
@@ -2993,78 +2816,42 @@ class Member extends ActiveRecord
 		/* Invalidate login keys and sessions for all devices */
 		$this->invalidateSessionsAndLogins();
 		
-		$key = md5( SUITE_UNIQUE_KEY . $this->email . $this->real_name );
+		$key = md5( \IPS\SUITE_UNIQUE_KEY . $this->email . $this->real_name );
 		
-		$email = Email::buildFromTemplate( 'core', 'password_reset_forced', array( $this, $key ), Email::TYPE_TRANSACTIONAL );
+		$email = \IPS\Email::buildFromTemplate( 'core', 'password_reset_forced', array( $this, $key ), \IPS\Email::TYPE_TRANSACTIONAL );
 		$email->send( $this );
 	}
 	
 	/**
 	 * Password Reset Forced
 	 *
-	 * @param	Url|null $ref		Referrer, or NULL for no referrer.
-	 * @return	Url|null
+	 * @param	\IPS\Http\Url|NULL $ref		Referrer, or NULL for no referrer.
+	 * @return	bool
 	 */
-	public function passwordResetForced( ?Url $ref = NULL ): ?Url
+	public function passwordResetForced( ?\IPS\Http\Url $ref = NULL ): ?\IPS\Http\Url
 	{
 		if ( $this->members_bitoptions['password_reset_forced'] AND !$this->members_pass_hash )
 		{
-			return Url::internal( 'app=core&module=system&controller=settings&area=password', 'front', 'settings_password' )->setQueryString( 'ref', base64_encode( $ref ) );
+			return \IPS\Http\Url::internal( 'app=core&module=system&controller=settings&area=password', 'front', 'settings_password' )->setQueryString( 'ref', base64_encode( $ref ) );
 		}
 		
 		return NULL;
 	}
 
 	/**
-	 * Change the member's email address
-	 *
-	 * @param string $newEmail
-	 * @return void
-	 */
-	public function changeEmail( string $newEmail ) : void
-	{
-		/* Disable syncing */
-		$profileSync = $this->profilesync;
-		if ( isset( $profileSync['email'] ) )
-		{
-			unset( $profileSync['email'] );
-			$this->profilesync = $profileSync;
-			$this->save();
-		}
-
-		/* Change the email */
-		$oldEmail = $this->email;
-		$this->email = $newEmail;
-		$this->save();
-		foreach ( Login::methods() as $method )
-		{
-			try
-			{
-				$method->changeEmail( $this, $oldEmail, $newEmail );
-			}
-			catch( BadMethodCallException $e ){}
-		}
-		$this->logHistory( 'core', 'email_change', array( 'old' => $oldEmail, 'new' => $newEmail, 'by' => 'manual' ) );
-
-		Db::i()->delete( 'core_validating', [ 'member_id=? and email_chg=?', $this->member_id, 1 ] );
-
-		Event::fire( 'onEmailChange', $this, array( $newEmail, $oldEmail ) );
-	}
-
-	/**
 	 * @brief	Cached notifications configuration
 	 * @note	This property is public so it can be populated en-masse in areas that may benefit from doing so
 	 */
-	public ?array $notificationsConfiguration	= NULL;
+	public $notificationsConfiguration	= NULL;
 
-	static protected array $extCache = [];
+	static protected $extCache = [];
 	
 	/**
 	 * Notifications Configuration
 	 *
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function notificationsConfiguration(): ?array
+	public function notificationsConfiguration()
 	{
 		if( $this->notificationsConfiguration === NULL )
 		{
@@ -3072,7 +2859,7 @@ class Member extends ActiveRecord
 			$defaultNotifications = [];
 
 			foreach (
-				Db::i()->select(
+				\IPS\Db::i()->select(
 					'd.*, p.preference',
 					array( 'core_notification_defaults', 'd' )
 				)->join(
@@ -3092,33 +2879,36 @@ class Member extends ActiveRecord
 			}
 
 			/* Only cycle through if this member has any non-default notifications */
-			if( count( $this->notificationsConfiguration ) )
+			if( \count( $this->notificationsConfiguration ) )
 			{
 				/* Cache extension references */
-				if ( !count( static::$extCache ) )
+				if ( !\count( static::$extCache ) )
 				{
-					static::$extCache = Application::allExtensions( 'core', 'Notifications' );
+					static::$extCache = \IPS\Application::allExtensions( 'core', 'Notifications' );
 				}
 
 				foreach ( $defaultNotifications as $k => $v )
 				{
 					foreach ( static::$extCache as $extension )
 					{
-						foreach ( $extension->configurationOptions( null ) as $optionKey => $option )
+						if ( method_exists( $extension, 'configurationOptions' ) )
 						{
-							if ( $option['type'] == 'standard' and in_array( $k, $option['notificationTypes'] ) and count( $option['notificationTypes'] ) > 1 )
+							foreach ( $extension->configurationOptions( null ) as $optionKey => $option )
 							{
-								if ( !empty( $this->notificationsConfiguration[ $option['notificationTypes'][0] ] ) )
+								if ( $option['type'] == 'standard' and \in_array( $k, $option['notificationTypes'] ) and \count( $option['notificationTypes'] ) > 1 )
 								{
-									$defaultNotifications[ $k ] = $this->notificationsConfiguration[ $option['notificationTypes'][0] ];
-									Db::i()->insert( 'core_notification_preferences', [
-									'member_id' => $this->member_id,
-									'notification_key' => $k,
-									'preference' => implode( ',', $this->notificationsConfiguration[ $option['notificationTypes'][0] ] )
-									] );
-								}
+									if ( !empty( $this->notificationsConfiguration[ $option['notificationTypes'][0] ] ) )
+									{
+										$defaultNotifications[ $k ] = $this->notificationsConfiguration[ $option['notificationTypes'][0] ];
+										\IPS\Db::i()->insert( 'core_notification_preferences', [
+											'member_id' => $this->member_id,
+											'notification_key' => $k,
+											'preference' => implode( ',', $this->notificationsConfiguration[ $option['notificationTypes'][0] ] )
+										] );
+									}
 
-								continue 2;
+									continue 2;
+								}
 							}
 						}
 					}
@@ -3134,7 +2924,7 @@ class Member extends ActiveRecord
 	/**
 	 * @brief	Cached PWA Authorizations
 	 */
-	protected ?array $_pwa = NULL;
+	protected $_pwa = NULL;
 	
 	/**
 	 * Get members PWA Authorizations
@@ -3146,7 +2936,7 @@ class Member extends ActiveRecord
 		if ( $this->_pwa === NULL )
 		{
 			$this->_pwa = array();
-			foreach(Db::i()->select( '*', 'core_notifications_pwa_keys', array( "`member`=?", $this->member_id ) ) AS $auth )
+			foreach( \IPS\Db::i()->select( '*', 'core_notifications_pwa_keys', array( "`member`=?", $this->member_id ) ) AS $auth )
 			{
 				$this->_pwa[ $auth['id'] ] = $auth;
 			}
@@ -3158,28 +2948,28 @@ class Member extends ActiveRecord
 	/**
 	 * Get members PWA Authorizations
 	 *
-	 * @return	void
+	 * @return	array
 	 */
-	public function clearPwaAuths() : void
+	public function clearPwaAuths()
 	{
 		$this->_pwa = NULL;
-		Db::i()->delete( 'core_notifications_pwa_keys', array( "`member`=?", $this->member_id ) );
+		\IPS\Db::i()->delete( 'core_notifications_pwa_keys', array( "`member`=?", $this->member_id ) );
 	}
 	
 	/**
 	 * @brief	Following?
 	 */
-	protected array $_following	= array();
+	protected $_following	= array();
 
 	/**
 	 * Following
 	 *
-	 * @param string $app	Application key
-	 * @param string $area	Area
-	 * @param int $id		Item ID
+	 * @param	string	$app	Application key
+	 * @param	string	$area	Area
+	 * @param	int		$id		Item ID
 	 * @return	bool
 	 */
-	public function following( string $app, string $area, int $id ): bool
+	public function following( $app, $area, $id )
 	{
 		$_key	= md5( $app . $area . $id );
 		if( isset( $this->_following[ $_key ] ) )
@@ -3189,38 +2979,23 @@ class Member extends ActiveRecord
 
 		try
 		{
-			Db::i()->select( 'follow_id', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=? AND follow_member_id=?', $app, $area, $id, $this->member_id ) )->first();
+			\IPS\Db::i()->select( 'follow_id', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id=? AND follow_member_id=?', $app, $area, $id, $this->member_id ) )->first();
 			$this->_following[ $_key ]	= TRUE;
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			$this->_following[ $_key ]	= FALSE;
 		}
 
 		return $this->_following[ $_key ];
 	}
-
-
-	/**
-	 * Clear the cached result used by the following method
-	 *
-	 * @param string $app	Application key
-	 * @param string $area	Area
-	 * @param int $id		Item ID
-	 * @return	void
-	 */
-	public function clearFollowingCache( string $app, string $area, int $id ): void
-	{
-		$key = md5( $app . $area . $id );
-		unset( $this->_following[ $key ] );
-	}
-
+	
 	/**
 	 * Admin CP Restrictions
 	 *
-	 * @return bool|array|string
+	 * @return	array
 	 */
-	protected function acpRestrictions(): bool|array|string
+	protected function acpRestrictions()
 	{
 		if ( !$this->member_id )
 		{
@@ -3245,7 +3020,7 @@ class Member extends ActiveRecord
 			}
 									
 			$this->restrictions = FALSE;
-			if ( count( $rows ) > 0 )
+			if ( \count( $rows ) > 0 )
 			{
 				$this->restrictions = array();
 				foreach ( $rows as $row )
@@ -3262,7 +3037,7 @@ class Member extends ActiveRecord
 						$this->restrictions = $perms;
 						break;
 					}
-					else if( is_array( $perms ) )
+					else if( \is_array( $perms ) )
 					{
 						if ( empty( $this->restrictions ) )
 						{
@@ -3306,7 +3081,7 @@ class Member extends ActiveRecord
 
 										foreach ( $items as $item )
 										{
-											if ( !in_array( $item, $this->restrictions['items'][ $app ][ $module ] ) )
+											if ( !\in_array( $item, $this->restrictions['items'][ $app ][ $module ] ) )
 											{
 												$this->restrictions['items'][ $app ][ $module ][] = $item;
 											}
@@ -3326,14 +3101,14 @@ class Member extends ActiveRecord
 	/**
 	 * @brief Cache moderator badge results
 	 */
-	protected static array $modBadge = array();
+	protected static $modBadge = array();
 	
 	/**
 	 * Show moderator badge?
 	 *
-	 * @return	boolean|array
+	 * @return	boolean
 	 */
-	public function modShowBadge(): bool|array
+	public function modShowBadge()
 	{
 		if ( ! $this->member_id )
 		{
@@ -3346,32 +3121,32 @@ class Member extends ActiveRecord
 			
 			if ( $this->modPermission() )
 			{
-				if ( isset( Store::i()->moderators['m'][ $this->member_id ] ) )
+				if ( isset( \IPS\Data\Store::i()->moderators['m'][ $this->member_id ] ) )
 				{
-					static::$modBadge[ $this->member_id ] = Store::i()->moderators['m'][ $this->member_id ]['show_badge'];
+					static::$modBadge[ $this->member_id ] = \IPS\Data\Store::i()->moderators['m'][ $this->member_id ]['show_badge'];
 				}
 				else
 				{
 					foreach ( $this->groups as $id )
 					{
-						if ( isset( Store::i()->moderators['g'][ $id ] ) and Store::i()->moderators['g'][ $id ]['show_badge'] )
+						if ( isset( \IPS\Data\Store::i()->moderators['g'][ $id ] ) and \IPS\Data\Store::i()->moderators['g'][ $id ]['show_badge'] )
 						{
-							static::$modBadge[ $this->member_id ] = Store::i()->moderators['g'][ $id ];
+							static::$modBadge[ $this->member_id ] = \IPS\Data\Store::i()->moderators['g'][ $id ];
 						}
 					}
 				}
 			}
 		}
-
+		
 		return static::$modBadge[ $this->member_id ];
 	}
 	
 	/**
 	 * Moderator Permissions
 	 *
-	 * @return	bool|array|string
+	 * @return	array|false
 	 */
-	public function modPermissions(): bool|array|string
+	public function modPermissions()
 	{
 		/* Only members can be moderators of course */
 		if ( !$this->member_id )
@@ -3386,18 +3161,18 @@ class Member extends ActiveRecord
 			$this->modPermissions = FALSE;
 			
 			/* If we don't have a datastore of moderator configuration, load that now */
-			if ( !isset( Store::i()->moderators ) )
+			if ( !isset( \IPS\Data\Store::i()->moderators ) )
 			{
-				Store::i()->moderators = array(
-					'm'	=> iterator_to_array( Db::i()->select( '*', 'core_moderators', array( 'type=?', 'm' ) )->setKeyField( 'id' ) ),
-					'g'	=> iterator_to_array( Db::i()->select( '*', 'core_moderators', array( 'type=?', 'g' ) )->setKeyField( 'id' ) ),
+				\IPS\Data\Store::i()->moderators = array(
+					'm'	=> iterator_to_array( \IPS\Db::i()->select( '*', 'core_moderators', array( 'type=?', 'm' ) )->setKeyField( 'id' ) ),
+					'g'	=> iterator_to_array( \IPS\Db::i()->select( '*', 'core_moderators', array( 'type=?', 'g' ) )->setKeyField( 'id' ) ),
 				);
 			}
 			
 			/* Member-level moderator permissions override all group-level permissions, so if this member is a moderator at a member-level, just use that */
-			if ( isset( Store::i()->moderators['m'][ $this->member_id ] ) )
+			if ( isset( \IPS\Data\Store::i()->moderators['m'][ $this->member_id ] ) )
 			{
-				$perms = Store::i()->moderators['m'][ $this->member_id ]['perms'];
+				$perms = \IPS\Data\Store::i()->moderators['m'][ $this->member_id ]['perms'];
 				$this->modPermissions = $perms == '*' ? '*' : json_decode( $perms, TRUE );
 			}
 			
@@ -3408,14 +3183,14 @@ class Member extends ActiveRecord
 				$rows = array();
 				foreach ( $this->groups as $id )
 				{
-					if ( isset( Store::i()->moderators['g'][ $id ] ) )
+					if ( isset( \IPS\Data\Store::i()->moderators['g'][ $id ] ) )
 					{
-						$rows[] = Store::i()->moderators['g'][ $id ];
+						$rows[] = \IPS\Data\Store::i()->moderators['g'][ $id ];
 					}
 				}
 				
 				/* And if we have any... */			
-				if ( count( $rows ) > 0 )
+				if ( \count( $rows ) > 0 )
 				{
 					/* Start with an empty array (indicates they are a moderator, but haven't get given them any permissions) */
 					$this->modPermissions = array();
@@ -3442,7 +3217,7 @@ class Member extends ActiveRecord
 									$this->modPermissions[ $k ] = $v;
 								}
 								/* If it's an array, combine the values */
-								elseif ( is_array( $this->modPermissions[ $k ] ) AND is_array( $v ) )
+								elseif ( \is_array( $this->modPermissions[ $k ] ) AND \is_array( $v ) )
 								{
 									$this->modPermissions[ $k ] = array_merge( $this->modPermissions[ $k ], $v );
 								}
@@ -3466,25 +3241,25 @@ class Member extends ActiveRecord
 	/**
 	 * @brief	Report count
 	 */
-	protected ?int $reportCount = NULL;
+	protected $reportCount = NULL;
 	
 	/**
 	 * Get number of open reports that this member can see
 	 *
-	 * @param bool $force	Fetch the count even if the notification is off
+	 * @param	bool	$force	Fetch the count even if the notification is off
 	 * @return	int
 	 */
-	public function reportCount( bool $force=FALSE ): int
+	public function reportCount( $force=FALSE )
 	{
 		if ( $this->reportCount === NULL OR $force === TRUE )
 		{
-			if ( $this->canAccessModule( Module::get( 'core', 'modcp' ) ) )
+			if ( $this->canAccessModule( \IPS\Application\Module::get( 'core', 'modcp' ) ) )
 			{
 				if( !$this->members_bitoptions['no_report_count'] OR $force === TRUE )
 				{
-					$where = [ Report::where( $this ), [ 'status IN( 1,2 )' ] ];
+					$where = [ \IPS\core\Reports\Report::where( $this ), [ 'status IN( 1,2 )' ] ];
 
-					$reportCount = Db::i()->select(
+					$reportCount = \IPS\Db::i()->select(
 						'COUNT(*)',
 						'core_rc_index',
 						$where
@@ -3508,109 +3283,25 @@ class Member extends ActiveRecord
 		
 		return (int) $this->reportCount;
 	}
-
-	/**
-	 * Can the member view any reported content?
-	 *
-	 * @return bool
-	 */
-	public function canAccessReportCenter() : bool
-	{
-		if( $this->modPermission( 'can_view_reports' ) )
-		{
-			return TRUE;
-		}
-
-		$perms = $this->modPermissions();
-
-		if ( $perms === false )
-		{
-			return false;
-		}
-		
-		foreach ( Content::routedClasses( $this, FALSE, TRUE ) as $_class )
-		{
-			if( isset( $perms[ "can_view_reports_{$_class::$title}" ] ) and $perms[ "can_view_reports_{$_class::$title}" ] )
-			{
-				return TRUE;
-			}
-		}
-
-		return FALSE;
-	}
-
-	/**
-	 * @var int|null
-	 */
-	protected ?int $_assignments = null;
-
-	/**
-	 * Return total number of content items assigned to this member
-	 *
-	 * @return int
-	 */
-	public function totalAssignments() : int
-	{
-		if( $this->_assignments === null )
-		{
-			$clause = [
-				"(assign_type=? and assign_to=?)"
-			];
-			$binds = [
-				Assignment::ASSIGNMENT_MEMBER,
-				$this->member_id
-			];
-
-			if( $teams = $this->teams() )
-			{
-				$clause[] = "(assign_type=? and " . Db::i()->in( 'assign_to', array_keys( $teams ) ) . ")";
-				$binds[] = Assignment::ASSIGNMENT_TEAM;
-			}
-
-			$where = array_merge( array( implode( " OR ", $clause ) ), $binds );
-			$this->_assignments = (int) Db::i()->select( 'count(assign_id)', 'core_assignments', $where )->first();
-		}
-
-		return $this->_assignments;
-	}
-
-	/**
-	 * Get all teams to which this member belongs
-	 *
-	 * @return array|null
-	 */
-	public function teams() : array|null
-	{
-		$teams = [];
-		foreach( Team::teams() as $t )
-		{
-			if( in_array( $this->member_id, $t->members ) )
-			{
-				$teams[$t->id] = $t;
-			}
-		}
-
-		return count( $teams ) ? $teams : null;
-	}
 	
 	/**
 	 * @brief	Ignore Preferences
 	 * @see		isIgnoring
 	 */
-	protected ?array $ignorePreferences = NULL;
+	protected $ignorePreferences = NULL;
 	
 	/**
 	 * Is this member ignoring another member?
 	 *
-	 * @param array|Member $member	The member
-	 * @param string $type	The type (topics, messages, signatures)
+	 * @param	\IPS\Member|array	$member	The member
+	 * @param	string				$type	The type (topics, messages, signatures)
 	 * @return	bool
 	 */
-	public function isIgnoring( array|Member $member, string $type ): bool
+	public function isIgnoring( $member, $type )
 	{
-		if( is_array( $member ) )
+		if( \is_array( $member ) )
 		{
-			$member = Member::load( $member['member_id'] );
+			$member = \IPS\Member::load( $member['member_id'] );
 		}
 
 		$group = $member->group;
@@ -3636,7 +3327,7 @@ class Member extends ActiveRecord
 			}
 			else
 			{
-				$this->ignorePreferences = iterator_to_array( Db::i()->select( '*', 'core_ignored_users', array( 'ignore_owner_id=?', $this->member_id ) )->setKeyField( 'ignore_ignore_id' ) );
+				$this->ignorePreferences = iterator_to_array( \IPS\Db::i()->select( '*', 'core_ignored_users', array( 'ignore_owner_id=?', $this->member_id ) )->setKeyField( 'ignore_ignore_id' ) );
 				
 				if ( empty( $this->ignorePreferences ) )
 				{
@@ -3653,62 +3344,76 @@ class Member extends ActiveRecord
 		
 		return FALSE;
 	}
-
+	
 	/**
-	 * Build a menu for this member
-	 * @param string $menuType (account|mobile|profile)
-	 * @return Menu|null
-	 */
-	public function menu( string $menuType ) : Menu|null
-	{
-		$method = $menuType . 'Menu';
-		$menu = UserMenu::$method( $this );
-		if( $menu instanceof Menu AND $menu->hasContent() )
-		{
-			return $menu;
-		}
-
-		return null;
-	}
-
-	/**
-	 * Insert extra content in the user navigation bar
+	 * Build the "Create" menu
 	 *
-	 * @return string
+	 * @return	array
 	 */
-	public function userNav() : string
+	public function createMenu()
 	{
-		$return = "";
-		foreach( Application::allExtensions( 'core', 'UserMenu', $this, 'core' ) as $ext )
-		{
-			$return .= $ext->userNav();
-		}
-		return $return;
-	}
+		$menu = NULL;
+		$rebuild = FALSE;
 
-	/**
-	 * Insert extra content in the mobile navigation bar
-	 *
-	 * @param string $position (header/footer)
-	 * @return string
-	 */
-	public function mobileNav( string $position = 'footer' ) : string
-	{
-		$return = "";
-		foreach( Application::allExtensions( 'core', 'UserMenu', $this, 'core' ) as $ext )
+		/* Make sure that this is a valid member */
+		if( !$this->member_id )
 		{
-			$return .= $ext->mobileNav( $position, Theme::i()->getParsedCssVariableFromKey( 'set__i-mobile-icons-location' ) );
+			return array();
 		}
-		return $return;
+		
+		if ( ! \IPS\Settings::i()->member_menu_create_key )
+		{
+			/* Generate a new key */
+			static::clearCreateMenu();
+		}
+		if ( \IPS\IN_DEV and !\IPS\DEV_USE_MENU_CACHE )
+		{
+			$rebuild = TRUE;
+		}
+		else if ( $this->create_menu !== NULL )
+		{
+			$menu = json_decode( $this->create_menu, TRUE );
+			
+			if ( ! isset( $menu['menu_key'] ) or $menu['menu_key'] != \IPS\Settings::i()->member_menu_create_key )
+			{
+				$rebuild = TRUE;
+			}
+		}
+		else
+		{
+			$rebuild = TRUE;
+		}
+		
+		if ( $rebuild === TRUE )
+		{
+			$createMenu = array();
+			foreach ( \IPS\Application::allExtensions( 'core', 'CreateMenu', $this ) as $ext )
+			{
+				$createMenu = array_merge( $createMenu, array_map( function( $val )
+				{
+					$val['link'] = (string) $val['link'];
+					return $val;
+				}, $ext->getItems() ) );
+			}
+			
+			$this->create_menu = json_encode( array( 'menu_key' => \IPS\Settings::i()->member_menu_create_key, 'menu' => $createMenu ) );
+			$this->save();
+			
+			return $createMenu;
+		}
+		else
+		{
+			return $menu['menu'];
+		}
 	}
 	
 	/**
 	 * Moderate New Content
 	 *
-	 * @param bool $considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
+	 * @param	bool	$considerPostBeforeRegistering	If TRUE, and $member is a guest, will check if a newly registered member would be moderated
 	 * @return	bool
 	 */
-	public function moderateNewContent( ?bool $considerPostBeforeRegistering=FALSE ): bool
+	public function moderateNewContent( $considerPostBeforeRegistering = FALSE )
 	{
 		$modQueued = FALSE;
 		
@@ -3720,7 +3425,7 @@ class Member extends ActiveRecord
 				/* Days since joining */
 				if ( $this->group['gbw_mod_post_unit_type'] )
 				{
-					$modQueued = $this->joined->add( new DateInterval( "P{$this->group['g_mod_post_unit']}D" ) )->getTimestamp() > time();
+					$modQueued = $this->joined->add( new \DateInterval( "P{$this->group['g_mod_post_unit']}D" ) )->getTimestamp() > time();
 				}
 				/* Content items */
 				else
@@ -3744,9 +3449,9 @@ class Member extends ActiveRecord
 		}
 		
 		/* Post before register check */
-		if ( !$modQueued and $considerPostBeforeRegistering and $this->member_group_id == Settings::i()->guest_group )
+		if ( !$modQueued and $considerPostBeforeRegistering and $this->member_group_id == \IPS\Settings::i()->guest_group )
 		{
-			$modQueued = (bool) Group::load( Settings::i()->member_group )->g_mod_preview;
+			$modQueued = (bool) \IPS\Member\Group::load( \IPS\Settings::i()->member_group )->g_mod_preview;
 		}
 
 		/* Return */
@@ -3756,17 +3461,17 @@ class Member extends ActiveRecord
 	/**
 	 * Cover Photo
 	 *
-	 * @return	Coverphoto
+	 * @return	\IPS\Helpers\CoverPhoto
 	 */
-	public function coverPhoto(): Coverphoto
+	public function coverPhoto()
 	{
-		$photo = new CoverPhoto;
+		$photo = new \IPS\Helpers\CoverPhoto;
 		if ( $this->pp_cover_photo )
 		{
-			$photo->file = File::get( 'core_Profile', $this->pp_cover_photo );
+			$photo->file = \IPS\File::get( 'core_Profile', $this->pp_cover_photo );
 			$photo->offset = $this->pp_cover_offset;
 		}
-		$photo->editable	= ( Member::loggedIn()->modPermission('can_modify_profiles') or ( Member::loggedIn()->member_id == $this->member_id and $this->group['g_edit_profile'] and $this->group['gbw_allow_upload_bgimage'] ) );
+		$photo->editable	= ( \IPS\Member::loggedIn()->modPermission('can_modify_profiles') or ( \IPS\Member::loggedIn()->member_id == $this->member_id and $this->group['g_edit_profile'] and $this->group['gbw_allow_upload_bgimage'] ) );
 		$photo->maxSize		= $this->group['g_max_bgimg_upload'];
 		$photo->object		= $this;
 		
@@ -3776,11 +3481,11 @@ class Member extends ActiveRecord
 	/**
 	 * Get HTML for search result display
 	 *
-	 * @return	string
+	 * @return	callable
 	 */
-	public function searchResultHtml(): string
+	public function searchResultHtml()
 	{
-		return Theme::i()->getTemplate('search')->member( $this );
+		return \IPS\Theme::i()->getTemplate('search')->member( $this );
 	}
 	
 	/**
@@ -3788,40 +3493,16 @@ class Member extends ActiveRecord
 	 *
 	 * @return	boolean
 	 */
-	public function hasHighlightedReplies(): bool
+	public function hasHighlightedReplies()
 	{
 		return (boolean) $this->group['gbw_post_highlight'];
-	}
-
-	/**
-	 * Return the group ID that has highlighting enabled
-	 *
-	 * @return int|null
-	 */
-	public function highlightedGroup() : ?int
-	{
-		if( !$this->hasHighlightedReplies() )
-		{
-			return null;
-		}
-
-		foreach( $this->groups as $groupId )
-		{
-			$options = Group::load( $groupId )->g_bitoptions->asArray();
-			if( $options['gbw_post_highlight'] )
-			{
-				return $groupId;
-			}
-		}
-
-		return null;
 	}
 	
 	/**
 	 * Get output for API
 	 *
-	 * @param Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @param array|null $otherFields		Array of additional fields to return (raw values)
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	array|NULL			$otherFields		Array of additional fields to return (raw values)
 	 * @return	array
 	 * @apiresponse			int											id						ID number
 	 * @apiresponse			string										name					Username
@@ -3845,30 +3526,24 @@ class Member extends ActiveRecord
 	 * @clientapiresponse	datetime|null								lastVisit				Last distinct visit date on the site.
 	 * @clientapiresponse	datetime|null								lastPost				Latest content submission date.
 	 * @apiresponse			int											profileViews			Number of times member's profile has been viewed
-	 * @clientapiresponse			bool										spammer					Is the member flagged as a spammer?
-	 * @clientapiresponse			bool										banned					Is the member currently banned?
 	 * @apiresponse			string										birthday				Member birthday in MM/DD/YYYY format (or MM/DD format if no year has been supplied).
-	 * @apiresponse 		array										login_methods			Array of login methods used <int, array{name: string, id: int|string}>, key is login method ID.
 	 * @apiresponse			[\IPS\core\ProfileFields\Api\FieldGroup]	customFields			Custom profile fields. For requests using an OAuth Access Token for a particular member, only fields the authorized user can view will be included
 	 * @apiresponse			[\IPS\core\Achievements\Rank]					rank					Rank
 	 * @apiresponse			int											achievements_points		Points
-	 * @clientapiresponse			bool										allowAdminEmails		Whether or not this member wants to receive admin emails
+	 * @apiresponse			bool										allowAdminEmails		Whether or not this member wants to receive admin emails
 	 * @apiresponse			bool										completed				Whether or not the registration is completed
-	 * @clientapiresponse			int											totalMessages			Total number of Personal Messages
-	 * @clientapiresponse			int											unreadMessages			Total number of unread Personal Messages
-	 * @apiresponse			[IPS\core\Achievements\Badge]				badges					All badges received by this member
 	 */
-	public function apiOutput( Member $authorizedMember = NULL, array $otherFields = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL, $otherFields = NULL )
 	{
 		try
 		{
-			$group = Group::load( $this->_data['member_group_id'] );
+			$group = \IPS\Member\Group::load( $this->_data['member_group_id'] );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			Log::log( "{$this->name} has an invalid group ({$this->_data['member_group_id']}) during API call. Resetting.", 'api_invalid_group' );
-			$group = Group::load( Settings::i()->member_group ); // Intentially no catch here as that means things are really broken.
-			$this->member_group_id = Settings::i()->member_group;
+			\IPS\Log::log( "{$this->name} has an invalid group ({$this->_data['member_group_id']}) during API call. Resetting.", 'api_invalid_group' );
+			$group = \IPS\Member\Group::load( \IPS\Settings::i()->member_group ); // Intentially no catch here as that means things are really broken.
+			$this->member_group_id = \IPS\Settings::i()->member_group;
 			$this->save();
 		}
 		
@@ -3877,9 +3552,9 @@ class Member extends ActiveRecord
 		{
 			try
 			{
-				$secondaryGroups[] = Group::load( $secondaryGroupId )->apiOutput( $authorizedMember );
+				$secondaryGroups[] = \IPS\Member\Group::load( $secondaryGroupId )->apiOutput( $authorizedMember );
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 
 		/* Figure out custom fields if any */
@@ -3887,8 +3562,8 @@ class Member extends ActiveRecord
 		
 		try
 		{
-			$fieldData		= core\ProfileFields\Field::fieldData();
-			$fieldValues	= Db::i()->select( '*', 'core_pfields_content', array( 'member_id=?', $this->member_id ) )->first();
+			$fieldData		= \IPS\core\ProfileFields\Field::fieldData();
+			$fieldValues	= \IPS\Db::i()->select( '*', 'core_pfields_content', array( 'member_id=?', $this->member_id ) )->first();
 	
 			foreach( $fieldData as $profileFieldGroup => $profileFields )
 			{
@@ -3903,14 +3578,14 @@ class Member extends ActiveRecord
 						( $field['pf_member_hide'] == 'staff' and ( $authorizedMember->modPermissions() OR $authorizedMember->isAdmin() ) )
 						)
 					{
-						$groupValues[ $field['pf_id'] ] = new Field( $this->language()->get( 'core_pfield_' . $field['pf_id'] ), $fieldValues[ 'field_' . $field['pf_id'] ] );
+						$groupValues[ $field['pf_id'] ] = new \IPS\core\ProfileFields\Api\Field( $this->language()->get( 'core_pfield_' . $field['pf_id'] ), $fieldValues[ 'field_' . $field['pf_id'] ] );
 					}
 				}
 				
-				$fields[ $profileFieldGroup ] = ( new FieldGroup( $this->language()->get( 'core_pfieldgroups_' . $profileFieldGroup ), $groupValues ) )->apiOutput( $authorizedMember );
+				$fields[ $profileFieldGroup ] = ( new \IPS\core\ProfileFields\Api\FieldGroup( $this->language()->get( 'core_pfieldgroups_' . $profileFieldGroup ), $groupValues ) )->apiOutput( $authorizedMember );
 			}
 		}
-		catch( UnderflowException $e ) { } # Guests will not have any profile field information
+		catch( \UnderflowException $e ) { } # Guests will not have any profile field information.
 		
 		$return = array();
 		$return['id']					= $this->member_id;
@@ -3934,54 +3609,33 @@ class Member extends ActiveRecord
 			$return['warningPoints']		= $this->warn_level;
 		}
 		$return['reputationPoints']		= $this->pp_reputation_points;
-		$return['photoUrl']				= static::photoUrl($this->_data, FALSE);
-		$return['photoUrlIsDefault']	= in_array( $this->pp_photo_type, [ 'none', 'letter' ] ) or static::photoUrl($this->_data, FALSE, FALSE, FALSE) != $return['photoUrl'];
-		$return['coverPhotoUrl']		= $this->pp_cover_photo ? ( (string) File::get( 'core_Profile', $this->pp_cover_photo )->url ) : '';
+		$return['photoUrl']				= static::photoUrl( $this->_data, FALSE );
+		$return['photoUrlIsDefault']	= \in_array( $this->pp_photo_type, [ 'none', 'letter' ] ) or static::photoUrl( $this->_data, FALSE, FALSE, FALSE ) != $return['photoUrl'];
+		$return['coverPhotoUrl']		= $this->pp_cover_photo ? ( (string) \IPS\File::get( 'core_Profile', $this->pp_cover_photo )->url ) : '';
 		$return['profileUrl']			= ( $this->member_id ) ? (string) $this->url() : NULL;
 		if ( !$authorizedMember )
 		{
 			$return['validating']			= (bool) $this->members_bitoptions['validating'];
 		}
 		$return['posts']				= $this->member_posts;
-		
+
 		if( !$authorizedMember )
 		{
-			$return['lastActivity'] 		= ( $this->last_activity AND !$this->isOnlineAnonymously() ) ? DateTime::ts( $this->last_activity )->rfc3339() : NULL;
-			$return['lastVisit'] 		= $this->last_visit ? DateTime::ts( (int)$this->last_visit )->rfc3339() : NULL;
-			$return['lastPost'] 		= $this->member_last_post ? DateTime::ts( $this->member_last_post )->rfc3339() : NULL;
+			$return['lastActivity'] 	= ( $this->last_activity ) ? \IPS\DateTime::ts( $this->last_activity )->rfc3339() : NULL;
+			$return['lastVisit'] 		= $this->last_visit ? \IPS\DateTime::ts( $this->last_visit )->rfc3339() : NULL;
+			$return['lastPost'] 		= $this->member_last_post ? \IPS\DateTime::ts( $this->member_last_post )->rfc3339() : NULL;
 		}
 
-		if( !$authorizedMember OR $authorizedMember->member_id === $this->member_id )
+		if( !$authorizedMember OR $authorizedMember?->member_id === $this->member_id )
 		{
 			$return['birthday'] = $this->bday_month ? ( $this->bday_month . '/' . $this->bday_day . ( $this->bday_year ? '/' . $this->bday_year : '' ) ) : NULL;
-
-			/* Login Links */
-			$return['login_methods'] = [];
-			foreach( Db::i()->select( '*', 'core_login_links', [ 'token_member=? and token_linked=?', $this->member_id, 1 ] ) as $link )
-			{
-				/* Only include enabled methods */
-				if( isset( Login::methods()[ $link['token_login_method'] ] ) )
-				{
-					$return['login_methods'][ $link['token_login_method'] ] = [
-						'name' => Login::methods()[ $link['token_login_method'] ]->_title,
-						'id' => $link['token_identifier']
-					];
-				}
-			}
 		}
 		$return['profileViews']		= $this->members_profile_views;
-
-		if( $authorizedMember === null or $authorizedMember->member_id == $this->member_id )
-		{
-			$return['spammer']          = (bool) $this->members_bitoptions['bw_is_spammer'];
-			$return['banned']           = (bool) $this->isBanned();
-		}
-
 		$return['customFields']		= $fields;
 
 		if ( !$authorizedMember )
 		{
-			if( $otherFields !== NULL AND is_array( $otherFields ) )
+			if( $otherFields !== NULL AND \is_array( $otherFields ) )
 			{
 				foreach( $otherFields as $property )
 				{
@@ -3992,28 +3646,8 @@ class Member extends ActiveRecord
 
 		$return['rank'] = $this->rank() ? $this->rank()->apiOutput( $authorizedMember ) : NULL;
 		$return['achievements_points'] = $this->achievements_points;
-
-		if( $authorizedMember === null or $authorizedMember->member_id == $this->member_id )
-		{
-			$return['allowAdminEmails'] = $this->allow_admin_mails;
-		}
-
-		$return['completed'] = $this->completed;
-
-		$counts = \IPS\Db::i()->select( 'COUNT(map_id) as total_count, COUNT(CASE WHEN map_has_unread = 1 THEN 1 END) as unread_messages', 'core_message_topic_user_map', [ 'map_user_id=?', $this->member_id ] )->first();
-
-		if( $authorizedMember === null or $authorizedMember->member_id == $this->member_id )
-		{
-			$return['totalMessages'] = $counts['total_count'];
-			$return['unreadMessages'] = $counts['unread_messages'];
-		}
-
-		/* Add member badges */
-		$return['badges'] = array();
-		foreach( $this->recentBadges( NULL ) as $badge )
-		{
-			$return['badges'][] = $badge->apiOutput();
-		}
+		$return['allowAdminEmails'] = (bool) $this->allow_admin_mails;
+		$return['completed'] = (bool) $this->completed;
 
 		return $return;
 	}
@@ -4021,25 +3655,25 @@ class Member extends ActiveRecord
 	/**
 	 * Answers to security questions
 	 *
-	 * @return	Select
+	 * @return	\IPS\Db\Select
 	 */
-	public function securityAnswers(): Select
+	public function securityAnswers()
 	{
-		return Db::i()->select( array( 'answer_question_id', 'answer_answer' ), 'core_security_answers', array( 'answer_member_id=?', $this->member_id ) )->setKeyField('answer_question_id')->setValueField('answer_answer');
+		return \IPS\Db::i()->select( array( 'answer_question_id', 'answer_answer' ), 'core_security_answers', array( 'answer_member_id=?', $this->member_id ) )->setKeyField('answer_question_id')->setValueField('answer_answer');
 	}
 	
 	/**
 	 * Last used device
 	 *
-	 * @return	Device|NULL
+	 * @return	\IPS\Member\Device|NULL
 	 */
-	public function lastUsedDevice(): ?Device
+	public function lastUsedDevice()
 	{
 		try
 		{
-			return Device::constructFromData( Db::i()->select( '*', 'core_members_known_devices', array( 'member_id=?', $this->member_id ), 'last_seen DESC', 1 )->first() );
+			return \IPS\Member\Device::constructFromData( \IPS\Db::i()->select( '*', 'core_members_known_devices', array( 'member_id=?', $this->member_id ), 'last_seen DESC', 1 )->first() );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
 			return NULL;
 		}
@@ -4048,15 +3682,15 @@ class Member extends ActiveRecord
 	/**
 	 * Last used IP address
 	 *
-	 * @return	string|NULL
+	 * @return	\IPS\Member\Device|NULL
 	 */
-	public function lastUsedIp(): ?string
+	public function lastUsedIp()
 	{
 		try
 		{
-			return Db::i()->select( 'ip_address', 'core_members_known_ip_addresses', array( 'member_id=?', $this->member_id ), 'last_seen DESC', 1 )->first();
+			return \IPS\Db::i()->select( 'ip_address', 'core_members_known_ip_addresses', array( 'member_id=?', $this->member_id ), 'last_seen DESC', 1 )->first();
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
 			return NULL;
 		}
@@ -4067,28 +3701,28 @@ class Member extends ActiveRecord
 	 *
 	 * @return	int
 	 */
-	public function deviceCount(): int
+	public function deviceCount()
 	{
-		return Db::i()->select( 'COUNT(*)', 'core_members_known_devices', array( 'member_id=?', $this->member_id ) )->first();
+		return \IPS\Db::i()->select( 'COUNT(*)', 'core_members_known_devices', array( 'member_id=?', $this->member_id ) )->first();
 	}
 
 	protected array $_failedLoginCache;
-
+	
 	/**
 	 * Check if account is locked - returns FALSE if account is unlocked, an \IPS\DateTime object if the account is locked until a certain time, or TRUE if account is locked indefinitely
 	 *
-	 * @return    DateTime|bool
+	 * @return	\IPS\DateTime|bool
 	 */
-	public function unlockTime() : DateTime|bool
+	public function unlockTime()
 	{
-		if( !Settings::i()->ipb_bruteforce_attempts )
+		if( !\IPS\Settings::i()->ipb_bruteforce_attempts )
 		{
 			return FALSE;
 		}
 
-		if( !isset( $this->_failedLoginCache[ Request::i()->ipAddress() ] ) )
+		if( !isset( $this->_failedLoginCache[ \IPS\Request::i()->ipAddress() ] ) )
 		{
-			$where = [ [ 'login_date>=? AND login_ip_address=?', ( new DateTime() )->sub( new DateInterval( 'PT' . Settings::i()->ipb_bruteforce_period . 'M' ) )->getTimestamp(), Request::i()->ipAddress() ] ];
+			$where = [ [ 'login_date>=? AND login_ip_address=?', ( new \IPS\DateTime() )->sub( new \DateInterval( 'PT' . \IPS\Settings::i()->ipb_bruteforce_period . 'M' ) )->getTimestamp(), \IPS\Request::i()->ipAddress() ] ];
 			if ( $this->member_id )
 			{
 				$where[] = [ 'login_member_id=?', $this->member_id ];
@@ -4098,14 +3732,14 @@ class Member extends ActiveRecord
 				$where[] = [ 'login_email=?', $this->email ];
 			}
 
-			$this->_failedLoginCache[ Request::i()->ipAddress() ] = iterator_to_array( Db::i()->select( '*', 'core_login_failures', $where ) );
+			$this->_failedLoginCache[ \IPS\Request::i()->ipAddress() ] = iterator_to_array( \IPS\Db::i()->select( '*', 'core_login_failures', $where ) );
 		}
 
-		if( count( $this->_failedLoginCache[ Request::i()->ipAddress() ] ) > Settings::i()->ipb_bruteforce_attempts )
+		if( count( $this->_failedLoginCache[ \IPS\Request::i()->ipAddress() ] ) > \IPS\Settings::i()->ipb_bruteforce_attempts )
 		{
-			if ( Settings::i()->ipb_bruteforce_period and Settings::i()->ipb_bruteforce_unlock )
+			if ( \IPS\Settings::i()->ipb_bruteforce_period and \IPS\Settings::i()->ipb_bruteforce_unlock )
 			{
-				return DateTime::ts( max( array_column( $this->_failedLoginCache[ Request::i()->ipAddress() ], 'login_date' ) ) )->add( new DateInterval( 'PT' . Settings::i()->ipb_bruteforce_period . 'M' ) );
+				return \IPS\DateTime::ts( max( array_column( $this->_failedLoginCache[ \IPS\Request::i()->ipAddress() ], 'login_date' ) ) )->add( new \DateInterval( 'PT' . \IPS\Settings::i()->ipb_bruteforce_period . 'M' ) );
 			}
 
 			return TRUE;
@@ -4117,20 +3751,14 @@ class Member extends ActiveRecord
 	/**
 	 * Return the number of failed logins for a given IP address
 	 *
-	 * @param string $ipAddress	IP Address
+	 * @param	string	$ipAddress	IP Address
 	 * @return	int
 	 */
-	/**
-	 * Return the number of failed logins for a given IP address
-	 *
-	 * @param string $ipAddress	IP Address
-	 * @return	int
-	 */
-	public function failedLoginCount( string $ipAddress ): int
+	public function failedLoginCount( $ipAddress ): int
 	{
 		if( !isset( $this->_failedLoginCache[ $ipAddress ] ) )
 		{
-			$where = [ [ 'login_date>=? AND login_ip_address=?', ( new DateTime() )->sub( new DateInterval( 'PT' . Settings::i()->ipb_bruteforce_period . 'M' ) )->getTimestamp(), Request::i()->ipAddress() ] ];
+			$where = [ [ 'login_date>=? AND login_ip_address=?', ( new \IPS\DateTime() )->sub( new \DateInterval( 'PT' . \IPS\Settings::i()->ipb_bruteforce_period . 'M' ) )->getTimestamp(), \IPS\Request::i()->ipAddress() ] ];
 			if( $this->member_id )
 			{
 				$where[] = [ 'login_member_id=?', $this->member_id ];
@@ -4140,7 +3768,7 @@ class Member extends ActiveRecord
 				$where[] = [ 'login_email=?', $this->email ];
 			}
 
-			$this->_failedLoginCache[ $ipAddress ] = Db::i()->select( '*', 'core_login_failures', $where )->first();
+			$this->_failedLoginCache[ $ipAddress ] = \IPS\Db::i()->select( '*', 'core_login_failures', $where )->first();
 		}
 
 		return count( $this->_failedLoginCache[ $ipAddress ] );
@@ -4151,16 +3779,16 @@ class Member extends ActiveRecord
 	/**
 	 * @var	array	ACP restriction keys which are hardcoded to FALSE when on CiC (even if admin has no restrictions)
 	 */
-	public static array $cicBlockedAcpRestrictions = [ 'core.membersettings.member_history_prune', 'core.settings.datastore', 'core.membersettings.notifications_prune' ];
+	public static $cicBlockedAcpRestrictions = [ 'core.membersettings.member_history_prune', 'core.settings.datastore', 'core.customization.theme_designers_mode', 'core.membersettings.notifications_prune' ];
 	
 	/**
 	 * Has access to a restricted ACP area?
 	 *
-	 * @param string|Application $app	Application
-	 * @param string|Module|null $module	Module
-	 * @param string|null $key	Restriction Key
+	 * @param	\IPS\Application|string				$app	Application
+	 * @param	\IPS\Application\Module|string|null	$module	Module
+	 * @param	string|null							$key	Restriction Key
 	 */
-	public function hasAcpRestriction( Application|string $app, Module|string $module=NULL, string $key=NULL ): bool
+	public function hasAcpRestriction( $app, $module=NULL, $key=NULL )
 	{		
 		/* Load our ACP restrictions */
 		$restrictions = $this->acpRestrictions();
@@ -4170,9 +3798,9 @@ class Member extends ActiveRecord
 		}
 		
 		/* CiC Block */
-		$appKey = is_string( $app ) ? $app : $app->directory;
-		$moduleKey = ( $module === NULL or is_string( $module ) ) ? $module : $module->key;
-		if ( CIC and in_array( $appKey . ( $moduleKey ? ( ".{$moduleKey}" . ( $key ? ".{$key}" : '' ) ) : '' ), static::$cicBlockedAcpRestrictions ) )
+		$appKey = \is_string( $app ) ? $app : $app->directory;
+		$moduleKey = ( $module === NULL or \is_string( $module ) ) ? $module : $module->key;
+		if ( \IPS\CIC and \in_array( $appKey . ( $moduleKey ? ( ".{$moduleKey}" . ( $key ? ".{$key}" : '' ) ) : '' ), static::$cicBlockedAcpRestrictions ) )
 		{
 			return FALSE;
 		}
@@ -4184,7 +3812,7 @@ class Member extends ActiveRecord
 		}
 
 		/* If we don't have any permissions, return false */
-		if( !count( $restrictions ) )
+		if( !\count( $restrictions ) )
 		{
 			return FALSE;
 		}
@@ -4198,13 +3826,13 @@ class Member extends ActiveRecord
 			}
 			else
 			{
-				if ( in_array( $moduleKey, $restrictions['applications'][ $appKey ] ) )
+				if ( \in_array( $moduleKey, $restrictions['applications'][ $appKey ] ) )
 				{
 					if ( $key === NULL )
 					{
 						return TRUE;
 					}
-					elseif ( isset( $restrictions['items'][ $appKey ][ $moduleKey ] ) and in_array( $key, $restrictions['items'][ $appKey ][ $moduleKey ] ) )
+					elseif ( isset( $restrictions['items'][ $appKey ][ $moduleKey ] ) and \in_array( $key, $restrictions['items'][ $appKey ][ $moduleKey ] ) )
 					{
 						return TRUE;
 					}
@@ -4217,10 +3845,10 @@ class Member extends ActiveRecord
 	/**
 	 * Get moderator permission
 	 *
-	 * @param string|null $key	Permission Key to check, or NULL to just test if they have any moderator permissions.
+	 * @param	string|NULL	$key	Permission Key to check, or NULL to just test if they have any moderator permissions.
 	 * @return	mixed
 	 */
-	public function modPermission( string $key=NULL ): mixed
+	public function modPermission( $key=NULL )
 	{
 		/* Load our permissions */
 		$permissions = $this->modPermissions();
@@ -4237,31 +3865,31 @@ class Member extends ActiveRecord
 		}
 				
 		/* Otherwise return it */
-		return $permissions[$key] ?? false;
+		return isset( $permissions[ $key ] ) ? $permissions[ $key ] : NULL;
 	}
 	
 	/**
 	 * Can warn
 	 *
-	 * @param Member $member	The member to warn
+	 * @param	\IPS\Member	$member	The member to warn
 	 * @return	bool
 	 */
-	public function canWarn( Member $member ): bool
+	public function canWarn( \IPS\Member $member )
 	{
 		if( !$this->modPermission('mod_can_warn') OR !$this->modPermission('mod_see_warn') )
 		{
 			return FALSE;
 		}
 		
-		if( $member->inGroup( explode( ',', Settings::i()->warn_protected ) ) or $member->member_id == Member::loggedIn()->member_id )
+		if( $member->inGroup( explode( ',', \IPS\Settings::i()->warn_protected ) ) or $member->member_id == \IPS\Member::loggedIn()->member_id )
 		{
 			return FALSE;
 		}
 		
 		if ( $this->modPermission('warn_mod_day') !== TRUE and $this->modPermission('warn_mod_day') != -1 )
 		{
-			$oneDayAgo = DateTime::create()->sub( new DateInterval( 'P1D' ) );
-			$warningsGivenInTheLastDay = Db::i()->select( 'COUNT(*)', 'core_members_warn_logs', array( 'wl_moderator=? AND wl_date>?', $this->member_id, $oneDayAgo->getTimestamp() ) )->first();
+			$oneDayAgo = \IPS\DateTime::create()->sub( new \DateInterval( 'P1D' ) );
+			$warningsGivenInTheLastDay = \IPS\Db::i()->select( 'COUNT(*)', 'core_members_warn_logs', array( 'wl_moderator=? AND wl_date>?', $this->member_id, $oneDayAgo->getTimestamp() ) )->first();
 			if( $warningsGivenInTheLastDay >= $this->modPermission('warn_mod_day') )
 			{
 				return FALSE;
@@ -4278,9 +3906,10 @@ class Member extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function recountNotifications() : void
+	public function recountNotifications()
 	{
-		$this->notification_cnt = Db::i()->select( 'COUNT(*)', 'core_notifications', array( '`member`=? AND read_time IS NULL', $this->member_id ), NULL, NULL, NULL, NULL, Db::SELECT_FROM_WRITE_SERVER )->first();
+		/* @note SELECT_FROM_WRITE_SERVER Race condition, need true value from write server as read can be slightly out */
+		$this->notification_cnt = \IPS\Db::i()->select( 'COUNT(*)', 'core_notifications', array( '`member`=? AND read_time IS NULL', $this->member_id ), NULL, NULL, NULL, NULL, \IPS\Db::SELECT_FROM_WRITE_SERVER )->first();
 		$this->save();
 	}
 
@@ -4289,10 +3918,10 @@ class Member extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function recountContent() : void
+	public function recountContent()
 	{
 		$this->member_posts = 0;
-        foreach ( Content::routedClasses( $this, TRUE, FALSE ) as $class )
+        foreach ( \IPS\Content::routedClasses( $this, TRUE, FALSE ) as $class )
 		{			
 			$this->member_posts += $class::memberPostCount( $this );
 		}
@@ -4305,23 +3934,23 @@ class Member extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function recountReputation() : void
+	public function recountReputation()
 	{
-		$this->pp_reputation_points = Db::i()->select( 'SUM(rep_rating)', 'core_reputation_index', array( 'member_received=?', $this->member_id ) )->first();
+		$this->pp_reputation_points = \IPS\Db::i()->select( 'SUM(rep_rating)', 'core_reputation_index', array( 'member_received=?', $this->member_id ) )->first();
 		$this->save();
 	}
 
 	/**
 	 * Removes reputation for this member
 	 *
-	 * @param string $type	given|received The type of reputation to remove
+	 * @param	string	$type	given|received The type of reputation to remove
 	 * @return void
 	 */
-	public function removeReputation( string $type ) : void
+	public function removeReputation( $type )
 	{
 		$where = ( $type == 'given' ) ? array( 'member_id=?', $this->member_id ) : array( 'member_received=?', $this->member_id );
 
-		Db::i()->delete( 'core_reputation_index', $where );
+		\IPS\Db::i()->delete( 'core_reputation_index', $where );
 
 		if( $type == 'received' )
 		{
@@ -4334,38 +3963,38 @@ class Member extends ActiveRecord
 	/**
 	 * Can use module
 	 *
-	 * @param Module $module	The module to test
+	 * @param	\IPS\Application\Module	$module	The module to test
 	 * @return	bool
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function canAccessModule( Module $module ): bool
+	public function canAccessModule( $module )
 	{
-		if ( !( $module instanceof Module ) )
+		if ( !( $module instanceof \IPS\Application\Module ) )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 		
-		return Application::load( $module->application )->canAccess( $this ) and ( $module->protected or $module->can( 'view', $this ) );
+		return \IPS\Application::load( $module->application )->canAccess( $this ) and ( $module->protected or $module->can( 'view', $this ) );
 	}
 
 	/**
 	 * @brief		Store whitelist filters
 	 */
-	public static ?array $whitelistFilters = NULL;
+	public static $whitelistFilters = NULL;
 
 	/**
 	 * Check Spam Defense Whitelist
 	 *
-	 * @param string|null $emailAddress			Email address to check, NULL for existing email address
+	 * @param	string|NULL		$emailAddress			Email address to check, NULL for existing email address
 	 * @return	boolean
 	 */
-	public function spamDefenseWhitelist( string $emailAddress=NULL ): bool
+	public function spamDefenseWhitelist( $emailAddress=NULL )
 	{
 		$email = $emailAddress ?: $this->email;
 
 		if( static::$whitelistFilters === NULL )
 		{
-			static::$whitelistFilters = iterator_to_array( Db::i()->select( 'whitelist_type, whitelist_content', 'core_spam_whitelist' ) );
+			static::$whitelistFilters = iterator_to_array( \IPS\Db::i()->select( 'whitelist_type, whitelist_content', 'core_spam_whitelist' ) );
 		}
 
 		foreach( static::$whitelistFilters as $whitelist )
@@ -4392,14 +4021,14 @@ class Member extends ActiveRecord
 	/**
 	 * IPS Spam Defense Service
 	 *
-	 * @param string $type			Request type
-	 * @param string|null $emailAddress	Email address to check, NULL for existing email address
-	 * @param int|null $spamCode		If set, will modify by reference with the raw value from the spam service
+	 * @param	string		$type			Request type
+	 * @param	string		$emailAddress	Email address to check, NULL for existing email address
+	 * @param	int			$spamCode		If set, will modify by reference with the raw value from the spam service
 	 * @param	bool		$disposable		If set, will modify by reference if the user used a disposable email.
 	 * @param	bool		$geoBlock		If set, will modify by reference if the user is in a moderated / blocked country.
 	 * @return	int|NULL					Action code based on spam service response, or NULL for no action
 	 */
-	public function spamService( string $type='register', string $emailAddress=NULL, int &$spamCode=NULL, bool &$disposable=FALSE, bool &$geoBlock=FALSE ): ?int
+	public function spamService( $type='register', $emailAddress=NULL, &$spamCode=NULL, &$disposable=FALSE, &$geoBlock=FALSE )
 	{
 		$email = $emailAddress ?: $this->email;
 
@@ -4412,21 +4041,21 @@ class Member extends ActiveRecord
 
 		try
 		{
-			$response = Url::ips( 'spam/' . $type )->request()->login( Settings::i()->ipb_reg_number, '' )->post( array(
+			$response = \IPS\Http\Url::ips( 'spam/' . $type )->request()->login( \IPS\Settings::i()->ipb_reg_number, '' )->post( array(
 				'email'	=> $email,
 				'ip'	=> $this->ip_address,
 			) );
 
 			if ( $response->httpResponseCode != 200 )
 			{
-				throw new DomainException( print_r( $response, TRUE ) );
+				throw new \DomainException( print_r( $response, TRUE ) );
 			}
 			
-			$spamCode = intval( (string) $response );
+			$spamCode = \intval( (string) $response );
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Log::debug( $e, 'spam-service' );
+			\IPS\Log::debug( $e, 'spam-service' );
 			$spamCode = 0;
 		}
 				
@@ -4435,17 +4064,17 @@ class Member extends ActiveRecord
 		if( $type == 'register' and $spamCode )
 		{
 			/* Log Request */
-			Db::i()->insert( 'core_spam_service_log', array(
-				'log_date'		=> time(),
-				'log_code'		=> $spamCode,
-				'log_msg'		=> '',	// No value is returned unless it's a developer account making the call
-				'email_address'	=> $email,
-				'ip_address'	=> $this->ip_address
+			\IPS\Db::i()->insert( 'core_spam_service_log', array(
+															'log_date'		=> time(),
+															'log_code'		=> $spamCode,
+															'log_msg'		=> '',	// No value is returned unless it's a developer account making the call
+															'email_address'	=> $email,
+															'ip_address'	=> $this->ip_address
 			) );
 			
 			/* Action to perform */
 			$key = "spam_service_action_{$spamCode}";
-			$action = Settings::i()->$key;
+			$action = \IPS\Settings::i()->$key;
 			
 			/* Perform Action */
 			switch( $action )
@@ -4456,7 +4085,7 @@ class Member extends ActiveRecord
 			
 					/* Flag for admin approval */
 				case 2:
-					Settings::i()->reg_auth_type = 'admin';
+					\IPS\Settings::i()->reg_auth_type = 'admin';
 					break;
 			
 					/* Approve the account, but ban it */
@@ -4471,7 +4100,7 @@ class Member extends ActiveRecord
 
 					/* Moderate posts */
 				case 5:
-					$days = json_decode( Settings::i()->spam_service_days, TRUE );
+					$days = json_decode( \IPS\Settings::i()->spam_service_days, TRUE );
 
 					if ( isset( $days[ $spamCode ] ) )
 					{
@@ -4481,145 +4110,143 @@ class Member extends ActiveRecord
 						}
 						else if ( $days[ $spamCode ] > 0 )
 						{
-							$this->mod_posts = DateTime::ts( time() )->add( new DateInterval( "P{$days[ $spamCode ]}D" ) )->getTimestamp();
+							$this->mod_posts = \IPS\DateTime::ts( time() )->add( new \DateInterval( "P{$days[ $spamCode ]}D" ) )->getTimestamp();
 						}
 					}
 					break;
 			}
 		}
-
+		
 		/* GeoLocation */
 		if ( $type === 'register' AND $action == 1 )
 		{
 			$action = $this->geoSpamCheck( $geoBlock );
 		}
-
+		
 		/* If the normal spam service and geolocation didn't pick up anything, check for a disposable email. */
 		if ( $type === 'register' AND $action == 1 )
 		{
-			$action = $this->disposableEmailCheck( $email, $disposable );
+			$action = $this->disposableEmailCheck( $emailAddress, $disposable );
 		}
 
 		return $action;
 	}
-
+	
 	/**
 	 * GeoLocation Block Check
 	 *
 	 * @param	bool		$geoBlock		If set, will modify by reference if the user is in a moderated / blocked country.
 	 * @return	int|NULL
 	 */
-	public function geoSpamCheck( bool &$geoBlock ): ?int
+	public function geoSpamCheck( &$geoBlock ): ?int
 	{
 		/* If Geo is enabled, don't bother. */
-		if ( !Settings::i()->ipsgeoip )
+		if ( !\IPS\Settings::i()->ipsgeoip )
 		{
 			return 1;
 		}
-
+		
 		/* See we have anything configured. If we don't, don't bother. */
-		$settings = Settings::i()->spam_geo_settings ? json_decode( Settings::i()->spam_geo_settings, true ) : array();
-
-		if ( !count( $settings ) )
+		$settings = \IPS\Settings::i()->spam_geo_settings ? json_decode( \IPS\Settings::i()->spam_geo_settings, true ) : array();
+		
+		if ( !\count( $settings ) )
 		{
 			return 1;
 		}
-
+		
 		try
 		{
-			$location = GeoLocation::getRequesterLocation();
+			$location = \IPS\GeoLocation::getRequesterLocation();
 		}
-		catch( BadFunctionCallException | BadMethodCallException| Http\Request\Exception | RuntimeException |OutOfRangeException $e )
+		catch( \BadFunctionCallException | \BadMethodCallException | \IPS\Http\Request\Exception | \RuntimeException | \OutOfRangeException $e )
 		{
 			/* If it fails for any reason, don't bother. */
-			Log::debug( $e, 'spam-service' );
+			\IPS\Log::debug( $e, 'spam-service' );
 			return 1;
 		}
-
+		
 		/* All good, start checking. */
 		if ( !isset( $settings[ $location->country ] ) )
 		{
 			/* Not in the list, we're good. */
 			return 1;
 		}
-
+		
 		/* See what action we're taking. */
 		switch( $settings[$location->country] )
 		{
 			case 'moderate':
-				Settings::i()->reg_auth_type = 'admin';
+				\IPS\Settings::i()->reg_auth_type = 'admin';
 				$geoBlock = TRUE;
 				return 2;
-
+			
 			case 'block':
 				return 4;
 		}
-
-		return 1;
 	}
-
+	
 	/**
 	 * Check for disposable email address domain
 	 *
-	 * @param string $emailAddress 	Email to check, or NULL for current.
-	 * @param bool $disposable		If set, will modify by reference if the user used a disposable email.
+	 * @param	string		$emailAddress 	Email to check, or NULL for current.
+	 * @param	bool		$disposable		If set, will modify by reference if the user used a disposable email.
 	 * @return	int|NULL
 	 */
-	public function disposableEmailCheck( string $emailAddress, bool &$disposable=FALSE ): ?int
+	public function disposableEmailCheck( $emailAddress, &$disposable=FALSE ): ?int
 	{
 		$email = $emailAddress ?: $this->email;
-
+		
 		try
 		{
-			$response = Url::ips( 'spam/disposable' )->request()->login( Settings::i()->ipb_reg_number, '' )->post( array(
+			$response = \IPS\Http\Url::ips( 'spam/disposable' )->request()->login( \IPS\Settings::i()->ipb_reg_number, '' )->post( array(
 				'email'	=> $email,
 			) );
 
 			if ( $response->httpResponseCode != 200 )
 			{
-				throw new DomainException( print_r( $response, TRUE ) );
+				throw new \DomainException( print_r( $response, TRUE ) );
 			}
-
+			
 			$result = (bool) $response->decodeJson()['result'];
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			Log::debug( $e, 'spam-service' );
+			\IPS\Log::debug( $e, 'spam-service' );
 			$result = false;
 		}
-
+		
 		$action = NULL;
 		if ( $result )
 		{
 			$disposable = TRUE;
-
-			$action = Settings::i()->spam_service_disposable;
-
+			
+			$action = \IPS\Settings::i()->spam_service_disposable;
+			
 			/* Perform Action */
 			switch( $action )
 			{
 				/* Proceed with registration */
 				case 1:
 					break;
-
+			
 					/* Flag for admin approval */
 				case 2:
-					Settings::i()->reg_auth_type = 'admin';
+					\IPS\Settings::i()->reg_auth_type = 'admin';
 					break;
-
+			
 					/* Approve the account, but ban it */
 				case 3:
 					$this->temp_ban = -1;
 					$this->members_bitoptions['bw_is_spammer'] = TRUE;
 					break;
-
+			
 					/* Deny registration - we return the code and the controller is expected to show an error */
 				case 4:
 					break;
 
 					/* Moderate posts */
 				case 5:
-					$days = json_decode( Settings::i()->spam_service_days, TRUE );
+					$days = json_decode( \IPS\Settings::i()->spam_service_days, TRUE );
 
 					if ( isset( $days['disposable'] ) )
 					{
@@ -4629,44 +4256,64 @@ class Member extends ActiveRecord
 						}
 						else if ( $days['disposable'] > 0 )
 						{
-							$this->mod_posts = DateTime::ts( time() )->add( new DateInterval( "P{$days['disposable']}D" ) )->getTimestamp();
+							$this->mod_posts = \IPS\DateTime::ts( time() )->add( new \DateInterval( "P{$days['disposable']}D" ) )->getTimestamp();
 						}
 					}
 					break;
 			}
 		}
-
+		
 		return $action;
 	}
-
+	
 	/**
 	 * Member Sync
 	 *
-	 * Use Event::fire instead
-	 *
-	 * @param string $method Method
-	 * @param array $params Additional parameters to pass
-	 * @return    void
-	 * @throws Exception
-	 * @deprecated
+	 * @param	string	$method	Method
+	 * @param	array	$params	Additional parameters to pass
+	 * @return	void
 	 */
-	public function memberSync( string $method, array $params=array() ) : void
+	public function memberSync( $method, $params=array() )
 	{
-		/* Just in case someone calls this, redirect to the Event::fire */
-		Event::fire( $method, $this, $params );
+		/* Don't do this during an upgrade */
+		if( \IPS\Dispatcher::hasInstance() AND \IPS\Dispatcher::i()->controllerLocation === 'setup' )
+		{
+			return;
+		}
+
+		foreach ( \IPS\Application::allExtensions( 'core', 'MemberSync', FALSE ) as $class )
+		{
+			if ( method_exists( $class, $method ) )
+			{
+			    try
+                {
+                	/* Cannot unpack an associative array */
+                	$params = array_values( $params );
+					$class->$method( $this, ...$params );
+                }
+                /* 4.3 backwards compatibility for 4.2 applications */
+                catch( \ArgumentCountError $e )
+                {
+                    if ( \IPS\IN_DEV )
+                    {
+                        throw $e;
+                    }
+                }
+			}
+		}
 	}
 			
 	/**
 	 * Merge
 	 *
-	 * @param Member $otherMember	Member to merge with
+	 * @param	\IPS\Member	$otherMember	Member to merge with
 	 * @return	void
 	 */
-	public function merge( Member $otherMember ) : void
+	public function merge( \IPS\Member $otherMember )
 	{
-		if ( $this === $otherMember )
+		if ( $this == $otherMember )
 		{
-			throw new InvalidArgumentException( 'merge_self_error' );
+			throw new \InvalidArgumentException( 'merge_self_error' );
 		}
 		
 		/* Merge content */
@@ -4676,16 +4323,16 @@ class Member extends ActiveRecord
 		$this->logHistory( 'core', 'account', array( 'type' => 'merge', 'id' => $otherMember->member_id, 'name' => $otherMember->name, 'email' => $otherMember->email ) );
 		
 		/* Let apps do their stuff */
-		Event::fire( 'onMerge', $this, array( $otherMember ) );
+		$this->memberSync( 'onMerge', array( $otherMember ) );
 	}
 	
 	/**
 	 * Add profile visitor
 	 *
-	 * @param Member $visitor	Member that viewed profile
+	 * @param   \IPS\Member $visitor	Member that viewed profile
 	 * @return	void
 	 */
-	public function addVisitor( Member $visitor ) : void
+	public function addVisitor( $visitor )
 	{
 		$visitors = json_decode( $this->pp_last_visitors, TRUE );
 				
@@ -4695,7 +4342,7 @@ class Member extends ActiveRecord
 			unset( $visitors[ $visitor->member_id ] );
 		}
 		/* We want to limit to 5 members */
-		else if ( is_array( $visitors ) AND count( $visitors ) >= 5 )
+		else if ( \is_array( $visitors ) AND \count( $visitors ) >= 5 )
 		{
 			$visitors	= array_reverse( $visitors, TRUE );
 			array_pop( $visitors );
@@ -4713,14 +4360,14 @@ class Member extends ActiveRecord
 	/**
 	 * @brief	Posts Per Day Storage
 	 */
-	protected ?int $_ppdLimit = NULL;
+	protected $_ppdLimit = NULL;
 	
 	/**
 	 * Check posts per day to see if this member can post.
 	 *
 	 * @return	bool
 	 */
-	public function checkPostsPerDay(): bool
+	public function checkPostsPerDay()
 	{
 		/* Fetch our PPD limit - we should only need to do this once */
 		if ( $this->_ppdLimit === NULL )
@@ -4749,7 +4396,7 @@ class Member extends ActiveRecord
 		}
 		
 		/* Are we beyond our 24 hours? */
-		if ( $time AND $time < DateTime::create()->sub( new DateInterval( 'P1D' ) )->getTimestamp() )
+		if ( $time AND $time < \IPS\DateTime::create()->sub( new \DateInterval( 'P1D' ) )->getTimestamp() )
 		{
 			/* Update member immediately */
 			$this->members_day_posts = array( 0, 0 );
@@ -4766,7 +4413,7 @@ class Member extends ActiveRecord
 				if( $this->group['gbw_ppd_unit_type'] )
 				{
 					/* Days */
-					if ( $this->joined->add( new DateInterval( "P{$this->group['g_ppd_unit']}D" ) )->getTimestamp() < time() )
+					if ( $this->joined->add( new \DateInterval( "P{$this->group['g_ppd_unit']}D" ) )->getTimestamp() < time() )
 					{
 						return TRUE;
 					}
@@ -4793,7 +4440,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function checkGroupPromotion() : void
+	public function checkGroupPromotion()
 	{
 		/* If we should ignore promotions for this member, do so */
 		if( $this->members_bitoptions['ignore_promotions'] )
@@ -4804,17 +4451,17 @@ class Member extends ActiveRecord
 		/* Default to member group if none. This shouldn't happen but can if Redis/MySQL is temporarily unavailable. The next save event will re-check promotion. */
 		try
 		{
-			$primaryGroup = Group::load( $this->member_group_id );
+			$primaryGroup = \IPS\Member\Group::load( $this->member_group_id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			/* Log the error as part of the failure audit trail */
-			Log::log( "Group promotion found a member (#{$this->member_id}: {$this->name} [Group ID {$this->member_group_id}] with an invalid member group", 'group_promotion' );
+			\IPS\Log::log( "Group promotion found a member (#{$this->member_id}: {$this->name} [Group ID {$this->member_group_id}] with an invalid member group", 'group_promotion' );
 			return;
 		}
 
 		/* Just check the primary group, secondary groups should not prevent promoting */
-		if( Group::load( $this->member_group_id )->g_promote_exclude )
+		if( \IPS\Member\Group::load( $this->member_group_id )->g_promote_exclude )
 		{
 			return;
 		}
@@ -4822,7 +4469,7 @@ class Member extends ActiveRecord
 		$ruleToUse = NULL;
 
 		/* Loop over all group promotion rules and get the last one that matches us */
-		foreach( GroupPromotion::roots() as $rule )
+		foreach( \IPS\Member\GroupPromotion::roots() as $rule )
 		{
 			if( $rule->enabled and $rule->matches( $this ) )
 			{
@@ -4837,7 +4484,7 @@ class Member extends ActiveRecord
 		}
 
 		/* If we matched a rule, get that rule now */
-		$ruleToUse	= GroupPromotion::load( $ruleToUse );
+		$ruleToUse	= \IPS\Member\GroupPromotion::load( $ruleToUse );
 
 		/* Set the primary and secondary groups as appropriate */
 		$action = $ruleToUse->_actions;
@@ -4846,20 +4493,20 @@ class Member extends ActiveRecord
 		{
 			try
 			{
-				$group = Group::load( $action['primary_group'] );
+				$group = \IPS\Member\Group::load( $action['primary_group'] );
 
 				/* Need to store the history before we actually change the group, otherwise history shows "promoted from group X to X" */
 				$this->logHistory( 'core', 'group', array( 'type' => 'primary', 'by' => 'promotion', 'id' => $ruleToUse->id, 'old' => $this->member_group_id, 'new' => $action['primary_group'] ) );
 
 				$this->member_group_id = $action['primary_group'];
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				Log::debug( 'Promotion ' .  $ruleToUse->id . ' tried to set not existing member group' );
+				\IPS\Log::debug( 'Promotion ' .  $ruleToUse->id . ' tried to set not existing member group' );
 			}
 		}
 
-		if( count( $action['secondary_group'] ) OR count( $action['secondary_remove'] ) )
+		if( \count( $action['secondary_group'] ) OR \count( $action['secondary_remove'] ) )
 		{
 			$secondaryGroups = array_filter( explode( ',', $this->_data['mgroup_others'] ) );
 			$oldSecondaryGroups = $secondaryGroups;
@@ -4868,15 +4515,15 @@ class Member extends ActiveRecord
 			{
 				try
 				{
-					$group = Group::load( $group );
+					$group = \IPS\Member\Group::load( $group );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
 					unset( $action['secondary_group'][$key] );
-					Log::debug( 'Promotion ' .  $ruleToUse->id . ' tried to set not existing member group' );
+					\IPS\Log::debug( 'Promotion ' .  $ruleToUse->id . ' tried to set not existing member group' );
 				}
 			}
-			if( count( $action['secondary_group'] ) )
+			if( \count( $action['secondary_group'] ) )
 			{
 				if( array_diff( $action['secondary_group'], $secondaryGroups ) )
 				{
@@ -4884,11 +4531,11 @@ class Member extends ActiveRecord
 				}
 			}
 
-			if( count( $action['secondary_remove'] ) )
+			if( \count( $action['secondary_remove'] ) )
 			{
 				foreach( $action['secondary_remove'] as $groupToRemove )
 				{
-					while( in_array( $groupToRemove, $secondaryGroups ) )
+					while( \in_array( $groupToRemove, $secondaryGroups ) )
 					{
 						$key = array_search( $groupToRemove, $secondaryGroups );
 
@@ -4911,13 +4558,13 @@ class Member extends ActiveRecord
 	 *
 	 * @return bool
 	 */
-	public function canUseContactUs(): bool
+	public function canUseContactUs()
 	{
 		try
 		{
-			$module = Module::get( 'core', 'contact', 'front' );
+			$module = \IPS\Application\Module::get( 'core', 'contact', 'front' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}
@@ -4928,14 +4575,14 @@ class Member extends ActiveRecord
 		}
 
 		/* If all groups have access, we can */
-		if( Settings::i()->contact_access != '*' )
+		if( \IPS\Settings::i()->contact_access != '*' )
 		{
 			/* Check member */
 			$memberGroups	= array_merge( array( $this->member_group_id ), array_filter( explode( ',', $this->mgroup_others ) ) );
-			$accessGroups	= explode( ',', Settings::i()->contact_access );
+			$accessGroups	= explode( ',', \IPS\Settings::i()->contact_access );
 
 			/* Are we in an allowed group? */
-			if( count( array_intersect( $accessGroups, $memberGroups ) ) )
+			if( \count( array_intersect( $accessGroups, $memberGroups ) ) )
 			{
 				return TRUE;
 			}
@@ -4961,7 +4608,7 @@ class Member extends ActiveRecord
 		}
 
 		/* Test module permissions */
-		return $this->canAccessModule( Module::get( 'core', 'messaging' ) );
+		return $this->canAccessModule( \IPS\Application\Module::get( 'core', 'messaging' ) );
 	}
 
 	/**
@@ -4972,12 +4619,12 @@ class Member extends ActiveRecord
 	 *
 	 * @return	string
 	 */
-	public function getUniqueMemberHash(): string
+	public function getUniqueMemberHash()
 	{
 		/* If this is a guest, just return a random string. */
 		if ( !$this->member_id )
 		{
-			return Login::generateRandomString();
+			return \IPS\Login::generateRandomString();
 		}
 		
 		/* Return the password hash if we already have it */
@@ -4993,7 +4640,7 @@ class Member extends ActiveRecord
 		}
 
 		/* Otherwise, generate one */
-		$this->unique_hash = md5( Login::generateRandomString(32) );
+		$this->unique_hash = md5( \IPS\Login::generateRandomString(32) );
 
 		$this->save();
 
@@ -5013,48 +4660,58 @@ class Member extends ActiveRecord
 	 * @note This task can be processing or waiting to process and the member can still change the value, so it could be possible for the member to set a 'skin' parameter and then have this
 	 * overwritten when this task processes.
 	 *
-	 * @param array $update		array( field => value ) pairs to be used directly in a \IPS\Db::i()->update( 'core_members', $update ) query
-	 * @param int $severity	Severity level. 1 being highest, 5 lowest
+	 * @param	array	$update		array( field => value ) pairs to be used directly in a \IPS\Db::i()->update( 'core_members', $update ) query
+	 * @param	int		$severity	Severity level. 1 being highest, 5 lowest
 	 * @return	void
 	 */
-	public static function updateAllMembers( array $update, int $severity=3 ) : void
+	public static function updateAllMembers( $update, $severity=3 )
 	{
-		Task::queue( 'core', 'UpdateMembers', array( 'update' => $update ), $severity, array( 'update' ) );
+		\IPS\Task::queue( 'core', 'UpdateMembers', array( 'update' => $update ), $severity, array( 'update' ) );
+	}
+
+	/**
+	 * Invalidate the current "create menu" key
+	 *
+	 * @return	void
+	 */
+	public static function clearCreateMenu()
+	{
+		\IPS\Settings::i()->changeValues( array( 'member_menu_create_key' => mt_rand() ) );
 	}
 	
 	/**
 	 * Invalidate all sessions and auto-login-keys. Called after the user changes their email address or password.
 	 *
-	 * @param bool|string $frontEndSessions	Boolean value indicating if front-end sessions should be cleared, or a string containing a session ID to wipe all except that one
-	 * @param bool|string $acpSessions		Boolean value indicating if acp sessions should be cleared, or a string containing a session ID to wipe all except that one
-	 * @param bool $loginKeys			Boolean value indicating if login keys (used for "Remember Me" logins) should be wiped
+	 * @param	bool|string	$frontEndSessions	Boolean value indicating if front-end sessions should be cleared, or a string containing a session ID to wipe all except that one
+	 * @param	bool|string	$acpSessions		Boolean value indicating if acp sessions should be cleared, or a string containing a session ID to wipe all except that one
+	 * @param	bool		$loginKeys			Boolean value indicating if login keys (used for "Remember Me" logins) should be wiped
 	 * @return	void
 	 */
-	public function invalidateSessionsAndLogins( bool|string $frontEndSessions=TRUE, bool|string $acpSessions=TRUE, bool $loginKeys=TRUE ) : void
+	public function invalidateSessionsAndLogins( $frontEndSessions=TRUE, $acpSessions=TRUE, $loginKeys=TRUE )
 	{
 		/* Terminate any active sessions */
 		if ( $frontEndSessions !== FALSE )
 		{
-			Session\Store::i()->deleteByMember( $this->member_id, NULL, $frontEndSessions !== TRUE ? array( $frontEndSessions ) : NULL );
+			\IPS\Session\Store::i()->deleteByMember( $this->member_id, NULL, $frontEndSessions !== TRUE ? array( $frontEndSessions ) : NULL );
 		}
 		if ( $acpSessions !== FALSE )
 		{
 			$where = array( array( 'session_member_id=?', $this->member_id ) );
-			if ( is_string( $acpSessions ) )
+			if ( \is_string( $acpSessions ) )
 			{
 				$where[] = array( 'session_id<>?', $acpSessions );
 			}
-			Db::i()->delete( 'core_sys_cp_sessions', $where );
+			\IPS\Db::i()->delete( 'core_sys_cp_sessions', $where );
 		}
 		
 		/* Wipe login keys to stop "Remember Me" cookies automatically logging us in */
 		if ( $loginKeys )
 		{
-			Db::i()->update( 'core_members_known_devices', array( 'login_key' => NULL ), array( 'member_id=?', $this->member_id ) );
+			\IPS\Db::i()->update( 'core_members_known_devices', array( 'login_key' => NULL ), array( 'member_id=?', $this->member_id ) );
 		}
 		
 		/* Invalidate any pending "Forgot Password" or 2FA recovery emails, because they provide a doorway into accessing the account */
-		Db::i()->delete( 'core_validating', array( 'member_id=? AND ( lost_pass=1 OR forgot_security=1 )', $this->member_id ) );
+		\IPS\Db::i()->delete( 'core_validating', array( 'member_id=? AND ( lost_pass=1 OR forgot_security=1 )', $this->member_id ) );
 	}
 	
 	/* !Registration/Validation */
@@ -5062,16 +4719,16 @@ class Member extends ActiveRecord
 	/**
 	 * Call after completed registration to send email for validation if required or flag for admin validation
 	 *
-	 * @param bool $noEmailValidationRequired	If the user's email is implicitly trusted (for example, provided by a third party), set this to TRUE to bypass email validation
-	 * @param bool $doNotDelete				If TRUE, the account will not be deleted in the normal cleanup of unvalidated accounts. Used for accounts created in Commerce checkout.
-	 * @param array|null $postBeforeRegister			The row from core_post_before_registering if applicable
-	 * @param Url|null $refUrl						The URL the user should be redirected to after validation
+	 * @param	bool				$noEmailValidationRequired	If the user's email is implicitly trusted (for example, provided by a third party), set this to TRUE to bypass email validation
+	 * @param	bool				$doNotDelete				If TRUE, the account will not be deleted in the normal cleanup of unvalidated accounts. Used for accounts created in Commerce checkout.
+	 * @param	array|NULL			$postBeforeRegister			The row from core_post_before_registering if applicable
+	 * @param	\IPS\Http\Url|NULL	$refUrl						The URL the user should be redirected to after validation
 	 * @return	void
 	 */
-	public function postRegistration( bool $noEmailValidationRequired=FALSE, bool $doNotDelete=FALSE, array $postBeforeRegister = NULL, Url $refUrl = NULL ) : void
+	public function postRegistration( $noEmailValidationRequired = FALSE, $doNotDelete = FALSE, $postBeforeRegister = NULL, $refUrl = NULL )
 	{
 		/* Work out validation type */
-		$validationType = Settings::i()->reg_auth_type;
+		$validationType = \IPS\Settings::i()->reg_auth_type;
 		if ( $noEmailValidationRequired )
 		{
 			switch ( $validationType )
@@ -5093,19 +4750,19 @@ class Member extends ActiveRecord
 			$this->save();
 			
 			/* Prevent duplicates from double clicking, etc */
-			Db::i()->delete( 'core_validating', array( 'member_id=? and new_reg=1', $this->member_id ) );
+			\IPS\Db::i()->delete( 'core_validating', array( 'member_id=? and new_reg=1', $this->member_id ) );
 			
 			/* Insert a record */
-			$vid = md5( $this->members_pass_hash . Login::generateRandomString() );
-			$plainSecurityKey = Login::generateRandomString();
-			Db::i()->insert( 'core_validating', array(
+			$vid = md5( $this->members_pass_hash . \IPS\Login::generateRandomString() );
+			$plainSecurityKey = \IPS\Login::generateRandomString();
+			\IPS\Db::i()->insert( 'core_validating', array(
 				'vid'		   	=> $vid,
 				'member_id'	 	=> $this->member_id,
 				'entry_date'	=> time(),
 				'new_reg'	   	=> 1,
 				'ip_address'	=> $this->ip_address,
 				'spam_flag'	 	=> ( $this->members_bitoptions['bw_is_spammer'] ) ?: FALSE,
-				'user_verified' => $validationType == 'admin',
+				'user_verified' => ( $validationType == 'admin' ) ?: FALSE,
 				'email_sent'	=> ( $validationType != 'admin' ) ? time() : NULL,
 				'do_not_delete'	=> $doNotDelete,
 				'ref'			=> $refUrl ? ( (string) $refUrl ) : NULL,
@@ -5115,24 +4772,24 @@ class Member extends ActiveRecord
 			/* Send email for validation */
 			if ( $validationType != 'admin' )
 			{
-				Email::buildFromTemplate( 'core', 'registration_validate', array( $this, $vid, $plainSecurityKey, '' ), Email::TYPE_TRANSACTIONAL )->send( $this );
+				\IPS\Email::buildFromTemplate( 'core', 'registration_validate', array( $this, $vid, $plainSecurityKey ), \IPS\Email::TYPE_TRANSACTIONAL )->send( $this );
 			}
 			
 			/* Update core_post_before_registering */
 			if ( $postBeforeRegister )
 			{
-				Db::i()->update( 'core_post_before_registering', array( 'member' => $this->member_id ), array( 'secret=?', $postBeforeRegister['secret'] ) );
+				\IPS\Db::i()->update( 'core_post_before_registering', array( 'member' => $this->member_id ), array( 'secret=?', $postBeforeRegister['secret'] ) );
 			}
 		}
 		
 		/* If no email-related validation is required, send admin notification */
 		if ( $validationType == 'admin' )
 		{
-			AdminNotification::send( 'core', 'NewRegValidate', NULL, TRUE, $this );
+			\IPS\core\AdminNotification::send( 'core', 'NewRegValidate', NULL, TRUE, $this );
 		}
 		elseif ( $validationType == 'none' )
 		{
-			AdminNotification::send( 'core', 'NewRegComplete', NULL, TRUE, $this );
+			\IPS\core\AdminNotification::send( 'core', 'NewRegComplete', NULL, TRUE, $this );
 		}
 
 		/* Send emails and handle post before register if validation is disabled */
@@ -5148,20 +4805,20 @@ class Member extends ActiveRecord
 	/**
 	 * Email Validation Confirmed
 	 *
-	 * @param array $record		validating record
+	 * @param	array	$record		validating record
 	 * @return	void
 	 */
-	public function emailValidationConfirmed( array $record ) : void
+	public function emailValidationConfirmed( $record )
 	{
 		/* Log */
 		$this->logHistory( 'core', 'account', array( 'type' => 'email_validated' ) );
 		
 		/* If admin validation is required, set the flag and send an admin notification */
-		if ( Settings::i()->reg_auth_type == 'admin_user' )
+		if ( \IPS\Settings::i()->reg_auth_type == 'admin_user' )
 		{
-			AdminNotification::send( 'core', 'NewRegValidate', NULL, TRUE, $this );
+			\IPS\core\AdminNotification::send( 'core', 'NewRegValidate', NULL, TRUE, $this );
 			
-			Db::i()->update( 'core_validating', array( 'user_verified' => TRUE ), array( 'member_id=?', $this->member_id ) );
+			\IPS\Db::i()->update( 'core_validating', array( 'user_verified' => TRUE ), array( 'member_id=?', $this->member_id ) );
 		}
 		
 		/* Otherwise, validation is complete */
@@ -5177,11 +4834,11 @@ class Member extends ActiveRecord
 	 * If email-only validation is enabled: this is called after the user has validated their email address or if the admin manually validates the account
 	 * If admin (including email and admin) validation is enabled: this is called after the admin has validated the account
 	 *
-	 * @param FALSE|Member $initiatedByAdmin			If an administrator performed the validation, the admin that did so
-	 * @param string|null $postBeforeRegisterSecret	The secret from core_post_before_register, if applicable
+	 * @param	\IPS\Member|FALSE	$initiatedByAdmin			If an administrator performed the validation, the admin that did so
+	 * @param	string				$postBeforeRegisterSecret	The secret from core_post_before_register, if applicable
 	 * @return	void
 	 */
-	public function validationComplete( Member|bool $initiatedByAdmin=FALSE, string $postBeforeRegisterSecret=NULL ) : void
+	public function validationComplete( $initiatedByAdmin = FALSE, $postBeforeRegisterSecret = NULL )
 	{
 		/* Process any posts made before registering */
 		$this->_processPostBeforeRegistering( $postBeforeRegisterSecret );
@@ -5191,36 +4848,36 @@ class Member extends ActiveRecord
 
 		/* Send referral notification */
 		$this->_sendReferralNotification();
-
+		
 		/* Send an admin notification */
-		AdminNotification::send( 'core', 'NewRegComplete', NULL, TRUE, $this, $initiatedByAdmin );
+		\IPS\core\AdminNotification::send( 'core', 'NewRegComplete', NULL, TRUE, $this, $initiatedByAdmin );
 		
 		/* Delete rows */
-		Db::i()->delete( 'core_validating', array( 'member_id=?', $this->member_id ) );
+		\IPS\Db::i()->delete( 'core_validating', array( 'member_id=?', $this->member_id ) );
 		
 		/* Reset the flag */
 		$this->members_bitoptions['validating'] = FALSE;
 		$this->save();
 
-		Webhook::fire( 'member_registration_complete', $this, $this->webhookFilters() );
-
+		\IPS\Api\Webhook::fire( 'member_registration_complete', $this, $this->webhookFilters() );
+		
 		/* Sync */
-		Event::fire( 'onValidate', $this );
+		$this->memberSync( 'onValidate' );
 	}
 	
 	/**
 	 * Process any posts made before registering
 	 *
-	 * @param string|null $secret	The secret, if just created (necessary for avoiding R/W separation issues if no validation is required)
+	 * @param	string	$secret	The secret, if just created (necessary for avoiding R/W separation issues if no validation is required)
 	 * @return	void
 	 */
-	protected function _processPostBeforeRegistering( string $secret = NULL ) : void
+	protected function _processPostBeforeRegistering( $secret = NULL )
 	{		
 		$where = $secret ? array( '`member`=? OR secret=?', $this->member_id, $secret ) : array( '`member`=?', $this->member_id );
 		
-		foreach (Db::i()->select( '*', 'core_post_before_registering', $where ) as $row )
+		foreach ( \IPS\Db::i()->select( '*', 'core_post_before_registering', $where ) as $row )
 		{
-			Db::i()->delete( 'core_post_before_registering', array( 'class=? AND id=?', $row['class'], $row['id'] ) );
+			\IPS\Db::i()->delete( 'core_post_before_registering', array( 'class=? AND id=?', $row['class'], $row['id'] ) );
 			
 			try
 			{
@@ -5229,27 +4886,29 @@ class Member extends ActiveRecord
 				
 				if ( $content->author()->member_id )
 				{
-					throw new OutOfRangeException;
+					throw new \OutOfRangeException;
 				}
 				
 				$content->changeAuthor( $this, FALSE );
-
-				$moderated = FALSE;
-				if ( $content instanceof Review AND IPS::classUsesTrait( $content->item(), 'IPS\Content\Hideable' ) )
+				
+				if ( $content instanceof \IPS\Content\Review )
 				{
-					$moderated = $content->item()->moderateNewReviews( $this );
+					$moderated = $content->item()->moderateNewReviews( $this, FALSE );
 				}
-				elseif ( $content instanceof Comment AND IPS::classUsesTrait( $content->item(), 'IPS\Content\Hideable' ) )
+				elseif ( $content instanceof \IPS\Content\Comment )
 				{
-					$moderated = $content->item()->moderateNewComments( $this );
+					$moderated = $content->item()->moderateNewComments( $this, FALSE );
 				}
-				elseif( IPS::classUsesTrait( $content, 'IPS\Content\Hideable' ) )
+				else
 				{
 					$moderated = $content::moderateNewItems( $this, $content->containerWrapper(), FALSE );
 				}
 
 				/* Do additional processing */
-				$moderated = Bridge::i()->cloudPbrProcessMember( $this, $content, $moderated );
+				if( method_exists( $this, '_cloudPbrProcess' ) )
+				{
+					$moderated = $this->_cloudPbrProcess( $content, $moderated );
+				}
 				
 				if ( $moderated )
 				{
@@ -5268,9 +4927,9 @@ class Member extends ActiveRecord
 					$content->sendUnapprovedNotification();
 					
 					$container = NULL;
-					if ( $content instanceof Comment )
+					if ( $content instanceof \IPS\Content\Comment )
 					{
-						if ( $content instanceof Review )
+						if ( $content instanceof \IPS\Content\Review )
 						{
 							$content->item()->resyncReviewCounts();
 						}
@@ -5310,7 +4969,7 @@ class Member extends ActiveRecord
 					}
 					
 					/* Run through checkProfanityFilters() */
-					if ( $content->checkProfanityFilters( $content instanceof Comment and $content->item()::$firstCommentRequired and $content->isFirst() ) )
+					if ( $content->checkProfanityFilters( $content instanceof \IPS\Content\Comment and $content->item()::$firstCommentRequired and $content->isFirst() ) )
 					{
 						$content->sendUnapprovedNotification();
 					}
@@ -5325,7 +4984,7 @@ class Member extends ActiveRecord
 					}
 				}
 			}
-			catch ( OutOfRangeException $e ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 	}
 
@@ -5335,29 +4994,13 @@ class Member extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	protected function _sendWelcomeEmail() : void
+	protected function _sendWelcomeEmail()
 	{
-		if( Settings::i()->reg_welcome_email )
+		try
 		{
-			if( $this->language()->checkKeyExists( 'reg_welcome_email_message' ) )
-			{
-				$message = $this->language()->get( 'reg_welcome_email_message' );
-			}
-			else
-			{
-				$message = $this->language()->addToStack( 'email_reg_complete', false, [ 'sprintf' => [ Settings::i()->board_name ] ] );
-				if( $this->members_pass_hash )
-				{
-					$message .= $this->language()->addToStack( 'email_reg_complete_pass' );
-				}
-			}
-
-			try
-			{
-				Email::buildFromTemplate( 'core', 'registration_complete', array( $this, $message ), Email::TYPE_TRANSACTIONAL )->send( $this );
-			}
-			catch( ErrorException $e ) { }
+			\IPS\Email::buildFromTemplate( 'core', 'registration_complete', array( $this ), \IPS\Email::TYPE_TRANSACTIONAL )->send( $this );
 		}
+		catch( \ErrorException $e ) { }
 	}
 
 	/**
@@ -5366,45 +5009,45 @@ class Member extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	protected function _sendReferralNotification() : void
+	protected function _sendReferralNotification()
 	{
 		try
 		{
-			$referrer = Db::i()->select( 'referred_by', 'core_referrals', array( 'member_id=?', $this->member_id ) )->first();
-			$notification = new Notification( Application::load( 'core' ), 'referral', $this, array( $this ) );
-			$notification->recipients->attach( Member::load( $referrer ) );
+			$referrer = \IPS\Db::i()->select( 'referred_by', 'core_referrals', array( 'member_id=?', $this->member_id ) )->first();
+			$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'referral', $this, array( $this ) );
+			$notification->recipients->attach( \IPS\Member::load( $referrer ) );
 			$notification->send();
 		}
-		catch( OutOfRangeException | UnderflowException $e ) {}
+		catch( \OutOfRangeException | \UnderflowException $e ) {}
 	}
 
 	/**
 	 * Get how often the member changed his name
 	 *
-	 * @return bool|int
+	 * @return bool
 	 */
-	public function hasNameChanges(): bool|int
+	public function hasNameChanges()
 	{
 		try
 		{
-			return Db::i()->select( 'count(*)', 'core_member_history', array( 'log_member=? AND log_app=? AND log_type=?', $this->member_id, 'core', 'display_name' ) )->first();
+			return \IPS\Db::i()->select( 'count(*)', 'core_member_history', array( 'log_member=? AND log_app=? AND log_type=?', $this->member_id, 'core', 'display_name' ) )->first();
 		}
-		catch ( UnderflowException $e )
+		catch ( \UnderflowException $e )
 		{
 			return FALSE;
 		}
 	}
-
+		
 	/**
 	 * Profile Sync
 	 *
-	 * @return	void
+	 * @return	array
 	 */
-	public function profileSync(): void
+	public function profileSync()
 	{		
 		$profileSync = $this->profilesync;
 		
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
 			if ( $method->canProcess( $this ) )
 			{
@@ -5415,247 +5058,295 @@ class Member extends ActiveRecord
 						$profileSync[ $type ] = array( 'handler' => $method->_id, 'ref' => NULL, 'error' => NULL );
 					}
 				}
-
-				/* Perform any extra profile sync the login handler may need */
-				try
-				{
-					if( method_exists( $method, 'extraProfileSync' ) )
-					{
-						$method->extraProfileSync( $this );
-					}
-				}
-				catch( Login\Exception $e ) {}
 			}
 		}
 						
-		if ( is_array( $profileSync ) )
+		if ( \is_array( $profileSync ) )
 		{
 			foreach ( $profileSync as $k => $v )
 			{
-				try
+				if ( $k === 'status' AND \IPS\Settings::i()->profile_comments AND $this->canAccessModule( \IPS\Application\Module::get( 'core', 'members', 'front' ) ) and $this->pp_setting_count_comments and !$this->members_bitoptions['bw_no_status_update'] and !$this->group['gbw_no_status_import'] )
 				{
-					$method = Handler::load( $v['handler'] );
-				}
-				catch ( OutOfRangeException $e )
-				{
-					unset( $profileSync[ $k ] );
-					continue;
-				}
-
-				/* Check the method is enabled */
-				if( !$method->_enabled )
-				{
-					continue;
-				}
-
-				/* Check we're syncing this item */
-				if ( !in_array( $k, $method->forceSync() ) and !in_array( $k, $method->syncOptions( $this ) ) )
-				{
-					continue;
-				}
-
-				try
-				{
-					$profileSync[ $k ]['error'] = NULL;
-
-					switch ( $k )
+					foreach ( $v as $methodId => $data )
 					{
-						case 'email':
-							$email = $method->userEmail( $this );
-							if ( $email and $email != $this->email )
+						try
+						{
+							$method = \IPS\Login\Handler::load( $methodId );
+						}
+						catch ( \OutOfRangeException $e )
+						{
+							unset( $profileSync['status'][ $methodId ] );
+							continue;
+						}
+
+						/* Check the method is enabled */
+						if( !$method->_enabled )
+						{
+							continue;
+						}
+
+						/* Check we're syncing this item */
+						if ( !\in_array( 'status', $method->forceSync() ) and !\in_array( 'status', $method->syncOptions( $this ) ) )
+						{
+							continue;
+						}
+						
+						try
+						{
+							$profileSync['status'][ $methodId ]['error'] = NULL;
+							foreach ( $method->userStatuses( $this, $profileSync['status'][ $methodId ]['lastsynced'] ? \IPS\DateTime::ts( $profileSync['status'][ $methodId ]['lastsynced'] ) : NULL ) as $status )
 							{
-								if ( $error = Login::emailIsInUse( $email, $this ) )
-								{
-									throw new DomainException('member_email_exists');
-								}
+								$status->member_id = $this->member_id;
+								$status->imported = TRUE;
+								$status->save();
+								
+								\IPS\Content\Search\Index::i()->index( $status );
+							}
+							$profileSync['status'][ $methodId ]['lastsynced'] = time();
+						}
+						catch ( \IPS\Login\Exception $e )
+						{
+							unset( $profileSync['status'][ $methodId ] );
+						}
+						catch ( \DomainException $e )
+						{
+							$profileSync['status'][ $methodId ]['error'] = $e->getMessage();
+						}
+						catch ( \Exception $e )
+						{
+							\IPS\Log::log( $e, 'profilesync' );
+							$profileSync['status'][ $methodId ]['error'] = 'profilesync_generic_error';
+						}
+					}
+				}
+				else
+				{
+					try
+					{
+						$method = \IPS\Login\Handler::load( $v['handler'] );
+					}
+					catch ( \OutOfRangeException $e )
+					{
+						unset( $profileSync[ $k ] );
+						continue;
+					}
 
-								foreach (Db::i()->select( 'ban_content', 'core_banfilters', array( "ban_type=?", 'email' ) ) as $bannedEmail )
+					/* Check the method is enabled */
+					if( !$method->_enabled )
+					{
+						continue;
+					}
+
+					/* Check we're syncing this item */
+					if ( !\in_array( $k, $method->forceSync() ) and !\in_array( $k, $method->syncOptions( $this ) ) )
+					{
+						continue;
+					}
+					
+					try
+					{
+						$profileSync[ $k ]['error'] = NULL;
+						
+						switch ( $k )
+						{
+							case 'email':
+								$email = $method->userEmail( $this );
+								if ( $email and $email != $this->email )
 								{
-									if ( preg_match( '/^' . str_replace( '\*', '.*', preg_quote( $bannedEmail, '/' ) ) . '$/i', $this->value ) )
+									if ( $error = \IPS\Login::emailIsInUse( $email, $this ) )
 									{
-										throw new DomainException( 'form_email_banned' );
+										throw new \DomainException('member_email_exists');
 									}
-								}
-
-								if ( Settings::i()->allowed_reg_email !== '' AND $allowedEmailDomains = explode( ',', Settings::i()->allowed_reg_email )  )
-								{
-									$matched = FALSE;
-									foreach ( $allowedEmailDomains AS $domain )
-									{
-										if( mb_stripos( $email,  "@" . $domain ) !== FALSE )
+									
+									foreach ( \IPS\Db::i()->select( 'ban_content', 'core_banfilters', array( "ban_type=?", 'email' ) ) as $bannedEmail )
+									{	 			
+										if ( preg_match( '/^' . str_replace( '\*', '.*', preg_quote( $bannedEmail, '/' ) ) . '$/i', $this->value ) )
 										{
-											$matched = TRUE;
+											throw new \DomainException( 'form_email_banned' );
 										}
 									}
-
-									if ( count( $allowedEmailDomains ) AND !$matched )
+									
+									if ( \IPS\Settings::i()->allowed_reg_email !== '' AND $allowedEmailDomains = explode( ',', \IPS\Settings::i()->allowed_reg_email )  )
 									{
-										throw new DomainException( 'form_email_banned' );
+										$matched = FALSE;
+										foreach ( $allowedEmailDomains AS $domain )
+										{
+											if( \mb_stripos( $email,  "@" . $domain ) !== FALSE )
+											{
+												$matched = TRUE;
+											}
+										}
+
+										if ( \count( $allowedEmailDomains ) AND !$matched )
+										{
+											throw new \DomainException( 'form_email_banned' );
+										}
 									}
+									
+									$this->logHistory( 'core', 'email_change', array( 'old' => $this->email, 'new' => $email, 'by' => 'profilesync', 'id' => $method->id, 'service' => $method::getTitle() ) );
+									$this->email = $email;
 								}
-
-								$this->logHistory( 'core', 'email_change', array( 'old' => $this->email, 'new' => $email, 'by' => 'profilesync', 'id' => $method->id, 'service' => $method::getTitle() ) );
-								$this->email = $email;
-							}
-							break;
-
-						case 'name':
-							$name = $method->userProfileName( $this );
-							if ( $name and $name != $this->name )
-							{
-								if ( mb_strlen( $name ) < Settings::i()->min_user_name_length )
+								break;
+								
+							case 'name':
+								$name = $method->userProfileName( $this );
+								if ( $name and $name != $this->name )
 								{
-									throw new DomainException('form_minlength_unspecific');
-								}
-								if ( mb_strlen( $name ) > Settings::i()->max_user_name_length )
-								{
-									throw new DomainException('form_minlength_unspecific');
-								}
-
-								if ( !Login::usernameIsAllowed( $name ) )
-								{
-									throw new DomainException('form_name_banned');
-								}
-
-								if ( Login::usernameIsInUse( $name, $this ) )
-								{
-									throw new DomainException('member_name_exists');
-								}
-
-								foreach(Db::i()->select( 'ban_content', 'core_banfilters', array("ban_type=?", 'name') ) as $bannedName )
-								{
-									if( preg_match( '/^' . str_replace( '\*', '.*', preg_quote( $bannedName, '/' ) ) . '$/i', $this->value ) )
+									if ( mb_strlen( $name ) < \IPS\Settings::i()->min_user_name_length )
 									{
-										throw new DomainException( 'form_name_banned' );
+										throw new \DomainException('form_minlength_unspecific');
 									}
-								}
-
-								$this->logHistory( 'core', 'display_name', array( 'old' => $this->name, 'new' => $name, 'by' => 'profilesync', 'id' => $method->id, 'service' => $method::getTitle() ) );
-								$this->name = $name;
-							}
-							break;
-
-						case 'photo':
-							$photoUrl = $method->userProfilePhoto( $this );
-							if ( (string) $photoUrl )
-							{
-								/* Make sure we have a scheme */
-								if( !$photoUrl->data[ Url::COMPONENT_SCHEME ] )
-								{
-									$photoUrl = $photoUrl->setScheme( 'https' );
-								}
-
-								$contents = $photoUrl->request()->get();
-								$md5 = md5( $contents );
-
-								if ( $contents AND ( !isset( $v['ref'] ) or $md5 != $v['ref'] ) )
-								{
-									$photoVars = explode( ':', $this->group['g_photo_max_vars'] );
-
-									try
+									if ( mb_strlen( $name ) > \IPS\Settings::i()->max_user_name_length )
 									{
-										$image = Image::create( $contents );
-									}
-									catch( Exception $e )
-									{
-										throw new DomainException('member_photo_bad_url');
-									}
-									if( $image->isAnimatedGif and !$this->group['g_upload_animated_photos'] )
-									{
-										throw new DomainException('member_photo_upload_no_animated');
-									}
-									if ( $image->width > $photoVars[1] or $image->height > $photoVars[2] )
-									{
-										$image->resizeToMax( $photoVars[1], $photoVars[2] );
-									}
-									if ( $photoVars[0] and strlen( $image ) > ( $photoVars[0] * 1024 ) )
-									{
-										throw new DomainException('upload_too_big_unspecific');
+										throw new \DomainException('form_minlength_unspecific');
 									}
 
-									$newFile = File::create( 'core_Profile', 'imported-photo-' . $this->member_id . '.' . $image->type, (string) $image );
-
-									$this->pp_photo_type  = 'custom';
-									$this->pp_main_photo  = (string) $newFile;
-									$thumbnail = $newFile->thumbnail( 'core_Profile', PHOTO_THUMBNAIL_SIZE, PHOTO_THUMBNAIL_SIZE, TRUE );
-									$this->pp_thumb_photo = (string) $thumbnail;
-									if ( isset( $v['ref'] ) )
+									if ( !\IPS\Login::usernameIsAllowed( $name ) )
 									{
-										$this->photo_last_update = time();
+										throw new \DomainException('form_name_banned');
 									}
-									$this->logHistory( 'core', 'photo', array( 'action' => 'new', 'type' => 'profilesync', 'id' => $method->id, 'service' => $method::getTitle() ) );
-
-									$profileSync['photo']['ref'] = $md5;
+									
+									if ( \IPS\Login::usernameIsInUse( $name, $this ) )
+									{
+										throw new \DomainException('member_name_exists');
+									}
+									
+									foreach( \IPS\Db::i()->select( 'ban_content', 'core_banfilters', array("ban_type=?", 'name') ) as $bannedName )
+									{
+										if( preg_match( '/^' . str_replace( '\*', '.*', preg_quote( $bannedName, '/' ) ) . '$/i', $this->value ) )
+										{
+											throw new \DomainException( 'form_name_banned' );
+										}
+									}
+									
+									$this->logHistory( 'core', 'display_name', array( 'old' => $this->name, 'new' => $name, 'by' => 'profilesync', 'id' => $method->id, 'service' => $method::getTitle() ) );
+									$this->name = $name;
 								}
-							}
-							break;
-
-						case 'cover':
-							/* Sync the cover photo only if the user has permission to have one */
-							if ( $this->group['gbw_allow_upload_bgimage'] )
-							{
-								$coverPhotoUrl = $method->userCoverPhoto( $this );
-								if ( (string) $coverPhotoUrl )
+								break;
+		
+							case 'photo':
+								$photoUrl = $method->userProfilePhoto( $this );
+								if ( (string) $photoUrl )
 								{
 									/* Make sure we have a scheme */
-									if( !$coverPhotoUrl->data[ Url::COMPONENT_SCHEME ] )
+									if( !$photoUrl->data[ \IPS\Http\Url::COMPONENT_SCHEME ] )
 									{
-										$coverPhotoUrl = $coverPhotoUrl->setScheme( 'https' );
+										$photoUrl = $photoUrl->setScheme( 'https' );
 									}
 
-									$contents = $coverPhotoUrl->request()->get();
+									$contents = $photoUrl->request()->get();
 									$md5 = md5( $contents );
-
-									if ( !isset( $v['ref'] ) or $md5 != $v['ref'] )
-									{
+									
+									if ( $contents AND ( !isset( $v['ref'] ) or $md5 != $v['ref'] ) )
+									{										
+										$photoVars = explode( ':', $this->group['g_photo_max_vars'] );
+										
 										try
 										{
-											$image = Image::create( $contents );
+											$image = \IPS\Image::create( $contents );
 										}
-										catch( Exception $e )
+										catch( \Exception $e )
 										{
-											throw new DomainException('member_photo_bad_url');
+											throw new \DomainException('member_photo_bad_url');
 										}
-
-										if ( $this->group['g_max_bgimg_upload'] != -1 and strlen( $image ) > ( $this->group['g_max_bgimg_upload'] * 1024 ) )
+										if( $image->isAnimatedGif and !$this->group['g_upload_animated_photos'] )
 										{
-											throw new DomainException('upload_too_big_unspecific');
+											throw new \DomainException('member_photo_upload_no_animated');
+										}
+										if ( $image->width > $photoVars[1] or $image->height > $photoVars[2] )
+										{
+											$image->resizeToMax( $photoVars[1], $photoVars[2] );
+										}
+										if ( $photoVars[0] and \strlen( $image ) > ( $photoVars[0] * 1024 ) )
+										{
+											throw new \DomainException('upload_too_big_unspecific');
+										}
+																														
+										$newFile = \IPS\File::create( 'core_Profile', 'imported-photo-' . $this->member_id . '.' . $image->type, (string) $image );
+										
+										$this->pp_photo_type  = 'custom';
+										$this->pp_main_photo  = NULL;
+										$this->pp_main_photo  = (string) $newFile;
+										$thumbnail = $newFile->thumbnail( 'core_Profile', \IPS\PHOTO_THUMBNAIL_SIZE, \IPS\PHOTO_THUMBNAIL_SIZE, TRUE );
+										$this->pp_thumb_photo = (string) $thumbnail;
+										if ( isset( $v['ref'] ) )
+										{
+											$this->photo_last_update = time();
+										}
+										$this->logHistory( 'core', 'photo', array( 'action' => 'new', 'type' => 'profilesync', 'id' => $method->id, 'service' => $method::getTitle() ) );
+										
+										$profileSync['photo']['ref'] = $md5;
+									}
+								}
+								break;
+								
+							case 'cover':
+								/* Sync the cover photo only if the user has permission to have one */
+								if ( $this->group['gbw_allow_upload_bgimage'] )
+								{
+									$coverPhotoUrl = $method->userCoverPhoto( $this );
+									if ( (string) $coverPhotoUrl )
+									{
+										/* Make sure we have a scheme */
+										if( !$coverPhotoUrl->data[ \IPS\Http\Url::COMPONENT_SCHEME ] )
+										{
+											$coverPhotoUrl = $coverPhotoUrl->setScheme( 'https' );
 										}
 
-										$newFile = File::create( 'core_Profile', 'imported-cover-photo-' . $this->member_id . '.' . $image->type, (string) $image );
+										$contents = $coverPhotoUrl->request()->get();
+										$md5 = md5( $contents );
 
-										if ( $this->pp_cover_photo )
+										if ( !isset( $v['ref'] ) or $md5 != $v['ref'] )
 										{
 											try
 											{
-												File::get( 'core_Profile', $this->pp_cover_photo )->delete();
+												$image = \IPS\Image::create( $contents );
 											}
-											catch ( Exception $e ) { }
+											catch( \Exception $e )
+											{
+												throw new \DomainException('member_photo_bad_url');
+											}
+
+											if ( $this->group['g_max_bgimg_upload'] != -1 and \strlen( $image ) > ( $this->group['g_max_bgimg_upload'] * 1024 ) )
+											{
+												throw new \DomainException('upload_too_big_unspecific');
+											}
+
+											$newFile = \IPS\File::create( 'core_Profile', 'imported-cover-photo-' . $this->member_id . '.' . $image->type, (string) $image );
+
+											if ( $this->pp_cover_photo )
+											{
+												try
+												{
+													\IPS\File::get( 'core_Profile', $this->pp_cover_photo )->delete();
+												}
+												catch ( \Exception $e ) { }
+											}
+
+											$this->pp_cover_photo = (string) $newFile;
+											$this->logHistory( 'core', 'photo', array( 'action' => 'new', 'type' => 'profilesync', 'id' => $method->id, 'service' => $method::getTitle() ) );
+
+											$profileSync['cover']['ref'] = $md5;
 										}
-
-										$this->pp_cover_photo = (string) $newFile;
-										$this->logHistory( 'core', 'photo', array( 'action' => 'new', 'type' => 'profilesync', 'id' => $method->id, 'service' => $method::getTitle() ) );
-
-										$profileSync['cover']['ref'] = $md5;
 									}
 								}
-							}
-							break;
+								break;
+						}
+						
 					}
-
-				}
-				catch ( Login\Exception $e )
-				{
-					unset( $profileSync[ $k ] );
-				}
-				catch ( DomainException $e )
-				{
-					$profileSync[ $k ]['error'] = $e->getMessage();
-				}
-				catch ( Exception $e )
-				{
-					Log::log( $e, 'profilesync' );
-					$profileSync[ $k ]['error'] = 'profilesync_generic_error';
+					catch ( \IPS\Login\Exception $e )
+					{
+						unset( $profileSync[ $k ] );
+					}
+					catch ( \DomainException $e )
+					{
+						$profileSync[ $k ]['error'] = $e->getMessage();
+					}
+					catch ( \Exception $e )
+					{
+						\IPS\Log::log( $e, 'profilesync' );
+						$profileSync[ $k ]['error'] = 'profilesync_generic_error';
+					}
 				}
 			}
 
@@ -5671,9 +5362,9 @@ class Member extends ActiveRecord
 	 *
 	 * @return bool
 	 */
-	public function canBeIgnored(): bool
+	public function canBeIgnored()
 	{
-		if ( !Settings::i()->ignore_system_on )
+		if ( !\IPS\Settings::i()->ignore_system_on )
 		{
 			return FALSE;
 		}
@@ -5700,30 +5391,30 @@ class Member extends ActiveRecord
 	 * Log Member Action
 	 *
 	 * @param	mixed		$app			The application action applies to
-	 * @param string $type			Log type
-	 * @param mixed|null $extra			Any extra data for the type
-	 * @param mixed|null $by				The member performing the action. NULL for currently logged in member or FALSE for no member
+	 * @param	string		$type			Log type
+	 * @param	mixed		$extra			Any extra data for the type
+	 * @param	mixed		$by				The member performing the action. NULL for currently logged in member or FALSE for no member
 	 * 
 	 * @return	void
 	 */
-	public function logHistory( mixed $app, string $type, mixed $extra=NULL, mixed $by=NULL ) : void
+	public function logHistory( $app, $type, $extra=NULL, $by=NULL )
 	{
 		if ( $this->member_id )
 		{
 			/* Set this only if this was not called by the task system, otherwise we'll set the member who triggered the task as moderator   */
-			if ( Dispatcher::hasInstance() and isset( Dispatcher::i()->inDestructor ) and !Dispatcher::i()->inDestructor and $by === NULL  )
+			if ( \IPS\Dispatcher::hasInstance() and !\IPS\Dispatcher::i()->inDestructor and $by === NULL  )
 			{
-				$by = Session::i()->member; // Not \IPS\Member::loggedIn() because if this is an admin logged in as a member, we want to log that the action was done by the admin
+				$by = \IPS\Session::i()->member; // Not \IPS\Member::loggedIn() because if this is an admin logged in as a member, we want to log that the action was done by the admin
 			}
 
-			Db::i()->insert( 'core_member_history', array(
+			\IPS\Db::i()->insert( 'core_member_history', array(
 				'log_app'			=> $app,
 				'log_member'		=> (int) $this->member_id,
 				'log_by'			=> $by ? $by->member_id : NULL,
 				'log_type'			=> $type,
 				'log_data'			=> json_encode( $extra ),
 				'log_date'			=> microtime( TRUE ),
-				'log_ip_address'	=> Request::i()->ipAddress()
+				'log_ip_address'	=> \IPS\Request::i()->ipAddress()
 			) );
 		}
 	}
@@ -5740,24 +5431,24 @@ class Member extends ActiveRecord
 	const TOP_MEMBERS_FILTERS = 2;
 	
 	/**
-	 * @brief	Custom count for a top member result
+	 * @brief	Custom count for a top member resu;t
 	 */
-	public ?int $_customCount = NULL;
+	public $_customCount = NULL;
 	
 	/**
 	 * Get available Top Members options
 	 *
-	 * @param int $filter		See TOP_MEMBERS_* constants
+	 * @param	int		$filter		See TOP_MEMBERS_* constants
 	 * @return	array
 	 */
-	public static function topMembersOptions( int $filter = 0 ): array
+	public static function topMembersOptions( $filter = 0 )
 	{
 		$filters = array(
-			'pp_reputation_points' => Member::loggedIn()->language()->addToStack('leaderboard_tab_reputation'),
-			'member_posts' => Member::loggedIn()->language()->addToStack('leaderboard_tab_posts')
+			'pp_reputation_points' => \IPS\Member::loggedIn()->language()->addToStack('leaderboard_tab_reputation'),
+			'member_posts' => \IPS\Member::loggedIn()->language()->addToStack('leaderboard_tab_posts')
 		);
 		
-		foreach (Application::allExtensions( 'core', 'ContentRouter', TRUE ) as $object )
+		foreach ( \IPS\Application::allExtensions( 'core', 'ContentRouter', TRUE ) as $object )
 		{
 			foreach( $object->classes as $item )
 			{
@@ -5769,23 +5460,23 @@ class Member extends ActiveRecord
 				
 				if ( $item::$firstCommentRequired and isset( $commentClass::$databaseColumnMap['author'] ) )
 				{
-					$filters[ $commentClass ] = Member::loggedIn()->language()->addToStack( 'leaderboard_tab_x', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack("{$commentClass::$title}_pl_lc") ) ) );
+					$filters[ $commentClass ] = \IPS\Member::loggedIn()->language()->addToStack( 'leaderboard_tab_x', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack("{$commentClass::$title}_pl_lc") ) ) );
 				}
 				elseif ( isset( $item::$databaseColumnMap['author'] ) )
 				{
-					$filters[ $item ] = Member::loggedIn()->language()->addToStack( 'leaderboard_tab_x', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack("{$item::$title}_pl_lc") ) ) );
+					$filters[ $item ] = \IPS\Member::loggedIn()->language()->addToStack( 'leaderboard_tab_x', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack("{$item::$title}_pl_lc") ) ) );
 				}
 			}
 		}
 		
 		if ( $filter )
 		{
-			$available = $filter === static::TOP_MEMBERS_OVERVIEW ? Settings::i()->reputation_top_members_overview : Settings::i()->reputation_top_members_filters;
+			$available = $filter === static::TOP_MEMBERS_OVERVIEW ? \IPS\Settings::i()->reputation_top_members_overview : \IPS\Settings::i()->reputation_top_members_filters;
 			if ( $available != '*' )
 			{
 				$available = explode( ',', $available );
 				$filters = array_filter( $filters, function( $k ) use ( $available ) {
-					return in_array( $k, $available );
+					return \in_array( $k, $available );
 				}, ARRAY_FILTER_USE_KEY );
 			}
 		}
@@ -5796,36 +5487,34 @@ class Member extends ActiveRecord
 	/**
 	 * Get top members for a particular type
 	 *
-	 * @param string $type	The type (as returned by topMembersOptions())
-	 * @param int $limit	Number to get
-	 * @return	ActiveRecordIterator|array
+	 * @param	string	$type	The type (as returned by topMembersOptions())
+	 * @param	int		$limit	Number to get
+	 * @return	\Traversable
 	 */
-	public static function topMembers( string $type, int $limit ): ActiveRecordIterator|array
+	public static function topMembers( $type, $limit )
 	{
-		if ( in_array( $type, array( 'pp_reputation_points', 'member_posts' ) ) )
+		if ( \in_array( $type, array( 'pp_reputation_points', 'member_posts' ) ) )
 		{
 			$where = array(
 				array( "completed=1" ),
 				array( "temp_ban != -1" ),
 				array( $type . '>0' ),
-				Db::i()->in( 'member_group_id', explode( ',', Settings::i()->leaderboard_excluded_groups ), TRUE )
+				\IPS\Db::i()->in( 'member_group_id', explode( ',', \IPS\Settings::i()->leaderboard_excluded_groups ), TRUE )
 			);
 			$orderBy = $type . ' DESC';
 			
-			return new ActiveRecordIterator( Db::i()->select( '*', 'core_members', $where, $orderBy, $limit ), 'IPS\Member' );
+			return new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', $where, $orderBy, $limit ), 'IPS\Member' );
 		}
 		else
 		{
 			$storeKey = 'store_' . str_replace( '\\', '-', $type );
-			$stored = isset( Store::i()->$storeKey ) ? Store::i()->$storeKey : NULL;
+			$stored = isset( \IPS\Data\Store::i()->$storeKey ) ? \IPS\Data\Store::i()->$storeKey : NULL;
 			
 			if ( ! $stored or ( ( time() - $stored['time'] ) > 300 ) )
 			{
-				/* @var Content|Member $type */
 				$members = array();
 				foreach( $type::topMembersQuery( $limit ) as $row )
 				{
-					/* @var $databaseColumnMap array */
 					$members[ $row[ $type::$databasePrefix . $type::$databaseColumnMap['author'] ] ] = $row['count'];
 				}
 				
@@ -5834,20 +5523,20 @@ class Member extends ActiveRecord
 
 				/* Make sure they're not in an excluded group */
 				$memberWhere = array();
-				$memberWhere[] = Db::i()->in( 'member_id', array_keys( $members ) );
-				$memberWhere[] = Db::i()->in( 'member_group_id', explode( ',', Settings::i()->leaderboard_excluded_groups ), TRUE );
+				$memberWhere[] = \IPS\Db::i()->in( 'member_id', array_keys( $members ) );
+				$memberWhere[] = \IPS\Db::i()->in( 'member_group_id', explode( ',', \IPS\Settings::i()->leaderboard_excluded_groups ), TRUE );
 
-				foreach(Db::i()->select( 'member_id', 'core_members', $memberWhere ) AS $member_id )
+				foreach( \IPS\Db::i()->select( 'member_id', 'core_members', $memberWhere ) AS $member_id )
 				{
 					$memberIds[ $member_id ] = $members[ $member_id ];
 				}
 			
-				Store::i()->$storeKey = array( 'time' => time(), 'memberIds' => $memberIds );
-				$stored = Store::i()->$storeKey;
+				\IPS\Data\Store::i()->$storeKey = array( 'time' => time(), 'memberIds' => $memberIds );
+				$stored = \IPS\Data\Store::i()->$storeKey;
 			}
 
 			$results = array();
-			foreach (new ActiveRecordIterator( Db::i()->select( '*', 'core_members', Db::i()->in( 'member_id', array_keys( $stored['memberIds'] ) ), NULL, $limit ), 'IPS\Member' ) as $member )
+			foreach ( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', \IPS\Db::i()->in( 'member_id', array_keys( $stored['memberIds'] ) ), NULL, $limit ), 'IPS\Member' ) as $member )
 			{
 				$member->_customCount = $stored['memberIds'][ $member->member_id ];
 				$results[ $member->member_id ] = $member;
@@ -5859,9 +5548,9 @@ class Member extends ActiveRecord
 			});
 
 			/* Preload follower data */
-			if( count( $results ) )
+			if( \count( $results ) )
 			{
-				Member::loggedIn()->preloadMemberFollowers( array_keys( $results ) );
+				\IPS\Member::loggedIn()->preloadMemberFollowers( array_keys( $results ) );
 			}
 
 			return $results;
@@ -5872,10 +5561,10 @@ class Member extends ActiveRecord
 	 * Preload follower information for top members
 	 *
 	 * @note	Allows us to run two queries instead of two per member
-	 * @param array $memberIds	Member IDs to preload
+	 * @param	array	$memberIds	Member IDs to preload
 	 * @return	void
 	 */
-	public function preloadMemberFollowers( array $memberIds ) : void
+	public function preloadMemberFollowers( $memberIds )
 	{
 		/* Preload the "are we following" flag */
 		foreach( $memberIds as $memberId )
@@ -5883,7 +5572,7 @@ class Member extends ActiveRecord
 			$this->_following[ md5( 'coremember' . $memberId ) ]	= FALSE;
 		}
 
-		foreach(Db::i()->select( 'follow_rel_id', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id IN(' . implode( ',', $memberIds ) . ') AND follow_member_id=?', 'core', 'member', $this->member_id ) ) as $followerId )
+		foreach( \IPS\Db::i()->select( 'follow_rel_id', 'core_follow', array( 'follow_app=? AND follow_area=? AND follow_rel_id IN(' . implode( ',', $memberIds ) . ') AND follow_member_id=?', 'core', 'member', $this->member_id ) ) as $followerId )
 		{
 			$this->_following[ md5( 'coremember' . $followerId ) ]	= TRUE;
 		}
@@ -5897,14 +5586,14 @@ class Member extends ActiveRecord
 	/**
 	 * @brief	Profile Completion Cache
 	 */
-	public ?array $_profileCompletion = NULL;
+	public $_profileCompletion = NULL;
 	
 	/**
 	 * Returns suggested profile items
 	 *
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function profileCompletion(): ?array
+	public function profileCompletion()
 	{
 		if ( $this->_profileCompletion === NULL )
 		{
@@ -5916,11 +5605,6 @@ class Member extends ActiveRecord
 			{
 				foreach( Member\ProfileStep::loadAll() AS $id => $step )
 				{
-					if( !$step->canComplete( $this ) )
-					{
-						continue;
-					}
-
 					$this->_profileCompletion[ ( $step->required ) ? 'required' : 'suggested' ][ $step->id ] = $step->completed( $this );
 				}
 			}
@@ -5932,13 +5616,13 @@ class Member extends ActiveRecord
 	/**
 	 * Profile Completion Percentage
 	 *
-	 * @return	Number
+	 * @return	\IPS\Math\Number
 	 */
-	public function profileCompletionPercentage(): Number
+	public function profileCompletionPercentage()
 	{
 		if ( $this->members_bitoptions['profile_completed'] )
 		{
-			return new Number( '100' );
+			return new \IPS\Math\Number( '100' );
 		}
 		
 		$total	= 0;
@@ -5974,24 +5658,24 @@ class Member extends ActiveRecord
 		
 		if ( $this->members_bitoptions['profile_completed'] )
 		{
-			return new Number( '100' );
+			return new \IPS\Math\Number( '100' );
 		}
 		elseif( !$total )
 		{
-			return new Number( '100' );
+			return new \IPS\Math\Number( '100' );
 		}
 		else
 		{
-			return new Number( (string) round( 100 / $total * $done ) );
+			return new \IPS\Math\Number( (string) round( 100 / $total * $done ) );
 		}
 	}
 	
 	/**
 	 * Next Profile Step
 	 *
-	 * @return	ProfileStep|NULL
+	 * @return	\IPS\Member\ProfileStep|NULL
 	 */
-	public function nextProfileStep(): ?ProfileStep
+	public function nextProfileStep()
 	{
 		if ( $this->members_bitoptions['profile_completed'] )
 		{
@@ -6000,7 +5684,7 @@ class Member extends ActiveRecord
 		
 		$completed = $this->profileCompletion();
 		
-		if ( !count( $completed['suggested'] ) )
+		if ( !\count( $completed['suggested'] ) )
 		{
 			return NULL;
 		}
@@ -6010,7 +5694,7 @@ class Member extends ActiveRecord
 		{
 			if ( !$complete )
 			{
-				$nextStep = ProfileStep::load( $id );
+				$nextStep = \IPS\Member\ProfileStep::load( $id );
 				break;
 			}
 		}
@@ -6023,10 +5707,10 @@ class Member extends ActiveRecord
 	 *
 	 * @return bool
 	 */
-	public function canEditSignature(): bool
+	public function canEditSignature()
 	{
 		/* If signatures are globally disabled, we can't edit them */
-		if( !Settings::i()->signatures_enabled )
+		if( !\IPS\Settings::i()->signatures_enabled )
 		{
 			return FALSE;
 		}
@@ -6044,7 +5728,7 @@ class Member extends ActiveRecord
 		{
 			if( $this->group['gbw_sig_unit_type'] )
 			{
-				if ( $this->joined->diff( DateTime::create() )->days < $this->group['g_sig_unit'] )
+				if ( $this->joined->diff( \IPS\DateTime::create() )->days < $this->group['g_sig_unit'] )
 				{
 					return FALSE;
 				}
@@ -6066,7 +5750,7 @@ class Member extends ActiveRecord
 	 *
 	 * @return string
 	 */
-	public function coverPhotoBackgroundColor(): string
+	public function coverPhotoBackgroundColor()
 	{
 		return $this->staticCoverPhotoBackgroundColor( $this->name );
 	}
@@ -6076,17 +5760,17 @@ class Member extends ActiveRecord
 	 *
 	 * @return array
 	 */
-	public function get_profileVisitors(): array
+	public function get_profileVisitors()
 	{
 		$visitors = array();
 		$visitorData = array();
 		$visitorInfo = json_decode( $this->pp_last_visitors, TRUE );
-		if ( !is_array( $visitorInfo ) )
+		if ( !\is_array( $visitorInfo ) )
 		{
 			$visitorInfo = array();
 		}
 
-		foreach(new ActiveRecordIterator( Db::i()->select( '*', 'core_members', array( Db::i()->in( 'member_id', array_keys( array_reverse( $visitorInfo, TRUE ) ) ) ) ), 'IPS\Member' ) AS $row )
+		foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_members', array( \IPS\Db::i()->in( 'member_id', array_keys( array_reverse( $visitorInfo, TRUE ) ) ) ) ), 'IPS\Member' ) AS $row )
 		{
 			$visitorData[$row->member_id] = $row;
 		}
@@ -6104,23 +5788,23 @@ class Member extends ActiveRecord
 	}
 
 	/* Referrals */
-	protected ?Member $_referredBy = NULL;
+	protected $_referredBy = NULL;
 
 	/**
 	 * Referred By
 	 *
-	 * @return    Member|NULL
+	 * @return	\IPS\Member|NULL
 	 */
-	public function referredBy(): Member|null
+	public function referredBy()
 	{
 		if ( $this->_referredBy === NULL )
 		{
 			try
 			{
-				$referredByID = Db::i()->select( 'referred_by', 'core_referrals', array( 'member_id=?', $this->member_id ) )->first();
-				$this->_referredBy = Member::load( $referredByID );
+				$referredByID = \IPS\Db::i()->select( 'referred_by', 'core_referrals', array( 'member_id=?', $this->member_id ) )->first();
+				$this->_referredBy = \IPS\Member::load( $referredByID );
 			}
-			catch ( UnderflowException | OutOfRangeException $e )
+			catch ( \UnderflowException | \OutOfRangeException $e )
 			{
 				$this->_referredBy = NULL;
 			}
@@ -6132,24 +5816,24 @@ class Member extends ActiveRecord
 	/**
 	 * Add Referral
 	 *
-	 * @param Member $member			The member being referred
+	 * @param	\IPS\Member		$member			The member being referred
 	 *
 	 * @return	void
 	 */
-	public function addReferral( Member $member ) : void
+	public function addReferral( $member )
 	{
 		if ( $this->member_id and $member->member_id )
 		{
-			Db::i()->insert( 'core_referrals', array( 'member_id' => $member->member_id, 'referred_by' => $this->member_id ) );
+			\IPS\Db::i()->insert( 'core_referrals', array( 'member_id' => $member->member_id, 'referred_by' => $this->member_id ) );
 		}
 	}
     
 	/**
 	 * Get member link preference
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function linkPref(): ?string
+	public function linkPref()
 	{
 		if ( $this->members_bitoptions['link_pref_unread'] )
 		{
@@ -6176,7 +5860,7 @@ class Member extends ActiveRecord
 	 */
 	public function joinedRecently() : bool
 	{
-		if ( $this->member_id AND $this->joined->diff( DateTime::ts( time() ) )->days < 30 )
+		if ( $this->member_id AND $this->joined->diff( \IPS\DateTime::ts( time() ) )->days < 30 )
 		{
 			return TRUE;
 		}
@@ -6189,39 +5873,39 @@ class Member extends ActiveRecord
 	/**
 	 * Get current rank
 	 *
-	 * @return Rank|null
+	 * @return	array
 	 */
-	public function rank(): ?Rank
+	public function rank(): ?\IPS\core\Achievements\Rank
 	{
-		return Rank::fromPoints( (int) $this->achievements_points );
+		return \IPS\core\Achievements\Rank::fromPoints( $this->achievements_points );
 	}
 	
 	/**
 	 * Get when the current rank was earned
 	 *
-	 * @return	?DateTime
+	 * @return	?\IPS\DateTime
 	 */
-	public function rankEarned(): ?DateTime
+	public function rankEarned(): ?\IPS\DateTime
 	{
 		if ( $rank = $this->rank() )
 		{
 			try
 			{
-				return DateTime::ts( Db::i()->select( 'datetime', 'core_points_log', [ '`member`=? AND new_rank=?', $this->member_id, $rank->id ], 'datetime DESC', 1 )->first() );
+				return \IPS\DateTime::ts( \IPS\Db::i()->select( 'datetime', 'core_points_log', [ '`member`=? AND new_rank=?', $this->member_id, $rank->id ], 'datetime DESC', 1 )->first() );
 			}
-			catch ( UnderflowException $e ) { }
+			catch ( \UnderflowException $e ) { }
 		}
 		return NULL;
 	}
-
+	
 	/**
 	 * Get next rank
 	 *
-	 * @return Rank|null
+	 * @return	array
 	 */
-	public function nextRank(): ?Rank
+	public function nextRank(): ?\IPS\core\Achievements\Rank
 	{
-		foreach ( Rank::getStore() as $rank )
+		foreach ( \IPS\core\Achievements\Rank::getStore() as $rank )
 		{
 			if ( $rank->points > $this->achievements_points )
 			{
@@ -6231,7 +5915,7 @@ class Member extends ActiveRecord
 		return NULL;
 	}
 
-	protected ?array $rankHistory = NULL;
+	protected $rankHistory = NULL;
 
 	/**
 	 * Return rank history
@@ -6243,10 +5927,10 @@ class Member extends ActiveRecord
 		if ( ! $this->rankHistory )
 		{
 			$return = [ 'earned' => NULL, 'not_earned' => NULL ];
-			$query = iterator_to_array( Db::i()->select( 'new_rank, datetime', 'core_points_log', ['`member`=? and new_rank IS NOT NULL', $this->member_id] )->setKeyField('new_rank')->setValueField('datetime') );
+			$query = iterator_to_array( \IPS\Db::i()->select( 'new_rank, datetime', 'core_points_log', ['`member`=? and new_rank IS NOT NULL', $this->member_id] )->setKeyField('new_rank')->setValueField('datetime') );
 			$currentRank = $this->rank();
 
-			foreach ( Rank::getStore() as $rank )
+			foreach ( \IPS\core\Achievements\Rank::getStore() as $rank )
 			{
 				if ( $rank->points == 0 )
 				{
@@ -6254,7 +5938,7 @@ class Member extends ActiveRecord
 				}
 				elseif ( $rank->points <= $currentRank->points )
 				{
-					$return['earned'][] = ['rank' => $rank, 'time' => isset( $query[ $rank->id ] ) ? DateTime::ts( $query[ $rank->id ] ) : NULL ];
+					$return['earned'][] = ['rank' => $rank, 'time' => isset( $query[ $rank->id ] ) ? \IPS\DateTime::ts( $query[ $rank->id ] ) : NULL ];
 				}
 				else
 				{
@@ -6289,13 +5973,13 @@ class Member extends ActiveRecord
 		}
 
 		$time = ( $lastRank  and $lastRank['time'] ) ? $lastRank['time'] : $this->joined;
-		return intval( DateTime::ts( time() )->diff( $time )->days );
+		return \intval( \IPS\DateTime::ts( time() )->diff( $time )->days );
 	}
 
 	/**
 	 * @brief	List of badge IDs that this member has earned
 	 */
-	protected ?array $_badgeIds = NULL;
+	protected $_badgeIds = NULL;
 	
 	/**
 	 * Get list of badge IDs that this member has earned
@@ -6306,15 +5990,15 @@ class Member extends ActiveRecord
 	{
 		if ( $this->_badgeIds === NULL )
 		{
-			$this->_badgeIds = iterator_to_array( Db::i()->select( 'badge', 'core_member_badges', [ '`member`=?', $this->member_id ] ) );
+			$this->_badgeIds = iterator_to_array( \IPS\Db::i()->select( 'badge', 'core_member_badges', [ '`member`=?', $this->member_id ] ) );
 		}
 		return $this->_badgeIds;
 	}
 	
 	/**
-	 * @brief	Count of badges this member has earned
+	 * @brief	Iterator of badges this member has earned
 	 */
-	public ?int $_badgeCount = NULL;
+	public $_badgeCount = NULL;
 	
 	/**
 	 * Get count of badges that this member has earned
@@ -6325,7 +6009,7 @@ class Member extends ActiveRecord
 	{
 		if ( $this->_badgeCount === NULL )
 		{
-			$this->_badgeCount = Db::i()->select( 'count(*)', 'core_member_badges', [ '`member`=?', $this->member_id ] )->first();
+			$this->_badgeCount = \IPS\Db::i()->select( 'count(*)', 'core_member_badges', [ '`member`=?', $this->member_id ] )->first();
 		}
 		return $this->_badgeCount;
 	}
@@ -6333,22 +6017,22 @@ class Member extends ActiveRecord
 	/**
 	 * Recent Badges
 	 *
-	 * @param int|null $numberToGet	Number to get
-	 * @return	ActiveRecordIterator
+	 * @param	int|NULL	$numberToGet	Number to get
+	 * @return	\IPS\Patterns\ActiveRecordIterator
 	 */
-	public function recentBadges( ?int $numberToGet ): ActiveRecordIterator
+	public function recentBadges( $numberToGet ): \IPS\Patterns\ActiveRecordIterator
 	{
-		return new ActiveRecordIterator(
-			Db::i()->select( 'core_badges.*, core_member_badges.member, core_member_badges.badge, core_member_badges.datetime, core_member_badges.rule, core_member_badges.action_log, core_member_badges.actor, core_member_badges.recognize', 'core_member_badges', [ '`member`=?', $this->member_id ], 'datetime DESC', $numberToGet )
+		return new \IPS\Patterns\ActiveRecordIterator(
+			\IPS\Db::i()->select( 'core_badges.*, core_member_badges.member, core_member_badges.badge, core_member_badges.datetime, core_member_badges.rule, core_member_badges.action_log, core_member_badges.actor, core_member_badges.recognize', 'core_member_badges', [ '`member`=?', $this->member_id ], 'datetime DESC', $numberToGet )
 				->join( 'core_badges', 'core_member_badges.badge=core_badges.id' ),
 			'IPS\core\Achievements\Badge'
 		);
 	}
 
 	/**
-	 * @var array|null Cache for excluded groups for rules
+	 * @var array Cache for excluded groups for rules
 	 */
-	protected static ?array $rulesExcluded = NULL;
+	protected static $rulesExcluded = NULL;
 
 	/**
 	 * Can this member partake in the fun an frivolity of achievements?
@@ -6357,7 +6041,7 @@ class Member extends ActiveRecord
 	 */
 	public function canHaveAchievements(): bool
 	{
-		if ( ! Settings::i()->achievements_enabled )
+		if ( ! \IPS\Settings::i()->achievements_enabled )
 		{
 			return FALSE;
 		}
@@ -6369,15 +6053,15 @@ class Member extends ActiveRecord
 
 		if ( static::$rulesExcluded === NULL )
 		{
-			static::$rulesExcluded = json_decode( Settings::i()->rules_exclude_groups, TRUE );
+			static::$rulesExcluded = json_decode( \IPS\Settings::i()->rules_exclude_groups, TRUE );
 		}
 
-		if ( ! is_array( static::$rulesExcluded ) or ! count( static::$rulesExcluded  ) )
+		if ( ! \is_array( static::$rulesExcluded ) or ! \count( static::$rulesExcluded  ) )
 		{
 			return TRUE;
 		}
 
-		return ! $this->inGroup(static::$rulesExcluded);
+		return ! $this->inGroup( static::$rulesExcluded  );
 	}
 	
 	/**
@@ -6385,21 +6069,21 @@ class Member extends ActiveRecord
 	 *
 	 * @param	string	$app				Application key for the action being performed
 	 * @param	string	$extension			Extension key for the action being performed
-	 * @param	mixed|null $extra				Any additional information to be passed along to the extension (e.g. if a post is being made: the post object)
-	 * @param	DateTime|null $date		Optional DateTime object to be used as the date the achievement was earned
+	 * @param	?mixed	$extra				Any additional information to be passed along to the extension (e.g. if a post is being made: the post object)
+	 * @param	?\IPS\DateTime	$date		Optional DateTime object to be used as the date the achievement was earned
 	 * @return	void
 	 */
-	public function achievementAction( string $app, string $extension, mixed $extra = NULL, DateTime $date = NULL ) : void
+	public function achievementAction( string $app, string $extension, $extra = NULL, $date = NULL )
 	{
 		if ( ! $this->canHaveAchievements() )
 		{
 			return;
 		}
 
-		if ( isset( Rule::getStore()["{$app}_{$extension}"] ) )
+		if ( isset( \IPS\core\Achievements\Rule::getStore()["{$app}_{$extension}"] ) )
 		{
 			$enabled = FALSE;
-			foreach ( Rule::getStore()["{$app}_{$extension}"] as $ruleId => $ruleData )
+			foreach ( \IPS\core\Achievements\Rule::getStore()["{$app}_{$extension}"] as $ruleId => $ruleData )
 			{
 				if ( $ruleData['enabled'] )
 				{
@@ -6409,12 +6093,12 @@ class Member extends ActiveRecord
 
 			if ( $enabled === TRUE )
 			{
-				$extensionObject = Application::load( $app )->extensions( 'core', 'AchievementAction' )[$extension];
+				$extensionObject = \IPS\Application::load( $app )->extensions( 'core', 'AchievementAction' )[$extension];
 
 				/* Log it first, because doing so allows us to tell if we have already ran the rules
 					for this action (e.g. if someone unlikes and relikes a post, we don't want to keep
 					doing the actions for that every time: only once) */
-				$logId = Db::i()->insert( 'core_achievements_log', [
+				$logId = \IPS\Db::i()->insert( 'core_achievements_log', [
 					'action' => "{$app}_{$extension}",
 					'identifier' => $extensionObject->identifier( $this, $extra ),
 					'datetime' => ( $date ) ? $date->getTimestamp() : time()
@@ -6433,15 +6117,9 @@ class Member extends ActiveRecord
 			/* Work out what we have to dish out */
 			$awards = [];
 			$milestoneHitWithRules = [];
-			foreach ( Rule::getStore()["{$app}_{$extension}"] as $ruleId => $ruleData )
+			foreach ( \IPS\core\Achievements\Rule::getStore()["{$app}_{$extension}"] as $ruleId => $ruleData )
 			{
 				if ( ! $ruleData['enabled'] )
-				{
-					continue;
-				}
-
-				/* Cloudy stuff */
-				if( !Bridge::i()->checkAchievementRule( array_merge( [ 'action' => "{$app}_{$extension}" ], $ruleData ), $this ) )
 				{
 					continue;
 				}
@@ -6449,7 +6127,7 @@ class Member extends ActiveRecord
 				if ( !$ruleData['filters'] or $extensionObject->filtersMatch( $this, $ruleData['filters'], $extra ) )
 				{
 					/* Did we already award for this milestone? */
-					if ( Rule::ruleHasMilestone( $ruleData['filters'] ) )
+					if ( \IPS\core\Achievements\Rule::ruleHasMilestone( $ruleData['filters'] ) )
 					{
 						$milestoneHitWithRules[ $ruleId ] = [];
 					}
@@ -6470,7 +6148,7 @@ class Member extends ActiveRecord
 							$awards[ $this->member_id ]['actor']['subject'] = 'subject';
 							$awards[ $this->member_id ]['points'][ $ruleId ] = $ruleData['points_subject'];
 						}
-						if ( $ruleData['badge_subject'] and !in_array( $ruleData['badge_subject'], $this->badgeIds() ) )
+						if ( $ruleData['badge_subject'] and !\in_array( $ruleData['badge_subject'], $this->badgeIds() ) )
 						{
 							$awards[ $this->member_id ]['actor']['subject'] = 'subject';
 							$awards[ $this->member_id ]['badges'][ $ruleId ] = $ruleData['badge_subject'];
@@ -6503,16 +6181,13 @@ class Member extends ActiveRecord
 								$awards[ $member->member_id ]['actor']['other'] = 'other';
 								$awards[ $member->member_id ]['points'][ $ruleId ] = $ruleData['points_other'];
 							}
-							if ( $ruleData['badge_other'] and !in_array( $ruleData['badge_other'], $member->badgeIds() ) )
+							if ( $ruleData['badge_other'] and !\in_array( $ruleData['badge_other'], $member->badgeIds() ) )
 							{
 								$awards[ $member->member_id ]['actor']['other'] = 'other';
 								$awards[ $member->member_id ]['badges'][ $ruleId ] = $ruleData['badge_other'];
 							}
 						}
 					}
-
-					/* Fire the post-achievement here */
-					Bridge::i()->postAchievement( $ruleId, array_merge( [ 'action' => "{$app}_{$extension}" ], $ruleData ), $this, $extra );
 				}
 			}
 
@@ -6527,7 +6202,7 @@ class Member extends ActiveRecord
 					foreach( $members as $data )
 					{
 						[ $type, $memberId ] = explode( '-', $data );
-						$insertId = Db::i()->insert( 'core_achievements_log_milestones', [
+						$insertId = \IPS\Db::i()->insert( 'core_achievements_log_milestones', [
 							'milestone_member_id' => $memberId,
 							'milestone_rule'      => $ruleId,
 							'milestone_log_id'    => $logId,
@@ -6547,28 +6222,28 @@ class Member extends ActiveRecord
 					{
 						foreach( $memberAwards['points'] as $ruleId => $data )
 						{
-							if ( isset( $alreadyHitMilestone[ $memberId ] ) and in_array( $ruleId, $alreadyHitMilestone[ $memberId ] ) )
+							if ( isset( $alreadyHitMilestone[ $memberId ] ) and \in_array( $ruleId, $alreadyHitMilestone[ $memberId ] ) )
 							{
 								unset( $memberAwards['points'][ $ruleId ] );
 							}
 						}
 
-						if ( array_key_exists( 'points', $memberAwards ) and count( $memberAwards['points'] ) )
+						if ( \array_key_exists( 'points', $memberAwards ) and \count( $memberAwards['points'] ) )
 						{
-							Member::load( $memberId )->awardPoints( array_sum( $memberAwards['points'] ), $logId, array_keys( $memberAwards['points'] ), $memberAwards['actor'], 0, $date );
+							\IPS\Member::load( $memberId )->awardPoints( array_sum( $memberAwards['points'] ), $logId, array_keys( $memberAwards['points'] ), $memberAwards['actor'], 0, $date );
 						}
 					}
 					if ( $memberAwards['badges'] )
 					{
 						foreach ( array_unique( $memberAwards['badges'] ) as $ruleId => $badgeId )
 						{
-							if ( ! isset( $alreadyHitMilestone[ $memberId ] ) or ! in_array( $ruleId, $alreadyHitMilestone[ $memberId ] ) )
+							if ( ! isset( $alreadyHitMilestone[ $memberId ] ) or ! \in_array( $ruleId, $alreadyHitMilestone[ $memberId ] ) )
 							{
 								try
 								{
-									Member::load( $memberId )->awardBadge( Badge::load( $badgeId ), $logId, $ruleId, $memberAwards['actor'], 0, $date );
+									\IPS\Member::load( $memberId )->awardBadge( \IPS\core\Achievements\Badge::load( $badgeId ), $logId, $ruleId, $memberAwards['actor'], 0, $date );
 								}
-								catch ( OutOfRangeException $e ) { }
+								catch ( \OutOfRangeException $e ) { }
 							}
 						}
 					}
@@ -6585,9 +6260,9 @@ class Member extends ActiveRecord
 	 * @param	array	$ruleIds	The ID number of the rules which matched that action which contributed to this number of points being awarded
 	 * @param	array	$actor		If member is "subject", "other" or both
 	 * @param	int		$recognize	The ID of the recognize table row (optional)
-	 * @param	DateTime|null $date		Optional DateTime object to be used as the date the achievement was earned
+	 * @param	?\IPS\DateTime	$date		Optional DateTime object to be used as the date the achievement was earned
 	 */
-	public function awardPoints(int $points, int $logId, array $ruleIds, array $actor, int $recognize=0, DateTime $date=NULL ) : void
+	public function awardPoints( int $points, int $logId, array $ruleIds, array $actor, int $recognize=0, $date=NULL )
 	{
 		if ( ! $this->canHaveAchievements() )
 		{
@@ -6606,10 +6281,10 @@ class Member extends ActiveRecord
 		{
 			$newRank = NULL;
 		}
-		Db::i()->update( 'core_members', "achievements_points = achievements_points + " . $points, [ 'member_id=?', $this->member_id ] );
+		\IPS\Db::i()->update( 'core_members', "achievements_points = achievements_points + " . \intval( $points ), [ 'member_id=?', $this->member_id ] );
 		
 		/* Log it */
-		$logId = Db::i()->insert( 'core_points_log', [
+		$logId = \IPS\Db::i()->insert( 'core_points_log', [
 			'member'	=> $this->member_id,
 			'points'	=> $points,
 			'datetime'	=> ( $date ) ? $date->getTimestamp() : time(),
@@ -6617,15 +6292,15 @@ class Member extends ActiveRecord
 			'rules'		=> implode( ',', $ruleIds ),
 			'action_log'=> $logId,
 			'actor'		=> implode( ',', $actor ),
-			'new_rank'	=> $newRank?->id,
+			'new_rank'	=> $newRank ? $newRank->id : NULL,
 			'time_to_new_rank'	=> $newRank ? time() - $this->joined->getTimestamp() : NULL,
 			'recognize' => $recognize
 		], FALSE, TRUE );
 
 		/* Did that push them over threshold for a new rank? Don't send a notification if rebuilds are in progress, and a random post made live triggers a new badge or award */
-		if ( $newRank and ! Settings::i()->achievements_rebuilding )
+		if ( $newRank and ! \IPS\Settings::i()->achievements_rebuilding )
 		{
-			$notification = new Notification( Application::load( 'core' ), 'new_rank', $this, [ $newRank, $this ], [ $newRank->id ] );
+			$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'new_rank', $this, [ $newRank, $this ], [ $newRank->id ] );
 			$notification->recipients->attach( $this );
 			$notification->send();
 		}
@@ -6641,21 +6316,21 @@ class Member extends ActiveRecord
 	/**
 	 * Award Badge
 	 *
-	 * @param	Badge	$badge		The badge to award
+	 * @param	\IPS\core\Achievements\Badge	$badge		The badge to award
 	 * @param	int								$logId		The ID number of the log in core_achievements_log which will tell us specifically what ACTION caused this (eg what post was made)
 	 * @param	int								$ruleId		The ID number of the rule which matched that action which caused this badge to be awarded
 	 * @param	array							$actor		If member is "subject", "other" or both
 	 * @param	int								$recognize	The ID of the recognize table row (optional)
-	 * @param DateTime|null $date		Optional DateTime object to be used as the date the achievement was earned
+	 * @param	?\IPS\DateTime					$date		Optional DateTime object to be used as the date the achievement was earned
 	 */
-	public function awardBadge( Badge $badge, int $logId, int $ruleId, array $actor, int $recognize=0, DateTime $date=NULL ) : void
+	public function awardBadge( \IPS\core\Achievements\Badge $badge, int $logId, int $ruleId, array $actor, int $recognize=0, $date=NULL )
 	{
 		if ( ! $this->canHaveAchievements() )
 		{
 			return;
 		}
 
-		$insertId = Db::i()->insert( 'core_member_badges', [
+		$insertId = \IPS\Db::i()->insert( 'core_member_badges', [
 			'member'		=> $this->member_id,
 			'badge'			=> $badge->id,
 			'datetime'		=> ( $date ) ? $date->getTimestamp() : time(),
@@ -6671,9 +6346,9 @@ class Member extends ActiveRecord
 		}
 
 		/* Don't send a notification if rebuilds are in progress, and a random post made live triggers a new badge or award */
-		if ( ! Settings::i()->achievements_rebuilding )
+		if ( ! \IPS\Settings::i()->achievements_rebuilding )
 		{
-			$notification = new Notification( Application::load( 'core' ), 'new_badge', $this, [ $this, $badge ], [ $badge->id ] );
+			$notification = new \IPS\Notification( \IPS\Application::load( 'core' ), 'new_badge', $this, [ $this, $badge ], [ $badge->id ] );
 			$notification->recipients->attach( $this );
 			$notification->send();
 		}
@@ -6683,11 +6358,11 @@ class Member extends ActiveRecord
 			'badge' => $badge->apiOutput(),
 		];
 
-		Webhook::fire( 'member_badge_awarded', $data );
+		\IPS\Api\Webhook::fire( 'member_badge_awarded', $data );
 		$this->save();
 	}
 
-	public static array $_memberRecognizedPoints = array();
+	public static $_memberRecognizedPoints = array();
 	/**
 	 * Grab todays recognized points
 	 *
@@ -6697,10 +6372,10 @@ class Member extends ActiveRecord
 	{
 		if ( ! isset( static::$_memberRecognizedPoints[ $this->member_id ] ) )
 		{
-			$timezone = new DateTimeZone( Settings::i()->reputation_timezone );
-			$today = DateTime::create()->setTimezone( $timezone )->setTime( 0, 0 );
+			$timezone = new \DateTimeZone( \IPS\Settings::i()->reputation_timezone );
+			$today = \IPS\DateTime::create()->setTimezone( $timezone )->setTime( 0, 0 );
 
-			$sum = Db::i()->select( 'SUM(r_points)', 'core_member_recognize', [ 'r_member_id=? and r_added >=?', $this->member_id, $today->getTimestamp() ] )->first();
+			$sum = \IPS\Db::i()->select( 'SUM(r_points)', 'core_member_recognize', [ 'r_member_id=? and r_added >=?', $this->member_id, $today->getTimestamp() ] )->first();
 
 			static::$_memberRecognizedPoints[ $this->member_id ] = $sum !== NULL ? $sum : 0;
 		}
@@ -6708,7 +6383,7 @@ class Member extends ActiveRecord
 		return static::$_memberRecognizedPoints[ $this->member_id ];
 	}
 
-	public static array $_memberRecognizedBadges = array();
+	public static $_memberRecognizedBadges = array();
 	/**
 	 * Grab todays recognized points
 	 *
@@ -6718,10 +6393,10 @@ class Member extends ActiveRecord
 	{
 		if ( ! isset( static::$_memberRecognizedBadges[ $this->member_id ] ) )
 		{
-			$timezone = new DateTimeZone( Settings::i()->reputation_timezone );
-			$today = DateTime::create()->setTimezone( $timezone )->setTime( 0, 0 );
+			$timezone = new \DateTimeZone( \IPS\Settings::i()->reputation_timezone );
+			$today = \IPS\DateTime::create()->setTimezone( $timezone )->setTime( 0, 0 );
 
-			$sum = Db::i()->select( 'COUNT(*)', 'core_member_recognize', [ 'r_member_id=? and r_badge > 0 and r_added >=?', $this->member_id, $today->getTimestamp() ] )->first();
+			$sum = \IPS\Db::i()->select( 'COUNT(*)', 'core_member_recognize', [ 'r_member_id=? and r_badge > 0 and r_added >=?', $this->member_id, $today->getTimestamp() ] )->first();
 
 			static::$_memberRecognizedBadges[ $this->member_id ] = $sum !== NULL ? $sum : 0;
 		}
@@ -6732,7 +6407,7 @@ class Member extends ActiveRecord
 	/**
 	 * @brief	Count of solutions member has given
 	 */
-	public ?int $_solutionCount = NULL;
+	public $_solutionCount = NULL;
 	
 	/**
 	 * Get count of solutions member has given
@@ -6743,7 +6418,7 @@ class Member extends ActiveRecord
 	{
 		if ( $this->_solutionCount === NULL )
 		{
-			$this->_solutionCount = Db::i()->select( 'COUNT(*)', 'core_solved_index', array( 'member_id=? AND type=?', $this->member_id, 'solved' ) )->first();
+			$this->_solutionCount = \IPS\Db::i()->select( 'COUNT(*)', 'core_solved_index', array( 'member_id=?', $this->member_id ) )->first();
 		}
 		return $this->_solutionCount;
 	}
@@ -6753,21 +6428,21 @@ class Member extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	public function recordLogin() : void
+	public function recordLogin()
 	{
 		$this->sendLoginAfterInactivityNotification();
 
 		try
 		{
-			Db::i()->insert( 'core_members_logins', [ 'member_id' => $this->member_id, 'member_timestamp' => time(), 'member_date' => date( 'Y-m-d', DateTime::ts( time() )->getTimestamp() ) ] );
+			\IPS\Db::i()->insert( 'core_members_logins', [ 'member_id' => $this->member_id, 'member_timestamp' => time(), 'member_date' => date( 'Y-m-d', \IPS\DateTime::ts( time() )->getTimestamp() ) ] );
 		}
-		catch( Exception $e ) { }
+		catch( \Exception $e ) { }
 	}
 
 	/**
 	 * If required, send an email notification when signing in after a period of inactivity.
 	 *
-	 * @return bool
+	 * @return void
 	 */
 	public function sendLoginAfterInactivityNotification(): bool
 	{
@@ -6780,25 +6455,21 @@ class Member extends ActiveRecord
 		{
 			$lastLogin = Db::i()->select( 'member_timestamp', 'core_members_logins', [ 'member_id=?', $this->member_id ], 'member_timestamp DESC', 1 )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			/* This is the first login, or they haven't logged in since upgrading from < 106100 */
 			try
 			{
 				$lastLogin = Db::i()->select( 'MIN(upgrade_date)', 'core_upgrade_history', [ 'upgrade_app=? AND upgrade_version_id>=?', 'core', 106100 ] )->first();
-				if( !$lastLogin )
-				{
-					return false;
-				}
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				/* This could be a new install, or IN_DEV where upgrade history isn't available */
 				return false;
 			}
 		}
 
-		$lastLoginObj = DateTime::ts( $lastLogin );
+		$lastLoginObj = \IPS\DateTime::ts( $lastLogin );
 
 		/* Likely to be the first login */
 		if( $this->joined > $lastLoginObj )
@@ -6807,23 +6478,23 @@ class Member extends ActiveRecord
 		}
 
 		/* If this login is within the period, don't send an email */
-		if( $lastLoginObj > DateTime::create()->sub( new DateInterval( static::LOGIN_INACTIVITY_NOTIFICATION ) ) )
+		if( $lastLoginObj > \IPS\DateTime::create()->sub( new \DateInterval( static::LOGIN_INACTIVITY_NOTIFICATION ) ) )
 		{
 			return false;
 		}
 
 		/* Device data */
-		$device = Device::loadOrCreate( $this, false );
+		$device = \IPS\Member\Device::loadOrCreate( $this, false );
 		try
 		{
-			$location = GeoLocation::getRequesterLocation();
+			$location = \IPS\GeoLocation::getRequesterLocation();
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
 			$location = NULL;
 		}
 
-		Email::buildFromTemplate( 'core', 'loginAfterInactivity', array( $this, $device, $location ), Email::TYPE_TRANSACTIONAL )->send( $this );
+		\IPS\Email::buildFromTemplate( 'core', 'loginAfterInactivity', array( $this, $device, $location ), \IPS\Email::TYPE_TRANSACTIONAL )->send( $this );
 
 		return true;
 	}
@@ -6855,18 +6526,18 @@ class Member extends ActiveRecord
 	/**
 	 * Get the member's personal information
 	 *
-	 * @return SimpleXML
+	 * @return \IPS\Xml\SimpleXML
 	 */
-	public function getPiiData(): SimpleXML
+	public function getPiiData(): \IPS\Xml\SimpleXML
 	{
 		/* Init */
-		$xml = SimpleXML::create('member_export');
-		$xml->addAttribute( 'created', DateTime::ts( time() )->rfc3339() );
+		$xml = \IPS\Xml\SimpleXML::create('member_export');
+		$xml->addAttribute( 'created', \IPS\DateTime::ts( time() )->rfc3339() );
 
 		/* Get the data */
-		foreach( Application::allExtensions( 'core', 'MemberExportPersonalInformation', TRUE, 'core' ) AS $key => $ext )
+		foreach( \IPS\Application::allExtensions( 'core', 'MemberExportPersonalInformation', TRUE, 'core' ) AS $key => $ext )
 		{
-			if ( $data = $ext->getData( $this ) and is_array( $data ) and count( $data ) )
+			if ( $data = $ext->getData( $this ) and \is_array( $data ) and \count( $data ) )
 			{
 				$child = $xml->addChild( $key );
 				foreach( $data as $k => $v )
@@ -6887,19 +6558,9 @@ class Member extends ActiveRecord
 	{
 		$where = [];
 		$where[] = ['member_id=?', $this->member_id];
-		$where[] = [ 'action=?', PrivacyAction::TYPE_REQUEST_DELETE ];
+		$where[] = [ \IPS\Db::i()->in( 'action',[\IPS\Member\PrivacyAction::TYPE_REQUEST_DELETE, \IPS\Member\PrivacyAction::TYPE_REQUEST_DELETE_VALIDATION ] ) ];
 
-		return (bool) Db::i()->select( 'count(*)', PrivacyAction::$databaseTable, $where )->first();
-	}
-
-	/**
-	 * Is there a deletion request pending validation? We can still cancel it
-	 *
-	 * @return bool
-	 */
-	public function get_canCancelDeletion() : bool
-	{
-		return (bool) Db::i()->select( 'count(*)', PrivacyAction::$databaseTable, [ 'member_id=? and action=?', $this->member_id, PrivacyAction::TYPE_REQUEST_DELETE_VALIDATION ] )->first();
+		return !\IPS\Db::i()->select( 'count(*)', \IPS\Member\PrivacyAction::$databaseTable, $where )->first() == 0;
 	}
 
 	/**
@@ -6908,108 +6569,45 @@ class Member extends ActiveRecord
 	 * @param int $time
 	 * @return void
 	 */
-	public static function pruneAllLoggedIpAddresses(int $time ) : void
+	public static function pruneAllLoggedIpAddresses( int $time )
 	{
-		foreach ( Content::routedClasses( FALSE, TRUE ) as $class )
+		foreach ( \IPS\Content::routedClasses( FALSE, TRUE ) as $class )
 		{
 			try
 			{
-				$class::pruneIpAddresses( Settings::i()->ip_address_prune );
+				$class::pruneIpAddresses( \IPS\Settings::i()->ip_address_prune );
 			}
-			catch( Exception $ex ) { }
+			catch( \Exception $ex ) { }
 		}
 
 		/* PMs are treated extra */
-		Db::i()->update( 'core_message_posts', array( 'msg_ip_address' => '' ), array( "msg_ip_address != '' AND msg_date <= " . $time ) );
+		\IPS\Db::i()->update( 'core_message_posts', array( 'msg_ip_address' => '' ), array( "msg_ip_address != '' AND msg_date <= " . $time ) );
 
-		foreach ( Application::allExtensions( 'core', 'IpAddresses', FALSE, 'core' ) as $key => $extension )
+		foreach ( \IPS\Application::allExtensions( 'core', 'IpAddresses', FALSE, 'core' ) as $key => $extension )
 		{
-			$extension->pruneIpAddresses( $time );
+			if( method_exists( $extension, 'pruneIpAddresses'))
+			{
+				$extension->pruneIpAddresses( $time );
+			}
 		}
 	}
 
 	/**
 	 * Can this member request that his account gets deleted via the frontend
-	 *
+	 * 
 	 * @return bool
 	 */
 	public function canUseAccountDeletion(): bool
 	{
-		if( Settings::i()->right_to_be_forgotten_type != 'on' )
+		if( \IPS\Settings::i()->right_to_be_forgotten_type != 'on' )
 		{
 			return FALSE;
 		}
 
-		if( Member::loggedIn()->isAdmin() )
+		if( \IPS\Member::loggedIn()->isAdmin() )
 		{
 			return FALSE;
 		}
 		return TRUE;
-	}
-
-	/**
-	 * Determines if this member has permission to change the layout
-	 *
-	 * @return bool
-	 */
-	public function canChangeLayoutValue() : bool
-	{
-		return ( $this->member_id and $this->group['gbw_change_layouts'] );
-	}
-
-	/**
-	 * Return the layout value based on member choice, permissions and default theme option
-	 *
-	 * @param string $what Theme constant
-	 * @return string
-	 * @throws Exception
-	 */
-	public function getLayoutValue( string $what ): string
-	{
-		$themeOption = Theme::i()->getLayoutValue( $what );
-
-		/* If we are in the theme editor mode, then return theme settings */
-		if ( Member::loggedIn()->isEditingTheme() )
-		{
-			return $themeOption;
-		}
-
-		if ( $this->canChangeLayoutValue() and $this->layouts and $memberOptions = json_decode( $this->layouts, TRUE ) )
-		{
-			if ( isset( $memberOptions[ $what ] ) )
-			{
-				return $memberOptions[ $what ];
-			}
-		}
-
-		/* Still here? Return the theme default value */
-		return $themeOption;
-	}
-
-	/**
-	 * Store the layout value
-	 *
-	 * @param string|null $what
-	 * @param string|null $value
-	 * @return void
-	 */
-	public function setLayoutValue( string|null $what, string|null $value ): void
-	{
-		if( $this->canChangeLayoutValue() )
-		{
-			if ( $what === null )
-			{
-				/* Clear all custom layouts */
-				$this->layouts = null;
-			}
-			else
-			{
-				$memberOptions = json_decode( $this->layouts, true );
-				$memberOptions[$what] = $value;
-				$this->layouts = json_encode( $memberOptions );
-			}
-
-			$this->save();
-		}
 	}
 }

@@ -11,32 +11,23 @@
 namespace IPS\Data\Cache;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use IPS\Data\Cache;
-use IPS\DateTime;
-use IPS\Helpers\Form\Text;
-use function defined;
-use function file_put_contents;
-use const IPS\IPS_FILE_PERMISSION;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Test Cache Class
  */
-class Test extends Cache
+class _Test extends \IPS\Data\Cache
 {
 	/**
 	 * Server supports this method?
 	 *
 	 * @return	bool
 	 */
-	public static function supported(): bool
+	public static function supported()
 	{
 		return TRUE;
 	}
@@ -47,15 +38,15 @@ class Test extends Cache
 	 * @param	array	$configuration	Existing settings
 	 * @return	array	\IPS\Helpers\Form\FormAbstract elements
 	 */
-	public static function configuration( array $configuration ): array
+	public static function configuration( $configuration )
 	{
-		return array( 'path' => new Text( 'datastore_test_path', ( isset( $configuration['path'] ) ) ? $configuration['path'] : '', FALSE ) );
+		return array( 'path' => new \IPS\Helpers\Form\Text( 'datastore_test_path', ( isset( $configuration['path'] ) ) ? $configuration['path'] : '', FALSE ) );
 	}
 	
 	/**
 	 * @brief	Storage Path
 	 */
-	public string $_path;
+	public $_path;
 	
 	/**
 	 * Constructor
@@ -63,7 +54,7 @@ class Test extends Cache
 	 * @param	array	$configuration	Configuration
 	 * @return	void
 	 */
-	public function __construct( array $configuration )
+	public function __construct( $configuration )
 	{
 		$this->_path = rtrim( $configuration['path'], '/' );
 	}
@@ -71,10 +62,10 @@ class Test extends Cache
 	/**
 	 * Abstract Method: Get
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	string	Value from the _datastore
 	 */
-	protected function get( string $key ): string
+	protected function get( $key )
 	{
 		return file_get_contents( $this->_path . '/' . $key . '.txt' );
 	}
@@ -82,25 +73,25 @@ class Test extends Cache
 	/**
 	 * Abstract Method: Set
 	 *
-	 * @param string $key	Key
-	 * @param string $value	Value
-	 * @param	DateTime|NULL	$expire	Expreation time, or NULL for no expiration
+	 * @param	string			$key	Key
+	 * @param	string			$value	Value
+	 * @param	\IPS\DateTime|NULL	$expire	Expreation time, or NULL for no expiration
 	 * @return	bool
 	 */
-	protected function set( string $key, string $value, DateTime $expire = NULL ): bool
+	protected function set( $key, $value, \IPS\DateTime $expire = NULL )
 	{
-		$return = file_put_contents( $this->_path . '/' . $key . '.txt', $value );
-		chmod( $this->_path . '/' . $key . '.txt', IPS_FILE_PERMISSION );
+		$return = \file_put_contents( $this->_path . '/' . $key . '.txt', $value );
+		chmod( $this->_path . '/' . $key . '.txt', \IPS\IPS_FILE_PERMISSION );
 		return $return;
 	}
 	
 	/**
 	 * Abstract Method: Exists?
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	protected function exists( string $key ): bool
+	protected function exists( $key )
 	{
 		return file_exists( $this->_path . '/' . $key . '.txt' );
 	}
@@ -108,10 +99,10 @@ class Test extends Cache
 	/**
 	 * Abstract Method: Delete
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	bool
 	 */
-	protected function delete( string $key ): bool
+	protected function delete( $key )
 	{
 		return @unlink( $this->_path . '/' . $key . '.txt' );
 	}
@@ -121,10 +112,10 @@ class Test extends Cache
 	 *
 	 * @return	void
 	 */
-	public function clearAll() : void
+	public function clearAll()
 	{
 		parent::clearAll();
-		foreach ( new DirectoryIterator( $this->_path ) as $file )
+		foreach ( new \DirectoryIterator( $this->_path ) as $file )
 		{			
 			if ( !$file->isDot() and $file != 'index.html' )
 			{

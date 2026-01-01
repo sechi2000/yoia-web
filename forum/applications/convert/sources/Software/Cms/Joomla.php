@@ -12,30 +12,23 @@
 namespace IPS\convert\Software\Cms;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\convert\Software;
-use IPS\convert\Software\Exception;
-use IPS\Task;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Joomla Pages Converter
  */
-class Joomla extends Software
+class _Joomla extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "Joomla";
@@ -44,9 +37,9 @@ class Joomla extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "joomla";
@@ -55,9 +48,9 @@ class Joomla extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertCmsDatabases'			=> array(
@@ -78,30 +71,32 @@ class Joomla extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
 			case 'cms_database':
 				return 1;
+				break;
 			
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -109,9 +104,9 @@ class Joomla extends Software
 	/**
 	 * Requires Parent?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -119,9 +114,9 @@ class Joomla extends Software
 	/**
 	 * Available Parents
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'joomla' ) );
 	}
@@ -129,19 +124,19 @@ class Joomla extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		try
 		{
 			$database = $this->app->getLink( 1, 'cms_databases' );
-			Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\cms\Categories' . $database, 'count' => 0 ), 5, array( 'class' ) );
-			Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'cms_custom_database_' . $database, 'class' => 'IPS\cms\Records' . $database ), 2, array( 'app', 'link', 'class' ) );
+			\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\cms\Categories' . $database, 'count' => 0 ), 5, array( 'class' ) );
+			\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'cms_custom_database_' . $database, 'class' => 'IPS\cms\Records' . $database ), 2, array( 'app', 'link', 'class' ) );
 
 			return array( "f_recount_cms_categories" );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
 			return array();
 		}
@@ -152,7 +147,7 @@ class Joomla extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertCmsDatabases() : void
+	public function convertCmsDatabases()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -188,7 +183,7 @@ class Joomla extends Software
 		) );
 		
 		/* Throw an exception here to tell the library that we're done with this step */
-		throw new Exception;
+		throw new \IPS\convert\Software\Exception;
 	}
 
 	/**
@@ -196,13 +191,13 @@ class Joomla extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertCmsDatabaseCategories() : void
+	public function convertCmsDatabaseCategories()
 	{
 		$libraryClass = $this->getLibrary();
 		
 		$libraryClass::setKey( 'id' );
 		
-		foreach( $this->fetch( 'categories' ) as $row )
+		foreach( $this->fetch( 'categories', 'id' ) as $row )
 		{
 			$info = array(
 				'category_id'			=> $row['id'],
@@ -223,13 +218,13 @@ class Joomla extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertCmsDatabaseRecords() : void
+	public function convertCmsDatabaseRecords()
 	{
 		$libraryClass = $this->getLibrary();
 		
 		$libraryClass::setKey( 'id' );
 		
-		foreach( $this->fetch( 'content' ) as $row )
+		foreach( $this->fetch( 'content', 'id' ) as $row )
 		{
 			/* Set the basic details */
 			$info = array(

@@ -10,37 +10,30 @@
  */
 
 namespace IPS\blog\api\GraphQL\Mutations;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\blog\api\GraphQL\Types\CommentType;
-use IPS\blog\Entry;
-use IPS\blog\Entry\Comment;
-use IPS\Content\Api\GraphQL\CommentMutator;
-use IPS\Member;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * Reply to entry mutation for GraphQL API
  */
-class ReplyEntry extends CommentMutator
+class _ReplyEntry extends \IPS\Content\Api\GraphQL\CommentMutator
 {
     /**
      * Class
      */
-    protected string $class = Comment::class;
+    protected $class = \IPS\blog\Entry\Comment::class;
 
     /*
      * @brief 	Query description
      */
-    public static string $description = "Create a new comment";
+    public static $description = "Create a new comment";
 
     /*
      * Mutation arguments
@@ -58,7 +51,7 @@ class ReplyEntry extends CommentMutator
     /**
      * Return the mutation return type
      */
-    public function type(): CommentType
+    public function type()
     {
         return \IPS\blog\api\GraphQL\TypeRegistry::comment();
     }
@@ -66,34 +59,33 @@ class ReplyEntry extends CommentMutator
     /**
      * Resolves this mutation
      *
-     * @param 	mixed $val 	Value passed into this resolver
-     * @param 	array $args 	Arguments
-     * @param 	array $context 	Context values
-	 * @param 	mixed $info
-     * @return	Comment
+     * @param 	mixed 	Value passed into this resolver
+     * @param 	array 	Arguments
+     * @param 	array 	Context values
+     * @return	\IPS\blog\Entry
      */
-    public function resolve( mixed $val, array $args, array $context, mixed $info): Comment
+    public function resolve($val, $args, $context, $info)
     {
         /* Get topic */
         try
         {
-            $entry = Entry::loadAndCheckPerms( $args['entryID'] );
+            $entry = \IPS\blog\Entry::loadAndCheckPerms( $args['entryID'] );
         }
-        catch ( OutOfRangeException )
+        catch ( \OutOfRangeException $e )
         {
-            throw new SafeException( 'NO_TOPIC', '1F295/1_graphql', 403 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_TOPIC', '1F295/1_graphql', 403 );
         }
 
         /* Get author */
-        if ( !$entry->canComment( Member::loggedIn() ) )
+        if ( !$entry->canComment( \IPS\Member::loggedIn() ) )
         {
-            throw new SafeException( 'NO_PERMISSION', '2F294/A_graphql', 403 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_PERMISSION', '2F294/A_graphql', 403 );
         }
 
         /* Check we have a post */
         if ( !$args['content'] )
         {
-            throw new SafeException( 'NO_POST', '1F295/3_graphql', 403 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_POST', '1F295/3_graphql', 403 );
         }
 
         $originalPost = NULL;
@@ -102,9 +94,9 @@ class ReplyEntry extends CommentMutator
         {
             try
             {
-                $originalPost = Comment::loadAndCheckPerms( $args['replyingTo'] );
+                $originalPost = \IPS\blog\Entry\Comment::loadAndCheckPerms( $args['replyingTo'] );
             }
-            catch ( OutOfRangeException )
+            catch ( \OutOfRangeException $e )
             {
                 // Just ignore it
             }

@@ -12,55 +12,39 @@
 namespace IPS\convert\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Content\Taggable;
-use IPS\convert\App;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\IPS;
-use IPS\Log;
-use IPS\Member;
-use IPS\Task\Queue\OutOfRangeException as QueueOutOfRangeException;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-use const IPS\REBUILD_QUICK;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class RebuildTagCache extends QueueAbstract
+class _RebuildTagCache
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data	Data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		$classname = $data['class'];
 
-		Log::debug( "Getting preQueueData for " . $classname, 'rebuildTagCache' );
+		\IPS\Log::debug( "Getting preQueueData for " . $classname, 'rebuildTagCache' );
 
 		try
 		{
-			$data['count']		= Db::i()->select( 'COUNT(DISTINCT tag_aai_lookup)', 'core_tags', array( 'tag_meta_app=? AND tag_meta_area=?', $classname::$application, $classname::$module ) )->first();
+			$data['count']		= \IPS\Db::i()->select( 'COUNT(DISTINCT tag_aai_lookup)', 'core_tags', array( 'tag_meta_app=? AND tag_meta_area=?', $classname::$application, $classname::$module ) )->first();
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
-		Log::debug( "PreQueue count for " . $classname . " is " . $data['count'], 'rebuildTagCache' );
+		\IPS\Log::debug( "PreQueue count for " . $classname . " is " . $data['count'], 'rebuildTagCache' );
 
 		if( $data['count'] == 0 )
 		{
@@ -78,31 +62,31 @@ class RebuildTagCache extends QueueAbstract
 	 *
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
-	 * @return	int					New offset or NULL if complete
-	 * @throws    QueueOutOfRangeException    Indicates offset doesn't exist and thus task is complete
+	 * @return	int|null					New offset or NULL if complete
+	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		$classname = $data['class'];
         $exploded = explode( '\\', $classname );
-        if ( !class_exists( $classname ) or !Application::appIsEnabled( $exploded[1] ) OR !IPS::classUsesTrait( $classname, Taggable::class ) )
+        if ( !class_exists( $classname ) or !\IPS\Application::appIsEnabled( $exploded[1] ) OR !\in_array( 'IPS\Content\Tags', class_implements( $classname ) ) )
 		{
-			throw new QueueOutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		/* Intentionally no try/catch as it means app doesn't exist */
 		try
 		{
-			$app = App::load( $data['app'] );
+			$app = \IPS\convert\App::load( $data['app'] );
 		}
-		catch( OutOfRangeException $e )
+		catch( \OutOfRangeException $e )
 		{
-			throw new QueueOutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
-		Log::debug( "Running " . $classname . ", with an offset of " . $offset, 'rebuildTagCache' );
+		\IPS\Log::debug( "Running " . $classname . ", with an offset of " . $offset, 'rebuildTagCache' );
 
-		$select   = Db::i()->select( '*', 'core_tags', array( 'tag_id>? AND tag_meta_app=? AND tag_meta_area=?', $data['currentId'], $classname::$application, $classname::$module ), 'tag_id ASC', array( 0, REBUILD_QUICK ), NULL, NULL, Db::SELECT_DISTINCT );
+		$select   = \IPS\Db::i()->select( '*', 'core_tags', array( 'tag_id>? AND tag_meta_app=? AND tag_meta_area=?', $data['currentId'], $classname::$application, $classname::$module ), 'tag_id ASC', array( 0, \IPS\REBUILD_QUICK ), NULL, NULL, \IPS\Db::SELECT_DISTINCT );
 		$last     = NULL;
 
 		foreach( $select as $outerTag )
@@ -112,7 +96,7 @@ class RebuildTagCache extends QueueAbstract
 			$last	= $outerTag['tag_id'];
 			$prefix	= NULL;
 
-			foreach( Db::i()->select( '*', 'core_tags', array( 'tag_aai_lookup=?', $outerTag['tag_aai_lookup'] ) ) as $tag )
+			foreach( \IPS\Db::i()->select( '*', 'core_tags', array( 'tag_aai_lookup=?', $outerTag['tag_aai_lookup'] ) ) as $tag )
 			{
 				if( $tag['tag_prefix'] )
 				{
@@ -135,7 +119,7 @@ class RebuildTagCache extends QueueAbstract
 				/* Just checking, we don't actually need anything */
 				$app->checkLink( $outerTag['tag_meta_id'], $data['link'] );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				continue;
 			}
@@ -145,12 +129,12 @@ class RebuildTagCache extends QueueAbstract
 			{
 				$item = $classname::load( $outerTag['tag_meta_id'] );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				continue;
 			}
 
-			Db::i()->insert( 'core_tags_cache', array(
+			\IPS\Db::i()->insert( 'core_tags_cache', array(
 				'tag_cache_key'		=> $outerTag['tag_aai_lookup'],
 				'tag_cache_text'	=> json_encode( array( 'tags' => $tags, 'prefix' => $prefix ) ),
 				'tag_cache_date'	=> time()
@@ -164,11 +148,11 @@ class RebuildTagCache extends QueueAbstract
 				
 				if ( isset( $containerClass::$permissionMap['read'] ) )
 				{
-					Db::i()->insert( 'core_tags_perms', array(
+					\IPS\Db::i()->insert( 'core_tags_perms', array(
 						'tag_perm_aai_lookup'		=> $outerTag['tag_aai_lookup'],
 						'tag_perm_aap_lookup'		=> $outerTag['tag_aap_lookup'],
 						'tag_perm_text'				=> $permissions[ 'perm_' . $containerClass::$permissionMap['read'] ] ?? '',
-						'tag_perm_visible'			=> ( $item->hidden() OR ( IPS::classUsesTrait( $item, 'IPS\Content\FuturePublishing' ) AND $item->isFutureDate() ) ) ? 0 : 1,
+						'tag_perm_visible'			=> ( $item->hidden() OR $item->isFutureDate() ) ? 0 : 1,
 					), TRUE );
 				}
 			}
@@ -181,7 +165,7 @@ class RebuildTagCache extends QueueAbstract
 
 		if( $last === NULL )
 		{
-			throw new QueueOutOfRangeException;
+			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		/* Return the number rebuilt so far, so that the rebuild progress bar text makes sense */
@@ -194,17 +178,17 @@ class RebuildTagCache extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		$class = $data['class'];
         $exploded = explode( '\\', $class );
-        if ( !class_exists( $class ) or !Application::appIsEnabled( $exploded[1] ) )
+        if ( !class_exists( $class ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 
-		return array( 'text' => Member::loggedIn()->language()->addToStack( 'queue_rebuilding_tag_cache', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( $class::$title . '_pl', FALSE, array( 'strtolower' => TRUE ) ) ) ) ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['indexed'], 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'queue_rebuilding_tag_cache', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl', FALSE, array( 'strtolower' => TRUE ) ) ) ) ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['indexed'], 2 ) ) : 100 );
 	}
 }

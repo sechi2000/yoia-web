@@ -11,34 +11,23 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Login;
-use IPS\Member;
-use IPS\Task;
-use UnderflowException;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Profile-sync Task
  */
-class profilesync extends Task
+class _profilesync extends \IPS\Task
 {
 	/**
 	 * Execute
 	 *
-	 * @return	mixed
+	 * @return	void
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		/* Do we have any login methods that even support syncing enabled? */
 		if( !$this->canSync() )
@@ -49,7 +38,7 @@ class profilesync extends Task
 		$where = array( array( "temp_ban=?", 0 ), array( "profilesync_lastsync > ?", 0 ) );
 
 		/* Only check accounts that have visited in the last 6 months */
-		$where[] = array( "GREATEST(last_activity, last_visit) > ?", DateTime::create()->sub( new DateInterval('P6M') )->getTimestamp() );
+		$where[] = array( "GREATEST(last_activity, last_visit) > ?", \IPS\DateTime::create()->sub( new \DateInterval('P6M') )->getTimestamp() );
 
 		/* And only check accounts that are actually synchronizing, UNLESS the admin is also forcing synchronization for any login methods */
 		if( !$this->hasForcedSync() )
@@ -58,7 +47,7 @@ class profilesync extends Task
 		}
 		
 
-		$totalToSync = Db::i()->select( 'count(*)', 'core_members', $where )->first();
+		$totalToSync = \IPS\Db::i()->select( 'count(*)', 'core_members', $where )->first();
 
 		if( !$totalToSync )
 		{
@@ -78,14 +67,14 @@ class profilesync extends Task
 		{
 			try
 			{
-				$member = Db::i()->select( '*', 'core_members', $where, 'profilesync_lastsync ASC', 1 )->first();
+				$member = \IPS\Db::i()->select( '*', 'core_members', $where, 'profilesync_lastsync ASC', 1 )->first();
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
 				return FALSE;
 			}
 			
-			$member = Member::constructFromData( $member );
+			$member = \IPS\Member::constructFromData( $member );
 			$member->profileSync();
 			
 			return TRUE;
@@ -99,9 +88,9 @@ class profilesync extends Task
 	 *
 	 * @return bool
 	 */
-	protected function canSync() : bool
+	protected function canSync()
 	{
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
 			if( $method->hasSyncOptions() )
 			{
@@ -117,11 +106,11 @@ class profilesync extends Task
 	 *
 	 * @return bool
 	 */
-	protected function hasForcedSync() : bool
+	protected function hasForcedSync()
 	{
-		foreach ( Login::methods() as $method )
+		foreach ( \IPS\Login::methods() as $method )
 		{
-			if( count( $method->forceSync() ) )
+			if( \count( $method->forceSync() ) )
 			{
 				return TRUE;
 			}

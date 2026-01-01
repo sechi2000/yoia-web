@@ -12,43 +12,9 @@
 namespace IPS\convert\Library;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ErrorException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\cms\Databases;
-use IPS\cms\Fields;
-use IPS\cms\Pages\Folder;
-use IPS\cms\Pages\Page;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Exception as DbException;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use LogicException;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_null;
-use function is_numeric;
-use function strtolower;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -56,21 +22,21 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  * Invision Pages Support
  * @note	We must extend the Core Library here so we can access methods like convertAttachment, convertFollow, etc
  */
-class Cms extends Core
+class _Cms extends Core
 {
 	/**
 	 * @brief	Application
 	 */
-	public static string $app = 'cms';
+	public $app = 'cms';
 	
 	/**
 	 * Returns a block of text, or a language string, that explains what the admin must do to complete this conversion
 	 *
 	 * @return	string
 	 */
-	public function getPostConversionInformation() : string
+	public function getPostConversionInformation()
 	{
-		return parent::getPostConversionInformation() . Member::loggedIn()->language()->addToStack( 'convert_cms_info_message' );
+		return parent::getPostConversionInformation() . \IPS\Member::loggedIn()->language()->addToStack( 'convert_cms_info_message' );
 	}
 
 	/**
@@ -79,7 +45,7 @@ class Cms extends Core
 	 * @param	bool	$rowCounts		enable row counts
 	 * @return	array
 	 */
-	public function menuRows( bool $rowCounts=FALSE ) : array
+	public function menuRows( $rowCounts=FALSE )
 	{
 		$return		= array();
 		$extraRows 	= $this->software->extraMenuRows();
@@ -97,10 +63,10 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_cms_blocks',
 						'step_method'	=> 'convertCmsBlocks',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'cms_blocks' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'cms_blocks' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 100,
-						'dependencies'	=> $dependencies,
+						'dependencies'	=> array(),
 						'link_type'		=> 'cms_blocks',
 					);
 					break;
@@ -109,7 +75,7 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_cms_containers',
 						'step_method'	=> 'convertCmsContainers',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'cms_containers' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'cms_containers' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array(),
@@ -126,7 +92,7 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_cms_databases',
 						'step_method'	=> 'convertCmsDatabases',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'cms_databases' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'cms_databases' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 100,
 						'dependencies'	=> $dependencies,
@@ -138,7 +104,7 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_cms_database_categories',
 						'step_method'	=> 'convertCmsDatabaseCategories',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'cms_database_categories' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'cms_database_categories' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array( 'convertCmsDatabases' ),
@@ -149,11 +115,11 @@ class Cms extends Core
 				case 'convertCmsDatabaseRecords':
 					$count = 0;
 					$links = array();
-					foreach( Db::i()->select( 'database_id', 'cms_databases' ) AS $database )
+					foreach( \IPS\Db::i()->select( 'database_id', 'cms_databases' ) AS $database )
 					{
 						if( $rowCounts )
 						{
-							$count += Db::i()->select( 'COUNT(*)', "cms_custom_database_{$database}" )->first();
+							$count += \IPS\Db::i()->select( 'COUNT(*)', "cms_custom_database_{$database}" )->first();
 						}
 						$links[] = "cms_custom_database_{$database}";
 					}
@@ -180,7 +146,7 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_cms_database_comments',
 						'step_method'		=> 'convertCmsDatabaseComments',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'cms_database_comments' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'cms_database_comments' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertCmsDatabaseRecords' ),
@@ -193,7 +159,7 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'		=> 'convert_cms_database_reviews',
 						'step_method'		=> 'convertCmsDatabaseReviews',
-						'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'cms_database_reviews' ),
+						'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'cms_database_reviews' ),
 						'source_rows'		=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'			=> 200,
 						'dependencies'		=> array( 'convertCmsDatabaseRecords' ),
@@ -206,7 +172,7 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_cms_folders',
 						'step_method'	=> 'convertCmsFolders',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'cms_folders' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'cms_folders' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array(),
@@ -224,7 +190,7 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_cms_media',
 						'step_method'	=> 'convertCmsMedia',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'cms_media' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'cms_media' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 10,
 						'dependencies'	=> $dependencies,
@@ -236,7 +202,7 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_cms_media_folders',
 						'step_method'	=> 'convertCmsMediaFolders',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'cms_media_folders' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'cms_media_folders' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 200,
 						'dependencies'	=> array(),
@@ -254,7 +220,7 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_cms_pages',
 						'step_method'	=> 'convertCmsPages',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'cms_pages' ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'cms_pages' ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 100,
 						'dependencies'	=> $dependencies,
@@ -276,7 +242,7 @@ class Cms extends Core
 					}
 
 					$in = array();
-					foreach( Db::i()->select( 'database_id', 'cms_databases' ) AS $database )
+					foreach( \IPS\Db::i()->select( 'database_id', 'cms_databases' ) AS $database )
 					{
 						$in[] = $database;
 					}
@@ -284,7 +250,7 @@ class Cms extends Core
 					$return[ $k ] = array(
 						'step_title'	=> 'convert_cms_attachments',
 						'step_method'	=> 'convertAttachments',
-						'ips_rows'		=> Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( Db::i()->in( 'id3', $in ) . " AND location_key=?", 'cms_Records' ) ),
+						'ips_rows'		=> \IPS\Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( \IPS\Db::i()->in( 'id3', $in ) . " AND location_key=?", 'cms_Records' ) ),
 						'source_rows'	=> array( 'table' => $v['table'], 'where' => $v['where'] ),
 						'per_cycle'		=> 10,
 						'dependencies'	=> $dependencies,
@@ -318,12 +284,10 @@ class Cms extends Core
 	 * @param	string	$method	Method to truncate
 	 * @return	array
 	 */
-	protected function truncate( string $method ) : array
+	protected function truncate( $method )
 	{
 		$return		= array();
-		$classname	= get_class( $this->software );
-
-		/* @var Software $classname */
+		$classname	= \get_class( $this->software );
 		foreach( $classname::canConvert() as $k => $v )
 		{
 			switch( $k )
@@ -350,7 +314,7 @@ class Cms extends Core
 				case 'convertCmsDatabases':
 					if ( $method == $k )
 					{
-						foreach( new ActiveRecordIterator( Db::i()->select( '*', 'cms_databases' ), 'IPS\cms\Databases' ) AS $database )
+						foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'cms_databases' ), 'IPS\cms\Databases' ) AS $database )
 						{
 							$database->delete();
 						}
@@ -371,7 +335,7 @@ class Cms extends Core
 					if ( $method == $k )
 					{
 						$toReturn = array();
-						foreach( new ActiveRecordIterator( Db::i()->select( '*', 'cms_databases' ), 'IPS\cms\Databases' ) AS $database )
+						foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'cms_databases' ), 'IPS\cms\Databases' ) AS $database )
 						{
 							$toReturn["cms_custom_database_{$database->_id}"] = NULL;
 						}
@@ -398,14 +362,14 @@ class Cms extends Core
 					break;
 
 				case 'convertAttachments':
-					$subQuery = (string) Db::i()->select( 'attachment_id', 'core_attachments_map', array( "location_key='cms_Records'" ) );
+					$subQuery = (string) \IPS\Db::i()->select( 'attachment_id', 'core_attachments_map', array( "location_key='cms_Records'" ) );
 					$return['convertAttachments'] = array( 'core_attachments' => "attach_id IN ( {$subQuery} )", 'core_attachments_map' => array( "location_key=?", 'cms_Records' ) );
 					break;
 
 			}
 		}
 
-		return $return[$method] ?? array();
+		return isset( $return[ $method ] ) ? $return[ $method ] : array();
 	}
 	
 	/**
@@ -426,13 +390,13 @@ class Cms extends Core
 	 * Convert a Folder
 	 *
 	 * @param	array			$info	Data to insert.
-	 * @return	int|bool	The ID of the newly inserted folder, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted folder, or FALSE on failure.
 	 */
-	public function convertCmsFolder( array $info=array() ) : bool|int
+	public function convertCmsFolder( $info=array() )
 	{
 		if ( !isset( $info['folder_id'] ) )
 		{
-			$this->software->app->log( 'cms_folder_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_folder_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -447,7 +411,7 @@ class Cms extends Core
 			{
 				$info['folder_parent_id'] = $this->software->app->getLink( $info['folder_parent_id'], 'cms_folders' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['folder_conv_parent'] = $info['folder_parent_id'];
 			}
@@ -459,7 +423,7 @@ class Cms extends Core
 		
 		if ( isset( $info['folder_last_modified'] ) )
 		{
-			if ( $info['folder_last_modified'] instanceof DateTime )
+			if ( $info['folder_last_modified'] instanceof \IPS\DateTime )
 			{
 				$info['folder_last_modified'] = $info['folder_last_modified']->getTimestamp();
 			}
@@ -477,10 +441,10 @@ class Cms extends Core
 		$id = $info['folder_id'];
 		unset( $info['folder_id'] );
 		
-		$inserted_id = Db::i()->insert( 'cms_folders', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'cms_folders', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'cms_folders' );
 		
-		Db::i()->update( 'cms_folders', array( 'folder_parent_id' => $inserted_id ), array( "folder_conv_parent=?", $id ) );
+		\IPS\Db::i()->update( 'cms_folders', array( 'folder_parent_id' => $inserted_id ), array( "folder_conv_parent=?", $id ) );
 		
 		return $inserted_id;
 	}
@@ -489,13 +453,13 @@ class Cms extends Core
 	 * Convert a Page
 	 *
 	 * @param	array			$info	Data to insert.
-	 * @return	int|bool	The ID of the newly inserted page, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted page, or FALSE on failure.
 	 */
-	public function convertCmsPage( array $info=array() ) : bool|int
+	public function convertCmsPage( $info=array() )
 	{
 		if ( !isset( $info['page_id'] ) )
 		{
-			$this->software->app->log( 'cms_page_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_page_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -516,7 +480,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['page_seo_name'] ) OR empty( $info['page_seo_name'] ) )
 		{
-			$info['page_seo_name'] = Url::seoTitle( $info['page_name'] );
+			$info['page_seo_name'] = \IPS\Http\Url::seoTitle( $info['page_name'] );
 		}
 		
 		if ( !isset( $info['page_content'] ) )
@@ -526,7 +490,7 @@ class Cms extends Core
 		
 		if ( isset( $info['page_meta_keywords'] ) )
 		{
-			if ( is_array( $info['page_meta_keywords'] ) )
+			if ( \is_array( $info['page_meta_keywords'] ) )
 			{
 				$info['page_meta_keywords'] = implode( ',', $info['page_meta_keywords'] );
 			}
@@ -557,7 +521,7 @@ class Cms extends Core
 			{
 				$info['page_folder_id'] = $this->software->app->getLink( $info['page_folder_id'], 'cms_folders' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['page_folder_id'] = 0;
 			}
@@ -571,26 +535,26 @@ class Cms extends Core
 		try
 		{
 			/* Check folder */
-			if ( $info['page_folder_id'] == Folder::load( $info['page_seo_name'], 'folder_name' )->parent_id )
+			if ( \intval( $info['page_folder_id'] ) == \IPS\cms\Pages\Folder::load( $info['page_seo_name'], 'folder_name' )->parent_id )
 			{
-				$info['page_seo_name'] = Url::seoTitle( $info['page_name'] . '-' . $info['page_id'] );
+				$info['page_seo_name'] = \IPS\Http\Url::seoTitle( $info['page_name'] . '-' . $info['page_id'] );
 			}
 		}
-		catch ( OutOfRangeException $e ) {}
+		catch ( \OutOfRangeException $e ) {}
 
 		/* Check that we don't have the same FURL as an app */
-		if ( Page::isFurlCollision( $info['page_seo_name'] ) )
+		if ( \IPS\cms\Pages\Page::isFurlCollision( $info['page_seo_name'] ) )
 		{
-			$info['page_seo_name'] = Url::seoTitle( $info['page_name'] . '-page' );
+			$info['page_seo_name'] = \IPS\Http\Url::seoTitle( $info['page_name'] . '-page' );
 		}
 		
 		if ( !isset( $info['page_full_path'] ) )
 		{
 			try
 			{
-				$info['page_full_path'] = Db::i()->select( 'folder_path', 'cms_folders', array( "folder_id=?", $info['page_folder_id'] ) )->first() . '/' . $info['page_seo_name'];
+				$info['page_full_path'] = \IPS\Db::i()->select( 'folder_path', 'cms_folders', array( "folder_id=?", $info['page_folder_id'] ) )->first() . '/' . $info['page_seo_name'];
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$info['page_full_path'] = $info['page_seo_name'];
 			}
@@ -613,11 +577,11 @@ class Cms extends Core
 		$id = $info['page_id'];
 		unset( $info['page_id'] );
 		
-		$inserted_id = Db::i()->insert( 'cms_pages', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'cms_pages', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'cms_pages' );
-		Lang::saveCustom( 'cms', "cms_page_{$inserted_id}", $info['page_name'] );
+		\IPS\Lang::saveCustom( 'cms', "cms_page_{$inserted_id}", $info['page_name'] );
 
-		Db::i()->insert( 'core_permission_index', array( 'app' => 'cms', 'perm_type' => 'pages', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
+		\IPS\Db::i()->insert( 'core_permission_index', array( 'app' => 'cms', 'perm_type' => 'pages', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
 		
 		return $inserted_id;
 	}
@@ -626,20 +590,20 @@ class Cms extends Core
 	 * Convert a block container
 	 *
 	 * @param	array			$info	Data to insert.
-	 * @return	int|bool	The ID of the newly inserted container, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted container, or FALSE on failure.
 	 */
-	public function convertCmsContainer( array $info=array() ) : bool|int
+	public function convertCmsContainer( $info=array() )
 	{
 		if ( !isset( $info['container_id'] ) )
 		{
-			$this->software->app->log( 'cms_container_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_container_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['container_name'] ) )
 		{
 			$info['container_name'] = "Converted Blocks";
-			$this->software->app->log( 'cms_container_no_name', __METHOD__, ApP::LOG_NOTICE, $info['container_id'] );
+			$this->software->app->log( 'cms_container_no_name', __METHOD__, \IPS\convert\ApP::LOG_NOTICE, $info['container_id'] );
 		}
 		
 		if ( isset( $info['container_parent_id'] ) )
@@ -648,7 +612,7 @@ class Cms extends Core
 			{
 				$info['container_parent_id'] = $this->software->app->getLink( $info['container_parent_id'], 'cms_containers' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['container_conv_parent'] = $info['container_parent_id'];
 			}
@@ -658,30 +622,30 @@ class Cms extends Core
 			$info['container_parent_id'] = 0;
 		}
 		
-		if ( !isset( $info['container_type'] ) OR $info['container_type'] != 'block' )
+		if ( !isset( $info['container_type'] ) OR !\in_array( $info['container_type'], array( 'block' ) ) )
 		{
 			$info['container_type'] = 'block';
 		}
 		
 		if ( !isset( $info['container_order'] ) )
 		{
-			$position = Db::i()->select( 'MAX(container_order)', 'cms_containers' )->first();
+			$position = \IPS\Db::i()->select( 'MAX(container_order)', 'cms_containers' )->first();
 			
 			$info['container_order'] = $position + 1;
 		}
 		
 		if ( !isset( $info['container_key'] ) )
 		{
-			$info['container_key'] = Url::seoTitle( $info['container_name'] );
+			$info['container_key'] = \IPS\Http\Url::seoTitle( $info['container_name'] );
 		}
 		
 		$id = $info['container_id'];
 		unset( $info['container_id'] );
 		
-		$inserted_id = Db::i()->insert( 'cms_containers', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'cms_containers', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'cms_containers' );
 		
-		Db::i()->update( 'cms_containers', array( "container_parent_id" => $inserted_id ), array( "container_conv_parent=?", $id ) );
+		\IPS\Db::i()->update( 'cms_containers', array( "container_parent_id" => $inserted_id ), array( "container_conv_parent=?", $id ) );
 		
 		return $inserted_id;
 	}
@@ -691,13 +655,13 @@ class Cms extends Core
 	 * @note These probably won't really work unless going from Invision Community to Invision Community, but we still support them anyway so they can be refactored.
 	 *
 	 * @param	array			$info	Data to insert.
-	 * @return	int|bool	The ID of the newly inserted block, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted block, or FALSE on failure.
 	 */
-	public function convertCmsBlock( array $info ) : bool|int
+	public function convertCmsBlock( $info )
 	{
 		if ( !isset( $info['block_id'] ) )
 		{
-			$this->software->app->log( 'cms_block_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_block_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -723,7 +687,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['block_key'] ) )
 		{
-			$info['block_key'] = Url::seoTitle( $name );
+			$info['block_key'] = \IPS\Http\Url::seoTitle( $name );
 		}
 		
 		/* We cannot do these - force defaults */
@@ -737,7 +701,7 @@ class Cms extends Core
 		
 		if ( isset( $info['block_config'] ) )
 		{
-			if ( !is_array( $info['block_config'] ) )
+			if ( !\is_array( $info['block_config'] ) )
 			{
 				$info['block_config'] = json_decode( $info['block_config'], TRUE );
 			}
@@ -748,7 +712,7 @@ class Cms extends Core
 			}
 			else
 			{
-				if ( !isset( $info['block_config']['editor'] ) OR !in_array( $info['block_config']['editor'], array( 'editor', 'html', 'php' ) ) )
+				if ( !isset( $info['block_config']['editor'] ) OR !\in_array( $info['block_config']['editor'], array( 'editor', 'html', 'php' ) ) )
 				{
 					$info['block_config']['editor'] = 'html';
 				}
@@ -768,7 +732,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['block_position'] ) )
 		{
-			$position = Db::i()->select( 'MAX(block_position)', 'cms_blocks' )->first();
+			$position = \IPS\Db::i()->select( 'MAX(block_position)', 'cms_blocks' )->first();
 			
 			$info['block_position'] = $position + 1;
 		}
@@ -779,7 +743,7 @@ class Cms extends Core
 			{
 				$info['block_category'] = $this->software->app->getLink( $info['block_category'], 'cms_containers' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['block_category'] = $this->_orphanedBlocksCategory();
 			}
@@ -797,13 +761,13 @@ class Cms extends Core
 		$id = $info['block_id'];
 		unset( $info['block_id'] );
 		
-		$inserted_id = Db::i()->insert( 'cms_blocks', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'cms_blocks', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'cms_blocks' );
 		
-		Lang::saveCustom( 'cms', "content_block_name_{$inserted_id}", $name );
-		Lang::saveCustom( 'cms', "content_block_name_{$inserted_id}_desc", $desc );
+		\IPS\Lang::saveCustom( 'cms', "content_block_name_{$inserted_id}", $name );
+		\IPS\Lang::saveCustom( 'cms', "content_block_name_{$inserted_id}_desc", $desc );
 
-		Db::i()->insert( 'core_permission_index', array( 'app' => 'cms', 'perm_type' => 'blocks', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
+		\IPS\Db::i()->insert( 'core_permission_index', array( 'app' => 'cms', 'perm_type' => 'blocks', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
 		
 		return $inserted_id;
 	}
@@ -811,14 +775,14 @@ class Cms extends Core
 	/**
 	 * @brief	Orphaned Blocks Container
 	 */
-	protected ?int $orphanedBlockContainer = NULL;
+	protected $orphanedBlockContainer = NULL;
 	
 	/**
 	 * Returns a category to store blocks that do not have one, creating one if needed.
 	 *
-	 * @return	int	The ID.
+	 * @return	integer	The ID.
 	 */
-	protected function _orphanedBlocksCategory() : int
+	protected function _orphanedBlocksCategory()
 	{
 		if ( $this->orphanedBlockContainer === NULL )
 		{
@@ -826,7 +790,7 @@ class Cms extends Core
 			{
 				$this->orphanedBlockContainer = $this->software->app->getLink( '__orphaned__', 'cms_containers' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$this->orphanedBlockContainer = $this->convertCmsContainer( array(
 					'container_id'		=> '__orphaned__',
@@ -843,21 +807,21 @@ class Cms extends Core
 	 *
 	 * @param	array			$info	Data to insert
 	 * @param	array			$fields	Custom Field Data
-	 * @return	int|bool	The ID of the newly inserted database, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted database, or FALSE on failure.
 	 */
-	public function convertCmsDatabase( array $info=array(), array $fields=array() ) : bool|int
+	public function convertCmsDatabase( $info=array(), $fields=array() )
 	{
 		/* This is about to get caaaraaaaaazy */
 		if ( !isset( $info['database_id'] ) )
 		{
-			$this->software->app->log( 'cms_database_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_database_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
 		/* No fields - we need at least one */
-		if ( !count( $fields ) )
+		if ( !\count( $fields ) )
 		{
-			$this->software->app->log( 'cms_database_no_fields', __METHOD__, App::LOG_WARNING, $info['database_id'] );
+			$this->software->app->log( 'cms_database_no_fields', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['database_id'] );
 			return FALSE;
 		}
 		
@@ -934,11 +898,11 @@ class Cms extends Core
 		
 		if ( !isset( $info['database_key'] ) )
 		{
-			$info['database_key'] = Url::seoTitle( $name ) . '_' . time();
+			$info['database_key'] = \IPS\Http\Url::seoTitle( $name ) . '_' . time();
 		}
 		
 		/* Zero Defaults */
-		foreach( array( 'database_record_count', 'database_all_editable', 'database_comment_approve', 'database_record_approve', 'database_tags_enabled', 'database_tags_noprefixes' ) AS $zeroDefault )
+		foreach( array( 'database_record_count', 'database_all_editable', 'database_comment_approve', 'database_record_approve', 'database_tags_enabled', 'database_tags_noprefixes', 'database_cat_index_type' ) AS $zeroDefault )
 		{
 			if ( !isset( $info[ $zeroDefault ] ) )
 			{
@@ -957,11 +921,11 @@ class Cms extends Core
 		
 		if ( isset( $info['database_options'] ) )
 		{
-			if ( is_array( $info['database_options'] ) )
+			if ( \is_array( $info['database_options'] ) )
 			{
 				$bitoptions = 0;
 				
-				foreach( Databases::$bitOptions as $key => $value )
+				foreach( \IPS\cms\Databases::$bitOptions as $key => $value )
 				{
 					if ( isset( $info['database_options'][$key] ) AND $info['database_options'][$key] )
 					{
@@ -979,7 +943,7 @@ class Cms extends Core
 		
 		if ( isset( $info['database_fixed_field_perms'] ) )
 		{
-			if ( is_array( $info['database_fixed_field_perms'] ) )
+			if ( \is_array( $info['database_fixed_field_perms'] ) )
 			{
 				$info['database_fixed_field_perms'] = json_encode( $info['database_fixed_field_perms'] );
 			}
@@ -987,24 +951,43 @@ class Cms extends Core
 		else
 		{
 			$info['database_fixed_field_perms'] = json_encode( array(
-				'record' => array(
-					'visible' => TRUE,
-					'perm_view' => '*',
-					'perm_2' => '*',
-					'perm_3' => '*'
+				'record'		=> array(
+					'visible'		=> TRUE,
+					'perm_view'		=> '*',
+					'perm_2'		=> '*',
+					'perm_3'		=> '*'
 				),
-				'record_image' => array(
-					'visible' => TRUE,
-					'perm_view' => '*',
-					'perm_2' => '*',
-					'perm_3' => '*'
+				'record_image'	=> array(
+					'visible'		=> TRUE,
+					'perm_view'		=> '*',
+					'perm_2'		=> '*',
+					'perm_3'		=> '*'
 				)
+			) );
+		}
+		
+		if ( isset( $info['database_featured_settings'] ) )
+		{
+			if ( \is_array( $info['database_featured_settings'] ) )
+			{
+				$info['database_featured_settings'] = json_encode( $info['database_featured_settings'] );
+			}
+		}
+		else
+		{
+			$info['database_featured_settings'] = json_encode( array(
+				'featured'		=> FALSE,
+				'perpage'		=> 10,
+				'pagination'	=> FALSE,
+				'sort'			=> 'record_publish_date',
+				'direction'		=> 'desc',
+				'categories'	=> 0,
 			) );
 		}
 		
 		if ( isset( $info['database_fixed_field_settings'] ) )
 		{
-			if ( is_array( $info['database_fixed_field_settings'] ) )
+			if ( \is_array( $info['database_fixed_field_settings'] ) )
 			{
 				$info['database_fixed_field_settings'] = json_encode( $info['database_fixed_field_settings'] );
 			}
@@ -1020,16 +1003,21 @@ class Cms extends Core
 		}
 		
 		/* These are things we will not know, or cannot convert (like templates) */
+		$info['database_template_listing']		= 'listing';
+		$info['database_template_display']		= 'display';
+		$info['database_template_categories']	= 'category_index';
 		$info['database_field_title']			= 0; # we will set this later
 		$info['database_field_content']			= 0; # we will set this later
+		$info['database_template_form']			= 'form';
+		$info['database_template_featured']		= 'category_articles';
 		
 		/* Forum Integration */
 		try
 		{
 			$this->software->app->checkForSibling( 'forums' );
-			if ( Application::appIsEnabled( 'forums' ) === FALSE )
+			if ( \IPS\Application::appIsEnabled( 'forums' ) === FALSE )
 			{
-				throw new LogicException;
+				throw new \LogicException;
 			}
 			
 			foreach( array( 'database_forum_record', 'database_forum_comments', 'database_forum_delete' ) as $forumZero )
@@ -1054,10 +1042,10 @@ class Cms extends Core
 			}
 			else
 			{
-				throw new InvalidArgumentException;
+				throw new \InvalidArgumentException;
 			}
 		}
-		catch( OutOfRangeException $e ) # no sibling or forum
+		catch( \OutOfRangeException $e ) # no sibling or forum
 		{
 			$info['database_forum_record']		= 0;
 			$info['database_forum_comments']	= 0;
@@ -1066,7 +1054,7 @@ class Cms extends Core
 			$info['database_forum_prefix']		= '';
 			$info['database_forum_suffix']		= '';
 		}
-		catch( InvalidArgumentException $e ) # no forum provided
+		catch( \InvalidArgumentException $e ) # no forum provided
 		{
 			$info['database_forum_record']		= 0;
 			$info['database_forum_comments']	= 0;
@@ -1074,11 +1062,15 @@ class Cms extends Core
 			$info['database_forum_forum']		= 0;
 			$info['database_forum_prefix']		= '';
 			$info['database_forum_suffix']		= '';
+		}
+		catch( \LogicException $e ) # a bug
+		{
+			throw $e;
 		}
 		
 		if ( isset( $info['database_tags_predefined'] ) )
 		{
-			if ( is_array( $info['database_tags_predefined'] ) )
+			if ( \is_array( $info['database_tags_predefined'] ) )
 			{
 				$info['database_tags_predefined'] = implode( ',', $info['database_tags_predefined'] );
 			}
@@ -1090,7 +1082,7 @@ class Cms extends Core
 			{
 				$info['database_page_id'] = $this->software->app->getLink( $info['database_page_id'], 'cms_pages' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['database_page_id'] = 0;
 			}
@@ -1104,13 +1096,13 @@ class Cms extends Core
 		$id = $info['database_id'];
 		unset( $info['database_id'] );
 		
-		$inserted_id = Db::i()->insert( 'cms_databases', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'cms_databases', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'cms_databases' );
 
-		Db::i()->insert( 'core_permission_index', array( 'app' => 'cms', 'perm_type' => 'databases', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
+		\IPS\Db::i()->insert( 'core_permission_index', array( 'app' => 'cms', 'perm_type' => 'databases', 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
 		
 		/* And now fields */
-		$validFields		= array_merge( static::$fieldTypes, Fields::$additionalFieldTypes, array( 'Youtube', 'Spotify', 'Soundcloud' ) );
+		$validFields		= array_merge( static::$fieldTypes, \IPS\cms\Fields::$additionalFieldTypes, array( 'Youtube', 'Spotify', 'Soundcloud' ) );
 		$fieldsInserted		= array();
 		$titleField			= 0;
 		$contentField		= 0;
@@ -1126,7 +1118,7 @@ class Cms extends Core
 			/* We already know this */
 			$field['field_database_id'] = $inserted_id;
 			
-			if ( !in_array( $field['field_type'], $validFields ) )
+			if ( !\in_array( $field['field_type'], $validFields ) )
 			{
 				continue;
 			}
@@ -1138,7 +1130,7 @@ class Cms extends Core
 			}
 			else
 			{
-				$fieldName = IPS::mb_ucfirst( $field['field_type'] );
+				$fieldName = mb_ucfirst( $field['field_type'] );
 			}
 			
 			if ( isset( $field['field_desc'] ) )
@@ -1153,7 +1145,7 @@ class Cms extends Core
 			
 			if ( !isset( $field['field_key'] ) )
 			{
-				$field['field_key'] = strtolower( $field['field_type'] . '_' . $fieldsInserted );
+				$field['field_key'] = \strtolower( $field['field_type'] . '_' . $fieldsInserted );
 			}
 			
 			if ( !isset( $field['field_required'] ) )
@@ -1168,7 +1160,7 @@ class Cms extends Core
 			
 			if ( !isset( $field['field_position'] ) )
 			{
-				$position = Db::i()->select( 'MAX(field_position)', 'cms_database_fields', array( 'field_database_id=?', $inserted_id ) )->first();
+				$position = \IPS\Db::i()->select( 'MAX(field_position)', 'cms_database_fields', array( 'field_database_id=?', $inserted_id ) )->first();
 				
 				$field['field_position'] = $position + 1;
 			}
@@ -1194,10 +1186,10 @@ class Cms extends Core
 					{
 						$fieldExtra['database'] = $this->software->app->getLink( $fieldExtra['database'], 'cms_databases' );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						/* Can't convert this if we don't know what it's referencing */
-						$this->software->app->log( 'cms_database_field_item_no_reference', __METHOD__, APP::LOG_NOTICE, $field['field_id'] );
+						$this->software->app->log( 'cms_database_field_item_no_reference', __METHOD__, \IPS\convert\APP::LOG_NOTICE, $field['field_id'] );
 						continue;
 					}
 				}
@@ -1237,20 +1229,20 @@ class Cms extends Core
 			if ( isset( $field['field_format_opts'] ) )
 			{
 				$opts = array();
-				if ( !is_array( $field['field_format_opts'] ) )
+				if ( !\is_array( $field['field_format_opts'] ) )
 				{
 					$field['field_format_opts'] = json_decode( $field['field_format_opts'], TRUE );
 				}
 				
 				foreach( $field['field_format_opts'] AS $key => $value )
 				{
-					if ( in_array( $value, array( 'strtolower', 'strtoupper', 'ucfirst', 'ucwords', 'punct', 'numerical', 'bold', 'italic' ) ) )
+					if ( \in_array( $value, array( 'strtolower', 'strtoupper', 'ucfirst', 'ucwords', 'punct', 'numerical', 'bold', 'italic' ) ) )
 					{
 						$opts[$key] = $value;
 					}
 				}
 				
-				if ( count( $opts ) )
+				if ( \count( $opts ) )
 				{
 					$field['field_format_opts'] = json_encode( $opts );
 				}
@@ -1281,7 +1273,7 @@ class Cms extends Core
 			
 			if ( isset( $field['field_allowed_extensions'] ) )
 			{
-				if ( is_array( $field['field_allowed_extensions'] ) )
+				if ( \is_array( $field['field_allowed_extensions'] ) )
 				{
 					$field['field_allowed_extensions'] = json_encode( $field['field_allow_extensions'] );
 				}
@@ -1313,7 +1305,7 @@ class Cms extends Core
 			
 			if ( isset( $field['field_display_json'] ) )
 			{
-				if ( is_array( $field['field_display_json'] ) )
+				if ( \is_array( $field['field_display_json'] ) )
 				{
 					$field['field_display_json'] = json_encode( $field['field_display_json'] );
 				}
@@ -1341,12 +1333,12 @@ class Cms extends Core
 			$fieldId = $field['field_id'];
 			unset( $field['field_id'] );
 			
-			$fieldInsertedId = Db::i()->insert( 'cms_database_fields', $field );
-			Lang::saveCustom( 'cms', "content_field_{$fieldInsertedId}", $fieldName );
-			Lang::saveCustom( 'cms', "content_field_{$fieldInsertedId}_desc", $fieldDesc );
+			$fieldInsertedId = \IPS\Db::i()->insert( 'cms_database_fields', $field );
+			\IPS\Lang::saveCustom( 'cms', "content_field_{$fieldInsertedId}", $fieldName );
+			\IPS\Lang::saveCustom( 'cms', "content_field_{$fieldInsertedId}_desc", $fieldDesc );
 			$this->software->app->addLink( $fieldInsertedId, $fieldId, 'cms_database_fields' );
 
-			Db::i()->insert( 'core_permission_index', array( 'app' => 'cms', 'perm_type' => 'fields', 'perm_type_id' => $fieldInsertedId, 'perm_view' => '' ) );
+			\IPS\Db::i()->insert( 'core_permission_index', array( 'app' => 'cms', 'perm_type' => 'fields', 'perm_type_id' => $fieldInsertedId, 'perm_view' => '' ) );
 			
 			if ( $haveTitleField AND $titleField == 0 )
 			{
@@ -1361,26 +1353,27 @@ class Cms extends Core
 			$fieldsInserted[$fieldInsertedId] = array( 'type' => $field['field_type'], 'multiple' => $field['field_is_multiple'], 'max_length' => $field['field_max_length'] );
 		}
 		
-		if ( count( $fieldsInserted ) > 0 )
+		if ( \count( $fieldsInserted ) > 0 )
 		{
-			Db::i()->update( 'cms_databases', array( 'database_field_title' => $titleField, 'database_field_content' => $contentField ), array( "database_id=?", $inserted_id ) );
-			Lang::saveCustom( 'cms', "content_db_{$inserted_id}", $name );
-			Lang::saveCustom( 'cms', "module__cms_records{$inserted_id}", $name );
-			Lang::saveCustom( 'cms', "content_db_{$inserted_id}_desc", $desc );
-			Lang::saveCustom( 'cms', "content_db_lang_sl_{$inserted_id}", $sln );
-			Lang::saveCustom( 'cms', "content_db_lang_pl_{$inserted_id}", $pln );
-			Lang::saveCustom( 'cms', "content_db_lang_su_{$inserted_id}", $scn );
-			Lang::saveCustom( 'cms', "content_db_lang_pu_{$inserted_id}", $pcn );
-			Lang::saveCustom( 'cms', "content_db_lang_ia_{$inserted_id}", $ia );
-			Lang::saveCustom( 'cms', "content_db_lang_sl_{$inserted_id}_pl", $pcn );
-			Lang::saveCustom( 'cms', "digest_area_cms_records{$inserted_id}", $pcn );
-			Lang::saveCustom( 'cms', "cms_records{$inserted_id}_pl", $scn );
+			\IPS\Db::i()->update( 'cms_databases', array( 'database_field_title' => $titleField, 'database_field_content' => $contentField ), array( "database_id=?", $inserted_id ) );
+			\IPS\Lang::saveCustom( 'cms', "content_db_{$inserted_id}", $name );
+			\IPS\Lang::saveCustom( 'cms', "module__cms_records{$inserted_id}", $name );
+			\IPS\Lang::saveCustom( 'cms', "content_db_{$inserted_id}_desc", $desc );
+			\IPS\Lang::saveCustom( 'cms', "content_db_lang_sl_{$inserted_id}", $sln );
+			\IPS\Lang::saveCustom( 'cms', "content_db_lang_pl_{$inserted_id}", $pln );
+			\IPS\Lang::saveCustom( 'cms', "content_db_lang_su_{$inserted_id}", $scn );
+			\IPS\Lang::saveCustom( 'cms', "content_db_lang_pu_{$inserted_id}", $pcn );
+			\IPS\Lang::saveCustom( 'cms', "content_db_lang_ia_{$inserted_id}", $ia );
+			\IPS\Lang::saveCustom( 'cms', "content_db_lang_sl_{$inserted_id}_pl", $pcn );
+			\IPS\Lang::saveCustom( 'cms', "cms_create_menu_records_{$inserted_id}", "{$scn} in {$name}" );
+			\IPS\Lang::saveCustom( 'cms', "digest_area_cms_records{$inserted_id}", $pcn );
+			\IPS\Lang::saveCustom( 'cms', "cms_records{$inserted_id}_pl", $scn );
 		}
 		else
 		{
 			/* If we did not insert any fields, delete the database row and log a warning */
-			Db::i()->delete( 'cms_databases', array( "database_id=?", $inserted_id ) );
-			$this->software->app->log( 'cms_database_no_fields', __METHOD__, App::LOG_WARNING, $info['database_id'] );
+			\IPS\Db::i()->delete( 'cms_databases', array( "database_id=?", $inserted_id ) );
+			$this->software->app->log( 'cms_database_no_fields', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['database_id'] );
 			return FALSE;
 		}
 		
@@ -1408,14 +1401,14 @@ class Cms extends Core
 		
 		try
 		{
-			if ( ! Db::i()->checkForTable( $table['name'] ) )
+			if ( ! \IPS\Db::i()->checkForTable( $table['name'] ) )
 			{
-				Db::i()->createTable( $table );
+				\IPS\Db::i()->createTable( $table );
 			}
 		}
-		catch( DbException $ex )
+		catch( \IPS\Db\Exception $ex )
 		{
-			throw new LogicException( $ex );
+			throw new \LogicException( $ex );
 		}
 		
 		foreach( $fieldsInserted as $name => $data )
@@ -1496,17 +1489,17 @@ class Cms extends Core
 				}
 			}
 			
-			Db::i()->addColumn( "cms_custom_database_{$inserted_id}", $columnDefinition );
+			\IPS\Db::i()->addColumn( "cms_custom_database_{$inserted_id}", $columnDefinition );
 			
 			if ( $data['type'] != 'Upload' )
 			{
-				if ( in_array( $columnDefinition['type'], [ 'TEXT', 'MEDIUMTEXT' ] ) )
+				if ( \in_array( $columnDefinition['type'], [ 'TEXT', 'MEDIUMTEXT' ] ) )
 				{
-					Db::i()->addIndex( "cms_custom_database_{$inserted_id}", array( 'type' => 'fulltext', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
+					\IPS\Db::i()->addIndex( "cms_custom_database_{$inserted_id}", array( 'type' => 'fulltext', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
 				}
 				else
 				{
-					Db::i()->addIndex( "cms_custom_database_{$inserted_id}", array( 'type' => 'key', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
+					\IPS\Db::i()->addIndex( "cms_custom_database_{$inserted_id}", array( 'type' => 'key', 'name' => $columnDefinition['name'], 'columns' => array( $columnDefinition['name'] ) ) );
 				}
 			}
 		}
@@ -1514,7 +1507,7 @@ class Cms extends Core
 		/* Make sure the page has the appropriate tag */
 		try
 		{
-			$page = Db::i()->select( 'page_content', 'cms_pages', array( "page_id=?", $info['database_page_id'] ) )->first();
+			$page = \IPS\Db::i()->select( 'page_content', 'cms_pages', array( "page_id=?", $info['database_page_id'] ) )->first();
 			
 			if ( preg_match( '/\{database=\"' . $id . '\"\}/', $page ) )
 			{
@@ -1525,11 +1518,12 @@ class Cms extends Core
 				$page .= "\n{database=\"{$inserted_id}\"}";
 			}
 			
-			Db::i()->update( 'cms_pages', array( 'page_content' => $page ), array( "page_id=?", $info['database_page_id'] ) );
+			\IPS\Db::i()->update( 'cms_pages', array( 'page_content' => $page ), array( "page_id=?", $info['database_page_id'] ) );
 		}
-		catch( UnderflowException|DbException $e ) {}
+		catch( \UnderflowException $e ) {}
+		catch( \IPS\Db\Exception $e ) {}
 
-		unset( Store::i()->cms_databases );
+		unset( \IPS\Data\Store::i()->cms_databases );
 		
 		/* And return */
 		return $inserted_id;
@@ -1539,13 +1533,13 @@ class Cms extends Core
 	 * Convert a database category
 	 *
 	 * @param	array			$info	Data to insert.
-	 * @return	int|bool	The ID of the newly inserted category, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted category, or FALSE on failure.
 	 */
-	public function convertCmsDatabaseCategory( array $info=array() ) : bool|int
+	public function convertCmsDatabaseCategory( $info=array() )
 	{
 		if ( !isset( $info['category_id'] ) )
 		{
-			$this->software->app->log( 'cms_database_category_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_database_category_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -1555,21 +1549,21 @@ class Cms extends Core
 			{
 				$info['category_database_id'] = $this->software->app->getLink( $info['category_database_id'], 'cms_databases' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutRangeException $e )
 			{
-				$this->software->app->log( 'cms_database_category_missing_database', __METHOD__, App::LOG_WARNING, $info['category_id'] );
+				$this->software->app->log( 'cms_database_category_missing_database', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['category_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'cms_database_category_missing_database', __METHOD__, App::LOG_WARNING, $info['category_id'] );
+			$this->software->app->log( 'cms_database_category_missing_database', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['category_id'] );
 			return FALSE;
 		}
 		
 		if ( !isset( $info['category_name'] ) )
 		{
-			$info['category_name'] = Member::loggedIn()->language()->get( "content_db_{$info['category_database_id']}" ) . " Category {$info['category_id']}";
+			$info['category_name'] = \IPS\Member::loggedIn()->language()->get( "content_db_{$info['category_database_id']}" ) . " Category {$info['category_id']}";
 		}
 		
 		if ( array_key_exists( 'category_desc', $info ) )
@@ -1587,7 +1581,7 @@ class Cms extends Core
 		
 		if ( isset( $info['category_last_record_date'] ) )
 		{
-			if ( $info['category_last_record_date'] instanceof DateTime )
+			if ( $info['category_last_record_date'] instanceof \IPS\DateTime )
 			{
 				$info['category_last_record_date'] = $info['category_last_record_date']->getTimestamp();
 			}
@@ -1603,7 +1597,7 @@ class Cms extends Core
 			{
 				$info['category_last_record_member'] = $this->software->app->getLink( $info['category_last_record_member'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['category_last_record_member'] = 0;
 			}
@@ -1615,7 +1609,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['category_last_record_name'] ) )
 		{
-			$author = Member::load( $info['category_last_record_member'] );
+			$author = \IPS\Member::load( $info['category_last_record_member'] );
 			
 			if ( $author->member_id )
 			{
@@ -1633,9 +1627,9 @@ class Cms extends Core
 		
 		if ( !isset( $info['category_last_record_seo_name'] ) )
 		{
-			if ( !is_null( $info['category_last_record_name'] ) )
+			if ( !\is_null( $info['category_last_record_name'] ) )
 			{
-				$info['category_last_record_seo_name'] = Url::seoTitle( $info['category_last_record_name'] );
+				$info['category_last_record_seo_name'] = \IPS\Http\Url::seoTitle( $info['category_last_record_name'] );
 			}
 			else
 			{
@@ -1649,7 +1643,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['category_position'] ) )
 		{
-			$position = Db::i()->select( 'MAX(category_position)', 'cms_database_categories', array( "category_database_id=?", $info['category_database_id'] ) )->first();
+			$position = \IPS\Db::i()->select( 'MAX(category_position)', 'cms_database_categories', array( "category_database_id=?", $info['category_database_id'] ) )->first();
 			
 			$info['category_position'] = $position + 1;
 		}
@@ -1670,12 +1664,12 @@ class Cms extends Core
 		
 		if ( !isset( $info['category_furl_name'] ) )
 		{
-			$info['category_furl_name'] = Url::seoTitle( $info['category_name'] );
+			$info['category_furl_name'] = \IPS\Http\Url::seoTitle( $info['category_name'] );
 		}
 		
 		if ( isset( $info['category_meta_keywords'] ) )
 		{
-			if ( is_array( $info['category_meta_keywords'] ) )
+			if ( \is_array( $info['category_meta_keywords'] ) )
 			{
 				$info['category_meta_keywords'] = implode( ',', $info['category_meta_keywords'] );
 			}
@@ -1698,7 +1692,7 @@ class Cms extends Core
 				{
 					$info['category_parent_id'] = $this->software->app->getLink( $info['category_parent_id'], 'cms_database_categories' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* Does the ID exist in the source? */
 					$info['category_conv_parent'] = $info['category_parent_id'];
@@ -1713,9 +1707,9 @@ class Cms extends Core
 		try
 		{
 			$this->software->app->checkForSibling( 'forums' );
-			if ( Application::appIsEnabled( 'forums' ) === FALSE )
+			if ( \IPS\Application::appIsEnabled( 'forums' ) === FALSE )
 			{
-				throw new LogicException;
+				throw new \LogicException;
 			}
 			
 			foreach( array( 'category_forum_override', 'category_forum_record', 'category_forum_comments', 'category_forum_delete' ) AS $forumZero )
@@ -1732,7 +1726,7 @@ class Cms extends Core
 			}
 			else
 			{
-				throw new InvalidArgumentException;
+				throw new \InvalidArgumentException;
 			}
 			
 			foreach( array( 'category_forum_prefix', 'category_forum_suffix' ) as $forumNull )
@@ -1743,7 +1737,7 @@ class Cms extends Core
 				}
 			}
 		}
-		catch( OutOfRangeException|InvalidArgumentException $e )
+		catch( \OutOfRangeException $e )
 		{
 			$info['category_forum_override']	= 0;
 			$info['category_forum_record']		= 0;
@@ -1753,10 +1747,24 @@ class Cms extends Core
 			$info['category_forum_prefix']		= NULL;
 			$info['category_forum_suffix']		= NULL;
 		}
+		catch( \InvalidArgumentException $e )
+		{
+			$info['category_forum_override']	= 0;
+			$info['category_forum_record']		= 0;
+			$info['category_forum_comments']	= 0;
+			$info['category_forum_delete']		= 0;
+			$info['category_forum_forum']		= 0;
+			$info['category_forum_prefix']		= NULL;
+			$info['category_forum_suffix']		= NULL;
+		}
+		catch( \LogicException $e )
+		{
+			throw $e;
+		}
 		
 		if ( !isset( $info['category_full_path'] ) )
 		{
-			$info['category_full_path'] = Url::seoTitle( $info['category_name'] );
+			$info['category_full_path'] = \IPS\Http\Url::seoTitle( $info['category_name'] );
 		}
 		
 		if ( !isset( $info['category_last_title'] ) )
@@ -1766,9 +1774,9 @@ class Cms extends Core
 		
 		if ( !isset( $info['category_last_seo_title'] ) )
 		{
-			if ( !is_null( $info['category_last_title'] ) )
+			if ( !\is_null( $info['category_last_title'] ) )
 			{
-				$info['category_last_seo_title'] = Url::seoTitle( $info['category_last_title'] );
+				$info['category_last_seo_title'] = \IPS\Http\Url::seoTitle( $info['category_last_title'] );
 			}
 			else
 			{
@@ -1782,7 +1790,7 @@ class Cms extends Core
 		
 		if ( isset( $info['category_fields'] ) )
 		{
-			if ( !is_array( $info['category_fields'] ) )
+			if ( !\is_array( $info['category_fields'] ) )
 			{
 				$info['category_fields'] = json_decode( $info['category_fields'], TRUE );
 			}
@@ -1794,13 +1802,13 @@ class Cms extends Core
 				{
 					$fields[] = $this->software->app->getLink( $field, 'cms_database_fields' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					continue;
 				}
 			}
 			
-			if ( count( $fields ) )
+			if ( \count( $fields ) )
 			{
 				$info['category_fields'] = json_encode( $fields );
 			}
@@ -1824,14 +1832,14 @@ class Cms extends Core
 		$id = $info['category_id'];
 		unset( $info['category_id'] );
 		
-		$inserted_id = Db::i()->insert( 'cms_database_categories', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'cms_database_categories', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'cms_database_categories' );
 
-		Db::i()->update( 'cms_database_categories', array( "category_parent_id" => $inserted_id ), array( "category_conv_parent=?", $id ) );
-		Db::i()->insert( 'core_permission_index', array( 'app' => 'cms', 'perm_type' => 'categories_' . $info['category_database_id'], 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
+		\IPS\Db::i()->update( 'cms_database_categories', array( "category_parent_id" => $inserted_id ), array( "category_conv_parent=?", $id ) );
+		\IPS\Db::i()->insert( 'core_permission_index', array( 'app' => 'cms', 'perm_type' => 'categories_' . $info['category_database_id'], 'perm_type_id' => $inserted_id, 'perm_view' => '' ) );
 		
-		Lang::saveCustom( 'cms', "content_cat_name_{$inserted_id}", $info['category_name'] );
-		Lang::saveCustom( 'cms', "content_cat_name_{$inserted_id}_desc", $desc );
+		\IPS\Lang::saveCustom( 'cms', "content_cat_name_{$inserted_id}", $info['category_name'] );
+		\IPS\Lang::saveCustom( 'cms', "content_cat_name_{$inserted_id}_desc", $desc );
 		
 		return $inserted_id;
 	}
@@ -1843,13 +1851,13 @@ class Cms extends Core
 	 * @param	array			$fields			Custom Field Data.
 	 * @param	string|NULL		$imagepath		Path to record image
 	 * @param	string|NULL		$imagedata		Image data
-	 * @return	int|bool	The ID of the newly inserted record, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted record, or FALSE on failure.
 	 */
-	public function convertCmsDatabaseRecord( array $info=array(), array $fields=array(), ?string $imagepath=NULL, ?string $imagedata=NULL ) : bool|int
+	public function convertCmsDatabaseRecord( $info=array(), $fields=array(), $imagepath=NULL, $imagedata=NULL )
 	{
 		if ( !isset( $info['record_id'] ) )
 		{
-			$this->software->app->log( 'cms_database_record_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_database_record_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -1860,15 +1868,15 @@ class Cms extends Core
 				$database = $this->software->app->getLink( $info['record_database_id'], 'cms_databases' );
 				unset( $info['record_database_id'] );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'cms_database_record_missing_datebase', __METHOD__, App::LOG_WARNING, $info['record_id'] );
+				$this->software->app->log( 'cms_database_record_missing_datebase', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['record_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'cms_database_record_missing_database', __METHOD__, App::LOG_WARNING, $info['record_id'] );
+			$this->software->app->log( 'cms_database_record_missing_database', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['record_id'] );
 			return FALSE;
 		}
 		
@@ -1878,7 +1886,7 @@ class Cms extends Core
 			{
 				$info['member_id'] = $this->software->app->getLink( $info['member_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['member_id'] = 0;
 			}
@@ -1902,7 +1910,7 @@ class Cms extends Core
 		{
 			if ( isset( $info[ $date ] ) )
 			{
-				if ( $info[ $date ] instanceof DateTime )
+				if ( $info[ $date ] instanceof \IPS\DateTime )
 				{
 					$info[ $date ] = $info[ $date ]->getTimestamp();
 				}
@@ -1919,15 +1927,15 @@ class Cms extends Core
 			{
 				$info['category_id'] = $this->software->app->getLink( $info['category_id'], 'cms_database_categories' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'cms_database_record_missing_category', __METHOD__, App::LOG_WARNING, $info['record_id'] );
+				$this->software->app->log( 'cms_database_record_missing_category', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['record_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'cms_database_record_missing_category', __METHOD__, App::LOG_WARNING, $info['record_id'] );
+			$this->software->app->log( 'cms_database_record_missing_category', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['record_id'] );
 			return FALSE;
 		}
 		
@@ -1940,9 +1948,9 @@ class Cms extends Core
 		
 		if ( !isset( $info['record_dynamic_furl'] ) )
 		{
-			$titleField = Db::i()->select( 'database_field_title', 'cms_databases', array( "database_id=?", $database ) )->first();
+			$titleField = \IPS\Db::i()->select( 'database_field_title', 'cms_databases', array( "database_id=?", $database ) )->first();
 			
-			$info['record_dynamic_furl'] = Url::seoTitle( $fields['field_' . $titleField ] );
+			$info['record_dynamic_furl'] = \IPS\Http\Url::seoTitle( $fields['field_' . $titleField ] );
 		}
 		
 		if ( !isset( $info['record_static_furl'] ) )
@@ -1951,12 +1959,12 @@ class Cms extends Core
 		}
 		else
 		{
-			$info['record_static_furl'] = Url::seoTitle( $info['record_static_furl'] );
+			$info['record_static_furl'] = \IPS\Http\Url::seoTitle( $info['record_static_furl'] );
 		}
 		
 		if ( isset( $info['record_meta_keywords'] ) )
 		{
-			if ( is_array( $info['record_meta_keywords'] ) )
+			if ( \is_array( $info['record_meta_keywords'] ) )
 			{
 				$info['record_meta_keywords'] = implode( ',', $info['record_meta_keywords'] );
 			}
@@ -1976,16 +1984,20 @@ class Cms extends Core
 			try
 			{
 				$this->software->app->checkForSibling( 'forums' );
-				if ( Application::appIsEnabled( 'forums' ) === FALSE )
+				if ( \IPS\Application::appIsEnabled( 'forums' ) === FALSE )
 				{
-					throw new LogicException;
+					throw new \LogicException;
 				}
 				
 				$info['record_topicid'] = $this->software->app->getSiblingLink( $info['record_topicid'], 'forums_topics', 'forums' );
 			}
-			catch( OutOfrangeException $e )
+			catch( \OutOfrangeException $e )
 			{
 				$info['record_topicid'] = 0;
+			}
+			catch( \LogicException $e )
+			{
+				throw $e;
 			}
 		}
 		else
@@ -1997,13 +2009,13 @@ class Cms extends Core
 		{
 			if ( isset( $info[ $currentDate ] ) )
 			{
-				if ( $info[ $currentDate ] instanceof DateTime )
+				if ( $info[ $currentDate ] instanceof \IPS\DateTime )
 				{
 					$info[ $currentDate ] = $info[ $currentDate ]->getTimestamp();
 				}
 
 				/* Last comment and last review dates cannot be in the future */
-				if( in_array( $currentDate, array( 'record_last_comment', 'record_last_review' ) ) AND $info[ $currentDate ] > time() )
+				if( \in_array( $currentDate, array( 'record_last_comment', 'record_last_review' ) ) AND $info[ $currentDate ] > time() )
 				{
 					$info[ $currentDate ] = time();
 				}
@@ -2020,7 +2032,7 @@ class Cms extends Core
 			{
 				$info['record_last_comment_by'] = $this->software->app->getLink( $info['record_last_comment_by'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['record_last_comment_by'] = 0;
 			}
@@ -2032,7 +2044,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['record_last_comment_name'] ) )
 		{
-			$author = Member::load( $info['record_last_comment_by'] );
+			$author = \IPS\Member::load( $info['record_last_comment_by'] );
 			
 			if ( $author->member_id )
 			{
@@ -2048,7 +2060,7 @@ class Cms extends Core
 			$info['record_last_comment_name'] = NULL;
 		}
 
-		if ( isset( $info['record_image'] ) AND ( !is_null( $imagepath ) OR !is_null( $imagedata ) ) )
+		if ( isset( $info['record_image'] ) AND ( !\is_null( $imagepath ) OR !\is_null( $imagedata ) ) )
 		{
 			$container = NULL;
 			if( $info['record_saved'] )
@@ -2058,17 +2070,17 @@ class Cms extends Core
 
 			try
 			{
-				if ( is_null( $imagedata ) AND !is_null( $imagepath ) )
+				if ( \is_null( $imagedata ) AND !\is_null( $imagepath ) )
 				{
 					$imagedata = @file_get_contents( $imagepath );
 					$imagepath = NULL;
 				}
 
-				$file = File::create( 'cms_Records', $info['record_image'], $imagedata, $container, TRUE );
+				$file = \IPS\File::create( 'cms_Records', $info['record_image'], $imagedata, $container, TRUE );
 				$info['record_image']		= (string) $file;
 				$info['record_image_thumb']	= (string) $file->thumbnail( 'cms_Records' );
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				$info['record_image']		= NULL;
 				$info['record_image_thumb']	= NULL;
@@ -2086,7 +2098,7 @@ class Cms extends Core
 			{
 				$info['record_last_review_by'] = $this->software->app->getLink( $info['record_last_review_by'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['record_last_review_by'] = 0;
 			}
@@ -2098,7 +2110,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['record_last_review_name'] ) )
 		{
-			$author = Member::load( $info['record_last_review_by'] );
+			$author = \IPS\Member::load( $info['record_last_review_by'] );
 			
 			if ( $author->member_id )
 			{
@@ -2125,7 +2137,7 @@ class Cms extends Core
 			{
 				$info['record_edit_member_id'] = $this->software->app->getLink( $info['record_edit_member_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['record_edit_member_id'] = 0;
 			}
@@ -2137,7 +2149,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['record_edit_member_name'] ) )
 		{
-			$member = Member::load( $info['record_edit_member_id'] );
+			$member = \IPS\Member::load( $info['record_edit_member_id'] );
 			
 			if ( $member->member_id )
 			{
@@ -2155,7 +2167,7 @@ class Cms extends Core
 		$id = $info['record_id'];
 		unset( $info['record_id'] );
 		
-		$inserted_id = Db::i()->insert( "cms_custom_database_{$database}", $info );
+		$inserted_id = \IPS\Db::i()->insert( "cms_custom_database_{$database}", $info );
 		$this->software->app->addLink( $inserted_id, $id, "cms_custom_database_{$database}" );
 		
 		return $inserted_id;
@@ -2167,11 +2179,11 @@ class Cms extends Core
 	 * @param	array	$fieldInfo		The Field Information to format. This SHOULD be in $foreign_id => $content format, however field_$foreign_id => $content is also accepted.
 	 * @return	array					An array of data formatted for cms_custom_database_*
 	 */
-	protected function _formatFieldsForSaving( array $fieldInfo ) : array
+	protected function _formatFieldsForSaving( $fieldInfo )
 	{
 		$return = array();
 		
-		if ( count( $fieldInfo ) )
+		if ( \count( $fieldInfo ) )
 		{
 			foreach( $fieldInfo as $key => $value )
 			{
@@ -2179,7 +2191,7 @@ class Cms extends Core
 				{
 					$id = str_replace( 'field_', '', $matches[1] );
 				}
-				else if ( is_numeric( $key ) )
+				else if ( \is_numeric( $key ) )
 				{
 					$id = $key;
 				}
@@ -2192,7 +2204,7 @@ class Cms extends Core
 				{
 					$link = $this->software->app->getLink( $id, 'cms_database_fields' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* Does not exist - skip */
 					continue;
@@ -2209,13 +2221,13 @@ class Cms extends Core
 	 * Convert a Comment
 	 *
 	 * @param	array			$info	Data to insert.
-	 * @return	int|bool	The ID of the newly inserted comment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted comment, or FALSE on failure.
 	 */
-	public function convertCmsDatabaseComment( array $info=array() ) : bool|int
+	public function convertCmsDatabaseComment( $info=array() )
 	{
 		if ( !isset( $info['comment_id'] ) )
 		{
-			$this->software->app->log( 'cms_database_comment_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_database_comment_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -2225,7 +2237,7 @@ class Cms extends Core
 			{
 				$info['comment_user'] = $this->software->app->getLink( $info['comment_user'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['comment_user'] = 0;
 			}
@@ -2241,15 +2253,15 @@ class Cms extends Core
 			{
 				$info['comment_database_id'] = $this->software->app->getLink( $info['comment_database_id'], 'cms_databases' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'cms_database_comment_missing_database', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+				$this->software->app->log( 'cms_database_comment_missing_database', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'cms_database_comment_missing_database', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'cms_database_comment_missing_database', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 		
@@ -2259,21 +2271,21 @@ class Cms extends Core
 			{
 				$info['comment_record_id'] = $this->software->app->getLink( $info['comment_record_id'], "cms_custom_database_{$info['comment_database_id']}" );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'cms_database_comment_missing_record', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+				$this->software->app->log( 'cms_database_comment_missing_record', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'cms_database_comment_missing_record', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'cms_database_comment_missing_record', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 		
 		if ( isset( $info['comment_date'] ) )
 		{
-			if ( $info['comment_date'] instanceof DateTime )
+			if ( $info['comment_date'] instanceof \IPS\DateTime )
 			{
 				$info['comment_date'] = $info['comment_date']->getTimestamp();
 			}
@@ -2290,7 +2302,7 @@ class Cms extends Core
 		
 		if ( empty( $info['comment_post'] ) )
 		{
-			$this->software->app->log( 'cms_database_comment_missing_content', __METHOD__, App::LOG_WARNING, $info['comment_id'] );
+			$this->software->app->log( 'cms_database_comment_missing_content', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['comment_id'] );
 			return FALSE;
 		}
 		
@@ -2301,7 +2313,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['comment_author'] ) )
 		{
-			$author = Member::load( $info['comment_user'] );
+			$author = \IPS\Member::load( $info['comment_user'] );
 			
 			if ( $author->member_id )
 			{
@@ -2315,7 +2327,7 @@ class Cms extends Core
 		
 		if ( isset( $info['comment_edit_date'] ) )
 		{
-			if ( $info['comment_edit_date'] instanceof DateTime )
+			if ( $info['comment_edit_date'] instanceof \IPS\DateTime )
 			{
 				$info['comment_edit_date'] = $info['comment_edit_date']->getTimestamp();
 			}
@@ -2336,7 +2348,7 @@ class Cms extends Core
 			{
 				$info['comment_edit_member_id'] = $this->software->app->getLink( $info['comment_edit_member_id'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['comment_edit_member_id'] = 0;
 			}
@@ -2348,7 +2360,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['comment_edit_member_name'] ) )
 		{
-			$member = Member::load( $info['comment_edit_member_id'] );
+			$member = \IPS\Member::load( $info['comment_edit_member_id'] );
 			
 			if ( $member->member_id )
 			{
@@ -2372,7 +2384,7 @@ class Cms extends Core
 		$id = $info['comment_id'];
 		unset( $info['comment_id'] );
 		
-		$inserted_id = Db::i()->insert( 'cms_database_comments', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'cms_database_comments', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'cms_database_comments' );
 		
 		return $inserted_id;
@@ -2382,13 +2394,13 @@ class Cms extends Core
 	 * Convert a review
 	 *
 	 * @param	array			$info		Data to insert
-	 * @return	int|bool	The ID of the newly inserted review, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted review, or FALSE on failure.
 	 */
-	public function convertCmsDatabaseReview( array $info=array() ) : bool|int
+	public function convertCmsDatabaseReview( $info=array() )
 	{
 		if ( !isset( $info['review_id'] ) )
 		{
-			$this->software->app->log( 'cms_database_review_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_database_review_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -2398,15 +2410,15 @@ class Cms extends Core
 			{
 				$info['review_database_id'] = $this->software->app->getLink( $info['review_database_id'], 'cms_databases' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'cms_database_review_missing_database', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+				$this->software->app->log( 'cms_database_review_missing_database', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'cms_database_review_missing_database', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'cms_database_review_missing_database', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 		
@@ -2416,15 +2428,15 @@ class Cms extends Core
 			{
 				$info['review_item'] = $this->software->app->getLink( $info['review_item'], "cms_custom_database_{$info['review_database_id']}" );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'cms_database_review_missing_item', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+				$this->software->app->log( 'cms_database_review_missing_item', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'cms_database_review_missing_item', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'cms_database_review_missing_item', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 		
@@ -2435,28 +2447,28 @@ class Cms extends Core
 			{
 				$info['review_author'] = $this->software->app->getLink( $info['review_author'], 'core_members', TRUE );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				$this->software->app->log( 'cms_database_review_missing_member', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+				$this->software->app->log( 'cms_database_review_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 				return FALSE;
 			}
 		}
 		else
 		{
-			$this->software->app->log( 'cms_database_review_missing_member', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'cms_database_review_missing_member', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 		
 		if ( empty( $info['review_content'] ) )
 		{
-			$this->software->app->log( 'cms_database_review_empty', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'cms_database_review_empty', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 		
 		/* This seems silly, but we really do need a rating  */
 		if ( !isset( $info['review_rating'] ) OR $info['review_rating'] < 1 )
 		{
-			$this->software->app->log( 'cms_database_review_invalid_rating', __METHOD__, App::LOG_WARNING, $info['review_id'] );
+			$this->software->app->log( 'cms_database_review_invalid_rating', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['review_id'] );
 			return FALSE;
 		}
 		
@@ -2467,7 +2479,7 @@ class Cms extends Core
 		
 		if ( isset( $info['review_edit_time'] ) )
 		{
-			if ( $info['review_edit_time'] instanceof DateTime )
+			if ( $info['review_edit_time'] instanceof \IPS\DateTime )
 			{
 				$info['review_edit_time'] = $info['review_edit_time']->getTimestamp();
 			}
@@ -2484,7 +2496,7 @@ class Cms extends Core
 		
 		if ( isset( $info['review_date'] ) )
 		{
-			if ( $info['review_date'] instanceof DateTime )
+			if ( $info['review_date'] instanceof \IPS\DateTime )
 			{
 				$info['review_date'] = $info['review_date']->getTimestamp();
 			}
@@ -2501,7 +2513,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['review_author_name'] ) )
 		{
-			$author = Member::load( $info['review_mid'] );
+			$author = \IPS\Member::load( $info['review_mid'] );
 			
 			if ( $author->member_id )
 			{
@@ -2515,13 +2527,13 @@ class Cms extends Core
 		
 		if ( isset( $info['review_votes_data'] ) )
 		{
-			if ( !is_array( $info['review_votes_data'] ) )
+			if ( !\is_array( $info['review_votes_data'] ) )
 			{
 				$info['review_votes_data'] = json_decode( $info['review_votes_data'], TRUE );
 			}
 			
 			$newVoters = array();
-			if ( !is_null( $info['review_votes_data'] ) AND count( $info['review_votes_data'] ) )
+			if ( !\is_null( $info['review_votes_data'] ) AND \count( $info['review_votes_data'] ) )
 			{
 				foreach( $info['review_votes_data'] AS $member => $vote )
 				{
@@ -2529,7 +2541,7 @@ class Cms extends Core
 					{
 						$memberId = $this->software->app->getLink( $member, 'core_members', TRUE );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						continue;
 					}
@@ -2538,7 +2550,7 @@ class Cms extends Core
 				}
 			}
 			
-			if ( count( $newVoters ) )
+			if ( \count( $newVoters ) )
 			{
 				$info['review_votes_data'] = json_encode( $newVoters );
 			}
@@ -2554,19 +2566,19 @@ class Cms extends Core
 		
 		if ( !isset( $info['review_votes_total'] ) )
 		{
-			if ( is_null( $info['review_votes_data'] ) )
+			if ( \is_null( $info['review_votes_data'] ) )
 			{
 				$info['review_votes_total'] = 0;
 			}
 			else
 			{
-				$info['review_votes_total'] = count( json_decode( $info['review_votes_data'], TRUE ) );
+				$info['review_votes_total'] = \count( json_decode( $info['review_votes_data'], TRUE ) );
 			}
 		}
 		
 		if ( !isset( $info['review_votes_helpful'] ) )
 		{
-			if ( is_null( $info['review_votes_data'] ) )
+			if ( \is_null( $info['review_votes_data'] ) )
 			{
 				$info['review_votes_helpful'] = 0;
 			}
@@ -2593,7 +2605,7 @@ class Cms extends Core
 		$id = $info['review_id'];
 		unset( $info['review_id'] );
 		
-		$inserted_id = Db::i()->insert( 'cms_database_reviews', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'cms_database_reviews', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'cms_database_reviews' );
 		
 		return $inserted_id;
@@ -2603,13 +2615,13 @@ class Cms extends Core
 	 * Convert a Media Folder
 	 *
 	 * @param	array			$info	Data to insert
-	 * @return	int|bool	The ID of the newly inserted folder, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted folder, or FALSE on failure.
 	 */
-	public function convertCmsMediaFolder( array $info=array() ) : bool|int
+	public function convertCmsMediaFolder( $info=array() )
 	{
 		if ( !isset( $info['media_folder_id'] ) )
 		{
-			$this->software->app->log( 'cms_media_folder_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_media_folder_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
@@ -2624,7 +2636,7 @@ class Cms extends Core
 			{
 				$info['media_folder_parent'] = $this->software->app->getLink( $info['media_folder_parent'], 'cms_media_folders' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['media_conv_parent'] = $info['media_folder_parent'];
 			}
@@ -2642,10 +2654,10 @@ class Cms extends Core
 		$id = $info['media_folder_id'];
 		unset( $info['media_folder_id'] );
 		
-		$inserted_id = Db::i()->insert( 'cms_media_folders', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'cms_media_folders', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'cms_media_folders' );
 		
-		Db::i()->update( 'cms_media_folders', array( "media_folder_parent" => $inserted_id ), array( "media_conv_parent=?", $id ) );
+		\IPS\Db::i()->update( 'cms_media_folders', array( "media_folder_parent" => $inserted_id ), array( "media_conv_parent=?", $id ) );
 		
 		return $inserted_id;
 	}
@@ -2656,19 +2668,19 @@ class Cms extends Core
 	 * @param	array			$info		Data to insert
 	 * @param	string|NULL		$filepath	The path to the file, or NULL.
 	 * @param	string|NULL		$filedata	The data for the file, or NULL.
-	 * @return	int|bool	The ID of the newly inserted media file, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted media file, or FALSE on failure.
 	 */
-	public function convertCmsMedia( array $info=array(), ?string $filepath=NULL, ?string $filedata=NULL ) : bool|int
+	public function convertCmsMedia( $info=array(), $filepath=NULL, $filedata=NULL )
 	{
 		if ( !isset( $info['media_id'] ) )
 		{
-			$this->software->app->log( 'cms_media_file_missing_ids', __METHOD__, App::LOG_WARNING );
+			$this->software->app->log( 'cms_media_file_missing_ids', __METHOD__, \IPS\convert\App::LOG_WARNING );
 			return FALSE;
 		}
 		
-		if ( is_null( $filepath ) AND is_null( $filedata ) )
+		if ( \is_null( $filepath ) AND \is_null( $filedata ) )
 		{
-			$this->software->app->log( 'cms_media_file_no_file', __METHOD__, App::LOG_WARNING, $info['media_id'] );
+			$this->software->app->log( 'cms_media_file_no_file', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['media_id'] );
 			return FALSE;
 		}
 		
@@ -2678,7 +2690,7 @@ class Cms extends Core
 			{
 				$info['media_parent'] = $this->software->app->getLink( $info['media_parent'], 'cms_media_folders' );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				$info['media_parent'] = 0;
 			}
@@ -2690,7 +2702,7 @@ class Cms extends Core
 		
 		if ( !isset( $info['media_filename'] ) )
 		{
-			if ( !is_null( $filepath ) )
+			if ( !\is_null( $filepath ) )
 			{
 				$name = explode( '/', $filepath );
 				$name = array_pop( $name );
@@ -2698,14 +2710,14 @@ class Cms extends Core
 			}
 			else
 			{
-				$this->software->app->log( 'cms_media_file_missing_name', __METHOD__, App::LOG_WARNING, $info['media_id'] );
+				$this->software->app->log( 'cms_media_file_missing_name', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['media_id'] );
 				return FALSE;
 			}
 		}
 		
 		if ( isset( $info['media_added'] ) )
 		{
-			if ( $info['media_added'] instanceof DateTime )
+			if ( $info['media_added'] instanceof \IPS\DateTime )
 			{
 				$info['media_added'] = $info['media_added']->getTimestamp();
 			}
@@ -2719,9 +2731,9 @@ class Cms extends Core
 		{
 			try
 			{
-				$folderPath = Db::i()->select( 'media_folder_path', 'cms_media_folders', array( "media_folder_id=?", $info['media_parent'] ) )->first();
+				$folderPath = \IPS\Db::i()->select( 'media_folder_path', 'cms_media_folders', array( "media_folder_id=?", $info['media_parent'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$folderPath = '';
 			}
@@ -2731,13 +2743,13 @@ class Cms extends Core
 		
 		try
 		{
-			if ( is_null( $filedata ) AND !is_null( $filepath ) )
+			if ( \is_null( $filedata ) AND !\is_null( $filepath ) )
 			{
 				$filedata = @file_get_contents( $filepath );
 				$filepath = NULL;
 			}
 			
-			$file = File::create( 'cms_Media', $info['media_parent'] . '_' . $info['media_filename'], $filedata, 'pages_media' );
+			$file = \IPS\File::create( 'cms_Media', $info['media_parent'] . '_' . $info['media_filename'], $filedata, 'pages_media' );
 			$info['media_file_object'] = (string) $file;
 			$info['media_filename_stored'] = $info['media_parent'] . '_' . $info['media_filename'];
 			
@@ -2753,16 +2765,21 @@ class Cms extends Core
 				}
 			}
 		}
-		catch( Exception|ErrorException $e )
+		catch( \Exception $e )
 		{
-			$this->software->app->log( $e->getMessage(), __METHOD__, App::LOG_WARNING, $info['media_id'] );
+			$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_WARNING, $info['media_id'] );
 			return FALSE;
 		}
-
+		catch( \ErrorException $e )
+		{
+			$this->software->app->log( $e->getMessage(), __METHOD__, \IPS\convert\App::LOG_WARNING, $info['media_id'] );
+			return FALSE;
+		}
+		
 		$id = $info['media_id'];
 		unset( $info['media_id'] );
 		
-		$inserted_id = Db::i()->insert( 'cms_media', $info );
+		$inserted_id = \IPS\Db::i()->insert( 'cms_media', $info );
 		$this->software->app->addLink( $inserted_id, $id, 'cms_media' );
 		
 		return $inserted_id;
@@ -2776,12 +2793,11 @@ class Cms extends Core
 	 * @param	string|NULL		$filepath	Path to the file, or NULL.
 	 * @param	string|NULL		$filedata	Binary data for the file, or NULL.
 	 * @param	string|NULL		$thumbnailpath	Path to the thumbnail, or NULL.
-	 * @return	int|bool	The ID of the newly inserted attachment, or FALSE on failure.
+	 * @return	integer|boolean	The ID of the newly inserted attachment, or FALSE on failure.
 	 */
-	public function convertAttachment( array $info=array(), array $map=array(), ?string $filepath=NULL, ?string $filedata=NULL, ?string $thumbnailpath = NULL ) : bool|int
+	public function convertAttachment( $info=array(), $map=array(), $filepath=NULL, $filedata=NULL, $thumbnailpath = NULL )
 	{
-		/* We always skip the link for id3, thus it's already the right database id */
-		$database = str_replace( [ '-review', '-comment' ], '', $map['id3'] );
+		$database = $this->software->app->getLink( str_replace( '-review', '', $map['id3'] ), 'cms_databases' );
 		
 		$map['id1_type']		= "cms_custom_database_{$database}";
 		$map['id1_from_parent']	= FALSE;
@@ -2791,7 +2807,7 @@ class Cms extends Core
 
 		if( empty( $map['id2_type'] ) )
 		{
-			if ( substr( $map['id3'], -1, 7 ) == '-review' )
+			if ( \substr( $map['id3'], -1, 7 ) == '-review' )
 			{
 				$map['id2_type'] = 'cms_database_reviews';
 			}
@@ -2800,11 +2816,8 @@ class Cms extends Core
 				$map['id2_type'] = 'cms_database_comments';
 			}
 		}
-
-		if( empty( $map['id3'] ) )
-		{
-			$map['id3'] = $database;
-		}
+		
+		$map['id3'] = $database;
 		
 		return parent::convertAttachment( $info, $map, $filepath, $filedata, $thumbnailpath );
 	}
@@ -2814,17 +2827,17 @@ class Cms extends Core
 	 * Convert a Tag - CMS, we need to verify the database in a different way that doesn't require it to be on a page
 	 *
 	 * @param	array		$info	Data to insert
-	 * @return	bool|int		The ID of the newly inserted tag, or FALSE on failure.
+	 * @return	boolean|integer		The ID of the newly inserted tag, or FALSE on failure.
 	 * @note Like Follows, this should be done when the actual content it's attached too is being converted.
 	 * @note core_tags_cache and core_tags_perms need to be populated by the converter.
 	 */
-	public function convertTag( array $info=array() ) : bool|int
+	public function convertTag( $info=array() )
 	{
 		$classname = 'IPS\cms\\' . ucfirst( $info['tag_meta_area'] );
 
 		if( !class_exists( $classname ) )
 		{
-			$this->software->app->log( 'tag_area_invalid_cms', __METHOD__, App::LOG_WARNING, $info['tag_id'] ?? NULL );
+			$this->software->app->log( 'tag_area_invalid_cms', __METHOD__, \IPS\convert\App::LOG_WARNING, $info['tag_id'] ?? NULL );
 			return FALSE;
 		}
 

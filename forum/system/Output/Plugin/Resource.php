@@ -11,67 +11,36 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\IPS;
-use IPS\Theme;
-use function array_pop;
-use function count;
-use function defined;
-use function explode;
-use function implode;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - Theme Resource (image, font, theme-specific JS, etc)
  */
-class Resource
+class _Resource
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = TRUE;
+	public static $canBeUsedInCss = TRUE;
 	
 	/**
 	 * Run the plug-in
 	 *
-	 * @param string $data		The initial data from the tag
-	 * @param array $options    Array of options
-	 * @param string $context	The name of the calling function
+	 * @param	string 		$data		The initial data from the tag
+	 * @param	array		$options    Array of options
+	 * @param	string		$context	The name of the calling function
 	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options, string $context ): string
+	public static function runPlugin( $data, $options, $context )
 	{	
 		$exploded = explode( '_', $context );
-		$app      = ( $options['app'] ?? ( $exploded[1] ?? 'core' ) );
-		$location = ( $options['location'] ?? ( $exploded[2] ?? 'front' ) );
+		$app      = ( isset( $options['app'] )      ? $options['app']      : ( isset( $exploded[1] ) ? $exploded[1] : '' ) );
+		$location = ( isset( $options['location'] ) ? $options['location'] : ( isset( $exploded[2] ) ? $exploded[2] : '' ) );
 		$noProtocol =  ( isset( $options['noprotocol'] ) ) ? $options['noprotocol'] : "false";
-
-		if ( ( ! \IPS\IN_DEV or Application::areWeBuilding() ) and isset( $options['inCss'] ) and $options['inCss'] and $app and in_array( $app, IPS::$ipsApps ) )
-		{
-			/* We can use a relative path */
-			$paths    = explode( '/', $data );
-			$name     = array_pop( $paths );
-			$path     = ( count( $paths ) ) ? ( '/' . implode( '/', $paths ) . '/' ) : '/';
-			$hash = Theme::makeBuiltTemplateLookupHash( $app, $location, $path );
-
-			if ( $location === 'interface' )
-			{
-				return '"../../applications/' . $app . '/interface/' . $data . '"';
-			}
-
-			/* If we're building from install or upgrade, we need to use the relative paths otherwise the theme will use the building site's URL in the static files */
-			if ( $location !== 'admin' )
-			{
-				return '"../resources/' . $app . '_' . $hash  . '_' . $name . '"';
-			}
-		}
 
 		return "\\IPS\\Theme::i()->resource( \"{$data}\", \"{$app}\", '{$location}', {$noProtocol} )";
 	}

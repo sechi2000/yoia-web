@@ -12,36 +12,21 @@
 namespace IPS\blog\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\blog\Blog;
-use IPS\blog\Entry;
-use IPS\blog\Entry\Comment;
-use IPS\Content\Api\ItemController;
-use IPS\Content\Item;
-use IPS\Member;
-use IPS\Request;
-use IPS\Text\Parser;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Blog Entries API
  */
-class entries extends ItemController
+class _entries extends \IPS\Content\Api\ItemController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\blog\Entry';
+	protected $class = 'IPS\blog\Entry';
 	
 	/**
 	 * GET /blog/entries
@@ -60,10 +45,9 @@ class entries extends ItemController
 	 * @apiparam	string	sortDir			Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page			Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\blog\Entry>
-	 * @return PaginatedResponse<Entry>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\blog\Entry>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = array();
@@ -73,9 +57,9 @@ class entries extends ItemController
 		{
 			$where[] = array( 'entry_status=? AND blog_disabled=0 AND blog_social_group IS NULL AND blog_club_id IS NULL', 'published' );
 		}
-		elseif ( isset( Request::i()->draft ) )
+		elseif ( isset( \IPS\Request::i()->draft ) )
 		{
-			$where[] = array( 'entry_status=?', Request::i()->draft ? 'draft' : 'published' );
+			$where[] = array( 'entry_status=?', \IPS\Request::i()->draft ? 'draft' : 'published' );
 		}
 				
 		/* Return */
@@ -88,18 +72,17 @@ class entries extends ItemController
 	 *
 	 * @param		int		$id				ID Number
 	 * @throws		2B300/A	INVALID_ID		The entry ID does not exist
-	 * @apireturn		\IPS\blog\Entry
-	 * @return Response
+	 * @return		\IPS\blog\Entry
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{
 			return $this->_view( $id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2B300/A', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2B300/A', 404 );
 		}
 	}
 
@@ -111,18 +94,17 @@ class entries extends ItemController
 	 * @apiparam	int		page		Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
 	 * @throws		2B300/1	INVALID_ID	The entry ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		PaginatedResponse<IPS\blog\Entry\Comment>
-	 * @return PaginatedResponse<Comment>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\blog\Entry\Comment>
 	 */
-	public function GETitem_comments( int $id ): PaginatedResponse
+	public function GETitem_comments( $id )
 	{
 		try
 		{
 			return $this->_comments( $id, 'IPS\blog\Entry\Comment' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2B300/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2B300/1', 404 );
 		}
 	}
 	
@@ -155,19 +137,18 @@ class entries extends ItemController
 	 * @throws		1B300/4				NO_TITLE		No title was supplied
 	 * @throws		1B300/5				NO_CONTENT		No content was supplied
 	 * @throws		1B300/A				NO_PERMISSION	The authorized user does not have permission to create an entry in that blog
-	 * @apireturn		\IPS\blog\Entry
-	 * @return Response
+	 * @return		\IPS\blog\Entry
 	 */
-	public function POSTindex(): Response
+	public function POSTindex()
 	{		
 		/* Get blog */
 		try
 		{
-			$blog = Blog::load( Request::i()->blog );
+			$blog = \IPS\blog\Blog::load( \IPS\Request::i()->blog );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'NO_BLOG', '1B300/2', 400 );
+			throw new \IPS\Api\Exception( 'NO_BLOG', '1B300/2', 400 );
 		}
 		
 		/* Get author */
@@ -175,45 +156,45 @@ class entries extends ItemController
 		{
 			if ( !$blog->can( 'add', $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '1B300/A', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '1B300/A', 403 );
 			}
 			$author = $this->member;
 		}
 		else
 		{
-			if ( Request::i()->author )
+			if ( \IPS\Request::i()->author )
 			{
-				$author = Member::load( Request::i()->author );
+				$author = \IPS\Member::load( \IPS\Request::i()->author );
 				if ( !$author->member_id )
 				{
-					throw new Exception( 'NO_AUTHOR', '1B300/3', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1B300/3', 400 );
 				}
 			}
 			else
 			{
-				if ( (int) Request::i()->author === 0 )
+				if ( (int) \IPS\Request::i()->author === 0 ) 
 				{
-					$author = new Member;
+					$author = new \IPS\Member;
 				}
 				else 
 				{
-					throw new Exception( 'NO_AUTHOR', '1B300/3', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1B300/3', 400 );
 				}
 			}
 		}
 		
 		/* Check we have a title and a description */
-		if ( !Request::i()->title )
+		if ( !\IPS\Request::i()->title )
 		{
-			throw new Exception( 'NO_TITLE', '1B300/4', 400 );
+			throw new \IPS\Api\Exception( 'NO_TITLE', '1B300/4', 400 );
 		}
-		if ( !Request::i()->entry )
+		if ( !\IPS\Request::i()->entry )
 		{
-			throw new Exception( 'NO_CONTENT', '1B300/5', 400 );
+			throw new \IPS\Api\Exception( 'NO_CONTENT', '1B300/5', 400 );
 		}
 		
 		/* Do it */
-		return new Response( 201, $this->_create( $blog, $author )->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 201, $this->_create( $blog, $author )->apiOutput( $this->member ) );
 	}
 	
 	/**
@@ -243,58 +224,57 @@ class entries extends ItemController
 	 * @throws		1B300/7				NO_BLOG			The blog ID does not exist or the authorized user does not have permission to post in it
 	 * @throws		1B300/8				NO_AUTHOR		The author ID does not exist
 	 * @throws		1B300/B				NO_PERMISSION	The authorized user does not have permission to edit that blog entry
-	 * @apireturn		\IPS\blog\Entry
-	 * @return Response
+	 * @return		\IPS\blog\Entry
 	 */
-	public function POSTitem( int $id ): Response
+	public function POSTitem( $id )
 	{
 		try
 		{
-			$entry = Entry::load( $id );
+			$entry = \IPS\blog\Entry::load( $id );
 			if ( $this->member and !$entry->can( 'read', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			if ( $this->member and !$entry->canEdit( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '1B300/B', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '1B300/B', 403 );
 			}
 			
 			/* New blog */
-			if ( isset( Request::i()->blog ) and Request::i()->blog != $entry->blog_id and ( !$this->member or $entry->canMove( $this->member ) ) )
+			if ( isset( \IPS\Request::i()->blog ) and \IPS\Request::i()->blog != $entry->blog_id and ( !$this->member or $entry->canMove( $this->member ) ) )
 			{
 				try
 				{
-					$newBlog = Blog::load( Request::i()->blog );
+					$newBlog = \IPS\blog\Blog::load( \IPS\Request::i()->blog );
 					if ( $this->member and !$newBlog->can( 'add', $this->member ) )
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 					
 					$entry->move( $newBlog );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					throw new Exception( 'NO_BLOG', '1B300/7', 400 );
+					throw new \IPS\Api\Exception( 'NO_BLOG', '1B300/7', 400 );
 				}
 			}
 			
 			/* New author */
-			if ( !$this->member and isset( Request::i()->author ) )
+			if ( !$this->member and isset( \IPS\Request::i()->author ) )
 			{				
 				try
 				{
-					$member = Member::load( Request::i()->author );
+					$member = \IPS\Member::load( \IPS\Request::i()->author );
 					if ( !$member->member_id )
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 					
 					$entry->changeAuthor( $member );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					throw new Exception( 'NO_AUTHOR', '1B300/8', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1B300/8', 400 );
 				}
 			}
 			
@@ -303,36 +283,36 @@ class entries extends ItemController
 			
 			/* Save and return */
 			$entry->save();
-			return new Response( 200, $entry->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $entry->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2B300/6', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2B300/6', 404 );
 		}
 	}
 
 	/**
 	 * Create or update entry
 	 *
-	 * @param	Item	$item	The item
+	 * @param	\IPS\Content\Item	$item	The item
 	 * @param	string				$type	add or edit
-	 * @return	Item
+	 * @return	\IPS\Content\Item
 	 */
-	protected function _createOrUpdate( Item $item, string $type='add' ): Item
+	protected function _createOrUpdate( \IPS\Content\Item $item, $type='add' )
 	{
 		/* Is draft */
-		if ( isset( Request::i()->draft ) )
+		if ( isset( \IPS\Request::i()->draft ) )
 		{
-			$item->status = Request::i()->draft ? 'draft' : 'published';
+			$item->status = \IPS\Request::i()->draft ? 'draft' : 'published';
 		}
 		
 		/* Content */
-		if ( isset( Request::i()->entry ) )
+		if ( isset( \IPS\Request::i()->entry ) )
 		{
-			$entryContents = Request::i()->entry;
+			$entryContents = \IPS\Request::i()->entry;
 			if ( $this->member )
 			{
-				$entryContents = Parser::parseStatic( $entryContents, NULL, $this->member, 'blog_Entries' );
+				$entryContents = \IPS\Text\Parser::parseStatic( $entryContents, TRUE, NULL, $this->member, 'blog_Entries' );
 			}
 			$item->content = $entryContents;
 		}
@@ -341,9 +321,9 @@ class entries extends ItemController
 		$this->_createOrUpdatePoll( $item, $type );
 
 		/* Category */
-		if ( isset( Request::i()->category ) )
+		if ( isset( \IPS\Request::i()->category ) )
 		{
-			$item->category_id = Request::i()->category;
+			$item->category_id = \IPS\Request::i()->category;
 		}
 		
 		/* Pass up */
@@ -357,26 +337,25 @@ class entries extends ItemController
 	 * @param		int		$id			ID Number
 	 * @throws		2B300/9	INVALID_ID		The entry ID does not exist
 	 * @throws		2B300/C	NO_PERMISSION	The authorized user does not have permission to delete the entry
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
 		try
 		{
-			$item = Entry::load( $id );
+			$item = \IPS\blog\Entry::load( $id );
 			if ( $this->member and !$item->canDelete( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2B300/C', 404 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2B300/C', 404 );
 			}
 			
 			$item->delete();
 			
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2B300/9', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2B300/9', 404 );
 		}
 	}
 }

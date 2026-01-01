@@ -10,10 +10,9 @@
 
 namespace IPS\Email\Outgoing;
 
+use Cassandra\Set;
 use IPS\core\Advertisement;
-use IPS\core\extensions\core\CommunityEnhancements\Postmark as PostmarkIntegration;
 use IPS\Db;
-use IPS\Email;
 use IPS\Http\Url;
 use IPS\Lang;
 use IPS\Member;
@@ -30,7 +29,7 @@ if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 /**
  * Postmark Email Class
  */
-class Postmark extends Email
+class _Postmark extends \IPS\Email
 {
 	/* !Configuration */
 
@@ -59,15 +58,15 @@ class Postmark extends Email
 	 * Send the email
 	 *
 	 * @param	mixed	$to					The member or email address, or array of members or email addresses, to send to
-	 * @param mixed $cc					Addresses to CC (can also be email, member or array of either)
-	 * @param mixed $bcc				Addresses to BCC (can also be email, member or array of either)
-	 * @param mixed $fromEmail			The email address to send from. If NULL, default setting is used
-	 * @param mixed $fromName			The name the email should appear from. If NULL, default setting is used
-	 * @param array $additionalHeaders	Additional headers to send
+	 * @param	mixed	$cc					Addresses to CC (can also be email, member or array of either)
+	 * @param	mixed	$bcc				Addresses to BCC (can also be email, member or array of either)
+	 * @param	mixed	$fromEmail			The email address to send from. If NULL, default setting is used
+	 * @param	mixed	$fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	array	$additionalHeaders	The name the email should appear from. If NULL, default setting is used
 	 * @return	void
-	 * @throws    Exception
+	 * @throws	\IPS\Email\Outgoing\Exception
 	 */
-	public function _send( mixed $to, mixed $cc=array(), mixed $bcc=array(), mixed $fromEmail = NULL, mixed $fromName = NULL, array $additionalHeaders = array() ) : void
+	public function _send( $to, $cc=array(), $bcc=array(), $fromEmail = NULL, $fromName = NULL, $additionalHeaders = array() )
 	{
 		$emailData = $this->_constructEmailRequest( $to, $cc, $bcc, $fromEmail, $fromName, $additionalHeaders );
 
@@ -75,7 +74,7 @@ class Postmark extends Email
 		$response = $this->api( 'email', $emailData );
 		if ( !empty( $response['ErrorCode'] ) )
 		{
-			throw new Exception( $response['Message'], $response['ErrorCode'] );
+			throw new \IPS\Email\Outgoing\Exception( $response['Message'], $response['ErrorCode'] );
 		}
 	}
 
@@ -87,7 +86,7 @@ class Postmark extends Email
 	 */
 	public static function isUsable( string $type ): bool
 	{
-		if( ( new PostmarkIntegration() )->enabled )
+		if( ( new \IPS\core\extensions\core\CommunityEnhancements\Postmark() )->enabled )
 		{
 			return true;
 		}
@@ -98,14 +97,14 @@ class Postmark extends Email
 	/**
 	 * Merge and Send
 	 *
-	 * @param array $recipients			Array where the keys are the email addresses to send to and the values are an array of variables to replace
-	 * @param mixed $fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
-	 * @param mixed $fromName			The name the email should appear from. If NULL, default setting is used
-	 * @param array $additionalHeaders	Additional headers to send. Merge tags can be used like in content.
+	 * @param	array			$recipients			Array where the keys are the email addresses to send to and the values are an array of variables to replace
+	 * @param	mixed			$fromEmail			The email address to send from. If NULL, default setting is used. NOTE: This should always be a site-controlled domin. Some services like Sparkpost require the domain to be validated.
+	 * @param	mixed			$fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param	array			$additionalHeaders	Additional headers to send. Merge tags can be used like in content.
 	 * @param	Lang|NULL	$language			The language the email content should be in
 	 * @return	int				Number of successful sends
 	 */
-	public function mergeAndSend( array $recipients, mixed $fromEmail = NULL, mixed $fromName = NULL, array $additionalHeaders = array(), Lang $language = NULL ): int
+	public function mergeAndSend( $recipients, $fromEmail = NULL, $fromName = NULL, $additionalHeaders = [], Lang $language = NULL )
 	{
 		/* Get the current locale, and then set the language's locale so datetime formatting in templates is correct for this language */
 		$currentLocale = setlocale( LC_ALL, '0' );
@@ -149,7 +148,7 @@ class Postmark extends Email
 			/* Send */
 			$response = $this->api( 'email/batch', $emailData );
 		}
-		catch( \JsonException |Exception $e )
+		catch( \JsonException | \IPS\Email\Outgoing\Exception $e )
 		{
 			$first = array_shift( $emailData );
 			Db::i()->insert( 'core_mail_error_logs', [
@@ -279,8 +278,8 @@ class Postmark extends Email
 	 *
 	 * @param	string	$method	Method
 	 * @param	array	$args	Arguments
-	 * @return    array|null
-	 *@throws  Exception   Indicates an invalid JSON response or HTTP error
+	 * @throws  \IPS\Email\Outgoing\Exception   Indicates an invalid JSON response or HTTP error
+	 * @return	array|null
 	 */
 	public function api( $method, $args=NULL )
 	{
@@ -316,7 +315,7 @@ class Postmark extends Email
 		}
 		catch ( \RuntimeException | \IPS\Http\Request\Exception $e )
 		{
-			throw new Exception( $e->getMessage(), $e->getCode() );
+			throw new \IPS\Email\Outgoing\Exception( $e->getMessage(), $e->getCode() );
 		}
 	}
 

@@ -1,25 +1,27 @@
 <?php
 
-use IPS\Output;
-use IPS\Request;
-use IPS\Theme;
-
 define('REPORT_EXCEPTIONS', TRUE);
 require_once '../../../../init.php';
 
-Output::setCacheTime( false );
+\IPS\Output::setCacheTime( false );
 
-if ( \IPS\IN_DEV !== true )
+if ( \IPS\IN_DEV !== true AND ! \IPS\Theme::designersModeEnabled() )
 {
 	exit();
 }
 
+/* The CSS is parsed by the theme engine, and the theme engine has plugins, and those plugins need to now which theme ID we're using */
+if ( \IPS\Theme::designersModeEnabled() )
+{
+	\IPS\Session\Front::i();
+}
+
 $needsParsing = FALSE;
 
-if( strstr( Request::i()->css, ',' ) )
+if( strstr( \IPS\Request::i()->css, ',' ) )
 {
 	$contents = '';
-	foreach( explode( ',', Request::i()->css ) as $css )
+	foreach( explode( ',', \IPS\Request::i()->css ) as $css )
 	{
 		if ( mb_substr( $css, -4 ) !== '.css' )
 		{
@@ -36,7 +38,7 @@ if( strstr( Request::i()->css, ',' ) )
 		}
 		
 		$contents .= "\n" . $file;
-
+		
 		if ( needsParsing( $css ) )
 		{
 			$needsParsing = TRUE;
@@ -45,12 +47,12 @@ if( strstr( Request::i()->css, ',' ) )
 }
 else
 {
-	if ( mb_substr( Request::i()->css, -4 ) !== '.css' )
+	if ( mb_substr( \IPS\Request::i()->css, -4 ) !== '.css' )
 	{
 		exit();
 	}
 
-	$contents  = file_get_contents( \IPS\ROOT_PATH . '/' . str_replace( array( '../', '..\\' ), array( '&#46;&#46;/', '&#46;&#46;\\' ), Request::i()->css ) );
+	$contents  = file_get_contents( \IPS\ROOT_PATH . '/' . str_replace( array( '../', '..\\' ), array( '&#46;&#46;/', '&#46;&#46;\\' ), \IPS\Request::i()->css ) );
 	
 	$params = processFile( $contents );
 		
@@ -59,7 +61,7 @@ else
 		exit;
 	}
 	
-	if ( needsParsing( Request::i()->css ) )
+	if ( needsParsing( \IPS\Request::i()->css ) )
 	{
 		$needsParsing = TRUE;
 	}
@@ -67,15 +69,35 @@ else
 
 if ( $needsParsing )
 {
+	if ( \IPS\Theme::designersModeEnabled() )
+	{
+		/* If we're in designer's mode, we need to reset the theme ID based on the CSS path as we could be in the ACP which may have a different theme ID set */
+		preg_match( '#themes/(\d+)/css/(.+?)/(.+?)/(.*)\.css#', \IPS\Request::i()->css, $matches );
+	
+		if ( $matches[1] and $matches[1] !== \IPS\Theme::$memberTheme->id )
+		{
+			try
+			{
+				\IPS\Theme::$memberTheme = \IPS\Theme\Advanced\Theme::load( $matches[1] );
+			}
+			catch( \OutOfRangeException $ex ) { }
+		}
+	}
 	
 	$functionName = 'css_' . mt_rand();
-	Theme::makeProcessFunction( $contents, $functionName, '', false, true );
+	$contents = str_replace( '\\', '\\\\', $contents );
+	/* If we have something like `{expression="\IPS\SOME_CONSTANT"}` we cannot double escape it, however we do need to escape font icons and similar. */
+	$contents = preg_replace_callback( "/{expression=\"(.+?)\"}/ms", function( $matches ) {
+		return '{expression="' . str_replace( '\\\\', '\\', $matches[1] ) . '"}';
+	}, $contents );
+	\IPS\Theme::makeProcessFunction( $contents, $functionName );
 	$functionName = "IPS\Theme\\{$functionName}";
-	Output::i()->sendOutput( $functionName(), 200, 'text/css' );
+	
+	\IPS\Output::i()->sendOutput( $functionName(), 200, 'text/css' );
 }
 else
 { 
-	Output::i()->sendOutput( $contents, 200, 'text/css' );
+	\IPS\Output::i()->sendOutput( $contents, 200, 'text/css' );
 }
 
 /**
@@ -85,16 +107,16 @@ else
  */
 function needsParsing( $fileName )
 {
-	if( \IPS\IN_DEV === TRUE )
+	if( \IPS\IN_DEV === TRUE AND ! \IPS\Theme::designersModeEnabled() )
 	{
 		preg_match( '#applications/(.+?)/dev/css/(.+?)/(.*)\.css#', $fileName, $appMatches );
 		preg_match( '#plugins/(.+?)/dev/css/(.*)\.css#', $fileName, $pluginMatches );
-		return ( count( $appMatches ) or count( $pluginMatches ) );
+		return (bool) ( \count( $appMatches ) or \count( $pluginMatches ) );
 	}
 	else
 	{
 		preg_match( '#themes/(?:\d+)/css/(.+?)/(.+?)/(.*)\.css#', $fileName, $themeMatches );
-		return count( $themeMatches );
+		return \count( $themeMatches );
 	}
 
 	return FALSE;
@@ -111,7 +133,7 @@ function processFile( $contents )
 	
 	/* Parse the header tag */
 	preg_match_all( '#^/\*<ips:css([^>]+?)>\*/\n#', $contents, $params, PREG_SET_ORDER );
-	foreach( $params as $param )
+	foreach( $params as $id => $param )
 	{
 		preg_match_all( '#([\d\w]+?)=\"([^"]+?)"#i', $param[1], $items, PREG_SET_ORDER );
 			
@@ -126,10 +148,10 @@ function processFile( $contents )
 					$return['app'] = trim( $attr[2] );
 					break;
 				case 'position':
-					$return['pos'] = intval( $attr[2] );
+					$return['pos'] = \intval( $attr[2] );
 					break;
 				case 'hidden':
-					$return['hidden'] = intval( $attr[2] );
+					$return['hidden'] = \intval( $attr[2] );
 					break;
 			}
 		}

@@ -11,22 +11,16 @@
 namespace IPS\Helpers\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Request;
-use IPS\Theme;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Checkbox class for Form Builder
  */
-class Checkbox extends FormAbstract
+class _Checkbox extends FormAbstract
 {
 	/**
 	 * @brief	Default Options
@@ -39,7 +33,7 @@ class Checkbox extends FormAbstract
 	 	);
 	 * @endcode
 	 */
-	protected array $defaultOptions = array(
+	protected $defaultOptions = array(
 		'disabled'		=> FALSE,
 		'togglesOn'		=> array(),
 		'togglesOff'	=> array(),
@@ -51,7 +45,7 @@ class Checkbox extends FormAbstract
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
 		if ( !$this->htmlId )
 		{
@@ -59,15 +53,15 @@ class Checkbox extends FormAbstract
 		}
 		
 		$checkboxName = preg_replace( '/^(.+?\[?.+?)(\])?$/', '$1_checkbox$2', $this->name );
-		return Theme::i()->getTemplate( 'forms', 'core', 'global' )->checkbox( $checkboxName, $this->value, $this->options['disabled'], $this->options['togglesOn'], $this->options['togglesOff'], $this->options['label'], $this->name, $this->htmlId );
+		return \IPS\Theme::i()->getTemplate( 'forms', 'core', 'global' )->checkbox( $checkboxName, $this->value, $this->options['disabled'], $this->options['togglesOn'], $this->options['togglesOff'], $this->options['label'], $this->name, $this->htmlId );
 	}
 
 	/**
 	 * Format Value
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function formatValue(): bool
+	public function formatValue()
 	{
 		return (bool) $this->value;
 	}
@@ -77,16 +71,16 @@ class Checkbox extends FormAbstract
 	 *
 	 * @return	mixed
 	 */
-	public function getValue(): mixed
+	public function getValue()
 	{
 		$checkboxName = preg_replace( '/^(.+?\[?.+?)(\])?$/', '$1_checkbox$2', $this->name );
 		if ( mb_strpos( $checkboxName, '[' ) === FALSE )
 		{
-			return Request::i()->$checkboxName;
+			return \IPS\Request::i()->$checkboxName;
 		}
 		else
 		{
-			return Request::i()->valueFromArray( $checkboxName );
+			return \IPS\Request::i()->valueFromArray( $checkboxName );
 		}
 	}
 	
@@ -94,10 +88,10 @@ class Checkbox extends FormAbstract
 	 * String Value
 	 *
 	 * @param	mixed	$value	The value
-	 * @return    string|int|null
+	 * @return	int
 	 */
-	public static function stringValue( mixed $value ): string|int|null
+	public static function stringValue( $value )
 	{
-		return intval( $value );
+		return \intval( $value );
 	}
 }

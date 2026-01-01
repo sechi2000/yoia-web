@@ -10,26 +10,22 @@
  */
 
 namespace IPS\Api\GraphQL\Queries;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Api\GraphQL\Types\ModuleAccessType;
-use IPS\Application;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ModuleAccess query for GraphQL API
  */
-class ModuleAccess
+class _ModuleAccess
 {
-	protected ?Application $app = null;
-
-	public function __construct( Application $app )
+	public function __construct($app)
 	{
         $this->app = $app;
     }
@@ -37,7 +33,7 @@ class ModuleAccess
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns module view permissions";
+	public static $description = "Returns module view permissions";
 
 	/*
 	 * Query arguments
@@ -50,7 +46,7 @@ class ModuleAccess
 	/**
 	 * Return the query return type
 	 */
-	public function type()  : ModuleAccessType
+	public function type() 
 	{
 		return TypeRegistry::moduleAccess();
 	}
@@ -58,12 +54,12 @@ class ModuleAccess
 	/**
 	 * Resolves this query
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @param 	array $context 	Context values
-	 * @return	Application
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\Application
 	 */
-	public function resolve( mixed $val, array $args, array $context ) : Application
+	public function resolve($val, $args, $context)
 	{
 		return $this->app;
 	}

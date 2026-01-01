@@ -11,54 +11,39 @@
 namespace IPS\cms\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Stack;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Widget\Builder;
-use IPS\Widget\StaticCache;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * pagebuilderupload Widget
  */
-class pagebuilderupload extends StaticCache implements Builder
+class _pagebuilderupload extends \IPS\Widget\StaticCache implements \IPS\Widget\Builder
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'pagebuilderupload';
+	public $key = 'pagebuilderupload';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'cms';
-
-	/**
-	 * @var bool
-	 */
-	public bool $allowNoBox = true;
+	public $app = 'cms';
 		
-
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
 	
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param	null|Form	$form	Form object
-	 * @return	Form
+	 * @param	null|\IPS\Helpers\Form	$form	Form object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
 	{
  		$form = parent::configuration( $form );
  		
@@ -70,7 +55,7 @@ class pagebuilderupload extends StaticCache implements Builder
  		{
 	 		foreach( explode( ',', $this->configuration['pagebuilderupload_upload'] ) as $img )
 			{
-				$images[] = File::get( 'core_Attachment', $img );
+				$images[] = \IPS\File::get( 'core_Attachment', $img );
 			}
  		}
  		
@@ -90,15 +75,12 @@ class pagebuilderupload extends StaticCache implements Builder
 			}
  		}
  		
- 		$form->add( new Upload( 'pagebuilderupload_upload', $images, FALSE, array( 'multiple' => true, 'storageExtension' => 'core_Attachment', 'allowStockPhotos' => TRUE, 'image' => true ) ) );
- 		$form->add( new Stack( 'pagebuilderupload_captions', $captions, FALSE, array( 'stackFieldType' => 'Text', 'removeEmptyValues' => false ) ) );
-		$form->add( new Stack( 'pagebuilderupload_urls', $urls, FALSE, array( 'stackFieldType' => 'Url', 'removeEmptyValues' => false ) ) );
-		$form->add( new YesNo( 'pagebuilderupload_tab', $this->configuration['pagebuilderupload_tab'] ?? false ) );
-
-		// This is now handled by the page builder
-		$form->add( new Number( 'pagebuilderupload_height', ( $this->configuration['pagebuilderupload_height'] ?? 300 ), FALSE, array( 'unlimited' => 0 ) ) );
-
-		$form->add( new YesNo( 'pagebuilderupload_backdrop', $this->configuration['pagebuilderupload_backdrop'] ?? true, false ) );
+ 		$form->add( new \IPS\Helpers\Form\Upload( 'pagebuilderupload_upload', $images, FALSE, array( 'multiple' => true, 'storageExtension' => 'core_Attachment', 'allowStockPhotos' => TRUE, 'image' => true ) ) );
+ 		$form->add( new \IPS\Helpers\Form\YesNo( 'pagebuilderupload_slideshow', ( isset( $this->configuration['pagebuilderupload_slideshow'] ) ? $this->configuration['pagebuilderupload_slideshow'] : FALSE ) ) );
+ 		$form->add( new \IPS\Helpers\Form\Stack( 'pagebuilderupload_captions', $captions, FALSE, array( 'stackFieldType' => 'Text' ) ) );
+		$form->add( new \IPS\Helpers\Form\Stack( 'pagebuilderupload_urls', $urls, FALSE, array( 'stackFieldType' => 'Url' ) ) );
+		
+		$form->add( new \IPS\Helpers\Form\Number( 'pagebuilderupload_height', ( isset( $this->configuration['pagebuilderupload_height'] ) ? $this->configuration['pagebuilderupload_height'] : 300 ), FALSE, array( 'unlimited' => 0 ) ) );
  		return $form;
  	}
 
@@ -107,15 +89,15 @@ class pagebuilderupload extends StaticCache implements Builder
 	 *
 	 * @return void
 	 */
-	public function delete() : void
+	public function delete()
 	{
 		foreach( explode( ',', $this->configuration['pagebuilderupload_upload'] ) as $img )
 		{
 			try
 			{
-				File::get( 'core_Attachment', $img )->delete();
+				\IPS\File::get( 'core_Attachment', $img )->delete();
 			}
-			catch( Exception $e ) { }
+			catch( \Exception $e ) { }
 		}
 	}
  	
@@ -125,7 +107,7 @@ class pagebuilderupload extends StaticCache implements Builder
  	 * @param	array	$values	Values from form
  	 * @return	array
  	 */
- 	public function preConfig( array $values ): array
+ 	public function preConfig( $values )
  	{
 	 	$images = array();
 	 	$urls = array();
@@ -150,26 +132,22 @@ class pagebuilderupload extends StaticCache implements Builder
 	 *
 	 * @return	string
 	 */ 
-	public function render() : string
+	public function render()
 	{
 		$images = array();
 		$captions = ( isset( $this->configuration['pagebuilderupload_captions'] ) ) ? $this->configuration['pagebuilderupload_captions'] : array();
 		$urls = ( isset( $this->configuration['pagebuilderupload_urls'] ) ) ? json_decode( $this->configuration['pagebuilderupload_urls'], TRUE ) : array();
-
-		$options = [
-			'maxHeight' => $this->configuration['pagebuilderupload_height'] ?? false,
-			'showBackdrop' => $this->configuration['pagebuilderupload_backdrop'] ?? true,
-			'tab' => $this->configuration['pagebuilderupload_tab'] ?? false
-		];
+		$autoPlay = ( isset( $this->configuration['pagebuilderupload_slideshow'] ) ) ? $this->configuration['pagebuilderupload_slideshow'] : FALSE;
+		$maxHeight = ( isset( $this->configuration['pagebuilderupload_height'] ) ) ? $this->configuration['pagebuilderupload_height'] : FALSE;
 		
 		if ( isset( $this->configuration['pagebuilderupload_upload'] ) )
 		{
 			foreach( explode( ',', $this->configuration['pagebuilderupload_upload'] ) as $img )
 			{
-				$images[] = (string) File::get( 'core_Attachment', $img )->url;
+				$images[] = (string) \IPS\File::get( 'core_Attachment', $img )->url;
 			}
 
-			return $this->output( ( count( $images ) === 1 ? $images[0] : $images ), $captions, $urls, $options );
+			return $this->output( ( \count( $images ) === 1 ? $images[0] : $images ), $captions, $urls, $autoPlay, $maxHeight );
 		}
 		
 		return '';

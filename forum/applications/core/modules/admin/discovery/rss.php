@@ -11,43 +11,35 @@
 namespace IPS\core\modules\admin\discovery;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher;
-use IPS\Member;
-use IPS\Node\Controller;
-use IPS\Output;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * rss
  */
-class rss extends Controller
+class _rss extends \IPS\Node\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Node Class
 	 */
-	protected string $nodeClass = '\IPS\core\Rss';
+	protected $nodeClass = '\IPS\core\Rss';
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'rss_export_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'rss_export_manage' );
 		parent::execute();
 	}
 	
@@ -56,9 +48,9 @@ class rss extends Controller
 	 *
 	 * @return	void
 	 */
-	public function manage() : void
+	public function manage()
 	{
-		Output::i()->output .= Theme::i()->getTemplate( 'forms', 'core' )->blurb( Member::loggedIn()->language()->addToStack( 'rss_feed_blurb' ) );
+		\IPS\Output::i()->output .= \IPS\Theme::i()->getTemplate( 'forms', 'core' )->blurb( \IPS\Member::loggedIn()->language()->addToStack( 'rss_feed_blurb' ) );
 		
 		parent::manage();
 	}

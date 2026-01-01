@@ -11,50 +11,36 @@
  
 namespace IPS\downloads;
 
-use IPS\Application as SystemApplication;
-use IPS\Content\Filter;
-use IPS\DateTime;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use IPS\Xml\Rss;
-use OutOfRangeException;
-use function is_numeric;
-
 /**
  * Downloads Application Class
  */
-class Application extends SystemApplication
+class _Application extends \IPS\Application
 {
 	/**
 	 * Init
 	 *
 	 * @return	void
 	 */
-	public function init(): void
+	public function init()
 	{
 		/* Handle RSS requests */
-		if ( Request::i()->module == 'downloads' and Request::i()->controller == 'browse' and Request::i()->do == 'rss' )
+		if ( \IPS\Request::i()->module == 'downloads' and \IPS\Request::i()->controller == 'browse' and \IPS\Request::i()->do == 'rss' )
 		{
 			$member = NULL;
-			if( Request::i()->member AND Request::i()->key )
+			if( \IPS\Request::i()->member AND \IPS\Request::i()->key )
 			{
-				$member = Member::load( Request::i()->member );
-				if( !Login::compareHashes( $member->getUniqueMemberHash(), (string) Request::i()->key ) )
+				$member = \IPS\Member::load( \IPS\Request::i()->member );
+				if( !\IPS\Login::compareHashes( $member->getUniqueMemberHash(), (string) \IPS\Request::i()->key ) )
 				{
 					$member = NULL;
 				}
 			}
 
-			$this->sendDownloadsRss( $member ?? new Member );
+			$this->sendDownloadsRss( $member ?? new \IPS\Member );
 
-			if( !Member::loggedIn()->group['g_view_board'] )
+			if( !\IPS\Member::loggedIn()->group['g_view_board'] )
 			{
-				Output::i()->error( 'node_error', '2D220/1', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2D220/1', 404, '' );
 			}
 		}
 
@@ -66,44 +52,49 @@ class Application extends SystemApplication
 	 *
 	 * @return void
 	 */
-	public static function outputCss() : void
+	public static function outputCss()
 	{
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'downloads.css', 'downloads', 'front' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'downloads.css', 'downloads', 'front' ) );
+
+		if ( \IPS\Theme::i()->settings['responsive'] )
+		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'downloads_responsive.css', 'downloads', 'front' ) );
+		}
 	}
 
 	/**
 	 * Send the latest file RSS feed for the indicated member
 	 *
-	 * @param Member $member		Member
+	 * @param	\IPS\Member		$member		Member
 	 * @return	void
 	 */
-	protected function sendDownloadsRss( Member $member ) : void
+	protected function sendDownloadsRss( $member )
 	{
-		if( !Settings::i()->idm_rss )
+		if( !\IPS\Settings::i()->idm_rss )
 		{
-			Output::i()->error( 'rss_offline', '2D175/2', 403, 'rss_offline_admin' );
+			\IPS\Output::i()->error( 'rss_offline', '2D175/2', 403, 'rss_offline_admin' );
 		}
 
-		$document = Rss::newDocument( Url::internal( 'app=downloads&module=downloads&controller=browse', 'front', 'downloads' ), $member->language()->get('idm_rss_title'), $member->language()->get('idm_rss_title') );
+		$document = \IPS\Xml\Rss::newDocument( \IPS\Http\Url::internal( 'app=downloads&module=downloads&controller=browse', 'front', 'downloads' ), $member->language()->get('idm_rss_title'), $member->language()->get('idm_rss_title') );
 		
-		foreach (File::getItemsWithPermission( array(), NULL, 10, 'read', Filter::FILTER_AUTOMATIC, 0, $member ) as $file )
+		foreach ( \IPS\downloads\File::getItemsWithPermission( array(), NULL, 10, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, $member ) as $file )
 		{
 			$content = $file->desc;
-			Output::i()->parseFileObjectUrls( $content );
-			$document->addItem( $file->name, $file->url(), $file->desc, DateTime::ts( $file->updated ), $file->id );
+			\IPS\Output::i()->parseFileObjectUrls( $content );
+			$document->addItem( $file->name, $file->url(), $content, \IPS\DateTime::ts( $file->updated ), $file->id );
 		}
 		
 		/* @note application/rss+xml is not a registered IANA mime-type so we need to stick with text/xml for RSS */
-		Output::i()->sendOutput( $document->asXML(), 200, 'text/xml', parseFileObjects: true );
+		\IPS\Output::i()->sendOutput( $document->asXML(), 200, 'text/xml', array(), TRUE );
 	}
 
 	/**
 	 * [Node] Get Icon for tree
 	 *
 	 * @note	Return the class for the icon (e.g. 'globe')
-	 * @return    string
+	 * @return	string|null
 	 */
-	protected function get__icon(): string
+	protected function get__icon()
 	{
 		return 'download';
 	}
@@ -131,7 +122,7 @@ class Application extends SystemApplication
 	 * @endcode
 	 * @return array
 	 */
-	public function defaultFrontNavigation(): array
+	public function defaultFrontNavigation()
 	{
 		return array(
 			'rootTabs'		=> array(),
@@ -146,22 +137,22 @@ class Application extends SystemApplication
 	 *
 	 * @return	void
 	 */
-	public function convertLegacyParameters() : void
+	public function convertLegacyParameters()
 	{
-		if ( isset( Request::i()->showfile ) AND is_numeric( Request::i()->showfile ) )
+		if ( isset( \IPS\Request::i()->showfile ) AND \is_numeric( \IPS\Request::i()->showfile ) )
 		{
 			try
 			{
-				$file = File::loadAndCheckPerms( Request::i()->showfile );
+				$file = \IPS\downloads\File::loadAndCheckPerms( \IPS\Request::i()->showfile );
 				
-				Output::i()->redirect( $file->url() );
+				\IPS\Output::i()->redirect( $file->url() );
 			}
-			catch( OutOfRangeException $e ) {}
+			catch( \OutOfRangeException $e ) {}
 		}
 
-		if ( isset( Request::i()->module ) AND Request::i()->module == 'post' AND isset( Request::i()->controller ) AND Request::i()->controller == 'submit' )
+		if ( isset( \IPS\Request::i()->module ) AND \IPS\Request::i()->module == 'post' AND isset( \IPS\Request::i()->controller ) AND \IPS\Request::i()->controller == 'submit' )
 		{
-			Output::i()->redirect( Url::internal( "app=downloads&module=downloads&controller=submit", "front", "downloads_submit" ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=downloads&module=downloads&controller=submit", "front", "downloads_submit" ) );
 		}
 	}
 	
@@ -170,7 +161,7 @@ class Application extends SystemApplication
 	 *
 	 * @return	array
 	 */
-	public function uploadSettings(): array
+	public function uploadSettings()
 	{
 		/* Apps can overload this */
 		return array( 'idm_watermarkpath' );
@@ -183,7 +174,7 @@ class Application extends SystemApplication
 	 */
 	public function getWebhooks(): array
 	{
-		return array_merge( parent::getWebhooks(), [ 'downloads_new_version' => File::class ] );
+		return array_merge( parent::getWebhooks(), [ 'downloads_new_version' => \IPS\downloads\File::class ] );
 	}
 
 }

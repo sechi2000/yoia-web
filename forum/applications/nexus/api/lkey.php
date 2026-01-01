@@ -12,25 +12,16 @@
 namespace IPS\nexus\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Api\Exception;
-use IPS\Api\Response;
-use IPS\nexus\Purchase\LicenseKey;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	License Key API
  */
-class lkey extends Controller
+class _lkey extends \IPS\Api\Controller
 {
 	/**
 	 * GET /nexus/lkey/{key}
@@ -38,25 +29,24 @@ class lkey extends Controller
 	 *
 	 * @param		string		$lkey			License key
 	 * @throws		2X310/1		INVALID_KEY		The license key does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\nexus\Purchase
-	 * @return Response
+	 * @return		\IPS\nexus\Purchase
 	 */
-	public function GETitem( string $lkey ): Response
+	public function GETitem( $lkey )
 	{
 		try
 		{
-			$licenseKey = LicenseKey::load( $lkey );
+			$licenseKey = \IPS\nexus\Purchase\LicenseKey::load( $lkey );
 			$purchase = $licenseKey->purchase;
 			if ( $this->member and !$purchase->canView( $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
-			return new Response( 200, $purchase->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $purchase->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_KEY', '2X332/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_KEY', '2X332/1', 404 );
 		}
 	}
 	
@@ -68,25 +58,24 @@ class lkey extends Controller
 	 * @apiparam	object		customFields	Values for custom fields
 	 * @param		string		$lkey			License key
 	 * @throws		2X310/2		INVALID_KEY		The license key does not exist
-	 * @apireturn		\IPS\nexus\Purchase
-	 * @return Response
+	 * @return		\IPS\nexus\Purchase
 	 */
-	public function POSTitem( string $lkey ): Response
+	public function POSTitem( $lkey )
 	{
 		try
 		{	
-			$licenseKey = LicenseKey::load( $lkey );
-			$purchase = $licenseKey->purchase;
+			$licenseKey = \IPS\nexus\Purchase\LicenseKey::load( $lkey );
+			$purchase = $licenseKey->purchase;		
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_KEY', '2X332/2', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_KEY', '2X332/2', 404 );
 		}
 		
-		if ( isset( Request::i()->customFields ) )
+		if ( isset( \IPS\Request::i()->customFields ) )
 		{
 			$customFields = $purchase->custom_fields;
-			foreach ( Request::i()->customFields as $k => $v )
+			foreach ( \IPS\Request::i()->customFields as $k => $v )
 			{
 				$customFields[ $k ] = $v;
 			}
@@ -95,6 +84,6 @@ class lkey extends Controller
 		
 		$purchase->save();
 		
-		return new Response( 200, $purchase->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 200, $purchase->apiOutput( $this->member ) );
 	}
 }

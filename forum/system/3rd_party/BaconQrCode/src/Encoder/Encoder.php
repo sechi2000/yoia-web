@@ -20,10 +20,7 @@ final class Encoder
     /**
      * Default byte encoding.
      */
-    public const DEFAULT_BYTE_MODE_ENCODING = 'ISO-8859-1';
-
-    /** @deprecated use DEFAULT_BYTE_MODE_ENCODING */
-    public const DEFAULT_BYTE_MODE_ECODING = self::DEFAULT_BYTE_MODE_ENCODING;
+    public const DEFAULT_BYTE_MODE_ECODING = 'ISO-8859-1';
 
     /**
      * The original table is defined in the table 5 of JISX0510:2004 (p.19).
@@ -40,9 +37,9 @@ final class Encoder
     /**
      * Codec cache.
      *
-     * @var array<string,ReedSolomonCodec>
+     * @var array
      */
-    private static array $codecs = [];
+    private static $codecs = [];
 
     /**
      * Encodes "content" with the error correction level "ecLevel".
@@ -50,10 +47,8 @@ final class Encoder
     public static function encode(
         string $content,
         ErrorCorrectionLevel $ecLevel,
-        string $encoding = self::DEFAULT_BYTE_MODE_ENCODING,
-        ?Version $forcedVersion = null,
-        // Barcode scanner might not be able to read the encoded message of the QR code with the prefix ECI of UTF-8
-        bool $prefixEci = true
+        string $encoding = self::DEFAULT_BYTE_MODE_ECODING,
+        ?Version $forcedVersion = null
     ) : QrCode {
         // Pick an encoding mode appropriate for the content. Note that this
         // will not attempt to use multiple modes / segments even if that were
@@ -65,7 +60,7 @@ final class Encoder
         $headerBits = new BitArray();
 
         // Append ECI segment if applicable
-        if ($prefixEci && Mode::BYTE() === $mode && self::DEFAULT_BYTE_MODE_ENCODING !== $encoding) {
+        if (Mode::BYTE() === $mode && self::DEFAULT_BYTE_MODE_ECODING !== $encoding) {
             $eci = CharacterSetEci::getCharacterSetEciByName($encoding);
 
             if (null !== $eci) {
@@ -160,7 +155,7 @@ final class Encoder
     /**
      * Chooses the best mode for a given content.
      */
-    private static function chooseMode(string $content, ?string $encoding = null) : Mode
+    private static function chooseMode(string $content, string $encoding = null) : Mode
     {
         if (null !== $encoding && 0 === strcasecmp($encoding, 'SHIFT-JIS')) {
             return self::isOnlyDoubleByteKanji($content) ? Mode::KANJI() : Mode::BYTE();
@@ -222,7 +217,7 @@ final class Encoder
         }
 
         for ($i = 0; $i < $length; $i += 2) {
-            $byte = ord($bytes[$i]) & 0xff;
+            $byte = $bytes[$i] & 0xff;
 
             if (($byte < 0x81 || $byte > 0x9f) && $byte < 0xe0 || $byte > 0xeb) {
                 return false;
@@ -634,23 +629,17 @@ final class Encoder
      */
     private static function appendKanjiBytes(string $content, BitArray $bits) : void
     {
-        $bytes = @iconv('utf-8', 'SHIFT-JIS', $content);
-
-        if (false === $bytes) {
-            throw new WriterException('Content could not be converted to SHIFT-JIS');
-        }
-
-        if (strlen($bytes) % 2 > 0) {
+        if (strlen($content) % 2 > 0) {
             // We just do a simple length check here. The for loop will check
             // individual characters.
             throw new WriterException('Content does not seem to be encoded in SHIFT-JIS');
         }
 
-        $length = strlen($bytes);
+        $length = strlen($content);
 
         for ($i = 0; $i < $length; $i += 2) {
-            $byte1 = ord($bytes[$i]) & 0xff;
-            $byte2 = ord($bytes[$i + 1]) & 0xff;
+            $byte1 = ord($content[$i]) & 0xff;
+            $byte2 = ord($content[$i + 1]) & 0xff;
             $code = ($byte1 << 8) | $byte2;
 
             if ($code >= 0x8140 && $code <= 0x9ffc) {

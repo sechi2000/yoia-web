@@ -12,35 +12,21 @@
 namespace IPS\cms\extensions\core\Sitemap;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Pages\Page;
-use IPS\Db;
-use IPS\Extensions\SitemapAbstract;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\YesNo;
-use IPS\Member;
-use IPS\Settings;
-use IPS\Sitemap;
-use function defined;
-use function intval;
-use const IPS\SITEMAP_MAX_PER_FILE;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Support Pages in sitemaps
  */
-class Pages extends SitemapAbstract
+class _Pages
 {
 	/**
 	 * @brief	Recommended Settings
 	 */
-	public array $recommendedSettings = array(
+	public $recommendedSettings = array(
 		'sitemap_pages_include'		=> true,
 		'sitemap_pages_count'		=> -1,
 		'sitemap_pages_priority'	=> 1
@@ -51,12 +37,12 @@ class Pages extends SitemapAbstract
 	 *
 	 * @return	array
 	 */
-	public function settings(): array
+	public function settings()
 	{
 		return array(
-			'sitemap_pages_include'	=> new YesNo( "sitemap_pages_include", Settings::i()->sitemap_pages_count != 0, FALSE, array( 'togglesOn' => array( "sitemap_pages_count", "sitemap_pages_priority" ) ), NULL, NULL, NULL, "sitemap_pages_include" ),
-			'sitemap_pages_count'	 => new Number( 'sitemap_pages_count', Settings::i()->sitemap_pages_count, FALSE, array( 'min' => '-1', 'unlimited' => '-1' ), NULL, NULL, NULL, 'sitemap_pages_count' ),
-			'sitemap_pages_priority' => new Select( 'sitemap_pages_priority', Settings::i()->sitemap_pages_priority, FALSE, array( 'options' => Sitemap::$priorities, 'unlimited' => '-1', 'unlimitedLang' => 'sitemap_dont_include' ), NULL, NULL, NULL, 'sitemap_pages_priority' )
+			'sitemap_pages_include'	=> new \IPS\Helpers\Form\YesNo( "sitemap_pages_include", \IPS\Settings::i()->sitemap_pages_count != 0, FALSE, array( 'togglesOn' => array( "sitemap_pages_count", "sitemap_pages_priority" ) ), NULL, NULL, NULL, "sitemap_pages_include" ),
+			'sitemap_pages_count'	 => new \IPS\Helpers\Form\Number( 'sitemap_pages_count', \IPS\Settings::i()->sitemap_pages_count, FALSE, array( 'min' => '-1', 'unlimited' => '-1' ), NULL, NULL, NULL, 'sitemap_pages_count' ),
+			'sitemap_pages_priority' => new \IPS\Helpers\Form\Select( 'sitemap_pages_priority', \IPS\Settings::i()->sitemap_pages_priority, FALSE, array( 'options' => \IPS\Sitemap::$priorities, 'unlimited' => '-1', 'unlimitedLang' => 'sitemap_dont_include' ), NULL, NULL, NULL, 'sitemap_pages_priority' )
 		);
 	}
 
@@ -66,15 +52,15 @@ class Pages extends SitemapAbstract
 	 * @param	array	$values	Values
 	 * @return	void
 	 */
-	public function saveSettings( array $values ) : void
+	public function saveSettings( $values )
 	{
 		if ( $values['sitemap_configuration_info'] )
 		{
-			Settings::i()->changeValues( array( 'sitemap_pages_count' => $this->recommendedSettings['sitemap_pages_count'], 'sitemap_pages_priority' => $this->recommendedSettings['sitemap_pages_priority'] ) );
+			\IPS\Settings::i()->changeValues( array( 'sitemap_pages_count' => $this->recommendedSettings['sitemap_pages_count'], 'sitemap_pages_priority' => $this->recommendedSettings['sitemap_pages_priority'] ) );
 		}
 		else
 		{
-			Settings::i()->changeValues( array( 'sitemap_pages_count' => $values['sitemap_pages_include'] ? $values['sitemap_pages_count'] : 0, 'sitemap_pages_priority' => $values['sitemap_pages_priority'] ) );
+			\IPS\Settings::i()->changeValues( array( 'sitemap_pages_count' => $values['sitemap_pages_include'] ? $values['sitemap_pages_count'] : 0, 'sitemap_pages_priority' => $values['sitemap_pages_priority'] ) );
 		}
 	}
 	
@@ -83,10 +69,10 @@ class Pages extends SitemapAbstract
 	 *
 	 * @return	array
 	 */
-	public function getFilenames(): array
+	public function getFilenames()
 	{
 		/* Are we even including? */
-		if( Settings::i()->sitemap_pages_count == 0 )
+		if( \IPS\Settings::i()->sitemap_pages_count == 0 )
 		{
 			return array();
 		}
@@ -94,19 +80,17 @@ class Pages extends SitemapAbstract
 		$files  = array();
 		$class  = '\IPS\cms\Pages\Page';
 		$count  = 0;
-		$member = new Member;
+		$member = new \IPS\Member;
 		$permissionCheck = 'view';
-
-		/* @var Page $class
-		 * @var array $permissionMap */
-		$where = array( array( '(' . Db::i()->findInSet( 'perm_' . $class::$permissionMap[ $permissionCheck ], $member->groups ) . ' OR ' . 'perm_' . $class::$permissionMap[ $permissionCheck ] . '=? )', '*' ) );
+		
+		$where = array( array( '(' . \IPS\Db::i()->findInSet( 'perm_' . $class::$permissionMap[ $permissionCheck ], $member->groups ) . ' OR ' . 'perm_' . $class::$permissionMap[ $permissionCheck ] . '=? )', '*' ) );
 		$where[] = [ 'page_meta_index=?', 1 ];
 
-		$count = Db::i()->select( '*', $class::$databaseTable, $where )
+		$count = \IPS\Db::i()->select( '*', $class::$databaseTable, $where )
 				->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . $class::$databaseTable . "." . $class::$databasePrefix . $class::$databaseColumnId, $class::$permApp, $class::$permType ) )
 				->count();
 				
-		$count = ceil( max( $count, Settings::i()->sitemap_pages_count ) / SITEMAP_MAX_PER_FILE );
+		$count = ceil( max( $count, \IPS\Settings::i()->sitemap_pages_count ) / \IPS\SITEMAP_MAX_PER_FILE );
 		
 		for( $i=1; $i <= $count; $i++ )
 		{
@@ -120,30 +104,30 @@ class Pages extends SitemapAbstract
 	 * Generate the sitemap
 	 *
 	 * @param	string			$filename	The sitemap file to build (should be one returned from getFilenames())
-	 * @param	Sitemap	$sitemap	Sitemap object reference
-	 * @return	int|null
+	 * @param	\IPS\Sitemap	$sitemap	Sitemap object reference
+	 * @return	void
 	 */
-	public function generateSitemap( string $filename, Sitemap $sitemap ) : ?int
+	public function generateSitemap( $filename, $sitemap )
 	{
 		/* We have elected to not add databases to the sitemap */
-		if ( ! Settings::i()->sitemap_pages_count )
+		if ( ! \IPS\Settings::i()->sitemap_pages_count )
 		{
-			return null;
+			return NULL;
 		}
 		
 		$class  = '\IPS\cms\Pages\Page';
 		$count  = 0;
-		$member = new Member;
+		$member = new \IPS\Member;
 		$permissionCheck = 'view';
 		$entries = array();
 		
 		$exploded = explode( '_', $filename );
 		$block = (int) array_pop( $exploded );
 			
-		$offset = ( $block - 1 ) * SITEMAP_MAX_PER_FILE;
-		$limit = SITEMAP_MAX_PER_FILE;
+		$offset = ( $block - 1 ) * \IPS\SITEMAP_MAX_PER_FILE;
+		$limit = \IPS\SITEMAP_MAX_PER_FILE;
 		
-		$totalLimit = Settings::i()->sitemap_pages_count;
+		$totalLimit = \IPS\Settings::i()->sitemap_pages_count;
 		if ( $totalLimit > -1 and ( $offset + $limit ) > $totalLimit )
 		{
 			if ( $totalLimit < $limit )
@@ -155,13 +139,11 @@ class Pages extends SitemapAbstract
 				$limit = $totalLimit - $offset;
 			}
 		}
-
-		/* @var Page $class
-		 * @var array $permissionMap */
-		$where = array( array( '(' . Db::i()->findInSet( 'perm_' . $class::$permissionMap[ $permissionCheck ], $member->groups ) . ' OR ' . 'perm_' . $class::$permissionMap[ $permissionCheck ] . '=? )', '*' ) );
+			
+		$where = array( array( '(' . \IPS\Db::i()->findInSet( 'perm_' . $class::$permissionMap[ $permissionCheck ], $member->groups ) . ' OR ' . 'perm_' . $class::$permissionMap[ $permissionCheck ] . '=? )', '*' ) );
 		$where[] = [ 'page_meta_index=?', 1 ];
-		$direction = ( $totalLimit > SITEMAP_MAX_PER_FILE ) ? ' ASC' : ' DESC';
-		$select = Db::i()->select( '*', $class::$databaseTable, $where, 'page_id' . $direction, array( $offset, $limit ) )
+		$direction = ( $totalLimit > \IPS\SITEMAP_MAX_PER_FILE ) ? ' ASC' : ' DESC';
+		$select = \IPS\Db::i()->select( '*', $class::$databaseTable, $where, 'page_id' . $direction, array( $offset, $limit ) )
 				->join( 'core_permission_index', array( "core_permission_index.app=? AND core_permission_index.perm_type=? AND core_permission_index.perm_type_id=" . $class::$databaseTable . "." . $class::$databasePrefix . $class::$databaseColumnId, $class::$permApp, $class::$permType ) );
 
 		foreach( $select as $row )
@@ -169,18 +151,16 @@ class Pages extends SitemapAbstract
 			$item = $class::constructFromData( $row );
 			
 			$data = array( 'url' => $item->url() );				
-			$priority = intval( Settings::i()->sitemap_pages_priority );
+			$priority = \intval( \IPS\Settings::i()->sitemap_pages_priority );
 			if ( $priority !== -1 )
 			{
 				$data['priority'] = $priority;
 			}
 
 			$entries[] = $data;
-			$lastId = $item->id;
 		}
 
 		$sitemap->buildSitemapFile( $filename, $entries );
-		return $lastId ?? 0;
 	}
 
 }

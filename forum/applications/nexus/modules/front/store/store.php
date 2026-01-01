@@ -12,87 +12,59 @@
 namespace IPS\nexus\modules\front\store;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\Content\Filter;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Http\Url;
-use IPS\Login;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\nexus\Money;
-use IPS\nexus\Package;
-use IPS\nexus\Package\Group;
-use IPS\nexus\Package\Item;
-use IPS\Output;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfBoundsException;
-use OutofRangeException;
-use function count;
-use function defined;
-use function floatval;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Browse Store
  */
-class store extends Controller
+class _store extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Products per page
 	 */
-	protected static int $productsPerPage = 50;
+	protected static $productsPerPage = 50;
 	
 	/**
 	 * @brief	Currency
 	 */
-	protected mixed $currency = NULL;
+	protected $currency;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
 		/* Set CSS */
-		Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'store.css', 'nexus' ) );
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'store.css', 'nexus' ) );
+		if ( \IPS\Theme::i()->settings['responsive'] )
+		{
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'store_responsive.css', 'nexus', 'front' ) );
+		}
 
 		/* Work out currency */
-		if ( isset( Request::i()->currency ) and in_array( Request::i()->currency, Money::currencies() ) )
+		if ( isset( \IPS\Request::i()->currency ) and \in_array( \IPS\Request::i()->currency, \IPS\nexus\Money::currencies() ) )
 		{
-			if ( isset( Request::i()->csrfKey ) and Login::compareHashes( (string) Session::i()->csrfKey, (string) Request::i()->csrfKey ) )
+			if ( isset( \IPS\Request::i()->csrfKey ) and \IPS\Login::compareHashes( (string) \IPS\Session::i()->csrfKey, (string) \IPS\Request::i()->csrfKey ) )
 			{
 				$_SESSION['cart'] = array();
-				Request::i()->setCookie( 'currency', Request::i()->currency );
+				\IPS\Request::i()->setCookie( 'currency', \IPS\Request::i()->currency );
 
-				Output::i()->redirect( Request::i()->url() );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=nexus&module=store&controller=store', 'front', 'store' ) );
 			}
-			$this->currency = Request::i()->currency;
+			$this->currency = \IPS\Request::i()->currency;
 		}
 		else
 		{
-			$this->currency = Customer::loggedIn()->defaultCurrency();
+			$this->currency = \IPS\nexus\Customer::loggedIn()->defaultCurrency();
 		}
 
-		Output::setCacheTime( false );
+		\IPS\Output::setCacheTime( false );
 		
 		/* Pass up */
 		parent::execute();
@@ -103,12 +75,12 @@ class store extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{		
 		/* If we have a category, display it */
-		if ( isset( Request::i()->cat ) )
+		if ( isset( \IPS\Request::i()->cat ) )
 		{
-			$this->_categoryView();
+			return $this->_categoryView();
 		}
 		
 		/* Otherwise, display the index */
@@ -123,21 +95,21 @@ class store extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function _categoryView() : void
+	protected function _categoryView()
 	{
 		/* Load category */
 		try
 		{
-			$category = Group::loadAndCheckPerms( Request::i()->cat );
+			$category = \IPS\nexus\Package\Group::loadAndCheckPerms( \IPS\Request::i()->cat );
 		}
-		catch ( OutofRangeException )
+		catch ( \OutofRangeException $e )
 		{
-			Output::i()->error( 'node_error', '1X241/1', 404, '' );
+			\IPS\Output::i()->error( 'node_error', '1X241/1', 404, '' );
 		}
 		$url = $category->url();
 		
 		/* Set initial stuff for fetching packages */
-		$currentPage = isset( Request::i()->page ) ? intval( Request::i()->page ) : 1;
+		$currentPage = isset( \IPS\Request::i()->page ) ? \intval( \IPS\Request::i()->page ) : 1;
 		if( $currentPage < 1 )
 		{
 			$currentPage = 1;
@@ -145,55 +117,55 @@ class store extends Controller
 		$where = array(
 			array( 'p_group=?', $category->id ),
 			array( 'p_store=1' ),
-			array( "( p_member_groups='*' OR " . Db::i()->findInSet( 'p_member_groups', Member::loggedIn()->groups ) . ' )' )
+			array( "( p_member_groups='*' OR " . \IPS\Db::i()->findInSet( 'p_member_groups', \IPS\Member::loggedIn()->groups ) . ' )' )
 		);
-		$havePackagesWhichAcceptReviews = (bool) Db::i()->select( 'COUNT(*)', 'nexus_packages', array_merge( $where, array( array( 'p_reviewable=1' ) ) ) )->first();
-		$havePackagesWhichUseStockLevels = (bool) Db::i()->select( 'COUNT(*)', 'nexus_packages', array_merge( $where, array( array( 'p_stock<>-1' ) ) ) )->first();
+		$havePackagesWhichAcceptReviews = (bool) \IPS\Db::i()->select( 'COUNT(*)', 'nexus_packages', array_merge( $where, array( array( 'p_reviewable=1' ) ) ) )->first();
+		$havePackagesWhichUseStockLevels = (bool) \IPS\Db::i()->select( 'COUNT(*)', 'nexus_packages', array_merge( $where, array( array( 'p_stock<>-1' ) ) ) )->first();
 		$joins = array();
 				
 		/* Apply Filters */
-		if ( isset( Request::i()->filter ) and is_array( Request::i()->filter ) )
+		if ( isset( \IPS\Request::i()->filter ) and \is_array( \IPS\Request::i()->filter ) )
 		{
-			$url = $url->setQueryString( 'filter', Request::i()->filter );
-			foreach ( Request::i()->filter as $filterId => $allowedValues )
+			$url = $url->setQueryString( 'filter', \IPS\Request::i()->filter );
+			foreach ( \IPS\Request::i()->filter as $filterId => $allowedValues )
 			{
 				$filterId = (int) $filterId;
-				$where[] = array( Db::i()->findInSet( "filter{$filterId}.pfm_values", array_map( 'intval', explode( ',', $allowedValues ) ) ) );
+				$where[] = array( \IPS\Db::i()->findInSet( "filter{$filterId}.pfm_values", array_map( 'intval', explode( ',', $allowedValues ) ) ) );
 				$joins[] = array( 'table' => array( 'nexus_package_filters_map', "filter{$filterId}" ), 'on' => array( "filter{$filterId}.pfm_package=p_id AND filter{$filterId}.pfm_filter=?", $filterId ) );
 			}
 		}
 		foreach ( array( 'minPrice' => '>', 'maxPrice' => '<' ) as $k => $op )
 		{
-			if ( isset( Request::i()->$k ) and is_numeric( Request::i()->$k ) and floatval( Request::i()->$k ) > 0 )
+			if ( isset( \IPS\Request::i()->$k ) and \is_numeric( \IPS\Request::i()->$k ) and \floatval( \IPS\Request::i()->$k ) > 0 )
 			{
-				$url = $url->setQueryString( $k, Request::i()->$k );
+				$url = $url->setQueryString( $k, \IPS\Request::i()->$k );
 				$joins['nexus_package_base_prices'] = array( 'table' => 'nexus_package_base_prices', 'on' => array( 'id=p_id' ) );
-				$where[] = array( $this->currency . $op . '=?', floatval( Request::i()->$k ) );
+				$where[] = array( $this->currency . $op . '=?', \floatval( \IPS\Request::i()->$k ) );
 			}
 		}
-		if ( isset( Request::i()->minRating ) and is_numeric( Request::i()->minRating ) and floatval( Request::i()->minRating ) > 0 )
+		if ( isset( \IPS\Request::i()->minRating ) and \is_numeric( \IPS\Request::i()->minRating ) and \floatval( \IPS\Request::i()->minRating ) > 0 )
 		{
-			$url = $url->setQueryString( 'minRating', Request::i()->minRating );
-			$where[] = array( 'p_rating>=?', intval( Request::i()->minRating ) );
+			$url = $url->setQueryString( 'minRating', \IPS\Request::i()->minRating );
+			$where[] = array( 'p_rating>=?', \intval( \IPS\Request::i()->minRating ) );
 		}
-		if ( isset( Request::i()->inStock ) )
+		if ( isset( \IPS\Request::i()->inStock ) )
 		{
-			$url = $url->setQueryString( 'inStock', Request::i()->inStock );
-			$where[] = array( '( p_stock>0 OR ( p_stock=-2 AND (?)>0 ) )', Db::i()->select( 'MAX(opt_stock)', 'nexus_product_options', 'opt_package=p_id' ) );
+			$url = $url->setQueryString( 'inStock', \IPS\Request::i()->inStock );
+			$where[] = array( '( p_stock>0 OR ( p_stock=-2 AND (?)>0 ) )', \IPS\Db::i()->select( 'MAX(opt_stock)', 'nexus_product_options', 'opt_package=p_id' ) );
 		}
 		
 		/* Figure out the sorting */
-		switch ( Request::i()->sortby )
+		switch ( \IPS\Request::i()->sortby )
 		{
 			case 'name':
-				$joins['core_sys_lang_words'] = array( 'table' => 'core_sys_lang_words', 'on' => array( "word_app='nexus' AND word_key=CONCAT( 'nexus_package_', p_id ) AND lang_id=?", Member::loggedIn()->language()->id ) );
+				$joins['core_sys_lang_words'] = array( 'table' => 'core_sys_lang_words', 'on' => array( "word_app='nexus' AND word_key=CONCAT( 'nexus_package_', p_id ) AND lang_id=?", \IPS\Member::loggedIn()->language()->id ) );
 				$sortBy = 'word_custom';
 				break;
 				
 			case 'price_low':
 			case 'price_high':
 				$joins['nexus_package_base_prices'] = array( 'table' => 'nexus_package_base_prices', 'on' => array( 'id=p_id' ) );
-				$sortBy = Request::i()->sortby == 'price_low' ? $this->currency : ( $this->currency . ' DESC' );
+				$sortBy = \IPS\Request::i()->sortby == 'price_low' ? $this->currency : ( $this->currency . ' DESC' );
 				break;
 				
 			case 'rating':
@@ -206,15 +178,15 @@ class store extends Controller
 		}
 		
 		/* Fetch the packages */
-		$select = Db::i()->select( '*', 'nexus_packages', $where, $sortBy, array( ( $currentPage - 1 ) * static::$productsPerPage, static::$productsPerPage ) );
+		$select = \IPS\Db::i()->select( '*', 'nexus_packages', $where, $sortBy, array( ( $currentPage - 1 ) * static::$productsPerPage, static::$productsPerPage ) );
 		foreach ( $joins as $join )
 		{
 			$select->join( $join['table'], $join['on'] );
 		}
-		$packages = new ActiveRecordIterator( $select, 'IPS\nexus\Package' );
+		$packages = new \IPS\Patterns\ActiveRecordIterator( $select, 'IPS\nexus\Package' );
 
 		/* Get packages count */
-		$select = Db::i()->select( 'COUNT(*)', 'nexus_packages', $where );
+		$select = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_packages', $where );
 		foreach ( $joins as $join )
 		{
 			$select->join( $join['table'], $join['on'] );
@@ -225,43 +197,50 @@ class store extends Controller
 		$totalPages = ceil( $totalCount / static::$productsPerPage );
 		if ( $totalPages and $currentPage > $totalPages )
 		{
-			Output::i()->redirect( $category->url()->setPage( 'page', $totalPages ), NULL, 303 );
+			\IPS\Output::i()->redirect( $category->url()->setPage( 'page', $totalPages ), NULL, 303 );
 		} 
-		$pagination = Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $category->url(), $totalPages, $currentPage, static::$productsPerPage );
+		$pagination = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->pagination( $category->url(), $totalPages, $currentPage, static::$productsPerPage );
 		
 		/* Other stuff we need for the view */
-		$subcategories = new ActiveRecordIterator( Db::i()->select( '*', 'nexus_package_groups', array( 'pg_parent=?', $category->id ), 'pg_position ASC' ), 'IPS\nexus\Package\Group' );
+		$subcategories = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_package_groups', array( 'pg_parent=?', $category->id ), 'pg_position ASC' ), 'IPS\nexus\Package\Group' );
 		$packagesWithCustomFields = array();
-		foreach ( iterator_to_array( Db::i()->select( 'cf_packages', 'nexus_package_fields', 'cf_purchase=1' ) ) as $ids )
+		foreach ( iterator_to_array( \IPS\Db::i()->select( 'cf_packages', 'nexus_package_fields', 'cf_purchase=1' ) ) as $ids )
 		{
 			$packagesWithCustomFields = array_merge( $packagesWithCustomFields, array_filter( explode( ',', $ids ) ) );
 		}
-
-		Output::i()->bodyAttributes['contentClass'] = Group::class;
+		
+		/* List or grid? */
+		if ( \IPS\Request::i()->view )
+		{
+			\IPS\Session::i()->csrfCheck();
+			\IPS\Request::i()->setCookie( 'storeView', ( \IPS\Request::i()->view == 'list' ) ? 'list' : 'grid', \IPS\DateTime::ts( time() )->add( new \DateInterval( 'P1Y' ) ) );
+			\IPS\Request::i()->cookie['storeView'] = ( \IPS\Request::i()->view == 'list' ) ? 'list' : 'grid';
+		}
 		
 		/* Output */
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->json( array(
-				'contents' 	=> Theme::i()->getTemplate('store')->categoryContents( $category, $subcategories, $packages, $pagination, $packagesWithCustomFields, $totalCount ),
-				'sidebar'	=> Theme::i()->getTemplate('store')->categorySidebar( $category, $subcategories, $url, count( $packages ), $this->currency, $havePackagesWhichAcceptReviews, $havePackagesWhichUseStockLevels )
+			\IPS\Output::i()->json( array(
+				'contents' 	=> \IPS\Theme::i()->getTemplate('store')->categoryContents( $category, $subcategories, $packages, $pagination, $packagesWithCustomFields, $totalCount ),
+				'sidebar'	=> \IPS\Theme::i()->getTemplate('store')->categorySidebar( $category, $subcategories, $url, \count( $packages ), $this->currency, $havePackagesWhichAcceptReviews, $havePackagesWhichUseStockLevels )
 			)) ;
+			return;
 		}
 		else
 		{
 			foreach ( $category->parents() as $parent )
 			{
-				Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
+				\IPS\Output::i()->breadcrumb[] = array( $parent->url(), $parent->_title );
 			}
-			Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
-			Output::i()->title = $category->_title;
-			Output::i()->sidebar['contextual'] = Theme::i()->getTemplate('store')->categorySidebar( $category, $subcategories, $url, count( $packages ), $this->currency, $havePackagesWhichAcceptReviews, $havePackagesWhichUseStockLevels );
+			\IPS\Output::i()->breadcrumb[] = array( $category->url(), $category->_title );
+			\IPS\Output::i()->title = $category->_title;
+			\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate('store')->categorySidebar( $category, $subcategories, $url, \count( $packages ), $this->currency, $havePackagesWhichAcceptReviews, $havePackagesWhichUseStockLevels );	
 
 			/* Set default search */
-			Output::i()->defaultSearchOption = array( 'nexus_package_item', "nexus_package_item_el" );
+			\IPS\Output::i()->defaultSearchOption = array( 'nexus_package_item', "nexus_package_item_el" );	
 
-			Output::i()->output = Theme::i()->getTemplate('store')->category( $category, $subcategories, $packages, $pagination, $packagesWithCustomFields, $totalCount );
-			Output::i()->globalControllers[] = 'nexus.front.store.category';
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('store')->category( $category, $subcategories, $packages, $pagination, $packagesWithCustomFields, $totalCount );
+			\IPS\Output::i()->globalControllers[] = 'nexus.front.store.category';
 		}
 
 		/* JSON-LD
@@ -269,14 +248,13 @@ class store extends Controller
 			@link https://developers.google.com/search/docs/guides/intro-structured-data#multiple-entities-on-the-same-page */
 		foreach( $packages as $package )
 		{
-			/* @var Package $package */
-			$item	= Item::load( $package->id );
+			$item	= \IPS\nexus\Package\Item::load( $package->id );
 
 			try
 			{
 				$price = $package->price();
 			}
-			catch( OutOfBoundsException )
+			catch( \OutOfBoundsException $e )
 			{
 				$price = NULL;
 			}
@@ -284,8 +262,8 @@ class store extends Controller
 			/* A product MUST have an offer, so if there's no price (i.e. due to currency configuration) don't even output */
 			if( $price !== NULL )
 			{
-				Output::i()->jsonLd['package' . $package->id ]	= array(
-					'@context'		=> "https://schema.org",
+				\IPS\Output::i()->jsonLd['package' . $package->id ]	= array(
+					'@context'		=> "http://schema.org",
 					'@type'			=> "Product",
 					'name'			=> $package->_title,
 					'description'	=> $item->truncated( TRUE, NULL ),
@@ -298,29 +276,32 @@ class store extends Controller
 										'priceCurrency'	=> $price->currency,
 										'seller'		=> array(
 															'@type'		=> 'Organization',
-															'name'		=> Settings::i()->board_name
+															'name'		=> \IPS\Settings::i()->board_name
 														),
 									),
 				);
 
 				/* Stock levels */
-				if( $package->stockLevel() === 0 )
+				if( $package->physical )
 				{
-					Output::i()->jsonLd['package' . $package->id ]['offers']['availability'] = 'https://schema.org/OutOfStock';
-				}
-				else
-				{
-					Output::i()->jsonLd['package' . $package->id ]['offers']['availability'] = 'https://schema.org/InStock';
+					if( $package->stockLevel() === 0 )
+					{
+						\IPS\Output::i()->jsonLd['package' . $package->id ]['offers']['availability'] = 'http://schema.org/OutOfStock';
+					}
+					else
+					{
+						\IPS\Output::i()->jsonLd['package' . $package->id ]['offers']['availability'] = 'http://schema.org/InStock';
+					}
 				}
 
 				if( $package->image )
 				{
-					Output::i()->jsonLd['package' . $package->id ]['image'] = (string) $package->image;
+					\IPS\Output::i()->jsonLd['package' . $package->id ]['image'] = (string) $package->image;
 				}
 
 				if( $package->reviewable and $item->averageReviewRating() )
 				{
-					Output::i()->jsonLd['package' . $package->id ]['aggregateRating'] = array(
+					\IPS\Output::i()->jsonLd['package' . $package->id ]['aggregateRating'] = array(
 						'@type'			=> 'AggregateRating',
 						'ratingValue'	=> $item->averageReviewRating(),
 						'ratingCount'	=> $item->reviews
@@ -335,21 +316,21 @@ class store extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function priceFilter() : void
+	protected function priceFilter()
 	{
-		if ( !isset( Request::i()->maxPrice ) )
+		if ( !isset( \IPS\Request::i()->maxPrice ) )
 		{
-			Request::i()->maxPrice = 0;
+			\IPS\Request::i()->maxPrice = 0;
 		}
 		
-		$form = new Form( 'price_filter', 'filter' );
-		$form->class = 'ipsForm--vertical ipsForm--price-filter';
-		$form->add( new Number( 'minPrice', FALSE, 0, array( 'decimals' => Money::numberOfDecimalsForCurrency( $this->currency ) ), NULL, NULL, $this->currency ) );
-		$form->add( new Number( 'maxPrice', FALSE, 0, array( 'decimals' => Money::numberOfDecimalsForCurrency( $this->currency ), 'unlimited' => 0 ), NULL, NULL, $this->currency ) );
+		$form = new \IPS\Helpers\Form( 'price_filter', 'filter' );
+		$form->class = 'ipsForm_vertical';
+		$form->add( new \IPS\Helpers\Form\Number( 'minPrice', FALSE, 0, array( 'decimals' => \IPS\nexus\Money::numberOfDecimalsForCurrency( $this->currency ) ), NULL, NULL, $this->currency ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'maxPrice', FALSE, 0, array( 'decimals' => \IPS\nexus\Money::numberOfDecimalsForCurrency( $this->currency ), 'unlimited' => 0 ), NULL, NULL, $this->currency ) );
 		
 		if ( $values = $form->values() )
 		{
-			$url = Request::i()->url()->setQueryString( 'do', NULL );
+			$url = \IPS\Request::i()->url()->setQueryString( 'do', NULL );
 			if ( $values['minPrice'] )
 			{
 				$url = $url->setQueryString( 'minPrice', $values['minPrice'] );
@@ -366,11 +347,11 @@ class store extends Controller
 			{
 				$url = $url->setQueryString( 'maxPrice', NULL );
 			}
-			Output::i()->redirect( $url );
+			\IPS\Output::i()->redirect( $url );
 		}
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('price_filter');
-		Output::i()->output = $form->customTemplate( array( Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('price_filter');
+		\IPS\Output::i()->output = $form->customTemplate( array( \IPS\Theme::i()->getTemplate( 'forms', 'core' ), 'popupTemplate' ) );
 	}
 	
 	/**
@@ -378,38 +359,38 @@ class store extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function _indexView() : void
+	protected function _indexView()
 	{
 		/* New Products */
 		$newProducts = array();
-		$nexus_store_new = explode( ',', Settings::i()->nexus_store_new );
+		$nexus_store_new = explode( ',', \IPS\Settings::i()->nexus_store_new );
 		if ( $nexus_store_new[0] )
 		{
-			$newProducts = Item::getItemsWithPermission( array( array( 'p_date_added>?', DateTime::create()->sub( new DateInterval( 'P' . $nexus_store_new[1] . 'D' ) )->getTimestamp() ) ), 'p_date_added DESC', $nexus_store_new[0] );
+			$newProducts = \IPS\nexus\Package\Item::getItemsWithPermission( array( array( 'p_date_added>?', \IPS\DateTime::create()->sub( new \DateInterval( 'P' . $nexus_store_new[1] . 'D' ) )->getTimestamp() ) ), 'p_date_added DESC', $nexus_store_new[0] );
 		}
 		
 		/* Popular Products */
 		$popularProducts = array();
-		$nexus_store_popular = explode( ',', Settings::i()->nexus_store_popular );
+		$nexus_store_popular = explode( ',', \IPS\Settings::i()->nexus_store_popular );
 		if ( $nexus_store_popular[0] )
 		{
 			$where = array();
-			$where[] = array( 'ps_app=? AND ps_type=? AND ps_start>?', 'nexus', 'package', DateTime::create()->sub( new DateInterval( 'P' . $nexus_store_popular[1] . 'D' ) )->getTimestamp() );
-			$where[] = "( p_member_groups='*' OR " . Db::i()->findInSet( 'p_member_groups', Member::loggedIn()->groups ) . ' )';
+			$where[] = array( 'ps_app=? AND ps_type=? AND ps_start>?', 'nexus', 'package', \IPS\DateTime::create()->sub( new \DateInterval( 'P' . $nexus_store_popular[1] . 'D' ) )->getTimestamp() );
+			$where[] = "( p_member_groups='*' OR " . \IPS\Db::i()->findInSet( 'p_member_groups', \IPS\Member::loggedIn()->groups ) . ' )';
 			$where[] = array( 'p_store=?', 1 );
 
-			$popularIds = Db::i()->select( 'nexus_purchases.ps_item_id', 'nexus_purchases', $where, 'COUNT(ps_item_id) DESC', $nexus_store_popular[0], 'ps_item_id' )->join( 'nexus_packages', 'ps_item_id=p_id' );
-			if( count( $popularIds ) )
+			$popularIds = \IPS\Db::i()->select( 'nexus_purchases.ps_item_id', 'nexus_purchases', $where, 'COUNT(ps_item_id) DESC', $nexus_store_popular[0], 'ps_item_id' )->join( 'nexus_packages', 'ps_item_id=p_id' );
+			if( \count( $popularIds ) )
 			{
-				$popularProducts = new ActiveRecordIterator( Db::i()->select( 'nexus_packages.*', 'nexus_packages', array( Db::i()->in( 'p_id', iterator_to_array( $popularIds ) ) ), 'FIELD(p_id, ' . implode( ',', iterator_to_array($popularIds) ) . ')' ), 'IPS\nexus\Package' );
+				$popularProducts = new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( 'nexus_packages.*', 'nexus_packages', array( \IPS\Db::i()->in( 'p_id', iterator_to_array( $popularIds ) ) ), 'FIELD(p_id, ' . implode( ',', iterator_to_array($popularIds) ) . ')' ), 'IPS\nexus\Package' );
 			}
 		}
 					
 		/* Display */
-		Output::i()->sidebar['contextual'] = Theme::i()->getTemplate('store')->categorySidebar( );
-		Output::i()->linkTags['canonical'] = (string) Url::internal( 'app=nexus&module=store&controller=store', 'front', 'store' );
-		Output::i()->output = Theme::i()->getTemplate('store')->index( Customer::loggedIn()->cm_credits[ $this->currency ], $newProducts, $popularProducts );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('module__nexus_store');
+		\IPS\Output::i()->sidebar['contextual'] = \IPS\Theme::i()->getTemplate('store')->categorySidebar( );
+		\IPS\Output::i()->linkTags['canonical'] = (string) \IPS\Http\Url::internal( 'app=nexus&module=store&controller=store', 'front', 'store' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('store')->index( \IPS\nexus\Customer::loggedIn()->cm_credits[ $this->currency ], $newProducts, $popularProducts );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('module__nexus_store');
 	}
 	
 	/**
@@ -417,12 +398,12 @@ class store extends Controller
 	 *
 	 * @return	void
 	 */
-	public function register() : void
+	public function register()
 	{
-		Output::i()->bodyClasses[] = 'ipsLayout_minimal';
-		Output::i()->sidebar['enabled'] = FALSE;
-		Output::i()->output = Theme::i()->getTemplate('store')->register( Item::getItemsWithPermission( array( array( 'p_reg=1' ) ), 'pg_position, p_position', 10, 'read', Filter::FILTER_AUTOMATIC, 0, NULL, TRUE ) );
-		Output::i()->title = Member::loggedIn()->language()->addToStack('sign_up');
+		\IPS\Output::i()->bodyClasses[] = 'ipsLayout_minimal';
+		\IPS\Output::i()->sidebar['enabled'] = FALSE;
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('store')->register( \IPS\nexus\Package\Item::getItemsWithPermission( array( array( 'p_reg=1' ) ), 'pg_position, p_position', 10, 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, TRUE ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('sign_up');
 	}
 		
 	/**
@@ -430,8 +411,8 @@ class store extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function cart() : void
+	protected function cart()
 	{
-		Output::i()->output = Theme::i()->getTemplate('store')->cart();
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate('store')->cart();
 	}
 }

@@ -11,32 +11,16 @@
 namespace IPS\core\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateInterval;
-use IPS\Api\Controller;
-use IPS\Api\Response;
-use IPS\Content\Search\ApiResponse;
-use IPS\Content\Search\ContentFilter;
-use IPS\Content\Search\Query;
-use IPS\core\modules\front\search\search as FrontModuleSearch;
-use IPS\DateTime;
-use IPS\Member;
-use IPS\Request;
-use IPS\Settings;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Search API
  */
-class search extends Controller
+class _search extends \IPS\Api\Controller
 {
 	/**
 	 * GET /core/search
@@ -65,22 +49,21 @@ class search extends Controller
 	 * @apiparam	string	search_in		Specify "titles" to search in titles only, otherwise titles and content are both searched
 	 * @apiparam	int		search_as		Member ID to perform the search as (guest permissions will be used when this parameter is omitted)
 	 * @apiparam	bool	doNotTrack		If doNotTrack is passed with a value of 1, the search will not be tracked for statistical purposes
-	 * @apireturn		array
+	 * @return		array
 	 * @apiresponse	int		page		api_int_page
 	 * @apiresponse	int		perPage		api_int_perpage
 	 * @apiresponse	int		totalResults	api_int_totalresults
 	 * @apiresponse	int		totalPages	api_int_totalpages
 	 * @apiresponse	[\IPS\Content\Search\Result]	results		api_results_thispage
 	 * @note	For requests using an OAuth Access Token for a particular member, only content the authorized user can view will be included and the "search_as" parameter will be ignored.
-	 * @return ApiResponse
 	 */
-	public function GETindex(): ApiResponse
+	public function GETindex()
 	{
 		$memberPermissions = $this->member;
 
-		if( !$this->member AND isset( Request::i()->search_as ) )
+		if( !$this->member AND isset( \IPS\Request::i()->search_as ) )
 		{
-			$memberPermissions = Member::load( Request::i()->search_as );
+			$memberPermissions = \IPS\Member::load( \IPS\Request::i()->search_as );
 
 			if( !$memberPermissions->member_id )
 			{
@@ -89,48 +72,48 @@ class search extends Controller
 		}
 
 		/* Get valid content types */
-		$contentTypes = FrontModuleSearch::contentTypes( $memberPermissions ?: TRUE );
+		$contentTypes = \IPS\core\modules\front\search\search::contentTypes( $memberPermissions ?: TRUE );
 
 		/* Initialize search */
-		$query = Query::init( $memberPermissions ?: NULL );
+		$query = \IPS\Content\Search\Query::init( $memberPermissions ?: NULL );
 
 		/* Set content type */
-		if ( isset( Request::i()->type ) and array_key_exists( Request::i()->type, $contentTypes ) )
+		if ( isset( \IPS\Request::i()->type ) and array_key_exists( \IPS\Request::i()->type, $contentTypes ) )
 		{	
-			if ( isset( Request::i()->item ) )
+			if ( isset( \IPS\Request::i()->item ) )
 			{
-				$class = $contentTypes[ Request::i()->type ];
+				$class = $contentTypes[ \IPS\Request::i()->type ];
 				try
 				{
-					$item = $class::loadAndCheckPerms( Request::i()->item );
-					$query->filterByContent( array( ContentFilter::init( $class )->onlyInItems( array( Request::i()->item ) ) ) );
+					$item = $class::loadAndCheckPerms( \IPS\Request::i()->item );
+					$query->filterByContent( array( \IPS\Content\Search\ContentFilter::init( $class )->onlyInItems( array( \IPS\Request::i()->item ) ) ) );
 				}
-				catch ( OutOfRangeException $e ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 			else
 			{
-				$filter = ContentFilter::init( $contentTypes[ Request::i()->type ] );
+				$filter = \IPS\Content\Search\ContentFilter::init( $contentTypes[ \IPS\Request::i()->type ] );
 				
-				if ( isset( Request::i()->nodes ) )
+				if ( isset( \IPS\Request::i()->nodes ) )
 				{
-					$filter->onlyInContainers( explode( ',', Request::i()->nodes ) );
+					$filter->onlyInContainers( explode( ',', \IPS\Request::i()->nodes ) );
 				}
 				
-				if ( isset( Request::i()->search_min_comments ) )
+				if ( isset( \IPS\Request::i()->search_min_comments ) )
 				{
-					$filter->minimumComments(  Request::i()->search_min_comments );
+					$filter->minimumComments(  \IPS\Request::i()->search_min_comments );
 				}
-				if ( isset( Request::i()->search_min_replies ) )
+				if ( isset( \IPS\Request::i()->search_min_replies ) )
 				{
-					$filter->minimumComments(  Request::i()->search_min_replies + 1 );
+					$filter->minimumComments(  \IPS\Request::i()->search_min_replies + 1 );
 				}
-				if ( isset( Request::i()->search_min_reviews ) )
+				if ( isset( \IPS\Request::i()->search_min_reviews ) )
 				{
-					$filter->minimumReviews(  Request::i()->search_min_reviews );
+					$filter->minimumReviews(  \IPS\Request::i()->search_min_reviews );
 				}
-				if ( isset( Request::i()->search_min_views ) )
+				if ( isset( \IPS\Request::i()->search_min_views ) )
 				{
-					$filter->minimumViews(  Request::i()->search_min_views );
+					$filter->minimumViews(  \IPS\Request::i()->search_min_views );
 				}
 				
 				$query->filterByContent( array( $filter ) );
@@ -138,9 +121,9 @@ class search extends Controller
 		}
 		
 		/* Filter by author */
-		if ( isset( Request::i()->author ) )
+		if ( isset( \IPS\Request::i()->author ) )
 		{
-			$author = Member::load( Request::i()->author, 'name' );
+			$author = \IPS\Member::load( \IPS\Request::i()->author, 'name' );
 			if ( $author->member_id )
 			{
 				$query->filterByAuthor( $author );
@@ -148,9 +131,9 @@ class search extends Controller
 		}
 		
 		/* Filter by club */
-		if ( isset( Request::i()->club ) AND Settings::i()->clubs )
+		if ( isset( \IPS\Request::i()->club ) AND \IPS\Settings::i()->clubs )
 		{
-			$query->filterByClub( explode( ',', Request::i()->club ) );
+			$query->filterByClub( explode( ',', \IPS\Request::i()->club ) );
 		}
 		
 		/* Set time cutoffs */
@@ -158,38 +141,38 @@ class search extends Controller
 		{
 			$beforeKey = "{$k}_before";
 			$afterKey = "{$k}_after";
-			if ( isset( Request::i()->$beforeKey ) or isset( Request::i()->$afterKey ) )
+			if ( isset( \IPS\Request::i()->$beforeKey ) or isset( \IPS\Request::i()->$afterKey ) )
 			{
 				foreach ( array( 'before', 'after' ) as $l )
 				{
 					$$l = NULL;
 					$key = "{$l}Key";
-					if ( isset( Request::i()->$$key ) AND Request::i()->$$key != 'any' )
+					if ( isset( \IPS\Request::i()->$$key ) AND \IPS\Request::i()->$$key != 'any' )
 					{
-						switch ( Request::i()->$$key )
+						switch ( \IPS\Request::i()->$$key )
 						{
 							case 'day':
-								$$l = DateTime::create()->sub( new DateInterval( 'P1D' ) );
+								$$l = \IPS\DateTime::create()->sub( new \DateInterval( 'P1D' ) );
 								break;
 								
 							case 'week':
-								$$l = DateTime::create()->sub( new DateInterval( 'P1W' ) );
+								$$l = \IPS\DateTime::create()->sub( new \DateInterval( 'P1W' ) );
 								break;
 								
 							case 'month':
-								$$l = DateTime::create()->sub( new DateInterval( 'P1M' ) );
+								$$l = \IPS\DateTime::create()->sub( new \DateInterval( 'P1M' ) );
 								break;
 								
 							case 'six_months':
-								$$l = DateTime::create()->sub( new DateInterval( 'P6M' ) );
+								$$l = \IPS\DateTime::create()->sub( new \DateInterval( 'P6M' ) );
 								break;
 								
 							case 'year':
-								$$l = DateTime::create()->sub( new DateInterval( 'P1Y' ) );
+								$$l = \IPS\DateTime::create()->sub( new \DateInterval( 'P1Y' ) );
 								break;
 								
 							default:
-								$$l = DateTime::ts( (int)Request::i()->$$key );
+								$$l = \IPS\DateTime::ts( \IPS\Request::i()->$$key );
 								break;
 						}
 					}
@@ -200,44 +183,44 @@ class search extends Controller
 		}
 
 		/* Set Order */
-		if ( ! isset( Request::i()->sortby ) )
+		if ( ! isset( \IPS\Request::i()->sortby ) )
 		{
-			Request::i()->sortby = $query->getDefaultSortMethod();
+			\IPS\Request::i()->sortby = $query->getDefaultSortMethod();
 		}
 		
-		switch( Request::i()->sortby )
+		switch( \IPS\Request::i()->sortby )
 		{
 			case 'newest':
-				$query->setOrder( Query::ORDER_NEWEST_CREATED );
+				$query->setOrder( \IPS\Content\Search\Query::ORDER_NEWEST_CREATED );
 				break;
 
 			case 'relevancy':
-				$query->setOrder( Query::ORDER_RELEVANCY );
+				$query->setOrder( \IPS\Content\Search\Query::ORDER_RELEVANCY );
 				break;
 		}
 
-		$flags = ( isset( Request::i()->eitherTermsOrTags ) and Request::i()->eitherTermsOrTags === 'and' ) ? Query::TERM_AND_TAGS : Query::TERM_OR_TAGS;
+		$flags = ( isset( \IPS\Request::i()->eitherTermsOrTags ) and \IPS\Request::i()->eitherTermsOrTags === 'and' ) ? \IPS\Content\Search\Query::TERM_AND_TAGS : \IPS\Content\Search\Query::TERM_OR_TAGS;
 		$operator = NULL;
 		
-		if ( isset( Request::i()->search_and_or ) and in_array( Request::i()->search_and_or, array( Query::OPERATOR_OR, Query::OPERATOR_AND ) ) )
+		if ( isset( \IPS\Request::i()->search_and_or ) and \in_array( \IPS\Request::i()->search_and_or, array( \IPS\Content\Search\Query::OPERATOR_OR, \IPS\Content\Search\Query::OPERATOR_AND ) ) )
 		{
-			$operator = Request::i()->search_and_or;
+			$operator = \IPS\Request::i()->search_and_or;
 		}
 		
-		if ( isset( Request::i()->search_in ) and Request::i()->search_in === 'titles' )
+		if ( isset( \IPS\Request::i()->search_in ) and \IPS\Request::i()->search_in === 'titles' )
 		{
-			$flags = $flags | Query::TERM_TITLES_ONLY;
+			$flags = $flags | \IPS\Content\Search\Query::TERM_TITLES_ONLY;
 		}
 
 		/* Return */
-		return new ApiResponse(
+		return new \IPS\Content\Search\ApiResponse(
 			200,
-			array( $query, $flags, isset( Request::i()->q ) ? ( Request::i()->q ) : NULL, isset( Request::i()->tags ) ? explode( ',', Request::i()->tags ) : NULL, $operator ),
-			isset( Request::i()->page ) ? Request::i()->page : 1,
-			'',
+			array( $query, $flags, isset( \IPS\Request::i()->q ) ? ( \IPS\Request::i()->q ) : NULL, isset( \IPS\Request::i()->tags ) ? explode( ',', \IPS\Request::i()->tags ) : NULL, $operator ),
+			isset( \IPS\Request::i()->page ) ? \IPS\Request::i()->page : 1,
+			NULL,
 			0,
 			$this->member,
-			isset( Request::i()->perPage ) ? Request::i()->perPage : NULL
+			isset( \IPS\Request::i()->perPage ) ? \IPS\Request::i()->perPage : NULL
 		);
 	}
 
@@ -246,17 +229,16 @@ class search extends Controller
 	 * Get list of content types that can be searched
 	 *
 	 * @clientapiparam	int	search_as	Member ID to perform the search as (by default, search results are based on guest permissions)
-	 * @apireturn		array
+	 * @return		array
 	 * @apiresponse	array	contenttypes	Content types that can be used in /search requests in the 'type' parameter
-	 * @return Response
 	 */
-	public function GETitem(): Response
+	public function GETitem()
 	{
 		$memberPermissions = $this->member;
 
-		if( !$this->member AND isset( Request::i()->search_as ) )
+		if( !$this->member AND isset( \IPS\Request::i()->search_as ) )
 		{
-			$memberPermissions = Member::load( Request::i()->search_as );
+			$memberPermissions = \IPS\Member::load( \IPS\Request::i()->search_as );
 
 			if( !$memberPermissions->member_id )
 			{
@@ -264,6 +246,6 @@ class search extends Controller
 			}
 		}
 
-		return new Response( 200, array( 'contenttypes' => array_keys( FrontModuleSearch::contentTypes( $memberPermissions ?: TRUE ) ) ) );
+		return new \IPS\Api\Response( 200, array( 'contenttypes' => array_keys( \IPS\core\modules\front\search\search::contentTypes( $memberPermissions ?: TRUE ) ) ) );
 	}
 }

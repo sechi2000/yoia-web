@@ -7,19 +7,16 @@
  * @license        https://www.invisioncommunity.com/legal/standards/
  * @package        Invision Community
  * @subpackage
- * @since        7/23/2024
+ * @since        6/25/2024
  */
-
 namespace IPS\Node;
 
-/* To prevent PHP errors (extending class does not exist) revealing path */
-
+use BadMethodCallException;
 use IPS\Data\Store;
 use IPS\Redis;
 use OutOfRangeException;
-use BadMethodCallException;
-use function get_called_class;
 
+/* To prevent PHP errors (extending class does not exist) revealing path */
 if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
 	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
@@ -33,7 +30,7 @@ trait DelayedCount
 	 */
 	protected function getStorageId() : string
 	{
-		return get_called_class() . '_' . $this->_id;
+		return \get_called_class() . '_' . $this->_id;
 	}
 
 	/**
@@ -74,7 +71,7 @@ trait DelayedCount
 				Redis::i()->expire( 'nodeSyncTimes', ( 2 * 3600 ) );
 			}
 		}
-		catch( BadMethodCallException )
+		catch( BadMethodCallException | \RedisException )
 		{
 			try
 			{
@@ -96,7 +93,10 @@ trait DelayedCount
 		/* Bubble up to parent nodes */
 		try
 		{
-			$this->parent()?->storeUpdateTime();
+			if( $parent = $this->parent() )
+			{
+				$parent->storeUpdateTime();
+			}
 		}
 		catch( \OutOfRangeException )
 		{}
@@ -156,7 +156,7 @@ trait DelayedCount
 	/**
 	 * Count all comments, items, etc
 	 *
-	 * @return void
+	 * @return mixed
 	 */
-	abstract protected function recount() : void;
+	abstract protected function recount();
 }

@@ -11,123 +11,23 @@
 namespace IPS\convert\Software\Core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DateTimeZone;
-use erusev\Parsedown;
-use IPS\Application;
-use IPS\Content\Search\Index;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Login;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Task;
-use PasswordHash;
-use function count;
-use function defined;
-use function is_array;
-use function unserialize;
-use const PATHINFO_BASENAME;
-use const PATHINFO_DIRNAME;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Vanilla Core Converter
  */
-class Vanilla extends Software
+class _Vanilla extends \IPS\convert\Software
 {
-	/**
-	 * Constructor
-	 *
-	 * @param	App	$app	The application to reference for database and other information.
-	 * @param	bool				$needDB	Establish a DB connection
-	 * @return	void
-	 * @throws	InvalidArgumentException
-	 */
-	public function __construct( App $app, bool $needDB=TRUE )
-	{
-		parent::__construct( $app, $needDB );
-
-		/* Check for temp table */
-		if ( $needDB )
-		{
-			if( !Db::i()->checkForTable( 'convert_vanilla_temp' ) )
-			{
-				Db::i()->createTable( array(
-					'name'		=> 'convert_vanilla_temp',
-					'columns'	=> array(
-						'id' => array(
-							'name'			=> 'id',
-							'type'			=> 'int',
-							'length'		=> 10,
-							'allow_null'	=> false,
-							'auto_increment'	=> true
-						),
-						'media_id' => array(
-							'name'			=> 'media_id',
-							'type'			=> 'int',
-							'length'		=> 10,
-							'allow_null'	=> false,
-							'auto_increment'	=> false
-						),
-						'link_type' => array(
-							'name'			=> 'link_type',
-							'type'			=> 'varchar',
-							'length'		=> 255,
-							'allow_null'	=> true,
-							'default'		=> null
-						),
-						'content_id' => array(
-							'name'			=> 'content_id',
-							'type'			=> 'int',
-							'length'		=> 10,
-							'allow_null'	=> false,
-							'default'		=> 0
-						),
-						'post_id' => array(
-							'name'			=> 'post_id',
-							'type'			=> 'int',
-							'length'		=> 10,
-							'allow_null'	=> false,
-							'default'		=> 0
-						),
-					),
-					'indexes'	=> array(
-						'PRIMARY' => array(
-							'type'		=> 'primary',
-							'name'		=> 'PRIMARY',
-							'columns'	=> array( 'id', 'media_id' ),
-							'length'	=> array( NULL )
-						),
-						'lookup' => array(
-							'type'		=> 'index',
-							'name'		=> 'lookup',
-							'columns'	=> array( 'media_id', 'link_type' ),
-							'length'	=> array( NULL, NULL )
-						),
-					)
-				)	);
-			}
-		}
-	}
-
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "Vanilla (3.x)";
@@ -136,20 +36,55 @@ class Vanilla extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "vanilla";
 	}
 
 	/**
+	 * @brief	The activity type ID for status updates
+	 */
+	protected static $activityStatusType = NULL;
+
+	/**
+	 * Constructor
+	 *
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
+	 * @param	bool				$needDB	Establish a DB connection
+	 * @return	void
+	 * @throws	\InvalidArgumentException
+	 */
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
+	{
+		$return = parent::__construct( $app, $needDB );
+
+		if ( $needDB )
+		{
+			/* What is the activity type ID for status updates? */
+			if ( static::$activityStatusType === NULL )
+			{
+				try
+				{
+					static::$activityStatusType = $this->db->select( 'ActivityTypeID', 'ActivityType',
+						array( 'Name=?', 'Status' ), NULL, 1
+					)->first();
+				}
+				catch ( \Exception $e ) {}
+			}
+		}
+
+		return $return;
+	}
+
+	/**
 	 * Can we convert settings?
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function canConvertSettings(): bool
+	public static function canConvertSettings()
 	{
 		return TRUE;
 	}
@@ -157,12 +92,12 @@ class Vanilla extends Software
 	/**
 	 * Settings Map Listing
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function settingsMapList(): array
+	public function settingsMapList()
 	{
 		$settings = array(
-			'fluid'	=> array( 'title' => Member::loggedIn()->language()->addToStack( 'use_fluid_view_convert' ), 'value' => true, 'our_key' => 'use_fluid_view_convert', 'our_title' => Member::loggedIn()->language()->addToStack( 'use_fluid_view_convert' ) )
+			'fluid'	=> array( 'title' => \IPS\Member::loggedIn()->language()->addToStack( 'use_fluid_view_convert' ), 'value' => true, 'our_key' => 'use_fluid_view_convert', 'our_title' => \IPS\Member::loggedIn()->language()->addToStack( 'use_fluid_view_convert' ) )
 		);
 		
 		return $settings;
@@ -174,14 +109,14 @@ class Vanilla extends Software
 	 * @param	array	$settings	Settings to convert
 	 * @return	void
 	 */
-	public function convertSettings( array $settings=array() ) : void
+	public function convertSettings( $settings=array() )
 	{
-		if ( !isset( $settings['use_fluid_view_convert'] ) OR !$settings['use_fluid_view_convert'] )
+		if ( !isset( $settings['use_fluid_view_convert'] ) OR $settings['use_fluid_view_convert'] == FALSE )
 		{
 			return;
 		}
 
-		Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => 'fluid' ), array( "conf_key=?", 'forums_default_view' ) );
+		\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => 'fluid' ), array( "conf_key=?", 'forums_default_view' ) );
 	}
 
 	/**
@@ -190,16 +125,16 @@ class Vanilla extends Software
 	 *
 	 * @param   string	$location       File location retrieved from the database
 	 * @param   string	$uploadsPath    Configured uploads path
-	 * @return  Url|string|null
+	 * @return  \IPS\Http\Url|string|void
 	 */
-	public static function parseMediaLocation( string $location, string $uploadsPath ) : Url|string|null
+	public static function parseMediaLocation( $location, $uploadsPath )
 	{
 		$uploadsPath = str_replace( '\\', '/', $uploadsPath );
 
 		// URL
 		if ( preg_match( '`^https?://`', $location ) )
 		{
-			return Url::external( $location );
+			return \IPS\Http\Url::external( $location );
 		}
 		// Full filesystem path
 		elseif ( mb_strpos( $location, $uploadsPath ) === 0 )
@@ -222,7 +157,7 @@ class Vanilla extends Software
 			{
 				if ( !isset( $parts['path'], $parts['host'] ) )
 				{
-					return null;
+					return;
 				}
 
 				// This is a url in the format type:://domain/path.
@@ -245,19 +180,19 @@ class Vanilla extends Software
 	 * Attempt to convert a MySQL datetime string into a unix timestamp
 	 *
 	 * @param   string  $date   Date(Time) string
-	 * @return  DateTime    Timestamp on successful conversion, otherwise NULL
+	 * @return  \IPS\DateTime    Timestamp on successful conversion, otherwise NULL
 	 */
-	public static function mysqlToDateTime( string $date ) : DateTime
+	public static function mysqlToDateTime( $date )
 	{
-		return DateTime::ts( strtotime( $date ) ?: time() );
+		return \IPS\DateTime::ts( strtotime( $date ) ?: time() );
 	}
 
 	/**
 	 * Content we can convert from this software.
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertGroups'        => array(
@@ -268,6 +203,10 @@ class Vanilla extends Software
 				'table'         => 'User',
 				'where'         => array( "Deleted<>?", 1 ),
 			),
+			'convertStatuses'      => array(
+				'table'     => 'Activity',
+				'where'     => array( 'ActivityTypeId=?', (int) static::$activityStatusType )
+			),
 			'convertPrivateMessages'  => array(
 				'table'     => 'Conversation',
 				'where'     => NULL
@@ -275,10 +214,6 @@ class Vanilla extends Software
 			'convertPrivateMessageReplies'	=> array(
 				'table'		=> 'ConversationMessage',
 				'where'		=> NULL,
-			),
-			'convertAttachments'	=> array(
-				'table'		=> 'Media',
-				'where'		=> [ "ForeignTable IN ('embed')" ]
 			)
 		);
 	}
@@ -286,9 +221,9 @@ class Vanilla extends Software
 	/**
 	 * Can we convert passwords from this software.
 	 *
-	 * @return    boolean
+	 * @return 	boolean
 	 */
-	public static function loginEnabled(): bool
+	public static function loginEnabled()
 	{
 		return TRUE;
 	}
@@ -296,9 +231,9 @@ class Vanilla extends Software
 	/**
 	 * Returns a block of text, or a language string, that explains what the admin must do to start this conversion
 	 *
-	 * @return    string|null
+	 * @return	string
 	 */
-	public static function getPreConversionInformation(): ?string
+	public static function getPreConversionInformation()
 	{
 		return 'convert_vanilla_preconvert';
 	}
@@ -306,9 +241,9 @@ class Vanilla extends Software
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertGroups',
@@ -319,10 +254,10 @@ class Vanilla extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		switch( $method )
 		{
@@ -331,15 +266,15 @@ class Vanilla extends Software
 
 				$options = array();
 				$options['none'] = 'None';
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_groups' ), 'IPS\Member\Group' ) AS $group )
 				{
 					$options[ $group->g_id ] = $group->name;
 				}
 
 				foreach( $this->db->select( '*', 'Role' ) AS $group )
 				{
-					Member::loggedIn()->language()->words["map_group_{$group['RoleID']}"]		= $group['Name'];
-					Member::loggedIn()->language()->words["map_group_{$group['RoleID']}_desc"]	= Member::loggedIn()->language()->addToStack( 'map_group_desc' );
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['RoleID']}"]		= $group['Name'];
+					\IPS\Member::loggedIn()->language()->words["map_group_{$group['RoleID']}_desc"]	= \IPS\Member::loggedIn()->language()->addToStack( 'map_group_desc' );
 
 					$return['convertGroups']["map_group_{$group['RoleID']}"] = array(
 						'field_class'		=> 'IPS\\Helpers\\Form\\Select',
@@ -355,13 +290,13 @@ class Vanilla extends Software
 				$return['convertMembers'] = array();
 
 				/* Find out where the photos live */
-				Member::loggedIn()->language()->words['attach_location_desc'] = Member::loggedIn()->language()->addToStack( 'attach_location' );
+				\IPS\Member::loggedIn()->language()->words['attach_location_desc'] = \IPS\Member::loggedIn()->language()->addToStack( 'attach_location' );
 				$return['convertMembers']['attach_location'] = array(
 					'field_class'			=> 'IPS\\Helpers\\Form\\Text',
 					'field_default'			=> NULL,
 					'field_required'		=> TRUE,
 					'field_extra'			=> array(),
-					'field_hint'			=> Member::loggedIn()->language()->addToStack('convert_vanilla_photopath'),
+					'field_hint'			=> \IPS\Member::loggedIn()->language()->addToStack('convert_vanilla_photopath'),
 				);
 				break;
 		}
@@ -372,33 +307,33 @@ class Vanilla extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Search Index Rebuild */
-		Index::i()->rebuild();
+		\IPS\Content\Search\Index::i()->rebuild();
 
 		/* Clear Cache and Store */
-		Store::i()->clearAll();
-		Cache::i()->clearAll();
+		\IPS\Data\Store::i()->clearAll();
+		\IPS\Data\Cache::i()->clearAll();
+
+		/* Content Rebuilds */
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'core_member_status_updates', 'class' => 'IPS\core\Statuses\Status' ), 2, array( 'app', 'link', 'class' ) );
 
 		/* Non-Content Rebuilds */
-		Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
-		Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildProfilePhotos', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_message_posts', 'extension' => 'core_Messaging' ), 2, array( 'app', 'link', 'extension' ) );
+		\IPS\Task::queue( 'convert', 'RebuildNonContent', array( 'app' => $this->app->app_id, 'link' => 'core_members', 'extension' => 'core_Signatures' ), 2, array( 'app', 'link', 'extension' ) );
 
 		/* Content Counts */
-		Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RecountMemberContent', array( 'app' => $this->app->app_id ), 4, array( 'app' ) );
 
 		/* First Post Data */
-		Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'RebuildConversationFirstIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
 
 		/* Attachments */
-		Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
-
-		/* Remove temp table */
-		Db::i()->dropTable('convert_vanilla_temp');
+		\IPS\Task::queue( 'core', 'RebuildAttachmentThumbnails', array( 'app' => $this->app->app_id ), 1, array( 'app' ) );
 
 		return array( "f_search_index_rebuild", "f_clear_caches", "f_rebuild_pms", "f_signatures_rebuild", "f_rebuild_attachments" );
 	}
@@ -406,18 +341,15 @@ class Vanilla extends Software
 	/**
 	 * @brief   Store parsedown object
 	 */
-	protected static ?Parsedown $_parseDown = NULL;
+	protected static $_parseDown = NULL;
 
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix post data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param 	string		$post	Raw post data
+	 * @return 	string		Parsed post data
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
 		/* Is this Markdown? */
 		if( mb_substr( $post, 0, 15 ) == '<!--Markdown-->' )
@@ -425,63 +357,73 @@ class Vanilla extends Software
 			/* Load parser */
 			if( static::$_parseDown === NULL )
 			{
-				IPS::$PSR0Namespaces['erusev'] = \IPS\ROOT_PATH . "/applications/convert/sources/Tools/Vanilla/Parsedown";
-				static::$_parseDown = new Parsedown();
+				\IPS\IPS::$PSR0Namespaces['erusev'] = \IPS\ROOT_PATH . "/applications/convert/sources/Tools/Vanilla/Parsedown";
+				static::$_parseDown = new \erusev\Parsedown();
 			}
 
 			$post = str_replace( '<!--Markdown-->', '', $post );
 			$post = static::$_parseDown->text( $post );
 		}
-		/* If rich, we've already processed it, but need to skip the legacy formatting */
-		elseif( mb_substr( $post, 0, 11 ) == '<!--Rich-->' )
+		elseif( mb_substr( $post, 0, 3 ) == '[{"' ) // Probably a delta
 		{
-			$post = str_replace( '<!--Rich-->', '', $post );
-		}
-		/* Deltas still tha haven't been previously processed */
-		elseif( mb_substr( $post, 0, 3 ) == '[{"' )
-		{
-			$post = static::processQuill( $post, $app );
-		}
-		/* LEGACY CONVERSIONS BELOW FOR OLDER CONTENT */
-		else
-		{
-			/* Mentions */
-			$matches = [];
-			preg_match_all( '/@("|&quot;)([^@"]+)("|&quot;)/i', $post, $matches );
+			$postData = str_replace( [ "\r\n","\n" ], '', $post );
+			$postData = json_decode( $postData, TRUE );
 
-			if( count( $matches ) )
+			$post = '';
+			foreach( $postData as $data )
 			{
-				foreach( $matches[0] as $key => $tag )
+				if( \is_array( $data['insert'] ) )
 				{
-					$member = Member::load( $matches[2][ $key ], 'name' );
-					if( !$member->member_id )
+					switch ( $data['insert']['embed-external']['data']['embedType'] )
 					{
-						continue;
+						case 'quote':
+							$post .= '[quote name="' . $data['insert']['embed-external']['data']['insertUser']['name'] . '" timestamp="' . strtotime( $data['insert']['embed-external']['data']['dateInserted'] ) . '"]' . $data['insert']['embed-external']['data']['body'] . "[/quote]";
+							break;
 					}
-
-					$post = str_replace( $tag, "[mention={$member->member_id}]{$member->name}[/mention]", $post );
+				}
+				else
+				{
+					$post .= $data['insert'] . "<br>";
 				}
 			}
-
-			/**
-			 * Vanilla has a quotes plugin that seems to have changed formats quite often. - We'll try to match as many formats as we can
-			 */
-			$post = preg_replace( '/(?:<blockquote\s+(?:class=\"(?:User)?Quote\")?(?:\s+rel=\"(?:[^\"]+)\")?>)(?:\s+)?<div class=\"QuoteAuthor\">([^\"]+)<\/div>(?:\s+)?<div class=\"QuoteText\">(?:<p>)?(.*?)(?:<\/p>)?<\/div>(?:\s+)?<\/blockquote>/i',
-				'[quote name="$1"]$2[/quote]' ,
-				$post );
-
-			$post = preg_replace( '/(?:<blockquote\s+(?:class=\"Quote (?:User)?Quote\")?(?:\s+rel=\"(?:[^\"]+)\")?>)(?:\s+)?<div class=\"QuoteText\">(?:<p>)?(.*?)(?:<\/p>)?<\/div>(?:\s+)?<\/blockquote>/i',
-				'[quote]$1[/quote]' ,
-				$post );
-
-			$post = preg_replace( '/<blockquote\s+rel=\"([^\"]+)\"?>(.*?)<\/blockquote>/i',
-				'[quote name="$1"]$2[/quote]' ,
-				$post );
-
-			$post = preg_replace( '/<blockquote>(.*?)<\/blockquote>/ims',
-				'[quote]$1[/quote]' ,
-				$post );
 		}
+
+		/* Mentions */
+		$matches = [];
+		preg_match_all( '/@("|&quot;)([^@"]+)("|&quot;)/i', $post, $matches );
+
+		if( \count( $matches ) )
+		{
+			foreach( $matches[0] as $key => $tag )
+			{
+				$member = \IPS\Member::load( $matches[2][ $key ], 'name' );
+				if( !$member->member_id )
+				{
+					continue;
+				}
+
+				$post = str_replace( $tag, "[mention={$member->member_id}]{$member->name}[/mention]", $post );
+			}
+		}
+
+		/**
+		 * Vanilla has a quotes plugin that seems to have changed formats quite often. - We'll try to match as many formats as we can
+		 */
+		$post = preg_replace( '/(?:<blockquote\s+(?:class=\"(?:User)?Quote\")?(?:\s+rel=\"(?:[^\"]+)\")?>)(?:\s+)?<div class=\"QuoteAuthor\">([^\"]+)<\/div>(?:\s+)?<div class=\"QuoteText\">(?:<p>)?(.*?)(?:<\/p>)?<\/div>(?:\s+)?<\/blockquote>/i',
+			'[quote name="$1"]$2[/quote]' ,
+			$post );
+
+		$post = preg_replace( '/(?:<blockquote\s+(?:class=\"Quote (?:User)?Quote\")?(?:\s+rel=\"(?:[^\"]+)\")?>)(?:\s+)?<div class=\"QuoteText\">(?:<p>)?(.*?)(?:<\/p>)?<\/div>(?:\s+)?<\/blockquote>/i',
+			'[quote]$1[/quote]' ,
+			$post );
+
+		$post = preg_replace( '/<blockquote\s+rel=\"([^\"]+)\"?>(.*?)<\/blockquote>/i',
+			'[quote name="$1"]$2[/quote]' ,
+			$post );
+
+		$post = preg_replace( '/<blockquote>(.*?)<\/blockquote>/ims',
+			'[quote]$1[/quote]' ,
+			$post );
 
 		return $post;
 	}
@@ -491,7 +433,7 @@ class Vanilla extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertGroups() : void
+	public function convertGroups()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'r.RoleID' );
@@ -512,7 +454,7 @@ class Vanilla extends Software
 		}
 
 		/* Now check for group promotions */
-		if( count( $libraryClass->groupPromotions ) )
+		if( \count( $libraryClass->groupPromotions ) )
 		{
 			foreach( $libraryClass->groupPromotions as $groupPromotion )
 			{
@@ -526,22 +468,18 @@ class Vanilla extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertMembers() : void
+	public function convertMembers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'u.UserID' );
 
 		$uploadsPath = $this->app->_session['more_info']['convertMembers']['attach_location'];
 
-		$users = $this->fetch( array( 'User', 'u' ), 'u.UserID', array( "u.Deleted<>?", 1 ) );
+		$users = $this->fetch( array( 'User', 'u' ), 'u.UserID', array( "u.Deleted<>?", 1 ), 'u.*, ur.RoleID' );
+		$users->join( array( 'UserRole', 'ur' ), 'ur.UserID=u.UserID' );
 
 		$data = iterator_to_array( $users );
-		$userIds = array_column( $data, 'UserID' );
-		$roles = array_fill_keys( $userIds, [] );
-		foreach( $this->db->select( '*', 'UserRole', [ $this->db->in( 'UserID', $userIds ) ] ) as $role )
-		{
-			$roles[ $role['UserID'] ][] = $role['RoleID'];
-		}
+		$this->app->preCacheLinks( $data, [ 'core_groups' => 'RoleID' ] );
 
 		foreach( $data AS $row )
 		{
@@ -550,8 +488,8 @@ class Vanilla extends Software
 			$bdayMonth	= NULL;
 			$bdayYear	= NULL;
 
-			$dateOfBirth = !empty( $row['DateOfBirth'] ) ? @DateTime::ts( strtotime( $row['DateOfBirth'] ) ) : NULL;
-			if ( $dateOfBirth instanceof DateTime )
+			$dateOfBirth = !empty( $row['DateOfBirth'] ) ? @\IPS\DateTime::ts( strtotime( $row['DateOfBirth'] ) ) : NULL;
+			if ( $dateOfBirth instanceof \IPS\DateTime )
 			{
 				$bdayYear  = $dateOfBirth->format( 'Y' );
 				$bdayMonth = $dateOfBirth->format( 'n' );
@@ -561,57 +499,25 @@ class Vanilla extends Software
 			/* Work out banned stuff */
 			$tempBan = ( $row['Banned'] == 1 ) ? -1 : 0;
 
-			/* Get IP */
-			try
-			{
-				$ipAddress = ( $row['InsertIPAddress'] AND !str_contains( $row['InsertIPAddress'], '.' ) ) ? long2ip( hexdec( bin2hex( $row['InsertIPAddress'] ) ) ) : $row['InsertIPAddress'];
-			}
-			catch( \ErrorException $e )
-			{
-				$ipAddress = '';
-			}
-
-			if( !empty( $row['RoleID'] ) )
-			{
-				array_unshift( $roles[ $row['UserID'] ], $row['RoleID'] );
-			}
-
-			$allRoles = array_unique( $roles[ $row['UserID'] ] );
-			$primaryRole = NULL;
-			$secondaryRoles = [];
-
-			/* Find a primary role. */
-			if( count( $allRoles ) )
-			{
-				$primaryRole = array_shift( $allRoles );
-			}
-
-			/* Any remaining roles will be secondary */
-			if( count( $allRoles ) )
-			{
-				$secondaryRoles = $allRoles;
-			}
-
 			/* Array of basic data */
 			$info = array(
 				'member_id'       => $row['UserID'],
 				'email'           => $row['Email'],
 				'name'            => $row['Name'],
 				'password'        => $row['Password'],
-				'member_group_id'    => $primaryRole,
-				'mgroup_others'		=> $secondaryRoles,
+				'member_group_id'    => $row['RoleID'] ?: NULL,
 				'joined'          => static::mysqlToDateTime( $row['DateInserted'] ),
-				'ip_address'      => $ipAddress,
+				'ip_address'      => $row['InsertIPAddress'],
 				'temp_ban'        => $tempBan,
 				'bday_day'        => $bdayDay,
 				'bday_month'      => $bdayMonth,
 				'bday_year'       => $bdayYear,
 				'msg_count_new'   => (int) $row['CountUnreadDiscussions'],
 				'msg_count_total' => (int) $row['CountDiscussions'],
-				'last_visit'      => $row['DateLastActive'] ? static::mysqlToDateTime( $row['DateLastActive'] ) : NULL,
+				'last_visit'      => static::mysqlToDateTime( $row['DateLastActive'] ),
 				'timezone'        => !empty( $row['HourOffset'] )
 					? (int) $row['HourOffset']
-					: new DateTimeZone(
+					: new \DateTimeZone(
 						'UTC'
 					),
 				'member_posts'    => (int) $row['CountComments'],
@@ -623,7 +529,7 @@ class Vanilla extends Software
 
 			if ( !empty( $row['Photo'] ) AND ( $location = static::parseMediaLocation( $row['Photo'], $uploadsPath ) ) )
 			{
-				if ( $location instanceof Url )
+				if ( $location instanceof \IPS\Http\Url )
 				{
 					/* The library uses file_get_contents() so we can just pop the file name off and pass the URL directly */
 					$filebits = explode( '/', (string) $location );
@@ -633,8 +539,8 @@ class Vanilla extends Software
 				else
 				{
 					// Full-sized profile photos start with "p", small profile photos start with "n"
-					$filename = 'p' . pathinfo( $location, PATHINFO_BASENAME );
-					$filepath = pathinfo( $location, PATHINFO_DIRNAME );
+					$filename = 'p' . pathinfo( $location, \PATHINFO_BASENAME );
+					$filepath = pathinfo( $location, \PATHINFO_DIRNAME );
 				}
 
 			}
@@ -646,11 +552,42 @@ class Vanilla extends Software
 	}
 
 	/**
+	 * Convert statuses
+	 *
+	 * @return 	void
+	 */
+	public function convertStatuses()
+	{
+		$libraryClass = $this->getLibrary();
+		$libraryClass::setKey( 'ActivityID' );
+
+		$data = iterator_to_array( $this->fetch( 'Activity', 'ActivityID', array( 'ActivityTypeID=?', static::$activityStatusType ) ) );
+		$this->app->preCacheLinks( $data, [ 'core_members' => 'ActivityUserID' ] );
+
+		/* Run conversions */
+		foreach ( $data as $row )
+		{
+			$info = array(
+				'status_id'         => $row['ActivityID'],
+				'status_member_id'  => $row['ActivityUserID'],
+				'status_date'       => \IPS\DateTime::ts( strtotime( $row['DateInserted'] ) ?: time() ),
+				'status_content'    => $row['Story'],
+				//'status_replies'    => $this->countRows( 'ActivityComment', array( 'ActivityID=?', $row['ActivityID'] ) ),
+				'status_author_id'  => $row['ActivityUserID'],
+				'status_author_ip'  => $row['InsertIPAddress'],
+			);
+
+			$libraryClass->convertStatus( $info );
+			$libraryClass->setLastKeyValue( $row['ActivityID'] );
+		}
+	}
+
+	/**
 	 * Convert PMs
 	 *
 	 * @return 	void
 	 */
-	public function convertPrivateMessages() : void
+	public function convertPrivateMessages()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'ConversationID' );
@@ -669,7 +606,7 @@ class Vanilla extends Software
 				'mt_date'           => static::mysqlToDateTime( $row['DateInserted'] ),
 				'mt_starter_id'     => $row['InsertUserID'],
 				'mt_last_post_time' => static::mysqlToDateTime( $row['DateUpdated'] ),
-				'mt_to_count'       => ( isset( $row['CountParticipants'] ) ) ? $row['CountParticipants'] : count( unserialize( $row['Contributors'] ) ),
+				'mt_to_count'       => ( isset( $row['CountParticipants'] ) ) ? $row['CountParticipants'] : \count( \unserialize( $row['Contributors'] ) ),
 				'mt_replies'        => $row['CountMessages'],
 			);
 
@@ -677,14 +614,14 @@ class Vanilla extends Software
 			$maps = array();
 			$rows = iterator_to_array( $this->db->select( '*', 'UserConversation', array( 'ConversationID=?', $row['ConversationID'] ) ) );
 			$this->app->preCacheLinks( $rows, [ 'core_members' => 'UserID' ] );
-			foreach ( $rows as $r )
+			foreach ( $rows as $row )
 			{
-				$maps[ $r['UserID'] ] = array(
-					'map_user_id'           => $r['UserID'],
-					'map_read_time'         => $r['DateLastViewed'] ? static::mysqlToDateTime( $r['DateLastViewed'] ) : NULL,
+				$maps[ $row['UserID'] ] = array(
+					'map_user_id'           => $row['UserID'],
+					'map_read_time'         => static::mysqlToDateTime( $row['DateLastViewed'] ),
 					//'map_folder_id'        => TODO: Create a Bookmarks folder for "Bookmarked" conversations?
-					'map_user_active'       => $r['Deleted'] == 0 ? 1 : 0,
-					'map_last_topic_reply'  => $r['DateConversationUpdated'] ? static::mysqlToDateTime( $r['DateConversationUpdated'] ) : NULL
+					'map_user_active'       => $row['Deleted'] == 0 ? 1 : 0,
+					'map_last_topic_reply'  => static::mysqlToDateTime( $row['DateConversationUpdated'] )
 				);
 			}
 
@@ -698,7 +635,7 @@ class Vanilla extends Software
 	 *
 	 * @return 	void
 	 */
-	public function convertPrivateMessageReplies() : void
+	public function convertPrivateMessageReplies()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'MessageID' );
@@ -713,20 +650,6 @@ class Vanilla extends Software
 			{
 				$row['Body'] = '<!--Markdown-->' . $row['Body'];
 			}
-			elseif( $row['Format'] == 'Rich' )
-			{
-				$row['Body'] = static::processQuill( $row['Body'], $this->app, 'core_message_posts', $row['ConversationID'], $row['MessageID'] );
-			}
-
-			/* Get IP */
-			try
-			{
-				$ipAddress = ( $row['InsertIPAddress'] AND !str_contains( $row['InsertIPAddress'], '.' ) ) ? long2ip( hexdec( bin2hex( $row['InsertIPAddress'] ) ) ) : $row['InsertIPAddress'];
-			}
-			catch( \ErrorException $e )
-			{
-				$ipAddress = '';
-			}
 
 			$libraryClass->convertPrivateMessageReply( array(
 				'msg_id'            => $row['MessageID'],
@@ -734,7 +657,7 @@ class Vanilla extends Software
 				'msg_date'          => static::mysqlToDateTime( $row['DateInserted'] ),
 				'msg_post'          => $row['Body'],
 				'msg_author_id'     => $row['InsertUserID'],
-				'msg_ip_address'    => $ipAddress
+				'msg_ip_address'    => $row['InsertIPAddress']
 			) );
 			
 			$libraryClass->setLastKeyValue( $row['MessageID'] );
@@ -742,156 +665,29 @@ class Vanilla extends Software
 	}
 
 	/**
-	 * @brief   temporarily store post content
-	 */
-	protected array $_postContent = array();
-
-	/**
-	 * Convert attachments
-	 *
-	 * @return	void
-	 */
-	public function convertAttachments(): void
-	{
-		$libraryClass = $this->getLibrary();
-		$libraryClass::setKey( 'MediaID' );
-		$this->_postContent = [];
-
-		foreach( $this->fetch( 'Media', 'MediaID', [ $this->db->in( 'ForeignTable', [ 'embed' ] ) ] ) AS $row )
-		{
-			$mediaRows = iterator_to_array( 
-				\IPS\Db::i()->select( 
-					'*', 
-					'convert_vanilla_temp', 
-					[ 'media_id=? AND ' . \IPS\Db::i()->in( 'link_type', [ 'core_message_posts' ] ), $row['MediaID'] ] 
-			) );
-
-			// Nothing to do, attachment must be in another content type
-			if( !count( $mediaRows ) )
-			{
-				$libraryClass->setLastKeyValue( $row['MediaID'] );
-				continue;
-			}
-
-			$map = [
-				'id1'	=> $mediaRows[0]['content_id'],
-				'id2'	=> $mediaRows[0]['post_id']
-			];
-			
-			$map['id1_type']		= 'core_message_topics';
-			$map['id2_type']		= 'core_message_posts';
-			$map['location_key']	= 'core_Messaging';
-			$map['id1_from_parent'] = FALSE;
-			$map['id2_from_parent'] = FALSE;
-			$map['id3_skip_link'] = TRUE;
-
-			/* File extension */
-			$ext = explode( '.', $row['Path'] );
-			$ext = array_pop( $ext );
-
-			$info = array(
-				'attach_id'			=> $row['MediaID'],
-				'attach_file'		=> $row['Name'],
-				'attach_date'		=> static::mysqlToDateTime( $row['DateInserted'] ),
-				'attach_member_id'	=> $row['InsertUserID'],
-				'attach_hits'		=> 0,
-				'attach_ext'		=> $ext,
-				'attach_filesize'	=> $row['Size'],
-			);
-
-			$uploadPath = static::parseMediaLocation( $row['Path'], $this->app->_session['more_info']['convertMembers']['attach_location'] );
-
-			$attachId = $libraryClass->convertAttachment( $info, $map, $uploadPath );
-
-			/* Do some re-jiggery on the post itself to make sure attachment displays */
-			if ( $attachId !== FALSE )
-			{
-				foreach( $mediaRows as $mediaRow )
-				{
-					try
-					{
-						$pid = $this->app->getLink( $map['id2'], 'core_message_posts' );
-
-						if( !isset( $this->_postContent[ $pid ] ) )
-						{
-							$this->_postContent[ $pid ] = Db::i()->select( 'msg_post', 'core_message_posts', array( "msg_id=?", $pid ) )->first();
-						}
-
-						$this->_postContent[ $pid ] = str_replace( "[ATTACH={$row['MediaID']}]", '[attachment=' . $attachId . ':name]', $this->_postContent[ $pid ] );
-					}
-					catch( UnderflowException|OutOfRangeException $e ) {}
-				}
-			}
-
-			unset( $mediaRows );
-			$libraryClass->setLastKeyValue( $row['MediaID'] );
-		}
-
-		/* Do the updates */
-		foreach( $this->_postContent as $pid => $content )
-		{
-			Db::i()->update( 'core_message_posts', array( 'msg_post' => $content ), array( 'msg_id=?', $pid ) );
-		}
-	}
-
-	/**
 	 * Process a login
 	 *
-	 * @param	Member		$member			The member
+	 * @param	\IPS\Member		$member			The member
 	 * @param	string			$password		Password from form
 	 * @return	bool
 	 */
-	public static function login( Member $member, string $password ) : bool
+	public static function login( $member, $password )
 	{
 		/* Vanilla 2.2 */
 		if( preg_match( '/^\$2[ay]\$(0[4-9]|[1-2][0-9]|3[0-1])\$[a-zA-Z0-9.\/]{53}/', $member->conv_password ) OR mb_substr( $member->conv_password, 0, 3 ) == '$P$' )
 		{
 			require_once \IPS\ROOT_PATH . "/applications/convert/sources/Login/PasswordHash.php";
-			$ph = new PasswordHash( 8, TRUE );
-			return $ph->CheckPassword( $password, $member->conv_password );
+			$ph = new \PasswordHash( 8, TRUE );
+			return $ph->CheckPassword( $password, $member->conv_password ) ? TRUE : FALSE;
 		}
 
-		if ( Login::compareHashes( $member->conv_password, md5( md5( str_replace( '&#39;', "'", html_entity_decode( $password ) ) ) . $member->misc ) ) )
+		if ( \IPS\Login::compareHashes( $member->conv_password, md5( md5( str_replace( '&#39;', "'", html_entity_decode( $password ) ) ) . $member->misc ) ) )
 		{
 			return TRUE;
 		}
 		else
 		{
 			return FALSE;
-		}
-	}
-
-	public static function processQuill( string $postJson, ?App $app=null, ?string $type=null, ?int $contentId=null, ?int $commentId=null ): string
-	{
-		/* Need to wrap so it's an expected format */
-		$post = '{"ops":' . $postJson . '}';
-
-		if ( strpos( $post, '"header":' ) !== false )
-		{
-			$post = preg_replace('/{"header":{"level":(\d+),"ref":"([^"]*)"}}/', '{"header":$1}', $post );
-		}
-
-		$data = json_decode( $post, true );
-
-		if ( !isset( $data['ops'][ count( $data['ops'] ) - 1 ]['insert'] ) OR is_array( $data['ops'][ count( $data['ops'] ) - 1 ]['insert'] ) OR \substr( $data['ops'][ count( $data['ops'] ) - 1 ]['insert'], -1 ) !== "\n" )
-		{
-			$data['ops'][] = [ "insert" => "\n" ];
-		}
-
-		/* Get the autoloader for the Quill library */
-		require_once Application::load( 'convert' )->getApplicationPath() . '/sources/Tools/Quill/vendor/autoload.php';
-
-		$lexer = new \nadar\quill\Lexer( $data );
-		$lexer->registerListener( new \IPS\convert\Tools\Vanilla\QuillListeners\Emoji() );
-		$lexer->registerListener( new \IPS\convert\Tools\Vanilla\QuillListeners\EmbedExternal( $type, $contentId, $commentId ) );
-		$lexer->registerListener( new \IPS\convert\Tools\Vanilla\QuillListeners\Mention( $app ) );
-		try
-		{
-			return '<!--Rich-->' . $lexer->render();
-		}
-		catch( \ErrorException $e )
-		{
-			return $postJson;
 		}
 	}
 }

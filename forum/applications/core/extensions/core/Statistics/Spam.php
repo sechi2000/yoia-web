@@ -11,39 +11,31 @@
 namespace IPS\core\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Spam extends \IPS\core\Statistics\Chart
+class _Spam extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_stats_spam';
+	public $controller = 'core_stats_spam';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$chart	= new Database( $url, 'core_spam_service_log', 'log_date', '', array(
+		$chart	= new \IPS\Helpers\Chart\Database( $url, 'core_spam_service_log', 'log_date', '', array( 
 			'isStacked' => TRUE,
 			'backgroundColor' 	=> '#ffffff',
 			'hAxis'				=> array( 'gridlines' => array( 'color' => '#f5f5f5' ) ),
@@ -56,16 +48,16 @@ class Spam extends \IPS\core\Statistics\Chart
 
 		foreach( array( 1,2,3,4 ) as $v )
 		{
-			$chart->addSeries(  Member::loggedIn()->language()->addToStack('spam_service_action_stats_' . $v ), 'number', 'COUNT(*)', TRUE, $v );
+			$chart->addSeries(  \IPS\Member::loggedIn()->language()->addToStack('spam_service_action_stats_' . $v ), 'number', 'COUNT(*)', TRUE, $v );		
 		}
 
-		$chart->title = Member::loggedIn()->language()->addToStack('stats_spam_title');
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('stats_spam_title');
 		$chart->availableTypes = array( 'LineChart', 'AreaChart', 'ColumnChart', 'BarChart' );
 
 		$chart->tableParsers = array(
 			'log_date'	=> function( $val )
 			{
-				return (string) DateTime::ts( $val );
+				return (string) \IPS\DateTime::ts( $val );
 			}
 		);
 		

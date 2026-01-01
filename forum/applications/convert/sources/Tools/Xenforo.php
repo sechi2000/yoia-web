@@ -12,21 +12,9 @@
 namespace IPS\convert\Tools;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Image;
-use IPS\Image\Gd;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function file_exists;
-use function file_get_contents;
-use function is_null;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -49,7 +37,7 @@ trait Xenforo
 		}
 		else
 		{
-			return unserialize( $value );
+			return \unserialize( $value );
 		}
 	}
 
@@ -60,14 +48,14 @@ trait Xenforo
 	 * @param	string			$xfTwoTitle		XF2 Phrase Title
 	 * @return	string|null
 	 */
-	protected function getPhrase( string $xfOneTitle, string $xfTwoTitle ) : ?string
+	protected function getPhrase( $xfOneTitle, $xfTwoTitle )
 	{
 		try
 		{
-			$title = ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) ? $xfTwoTitle : $xfOneTitle;
+			$title = ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) ? $xfTwoTitle : $xfOneTitle;
 			return $this->db->select( 'phrase_text', 'xf_phrase', array( "title=?", $title ) )->first();
 		}
-		catch( UnderflowException $e )
+		catch( \UnderflowException $e )
 		{
 			return NULL;
 		}
@@ -76,7 +64,7 @@ trait Xenforo
 	/**
 	 * @brief	Cache sprite image objects
 	 */
-	protected array $_spriteImages = array();
+	protected $_spriteImages = array();
 
 	/**
 	 * Return image from sprite - We must use GD for this, it's generally available on most servers
@@ -87,25 +75,25 @@ trait Xenforo
 	 * @param	array		$spriteParams	Sprite parameters
 	 * @return	array
 	 *
-	 * @throws	OutOfRangeException
-	 * @throws	InvalidArgumentException
+	 * @throws	\OutOfRangeException
+	 * @throws	\InvalidArgumentException
 	 */
-	protected function _imageFromSprite( string $sprite, array $spriteParams ) : array
+	protected function _imageFromSprite( $sprite, $spriteParams )
 	{
 		$key = md5( $sprite );
 
 		/* Set up image canvas */
 		if( !isset( $this->_spriteImages[ $key ] ) )
 		{
-			if( !file_exists( $sprite ) )
+			if( !\file_exists( $sprite ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
 			// Check valid image
-			$image = file_get_contents( $sprite );
-			Image::create( $image );
-			$this->_spriteImages[ $key ] = new Gd( $image );
+			$image = \file_get_contents( $sprite );
+			\IPS\Image::create( $image );
+			$this->_spriteImages[ $key ] = new \IPS\Image\Gd( $image );
 		}
 
 		/* x2 image? */
@@ -115,7 +103,7 @@ trait Xenforo
 			$multiplier = 2;
 		}
 
-		$image = Gd::newImageCanvas( $spriteParams['w'] * $multiplier, $spriteParams['h'] * $multiplier, array( 0, 0, 0 ) );
+		$image = \IPS\Image\Gd::newImageCanvas( $spriteParams['w'] * $multiplier, $spriteParams['h'] * $multiplier, array( 0, 0, 0 ) );
 
 		/* Set the background to transparent */
 		imagefill( $image->image, 0, 0, imagecolorallocatealpha( $image->image, 0, 0, 0, 127 ) );

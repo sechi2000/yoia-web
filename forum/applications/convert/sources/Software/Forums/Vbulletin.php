@@ -12,66 +12,43 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use InvalidArgumentException;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Vbulletin as VbulletinCore;
-use IPS\Db;
-use IPS\forums\Forum;
-use IPS\forums\Topic;
-use IPS\forums\Topic\Post;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function in_array;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * vBulletin Forums Converter
  */
-class Vbulletin extends Software
+class _Vbulletin extends \IPS\convert\Software
 {
 	/**
 	 * @brief	vBulletin 4 Stores all attachments under one table - this will store the content type for the forums app.
 	 */
-	protected static ?int $postContentType		= NULL;
+	protected static $postContentType		= NULL;
 	
 	/**
 	 * @brief	The schematic for vB3 and vB4 is similar enough that we can make specific concessions in a single converter for either version.
 	 */
-	protected static ?bool $isLegacy					= NULL;
+	protected static $isLegacy					= NULL;
 	
 	/**
 	 * @brief	Flag to indicate the post data has been fixed during conversion, and we only need to use Legacy Parser
 	 */
-	public static bool $contentFixed = TRUE;
+	public static $contentFixed = TRUE;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param	App	$app	The application to reference for database and other information.
+	 * @param	\IPS\convert\App	$app	The application to reference for database and other information.
 	 * @param	bool				$needDB	Establish a DB connection
 	 * @return	void
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public function __construct( App $app, bool $needDB=TRUE )
+	public function __construct( \IPS\convert\App $app, $needDB=TRUE )
 	{
-		parent::__construct( $app, $needDB );
+		$return = parent::__construct( $app, $needDB );
 		
 		if ( $needDB )
 		{
@@ -94,21 +71,23 @@ class Vbulletin extends Software
 				
 				
 				/* If this is vB4, what is the content type ID for posts? */
-				if ( static::$postContentType === NULL AND ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) )
+				if ( static::$postContentType === NULL AND ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) )
 				{
 					static::$postContentType = $this->db->select( 'contenttypeid', 'contenttype', array( "class=?", 'Post' ) )->first();
 				}
 			}
-			catch( Exception $e ) {}
+			catch( \Exception $e ) {}
 		}
+		
+		return $return;
 	}
 	
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "vBulletin Forums (3.8.x/4.x)";
@@ -117,9 +96,9 @@ class Vbulletin extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "vbulletin";
@@ -128,9 +107,9 @@ class Vbulletin extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums'	=> array(
@@ -152,7 +131,7 @@ class Vbulletin extends Software
 			),
 			'convertClubForums'		=> array(
 				'table'		=> 'socialgroup',
-				'where'		=> array( Db::i()->bitwiseWhere( array( 'options' => static::$bitOptions['cluboptions'] ), 'enable_group_messages' ) )
+				'where'		=> array( \IPS\Db::i()->bitwiseWhere( array( 'options' => static::$bitOptions['cluboptions'] ), 'enable_group_messages' ) )
 			),
 			'convertClubTopics'		=> array(
 				'table'		=> 'discussion',
@@ -164,7 +143,7 @@ class Vbulletin extends Software
 			),
 			'convertAttachments'	=> array(
 				'table'		=> 'attachment',
-				'where'		=> ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) ? array( "contenttypeid=?", static::$postContentType ) : NULL
+				'where'		=> ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) ? array( "contenttypeid=?", static::$postContentType ) : NULL
 			)
 		);
 	}
@@ -172,15 +151,15 @@ class Vbulletin extends Software
 	/**
 	 * Allows software to add additional menu row options
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function extraMenuRows(): array
+	public function extraMenuRows()
 	{
 		$rows = array();
 		$rows['convertForumsTopicsFollowers'] = array(
 			'step_title'		=> 'convert_forums_topics_followers',
 			'step_method'		=> 'convertForumsTopicsFollowers',
-			'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_follow', array( 'follow_app=? AND follow_area=?', 'forums', 'topics' ) ),
+			'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_follow', array( 'follow_app=? AND follow_area=?', 'forums', 'topics' ) ),
 			'source_rows'		=> array( 'table' => static::canConvert()['convertForumsTopicsFollowers']['table'], 'where' => static::canConvert()['convertForumsTopicsFollowers']['where'] ),
 			'per_cycle'			=> 2000,
 			'dependencies'		=> array( 'convertForumsTopics' ),
@@ -194,9 +173,9 @@ class Vbulletin extends Software
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -204,9 +183,9 @@ class Vbulletin extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'vbulletin' ) );
 	}
@@ -214,47 +193,44 @@ class Vbulletin extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 2, array( 'class' ) ); // This must run before the CMS item count task runs.
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 2, array( 'class' ) ); // This must run before the CMS item count task runs.
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		/* Rebuild Leaderboard */
-		Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
-		Db::i()->delete('core_reputation_leaderboard_history');
+		\IPS\Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
+		\IPS\Db::i()->delete('core_reputation_leaderboard_history');
 
 		/* Caches */
-		Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildTagCache', array( 'app' => $this->app->app_id, 'link' => 'forums_topics', 'class' => 'IPS\forums\Topic' ), 3, array( 'app', 'link', 'class' ) );
 		
 		return array( "f_forum_last_post_data", "f_rebuild_posts", "f_recounting_forums", "f_recounting_topics", "f_topic_tags_recount" );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix Post Data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string	$post	Post
+	 * @return	string	Fixed Posts
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return VbulletinCore::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Vbulletin::fixPostData( $post );
 	}
 
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertAttachments', 
@@ -265,10 +241,10 @@ class Vbulletin extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -277,10 +253,10 @@ class Vbulletin extends Software
 				/* Get our reactions to let the admin map them */
 				$options		= array();
 				$descriptions	= array();
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
 				{
 					$options[ $reaction->id ]		= $reaction->_icon->url;
-					$descriptions[ $reaction->id ]	= Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
+					$descriptions[ $reaction->id ]	= \IPS\Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
 				}
 
 				$return['convertForumsPosts'] = array(
@@ -319,13 +295,13 @@ class Vbulletin extends Software
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'database'				=> Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
-								'file_system'			=> Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
+								'database'				=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
+								'file_system'			=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
 							),
 							'userSuppliedInput'	=> 'file_system',
 						),
 						'field_hint'			=> NULL,
-						'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;
@@ -339,7 +315,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums() : void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -356,7 +332,7 @@ class Vbulletin extends Software
 					$key = 'options';
 				}
 				
-				if ( $forum[$key] & static::$bitOptions[$name][$perm] )
+				if ( $forum[$key] & $self::$bitOptions[$name][$perm] )
 				{
 					return TRUE;
 				}
@@ -370,9 +346,13 @@ class Vbulletin extends Software
 				'description'			=> $forum['description'],
 				'topics'				=> $forum['threadcount'],
 				'posts'					=> $forum['replycount'],
+				'last_post'				=> $forum['lastpost'],
+				'last_poster_id'		=> ( static::$isLegacy === FALSE or \is_null( static::$isLegacy ) ) ? $forum['lastposterid'] : 0,
+				'last_poster_name'		=> $forum['lastposter'],
 				'parent_id'				=> $forum['parentid'],
 				'position'				=> $forum['displayorder'],
 				'password'				=> $forum['password'] ?: NULL,
+				'last_title'			=> $forum['lastthread'],
 				'preview_posts'			=> $checkpermission( 'forumoptions', 'moderatenewpost' ),
 				'inc_postcount'			=> $checkpermission( 'forumoptions', 'countposts' ),
 				'redirect_url'			=> $forum['link'],
@@ -427,7 +407,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics() : void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'threadid' );
@@ -464,7 +444,7 @@ class Vbulletin extends Software
 						$votes[$index] = $vote;
 						$index++;
 						
-						$numvotes += (int) $vote;
+						$numvotes += $vote;
 					}
 					
 					$poll = array();
@@ -514,7 +494,7 @@ class Vbulletin extends Software
 						);
 					}
 				}
-				catch( UnderflowException $e ) {} # if the poll is missing, don't bother
+				catch( \UnderflowException $e ) {} # if the poll is missing, don't bother
 			}
 			
 			switch( $topic['visible'] )
@@ -540,14 +520,14 @@ class Vbulletin extends Software
 				'posts'				=> $topic['replycount'],
 				'starter_id'		=> $topic['postuserid'],
 				'start_date'		=> $topic['dateline'],
-				'last_poster_id'	=> ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) ) ? $topic['lastposterid'] : NULL,
+				'last_poster_id'	=> ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) ) ? $topic['lastposterid'] : NULL,
 				'last_post'			=> $topic['lastpost'],
 				'starter_name'		=> $topic['postusername'],
 				'last_poster_name'	=> $topic['lastposter'],
 				'poll_state'		=> $poll,
 				'last_vote'			=> $lastVote,
 				'views'				=> $topic['views'],
-				'approved'			=> $approved ?? 1,
+				'approved'			=> $approved,
 				'pinned'			=> $topic['sticky'],
 				'topic_hiddenposts'	=> $topic['hiddencount'] + $topic['deletedcount']
 			);
@@ -589,13 +569,13 @@ class Vbulletin extends Software
 					'tag_prefix'			=> 1, # key to this whole operation right here
 				) );
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			/* Tags */
 			if( $topic['taglist'] !== NULL AND !empty( $topic['taglist'] ) )
 			{
 				$tags = explode( ',', $topic['taglist'] );
-				if ( count( $tags ) )
+				if ( \count( $tags ) )
 				{
 					foreach( $tags AS $tag )
 					{
@@ -622,7 +602,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopicsFollowers() : void
+	public function convertForumsTopicsFollowers()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'subscribethreadid' );
@@ -672,7 +652,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts() : void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'postid' );
@@ -718,7 +698,7 @@ class Vbulletin extends Software
 				'ip_address'		=> $post['ipaddress'],
 				'post_date'			=> $post['dateline'],
 				'queued'			=> $queued,
-				'post_htmlstate'	=> ( static::$isLegacy === FALSE AND in_array( $post['htmlstate'], array( 'on', 'on_nl2br' ) ) ) ? 1 : 0,
+				'post_htmlstate'	=> ( static::$isLegacy === FALSE AND \in_array( $post['htmlstate'], array( 'on', 'on_nl2br' ) ) ) ? 1 : 0,
 			);
 
 			/* Edited? */
@@ -730,7 +710,7 @@ class Vbulletin extends Software
 				$info['edit_name'] = $lastEdit['username'];
 				$info['post_edit_reason'] = $lastEdit['reason'] ?? null;
 			}
-			catch( UnderflowException $e ) {}
+			catch( \UnderflowException $e ) {}
 			
 			$libraryClass->convertForumsPost( $info );
 			
@@ -814,7 +794,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -823,7 +803,7 @@ class Vbulletin extends Software
 		$where			= NULL;
 		$column			= NULL;
 		
-		if ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) )
+		if ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) )
 		{
 			$where			= array( "contenttypeid=?", static::$postContentType );
 			$column			= 'contentid';
@@ -839,25 +819,25 @@ class Vbulletin extends Software
 			{
 				$topic_id = $this->db->select( 'threadid', 'post', array( "postid=?", $attachment[$column] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				/* If the topic is missing, there isn't much we can do. */
 				$libraryClass->setLastKeyValue( $attachment['attachmentid'] );
-				$this->app->log( 'vb_attach_missing_topic', __METHOD__, App::LOG_WARNING, $attachment['attachmentid'] );
+				$this->app->log( 'vb_attach_missing_topic', __METHOD__, \IPS\convert\App::LOG_WARNING, $attachment['attachmentid'] );
 				continue;
 			}
 			
-			if ( static::$isLegacy === FALSE OR is_null( static::$isLegacy ) )
+			if ( static::$isLegacy === FALSE OR \is_null( static::$isLegacy ) )
 			{
 				try
 				{
 					$filedata = $this->db->select( '*', 'filedata', array( "filedataid=?", $attachment['filedataid'] ) )->first();
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					/* If the filedata row is missing, there isn't much we can do. */
 					$libraryClass->setLastKeyValue( $attachment['attachmentid'] );
-					$this->app->log( 'vb_attach_missing_filedata', __METHOD__, App::LOG_WARNING, $attachment['attachmentid'] );
+					$this->app->log( 'vb_attach_missing_filedata', __METHOD__, \IPS\convert\App::LOG_WARNING, $attachment['attachmentid'] );
 					continue;
 				}
 			}
@@ -904,16 +884,17 @@ class Vbulletin extends Software
 				{
 					$pid = $this->app->getLink( $attachment[$column], 'forums_posts' );
 					
-					$post = Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
+					$post = \IPS\Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
 					
 					if ( preg_match( "/\[ATTACH([^\]]+?)?\]".$attachment['attachmentid']."\[\/ATTACH\]/i", $post ) )
 					{
 						$post = preg_replace( "/\[ATTACH([^\]]+?)?\]" . $attachment['attachmentid'] . "\[\/ATTACH\]/i", '[attachment=' . $attach_id . ':name]', $post );
 
-						Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
+						\IPS\Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
 					}
 				}
-				catch( UnderflowException|OutOfRangeException $e ) {}
+				catch( \UnderflowException $e ) {}
+				catch( \OutOfRangeException $e ) {}
 			}
 			
 			$libraryClass->setLastKeyValue( $attachment['attachmentid'] );
@@ -925,11 +906,11 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertClubForums() : void
+	public function convertClubForums()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'groupid' );
-		foreach( $this->fetch( 'socialgroup', 'groupid', array( Db::i()->bitwiseWhere( array( 'options' => static::$bitOptions['cluboptions'] ), 'enable_group_messages' ) ) ) AS $row )
+		foreach( $this->fetch( 'socialgroup', 'groupid', array( \IPS\Db::i()->bitwiseWhere( array( 'options' => static::$bitOptions['cluboptions'] ), 'enable_group_messages' ) ) ) AS $row )
 		{
 			$libraryClass->convertClubForum( array(
 				'id'			=> "clubforum{$row['groupid']}",
@@ -948,7 +929,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertClubTopics() : void
+	public function convertClubTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'discussionid' );
@@ -958,7 +939,7 @@ class Vbulletin extends Software
 			{
 				$firstpost = $this->db->select( '*', 'groupmessage', array( "gmid=?", $row['firstpostid'] ) )->first();
 			}
-			catch( UnderflowException $e )
+			catch( \UnderflowException $e )
 			{
 				$libraryClass->setLastKeyValue( $row['discussionid'] );
 				continue;
@@ -990,7 +971,7 @@ class Vbulletin extends Software
 				'last_post'			=> $row['lastpost'],
 				'starter_name'		=> $firstpost['postusername'],
 				'last_poster_name'	=> $row['lastposter'],
-				'approved'			=> $approved ?? 1,
+				'approved'			=> $approved,
 			) );
 
 			$libraryClass->setLastKeyValue( $row['discussionid'] );
@@ -1002,7 +983,7 @@ class Vbulletin extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertClubPosts() : void
+	public function convertClubPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		$libraryClass::setKey( 'gmid' );
@@ -1030,7 +1011,7 @@ class Vbulletin extends Software
 				'author_id'		=> $row['postuserid'],
 				'author_name'	=> $row['postusername'],
 				'post_date'		=> $row['dateline'],
-				'queued'		=> $queued ?? 0,
+				'queued'		=> $queued,
 			) );
 			$libraryClass->setLastKeyValue( $row['gmid'] );
 		}
@@ -1041,7 +1022,7 @@ class Vbulletin extends Software
 	/**
 	 * @brief	Silly Bitwise
 	 */
-	public static array $bitOptions = array (
+	public static $bitOptions = array (
 		'forumoptions' => array(
 			'active' => 1,
 			'allowposting' => 2,
@@ -1078,38 +1059,38 @@ class Vbulletin extends Software
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
 		/* If it looks like a VBSEO URL, rewrite it */
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], '.html' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], '.html' ) !== FALSE )
 		{
 			/* Paginated topics */
-			if( preg_match( "/\/(\d+)\-.+?\-(\d+)\.html/", $url->data[ Url::COMPONENT_PATH ], $matches ) )
+			if( preg_match( "/\/(\d+)\-.+?\-(\d+)\.html/", $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 			{
-				$url = $url->setPath( preg_replace( "/\/(\d+)\-.+?\-(\d+)\.html/", "/showthread.php", $url->data[ Url::COMPONENT_PATH ] ) )->setQueryString( array( 't' => $matches[1], 'page' => $matches[2] ) );
-				Request::i()->t	= $matches[1];
-				Request::i()->page	= $matches[2];
+				$url = $url->setPath( preg_replace( "/\/(\d+)\-.+?\-(\d+)\.html/", "/showthread.php", $url->data[ \IPS\Http\Url::COMPONENT_PATH ] ) )->setQueryString( array( 't' => $matches[1], 'page' => $matches[2] ) );
+				\IPS\Request::i()->t	= $matches[1];
+				\IPS\Request::i()->page	= $matches[2];
 			}
 			/* Normal Topics */
-			elseif( preg_match( "/\/(\d+)\-.+?\.html/", $url->data[ Url::COMPONENT_PATH ], $matches ) )
+			elseif( preg_match( "/\/(\d+)\-.+?\.html/", $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 			{
-				$url = $url->setPath( preg_replace( "/\/(\d+)\-.+?\.html/", "/showthread.php", $url->data[ Url::COMPONENT_PATH ] ) )->setQueryString( 't', $matches[1] );
-				Request::i()->t	= $matches[1];
+				$url = $url->setPath( preg_replace( "/\/(\d+)\-.+?\.html/", "/showthread.php", $url->data[ \IPS\Http\Url::COMPONENT_PATH ] ) )->setQueryString( 't', $matches[1] );
+				\IPS\Request::i()->t	= $matches[1];
 			}
 			/* Post Links */
-			elseif( preg_match( "/\/(\d+)\-.+?\-post(\d+)\.html/", $url->data[ Url::COMPONENT_PATH ], $matches ) )
+			elseif( preg_match( "/\/(\d+)\-.+?\-post(\d+)\.html/", $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 			{
-				$url = $url->setPath( preg_replace( "/\/(\d+)\-.+?\-post(\d+)\.html/", "/showpost.php", $url->data[ Url::COMPONENT_PATH ] ) )->setQueryString( 'p', $matches[2] );
-				Request::i()->p	= $matches[2];
+				$url = $url->setPath( preg_replace( "/\/(\d+)\-.+?\-post(\d+)\.html/", "/showpost.php", $url->data[ \IPS\Http\Url::COMPONENT_PATH ] ) )->setQueryString( 'p', $matches[2] );
+				\IPS\Request::i()->p	= $matches[2];
 			}
 		}
 
 		/* Forum URLs are the same across VB 3.8 and VB 4 */
-		if( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'forumdisplay.php' ) !== FALSE )
+		if( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'forumdisplay.php' ) !== FALSE )
 		{
 			/* Forum URLs can be in one of 4 formats really...
 			 * /forumdisplay.php/1-name
@@ -1117,14 +1098,14 @@ class Vbulletin extends Software
 			 * /forumdisplay.php?f=1
 			 * /forumdisplay.php?1-name
 			 */
-			$path = $url->data[ Url::COMPONENT_PATH ];
+			$path = $url->data[ \IPS\Http\Url::COMPONENT_PATH ];
 			if( mb_strpos( $path, 'forumdisplay.php' ) !== FALSE )
 			{
-				if( isset( Request::i()->f ) )
+				if( isset( \IPS\Request::i()->f ) )
 				{
-					$oldId	= Request::i()->f;
+					$oldId	= \IPS\Request::i()->f;
 				}
-				elseif( preg_match( '#^(\d+)-[^/]+#i', $url->data[ Url::COMPONENT_QUERY ], $matches ) )
+				elseif( preg_match( '#^(\d+)-[^/]+#i', $url->data[ \IPS\Http\Url::COMPONENT_QUERY ], $matches ) )
 				{
 					$oldId = $matches[1];
 				}
@@ -1140,72 +1121,72 @@ class Vbulletin extends Software
 				try
 				{
 					$data = (string) $this->app->getLink( $oldId, array( 'forums', 'forums_forums' ) );
-					$item = Forum::load( $data );
+					$item = \IPS\forums\Forum::load( $data );
 
 					if( $item->can( 'view' ) )
 					{
 						return $item->url();
 					}
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					return NULL;
 				}
 			}
 		}
-		elseif( preg_match( '#/forums/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		elseif( preg_match( '#/forums/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			try
 			{
 				$data = (string) $this->app->getLink( (int) $matches[1], array( 'forums', 'forums_forums' ) );
-				$item = Forum::load( $data );
+				$item = \IPS\forums\Forum::load( $data );
 
 				if( $item->can( 'view' ) )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
 		}
 		/* And then post URLs, simple */
 		elseif( 
-			( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'showthread.php' ) !== FALSE OR
-			  mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'showpost.php' ) !== FALSE OR
-			  preg_match( '#/threads/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ] )
+			( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'showthread.php' ) !== FALSE OR
+			  mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'showpost.php' ) !== FALSE OR 
+			  preg_match( '#/threads/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ] )
 			)
-			AND ( isset( Request::i()->p ) OR isset( Request::i()->postid ) )
+			AND ( isset( \IPS\Request::i()->p ) OR isset( \IPS\Request::i()->postid ) )
 		)
 		{
 			try
 			{
-				$postId = Request::i()->postid ?? Request::i()->p;
+				$postId = \IPS\Request::i()->postid ?? \IPS\Request::i()->p;
 				try
 				{
 					$data = (string) $this->app->getLink( (int) $postId, array( 'posts', 'forums_posts' ) );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* Try the main table */
 					$data = (string) $this->app->getLink( (int) $postId, array( 'posts', 'forums_posts' ), FALSE, TRUE );
 				}
-				$item = Post::load( $data );
+				$item = \IPS\forums\Topic\Post::load( $data );
 
 				if( $item->canView() )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
 		}
 		/* And then topic URLs, same idea */
-		elseif( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'showthread.php' ) !== FALSE OR
-				mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'printthread.php' ) !== FALSE )
+		elseif( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'showthread.php' ) !== FALSE OR
+				mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'printthread.php' ) !== FALSE )
 		{
 			/* Topic URLs can be in one of 4 formats really...
 			 * /showthread.php/1-name
@@ -1215,18 +1196,18 @@ class Vbulletin extends Software
 			 * /printthread.php?t=1
 			 * /showthread.php?threadid=?
 			 */
-			$path = $url->data[ Url::COMPONENT_PATH ];
+			$path = $url->data[ \IPS\Http\Url::COMPONENT_PATH ];
 			if( mb_strpos( $path, 'showthread.php' ) !== FALSE OR mb_strpos( $path, 'printthread.php' ) !== FALSE )
 			{
-				if( isset( Request::i()->t ) )
+				if( isset( \IPS\Request::i()->t ) )
 				{
-					$oldId	= Request::i()->t;
+					$oldId	= \IPS\Request::i()->t;
 				}
-				elseif( isset( Request::i()->threadid ) )
+				elseif( isset( \IPS\Request::i()->threadid ) )
 				{
-					$oldId	= Request::i()->threadid;
+					$oldId	= \IPS\Request::i()->threadid;
 				}
-				elseif( preg_match( '#^(\d+)-[^/]+#i', $url->data[ Url::COMPONENT_QUERY ], $matches ) )
+				elseif( preg_match( '#^(\d+)-[^/]+#i', $url->data[ \IPS\Http\Url::COMPONENT_QUERY ], $matches ) )
 				{
 					$oldId = $matches[1];
 				}
@@ -1236,7 +1217,7 @@ class Vbulletin extends Software
 					$oldId				= $queryStringPieces[0];
 				}
 			}
-			elseif( preg_match( '#/forums/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+			elseif( preg_match( '#/forums/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 			{
 				$oldId	= (int) $matches[1];
 			}
@@ -1249,25 +1230,25 @@ class Vbulletin extends Software
 					{
 						$data = (string) $this->app->getLink( $oldId, array( 'topics', 'forums_topics' ) );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						/* Try the main table */
 						$data = (string) $this->app->getLink( $oldId, array( 'topics', 'forums_topics' ), FALSE, TRUE );
 					}
-					$item = Topic::load( $data );
+					$item = \IPS\forums\Topic::load( $data );
 
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					return NULL;
 				}
 			}
 		}
-		elseif( preg_match( '#/threads/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		elseif( preg_match( '#/threads/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			try
 			{
@@ -1275,27 +1256,27 @@ class Vbulletin extends Software
 				{
 					$data = (string) $this->app->getLink( (int) $matches[1], array( 'topics', 'forums_topics' ) );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* Try the main table */
 					$data = (string) $this->app->getLink( (int) $matches[1], array( 'topics', 'forums_topics' ), FALSE, TRUE );
 				}
-				$item = Topic::load( $data );
+				$item = \IPS\forums\Topic::load( $data );
 
 				if( $item->canView() )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
 		}
 		/* And finally, archives */
-		elseif( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'archive/index.php' ) !== FALSE )
+		elseif( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'archive/index.php' ) !== FALSE )
 		{
-			$request 		= explode( '/', $url->data[ Url::COMPONENT_PATH ] );
+			$request 		= explode( '/', $url->data[ \IPS\Http\Url::COMPONENT_PATH ] );
 			$parameters		= explode( '-', array_pop( $request ) );
 			$parameters[1]	= str_replace( '.html', '', $parameters[1] );
 
@@ -1308,11 +1289,11 @@ class Vbulletin extends Software
 						{
 							$data = $this->app->getLink( (string) $parameters[1], array( 'topics', 'forums_topics' ) );
 						}
-						catch( OutOfRangeException $e )
+						catch( \OutOfRangeException $e )
 						{
 							$data = $this->app->getLink( (string) $parameters[1], array( 'topics', 'forums_topics' ), FALSE, TRUE );
 						}
-						$item = Topic::load( $data );
+						$item = \IPS\forums\Topic::load( $data );
 
 						if( $item->canView() )
 						{
@@ -1322,7 +1303,7 @@ class Vbulletin extends Software
 
 					case 'f':
 						$data = $this->app->getLink( (string) $parameters[1], array( 'forums', 'forums_forums' ) );
-						$item = Forum::load( $data );
+						$item = \IPS\forums\Forum::load( $data );
 
 						if( $item->can( 'view' ) )
 						{
@@ -1331,26 +1312,26 @@ class Vbulletin extends Software
 					break;
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
 		}
 		/* Club Discussions */
-		elseif( ( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'group.php' ) !== FALSE AND isset( Request::i()->discussionid ) ) OR
-			preg_match( '#/social-groups/(.*)/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		elseif( ( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'group.php' ) !== FALSE AND isset( \IPS\Request::i()->discussionid ) ) OR
+			preg_match( '#/social-groups/(.*)/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
-			$id = Request::i()->discussionid ?? $matches[2];
+			$id = \IPS\Request::i()->discussionid ?? $matches[2];
 			try
 			{
 				$data = (string) $this->app->getLink( 'clubtopic' . $id, array( 'topics', 'forums_topics' ) );
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				return NULL;
 			}
 
-			$item = Topic::load( $data );
+			$item = \IPS\forums\Topic::load( $data );
 
 			if( $item->canView() )
 			{

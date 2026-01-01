@@ -11,38 +11,25 @@
 namespace IPS\Xml;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DOMDocument;
-use InvalidArgumentException;
-use SimpleXMLElement;
-use function count;
-use function defined;
-use function get_called_class;
-use function gettype;
-use function in_array;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Class for managing small XML files
  */
-class SimpleXML extends SimpleXMLElement
+class _SimpleXML extends \SimpleXMLElement
 {
 	/**
 	 * Create New XML Document
 	 *
-	 * @param string $rootElement	Name of Root Element
-	 * @param string|null $xmlns		Namespace
+	 * @param	string		$rootElement	Name of Root Element
+	 * @param	string|NULL	$xmlns		Namespace
 	 * @return	static
 	 */
-	public static function create( string $rootElement, string $xmlns=NULL ): static
+	public static function create( $rootElement, $xmlns=NULL )
 	{
 		if ( $xmlns )
 		{
@@ -57,11 +44,11 @@ class SimpleXML extends SimpleXMLElement
 	/**
 	 * Load File
 	 *
-	 * @param string $filename	Filename of XML file
+	 * @param	string	$filename	Filename of XML file
 	 * @return	static
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public static function loadFile( string $filename ): static
+	public static function loadFile( $filename )
 	{
 		return static::loadString( file_get_contents( $filename ) );
 	}
@@ -69,35 +56,33 @@ class SimpleXML extends SimpleXMLElement
 	/**
 	 * Load String
 	 *
-	 * @param string $xml	XML
+	 * @param	string	$xml	XML
 	 * @return	static
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
 	 */
-	public static function loadString( string $xml ): static
+	public static function loadString( $xml )
 	{
 		if ( version_compare( PHP_VERSION, '8.0.0' ) >= 0 )
 		{
-			$class = @simplexml_load_string( $xml, get_called_class() );
+			$class = @simplexml_load_string( $xml, \get_called_class() );
 		}
 		else
 		{
-			/* Commented out because this is deprecated */
 			/* Turn off external entity loader to prevent XXE in PHP less than 8.0 */
-			//$entityLoaderValue = libxml_disable_entity_loader( TRUE );
+			$entityLoaderValue = libxml_disable_entity_loader( TRUE );
 			
 			/* Load it */
-			$class = @simplexml_load_string( $xml, get_called_class() );
-
-			/* Commented out because this is deprecated */
+			$class = @simplexml_load_string( $xml, \get_called_class() );
+			
 			/* Turn external entity loader back to what it was before so we're not messing with other
 				PHP scripts on this server */
-			//libxml_disable_entity_loader( $entityLoaderValue );
+			libxml_disable_entity_loader( $entityLoaderValue );
 		}
 		
 		/* Return */
 		if ( $class === FALSE )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 		return $class->subtype();
 	}
@@ -107,24 +92,24 @@ class SimpleXML extends SimpleXMLElement
 	 *
 	 * @return	static
 	 */
-	protected function subtype(): static
+	protected function subtype()
 	{
-		if ( get_called_class() === 'IPS\Xml\SimpleXML' )
+		if ( \get_called_class() === 'IPS\Xml\SimpleXML' )
 		{
 			if ( $this->getName() === 'rss' )
 			{
-				return Rss::loadString( $this->asXml() );
+				return \IPS\Xml\Rss::loadString( $this->asXml() );
 			}
 			if ( $this->getName() === 'feed' )
 			{
-				return Atom::loadString( $this->asXml() );
+				return \IPS\Xml\Atom::loadString( $this->asXml() );
 			}
 			if ( mb_strtolower( $this->getName() ) === 'rdf' )
 			{
 				/* Verify this is an RSS 1.0 document */
-				if( in_array( 'https://purl.org/rss/1.0/', $this->getNamespaces( true ) ) )
+				if( \in_array( 'http://purl.org/rss/1.0/', $this->getNamespaces( true ) ) )
 				{
-					return Rss1::loadString( $this->asXml() );
+					return \IPS\Xml\Rss1::loadString( $this->asXml() );
 				}
 			}
 		}
@@ -135,57 +120,57 @@ class SimpleXML extends SimpleXMLElement
 	/**
 	 * Get articles
 	 *
-	 * @param mixed|null $guidKey	In previous versions, we encoded a key with the GUID. For legacy purposes, this can be passed here.
+	 * @param	mixed	$guidKey	In previous versions, we encoded a key with the GUID. For legacy purposes, this can be passed here.
 	 * @return	array
 	 * @note		Subtypes (ATOM and RSS) define this method
-	 * @throws	BadMethodCallException
+	 * @throws	\BadMethodCallException
 	 */
-	public function articles( mixed $guidKey=NULL ): array
+	public function articles( $guidKey=NULL )
 	{
-		throw new BadMethodCallException;
+		throw new \BadMethodCallException;
 	}
 	
 	/**
 	 * Add Child
 	 * Modified to support passing other data types (including multi-dimensional arrays and other \IPS\XML\SimpleXML objects) as values
 	 *
-	 * @param	mixed		$qualifiedName	Element Name
+	 * @see		<a href='http://www.php.net/manual/en/simplexmlelement.addchild.php'>SimpleXMLElement::addChild</a>
+	 * @param	string		$name	Element Name
 	 * @param	mixed		$value	Value
-	 * @param	string|null	$namespace		Namespace
-	 * @return    SimpleXMLElement|null
-	 *@see		<a href='http://www.php.net/manual/en/simplexmlelement.addchild.php'>SimpleXMLElement::addChild</a>
+	 * @param	string|null	$ns		Namespace
+	 * @return	void
 	 */
-	public function addChild( mixed $qualifiedName, mixed $value=null, ?string $namespace=null ): null|static
-	{
+	public function addChild( $name, $value=NULL, $ns=NULL )
+	{		
 		/* Arrays are possibly numerically indexed, which XML won't have */
-		if( gettype( $qualifiedName ) === 'integer' )
+		if( \gettype( $name ) === 'integer' )
 		{
-			$qualifiedName = $this->getName();
+			$name = $this->getName();
 			
 			/* If the name ends in s (e.g. <elements>) - we'll name it's children without the s (e.g. <element>) */
-			if( mb_substr( $qualifiedName, -2 ) === 'es' )
+			if( mb_substr( $name, -2 ) === 'es' )
 			{
-				$qualifiedName = mb_substr( $qualifiedName, 0, mb_strlen( $qualifiedName ) - 2 );
+				$name = mb_substr( $name, 0, mb_strlen( $name ) - 2 );
 			}
-			else if( mb_substr( $qualifiedName, -1 ) === 's' )
+			else if( mb_substr( $name, -1 ) === 's' )
 			{
-				$qualifiedName = mb_substr( $qualifiedName, 0, mb_strlen( $qualifiedName ) - 1 );
+				$name = mb_substr( $name, 0, mb_strlen( $name ) - 1 );
 			}				
 		}
 		
 		/* If it's not an array, we can just let the default SimpleXML method handle this */
-		if( !is_array( $value ) and !( $value instanceof SimpleXML) )
+		if( !\is_array( $value ) and !( $value instanceof \IPS\Xml\SimpleXML ) )
 		{			
 			/* Unless it's a boolean value, then we should cast that to an integer */
-			if( gettype( $value ) === 'boolean' )
+			if( \gettype( $value ) === 'boolean' )
 			{
-				$value = intval( $value );
+				$value = \intval( $value );
 			}
 			
 			/* Needs CDATA? */
-			if ( preg_match( '/[<>&]/', $value ) )
+			if ( preg_match( '/<|>|&/', $value ) )
 			{
-				$element = parent::addChild( $qualifiedName, '', $namespace );
+				$element = parent::addChild( $name, '', $ns );
 
 				$node = dom_import_simplexml( $element ); 
 				$no = $node->ownerDocument; 
@@ -195,7 +180,7 @@ class SimpleXML extends SimpleXMLElement
 			}
 			else
 			{
-				return parent::addChild( $qualifiedName, $value, $namespace );
+				return parent::addChild( $name, $value, $ns );
 			}
 			
 			/* Return */
@@ -204,23 +189,21 @@ class SimpleXML extends SimpleXMLElement
 		else
 		{			
 			/* Create an element with a blank value */
-			$element = parent::addChild( $qualifiedName, '', $namespace );
+			$element = parent::addChild( $name, '', $ns );
 			
 			/* And loop through each value and rerun this method for each */
 			foreach ( $value as $k => $v )
 			{
 				/* If the value is an XML text element, just get the value */
-				if ( $v instanceof SimpleXML and count( $v->children() ) === 0 )
+				if ( $v instanceof \IPS\Xml\SimpleXML and \count( $v->children() ) === 0 )
 				{
 					$v = (string) $v;
 				}
 				
 				/* And add it */
-				$element->addChild( $k, $v, $namespace );
+				$element->addChild( $k, $v, $ns );
 			}
 		}
-
-		return null;
 	}
 	
 	/**
@@ -238,9 +221,9 @@ class SimpleXML extends SimpleXMLElement
 	 *
 	 * @return	string
 	 */
-	public function format(): string
+	public function format()
 	{
-		$dom = new DOMDocument( '1.0', 'UTF-8' );
+		$dom = new \DOMDocument( '1.0', 'UTF-8' );
 		$dom->preserveWhiteSpace = false;
 		$dom->formatOutput = true;
 		@$dom->loadXML( $this->asXML() );

@@ -12,42 +12,32 @@
 namespace IPS\nexus\Customer;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\GeoLocation;
-use IPS\Member;
-use IPS\nexus\Customer;
-use IPS\Patterns\ActiveRecord;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Customer Address Model
  */
-
-/* @property Customer $member */
-class Address extends ActiveRecord
+class _Address extends \IPS\Patterns\ActiveRecord
 {	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_customer_addresses';
+	public static $databaseTable = 'nexus_customer_addresses';
 
 	/**
 	 * @brief	State Codes
 	 * @see		https://developer.paypal.com/docs/classic/api/state_codes/
 	 */
-	public static array $stateCodes = array(
+	public static $stateCodes = array(
 		'CA' => array(
 			'AB'	=> "Alberta",
 			'BC'	=> "British Columbia",
@@ -131,28 +121,28 @@ class Address extends ActiveRecord
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
-		$this->added = new DateTime;
+		$this->added = new \IPS\DateTime;
 	}
 	
 	/**
 	 * Get member
 	 *
-	 * @return	Customer
+	 * @return	\IPS\nexus\Customer
 	 */
-	public function get_member(): Customer
+	public function get_member()
 	{
-		return Customer::load( $this->_data['member'] );
+		return \IPS\nexus\Customer::load( $this->_data['member'] );
 	}
 	
 	/**
 	 * Set member
 	 *
-	 * @param	Member	$member	Member
+	 * @param	\IPS\Member	$member	Member
 	 * @return	void
 	 */
-	public function set_member( Member $member ) : void
+	public function set_member( \IPS\Member $member )
 	{
 		$this->_data['member'] = $member->member_id;
 	}
@@ -160,20 +150,20 @@ class Address extends ActiveRecord
 	/**
 	 * Get address
 	 *
-	 * @return	GeoLocation
+	 * @return	\IPS\GeoLocation
 	 */
-	public function get_address(): GeoLocation
+	public function get_address()
 	{
-		return isset( $this->_data['address'] ) ? GeoLocation::buildFromJson( $this->_data['address'] ) : new GeoLocation;
+		return isset( $this->_data['address'] ) ? \IPS\GeoLocation::buildFromJson( $this->_data['address'] ) : new \IPS\GeoLocation;
 	}
 	
 	/**
 	 * Set member
 	 *
-	 * @param	GeoLocation	$address	Address
+	 * @param	\IPS\GeoLocation	$address	Address
 	 * @return	void
 	 */
-	public function set_address( GeoLocation $address ) : void
+	public function set_address( \IPS\GeoLocation $address )
 	{
 		$this->_data['address'] = json_encode( $address );
 	}
@@ -181,20 +171,20 @@ class Address extends ActiveRecord
 	/**
 	 * Get added date
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_added(): DateTime
+	public function get_added()
 	{
-		return DateTime::ts( $this->_data['added'] );
+		return \IPS\DateTime::ts( $this->_data['added'] );
 	}
 	
 	/**
 	 * Set added date
 	 *
-	 * @param	DateTime	$date	The invoice date
+	 * @param	\IPS\DateTime	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_added( DateTime $date ) : void
+	public function set_added( \IPS\DateTime $date )
 	{
 		$this->_data['added'] = $date->getTimestamp();
 	}

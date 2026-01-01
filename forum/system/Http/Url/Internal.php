@@ -11,46 +11,30 @@
 namespace IPS\Http\Url;
  
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Content;
-use IPS\Http\Url;
-use IPS\Member\Club;
-use IPS\Node\Model;
-use IPS\cms\Pages\Router;
-use IPS\Session;
-use IPS\Application;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function intval;
-use function is_numeric;
-use function is_string;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Internal URL
  */
-class Internal extends Url
+class _Internal extends \IPS\Http\Url
 {
 	/**
 	 * Create internal URL from components - all arguments should be UNENCODED
 	 *
-	 * @param string $base		Key for the URL base
-	 * @param int|string|null $protocol	Protocol (one of the PROTOCOL_* constants) or an actual scheme
-	 * @param string $path		Path, relative to site's base URL
-	 * @param array|string|null $query		Query
-	 * @param string|null $fragment	Fragment
-	 * @return	Url
+	 * @param	string				$base		Key for the URL base
+	 * @param	int|string|null		$protocol	Protocol (one of the PROTOCOL_* constants) or an actual scheme
+	 * @param	string				$path		Path, relative to site's base URL
+	 * @param	string|array|NULL	$query		Query
+	 * @param	string|NULL			$fragment	Fragment
+	 * @return	\IPS\Http\Url
 	 */
-	protected static function createInternalFromComponents( string $base, int|string|null $protocol, string $path, array|string $query = NULL, string $fragment = NULL ): Url
+	protected static function createInternalFromComponents( $base, $protocol, $path, $query = NULL, $fragment = NULL )
 	{		
-		$baseUrlData = parse_url( static::baseUrl( is_numeric( $protocol ) ? $protocol : NULL ) );
+		$baseUrlData = parse_url( static::baseUrl( \is_numeric( $protocol ) ? $protocol : NULL ) );
 		
 		$pathToUse = '';
 		if ( isset( $baseUrlData['path'] ) and $baseUrlData['path'] )
@@ -68,12 +52,12 @@ class Internal extends Url
 								
 		$return = static::createFromComponents(
 			$baseUrlData['host'],
-			( is_string( $protocol ) and !is_numeric( $protocol ) ) ? $protocol : ( ( isset( $baseUrlData['scheme'] ) AND $protocol !== NULL ) ? $baseUrlData['scheme'] : NULL ),
+			( \is_string( $protocol ) and !\is_numeric( $protocol ) ) ? $protocol : ( ( isset( $baseUrlData['scheme'] ) AND $protocol !== NULL ) ? $baseUrlData['scheme'] : NULL ),
 			$pathToUse ? "/{$pathToUse}" : '',
 			$query,
-			$baseUrlData['port'] ?? NULL,
-			$baseUrlData['user'] ?? NULL,
-			$baseUrlData['pass'] ?? NULL,
+			isset( $baseUrlData['port'] ) ? $baseUrlData['port'] : NULL,
+			isset( $baseUrlData['user'] ) ? $baseUrlData['user'] : NULL,
+			isset( $baseUrlData['pass'] ) ? $baseUrlData['pass'] : NULL,
 			$fragment
 		);
 		
@@ -84,23 +68,21 @@ class Internal extends Url
 	/**
 	 * @brief	Does this URL have the SEO pagination (page/n/)?
 	 */
-	public ?bool $seoPagination = NULL;
+	public $seoPagination = NULL;
 	
 	/**
 	 * @brief	Base
 	 */
-	public ?string $base = NULL;
+	public $base;
 	
 	/**
 	 * Get the friendly URL for this URL if there is one
 	 *
 	 * @return	mixed	The friendly URL if there is one, TRUE if there isn't, or NULL if not sure
 	 */
-	public function correctFriendlyUrl(): mixed
+	public function correctFriendlyUrl()
 	{
-		$return = FALSE;
-
-		foreach (Friendly::furlDefinition() as $seoTemplate => $furlDefinition )
+		foreach ( \IPS\Http\Url\Friendly::furlDefinition() as $seoTemplate => $furlDefinition )
 		{
 			if( mb_stripos( $this->data[ static::COMPONENT_QUERY ], $furlDefinition['real'] ) !== FALSE )
 			{
@@ -113,6 +95,9 @@ class Internal extends Url
 					switch ( mb_substr( $tag, 0, 1 ) )
 					{
 						case '#':
+							$params[] = mb_substr( $tag, 1 );
+							break;
+						
 						case '@':
 							$params[] = mb_substr( $tag, 1 );
 							break;
@@ -120,7 +105,7 @@ class Internal extends Url
 				}
 
 				/* If this definition requires a parameter, see if we have it.  If not, skip to next definition to check. */
-				if( count( array_diff( $params, array_keys( $this->queryString ) ) ) )
+				if( \count( array_diff( $params, array_keys( $this->queryString ) ) ) )
 				{
 					continue;
 				}
@@ -134,15 +119,16 @@ class Internal extends Url
 						/* Load it */
 						try
 						{
-							if ( ! $return = $this->correctUrlFromVerifyClass( $furlDefinition['verify'] ) )
+							if ( $return = $this->correctUrlFromVerifyClass( $furlDefinition['verify'] ) )
 							{
-								$return = NULL;
+								return $return;
 							}
+							return NULL;
 						}
 						/* It doesn't exist */
-						catch ( OutOfRangeException $e )
+						catch ( \OutOfRangeException $e )
 						{
-							$return = NULL;
+							return NULL;
 						}
 					}
 					/* If not, we have to build it ourself */
@@ -161,62 +147,27 @@ class Internal extends Url
 																						
 									$seoTitles[] = $class::load( $this->queryString[ $queryParam ] )->$property;
 								}
-								catch ( OutOfRangeException $e ) {}
+								catch ( \OutOfRangeException $e ) {}
 							}
 						}
 						
-						$return = Url::internal( $this->data['query'], 'front', $seoTemplate, $seoTitles );
+						return \IPS\Http\Url::internal( $this->data['query'], 'front', $seoTemplate, $seoTitles );
 					}
 				}
-				catch ( Exception $e ) {}
+				catch ( \Exception $e ) {}
 			}
 		}
-
-		/* If it it thinks it belongs to "pages", we might be able to be more accurate */
-		if ( Application::appIsEnabled( 'cms' ) and ( $return instanceof Friendly and $return->seoTemplate === 'content_page_path' and isset( $this->queryString['path'] ) ) )
-		{
-			/* Try to find a page */
-			try
-			{
-				/* Create it */
-				$correctUrl = Router::loadFromUrl( $this )->url();
-
-				/* Set extra stuff in our query string */
-				$paramsToSet = array();
-				foreach ( $this->queryString as $k => $v )
-				{
-					if ( !array_key_exists( $k, $correctUrl->queryString ) and !array_key_exists( $k, $correctUrl->hiddenQueryString ) )
-					{
-						$paramsToSet[ $k ] = $v;
-					}
-				}
-				if ( count( $paramsToSet ) )
-				{
-					$correctUrl = $correctUrl->setQueryString( $paramsToSet );
-				}
-
-				/* Return */
-				$return = $correctUrl;
-			}
-				/* Couldn't find one? Don't accept responsibility */
-			catch (OutOfRangeException $e ){}
-		}
-		else if( $return !== NULL and !( $return instanceof Friendly ) )
-		{
-			$return = TRUE;
-		}
-
-		return $return;
+		return TRUE;
 	}
 	
 	/**
 	 * Get the correct URL using a "verify" property from the FURL definition
 	 *
-	 * @param mixed $verify	Class containing `preCorrectUrlFromVerifyClass()` method to check URL against
-	 * @return	NULL|Url
-	 * @throws	OutOfRangeException
+	 * @param	object	$verify	Class containing `preCorrectUrlFromVerifyClass()` method to check URL against
+	 * @return	NULL|\IPS\Http\Url
+	 * @throws	\OutOfRangeException
 	 */
-	protected function correctUrlFromVerifyClass( mixed $verify ): ?Url
+	protected function correctUrlFromVerifyClass( $verify )
 	{
 		/* Load it */
 		if ( method_exists( $verify, 'preCorrectUrlFromVerifyClass' ) )
@@ -228,11 +179,11 @@ class Internal extends Url
 		/* Check the currently logged in user can view it, as we don't want to reveal the correct
 			URL to something the user has no permission to view */
 		$canView = TRUE;
-		if ( $contentObject instanceof Content or $contentObject instanceof Club )
+		if ( $contentObject instanceof \IPS\Content or $contentObject instanceof \IPS\Member\Club )
 		{
 			$canView = $contentObject->canView();
 		}
-		elseif ( $contentObject instanceof Model )
+		elseif ( $contentObject instanceof \IPS\Node\Model )
 		{
 			$canView = $contentObject->can('view');
 		}
@@ -253,7 +204,7 @@ class Internal extends Url
 				$paramsToSet[ $k ] = $v;
 			}
 		}
-		if ( count( $paramsToSet ) )
+		if ( \count( $paramsToSet ) )
 		{
 			$correctUrl = $correctUrl->setQueryString( $paramsToSet );
 		}
@@ -265,26 +216,26 @@ class Internal extends Url
 	/**
 	 * Add CSRF check to query string
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function csrf(): Url
+	public function csrf()
 	{
-		return $this->setQueryString( 'csrfKey', Session::i()->csrfKey );
+		return $this->setQueryString( 'csrfKey', \IPS\Session::i()->csrfKey );
 	}
 	
 	/**
 	 * Adds the page parameter to the URL
 	 *
-	 * @param string $param	The page key, default is 'page'
-	 * @param int|null $number	The page number to use
-	 * @return	Url
+	 * @param	string	$param	The page key, default is 'page'
+	 * @param	int|NULL		$number	The page number to use
+	 * @return	\IPS\Http\Url
 	 */
-	public function setPage( string $param='page', ?int $number=1 ): Url
+	public function setPage( $param='page', $number=1 )
 	{
 		/* Remove any existing page param */
 		$url = $this->stripQueryString( $param );
 		
-		if ( intval( $number ) > 1 )
+		if ( \intval( $number ) > 1 )
 		{
 			$url = $this->setQueryString( $param, $number );
 		}
@@ -297,7 +248,7 @@ class Internal extends Url
 	 *
 	 * @return	string
 	 */
-	public function acpQueryString(): string
+	public function acpQueryString()
 	{
 		$queryString = $this->queryString;
 		unset( $queryString['csrf'] );
@@ -310,7 +261,7 @@ class Internal extends Url
 	 *
 	 * @return	bool
 	 */
-	public function openRedirect(): bool
+	public function openRedirect()
 	{
 		return isset( $this->queryString['app'] ) and $this->queryString['app'] === 'core' and isset( $this->queryString['module'] ) and $this->queryString['module'] === 'system' and isset( $this->queryString['controller'] ) and $this->queryString['controller'] === 'redirect';
 	}

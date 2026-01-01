@@ -12,72 +12,32 @@
 namespace IPS\nexus;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use DateInterval;
-use ErrorException;
-use Exception;
-use IPS\Application;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Events\Event;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Tree\Tree;
-use IPS\Http\Url;
-use IPS\Http\Url\Friendly;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\nexus\Customer\BillingAgreement;
-use IPS\nexus\Invoice\Item\Purchase as ItemPurchase;
-use IPS\nexus\Package\CustomField;
-use IPS\nexus\Purchase\LicenseKey;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\Node\Model;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use UnexpectedValueException;
-use function call_user_func_array;
-use function count;
-use function defined;
-use function intval;
-use function is_null;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Purchase Model
- * @method onExpirationDateChange() : void
- * @method onExpireWarning() : bool
- * @method onRenew(int $cycles = 1): void
- * @method onTransfer( Member $newCustomer ) : void
- * @method onCancelWarning() : string|null
- * @property Customer $member
  */
-class Purchase extends Model
+class _Purchase extends \IPS\Node\Model
 {
 	/**
 	 * Tree
 	 *
-	 * @param	Url					$url			URL
+	 * @param	\IPS\Http\Url					$url			URL
 	 * @param	array							$where			Where clause
 	 * @param	string							$ref			Referer
-	 * @param Purchase|NULL		$root			Root (NULL for all root purchases)
+	 * @param	\IPS\nexus\Purchase|NULL		$root			Root (NULL for all root purchases)
 	 * @param	bool							$includeRoot	Show the root?
-	 * @return	Tree
+	 * @return	\IPS\Helpers\Tree\Tree
 	 */
-	public static function tree(Url $url, array $where, string $ref = 'c', ?Purchase $root = NULL, bool $includeRoot = TRUE ) : Tree
+	public static function tree( \IPS\Http\Url $url, array $where, $ref = 'c', \IPS\nexus\Purchase $root = NULL, $includeRoot = TRUE )
 	{		
 		$where[] = array( 'ps_show=1' );
 				
-		return new Tree(
+		return new \IPS\Helpers\Tree\Tree(
 			$url,
 			'Purchases',
 			function( $limit ) use ( $url, $where, $ref, $root, $includeRoot )
@@ -99,25 +59,24 @@ class Purchase extends Model
 				}
 				
 				$rows = array();				
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'nexus_purchases', $where, 'ps_start DESC', $limit ), 'IPS\nexus\Purchase' ) as $purchase )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'nexus_purchases', $where, 'ps_start DESC', $limit ), 'IPS\nexus\Purchase' ) as $purchase )
 				{
-					/* @var Purchase $purchase */
 					$rows[ $purchase->id ] = $purchase->treeRow( $url, $ref );
 				}
 				return $rows;
 			},
 			function( $id ) use ( $url, $ref )
 			{
-				return Purchase::load( $id )->treeRow( $url, $ref );
+				return \IPS\nexus\Purchase::load( $id )->treeRow( $url, $ref );
 			},
 			function( $id )
 			{
-				return Purchase::load( $id )->parent();
+				return \IPS\nexus\Purchase::load( $id )->parent();
 			},
 			function( $id ) use ( $url, $ref, $where )
 			{
 				$rows = array();
-				foreach (Purchase::load( $id )->children( NULL, NULL, TRUE, NULL, $where ) as $child )
+				foreach ( \IPS\nexus\Purchase::load( $id )->children( NULL, NULL, TRUE, NULL, $where ) as $child )
 				{
 					$rows[ $child->id ] = $child->treeRow( $url, $ref );
 				}
@@ -131,7 +90,7 @@ class Purchase extends Model
 			function()
 			{
 				$where[] = array( 'ps_parent=0' );
-				return Db::i()->select( 'COUNT(*)', 'nexus_purchases', $where )->first();
+				return \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', $where )->first();
 			}
 		);
 	}
@@ -139,11 +98,11 @@ class Purchase extends Model
 	/**
 	 * Tree Row
 	 *
-	 * @param Url $url	URL
-	 * @param string $ref	Referer
-	 * @return    string
+	 * @param	\IPS\Http\Url	$url	URL
+	 * @param	string			$ref	Referer
+	 * @return	string
 	 */
-	public function treeRow( Url $url, string $ref ): string
+	public function treeRow( $url, $ref )
 	{				
 		$childCount = $this->childrenCount( NULL, NULL, TRUE, array( array( 'ps_show=1' ) ) );
 		
@@ -152,51 +111,49 @@ class Purchase extends Model
 		{
 			try
 			{
-				$customFieldValue = CustomField::load( $k )->displayValue( $v, TRUE );
-				if ( $customFieldValue and trim( $customFieldValue ) )
+				if ( trim( \IPS\nexus\Package\CustomField::load( $k )->displayValue( $v, TRUE ) ) )
 				{
 					$hasCustomFields = TRUE;
 					break;
 				}
 			}
-			catch( OutOfRangeException ) {}
+			catch( \OutOfRangeException $e ) {}
 		}
 
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			$description = $extension::getPurchaseNameInfo( $this );
 
 			if( empty( $description ) )
 			{
-				$description[] = Member::loggedIn()->language()->addToStack( 'purchase_number', FALSE, array( 'sprintf' => array( $this->id ) ) );
+				$description[] = \IPS\Member::loggedIn()->language()->addToStack( 'purchase_number', FALSE, array( 'sprintf' => array( $this->id ) ) );
 			}
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			$description = array();
 		}
 		if ( $this->grouped_renewals )
 		{
-			$description[] = Member::loggedIn()->language()->addToStack('purchase_grouped');
+			$description[] = \IPS\Member::loggedIn()->language()->addToStack('purchase_grouped');
 		}
 		elseif ( $this->renewals )
 		{
 			$renewals = (string) $this->renewals;
 			if ( $this->renewals->tax )
 			{
-				$renewals .= Member::loggedIn()->language()->addToStack( 'plus_tax_rate', FALSE, array( 'sprintf' => array( $this->renewals->tax->_title ) ) );
+				$renewals .= \IPS\Member::loggedIn()->language()->addToStack( 'plus_tax_rate', FALSE, array( 'sprintf' => array( $this->renewals->tax->_title ) ) );
 			}
 			$description[] = $renewals;
 		}
 
 		$description = implode( ' &middot; ', $description );
 
-		return Theme::i()->getTemplate( 'trees', 'core' )->row(
+		return \IPS\Theme::i()->getTemplate( 'trees', 'core' )->row(
 			$url,
 			$this->id,
-			( $hasCustomFields and !$childCount ) ? Theme::i()->getTemplate( 'purchases', 'nexus' )->link( $this, FALSE, FALSE, TRUE ) : $this->_name,
+			( $hasCustomFields and !$childCount ) ? \IPS\Theme::i()->getTemplate( 'purchases', 'nexus' )->link( $this, FALSE, FALSE, TRUE ) : $this->_name,
 			$childCount,
 			array_merge( array(
 				'view'	=> array(
@@ -208,7 +165,7 @@ class Purchase extends Model
 			$description,
 			$this->getIcon(),
 			NULL,
-			$this->id == Request::i()->root,
+			$this->id == \IPS\Request::i()->root,
 			NULL,
 			NULL,
 			!$this->active ? ( $this->cancelled ? array( 'style5', 'purchase_canceled' ) : array( 'style6', 'purchase_expired' ) ) : NULL,
@@ -221,34 +178,34 @@ class Purchase extends Model
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_purchases';
+	public static $databaseTable = 'nexus_purchases';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'ps_';
+	public static $databasePrefix = 'ps_';
 	
 	/* !Node */
 	
 	/**
 	 * @brief	Node Title
 	 */
-	public static string $nodeTitle = 'purchases';
+	public static $nodeTitle = 'purchases';
 	
 	/**
 	 * @brief	[Node] Parent ID Database Column
 	 */
-	public static ?string $databaseColumnParent = 'parent';
+	public static $databaseColumnParent = 'parent';
 	
 	/**
 	 * @brief	[Node] If the node can be "owned", the owner "type" (typically "member" or "group") and the associated database column
 	 */
-	public static ?array $ownerTypes = array(
+	public static $ownerTypes = array(
 		'member'	=> 'member'
 	);
 	
@@ -257,7 +214,7 @@ class Purchase extends Model
 	 *
 	 * @return	string
 	 */
-	public function get__title(): string
+	public function get__title()
 	{
 		return $this->name;
 	}
@@ -269,10 +226,10 @@ class Purchase extends Model
 	 *
 	 * @return	void
 	 */
-	public function setDefaultValues() : void
+	public function setDefaultValues()
 	{
 		$this->_data['active'] = TRUE; // do directly so it doesn't call onReactivate
-		$this->start = new DateTime;
+		$this->start = new \IPS\DateTime;
 		$this->renewal_price = 0;
 		$this->renewal_currency = '';
 		$this->invoice_pending = NULL;
@@ -281,29 +238,28 @@ class Purchase extends Model
 	/**
 	 * @brief	Name with sticky fields
 	 */
-	protected string $nameWithStickyFields = '';
+	protected $nameWithStickyFields;
 	
 	/**
 	 * Get name
 	 *
 	 * @return	string
 	 */
-	public function get_name() : string
+	public function get_name()
 	{
 		if ( !$this->nameWithStickyFields )
 		{
 			$this->nameWithStickyFields = $this->_data['name'];
 			try
 			{
-				/* @var ItemPurchase $extension */
 				$extension = $this->extension();
 				$info = $extension::getPurchaseNameInfo( $this );
-				if ( count( $info ) )
+				if ( \count( $info ) )
 				{
 					$this->nameWithStickyFields .= ' (' . implode( ' &middot; ', $info ) . ')';
 				}
 			}
-			catch ( OutOfRangeException ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 		return $this->nameWithStickyFields;
 	}
@@ -313,7 +269,7 @@ class Purchase extends Model
 	 *
 	 * @return	string
 	 */
-	public function get__name() : string
+	public function get__name()
 	{
 		return $this->_data['name'];
 	}
@@ -321,20 +277,20 @@ class Purchase extends Model
 	/**
 	 * Get member
 	 *
-	 * @return	Member
+	 * @return	\IPS\Member
 	 */
-	public function get_member() : Member
+	public function get_member()
 	{
-		return Customer::load( $this->_data['member'] );
+		return \IPS\nexus\Customer::load( $this->_data['member'] );
 	}
 	
 	/**
 	 * Set member
 	 *
-	 * @param	Member $member
+	 * @param	\IPS\Member
 	 * @return	void
 	 */
-	public function set_member( Member $member ) : void
+	public function set_member( \IPS\Member $member )
 	{
 		$this->_data['member'] = $member->member_id;
 	}
@@ -345,7 +301,7 @@ class Purchase extends Model
 	 * @param	bool	$active	Is active?
 	 * @return	void
 	 */
-	public function set_active( bool $active ) : void
+	public function set_active( $active )
 	{	
 		if ( $this->id )
 		{
@@ -362,6 +318,18 @@ class Purchase extends Model
 		}
 		
 		$this->_data['active'] = $active;
+
+		/* Set any child purchases to match this state.
+		Note that this will not be executed if editing a purchase in the ACP,
+		as the purchases are temporarily ungrouped at this point. */
+		foreach( $this->children() as $child )
+		{
+			if( $child->grouped_renewals and !$child->cancelled )
+			{
+				$child->active = $active;
+				$child->save();
+			}
+		}
 	}
 	
 	/**
@@ -370,7 +338,7 @@ class Purchase extends Model
 	 * @param	bool	$cancelled	Is cancelled?
 	 * @return	void
 	 */
-	public function set_cancelled( bool $cancelled ) : void
+	public function set_cancelled( $cancelled )
 	{
 		if ( $cancelled )
 		{
@@ -395,20 +363,20 @@ class Purchase extends Model
 	/**
 	 * Get start date
 	 *
-	 * @return	DateTime
+	 * @return	\IPS\DateTime
 	 */
-	public function get_start() : DateTime
+	public function get_start()
 	{
-		return DateTime::ts( $this->_data['start'] );
+		return \IPS\DateTime::ts( $this->_data['start'] );
 	}
 	
 	/**
 	 * Set start date
 	 *
-	 * @param	DateTime	$date	The invoice date
+	 * @param	\IPS\DateTime	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_start( DateTime $date ) : void
+	public function set_start( \IPS\DateTime $date )
 	{
 		$this->_data['start'] = $date->getTimestamp();
 	}
@@ -416,20 +384,20 @@ class Purchase extends Model
 	/**
 	 * Get expire date
 	 *
-	 * @return	DateTime|NULL
+	 * @return	\IPS\DateTime|NULL
 	 */
-	public function get_expire() : DateTime|null
+	public function get_expire()
 	{
-		return ( isset( $this->_data['expire'] ) and $this->_data['expire'] ) ? DateTime::ts( $this->_data['expire'] ) : NULL;
+		return ( isset( $this->_data['expire'] ) and $this->_data['expire'] ) ? \IPS\DateTime::ts( $this->_data['expire'] ) : NULL;
 	}
 	
 	/**
 	 * Set expire date
 	 *
-	 * @param	DateTime|NULL	$date	The invoice date
+	 * @param	\IPS\DateTime|NULL	$date	The invoice date
 	 * @return	void
 	 */
-	public function set_expire( ?DateTime $date = NULL ) : void
+	public function set_expire( \IPS\DateTime $date = NULL )
 	{
 		if ( $date === NULL )
 		{
@@ -439,20 +407,31 @@ class Purchase extends Model
 		else
 		{	
 			$this->_data['expire'] = $date->getTimestamp();
-			$this->active = ( !$this->cancelled and $date->add( new DateInterval( 'PT' . intval( $this->grace_period ) . 'S' ) )->getTimestamp() > time() );
+			$this->active = ( !$this->cancelled and $date->add( new \DateInterval( 'PT' . \intval( $this->grace_period ) . 'S' ) )->getTimestamp() > time() );
 		}
 		if ( $this->id )
 		{
 			$this->onExpirationDateChange();
 		}
+
+		/* If we have a parent purchase and the renewals are grouped,
+		set the active flag to match */
+		try
+		{
+			if( $parent = $this->parent() and $this->grouped_renewals )
+			{
+				$this->active = $parent->active;
+			}
+		}
+		catch ( \OutOfRangeException $e ){}
 	}
 	
 	/**
 	 * Get renewal term
 	 *
-	 * @return	RenewalTerm|NULL
+	 * @return	\IPS\nexus\Purchase\RenewalTerm|NULL
 	 */
-	public function get_renewals() : RenewalTerm|null
+	public function get_renewals()
 	{
 		if( isset( $this->_data['renewals'] ) and $this->_data['renewals'] )
 		{
@@ -461,12 +440,12 @@ class Purchase extends Model
 			{
 				try
 				{
-					$tax = Tax::load( $this->_data['tax'] );
+					$tax = \IPS\nexus\Tax::load( $this->_data['tax'] );
 				}
-				catch ( Exception ) { }
+				catch ( \Exception $e ) { }
 			}
 			
-			return new RenewalTerm( new Money( $this->_data['renewal_price'], $this->_data['renewal_currency'] ), new DateInterval( 'P' . $this->_data['renewals'] . mb_strtoupper( $this->_data['renewal_unit'] ) ), $tax );
+			return new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $this->_data['renewal_price'], $this->_data['renewal_currency'] ), new \DateInterval( 'P' . $this->_data['renewals'] . mb_strtoupper( $this->_data['renewal_unit'] ) ), $tax );
 		}
 		return NULL;
 	}
@@ -474,10 +453,10 @@ class Purchase extends Model
 	/**
 	 * Set renewal term
 	 *
-	 * @param	RenewalTerm|NULL	$term	The renewal term
+	 * @param	\IPS\nexus\Purchase\RenewalTerm|NULL	$term	The renewal term
 	 * @return	void
 	 */
-	public function set_renewals( ?RenewalTerm $term = NULL ) : void
+	public function set_renewals( \IPS\nexus\Purchase\RenewalTerm $term = NULL )
 	{
 		if ( $term === NULL OR $term->cost->amount->isZero() )
 		{
@@ -497,9 +476,9 @@ class Purchase extends Model
 	/**
 	 * Get custom fields
 	 *
-	 * @return	array
+	 * @return	mixed
 	 */
-	public function get_custom_fields() : array
+	public function get_custom_fields()
 	{
 		return json_decode( $this->_data['custom_fields'], TRUE ) ?: array();
 	}
@@ -507,10 +486,10 @@ class Purchase extends Model
 	/**
 	 * Set custom fields
 	 *
-	 * @param	array|null	$customFields	The data
+	 * @param	mixed	$customFields	The data
 	 * @return	void
 	 */
-	public function set_custom_fields( ?array $customFields ) : void
+	public function set_custom_fields( $customFields )
 	{
 		$this->_data['custom_fields'] = json_encode( $customFields );
 	}
@@ -518,20 +497,20 @@ class Purchase extends Model
 	/**
 	 * Get extra information
 	 *
-	 * @return	array
+	 * @return	mixed
 	 */
-	public function get_extra() : array
+	public function get_extra()
 	{
-		return json_decode( $this->_data['extra'], TRUE ) ?: array();
+		return json_decode( $this->_data['extra'], TRUE );
 	}
 	
 	/**
 	 * Set extra information
 	 *
-	 * @param	array|null	$extra	The data
+	 * @param	mixed	$extra	The data
 	 * @return	void
 	 */
-	public function set_extra( ?array $extra ) : void
+	public function set_extra( $extra )
 	{
 		$this->_data['extra'] = json_encode( $extra );
 	}
@@ -539,10 +518,10 @@ class Purchase extends Model
 	/**
 	 * Set parent purchase
 	 *
-	 * @param Purchase|null $purchase
+	 * @param	\IPS\nexus\Purchase
 	 * @return	void
 	 */
-	public function set_parent( ?Purchase $purchase = NULL ) : void
+	public function set_parent( \IPS\nexus\Purchase $purchase = NULL )
 	{
 		$this->_data['parent'] = $purchase ? $purchase->id : 0;
 	}
@@ -550,15 +529,15 @@ class Purchase extends Model
 	/**
 	 * Get pending invoice
 	 *
-	 * @return    Invoice|null
+	 * @return	\IPS\nexus\Invoice
 	 */
-	public function get_invoice_pending() : Invoice|null
+	public function get_invoice_pending()
 	{
 		try
 		{
-			return $this->_data['invoice_pending'] ? Invoice::load( $this->_data['invoice_pending'] ) : NULL;
+			return $this->_data['invoice_pending'] ? \IPS\nexus\Invoice::load( $this->_data['invoice_pending'] ) : NULL;
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -567,10 +546,10 @@ class Purchase extends Model
 	/**
 	 * Set pending invoice
 	 *
-	 * @param Invoice|null $invoice
+	 * @param	\IPS\nexus\Invoice
 	 * @return	void
 	 */
-	public function set_invoice_pending( ?Invoice $invoice = NULL ) : void
+	public function set_invoice_pending( \IPS\nexus\Invoice $invoice = NULL )
 	{
 		$this->_data['invoice_pending'] = $invoice ? $invoice->id : 0;
 		
@@ -583,15 +562,15 @@ class Purchase extends Model
 	/**
 	 * Get member to receive payments
 	 *
-	 * @return	Member|null
+	 * @return	\IPS\Member
 	 */
-	public function get_pay_to() : Member|null
+	public function get_pay_to()
 	{
 		try
 		{
-			return $this->_data['pay_to'] ? Customer::load( $this->_data['pay_to'] ) : NULL;
+			return $this->_data['pay_to'] ? \IPS\nexus\Customer::load( $this->_data['pay_to'] ) : NULL;
 		}
-		catch ( Exception )
+		catch ( \Exception $e )
 		{
 			return NULL;
 		}
@@ -600,10 +579,10 @@ class Purchase extends Model
 	/**
 	 * Set member to receive payments
 	 *
-	 * @param	Member $member
+	 * @param	\IPS\Member
 	 * @return	void
 	 */
-	public function set_pay_to( Member $member ) : void
+	public function set_pay_to( \IPS\Member $member )
 	{
 		$this->_data['pay_to'] = $member->member_id;
 	}
@@ -611,17 +590,17 @@ class Purchase extends Model
 	/**
 	 * Get fee to commission on renewal charges
 	 *
-	 * @return    Money|NULL
+	 * @return	\IPS\nexus\Money|NULL
 	 */
-	public function get_fee() : Money|null
+	public function get_fee()
 	{
 		if ( $this->_data['fee'] and $this->renewals )
 		{
 			try
 			{
-				return new Money( $this->_data['fee'], $this->renewals->cost->currency );
+				return new \IPS\nexus\Money( $this->_data['fee'], $this->renewals->cost->currency );
 			}
-			catch ( Exception ) { }
+			catch ( \Exception $e ) { }
 		}
 		return NULL;
 	}
@@ -629,31 +608,31 @@ class Purchase extends Model
 	/**
 	 * Set fee to commission on renewal charges
 	 *
-	 * @param Money|NULL	$fee	The fee
+	 * @param	\IPS\nexus\Money|NULL	$fee	The fee
 	 * @return	void
 	 */
-	public function set_fee( ?Money $fee = NULL ) : void
+	public function set_fee( \IPS\nexus\Money $fee = NULL )
 	{
-		$this->_data['fee'] = $fee?->amount;
+		$this->_data['fee'] = $fee ? $fee->amount : NULL;
 	}
 	
 	/**
 	 * Get original invoice
 	 *
-	 * @return    Invoice
+	 * @return	\IPS\nexus\Invoice
 	 */
-	public function get_original_invoice() : Invoice
+	public function get_original_invoice()
 	{
-		return Invoice::load( $this->_data['original_invoice'] );
+		return \IPS\nexus\Invoice::load( $this->_data['original_invoice'] );
 	}
 	
 	/**
 	 * Set original invoice
 	 *
-	 * @param Invoice $invoice
+	 * @param	\IPS\nexus\Invoice
 	 * @return	void
 	 */
-	public function set_original_invoice( Invoice $invoice ) : void
+	public function set_original_invoice( \IPS\nexus\Invoice $invoice )
 	{
 		$this->_data['original_invoice'] = $invoice->id;
 	}
@@ -661,9 +640,9 @@ class Purchase extends Model
 	/**
 	 * Get grouped renewals information
 	 *
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function get_grouped_renewals() : array|null
+	public function get_grouped_renewals()
 	{
 		return $this->_data['grouped_renewals'] ? json_decode( $this->_data['grouped_renewals'], TRUE ) : NULL;
 	}
@@ -674,25 +653,25 @@ class Purchase extends Model
 	 * @param	array|NULL	$data	The data
 	 * @return	void
 	 */
-	public function set_grouped_renewals( ?array $data ) : void
+	public function set_grouped_renewals( $data )
 	{
-		$this->_data['grouped_renewals'] = !is_null( $data ) ? json_encode( $data ) : NULL;
+		$this->_data['grouped_renewals'] = !\is_null( $data ) ? json_encode( $data ) : NULL;
 	}
 	
 	/**
 	 * Get billing agreement
 	 *
-	 * @return	BillingAgreement|NULL
+	 * @return	\IPS\nexus\Customer\BillingAgreement|NULL
 	 */
-	public function get_billing_agreement() : BillingAgreement|null
+	public function get_billing_agreement()
 	{
 		if ( $this->_data['billing_agreement'] )
 		{
 			try
 			{
-				return BillingAgreement::load( $this->_data['billing_agreement'] );
+				return \IPS\nexus\Customer\BillingAgreement::load( $this->_data['billing_agreement'] );
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException $e )
 			{
 				$this->_data['billing_agreement'] = NULL;
 			}
@@ -703,12 +682,12 @@ class Purchase extends Model
 	/**
 	 * Set billing agreement
 	 *
-	 * @param	BillingAgreement|NULL	$billingAgreement	The billing agreement
+	 * @param	\IPS\nexus\Customer\BillingAgreement|NULL	$billingAgreement	The billing agreement
 	 * @return	void
 	 */
-	public function set_billing_agreement( ?BillingAgreement $billingAgreement = NULL ) : void
+	public function set_billing_agreement( \IPS\nexus\Customer\BillingAgreement $billingAgreement = NULL )
 	{
-		$this->_data['billing_agreement'] = $billingAgreement?->id;
+		$this->_data['billing_agreement'] = $billingAgreement === NULL ? NULL : $billingAgreement->id;
 	}
 	
 	/* !Properties and syncing */
@@ -716,15 +695,15 @@ class Purchase extends Model
 	/**
 	 * @brief	Extension
 	 */
-	protected ?string $extension = null;
+	protected $extension;
 	
 	/** 
 	 * Get extension
 	 *
-	 * @return    string
-	 * @throws	OutOfRangeException
+	 * @return	\IPS\nexus\Invoice\Item\Purchase
+	 * @throws	\OutOfRangeException
 	 */
-	protected function extension() : string
+	protected function extension()
 	{
 		if ( $this->extension === NULL )
 		{
@@ -734,11 +713,11 @@ class Purchase extends Model
 				for that */
 			try
 			{
-				$app = Application::load( $this->app );
+				$app = \IPS\Application::load( $this->app );
 			}
-			catch ( UnexpectedValueException )
+			catch ( \UnexpectedValueException $e )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			
 			/* Find the extension */
@@ -754,7 +733,7 @@ class Purchase extends Model
 			/* Don't have it? */
 			if ( !$this->extension )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
 		return $this->extension;
@@ -765,15 +744,14 @@ class Purchase extends Model
 	 *
 	 * @return	string
 	 */
-	public function getIcon() : string
+	public function getIcon()
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			return $extension::getIcon( $this );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return 'question';
 		}
@@ -782,17 +760,16 @@ class Purchase extends Model
 	/** 
 	 * Get icon
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function getTypeTitle() : string|null
+	public function getTypeTitle()
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			return $extension::getTypeTitle( $this );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -801,17 +778,16 @@ class Purchase extends Model
 	/** 
 	 * Get image
 	 *
-	 * @return    File|null
+	 * @return	string
 	 */
-	public function image() : File|null
+	public function image()
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			return $extension::purchaseImage( $this );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -820,17 +796,16 @@ class Purchase extends Model
 	/** 
 	 * Get ACP Page HTML
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function acpPage(): string
+	public function acpPage()
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			return $extension::acpPage( $this );
 		}
-		catch ( OutOfRangeException | BadMethodCallException )
+		catch ( \OutOfRangeException | \BadMethodCallException $e )
 		{
 			return '';
 		}
@@ -839,52 +814,55 @@ class Purchase extends Model
 	/** 
 	 * ACP Edit Form
 	 *
-	 * @param	Form				$form		The form
-	 * @param RenewalTerm|null $renewals	The renewal term
-	 * @return    void
+	 * @param	\IPS\Helpers\Form				$form		The form
+	 * @param	\IPS\nexus\Purchase\RenewalTerm	$renewals	The renewal term
+	 * @return	string
 	 */
-	public function acpEdit(Form $form, ?RenewalTerm $renewals ): void
+	public function acpEdit( \IPS\Helpers\Form $form, $renewals )
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
-			$extension::acpEdit( $this, $form, $renewals );
+			return $extension::acpEdit( $this, $form, $renewals );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/** 
 	 * ACP Edit Save
 	 *
 	 * @param	array	$values		Values from form
-	 * @return    void
+	 * @return	string
 	 */
-	public function acpEditSave( array $values ): void
+	public function acpEditSave( array $values )
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
-			$extension::acpEditSave( $this, $values );
+			return $extension::acpEditSave( $this, $values );
 		}
-		catch ( OutOfRangeException ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/** 
 	 * Get Client Area Page HTML
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function clientAreaPage(): array
+	public function clientAreaPage()
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			return $extension::clientAreaPage( $this );
 		}
-		catch ( OutOfRangeException | BadMethodCallException | ErrorException )
+		catch ( \OutOfRangeException | \BadMethodCallException $e )
 		{
 			return array( 'packageInfo' => '', 'purchaseInfo' => '' );
 		}
@@ -893,52 +871,88 @@ class Purchase extends Model
 	/** 
 	 * Perform ACP Action
 	 *
-	 * @return    string|null
+	 * @return	void
 	 */
-	public function acpAction(): string|null
+	public function acpAction()
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			return $extension::acpAction( $this );
 		}
-		catch ( OutOfRangeException  )
+		catch ( \OutOfRangeException $e )
 		{
-			return null;
+			return NULL;
 		}
 	}
 	
 	/** 
 	 * Perform Client Area Action
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function clientAreaAction(): void
+	public function clientAreaAction()
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
-			$extension::clientAreaAction( $this );
+			return $extension::clientAreaAction( $this );
 		}
-		catch ( OutOfRangeException  ){}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
+	}
+	
+	/** 
+	 * Get ACP Support View HTML
+	 *
+	 * @return	string
+	 */
+	public function acpSupportView()
+	{
+		try
+		{
+			$extension = $this->extension();
+			return $extension::acpSupportView( $this );
+		}
+		catch ( \OutOfRangeException $e )
+		{
+			return '';
+		}
+	}
+	
+	/**
+	 * Support Severity
+	 *
+	 * @return	\IPS\nexus\Support\Severity|NULL
+	 */
+	public function supportSeverity()
+	{
+		try
+		{
+			$extension = $this->extension();
+			return $extension::supportSeverity( $this );
+		}
+		catch ( \OutOfRangeException $e )
+		{
+			return NULL;
+		}
 	}
 	
 	/** 
 	 * Get renewal payment methods IDs
 	 *
-	 * @return    array|NULL
+	 * @return	array|NULL
 	 */
-	public function renewalPaymentMethodIds(): array|null
+	public function renewalPaymentMethodIds()
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			return $extension::renewalPaymentMethodIds( $this );
 		}
-		catch ( OutOfRangeException  )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -947,45 +961,32 @@ class Purchase extends Model
 	/**
 	 * Call on*
 	 *
-	 * @param string $method	Method
-	 * @param array $params	Params
-	 * @return    mixed
+	 * @param	string	$method	Method
+	 * @param	array	$params	Params
+	 * @return	mixed
 	 */
-	public function __call(string $method, array $params ): mixed
+	public function __call( $method, $params )
 	{
 		if ( mb_substr( $method, 0, 2 ) === 'on' )
 		{
 			try
 			{
-				$result = call_user_func_array( array( $this->extension(), $method ), array_merge( array( $this ), $params ) );
-
-				/* Fire the event, but do it on the original invoice item, not on the purchase itself.
-				This way we support all possible invoice items. */
-
-				$price = new Money( "0", $this->member->defaultCurrency() );
-				if( $this->renewals instanceof RenewalTerm )
-				{
-					$price = $this->renewals->cost;
-				}
-				$item = new $this->extension( $this->name, $price );
-				Event::fire( $method, $item, array_merge( array( $this ), $params ) );
-
-				return $result;
+				return \call_user_func_array( array( $this->extension(), $method ), array_merge( array( $this ), $params ) );
 			}
-			catch ( OutOfRangeException  ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
-		throw new BadMethodCallException;
+		throw new \BadMethodCallException;
 	}
 	
 	/**
 	 * Purchase can be reactivated in the ACP?
 	 *
-	 * @param string|NULL $error		Error to show, passed by reference
-	 * @return    bool
+	 * @param	\IPS\nexus\Purchase $purchase	The purchase
+	 * @param	NULL				$error		Error to show, passed by reference
+	 * @return	bool
 	 */
-	public function canAcpReactivate( ?string &$error=NULL ): bool
+	public function canAcpReactivate( &$error=NULL )
 	{
-		/* @var ItemPurchase $extension */
 		$extension = $this->extension();
 		return $extension::canAcpReactivate( $this, $error );
 	}
@@ -993,7 +994,7 @@ class Purchase extends Model
 	/**
 	 * Get output for API
 	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
+	 * @param	\IPS\Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
 	 * @return	array
 	 * @apiresponse		int									id				ID number
 	 * @apiresponse		string								name			Name
@@ -1013,7 +1014,7 @@ class Purchase extends Model
 	 * @apiresponse		string								image			If the item has a relevant image (for exmaple, product image, Downloads file screenshot), the URL to it
 	 * @apiresponse		string								url				The URL for the customer to view this purchase in the client area
 	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
+	public function apiOutput( \IPS\Member $authorizedMember = NULL )
 	{
 		$parent = NULL;
 		if ( $this->parent )
@@ -1022,7 +1023,7 @@ class Purchase extends Model
 			{
 				$parent = static::load( $this->parent )->apiOutput( $authorizedMember );
 			}
-			catch ( OutOfRangeException ) {}
+			catch ( \OutOfRangeException $e ) {}
 		}
 		
 		return array(
@@ -1034,9 +1035,9 @@ class Purchase extends Model
 			'customer'		=> $this->member->apiOutput( $authorizedMember ),
 			'purchased'		=> $this->start->rfc3339(),
 			'expires'		=> $this->expire ? $this->expire->rfc3339() : null,
-			'active'		=> $this->active,
+			'active'		=> (bool) $this->active,
 			'canceled'		=> (bool) $this->cancelled,
-			'renewalTerm'	=> $this->renewals?->apiOutput($authorizedMember),
+			'renewalTerm'	=> $this->renewals ? $this->renewals->apiOutput( $authorizedMember ) : null,
 			'customFields'	=> $this->custom_fields,
 			'parent'		=> $parent,
 			'show'			=> (bool) $this->show,
@@ -1051,22 +1052,22 @@ class Purchase extends Model
 	/**
 	 * @brief	License key
 	 */
-	public LicenseKey|null|bool $licenseKey = null;
+	public $licenseKey;
 	
 	/**
 	 * Get license key
 	 *
-	 * @return	LicenseKey|NULL|bool
+	 * @return	\IPS\nexus\Purchase\LicenseKey|NULL
 	 */
-	public function licenseKey() : LicenseKey|null|bool
+	public function licenseKey()
 	{
 		if ( $this->licenseKey === NULL )
 		{
 			try
 			{
-				$this->licenseKey = LicenseKey::load( $this->id, 'lkey_purchase' );
+				$this->licenseKey = \IPS\nexus\Purchase\LicenseKey::load( $this->id, 'lkey_purchase' );
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException $e )
 			{
 				$this->licenseKey = FALSE;
 			}
@@ -1079,7 +1080,7 @@ class Purchase extends Model
 	 *
 	 * @return	void
 	 */
-	public function onExpire() : void
+	public function onExpire()
 	{
 		if ( $licenseKey = $this->licenseKey() )
 		{
@@ -1087,7 +1088,7 @@ class Purchase extends Model
 			$licenseKey->save();
 		}
 		
-		$this->__call( 'onExpire', array() );
+		return $this->__call( 'onExpire', array() );
 	}
 	
 	/**
@@ -1095,7 +1096,7 @@ class Purchase extends Model
 	 *
 	 * @return	void
 	 */
-	public function onCancel() : void
+	public function onCancel()
 	{
 		if ( $licenseKey = $this->licenseKey() )
 		{
@@ -1103,7 +1104,7 @@ class Purchase extends Model
 			$licenseKey->save();
 		}
 		
-		$this->__call( 'onCancel', array() );
+		return $this->__call( 'onCancel', array() );
 	}
 	
 	/**
@@ -1111,7 +1112,7 @@ class Purchase extends Model
 	 *
 	 * @return	void
 	 */
-	public function onReactivate() : void
+	public function onReactivate()
 	{
 		if ( $licenseKey = $this->licenseKey() )
 		{
@@ -1119,7 +1120,7 @@ class Purchase extends Model
 			$licenseKey->save();
 		}
 		
-		$this->__call( 'onReactivate', array() );
+		return $this->__call( 'onReactivate', array() );
 	}
 	
 	/**
@@ -1127,14 +1128,14 @@ class Purchase extends Model
 	 *
 	 * @return	void
 	 */
-	public function onDelete() : void
+	public function onDelete()
 	{
 		if ( $licenseKey = $this->licenseKey() )
 		{
 			$licenseKey->delete();
 		}
 		
-		$this->__call( 'onDelete', array() );
+		return $this->__call( 'onDelete', array() );
 	}
 	
 	/* !Client Area */
@@ -1142,19 +1143,19 @@ class Purchase extends Model
 	/**
 	 * Can view?
 	 *
-	 * @param Member|Group|null $member	The member to check (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member	The member to check (NULL for currently logged in member)
 	 * @return	bool
 	 */
-	public function canView( Member|Group|null $member=null ): bool
+	public function canView( $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 
 		/* Show only purchases from active applications */
 		try
 		{
-			$app = Application::load( $this->app );
+			$app = \IPS\Application::load( $this->app );
 		}
-		catch ( UnexpectedValueException )
+		catch ( \UnexpectedValueException $e )
 		{
 			return FALSE;
 		}
@@ -1164,7 +1165,7 @@ class Purchase extends Model
 			return FALSE;
 		}
 
-		if ( $this->member->member_id === $member->member_id or array_key_exists( $member->member_id, iterator_to_array( $this->member->alternativeContacts( array( Db::i()->findInSet( 'purchases', array( $this->id ) ) ) ) ) ) )
+		if ( $this->member->member_id === $member->member_id or array_key_exists( $member->member_id, iterator_to_array( $this->member->alternativeContacts( array( \IPS\Db::i()->findInSet( 'purchases', array( $this->id ) ) ) ) ) ) )
 		{
 			return TRUE;
 		}
@@ -1177,7 +1178,7 @@ class Purchase extends Model
 	 *
 	 * @return	bool
 	 */
-	public function canChangeExpireDate() : bool
+	public function canChangeExpireDate()
 	{
 		if ( $this->billing_agreement and !$this->billing_agreement->canceled )
 		{
@@ -1186,11 +1187,10 @@ class Purchase extends Model
 		
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			return $extension::canChangeExpireDate( $this );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return TRUE;
 		}
@@ -1199,12 +1199,12 @@ class Purchase extends Model
 	/**
 	 * Can Renew Until
 	 *
-	 * @param	Member|NULL	$member		The member to check (NULL for currently logged in member)
+	 * @param	\IPS\Member|NULL	$member		The member to check (NULL for currently logged in member)
 	 * @param	bool				$inCycles	Get in cycles rather than a date?
-	 * @param bool $admin		If TRUE, is for ACP. If FALSE, is for front-end.
-	 * @return    bool|DateTime|int    TRUE means can renew as much as they like. FALSE means cannot renew at all. \IPS\DateTime (or int if $inCycles is TRUE) means can renew until that date
+	 * @param	bool				$admin		If TRUE, is for ACP. If FALSE, is for front-end.
+	 * @return	\IPS\DateTime|bool	TRUE means can renew as much as they like. FALSE means cannot renew at all. \IPS\DateTime (or int if $inCycles is TRUE) means can renew until that date
 	 */
-	public function canRenewUntil(?Member $member = NULL, bool $inCycles = FALSE, bool $admin = FALSE ): DateTime|int|bool
+	public function canRenewUntil( \IPS\Member $member = NULL, $inCycles = FALSE, $admin = FALSE )
 	{
 		/* Can this purchase be renewed at all? */
 		if ( !$this->canBeRenewed() )
@@ -1212,9 +1212,9 @@ class Purchase extends Model
 			return FALSE;
 		}
 
-		$member = $member ?: Member::loggedIn();
+		$member = $member ?: \IPS\Member::loggedIn();
 		
-		if ( !$admin and $this->member->member_id !== $member->member_id and !array_key_exists( $member->member_id, iterator_to_array( $this->member->alternativeContacts( array( Db::i()->findInSet( 'purchases', array( $this->id ) ) . ' AND billing=1' ) ) ) ) )
+		if ( !$admin and $this->member->member_id !== $member->member_id and !array_key_exists( $member->member_id, iterator_to_array( $this->member->alternativeContacts( array( \IPS\Db::i()->findInSet( 'purchases', array( $this->id ) ) . ' AND billing=1' ) ) ) ) )
 		{
 			return FALSE;
 		}
@@ -1231,13 +1231,12 @@ class Purchase extends Model
 				
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			$date = $extension::canRenewUntil( $this, $admin );
 					
-			if ( $inCycles and $date instanceof DateTime )
+			if ( $inCycles and $date instanceof \IPS\DateTime )
 			{
-				$now = DateTime::create();
+				$now = \IPS\DateTime::create();
 				$cycles = 0;
 				while ( $now->add( $this->renewals->interval )->getTimestamp() < $date->getTimestamp() )
 				{
@@ -1250,7 +1249,7 @@ class Purchase extends Model
 				return $date;
 			}
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return FALSE;
 		}
@@ -1259,17 +1258,16 @@ class Purchase extends Model
 	/**
 	 * Purchase can be renewed?
 	 *
-	 * @return    boolean|NULL
+	 * @return	boolean|NULL
 	 */
-	public function canBeRenewed(): bool|null
+	public function canBeRenewed()
 	{
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			return $extension::canBeRenewed( $this );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			return NULL;
 		}
@@ -1278,13 +1276,13 @@ class Purchase extends Model
 	/**
 	 * Can Cancel
 	 *
-	 * @param Member|NULL $member	The member to check (NULL for currently logged in member)
-	 * @return    bool
+	 * @param	\IPS\Member|NULL	$member	The member to check (NULL for currently logged in member)
+	 * @return	bool
 	 */
-	public function canCancel(?Member $member = NULL ): bool
+	public function canCancel( \IPS\Member $member = NULL )
 	{
-		$member = $member ?: Member::loggedIn();
-		if ( $this->member->member_id !== $member->member_id and !array_key_exists( $member->member_id, iterator_to_array( $this->member->alternativeContacts( array( Db::i()->findInSet( 'purchases', array( $this->id ) ) . ' AND billing=1' ) ) ) ) )
+		$member = $member ?: \IPS\Member::loggedIn();
+		if ( $this->member->member_id !== $member->member_id and !array_key_exists( $member->member_id, iterator_to_array( $this->member->alternativeContacts( array( \IPS\Db::i()->findInSet( 'purchases', array( $this->id ) ) . ' AND billing=1' ) ) ) ) )
 		{
 			return FALSE;
 		}
@@ -1295,18 +1293,18 @@ class Purchase extends Model
 	/**
 	 * @brief	Cached URL
 	 */
-	protected mixed $_url = NULL;
+	protected $_url	= NULL;
 
 	/**
 	 * Get URL
 	 *
-	 * @return	Url\Internal|string|null
+	 * @return	\IPS\Http\Url
 	 */
-	function url(): Url\Internal|string|null
+	public function url()
 	{
 		if( $this->_url === NULL )
 		{
-			$this->_url = Url::internal( "app=nexus&module=clients&controller=purchases&do=view&id={$this->id}", 'front', 'clientspurchase', array( Friendly::seoTitle( $this->name ) ) );
+			$this->_url = \IPS\Http\Url::internal( "app=nexus&module=clients&controller=purchases&do=view&id={$this->id}", 'front', 'clientspurchase', array( \IPS\Http\Url\Friendly::seoTitle( $this->name ) ) );
 		}
 
 		return $this->_url;
@@ -1317,10 +1315,10 @@ class Purchase extends Model
 	/**
 	 * Transfer
 	 *
-	 * @param	Member	$newCustomer
+	 * @param	\IPS\Member	$newCustomer
 	 * @return	void
 	 */
-	public function transfer( Member $newCustomer ) : void
+	public function transfer( \IPS\Member $newCustomer )
 	{
 		$this->onTransfer( $newCustomer );
 		$this->member = $newCustomer;
@@ -1336,11 +1334,11 @@ class Purchase extends Model
 	 * Delete
 	 *
 	 * @param	bool	$deleteChildren		If TRUE, child purchases will also be deleted. If FALSE, they will become unassociated.
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete( bool $deleteChildren = TRUE ): void
+	public function delete( $deleteChildren = TRUE )
 	{
-		File::unclaimAttachments( 'nexus_Purchases', $this->id, NULL, 'purchase' );
+		\IPS\File::unclaimAttachments( 'nexus_Purchases', $this->id, NULL, 'purchase' );
 		
 		foreach ( $this->children( NULL ) as $child )
 		{
@@ -1359,7 +1357,7 @@ class Purchase extends Model
 		{
 			$this->onDelete();
 		}
-		catch ( BadMethodCallException ) {}
+		catch ( \BadMethodCallException $e ) {}
 
 		parent::delete();
 	}
@@ -1370,15 +1368,15 @@ class Purchase extends Model
 	 * Group with parent
 	 *
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function groupWithParent() : void
+	public function groupWithParent()
 	{		
 		/* Get the parent */
 		$parent = $this->parent();
 		if ( !$parent )
 		{
-			throw new BadMethodCallException('no_parent');
+			throw new \BadMethodCallException('no_parent');
 		}
 				
 		/* If we have a renewal term, we need to merge it with the parent... */
@@ -1395,7 +1393,8 @@ class Purchase extends Model
 				/* If the parent also has a renewal term, merge them */
 				if ( $parent->renewals )
 				{
-					$parent->renewals = new RenewalTerm( $parent->renewals->add( $this->renewals ), $parent->renewals->interval, $parent->renewals->tax );
+					$parent->renewals = new \IPS\nexus\Purchase\RenewalTerm( $parent->renewals->add( $this->renewals ), $parent->renewals->interval, $parent->renewals->tax );
+					$parent->save();
 				}
 				/* Otherwise just set the parent to this */
 				else
@@ -1405,9 +1404,8 @@ class Purchase extends Model
 					{
 						$parent->expire = $this->expire;
 					}
+					$parent->save();
 				}
-
-				$parent->save();
 			}
 			
 			/* Cancel any pending invoices as they're no longer valid */
@@ -1436,15 +1434,15 @@ class Purchase extends Model
 	 * Ungroup from parent
 	 *
 	 * @return	void
-	 * @throws	BadMethodCallException
+	 * @throws	\LogicException
 	 */
-	public function ungroupFromParent() : void
+	public function ungroupFromParent()
 	{		
 		/* Get the parent */
 		$parent = $this->parent();
 		if ( !$parent )
 		{
-			throw new BadMethodCallException('no_parent');
+			throw new \BadMethodCallException('no_parent');
 		}
 		
 		/* If we have a renewal term, we need to remove it from the parent... */
@@ -1460,7 +1458,7 @@ class Purchase extends Model
 				}
 				else
 				{
-					$parent->renewals = new RenewalTerm( $newRenewalPrice, $parent->renewals->interval, $parent->renewals->tax );
+					$parent->renewals = new \IPS\nexus\Purchase\RenewalTerm( $newRenewalPrice, $parent->renewals->interval, $parent->renewals->tax );
 				}
 				$parent->save();
 			}
@@ -1471,15 +1469,15 @@ class Purchase extends Model
 			{
 				try
 				{
-					$tax = ( isset( $groupedRenewals['tax'] ) and $groupedRenewals['tax'] ) ? Tax::load( $groupedRenewals['tax'] ) : NULL;
+					$tax = ( isset( $groupedRenewals['tax'] ) and $groupedRenewals['tax'] ) ? \IPS\nexus\Tax::load( $groupedRenewals['tax'] ) : NULL;
 				}
-				catch ( OutOfRangeException )
+				catch ( \OutOfRangeException $e )
 				{
 					$tax = NULL;
 				}
-				$this->renewals = new RenewalTerm(
-					new Money( $groupedRenewals['price'], $groupedRenewals['currency'] ?? $this->member->defaultCurrency()),
-					new DateInterval( 'P' . $groupedRenewals['term'] . mb_strtoupper( $groupedRenewals['unit'] ) ),
+				$this->renewals = new \IPS\nexus\Purchase\RenewalTerm(
+					new \IPS\nexus\Money( $groupedRenewals['price'], isset( $groupedRenewals['currency'] ) ? $groupedRenewals['currency'] : $this->member->defaultCurrency() ),
+					new \DateInterval( 'P' . $groupedRenewals['term'] . mb_strtoupper( $groupedRenewals['unit'] ) ),
 					$tax
 				);
 			}
@@ -1508,13 +1506,13 @@ class Purchase extends Model
 	/**
 	 * Get the URL of the AdminCP page for this node
 	 *
-	 * @param   string|null  $do The "do" query parameter of the url (e.g. 'form', 'permissions', etc).
+	 * @param   string|NULL  $do The "do" query parameter of the url (e.g. 'form', 'permissions', etc).
 	 *
-	 * @return Url | NULL
+	 * @return \IPS\Http\Url | NULL
 	 */
-	public function acpUrl( ?string $do="form" ): ?Url
+	public function acpUrl( $do="form" )
 	{
-		return Url::internal( "app=nexus&module=customers&controller=purchases&do=view&id={$this->id}", 'admin' );
+		return \IPS\Http\Url::internal( "app=nexus&module=customers&controller=purchases&do=view&id={$this->id}", 'admin' );
 	}
 	
 	/**
@@ -1523,44 +1521,43 @@ class Purchase extends Model
 	 * @param	string	$ref	Referer
 	 * @return	array
 	 */
-	public function buttons( string $ref='v' ) : array
+	public function buttons( $ref='v' )
 	{
 		$return = array();
 		
 		$url = $this->acpUrl()->setQueryString( 'r', $ref );
 		
-		if( Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_edit' ) )
+		if( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_edit' ) )
 		{
 			$return['edit'] = array(
 				'icon'	=> 'pencil',
 				'title'	=> 'edit',
 				'link'	=> $url->setQueryString( 'do', 'edit' ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit') )
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit') )
 			);
 		}
 		
 		$extension = NULL;
 		try
 		{
-			/* @var ItemPurchase $extension */
 			$extension = $this->extension();
 			$return = array_merge( $return, $extension::acpButtons( $this, $url ) );
 		}
-		catch ( OutOfRangeException ) { }
+		catch ( \OutOfRangeException $e ) { }
 		
 		$parent = $this->parent();
 				
-		if ( !$this->grouped_renewals and ( !$this->billing_agreement or $this->billing_agreement->canceled ) and $this->renewals and Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_add' ) )
+		if ( !$this->grouped_renewals and ( !$this->billing_agreement or $this->billing_agreement->canceled ) and $this->renewals and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'payments', 'invoices_add' ) )
 		{
 			$return['renew'] = array(
 				'icon'	=> 'refresh',
 				'title'	=> 'generate_renewal_invoice',
 				'link'	=> $url->setQueryString( 'do', 'renew' ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('generate_renewal_invoice') )
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('generate_renewal_invoice') )
 			);
 		}
 		
-		if ( ( !$this->billing_agreement or $this->billing_agreement->canceled ) and $this->parent() and Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_edit' ) )
+		if ( ( !$this->billing_agreement or $this->billing_agreement->canceled ) and $this->parent() and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_edit' ) )
 		{
 			if ( !$this->grouped_renewals )
 			{
@@ -1568,7 +1565,7 @@ class Purchase extends Model
 					'icon'	=> 'compress',
 					'title'	=> 'group_with_parent',
 					'link'	=> $url->setQueryString( 'do', 'group' )->csrf(),
-					'data'	=> array( 'confirm' => '', 'confirmSubMessage' => Member::loggedIn()->language()->addToStack('group_with_parent_info') )
+					'data'	=> array( 'confirm' => '', 'confirmSubMessage' => \IPS\Member::loggedIn()->language()->addToStack('group_with_parent_info') )
 				);
 			}
 			else
@@ -1577,26 +1574,25 @@ class Purchase extends Model
 					'icon'	=> 'expand',
 					'title'	=> 'ungroup_from_parent',
 					'link'	=> $url->setQueryString( 'do', 'ungroup' )->csrf(),
-					'data'	=> array( 'confirm' => '', 'confirmSubMessage' => Member::loggedIn()->language()->addToStack('ungroup_from_parent_info') )
+					'data'	=> array( 'confirm' => '', 'confirmSubMessage' => \IPS\Member::loggedIn()->language()->addToStack('ungroup_from_parent_info') )
 				);
 			}
 		}
 		
-		if( ( !$this->billing_agreement or $this->billing_agreement->canceled ) and !$this->grouped_renewals and Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_transfer' ) )
+		if( ( !$this->billing_agreement or $this->billing_agreement->canceled ) and !$this->grouped_renewals and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_transfer' ) )
 		{
 			$return['transfer'] = array(
 				'icon'	=> 'user',
 				'title'	=> 'transfer',
 				'link'	=> $url->setQueryString( 'do', 'transfer' ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('transfer') )
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('transfer') )
 			);
 		}
 		
-		if ( ( !$this->billing_agreement or $this->billing_agreement->canceled ) and ( !$this->grouped_renewals or !$parent or !$parent->billing_agreement or $parent->billing_agreement->canceled ) and Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_cancel' ) )
+		if ( ( !$this->billing_agreement or $this->billing_agreement->canceled ) and ( !$this->grouped_renewals or !$parent or !$parent->billing_agreement or $parent->billing_agreement->canceled ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_cancel' ) )
 		{
 			if ( $this->cancelled )
 			{
-				/* @var ItemPurchase $extension */
 				if ( $extension AND $extension::canAcpReactivate( $this ) )
 				{
 					$return['reactivate'] = array(
@@ -1613,12 +1609,12 @@ class Purchase extends Model
 					'icon'	=> 'times',
 					'title'	=> 'cancel',
 					'link'	=> $url->setQueryString( 'do', 'cancel' ),
-					'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('cancel') )
+					'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('cancel') )
 				);
 			}
 		}
 				
-		if ( ( !$this->billing_agreement or $this->billing_agreement->canceled ) and ( !$this->grouped_renewals or !$parent or !$parent->billing_agreement or $parent->billing_agreement->canceled ) and Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_delete' ) )
+		if ( ( !$this->billing_agreement or $this->billing_agreement->canceled ) and ( !$this->grouped_renewals or !$parent or !$parent->billing_agreement or $parent->billing_agreement->canceled ) and \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'customers', 'purchases_delete' ) )		
 		{
 			$return['delete'] = array(
 				'icon'	=> 'times-circle',
@@ -1629,16 +1625,5 @@ class Purchase extends Model
 		}
 		
 		return $return;
-	}
-
-	/**
-	 * Allow for individual classes to override and
-	 * specify a primary image. Used for grid views, etc.
-	 *
-	 * @return File|null
-	 */
-	public function primaryImage() : ?File
-	{
-		return $this->image();
 	}
 }

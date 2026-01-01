@@ -11,61 +11,41 @@
 namespace IPS\core\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Theme extends \IPS\core\Statistics\Chart
+class _Theme extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'core_stats_preferences_theme';
-
+	public $controller = 'core_stats_preferences_theme';
+	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$chart	= new Database( $url, 'core_members', 'skin', '', array(
-			'isStacked'			=> FALSE,
-			'backgroundColor' 	=> '#ffffff',
-			'colors'			=> array( '#10967e', '#ea7963', '#de6470', '#6b9dde', '#b09be4', '#eec766', '#9fc973', '#e291bf', '#55c1a6', '#5fb9da' ),
-			'hAxis'				=> array( 'gridlines' => array( 'color' => '#f5f5f5' ) ),
-			'lineWidth'			=> 1,
-			'areaOpacity'		=> 0.4
-		),
-			'PieChart',
-			'monthly',
-			array( 'start' => 0, 'end' => 0 ),
-			array(),
-			'skin' );
-		$chart->where = array( "skin > ?", 0);
-		$chart->groupBy	= 'skin';
+		$chart	= new \IPS\Helpers\Chart;
+		$counts = iterator_to_array( \IPS\Db::i()->select( 'skin, COUNT(member_id) as count', 'core_members', array( "skin > ?", 0), NULL, NULL, "skin" )->setKeyField( 'skin' ) );
 
-		foreach( \IPS\Theme::themes() as $id => $theme )
+		$chart->addHeader( "theme", "string" );
+		$chart->addHeader( \IPS\Member::loggedIn()->language()->get('chart_members'), "number" );
+		foreach( $counts as $id => $theme )
 		{
-			$chart->addSeries( $theme->_title, 'number', 'count(*)', TRUE, $id );
+			$chart->addRow( array( \IPS\Member::loggedIn()->language()->addToStack('core_theme_set_title_' . $id ), $theme['count'] ) );
 		}
-
-		$chart->title = Member::loggedIn()->language()->addToStack('stats_theme_title');
-		$chart->availableTypes = array( 'PieChart' );
-
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack('stats_theme_title');
+				
 		return $chart;
 	}
 }

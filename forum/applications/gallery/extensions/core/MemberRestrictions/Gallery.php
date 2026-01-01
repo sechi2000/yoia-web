@@ -11,35 +11,27 @@
 namespace IPS\gallery\extensions\core\MemberRestrictions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\MemberACPProfile\Restriction;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\YesNo;
-use IPS\Member;
-use function defined;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Member Restrictions: Gallery
  */
-class Gallery extends Restriction
+class _Gallery extends \IPS\core\MemberACPProfile\Restriction
 {
 	/**
 	 * Modify Edit Restrictions form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form $form ) : void
+	public function form( \IPS\Helpers\Form $form )
 	{
-		$form->add( new YesNo( 'remove_gallery_access', !$this->member->members_bitoptions['remove_gallery_access'], FALSE, array( 'togglesOn' => array( 'remove_gallery_upload' ) ) ) );
-		$form->add( new YesNo( 'remove_gallery_upload', !$this->member->members_bitoptions['remove_gallery_upload'], FALSE, array(), NULL, NULL, NULL, 'remove_gallery_upload' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'remove_gallery_access', !$this->member->members_bitoptions['remove_gallery_access'], FALSE, array( 'togglesOn' => array( 'remove_gallery_upload' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'remove_gallery_upload', !$this->member->members_bitoptions['remove_gallery_upload'], FALSE, array(), NULL, NULL, NULL, 'remove_gallery_upload' ) );
 	}
 	
 	/**
@@ -48,7 +40,7 @@ class Gallery extends Restriction
 	 * @param	array	$values	Values from form
 	 * @return	array
 	 */
-	public function save( array $values ): array
+	public function save( $values )
 	{
 		$return = array();
 		
@@ -72,7 +64,7 @@ class Gallery extends Restriction
 	 *
 	 * @return	array
 	 */
-	public function activeRestrictions(): array
+	public function activeRestrictions()
 	{
 		$return = array();
 		
@@ -103,7 +95,7 @@ class Gallery extends Restriction
 		{
 			if ( isset( $changes[ $k ] ) )
 			{
-				$return[] = Member::loggedIn()->language()->addToStack( 'history_restrictions_' . $k . '_' . intval( $changes[ $k ]['new'] ) );
+				$return[] = \IPS\Member::loggedIn()->language()->addToStack( 'history_restrictions_' . $k . '_' . \intval( $changes[ $k ]['new'] ) );
 			}
 		}
 		

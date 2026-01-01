@@ -12,37 +12,26 @@
 namespace IPS\nexus\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use IPS\nexus\Package;
-use IPS\Patterns\ActiveRecordIterator;
-use OutOfRangeException;
-use function count;
-use function defined;
-use const IPS\REBUILD_SLOW;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task
  */
-class MassChangePurchases extends QueueAbstract
+class _MassChangePurchases
 {
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
-		$data['count'] = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'nexus', 'package', $data['id'] ) )->first();
+		$data['count'] = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'nexus', 'package', $data['id'] ) )->first();
 		
 		return $data;
 	}
@@ -55,30 +44,30 @@ class MassChangePurchases extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( array &$data, int $offset ): int
+	public function run( $data, $offset )
 	{
 		try
 		{
-			$package = Package::load( $data['id'] );
+			$package = \IPS\nexus\Package::load( $data['id'] );
 		}
-		catch( OutOfRangeException )
+		catch( \OutOfRangeException $e )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
-		$admin = Member::load( $data['admin'] );
+		$admin = \IPS\Member::load( $data['admin'] );
 		if ( $data['cancel_type'] == 'change' )
 		{
-			$newPackage = Package::load( $data['mass_change_purchases_to'] );
+			$newPackage = \IPS\nexus\Package::load( $data['mass_change_purchases_to'] );
 		}
 		
-		$query = Db::i()->select( '*', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'nexus', 'package', $data['id'] ), 'ps_id ASC', ( $data['cancel_type'] == 'change' ) ? NULL : array( $offset, REBUILD_SLOW ) );
-		if ( !count( $query ) )
+		$query = \IPS\Db::i()->select( '*', 'nexus_purchases', array( 'ps_app=? AND ps_type=? AND ps_item_id=?', 'nexus', 'package', $data['id'] ), 'ps_id ASC', ( $data['cancel_type'] == 'change' ) ? NULL : array( $offset, \IPS\REBUILD_SLOW ) );
+		if ( !\count( $query ) )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
-		foreach ( new ActiveRecordIterator( $query, 'IPS\nexus\Purchase' ) as $purchase )
+		foreach ( new \IPS\Patterns\ActiveRecordIterator( $query, 'IPS\nexus\Purchase' ) as $purchase )
 		{
 			if ( $data['cancel_type'] == 'change' )
 			{
@@ -118,7 +107,7 @@ class MassChangePurchases extends QueueAbstract
 			}
 		}
 				
-		return $offset + REBUILD_SLOW;
+		return $offset + \IPS\REBUILD_SLOW;
 	}
 	
 	/**
@@ -127,11 +116,11 @@ class MassChangePurchases extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{		
-		return array( 'text' => Member::loggedIn()->language()->addToStack( 'mass_change_purchases_in_progress_text', FALSE, array( 'sprintf' => Package::load( $data['id'] )->_title ) ), 'complete' => floor( 100 / $data['count'] * $offset ) );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack( 'mass_change_purchases_in_progress_text', FALSE, array( 'sprintf' => \IPS\nexus\Package::load( $data['id'] )->_title ) ), 'complete' => floor( 100 / $data['count'] * $offset ) );
 	}
 
 	/**
@@ -141,7 +130,7 @@ class MassChangePurchases extends QueueAbstract
 	 * @param	bool	$processed	Was anything processed or not? If preQueueData returns NULL, this will be FALSE.
 	 * @return	void
 	 */
-	public function postComplete( array $data, bool $processed = TRUE ) : void
+	public function postComplete( $data, $processed = TRUE )
 	{
 
 	}

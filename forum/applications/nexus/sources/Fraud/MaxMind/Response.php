@@ -12,25 +12,21 @@
 namespace IPS\nexus\Fraud\MaxMind;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * MaxMind Response
  */
-class Response
+class _Response
 {
 	/**
 	 * @brief	Data
 	 */
-	protected array $data = array();
+	protected $data = array();
 	
 	/**
 	 * Constructor
@@ -38,7 +34,7 @@ class Response
 	 * @param	string|NULL	$data	Data from MaxMind
 	 * @return	void
 	 */
-	public function __construct( ?string $data = NULL )
+	public function __construct( $data = NULL )
 	{
 		if ( $data )
 		{
@@ -52,7 +48,7 @@ class Response
 	 * @param	string	$key	Key
 	 * @return	mixed
 	 */
-	public function __get( string $key )
+	public function __get( $key )
 	{
 		if ( isset( $this->data[ $key ] ) )
 		{
@@ -70,9 +66,9 @@ class Response
 	 * Build from JSON
 	 *
 	 * @param	string	$json	JSON data
-	 * @return    static
+	 * @return	\IPS\nexus\Fraud\MaxMind\Response
 	 */
-	public static function buildFromJson( string $json ) : static
+	public static function buildFromJson( $json )
 	{
 		$obj = new static;
 		$obj->data = json_decode( $json, TRUE );
@@ -94,7 +90,7 @@ class Response
 	 *
 	 * @return	int
 	 */
-	public function proxyScorePercentage() : int
+	public function proxyScorePercentage()
 	{
 		return ( 100 - 10 ) / 3 * $this->proxyScore + ( $this->proxyScore > 3 ? ( 10 * ( $this->proxyScore - 3 ) ) : 0 );
 	}
@@ -110,9 +106,9 @@ class Response
 	 *
 	 * @return bool
 	 */
-	public function error() : bool
+	public function error()
 	{
-		if ( $this->error AND in_array( $this->code, static::$responseErrors ) )
+		if ( $this->error AND \in_array( $this->code, static::$responseErrors ) )
 		{
 			return TRUE;
 		}
@@ -124,9 +120,9 @@ class Response
 	 *
 	 * @return bool
 	 */
-	public function warning() : bool
+	public function warning()
 	{
-		if ( $this->error AND !in_array($this->code, static::$responseErrors ) )
+		if ( $this->error AND !\in_array($this->code, static::$responseErrors ) )
 		{
 			return TRUE;
 		}

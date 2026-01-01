@@ -11,48 +11,36 @@
 namespace IPS\nexus\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\GeoLocation;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Invoice;
-use IPS\nexus\Money;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Market extends \IPS\core\Statistics\Chart
+class _Market extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'nexus_reports_markets_count';
+	public $controller = 'nexus_reports_markets_count';
 	
 	/**
 	 * @brief	Identifier
 	 */
-	protected string $_identifier = 'count';
+	protected $_identifier = 'count';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$chart = new Database(
+		$chart = new \IPS\Helpers\Chart\Database(
 			$url,
 			'nexus_invoices',
 			'i_paid',
@@ -72,12 +60,12 @@ class Market extends \IPS\core\Statistics\Chart
 		);
 		$chart->setExtension( $this );
 		$chart->availableTypes = array( 'GeoChart', 'AreaChart', 'LineChart', 'ColumnChart', 'BarChart', 'PieChart' );
-		$chart->where[] = array( 'i_status=? AND i_billcountry IS NOT NULL', Invoice::STATUS_PAID );
+		$chart->where[] = array( 'i_status=? AND i_billcountry IS NOT NULL', \IPS\nexus\Invoice::STATUS_PAID );
 		$chart->groupBy = 'i_billcountry';
 				
-		foreach ( GeoLocation::$countries as $countryCode )
+		foreach ( \IPS\GeoLocation::$countries as $countryCode )
 		{
-			$chart->addSeries( [ 'value' => Member::loggedIn()->language()->get( 'country-' . $countryCode ), 'key' => $countryCode ], 'number', $this->_identifier === 'count' ? 'COUNT(*)' : 'SUM(i_total)', TRUE, $countryCode );
+			$chart->addSeries( [ 'value' => \IPS\Member::loggedIn()->language()->get( 'country-' . $countryCode ), 'key' => $countryCode ], 'number', $this->_identifier === 'count' ? 'COUNT(*)' : 'SUM(i_total)', TRUE, $countryCode );
 		}
 		
 		if ( $chart->type === 'GeoChart' )
@@ -92,15 +80,14 @@ class Market extends \IPS\core\Statistics\Chart
 	/**
 	 * Set Currency
 	 *
-	 * @param	Chart 	$chart		Chart
+	 * @param	\IPS\Helpers\Chart 	$chart		Chart
 	 * @param	string				$currency	Currency
-	 * @return void
 	 */
-	public function setCurrency( Chart $chart, string $currency ) : void
+	public function setCurrency( \IPS\Helpers\Chart &$chart, string $currency )
 	{
-		if ( !in_array( $currency, Money::currencies() ) )
+		if ( !\in_array( $currency, \IPS\nexus\Money::currencies() ) )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 		
 		$this->_identifier = $currency;

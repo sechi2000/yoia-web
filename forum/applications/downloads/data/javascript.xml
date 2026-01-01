@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <javascript app="downloads">
- <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/downloads" javascript_name="ips.downloads.browse.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000200">/**
+ <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/downloads" javascript_name="ips.downloads.browse.js" javascript_type="controller" javascript_version="107827" javascript_position="1000200">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -59,7 +59,7 @@
 		}
 	});
 }(jQuery, _));</file>
- <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/pending" javascript_name="ips.pending.buttons.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000250">/**
+ <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/pending" javascript_name="ips.pending.buttons.js" javascript_type="controller" javascript_version="107827" javascript_position="1000250">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -77,17 +77,17 @@
 	},
 
 	processButton: function(e) {
-		if( $(e.currentTarget).hasClass('ipsButton--disabled') )
+		if( $(e.currentTarget).hasClass('ipsButton_disabled') )
 		{
 			e.preventDefault();
 		}
 
-		$(e.currentTarget).addClass('ipsButton--disabled');
+		$(e.currentTarget).addClass('ipsButton_disabled');
 	}
 
 	});
 }(jQuery, _));</file>
- <file javascript_app="downloads" javascript_location="admin" javascript_path="controllers/settings" javascript_name="ips.settings.settings.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000050">/**
+ <file javascript_app="downloads" javascript_location="admin" javascript_path="controllers/settings" javascript_name="ips.settings.settings.js" javascript_type="controller" javascript_version="107827" javascript_position="1000050">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -140,7 +140,7 @@
 
 	});
 }(jQuery, _));</file>
- <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.linkedScreenshots.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100">/**
+ <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.linkedScreenshots.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -198,6 +198,7 @@
 		 * @returns 	{void}
 		 */
 		removeField: function ( e ) {
+			e.preventDefault();
 			$(e.currentTarget).closest('li').remove();
 		},
 		
@@ -211,7 +212,7 @@
 		}
 	});
 }(jQuery, _));</file>
- <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.main.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000100"><![CDATA[/**
+ <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/submit" javascript_name="ips.submit.main.js" javascript_type="controller" javascript_version="107827" javascript_position="1000100"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -279,15 +280,13 @@
 
 
 			var hideProgressBar = function ( force=false ) {
-				/* if( !_.isUndefined( self._ui.progressBar.attr('data-ipsSticky') ) && !force ){
+				if( !_.isUndefined( self._ui.progressBar.attr('data-ipsSticky') ) && !force ){
 					self.on( 'stickyInit', function () {
 						self._ui.progressBar.hide();
 					});
 				} else {
 					self._ui.progressBar.hide();
-				} */
-
-				self._ui.progressBar.hide();
+				}
 			};
 
 			// Are there any existing files?
@@ -321,6 +320,8 @@
 		 * @returns 	{void}
 		 */
 		confirmURLs: function (e) {
+			e.preventDefault();
+
 			var gotURLs = this._confirmMenu( 'url_files', 'elURLFiles' );
 
 			if( gotURLs ){
@@ -335,6 +336,8 @@
 		 * @returns 	{void}
 		 */
 		confirmImports: function (e) {
+			e.preventDefault();
+
 			var gotImports = this._confirmMenu( 'import_files', 'elImportFiles' );
 
 			if( gotImports ){
@@ -349,6 +352,8 @@
 		 * @returns 	{void}
 		 */
 		confirmScreenshots: function (e) {
+			e.preventDefault();
+
 			var gotURLs = this._confirmMenu( 'url_screenshots', 'elURLScreenshots' );
 
 			if( gotURLs ){
@@ -363,6 +368,8 @@
 		 * @returns 	{void}
 		 */
 		uploadMore: function (e) {
+			e.preventDefault();
+
 			this._hiddenUploader = false;
 			this._overriddenUploader = true;
 		},
@@ -399,7 +406,7 @@
 			}
 
 			if( data.count === 0 ){
-				this.scope.find( '#elDownloadsSubmit_progress .ipsProgress__progress')
+				this.scope.find( '#elDownloadsSubmit_progress .ipsProgressBar_progress')
 					.attr('data-progress', '0%')
 					.css( {
 						width: '0%'
@@ -442,7 +449,7 @@
 			var self = this;
 			this._showProgress();
 
-			this.scope.find( '#elDownloadsSubmit_progress .ipsProgress__progress')
+			this.scope.find( '#elDownloadsSubmit_progress .ipsProgressBar_progress')
 				.attr('data-progress', data.percent + '%')
 				.css( {
 					width: data.percent + '%'
@@ -450,7 +457,7 @@
 
 			if( data.percent === 100 && !this._progressbarTimeout ){
 				this._progressbarTimeout = setTimeout( function () {
-					self._ui.progressBar.find('.ipsProgress').removeClass('ipsProgress--animated');
+					self._ui.progressBar.find('.ipsProgressBar').removeClass('ipsProgressBar_animated');
 					self._progressbarTimeout = null;
 				}, 300 );
 			}
@@ -479,7 +486,7 @@
 			});
 
 			if( !invalid ){
-				this.elem.querySelector(`#${elemID}_menu`)?.closest("[popover]")?.hidePopover();
+				this.scope.find( '#' + elemID ).trigger('closeMenu');
 			}
 
 			// Update UI if we have a file limit
@@ -616,7 +623,7 @@
 		 */
 		_showProgress: function () {
 			if( !this._hiddenUploader && !this._overriddenUploader ){
-				this._ui.progressBar.show().find('.ipsProgress').addClass('ipsProgress--animated');
+				this._ui.progressBar.show().find('.ipsProgressBar').addClass('ipsProgressBar_animated');
 				this._hiddenUploader = true;
 			}
 		},
@@ -648,7 +655,7 @@
 		}
 	});
 }(jQuery, _));]]></file>
- <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.changeLog.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150">/**
+ <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.changeLog.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150"><![CDATA[/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -657,7 +664,7 @@
  * Author: Rikki Tissier
  */
 ;( function($, _, undefined){
-	&quot;use strict&quot;;
+	"use strict";
 
 	ips.controller.register('downloads.front.view.changeLog', {
 
@@ -689,10 +696,10 @@
 		 * @param 		{object} 	data 	Event data object from the menu
 		 * @returns 	{void}
 		 */
-		changeVersion: function (e, data = e.detail) {
+		changeVersion: function (e, data) {
 			data.originalEvent.preventDefault();
 
-			var url = $(data.menuElem).find('[data-ipsMenuValue=&quot;' + data.selectedItemID + '&quot;]').attr('href');
+			var url = data.menuElem.find('[data-ipsMenuValue="' + data.selectedItemID + '"] > a').attr('href');
 
 			// Update page URL
 			ips.utils.history.pushState( {
@@ -700,11 +707,10 @@
 				version: data.selectedItemID
 			}, 'downloads.front.view.changeLog', url );
 
-			this._loadVersion( url, $(data.menuElem).find('[data-ipsMenuValue=&quot;' + data.selectedItemID + '&quot;]').attr('data-changelogTitle') );
+			this._loadVersion( url, data.menuElem.find('[data-ipsMenuValue="' + data.selectedItemID + '"]').attr('data-changelogTitle') );
 		},
 
 		/**
-		 * Event handler for History.js
 		 * When the state changes, we locate that menu item based on the version, and then pull
 		 * the version string and URL and load it
 		 *
@@ -721,12 +727,12 @@
 			let item;
 
 			if (state.version) {
-				item = $('#elChangelog_menu').find('[data-ipsMenuValue=&quot;' + state.version + '&quot;]');
+				item = $('#elChangelog_menu').find('[data-ipsMenuValue="' + state.version + '"]');
 			} else {
 				item = $('#elChangelog_menu').find('[data-ipsMenuValue]').first();
 			}
 
-			this._loadVersion( item.attr('href'), item.attr('data-ipsMenuValue') );
+			this._loadVersion( item.find('a').attr('href'), item.attr('data-ipsMenuValue') );
 		},
 
 		/**
@@ -740,13 +746,13 @@
 			var self = this;
 
 			// Update version
-			this.scope.find('[data-role=&quot;versionTitle&quot;]').text( versionTitle );
+			this.scope.find('[data-role="versionTitle"]').text( versionTitle );
 
 			// Set height on info area and set to loading
 			this.scope
-				.find('[data-role=&quot;changeLogData&quot;]')
+				.find('[data-role="changeLogData"]')
 					.css( {
-						height: this.scope.find('[data-role=&quot;changeLogData&quot;]').height() + 'px'
+						height: this.scope.find('[data-role="changeLogData"]').height() + 'px'
 					})
 					.addClass('ipsLoading')
 					.html('');
@@ -756,12 +762,13 @@
 			ips.getAjax()( url )
 				.done( function (response) {
 					self.scope
-						.find('[data-role=&quot;changeLogData&quot;]')
+						.find('[data-role="changeLogData"]')
 							.html( response )
 							.removeClass('ipsLoading')
 							.css({
 								height: 'auto'
 							});
+					ips.utils.lazyLoad.loadContent( self.scope.find('[data-role="changeLogData"]') );
 				})
 				.fail( function (jqXHR, textStatus, errorThrown) {
 					window.location = url;
@@ -769,8 +776,8 @@
 		}
 		
 	});
-}(jQuery, _));</file>
- <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.download.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150">/**
+}(jQuery, _));]]></file>
+ <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.download.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -898,7 +905,7 @@
 		
 	});
 }(jQuery, _));</file>
- <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.subscribe.js" javascript_type="controller" javascript_version="5001403" javascript_position="1000150">/**
+ <file javascript_app="downloads" javascript_location="front" javascript_path="controllers/view" javascript_name="ips.view.subscribe.js" javascript_type="controller" javascript_version="107827" javascript_position="1000150">/**
  * Invision Community
  * (c) Invision Power Services, Inc. - https://www.invisioncommunity.com
  *
@@ -935,55 +942,55 @@
 			var clicked = $( e.currentTarget );
 
 
-			clicked.addClass('i-opacity_3');
+			clicked.addClass('ipsFaded ipsFaded_more');
 
 			ips.getAjax()( clicked.attr('href') )
 				.done( function (response) {
 					if( !response.error ) {
 						if( response == 'unsubscribed' )
 						{
-							clicked.removeClass( 'ipsButton--primary' );
-							clicked.addClass( 'ipsButton--text' );
+							clicked.removeClass( 'ipsButton_primary' );
+							clicked.addClass( 'ipsButton_link' );
 							clicked.text( ips.getString('file_subscribe')  );
 						}
 						else
 						{
-							clicked.addClass( 'ipsButton--primary' );
-							clicked.removeClass( 'ipsButton--text' );
+							clicked.addClass( 'ipsButton_primary' );
+							clicked.removeClass( 'ipsButton_link' );
 							clicked.text( ips.getString('file_unsubscribe')  );
 						}
 					}
 
 				})
 				.always( function () {
-					clicked.removeClass('i-opacity_3');
+					clicked.removeClass('ipsFaded ipsFaded_more');
 				});
 		}
 	});
 }(jQuery, _));</file>
- <file javascript_app="downloads" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.submit.js" javascript_type="template" javascript_version="5001403" javascript_position="1000050"><![CDATA[/* VIEW TEMPLATES */
+ <file javascript_app="downloads" javascript_location="front" javascript_path="templates" javascript_name="ips.templates.submit.js" javascript_type="template" javascript_version="107827" javascript_position="1000050"><![CDATA[/* VIEW TEMPLATES */
 ips.templates.set('downloads.submit.screenshot', " \
-	<div class='ipsUploader__row ipsUploader__row--image ipsAttach {{#done}}ipsAttach_done{{/done}}' id='{{id}}' data-role='file' data-fileid='{{id}}' data-filesize='{{sizeRaw}}' data-fullsizeurl='{{imagesrc}}' data-thumbnailurl='{{thumbnail}}' data-fileType='image'>\
-		<div class='ipsUploader__rowPreview' data-role='preview'>\
-			<label for='{{field_name}}_primary_screenshot_{{id}}' class='i-cursor_pointer'>\
+	<div class='ipsUploader__row ipsUploader__row--withBorder ipsUploader__row--image ipsAttach ipsContained {{#done}}ipsAttach_done{{/done}}' id='{{id}}' data-role='file' data-fileid='{{id}}' data-filesize='{{sizeRaw}}' data-fullsizeurl='{{imagesrc}}' data-thumbnailurl='{{thumbnail}}' data-fileType='image'>\
+		<div class='ipsUploader__rowPreview ipsType_center' data-role='preview'>\
+			<label for='{{field_name}}_primary_screenshot_{{id}}' class='ipsCursor_pointer'>\
 				{{#thumb}}\
 					{{{thumb}}}\
 				{{/thumb}}\
-				<div class='ipsUploader__rowPreview__generic' {{#thumb}}style='display: none'{{/thumb}}>\
-					<i class='fa-solid fa-{{extIcon}}'></i>\
+				<div class='ipsUploader__rowPreview__generic ipsFlex ipsFlex-ai:center ipsFlex-jc:center' {{#thumb}}style='display: none'{{/thumb}}>\
+					<i class='fa fa-{{extIcon}} ipsType_large'></i>\
 				</div>\
 			</label>\
 		</div>\
-		<div class='ipsUploader_rowMeta'>\
-			<h2 class='ipsUploader_rowTitle' data-role='title'>{{title}}</h2>\
-			<p class='ipsUploader_rowDesc'>\
-				{{size}} {{#statusText}}&middot; <span class='i-color_soft' data-role='status'>{{statusText}}</span>{{/statusText}}\
+		<div class='ipsUploader_rowMeta ipsFlex ipsFlex-fd:column ipsFlex-jc:center ipsFlex-ai:start'>\
+			<h2 class='ipsUploader_rowTitle ipsMargin:none ipsType_reset ipsAttach_title ipsTruncate ipsTruncate_line' data-role='title'>{{title}}</h2>\
+			<p class='ipsDataItem_meta ipsType_medium ipsType_light'>\
+				{{size}} {{#statusText}}&middot; <span class='ipsType_light' data-role='status'>{{statusText}}</span>{{/statusText}}\
 			</p>\
-			{{#status}}<meter class='ipsMeter' data-role='progressbar' max='100'></meter>{{/status}}\
+			{{#status}}<span class='ipsAttachment_progress'><span data-role='progressbar'></span></span>{{/status}}\
 		</div>\
 		<span data-role='insert' {{#insertable}}style='display: none'{{/insertable}}>\
 			<a href='#' class='ipsAttach_selection' data-ipsTooltip title='{{#lang}}insertIntoPost{{/lang}}'>\
-				<i class='fa-solid fa-plus'></i>\
+				<i class='fa fa-plus'></i>\
 			</a>\
 		</span>\
 		{{#supportsDelete}}\
@@ -1001,7 +1008,10 @@ ips.templates.set('downloads.submit.screenshot', " \
 			</div>\
 		{{/supportsDelete}}\
 		<label for='{{field_name}}_primary_screenshot_{{id}}' class='cDownloadsPrimaryRadio' data-ipsTooltip title='{{#lang}}makePrimaryScreenshot{{/lang}}'>\
-			<input type='radio' name='{{field_name}}_primary_screenshot' id='{{field_name}}_primary_screenshot_{{id}}' value='{{id}}' {{#default}}checked{{/default}} class='ipsInput ipsInput--toggle'>\
+			<span class='ipsCustomInput'>\
+				<input type='radio' name='{{field_name}}_primary_screenshot' id='{{field_name}}_primary_screenshot_{{id}}' value='{{id}}' {{#default}}checked{{/default}}>\
+				<span></span>\
+			</span>\
 			{{#lang}}makePrimary{{/lang}}\
 		</label>\
 	</div>\
@@ -1012,10 +1022,14 @@ ips.templates.set('downloads.submit.screenshotWrapper', " \
 ");
 
 ips.templates.set('downloads.submit.linkedScreenshot', " \
-	<li class='i-flex i-gap_2 cDownloadsLinkedScreenshotItem'>\
-		<input class='ipsInput i-flex_00 i-align-self_center' type='radio' name='screenshots_primary_screenshot' value='{{id}}' title='{{#lang}}makePrimaryScreenshot{{/lang}}' data-ipsTooltip {{extra}}>\
-		<input class='ipsInput i-flex_11' type='url' name='{{name}}[{{id}}]' value='{{value}}'>\
-		<button class='ipsButton ipsButton--text i-flex_00' type='button' data-action='removeField' title='{{#lang}}removeScreenshot{{/lang}}' data-ipsTooltip><i class='fa-solid fa-xmark'></i></button>\
+	<li class='cDownloadsLinkedScreenshotItem'>\
+		<input type='url' name='{{name}}[{{id}}]' value='{{value}}'>\
+		<div class='cDownloadsLinkedScreenshotItem_block'>\
+			<input type='radio' name='screenshots_primary_screenshot' value='{{id}}' title='{{#lang}}makePrimaryScreenshot{{/lang}}' data-ipsTooltip {{extra}}>\
+		</div>\
+		<div class='cDownloadsLinkedScreenshotItem_block'>\
+			<a href='#' data-action='removeField' title='{{#lang}}removeScreenshot{{/lang}}' data-ipsTooltip><i class='fa fa-times'></i></a>\
+		</div>\
 	</li>\
 ");]]></file>
  <order app="global" path="/dev/js//framework/">templates
@@ -1030,7 +1044,8 @@ mustache
 Debug.js
 app.js</order>
  <order app="global" path="/dev/js//library//jquery">jquery.js
-jquery-migrate.js</order>
+jquery-migrate.js
+jquery.transform.js</order>
  <order app="global" path="/dev/js//library//linkify">linkify.min.js
 linkify-jquery.min.js</order>
 </javascript>

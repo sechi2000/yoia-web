@@ -12,29 +12,24 @@
 namespace IPS\nexus\Form;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Helpers\Form\FormAbstract;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Usergroup discount input class for Form Builder
  */
-class DiscountUsergroup extends FormAbstract
+class _DiscountUsergroup extends \IPS\Helpers\Form\FormAbstract
 {
 	/** 
 	 * Get HTML
 	 *
 	 * @return	string
 	 */
-	public function html(): string
+	public function html()
 	{
-		return Theme::i()->getTemplate( 'discountforms' )->usergroup( $this );
+		return \IPS\Theme::i()->getTemplate( 'discountforms' )->usergroup( $this );
 	}
 }

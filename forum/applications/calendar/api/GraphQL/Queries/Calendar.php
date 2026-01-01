@@ -10,28 +10,25 @@
  */
 
 namespace IPS\calendar\api\GraphQL\Queries;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\calendar\api\GraphQL\Types\CalendarType;
-use IPS\calendar\Calendar as CalendarClass;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * Calendar query for GraphQL API
  */
-class Calendar
+class _calendar
 {
     /*
      * @brief 	Query description
      */
-    public static string $description = "Returns a calendar";
+    public static $description = "Returns a calendar";
 
     /*
      * Query arguments
@@ -46,7 +43,7 @@ class Calendar
     /**
      * Return the query return type
      */
-    public function type(): CalendarType
+    public function type()
     {
         return \IPS\calendar\api\GraphQL\TypeRegistry::calendar();
     }
@@ -54,19 +51,18 @@ class Calendar
     /**
      * Resolves this query
      *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @param mixed $info
-     * @return	CalendarClass
+     * @param 	mixed 	Value passed into this resolver
+     * @param 	array 	Arguments
+     * @param 	array 	Context values
+     * @return	\IPS\calendar\Calendar
      */
-    public function resolve( mixed $val, array$args, array $context, mixed $info ): CalendarClass
+    public function resolve($val, $args, $context, $info)
     {
-        $calendar = CalendarClass::load( $args['id'] );
+        $calendar = \IPS\calendar\Calendar::load( $args['id'] );
 
         if( !$calendar->can( 'view', $context['member'] ) )
         {
-            throw new OutOfRangeException;
+            throw new \OutOfRangeException;
         }
         return $calendar;
     }

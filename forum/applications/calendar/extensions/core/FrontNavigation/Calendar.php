@@ -12,78 +12,64 @@
 namespace IPS\calendar\extensions\core\FrontNavigation;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application\Module;
-use IPS\core\FrontNavigation;
-use IPS\core\FrontNavigation\FrontNavigationAbstract;
-use IPS\Dispatcher;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Front Navigation Extension: Calendar
  */
-class Calendar extends FrontNavigationAbstract
+class _Calendar extends \IPS\core\FrontNavigation\FrontNavigationAbstract
 {
-	/**
-	 * @var string Default icon
-	 */
-	public string $defaultIcon = '\f133';
-
 	/**
 	 * Get Type Title which will display in the AdminCP Menu Manager
 	 *
 	 * @return	string
 	 */
-	public static function typeTitle(): string
+	public static function typeTitle()
 	{
-		return Member::loggedIn()->language()->addToStack('frontnavigation_calendar');
+		return \IPS\Member::loggedIn()->language()->addToStack('frontnavigation_calendar');
 	}
 		
 	/**
 	 * Can the currently logged in user access the content this item links to?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canAccessContent(): bool
+	public function canAccessContent()
 	{
-		return Member::loggedIn()->canAccessModule( Module::get( 'calendar', 'calendar' ) );
+		return \IPS\Member::loggedIn()->canAccessModule( \IPS\Application\Module::get( 'calendar', 'calendar' ) );
 	}
 	
 	/**
 	 * Get Title
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
-		return Member::loggedIn()->language()->addToStack('frontnavigation_calendar');
+		return \IPS\Member::loggedIn()->language()->addToStack('frontnavigation_calendar');
 	}
 	
 	/**
 	 * Get Link
 	 *
-	 * @return    string|Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|string|null
+	public function link()
 	{
-		return Url::internal( "app=calendar&module=calendar&controller=view", 'front', 'calendar' );
+		return \IPS\Http\Url::internal( "app=calendar&module=calendar&controller=view", 'front', 'calendar' );
 	}
 	
 	/**
 	 * Is Active?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function active(): bool
+	public function active()
 	{
-		return !FrontNavigation::$clubTabActive and !FrontNavigation::nodeExtensionIsActive( 'calendar' ) and Dispatcher::i()->application->directory === 'calendar';
+		return !\IPS\core\FrontNavigation::$clubTabActive and \IPS\Dispatcher::i()->application->directory === 'calendar';
 	}
 }

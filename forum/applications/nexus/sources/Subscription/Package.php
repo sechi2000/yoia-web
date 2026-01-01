@@ -13,109 +13,73 @@ namespace IPS\nexus\Subscription;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use DateInterval;
-use Exception;
-use InvalidArgumentException;
 use IPS\DateTime;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Form\YesNo;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Math\Number;
-use IPS\Member;
-use IPS\Member\Group;
-use IPS\nexus\Customer;
-use IPS\nexus\extensions\nexus\Item\Subscription;
-use IPS\nexus\extensions\nexus\Item\SubscriptionUpgrade;
-use IPS\nexus\invoice;
-use IPS\nexus\Money;
-use IPS\nexus\Package as PackageClass;
-use IPS\nexus\Purchase;
-use IPS\nexus\Purchase\RenewalTerm;
-use IPS\nexus\Tax;
-use IPS\Node\Model;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use function defined;
-use function in_array;
-use function is_array;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Member Subscription Model
  */
-class Package extends Model
+class _Package extends \IPS\Node\Model
 {
 	/* !ActiveRecord */
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'nexus_sub_count' );
+	protected $caches = array( 'nexus_sub_count' );
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'nexus_member_subscription_packages';
+	public static $databaseTable = 'nexus_member_subscription_packages';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'sp_';
+	public static $databasePrefix = 'sp_';
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Order Database Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 		
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'nexus_subs_';
+	public static $titleLangPrefix = 'nexus_subs_';
 	
 	/**
 	 * @brief	[Node] Description suffix.  If specified, will look for a language key with "{$titleLangPrefix}_{$id}_{$descriptionLangSuffix}" as the key
 	 */
-	public static ?string $descriptionLangSuffix = '_desc';
+	public static $descriptionLangSuffix = '_desc';
 	
 	/* !Node */
 
 	/**
 	 * @brief	[Node] App for permission index
 	 */
-	public static ?string $permApp = 'nexus';
+	public static $permApp = 'nexus';
 
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'menu__nexus_subscriptions_subscriptions';
+	public static $nodeTitle = 'menu__nexus_subscriptions_subscriptions';
 			
 	/**
 	 * @brief	[Node] ACP Restrictions
@@ -133,7 +97,7 @@ class Package extends Model
 	 		'prefix'	=> 'foo_',				// [Optional] Rather than specifying each  key in the map, you can specify a prefix, and it will automatically look for restrictions with the key "[prefix]_add/edit/permissions/delete"
 	 * @endcode
 	 */
-	protected static ?array $restrictions = array(
+	protected static $restrictions = array(
 		'app'		=> 'nexus',
 		'module'	=> 'subscriptions',
 		'prefix' 	=> 'subscriptions_'
@@ -142,31 +106,24 @@ class Package extends Model
 	/**
 	 * @brief	URL Base
 	 */
-	protected static string $urlBase = 'app=nexus&module=subscriptions&controller=subscriptions&id=';
+	protected static $urlBase = 'app=nexus&module=subscriptions&controller=subscriptions&id=';
 
 	/**
 	 * @brief	URL Template
 	 */
-	protected static string $urlTemplate = 'nexus_subscription';
+	protected static $urlTemplate = 'nexus_subscription';
 	
 	/**
 	 * @brief	SEO Title Column
 	 */
-	protected static string $seoTitleColumn = '';
-
-	/**
-	 * Determines if this class can be extended via UI Extension
-	 *
-	 * @var bool
-	 */
-	public static bool $canBeExtended = true;
+	protected static $seoTitleColumn = '';
 
     /**
      * [ActiveRecord] Duplicate
      *
      * @return	void
      */
-    public function __clone() : void
+    public function __clone()
     {
         if ( $this->skipCloneDuplication === TRUE )
         {
@@ -182,31 +139,31 @@ class Package extends Model
 		{
 			try
 			{
-				$file = File::get( 'nexus_Products', $old->image );
-				$this->image = (string) File::create( 'nexus_Products', $file->originalFilename, $file->contents() );
+				$file = \IPS\File::get( 'nexus_Products', $old->image );
+				$this->image = (string) \IPS\File::create( 'nexus_Products', $file->originalFilename, $file->contents() );
 				$this->save();
 			}
-			catch( Exception ) {}
+			catch( \Exception $e ) {}
 		}
     }
 
 	/**
 	 * [ActiveRecord] Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-    public function delete(): void
+    public function delete()
 	{
 		try
 		{
 			if( $this->image )
 			{
-				File::get( 'nexus_Products', $this->image )->delete();
+				\IPS\File::get( 'nexus_Products', $this->image )->delete();
 			}
 		}
-		catch( Exception ){}
+		catch( \Exception $e ){}
 
-		Task::queue( 'nexus', 'DeleteSubscriptions', [ 'id' => $this->id ] );
+		\IPS\Task::queue( 'nexus', 'DeleteSubscriptions', [ 'id' => $this->id ] );
 
 		parent::delete();
 	}
@@ -216,31 +173,31 @@ class Package extends Model
 	 * Example code explains return value
 	 *
 	 * @code
-	 	* array(
-	 		* array(
-	 			* 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
-	 			* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	 			* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	 			* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	 		* ),
-	 		* ...							// Additional buttons
-	 	* );
+	 	array(
+	 		array(
+	 			'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
+	 			'title'	=> 'foo',		// Language key to use for button's title parameter
+	 			'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	 			'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	 		),
+	 		...							// Additional buttons
+	 	);
 	 * @endcode
-	 * @param Url $url		Base URL
+	 * @param	string	$url		Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = array();
 		
-		if ( Member::loggedIn()->hasAcpRestriction( 'nexus', 'subscriptions', 'subscriptions_manage' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'nexus', 'subscriptions', 'subscriptions_manage' ) )
 		{
 			$buttons['add_member'] = array(
 				'icon'	=> 'plus',
 				'title'	=> 'nexus_subs_add_member',
 				'link'	=> $url->setQueryString( array( 'do' => 'addMember', 'id' => $this->id ) ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('nexus_subs_add_member') )
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('nexus_subs_add_member') )
 			);
 		}
 		
@@ -258,23 +215,28 @@ class Package extends Model
 	/**
 	 * Fetch the cover image uRL
 	 *
-	 * @return File | NULL
+	 * @return \IPS\File | NULL
 	 */
-	public function get__image() : File|null
+	public function get__image()
 	{
-		return ( $this->image ) ? File::get( 'nexus_Products', $this->image ) : NULL;
+		return ( $this->image ) ? \IPS\File::get( 'nexus_Products', $this->image ) : NULL;
 	}
 	
 	/**
 	 * [Node] Add/Edit Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ) : void
+	public function form( &$form )
 	{
+		$groups = array();
+		foreach ( \IPS\Member\Group::groups() as $group )
+		{
+			$groups[ $group->g_id ] = $group->name;
+		}
 		$groupsExcludingGuestsAndAdmins = array();
-		foreach ( Group::groups( FALSE, FALSE ) as $group )
+		foreach ( \IPS\Member\Group::groups( FALSE, FALSE ) as $group )
 		{
 			$groupsExcludingGuestsAndAdmins[ $group->g_id ] = $group->name;
 		}
@@ -282,19 +244,19 @@ class Package extends Model
 		$renewInterval = NULL;
 		$renewalTerm = NULL;
 		$renewalCosts = array();
-		if ( $this->renew_options and $_renewOptions = json_decode( $this->renew_options, TRUE ) and is_array( $_renewOptions ) )
+		if ( $this->renew_options and $_renewOptions = json_decode( $this->renew_options, TRUE ) and \is_array( $_renewOptions ) )
 		{
 			foreach ( $_renewOptions['cost'] as $cost )
 			{
-				$renewalCosts[ $cost['currency'] ] = new Money( $cost['amount'], $cost['currency'] );
+				$renewalCosts[ $cost['currency'] ] = new \IPS\nexus\Money( $cost['amount'], $cost['currency'] );
 			}
 			
 			try
 			{
-				$renewInterval = new DateInterval( "P{$_renewOptions['term']}" . mb_strtoupper( $_renewOptions['unit'] ) );
-				$renewalTerm = new RenewalTerm( $renewalCosts, $renewInterval, NULL );
+				$renewInterval = new \DateInterval( "P{$_renewOptions['term']}" . mb_strtoupper( $_renewOptions['unit'] ) );
+				$renewalTerm = new \IPS\nexus\Purchase\RenewalTerm( $renewalCosts, $renewInterval, NULL );
 			}
-			catch( Exception ) { } // Catch any invalid renewal terms, these can occasionally appear from legacy IP.Subscriptions
+			catch( \Exception $ex ) { } // Catch any invalid renewal terms, these can occasionally appear from legacy IP.Subscriptions
 		}
 		
 		$initialPrice = NULL;
@@ -305,12 +267,12 @@ class Package extends Model
 			$costs = json_decode( $this->price, TRUE );
 			if ( isset( $costs['cost'] ) )
 			{
-				$initialInterval = new DateInterval( 'P' . $costs['term'] . mb_strtoupper( $costs['unit'] ) );
+				$initialInterval = new \DateInterval( 'P' . $costs['term'] . mb_strtoupper( $costs['unit'] ) );
 				$costs = $costs['cost'];
 			}
 			foreach ( $costs as $price )
 			{
-				$initialPrices[ $price['currency'] ] = new Money( $price['amount'], $price['currency'] );
+				$initialPrices[ $price['currency'] ] = new \IPS\nexus\Money( $price['amount'], $price['currency'] );
 			}
 			
 			if ( $initialPrices == $renewalCosts )
@@ -318,34 +280,34 @@ class Package extends Model
 				$renewalTerm = NULL;
 			}
 			
-			$initialPrice = new RenewalTerm( $initialPrices, $initialInterval );
+			$initialPrice = new \IPS\nexus\Purchase\RenewalTerm( $initialPrices, $initialInterval );
 		}
 		
 		$form->addHeader('subscription_basic_settings');
-		$form->add( new Translatable( 'sp_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_subs_{$this->id}" : NULL ) ) );
-		$form->add( new YesNo( 'sp_enabled', $this->id ? $this->enabled : TRUE, FALSE ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'sp_name', NULL, TRUE, array( 'app' => 'nexus', 'key' => $this->id ? "nexus_subs_{$this->id}" : NULL ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'sp_enabled', $this->id ? $this->enabled : TRUE, FALSE ) );
 		$form->addHeader( 'nexus_subs_cost' );
 		$form->add( new \IPS\nexus\Form\RenewalTerm( 'sp_price', $initialPrice, NULL, array( 'allCurrencies' => TRUE, 'initialTerm' => TRUE, 'unlimitedTogglesOn' => [ 'sp_renew_upgrade' ], 'unlimitedTogglesOff' => [ 'sp_renew_options' ] ), NULL, NULL, NULL, 'sp_initial_term' ) );
 		$form->add( new \IPS\nexus\Form\RenewalTerm( 'sp_renew_options', $renewalTerm, NULL, array( 'allCurrencies' => TRUE, 'nullLang' => 'term_same_as_initial' ), NULL, NULL, NULL, 'sp_renew_options' ) );
-		$form->add( new Radio( 'sp_renew_upgrade', $this->renew_upgrade ?: 0, FALSE, array( 'options' => array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'sp_renew_upgrade', $this->renew_upgrade ?: 0, FALSE, array( 'options' => array(
 				0 => 'sp_renew_upgrade_none',
 				1 => 'sp_renew_upgrade_full',
 				2 => 'sp_renew_upgrade_partial'
 			) ), NULL, NULL, NULL, 'sp_renew_upgrade' ) );	
-		$form->add( new Node( 'sp_tax', (int) $this->tax, FALSE, array( 'class' => 'IPS\nexus\Tax', 'zeroVal' => 'do_not_tax' ) ) );
-		$form->add( new Node( 'sp_gateways', ( !$this->gateways or $this->gateways === '*' ) ? 0 : explode( ',', $this->gateways ), FALSE, array( 'class' => 'IPS\nexus\Gateway', 'multiple' => TRUE, 'zeroVal' => 'any' ) ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'sp_tax', (int) $this->tax, FALSE, array( 'class' => 'IPS\nexus\Tax', 'zeroVal' => 'do_not_tax' ) ) );
+		$form->add( new \IPS\Helpers\Form\Node( 'sp_gateways', ( !$this->gateways or $this->gateways === '*' ) ? 0 : explode( ',', $this->gateways ), FALSE, array( 'class' => 'IPS\nexus\Gateway', 'multiple' => TRUE, 'zeroVal' => 'any' ) ) );
 		
 
 		$form->addHeader( 'nexus_subs_groups' );
-		$form->add( new Select( 'sp_primary_group', $this->primary_group ?: '*', FALSE, array( 'options' => $groupsExcludingGuestsAndAdmins, 'unlimited' => '*', 'unlimitedLang' => 'do_not_change', 'unlimitedToggles' => array( 'p_return_primary' ), 'unlimitedToggleOn' => FALSE ) ) );
-		$form->add( new Select( 'sp_secondary_group', $this->secondary_group ? explode( ',', $this->secondary_group ) : '*', FALSE, array( 'options' => $groupsExcludingGuestsAndAdmins, 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'do_not_change', 'unlimitedToggles' => array( 'p_return_secondary' ), 'unlimitedToggleOn' => FALSE ) ) );
-		$form->add( new YesNo( 'sp_return_primary', $this->return_primary, FALSE, array(), NULL, NULL, NULL, 'sp_return_primary' ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'sp_primary_group', $this->primary_group ?: '*', FALSE, array( 'options' => $groupsExcludingGuestsAndAdmins, 'unlimited' => '*', 'unlimitedLang' => 'do_not_change', 'unlimitedToggles' => array( 'p_return_primary' ), 'unlimitedToggleOn' => FALSE ) ) );
+		$form->add( new \IPS\Helpers\Form\Select( 'sp_secondary_group', $this->secondary_group ? explode( ',', $this->secondary_group ) : '*', FALSE, array( 'options' => $groupsExcludingGuestsAndAdmins, 'multiple' => TRUE, 'unlimited' => '*', 'unlimitedLang' => 'do_not_change', 'unlimitedToggles' => array( 'p_return_secondary' ), 'unlimitedToggleOn' => FALSE ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'sp_return_primary', $this->return_primary, FALSE, array(), NULL, NULL, NULL, 'sp_return_primary' ) );
 
 
 		$form->addHeader('nexus_subs_display');
-		$form->add( new Upload( 'sp_image', ( ( $this->id AND $this->image ) ? File::get( 'nexus_Products', $this->image ) : NULL ), FALSE, array( 'storageExtension' => 'nexus_Products', 'image' => TRUE, 'allowStockPhotos' => TRUE ), NULL, NULL, NULL, 'sp_image' ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'sp_image', ( ( $this->id AND $this->image ) ? \IPS\File::get( 'nexus_Products', $this->image ) : NULL ), FALSE, array( 'storageExtension' => 'nexus_Products', 'image' => TRUE, 'allowStockPhotos' => TRUE ), NULL, NULL, NULL, 'sp_image' ) );
 		/*$form->add( new \IPS\Helpers\Form\YesNo( 'sp_featured', $this->featured, FALSE, array(), NULL, NULL, NULL, 'sp_featured' ) );*/
-		$form->add( new Translatable( 'sp_desc', NULL, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Translatable( 'sp_desc', NULL, FALSE, array(
 			'app' => 'nexus',
 			'key' => $this->id ? "nexus_subs_{$this->id}_desc" : NULL,
 			'editor'	=> array(
@@ -355,30 +317,30 @@ class Package extends Model
 				'attachIds'		=> $this->id ? array( $this->id, NULL, 'sub' ) : NULL, 'minimize' => 'p_desc_placeholder'
 			)
 		), NULL, NULL, NULL, 'p_desc_editor' ) );
-
-        parent::form( $form );
 	}
 	
 	/**
 	 * [Node] Save Add/Edit Form
 	 *
 	 * @param	array	$values	Values from the form
-	 * @return    mixed
+	 * @return	void
 	 */
-	public function saveForm( array $values ): mixed
+	public function saveForm( $values )
 	{		
 		if ( !$this->id )
 		{	
 			$this->save();
 			unset( static::$multitons[ $this->id ] );
 			
-			File::claimAttachments( 'nexus-new-sub', $this->id, NULL, 'sub', TRUE );
+			\IPS\File::claimAttachments( 'nexus-new-sub', $this->id, NULL, 'sub', TRUE );
 				
 			$obj = static::load( $this->id );
 			return $obj->saveForm( $obj->formatFormValues( $values ) );			
 		}
 		
-		return parent::saveForm( $values );
+		$return = parent::saveForm( $values );
+		
+		return $return;
 	}
 	
 	/**
@@ -387,7 +349,7 @@ class Package extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( !$this->id )
 		{
@@ -399,7 +361,7 @@ class Package extends Model
 		{
 			if ( isset( $values[ 'sp_' . $key ] ) )
 			{
-				Lang::saveCustom( 'nexus', "nexus_subs_{$this->id}{$suffix}", $values[ 'sp_' . $key ] );
+				\IPS\Lang::saveCustom( 'nexus', "nexus_subs_{$this->id}{$suffix}", $values[ 'sp_' . $key ] );
 			}
 			unset( $values[ 'sp_' . $key ] );
 		}
@@ -441,7 +403,7 @@ class Package extends Model
 		
 		if( isset( $values['sp_gateways'] ) )
 		{
-			$values['sp_gateways'] = is_array( $values['sp_gateways'] ) ? implode( ',', array_keys( $values['sp_gateways'] ) ) : '*';
+			$values['sp_gateways'] = ( isset( $values['sp_gateways'] ) and \is_array( $values['sp_gateways'] ) ) ? implode( ',', array_keys( $values['sp_gateways'] ) ) : '*';
 		}
 
 		/* Renewal options */
@@ -449,6 +411,7 @@ class Package extends Model
 		{
 			if ( $values['sp_renew_options'] )
 			{
+				$renewOptions = array();
 				$option = $values['sp_renew_options'];
 				$term = $option->getTerm();
 				
@@ -481,13 +444,13 @@ class Package extends Model
 	 * Price
 	 *
 	 * @param	string|NULL	$currency	Desired currency, or NULL to choose based on member's chosen currency
-	 * @return	Money|NULL
+	 * @return	\IPS\nexus\Money|NULL
 	 */
-	public function price( ?string $currency = NULL ) : Money|null
+	public function price( $currency = NULL )
 	{
 		if ( !$currency )
 		{
-			$currency = ( isset( Request::i()->cookie['currency'] ) and in_array( Request::i()->cookie['currency'], Money::currencies() ) ) ? Request::i()->cookie['currency'] : Customer::loggedIn()->defaultCurrency();
+			$currency = ( isset( \IPS\Request::i()->cookie['currency'] ) and \in_array( \IPS\Request::i()->cookie['currency'], \IPS\nexus\Money::currencies() ) ) ? \IPS\Request::i()->cookie['currency'] : \IPS\nexus\Customer::loggedIn()->defaultCurrency();
 		}
 		
 		$costs = json_decode( $this->price, TRUE );
@@ -496,9 +459,9 @@ class Package extends Model
 			$costs = $costs['cost'];
 		}
 
-		if ( is_array( $costs ) and isset( $costs[ $currency ]['amount'] ) )
+		if ( \is_array( $costs ) and isset( $costs[ $currency ]['amount'] ) )
 		{
-			return new Money( $costs[ $currency ]['amount'], $currency );
+			return new \IPS\nexus\Money( $costs[ $currency ]['amount'], $currency );
 		}
 	
 		return NULL;
@@ -508,25 +471,25 @@ class Package extends Model
 	 * Joining fee
 	 *
 	 * @param	string|NULL	$currency	Desired currency, or NULL to choose based on member's chosen currency
-	 * @return	RenewalTerm|NULL
-	 * @throws	OutOfRangeException
+	 * @return	\IPS\nexus\Money|NULL
+	 * @throws	\OutOfRangeException
 	 */
-	public function renewalTerm( ?string $currency = NULL ) : RenewalTerm|null
+	public function renewalTerm( $currency = NULL )
 	{
 		if ( $this->renew_options and $renewal = json_decode( $this->renew_options, TRUE ) )
 		{
 			$renewalPrices = $renewal['cost'];
 			if ( !$currency )
 			{
-				$currency = ( isset( Request::i()->cookie['currency'] ) and in_array( Request::i()->cookie['currency'], Money::currencies() ) ) ? Request::i()->cookie['currency'] : Customer::loggedIn()->defaultCurrency();
+				$currency = ( isset( \IPS\Request::i()->cookie['currency'] ) and \in_array( \IPS\Request::i()->cookie['currency'], \IPS\nexus\Money::currencies() ) ) ? \IPS\Request::i()->cookie['currency'] : \IPS\nexus\Customer::loggedIn()->defaultCurrency();
 			}
 			
 			if ( isset( $renewalPrices[ $currency ] ) )
 			{
 				$grace = NULL;
-				if ( Settings::i()->nexus_subs_invoice_grace )
+				if ( \IPS\Settings::i()->nexus_subs_invoice_grace )
 				{
-					$grace = new DateInterval( 'P' . Settings::i()->nexus_subs_invoice_grace . 'D' );
+					$grace = new \DateInterval( 'P' . \IPS\Settings::i()->nexus_subs_invoice_grace . 'D' );
 				}
 				
 				$tax = NULL;
@@ -534,16 +497,16 @@ class Package extends Model
 				{
 					try
 					{
-						$tax = Tax::load( $this->tax );
+						$tax = \IPS\nexus\Tax::load( $this->tax );
 					} 
-					catch( OutOfRangeException ) { }
+					catch( \OutOfRangeException $e ) { }
 				}
 				
-				return new RenewalTerm( new Money( $renewalPrices[ $currency ]['amount'], $currency ), new DateInterval( 'P' . $renewal['term'] . mb_strtoupper( $renewal['unit'] ) ), $tax, FALSE, $grace );
+				return new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $renewalPrices[ $currency ]['amount'], $currency ), new \DateInterval( 'P' . $renewal['term'] . mb_strtoupper( $renewal['unit'] ) ), $tax, FALSE, $grace );
 			}
 			else
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
 		
@@ -555,7 +518,7 @@ class Package extends Model
 	 *
 	 * @return	array|NULL
 	 */
-	public function priceInfo() : array|null
+	public function priceInfo()
 	{
 		/* Base Price */
 		$price = $this->price();
@@ -563,7 +526,7 @@ class Package extends Model
 		/* Price may not have been defined in our currency - abort if we don't have one */
 		if( $price === NULL )
 		{
-			return null;
+			return $price;
 		}
 		
 		/* Renewal Term */
@@ -577,10 +540,10 @@ class Package extends Model
 			$priceInfo = json_decode( $this->price, TRUE );
 			if ( isset( $priceInfo['term'] ) )
 			{
-				$initialTerm = new RenewalTerm( $price, new DateInterval( 'P' . $priceInfo['term'] . mb_strtoupper( $priceInfo['unit'] ) ) );
+				$initialTerm = new \IPS\nexus\Purchase\RenewalTerm( $price, new \DateInterval( 'P' . $priceInfo['term'] . mb_strtoupper( $priceInfo['unit'] ) ) );
 			}
 		}
-		catch ( OutOfRangeException ) {}
+		catch ( \OutOfRangeException $e ) {}
 		
 		/* If we can encompass the primary price and renewal term together, do that */
 		$priceIsZero = $price->amount->isZero();
@@ -591,25 +554,25 @@ class Package extends Model
 		}
 		elseif ( $price )
 		{
-			if ( Settings::i()->nexus_show_tax and $this->tax )
+			if ( \IPS\Settings::i()->nexus_show_tax and $this->tax )
 			{
 				try
 				{
-					$taxRate = new Number( Tax::load( $this->tax )->rate( Customer::loggedIn()->estimatedLocation() ) );
+					$taxRate = new \IPS\Math\Number( \IPS\nexus\Tax::load( $this->tax )->rate( \IPS\nexus\Customer::loggedIn()->estimatedLocation() ) );
 					
 					$price->amount = $price->amount->add( $price->amount->multiply( $taxRate ) );
 				}
-				catch ( OutOfRangeException ) { }
+				catch ( \OutOfRangeException $e ) { }
 			}
 		}
 
 		/* Return */
 		return array(
-			'primaryPrice'					=> $priceIsZero ? Member::loggedIn()->language()->addToStack('nexus_sub_cost_free') : $price,
+			'primaryPrice'					=> $priceIsZero ? \IPS\Member::loggedIn()->language()->addToStack('nexus_sub_cost_free') : $price,
 			'primaryPriceIsZero'			=> $priceIsZero,
 			'primaryPriceDiscountedFrom'	=> NULL,
-			'initialTerm'					=> $initialTerm?->getTermUnit(),
-			'renewalPrice'					=> $renewalTerm?->toDisplay(),
+			'initialTerm'					=> $initialTerm ? $initialTerm->getTermUnit() : NULL,
+			'renewalPrice'					=> $renewalTerm ? $renewalTerm->toDisplay() : NULL,
 		);
 	}
 	
@@ -618,7 +581,7 @@ class Package extends Model
 	 *
 	 * @return	string|NULL
 	 */
-	public function priceBlurb() : string|null
+	public function priceBlurb()
 	{
 		$priceInfo = $this->priceInfo();
 		
@@ -626,7 +589,7 @@ class Package extends Model
 		{
 			if ( $priceInfo['renewalPrice'] and $priceInfo['initialTerm'] )
 			{
-				return Member::loggedIn()->language()->addToStack( 'nexus_sub_cost_plus_renewal', FALSE, array( 'sprintf' => array( $priceInfo['primaryPrice'], $priceInfo['initialTerm'], $priceInfo['renewalPrice'] ) ) );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'nexus_sub_cost_plus_renewal', FALSE, array( 'sprintf' => array( $priceInfo['primaryPrice'], $priceInfo['initialTerm'], $priceInfo['renewalPrice'] ) ) );
 			}
 			elseif ( $priceInfo['renewalPrice'] )
 			{
@@ -639,23 +602,23 @@ class Package extends Model
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack('nexus_sub_cost_unavailable');
+			return \IPS\Member::loggedIn()->language()->addToStack('nexus_sub_cost_unavailable');
 		}		
 	}
 	
 	/** 
 	 * Cost to upgrade to this package (may return negative value for refund)
 	 *
-	 * @param Package $package	The currently subscribed package
-	 * @param	Customer						$member		The member.
-	 * @return	Money|NULL
-	 * @throws	InvalidArgumentException
+	 * @param	\IPS\nexus\Subscription\Package	$package	The currently subscribed package
+	 * @param	\IPS\Member						$member		The member. 
+	 * @return	\IPS\nexus\Money|NULL
+	 * @throws	\InvalidArgumentException
 	 */
-	public function costToUpgrade(Package $package, Customer $member ) : Money|null
+	public function costToUpgrade( \IPS\nexus\Subscription\Package $package, \IPS\Member $member )
 	{
 		/* Fetch purchase */
 		$purchase = NULL;
-		foreach ( Subscription::getPurchases( $member, $package->id, TRUE, TRUE ) as $row )
+		foreach ( \IPS\nexus\extensions\nexus\Item\Subscription::getPurchases( $member, $package->id, TRUE, TRUE ) as $row )
 		{
 			if ( !$row->cancelled OR ( $row->cancelled AND $row->can_reactivate ) )
 			{
@@ -668,13 +631,12 @@ class Package extends Model
 		{
 			return NULL;
 		}
-
-		/* @var Purchase $purchase */
+		
 		try
 		{
 			$currency = $purchase->original_invoice->currency;
 		}
-		catch ( Exception )
+		catch ( \Exception $e )
 		{
 			$currency = $purchase->member->defaultCurrency();
 		}
@@ -694,6 +656,13 @@ class Package extends Model
 		$priceOfThisPackage = $priceOfThisPackage[ $currency ]['amount'];
 		$renewalOptionsOnNewPackage = json_decode( $this->renew_options, TRUE );
 
+		/* If the price of the package is greater than 0, and the renewals are 0, then this is a lifetime purchase,
+		so ignore any renewals  */
+		if( $priceOfThisPackage > 0 and !empty( $renewalOptionsOnNewPackage ) and $renewalOptionsOnNewPackage['cost'][ $currency ]['amount'] == 0 )
+		{
+			$renewalOptionsOnNewPackage = null;
+		}
+
 		/* It's a non-recurring subscription */
 		if ( empty( $renewalOptionsOnNewPackage ) )
 		{
@@ -703,66 +672,66 @@ class Package extends Model
 					return NULL;
 				
 				case 1:
-					return new Money( $priceOfThisPackage, $currency );
+					return new \IPS\nexus\Money( $priceOfThisPackage, $currency );
 					
 				case 2:
-					return new Money( $priceOfThisPackage - $priceOfExistingPackage, $currency );
+					return new \IPS\nexus\Money( $priceOfThisPackage - $priceOfExistingPackage, $currency );
 			}
-		}
-
-		/* If the purchase is expired, charge the full amount */
-		if( !$purchase->active or ( $purchase->expire instanceof DateTime and $purchase->expire->getTimestamp() < time() ) )
-		{
-			$newPrice = new Money( $priceOfThisPackage, $currency );
-
-			/* If the package has a free trial, charge the renewal fee instead to stop endless free trials */
-			if( $newPrice->amount->isZero() )
-			{
-				return new Money( $renewalOptionsOnNewPackage['cost'][ $currency ]['amount'], $currency );
-			}
-
-			return new Money( $priceOfThisPackage, $currency );
 		}
 		
 		/* It's a recurring subscription */
 		if ( $priceOfThisPackage >= $priceOfExistingPackage )
 		{
-			$type = Settings::i()->nexus_subs_upgrade;
+			$type = \IPS\Settings::i()->nexus_subs_upgrade;
 		}
 		else
 		{
-			$type = Settings::i()->nexus_subs_downgrade;
+			$type = \IPS\Settings::i()->nexus_subs_downgrade;
 		}
 
 		switch ( $type )
 		{
 			case -1:
 				return NULL; /* nope */
-				
+
 			case 0:
-				return new Money( 0, $currency );
-			
+				return new \IPS\nexus\Money( 0, $currency );
+
 			case 1:
-				return new Money( $priceOfThisPackage - $priceOfExistingPackage, $currency );
-			
+				/* If the purchase is expired, charge the full amount */
+				if( !$purchase->active or ( $purchase->expire instanceof \IPS\DateTime and $purchase->expire->getTimestamp() < time() ) )
+				{
+					$newPrice = new \IPS\nexus\Money( $priceOfThisPackage, $currency );
+
+					/* If the package has a free trial, charge the renewal fee instead to stop endless free trials */
+					if( $newPrice->amount->isZero() )
+					{
+						return new \IPS\nexus\Money( $renewalOptionsOnNewPackage['cost'][ $currency ]['amount'], $currency );
+					}
+
+					return new \IPS\nexus\Money( $priceOfThisPackage, $currency );
+				}
+
+				return new \IPS\nexus\Money( $priceOfThisPackage - $priceOfExistingPackage, $currency );
+
 			case 2:
 				/* If there are no renewals, we charge full price no matter what */
-				if ( !$purchase->renewals and !$purchase->expire )
+				if ( !$purchase->renewals or !$purchase->expire )
 				{
-					return new Money( $priceOfThisPackage, $currency );
+					return new \IPS\nexus\Money( $priceOfThisPackage, $currency );
 				}
 				if ( !$renewalOptionsOnNewPackage )
 				{
-					throw new InvalidArgumentException;
+					throw new \InvalidArgumentException;
 				}
 
 				/* What is the closest renewal option on the new package? We'll use that one */
 				$renewalOptionsInDays = array();
-				$term = ( new RenewalTerm( new Money( $renewalOptionsOnNewPackage['cost'][ $currency ]['amount'], $currency ), new DateInterval( 'P' . $renewalOptionsOnNewPackage['term'] . mb_strtoupper( $renewalOptionsOnNewPackage['unit'] ) ), $purchase->renewals?->tax ) );
+				$term = ( new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $renewalOptionsOnNewPackage['cost'][ $currency ]['amount'], $currency ), new \DateInterval( 'P' . $renewalOptionsOnNewPackage['term'] . mb_strtoupper( $renewalOptionsOnNewPackage['unit'] ) ), $purchase->renewals?->tax ) );
 				$renewalOptionsInDays[ $term->days() ] = $term;
 
 				$closestRenewalOption = null;
-				$numberOfDaysInCurrentRenewalTerm = $purchase->renewals ? $purchase->renewals->days() : ( $purchase->expire ? $purchase->start->diff( $purchase->expire )->days : 0 );
+				$numberOfDaysInCurrentRenewalTerm = $purchase->renewals->days();
 				foreach ( $renewalOptionsInDays as $days => $term )
 				{
 					if ( $closestRenewalOption === null or abs( $numberOfDaysInCurrentRenewalTerm - $closestRenewalOption ) > abs( $days - $numberOfDaysInCurrentRenewalTerm ) )
@@ -771,25 +740,37 @@ class Package extends Model
 					}
 				}
 				$renewalTermToUse = $renewalOptionsInDays[ $closestRenewalOption ];
-				$numberOfDaysInCurrentRenewalTerm = new Number( (string) round( $numberOfDaysInCurrentRenewalTerm ) );
-
+				$numberOfDaysInCurrentRenewalTerm = new \IPS\Math\Number( (string) round( $numberOfDaysInCurrentRenewalTerm ) );
 
 				/* If the purchase is not active, it is the full cost */
-				if( !$purchase->active or ( $purchase->expire instanceof DateTime and $purchase->expire->getTimestamp() < time() ) )
+				if( !$purchase->active or ( $purchase->expire instanceof \IPS\DateTime and $purchase->expire->getTimestamp() < time() ) )
 				{
-					return new Money( $renewalTermToUse->cost->amount, $currency );
+					return new \IPS\nexus\Money( $renewalTermToUse->cost->amount, $currency );
 				}
 
 				/* Current Period Start Date */
-				if( $purchase->expire instanceof DateTime and $purchase->renewals )
+				if( $purchase->expire instanceof \IPS\DateTime and $purchase->renewals )
 				{
 					$startOfCurrentPeriod = $purchase->expire->sub( $purchase->renewals->interval );
+
+					/* If we renewed for multiple cycles, we might be in the future, so go back */
+					$cycles = 1;
+					while( $startOfCurrentPeriod->diff( \IPS\DateTime::create() )->invert )
+					{
+						$startOfCurrentPeriod = $startOfCurrentPeriod->sub( $purchase->renewals->interval );
+						$cycles++;
+					}
+
+					if( $cycles > 1 )
+					{
+						$numberOfDaysInCurrentRenewalTerm = $numberOfDaysInCurrentRenewalTerm->multiply( new \IPS\Math\Number( "{$cycles}" ) );
+					}
 				}
 				else
 				{
 					/* If the purchase does not expire, we have to do some fun logic here */
-					$timeSincePurchase = $purchase->start->diff( DateTime::create() );
-					$daysUsedSincePurchase = new Number( (string)DateTime::intervalToDays( $timeSincePurchase ) );
+					$timeSincePurchase = $purchase->start->diff( \IPS\DateTime::create() );
+					$daysUsedSincePurchase = new \IPS\Math\Number( (string)\IPS\DateTime::intervalToDays( $timeSincePurchase ) );
 
 					/* If we used less than a full renewal period, then set the start to the purchase date */
 					if( $daysUsedSincePurchase->compare( $numberOfDaysInCurrentRenewalTerm ) <= 0 )
@@ -803,78 +784,67 @@ class Package extends Model
 						while( $daysUsedSincePurchase->compare( $numberOfDaysInCurrentRenewalTerm ) > 0 )
 						{
 							$start = $start->add( $purchase->renewals->interval );
-							$timeSincePurchase = $start->diff( DateTime::create() );
-							$daysUsedSincePurchase = new Number( (string)DateTime::intervalToDays( $timeSincePurchase ) );
+							$timeSincePurchase = $start->diff( \IPS\DateTime::create() );
+							$daysUsedSincePurchase = new \IPS\Math\Number( (string)\IPS\DateTime::intervalToDays( $timeSincePurchase ) );
 						}
 						$startOfCurrentPeriod = $start;
 					}
 				}
 
 				/* DateInterval of time between subscription start and now */
-				$timeSinceStartOfCurrentPeriod = $startOfCurrentPeriod->diff( DateTime::create() );
+				$timeSinceStartOfCurrentPeriod = $startOfCurrentPeriod->diff( \IPS\DateTime::create() );
 
 				/* Count Days in Period */
-				$daysUsedInPeriod = new Number( (string)DateTime::intervalToDays( $timeSinceStartOfCurrentPeriod ) );
-				$daysRemainingInPeriod = new Number( (string) $numberOfDaysInCurrentRenewalTerm->subtract( $daysUsedInPeriod ) );
+				$daysUsedInPeriod = new \IPS\Math\Number( (string)\IPS\DateTime::intervalToDays( $timeSinceStartOfCurrentPeriod ) );
 
-				/* Currency Worth of value used in current sub */
-				$valueUsedOfSubscription = $purchase->renewals ? $purchase->renewals->cost->amount->divide( $numberOfDaysInCurrentRenewalTerm )->multiply( $daysUsedInPeriod ) : new Money( new Number( '0' ), $currency );
+				/* Count how many days we have left to our current subscription so we can calculate how much we are owed */
+				$daysRemainingInPeriod = $numberOfDaysInCurrentRenewalTerm->subtract( $daysUsedInPeriod );
+				$valueRemainingInSubscription = $purchase->renewals ? $purchase->renewals->costPerDay()->amount->multiply( $daysRemainingInPeriod ) : new \IPS\Math\Number( '0' );
 
-				/* If there are no days left, charge the full amount */
-				if ( !$daysRemainingInPeriod->isGreaterThanZero() )
+				/* Start with 0 and subtract what we are still owed */
+				$cost = new \IPS\Math\Number( "0" );
+				$cost = $cost->subtract( $valueRemainingInSubscription );
+
+				/* Now add the cost of the new package */
+                $valueRemainingInThisPackage = $renewalTermToUse->costPerDay()->amount->multiply( $daysRemainingInPeriod );
+				$cost = $cost->add( $valueRemainingInThisPackage );
+
+				/* But what if our current expiration is multiple cycles ahead? */
+				if( $purchase->expire instanceof \IPS\DateTime and $purchase->renewals->days() < $renewalTermToUse->days())
 				{
-					return new Money( $priceOfThisPackage, $currency );
-				}
-				elseif( $priceOfExistingPackage > $priceOfThisPackage )
-				{
-					/* If this is a downgrade, calculate a refund */
-					$refund = $purchase->renewals->cost->amount->subtract( $valueUsedOfSubscription );
-					return new Money( $refund->multiply( new Number( "-1" ) ), $currency );
-				}
-				else
-				{
-					/* If we have renewals, then we have a valid value to use */
-					if( $purchase->renewals )
+					$calculatedExpiration = $purchase->expire->sub( $renewalTermToUse->interval );
+					while( $calculatedExpiration->diff( \IPS\DateTime::create() )->invert )
 					{
-						return new Money( $renewalTermToUse->cost->amount->subtract( $valueUsedOfSubscription ), $currency );
-					}
-					else
-					{
-						/* Otherwise we have to calculate the cost based on how much time is left */
-						$cost = new Money( $renewalTermToUse->costPerDay()->amount->multiply( $daysRemainingInPeriod ), $currency );
-						if( $cost->amount->compare( new Number( $priceOfThisPackage ) ) == 1 )
-						{
-							$cost = new Money( $priceOfThisPackage, $currency );
-						}
-						return $cost;
+						$cost = $cost->add( new \IPS\Math\Number( $priceOfThisPackage ) );
+						$calculatedExpiration = $calculatedExpiration->sub( $renewalTermToUse->interval );
 					}
 				}
+
+				return new \IPS\nexus\Money( $cost, $currency );
 		}
-
-		return null;
 	}
 
 	/**
 	 * Cost to upgrade to this package (may return negative value for refund)
 	 *
-	 * @param Package $package	The currently subscribed package
-	 * @param	Customer						$member		The member.
-	 * @return	Money|NULL
-	 * @throws	InvalidArgumentException
+	 * @param	\IPS\nexus\Subscription\Package	$package	The currently subscribed package
+	 * @param	\IPS\Member						$member		The member.
+	 * @return	\IPS\nexus\Money|NULL
+	 * @throws	\InvalidArgumentException
 	 */
-	public function costToUpgradeIncludingTax(Package $package, Customer $member ) : Money|null
+	public function costToUpgradeIncludingTax( \IPS\nexus\Subscription\Package $package, \IPS\Member $member )
 	{
 		$upgradeCost = $this->costToUpgrade( $package, $member );
 
-		if( $upgradeCost !== NULL AND $upgradeCost->amount->isGreaterThanZero() AND Settings::i()->nexus_show_tax and $this->tax )
+		if( $upgradeCost !== NULL AND $upgradeCost->amount->isGreaterThanZero() AND \IPS\Settings::i()->nexus_show_tax and $this->tax )
 		{
 			try
 			{
-				$taxRate = new Number( Tax::load( $this->tax )->rate( Customer::loggedIn()->estimatedLocation() ) );
+				$taxRate = new \IPS\Math\Number( \IPS\nexus\Tax::load( $this->tax )->rate( \IPS\nexus\Customer::loggedIn()->estimatedLocation() ) );
 
 				$upgradeCost->amount = $upgradeCost->amount->add( $upgradeCost->amount->multiply( $taxRate ) );
 			}
-			catch ( OutOfRangeException ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 
 		return $upgradeCost;
@@ -883,15 +853,15 @@ class Package extends Model
 	/**
 	 * Create the upgrade/downgrade invoice or refund
 	 *
-	 * @param	Purchase 			$purchase
-	 * @param Package $newPackage
+	 * @param	\IPS\nexus\Purchase 			$purchase
+	 * @param	\IPS\nexus\Subscription\Package $newPackage
 	 * @param	bool										$skipCharge				If TRUE, an upgrade charges and downgrade refunds will not be issued
-	 * @return	Invoice|null							An invoice if an upgrade charge has to be paid, or null if not
+	 * @return	\IPS\nexus\Invoice|void												An invoice if an upgrade charge has to be paid, or void if not
 	 */
-	public function upgradeDowngrade(Purchase $purchase, Package $newPackage, bool $skipCharge = FALSE ) : Invoice|null
+	public function upgradeDowngrade( \IPS\nexus\Purchase $purchase, \IPS\nexus\Subscription\Package $newPackage, $skipCharge = FALSE )
 	{
 		/* Right, that's all the "I'll tamper with the URLs for a laugh" stuff out of the way... */
-		$oldPackage = Package::load( $purchase->item_id );
+		$oldPackage = \IPS\nexus\Subscription\Package::load( $purchase->item_id );
 		$costToUpgrade = $newPackage->costToUpgrade( $oldPackage, $purchase->member );
 		
 		/* Charge / Refund */
@@ -900,8 +870,8 @@ class Package extends Model
 			/* Upgrade Charge */
 			if ( $costToUpgrade->amount->isGreaterThanZero() )
 			{
-				$item = new SubscriptionUpgrade( sprintf( $purchase->member->language()->get( 'upgrade_charge_item' ), $purchase->member->language()->get( "nexus_subs_{$this->id}" ), $purchase->member->language()->get( "nexus_subs_{$newPackage->id}" ) ), $costToUpgrade );
-				$item->tax = $newPackage->tax ? Tax::load( $newPackage->tax ) : NULL;
+				$item = new \IPS\nexus\extensions\nexus\Item\SubscriptionUpgrade( sprintf( $purchase->member->language()->get( 'upgrade_charge_item' ), $purchase->member->language()->get( "nexus_subs_{$this->id}" ), $purchase->member->language()->get( "nexus_subs_{$newPackage->id}" ) ), $costToUpgrade );
+				$item->tax = $newPackage->tax ? \IPS\nexus\Tax::load( $newPackage->tax ) : NULL;
 				$item->id = $purchase->id;
 				$item->extra = array( 'newPackage' => $newPackage->id, 'oldPackage' => $this->id );
 	
@@ -910,7 +880,7 @@ class Package extends Model
 					$item->paymentMethodIds = explode( ',', $newPackage->gateways );
 				}
 	
-				$invoice = new Invoice;
+				$invoice = new \IPS\nexus\Invoice;
 				$invoice->member = $purchase->member;
 				$invoice->currency = $costToUpgrade->currency;
 				$invoice->addItem( $item );
@@ -922,17 +892,19 @@ class Package extends Model
 			elseif ( !$costToUpgrade->amount->isPositive() )
 			{
 				$credits = $purchase->member->cm_credits;
-				$credits[ $costToUpgrade->currency ]->amount = $credits[ $costToUpgrade->currency ]->amount->add( $costToUpgrade->amount->multiply( new Number( '-1' ) ) );
+				$credits[ $costToUpgrade->currency ]->amount = $credits[ $costToUpgrade->currency ]->amount->add( $costToUpgrade->amount->multiply( new \IPS\Math\Number( '-1' ) ) );
 				$purchase->member->cm_credits = $credits;
 				$purchase->member->save();
 			}
 		}
 		
 		/* Get old renewal term details here */
+		$oldTerm = NULL;
 		$oldRenewalOptions = json_decode( $oldPackage->renew_options, TRUE );
 		$oldTerm = $oldRenewalOptions;
 		
 		/* Work out the new renewal term */
+		$term = NULL;
 		$renewalOptions = json_decode( $newPackage->renew_options, TRUE );
 		$term = $rawTerm = $renewalOptions;
 		
@@ -942,7 +914,7 @@ class Package extends Model
 			{
 				$currency = $purchase->original_invoice->currency;
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException $e )
 			{
 				$currency = $purchase->member->defaultCurrency();
 			}
@@ -951,10 +923,10 @@ class Package extends Model
 			$tax = NULL;
 			try
 			{
-				$tax = $newPackage->tax ? Tax::load( $newPackage->tax ) : NULL;
+				$tax = $newPackage->tax ? \IPS\nexus\Tax::load( $newPackage->tax ) : NULL;
 			}
-			catch( OutOfRangeException ) {}
-			$term = new RenewalTerm( new Money( $term['cost'][$currency]['amount'], $currency ), new DateInterval( 'P' . $term['term'] . mb_strtoupper( $term['unit'] ) ), $tax );
+			catch( \OutOfRangeException $e ) {}
+			$term = new \IPS\nexus\Purchase\RenewalTerm( new \IPS\nexus\Money( $term['cost'][$currency]['amount'], $currency ), new \DateInterval( 'P' . $term['term'] . mb_strtoupper( $term['unit'] ) ), $tax );
 		}
 
 		/* Remove usergroups */
@@ -963,7 +935,7 @@ class Package extends Model
 		/* If we didn't have an expiry date before, but the new package has a renewal term, set an expiry date */
 		if ( !$purchase->expire and $term )
 		{
-			$purchase->expire = DateTime::create()->add( $term->interval );
+			$purchase->expire = \IPS\DateTime::create()->add( $term->interval );
 		}
 		/* OR if we did have an expiry date, but the new package does not have a renewal term, remove it */
 		elseif ( !$term )
@@ -971,12 +943,12 @@ class Package extends Model
 			$purchase->expire = NULL;
 		}
 		/* We have a term, but the unit is different from the existing package */
-		elseif ( $purchase->expire and $oldTerm and ( $rawTerm['unit'] != $oldTerm['unit'] ) )
+		elseif ( $purchase->expire and $term and $oldTerm and ( $rawTerm['unit'] != $oldTerm['unit'] or $rawTerm['term'] != $oldTerm['term'] ) )
 		{
 			/* If there is an upgrade cost, the expire date should be from when the current billing period started. */
-			if( $costToUpgrade->amount->isGreaterThanZero() AND Settings::i()->nexus_subs_upgrade > 0 )
+			if( $costToUpgrade->amount->isGreaterThanZero() AND \IPS\Settings::i()->nexus_subs_upgrade > 0 )
 			{
-				$startOfCurrentPeriod = $purchase->expire->sub( new DateInterval( 'P' . $oldTerm['term'] . mb_strtoupper( $oldTerm['unit'] ) ) );
+				$startOfCurrentPeriod = $purchase->expire->sub( new \DateInterval( 'P' . $oldTerm['term'] . mb_strtoupper( $oldTerm['unit'] ) ) );
 				$purchase->expire = $startOfCurrentPeriod < $purchase->start ? $purchase->start->add( $term->interval ) : $startOfCurrentPeriod->add( $term->interval );
 			}
 			else
@@ -985,12 +957,12 @@ class Package extends Model
 
 				if ( $difference > 0 )
 				{
-					$newExpire = DateTime::ts( ( time() - $difference ) );
+					$newExpire = \IPS\DateTime::ts( ( time() - $difference ) );
 					$newExpire = $newExpire->add( $term->interval );
 
 					if ( $newExpire->getTimestamp() < time() )
 					{
-						$newExpire = DateTime::create()->add( $term->interval );
+						$newExpire = \IPS\DateTime::create()->add( $term->interval );
 					}
 
 					$purchase->expire = $newExpire;
@@ -1000,11 +972,11 @@ class Package extends Model
 		/* Purchase expired in the past, so it needs one renewal term adding */
 		elseif( $purchase->expire->getTimestamp() < time() AND $term )
 		{
-			$purchase->expire = DateTime::create()->add( $term->interval );
+			$purchase->expire = \IPS\DateTime::create()->add( $term->interval );
 		}
 				
 		/* Update Purchase */
-		$purchase->name = Member::loggedIn()->language()->get( "nexus_subs_{$newPackage->id}" );
+		$purchase->name = \IPS\Member::loggedIn()->language()->get( "nexus_subs_{$newPackage->id}" );
 		$purchase->cancelled = FALSE;
 		$purchase->item_id = $newPackage->id;
 		$purchase->renewals = $term;
@@ -1016,7 +988,7 @@ class Package extends Model
 		/* Cancel any pending invoices */
 		if ( $pendingInvoice = $purchase->invoice_pending )
 		{
-			$pendingInvoice->status = invoice::STATUS_CANCELED;
+			$pendingInvoice->status = \IPS\nexus\invoice::STATUS_CANCELED;
 			$pendingInvoice->save();
 			$purchase->invoice_pending = NULL;
 			$purchase->save();
@@ -1027,21 +999,19 @@ class Package extends Model
 		{
 			\IPS\nexus\Subscription::load( $purchase->id, 'sub_purchase_id' )->changePackage( $newPackage, $purchase->expire );
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
-			Log::log( "Change Package error (" . $e->getCode() . ") " . $e->getMessage(), 'subscriptions' );
+			\IPS\Log::log( "Change Package error (" . $e->getCode() . ") " . $e->getMessage(), 'subscriptions' );
 		}
-
-		return null;
 	}
 	
 	/**
 	 * Renew a member to the subscription package
 	 *
-	 * @param	Customer			$member		The cutomer innit
+	 * @param	\IPS\nexus\Customer			$member		The cutomer innit
 	 * @return  \IPS\nexus\Subscription		The new subscription object added
 	 */
-	public function renewMember( Customer $member ) : \IPS\nexus\Subscription
+	public function renewMember( $member )
 	{
 		try
 		{
@@ -1053,8 +1023,8 @@ class Package extends Model
 			
 			if ( $this->renew_options and $renewal = json_decode( $this->renew_options, TRUE ) )
 			{
-				$nextExpiration = DateTime::ts( $sub->expire, TRUE );
-				$nextExpiration->add( new DateInterval( 'P' . $renewal['term'] . mb_strtoupper( $renewal['unit'] ) ) );
+				$nextExpiration = \IPS\DateTime::ts( $sub->expire, TRUE );
+				$nextExpiration->add( new \DateInterval( 'P' . $renewal['term'] . mb_strtoupper( $renewal['unit'] ) ) );
 				$expires = $nextExpiration->getTimeStamp();
 				$renews = 1;
 			}
@@ -1071,7 +1041,7 @@ class Package extends Model
 			
 			return $sub;
 		}
-		catch( Exception )
+		catch( \Exception $ex )
 		{
 			return $this->addMember( $member );
 		}
@@ -1080,18 +1050,18 @@ class Package extends Model
 	/**
 	 * Adds a member to the subscription package
 	 *
-	 * @param	Customer	        $member		        The customer innit
+	 * @param	\IPS\nexus\Customer	        $member		        The customer innit
 	 * @param   bool                        $generatePurchase   Generate purchase when adding member (for manual subscriptions)
 	 * @param   bool                        $purchaseRenews     Does the purchase renew, or is it forever
 	 * @return  \IPS\nexus\Subscription		                    The new subscription object added
 	 */
-	public function addMember( Customer $member, bool $generatePurchase=FALSE, bool $purchaseRenews=FALSE ): \IPS\nexus\Subscription
+	public function addMember( \IPS\nexus\Customer $member, bool $generatePurchase=FALSE, bool $purchaseRenews=FALSE ): \IPS\nexus\Subscription
 	{
 		try
 		{
 			$sub = \IPS\nexus\Subscription::loadByMemberAndPackage( $member, $this, FALSE );
 		}
-		catch ( OutOfRangeException )
+		catch ( \OutOfRangeException $e )
 		{
 			$sub = new \IPS\nexus\Subscription;
 			$sub->package_id = $this->id;
@@ -1102,8 +1072,8 @@ class Package extends Model
 		$renews  = 0;
 		if ( $this->renew_options and $renewal = json_decode( $this->renew_options, TRUE ) )
 		{
-			$start = DateTime::ts( time(), TRUE );
-			$start->add( new DateInterval( 'P' . $renewal['term'] . mb_strtoupper( $renewal['unit'] ) ) );
+			$start = \IPS\DateTime::ts( time(), TRUE );
+			$start->add( new \DateInterval( 'P' . $renewal['term'] . mb_strtoupper( $renewal['unit'] ) ) );
 			$expires = $start->getTimeStamp();
 			$renews = 1;
 		}
@@ -1119,7 +1089,7 @@ class Package extends Model
 		/* Do we need to generate a purchase to track this sub? */
 		if( $generatePurchase )
 		{
-			$purchase = new Purchase;
+			$purchase = new \IPS\nexus\Purchase;
 			$purchase->member = $member;
 			$purchase->name = $member->language()->get( static::$titleLangPrefix . $this->id );
 			$purchase->app = 'nexus';
@@ -1134,7 +1104,7 @@ class Package extends Model
 				{
 					$purchase->renewals = $renewalTerm;
 				}
-				$purchase->expire = DateTime::ts( $expires );
+				$purchase->expire = \IPS\DateTime::ts( $expires );
 			}
 			else
 			{
@@ -1157,10 +1127,10 @@ class Package extends Model
 	/**
 	 * Expires a member
 	 *
-	 * @param	Customer		$member		The cutomer innit
+	 * @param	\IPS\nexus\Customer		$member		The cutomer innit
 	 * @return void
 	 */
-	public function expireMember( Customer $member ) : void
+	public function expireMember( $member )
 	{
 		/* Run before marking it inactive or it won't find the row in _removeUsergroups */
 		$this->_removeUsergroups( $member );
@@ -1172,10 +1142,10 @@ class Package extends Model
 	/**
 	 * Cancels a member
 	 *
-	 * @param	Customer		$member		The cutomer innit
+	 * @param	\IPS\nexus\Customer		$member		The cutomer innit
 	 * @return void
 	 */
-	public function cancelMember( Customer $member ) : void
+	public function cancelMember( $member )
 	{
 		/* Run before marking it inactive or it won't find the row in _removeUsergroups */
 		$this->_removeUsergroups( $member );
@@ -1184,7 +1154,7 @@ class Package extends Model
 		\IPS\nexus\Subscription::markInactiveByUser( $member );
 		
 		/* Cancel purchase */
-		foreach ( Subscription::getPurchases( $member, $this->id ) as $purchase )
+		foreach ( \IPS\nexus\extensions\nexus\Item\Subscription::getPurchases( $member, $this->id ) as $purchase )
 		{
 			if ( $purchase->active )
 			{
@@ -1197,10 +1167,10 @@ class Package extends Model
 	/**
 	 * Removes a member
 	 *
-	 * @param	Customer		$member		The cutomer innit
+	 * @param	\IPS\nexus\Customer		$member		The cutomer innit
 	 * @return void
 	 */
-	public function removeMember( Customer $member ) : void
+	public function removeMember( $member )
 	{
 		/* Run before marking it inactive or it won't find the row in _removeUsergroups */
 		$this->_removeUsergroups( $member );
@@ -1209,7 +1179,7 @@ class Package extends Model
 		{
 			\IPS\nexus\Subscription::loadByMemberAndPackage( $member, $this, FALSE )->delete();
 		}
-		catch( OutOfRangeException ) {}
+		catch( \OutOfRangeException $ex ) {}
 	}
 		
 	/* !Usergroups */
@@ -1217,31 +1187,32 @@ class Package extends Model
 	/**
 	 * Add user groups
 	 *
-	 * @param	Customer	$member	The customer
-	 * @param bool $isPackageChange true if this is an upgrade/downgrade
+	 * @param	\IPS\nexus\Customer	$member	The customer
+	 * @param bool	$isPackageChange	true if this is an upgrade/downgrade
 	 * @return	void
 	 */
-	public function _addUsergroups( Customer $member, bool $isPackageChange=false ) : void
+	public function _addUsergroups( $member, $isPackageChange=false )
 	{
 		$previousGroup = 0;
 		$previousSecondary = '';
+		$newSecondary = '';
 		$current = null;
 		try
 		{
-			$current = Db::i()->select( 'sub_previous_group,sub_previous_secondary_groups', 'nexus_member_subscriptions', array( 'sub_active=? and sub_member_id=? and sub_package_id=?', 1, $member->member_id, $this->id ) )->first();
+			$current = \IPS\Db::i()->select( 'sub_previous_group,sub_previous_secondary_groups', 'nexus_member_subscriptions', array( 'sub_active=? and sub_member_id=? and sub_package_id=?', 1, $member->member_id, $this->id ) )->first();
 		}
-
-		catch( UnderflowException ){}
+		catch( \UnderflowException ){}
+		
 		/* Primary Group */
-		if ( $this->primary_group and $this->primary_group != $member->member_group_id and !in_array( $member->member_group_id, explode( ',', Settings::i()->nexus_subs_exclude_groups ) ) )
+		if ( $this->primary_group and $this->primary_group != $member->member_group_id and !\in_array( $member->member_group_id, explode( ',', \IPS\Settings::i()->nexus_subs_exclude_groups ) ) )
 		{
 			/* Hang on, are we about to boot someone out the ACP? */
-			if ( ! ( $member->isAdmin() and !in_array( $this->primary_group, array_keys( Member::administrators()['g'] ) ) ) )
+			if ( ! ( $member->isAdmin() and !\in_array( $this->primary_group, array_keys( \IPS\Member::administrators()['g'] ) ) ) )
 			{
 				/* Only do this if the target group exists */
 				try
 				{
-					$group = Group::load( $this->primary_group );
+					$group = \IPS\Member\Group::load( $this->primary_group);
 					/* Save the current group */
 					$previousGroup = $member->member_group_id;
 
@@ -1251,7 +1222,7 @@ class Package extends Model
 					$member->save();
 					$member->logHistory( 'core', 'group', array( 'type' => 'primary', 'by' => 'subscription', 'action' => 'add', 'id' => $this->id, 'old' => $previousGroup, 'new' => $member->member_group_id ) );
 				}
-				catch( OutOfRangeException )
+				catch( \OutOfRangeException $e )
 				{
 
 				}
@@ -1267,15 +1238,15 @@ class Package extends Model
 		{
 			foreach ( $secondary as $gid )
 			{
-				if ( !in_array( $gid, $newSecondary ) )
+				if ( !\in_array( $gid, $newSecondary ) )
 				{
 					/* Only do this if the target group exists */
 					try
 					{
-						$group = Group::load( $gid );
+						$group = \IPS\Member\Group::load( $gid );
 						$newSecondary[] = $gid;
 					}
-					catch( OutOfRangeException )
+					catch( \OutOfRangeException $e )
 					{
 
 					}
@@ -1302,28 +1273,28 @@ class Package extends Model
 		{
 			$update['sub_previous_secondary_groups'] = $previousSecondary;
 		}
-		if( count( $update ) )
+		if( \count( $update ) )
 		{
-			Db::i()->update( 'nexus_member_subscriptions', $update, array( 'sub_active=1 and sub_member_id=?', $member->member_id ) );
+			\IPS\Db::i()->update( 'nexus_member_subscriptions', $update, array( 'sub_active=1 and sub_member_id=?', $member->member_id ) );
 		}
 	}
 	
 	/**
 	 * Remove user groups
 	 *
-	 * @param	Customer	$member	The customer
+	 * @param	\IPS\nexus\Customer	$member	The customer
 	 * @return	void
 	 */
-	public function _removeUsergroups( Customer $member ) : void
+	public function _removeUsergroups( $member )
 	{
 		if ( ! $this->return_primary )
 		{
-			return;
+			return NULL;
 		}
 		
 		/* Fetch purchase */
 		$purchase = NULL;
-		foreach ( Subscription::getPurchases( $member, $this->id ) as $row )
+		foreach ( \IPS\nexus\extensions\nexus\Item\Subscription::getPurchases( $member, $this->id ) as $row )
 		{
 			/* Don't check for cancelled here, as the purchase will be cancelled before we get here */
 			if ( $row->active )
@@ -1335,11 +1306,11 @@ class Package extends Model
 		
 		try
 		{
-			$sub = Db::i()->select( '*', 'nexus_member_subscriptions', array( 'sub_active=1 and sub_package_id=? and sub_member_id=?', $this->id, $member->member_id ) )->first();
+			$sub = \IPS\Db::i()->select( '*', 'nexus_member_subscriptions', array( 'sub_active=1 and sub_package_id=? and sub_member_id=?', $this->id, $member->member_id ) )->first();
 		}
-		catch( UnderflowException )
+		catch( \UnderflowException $e )
 		{
-			return;
+			return NULL;
 		}
 		
 		/* We only want to move them back if they haven't been moved again since */
@@ -1352,13 +1323,13 @@ class Package extends Model
 			{
 				if( $purchase !== NULL )
 				{
-					$next = Db::i()->select( array( 'ps_id', 'ps_name', 'p_primary_group' ), 'nexus_purchases', array( 'ps_member=? AND ps_app=? AND ps_type=? AND ps_active=1 AND p_primary_group<>0 AND ps_id<>?', $member->member_id, 'nexus', 'package', $purchase->id ) )
+					$next = \IPS\Db::i()->select( array( 'ps_id', 'ps_name', 'p_primary_group' ), 'nexus_purchases', array( 'ps_member=? AND ps_app=? AND ps_type=? AND ps_active=1 AND p_primary_group<>0 AND ps_id<>?', $member->member_id, 'nexus', 'package', $purchase->id ) )
 						->join( 'nexus_packages', 'p_id=ps_item_id' )
 						->first();
 				}
 				else
 				{
-					$next = Db::i()->select( array( 'ps_id', 'ps_name', 'p_primary_group' ), 'nexus_purchases', array( 'ps_member=? AND ps_app=? AND ps_type=? AND ps_active=1 AND p_primary_group<>0', $member->member_id, 'nexus', 'package' ) )
+					$next = \IPS\Db::i()->select( array( 'ps_id', 'ps_name', 'p_primary_group' ), 'nexus_purchases', array( 'ps_member=? AND ps_app=? AND ps_type=? AND ps_active=1 AND p_primary_group<>0', $member->member_id, 'nexus', 'package' ) )
 						->join( 'nexus_packages', 'p_id=ps_item_id' )
 						->first();
 				}
@@ -1366,11 +1337,11 @@ class Package extends Model
 				/* Make sure this group exists */
 				try
 				{
-					Group::load( $next['p_primary_group'] );
+					\IPS\Member\Group::load( $next['p_primary_group'] );
 				}
-				catch( OutOfRangeException )
+				catch( \OutOfRangeException $e )
 				{
-					throw new UnderflowException;
+					throw new \UnderflowException;
 				}
 
 				$member->member_group_id = $next['p_primary_group'];
@@ -1378,17 +1349,17 @@ class Package extends Model
 				$member->logHistory( 'core', 'group', array( 'type' => 'primary', 'by' => 'purchase', 'action' => 'change', 'remove_id' => $next['ps_id'], 'ps_name' => $next['ps_id'], 'id' => $next['ps_id'], 'name' => $next['ps_name'], 'old' => $oldGroup, 'new' => $member->member_group_id ) );
 			}
 			/* No, move them to their original group */
-			catch ( UnderflowException )
+			catch ( \UnderflowException $e )
 			{
 				/* Does this group exist? */
 				try
 				{
-					Group::load( $sub['sub_previous_group'] );
+					\IPS\Member\Group::load( $sub['sub_previous_group'] );
 					$member->member_group_id = $sub['sub_previous_group'];
 				}
-				catch ( OutOfRangeException )
+				catch ( \OutOfRangeException $e )
 				{
-					$member->member_group_id = Settings::i()->member_group;
+					$member->member_group_id = \IPS\Settings::i()->member_group;
 				}
 									
 				/* Save */
@@ -1401,7 +1372,7 @@ class Package extends Model
 		// Secondary groups
 		$secondaryGroupsAwardedByThisPurchase = array_unique( array_filter( explode( ',', $this->secondary_group ) ) );
 		$membersSecondaryGroups = $member->mgroup_others ? array_unique( array_filter( explode( ',', $member->mgroup_others ) ) ) : array();
-		if ( isset( $sub['sub_previous_secondary_groups'] ) and $sub['sub_previous_secondary_groups'] )
+		if ( isset( $sub['sub_previous_secondary_groups'] ) and $sub['sub_previous_secondary_groups'] !== NULL )
 		{			
 			/* Work some stuff out */
 			$currentSecondaryGroups = $membersSecondaryGroups;
@@ -1412,11 +1383,11 @@ class Package extends Model
 
 			if( $purchase !== NULL )
 			{
-				$query = Db::i()->select( 'p_secondary_group', 'nexus_purchases', array( 'ps_member=? AND ps_app=? AND ps_type=? AND ps_active=1 AND p_secondary_group IS NOT NULL AND p_secondary_group<>? AND ps_id<>?', $member->member_id, 'nexus', 'package', '', $purchase->id ) )->join( 'nexus_packages', 'p_id=ps_item_id' );
+				$query = \IPS\Db::i()->select( 'p_secondary_group', 'nexus_purchases', array( 'ps_member=? AND ps_app=? AND ps_type=? AND ps_active=1 AND p_secondary_group IS NOT NULL AND p_secondary_group<>? AND ps_id<>?', $member->member_id, 'nexus', 'package', '', $purchase->id ) )->join( 'nexus_packages', 'p_id=ps_item_id' );
 			}
 			else
 			{
-				$query = Db::i()->select( 'p_secondary_group', 'nexus_purchases', array( 'ps_member=? AND ps_app=? AND ps_type=? AND ps_active=1 AND p_secondary_group IS NOT NULL AND p_secondary_group<>?', $member->member_id, 'nexus', 'package', '' ) )->join( 'nexus_packages', 'p_id=ps_item_id' );
+				$query = \IPS\Db::i()->select( 'p_secondary_group', 'nexus_purchases', array( 'ps_member=? AND ps_app=? AND ps_type=? AND ps_active=1 AND p_secondary_group IS NOT NULL AND p_secondary_group<>?', $member->member_id, 'nexus', 'package', '' ) )->join( 'nexus_packages', 'p_id=ps_item_id' );
 			}
 
 			foreach ( $query as $secondaryGroups )
@@ -1430,13 +1401,13 @@ class Package extends Model
 			foreach ( $secondaryGroupsAwardedByThisPurchase as $groupId )
 			{
 				/* If we had this group before we made this purchase, we're going to keep it */
-				if ( in_array( $groupId, $membersPreviousSecondaryGroupsBeforeThisPurchase ) )
+				if ( \in_array( $groupId, $membersPreviousSecondaryGroupsBeforeThisPurchase ) )
 				{
 					continue;
 				}
 				
 				/* If we are being awarded this group by a different purchase, we're also going to keep it */
-				if ( in_array( $groupId, $secondaryGroupsAwardedByOtherPurchases ) )
+				if ( \in_array( $groupId, $secondaryGroupsAwardedByOtherPurchases ) )
 				{
 					continue;
 				}
@@ -1449,10 +1420,10 @@ class Package extends Model
 			$membersSecondaryGroups = array_filter( $membersSecondaryGroups, function( $group ){
 				try
 				{
-					Group::load( $group );
+					\IPS\Member\Group::load( $group );
 					return TRUE;
 				}
-				catch( OutOfRangeException )
+				catch( \OutOfRangeException $e )
 				{
 					return FALSE;
 				}
@@ -1468,7 +1439,7 @@ class Package extends Model
 			$currentSecondaryGroups = $membersSecondaryGroups;
 			foreach( $membersSecondaryGroups as $group )
 			{
-				if ( in_array( $group, $secondaryGroupsAwardedByThisPurchase ) )
+				if ( \in_array( $group, $secondaryGroupsAwardedByThisPurchase ) )
 				{
 					unset( $membersSecondaryGroups[ array_search( $group, $membersSecondaryGroups ) ] );
 				}
@@ -1478,10 +1449,10 @@ class Package extends Model
 			$membersSecondaryGroups = array_filter( $membersSecondaryGroups, function( $group ){
 				try
 				{
-					Group::load( $group );
+					\IPS\Member\Group::load( $group );
 					return TRUE;
 				}
-				catch( OutOfRangeException )
+				catch( \OutOfRangeException $e )
 				{
 					return FALSE;
 				}
@@ -1496,12 +1467,12 @@ class Package extends Model
 	/**
 	 * Determines whether this package can be converted or not.
 	 *
-	 * @param	PackageClass	$package	The package we wish to convert
+	 * @param	\IPS\nexus\Package	$package	The package we wish to convert
 	 * @return boolean
 	 */
-	public static function canConvert( PackageClass $package ) : bool
+	public static function canConvert( \IPS\nexus\Package $package )
 	{
-		if ( ! $package->lkey )
+		if ( ! $package->physical and ! $package->lkey )
 		{
 			return TRUE;
 		}
@@ -1512,12 +1483,12 @@ class Package extends Model
 	/**
 	 * Update existing purchases
 	 *
-	 * @param	Purchase	$purchase							The purchase
+	 * @param	\IPS\nexus\Purchase	$purchase							The purchase
 	 * @param	array				$changes							The old values
 	 * @param	bool				$cancelBillingAgreementIfNecessary	If making changes to renewal terms, TRUE will cancel associated billing agreements. FALSE will skip that change
 	 * @return	void
 	 */
-	public function updatePurchase( Purchase $purchase, array $changes, bool $cancelBillingAgreementIfNecessary=FALSE ) : void
+	public function updatePurchase( \IPS\nexus\Purchase $purchase, $changes, $cancelBillingAgreementIfNecessary=FALSE )
 	{
 		if ( array_key_exists( 'tax', $changes ) )
 		{
@@ -1530,7 +1501,7 @@ class Package extends Model
 						$billingAgreement->cancel();
 						$billingAgreement->save();
 					}
-					catch ( Exception ) { }
+					catch ( \Exception $e ) { }
 				}
 				
 				$purchase->tax = $this->tax;
@@ -1542,7 +1513,7 @@ class Package extends Model
 		{
 			$newRenewTerms = json_decode( $this->renew_options, TRUE );
 
-			if( !is_array( $newRenewTerms ) )
+			if( !\is_array( $newRenewTerms ) )
 			{
 				$newRenewTerms = array();
 			}
@@ -1559,7 +1530,7 @@ class Package extends Model
 							$billingAgreement->cancel();
 							$billingAgreement->save();
 						}
-						catch ( Exception ) { }
+						catch ( \Exception $e ) { }
 					}
 					break;
 				case 'y':
@@ -1573,7 +1544,7 @@ class Package extends Model
 							$billingAgreement->cancel();
 							$billingAgreement->save();
 						}
-						catch ( Exception ) { }
+						catch ( \Exception $e ) { }
 					}
 					break;
 				case 'x':
@@ -1587,7 +1558,7 @@ class Package extends Model
 							$billingAgreement->cancel();
 							$billingAgreement->save();
 						}
-						catch ( Exception ) { }
+						catch ( \Exception $e ) { }
 					}
 					break;
 				case '-':
@@ -1605,7 +1576,7 @@ class Package extends Model
 									$billingAgreement->cancel();
 									$billingAgreement->save();
 								}
-								catch ( Exception ) { }
+								catch ( \Exception $e ) { }
 							}
 							
 							
@@ -1614,16 +1585,16 @@ class Package extends Model
 							{
 								try
 								{
-									$tax = Tax::load( $purchase->tax );
+									$tax = \IPS\nexus\Tax::load( $purchase->tax );
 								}
-								catch ( OutOfRangeException ) { }
+								catch ( \OutOfRangeException $e ) { }
 							}
 							
 							$currency = $purchase->renewal_currency ?: $purchase->member->defaultCurrency( );
 
-							$purchase->renewals = new RenewalTerm(
-								new Money( $newRenewTerms['cost'][ $currency ]['amount'], $currency ),
-								new DateInterval( 'P' . $newRenewTerms['term'] . mb_strtoupper( $newRenewTerms['unit'] ) ),
+							$purchase->renewals = new \IPS\nexus\Purchase\RenewalTerm(
+								new \IPS\nexus\Money( $newRenewTerms['cost'][ $currency ]['amount'], $currency ), 
+								new \DateInterval( 'P' . $newRenewTerms['term'] . mb_strtoupper( $newRenewTerms['unit'] ) ),
 								$tax
 							);
 							$purchase->save();
@@ -1638,16 +1609,5 @@ class Package extends Model
 			$this->_removeUsergroups( $purchase->member );
 			$this->_addUsergroups( $purchase->member );
 		}
-	}
-
-	/**
-	 * Allow for individual classes to override and
-	 * specify a primary image. Used for grid views, etc.
-	 *
-	 * @return File|null
-	 */
-	public function primaryImage() : ?File
-	{
-		return $this->_image;
 	}
 }

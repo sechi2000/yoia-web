@@ -10,38 +10,37 @@
  */
 
 namespace IPS\blog\api\GraphQL;
-use IPS\blog\api\GraphQL\Types\BlogType;
-use IPS\blog\api\GraphQL\Types\CommentType;
-use IPS\blog\api\GraphQL\Types\EntryType;
-use function defined;
+use GraphQL\Type\Definition\ObjectType;
+use IPS\Api\GraphQL\Types;
+use IPS\blog\api\GraphQL\Types\_BlogType;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 
-class TypeRegistry
+class _TypeRegistry
 {
     /**
      * The blog type instance
-     * @var BlogType
+     * @var \IPS\blog\api\GraphQL\Types\BlogType
      */
-    protected static BlogType $blog;
+    protected static $blog;
 
     /**
      * The blog entry type instance
-     * @var EntryType
+     * @var \IPS\blog\api\GraphQL\Types\EntryType
      */
-    protected static EntryType $entry;
+    protected static $entry;
 
     /**
      * The entry comment instance
-     * @var CommentType
+     * @var \IPS\blog\api\GraphQL\Types\CommentType
      */
-    protected static CommentType $comment;
+    protected static $comment;
 
     /**
      * Constructor
@@ -54,24 +53,24 @@ class TypeRegistry
     /**
      * @return BlogType
      */
-    public static function blog(): BlogType
+    public static function blog(): \IPS\blog\api\GraphQL\Types\BlogType
     {
-        return self::$blog ?? (self::$blog = new BlogType());
+        return self::$blog ?: (self::$blog = new \IPS\blog\api\GraphQL\Types\BlogType());
     }
 
     /**
      * @return EntryType
      */
-    public static function entry(): EntryType
+    public static function entry(): \IPS\blog\api\GraphQL\Types\EntryType
     {
-        return self::$entry ?? (self::$entry = new EntryType());
+        return self::$entry ?: (self::$entry = new \IPS\blog\api\GraphQL\Types\EntryType());
     }
 
     /**
      * @return CommentType
      */
-    public static function comment(): CommentType
+    public static function comment(): \IPS\blog\api\GraphQL\Types\CommentType
     {
-        return self::$comment??( self::$comment = new CommentType() );
+        return self::$comment ?: (self::$comment = new \IPS\blog\api\GraphQL\Types\CommentType());
     }
 }

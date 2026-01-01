@@ -12,42 +12,21 @@
 namespace IPS\gallery\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Exception;
-use IPS\Api\PaginatedResponse;
-use IPS\Api\Response;
-use IPS\Content\Api\ItemController;
-use IPS\Content\Item;
-use IPS\Db;
-use IPS\File;
-use IPS\gallery\Album;
-use IPS\gallery\Category;
-use IPS\gallery\Image;
-use IPS\gallery\Image\Comment;
-use IPS\gallery\Image\Review;
-use IPS\Member;
-use IPS\Request;
-use IPS\Text\Parser;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function strlen;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Gallery Images API
  */
-class images extends ItemController
+class _images extends \IPS\Content\Api\ItemController
 {
 	/**
 	 * Class
 	 */
-	protected string $class = 'IPS\gallery\Image';
+	protected $class = 'IPS\gallery\Image';
 	
 	/**
 	 * GET /gallery/images
@@ -65,22 +44,21 @@ class images extends ItemController
 	 * @apiparam	string	sortDir			Sort direction. Can be 'asc' or 'desc' - defaults to 'asc'
 	 * @apiparam	int		page			Page number
 	 * @apiparam	int		perPage			Number of results per page - defaults to 25
-	 * @apireturn		PaginatedResponse<IPS\gallery\Image>
-	 * @return PaginatedResponse<Image>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\gallery\Image>
 	 */
-	public function GETindex(): PaginatedResponse
+	public function GETindex()
 	{
 		/* Where clause */
 		$where = array();
 		
 		/* Albums */
-		if ( isset( Request::i()->albums ) )
+		if ( isset( \IPS\Request::i()->albums ) )
 		{
-			$where[] = array( Db::i()->in( 'image_album_id', array_filter( explode( ',', Request::i()->albums ) ) ) );
+			$where[] = array( \IPS\Db::i()->in( 'image_album_id', array_filter( explode( ',', \IPS\Request::i()->albums ) ) ) );
 		}
 				
 		/* Return */
-		return $this->_list( $where );
+		return $this->_list( $where, 'categories' );
 	}
 	
 	/**
@@ -89,18 +67,17 @@ class images extends ItemController
 	 *
 	 * @param		int		$id			ID Number
 	 * @throws		2G316/1	INVALID_ID	The image ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		\IPS\gallery\Image
-	 * @return Response
+	 * @return		\IPS\gallery\Image
 	 */
-	public function GETitem( int $id ): Response
+	public function GETitem( $id )
 	{
 		try
 		{
 			return $this->_view( $id );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2G316/1', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2G316/1', 404 );
 		}
 	}
 	
@@ -135,90 +112,89 @@ class images extends ItemController
 	 * @throws		1G316/6				NO_IMAGE				The image was invalid
 	 * @throws		2G316/D				NO_PERMISSION			The authorized user does not have permission to create an image in that category/album
 	 * @throws		1G316/E				IMAGE_TOO_BIG			The image exceeds the filesize the authorized user can upload
-	 * @apireturn		\IPS\gallery\Image
-	 * @return Response
+	 * @return		\IPS\gallery\Image
 	 */
-	public function POSTindex(): Response
+	public function POSTindex()
 	{		
 		/* Get category or album */
-		if ( isset( Request::i()->album ) )
+		if ( isset( \IPS\Request::i()->album ) )
 		{
 			try
 			{
-				$album = Album::load( Request::i()->album );
+				$album = \IPS\gallery\Album::load( \IPS\Request::i()->album );
 				$category = $album->category();
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				throw new Exception( 'NO_CATEGORY_OR_ALBUM', '1G316/2', 400 );
+				throw new \IPS\Api\Exception( 'NO_CATEGORY_OR_ALBUM', '1G316/2', 400 );
 			}
 		}
 		else
 		{
 			try
 			{
-				$category = Category::load( Request::i()->category );
+				$category = \IPS\gallery\Category::load( \IPS\Request::i()->category );
 			}
-			catch ( OutOfRangeException $e )
+			catch ( \OutOfRangeException $e )
 			{
-				throw new Exception( 'NO_CATEGORY_OR_ALBUM', '1G316/2', 400 );
+				throw new \IPS\Api\Exception( 'NO_CATEGORY_OR_ALBUM', '1G316/2', 400 );
 			}
 		}
 		
 		/* Get author */
 		if ( $this->member )
 		{
-			if ( isset( Request::i()->album ) )
+			if ( isset( \IPS\Request::i()->album ) )
 			{
 				if ( !$album->can( 'add', $this->member ) )
 				{
-					throw new Exception( 'NO_PERMISSION', '2G316/D', 403 );
+					throw new \IPS\Api\Exception( 'NO_PERMISSION', '2G316/D', 403 );
 				}
 			}
 			elseif ( !$category->can( 'add', $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2G316/D', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2G316/D', 403 );
 			}
 			$author = $this->member;
 		}
 		else
 		{
-			if ( Request::i()->author )
+			if ( \IPS\Request::i()->author )
 			{
-				$author = Member::load( Request::i()->author );
+				$author = \IPS\Member::load( \IPS\Request::i()->author );
 				if ( !$author->member_id )
 				{
-					throw new Exception( 'NO_AUTHOR', '1G316/3', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1G316/3', 400 );
 				}
 			}
 			else
 			{
-				if ( (int) Request::i()->author === 0 )
+				if ( \IPS\Request::i()->author === 0 ) 
 				{
-					$author = new Member;
+					$author = new \IPS\Member;
 				}
 				else 
 				{
-					throw new Exception( 'NO_AUTHOR', '1G316/3', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1G316/3', 400 );
 				}
 			}
 		}
 		
 		/* Check we have a caption and a filename */
-		if ( !Request::i()->caption )
+		if ( !\IPS\Request::i()->caption )
 		{
-			throw new Exception( 'NO_CAPTION', '1G316/4', 400 );
+			throw new \IPS\Api\Exception( 'NO_CAPTION', '1G316/4', 400 );
 		}
-		if ( !Request::i()->filename )
+		if ( !\IPS\Request::i()->filename )
 		{
-			throw new Exception( 'NO_FILENAME', '1G316/5', 400 );
+			throw new \IPS\Api\Exception( 'NO_FILENAME', '1G316/5', 400 );
 		}
 		
 		/* Check it's a valid image */
-		$imageContents = base64_decode( Request::i()->image );
-		if ( $this->member and $this->member->group['g_max_upload'] and strlen( $imageContents ) > $this->member->group['g_max_upload'] * 1024 )
+		$imageContents = base64_decode( \IPS\Request::i()->image );
+		if ( $this->member and $this->member->group['g_max_upload'] and \strlen( $imageContents ) > $this->member->group['g_max_upload'] * 1024 )
 		{
-			throw new Exception( 'IMAGE_TOO_BIG', '1G316/E', 400 );
+			throw new \IPS\Api\Exception( 'IMAGE_TOO_BIG', '1G316/E', 400 );
 		}
 		try
 		{
@@ -226,11 +202,11 @@ class images extends ItemController
 		}
 		catch ( \Exception $e )
 		{
-			throw new Exception( 'NO_IMAGE', '1G316/6', 400 );
+			throw new \IPS\Api\Exception( 'NO_IMAGE', '1G316/6', 400 );
 		}
 		
 		/* Create the file */
-		$file = File::create( 'gallery_Images', Request::i()->filename, $imageContents );
+		$file = \IPS\File::create( 'gallery_Images', \IPS\Request::i()->filename, $imageContents );
 		
 		/* Create the object */
 		$image = $this->_create( $category, $author );
@@ -239,30 +215,33 @@ class images extends ItemController
 		$image->original_file_name	= (string) $file;
 		$image->file_size	= $file->filesize();
 		$image->file_name	= $file->originalFilename;
-		$image->file_type	= File::getMimeType( $file->filename );
+		$image->file_type	= \IPS\File::getMimeType( $file->filename );
 		if( \IPS\Image::exifSupported() )
 		{
 			$image->metadata	= $imageObject->parseExif();
-			if( count( $image->metadata ) )
+			if( \count( $image->metadata ) )
 			{
 				$image->parseGeolocation();
-				$image->gps_show = isset( Request::i()->gpsShow ) ? Request::i()->gpsShow : 1;
+				$image->gps_show = isset( \IPS\Request::i()->gpsShow ) ? \IPS\Request::i()->gpsShow : 1;
 			}
 			$metadata = $image->metadata;
+			array_walk_recursive( $metadata, function( &$val, $key )
+			{
+				$val = utf8_encode( $val );
+			} );
 			$image->metadata = json_encode( $metadata );
 		}
 		$image->buildThumbnails( $file );
 		$image->save();
 					
 		/* Output */
-		return new Response( 201, $image->apiOutput( $this->member ) );
+		return new \IPS\Api\Response( 201, $image->apiOutput( $this->member ) );
 	}
 	
 	/**
 	 * POST /gallery/images/{id}
 	 * Edit an image
 	 *
-	 * @param int $id
 	 * @note		For requests using an OAuth Access Token for a particular member, any parameters the user doesn't have permission to use are ignored (for example, locked will only be honoured if the authenticated user has permission to lock topics).
 	 * @apiparam	int					album					The ID number of the album (only provide this or category to move image)
 	 * @apiparam	int					category				The ID number of the category (only provide this or category to move image)
@@ -284,21 +263,20 @@ class images extends ItemController
 	 * @throws		1G316/8				NO_CATEGORY_OR_ALBUM	The category or album does not exist or the authorized user does not have permission to post in it
 	 * @throws		1G316/9				NO_AUTHOR				The author ID does not exist
 	 * @throws		2G316/F				NO_PERMISSION			The authorized user does not have permission to edit the image
-	 * @apireturn		\IPS\gallery\Image
-	 * @return Response
+	 * @return		\IPS\gallery\Image
 	 */
-	public function POSTitem( int $id ): Response
+	public function POSTitem( $id )
 	{
 		try
 		{
-			$image = Image::load( $id );
+			$image = \IPS\gallery\Image::load( $id );
 			if ( $this->member and !$image->can( 'read', $this->member ) )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 			if ( $this->member and !$image->canEdit( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2G316/FD', 403 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2G316/FD', 403 );
 			}
 			
 			/* New category or album */
@@ -306,49 +284,49 @@ class images extends ItemController
 			{
 				try
 				{
-					if ( isset( Request::i()->album ) and Request::i()->album != $image->album_id )
+					if ( isset( \IPS\Request::i()->album ) and \IPS\Request::i()->album != $image->album_id )
 					{
-						$newAlbum = Album::load( Request::i()->album );
+						$newAlbum = \IPS\gallery\Album::load( \IPS\Request::i()->album );
 						if ( $this->member and !$newAlbum->can( 'add', $this->member ) )
 						{
-							throw new OutOfRangeException;
+							throw new \OutOfRangeException;
 						}
 						
 						$image->move( $newAlbum );
 					}
-					elseif ( isset( Request::i()->category ) and Request::i()->category != $image->category_id )
+					elseif ( isset( \IPS\Request::i()->category ) and \IPS\Request::i()->category != $image->category_id )
 					{
-						$newCategory = Category::load( Request::i()->category );
+						$newCategory = \IPS\gallery\Category::load( \IPS\Request::i()->category );
 						if ( $this->member and !$newCategory->can( 'add', $this->member ) )
 						{
-							throw new OutOfRangeException;
+							throw new \OutOfRangeException;
 						}
 						
 						$image->move( $newCategory );
 					}
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					throw new Exception( 'NO_CATEGORY_OR_ALBUM', '1G316/8', 400 );
+					throw new \IPS\Api\Exception( 'NO_CATEGORY_OR_ALBUM', '1G316/8', 400 );
 				}
 			}
 			
 			/* New author */
-			if ( !$this->member and isset( Request::i()->author ) )
+			if ( !$this->member and isset( \IPS\Request::i()->author ) )
 			{				
 				try
 				{
-					$member = Member::load( Request::i()->author );
+					$member = \IPS\Member::load( \IPS\Request::i()->author );
 					if ( !$member->member_id )
 					{
-						throw new OutOfRangeException;
+						throw new \OutOfRangeException;
 					}
 					
 					$image->changeAuthor( $member );
 				}
-				catch ( OutOfRangeException $e )
+				catch ( \OutOfRangeException $e )
 				{
-					throw new Exception( 'NO_AUTHOR', '1G316/9', 400 );
+					throw new \IPS\Api\Exception( 'NO_AUTHOR', '1G316/9', 400 );
 				}
 			}
 			
@@ -357,11 +335,11 @@ class images extends ItemController
 			
 			/* Save and return */
 			$image->save();
-			return new Response( 200, $image->apiOutput( $this->member ) );
+			return new \IPS\Api\Response( 200, $image->apiOutput( $this->member ) );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2G316/7', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2G316/7', 404 );
 		}
 	}
 	
@@ -375,18 +353,17 @@ class images extends ItemController
 	 * @apiparam	int		page		Page number
 	 * @apiparam	int		perPage		Number of results per page - defaults to 25
 	 * @throws		2G316/A	INVALID_ID	The image ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		PaginatedResponse<IPS\gallery\Image\Comment>
-	 * @return PaginatedResponse<Comment>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\gallery\Image\Comment>
 	 */
-	public function GETitem_comments( int $id ): PaginatedResponse
+	public function GETitem_comments( $id )
 	{
 		try
 		{
 			return $this->_comments( $id, 'IPS\gallery\Image\Comment' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2G316/A', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2G316/A', 404 );
 		}
 	}
 	
@@ -400,69 +377,68 @@ class images extends ItemController
 	 * @apiparam	int		page		Page number
 	 * @apiparam	int		perPage		Number of results per page - defaults to 25
 	 * @throws		2G316/B	INVALID_ID	The image ID does not exist or the authorized user does not have permission to view it
-	 * @apireturn		PaginatedResponse<IPS\gallery\Image\Review>
-	 * @return PaginatedResponse<Review>
+	 * @return		\IPS\Api\PaginatedResponse<IPS\gallery\Image\Review>
 	 */
-	public function GETitem_reviews( int $id ): PaginatedResponse
+	public function GETitem_reviews( $id )
 	{
 		try
 		{
 			return $this->_comments( $id, 'IPS\gallery\Image\Review' );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2G316/B', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2G316/B', 404 );
 		}
 	}
 	
 	/**
 	 * Create or update image
 	 *
-	 * @param	Item	$item	The item
+	 * @param	\IPS\Content\Item	$item	The item
 	 * @param	string				$type	add or edit
-	 * @return	Item
+	 * @return	\IPS\Content\Item
 	 */
-	protected function _createOrUpdate( Item $item, string $type='add' ): Item
+	protected function _createOrUpdate( \IPS\Content\Item $item, $type='add' )
 	{
 		/* Album */
-		if ( isset( Request::i()->album ) and !$item->id )
+		if ( isset( \IPS\Request::i()->album ) and !$item->id )
 		{
-			$item->album_id = Request::i()->album;
+			$item->album_id = \IPS\Request::i()->album;
 		}
 		
 		/* Caption */
-		if ( isset( Request::i()->caption ) )
+		if ( isset( \IPS\Request::i()->caption ) )
 		{
-			$item->caption = Request::i()->caption;
+			$item->caption = \IPS\Request::i()->caption;
 		}
 
 		/* Description */
-		if ( isset( Request::i()->description ) )
+		if ( isset( \IPS\Request::i()->description ) )
 		{
-			$descriptionContents = Request::i()->description;
+			$descriptionContents = \IPS\Request::i()->description;
 			if ( $this->member )
 			{
-				$descriptionContents = Parser::parseStatic( $descriptionContents, NULL, $this->member, 'gallery_Images' );
+				$descriptionContents = \IPS\Text\Parser::parseStatic( $descriptionContents, TRUE, NULL, $this->member, 'gallery_Images' );
 			}
 			$item->description = $descriptionContents;
 		}
 
 		/* Copyright */
-		if ( isset( Request::i()->copyright ) )
+		if ( isset( \IPS\Request::i()->copyright ) )
 		{
-			$item->copyright = Request::i()->copyright;
+			$item->copyright = \IPS\Request::i()->copyright;
 		}
 
 		/* Credit */
-		if ( isset( Request::i()->credit ) )
+		if ( isset( \IPS\Request::i()->credit ) )
 		{
-			$item->credit_info = Request::i()->credit;
+			$item->credit_info = \IPS\Request::i()->credit;
 		}
 		
 		/* GPS Show */
-		if ( isset( Request::i()->gpsShow ) )
+		if ( isset( \IPS\Request::i()->gpsShow ) )
 		{
-			$item->gps_show = Request::i()->gpsShow;
+			$item->gps_show = \IPS\Request::i()->gpsShow;
 		}
 		
 		/* Pass up */
@@ -476,26 +452,25 @@ class images extends ItemController
 	 * @param		int		$id			ID Number
 	 * @throws		2G316/C	INVALID_ID		The image ID does not exist
 	 * @throws		2G316/G	NO_PERMISSION	The authorized user does not have permission to delete the image
-	 * @apireturn		void
-	 * @return Response
+	 * @return		void
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
 		try
 		{
-			$item = Image::load( $id );
+			$item = \IPS\gallery\Image::load( $id );
 			if ( $this->member and !$item->canDelete( $this->member ) )
 			{
-				throw new Exception( 'NO_PERMISSION', '2G316/G', 404 );
+				throw new \IPS\Api\Exception( 'NO_PERMISSION', '2G316/G', 404 );
 			}
 			
 			$item->delete();
 			
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '2G316/C', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '2G316/C', 404 );
 		}
 	}
 }

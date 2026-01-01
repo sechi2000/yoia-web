@@ -10,29 +10,25 @@
  */
 
 namespace IPS\forums\api\GraphQL\Queries;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\forums\api\GraphQL\Types\TopicType;
-use IPS\forums\Topic as TopicClass;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Topic query for GraphQL API
  */
-class Topic
+class _Topic
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns a topic";
+	public static $description = "Returns a topic";
 
 	/*
 	 * Query arguments
@@ -46,10 +42,8 @@ class Topic
 
 	/**
 	 * Return the query return type
-	 *
-	 * @return TopicType
 	 */
-	public function type() : TopicType
+	public function type() 
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::topic();
 	}
@@ -57,26 +51,25 @@ class Topic
 	/**
 	 * Resolves this query
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @param 	array $context 	Context values
-	 * @param	mixed $info
-	 * @return	TopicClass
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\forums\Topic\Post
 	 */
-	public function resolve( mixed $val, array $args, array $context, mixed $info ) : TopicClass
+	public function resolve($val, $args, $context, $info)
 	{
 		try
 		{
-			$topic = TopicClass::loadAndCheckPerms( $args['id'] );
+			$topic = \IPS\forums\Topic::loadAndCheckPerms( $args['id'] );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new SafeException( 'NO_TOPIC', '1F294/2_graphql', 400 );
+			throw new \IPS\Api\GraphQL\SafeException( 'NO_TOPIC', '1F294/2_graphql', 400 );
 		}
 
 		if( !$topic->can('read') )
 		{
-			throw new SafeException( 'INVALID_ID', '2F294/9_graphql', 403 );
+			throw new \IPS\Api\GraphQL\SafeException( 'INVALID_ID', '2F294/9_graphql', 403 );
 		}
 
 		return $topic;

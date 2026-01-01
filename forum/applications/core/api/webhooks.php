@@ -11,26 +11,16 @@
 namespace IPS\core\api;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Api\Controller;
-use IPS\Api\Exception;
-use IPS\Api\Response;
-use IPS\Api\Webhook;
-use IPS\Http\Url;
-use IPS\Request;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Webhooks API
  */
-class webhooks extends Controller
+class _webhooks extends \IPS\Api\Controller
 {
 	/**
 	 * POST /core/webhooks
@@ -40,40 +30,39 @@ class webhooks extends Controller
 	 * @reqapiparam	array	events	List of events to subscribe to
 	 * @reqapiparam	string	url		URL to send webhook to
 	 * @apiparam	string	content_header	The content type for the request.
-	 * @apireturn		\IPS\Api\Webhook
+	 * @return		\IPS\Api\Webhook
 	 * @throws		1C293/1	NO_EVENTS	No events were specified
 	 * @throws		1C293/2	INVALID_URL	The URL specified was not valid
-	 * @return Response
 	 */
-	public function POSTindex(): Response
+	public function POSTindex()
 	{				
-		$events = Request::i()->events;
+		$events = \IPS\Request::i()->events;
 		if ( !$events )
 		{
-			throw new Exception( 'NO_EVENTS', '1C293/1', 400 );
+			throw new \IPS\Api\Exception( 'NO_EVENTS', '1C293/1', 400 );
 		}
 		
 		try
 		{
-			$url = new Url( Request::i()->url );
+			$url = new \IPS\Http\Url( \IPS\Request::i()->url );
 		}
-		catch ( Url\Exception $e )
+		catch ( \IPS\Http\Url\Exception $e )
 		{
-			throw new Exception( 'INVALID_URL', '1C293/2', 400 );
+			throw new \IPS\Api\Exception( 'INVALID_URL', '1C293/2', 400 );
 		}
 		
-		$webhook = new Webhook;
+		$webhook = new \IPS\Api\Webhook;
 		$webhook->api_key = $this->apiKey;
 		$webhook->events = $events;
-		$webhook->filters = ( Request::i()->filters ?: array() );
+		$webhook->filters = ( \IPS\Request::i()->filters ?: array() );
 		$webhook->url = $url;
-		if( Request::i()->content_header )
+		if( \IPS\Request::i()->content_header )
 		{
-			$webhook->content_type = Request::i()->content_header;
+			$webhook->content_type = \IPS\Request::i()->content_header;
 		}
 		$webhook->save();
 		
-		return new Response( 201, $webhook->apiOutput() );
+		return new \IPS\Api\Response( 201, $webhook->apiOutput() );
 	}
 	
 	/**
@@ -82,29 +71,28 @@ class webhooks extends Controller
 	 *
 	 * @apiclientonly
 	 * @param		int		$id					ID Number
-	 * @apireturn		void
+	 * @return		void
 	 * @throws		1C293/3	INVALID_ID		The ID provided does not match any webhook
 	 * @throws		3C293/4	WRONG_API_KEY	The API key making this request is not the API key that created the webhook
-	 * @return Response
 	 */
-	public function DELETEitem( int $id ): Response
+	public function DELETEitem( $id )
 	{
 		try
 		{
-			$webhook = Webhook::load( $id );
+			$webhook = \IPS\Api\Webhook::load( $id );
 			
 			if ( $webhook->api_key != $this->apiKey )
 			{
-				throw new Exception( 'WRONG_API_KEY', '3C293/4', 403 );
+				throw new \IPS\Api\Exception( 'WRONG_API_KEY', '3C293/4', 403 );
 			}
 
 			$webhook->delete();
 
-			return new Response( 200, NULL );
+			return new \IPS\Api\Response( 200, NULL );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			throw new Exception( 'INVALID_ID', '1C293/3', 404 );
+			throw new \IPS\Api\Exception( 'INVALID_ID', '1C293/3', 404 );
 		}
 	}
 }

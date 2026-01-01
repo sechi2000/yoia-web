@@ -11,26 +11,21 @@
 namespace IPS\Output\Plugin;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\File as SystemFile;
-use IPS\Request;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Template Plugin - File
  */
-class File
+class _File
 {
 	/**
 	 * @brief	Can be used when compiling CSS
 	 */
-	public static bool $canBeUsedInCss = TRUE;
+	public static $canBeUsedInCss = TRUE;
 	
 	/**
 	 * Run the plug-in
@@ -39,16 +34,16 @@ class File
 	 * @param	array		$options    Array of options
 	 * @return	string		Code to eval
 	 */
-	public static function runPlugin( string $data, array $options ): string
+	public static function runPlugin( $data, $options )
 	{
-		$extension = ( $options['extension'] ?? 'core_Attachment' );
-		$scheme    = ( $options['scheme'] ?? NULL );
-		$cacheBust = ( $options['cb'] ?? NULL );
+		$extension = ( isset( $options['extension'] )  ? $options['extension'] : 'core_Attachment' );
+		$scheme    = ( isset( $options['scheme'] )  ? $options['scheme'] : NULL );
+		$cacheBust = ( isset( $options['cb'] ) ? $options['cb'] : NULL );
 		$schemeString = $cbString = '';
 
 		if ( $scheme )
 		{
-			$fullScheme = ( Request::i()->isSecure() ) ? 'https' : 'http';
+			$fullScheme = ( \IPS\Request::i()->isSecure() ) ? 'https' : 'http';
 			$schemeString = ( $scheme == 'full' ) ? '->setScheme("' . $fullScheme .'")' : '->setScheme(NULL)';
 		}
 
@@ -56,8 +51,7 @@ class File
 		{
 			$cbString = "->setQueryString( 'v', " . $cacheBust . ")";
 		}
-
-		if ( $data instanceof SystemFile )
+		if ( $data instanceof \IPS\File )
 		{
 			return "(string) " . $data . "->url" . $schemeString . $cbString;
 		}

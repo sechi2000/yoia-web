@@ -10,75 +10,51 @@
 namespace IPS\core\extensions\core\AchievementAction;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Content;
-use IPS\Content\Reaction as ContentReaction;
-use IPS\core\Achievements\Actions\ContentAchievementActionAbstract;
-use IPS\core\Achievements\Rule;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Helpers\Form\Custom;
-use IPS\Helpers\Form\Node;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Theme;
-use OutOfRangeException;
-use function class_exists;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_integer;
-use function is_numeric;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement Action Extension
  */
-class Reaction extends ContentAchievementActionAbstract
+class _Reaction extends \IPS\core\Achievements\Actions\AbstractContentAchievementAction
 {
-	protected static bool $includeItems = FALSE;
+	protected static $includeItems = FALSE;
 
 	/**
 	 * @var bool    Exclude content items that require a first comment
 	 */
-	protected static bool $excludeItemsWithRequiredComment = TRUE;
+	protected static $excludeItemsWithRequiredComment = TRUE;
 
 	/**
 	 * Get filter form elements
 	 *
 	 * @param	array|NULL		$filters	Current filter values (if editing)
-	 * @param	Url	$url		The URL the form is being shown on
+	 * @param	\IPS\Http\Url	$url		The URL the form is being shown on
 	 * @return	array
 	 */
-	public function filters( ?array $filters, Url $url ): array
+	public function filters( ?array $filters, \IPS\Http\Url $url ): array
 	{
 		$return = parent::filters( $filters, $url );
 		
-		$reactionFilter = new Node( 'achievement_filter_Reaction_reaction', ( $filters and isset( $filters['reactions'] ) and $filters['reactions'] ) ? $filters['reactions'] : 0, FALSE, [
+		$reactionFilter = new \IPS\Helpers\Form\Node( 'achievement_filter_Reaction_reaction', ( $filters and isset( $filters['reactions'] ) and $filters['reactions'] ) ? $filters['reactions'] : 0, FALSE, [
 			'url'				=> $url,
 			'class'				=> 'IPS\Content\Reaction',
 			'showAllNodes'		=> TRUE,
 			'multiple' 			=> TRUE,
-		], NULL, Member::loggedIn()->language()->addToStack( 'achievement_subfilter_Reaction_reaction_prefix' ) );
+		], NULL, \IPS\Member::loggedIn()->language()->addToStack( 'achievement_subfilter_Reaction_reaction_prefix' ) );
 		$return['reactions'] = $reactionFilter;
 
-		$return['milestone'] = new Custom( 'achievement_filter_Reaction_nth', ( $filters and isset( $filters['milestone'] ) and $filters['milestone'] ) ? $filters['milestone'] : [], FALSE, array( 'getHtml' => function( $element )
+		$return['milestone'] = new \IPS\Helpers\Form\Custom( 'achievement_filter_Reaction_nth', ( $filters and isset( $filters['milestone'] ) and $filters['milestone'] ) ? $filters['milestone'] : [], FALSE, array( 'getHtml' => function( $element )
 		{
 			/* 4.6.0 - 4.6.3 */
-			if ( is_integer( $element->value ) )
+			if ( \is_integer( $element->value ) )
 			{
 				$element->value = ['receiver', $element->value];
 			}
-			return Theme::i()->getTemplate( 'achievements', 'core' )->milestoneWithSubjectSwitch( $element->name, $element->value );
+			return \IPS\Theme::i()->getTemplate( 'achievements' )->milestoneWithSubjectSwitch( $element->name, $element->value );
 		} ), NULL, NULL, NULL, 'achievement_filter_Reaction_nth' );
 
 		return $return;
@@ -108,12 +84,12 @@ class Reaction extends ContentAchievementActionAbstract
 	 * calls that BEFORE making its change in the database (or there is read/write separation), you will need to add
 	 * 1 to the value being considered for milestones
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	array		$filters	The value returned by formatFilterValues()
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	bool
 	 */
-	public function filtersMatch( Member $subject, array $filters, mixed $extra = NULL ): bool
+	public function filtersMatch( \IPS\Member $subject, array $filters, $extra = NULL ): bool
 	{
 		if ( !parent::filtersMatch( $subject, $filters, $extra['content'] ) )
 		{
@@ -122,7 +98,7 @@ class Reaction extends ContentAchievementActionAbstract
 
 		if ( isset( $filters['reactions'] ) )
 		{
-			if ( !in_array( $extra['reaction']->id, $filters['reactions'] ) )
+			if ( !\in_array( $extra['reaction']->id, $filters['reactions'] ) )
 			{
 				return FALSE;
 			}
@@ -130,7 +106,7 @@ class Reaction extends ContentAchievementActionAbstract
 
 		if ( isset( $filters['milestone'] ) )
 		{
-			if ( is_array( $filters['milestone'] ) )
+			if ( isset( $filters['milestone'] ) and \is_array( $filters['milestone'] ) )
 			{
 				$field = ( $filters['milestone'][0] == 'giver' ) ? 'member_id' : 'member_received';
 				$member = ( $filters['milestone'][0] == 'giver' ) ? $extra['giver'] : $subject;
@@ -154,58 +130,18 @@ class Reaction extends ContentAchievementActionAbstract
 		
 		return TRUE;
 	}
-
-	/**
-	 * Determines if the member has already completed this rule.
-	 * Used for retroactive rule completion.
-	 * So far, this is only used in Quests, but may be used elsewhere at a later point.
-	 *
-	 * @param Member $member
-	 * @param array $filters
-	 * @return bool
-	 */
-	public function isRuleCompleted( Member $member, array $filters ) : bool
-	{
-		$where = [];
-
-		if( !empty( $filters['milestone'] ) )
-		{
-			$milestone = is_array( $filters['milestone'] ) ? $filters['milestone'][1] : $filters['milestone'];
-			if( is_array( $filters['milestone'] ) and $filters['milestone'][0] == 'receiver' )
-			{
-				$where[] = [ 'member_received=?', $member->member_id ];
-			}
-			else
-			{
-				$where[] = [ 'member_id=?', $member->member_id ];
-			}
-		}
-
-		if( !empty( $filters['reactions'] ) )
-		{
-			$where[] = [ Db::i()->in( 'reaction', $filters['reactions'] ) ];
-		}
-
-		$total = (int) Db::i()->select( 'count(*)', 'core_reputation_index', $where )->first();
-		if( isset( $milestone ) )
-		{
-			return $total >= $milestone;
-		}
-
-		return $total > 0;
-	}
 	
 	/**
 	 * Get identifier to prevent the member being awarded points for the same action twice
 	 * Must be unique within within of this domain, must not exceed 32 chars.
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	string
 	 */
-	public function identifier( Member $subject, mixed $extra = NULL ): string
+	public function identifier( \IPS\Member $subject, $extra = NULL ): string
 	{
-		return get_class( $extra['content'] ) . ':' . $extra['content']->{$extra['content']::$databaseColumnId} . ':' . $extra['giver']->member_id;
+		return \get_class( $extra['content'] ) . ':' . $extra['content']->{$extra['content']::$databaseColumnId} . ':' . $extra['giver']->member_id;
 	}
 
 	/**
@@ -230,7 +166,7 @@ class Reaction extends ContentAchievementActionAbstract
 	 * @param	array|NULL	$filters	Current filter values
 	 * @return	array
 	 */
-	public function awardOther( mixed $extra = NULL, ?array $filters = NULL ): array
+	public function awardOther( $extra = NULL, ?array $filters = NULL ): array
 	{
 		return [ $extra['giver'] ];
 	}
@@ -246,47 +182,41 @@ class Reaction extends ContentAchievementActionAbstract
 	{
 		$exploded = explode( ':', $identifier );
 				
-		$reactionName = Member::loggedIn()->language()->addToStack('unknown');
-		$contentLink = Member::loggedIn()->language()->addToStack('modcp_deleted');
+		$reactionName = \IPS\Member::loggedIn()->language()->addToStack('unknown');
+		$contentLink = \IPS\Member::loggedIn()->language()->addToStack('modcp_deleted');
 		try
 		{
 			$class = $exploded[0];
-			if( class_exists( $class ) )
-			{
-				$content = $class::load( $exploded[1] );
-				if( \IPS\IPS::classUsesTrait( $content, 'IPS\Content\Reactable' ) )
-				{
-					$contentLink = Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $content->url(), TRUE, $content->indefiniteArticle(), FALSE );
-
-					$reaction = $content->reacted( Member::load( $exploded[2] ) );
-					$reactionName = $reaction->_title;
-				}
-			}
+			$content = $class::load( $exploded[1] );
+			$contentLink = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $content->url(), TRUE, $content->indefiniteArticle(), FALSE );
+			
+			$reaction = $content->reacted( \IPS\Member::load( $exploded[2] ) );
+			$reactionName = $reaction->_title;
 		}
-		catch ( Exception $e ) {  }
+		catch ( \Exception $e ) {  }
 		
-		if ( in_array( 'subject', $actor ) )
+		if ( \in_array( 'subject', $actor ) )
 		{
-			return Member::loggedIn()->language()->addToStack( 'AchievementAction__Reaction_log_subject', FALSE, [ 'sprintf' => [ $reactionName ], 'htmlsprintf' => [ $contentLink ] ] );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__Reaction_log_subject', FALSE, [ 'sprintf' => [ $reactionName ], 'htmlsprintf' => [ $contentLink ] ] );
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack( 'AchievementAction__Reaction_log_other', FALSE, [ 'sprintf' => [ $reactionName ], 'htmlsprintf' => [ $contentLink ] ] );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__Reaction_log_other', FALSE, [ 'sprintf' => [ $reactionName ], 'htmlsprintf' => [ $contentLink ] ] );
 		}
 	}
 	
 	/**
 	 * Get "description" for rule
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	public function ruleDescription( Rule $rule ): ?string
+	public function ruleDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{		
 		$conditions = [];
 		if ( isset( $rule->filters['milestone'] ) )
 		{
-			if ( is_integer( $rule->filters['milestone'] ) )
+			if ( \is_integer( $rule->filters['milestone'] ) )
 			{
 				/* 4.6.0 - 4.6.3 */
 				$milestone = $rule->filters['milestone'];
@@ -296,11 +226,11 @@ class Reaction extends ContentAchievementActionAbstract
 				$milestone = $rule->filters['milestone'][1];
 			}
 
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
 				'htmlsprintf' => [
-					Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'milestone', Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $milestone ] ] ) )
+					\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'milestone', \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $milestone ] ] ) )
 				],
-				'sprintf' => Member::loggedIn()->language()->addToStack('AchievementAction__Reaction_title_generic')
+				'sprintf' => \IPS\Member::loggedIn()->language()->addToStack('AchievementAction__Reaction_title_generic')
 			] );
 		}
 		if ( isset( $rule->filters['reactions'] ) )
@@ -310,19 +240,19 @@ class Reaction extends ContentAchievementActionAbstract
 			{
 				try
 				{
-					$reactionNames[] = ContentReaction::load( $id )->_title;
+					$reactionNames[] = \IPS\Content\Reaction::load( $id )->_title;
 				}
-				catch ( OutOfRangeException $e ) {}
+				catch ( \OutOfRangeException $e ) {}
 			}
 			if ( $reactionNames )
 			{
-				$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_type', FALSE, [
+				$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_type', FALSE, [
 					'htmlsprintf' => [
-						Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'other',
-							count( $reactionNames ) === 1 ? $reactionNames[0] : Member::loggedIn()->language()->addToStack( 'AchievementAction__Reaction_types', FALSE, [ 'sprintf' => [
-								count( $reactionNames ),
+						\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'other',
+							\count( $reactionNames ) === 1 ? $reactionNames[0] : \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__Reaction_types', FALSE, [ 'sprintf' => [
+								\count( $reactionNames ),
 							] ] ),
-							count( $reactionNames ) === 1 ? NULL : $reactionNames
+							\count( $reactionNames ) === 1 ? NULL : $reactionNames
 						)
 					],
 				] );
@@ -332,15 +262,11 @@ class Reaction extends ContentAchievementActionAbstract
 		{
 			$conditions[] = $nodeCondition;
 		}
-		if( $questCondition = $this->_questFilterDescription( $rule ) )
-		{
-			$conditions[] = $questCondition;
-		}
 		
-		return Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescription(
-			( ( isset( $rule->filters['milestone'] ) and ( ( is_array( $rule->filters['milestone'] ) and $rule->filters['milestone'][0] == 'giver' ) or is_numeric( $rule->filters['milestone'] ) ) ) or ! isset( $rule->filters['milestone']) )
-			? Member::loggedIn()->language()->addToStack( 'AchievementAction__Reaction_title' )
-			: Member::loggedIn()->language()->addToStack( 'AchievementAction__Reaction_title_received' ),
+		return \IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescription(
+			( ( isset( $rule->filters['milestone'] ) and ( ( \is_array( $rule->filters['milestone'] ) and $rule->filters['milestone'][0] == 'giver' ) or \is_numeric( $rule->filters['milestone'] ) ) ) or ! isset( $rule->filters['milestone']) )
+			? \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__Reaction_title' )
+			: \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__Reaction_title_received' ),
 			$conditions
 		);
 	}
@@ -350,7 +276,7 @@ class Reaction extends ContentAchievementActionAbstract
 	 *
 	 * @return	array
 	 */
-	static public function rebuildData(): array
+	static public function rebuildData()
 	{
 		return [ [
 			'table' => 'core_reputation_index',
@@ -367,20 +293,20 @@ class Reaction extends ContentAchievementActionAbstract
 	 * @param array		$data	Data collected when starting rebuild [table, pkey...]
 	 * @return void
 	 */
-	public static function rebuildRow( array $row, array $data ) : void
+	public static function rebuildRow( $row, $data )
 	{
-		if ( !$row['rep_class'] OR !class_exists( $row['rep_class'] ) )
+		if ( !$row['rep_class'] OR !\class_exists( $row['rep_class'] ) )
 		{
 			/* Class either isn't set or doesn't exist, so move on. */
 			return;
 		}
 
 		$object = $row['rep_class']::load( $row['type_id'] );
-		$reaction = ContentReaction::load( $row['reaction'] );
+		$reaction = \IPS\Content\Reaction::load( $row['reaction'] );
 
 		/* Give points */
 		static::getAuthor( $object )->achievementAction( 'core', 'Reaction', [
-			'giver'		=> Member::load( $row['member_id'] ),
+			'giver'		=> \IPS\Member::load( $row['member_id'] ),
 			'content'	=> $object,
 			'reaction'	=> $reaction
 		] );
@@ -390,18 +316,18 @@ class Reaction extends ContentAchievementActionAbstract
 	 * Get the author of the content / node
 	 * 
 	 * @param $object
-	 * @return Member|null
+	 * @return \IPS\Member|null
 	 */
-	public static function getAuthor( $object ): ?Member
+	public static function getAuthor( $object ): ?\IPS\Member
 	{
 		$owner = NULL;
 
 		/* Figure out the owner of this - if it is content, it will be the author. If it is a node, then it will be the person who created it */
-		if ( $object instanceof Content )
+		if ( $object instanceof \IPS\Content )
 		{
 			$owner = $object->author();
 		}
-		else if ( $object instanceof Model )
+		else if ( $object instanceof \IPS\Node\Model )
 		{
 			$owner = $object->owner();
 		}
@@ -415,39 +341,38 @@ class Reaction extends ContentAchievementActionAbstract
 	 * @param	array|NULL	$where		Where for the query
 	 * @param	int|NULL	$limit		Limit for the query
 	 * @param	array		$filters	Rule filters
-	 * @return	Select
+	 * @return	\IPS\Db\Select
 	 */
-	public function getQuery( string $select, ?array $where, ?int $limit, array $filters ): Select
+	public function getQuery( $select, $where, $limit, $filters ): \IPS\Db\Select
 	{
 		$joinContainers		= FALSE;
 		$extraJoinCondition	= NULL;
-		$where				= is_array( $where ) ? $where : array();
+		$where				= \is_array( $where ) ? $where : array();
 
 		/* Limit by type and node */
 		if ( isset( $filters['type'] ) )
 		{
 			$where[] = ['rep_class=?', $filters['type']];
 			$itemClass = $filters['type'];
-			if ( in_array( 'IPS\Content\Comment', class_parents( $filters['type'] ) ) )
+			if ( \in_array( 'IPS\Content\Comment', class_parents( $filters['type'] ) ) )
 			{
 				$itemClass = $filters['type']::$itemClass;
 			}
 
 			if ( isset( $filters['nodes_' . str_replace( '\\', '-', $itemClass )] ) )
 			{
-				/* @var array $databaseColumnMap */
 				$joinContainers		= TRUE;
-				$extraJoinCondition	= ' AND ' . Db::i()->in( $itemClass::$databaseTable . '.' . $itemClass::$databaseColumnMap['container'], $filters['nodes_' . str_replace( '\\', '-', $itemClass )] );
+				$extraJoinCondition	= ' AND ' . \IPS\Db::i()->in( $itemClass::$databaseTable . '.' . $itemClass::$databaseColumnMap['container'], $filters['nodes_' . str_replace( '\\', '-', $itemClass )] );
 			}
 		}
 
 		/* Limit by reaction type */
 		if ( isset( $filters['reactions'] ) )
 		{
-			$where[] = [ Db::i()->in( 'reaction', $filters['reactions'] ) ];
+			$where[] = [ \IPS\Db::i()->in( 'reaction', $filters['reactions'] ) ];
 		}
 
-		$query = Db::i()->select( $select, 'core_reputation_index', $where, NULL, $limit );
+		$query = \IPS\Db::i()->select( $select, 'core_reputation_index', $where, NULL, $limit );
 
 		if ( $joinContainers )
 		{

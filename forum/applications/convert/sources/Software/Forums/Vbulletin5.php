@@ -12,45 +12,23 @@
 namespace IPS\convert\Software\Forums;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\convert\App;
-use IPS\convert\Software;
-use IPS\convert\Software\Core\Vbulletin5 as Vbulletin5Core;
-use IPS\Db;
-use IPS\forums\Topic;
-use IPS\forums\Topic\Post;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Request;
-use IPS\Task;
-use OutOfRangeException;
-use UnderflowException;
-use UnexpectedValueException;
-use function count;
-use function defined;
-use function in_array;
-use function unserialize;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * vBulletin 5 Forums Converter
  */
-class Vbulletin5 extends Software
+class _Vbulletin5 extends \IPS\convert\Software
 {
 	/**
 	 * Software Name
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareName(): string
+	public static function softwareName()
 	{
 		/* Child classes must override this method */
 		return "vBulletin Forums (5.x)";
@@ -59,9 +37,9 @@ class Vbulletin5 extends Software
 	/**
 	 * Software Key
 	 *
-	 * @return    string
+	 * @return	string
 	 */
-	public static function softwareKey(): string
+	public static function softwareKey()
 	{
 		/* Child classes must override this method */
 		return "vbulletin5";
@@ -70,9 +48,9 @@ class Vbulletin5 extends Software
 	/**
 	 * Content we can convert from this software. 
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function canConvert(): ?array
+	public static function canConvert()
 	{
 		return array(
 			'convertForumsForums'	=> array(
@@ -102,15 +80,15 @@ class Vbulletin5 extends Software
 	/**
 	 * Allows software to add additional menu row options
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public function extraMenuRows(): array
+	public function extraMenuRows()
 	{
 		$rows = array();
 		$rows['convertAttachments2'] = array(
 			'step_method'		=> 'convertAttachments2',
 			'step_title'		=> 'convert_attachments',
-			'ips_rows'			=> Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( "location_key=?", 'gallery_Images' ) ),
+			'ips_rows'			=> \IPS\Db::i()->select( 'COUNT(*)', 'core_attachments_map', array( "location_key=?", 'gallery_Images' ) ),
 			'source_rows'		=> array( 'table' => static::canConvert()['convertAttachments2']['table'], 'where' => static::canConvert()['convertAttachments2']['where'] ),
 			'per_cycle'			=> 10,
 			'dependencies'		=> array( 'convertAttachments' ),
@@ -123,53 +101,58 @@ class Vbulletin5 extends Software
 	/**
 	 * Count Source Rows for a specific step
 	 *
-	 * @param string $table		The table containing the rows to count.
-	 * @param string|array|NULL $where		WHERE clause to only count specific rows, or NULL to count all.
-	 * @param bool $recache	Skip cache and pull directly (updating cache)
-	 * @return    integer
+	 * @param	string		$table		The table containing the rows to count.
+	 * @param	array|NULL	$where		WHERE clause to only count specific rows, or NULL to count all.
+	 * @param	bool		$recache	Skip cache and pull directly (updating cache)
+	 * @return	integer
 	 * @throws	\IPS\convert\Exception
 	 */
-	public function countRows( string $table, string|array|null $where=NULL, bool $recache=FALSE ): int
+	public function countRows( $table, $where=NULL, $recache=FALSE )
 	{
 		switch( $table )
 		{
 			case 'forum':
-				return count( $this->fetchForums() );
+				return \count( $this->fetchForums() );
+				break;
 			
 			case 'thread':
 				try
 				{
-					return parent::countRows( 'node', array( Db::i()->in( 'contenttypeid', array( $this->fetchType( 'Text' ), $this->fetchType( 'Poll' ), $this->fetchType( 'Gallery' ), $this->fetchType( 'Video' ), $this->fetchType( 'Link' ) ) ) . " AND " . Db::i()->in( 'parentid', array_keys( $this->fetchForums() ) ), $this->fetchType( 'Text' ), $this->fetchType( 'Poll' ) ) );
+					return parent::countRows( 'node', array( \IPS\Db::i()->in( 'contenttypeid', array( $this->fetchType( 'Text' ), $this->fetchType( 'Poll' ), $this->fetchType( 'Gallery' ), $this->fetchType( 'Video' ), $this->fetchType( 'Link' ) ) ) . " AND " . \IPS\Db::i()->in( 'parentid', array_keys( $this->fetchForums() ) ), $this->fetchType( 'Text' ), $this->fetchType( 'Poll' ) ) );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 			
 			case 'post':
 				try
 				{
-					return parent::countRows( 'node', array( Db::i()->in( 'contenttypeid', array( $this->fetchType( 'Text' ), $this->fetchType( 'Gallery' ), $this->fetchType( 'Video' ), $this->fetchType( 'Link' ), $this->fetchType( 'Poll' ) ) ) ) );
+					return parent::countRows( 'node', array( \IPS\Db::i()->in( 'contenttypeid', array( $this->fetchType( 'Text' ), $this->fetchType( 'Gallery' ), $this->fetchType( 'Video' ), $this->fetchType( 'Link' ), $this->fetchType( 'Poll' ) ) ) ) );
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
-					throw new \IPS\convert\Exception( sprintf( Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
+					throw new \IPS\convert\Exception( sprintf( \IPS\Member::loggedIn()->language()->get( 'could_not_count_rows' ), $table ) );
 				}
+				break;
 			
 			case 'attachment':
 				return parent::countRows( 'node', array( "contenttypeid IN (" . $this->fetchType( 'Attach' ) . ',' . $this->fetchType( 'Photo' ) . ")" ) );
+				break;
 			
 			default:
 				return parent::countRows( $table, $where, $recache );
+				break;
 		}
 	}
 
 	/**
 	 * Requires Parent
 	 *
-	 * @return    boolean
+	 * @return	boolean
 	 */
-	public static function requiresParent(): bool
+	public static function requiresParent()
 	{
 		return TRUE;
 	}
@@ -177,9 +160,9 @@ class Vbulletin5 extends Software
 	/**
 	 * Possible Parent Conversions
 	 *
-	 * @return    array|null
+	 * @return	array
 	 */
-	public static function parents(): ?array
+	public static function parents()
 	{
 		return array( 'core' => array( 'vbulletin5' ) );
 	}
@@ -187,44 +170,41 @@ class Vbulletin5 extends Software
 	/**
 	 * Finish - Adds everything it needs to the queues and clears data store
 	 *
-	 * @return    array        Messages to display
+	 * @return	array		Messages to display
 	 */
-	public function finish(): array
+	public function finish()
 	{
 		/* Content Rebuilds */
-		Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 2, array( 'class' ) );
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
-		Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
-		Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
-		Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
+		\IPS\Task::queue( 'core', 'RebuildItemCounts', array( 'class' => 'IPS\forums\Topic' ), 2, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildContent', array( 'app' => $this->app->app_id, 'link' => 'forums_posts', 'class' => 'IPS\forums\Topic\Post' ), 2, array( 'app', 'link', 'class' ) );
+		\IPS\Task::queue( 'convert', 'RebuildFirstPostIds', array( 'app' => $this->app->app_id ), 2, array( 'app' ) );
+		\IPS\Task::queue( 'convert', 'DeleteEmptyTopics', array( 'app' => $this->app->app_id ), 5, array( 'app' ) );
 
 		/* Rebuild Leaderboard */
-		Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
-		Db::i()->delete('core_reputation_leaderboard_history');
+		\IPS\Task::queue( 'core', 'RebuildReputationLeaderboard', array(), 4 );
+		\IPS\Db::i()->delete('core_reputation_leaderboard_history');
 		
 		return array( 'f_rebuild_posts', 'f_recounting_forums', 'f_recounting_topics' );
 	}
-
+	
 	/**
-	 * Pre-process content for the Invision Community text parser
+	 * Fix Post Data
 	 *
-	 * @param	string			The post
-	 * @param	string|null		Content Classname passed by post-conversion rebuild
-	 * @param	int|null		Content ID passed by post-conversion rebuild
-	 * @param	App|null		App object if available
-	 * @return	string			The converted post
+	 * @param	string	$post	Post
+	 * @return	string	Fixed Posts
 	 */
-	public static function fixPostData( string $post, ?string $className=null, ?int $contentId=null, ?App $app=null ): string
+	public static function fixPostData( $post )
 	{
-		return Vbulletin5Core::fixPostData( $post, $className, $contentId, $app );
+		return \IPS\convert\Software\Core\Vbulletin5::fixPostData( $post );
 	}
 
 	/**
 	 * List of conversion methods that require additional information
 	 *
-	 * @return    array
+	 * @return	array
 	 */
-	public static function checkConf(): array
+	public static function checkConf()
 	{
 		return array(
 			'convertAttachments', 
@@ -235,10 +215,10 @@ class Vbulletin5 extends Software
 	/**
 	 * Get More Information
 	 *
-	 * @param string $method	Conversion method
-	 * @return    array|null
+	 * @param	string	$method	Conversion method
+	 * @return	array
 	 */
-	public function getMoreInfo( string $method ): ?array
+	public function getMoreInfo( $method )
 	{
 		$return = array();
 		switch( $method )
@@ -247,10 +227,10 @@ class Vbulletin5 extends Software
 				/* Get our reactions to let the admin map them */
 				$options		= array();
 				$descriptions	= array();
-				foreach( new ActiveRecordIterator( Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
+				foreach( new \IPS\Patterns\ActiveRecordIterator( \IPS\Db::i()->select( '*', 'core_reactions' ), 'IPS\Content\Reaction' ) AS $reaction )
 				{
 					$options[ $reaction->id ]		= $reaction->_icon->url;
-					$descriptions[ $reaction->id ]	= Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
+					$descriptions[ $reaction->id ]	= \IPS\Member::loggedIn()->language()->addToStack('reaction_title_' . $reaction->id ) . '<br>' . $reaction->_description;
 				}
 
 				$return['convertForumsPosts'] = array(
@@ -273,13 +253,13 @@ class Vbulletin5 extends Software
 						'field_required'		=> TRUE,
 						'field_extra'			=> array(
 							'options'				=> array(
-								'database'				=> Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
-								'file_system'			=> Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
+								'database'				=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_database' ),
+								'file_system'			=> \IPS\Member::loggedIn()->language()->addToStack( 'conv_store_file_system' ),
 							),
 							'userSuppliedInput'	=> 'file_system',
 						),
 						'field_hint'			=> NULL,
-						'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new DomainException( 'path_invalid' ); } },
+						'field_validation'		=> function( $value ) { if ( !@is_dir( $value ) ) { throw new \DomainException( 'path_invalid' ); } },
 					)
 				);
 				break;
@@ -293,9 +273,10 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsForums() : void
+	public function convertForumsForums()
 	{
 		$libraryClass = $this->getLibrary();
+		
 		$libraryClass::setKey( 'node.nodeid' );
 		$clubs = $this->fetchClubs();
 
@@ -306,10 +287,10 @@ class Vbulletin5 extends Software
 			{
 				$this->app->getLink( $forum['nodeid'], 'forums_forums' );
 				$libraryClass->setLastKeyValue( $forum['nodeid'] );
-				$this->app->log( 'vb5_skipped_forum', __METHOD__, App::LOG_WARNING );
+				$this->app->log( 'vb5_skipped_forum', __METHOD__, \IPS\convert\App::LOG_WARNING );
 				continue;
 			}
-			catch( OutOfRangeException $e ){}
+			catch( \OutOfRangeException $e ){}
 
 			$self = $this;
 			$checkpermission = function( $name, $perm ) use ( $forum, $self )
@@ -320,7 +301,7 @@ class Vbulletin5 extends Software
 					$key = 'nodeoptions';
 				}
 				
-				if ( $forum[$key] & static::$bitOptions[$name][$perm] )
+				if ( $forum[$key] & $self::$bitOptions[$name][$perm] )
 				{
 					return TRUE;
 				}
@@ -334,6 +315,9 @@ class Vbulletin5 extends Software
 				'description'			=> $forum['description'],
 				'topics'				=> $forum['textcount'],
 				'posts'					=> $forum['totalcount'],
+				'last_post'				=> $forum['lastcontent'],
+				'last_poster_id'		=> $forum['lastauthorid'],
+				'last_poster_name'		=> $forum['lastcontentauthor'],
 				'parent_id'				=> ( !array_key_exists( $forum['nodeid'], $clubs ) ) ? $forum['parentid'] : -1,
 				'club_id'				=> ( array_key_exists( $forum['nodeid'], $clubs ) ) ? $forum['nodeid'] : NULL,
 				'position'				=> $forum['displayorder'],
@@ -354,14 +338,14 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsTopics() : void
+	public function convertForumsTopics()
 	{
 		$libraryClass = $this->getLibrary();
 		
 		$libraryClass::setKey( 'node.nodeid' );
 		
 		$clubs = $this->fetchClubs();
-		foreach( $this->fetch( 'node', 'node.nodeid', array( "( " . Db::i()->in( 'node.parentid', array_keys( $this->fetchForums() ) ) . " OR " . $this->db->in( 'node.parentid', array_keys( $clubs ) ) . " ) AND " . Db::i()->in( 'node.contenttypeid', array( $this->fetchType( 'Text' ), $this->fetchType( 'Poll' ), $this->fetchType( 'Gallery' ), $this->fetchType( 'Video' ), $this->fetchType( 'Link' ) ) ) ) ) AS $topic )
+		foreach( $this->fetch( 'node', 'node.nodeid', array( "( " . \IPS\Db::i()->in( 'node.parentid', array_keys( $this->fetchForums() ) ) . " OR " . $this->db->in( 'node.parentid', array_keys( $clubs ) ) . " ) AND " . \IPS\Db::i()->in( 'node.contenttypeid', array( $this->fetchType( 'Text' ), $this->fetchType( 'Poll' ), $this->fetchType( 'Gallery' ), $this->fetchType( 'Video' ), $this->fetchType( 'Link' ) ) ) ) ) AS $topic )
 		{
 			/* Pesky Polls */
 			$poll		= NULL;
@@ -370,12 +354,12 @@ class Vbulletin5 extends Software
 			{
 				/* Does this topic have a corresponding poll? */
 				$pollData		= $this->db->select( '*', 'poll', array( "nodeid=?", $topic['nodeid'] ) )->first();
-				$pollOptions	= @unserialize( $pollData['options'] );
+				$pollOptions	= @\unserialize( $pollData['options'] );
 				$lastVote		= $pollData['lastvote'];
 				
 				if ( $pollOptions === FALSE )
 				{
-					throw new UnexpectedValueException;
+					throw new \UnexpectedValueException;
 				}
 				
 				$choices	= array();
@@ -433,7 +417,8 @@ class Vbulletin5 extends Software
 					);
 				}
 			}
-			catch( UnderflowException|UnexpectedValueException $e ) {} # if the poll is missing, don't bother # if poll data is corrupt, then skip
+			catch( \UnderflowException $e ) {} # if the poll is missing, don't bother
+			catch( \UnexpectedValueException $e ) {} # if poll data is corrupt, then skip
 			
 			$info = array(
 				'tid'				=> $topic['nodeid'],
@@ -483,12 +468,12 @@ class Vbulletin5 extends Software
 						$softDeleteId = $this->app->getLink( $topic['deleteuserid'], 'core_members', TRUE );
 					}
 						/* User link doesn't exist */
-					catch ( OutOfRangeException $e )
+					catch ( \OutOfRangeException $e )
 					{
 						$softDeleteId = 0;
 					}
 
-					Db::i()->insert( 'core_soft_delete_log', array(
+					\IPS\Db::i()->insert( 'core_soft_delete_log', array(
 						'sdl_obj_id' => $topicId,
 						'sdl_obj_key' => 'topic',
 						'sdl_obj_member_id' => $softDeleteId,
@@ -508,13 +493,13 @@ class Vbulletin5 extends Software
 	 *
 	 * @return	void
 	 */
-	public function convertForumsPosts() : void
+	public function convertForumsPosts()
 	{
 		$libraryClass = $this->getLibrary();
 		
 		$libraryClass::setKey( 'node.nodeid' );
 
-		foreach( $this->fetch( 'node', 'node.nodeid', array( Db::i()->in( 'node.contenttypeid', array( $this->fetchType( 'Text' ), $this->fetchType( 'Gallery' ), $this->fetchType( 'Video' ), $this->fetchType( 'Link' ), $this->fetchType( 'Poll' ) ) ) ), 'node.*, text.rawtext, text.htmlstate' )->join( 'text', 'text.nodeid = node.nodeid' ) AS $post )
+		foreach( $this->fetch( 'node', 'node.nodeid', array( \IPS\Db::i()->in( 'node.contenttypeid', array( $this->fetchType( 'Text' ), $this->fetchType( 'Gallery' ), $this->fetchType( 'Video' ), $this->fetchType( 'Link' ), $this->fetchType( 'Poll' ) ) ) ), 'node.*, text.rawtext, text.htmlstate' )->join( 'text', 'text.nodeid = node.nodeid' ) AS $post )
 		{
 			/* Comments of comments of comments of comments */
 			$isSubComment = FALSE;
@@ -525,14 +510,14 @@ class Vbulletin5 extends Software
 				
 				$post['parentid'] = $post['nodeid'];
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				try
 				{
 					/* If parentid exists as a forums_topics link, we don't actually need to do anything */
 					$this->app->getLink( $post['parentid'], 'forums_topics' );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					try
 					{
@@ -547,18 +532,18 @@ class Vbulletin5 extends Software
 						$post['parentid']	= $parent['parentid'];
 						$post['rawtext']	= "[quote name='" . $parent['authorname'] ."' timestamp='" . $parent['created'] . "']" . $parent['rawtext'] . "[/quote]\n" . $post['rawtext'];
 					}
-					catch( OutOfRangeException $e ) # we need to go deeper!
+					catch( \OutOfRangeException $e ) # we need to go deeper!
 					{
 						/* Actually, we don't - end of the line */
 						$libraryClass->setLastKeyValue( $post['nodeid'] );
-						$this->app->log( 'vb5_post_missing_parent_post', __METHOD__, App::LOG_WARNING, $post['nodeid'] );
+						$this->app->log( 'vb5_post_missing_parent_post', __METHOD__, \IPS\convert\App::LOG_WARNING, $post['nodeid'] );
 						continue;
 					}
-					catch( UnderflowException $e )
+					catch( \UnderflowException $e )
 					{
 						/* Loading the parent failed - move on */
 						$libraryClass->setLastKeyValue( $post['nodeid'] );
-						$this->app->log( 'vb5_post_missing_parent_post_2', __METHOD__, App::LOG_WARNING, $post['nodeid'] );
+						$this->app->log( 'vb5_post_missing_parent_post_2', __METHOD__, \IPS\convert\App::LOG_WARNING, $post['nodeid'] );
 						continue;
 					}
 				}
@@ -587,7 +572,7 @@ class Vbulletin5 extends Software
 				'ip_address'		=> $post['ipaddress'],
 				'post_date'			=> $post['publishdate'],
 				'queued'			=> $queued,
-				'post_htmlstate'	=> ( in_array( $post['htmlstate'], array( 'on', 'on_nl2br' ) ) ) ? 1 : 0,
+				'post_htmlstate'	=> ( \in_array( $post['htmlstate'], array( 'on', 'on_nl2br' ) ) ) ? 1 : 0,
 			);
 
 			/* Any vB5 Links? */
@@ -612,7 +597,7 @@ LINK;
 LINK;
 					}
 				}
-				catch ( UnderflowException $e ) {}
+				catch ( \UnderflowException $e ) {}
 			}
 			
 			$post_id = $libraryClass->convertForumsPost( $info );
@@ -633,12 +618,12 @@ LINK;
 						$softDeleteId = $this->app->getLink( $post['deleteuserid'], 'core_members', TRUE );
 					}
 						/* User link doesn't exist */
-					catch ( OutOfRangeException $e )
+					catch ( \OutOfRangeException $e )
 					{
 						$softDeleteId = 0;
 					}
 
-					Db::i()->insert( 'core_soft_delete_log', array(
+					\IPS\Db::i()->insert( 'core_soft_delete_log', array(
 						'sdl_obj_id' => $post_id,
 						'sdl_obj_key' => 'post',
 						'sdl_obj_member_id' => $softDeleteId,
@@ -719,7 +704,7 @@ LINK;
 				/* If we have a latest edit, then update the main post - this should really be in the library, as the converters should not be altering data */
 				if ( $latestedit )
 				{
-					Db::i()->update( 'forums_posts', array( 'append_edit' => 1, 'edit_time' => $latestedit, 'edit_name' => $name, 'post_edit_reason' => $reason ), array( "pid=?", $post_id ) );
+					\IPS\Db::i()->update( 'forums_posts', array( 'append_edit' => 1, 'edit_time' => $latestedit, 'edit_name' => $name, 'post_edit_reason' => $reason ), array( "pid=?", $post_id ) );
 				}
 			}
 			
@@ -732,7 +717,7 @@ LINK;
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments() : void
+	public function convertAttachments()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -751,7 +736,7 @@ LINK;
 				$post_id = $attachment['parentid'];
 			}
 			/* It isn't the first post in the topic */
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				try
 				{
@@ -761,18 +746,18 @@ LINK;
 					$attachment['parentid']	= $parent['parentid'];
 					$post_id				= $parent['nodeid'];
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* No valid converter link for the parent post */
 					$libraryClass->setLastKeyValue( $attachment['nodeid'] );
-					$this->app->log( 'vb5_attach_missing_post_link', __METHOD__, App::LOG_WARNING, $attachment['nodeid'] );
+					$this->app->log( 'vb5_attach_missing_post_link', __METHOD__, \IPS\convert\App::LOG_WARNING, $attachment['nodeid'] );
 					continue;
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					/* Parent post does not exist in vB database */
 					$libraryClass->setLastKeyValue( $attachment['nodeid'] );
-					$this->app->log( 'vb5_attach_missing_post', __METHOD__, App::LOG_WARNING, $attachment['nodeid'] );
+					$this->app->log( 'vb5_attach_missing_post', __METHOD__, \IPS\convert\App::LOG_WARNING, $attachment['nodeid'] );
 					continue;
 				}
 			}
@@ -827,9 +812,9 @@ LINK;
 				{
 					$pid = $this->app->getLink( $post_id, 'forums_posts' );
 					
-					$post = Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
+					$post = \IPS\Db::i()->select( 'post', 'forums_posts', array( "pid=?", $pid ) )->first();
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* If the post didn't exist and this is just an orphaned attachment, move along */
 					$libraryClass->setLastKeyValue( $attachment['nodeid'] );
@@ -840,7 +825,7 @@ LINK;
 				{
 					$post = preg_replace( "/\[ATTACH([^\]]+?)?\]n" . $attachment['nodeid'] . "\[\/ATTACH\]/i", '[attachment=' . $attach_id . ':name]', $post );
 
-					Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
+					\IPS\Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
 				}
 				else
 				{
@@ -853,7 +838,7 @@ LINK;
 						$oldAttachId = $this->db->select( 'attachmentid', 'attachment', array( 'filedataid=?', $attachment['filedataid'] ) )->first();
 					}
 					/* Don't fail if this table/value doesn't exist */
-					catch( Exception $e ) { }
+					catch( \Exception $e ) { }
 
 					if ( $oldAttachId !== NULL and preg_match( "/\[ATTACH([^\]]+?)?\]" . $oldAttachId . "\[\/ATTACH\]/i", $post ) )
 					{
@@ -868,7 +853,7 @@ LINK;
 
 					if( $update )
 					{
-						Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
+						\IPS\Db::i()->update( 'forums_posts', array( 'post' => $post ), array( "pid=?", $pid ) );
 					}
 				}
 			}
@@ -882,7 +867,7 @@ LINK;
 	 *
 	 * @return	void
 	 */
-	public function convertAttachments2() : void
+	public function convertAttachments2()
 	{
 		$libraryClass = $this->getLibrary();
 		
@@ -901,7 +886,7 @@ LINK;
 				$post_id = $attachment['parentid'];
 			}
 			/* It isn't the first post in the topic */
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				try
 				{
@@ -911,18 +896,18 @@ LINK;
 					$attachment['parentid']	= $parent['parentid'];
 					$post_id				= $parent['nodeid'];
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* No valid converter link for the parent post */
 					$libraryClass->setLastKeyValue( $attachment['nodeid'] );
-					$this->app->log( 'vb5_attach_missing_post_link', __METHOD__, App::LOG_WARNING, $attachment['nodeid'] );
+					$this->app->log( 'vb5_attach_missing_post_link', __METHOD__, \IPS\convert\App::LOG_WARNING, $attachment['nodeid'] );
 					continue;
 				}
-				catch( UnderflowException $e )
+				catch( \UnderflowException $e )
 				{
 					/* Parent post does not exist in vB database */
 					$libraryClass->setLastKeyValue( $attachment['nodeid'] );
-					$this->app->log( 'vb5_attach_missing_post', __METHOD__, App::LOG_WARNING, $attachment['nodeid'] );
+					$this->app->log( 'vb5_attach_missing_post', __METHOD__, \IPS\convert\App::LOG_WARNING, $attachment['nodeid'] );
 					continue;
 				}
 			}
@@ -979,7 +964,7 @@ LINK;
 	/**
 	 * @brief	Silly Bitwise
 	 */
-	public static array $bitOptions = array (
+	public static $bitOptions = array (
 		'forumoptions' => array(
 			'active' => 1,
 			'allowposting' => 2,
@@ -1011,7 +996,7 @@ LINK;
 	 *
 	 * @return array
 	 */
-	protected function fetchForums() : array
+	protected function fetchForums()
 	{
 		$forums = array();
 		$clubs = $this->fetchClubs();
@@ -1028,14 +1013,14 @@ LINK;
 	 *
 	 * @return	array
 	 */
-	protected function fetchClubs() : array
+	protected function fetchClubs()
 	{
 		$clubs = array();
 	
 		try
 		{
 			/* Get the main social group node ID from the channel GUID. */
-			$mainNodeId = $this->db->select( 'nodeid', 'channel', array( "guid=?", Vbulletin5::$guids['clubs'] ) )->first();
+			$mainNodeId = $this->db->select( 'nodeid', 'channel', array( "guid=?", \IPS\convert\Software\Core\Vbulletin5::$guids['clubs'] ) )->first();
 			
 			$categories = array();
 			foreach( $this->db->select( 'nodeid', 'node', array( "parentid=?", $mainNodeId ) ) AS $cat )
@@ -1049,7 +1034,7 @@ LINK;
 				$clubs[ $row['nodeid'] ] = $row;
 			}
 		}
-		catch( UnderflowException $e ) { /* Just in case something goofy happened and there is no main channel */ }
+		catch( \UnderflowException $e ) { /* Just in case something goofy happened and there is no main channel */ }
 		
 		return $clubs;
 	}
@@ -1057,73 +1042,77 @@ LINK;
 	/**
 	 * @brief	Types Cache
 	 */
-	protected array $typesCache = array();
+	protected $typesCache = array();
 
 	/**
 	 * Helper method to retrieve content type ids
 	 *
 	 * @param	int|string	$type	The content type
-	 * @return array
+	 * @return void
 	 */
-	protected function fetchType( int|string $type ) : array
+	protected function fetchType( $type )
 	{
-		if ( !count( $this->typesCache ) )
+		if ( \count( $this->typesCache ) )
+		{
+			return $this->typesCache[ $type ];
+		}
+		else
 		{
 			foreach( $this->db->select( '*', 'contenttype' ) AS $contenttype )
 			{
 				$this->typesCache[ $contenttype['class'] ] = $contenttype['contenttypeid'];
 			}
-		}
 
-		return $this->typesCache[ $type ];
+			return $this->typesCache[ $type ];
+		}
 	}
 
 	/**
 	 * Check if we can redirect the legacy URLs from this software to the new locations
 	 *
-	 * @return    Url|NULL
+	 * @return	NULL|\IPS\Http\Url
 	 * @note	Forum URLs do not have IDs in them, so we cannot redirect them reliably
 	 */
-	public function checkRedirects(): ?Url
+	public function checkRedirects()
 	{
-		$url = Request::i()->url();
+		$url = \IPS\Request::i()->url();
 
 		if(
-			( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'showthread.php' ) !== FALSE OR
-				mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'showpost.php' ) !== FALSE OR
-				preg_match( '#/threads/([0-9]+)#i', $url->data[ Url::COMPONENT_PATH ] )
+			( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'showthread.php' ) !== FALSE OR
+				mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'showpost.php' ) !== FALSE OR
+				preg_match( '#/threads/([0-9]+)#i', $url->data[ \IPS\Http\Url::COMPONENT_PATH ] )
 			)
-			AND ( isset( Request::i()->p ) OR isset( Request::i()->postid ) )
+			AND ( isset( \IPS\Request::i()->p ) OR isset( \IPS\Request::i()->postid ) )
 		)
 		{
 			try
 			{
-				$postId = Request::i()->postid ?? Request::i()->p;
+				$postId = \IPS\Request::i()->postid ?? \IPS\Request::i()->p;
 				try
 				{
 					$data = (string) $this->app->getLink( $postId, array( 'forums_posts_old' ) );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* Try the main table */
 					$data = (string) $this->app->getLink( $postId, array( 'forums_posts_old' ), FALSE, TRUE );
 				}
-				$item = Post::load( $data );
+				$item = \IPS\forums\Topic\Post::load( $data );
 
 				if( $item->canView() )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}
 		}
 		/* And then topic URLs, same idea */
-		elseif( ( mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'showthread.php' ) !== FALSE OR
-			mb_strpos( $url->data[ Url::COMPONENT_PATH ], 'printthread.php' ) !== FALSE )
-			AND ( isset( Request::i()->t ) OR isset( Request::i()->threadid ) )
+		elseif( ( mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'showthread.php' ) !== FALSE OR
+			mb_strpos( $url->data[ \IPS\Http\Url::COMPONENT_PATH ], 'printthread.php' ) !== FALSE )
+			AND ( isset( \IPS\Request::i()->t ) OR isset( \IPS\Request::i()->threadid ) )
 		)
 		{
 			/* Topic URLs.
@@ -1132,18 +1121,18 @@ LINK;
 			 * /showthread.php?threadid=?
 			 * /printthread.php?threadid=?
 			 */
-			$path = $url->data[ Url::COMPONENT_PATH ];
+			$path = $url->data[ \IPS\Http\Url::COMPONENT_PATH ];
 			if( mb_strpos( $path, 'showthread.php' ) !== FALSE OR mb_strpos( $path, 'printthread.php' ) !== FALSE )
 			{
-				if( isset( Request::i()->t ) )
+				if( isset( \IPS\Request::i()->t ) )
 				{
-					$oldId	= Request::i()->t;
+					$oldId	= \IPS\Request::i()->t;
 				}
-				elseif( isset( Request::i()->threadid ) )
+				elseif( isset( \IPS\Request::i()->threadid ) )
 				{
-					$oldId	= Request::i()->threadid;
+					$oldId	= \IPS\Request::i()->threadid;
 				}
-				elseif( preg_match( '#^(\d+)-[^/]+#i', $url->data[ Url::COMPONENT_QUERY ], $matches ) )
+				elseif( preg_match( '#^(\d+)-[^/]+#i', $url->data[ \IPS\Http\Url::COMPONENT_QUERY ], $matches ) )
 				{
 					$oldId = $matches[1];
 				}
@@ -1162,26 +1151,26 @@ LINK;
 					{
 						$data = (string) $this->app->getLink( $oldId, array( 'forums_topics_old' ) );
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						/* Try the main table */
 						$data = (string) $this->app->getLink( $oldId, array( 'forums_topics_old' ), FALSE, TRUE );
 					}
-					$item = Topic::load( $data );
+					$item = \IPS\forums\Topic::load( $data );
 
 					if( $item->canView() )
 					{
 						return $item->url();
 					}
 				}
-				catch( Exception $e )
+				catch( \Exception $e )
 				{
 					return NULL;
 				}
 			}
 		}
 
-		if( preg_match( '#(?<!topic|file|image)/([0-9]+)\-([^/]*?)#', $url->data[ Url::COMPONENT_PATH ], $matches ) )
+		if( preg_match( '#(?<!topic|file|image)/([0-9]+)\-([^/]*?)#', $url->data[ \IPS\Http\Url::COMPONENT_PATH ], $matches ) )
 		{
 			try
 			{
@@ -1189,18 +1178,18 @@ LINK;
 				{
 					$data = (string) $this->app->getLink( (int) $matches[1], array( 'topics', 'forums_topics' ) );
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					$data = (string) $this->app->getLink( (int) $matches[1], array( 'topics', 'forums_topics' ), FALSE, TRUE );
 				}
-				$item = Topic::load( $data );
+				$item = \IPS\forums\Topic::load( $data );
 
 				if( $item->canView() )
 				{
 					return $item->url();
 				}
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
 				return NULL;
 			}

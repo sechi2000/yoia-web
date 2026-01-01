@@ -12,20 +12,16 @@
 namespace IPS\forums\setup\upg_107028;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Task;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * 4.7.2 Beta 3 Upgrade Code
  */
-class Upgrade
+class _Upgrade
 {
 	/**
 	 * Recount forums.
@@ -34,7 +30,7 @@ class Upgrade
 	 */
 	public function step1()
 	{
-		Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
+		\IPS\Task::queue( 'core', 'RebuildContainerCounts', array( 'class' => 'IPS\forums\Forum', 'count' => 0 ), 4, array( 'class' ) );
 
 		return TRUE;
 	}

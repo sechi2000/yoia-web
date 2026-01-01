@@ -10,28 +10,25 @@
  */
 
 namespace IPS\forums\api\GraphQL\Queries;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\forums\api\GraphQL\Types\PostType;
-use IPS\forums\Topic\Post as PostClass;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Post query for GraphQL API
  */
-class Post
+class _Post
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = "Returns a post";
+	public static $description = "Returns a post";
 
 	/*
 	 * Query arguments
@@ -45,10 +42,8 @@ class Post
 
 	/**
 	 * Return the query return type
-	 *
-	 * @return PostType
 	 */
-	public function type() : PostType
+	public function type() 
 	{
 		return \IPS\forums\api\GraphQL\TypeRegistry::post();
 	}
@@ -56,19 +51,18 @@ class Post
 	/**
 	 * Resolves this query
 	 *
-	 * @param 	mixed $val 	Value passed into this resolver
-	 * @param 	array $args 	Arguments
-	 * @param 	array $context 	Context values
-	 * @param	mixed $info
-	 * @return	PostClass
+	 * @param 	mixed 	Value passed into this resolver
+	 * @param 	array 	Arguments
+	 * @param 	array 	Context values
+	 * @return	\IPS\forums\Topic\Post
 	 */
-	public function resolve( mixed $val, array $args, array $context, mixed $info ) : PostClass
+	public function resolve($val, $args, $context, $info)
 	{
-		$post = PostClass::loadAndCheckPerms( $args['id'] );
+		$post = \IPS\forums\Topic\Post::loadAndCheckPerms( $args['id'] );
 
 		if( !$post->item()->canView() )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		return $post;
 	}

@@ -11,43 +11,36 @@
 namespace IPS\Archive\Zip;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Archive;
-use IPS\Archive\Exception;
-use IPS\Archive\Zip;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	ZipArchive Zip Class
  */
-class ZipArchive extends Zip
+class _ZipArchive extends \IPS\Archive\Zip
 {
 	/**
 	 * @brief	ZipArchive Object
 	 */
-	protected ?\ZipArchive $zipArchive;
+	protected $zipArchive;
 	
 	/**
 	 * Create object from local file
 	 *
-	 * @param string $path			Path to archive file
-	 * @return	Archive
+	 * @param	string	$path			Path to archive file
+	 * @return	\IPS\Archive
 	 */
-	public static function _fromLocalFile( string $path ): Archive
+	public static function _fromLocalFile( $path )
 	{
 		$object = new static;
 		$object->zipArchive = new \ZipArchive;
 		$open = $object->zipArchive->open( $path );
 		if ( $open !== TRUE )
 		{
-			throw new Exception( $open, Exception::COULD_NOT_OPEN );
+			throw new \IPS\Archive\Exception( $open, \IPS\Archive\Exception::COULD_NOT_OPEN );
 		}
 		return $object;
 	}
@@ -57,7 +50,7 @@ class ZipArchive extends Zip
 	 *
 	 * @return	int
 	 */
-	public function numberOfFiles(): int
+	public function numberOfFiles()
 	{
 		return $this->zipArchive->numFiles;
 	}
@@ -65,16 +58,16 @@ class ZipArchive extends Zip
 	/**
 	 * Get file name
 	 *
-	 * @param int $i	File number
+	 * @param	int	$i	File number
 	 * @return	string
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	public function getFileName( int $i ): string
+	public function getFileName( $i )
 	{
 		$info = $this->zipArchive->statIndex( $i );
 		if ( $info === FALSE )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		return mb_substr( $info['name'], 0, mb_strlen( $this->containerName ) ) === $this->containerName ? mb_substr( $info['name'], mb_strlen( $this->containerName ) ) : $info['name'];
@@ -83,11 +76,11 @@ class ZipArchive extends Zip
 	/**
 	 * Get file contents
 	 *
-	 * @param int $i	File number
+	 * @param	int	$i	File number
 	 * @return	string
-	 * @throws	OutOfRangeException
+	 * @throws	\OutOfRangeException
 	 */
-	public function getFileContents( int $i ): string
+	public function getFileContents( $i )
 	{
 		return $this->zipArchive->getFromIndex( $i );
 	}

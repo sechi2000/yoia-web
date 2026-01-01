@@ -5,17 +5,14 @@
 ( function () {
 	"use strict";
 
-	let _origin;
-	let _div;
-	let _embedId = '';
-	let _initialHeight = 0;
-	let _embedMaxWidth = null;
-	let _currentHeight = null;
-
-	/**
-	 * @type {ResizeObserver}
-	 */
-	let _ro;
+	var _origin;
+	var _div;
+	var _posting = false;
+	var _timer;
+	var _timeout = 200; //ms
+	var _embedId = '';
+	var _embedMaxWidth = null;
+	var _initialHeight = 0;
 
 	/**
 	 * Init method, called when the document is ready
@@ -30,16 +27,29 @@
 
 		// Work out our URL
 		_div = ips.utils.get('ipsEmbed');
-		const url = new URL(window.location.href);
+		var url = ips.utils.parseURL( window.location );
+
+		if( url.protocol == '' || url.protocol == ':' ){
+			ips.utils.log( url );
+			url.protocol = window.location.protocol;
+		}
 
 		// Set our origin
-		_origin = url.origin;
+		_origin = url.protocol + '//' + url.host;
 		ips.utils.log( "Origin in loader is " + _origin );
 
 		// Hide the content
 		_div.style.opacity = '0.00001';
 
 		_initialHeight = ips.utils.getObjHeight( _div );
+
+		// Do we have a specified maxWidth here?
+		var maxWidthElem = document.querySelector('[data-embedInfo-maxSize]');
+
+		if( maxWidthElem ){
+			_embedMaxWidth = maxWidthElem.getAttribute('data-embedInfo-maxSize');
+			maxWidthElem.style.maxWidth = (  maxWidthElem.getAttribute('data-embedInfo-maxSize').indexOf('%') == -1 ) ? parseInt( _embedMaxWidth ) + "px" : _embedMaxWidth + '%';
+		}
 
 		// Check for any truncated text
 		var truncated = document.querySelectorAll('[data-truncate]');
@@ -59,11 +69,11 @@
 			links[i].setAttribute('target', '_blank');
 		}
 
-		createResizeObserver();
-	}
+		startTimeout();
+	};
 
 	var _showEmbed = function () {
-		document.body.classList.remove('unloaded');
+		document.body.className = document.body.className.replace('unloaded ', '');
 		ips.utils.fadeIn( _div );
 	};
 
@@ -72,79 +82,66 @@
 	 *
 	 * @returns {void}
 	 */
-	function createResizeObserver() {
-		ips.utils.log("Creating resize observer for internal embed...");
-		let debounceLastCall=0, debounceTimeout, debounceInterval=200, sentMessage=false;
-		const debouncePostMessage = (height) => {
-			clearTimeout(debounceTimeout);
-			const delta = Date.now() - debounceLastCall - debounceInterval;
-			debounceLastCall = Date.now();
-			debounceTimeout = setTimeout(
-				() => {
-					_currentHeight = height;
-					ips.utils.log("Determined height as " + height + ' for internal embed ID ' + _embedId );
-					if (!sentMessage) {
-						sentMessage = true;
-						_showEmbed();
-					}
+	var startTimeout = function () {
 
-					if( _embedMaxWidth !== null ){
-						_postMessage('dims', {
-							height: height,
-							width: _embedMaxWidth
-						});
-					} else {
-						_postMessage('height', {
-							height: height
-						});
-					}
-				},
-				Math.max(0, -delta)
-			);
-		}
+		var currentSize = 0;
+		var repeats = 0;
 
-		_ro = new ResizeObserver((entries) => {
-			for (const entry of entries) {
-				if (entry.target === _div) {
-					if (typeof entry.borderBoxSize?.[0]?.blockSize === 'number') {
-						debouncePostMessage(entry.borderBoxSize[0].blockSize + 10);
-					}
-					break;
+		ips.utils.log("Starting timeout...");
+
+		// Main loop
+		_timer = setInterval( function () {
+			// What we want to do here is make the loading process more pleasant and less jumpy.
+			// To do that, we'll make the embed invisible until we've fetched the same height 6 times
+			// in a row (approx 1 second). If that happens we'll assume it has finished loading, and then
+			// we'll fade it in and start sending the recorded height to the parent for resizing.
+
+			var height = ips.utils.getObjHeight( _div );
+
+			// If we HAVEN'T started posting our size
+			if( !_posting ){
+				if( height == currentSize ){
+					repeats++;
+				} else {
+					// The height has changed, so reset our repeat counter
+					repeats = 0;
+				}
+
+				if( repeats == 6 ){
+					_posting = true;
+					_showEmbed();
 				}
 			}
-		});
 
-		_ro.observe(
-			_div,
-			{box: 'border-box'}
-		);
+			currentSize = height;
 
-		// resize observers usually call the callback right when .observe() is called, but just in case we manually send the height if there hasn't been one
-		setTimeout(() => {
-			// still hasn't been called?
-			if (debounceLastCall === 0) {
-				const height = ips.utils.getObjHeight(_div);
-
-				// getting the height can force a reflow, so just double check it stil hasn't been called
-				if (debounceLastCall === 0) {
-					debounceLastCall = Date.now(); // do this outside the last call
-					debouncePostMessage(height + 10);
+			if( _posting ){
+				if( _embedMaxWidth !== null ){
+					_postMessage('dims', {
+						height: height,
+						width: _embedMaxWidth
+					});
+				} else {
+					_postMessage('height', {
+						height: height
+					});
 				}
 			}
-		}, 20);
-	}
+		}, _timeout);
+	};
 
 	/**
 	 * Posts a message to the iframe
 	 *
-	 * @param {string}	method		Method - will be encoded in the resulting message
-	 * @param {Object}	[obj={}]	Obj - Any other keys and properties to encode in the message object
-	 *
+	 * @param	{number} 	[pageNo]	Page number to load
 	 * @returns {void}
 	 */
 	var _postMessage = function (method, obj) {
 		// Send to parent window
-		window.top.postMessage( JSON.stringify({...obj, method, embedId: _embedId}), _origin);
+		window.top.postMessage( JSON.stringify( ips.utils.extendObj( obj || {}, {
+			method: method,
+			embedId: _embedId
+		} ) ), _origin );
 	};
 
 	/**
@@ -189,32 +186,17 @@
 		 * @param 	{object} 	data 	Data from the iframe
 		 * @returns {void}
 		 */
-		ready(data) {
+		ready: function (data) {
 			_embedId = data.embedId;
 			_postMessage('ok');
-
-
-			// make sure this is sent back to the regular IPS js. The resize observer is created on init(), which is called on domcontentready, not on "ready" which indicates the host page is ready to accept messages
-			if (_currentHeight !== null) {
-				if( _embedMaxWidth !== null ){
-					_postMessage('dims', {
-						height: _currentHeight,
-						width: _embedMaxWidth
-					});
-				} else {
-					_postMessage('height', {
-						height: _currentHeight
-					});
-				}
-			}
 		},
 
-		stop() {
-			_ro?.disconnect();
+		stop: function (data) {
+			clearInterval( _timer );
 			ips.eventHandler.off( window, 'message', windowMessage );
 		},
 
-		responsiveState(data) {
+		responsiveState: function (data) {
 			if( data.currentIs === 'phone' ){
 				document.body.className += ' ipsRichEmbed_phone';
 			} else {
@@ -239,7 +221,6 @@
 			var method = pmData.method;
 		} catch (err) {
 			ips.utils.error("iframe: invalid data.");
-			ips.utils.error(err.message)
 			return;
 		}
 
@@ -249,7 +230,7 @@
 		} else {
 			ips.utils.log("Method " + method + " doesn't exist");
 		}
-	}
+	};
 
 	ips.utils.contentLoaded( window, function () {
 		init();

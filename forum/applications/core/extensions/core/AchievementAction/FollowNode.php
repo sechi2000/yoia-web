@@ -10,43 +10,31 @@
 namespace IPS\core\extensions\core\AchievementAction;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Achievements\Actions\NodeAchievementActionAbstract;
-use IPS\core\Achievements\Rule;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function defined;
-use function in_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement Action Extension
  */
-class FollowNode extends NodeAchievementActionAbstract
+class _FollowNode extends \IPS\core\Achievements\Actions\AbstractNodeAchievementAction
 {
 	/**
 	 * Get filter form elements
 	 *
 	 * @param	array|NULL		$filters	Current filter values (if editing)
-	 * @param	Url	$url		The URL the form is being shown on
+	 * @param	\IPS\Http\Url	$url		The URL the form is being shown on
 	 * @return	array
 	 */
-	public function filters( ?array $filters, Url $url ): array
+	public function filters( ?array $filters, \IPS\Http\Url $url ): array
 	{
 		$filters = parent::filters( $filters, $url );
 
 		foreach( $filters['type']->options['options'] as $class => $value )
 		{
-			if ( isset( $class::$contentItemClass ) and  !IPS::classUsesTrait( $class::$contentItemClass, 'IPS\Content\Followable' ) )
+			if ( isset( $class::$contentItemClass ) and  ! \in_array( 'IPS\Content\Followable', class_implements( $class::$contentItemClass ) ) )
 			{
 				unset( $filters['type']->options['options'][ $class ] );
 				unset( $filters['nodes_' . str_replace( '\\', '-', $class ) ] );
@@ -54,56 +42,6 @@ class FollowNode extends NodeAchievementActionAbstract
 		}
 
 		return $filters;
-	}
-
-	/**
-	 * Determines if the member has already completed this rule.
-	 * Used for retroactive rule completion.
-	 * So far, this is only used in Quests, but may be used elsewhere at a later point.
-	 *
-	 * @param Member $member
-	 * @param array $filters
-	 * @return bool
-	 */
-	public function isRuleCompleted( Member $member, array $filters ) : bool
-	{
-		$where = [
-			[ 'follow_member_id=?', $member->member_id ],
-			[ 'follow_area !=?', 'member' ]
-		];
-
-		$totalNodesFollowed = 0;
-		$matchesFilters = empty( $filters['nodes'] );
-		foreach( Db::i()->select( '*', 'core_follow', $where, 'follow_added' ) as $row )
-		{
-			$class = 'IPS\\' . $row['follow_app'] . '\\' . \ucfirst( $row['follow_area'] );
-			if ( class_exists( $class ) AND \in_array( 'IPS\Node\Model', class_parents( $class ) ) )
-			{
-				$totalNodesFollowed++;
-				if( !empty( $filters['nodes'] ) and in_array( $row['follow_rel_id'], $filters['nodes'] ) )
-				{
-					$matchesFilters = true;
-				}
-
-				/* Check if we hit the conditions yet */
-				if( $matchesFilters )
-				{
-					if( !empty( $filters['milestone'] ) )
-					{
-						if( $totalNodesFollowed >= $filters['milestone'] )
-						{
-							return true;
-						}
-					}
-					else
-					{
-						return true;
-					}
-				}
-			}
-		}
-
-		return false;
 	}
 
 	/**
@@ -122,48 +60,44 @@ class FollowNode extends NodeAchievementActionAbstract
 		{
 			$node = $exploded[0]::load( $exploded[1] );
 			$sprintf = [ 'htmlsprintf' => [
-				Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $node->url(), TRUE, $node->_title, FALSE )
+				\IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $node->url(), TRUE, $node->_title, FALSE )
 			] ];
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			$sprintf = [ 'sprintf' => [ Member::loggedIn()->language()->addToStack('modcp_deleted') ] ];
+			$sprintf = [ 'sprintf' => [ \IPS\Member::loggedIn()->language()->addToStack('modcp_deleted') ] ];
 		}
 
-		return Member::loggedIn()->language()->addToStack( 'AchievementAction__FollowNode_log', FALSE, $sprintf );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__FollowNode_log', FALSE, $sprintf );
 	}
 
 	/**
 	 * Get "description" for rule
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	public function ruleDescription( Rule $rule ): ?string
+	public function ruleDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		$type = $rule->filters['type'] ?? NULL;
 
 		$conditions = [];
 		if ( isset( $rule->filters['milestone'] ) )
 		{
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
 				'htmlsprintf' => [
-					Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'milestone', Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
+					\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'milestone', \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
 				],
-				'sprintf'		=> [ $type ? Member::loggedIn()->language()->addToStack( $type::fullyQualifiedType(), FALSE, [ 'strtolower' => TRUE ] ) : Member::loggedIn()->language()->addToStack('AchievementAction__NewContentItem_title_generic') ]
+				'sprintf'		=> [ $type ? \IPS\Member::loggedIn()->language()->addToStack( $type::fullyQualifiedType(), FALSE, [ 'strtolower' => TRUE ] ) : \IPS\Member::loggedIn()->language()->addToStack('AchievementAction__NewContentItem_title_generic') ]
 			] );
 		}
 		if ( $nodeCondition = $this->_nodeFilterDescription( $rule ) )
 		{
 			$conditions[] = $nodeCondition;
 		}
-		if( $questCondition = $this->_questFilterDescription( $rule ) )
-		{
-			$conditions[] = $questCondition;
-		}
 
-		return Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescription(
-			$type ? Member::loggedIn()->language()->addToStack( 'AchievementAction__FollowNode_title_t', FALSE, [ 'sprintf' => [ Member::loggedIn()->language()->addToStack( $type::fullyQualifiedType() ) ] ] ) : Member::loggedIn()->language()->addToStack( 'AchievementAction__FollowNode_title' ),
+		return \IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescription(
+			$type ? \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__FollowNode_title_t', FALSE, [ 'sprintf' => [ \IPS\Member::loggedIn()->language()->addToStack( $type::fullyQualifiedType() ) ] ] ) : \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__FollowNode_title' ),
 			$conditions
 		);
 	}
@@ -173,7 +107,7 @@ class FollowNode extends NodeAchievementActionAbstract
 	 *
 	 * @return	array
 	 */
-	static public function rebuildData(): array
+	static public function rebuildData()
 	{
 		return [ [
 			'table' => 'core_follow',
@@ -190,12 +124,12 @@ class FollowNode extends NodeAchievementActionAbstract
 	 * @param array		$data	Data collected when starting rebuild [table, pkey...]
 	 * @return void
 	 */
-	public static function rebuildRow( array $row, array $data ) : void
+	public static function rebuildRow( $row, $data )
 	{
-		$class = 'IPS\\' . $row['follow_app'] . '\\' . IPS::mb_ucfirst( $row['follow_area'] );
-		if ( class_exists( $class ) AND in_array( 'IPS\Node\Model', class_parents( $class ) ) )
+		$class = 'IPS\\' . $row['follow_app'] . '\\' . mb_ucfirst( $row['follow_area'] );
+		if ( class_exists( $class ) AND \in_array( 'IPS\Node\Model', class_parents( $class ) ) )
 		{
-			Member::load( $row['follow_member_id'] )->achievementAction( 'core', 'FollowNode', $class::load( $row['follow_rel_id'] ) );
+			\IPS\Member::load( $row['follow_member_id'] )->achievementAction( 'core', 'FollowNode', $class::load( $row['follow_rel_id'] ) );
 		}
 	}
 }

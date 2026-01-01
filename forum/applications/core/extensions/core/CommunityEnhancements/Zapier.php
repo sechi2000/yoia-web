@@ -12,35 +12,16 @@
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Api\Key;
-use IPS\Application;
-use IPS\Db;
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Login;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use function defined;
-use const IPS\CIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancement
  */
-class Zapier extends CommunityEnhancementsAbstract
+class _Zapier
 {
 	/**
 	 * Get the permissions needed for the Zapier API key
@@ -49,7 +30,7 @@ class Zapier extends CommunityEnhancementsAbstract
 	 *
 	 * @return	array
 	 */
-	public static function apiKeyPermissions() : array
+	public static function apiKeyPermissions()
 	{
 		$return = array(
 			'core/clubs/GETindex'				=> array( 'access' => TRUE ),
@@ -66,10 +47,9 @@ class Zapier extends CommunityEnhancementsAbstract
 			'core/webhooks/DELETEitem'			=> array( 'access' => TRUE ),
 			'core/promotions/GETindex'			=> array( 'access' => TRUE ),
 			'core/promotions/GETitem'			=> array( 'access' => TRUE ),
-			'core/content/GETitem'				=> array( 'access' => TRUE ),
 		);
 		
-		if ( Application::appIsEnabled('forums') )
+		if ( \IPS\Application::appIsEnabled('forums') )
 		{
 			$return['forums/forums/GETindex'] 	= array( 'access' => TRUE );
 			$return['forums/forums/GETitem'] 	= array( 'access' => TRUE );
@@ -81,7 +61,7 @@ class Zapier extends CommunityEnhancementsAbstract
 			$return['forums/posts/POSTindex'] 	= array( 'access' => TRUE );
 		}
 		
-		if ( Application::appIsEnabled('calendar') )
+		if ( \IPS\Application::appIsEnabled('calendar') )
 		{
 			$return['calendar/calendars/GETindex'] 	= array( 'access' => TRUE );
 			$return['calendar/calendars/GETitem'] 	= array( 'access' => TRUE );
@@ -96,7 +76,7 @@ class Zapier extends CommunityEnhancementsAbstract
 			$return['calendar/reviews/POSTindex'] 	= array( 'access' => TRUE );
 		}
 		
-		if ( Application::appIsEnabled('downloads') )
+		if ( \IPS\Application::appIsEnabled('downloads') )
 		{
 			$return['downloads/categories/GETindex'] 	= array( 'access' => TRUE );
 			$return['downloads/categories/GETitem'] 	= array( 'access' => TRUE );
@@ -111,7 +91,7 @@ class Zapier extends CommunityEnhancementsAbstract
 			$return['downloads/reviews/POSTindex'] 		= array( 'access' => TRUE );
 		}
 
-		if ( Application::appIsEnabled('blog') )
+		if ( \IPS\Application::appIsEnabled('blog') )
 		{
 			$return['blog/categories/GETindex'] 	= array( 'access' => TRUE );
 			$return['blog/categories/GETitem'] 		= array( 'access' => TRUE );
@@ -128,7 +108,7 @@ class Zapier extends CommunityEnhancementsAbstract
 			$return['blog/comments/POSTindex'] 		= array( 'access' => TRUE );
 		}
 		
-		if ( Application::appIsEnabled('gallery') )
+		if ( \IPS\Application::appIsEnabled('gallery') )
 		{
 			$return['gallery/categories/GETindex'] 	= array( 'access' => TRUE );
 			$return['gallery/categories/GETitem'] 	= array( 'access' => TRUE );
@@ -145,7 +125,7 @@ class Zapier extends CommunityEnhancementsAbstract
 			$return['gallery/reviews/POSTindex'] 	= array( 'access' => TRUE );
 		}
 		
-		if ( Application::appIsEnabled('cms') )
+		if ( \IPS\Application::appIsEnabled('cms') )
 		{
 			$return['cms/databases/GETindex'] 	= array( 'access' => TRUE );
 			$return['cms/databases/GETitem'] 	= array( 'access' => TRUE );
@@ -161,13 +141,6 @@ class Zapier extends CommunityEnhancementsAbstract
 			$return['cms/reviews/GETitem'] 		= array( 'access' => TRUE );
 			$return['cms/reviews/POSTindex'] 	= array( 'access' => TRUE );
 		}
-
-		if ( Application::appIsEnabled('courses') )
-		{
-			$return['courses/courses/GETindex'] 	= array( 'access' => TRUE );
-			$return['courses/courses/GETitem'] 	= array( 'access' => TRUE );
-			$return['courses/courses/POSTitem'] 	= array( 'access' => TRUE );
-		}
 		
 		return $return;
 	}
@@ -175,29 +148,29 @@ class Zapier extends CommunityEnhancementsAbstract
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= FALSE;
+	public $ips	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= TRUE;
+	public $hasOptions	= TRUE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "zapier.png";
+	public $icon	= "zapier.png";
 	
 	/**
 	 * Can we use this?
 	 *
-	 * @return	bool
+	 * @return	void
 	 */
-	public static function isAvailable() : bool
+	public static function isAvailable()
 	{
 		return TRUE;
 	}
@@ -209,14 +182,14 @@ class Zapier extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		if ( Settings::i()->zapier_api_key )
+		if ( \IPS\Settings::i()->zapier_api_key )
 		{
 			try
 			{
-				$apiKey = Key::load( Settings::i()->zapier_api_key );
+				$apiKey = \IPS\Api\Key::load( \IPS\Settings::i()->zapier_api_key );
 				$this->enabled = (bool) json_decode( $apiKey->permissions, TRUE );
 			}
-			catch ( OutOfRangeException $e ) {}
+			catch ( \OutOfRangeException $e ) {}
 		}
 	}
 	
@@ -225,9 +198,9 @@ class Zapier extends CommunityEnhancementsAbstract
 	 *
 	 * @return	void
 	 */
-	public function edit() : void
+	public function edit()
 	{
-		$apiKey = Key::load( Settings::i()->zapier_api_key );
+		$apiKey = \IPS\Api\Key::load( \IPS\Settings::i()->zapier_api_key );
 		
 		$correctPermissions = json_encode( static::apiKeyPermissions() );
 		if ( $apiKey->permissions != $correctPermissions )
@@ -240,12 +213,12 @@ class Zapier extends CommunityEnhancementsAbstract
 		{
 			$this->testSettings();
 		}
-		catch ( DomainException $e )
+		catch ( \DomainException $e )
 		{
-			Output::i()->error( $e->getMessage(), '3C414/2' );
+			\IPS\Output::i()->error( $e->getMessage(), '3C414/2' );
 		}
 		
-		Output::i()->output = Theme::i()->getTemplate( 'api' )->zapier( $apiKey );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'api' )->zapier( $apiKey );
 	}
 	
 	/**
@@ -253,21 +226,21 @@ class Zapier extends CommunityEnhancementsAbstract
 	 *
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		$isNew = FALSE;
 		try
 		{
-			$apiKey = Key::load( Settings::i()->zapier_api_key );
+			$apiKey = \IPS\Api\Key::load( \IPS\Settings::i()->zapier_api_key );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			$isNew = TRUE;
 			
-			$apiKey = new Key;
-			$apiKey->id = Login::generateRandomString( 32 );
+			$apiKey = new \IPS\Api\Key;
+			$apiKey->id = \IPS\Login::generateRandomString( 32 );
 		}
 				
 		if ( $enabled )
@@ -276,30 +249,30 @@ class Zapier extends CommunityEnhancementsAbstract
 			{
 				$this->testSettings();
 			}
-			catch ( DomainException $e )
+			catch ( \DomainException $e )
 			{
-				Output::i()->error( $e->getMessage(), '3C414/1' );
+				\IPS\Output::i()->error( $e->getMessage(), '3C414/1' );
 			}
 			
 			$apiKey->permissions = json_encode( static::apiKeyPermissions() );
-			Db::i()->update( 'core_api_webhooks', array( 'enabled' => 1 ), array( 'api_key=?', $apiKey->id ) );
+			\IPS\Db::i()->update( 'core_api_webhooks', array( 'enabled' => 1 ), array( 'api_key=?', $apiKey->id ) );
 		}
 		else
 		{
 			$apiKey->permissions = json_encode( array() );
-			Db::i()->update( 'core_api_webhooks', array( 'enabled' => 0 ), array( 'api_key=?', $apiKey->id ) );
+			\IPS\Db::i()->update( 'core_api_webhooks', array( 'enabled' => 0 ), array( 'api_key=?', $apiKey->id ) );
 		}
 		
 		$apiKey->allowed_ips = NULL;
 		$apiKey->save();
 		
-		Settings::i()->changeValues( array( 'zapier_api_key' => $apiKey->id ) );
+		\IPS\Settings::i()->changeValues( array( 'zapier_api_key' => $apiKey->id ) );
 		
 		if ( $isNew )
 		{
-			Lang::saveCustom( 'core', "core_api_name_{$apiKey->id}", "Zapier" );
+			\IPS\Lang::saveCustom( 'core', "core_api_name_{$apiKey->id}", "Zapier" );
 			
-			throw new DomainException;
+			throw new \DomainException;
 		}
 	}
 	
@@ -307,23 +280,19 @@ class Zapier extends CommunityEnhancementsAbstract
 	 * Test Settings
 	 *
 	 * @return	void
-	 * @throws	DomainException
+	 * @throws	\DomainException
 	 */
-	protected function testSettings() : void
+	protected function testSettings()
 	{
-		if( CIC )
+		if ( !\IPS\Settings::i()->use_friendly_urls or !\IPS\Settings::i()->htaccess_mod_rewrite )
 		{
-			return;
-		}
-		if ( !Settings::i()->use_friendly_urls or !Settings::i()->htaccess_mod_rewrite )
-		{
-			throw new DomainException( 'zapier_error_friendly_urls' );
+			throw new \DomainException( 'zapier_error_friendly_urls' );
 		}
 
-		$url = Url::external( rtrim( Settings::i()->base_url, '/' ) . '/api/core/hello' );
+		$url = \IPS\Http\Url::external( rtrim( \IPS\Settings::i()->base_url, '/' ) . '/api/core/hello' );
 		try
 		{
-			if ( Request::i()->isCgi() )
+			if ( \IPS\Request::i()->isCgi() )
 			{
 				$response = $url->setQueryString( 'key', 'test' )->request()->get()->decodeJson();
 			}
@@ -333,17 +302,17 @@ class Zapier extends CommunityEnhancementsAbstract
 			}
 			if ( isset( $response['errorMessage'] ) AND $response['errorMessage'] == 'IP_ADDRESS_BANNED' )
 			{
-				throw new Exception;
+				throw new \Exception;
 			}
 			
 			if ( $response['errorMessage'] != 'INVALID_API_KEY' and $response['errorMessage'] != 'TOO_MANY_REQUESTS_WITH_BAD_KEY' )
 			{
-				throw new Exception;
+				throw new \Exception;
 			}
 		}
-		catch ( Exception $e )
+		catch ( \Exception $e )
 		{
-			throw new DomainException( 'zapier_error_api' );
+			throw new \DomainException( 'zapier_error_api' );
 		}
 	}
 
@@ -352,14 +321,14 @@ class Zapier extends CommunityEnhancementsAbstract
 	 *
 	 * @return void
 	 */
-	public static function rebuildRESTApiPermissions() : void
+	public static function rebuildRESTApiPermissions()
 	{
 		/* Rebuild Zapier REST API Key Permissions */
-		if( Settings::i()->zapier_api_key )
+		if( \IPS\Settings::i()->zapier_api_key )
 		{
 			try
 			{
-				$apiKey = Key::load( Settings::i()->zapier_api_key );
+				$apiKey = \IPS\Api\Key::load( \IPS\Settings::i()->zapier_api_key );
 
 				$correctPermissions = json_encode( static::apiKeyPermissions() );
 				if ( $apiKey->permissions != $correctPermissions )
@@ -368,7 +337,7 @@ class Zapier extends CommunityEnhancementsAbstract
 					$apiKey->save();
 				}
 			}
-			catch ( OutOfRangeException $e ) {}
+			catch ( \OutOfRangeException $e ) {}
 		}
 	}
 }

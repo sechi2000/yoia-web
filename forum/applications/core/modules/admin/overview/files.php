@@ -11,95 +11,46 @@
 namespace IPS\core\modules\admin\overview;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DomainException;
-use Exception;
-use IPS\Application;
-use IPS\Data\Cache;
-use IPS\Data\Store;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Interval;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Select;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Task;
-use IPS\Theme;
-use LogicException;
-use OutOfRangeException;
-use UnderflowException;
-use function count;
-use function defined;
-use function get_class;
-use function in_array;
-use function intval;
-use function is_array;
-use function json_decode;
-use function json_encode;
-use function sprintf;
-use function str_replace;
-use const IPS\CIC;
-use const IPS\ROOT_PATH;
-use const IPS\Helpers\Table\SEARCH_CONTAINS_TEXT;
-use const IPS\Helpers\Table\SEARCH_DATE_RANGE;
-use const IPS\Helpers\Table\SEARCH_MEMBER;
-use const IPS\Helpers\Table\SEARCH_NUMERIC;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * File Settings
  */
-class files extends Controller
+class _files extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 
 	/**
 	 * Manage Attachment Types
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
-	{
-		/* This method is also called via ACP Member View with a CSRF key inline */
-		Output::i()->bypassCsrfKeyCheck = true;
-
-		Dispatcher::i()->checkAcpPermission( 'files_view' );
+	protected function manage()
+	{		
+		\IPS\Dispatcher::i()->checkAcpPermission( 'files_view' );
 		
-		Output::i()->title = Member::loggedIn()->language()->addToStack('uploaded_files');
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('uploaded_files');
 		
-		Output::i()->sidebar['actions'] = array();
+		\IPS\Output::i()->sidebar['actions'] = array();
 
-		if ( Member::loggedIn()->hasAcpRestriction( 'core', 'overview', 'files_settings' ) )
+		if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'overview', 'files_settings' ) )
 		{
-			Output::i()->sidebar['actions']['settings'] = array(
+			\IPS\Output::i()->sidebar['actions']['settings'] = array(
 				'icon'	=> 'cog',
-				'link'	=> Url::internal( 'app=core&module=overview&controller=files&do=settings' ),
+				'link'	=> \IPS\Http\Url::internal( 'app=core&module=overview&controller=files&do=settings' ),
 				'title'	=> 'storage_settings',
 			);
 
-			Output::i()->sidebar['actions']['images'] = array(
+			\IPS\Output::i()->sidebar['actions']['images'] = array(
 				'icon'	=> 'cog',
-				'link'	=> Url::internal( 'app=core&module=overview&controller=files&do=imagesettings' ),
+				'link'	=> \IPS\Http\Url::internal( 'app=core&module=overview&controller=files&do=imagesettings' ),
 				'title'	=> 'image_settings',
 			);
 		}
@@ -115,9 +66,9 @@ class files extends Controller
 			);
 		}*/
 		
-		$table = new TableDb( 'core_attachments', Url::internal( 'app=core&module=overview&controller=files' ) );
-		$table->tableTemplate = array( Theme::i()->getTemplate( 'dashboard' ), 'fileTable' );
-		$table->rowsTemplate = array( Theme::i()->getTemplate( 'dashboard' ), 'fileTableRows' );
+		$table = new \IPS\Helpers\Table\Db( 'core_attachments', \IPS\Http\Url::internal( 'app=core&module=overview&controller=files' ) );
+		$table->tableTemplate = array( \IPS\Theme::i()->getTemplate( 'dashboard' ), 'fileTable' );
+		$table->rowsTemplate = array( \IPS\Theme::i()->getTemplate( 'dashboard' ), 'fileTableRows' );
 		$table->filters = array(
 			'images'	=> "attach_is_image=1",
 			'files'		=> "attach_is_image=0",
@@ -137,13 +88,12 @@ class files extends Controller
 			{
 				if ( $row['attach_is_image'] and $table->filter === 'images' )
 				{
-					$url = Url::external( File::get( 'core_Attachment', $row['attach_location'] )->url );
-					$alt = $row['attach_file'];
-					return "<a href='{$url}' target='_blank' rel='noopener'><img src='{$url}' style='max-height:200px' alt='{$alt}'></a>";
+					$url = \IPS\Http\Url::external( \IPS\File::get( 'core_Attachment', $row['attach_location'] )->url );
+					return "<a href='{$url}' target='_blank' rel='noopener'><img src='{$url}' style='max-height:200px'></a>";
 				}
 				else
 				{
-					$url = Url::external( Settings::i()->base_url . "applications/core/interface/file/attachment.php" )->setQueryString( 'id', $row['attach_id'] );
+					$url = \IPS\Http\Url::external( \IPS\Settings::i()->base_url . "applications/core/interface/file/attachment.php" )->setQueryString( 'id', $row['attach_id'] );
 					if ( $row['attach_security_key'] )
 					{
 						$url = $url->setQueryString( 'key', $row['attach_security_key'] );
@@ -173,7 +123,7 @@ class files extends Controller
 			},
 			'attach_date' => function( $val )
 			{
-				return DateTime::ts( $val );
+				return \IPS\DateTime::ts( $val );
 			},
 			'attach_hits' => function( $val, $row )
 			{
@@ -183,22 +133,22 @@ class files extends Controller
 			{
 				if ( $val == 0 )
 				{
-					return Member::load( $val )->name;
+					return \IPS\Member::load( $val )->name;
 				}
 				else
 				{
-					return "<a href='" . Url::internal( 'app=core&module=members&controller=members&do=view&id=' . $val ) . "'>" . htmlentities( Member::load( $val )->name, ENT_DISALLOWED, 'UTF-8', FALSE ) . '</a>';
+					return "<a href='" . \IPS\Http\Url::internal( 'app=core&module=members&controller=members&do=view&id=' . $val ) . "'>" . htmlentities( \IPS\Member::load( $val )->name, ENT_DISALLOWED, 'UTF-8', FALSE ) . '</a>';
 			
 				}
 			}
 		);
 		$table->advancedSearch = array(
-			'attach_file'		=> SEARCH_CONTAINS_TEXT,
-			'attach_ext'		=> SEARCH_CONTAINS_TEXT,
-			'attach_hits'		=> SEARCH_NUMERIC,
-			'attach_date'		=> SEARCH_DATE_RANGE,
-			'attach_member_id'	=> SEARCH_MEMBER,
-			'attach_filesize'	=> SEARCH_NUMERIC,
+			'attach_file'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'attach_ext'		=> \IPS\Helpers\Table\SEARCH_CONTAINS_TEXT,
+			'attach_hits'		=> \IPS\Helpers\Table\SEARCH_NUMERIC,
+			'attach_date'		=> \IPS\Helpers\Table\SEARCH_DATE_RANGE,
+			'attach_member_id'	=> \IPS\Helpers\Table\SEARCH_MEMBER,
+			'attach_filesize'	=> \IPS\Helpers\Table\SEARCH_NUMERIC,
 		);
 		$table->rowButtons = function( $row )
 		{
@@ -206,16 +156,16 @@ class files extends Controller
 			$buttons['view'] = array(
 				'icon'	=> 'search',
 				'title'	=> 'attach_view_locations',
-				'link'	=> Url::internal( "app=core&module=overview&controller=files&do=lookup&id={$row['attach_id']}" ),
+				'link'	=> \IPS\Http\Url::internal( "app=core&module=overview&controller=files&do=lookup&id={$row['attach_id']}" ),
 				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => $row['attach_file'] )
 			);
 			
-			if ( Member::loggedIn()->hasAcpRestriction( 'core', 'overview', 'files_delete' ) )
+			if ( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'overview', 'files_delete' ) )
 			{
 				$buttons['delete'] = array(
 					'icon'	=> 'times-circle',
 					'title'	=> 'delete',
-					'link'	=> Url::internal( "app=core&module=overview&controller=files&do=delete&id={$row['attach_id']}" ),
+					'link'	=> \IPS\Http\Url::internal( "app=core&module=overview&controller=files&do=delete&id={$row['attach_id']}" ),
 					'data'		=> array( 'delete' => '' ),
 				);
 			}
@@ -223,8 +173,9 @@ class files extends Controller
 			return $buttons;
 		};
 
-		Output::i()->jsFiles = array_merge( Output::i()->jsFiles, Output::i()->js( 'admin_files.js', 'core', 'admin' ) );
-		Output::i()->output = (string) $table;
+		\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'dashboard/files.css', 'core', 'admin' ) );
+		\IPS\Output::i()->jsFiles = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_files.js', 'core', 'admin' ) );
+		\IPS\Output::i()->output = (string) $table;
 	}
 	
 	/**
@@ -232,30 +183,30 @@ class files extends Controller
 	 *
 	 * @return	void
 	 */
-	public function lookup() : void
+	public function lookup()
 	{
-		Dispatcher::i()->checkAcpPermission( 'files_view' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'files_view' );
 		
 		$loadedExtensions = array();
 		$locations = array();
 		
-		foreach ( Db::i()->select( '*', 'core_attachments_map', array( 'attachment_id=?', intval( Request::i()->id ) ) ) as $map )
+		foreach ( \IPS\Db::i()->select( '*', 'core_attachments_map', array( 'attachment_id=?', \intval( \IPS\Request::i()->id ) ) ) as $map )
 		{
 			if ( !isset( $loadedExtensions[ $map['location_key'] ] ) )
 			{
 				$exploded = explode( '_', $map['location_key'] );
 				try
 				{
-					$extensions = Application::load( $exploded[0] )->extensions( 'core', 'EditorLocations' );
+					$extensions = \IPS\Application::load( $exploded[0] )->extensions( 'core', 'EditorLocations' );
 					if ( isset( $extensions[ $exploded[1] ] ) )
 					{
 						$loadedExtensions[ $map['location_key'] ] = $extensions[ $exploded[1] ];
 					}
 				}
-				catch ( OutOfRangeException $e ){ }
+				catch ( \OutOfRangeException $e ){ }
 			}
 			
-			if ( isset( $loadedExtensions[ $map['location_key'] ] ) )
+			if ( isset( $loadedExtensions[ $map['location_key'] ] ) AND method_exists( $loadedExtensions[ $map['location_key'] ], 'attachmentLookup' ) )
 			{
 				try
 				{
@@ -264,11 +215,11 @@ class files extends Controller
 						$locations[] = $url;
 					}
 				}
-				catch ( LogicException | OutOfRangeException $e ) { }
+				catch ( \LogicException $e ) { }
 			}
 		}
 		
-		Output::i()->output = Theme::i()->getTemplate( 'global' )->block( NULL, Theme::i()->getTemplate( 'members', 'core', 'global' )->attachmentLocations( $locations, FALSE ), TRUE, 'i-padding_3' );
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->block( NULL, \IPS\Theme::i()->getTemplate( 'members', 'core', 'global' )->attachmentLocations( $locations, FALSE ), TRUE, 'ipsPad' );
 	}
 	
 	/**
@@ -276,31 +227,31 @@ class files extends Controller
 	 *
 	 * @return	void
 	 */
-	public function delete() : void
+	public function delete()
 	{
-		Dispatcher::i()->checkAcpPermission( 'files_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'files_delete' );
 
 		/* Make sure the user confirmed the deletion */
-		Request::i()->confirmedDelete();
+		\IPS\Request::i()->confirmedDelete();
 		
 		try
 		{
-			$attachment = Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', Request::i()->id ) )->first();
+			$attachment = \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', \IPS\Request::i()->id ) )->first();
 			
 			try
 			{
-				File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
-				File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
+				\IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
+				\IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
 			}
-			catch ( Exception $e ) { }
+			catch ( \Exception $e ) { }
 			
-			Db::i()->delete( 'core_attachments', array( 'attach_id=?', Request::i()->id ) );
+			\IPS\Db::i()->delete( 'core_attachments', array( 'attach_id=?', \IPS\Request::i()->id ) );
 			
-			Session::i()->log( 'acplogs__file_deleted', array( $attachment['attach_file'] => FALSE ) );
+			\IPS\Session::i()->log( 'acplogs__file_deleted', array( $attachment['attach_file'] => FALSE ) );
 		}
-		catch ( UnderflowException $e ) { }
+		catch ( \UnderflowException $e ) { }
 		
-		Output::i()->redirect( Url::internal( "app=core&module=overview&controller=files" ) );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=overview&controller=files" ) );
 	}
 
 	/**
@@ -308,36 +259,36 @@ class files extends Controller
 	 * 
 	 * @return	void
 	 */
-	protected function imagesettings() : void
+	protected function imagesettings()
 	{
 		/* Init */
-		Dispatcher::i()->checkAcpPermission( 'files_settings' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'files_settings' );
 
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 
-		$form->add( new Radio( 'image_suite', class_exists( 'Imagick', FALSE ) ? Settings::i()->image_suite : 'gd', TRUE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'image_suite', class_exists( 'Imagick', FALSE ) ? \IPS\Settings::i()->image_suite : 'gd', TRUE, array(
 			'options' => array( 'gd' => 'imagesuite_gd', 'imagemagick' => 'imagesuite_imagemagick' ),
 			'toggles' => array( 'imagemagick' => array( 'image_jpg_quality', 'imagick_strip_exif' ), 'gd' => array( 'image_jpg_quality', 'image_png_quality_gd' ) ),
 			'disabled'=> class_exists( 'Imagick', FALSE ) ? array() : array( 'imagemagick' )
 		) ) );
 
-		$form->add( new Number( 'image_jpg_quality', Settings::i()->image_jpg_quality, FALSE, array( 'min' => 0, 'max' => 100, 'range' => TRUE, 'step' => 1 ), NULL, NULL, NULL, 'image_jpg_quality' ) );
-		$form->add( new Number( 'image_png_quality_gd', Settings::i()->image_png_quality_gd, FALSE, array( 'min' => 0, 'max' => 9, 'range' => TRUE, 'step' => 1 ), NULL, NULL, NULL, 'image_png_quality_gd' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'image_jpg_quality', \IPS\Settings::i()->image_jpg_quality, FALSE, array( 'min' => 0, 'max' => 100, 'range' => TRUE, 'step' => 1 ), NULL, NULL, NULL, 'image_jpg_quality' ) );
+		$form->add( new \IPS\Helpers\Form\Number( 'image_png_quality_gd', \IPS\Settings::i()->image_png_quality_gd, FALSE, array( 'min' => 0, 'max' => 9, 'range' => TRUE, 'step' => 1 ), NULL, NULL, NULL, 'image_png_quality_gd' ) );
 
-		$form->add( new YesNo( 'imagick_strip_exif', Settings::i()->imagick_strip_exif, FALSE, array(), NULL, NULL, NULL, 'imagick_strip_exif' ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'imagick_strip_exif', \IPS\Settings::i()->imagick_strip_exif, FALSE, array(), NULL, NULL, NULL, 'imagick_strip_exif' ) );
 
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings();
 
-			Session::i()->log( 'acplogs__image_settings_updated' );
+			\IPS\Session::i()->log( 'acplogs__image_settings_updated' );
 			
-			Output::i()->redirect( Url::internal( 'app=core&module=overview&controller=files&do=imagesettings' ), 'saved' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=overview&controller=files&do=imagesettings' ), 'saved' );
 		}
 
 		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('image_settings');
-		Output::i()->output = $form;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('image_settings');
+		\IPS\Output::i()->output = $form;
 	}
 
 	/**
@@ -345,70 +296,52 @@ class files extends Controller
 	 * 
 	 * @return	void
 	 */
-	protected function settings() : void
+	protected function settings()
 	{
 		/* Init */
-		Dispatcher::i()->checkAcpPermission( 'files_settings' );
-
-		$totalConfigurations = (int) Db::i()->select( 'count(*)', 'core_file_storage' )->first();
-		$cicConfigurations = 0;
-		if( CIC )
-		{
-			$cicConfigurations = (int) Db::i()->select( 'count(*)', 'core_file_storage', array( "method=? AND configuration LIKE CONCAT( '%', ?, '%' )", 'Amazon', 'ips-cic-filestore' ) )->first();
-		}
-
-		/* If we have only one configuration, don't bother showing the settings tab */
-		if( $totalConfigurations == 1 )
-		{
-			$tabs = [ 'configurations' => 'filestorage_configurations' ];
-			$activeTab = 'configurations';
-		}
-		else
-		{
-			$tabs = [ 'settings' => 'filestorage_settings', 'configurations' => 'filestorage_configurations' ];
-			$activeTab = Request::i()->tab ?? 'settings';
-		}
+		\IPS\Dispatcher::i()->checkAcpPermission( 'files_settings' );
+		$activeTab = isset( \IPS\Request::i()->tab ) ? \IPS\Request::i()->tab : 'settings';
 				
 		/* Settings form */
 		if ( $activeTab === 'settings' )
 		{
-			$settings = json_decode( Settings::i()->upload_settings, TRUE );
+			$settings = json_decode( \IPS\Settings::i()->upload_settings, TRUE );
 			
 			$configurations	= array();
 			$cicDisabled	= FALSE;
 
-			if( CIC )
+			if( \IPS\CIC )
 			{
 				$cicDisabled = array();
 			}
 
-			foreach ( Db::i()->select( '*', 'core_file_storage' ) as $row )
+			foreach ( \IPS\Db::i()->select( '*', 'core_file_storage' ) as $row )
 			{
-				$handlers	= File::storageHandlers( $row );
+				$handlers	= \IPS\File::storageHandlers( $row );
 				$classname	= $handlers[ $row['method'] ];
 				$configurations[ $row['id'] ] = $classname::displayName( json_decode( $row['configuration'], TRUE ) );
 
-				if( $row['method'] == 'FileSystem' AND CIC )
+				if( $row['method'] == 'FileSystem' AND \IPS\CIC )
 				{
 					$cicDisabled[ $row['id'] ] = $row['id'];
 				}
 				
-				if ( $row['method'] == 'Amazon' AND CIC AND json_decode( $row['configuration'], TRUE )['bucket'] == 'ips-cic-filestore' )
+				if ( $row['method'] == 'Amazon' AND \IPS\CIC AND json_decode( $row['configuration'], TRUE )['bucket'] == 'ips-cic-filestore' )
 				{
 					$cicDisabled[ $row['id'] ] = $row['id'];
 				}
 			}
 			
-			$form = new Form;
+			$form = new \IPS\Helpers\Form;
 			$form->addMessage( 'filestorage_move_info' );
-			foreach ( Application::allExtensions( 'core', 'FileStorage', FALSE, NULL, NULL, TRUE ) as $name => $obj )
+			foreach ( \IPS\Application::allExtensions( 'core', 'FileStorage', FALSE, NULL, NULL, TRUE ) as $name => $obj )
 			{
-				$disabled = ( isset( $settings[ "filestorage__{$name}" ] ) and is_array( $settings[ "filestorage__{$name}" ] ) );
+				$disabled = ( isset( $settings[ "filestorage__{$name}" ] ) and \is_array( $settings[ "filestorage__{$name}" ] ) ) ? TRUE : FALSE;
 				$value    = NULL;
 				
 				if ( isset( $settings[ "filestorage__{$name}" ] ) )
 				{
-					if ( is_array( $settings[ "filestorage__{$name}" ] ) )
+					if ( \is_array( $settings[ "filestorage__{$name}" ] ) )
 					{
 						$copyOfSettings = $settings[ "filestorage__{$name}" ];
 						$value = array_shift( $copyOfSettings );
@@ -436,26 +369,26 @@ class files extends Controller
 					unset( $handlerDisabled[ $value ] );
 				}
 
-				$form->add( new Select( 'filestorage__' . $name, (int) $value, TRUE, array( 'options' => $configurations, 'disabled' => $disabled ?: $handlerDisabled, 'toggles' => $toggles ) ) );
+				$form->add( new \IPS\Helpers\Form\Select( 'filestorage__' . $name, (int) $value, TRUE, array( 'options' => $configurations, 'disabled' => $disabled ?: $handlerDisabled, 'toggles' => $toggles ) ) );
 				
 				if ( $disabled )
 				{
-					Member::loggedIn()->language()->words[ 'filestorage__' . $name . '_warning' ] = Member::loggedIn()->language()->addToStack( 'file_storage_move_in_progress' );
+					\IPS\Member::loggedIn()->language()->words[ 'filestorage__' . $name . '_warning' ] = \IPS\Member::loggedIn()->language()->addToStack( 'file_storage_move_in_progress' );
 				}
 			}
 
-			$form->add( new YesNo( 'filestorage_move', TRUE, FALSE, array(), NULL, NULL, NULL, 'filestorage_move' ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'filestorage_move', TRUE, FALSE, array(), NULL, NULL, NULL, 'filestorage_move' ) );
 						
 			if ( $values = $form->values() )
 			{
 				/* Block moves to filesystem on CIC */
 				foreach ( $values as $k => $v )
 				{
-					if ( isset( $settings[ $k ] ) AND !is_array( $settings[ $k ] ) )
+					if ( isset( $settings[ $k ] ) AND !\is_array( $settings[ $k ] ) )
 					{
-						if( $settings[ $k ] != $v AND $k != 'filestorage_move' AND CIC AND in_array( $v, $cicDisabled ) )
+						if( $settings[ $k ] != $v AND $k != 'filestorage_move' AND \IPS\CIC AND \in_array( $v, $cicDisabled ) )
 						{
-							Output::i()->error( 'file_storage_cic_filesystem', '3C158/7', 403, '' );
+							\IPS\Output::i()->error( 'file_storage_cic_filesystem', '3C158/7', 403, '' );
 						}
 					}
 				}
@@ -470,7 +403,7 @@ class files extends Controller
 	                    $rebuild = TRUE;
 	                    $extension = new \IPS\core\extensions\core\FileStorage\Theme;
 	                    
-	                    Task::queue( 'core', 'MoveFiles', array( 'storageExtension' => 'filestorage__core_Theme', 'oldConfiguration' => $settings[ 'filestorage__core_Theme' ], 'newConfiguration' => $values[ 'filestorage__core_Theme' ], 'count' => $extension->count() ), 1 );
+	                    \IPS\Task::queue( 'core', 'MoveFiles', array( 'storageExtension' => 'filestorage__core_Theme', 'oldConfiguration' => $settings[ 'filestorage__core_Theme' ], 'newConfiguration' => $values[ 'filestorage__core_Theme' ], 'count' => $extension->count() ), 1 );
 						
 						/* Add to allowed storage methods so when moving files, we can accept old config or new config if move is in progress. Important: order is array(x, y) x is the new location (pos 0), y is the old location (pos 1)*/
 						$values['filestorage__core_Theme'] = array( $values['filestorage__core_Theme'], $settings['filestorage__core_Theme'] );
@@ -478,27 +411,19 @@ class files extends Controller
 					$totalCount = 0;
 					foreach ( $values as $k => $v )
 					{
-						if ( isset( $settings[$k] ) AND !is_array( $settings[$k] ) )
+						if ( isset( $settings[$k] ) AND !\is_array( $settings[$k] ) )
 						{
 							if ( $settings[ $k ] != $v and $k != 'filestorage__core_Theme' AND $k != 'filestorage_move' )
 							{
 								/* Do we need to move files at all? */
-								$configurations = File::getStore();
+								$configurations = \IPS\File::getStore();
 								$exploded = explode( '_', $k );
-								try
-								{
-									$classname = Application::getExtensionClass( $exploded[2], 'FileStorage', $exploded[3] );
-								}
-								catch( OutOfRangeException )
-								{
-									continue;
-								}
-
+								$classname = "IPS\\{$exploded[2]}\\extensions\\core\\FileStorage\\{$exploded[3]}";
 								$extension = new $classname;
-								$currentClass = File::getClass( intval( $settings[ $k ] ) );
-								$newClass = File::getClass( intval( $v ) );
+								$currentClass = \IPS\File::getClass( \intval( $settings[ $k ] ) );
+								$newClass = \IPS\File::getClass( \intval( $v ) );
 								
-								if ( ( isset( $configurations[ $v ] ) and isset( $configurations[ $settings[ $k ] ] ) ) and ( get_class( $currentClass ) == get_class( $newClass ) ) and ! $newClass::moveCheck( $newClass->configuration, $currentClass->configuration ) )
+								if ( ( isset( $configurations[ $v ] ) and isset( $configurations[ $settings[ $k ] ] ) ) and ( \get_class( $currentClass ) == \get_class( $newClass ) ) and ! $newClass::moveCheck( $newClass->configuration, $currentClass->configuration ) )
 								{
 									$rebuild = FALSE;
 								}
@@ -514,7 +439,7 @@ class files extends Controller
 									if ( $count )
 									{
 										$totalCount += $count;
-										Task::queue( 'core', 'MoveFiles', array( 'storageExtension' => $k, 'oldConfiguration' => $settings[ $k ], 'newConfiguration' => $values[ $k ], 'count' => $count ), 2 );
+										\IPS\Task::queue( 'core', 'MoveFiles', array( 'storageExtension' => $k, 'oldConfiguration' => $settings[ $k ], 'newConfiguration' => $values[ $k ], 'count' => $count ), 2 );
 										
 										/* Add to allowed storage methods so when moving files, we can accept old config or new config if move is in progress. Important: order is array(x, y) x is the new location (pos 0), y is the old location (pos 1)*/
 										$values[ $k ] = array( $v, $settings[ $k ] );
@@ -526,19 +451,19 @@ class files extends Controller
 					
 					if( $rebuild )
 					{
-						Task::queue( 'core', 'DeleteMovedFiles', array( 'delete' => true, 'count' => $totalCount ), 5, array( 'delete' ) ); /* We use a key in the data array just to trigger the code that deletes duplicate tasks */
+						\IPS\Task::queue( 'core', 'DeleteMovedFiles', array( 'delete' => true, 'count' => $totalCount ), 5, array( 'delete' ) ); /* We use a key in the data array just to trigger the code that deletes duplicate tasks */
 					}
 				}
 
 				/* Update the settings */
-				Settings::i()->changeValues( array( 'upload_settings' => json_encode( $values ) ) );
+				\IPS\Settings::i()->changeValues( array( 'upload_settings' => json_encode( $values ) ) );
 
 				/* Clear guest page caches */
-				Cache::i()->clearAll();
+				\IPS\Data\Cache::i()->clearAll();
 
-				Session::i()->log( 'acplogs__files_config_moved' );
+				\IPS\Session::i()->log( 'acplogs__files_config_moved', array() );
 				
-				Output::i()->redirect( Url::internal('app=core&module=overview&controller=files&do=settings&tab=settings'), 'saved' );
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal('app=core&module=overview&controller=files&do=settings&tab=settings'), 'saved' );
 			}
 			
 			$activeTabContents = $form;
@@ -546,38 +471,34 @@ class files extends Controller
 		/* Or configurations table */
 		else
 		{
-			$table = new TableDb( 'core_file_storage', Url::internal( "app=core&module=overview&controller=files&do=settings&tab=configurations" ) );
+			$table = new \IPS\Helpers\Table\Db( 'core_file_storage', \IPS\Http\Url::internal( "app=core&module=overview&controller=files&do=settings&tab=configurations" ) );
 			$table->include = array( 'filestorage_method' );
 			$table->noSort = array( 'filestorage_method' );
 			$table->mainColumn = 'filestorage_method';
 			$table->parsers = array( 'filestorage_method' => function( $val, $row )
 			{
-				$handlers	= File::storageHandlers( $row );
+				$handlers	= \IPS\File::storageHandlers( $row );
 				$classname	= $handlers[ $row['method'] ];
 				$title		= $classname::displayName( json_decode( $row['configuration'], TRUE ) );
 
-				if( CIC AND $row['method'] == 'FileSystem' )
+				if( \IPS\CIC AND $row['method'] == 'FileSystem' )
 				{
-					return Theme::i()->getTemplate( 'dashboard' )->filesystemNotCic( $title );
+					return \IPS\Theme::i()->getTemplate( 'dashboard' )->filesystemNotCic( $title );
 				}
 
 				return $title;
 			} );
-
-			/* If we already have a storage configuration, we cannot create any new ones */
-			if( $totalConfigurations - $cicConfigurations < 2 )
-			{
-				$table->rootButtons = array( 'add' => array(
-					'icon'	=> 'plus',
-					'title'	=> 'add',
-					'link'	=> Url::internal( "app=core&module=overview&controller=files&do=configurationForm" )
-				) );
-			}
-			$settings = json_decode( Settings::i()->upload_settings, TRUE );
-			$table->rowButtons = function( $row ) use ( $settings )
+			
+			$table->rootButtons = array( 'add' => array(
+				'icon'	=> 'plus',
+				'title'	=> 'add',
+				'link'	=> \IPS\Http\Url::internal( "app=core&module=overview&controller=files&do=configurationForm" )
+			) );
+			
+			$table->rowButtons = function( $row )
 			{
 				$config = json_decode( $row['configuration'], true );
-				if( CIC AND ( ( $row['method'] == 'Amazon' AND $config['bucket'] == 'ips-cic-filestore' ) OR $row['method'] == 'Cloud' ) )
+				if( \IPS\CIC AND ( ( $row['method'] == 'Amazon' AND $config['bucket'] == 'ips-cic-filestore' ) OR $row['method'] == 'Cloud' ) )
 				{
 					return array(
 						'log'	=> array(
@@ -588,7 +509,7 @@ class files extends Controller
 					);
 				}
 				
-				$buttons = array(
+				return array(
 					'edit'	=> array(
 						'icon'	=> 'pencil',
 						'title'	=> 'edit',
@@ -597,64 +518,39 @@ class files extends Controller
 					'log'	=> array(
 						'icon'	=> 'search',
 						'title'	=> 'file_config_log_title',
-						'link'	=> Url::internal( "app=core&module=overview&controller=files&do=configurationLog&id={$row['id']}" )
+						'link'	=> \IPS\Http\Url::internal( "app=core&module=overview&controller=files&do=configurationLog&id={$row['id']}" )
 					),
-					'move' => array(
-						'icon' => 'arrow-right',
-						'title' => 'files_type_move',
-						'link' => Url::internal( "app=core&module=overview&controller=files&do=configurationMove&id={$row['id']}" )
-					)
+					'delete'	=> array(
+						'icon'	=> 'times-circle',
+						'title'	=> 'delete',
+						'link'	=> \IPS\Http\Url::internal( "app=core&module=overview&controller=files&do=configurationForm&id={$row['id']}&delete=1" )->csrf()
+					),
 				);
-
-				if( ( !isset( $settings['filestorage_move'] ) or !$settings['filestorage_move'] ) and !in_array( $row['id'], $settings ) )
-				{
-					$buttons['delete'] = array(
-						'icon' => 'times-circle',
-						'title' => 'delete',
-						'link' => Url::internal( "app=core&module=overview&controller=files&do=configurationDelete&id={$row['id']}" )->csrf(),
-						'data' => array( 'confirm' => '' )
-					);
-				}
-
-				return $buttons;
 			};
-
+			
 			$activeTabContents = $table;
 		}
 
 		/* Add a button for settings */
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 				'settings'	=> array(
 						'title'		=> 'settings',
 						'icon'		=> 'cog',
-						'link'		=> Url::internal( 'app=core&module=overview&controller=files&do=fileLogSettings' ),
-						'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('settings') )
+						'link'		=> \IPS\Http\Url::internal( 'app=core&module=overview&controller=files&do=fileLogSettings' ),
+						'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('settings') )
 				),
 		);
 		
 		/* Display */
-		if ( Request::i()->isAjax() and !isset( Request::i()->ajaxValidate ) )
+		if ( \IPS\Request::i()->isAjax() and !isset( \IPS\Request::i()->ajaxValidate ) )
 		{
-			Output::i()->output = $activeTabContents;
+			\IPS\Output::i()->output = $activeTabContents;
+			return;
 		}
 		else
 		{
-			Output::i()->title = Member::loggedIn()->language()->addToStack('storage_settings');
-
-			if( count( $tabs ) == 1 )
-			{
-				Output::i()->output = $activeTabContents;
-			}
-			else
-			{
-				$message = '';
-				if( $totalConfigurations - $cicConfigurations >= 2 )
-				{
-					$message = Theme::i()->getTemplate( 'global', 'core' )->message( Member::loggedIn()->language()->addToStack( 'multiple_filestorage_error' ), 'info' );
-				}
-
-				Output::i()->output = $message . Theme::i()->getTemplate( 'global' )->tabs( $tabs, $activeTab, $activeTabContents, Url::internal( "app=core&module=overview&controller=files&do=settings" ) );
-			}
+			\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('storage_settings');
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global' )->tabs( array( 'settings' => 'filestorage_settings', 'configurations' => 'filestorage_configurations' ), $activeTab, $activeTabContents, \IPS\Http\Url::internal( "app=core&module=overview&controller=files&do=settings" ) );
 		}
 	}
 
@@ -663,235 +559,20 @@ class files extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function fileLogSettings() : void
+	protected function fileLogSettings()
 	{
-		$form = new Form;
-		$form->add( new Interval( 'file_log_pruning', Settings::i()->file_log_pruning, FALSE, array( 'valueAs' => Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, Member::loggedIn()->language()->addToStack('after'), NULL, 'file_log_pruning' ) );
+		$form = new \IPS\Helpers\Form;
+		$form->add( new \IPS\Helpers\Form\Interval( 'file_log_pruning', \IPS\Settings::i()->file_log_pruning, FALSE, array( 'valueAs' => \IPS\Helpers\Form\Interval::DAYS, 'unlimited' => 0, 'unlimitedLang' => 'never' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('after'), NULL, 'file_log_pruning' ) );
 	
 		if ( $values = $form->values() )
 		{
 			$form->saveAsSettings();
-			Session::i()->log( 'acplog__filelog_settings' );
-			Output::i()->redirect( Url::internal( 'app=core&module=overview&controller=files&do=settings' ), 'saved' );
+			\IPS\Session::i()->log( 'acplog__filelog_settings' );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=overview&controller=files&do=settings' ), 'saved' );
 		}
 	
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('filelog_settings');
-		Output::i()->output 	= Theme::i()->getTemplate('global')->block( 'filelog_settings', $form, FALSE );
-	}
-
-	protected function configurationMove() : void
-	{
-		/* Get existing */
-		try
-		{
-			$current = Db::i()->select( '*', 'core_file_storage', array( 'id=?', intval( Request::i()->id ) ) )->first();
-		}
-		catch ( UnderflowException $e )
-		{
-			Output::i()->error( 'node_error', '2C158/3', 404, '' );
-		}
-
-		$currentHandlerSettings = json_decode( $current['configuration'], TRUE );
-
-		/* Check if we are in the middle of a move */
-		foreach ( Db::i()->select( 'data', 'core_queue', array( '`key`=?', 'MoveFiles' ) ) as $data )
-		{
-			$data = json_decode( $data, TRUE );
-			if ( $data['oldConfiguration'] == Request::i()->id )
-			{
-				Output::i()->error( 'file_storage_move_out', '1C158/3', 403, '' );
-			}
-			elseif ( $data['newConfiguration'] == Request::i()->id )
-			{
-				Output::i()->error( 'file_storage_move_in', '1C158/4', 403, '' );
-			}
-		}
-
-		/* Do we already have more than one file storage location configured? */
-		$configurations = [];
-		$currentDisplayName = '';
-		foreach ( Db::i()->select( '*', 'core_file_storage' ) as $row )
-		{
-			$handlers	= File::storageHandlers( $row );
-			$classname	= $handlers[ $row['method'] ];
-
-			if( $row['id'] == $current['id'] )
-			{
-				$currentDisplayName = $classname::displayName( json_decode( $row['configuration'], TRUE ) );
-				continue;
-			}
-
-			$configurations[ $row['id'] ] = $classname::displayName( json_decode( $row['configuration'], TRUE ) );
-		}
-
-		$form = new Form( 'form', 'move' );
-		$form->addMessage( 'filestorage_moveall_info', 'ipsMessage ipsMessage--warning' );
-		$form->addHeader( sprintf( Member::loggedIn()->language()->get( 'filestorage_moveall_from' ), $currentDisplayName ) );
-		if( count( $configurations ) )
-		{
-			$form->add( new Radio( 'files_move_to', null, true, [
-				'options' => $configurations,
-				'noDefault' => true,
-				'disabled' => [ $current['id'] ]
-			] ) );
-		}
-		else
-		{
-			/* if we only have one location, allow them to create another one */
-			$handlers = array();
-			$handlerSettings = array();
-			$toggles = array();
-			foreach ( File::storageHandlers( $current ) as $key => $class )
-			{
-				$handlers[ $key ] = 'filehandler__' . $key;
-				foreach ( $class::settings( $currentHandlerSettings ) as $k => $v )
-				{
-					if ( is_array( $v ) )
-					{
-						$settingClass = '\IPS\Helpers\Form\\' . $v['type'];
-
-						$default = isset( $currentHandlerSettings[ $k ] ) ? str_replace( '{root}', ROOT_PATH, $currentHandlerSettings[ $k ] ) : NULL;
-						if ( isset( $v['default'] ) and !$default )
-						{
-							$default = str_replace( '{root}', ROOT_PATH, $v['default'] );
-						}
-
-						$handlerSettings[ $key ][ $k ] = new $settingClass( "filehandler__{$key}_{$k}", $default, FALSE, $v['options'] ?? array(), $v['validate'] ?? NULL, $v['prefix'] ?? NULL, $v['suffix'] ?? NULL, "{$key}_{$k}" );
-					}
-					else
-					{
-						$settingClass = '\IPS\Helpers\Form\\' . $v;
-						$handlerSettings[ $key ][ $k ] = new $settingClass( "filehandler__{$key}_{$k}", $currentHandlerSettings[$k] ?? NULL, FALSE, array(), NULL, NULL, NULL, "{$key}_{$k}" );
-					}
-					$toggles[ $key ][ $k ] = "{$key}_{$k}";
-				}
-			}
-
-			/* Build form */
-			$form->add( new Radio( 'filestorage_method', $current ? $current['method'] : ( CIC ? 'Amazon' : 'FileSystem' ), TRUE, array( 'options' => $handlers, 'toggles' => $toggles ) ) );
-			foreach ( $handlerSettings as $handlerKey => $settings )
-			{
-				foreach ( $settings as $setting )
-				{
-					$form->add( $setting );
-				}
-			}
-		}
-
-		/* Handle submissions */
-		if ( $values = $form->values() )
-		{
-			if( isset( $values['files_move_to'] ) )
-			{
-				$newStorageId = $values['files_move_to'];
-			}
-			else
-			{
-				try
-				{
-					if ( isset( $toggles[ $values['filestorage_method'] ] ) )
-					{
-						foreach ( $toggles[ $values['filestorage_method'] ] as $k => $v )
-						{
-							$currentHandlerSettings[ $k ] = ( ROOT_PATH !== '/' ) ? str_replace( ROOT_PATH, '{root}', $values[ 'filehandler__' . $v ] ) : $values[ 'filehandler__' . $v ];
-						}
-					}
-
-					$classname = File::storageHandlers( $current )[ $values['filestorage_method'] ];
-					if ( method_exists( $classname, 'testSettings' ) )
-					{
-						$classname::testSettings( $currentHandlerSettings );
-					}
-
-					$existingWithSameConfig = false;
-					/* Make sure there are no other configurations that are exactly the same */
-					foreach( Db::i()->select( '*', 'core_file_storage', array( 'method=?', $values['filestorage_method'] ) ) as $existing )
-					{
-						if ( $current and $current['id'] == $existing['id'] )
-						{
-							continue;
-						}
-
-						$existingWithSameConfig = true;
-						$existingConfiguration = json_decode( $existing['configuration'], true );
-						foreach( $existingConfiguration as $k => $v )
-						{
-							$v = str_replace( ROOT_PATH, '{root}', $v );
-
-							if ( array_key_exists( $k, $currentHandlerSettings ) )
-							{
-								if ( $v != $currentHandlerSettings[ $k ] )
-								{
-									$existingWithSameConfig = false;
-								}
-							}
-						}
-					}
-
-					if ( $existingWithSameConfig )
-					{
-						/* Let's not allow this to be saved as someone can start a move to the same location, which will end up deleting the files */
-						throw new DomainException( Member::loggedIn()->language()->addToStack( 'file_config_is_the_same_as_existing', FALSE ) );
-					}
-
-					/* Create the new location */
-					$newStorageId = Db::i()->insert( 'core_file_storage', array(
-						'method'		=> $values['filestorage_method'],
-						'configuration'	=> json_encode( $currentHandlerSettings ),
-					) );
-					unset( Store::i()->storageConfigurations );
-
-					/* Log the storage addition */
-					Session::i()->log( 'acplogs__files_config_added' );
-				}
-				catch ( LogicException $e )
-				{
-					$msg = $e->getMessage();
-					$form->error = Member::loggedIn()->language()->addToStack( $msg );
-				}
-			}
-
-			if( isset( $newStorageId ) )
-			{
-				$settings = json_decode( Settings::i()->upload_settings, TRUE );
-				$totalCount = 0;
-				foreach ( $settings as $k => $v )
-				{
-					if ( $v == $current['id'] )
-					{
-						$exploded = explode( '_', $k );
-						try
-						{
-							$classname = Application::getExtensionClass( $exploded[2], 'FileStorage', $exploded[3] );
-
-							$extension = new $classname;
-							$count = $extension->count();
-
-							/* Don't bother with this task if there is nothing to move */
-							if( $count > 0 )
-							{
-								$totalCount += $count;
-								Task::queue( 'core', 'MoveFiles', array( 'storageExtension' => $k, 'oldConfiguration' => $v, 'newConfiguration' => $newStorageId, 'count' => $count ), 2 );
-							}
-
-							$settings[ $k ] = $newStorageId;
-						}
-						catch( Exception $e ){}
-					}
-				}
-
-				Settings::i()->changeValues( array( 'upload_settings' => json_encode( $settings ) ) );
-
-				Task::queue( 'core', 'DeleteMovedFiles', array( 'delete' => true, 'count' => $totalCount, 'storageToDelete' => $current['id'] ), 5, array( 'delete' ) ); /* We use a key in the data array just to trigger the code that deletes duplicate tasks */
-
-				Output::i()->redirect( Url::internal( "app=core&module=overview&controller=files&do=settings" ) );
-			}
-		}
-
-		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('storage_settings');
-		Output::i()->breadcrumb[] = array( Url::internal( "&app=core&module=overview&controller=files&do=settings&tab=configurations" ), 'filestorage_settings' );
-		Output::i()->output = $form;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('filelog_settings');
+		\IPS\Output::i()->output 	= \IPS\Theme::i()->getTemplate('global')->block( 'filelog_settings', $form, FALSE );
 	}
 	
 	/**
@@ -899,57 +580,82 @@ class files extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function configurationForm() : void
+	protected function configurationForm()
 	{
-		/* Are we allowed to create a new location? */
-		if ( ! isset( Request::i()->id ) )
+		/* Get existing */
+		$current = NULL;
+		$currentHandlerSettings = array();
+		$createNewAndMove = FALSE;
+		if ( isset( \IPS\Request::i()->id ) )
 		{
-			$totalConfigurations = (int) Db::i()->select( 'count(*)', 'core_file_storage' )->first();
-			$cicConfigurations = 0;
-			if( CIC )
+			try
 			{
-				$cicConfigurations = (int) Db::i()->select( 'count(*)', 'core_file_storage', array( "method=?", 'Cloud' ) )->first();
-			}
-			if( $totalConfigurations - $cicConfigurations > 2 )
-			{
-				Output::i()->error( 'multiple_filestorage_error', '2C158/3', 403 );
-			}
-		}
-		else
-		{
-			/* Before we edit any details, check to make sure we're not processing files in this location */
-			foreach ( Db::i()->select( 'data', 'core_queue', array( '`key`=?', 'MoveFiles' ) ) as $data )
-			{
-				$data = json_decode( $data, true );
-				if ( $data['oldConfiguration'] == Request::i()->id )
+				$current = \IPS\Db::i()->select( '*', 'core_file_storage', array( 'id=?', \intval( \IPS\Request::i()->id ) ) )->first();
+				$currentHandlerSettings = json_decode( $current['configuration'], TRUE );
+				
+				/* If this is the special S3 handler for Cloud, throw error */
+				if ( \IPS\CIC AND $current['method'] == 'Amazon' AND $currentHandlerSettings['bucket'] == 'ips-cic-filestore' )
 				{
-					Output::i()->error( 'file_storage_move_out', '1C158/3', 403, '' );
+					throw new \UnderflowException;
 				}
-				elseif ( $data['newConfiguration'] == Request::i()->id )
+				
+				/* If this is CiC and is FileSystem, error */
+				if ( \IPS\CIC AND $current['method'] == 'FileSystem' )
 				{
-					Output::i()->error( 'file_storage_move_in', '1C158/4', 403, '' );
+					throw new \UnderflowException;
+				}
+				
+				if ( \in_array( \intval( \IPS\Request::i()->id ), array_filter( json_decode( \IPS\Settings::i()->upload_settings, TRUE ), function( $key ){ return $key != 'filestorage_move'; }, ARRAY_FILTER_USE_KEY ) ) )
+				{
+					if ( isset( \IPS\Request::i()->delete ) )
+					{
+						\IPS\Output::i()->error( 'file_storage_in_use', '1C158/2', 403, '' );
+					}
+					else
+					{
+						$createNewAndMove = TRUE;
+					}
+				}
+				else
+				{
+					foreach ( \IPS\Db::i()->select( 'data', 'core_queue', array( '`key`=?', 'MoveFiles' ) ) as $data )
+					{
+						$data = json_decode( $data, TRUE );
+						if ( $data['oldConfiguration'] == \IPS\Request::i()->id )
+						{
+							\IPS\Output::i()->error( 'file_storage_move_out', '1C158/3', 403, '' );
+						}
+						elseif ( $data['newConfiguration'] == \IPS\Request::i()->id )
+						{
+							\IPS\Output::i()->error( 'file_storage_move_in', '1C158/4', 403, '' );
+						}
+					}
+					
+					if ( isset( \IPS\Request::i()->delete ) )
+					{
+						\IPS\Session::i()->csrfCheck();
+						
+						\IPS\Db::i()->delete( 'core_file_storage', array( 'id=?', \intval( \IPS\Request::i()->id ) ) );
+						unset( \IPS\Data\Store::i()->storageConfigurations );
+	
+						\IPS\Session::i()->log( 'acplogs__files_config_removed', array() );
+						\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=overview&controller=files&do=settings&tab=configurations' ) );
+					}
 				}
 			}
+			catch ( \UnderflowException $e )
+			{
+				\IPS\Output::i()->error( 'node_error', '2C158/1', 404, '' );
+			}
 		}
-
-		try
-		{
-			$current = Db::i()->select( '*', 'core_file_storage', ['id=?', intval( Request::i()->id )] )->first();
-			$currentHandlerSettings = json_decode( $current['configuration'], true );
-		}
-		catch ( \UnderflowException $e )
-		{
-			$current = NULL;
-			$currentHandlerSettings = array();
-		}
-
+		
 		/* Get handlers */
 		$handlers = array();
 		$handlerSettings = array();
 		$toggles = array();
-		foreach ( File::storageHandlers( NULL ) as $key => $class )
+		foreach ( \IPS\File::storageHandlers( $current ) as $key => $class )
 		{
-			if ( CIC AND $key == 'Cloud' AND ! Member::loggedIn()->members_bitoptions['is_support_account'] )
+			if ( \IPS\CIC AND $key == 'Cloud' AND !\IPS\Member::loggedIn()->members_bitoptions['is_support_account'] )
 			{
 				continue;
 			}
@@ -957,38 +663,36 @@ class files extends Controller
 			$handlers[ $key ] = 'filehandler__' . $key;
 			foreach ( $class::settings( $currentHandlerSettings ) as $k => $v )
 			{
-				if ( is_array( $v ) )
+				if ( \is_array( $v ) )
 				{
 					$settingClass = '\IPS\Helpers\Form\\' . $v['type'];
-
-					$default = isset( $currentHandlerSettings[ $k ] ) ? str_replace( '{root}', ROOT_PATH, $currentHandlerSettings[ $k ] ) : NULL;
+					
+					$default = isset( $currentHandlerSettings[ $k ] ) ? str_replace( '{root}', \IPS\ROOT_PATH, $currentHandlerSettings[ $k ] ) : NULL;
 					if ( isset( $v['default'] ) and !$default )
 					{
-						$default = str_replace( '{root}', ROOT_PATH, $v['default'] );
+						$default = str_replace( '{root}', \IPS\ROOT_PATH, $v['default'] );
 					}
 					
-					$handlerSettings[ $key ][ $k ] = new $settingClass( "filehandler__{$key}_{$k}", $default, FALSE, $v['options'] ?? array(), $v['validate'] ?? NULL, $v['prefix'] ?? NULL, $v['suffix'] ?? NULL, "{$key}_{$k}" );
+					$handlerSettings[ $key ][ $k ] = new $settingClass( "filehandler__{$key}_{$k}", $default, FALSE, isset( $v['options'] ) ? $v['options'] : array(), isset( $v['validate'] ) ? $v['validate'] : NULL, isset( $v['prefix'] ) ? $v['prefix'] : NULL, isset( $v['suffix'] ) ? $v['suffix'] : NULL, "{$key}_{$k}" );
 				}
 				else
 				{
 					$settingClass = '\IPS\Helpers\Form\\' . $v;
-					$handlerSettings[ $key ][ $k ] = new $settingClass( "filehandler__{$key}_{$k}", NULL, FALSE, array(), NULL, NULL, NULL, "{$key}_{$k}" );
+					$handlerSettings[ $key ][ $k ] = new $settingClass( "filehandler__{$key}_{$k}", isset( $currentHandlerSettings[ $k ] ) ? $currentHandlerSettings[ $k ] : NULL, FALSE, array(), NULL, NULL, NULL, "{$key}_{$k}" );
 				}
 				$toggles[ $key ][ $k ] = "{$key}_{$k}";
 			}
 		}
-
+		
 		/* Build form */
-		$form = new Form;
-		if ( $current )
+		$form = new \IPS\Helpers\Form;
+		$form->hiddenValues['configurationId'] = isset( \IPS\Request::i()->id ) ? \IPS\Request::i()->id : 0;
+		if ( isset( \IPS\Request::i()->id ) AND \in_array( \intval( \IPS\Request::i()->id ), json_decode( \IPS\Settings::i()->upload_settings, TRUE ) ) and $current['method'] !== 'FileSystem')
 		{
-			$form->addMessage( Member::loggedIn()->language()->addToStack( "filestorage_config_edit_warning", null, [
-				'sprintf' =>  Url::internal( 'app=core&module=overview&controller=files&do=configurationMove&id=' . $current['id'] ),
-			] ), 'ipsMessage ipsMessage--warning' );
+			$form->addMessage( 'files_edit_existing_and_used', 'ipsMessage ipsMessage_info' );
 		}
 
-		$form->add( new Radio( 'filestorage_method', $current ? $current['method'] : ( CIC ? 'Amazon' : 'FileSystem' ), TRUE, array( 'disabled' => ( isset( Request::i()->id ) ), 'options' => $handlers, 'toggles' => $toggles ) ) );
-
+		$form->add( new \IPS\Helpers\Form\Radio( 'filestorage_method', $current ? $current['method'] : ( \IPS\CIC ? 'Amazon' : 'FileSystem' ), TRUE, array( 'options' => $handlers, 'toggles' => $toggles ) ) );
 		foreach ( $handlerSettings as $handlerKey => $settings )
 		{
 			foreach ( $settings as $setting )
@@ -997,21 +701,25 @@ class files extends Controller
 			}
 		}
 		
+		if ( $createNewAndMove )
+		{
+			$form->add( new \IPS\Helpers\Form\YesNo( 'filestorage_move', TRUE ) );
+		}
+		
 		/* Handle submissions */
 		if ( $values = $form->values() )
 		{
-			$currentHandlerSettings = [];
 			try
 			{
 				if ( isset( $toggles[ $values['filestorage_method'] ] ) )
 				{
 					foreach ( $toggles[ $values['filestorage_method'] ] as $k => $v )
 					{
-						$currentHandlerSettings[ $k ] = ( ROOT_PATH !== '/' ) ? str_replace( ROOT_PATH, '{root}', $values[ 'filehandler__' . $v ] ) : $values[ 'filehandler__' . $v ];
+						$currentHandlerSettings[ $k ] = ( \IPS\ROOT_PATH !== '/' ) ? str_replace( \IPS\ROOT_PATH, '{root}', $values[ 'filehandler__' . $v ] ) : $values[ 'filehandler__' . $v ];
 					}
 				}
 
-				$classname = File::storageHandlers( NULL )[ $values['filestorage_method'] ];
+				$classname = \IPS\File::storageHandlers( $current )[ $values['filestorage_method'] ];
 				if ( method_exists( $classname, 'testSettings' ) )
 				{
 					$classname::testSettings( $currentHandlerSettings );
@@ -1019,13 +727,18 @@ class files extends Controller
 				
 				$existingWithSameConfig = false;
 				/* Make sure there are no other configurations that are exactly the same */
-				foreach( Db::i()->select( '*', 'core_file_storage', array( 'method=?', $values['filestorage_method'] ) ) as $existing )
+				foreach( \IPS\Db::i()->select( '*', 'core_file_storage', array( 'method=?', $values['filestorage_method'] ) ) as $existing )
 				{
+					if ( $current and $current['id'] == $existing['id'] )
+					{
+						continue;
+					}
+					
 					$existingWithSameConfig = true;
 					$existingConfiguration = json_decode( $existing['configuration'], true );
 					foreach( $existingConfiguration as $k => $v )
 					{
-						$v = str_replace( ROOT_PATH, '{root}', (string) $v );
+						$v = str_replace( \IPS\ROOT_PATH, '{root}', $v );
 						
 						if ( array_key_exists( $k, $currentHandlerSettings ) )
 						{
@@ -1037,76 +750,142 @@ class files extends Controller
 					}
 				}
 
-				if ( $existingWithSameConfig and ! Request::i()->id )
+				if ( $existingWithSameConfig )
 				{
 					/* Let's not allow this to be saved as someone can start a move to the same location, which will end up deleting the files */
-					throw new DomainException( Member::loggedIn()->language()->addToStack( 'file_config_is_the_same_as_existing', FALSE ) );
+					throw new \DomainException( \IPS\Member::loggedIn()->language()->addToStack( 'file_config_is_the_same_as_existing', FALSE ) );
 				}
 
-				if ( Request::i()->id )
+				/* Do we really need to create and move? */
+				if ( $current AND $createNewAndMove )
 				{
-					Db::i()->update( 'core_file_storage', [
+					$currentConf      = json_decode( $current['configuration'], TRUE );
+					$createNewAndMove = $classname::moveCheck( $currentHandlerSettings, $currentConf );
+				}
+
+				if ( $current === NULL or $createNewAndMove )
+				{
+					$insertId = \IPS\Db::i()->insert( 'core_file_storage', array(
+						'method'		=> $values['filestorage_method'],
 						'configuration'	=> json_encode( $currentHandlerSettings ),
-					], array( 'id=?', Request::i()->id ) );
+					) );
+					unset( \IPS\Data\Store::i()->storageConfigurations );
+
+					/* Log the storage addition */
+					\IPS\Session::i()->log( 'acplogs__files_config_added' );
+
+					if ( $createNewAndMove )
+					{
+						$settings = json_decode( \IPS\Settings::i()->upload_settings, TRUE );
+						$totalCount = 0;
+						foreach ( $settings as $k => $v )
+						{
+							if ( $v == $current['id'] )
+							{
+								if ( $values['filestorage_move'] )
+								{
+									$exploded = explode( '_', $k );
+									try
+									{
+										$classname = "IPS\\{$exploded[2]}\\extensions\\core\\FileStorage\\{$exploded[3]}";
+	
+										if( \IPS\Application::appIsEnabled( $exploded[2] ) AND class_exists( $classname ) )
+										{
+											$extension = new $classname;
+											$count = $extension->count();
+											$totalCount += $count;
+											\IPS\Task::queue( 'core', 'MoveFiles', array( 'storageExtension' => $k, 'oldConfiguration' => $v, 'newConfiguration' => $insertId, 'count' => $count ), 2 );
+										}
+										
+										$settings[ $k ] = $insertId;
+									}
+									catch( \Exception $e ){}
+								}
+								else
+								{
+									$settings[ $k ] = $insertId;
+								}
+							}
+						}
+						
+						\IPS\Settings::i()->changeValues( array( 'upload_settings' => json_encode( $settings ) ) );
+						
+						if ( $values['filestorage_move'] )
+						{
+							\IPS\Task::queue( 'core', 'DeleteMovedFiles', array( 'delete' => true, 'count' => $totalCount ), 5, array( 'delete' ) ); /* We use a key in the data array just to trigger the code that deletes duplicate tasks */
+						}
+					}
 				}
 				else
 				{
-					Db::i()->insert( 'core_file_storage', [
-						'method' => $values['filestorage_method'],
-						'configuration' => json_encode( $currentHandlerSettings ),
-					] );
+					\IPS\Db::i()->update( 'core_file_storage', array( 'configuration' => json_encode( $currentHandlerSettings ) ), array( 'id=?', $current['id'] ) );
+					unset( \IPS\Data\Store::i()->storageConfigurations );
 				}
-				unset( Store::i()->storageConfigurations );
+				
+				if ( $current !== NULL and ! $createNewAndMove )
+				{
+					/* Log the storage change */
+					\IPS\Session::i()->log( 'acplogs__files_config_changed' );
 
-				/* Log the storage addition */
-				Session::i()->log( 'acplogs__files_config_added' );
-
-				Output::i()->redirect( Url::internal( 'app=core&module=overview&controller=files&do=settings&tab=configurations' ), 'saved' );
+					$classname::getClass( $current['id'] )->settingsUpdated();
+				}
+				
+				\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=overview&controller=files&do=settings&tab=configurations' ), 'saved' );
 			}
-			catch ( LogicException $e )
+			catch ( \LogicException $e )
 			{
 				$msg = $e->getMessage();
-				$form->error = Member::loggedIn()->language()->addToStack( $msg );
+				$form->error = \IPS\Member::loggedIn()->language()->addToStack( $msg );
 			}
 		}
 		
+		\IPS\Output::i()->jsFiles  = array_merge( \IPS\Output::i()->jsFiles, \IPS\Output::i()->js( 'admin_files.js', 'core' ) );
+		\IPS\Output::i()->globalControllers[]  = 'core.admin.files.form';
+		
 		/* Display */
-		Output::i()->title = Member::loggedIn()->language()->addToStack('storage_settings');
-		Output::i()->output = $form;
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('storage_settings');
+		\IPS\Output::i()->output = $form;
 	}
-
+	
 	/**
-	 * Delete a file storage method
+	 * Determine if a move is needed (ajax method)
 	 *
 	 * @return void
 	 */
-	protected function configurationDelete() : void
+	protected function checkMoveNeeded()
 	{
-		Request::i()->confirmedDelete();
-
 		try
 		{
-			$storage = Db::i()->select( '*', 'core_file_storage', [ 'id=?', Request::i()->id ] )->first();
+			$current = \IPS\Db::i()->select( '*', 'core_file_storage', array( 'id=?', \intval( \IPS\Request::i()->id ) ) )->first();
 		}
-		catch( \UnderflowException )
+		catch( \UnderflowException $e )
 		{
-			Output::i()->error( 'node_error', '2C158/7', 404 );
+			\IPS\Output::i()->json( array( 'needsMoving' => FALSE ) );
 		}
-
-		$settings = json_decode( Settings::i()->upload_settings, TRUE );
-		if( isset( $settings['filestorage_move'] ) and $settings['filestorage_move'] )
+		
+		$currentConf = json_decode( $current['configuration'], TRUE );
+		$needsMoving = FALSE;
+		
+		if ( \in_array( \intval( \IPS\Request::i()->id ), json_decode( \IPS\Settings::i()->upload_settings, TRUE ) ) )
 		{
-			Output::i()->error( 'file_storage_delete_move_in_progress', '2C158/8' );
+			foreach ( $currentConf as $k => $v )
+			{
+				$checkKey = 'filehandler__' . $current['method'] . '_' . $k;
+				
+				if ( isset( \IPS\Request::i()->$checkKey ) )
+				{
+					$currentHandlerSettings[ $k ] = str_replace( \IPS\ROOT_PATH, '{root}', \IPS\Request::i()->$checkKey );
+				}
+			}
+
+			$handlers	= \IPS\File::storageHandlers( $current );
+			$classname	= $handlers[ $current['method'] ];
+			
+			/* Do we really need to create and move? */
+			$needsMoving = $classname::moveCheck( $currentHandlerSettings, $currentConf );
 		}
-
-		if( in_array( $storage['id'], $settings ) )
-		{
-			Output::i()->error( 'file_storage_delete_in_use', '2C158/9' );
-		}
-
-		Db::i()->delete( 'core_file_storage', [ 'id=?', Request::i()->id ] );
-
-		Output::i()->redirect( Url::internal( "app=core&module=overview&controller=files&do=settings&tab=configurations" ) );
+		
+		\IPS\Output::i()->json( array( 'needsMoving' => (boolean) $needsMoving ) );
 	}
 	
 	/**
@@ -1114,13 +893,13 @@ class files extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function configurationLog() : void
+	protected function configurationLog()
 	{
-		$method = Db::i()->select( '*', 'core_file_storage', array( 'id=?', intval( Request::i()->id ) ) )->first();
-		$title  = Member::loggedIn()->language()->addToStack( 'file_config_log', FALSE, array( 'sprintf' => array( $method['method'] ) ) );
+		$method = \IPS\Db::i()->select( '*', 'core_file_storage', array( 'id=?', \intval( \IPS\Request::i()->id ) ) )->first();
+		$title  = \IPS\Member::loggedIn()->language()->addToStack( 'file_config_log', FALSE, array( 'sprintf' => array( $method['method'] ) ) );
 
 		/* Create the table */
-		$table = new TableDb( 'core_file_logs', Url::internal( 'app=core&module=overview&controller=files&do=configurationLog&id=' . Request::i()->id ), array( array( 'log_configuration_id=?', Request::i()->id ) ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_file_logs', \IPS\Http\Url::internal( 'app=core&module=overview&controller=files&do=configurationLog&id=' . \IPS\Request::i()->id ), array( array( 'log_configuration_id=?', \IPS\Request::i()->id ) ) );
 		$table->langPrefix  = 'files_';
 		$table->title       = $title;
 		$table->quickSearch = 'log_filename';
@@ -1140,22 +919,22 @@ class files extends Controller
 			},
 			'log_date' => function( $val )
 			{
-				return DateTime::ts( $val )->localeDate();
+				return \IPS\DateTime::ts( $val )->localeDate();
 			},
 			'log_type' => function( $val )
 			{
-				return Member::loggedIn()->language()->addToStack( 'files_type_' . $val );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'files_type_' . $val );
 			},
 			'log_action' => function( $val )
 			{
-				return Member::loggedIn()->language()->addToStack( 'files_action_' . $val );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'files_action_' . $val );
 			}
 		);
 
 		/* Display */
-		Output::i()->breadcrumb[] = array( Url::internal( "&app=core&module=overview&controller=files&do=settings&tab=configurations" ), 'filestorage_settings' );
-		Output::i()->output = (string) $table;
-		Output::i()->title  = $title;
+		\IPS\Output::i()->breadcrumb[] = array( \IPS\Http\Url::internal( "&app=core&module=overview&controller=files&do=settings&tab=configurations" ), 'filestorage_settings' );
+		\IPS\Output::i()->output = (string) $table;
+		\IPS\Output::i()->title  = $title;
 	}
 
 	/**
@@ -1163,16 +942,16 @@ class files extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function orphaned() : void
+	protected function orphaned()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 		
-		foreach( Db::i()->select( '*', 'core_file_storage', NULL, 'id' ) as $row )
+		foreach( \IPS\Db::i()->select( '*', 'core_file_storage', NULL, 'id' ) as $row )
 		{
-			Task::queue( 'core', 'FindOrphanedFiles', array( 'configurationId' => $row['id'] ), 4, array( 'configurationId' ) );
+			\IPS\Task::queue( 'core', 'FindOrphanedFiles', array( 'configurationId' => $row['id'] ), 4, array( 'configurationId' ) );
 		}
 	
-		Output::i()->redirect( Url::internal( "app=core&module=overview&controller=files" ), 'orphaned_files_tasks_added' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( "app=core&module=overview&controller=files" ), 'orphaned_files_tasks_added' );
 	}
 
 	/**
@@ -1180,37 +959,37 @@ class files extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function multimod() : void
+	protected function multimod()
 	{
-		Dispatcher::i()->checkAcpPermission( 'files_delete' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'files_delete' );
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		if( !isset( Request::i()->multimod ) OR !is_array( Request::i()->multimod ) OR !count( Request::i()->multimod ) )
+		if( !isset( \IPS\Request::i()->multimod ) OR !\is_array( \IPS\Request::i()->multimod ) OR !\count( \IPS\Request::i()->multimod ) )
 		{
-			Output::i()->error( 'nothing_mm_selected', '2C158/6', 403, '' );
+			\IPS\Output::i()->error( 'nothing_mm_selected', '2C158/6', 403, '' );
 		}
 
-		foreach ( Db::i()->select( '*', 'core_attachments', Db::i()->in( 'attach_id', array_keys( Request::i()->multimod ) ) ) as $attachment )
+		foreach ( \IPS\Db::i()->select( '*', 'core_attachments', \IPS\Db::i()->in( 'attach_id', array_keys( \IPS\Request::i()->multimod ) ) ) as $attachment )
 		{
-			File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
+			\IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
 
 			if( $attachment['attach_thumb_location'] )
 			{
-				File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
+				\IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
 			}
 
-			Session::i()->log( 'acplogs__file_deleted', array( $attachment['attach_file'] => FALSE ) );
+			\IPS\Session::i()->log( 'acplogs__file_deleted', array( $attachment['attach_file'] => FALSE ) );
 		}
 
-		Db::i()->delete( 'core_attachments', Db::i()->in( 'attach_id', array_keys( Request::i()->multimod ) ) );
+		\IPS\Db::i()->delete( 'core_attachments', \IPS\Db::i()->in( 'attach_id', array_keys( \IPS\Request::i()->multimod ) ) );
 
-		$url = Url::internal( "app=core&module=overview&controller=files" );
+		$url = \IPS\Http\Url::internal( "app=core&module=overview&controller=files" );
 
-		if( Request::i()->listResort )
+		if( \IPS\Request::i()->listResort )
 		{
-			$url = $url->setQueryString( array( 'listResort' => 1, 'sortby' => Request::i()->sortby, 'sortdirection' => Request::i()->sortdirection ) )->csrf();
+			$url = $url->setQueryString( array( 'listResort' => 1, 'sortby' => \IPS\Request::i()->sortby, 'sortdirection' => \IPS\Request::i()->sortdirection ) )->csrf();
 		}
-		Output::i()->redirect( $url, 'deleted' );
+		\IPS\Output::i()->redirect( $url, 'deleted' );
 	}
 }

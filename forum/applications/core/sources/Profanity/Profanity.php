@@ -12,89 +12,62 @@ namespace IPS\core;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
 
-use DOMElement;
-use DOMXPath;
-use Exception;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Number;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\Upload;
-use IPS\Helpers\Table\Db as TableDb;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Patterns\ActiveRecord;
-use IPS\Request;
-use IPS\Settings;
 use IPS\Text\DOMParser;
-use IPS\Text\Parser;
-use IPS\Xml\DOMDocument;
-use JsonSerializable;
-use LogicException;
-use OutOfRangeException;
-use ValueError;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-use function is_string;
 
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Profanity Model
  */
-class Profanity extends ActiveRecord implements JsonSerializable
+class _Profanity extends \IPS\Patterns\ActiveRecord implements \JsonSerializable
 {
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_profanity_filters';
+	public static $databaseTable = 'core_profanity_filters';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = '';
+	public static $databasePrefix = '';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 		
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'wid';
+	public static $databaseColumnId = 'wid';
 	
 	/**
 	 * @brief	[ActiveRecord] Database ID Fields
 	 */
-	protected static array $databaseIdFields = array( 'type' );
+	protected static $databaseIdFields = array( 'type' );
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	Action Type
 	 */
-	public static array $actionTypes = array( 'swap', 'moderate', 'block' );
+	public static $actionTypes = array( 'swap', 'moderate', 'block' );
 	
 	/**
 	 * Table
 	 *
-	 * @return	TableDb
+	 * @return	\IPS\Helpers\Table
 	 */
-	public static function table() : TableDb
+	public static function table()
 	{
-		$table = new TableDb( 'core_profanity_filters', Url::internal( 'app=core&module=settings&controller=posting&tab=profanityFilters' ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_profanity_filters', \IPS\Http\Url::internal( 'app=core&module=settings&controller=posting&tab=profanityFilters' ) );
 		$table->langPrefix = 'profanity_';
 		$table->mainColumn = 'type';
 		
@@ -121,25 +94,25 @@ class Profanity extends ActiveRecord implements JsonSerializable
 			{
 				if ( $val == 'swap' )
 				{
-					return Member::loggedIn()->language()->addToStack( 'profanity_replace_with_x', FALSE, array( 'sprintf' => array( $row['swop'] ) ) );
+					return \IPS\Member::loggedIn()->language()->addToStack( 'profanity_replace_with_x', FALSE, array( 'sprintf' => array( $row['swop'] ) ) );
 				}
 				else if ( $val == 'block' )
 				{
-					return Member::loggedIn()->language()->addToStack( 'profanity_block' );
+					return \IPS\Member::loggedIn()->language()->addToStack( 'profanity_block' );
 				}
 				else
 				{
 					if ( $row['min_posts'] )
 					{
-						return Member::loggedIn()->language()->addToStack( 'profanity_filter_action_moderate_min_posts', FALSE, array( 'pluralize' => array( $row['min_posts'] ) ) );
+						return \IPS\Member::loggedIn()->language()->addToStack( 'profanity_filter_action_moderate_min_posts', FALSE, array( 'pluralize' => array( $row['min_posts'] ) ) );
 					}
 
-					return Member::loggedIn()->language()->addToStack('profanity_filter_action_moderate');
+					return \IPS\Member::loggedIn()->language()->addToStack('profanity_filter_action_moderate');
 				}
 			},
 			'm_exact'				=> function( $val, $row )
 			{
-				return ( $val ) ? Member::loggedIn()->language()->addToStack('profanity_filter_exact') : Member::loggedIn()->language()->addToStack('profanity_filter_loose');
+				return ( $val ) ? \IPS\Member::loggedIn()->language()->addToStack('profanity_filter_exact') : \IPS\Member::loggedIn()->language()->addToStack('profanity_filter_loose');
 			}
 		);
 		
@@ -148,15 +121,15 @@ class Profanity extends ActiveRecord implements JsonSerializable
 		$table->rootButtons['add'] = array(
 			'icon'		=> 'plus',
 			'title'		=> 'profanity_add',
-			'link'		=> Url::internal( 'app=core&module=settings&controller=posting&do=profanity' ),
-			'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('profanity_add') )
+			'link'		=> \IPS\Http\Url::internal( 'app=core&module=settings&controller=posting&do=profanity' ),
+			'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('profanity_add') )
 		);
 
 		$table->rootButtons['download'] = array(
 			'icon'		=> 'download',
 			'title'		=> 'download',
-			'link'		=> Url::internal( 'app=core&module=settings&controller=posting&do=downloadProfanity' ),
-			'data'		=> array( 'confirm' => '', 'confirmMessage' => Member::loggedIn()->language()->addToStack('profanity_download'), 'confirmIcon' => 'info', 'confirmButtons' => json_encode( array( 'ok' => Member::loggedIn()->language()->addToStack('download'), 'cancel' => Member::loggedIn()->language()->addToStack('cancel') ) ) )
+			'link'		=> \IPS\Http\Url::internal( 'app=core&module=settings&controller=posting&do=downloadProfanity' ),
+			'data'		=> array( 'confirm' => '', 'confirmMessage' => \IPS\Member::loggedIn()->language()->addToStack('profanity_download'), 'confirmIcon' => 'info', 'confirmButtons' => json_encode( array( 'ok' => \IPS\Member::loggedIn()->language()->addToStack('download'), 'cancel' => \IPS\Member::loggedIn()->language()->addToStack('cancel') ) ) )
 		);
 
 		/* And the row buttons */
@@ -167,14 +140,14 @@ class Profanity extends ActiveRecord implements JsonSerializable
 			$return['edit'] = array(
 				'icon'		=> 'pencil',
 				'title'		=> 'edit',
-				'link'		=> Url::internal( 'app=core&module=settings&controller=posting&do=profanity&id=' ) . $row['wid'],
-				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('edit') )
+				'link'		=> \IPS\Http\Url::internal( 'app=core&module=settings&controller=posting&do=profanity&id=' ) . $row['wid'],
+				'data'		=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('edit') )
 			);
 
 			$return['delete'] = array(
 				'icon'		=> 'times',
 				'title'		=> 'delete',
-				'link'		=> Url::internal( 'app=core&module=settings&controller=posting&do=deleteProfanityFilters&id=' ) . $row['wid'],
+				'link'		=> \IPS\Http\Url::internal( 'app=core&module=settings&controller=posting&do=deleteProfanityFilters&id=' ) . $row['wid'],
 				'data'		=> array( 'delete' => '' ),
 			);
 				
@@ -187,19 +160,19 @@ class Profanity extends ActiveRecord implements JsonSerializable
 	/**
 	 * Form
 	 *
-	 * @param Profanity|NULL	$current	If we are editing, an \IPS\core\Profanity instance of the record
-	 * @return	Form
+	 * @param	\IPS\core\Profanity|NULL	$current	If we are editing, an \IPS\core\Profanity instance of the record
+	 * @return	\IPS\Helpers\Form
 	 */
-	public static function form( ?Profanity $current=NULL ) : Form
+	public static function form( \IPS\core\Profanity $current=NULL )
 	{
-		$form = new Form;
+		$form = new \IPS\Helpers\Form;
 		
 		if ( !$current )
 		{
 			$form->addTab('add');
 		}
 		
-		$form->add( new Text( 'profanity_type', ( $current ) ? $current->type : NULL, NULL, array(), function( $val )
+		$form->add( new \IPS\Helpers\Form\Text( 'profanity_type', ( $current ) ? $current->type : NULL, NULL, array(), function( $val )
 		{
 			if ( $val )
 			{
@@ -207,18 +180,18 @@ class Profanity extends ActiveRecord implements JsonSerializable
 				{
 					$word = static::load( $val, 'type' );
 
-					if ( ! isset( Request::i()->id ) or ( isset( Request::i()->id ) and Request::i()->id != $word->wid ) )
+					if ( ! isset( \IPS\Request::i()->id ) or ( isset( \IPS\Request::i()->id ) and \IPS\Request::i()->id != $word->wid ) )
 					{
-						throw new LogicException( 'profanity_already_exists' );
+						throw new \LogicException( 'profanity_already_exists' );
 					}
 				}
-				catch( OutOfRangeException $e )
+				catch( \OutOfRangeException $e )
 				{
 					/* Nothing exists, so we are good */
 				}
 			}
 		} ) );
-		$form->add( new Radio( 'profanity_action', ( $current ) ? $current->action : 'swap', FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Radio( 'profanity_action', ( $current ) ? $current->action : 'swap', FALSE, array(
 			'options'	=> array(
 				'swap'		=> 'profanity_filter_action_swap',
 				'block'		=> 'profanity_filter_action_block',
@@ -230,9 +203,9 @@ class Profanity extends ActiveRecord implements JsonSerializable
 			)
 		) ) );
 
-		$form->add( new Number( 'profanity_min_posts', ( $current ) ? $current->min_posts : 0, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'profanity_min_posts_unlimited' ), NULL, Member::loggedIn()->language()->addToStack('profanity_min_posts_prefix'), Member::loggedIn()->language()->addToStack('profanity_min_posts_suffix'), 'profanity_min_posts' ) );
-		$form->add( new Text( 'profanity_swop', ( $current ) ? $current->swop : NULL, NULL, array(), NULL, NULL, NULL, 'profanity_swop' ) );
-		$form->add( new Radio( 'profanity_m_exact', ( $current ) ? $current->m_exact : NULL, FALSE, array(
+		$form->add( new \IPS\Helpers\Form\Number( 'profanity_min_posts', ( $current ) ? $current->min_posts : 0, FALSE, array( 'unlimited' => 0, 'unlimitedLang' => 'profanity_min_posts_unlimited' ), NULL, \IPS\Member::loggedIn()->language()->addToStack('profanity_min_posts_prefix'), \IPS\Member::loggedIn()->language()->addToStack('profanity_min_posts_suffix'), 'profanity_min_posts' ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'profanity_swop', ( $current ) ? $current->swop : NULL, NULL, array(), NULL, NULL, NULL, 'profanity_swop' ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'profanity_m_exact', ( $current ) ? $current->m_exact : NULL, FALSE, array(
 			'options' => array(
 				'1' => 'profanity_filter_exact',
 				'0'	=> 'profanity_filter_loose' )
@@ -241,7 +214,7 @@ class Profanity extends ActiveRecord implements JsonSerializable
 		if ( !$current )
 		{
 			$form->addTab('upload');
-			$form->add( new Upload( 'profanity_upload', NULL, NULL, array( 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ) ) );
+			$form->add( new \IPS\Helpers\Form\Upload( 'profanity_upload', NULL, NULL, array( 'allowedFileTypes' => array( 'xml' ), 'temporary' => TRUE ) ) );
 		}
 		
 		return $form;
@@ -251,10 +224,10 @@ class Profanity extends ActiveRecord implements JsonSerializable
 	 * Create From Form
 	 *
 	 * @param	array						$values		Array of values
-	 * @param Profanity|NULL	$current	If we are editing, an \IPS\core\Profanity instance of the record
-	 * @return    Profanity
+	 * @param	\IPS\core\Profanity|NULL	$current	If we are editing, an \IPS\core\Profanity instance of the record
+	 * @return	\IPS\core\Profanity
 	 */
-	public static function createFromForm( array $values, ?Profanity $current=NULL ) : Profanity
+	public static function createFromForm( array $values, \IPS\core\Profanity $current=NULL )
 	{
 		if ( $current )
 		{
@@ -292,7 +265,7 @@ class Profanity extends ActiveRecord implements JsonSerializable
 		
 		if ( array_key_exists( 'action', $values ) )
 		{
-			if ( in_array( $values['action'], static::$actionTypes ) )
+			if ( \in_array( $values['action'], static::$actionTypes ) )
 			{
 				$obj->action = $values['action'];
 			}
@@ -308,7 +281,7 @@ class Profanity extends ActiveRecord implements JsonSerializable
 	 *
 	 * @return	array
 	 */
-	public static function getProfanity() : array
+	public static function getProfanity()
 	{
 		$return = array();
 
@@ -325,29 +298,29 @@ class Profanity extends ActiveRecord implements JsonSerializable
 	 *
 	 * @return	array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->profanityFilters ) )
+		if ( !isset( \IPS\Data\Store::i()->profanityFilters ) )
 		{
-			Store::i()->profanityFilters = iterator_to_array( Db::i()->select( '*', static::$databaseTable )->setKeyField( 'wid' ) );
+			\IPS\Data\Store::i()->profanityFilters = iterator_to_array( \IPS\Db::i()->select( '*', static::$databaseTable )->setKeyField( 'wid' ) );
 		}
 
-		return Store::i()->profanityFilters;
+		return \IPS\Data\Store::i()->profanityFilters;
 	}
-
+	
 	/**
 	 * Check if the content should be hidden by profanity or url filters
 	 *
-	 * @param string $content The content to check
-	 * @param Member|NULL $member The author of the content
-	 * @param array $filtersMatched What matched, passed by reference
-	 * @return    bool
+	 * @param	string				$content	The content to check
+	 * @param	\IPS\Member|NULL	$member		The author of the content
+	 * @param	array|NULL			$filtersMatched	What matched, passed by reference
+	 * @return	bool
 	 */
-	public static function hiddenByFilters( string $content, ?Member $member=NULL, array &$filtersMatched = array() ) : bool
+	public static function hiddenByFilters( $content, $member=NULL, array &$filtersMatched = array() )
 	{
 		$return = static::_checkProfanityFilters( $content, $member );
-
-		if ( is_string( $return ) )
+		
+		if ( \is_string( $return ) )
 		{
 			$filtersMatched = array(
 				'type'	=> 'profanity',
@@ -357,9 +330,9 @@ class Profanity extends ActiveRecord implements JsonSerializable
 			return TRUE;
 		}
 		
-		$return = static::_checkLinkUrlFilters( $content );
+		$return = static::_checkUrlFilters( $content );
 		
-		if ( is_string( $return ) )
+		if ( \is_string( $return ) )
 		{
 			$filtersMatched = array(
 				'type'	=> 'url',
@@ -369,21 +342,9 @@ class Profanity extends ActiveRecord implements JsonSerializable
 			return TRUE;
 		}
 
-		$return = static::_checkEmbedUrlFilters( $content );
-
-		if ( is_string( $return ) )
-		{
-			$filtersMatched = array(
-				'type'	=> 'embed',
-				'match'	=> $return
-			);
-
-			return TRUE;
-		}
-
 		$return = static::_checkEmailFilters( $content );
 		
-		if ( is_string( $return ) )
+		if ( \is_string( $return ) )
 		{
 			/* Add to approval queue table */
 			$filtersMatched = array(
@@ -401,10 +362,10 @@ class Profanity extends ActiveRecord implements JsonSerializable
 	 * Check Profanity Filters
 	 *
 	 * @param	string				$content	The content to check
-	 * @param	Member|NULL	$member		The author of the content
+	 * @param	\IPS\Member|NULL	$member		The author of the content
 	 * @return	bool|string
 	 */
-	protected static function _checkProfanityFilters( string $content, ?Member $member=NULL ) : bool|string
+	protected static function _checkProfanityFilters( $content, $member=NULL )
 	{
 		$looseProfanity = array();
 		$exactProfanity = array();
@@ -435,19 +396,20 @@ class Profanity extends ActiveRecord implements JsonSerializable
 		}
 		
 		/* Loose is easy - if any of the words are present, then mod queue */
-		if ( count( $looseProfanity ) )
+		if ( \count( $looseProfanity ) )
 		{
 			foreach( $looseProfanity AS $word )
 			{
 				if ( mb_stristr( $content, $word ) )
 				{
 					return $word;
+					break;
 				}
 			}
 		}
 		
 		/* Still here? Check exact - this gets a bit more complicated. */
-		if ( count( $exactProfanity ) )
+		if ( \count( $exactProfanity ) )
 		{
 			$words = array();
 			foreach( $exactProfanity AS $word )
@@ -455,15 +417,16 @@ class Profanity extends ActiveRecord implements JsonSerializable
 				$words[] = preg_quote( $word, '/' );
 			}
 			
-			$split = preg_split( '/((?=<^|\b)(?:' . implode( '|', $words ) . ')(?=\b|$))/iu', $content, 0, PREG_SPLIT_DELIM_CAPTURE );
+			$split = preg_split( '/((?=<^|\b)(?:' . implode( '|', $words ) . ')(?=\b|$))/iu', $content, null, PREG_SPLIT_DELIM_CAPTURE );
 
-			if ( is_array( $split ) )
+			if ( \is_array( $split ) )
 			{
 				foreach( $split AS $section )
 				{
-					if ( in_array( mb_strtolower( $section ), array_map( 'mb_strtolower', $exactProfanity ) ) )
+					if ( \in_array( mb_strtolower( $section ), array_map( 'mb_strtolower', $exactProfanity ) ) )
 					{
 						return $section;
+						break;
 					}
 				}
 			}
@@ -479,7 +442,7 @@ class Profanity extends ActiveRecord implements JsonSerializable
 	 * @param	string				$content	The content to check
 	 * @return	bool|string
 	 */
-	public static function checkProfanityBlocks( string $content ) : bool|string
+	public static function checkProfanityBlocks( $content )
 	{
 		$looseProfanity = array();
 		$exactProfanity = array();
@@ -506,19 +469,20 @@ class Profanity extends ActiveRecord implements JsonSerializable
 		}
 		
 		/* Loose is easy - if any of the words are present, then mod queue */
-		if ( count( $looseProfanity ) )
+		if ( \count( $looseProfanity ) )
 		{
 			foreach( $looseProfanity AS $word )
 			{
 				if ( mb_stristr( $content, $word ) )
 				{
 					return $word;
+					break;
 				}
 			}
 		}
 		
 		/* Still here? Check exact - this gets a bit more complicated. */
-		if ( count( $exactProfanity ) )
+		if ( \count( $exactProfanity ) )
 		{
 			$words = array();
 			foreach( $exactProfanity AS $word )
@@ -526,15 +490,16 @@ class Profanity extends ActiveRecord implements JsonSerializable
 				$words[] = preg_quote( $word, '/' );
 			}
 			
-			$split = preg_split( '/((?=<^|\b)(?:' . implode( '|', $words ) . ')(?=\b|$))/iu', $content, -1, PREG_SPLIT_DELIM_CAPTURE );
+			$split = preg_split( '/((?=<^|\b)(?:' . implode( '|', $words ) . ')(?=\b|$))/iu', $content, null, PREG_SPLIT_DELIM_CAPTURE );
 
-			if ( is_array( $split ) )
+			if ( \is_array( $split ) )
 			{
 				foreach( $split AS $section )
 				{
-					if ( in_array( mb_strtolower( $section ), array_map( 'mb_strtolower', $exactProfanity ) ) )
+					if ( \in_array( mb_strtolower( $section ), array_map( 'mb_strtolower', $exactProfanity ) ) )
 					{
 						return $section;
+						break;
 					}
 				}
 			}
@@ -550,56 +515,50 @@ class Profanity extends ActiveRecord implements JsonSerializable
 	 * @param	string	$content	The content to check
 	 * @return	bool|string
 	 */
-	protected static function _checkLinkUrlFilters( string $content ) : bool|string
+	protected static function _checkUrlFilters( $content )
 	{
 		/* If we are allowing ANY URL's and not doing anything, then do that */
-		if ( Settings::i()->ipb_url_filter_option == 'none' AND Settings::i()->url_filter_any_action == 'allow' )
+		if ( \IPS\Settings::i()->ipb_url_filter_option == 'none' AND \IPS\Settings::i()->url_filter_any_action == 'allow' )
 		{
 			return FALSE;
 		}
 		
 		/* If we are using a black or white list, but not moderating, do that. */
-		if ( in_array( Settings::i()->ipb_url_filter_option, array( 'black', 'white' ) ) AND Settings::i()->url_filter_action == 'block' )
+		if ( \in_array( \IPS\Settings::i()->ipb_url_filter_option, array( 'black', 'white' ) ) AND \IPS\Settings::i()->url_filter_action == 'block' )
 		{
 			return FALSE;
 		}
 		
-		$urls = ( Settings::i()->ipb_url_filter_option == 'black' ) ? explode( ',', Settings::i()->ipb_url_blacklist ) : ( Settings::i()->ipb_url_filter_option != 'none' ? explode( ',', Settings::i()->ipb_url_whitelist ) : [] );
+		$urls = ( \IPS\Settings::i()->ipb_url_filter_option == 'black' ) ? explode( ',', \IPS\Settings::i()->ipb_url_blacklist ) : ( \IPS\Settings::i()->ipb_url_filter_option != 'none' ? explode( ',', \IPS\Settings::i()->ipb_url_whitelist ) : [] );
 		
-		if ( Settings::i()->ipb_url_filter_option == 'white' OR Settings::i()->url_filter_any_action == 'moderate' )
+		if ( \IPS\Settings::i()->ipb_url_filter_option == 'white' OR \IPS\Settings::i()->url_filter_any_action == 'moderate' )
 		{
-			$urls[] = "http://" . parse_url( Settings::i()->base_url, PHP_URL_HOST ) . "/*";
-			$urls[] = "https://" . parse_url( Settings::i()->base_url, PHP_URL_HOST ) . "/*";
+			$urls[] = "http://" . parse_url( \IPS\Settings::i()->base_url, PHP_URL_HOST ) . "/*";
+			$urls[] = "https://" . parse_url( \IPS\Settings::i()->base_url, PHP_URL_HOST ) . "/*";
 		}
 
-		if ( !empty( $urls ) )
+		if ( $urls )
 		{
 			/* We are only checking the content to see if it should be filtered, not using it later. We need to fix embeds, otherwise they won't trigger post moderation
 				even if they should */
-			$content = str_replace( '<___base_url___>', rtrim( Settings::i()->base_url, '/' ), $content );
+			$content = str_replace( '<___base_url___>', rtrim( \IPS\Settings::i()->base_url, '/' ), $content );
 
 			try
 			{
 				/* Load the content so we can look for URL's */
-				$dom = new DOMDocument;
+				$dom = new \IPS\Xml\DOMDocument;
 				$dom->loadHTML( $content );
 				
 				/* Gather up all URL's */
-				$selector = new DOMXPath($dom);
+				$selector = new \DOMXPath($dom);
 				$tags = $selector->query('//img | //a | //iframe');
 				$good = NULL;
 
 				foreach( $tags AS $tag )
 				{
-					/* We don't care about raw iframes here, that's handled in the _checkEmbedUrlFilters() method */
-					if ( $tag instanceof DOMElement and strtolower( $tag->nodeName ) == 'iframe' and preg_match( "/(^|\\s)ipsRawIframe(\\s|$)/", $tag->getAttribute( 'class' ) ?: '' ) )
-					{
-						continue;
-					}
-
 					if ( ( $tag->hasAttribute( 'href' ) and !$tag->hasAttribute( 'data-mentionid' ) AND !$tag->hasAttribute( 'data-fileid' ) ) OR ( ( $tag->hasAttribute( 'src' ) OR $tag->hasAttribute( 'data-embed-src' ) ) AND !$tag->hasAttribute( 'data-emoticon' ) AND !$tag->hasAttribute( 'data-fileid' ) ) )
 					{
-						if ( Settings::i()->ipb_url_filter_option == 'none' AND Settings::i()->url_filter_action == 'allow' )
+						if ( \IPS\Settings::i()->ipb_url_filter_option == 'none' AND \IPS\Settings::i()->url_filter_action == 'allow' )
 						{
 							return $tag->hasAttribute( 'href' );
 						}
@@ -609,7 +568,7 @@ class Profanity extends ActiveRecord implements JsonSerializable
 						/* If this is an embed routed through our internal embed handler, we need to retrieve the actual URL that was embedded */
 						if( mb_strpos( $urlToCheck, 'controller=embed' ) !== FALSE AND mb_strpos( $urlToCheck, 'url=' ) !== FALSE )
 						{
-							$urlToCheck = Url::external( $urlToCheck )->queryString['url'];
+							$urlToCheck = \IPS\Http\Url::external( $urlToCheck )->queryString['url'];
 						}
 
 						foreach( $urls AS $url )
@@ -628,7 +587,7 @@ class Profanity extends ActiveRecord implements JsonSerializable
 								$url = str_replace( '\*', "(.*?)", $url );
 								
 								/* If it's a blacklist, check that */
-								if ( Settings::i()->ipb_url_filter_option == 'black' )
+								if ( \IPS\Settings::i()->ipb_url_filter_option == 'black' )
 								{
 									if ( preg_match( '/' . $url . '/i', $urlToCheck ) )
 									{
@@ -636,10 +595,10 @@ class Profanity extends ActiveRecord implements JsonSerializable
 									}
 								}
 								/* If it's a whitelist, check that */
-								else if ( Settings::i()->ipb_url_filter_option == 'white' )
+								else if ( \IPS\Settings::i()->ipb_url_filter_option == 'white' )
 								{
-									/* @note http:// is hard-coded here as we're simply validating that the URL is on the same domain, so the protocol doesn't matter for the base_url replacement | todo this is probably redundant because all usages of <___base_url___> are replaced before generating the DOMDocument */
-									if ( !preg_match( '/' . $url . '/i', str_replace( '<___base_url___>', 'http://' . parse_url( Settings::i()->base_url, PHP_URL_HOST ), $urlToCheck ), $matches ) )
+									/* @note http:// is hard-coded here as we're simply validating that the URL is on the same domain, so the protocol doesn't matter for the base_url replacement */
+									if ( !preg_match( '/' . $url . '/i', str_replace( '<___base_url___>', 'http://' . parse_url( \IPS\Settings::i()->base_url, PHP_URL_HOST ), $urlToCheck ), $matches ) )
 									{
 										$good = $urlToCheck;
 									}
@@ -656,95 +615,27 @@ class Profanity extends ActiveRecord implements JsonSerializable
 						if ( $good !== TRUE )
 						{
 							/* If we are moderating links, only return if the URL was caught by a rule above. */
-							if ( Settings::i()->url_filter_any_action == 'moderate' AND $good !== NULL )
+							if ( \IPS\Settings::i()->url_filter_any_action == 'moderate' AND ( \IPS\Settings::i()->ipb_url_filter_option == 'none' OR $good !== NULL ) )
 							{
 								return $urlToCheck;
 							}
 
-							/* If all links are to be moderated */
-							if ( $good === NULL AND Settings::i()->ipb_url_filter_option == 'none' AND Settings::i()->url_filter_any_action == 'moderate' )
+							if ( \IPS\Settings::i()->ipb_url_filter_option == 'none' )
 							{
-								return $urlToCheck;
+								return $good;
 							}
 						}
 					}
 				}
-
-				/* If we have tags, and it's still null, that means none of the tags were worth checking (e.g. local attachments) */
-				if( count( $tags ) and $good === null )
-				{
-					$good = true;
-				}
 				
-				if ( count($tags) and $good !== TRUE AND Settings::i()->ipb_url_filter_option == 'white' )
+				if ( $good !== TRUE AND \IPS\Settings::i()->ipb_url_filter_option == 'white' )
 				{
 					return $good;
 				}
 			}
-			catch( Exception | ValueError $e ) {}
+			catch( \Exception | \ValueError $e ) {}
 		}
 		
-		return FALSE;
-	}
-
-	/**
-	 * Check URL Filters
-	 *
-	 * @param	string	$content	The content to check
-	 * @return	bool|string
-	 */
-	protected static function _checkEmbedUrlFilters( string $content ) : bool|string
-	{
-		/* If we are allowing ANY URL's and not doing anything, then do that */
-		if ( Settings::i()->ipb_embed_url_filter_option AND Settings::i()->embed_url_filter_any_action == 'allow' )
-		{
-			return FALSE;
-		}
-
-		$domains = ( Settings::i()->ipb_embed_url_filter_option ) ? explode( ',', Settings::i()->ipb_embed_url_whitelist ) : [];
-
-		if ( Settings::i()->ipb_embed_url_filter_option OR Settings::i()->embed_url_filter_any_action == 'moderate' )
-		{
-			$domains[] = parse_url( Settings::i()->base_url, PHP_URL_HOST );
-		}
-
-		$domainsRegex = [];
-		$randStr = md5( mt_rand( 0, 1000000000 ) );
-		foreach( $domains as $domain )
-		{
-			$domainsRegex[] = preg_quote( str_replace( '*', $randStr, $domain ) );
-		}
-
-		$domainsRegex = str_replace( $randStr, '.*', '/^(' . implode( '|', $domainsRegex ) . ')$/i' );
-
-		/* We are only checking the content to see if it should be filtered, not using it later. We need to fix embeds, otherwise they won't trigger post moderation
-			even if they should */
-		$content = str_replace( '<___base_url___>', rtrim( Settings::i()->base_url, '/' ), $content );
-
-		try
-		{
-			/* Gather up all iframe src's */
-			$dom = new DOMDocument;
-			$dom->loadHTML( $content );
-			$selector = new DOMXPath($dom);
-			$tags = $selector->query('//iframe[@class and @src]');
-
-			foreach( $tags AS $tag )
-			{
-				if ( preg_match( "/(^|\\s)ipsRawIframe($|\\s)/", $tag->getAttribute( 'class' ) ?: '' ) )
-				{
-					$iframeDomain = parse_url( $tag->getAttribute( 'src' ) ?: '', PHP_URL_HOST ) ?: '';
-
-					/* we have an issue if this is not whitelisted */
-					if ( !$iframeDomain or empty( $domains ) or !preg_match( $domainsRegex, $iframeDomain ) )
-					{
-						return $iframeDomain ?: false;
-					}
-				}
-			}
-		}
-		catch( Exception | ValueError $e ) {}
-
 		return FALSE;
 	}
 
@@ -754,14 +645,14 @@ class Profanity extends ActiveRecord implements JsonSerializable
 	 * @param	string	$content	The content to check
 	 * @return	bool|string
 	 */
-	protected static function _checkEmailFilters( string $content ) : bool|string
+	protected static function _checkEmailFilters( $content )
 	{
 		/* If we are allowing ANY URL's and not doing anything, then do that */
-		if ( Settings::i()->email_filter_action == 'moderate')
+		if ( \IPS\Settings::i()->email_filter_action == 'moderate')
 		{
 			/* Ensure that image and file names don't trip up the email filter */
-			$source = new DOMDocument( '1.0', 'UTF-8' );
-			$source->loadHTML( DOMDocument::wrapHtml( $content ) );
+			$source = new \IPS\Xml\DOMDocument( '1.0', 'UTF-8' );
+			$source->loadHTML( \IPS\Xml\DOMDocument::wrapHtml( $content ) );
 
 			$contentImages = $source->getElementsByTagName( 'img' );
 
@@ -796,9 +687,9 @@ class Profanity extends ActiveRecord implements JsonSerializable
 			}
 
 			/* Get DOMDocument output */
-			$content = DOMParser::getDocumentBodyContents( $source );
+			$content = \IPS\Text\DOMParser::getDocumentBodyContents( $source );
 
-			if( preg_match( '/' . Parser::EMAIL_REGEX . '/u', $content, $matches ) )
+			if( preg_match( '/' . \IPS\Text\Parser::EMAIL_REGEX . '/u', $content, $matches ) )
 			{
 				return $matches[0];
 			}
@@ -811,14 +702,14 @@ class Profanity extends ActiveRecord implements JsonSerializable
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'profanityFilters' );
+	protected $caches = array( 'profanityFilters' );
 
 	/**
 	 * JSON Serialize
 	 *
 	 * @return	array
 	 */
-	public function jsonSerialize(): array
+	public function jsonSerialize()
 	{
 		return array(
 			'wid'		=> $this->wid,

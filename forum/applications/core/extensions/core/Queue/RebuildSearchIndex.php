@@ -11,40 +11,21 @@
 namespace IPS\core\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\Content\Search\Index;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Db\Exception as DbException;
-use IPS\Extensions\QueueAbstract;
-use IPS\IPS;
-use IPS\Log;
-use IPS\Member;
-use IPS\Patterns\ActiveRecordIterator;
-use IPS\Settings;
-use OutOfRangeException;
-use Throwable;
-use function defined;
-use function in_array;
-use const IPS\REBUILD_QUICK;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Rebuild Search Index
  */
-class RebuildSearchIndex extends QueueAbstract
+class _RebuildSearchIndex
 {
 	/**
 	 * @brief Number of content items to index per cycle
 	 */
-	public int $index	= REBUILD_QUICK;
+	public $index	= \IPS\REBUILD_QUICK;
 	
 	/**
 	 * Build query
@@ -52,7 +33,7 @@ class RebuildSearchIndex extends QueueAbstract
 	 * @param	array	$data
 	 * @return	array	array( 'where' => xxx, 'joins' => array() )
 	 */
-	protected function _buildQuery( array $data ) : array
+	protected function _buildQuery( $data )
 	{
 		$classname = $data['class'];
 		
@@ -61,8 +42,7 @@ class RebuildSearchIndex extends QueueAbstract
 		
 		if ( isset( $data['container'] ) )
 		{
-			/* @var array $databaseColumnMap */
-			if ( in_array( 'IPS\Content\Comment', class_parents( $classname ) ) )
+			if ( \in_array( 'IPS\Content\Comment', class_parents( $classname ) ) )
 			{
 				$itemClass = $classname::$itemClass;
 				$where[] = array( $itemClass::$databasePrefix . $itemClass::$databaseColumnMap['container'] . '=' . $data['container'] );
@@ -79,10 +59,10 @@ class RebuildSearchIndex extends QueueAbstract
 			$where[] = $classname::commentWhere();
 		}
 		
-		if( Settings::i()->search_method == 'mysql' and Settings::i()->search_index_timeframe )
+		if( \IPS\Settings::i()->search_method == 'mysql' and \IPS\Settings::i()->search_index_timeframe )
 		{
-			$cutoff = DateTime::ts( time() - ( 86400 * Settings::i()->search_index_timeframe ) )->getTimestamp();
-
+			$cutoff = \IPS\DateTime::ts( time() - ( 86400 * \IPS\Settings::i()->search_index_timeframe ) )->getTimestamp();
+			
 			/* If we store the time of the last comment / review, use that. If not, then use normal start date. */
 			if ( isset( $classname::$databaseColumnMap['last_comment'] ) OR isset( $classname::$databaseColumnMap['last_review'] ) )
 			{
@@ -104,7 +84,7 @@ class RebuildSearchIndex extends QueueAbstract
 						$binds[]	= $cutoff;
 					}
 				}
-
+				
 				if ( isset( $classname::$databaseColumnMap['last_review'] ) )
 				{
 					if ( is_array( $classname::$databaseColumnMap['last_review'] ) )
@@ -121,7 +101,7 @@ class RebuildSearchIndex extends QueueAbstract
 						$binds[]	= $cutoff;
 					}
 				}
-
+				
 				$where[] = array( '(' . implode( ' OR ', $columns ) . ')', ...$binds );
 			}
 			else if( isset( $classname::$databaseColumnMap['date'] ) )
@@ -137,18 +117,18 @@ class RebuildSearchIndex extends QueueAbstract
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		$classname = $data['class'];
 		
-		Log::debug( "Getting preQueueData for " . $classname, 'rebuildSearchIndex' );
+		\IPS\Log::debug( "Getting preQueueData for " . $classname, 'rebuildSearchIndex' );
 		
 		$queryData = $this->_buildQuery( $data );
 		try
 		{
-			$select = Db::i()->select( 'MAX(' . $classname::$databasePrefix . $classname::$databaseColumnId . ')', $classname::$databaseTable, $queryData['where'] );
+			$select = \IPS\Db::i()->select( 'MAX(' . $classname::$databasePrefix . $classname::$databaseColumnId . ')', $classname::$databaseTable, $queryData['where'] );
 			foreach ( $queryData['joins'] as $table => $on )
 			{
 				$select->join( $table, $on );
@@ -158,16 +138,16 @@ class RebuildSearchIndex extends QueueAbstract
 			/* We're going to use the < operator, so we need to ensure the most recent item is indexed */
 		    $data['runPid'] = $data['count'] + 1;
 		    
-			$select = Db::i()->select( 'COUNT(*)', $classname::$databaseTable, $queryData['where'] );
+			$select = \IPS\Db::i()->select( 'COUNT(*)', $classname::$databaseTable, $queryData['where'] );
 			foreach ( $queryData['joins'] as $table => $on )
 			{
 				$select->join( $table, $on );
 			}
 			$data['realCount'] = $select->first();
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		if( $data['count'] == 0 )
@@ -188,30 +168,30 @@ class RebuildSearchIndex extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
 		/* We want to allow read/write separation in this task */
-		Db::i()->readWriteSeparation = TRUE;
+		\IPS\Db::i()->readWriteSeparation = TRUE;
 
 		$classname = $data['class'];		
         $exploded = explode( '\\', $classname );
-        if ( !class_exists( $classname ) or !Application::appIsEnabled( $exploded[1] ) )
+        if ( !class_exists( $classname ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 		
 		$indexed = NULL;
 		
-		Log::debug( "Running " . $classname . ", with an offset of " . $offset, 'rebuildSearchIndex' );
+		\IPS\Log::debug( "Running " . $classname . ", with an offset of " . $offset, 'rebuildSearchIndex' );
 		
 		$queryData = $this->_buildQuery( $data );		
 		
-		$indexer = Index::massIndexer();
+		$indexer = \IPS\Content\Search\Index::massIndexer();
 				
 		/* A pages database may have been deleted */
 		try
 		{
-			$select = Db::i()->select( '*', $classname::$databaseTable, array_merge( $queryData['where'], array( array( $classname::$databasePrefix . $classname::$databaseColumnId . ' < ?',  $data['runPid'] ) ) ), $classname::$databasePrefix . $classname::$databaseColumnId . ' DESC', array( 0, $this->index ) );
+			$select = \IPS\Db::i()->select( '*', $classname::$databaseTable, array_merge( $queryData['where'], array( array( $classname::$databasePrefix . $classname::$databaseColumnId . ' < ?',  $data['runPid'] ) ) ), $classname::$databasePrefix . $classname::$databaseColumnId . ' DESC', array( 0, $this->index ) );
 			foreach ( $queryData['joins'] as $table => $on )
 			{
 				$select->join( $table, $on );
@@ -219,7 +199,7 @@ class RebuildSearchIndex extends QueueAbstract
 			
 			try
 			{
-				$iterator = new ActiveRecordIterator( $select, $classname );
+				$iterator = new \IPS\Patterns\ActiveRecordIterator( $select, $classname );
 			
 				foreach( $iterator as $item )
 				{
@@ -227,25 +207,25 @@ class RebuildSearchIndex extends QueueAbstract
 		
 					try
 					{
-						$index = TRUE;
-						if ( IPS::classUsesTrait( $item, 'IPS\Content\FuturePublishing' ) AND $item->isFutureDate() )
-						{
-							$index = FALSE;
-						}
-						if ( $index )
+						if ( !$item->isFutureDate() )
 						{
 							$indexer->index($item);
 						}
 					}
-					catch( OutOfRangeException $e )
+					catch( \OutOfRangeException $e )
 					{
 						/* This can happen if there are older, orphaned posts/comments. Just do nothing here,
 						don't even log it, because we end up with pages and pages of logs. */
 					}
-					catch ( Exception| Throwable $e )
+					catch ( \Exception $e )
 					{
 						/* There was an issue indexing the item - skip and log it */
-						Log::log( $e, 'rebuildSearchIndex' );
+						\IPS\Log::log( $e, 'rebuildSearchIndex' );
+					}
+					catch( \Throwable $e )
+					{
+						/* There was an issue indexing the item - skip and log it */
+						\IPS\Log::log( $e, 'rebuildSearchIndex' );
 					}
 		
 					$indexed = $item->$idColumn;
@@ -255,19 +235,19 @@ class RebuildSearchIndex extends QueueAbstract
 					$data['indexed']++;
 				}
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
 				/* Turn off read/write separation before returning */
-				Db::i()->readWriteSeparation = FALSE;
+				\IPS\Db::i()->readWriteSeparation = FALSE;
 
 				/* Something has gone wrong with iterator attempting to use constructFromData */
 				throw new \IPS\Task\Queue\OutOfRangeException;
 			}
 		}
-		catch( DbException $e )
+		catch( \IPS\Db\Exception $e )
 		{
 			/* Turn off read/write separation before returning */
-			Db::i()->readWriteSeparation = FALSE;
+			\IPS\Db::i()->readWriteSeparation = FALSE;
 
 			/* Something has gone wrong with the query, like the table not existing */
 			throw new \IPS\Task\Queue\OutOfRangeException;
@@ -276,13 +256,13 @@ class RebuildSearchIndex extends QueueAbstract
 		if( $indexed === NULL )
 		{
 			/* Turn off read/write separation before returning */
-			Db::i()->readWriteSeparation = FALSE;
+			\IPS\Db::i()->readWriteSeparation = FALSE;
 
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		/* Turn off read/write separation before returning */
-		Db::i()->readWriteSeparation = FALSE;
+		\IPS\Db::i()->readWriteSeparation = FALSE;
 				
 		/* Return the number indexed so far, so that the rebuild progress bar text makes sense */
 		return $data['indexed'];
@@ -294,17 +274,17 @@ class RebuildSearchIndex extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
 		$class = $data['class'];
 		$exploded = explode( '\\', $class );
-		if ( !class_exists( $class ) or !Application::appIsEnabled( $exploded[1] ) )
+		if ( !class_exists( $class ) or !\IPS\Application::appIsEnabled( $exploded[1] ) )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
-		return array( 'text' => Member::loggedIn()->language()->addToStack('reindexing_stuff', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( $class::$title . '_pl_lc' ) ) ) ), 'complete' => $data['realCount'] ? ( round( 100 / $data['realCount'] * $data['indexed'], 2 ) ) : 100 );
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('reindexing_stuff', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( $class::$title . '_pl_lc' ) ) ) ), 'complete' => $data['realCount'] ? ( round( 100 / $data['realCount'] * $data['indexed'], 2 ) ) : 100 );
 	}	
 }

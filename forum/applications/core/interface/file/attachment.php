@@ -8,42 +8,29 @@
  * @since		30 May 2013
  */
 
-use IPS\Application;
-use IPS\Db;
-use IPS\Dispatcher\External;
-use IPS\Events\Event;
-use IPS\File;
-use IPS\Login;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session\Front;
-
 define('REPORT_EXCEPTIONS', TRUE);
 require_once str_replace( 'applications/core/interface/file/attachment.php', '', str_replace( '\\', '/', __FILE__ ) ) . 'init.php';
-Front::i();
+\IPS\Session\Front::i();
 
 try
 {
 	/* Load member */
-	$member = Member::loggedIn();
+	$member = \IPS\Member::loggedIn();
 	
 	/* Init */
 	$permission = FALSE;
 	$loadedExtensions = array();
-	$relatedItem = null;
-	$extra = array();
 	
 	/* Get attachment */
-	$attachment = Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', Request::i()->id ) )->first();
+	$attachment = \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', \IPS\Request::i()->id ) )->first();
 	
 	/* If the user isn't logged in, and this attachment has a security key attached to it, check that. */
 	if ( $attachment['attach_security_key'] )
 	{
 		/* Key doesn't exist or doesn't match */
-		if ( !isset( Request::i()->key ) OR !Login::compareHashes( $attachment['attach_security_key'], Request::i()->key ) )
+		if ( !isset( \IPS\Request::i()->key ) OR !\IPS\Login::compareHashes( $attachment['attach_security_key'], \IPS\Request::i()->key ) )
 		{
-			throw new UnexpectedValueException;
+			throw new \UnexpectedValueException;
 		}
 		
 		/* Key passes, so do normal permission checks. */
@@ -58,81 +45,78 @@ try
 		}
 	}
 
-	foreach ( Db::i()->select( '*', 'core_attachments_map', array( 'attachment_id=?', $attachment['attach_id'] ) ) as $map )
+	if( $permission !== TRUE )
 	{
-		$extra = [ 'id1' => $map['id1'], 'id2' => $map['id2'], 'id3' => $map['id3'] ];
-
-		if ( !isset( $loadedExtensions[ $map['location_key'] ] ) )
+		foreach ( \IPS\Db::i()->select( '*', 'core_attachments_map', array( 'attachment_id=?', $attachment['attach_id'] ) ) as $map )
 		{
-			$exploded = explode( '_', $map['location_key'] );
-			try
+			if ( !isset( $loadedExtensions[ $map['location_key'] ] ) )
 			{
-				$extensions = Application::load( $exploded[0] )->extensions( 'core', 'EditorLocations' );
-				if ( isset( $extensions[ $exploded[1] ] ) )
+				$exploded = explode( '_', $map['location_key'] );
+				try
 				{
-					$loadedExtensions[ $map['location_key'] ] = $extensions[ $exploded[1] ];
+					$extensions = \IPS\Application::load( $exploded[0] )->extensions( 'core', 'EditorLocations' );
+					if ( isset( $extensions[ $exploded[1] ] ) )
+					{
+						$loadedExtensions[ $map['location_key'] ] = $extensions[ $exploded[1] ];
+					}
 				}
+				catch ( \OutOfRangeException $e ) { }
 			}
-			catch (OutOfRangeException $e ) { }
-		}
-
-		if ( isset( $loadedExtensions[ $map['location_key'] ] ) )
-		{
-			try
+					
+			if ( isset( $loadedExtensions[ $map['location_key'] ] ) )
 			{
-				$relatedItem = $loadedExtensions[ $map['location_key'] ]->attachmentLookup( $map['id1'], $map['id2'], $map['id3'] );
-				if ( !$permission and $loadedExtensions[ $map['location_key'] ]->attachmentPermissionCheck( $member, $map['id1'], $map['id2'], $map['id3'], $attachment ) )
+				try
 				{
-					$permission = TRUE;
+					if ( method_exists( $loadedExtensions[ $map['location_key'] ], 'attachmentPermissionCheck') AND $loadedExtensions[ $map['location_key'] ]->attachmentPermissionCheck( $member, $map['id1'], $map['id2'], $map['id3'], $attachment ) )
+					{
+						$permission = TRUE;
+						break;
+					}
 				}
+				catch ( \OutOfRangeException $e ) { }
 			}
-			catch ( OutOfRangeException | LogicException $e ) { }
-			break;
 		}
 	}
 		
 	/* Permission check */
 	if ( !$permission )
 	{
-		External::i();
-		Output::i()->error( 'no_attachment_permission', '2C171/1', 403, '' );
+		\IPS\Dispatcher\External::i();
+		\IPS\Output::i()->error( 'no_attachment_permission', '2C171/1', 403, '' );
 	}
 
 	/* Get file and data */
-	$file		= File::get( 'core_Attachment', $attachment['attach_location'] );
-	$headers	= array_merge( Output::getCacheHeaders( time(), 360 ), array( "Content-Disposition" => Output::getContentDisposition( 'attachment', $attachment['attach_file'] ), "X-Content-Type-Options" => "nosniff" ) );
+	$file		= \IPS\File::get( 'core_Attachment', $attachment['attach_location'] );
+	$headers	= array_merge( \IPS\Output::getCacheHeaders( time(), 360 ), array( "Content-Disposition" => \IPS\Output::getContentDisposition( 'attachment', $attachment['attach_file'] ), "X-Content-Type-Options" => "nosniff" ) );
 
 	/* Update download counter */
-	Db::i()->update( 'core_attachments', "attach_hits=attach_hits+1", array( 'attach_id=?', $attachment['attach_id'] ) );
-
-	/* Fire an event */
-	Event::fire( 'onDownload', $file, [ $relatedItem, $extra ] );
+	\IPS\Db::i()->update( 'core_attachments', "attach_hits=attach_hits+1", array( 'attach_id=?', $attachment['attach_id'] ) );
 	
 	/* If it's an AWS file just redirect to it */
 	$file->originalFilename = $attachment['attach_file'];
 	if ( $signedUrl = $file->generateTemporaryDownloadUrl() )
 	{
-		Output::i()->redirect( $signedUrl );
+		\IPS\Output::i()->redirect( $signedUrl );
 	}
 	
 	/* Send headers and print file */
-	Output::i()->sendStatusCodeHeader( 200 );
-	Output::i()->sendHeader( "Content-type: " . File::getMimeType( $file->originalFilename ) . ";charset=UTF-8" );
+	\IPS\Output::i()->sendStatusCodeHeader( 200 );
+	\IPS\Output::i()->sendHeader( "Content-type: " . \IPS\File::getMimeType( $file->originalFilename ) . ";charset=UTF-8" );
 
-	Output::i()->sendHeader( "Content-Security-Policy: default-src 'none'; sandbox" );
-	Output::i()->sendHeader( "X-Content-Security-Policy: default-src 'none'; sandbox" );
-	Output::i()->sendHeader( "Cross-Origin-Opener-Policy: same-origin" );
-	
+	\IPS\Output::i()->sendHeader( "Content-Security-Policy: default-src 'none'; sandbox" );
+	\IPS\Output::i()->sendHeader( "X-Content-Security-Policy:  default-src 'none'; sandbox" );
+	\IPS\Output::i()->sendHeader( "Cross-Origin-Opener-Policy: same-origin" );
+
 	foreach( $headers as $key => $header )
 	{
-		Output::i()->sendHeader( $key . ': ' . $header );
+		\IPS\Output::i()->sendHeader( $key . ': ' . $header );
 	}
-	Output::i()->sendHeader( "Content-Length: " . $file->filesize() );
+	\IPS\Output::i()->sendHeader( "Content-Length: " . $file->filesize() );
 
 	$file->printFile();
 	exit;
 }
-catch ( UnexpectedValueException | UnderflowException | ErrorException $e )
+catch ( \UnexpectedValueException | \UnderflowException | \ErrorException $e )
 {
 	switch( get_class( $e ) )
 	{
@@ -145,12 +129,11 @@ catch ( UnexpectedValueException | UnderflowException | ErrorException $e )
 			break;
 		
 		case 'ErrorException':
-		default:
 			$code = '2C327/1';
 			break;
 	}
 	/* Remove previously sent headers, so that the browser doesn't try to download this error as a file */
 	header_remove();
-	External::i();
-	Output::i()->error( 'node_error', $code, 404, '' );
+	\IPS\Dispatcher\External::i();
+	\IPS\Output::i()->error( 'node_error', $code, 404, '' );
 }

@@ -11,48 +11,38 @@
 namespace IPS\nexus\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\core\modules\admin\promotion\advertisements;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP Notification: Advertisements Requiring Approval
  */
-class Advertisement extends AdminNotification
+class _Advertisement extends \IPS\core\AdminNotification
 {	
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'commerce';
+	public static $group = 'commerce';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 4;
+	public static $groupPriority = 4;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 4;
+	public static $itemPriority = 4;
 	
 	/**
 	 * Title for settings
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle(): string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_Advertisement';
 	}
@@ -60,9 +50,9 @@ class Advertisement extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional(): bool
+	public static function mayBeOptional()
 	{
 		return TRUE;
 	}
@@ -72,7 +62,7 @@ class Advertisement extends AdminNotification
 	 *
 	 * @return	bool
 	 */
-	public static function mayRecur(): bool
+	public static function mayRecur()
 	{
 		return TRUE;
 	}
@@ -80,18 +70,18 @@ class Advertisement extends AdminNotification
 	/**
 	 * @brief	Current count
 	 */
-	protected ?int $count = NULL;
+	protected $count = NULL;
 	
 	/**
 	 * Get count
 	 *
-	 * @return	int
+	 * @return	bool
 	 */
-	public function count(): int
+	public function count()
 	{
 		if ( $this->count === NULL )
 		{
-			$this->count = Db::i()->select( 'COUNT(*)', 'core_advertisements', array( 'ad_active=-1' ) )->first();
+			$this->count = \IPS\Db::i()->select( 'COUNT(*)', 'core_advertisements', array( 'ad_active=-1' ) )->first();
 		}
 		return $this->count;
 	}
@@ -99,12 +89,12 @@ class Advertisement extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member )
 	{
-		return $member->hasAcpRestriction( 'core', 'promotion', 'advertisements_manage' ) and Db::i()->select( 'COUNT(*)', 'nexus_packages_ads' )->first();
+		return $member->hasAcpRestriction( 'core', 'promotion', 'advertisements_manage' ) and \IPS\Db::i()->select( 'COUNT(*)', 'nexus_packages_ads' )->first();
 	}
 	
 	/**
@@ -112,23 +102,23 @@ class Advertisement extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{		
-		return Member::loggedIn()->language()->addToStack( 'acpNotification_nexusAdvertisements', FALSE, array( 'pluralize' => array( $this->count() ) ) );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'acpNotification_nexusAdvertisements', FALSE, array( 'pluralize' => array( $this->count() ) ) );
 	}
 	
 	/**
 	 * Notification Subtitle (no HTML)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function subtitle(): ?string
+	public function subtitle()
 	{
 		try
 		{
-			return DateTime::ts( Db::i()->select( 'ad_start', 'core_advertisements', array( 'ad_active=-1' ), 'ad_start asc', 1 )->first() )->relative();
+			return \IPS\DateTime::ts( \IPS\Db::i()->select( 'ad_start', 'core_advertisements', array( 'ad_active=-1' ), 'ad_start asc', 1 )->first() )->relative();
 		}
-		catch ( UnderflowException )
+		catch ( \UnderflowException $e )
 		{
 			return NULL;
 		}
@@ -137,15 +127,15 @@ class Advertisement extends AdminNotification
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body()
 	{
-		$table = advertisements::table( Url::internal('app=core&module=overview&controller=notifications&_table=nexus_Advertisement') );
+		$table = \IPS\core\modules\admin\promotion\advertisements::table( \IPS\Http\Url::internal('app=core&module=overview&controller=notifications&_table=nexus_Advertisement') );
 		$table->limit = 10;
 		$table->filters = array();
 		$table->quickSearch = NULL;
-		$table->advancedSearch = [];
+		$table->advancedSearch = NULL;
 		$table->where[] = array( 'ad_active=-1' );
 		
 		return (string) $table;
@@ -156,7 +146,7 @@ class Advertisement extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function severity(): string
+	public function severity()
 	{
 		return static::SEVERITY_OPTIONAL;
 	}
@@ -166,7 +156,7 @@ class Advertisement extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function dismissible(): string
+	public function dismissible()
 	{	
 		return static::DISMISSIBLE_NO;
 	}
@@ -174,9 +164,9 @@ class Advertisement extends AdminNotification
 	/**
 	 * Style
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
-	public function style(): string
+	public function style()
 	{
 		return static::STYLE_INFORMATION;
 	}
@@ -184,11 +174,11 @@ class Advertisement extends AdminNotification
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url
+	 * @return	bool
 	 */
-	public function link(): Url
+	public function link()
 	{
-		return Url::internal('app=core&module=promotion&controller=advertisements&filter=ad_filters_pending');
+		return \IPS\Http\Url::internal('app=core&module=promotion&controller=advertisements&filter=ad_filters_pending');
 	}
 	
 	/**
@@ -197,7 +187,7 @@ class Advertisement extends AdminNotification
 	 * @note	This is checked every time the notification shows. Should be lightweight.
 	 * @return	bool
 	 */
-	public function selfDismiss(): bool
+	public function selfDismiss()
 	{
 		return !$this->count();
 	}

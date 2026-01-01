@@ -10,66 +10,55 @@
 
 namespace IPS;
 
+use function class_exists;
+
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use IPS\Session\Store;
-use IPS\Text\Encrypt;
-use Redis as PHPRedis;
-use RedisException;
-use function array_slice;
-use function count;
-use function defined;
-use function stristr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Redis Cache Class
- *
- * @mixin PHPRedis
  */
-class Redis
+class _Redis
 {
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons = array();
+	protected static $multitons = array();
 	
 	/**
 	 * @brief	Connections Store
 	 * @var   \Redis[]
 	 */
-	protected static array $connections = array();
+	protected static $connections = array();
 	
 	/**
 	 * @brief	Default expiration for keys in seconds
 	 */
-	protected static int $ttl = 604800; #7 days
+	protected static $ttl = 604800; #7 days
 	
 	/**
 	 * @brief Log what redis is up to
 	 */
-	public static array $log = array();
+	public static $log = array();
 	
 	/**
-	 * @brief Prefix
+	 * @brief Log what redis is up to
 	 */
-	public ?string $prefix = NULL;
+	public $prefix = NULL;
 	
 	/**
 	 * @brief Unpack the config once
 	 */
-	protected static ?array $config = NULL;
+	protected static $config = NULL;
 	
 	/**
 	 * Writes made
 	 */
-	protected static array $writes = array();
+	protected static $writes = array();
 
 	/**
 	 * @var array
@@ -79,26 +68,26 @@ class Redis
 	/**
 	 * Get instance
 	 *
-	 * @param array|null $configuration	Configuration to use (NULL to use \IPS\REDIS_CONFIG or \IPS\CACHE_CONFIG)
-	 * @param string|null $identifier		Identifier (to support multiple instances)
-	 * @return	Redis
+	 * @param	NULL|array	$configuration	Configuration to use (NULL to use \IPS\REDIS_CONFIG or \IPS\CACHE_CONFIG)
+	 * @param	NULL|string	$identifier		Identifier (to support multiple instances)
+	 * @return	\Redis
 	 */
-	public static function i( array $configuration=NULL, string $identifier=NULL ) : Redis
+	public static function i( $configuration=NULL, $identifier=NULL )
 	{
 		if ( static::$config === NULL )
 		{
-			$config = ( defined( '\IPS\REDIS_CONFIG' ) and REDIS_CONFIG !== NULL ) ? REDIS_CONFIG : CACHE_CONFIG;
+			$config = ( \defined( '\IPS\REDIS_CONFIG' ) and \IPS\REDIS_CONFIG !== NULL ) ? \IPS\REDIS_CONFIG : \IPS\CACHE_CONFIG;
 			static::$config = $configuration ?: json_decode( $config, true );
 		}
 
-		$identifier = $identifier ?: '_MAIN';
+		$identifier = $identifier ? $identifier : '_MAIN';
 		
 		if ( ! isset( static::$multitons[ $identifier ] ) )
 		{
 			static::$multitons[ $identifier ] = new static;
 			
 			/* Set the prefix with the most obvious comment in the world */
-			static::$multitons[ $identifier ]->prefix = SUITE_UNIQUE_KEY . '_';
+			static::$multitons[ $identifier ]->prefix = \IPS\SUITE_UNIQUE_KEY . '_';
 		}
 		
 		/* Return */
@@ -112,31 +101,31 @@ class Redis
 	 */
 	public function __destruct()
 	{
-		if ( DEBUG_LOG and count( static::$writes ) > 50 )
+		if ( \IPS\DEBUG_LOG and \count( static::$writes ) > 50 )
 		{ 
-			$slice = implode( ', ', array_slice( static::$writes, 0, 50 ) );
-			Log::debug( "Large number of Redis writes: " . $slice, 'redis_writes' );
+			$slice = implode( ', ', \array_slice( static::$writes, 0, 50 ) );
+			\IPS\Log::debug( "Large number of Redis writes: " . $slice, 'redis_writes' );
 		}
 	}
 	
 	/**
 	 * @brief	Chosen reader for this session
 	 */
-	protected static ?int $reader = NULL;
+	protected static $reader = NULL;
 	
 	/**
 	 * Connect to Redis
 	 *
-	 * @param string|null $identifier		Identifier
-	 * @return	PHPRedis
-	 * @throws	RedisException	If connection cannot be established
-	 * @throws	BadMethodCallException	If Redis PHP extension is not installed
+	 * @param	string|NULL	$identifier		Identifier
+	 * @return	\Redis
+	 * @throws	\RedisException	If connection cannot be established
+	 * @throws	\BadMethodCallException	If Redis PHP extension is not installed
 	 */
-	public function connection( string $identifier=NULL ): PHPRedis
+	public function connection( $identifier=NULL )
 	{
 		if ( ! class_exists('Redis') )
 		{
-			throw new BadMethodCallException;
+			throw new \BadMethodCallException;
 		}
 		
 		$useConfig = NULL;
@@ -151,7 +140,7 @@ class Redis
 			{
 				if ( static::$reader === NULL )
 				{
-					static::$reader = rand( 0, count( static::$config['read'] ) - 1 );
+					static::$reader = rand( 0, \count( static::$config['read'] ) - 1 );
 				}
 				
 				$useConfig = static::$config['read'][ static::$reader ];
@@ -175,7 +164,7 @@ class Redis
 		{
 			try
 			{
-				static::$connections[ $identifier ] = new PHPRedis;
+				static::$connections[ $identifier ] = new \Redis;
 
 				/* Track connection requests */
 				if ( ! isset( static::$connectionAttempts[ $identifier ] ) )
@@ -195,7 +184,7 @@ class Redis
 				if( @static::$connections[ $identifier ]->connect( $useConfig['server'], $useConfig['port'], 1, '', 500 ) === FALSE ) # Connect with a 1 second timeout, and 500ms between connection attempts
 				{
 					unset( static::$connections[ $identifier ] );
-					throw new RedisException('CANNOT_CONNECT');
+					throw new \RedisException('CANNOT_CONNECT');
 				}
 				else
 				{
@@ -204,33 +193,33 @@ class Redis
 						if( static::$connections[ $identifier ]->auth( $useConfig['password'] ) === FALSE )
 						{
 							unset( static::$connections[ $identifier ] );
-							throw new RedisException;
+							throw new \RedisException;
 						}
 					}
 				}
 				
 				if( static::$connections[ $identifier ] !== NULL )
 				{
-					static::$connections[ $identifier ]->setOption( PHPRedis::OPT_SERIALIZER, PHPRedis::SERIALIZER_NONE );
-					static::$connections[ $identifier ]->setOption( PHPRedis::OPT_PREFIX, $this->prefix );
+					static::$connections[ $identifier ]->setOption( \Redis::OPT_SERIALIZER, \Redis::SERIALIZER_NONE );
+					static::$connections[ $identifier ]->setOption( \Redis::OPT_PREFIX, $this->prefix );
 				}
 				
 				/* If connection times out, connect can return TRUE and we won't know until our next attempt to talk to the server,
 					so we should ping now to verify we were able to connect successfully */
 				static::$connections[ $identifier ]->ping();
 				
-				if (REDIS_LOG)
+				if ( \IPS\REDIS_LOG )
 				{
 					static::$log[ sprintf( '%.4f', microtime(true) ) ] = array( 'redis', "Redis connected (" . $identifier . ' ' . $useConfig['server'] . ")"  );
 				}
 
-				if ( count( static::$connections ) === 1 ) # Only set the shutdown function if this is the first connection so we don't get multiple shutdown functions
+				if ( \count( static::$connections ) === 1 ) # Only set the shutdown function if this is the first connection so we don't get multiple shutdown functions
 				{
 					register_shutdown_function( function( $object ){
 						try
 						{
 							/* First we have to make sure sessions have written */
-							if( Store::i() instanceof Store\Redis)
+							if( \IPS\Session\Store::i() instanceof \IPS\Session\Store\Redis )
 							{
 								session_write_close();
 							}
@@ -243,11 +232,11 @@ class Redis
 							/* Reset stored connections so they can be re-connected correctly if tasks run after this shutdown proceses */
 							static::$connections = array();
 						}
-						catch( RedisException $e ){}
+						catch( \RedisException $e ){}
 					}, $this );
 				}
 			}
-			catch( RedisException $e )
+			catch( \RedisException $e )
 			{
 				/* Unset this connection */
 				if ( isset( static::$connections[ $identifier ] ) )
@@ -261,7 +250,7 @@ class Redis
 
 		if( !isset( static::$connections[ $identifier ] ) )
 		{
-			throw new RedisException('CANNOT_CONNECT');
+			throw new \RedisException('CANNOT_CONNECT');
 		}
 		
 		return static::$connections[ $identifier ];
@@ -270,23 +259,23 @@ class Redis
 	/**
 	 * Call methods
 	 *
-	 * @param string $method	Method
+	 * @param	string	$method	Method
 	 * @param	mixed	$args	Arguments
 	 * @return	mixed
 	 */
-	public function __call( string $method, mixed $args )
+	public function __call( $method, $args )
 	{
 		if ( method_exists( 'Redis', $method ) )
 		{
-			$type = ( stristr( $method, 'get' ) or stristr( $method, 'RevRange' ) or $method === 'lRange' ) ? 'read' : 'write';
+			$type = ( \stristr( $method, 'get' ) or \stristr( $method, 'RevRange' ) or $method === 'lRange' ) ? 'read' : 'write';
 			$return = $this->connection( $type )->$method( ...$args );
 			
-			if ( $type === 'write' and count( $args ) )
+			if ( $type === 'write' and \count( $args ) )
 			{
 				static::$writes[] = $args[0];
 			}
 			
-			if ( REDIS_LOG and count( $args ) )
+			if ( \IPS\REDIS_LOG and \count( $args ) )
 			{
 				if ( preg_match( '#^[a-f0-9]{32}_str__#', $args[0] ) )
 				{
@@ -297,27 +286,26 @@ class Redis
 			}
 			
 			return $return;
-		}
-		return null;
+		}	
 	}
 	
 	/**
 	 * Add one or more members to a sorted set or update its score if it already exists
 	 * Overloaded here so it can add a TTL to prevent permanent keys
 	 *
-	 * @param string $key	Key
-	 * @param float $score	Score
-	 * @param string $value	Value
-	 * @param int|null $ttl	TTL in seconds
-	 * @return int	1 if the element is added. 0 otherwise.
+	 * @param	string		$key	Key
+	 * @param	float		$score	Score
+	 * @param	string		$value	Value
+	 * @param	int|NULL	$ttl	TTL in seconds
+	 * @return	1 if the element is added. 0 otherwise.
 	 */
-	public function zAdd( string $key, float $score, string $value, int $ttl=NULL ): int
+	public function zAdd( $key, $score, $value, $ttl=NULL )
 	{
 		$return = $this->connection('write')->zAdd( $this->key( $key ), $score, $value );
 		
-		$this->connection('write')->expire( $this->key( $key ), ( $ttl ?: static::$ttl ) );
+		$this->connection('write')->expire( $this->key( $key ), ( $ttl ? $ttl : static::$ttl ) );
 		
-		if (REDIS_LOG)
+		if ( \IPS\REDIS_LOG )
 		{
 			static::$log[ sprintf( '%.4f', microtime(true) ) ] = array( 'redis', "(write) zAdd " . $key . " = " . $return, json_encode( $value ) );
 		}
@@ -329,18 +317,18 @@ class Redis
 	 * Fills in a whole hash. Non-string values are converted to string, using the standard (string) cast. NULL values are stored as empty strings.
 	 * Overloaded here so it can add a TTL to prevent permanent keys
 	 *
-	 * @param string $key	Key
-	 * @param array $value	Value
-	 * @param int|null $ttl	TTL in seconds
+	 * @param	string		$key	Key
+	 * @param	array		$value	Value
+	 * @param	int|NULL	$ttl	TTL in seconds
 	 * @return	boolean
 	 */
-	public function hMSet( string $key, array $value, int $ttl=NULL ): bool
+	public function hMSet( $key, $value, $ttl=NULL )
 	{
 		$return = $this->connection('write')->hMSet( $this->key( $key ), $value );
 		
-		$this->connection('write')->expire( $this->key( $key ), ( $ttl ?: static::$ttl ) );
+		$this->connection('write')->expire( $this->key( $key ), ( $ttl ? $ttl : static::$ttl ) );
 		
-		if (REDIS_LOG)
+		if ( \IPS\REDIS_LOG )
 		{
 			static::$log[ sprintf( '%.4f', microtime(true) ) ] = array( 'redis', "(write) hMSet " . $key . " = " . $return, json_encode( $value ) );
 		}
@@ -352,16 +340,16 @@ class Redis
 	 * Set the string value in argument as value of the key, with a time to live
 	 * Overloaded here so it can be logged
 	 *
-	 * @param string $key	Key
-	 * @param int|null $ttl	TTL in seconds
-	 * @param string $value	Value
+	 * @param	string		$key	Key
+	 * @param	int|NULL	$ttl	TTL in seconds
+	 * @param	string		$value	Value
 	 * @return	boolean
 	 */
-	public function setEx( string $key, ?int $ttl, string $value ): bool
+	public function setEx( $key, $ttl, $value )
 	{
 		$return = $this->connection('write')->setEx( $this->key( $key ), $ttl, $value );
 		
-		if (REDIS_LOG)
+		if ( \IPS\REDIS_LOG )
 		{
 			static::$log[ sprintf( '%.4f', microtime(true) ) ] = array( 'redis', "(write) setEx " . $key . "  = " . $return, json_encode( $value ) );
 		}
@@ -373,11 +361,11 @@ class Redis
 	 * Sort the elements in a list, set or sorted set.
 	 * Overloaded here so we can adjust the key
 	 *
-	 * @param string $key		Key
-	 * @param array $options	Options: array(key => value, ...) - optional
-	 * @return	array|int
+	 * @param	string		$key		Key
+	 * @param	array		$options	Options: array(key => value, ...) - optional
+	 * @return	array
 	 */
-	public function sort( string $key, array $options=array() ): array|int
+	public function sort( $key, $options=array() )
 	{
 		$return = $this->connection('write')->sort( $this->key( $key ), $options );
 		
@@ -386,7 +374,7 @@ class Redis
 			$this->connection('write')->expire( $this->key( $options['store'] ), ( isset( $options['ttl'] ) and $options['ttl'] ) ? $options['ttl'] : static::$ttl );
 		}
 		
-		if (REDIS_LOG)
+		if ( \IPS\REDIS_LOG )
 		{
 			static::$log[ sprintf( '%.4f', microtime(true) ) ] = array( 'redis', "(write) sort " . $key, json_encode( $return ) );
 		}
@@ -398,15 +386,15 @@ class Redis
 	 * Returns the whole hash, as an array of strings indexed by strings.
 	 * Overloaded here so it can be logged
 	 *
-	 * @param string $key	Key
+	 * @param	string		$key	Key
 	 * @return	array
 	 */
-	public function hGetAll( string $key ): array
+	public function hGetAll( $key )
 	{
 		/* Make sure we read */
 		$return = $this->connection('read')->hGetAll( $this->key( $key ) );
 		
-		if (REDIS_LOG)
+		if ( \IPS\REDIS_LOG )
 		{
 			static::$log[ sprintf( '%.4f', microtime(true) ) ] = array( 'redis', "(read) hGetAll " . $key, json_encode( $return ) );
 		}
@@ -418,10 +406,10 @@ class Redis
 	 * Publish a message to Redis PubSub
 	 * 
 	 * @param 	string 		$key		The message key
-	 * @param mixed  $value 		The payload
+	 * @param 	mixed 		$value 		The payload
 	 * @param 	boolean		$encrypted	Should the payload be encrypted? Has no effect in non-CiC environments.
 	 */
-	public function publish(string $key, mixed $value=array(), bool $encrypted=FALSE ) :int
+	public function publish( string $key, $value=array(), bool $encrypted=FALSE ) :int
 	{
 		return $this->connection('write')->publish( $key, $this->encode($value, $encrypted) );
 	}
@@ -430,18 +418,18 @@ class Redis
 	 * Increments the score of a member from a sorted set by a given amount.
 	 * Overloaded here so it can be logged and a ttl set
 	 *
-	 * @param string $key	Key
-	 * @param int $inc	Value to increment
-	 * @param string $value	Value
-	 * @param int|null $ttl	TTL in seconds
+	 * @param	string		$key	Key
+	 * @param	int			$inc	Value to increment
+	 * @param	string		$value	Value
+	 * @param	int|NULL	$ttl	TTL in seconds
 	 * @return	boolean
 	 */
-	public function zIncrBy( string $key, int $inc, string $value, int $ttl=NULL ): bool
+	public function zIncrBy( $key, $inc, $value, $ttl=NULL )
 	{
 		$return = $this->connection('write')->zIncrBy( $this->key( $key ), $inc, $value );
-		$this->connection('write')->expire( $this->key( $key ), ( $ttl ?: static::$ttl ) );
+		$this->connection('write')->expire( $this->key( $key ), ( $ttl ? $ttl : static::$ttl ) );
 		
-		if (REDIS_LOG)
+		if ( \IPS\REDIS_LOG )
 		{
 			static::$log[ sprintf( '%.4f', microtime(true) ) ] = array( 'redis', "(write) zIncrBy " . $key . "  = " . $return, json_encode( $value ) );
 		}
@@ -452,10 +440,10 @@ class Redis
 	/**
 	 * Strip prefixes from keys as PHP redis will handle this
 	 *
-	 * @param string $key	Key
+	 * @param	string	$key	Key
 	 * @return	string
 	 */
-	protected function key( string $key ): string
+	protected function key( $key )
 	{
 		if ( $this->prefix )
 		{
@@ -472,14 +460,13 @@ class Redis
 	 * Encode
 	 *
 	 * @param	mixed	$value	Value
-	 * @param bool $encryptIfCic Encrypt for CiC
 	 * @return	string
 	 */
-	public function encode(mixed $value, bool $encryptIfCic=TRUE ): string
+	public function encode( $value, $encryptIfCic=TRUE )
 	{
-		if ( CIC && $encryptIfCic )
+		if ( \IPS\CIC && $encryptIfCic )
 		{
-			return Encrypt::fromPlaintext( json_encode( $value ) )->tag();
+			return \IPS\Text\Encrypt::fromPlaintext( json_encode( $value ) )->tag();
 		}
 		else
 		{
@@ -493,15 +480,15 @@ class Redis
 	 * @param	mixed	$value	Value
 	 * @return	mixed
 	 */
-	public function decode( mixed $value ): mixed
+	public function decode( $value )
 	{
-		if (CIC)
+		if ( \IPS\CIC )
 		{
-			$decoded = json_decode( Encrypt::fromTag( $value )->decrypt(), TRUE );
+			$decoded = json_decode( \IPS\Text\Encrypt::fromTag( $value )->decrypt(), TRUE );
 			
 			if( $decoded === NULL )
 			{
-				throw new RedisException('DECODE_ERROR');
+				throw new \RedisException('DECODE_ERROR');
 			}
 		}
 		else
@@ -515,22 +502,22 @@ class Redis
 	/**
 	 * Reset connection
 	 *
-	 * @param	RedisException|NULL	$e	If this was called as a result of an exception, log that to the debug log
+	 * @param	\RedisException|NULL	$e	If this was called as a result of an exception, log that to the debug log
 	 * @return void
 	 */
-	public function resetConnection( RedisException $e = NULL ) : void
+	public function resetConnection( \RedisException $e = NULL )
 	{
 		$message = '';
 
 		if ( $e !== NULL )
 		{
 			$message = $e->getMessage();
-			Log::debug( $e, 'redis_exception' );
+			\IPS\Log::debug( $e, 'redis_exception' );
 		}
 
 		static::$multitons = array();
 		
-		if (REDIS_LOG)
+		if ( \IPS\REDIS_LOG )
 		{
 			static::$log[ microtime() ] = array( 'redis', "Redis connections reset " . $message );
 		}
@@ -541,9 +528,9 @@ class Redis
 	 *
 	 * @return	bool
 	 */
-	public function test(): bool
+	public function test()
 	{
-		return (bool) count( static::$connections );
+		return ( \count( static::$connections ) ) ? TRUE : FALSE;
 	}
 
 	/**
@@ -553,11 +540,11 @@ class Redis
 	 * @param string $pattern Pattern (* to fetch all)
 	 * @param boolean $keyNamesOnly Return names only
 	 * @return    array
-	 * @throws RedisException
+	 * @throws \RedisException
 	 */
-	public function debugGetKeys( string $pattern='*', bool $keyNamesOnly=FALSE ): array
+	public function debugGetKeys( $pattern='*', $keyNamesOnly=FALSE )
 	{
-		$this->connection('write')->setOption( PHPRedis::OPT_SCAN, PHPRedis::SCAN_RETRY );
+		$this->connection('write')->setOption( \Redis::OPT_SCAN, \Redis::SCAN_RETRY );
 		
 		$return = array();
 		$iterator = NULL;
@@ -573,31 +560,31 @@ class Redis
 				{
 					$key = $this->key( $key );
 					$type = $this->connection('write')->type( $key );
-					$ttl = $this->ttl( $key );
+					$ttl = \IPS\Redis::i()->ttl( $key );
 
 					switch( $type )
 					{
-						case PHPRedis::REDIS_STRING:
+						case \Redis::REDIS_STRING:
 							if ( mb_stristr( $key, '_pg__page_' ) )
 							{
-								$return[ $key . ' (TTL: ' . $ttl . ')' ] =  @gzdecode( Encrypt::fromCipher(  $this->get( $key ) )->decrypt() );
+								$return[ $key . ' (TTL: ' . $ttl . ')' ] =  @gzdecode( \IPS\Text\Encrypt::fromCipher(  \IPS\Redis::i()->get( $key ) )->decrypt() );
 							}
 							else
 							{
-								$return[ $key . ' (TTL: ' . $ttl . ')' ] = Redis::i()->decode( $this->connection('write')->get( $key ) );
+								$return[ $key . ' (TTL: ' . $ttl . ')' ] = \IPS\Redis::i()->decode( $this->connection('write')->get( $key ) );
 							}
 						break;
-						case PHPRedis::REDIS_ZSET:
+						case \Redis::REDIS_ZSET:
 							$return[ $key . ' (TTL: ' . $ttl . ')' ] = $this->connection('write')->zRange( $key, 0, -1, TRUE );
 						break;
-						case PHPRedis::REDIS_HASH:
+						case \Redis::REDIS_HASH:
 							$return[ $key . ' (TTL: ' . $ttl . ')' ] = $this->connection('write')->hGetAll( $key );
 							if ( isset( $return[ $key . ' (TTL: ' . $ttl . ')' ]['data'] ) )
 							{
-								$return[ $key . ' (TTL: ' . $ttl . ')' ]['data'] = Redis::i()->decode( $return[ $key . ' (TTL: ' . $ttl . ')' ]['data'] );
+								$return[ $key . ' (TTL: ' . $ttl . ')' ]['data'] = \IPS\Redis::i()->decode( $return[ $key . ' (TTL: ' . $ttl . ')' ]['data'] );
 							}
 						break;
-						case PHPRedis::REDIS_LIST:
+						case \Redis::REDIS_LIST:
 							$return[ $key . ' (TTL: ' . $ttl . ')' ] = $this->connection('write')->lRange( $key, 0, -1 );
 						break;
 					}

@@ -11,131 +11,83 @@
 namespace IPS\Output;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use DirectoryIterator;
-use Exception;
-use Garfix\JsMinify\Minifier;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Dispatcher;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\IPS;
-use IPS\Lang;
-use IPS\Output;
-use IPS\Patterns\ActiveRecord;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use RuntimeException;
-use UnderflowException;
-use XMLReader;
-use XMLWriter;
-use function array_merge;
-use function chmod;
-use function count;
-use function defined;
-use function explode;
-use function file;
-use function file_exists;
-use function file_get_contents;
-use function file_put_contents;
-use function implode;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_dir;
-use function is_file;
-use function is_string;
-use function json_encode;
-use function mb_strtolower;
-use function md5;
-use function mkdir;
-use function preg_match;
-use function rtrim;
-use function str_ends_with;
-use function substr;
-use function unlink;
-use function urlencode;
-use const IPS\CACHEBUST_KEY;
-use const IPS\IPS_FILE_PERMISSION;
-use const IPS\IPS_FOLDER_PERMISSION;
-use const IPS\ROOT_PATH;
-use const LOCK_EX;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Javascript: Javascript handler
  */
-class Javascript extends ActiveRecord
+class _Javascript extends \IPS\Patterns\ActiveRecord
 {
 	/**
 	 * @brief	[Javascript]	Array of found javascript keys and objects
 	 */
-	protected static array $foundJsObjects = array();
+	protected static $foundJsObjects = array();
 	
 	/**
 	 * @brief	[Javascript]	Position index for writing javascript to core_javascript
 	 */
-	protected static array $positions = array();
+	protected static $positions = array();
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 	
 	/**
 	 * @brief	[ActiveRecord] Database Table
 	 */
-	public static ?string $databaseTable = 'core_javascript';
+	public static $databaseTable = 'core_javascript';
 	
 	/**
 	 * @brief	[ActiveRecord] Database Prefix
 	 */
-	public static string $databasePrefix = 'javascript_';
+	public static $databasePrefix = 'javascript_';
 
 	/**
 	 * @brief	Javascript map of file object URLs
 	 */
-	protected static ?array $javascriptObjects = null;
+	protected static $javascriptObjects = null;
 		
 	/**
 	 * Find JavaScript file
 	 *
-	 * @param string $app			Application key or Plugin key
-	 * @param string $location		Location (front, admin, etc)
-	 * @param string $path			Path
-	 * @param string $name			Filename
-	 * @return    Javascript
-	 * @throws	OutOfRangeException
+	 * @param	string $app			Application key or Plugin key
+	 * @param	string $location		Location (front, admin, etc)
+	 * @param	string $path			Path
+	 * @param	string $name			Filename
+	 * @return	\IPS\Output\Javascript
+	 * @throws	\OutOfRangeException
 	 */
-	public static function find( string $app, string $location, string $path, string $name ): Javascript
+	public static function find( $app, $location, $path, $name )
 	{
 		$key = md5( $app . '-' . $location . '-' . $path . '-' . $name );
 		
-		if ( !in_array( $key, static::$foundJsObjects ) )
+		if ( !\in_array( $key, static::$foundJsObjects ) )
 		{
 			$where  = array( 'javascript_app=?', 'javascript_location=?', 'javascript_path=?', 'javascript_name=?' );
 			
-			$bindings = array( $app, $location, $path, $name );
-
+			if ( !\is_string( $app ) )
+			{
+				$where[]  = 'javascript_plugin=?';
+				$bindings = array( 'core', 'plugins', '/', $name, $app );
+			}
+			else
+			{
+				$bindings = array( $app, $location, $path, $name );
+			}
 			
 			try
 			{
-				$js = Db::i()->select( '*', 'core_javascript', array_merge( array( implode( ' AND ', $where ) ), $bindings ) )->first();
+				$js = \IPS\Db::i()->select( '*', 'core_javascript', array_merge( array( implode( ' AND ', $where ) ), $bindings ) )->first();
 				static::$foundJsObjects[ $key ] = parent::constructFromData( $js );
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
-				throw new OutOfRangeException;
+				throw new \OutOfRangeException;
 			}
 		}
 		
@@ -147,15 +99,15 @@ class Javascript extends ActiveRecord
 	 *
 	 * @return void
 	 */
-	protected function setAppOrPluginProperties() : void
+	protected function setAppOrPluginProperties()
 	{
-		if ( ( $this->app AND !is_string( $this->app ) ) OR ( $this->plugin ) )
+		if ( ( $this->app AND !\is_string( $this->app ) ) OR ( $this->plugin ) )
 		{
 			$this->app		= 'core';
 			$this->location	= 'plugins';
 			$this->path		= '/';
 			$this->type		= 'plugin';
-			$this->plugin	= ( !is_string( $this->app ) ) ? $this->app : $this->plugin;
+			$this->plugin	= ( !\is_string( $this->app ) ) ? $this->app : $this->plugin;
 		}
 	}
 	
@@ -164,11 +116,11 @@ class Javascript extends ActiveRecord
 	 * If a $this->app is not a string, then it will assume plugin and automatically determine the correct 'app', 'location' and 'path' so these do not need to
 	 * be defined.
 	 * 
-	 * @return    void
-	 *@throws	RuntimeException
-	 * @throws	InvalidArgumentException
+	 * @throws	\InvalidArgumentException
+	 * @throws	\RuntimeException
+	 * @return	void
 	 */
-	public function save(): void
+	public function save()
 	{
 		$this->setAppOrPluginProperties();
 
@@ -179,7 +131,7 @@ class Javascript extends ActiveRecord
 		
 		if ( ! $this->app OR ! $this->location OR ! $this->name )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 		
 		if ( ! $this->type )
@@ -189,9 +141,15 @@ class Javascript extends ActiveRecord
 
 		$key = '';
 
-		Db::i()->insert( 'core_javascript', array(
+		if ( \IPS\IN_DEV AND $this->type == 'plugin' )
+		{
+			$key = md5( $this->app . ';' . $this->location . ';' . $this->path . ';' . $this->name );
+		}
+
+		\IPS\Db::i()->insert( 'core_javascript', array(
 			'javascript_app'		=> $this->app,
 			'javascript_location'	=> $this->location,
+			'javascript_plugin'		=> $this->plugin,
 			'javascript_path'		=> $this->path,
 			'javascript_name'		=> $this->name,
 			'javascript_type'		=> $this->type,
@@ -206,10 +164,10 @@ class Javascript extends ActiveRecord
 	 * Delete a javascript file
 	 * be defined.
 	 * 
+	 * @throws	\InvalidArgumentException
 	 * @return	void
-	 *@throws	InvalidArgumentException
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		$this->setAppOrPluginProperties();
 	
@@ -220,7 +178,7 @@ class Javascript extends ActiveRecord
 		
 		if ( ! $this->app OR ! $this->location OR ! $this->name )
 		{
-			throw new InvalidArgumentException;
+			throw new \InvalidArgumentException;
 		}
 		
 		if ( ! $this->type )
@@ -228,23 +186,46 @@ class Javascript extends ActiveRecord
 			$this->type = static::_getType( $this->path, $this->name );
 		}
 		
+		if ( \IPS\IN_DEV AND $this->location == 'plugins' )
+		{
+			try
+			{
+				$plugin = \IPS\Plugin::load( $this->plugin );
+
+				/* Write the file to disk in the correct location */
+				$file = \IPS\ROOT_PATH . '/plugins/' . $plugin->location . '/dev/js/' . $this->name;
+					
+				if ( \is_file( $file ) )
+				{
+					\unlink( $file );
+				}
+			}
+			catch( \OutOfRangeException $e ) {}
+		}
+		
 		$_where    = "javascript_app=? AND javascript_location=? AND javascript_path=? AND javascript_name=?";
 		$where = array( $this->app, $this->location, $this->path, $this->name );
 
+		if ( $this->location == 'plugins' )
+		{
+			$_where    .= " AND javascript_plugin=?";
+			$where = array_merge( $where, array( $this->plugin ) );
+		}
+
 		array_unshift( $where, $_where );
 
-		Db::i()->delete( 'core_javascript', $where );
+		\IPS\Db::i()->delete( 'core_javascript', $where );
 	}
 	
 	/**
 	 * Create an XML document
 	 *
-	 * @param string $app		Application
-	 * @param array $current	Details about current javascript.xml file. Used if $changes is desired to be tracked
-	 * @param array|null $changes	If set, will set details of any changes by reference
-	 * @return	XMLWriter
+	 * @param	string	$app		Application
+	 * @param	array	$current	Details about current javascript.xml file. Used if $changes is desired to be tracked
+	 * @param	array	$changes	If set, will set details of any changes by reference
+	 * @return	object
 	 */
-	public static function createXml( string $app, array $current = array(), array &$changes = NULL ): XMLWriter
+	public static function createXml( $app, $current = array(), &$changes = NULL )
 	{
 		static::importDev($app);
 		
@@ -254,7 +235,7 @@ class Javascript extends ActiveRecord
 		}
 		
 		/* Build XML and write to app directory */
-		$xml = new XMLWriter;
+		$xml = new \XMLWriter;
 		$xml->openMemory();
 		$xml->setIndent( TRUE );
 		$xml->startDocument( '1.0', 'UTF-8' );
@@ -266,14 +247,14 @@ class Javascript extends ActiveRecord
 		$xml->endAttribute();
 		
 		/* Loop */
-		foreach ( Db::i()->select( '*', 'core_javascript', ( $app === 'core' ) ? Db::i()->in( 'javascript_app', array('core', 'global') ) : array( 'javascript_app=?', $app ), 'javascript_path, javascript_location, javascript_name' ) as $js )
+		foreach ( \IPS\Db::i()->select( '*', 'core_javascript', ( $app === 'core' ) ? \IPS\Db::i()->in( 'javascript_app', array('core', 'global') ) : array( 'javascript_app=?', $app ), 'javascript_path, javascript_location, javascript_name' ) as $js )
 		{
 			/* Initiate the <template> tag */
 			$xml->startElement('file');
 			$attributes = array();
 			foreach( $js as $k => $v )
 			{
-				if ( in_array( substr( $k, 11 ), array('app', 'location', 'path', 'name', 'type', 'version', 'position' ) ) )
+				if ( \in_array( \substr( $k, 11 ), array('app', 'location', 'path', 'name', 'type', 'version', 'position' ) ) )
 				{
 					$attributes[ $k ] = $v;
 					$xml->startAttribute( $k );
@@ -313,7 +294,7 @@ class Javascript extends ActiveRecord
 			unset( $current['files'][ $k ] );
 		}
 
-		if( count( static::$_orders ) )
+		if( \count( static::$_orders ) )
 		{
 			foreach( static::$_orders as $_app => $orderArray )
 			{
@@ -368,14 +349,14 @@ class Javascript extends ActiveRecord
 	/**
 	 * Import from an XML file on disk
 	 * 
-	 * @param string $file	File to import from (can be from applications dir, or tmp uploaded file)
-	 * @param int|null $offset Offset to begin import from
-	 * @param int|null $limit	Number of rows to import
+	 * @param	string		$file	File to import from (can be from applications dir, or tmp uploaded file)
+	 * @param	int|null	$offset Offset to begin import from
+	 * @param	int|null	$limit	Number of rows to import
 	 * @return	bool|int	False if the file is invalid, otherwise the number of rows inserted
 	 */
-	public static function importXml( string $file, int $offset=null, int $limit=null ): bool|int
+	public static function importXml( $file, $offset=null, $limit=null )
 	{
-		if ( ! is_file( $file ) )
+		if ( ! \is_file( $file ) )
 		{
 			return false;
 		}
@@ -406,17 +387,17 @@ class Javascript extends ActiveRecord
 		/* Remove existing elements */
 		if( $offset === null or $offset === 0 )
 		{
-			Db::i()->delete( 'core_javascript', array( 'javascript_app=?', $app ) );
+			\IPS\Db::i()->delete( 'core_javascript', array( 'javascript_app=? and (javascript_plugin is null or javascript_plugin=?)', $app, '' ) );
 
 			if ( $app === 'core' )
 			{
-				Db::i()->delete( 'core_javascript', array( 'javascript_app=?', 'global' ) );
+				\IPS\Db::i()->delete( 'core_javascript', array( 'javascript_app=?', 'global' ) );
 			}
 		}
 		
 		while( $xml->read() )
 		{
-			if( $xml->nodeType != XMLReader::ELEMENT )
+			if( $xml->nodeType != \XMLReader::ELEMENT )
 			{
 				continue;
 			}
@@ -442,9 +423,10 @@ class Javascript extends ActiveRecord
 			if( $xml->name == 'file' )
 			{
 				/* We have a unique key on app, location, path, name so we use replace into to prevent duplicates */
-				Db::i()->replace( 'core_javascript', array(
+				\IPS\Db::i()->replace( 'core_javascript', array(
 					'javascript_app'		=> $xml->getAttribute('javascript_app'),
 					'javascript_key'        => '',
+					'javascript_plugin'		=> '',
 					'javascript_location'	=> $xml->getAttribute('javascript_location'),
 					'javascript_path'		=> $xml->getAttribute('javascript_path'),
 					'javascript_name'		=> $xml->getAttribute('javascript_name'),
@@ -467,33 +449,31 @@ class Javascript extends ActiveRecord
 	/**
 	 * Export Javascript to /dev/js
 	 *
-	 * @param string $app		 Application Directory
+	 * @param	string	$app		 Application Directory
 	 * @return	void
-	 * @throws	RuntimeException
+	 * @throws	\RuntimeException
 	 */
-	public static function exportDev( string $app ) : void
+	public static function exportDev( $app )
 	{
-		/* Commenting this out because I cannot find this method anywhere in the codebase */
-		/*try
+		try
 		{
-			Developer::writeDirectory( $app, 'js' );
+			\IPS\Developer::writeDirectory( $app, 'js' );
 		}
-		catch( RuntimeException $e )
+		catch( \RuntimeException $e )
 		{
-			throw new RuntimeException( $e->getMessage() );
-		}*/
+			throw new \RuntimeException( $e->getMessage() );
+		}
 	
-		foreach( Db::i()->select( '*', 'core_javascript', array( 'javascript_app=?', $app ) )->setKeyField('javascript_id') as $jsId => $js )
+		foreach( \IPS\Db::i()->select( '*', 'core_javascript', array( 'javascript_app=?', $app ) )->setKeyField('javascript_id') as $jsId => $js )
 		{
-			$pathToWrite = $js['javascript_location'];
-			/*try
+			try
 			{
-				$pathToWrite = Developer::writeDirectory( $app, 'js/', $js['javascript_location'] );
+				$pathToWrite = \IPS\Developer::writeDirectory( $app, 'js/', $js['javascript_location'] );
 			}
-			catch( RuntimeException $e )
+			catch( \RuntimeException $e )
 			{
-				throw new RuntimeException( $e->getMessage() );
-			}*/
+				throw new \RuntimeException( $e->getMessage() );
+			}
 	
 			if ( $js['javascript_path'] != '/' )
 			{
@@ -502,22 +482,21 @@ class Javascript extends ActiveRecord
 				foreach( explode( '/', trim( $js['javascript_path'], '/' ) ) as $dir )
 				{
 					$_path .= '/' . trim( $dir, '/' );
-					$pathToWrite = 'js/' . $js['javascript_location'] . $_path;
 						
-					/*try
+					try
 					{
-						$pathToWrite = Developer::writeDirectory( $app, 'js/' . $js['javascript_location'] . $_path );
+						$pathToWrite = \IPS\Developer::writeDirectory( $app, 'js/' . $js['javascript_location'] . $_path );
 					}
-					catch( RuntimeException $e )
+					catch( \RuntimeException $e )
 					{
-						throw new RuntimeException( $e->getMessage() );
-					}*/
+						throw new \RuntimeException( $e->getMessage() );
+					}
 				}
 			}
 	
-			if ( ! @file_put_contents( $pathToWrite . '/' . $js['javascript_name'], $js['javascript_content'] ) )
+			if ( ! @\file_put_contents( $pathToWrite . '/' . $js['javascript_name'], $js['javascript_content'] ) )
 			{
-				throw new RuntimeException('core_theme_dev_cannot_write_js,' . $pathToWrite . '/' . $js['javascript_name']);
+				throw new \RuntimeException('core_theme_dev_cannot_write_js,' . $pathToWrite . '/' . $js['javascript_name']);
 			}
 			else
 			{
@@ -526,14 +505,14 @@ class Javascript extends ActiveRecord
 		}
 
 		/* Open XML file */
-		if( file_exists( ROOT_PATH . '/applications/' . $app . '/data/javascript.xml' ) )
+		if( file_exists( \IPS\ROOT_PATH . '/applications/' . $app . '/data/javascript.xml' ) )
 		{
-			$xml = \IPS\Xml\XMLReader::safeOpen( ROOT_PATH . '/applications/' . $app . '/data/javascript.xml' );
+			$xml = \IPS\Xml\XMLReader::safeOpen( \IPS\ROOT_PATH . '/applications/' . $app . '/data/javascript.xml' );				
 			$xml->read();
 
 			while( $xml->read() )
 			{
-				if( $xml->nodeType != XMLReader::ELEMENT )
+				if( $xml->nodeType != \XMLReader::ELEMENT )
 				{
 					continue;
 				}
@@ -544,7 +523,7 @@ class Javascript extends ActiveRecord
 					$app = $xml->getAttribute('app');
 					$content = $xml->readString();
 
-					file_put_contents( ROOT_PATH . $path . 'order.txt', $content );
+					file_put_contents( \IPS\ROOT_PATH . $path . 'order.txt', $content );
 				}
 			}
 		}
@@ -553,31 +532,31 @@ class Javascript extends ActiveRecord
 	/**
 	 * @brief	Track order.txt files for writing
 	 */
-	protected static array $_orders = array();
+	protected static $_orders = array();
 
 	/**
 	 * Import JS from dev folders and store into core_javascript
 	 * 
-	 * @param string $app	Application
+	 * @param	string	$app	Application
 	 * @return	void
 	 */
-	public static function importDev( string $app ) : void
+	public static function importDev( $app )
 	{
-		$root = ROOT_PATH . '/applications/' . $app . '/dev/js';
+		$root = \IPS\ROOT_PATH . '/applications/' . $app . '/dev/js';
 		
 		if ( $app == 'global' )
 		{
-			$root = ROOT_PATH . '/dev/js/';
+			$root = \IPS\ROOT_PATH . '/dev/js/';
 		}
 
 		static::$_orders[ $app ]	= array();
 		
 		if ( is_dir( $root ) )
 		{
-			Db::i()->delete( 'core_javascript', array( 'javascript_app=?', $app ) );
+			\IPS\Db::i()->delete( 'core_javascript', array( 'javascript_app=? and javascript_plugin = \'\'', $app ) );
 			static::$positions = array();
 			
-			foreach( new DirectoryIterator( $root ) as $location )
+			foreach( new \DirectoryIterator( $root ) as $location )
 			{
 				if ( $location->isDot() OR mb_substr( $location->getFilename(), 0, 1 ) === '.' )
 				{
@@ -595,18 +574,18 @@ class Javascript extends ActiveRecord
 	/**
 	 * Import a /dev directory recursively.
 	 * 
-	 * @param string $root		Root directory to recurse
-	 * @param string $app		Application key
-	 * @param string $location	Location (front, global, etc)
-	 * @param string $path		Additional path information
+	 * @param	string	$root		Root directory to recurse
+	 * @param	string	$app		Application key
+	 * @param	string	$location	Location (front, global, etc)
+	 * @param   string  $path		Additional path information
 	 * @return	void
 	 */
-	protected static function _importDevDirectory( string $root, string $app, string $location, string $path='' ) : void
+	protected static function _importDevDirectory( $root, $app, $location, $path='' )
 	{
 		$dir       = $root . '/' . $location . '/' . $path;
-		$parentDir = preg_replace( '#^(.*)/([^/]+?)$#', '\2', $dir );
+		$parentDir = preg_replace( '#^(.*)/([^\/]+?)$#', '\2', $dir );
 		
-		if ( file_exists( $dir . '/order.txt' ) )
+		if ( \file_exists( $dir . '/order.txt' ) )
 		{
 			$contents = file_get_contents( $dir . '/order.txt' );
 
@@ -616,9 +595,9 @@ class Javascript extends ActiveRecord
 				$contents = str_replace( "\r\n", "\n", $contents );
 			}
 
-			static::$_orders[ $app ][] = array( 'path' => str_replace( ROOT_PATH, '', $dir ), 'contents' => $contents );
+			static::$_orders[ $app ][] = array( 'path' => str_replace( \IPS\ROOT_PATH, '', $dir ), 'contents' => $contents );
 
-			$order = file( $dir . '/order.txt' );
+			$order = \file( $dir . '/order.txt' );
 			
 			foreach( $order as $item )
 			{
@@ -635,7 +614,7 @@ class Javascript extends ActiveRecord
 			}
 		}
 		
-		foreach ( new DirectoryIterator( $dir ) as $file )
+		foreach ( new \DirectoryIterator( $dir ) as $file )
 		{
 			if ( $file->isDot() || mb_substr( $file->getFilename(), 0, 1 ) === '.' || $file == 'index.html' )
 			{
@@ -648,7 +627,7 @@ class Javascript extends ActiveRecord
 			}
 			else if ( mb_substr( $file->getFileName(), -3 ) === '.js' )
 			{
-				$js = file_get_contents( $dir . '/' . $file->getFilename() );
+				$js = \file_get_contents( $dir . '/' . $file->getFilename() );
 				
 				if ( isset( static::$positions[ $app . '-' . $location . '-' . $file->getFilename() ] ) )
 				{
@@ -673,17 +652,18 @@ class Javascript extends ActiveRecord
 				
 				$path = trim( $path, '/' );
 
-				Db::i()->delete( 'core_javascript', array( 'javascript_app=? AND javascript_location=? AND javascript_path=? AND javascript_name=?', $app, $location, $path, $file->getFileName() ) );
+				\IPS\Db::i()->delete( 'core_javascript', array( 'javascript_app=? AND javascript_location=? AND javascript_path=? AND javascript_name=?', $app, $location, $path, $file->getFileName() ) );
 				
-				Db::i()->insert( 'core_javascript', array(
+				\IPS\Db::i()->insert( 'core_javascript', array(
 						'javascript_app'		=> $app,
 						'javascript_location'	=> $location,
+						'javascript_plugin'		=> '',
 						'javascript_path'		=> $path,
 						'javascript_name'		=> $file->getFileName(),
 						'javascript_type'		=> static::_getType( $dir . '/', $file->getFileName() ),
 						'javascript_content'	=> ( mb_strtolower( mb_substr( PHP_OS, 0, 3 ) ) === 'win' ) ? str_replace( "\r\n", "\n", $js ) : $js,
 						'javascript_position'   => $position,
-						'javascript_version'	=> Application::load( ( $app == 'global' ? 'core' : $app ) )->long_version,
+						'javascript_version'	=> \IPS\Application::load( ( $app == 'global' ? 'core' : $app ) )->long_version,
 						'javascript_key'		=> md5( $app . ';' . $location . ';' . $path . ';' . $file->getFileName() )
 				) );
 			}
@@ -693,14 +673,15 @@ class Javascript extends ActiveRecord
 	/**
 	 * Delete a compiled JS file
 	 * 
-	 * @param string $app		Application
-	 * @param string|null $location	Location (front, global, etc)
-	 * @param string|null $file		File to remove
-	 * @return	void
+	 * @param	string		$app		Application
+	 * @param	string|null	$location	Location (front, global, etc)
+	 * @param	string|null	$file		File to remove
+	 * @return	boolean|null
 	 */
-	public static function deleteCompiled( string $app, string $location=null, string $file=null ): void
+	public static function deleteCompiled( $app, $location=null, $file=null )
 	{
-		$map   = ( isset( Store::i()->javascript_map ) ) ? Store::i()->javascript_map : array();
+		$map   = ( isset( \IPS\Data\Store::i()->javascript_map ) )      ? \IPS\Data\Store::i()->javascript_map      : array();
+		$files = ( isset( \IPS\Data\Store::i()->javascript_file_map ) ) ? \IPS\Data\Store::i()->javascript_file_map : array();
 
 		if ( $location === NULL and $file === NULL )
 		{
@@ -710,9 +691,9 @@ class Javascript extends ActiveRecord
 				{
 					try
 					{
-						File::get( 'core_Theme', $path )->delete();
+						\IPS\File::get( 'core_Theme', $path )->delete();
 					}
-					catch( Exception $e ) { }
+					catch( \Exception $e ) { }
 				}
 				
 				$map[ $app ] = array();
@@ -737,9 +718,9 @@ class Javascript extends ActiveRecord
 					{
 						try
 						{
-							File::get( 'core_Theme', $path )->delete();
+							\IPS\File::get( 'core_Theme', $path )->delete();
 						}
-						catch( Exception $e ) { }
+						catch( \Exception $e ) { }
 						
 						unset( $map[ $app ][ $hash ] );
 					}
@@ -747,186 +728,98 @@ class Javascript extends ActiveRecord
 			}
 		}
 		
-		Store::i()->javascript_map = $map;
-	}
-
-	/**
-	 * Get the URL of the JS language file
-	 *
-	 * @param Lang $language
-	 * @return string
-	 */
-	public static function getLanguageUrl( Lang $language ): string
-	{
-		if ( \IPS\IN_DEV )
-		{
-			return Url::baseUrl() . "/applications/core/interface/js/jslang.php?langId=" . $language->id;
-		}
-		else
-		{
-			if ( $language->file )
-			{
-				try
-				{
-					$fileUrl = Url::createFromString( File::get( 'core_Theme', $language->file )->url );
-					return $fileUrl->setQueryString( 'v', Javascript::javascriptCacheBustKey() );
-				}
-				catch( Exception $e )
-				{
-					/* Best try and write it */
-					$fileUrl = Url::createFromString( File::get( 'core_Theme', (string ) static::writeLanguage( $language ) )->url );
-					return $fileUrl->setQueryString( 'v', Javascript::javascriptCacheBustKey() );
-				}
-			}
-			else
-			{
-				/* Write it */
-				$fileUrl = Url::createFromString( File::get( 'core_Theme', (string ) static::writeLanguage( $language ) )->url );
-				return $fileUrl->setQueryString( 'v', Javascript::javascriptCacheBustKey() );
-			}
-		}
-	}
-
-	/**
-	 * Write the language JS files to the file system
-	 *
-	 * @param Lang $language
-	 * @return File
-	 */
-	public static function writeLanguage( Lang $language ): File
-	{
-		$lang = [];
-
-		foreach ( Db::i()->select( '*', 'core_sys_lang_words', array( 'lang_id=? AND word_js=?', $language->id, TRUE ) ) as $row )
-		{
-			$lang[ $row['word_key'] ] = $row['word_custom'] ?: $row['word_default'];
-		}
-
-		if ( \IPS\IN_DEV )
-		{
-			foreach ( Application::enabledApplications() as $app )
-			{
-				$lang = array_merge( $lang, Lang::readLangFiles( $app->directory, true ) );
-			}
-		}
-
-		$file = static::_writeForFileSystem( 'ips.setString( ' . json_encode( $lang ) . ')', 'js_lang_' . $language->id . '.js', 'global', 'root' );
-
-		Db::i()->update( 'core_sys_lang', [ 'lang_file' => (string) $file ], [ 'lang_id=?', $language->id ] );
-
-		/* Clear the data store, so when it is rebuilt, the rebuild store has the lang_file data in it */
-		if ( isset( Store::i()->languages ) )
-		{
-			unset( Store::i()->languages );
-		}
-
-		return $file;
-	}
-
-	/**
-	 * Remove language files
-	 *
-	 * @param Lang $language
-	 * @return void
-	 */
-	public static function clearLanguage( Lang $language ): void
-	{
-		if ( $language->file )
-		{
-			try
-			{
-				File::get( 'core_Theme', $language->file )->delete();
-			}
-			catch( \IPS\Db\Exception ) { }
-		}
-
-		Db::i()->update( 'core_sys_lang', [ 'lang_file' => '' ], [ 'lang_id=?', $language->id ] );
-
-		/* Clear the data store, so the language file can be rebuilt on the next process */
-		if ( isset( Store::i()->languages ) )
-		{
-			unset( Store::i()->languages );
-		}
+		\IPS\Data\Store::i()->javascript_map = $map;
 	}
 	
 	/**
 	 * Compiles JS into fewer minified files suitable for non IN_DEV use.
 	 * Imports the fewer files into a database for writing out.
 	 * 
-	 * @param string $app		Application
-	 * @param string|null $location	Location (front, global, etc)
-	 * @param string|null $file		File to build
+	 * @param	string		$app		Application
+	 * @param	string|null	$location	Location (front, global, etc)
+	 * @param	string|null	$file		File to build
 	 * @return	boolean|null
 	 */
-	public static function compile( string $app, string $location=null, string $file=null ): ?bool
+	public static function compile( $app, $location=null, $file=null )
 	{
 		$flagKey = 'js_compiling_' . md5( $app . ',' . $location . ',' . $file );
-		if ( Theme::checkLock( $flagKey ) )
+		if ( \IPS\Theme::checkLock( $flagKey ) )
 		{
 			return NULL;
 		}
 
-		Theme::lock( $flagKey );
-
-		$map   = ( isset( Store::i()->javascript_map ) and is_array( Store::i()->javascript_map ) ) ? Store::i()->javascript_map      : array();
-		$files = static::getFileMapStore();
+		\IPS\Theme::lock( $flagKey );
 		
-		if ( $location === null and $file === null and ! in_array( $app, IPS::$ipsApps ) )
+		$map   = ( isset( \IPS\Data\Store::i()->javascript_map ) and \is_array( \IPS\Data\Store::i()->javascript_map ) )           ? \IPS\Data\Store::i()->javascript_map      : array();
+		$files = ( isset( \IPS\Data\Store::i()->javascript_file_map ) and \is_array( \IPS\Data\Store::i()->javascript_file_map ) ) ? \IPS\Data\Store::i()->javascript_file_map : array();
+		
+		if ( $location === null and $file === null )
 		{
 			$map[ $app ]   = array();
 			$files[ $app ] = array();
 			
-			Store::i()->javascript_file_map = $files;
+			\IPS\Data\Store::i()->javascript_file_map = $files;
 		}
 		
 		if ( $app == 'global' )
 		{
 			if ( $location === null and $file === null )
 			{
-				File::getClass('core_Theme')->deleteContainer( 'javascript_' . $app );
+				\IPS\File::getClass('core_Theme')->deleteContainer( 'javascript_' . $app );
 			}
+			
+			if ( mb_substr( $file, 0, 8 ) === 'js_lang_' )
+			{
+				$langId = \intval( mb_substr( $file, 8, -3 ) );
+				
+				if ( $langId > 0 )
+				{
+					/* Write it */
+					$obj = static::_writeJavascriptFromResultset( array( array(
+						'javascript_app'      => 'global',
+						'javascript_location' => 'root',
+						'javascript_path'     => '',
+						'javascript_name'     => $file,
+						'javascript_type'     => 'lang',
+						'javascript_content'  => static::getJavascriptLanguage( $langId ),
+						'javascript_position' => 0
+					) ), $file, 'global', 'root' );
 
-			foreach( Output::$globalJavascript as $fileName )
+					$map[ $app ][ md5( 'global-root-' . $file ) ] = (string) $obj;
+				}
+			}
+			
+			foreach( \IPS\Output::$globalJavascript as $fileName )
 			{			
 				if ( $file === null OR $file == $fileName )
 				{
-					$rows = iterator_to_array( Db::i()->select(
-						'*',
-						'core_javascript', array( 'javascript_app=? AND javascript_location=?', $app, mb_substr( $fileName, 0, -3 ) ),
-						'javascript_app, javascript_location, javascript_position'
-					)->setKeyField('javascript_id') );
-
-					/* Web Components are not loaded along with the rest of dev/js/framework */
-					$locationRows = [];
-					$componentRows = [];
-					foreach ( $rows as $id => $row )
+					if ( $fileName === 'map.js' )
 					{
-						if ( $fileName === 'framework.js' and $row['javascript_type'] === 'component' )
-						{
-							$componentRows[$id] = $row;
-						}
-						else
-						{
-							$locationRows[$id] = $row;
-						}
+						/* Write it */
+						$obj = static::_writeJavascriptFromResultset( array( array(
+							'javascript_app'      => 'global',
+							'javascript_location' => 'root',
+							'javascript_path'     => '',
+							'javascript_name'     => 'map.js',
+							'javascript_type'     => 'framework',
+							'javascript_content'  => static::_getMapAsScript(),
+							'javascript_position' => 0
+						) ), 'map.js', 'global', 'root' );
+
+						$map[ $app ][ md5( 'global-root-map.js' ) ] = (string) $obj;
 					}
-
-					/* Write it */
-					$obj = static::_writeJavascriptFromResultset( $locationRows, $fileName, $app, 'root' );
-
-					$map[ $app ][ md5( $app .'-' . 'root' . '-' . $fileName ) ] = $obj ? (string) $obj : null;
-
-					/* Web Components should have their own file */
-					foreach ( $componentRows as $id => $row )
+					else
 					{
-						$componentName = explode( '.', $row['javascript_name'] )[0];
-						if ( !preg_match( "/^[a-zA-Z][a-zA-Z0-9]*$/", $componentName ) )
-						{
-							continue;
-						}
-						$row['javascript_content'] = static::wrapWebComponentContents( $row['javascript_content'], $componentName );
-						$componentObj = static::_writeJavascriptFromResultset( [ $id => $row ], "component_" . $row['javascript_name'], $app, 'root' );
-						$map[ $app ][ md5( $app . '-root-' . "component_" . $row['javascript_name'] ) ] = $componentObj ? (string) $componentObj : null;
+						$rows = iterator_to_array( \IPS\Db::i()->select(
+							'*',
+							'core_javascript', array( 'javascript_app=? AND javascript_location=?', $app, mb_substr( $fileName, 0, -3 ) ),
+							'javascript_app, javascript_location, javascript_position'
+						)->setKeyField('javascript_id') );
+						
+						/* Write it */
+						$obj = static::_writeJavascriptFromResultset( $rows, $fileName, $app, 'root' );
+
+						$map[ $app ][ md5( $app .'-' . 'root' . '-' . $fileName ) ] = $obj ? (string) $obj : null;
 					}
 				}
 			}
@@ -935,7 +828,27 @@ class Javascript extends ActiveRecord
 		{
 			if ( $location === null and $file === null )
 			{
-				File::getClass('core_Theme')->deleteContainer( 'javascript_' . $app );
+				\IPS\File::getClass('core_Theme')->deleteContainer( 'javascript_' . $app );
+			}
+			
+			/* Plugins */
+			if ( $app === 'core' )
+			{
+				if ( $file === null OR $file === 'plugins.js' )
+				{
+					$ids = array();
+					
+					foreach ( \IPS\Db::i()->select( '*', 'core_plugins', 'plugin_enabled=1' ) as $row )
+					{
+						$ids[] = \intval( $row['plugin_id'] );
+					}
+		
+					if ( \count( $ids ) )
+					{
+						$obj = static::_writeJavascriptFromResultset( \IPS\Db::i()->select( '*', 'core_javascript', array( array( 'javascript_app=? AND javascript_location=? AND javascript_type=? AND javascript_plugin IN(' . implode( ',', array_values( $ids ) ) . ')', 'core', 'plugins', 'plugin' ) ), 'javascript_app, javascript_location, javascript_position' )->setKeyField('javascript_id'), 'plugins.js', 'core', 'plugins' );
+						$map[ $app ][ md5( 'core-plugins-plugins.js' ) ] = $obj ? (string) $obj : null;
+					}
+				}
 			}
 			
 			foreach( array( 'front', 'admin', 'global' ) as $loc )
@@ -943,8 +856,8 @@ class Javascript extends ActiveRecord
 				if ( ( $file === null OR $file === 'app.js' ) AND ( $location === null OR $location === $loc ) )
 				{
 					/* app.js: All models and ui for the app */
-					$obj = static::_writeJavascriptFromResultset( Db::i()->select( '*', 'core_javascript', array( 'javascript_app=? AND javascript_location=? AND javascript_type IN (\'mixins\', \'model\',\'ui\')', $app, $loc ), 'javascript_app, javascript_location, javascript_position' )->setKeyField('javascript_id'), 'app.js', $app, $loc );
-
+					$obj = static::_writeJavascriptFromResultset( \IPS\Db::i()->select( '*', 'core_javascript', array( 'javascript_app=? AND javascript_location=? AND javascript_type IN (\'mixins\', \'model\',\'ui\')', $app, $loc ), 'javascript_app, javascript_location, javascript_position' )->setKeyField('javascript_id'), 'app.js', $app, $loc );
+				
 					$map[ $app ][ md5( $app .'-' . $loc . '-' . 'app.js' ) ] = $obj ? (string) $obj : null;
 				}
 				
@@ -952,11 +865,11 @@ class Javascript extends ActiveRecord
 				$controllers = array();
 				$templates   = array();
 				
-				foreach( Db::i()->select( '*', 'core_javascript', array( 'javascript_app=? AND javascript_location=? AND javascript_type IN (\'controller\', \'template\')', $app, $loc ), 'javascript_app, javascript_location, javascript_position' )->setKeyField('javascript_id') as $id => $row )
+				foreach( \IPS\Db::i()->select( '*', 'core_javascript', array( 'javascript_app=? AND javascript_location=? AND javascript_type IN (\'controller\', \'template\')', $app, $loc ), 'javascript_app, javascript_location, javascript_position' )->setKeyField('javascript_id') as $id => $row )
 				{
 					if ( $row['javascript_type'] == 'controller' )
 					{
-						[ $dir, $controller ] = explode( '/', $row['javascript_path'] );
+						list( $dir, $controller ) = explode( '/', $row['javascript_path'] );
 						
 						$controllers[ $controller ][] = $row;
 					}
@@ -994,7 +907,7 @@ class Javascript extends ActiveRecord
 						}
 						
 						/* Template only? */
-						if ( count( $templateOnlyKeys ) AND in_array( $key, $templateOnlyKeys ) )
+						if ( \count( $templateOnlyKeys ) AND \in_array( $key, $templateOnlyKeys ) )
 						{
 							foreach( $templates[ $key ] as $tmpl )
 							{
@@ -1003,58 +916,55 @@ class Javascript extends ActiveRecord
 						}
 						
 						$obj = static::_writeJavascriptFromResultset( $files, $loc . '_' . $key . '.js', $app, $loc );
-
-						$map[$app][md5( $app . '-' . $loc . '-' . $loc . '_' . $key . '.js' )] = $obj ? (string)$obj : null;
+						
+						$map[ $app ][ md5( $app .'-' . $loc . '-' . $loc . '_' . $key . '.js' ) ] = $obj ? (string) $obj : null;
 					}
 				}
 			}
 		}
+		
+		\IPS\Data\Store::i()->javascript_map = $map;
+		\IPS\Settings::i()->changeValues( array( 'javascript_updated' => time() ) );
 
-		/* Update the map making sure to remove any IPS apps */
-		$ipsApps = array_merge( [ 'global'] , IPS::$ipsApps );
-		foreach( $map as $application => $locations )
+		/* As the filename has changed, rebuild the JS map */
+		if ( ( $app !== 'global' and ( $location === NULL or \in_array( $location, array( 'admin', 'front', 'global' ) ) ) ) )
 		{
-			if ( in_array( $application, $ipsApps ) )
-			{
-				unset( $map[ $application ] );
-			}
+			\IPS\Output\Javascript::compile( 'global', 'root', 'map.js' );
 		}
-
-		Store::i()->javascript_map = $map;
-		Settings::i()->changeValues( array( 'javascript_updated' => time() ) );
-
-		Theme::unlock( $flagKey );
+		
+		\IPS\Theme::unlock( $flagKey );
 		
 		return TRUE;
 	}
-
+	
 	/**
 	 * Combines the DB rows into a single string for writing.
-	 *
-	 * @param Select|array $files Result set
-	 * @param string $fileName Filename to use
-	 * @param string $app Application
-	 * @param string $location Location (front, global, etc)
-	 * @return    object|string|null        \IPS\File object
+	 * 
+	 * @param 	\IPS\Db\Select	$files		Result set
+	 * @param 	string 			$fileName	Filename to use
+	 * @param	string			$app		Application
+	 * @param	string			$location	Location (front, global, etc)
+	 * @return	object|null		\IPS\File object
 	 */
-	protected static function _writeJavascriptFromResultset( Select|array $files, string $fileName, string $app, string $location ): object|string|null
+	protected static function _writeJavascriptFromResultset( $files, $fileName, $app, $location )
 	{
 		$content = array();
-		$jsMap   = ( isset( Store::i()->javascript_map ) and is_array( Store::i()->javascript_map ) ) ? Store::i()->javascript_map : array();
+		$jsMap   = ( isset( \IPS\Data\Store::i()->javascript_map ) and \is_array( \IPS\Data\Store::i()->javascript_map ) ) ? \IPS\Data\Store::i()->javascript_map : array();
 		
 		/* Try and remove any existing files */
 		try
 		{
 			$md5 = md5( $app . '-' . $location . '-' . $fileName );
 			
-			if ( isset( $jsMap[ $app ] ) and in_array( $md5, array_keys( $jsMap[ $app ] ) ) )
+			if ( isset( $jsMap[ $app ] ) and \in_array( $md5, array_keys( $jsMap[ $app ] ) ) )
 			{
-				File::get( 'core_Theme', $jsMap[ $app ][ $md5 ] )->delete();
+				\IPS\File::get( 'core_Theme', $jsMap[ $app ][ $md5 ] )->delete();
 			}
 		}
-		catch ( InvalidArgumentException $e ) { }
-
-		if ( ! count( $files ) )
+		catch ( \InvalidArgumentException $e ) { }
+		
+		
+		if ( ! \count( $files ) )
 		{
 			return null;
 		}
@@ -1063,40 +973,25 @@ class Javascript extends ActiveRecord
 		{
 			$content[] = static::_minify( $row['javascript_content'] ) . ";"; 
 		}
+		
+		$fileObject = static::_writeJavascript( implode( "\n", $content ), $fileName, $app, $location );
 
-		if ( ( in_array( $app, IPS::$ipsApps ) OR $app === 'global' ) )
+		try
 		{
-			$fileObject = static::_writeForStatic( implode( "\n", $content ), $fileName, $app, $location );
-
+			$map = \IPS\Data\Store::i()->javascript_file_map;
 		}
-		else
+		catch ( \OutOfRangeException $e )
 		{
-			$fileObject = static::_writeForFileSystem( implode( "\n", $content ), $fileName, $app, $location );
+			$map = array();
 		}
-
-		$map = static::getFileMapStore();
-
-		/* Update the map if it's a third party app */
-		foreach ( $files as $row )
+		
+		foreach( $files as $row )
 		{
-			if ( in_array( $row['javascript_location'], [ 'front', 'admin', 'global' ] ) )
-			{
-				$path = ( ( ! empty( $row['javascript_path'] ) AND $row['javascript_path'] !== '/' ) ? '/' . $row['javascript_path'] . '/' : '/' );
-				$map[$row['javascript_app']][$row['javascript_location']][$path][$row['javascript_name']] = (string)$fileObject;
-			}
+			$path = ( ( ! empty( $row['javascript_path'] ) AND $row['javascript_path'] !== '/' ) ? '/' . $row['javascript_path'] . '/' : '/' );
+			$map[ $row['javascript_app'] ][ $row['javascript_location'] ][ $path ][ $row['javascript_name'] ] = (string) $fileObject;
 		}
-
-		/* Update the map making sure to remove any IPS apps */
-		$ipsApps = array_merge( [ 'global'] , IPS::$ipsApps );
-		foreach( $map as $application => $locations )
-		{
-			if ( in_array( $application, $ipsApps ) )
-			{
-				unset( $map[ $application ] );
-			}
-		}
-
-		Store::i()->javascript_file_map = $map;
+		
+		\IPS\Data\Store::i()->javascript_file_map = $map;
 		
 		return $fileObject;
 	}
@@ -1104,60 +999,65 @@ class Javascript extends ActiveRecord
 	/**
 	 * Combines the DB rows into a single string for writing.
 	 *
-	 * @param string $content	Javascript string to write
-	 * @param string $fileName	Filename to use
-	 * @param string $app		Application
-	 * @param string $location	Location (front, global, etc)
-	 * @return	File		\IPS\File object
+	 * @param 	string		$content	Javascript string to write
+	 * @param 	string 		$fileName	Filename to use
+	 * @param	string		$app		Application
+	 * @param	string		$location	Location (front, global, etc)
+	 * @return	object		\IPS\File object
 	 */
-	protected static function _writeForFileSystem( string $content, string $fileName, string $app, string $location ): File
+	protected static function _writeJavascript( $content, $fileName, $app, $location )
 	{
-		return File::create( 'core_Theme', $location . '_' . $fileName, $content, 'javascript_' . $app, TRUE, NULL, FALSE );
+		return \IPS\File::create( 'core_Theme', $location . '_' . $fileName, $content, 'javascript_' . $app, TRUE, NULL, FALSE );
 	}
-
+	
 	/**
-	 * Combines the DB rows into a single string for writing.
-	 *
-	 * @param string $content	Javascript string to write
-	 * @param string $fileName	Filename to use
-	 * @param string $app		Application
-	 * @param string $location	Location (front, global, etc)
-	 * @return	File|string		\IPS\File object
+	 * Get javascript language as a script
+	 * 
+	 * @param	int		$langId	ID of language to fetch
+	 * @return string
 	 */
-	protected static function _writeForStatic( string $content, string $fileName, string $app, string $location ): File|string
+	public static function getJavascriptLanguage( $langId )
 	{
-		$path = '/static/js/' . $app . '/'; // Applications are in the root on Cloud2
-		$jsFileName = $path . $location . '_' . $fileName;
-
-		if( !is_dir( ROOT_PATH. $path ) )
+		$_lang	= array();
+		
+		foreach ( \IPS\Db::i()->select( '*', 'core_sys_lang_words', array( 'lang_id=? AND word_js=?', $langId, TRUE ) ) as $row )
 		{
-			mkdir( ROOT_PATH . $path, IPS_FOLDER_PERMISSION, TRUE );
+			$_lang[ $row['word_key'] ] = $row['word_custom'] ?: $row['word_default'];
 		}
-
-		$result = (bool) @file_put_contents( ROOT_PATH . $jsFileName, $content, LOCK_EX );
-
-		/* Sometimes LOCK_EX is unavailable and throws file_put_contents(): Exclusive locks are not supported for this stream.
-			While we would prefer an exclusive lock, it would be better to write the file if possible. */
-		if( !$result )
+		
+		if ( \IPS\IN_DEV )
 		{
-			@unlink( ROOT_PATH . $jsFileName );
-			$result = (bool) @file_put_contents( ROOT_PATH . $jsFileName, $content );
+			foreach ( \IPS\Application::enabledApplications() as $app )
+			{
+				if ( file_exists( \IPS\ROOT_PATH . "/applications/{$app->directory}/dev/jslang.php" ) )
+				{
+					require \IPS\ROOT_PATH . "/applications/{$app->directory}/dev/jslang.php";
+					$_lang = array_merge( $_lang, $lang );
+				}
+			}
+			foreach ( \IPS\Plugin::enabledPlugins() as $plugin )
+			{
+				if ( file_exists( \IPS\ROOT_PATH . "/plugins/{$plugin->location}/dev/jslang.php" ) )
+				{
+					require \IPS\ROOT_PATH . "/plugins/{$plugin->location}/dev/jslang.php";
+					$_lang = array_merge( $_lang, $lang );
+				}
+			}
 		}
-
-		@chmod( ROOT_PATH . $jsFileName, IPS_FILE_PERMISSION );
-		return $jsFileName;
+		
+		return 'ips.setString( ' . json_encode( $_lang ) . ')';
 	}
-
+	
 	/**
 	 * Get javascript map as a script
-	 *
-	 * @return array
+	 * 
+	 * @return string
 	 */
-	public static function getJavascriptFileMap(): array
+	protected static function _getMapAsScript()
 	{
-		$fileMap =static::getFileMapStore();
+		$fileMap = isset(\IPS\Data\Store::i()->javascript_file_map) ? \IPS\Data\Store::i()->javascript_file_map : array();
 		$map     = array();
-
+		
 		/* Fix up the map a little */
 		foreach( $fileMap as $app => $location )
 		{
@@ -1165,7 +1065,7 @@ class Javascript extends ActiveRecord
 			{
 				continue;
 			}
-
+			
 			foreach( $location as $locName => $locData )
 			{
 				foreach( $locData as $name => $items )
@@ -1173,14 +1073,16 @@ class Javascript extends ActiveRecord
 					if ( mb_stristr( $name, '/controllers/' ) )
 					{
 						$url = array_pop( $items );
-
-						$map[ $app ][ $locName . '_' . trim( str_replace( '/controllers/', '', $name ) , '/' ) ] = (string) File::get( 'core_Theme', $url )->url;
+					
+						$map[ $app ][ $locName . '_' . trim( str_replace( '/controllers/', '', $name ) , '/' ) ] = (string) \IPS\File::get( 'core_Theme', $url )->url;
 					}
 				}
 			}
 		}
-
-		return $map;
+		
+		$json = json_encode( $map, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		
+		return 'var ipsJavascriptMap = ' . $json . ';';
 	}
 	
 	/**
@@ -1189,26 +1091,49 @@ class Javascript extends ActiveRecord
 	 * @param string $js	Javascript code
 	 * @return string
 	 */
-	protected static function _minify( string $js ): string
+	protected static function _minify( $js )
 	{
-		require_once( ROOT_PATH . '/system/3rd_party/JsMinify/Minifier.php' );
-		require_once( ROOT_PATH . '/system/3rd_party/JsMinify/MinifierError.php' );
-		require_once( ROOT_PATH . '/system/3rd_party/JsMinify/MinifierExpressions.php' );
+		require_once( \IPS\ROOT_PATH . '/system/3rd_party/JsMinify/Minifier.php' );
+		require_once( \IPS\ROOT_PATH . '/system/3rd_party/JsMinify/MinifierError.php' );
+		require_once( \IPS\ROOT_PATH . '/system/3rd_party/JsMinify/MinifierExpressions.php' );
 
-		return Minifier::minify( $js, array( 'flaggedComments' => false ) );
+		return \Garfix\JsMinify\Minifier::minify( $js, array( 'flaggedComments' => false ) );
 	}
 	
 	/**
 	 * Get JS
 	 *
-	 * @param string $file		Filename
-	 * @param string|null $app		Application
-	 * @param string|null $location	Location (e.g. 'admin', 'front', 'components')
+	 * @param	string		$file		Filename
+	 * @param	string|null	$app		Application
+	 * @param	string|null	$location	Location (e.g. 'admin', 'front')
 	 * @return	array		URL to JS files
 	 */
-	public static function inDevJs( string $file, string $app=NULL, string $location=NULL ): array
+	public static function inDevJs( $file, $app=NULL, $location=NULL )
 	{
-		/* 1: Is it a named grouped collection? */
+		/* 1: Is this the magic plugin JS */
+		if ( $app === 'core' and $location === 'plugins' and $file === 'plugins.js' )
+		{
+			$return = array();
+			
+			foreach ( new \GlobIterator( \IPS\ROOT_PATH . '/plugins/*/dev/js/*' ) as $file )
+			{
+				try
+				{
+					$plugin = \IPS\Plugin::getPluginFromPath( $file );
+
+					if( $plugin->enabled )
+					{
+						$url = str_replace( \IPS\ROOT_PATH, rtrim( \IPS\Settings::i()->base_url, '/' ), $file );
+						$return[] = str_replace( '\\', '/', $url );
+					}
+				}
+				catch( \OutOfRangeException $e ){}
+			}
+			
+			return $return;
+		}
+	
+		/* 2: Is it a named grouped collection? */
 		if ( $app === NULL AND $location === NULL )
 		{
 			if ( $file === 'map.js' )
@@ -1216,27 +1141,22 @@ class Javascript extends ActiveRecord
 				return array();
 			}
 			
-			if ( in_array( $file, Output::$globalJavascript ) )
+			if ( \in_array( $file, \IPS\Output::$globalJavascript ) )
 			{
 				$app      = 'global';
 				$location = '/';
 			}
-		}
-
-		// Loading a web component? we then need to load from the file directly
-		if ( $location === "components" )
-		{
-			if ( str_ends_with( $file, '.js' ) )
+			
+			if ( mb_substr( $file, 0, 8 ) === 'js_lang_' )
 			{
-				$file = mb_substr( $file, 0, -3 );
+				return array( \IPS\Http\Url::baseUrl() . "/applications/core/interface/js/jslang.php?langId=" . \intval( mb_substr( $file, 8, -3 ) ) );
 			}
-			return array( Url::baseUrl() . "/applications/core/interface/js/webcomponents.php?component=" . urlencode( $file ) );
 		}
 	
-		$app      = $app      ?: ( Dispatcher::i()->application ? Dispatcher::i()->application->directory : NULL );
-		$location = $location ?: Dispatcher::i()->controllerLocation;
+		$app      = $app      ?: ( \IPS\Dispatcher::i()->application ? \IPS\Dispatcher::i()->application->directory : NULL );
+		$location = $location ?: \IPS\Dispatcher::i()->controllerLocation;
 		
-		/* 2: App JS? */
+		/* 3: App JS? */
 		if ( $file == 'app.js' )
 		{
 			return static::_appJs( $app, $location );
@@ -1245,7 +1165,7 @@ class Javascript extends ActiveRecord
 		/* 3: Is this a controller/template combo? */
 		if ( mb_strstr( $file, '_') AND mb_substr( $file, -3 ) === '.js' )
 		{
-			[ $location, $key ] = explode( '_',  mb_substr( $file, 0, -3 ) );
+			list( $location, $key ) = explode( '_',  mb_substr( $file, 0, -3 ) );
 			
 			if ( ( $location == 'front' OR $location == 'admin' OR $location == 'global' ) AND ! empty( $key ) )
 			{ 
@@ -1256,22 +1176,22 @@ class Javascript extends ActiveRecord
 		/* 4: Is it in the interface directory? */
 		if ( $location === 'interface' )
 		{
-			$path = ROOT_PATH . "/applications/{$app}/interface/{$file}";
+			$path = \IPS\ROOT_PATH . "/applications/{$app}/interface/{$file}";
 		}
 		else if ( $app === 'global' )
 		{
 			$return = array();
 			
-			if ( in_array( $file, Output::$globalJavascript ) )
+			if ( \in_array( $file, \IPS\Output::$globalJavascript ) )
 			{
-				return static::_directoryJs( ROOT_PATH . "/dev/js/" . mb_substr( $file, 0, -3 ) );
+				return static::_directoryJs( \IPS\ROOT_PATH . "/dev/js/" . mb_substr( $file, 0, -3 ) );
 			}
-
-			$path = ROOT_PATH . "/dev/js";
+			
+			$path = \IPS\ROOT_PATH . "/dev/js";
 		}
 		else
 		{
-			$path = ROOT_PATH . "/applications/{$app}/dev/js/{$location}/{$file}";
+			$path = \IPS\ROOT_PATH . "/applications/{$app}/dev/js/{$location}/{$file}";
 		}
 		
 		if ( is_dir( $path ) )
@@ -1280,28 +1200,28 @@ class Javascript extends ActiveRecord
 		}
 		else
 		{
-			return array( str_replace( ROOT_PATH, Url::baseUrl(), $path ) );
+			return array( str_replace( \IPS\ROOT_PATH, \IPS\Http\Url::baseUrl(), $path ) );
 		}
 	}
-
+	
 	/**
 	 * Get the map for IN_DEV use
-	 *
-	 * @return array|string
+	 * 
+	 * @return array
 	 */
-	public static function inDevMapJs(): array|string
+	public static function inDevMapJs()
 	{
 		$files = array();
 
-		foreach( Application::enabledApplications() as $app => $data )
+		foreach( \IPS\Application::enabledApplications() as $app => $data )
 		{
-			$root = ROOT_PATH . "/applications/{$app}/dev/js/";
+			$root       	= \IPS\ROOT_PATH . "/applications/{$app}/dev/js/";
 
 			foreach( array( 'front', 'admin', 'global' ) as $location )
 			{
 				if ( is_dir( $root . "{$location}/controllers" ) )
 				{
-					foreach ( new DirectoryIterator( $root . "{$location}/controllers" ) as $controllerDir )
+					foreach ( new \DirectoryIterator( $root . "{$location}/controllers" ) as $controllerDir )
 					{
 						if ( $controllerDir->isDot() || mb_substr( $controllerDir->getFilename(), 0, 1 ) === '.' )
 						{
@@ -1310,16 +1230,16 @@ class Javascript extends ActiveRecord
 							
 						if ( $controllerDir->isDir() )
 						{
-							$controllerPath	= ROOT_PATH . "/applications/{$app}/dev/js/{$location}/controllers/{$controllerDir}";
+							$controllerPath	= \IPS\ROOT_PATH . "/applications/{$app}/dev/js/{$location}/controllers/{$controllerDir}";
 
-							foreach ( new DirectoryIterator( $root . "{$location}/controllers/{$controllerDir}" ) as $file )
+							foreach ( new \DirectoryIterator( $root . "{$location}/controllers/{$controllerDir}" ) as $file )
 							{
 								if ( $file->isDot() || mb_substr( $file->getFilename(), 0, 1 ) === '.' || $file == 'index.html' )
 								{
 									continue;
 								}
 
-								$files[ $app ][ $location . '_' . $controllerDir ] = str_replace( ROOT_PATH, rtrim( Url::baseUrl( Url::PROTOCOL_RELATIVE ), '/' ), $controllerPath ) . '/' . $file->getFileName();
+								$files[ $app ][ $location . '_' . $controllerDir ] = str_replace( \IPS\ROOT_PATH, rtrim( \IPS\Http\Url::baseUrl( \IPS\Http\Url::PROTOCOL_RELATIVE ), '/' ), $controllerPath ) . '/' . $file->getFileName();
 							}
 						}
 					}
@@ -1336,9 +1256,9 @@ class Javascript extends ActiveRecord
 	 *
 	 * @return string
 	 */
-	public static function javascriptCacheBustKey(): string
+	public static function javascriptCacheBustKey()
 	{
-		return CACHEBUST_KEY . Settings::i()->javascript_updated;
+		return \IPS\CACHEBUST_KEY . \IPS\Settings::i()->javascript_updated;
 	}
 
 	/**
@@ -1347,9 +1267,9 @@ class Javascript extends ActiveRecord
 	 * @param string $url	Full URL of javascript file
 	 * @return array	Array( 'app' => .., 'location' => .., 'path' => .., 'name' => .. );
 	 */
-	protected static function _urlToComponents( string $url ): array
+	protected static function _urlToComponents( $url )
 	{
-		$url  = ltrim( str_replace( Url::baseUrl( Url::PROTOCOL_RELATIVE ) . 'applications', '', $url ), '/' );
+		$url  = ltrim( str_replace( \IPS\Http\Url::baseUrl( \IPS\Http\Url::PROTOCOL_RELATIVE ) . 'applications', '', $url ), '/' );
 		$bits = explode( "/", $url );
 		
 		$app = array_shift( $bits );
@@ -1368,26 +1288,26 @@ class Javascript extends ActiveRecord
 	/**
 	 * Gets app specific Javascript
 	 * 
-	 * @param string $app	    Application
-	 * @param string $location	Location (front, global, etc)
+	 * @param   string  $app	    Application
+	 * @param	string	$location	Location (front, global, etc)
 	 * @return  array
 	 */
-	protected static function _appJs( string $app, string $location ): array
+	protected static function _appJs( $app, $location )
 	{
 		$models = array();
 
 		/* Only include if the app is enabled */
-		if( !in_array( $app, array_keys( Application::enabledApplications() ) ) )
+		if( !\in_array( $app, array_keys( \IPS\Application::enabledApplications() ) ) )
 		{
 			return $models;
 		}
 		
-		if ( is_dir( ROOT_PATH . "/applications/" . $app ) )
+		if ( \is_dir( \IPS\ROOT_PATH . "/applications/" . $app ) )
 		{
-			foreach( array( ROOT_PATH . "/applications/{$app}/dev/js/{$location}/mixins", ROOT_PATH . "/applications/{$app}/dev/js/{$location}/models", ROOT_PATH . "/applications/{$app}/dev/js/{$location}/ui" ) as $durr )
+			foreach( array( \IPS\ROOT_PATH . "/applications/{$app}/dev/js/{$location}/mixins", \IPS\ROOT_PATH . "/applications/{$app}/dev/js/{$location}/models", \IPS\ROOT_PATH . "/applications/{$app}/dev/js/{$location}/ui" ) as $durr )
 			{
 				/* Models */
-				if ( is_dir( $durr ) )
+				if ( \is_dir( $durr ) )
 				{
 					$models = static::_directoryJs( $durr );
 				}
@@ -1405,28 +1325,28 @@ class Javascript extends ActiveRecord
 	 * @param string $app			Application
 	 * @return	array
 	 */
-	protected static function _sectionJs( string $key, string $location, string $app ): array
+	protected static function _sectionJs( $key, $location, $app )
 	{
 		$return        = array();
-		$controllerDir = ROOT_PATH . "/applications/{$app}/dev/js/{$location}/controllers/{$key}";
-		$templatesDir  = ROOT_PATH . "/applications/{$app}/dev/js/{$location}/templates";
+		$controllerDir = \IPS\ROOT_PATH . "/applications/{$app}/dev/js/{$location}/controllers/{$key}";
+		$templatesDir  = \IPS\ROOT_PATH . "/applications/{$app}/dev/js/{$location}/templates";
 		$controllers   = array();
 		$templates     = array();
 		
 		/* Get controllers */
-		if ( is_dir( $controllerDir ) )
+		if ( \is_dir( $controllerDir ) )
 		{
 			$controllers = static::_directoryJs( $controllerDir );
 		}
 		
 		/* Templates */
-		if ( is_dir( $templatesDir . '/' . $key ) )
+		if ( \is_dir( $templatesDir . '/' . $key ) )
 		{
 			$templates = static::_directoryJs( $templatesDir . '/' . $key );
 		}
-		else if ( file_exists( $templatesDir . '/ips.templates.' . $key . '.js' ) )
+		else if ( \file_exists( $templatesDir . '/ips.templates.' . $key . '.js' ) )
 		{
-			$templates = array( str_replace( ROOT_PATH, rtrim( Url::baseUrl( Url::PROTOCOL_RELATIVE ), '/' ), $templatesDir . '/ips.templates.' . $key . '.js' ) );
+			$templates = array( str_replace( \IPS\ROOT_PATH, rtrim( \IPS\Http\Url::baseUrl( \IPS\Http\Url::PROTOCOL_RELATIVE ), '/' ), $templatesDir . '/ips.templates.' . $key . '.js' ) );
 		}
 		
 		return array_merge( $templates, $controllers );
@@ -1436,36 +1356,35 @@ class Javascript extends ActiveRecord
 	 * Get Javascript files recursively.
 	 * 
 	 * @param string $path		Path to open
-	 * @param array $return	Items retreived so far
+	 * @param array	 $return	Items retreived so far
 	 * @return array
 	 */
-	protected static function _directoryJs( string $path, array $return=array() ): array
+	protected static function _directoryJs( $path, $return=array() )
 	{
 		$path     = rtrim( $path, '/' );
 		$contents = array();
 		
-		foreach ( new DirectoryIterator( $path ) as $file )
+		foreach ( new \DirectoryIterator( $path ) as $file )
 		{
 			if ( $file->isDot() || mb_substr( $file->getFilename(), 0, 1 ) === '.' )
 			{
 				continue;
 			}
-
-			// Skip the /framework/common/components directory
-			if ( $file->isDir() && !( str_ends_with( $path, 'dev/js/framework/common' ) and rtrim( $file->getFilename(), '/' ) == 'components' ) )
+			
+			if ( $file->isDir() )
 			{
 				$return = static::_directoryJs( $path . '/' . $file->getFileName(), $return );
 			}
 			else if ( mb_substr( $file->getFileName(), -3 ) === '.js' )
 			{
-				$contents[] = str_replace( ROOT_PATH, rtrim( Url::baseUrl( Url::PROTOCOL_RELATIVE ), '/' ), $path ) . '/' . $file->getFileName();
+				$contents[] = str_replace( \IPS\ROOT_PATH, rtrim( \IPS\Http\Url::baseUrl( \IPS\Http\Url::PROTOCOL_RELATIVE ), '/' ), $path ) . '/' . $file->getFileName();
 			}
 		}
 		
-		if ( count( $contents ) )
+		if ( \count( $contents ) )
 		{
 			/* Check to see if 'ips.{dir}.js' exists and if so, put that first */
-			$parentDir = preg_replace( '#^(.*)/([^/]+?)$#', '\2', $path );
+			$parentDir = preg_replace( '#^(.*)/([^\/]+?)$#', '\2', $path );
 				
 			$reordered = array();
 				
@@ -1483,9 +1402,9 @@ class Javascript extends ActiveRecord
 		
 		$reordered = array();
 		
-		if ( is_dir( $path ) AND file_exists( $path . '/order.txt' ) )
+		if ( is_dir( $path ) AND \file_exists( $path . '/order.txt' ) )
 		{
-			$order = file( $path . '/order.txt' );
+			$order = \file( $path . '/order.txt' );
 			
 			foreach( $order as $item )
 			{
@@ -1502,7 +1421,7 @@ class Javascript extends ActiveRecord
 					}
 					else
 					{
-						if ( mb_substr( str_replace( Url::baseUrl( Url::PROTOCOL_RELATIVE ) . ltrim( str_replace( ROOT_PATH, '', $path ), '/' ), '', $url ), 1, (mb_strlen( $item ) ) ) == $item )
+						if ( mb_substr( str_replace( \IPS\Http\Url::baseUrl( \IPS\Http\Url::PROTOCOL_RELATIVE ) . ltrim( str_replace( \IPS\ROOT_PATH, '', $path ), '/' ), '', $url ), 1, (mb_strlen( $item ) ) ) == $item )
 						{
 							$reordered[] = $url;
 						}
@@ -1511,12 +1430,12 @@ class Javascript extends ActiveRecord
 			}
 		}
 		
-		if ( count( $reordered ) )
+		if ( \count( $reordered ) )
 		{
 			/* Add in items not specified in the order */
 			$diff = array_diff( $return, $reordered );
 				
-			if ( count( $diff ) )
+			if ( \count( $diff ) )
 			{
 				foreach( $diff as $url )
 				{
@@ -1532,11 +1451,11 @@ class Javascript extends ActiveRecord
 	
 	/**
 	 * Returns the type of javascript file
-	 * @param string $path	Path
-	 * @param string $name	File Name
+	 * @param	string	$path	Path
+	 * @param	string	$name	File Name
 	 * @return string
 	 */
-	protected static function _getType( string $path, string $name ): string
+	protected static function _getType( $path, $name )
 	{
 		$type = 'framework';
 		
@@ -1551,10 +1470,6 @@ class Javascript extends ActiveRecord
 		else if ( mb_strstr( $path, '/mixins/' ) )
 		{
 			$type = 'mixins';
-		}
-		else if ( mb_strstr( $path, '/components/' ) )
-		{
-			$type = 'component';
 		}
 		else if ( mb_strstr( $path, '/ui/' ) )
 		{
@@ -1571,11 +1486,11 @@ class Javascript extends ActiveRecord
 	/**
 	 * Returns an incremented position integer for this app and location
 	 *
-	 * @param string $app		Application key
-	 * @param string $location	Location (front, global, etc)
+	 * @param	string	$app		Application key
+	 * @param	string	$location	Location (front, global, etc)
 	 * @return	int
 	 */
-	protected static function _getNextPosition( string $app, string $location ): int
+	protected static function _getNextPosition( $app, $location )
 	{
 		if ( ! isset( static::$positions[ $app . '-' . $location ] ) )
 		{
@@ -1585,115 +1500,5 @@ class Javascript extends ActiveRecord
 		static::$positions[ $app . '-' . $location ] += 50;
 		
 		return static::$positions[ $app . '-' . $location ];
-	}
-
-	/**
-	 * Rebuild JS map from database
-	 *
-	 * @return array
-	 */
-	public static function getFileMapStore(): array
-	{
-		try
-		{
-			$map = Store::i()->javascript_file_map;
-
-			if ( ! is_array( $map ) )
-			{
-				$map = array();
-			}
-		}
-		catch( Exception )
-		{
-			$map = [];
-
-			foreach ( Db::i()->select( '*', 'core_javascript', ['javascript_type=? and javascript_app IN(?)', 'controller', implode( ',', array_merge( [ 'global'] , IPS::$ipsApps ) ) ] ) as $row )
-			{
-				$path = ( ( !empty( $row['javascript_path'] ) and $row['javascript_path'] !== '/' ) ? '/' . $row['javascript_path'] . '/' : '/' );
-				$bits = explode( '/', $row['javascript_path'] );
-				$name = array_pop( $bits );
-				$map[$row['javascript_app']][$row['javascript_location']][$path][$row['javascript_name']] = 'javascript_' . $row['javascript_app'] . '/' . $row['javascript_location'] . '_' . $row['javascript_location'] . '_' . $name . '.js';
-			}
-
-			Store::i()->javascript_file_map = $map;
-		}
-
-		return $map;
-	}
-
-	/**
-	 * Wrap contents with the web components
-	 *
-	 * @param string $contents
-	 * @param string $component The component's file name
-	 * @return string
-	 */
-	protected static function wrapWebComponentContents( string $contents, string $component ) : string
-	{
-		/* Start with some light validation to make sure the component is a valid string */
-		if ( !preg_match( '/^[a-zA-Z][a-zA-Z0-9]*$/', $component ) )
-		{
-			throw new InvalidArgumentException( "The name {$component} is invalid. Expected an alphanumeric string (camel case)" );
-		}
-
-		$encodedComponent = json_encode( $component );
-		$errorStatement = <<<JS
-Debug.log(`The source file for the component \${{$encodedComponent}} does not contain a class that extends HTMLElement. If the component extends a class other than HTMLElement, ips.ui.registerWebComponent() will need to be invoked directly.`);
-JS;
-		if ( preg_match( "/class\s+([a-zA-Z][a-zA-Z0-9]*)\s+extends\s+HTMLElement/", $contents, $matches ) )
-		{
-			$classStatement = <<<JS
-ips.ui.registerWebComponent( {$encodedComponent}, {$matches[1]} );
-Debug.log(`Submitted the web component constructor, {$matches[1]}, for \${{$encodedComponent}}`);
-JS;
-
-		}
-		else
-		{
-			$classStatement = $errorStatement;
-		}
-
-		return <<<JS
-;(function() {
-"use strict";
-{$contents}
-    
-{$classStatement}
-})();
-JS;
-	}
-
-	/**
-	 * Generate the JS that defines a Web Component
-	 *
-	 * @param string $component
-	 *
-	 * @return string
-	 */
-	public static function generateWebComponent( string $component ) : string
-	{
-		/* Start with some light validation to make sure the component is a valid string */
-		if ( !preg_match( '/^[a-zA-Z][a-zA-Z0-9]*$/', $component ) )
-		{
-			throw new InvalidArgumentException( "The name {$component} is invalid. Expected an alphanumeric string (camel case)" );
-		}
-
-		if ( \IPS\IN_DEV )
-		{
-			$path = Application::getRootPath() . '/dev/js/framework/common/components/' . $component . '.js';
-			if ( file_exists( $path ) and $contents = file_get_contents( $path ) )
-			{
-				return static::wrapWebComponentContents( $contents, $component );
-			}
-		}
-		else
-		{
-			$path = Application::getRootPath() . "static/js/global/root_component_" . $component . 'js';
-			if ( file_exists( $path ) and $contents = file_get_contents( $path ) )
-			{
-				return $contents;
-			}
-		}
-		throw new OutOfRangeException( "Cannot find file $path" );
 	}
 } 

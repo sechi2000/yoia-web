@@ -11,59 +11,41 @@
 namespace IPS\calendar\extensions\core\AchievementAction;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\calendar\Calendar;
-use IPS\calendar\Event;
-use IPS\core\Achievements\Actions\AchievementActionAbstract;
-use IPS\core\Achievements\Rule;
-use IPS\Db;
-use IPS\Db\Select;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Number;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function in_array;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Achievement Action Extension
  */
-class Rsvp extends AchievementActionAbstract // NOTE: Other classes exist to provided bases for common situations, like where node-based filters will be required
+class _Rsvp extends \IPS\core\Achievements\Actions\AbstractAchievementAction // NOTE: Other classes exist to provided bases for common situations, like where node-based filters will be required
 {	
 	/**
 	 * Get filter form elements
 	 *
 	 * @param	array|NULL		$filters	Current filter values (if editing)
-	 * @param	Url	$url		The URL the form is being shown on
+	 * @param	\IPS\Http\Url	$url		The URL the form is being shown on
 	 * @return	array
 	 */
-	public function filters( ?array $filters, Url $url ): array
+	public function filters( ?array $filters, \IPS\Http\Url $url ): array
 	{
-		$return = parent::filters( $filters, $url );
+		$return	= array();
 
-		$return['nodes'] = new Node( 'achievement_filter_Rsvp_nodes', ( $filters and isset( $filters['nodes'] ) and $filters['nodes'] ) ? $filters['nodes'] : 0, FALSE, [
+		$return['nodes'] = new \IPS\Helpers\Form\Node( 'achievement_filter_Rsvp_nodes', ( $filters and isset( $filters['nodes'] ) and $filters['nodes'] ) ? $filters['nodes'] : 0, FALSE, [
 			'url'				=> $url,
 			'class'				=> 'IPS\calendar\Calendar',
 			'showAllNodes'		=> TRUE,
 			'multiple' 			=> TRUE,
-		], NULL, Member::loggedIn()->language()->addToStack( 'achievement_filter_NewContentItem_node_prefix', FALSE, [ 'sprintf' => [
-			Member::loggedIn()->language()->addToStack( 'rsvp', FALSE ),
-			Member::loggedIn()->language()->addToStack( 'calendars', FALSE, [ 'strtolower' => TRUE ] )
+		], NULL, \IPS\Member::loggedIn()->language()->addToStack( 'achievement_filter_NewContentItem_node_prefix', FALSE, [ 'sprintf' => [
+			\IPS\Member::loggedIn()->language()->addToStack( 'rsvp', FALSE ),
+			\IPS\Member::loggedIn()->language()->addToStack( 'calendars_sg', FALSE, [ 'strtolower' => TRUE ] )
 		] ] ) );
-		$return['nodes']->label = Member::loggedIn()->language()->addToStack( 'achievement_filter_NewContentItem_node', FALSE, [ 'sprintf' => [ Member::loggedIn()->language()->addToStack( 'calendars', FALSE, [ 'strtolower' => TRUE ] ) ] ] );
+		$return['nodes']->label = \IPS\Member::loggedIn()->language()->addToStack( 'achievement_filter_NewContentItem_node', FALSE, [ 'sprintf' => [ \IPS\Member::loggedIn()->language()->addToStack( 'calendars_sg', FALSE, [ 'strtolower' => TRUE ] ) ] ] );
 
-		$return['milestone'] = new Number( 'achievement_filter_Rsvp_nth', ( $filters and isset( $filters['milestone'] ) and $filters['milestone'] ) ? $filters['milestone'] : 0, FALSE, [], NULL, Member::loggedIn()->language()->addToStack('achievement_filter_nth_their'), Member::loggedIn()->language()->addToStack('achievement_filter_Rsvp_nth_suffix') );
-		$return['milestone']->label = Member::loggedIn()->language()->addToStack('achievement_filter_NewContentItem_nth');
+		$return['milestone'] = new \IPS\Helpers\Form\Number( 'achievement_filter_Rsvp_nth', ( $filters and isset( $filters['milestone'] ) and $filters['milestone'] ) ? $filters['milestone'] : 0, FALSE, [], NULL, \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_nth_their'), \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_Rsvp_nth_suffix') );
+		$return['milestone']->label = \IPS\Member::loggedIn()->language()->addToStack('achievement_filter_NewContentItem_nth');
 		
 		return $return;
 	}
@@ -76,7 +58,7 @@ class Rsvp extends AchievementActionAbstract // NOTE: Other classes exist to pro
 	 */
 	public function formatFilterValues( array $values ): array
 	{
-		$return = parent::formatFilterValues( $values );
+		$return = [];
 		if ( isset( $values['achievement_filter_Rsvp_nodes'] ) )
 		{			
 			$return['nodes'] = array_keys( $values['achievement_filter_Rsvp_nodes'] );
@@ -95,16 +77,16 @@ class Rsvp extends AchievementActionAbstract // NOTE: Other classes exist to pro
 	 * calls that BEFORE making its change in the database (or there is read/write separation), you will need to add
 	 * 1 to the value being considered for milestones
 	 *
-	 * @param	Member	$subject	The subject member
+	 * @param	\IPS\Member	$subject	The subject member
 	 * @param	array		$filters	The value returned by formatFilterValues()
-	 * @param mixed|null $extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
+	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	bool
 	 */
-	public function filtersMatch( Member $subject, array $filters, mixed $extra = NULL ): bool
+	public function filtersMatch( \IPS\Member $subject, array $filters, $extra = NULL ): bool
 	{
 		if ( isset( $filters['nodes'] ) )
 		{
-			if ( !in_array( $extra->container()->_id, $filters['nodes'] ) )
+			if ( !\in_array( $extra->container()->_id, $filters['nodes'] ) )
 			{
 				return FALSE;
 			}
@@ -141,55 +123,24 @@ class Rsvp extends AchievementActionAbstract // NOTE: Other classes exist to pro
 	/**
 	 * Get the "other" people we need to award =stuff to
 	 *
-	 * @param mixed|null $extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
+	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @param	array|NULL	$filters	Current filter values
 	 * @return	array
 	 */
-	public function awardOther( mixed $extra = NULL, ?array $filters = NULL ): array
+	public function awardOther( $extra = NULL, ?array $filters = NULL ): array
 	{
 		return [ $extra->author() ];
-	}
-
-	/**
-	 * Determines if the member has already completed this rule.
-	 * Used for retroactive rule completion.
-	 * So far, this is only used in Quests, but may be used elsewhere at a later point.
-	 *
-	 * @param Member $member
-	 * @param array $filters
-	 * @return bool
-	 */
-	public function isRuleCompleted( Member $member, array $filters ) : bool
-	{
-		$where = [
-			[ 'rsvp_member_id=?', $member->member_id ]
-		];
-
-		if( !empty( $filters['nodes'] ) )
-		{
-			$where[] = [ Db::i()->in( 'event_calendar_id', $filters['nodes'] ) ];
-		}
-
-		$total = Db::i()->select( 'count(*)', 'calendar_event_rsvp', $where )
-			->join( 'calendar_events', 'rsvp_event_id=event_id' )->first();
-
-		if( !empty( $filters['milestone'] ) )
-		{
-			return $total >= $filters['milestone'];
-		}
-
-		return $total > 0;
 	}
 	
 	/**
 	 * Get identifier to prevent the member being awarded points for the same action twice
 	 * Must be unique within within of this domain, must not exceed 32 chars.
 	 *
-	 * @param	Member	$subject	The subject member
-	 * @param mixed|null $extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
+	 * @param	\IPS\Member	$subject	The subject member
+	 * @param	mixed		$extra		Any additional information about what is happening (e.g. if a post is being made: the post object)
 	 * @return	string
 	 */
-	public function identifier( Member $subject, mixed $extra = NULL ): string
+	public function identifier( \IPS\Member $subject, $extra = NULL ): string
 	{
 		return 'Rsvp:' . $extra->id . ':' . $subject->member_id;
 	}
@@ -205,50 +156,47 @@ class Rsvp extends AchievementActionAbstract // NOTE: Other classes exist to pro
 	{
 		$exploded = explode( ':', $identifier );
 
+		$sprintf = [];
 		try
 		{
-			$item = Event::load( $exploded[1] );
+			$item = \IPS\calendar\Event::load( $exploded[1] );
 			$sprintf = [ 'htmlsprintf' => [
-				Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $item->url(), TRUE, $item->mapped('title') ?: $item->indefiniteArticle(), FALSE )
+				\IPS\Theme::i()->getTemplate( 'global', 'core', 'global' )->basicUrl( $item->url(), TRUE, $item->mapped('title') ?: $item->indefiniteArticle(), FALSE )
 			] ];
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
-			$sprintf = [ 'sprintf' => [ Member::loggedIn()->language()->addToStack('modcp_deleted') ] ];
+			$sprintf = [ 'sprintf' => [ \IPS\Member::loggedIn()->language()->addToStack('modcp_deleted') ] ];
 		}
 
-		return Member::loggedIn()->language()->addToStack( 'AchievementAction__Rsvp_log', FALSE, $sprintf );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__Rsvp_log', FALSE, $sprintf );
 	}
 	
 	/**
 	 * Get "description" for rule
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	public function ruleDescription( Rule $rule ): ?string
+	public function ruleDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		$conditions = [];
 		if ( isset( $rule->filters['milestone'] ) )
 		{
-			$conditions[] = Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
+			$conditions[] = \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone', FALSE, [
 				'htmlsprintf' => [
-					Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'milestone', Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
+					\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'milestone', \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_milestone_nth', FALSE, [ 'pluralize' => [ $rule->filters['milestone'] ] ] ) )
 				],
-				'sprintf'		=> [ Member::loggedIn()->language()->addToStack('rsvp') ]
+				'sprintf'		=> [ \IPS\Member::loggedIn()->language()->addToStack('rsvp') ]
 			] );
 		}
 		if ( $nodeCondition = $this->_nodeFilterDescription( $rule ) )
 		{
 			$conditions[] = $nodeCondition;
 		}
-		if( $questCondition = $this->_questFilterDescription( $rule ) )
-		{
-			$conditions[] = $questCondition;
-		}
 
-		return Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescription(
-			Member::loggedIn()->language()->addToStack( 'AchievementAction__Rsvp_title' ),
+		return \IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescription(
+			\IPS\Member::loggedIn()->language()->addToStack( 'AchievementAction__Rsvp_title' ),
 			$conditions
 		);
 	}
@@ -256,10 +204,10 @@ class Rsvp extends AchievementActionAbstract // NOTE: Other classes exist to pro
 	/**
 	 * Get "description" for rule (usually a description of the rule's filters)
 	 *
-	 * @param	Rule	$rule	The rule
+	 * @param	\IPS\core\Achievements\Rule	$rule	The rule
 	 * @return	string|NULL
 	 */
-	protected function _nodeFilterDescription( Rule $rule ): ?string
+	protected function _nodeFilterDescription( \IPS\core\Achievements\Rule $rule ): ?string
 	{
 		if ( isset( $rule->filters['nodes'] ) )
 		{
@@ -268,20 +216,20 @@ class Rsvp extends AchievementActionAbstract // NOTE: Other classes exist to pro
 			{
 				try
 				{
-					$nodeNames[] = Calendar::load( $id )->_title;
+					$nodeNames[] = \IPS\calendar\Calendar::load( $id )->_title;
 				}
-				catch ( OutOfRangeException $e ) {}
+				catch ( \OutOfRangeException $e ) {}
 			}
 			if ( $nodeNames )
 			{
-				return Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location', FALSE, [
+				return \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location', FALSE, [
 					'htmlsprintf' => [
-						Theme::i()->getTemplate( 'achievements', 'core' )->ruleDescriptionBadge( 'location',
-							count( $nodeNames ) === 1 ? $nodeNames[0] : Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location_val', FALSE, [ 'sprintf' => [
-								count( $nodeNames ),
-								Member::loggedIn()->language()->addToStack( 'calendars', FALSE, [ 'strtolower' => TRUE ] )
+						\IPS\Theme::i()->getTemplate( 'achievements' )->ruleDescriptionBadge( 'location',
+							\count( $nodeNames ) === 1 ? $nodeNames[0] : \IPS\Member::loggedIn()->language()->addToStack( 'achievements_title_filter_location_val', FALSE, [ 'sprintf' => [
+								\count( $nodeNames ),
+								\IPS\Member::loggedIn()->language()->addToStack( 'calendars', FALSE, [ 'strtolower' => TRUE ] )
 							] ] ),
-							count( $nodeNames ) === 1 ? NULL : $nodeNames
+							\count( $nodeNames ) === 1 ? NULL : $nodeNames
 						)
 					],
 				] );
@@ -292,28 +240,73 @@ class Rsvp extends AchievementActionAbstract // NOTE: Other classes exist to pro
 	}
 
 	/**
-	 * Get a query to use for multiple methods within this extension
-	 * @param string $select		Select for the query
-	 * @param array|null $where		Where for the query
-	 * @param int|null $limit		Limit for the query
-	 * @param string|null $order		Order by for the query
-	 * @param array $filters	Rule filters
-	 * @return	Select
+	 * Rebuild points and badges based on the content this rule manages
+	 *
+	 * @param	array				$data		The rebuild data
+	 * @param	array				$filters	The value returned by formatFilterValues()
+	 * @param	int					$lastId		The last ID returned by a previous iteration
+	 * @param	int					$limit		The limit of how many to rebuild
+	 * @param 	\IPS\DataTime|null 	$time		Any time limit to add
+	 * @return array
 	 */
-	public function getQuery( string $select, ?array $where, ?int $limit, ?string $order, array $filters ): Select
+	public function processRebuild( $data, $filters, $lastId, $limit, \IPS\DateTime $time = NULL ): array
+	{
+		$where = ( $time ? [ ['rsvp_id > ? and rsvp_date >= ?', $lastId, $time->getTimestamp() ] ] : [ [ 'rsvp_id > ?', $lastId ] ] );
+
+		/* Try and limit the number of rows for the good of humanity */
+		$query = $this->getQuery( '*', $where, $limit, 'rsvp_id ASC', $filters );
+		$done = 0;
+		foreach( $query as $row )
+		{
+			try
+			{
+				\IPS\Member::load( $row['rsvp_member_id'] )->achievementAction( 'calendar', 'Rsvp', [ \IPS\calendar\Event::load( $row['rsvp_event_id'] ) ] );
+			}
+			catch( \Exception $e ){}
+
+			$done++;
+			$lastId = $row['rsvp_id'];
+		}
+
+		return [ 'processed' => $done, 'lastId' => $lastId ];
+	}
+
+	/**
+	 * Get rebuild data
+	 *
+	 * @param	array				$data		Data stored with the queue item
+	 * @param	array				$filters	The value returned by formatFilterValues()
+	 * @param	\IPS\DataTime|null	$time		Any time limit to add
+	 * @return	void
+	 */
+	public function preRebuildData( &$data, $filters, \IPS\DateTime $time = NULL )
+	{
+		$data['count'] = $this->getQuery( 'COUNT(*)', ( $time ? [ ['rsvp_date >= ?', $time->getTimestamp() ] ] : [] ), NULL, NULL, $filters )->first();
+	}
+
+	/**
+	 * Get a query to use for multiple methods within this extension
+	 * @param	string		$select		Select for the query
+	 * @param	array|NULL	$where		Where for the query
+	 * @param	int|NULL	$limit		Limit for the query
+	 * @param	string|NULL	$order		Order by for the query
+	 * @param	array		$filters	Rule filters
+	 * @return	\IPS\Db\Select
+	 */
+	public function getQuery( $select, $where, $limit, $order, $filters ): \IPS\Db\Select
 	{
 		$joinContainers		= FALSE;
 		$extraJoinCondition	= NULL;
-		$where				= is_array( $where ) ? $where : array();
+		$where				= \is_array( $where ) ? $where : array();
 
 		/* Limit by node */
 		if ( isset( $filters['nodes'] ) )
 		{
 			$joinContainers		= TRUE;
-			$extraJoinCondition	= ' AND ' . Db::i()->in( 'calendar_events.event_calendar_id', $filters['nodes'] );
+			$extraJoinCondition	= ' AND ' . \IPS\Db::i()->in( 'calendar_events.event_calendar_id', $filters['nodes'] );
 		}
 
-		$query = Db::i()->select( $select, 'calendar_event_rsvp', $where, $order, $limit );
+		$query = \IPS\Db::i()->select( $select, 'calendar_event_rsvp', $where, $order, $limit );
 
 		if ( $joinContainers )
 		{
@@ -321,33 +314,5 @@ class Rsvp extends AchievementActionAbstract // NOTE: Other classes exist to pro
 		}
 
 		return $query;
-	}
-
-	/**
-	 * Get rebuild data
-	 *
-	 * @return	array
-	 */
-	static public function rebuildData(): array
-	{
-		return [ [
-			'table' => 'calendar_event_rsvp',
-			'pkey'  => 'rsvp_id',
-			'where' => [ [ 'status=?', Event::RSVP_YES ] ],
-		] ];
-	}
-
-	/**
-	 * Process the rebuild row
-	 *
-	 * @param array		$row	Row from database
-	 * @param array		$data	Data collected when starting rebuild [table, pkey...]
-	 * @return void
-	 */
-	public static function rebuildRow( array $row, array $data ) : void
-	{
-		$event = Event::load( $row['rsvp_event_id'] );
-		$member = Member::load( $row['rsvp_member_id'] );
-		$member->achievementAction( 'calendar', 'Rsvp', $event );
 	}
 }

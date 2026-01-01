@@ -12,18 +12,14 @@
 namespace IPS\convert;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use ErrorException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Converter Exception
  */
-class Exception extends ErrorException
+class _Exception extends \ErrorException
 {}

@@ -12,33 +12,21 @@
 namespace IPS\nexus\extensions\core\OverviewStatistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Extensions\OverviewStatisticsAbstract;
-use IPS\Member;
-use IPS\nexus\Package;
-use IPS\Theme;
-use function count;
-use function defined;
-use function is_array;
-use function round;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * @brief	Overview statistics extension: Products
  */
-class Products extends OverviewStatisticsAbstract
+class _Products
 {
 	/**
 	 * @brief	Which statistics page (activity or user)
 	 */
-	public string $page	= 'user';
+	public $page	= 'user';
 
 	/**
 	 * Return the sub-block keys
@@ -46,7 +34,7 @@ class Products extends OverviewStatisticsAbstract
 	 * @note This is designed to allow one class to support multiple blocks, for instance using the ContentRouter to generate blocks.
 	 * @return array
 	 */
-	public function getBlocks(): array
+	public function getBlocks()
 	{
 		return array( 'products' );
 	}
@@ -57,7 +45,7 @@ class Products extends OverviewStatisticsAbstract
 	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
 	 * @return	array
 	 */
-	public function getBlockDetails( string $subBlock = NULL ): array
+	public function getBlockDetails( $subBlock = NULL )
 	{
 		/* Description can be null and will not be shown if so */
 		return array( 'app' => 'nexus', 'title' => 'stats_overview_products', 'description' => null, 'refresh' => 60 );
@@ -66,88 +54,90 @@ class Products extends OverviewStatisticsAbstract
 	/** 
 	 * Return the block HTML to show
 	 *
-	 * @param	array|string|null    $dateRange	String for a fixed time period in days, NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
+	 * @param	array|NULL	$dateRange	NULL for all time, or an array with 'start' and 'end' \IPS\DateTime objects to restrict to
 	 * @param	string|NULL	$subBlock	The subblock we are loading as returned by getBlocks()
 	 * @return	string
 	 */
-	public function getBlock( array|string $dateRange = NULL, string $subBlock = NULL ): string
+	public function getBlock( $dateRange = NULL, $subBlock = NULL )
 	{
 		/* Init Chart */
 		$pieBarData = array();
-		$numbers = $this->getBlockNumbers( $dateRange, $subBlock );
-		foreach ( $numbers as $key => $value )
-		{
-			if ( $key === 'statsreports_previous_total' or $key === 'statsreports_current_total' )
-			{
-				continue;
-			}
-
-			$pieBarData[] = [
-				'name' => Member::loggedIn()->language()->addToStack( $key ),
-				'value' => $value,
-				'percentage' => $numbers['statsreports_current_total'] ? round( ( $value / $numbers['statsreports_current_total'] ) * 100, 2 ) : 0
-			];
-		}
-
-		$chart = NULL;
-		if( count( $pieBarData ) )
-		{
-			$chart = Theme::i()->getTemplate( 'global', 'core', 'global'  )->applePieChart( $pieBarData );
-		}
-
-		return Theme::i()->getTemplate( 'stats' )->overviewComparisonCount( $numbers['statsreports_current_total'], $numbers['statsreports_previous_total'], $chart );
-	}
-
-	/**
-	 * Get the numbers to add to the CSV export
-	 *
-	 * @param array|string|null $dateRange
-	 * @param string|null $subBlock
-	 *
-	 * @return array
-	 */
-	public function getBlockNumbers( array|string $dateRange=null, string $subBlock=null ) : array
-	{
-		$numbers = array();
-
+		
 		/* Add Rows */
 		$where			= array( array( 'ps_app=?', 'nexus' ), array( 'ps_type=?', 'package' ) );
 		$previousCount	= NULL;
 
-		if( is_array( $dateRange ) )
+		if( \is_array( $dateRange ) )
 		{
 			$where[] = array( 'ps_start > ?', $dateRange['start']->getTimestamp() );
 			$where[] = array( 'ps_start < ?', $dateRange['end']->getTimestamp() );
 		}
 		elseif( $dateRange !== NULL )
 		{
-			$currentDate	= new DateTime;
-			$interval = static::getInterval( $dateRange );
+			$currentDate	= new \IPS\DateTime;
+			$interval		= NULL;
+
+			switch( $dateRange )
+			{
+				case '7':
+					$interval = new \DateInterval( 'P7D' );
+				break;
+
+				case '30':
+					$interval = new \DateInterval( 'P1M' );
+				break;
+
+				case '90':
+					$interval = new \DateInterval( 'P3M' );
+				break;
+
+				case '180':
+					$interval = new \DateInterval( 'P6M' );
+				break;
+
+				case '365':
+					$interval = new \DateInterval( 'P1Y' );
+				break;
+			}
+
 			$initialTimestamp = $currentDate->sub( $interval )->getTimestamp();
 			$where[] = array( 'ps_start > ?', $initialTimestamp );
 
-			$previousCount = Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( array( 'ps_app=?', 'nexus' ), array( 'ps_type=?', 'package' ), array( 'ps_start BETWEEN ? AND ?', $currentDate->sub( $interval )->getTimestamp(), $initialTimestamp ) ) )->first();
+			$previousCount = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', array( array( 'ps_app=?', 'nexus' ), array( 'ps_type=?', 'package' ), array( 'ps_start BETWEEN ? AND ?', $currentDate->sub( $interval )->getTimestamp(), $initialTimestamp ) ) )->first();
 		}
 
 		$total = 0;
+		$chart = NULL;
 
-		foreach( Package::roots() as $package )
+		foreach( \IPS\nexus\Package::roots() as $package )
 		{
 			$filter		= $where;
 			$filter[]	= array( 'ps_item_id=?', $package->id );
 
-			$value = Db::i()->select( 'COUNT(*)', 'nexus_purchases', $filter )->first();
+			$value = \IPS\Db::i()->select( 'COUNT(*)', 'nexus_purchases', $filter )->first();
 
 			if( $value > 0 )
 			{
 				$total += $value;
-				$numbers['nexus_package_' . $package->id] = $value;
+
+				$pieBarData[] = array(
+					'name' =>  \IPS\Member::loggedIn()->language()->addToStack('nexus_package_' . $package->id ),
+					'value' => $value,
+					'percentage' => 0
+				);
 			}
 		}
 
-		$numbers['statsreports_current_total'] = $total;
-		$numbers['statsreports_previous_total'] = $previousCount;
+		foreach( $pieBarData as &$package )
+		{
+			$package['percentage'] = round( ( $package['value'] / $total ) * 100, 2 );
+		}
 
-		return $numbers;
+		if( \count( $pieBarData ) )
+		{
+			$chart = \IPS\Theme::i()->getTemplate( 'global', 'core', 'global'  )->applePieChart( $pieBarData );
+		}
+
+		return \IPS\Theme::i()->getTemplate( 'stats' )->overviewComparisonCount( $total, $previousCount, $chart );
 	}
 }

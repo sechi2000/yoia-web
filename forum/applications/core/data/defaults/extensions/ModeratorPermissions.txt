@@ -12,25 +12,20 @@
 namespace IPS\{app}\extensions\core\ModeratorPermissions;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\ModeratorPermissionsAbstract;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Moderator Permissions
  */
-class {class} extends ModeratorPermissionsAbstract
+class _{class}
 {
 	/**
 	 * Get Permissions
 	 *
-	 * @param array $toggles
 	 * @code
 	 	return array(
 	 		'key'	=> 'YesNo',	// Can just return a string with type
@@ -45,11 +40,43 @@ class {class} extends ModeratorPermissionsAbstract
 	 * @endcode
 	 * @return	array
 	 */
-	public function getPermissions( array $toggles ): array
+	public function getPermissions(): array
 	{
-		return array(
-			/*'can_edit_course_content' 	=> "YesNo",
-			'can_delete_course_content' 	=> "YesNo",*/
-		);
+		return array();
+	}
+
+	/**
+	 * Pre-save
+	 *
+	 * @note	This can be used to adjust the values submitted on the form prior to saving
+	 * @param	array	$values		The submitted form values
+	 * @return	void
+	 */
+	public function preSave( &$values )
+	{
+		
+	}
+	
+	/**
+	 * After change
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @param	array	$changed	Values that were changed
+	 * @return	void
+	 */
+	public function onChange( $moderator, $changed )
+	{
+		
+	}
+	
+	/**
+	 * After delete
+	 *
+	 * @param	array	$moderator	The moderator
+	 * @return	void
+	 */
+	public function onDelete( $moderator )
+	{
+		
 	}
 }

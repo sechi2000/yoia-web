@@ -12,43 +12,36 @@
 namespace IPS\core\extensions\core\CommunityEnhancements;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\CommunityEnhancementsAbstract;
-use IPS\Login;
-use IPS\Settings;
-use LogicException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Community Enhancement
  */
-class IndexNow extends CommunityEnhancementsAbstract
+class _IndexNow
 {
 	/**
 	 * @brief	Enhancement is enabled?
 	 */
-	public bool $enabled	= FALSE;
+	public $enabled	= FALSE;
 
 	/**
 	 * @brief	IPS-provided enhancement?
 	 */
-	public bool $ips	= FALSE;
+	public $ips	= FALSE;
 
 	/**
 	 * @brief	Enhancement has configuration options?
 	 */
-	public bool $hasOptions	= FALSE;
+	public $hasOptions	= FALSE;
 
 	/**
 	 * @brief	Icon data
 	 */
-	public string $icon	= "";
+	public $icon	= "";
 	
 	/**
 	 * Constructor
@@ -57,7 +50,7 @@ class IndexNow extends CommunityEnhancementsAbstract
 	 */
 	public function __construct()
 	{
-		$this->enabled = Settings::i()->indexnow_enabled;
+		$this->enabled = \IPS\Settings::i()->indexnow_enabled;
 	}
 	
 	/**
@@ -65,32 +58,22 @@ class IndexNow extends CommunityEnhancementsAbstract
 	 *
 	 * @param	$enabled	bool	Enable/Disable
 	 * @return	void
-	 * @throws	LogicException
+	 * @throws	\LogicException
 	 */
-	public function toggle( bool $enabled ) : void
+	public function toggle( $enabled )
 	{
 		/* If we're disabling, just disable */
 		if( !$enabled )
 		{
-			Settings::i()->changeValues( array( 'indexnow_enabled' => 0 ) );
-			Settings::i()->changeValues( array( 'indexnow_key' => '' ) );
+			\IPS\Settings::i()->changeValues( array( 'indexnow_enabled' => 0 ) );
+			\IPS\Settings::i()->changeValues( array( 'indexnow_key' => '' ) );
 		}
 		else
 		{
-			$key = Login::generateRandomString();
+			$key = \IPS\Login::generateRandomString();
 
-			Settings::i()->changeValues( array( 'indexnow_enabled' => 1 ) );
-			Settings::i()->changeValues( array( 'indexnow_key' => $key ) );
+			\IPS\Settings::i()->changeValues( array( 'indexnow_enabled' => 1 ) );
+			\IPS\Settings::i()->changeValues( array( 'indexnow_key' => $key ) );
 		}
-	}
-
-	/**
-	 * Edit
-	 *
-	 * @return    void
-	 */
-	public function edit(): void
-	{
-
 	}
 }

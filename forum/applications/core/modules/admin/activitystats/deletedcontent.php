@@ -12,39 +12,30 @@
 namespace IPS\core\modules\admin\activitystats;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\Statistics\Chart;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * deletedcontent
  */
-class deletedcontent extends Controller
+class _deletedcontent extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'deletedcontent_manage' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'deletedcontent_manage' );
 		parent::execute();
 	}
 
@@ -53,12 +44,11 @@ class deletedcontent extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$chart = Chart::loadFromExtension( 'core', 'DeletedContent' )->getChart( Url::internal( "app=core&module=activitystats&controller=deletedcontent" ) );
-
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_activitystats_deletedcontent');
-		Output::i()->output = (string) $chart;
+		$chart = \IPS\core\Statistics\Chart::loadFromExtension( 'core', 'DeletedContent' )->getChart( \IPS\Http\Url::internal( "app=core&module=activitystats&controller=deletedcontent" ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_activitystats_deletedcontent');
+		\IPS\Output::i()->output = (string) $chart;
 	}
 	
 }

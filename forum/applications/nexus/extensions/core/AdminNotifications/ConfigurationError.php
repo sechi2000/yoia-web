@@ -11,49 +11,38 @@
 namespace IPS\nexus\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Gateway;
-use IPS\Theme;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function substr;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP  Notification Extension
  */
-class ConfigurationError extends AdminNotification
+class _ConfigurationError extends \IPS\core\AdminNotification
 {	
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'commerce';
+	public static $group = 'commerce';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 4;
+	public static $groupPriority = 4;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 5;
+	public static $itemPriority = 5;
 	
 	/**
 	 * Title for settings
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle(): string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_ConfigurationError';
 	}
@@ -61,10 +50,10 @@ class ConfigurationError extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member )
 	{
 		return $member->hasAcpRestriction( 'nexus', 'payments', 'gateways_manage' );
 	}
@@ -72,9 +61,9 @@ class ConfigurationError extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional(): bool
+	public static function mayBeOptional()
 	{
 		return TRUE;
 	}
@@ -84,7 +73,7 @@ class ConfigurationError extends AdminNotification
 	 *
 	 * @return	bool
 	 */
-	public static function mayRecur(): bool
+	public static function mayRecur()
 	{
 		return TRUE;
 	}
@@ -94,62 +83,64 @@ class ConfigurationError extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function title(): string
+	public function title()
 	{
 		if( mb_substr( $this->extra, 0, 2 ) === 'pm' )
 		{
-			return Member::loggedIn()->language()->addToStack('acp_notification_nexus_config_error_paymethod');
+			return \IPS\Member::loggedIn()->language()->addToStack('acp_notification_nexus_config_error_paymethod');
 		}
 		elseif( mb_substr( $this->extra, 0, 2 ) === 'po' )
 		{
-			return Member::loggedIn()->language()->addToStack( 'acp_notification_nexus_config_error_payoutmethod' );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'acp_notification_nexus_config_error_payoutmethod' );
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack( 'acpNotification_nexusBACancelErrors', FALSE, array( 'pluralize' => array( count( json_decode( $this->extra, TRUE ) ) ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'acpNotification_nexusBACancelErrors', FALSE, array( 'pluralize' => array( \count( json_decode( $this->extra, TRUE ) ) ) ) );
 		}
 	}
 	
 	/**
 	 * Notification Subtitle (no HTML)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function subtitle(): ?string
+	public function subtitle()
 	{
 		if( mb_substr( $this->extra, 0, 2 ) === 'pm' )
 		{
 			try
 			{
-				$method = Gateway::load( substr( $this->extra, 2 ) );
-				return Member::loggedIn()->language()->addToStack( 'acp_notification_nexus_config_error_paymethod_desc', FALSE, array( 'sprintf' => array( $method->_title ) ) );
+				$method = \IPS\nexus\Gateway::load( \substr( $this->extra, 2 ) );
+				return \IPS\Member::loggedIn()->language()->addToStack( 'acp_notification_nexus_config_error_paymethod_desc', FALSE, array( 'sprintf' => array( $method->_title ) ) );
 			}
-			catch ( OutOfRangeException ) { }
+			catch ( \OutOfRangeException $e ) { }
 		}
 		elseif( mb_substr( $this->extra, 0, 2 ) === 'po' )
 		{
 			$gateway = mb_substr( $this->extra, 2 );
-			return Member::loggedIn()->language()->addToStack( 'acp_notification_nexus_config_error_payoutmethod_desc', FALSE, array( 'sprintf' => array( $gateway ) ) );
+			return \IPS\Member::loggedIn()->language()->addToStack( 'acp_notification_nexus_config_error_payoutmethod_desc', FALSE, array( 'sprintf' => array( $gateway ) ) );
 		}
-
-		return '';
+		else
+		{
+			return '';
+		}
 	}
 	
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body()
 	{
 		if( mb_substr( $this->extra, 0, 2 ) === 'pm' )
 		{
 			try
 			{
-				$method = Gateway::load( substr( $this->extra, 2 ) );
-				return Theme::i()->getTemplate( 'notifications', 'nexus', 'admin' )->paymentMethodError( $method );
+				$method = \IPS\nexus\Gateway::load( \substr( $this->extra, 2 ) );
+				return \IPS\Theme::i()->getTemplate( 'notifications', 'nexus', 'admin' )->paymentMethodError( $method );
 			}
-			catch ( OutOfRangeException )
+			catch ( \OutOfRangeException $e )
 			{
 				return '';
 			}
@@ -157,11 +148,11 @@ class ConfigurationError extends AdminNotification
 		elseif( mb_substr( $this->extra, 0, 2 ) === 'po' )
 		{
 			$gateway = mb_substr( $this->extra, 2 );
-			return Theme::i()->getTemplate( 'notifications', 'nexus', 'admin' )->payoutSettingsError( $gateway );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'nexus', 'admin' )->payoutSettingsError( $gateway );
 		}
 		else
 		{
-			return Theme::i()->getTemplate( 'notifications', 'nexus', 'admin' )->baCancellationError( json_decode( $this->extra, TRUE ) );
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'nexus', 'admin' )->baCancellationError( json_decode( $this->extra, TRUE ) );
 		}
 	}
 	
@@ -170,7 +161,7 @@ class ConfigurationError extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function severity(): string
+	public function severity()
 	{
 		return ( mb_substr( $this->extra, 0, 2 ) === 'pm' OR mb_substr( $this->extra, 0, 2 ) === 'po' ) ? static::SEVERITY_CRITICAL : static::SEVERITY_OPTIONAL;
 	}
@@ -180,7 +171,7 @@ class ConfigurationError extends AdminNotification
 	 *
 	 * @return	string
 	 */
-	public function dismissible(): string
+	public function dismissible()
 	{
 		return ( mb_substr( $this->extra, 0, 2 ) === 'pm' OR mb_substr( $this->extra, 0, 2 ) === 'po' ) ? static::DISMISSIBLE_NO : static::DISMISSIBLE_PERMANENT;
 	}
@@ -191,16 +182,16 @@ class ConfigurationError extends AdminNotification
 	 * @note	This is checked every time the notification shows. Should be lightweight.
 	 * @return	bool
 	 */
-	public function selfDismiss(): bool
+	public function selfDismiss()
 	{
 		if( mb_substr( $this->extra, 0, 2 ) === 'pm' )
 		{
 			try
 			{
-				Gateway::load( substr( $this->extra, 2 ) );
+				\IPS\nexus\Gateway::load( \substr( $this->extra, 2 ) );
 				return FALSE;
 			}
-			catch( OutOfRangeException )
+			catch( \OutOfRangeException $e )
 			{
 				return TRUE;
 			}
@@ -214,9 +205,9 @@ class ConfigurationError extends AdminNotification
 	/**
 	 * Style
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
-	public function style(): string
+	public function style()
 	{
 		return ( mb_substr( $this->extra, 0, 2 ) === 'pm' OR mb_substr( $this->extra, 0, 2 ) === 'po' ) ? static::STYLE_ERROR : static::STYLE_WARNING;
 	}
@@ -224,19 +215,19 @@ class ConfigurationError extends AdminNotification
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url|null
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url|null
+	public function link()
 	{
 		if( mb_substr( $this->extra, 0, 2 ) === 'pm' )
 		{
-			return Url::internal( 'app=nexus&module=payments&controller=paymentsettings&tab=gateways&do=form&id=' . substr( $this->extra, 2 ) );
+			return \IPS\Http\Url::internal( 'app=nexus&module=payments&controller=paymentsettings&tab=gateways&do=form&id=' . \substr( $this->extra, 2 ) );
 		}
 		elseif( mb_substr( $this->extra, 0, 2 ) === 'po' )
 		{
-			return Url::internal( 'app=nexus&module=payments&controller=payouts&do=settings' );
+			return \IPS\Http\Url::internal( 'app=nexus&module=payments&controller=payouts&do=settings' );
 		}
 
-		return parent::link();
+		parent::link();
 	}
 }

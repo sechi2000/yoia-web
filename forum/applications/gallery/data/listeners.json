@@ -1,7 +1,0 @@
-{
-    "Gallery": {
-        "type": "MemberListenerType",
-        "classname": "IPS\\gallery\\listeners\\Gallery",
-        "extends": "IPS\\Member"
-    }
-}

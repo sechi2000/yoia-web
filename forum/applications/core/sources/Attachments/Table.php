@@ -12,68 +12,53 @@
 namespace IPS\core\Attachments;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\core\extensions\core\EditorMedia\Attachment;
-use IPS\Db;
-use IPS\File;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use UnderflowException;
-use function count;
-use function defined;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Table Builder for attachments
  */
-class Table extends \IPS\Helpers\Table\Db
+class _Table extends \IPS\Helpers\Table\Db
 {
 	/**
 	 * Constructor
 	 *
 	 * @param	string	$table						Database table
-	 * @param	Url	$baseUrl			Base URL
+	 * @param	\IPS\Http\Url	$baseUrl			Base URL
 	 * @param	array|null		$where				WHERE clause
 	 * @param	array|null		$forceIndex			Index to force
 	 * @return	void
 	 */
-	public function __construct( $table, Url $baseUrl, $where=NULL, $forceIndex=NULL )
+	public function __construct( $table, \IPS\Http\Url $baseUrl, $where=NULL, $forceIndex=NULL )
 	{
-        parent::__construct( $table, $baseUrl, $where, $forceIndex );
-
 		/* Do any multi-mod */
-		if ( isset( Request::i()->modaction ) )
+		if ( isset( \IPS\Request::i()->modaction ) )
 		{
 			$this->multiMod();
 		}
+
+		return parent::__construct( $table, $baseUrl, $where, $forceIndex );
 	}
 
 	/**
 	 * @brief	Return table filters
 	 */
-	public bool $showFilters	= TRUE;
+	public $showFilters	= TRUE;
 
 	/**
 	 * Saved Actions (for multi-moderation)
 	 */
-	public array $savedActions = array();
+	public $savedActions = array();
 
 	/**
 	 * Return the filters that are available for selecting table rows
 	 *
 	 * @return	array
 	 */
-	public function getFilters() : array
+	public function getFilters()
 	{
 		return array();
 	}
@@ -84,9 +69,9 @@ class Table extends \IPS\Helpers\Table\Db
 	 * @param	string|null		$action		Specific action to check (hide/unhide, etc.) or NULL for a generic check
 	 * @return	bool
 	 */
-	public function canModerate( string $action=NULL ): bool
+	public function canModerate( $action=NULL )
 	{
-		return (bool) Member::loggedIn()->group['gbw_delete_attachments'];
+		return (bool) \IPS\Member::loggedIn()->group['gbw_delete_attachments'];
 	}
 	
 	/**
@@ -94,7 +79,7 @@ class Table extends \IPS\Helpers\Table\Db
 	 *
 	 * @return	array
 	 */
-	public function multimodActions() : array
+	public function multimodActions()
 	{
 		return array( 'delete' );
 	}
@@ -104,56 +89,56 @@ class Table extends \IPS\Helpers\Table\Db
 	 *
 	 * @return	void
 	 */
-	protected function multimod() : void
+	protected function multimod()
 	{
-		if( !is_array( Request::i()->moderate ) )
+		if( !\is_array( \IPS\Request::i()->moderate ) )
 		{
 			return;
 		}
 
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		foreach (Request::i()->moderate as $id => $status )
+		foreach (\IPS\Request::i()->moderate as $id => $status )
 		{
 			try
 			{
-				$attachment = Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', $id ) )->first();
+				$attachment = \IPS\Db::i()->select( '*', 'core_attachments', array( 'attach_id=?', $id ) )->first();
 
 				/* Check it belongs to us */
-				if ( $attachment['attach_member_id'] !== Member::loggedIn()->member_id )
+				if ( $attachment['attach_member_id'] !== \IPS\Member::loggedIn()->member_id )
 				{
-					Output::i()->error( 'no_module_permission', '2C388/1', 403, '' );
+					\IPS\Output::i()->error( 'no_module_permission', '2C388/1', 403, '' );
 				}
 
 				/* And we can delete it */
-				if ( !Member::loggedIn()->group['gbw_delete_attachments'] )
+				if ( !\IPS\Member::loggedIn()->group['gbw_delete_attachments'] )
 				{
-					Attachment::getLocations( $attachment['attach_id'] );
-					if ( count( Attachment::$locations[ $attachment['attach_id'] ] ) )
+					\IPS\core\extensions\core\EditorMedia\Attachment::getLocations( $attachment['attach_id'] );
+					if ( \count( \IPS\core\extensions\core\EditorMedia\Attachment::$locations[ $attachment['attach_id'] ] ) )
 					{
-						Output::i()->error( 'no_module_permission', '2C388/2', 403, '' );
+						\IPS\Output::i()->error( 'no_module_permission', '2C388/2', 403, '' );
 					}
 				}
 
 				/* Delete */
 				try
 				{
-					File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
+					\IPS\File::get( 'core_Attachment', $attachment['attach_location'] )->delete();
 					if ( $attachment['attach_thumb_location'] )
 					{
-						File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
+						\IPS\File::get( 'core_Attachment', $attachment['attach_thumb_location'] )->delete();
 					}
 				}
-				catch ( Exception $e ) { }
-				Db::i()->delete( 'core_attachments', array( 'attach_id=?', $attachment['attach_id'] ) );
-				Db::i()->delete( 'core_attachments_map', array( 'attachment_id=?', $attachment['attach_id'] ) );
+				catch ( \Exception $e ) { }
+				\IPS\Db::i()->delete( 'core_attachments', array( 'attach_id=?', $attachment['attach_id'] ) );
+				\IPS\Db::i()->delete( 'core_attachments_map', array( 'attachment_id=?', $attachment['attach_id'] ) );
 			}
-			catch ( UnderflowException $e )
+			catch ( \UnderflowException $e )
 			{
-				Output::i()->error( 'node_error', '2C388/3', 404, '' );
+				\IPS\Output::i()->error( 'node_error', '2C388/3', 404, '' );
 			}
 		}
 
-		Output::i()->redirect( $this->baseUrl, 'deleted' );
+		\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=system&controller=attachments', 'front', 'attachments' ), 'deleted' );
 	}
 }

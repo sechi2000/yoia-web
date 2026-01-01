@@ -12,41 +12,35 @@
 namespace IPS\cms\Databases;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Dispatcher\Controller as DispatcherController;
-use IPS\Http\Url;
-use function defined;
-use function get_called_class;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Abstract class that Controllers should extend
  */
-abstract class Controller extends DispatcherController
+abstract class _Controller extends \IPS\Dispatcher\Controller
 {
 	/** 
 	 * @brief	Base URL
 	 */
-	public mixed $url;
+	public $url;
 	
 	/**
 	 * Constructor
 	 *
-	 * @param mixed|null $url		The base URL for this controller or NULL to calculate automatically
+	 * @param	\IPS\Http\Url|NULL	$url		The base URL for this controller or NULL to calculate automatically
 	 * @return	void
 	 */
-	public function __construct( mixed $url=NULL )
+	public function __construct( $url=NULL )
 	{
 		if ( $url === NULL )
 		{
-			$class		= get_called_class();
+			$class		= \get_called_class();
 			$exploded	= explode( '\\', $class );
-			$this->url = Url::internal( "app=cms&module=database", 'front' ); /* @todo fix URL */
+			$this->url = \IPS\Http\Url::internal( "app=cms&module=database", 'front' ); /* @todo fix URL */
 		}
 		else
 		{

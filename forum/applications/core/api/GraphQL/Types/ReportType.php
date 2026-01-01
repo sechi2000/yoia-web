@@ -12,25 +12,23 @@
 namespace IPS\core\api\GraphQL\Types;
 use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\Content;
-use IPS\Member;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ReportType for GraphQL API
  */
-class ReportType extends ObjectType
+class _ReportType extends ObjectType
 {
 	/**
 	 * Get object type
 	 *
+	 * @return	ObjectType
 	 */
 	public function __construct()
 	{
@@ -100,11 +98,10 @@ class ReportType extends ObjectType
     /**
 	 * Returns whether the user has reported this content
 	 *
-	 * @param Content $content
 	 * @return	boolean
 	 */
-    protected function hasReported( Content $content ) : bool
+    protected function hasReported($content)
     {
-        return ( $content->canReport( Member::loggedIn() ) === 'report_err_already_reported' );
+        return ( $content->canReport( \IPS\Member::loggedIn() ) === 'report_err_already_reported' );
     }
 }

@@ -11,39 +11,31 @@
 namespace IPS\forums\extensions\core\Statistics;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Helpers\Chart;
-use IPS\Helpers\Chart\Database;
-use IPS\Http\Url;
-use IPS\Member;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Statistics Chart Extension
  */
-class Posts extends \IPS\core\Statistics\Chart
+class _Posts extends \IPS\core\Statistics\Chart
 {
 	/**
 	 * @brief	Controller
 	 */
-	public ?string $controller = 'forums_stats_posts_total';
+	public $controller = 'forums_stats_posts_total';
 	
 	/**
 	 * Render Chart
 	 *
-	 * @param	Url	$url	URL the chart is being shown on.
-	 * @return Chart
+	 * @param	\IPS\Http\Url	$url	URL the chart is being shown on.
+	 * @return \IPS\Helpers\Chart
 	 */
-	public function getChart( Url $url ): Chart
+	public function getChart( \IPS\Http\Url $url ): \IPS\Helpers\Chart
 	{
-		$chart = new Database( $url, 'forums_posts', 'post_date', '', array(
+		$chart = new \IPS\Helpers\Chart\Database( $url, 'forums_posts', 'post_date', '', array(
 			'isStacked' => FALSE,
 			'backgroundColor' 	=> '#ffffff',
 			'colors'			=> array( '#10967e' ),
@@ -53,9 +45,9 @@ class Posts extends \IPS\core\Statistics\Chart
 		) );
 		$chart->setExtension( $this );
 
-		$chart->where = array( array( Db::i()->in( 'queued', array( -2, -3 ), TRUE ) ) );
-		$chart->addSeries( Member::loggedIn()->language()->addToStack( 'stats_new_posts' ), 'number', 'COUNT(*)', FALSE );
-		$chart->title = Member::loggedIn()->language()->addToStack( 'stats_posts_title' );
+		$chart->where = array( array( \IPS\Db::i()->in( 'queued', array( -2, -3 ), TRUE ) ) );
+		$chart->addSeries( \IPS\Member::loggedIn()->language()->addToStack( 'stats_new_posts' ), 'number', 'COUNT(*)', FALSE );
+		$chart->title = \IPS\Member::loggedIn()->language()->addToStack( 'stats_posts_title' );
 		$chart->availableTypes = array( 'AreaChart', 'ColumnChart', 'BarChart' );
 		
 		return $chart;

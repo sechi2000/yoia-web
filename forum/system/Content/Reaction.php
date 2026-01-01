@@ -11,130 +11,88 @@
 namespace IPS\Content;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\IPS;
-use IPS\Node\CustomBadge;
-use IPS\Platform\Bridge;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\File;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Radio;
-use IPS\Helpers\Form\Translatable;
-use IPS\Helpers\Form\Upload;
-use IPS\Http\Url;
-use IPS\Lang;
-use IPS\Member;
-use IPS\Node\Model;
-use IPS\Settings;
-use function count;
-use function defined;
-use function get_called_class;
-use function intval;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Reaction Model
  */
-class Reaction extends Model
+class _Reaction extends \IPS\Node\Model
 {
-	use CustomBadge;
-
 	/**
 	 * @brief	Database Table
 	 */
-	public static ?string $databaseTable = 'core_reactions';
+	public static $databaseTable = 'core_reactions';
 	
 	/**
 	 * @brief	Database Prefix
 	 */
-	public static string $databasePrefix = 'reaction_';
+	public static $databasePrefix = 'reaction_';
 	
 	/**
 	 * @brief	Multiton Store
 	 */
-	protected static array $multitons;
+	protected static $multitons;
 		
 	/**
 	 * @brief	[ActiveRecord] ID Database Column
 	 */
-	public static string $databaseColumnId = 'id';
+	public static $databaseColumnId = 'id';
 	
 	/**
 	 * @brief	[ActiveRecord] Multiton Map
 	 */
-	protected static array $multitonMap	= array();
+	protected static $multitonMap	= array();
 	
 	/**
 	 * @brief	[Node] Node Title
 	 */
-	public static string $nodeTitle = 'reactions';
+	public static $nodeTitle = 'reactions';
 	
 	/**
 	 * @brief	[Node] Sortable
 	 */
-	public static bool $nodeSortable = TRUE;
+	public static $nodeSortable = TRUE;
 	
 	/**
 	 * @brief	[Node] Positon Column
 	 */
-	public static ?string $databaseColumnOrder = 'position';
+	public static $databaseColumnOrder = 'position';
 	
 	/**
 	 * @brief	[Node] Modal Forms because Charles loves them so
 	 */
-	public static bool $modalForms = TRUE;
+	public static $modalForms = TRUE;
 	
 	/**
 	 * @brief	[Node] Title prefix.  If specified, will look for a language key with "{$key}_title" as the key
 	 */
-	public static ?string $titleLangPrefix = 'reaction_title_';
+	public static $titleLangPrefix = 'reaction_title_';
 	
 	/**
 	 * @brief	[Node] Enabled/Disabled Column
 	 */
-	public static ?string $databaseColumnEnabledDisabled = 'enabled';
+	public static $databaseColumnEnabledDisabled = 'enabled';
 
 	/**
 	 * @brief Icon Cache
 	 */
-	public static array $icons = array();
-
-	/**
-	 * @brief	Disable the number overlay for custom badges
-	 */
-	public static bool $customBadgeNumberOverlay = false;
-
-	/**
-	 * @brief	Toggle off these fields when generating a custom badge
-	 *
-	 * @var array|string[]
-	 */
-	public static array $customBadgeToggles = [ 'reaction_icon' ];
+	public static $icons = array();
 
 	/**
 	 * Form
 	 *
-	 * @param	Form	$form	The form
+	 * @param	\IPS\Helpers\Form	$form	The form
 	 * @return	void
 	 */
-	public function form( Form &$form ): void
+	public function form( &$form )
 	{
-		/* Allow SVGs without the obscure hash removing the file extension */
-		File::$safeFileExtensions[] = 'svg';
-
-		$form->add( new Translatable( 'reaction_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? 'reaction_title_' . $this->id : NULL ) ) ) );
-		$form->add( new Radio( 'reaction_value', $this->id ? $this->value : 1, TRUE, array( 'options' => array( 1 => 'positive', 0 => 'neutral', -1 => 'negative' ) ) ) );
-
-		parent::form( $form );
-
-		$form->add( new Upload( 'reaction_icon', $this->id ? File::get( 'core_Reaction', (string) $this->icon ) : NULL, false, array( 'image' => TRUE, 'storageExtension' => 'core_Reaction', 'storageContainer' => 'reactions', 'obscure' => FALSE ), null, null, null, 'reaction_icon' ) );
+		$form->add( new \IPS\Helpers\Form\Translatable( 'reaction_title', NULL, TRUE, array( 'app' => 'core', 'key' => ( $this->id ? 'reaction_title_' . $this->id : NULL ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Radio( 'reaction_value', $this->id ? $this->value : 1, TRUE, array( 'options' => array( 1 => 'positive', 0 => 'neutral', -1 => 'negative' ) ) ) );
+		$form->add( new \IPS\Helpers\Form\Upload( 'reaction_icon', $this->id ? \IPS\File::get( 'core_Reaction', $this->icon ) : NULL, TRUE, array( 'image' => TRUE, 'storageExtension' => 'core_Reaction', 'storageContainer' => 'reactions', 'obscure' => FALSE ) ) );
 	}
 	
 	/**
@@ -143,16 +101,14 @@ class Reaction extends Model
 	 * @param	array	$values	Values from the form
 	 * @return	array
 	 */
-	public function formatFormValues( array $values ): array
+	public function formatFormValues( $values )
 	{
 		if ( !$this->id )
 		{
 			$this->save();
 		}
-
-		$values['use_custom'] = ( isset( $values['custombadge_use_custom'] ) and $values['custombadge_use_custom'] );
 		
-		Lang::saveCustom( 'core', 'reaction_title_' . $this->id, $values['reaction_title'] );
+		\IPS\Lang::saveCustom( 'core', 'reaction_title_' . $this->id, $values['reaction_title'] );
 		unset( $values['reaction_title'] );
 		
 		return parent::formatFormValues( $values );
@@ -161,133 +117,51 @@ class Reaction extends Model
 	/**
 	 * [Node] Does the currently logged in user have permission to delete this node?
 	 *
-	 * @return    bool
+	 * @return	bool
 	 */
-	public function canDelete(): bool
+	public function canDelete()
 	{
-		if ( $this->id === 1 OR Bridge::i()->liveTopicsUnconverted() )
+		if ( $this->id === 1 )
 		{
 			return FALSE;
 		}
 		
 		return TRUE;
 	}
-
-	/**
-	 * @inheritDoc
-	 * @return bool
-	 */
-	public static function canAddRoot() : bool
-	{
-		/* When live topics are in session, prevent users from modifying the content */
-		if ( Bridge::i()->liveTopicsUnconverted() )
-		{
-			return false;
-		}
-		return parent::canAddRoot();
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function canAdd() : bool
-	{
-		if ( Bridge::i()->liveTopicsUnconverted() )
-		{
-			return false;
-		}
-		return parent::canAdd();
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function canEdit() : bool
-	{
-		if ( Bridge::i()->liveTopicsUnconverted() )
-		{
-			return false;
-		}
-		return parent::canEdit();
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function canManagePermissions() : bool
-	{
-		if ( Bridge::i()->liveTopicsUnconverted() )
-		{
-			return false;
-		}
-		return parent::canManagePermissions();
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function canMassManageContent() : bool
-	{
-		if ( Bridge::i()->liveTopicsUnconverted() )
-		{
-			return false;
-		}
-		return parent::canMassManageContent();
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function canCopy() : bool
-	{
-		if ( Bridge::i()->liveTopicsUnconverted() )
-		{
-			return false;
-		}
-		return parent::canCopy();
-	}
-
+	
 	/**
 	 * Get Icon
 	 *
-	 * @return	mixed
+	 * @return	\IPS\File
 	 */
-	public function get__icon(): mixed
+	public function get__icon()
 	{
-		if( $this->use_custom and $badge = $this->getRecordBadge() )
+		if ( !isset( static::$icons[ $this->id ] ) )
 		{
-			return $badge->file()?->url;
+			static::$icons[ $this->id ] = \IPS\File::get( 'core_Reaction', $this->_data['icon'] );
 		}
-		if( $this->_data['icon'] )
-		{
-			try
-			{
-				return File::get( 'core_Reaction', $this->_data['icon'] );
-			}
-			catch( Exception $e ){}
 
-		}
-		return NULL;
+		return static::$icons[ $this->id ];
 	}
 
 	/**
 	 * Get Description
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function get__description(): ?string
+	public function get__description()
 	{
 		if ( $this->value == 1 )
 		{
-			return Member::loggedIn()->language()->addToStack('positive');
+			return \IPS\Member::loggedIn()->language()->addToStack('positive');
 		}
 		elseif ( $this->value == -1 )
 		{
-			return Member::loggedIn()->language()->addToStack('negative');
+			return \IPS\Member::loggedIn()->language()->addToStack('negative');
 		}
 		else
 		{
-			return Member::loggedIn()->language()->addToStack('neutral');
+			return \IPS\Member::loggedIn()->language()->addToStack('neutral');
 		}
 	}
 	
@@ -295,16 +169,16 @@ class Reaction extends Model
 	 * Fetch All Root Nodes
 	 *
 	 * @param	string|NULL			$permissionCheck	The permission key to check for or NULl to not check permissions
-	 * @param	Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
+	 * @param	\IPS\Member|NULL	$member				The member to check permissions for or NULL for the currently logged in member
 	 * @param	mixed				$where				Additional WHERE clause
 	 * @param	array|NULL			$limit				Limit/offset to use, or NULL for no limit (default)
-	 * @return	(static|Model)[]|static[]
+	 * @return	array
 	 */
-	public static function roots( ?string $permissionCheck='view', Member|null $member=NULL, mixed $where=array(), array $limit=NULL ): array
+	public static function roots( $permissionCheck='view', $member=NULL, $where=array(), $limit=NULL )
 	{
-		if ( !count( $where ) )
+		if ( !\count( $where ) )
 		{
-			$cacheKey	= md5( get_called_class() . $permissionCheck );
+			$cacheKey	= md5( \get_called_class() . $permissionCheck );
 
 			if( isset( static::$rootsResult[ $cacheKey ] ) )
 			{
@@ -331,7 +205,7 @@ class Reaction extends Model
 	 * @note	Return value NULL indicates the node cannot be enabled/disabled
 	 * @return	bool|null
 	 */
-	protected function get__enabled(): ?bool
+	protected function get__enabled()
 	{
 		if ( $this->id == 1 )
 		{
@@ -346,14 +220,14 @@ class Reaction extends Model
 	 *
 	 * @return	array
 	 */
-	public static function getStore(): array
+	public static function getStore()
 	{
-		if ( !isset( Store::i()->reactions ) )
+		if ( !isset( \IPS\Data\Store::i()->reactions ) )
 		{
-			Store::i()->reactions = iterator_to_array( Db::i()->select( '*', 'core_reactions', NULL, "reaction_position ASC" )->setKeyField( 'reaction_id' ) );
+			\IPS\Data\Store::i()->reactions = iterator_to_array( \IPS\Db::i()->select( '*', 'core_reactions', NULL, "reaction_position ASC" )->setKeyField( 'reaction_id' ) );
 		}
 		
-		return Store::i()->reactions;
+		return \IPS\Data\Store::i()->reactions;
 	}
 	
 	/**
@@ -361,22 +235,22 @@ class Reaction extends Model
 	 *
 	 * @return	bool
 	 */
-	public static function isLikeMode(): bool
+	public static function isLikeMode()
 	{
-		return (bool) Settings::i()->reaction_is_likemode;
+		return (bool) \IPS\Settings::i()->reaction_is_likemode;
 	}
 	
 	/**
 	 * @brief	[ActiveRecord] Attempt to load from cache
 	 * @note	If this is set to TRUE you MUST define a getStore() method to return the objects from cache
 	 */
-	protected static bool $loadFromCache = TRUE;
+	protected static $loadFromCache = TRUE;
 
 	/**
 	 * @brief	[ActiveRecord] Caches
 	 * @note	Defined cache keys will be cleared automatically as needed
 	 */
-	protected array $caches = array( 'reactions' );
+	protected $caches = array( 'reactions' );
 
 	/**
 	 * Clear any defined caches
@@ -384,7 +258,7 @@ class Reaction extends Model
 	 * @param	bool	$removeMultiton		Should the multiton record also be removed?
 	 * @return void
 	 */
-	public function clearCaches( bool $removeMultiton=FALSE ): void
+	public function clearCaches( $removeMultiton=FALSE )
 	{
 		parent::clearCaches( $removeMultiton );
 
@@ -396,21 +270,21 @@ class Reaction extends Model
 	 * Example code explains return value
 	 *
 	 * @code
-	* array(
-	* array(
-	* 'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
-	* 'title'	=> 'foo',		// Language key to use for button's title parameter
-	* 'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
-	* 'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
-	* ),
-	* ...							// Additional buttons
-	* );
+	array(
+	array(
+	'icon'	=>	'plus-circle', // Name of FontAwesome icon to use
+	'title'	=> 'foo',		// Language key to use for button's title parameter
+	'link'	=> \IPS\Http\Url::internal( 'app=foo...' )	// URI to link to
+	'class'	=> 'modalLink'	// CSS Class to use on link (Optional)
+	),
+	...							// Additional buttons
+	);
 	 * @endcode
-	 * @param Url $url		Base URL
+	 * @param	string	$url		Base URL
 	 * @param	bool	$subnode	Is this a subnode?
 	 * @return	array
 	 */
-	public function getButtons( Url $url, bool $subnode=FALSE ):array
+	public function getButtons( $url, $subnode=FALSE )
 	{
 		$buttons = parent::getButtons( $url, $subnode );
 		
@@ -420,7 +294,7 @@ class Reaction extends Model
 				'icon'	=> 'times-circle',
 				'title'	=> 'delete',
 				'link'	=> $url->setQueryString( array( 'do' => 'delete', 'id' => $this->_id ) ),
-				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack('delete') ),
+				'data'	=> array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack('delete') ),
 				'hotkey'=> 'd'
 			);
 		}
@@ -432,9 +306,9 @@ class Reaction extends Model
 	 *
 	 * @return void
 	 */
-	public static function updateLikeModeSetting(): void
+	public static function updateLikeModeSetting()
 	{
-		Settings::i()->changeValues( array( 'reaction_is_likemode' => intval( count( static::enabledReactions() ) == 1 ) ) );
+		\IPS\Settings::i()->changeValues( array( 'reaction_is_likemode' => \intval( \count( static::enabledReactions() ) == 1 ) ) );
 	}
 
 	/**
@@ -442,7 +316,7 @@ class Reaction extends Model
 	 *
 	 * @return array
 	 */
-	public static function enabledReactions(): array
+	public static function enabledReactions()
 	{
 		return array_filter( 
 			static::roots(), 
@@ -457,7 +331,7 @@ class Reaction extends Model
 	 *
 	 * @return	void
 	 */
-	public function __clone(): void
+	public function __clone()
 	{
 		if ( $this->skipCloneDuplication === TRUE )
 		{
@@ -470,12 +344,12 @@ class Reaction extends Model
 
 			try
 			{
-				$icon = File::get( 'core_Reaction', $oldIcon );
-				$newIcon = File::create( 'core_Reaction', $icon->originalFilename, $icon->contents() );
+				$icon = \IPS\File::get( 'core_Reaction', $oldIcon );
+				$newIcon = \IPS\File::create( 'core_Reaction', $icon->originalFilename, $icon->contents() );
 				$this->icon = (string) $newIcon;
 			}
 
-			catch ( Exception $e )
+			catch ( \Exception $e )
 			{
 				$this->icon = NULL;
 			}
@@ -486,37 +360,16 @@ class Reaction extends Model
 	/**
 	 * Delete Record
 	 *
-	 * @return    void
+	 * @return	void
 	 */
-	public function delete(): void
+	public function delete()
 	{
 		try
 		{
-			File::get( 'core_Reaction', $this->icon )->delete();
+			\IPS\File::get( 'core_Reaction', $this->icon )->delete();
 		}
-		catch( Exception $ex ) { }
+		catch( \Exception $ex ) { }
 
 		parent::delete();
-	}
-
-	/**
-	 * Get output for API
-	 *
-	 * @param	Member|NULL	$authorizedMember	The member making the API request or NULL for API Key / client_credentials
-	 * @return	array
-	 * @apiresponse	int			id				ID number
-	 * @apiresponse	string		icon			URL to the icon,
-	 * @apiresponse string		value			Value of the reaction
-	 */
-	public function apiOutput( Member $authorizedMember = NULL ): array
-	{
-		$return = array(
-		'id'			=> $this->id,
-		'title'			=> $this->title,
-		'icon' 			=> (string) $this->icon,
-		'value'				=>	$this->value
-		);
-		
-		return $return;
 	}
 }

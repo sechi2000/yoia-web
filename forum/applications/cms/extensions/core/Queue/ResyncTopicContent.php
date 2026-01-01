@@ -12,58 +12,45 @@
 namespace IPS\cms\extensions\core\Queue;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\Application;
-use IPS\cms\Databases;
-use IPS\cms\Records;
-use IPS\Db;
-use IPS\Extensions\QueueAbstract;
-use IPS\Member;
-use OutOfRangeException;
-use function count;
-use function defined;
-use const IPS\REBUILD_NORMAL;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Background Task: Rebuild database records
  */
-class ResyncTopicContent extends QueueAbstract
+class _ResyncTopicContent
 {
 	/**
 	 * @brief Number of content items to rebuild per cycle
 	 */
-	public int $rebuild	= REBUILD_NORMAL;
+	public $rebuild	= \IPS\REBUILD_NORMAL;
 
 	/**
 	 * Parse data before queuing
 	 *
 	 * @param	array	$data
-	 * @return	array|null
+	 * @return	array
 	 */
-	public function preQueueData( array $data ): ?array
+	public function preQueueData( $data )
 	{
 		try
 		{
-			$database = Databases::load( $data['databaseId'] );
+			$database = \IPS\cms\Databases::load( $data['databaseId'] );
 			
 			if ( $database->forum_record )
 			{
-				$data['count'] = (int) Db::i()->select( 'COUNT(*)', 'cms_custom_database_' . $data['databaseId'] )->first();
+				$data['count'] = (int) \IPS\Db::i()->select( 'COUNT(*)', 'cms_custom_database_' . $data['databaseId'] )->first();
 			}
 			else
 			{
-				$cats = iterator_to_array( Db::i()->select( 'category_id', 'cms_database_categories', array( 'category_forum_record=1 AND category_database_id=?', $data['databaseId'] ) ) );
+				$cats = iterator_to_array( \IPS\Db::i()->select( 'category_id', 'cms_database_categories', array( 'category_forum_record=1 AND category_database_id=?', $data['databaseId'] ) ) );
 				
-				if ( count( $cats ) )
+				if ( \count( $cats ) )
 				{
-					$data['count'] = (int) Db::i()->select( 'COUNT(*)', 'cms_custom_database_' . $data['databaseId'], array( Db::i()->in( 'category_id', $cats ) ) )->first();
+					$data['count'] = (int) \IPS\Db::i()->select( 'COUNT(*)', 'cms_custom_database_' . $data['databaseId'], array( \IPS\Db::i()->in( 'category_id', $cats ) ) )->first();
 				}
 				else
 				{
@@ -71,9 +58,9 @@ class ResyncTopicContent extends QueueAbstract
 				}
 			}
 		}
-		catch( Exception $ex )
+		catch( \Exception $ex )
 		{
-			throw new OutOfRangeException;
+			throw new \OutOfRangeException;
 		}
 		
 		if( $data['count'] == 0 )
@@ -94,38 +81,37 @@ class ResyncTopicContent extends QueueAbstract
 	 * @return	int							New offset
 	 * @throws	\IPS\Task\Queue\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function run( mixed &$data, int $offset ): int
+	public function run( &$data, $offset )
 	{
-		/* @var Records $class */
 		$class	= '\IPS\cms\Records' . $data['databaseId'];
 		$where	= array( 'primary_id_field>?', $offset );
 		$last	= NULL;
 
 		try
 		{
-			$database = Databases::load( $data['databaseId'] );
+			$database = \IPS\cms\Databases::load( $data['databaseId'] );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			throw new \IPS\Task\Queue\OutOfRangeException;
 		}
 
 		if ( ! $database->forum_record )
 		{
-			$cats = iterator_to_array( Db::i()->select( 'category_id', 'cms_database_categories', array( 'category_forum_record=1 AND category_database_id=?', $data['databaseId'] ) ) );
-			$where[] = array( Db::i()->in( 'category_id', $cats ) );
+			$cats = iterator_to_array( \IPS\Db::i()->select( 'category_id', 'cms_database_categories', array( 'category_forum_record=1 AND category_database_id=?', $data['databaseId'] ) ) );
+			$where[] = array( \IPS\Db::i()->in( 'category_id', $cats ) );
 		}
 
-		if ( Db::i()->checkForTable( 'cms_custom_database_' . $data['databaseId'] ) )
+		if ( \IPS\Db::i()->checkForTable( 'cms_custom_database_' . $data['databaseId'] ) )
 		{
-			foreach ( Db::i()->select( '*', 'cms_custom_database_' . $data['databaseId'], $where, 'primary_id_field asc', array( 0, $this->rebuild ) ) as $row )
+			foreach ( \IPS\Db::i()->select( '*', 'cms_custom_database_' . $data['databaseId'], $where, 'primary_id_field asc', array( 0, $this->rebuild ) ) as $row )
 			{
 				try
 				{
 					$record = $class::constructFromData( $row );
 					$record->syncTopic();
 				}
-				catch( Exception $ex ) { }
+				catch( \Exception $ex ) { }
 				
 				$data['completed']++;
 				$last = $row['primary_id_field'];
@@ -146,11 +132,11 @@ class ResyncTopicContent extends QueueAbstract
 	 * @param	mixed					$data	Data as it was passed to \IPS\Task::queue()
 	 * @param	int						$offset	Offset
 	 * @return	array( 'text' => 'Doing something...', 'complete' => 50 )	Text explaining task and percentage complete
-	 * @throws	OutOfRangeException	Indicates offset doesn't exist and thus task is complete
+	 * @throws	\OutOfRangeException	Indicates offset doesn't exist and thus task is complete
 	 */
-	public function getProgress( mixed $data, int $offset ): array
+	public function getProgress( $data, $offset )
 	{
-		$title = ( Application::appIsEnabled('cms') ) ? Databases::load( $data['databaseId'] )->_title : 'Database #' . $data['databaseId'];
-		return array( 'text' => Member::loggedIn()->language()->addToStack('rebuilding_cms_database_sync_topics', FALSE, array( 'sprintf' => array( $title ) ) ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
+		$title = ( \IPS\Application::appIsEnabled('cms') ) ? \IPS\cms\Databases::load( $data['databaseId'] )->_title : 'Database #' . $data['databaseId'];
+		return array( 'text' => \IPS\Member::loggedIn()->language()->addToStack('rebuilding_cms_database_sync_topics', FALSE, array( 'sprintf' => array( $title ) ) ), 'complete' => $data['count'] ? ( round( 100 / $data['count'] * $data['completed'], 2 ) ) : 100 );
 	}	
 }

@@ -12,60 +12,47 @@
 namespace IPS\core\modules\admin\membersettings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Application;
-use IPS\DateTime;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Table\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\nexus\Money;
-use IPS\Output;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Referrals
  */
-class referrals extends Controller
+class _referrals extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @brief	Has been CSRF-protected
 	 */
-	public static bool $csrfProtected = TRUE;
+	public static $csrfProtected = TRUE;
 	
 	/**
 	 * Call
 	 *
 	 * @param	string	$method	Method name
 	 * @param	mixed	$args	Method arguments
+	 * @return	void
 	 */
-	public function __call( string $method, mixed $args )
+	public function __call( $method, $args )
 	{
 		$tabs = array();
-		if( Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'referrals_manage' ) )
+		if( \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'referrals_manage' ) )
 		{
 			$tabs['refersettings'] = 'settings';
 		}
-		if( Settings::i()->ref_on and Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'referrals_manage' ) )
+		if( \IPS\Settings::i()->ref_on and \IPS\Member::loggedIn()->hasAcpRestriction( 'core', 'membersettings', 'referrals_manage' ) )
 		{
 			$tabs['referralbanners'] = 'referral_banners';
 		}
-		if( Settings::i()->ref_on and Application::appIsEnabled( 'nexus' ) )
+		if( \IPS\Settings::i()->ref_on and \IPS\Application::appIsEnabled( 'nexus' ) )
 		{
 			$tabs['referralcommission'] = 'referral_commission';
 		}
-		if ( isset( Request::i()->tab ) and isset( $tabs[ Request::i()->tab ] ) )
+		if ( isset( \IPS\Request::i()->tab ) and isset( $tabs[ \IPS\Request::i()->tab ] ) )
 		{
-			$activeTab = Request::i()->tab;
+			$activeTab = \IPS\Request::i()->tab;
 		}
 		else
 		{
@@ -75,24 +62,24 @@ class referrals extends Controller
 
 		$classname = 'IPS\core\modules\admin\membersettings\\' . $activeTab;
 		$class = new $classname;
-		$class->url = Url::internal("app=core&module=membersettings&controller=referrals&tab={$activeTab}");
+		$class->url = \IPS\Http\Url::internal("app=core&module=membersettings&controller=referrals&tab={$activeTab}");
 		$class->execute();
 
-		if ( $method !== 'manage' or Request::i()->isAjax() )
+		if ( $method !== 'manage' or \IPS\Request::i()->isAjax() )
 		{
 			return;
 		}
 
-		Output::i()->sidebar['actions'] = array(
+		\IPS\Output::i()->sidebar['actions'] = array(
 			'history'	=> array(
 				'title'		=> 'referral_history',
-				'icon'		=> 'clock',
-				'link'		=> Url::internal( 'app=core&module=membersettings&controller=referrals&do=history' ),
+				'icon'		=> 'clock-o',
+				'link'		=> \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=referrals&do=history' ),
 				),
 		);
 
-		Output::i()->title = Member::loggedIn()->language()->addToStack('menu__core_membersettings_referrals');
-		Output::i()->output = Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, Output::i()->output, Url::internal( "app=core&module=membersettings&controller=referrals" ) );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack('menu__core_membersettings_referrals');
+		\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core' )->tabs( $tabs, $activeTab, \IPS\Output::i()->output, \IPS\Http\Url::internal( "app=core&module=membersettings&controller=referrals" ) );
 	}
 
 	/**
@@ -100,14 +87,14 @@ class referrals extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function history() : void
+	protected function history()
 	{
-		$table = new Db( 'core_referrals', Url::internal( 'app=core&module=membersettings&controller=referrals&do=history' ) );
+		$table = new \IPS\Helpers\Table\Db( 'core_referrals', \IPS\Http\Url::internal( 'app=core&module=membersettings&controller=referrals&do=history' ) );
 		$table->langPrefix = 'referrals_';
 
 		/* Columns we need */
 		$table->include = array( 'photo', 'member_id', 'referred_by', 'joined' );
-		if( Application::appIsEnabled( 'nexus' ) )
+		if( \IPS\Application::appIsEnabled( 'nexus' ) )
 		{
 			$table->include[] = 'amount';
 		}
@@ -123,55 +110,55 @@ class referrals extends Controller
 		$table->parsers = array(
 			'photo'				=> function( $val, $row )
 			{
-				return Theme::i()->getTemplate( 'global', 'core' )->userPhoto( Member::constructFromData( $row ), 'tiny' );
+				return \IPS\Theme::i()->getTemplate( 'global', 'core' )->userPhoto( \IPS\Member::constructFromData( $row ), 'tiny' );
 
 			},
 			'member_id'	=> function( $val, $row )
 			{
 				if ( $val )
 				{
-					return Theme::i()->getTemplate( 'global', 'core', 'admin' )->userLink( Member::constructFromData( $row ) );
+					return \IPS\Theme::i()->getTemplate( 'global', 'core', 'admin' )->userLink( \IPS\Member::constructFromData( $row ) );
 				}
 				else
 				{
-					return Theme::i()->getTemplate( 'members', 'core', 'admin' )->memberReserved( Member::load( $val ) );
+					return \IPS\Theme::i()->getTemplate( 'members', 'core', 'admin' )->memberReserved( \IPS\Member::load( $val ) );
 				}
 			},
-			'referred_by'	=> function( $val )
+			'referred_by'	=> function( $val, $row )
 			{
 				if ( $val )
 				{
-					return Theme::i()->getTemplate( 'global', 'core', 'admin' )->userLink( Member::load( $val ) );
+					return \IPS\Theme::i()->getTemplate( 'global', 'core', 'admin' )->userLink( \IPS\Member::load( $val ) );
 				}
 				else
 				{
-					return Theme::i()->getTemplate( 'members', 'core', 'admin' )->memberReserved( Member::load( $val ) );
+					return \IPS\Theme::i()->getTemplate( 'members', 'core', 'admin' )->memberReserved( \IPS\Member::load( $val ) );
 				}
 			},
-			'joined'	=> function( $val )
+			'joined'	=> function( $val, $row )
 			{
-				return DateTime::ts( $val )->localeDate();
+				return \IPS\DateTime::ts( $val )->localeDate();
 			},
-			'amount' => function ( $val )
+			'amount' => function ( $val, $row )
 			{
 				$return = array();
 				if ( $val )
 				{
 					foreach ( json_decode( $val, TRUE ) as $currency => $amount )
 					{
-						$return[] = new Money( $amount, $currency );
+						$return[] = new \IPS\nexus\Money( $amount, $currency );
 					}
 				}
 				else
 				{
-					$return[] = Member::loggedIn()->language()->addToStack('none');
+					$return[] = \IPS\Member::loggedIn()->language()->addToStack('none');
 				}
 				return implode( '<br>', $return );
 			}
 		);
 
 		/* Display */
-		Output::i()->title		= Member::loggedIn()->language()->addToStack('referrals');
-		Output::i()->output	= (string) $table;
+		\IPS\Output::i()->title		= \IPS\Member::loggedIn()->language()->addToStack('referrals');
+		\IPS\Output::i()->output	= (string) $table;
 	}
 }

@@ -12,56 +12,21 @@
 namespace IPS\core\modules\admin\settings;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\core\DataLayer as DataLayerClass;
-use IPS\core\DataLayer\Handler;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\Dispatcher;
-use IPS\Dispatcher\Controller;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\CheckboxSet;
-use IPS\Helpers\Form\Node;
-use IPS\Helpers\Form\Text;
-use IPS\Helpers\Form\TextArea;
-use IPS\Helpers\Form\YesNo;
-use IPS\Helpers\Table\Custom;
-use IPS\Http\Url;
-use IPS\Login\Handler as HandlerClass;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Settings;
-use IPS\Theme;
-use OutOfRangeException;
-use function call_user_func_array;
-use function count;
-use function defined;
-use function mb_substr;
-use function method_exists;
-use function strlen;
-use function strtolower;
-use function substr;
-use function trim;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * dataLayer
  */
-class dataLayer extends Controller
+class _dataLayer extends \IPS\Dispatcher\Controller
 {
 	/**
 	 * @breif the tabs
 	 */
-	protected static array $tabs = array(
+	protected static $tabs = array(
 		'main'        => 'datalayer_main',
 		'pageContext' => 'datalayer_pageContext',
 		'properties'  => 'datalayer_properties',
@@ -71,35 +36,22 @@ class dataLayer extends Controller
 	/**
 	 * @breif   Makes this controller work
 	 */
-	public static bool $csrfProtected = true;
+	public static $csrfProtected = true;
 
 	/**
 	 * @brief   used to actually handle events and properties in the browser
 	 */
-	public static string $handlerClass = '\IPS\core\DataLayer\Handler';
-
-	/**
-	 * Constructor
-	 */
-	public function __construct()
-	{
-		if ( Application::appIsEnabled('cloud') and DataLayerClass::i() instanceof \IPS\cloud\DataLayer )
-		{
-			static::$handlerClass = 'IPS\cloud\DataLayer\Handler';
-		}
-
-		return parent::__construct();
-	}
+	public static $handlerClass = '\IPS\core\DataLayer\Handler';
 
 	/**
 	 * Execute
 	 *
 	 * @return	void
 	 */
-	public function execute() : void
+	public function execute()
 	{
-		Dispatcher::i()->checkAcpPermission( 'dataLayer_manage' );
-		Output::i()->title = Member::loggedIn()->language()->addToStack( 'menu__core_settings_dataLayer' );
+		\IPS\Dispatcher::i()->checkAcpPermission( 'dataLayer_manage' );
+		\IPS\Output::i()->title = \IPS\Member::loggedIn()->language()->addToStack( 'menu__core_settings_dataLayer' );
 
 		/* Can we use custom handlers? Only show the tab on sites that have full analytics */
 		$class = static::$handlerClass;
@@ -108,7 +60,7 @@ class dataLayer extends Controller
 			class_exists( 'IPS\cloud\Application' ) AND
 			method_exists( $class, 'handlerForm' ) AND
 			method_exists( $class, 'loadWhere' ) AND
-			Member::loggedIn()->hasAcpRestriction( 'dataLayer_handlers_view' ) AND
+			\IPS\Member::loggedIn()->hasAcpRestriction( 'dataLayer_handlers_view' ) AND
 			\IPS\cloud\Application::featureIsEnabled('analytics_full')
 		)
 		{
@@ -121,7 +73,7 @@ class dataLayer extends Controller
 			);
 		}
 
-		Output::i()->cssFiles	= array_merge( Output::i()->cssFiles, Theme::i()->css( 'settings/general.css', 'core', 'admin' ) );
+		\IPS\Output::i()->cssFiles	= array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'settings/general.css', 'core', 'admin' ) );
 		parent::execute();
 	}
 
@@ -134,12 +86,12 @@ class dataLayer extends Controller
 	{
 		if ( method_exists( $this, $name ) )
 		{
-			return call_user_func_array( $this->$name, $arguments );
+			return \call_user_func_array( $this->$name, $arguments );
 		}
-		elseif ( method_exists( DataLayerClass::i(), $name ) )
+		elseif ( method_exists( \IPS\core\DataLayer::i(), $name ) )
 		{
-			$method = array( DataLayerClass::i(), $name );
-			return call_user_func_array( $method, $arguments );
+			$method = array( \IPS\core\DataLayer::i(), $name );
+			return \call_user_func_array( $method, $arguments );
 		}
 
 		return "You should Upgrade!";
@@ -150,49 +102,49 @@ class dataLayer extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function manage() : void
+	protected function manage()
 	{
-		$tab    = Request::i()->tab;
+		$tab    = \IPS\Request::i()->tab;
 		$tab    = empty( static::$tabs[ $tab ] ) ? 'main' : $tab;
 		$output = $this->$tab();
 		$output = "<div id='dataLayerContent'>$output</div>" ;
 
-		if ( isset( static::$tabs['handlers'] ) AND Member::loggedIn()->hasAcpRestriction( 'dataLayer_handlers_edit' ) )
+		if ( isset( static::$tabs['handlers'] ) AND \IPS\Member::loggedIn()->hasAcpRestriction( 'dataLayer_handlers_edit' ) )
 		{
-			Output::i()->sidebar['actions']['addHandler'] = array(
-				'title'     => Member::loggedIn()->language()->addToStack( 'datalayer_handler_form' ),
+			\IPS\Output::i()->sidebar['actions']['addHandler'] = array(
+				'title'     => \IPS\Member::loggedIn()->language()->addToStack( 'datalayer_handler_form' ),
 				'icon'      =>  'plus',
-				'link'      => Url::internal( 'app=core&module=settings&controller=dataLayer&do=addHandler' ),
-				'data'      => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'datalayer_handler_form' ) )
+				'link'      => \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&do=addHandler' ),
+				'data'      => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack( 'datalayer_handler_form' ) )
 			);
 		}
 
 
-		$addPropertyUrl = Url::internal( 'app=core&module=settings&controller=dataLayer&do=addProperty' );
-		Output::i()->sidebar['actions']['addProperty'] = array(
-			'title'		=> Member::loggedIn()->language()->addToStack( 'datalayer_add_property' ),
+		$addPropertyUrl = \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&do=addProperty' );
+		\IPS\Output::i()->sidebar['actions']['addProperty'] = array(
+			'title'		=> \IPS\Member::loggedIn()->language()->addToStack( 'datalayer_add_property' ),
 			'icon'		=> 'plus',
 			'link'		=> $addPropertyUrl,
-			'data'      => array( 'ipsDialog' => '', 'ipsDialog-title' => Member::loggedIn()->language()->addToStack( 'datalayer_add_property' ) )
+			'data'      => array( 'ipsDialog' => '', 'ipsDialog-title' => \IPS\Member::loggedIn()->language()->addToStack( 'datalayer_add_property' ) )
 		);
 
-		if ( Request::i()->isAjax() )
+		if ( \IPS\Request::i()->isAjax() )
 		{
-			Output::i()->output = $output;
+			\IPS\Output::i()->output = $output;
 		}
 		else
 		{
 			if ( isset( $_SESSION['deleted_datalayer_property'] ) )
 			{
-				Output::i()->inlineMessage = 'Deleted Property';
+				\IPS\Output::i()->inlineMessage = 'Deleted Property';
 				unset( $_SESSION['deleted_datalayer_property'] );
 			}
 
-			Output::i()->output = Theme::i()->getTemplate( 'global', 'core', 'admin' )->tabs(
+			\IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'global', 'core', 'admin' )->tabs(
 				static::$tabs,
 				$tab,
 				$output,
-				Url::internal( 'app=core&module=settings&controller=dataLayer', 'admin' )
+				\IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer', 'admin' )
 			);
 		}
 	}
@@ -203,25 +155,25 @@ class dataLayer extends Controller
 	 *
 	 * @return string
 	 */
-	protected function main() : string
+	protected function main()
 	{
-		$form = new Form( 'datalayer_general' );
+		$form = new \IPS\Helpers\Form( 'datalayer_general' );
 
 		$form->addHeader('Settings');
-		$form->add( new YesNo( 'core_datalayer_enabled', Settings::i()->core_datalayer_enabled, false ) );
-		$form->add( new YesNo( 'core_datalayer_include_pii', Settings::i()->core_datalayer_include_pii, false, array( 'togglesOn' => [ 'datalayer_general_core_datalayer_member_pii_choice' ] ) ) );
-		$form->add( new YesNo( 'core_datalayer_member_pii_choice', Settings::i()->core_datalayer_member_pii_choice, false ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'core_datalayer_enabled', \IPS\Settings::i()->core_datalayer_enabled, false ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'core_datalayer_include_pii', \IPS\Settings::i()->core_datalayer_include_pii, false, array( 'togglesOn' => [ 'datalayer_general_core_datalayer_member_pii_choice' ] ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'core_datalayer_member_pii_choice', \IPS\Settings::i()->core_datalayer_member_pii_choice, false ) );
 
 		try
 		{
-			$default = HandlerClass::load( Settings::i()->core_datalayer_replace_with_sso );
+			$default = \IPS\Login\Handler::load( \IPS\Settings::i()->core_datalayer_replace_with_sso );
 		}
-		catch ( OutOfRangeException $e )
+		catch ( \OutOfRangeException $e )
 		{
 			$default = 0;
 		}
 
-		$form->add( new Node( 'core_datalayer_replace_with_sso', $default, false, array(
+		$form->add( new \IPS\Helpers\Form\Node( 'core_datalayer_replace_with_sso', $default, false, array(
 			'class'   => '\IPS\Login\Handler',
 			'zeroVal'   => 'Use internal Member ID (default)',
 			'where'     => array(
@@ -233,47 +185,47 @@ class dataLayer extends Controller
 		) ) );
 
 		$form->addHeader('enhancements__core_GoogleTagManager');
-		$form->addMessage( 'use_gtm_for_installation', 'ipsMessage ipsMessage--info i-margin_3' );
-		$form->add( new YesNo( 'core_datalayer_use_gtm', Settings::i()->core_datalayer_use_gtm, false ) );
-		$gtmkey = explode( '.', Settings::i()->core_datalayer_gtmkey );
-		$form->add( new Text(
+		$form->addMessage( 'use_gtm_for_installation', 'ipsMessage ipsMessage_info ipsMargin' );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'core_datalayer_use_gtm', \IPS\Settings::i()->core_datalayer_use_gtm, false ) );
+		$gtmkey = explode( '.', \IPS\Settings::i()->core_datalayer_gtmkey );
+		$form->add( new \IPS\Helpers\Form\Text(
 			'core_datalayer_gtmkey',
 			array_pop( $gtmkey ),
 			false,
 			array(),
             function( $_value ) {
 	            /* Check for invalid characters */
-	            if ( preg_match( '/[^a-zA-Z0-9_]/', $_value ) )
+	            if ( preg_match( '/[^a-z,A-Z,0-9,\_]/', $_value ) )
 	            {
-		            throw new InvalidArgumentException( 'The variable name can only contain alphanumeric characters and underscores.' );
+		            throw new \InvalidArgumentException( 'The variable name can only contain alphanumeric characters and underscores.' );
 	            }
-	            elseif ( preg_match( '/[0-9]/', mb_substr( $_value, 0, 1 ) ) )
+	            elseif ( preg_match( '/[0-9]/', \mb_substr( $_value, 0, 1 ) ) )
 	            {
-		            throw new InvalidArgumentException( 'The variable name cannot start with a number.' );
+		            throw new \InvalidArgumentException( 'The variable name cannot start with a number.' );
 	            }
 
 				/* Is a custom handler using this? Note that, in JS, window.variable and variable are nearly always the same */
 	            $where = [
 		            [ 'enabled=?', 1 ],
 		            [ 'use_js=?', 1 ],
-		            Db::i()->in( 'datalayer_key', [ $_value, "window.$_value" ] ),
+		            \IPS\Db::i()->in( 'datalayer_key', [ $_value, "window.$_value" ] ),
 	            ];
 
 	            if (
 		            class_exists( 'IPS\cloud\DataLayer' ) AND
-					DataLayerClass::i() instanceof \IPS\cloud\DataLayer AND
-		            count( Db::i()->select( 'datalayer_key', \IPS\cloud\DataLayer\Handler::$databaseTable, $where, null, 1 ) )
+		            \IPS\core\DataLayer::i() instanceof \IPS\cloud\DataLayer AND
+		            \count( \IPS\Db::i()->select( 'datalayer_key', \IPS\cloud\DataLayer\Handler::$databaseTable, $where, null, 1 ) )
 	            )
 	            {
-		            throw new InvalidArgumentException( "$_value or window.$_value is in use by a custom handler." );
+		            throw new \InvalidArgumentException( "$_value or window.$_value is in use by a custom handler." );
 	            }
             },
-			'<span class="i-font-family_monospace">window.</span>'
+			'<span class="ipsType_monospace">window.</span>'
         ));
 
 		if ( $values = $form->values() )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 
 			if ( isset( $values['core_datalayer_replace_with_sso'] ) )
 			{
@@ -291,21 +243,21 @@ class dataLayer extends Controller
 			{
 				if ( isset( $values[$input] ) )
 				{
-					$key = Handler::$handlerCacheKey;
-					unset( Store::i()->$key );
+					$key = \IPS\core\DataLayer\Handler::$handlerCacheKey;
+					unset( \IPS\Data\Store::i()->$key );
 					break;
 				}
 			}
 
 			/* Clear the cached configuration since we're changing it */
-			DataLayerClass::i()->clearCachedConfiguration([ '_jsConfig', '_eventProperties', '_propertyEvents' ]);
+			\IPS\core\DataLayer::i()->clearCachedConfiguration([ '_jsConfig', '_eventProperties', '_propertyEvents' ]);
 
-			Settings::i()->changeValues( $values );
+			\IPS\Settings::i()->changeValues( $values );
 			
-			Session::i()->log( 'acplog__datalayer_settings_edited' );
+			\IPS\Session::i()->log( 'acplog__datalayer_settings_edited' );
 
 			/* Redirect to avoid csrfKey errors */
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=dataLayer&tab=main' ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=main' ) );
 		}
 
 		return "<br>$form";
@@ -316,10 +268,10 @@ class dataLayer extends Controller
 	 *
 	 * @return string
 	 */
-	protected function pageContext() : string
+	protected function pageContext()
 	{
 		/* Get the page level properties */
-		$_properties = DataLayerClass::i()->propertiesConfiguration;
+		$_properties = \IPS\core\DataLayer::i()->propertiesConfiguration;
 		foreach ( $_properties as $k => $property )
 		{
 			if ( $property['page_level'] AND $property['enabled'] )
@@ -334,20 +286,20 @@ class dataLayer extends Controller
 			}
 		}
 
-		$propertyBlock              = new Custom(
+		$propertyBlock              = new \IPS\Helpers\Table\Custom(
 			$properties,
-			Url::internal( 'app=core&module=settings&controller=dataLayer&tab=pageContext' )
+			\IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=pageContext' )
 		);
-		$propertyBlock->classes[]   = 'ipsPadding:none';
+		$propertyBlock->classes[]   = 'ipsPadding:none ipsMargin:none';
 		$propertyBlock->exclude     = array('custom', 'description');
 		$propertyBlock->langPrefix  = 'datalayer_';
 
-		if ( !Request::i()->sortby )
+		if ( !\IPS\Request::i()->sortby )
 		{
 			$propertyBlock->sortBy = 'name';
 		}
 
-		if ( !Request::i()->sortdirection )
+		if ( !\IPS\Request::i()->sortdirection )
 		{
 			$propertyBlock->sortDirection = 'asc';
 		}
@@ -355,13 +307,13 @@ class dataLayer extends Controller
 		$propertyBlock->parsers = array(
 			'pii'   => array( $this, '_yesNo' ),
 			'name'  => function ( $val, $row ) {
-				$url = Url::internal('app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $val);
+				$url = \IPS\Http\Url::internal('app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $val);
 				$title = $row['short'];
-				return "<span class='i-font-family_monospace'><a href='$url' data-ipstooltip title='$title'>$val</a></span>";
+				return "<span class='ipsType_monospace ipsMargin:none'><a href='$url' data-ipstooltip title='$title'>$val</a></span>";
 			},
 		);
 
-		return Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerContext( $propertyBlock );
+		return \IPS\Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerContext( $propertyBlock );
 	}
 
 	/**
@@ -369,21 +321,21 @@ class dataLayer extends Controller
 	 *
 	 * @return string
 	 */
-	protected function properties() : string
+	protected function properties()
 	{
 		/* Load our properties */
-		$properties     = DataLayerClass::i()->propertiesConfiguration;
-		$property_key   = Request::i()->property_key ?: array_keys( $properties )[0];
+		$properties     = \IPS\core\DataLayer::i()->propertiesConfiguration;
+		$property_key   = \IPS\Request::i()->property_key ?: array_keys( $properties )[0];
 
 		/* Do we know the requested property? */
 		if ( !isset( $properties[$property_key] ) )
 		{
-			Output::i()->redirect( Request::i()->url()->stripQueryString([ 'property_key' ]) );
+			\IPS\Output::i()->redirect( \IPS\Request::i()->url()->stripQueryString([ 'property_key' ]) );
 		}
 		$property               = $properties[$property_key];
 
 		/* Sidebar */
-		$propertySelector   = Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerSelector(
+		$propertySelector   = \IPS\Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerSelector(
 			$properties,
 			'properties',
 			'property_key',
@@ -394,30 +346,46 @@ class dataLayer extends Controller
 		);
 
 		/* Form */
-		$form           = new Form( 'datalayer_properties_' . $property_key, 'save', Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $property_key ) );
-		$form->class    = 'ipsForm--vertical ipsForm--datalayer-properties';
+		$form           = new \IPS\Helpers\Form( 'datalayer_properties_' . $property_key, 'save', \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $property_key ) );
+		$form->class    = 'ipsForm_vertical';
 
-		$form->add( new YesNo( 'datalayer_property_enabled', $property['enabled'], false ) );
-		$form->add( new Text( 'datalayer_property_formatted_name', $property['formatted_name'], false, array(), $this->formattedNameValid('properties', $property_key) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'datalayer_property_enabled', $property['enabled'], false ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'datalayer_property_formatted_name', $property['formatted_name'], false, array(), $this->formattedNameValid('properties', $property_key) ) );
 
 		if ( $property['custom'] ?? 0 )
 		{
-			$form->add( new Text( 'datalayer_property_value', $property['value'], true ) );
-			$form->add( new YesNo( 'datalayer_property_page_level', $property['page_level'], true ) );
-			$form->add( new Text( 'datalayer_property_short', $property['short'], false, array( 'maxLength' => 50 ) ) );
+			$defaults = [
+				'pii' => false,
+				'value' => null,
+				'page_level' => true,
+				'short' => "",
+				'description' => "",
+				'event_keys' => []
+			];
 
-			$events = DataLayerClass::i()->eventConfiguration;
+			foreach ( $defaults as $key => $value )
+			{
+				if ( !array_key_exists( $key, $property ) )
+				{
+					$property[$key] = $value;
+				}
+			}
+			$form->add( new \IPS\Helpers\Form\Text( 'datalayer_property_value', $property['value'], true ) );
+			$form->add( new \IPS\Helpers\Form\YesNo( 'datalayer_property_page_level', $property['page_level'], true ) );
+			$form->add( new \IPS\Helpers\Form\Text( 'datalayer_property_short', $property['short'], false, array( 'maxLength' => 50 ) ) );
+
+			$events = \IPS\core\DataLayer::i()->eventConfiguration;
 			$options = array();
 			foreach ( $events as $key => $data )
 			{
 				$options[$key]  = $data['formatted_name'];
 			}
 
-			$form->add( new CheckboxSet( 'datalayer_property_event_keys', $property['event_keys'], false, array('options' => $options, 'multiple' => 1) ) );
+			$form->add( new \IPS\Helpers\Form\CheckboxSet( 'datalayer_property_event_keys', $property['event_keys'], false, array('options' => $options, 'multiple' => 1) ) );
 		}
 
 		/* Update the values as long as the property_key was specified in the request */
-		if ( ( $values = $form->values() ) AND Request::i()->property_key === $property_key )
+		if ( ( $values = $form->values() ) AND \IPS\Request::i()->property_key === $property_key )
 		{
 			/* Get our submitted values */
 			$_values = array();
@@ -450,18 +418,18 @@ class dataLayer extends Controller
 			{
 				try
 				{
-					DataLayerClass::i()->savePropertyConfiguration( $property_key, $_values );
+					\IPS\core\DataLayer::i()->savePropertyConfiguration( $property_key, $_values );
 				}
-				catch ( InvalidArgumentException $e ) {}
+				catch ( \InvalidArgumentException $e ) {}
 				
-				Session::i()->log( 'acplog__data_layer_property_edited', array( $property_key => FALSE ) );
+				\IPS\Session::i()->log( 'acplog__data_layer_property_edited', array( $property_key => FALSE ) );
 			}
 
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $property_key ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $property_key ) );
 		}
 
 		/* Load our events */
-		$_events    = DataLayerClass::i()->getPropertyEvents( $property_key );
+		$_events    = \IPS\core\DataLayer::i()->getPropertyEvents( $property_key );
 		$events     = array();
 		foreach( $_events as $key => $event )
 		{
@@ -480,18 +448,18 @@ class dataLayer extends Controller
 		}
 		else
 		{
-			$eventTable = new Custom(
+			$eventTable = new \IPS\Helpers\Table\Custom(
 				$events,
-				Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $property_key )
+				\IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $property_key )
 			);
 
 
 
-			if ( !Request::i()->sortby )
+			if ( !\IPS\Request::i()->sortby )
 			{
 				$eventTable->sortBy = 'name';
 			}
-			if ( !Request::i()->sortdirection )
+			if ( !\IPS\Request::i()->sortdirection )
 			{
 				$eventTable->sortDirection = 'asc';
 			}
@@ -501,16 +469,16 @@ class dataLayer extends Controller
 			$eventTable->parsers    = array(
 				'name'      => function ( $val, $row )
 				{
-					$url    = Url::internal('app=core&module=settings&controller=dataLayer&tab=events&event_key=' . $row['key']);
+					$url    = \IPS\Http\Url::internal('app=core&module=settings&controller=dataLayer&tab=events&event_key=' . $row['key']);
 					$title  = $row['short'];
-					return  "<span class='i-font-family_monospace'><a href='$url' data-ipstooltip title='$title'>$val</a></span>";
+					return  "<span class='ipsMargin:none ipsType_monospace'><a href='$url' data-ipstooltip title='$title'>$val</a></span>";
 				},
 				'enabled'   => array( $this, '_enabledDisabled' ),
 			);
 		}
 
 		/* Render Content */
-		$content = Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerTitleContent(
+		$content = \IPS\Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerTitleContent(
 			$property,
 			$property_key,
 			'property',
@@ -518,36 +486,36 @@ class dataLayer extends Controller
 			(string) $eventTable
 		);
 
-		return Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerTab( $propertySelector, $content );
+		return \IPS\Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerTab( $propertySelector, $content );
 	}
 
 	/**
 	 * Property settings and configuration
 	 *
-	 * @return void
+	 * @return string
 	 */
-	protected function addProperty() : void
+	protected function addProperty()
 	{
-		Output::i()->title = 'Add property';
-		$form = new Form( 'datalayer_add_property' );
-		$form->add( new Text( 'datalayer_property_formatted_name', null, true, array(), $this->formattedNameValid() ) );
-		$form->add( new Text( 'datalayer_property_value', null, true ) );
-		$form->add( new TextArea( 'datalayer_property_description', null, true ) );
-		$form->add( new Text( 'datalayer_property_short', null, false, array( 'maxLength' => 50 ) ) );
-		$form->add( new YesNo( 'datalayer_property_page_level', 1, true ) );
+		\IPS\Output::i()->title = 'Add property';
+		$form = new \IPS\Helpers\Form( 'datalayer_add_property' );
+		$form->add( new \IPS\Helpers\Form\Text( 'datalayer_property_formatted_name', null, true, array(), $this->formattedNameValid() ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'datalayer_property_value', null, true ) );
+		$form->add( new \IPS\Helpers\Form\TextArea( 'datalayer_property_description', null, true ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'datalayer_property_short', null, false, array( 'maxLength' => 50 ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'datalayer_property_page_level', 1, true ) );
 
-		$events = DataLayerClass::i()->eventConfiguration;
+		$events = \IPS\core\DataLayer::i()->eventConfiguration;
 		$options = array();
 		foreach ( $events as $key => $data )
 		{
 			$options[$key]  = $data['formatted_name'];
 		}
 
-		$form->add( new CheckboxSet( 'datalayer_property_event_keys', array(), false, array('options' => $options, 'multiple' => 1) ) );
+		$form->add( new \IPS\Helpers\Form\CheckboxSet( 'datalayer_property_event_keys', array(), false, array('options' => $options, 'multiple' => 1) ) );
 
 		if ( $values = $form->values() )
 		{
-			Session::i()->csrfCheck();
+			\IPS\Session::i()->csrfCheck();
 			$_values = array();
 			foreach ( $values as $field => $value )
 			{
@@ -559,40 +527,40 @@ class dataLayer extends Controller
 			$values['enabled'] = true;
 			$key = $values['formatted_name'];
 
-			DataLayerClass::i()->savePropertyConfiguration( $key, $values, true );
+			\IPS\core\DataLayer::i()->savePropertyConfiguration( $key, $values, true );
 			
-			Session::i()->log( 'acplog__data_layer_property_added', array( $key => FALSE ) );
+			\IPS\Session::i()->log( 'acplog__data_layer_property_added', array( $key => FALSE ) );
 
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $key ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $key ) );
 		}
 
-		Output::i()->output = (string) $form;
+		\IPS\Output::i()->output = (string) $form;
 	}
 
 	/**
 	 * Delete a property
 	 */
-	protected function deleteProperty() : void
+	protected function deleteProperty()
 	{
-		Session::i()->csrfCheck();
+		\IPS\Session::i()->csrfCheck();
 
-		$key = Request::i()->property_key;
-		$propertiesUrl = Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties' );
+		$key = \IPS\Request::i()->property_key;
+		$propertiesUrl = \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties' );
 		if ( empty( $key ) )
 		{
-			Output::i()->redirect( $propertiesUrl );
+			\IPS\Output::i()->redirect( $propertiesUrl );
 		}
 
-		$properties = DataLayerClass::i()->propertiesConfiguration;
+		$properties = \IPS\core\DataLayer::i()->propertiesConfiguration;
 		if ( isset( $properties[$key] ) )
 		{
 			if ( $properties[$key]['custom'] ?? 0 )
 			{
-				$setting = json_decode( Settings::i()->core_datalayer_properties, true ) ?: array();
+				$setting = json_decode( \IPS\Settings::i()->core_datalayer_properties, true ) ?: array();
 				unset( $setting[$key] );
-				Settings::i()->changeValues([ 'core_datalayer_properties' => json_encode( $setting ) ]);
-				DataLayerClass::i()->clearCachedConfiguration();
-				Session::i()->log( 'acplog__data_layer_property_deleted', array( $key => FALSE ) );
+				\IPS\Settings::i()->changeValues([ 'core_datalayer_properties' => json_encode( $setting ) ]);
+				\IPS\core\DataLayer::i()->clearCachedConfiguration();
+				\IPS\Session::i()->log( 'acplog__data_layer_property_deleted', array( $key => FALSE ) );
 				$_SESSION['deleted_datalayer_property'] = 1;
 			}
 			else
@@ -600,7 +568,7 @@ class dataLayer extends Controller
 				$propertiesUrl = $propertiesUrl->setQueryString([ 'property_key' => $key ]);
 			}
 		}
-		Output::i()->redirect( $propertiesUrl );
+		\IPS\Output::i()->redirect( $propertiesUrl );
 	}
 
 	/**
@@ -608,16 +576,16 @@ class dataLayer extends Controller
 	 *
 	 * @return string
 	 */
-	protected function events() : string
+	protected function events()
 	{
 		/* Load our events */
-		$events = DataLayerClass::i()->eventConfiguration;
-		$event_key = Request::i()->event_key ?: 'content_create';
+		$events = \IPS\core\DataLayer::i()->eventConfiguration;
+		$event_key = \IPS\Request::i()->event_key ?: 'content_create';
 
 		/* Do we know the recognized one? */
 		if ( !isset( $events[$event_key] ) )
 		{
-			Output::i()->redirect( Request::i()->url()->stripQueryString([ 'event_key' ]) );
+			\IPS\Output::i()->redirect( \IPS\Request::i()->url()->stripQueryString([ 'event_key' ]) );
 		}
 		$event                      = $events[$event_key];
 
@@ -627,7 +595,7 @@ class dataLayer extends Controller
 		}
 
 		/* Create our sidebar */
-		$eventSelector  = Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerSelector(
+		$eventSelector  = \IPS\Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerSelector(
 			$events,
 			'events',
 			'event_key',
@@ -638,14 +606,14 @@ class dataLayer extends Controller
 		);
 
 		/* Form */
-		$form           = new Form( 'datalayer_events_' . $event_key, 'save',  Url::internal( 'app=core&module=settings&controller=dataLayer&tab=events&event_key=' . $event_key ) );
-		$form->class    = 'ipsForm--vertical ipsForm--datalayer-events';
+		$form           = new \IPS\Helpers\Form( 'datalayer_events_' . $event_key, 'save',  \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=events&event_key=' . $event_key ) );
+		$form->class    = 'ipsForm_vertical';
 
-		$form->add( new YesNo( 'datalayer_event_enabled', $event['enabled'], false ) );
-		$form->add( new Text( 'datalayer_event_formatted_name', $event['formatted_name'], false, array(), $this->formattedNameValid( 'events', $event_key ) ) );
+		$form->add( new \IPS\Helpers\Form\YesNo( 'datalayer_event_enabled', $event['enabled'], false ) );
+		$form->add( new \IPS\Helpers\Form\Text( 'datalayer_event_formatted_name', $event['formatted_name'], false, array(), $this->formattedNameValid( 'events', $event_key ) ) );
 
 		/* We only want to change values when a real event is specified in the request */
-		if ( ( $values = $form->values() ) AND Request::i()->event_key === $event_key )
+		if ( ( $values = $form->values() ) AND \IPS\Request::i()->event_key === $event_key )
 		{
 			/* Pull out the values to use */
 			$_values = array();
@@ -664,19 +632,19 @@ class dataLayer extends Controller
 			{
 				try
 				{
-					DataLayerClass::i()->saveEventConfiguration( $event_key, $_values );
+					\IPS\core\DataLayer::i()->saveEventConfiguration( $event_key, $_values );
 				}
-				catch ( InvalidArgumentException $e ) {}
+				catch ( \InvalidArgumentException $e ) {}
 			}
 			
-			Session::i()->log( 'acplog__data_layer_event_edited', array( $event_key => FALSE ) );
+			\IPS\Session::i()->log( 'acplog__data_layer_event_edited', array( $event_key => FALSE ) );
 
-			Output::i()->redirect( Url::internal( 'app=core&module=settings&controller=dataLayer&tab=events&event_key=' . $event_key ) );
+			\IPS\Output::i()->redirect( \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=events&event_key=' . $event_key ) );
 		}
 
 
 		/* Load our properties */
-		$_properties    = DataLayerClass::i()->getEventProperties( $event_key );
+		$_properties    = \IPS\core\DataLayer::i()->getEventProperties( $event_key );
 		$properties     = array();
 		foreach( $_properties as $key => $property )
 		{
@@ -698,17 +666,17 @@ class dataLayer extends Controller
 		}
 		else
 		{
-			$propertyTable = new Custom(
+			$propertyTable = new \IPS\Helpers\Table\Custom(
 				$properties,
-				Url::internal( 'app=core&module=settings&controller=dataLayer&tab=events&event_key=' . $event_key )
+				\IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=events&event_key=' . $event_key )
 			);
 
-			if ( !Request::i()->sortby )
+			if ( !\IPS\Request::i()->sortby )
 			{
 				$propertyTable->sortBy  = 'name';
 			}
 
-			if ( !Request::i()->sortdirection )
+			if ( !\IPS\Request::i()->sortdirection )
 			{
 				$propertyTable->sortDirection   = 'asc';
 			}
@@ -720,16 +688,16 @@ class dataLayer extends Controller
 				'pii'       => array( $this, '_yesNo' ),
 				'name'      => function ( $val, $row )
 				{
-					$url     = Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $row['key'] );
+					$url     = \IPS\Http\Url::internal( 'app=core&module=settings&controller=dataLayer&tab=properties&property_key=' . $row['key'] );
 					$title   = $row['short'];
-					return  "<pre><a href='$url' data-ipstooltip title='$title' >$val</a></pre>";
+					return  "<pre class='ipsMargin:none'><a href='$url' data-ipstooltip title='$title' >$val</a></pre>";
 				},
 			);
 		}
 
 		/* Render Content */
 		$event['description'] = "Fires when {$event['description']}";
-		$content = Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerTitleContent(
+		$content = \IPS\Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerTitleContent(
 			$event,
 			$event_key,
 			'event',
@@ -737,7 +705,7 @@ class dataLayer extends Controller
 			(string) $propertyTable
 		);
 
-		return Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerTab( $eventSelector, $content );
+		return \IPS\Theme::i()->getTemplate( 'settings', 'core', 'admin' )->dataLayerTab( $eventSelector, $content );
 	}
 
 	/**
@@ -746,23 +714,23 @@ class dataLayer extends Controller
 	 * @param   string      $group      Either properties or events; the datalayer collection to test the key against
 	 * @param   ?string     $current    The key of the property/event that currently has this value set as its formatted name
 	 *
-	 * @return callable
+	 * @return callback
 	 */
-	public function formattedNameValid( string $group='properties', ?string $current=null ) : callable
+	public function formattedNameValid( string $group='properties', ?string $current=null )
 	{
 		return function( $value ) use ( $group, $current )
 		{
-			if ( $group === 'properties' AND strtolower( $value ) === 'event' )
+			if ( $group === 'properties' AND \strtolower( $value ) === 'event' )
 			{
-				throw new InvalidArgumentException( "You cannot name a property '$value' because that key is reserved" );
+				throw new \InvalidArgumentException( "You cannot name a property '$value' because that key is reserved" );
 			}
 
-			if ( preg_match( '/[^a-zA-Z_]/', $value ) )
+			if ( preg_match( '/[^a-z,A-Z,\_]/', $value ) )
 			{
-				throw new InvalidArgumentException( 'The name can only contain letters and underscores.' );
+				throw new \InvalidArgumentException( 'The name can only contain letters and underscores.' );
 			}
 
-			$collection = ( $group === 'events' ) ? DataLayerClass::i()->eventConfiguration : DataLayerClass::i()->propertiesConfiguration;
+			$collection = ( $group === 'events' ) ? \IPS\core\DataLayer::i()->eventConfiguration : \IPS\core\DataLayer::i()->propertiesConfiguration;
 			foreach ( $collection as $key => $data )
 			{
 				if ( $key === $current )
@@ -772,7 +740,7 @@ class dataLayer extends Controller
 
 				if ( isset( $data['formatted_name'] ) AND $data['formatted_name'] === $value )
 				{
-					throw new InvalidArgumentException( 'This Data Layer name is already in use' );
+					throw new \InvalidArgumentException( 'This Data Layer name is already in use' );
 				}
 			}
 		};
@@ -781,11 +749,11 @@ class dataLayer extends Controller
 	/**
 	 * Formatter method to make code cleaner
 	 *
-	 * @param mixed   $val
-	 * @param array|null $row	 *
+	 * @param   mixed   $val
+	 *
 	 * @return  string
 	 */
-	public function _enabledDisabled( mixed $val, ?array $row=null ) : string
+	public function _enabledDisabled( $val, $row=null )
 	{
 		return $val ? 'Enabled' : 'Disabled';
 	}
@@ -794,10 +762,10 @@ class dataLayer extends Controller
 	 * Formatter method to make code cleaner
 	 *
 	 * @param   mixed   $val
-	 * @param array|null $row
+	 *
 	 * @return  string
 	 */
-	public function _yesNo( mixed $val, ?array $row=null ) : string
+	public function _yesNo( $val, $row=null )
 	{
 		return $val ? 'Yes' : 'No';
 	}
@@ -810,15 +778,15 @@ class dataLayer extends Controller
 	 *
 	 * @return  string
 	 */
-	public function _truncate( string $_string, int $length=100 ) : string
+	public function _truncate( $_string, $length=100 )
 	{
 		$_string   = strip_tags( $_string );
-		$string    = substr( $_string, 0, $length );
-		$changedLength  = ( strlen( $_string ) !== strlen( $string ) );
+		$string    = \substr( $_string, 0, $length );
+		$changedLength  = ( \strlen( $_string ) !== \strlen( $string ) );
 		$string    = trim( $string, ". \n\r\t\v\x00" );
 		if ( $changedLength )
 		{
-			$string = trim( substr( $string, 0, $length - 3 ), ". \n\r\t\v\x00" ) . '...';
+			$string = \trim( \substr( $string, 0, $length - 3 ), ". \n\r\t\v\x00" ) . '...';
 		}
 		return $string;
 	}

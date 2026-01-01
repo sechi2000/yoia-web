@@ -11,31 +11,25 @@
 
 namespace IPS\core\api\GraphQL\Queries;
 
-use GraphQL\Type\Definition\ListOfType;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\core\api\GraphQL\Types\MemberType;
-use IPS\Db;
-use IPS\Patterns\ActiveRecordIterator;
-use function defined;
-use function in_array;
-use function is_int;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ).' 403 Forbidden' );
+	header( ( isset( $_SERVER[ 'SERVER_PROTOCOL' ] ) ? $_SERVER[ 'SERVER_PROTOCOL' ] : 'HTTP/1.0' ).' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Members query for GraphQL API
  */
-class Members
+class _Members
 {
 	/*
 	 * @brief 	Query description
 	 */
-	public static string $description = 'Returns a list of members';
+	public static $description = 'Returns a list of members';
 
 	/*
 	 * Query arguments
@@ -56,7 +50,7 @@ class Members
 			'type' => TypeRegistry::eNum( [
 									  'name' => 'member_order_by',
 									  'description' => 'Fields on which topics can be sorted',
-									  'values' => MemberType::getOrderByOptions()
+									  'values' => \IPS\core\api\GraphQL\Types\MemberType::getOrderByOptions()
 									  ] ),
 			'defaultValue' => NULL // will use default sort option
 		],
@@ -74,10 +68,8 @@ class Members
 
 	/**
 	 * Return the query return type
-	 *
-	 * @return ListOfType<MemberType>
 	 */
-	public function type() : ListOfType
+	public function type()
 	{
 		return TypeRegistry::listOf( \IPS\core\api\GraphQL\TypeRegistry::member() );
 	}
@@ -85,20 +77,19 @@ class Members
 	/**
 	 * Resolves this query
 	 *
-	 * @param mixed $val   Value passed into this resolver
-	 * @param array $args   Arguments
-	 * @param array $context   Context values
-	 * @param mixed $info
-	 * @return    ActiveRecordIterator
+	 * @param mixed    Value passed into this resolver
+	 * @param array    Arguments
+	 * @param array    Context values
+	 * @return    [\IPS\Members]
 	 */
-	public function resolve( mixed $val, array $args, array $context, mixed $info ) : ActiveRecordIterator
+	public function resolve( $val, $args, $context, $info )
 	{
 		$where = [];
-		$sortBy = ( isset( $args['orderBy'] ) and in_array( $args['orderBy'], MemberType::getOrderByOptions() ) ) ? $args['orderBy'] : 'member_id';
-		$sortDir = ( isset( $args['orderDir'] ) and in_array( mb_strtolower( $args['orderDir'] ), array( 'asc', 'desc' ) ) ) ? $args['orderDir'] : 'desc';
-		$limit =( isset( $args['orderDir'] ) and is_int( $args['limit'] ) ) ? $args['limit'] : 25;
+		$sortBy = ( isset( $args['orderBy'] ) and \in_array( $args['orderBy'], \IPS\core\api\GraphQL\Types\MemberType::getOrderByOptions() ) ) ? $args['orderBy'] : 'member_id';
+		$sortDir = ( isset( $args['orderDir'] ) and \in_array( mb_strtolower( $args['orderDir'] ), array( 'asc', 'desc' ) ) ) ? $args['orderDir'] : 'desc';
+		$limit =( isset( $args['orderDir'] ) and \is_int( $args['limit'] ) ) ? $args['limit'] : 25;
 
-		$query = Db::i()->select( '*', 'core_members', $where, "{$sortBy} {$sortDir}", $limit );
-		return new ActiveRecordIterator( $query, 'IPS\Member' );
+		$query = \IPS\Db::i()->select( '*', 'core_members', $where, "{$sortBy} {$sortDir}", $limit );
+		return new \IPS\Patterns\ActiveRecordIterator( $query, 'IPS\Member' );
 	}
 }

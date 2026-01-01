@@ -12,54 +12,48 @@
 namespace IPS\cms\widgets;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use Exception;
-use IPS\cms\Blocks\Block;
-use IPS\cms\Blocks\Container;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Widget\PermissionCache;
-use OutOfRangeException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Custom block Widget
  */
-class Blocks extends PermissionCache
+class _Blocks extends \IPS\Widget\PermissionCache
 {
 	/**
 	 * @brief	Widget Key
 	 */
-	public string $key = 'Blocks';
+	public $key = 'Blocks';
 	
 	/**
 	 * @brief	App
 	 */
-	public string $app = 'cms';
-
+	public $app = 'cms';
+		
+	/**
+	 * @brief	Plugin
+	 */
+	public $plugin = '';
+	
 	/**
 	 * Constructor
 	 *
-	 * @param String $uniqueKey				Unique key for this specific instance
+	 * @param	string				$uniqueKey				Unique key for this specific instance
 	 * @param	array				$configuration			Widget custom configuration
-	 * @param array|string|null $access					Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
-	 * @param string|null $orientation			Orientation (top, bottom, right, left)
-	 * @param string $layout
+	 * @param	null|string|array	$access					Array/JSON string of executable apps (core=sidebar only, content=IP.Content only, etc)
+	 * @param	null|string			$orientation			Orientation (top, bottom, right, left)
 	 * @return	void
 	 */
-	public function __construct(string $uniqueKey, array $configuration, array|string $access=null, string $orientation=null, string $layout='table' )
+	public function __construct( $uniqueKey, array $configuration, $access=null, $orientation=null )
 	{
 		try
 		{
 			if (  isset( $configuration['cms_widget_custom_block'] ) )
 			{
-				$block = Block::load( $configuration['cms_widget_custom_block'], 'block_key' );
+				$block = \IPS\cms\Blocks\Block::load( $configuration['cms_widget_custom_block'], 'block_key' );
 				if ( $block->type === 'custom' AND ! $block->cache )
 				{
 					$this->neverCache = TRUE;
@@ -72,22 +66,22 @@ class Blocks extends PermissionCache
 						$block->orientation = $orientation;
 						$block->widget()->init();
 					}
-					catch( Exception $e ) { }
+					catch( \Exception $e ) { }
 				}
 			}
 		}
-		catch( Exception $e ) { }
+		catch( \Exception $e ) { }
 		
-		parent::__construct( $uniqueKey, $configuration, $access, $orientation, $layout );
+		parent::__construct( $uniqueKey, $configuration, $access, $orientation );
 	}
 	
 	/**
 	 * Specify widget configuration
 	 *
-	 * @param   Form|null   $form       Form Object
-	 * @return	Form
+	 * @param   \IPS\Helpers\Form   $form       Form Object
+	 * @return	null|\IPS\Helpers\Form
 	 */
-	public function configuration( Form &$form=null ): Form
+	public function configuration( &$form=null )
  	{
 		$form = parent::configuration( $form );
 		
@@ -97,17 +91,17 @@ class Blocks extends PermissionCache
 		{
 			if ( isset( $this->configuration['cms_widget_custom_block'] ) )
 			{
-				$block = Block::load( $this->configuration['cms_widget_custom_block'], 'block_key' );
+				$block = \IPS\cms\Blocks\Block::load( $this->configuration['cms_widget_custom_block'], 'block_key' );
 			}
 		}
-		catch( OutOfRangeException $e ) { }
+		catch( \OutOfRangeException $e ) { }
 		
-	    $form->add( new Node( 'cms_widget_custom_block', $block, FALSE, array(
+	    $form->add( new \IPS\Helpers\Form\Node( 'cms_widget_custom_block', $block, FALSE, array(
             'class' => '\IPS\cms\Blocks\Container',
             'showAllNodes' => TRUE,
             'permissionCheck' => function( $node )
                 {
-	                if ( $node instanceof Container )
+	                if ( $node instanceof \IPS\cms\Blocks\Container )
 	                {
 		                return FALSE;
 	                }
@@ -125,7 +119,7 @@ class Blocks extends PermissionCache
 	 * @param   array   $values     Form values
 	 * @return  array
 	 */
-	public function preConfig( array $values ): array
+	public function preConfig( $values )
 	{
 		$newValues = $values;
 
@@ -142,11 +136,11 @@ class Blocks extends PermissionCache
 	 *
 	 * @return	string
 	 */
-	public function render(): string
+	public function render()
 	{
 		if ( isset( $this->configuration['cms_widget_custom_block'] ) )
 		{
-			return (string) Block::display( $this->configuration['cms_widget_custom_block'], $this->orientation );
+			return (string) \IPS\cms\Blocks\Block::display( $this->configuration['cms_widget_custom_block'], $this->orientation );
 		}
 
 		return '';

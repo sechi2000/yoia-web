@@ -12,74 +12,40 @@
 namespace IPS\cms\modules\front\database;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\cms\Categories;
-use IPS\cms\Databases;
-use IPS\cms\Databases\Controller;
-use IPS\cms\Databases\Dispatcher;
-use IPS\cms\Fields;
-use IPS\cms\Pages\Page;
-use IPS\cms\Records;
-use IPS\Content\Filter;
-use IPS\DateTime;
-use IPS\Db;
-use IPS\Helpers\Form;
-use IPS\Helpers\Form\Node;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Output;
-use IPS\Request;
-use IPS\Session;
-use IPS\Theme;
-use IPS\Xml\Rss;
-use OutOfRangeException;
-use function count;
-use function defined;
-use function intval;
-use function is_array;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * List
  */
-class index extends Controller
+class _index extends \IPS\cms\Databases\Controller
 {
-	/**
-	 * Store any active filters for this view
-	 *
-	 * @var	array
-	 */
-	static public array $activeFilters = array();
 
 	/**
 	 * Determine which method to load
 	 *
 	 * @return void
 	 */
-	public function manage() : void
+	public function manage()
 	{
 		/* If the Databases module is set as default we end up here, but not routed through the database dispatcher which means the
 			database ID isn't set. In that case, just re-route back through the pages controller which handles everything. */
-		if( Dispatcher::i()->databaseId === NULL )
+		if( \IPS\cms\Databases\Dispatcher::i()->databaseId === NULL )
 		{
 			$pages = new \IPS\cms\modules\front\pages\page;
-			$pages->manage();
-			return;
+			return $pages->manage();
 		}
 
-		$database = Databases::load( Dispatcher::i()->databaseId );
+		$database = \IPS\cms\Databases::load( \IPS\cms\Databases\Dispatcher::i()->databaseId );
 
 		/* Not using categories? */
-		if ( ! $database->use_categories AND $database->display_settings['index']['type'] == 'categories' )
+		if ( ! $database->use_categories AND $database->cat_index_type === 0 )
 		{
-			$controller = new category( $this->url );
-			$controller->view();
-			return;
+			$controller = new \IPS\cms\modules\front\database\category( $this->url );
+			return $controller->view();
 		}
 		
 		$this->view();
@@ -90,26 +56,25 @@ class index extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function view() : void
+	protected function view()
 	{
-		$database    = Databases::load( Dispatcher::i()->databaseId );
-		$recordClass = 'IPS\cms\Records' . Dispatcher::i()->databaseId;
-		$url         = Url::internal( "app=cms&module=pages&controller=page&path=" . Page::$currentPage->full_path, 'front', 'content_page_path', Page::$currentPage->full_path );
+		$database    = \IPS\cms\Databases::load( \IPS\cms\Databases\Dispatcher::i()->databaseId );
+		$recordClass = 'IPS\cms\Records' . \IPS\cms\Databases\Dispatcher::i()->databaseId;
+		$url         = \IPS\Http\Url::internal( "app=cms&module=pages&controller=page&path=" . \IPS\cms\Pages\Page::$currentPage->full_path, 'front', 'content_page_path', \IPS\cms\Pages\Page::$currentPage->full_path );
 
 		/* RSS */
 		if ( $database->rss )
 		{
 			/* Show the link */
-			Output::i()->rssFeeds[ $database->_title ] = $url->setQueryString( 'rss', 1 );
+			\IPS\Output::i()->rssFeeds[ $database->_title ] = $url->setQueryString( 'rss', 1 );
 
 			/* Or actually show RSS feed */
-			if ( isset( Request::i()->rss ) )
+			if ( isset( \IPS\Request::i()->rss ) )
 			{
-				$document     = Rss::newDocument( $url, Member::loggedIn()->language()->get('content_db_' . $database->id ), Member::loggedIn()->language()->get('content_db_' . $database->id . '_desc' ) );
+				$document     = \IPS\Xml\Rss::newDocument( $url, \IPS\Member::loggedIn()->language()->get('content_db_' . $database->id ), \IPS\Member::loggedIn()->language()->get('content_db_' . $database->id . '_desc' ) );
 				$contentField = 'field_' . $database->field_content;
-
-				/* @var Records $recordClass */
-				foreach ( $recordClass::getItemsWithPermission( array(), $database->field_sort . ' ' . $database->field_direction, $database->rss ) as $record )
+				
+				foreach ( $recordClass::getItemsWithPermission( array(), $database->field_sort . ' ' . $database->field_direction, $database->rss, 'read' ) as $record )
 				{
 					$content = $record->$contentField;
 						
@@ -118,145 +83,67 @@ class index extends Controller
 						$content = \IPS\cms\Theme::i()->getTemplate( 'listing', 'cms', 'database' )->rssItemWithImage( $content, $record->record_image );
 					}
 
-					$document->addItem( $record->_title, $record->url(), $content, DateTime::ts( $record->_publishDate ), $record->_id );
+					$document->addItem( $record->_title, $record->url(), $content, \IPS\DateTime::ts( $record->_publishDate ), $record->_id );
 				}
 		
 				/* @note application/rss+xml is not a registered IANA mime-type so we need to stick with text/xml for RSS */
-				Output::i()->sendOutput( $document->asXML(), 200, 'text/xml' );
+				\IPS\Output::i()->sendOutput( $document->asXML(), 200, 'text/xml', array(), TRUE );
 			}
 		}
 
-		$page = isset( Request::i()->page ) ? intval( Request::i()->page ) : 1;
+		$page = isset( \IPS\Request::i()->page ) ? \intval( \IPS\Request::i()->page ) : 1;
 
 		if( $page < 1 )
 		{
 			$page = 1;
 		}
 
-		if ( $database->display_settings['index']['type'] != 'categories' and ! isset( Request::i()->show ) )
+		if ( $database->cat_index_type === 1 and ! isset( \IPS\Request::i()->show ) )
 		{
 			/* Featured */
 			$limit = 0;
 			$count = 0;
-			$perPage = ( $database->field_perpage ?? 25 );
 
-			if ( isset( Request::i()->page ) )
+			if ( isset( \IPS\Request::i()->page ) )
 			{
-				$limit = $perPage * ( $page - 1 );
+				$limit = $database->featured_settings['perpage'] * ( $page - 1 );
 			}
 
-			$where = [];
-
-			$cookie = $database->getFilterCookie();
-			if( $cookie !== null )
+			$where = ( $database->featured_settings['featured'] ) ? array( array( 'record_featured=?', 1 ) ) : NULL;
+			
+			if ( isset( $database->featured_settings['categories'] ) and \is_array( $database->featured_settings['categories'] ) and \count( $database->featured_settings['categories'] ) )
 			{
-				$where = $database->buildWhereFromCookie( $cookie );
+				$categoryField = "`cms_custom_database_{$database->_id}`.`category_id`";
+				$where[] = array( \IPS\Db::i()->in( $categoryField, array_values( $database->featured_settings['categories'] ) ) );
 			}
-			elseif( isset( Request::i()->advanced_search_submitted ) and Request::i()->advanced_search_submitted )
+			
+			$articles = $recordClass::getItemsWithPermission( $where, 'record_pinned DESC, ' . $database->featured_settings['sort'] . ' ' . $database->featured_settings['direction'], array( $limit, $database->featured_settings['perpage'] ), 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, TRUE, FALSE, FALSE, FALSE );
+
+			if ( $database->featured_settings['pagination'] )
 			{
-				$cookie = [];
-				foreach( Request::i() as $k => $v )
-				{
-					if( $k == 'cms_record_i_started' )
-					{
-						$cookie[ $k ] = $v;
-					}
-					elseif( str_starts_with( $k, 'content_field_' ) )
-					{
-						$cookie[ mb_substr( $k, 14 ) ] = $v;
-					}
-				}
-				if( count( $cookie ) )
-				{
-					$where = $database->buildWhereFromCookie( $cookie );
-				}
+				$count = $recordClass::getItemsWithPermission( $where, 'record_pinned DESC, ' . $database->featured_settings['sort'] . ' ' . $database->featured_settings['direction'], $database->featured_settings['perpage'], 'read', \IPS\Content\Hideable::FILTER_AUTOMATIC, 0, NULL, FALSE, FALSE, FALSE, TRUE );
 			}
-
-			/* Build the filters */
-			/* @var Fields $fieldClass */
-			$fieldClass = 'IPS\cms\Fields' . $database->id;
-			$customFields = $fieldClass::data( 'view', null, $fieldClass::FIELD_SKIP_TITLE_CONTENT );
-			if( $cookie !== null )
-			{
-				foreach( $cookie as $f => $v )
-				{
-					if( $f == 'cms_record_i_started' and Member::loggedIn()->member_id )
-					{
-						/* FilterMessage template only accepts \IPS\cms\Fields */
-						$field = new Fields;
-						$field->id = 'cms_record_i_started';
-
-						Member::loggedIn()->language()->words['content_field_cms_record_i_started'] = Member::loggedIn()->language()->addToStack( 'cms_record_i_started_sprintf', FALSE, array( 'sprintf' => $database->recordWord() ) );
-
-						static::$activeFilters['cms_record_i_started'] = array( 'field' => $field, 'value' => Member::loggedIn()->language()->addToStack('content_field_cms_record_i_started_on') );
-					}
-					else
-					{
-						$displayValue = $customFields[ $f ]->displayValue( $v );
-
-						if ( $customFields[ $f ]->type === 'Member' )
-						{
-							if ( ! empty( $v ) )
-							{
-								$newDisplayValue = array();
-								$concat = '\n';
-
-								if ( is_array( $v ) )
-								{
-									foreach( $v as $m )
-									{
-										$member = Member::load( $m );
-										$newDisplayValue[] = $member->name;
-									}
-								}
-								else
-								{
-									$member = Member::load( $v );
-									$newDisplayValue[] = $member->name;
-								}
-
-								$displayValue = implode( ', ', $newDisplayValue );
-							}
-						}
-
-						static::$activeFilters[ $f ] = array( 'field' => $customFields[ $f ], 'value' => $displayValue );
-					}
-				}
-			}
-
-			if( $database->display_settings['index']['type'] == 'featured' )
-			{
-				$where[] = [ 'record_featured=?', 1 ];
-			}
-
-			$sort = (  $database->field_sort ?  $recordClass::$databaseTable . '.' . $recordClass::$databasePrefix . $database->field_sort : 'record_last_comment' );
-			$sortDirection = $database->field_direction ?? 'desc';
-
-			$articles = $recordClass::getItemsWithPermission( $where, 'record_pinned DESC, ' . $sort . ' ' . $sortDirection, array( $limit, $perPage ), 'read', Filter::FILTER_AUTOMATIC, 0, NULL, TRUE );
-
-			$count = $recordClass::getItemsWithPermission( $where, 'record_pinned DESC, ' . $sort . ' ' . $sortDirection, $perPage, 'read', Filter::FILTER_AUTOMATIC, 0, NULL, FALSE, FALSE, FALSE, TRUE );
 
 			/* Pagination */
 			$pagination = array(
 				'page'  => $page,
-				'pages' => ( $count > 0 ) ? ceil( $count / $perPage ) : 1
+				'pages' => ( $count > 0 ) ? ceil( $count / $database->featured_settings['perpage'] ) : 1
 			);
 			
 			/* Make sure we are viewing a real page */
 			if ( $page > $pagination['pages'] )
 			{
-				Output::i()->redirect( Request::i()->url()->setPage( 'page', 1 ), NULL, 303 );
+				\IPS\Output::i()->redirect( \IPS\Request::i()->url()->setPage( 'page', 1 ), NULL, 303 );
 			}
 			
-			Output::i()->cssFiles = array_merge( Output::i()->cssFiles, Theme::i()->css( 'database_index/featured.css', 'cms', 'front' ) );
-			Output::i()->title = ( $page > 1 ) ? Member::loggedIn()->language()->addToStack( 'title_with_page_number', FALSE, array( 'sprintf' => array( $database->pageTitle(), $page ) ) ) : $database->pageTitle();
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'database_index/featured.css', 'cms', 'front' ) );
+			\IPS\Output::i()->title = ( $page > 1 ) ? \IPS\Member::loggedIn()->language()->addToStack( 'title_with_page_number', FALSE, array( 'sprintf' => array( $database->pageTitle(), $page ) ) ) : $database->pageTitle();
 
-			Dispatcher::i()->output .= Output::i()->output = \IPS\cms\Theme::i()->getTemplate( $database->template_featured, 'cms', 'database' )->index( $database, $articles, $url, $pagination, static::$activeFilters );
+			\IPS\cms\Databases\Dispatcher::i()->output .= \IPS\Output::i()->output = \IPS\cms\Theme::i()->getTemplate( $database->template_featured, 'cms', 'database' )->index( $database, $articles, $url, $pagination );
 		}
 		else
 		{
 			/* Category view */
-			/* @var Categories $class */
 			$class = '\IPS\cms\Categories' . $database->id;
 			
 			/* Load into memory */
@@ -272,8 +159,9 @@ class index extends Controller
 				}
 			}
 
-			Output::i()->title = $database->pageTitle();
-			Dispatcher::i()->output .= Output::i()->output = \IPS\cms\Theme::i()->getTemplate( $database->template_categories, 'cms', 'database' )->index( $database, $categories, $url );
+			\IPS\Output::i()->cssFiles = array_merge( \IPS\Output::i()->cssFiles, \IPS\Theme::i()->css( 'records/index.css', 'cms', 'front' ) );
+			\IPS\Output::i()->title = $database->pageTitle();
+			\IPS\cms\Databases\Dispatcher::i()->output .= \IPS\Output::i()->output = \IPS\cms\Theme::i()->getTemplate( $database->template_categories, 'cms', 'database' )->index( $database, $categories, $url );
 		}
 	}
 
@@ -282,31 +170,32 @@ class index extends Controller
 	 *
 	 * @return	void
 	 */
-	protected function form() : void
+	protected function form()
 	{
 		/* If the page is the default page and Pages is the default app, the node selector cannot find the page as it bypasses the Database dispatcher */
-		if ( Page::$currentPage === NULL and Dispatcher::i()->databaseId === NULL and isset( Request::i()->page_id ) )
+		if ( \IPS\cms\Pages\Page::$currentPage === NULL and \IPS\cms\Databases\Dispatcher::i()->databaseId === NULL and isset( \IPS\Request::i()->page_id ) )
 		{
 			try
 			{
-				Page::$currentPage = Page::load( Request::i()->page_id );
-				$database = Page::$currentPage->getDatabase();
+				\IPS\cms\Pages\Page::$currentPage = \IPS\cms\Pages\Page::load( \IPS\Request::i()->page_id );
+				$database = \IPS\cms\Pages\Page::$currentPage->getDatabase();
+				
 			}
-			catch( OutOfRangeException $e )
+			catch( \OutOfRangeException $e )
 			{
-				Output::i()->error( 'content_err_page_404', '2T389/1', 404, '' );
+				\IPS\Output::i()->error( 'content_err_page_404', '2T389/1', 404, '' );
 			}
 		}
-		else if ( Page::$currentPage === NULL and Dispatcher::i()->databaseId === NULL and isset( Request::i()->d ) )
+		else if ( \IPS\cms\Pages\Page::$currentPage === NULL and \IPS\cms\Databases\Dispatcher::i()->databaseId === NULL and isset( \IPS\Request::i()->d ) )
 		{
-			Page::$currentPage = Page::loadByDatabaseId( Request::i()->d );
+			\IPS\cms\Pages\Page::$currentPage = \IPS\cms\Pages\Page::loadByDatabaseId( \IPS\Request::i()->d );
 		}
 		
-		$form = new Form( 'select_category', 'continue' );
-		$form->class = 'ipsForm--vertical ipsForm--select-database-category ipsForm--noLabels';
-		$form->add( new Node( 'category', NULL, TRUE, array(
-			'url'					=> Page::$currentPage->url()->setQueryString( array( 'do' => 'form', 'page_id' => Page::$currentPage->id ) ),
-			'class'					=> 'IPS\cms\Categories' . Page::$currentPage->getDatabase()->_id,
+		$form = new \IPS\Helpers\Form( 'select_category', 'continue' );
+		$form->class = 'ipsForm_vertical ipsForm_noLabels';
+		$form->add( new \IPS\Helpers\Form\Node( 'category', NULL, TRUE, array(
+			'url'					=> \IPS\cms\Pages\Page::$currentPage->url()->setQueryString( array( 'do' => 'form', 'page_id' => \IPS\cms\Pages\Page::$currentPage->id ) ),
+			'class'					=> 'IPS\cms\Categories' . \IPS\cms\Pages\Page::$currentPage->getDatabase()->_id,
 			'permissionCheck'		=> function( $node )
 			{
 				if ( $node->can( 'view' ) )
@@ -325,26 +214,11 @@ class index extends Controller
 
 		if ( $values = $form->values() )
 		{
-			Output::i()->redirect( $values['category']->url()->setQueryString( 'do', 'form' ) );
+			\IPS\Output::i()->redirect( $values['category']->url()->setQueryString( 'do', 'form' ) );
 		}
 
-		Output::i()->title						= Member::loggedIn()->language()->addToStack( 'cms_select_category' );
-		Output::i()->breadcrumb[]				= array( NULL, Member::loggedIn()->language()->addToStack( 'cms_select_category' ) );
-		Dispatcher::i()->output	= Output::i()->output = Theme::i()->getTemplate( 'records' )->categorySelector( $form );
-	}
-
-	/**
-	 * Clear any filters
-	 *
-	 * @return void
-	 */
-	public function clearFilters() : void
-	{
-		Session::i()->csrfCheck();
-
-		$database = Databases::load( Dispatcher::i()->databaseId );
-		$database->saveFilterCookie( false );
-
-		Output::i()->redirect( $database->page->url(), 'cms_filters_cleared' );
+		\IPS\Output::i()->title						= \IPS\Member::loggedIn()->language()->addToStack( 'cms_select_category' );
+		\IPS\Output::i()->breadcrumb[]				= array( NULL, \IPS\Member::loggedIn()->language()->addToStack( 'cms_select_category' ) );
+		\IPS\cms\Databases\Dispatcher::i()->output	= \IPS\Output::i()->output = \IPS\Theme::i()->getTemplate( 'records' )->categorySelector( $form );
 	}
 }

@@ -11,48 +11,38 @@
 namespace IPS\core\extensions\core\AdminNotifications;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\core\AdminNotification;
-use IPS\Db;
-use IPS\Http\Url;
-use IPS\Member;
-use IPS\Member\PrivacyAction;
-use IPS\Theme;
-use function count;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * ACP  Notification Extension
  */
-class AccountDeletion extends AdminNotification
+class _AccountDeletion extends \IPS\core\AdminNotification
 {	
 	/**
 	 * @brief	Identifier for what to group this notification type with on the settings form
 	 */
-	public static string $group = 'members';
+	public static $group = 'members';
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this group compared to others
 	 */
-	public static int $groupPriority = 2;
+	public static $groupPriority = 2;
 	
 	/**
 	 * @brief	Priority 1-5 (1 being highest) for this notification type compared to others in the same group
 	 */
-	public static int $itemPriority = 1;
+	public static $itemPriority = 1;
 	
 	/**
 	 * Title for settings
 	 *
 	 * @return	string
 	 */
-	public static function settingsTitle() : string
+	public static function settingsTitle()
 	{
 		return 'acp_notification_AccountDeletion';
 	}
@@ -60,10 +50,10 @@ class AccountDeletion extends AdminNotification
 	/**
 	 * Can a member access this type of notification?
 	 *
-	 * @param	Member	$member	The member
+	 * @param	\IPS\Member	$member	The member
 	 * @return	bool
 	 */
-	public static function permissionCheck( Member $member ): bool
+	public static function permissionCheck( \IPS\Member $member ): bool
 	{
 		return $member->hasAcpRestriction( 'core', 'members' );
 	}
@@ -71,9 +61,9 @@ class AccountDeletion extends AdminNotification
 	/**
 	 * Is this type of notification ever optional (controls if it will be selectable as "viewable" in settings)
 	 *
-	 * @return	bool
+	 * @return	string
 	 */
-	public static function mayBeOptional() : bool
+	public static function mayBeOptional()
 	{
 		return FALSE;
 	}
@@ -95,13 +85,13 @@ class AccountDeletion extends AdminNotification
 	 */
 	public function title(): string
 	{
-		$others = Db::i()->select( 'COUNT(*)', 'core_member_privacy_actions', [ 'action=?', PrivacyAction::TYPE_REQUEST_DELETE ] )->first();
+		$others = \IPS\Db::i()->select( 'COUNT(*)', 'core_member_privacy_actions', [ 'action=?', \IPS\Member\PrivacyAction::TYPE_REQUEST_DELETE ] )->first();
 		$names = [];
 		foreach(
-			Db::i()->select(
+			\IPS\Db::i()->select(
 				'*',
 				'core_member_privacy_actions',
-				where: [ 'action=?', PrivacyAction::TYPE_REQUEST_DELETE ],
+				where: [ 'action=?', \IPS\Member\PrivacyAction::TYPE_REQUEST_DELETE ],
 				order: 'request_date asc',
 				limit: [ 0, 2 ]
 			)->join(
@@ -116,28 +106,28 @@ class AccountDeletion extends AdminNotification
 
 		if( $others )
 		{
-			$names[] = Member::loggedIn()->language()->addToStack( 'and_x_others', FALSE, [ 'pluralize' => [ $others ] ] );
+			$names[] = \IPS\Member::loggedIn()->language()->addToStack( 'and_x_others', FALSE, [ 'pluralize' => [ $others ] ] );
 		}
 
-		return Member::loggedIn()->language()->addToStack( 'account_deletion_request_adminnotification', FALSE, [ 'pluralize' => [ count( $names ) ], 'sprintf' => [ Member::loggedIn()->language()->formatList( $names ) ] ] );
+		return \IPS\Member::loggedIn()->language()->addToStack( 'account_deletion_request_adminnotification', FALSE, [ 'pluralize' => [ \count( $names ) ], 'sprintf' => [ \IPS\Member::loggedIn()->language()->formatList( $names ) ] ] );
 
 	}
 
 	/**
 	 * Notification Body (full HTML, must be escaped where necessary)
 	 *
-	 * @return	string|null
+	 * @return	string
 	 */
-	public function body(): ?string
+	public function body(): string
 	{
 		$users = [];
 
 		$names = [];
 		foreach(
-		Db::i()->select(
+		\IPS\Db::i()->select(
 		'*',
 		'core_member_privacy_actions',
-		where: ['action=?', PrivacyAction::TYPE_REQUEST_DELETE],
+		where: ['action=?', \IPS\Member\PrivacyAction::TYPE_REQUEST_DELETE],
 		order: 'request_date asc',
 		limit: [0, 2]
 		)->join(
@@ -146,15 +136,14 @@ class AccountDeletion extends AdminNotification
 		) as $user
 		)
 		{
-			$users[ $user[ 'member_id' ] ] = Member::constructFromData( $user );
+			$users[ $user[ 'member_id' ] ] = \IPS\Member::constructFromData( $user );
 			$users[ $user[ 'member_id' ] ]->_privacy_id = $user['id'];
 		}
 		
-		if( count( $users ) )
+		if( \count( $users ) )
 		{
-			return Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->accountDeletionRequest( $users );
-		}
-		else
+			return \IPS\Theme::i()->getTemplate( 'notifications', 'core', 'admin' )->accountDeletionRequest( $users );
+		}else
 		{
 			return '';
 		}
@@ -183,7 +172,7 @@ class AccountDeletion extends AdminNotification
 	/**
 	 * Style
 	 *
-	 * @return	string
+	 * @return	bool
 	 */
 	public function style(): string
 	{
@@ -193,10 +182,10 @@ class AccountDeletion extends AdminNotification
 	/**
 	 * Quick link from popup menu
 	 *
-	 * @return	Url
+	 * @return	\IPS\Http\Url
 	 */
-	public function link(): Url
+	public function link(): \IPS\Http\Url
 	{
-		return Url::internal( 'app=core&module=members&controller=privacy&filter=deletion_request' );
+		return \IPS\Http\Url::internal( 'app=core&module=members&controller=privacy&filter=deletion_request' );
 	}
 }

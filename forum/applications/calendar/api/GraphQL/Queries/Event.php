@@ -10,29 +10,25 @@
  */
 
 namespace IPS\calendar\api\GraphQL\Queries;
-use IPS\Api\GraphQL\SafeException;
+use GraphQL\Type\Definition\ObjectType;
 use IPS\Api\GraphQL\TypeRegistry;
-use IPS\calendar\api\GraphQL\Types\EventType;
-use IPS\calendar\Event as EventClass;
-use OutOfRangeException;
-use function defined;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-    header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+    header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
     exit;
 }
 
 /**
  * Event query for GraphQL API
  */
-class Event
+class _Event
 {
     /*
      * @brief 	Query description
      */
-    public static string $description = "Returns an event";
+    public static $description = "Returns an event";
 
     /*
      * Query arguments
@@ -47,7 +43,7 @@ class Event
     /**
      * Return the query return type
      */
-    public function type(): EventType
+    public function type()
     {
         return \IPS\calendar\api\GraphQL\TypeRegistry::event();
     }
@@ -55,26 +51,25 @@ class Event
     /**
      * Resolves this query
      *
-	 * @param mixed $val Value passed into this resolver
-	 * @param array $args Arguments
-	 * @param array $context Context values
-	 * @param mixed $info
-     * @return	EventClass
+     * @param 	mixed 	Value passed into this resolver
+     * @param 	array 	Arguments
+     * @param 	array 	Context values
+     * @return	\IPS\calendar\Event
      */
-    public function resolve( mixed $val, array $args, array $context, mixed $info ): EventClass
+    public function resolve($val, $args, $context, $info)
     {
         try
         {
-            $event = EventClass::loadAndCheckPerms( $args['id'] );
+            $event = \IPS\calendar\Event::loadAndCheckPerms( $args['id'] );
         }
-        catch ( OutOfRangeException $e )
+        catch ( \OutOfRangeException $e )
         {
-            throw new SafeException( 'NO_EVENT', '1F294/2_graphql', 400 );
+            throw new \IPS\Api\GraphQL\SafeException( 'NO_EVENT', '1F294/2_graphql', 400 );
         }
 
         if( !$event->can('read') )
         {
-            throw new SafeException( 'INVALID_ID', '2F294/9_graphql', 403 );
+            throw new \IPS\Api\GraphQL\SafeException( 'INVALID_ID', '2F294/9_graphql', 403 );
         }
 
         return $event;

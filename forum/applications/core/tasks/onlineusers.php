@@ -11,24 +11,16 @@
 namespace IPS\core\tasks;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Db;
-use IPS\Session\Store;
-use IPS\Task;
-use IPS\Task\Exception;
-use UnderflowException;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * onlineusers Task
  */
-class onlineusers extends Task
+class _onlineusers extends \IPS\Task
 {
 	/**
 	 * Execute
@@ -39,9 +31,9 @@ class onlineusers extends Task
 	 * Tasks should execute within the time of a normal HTTP request.
 	 *
 	 * @return	mixed	Message to log or NULL
-	 * @throws	Exception
+	 * @throws	\IPS\Task\Exception
 	 */
-	public function execute() : mixed
+	public function execute()
 	{
 		/* We want the rows to have the same timestamp exactly */
 		$time = time();
@@ -51,19 +43,19 @@ class onlineusers extends Task
 
 		try
 		{
-			$onlineGuests = Store::i()->getOnlineUsers( Store::ONLINE_GUESTS | Store::ONLINE_COUNT_ONLY, 'desc', NULL, NULL, TRUE );
-			$onlineMembers = Store::i()->getOnlineUsers( Store::ONLINE_MEMBERS | Store::ONLINE_COUNT_ONLY, 'desc', NULL, NULL, TRUE );
+			$onlineGuests = \IPS\Session\Store::i()->getOnlineUsers( \IPS\Session\Store::ONLINE_GUESTS | \IPS\Session\Store::ONLINE_COUNT_ONLY, 'desc', NULL, NULL, TRUE );
+			$onlineMembers = \IPS\Session\Store::i()->getOnlineUsers( \IPS\Session\Store::ONLINE_MEMBERS | \IPS\Session\Store::ONLINE_COUNT_ONLY, 'desc', NULL, NULL, TRUE );
 		}
-		catch( UnderflowException $e) {}
+		catch( \UnderflowException $e) {}
 
-		Db::i()->insert( 'core_statistics', array(
+		\IPS\Db::i()->insert( 'core_statistics', array(
 			'type'		=> 'online_users',
 			'time'		=> $time,
 			'value_4'	=> 'guests',
 			'value_1'	=> $onlineGuests
 		)	);
 
-		Db::i()->insert( 'core_statistics', array(
+		\IPS\Db::i()->insert( 'core_statistics', array(
 			'type'		=> 'online_users',
 			'time'		=> $time,
 			'value_4'	=> 'members',

@@ -11,81 +11,63 @@
 namespace IPS\core\Setup;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use BadMethodCallException;
-use Exception;
-use InvalidArgumentException;
-use IPS\Application;
-use IPS\Data\Store;
-use IPS\Db;
-use IPS\File;
-use IPS\Lang;
-use IPS\Log;
-use IPS\Member;
-use IPS\Output\Plugin\Filesize;
-use IPS\Request;
-use IPS\Settings;
-use IPS\Theme;
-use function count;
-use function defined;
-use function extension_loaded;
-use function function_exists;
-use function in_array;
-use function intval;
-use function is_array;
-use function is_string;
-use const IPS\CIC;
-use const IPS\NO_WRITES;
-use const IPS\ROOT_PATH;
-use const IPS\TEMP_DIRECTORY;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
 /**
  * Installer
  */
-class Install
+class _Install
 {	
 	/**
 	 * System Requirements
 	 *
 	 * @return	array
 	 */
-	public static function systemRequirements() : array
+	public static function systemRequirements()
 	{
 		$return = array();
 
 		/* We don't need to check the CIC platform */
-		if( CIC )
+		if( \IPS\CIC )
 		{
 			return array( 'recommendations' => array(), 'requirements' => array() );
 		}
 				
 		/* PHP Version */
 		$phpVersion = PHP_VERSION;
-		$requirements = json_decode( file_get_contents( ROOT_PATH . '/applications/core/data/requirements.json' ), TRUE );
+		$requirements = json_decode( file_get_contents( \IPS\ROOT_PATH . '/applications/core/data/requirements.json' ), TRUE );
 		if ( version_compare( $phpVersion, $requirements['php']['required'] ) >= 0 )
 		{
 			$return['requirements']['PHP']['version'] = array(
 				'success'	=> TRUE,
-				'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_php_version_success', FALSE, array( 'sprintf' => array( $phpVersion ) ) )
+				'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_php_version_success', FALSE, array( 'sprintf' => array( $phpVersion ) ) )
 			);
+
+			$php = explode( '.', $requirements['php']['recommended'] );
+			$maxRecommended = implode( '.', [ $php[0], $php[1], 99 ] );
+			$humanReadable = implode( '.', [ $php[0], $php[1], 'x' ] );
+
+			if( version_compare( $phpVersion, $maxRecommended ) >= 0 )
+			{
+				$return['advice']['PHP']['php'] = \IPS\Member::loggedIn()->language()->addToStack( 'requirements_php_version_advice_max', FALSE, array( 'sprintf' => array( $phpVersion, $humanReadable ) ) );
+				$return['requirements']['PHP']['version']['downgrade'] = TRUE;
+			}
 		}
 		else
 		{
 			$return['requirements']['PHP']['version'] = array(
 				'success'	=> FALSE,
-				'message'	=> ( $requirements['php']['required'] == $requirements['php']['recommended'] ) ? Member::loggedIn()->language()->addToStack( 'requirements_php_version_fail_no_recommended', FALSE, array( 'sprintf' => array( $phpVersion, $requirements['php']['required'] ) ) ) : Member::loggedIn()->language()->addToStack( 'requirements_php_version_fail', FALSE, array( 'sprintf' => array( $phpVersion, $requirements['php']['required'], $requirements['php']['recommended'] ) ) ),
+				'message'	=> ( $requirements['php']['required'] == $requirements['php']['recommended'] ) ? \IPS\Member::loggedIn()->language()->addToStack( 'requirements_php_version_fail_no_recommended', FALSE, array( 'sprintf' => array( $phpVersion, $requirements['php']['required'] ) ) ) : \IPS\Member::loggedIn()->language()->addToStack( 'requirements_php_version_fail', FALSE, array( 'sprintf' => array( $phpVersion, $requirements['php']['required'], $requirements['php']['recommended'] ) ) ),
 			);
 		}
 		if ( $return['requirements']['PHP']['version']['success'] and version_compare( $phpVersion, $requirements['php']['recommended'] ) == -1 )
 		{
-			$return['requirements']['PHP']['version']['message'] = Member::loggedIn()->language()->addToStack( 'requirements_php_version_success', FALSE, array( 'sprintf' => array( $phpVersion ) ) );
-			$return['advice']['PHP']['php'] = Member::loggedIn()->language()->addToStack( 'requirements_php_version_advice', FALSE, array( 'sprintf' => array( $phpVersion, $requirements['php']['recommended'] ) ) );
+			$return['requirements']['PHP']['version']['message'] = \IPS\Member::loggedIn()->language()->addToStack( 'requirements_php_version_success', FALSE, array( 'sprintf' => array( $phpVersion ) ) );
+			$return['advice']['PHP']['php'] = \IPS\Member::loggedIn()->language()->addToStack( 'requirements_php_version_advice', FALSE, array( 'sprintf' => array( $phpVersion, $requirements['php']['recommended'] ) ) );
 		}
 
 		/* We require file_uploads otherwise lots of stuff won't work */
@@ -93,60 +75,53 @@ class Install
 		{
 			$return['requirements']['PHP'][] = array(
 				'success'	=> FALSE,
-				'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_file_uploads' ),
-				'short'		=> Member::loggedIn()->language()->addToStack( 'health__php_fileuploads' ),
+				'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_file_uploads' ),
+				'short'		=> \IPS\Member::loggedIn()->language()->addToStack( 'health__php_fileuploads' ),
 			);
 		}
-
-		/* cURL */
-		if ( extension_loaded('curl') and $version = curl_version() and version_compare( $version['version'], '7.36', '>=' ) )
+		
+		/* cURL or allow_url_fopen */
+		if ( \extension_loaded('curl') and $version = curl_version() and version_compare( $version['version'], '7.36', '>=' ) )
 		{
 			$return['requirements']['PHP'][] = array(
 				'success'	=> TRUE,
-				'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_curl_success' ),
+				'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_curl_success' ),
 			);
+		}
+		elseif ( \function_exists('fsockopen') )
+		{
+			$return['requirements']['PHP'][] = array(
+				'success'	=> TRUE,
+				'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_curl_fopen' ),
+			);
+			
+			$return['advice']['PHP']['curl'] = \IPS\Member::loggedIn()->language()->addToStack( 'requirements_curl_advice' );
 		}
 		else
 		{
 			$return['requirements']['PHP'][] = array(
 				'success'	=> FALSE,
-				'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_curl_fail' ),
-				'short'		=> Member::loggedIn()->language()->addToStack( 'health__php_curl' ),
-			);
-		}
-
-		/* We need dns_get_record to secure against ssrf */
-		if ( function_exists( 'dns_get_record' ) )
-		{
-			$return['requirements']['PHP'][] = array(
-				'success'	=> TRUE,
-				'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_dns_success' ),
-			);
-		}
-		else
-		{
-			$return['requirements']['PHP'][] = array(
-				'success'	=> FALSE,
-				'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_dns_fail' ),
+				'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_curl_fail' ),
+				'short'		=> \IPS\Member::loggedIn()->language()->addToStack( 'health__php_curl' ),
 			);
 		}
 		
 		/* mbstring can be configured with --disable-mbregex */
-		if ( extension_loaded( 'mbstring' ) )
+		if ( \extension_loaded( 'mbstring' ) )
 		{
-			if ( function_exists( 'mb_eregi' ) )
+			if ( \function_exists( 'mb_eregi' ) )
 			{
 				$return['requirements']['PHP'][] = array(
 					'success'	=> TRUE,
-					'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_mb_success' ),
+					'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_mb_success' ),
 				);
 			}
 			else
 			{
 				$return['requirements']['PHP'][] = array(
 					'success'	=> FALSE,
-					'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_mb_regex' ),
-					'short'		=> Member::loggedIn()->language()->addToStack( 'health__php_mbregex' ),
+					'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_mb_regex' ),
+					'short'		=> \IPS\Member::loggedIn()->language()->addToStack( 'health__php_mbregex' ),
 				);
 			}
 
@@ -154,8 +129,8 @@ class Install
 			{
 				$return['requirements']['PHP'][] = array(
 					'success'	=> FALSE,
-					'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_mb_overload' ),
-					'short'		=> Member::loggedIn()->language()->addToStack( 'health__php_mboverload' ),
+					'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_mb_overload' ),
+					'short'		=> \IPS\Member::loggedIn()->language()->addToStack( 'health__php_mboverload' ),
 				);
 			}
 		}
@@ -163,8 +138,8 @@ class Install
 		{
 			$return['requirements']['PHP'][] = array(
 				'success'	=> FALSE,
-				'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_mb_fail' ),
-				'short'		=> Member::loggedIn()->language()->addToStack( 'health__php_mb' ),
+				'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_mb_fail' ),
+				'short'		=> \IPS\Member::loggedIn()->language()->addToStack( 'health__php_mb' ),
 			);
 		}
 		
@@ -176,30 +151,30 @@ class Install
 		{
 			foreach ( $extensions as $extension )
 			{
-				if ( extension_loaded( $extension ) )
+				if ( \extension_loaded( $extension ) )
 				{
 					$return['requirements']['PHP'][] = array(
 						'success'	=> TRUE,
-						'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_extension_success', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( "requirements_extension_{$extension}" ) ) ) ),
+						'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_extension_success', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( "requirements_extension_{$extension}" ) ) ) ),
 					);
 				}
 				elseif ( $type === 'required' )
 				{
 					$return['requirements']['PHP'][] = array(
 						'success'	=> FALSE,
-						'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_extension_fail', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( "requirements_extension_{$extension}" ) ) ) ),
-						'short'		=> Member::loggedIn()->language()->addToStack( 'health__php_extension', FALSE, array( 'sprintf' => array( $extension ) ) ),
+						'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_extension_fail', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( "requirements_extension_{$extension}" ) ) ) ),
+						'short'		=> \IPS\Member::loggedIn()->language()->addToStack( 'health__php_extension', FALSE, array( 'sprintf' => array( $extension ) ) ),
 					);
 				}
 				elseif ( $type === 'advised' )
 				{
-					if( Member::loggedIn()->language()->checkKeyExists( 'requirements_extension_advice_' . $extension ) )
+					if( \IPS\Member::loggedIn()->language()->checkKeyExists( 'requirements_extension_advice_' . $extension ) )
 					{
-						$return['advice']['PHP'][ $extension ] = Member::loggedIn()->language()->addToStack( 'requirements_extension_advice_' . $extension );
+						$return['advice']['PHP'][ $extension ] = \IPS\Member::loggedIn()->language()->addToStack( 'requirements_extension_advice_' . $extension );
 					}
 					else
 					{
-						$return['advice']['PHP'][ $extension ] = Member::loggedIn()->language()->addToStack( 'requirements_extension_advice', FALSE, array( 'sprintf' => array( Member::loggedIn()->language()->addToStack( "requirements_extension_{$extension}" ) ) ) );
+						$return['advice']['PHP'][ $extension ] = \IPS\Member::loggedIn()->language()->addToStack( 'requirements_extension_advice', FALSE, array( 'sprintf' => array( \IPS\Member::loggedIn()->language()->addToStack( "requirements_extension_{$extension}" ) ) ) );
 					}
 				}
 			}
@@ -213,41 +188,41 @@ class Install
 			preg_match( "#^(\d+)(\w+)$#", mb_strtolower($memoryLimit), $match );
 			if( $match[2] == 'g' )
 			{
-				$memoryLimit = intval( $memoryLimit ) * 1024 * 1024 * 1024;
+				$memoryLimit = \intval( $memoryLimit ) * 1024 * 1024 * 1024;
 			}
 			else if ( $match[2] == 'm' )
 			{
-				$memoryLimit = intval( $memoryLimit ) * 1024 * 1024;
+				$memoryLimit = \intval( $memoryLimit ) * 1024 * 1024;
 			}
 			else if ( $match[2] == 'k' )
 			{
-				$memoryLimit = intval( $memoryLimit ) * 1024;
+				$memoryLimit = \intval( $memoryLimit ) * 1024;
 			}
 			else
 			{
-				$memoryLimit = intval( $memoryLimit );
+				$memoryLimit = \intval( $memoryLimit );
 			}
 		}
 		if ( $memoryLimit >= ( 128 * 1024 * 1024 ) OR $memoryLimit == -1 )
 		{
 			$return['requirements']['PHP'][] = array(
 				'success'	=> TRUE,
-				'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_memory_limit_success', FALSE, array( 'sprintf' => array( ( $memoryLimit != -1 ) ? Filesize::humanReadableFilesize( $memoryLimit ) : Member::loggedIn()->language()->get( 'unlimited' ) ) ) )
+				'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_memory_limit_success', FALSE, array( 'sprintf' => array( ( $memoryLimit != -1 ) ? \IPS\Output\Plugin\Filesize::humanReadableFilesize( $memoryLimit ) : \IPS\Member::loggedIn()->language()->get( 'unlimited' ) ) ) )
 			);
 		}
 		else
 		{
 			$return['requirements']['PHP'][] = array(
 				'success'	=> FALSE,
-				'message'	=> Member::loggedIn()->language()->addToStack( 'requirements_memory_limit_fail', FALSE, array( 'sprintf' => array( Filesize::humanReadableFilesize( $memoryLimit ) ) ) ),
-				'short'		=> Member::loggedIn()->language()->addToStack( 'health__php_memory' ),
+				'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'requirements_memory_limit_fail', FALSE, array( 'sprintf' => array( \IPS\Output\Plugin\Filesize::humanReadableFilesize( $memoryLimit ) ) ) ),
+				'short'		=> \IPS\Member::loggedIn()->language()->addToStack( 'health__php_memory' ),
 			);
 		}
 		
-		$writeablesKey = Member::loggedIn()->language()->addToStack('requirements_file_system');
+		$writeablesKey = \IPS\Member::loggedIn()->language()->addToStack('requirements_file_system');
 
 		/* Suhosin */
-		if ( extension_loaded( 'suhosin' ) )
+		if ( \extension_loaded( 'suhosin' ) )
 		{
 			foreach ( array(
 				'suhosin.post.max_vars'					=> 4096,
@@ -261,67 +236,67 @@ class Install
 				$value = ini_get( $setting );
 				if ( $value and $value < $minimum )
 				{
-					$return['advice'][ $writeablesKey ]['suhosin'] = Member::loggedIn()->language()->addToStack( 'requirements_suhosin_limit', FALSE, array( 'sprintf' => array( $setting, $value, $minimum ) ) );
+					$return['advice'][ $writeablesKey ]['suhosin'] = \IPS\Member::loggedIn()->language()->addToStack( 'requirements_suhosin_limit', FALSE, array( 'sprintf' => array( $setting, $value, $minimum ) ) );
 				}
 			}
 			
 			$value = ini_get('suhosin.cookie.encrypt');
 			if ( $value and $value == 1 )
 			{
-				$return['advice'][ $writeablesKey ]['suhosin'] = Member::loggedIn()->language()->addToStack( 'requirements_suhosin_cookie_encrypt' );
+				$return['advice'][ $writeablesKey ]['suhosin'] = \IPS\Member::loggedIn()->language()->addToStack( 'requirements_suhosin_cookie_encrypt' );
 			}
 		}
 		
 		/* Writeables */
-		foreach ( array( 'applications', 'datastore', 'uploads' ) as $dir )
+		foreach ( array( 'applications', 'datastore', 'plugins', 'uploads' ) as $dir )
 		{
-			$success = is_writable( ROOT_PATH . '/' . $dir );
+			$success = is_writable( \IPS\ROOT_PATH . '/' . $dir );
 			
 			$return['requirements'][ $writeablesKey ][ $dir ] = array(
 				'success'	=> $success,
-				'message'	=> $success ?  Member::loggedIn()->language()->addToStack( 'requirements_file_writable', FALSE, array( 'sprintf' => array( ROOT_PATH . '/' . $dir ) ) ) : Member::loggedIn()->language()->addToStack( 'err_not_writable', FALSE, array( 'sprintf' => array( ROOT_PATH . '/' . $dir ) ) )
+				'message'	=> $success ?  \IPS\Member::loggedIn()->language()->addToStack( 'requirements_file_writable', FALSE, array( 'sprintf' => array( \IPS\ROOT_PATH . '/' . $dir ) ) ) : \IPS\Member::loggedIn()->language()->addToStack( 'err_not_writable', FALSE, array( 'sprintf' => array( \IPS\ROOT_PATH . '/' . $dir ) ) )
 			);
 		}
-		if( !NO_WRITES )
+		if( !\IPS\NO_WRITES )
 		{
-			$dir = Log::fallbackDir();
+			$dir = \IPS\Log::fallbackDir();
 			if ( $dir !== NULL )
 			{
 				$success = is_writable( $dir );
 				$return['requirements'][ $writeablesKey ][ $dir ] = array(
 					'success'	=> $success,
-					'message'	=> $success ? Member::loggedIn()->language()->addToStack( 'requirements_file_writable', FALSE, array( 'sprintf' => array( $dir ) ) ) : Member::loggedIn()->language()->addToStack( 'err_not_writable', FALSE, array( 'sprintf' => array( $dir ) ) )
+					'message'	=> $success ? \IPS\Member::loggedIn()->language()->addToStack( 'requirements_file_writable', FALSE, array( 'sprintf' => array( $dir ) ) ) : \IPS\Member::loggedIn()->language()->addToStack( 'err_not_writable', FALSE, array( 'sprintf' => array( $dir ) ) )
 				);
 			}
 		}
 		try
 		{
-			if ( !is_writable( TEMP_DIRECTORY ) )
+			if ( !is_writable( \IPS\TEMP_DIRECTORY ) )
 			{
-				throw new Exception;
+				throw new \Exception;
 			}
-			$tempFile = tempnam( TEMP_DIRECTORY, 'IPS' );
+			$tempFile = tempnam( \IPS\TEMP_DIRECTORY, 'IPS' );
 			if ( $tempFile === FALSE or !file_exists( $tempFile ) )
 			{
-				throw new Exception;
+				throw new \Exception;
 			}
 
 			@unlink( $tempFile );
 		}
-		catch( Exception $e )
+		catch( \Exception $e )
 		{
-			if( file_exists( ROOT_PATH . '/constants.php' ) )
+			if( file_exists( \IPS\ROOT_PATH . '/constants.php' ) )
 			{
 				$return['requirements'][ $writeablesKey ]['tmp'] = array(
 					'success'	=> FALSE,
-					'message'	=> Member::loggedIn()->language()->addToStack( 'err_tmp_dir_adjust', FALSE, array( 'sprintf' => array( ROOT_PATH ) ) )
+					'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'err_tmp_dir_adjust', FALSE, array( 'sprintf' => array( \IPS\ROOT_PATH ) ) )
 				);
 			}
 			else
 			{
 				$return['requirements'][ $writeablesKey ]['tmp'] = array(
 					'success'	=> FALSE,
-					'message'	=> Member::loggedIn()->language()->addToStack( 'err_tmp_dir_create', FALSE, array( 'sprintf' => array( ROOT_PATH ) ) )
+					'message'	=> \IPS\Member::loggedIn()->language()->addToStack( 'err_tmp_dir_create', FALSE, array( 'sprintf' => array( \IPS\ROOT_PATH ) ) )
 				);
 			}
 		}
@@ -332,28 +307,7 @@ class Install
 	/**
 	 * @brief	Percentage of *this step* completed (used for the progress bar)
 	 */
-	protected int $stepProgress = 0;
-
-	/**
-	 * @var array
-	 */
-	protected array $apps = [];
-
-	/**
-	 * @var string
-	 */
-	protected string $defaultApp = '';
-
-	/**
-	 * @var string
-	 */
-	protected string $baseUrl = '';
-
-	protected string $path = '';
-	protected string $adminName = '';
-	protected string $adminPass = '';
-	protected string $adminEmail = '';
-	protected bool $diagnostics = false;
+	protected $stepProgress = 0;
 
 	/**
 	 * Constructor
@@ -361,22 +315,22 @@ class Install
 	 * @param	array	$apps			Application keys of apps to install
 	 * @param	string	$defaultApp		The default applicaion
 	 * @param	string	$baseUrl		Base URL
-	 * @param	string	$path			Base Path
+	 * @param	array	$path			Base Path
 	 * @param	array	$db				Database connection detials [see \IPS\Db::i()]
 	 * @param	string	$adminName		Admin Username
 	 * @param	string	$adminPass		Admin Password
 	 * @param	string	$adminEmail		Admin Email
 	 * @param	bool	$diagnostics	Enable diagnostics reporting?
 	 * @return	void
-	 * @throws	InvalidArgumentException
-	 * @see        Db::i
+	 * @throws	\InvalidArgumentException
+	 * @see		\IPS\Db::i()
 	 */
-	public function __construct( array $apps, string $defaultApp, string $baseUrl, string $path, array $db, string $adminName, string $adminPass, string $adminEmail, bool $diagnostics=TRUE )
+	public function __construct( $apps, $defaultApp, $baseUrl, $path, $db, $adminName, $adminPass, $adminEmail, $diagnostics=TRUE )
 	{
 		/* Have core app? */
-		if ( !in_array( 'core', $apps ) )
+		if ( !\in_array( 'core', $apps ) )
 		{
-			throw new InvalidArgumentException( 'NO_CORE_APP' );
+			throw new \InvalidArgumentException( 'NO_CORE_APP' );
 		}
 		
 		/* Put the default app first */
@@ -385,7 +339,7 @@ class Install
 			{
 				return -1;
 			}
-			if ( $b == 'core' or ( $b == $defaultApp ) )
+			if ( $b == 'core' or ( $b == $defaultApp and $a != 'core' ) )
 			{
 				return 1;
 			}
@@ -393,12 +347,12 @@ class Install
 		} );
 		
 		/* Connect to DB */
-		$db = Db::i( NULL, $db );
+		$db = \IPS\Db::i( NULL, $db );
 		
 		/* Check we have everything else */
 		if ( !$baseUrl or !$path or !$adminName or !$adminEmail or !$adminPass )
 		{
-			throw new InvalidArgumentException( 'INSUFFICIENT_DATA' );
+			throw new \InvalidArgumentException( 'INSUFFICIENT_DATA' );
 		}
 		
 		/* Store data */
@@ -415,24 +369,24 @@ class Install
 	/**
 	 * @brief	Custom Title
 	 */
-	protected ?string $customTitle = NULL;
+	protected $customTitle = NULL;
 	
 	/**
 	 * Process
 	 *
-	 * @param	array|null	$data	Multi-redirector data
+	 * @param	array	$data	Multi-redirector data
 	 * @return	array|null	Multiple-Redirector Data or NULL indicates done
 	 */
-	public function process( ?array $data ) : ?array
+	public function process( $data )
 	{
 		/* Start */
 		if ( ! $data )
 		{
-			return array( array( 1 ), Member::loggedIn()->language()->addToStack('installing') );
+			return array( array( 1 ), \IPS\Member::loggedIn()->language()->addToStack('installing') );
 		}
 		
 		/* Run the step */
-		$step = intval( $data[0] );
+		$step = \intval( $data[0] );
 		
 		if ( $step == 13 )
 		{
@@ -440,29 +394,29 @@ class Install
 		}
 		elseif ( !method_exists( $this, "step{$step}" ) )
 		{
-			throw new BadMethodCallException( 'NO_STEP' );
+			throw new \BadMethodCallException( 'NO_STEP' );
 		}
 		$stepFunction = "step{$step}";
 		$response = $this->$stepFunction( $data );
 		
-		return array( $response, ( $this->customTitle ) ?: Member::loggedIn()->language()->addToStack( 'install_step_' . $step ), ( ( ( 100/12 ) * $data[0] + ( ( 100/12 ) / 100 * $this->stepProgress ) ) ) ?: 1 );
+		return array( $response, ( $this->customTitle ) ? $this->customTitle : \IPS\Member::loggedIn()->language()->addToStack( 'install_step_' . $step ), ( ( ( 100/12 ) * $data[0] + ( ( 100/12 ) / 100 * $this->stepProgress ) ) ) ?: 1 );
 	}
 	
 	/**
 	 * App Looper
 	 *
 	 * @param	array		$data	Multiple-Redirector Data
-	 * @param	callable	$code	Code to execute for each app
+	 * @param	callback	$code	Code to execute for each app
 	 * @return	array		Data to Multiple-Redirector Data
 	 */
-	protected function appLoop( array $data, callable $code ) : array
+	protected function appLoop( $data, $code )
 	{
 		$this->stepProgress = 0;
 		
 		$returnNext = FALSE;
 		foreach ( $this->apps as $app )
 		{
-			$this->stepProgress += ( 100 / count( $this->apps ) );
+			$this->stepProgress += ( 100 / \count( $this->apps ) );
 						
 			if ( !isset( $data[1] ) )
 			{
@@ -472,7 +426,7 @@ class Install
 			{
 				$val = $code( $app );
 				
-				if ( is_array( $val ) )
+				if ( \is_array( $val ) )
 				{
 					return $val;
 				}
@@ -497,10 +451,10 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step1( array $data ) : array
+	protected function step1( $data )
 	{
 		$this->stepProgress = 0;
-		$perAppProgress = floor( 100 / count( $this->apps ) );
+		$perAppProgress = floor( 100 / \count( $this->apps ) );
 				
 		$returnNext = FALSE;
 		foreach ( $this->apps as $app )
@@ -518,14 +472,14 @@ class Install
 					$data[2] = 0;
 				}
 				
-				$this->customTitle = sprintf( Member::loggedIn()->language()->get('install_step_1_app'), $app, $data[2] );
+				$this->customTitle = sprintf( \IPS\Member::loggedIn()->language()->get('install_step_1_app'), $app, $data[2] );
 				
-				if ( file_exists( ROOT_PATH . "/applications/{$app}/data/schema.json" ) )
+				if ( file_exists( \IPS\ROOT_PATH . "/applications/{$app}/data/schema.json" ) )
 				{
-					$schema = json_decode( file_get_contents( ROOT_PATH . "/applications/{$app}/data/schema.json" ), TRUE );
-					if ( count( $schema ) )
+					$schema = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$app}/data/schema.json" ), TRUE );
+					if ( \count( $schema ) )
 					{
-						$perTableProgress = (int) ( $perAppProgress / count( $schema ) );
+						$perTableProgress = ( $perAppProgress / \count( $schema ) );
 						$i = 0;
 						foreach( $schema as $dbTable )
 						{
@@ -536,16 +490,16 @@ class Install
 								continue 2;
 							}
 														
-							Db::i()->dropTable( $dbTable['name'], TRUE );
-							Db::i()->createTable( $dbTable );
+							\IPS\Db::i()->dropTable( $dbTable['name'], TRUE );
+							\IPS\Db::i()->createTable( $dbTable );
 													
 							if ( isset( $dbTable['inserts'] ) )
 							{
 								foreach ( $dbTable['inserts'] as $insertData )
 								{
 									$adminName = $this->adminName;
-									Db::i()->insert( $dbTable['name'], array_map( function( $column ) use( $adminName ) {
-										if( !is_string( $column ) )
+									\IPS\Db::i()->insert( $dbTable['name'], array_map( function( $column ) use( $adminName ) {
+										if( !\is_string( $column ) )
 										{
 											return $column;
 										}
@@ -558,7 +512,7 @@ class Install
 								}
 							}
 							
-							if ( !file_exists( ROOT_PATH . "/applications/{$app}/setup/install/queries.json" ) )
+							if ( !file_exists( \IPS\ROOT_PATH . "/applications/{$app}/setup/install/queries.json" ) )
 							{
 								$data[2]++;
 								return $data;
@@ -567,9 +521,9 @@ class Install
 					}
 				}
 				
-				if ( file_exists( ROOT_PATH . "/applications/{$app}/setup/install/queries.json" ) )
+				if ( file_exists( \IPS\ROOT_PATH . "/applications/{$app}/setup/install/queries.json" ) )
 				{
-					$schema	= json_decode( file_get_contents( ROOT_PATH . "/applications/{$app}/setup/install/queries.json" ), TRUE );
+					$schema	= json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$app}/setup/install/queries.json" ), TRUE );
 		
 					ksort($schema);
 		
@@ -578,19 +532,19 @@ class Install
 						if ( $instruction['method'] === 'addColumn' )
 						{
 							/* Check to see if it exists first */
-							$tableDefinition = Db::i()->getTableDefinition( $instruction['params'][0] );
+							$tableDefinition = \IPS\Db::i()->getTableDefinition( $instruction['params'][0] );
 							
 							if ( ! empty( $tableDefinition['columns'][ $instruction['params'][1]['name'] ] ) )
 							{
 								/* Run an alter instead */
-								Db::i()->changeColumn( $instruction['params'][0], $instruction['params'][1]['name'], $instruction['params'][1] );
+								\IPS\Db::i()->changeColumn( $instruction['params'][0], $instruction['params'][1]['name'], $instruction['params'][1] );
 								continue;
 							}
 						}
 
-						if( isset( $instruction['params'][1] ) and is_array( $instruction['params'][1] ) )
+						if( isset( $instruction['params'][1] ) and \is_array( $instruction['params'][1] ) )
 						{
-							$groups	= array_filter( iterator_to_array( Db::i()->select( 'g_id', 'core_groups' ) ), function( $groupId ) {
+							$groups	= array_filter( iterator_to_array( \IPS\Db::i()->select( 'g_id', 'core_groups' ) ), function( $groupId ) {
 								if( $groupId == 2 )
 								{
 									return FALSE;
@@ -610,7 +564,7 @@ class Install
 
 						$method = $instruction['method'];
 						$params = $instruction['params'];
-						Db::i()->$method( ...$params );
+						\IPS\Db::i()->$method( ...$params );
 					}
 				}
 							
@@ -632,23 +586,23 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step2( array $data ) : array
+	protected function step2( $data )
 	{
 		$pos = 0;
 		$defaultApp = $this->defaultApp;
 		return $this->appLoop( $data, function( $app ) use ( &$pos, $defaultApp )
 		{
 			/* Get version data */
-			if ( file_exists( ROOT_PATH . "/applications/{$app}/data/versions.json" ) )
+			if ( file_exists( \IPS\ROOT_PATH . "/applications/{$app}/data/versions.json" ) )
 			{
-				$this->customTitle = sprintf( Member::loggedIn()->language()->get('install_step_2_app'), $app );
-				$versions = json_decode( file_get_contents( ROOT_PATH . "/applications/{$app}/data/versions.json" ), TRUE );
+				$this->customTitle = sprintf( \IPS\Member::loggedIn()->language()->get('install_step_2_app'), $app );
+				$versions = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$app}/data/versions.json" ), TRUE );
 				$keys = array_keys( $versions );
 
-				$info = json_decode( file_get_contents( ROOT_PATH . "/applications/{$app}/data/application.json" ), TRUE );
+				$info = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$app}/data/application.json" ), TRUE );
 						
 				/* App Data */
-				Db::i()->insert( 'core_applications', array(
+				\IPS\Db::i()->insert( 'core_applications', array(
 					'app_author'		=> $info['app_author'],
 					'app_version'		=> array_pop( $versions ),
 					'app_long_version'	=> array_pop( $keys ),
@@ -661,13 +615,13 @@ class Install
 				) );
 				
 				/* Modules */
-				$modules = json_decode( file_get_contents( ROOT_PATH . "/applications/{$app}/data/modules.json" ), TRUE );
+				$modules = json_decode( file_get_contents( \IPS\ROOT_PATH . "/applications/{$app}/data/modules.json" ), TRUE );
 				$modulePos = 0;
 				foreach ( $modules as $area => $areaModules )
 				{
 					foreach ( $areaModules as $key => $data )
 					{
-						$insertId = Db::i()->insert( 'core_modules', array(
+						$insertId = \IPS\Db::i()->insert( 'core_modules', array(
 							'sys_module_application'		=> $app,
 							'sys_module_key'				=> $key,
 							'sys_module_protected'			=> $data['protected'],
@@ -678,7 +632,7 @@ class Install
 							'sys_module_default'			=> (int) ( isset( $data['default'] ) and $data['default'] )
 						) );
 						
-						Db::i()->insert( 'core_permission_index', array(
+						\IPS\Db::i()->insert( 'core_permission_index', array(
 							'app'			=> 'core',
 							'perm_type'		=> 'module',
 							'perm_type_id'	=> $insertId,
@@ -697,18 +651,18 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step3( array $data ) : array
+	protected function step3( $data )
 	{
 		return $this->appLoop( $data, function( $app )
 		{
-			$this->customTitle = sprintf( Member::loggedIn()->language()->get('install_step_3_app'), $app );
-			Application::load( $app )->installSettings();
+			$this->customTitle = sprintf( \IPS\Member::loggedIn()->language()->get('install_step_3_app'), $app );
+			\IPS\Application::load( $app )->installSettings();
 			
 			if ( $app === 'core' )
 			{
-				require ROOT_PATH . '/conf_global.php';
+				require \IPS\ROOT_PATH . '/conf_global.php';
 
-				Db::i()->insert( 'core_file_storage', array(
+				\IPS\Db::i()->insert( 'core_file_storage', array(
 					'method' => 'FileSystem',
 					'configuration' => json_encode( array(
 						'dir' => '{root}/uploads',
@@ -718,7 +672,7 @@ class Install
 			}
 			
 			/* Set up File Storage methods */
-			Application::load( $app )->installExtensions( TRUE );
+			\IPS\Application::load( $app )->installExtensions( TRUE );
 		} );
 	}
 	
@@ -729,14 +683,14 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step4( array $data ) : array
+	protected function step4( $data )
 	{
-		Settings::i()->member_group = 4;
-		$member = new Member;
+		\IPS\Settings::i()->member_group = 4;
+		$member = new \IPS\Member;
 		$member->pp_photo_type        = '';
 		$member->name = $this->adminName;
 		$member->email = $this->adminEmail;
-		$member->ip_address	= Request::i()->ipAddress();
+		$member->ip_address	= \IPS\Request::i()->ipAddress();
 		$member->timezone = 'UTC';
 		$member->member_group_id = 4;
 		$member->allow_admin_mails = 0;
@@ -745,12 +699,12 @@ class Install
 		$member->members_bitoptions['view_sigs'] = TRUE;
 		$member->save();
 	
-		Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $this->adminEmail ), "conf_key = 'email_out'" );
-		Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $this->adminEmail ), "conf_key = 'email_in'" );
-		Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $this->adminEmail ), "conf_key = 'upgrade_email'" );
-		Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $this->diagnostics ), "conf_key = 'diagnostics_reporting' OR conf_key = 'usage_reporting'" );
+		\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $this->adminEmail ), "conf_key = 'email_out'" );
+		\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $this->adminEmail ), "conf_key = 'email_in'" );
+		\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $this->adminEmail ), "conf_key = 'upgrade_email'" );
+		\IPS\Db::i()->update( 'core_sys_conf_settings', array( 'conf_value' => $this->diagnostics ), "conf_key = 'diagnostics_reporting' OR conf_key = 'usage_reporting'" );
 
-		Settings::i()->clearCache();
+		\IPS\Settings::i()->clearCache();
 		
 		return array( 5 );
 	}
@@ -762,12 +716,12 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step5( array $data ) : array
+	protected function step5( $data )
 	{
 		return $this->appLoop( $data, function( $app )
 		{
-			$this->customTitle = sprintf( Member::loggedIn()->language()->get('install_step_5_app'), $app );
-			Application::load( $app )->installTasks();
+			$this->customTitle = sprintf( \IPS\Member::loggedIn()->language()->get('install_step_5_app'), $app );
+			\IPS\Application::load( $app )->installTasks();
 
 		} );
 	}
@@ -779,7 +733,7 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step6( array $data ) : array
+	protected function step6( $data )
 	{
 		/* Install the default language */
 		$locales = array( 'en_US', 'en_US.UTF-8', 'en_US.UTF8', 'en_US.utf8', 'english' );
@@ -787,9 +741,9 @@ class Install
 		{
 			try
 			{
-				Lang::validateLocale( $localeCode );
+				\IPS\Lang::validateLocale( $localeCode );
 			}
-			catch ( InvalidArgumentException $e )
+			catch ( \InvalidArgumentException $e )
 			{
 				unset( $locales[ $k ] );
 			}
@@ -797,21 +751,20 @@ class Install
 
 		$locale = ( !empty( $locales ) ) ? array_shift( $locales ) : 'en_US';
 
-		Db::i()->insert( 'core_sys_lang', array(
+		\IPS\Db::i()->insert( 'core_sys_lang', array(
 				'lang_id' => 1,
 				'lang_short' => $locale,
 				'lang_title' => "English (USA)",
 				'lang_default' => 1,
 				'lang_isrtl' => 0,
 				'lang_protected' => 1,
-				'lang_order' => 1,
-				'lang_author_name' => 'Invision Power Services, Inc.'
+				'lang_order' => 1
 			)
 		);
 
-		if ( isset( Store::i()->languages ) )
+		if ( isset( \IPS\Data\Store::i()->languages ) )
 		{
-			unset( Store::i()->languages );
+			unset( \IPS\Data\Store::i()->languages );
 		}
 
 		return array( 7 );
@@ -824,7 +777,7 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step7( array $data ) : array
+	protected function step7( $data )
 	{
 		return $this->appLoop( $data, function( $app ) use ($data)
 		{
@@ -832,8 +785,8 @@ class Install
 			{
 				$data[2] = 0;
 			}
-			$this->customTitle = sprintf( Member::loggedIn()->language()->get('install_step_7_app'), $app, $data[2] );
-			$inserted = Application::load( $app )->installLanguages( $data[2], 250 );
+			$this->customTitle = sprintf( \IPS\Member::loggedIn()->language()->get('install_step_7_app'), $app, $data[2] );
+			$inserted = \IPS\Application::load( $app )->installLanguages( $data[2], 250 );
 			
 			if ( $inserted )
 			{
@@ -854,12 +807,12 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step8( array $data ) : array
+	protected function step8( $data )
 	{
 		return $this->appLoop( $data, function( $app )
 		{
-			$this->customTitle = sprintf( Member::loggedIn()->language()->get('install_step_8_app'), $app );
-			Application::load( $app )->installEmailTemplates();
+			$this->customTitle = sprintf( \IPS\Member::loggedIn()->language()->get('install_step_8_app'), $app );
+			\IPS\Application::load( $app )->installEmailTemplates();
 		} );
 	}
 	
@@ -870,7 +823,7 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step9( array $data ) : array
+	protected function step9( $data )
 	{
 		return $this->appLoop( $data, function( $app ) use ($data)
 		{
@@ -879,14 +832,13 @@ class Install
 				$data[2] = 0;
 			}
 			
-			$this->customTitle = sprintf( Member::loggedIn()->language()->get('install_step_9_app'), $app, $data[2] );
+			$this->customTitle = sprintf( \IPS\Member::loggedIn()->language()->get('install_step_9_app'), $app, $data[2] );
 			if( $data[2] == 0 )
 			{
-				Application::load( $app )->installThemeEditorSettings();
-				Application::load( $app )->installCustomTemplates();
+				\IPS\Application::load( $app )->installThemeSettings();
 			}
 			
-			$inserted = Application::load( $app )->installTemplates( FALSE, $data[2], 75 );
+			$inserted = \IPS\Application::load( $app )->installTemplates( FALSE, $data[2], 150 );
 			
 			if ( $inserted )
 			{
@@ -895,7 +847,7 @@ class Install
 			}
 			else
 			{
-				Theme::load( Theme::defaultTheme() )->saveSet();
+				\IPS\Theme::load( \IPS\Theme::defaultTheme() )->saveSet();
 				return null;
 			}
 		} );
@@ -908,7 +860,7 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step10( array $data ) : array
+	protected function step10( $data )
 	{
 		return $this->appLoop( $data, function( $app ) use( $data )
 		{
@@ -917,8 +869,8 @@ class Install
 				$data[2] = 0;
 			}
 			
-			$this->customTitle = sprintf( Member::loggedIn()->language()->get('install_step_10_app'), $app, $data[2] );
-			$inserted = Application::load( $app )->installJavascript( $data[2], 250 );
+			$this->customTitle = sprintf( \IPS\Member::loggedIn()->language()->get('install_step_10_app'), $app, $data[2] );
+			$inserted = \IPS\Application::load( $app )->installJavascript( $data[2], 250 );
 			
 			if ( $inserted )
 			{
@@ -939,12 +891,12 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step11( array $data ) : array
+	protected function step11( $data )
 	{
 		return $this->appLoop( $data, function( $app )
 		{
-			$this->customTitle = sprintf( Member::loggedIn()->language()->get('install_step_11_app'), $app );
-			Application::load( $app )->installSearchKeywords();
+			$this->customTitle = sprintf( \IPS\Member::loggedIn()->language()->get('install_step_11_app'), $app );
+			\IPS\Application::load( $app )->installSearchKeywords();
 		} );
 	}
 	
@@ -955,19 +907,31 @@ class Install
 	 * @param	array	$data	Multi-redirector data
 	 * @return	array	Multiple-Redirector Data
 	 */
-	protected function step12( array $data ) : array
+	protected function step12( $data )
 	{
 		return $this->appLoop( $data, function( $app )
 		{
-			$this->customTitle = sprintf( Member::loggedIn()->language()->get('install_step_12_app'), $app );
+			if( !file_exists( \IPS\ROOT_PATH . '/plugins/hooks.php' ) )
+			{
+				@touch( \IPS\ROOT_PATH . '/plugins/hooks.php' );
+				@chmod( \IPS\ROOT_PATH . '/plugins/hooks.php', 0777 );
+			}
+
+			if( !is_writable( \IPS\ROOT_PATH . '/plugins/hooks.php' ) )
+			{
+				throw new \RuntimeException( sprintf( \IPS\Member::loggedIn()->language()->get("hook_file_not_writable"), \IPS\ROOT_PATH . '/plugins/hooks.php' ) );
+			}
+			
+			$this->customTitle = sprintf( \IPS\Member::loggedIn()->language()->get('install_step_12_app'), $app );
 			try
 			{
-				Application::load( $app )->installWidgets();
-				Application::load( $app )->installOther();
+				\IPS\Application::load( $app )->installHooks();
+				\IPS\Application::load( $app )->installWidgets();
+				\IPS\Application::load( $app )->installOther();
 			}
-			catch( Exception $e )
+			catch( \Exception $e )
 			{
-				Log::log( $e, 'install_error' );
+				\IPS\Log::log( $e, 'install_error' );
 			}
 			
 			/* Insert default emoticons and reaction */
@@ -975,15 +939,15 @@ class Install
 			{
 				$setId = mt_rand();
 				$position = 0;
-				Lang::saveCustom( 'core', "core_emoticon_group_{$setId}", "Classic" );
+				\IPS\Lang::saveCustom( 'core', "core_emoticon_group_{$setId}", "Classic" );
 
 				$inserts = array();
 
-				foreach( json_decode( file_get_contents( ROOT_PATH . "/admin/install/emoticons/data.json" ), TRUE ) as $type => $file )
+				foreach( json_decode( file_get_contents( \IPS\ROOT_PATH . '/' . \IPS\CP_DIRECTORY ."/install/emoticons/data.json" ), TRUE ) as $type => $file )
 				{
-					$fileObj = File::create( 'core_Emoticons', $file['image'], file_get_contents( ROOT_PATH . "/admin/install/emoticons/" . $file['image'] ), 'emoticons', FALSE, NULL, FALSE );
-					$fileObj2x = isset( $file['image_2x'] ) ? File::create( 'core_Emoticons', $file['image_2x'], file_get_contents( ROOT_PATH . "/admin/install/emoticons/" . $file['image_2x'] ), 'emoticons', FALSE, NULL, FALSE ) : NULL;
-					$imageProperties = @getimagesize( ROOT_PATH . "/admin/install/emoticons/" . $file['image'] );
+					$fileObj = \IPS\File::create( 'core_Emoticons', $file['image'], file_get_contents( \IPS\ROOT_PATH . '/' . \IPS\CP_DIRECTORY . "/install/emoticons/" . $file['image'] ), 'emoticons', FALSE, NULL, FALSE );
+					$fileObj2x = isset( $file['image_2x'] ) ? \IPS\File::create( 'core_Emoticons', $file['image_2x'], file_get_contents( \IPS\ROOT_PATH . '/' . \IPS\CP_DIRECTORY . "/install/emoticons/" . $file['image_2x'] ), 'emoticons', FALSE, NULL, FALSE ) : NULL;
+					$imageProperties = @getimagesize( \IPS\ROOT_PATH . '/' . \IPS\CP_DIRECTORY . "/install/emoticons/" . $file['image'] );
 
 					$inserts[] = array(
 						'typed'			=> $type,
@@ -992,27 +956,27 @@ class Install
 						'clickable'		=> TRUE,
 						'emo_set'		=> $setId,
 						'emo_position'	=> ++$position,
-						'width'			=> $imageProperties[0] ?? 0,
-						'height'		=> $imageProperties[1] ?? 0
+						'width'			=> isset( $imageProperties[0] ) ? $imageProperties[0] : 0,
+						'height'		=> isset( $imageProperties[1] ) ? $imageProperties[1] : 0
 					);
 				}
 
-				if( count( $inserts ) )
+				if( \count( $inserts ) )
 				{
-					Db::i()->insert( 'core_emoticons', $inserts );
+					\IPS\Db::i()->insert( 'core_emoticons', $inserts );
 				}
 				
 				$position = 0;
 				foreach( array( 'like', 'thanks', 'haha', 'confused', 'sad' ) AS $reaction )
 				{
-					$fileObj = File::create( 'core_Reaction', "react_{$reaction}.png", file_get_contents( ROOT_PATH . "/admin/install/reaction/react_{$reaction}.png" ), 'reactions', FALSE, NULL, FALSE );
-					$id = Db::i()->insert( 'core_reactions', array(
-						'reaction_value'	=> ( in_array( $reaction, array( 'confused', 'sad' ) ) ) ? 0 : 1,
+					$fileObj = \IPS\File::create( 'core_Reaction', "react_{$reaction}.png", file_get_contents( \IPS\ROOT_PATH . '/' . \IPS\CP_DIRECTORY . "/install/reaction/react_{$reaction}.png" ), 'reactions', FALSE, NULL, FALSE );
+					$id = \IPS\Db::i()->insert( 'core_reactions', array(
+						'reaction_value'	=> ( \in_array( $reaction, array( 'confused', 'sad' ) ) ) ? 0 : 1,
 						'reaction_icon'		=> (string) $fileObj,
 						'reaction_position'	=> ++$position,
 						'reaction_enabled'	=> 1,
 					) );
-					Lang::saveCustom( 'core', 'reaction_title_' . $id, ucwords( $reaction ) );
+					\IPS\Lang::saveCustom( 'core', 'reaction_title_' . $id, ucwords( $reaction ) );
 				}
 			}
 		} );

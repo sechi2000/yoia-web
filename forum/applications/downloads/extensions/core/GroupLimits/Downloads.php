@@ -12,13 +12,9 @@
 namespace IPS\downloads\extensions\core\GroupLimits;
 
 /* To prevent PHP errors (extending class does not exist) revealing path */
-
-use IPS\Extensions\GroupLimitsAbstract;
-use function defined;
-
-if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+if ( !\defined( '\IPS\SUITE_UNIQUE_KEY' ) )
 {
-	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	header( ( isset( $_SERVER['SERVER_PROTOCOL'] ) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0' ) . ' 403 Forbidden' );
 	exit;
 }
 
@@ -27,14 +23,14 @@ if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
  *
  * This extension is used to define which limit values "win" when a user has secondary groups defined
  */
-class Downloads extends GroupLimitsAbstract
+class _Downloads
 {
 	/**
 	 * Get group limits by priority
 	 *
 	 * @return	array
 	 */
-	public function getLimits(): array
+	public function getLimits()
 	{
 		return array (
 			'exclude' 		=> array(),
